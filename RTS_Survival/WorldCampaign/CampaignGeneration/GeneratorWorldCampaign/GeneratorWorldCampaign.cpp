@@ -17,6 +17,8 @@
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignPruningHelper.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldFortificationModificationsComponent.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthEstimationComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
@@ -25,8 +27,9 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Boundary/WorldSplineBoundary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Connection/Connection.h"
+#include "RTS_Survival/WorldCampaign/WorldCountryOccupation/WorldCountryOccupationRegulator.h"
 #include "RTS_Survival/WorldCampaign/WorldData/WorldDataComponent.h"
-#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldDifficultyInfluence.h"
+#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldStrategicSupportArea.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
 
 namespace
@@ -95,6 +98,7 @@ namespace
 
 	struct FWorldDifficultyMapObjects
 	{
+		TArray<AWorldMapObject*> WorldObjects;
 		TArray<AWorldEnemyObject*> EnemyObjects;
 		TArray<AWorldMissionObject*> MissionObjects;
 	};
@@ -103,6 +107,7 @@ namespace
 		const FWorldCampaignPlacementState& PlacementState)
 	{
 		FWorldDifficultyMapObjects MapObjects;
+		MapObjects.WorldObjects.Reserve(PlacementState.CachedAnchors.Num());
 		MapObjects.EnemyObjects.Reserve(PlacementState.EnemyItemsByAnchorKey.Num());
 		MapObjects.MissionObjects.Reserve(PlacementState.MissionsByAnchorKey.Num());
 
@@ -118,6 +123,8 @@ namespace
 			{
 				continue;
 			}
+
+			MapObjects.WorldObjects.Add(PromotedWorldObject);
 
 			if (AWorldEnemyObject* EnemyObject = Cast<AWorldEnemyObject>(PromotedWorldObject))
 			{
@@ -148,39 +155,63 @@ namespace
 		return FVector2D::DistSquared(SourceXY, TargetXY) <= FMath::Square(XYRadius);
 	}
 
-	void ResetAuxiliaryDifficultyInfluenceReasons(const FWorldDifficultyMapObjects& MapObjects)
+	UWorldStrengthEstimationComponent* GetStrengthEstimationComponent(AWorldMapObject* WorldMapObject)
+	{
+		if (not IsValid(WorldMapObject))
+		{
+			return nullptr;
+		}
+
+		return WorldMapObject->GetWorldStrengthEstimationComponent();
+	}
+
+	void ResetStrategicReport(const FWorldDifficultyMapObjects& MapObjects)
 	{
 		for (AWorldEnemyObject* EnemyObject : MapObjects.EnemyObjects)
 		{
-			if (not IsValid(EnemyObject))
+			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				GetStrengthEstimationComponent(EnemyObject))
 			{
-				continue;
+				StrengthEstimationComponent->ResetStrategicSupportReport();
 			}
-
-			EnemyObject->ResetAuxiliaryDifficultyInfluenceReasons();
 		}
 
 		for (AWorldMissionObject* MissionObject : MapObjects.MissionObjects)
 		{
-			if (not IsValid(MissionObject))
+			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				GetStrengthEstimationComponent(MissionObject))
 			{
-				continue;
+				StrengthEstimationComponent->ResetStrategicSupportReport();
 			}
-
-			MissionObject->ResetAuxiliaryDifficultyInfluenceReasons();
 		}
 	}
 
-	bool GetCanApplyDifficultyInfluenceToTarget(const AWorldMapObject* SourceObject,
-	                                            const AWorldMapObject* TargetObject,
-	                                            const float XYRadius)
+	void ResetFieldDivisionReport(const FWorldDifficultyMapObjects& MapObjects)
 	{
-		if (not IsValid(SourceObject) || not IsValid(TargetObject))
+		for (AWorldEnemyObject* EnemyObject : MapObjects.EnemyObjects)
 		{
-			return false;
+			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				GetStrengthEstimationComponent(EnemyObject))
+			{
+				StrengthEstimationComponent->ResetFieldDivisionReport();
+			}
 		}
 
-		if (SourceObject == TargetObject)
+		for (AWorldMissionObject* MissionObject : MapObjects.MissionObjects)
+		{
+			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				GetStrengthEstimationComponent(MissionObject))
+			{
+				StrengthEstimationComponent->ResetFieldDivisionReport();
+			}
+		}
+	}
+
+	bool GetCanApplyStrategicSupportToTarget(const AWorldMapObject* SourceObject,
+	                                         const AWorldMapObject* TargetObject,
+	                                         const float XYRadius)
+	{
+		if (not IsValid(SourceObject) || not IsValid(TargetObject))
 		{
 			return false;
 		}
@@ -188,91 +219,121 @@ namespace
 		return GetIsWithinXYRadius(SourceObject->GetActorLocation(), TargetObject->GetActorLocation(), XYRadius);
 	}
 
-	void ApplyDifficultyInfluenceToEnemyTargets(
+	void ApplyStrategicSupportToEnemyTargets(
 		const AWorldMapObject* SourceObject,
-		const FRTSStrengthEstimationInfluenceReason& InfluenceReason,
+		const FWorldStrengthReason& StrengthReason,
 		const float XYRadius,
 		const TArray<AWorldEnemyObject*>& EnemyObjects)
 	{
 		for (AWorldEnemyObject* EnemyObject : EnemyObjects)
 		{
-			if (not GetCanApplyDifficultyInfluenceToTarget(SourceObject, EnemyObject, XYRadius))
+			if (not GetCanApplyStrategicSupportToTarget(SourceObject, EnemyObject, XYRadius))
 			{
 				continue;
 			}
 
-			EnemyObject->AddAuxiliaryDifficultyInfluenceReason(InfluenceReason);
+			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				GetStrengthEstimationComponent(EnemyObject))
+			{
+				StrengthEstimationComponent->AddStrategicSupportReason(StrengthReason);
+			}
 		}
 	}
 
-	void ApplyDifficultyInfluenceToMissionTargets(
+	void ApplyStrategicSupportToMissionTargets(
 		const AWorldMapObject* SourceObject,
-		const FRTSStrengthEstimationInfluenceReason& InfluenceReason,
+		const FWorldStrengthReason& StrengthReason,
 		const float XYRadius,
 		const TArray<AWorldMissionObject*>& MissionObjects)
 	{
 		for (AWorldMissionObject* MissionObject : MissionObjects)
 		{
-			if (not GetCanApplyDifficultyInfluenceToTarget(SourceObject, MissionObject, XYRadius))
+			if (not GetCanApplyStrategicSupportToTarget(SourceObject, MissionObject, XYRadius))
 			{
 				continue;
 			}
 
-			MissionObject->AddAuxiliaryDifficultyInfluenceReason(InfluenceReason);
+			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				GetStrengthEstimationComponent(MissionObject))
+			{
+				StrengthEstimationComponent->AddStrategicSupportReason(StrengthReason);
+			}
 		}
 	}
 
-	void ApplyDifficultyInfluenceToTargets(const AWorldMapObject* SourceObject,
-	                                       const UWorldDifficultyInfluence& DifficultyInfluence,
-	                                       const FWorldDifficultyMapObjects& MapObjects,
-	                                       const ERTSGameDifficulty GameDifficulty)
+	void ApplyStrategicSupportToTargets(const AWorldMapObject* SourceObject,
+	                                    UWorldStrategicSupportArea& StrategicSupportArea,
+	                                    const FWorldDifficultyMapObjects& MapObjects,
+	                                    const UWorldDataComponent& WorldDataComponent,
+	                                    const ERTSGameDifficulty GameDifficulty)
 	{
-		const FRTSStrengthEstimationInfluenceReason InfluenceReason =
-			DifficultyInfluence.BuildInfluenceReason(GameDifficulty);
-		if (not InfluenceReason.GetHasInfluence())
+		/*
+		 * The support component stores only an enum and radius. The actual percentage and player-facing reason are
+		 * resolved through WorldData each turn so difficulty multipliers and data-asset edits stay centralized.
+		 */
+		FWorldStrengthReason StrengthReason;
+		if (not WorldDataComponent.TryBuildStrategicSupportReason(
+			StrategicSupportArea.GetStrategicSupport(),
+			GameDifficulty,
+			StrengthReason))
+		{
+			StrategicSupportArea.SetCachedStrategicSupportPercentage(0);
+			return;
+		}
+
+		StrategicSupportArea.SetCachedStrategicSupportPercentage(StrengthReason.StrengthPercent);
+		if (not StrengthReason.GetHasStrength())
 		{
 			return;
 		}
 
-		const float XYRadius = DifficultyInfluence.GetXYRadius();
-		ApplyDifficultyInfluenceToEnemyTargets(SourceObject, InfluenceReason, XYRadius, MapObjects.EnemyObjects);
-		ApplyDifficultyInfluenceToMissionTargets(SourceObject, InfluenceReason, XYRadius, MapObjects.MissionObjects);
+		const float XYRadius = StrategicSupportArea.GetXYRadius();
+		ApplyStrategicSupportToEnemyTargets(SourceObject, StrengthReason, XYRadius, MapObjects.EnemyObjects);
+		ApplyStrategicSupportToMissionTargets(SourceObject, StrengthReason, XYRadius, MapObjects.MissionObjects);
 	}
 
-	void ApplyDifficultyInfluencersFromSource(AWorldMapObject* SourceObject,
-	                                          const FWorldDifficultyMapObjects& MapObjects,
-	                                          const ERTSGameDifficulty GameDifficulty)
+	void ApplyStrategicSupportFromSource(AWorldMapObject* SourceObject,
+	                                     const FWorldDifficultyMapObjects& MapObjects,
+	                                     const UWorldDataComponent& WorldDataComponent,
+	                                     const ERTSGameDifficulty GameDifficulty)
 	{
 		if (not IsValid(SourceObject))
 		{
 			return;
 		}
 
-		TArray<UWorldDifficultyInfluence*> DifficultyInfluences;
-		SourceObject->GetComponents<UWorldDifficultyInfluence>(DifficultyInfluences);
-		for (const UWorldDifficultyInfluence* DifficultyInfluence : DifficultyInfluences)
+		TArray<UWorldStrategicSupportArea*> StrategicSupportAreas;
+		SourceObject->GetComponents<UWorldStrategicSupportArea>(StrategicSupportAreas);
+		for (UWorldStrategicSupportArea* StrategicSupportArea : StrategicSupportAreas)
 		{
-			if (not IsValid(DifficultyInfluence))
+			if (not IsValid(StrategicSupportArea))
 			{
 				continue;
 			}
 
-			ApplyDifficultyInfluenceToTargets(SourceObject, *DifficultyInfluence, MapObjects, GameDifficulty);
+			ApplyStrategicSupportToTargets(
+				SourceObject,
+				*StrategicSupportArea,
+				MapObjects,
+				WorldDataComponent,
+				GameDifficulty);
 		}
 	}
 
-	void ApplyDifficultyInfluencers(const FWorldDifficultyMapObjects& MapObjects,
-	                                const ERTSGameDifficulty GameDifficulty)
+	void ApplyStrategicSupport(const FWorldDifficultyMapObjects& MapObjects,
+	                           const UWorldDataComponent& WorldDataComponent,
+	                           const ERTSGameDifficulty GameDifficulty)
 	{
-		for (AWorldEnemyObject* EnemyObject : MapObjects.EnemyObjects)
+		for (AWorldMapObject* WorldObject : MapObjects.WorldObjects)
 		{
-			ApplyDifficultyInfluencersFromSource(EnemyObject, MapObjects, GameDifficulty);
+			ApplyStrategicSupportFromSource(WorldObject, MapObjects, WorldDataComponent, GameDifficulty);
 		}
+	}
 
-		for (AWorldMissionObject* MissionObject : MapObjects.MissionObjects)
-		{
-			ApplyDifficultyInfluencersFromSource(MissionObject, MapObjects, GameDifficulty);
-		}
+	void ApplyFieldDivisions(const FWorldDifficultyMapObjects& MapObjects,
+	                         const ERTSGameDifficulty GameDifficulty)
+	{
+		// Field division strength is intentionally stubbed until the field division system is implemented.
 	}
 
 	struct FAnchorCandidate
@@ -5036,6 +5097,7 @@ void AGeneratorWorldCampaign::PostInitializeComponents()
 	Super::PostInitializeComponents();
 
 	M_WorldDataComponent = FindComponentByClass<UWorldDataComponent>();
+	M_WorldCountryOccupationRegulator = FindComponentByClass<UWorldCountryOccupationRegulator>();
 	ApplyDebuggerSettingsToComponent();
 }
 
@@ -5055,6 +5117,16 @@ bool AGeneratorWorldCampaign::GetIsGenerationFinished() const
 	return M_GenerationStep == ECampaignGenerationStep::Finished;
 }
 
+void AGeneratorWorldCampaign::InitializeCountryOccupationRegulator()
+{
+	if (not GetIsValidWorldCountryOccupationRegulator())
+	{
+		return;
+	}
+
+	M_WorldCountryOccupationRegulator->InitializeCountryOccupation(this);
+}
+
 void AGeneratorWorldCampaign::LoadWorldDataIntoObjects()
 {
 	if (not GetIsValidWorldDataComponent())
@@ -5065,12 +5137,52 @@ void AGeneratorWorldCampaign::LoadWorldDataIntoObjects()
 	M_WorldDataComponent->LoadWorldDataIntoObjects(this);
 }
 
-void AGeneratorWorldCampaign::InitMapObjectsBaseDifficulty(const ERTSGameDifficulty GameDifficulty)
+void AGeneratorWorldCampaign::InitMapObjectsBaseFortificationStrength(const ERTSGameDifficulty GameDifficulty)
 {
 	if (not GetIsValidWorldDataComponent())
 	{
 		return;
 	}
+
+	/*
+	 * Base fortification strength is stored separately from modifier reasons. This helper refreshes only the modifier
+	 * portion so generation and restore can rebuild FortificationStrength without disturbing strategic support/field data.
+	 */
+	const auto ApplyFortificationModifierReasons =
+		[this, GameDifficulty](AWorldMapObject* WorldObject,
+		                        const UWorldFortificationModificationsComponent* FortificationModificationsComponent)
+		{
+			if (not IsValid(WorldObject))
+			{
+				return;
+			}
+
+			UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				WorldObject->GetWorldStrengthEstimationComponent();
+			if (not IsValid(StrengthEstimationComponent))
+			{
+				return;
+			}
+
+			StrengthEstimationComponent->ResetFortificationModifierReport();
+			if (not IsValid(FortificationModificationsComponent))
+			{
+				return;
+			}
+
+			for (const EWorldFortificationStrength FortificationStrength :
+			     FortificationModificationsComponent->GetFortificationStrengths())
+			{
+				FWorldStrengthReason FortificationReason;
+				if (M_WorldDataComponent->TryBuildFortificationStrengthReason(
+					FortificationStrength,
+					GameDifficulty,
+					FortificationReason))
+				{
+					StrengthEstimationComponent->AddFortificationModifierReason(FortificationReason);
+				}
+			}
+		};
 
 	const FWorldDifficultyMapObjects MapObjects = BuildWorldDifficultyMapObjects(M_PlacementState);
 	for (AWorldEnemyObject* EnemyObject : MapObjects.EnemyObjects)
@@ -5080,12 +5192,22 @@ void AGeneratorWorldCampaign::InitMapObjectsBaseDifficulty(const ERTSGameDifficu
 			continue;
 		}
 
-		FRTSStrengthEstimationInfluenceReason BaseDifficultyReason;
+		FWorldStrengthReason BaseFortificationStrengthReason;
 		M_WorldDataComponent->TryBuildEnemyBaseDifficultyReason(
 			EnemyObject->GetEnemyItemType(),
 			GameDifficulty,
-			BaseDifficultyReason);
-		EnemyObject->SetBaseDifficultyInfluenceReason(BaseDifficultyReason);
+			BaseFortificationStrengthReason);
+
+		/*
+		 * Write base strength directly to the shared component. Enemy/mission objects keep their identity data,
+		 * while UWorldStrengthEstimationComponent owns the strength report.
+		 */
+		if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+			EnemyObject->GetWorldStrengthEstimationComponent())
+		{
+			StrengthEstimationComponent->SetBaseFortificationStrengthReason(BaseFortificationStrengthReason);
+		}
+		ApplyFortificationModifierReasons(EnemyObject, EnemyObject->GetFortificationModificationsComponent());
 	}
 
 	for (AWorldMissionObject* MissionObject : MapObjects.MissionObjects)
@@ -5095,21 +5217,43 @@ void AGeneratorWorldCampaign::InitMapObjectsBaseDifficulty(const ERTSGameDifficu
 			continue;
 		}
 
-		FRTSStrengthEstimationInfluenceReason BaseDifficultyReason;
+		FWorldStrengthReason BaseFortificationStrengthReason;
 		M_WorldDataComponent->TryBuildMissionBaseDifficultyReason(
 			MissionObject->GetMissionType(),
 			GameDifficulty,
-			BaseDifficultyReason);
-		MissionObject->SetBaseDifficultyInfluenceReason(BaseDifficultyReason);
+			BaseFortificationStrengthReason);
+
+		/*
+		 * Missions use the same report component path as enemies; only the WorldData lookup key differs.
+		 */
+		if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+			MissionObject->GetWorldStrengthEstimationComponent())
+		{
+			StrengthEstimationComponent->SetBaseFortificationStrengthReason(BaseFortificationStrengthReason);
+		}
+		ApplyFortificationModifierReasons(MissionObject, MissionObject->GetFortificationModificationsComponent());
 	}
 }
 
-void AGeneratorWorldCampaign::AdjustDifficutlyPercentagesForInfluencers(
+void AGeneratorWorldCampaign::AdjustDifficultyPercentagesForStrategicSupport(
+	const ERTSGameDifficulty GameDifficulty)
+{
+	if (not GetIsValidWorldDataComponent())
+	{
+		return;
+	}
+
+	const FWorldDifficultyMapObjects MapObjects = BuildWorldDifficultyMapObjects(M_PlacementState);
+	ResetStrategicReport(MapObjects);
+	ApplyStrategicSupport(MapObjects, *M_WorldDataComponent, GameDifficulty);
+}
+
+void AGeneratorWorldCampaign::AdjustDifficultyPercentagesForFieldDivisions(
 	const ERTSGameDifficulty GameDifficulty)
 {
 	const FWorldDifficultyMapObjects MapObjects = BuildWorldDifficultyMapObjects(M_PlacementState);
-	ResetAuxiliaryDifficultyInfluenceReasons(MapObjects);
-	ApplyDifficultyInfluencers(MapObjects, GameDifficulty);
+	ResetFieldDivisionReport(MapObjects);
+	ApplyFieldDivisions(MapObjects, GameDifficulty);
 }
 
 void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* WorldPlayerController,
@@ -5286,13 +5430,37 @@ void AGeneratorWorldCampaign::AddSavedAnchorsAndMapItems(FWorldCampaignState& Wo
 		{
 			MapItemSaveData.MapItemType = EMapItemType::EnemyItem;
 			MapItemSaveData.EnemyItemType = EnemyObject->GetEnemyItemType();
-			MapItemSaveData.BaseDifficulty = EnemyObject->GetBaseDifficultyPercentage();
+			if (const UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				EnemyObject->GetWorldStrengthEstimationComponent())
+			{
+				MapItemSaveData.BaseFortificationStrength =
+					StrengthEstimationComponent->GetBaseFortificationStrengthPercentage();
+			}
+			if (const UWorldFortificationModificationsComponent* FortificationModificationsComponent =
+				EnemyObject->GetFortificationModificationsComponent())
+			{
+				MapItemSaveData.FortificationStrengthModifiers =
+					FortificationModificationsComponent->GetFortificationStrengths();
+				MapItemSaveData.bHasSavedFortificationStrengthModifiers = true;
+			}
 		}
 		else if (const AWorldMissionObject* MissionObject = Cast<AWorldMissionObject>(PromotedWorldObject))
 		{
 			MapItemSaveData.MapItemType = EMapItemType::Mission;
 			MapItemSaveData.MissionType = MissionObject->GetMissionType();
-			MapItemSaveData.BaseDifficulty = MissionObject->GetBaseDifficultyPercentage();
+			if (const UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				MissionObject->GetWorldStrengthEstimationComponent())
+			{
+				MapItemSaveData.BaseFortificationStrength =
+					StrengthEstimationComponent->GetBaseFortificationStrengthPercentage();
+			}
+			if (const UWorldFortificationModificationsComponent* FortificationModificationsComponent =
+				MissionObject->GetFortificationModificationsComponent())
+			{
+				MapItemSaveData.FortificationStrengthModifiers =
+					FortificationModificationsComponent->GetFortificationStrengths();
+				MapItemSaveData.bHasSavedFortificationStrengthModifiers = true;
+			}
 		}
 		else if (const AWorldNeutralObject* NeutralObject = Cast<AWorldNeutralObject>(PromotedWorldObject))
 		{
@@ -5440,6 +5608,69 @@ void AGeneratorWorldCampaign::RestoreSavedConnections(const FWorldCampaignState&
 void AGeneratorWorldCampaign::RestoreSavedMapItems(const FWorldCampaignState& WorldCampaignState,
                                                    const TMap<FGuid, TObjectPtr<AAnchorPoint>>& AnchorsByKey)
 {
+	const auto RestoreStrengthData =
+		[this](AWorldMapObject* WorldObject,
+		       UWorldFortificationModificationsComponent* FortificationModificationsComponent,
+		       const FWorldCampaignMapItemSaveData& MapItemSaveData)
+		{
+			if (not IsValid(WorldObject))
+			{
+				return;
+			}
+
+			UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+				WorldObject->GetWorldStrengthEstimationComponent();
+			if (IsValid(StrengthEstimationComponent))
+			{
+				StrengthEstimationComponent->SetBaseFortificationStrengthPercentage(
+					FMath::RoundToInt(MapItemSaveData.BaseFortificationStrength));
+				StrengthEstimationComponent->ResetFortificationModifierReport();
+			}
+
+			TArray<EWorldFortificationStrength> FortificationStrengthModifiersToApply;
+			const bool bShouldUseSavedFortificationStrengthModifiers =
+				MapItemSaveData.bHasSavedFortificationStrengthModifiers
+				|| MapItemSaveData.FortificationStrengthModifiers.Num() > 0;
+
+			/*
+			 * Old saves did not serialize the modifier array. If the flag is missing and the array is empty, keep the
+			 * component's current/default modifiers instead of interpreting that as "designer intentionally saved none."
+			 */
+			if (IsValid(FortificationModificationsComponent))
+			{
+				if (bShouldUseSavedFortificationStrengthModifiers)
+				{
+					FortificationModificationsComponent->SetFortificationStrengths(
+						MapItemSaveData.FortificationStrengthModifiers);
+				}
+
+				FortificationStrengthModifiersToApply =
+					FortificationModificationsComponent->GetFortificationStrengths();
+			}
+			else if (bShouldUseSavedFortificationStrengthModifiers)
+			{
+				FortificationStrengthModifiersToApply = MapItemSaveData.FortificationStrengthModifiers;
+			}
+
+			if (not IsValid(StrengthEstimationComponent) || not IsValid(M_WorldDataComponent))
+			{
+				return;
+			}
+
+			for (const EWorldFortificationStrength FortificationStrength :
+			     FortificationStrengthModifiersToApply)
+			{
+				FWorldStrengthReason FortificationReason;
+				if (M_WorldDataComponent->TryBuildFortificationStrengthReason(
+					FortificationStrength,
+					M_CountAndDifficultyTuning.DifficultyLevel,
+					FortificationReason))
+				{
+					StrengthEstimationComponent->AddFortificationModifierReason(FortificationReason);
+				}
+			}
+		};
+
 	for (const FWorldCampaignMapItemSaveData& MapItemSaveData : WorldCampaignState.MapItems)
 	{
 		TObjectPtr<AAnchorPoint> const* AnchorPoint = AnchorsByKey.Find(MapItemSaveData.AnchorKey);
@@ -5456,7 +5687,10 @@ void AGeneratorWorldCampaign::RestoreSavedMapItems(const FWorldCampaignState& Wo
 			if (AWorldEnemyObject* EnemyObject = Cast<AWorldEnemyObject>(
 				AnchorPoint->Get()->OnEnemyItemPromotion(MapItemSaveData.EnemyItemType, ECampaignGenerationStep::Finished)))
 			{
-				EnemyObject->SetBaseDifficultyPercentage(FMath::RoundToInt(MapItemSaveData.BaseDifficulty));
+				RestoreStrengthData(
+					EnemyObject,
+					EnemyObject->GetFortificationModificationsComponent(),
+					MapItemSaveData);
 			}
 			M_PlacementState.EnemyItemsByAnchorKey.Add(MapItemSaveData.AnchorKey, MapItemSaveData.EnemyItemType);
 			M_DerivedData.EnemyItemPlacedCounts.FindOrAdd(MapItemSaveData.EnemyItemType)++;
@@ -5465,7 +5699,10 @@ void AGeneratorWorldCampaign::RestoreSavedMapItems(const FWorldCampaignState& Wo
 			if (AWorldMissionObject* MissionObject = Cast<AWorldMissionObject>(
 				AnchorPoint->Get()->OnMissionPromotion(MapItemSaveData.MissionType, ECampaignGenerationStep::Finished)))
 			{
-				MissionObject->SetBaseDifficultyPercentage(FMath::RoundToInt(MapItemSaveData.BaseDifficulty));
+				RestoreStrengthData(
+					MissionObject,
+					MissionObject->GetFortificationModificationsComponent(),
+					MapItemSaveData);
 			}
 			M_PlacementState.MissionsByAnchorKey.Add(MapItemSaveData.AnchorKey, MapItemSaveData.MissionType);
 			break;
@@ -6123,6 +6360,21 @@ bool AGeneratorWorldCampaign::GetIsValidWorldDataComponent() const
 		TEXT("AGeneratorWorldCampaign::GetIsValidWorldDataComponent"),
 		this
 	);
+	return false;
+}
+
+bool AGeneratorWorldCampaign::GetIsValidWorldCountryOccupationRegulator() const
+{
+	if (IsValid(M_WorldCountryOccupationRegulator))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_WorldCountryOccupationRegulator"),
+		TEXT("AGeneratorWorldCampaign::GetIsValidWorldCountryOccupationRegulator"),
+		this);
 	return false;
 }
 

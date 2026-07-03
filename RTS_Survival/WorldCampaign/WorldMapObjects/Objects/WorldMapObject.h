@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthEstimationComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
 #include "WorldMapObject.generated.h"
 
@@ -27,9 +28,22 @@ public:
 
 	AAnchorPoint* GetOwningAnchor() const;
 	FGuid GetAnchorKey() const;
+
+	/**
+	 * @brief Gets the authoritative strength estimation cache shared by enemy and mission map objects.
+	 * @return Strength estimation component owned by this world map object.
+	 */
+	UWorldStrengthEstimationComponent* GetWorldStrengthEstimationComponent() const
+	{
+		return M_WorldStrengthEstimationComponent;
+	}
 	virtual UWorldMapFowComponent* GetFowComponent() const override { return M_WorldMapFowComponent.Get(); }
 
 private:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWorldStrengthEstimationComponent> M_WorldStrengthEstimationComponent;
+
 	UPROPERTY()
 	TWeakObjectPtr<UWorldMapFowComponent> M_WorldMapFowComponent;
 

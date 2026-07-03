@@ -139,7 +139,8 @@ private:
 	 */
 	void OnAllWorldObjectsAndTheirDataReady();
 
-	void BeginPlay_SpawnWorldFowManager();
+	void WorldGenerated_InitCountryOccupationRegulator();
+	void WorldGenerated_SpawnWorldFowManager();
 	bool GetCanPrimaryClickActor(AActor* ClickedActor) const;
 
 	void OnInitialWorldSetupComplete();

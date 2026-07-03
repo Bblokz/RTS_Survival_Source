@@ -28,6 +28,7 @@ class AConnection;
 class AWorldSplineBoundary;
 class UWorldCampaignDebugger;
 class UWorldDataComponent;
+class UWorldCountryOccupationRegulator;
 
 namespace WorldCampaignDebugDefaults
 {
@@ -500,8 +501,30 @@ public:
 	float GetDebugLineThickness() const { return WorldCampaignDebugDefaults::ConnectionLineThickness; }
 	const FWorldCampaignPlacementState& GetPlacementState() const { return M_PlacementState; }
 	void LoadWorldDataIntoObjects();
-	void InitMapObjectsBaseDifficulty(ERTSGameDifficulty GameDifficulty);
-	void AdjustDifficutlyPercentagesForInfluencers(ERTSGameDifficulty GameDifficulty);
+
+	/**
+	 * @brief Initializes base fortification strength and fortification modifier reasons on enemy and mission objects.
+	 * @param GameDifficulty Current campaign difficulty used to apply WorldData multipliers.
+	 * @note Called after world data/object promotion so the component report starts with stable fortification data.
+	 */
+	void InitMapObjectsBaseFortificationStrength(ERTSGameDifficulty GameDifficulty);
+
+	void InitializeCountryOccupationRegulator();
+
+	/**
+	 * @brief Recalculates strategic support strength on enemy and mission objects for the current turn.
+	 * @param GameDifficulty Current campaign difficulty used to resolve strategic support definitions.
+	 * @note This resets only the strategic support category before applying support areas.
+	 */
+	void AdjustDifficultyPercentagesForStrategicSupport(ERTSGameDifficulty GameDifficulty);
+
+	/**
+	 * @brief Recalculates field division strength on enemy and mission objects for the current turn.
+	 * @param GameDifficulty Current campaign difficulty reserved for future field division scaling.
+	 * @note This currently resets the field division category and calls an empty apply stub.
+	 */
+	void AdjustDifficultyPercentagesForFieldDivisions(ERTSGameDifficulty GameDifficulty);
+
 	FWorldCampaignState BuildWorldCampaignStateFromCurrentGeneration() const;
 	void RestoreWorldStateFromSave(const FWorldCampaignState& WorldCampaignState);
 
@@ -737,6 +760,7 @@ private:
 	bool GetIsValidPlayerHQAnchor() const;
 	bool GetIsValidEnemyHQAnchor() const;
 	bool GetIsValidWorldDataComponent() const;
+	bool GetIsValidWorldCountryOccupationRegulator() const;
 
 	/**
 	 * @brief Wraps step execution so undo data is recorded for backtracking.
@@ -1932,6 +1956,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UWorldDataComponent> M_WorldDataComponent = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWorldCountryOccupationRegulator> M_WorldCountryOccupationRegulator = nullptr;
 
 	// Tracks when undo operations are attributed to backtracking failures for reporting.
 	bool bM_Report_UndoContextActive = false;

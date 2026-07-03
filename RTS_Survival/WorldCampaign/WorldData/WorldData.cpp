@@ -49,3 +49,42 @@ bool UWorldData::TryGetEnemyBaseDifficultyPercentage(const EMapEnemyItem EnemyIt
 		GameDifficulty);
 	return true;
 }
+
+bool UWorldData::TryGetFortificationStrengthDefinition(
+	const EWorldFortificationStrength FortificationStrength,
+	const ERTSGameDifficulty GameDifficulty,
+	FWorldDataStrengthReasonDefinition& OutDefinition) const
+{
+	const FWorldDataStrengthReasonDefinition* Definition =
+		M_FortificationStrengthDefinitions.Find(FortificationStrength);
+	if (Definition == nullptr)
+	{
+		OutDefinition = FWorldDataStrengthReasonDefinition();
+		return false;
+	}
+
+	OutDefinition = *Definition;
+	OutDefinition.StrengthPercentage = M_FortificationStrengthMlt.ApplyToPercentage(
+		Definition->StrengthPercentage,
+		GameDifficulty);
+	return true;
+}
+
+bool UWorldData::TryGetStrategicSupportDefinition(
+	const EWorldStrategicSupport StrategicSupport,
+	const ERTSGameDifficulty GameDifficulty,
+	FWorldDataStrengthReasonDefinition& OutDefinition) const
+{
+	const FWorldDataStrengthReasonDefinition* Definition = M_StrategicSupportDefinitions.Find(StrategicSupport);
+	if (Definition == nullptr)
+	{
+		OutDefinition = FWorldDataStrengthReasonDefinition();
+		return false;
+	}
+
+	OutDefinition = *Definition;
+	OutDefinition.StrengthPercentage = M_StrategicSupportMlt.ApplyToPercentage(
+		Definition->StrengthPercentage,
+		GameDifficulty);
+	return true;
+}

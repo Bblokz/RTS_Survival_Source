@@ -1,18 +1,27 @@
-﻿I now want to implement the architecture for the difficulty percentage modifiers.
-we already have UI data setup like Strength percentage text on Map item UI data. and Influence reasons. The idea is that the designer will be able to define all percentages and radii (explained later) in our WorldData data asset.
+﻿we want to refactor the way strength estimation works and how certain data related to strength estimation is cached on objects. 
+First: we will divide strength percentage up into three categories now called EWorldStrengthTypes, see also WorldStrengthTypes.h, 
+-FortificationStrength, 
+-FieldDivisions, 
+-StrategicSupport 
 
-Important to define first is a GameDifficultyMultiplier which allows the designer to define float multipliers for each of 
-the possible game difficulties.
-this multiplier will appear in various sections so ensure it is well defined in its own file.
+Where fortification strength will be composed of two factors: the base strength as determined by the type of object; loaded from the world data asset and multiplied with its modifier for game difficulty (just like before)
+and from enums laoded from a new actor component that will be created in the ctor of map object: FortificationModifications which will hold an array of EWorldFortificationStrength.
 
-First the base difficulty percentages:
-make a section on WorldData  where the designer can set the base difficulty int percentage for each mission enum and 
-define one GameDifficultyMultiplier for just the missions base dificulty. The base difficulty calculated will then be
-the value for the enum multiplied by the multiplier for the game difficulty.
+make sure that on the world data asset there will be a category to get the int32 percentage per EWorldFortificationStrength and a multiplier per difficulty for that category.
 
-DifficultyModifierRadius will be an actor component of which the reference will be placed on the enemy world object and the component
-will be looked for at post init components.
-it will have its own settings struct with;
-int32 AddedDifficulty
-and float XYRange
- 
+I also want the base strength to be cached on that component so no longer directly on the AWorldEnemyObject or the AWorldMissionObject but on the component both of these classes now have due to their common base.
+
+How we will also refactor AuxiliaryDifficultyInfluenceReasons
+the UWorldDifficultyInfluence will now always be of the type StrategicSupport, make sure that in the component edit anywhere the designer 
+will set the type of EWorldStrategicSupport. the world difficulty influence was already renamed to UWorldStrategicSupportArea.
+I want AdjustDifficutlyPercentagesForInfluencers renamed to AdjustDifficultyPercentagesForStrategicSupport and in there ResetStrategicReport instead of ResetAuxiliaryDifficultyInfluenceReasons
+and ApplyStrategicSupport instead of ApplyDifficultyInfluencers.
+
+
+also add to the AGeneratorWorldCampaign AdjustDifficultyPercentagesForFieldDivisions and in there call a reset and apply for that type as well but leave those implementations empty; we will implement field divisions later.
+
+on the UW_StrengthEstimation when will make sure that then the strength percentages and their reasons are put in the correct rich text blocks:
+
+M_FortificationsRichText: the base difficulty and those from the fortification modifiers.
+M_FieldDivisionsRichText: for the field divisions nearby (empty for now; only setup empty function calls as we will implement it later)
+M_StrategicSupportRichText the

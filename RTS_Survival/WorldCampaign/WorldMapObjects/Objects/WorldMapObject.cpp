@@ -3,12 +3,15 @@
 #include "WorldMapObject.h"
 
 
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthEstimationComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldMapFowComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 
 AWorldMapObject::AWorldMapObject()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	M_WorldStrengthEstimationComponent = CreateDefaultSubobject<UWorldStrengthEstimationComponent>(
+		TEXT("WorldStrengthEstimation"));
 }
 
 void AWorldMapObject::PostInitializeComponents()

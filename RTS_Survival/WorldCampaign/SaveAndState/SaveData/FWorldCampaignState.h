@@ -11,6 +11,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/GenerationStep/Enum_CampaignGenerationStep.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
 #include "RTS_Survival/WorldCampaign/PlayerProfile/FPlayerProfileSaveData.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthTypes.h"
 #include "FWorldCampaignState.generated.h"
 
 /**
@@ -72,8 +73,23 @@ struct RTS_SURVIVAL_API FWorldCampaignMapItemSaveData
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	EMapPlayerItem PlayerItemType = EMapPlayerItem::None;
 
+	/**
+	 * @brief Cached base fortification strength percentage for enemy/mission map items.
+	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
-	float BaseDifficulty = 0.f;
+	float BaseFortificationStrength = 0.f;
+
+	/**
+	 * @brief Fortification modifier enums restored into UWorldFortificationModificationsComponent.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	TArray<EWorldFortificationStrength> FortificationStrengthModifiers;
+
+	/**
+	 * @brief Distinguishes a newly saved empty modifier list from an older save that did not serialize this array.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	bool bHasSavedFortificationStrengthModifiers = false;
 };
 
 /**

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldFortificationModificationsComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_EnemyMapItem/EnemyMapItemUIData/FEnemyMapItemUIData.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/RewardStructs/FMissionRewardStructs.h"
@@ -18,21 +19,41 @@ class RTS_SURVIVAL_API AWorldMissionObject : public AWorldMapObject
 	GENERATED_BODY()
 
 public:
+	AWorldMissionObject();
+
 	void InitializeForAnchorWithMissionType(AAnchorPoint* AnchorPoint, EMapMission MissionType);
 
 	EMapMission GetMissionType() const { return M_MissionType; }
-	const FEnemyOrMissionMapItemUIData& GetMapItemUIData() const { return M_MapItemUIData; }
+	FEnemyOrMissionMapItemUIData GetMapItemUIData() const;
 	const FPrimaryReward& GetPrimaryReward() const { return M_PrimaryReward; }
 	const FSecondaryReward& GetSecondaryReward() const { return M_SecondaryReward; }
-	void SetBaseDifficultyInfluenceReason(const FRTSStrengthEstimationInfluenceReason& InfluenceReason);
+
+	/**
+	 * @brief Gets the runtime/save-game fortification modifier component for this mission object.
+	 * @return Component that stores EWorldFortificationStrength modifiers.
+	 */
+	UWorldFortificationModificationsComponent* GetFortificationModificationsComponent() const
+	{
+		return M_FortificationModificationsComponent;
+	}
+
+	/**
+	 * @brief Gets the base fortification strength percentage cached on the shared strength component.
+	 * @return Base fortification strength percentage for this mission object.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Difficulty")
 	int32 GetBaseDifficultyPercentage() const;
-	UFUNCTION(BlueprintCallable, Category = "World Campaign|Difficulty")
-	void SetBaseDifficultyPercentage(int32 DifficultyPercentage);
-	UFUNCTION(BlueprintCallable, Category = "World Campaign|Difficulty")
-	void AddBaseDifficultyPercentage(int32 AddedDifficultyPercentage);
-	void ResetAuxiliaryDifficultyInfluenceReasons();
-	void AddAuxiliaryDifficultyInfluenceReason(const FRTSStrengthEstimationInfluenceReason& InfluenceReason);
+
+	/**
+	 * @brief Resets the strategic support category on the shared strength component.
+	 */
+	void ResetStrategicReport();
+
+	/**
+	 * @brief Adds one strategic support reason to the shared strength component.
+	 * @param StrengthReason Strategic support reason to add.
+	 */
+	void AddStrategicSupportReason(const FWorldStrengthReason& StrengthReason);
 
 private:
 	UPROPERTY(VisibleAnywhere, Category = "World Campaign|World Objects", meta = (AllowPrivateAccess = "true"))
@@ -41,13 +62,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Map Item", meta = (AllowPrivateAccess = "true", ShowOnlyInnerProperties))
 	FEnemyOrMissionMapItemUIData M_MapItemUIData;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty",
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Fortification Modifications",
 		meta = (AllowPrivateAccess = "true"))
-	FRTSStrengthEstimationInfluenceReason M_BaseDifficultyInfluenceReason;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Difficulty",
-		meta = (AllowPrivateAccess = "true"))
-	TArray<FRTSStrengthEstimationInfluenceReason> M_AuxiliaryDifficultyInfluenceReasons;
+	TObjectPtr<UWorldFortificationModificationsComponent> M_FortificationModificationsComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Map Item", meta = (AllowPrivateAccess = "true", ShowOnlyInnerProperties))
 	FPrimaryReward M_PrimaryReward;
@@ -55,5 +72,9 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Map Item", meta = (AllowPrivateAccess = "true", ShowOnlyInnerProperties))
 	FSecondaryReward M_SecondaryReward;
 
-	void RebuildDifficultyInfluenceReasons();
+	/**
+	 * @brief Builds a UI data copy with the current strength report projected from the shared component.
+	 * @return Mission map item UI data for the current object state.
+	 */
+	FEnemyOrMissionMapItemUIData BuildMapItemUIData() const;
 };

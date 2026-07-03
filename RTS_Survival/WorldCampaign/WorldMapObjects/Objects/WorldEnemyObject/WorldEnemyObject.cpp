@@ -2,14 +2,13 @@
 
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 
-namespace
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldFortificationModificationsComponent.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthEstimationComponent.h"
+
+AWorldEnemyObject::AWorldEnemyObject()
 {
-	const FText& GetEnemyObjectBaseDifficultyReasonText()
-	{
-		static const FText EnemyObjectBaseDifficultyReasonText =
-			FText::FromString(TEXT("<Text_NewBad>Base Difficulty</>"));
-		return EnemyObjectBaseDifficultyReasonText;
-	}
+	M_FortificationModificationsComponent =
+		CreateDefaultSubobject<UWorldFortificationModificationsComponent>(TEXT("FortificationModifications"));
 }
 
 void AWorldEnemyObject::InitializeForAnchorWithEnemyItem(AAnchorPoint* AnchorPoint, EMapEnemyItem EnemyItemType)
@@ -18,72 +17,52 @@ void AWorldEnemyObject::InitializeForAnchorWithEnemyItem(AAnchorPoint* AnchorPoi
 	M_EnemyItemType = EnemyItemType;
 }
 
+FEnemyOrMissionMapItemUIData AWorldEnemyObject::GetMapItemUIData() const
+{
+	return BuildMapItemUIData();
+}
+
 void AWorldEnemyObject::SetPrimaryReward(const FPrimaryReward& PrimaryReward)
 {
 	M_PrimaryReward = PrimaryReward;
 }
 
-void AWorldEnemyObject::SetBaseDifficultyInfluenceReason(
-	const FRTSStrengthEstimationInfluenceReason& InfluenceReason)
-{
-	M_BaseDifficultyInfluenceReason = InfluenceReason;
-	RebuildDifficultyInfluenceReasons();
-}
-
 int32 AWorldEnemyObject::GetBaseDifficultyPercentage() const
 {
-	return M_BaseDifficultyInfluenceReason.InfluencePercent;
-}
-
-void AWorldEnemyObject::SetBaseDifficultyPercentage(const int32 DifficultyPercentage)
-{
-	M_BaseDifficultyInfluenceReason.ReasonText = GetEnemyObjectBaseDifficultyReasonText();
-	M_BaseDifficultyInfluenceReason.InfluencePercent = DifficultyPercentage;
-	RebuildDifficultyInfluenceReasons();
-}
-
-void AWorldEnemyObject::AddBaseDifficultyPercentage(const int32 AddedDifficultyPercentage)
-{
-	SetBaseDifficultyPercentage(GetBaseDifficultyPercentage() + AddedDifficultyPercentage);
-}
-
-void AWorldEnemyObject::ResetAuxiliaryDifficultyInfluenceReasons()
-{
-	M_AuxiliaryDifficultyInfluenceReasons.Reset();
-	RebuildDifficultyInfluenceReasons();
-}
-
-void AWorldEnemyObject::AddAuxiliaryDifficultyInfluenceReason(
-	const FRTSStrengthEstimationInfluenceReason& InfluenceReason)
-{
-	if (not InfluenceReason.GetHasInfluence())
+	if (const UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
 	{
-		return;
+		return StrengthEstimationComponent->GetBaseFortificationStrengthPercentage();
 	}
 
-	M_AuxiliaryDifficultyInfluenceReasons.Add(InfluenceReason);
-	RebuildDifficultyInfluenceReasons();
+	return 0;
 }
 
-void AWorldEnemyObject::RebuildDifficultyInfluenceReasons()
+void AWorldEnemyObject::ResetStrategicReport()
 {
-	TArray<FRTSStrengthEstimationInfluenceReason> InfluenceReasons;
-	if (M_BaseDifficultyInfluenceReason.GetHasInfluence())
+	if (UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
 	{
-		InfluenceReasons.Add(M_BaseDifficultyInfluenceReason);
+		StrengthEstimationComponent->ResetStrategicSupportReport();
+	}
+}
+
+void AWorldEnemyObject::AddStrategicSupportReason(
+	const FWorldStrengthReason& StrengthReason)
+{
+	if (UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
+	{
+		StrengthEstimationComponent->AddStrategicSupportReason(StrengthReason);
+	}
+}
+
+FEnemyOrMissionMapItemUIData AWorldEnemyObject::BuildMapItemUIData() const
+{
+	FEnemyOrMissionMapItemUIData UIData = M_MapItemUIData;
+	if (const UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
+	{
+		UIData.SetStrengthEstimation(StrengthEstimationComponent->GetStrengthEstimationMessage());
 	}
 
-	for (const FRTSStrengthEstimationInfluenceReason& AuxiliaryInfluenceReason : M_AuxiliaryDifficultyInfluenceReasons)
-	{
-		if (not AuxiliaryInfluenceReason.GetHasInfluence())
-		{
-			continue;
-		}
-
-		InfluenceReasons.Add(AuxiliaryInfluenceReason);
-	}
-
-	M_MapItemUIData.SetStrengthInfluenceReasons(InfluenceReasons);
+	return UIData;
 }
 
 void AWorldEnemyObject::SetSecondaryObjectiveData(const EBonusObjective BonusObjective,

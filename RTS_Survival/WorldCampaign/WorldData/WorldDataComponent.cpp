@@ -5,6 +5,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthTypes.h"
 #include "RTS_Survival/WorldCampaign/WorldData/WorldData.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/AnchorPoint/AnchorPoint.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
@@ -15,7 +16,7 @@ namespace
 	constexpr int32 EnemyPrimaryRewardSeedOffset = 24103;
 	constexpr int32 EnemyTypeSeedMultiplier = 97;
 	constexpr int32 EnemyBonusObjectiveSeedOffset = 24107;
-	const TCHAR BaseDifficultyReasonText[] = TEXT("<Text_NewBad>Base Difficulty</>");
+	const TCHAR BaseDifficultyReasonText[] = TEXT("<Text_NewBad>Base Fortification Strength</>");
 
 	struct FEnemyPrimaryRewardRuntimePool
 	{
@@ -199,11 +200,37 @@ namespace
 		return Enum->GetNameStringByValue(EnumValue);
 	}
 
-	FRTSStrengthEstimationInfluenceReason BuildBaseDifficultyReason(const int32 DifficultyPercentage)
+	FWorldStrengthReason BuildBaseDifficultyReason(const int32 DifficultyPercentage)
 	{
-		return FRTSStrengthEstimationInfluenceReason(
+		return FWorldStrengthReason(
 			FText::FromString(FString(BaseDifficultyReasonText)),
 			DifficultyPercentage);
+	}
+
+	FText GetStrengthEnumReasonText(const UEnum* Enum, const int64 EnumValue, const TCHAR* FallbackName)
+	{
+		if (not IsValid(Enum))
+		{
+			return FText::FromString(FString(FallbackName));
+		}
+
+		return Enum->GetDisplayNameTextByValue(EnumValue);
+	}
+
+	FWorldStrengthReason BuildStrengthDefinitionReason(
+		const FWorldDataStrengthReasonDefinition& Definition,
+		const UEnum* Enum,
+		const int64 EnumValue,
+		const TCHAR* FallbackName)
+	{
+		/*
+		 * WorldData may provide only a percentage while designers are still filling content. Falling back to the enum
+		 * display name keeps the strength panel readable and avoids silent empty reason lines.
+		 */
+		const FText ReasonText = Definition.ReasonText.IsEmpty()
+			                         ? GetStrengthEnumReasonText(Enum, EnumValue, FallbackName)
+			                         : Definition.ReasonText;
+		return FWorldStrengthReason(ReasonText, Definition.StrengthPercentage);
 	}
 
 	void ReportMissingMissionBaseDifficulty(const EMapMission MissionType)
@@ -227,6 +254,28 @@ namespace
 			FString::Printf(TEXT("WorldData missing base difficulty percentage for enemy item type %s."),
 			                *EnemyName));
 	}
+
+	void ReportMissingFortificationStrengthDefinition(const EWorldFortificationStrength FortificationStrength)
+	{
+		const FString FortificationName = GetEnumValueName(
+			StaticEnum<EWorldFortificationStrength>(),
+			static_cast<int64>(FortificationStrength),
+			TEXT("UnknownFortificationStrength"));
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("WorldData missing strength definition for fortification modifier %s."),
+			                *FortificationName));
+	}
+
+	void ReportMissingStrategicSupportDefinition(const EWorldStrategicSupport StrategicSupport)
+	{
+		const FString StrategicSupportName = GetEnumValueName(
+			StaticEnum<EWorldStrategicSupport>(),
+			static_cast<int64>(StrategicSupport),
+			TEXT("UnknownStrategicSupport"));
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("WorldData missing strength definition for strategic support %s."),
+			                *StrategicSupportName));
+	}
 }
 
 UWorldDataComponent::UWorldDataComponent()
@@ -247,9 +296,9 @@ void UWorldDataComponent::LoadWorldDataIntoObjects(AGeneratorWorldCampaign* Worl
 bool UWorldDataComponent::TryBuildMissionBaseDifficultyReason(
 	const EMapMission MissionType,
 	const ERTSGameDifficulty GameDifficulty,
-	FRTSStrengthEstimationInfluenceReason& OutInfluenceReason) const
+	FWorldStrengthReason& OutStrengthReason) const
 {
-	OutInfluenceReason = BuildBaseDifficultyReason(0);
+	OutStrengthReason = BuildBaseDifficultyReason(0);
 	if (not GetIsValidWorldData())
 	{
 		return false;
@@ -260,7 +309,7 @@ bool UWorldDataComponent::TryBuildMissionBaseDifficultyReason(
 		MissionType,
 		GameDifficulty,
 		DifficultyPercentage);
-	OutInfluenceReason = BuildBaseDifficultyReason(DifficultyPercentage);
+	OutStrengthReason = BuildBaseDifficultyReason(DifficultyPercentage);
 	if (bFoundDifficultyPercentage)
 	{
 		return true;
@@ -273,9 +322,9 @@ bool UWorldDataComponent::TryBuildMissionBaseDifficultyReason(
 bool UWorldDataComponent::TryBuildEnemyBaseDifficultyReason(
 	const EMapEnemyItem EnemyItemType,
 	const ERTSGameDifficulty GameDifficulty,
-	FRTSStrengthEstimationInfluenceReason& OutInfluenceReason) const
+	FWorldStrengthReason& OutStrengthReason) const
 {
-	OutInfluenceReason = BuildBaseDifficultyReason(0);
+	OutStrengthReason = BuildBaseDifficultyReason(0);
 	if (not GetIsValidWorldData())
 	{
 		return false;
@@ -286,13 +335,73 @@ bool UWorldDataComponent::TryBuildEnemyBaseDifficultyReason(
 		EnemyItemType,
 		GameDifficulty,
 		DifficultyPercentage);
-	OutInfluenceReason = BuildBaseDifficultyReason(DifficultyPercentage);
+	OutStrengthReason = BuildBaseDifficultyReason(DifficultyPercentage);
 	if (bFoundDifficultyPercentage)
 	{
 		return true;
 	}
 
 	ReportMissingEnemyBaseDifficulty(EnemyItemType);
+	return false;
+}
+
+bool UWorldDataComponent::TryBuildFortificationStrengthReason(
+	const EWorldFortificationStrength FortificationStrength,
+	const ERTSGameDifficulty GameDifficulty,
+	FWorldStrengthReason& OutStrengthReason) const
+{
+	OutStrengthReason = FWorldStrengthReason();
+	if (FortificationStrength == EWorldFortificationStrength::None || not GetIsValidWorldData())
+	{
+		return false;
+	}
+
+	FWorldDataStrengthReasonDefinition Definition;
+	const bool bFoundDefinition = M_WorldData->TryGetFortificationStrengthDefinition(
+		FortificationStrength,
+		GameDifficulty,
+		Definition);
+	OutStrengthReason = BuildStrengthDefinitionReason(
+		Definition,
+		StaticEnum<EWorldFortificationStrength>(),
+		static_cast<int64>(FortificationStrength),
+		TEXT("Fortification"));
+	if (bFoundDefinition)
+	{
+		return true;
+	}
+
+	ReportMissingFortificationStrengthDefinition(FortificationStrength);
+	return false;
+}
+
+bool UWorldDataComponent::TryBuildStrategicSupportReason(
+	const EWorldStrategicSupport StrategicSupport,
+	const ERTSGameDifficulty GameDifficulty,
+	FWorldStrengthReason& OutStrengthReason) const
+{
+	OutStrengthReason = FWorldStrengthReason();
+	if (StrategicSupport == EWorldStrategicSupport::None || not GetIsValidWorldData())
+	{
+		return false;
+	}
+
+	FWorldDataStrengthReasonDefinition Definition;
+	const bool bFoundDefinition = M_WorldData->TryGetStrategicSupportDefinition(
+		StrategicSupport,
+		GameDifficulty,
+		Definition);
+	OutStrengthReason = BuildStrengthDefinitionReason(
+		Definition,
+		StaticEnum<EWorldStrategicSupport>(),
+		static_cast<int64>(StrategicSupport),
+		TEXT("Strategic Support"));
+	if (bFoundDefinition)
+	{
+		return true;
+	}
+
+	ReportMissingStrategicSupportDefinition(StrategicSupport);
 	return false;
 }
 

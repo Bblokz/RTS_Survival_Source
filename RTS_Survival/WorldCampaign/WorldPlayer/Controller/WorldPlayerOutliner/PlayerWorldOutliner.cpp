@@ -7,7 +7,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
-#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldDifficultyInfluence.h"
+#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldStrategicSupportArea.h"
 
 UPlayerWorldOutliner::UPlayerWorldOutliner()
 {
@@ -110,12 +110,12 @@ void UPlayerWorldOutliner::ResetOutlineIfActorChanged(const AActor* NewActor)
 
 void UPlayerWorldOutliner::SetHoverDifficultyInfluenceRadiiOnActor(AActor* Actor) const
 {
-	UWorldDifficultyInfluence::ShowHoverRadiiOnActor(Actor);
+	UWorldStrategicSupportArea::ShowHoverRadiiOnActor(Actor);
 }
 
 void UPlayerWorldOutliner::ResetHoverDifficultyInfluenceRadiiOnActor(AActor* Actor) const
 {
-	UWorldDifficultyInfluence::HideHoverRadiiOnActor(Actor);
+	UWorldStrategicSupportArea::HideHoverRadiiOnActor(Actor);
 }
 
 void UPlayerWorldOutliner::SetOutLineOnActor(const AActor* ActorToOutLine, const ERTSOutLineTypes OutLineType) const

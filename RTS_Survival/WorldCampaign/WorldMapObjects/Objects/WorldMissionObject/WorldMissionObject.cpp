@@ -2,14 +2,13 @@
 
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 
-namespace
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldFortificationModificationsComponent.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthEstimationComponent.h"
+
+AWorldMissionObject::AWorldMissionObject()
 {
-	const FText& GetMissionObjectBaseDifficultyReasonText()
-	{
-		static const FText MissionObjectBaseDifficultyReasonText =
-			FText::FromString(TEXT("<Text_NewBad>Base Difficulty</>"));
-		return MissionObjectBaseDifficultyReasonText;
-	}
+	M_FortificationModificationsComponent =
+		CreateDefaultSubobject<UWorldFortificationModificationsComponent>(TEXT("FortificationModifications"));
 }
 
 void AWorldMissionObject::InitializeForAnchorWithMissionType(AAnchorPoint* AnchorPoint, EMapMission MissionType)
@@ -18,65 +17,45 @@ void AWorldMissionObject::InitializeForAnchorWithMissionType(AAnchorPoint* Ancho
 	M_MissionType = MissionType;
 }
 
-void AWorldMissionObject::SetBaseDifficultyInfluenceReason(
-	const FRTSStrengthEstimationInfluenceReason& InfluenceReason)
+FEnemyOrMissionMapItemUIData AWorldMissionObject::GetMapItemUIData() const
 {
-	M_BaseDifficultyInfluenceReason = InfluenceReason;
-	RebuildDifficultyInfluenceReasons();
+	return BuildMapItemUIData();
 }
 
 int32 AWorldMissionObject::GetBaseDifficultyPercentage() const
 {
-	return M_BaseDifficultyInfluenceReason.InfluencePercent;
-}
-
-void AWorldMissionObject::SetBaseDifficultyPercentage(const int32 DifficultyPercentage)
-{
-	M_BaseDifficultyInfluenceReason.ReasonText = GetMissionObjectBaseDifficultyReasonText();
-	M_BaseDifficultyInfluenceReason.InfluencePercent = DifficultyPercentage;
-	RebuildDifficultyInfluenceReasons();
-}
-
-void AWorldMissionObject::AddBaseDifficultyPercentage(const int32 AddedDifficultyPercentage)
-{
-	SetBaseDifficultyPercentage(GetBaseDifficultyPercentage() + AddedDifficultyPercentage);
-}
-
-void AWorldMissionObject::ResetAuxiliaryDifficultyInfluenceReasons()
-{
-	M_AuxiliaryDifficultyInfluenceReasons.Reset();
-	RebuildDifficultyInfluenceReasons();
-}
-
-void AWorldMissionObject::AddAuxiliaryDifficultyInfluenceReason(
-	const FRTSStrengthEstimationInfluenceReason& InfluenceReason)
-{
-	if (not InfluenceReason.GetHasInfluence())
+	if (const UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
 	{
-		return;
+		return StrengthEstimationComponent->GetBaseFortificationStrengthPercentage();
 	}
 
-	M_AuxiliaryDifficultyInfluenceReasons.Add(InfluenceReason);
-	RebuildDifficultyInfluenceReasons();
+	return 0;
 }
 
-void AWorldMissionObject::RebuildDifficultyInfluenceReasons()
+void AWorldMissionObject::ResetStrategicReport()
 {
-	TArray<FRTSStrengthEstimationInfluenceReason> InfluenceReasons;
-	if (M_BaseDifficultyInfluenceReason.GetHasInfluence())
+	if (UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
 	{
-		InfluenceReasons.Add(M_BaseDifficultyInfluenceReason);
+		StrengthEstimationComponent->ResetStrategicSupportReport();
+	}
+}
+
+void AWorldMissionObject::AddStrategicSupportReason(
+	const FWorldStrengthReason& StrengthReason)
+{
+	if (UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
+	{
+		StrengthEstimationComponent->AddStrategicSupportReason(StrengthReason);
+	}
+}
+
+FEnemyOrMissionMapItemUIData AWorldMissionObject::BuildMapItemUIData() const
+{
+	FEnemyOrMissionMapItemUIData UIData = M_MapItemUIData;
+	if (const UWorldStrengthEstimationComponent* StrengthEstimationComponent = GetWorldStrengthEstimationComponent())
+	{
+		UIData.SetStrengthEstimation(StrengthEstimationComponent->GetStrengthEstimationMessage());
 	}
 
-	for (const FRTSStrengthEstimationInfluenceReason& AuxiliaryInfluenceReason : M_AuxiliaryDifficultyInfluenceReasons)
-	{
-		if (not AuxiliaryInfluenceReason.GetHasInfluence())
-		{
-			continue;
-		}
-
-		InfluenceReasons.Add(AuxiliaryInfluenceReason);
-	}
-
-	M_MapItemUIData.SetStrengthInfluenceReasons(InfluenceReasons);
+	return UIData;
 }

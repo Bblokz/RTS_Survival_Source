@@ -6,47 +6,63 @@ namespace
 	{
 		if (StrengthPercentage < 0)
 		{
-			return FRTSStrengthEstimationRichTextMessage::TotalNegativeValueOpeningTag;
+			return FWorldStrengthReport::TotalNegativeValueOpeningTag;
 		}
 
-		return FRTSStrengthEstimationRichTextMessage::TotalPositiveValueOpeningTag;
+		return FWorldStrengthReport::TotalPositiveValueOpeningTag;
 	}
 }
 
 void FEnemyOrMissionMapItemUIData::ResetStrengthEstimation()
 {
-	StrengthEstimation.InfluenceReasons.Reset();
+	StrengthEstimation.Reset();
 	RefreshStrengthPercentageText();
 }
 
-void FEnemyOrMissionMapItemUIData::SetStrengthInfluenceReasons(
-	const TArray<FRTSStrengthEstimationInfluenceReason>& InfluenceReasons)
+void FEnemyOrMissionMapItemUIData::SetStrengthEstimation(
+	const FWorldStrengthReport& StrengthEstimationMessage)
 {
-	StrengthEstimation.InfluenceReasons = InfluenceReasons;
+	StrengthEstimation = StrengthEstimationMessage;
 	RefreshStrengthPercentageText();
 }
 
-void FEnemyOrMissionMapItemUIData::AddStrengthInfluenceReason(
-	const FRTSStrengthEstimationInfluenceReason& InfluenceReason)
+void FEnemyOrMissionMapItemUIData::SetStrengthReasons(
+	const TArray<FWorldStrengthReason>& StrengthReasons)
 {
-	if (not InfluenceReason.GetHasInfluence())
-	{
-		return;
-	}
+	SetStrengthReasons(EWorldStrengthTypes::FortificationStrength, StrengthReasons);
+}
 
-	StrengthEstimation.InfluenceReasons.Add(InfluenceReason);
+void FEnemyOrMissionMapItemUIData::SetStrengthReasons(
+	const EWorldStrengthTypes StrengthType,
+	const TArray<FWorldStrengthReason>& StrengthReasons)
+{
+	StrengthEstimation.SetStrengthReasons(StrengthType, StrengthReasons);
+	RefreshStrengthPercentageText();
+}
+
+void FEnemyOrMissionMapItemUIData::AddStrengthReason(
+	const FWorldStrengthReason& StrengthReason)
+{
+	AddStrengthReason(EWorldStrengthTypes::FortificationStrength, StrengthReason);
+}
+
+void FEnemyOrMissionMapItemUIData::AddStrengthReason(
+	const EWorldStrengthTypes StrengthType,
+	const FWorldStrengthReason& StrengthReason)
+{
+	StrengthEstimation.AddStrengthReason(StrengthType, StrengthReason);
 	RefreshStrengthPercentageText();
 }
 
 void FEnemyOrMissionMapItemUIData::RefreshStrengthPercentageText()
 {
-	const int32 StrengthPercentage = StrengthEstimation.GetTotalInfluencePercent();
+	const int32 StrengthPercentage = StrengthEstimation.GetTotalStrengthPercent();
 	StrengthPercentageText = FText::FromString(
 		FString::Printf(
 			TEXT("%s%d%%%s"),
 			GetStrengthPercentageValueOpeningTag(StrengthPercentage),
 			StrengthPercentage,
-			FRTSStrengthEstimationRichTextMessage::RichTextClosingTag));
+			FWorldStrengthReport::RichTextClosingTag));
 
 	StrengthEstimation.FormatRichTextMessages();
 }

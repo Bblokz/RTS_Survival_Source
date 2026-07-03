@@ -18,7 +18,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/AsyncWorldGeneration/W_AsyncWorldGeneration.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
-#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldDifficultyInfluence.h"
+#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldStrategicSupportArea.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
@@ -137,7 +137,8 @@ void AWorldPlayerController::PlayerTurn()
 		return;
 	}
 
-	M_WorldGenerator->AdjustDifficutlyPercentagesForInfluencers(M_SelectedDifficulty.DifficultyLevel);
+	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
+	M_WorldGenerator->AdjustDifficultyPercentagesForFieldDivisions(M_SelectedDifficulty.DifficultyLevel);
 }
 
 void AWorldPlayerController::EnemyTurn()
@@ -282,11 +283,11 @@ void AWorldPlayerController::ShowClickedDifficultyInfluenceRadiiForActor(AActor*
 	AActor* ClickedDifficultyInfluenceRadiusActor = M_ClickedDifficultyInfluenceRadiusActor.Get();
 	if (IsValid(ClickedDifficultyInfluenceRadiusActor) && ClickedDifficultyInfluenceRadiusActor != Actor)
 	{
-		UWorldDifficultyInfluence::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
+		UWorldStrategicSupportArea::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
 	}
 
 	M_ClickedDifficultyInfluenceRadiusActor = Actor;
-	UWorldDifficultyInfluence::ShowSelectedRadiiOnActor(Actor);
+	UWorldStrategicSupportArea::ShowSelectedRadiiOnActor(Actor);
 }
 
 void AWorldPlayerController::HideClickedDifficultyInfluenceRadii()
@@ -294,7 +295,7 @@ void AWorldPlayerController::HideClickedDifficultyInfluenceRadii()
 	AActor* ClickedDifficultyInfluenceRadiusActor = M_ClickedDifficultyInfluenceRadiusActor.Get();
 	if (IsValid(ClickedDifficultyInfluenceRadiusActor))
 	{
-		UWorldDifficultyInfluence::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
+		UWorldStrategicSupportArea::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
 	}
 
 	M_ClickedDifficultyInfluenceRadiusActor = nullptr;
@@ -528,7 +529,7 @@ void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
 	M_WorldGenerator->PruneUnusedAnchorsAndRepairConnectivity();
 	UpdateAsyncWorldGenerationWidget_PruningCompleted();
 	LoadWorldDataIntoObjects();
-	M_WorldGenerator->InitMapObjectsBaseDifficulty(M_SelectedDifficulty.DifficultyLevel);
+	M_WorldGenerator->InitMapObjectsBaseFortificationStrength(M_SelectedDifficulty.DifficultyLevel);
 	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
 	const FPlayerProfileSaveData PlayerProfileSaveData =
 		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(M_PlayerFaction);
@@ -555,11 +556,22 @@ void AWorldPlayerController::OnAllWorldObjectsAndTheirDataReady()
 
 	bM_HasCompletedInitialWorldSetup = true;
 	HideAsyncWorldGenerationWidget();
-	BeginPlay_SpawnWorldFowManager();
+	WorldGenerated_InitCountryOccupationRegulator();
+	WorldGenerated_SpawnWorldFowManager();
 	OnInitialWorldSetupComplete();
 }
 
-void AWorldPlayerController::BeginPlay_SpawnWorldFowManager()
+void AWorldPlayerController::WorldGenerated_InitCountryOccupationRegulator()
+{
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	M_WorldGenerator->InitializeCountryOccupationRegulator();
+}
+
+void AWorldPlayerController::WorldGenerated_SpawnWorldFowManager()
 {
 	if (not GetIsValidWorldGenerator() || not IsValid(M_WorldFowManagerClass))
 	{

@@ -1,47 +1,30 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
-#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldDifficultyInfluence.h"
+#include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldStrategicSupportArea.h"
 
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/RTSRadiusPoolSubsystem/RTSRadiusPoolSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
-int32 FWorldDifficultyInfluenceSettings::GetDifficultyPercent(const ERTSGameDifficulty GameDifficulty) const
-{
-	return PerDifficultyMlt.ApplyToPercentage(BasePercentage, GameDifficulty);
-}
-
-FRTSStrengthEstimationInfluenceReason FWorldDifficultyInfluenceSettings::BuildInfluenceReason(
-	const ERTSGameDifficulty GameDifficulty) const
-{
-	return FRTSStrengthEstimationInfluenceReason(ReasonText, GetDifficultyPercent(GameDifficulty));
-}
-
-UWorldDifficultyInfluence::UWorldDifficultyInfluence()
+UWorldStrategicSupportArea::UWorldStrategicSupportArea()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UWorldDifficultyInfluence::EndPlay(const EEndPlayReason::Type EndPlayReason)
+void UWorldStrategicSupportArea::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	HideAllRadii();
 
 	Super::EndPlay(EndPlayReason);
 }
 
-int32 UWorldDifficultyInfluence::GetDifficultyInfluencePercent(const ERTSGameDifficulty GameDifficulty) const
+void UWorldStrategicSupportArea::SetCachedStrategicSupportPercentage(const int32 StrengthPercentage)
 {
-	return M_Settings.GetDifficultyPercent(GameDifficulty);
+	M_CachedStrategicSupportPercentage = StrengthPercentage;
 }
 
-FRTSStrengthEstimationInfluenceReason UWorldDifficultyInfluence::BuildInfluenceReason(
-	const ERTSGameDifficulty GameDifficulty) const
-{
-	return M_Settings.BuildInfluenceReason(GameDifficulty);
-}
-
-void UWorldDifficultyInfluence::ShowHoverRadius()
+void UWorldStrategicSupportArea::ShowHoverRadius()
 {
 	if (GetIsRadiusActive(M_SelectedRadiusId) || GetIsRadiusActive(M_HoverRadiusId))
 	{
@@ -53,12 +36,12 @@ void UWorldDifficultyInfluence::ShowHoverRadius()
 	M_HoverRadiusId = CreateRadius();
 }
 
-void UWorldDifficultyInfluence::HideHoverRadius()
+void UWorldStrategicSupportArea::HideHoverRadius()
 {
 	HideRadiusById(M_HoverRadiusId);
 }
 
-void UWorldDifficultyInfluence::ShowSelectedRadius()
+void UWorldStrategicSupportArea::ShowSelectedRadius()
 {
 	HideHoverRadius();
 	if (GetIsRadiusActive(M_SelectedRadiusId))
@@ -70,27 +53,27 @@ void UWorldDifficultyInfluence::ShowSelectedRadius()
 	M_SelectedRadiusId = CreateRadius();
 }
 
-void UWorldDifficultyInfluence::HideSelectedRadius()
+void UWorldStrategicSupportArea::HideSelectedRadius()
 {
 	HideRadiusById(M_SelectedRadiusId);
 }
 
-void UWorldDifficultyInfluence::HideAllRadii()
+void UWorldStrategicSupportArea::HideAllRadii()
 {
 	HideHoverRadius();
 	HideSelectedRadius();
 }
 
-void UWorldDifficultyInfluence::ShowHoverRadiiOnActor(AActor* Actor)
+void UWorldStrategicSupportArea::ShowHoverRadiiOnActor(AActor* Actor)
 {
 	if (not IsValid(Actor))
 	{
 		return;
 	}
 
-	TArray<UWorldDifficultyInfluence*> DifficultyInfluences;
-	Actor->GetComponents<UWorldDifficultyInfluence>(DifficultyInfluences);
-	for (UWorldDifficultyInfluence* DifficultyInfluence : DifficultyInfluences)
+	TArray<UWorldStrategicSupportArea*> DifficultyInfluences;
+	Actor->GetComponents<UWorldStrategicSupportArea>(DifficultyInfluences);
+	for (UWorldStrategicSupportArea* DifficultyInfluence : DifficultyInfluences)
 	{
 		if (not IsValid(DifficultyInfluence))
 		{
@@ -101,16 +84,16 @@ void UWorldDifficultyInfluence::ShowHoverRadiiOnActor(AActor* Actor)
 	}
 }
 
-void UWorldDifficultyInfluence::HideHoverRadiiOnActor(AActor* Actor)
+void UWorldStrategicSupportArea::HideHoverRadiiOnActor(AActor* Actor)
 {
 	if (not IsValid(Actor))
 	{
 		return;
 	}
 
-	TArray<UWorldDifficultyInfluence*> DifficultyInfluences;
-	Actor->GetComponents<UWorldDifficultyInfluence>(DifficultyInfluences);
-	for (UWorldDifficultyInfluence* DifficultyInfluence : DifficultyInfluences)
+	TArray<UWorldStrategicSupportArea*> DifficultyInfluences;
+	Actor->GetComponents<UWorldStrategicSupportArea>(DifficultyInfluences);
+	for (UWorldStrategicSupportArea* DifficultyInfluence : DifficultyInfluences)
 	{
 		if (not IsValid(DifficultyInfluence))
 		{
@@ -121,16 +104,16 @@ void UWorldDifficultyInfluence::HideHoverRadiiOnActor(AActor* Actor)
 	}
 }
 
-void UWorldDifficultyInfluence::ShowSelectedRadiiOnActor(AActor* Actor)
+void UWorldStrategicSupportArea::ShowSelectedRadiiOnActor(AActor* Actor)
 {
 	if (not IsValid(Actor))
 	{
 		return;
 	}
 
-	TArray<UWorldDifficultyInfluence*> DifficultyInfluences;
-	Actor->GetComponents<UWorldDifficultyInfluence>(DifficultyInfluences);
-	for (UWorldDifficultyInfluence* DifficultyInfluence : DifficultyInfluences)
+	TArray<UWorldStrategicSupportArea*> DifficultyInfluences;
+	Actor->GetComponents<UWorldStrategicSupportArea>(DifficultyInfluences);
+	for (UWorldStrategicSupportArea* DifficultyInfluence : DifficultyInfluences)
 	{
 		if (not IsValid(DifficultyInfluence))
 		{
@@ -141,16 +124,16 @@ void UWorldDifficultyInfluence::ShowSelectedRadiiOnActor(AActor* Actor)
 	}
 }
 
-void UWorldDifficultyInfluence::HideSelectedRadiiOnActor(AActor* Actor)
+void UWorldStrategicSupportArea::HideSelectedRadiiOnActor(AActor* Actor)
 {
 	if (not IsValid(Actor))
 	{
 		return;
 	}
 
-	TArray<UWorldDifficultyInfluence*> DifficultyInfluences;
-	Actor->GetComponents<UWorldDifficultyInfluence>(DifficultyInfluences);
-	for (UWorldDifficultyInfluence* DifficultyInfluence : DifficultyInfluences)
+	TArray<UWorldStrategicSupportArea*> DifficultyInfluences;
+	Actor->GetComponents<UWorldStrategicSupportArea>(DifficultyInfluences);
+	for (UWorldStrategicSupportArea* DifficultyInfluence : DifficultyInfluences)
 	{
 		if (not IsValid(DifficultyInfluence))
 		{
@@ -161,7 +144,7 @@ void UWorldDifficultyInfluence::HideSelectedRadiiOnActor(AActor* Actor)
 	}
 }
 
-bool UWorldDifficultyInfluence::GetIsValidRadiusPoolSubsystem()
+bool UWorldStrategicSupportArea::GetIsValidRadiusPoolSubsystem()
 {
 	if (M_RadiusPoolSubsystem.IsValid())
 	{
@@ -174,7 +157,7 @@ bool UWorldDifficultyInfluence::GetIsValidRadiusPoolSubsystem()
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this,
 			TEXT("World"),
-			TEXT("UWorldDifficultyInfluence::GetIsValidRadiusPoolSubsystem"),
+			TEXT("UWorldStrategicSupportArea::GetIsValidRadiusPoolSubsystem"),
 			this);
 		return false;
 	}
@@ -188,12 +171,12 @@ bool UWorldDifficultyInfluence::GetIsValidRadiusPoolSubsystem()
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		TEXT("M_RadiusPoolSubsystem"),
-		TEXT("UWorldDifficultyInfluence::GetIsValidRadiusPoolSubsystem"),
+		TEXT("UWorldStrategicSupportArea::GetIsValidRadiusPoolSubsystem"),
 		this);
 	return false;
 }
 
-URTSRadiusPoolSubsystem* UWorldDifficultyInfluence::GetRadiusPoolSubsystem()
+URTSRadiusPoolSubsystem* UWorldStrategicSupportArea::GetRadiusPoolSubsystem()
 {
 	if (not GetIsValidRadiusPoolSubsystem())
 	{
@@ -203,7 +186,7 @@ URTSRadiusPoolSubsystem* UWorldDifficultyInfluence::GetRadiusPoolSubsystem()
 	return M_RadiusPoolSubsystem.Get();
 }
 
-int32 UWorldDifficultyInfluence::CreateRadius()
+int32 UWorldStrategicSupportArea::CreateRadius()
 {
 	if (M_Settings.XYRadius <= 0.f)
 	{
@@ -235,7 +218,7 @@ int32 UWorldDifficultyInfluence::CreateRadius()
 	return RadiusId;
 }
 
-bool UWorldDifficultyInfluence::GetIsRadiusActive(const int32 RadiusId)
+bool UWorldStrategicSupportArea::GetIsRadiusActive(const int32 RadiusId)
 {
 	if (RadiusId <= 0)
 	{
@@ -251,7 +234,7 @@ bool UWorldDifficultyInfluence::GetIsRadiusActive(const int32 RadiusId)
 	return RadiusPoolSubsystem->GetIsRTSRadiusIdActive(RadiusId);
 }
 
-void UWorldDifficultyInfluence::HideRadiusById(int32& RadiusId)
+void UWorldStrategicSupportArea::HideRadiusById(int32& RadiusId)
 {
 	if (RadiusId <= 0)
 	{
