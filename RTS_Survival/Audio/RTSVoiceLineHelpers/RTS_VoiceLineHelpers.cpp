@@ -289,6 +289,8 @@ EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetAnnouncerForPlayerError(const 
 		return EAnnouncerVoiceLineType::NotEnoughEnergy;
 	case EPlayerError::Error_NotENoughAmmo:
 		break;
+	case EPlayerError::Error_NotEnoughIntel:
+		break;
 	case EPlayerError::Error_NotEnoughWeaponBlueprints:
 		break;
 	case EPlayerError::Error_NotEnoughBuildingBlueprints:
