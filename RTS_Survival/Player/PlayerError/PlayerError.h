@@ -13,6 +13,7 @@ enum class EPlayerError : uint8
 	Error_NotEnoughVehicleParts,
 	Error_NotEnoughtFuel,
 	Error_NotENoughAmmo,
+	Error_NotEnoughIntel,
 	Error_NotEnoughWeaponBlueprints,
 	Error_NotEnoughBuildingBlueprints,
 	Error_NotEnoughEnergyBlueprints,
@@ -37,6 +38,7 @@ inline EAnnouncerVoiceLineType ConvertPlayerErrorToAnnouncerVoiceLineType(const 
     case EPlayerError::Error_NotEnoughVehicleParts:
         return EAnnouncerVoiceLineType::NotEnoughVehicleParts;
     case EPlayerError::Error_NotEnoughtFuel:
+    case EPlayerError::Error_NotEnoughIntel:
     case EPlayerError::Error_LocationNotReachable:
         return EAnnouncerVoiceLineType::ErrorLocationNotReachable;
     case EPlayerError::Error_CannotStackBuildingAbilities:

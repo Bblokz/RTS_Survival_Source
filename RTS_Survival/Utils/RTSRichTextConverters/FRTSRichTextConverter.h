@@ -18,6 +18,7 @@ enum class ERTSResourceRichText : uint8
 	Blueprint,
 	DisplayAmount,
 	CommanderExp,
+	Intel,
 };
 
 
@@ -59,6 +60,7 @@ enum class ERTSRichText : uint8
 	Text_Exp,
 	Text_Seats,
 	Text_Cursive,
+	Text_Intel,
 	Text_GBeh,
 	Text_BBeh,
 	Text_sGBeh,
@@ -114,6 +116,8 @@ private:
 			return "<DisplayAmount>";
 		case ERTSResourceRichText::CommanderExp:
 			return "<CommanderExp>";
+		case ERTSResourceRichText::Intel:
+			return "<Intel>";
 		default:
 			return "";
 		}
@@ -189,6 +193,8 @@ private:
 			return "<Text_Seats>";
 		case ERTSRichText::Text_Cursive:
 			return "<Text_Cursive>";
+		case ERTSRichText::Text_Intel:
+			return "<Intel>";
 		case ERTSRichText::Text_GBeh:
 			return "<Text_GBeh>";
 		case ERTSRichText::Text_BBeh:

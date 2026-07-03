@@ -1020,6 +1020,9 @@ void ACPPController::DisplayErrorMessage(const EPlayerError Error)
 	case EPlayerError::Error_NotENoughAmmo:
 		DisplayErrorMessageCpp(FText::FromString("Not Enough Ammo"));
 		break;
+	case EPlayerError::Error_NotEnoughIntel:
+		DisplayErrorMessageCpp(FText::FromString("Not Enough Intel"));
+		break;
 	case EPlayerError::Error_LocationNotReachable:
 		DisplayErrorMessageCpp(FText::FromString("Location Not Reachable"));
 		break;
