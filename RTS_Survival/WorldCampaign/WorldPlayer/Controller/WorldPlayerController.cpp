@@ -10,6 +10,7 @@
 #include "WorldPlayerOutliner/PlayerWorldOutliner.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
+#include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
@@ -44,6 +45,7 @@ AWorldPlayerController::AWorldPlayerController()
 
 	M_PlayerWorldOutliner = CreateDefaultSubobject<UPlayerWorldOutliner>(TEXT("PlayerWorldOutliner"));
 	M_WorldStateAndSaveManager = CreateDefaultSubobject<UWorldStateAndSaveManager>(TEXT("WorldStateAndSaveManager"));
+	M_PlayerResourceManager = CreateDefaultSubobject<UPlayerResourceManager>(TEXT("PlayerResourceManager"));
 }
 
 AGeneratorWorldCampaign* AWorldPlayerController::GetWorldGenerator() const
@@ -62,6 +64,16 @@ UWorldStateAndSaveManager* AWorldPlayerController::GetWorldStateAndSaveManager()
 		return nullptr;
 	}
 	return M_WorldStateAndSaveManager;
+}
+
+UPlayerResourceManager* AWorldPlayerController::GetPlayerResourceManager() const
+{
+	if (not GetIsValidPlayerResourceManager())
+	{
+		return nullptr;
+	}
+
+	return M_PlayerResourceManager;
 }
 
 void AWorldPlayerController::PostInitializeComponents()
@@ -817,6 +829,22 @@ bool AWorldPlayerController::GetIsValidWorldStateAndSaveManager() const
 		this,
 		TEXT("M_WorldStateAndSaveManager"),
 		TEXT("GetIsValidWorldStateAndSaveManager"),
+		this
+	);
+	return false;
+}
+
+bool AWorldPlayerController::GetIsValidPlayerResourceManager() const
+{
+	if (IsValid(M_PlayerResourceManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_PlayerResourceManager"),
+		TEXT("GetIsValidPlayerResourceManager"),
 		this
 	);
 	return false;

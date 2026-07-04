@@ -17,6 +17,7 @@ class AWorldMissionObject;
 class AWorldEnemyObject;
 class UWorldStateAndSaveManager;
 class UWorldProfileAndUIManager;
+class UPlayerResourceManager;
 enum class ERTSFaction : uint8;
 class AGeneratorWorldCampaign;
 class UWorldCameraController;
@@ -44,6 +45,7 @@ public:
 
 	AGeneratorWorldCampaign* GetWorldGenerator() const;
 	UWorldStateAndSaveManager* GetWorldStateAndSaveManager() const;
+	UPlayerResourceManager* GetPlayerResourceManager() const;
 
 	UFUNCTION(BlueprintCallable)
 	void SetIsWorldCameraMovementDisabled(bool bIsDisabled);
@@ -172,6 +174,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UWorldStateAndSaveManager> M_WorldStateAndSaveManager = nullptr;
 	bool GetIsValidWorldStateAndSaveManager() const;
+
+	UPROPERTY()
+	TObjectPtr<UPlayerResourceManager> M_PlayerResourceManager = nullptr;
+	bool GetIsValidPlayerResourceManager() const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|FOW Cloud", meta = (AllowPrivateAccess = "true", DisplayName = "WorldFowManagerClass"))
 	TSubclassOf<AWorldFowManager> M_WorldFowManagerClass;
