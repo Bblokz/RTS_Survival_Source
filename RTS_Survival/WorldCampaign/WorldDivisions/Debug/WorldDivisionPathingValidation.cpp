@@ -35,6 +35,12 @@ namespace
 	constexpr float ValidationPathSampleSpacing = 100.f;
 	constexpr int32 ValidationPathMinSampleCount = 8;
 	constexpr int32 ValidationPathMaxSampleCount = 256;
+	constexpr int32 DefaultBenchmarkPreviewCount = 120;
+	constexpr int32 MinimumBenchmarkPreviewCount = 1;
+	constexpr int32 MaximumBenchmarkPreviewCount = 1000;
+	constexpr int32 BenchmarkTargetAnchorStride = 7;
+	constexpr double MillisecondsPerSecond = 1000.0;
+	constexpr float BenchmarkP95Percentile = 0.95f;
 	constexpr double MaxValidationSeconds = 130.0;
 
 	struct FDivisionPathingValidationRequest
@@ -44,6 +50,25 @@ namespace
 		bool bShouldRequestExit = false;
 		bool bRunExactRegressionCases = true;
 		bool bRunGeneratedCases = true;
+	};
+
+	struct FDivisionPathingBenchmarkRequest
+	{
+		int32 Seed = DefaultValidationSeed;
+		int32 PreviewCount = DefaultBenchmarkPreviewCount;
+		bool bShouldRequestExit = false;
+	};
+
+	struct FDivisionPathingBenchmarkStats
+	{
+		TArray<double> PathSeconds;
+		double TotalPathSeconds = 0.0;
+		double MinPathSeconds = TNumericLimits<double>::Max();
+		double MaxPathSeconds = 0.0;
+		int32 TotalPathPointCount = 0;
+		int32 MaxPathPreviewIndex = INDEX_NONE;
+		int32 MaxPathPointCount = 0;
+		FString MaxPathTargetName = TEXT("None");
 	};
 
 	struct FExactDivisionPathingRegressionCase
@@ -909,6 +934,261 @@ namespace
 		return false;
 	}
 
+	FDivisionPathingBenchmarkRequest BuildBenchmarkRequest(const TArray<FString>& Args)
+	{
+		FDivisionPathingBenchmarkRequest Request;
+		Request.bShouldRequestExit = GetShouldRequestExitAfterValidation(Args);
+		if (Args.Num() >= 1)
+		{
+			Request.Seed = FCString::Atoi(*Args[0]);
+		}
+
+		if (Args.Num() >= 2)
+		{
+			Request.PreviewCount = FMath::Clamp(
+				FCString::Atoi(*Args[1]),
+				MinimumBenchmarkPreviewCount,
+				MaximumBenchmarkPreviewCount);
+		}
+
+		return Request;
+	}
+
+	void RecordBenchmarkSample(const int32 PreviewIndex,
+	                           const FString& TargetAnchorName,
+	                           const double PathSeconds,
+	                           const int32 PathPointCount,
+	                           FDivisionPathingBenchmarkStats& InOutStats)
+	{
+		InOutStats.PathSeconds.Add(PathSeconds);
+		InOutStats.TotalPathSeconds += PathSeconds;
+		InOutStats.MinPathSeconds = FMath::Min(InOutStats.MinPathSeconds, PathSeconds);
+		InOutStats.TotalPathPointCount += PathPointCount;
+		if (PathSeconds <= InOutStats.MaxPathSeconds)
+		{
+			return;
+		}
+
+		InOutStats.MaxPathSeconds = PathSeconds;
+		InOutStats.MaxPathPreviewIndex = PreviewIndex;
+		InOutStats.MaxPathPointCount = PathPointCount;
+		InOutStats.MaxPathTargetName = TargetAnchorName;
+	}
+
+	double GetBenchmarkPercentileMilliseconds(TArray<double> PathSeconds, const float Percentile)
+	{
+		if (PathSeconds.Num() <= 0)
+		{
+			return 0.0;
+		}
+
+		Algo::Sort(PathSeconds);
+		const int32 PercentileIndex = FMath::Clamp(
+			FMath::CeilToInt(static_cast<float>(PathSeconds.Num()) * Percentile) - 1,
+			0,
+			PathSeconds.Num() - 1);
+		return PathSeconds[PercentileIndex] * MillisecondsPerSecond;
+	}
+
+	int32 GetBenchmarkTargetAnchorIndex(const int32 PreviewIndex, const int32 AnchorCount)
+	{
+		if (AnchorCount <= 1)
+		{
+			return 0;
+		}
+
+		int32 TargetAnchorIndex = (PreviewIndex * BenchmarkTargetAnchorStride + AnchorCount / 2) % AnchorCount;
+		if (TargetAnchorIndex == 0)
+		{
+			TargetAnchorIndex = (TargetAnchorIndex + 1) % AnchorCount;
+		}
+
+		return TargetAnchorIndex;
+	}
+
+	bool ValidateBenchmarkPath(const int32 PreviewIndex,
+	                           const TArray<AAnchorPoint*>& Anchors,
+	                           const TArray<FVector2D>& BoundaryPolygon,
+	                           const float AvoidanceRadius,
+	                           const FWorldDivisionSaveData& DivisionSaveData)
+	{
+		const FString CaseName = FString::Printf(TEXT("Benchmark_%d"), PreviewIndex);
+		if (not ValidatePathInsideBoundary(CaseName, DivisionSaveData.PathPoints, BoundaryPolygon))
+		{
+			return false;
+		}
+
+		const FClosestAnchorPathDistance ClosestDistance =
+			GetClosestAnchorPathDistance(Anchors, DivisionSaveData.PathPoints, BoundaryPolygon);
+		if (ClosestDistance.Distance + ValidationDistanceTolerance >= AvoidanceRadius)
+		{
+			return true;
+		}
+
+		LogValidationPath(CaseName, DivisionSaveData.PathPoints);
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("World division pathing benchmark failed: preview %d entered anchor avoidance radius by %.2f units. Anchor=%s Segment=%d."),
+			PreviewIndex,
+			AvoidanceRadius - ClosestDistance.Distance,
+			*ClosestDistance.AnchorName,
+			ClosestDistance.SegmentIndex);
+		return false;
+	}
+
+	void LogDivisionPathingBenchmarkSummary(const FDivisionPathingBenchmarkRequest& Request,
+	                                        const FDivisionPathingBenchmarkStats& Stats,
+	                                        const int32 AnchorCount,
+	                                        const bool bAllPathsPassed)
+	{
+		const int32 CompletedPreviewCount = Stats.PathSeconds.Num();
+		const double AveragePathMilliseconds = CompletedPreviewCount > 0
+			                                      ? Stats.TotalPathSeconds
+			                                      / static_cast<double>(CompletedPreviewCount)
+			                                      * MillisecondsPerSecond
+			                                      : 0.0;
+		const double AveragePathPointCount = CompletedPreviewCount > 0
+			                                     ? static_cast<double>(Stats.TotalPathPointCount)
+			                                     / static_cast<double>(CompletedPreviewCount)
+			                                     : 0.0;
+		const double P95PathMilliseconds =
+			GetBenchmarkPercentileMilliseconds(Stats.PathSeconds, BenchmarkP95Percentile);
+		const TCHAR* ResultText = bAllPathsPassed ? TEXT("passed") : TEXT("failed");
+		if (bAllPathsPassed)
+		{
+			UE_LOG(
+				LogTemp,
+				Display,
+				TEXT("World division pathing benchmark %s: seed=%d previews=%d anchors=%d avg=%.3fms p95=%.3fms min=%.3fms max=%.3fms avgPathPoints=%.2f maxPreview=%d maxTarget=%s maxPathPoints=%d."),
+				ResultText,
+				Request.Seed,
+				CompletedPreviewCount,
+				AnchorCount,
+				AveragePathMilliseconds,
+				P95PathMilliseconds,
+				Stats.MinPathSeconds * MillisecondsPerSecond,
+				Stats.MaxPathSeconds * MillisecondsPerSecond,
+				AveragePathPointCount,
+				Stats.MaxPathPreviewIndex,
+				*Stats.MaxPathTargetName,
+				Stats.MaxPathPointCount);
+			return;
+		}
+
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("World division pathing benchmark %s: seed=%d previews=%d anchors=%d avg=%.3fms p95=%.3fms min=%.3fms max=%.3fms avgPathPoints=%.2f maxPreview=%d maxTarget=%s maxPathPoints=%d."),
+			ResultText,
+			Request.Seed,
+			CompletedPreviewCount,
+			AnchorCount,
+			AveragePathMilliseconds,
+			P95PathMilliseconds,
+			Stats.MinPathSeconds * MillisecondsPerSecond,
+			Stats.MaxPathSeconds * MillisecondsPerSecond,
+			AveragePathPointCount,
+			Stats.MaxPathPreviewIndex,
+			*Stats.MaxPathTargetName,
+			Stats.MaxPathPointCount);
+	}
+
+	bool RunDivisionPathingBenchmarkRequests(AWorldDivisionBase& WorldDivision,
+	                                         const FDivisionPathingBenchmarkRequest& Request,
+	                                         const TArray<AAnchorPoint*>& AnchorsWithClearance,
+	                                         const TArray<FVector2D>& BoundaryPolygon,
+	                                         const float AvoidanceRadius,
+	                                         FDivisionPathingBenchmarkStats& OutStats)
+	{
+		bool bAllPathsPassed = true;
+		OutStats.PathSeconds.Reserve(Request.PreviewCount);
+		for (int32 PreviewIndex = 0; PreviewIndex < Request.PreviewCount; PreviewIndex++)
+		{
+			const AAnchorPoint* TargetAnchor =
+				AnchorsWithClearance[GetBenchmarkTargetAnchorIndex(PreviewIndex, AnchorsWithClearance.Num())];
+			const double PathStartSeconds = FPlatformTime::Seconds();
+			const bool bIssuedMoveOrder = WorldDivision.IssueMoveOrderToPoint(TargetAnchor->GetActorLocation());
+			const double PathSeconds = FPlatformTime::Seconds() - PathStartSeconds;
+			const FWorldDivisionSaveData DivisionSaveData = WorldDivision.BuildWorldDivisionSaveData();
+			RecordBenchmarkSample(
+				PreviewIndex,
+				TargetAnchor->GetName(),
+				PathSeconds,
+				DivisionSaveData.PathPoints.Num(),
+				OutStats);
+
+			if (not bIssuedMoveOrder
+				|| not ValidateBenchmarkPath(
+					PreviewIndex,
+					AnchorsWithClearance,
+					BoundaryPolygon,
+					AvoidanceRadius,
+					DivisionSaveData))
+			{
+				bAllPathsPassed = false;
+			}
+		}
+
+		return bAllPathsPassed;
+	}
+
+	bool RunDivisionPathingBenchmark(UWorld& World, const FDivisionPathingBenchmarkRequest& Request)
+	{
+		const UWorldCampaignSettings* Settings = UWorldCampaignSettings::Get();
+		const float AvoidanceRadius = IsValid(Settings) ? Settings->WorldDivisionAnchorAvoidanceRadius : 0.f;
+
+		TArray<AAnchorPoint*> Anchors;
+		FString FailureReason;
+		if (not BuildAnchorsForValidation(World, Request.Seed, Anchors, FailureReason))
+		{
+			UE_LOG(LogTemp, Error, TEXT("World division pathing benchmark failed: %s"), *FailureReason);
+			return false;
+		}
+
+		TArray<FVector2D> BoundaryPolygon;
+		BuildBoundaryPolygonForValidation(World, BoundaryPolygon);
+		if (BoundaryPolygon.Num() < 3)
+		{
+			UE_LOG(LogTemp, Error, TEXT("World division pathing benchmark failed: boundary polygon is invalid."));
+			return false;
+		}
+
+		TArray<AAnchorPoint*> AnchorsWithClearance;
+		BuildAnchorsWithAvoidanceClearance(Anchors, AvoidanceRadius, AnchorsWithClearance);
+		if (AnchorsWithClearance.Num() < 2)
+		{
+			UE_LOG(LogTemp, Error, TEXT("World division pathing benchmark failed: not enough anchors with clearance."));
+			return false;
+		}
+
+		const FVector StartLocation = BuildDivisionStartLocation(
+			*AnchorsWithClearance[0],
+			*AnchorsWithClearance[1],
+			0,
+			AvoidanceRadius);
+		TArray<TWeakObjectPtr<AWorldDivisionBase>> SpawnedDivisions;
+		AWorldDivisionBase* WorldDivision = SpawnValidationDivision(World, 0, StartLocation);
+		SpawnedDivisions.Add(WorldDivision);
+		if (not IsValid(WorldDivision))
+		{
+			UE_LOG(LogTemp, Error, TEXT("World division pathing benchmark failed: could not spawn division."));
+			return false;
+		}
+
+		FDivisionPathingBenchmarkStats Stats;
+		const bool bAllPathsPassed = RunDivisionPathingBenchmarkRequests(
+			*WorldDivision,
+			Request,
+			AnchorsWithClearance,
+			BoundaryPolygon,
+			AvoidanceRadius,
+			Stats);
+		DestroyValidationDivisions(SpawnedDivisions);
+		LogDivisionPathingBenchmarkSummary(Request, Stats, AnchorsWithClearance.Num(), bAllPathsPassed);
+		return bAllPathsPassed;
+	}
+
 	void ValidateWorldDivisionPathingCommand(const TArray<FString>& Args, UWorld* World)
 	{
 		const FDivisionPathingValidationRequest Request = BuildValidationRequest(Args);
@@ -931,4 +1211,27 @@ namespace
 		TEXT("RTS.WorldCampaign.ValidateDivisionPathing"),
 		TEXT("Generates a pruned campaign and validates temporary division paths against boundary and anchor constraints. Args: [Seed] [DivisionCount] [ExactOnly|GeneratedOnly] [Quit]."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ValidateWorldDivisionPathingCommand));
+
+	void BenchmarkWorldDivisionPathingCommand(const TArray<FString>& Args, UWorld* World)
+	{
+		const FDivisionPathingBenchmarkRequest Request = BuildBenchmarkRequest(Args);
+		if constexpr (DeveloperSettings::Debugging::GWorldCampaign_DivisionPathing_Compile_DebugSymbols)
+		{
+			if (not IsValid(World))
+			{
+				UE_LOG(LogTemp, Error, TEXT("World division pathing benchmark failed: invalid world."));
+				RequestExitAfterValidationIfNeeded(Request.bShouldRequestExit);
+				return;
+			}
+
+			(void)RunDivisionPathingBenchmark(*World, Request);
+		}
+
+		RequestExitAfterValidationIfNeeded(Request.bShouldRequestExit);
+	}
+
+	static FAutoConsoleCommandWithWorldAndArgs GBenchmarkWorldDivisionPathingCommand(
+		TEXT("RTS.WorldCampaign.BenchmarkDivisionPathing"),
+		TEXT("Generates a pruned campaign and times repeated preview-style division path requests. Args: [Seed] [PreviewCount] [Quit]."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&BenchmarkWorldDivisionPathingCommand));
 }

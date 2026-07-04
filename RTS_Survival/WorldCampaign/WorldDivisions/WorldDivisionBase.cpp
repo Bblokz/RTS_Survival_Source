@@ -8,6 +8,7 @@
 #include "NavigationSystem.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionInfluenceComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionMovementComponent.h"
@@ -47,6 +48,7 @@ namespace
 		TArray<FVector> Points;
 		float Length = TNumericLimits<float>::Max();
 		bool bRespectsConstraints = false;
+		bool bNeedsBoundaryRepair = false;
 	};
 
 	struct FBoundaryProjection
@@ -68,6 +70,32 @@ namespace
 		TArray<FVector> Points;
 		float Length = TNumericLimits<float>::Max();
 		bool bIsValid = false;
+	};
+
+	struct FAnchorDetourRingPath
+	{
+		TArray<FVector> RingPoints;
+		TArray<bool> IsValidRingPoint;
+		TArray<bool> IsForwardSegmentValid;
+		TArray<float> ForwardSegmentLengths;
+		TArray<int32> ForwardInvalidSegmentPrefixCounts;
+		TArray<float> ForwardSegmentLengthPrefixSums;
+		float TotalLength = 0.f;
+	};
+
+	struct FWorldDivisionPathContext
+	{
+		TArray<AAnchorPoint*> AnchorPoints;
+		TArray<FVector2D> BoundaryPolygon;
+	};
+
+	struct FWorldDivisionPathContextCache
+	{
+		TWeakObjectPtr<UWorld> World;
+		TArray<TWeakObjectPtr<AAnchorPoint>> AnchorPoints;
+		TWeakObjectPtr<AWorldSplineBoundary> Boundary;
+		TArray<FVector2D> BoundaryPolygon;
+		bool bHasCachedData = false;
 	};
 
 	FVector2D GetXY(const FVector& Location)
@@ -349,18 +377,18 @@ namespace
 		return false;
 	}
 
-	FVector BuildBoundaryOffsetPoint(const FVector2D& BoundaryPoint,
-	                                 const int32 BoundarySegmentIndex,
-	                                 const TArray<FVector2D>& BoundaryPolygon,
-	                                 const float Padding,
-	                                 const float Z)
+	FVector BuildBoundaryOffsetPointWithOrientation(const FVector2D& BoundaryPoint,
+	                                                const int32 BoundarySegmentIndex,
+	                                                const TArray<FVector2D>& BoundaryPolygon,
+	                                                const bool bIsCounterClockwise,
+	                                                const float Padding,
+	                                                const float Z)
 	{
 		if (not BoundaryPolygon.IsValidIndex(BoundarySegmentIndex))
 		{
 			return BuildVectorFromXY(BoundaryPoint, Z);
 		}
 
-		const bool bIsCounterClockwise = GetPolygonSignedArea(BoundaryPolygon) > 0.f;
 		const FVector2D& SegmentStart = BoundaryPolygon[BoundarySegmentIndex];
 		const FVector2D& SegmentEnd = BoundaryPolygon[(BoundarySegmentIndex + 1) % BoundaryPolygon.Num()];
 		const FVector2D DirectionInside =
@@ -392,17 +420,32 @@ namespace
 		return BuildVectorFromXY(BoundaryPoint, Z);
 	}
 
-	FVector BuildBoundaryVertexOffsetPoint(const int32 BoundaryVertexIndex,
-	                                       const TArray<FVector2D>& BoundaryPolygon,
-	                                       const float Padding,
-	                                       const float Z)
+	FVector BuildBoundaryOffsetPoint(const FVector2D& BoundaryPoint,
+	                                 const int32 BoundarySegmentIndex,
+	                                 const TArray<FVector2D>& BoundaryPolygon,
+	                                 const float Padding,
+	                                 const float Z)
+	{
+		return BuildBoundaryOffsetPointWithOrientation(
+			BoundaryPoint,
+			BoundarySegmentIndex,
+			BoundaryPolygon,
+			GetPolygonSignedArea(BoundaryPolygon) > 0.f,
+			Padding,
+			Z);
+	}
+
+	FVector BuildBoundaryVertexOffsetPointWithOrientation(const int32 BoundaryVertexIndex,
+	                                                      const TArray<FVector2D>& BoundaryPolygon,
+	                                                      const bool bIsCounterClockwise,
+	                                                      const float Padding,
+	                                                      const float Z)
 	{
 		if (not BoundaryPolygon.IsValidIndex(BoundaryVertexIndex))
 		{
 			return FVector::ZeroVector;
 		}
 
-		const bool bIsCounterClockwise = GetPolygonSignedArea(BoundaryPolygon) > 0.f;
 		const int32 PreviousSegmentIndex =
 			(BoundaryVertexIndex - 1 + BoundaryPolygon.Num()) % BoundaryPolygon.Num();
 		const int32 NextSegmentIndex = BoundaryVertexIndex;
@@ -433,7 +476,26 @@ namespace
 			return OffsetPoint;
 		}
 
-		return BuildBoundaryOffsetPoint(BoundaryPoint, NextSegmentIndex, BoundaryPolygon, Padding, Z);
+		return BuildBoundaryOffsetPointWithOrientation(
+			BoundaryPoint,
+			NextSegmentIndex,
+			BoundaryPolygon,
+			bIsCounterClockwise,
+			Padding,
+			Z);
+	}
+
+	FVector BuildBoundaryVertexOffsetPoint(const int32 BoundaryVertexIndex,
+	                                       const TArray<FVector2D>& BoundaryPolygon,
+	                                       const float Padding,
+	                                       const float Z)
+	{
+		return BuildBoundaryVertexOffsetPointWithOrientation(
+			BoundaryVertexIndex,
+			BoundaryPolygon,
+			GetPolygonSignedArea(BoundaryPolygon) > 0.f,
+			Padding,
+			Z);
 	}
 
 	FVector ProjectPointInsideBoundary(const FVector& Point,
@@ -631,6 +693,26 @@ namespace
 
 	TArray<AAnchorPoint*> FindAnchorPoints(const UObject* WorldContextObject)
 	{
+		if (const AGeneratorWorldCampaign* Generator = Cast<AGeneratorWorldCampaign>(
+			UGameplayStatics::GetActorOfClass(WorldContextObject, AGeneratorWorldCampaign::StaticClass())))
+		{
+			const TArray<TObjectPtr<AAnchorPoint>>& CachedAnchors = Generator->GetPlacementState().CachedAnchors;
+			if (CachedAnchors.Num() > 0)
+			{
+				TArray<AAnchorPoint*> AnchorPoints;
+				AnchorPoints.Reserve(CachedAnchors.Num());
+				for (const TObjectPtr<AAnchorPoint>& AnchorPoint : CachedAnchors)
+				{
+					if (IsValid(AnchorPoint))
+					{
+						AnchorPoints.Add(AnchorPoint.Get());
+					}
+				}
+
+				return AnchorPoints;
+			}
+		}
+
 		TArray<AActor*> AnchorActors;
 		UGameplayStatics::GetAllActorsOfClass(WorldContextObject, AAnchorPoint::StaticClass(), AnchorActors);
 
@@ -648,28 +730,120 @@ namespace
 		return AnchorPoints;
 	}
 
-	TArray<FVector2D> BuildBoundaryPolygon(const UObject* WorldContextObject)
+	TArray<FWorldDivisionPathContextCache>& GetWorldDivisionPathContextCaches()
 	{
-		TArray<AActor*> BoundaryActors;
-		UGameplayStatics::GetAllActorsOfClass(WorldContextObject, AWorldSplineBoundary::StaticClass(), BoundaryActors);
+		static TArray<FWorldDivisionPathContextCache> PathContextCaches;
+		return PathContextCaches;
+	}
 
+	FWorldDivisionPathContextCache& FindOrAddWorldPathContextCache(UWorld& World)
+	{
+		TArray<FWorldDivisionPathContextCache>& PathContextCaches = GetWorldDivisionPathContextCaches();
+		for (FWorldDivisionPathContextCache& PathContextCache : PathContextCaches)
+		{
+			if (PathContextCache.World.Get() == &World)
+			{
+				return PathContextCache;
+			}
+		}
+
+		FWorldDivisionPathContextCache& PathContextCache = PathContextCaches.AddDefaulted_GetRef();
+		PathContextCache.World = &World;
+		return PathContextCache;
+	}
+
+	bool TryReadWorldPathContextCache(const FWorldDivisionPathContextCache& PathContextCache,
+	                                  FWorldDivisionPathContext& OutPathContext)
+	{
+		OutPathContext.AnchorPoints.Reset();
+		OutPathContext.BoundaryPolygon.Reset();
+		if (not PathContextCache.bHasCachedData || not PathContextCache.World.IsValid())
+		{
+			return false;
+		}
+
+		if (PathContextCache.BoundaryPolygon.Num() >= 3 && not PathContextCache.Boundary.IsValid())
+		{
+			return false;
+		}
+
+		OutPathContext.AnchorPoints.Reserve(PathContextCache.AnchorPoints.Num());
+		for (const TWeakObjectPtr<AAnchorPoint>& AnchorPoint : PathContextCache.AnchorPoints)
+		{
+			AAnchorPoint* StrongAnchorPoint = AnchorPoint.Get();
+			if (not IsValid(StrongAnchorPoint))
+			{
+				return false;
+			}
+
+			OutPathContext.AnchorPoints.Add(StrongAnchorPoint);
+		}
+
+		OutPathContext.BoundaryPolygon = PathContextCache.BoundaryPolygon;
+		return true;
+	}
+
+	void RefreshWorldPathContextCache(const UObject* WorldContextObject,
+	                                  FWorldDivisionPathContextCache& PathContextCache)
+	{
+		PathContextCache.AnchorPoints.Reset();
+		PathContextCache.Boundary = nullptr;
+		PathContextCache.BoundaryPolygon.Reset();
+
+		const TArray<AAnchorPoint*> CurrentAnchorPoints = FindAnchorPoints(WorldContextObject);
+		PathContextCache.AnchorPoints.Reserve(CurrentAnchorPoints.Num());
+		for (AAnchorPoint* AnchorPoint : CurrentAnchorPoints)
+		{
+			PathContextCache.AnchorPoints.Add(AnchorPoint);
+		}
+
+		TArray<AActor*> BoundaryActors;
+		UGameplayStatics::GetAllActorsOfClass(
+			WorldContextObject,
+			AWorldSplineBoundary::StaticClass(),
+			BoundaryActors);
 		for (AActor* BoundaryActor : BoundaryActors)
 		{
-			const AWorldSplineBoundary* Boundary = Cast<AWorldSplineBoundary>(BoundaryActor);
+			AWorldSplineBoundary* Boundary = Cast<AWorldSplineBoundary>(BoundaryActor);
 			if (not IsValid(Boundary))
 			{
 				continue;
 			}
 
-			TArray<FVector2D> BoundaryPolygon;
-			Boundary->GetSampledPolygon2D(BoundarySampleSpacing, BoundaryPolygon);
-			if (BoundaryPolygon.Num() >= 3)
+			Boundary->GetSampledPolygon2D(BoundarySampleSpacing, PathContextCache.BoundaryPolygon);
+			if (PathContextCache.BoundaryPolygon.Num() < 3)
 			{
-				return BoundaryPolygon;
+				PathContextCache.BoundaryPolygon.Reset();
+				continue;
 			}
+
+			PathContextCache.Boundary = Boundary;
+			break;
 		}
 
-		return TArray<FVector2D>();
+		PathContextCache.bHasCachedData = true;
+	}
+
+	FWorldDivisionPathContext BuildWorldDivisionPathContext(const UObject* WorldContextObject)
+	{
+		FWorldDivisionPathContext PathContext;
+		if (not IsValid(WorldContextObject) || not IsValid(WorldContextObject->GetWorld()))
+		{
+			return PathContext;
+		}
+
+		FWorldDivisionPathContextCache& PathContextCache =
+			FindOrAddWorldPathContextCache(*WorldContextObject->GetWorld());
+		if (TryReadWorldPathContextCache(PathContextCache, PathContext))
+		{
+			PathContext.AnchorPoints = FindAnchorPoints(WorldContextObject);
+			return PathContext;
+		}
+
+		RefreshWorldPathContextCache(WorldContextObject, PathContextCache);
+		(void)TryReadWorldPathContextCache(PathContextCache, PathContext);
+		PathContext.AnchorPoints = FindAnchorPoints(WorldContextObject);
+		return PathContext;
 	}
 
 	FVector ProjectToValidMovePoint(const FVector& Point,
@@ -721,44 +895,58 @@ namespace
 		return not GetDoesSegmentIntersectCircle(SegmentStart, SegmentEnd, AnchorLocation, AvoidanceRadius);
 	}
 
-	bool GetDoesDetourStayInsideBoundary(const FVector& SegmentStart,
-	                                     const TArray<FVector>& DetourPoints,
-	                                     const FVector& SegmentEnd,
-	                                     const TArray<FVector2D>& BoundaryPolygon);
-
-	bool GetDoesDetourRespectConstraints(const FVector& SegmentStart,
-	                                     const TArray<FVector>& DetourPoints,
-	                                     const FVector& SegmentEnd,
-	                                     const FVector& AnchorLocation,
-	                                     const float AvoidanceRadius,
-	                                     const TArray<FVector2D>& BoundaryPolygon)
+	bool GetDoesSegmentRespectAllAnchorAvoidance(const FVector& SegmentStart,
+	                                             const FVector& SegmentEnd,
+	                                             const TArray<AAnchorPoint*>& AnchorPoints,
+	                                             const float AvoidanceRadius)
 	{
-		if (not GetDoesDetourStayInsideBoundary(SegmentStart, DetourPoints, SegmentEnd, BoundaryPolygon))
+		for (const AAnchorPoint* AnchorPoint : AnchorPoints)
 		{
-			return false;
-		}
+			if (not IsValid(AnchorPoint))
+			{
+				continue;
+			}
 
-		FVector PreviousPoint = SegmentStart;
-		for (const FVector& DetourPoint : DetourPoints)
-		{
 			if (not GetDoesSegmentRespectAnchorAvoidance(
-				PreviousPoint,
-				DetourPoint,
-				AnchorLocation,
+				SegmentStart,
+				SegmentEnd,
+				AnchorPoint->GetActorLocation(),
 				AvoidanceRadius))
 			{
 				return false;
 			}
-
-			PreviousPoint = DetourPoint;
 		}
 
-		return GetDoesSegmentRespectAnchorAvoidance(
-			PreviousPoint,
-			SegmentEnd,
-			AnchorLocation,
-			AvoidanceRadius);
+		return true;
 	}
+
+	bool GetDoesSegmentStayInsideBoundary(const FVector& SegmentStart,
+	                                      const FVector& SegmentEnd,
+	                                      const TArray<FVector2D>& BoundaryPolygon)
+	{
+		FVector OutsidePoint = FVector::ZeroVector;
+		return not TryFindFirstOutsidePointOnSegment(SegmentStart, SegmentEnd, BoundaryPolygon, OutsidePoint);
+	}
+
+	bool GetDoesSegmentRespectCampaignConstraints(const FVector& SegmentStart,
+	                                             const FVector& SegmentEnd,
+	                                             const TArray<FVector2D>& BoundaryPolygon,
+	                                             const TArray<AAnchorPoint*>& AnchorPoints,
+	                                             const float AvoidanceRadius)
+	{
+		const float SimplificationAvoidanceRadius = GetAnchorDetourRadius(AvoidanceRadius);
+		return GetDoesSegmentStayInsideBoundary(SegmentStart, SegmentEnd, BoundaryPolygon)
+			&& GetDoesSegmentRespectAllAnchorAvoidance(
+				SegmentStart,
+				SegmentEnd,
+				AnchorPoints,
+				SimplificationAvoidanceRadius);
+	}
+
+	bool GetDoesDetourStayInsideBoundary(const FVector& SegmentStart,
+	                                     const TArray<FVector>& DetourPoints,
+	                                     const FVector& SegmentEnd,
+	                                     const TArray<FVector2D>& BoundaryPolygon);
 
 	void BuildAnchorDetourRingPoints(const FVector& AnchorLocation,
 	                                 const float DetourRadius,
@@ -785,6 +973,68 @@ namespace
 
 			OutIsValidRingPoint[SampleIndex] = true;
 		}
+	}
+
+	void BuildAnchorDetourRingPathPrefixes(FAnchorDetourRingPath& InOutRingPath)
+	{
+		const int32 RingPointCount = InOutRingPath.RingPoints.Num();
+		InOutRingPath.ForwardInvalidSegmentPrefixCounts.SetNumZeroed(RingPointCount + 1);
+		InOutRingPath.ForwardSegmentLengthPrefixSums.SetNumZeroed(RingPointCount + 1);
+		for (int32 RingPointIndex = 0; RingPointIndex < RingPointCount; RingPointIndex++)
+		{
+			InOutRingPath.ForwardInvalidSegmentPrefixCounts[RingPointIndex + 1] =
+				InOutRingPath.ForwardInvalidSegmentPrefixCounts[RingPointIndex]
+				+ (InOutRingPath.IsForwardSegmentValid[RingPointIndex] ? 0 : 1);
+			InOutRingPath.ForwardSegmentLengthPrefixSums[RingPointIndex + 1] =
+				InOutRingPath.ForwardSegmentLengthPrefixSums[RingPointIndex]
+				+ InOutRingPath.ForwardSegmentLengths[RingPointIndex];
+		}
+	}
+
+	void BuildAnchorDetourRingPath(const FVector& AnchorLocation,
+	                               const float DetourRadius,
+	                               const float AvoidanceRadius,
+	                               const float PathZ,
+	                               const TArray<FVector2D>& BoundaryPolygon,
+	                               FAnchorDetourRingPath& OutRingPath)
+	{
+		BuildAnchorDetourRingPoints(
+			AnchorLocation,
+			DetourRadius,
+			PathZ,
+			BoundaryPolygon,
+			OutRingPath.RingPoints,
+			OutRingPath.IsValidRingPoint);
+
+		const int32 RingPointCount = OutRingPath.RingPoints.Num();
+		OutRingPath.IsForwardSegmentValid.Init(false, RingPointCount);
+		OutRingPath.ForwardSegmentLengths.Init(0.f, RingPointCount);
+		OutRingPath.TotalLength = 0.f;
+		for (int32 RingPointIndex = 0; RingPointIndex < RingPointCount; RingPointIndex++)
+		{
+			const int32 NextRingPointIndex = (RingPointIndex + 1) % RingPointCount;
+			const FVector& SegmentStart = OutRingPath.RingPoints[RingPointIndex];
+			const FVector& SegmentEnd = OutRingPath.RingPoints[NextRingPointIndex];
+			const float SegmentLength = FVector2D::Distance(GetXY(SegmentStart), GetXY(SegmentEnd));
+			OutRingPath.ForwardSegmentLengths[RingPointIndex] = SegmentLength;
+			OutRingPath.TotalLength += SegmentLength;
+
+			if (not OutRingPath.IsValidRingPoint[RingPointIndex]
+				|| not OutRingPath.IsValidRingPoint[NextRingPointIndex]
+				|| not GetDoesSegmentRespectAnchorAvoidance(
+					SegmentStart,
+					SegmentEnd,
+					AnchorLocation,
+					AvoidanceRadius)
+				|| not GetDoesSegmentStayInsideBoundary(SegmentStart, SegmentEnd, BoundaryPolygon))
+			{
+				continue;
+			}
+
+			OutRingPath.IsForwardSegmentValid[RingPointIndex] = true;
+		}
+
+		BuildAnchorDetourRingPathPrefixes(OutRingPath);
 	}
 
 	bool TryBuildAnchorRingArcPoints(const TArray<FVector>& RingPoints,
@@ -830,109 +1080,522 @@ namespace
 			BoundarySegmentMaxSampleCount);
 	}
 
-	FAnchorDetourCandidate BuildAnchorRingArcCandidate(const FVector& SegmentStart,
-	                                                   const FVector& SegmentEnd,
-	                                                   const TArray<FVector>& RingPoints,
-	                                                   const TArray<bool>& IsValidRingPoint,
-	                                                   const int32 EntryIndex,
-	                                                   const int32 ExitIndex,
-	                                                   const int32 DirectionStep,
-	                                                   const FVector& AnchorLocation,
-	                                                   const float AvoidanceRadius,
-	                                                   const TArray<FVector2D>& BoundaryPolygon)
+	bool GetDoesAnchorEndpointRespectConstraints(const FVector& SegmentStart,
+	                                             const FVector& SegmentEnd,
+	                                             const FVector& AnchorLocation,
+	                                             const float AvoidanceRadius,
+	                                             const TArray<FVector2D>& BoundaryPolygon)
 	{
-		FAnchorDetourCandidate Candidate;
-		if (not TryBuildAnchorRingArcPoints(
-			RingPoints,
-			IsValidRingPoint,
-			EntryIndex,
-			ExitIndex,
-			DirectionStep,
-			Candidate.Points))
-		{
-			return Candidate;
-		}
-
-		Candidate.bRespectsConstraints = GetDoesDetourRespectConstraints(
-			SegmentStart,
-			Candidate.Points,
-			SegmentEnd,
-			AnchorLocation,
-			AvoidanceRadius,
-			BoundaryPolygon);
-		if (Candidate.bRespectsConstraints)
-		{
-			Candidate.Length = GetPathLength(SegmentStart, Candidate.Points, SegmentEnd);
-		}
-
-		return Candidate;
+		return GetDoesSegmentRespectAnchorAvoidance(
+				SegmentStart,
+				SegmentEnd,
+				AnchorLocation,
+				AvoidanceRadius)
+			&& GetDoesSegmentStayInsideBoundary(SegmentStart, SegmentEnd, BoundaryPolygon);
 	}
 
-	void TryUpdateBestAnchorDetourCandidate(const FAnchorDetourCandidate& Candidate,
-	                                        FAnchorDetourCandidate& InOutBestCandidate)
+	int32 GetForwardRingSegmentInvalidCount(const FAnchorDetourRingPath& RingPath,
+	                                        const int32 StartIndex,
+	                                        const int32 EndIndex)
 	{
-		if (not Candidate.bRespectsConstraints)
+		const int32 RingPointCount = RingPath.RingPoints.Num();
+		if (RingPointCount <= 0 || StartIndex == EndIndex)
 		{
-			return;
+			return 0;
 		}
 
-		if (Candidate.Length >= InOutBestCandidate.Length)
+		if (StartIndex < EndIndex)
 		{
-			return;
+			return RingPath.ForwardInvalidSegmentPrefixCounts[EndIndex]
+				- RingPath.ForwardInvalidSegmentPrefixCounts[StartIndex];
 		}
 
-		InOutBestCandidate = Candidate;
+		return RingPath.ForwardInvalidSegmentPrefixCounts[RingPointCount]
+			- RingPath.ForwardInvalidSegmentPrefixCounts[StartIndex]
+			+ RingPath.ForwardInvalidSegmentPrefixCounts[EndIndex];
 	}
 
-	void TryBuildBestAnchorDetourCandidateForEntry(const FVector& SegmentStart,
-	                                               const FVector& SegmentEnd,
-	                                               const TArray<FVector>& RingPoints,
-	                                               const TArray<bool>& IsValidRingPoint,
-	                                               const int32 EntryIndex,
-	                                               const FVector& AnchorLocation,
-	                                               const float AvoidanceRadius,
-	                                               const TArray<FVector2D>& BoundaryPolygon,
-	                                               FAnchorDetourCandidate& InOutBestCandidate)
+	float GetForwardRingSegmentLength(const FAnchorDetourRingPath& RingPath,
+	                                  const int32 StartIndex,
+	                                  const int32 EndIndex)
 	{
-		for (int32 ExitIndex = 0; ExitIndex < RingPoints.Num(); ExitIndex++)
+		const int32 RingPointCount = RingPath.RingPoints.Num();
+		if (RingPointCount <= 0 || StartIndex == EndIndex)
 		{
-			if (not IsValidRingPoint[ExitIndex]
-				|| not GetDoesSegmentRespectAnchorAvoidance(
-					RingPoints[ExitIndex],
-					SegmentEnd,
-					AnchorLocation,
-					AvoidanceRadius))
+			return 0.f;
+		}
+
+		if (StartIndex < EndIndex)
+		{
+			return RingPath.ForwardSegmentLengthPrefixSums[EndIndex]
+				- RingPath.ForwardSegmentLengthPrefixSums[StartIndex];
+		}
+
+		return RingPath.TotalLength
+			- RingPath.ForwardSegmentLengthPrefixSums[StartIndex]
+			+ RingPath.ForwardSegmentLengthPrefixSums[EndIndex];
+	}
+
+	bool GetDoesAnchorRingArcStayValid(const FAnchorDetourRingPath& RingPath,
+	                                   const int32 EntryIndex,
+	                                   const int32 ExitIndex,
+	                                   const int32 DirectionStep)
+	{
+		if (not RingPath.IsValidRingPoint.IsValidIndex(EntryIndex)
+			|| not RingPath.IsValidRingPoint[EntryIndex])
+		{
+			return false;
+		}
+
+		const int32 ForwardStartIndex = DirectionStep > 0 ? EntryIndex : ExitIndex;
+		const int32 ForwardEndIndex = DirectionStep > 0 ? ExitIndex : EntryIndex;
+		return GetForwardRingSegmentInvalidCount(RingPath, ForwardStartIndex, ForwardEndIndex) == 0;
+	}
+
+	float GetAnchorRingArcLength(const FAnchorDetourRingPath& RingPath,
+	                             const int32 EntryIndex,
+	                             const int32 ExitIndex,
+	                             const int32 DirectionStep)
+	{
+		if (EntryIndex == ExitIndex)
+		{
+			return 0.f;
+		}
+
+		const int32 ForwardStartIndex = DirectionStep > 0 ? EntryIndex : ExitIndex;
+		const int32 ForwardEndIndex = DirectionStep > 0 ? ExitIndex : EntryIndex;
+		return GetForwardRingSegmentLength(RingPath, ForwardStartIndex, ForwardEndIndex);
+	}
+
+	void BuildAnchorEndpointOptions(const FVector& SegmentStart,
+	                                const FVector& SegmentEnd,
+	                                const FVector& AnchorLocation,
+	                                const float AvoidanceRadius,
+	                                const TArray<FVector2D>& BoundaryPolygon,
+	                                const FAnchorDetourRingPath& RingPath,
+	                                TArray<bool>& OutCanEnterByIndex,
+	                                TArray<bool>& OutCanExitByIndex,
+	                                TArray<float>& OutEnterDistanceByIndex,
+	                                TArray<float>& OutExitDistanceByIndex)
+	{
+		const int32 RingPointCount = RingPath.RingPoints.Num();
+		OutCanEnterByIndex.Init(false, RingPointCount);
+		OutCanExitByIndex.Init(false, RingPointCount);
+		OutEnterDistanceByIndex.Init(0.f, RingPointCount);
+		OutExitDistanceByIndex.Init(0.f, RingPointCount);
+
+		for (int32 RingPointIndex = 0; RingPointIndex < RingPointCount; RingPointIndex++)
+		{
+			if (not RingPath.IsValidRingPoint.IsValidIndex(RingPointIndex)
+				|| not RingPath.IsValidRingPoint[RingPointIndex])
 			{
 				continue;
 			}
 
-			TryUpdateBestAnchorDetourCandidate(
-				BuildAnchorRingArcCandidate(
-					SegmentStart,
-					SegmentEnd,
-					RingPoints,
-					IsValidRingPoint,
+			const FVector& RingPoint = RingPath.RingPoints[RingPointIndex];
+			OutCanEnterByIndex[RingPointIndex] = GetDoesAnchorEndpointRespectConstraints(
+				SegmentStart,
+				RingPoint,
+				AnchorLocation,
+				AvoidanceRadius,
+				BoundaryPolygon);
+			OutCanExitByIndex[RingPointIndex] = GetDoesAnchorEndpointRespectConstraints(
+				RingPoint,
+				SegmentEnd,
+				AnchorLocation,
+				AvoidanceRadius,
+				BoundaryPolygon);
+			OutEnterDistanceByIndex[RingPointIndex] =
+				FVector2D::Distance(GetXY(SegmentStart), GetXY(RingPoint));
+			OutExitDistanceByIndex[RingPointIndex] =
+				FVector2D::Distance(GetXY(RingPoint), GetXY(SegmentEnd));
+		}
+	}
+
+	void TryUpdateBestAnchorDetourIndices(const FAnchorDetourRingPath& RingPath,
+	                                      const int32 EntryIndex,
+	                                      const int32 ExitIndex,
+	                                      const int32 DirectionStep,
+	                                      const float CandidateEndpointLength,
+	                                      float& InOutBestLength,
+	                                      int32& InOutBestEntryIndex,
+	                                      int32& InOutBestExitIndex,
+	                                      int32& InOutBestDirectionStep)
+	{
+		if (not GetDoesAnchorRingArcStayValid(RingPath, EntryIndex, ExitIndex, DirectionStep))
+		{
+			return;
+		}
+
+		const float CandidateLength = CandidateEndpointLength
+			+ GetAnchorRingArcLength(RingPath, EntryIndex, ExitIndex, DirectionStep);
+		if (CandidateLength >= InOutBestLength)
+		{
+			return;
+		}
+
+		InOutBestLength = CandidateLength;
+		InOutBestEntryIndex = EntryIndex;
+		InOutBestExitIndex = ExitIndex;
+		InOutBestDirectionStep = DirectionStep;
+	}
+
+	void FindBestAnchorDetourIndices(const FAnchorDetourRingPath& RingPath,
+	                                  const TArray<bool>& CanEnterByIndex,
+	                                  const TArray<bool>& CanExitByIndex,
+	                                  const TArray<float>& EnterDistanceByIndex,
+	                                  const TArray<float>& ExitDistanceByIndex,
+	                                  FAnchorDetourCandidate& InOutBestCandidate,
+	                                  int32& OutBestEntryIndex,
+	                                  int32& OutBestExitIndex,
+	                                  int32& OutBestDirectionStep)
+	{
+		OutBestEntryIndex = INDEX_NONE;
+		OutBestExitIndex = INDEX_NONE;
+		OutBestDirectionStep = 1;
+		for (int32 EntryIndex = 0; EntryIndex < RingPath.RingPoints.Num(); EntryIndex++)
+		{
+			if (not CanEnterByIndex[EntryIndex])
+			{
+				continue;
+			}
+
+			for (int32 ExitIndex = 0; ExitIndex < RingPath.RingPoints.Num(); ExitIndex++)
+			{
+				if (not CanExitByIndex[ExitIndex])
+				{
+					continue;
+				}
+
+				const float CandidateEndpointLength =
+					EnterDistanceByIndex[EntryIndex] + ExitDistanceByIndex[ExitIndex];
+				TryUpdateBestAnchorDetourIndices(
+					RingPath,
 					EntryIndex,
 					ExitIndex,
 					1,
-					AnchorLocation,
-					AvoidanceRadius,
-					BoundaryPolygon),
-				InOutBestCandidate);
-			TryUpdateBestAnchorDetourCandidate(
-				BuildAnchorRingArcCandidate(
-					SegmentStart,
-					SegmentEnd,
-					RingPoints,
-					IsValidRingPoint,
+					CandidateEndpointLength,
+					InOutBestCandidate.Length,
+					OutBestEntryIndex,
+					OutBestExitIndex,
+					OutBestDirectionStep);
+				TryUpdateBestAnchorDetourIndices(
+					RingPath,
 					EntryIndex,
 					ExitIndex,
 					-1,
-					AnchorLocation,
-					AvoidanceRadius,
-					BoundaryPolygon),
-				InOutBestCandidate);
+					CandidateEndpointLength,
+					InOutBestCandidate.Length,
+					OutBestEntryIndex,
+					OutBestExitIndex,
+					OutBestDirectionStep);
+			}
 		}
+	}
+
+	bool GetDoesAnchorDetourRespectConstraints(const FVector& SegmentStart,
+	                                           const TArray<FVector>& DetourPoints,
+	                                           const FVector& SegmentEnd,
+	                                           const FVector& AnchorLocation,
+	                                           const float AvoidanceRadius,
+	                                           const TArray<FVector2D>& BoundaryPolygon)
+	{
+		if (not GetDoesDetourStayInsideBoundary(SegmentStart, DetourPoints, SegmentEnd, BoundaryPolygon))
+		{
+			return false;
+		}
+
+		FVector PreviousPoint = SegmentStart;
+		for (const FVector& DetourPoint : DetourPoints)
+		{
+			if (not GetDoesSegmentRespectAnchorAvoidance(
+				PreviousPoint,
+				DetourPoint,
+				AnchorLocation,
+				AvoidanceRadius))
+			{
+				return false;
+			}
+
+			PreviousPoint = DetourPoint;
+		}
+
+		return GetDoesSegmentRespectAnchorAvoidance(
+			PreviousPoint,
+			SegmentEnd,
+			AnchorLocation,
+			AvoidanceRadius);
+	}
+
+	void TryUpdateFallbackAnchorDetourCandidate(const FVector& SegmentStart,
+	                                           const TArray<FVector>& CandidatePoints,
+	                                           const FVector& SegmentEnd,
+	                                           const FVector& AnchorLocation,
+	                                           const float AvoidanceRadius,
+	                                           const TArray<FVector2D>& BoundaryPolygon,
+	                                           FAnchorDetourCandidate& InOutBestCandidate)
+	{
+		if (not GetDoesAnchorDetourRespectConstraints(
+			SegmentStart,
+			CandidatePoints,
+			SegmentEnd,
+			AnchorLocation,
+			AvoidanceRadius,
+			BoundaryPolygon))
+		{
+			return;
+		}
+
+		const float CandidateLength = GetPathLength(SegmentStart, CandidatePoints, SegmentEnd);
+		if (InOutBestCandidate.bRespectsConstraints
+			&& not InOutBestCandidate.bNeedsBoundaryRepair
+			&& CandidateLength >= InOutBestCandidate.Length)
+		{
+			return;
+		}
+
+		InOutBestCandidate.Points = CandidatePoints;
+		InOutBestCandidate.Length = CandidateLength;
+		InOutBestCandidate.bRespectsConstraints = true;
+		InOutBestCandidate.bNeedsBoundaryRepair = false;
+	}
+
+	bool GetDoesAnchorDetourRespectAnchorAvoidanceOnly(const FVector& SegmentStart,
+	                                                   const TArray<FVector>& DetourPoints,
+	                                                   const FVector& SegmentEnd,
+	                                                   const FVector& AnchorLocation,
+	                                                   const float AvoidanceRadius)
+	{
+		FVector PreviousPoint = SegmentStart;
+		for (const FVector& DetourPoint : DetourPoints)
+		{
+			if (not GetDoesSegmentRespectAnchorAvoidance(
+				PreviousPoint,
+				DetourPoint,
+				AnchorLocation,
+				AvoidanceRadius))
+			{
+				return false;
+			}
+
+			PreviousPoint = DetourPoint;
+		}
+
+		return GetDoesSegmentRespectAnchorAvoidance(
+			PreviousPoint,
+			SegmentEnd,
+			AnchorLocation,
+			AvoidanceRadius);
+	}
+
+	void TryUpdateRelaxedFallbackAnchorDetourCandidate(const FVector& SegmentStart,
+	                                                  const TArray<FVector>& CandidatePoints,
+	                                                  const FVector& SegmentEnd,
+	                                                  const FVector& AnchorLocation,
+	                                                  const float AvoidanceRadius,
+	                                                  FAnchorDetourCandidate& InOutBestCandidate)
+	{
+		if ((InOutBestCandidate.bRespectsConstraints && not InOutBestCandidate.bNeedsBoundaryRepair)
+			|| not GetDoesAnchorDetourRespectAnchorAvoidanceOnly(
+				SegmentStart,
+				CandidatePoints,
+				SegmentEnd,
+				AnchorLocation,
+				AvoidanceRadius))
+		{
+			return;
+		}
+
+		const float CandidateLength = GetPathLength(SegmentStart, CandidatePoints, SegmentEnd);
+		if (CandidateLength >= InOutBestCandidate.Length)
+		{
+			return;
+		}
+
+		InOutBestCandidate.Points = CandidatePoints;
+		InOutBestCandidate.Length = CandidateLength;
+		InOutBestCandidate.bRespectsConstraints = true;
+		InOutBestCandidate.bNeedsBoundaryRepair = true;
+	}
+
+	bool TryBuildTangentPointsToAnchorCircle(const FVector& Point,
+	                                         const FVector& AnchorLocation,
+	                                         const float Radius,
+	                                         TArray<FVector>& OutTangentPoints)
+	{
+		OutTangentPoints.Reset();
+		const FVector2D AnchorXY = GetXY(AnchorLocation);
+		const FVector2D PointFromAnchor = GetXY(Point) - AnchorXY;
+		const float Distance = PointFromAnchor.Size();
+		if (Distance <= Radius + KINDA_SMALL_NUMBER)
+		{
+			if (PointFromAnchor.SizeSquared() > MinDirectionSizeSquared)
+			{
+				OutTangentPoints.Add(BuildVectorFromXY(
+					AnchorXY + PointFromAnchor.GetSafeNormal() * Radius,
+					Point.Z));
+			}
+
+			return OutTangentPoints.Num() > 0;
+		}
+
+		const float BaseAngle = FMath::Atan2(PointFromAnchor.Y, PointFromAnchor.X);
+		const float TangentAngleOffset = FMath::Acos(Radius / Distance);
+		OutTangentPoints.Add(BuildVectorFromAngle(AnchorXY, BaseAngle - TangentAngleOffset, Radius, Point.Z));
+		OutTangentPoints.Add(BuildVectorFromAngle(AnchorXY, BaseAngle + TangentAngleOffset, Radius, Point.Z));
+		return true;
+	}
+
+	float GetPositiveAngleDelta(const float FromAngle, const float ToAngle)
+	{
+		float Delta = FMath::Fmod(ToAngle - FromAngle, 2.f * UE_PI);
+		if (Delta < 0.f)
+		{
+			Delta += 2.f * UE_PI;
+		}
+
+		return Delta;
+	}
+
+	void BuildFallbackAnchorArcPoints(const FVector& EntryPoint,
+	                                  const FVector& ExitPoint,
+	                                  const FVector& AnchorLocation,
+	                                  const float Radius,
+	                                  const int32 DirectionStep,
+	                                  TArray<FVector>& OutArcPoints)
+	{
+		OutArcPoints.Reset();
+		const FVector2D AnchorXY = GetXY(AnchorLocation);
+		const float EntryAngle = FMath::Atan2(EntryPoint.Y - AnchorLocation.Y, EntryPoint.X - AnchorLocation.X);
+		const float ExitAngle = FMath::Atan2(ExitPoint.Y - AnchorLocation.Y, ExitPoint.X - AnchorLocation.X);
+		const float DirectedDelta = DirectionStep > 0
+			                            ? GetPositiveAngleDelta(EntryAngle, ExitAngle)
+			                            : GetPositiveAngleDelta(ExitAngle, EntryAngle);
+		const float FullCircleSampleAngle = 2.f * UE_PI / static_cast<float>(AnchorBoundaryStandoffSampleCount);
+		const int32 ArcStepCount = FMath::Max(1, FMath::CeilToInt(DirectedDelta / FullCircleSampleAngle));
+		OutArcPoints.Reserve(ArcStepCount + 1);
+		for (int32 ArcPointIndex = 0; ArcPointIndex <= ArcStepCount; ArcPointIndex++)
+		{
+			const float Alpha = static_cast<float>(ArcPointIndex) / static_cast<float>(ArcStepCount);
+			const float Angle = EntryAngle + static_cast<float>(DirectionStep) * DirectedDelta * Alpha;
+			OutArcPoints.Add(BuildVectorFromAngle(AnchorXY, Angle, Radius, EntryPoint.Z));
+		}
+	}
+
+	void TryBuildFallbackAnchorTangentCandidates(const FVector& SegmentStart,
+	                                            const FVector& SegmentEnd,
+	                                            const FVector& AnchorLocation,
+	                                            const float AvoidanceRadius,
+	                                            const TArray<FVector2D>& BoundaryPolygon,
+	                                            FAnchorDetourCandidate& InOutBestCandidate)
+	{
+		const float DetourRadius = GetAnchorDetourRadius(AvoidanceRadius);
+		TArray<FVector> StartTangentPoints;
+		TArray<FVector> EndTangentPoints;
+		if (not TryBuildTangentPointsToAnchorCircle(SegmentStart, AnchorLocation, DetourRadius, StartTangentPoints)
+			|| not TryBuildTangentPointsToAnchorCircle(SegmentEnd, AnchorLocation, DetourRadius, EndTangentPoints))
+		{
+			return;
+		}
+
+		for (const FVector& StartTangentPoint : StartTangentPoints)
+		{
+			for (const FVector& EndTangentPoint : EndTangentPoints)
+			{
+				for (const int32 DirectionStep : { -1, 1 })
+				{
+					TArray<FVector> RawCandidatePoints;
+					BuildFallbackAnchorArcPoints(
+						StartTangentPoint,
+						EndTangentPoint,
+						AnchorLocation,
+						DetourRadius,
+						DirectionStep,
+						RawCandidatePoints);
+					TryUpdateRelaxedFallbackAnchorDetourCandidate(
+						SegmentStart,
+						RawCandidatePoints,
+						SegmentEnd,
+						AnchorLocation,
+						AvoidanceRadius,
+						InOutBestCandidate);
+
+					TArray<FVector> CandidatePoints;
+					CandidatePoints.Reserve(RawCandidatePoints.Num());
+					for (const FVector& RawCandidatePoint : RawCandidatePoints)
+					{
+						CandidatePoints.Add(FindBoundarySafeAnchorStandoffPoint(
+							RawCandidatePoint,
+							AnchorLocation,
+							DetourRadius,
+							BoundaryPolygon));
+					}
+					TryUpdateFallbackAnchorDetourCandidate(
+						SegmentStart,
+						CandidatePoints,
+						SegmentEnd,
+						AnchorLocation,
+						AvoidanceRadius,
+						BoundaryPolygon,
+						InOutBestCandidate);
+					TryUpdateRelaxedFallbackAnchorDetourCandidate(
+						SegmentStart,
+						CandidatePoints,
+						SegmentEnd,
+						AnchorLocation,
+						AvoidanceRadius,
+						InOutBestCandidate);
+				}
+			}
+		}
+	}
+
+	FAnchorDetourCandidate BuildFallbackAnchorDetourCandidate(const FVector& SegmentStart,
+	                                                          const FVector& SegmentEnd,
+	                                                          const FVector& AnchorLocation,
+	                                                          const float AvoidanceRadius,
+	                                                          const TArray<FVector2D>& BoundaryPolygon)
+	{
+		FAnchorDetourCandidate BestCandidate;
+		const FVector2D SegmentDelta = GetXY(SegmentEnd) - GetXY(SegmentStart);
+		if (SegmentDelta.SizeSquared() <= MinDirectionSizeSquared)
+		{
+			return BestCandidate;
+		}
+
+		const FVector2D SegmentDirection = SegmentDelta.GetSafeNormal();
+		const float DetourRadius = GetAnchorDetourRadius(AvoidanceRadius);
+		const FVector2D AnchorXY = GetXY(AnchorLocation);
+		const FVector2D PerpendicularDirection(-SegmentDirection.Y, SegmentDirection.X);
+		for (const float DirectionSign : { -1.f, 1.f })
+		{
+			const FVector PreferredPoint =
+				BuildVectorFromXY(AnchorXY + PerpendicularDirection * DirectionSign * DetourRadius, SegmentStart.Z);
+			const FVector CandidatePoint = FindBoundarySafeAnchorStandoffPoint(
+				PreferredPoint,
+				AnchorLocation,
+				DetourRadius,
+				BoundaryPolygon);
+			TArray<FVector> CandidatePoints;
+			CandidatePoints.Add(CandidatePoint);
+			TryUpdateFallbackAnchorDetourCandidate(
+				SegmentStart,
+				CandidatePoints,
+				SegmentEnd,
+				AnchorLocation,
+				AvoidanceRadius,
+				BoundaryPolygon,
+				BestCandidate);
+		}
+
+		TryBuildFallbackAnchorTangentCandidates(
+			SegmentStart,
+			SegmentEnd,
+			AnchorLocation,
+			AvoidanceRadius,
+			BoundaryPolygon,
+			BestCandidate);
+		return BestCandidate;
 	}
 
 	FAnchorDetourCandidate BuildBestAnchorDetourCandidate(const FVector& SegmentStart,
@@ -942,40 +1605,64 @@ namespace
 	                                                      const TArray<FVector2D>& BoundaryPolygon)
 	{
 		FAnchorDetourCandidate BestCandidate;
-		TArray<FVector> RingPoints;
-		TArray<bool> IsValidRingPoint;
-		BuildAnchorDetourRingPoints(
+		FAnchorDetourRingPath RingPath;
+		BuildAnchorDetourRingPath(
 			AnchorLocation,
 			GetAnchorDetourRadius(AvoidanceRadius),
+			AvoidanceRadius,
 			SegmentStart.Z,
 			BoundaryPolygon,
-			RingPoints,
-			IsValidRingPoint);
+			RingPath);
 
-		for (int32 EntryIndex = 0; EntryIndex < RingPoints.Num(); EntryIndex++)
+		TArray<bool> CanEnterByIndex;
+		TArray<bool> CanExitByIndex;
+		TArray<float> EnterDistanceByIndex;
+		TArray<float> ExitDistanceByIndex;
+		BuildAnchorEndpointOptions(
+			SegmentStart,
+			SegmentEnd,
+			AnchorLocation,
+			AvoidanceRadius,
+			BoundaryPolygon,
+			RingPath,
+			CanEnterByIndex,
+			CanExitByIndex,
+			EnterDistanceByIndex,
+			ExitDistanceByIndex);
+
+		int32 BestEntryIndex = INDEX_NONE;
+		int32 BestExitIndex = INDEX_NONE;
+		int32 BestDirectionStep = 1;
+		FindBestAnchorDetourIndices(
+			RingPath,
+			CanEnterByIndex,
+			CanExitByIndex,
+			EnterDistanceByIndex,
+			ExitDistanceByIndex,
+			BestCandidate,
+			BestEntryIndex,
+			BestExitIndex,
+			BestDirectionStep);
+
+		if (BestEntryIndex == INDEX_NONE
+			|| not TryBuildAnchorRingArcPoints(
+				RingPath.RingPoints,
+				RingPath.IsValidRingPoint,
+				BestEntryIndex,
+				BestExitIndex,
+				BestDirectionStep,
+				BestCandidate.Points))
 		{
-			if (not IsValidRingPoint[EntryIndex]
-				|| not GetDoesSegmentRespectAnchorAvoidance(
-					SegmentStart,
-					RingPoints[EntryIndex],
-					AnchorLocation,
-					AvoidanceRadius))
-			{
-				continue;
-			}
-
-			TryBuildBestAnchorDetourCandidateForEntry(
+			return BuildFallbackAnchorDetourCandidate(
 				SegmentStart,
 				SegmentEnd,
-				RingPoints,
-				IsValidRingPoint,
-				EntryIndex,
 				AnchorLocation,
 				AvoidanceRadius,
-				BoundaryPolygon,
-				BestCandidate);
+				BoundaryPolygon);
 		}
 
+		BestCandidate.bRespectsConstraints = true;
+		BestCandidate.bNeedsBoundaryRepair = false;
 		return BestCandidate;
 	}
 
@@ -1024,9 +1711,7 @@ namespace
 				{
 					PathPoints.Insert(DetourCandidate.Points[DetourPointIndex], PathIndex + 1);
 				}
-				PathIndex += DetourCandidate.Points.Num();
-				bInsertedDetour = true;
-				break;
+				return true;
 			}
 		}
 
@@ -1224,11 +1909,10 @@ namespace
 	                                     const FVector& SegmentEnd,
 	                                     const TArray<FVector2D>& BoundaryPolygon)
 	{
-		FVector OutsidePoint = FVector::ZeroVector;
 		FVector PreviousPoint = SegmentStart;
 		for (const FVector& DetourPoint : DetourPoints)
 		{
-			if (TryFindFirstOutsidePointOnSegment(PreviousPoint, DetourPoint, BoundaryPolygon, OutsidePoint))
+			if (not GetDoesSegmentStayInsideBoundary(PreviousPoint, DetourPoint, BoundaryPolygon))
 			{
 				return false;
 			}
@@ -1236,7 +1920,7 @@ namespace
 			PreviousPoint = DetourPoint;
 		}
 
-		return not TryFindFirstOutsidePointOnSegment(PreviousPoint, SegmentEnd, BoundaryPolygon, OutsidePoint);
+		return GetDoesSegmentStayInsideBoundary(PreviousPoint, SegmentEnd, BoundaryPolygon);
 	}
 
 	bool TryBuildBoundaryArcPoints(const FBoundaryIntersection& ExitIntersection,
@@ -1254,10 +1938,12 @@ namespace
 			return false;
 		}
 
-		OutArcPoints.Add(BuildBoundaryOffsetPoint(
+		const bool bIsCounterClockwise = GetPolygonSignedArea(BoundaryPolygon) > 0.f;
+		OutArcPoints.Add(BuildBoundaryOffsetPointWithOrientation(
 			ExitIntersection.Point,
 			ExitIntersection.BoundarySegmentIndex,
 			BoundaryPolygon,
+			bIsCounterClockwise,
 			BoundaryPadding,
 			Z));
 
@@ -1274,18 +1960,20 @@ namespace
 				break;
 			}
 
-			OutArcPoints.Add(BuildBoundaryVertexOffsetPoint(
+			OutArcPoints.Add(BuildBoundaryVertexOffsetPointWithOrientation(
 				CurrentVertexIndex,
 				BoundaryPolygon,
+				bIsCounterClockwise,
 				BoundaryPadding,
 				Z));
 			CurrentVertexIndex = (CurrentVertexIndex + DirectionStep + BoundaryPointCount) % BoundaryPointCount;
 		}
 
-		OutArcPoints.Add(BuildBoundaryOffsetPoint(
+		OutArcPoints.Add(BuildBoundaryOffsetPointWithOrientation(
 			ReentryIntersection.Point,
 			ReentryIntersection.BoundarySegmentIndex,
 			BoundaryPolygon,
+			bIsCounterClockwise,
 			BoundaryPadding,
 			Z));
 		return OutArcPoints.Num() >= 2;
@@ -1540,6 +2228,11 @@ namespace
 	                                      TArray<FVector>& OutDetourPoints)
 	{
 		OutDetourPoints.Reset();
+		if (GetDoesSegmentStayInsideBoundary(SegmentStart, SegmentEnd, BoundaryPolygon))
+		{
+			return false;
+		}
+
 		if (TryBuildBoundaryDetourPoints(
 			SegmentStart,
 			SegmentEnd,
@@ -1652,6 +2345,32 @@ namespace
 		}
 	}
 
+	bool TrySimplifyPathPoints(TArray<FVector>& PathPoints,
+	                           const TArray<FVector2D>& BoundaryPolygon,
+	                           const TArray<AAnchorPoint*>& AnchorPoints,
+	                           const float AvoidanceRadius)
+	{
+		bool bRemovedPathPoint = false;
+		for (int32 PathIndex = 0; PathIndex + 2 < PathPoints.Num();)
+		{
+			if (not GetDoesSegmentRespectCampaignConstraints(
+				PathPoints[PathIndex],
+				PathPoints[PathIndex + 2],
+				BoundaryPolygon,
+				AnchorPoints,
+				AvoidanceRadius))
+			{
+				PathIndex++;
+				continue;
+			}
+
+			PathPoints.RemoveAt(PathIndex + 1);
+			bRemovedPathPoint = true;
+		}
+
+		return bRemovedPathPoint;
+	}
+
 	void RepairPath(TArray<FVector>& PathPoints,
 	                const TArray<FVector2D>& BoundaryPolygon,
 	                const TArray<AAnchorPoint*>& AnchorPoints,
@@ -1666,6 +2385,7 @@ namespace
 		 */
 		ProjectAllPathPoints(PathPoints, BoundaryPolygon, AnchorPoints, AvoidanceRadius, BoundaryPadding);
 		RemoveDuplicatePathPoints(PathPoints);
+		(void)TrySimplifyPathPoints(PathPoints, BoundaryPolygon, AnchorPoints, AvoidanceRadius);
 
 		for (int32 AttemptIndex = 0; AttemptIndex < MaxRepairAttempts; AttemptIndex++)
 		{
@@ -1673,6 +2393,13 @@ namespace
 				PathPoints,
 				BoundaryPolygon,
 				BoundaryPadding);
+			if (bInsertedBoundaryDetour)
+			{
+				ProjectAllPathPoints(PathPoints, BoundaryPolygon, AnchorPoints, AvoidanceRadius, BoundaryPadding);
+				RemoveDuplicatePathPoints(PathPoints);
+				(void)TrySimplifyPathPoints(PathPoints, BoundaryPolygon, AnchorPoints, AvoidanceRadius);
+			}
+
 			const bool bInsertedAnchorDetour = TryInsertAnchorDetour(
 				PathPoints,
 				AnchorPoints,
@@ -1685,6 +2412,7 @@ namespace
 
 			ProjectAllPathPoints(PathPoints, BoundaryPolygon, AnchorPoints, AvoidanceRadius, BoundaryPadding);
 			RemoveDuplicatePathPoints(PathPoints);
+			(void)TrySimplifyPathPoints(PathPoints, BoundaryPolygon, AnchorPoints, AvoidanceRadius);
 		}
 	}
 }
@@ -2025,8 +2753,9 @@ TArray<FVector> AWorldDivisionBase::BuildPathToTargetPoint(const FVector& Target
 	const float BoundaryPadding = IsValid(Settings) ? Settings->WorldDivisionBoundaryProjectionPadding : 0.f;
 	const int32 MaxRepairAttempts = IsValid(Settings) ? Settings->WorldDivisionPathRepairMaxAttempts : 1;
 
-	const TArray<AAnchorPoint*> AnchorPoints = FindAnchorPoints(this);
-	const TArray<FVector2D> BoundaryPolygon = BuildBoundaryPolygon(this);
+	const FWorldDivisionPathContext PathContext = BuildWorldDivisionPathContext(this);
+	const TArray<AAnchorPoint*>& AnchorPoints = PathContext.AnchorPoints;
+	const TArray<FVector2D>& BoundaryPolygon = PathContext.BoundaryPolygon;
 	const FVector StartLocation = ProjectToValidMovePoint(
 		GetActorLocation(),
 		BoundaryPolygon,
