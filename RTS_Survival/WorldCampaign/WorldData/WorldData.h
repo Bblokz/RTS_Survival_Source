@@ -121,6 +121,17 @@ public:
 	                                      FWorldDataStrengthReasonDefinition& OutDefinition) const;
 
 	/**
+	 * @brief Gets the difficulty-adjusted strength definition for a field division enum.
+	 * @param FieldDivision Field division type to look up.
+	 * @param GameDifficulty Current campaign difficulty.
+	 * @param OutDefinition Output definition with percentage already multiplied for difficulty.
+	 * @return true when a field division definition was found.
+	 */
+	bool TryGetFieldDivisionDefinition(EWorldFieldDivisions FieldDivision,
+	                                   ERTSGameDifficulty GameDifficulty,
+	                                   FWorldDataStrengthReasonDefinition& OutDefinition) const;
+
+	/**
 	 * @brief Returns all bonus objective definitions used when filling generated enemy items.
 	 * @return Designer-authored bonus objective definitions.
 	 */
@@ -169,4 +180,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength|Strategic Support",
 		meta = (AllowPrivateAccess = "true"))
 	FRTSPerDifficultyMlt M_StrategicSupportMlt;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength|Field Divisions",
+		meta = (AllowPrivateAccess = "true"))
+	TMap<EWorldFieldDivisions, FWorldDataStrengthReasonDefinition> M_FieldDivisionDefinitions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength|Field Divisions",
+		meta = (AllowPrivateAccess = "true"))
+	FRTSPerDifficultyMlt M_FieldDivisionMlt;
 };

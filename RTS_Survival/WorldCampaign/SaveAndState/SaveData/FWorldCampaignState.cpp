@@ -75,6 +75,41 @@ namespace
 
 		return AnchorKeys;
 	}
+
+	bool GetDoesContainInvalidDivisionData(const TArray<FWorldDivisionSaveData>& WorldDivisions)
+	{
+		TSet<FGuid> DivisionKeys;
+		DivisionKeys.Reserve(WorldDivisions.Num());
+
+		for (const FWorldDivisionSaveData& DivisionSaveData : WorldDivisions)
+		{
+			if (not DivisionSaveData.DivisionKey.IsValid()
+				|| DivisionSaveData.DivisionType == EWorldFieldDivisions::None)
+			{
+				return true;
+			}
+
+			const int32 DivisionKeyCountBeforeAdd = DivisionKeys.Num();
+			DivisionKeys.Add(DivisionSaveData.DivisionKey);
+			if (DivisionKeys.Num() == DivisionKeyCountBeforeAdd)
+			{
+				return true;
+			}
+
+			if (not DivisionSaveData.bHasPendingMoveOrder)
+			{
+				continue;
+			}
+
+			if (DivisionSaveData.PathPoints.Num() == 0
+				|| not DivisionSaveData.PathPoints.IsValidIndex(DivisionSaveData.CurrentPathPointIndex))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
 }
 
 bool FWorldCampaignState::GetIsValidForRestore() const
@@ -120,6 +155,11 @@ bool FWorldCampaignState::GetIsValidForRestore() const
 		{
 			return false;
 		}
+	}
+
+	if (GetDoesContainInvalidDivisionData(WorldDivisions))
+	{
+		return false;
 	}
 
 	return true;

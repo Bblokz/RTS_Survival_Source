@@ -20,6 +20,8 @@
 #include "RTS_Survival/WorldCampaign/WorldMapUI/AsyncWorldGeneration/W_AsyncWorldGeneration.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
 #include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldStrategicSupportArea.h"
+#include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionInfluenceComponent.h"
+#include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionManager.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
@@ -45,6 +47,7 @@ AWorldPlayerController::AWorldPlayerController()
 
 	M_PlayerWorldOutliner = CreateDefaultSubobject<UPlayerWorldOutliner>(TEXT("PlayerWorldOutliner"));
 	M_WorldStateAndSaveManager = CreateDefaultSubobject<UWorldStateAndSaveManager>(TEXT("WorldStateAndSaveManager"));
+	M_WorldDivisionManager = CreateDefaultSubobject<UWorldDivisionManager>(TEXT("WorldDivisionManager"));
 	M_PlayerResourceManager = CreateDefaultSubobject<UPlayerResourceManager>(TEXT("PlayerResourceManager"));
 }
 
@@ -74,6 +77,16 @@ UPlayerResourceManager* AWorldPlayerController::GetPlayerResourceManager() const
 	}
 
 	return M_PlayerResourceManager;
+}
+
+UWorldDivisionManager* AWorldPlayerController::GetWorldDivisionManager() const
+{
+	if (not GetIsValidWorldDivisionManager())
+	{
+		return nullptr;
+	}
+
+	return M_WorldDivisionManager;
 }
 
 void AWorldPlayerController::PostInitializeComponents()
@@ -151,11 +164,39 @@ void AWorldPlayerController::PlayerTurn()
 
 	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
 	M_WorldGenerator->AdjustDifficultyPercentagesForFieldDivisions(M_SelectedDifficulty.DifficultyLevel);
+	MovePlayerDivisions();
 }
 
 void AWorldPlayerController::EnemyTurn()
 {
-	PlayerTurn();
+	if (not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
+	M_WorldGenerator->AdjustDifficultyPercentagesForFieldDivisions(M_SelectedDifficulty.DifficultyLevel);
+	MoveEnemyDivisions();
+}
+
+void AWorldPlayerController::MovePlayerDivisions()
+{
+	if (not GetIsValidWorldDivisionManager())
+	{
+		return;
+	}
+
+	M_WorldDivisionManager->MovePlayerDivisions(M_SelectedDifficulty.DifficultyLevel);
+}
+
+void AWorldPlayerController::MoveEnemyDivisions()
+{
+	if (not GetIsValidWorldDivisionManager())
+	{
+		return;
+	}
+
+	M_WorldDivisionManager->MoveEnemyDivisions(M_SelectedDifficulty.DifficultyLevel);
 }
 
 bool AWorldPlayerController::PrimaryClick_Regular()
@@ -296,10 +337,12 @@ void AWorldPlayerController::ShowClickedDifficultyInfluenceRadiiForActor(AActor*
 	if (IsValid(ClickedDifficultyInfluenceRadiusActor) && ClickedDifficultyInfluenceRadiusActor != Actor)
 	{
 		UWorldStrategicSupportArea::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
+		UWorldDivisionInfluenceComponent::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
 	}
 
 	M_ClickedDifficultyInfluenceRadiusActor = Actor;
 	UWorldStrategicSupportArea::ShowSelectedRadiiOnActor(Actor);
+	UWorldDivisionInfluenceComponent::ShowSelectedRadiiOnActor(Actor);
 }
 
 void AWorldPlayerController::HideClickedDifficultyInfluenceRadii()
@@ -308,6 +351,7 @@ void AWorldPlayerController::HideClickedDifficultyInfluenceRadii()
 	if (IsValid(ClickedDifficultyInfluenceRadiusActor))
 	{
 		UWorldStrategicSupportArea::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
+		UWorldDivisionInfluenceComponent::HideSelectedRadiiOnActor(ClickedDifficultyInfluenceRadiusActor);
 	}
 
 	M_ClickedDifficultyInfluenceRadiusActor = nullptr;
@@ -371,6 +415,17 @@ void AWorldPlayerController::WorldCamera_RightMovement(const float AxisValue)
 	}
 
 	M_WorldCameraController->RightMovement(AxisValue);
+}
+
+bool AWorldPlayerController::IssueWorldDivisionMoveOrder(AWorldDivisionBase* WorldDivision,
+                                                         const FVector& TargetLocation)
+{
+	if (not GetIsValidWorldDivisionManager())
+	{
+		return false;
+	}
+
+	return M_WorldDivisionManager->IssueMoveOrderToDivision(WorldDivision, TargetLocation);
 }
 
 void AWorldPlayerController::WorldCamera_MoveTo(const FMovePlayerCamera& MoveRequest)
@@ -525,6 +580,7 @@ void AWorldPlayerController::BeginPlay_LoadSavedWorld()
 
 	M_WorldGenerator->RestoreWorldStateFromSave(LoadedWorldCampaignState);
 	M_WorldProfileAndUIManager->SetupUIForLoadedCampaign(LoadedPlayerProfileSaveData);
+	RestoreWorldDivisionsFromSave(LoadedWorldCampaignState);
 	OnAllWorldObjectsAndTheirDataReady();
 }
 
@@ -546,6 +602,7 @@ void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
 	const FPlayerProfileSaveData PlayerProfileSaveData =
 		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(M_PlayerFaction);
 	M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);
+	InitializeWorldDivisionsForNewCampaign();
 	OnAllWorldObjectsAndTheirDataReady();
 }
 
@@ -557,6 +614,44 @@ void AWorldPlayerController::LoadWorldDataIntoObjects()
 	}
 
 	M_WorldGenerator->LoadWorldDataIntoObjects();
+}
+
+void AWorldPlayerController::InitializeWorldDivisionsForNewCampaign()
+{
+	if (not GetIsValidWorldDivisionManager() || not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	M_WorldDivisionManager->InitializeNewCampaignDivisions(
+		this,
+		M_WorldGenerator.Get(),
+		M_SelectedDifficulty.DifficultyLevel);
+}
+
+void AWorldPlayerController::RestoreWorldDivisionsFromSave(
+	const FWorldCampaignState& LoadedWorldCampaignState)
+{
+	if (not GetIsValidWorldDivisionManager() || not GetIsValidWorldGenerator())
+	{
+		return;
+	}
+
+	M_WorldDivisionManager->RestoreSavedCampaignDivisions(
+		this,
+		M_WorldGenerator.Get(),
+		M_SelectedDifficulty.DifficultyLevel,
+		LoadedWorldCampaignState.WorldDivisions);
+}
+
+void AWorldPlayerController::RefreshWorldDivisionInfluence()
+{
+	if (not GetIsValidWorldDivisionManager())
+	{
+		return;
+	}
+
+	M_WorldDivisionManager->RefreshDivisionInfluence(M_SelectedDifficulty.DifficultyLevel);
 }
 
 void AWorldPlayerController::OnAllWorldObjectsAndTheirDataReady()
@@ -829,6 +924,22 @@ bool AWorldPlayerController::GetIsValidWorldStateAndSaveManager() const
 		this,
 		TEXT("M_WorldStateAndSaveManager"),
 		TEXT("GetIsValidWorldStateAndSaveManager"),
+		this
+	);
+	return false;
+}
+
+bool AWorldPlayerController::GetIsValidWorldDivisionManager() const
+{
+	if (IsValid(M_WorldDivisionManager))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_WorldDivisionManager"),
+		TEXT("GetIsValidWorldDivisionManager"),
 		this
 	);
 	return false;

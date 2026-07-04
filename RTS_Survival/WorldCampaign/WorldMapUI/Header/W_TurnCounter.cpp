@@ -5,7 +5,7 @@
 
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
-#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
 
 void UW_TurnCounter::InitTurnCounter(const TArray<ERTSResourceType>& ResourceTypes, const int32 TurnCount)
 {
@@ -26,7 +26,7 @@ bool UW_TurnCounter::EnsureResourceIsValid(const TObjectPtr<UW_PlayerResource>& 
 
 UPlayerResourceManager* UW_TurnCounter::GetPlayerResourceManager() const
 {
-	UPlayerResourceManager* ResourceManager = FRTS_Statics::GetPlayerResourceManager(this);
+	UPlayerResourceManager* ResourceManager = FRTS_WorldStatics::GetPlayerResourceManager(this);
 	if (not ResourceManager)
 	{
 		RTSFunctionLibrary::ReportError("Failed to get the PlayerResource Manager for W_TurnCounter"

@@ -17,6 +17,6 @@ struct FRTS_WorldStatics
 	static UPlayerResourceManager* GetPlayerResourceManager(const UObject* WorldContextObject);
 
 private:
-	static AWorldPlayerController* GetWorldPlayerController(const UObject* WorldContextObject);
+	static const AWorldPlayerController* GetWorldPlayerController(const UObject* WorldContextObject);
 	static const FWorldCampaignState* GetWorldState(const AWorldPlayerController* Controller, bool& bIsValid);
 };

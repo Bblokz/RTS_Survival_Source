@@ -276,6 +276,17 @@ namespace
 			FString::Printf(TEXT("WorldData missing strength definition for strategic support %s."),
 			                *StrategicSupportName));
 	}
+
+	void ReportMissingFieldDivisionDefinition(const EWorldFieldDivisions FieldDivision)
+	{
+		const FString FieldDivisionName = GetEnumValueName(
+			StaticEnum<EWorldFieldDivisions>(),
+			static_cast<int64>(FieldDivision),
+			TEXT("UnknownFieldDivision"));
+		RTSFunctionLibrary::ReportError(
+			FString::Printf(TEXT("WorldData missing strength definition for field division %s."),
+			                *FieldDivisionName));
+	}
 }
 
 UWorldDataComponent::UWorldDataComponent()
@@ -402,6 +413,36 @@ bool UWorldDataComponent::TryBuildStrategicSupportReason(
 	}
 
 	ReportMissingStrategicSupportDefinition(StrategicSupport);
+	return false;
+}
+
+bool UWorldDataComponent::TryBuildFieldDivisionReason(
+	const EWorldFieldDivisions FieldDivision,
+	const ERTSGameDifficulty GameDifficulty,
+	FWorldStrengthReason& OutStrengthReason) const
+{
+	OutStrengthReason = FWorldStrengthReason();
+	if (FieldDivision == EWorldFieldDivisions::None || not GetIsValidWorldData())
+	{
+		return false;
+	}
+
+	FWorldDataStrengthReasonDefinition Definition;
+	const bool bFoundDefinition = M_WorldData->TryGetFieldDivisionDefinition(
+		FieldDivision,
+		GameDifficulty,
+		Definition);
+	OutStrengthReason = BuildStrengthDefinitionReason(
+		Definition,
+		StaticEnum<EWorldFieldDivisions>(),
+		static_cast<int64>(FieldDivision),
+		TEXT("Field Division"));
+	if (bFoundDefinition)
+	{
+		return true;
+	}
+
+	ReportMissingFieldDivisionDefinition(FieldDivision);
 	return false;
 }
 

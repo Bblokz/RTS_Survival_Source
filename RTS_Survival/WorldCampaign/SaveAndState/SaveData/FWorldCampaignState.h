@@ -12,6 +12,7 @@
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/NeutralObjectType/Enum_MapNeutralObjectType.h"
 #include "RTS_Survival/WorldCampaign/PlayerProfile/FPlayerProfileSaveData.h"
 #include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthTypes.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "FWorldCampaignState.generated.h"
 
 /**
@@ -93,6 +94,48 @@ struct RTS_SURVIVAL_API FWorldCampaignMapItemSaveData
 };
 
 /**
+ * @brief Persistent mobile division data restored separately from generated anchors.
+ */
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FWorldDivisionSaveData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	FGuid DivisionKey;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	EWorldFieldDivisions DivisionType = EWorldFieldDivisions::None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	int32 OwningPlayer = INDEX_NONE;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	FVector Location = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	int32 CurrentStrengthPercentage = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	FVector TargetLocation = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	TArray<FVector> PathPoints;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	int32 CurrentPathPointIndex = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	bool bHasPendingMoveOrder = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	TArray<ETankSubtype> TankSubtypes;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	TArray<ESquadSubtype> SquadSubtypes;
+};
+
+/**
  * @brief Save-only state for rebuilding the world campaign map independently from player UI/profile data.
  */
 USTRUCT(BlueprintType)
@@ -120,6 +163,9 @@ struct RTS_SURVIVAL_API FWorldCampaignState
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	TArray<FWorldCampaignMapItemSaveData> MapItems;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	TArray<FWorldDivisionSaveData> WorldDivisions;
 
 	bool GetIsValidForRestore() const;
 };

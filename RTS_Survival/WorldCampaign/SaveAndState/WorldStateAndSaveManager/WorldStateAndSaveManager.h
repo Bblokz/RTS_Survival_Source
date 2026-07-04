@@ -24,6 +24,7 @@ public:
 
 	void CacheCurrentWorldState(const AGeneratorWorldCampaign& WorldGenerator);
 	void CachePlayerProfileSaveData(const FPlayerProfileSaveData& PlayerProfileSaveData);
+	void CacheWorldDivisionSaveData(const TArray<FWorldDivisionSaveData>& WorldDivisionSaveData);
 
 	UFUNCTION(BlueprintCallable)
 	bool SaveCampaignState();

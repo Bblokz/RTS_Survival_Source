@@ -21,7 +21,7 @@ This system should live in the world campaign runtime layer, not in `AGeneratorW
 
 - `EWorldFieldDivisions` already exists in `WorldStrengthTypes.h`.
 - `UWorldStrengthEstimationComponent` already has `ResetFieldDivisionReport()` and `AddFieldDivisionReason()`.
-- `AGeneratorWorldCampaign::AdjustDifficultyPercentagesForFieldDivisions()` already exists and is currently a stub.
+- `AGeneratorWorldCampaign::AdjustDifficultyPercentagesForFieldDivisions()` clears the existing field-division report before runtime divisions apply current influence.
 - `AAnchorPoint` already provides anchor actor locations that can be treated as avoidance obstacles.
 - `AWorldSplineBoundary` can sample the playable map boundary in XY.
 - `UWorldStrategicSupportArea` is a useful reference for radius display behavior, but divisions need their own influence/movement ownership.

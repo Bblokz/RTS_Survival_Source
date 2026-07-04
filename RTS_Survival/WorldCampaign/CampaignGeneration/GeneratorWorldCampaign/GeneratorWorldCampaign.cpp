@@ -343,12 +343,6 @@ namespace
 		}
 	}
 
-	void ApplyFieldDivisions(const FWorldDifficultyMapObjects& MapObjects,
-	                         const ERTSGameDifficulty GameDifficulty)
-	{
-		// Field division strength is intentionally stubbed until the field division system is implemented.
-	}
-
 	struct FAnchorCandidate
 	{
 		TObjectPtr<AAnchorPoint> AnchorPoint = nullptr;
@@ -5262,11 +5256,20 @@ void AGeneratorWorldCampaign::AdjustDifficultyPercentagesForStrategicSupport(
 }
 
 void AGeneratorWorldCampaign::AdjustDifficultyPercentagesForFieldDivisions(
-	const ERTSGameDifficulty GameDifficulty)
+	const ERTSGameDifficulty)
 {
 	const FWorldDifficultyMapObjects MapObjects = BuildWorldDifficultyMapObjects(M_PlacementState);
 	ResetFieldDivisionReport(MapObjects);
-	ApplyFieldDivisions(MapObjects, GameDifficulty);
+}
+
+const UWorldDataComponent* AGeneratorWorldCampaign::GetWorldDataComponent() const
+{
+	if (not GetIsValidWorldDataComponent())
+	{
+		return nullptr;
+	}
+
+	return M_WorldDataComponent;
 }
 
 void AGeneratorWorldCampaign::InitializeWorldGenerator(AWorldPlayerController* WorldPlayerController,

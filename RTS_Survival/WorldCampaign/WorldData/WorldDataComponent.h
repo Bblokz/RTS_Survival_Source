@@ -11,6 +11,7 @@ class UWorldData;
 enum class EMapEnemyItem : uint8;
 enum class EMapMission : uint8;
 enum class ERTSGameDifficulty : uint8;
+enum class EWorldFieldDivisions : uint8;
 enum class EWorldFortificationStrength : uint8;
 enum class EWorldStrategicSupport : uint8;
 struct FWorldStrengthReason;
@@ -75,6 +76,17 @@ public:
 	bool TryBuildStrategicSupportReason(EWorldStrategicSupport StrategicSupport,
 	                                    ERTSGameDifficulty GameDifficulty,
 	                                    FWorldStrengthReason& OutStrengthReason) const;
+
+	/**
+	 * @brief Builds a UI-ready reason for one field division enum.
+	 * @param FieldDivision Field division type stored on a world division actor.
+	 * @param GameDifficulty Current campaign difficulty.
+	 * @param OutStrengthReason Output UI-ready reason from WorldData.
+	 * @return true when the field division definition exists in WorldData.
+	 */
+	bool TryBuildFieldDivisionReason(EWorldFieldDivisions FieldDivision,
+	                                 ERTSGameDifficulty GameDifficulty,
+	                                 FWorldStrengthReason& OutStrengthReason) const;
 
 private:
 	bool GetIsValidWorldData() const;

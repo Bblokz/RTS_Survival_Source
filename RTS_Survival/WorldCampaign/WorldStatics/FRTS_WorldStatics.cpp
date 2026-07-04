@@ -1,5 +1,6 @@
 ﻿#include "FRTS_WorldStatics.h"
 
+#include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/SaveData/FWorldCampaignState.h"
 #include "RTS_Survival/WorldCampaign/SaveAndState/WorldStateAndSaveManager/WorldStateAndSaveManager.h"
 #include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
@@ -47,6 +48,33 @@ FVector FRTS_WorldStatics::GetEnemyHQWorldLocation(AWorldPlayerController* Contr
 	}
 
 	return GetHQWorldLocationByAnchorKey(*WorldState, WorldState->EnemyHQAnchorKey);
+}
+
+UPlayerResourceManager* FRTS_WorldStatics::GetPlayerResourceManager(const UObject* WorldContextObject)
+{
+	const AWorldPlayerController* const WorldPlayerController = GetWorldPlayerController(WorldContextObject);
+	if (not IsValid(WorldPlayerController))
+	{
+		return nullptr;
+	}
+
+	return WorldPlayerController->GetPlayerResourceManager();
+}
+
+const AWorldPlayerController* FRTS_WorldStatics::GetWorldPlayerController(const UObject* WorldContextObject)
+{
+	if (not IsValid(WorldContextObject))
+	{
+		return nullptr;
+	}
+
+	const APlayerController* const PlayerController = UGameplayStatics::GetPlayerController(WorldContextObject, 0);
+	if (not IsValid(PlayerController))
+	{
+		return nullptr;
+	}
+
+	return Cast<AWorldPlayerController>(PlayerController);
 }
 
 const FWorldCampaignState* FRTS_WorldStatics::GetWorldState(const AWorldPlayerController* Controller, bool& bIsValid)

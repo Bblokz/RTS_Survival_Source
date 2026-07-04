@@ -88,3 +88,22 @@ bool UWorldData::TryGetStrategicSupportDefinition(
 		GameDifficulty);
 	return true;
 }
+
+bool UWorldData::TryGetFieldDivisionDefinition(
+	const EWorldFieldDivisions FieldDivision,
+	const ERTSGameDifficulty GameDifficulty,
+	FWorldDataStrengthReasonDefinition& OutDefinition) const
+{
+	const FWorldDataStrengthReasonDefinition* Definition = M_FieldDivisionDefinitions.Find(FieldDivision);
+	if (Definition == nullptr)
+	{
+		OutDefinition = FWorldDataStrengthReasonDefinition();
+		return false;
+	}
+
+	OutDefinition = *Definition;
+	OutDefinition.StrengthPercentage = M_FieldDivisionMlt.ApplyToPercentage(
+		Definition->StrengthPercentage,
+		GameDifficulty);
+	return true;
+}

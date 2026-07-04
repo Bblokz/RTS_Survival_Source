@@ -32,6 +32,12 @@ void UWorldStateAndSaveManager::CachePlayerProfileSaveData(const FPlayerProfileS
 	M_PlayerProfileSaveData = PlayerProfileSaveData;
 }
 
+void UWorldStateAndSaveManager::CacheWorldDivisionSaveData(
+	const TArray<FWorldDivisionSaveData>& WorldDivisionSaveData)
+{
+	M_WorldCampaignState.WorldDivisions = WorldDivisionSaveData;
+}
+
 bool UWorldStateAndSaveManager::SaveCampaignState()
 {
 	const FPlayerProfileSaveData PlayerSaveState = AggregatePlayerSaveState();

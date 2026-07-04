@@ -500,6 +500,7 @@ public:
 	float GetDebugDisplaySeconds() const { return WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds; }
 	float GetDebugLineThickness() const { return WorldCampaignDebugDefaults::ConnectionLineThickness; }
 	const FWorldCampaignPlacementState& GetPlacementState() const { return M_PlacementState; }
+	const UWorldDataComponent* GetWorldDataComponent() const;
 	void LoadWorldDataIntoObjects();
 
 	/**
@@ -519,9 +520,9 @@ public:
 	void AdjustDifficultyPercentagesForStrategicSupport(ERTSGameDifficulty GameDifficulty);
 
 	/**
-	 * @brief Recalculates field division strength on enemy and mission objects for the current turn.
-	 * @param GameDifficulty Current campaign difficulty reserved for future field division scaling.
-	 * @note This currently resets the field division category and calls an empty apply stub.
+	 * @brief Clears field division strength before runtime divisions apply their current influence.
+	 * @param GameDifficulty Current campaign difficulty kept for turn-flow symmetry.
+	 * @note Runtime division influence is applied by UWorldDivisionManager, not by the generator.
 	 */
 	void AdjustDifficultyPercentagesForFieldDivisions(ERTSGameDifficulty GameDifficulty);
 

@@ -8,6 +8,8 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
 #include "RTS_Survival/WorldCampaign/WorldDifficulty/WorldStrategicSupportArea.h"
+#include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionBase.h"
+#include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionInfluenceComponent.h"
 
 UPlayerWorldOutliner::UPlayerWorldOutliner()
 {
@@ -69,6 +71,11 @@ ERTSOutLineTypes UPlayerWorldOutliner::GetOutlineTypeForActor(const AActor* Acto
 		return ERTSOutLineTypes::VehicleParts;
 	}
 
+	if (Actor->IsA(AWorldDivisionBase::StaticClass()))
+	{
+		return ERTSOutLineTypes::Radixite;
+	}
+
 	return ERTSOutLineTypes::None;
 }
 
@@ -111,11 +118,13 @@ void UPlayerWorldOutliner::ResetOutlineIfActorChanged(const AActor* NewActor)
 void UPlayerWorldOutliner::SetHoverDifficultyInfluenceRadiiOnActor(AActor* Actor) const
 {
 	UWorldStrategicSupportArea::ShowHoverRadiiOnActor(Actor);
+	UWorldDivisionInfluenceComponent::ShowHoverRadiiOnActor(Actor);
 }
 
 void UPlayerWorldOutliner::ResetHoverDifficultyInfluenceRadiiOnActor(AActor* Actor) const
 {
 	UWorldStrategicSupportArea::HideHoverRadiiOnActor(Actor);
+	UWorldDivisionInfluenceComponent::HideHoverRadiiOnActor(Actor);
 }
 
 void UPlayerWorldOutliner::SetOutLineOnActor(const AActor* ActorToOutLine, const ERTSOutLineTypes OutLineType) const

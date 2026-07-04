@@ -95,7 +95,7 @@ public:
 
 	/**
 	 * @brief Adds one non-zero field division reason to the field division category.
-	 * @param StrengthReason Reason supplied by the future field division system.
+	 * @param StrengthReason Reason supplied by the runtime field division system.
 	 */
 	void AddFieldDivisionReason(const FWorldStrengthReason& StrengthReason);
 

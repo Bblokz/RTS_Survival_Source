@@ -15,7 +15,9 @@ class AWorldNeutralObject;
 class AWorldPlayerObject;
 class AWorldMissionObject;
 class AWorldEnemyObject;
+class AWorldDivisionBase;
 class UWorldStateAndSaveManager;
+class UWorldDivisionManager;
 class UWorldProfileAndUIManager;
 class UPlayerResourceManager;
 enum class ERTSFaction : uint8;
@@ -24,6 +26,7 @@ class UWorldCameraController;
 class UPlayerWorldOutliner;
 class AWorldFowManager;
 class UW_AsyncWorldGeneration;
+struct FWorldCampaignState;
 
 /**
  * @brief Controller used by the world campaign Blueprint to route Enhanced Input
@@ -46,6 +49,7 @@ public:
 	AGeneratorWorldCampaign* GetWorldGenerator() const;
 	UWorldStateAndSaveManager* GetWorldStateAndSaveManager() const;
 	UPlayerResourceManager* GetPlayerResourceManager() const;
+	UWorldDivisionManager* GetWorldDivisionManager() const;
 
 	UFUNCTION(BlueprintCallable)
 	void SetIsWorldCameraMovementDisabled(bool bIsDisabled);
@@ -64,6 +68,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void WorldCamera_RightMovement(float AxisValue);
+
+	UFUNCTION(BlueprintCallable, Category="World Campaign|World Divisions")
+	bool IssueWorldDivisionMoveOrder(AWorldDivisionBase* WorldDivision, const FVector& TargetLocation);
 
 	/**
 	 * @brief Provides a Blueprint routing point for move-to requests during the campaign map.
@@ -98,6 +105,8 @@ private:
 	void PlayTurn(const EWorldTurnType TurnType); 
 	void PlayerTurn();
 	void EnemyTurn();
+	void MovePlayerDivisions();
+	void MoveEnemyDivisions();
 	bool PrimaryClick_Regular();
 	void OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj);
 	void OnClicked_MissionMapObj(AWorldMissionObject* MissionMapObj);
@@ -134,6 +143,9 @@ private:
 	void OnGeneratedCampaignAsyncWorkFinished();
 
 	void LoadWorldDataIntoObjects();
+	void InitializeWorldDivisionsForNewCampaign();
+	void RestoreWorldDivisionsFromSave(const FWorldCampaignState& LoadedWorldCampaignState);
+	void RefreshWorldDivisionInfluence();
 
 	/**
 	 * @brief Runs world systems that require generated campaign actors to exist.
@@ -174,6 +186,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UWorldStateAndSaveManager> M_WorldStateAndSaveManager = nullptr;
 	bool GetIsValidWorldStateAndSaveManager() const;
+
+	UPROPERTY()
+	TObjectPtr<UWorldDivisionManager> M_WorldDivisionManager = nullptr;
+	bool GetIsValidWorldDivisionManager() const;
 
 	UPROPERTY()
 	TObjectPtr<UPlayerResourceManager> M_PlayerResourceManager = nullptr;
