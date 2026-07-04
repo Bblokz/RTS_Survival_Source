@@ -29,6 +29,12 @@ public:
 	int32 GetTotalStrengthPercentage() const;
 
 	/**
+	 * @brief Gets the strategic support enum values currently affecting this object.
+	 * @return Active strategic support types collected during the latest strategic support recalculation.
+	 */
+	const TArray<EWorldStrategicSupport>& GetStrategicSupportTypes() const;
+
+	/**
 	 * @brief Replaces the base fortification strength reason for this map object.
 	 * @param StrengthReason Reason built from world data for the object's enemy or mission type.
 	 */
@@ -75,6 +81,14 @@ public:
 	void AddStrategicSupportReason(const FWorldStrengthReason& StrengthReason);
 
 	/**
+	 * @brief Adds one non-zero strategic support reason and caches the enum type that produced it.
+	 * @param StrategicSupport Strategic support enum affecting this object.
+	 * @param StrengthReason Reason built from the strategic support definition in WorldData.
+	 */
+	void AddStrategicSupportReason(EWorldStrategicSupport StrategicSupport,
+	                               const FWorldStrengthReason& StrengthReason);
+
+	/**
 	 * @brief Clears only field division reasons while preserving fortification and strategic support data.
 	 */
 	void ResetFieldDivisionReport();
@@ -97,6 +111,10 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
 		meta = (AllowPrivateAccess = "true"))
 	TArray<FWorldStrengthReason> M_StrategicSupportReasons;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
+		meta = (AllowPrivateAccess = "true"))
+	TArray<EWorldStrategicSupport> M_StrategicSupportTypes;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
 		meta = (AllowPrivateAccess = "true"))

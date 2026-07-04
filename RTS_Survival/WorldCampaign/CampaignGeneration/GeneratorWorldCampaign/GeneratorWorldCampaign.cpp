@@ -221,6 +221,7 @@ namespace
 
 	void ApplyStrategicSupportToEnemyTargets(
 		const AWorldMapObject* SourceObject,
+		const EWorldStrategicSupport StrategicSupport,
 		const FWorldStrengthReason& StrengthReason,
 		const float XYRadius,
 		const TArray<AWorldEnemyObject*>& EnemyObjects)
@@ -235,13 +236,14 @@ namespace
 			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
 				GetStrengthEstimationComponent(EnemyObject))
 			{
-				StrengthEstimationComponent->AddStrategicSupportReason(StrengthReason);
+				StrengthEstimationComponent->AddStrategicSupportReason(StrategicSupport, StrengthReason);
 			}
 		}
 	}
 
 	void ApplyStrategicSupportToMissionTargets(
 		const AWorldMapObject* SourceObject,
+		const EWorldStrategicSupport StrategicSupport,
 		const FWorldStrengthReason& StrengthReason,
 		const float XYRadius,
 		const TArray<AWorldMissionObject*>& MissionObjects)
@@ -256,7 +258,7 @@ namespace
 			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
 				GetStrengthEstimationComponent(MissionObject))
 			{
-				StrengthEstimationComponent->AddStrategicSupportReason(StrengthReason);
+				StrengthEstimationComponent->AddStrategicSupportReason(StrategicSupport, StrengthReason);
 			}
 		}
 	}
@@ -271,9 +273,10 @@ namespace
 		 * The support component stores only an enum and radius. The actual percentage and player-facing reason are
 		 * resolved through WorldData each turn so difficulty multipliers and data-asset edits stay centralized.
 		 */
+		const EWorldStrategicSupport StrategicSupport = StrategicSupportArea.GetStrategicSupport();
 		FWorldStrengthReason StrengthReason;
 		if (not WorldDataComponent.TryBuildStrategicSupportReason(
-			StrategicSupportArea.GetStrategicSupport(),
+			StrategicSupport,
 			GameDifficulty,
 			StrengthReason))
 		{
@@ -288,8 +291,18 @@ namespace
 		}
 
 		const float XYRadius = StrategicSupportArea.GetXYRadius();
-		ApplyStrategicSupportToEnemyTargets(SourceObject, StrengthReason, XYRadius, MapObjects.EnemyObjects);
-		ApplyStrategicSupportToMissionTargets(SourceObject, StrengthReason, XYRadius, MapObjects.MissionObjects);
+		ApplyStrategicSupportToEnemyTargets(
+			SourceObject,
+			StrategicSupport,
+			StrengthReason,
+			XYRadius,
+			MapObjects.EnemyObjects);
+		ApplyStrategicSupportToMissionTargets(
+			SourceObject,
+			StrategicSupport,
+			StrengthReason,
+			XYRadius,
+			MapObjects.MissionObjects);
 	}
 
 	void ApplyStrategicSupportFromSource(AWorldMapObject* SourceObject,

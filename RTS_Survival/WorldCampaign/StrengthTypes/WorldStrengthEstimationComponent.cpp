@@ -25,6 +25,11 @@ int32 UWorldStrengthEstimationComponent::GetTotalStrengthPercentage() const
 	return M_StrengthEstimationMessage.GetTotalStrengthPercent();
 }
 
+const TArray<EWorldStrategicSupport>& UWorldStrengthEstimationComponent::GetStrategicSupportTypes() const
+{
+	return M_StrategicSupportTypes;
+}
+
 void UWorldStrengthEstimationComponent::SetBaseFortificationStrengthReason(
 	const FWorldStrengthReason& StrengthReason)
 {
@@ -70,15 +75,28 @@ void UWorldStrengthEstimationComponent::AddFortificationModifierReason(
 void UWorldStrengthEstimationComponent::ResetStrategicSupportReport()
 {
 	M_StrategicSupportReasons.Reset();
+	M_StrategicSupportTypes.Reset();
 	RebuildStrengthEstimationMessage();
 }
 
 void UWorldStrengthEstimationComponent::AddStrategicSupportReason(
 	const FWorldStrengthReason& StrengthReason)
 {
+	AddStrategicSupportReason(EWorldStrategicSupport::None, StrengthReason);
+}
+
+void UWorldStrengthEstimationComponent::AddStrategicSupportReason(
+	const EWorldStrategicSupport StrategicSupport,
+	const FWorldStrengthReason& StrengthReason)
+{
 	if (not StrengthReason.GetHasStrength())
 	{
 		return;
+	}
+
+	if (StrategicSupport != EWorldStrategicSupport::None)
+	{
+		M_StrategicSupportTypes.Add(StrategicSupport);
 	}
 
 	M_StrategicSupportReasons.Add(StrengthReason);
