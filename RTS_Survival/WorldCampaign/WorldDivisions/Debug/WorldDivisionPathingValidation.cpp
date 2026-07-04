@@ -8,6 +8,7 @@
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
 #include "HAL/PlatformTime.h"
+#include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
@@ -31,6 +32,9 @@ namespace
 	constexpr float MinSpawnOffset = 250.f;
 	constexpr float FallbackAngleStepRadians = UE_PI / 3.f;
 	constexpr float ValidationDistanceTolerance = 0.5f;
+	constexpr float ValidationPathSampleSpacing = 100.f;
+	constexpr int32 ValidationPathMinSampleCount = 8;
+	constexpr int32 ValidationPathMaxSampleCount = 256;
 	constexpr double MaxValidationSeconds = 130.0;
 
 	struct FDivisionPathingValidationRequest
@@ -38,6 +42,15 @@ namespace
 		int32 Seed = DefaultValidationSeed;
 		int32 DivisionCount = DefaultValidationDivisionCount;
 		bool bShouldRequestExit = false;
+		bool bRunExactRegressionCases = true;
+		bool bRunGeneratedCases = true;
+	};
+
+	struct FExactDivisionPathingRegressionCase
+	{
+		FString Name;
+		FVector StartLocation = FVector::ZeroVector;
+		FVector TargetLocation = FVector::ZeroVector;
 	};
 
 	struct FClosestAnchorPathDistance
@@ -49,6 +62,15 @@ namespace
 		FVector SegmentEnd = FVector::ZeroVector;
 		float AnchorBoundaryDistance = TNumericLimits<float>::Max();
 		int32 SegmentIndex = INDEX_NONE;
+	};
+
+	struct FPathBoundaryViolation
+	{
+		FVector OutsidePoint = FVector::ZeroVector;
+		FVector SegmentStart = FVector::ZeroVector;
+		FVector SegmentEnd = FVector::ZeroVector;
+		int32 SegmentIndex = INDEX_NONE;
+		int32 SampleIndex = INDEX_NONE;
 	};
 
 	FVector2D GetValidationXY(const FVector& Location)
@@ -69,6 +91,114 @@ namespace
 
 		const float Alpha = FVector2D::DotProduct(Point - SegmentStart, Segment) / SegmentSizeSquared;
 		return SegmentStart + Segment * FMath::Clamp(Alpha, 0.f, 1.f);
+	}
+
+	bool GetValidationIsPointInsidePolygon(const FVector2D& Point, const TArray<FVector2D>& Polygon)
+	{
+		if (Polygon.Num() < 3)
+		{
+			return false;
+		}
+
+		bool bIsInside = false;
+		int32 PreviousIndex = Polygon.Num() - 1;
+		for (int32 CurrentIndex = 0; CurrentIndex < Polygon.Num(); CurrentIndex++)
+		{
+			const FVector2D& CurrentPoint = Polygon[CurrentIndex];
+			const FVector2D& PreviousPoint = Polygon[PreviousIndex];
+			const bool bDoesEdgeCrossY = (CurrentPoint.Y > Point.Y) != (PreviousPoint.Y > Point.Y);
+			if (bDoesEdgeCrossY)
+			{
+				const float EdgeX = (PreviousPoint.X - CurrentPoint.X)
+					* (Point.Y - CurrentPoint.Y)
+					/ (PreviousPoint.Y - CurrentPoint.Y)
+					+ CurrentPoint.X;
+				if (Point.X < EdgeX)
+				{
+					bIsInside = not bIsInside;
+				}
+			}
+
+			PreviousIndex = CurrentIndex;
+		}
+
+		return bIsInside;
+	}
+
+	float GetPointDistanceToBoundary(const FVector2D& Point, const TArray<FVector2D>& BoundaryPolygon)
+	{
+		float ClosestDistance = TNumericLimits<float>::Max();
+		for (int32 BoundaryIndex = 0; BoundaryIndex < BoundaryPolygon.Num(); BoundaryIndex++)
+		{
+			const FVector2D& SegmentStart = BoundaryPolygon[BoundaryIndex];
+			const FVector2D& SegmentEnd = BoundaryPolygon[(BoundaryIndex + 1) % BoundaryPolygon.Num()];
+			const FVector2D ClosestPoint = GetValidationClosestPointOnSegment(Point, SegmentStart, SegmentEnd);
+			ClosestDistance = FMath::Min(ClosestDistance, FVector2D::Distance(Point, ClosestPoint));
+		}
+
+		return ClosestDistance;
+	}
+
+	bool TryFindBoundaryViolationOnSegment(const FVector& SegmentStart,
+	                                       const FVector& SegmentEnd,
+	                                       const TArray<FVector2D>& BoundaryPolygon,
+	                                       const int32 SegmentIndex,
+	                                       FPathBoundaryViolation& OutViolation)
+	{
+		const float SegmentDistance = FVector2D::Distance(GetValidationXY(SegmentStart), GetValidationXY(SegmentEnd));
+		const int32 SampleCount = FMath::Clamp(
+			FMath::CeilToInt(SegmentDistance / ValidationPathSampleSpacing),
+			ValidationPathMinSampleCount,
+			ValidationPathMaxSampleCount);
+		for (int32 SampleIndex = 0; SampleIndex <= SampleCount; SampleIndex++)
+		{
+			const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
+			const FVector Candidate = FMath::Lerp(SegmentStart, SegmentEnd, Alpha);
+			if (GetValidationIsPointInsidePolygon(GetValidationXY(Candidate), BoundaryPolygon))
+			{
+				continue;
+			}
+
+			if (GetPointDistanceToBoundary(GetValidationXY(Candidate), BoundaryPolygon)
+				<= ValidationDistanceTolerance)
+			{
+				continue;
+			}
+
+			OutViolation.OutsidePoint = Candidate;
+			OutViolation.SegmentStart = SegmentStart;
+			OutViolation.SegmentEnd = SegmentEnd;
+			OutViolation.SegmentIndex = SegmentIndex;
+			OutViolation.SampleIndex = SampleIndex;
+			return true;
+		}
+
+		return false;
+	}
+
+	bool TryFindPathBoundaryViolation(const TArray<FVector>& PathPoints,
+	                                  const TArray<FVector2D>& BoundaryPolygon,
+	                                  FPathBoundaryViolation& OutViolation)
+	{
+		if (PathPoints.Num() < 2 || BoundaryPolygon.Num() < 3)
+		{
+			return true;
+		}
+
+		for (int32 PathPointIndex = 0; PathPointIndex < PathPoints.Num() - 1; PathPointIndex++)
+		{
+			if (TryFindBoundaryViolationOnSegment(
+				PathPoints[PathPointIndex],
+				PathPoints[PathPointIndex + 1],
+				BoundaryPolygon,
+				PathPointIndex,
+				OutViolation))
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	float GetAnchorDistanceToSegment(const AAnchorPoint& AnchorPoint,
@@ -149,16 +279,21 @@ namespace
 	void BuildBoundaryPolygonForValidation(UWorld& World, TArray<FVector2D>& OutBoundaryPolygon)
 	{
 		OutBoundaryPolygon.Reset();
-		for (TActorIterator<AWorldSplineBoundary> BoundaryIterator(&World); BoundaryIterator; ++BoundaryIterator)
+		TArray<AActor*> BoundaryActors;
+		UGameplayStatics::GetAllActorsOfClass(&World, AWorldSplineBoundary::StaticClass(), BoundaryActors);
+		for (AActor* BoundaryActor : BoundaryActors)
 		{
-			const AWorldSplineBoundary* Boundary = *BoundaryIterator;
+			const AWorldSplineBoundary* Boundary = Cast<AWorldSplineBoundary>(BoundaryActor);
 			if (not IsValid(Boundary))
 			{
 				continue;
 			}
 
 			Boundary->GetSampledPolygon2D(ValidationBoundarySampleSpacing, OutBoundaryPolygon);
-			return;
+			if (OutBoundaryPolygon.Num() >= 3)
+			{
+				return;
+			}
 		}
 	}
 
@@ -222,6 +357,22 @@ namespace
 	{
 		FDivisionPathingValidationRequest Request;
 		Request.bShouldRequestExit = GetShouldRequestExitAfterValidation(Args);
+		for (const FString& Arg : Args)
+		{
+			FString NormalizedArg = Arg;
+			NormalizedArg.ReplaceInline(TEXT(";"), TEXT(""));
+			if (NormalizedArg.Equals(TEXT("ExactOnly"), ESearchCase::IgnoreCase))
+			{
+				Request.bRunExactRegressionCases = true;
+				Request.bRunGeneratedCases = false;
+			}
+			else if (NormalizedArg.Equals(TEXT("GeneratedOnly"), ESearchCase::IgnoreCase))
+			{
+				Request.bRunExactRegressionCases = false;
+				Request.bRunGeneratedCases = true;
+			}
+		}
+
 		if (Args.Num() >= 1)
 		{
 			Request.Seed = FCString::Atoi(*Args[0]);
@@ -291,6 +442,46 @@ namespace
 		{
 			return AAnchorPoint::IsDeterministicAnchorOrderLess(Left, Right);
 		});
+	}
+
+	void GatherExistingAnchors(UWorld& World, TArray<AAnchorPoint*>& OutAnchors)
+	{
+		OutAnchors.Reset();
+		TArray<AActor*> AnchorActors;
+		UGameplayStatics::GetAllActorsOfClass(&World, AAnchorPoint::StaticClass(), AnchorActors);
+		OutAnchors.Reserve(AnchorActors.Num());
+		for (AActor* AnchorActor : AnchorActors)
+		{
+			AAnchorPoint* AnchorPoint = Cast<AAnchorPoint>(AnchorActor);
+			if (IsValid(AnchorPoint))
+			{
+				OutAnchors.Add(AnchorPoint);
+			}
+		}
+
+		Algo::Sort(OutAnchors, [](const AAnchorPoint* Left, const AAnchorPoint* Right)
+		{
+			return AAnchorPoint::IsDeterministicAnchorOrderLess(Left, Right);
+		});
+	}
+
+	bool BuildAnchorsForValidation(UWorld& World,
+	                               int32 Seed,
+	                               TArray<AAnchorPoint*>& OutAnchors,
+	                               FString& OutFailureReason);
+
+	bool PrepareAnchorsForValidation(UWorld& World,
+	                                 const FDivisionPathingValidationRequest& Request,
+	                                 TArray<AAnchorPoint*>& OutAnchors,
+	                                 FString& OutFailureReason)
+	{
+		if (Request.bRunGeneratedCases)
+		{
+			return BuildAnchorsForValidation(World, Request.Seed, OutAnchors, OutFailureReason);
+		}
+
+		GatherExistingAnchors(World, OutAnchors);
+		return true;
 	}
 
 	bool BuildAnchorsForValidation(UWorld& World,
@@ -388,6 +579,71 @@ namespace
 		}
 	}
 
+	TArray<FExactDivisionPathingRegressionCase> BuildExactRegressionCases()
+	{
+		TArray<FExactDivisionPathingRegressionCase> RegressionCases;
+		RegressionCases.Add({
+			TEXT("Image1_BorderConcavity"),
+			FVector(1530.593711, -5147.434470, 0.000046),
+			FVector(1375.027801, -6665.369551, 0.000010)
+		});
+		RegressionCases.Add({
+			TEXT("Image2_LongBorderConcavity"),
+			FVector(3151.956549, -7886.137827, 0.000047),
+			FVector(1123.281896, -6736.084855, 0.000005)
+		});
+		RegressionCases.Add({
+			TEXT("Image3_PositiveBorderExample"),
+			FVector(4014.155085, -10413.672700, 0.000047),
+			FVector(1993.829431, -6669.245776, 0.000098)
+		});
+		return RegressionCases;
+	}
+
+	void LogValidationPath(const FString& CaseName, const TArray<FVector>& PathPoints)
+	{
+		UE_LOG(
+			LogTemp,
+			Display,
+			TEXT("World division pathing validation %s adjusted path point count=%d."),
+			*CaseName,
+			PathPoints.Num());
+		for (int32 PathPointIndex = 0; PathPointIndex < PathPoints.Num(); PathPointIndex++)
+		{
+			UE_LOG(
+				LogTemp,
+				Display,
+				TEXT("World division pathing validation %s path[%d]=%s."),
+				*CaseName,
+				PathPointIndex,
+				*PathPoints[PathPointIndex].ToCompactString());
+		}
+	}
+
+	bool ValidatePathInsideBoundary(const FString& CaseName,
+	                                const TArray<FVector>& PathPoints,
+	                                const TArray<FVector2D>& BoundaryPolygon)
+	{
+		FPathBoundaryViolation BoundaryViolation;
+		if (not TryFindPathBoundaryViolation(PathPoints, BoundaryPolygon, BoundaryViolation))
+		{
+			return true;
+		}
+
+		LogValidationPath(CaseName, PathPoints);
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("World division pathing validation failed: %s left world boundary. Segment=%d Sample=%d OutsidePoint=%s SegmentStart=%s SegmentEnd=%s."),
+			*CaseName,
+			BoundaryViolation.SegmentIndex,
+			BoundaryViolation.SampleIndex,
+			*BoundaryViolation.OutsidePoint.ToCompactString(),
+			*BoundaryViolation.SegmentStart.ToCompactString(),
+			*BoundaryViolation.SegmentEnd.ToCompactString());
+		return false;
+	}
+
 	bool RunSingleDivisionPathingValidationCase(UWorld& World,
 	                                            const TArray<AAnchorPoint*>& Anchors,
 	                                            const TArray<FVector2D>& BoundaryPolygon,
@@ -427,6 +683,12 @@ namespace
 		}
 
 		const FWorldDivisionSaveData DivisionSaveData = WorldDivision->BuildWorldDivisionSaveData();
+		const FString CaseName = FString::Printf(TEXT("Generated_%d"), DivisionIndex);
+		if (not ValidatePathInsideBoundary(CaseName, DivisionSaveData.PathPoints, BoundaryPolygon))
+		{
+			return false;
+		}
+
 		const FClosestAnchorPathDistance ClosestDistance =
 			GetClosestAnchorPathDistance(Anchors, DivisionSaveData.PathPoints, BoundaryPolygon);
 		const bool bAvoidanceRadiusHeld =
@@ -447,6 +709,7 @@ namespace
 			return true;
 		}
 
+		LogValidationPath(CaseName, DivisionSaveData.PathPoints);
 		UE_LOG(
 			LogTemp,
 			Error,
@@ -461,6 +724,79 @@ namespace
 		return false;
 	}
 
+	bool RunExactDivisionPathingRegressionCase(UWorld& World,
+	                                           const FExactDivisionPathingRegressionCase& RegressionCase,
+	                                           const int32 CaseIndex,
+	                                           const TArray<FVector2D>& BoundaryPolygon,
+	                                           TArray<TWeakObjectPtr<AWorldDivisionBase>>& SpawnedDivisions)
+	{
+		AWorldDivisionBase* WorldDivision = SpawnValidationDivision(World, CaseIndex, RegressionCase.StartLocation);
+		if (not IsValid(WorldDivision))
+		{
+			UE_LOG(
+				LogTemp,
+				Error,
+				TEXT("World division pathing validation failed: %s could not spawn division."),
+				*RegressionCase.Name);
+			return false;
+		}
+
+		SpawnedDivisions.Add(WorldDivision);
+		if (not WorldDivision->IssueMoveOrderToPoint(RegressionCase.TargetLocation))
+		{
+			UE_LOG(
+				LogTemp,
+				Error,
+				TEXT("World division pathing validation failed: %s rejected move order Start=%s Target=%s."),
+				*RegressionCase.Name,
+				*RegressionCase.StartLocation.ToCompactString(),
+				*RegressionCase.TargetLocation.ToCompactString());
+			return false;
+		}
+
+		const FWorldDivisionSaveData DivisionSaveData = WorldDivision->BuildWorldDivisionSaveData();
+		LogValidationPath(RegressionCase.Name, DivisionSaveData.PathPoints);
+		const bool bPathInsideBoundary =
+			ValidatePathInsideBoundary(RegressionCase.Name, DivisionSaveData.PathPoints, BoundaryPolygon);
+		if (bPathInsideBoundary)
+		{
+			UE_LOG(
+				LogTemp,
+				Display,
+				TEXT("World division pathing validation exact case passed: %s Start=%s Target=%s."),
+				*RegressionCase.Name,
+				*RegressionCase.StartLocation.ToCompactString(),
+				*RegressionCase.TargetLocation.ToCompactString());
+		}
+
+		return bPathInsideBoundary;
+	}
+
+	bool RunExactDivisionPathingRegressionCases(UWorld& World, const TArray<FVector2D>& BoundaryPolygon)
+	{
+		bool bAllCasesPassed = true;
+		const TArray<FExactDivisionPathingRegressionCase> RegressionCases = BuildExactRegressionCases();
+		TArray<TWeakObjectPtr<AWorldDivisionBase>> SpawnedDivisions;
+		SpawnedDivisions.Reserve(RegressionCases.Num());
+		for (int32 CaseIndex = 0; CaseIndex < RegressionCases.Num(); CaseIndex++)
+		{
+			if (RunExactDivisionPathingRegressionCase(
+				World,
+				RegressionCases[CaseIndex],
+				CaseIndex,
+				BoundaryPolygon,
+				SpawnedDivisions))
+			{
+				continue;
+			}
+
+			bAllCasesPassed = false;
+		}
+
+		DestroyValidationDivisions(SpawnedDivisions);
+		return bAllCasesPassed;
+	}
+
 	bool RunDivisionPathingValidation(UWorld& World, const FDivisionPathingValidationRequest& Request)
 	{
 		const double StartSeconds = FPlatformTime::Seconds();
@@ -469,17 +805,23 @@ namespace
 
 		TArray<AAnchorPoint*> Anchors;
 		FString FailureReason;
-		TArray<FVector2D> BoundaryPolygon;
-		BuildBoundaryPolygonForValidation(World, BoundaryPolygon);
-		if (not BuildAnchorsForValidation(World, Request.Seed, Anchors, FailureReason))
+		if (not PrepareAnchorsForValidation(World, Request, Anchors, FailureReason))
 		{
 			UE_LOG(LogTemp, Error, TEXT("World division pathing validation failed: %s"), *FailureReason);
 			return false;
 		}
 
+		TArray<FVector2D> BoundaryPolygon;
+		BuildBoundaryPolygonForValidation(World, BoundaryPolygon);
+		if (BoundaryPolygon.Num() < 3)
+		{
+			UE_LOG(LogTemp, Error, TEXT("World division pathing validation failed: boundary polygon is invalid."));
+			return false;
+		}
+
 		TArray<AAnchorPoint*> AnchorsWithClearance;
 		BuildAnchorsWithAvoidanceClearance(Anchors, AvoidanceRadius, AnchorsWithClearance);
-		if (AnchorsWithClearance.Num() < 2)
+		if (Request.bRunGeneratedCases && AnchorsWithClearance.Num() < 2)
 		{
 			UE_LOG(
 				LogTemp,
@@ -494,18 +836,26 @@ namespace
 		UE_LOG(
 			LogTemp,
 			Display,
-			TEXT("World division pathing validation started: seed=%d divisions=%d anchors=%d validationAnchors=%d avoidanceRadius=%.2f hardCapSeconds=%.0f."),
+			TEXT("World division pathing validation started: seed=%d divisions=%d anchors=%d validationAnchors=%d avoidanceRadius=%.2f exact=%s generated=%s hardCapSeconds=%.0f."),
 			Request.Seed,
 			Request.DivisionCount,
 			Anchors.Num(),
 			AnchorsWithClearance.Num(),
 			AvoidanceRadius,
+			Request.bRunExactRegressionCases ? TEXT("true") : TEXT("false"),
+			Request.bRunGeneratedCases ? TEXT("true") : TEXT("false"),
 			MaxValidationSeconds);
 
 		bool bAllCasesPassed = true;
+		if (Request.bRunExactRegressionCases)
+		{
+			bAllCasesPassed = RunExactDivisionPathingRegressionCases(World, BoundaryPolygon) && bAllCasesPassed;
+		}
+
 		TArray<TWeakObjectPtr<AWorldDivisionBase>> SpawnedDivisions;
 		SpawnedDivisions.Reserve(Request.DivisionCount);
-		for (int32 DivisionIndex = 0; DivisionIndex < Request.DivisionCount; DivisionIndex++)
+		for (int32 DivisionIndex = 0; Request.bRunGeneratedCases && DivisionIndex < Request.DivisionCount;
+		     DivisionIndex++)
 		{
 			if (FPlatformTime::Seconds() - StartSeconds > MaxValidationSeconds)
 			{
@@ -536,10 +886,12 @@ namespace
 			UE_LOG(
 				LogTemp,
 				Display,
-				TEXT("World division pathing validation passed: divisions=%d anchors=%d validationAnchors=%d duration=%.2fs."),
+				TEXT("World division pathing validation passed: divisions=%d anchors=%d validationAnchors=%d exact=%s generated=%s duration=%.2fs."),
 				Request.DivisionCount,
 				Anchors.Num(),
 				AnchorsWithClearance.Num(),
+				Request.bRunExactRegressionCases ? TEXT("true") : TEXT("false"),
+				Request.bRunGeneratedCases ? TEXT("true") : TEXT("false"),
 				DurationSeconds);
 			return true;
 		}
@@ -547,10 +899,12 @@ namespace
 		UE_LOG(
 			LogTemp,
 			Error,
-			TEXT("World division pathing validation failed: divisions=%d anchors=%d validationAnchors=%d duration=%.2fs."),
+			TEXT("World division pathing validation failed: divisions=%d anchors=%d validationAnchors=%d exact=%s generated=%s duration=%.2fs."),
 			Request.DivisionCount,
 			Anchors.Num(),
 			AnchorsWithClearance.Num(),
+			Request.bRunExactRegressionCases ? TEXT("true") : TEXT("false"),
+			Request.bRunGeneratedCases ? TEXT("true") : TEXT("false"),
 			DurationSeconds);
 		return false;
 	}
@@ -575,6 +929,6 @@ namespace
 
 	static FAutoConsoleCommandWithWorldAndArgs GValidateWorldDivisionPathingCommand(
 		TEXT("RTS.WorldCampaign.ValidateDivisionPathing"),
-		TEXT("Generates a pruned campaign and validates temporary division paths against anchor avoidance. Args: [Seed] [DivisionCount] [Quit]."),
+		TEXT("Generates a pruned campaign and validates temporary division paths against boundary and anchor constraints. Args: [Seed] [DivisionCount] [ExactOnly|GeneratedOnly] [Quit]."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ValidateWorldDivisionPathingCommand));
 }

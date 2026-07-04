@@ -23,15 +23,23 @@ namespace
 	constexpr float AdvanceTurnTargetReachedDistanceSquared = 1.f;
 	constexpr float AnchorDetourClearanceMin = 5.f;
 	constexpr float AnchorDetourClearanceScale = 0.1f;
-	constexpr int32 AnchorBoundaryStandoffSampleCount = 48;
+	constexpr int32 AnchorBoundaryStandoffSampleCount = 96;
 	constexpr int32 AnchorProjectionMaxPassCount = 8;
-	constexpr float DetourPaddingScale = 2.f;
+	constexpr float BoundarySegmentSampleSpacing = 100.f;
+	constexpr float BoundaryIntersectionTolerance = 0.001f;
+	constexpr float BoundaryOffsetRadiusRetryScale = 0.5f;
+	constexpr float BoundaryPaddingProjectionScale = 0.25f;
+	constexpr int32 BoundarySegmentMinSampleCount = 8;
+	constexpr int32 BoundarySegmentMaxSampleCount = 256;
+	constexpr int32 BoundaryOffsetDirectionSampleCount = 32;
+	constexpr int32 BoundaryOffsetRadiusRetryCount = 4;
+	constexpr int32 BoundaryCrossingRefinementCount = 12;
+	constexpr int32 MinimumPathRepairAttemptCount = 32;
 	constexpr float DebugPathDrawDurationSeconds = 5.f;
 	constexpr float DebugPathLineThickness = 8.f;
 	constexpr float DebugUnrealPathLineThickness = 2.f;
 	constexpr float DebugAdjustedPathLineThickness = 1.f;
 	constexpr float DebugPathZOffset = 25.f;
-	constexpr int32 SegmentSampleCount = 24;
 	constexpr uint8 DebugPathDepthPriority = 0;
 
 	struct FAnchorDetourCandidate
@@ -39,6 +47,27 @@ namespace
 		TArray<FVector> Points;
 		float Length = TNumericLimits<float>::Max();
 		bool bRespectsConstraints = false;
+	};
+
+	struct FBoundaryProjection
+	{
+		FVector2D Point = FVector2D::ZeroVector;
+		float DistanceSquared = TNumericLimits<float>::Max();
+		int32 SegmentIndex = INDEX_NONE;
+	};
+
+	struct FBoundaryIntersection
+	{
+		FVector2D Point = FVector2D::ZeroVector;
+		float SegmentAlpha = 0.f;
+		int32 BoundarySegmentIndex = INDEX_NONE;
+	};
+
+	struct FBoundaryDetourCandidate
+	{
+		TArray<FVector> Points;
+		float Length = TNumericLimits<float>::Max();
+		bool bIsValid = false;
 	};
 
 	FVector2D GetXY(const FVector& Location)
@@ -93,6 +122,11 @@ namespace
 			Center.X + FMath::Cos(AngleRadians) * Radius,
 			Center.Y + FMath::Sin(AngleRadians) * Radius,
 			Z);
+	}
+
+	float GetCross2D(const FVector2D& Left, const FVector2D& Right)
+	{
+		return Left.X * Right.Y - Left.Y * Right.X;
 	}
 
 	float GetAnchorDetourRadius(const float AvoidanceRadius)
@@ -186,35 +220,246 @@ namespace
 		return SegmentStart + Segment * FMath::Clamp(Alpha, 0.f, 1.f);
 	}
 
+	float GetPolygonSignedArea(const TArray<FVector2D>& Polygon)
+	{
+		float SignedArea = 0.f;
+		for (int32 PointIndex = 0; PointIndex < Polygon.Num(); PointIndex++)
+		{
+			const FVector2D& CurrentPoint = Polygon[PointIndex];
+			const FVector2D& NextPoint = Polygon[(PointIndex + 1) % Polygon.Num()];
+			SignedArea += CurrentPoint.X * NextPoint.Y - NextPoint.X * CurrentPoint.Y;
+		}
+
+		return SignedArea * 0.5f;
+	}
+
+	FVector2D GetBoundaryEdgeInwardNormal(const FVector2D& SegmentStart,
+	                                      const FVector2D& SegmentEnd,
+	                                      const bool bIsCounterClockwise)
+	{
+		const FVector2D Edge = SegmentEnd - SegmentStart;
+		if (Edge.SizeSquared() <= MinDirectionSizeSquared)
+		{
+			return FVector2D::ZeroVector;
+		}
+
+		const FVector2D EdgeDirection = Edge.GetSafeNormal();
+		return bIsCounterClockwise
+			       ? FVector2D(-EdgeDirection.Y, EdgeDirection.X)
+			       : FVector2D(EdgeDirection.Y, -EdgeDirection.X);
+	}
+
+	FBoundaryProjection FindClosestBoundaryProjection(const FVector2D& Point,
+	                                                  const TArray<FVector2D>& BoundaryPolygon)
+	{
+		FBoundaryProjection ClosestProjection;
+		for (int32 SegmentIndex = 0; SegmentIndex < BoundaryPolygon.Num(); SegmentIndex++)
+		{
+			const FVector2D& SegmentStart = BoundaryPolygon[SegmentIndex];
+			const FVector2D& SegmentEnd = BoundaryPolygon[(SegmentIndex + 1) % BoundaryPolygon.Num()];
+			const FVector2D CandidatePoint = GetClosestPointOnSegment(Point, SegmentStart, SegmentEnd);
+			const float CandidateDistanceSquared = FVector2D::DistSquared(Point, CandidatePoint);
+			if (CandidateDistanceSquared >= ClosestProjection.DistanceSquared)
+			{
+				continue;
+			}
+
+			ClosestProjection.Point = CandidatePoint;
+			ClosestProjection.DistanceSquared = CandidateDistanceSquared;
+			ClosestProjection.SegmentIndex = SegmentIndex;
+		}
+
+		return ClosestProjection;
+	}
+
+	bool TryBuildInsideOffsetPoint(const FVector2D& BoundaryPoint,
+	                               const FVector2D& DirectionInside,
+	                               const TArray<FVector2D>& BoundaryPolygon,
+	                               const float Padding,
+	                               const float Z,
+	                               FVector& OutPoint)
+	{
+		if (DirectionInside.SizeSquared() <= MinDirectionSizeSquared)
+		{
+			return false;
+		}
+
+		const float SafePadding = FMath::Max(0.f, Padding);
+		const FVector2D CandidatePoint = BoundaryPoint + DirectionInside.GetSafeNormal() * SafePadding;
+		if (BoundaryPolygon.Num() >= 3 && not GetIsPointInsidePolygon(CandidatePoint, BoundaryPolygon))
+		{
+			return false;
+		}
+
+		OutPoint = BuildVectorFromXY(CandidatePoint, Z);
+		return true;
+	}
+
+	bool TryBuildSampledInsideOffsetPoint(const FVector2D& BoundaryPoint,
+	                                      const FVector2D& PreferredDirectionInside,
+	                                      const TArray<FVector2D>& BoundaryPolygon,
+	                                      const float Padding,
+	                                      const float Z,
+	                                      FVector& OutPoint)
+	{
+		if (PreferredDirectionInside.SizeSquared() <= MinDirectionSizeSquared || Padding <= 0.f)
+		{
+			return false;
+		}
+
+		const float PreferredAngle = FMath::Atan2(PreferredDirectionInside.Y, PreferredDirectionInside.X);
+		float CurrentRadius = Padding;
+		for (int32 RadiusAttemptIndex = 0; RadiusAttemptIndex < BoundaryOffsetRadiusRetryCount; RadiusAttemptIndex++)
+		{
+			float BestAngularDelta = TNumericLimits<float>::Max();
+			FVector BestPoint = FVector::ZeroVector;
+			for (int32 DirectionSampleIndex = 0;
+			     DirectionSampleIndex < BoundaryOffsetDirectionSampleCount;
+			     DirectionSampleIndex++)
+			{
+				const float CandidateAngle = PreferredAngle
+					+ 2.f * UE_PI * static_cast<float>(DirectionSampleIndex)
+					/ static_cast<float>(BoundaryOffsetDirectionSampleCount);
+				const FVector2D Direction(FMath::Cos(CandidateAngle), FMath::Sin(CandidateAngle));
+				const FVector2D CandidatePoint = BoundaryPoint + Direction * CurrentRadius;
+				if (not GetIsPointInsidePolygon(CandidatePoint, BoundaryPolygon))
+				{
+					continue;
+				}
+
+				const float AngularDelta = FMath::Abs(FMath::FindDeltaAngleRadians(PreferredAngle, CandidateAngle));
+				if (AngularDelta >= BestAngularDelta)
+				{
+					continue;
+				}
+
+				BestAngularDelta = AngularDelta;
+				BestPoint = BuildVectorFromXY(CandidatePoint, Z);
+			}
+
+			if (BestAngularDelta < TNumericLimits<float>::Max())
+			{
+				OutPoint = BestPoint;
+				return true;
+			}
+
+			CurrentRadius *= BoundaryOffsetRadiusRetryScale;
+		}
+
+		return false;
+	}
+
+	FVector BuildBoundaryOffsetPoint(const FVector2D& BoundaryPoint,
+	                                 const int32 BoundarySegmentIndex,
+	                                 const TArray<FVector2D>& BoundaryPolygon,
+	                                 const float Padding,
+	                                 const float Z)
+	{
+		if (not BoundaryPolygon.IsValidIndex(BoundarySegmentIndex))
+		{
+			return BuildVectorFromXY(BoundaryPoint, Z);
+		}
+
+		const bool bIsCounterClockwise = GetPolygonSignedArea(BoundaryPolygon) > 0.f;
+		const FVector2D& SegmentStart = BoundaryPolygon[BoundarySegmentIndex];
+		const FVector2D& SegmentEnd = BoundaryPolygon[(BoundarySegmentIndex + 1) % BoundaryPolygon.Num()];
+		const FVector2D DirectionInside =
+			GetBoundaryEdgeInwardNormal(SegmentStart, SegmentEnd, bIsCounterClockwise);
+
+		FVector OffsetPoint = FVector::ZeroVector;
+		if (TryBuildInsideOffsetPoint(BoundaryPoint, DirectionInside, BoundaryPolygon, Padding, Z, OffsetPoint))
+		{
+			return OffsetPoint;
+		}
+
+		const FVector2D CentroidDirection = GetPolygonCentroid(BoundaryPolygon) - BoundaryPoint;
+		if (TryBuildInsideOffsetPoint(BoundaryPoint, CentroidDirection, BoundaryPolygon, Padding, Z, OffsetPoint))
+		{
+			return OffsetPoint;
+		}
+
+		if (TryBuildSampledInsideOffsetPoint(
+			BoundaryPoint,
+			DirectionInside,
+			BoundaryPolygon,
+			Padding,
+			Z,
+			OffsetPoint))
+		{
+			return OffsetPoint;
+		}
+
+		return BuildVectorFromXY(BoundaryPoint, Z);
+	}
+
+	FVector BuildBoundaryVertexOffsetPoint(const int32 BoundaryVertexIndex,
+	                                       const TArray<FVector2D>& BoundaryPolygon,
+	                                       const float Padding,
+	                                       const float Z)
+	{
+		if (not BoundaryPolygon.IsValidIndex(BoundaryVertexIndex))
+		{
+			return FVector::ZeroVector;
+		}
+
+		const bool bIsCounterClockwise = GetPolygonSignedArea(BoundaryPolygon) > 0.f;
+		const int32 PreviousSegmentIndex =
+			(BoundaryVertexIndex - 1 + BoundaryPolygon.Num()) % BoundaryPolygon.Num();
+		const int32 NextSegmentIndex = BoundaryVertexIndex;
+		const FVector2D PreviousNormal = GetBoundaryEdgeInwardNormal(
+			BoundaryPolygon[PreviousSegmentIndex],
+			BoundaryPolygon[BoundaryVertexIndex],
+			bIsCounterClockwise);
+		const FVector2D NextNormal = GetBoundaryEdgeInwardNormal(
+			BoundaryPolygon[BoundaryVertexIndex],
+			BoundaryPolygon[(BoundaryVertexIndex + 1) % BoundaryPolygon.Num()],
+			bIsCounterClockwise);
+		const FVector2D BoundaryPoint = BoundaryPolygon[BoundaryVertexIndex];
+
+		FVector OffsetPoint = FVector::ZeroVector;
+		if (TryBuildInsideOffsetPoint(
+			BoundaryPoint,
+			PreviousNormal + NextNormal,
+			BoundaryPolygon,
+			Padding,
+			Z,
+			OffsetPoint))
+		{
+			return OffsetPoint;
+		}
+
+		if (TryBuildInsideOffsetPoint(BoundaryPoint, PreviousNormal, BoundaryPolygon, Padding, Z, OffsetPoint))
+		{
+			return OffsetPoint;
+		}
+
+		return BuildBoundaryOffsetPoint(BoundaryPoint, NextSegmentIndex, BoundaryPolygon, Padding, Z);
+	}
+
 	FVector ProjectPointInsideBoundary(const FVector& Point,
 	                                   const TArray<FVector2D>& BoundaryPolygon,
 	                                   const float Padding)
 	{
-		if (BoundaryPolygon.Num() < 3 || GetIsPointInsidePolygon(GetXY(Point), BoundaryPolygon))
+		if (BoundaryPolygon.Num() < 3)
 		{
 			return Point;
 		}
 
-		const FVector2D PointXY = GetXY(Point);
-		const FVector2D Centroid = GetPolygonCentroid(BoundaryPolygon);
-		FVector2D ClosestBoundaryPoint = BoundaryPolygon[0];
-		float ClosestDistanceSquared = TNumericLimits<float>::Max();
-		for (int32 Index = 0; Index < BoundaryPolygon.Num(); Index++)
+		const FBoundaryProjection ClosestProjection = FindClosestBoundaryProjection(GetXY(Point), BoundaryPolygon);
+		const bool bIsInsideBoundary = GetIsPointInsidePolygon(GetXY(Point), BoundaryPolygon);
+		const float RequiredPadding = Padding * BoundaryPaddingProjectionScale;
+		if (bIsInsideBoundary
+			&& (RequiredPadding <= 0.f || ClosestProjection.DistanceSquared >= FMath::Square(RequiredPadding)))
 		{
-			const FVector2D& SegmentStart = BoundaryPolygon[Index];
-			const FVector2D& SegmentEnd = BoundaryPolygon[(Index + 1) % BoundaryPolygon.Num()];
-			const FVector2D Candidate = GetClosestPointOnSegment(PointXY, SegmentStart, SegmentEnd);
-			const float CandidateDistanceSquared = FVector2D::DistSquared(PointXY, Candidate);
-			if (CandidateDistanceSquared < ClosestDistanceSquared)
-			{
-				ClosestDistanceSquared = CandidateDistanceSquared;
-				ClosestBoundaryPoint = Candidate;
-			}
+			return Point;
 		}
 
-		const FVector2D DirectionInside = (Centroid - ClosestBoundaryPoint).GetSafeNormal();
-		const FVector2D ProjectedPoint = ClosestBoundaryPoint + DirectionInside * Padding;
-		return BuildVectorFromXY(ProjectedPoint, Point.Z);
+		return BuildBoundaryOffsetPoint(
+			ClosestProjection.Point,
+			ClosestProjection.SegmentIndex,
+			BoundaryPolygon,
+			Padding,
+			Point.Z);
 	}
 
 	bool TryFindFirstOutsidePointOnSegment(const FVector& SegmentStart,
@@ -227,9 +472,14 @@ namespace
 			return false;
 		}
 
-		for (int32 SampleIndex = 1; SampleIndex <= SegmentSampleCount; SampleIndex++)
+		const float SegmentDistance = FVector2D::Distance(GetXY(SegmentStart), GetXY(SegmentEnd));
+		const int32 SampleCount = FMath::Clamp(
+			FMath::CeilToInt(SegmentDistance / BoundarySegmentSampleSpacing),
+			BoundarySegmentMinSampleCount,
+			BoundarySegmentMaxSampleCount);
+		for (int32 SampleIndex = 1; SampleIndex <= SampleCount; SampleIndex++)
 		{
-			const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SegmentSampleCount);
+			const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
 			const FVector Candidate = FMath::Lerp(SegmentStart, SegmentEnd, Alpha);
 			if (not GetIsPointInsidePolygon(GetXY(Candidate), BoundaryPolygon))
 			{
@@ -471,12 +721,23 @@ namespace
 		return not GetDoesSegmentIntersectCircle(SegmentStart, SegmentEnd, AnchorLocation, AvoidanceRadius);
 	}
 
+	bool GetDoesDetourStayInsideBoundary(const FVector& SegmentStart,
+	                                     const TArray<FVector>& DetourPoints,
+	                                     const FVector& SegmentEnd,
+	                                     const TArray<FVector2D>& BoundaryPolygon);
+
 	bool GetDoesDetourRespectConstraints(const FVector& SegmentStart,
 	                                     const TArray<FVector>& DetourPoints,
 	                                     const FVector& SegmentEnd,
 	                                     const FVector& AnchorLocation,
-	                                     const float AvoidanceRadius)
+	                                     const float AvoidanceRadius,
+	                                     const TArray<FVector2D>& BoundaryPolygon)
 	{
+		if (not GetDoesDetourStayInsideBoundary(SegmentStart, DetourPoints, SegmentEnd, BoundaryPolygon))
+		{
+			return false;
+		}
+
 		FVector PreviousPoint = SegmentStart;
 		for (const FVector& DetourPoint : DetourPoints)
 		{
@@ -560,6 +821,15 @@ namespace
 		return false;
 	}
 
+	int32 GetBoundarySegmentSampleCount(const FVector& SegmentStart, const FVector& SegmentEnd)
+	{
+		const float SegmentDistance = FVector2D::Distance(GetXY(SegmentStart), GetXY(SegmentEnd));
+		return FMath::Clamp(
+			FMath::CeilToInt(SegmentDistance / BoundarySegmentSampleSpacing),
+			BoundarySegmentMinSampleCount,
+			BoundarySegmentMaxSampleCount);
+	}
+
 	FAnchorDetourCandidate BuildAnchorRingArcCandidate(const FVector& SegmentStart,
 	                                                   const FVector& SegmentEnd,
 	                                                   const TArray<FVector>& RingPoints,
@@ -568,7 +838,8 @@ namespace
 	                                                   const int32 ExitIndex,
 	                                                   const int32 DirectionStep,
 	                                                   const FVector& AnchorLocation,
-	                                                   const float AvoidanceRadius)
+	                                                   const float AvoidanceRadius,
+	                                                   const TArray<FVector2D>& BoundaryPolygon)
 	{
 		FAnchorDetourCandidate Candidate;
 		if (not TryBuildAnchorRingArcPoints(
@@ -587,7 +858,8 @@ namespace
 			Candidate.Points,
 			SegmentEnd,
 			AnchorLocation,
-			AvoidanceRadius);
+			AvoidanceRadius,
+			BoundaryPolygon);
 		if (Candidate.bRespectsConstraints)
 		{
 			Candidate.Length = GetPathLength(SegmentStart, Candidate.Points, SegmentEnd);
@@ -619,6 +891,7 @@ namespace
 	                                               const int32 EntryIndex,
 	                                               const FVector& AnchorLocation,
 	                                               const float AvoidanceRadius,
+	                                               const TArray<FVector2D>& BoundaryPolygon,
 	                                               FAnchorDetourCandidate& InOutBestCandidate)
 	{
 		for (int32 ExitIndex = 0; ExitIndex < RingPoints.Num(); ExitIndex++)
@@ -643,7 +916,8 @@ namespace
 					ExitIndex,
 					1,
 					AnchorLocation,
-					AvoidanceRadius),
+					AvoidanceRadius,
+					BoundaryPolygon),
 				InOutBestCandidate);
 			TryUpdateBestAnchorDetourCandidate(
 				BuildAnchorRingArcCandidate(
@@ -655,7 +929,8 @@ namespace
 					ExitIndex,
 					-1,
 					AnchorLocation,
-					AvoidanceRadius),
+					AvoidanceRadius,
+					BoundaryPolygon),
 				InOutBestCandidate);
 		}
 	}
@@ -697,6 +972,7 @@ namespace
 				EntryIndex,
 				AnchorLocation,
 				AvoidanceRadius,
+				BoundaryPolygon,
 				BestCandidate);
 		}
 
@@ -757,6 +1033,565 @@ namespace
 		return bInsertedDetour;
 	}
 
+	bool TryGetSegmentIntersectionAlpha(const FVector2D& SegmentStart,
+	                                    const FVector2D& SegmentEnd,
+	                                    const FVector2D& BoundaryStart,
+	                                    const FVector2D& BoundaryEnd,
+	                                    float& OutSegmentAlpha)
+	{
+		const FVector2D SegmentDirection = SegmentEnd - SegmentStart;
+		const FVector2D BoundaryDirection = BoundaryEnd - BoundaryStart;
+		const float Denominator = GetCross2D(SegmentDirection, BoundaryDirection);
+		if (FMath::Abs(Denominator) <= BoundaryIntersectionTolerance)
+		{
+			return false;
+		}
+
+		const FVector2D StartDelta = BoundaryStart - SegmentStart;
+		const float SegmentAlpha = GetCross2D(StartDelta, BoundaryDirection) / Denominator;
+		const float BoundaryAlpha = GetCross2D(StartDelta, SegmentDirection) / Denominator;
+		if (SegmentAlpha <= BoundaryIntersectionTolerance || SegmentAlpha >= 1.f - BoundaryIntersectionTolerance)
+		{
+			return false;
+		}
+
+		if (BoundaryAlpha < -BoundaryIntersectionTolerance || BoundaryAlpha > 1.f + BoundaryIntersectionTolerance)
+		{
+			return false;
+		}
+
+		OutSegmentAlpha = FMath::Clamp(SegmentAlpha, 0.f, 1.f);
+		return true;
+	}
+
+	void AddUniqueBoundaryIntersection(const FBoundaryIntersection& Intersection,
+	                                   TArray<FBoundaryIntersection>& InOutIntersections)
+	{
+		for (const FBoundaryIntersection& ExistingIntersection : InOutIntersections)
+		{
+			if (FMath::Abs(ExistingIntersection.SegmentAlpha - Intersection.SegmentAlpha)
+				<= BoundaryIntersectionTolerance)
+			{
+				return;
+			}
+		}
+
+		InOutIntersections.Add(Intersection);
+	}
+
+	void BuildBoundaryIntersectionsForSegment(const FVector& SegmentStart,
+	                                          const FVector& SegmentEnd,
+	                                          const TArray<FVector2D>& BoundaryPolygon,
+	                                          TArray<FBoundaryIntersection>& OutIntersections)
+	{
+		OutIntersections.Reset();
+		const FVector2D SegmentStartXY = GetXY(SegmentStart);
+		const FVector2D SegmentEndXY = GetXY(SegmentEnd);
+		for (int32 BoundaryIndex = 0; BoundaryIndex < BoundaryPolygon.Num(); BoundaryIndex++)
+		{
+			float SegmentAlpha = 0.f;
+			const FVector2D& BoundaryStart = BoundaryPolygon[BoundaryIndex];
+			const FVector2D& BoundaryEnd = BoundaryPolygon[(BoundaryIndex + 1) % BoundaryPolygon.Num()];
+			if (not TryGetSegmentIntersectionAlpha(
+				SegmentStartXY,
+				SegmentEndXY,
+				BoundaryStart,
+				BoundaryEnd,
+				SegmentAlpha))
+			{
+				continue;
+			}
+
+			FBoundaryIntersection Intersection;
+			Intersection.Point = SegmentStartXY + (SegmentEndXY - SegmentStartXY) * SegmentAlpha;
+			Intersection.SegmentAlpha = SegmentAlpha;
+			Intersection.BoundarySegmentIndex = BoundaryIndex;
+			AddUniqueBoundaryIntersection(Intersection, OutIntersections);
+		}
+
+		OutIntersections.Sort([](const FBoundaryIntersection& Left, const FBoundaryIntersection& Right)
+		{
+			return Left.SegmentAlpha < Right.SegmentAlpha;
+		});
+	}
+
+	FBoundaryIntersection BuildBoundaryIntersectionAtSegmentAlpha(const FVector& SegmentStart,
+	                                                              const FVector& SegmentEnd,
+	                                                              const float SegmentAlpha,
+	                                                              const TArray<FVector2D>& BoundaryPolygon)
+	{
+		FBoundaryIntersection Intersection;
+		const FVector PointOnSegment = FMath::Lerp(SegmentStart, SegmentEnd, SegmentAlpha);
+		const FBoundaryProjection BoundaryProjection =
+			FindClosestBoundaryProjection(GetXY(PointOnSegment), BoundaryPolygon);
+		Intersection.Point = BoundaryProjection.Point;
+		Intersection.SegmentAlpha = FMath::Clamp(SegmentAlpha, 0.f, 1.f);
+		Intersection.BoundarySegmentIndex = BoundaryProjection.SegmentIndex;
+		return Intersection;
+	}
+
+	float RefineBoundaryTransitionAlpha(const FVector& SegmentStart,
+	                                    const FVector& SegmentEnd,
+	                                    const float KnownInsideAlpha,
+	                                    const float KnownOutsideAlpha,
+	                                    const TArray<FVector2D>& BoundaryPolygon)
+	{
+		float InsideAlpha = KnownInsideAlpha;
+		float OutsideAlpha = KnownOutsideAlpha;
+		for (int32 RefinementIndex = 0; RefinementIndex < BoundaryCrossingRefinementCount; RefinementIndex++)
+		{
+			const float CandidateAlpha = (InsideAlpha + OutsideAlpha) * 0.5f;
+			const FVector CandidatePoint = FMath::Lerp(SegmentStart, SegmentEnd, CandidateAlpha);
+			if (GetIsPointInsidePolygon(GetXY(CandidatePoint), BoundaryPolygon))
+			{
+				InsideAlpha = CandidateAlpha;
+				continue;
+			}
+
+			OutsideAlpha = CandidateAlpha;
+		}
+
+		return (InsideAlpha + OutsideAlpha) * 0.5f;
+	}
+
+	bool TryBuildSampledBoundaryIntersectionsForSegment(const FVector& SegmentStart,
+	                                                    const FVector& SegmentEnd,
+	                                                    const TArray<FVector2D>& BoundaryPolygon,
+	                                                    FBoundaryIntersection& OutExitIntersection,
+	                                                    FBoundaryIntersection& OutReentryIntersection)
+	{
+		const int32 SampleCount = GetBoundarySegmentSampleCount(SegmentStart, SegmentEnd);
+		int32 FirstOutsideSampleIndex = INDEX_NONE;
+		int32 LastOutsideSampleIndex = INDEX_NONE;
+		for (int32 SampleIndex = 0; SampleIndex <= SampleCount; SampleIndex++)
+		{
+			const float SampleAlpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
+			const FVector SamplePoint = FMath::Lerp(SegmentStart, SegmentEnd, SampleAlpha);
+			if (GetIsPointInsidePolygon(GetXY(SamplePoint), BoundaryPolygon))
+			{
+				continue;
+			}
+
+			if (FirstOutsideSampleIndex == INDEX_NONE)
+			{
+				FirstOutsideSampleIndex = SampleIndex;
+			}
+			LastOutsideSampleIndex = SampleIndex;
+		}
+
+		if (FirstOutsideSampleIndex == INDEX_NONE)
+		{
+			return false;
+		}
+
+		const float ExitAlpha = FirstOutsideSampleIndex > 0
+			                        ? RefineBoundaryTransitionAlpha(
+				                        SegmentStart,
+				                        SegmentEnd,
+				                        static_cast<float>(FirstOutsideSampleIndex - 1) / static_cast<float>(SampleCount),
+				                        static_cast<float>(FirstOutsideSampleIndex) / static_cast<float>(SampleCount),
+				                        BoundaryPolygon)
+			                        : 0.f;
+		const float ReentryAlpha = LastOutsideSampleIndex < SampleCount
+			                           ? RefineBoundaryTransitionAlpha(
+				                           SegmentStart,
+				                           SegmentEnd,
+				                           static_cast<float>(LastOutsideSampleIndex + 1) / static_cast<float>(SampleCount),
+				                           static_cast<float>(LastOutsideSampleIndex) / static_cast<float>(SampleCount),
+				                           BoundaryPolygon)
+			                           : 1.f;
+		if (ReentryAlpha - ExitAlpha <= BoundaryIntersectionTolerance)
+		{
+			return false;
+		}
+
+		OutExitIntersection = BuildBoundaryIntersectionAtSegmentAlpha(
+			SegmentStart,
+			SegmentEnd,
+			ExitAlpha,
+			BoundaryPolygon);
+		OutReentryIntersection = BuildBoundaryIntersectionAtSegmentAlpha(
+			SegmentStart,
+			SegmentEnd,
+			ReentryAlpha,
+			BoundaryPolygon);
+		return OutExitIntersection.BoundarySegmentIndex != INDEX_NONE
+			&& OutReentryIntersection.BoundarySegmentIndex != INDEX_NONE;
+	}
+
+	bool GetDoesDetourStayInsideBoundary(const FVector& SegmentStart,
+	                                     const TArray<FVector>& DetourPoints,
+	                                     const FVector& SegmentEnd,
+	                                     const TArray<FVector2D>& BoundaryPolygon)
+	{
+		FVector OutsidePoint = FVector::ZeroVector;
+		FVector PreviousPoint = SegmentStart;
+		for (const FVector& DetourPoint : DetourPoints)
+		{
+			if (TryFindFirstOutsidePointOnSegment(PreviousPoint, DetourPoint, BoundaryPolygon, OutsidePoint))
+			{
+				return false;
+			}
+
+			PreviousPoint = DetourPoint;
+		}
+
+		return not TryFindFirstOutsidePointOnSegment(PreviousPoint, SegmentEnd, BoundaryPolygon, OutsidePoint);
+	}
+
+	bool TryBuildBoundaryArcPoints(const FBoundaryIntersection& ExitIntersection,
+	                               const FBoundaryIntersection& ReentryIntersection,
+	                               const int32 DirectionStep,
+	                               const TArray<FVector2D>& BoundaryPolygon,
+	                               const float BoundaryPadding,
+	                               const float Z,
+	                               TArray<FVector>& OutArcPoints)
+	{
+		OutArcPoints.Reset();
+		const int32 BoundaryPointCount = BoundaryPolygon.Num();
+		if (BoundaryPointCount < 3)
+		{
+			return false;
+		}
+
+		OutArcPoints.Add(BuildBoundaryOffsetPoint(
+			ExitIntersection.Point,
+			ExitIntersection.BoundarySegmentIndex,
+			BoundaryPolygon,
+			BoundaryPadding,
+			Z));
+
+		int32 CurrentVertexIndex = DirectionStep > 0
+			                           ? (ExitIntersection.BoundarySegmentIndex + 1) % BoundaryPointCount
+			                           : ExitIntersection.BoundarySegmentIndex;
+		const int32 StopVertexIndex = DirectionStep > 0
+			                              ? (ReentryIntersection.BoundarySegmentIndex + 1) % BoundaryPointCount
+			                              : ReentryIntersection.BoundarySegmentIndex;
+		for (int32 StepIndex = 0; StepIndex < BoundaryPointCount; StepIndex++)
+		{
+			if (CurrentVertexIndex == StopVertexIndex)
+			{
+				break;
+			}
+
+			OutArcPoints.Add(BuildBoundaryVertexOffsetPoint(
+				CurrentVertexIndex,
+				BoundaryPolygon,
+				BoundaryPadding,
+				Z));
+			CurrentVertexIndex = (CurrentVertexIndex + DirectionStep + BoundaryPointCount) % BoundaryPointCount;
+		}
+
+		OutArcPoints.Add(BuildBoundaryOffsetPoint(
+			ReentryIntersection.Point,
+			ReentryIntersection.BoundarySegmentIndex,
+			BoundaryPolygon,
+			BoundaryPadding,
+			Z));
+		return OutArcPoints.Num() >= 2;
+	}
+
+	FBoundaryDetourCandidate BuildBoundaryArcCandidate(const FVector& SegmentStart,
+	                                                   const FVector& SegmentEnd,
+	                                                   const FBoundaryIntersection& ExitIntersection,
+	                                                   const FBoundaryIntersection& ReentryIntersection,
+	                                                   const int32 DirectionStep,
+	                                                   const TArray<FVector2D>& BoundaryPolygon,
+	                                                   const float BoundaryPadding)
+	{
+		FBoundaryDetourCandidate Candidate;
+		if (not TryBuildBoundaryArcPoints(
+			ExitIntersection,
+			ReentryIntersection,
+			DirectionStep,
+			BoundaryPolygon,
+			BoundaryPadding,
+			SegmentStart.Z,
+			Candidate.Points))
+		{
+			return Candidate;
+		}
+
+		Candidate.bIsValid = GetDoesDetourStayInsideBoundary(
+			SegmentStart,
+			Candidate.Points,
+			SegmentEnd,
+			BoundaryPolygon);
+		if (Candidate.bIsValid)
+		{
+			Candidate.Length = GetPathLength(SegmentStart, Candidate.Points, SegmentEnd);
+		}
+
+		return Candidate;
+	}
+
+	void TryUpdateBestBoundaryDetourCandidate(const FBoundaryDetourCandidate& Candidate,
+	                                          FBoundaryDetourCandidate& InOutBestCandidate)
+	{
+		if (not Candidate.bIsValid || Candidate.Length >= InOutBestCandidate.Length)
+		{
+			return;
+		}
+
+		InOutBestCandidate = Candidate;
+	}
+
+	bool TryBuildBestBoundaryDetourPoints(const FVector& SegmentStart,
+	                                      const FVector& SegmentEnd,
+	                                      const FBoundaryIntersection& ExitIntersection,
+	                                      const FBoundaryIntersection& ReentryIntersection,
+	                                      const TArray<FVector2D>& BoundaryPolygon,
+	                                      const float BoundaryPadding,
+	                                      TArray<FVector>& OutDetourPoints)
+	{
+		OutDetourPoints.Reset();
+		FBoundaryDetourCandidate BestCandidate;
+		TryUpdateBestBoundaryDetourCandidate(
+			BuildBoundaryArcCandidate(
+				SegmentStart,
+				SegmentEnd,
+				ExitIntersection,
+				ReentryIntersection,
+				1,
+				BoundaryPolygon,
+				BoundaryPadding),
+			BestCandidate);
+		TryUpdateBestBoundaryDetourCandidate(
+			BuildBoundaryArcCandidate(
+				SegmentStart,
+				SegmentEnd,
+				ExitIntersection,
+				ReentryIntersection,
+				-1,
+				BoundaryPolygon,
+				BoundaryPadding),
+			BestCandidate);
+		if (not BestCandidate.bIsValid)
+		{
+			return false;
+		}
+
+		OutDetourPoints = BestCandidate.Points;
+		return true;
+	}
+
+	bool TryBuildBoundaryDetourPoints(const FVector& SegmentStart,
+	                                  const FVector& SegmentEnd,
+	                                  const TArray<FVector2D>& BoundaryPolygon,
+	                                  const float BoundaryPadding,
+	                                  TArray<FVector>& OutDetourPoints)
+	{
+		OutDetourPoints.Reset();
+		FBoundaryIntersection SampledExitIntersection;
+		FBoundaryIntersection SampledReentryIntersection;
+		if (TryBuildSampledBoundaryIntersectionsForSegment(
+			SegmentStart,
+			SegmentEnd,
+			BoundaryPolygon,
+			SampledExitIntersection,
+			SampledReentryIntersection)
+			&& TryBuildBestBoundaryDetourPoints(
+				SegmentStart,
+				SegmentEnd,
+				SampledExitIntersection,
+				SampledReentryIntersection,
+				BoundaryPolygon,
+				BoundaryPadding,
+				OutDetourPoints))
+		{
+			return true;
+		}
+
+		TArray<FBoundaryIntersection> Intersections;
+		BuildBoundaryIntersectionsForSegment(SegmentStart, SegmentEnd, BoundaryPolygon, Intersections);
+		if (Intersections.Num() >= 2
+			&& TryBuildBestBoundaryDetourPoints(
+				SegmentStart,
+				SegmentEnd,
+				Intersections[0],
+				Intersections[1],
+				BoundaryPolygon,
+				BoundaryPadding,
+				OutDetourPoints))
+		{
+			return true;
+		}
+
+		return false;
+	}
+
+	void AddDistinctFallbackPoint(const FVector& SegmentStart,
+	                              const FVector& CandidatePoint,
+	                              TArray<FVector>& InOutFallbackPoints)
+	{
+		const FVector& PreviousPoint = InOutFallbackPoints.Num() > 0
+			                               ? InOutFallbackPoints.Last()
+			                               : SegmentStart;
+		if (FVector::DistSquared(PreviousPoint, CandidatePoint) <= MinPathPointDistanceSquared)
+		{
+			return;
+		}
+
+		InOutFallbackPoints.Add(CandidatePoint);
+	}
+
+	bool TryBuildSampledBoundaryFallbackPoints(const FVector& SegmentStart,
+	                                           const FVector& SegmentEnd,
+	                                           const TArray<FVector2D>& BoundaryPolygon,
+	                                           const float BoundaryPadding,
+	                                           TArray<FVector>& OutFallbackPoints)
+	{
+		OutFallbackPoints.Reset();
+		const int32 SampleCount = GetBoundarySegmentSampleCount(SegmentStart, SegmentEnd);
+		for (int32 SampleIndex = 1; SampleIndex < SampleCount; SampleIndex++)
+		{
+			const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
+			const FVector CandidatePoint = FMath::Lerp(SegmentStart, SegmentEnd, Alpha);
+			if (GetIsPointInsidePolygon(GetXY(CandidatePoint), BoundaryPolygon))
+			{
+				continue;
+			}
+
+			AddDistinctFallbackPoint(
+				SegmentStart,
+				ProjectPointInsideBoundary(CandidatePoint, BoundaryPolygon, BoundaryPadding),
+				OutFallbackPoints);
+		}
+
+		if (OutFallbackPoints.Num() > 0
+			&& FVector::DistSquared(OutFallbackPoints.Last(), SegmentEnd) <= MinPathPointDistanceSquared)
+		{
+			OutFallbackPoints.RemoveAt(OutFallbackPoints.Num() - 1);
+		}
+
+		return OutFallbackPoints.Num() > 0;
+	}
+
+	bool GetDoesDetourMakeSegmentProgress(const FVector& SegmentStart,
+	                                      const FVector& SegmentEnd,
+	                                      const TArray<FVector>& DetourPoints)
+	{
+		if (DetourPoints.Num() <= 0)
+		{
+			return false;
+		}
+
+		const FVector2D SegmentStartXY = GetXY(SegmentStart);
+		const FVector2D SegmentEndXY = GetXY(SegmentEnd);
+		const FVector2D SegmentDirection = SegmentEndXY - SegmentStartXY;
+		const float SegmentSizeSquared = SegmentDirection.SizeSquared();
+		if (SegmentSizeSquared <= MinDirectionSizeSquared)
+		{
+			return false;
+		}
+
+		const float FirstPointAlpha =
+			FVector2D::DotProduct(GetXY(DetourPoints[0]) - SegmentStartXY, SegmentDirection) / SegmentSizeSquared;
+		const float LastPointAlpha =
+			FVector2D::DotProduct(GetXY(DetourPoints.Last()) - SegmentStartXY, SegmentDirection) / SegmentSizeSquared;
+		return FirstPointAlpha < 1.f - BoundaryIntersectionTolerance
+			&& LastPointAlpha > BoundaryIntersectionTolerance;
+	}
+
+	bool TryBuildBoundaryEndpointArcDetourPoints(const FVector& SegmentStart,
+	                                             const FVector& SegmentEnd,
+	                                             const TArray<FVector2D>& BoundaryPolygon,
+	                                             const float BoundaryPadding,
+	                                             TArray<FVector>& OutDetourPoints)
+	{
+		OutDetourPoints.Reset();
+
+		FVector OutsidePoint = FVector::ZeroVector;
+		if (not TryFindFirstOutsidePointOnSegment(SegmentStart, SegmentEnd, BoundaryPolygon, OutsidePoint))
+		{
+			return false;
+		}
+
+		const FBoundaryProjection StartProjection = FindClosestBoundaryProjection(GetXY(SegmentStart), BoundaryPolygon);
+		const FBoundaryProjection EndProjection = FindClosestBoundaryProjection(GetXY(SegmentEnd), BoundaryPolygon);
+		if (StartProjection.SegmentIndex == INDEX_NONE || EndProjection.SegmentIndex == INDEX_NONE)
+		{
+			return false;
+		}
+
+		FBoundaryIntersection ExitIntersection;
+		ExitIntersection.Point = StartProjection.Point;
+		ExitIntersection.SegmentAlpha = 0.f;
+		ExitIntersection.BoundarySegmentIndex = StartProjection.SegmentIndex;
+
+		FBoundaryIntersection ReentryIntersection;
+		ReentryIntersection.Point = EndProjection.Point;
+		ReentryIntersection.SegmentAlpha = 1.f;
+		ReentryIntersection.BoundarySegmentIndex = EndProjection.SegmentIndex;
+		return TryBuildBestBoundaryDetourPoints(
+			SegmentStart,
+			SegmentEnd,
+			ExitIntersection,
+			ReentryIntersection,
+			BoundaryPolygon,
+			BoundaryPadding,
+			OutDetourPoints);
+	}
+
+	bool TryBuildBoundaryDetourForSegment(const FVector& SegmentStart,
+	                                      const FVector& SegmentEnd,
+	                                      const TArray<FVector2D>& BoundaryPolygon,
+	                                      const float BoundaryPadding,
+	                                      TArray<FVector>& OutDetourPoints)
+	{
+		OutDetourPoints.Reset();
+		if (TryBuildBoundaryDetourPoints(
+			SegmentStart,
+			SegmentEnd,
+			BoundaryPolygon,
+			BoundaryPadding,
+			OutDetourPoints)
+			&& GetDoesDetourMakeSegmentProgress(SegmentStart, SegmentEnd, OutDetourPoints))
+		{
+			return true;
+		}
+
+		if (TryBuildBoundaryEndpointArcDetourPoints(
+			SegmentStart,
+			SegmentEnd,
+			BoundaryPolygon,
+			BoundaryPadding,
+			OutDetourPoints)
+			&& GetDoesDetourMakeSegmentProgress(SegmentStart, SegmentEnd, OutDetourPoints))
+		{
+			return true;
+		}
+
+		if (TryBuildSampledBoundaryFallbackPoints(
+			SegmentStart,
+			SegmentEnd,
+			BoundaryPolygon,
+			BoundaryPadding,
+			OutDetourPoints))
+		{
+			return true;
+		}
+
+		FVector OutsidePoint = FVector::ZeroVector;
+		if (not TryFindFirstOutsidePointOnSegment(SegmentStart, SegmentEnd, BoundaryPolygon, OutsidePoint))
+		{
+			return false;
+		}
+
+		OutDetourPoints.Add(ProjectPointInsideBoundary(OutsidePoint, BoundaryPolygon, BoundaryPadding));
+		return true;
+	}
+
+	void InsertDetourPointsAfterIndex(TArray<FVector>& PathPoints,
+	                                  const int32 PathIndex,
+	                                  const TArray<FVector>& DetourPoints)
+	{
+		for (int32 DetourPointIndex = DetourPoints.Num() - 1; DetourPointIndex >= 0; DetourPointIndex--)
+		{
+			PathPoints.Insert(DetourPoints[DetourPointIndex], PathIndex + 1);
+		}
+	}
+
 	bool TryInsertBoundaryDetour(TArray<FVector>& PathPoints,
 	                             const TArray<FVector2D>& BoundaryPolygon,
 	                             const float BoundaryPadding)
@@ -766,29 +1601,26 @@ namespace
 			return false;
 		}
 
+		bool bInsertedDetour = false;
 		for (int32 PathIndex = 0; PathIndex < PathPoints.Num() - 1; PathIndex++)
 		{
-			FVector OutsidePoint = FVector::ZeroVector;
-			if (not TryFindFirstOutsidePointOnSegment(
+			TArray<FVector> DetourPoints;
+			if (not TryBuildBoundaryDetourForSegment(
 				PathPoints[PathIndex],
 				PathPoints[PathIndex + 1],
 				BoundaryPolygon,
-				OutsidePoint))
+				BoundaryPadding,
+				DetourPoints))
 			{
 				continue;
 			}
 
-			FVector ProjectedPoint = ProjectPointInsideBoundary(OutsidePoint, BoundaryPolygon, BoundaryPadding);
-			const FVector2D SegmentDirection = (GetXY(PathPoints[PathIndex + 1]) - GetXY(PathPoints[PathIndex]))
-				.GetSafeNormal();
-			const FVector2D Perpendicular(-SegmentDirection.Y, SegmentDirection.X);
-			ProjectedPoint += BuildVectorFromXY(Perpendicular * BoundaryPadding * DetourPaddingScale, 0.f);
-			ProjectedPoint = ProjectPointInsideBoundary(ProjectedPoint, BoundaryPolygon, BoundaryPadding);
-			PathPoints.Insert(ProjectedPoint, PathIndex + 1);
-			return true;
+			InsertDetourPointsAfterIndex(PathPoints, PathIndex, DetourPoints);
+			PathIndex += DetourPoints.Num();
+			bInsertedDetour = true;
 		}
 
-		return false;
+		return bInsertedDetour;
 	}
 
 	void ProjectAllPathPoints(TArray<FVector>& PathPoints,
@@ -1247,7 +2079,7 @@ TArray<FVector> AWorldDivisionBase::BuildPathToTargetPoint(const FVector& Target
 		AnchorPoints,
 		AvoidanceRadius,
 		BoundaryPadding,
-		FMath::Max(FMath::Max(1, MaxRepairAttempts), AnchorPoints.Num()));
+		FMath::Max(FMath::Max(MinimumPathRepairAttemptCount, MaxRepairAttempts), AnchorPoints.Num()));
 	if constexpr (DeveloperSettings::Debugging::GWorldCampaign_DivisionPathing_Compile_DebugSymbols)
 	{
 		DebugDrawAdjustedDivisionPath(GetWorld(), PathPoints);
