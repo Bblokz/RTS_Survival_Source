@@ -24,6 +24,11 @@ public:
 
 	void CacheCurrentWorldState(const AGeneratorWorldCampaign& WorldGenerator);
 	void CachePlayerProfileSaveData(const FPlayerProfileSaveData& PlayerProfileSaveData);
+
+	/**
+	 * @brief Updates only the division slice of cached world state before saving.
+	 * @param WorldDivisionSaveData Current live division state built by UWorldDivisionManager.
+	 */
 	void CacheWorldDivisionSaveData(const TArray<FWorldDivisionSaveData>& WorldDivisionSaveData);
 
 	UFUNCTION(BlueprintCallable)

@@ -68,10 +68,10 @@ Recommended base functions:
 - `GetInfluenceAreaRadius() const`
 - `GetHoverRadiusType() const`
 
-`ApplyWorldDivisionDamage` should be virtual. The base version validates the request and delegates the actual composition loss to the derived class.
+`ApplyWorldDivisionDamage` should be virtual. The base version validates the~~~~ request and delegates the actual composition loss to the derived class.
 
 ### `AWorldTankDivision`
-
+~~~~
 Derived division for armor.
 
 Composition:

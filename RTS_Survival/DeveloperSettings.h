@@ -1946,6 +1946,9 @@ namespace DeveloperSettings
 		constexpr bool GBombBay_Compile_DebugSymbols = false;
 		// Ammo tracking system.
 		constexpr bool GAmmoTracking_Compile_DebugSymbols = false;
+		// Debug World Path Finding
+		constexpr bool GWorldCampaign_DivisionPathing_Compile_DebugSymbols = true;
+		
 	}
 }
 

@@ -99,6 +99,10 @@ namespace
 
 	int32 GetDivisionInfluenceSign(const AWorldDivisionBase& WorldDivision, const AWorldMapObject& TargetObject)
 	{
+		/*
+		 * Positive field-division strength means "harder" in the existing strength UI. Player divisions therefore add
+		 * positive strength to friendly map objects, but negative strength to enemy missions they are suppressing.
+		 */
 		const int32 DivisionOwner = WorldDivision.GetOwningPlayer();
 		const int32 TargetOwner = GetOwnerForMapObject(&TargetObject);
 		if (DivisionOwner == PlayerOwner && TargetOwner == PlayerOwner)
@@ -184,6 +188,10 @@ void UWorldDivisionManager::RefreshDivisionInfluence(const ERTSGameDifficulty Ga
 		return;
 	}
 
+	/*
+	 * Field-division reasons are fully rebuilt each time so movement and damage cannot leave stale strength entries on
+	 * map objects that were previously in range.
+	 */
 	M_CurrentGameDifficulty = GameDifficulty;
 	const TArray<AWorldMapObject*> MapObjects = BuildPromotedMapObjects(M_WorldGenerator->GetPlacementState());
 	for (AWorldMapObject* MapObject : MapObjects)
@@ -488,6 +496,10 @@ void UWorldDivisionManager::MoveDivisionsForOwner(const int32 OwningPlayer,
 	M_ActiveMovementDifficulty = GameDifficulty;
 	M_ActiveTurnMovementCount = 0;
 
+	/*
+	 * Movement is allowed only for the active owner, but completion is asynchronous because the movement component
+	 * interpolates visually. The manager counts started movements and performs save/influence work after all callbacks.
+	 */
 	for (const TObjectPtr<AWorldDivisionBase>& WorldDivision : M_WorldDivisions)
 	{
 		if (not IsValid(WorldDivision)
@@ -563,6 +575,10 @@ void UWorldDivisionManager::OnDivisionStrengthChanged(AWorldDivisionBase* WorldD
 
 void UWorldDivisionManager::FinishActiveTurnMovement()
 {
+	/*
+	 * This is the one post-movement choke point for both sides: recalc strength from final positions, cache division
+	 * state into the world save payload, then commit the campaign save.
+	 */
 	RefreshDivisionInfluence(M_ActiveMovementDifficulty);
 	CacheDivisionSaveState();
 

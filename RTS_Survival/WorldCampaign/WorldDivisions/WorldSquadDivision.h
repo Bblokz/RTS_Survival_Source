@@ -17,13 +17,31 @@ class RTS_SURVIVAL_API AWorldSquadDivision : public AWorldDivisionBase
 
 public:
 	virtual void PostInitializeComponents() override;
+
+	/**
+	 * @brief Removes whole squad entries from the roster and updates current division strength.
+	 * @param DamageEntryCount Number of squad entries to remove from the end of the array.
+	 */
 	virtual void ApplyWorldDivisionDamage(int32 DamageEntryCount) override;
 
+	/**
+	 * @brief Replaces squad composition and treats the new count as this division's full roster.
+	 * @param SquadSubtypes Squad subtype entries where duplicates represent multiple squads.
+	 */
 	void SetSquadSubtypes(const TArray<ESquadSubtype>& SquadSubtypes);
 	const TArray<ESquadSubtype>& GetSquadSubtypes() const { return M_SquadSubtypes; }
 
 protected:
+	/**
+	 * @brief Writes squad composition into generic world division save data.
+	 * @param OutDivisionSaveData Save data being assembled by the base class.
+	 */
 	virtual void FillSubtypeSaveData(FWorldDivisionSaveData& OutDivisionSaveData) const override;
+
+	/**
+	 * @brief Restores squad composition and estimates original count from saved strength.
+	 * @param DivisionSaveData Save data loaded for this squad division.
+	 */
 	virtual void RestoreSubtypeSaveData(const FWorldDivisionSaveData& DivisionSaveData) override;
 
 private:
@@ -33,5 +51,8 @@ private:
 
 	int32 M_StartingSquadCount = 0;
 
+	/**
+	 * @brief Recalculates current strength from remaining squads versus starting squad count.
+	 */
 	void RefreshStrengthFromSquadCount();
 };

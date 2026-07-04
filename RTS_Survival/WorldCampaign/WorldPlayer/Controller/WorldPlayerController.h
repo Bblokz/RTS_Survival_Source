@@ -49,6 +49,11 @@ public:
 	AGeneratorWorldCampaign* GetWorldGenerator() const;
 	UWorldStateAndSaveManager* GetWorldStateAndSaveManager() const;
 	UPlayerResourceManager* GetPlayerResourceManager() const;
+
+	/**
+	 * @brief Gets the controller-owned division manager used by turn flow and Blueprint move orders.
+	 * @return Division manager, or nullptr when the component is unavailable.
+	 */
 	UWorldDivisionManager* GetWorldDivisionManager() const;
 
 	UFUNCTION(BlueprintCallable)
@@ -69,6 +74,12 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void WorldCamera_RightMovement(float AxisValue);
 
+	/**
+	 * @brief Blueprint entry point for point-targeted world division move orders.
+	 * @param WorldDivision Division actor that should receive the order.
+	 * @param TargetLocation Arbitrary world-space target point, not an anchor.
+	 * @return true when the division accepted and cached the order.
+	 */
 	UFUNCTION(BlueprintCallable, Category="World Campaign|World Divisions")
 	bool IssueWorldDivisionMoveOrder(AWorldDivisionBase* WorldDivision, const FVector& TargetLocation);
 
@@ -105,7 +116,15 @@ private:
 	void PlayTurn(const EWorldTurnType TurnType); 
 	void PlayerTurn();
 	void EnemyTurn();
+
+	/**
+	 * @brief Runs the player-owned division movement pass at the end of the player turn.
+	 */
 	void MovePlayerDivisions();
+
+	/**
+	 * @brief Runs the enemy-owned division movement pass at the end of the enemy turn.
+	 */
 	void MoveEnemyDivisions();
 	bool PrimaryClick_Regular();
 	void OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapObj);
@@ -143,8 +162,21 @@ private:
 	void OnGeneratedCampaignAsyncWorkFinished();
 
 	void LoadWorldDataIntoObjects();
+
+	/**
+	 * @brief Spawns configured starting divisions after a newly generated campaign is save-ready.
+	 */
 	void InitializeWorldDivisionsForNewCampaign();
+
+	/**
+	 * @brief Restores saved divisions after generated anchors and map objects have been reconstructed.
+	 * @param LoadedWorldCampaignState Loaded state whose WorldDivisions array is authoritative.
+	 */
 	void RestoreWorldDivisionsFromSave(const FWorldCampaignState& LoadedWorldCampaignState);
+
+	/**
+	 * @brief Reapplies division influence using the selected campaign difficulty.
+	 */
 	void RefreshWorldDivisionInfluence();
 
 	/**
@@ -189,6 +221,11 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UWorldDivisionManager> M_WorldDivisionManager = nullptr;
+
+	/**
+	 * @brief Validates the controller-owned division manager component before turn or Blueprint use.
+	 * @return true when the manager exists.
+	 */
 	bool GetIsValidWorldDivisionManager() const;
 
 	UPROPERTY()

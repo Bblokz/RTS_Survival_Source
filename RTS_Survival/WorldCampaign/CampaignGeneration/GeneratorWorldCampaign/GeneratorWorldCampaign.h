@@ -500,6 +500,11 @@ public:
 	float GetDebugDisplaySeconds() const { return WorldCampaignDebugDefaults::ConnectionDrawDurationSeconds; }
 	float GetDebugLineThickness() const { return WorldCampaignDebugDefaults::ConnectionLineThickness; }
 	const FWorldCampaignPlacementState& GetPlacementState() const { return M_PlacementState; }
+
+	/**
+	 * @brief Exposes read-only world data access for runtime systems that operate after generation.
+	 * @return World data component used by generated map objects and division strength lookup.
+	 */
 	const UWorldDataComponent* GetWorldDataComponent() const;
 	void LoadWorldDataIntoObjects();
 

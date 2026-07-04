@@ -2,9 +2,11 @@
 
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionBase.h"
 
+#include "DrawDebugHelpers.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
+#include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/DeveloperSettings/WorldCampaignSettings.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionInfluenceComponent.h"
@@ -20,11 +22,53 @@ namespace
 	constexpr float AdvanceTurnTargetNearlyZeroTolerance = 1.f;
 	constexpr float AdvanceTurnTargetReachedDistanceSquared = 1.f;
 	constexpr float DetourPaddingScale = 2.f;
+	constexpr float DebugPathDrawDurationSeconds = 5.f;
+	constexpr float DebugPathLineThickness = 8.f;
+	constexpr float DebugUnrealPathLineThickness = 2.f;
+	constexpr float DebugAdjustedPathLineThickness = 1.f;
+	constexpr float DebugPathZOffset = 25.f;
 	constexpr int32 SegmentSampleCount = 24;
+	constexpr uint8 DebugPathDepthPriority = 0;
 
 	FVector2D GetXY(const FVector& Location)
 	{
 		return FVector2D(Location.X, Location.Y);
+	}
+
+	void DrawDebugPathPointsWithOffset(const UWorld* World,
+	                                   const TArray<FVector>& PathPoints,
+	                                   const FColor& Color,
+	                                   const float LineThickness)
+	{
+		if (not IsValid(World) || PathPoints.Num() < 2)
+		{
+			return;
+		}
+
+		for (int32 PathPointIndex = 0; PathPointIndex < PathPoints.Num() - 1; PathPointIndex++)
+		{
+			const FVector DebugSegmentStart = PathPoints[PathPointIndex] + FVector::UpVector * DebugPathZOffset;
+			const FVector DebugSegmentEnd = PathPoints[PathPointIndex + 1] + FVector::UpVector * DebugPathZOffset;
+			DrawDebugLine(
+				World,
+				DebugSegmentStart,
+				DebugSegmentEnd,
+				Color,
+				false,
+				DebugPathDrawDurationSeconds,
+				DebugPathDepthPriority,
+				LineThickness);
+		}
+	}
+
+	void DebugDrawUnrealDivisionPath(const UWorld* World, const TArray<FVector>& PathPoints)
+	{
+		DrawDebugPathPointsWithOffset(World, PathPoints, FColor::Red, DebugUnrealPathLineThickness);
+	}
+
+	void DebugDrawAdjustedDivisionPath(const UWorld* World, const TArray<FVector>& PathPoints)
+	{
+		DrawDebugPathPointsWithOffset(World, PathPoints, FColor::Blue, DebugAdjustedPathLineThickness);
 	}
 
 	FVector BuildVectorFromXY(const FVector2D& Location, const float Z)
@@ -258,6 +302,11 @@ namespace
 	                                const float AvoidanceRadius,
 	                                const float BoundaryPadding)
 	{
+		/*
+		 * Keep the operation ordered: boundary first, anchor standoff second, boundary again.
+		 * The second boundary pass matters because pushing away from an anchor near the edge can otherwise place the
+		 * point just outside the playable polygon.
+		 */
 		const FVector BoundaryProjectedPoint = ProjectPointInsideBoundary(Point, BoundaryPolygon, BoundaryPadding);
 		const FVector AnchorProjectedPoint = ProjectPointAwayFromAnchors(
 			BoundaryProjectedPoint,
@@ -407,6 +456,11 @@ namespace
 	                const float BoundaryPadding,
 	                const int32 MaxRepairAttempts)
 	{
+		/*
+		 * Navigation can return useful high-level path points while still ignoring campaign-only constraints.
+		 * This repair pass treats the nav path as a draft, then inserts small detours until segments stay inside the
+		 * world boundary and outside anchor avoidance circles.
+		 */
 		ProjectAllPathPoints(PathPoints, BoundaryPolygon, AnchorPoints, AvoidanceRadius, BoundaryPadding);
 		RemoveDuplicatePathPoints(PathPoints);
 
@@ -446,7 +500,7 @@ void AWorldDivisionBase::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
-	GetIsValidMovementComponent();
+	(void)GetIsValidMovementComponent();
 }
 
 void AWorldDivisionBase::InitializeWorldDivision(const FGuid& DivisionKey,
@@ -508,6 +562,10 @@ bool AWorldDivisionBase::IssueMoveOrderToPoint(const FVector& TargetWorldPoint)
 
 void AWorldDivisionBase::AdvanceTurn()
 {
+	/*
+	 * This editor path intentionally bypasses interpolation. CallInEditor does not have the same predictable runtime
+	 * ticking as the turn system, but designers still need the exact same distance-budget behavior for quick testing.
+	 */
 	if (AdvanceTurnTargetLocation.IsNearlyZero(AdvanceTurnTargetNearlyZeroTolerance)
 		|| GetIsAdvanceTurnTargetReached()
 		|| GetIsMoving())
@@ -536,6 +594,30 @@ void AWorldDivisionBase::AdvanceTurn()
 	}
 
 	SetActorLocation(MovementPathPoints.Last());
+}
+
+void AWorldDivisionBase::DebugPath()
+{
+	TArray<FVector> PathPoints;
+
+	/*
+	 * Prefer the editable test target over cached orders. This lets a designer adjust the vector and inspect the
+	 * repaired path without committing a move order or advancing the division.
+	 */
+	if (not AdvanceTurnTargetLocation.IsNearlyZero(AdvanceTurnTargetNearlyZeroTolerance))
+	{
+		PathPoints = BuildPathToTargetPoint(AdvanceTurnTargetLocation);
+	}
+	else if (bM_HasPendingMoveOrder && M_PathPoints.IsValidIndex(M_CurrentPathPointIndex))
+	{
+		PathPoints.Add(GetActorLocation());
+		for (int32 PathPointIndex = M_CurrentPathPointIndex; PathPointIndex < M_PathPoints.Num(); PathPointIndex++)
+		{
+			PathPoints.Add(M_PathPoints[PathPointIndex]);
+		}
+	}
+
+	DrawDebugPathPoints(PathPoints);
 }
 
 bool AWorldDivisionBase::MoveForTurnDistance(const float DistanceBudgetOverride)
@@ -671,6 +753,10 @@ bool AWorldDivisionBase::GetIsValidMovementComponent() const
 bool AWorldDivisionBase::ConsumeMovementBudget(const float DistanceBudget,
                                                TArray<FVector>& OutMovementPathPoints)
 {
+	/*
+	 * The pending path remains authoritative across turns. This function consumes only enough of that path for the
+	 * current turn and leaves M_CurrentPathPointIndex pointing at the next unconsumed path point.
+	 */
 	OutMovementPathPoints.Reset();
 	if (not M_PathPoints.IsValidIndex(M_CurrentPathPointIndex))
 	{
@@ -729,6 +815,10 @@ bool AWorldDivisionBase::GetIsAdvanceTurnTargetReached() const
 
 TArray<FVector> AWorldDivisionBase::BuildPathToTargetPoint(const FVector& TargetWorldPoint) const
 {
+	/*
+	 * The division asks Unreal navigation first, but the campaign map has extra rules that normal nav data may not know
+	 * about: anchor standoff circles and AWorldSplineBoundary containment. Those are applied after the nav query.
+	 */
 	const UWorldCampaignSettings* Settings = UWorldCampaignSettings::Get();
 	const float AvoidanceRadius = IsValid(Settings) ? Settings->WorldDivisionAnchorAvoidanceRadius : 0.f;
 	const float BoundaryPadding = IsValid(Settings) ? Settings->WorldDivisionBoundaryProjectionPadding : 0.f;
@@ -762,6 +852,10 @@ TArray<FVector> AWorldDivisionBase::BuildPathToTargetPoint(const FVector& Target
 		if (IsValid(NavigationPath) && NavigationPath->PathPoints.Num() >= 2)
 		{
 			PathPoints = NavigationPath->PathPoints;
+			if constexpr (DeveloperSettings::Debugging::GWorldCampaign_DivisionPathing_Compile_DebugSymbols)
+			{
+				DebugDrawUnrealDivisionPath(World, PathPoints);
+			}
 		}
 	}
 
@@ -785,7 +879,17 @@ TArray<FVector> AWorldDivisionBase::BuildPathToTargetPoint(const FVector& Target
 		AvoidanceRadius,
 		BoundaryPadding,
 		FMath::Max(1, MaxRepairAttempts));
+	if constexpr (DeveloperSettings::Debugging::GWorldCampaign_DivisionPathing_Compile_DebugSymbols)
+	{
+		DebugDrawAdjustedDivisionPath(GetWorld(), PathPoints);
+	}
+
 	return PathPoints;
+}
+
+void AWorldDivisionBase::DrawDebugPathPoints(const TArray<FVector>& PathPoints) const
+{
+	DrawDebugPathPointsWithOffset(GetWorld(), PathPoints, FColor::Cyan, DebugPathLineThickness);
 }
 
 void AWorldDivisionBase::CachePendingMoveOrder(const FVector& TargetWorldPoint,
