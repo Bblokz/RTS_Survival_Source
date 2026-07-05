@@ -10,13 +10,11 @@
 #include "W_CoolDownItem.generated.h"
 
 class UMaterialInstanceDynamic;
-class UMaterialInterface;
-class UMaterialParameterCollection;
 class UTexture2D;
 class UWorld;
 
 /**
- * Widget button that owns a dynamic UI material and drives a cooldown radial wipe.
+ * Widget button that owns an image dynamic material and tracks a cooldown clock.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_CoolDownItem : public UUserWidget
@@ -24,56 +22,51 @@ class RTS_SURVIVAL_API UW_CoolDownItem : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintPure, Category = "Cooldown")
 	bool GetIsOnCoolDown() const;
 
 	/**
-	 * @brief Caches the image MID and synchronizes cooldown state with the shader time source.
-	 * @param CooldownMaterial UI-domain material using the cooldown shader. Pass nullptr to use the image's current brush material.
-	 * @param IconTexture Optional icon texture assigned to the material's IconTexture parameter. Pass nullptr to keep the material default.
-	 * @param CurrentTimeParameterCollection MPC asset containing the same time scalar used by the material graph.
-	 * @param CurrentTimeParameterName Scalar parameter name inside the MPC, usually CurrentTimeSeconds.
-	 * @param CooldownSeconds Total cooldown duration in seconds.
-	 * @param CooldownClockColor Overlay color and alpha used by the material's CooldownClockColor parameter.
-	 * @param ClockEdgeSoftness01 Softness of the clock edge in normalized angle units.
-	 * @param ClockStartOffset01 Clock start offset in full turns; 0 starts at 12 o'clock.
-	 * @param AspectRatio Width divided by height for non-square icons.
-	 * @param bStartOnCooldown Whether this widget should immediately start covered.
-	 * @param WeakWorldContext Weak context used for timer management and MPC lookup.
-	 * @return None.
+	 * @brief Caches the image MID and optionally starts the cooldown immediately.
+	 * @param WeakWorldContext Context used to resolve the world for timers and world-time reads.
+	 * @param IconTexture Icon texture assigned to the material's IconTexture parameter.
+	 * @param CooldownSeconds Default cooldown duration used by this item.
+	 * @param bStartOnCooldown Whether this widget should immediately start cooling down.
 	 */
 	void Init(
-		UMaterialInterface* const CooldownMaterial,
+		const TWeakObjectPtr<UObject>& WeakWorldContext,
 		UTexture2D* const IconTexture,
-		UMaterialParameterCollection* const CurrentTimeParameterCollection,
-		const FName& CurrentTimeParameterName,
 		const float CooldownSeconds,
-		const FLinearColor& CooldownClockColor,
-		const float ClockEdgeSoftness01,
-		const float ClockStartOffset01,
-		const float AspectRatio,
-		const bool bStartOnCooldown,
-		const TWeakObjectPtr<UObject>& WeakWorldContext);
+		const bool bStartOnCooldown);
 
-	UFUNCTION(BlueprintPure, Category = "Cooldown")
 	float GetCooldownRemaining() const;
 
-	UFUNCTION(BlueprintCallable, Category = "Cooldown")
+	/**
+	 * @brief Starts a cooldown without restarting an already active cooldown.
+	 * @param CooldownTime Duration used for this cooldown start.
+	 */
+	void StartCooldown(const float CooldownTime);
+
 	void InstantlyResetCooldown();
 
 	/**
-	 * @brief Changes cooldown duration without restarting an active cooldown unless requested.
+	 * @brief Changes the stored cooldown duration while preserving active elapsed time when requested.
 	 * @param NewCooldown New total cooldown duration in seconds.
-	 * @param bResetCooldownState If true, stores the new duration and immediately finishes the cooldown.
-	 * @return None.
+	 * @param bResetCooldownState If true, stores the new duration and immediately clears cooldown state.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Cooldown")
 	void UpgradeCooldown(const float NewCooldown, const bool bResetCooldownState);
 
 protected:
 	virtual void NativeDestruct() override;
+	virtual void BeginDestroy() override;
 
 private:
+	static const FName S_IconTextureParameterName;
+	static const FName S_CooldownStartTimeParameterName;
+	static const FName S_CooldownDurationParameterName;
+
+	static constexpr float S_MinimumCooldownDurationSeconds = 0.0001f;
+	static constexpr float S_MinimumTimerDelaySeconds = 0.001f;
+	static constexpr float S_CooldownStateUpdateIntervalSeconds = 0.05f;
+
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
 	TObjectPtr<UButton> M_Button;
 
@@ -84,9 +77,6 @@ private:
 	TObjectPtr<UMaterialInstanceDynamic> M_DynamicMaterial;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UMaterialParameterCollection> M_CurrentTimeParameterCollection;
-
-	UPROPERTY(Transient)
 	TWeakObjectPtr<UObject> M_WeakWorldContext;
 
 	UPROPERTY(Transient)
@@ -94,39 +84,40 @@ private:
 
 	FTimerHandle M_CooldownTimerHandle;
 
-	FName M_CurrentTimeParameterName = TEXT("CurrentTimeSeconds");
-
 	float M_CooldownDurationSeconds = 0.0f;
 	float M_CooldownStartTimeSeconds = 0.0f;
-	FLinearColor M_CooldownClockColor = FLinearColor(1.0f, 1.0f, 1.0f, 0.65f);
-	float M_ClockEdgeSoftness01 = 0.003f;
-	float M_ClockStartOffset01 = 0.0f;
-	float M_AspectRatio = 1.0f;
+	float M_CooldownRemainingSeconds = 0.0f;
 
+	bool bM_WasInitialized = false;
 	bool bM_IsOnCooldown = false;
 
-	bool CacheDynamicMaterial(UMaterialInterface* const CooldownMaterial);
+	bool CacheDynamicMaterialFromImage();
 	bool CacheTimerWorldFromContext();
 
-	void ApplyMaterialSetupParameters(UTexture2D* const IconTexture) const;
+	void ApplyIconTextureParameter(UTexture2D* const IconTexture) const;
 	void ApplyCooldownMaterialActiveState() const;
 	void ApplyCooldownMaterialCompletedState() const;
-	void ApplyCooldownMaterialDisabledState() const;
 
-	void BeginCooldownInternal();
-	void HandleCooldownFinished();
-	void ScheduleCooldownTimer();
+	void CompleteCooldownInternal();
+	void HandleCooldownStateUpdateTimerElapsed();
+	void EnsureCooldownStateUpdateTimerIsScheduled();
+	void ScheduleNextCooldownStateUpdateTimer();
 	void ClearCooldownTimer();
 
-	bool TryGetCurrentGameTimeSeconds(float& OutCurrentGameTimeSeconds, const bool bReportError = true) const;
+	bool UpdateCooldownStateFromCurrentTime(const bool bReportError = true);
+	bool TryGetCurrentWorldTimeSeconds(float& OutCurrentWorldTimeSeconds, const bool bReportError = true) const;
+
+	float CalculateCooldownRemainingSeconds(const float CurrentWorldTimeSeconds) const;
+	float GetNextCooldownStateUpdateDelaySeconds() const;
+	bool GetIsCooldownTimerActive() const;
+
 	UWorld* GetTimerWorld(const bool bReportError = true) const;
 	UWorld* GetTimerWorldFromContext(const bool bReportError = true) const;
 
+	bool GetWasInitialized(const bool bReportError = true) const;
 	bool GetIsValidButton() const;
 	bool GetIsValidImage() const;
 	bool GetIsValidDynamicMaterial() const;
-	bool GetIsValidCurrentTimeParameterCollection(const bool bReportError = true) const;
-	bool GetIsValidCurrentTimeParameterName(const bool bReportError = true) const;
 	bool GetIsValidWorldContext(const bool bReportError = true) const;
 	bool GetIsValidTimerWorld(const bool bReportError = true) const;
 

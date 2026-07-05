@@ -5,88 +5,64 @@
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "Materials/MaterialInterface.h"
-#include "Materials/MaterialParameterCollection.h"
-#include "Materials/MaterialParameterCollectionInstance.h"
-#include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTSFunctionLibrary.h"
 
-namespace CoolDownItem
-{
-	static constexpr float MinimumCooldownDurationSeconds = 0.0001f;
-	static constexpr float MinimumClockEdgeSoftness01 = 0.00001f;
-	static constexpr float MinimumAspectRatio = 0.0001f;
-
-	static const FName IconTextureParameterName(TEXT("IconTexture"));
-	static const FName CooldownStartTimeParameterName(TEXT("CooldownStartTimeSeconds"));
-	static const FName CooldownDurationParameterName(TEXT("CooldownDurationSeconds"));
-	static const FName CooldownClockColorParameterName(TEXT("CooldownClockColor"));
-	static const FName ClockEdgeSoftnessParameterName(TEXT("ClockEdgeSoftness01"));
-	static const FName ClockStartOffsetParameterName(TEXT("ClockStartOffset01"));
-	static const FName AspectRatioParameterName(TEXT("AspectRatio"));
-
-	float Normalize01(const float Value)
-	{
-		return Value - FMath::FloorToFloat(Value);
-	}
-}
+const FName UW_CoolDownItem::S_IconTextureParameterName(TEXT("IconTexture"));
+const FName UW_CoolDownItem::S_CooldownStartTimeParameterName(TEXT("CooldownStartTimeSeconds"));
+const FName UW_CoolDownItem::S_CooldownDurationParameterName(TEXT("CooldownDurationSeconds"));
 
 bool UW_CoolDownItem::GetIsOnCoolDown() const
 {
-	return bM_IsOnCooldown;
+	if (not bM_IsOnCooldown)
+	{
+		return false;
+	}
+
+	return GetCooldownRemaining() > 0.0f;
 }
 
 void UW_CoolDownItem::Init(
-	UMaterialInterface* const CooldownMaterial,
+	const TWeakObjectPtr<UObject>& WeakWorldContext,
 	UTexture2D* const IconTexture,
-	UMaterialParameterCollection* const CurrentTimeParameterCollection,
-	const FName& CurrentTimeParameterName,
 	const float CooldownSeconds,
-	const FLinearColor& CooldownClockColor,
-	const float ClockEdgeSoftness01,
-	const float ClockStartOffset01,
-	const float AspectRatio,
-	const bool bStartOnCooldown,
-	const TWeakObjectPtr<UObject>& WeakWorldContext)
+	const bool bStartOnCooldown)
 {
 	ClearCooldownTimer();
 
+	bM_WasInitialized = false;
+	bM_IsOnCooldown = false;
+
+	M_DynamicMaterial = nullptr;
 	M_WeakWorldContext = WeakWorldContext;
 	M_WeakTimerWorld.Reset();
 
-	M_CurrentTimeParameterCollection = CurrentTimeParameterCollection;
-	M_CurrentTimeParameterName = CurrentTimeParameterName;
-
 	M_CooldownDurationSeconds = FMath::Max(CooldownSeconds, 0.0f);
 	M_CooldownStartTimeSeconds = 0.0f;
-	M_CooldownClockColor = CooldownClockColor;
-	M_ClockEdgeSoftness01 = FMath::Max(ClockEdgeSoftness01, CoolDownItem::MinimumClockEdgeSoftness01);
-	M_ClockStartOffset01 = CoolDownItem::Normalize01(ClockStartOffset01);
-	M_AspectRatio = FMath::Max(AspectRatio, CoolDownItem::MinimumAspectRatio);
-	bM_IsOnCooldown = false;
+	M_CooldownRemainingSeconds = 0.0f;
 
 	if (not GetIsValidButton())
 	{
 		return;
 	}
 
-	if (not CacheDynamicMaterial(CooldownMaterial))
+	if (not CacheDynamicMaterialFromImage())
 	{
 		return;
 	}
 
-	ApplyMaterialSetupParameters(IconTexture);
+	ApplyIconTextureParameter(IconTexture);
 
-	if (not CacheTimerWorldFromContext()
-		or not GetIsValidCurrentTimeParameterCollection()
-		or not GetIsValidCurrentTimeParameterName())
+	if (not CacheTimerWorldFromContext())
 	{
-		ApplyCooldownMaterialDisabledState();
+		ApplyCooldownMaterialCompletedState();
 		return;
 	}
+
+	bM_WasInitialized = true;
 
 	if (bStartOnCooldown)
 	{
-		BeginCooldownInternal();
+		StartCooldown(M_CooldownDurationSeconds);
 		return;
 	}
 
@@ -100,26 +76,79 @@ float UW_CoolDownItem::GetCooldownRemaining() const
 		return 0.0f;
 	}
 
-	float CurrentGameTimeSeconds = 0.0f;
-
-	if (not TryGetCurrentGameTimeSeconds(CurrentGameTimeSeconds))
+	if (M_CooldownDurationSeconds <= S_MinimumCooldownDurationSeconds)
 	{
 		return 0.0f;
 	}
 
-	const float ElapsedSeconds = FMath::Max(0.0f, CurrentGameTimeSeconds - M_CooldownStartTimeSeconds);
-	return FMath::Max(0.0f, M_CooldownDurationSeconds - ElapsedSeconds);
+	float CurrentWorldTimeSeconds = 0.0f;
+
+	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds, false))
+	{
+		return M_CooldownRemainingSeconds;
+	}
+
+	return CalculateCooldownRemainingSeconds(CurrentWorldTimeSeconds);
+}
+
+void UW_CoolDownItem::StartCooldown(const float CooldownTime)
+{
+	if (not GetWasInitialized())
+	{
+		return;
+	}
+
+	if (not UpdateCooldownStateFromCurrentTime())
+	{
+		return;
+	}
+
+	if (bM_IsOnCooldown)
+	{
+		EnsureCooldownStateUpdateTimerIsScheduled();
+		return;
+	}
+
+	M_CooldownDurationSeconds = FMath::Max(CooldownTime, 0.0f);
+
+	if (M_CooldownDurationSeconds <= S_MinimumCooldownDurationSeconds)
+	{
+		InstantlyResetCooldown();
+		return;
+	}
+
+	float CurrentWorldTimeSeconds = 0.0f;
+
+	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
+	{
+		return;
+	}
+
+	M_CooldownStartTimeSeconds = CurrentWorldTimeSeconds;
+	M_CooldownRemainingSeconds = M_CooldownDurationSeconds;
+	bM_IsOnCooldown = true;
+
+	ApplyCooldownMaterialActiveState();
+	ScheduleNextCooldownStateUpdateTimer();
 }
 
 void UW_CoolDownItem::InstantlyResetCooldown()
 {
-	bM_IsOnCooldown = false;
-	ClearCooldownTimer();
-	ApplyCooldownMaterialCompletedState();
+	if (not GetWasInitialized())
+	{
+		return;
+	}
+
+	CompleteCooldownInternal();
 }
 
 void UW_CoolDownItem::UpgradeCooldown(const float NewCooldown, const bool bResetCooldownState)
 {
+	if (not GetWasInitialized())
+	{
+		return;
+	}
+
 	M_CooldownDurationSeconds = FMath::Max(NewCooldown, 0.0f);
 
 	if (bResetCooldownState)
@@ -130,56 +159,66 @@ void UW_CoolDownItem::UpgradeCooldown(const float NewCooldown, const bool bReset
 
 	if (not bM_IsOnCooldown)
 	{
+		M_CooldownRemainingSeconds = 0.0f;
 		ApplyCooldownMaterialCompletedState();
 		return;
 	}
 
-	float CurrentGameTimeSeconds = 0.0f;
-
-	if (not TryGetCurrentGameTimeSeconds(CurrentGameTimeSeconds))
+	if (M_CooldownDurationSeconds <= S_MinimumCooldownDurationSeconds)
 	{
-		bM_IsOnCooldown = false;
-		ClearCooldownTimer();
-		ApplyCooldownMaterialDisabledState();
+		CompleteCooldownInternal();
 		return;
 	}
 
-	const float ElapsedSeconds = FMath::Max(0.0f, CurrentGameTimeSeconds - M_CooldownStartTimeSeconds);
+	float CurrentWorldTimeSeconds = 0.0f;
 
-	if (M_CooldownDurationSeconds <= CoolDownItem::MinimumCooldownDurationSeconds
-		or ElapsedSeconds >= M_CooldownDurationSeconds)
+	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
 	{
-		InstantlyResetCooldown();
+		CompleteCooldownInternal();
+		return;
+	}
+
+	M_CooldownRemainingSeconds = CalculateCooldownRemainingSeconds(CurrentWorldTimeSeconds);
+
+	if (M_CooldownRemainingSeconds <= S_MinimumCooldownDurationSeconds)
+	{
+		CompleteCooldownInternal();
 		return;
 	}
 
 	ApplyCooldownMaterialActiveState();
-	ScheduleCooldownTimer();
+	ScheduleNextCooldownStateUpdateTimer();
 }
 
 void UW_CoolDownItem::NativeDestruct()
 {
 	ClearCooldownTimer();
 
+	bM_WasInitialized = false;
 	bM_IsOnCooldown = false;
-	M_DynamicMaterial = nullptr;
-	M_CurrentTimeParameterCollection = nullptr;
-	M_WeakWorldContext.Reset();
-	M_WeakTimerWorld.Reset();
+	M_CooldownRemainingSeconds = 0.0f;
 
 	Super::NativeDestruct();
 }
 
-bool UW_CoolDownItem::CacheDynamicMaterial(UMaterialInterface* const CooldownMaterial)
+void UW_CoolDownItem::BeginDestroy()
+{
+	ClearCooldownTimer();
+
+	bM_WasInitialized = false;
+	bM_IsOnCooldown = false;
+	M_DynamicMaterial = nullptr;
+	M_WeakWorldContext.Reset();
+	M_WeakTimerWorld.Reset();
+
+	Super::BeginDestroy();
+}
+
+bool UW_CoolDownItem::CacheDynamicMaterialFromImage()
 {
 	if (not GetIsValidImage())
 	{
 		return false;
-	}
-
-	if (IsValid(CooldownMaterial))
-	{
-		M_Image->SetBrushFromMaterial(CooldownMaterial);
 	}
 
 	M_DynamicMaterial = M_Image->GetDynamicMaterial();
@@ -207,22 +246,20 @@ bool UW_CoolDownItem::CacheTimerWorldFromContext()
 	return true;
 }
 
-void UW_CoolDownItem::ApplyMaterialSetupParameters(UTexture2D* const IconTexture) const
+void UW_CoolDownItem::ApplyIconTextureParameter(UTexture2D* const IconTexture) const
 {
 	if (not GetIsValidDynamicMaterial())
 	{
 		return;
 	}
 
-	if (IsValid(IconTexture))
+	if (not IsValid(IconTexture))
 	{
-		M_DynamicMaterial->SetTextureParameterValue(CoolDownItem::IconTextureParameterName, IconTexture);
+		ReportInvalidState(TEXT("IconTexture is invalid."));
+		return;
 	}
 
-	M_DynamicMaterial->SetVectorParameterValue(CoolDownItem::CooldownClockColorParameterName, M_CooldownClockColor);
-	M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::ClockEdgeSoftnessParameterName, M_ClockEdgeSoftness01);
-	M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::ClockStartOffsetParameterName, M_ClockStartOffset01);
-	M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::AspectRatioParameterName, M_AspectRatio);
+	M_DynamicMaterial->SetTextureParameterValue(S_IconTextureParameterName, IconTexture);
 }
 
 void UW_CoolDownItem::ApplyCooldownMaterialActiveState() const
@@ -233,12 +270,12 @@ void UW_CoolDownItem::ApplyCooldownMaterialActiveState() const
 	}
 
 	M_DynamicMaterial->SetScalarParameterValue(
-		CoolDownItem::CooldownDurationParameterName,
-		M_CooldownDurationSeconds);
+		S_CooldownStartTimeParameterName,
+		M_CooldownStartTimeSeconds);
 
 	M_DynamicMaterial->SetScalarParameterValue(
-		CoolDownItem::CooldownStartTimeParameterName,
-		M_CooldownStartTimeSeconds);
+		S_CooldownDurationParameterName,
+		M_CooldownDurationSeconds);
 }
 
 void UW_CoolDownItem::ApplyCooldownMaterialCompletedState() const
@@ -248,78 +285,52 @@ void UW_CoolDownItem::ApplyCooldownMaterialCompletedState() const
 		return;
 	}
 
-	const float SafeCooldownDurationSeconds = FMath::Max(M_CooldownDurationSeconds, 0.0f);
-
-	if (SafeCooldownDurationSeconds <= CoolDownItem::MinimumCooldownDurationSeconds)
-	{
-		M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::CooldownDurationParameterName, 0.0f);
-		M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::CooldownStartTimeParameterName, 0.0f);
-		return;
-	}
-
-	float CurrentGameTimeSeconds = 0.0f;
-
-	if (not TryGetCurrentGameTimeSeconds(CurrentGameTimeSeconds))
-	{
-		M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::CooldownDurationParameterName, 0.0f);
-		M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::CooldownStartTimeParameterName, 0.0f);
-		return;
-	}
-
-	M_DynamicMaterial->SetScalarParameterValue(
-		CoolDownItem::CooldownDurationParameterName,
-		SafeCooldownDurationSeconds);
-
-	M_DynamicMaterial->SetScalarParameterValue(
-		CoolDownItem::CooldownStartTimeParameterName,
-		CurrentGameTimeSeconds - SafeCooldownDurationSeconds);
+	M_DynamicMaterial->SetScalarParameterValue(S_CooldownStartTimeParameterName, 0.0f);
+	M_DynamicMaterial->SetScalarParameterValue(S_CooldownDurationParameterName, 0.0f);
 }
 
-void UW_CoolDownItem::ApplyCooldownMaterialDisabledState() const
-{
-	if (not GetIsValidDynamicMaterial())
-	{
-		return;
-	}
-
-	M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::CooldownDurationParameterName, 0.0f);
-	M_DynamicMaterial->SetScalarParameterValue(CoolDownItem::CooldownStartTimeParameterName, 0.0f);
-}
-
-void UW_CoolDownItem::BeginCooldownInternal()
-{
-	ClearCooldownTimer();
-
-	if (M_CooldownDurationSeconds <= CoolDownItem::MinimumCooldownDurationSeconds)
-	{
-		InstantlyResetCooldown();
-		return;
-	}
-
-	float CurrentGameTimeSeconds = 0.0f;
-
-	if (not TryGetCurrentGameTimeSeconds(CurrentGameTimeSeconds))
-	{
-		bM_IsOnCooldown = false;
-		ApplyCooldownMaterialDisabledState();
-		return;
-	}
-
-	M_CooldownStartTimeSeconds = CurrentGameTimeSeconds;
-	bM_IsOnCooldown = true;
-
-	ApplyCooldownMaterialActiveState();
-	ScheduleCooldownTimer();
-}
-
-void UW_CoolDownItem::HandleCooldownFinished()
+void UW_CoolDownItem::CompleteCooldownInternal()
 {
 	bM_IsOnCooldown = false;
+	M_CooldownStartTimeSeconds = 0.0f;
+	M_CooldownRemainingSeconds = 0.0f;
+
 	ClearCooldownTimer();
 	ApplyCooldownMaterialCompletedState();
 }
 
-void UW_CoolDownItem::ScheduleCooldownTimer()
+void UW_CoolDownItem::HandleCooldownStateUpdateTimerElapsed()
+{
+	if (not GetWasInitialized(false))
+	{
+		return;
+	}
+
+	if (not UpdateCooldownStateFromCurrentTime(false))
+	{
+		CompleteCooldownInternal();
+		return;
+	}
+
+	if (not bM_IsOnCooldown)
+	{
+		return;
+	}
+
+	ScheduleNextCooldownStateUpdateTimer();
+}
+
+void UW_CoolDownItem::EnsureCooldownStateUpdateTimerIsScheduled()
+{
+	if (GetIsCooldownTimerActive())
+	{
+		return;
+	}
+
+	ScheduleNextCooldownStateUpdateTimer();
+}
+
+void UW_CoolDownItem::ScheduleNextCooldownStateUpdateTimer()
 {
 	ClearCooldownTimer();
 
@@ -328,51 +339,40 @@ void UW_CoolDownItem::ScheduleCooldownTimer()
 		return;
 	}
 
-	float CurrentGameTimeSeconds = 0.0f;
-
-	if (not TryGetCurrentGameTimeSeconds(CurrentGameTimeSeconds))
+	if (M_CooldownRemainingSeconds <= S_MinimumCooldownDurationSeconds)
 	{
-		bM_IsOnCooldown = false;
-		ApplyCooldownMaterialDisabledState();
+		CompleteCooldownInternal();
 		return;
 	}
 
-	const float ElapsedSeconds = FMath::Max(0.0f, CurrentGameTimeSeconds - M_CooldownStartTimeSeconds);
-	const float RemainingSeconds = FMath::Max(0.0f, M_CooldownDurationSeconds - ElapsedSeconds);
-
-	if (RemainingSeconds <= CoolDownItem::MinimumCooldownDurationSeconds)
-	{
-		HandleCooldownFinished();
-		return;
-	}
-
-	UWorld* const TimerWorld = GetTimerWorld(false);
+	UWorld* const TimerWorld = GetTimerWorld(true);
 
 	if (not IsValid(TimerWorld))
 	{
-		bM_IsOnCooldown = false;
-		ApplyCooldownMaterialDisabledState();
+		CompleteCooldownInternal();
 		return;
 	}
 
 	const TWeakObjectPtr<UW_CoolDownItem> WeakThis(this);
 
-	FTimerDelegate CooldownFinishedDelegate;
-	CooldownFinishedDelegate.BindLambda(
+	FTimerDelegate CooldownStateUpdateDelegate;
+	CooldownStateUpdateDelegate.BindLambda(
 		[WeakThis]()
 		{
-			if (not WeakThis.IsValid())
+			UW_CoolDownItem* const CooldownItem = WeakThis.Get();
+
+			if (not IsValid(CooldownItem))
 			{
 				return;
 			}
 
-			WeakThis->HandleCooldownFinished();
+			CooldownItem->HandleCooldownStateUpdateTimerElapsed();
 		});
 
 	TimerWorld->GetTimerManager().SetTimer(
 		M_CooldownTimerHandle,
-		CooldownFinishedDelegate,
-		RemainingSeconds,
+		CooldownStateUpdateDelegate,
+		GetNextCooldownStateUpdateDelaySeconds(),
 		false);
 }
 
@@ -393,21 +393,43 @@ void UW_CoolDownItem::ClearCooldownTimer()
 	M_CooldownTimerHandle.Invalidate();
 }
 
-bool UW_CoolDownItem::TryGetCurrentGameTimeSeconds(
-	float& OutCurrentGameTimeSeconds,
+bool UW_CoolDownItem::UpdateCooldownStateFromCurrentTime(const bool bReportError)
+{
+	if (not bM_IsOnCooldown)
+	{
+		M_CooldownRemainingSeconds = 0.0f;
+		return true;
+	}
+
+	if (M_CooldownDurationSeconds <= S_MinimumCooldownDurationSeconds)
+	{
+		CompleteCooldownInternal();
+		return true;
+	}
+
+	float CurrentWorldTimeSeconds = 0.0f;
+
+	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds, bReportError))
+	{
+		return false;
+	}
+
+	M_CooldownRemainingSeconds = CalculateCooldownRemainingSeconds(CurrentWorldTimeSeconds);
+
+	if (M_CooldownRemainingSeconds > S_MinimumCooldownDurationSeconds)
+	{
+		return true;
+	}
+
+	CompleteCooldownInternal();
+	return true;
+}
+
+bool UW_CoolDownItem::TryGetCurrentWorldTimeSeconds(
+	float& OutCurrentWorldTimeSeconds,
 	const bool bReportError) const
 {
-	OutCurrentGameTimeSeconds = 0.0f;
-
-	if (not GetIsValidCurrentTimeParameterCollection(bReportError))
-	{
-		return false;
-	}
-
-	if (not GetIsValidCurrentTimeParameterName(bReportError))
-	{
-		return false;
-	}
+	OutCurrentWorldTimeSeconds = 0.0f;
 
 	UWorld* const TimerWorld = GetTimerWorld(bReportError);
 
@@ -416,32 +438,40 @@ bool UW_CoolDownItem::TryGetCurrentGameTimeSeconds(
 		return false;
 	}
 
-	UMaterialParameterCollectionInstance* const CollectionInstance =
-		TimerWorld->GetParameterCollectionInstance(M_CurrentTimeParameterCollection.Get());
+	OutCurrentWorldTimeSeconds = TimerWorld->GetTimeSeconds();
+	return true;
+}
 
-	if (not IsValid(CollectionInstance))
+float UW_CoolDownItem::CalculateCooldownRemainingSeconds(const float CurrentWorldTimeSeconds) const
+{
+	const float ElapsedSeconds = FMath::Max(0.0f, CurrentWorldTimeSeconds - M_CooldownStartTimeSeconds);
+	return FMath::Max(0.0f, M_CooldownDurationSeconds - ElapsedSeconds);
+}
+
+float UW_CoolDownItem::GetNextCooldownStateUpdateDelaySeconds() const
+{
+	const float ClampedDelaySeconds = FMath::Min(
+		M_CooldownRemainingSeconds,
+		S_CooldownStateUpdateIntervalSeconds);
+
+	return FMath::Max(ClampedDelaySeconds, S_MinimumTimerDelaySeconds);
+}
+
+bool UW_CoolDownItem::GetIsCooldownTimerActive() const
+{
+	if (not M_CooldownTimerHandle.IsValid())
 	{
-		if (bReportError)
-		{
-			ReportInvalidState(TEXT("Current time Material Parameter Collection instance is invalid."));
-		}
-
 		return false;
 	}
 
-	if (CollectionInstance->GetScalarParameterValue(M_CurrentTimeParameterName, OutCurrentGameTimeSeconds))
+	UWorld* const TimerWorld = GetTimerWorld(false);
+
+	if (not IsValid(TimerWorld))
 	{
-		return true;
+		return false;
 	}
 
-	if (bReportError)
-	{
-		ReportInvalidState(FString::Printf(
-			TEXT("Current time scalar parameter '%s' was not found in the Material Parameter Collection."),
-			*M_CurrentTimeParameterName.ToString()));
-	}
-
-	return false;
+	return TimerWorld->GetTimerManager().IsTimerActive(M_CooldownTimerHandle);
 }
 
 UWorld* UW_CoolDownItem::GetTimerWorld(const bool bReportError) const
@@ -477,6 +507,21 @@ UWorld* UW_CoolDownItem::GetTimerWorldFromContext(const bool bReportError) const
 	return nullptr;
 }
 
+bool UW_CoolDownItem::GetWasInitialized(const bool bReportError) const
+{
+	if (bM_WasInitialized)
+	{
+		return true;
+	}
+
+	if (bReportError)
+	{
+		ReportInvalidState(TEXT("The widget was used before Init completed successfully."));
+	}
+
+	return false;
+}
+
 bool UW_CoolDownItem::GetIsValidButton() const
 {
 	if (IsValid(M_Button.Get()))
@@ -506,37 +551,7 @@ bool UW_CoolDownItem::GetIsValidDynamicMaterial() const
 		return true;
 	}
 
-	ReportInvalidState(TEXT("M_DynamicMaterial is invalid. Ensure M_Image uses the cooldown UI material."));
-	return false;
-}
-
-bool UW_CoolDownItem::GetIsValidCurrentTimeParameterCollection(const bool bReportError) const
-{
-	if (IsValid(M_CurrentTimeParameterCollection.Get()))
-	{
-		return true;
-	}
-
-	if (bReportError)
-	{
-		ReportInvalidState(TEXT("M_CurrentTimeParameterCollection is invalid."));
-	}
-
-	return false;
-}
-
-bool UW_CoolDownItem::GetIsValidCurrentTimeParameterName(const bool bReportError) const
-{
-	if (not M_CurrentTimeParameterName.IsNone())
-	{
-		return true;
-	}
-
-	if (bReportError)
-	{
-		ReportInvalidState(TEXT("M_CurrentTimeParameterName is None."));
-	}
-
+	ReportInvalidState(TEXT("M_DynamicMaterial is invalid. Set the cooldown UI material on M_Image in the widget defaults."));
 	return false;
 }
 
@@ -572,6 +587,10 @@ bool UW_CoolDownItem::GetIsValidTimerWorld(const bool bReportError) const
 
 void UW_CoolDownItem::ReportInvalidState(const FString& ErrorMessage) const
 {
-	const FString FullErrorMessage = FString::Printf(TEXT("UW_CoolDownItem: %s"), *ErrorMessage);
+	const FString FullErrorMessage = FString::Printf(
+		TEXT("UW_CoolDownItem '%s': %s"),
+		*GetNameSafe(this),
+		*ErrorMessage);
+
 	RTSFunctionLibrary::ReportError(FullErrorMessage);
 }
