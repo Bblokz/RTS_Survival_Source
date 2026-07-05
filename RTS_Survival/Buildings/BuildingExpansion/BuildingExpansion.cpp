@@ -635,7 +635,7 @@ void ABuildingExpansion::OnVerticalDestructionComplete()
 	BP_OnVerticalDestructionComplete();
 }
 
-FBxpData ABuildingExpansion::GetBxpData(const EBuildingExpansionType BxpSubType) const
+FBxpData ABuildingExpansion::GetBxpData(const EBuildingExpansionType BxpSubType, ABuildingExpansion* BxpRequesting) const
 {
 	FBxpData BxpData;
 	if (not GetIsValidRTSComponent())
@@ -646,8 +646,8 @@ FBxpData ABuildingExpansion::GetBxpData(const EBuildingExpansionType BxpSubType)
 	{
 		const bool bOwnedByPlayer = RTSComponent->GetOwningPlayer() == 1;
 		BxpData = bOwnedByPlayer
-			          ? RTSGameState->GetPlayerBxpData(BxpSubType)
-			          : RTSGameState->GetEnemyBxpData(BxpSubType);
+			          ? RTSGameState->GetPlayerBxpData(BxpSubType, BxpRequesting)
+			          : RTSGameState->GetEnemyBxpData(BxpSubType, BxpRequesting);
 	}
 	return BxpData;
 }
@@ -777,7 +777,7 @@ void ABuildingExpansion::InitBuildingExpansion(
 	TArray<FBuildingAttachment> NewBuildingAttachments, const bool bIsStandAlone,
 	const bool bLetBuildingMeshAffectNavMesh)
 {
-	const FBxpData MyData = GetBxpData(NewBuildingExpansionType);
+	const FBxpData MyData = GetBxpData(NewBuildingExpansionType, this);
 	if (GetIsValidRTSComponent())
 	{
 		RTSComponent->SetUnitSubtype(ENomadicSubtype::Nomadic_None,

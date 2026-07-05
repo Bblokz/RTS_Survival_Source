@@ -272,14 +272,15 @@ FAttachedRocketsData ACPPGameState::GetAttachedRocketDataOfPlayer(const int32 Pl
 	return FAttachedRocketsData();
 }
 
-FBxpData ACPPGameState::GetPlayerBxpData(const EBuildingExpansionType BxpType) const
+FBxpData ACPPGameState::GetPlayerBxpData(const EBuildingExpansionType BxpType, ABuildingExpansion* BxpRequesting) const
 {
 	if (M_TPlayerBxpDataHashMap.Contains(BxpType))
 	{
 		return M_TPlayerBxpDataHashMap[BxpType];
 	}
+	const FString SafeName = IsValid(BxpRequesting) ? BxpRequesting->GetName() : "NULL";
 	RTSFunctionLibrary::ReportError(
-		"Could not find bxp data for player bxp: " + Global_GetBxpTypeEnumAsString(BxpType));
+		"Could not find bxp data for player bxp: " + Global_GetBxpTypeEnumAsString(BxpType) + "\n" + SafeName);
 	return FBxpData();
 }
 
@@ -305,14 +306,15 @@ FAircraftData ACPPGameState::GetAircraftDataOfPlayer(const EAircraftSubtype Airc
 	return FAircraftData();
 }
 
-FBxpData ACPPGameState::GetEnemyBxpData(const EBuildingExpansionType BxpType) const
+FBxpData ACPPGameState::GetEnemyBxpData(const EBuildingExpansionType BxpType, ABuildingExpansion* BxpRequesting) const
 {
 	if (M_TEnemyBxpDataHashMap.Contains(BxpType))
 	{
 		return M_TEnemyBxpDataHashMap[BxpType];
 	}
+	const FString SafeName = IsValid(BxpRequesting) ? BxpRequesting->GetName() : "NULL";
 	RTSFunctionLibrary::ReportError(
-		"Could not find bxp data for enemy bxp: " + Global_GetBxpTypeEnumAsString(BxpType));
+		"Could not find bxp data for enemy bxp: " + Global_GetBxpTypeEnumAsString(BxpType) + "\n" + SafeName);
 	return FBxpData();
 }
 

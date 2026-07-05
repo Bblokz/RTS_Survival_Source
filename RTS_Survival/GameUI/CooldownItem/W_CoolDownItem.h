@@ -23,6 +23,8 @@ class RTS_SURVIVAL_API UW_CoolDownItem : public UUserWidget
 
 public:
 	bool GetIsOnCoolDown() const;
+	bool GetWasInitialized(const bool bReportError = true) const;
+	UButton* GetButton() const;
 
 	/**
 	 * @brief Caches the image MID and optionally starts the cooldown immediately.
@@ -44,6 +46,13 @@ public:
 	 * @param CooldownTime Duration used for this cooldown start.
 	 */
 	void StartCooldown(const float CooldownTime);
+
+	/**
+	 * @brief Restores cooldown visuals from saved gameplay state without losing elapsed time.
+	 * @param CooldownDurationSeconds Total duration represented by the material clock.
+	 * @param CooldownRemainingSeconds Remaining duration to display from this moment.
+	 */
+	void SetCooldownState(const float CooldownDurationSeconds, const float CooldownRemainingSeconds);
 
 	void InstantlyResetCooldown();
 
@@ -115,7 +124,6 @@ private:
 	UWorld* GetTimerWorld(const bool bReportError = true) const;
 	UWorld* GetTimerWorldFromContext(const bool bReportError = true) const;
 
-	bool GetWasInitialized(const bool bReportError = true) const;
 	bool GetIsValidButton() const;
 	bool GetIsValidImage() const;
 	bool GetIsValidDynamicMaterial() const;

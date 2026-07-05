@@ -53,6 +53,8 @@ public:
 
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation);
 	EGlobalAbility GetAbilityType() const;
+	const FGLobalAbilityCostState& GetAbilityCosts() const;
+	const FGlobalAbilityUISettings& GetUISettings() const;
 
 	FOnGlobalAbilityEnded OnGlobalAbilityEnded;
 

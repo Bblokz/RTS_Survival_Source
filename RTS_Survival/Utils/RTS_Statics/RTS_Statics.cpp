@@ -627,7 +627,7 @@ FBxpData FRTS_Statics::BP_GetPlayerBxpData(const EBuildingExpansionType BxpType,
 	{
 		if (const ACPPGameState* GameState = FRTS_Statics::GetGameState(WorldContextObject))
 		{
-			return GameState->GetPlayerBxpData(BxpType);
+			return GameState->GetPlayerBxpData(BxpType, nullptr);
 		}
 	}
 	bOutIsValidData = false;
@@ -642,7 +642,7 @@ FBxpData FRTS_Statics::BP_GetEnemyBxpData(const EBuildingExpansionType BxpType, 
 	{
 		if (const ACPPGameState* GameState = FRTS_Statics::GetGameState(WorldContextObject))
 		{
-			return GameState->GetEnemyBxpData(BxpType);
+			return GameState->GetEnemyBxpData(BxpType, nullptr);
 		}
 	}
 	bOutIsValidData = false;

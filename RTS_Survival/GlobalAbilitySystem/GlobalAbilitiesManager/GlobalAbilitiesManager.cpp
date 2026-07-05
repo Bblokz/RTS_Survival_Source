@@ -531,6 +531,7 @@ void UGlobalAbilitiesManager::UpdateAbilityItemAvailability(const UGlobalAbility
 	{
 		if (IsValid(AbilityItem) && AbilityItem->GetLoadedAbility() == Ability)
 		{
+			AbilityItem->RefreshCooldownFromLoadedAbility();
 			AbilityItem->SetAbilityAvailable(bIsEnabled, bUseGreyTint);
 			return;
 		}

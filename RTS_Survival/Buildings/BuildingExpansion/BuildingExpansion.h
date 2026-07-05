@@ -296,7 +296,7 @@ private:
 	UFUNCTION()
 	void OnVerticalDestructionComplete();
 
-	FBxpData GetBxpData(const EBuildingExpansionType BxpSubType) const;
+	FBxpData GetBxpData(const EBuildingExpansionType BxpSubType, ABuildingExpansion* BxpRequesting) const;
 
 	UPROPERTY()
 	UBuildingExpansionEnergyComponent* M_BuildingExpansionEnergyComponent;

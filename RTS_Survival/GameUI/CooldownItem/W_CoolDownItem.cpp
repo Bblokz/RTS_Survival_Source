@@ -21,6 +21,16 @@ bool UW_CoolDownItem::GetIsOnCoolDown() const
 	return GetCooldownRemaining() > 0.0f;
 }
 
+UButton* UW_CoolDownItem::GetButton() const
+{
+	if (not GetIsValidButton())
+	{
+		return nullptr;
+	}
+
+	return M_Button.Get();
+}
+
 void UW_CoolDownItem::Init(
 	const TWeakObjectPtr<UObject>& WeakWorldContext,
 	UTexture2D* const IconTexture,
@@ -126,6 +136,45 @@ void UW_CoolDownItem::StartCooldown(const float CooldownTime)
 
 	M_CooldownStartTimeSeconds = CurrentWorldTimeSeconds;
 	M_CooldownRemainingSeconds = M_CooldownDurationSeconds;
+	bM_IsOnCooldown = true;
+
+	ApplyCooldownMaterialActiveState();
+	ScheduleNextCooldownStateUpdateTimer();
+}
+
+void UW_CoolDownItem::SetCooldownState(const float CooldownDurationSeconds, const float CooldownRemainingSeconds)
+{
+	if (not GetWasInitialized())
+	{
+		return;
+	}
+
+	const float SanitizedCooldownRemainingSeconds = FMath::Max(CooldownRemainingSeconds, 0.0f);
+	M_CooldownDurationSeconds = FMath::Max(
+		FMath::Max(CooldownDurationSeconds, 0.0f),
+		SanitizedCooldownRemainingSeconds);
+
+	if (M_CooldownDurationSeconds <= S_MinimumCooldownDurationSeconds
+		|| SanitizedCooldownRemainingSeconds <= S_MinimumCooldownDurationSeconds)
+	{
+		CompleteCooldownInternal();
+		return;
+	}
+
+	float CurrentWorldTimeSeconds = 0.0f;
+
+	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
+	{
+		CompleteCooldownInternal();
+		return;
+	}
+
+	M_CooldownRemainingSeconds = FMath::Min(
+		SanitizedCooldownRemainingSeconds,
+		M_CooldownDurationSeconds);
+
+	const float CooldownElapsedSeconds = M_CooldownDurationSeconds - M_CooldownRemainingSeconds;
+	M_CooldownStartTimeSeconds = CurrentWorldTimeSeconds - CooldownElapsedSeconds;
 	bM_IsOnCooldown = true;
 
 	ApplyCooldownMaterialActiveState();

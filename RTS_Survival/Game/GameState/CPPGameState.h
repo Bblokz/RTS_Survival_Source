@@ -140,9 +140,9 @@ public:
 	FAttachedRocketsData GetAttachedRocketDataOfPlayer(const int32 PlayerOwningRocket,
 		const ERocketAbility RocketType) const;
 
-	FBxpData GetPlayerBxpData(const EBuildingExpansionType BxpType) const;
+	FBxpData GetPlayerBxpData(const EBuildingExpansionType BxpType, ABuildingExpansion* BxpRequesting) const;
 	FAircraftData GetAircraftDataOfPlayer(const EAircraftSubtype AircraftSubtype, const uint8 PlayerOwningAircraft) const;
-	FBxpData GetEnemyBxpData(const EBuildingExpansionType BxpType) const;
+	FBxpData GetEnemyBxpData(const EBuildingExpansionType BxpType, ABuildingExpansion* BxpRequesting) const;
 
 	FTankData GetTankData(const ETankSubtype TankSubtype) const;
 

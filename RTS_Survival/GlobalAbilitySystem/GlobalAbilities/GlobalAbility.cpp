@@ -107,6 +107,16 @@ EGlobalAbility UGlobalAbility::GetAbilityType() const
 	return M_AbilityType;
 }
 
+const FGLobalAbilityCostState& UGlobalAbility::GetAbilityCosts() const
+{
+	return M_AbilityCosts;
+}
+
+const FGlobalAbilityUISettings& UGlobalAbility::GetUISettings() const
+{
+	return M_UISettings;
+}
+
 int32 UGlobalAbility::GetOwningPlayer() const
 {
 	return M_OwningPlayer;

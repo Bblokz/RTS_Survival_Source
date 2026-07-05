@@ -419,7 +419,7 @@ FBxpData URTSBlueprintFunctionLibrary::BP_GetPlayerBxpData(const EBuildingExpans
 	{
 		if (const ACPPGameState* GameState = FRTS_Statics::GetGameState(WorldContextObject))
 		{
-			return GameState->GetPlayerBxpData(BxpType);
+			return GameState->GetPlayerBxpData(BxpType, nullptr);
 		}
 	}
 	return FBxpData();

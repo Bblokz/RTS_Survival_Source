@@ -237,7 +237,7 @@ FResistanceAndDamageReductionData FUnitResistanceDataHelpers::GetUnitResistanceD
 		}
 		break;
 	case EAllUnitType::UNType_BuildingExpansion:
-		Data = GS->GetPlayerBxpData(RTSComp->GetSubtypeAsBxpSubtype()).ResistancesAndDamageMlt;
+		Data = GS->GetPlayerBxpData(RTSComp->GetSubtypeAsBxpSubtype(), nullptr).ResistancesAndDamageMlt;
 		bOutFoundValidData = true;
 		break;
 	case EAllUnitType::UNType_Aircraft:
