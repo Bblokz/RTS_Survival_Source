@@ -10,6 +10,8 @@
 const FName UW_CoolDownItem::S_IconTextureParameterName(TEXT("IconTexture"));
 const FName UW_CoolDownItem::S_CooldownStartTimeParameterName(TEXT("CooldownStartTimeSeconds"));
 const FName UW_CoolDownItem::S_CooldownDurationParameterName(TEXT("CooldownDurationSeconds"));
+const FName UW_CoolDownItem::S_PauseAlphaParameterName(TEXT("CooldownPauseAlpha"));
+const FName UW_CoolDownItem::S_PauseTimeParameterName(TEXT("CooldownPausedTimeSeconds"));
 
 bool UW_CoolDownItem::GetIsOnCoolDown() const
 {
@@ -35,12 +37,15 @@ void UW_CoolDownItem::Init(
 	const TWeakObjectPtr<UObject>& WeakWorldContext,
 	UTexture2D* const IconTexture,
 	const float CooldownSeconds,
-	const bool bStartOnCooldown)
+	const bool bStartOnCooldown,
+	const bool bStartPaused,
+	const float SecondsLeft)
 {
 	ClearCooldownTimer();
 
 	bM_WasInitialized = false;
 	bM_IsOnCooldown = false;
+	bM_IsClockPaused = false;
 
 	M_DynamicMaterial = nullptr;
 	M_WeakWorldContext = WeakWorldContext;
@@ -49,6 +54,7 @@ void UW_CoolDownItem::Init(
 	M_CooldownDurationSeconds = FMath::Max(CooldownSeconds, 0.0f);
 	M_CooldownStartTimeSeconds = 0.0f;
 	M_CooldownRemainingSeconds = 0.0f;
+	M_CooldownPausedTimeSeconds = 0.0f;
 
 	if (not GetIsValidButton())
 	{
@@ -65,10 +71,63 @@ void UW_CoolDownItem::Init(
 	if (not CacheTimerWorldFromContext())
 	{
 		ApplyCooldownMaterialCompletedState();
+		ApplyPauseMaterialState();
 		return;
 	}
 
 	bM_WasInitialized = true;
+
+	float CurrentWorldTimeSeconds = 0.0f;
+
+	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
+	{
+		ApplyCooldownMaterialCompletedState();
+		ApplyPauseMaterialState();
+		return;
+	}
+
+	if (bStartPaused)
+	{
+		bM_IsClockPaused = true;
+		M_CooldownPausedTimeSeconds = CurrentWorldTimeSeconds;
+	}
+	else
+	{
+		bM_IsClockPaused = false;
+		M_CooldownPausedTimeSeconds = 0.0f;
+	}
+
+	ApplyPauseMaterialState();
+
+	if (SecondsLeft > 0.0f)
+	{
+		const float ClampedSecondsLeft = FMath::Clamp(
+			SecondsLeft,
+			0.0f,
+			M_CooldownDurationSeconds);
+
+		if (M_CooldownDurationSeconds <= S_MinimumCooldownDurationSeconds
+			|| ClampedSecondsLeft <= S_MinimumCooldownDurationSeconds)
+		{
+			CompleteCooldownInternal();
+			return;
+		}
+
+		const float EffectiveCooldownTimeSeconds = bM_IsClockPaused
+			? M_CooldownPausedTimeSeconds
+			: CurrentWorldTimeSeconds;
+
+		M_CooldownRemainingSeconds = ClampedSecondsLeft;
+
+		const float CooldownElapsedSeconds = M_CooldownDurationSeconds - M_CooldownRemainingSeconds;
+		M_CooldownStartTimeSeconds = EffectiveCooldownTimeSeconds - CooldownElapsedSeconds;
+		bM_IsOnCooldown = true;
+
+		ApplyCooldownMaterialActiveState();
+		ApplyPauseMaterialState();
+		RefreshCooldownTimerForCurrentPauseState();
+		return;
+	}
 
 	if (bStartOnCooldown)
 	{
@@ -78,6 +137,8 @@ void UW_CoolDownItem::Init(
 
 	InstantlyResetCooldown();
 }
+
+
 
 float UW_CoolDownItem::GetCooldownRemaining() const
 {
@@ -91,14 +152,14 @@ float UW_CoolDownItem::GetCooldownRemaining() const
 		return 0.0f;
 	}
 
-	float CurrentWorldTimeSeconds = 0.0f;
+	float EffectiveCooldownTimeSeconds = 0.0f;
 
-	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds, false))
+	if (not TryGetEffectiveCooldownTimeSeconds(EffectiveCooldownTimeSeconds, false))
 	{
 		return M_CooldownRemainingSeconds;
 	}
 
-	return CalculateCooldownRemainingSeconds(CurrentWorldTimeSeconds);
+	return CalculateCooldownRemainingSeconds(EffectiveCooldownTimeSeconds);
 }
 
 void UW_CoolDownItem::StartCooldown(const float CooldownTime)
@@ -115,7 +176,7 @@ void UW_CoolDownItem::StartCooldown(const float CooldownTime)
 
 	if (bM_IsOnCooldown)
 	{
-		EnsureCooldownStateUpdateTimerIsScheduled();
+		RefreshCooldownTimerForCurrentPauseState();
 		return;
 	}
 
@@ -127,22 +188,25 @@ void UW_CoolDownItem::StartCooldown(const float CooldownTime)
 		return;
 	}
 
-	float CurrentWorldTimeSeconds = 0.0f;
+	float EffectiveCooldownTimeSeconds = 0.0f;
 
-	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
+	if (not TryGetEffectiveCooldownTimeSeconds(EffectiveCooldownTimeSeconds))
 	{
 		return;
 	}
 
-	M_CooldownStartTimeSeconds = CurrentWorldTimeSeconds;
+	M_CooldownStartTimeSeconds = EffectiveCooldownTimeSeconds;
 	M_CooldownRemainingSeconds = M_CooldownDurationSeconds;
 	bM_IsOnCooldown = true;
 
 	ApplyCooldownMaterialActiveState();
-	ScheduleNextCooldownStateUpdateTimer();
+	ApplyPauseMaterialState();
+	RefreshCooldownTimerForCurrentPauseState();
 }
 
-void UW_CoolDownItem::SetCooldownState(const float CooldownDurationSeconds, const float CooldownRemainingSeconds)
+void UW_CoolDownItem::SetCooldownState(
+	const float CooldownDurationSeconds,
+	const float CooldownRemainingSeconds)
 {
 	if (not GetWasInitialized())
 	{
@@ -150,6 +214,7 @@ void UW_CoolDownItem::SetCooldownState(const float CooldownDurationSeconds, cons
 	}
 
 	const float SanitizedCooldownRemainingSeconds = FMath::Max(CooldownRemainingSeconds, 0.0f);
+
 	M_CooldownDurationSeconds = FMath::Max(
 		FMath::Max(CooldownDurationSeconds, 0.0f),
 		SanitizedCooldownRemainingSeconds);
@@ -161,9 +226,9 @@ void UW_CoolDownItem::SetCooldownState(const float CooldownDurationSeconds, cons
 		return;
 	}
 
-	float CurrentWorldTimeSeconds = 0.0f;
+	float EffectiveCooldownTimeSeconds = 0.0f;
 
-	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
+	if (not TryGetEffectiveCooldownTimeSeconds(EffectiveCooldownTimeSeconds))
 	{
 		CompleteCooldownInternal();
 		return;
@@ -174,11 +239,12 @@ void UW_CoolDownItem::SetCooldownState(const float CooldownDurationSeconds, cons
 		M_CooldownDurationSeconds);
 
 	const float CooldownElapsedSeconds = M_CooldownDurationSeconds - M_CooldownRemainingSeconds;
-	M_CooldownStartTimeSeconds = CurrentWorldTimeSeconds - CooldownElapsedSeconds;
+	M_CooldownStartTimeSeconds = EffectiveCooldownTimeSeconds - CooldownElapsedSeconds;
 	bM_IsOnCooldown = true;
 
 	ApplyCooldownMaterialActiveState();
-	ScheduleNextCooldownStateUpdateTimer();
+	ApplyPauseMaterialState();
+	RefreshCooldownTimerForCurrentPauseState();
 }
 
 void UW_CoolDownItem::InstantlyResetCooldown()
@@ -189,6 +255,22 @@ void UW_CoolDownItem::InstantlyResetCooldown()
 	}
 
 	CompleteCooldownInternal();
+}
+
+void UW_CoolDownItem::PauseClock(const bool bPause)
+{
+	if (not GetWasInitialized())
+	{
+		return;
+	}
+
+	if (bPause)
+	{
+		StartClockPauseInternal();
+		return;
+	}
+
+	StopClockPauseInternal();
 }
 
 void UW_CoolDownItem::UpgradeCooldown(const float NewCooldown, const bool bResetCooldownState)
@@ -210,6 +292,7 @@ void UW_CoolDownItem::UpgradeCooldown(const float NewCooldown, const bool bReset
 	{
 		M_CooldownRemainingSeconds = 0.0f;
 		ApplyCooldownMaterialCompletedState();
+		ApplyPauseMaterialState();
 		return;
 	}
 
@@ -219,15 +302,15 @@ void UW_CoolDownItem::UpgradeCooldown(const float NewCooldown, const bool bReset
 		return;
 	}
 
-	float CurrentWorldTimeSeconds = 0.0f;
+	float EffectiveCooldownTimeSeconds = 0.0f;
 
-	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
+	if (not TryGetEffectiveCooldownTimeSeconds(EffectiveCooldownTimeSeconds))
 	{
 		CompleteCooldownInternal();
 		return;
 	}
 
-	M_CooldownRemainingSeconds = CalculateCooldownRemainingSeconds(CurrentWorldTimeSeconds);
+	M_CooldownRemainingSeconds = CalculateCooldownRemainingSeconds(EffectiveCooldownTimeSeconds);
 
 	if (M_CooldownRemainingSeconds <= S_MinimumCooldownDurationSeconds)
 	{
@@ -236,7 +319,8 @@ void UW_CoolDownItem::UpgradeCooldown(const float NewCooldown, const bool bReset
 	}
 
 	ApplyCooldownMaterialActiveState();
-	ScheduleNextCooldownStateUpdateTimer();
+	ApplyPauseMaterialState();
+	RefreshCooldownTimerForCurrentPauseState();
 }
 
 void UW_CoolDownItem::NativeDestruct()
@@ -245,7 +329,9 @@ void UW_CoolDownItem::NativeDestruct()
 
 	bM_WasInitialized = false;
 	bM_IsOnCooldown = false;
+	bM_IsClockPaused = false;
 	M_CooldownRemainingSeconds = 0.0f;
+	M_CooldownPausedTimeSeconds = 0.0f;
 
 	Super::NativeDestruct();
 }
@@ -256,6 +342,8 @@ void UW_CoolDownItem::BeginDestroy()
 
 	bM_WasInitialized = false;
 	bM_IsOnCooldown = false;
+	bM_IsClockPaused = false;
+
 	M_DynamicMaterial = nullptr;
 	M_WeakWorldContext.Reset();
 	M_WeakTimerWorld.Reset();
@@ -338,6 +426,20 @@ void UW_CoolDownItem::ApplyCooldownMaterialCompletedState() const
 	M_DynamicMaterial->SetScalarParameterValue(S_CooldownDurationParameterName, 0.0f);
 }
 
+void UW_CoolDownItem::ApplyPauseMaterialState() const
+{
+	if (not GetIsValidDynamicMaterial())
+	{
+		return;
+	}
+
+	const float PauseAlpha = bM_IsClockPaused ? 1.0f : 0.0f;
+	const float PauseTimeSeconds = bM_IsClockPaused ? M_CooldownPausedTimeSeconds : 0.0f;
+
+	M_DynamicMaterial->SetScalarParameterValue(S_PauseTimeParameterName, PauseTimeSeconds);
+	M_DynamicMaterial->SetScalarParameterValue(S_PauseAlphaParameterName, PauseAlpha);
+}
+
 void UW_CoolDownItem::CompleteCooldownInternal()
 {
 	bM_IsOnCooldown = false;
@@ -346,12 +448,93 @@ void UW_CoolDownItem::CompleteCooldownInternal()
 
 	ClearCooldownTimer();
 	ApplyCooldownMaterialCompletedState();
+	ApplyPauseMaterialState();
+}
+
+void UW_CoolDownItem::StartClockPauseInternal()
+{
+	if (bM_IsClockPaused)
+	{
+		ClearCooldownTimer();
+		ApplyPauseMaterialState();
+		return;
+	}
+
+	if (not UpdateCooldownStateFromCurrentTime())
+	{
+		CompleteCooldownInternal();
+		return;
+	}
+
+	float CurrentWorldTimeSeconds = 0.0f;
+
+	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
+	{
+		return;
+	}
+
+	M_CooldownPausedTimeSeconds = CurrentWorldTimeSeconds;
+	bM_IsClockPaused = true;
+
+	ClearCooldownTimer();
+	ApplyPauseMaterialState();
+}
+
+void UW_CoolDownItem::StopClockPauseInternal()
+{
+	if (not bM_IsClockPaused)
+	{
+		ApplyPauseMaterialState();
+		RefreshCooldownTimerForCurrentPauseState();
+		return;
+	}
+
+	float CurrentWorldTimeSeconds = 0.0f;
+
+	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds))
+	{
+		return;
+	}
+
+	const float PauseDurationSeconds = CalculatePauseDurationSeconds(CurrentWorldTimeSeconds);
+
+	if (bM_IsOnCooldown)
+	{
+		M_CooldownStartTimeSeconds += PauseDurationSeconds;
+	}
+
+	bM_IsClockPaused = false;
+	M_CooldownPausedTimeSeconds = 0.0f;
+
+	ApplyPauseMaterialState();
+
+	if (not bM_IsOnCooldown)
+	{
+		M_CooldownRemainingSeconds = 0.0f;
+		return;
+	}
+
+	ApplyCooldownMaterialActiveState();
+
+	if (not UpdateCooldownStateFromCurrentTime())
+	{
+		CompleteCooldownInternal();
+		return;
+	}
+
+	RefreshCooldownTimerForCurrentPauseState();
 }
 
 void UW_CoolDownItem::HandleCooldownStateUpdateTimerElapsed()
 {
 	if (not GetWasInitialized(false))
 	{
+		return;
+	}
+
+	if (bM_IsClockPaused)
+	{
+		ClearCooldownTimer();
 		return;
 	}
 
@@ -371,8 +554,31 @@ void UW_CoolDownItem::HandleCooldownStateUpdateTimerElapsed()
 
 void UW_CoolDownItem::EnsureCooldownStateUpdateTimerIsScheduled()
 {
+	if (bM_IsClockPaused)
+	{
+		ClearCooldownTimer();
+		return;
+	}
+
 	if (GetIsCooldownTimerActive())
 	{
+		return;
+	}
+
+	ScheduleNextCooldownStateUpdateTimer();
+}
+
+void UW_CoolDownItem::RefreshCooldownTimerForCurrentPauseState()
+{
+	if (not bM_IsOnCooldown)
+	{
+		ClearCooldownTimer();
+		return;
+	}
+
+	if (bM_IsClockPaused)
+	{
+		ClearCooldownTimer();
 		return;
 	}
 
@@ -384,6 +590,11 @@ void UW_CoolDownItem::ScheduleNextCooldownStateUpdateTimer()
 	ClearCooldownTimer();
 
 	if (not bM_IsOnCooldown)
+	{
+		return;
+	}
+
+	if (bM_IsClockPaused)
 	{
 		return;
 	}
@@ -456,14 +667,14 @@ bool UW_CoolDownItem::UpdateCooldownStateFromCurrentTime(const bool bReportError
 		return true;
 	}
 
-	float CurrentWorldTimeSeconds = 0.0f;
+	float EffectiveCooldownTimeSeconds = 0.0f;
 
-	if (not TryGetCurrentWorldTimeSeconds(CurrentWorldTimeSeconds, bReportError))
+	if (not TryGetEffectiveCooldownTimeSeconds(EffectiveCooldownTimeSeconds, bReportError))
 	{
 		return false;
 	}
 
-	M_CooldownRemainingSeconds = CalculateCooldownRemainingSeconds(CurrentWorldTimeSeconds);
+	M_CooldownRemainingSeconds = CalculateCooldownRemainingSeconds(EffectiveCooldownTimeSeconds);
 
 	if (M_CooldownRemainingSeconds > S_MinimumCooldownDurationSeconds)
 	{
@@ -491,10 +702,28 @@ bool UW_CoolDownItem::TryGetCurrentWorldTimeSeconds(
 	return true;
 }
 
+bool UW_CoolDownItem::TryGetEffectiveCooldownTimeSeconds(
+	float& OutEffectiveCooldownTimeSeconds,
+	const bool bReportError) const
+{
+	if (bM_IsClockPaused)
+	{
+		OutEffectiveCooldownTimeSeconds = M_CooldownPausedTimeSeconds;
+		return true;
+	}
+
+	return TryGetCurrentWorldTimeSeconds(OutEffectiveCooldownTimeSeconds, bReportError);
+}
+
 float UW_CoolDownItem::CalculateCooldownRemainingSeconds(const float CurrentWorldTimeSeconds) const
 {
 	const float ElapsedSeconds = FMath::Max(0.0f, CurrentWorldTimeSeconds - M_CooldownStartTimeSeconds);
 	return FMath::Max(0.0f, M_CooldownDurationSeconds - ElapsedSeconds);
+}
+
+float UW_CoolDownItem::CalculatePauseDurationSeconds(const float CurrentWorldTimeSeconds) const
+{
+	return FMath::Max(0.0f, CurrentWorldTimeSeconds - M_CooldownPausedTimeSeconds);
 }
 
 float UW_CoolDownItem::GetNextCooldownStateUpdateDelaySeconds() const

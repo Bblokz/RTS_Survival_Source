@@ -8,6 +8,7 @@
 #include "Components/Image.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
+#include "RTS_Survival/GameUI/CooldownItem/W_CoolDownItem.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingUIWidget/TrainingItemState/TrainingWidgetState.h"
 #include "W_TrainingItem.generated.h"
@@ -71,6 +72,12 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "TrainingItem")
 	void OnHoverTrainingItem(const bool bIsHovering);
+	
+	// Called after OnUpdateTrainingItem in the blueprint has loaded the slate brush asset from the
+	// data table.
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "TrainingItem")
+	void OnObtainedSlateBrushFromTrainingTable(USlateBrushAsset* SlateBrushAsset);
+	
 
 	/**
 	 * @brief Updates the widget with the provided state.
@@ -98,6 +105,9 @@ protected:
 	// The button of this widget that is underneath the size box in the hierarchy.
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	UButton* M_TrainingItemButton;
+	
+	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
+	 UW_CoolDownItem* M_CoolDownItem;
 
 
 private:

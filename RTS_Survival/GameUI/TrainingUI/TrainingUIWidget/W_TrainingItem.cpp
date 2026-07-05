@@ -5,6 +5,7 @@
 #include "Styling/SlateWidgetStyleAsset.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
+#include "Slate/SlateBrushAsset.h"
 
 UW_TrainingItem::UW_TrainingItem(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -229,6 +230,29 @@ void UW_TrainingItem::OnHoverTrainingItem(const bool bIsHovering)
 	}
 
 	M_TrainingUIManager->OnTrainingItemHovered(M_TrainingItemState, bIsHovering);
+}
+
+void UW_TrainingItem::OnObtainedSlateBrushFromTrainingTable(USlateBrushAsset* SlateBrushAsset)
+{
+	// Note; no error report as not all training items have brushes set.
+	if (not IsValid(SlateBrushAsset))
+	{
+		// todo fully stop the cooldown timer on the M_CoolDownItem as for this trainer this item is not used.
+		return;
+	}
+	UObject* BrushResource =SlateBrushAsset->Brush.GetResourceObject();
+	if (not IsValid(BrushResource))
+	{
+		RTSFunctionLibrary::ReportError("No valid brush resource on slate brush obtained from data table");
+	}
+		
+	UImage* ImageResource  = Cast<UImage>(BrushResource);
+	if (not IsValid(ImageResource))
+	{
+		RTSFunctionLibrary::ReportError("could not cast slate brush resoruce to image in Training item!");
+	}
+	// to do set the image on the dynamic materail of the	
+	// M_CoolDownItem->Init(...)
 }
 
 void UW_TrainingItem::UpdateButtonWithGlobalSlateStyle()
