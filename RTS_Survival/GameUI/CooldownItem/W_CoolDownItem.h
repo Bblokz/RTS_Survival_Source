@@ -54,9 +54,10 @@ public:
 	 */
 	void UpgradeCooldown(const float NewCooldown, const bool bResetCooldownState);
 
+	virtual void BeginDestroy() override;
+	
 protected:
 	virtual void NativeDestruct() override;
-	virtual void BeginDestroy() override;
 
 private:
 	static const FName S_IconTextureParameterName;

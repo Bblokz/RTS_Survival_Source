@@ -5,7 +5,7 @@
 #include "Engine/Texture2D.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "RTSFunctionLibrary.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 const FName UW_CoolDownItem::S_IconTextureParameterName(TEXT("IconTexture"));
 const FName UW_CoolDownItem::S_CooldownStartTimeParameterName(TEXT("CooldownStartTimeSeconds"));
