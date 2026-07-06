@@ -257,6 +257,32 @@ void UW_CoolDownItem::InstantlyResetCooldown()
 	CompleteCooldownInternal();
 }
 
+void UW_CoolDownItem::ClearCooldownMaterial()
+{
+	ClearCooldownTimer();
+
+	bM_WasInitialized = false;
+	bM_IsOnCooldown = false;
+	bM_IsClockPaused = false;
+
+	M_WeakWorldContext.Reset();
+	M_WeakTimerWorld.Reset();
+
+	M_CooldownDurationSeconds = 0.0f;
+	M_CooldownStartTimeSeconds = 0.0f;
+	M_CooldownRemainingSeconds = 0.0f;
+	M_CooldownPausedTimeSeconds = 0.0f;
+
+	if (not CacheDynamicMaterialFromImage())
+	{
+		return;
+	}
+
+	M_DynamicMaterial->SetTextureParameterValue(S_IconTextureParameterName, nullptr);
+	ApplyCooldownMaterialCompletedState();
+	ApplyPauseMaterialState();
+}
+
 void UW_CoolDownItem::PauseClock(const bool bPause)
 {
 	if (not GetWasInitialized())

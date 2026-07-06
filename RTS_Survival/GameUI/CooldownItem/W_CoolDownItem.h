@@ -59,6 +59,7 @@ void Init(
 	void SetCooldownState(const float CooldownDurationSeconds, const float CooldownRemainingSeconds);
 
 	void InstantlyResetCooldown();
+	void ClearCooldownMaterial();
 
 	/**
 	 * @brief Pauses or unpauses the material clock and the cooldown state timer.
