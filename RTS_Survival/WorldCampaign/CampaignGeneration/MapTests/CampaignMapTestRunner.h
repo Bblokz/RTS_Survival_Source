@@ -12,7 +12,7 @@
 // this module on account of the harness.
 // -----------------------------------------------------------------------------------------------------
 
-#if RTS_WITH_CAMPAIGN_MAP_TESTS
+#if defined(RTS_WITH_CAMPAIGN_MAP_TESTS) && RTS_WITH_CAMPAIGN_MAP_TESTS
 
 #include "CoreMinimal.h"
 
@@ -43,4 +43,4 @@ namespace CampaignMapTest
 	void RunCampaignMapTestSweep(UWorld* World, int32 FirstSeed, int32 SeedCount, bool bQuitWhenDone);
 }
 
-#endif // RTS_WITH_CAMPAIGN_MAP_TESTS
+#endif // defined(RTS_WITH_CAMPAIGN_MAP_TESTS) && RTS_WITH_CAMPAIGN_MAP_TESTS

@@ -63,6 +63,7 @@
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
 #include "RTS_Survival/StartLocation/PlayerStartLocationMngr/PlayerStartLocationManager.h"
+#include "RTS_Survival/SteamCapture/RTSSteamCaptureSubsystem.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
@@ -914,6 +915,37 @@ void ACPPController::TakeScreenShot(const bool bIncludeUI, const float InnerPerc
 	{
 		UE_LOG(LogTemp, Warning, TEXT("TakeScreenShot: failed to queue screenshot request."));
 	}
+}
+
+bool ACPPController::SetSteamCaptureRecordingEnabled(const bool bEnable)
+{
+#if WITH_EDITOR
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot toggle Steam capture because world is invalid."));
+		return false;
+	}
+	if (World->WorldType != EWorldType::PIE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Steam capture can only be toggled while running in PIE."));
+		return false;
+	}
+
+	URTSSteamCaptureSubsystem* SteamCaptureSubsystem = World->GetSubsystem<URTSSteamCaptureSubsystem>();
+	if (not IsValid(SteamCaptureSubsystem))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Steam capture subsystem is not available in this world."));
+		return false;
+	}
+
+	return bEnable
+		       ? SteamCaptureSubsystem->StartCapture(this)
+		       : SteamCaptureSubsystem->StopCapture();
+#else
+	RTSFunctionLibrary::ReportError(TEXT("Steam capture is editor-only and unavailable in this build."));
+	return false;
+#endif
 }
 
 bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)

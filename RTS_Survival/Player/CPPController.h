@@ -344,6 +344,9 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void TakeScreenShot(const bool bIncludeUI, const float InnerPercent);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Steam Capture")
+	bool SetSteamCaptureRecordingEnabled(const bool bEnable);
+
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PauseGame(const ERTSPauseGameOptions PauseOption);

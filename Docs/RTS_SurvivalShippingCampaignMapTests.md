@@ -59,11 +59,20 @@ The test runs the campaign map `RTS_WorldCampaign` (`/Game/RTS_Survival/Maps/Cam
 
 ### Unattended (recommended)
 
-Once the campaign map is loaded and has settled (~3s), the harness automatically runs the full sweep and then exits:
+Just launch the executable. The harness **navigates to the campaign map itself** — you do not pass a map
+URL. The game boots to its front-end menu (which ignores a map argument); the harness primes a valid
+player faction, waits a few seconds, and if the campaign map has not loaded it force-opens
+`/Game/RTS_Survival/Maps/Campaign/RTS_WorldCampaign` on its own. Once the map settles it runs the full
+sweep and exits.
 
 ```powershell
-E:\CampaignTest\Windows\RTS_SurvivalShippingCampaignMapTests.exe /Game/RTS_Survival/Maps/Campaign/RTS_WorldCampaign -RTSCampaignMapTestsFirstSeed=0 -RTSCampaignMapTestsSeedCount=100 -unattended -log
+E:\RR_test\Tests\Windows\RTS_SurvivalShippingCampaignMapTests.exe -RTSCampaignMapTestsFirstSeed=0 -RTSCampaignMapTestsSeedCount=100 -unattended -windowed -ResX=640 -ResY=360 -log
 ```
+
+> **Run with a real RHI — do NOT use `-nullrhi`.** The game's front-end menu is UMG-heavy and crashes
+> under `-nullrhi` before the harness can navigate to the campaign map. `-windowed -ResX=640 -ResY=360`
+> (as above, matching the sibling shipping-test workflow) works. The determinism sweep itself is pure
+> game-thread logic and needs no rendering, but the boot path passes through the menu, which does.
 
 Command-line options (all optional):
 
@@ -72,6 +81,9 @@ Command-line options (all optional):
 -RTSCampaignMapTestsSeedCount=N   Number of sequential seeds. Default 100.
 -RTSCampaignMapTestsNoQuit        Keep the process alive after the sweep (default is to exit).
 ```
+
+Verified: a 100-seed unattended run (`-RTSCampaignMapTestsSeedCount=100`) completes with 100/100 seeds
+generated crash-free in ~30s, and a repeat run reproduces byte-identical per-seed logs and fingerprints.
 
 ### Console command (when already on the campaign map)
 
@@ -157,15 +169,26 @@ run the sweep twice and compare:
 - The `Summary.txt` fingerprint column gives an at-a-glance diff; the `Seed_XXXXXX.log` files give the
   exact placement that differed.
 
+Run the test twice with the **same seed range**, then compare. This script picks the two most recent run
+folders and compares only the seeds they have **in common**, so it is safe even if the runs used different
+seed counts (a common mistake is comparing a 5-seed run against a 100-seed run — the seeds beyond 4 simply
+don't exist in the shorter run):
+
 ```powershell
-# Compare two runs seed-by-seed
-$A = 'C:\Users\<User>\AppData\Local\RTS_Survival\Saved\CampaignMapTests\Run_A'
-$B = 'C:\Users\<User>\AppData\Local\RTS_Survival\Saved\CampaignMapTests\Run_B'
-Get-ChildItem $A -Filter 'Seed_*.log' | ForEach-Object {
-    $diff = Compare-Object (Get-Content $_.FullName) (Get-Content (Join-Path $B $_.Name))
-    if ($diff) { "DIFFERS: $($_.Name)" }
+$base = "$env:LOCALAPPDATA\RTS_Survival\Saved\CampaignMapTests"
+$runs = Get-ChildItem $base -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 2
+$a = $runs[0].FullName; $b = $runs[1].FullName
+$bNames = (Get-ChildItem $b -Filter 'Seed_*.log').Name
+$common = (Get-ChildItem $a -Filter 'Seed_*.log').Name | Where-Object { $bNames -contains $_ }
+$diffs = 0
+foreach ($n in $common) {
+    if (Compare-Object (Get-Content "$a\$n") (Get-Content "$b\$n")) { "DIFFERS: $n"; $diffs++ }
 }
+"Compared $($common.Count) common seed(s): A=$a  B=$b"
+if ($diffs -eq 0) { "All common seeds byte-identical - determinism holds." } else { "$diffs seed(s) differ." }
 ```
+
+For a full 100-seed verification make sure both of the two newest runs were 100-seed runs.
 
 Any seed that failed to generate is marked `FAIL` in the summary with its failure reason, and appears in
 the `Failed seeds:` line — this is how a crash-free run across all 100 seeds is confirmed.

@@ -2,7 +2,7 @@
 
 #include "CampaignMapTestRunner.h"
 
-#if RTS_WITH_CAMPAIGN_MAP_TESTS
+#if defined(RTS_WITH_CAMPAIGN_MAP_TESTS) && RTS_WITH_CAMPAIGN_MAP_TESTS
 
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
@@ -11,6 +11,7 @@
 #include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
+#include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Crc.h"
 #include "Misc/DateTime.h"
@@ -19,6 +20,7 @@
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 
+#include "RTS_Survival/FactionSystem/Factions/Factions.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapEnemyItem.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
@@ -50,6 +52,13 @@ namespace CampaignMapTest
 
 		// Poll cadence for the unattended auto-run ticker.
 		constexpr float AutoRunPollSeconds = 0.5f;
+
+		// If the game's boot flow lands on the front-end menu instead of the campaign map, the harness waits
+		// this long before opening the campaign map itself.
+		constexpr float AutoRunForceOpenGraceSeconds = 4.0f;
+
+		// Full path to the campaign map, used both to detect it and to force-open it when needed.
+		const TCHAR* const CampaignMapLoadPath = TEXT("/Game/RTS_Survival/Maps/Campaign/RTS_WorldCampaign");
 
 		FString EnemyItemName(const EMapEnemyItem Value)
 		{
@@ -422,9 +431,34 @@ namespace CampaignMapTest
 			TEXT("log and a summary under Saved/CampaignMapTests. Args: [FirstSeed] [SeedCount] [Quit]."),
 			FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&RunCampaignMapTestsCommand));
 
+		// ---- Front-end priming ------------------------------------------------------------------------
+		// The campaign map is normally reached through the front-end (faction/difficulty selection). When
+		// this test target drives straight into it, the game's own BeginPlay flow would otherwise abort
+		// with "Player faction was requested before it was set". Priming a valid faction lets the normal
+		// flow run cleanly; the determinism sweep then takes over. Safe to call every tick.
+		// Test-target only - guarded out of every shipping/game build.
+		void PrimeCampaignTestDefaults(UGameInstance* GameInstance)
+		{
+			URTSGameInstance* RTSGameInstance = Cast<URTSGameInstance>(GameInstance);
+			if (not IsValid(RTSGameInstance))
+			{
+				return;
+			}
+
+			if (RTSGameInstance->GetPlayerFaction() == ERTSFaction::NotInitialised)
+			{
+				RTSGameInstance->SetPlayerFaction(ERTSFaction::GerBreakthroughDoctrine);
+				UE_LOG(LogCampaignMapTest, Display,
+				       TEXT("Primed campaign test defaults: player faction set to GerBreakthroughDoctrine."));
+			}
+		}
+
 		// ---- Unattended trigger: auto-run once the campaign map is loaded -----------------------------
 		bool GHasRunAutoSweep = false;
+		bool GHasLoggedHarnessActive = false;
+		bool GHasRequestedCampaignOpen = false;
 		float GCampaignWorldSettleSeconds = -1.f;
+		float GElapsedWithoutCampaignSeconds = 0.f;
 
 		UWorld* FindLoadedCampaignGameWorld()
 		{
@@ -436,6 +470,26 @@ namespace CampaignMapTest
 			{
 				UWorld* World = Context.World();
 				if (WorldIsLoadedCampaignMap(World))
+				{
+					return World;
+				}
+			}
+			return nullptr;
+		}
+
+		// Any live Game/PIE world - used to prime the game instance and to issue the map-open request when
+		// the harness has to navigate to the campaign map itself.
+		UWorld* FindAnyGameWorld()
+		{
+			if (GEngine == nullptr)
+			{
+				return nullptr;
+			}
+			for (const FWorldContext& Context : GEngine->GetWorldContexts())
+			{
+				UWorld* World = Context.World();
+				if (IsValid(World)
+					&& (World->WorldType == EWorldType::Game || World->WorldType == EWorldType::PIE))
 				{
 					return World;
 				}
@@ -471,10 +525,41 @@ namespace CampaignMapTest
 				return false; // Stop ticking.
 			}
 
+			if (not GHasLoggedHarnessActive)
+			{
+				GHasLoggedHarnessActive = true;
+				UE_LOG(LogCampaignMapTest, Display,
+				       TEXT("Campaign map test harness active; waiting for campaign map '%s'."),
+				       CampaignMapLoadPath);
+			}
+
+			// Prime the faction every tick regardless of OnStartGameInstance timing, so whichever world is
+			// live (front-end or campaign) has a valid faction before its flow needs one.
+			if (UWorld* AnyWorld = FindAnyGameWorld())
+			{
+				PrimeCampaignTestDefaults(AnyWorld->GetGameInstance());
+			}
+
 			UWorld* CampaignWorld = FindLoadedCampaignGameWorld();
 			if (CampaignWorld == nullptr)
 			{
 				GCampaignWorldSettleSeconds = -1.f;
+				GElapsedWithoutCampaignSeconds += DeltaTime;
+
+				// The game boots to its front-end menu and ignores a campaign map URL, so once a world is up
+				// and the grace period has elapsed, travel to the campaign map ourselves.
+				if (not GHasRequestedCampaignOpen
+					&& GElapsedWithoutCampaignSeconds >= AutoRunForceOpenGraceSeconds)
+				{
+					if (UWorld* AnyWorld = FindAnyGameWorld())
+					{
+						GHasRequestedCampaignOpen = true;
+						UE_LOG(LogCampaignMapTest, Display,
+						       TEXT("Campaign map not loaded after %.0fs; opening '%s' directly."),
+						       GElapsedWithoutCampaignSeconds, CampaignMapLoadPath);
+						UGameplayStatics::OpenLevel(AnyWorld, FName(CampaignMapLoadPath));
+					}
+				}
 				return true;
 			}
 
@@ -506,10 +591,11 @@ namespace CampaignMapTest
 			EDelayedRegisterRunPhase::EndOfEngineInit,
 			[]()
 			{
+				FWorldDelegates::OnStartGameInstance.AddStatic(&PrimeCampaignTestDefaults);
 				FTSTicker::GetCoreTicker().AddTicker(
 					FTickerDelegate::CreateStatic(&AutoRunTick), AutoRunPollSeconds);
 			});
 	}
 }
 
-#endif // RTS_WITH_CAMPAIGN_MAP_TESTS
+#endif // defined(RTS_WITH_CAMPAIGN_MAP_TESTS) && RTS_WITH_CAMPAIGN_MAP_TESTS

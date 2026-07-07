@@ -1,0 +1,611 @@
+#include "RTSSteamCaptureSubsystem.h"
+
+#include "Camera/CameraComponent.h"
+#include "Dom/JsonObject.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Engine/World.h"
+#include "HAL/PlatformProcess.h"
+#include "HAL/PlatformTime.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/Camera/CameraPawn.h"
+#include "RTS_Survival/SteamCapture/RTSSteamCaptureCameraActor.h"
+#include "RTS_Survival/SteamCapture/RTSSteamCaptureSettings.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
+#include "UnrealClient.h"
+
+namespace RTSSteamCaptureSubsystemConstants
+{
+	constexpr float PendingWriteSleepSeconds = 0.01f;
+	constexpr int32 SessionGuidCharacters = 8;
+	constexpr float TargetFrameCountEpsilon = 0.001f;
+	constexpr float ManualStopMaxDurationSnapSeconds = 0.25f;
+	const TCHAR* const FramesDirectoryName = TEXT("Frames");
+	const TCHAR* const MetadataFileName = TEXT("metadata.json");
+	const TCHAR* const ManualStopReason = TEXT("ManualStop");
+	const TCHAR* const MaxDurationStopReason = TEXT("MaxDuration");
+}
+
+namespace
+{
+	FString GetSafeOutputName(const FString& RawName, const FString& FallbackName)
+	{
+		const FString SourceName = RawName.IsEmpty() ? FallbackName : RawName;
+		return FPaths::MakeValidFileName(SourceName);
+	}
+
+	TSharedRef<FJsonObject> BuildSettingsMetadata(const URTSSteamCaptureSettings& CaptureSettings)
+	{
+		TSharedRef<FJsonObject> SettingsJson = MakeShared<FJsonObject>();
+		SettingsJson->SetNumberField(TEXT("outputResolutionX"), CaptureSettings.M_OutputResolutionX);
+		SettingsJson->SetNumberField(TEXT("outputResolutionY"), CaptureSettings.M_OutputResolutionY);
+		SettingsJson->SetNumberField(TEXT("framesPerSecond"), CaptureSettings.M_FramesPerSecond);
+		SettingsJson->SetNumberField(TEXT("maxDurationSeconds"), CaptureSettings.M_MaxDurationSeconds);
+		SettingsJson->SetBoolField(TEXT("autoStopAtMaxDuration"), CaptureSettings.bM_AutoStopAtMaxDuration);
+		SettingsJson->SetStringField(
+			TEXT("localCameraOffset"),
+			CaptureSettings.M_CameraSettings.M_LocalLocationOffset.ToString());
+		SettingsJson->SetStringField(
+			TEXT("cameraRotationOffset"),
+			CaptureSettings.M_CameraSettings.M_RotationOffset.ToString());
+		SettingsJson->SetBoolField(
+			TEXT("matchPlayerCameraFov"),
+			CaptureSettings.M_CameraSettings.bM_MatchPlayerCameraFov);
+		SettingsJson->SetNumberField(
+			TEXT("captureFovDegrees"),
+			CaptureSettings.M_CameraSettings.M_CaptureFovDegrees);
+		SettingsJson->SetNumberField(TEXT("fovMultiplier"), CaptureSettings.M_CameraSettings.M_FovMultiplier);
+		return SettingsJson;
+	}
+}
+
+bool URTSSteamCaptureSubsystem::ShouldCreateSubsystem(UObject* Outer) const
+{
+	const UWorld* OuterWorld = Cast<UWorld>(Outer);
+	if (not IsValid(OuterWorld))
+	{
+		return false;
+	}
+
+#if WITH_EDITOR
+	return OuterWorld->WorldType == EWorldType::PIE;
+#else
+	return false;
+#endif
+}
+
+void URTSSteamCaptureSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	ResetSessionState();
+}
+
+void URTSSteamCaptureSubsystem::Deinitialize()
+{
+	StopCaptureInternal(TEXT("SubsystemDeinitialize"), true);
+	Super::Deinitialize();
+}
+
+void URTSSteamCaptureSubsystem::Tick(const float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	if (not bM_IsRecording || bM_IsStopping)
+	{
+		return;
+	}
+
+	const URTSSteamCaptureSettings* CaptureSettings = GetCaptureSettings();
+	if (not IsValid(CaptureSettings))
+	{
+		StopCaptureInternal(TEXT("InvalidSettings"), true);
+		return;
+	}
+
+	TickCapture(DeltaTime, *CaptureSettings);
+}
+
+TStatId URTSSteamCaptureSubsystem::GetStatId() const
+{
+	RETURN_QUICK_DECLARE_CYCLE_STAT(URTSSteamCaptureSubsystem, STATGROUP_Tickables);
+}
+
+bool URTSSteamCaptureSubsystem::StartCapture(ACPPController* PlayerController)
+{
+	if (bM_IsRecording)
+	{
+		return true;
+	}
+
+	const URTSSteamCaptureSettings* CaptureSettings = GetCaptureSettings();
+	if (not GetCanStartCapture(PlayerController, CaptureSettings))
+	{
+		return false;
+	}
+
+	ResetSessionState();
+	M_PlayerController = PlayerController;
+	M_SessionGuid = FGuid::NewGuid();
+	M_SessionStartDateTime = FDateTime::Now();
+	M_SessionName = BuildSessionName(*CaptureSettings);
+	M_FrameWriter.ResetFailedWriteCount();
+
+	if (not StartCapture_CreateSessionDirectory(*CaptureSettings)
+		|| not StartCapture_CreateRenderTarget(*CaptureSettings)
+		|| not StartCapture_SpawnCaptureActor()
+		|| not M_CaptureActor->InitCaptureCamera(M_RenderTarget))
+	{
+		AbortStartCapture();
+		return false;
+	}
+
+	bM_IsRecording = true;
+	return true;
+}
+
+bool URTSSteamCaptureSubsystem::StopCapture()
+{
+	if (not bM_IsRecording)
+	{
+		return true;
+	}
+
+	StopCaptureInternal(RTSSteamCaptureSubsystemConstants::ManualStopReason, true);
+	return true;
+}
+
+const URTSSteamCaptureSettings* URTSSteamCaptureSubsystem::GetCaptureSettings() const
+{
+	const URTSSteamCaptureSettings* CaptureSettings = GetDefault<URTSSteamCaptureSettings>();
+	if (IsValid(CaptureSettings))
+	{
+		return CaptureSettings;
+	}
+
+	RTSFunctionLibrary::ReportError(TEXT("RTS Steam Capture settings were not available."));
+	return nullptr;
+}
+
+bool URTSSteamCaptureSubsystem::GetCanStartCapture(
+	ACPPController* PlayerController,
+	const URTSSteamCaptureSettings* CaptureSettings) const
+{
+	if (not IsValid(CaptureSettings) || not CaptureSettings->bM_EnableSteamCapture)
+	{
+		return false;
+	}
+	if (not GetIsPieWorld())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Steam capture can only be started in PIE."));
+		return false;
+	}
+	if (not IsValid(PlayerController))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot start Steam capture because player controller is invalid."));
+		return false;
+	}
+
+	const ACameraPawn* CameraPawn = PlayerController->GetCameraPawn();
+	if (not IsValid(CameraPawn) || not IsValid(CameraPawn->GetCameraComponent()))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot start Steam capture because player camera is invalid."));
+		return false;
+	}
+
+	return true;
+}
+
+bool URTSSteamCaptureSubsystem::GetIsPieWorld() const
+{
+#if WITH_EDITOR
+	const UWorld* World = GetWorld();
+	return IsValid(World) && World->WorldType == EWorldType::PIE;
+#else
+	return false;
+#endif
+}
+
+bool URTSSteamCaptureSubsystem::StartCapture_CreateSessionDirectory(
+	const URTSSteamCaptureSettings& CaptureSettings)
+{
+	const FString OutputDirectoryName = GetSafeOutputName(
+		CaptureSettings.M_OutputDirectoryName,
+		TEXT("SteamCaptures"));
+	const FString RootDirectory = FPaths::Combine(FPaths::ProjectSavedDir(), OutputDirectoryName);
+	M_SessionDirectory = FPaths::Combine(RootDirectory, M_SessionName);
+	M_FramesDirectory = FPaths::Combine(
+		M_SessionDirectory,
+		RTSSteamCaptureSubsystemConstants::FramesDirectoryName);
+	M_MetadataPath = FPaths::Combine(
+		M_SessionDirectory,
+		RTSSteamCaptureSubsystemConstants::MetadataFileName);
+
+	const bool bCreated = IFileManager::Get().MakeDirectory(*M_FramesDirectory, true);
+	if (not bCreated)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Failed to create Steam capture frame directory: ") + M_FramesDirectory);
+	}
+	return bCreated;
+}
+
+bool URTSSteamCaptureSubsystem::StartCapture_CreateRenderTarget(
+	const URTSSteamCaptureSettings& CaptureSettings)
+{
+	const int32 OutputResolutionX = FMath::Max(1, CaptureSettings.M_OutputResolutionX);
+	const int32 OutputResolutionY = FMath::Max(1, CaptureSettings.M_OutputResolutionY);
+
+	const FName RenderTargetName = MakeUniqueObjectName(
+		this,
+		UTextureRenderTarget2D::StaticClass(),
+		TEXT("RTSSteamCaptureRenderTarget"));
+	M_RenderTarget = NewObject<UTextureRenderTarget2D>(this, RenderTargetName);
+	if (not GetIsValidRenderTarget())
+	{
+		return false;
+	}
+
+	M_RenderTarget->ClearColor = FLinearColor::Black;
+	M_RenderTarget->bAutoGenerateMips = false;
+	M_RenderTarget->InitCustomFormat(OutputResolutionX, OutputResolutionY, PF_B8G8R8A8, false);
+	M_RenderTarget->UpdateResourceImmediate(true);
+	return true;
+}
+
+bool URTSSteamCaptureSubsystem::StartCapture_SpawnCaptureActor()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return false;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot spawn Steam capture camera because world is invalid."));
+		return false;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = M_PlayerController.Get();
+	SpawnParams.ObjectFlags |= RF_Transient;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	M_CaptureActor = World->SpawnActor<ARTSSteamCaptureCameraActor>(
+		ARTSSteamCaptureCameraActor::StaticClass(),
+		FTransform::Identity,
+		SpawnParams);
+	return GetIsValidCaptureActor();
+}
+
+void URTSSteamCaptureSubsystem::AbortStartCapture()
+{
+	DestroyCaptureActorIfNeeded();
+	M_RenderTarget = nullptr;
+	M_PlayerController.Reset();
+	bM_IsRecording = false;
+}
+
+void URTSSteamCaptureSubsystem::ResetSessionState()
+{
+	M_CaptureActor = nullptr;
+	M_RenderTarget = nullptr;
+	M_PlayerController.Reset();
+	M_SessionDirectory.Reset();
+	M_FramesDirectory.Reset();
+	M_MetadataPath.Reset();
+	M_SessionName.Reset();
+	M_SessionGuid.Invalidate();
+	M_SessionStartDateTime = FDateTime();
+	M_RecordingElapsedSeconds = 0.0f;
+	M_CapturedFrameCount = 0;
+	M_DuplicatedFrameCount = 0;
+	M_DroppedFrameCount = 0;
+	M_LastCapturedFramePixels.Empty();
+	bM_IsRecording = false;
+	bM_IsStopping = false;
+}
+
+void URTSSteamCaptureSubsystem::DestroyCaptureActorIfNeeded()
+{
+	if (M_CaptureActor == nullptr)
+	{
+		return;
+	}
+
+	M_CaptureActor->Destroy();
+	M_CaptureActor = nullptr;
+}
+
+void URTSSteamCaptureSubsystem::TickCapture(
+	const float DeltaTime,
+	const URTSSteamCaptureSettings& CaptureSettings)
+{
+	const float MaxDurationSeconds = FMath::Max(0.1f, CaptureSettings.M_MaxDurationSeconds);
+	const float NewRecordingElapsedSeconds = M_RecordingElapsedSeconds + DeltaTime;
+	const bool bReachedMaxDuration = CaptureSettings.bM_AutoStopAtMaxDuration
+		&& NewRecordingElapsedSeconds >= MaxDurationSeconds;
+	M_RecordingElapsedSeconds = bReachedMaxDuration
+		                            ? MaxDurationSeconds
+		                            : NewRecordingElapsedSeconds;
+
+	QueueDueFrames(CaptureSettings);
+
+	if (bReachedMaxDuration)
+	{
+		StopCaptureInternal(RTSSteamCaptureSubsystemConstants::MaxDurationStopReason, true);
+	}
+}
+
+void URTSSteamCaptureSubsystem::QueueDueFrames(const URTSSteamCaptureSettings& CaptureSettings)
+{
+	const int32 TargetFrameCount = GetTargetFrameCount(CaptureSettings);
+	if (M_CapturedFrameCount >= TargetFrameCount)
+	{
+		return;
+	}
+
+	TArray<FColor> CurrentFramePixels;
+	if (not CaptureFramePixels(CaptureSettings, CurrentFramePixels))
+	{
+		return;
+	}
+
+	M_LastCapturedFramePixels = CurrentFramePixels;
+	if (not QueueFrameWrite(CaptureSettings, MoveTemp(CurrentFramePixels)))
+	{
+		return;
+	}
+
+	while (M_CapturedFrameCount < TargetFrameCount)
+	{
+		if (M_LastCapturedFramePixels.IsEmpty())
+		{
+			return;
+		}
+
+		TArray<FColor> DuplicatedFramePixels = M_LastCapturedFramePixels;
+		if (not QueueFrameWrite(CaptureSettings, MoveTemp(DuplicatedFramePixels)))
+		{
+			return;
+		}
+		++M_DuplicatedFrameCount;
+	}
+}
+
+bool URTSSteamCaptureSubsystem::CaptureFramePixels(
+	const URTSSteamCaptureSettings& CaptureSettings,
+	TArray<FColor>& OutFramePixels)
+{
+	if (not GetIsValidPlayerController() || not GetIsValidCaptureActor())
+	{
+		return false;
+	}
+
+	const ACameraPawn* CameraPawn = M_PlayerController->GetCameraPawn();
+	const UCameraComponent* PlayerCameraComponent = IsValid(CameraPawn) ? CameraPawn->GetCameraComponent() : nullptr;
+	if (not M_CaptureActor->SyncToPlayerCamera(PlayerCameraComponent, CaptureSettings.M_CameraSettings))
+	{
+		return false;
+	}
+	if (not M_CaptureActor->CaptureFrame())
+	{
+		return false;
+	}
+
+	return ReadRenderTargetPixels(OutFramePixels);
+}
+
+bool URTSSteamCaptureSubsystem::QueueFrameWrite(
+	const URTSSteamCaptureSettings& CaptureSettings,
+	TArray<FColor>&& FramePixels)
+{
+	const int32 MaxPendingFrameWrites = FMath::Max(1, CaptureSettings.M_MaxPendingFrameWrites);
+	if (M_FrameWriter.GetPendingWriteCount() >= MaxPendingFrameWrites)
+	{
+		++M_DroppedFrameCount;
+		return false;
+	}
+
+	++M_CapturedFrameCount;
+	M_FrameWriter.WritePngFrameAsync(
+		BuildFramePath(M_CapturedFrameCount),
+		FMath::Max(1, CaptureSettings.M_OutputResolutionX),
+		FMath::Max(1, CaptureSettings.M_OutputResolutionY),
+		MoveTemp(FramePixels));
+	return true;
+}
+
+bool URTSSteamCaptureSubsystem::ReadRenderTargetPixels(TArray<FColor>& OutPixels) const
+{
+	if (not GetIsValidRenderTarget())
+	{
+		return false;
+	}
+
+	FTextureRenderTargetResource* RenderTargetResource = M_RenderTarget->GameThread_GetRenderTargetResource();
+	if (RenderTargetResource == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Steam capture render target resource was invalid."));
+		return false;
+	}
+
+	FReadSurfaceDataFlags ReadFlags(RCM_UNorm);
+	ReadFlags.SetLinearToGamma(false);
+	return RenderTargetResource->ReadPixels(OutPixels, ReadFlags);
+}
+
+FString URTSSteamCaptureSubsystem::BuildFramePath(const int32 FrameNumber) const
+{
+	const FString FileName = FString::Printf(TEXT("Frame_%06d.png"), FrameNumber);
+	return FPaths::Combine(M_FramesDirectory, FileName);
+}
+
+FString URTSSteamCaptureSubsystem::BuildSessionName(
+	const URTSSteamCaptureSettings& CaptureSettings) const
+{
+	const FString Prefix = GetSafeOutputName(CaptureSettings.M_FileNamePrefix, TEXT("SteamCapture"));
+	const FString Stamp = M_SessionStartDateTime.ToString(TEXT("%Y%m%d-%H%M%S"));
+	const FString GuidText = M_SessionGuid.ToString(EGuidFormats::Digits).Left(
+		RTSSteamCaptureSubsystemConstants::SessionGuidCharacters);
+	return FString::Printf(TEXT("%s_%s_%s"), *Prefix, *Stamp, *GuidText);
+}
+
+int32 URTSSteamCaptureSubsystem::GetTargetFrameCount(
+	const URTSSteamCaptureSettings& CaptureSettings) const
+{
+	const int32 FramesPerSecond = FMath::Max(1, CaptureSettings.M_FramesPerSecond);
+	const float TargetFrameCount = M_RecordingElapsedSeconds * static_cast<float>(FramesPerSecond);
+	return FMath::FloorToInt(TargetFrameCount + RTSSteamCaptureSubsystemConstants::TargetFrameCountEpsilon);
+}
+
+void URTSSteamCaptureSubsystem::StopCaptureInternal(
+	const FString& StopReason,
+	const bool bWaitForFrameWrites)
+{
+	if (not bM_IsRecording && M_CaptureActor == nullptr)
+	{
+		return;
+	}
+
+	bM_IsStopping = true;
+	bM_IsRecording = false;
+	const FDateTime StopTime = FDateTime::Now();
+	const URTSSteamCaptureSettings* CaptureSettings = GetCaptureSettings();
+	if (IsValid(CaptureSettings)
+		&& StopReason == RTSSteamCaptureSubsystemConstants::ManualStopReason
+		&& CaptureSettings->bM_AutoStopAtMaxDuration)
+	{
+		const float MaxDurationSeconds = FMath::Max(0.1f, CaptureSettings->M_MaxDurationSeconds);
+		if (MaxDurationSeconds - M_RecordingElapsedSeconds <=
+			RTSSteamCaptureSubsystemConstants::ManualStopMaxDurationSnapSeconds)
+		{
+			M_RecordingElapsedSeconds = MaxDurationSeconds;
+			QueueDueFrames(*CaptureSettings);
+		}
+	}
+
+	if (bWaitForFrameWrites && IsValid(CaptureSettings) && CaptureSettings->bM_WaitForFrameWritesOnStop)
+	{
+		WaitForFrameWrites(*CaptureSettings);
+	}
+
+	WriteMetadata(StopReason, StopTime);
+	DestroyCaptureActorIfNeeded();
+	M_RenderTarget = nullptr;
+	M_PlayerController.Reset();
+	bM_IsStopping = false;
+}
+
+void URTSSteamCaptureSubsystem::WaitForFrameWrites(
+	const URTSSteamCaptureSettings& CaptureSettings) const
+{
+	const double WaitStartTime = FPlatformTime::Seconds();
+	while (M_FrameWriter.GetPendingWriteCount() > 0)
+	{
+		const double WaitDuration = FPlatformTime::Seconds() - WaitStartTime;
+		if (WaitDuration >= CaptureSettings.M_MaxFrameWriteFlushSeconds)
+		{
+			RTSFunctionLibrary::ReportError(TEXT("Timed out while waiting for Steam capture frame writes."));
+			return;
+		}
+
+		FPlatformProcess::Sleep(RTSSteamCaptureSubsystemConstants::PendingWriteSleepSeconds);
+	}
+}
+
+void URTSSteamCaptureSubsystem::WriteMetadata(
+	const FString& StopReason,
+	const FDateTime& StopTime) const
+{
+	if (M_MetadataPath.IsEmpty())
+	{
+		return;
+	}
+
+	const URTSSteamCaptureSettings* CaptureSettings = GetCaptureSettings();
+	TSharedRef<FJsonObject> MetadataJson = MakeShared<FJsonObject>();
+	MetadataJson->SetStringField(TEXT("sessionName"), M_SessionName);
+	MetadataJson->SetStringField(TEXT("sessionGuid"), M_SessionGuid.ToString(EGuidFormats::Digits));
+	MetadataJson->SetStringField(TEXT("startTimeLocal"), M_SessionStartDateTime.ToIso8601());
+	MetadataJson->SetStringField(TEXT("stopTimeLocal"), StopTime.ToIso8601());
+	MetadataJson->SetStringField(TEXT("stopReason"), StopReason);
+	MetadataJson->SetNumberField(TEXT("capturedFrameCount"), M_CapturedFrameCount);
+	MetadataJson->SetNumberField(TEXT("duplicatedFrameCount"), M_DuplicatedFrameCount);
+	MetadataJson->SetNumberField(TEXT("droppedFrameCount"), M_DroppedFrameCount);
+	MetadataJson->SetNumberField(TEXT("failedFrameWriteCount"), M_FrameWriter.GetFailedWriteCount());
+	MetadataJson->SetNumberField(TEXT("pendingFrameWriteCount"), M_FrameWriter.GetPendingWriteCount());
+	MetadataJson->SetNumberField(TEXT("recordedSeconds"), M_RecordingElapsedSeconds);
+	MetadataJson->SetStringField(TEXT("sessionDirectory"), M_SessionDirectory);
+	MetadataJson->SetStringField(TEXT("framesDirectory"), M_FramesDirectory);
+	if (IsValid(CaptureSettings))
+	{
+		MetadataJson->SetNumberField(TEXT("targetFrameCount"), GetTargetFrameCount(*CaptureSettings));
+		MetadataJson->SetObjectField(TEXT("settings"), BuildSettingsMetadata(*CaptureSettings));
+	}
+
+	if (const UWorld* World = GetWorld())
+	{
+		MetadataJson->SetStringField(TEXT("mapName"), World->GetMapName());
+	}
+
+	FString SerializedMetadata;
+	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&SerializedMetadata);
+	if (not FJsonSerializer::Serialize(MetadataJson, Writer))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Failed to serialize Steam capture metadata."));
+		return;
+	}
+
+	const bool bSaved = FFileHelper::SaveStringToFile(SerializedMetadata, *M_MetadataPath);
+	if (not bSaved)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Failed to save Steam capture metadata: ") + M_MetadataPath);
+	}
+}
+
+bool URTSSteamCaptureSubsystem::GetIsValidPlayerController() const
+{
+	if (M_PlayerController.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_PlayerController"),
+		TEXT("GetIsValidPlayerController"),
+		this);
+	return false;
+}
+
+bool URTSSteamCaptureSubsystem::GetIsValidCaptureActor() const
+{
+	if (IsValid(M_CaptureActor))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_CaptureActor"),
+		TEXT("GetIsValidCaptureActor"),
+		this);
+	return false;
+}
+
+bool URTSSteamCaptureSubsystem::GetIsValidRenderTarget() const
+{
+	if (IsValid(M_RenderTarget))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_RenderTarget"),
+		TEXT("GetIsValidRenderTarget"),
+		this);
+	return false;
+}
