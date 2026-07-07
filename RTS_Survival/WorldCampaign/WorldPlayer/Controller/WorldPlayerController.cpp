@@ -26,6 +26,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldPlayerObject/WorldPlayerObject.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerAudioController/WorldPlayerAudioController.h"
 #include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowManager.h"
@@ -49,6 +50,7 @@ AWorldPlayerController::AWorldPlayerController()
 	M_WorldStateAndSaveManager = CreateDefaultSubobject<UWorldStateAndSaveManager>(TEXT("WorldStateAndSaveManager"));
 	M_WorldDivisionManager = CreateDefaultSubobject<UWorldDivisionManager>(TEXT("WorldDivisionManager"));
 	M_PlayerResourceManager = CreateDefaultSubobject<UPlayerResourceManager>(TEXT("PlayerResourceManager"));
+	M_WorldPlayerAudioController = CreateDefaultSubobject<UWorldPlayerAudioController>(TEXT("WorldPlayerAudioController"));
 }
 
 AGeneratorWorldCampaign* AWorldPlayerController::GetWorldGenerator() const
@@ -129,6 +131,11 @@ void AWorldPlayerController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
+
 	if (not GetIsValidPlayerWorldOutliner())
 	{
 		return;
@@ -142,6 +149,11 @@ void AWorldPlayerController::Tick(float DeltaTime)
 
 void AWorldPlayerController::PrimaryClick()
 {
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
+
 	switch (M_PrimaryClickContext)
 	{
 	case None:
@@ -155,6 +167,10 @@ void AWorldPlayerController::PrimaryClick()
 
 void AWorldPlayerController::SecondaryClick()
 {
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
 }
 
 void AWorldPlayerController::PlayTurn(const EWorldTurnType TurnType)
@@ -425,6 +441,11 @@ bool AWorldPlayerController::GetIsWorldCameraMovementDisabled() const
 
 void AWorldPlayerController::WorldCamera_ZoomIn()
 {
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
+
 	if (not GetIsValidWorldCameraController())
 	{
 		return;
@@ -435,6 +456,11 @@ void AWorldPlayerController::WorldCamera_ZoomIn()
 
 void AWorldPlayerController::WorldCamera_ZoomOut()
 {
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
+
 	if (not GetIsValidWorldCameraController())
 	{
 		return;
@@ -445,6 +471,11 @@ void AWorldPlayerController::WorldCamera_ZoomOut()
 
 void AWorldPlayerController::WorldCamera_ForwardMovement(const float AxisValue)
 {
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
+
 	if (not GetIsValidWorldCameraController())
 	{
 		return;
@@ -455,6 +486,11 @@ void AWorldPlayerController::WorldCamera_ForwardMovement(const float AxisValue)
 
 void AWorldPlayerController::WorldCamera_RightMovement(const float AxisValue)
 {
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
+
 	if (not GetIsValidWorldCameraController())
 	{
 		return;
@@ -466,6 +502,11 @@ void AWorldPlayerController::WorldCamera_RightMovement(const float AxisValue)
 bool AWorldPlayerController::IssueWorldDivisionMoveOrder(AWorldDivisionBase* WorldDivision,
                                                          const FVector& TargetLocation)
 {
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return false;
+	}
+
 	if (not GetIsValidWorldDivisionManager())
 	{
 		return false;
@@ -484,6 +525,45 @@ void AWorldPlayerController::WorldCamera_MoveTo(const FMovePlayerCamera& MoveReq
 	M_WorldCameraController->MoveCameraTo(MoveRequest);
 }
 
+void AWorldPlayerController::WorldCamera_StartCameraOvertake(
+	const FCameraOvertakeSettings& CameraOvertakeSettings,
+	FWorldCameraOvertakeFinishedDelegate OnCameraOvertakeFinished)
+{
+	if (not GetIsValidWorldCameraController())
+	{
+		OnCameraOvertakeFinished.ExecuteIfBound(FVector::ZeroVector);
+		return;
+	}
+
+	if (not GetIsValidWorldProfileAndUIManager())
+	{
+		OnCameraOvertakeFinished.ExecuteIfBound(M_WorldCameraController->GetCurrentCameraLocation());
+		return;
+	}
+
+	if (CameraOvertakeSettings.Points.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Camera overtake needs at least one point.")
+			TEXT("\n See function: AWorldPlayerController::WorldCamera_StartCameraOvertake()"));
+		OnCameraOvertakeFinished.ExecuteIfBound(M_WorldCameraController->GetCurrentCameraLocation());
+		return;
+	}
+
+	BeginCameraOvertakeControl(CameraOvertakeSettings, OnCameraOvertakeFinished);
+	PlayCameraOvertakeSound(CameraOvertakeSettings.SoundStart);
+	FWorldCameraOvertakePointReachedNativeDelegate PointReachedDelegate;
+	PointReachedDelegate.BindUObject(this, &AWorldPlayerController::OnCameraOvertakePointReached);
+	FWorldCameraOvertakeFinishedNativeDelegate FinishedDelegate;
+	FinishedDelegate.BindUObject(this, &AWorldPlayerController::OnCameraOvertakeFinished);
+	if (M_WorldCameraController->StartCameraOvertake(CameraOvertakeSettings, PointReachedDelegate, FinishedDelegate))
+	{
+		return;
+	}
+
+	this->OnCameraOvertakeFinished(M_WorldCameraController->GetCurrentCameraLocation());
+}
+
 bool AWorldPlayerController::GetIsValidWorldCameraController() const
 {
 	if (M_WorldCameraController.IsValid())
@@ -495,6 +575,22 @@ bool AWorldPlayerController::GetIsValidWorldCameraController() const
 		this,
 		TEXT("M_WorldCameraController"),
 		TEXT("GetIsValidWorldCameraController"),
+		this
+	);
+	return false;
+}
+
+bool AWorldPlayerController::GetIsValidWorldPlayerAudioController() const
+{
+	if (IsValid(M_WorldPlayerAudioController))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_WorldPlayerAudioController"),
+		TEXT("GetIsValidWorldPlayerAudioController"),
 		this
 	);
 	return false;
@@ -926,6 +1022,112 @@ void AWorldPlayerController::SetAsyncWorldGenerationWidgetProgress(const FText& 
 	}
 
 	M_AsyncWorldGenerationWidget->SetGenerationProgress(DescriptionText, PercentageValue);
+}
+
+void AWorldPlayerController::BeginCameraOvertakeControl(
+	const FCameraOvertakeSettings& CameraOvertakeSettings,
+	FWorldCameraOvertakeFinishedDelegate OnCameraOvertakeFinished)
+{
+	if (not bM_IsCameraOvertakeControlActive)
+	{
+		HideWorldUIForCameraOvertake();
+	}
+
+	bM_IsCameraOvertakeControlActive = true;
+	M_CameraOvertakeFinishedDelegate = OnCameraOvertakeFinished;
+	M_CameraOvertakeSoundPerSequentialPoint = CameraOvertakeSettings.SoundPerSequentialPoint;
+	SetIsWorldPlayerInputDisabled(true);
+}
+
+void AWorldPlayerController::OnCameraOvertakePointReached(
+	const int32 ReachedPointIndex,
+	const FVector& ReachedCameraLocation)
+{
+	(void)ReachedCameraLocation;
+	constexpr int32 FirstSequentialPointIndex = 1;
+	if (ReachedPointIndex < FirstSequentialPointIndex)
+	{
+		return;
+	}
+
+	PlayCameraOvertakeSound(M_CameraOvertakeSoundPerSequentialPoint);
+}
+
+void AWorldPlayerController::OnCameraOvertakeFinished(const FVector& LastCameraPosition)
+{
+	bM_IsCameraOvertakeControlActive = false;
+	M_CameraOvertakeSoundPerSequentialPoint = nullptr;
+	RestoreWorldUIAfterCameraOvertake();
+	SetIsWorldPlayerInputDisabled(false);
+
+	FWorldCameraOvertakeFinishedDelegate FinishedDelegate = M_CameraOvertakeFinishedDelegate;
+	M_CameraOvertakeFinishedDelegate.Clear();
+	FinishedDelegate.ExecuteIfBound(LastCameraPosition);
+}
+
+void AWorldPlayerController::HideWorldUIForCameraOvertake()
+{
+	if (not GetIsValidWorldProfileAndUIManager())
+	{
+		return;
+	}
+
+	UW_WorldMenu* WorldMenu = M_WorldProfileAndUIManager->GetWorldMenu();
+	if (not IsValid(WorldMenu))
+	{
+		return;
+	}
+
+	M_WorldMenuVisibilityBeforeCameraOvertake = WorldMenu->GetVisibility();
+	WorldMenu->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void AWorldPlayerController::RestoreWorldUIAfterCameraOvertake()
+{
+	if (not GetIsValidWorldProfileAndUIManager())
+	{
+		return;
+	}
+
+	UW_WorldMenu* WorldMenu = M_WorldProfileAndUIManager->GetWorldMenu();
+	if (not IsValid(WorldMenu))
+	{
+		return;
+	}
+
+	WorldMenu->SetVisibility(M_WorldMenuVisibilityBeforeCameraOvertake);
+}
+
+void AWorldPlayerController::SetIsWorldPlayerInputDisabled(const bool bIsDisabled)
+{
+	if (bM_IsWorldPlayerInputDisabled == bIsDisabled)
+	{
+		return;
+	}
+
+	bM_IsWorldPlayerInputDisabled = bIsDisabled;
+	SetIgnoreMoveInput(bIsDisabled);
+	SetIgnoreLookInput(bIsDisabled);
+	SetIsWorldCameraMovementDisabled(bIsDisabled);
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		FlushPressedKeys();
+	}
+}
+
+void AWorldPlayerController::PlayCameraOvertakeSound(USoundBase* Sound) const
+{
+	if (not IsValid(Sound))
+	{
+		return;
+	}
+
+	if (not GetIsValidWorldPlayerAudioController())
+	{
+		return;
+	}
+
+	M_WorldPlayerAudioController->PlayUISound(Sound);
 }
 
 bool AWorldPlayerController::GetIsValidAsyncWorldGenerationWidget() const

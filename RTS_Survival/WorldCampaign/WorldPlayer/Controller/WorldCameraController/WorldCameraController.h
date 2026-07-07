@@ -9,8 +9,34 @@
 #include "WorldCameraController.generated.h"
 
 class USpringArmComponent;
+class USoundBase;
 class AActor;
 class AWorldPlayerController;
+
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FCameraOvertakeSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Overtake", meta = (ClampMin = "0.0"))
+	float TimeGetToFirstPoint = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Overtake")
+	TArray<FVector> Points = {};
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Overtake", meta = (ClampMin = "0.0"))
+	float TotalTimeMovementSequentialPoints = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Overtake")
+	TObjectPtr<USoundBase> SoundStart = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera|Overtake")
+	TObjectPtr<USoundBase> SoundPerSequentialPoint = nullptr;
+};
+
+DECLARE_DYNAMIC_DELEGATE_OneParam(FWorldCameraOvertakeFinishedDelegate, FVector, LastCameraPosition);
+DECLARE_DELEGATE_TwoParams(FWorldCameraOvertakePointReachedNativeDelegate, int32, const FVector&);
+DECLARE_DELEGATE_OneParam(FWorldCameraOvertakeFinishedNativeDelegate, const FVector&);
 
 /**
  * @brief Component used by the world campaign controller to route Blueprint input
@@ -45,6 +71,21 @@ public:
 	 * @param MoveRequest The parameters that describe the move and temporary input lockout.
 	 */
 	void MoveCameraTo(const FMovePlayerCamera& MoveRequest);
+
+	/**
+	 * @brief Starts a designer-authored camera overtake path while preserving camera boundary handling.
+	 * @param CameraOvertakeSettings Points, timings, and optional audio assets for the overtake sequence.
+	 * @param PointReachedDelegate Native callback used by the player controller for per-point side effects.
+	 * @param FinishedDelegate Native callback fired with the final camera location when the sequence ends.
+	 * @return true when a sequence was accepted or completed immediately.
+	 */
+	bool StartCameraOvertake(
+		const FCameraOvertakeSettings& CameraOvertakeSettings,
+		const FWorldCameraOvertakePointReachedNativeDelegate& PointReachedDelegate,
+		const FWorldCameraOvertakeFinishedNativeDelegate& FinishedDelegate);
+
+	bool GetIsCameraOvertakeActive() const;
+	FVector GetCurrentCameraLocation() const;
 
 	/**
 	 * @brief Registers an additional cached boundary evaluated by every world-camera XY move.
@@ -83,10 +124,27 @@ private:
 		bool bM_IgnoreBoundaryConstraints = false;
 	};
 
+	struct FWorldCameraOvertakeState
+	{
+		TArray<FVector> M_Points = {};
+		TArray<float> M_SequentialSegmentDurations = {};
+		FWorldCameraOvertakePointReachedNativeDelegate M_PointReachedDelegate;
+		FWorldCameraOvertakeFinishedNativeDelegate M_FinishedDelegate;
+		FVector M_SegmentStartLocation = FVector::ZeroVector;
+		FVector M_SegmentTargetLocation = FVector::ZeroVector;
+		FVector M_LastReachedLocation = FVector::ZeroVector;
+		float M_TimeGetToFirstPoint = 0.0f;
+		float M_SegmentElapsedTime = 0.0f;
+		float M_SegmentTotalTime = 0.0f;
+		int32 M_TargetPointIndex = INDEX_NONE;
+		bool bM_IsActive = false;
+	};
+
 	void BeginPlay_InitCameraCarrier();
 	void BeginPlay_InitSpringArmComponent();
 	void UpdateCameraInputDisabled(const float DeltaTime);
 	void UpdateMoveToLocation(const float DeltaTime);
+	void UpdateCameraOvertake(const float DeltaTime);
 	void UpdateAxisMovement(const float DeltaTime);
 	void UpdateEdgeScroll(const float DeltaTime);
 	void UpdateBoundarySafety();
@@ -143,6 +201,14 @@ private:
 	void RebuildCachedAdditionalPlaneConstraints();
 	void TryMoveCameraByWorldDelta(const FVector& WorldDelta) const;
 	void TryMoveCameraToLocation(const FVector& TargetCameraLocation) const;
+	void PlayOptionalMoveSound(USoundBase* MoveSound) const;
+	bool GetCanStartCameraOvertake(const FCameraOvertakeSettings& CameraOvertakeSettings) const;
+	void CacheCameraOvertakeDurations(const FCameraOvertakeSettings& CameraOvertakeSettings);
+	float GetCameraOvertakeSequentialSegmentDuration(const int32 TargetPointIndex) const;
+	void StartCameraOvertakeSegment(const int32 TargetPointIndex);
+	void CompleteCameraOvertakeSegment();
+	void FinishCameraOvertake();
+	void CancelActiveCameraMove();
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_CameraCarrierActor;
@@ -176,6 +242,7 @@ private:
 
 	FWorldCameraAxisInputState M_AxisInputState;
 	FWorldCameraMoveState M_MoveState;
+	FWorldCameraOvertakeState M_CameraOvertakeState;
 
 	float M_CameraInputDisabledRemainingSeconds = 0.0f;
 	bool bM_IsCameraMovementDisabled = false;

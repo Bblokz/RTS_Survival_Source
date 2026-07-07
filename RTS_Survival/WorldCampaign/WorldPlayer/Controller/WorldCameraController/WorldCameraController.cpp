@@ -31,6 +31,7 @@ void UWorldCameraController::TickComponent(float DeltaTime, ELevelTick TickType,
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	UpdateCameraInputDisabled(DeltaTime);
+	UpdateCameraOvertake(DeltaTime);
 	UpdateMoveToLocation(DeltaTime);
 	UpdateAxisMovement(DeltaTime);
 	UpdateEdgeScroll(DeltaTime);
@@ -40,6 +41,10 @@ void UWorldCameraController::TickComponent(float DeltaTime, ELevelTick TickType,
 void UWorldCameraController::SetIsCameraMovementDisabled(const bool bIsDisabled)
 {
 	bM_IsCameraMovementDisabled = bIsDisabled;
+	if (bM_IsCameraMovementDisabled)
+	{
+		M_AxisInputState = {};
+	}
 }
 
 bool UWorldCameraController::GetIsCameraMovementDisabled() const
@@ -114,10 +119,12 @@ void UWorldCameraController::MoveCameraTo(const FMovePlayerCamera& MoveRequest)
 		return;
 	}
 
-	if (IsValid(MoveRequest.MoveSound))
+	if (M_CameraOvertakeState.bM_IsActive)
 	{
-		UGameplayStatics::PlaySound2D(this, MoveRequest.MoveSound);
+		return;
 	}
+
+	PlayOptionalMoveSound(MoveRequest.MoveSound);
 
 	M_CameraInputDisabledRemainingSeconds = FMath::Max(
 		M_CameraInputDisabledRemainingSeconds,
@@ -139,6 +146,47 @@ void UWorldCameraController::MoveCameraTo(const FMovePlayerCamera& MoveRequest)
 	M_MoveState.M_TotalTime = MoveRequest.TimeToMove;
 	M_MoveState.bM_IsMoveActive = true;
 	M_MoveState.bM_IgnoreBoundaryConstraints = false;
+}
+
+bool UWorldCameraController::StartCameraOvertake(
+	const FCameraOvertakeSettings& CameraOvertakeSettings,
+	const FWorldCameraOvertakePointReachedNativeDelegate& PointReachedDelegate,
+	const FWorldCameraOvertakeFinishedNativeDelegate& FinishedDelegate)
+{
+	if (not GetCanStartCameraOvertake(CameraOvertakeSettings))
+	{
+		return false;
+	}
+
+	CancelActiveCameraMove();
+	CacheCameraOvertakeDurations(CameraOvertakeSettings);
+	M_CameraOvertakeState.M_PointReachedDelegate = PointReachedDelegate;
+	M_CameraOvertakeState.M_FinishedDelegate = FinishedDelegate;
+	M_CameraOvertakeState.bM_IsActive = true;
+	M_CameraOvertakeState.M_LastReachedLocation = GetCurrentCameraLocation();
+	constexpr int32 FirstPointIndex = 0;
+	StartCameraOvertakeSegment(FirstPointIndex);
+	if (M_CameraOvertakeState.M_SegmentTotalTime <= 0.0f)
+	{
+		CompleteCameraOvertakeSegment();
+	}
+	return true;
+}
+
+bool UWorldCameraController::GetIsCameraOvertakeActive() const
+{
+	return M_CameraOvertakeState.bM_IsActive;
+}
+
+FVector UWorldCameraController::GetCurrentCameraLocation() const
+{
+	if (not GetIsValidCameraCarrierActor())
+	{
+		return FVector::ZeroVector;
+	}
+
+	const AActor* const CameraCarrier = M_CameraCarrierActor.Get();
+	return CameraCarrier->GetActorLocation();
 }
 
 
@@ -271,6 +319,11 @@ void UWorldCameraController::UpdateCameraInputDisabled(const float DeltaTime)
 
 void UWorldCameraController::UpdateMoveToLocation(const float DeltaTime)
 {
+	if (M_CameraOvertakeState.bM_IsActive)
+	{
+		return;
+	}
+
 	if (not M_MoveState.bM_IsMoveActive)
 	{
 		return;
@@ -317,6 +370,41 @@ void UWorldCameraController::UpdateMoveToLocation(const float DeltaTime)
 		M_MoveState.bM_IsMoveActive = false;
 		M_MoveState.bM_IgnoreBoundaryConstraints = false;
 		bM_IsSafetyMoveToPlayerHQActive = false;
+	}
+}
+
+void UWorldCameraController::UpdateCameraOvertake(const float DeltaTime)
+{
+	if (not M_CameraOvertakeState.bM_IsActive)
+	{
+		return;
+	}
+
+	if (not GetIsValidCameraCarrierActor())
+	{
+		FinishCameraOvertake();
+		return;
+	}
+
+	if (M_CameraOvertakeState.M_SegmentTotalTime <= 0.0f)
+	{
+		CompleteCameraOvertakeSegment();
+		return;
+	}
+
+	M_CameraOvertakeState.M_SegmentElapsedTime += DeltaTime;
+	const float Alpha = FMath::Clamp(
+		M_CameraOvertakeState.M_SegmentElapsedTime / M_CameraOvertakeState.M_SegmentTotalTime,
+		0.0f,
+		1.0f);
+	const FVector NewLocation = FMath::Lerp(
+		M_CameraOvertakeState.M_SegmentStartLocation,
+		M_CameraOvertakeState.M_SegmentTargetLocation,
+		Alpha);
+	TryMoveCameraToLocation(NewLocation);
+	if (Alpha >= 1.0f)
+	{
+		CompleteCameraOvertakeSegment();
 	}
 }
 
@@ -477,7 +565,7 @@ void UWorldCameraController::UpdateEdgeScroll(const float DeltaTime)
 
 void UWorldCameraController::UpdateBoundarySafety()
 {
-	if (bM_IsSafetyMoveToPlayerHQActive || not GetIsCameraOutsideBoundaries())
+	if (M_CameraOvertakeState.bM_IsActive || bM_IsSafetyMoveToPlayerHQActive || not GetIsCameraOutsideBoundaries())
 	{
 		return;
 	}
@@ -862,4 +950,150 @@ void UWorldCameraController::TryMoveCameraToLocation(const FVector& TargetCamera
 	ConstrainedTargetLocation.X = ConstrainedBoundaryLocation.X;
 	ConstrainedTargetLocation.Y = ConstrainedBoundaryLocation.Y;
 	CameraCarrier->SetActorLocation(ConstrainedTargetLocation, true);
+}
+
+void UWorldCameraController::PlayOptionalMoveSound(USoundBase* MoveSound) const
+{
+	if (not IsValid(MoveSound))
+	{
+		return;
+	}
+
+	UGameplayStatics::PlaySound2D(this, MoveSound);
+}
+
+bool UWorldCameraController::GetCanStartCameraOvertake(
+	const FCameraOvertakeSettings& CameraOvertakeSettings) const
+{
+	if (CameraOvertakeSettings.Points.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Camera overtake needs at least one point.")
+			TEXT("\n See function: UWorldCameraController::StartCameraOvertake()"));
+		return false;
+	}
+
+	return GetIsValidCameraCarrierActor();
+}
+
+void UWorldCameraController::CacheCameraOvertakeDurations(
+	const FCameraOvertakeSettings& CameraOvertakeSettings)
+{
+	M_CameraOvertakeState = {};
+	M_CameraOvertakeState.M_Points = CameraOvertakeSettings.Points;
+	M_CameraOvertakeState.M_TimeGetToFirstPoint = FMath::Max(CameraOvertakeSettings.TimeGetToFirstPoint, 0.0f);
+	M_CameraOvertakeState.M_SequentialSegmentDurations.Reset();
+	constexpr int32 FirstSequentialPointIndex = 1;
+	const int32 SequentialSegmentCount = FMath::Max(
+		CameraOvertakeSettings.Points.Num() - FirstSequentialPointIndex,
+		0);
+	M_CameraOvertakeState.M_SequentialSegmentDurations.SetNum(SequentialSegmentCount);
+	if (SequentialSegmentCount <= 0)
+	{
+		return;
+	}
+
+	float TotalSequentialDistance = 0.0f;
+	constexpr int32 PreviousPointOffset = 1;
+	for (int32 PointIndex = FirstSequentialPointIndex; PointIndex < CameraOvertakeSettings.Points.Num(); ++PointIndex)
+	{
+		TotalSequentialDistance += FVector::Distance(
+			CameraOvertakeSettings.Points[PointIndex - PreviousPointOffset],
+			CameraOvertakeSettings.Points[PointIndex]);
+	}
+
+	if (TotalSequentialDistance <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const float TotalSequentialMovementTime = FMath::Max(
+		CameraOvertakeSettings.TotalTimeMovementSequentialPoints,
+		0.0f);
+	for (int32 PointIndex = FirstSequentialPointIndex; PointIndex < CameraOvertakeSettings.Points.Num(); ++PointIndex)
+	{
+		const float SegmentDistance = FVector::Distance(
+			CameraOvertakeSettings.Points[PointIndex - PreviousPointOffset],
+			CameraOvertakeSettings.Points[PointIndex]);
+		const int32 SegmentDurationIndex = PointIndex - FirstSequentialPointIndex;
+		M_CameraOvertakeState.M_SequentialSegmentDurations[SegmentDurationIndex] =
+			TotalSequentialMovementTime * SegmentDistance / TotalSequentialDistance;
+	}
+}
+
+float UWorldCameraController::GetCameraOvertakeSequentialSegmentDuration(const int32 TargetPointIndex) const
+{
+	constexpr int32 FirstSequentialPointIndex = 1;
+	const int32 SegmentDurationIndex = TargetPointIndex - FirstSequentialPointIndex;
+	if (not M_CameraOvertakeState.M_SequentialSegmentDurations.IsValidIndex(SegmentDurationIndex))
+	{
+		return 0.0f;
+	}
+
+	return M_CameraOvertakeState.M_SequentialSegmentDurations[SegmentDurationIndex];
+}
+
+void UWorldCameraController::StartCameraOvertakeSegment(const int32 TargetPointIndex)
+{
+	if (not M_CameraOvertakeState.M_Points.IsValidIndex(TargetPointIndex))
+	{
+		FinishCameraOvertake();
+		return;
+	}
+
+	M_CameraOvertakeState.M_TargetPointIndex = TargetPointIndex;
+	M_CameraOvertakeState.M_SegmentStartLocation = GetCurrentCameraLocation();
+	M_CameraOvertakeState.M_SegmentTargetLocation = M_CameraOvertakeState.M_Points[TargetPointIndex];
+	M_CameraOvertakeState.M_SegmentElapsedTime = 0.0f;
+	constexpr int32 FirstPointIndex = 0;
+	M_CameraOvertakeState.M_SegmentTotalTime = TargetPointIndex == FirstPointIndex
+		? M_CameraOvertakeState.M_TimeGetToFirstPoint
+		: GetCameraOvertakeSequentialSegmentDuration(TargetPointIndex);
+}
+
+void UWorldCameraController::CompleteCameraOvertakeSegment()
+{
+	while (M_CameraOvertakeState.bM_IsActive)
+	{
+		TryMoveCameraToLocation(M_CameraOvertakeState.M_SegmentTargetLocation);
+		M_CameraOvertakeState.M_LastReachedLocation = GetCurrentCameraLocation();
+		const int32 ReachedPointIndex = M_CameraOvertakeState.M_TargetPointIndex;
+		M_CameraOvertakeState.M_PointReachedDelegate.ExecuteIfBound(
+			ReachedPointIndex,
+			M_CameraOvertakeState.M_LastReachedLocation);
+
+		constexpr int32 NextPointOffset = 1;
+		const int32 NextPointIndex = ReachedPointIndex + NextPointOffset;
+		if (not M_CameraOvertakeState.M_Points.IsValidIndex(NextPointIndex))
+		{
+			FinishCameraOvertake();
+			return;
+		}
+
+		StartCameraOvertakeSegment(NextPointIndex);
+		if (M_CameraOvertakeState.M_SegmentTotalTime > 0.0f)
+		{
+			return;
+		}
+	}
+}
+
+void UWorldCameraController::FinishCameraOvertake()
+{
+	if (not M_CameraOvertakeState.bM_IsActive)
+	{
+		return;
+	}
+
+	const FVector LastReachedLocation = M_CameraOvertakeState.M_LastReachedLocation;
+	FWorldCameraOvertakeFinishedNativeDelegate FinishedDelegate =
+		M_CameraOvertakeState.M_FinishedDelegate;
+	M_CameraOvertakeState = {};
+	FinishedDelegate.ExecuteIfBound(LastReachedLocation);
+}
+
+void UWorldCameraController::CancelActiveCameraMove()
+{
+	M_MoveState = {};
+	bM_IsSafetyMoveToPlayerHQActive = false;
 }
