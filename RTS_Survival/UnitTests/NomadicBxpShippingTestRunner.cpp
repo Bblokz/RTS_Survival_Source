@@ -20,6 +20,7 @@
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
 #include "RTS_Survival/FactionSystem/Factions/Factions.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/Interfaces/Commands.h"
@@ -27,7 +28,11 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Stats/Stats.h"
 #include "Tickable.h"
 
@@ -116,6 +121,645 @@ namespace RTS::UnitTests::NomadicBxpShipping
 	}
 }
 
+namespace RTS::UnitTests::ShippingUnitAbilityStress
+{
+	constexpr float CommandPauseSeconds = 0.75f;
+	constexpr uint8 PlayerIndex = 1;
+	constexpr uint8 EnemyIndex = 2;
+
+	enum class EUnitAbilityStressSource : uint8
+	{
+		PlayerTank,
+		EnemyVehicle,
+		PlayerSquad,
+		EnemySquad,
+		PlayerAircraft,
+		EnemyAircraft,
+	};
+
+	struct FUnitAbilityStressScenario
+	{
+		TWeakObjectPtr<AActor> UnitActor;
+		TWeakObjectPtr<AActor> OpposingTargetActor;
+		TWeakObjectPtr<AActor> AlliedTargetActor;
+		FUnitAbilityEntry AbilityEntry;
+		FString Name;
+		EUnitAbilityStressSource Source = EUnitAbilityStressSource::PlayerTank;
+		bool bAttempted = false;
+	};
+
+	class FUnitAbilityStressHelper
+	{
+	public:
+		bool Start(UWorld& InWorld, int32 MaxScenarios);
+		bool Tick(float DeltaTime);
+
+		int32 GetCompletedScenarioCount() const { return M_CompletedScenarioCount; }
+		int32 GetFailedScenarioCount() const { return M_FailedScenarioCount; }
+		int32 GetScenarioCount() const { return M_Scenarios.Num(); }
+		int32 GetAttemptedScenarioCount() const { return M_AttemptedScenarioCount; }
+		int32 GetSkippedScenarioCount() const { return M_SkippedScenarioCount; }
+
+	private:
+		void GatherScenarios(UGameUnitManager& GameUnitManager, int32 MaxScenarios);
+		void GatherTankScenarios(
+			const TArray<ATankMaster*>& Tanks,
+			EUnitAbilityStressSource Source,
+			bool bIsPlayerOwned);
+		void GatherAircraftScenarios(
+			const TArray<AAircraftMaster*>& Aircraft,
+			EUnitAbilityStressSource Source,
+			bool bIsPlayerOwned);
+		void GatherAircraftScenariosFromWorld(UWorld& World);
+		void GatherSquadScenarios(
+			const TArray<ASquadUnit*>& SquadUnits,
+			EUnitAbilityStressSource Source,
+			bool bIsPlayerOwned);
+		void AddCommandScenariosForActor(
+			AActor& UnitActor,
+			EUnitAbilityStressSource Source,
+			bool bIsPlayerOwned,
+			int32 MaxScenarios);
+		void AddTargetActor(AActor& TargetActor, bool bIsPlayerOwned);
+		void StartNextScenario();
+		void FinishCurrentScenario();
+		void SkipCurrentScenario(const FString& Reason);
+		bool TryExecuteCurrentScenario(FString& OutSkipReason);
+
+		ECommandQueueError ExecuteAbility(
+			ICommands& Commands,
+			const FUnitAbilityStressScenario& Scenario,
+			bool& bOutWasDispatched,
+			FString& OutSkipReason) const;
+
+		AActor* GetFirstValidTarget(bool bUsePlayerTargets) const;
+		FVector GetScenarioTargetLocation(const FUnitAbilityStressScenario& Scenario) const;
+		FVector GetScenarioOffsetLocation(const FUnitAbilityStressScenario& Scenario) const;
+		FRotator GetScenarioRotation(const FUnitAbilityStressScenario& Scenario) const;
+		bool GetIsPlayerOwnedSource(EUnitAbilityStressSource Source) const;
+		bool GetHasCommandScenariosForActor(const AActor& UnitActor) const;
+		FString GetSourceString(EUnitAbilityStressSource Source) const;
+
+		TWeakObjectPtr<UWorld> M_World;
+		TArray<FUnitAbilityStressScenario> M_Scenarios;
+		TArray<TWeakObjectPtr<AActor>> M_PlayerTargetActors;
+		TArray<TWeakObjectPtr<AActor>> M_EnemyTargetActors;
+		int32 M_CurrentScenarioIndex = INDEX_NONE;
+		int32 M_CompletedScenarioCount = 0;
+		int32 M_AttemptedScenarioCount = 0;
+		int32 M_SkippedScenarioCount = 0;
+		int32 M_FailedScenarioCount = 0;
+		float M_CommandPauseSeconds = 0.0f;
+		bool bM_IsRunning = false;
+		bool bM_IsComplete = false;
+	};
+
+	bool GetShouldIncludeAbilityEntry(const FUnitAbilityEntry& AbilityEntry)
+	{
+		switch (AbilityEntry.AbilityId)
+		{
+		case EAbilityID::IdNoAbility:
+		case EAbilityID::IdNoAbility_MoveCloserToTarget:
+		case EAbilityID::IdNoAbility_MoveToEvasionLocation:
+		case EAbilityID::IdIdle:
+			return false;
+		default:
+			return true;
+		}
+	}
+
+	bool FUnitAbilityStressHelper::Start(UWorld& InWorld, const int32 MaxScenarios)
+	{
+		M_World = &InWorld;
+		M_CurrentScenarioIndex = INDEX_NONE;
+		M_CompletedScenarioCount = 0;
+		M_AttemptedScenarioCount = 0;
+		M_SkippedScenarioCount = 0;
+		M_FailedScenarioCount = 0;
+		M_CommandPauseSeconds = 0.0f;
+		M_Scenarios.Empty();
+		M_PlayerTargetActors.Empty();
+		M_EnemyTargetActors.Empty();
+		bM_IsRunning = true;
+		bM_IsComplete = false;
+
+		UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(&InWorld);
+		if (not IsValid(GameUnitManager))
+		{
+			M_FailedScenarioCount++;
+			bM_IsComplete = true;
+			bM_IsRunning = false;
+			UE_LOG(LogRTSNomadicBxpShippingTests, Error,
+			       TEXT("RTS_UNIT_ABILITY_STRESS_RESULT FAIL reason=GameUnitManagerInvalid"));
+			return false;
+		}
+
+		GatherScenarios(*GameUnitManager, MaxScenarios);
+		UE_LOG(LogRTSNomadicBxpShippingTests, Display,
+		       TEXT("RTS_UNIT_ABILITY_STRESS_BEGIN gathered=%d max_scenarios=%d"),
+		       M_Scenarios.Num(),
+		       MaxScenarios);
+
+		StartNextScenario();
+		return true;
+	}
+
+	bool FUnitAbilityStressHelper::Tick(const float DeltaTime)
+	{
+		if (bM_IsComplete)
+		{
+			return true;
+		}
+
+		if (not bM_IsRunning)
+		{
+			return false;
+		}
+
+		if (M_CommandPauseSeconds > 0.0f)
+		{
+			M_CommandPauseSeconds -= DeltaTime;
+			return false;
+		}
+
+		if (not M_Scenarios.IsValidIndex(M_CurrentScenarioIndex))
+		{
+			bM_IsComplete = true;
+			bM_IsRunning = false;
+			UE_LOG(LogRTSNomadicBxpShippingTests, Display,
+			       TEXT("RTS_UNIT_ABILITY_STRESS_RESULT PASS completed=%d attempted=%d skipped=%d failed=%d total=%d"),
+			       M_CompletedScenarioCount,
+			       M_AttemptedScenarioCount,
+			       M_SkippedScenarioCount,
+			       M_FailedScenarioCount,
+			       M_Scenarios.Num());
+			return true;
+		}
+
+		FUnitAbilityStressScenario& Scenario = M_Scenarios[M_CurrentScenarioIndex];
+		if (Scenario.bAttempted)
+		{
+			FinishCurrentScenario();
+			return false;
+		}
+
+		FString SkipReason;
+		if (TryExecuteCurrentScenario(SkipReason))
+		{
+			Scenario.bAttempted = true;
+			M_CommandPauseSeconds = CommandPauseSeconds;
+			return false;
+		}
+
+		SkipCurrentScenario(SkipReason);
+		return false;
+	}
+
+	void FUnitAbilityStressHelper::GatherScenarios(UGameUnitManager& GameUnitManager, const int32 MaxScenarios)
+	{
+		GatherTankScenarios(GameUnitManager.GetPlayerTanks(PlayerIndex), EUnitAbilityStressSource::PlayerTank, true);
+		GatherTankScenarios(GameUnitManager.GetPlayerTanks(EnemyIndex), EUnitAbilityStressSource::EnemyVehicle, false);
+		GatherSquadScenarios(GameUnitManager.GetSquadUnitsOfPlayer(PlayerIndex), EUnitAbilityStressSource::PlayerSquad, true);
+		GatherSquadScenarios(GameUnitManager.GetSquadUnitsOfPlayer(EnemyIndex), EUnitAbilityStressSource::EnemySquad, false);
+		GatherAircraftScenarios(
+			GameUnitManager.ShippingTest_GetAircraftOfPlayer(PlayerIndex),
+			EUnitAbilityStressSource::PlayerAircraft,
+			true);
+		GatherAircraftScenarios(
+			GameUnitManager.ShippingTest_GetAircraftOfPlayer(EnemyIndex),
+			EUnitAbilityStressSource::EnemyAircraft,
+			false);
+		if (UWorld* World = M_World.Get())
+		{
+			GatherAircraftScenariosFromWorld(*World);
+		}
+
+		if (MaxScenarios > 0 && M_Scenarios.Num() > MaxScenarios)
+		{
+			M_Scenarios.SetNum(MaxScenarios);
+		}
+	}
+
+	void FUnitAbilityStressHelper::GatherTankScenarios(
+		const TArray<ATankMaster*>& Tanks,
+		const EUnitAbilityStressSource Source,
+		const bool bIsPlayerOwned)
+	{
+		for (ATankMaster* Tank : Tanks)
+		{
+			if (not IsValid(Tank))
+			{
+				continue;
+			}
+
+			AddTargetActor(*Tank, bIsPlayerOwned);
+			AddCommandScenariosForActor(*Tank, Source, bIsPlayerOwned, 0);
+		}
+	}
+
+	void FUnitAbilityStressHelper::GatherAircraftScenarios(
+		const TArray<AAircraftMaster*>& Aircraft,
+		const EUnitAbilityStressSource Source,
+		const bool bIsPlayerOwned)
+	{
+		for (AAircraftMaster* AircraftUnit : Aircraft)
+		{
+			if (not IsValid(AircraftUnit))
+			{
+				continue;
+			}
+
+			AddTargetActor(*AircraftUnit, bIsPlayerOwned);
+			AddCommandScenariosForActor(*AircraftUnit, Source, bIsPlayerOwned, 0);
+		}
+	}
+
+	void FUnitAbilityStressHelper::GatherAircraftScenariosFromWorld(UWorld& World)
+	{
+		int32 PlayerAircraftFallbackCount = 0;
+		int32 EnemyAircraftFallbackCount = 0;
+		for (TActorIterator<AAircraftMaster> AircraftIterator(&World); AircraftIterator; ++AircraftIterator)
+		{
+			AAircraftMaster* AircraftUnit = *AircraftIterator;
+			if (not IsValid(AircraftUnit) || GetHasCommandScenariosForActor(*AircraftUnit))
+			{
+				continue;
+			}
+
+			URTSComponent* RTSComponent = AircraftUnit->GetRTSComponent();
+			if (not IsValid(RTSComponent))
+			{
+				continue;
+			}
+
+			if (RTSComponent->GetOwningPlayer() == PlayerIndex)
+			{
+				PlayerAircraftFallbackCount++;
+				AddTargetActor(*AircraftUnit, true);
+				AddCommandScenariosForActor(*AircraftUnit, EUnitAbilityStressSource::PlayerAircraft, true, 0);
+				continue;
+			}
+
+			if (RTSComponent->GetOwningPlayer() == EnemyIndex)
+			{
+				EnemyAircraftFallbackCount++;
+				AddTargetActor(*AircraftUnit, false);
+				AddCommandScenariosForActor(*AircraftUnit, EUnitAbilityStressSource::EnemyAircraft, false, 0);
+			}
+		}
+
+		if (PlayerAircraftFallbackCount > 0 || EnemyAircraftFallbackCount > 0)
+		{
+			UE_LOG(LogRTSNomadicBxpShippingTests, Display,
+			       TEXT("RTS_UNIT_ABILITY_STRESS_AIRCRAFT_WORLD_FALLBACK player=%d enemy=%d"),
+			       PlayerAircraftFallbackCount,
+			       EnemyAircraftFallbackCount);
+		}
+	}
+
+	void FUnitAbilityStressHelper::GatherSquadScenarios(
+		const TArray<ASquadUnit*>& SquadUnits,
+		const EUnitAbilityStressSource Source,
+		const bool bIsPlayerOwned)
+	{
+		TSet<ASquadController*> SquadControllers;
+		for (ASquadUnit* SquadUnit : SquadUnits)
+		{
+			if (not IsValid(SquadUnit))
+			{
+				continue;
+			}
+
+			AddTargetActor(*SquadUnit, bIsPlayerOwned);
+			ASquadController* SquadController = SquadUnit->GetSquadControllerChecked();
+			if (not IsValid(SquadController))
+			{
+				continue;
+			}
+
+			SquadControllers.Add(SquadController);
+		}
+
+		for (ASquadController* SquadController : SquadControllers)
+		{
+			if (IsValid(SquadController))
+			{
+				AddCommandScenariosForActor(*SquadController, Source, bIsPlayerOwned, 0);
+			}
+		}
+	}
+
+	void FUnitAbilityStressHelper::AddCommandScenariosForActor(
+		AActor& UnitActor,
+		const EUnitAbilityStressSource Source,
+		const bool bIsPlayerOwned,
+		const int32 MaxScenarios)
+	{
+		ICommands* Commands = Cast<ICommands>(&UnitActor);
+		if (Commands == nullptr)
+		{
+			return;
+		}
+
+		TArray<FUnitAbilityEntry> AbilityEntries = Commands->GetUnitAbilityEntries();
+		for (const FUnitAbilityEntry& AbilityEntry : AbilityEntries)
+		{
+			if (MaxScenarios > 0 && M_Scenarios.Num() >= MaxScenarios)
+			{
+				return;
+			}
+
+			if (not GetShouldIncludeAbilityEntry(AbilityEntry))
+			{
+				continue;
+			}
+
+			FUnitAbilityStressScenario Scenario;
+			Scenario.UnitActor = &UnitActor;
+			Scenario.OpposingTargetActor = GetFirstValidTarget(not bIsPlayerOwned);
+			Scenario.AlliedTargetActor = GetFirstValidTarget(bIsPlayerOwned);
+			Scenario.AbilityEntry = AbilityEntry;
+			Scenario.Source = Source;
+			Scenario.Name = FString::Printf(
+				TEXT("%s.%s.%s.%d"),
+				*GetSourceString(Source),
+				*UnitActor.GetName(),
+				*Global_GetAbilityIDAsString(AbilityEntry.AbilityId),
+				AbilityEntry.CustomType);
+			M_Scenarios.Add(Scenario);
+		}
+	}
+
+	void FUnitAbilityStressHelper::AddTargetActor(AActor& TargetActor, const bool bIsPlayerOwned)
+	{
+		TArray<TWeakObjectPtr<AActor>>& Targets = bIsPlayerOwned ? M_PlayerTargetActors : M_EnemyTargetActors;
+		Targets.AddUnique(&TargetActor);
+	}
+
+	void FUnitAbilityStressHelper::StartNextScenario()
+	{
+		M_CurrentScenarioIndex++;
+		if (not M_Scenarios.IsValidIndex(M_CurrentScenarioIndex))
+		{
+			return;
+		}
+
+		UE_LOG(LogRTSNomadicBxpShippingTests, Display,
+		       TEXT("RTS_UNIT_ABILITY_STRESS_BEGIN_SCENARIO index=%d name=%s"),
+		       M_CurrentScenarioIndex,
+		       *M_Scenarios[M_CurrentScenarioIndex].Name);
+	}
+
+	void FUnitAbilityStressHelper::FinishCurrentScenario()
+	{
+		FUnitAbilityStressScenario& Scenario = M_Scenarios[M_CurrentScenarioIndex];
+		if (AActor* UnitActor = Scenario.UnitActor.Get())
+		{
+			if (ICommands* Commands = Cast<ICommands>(UnitActor))
+			{
+				Commands->SetUnitToIdle();
+			}
+		}
+
+		M_CompletedScenarioCount++;
+		UE_LOG(LogRTSNomadicBxpShippingTests, Display,
+		       TEXT("RTS_UNIT_ABILITY_STRESS_PASS index=%d name=%s"),
+		       M_CurrentScenarioIndex,
+		       *Scenario.Name);
+		StartNextScenario();
+	}
+
+	void FUnitAbilityStressHelper::SkipCurrentScenario(const FString& Reason)
+	{
+		const FUnitAbilityStressScenario& Scenario = M_Scenarios[M_CurrentScenarioIndex];
+		M_CompletedScenarioCount++;
+		M_SkippedScenarioCount++;
+		UE_LOG(LogRTSNomadicBxpShippingTests, Warning,
+		       TEXT("RTS_UNIT_ABILITY_STRESS_SKIP index=%d name=%s reason=%s"),
+		       M_CurrentScenarioIndex,
+		       *Scenario.Name,
+		       *Reason);
+		StartNextScenario();
+	}
+
+	bool FUnitAbilityStressHelper::TryExecuteCurrentScenario(FString& OutSkipReason)
+	{
+		FUnitAbilityStressScenario& Scenario = M_Scenarios[M_CurrentScenarioIndex];
+		AActor* UnitActor = Scenario.UnitActor.Get();
+		if (not IsValid(UnitActor))
+		{
+			OutSkipReason = TEXT("Unit actor destroyed before ability stress attempt.");
+			return false;
+		}
+
+		ICommands* Commands = Cast<ICommands>(UnitActor);
+		if (Commands == nullptr)
+		{
+			OutSkipReason = TEXT("Unit no longer implements ICommands.");
+			return false;
+		}
+
+		const bool bIsPlayerOwnedSource = GetIsPlayerOwnedSource(Scenario.Source);
+		Scenario.OpposingTargetActor = GetFirstValidTarget(not bIsPlayerOwnedSource);
+		Scenario.AlliedTargetActor = GetFirstValidTarget(bIsPlayerOwnedSource);
+
+		bool bWasDispatched = false;
+		const ECommandQueueError CommandError = ExecuteAbility(*Commands, Scenario, bWasDispatched, OutSkipReason);
+		if (not bWasDispatched)
+		{
+			return false;
+		}
+
+		M_AttemptedScenarioCount++;
+		UE_LOG(LogRTSNomadicBxpShippingTests, Display,
+		       TEXT("RTS_UNIT_ABILITY_STRESS_ATTEMPT index=%d name=%s result=%d"),
+		       M_CurrentScenarioIndex,
+		       *Scenario.Name,
+		       static_cast<int32>(CommandError));
+		return true;
+	}
+
+	ECommandQueueError FUnitAbilityStressHelper::ExecuteAbility(
+		ICommands& Commands,
+		const FUnitAbilityStressScenario& Scenario,
+		bool& bOutWasDispatched,
+		FString& OutSkipReason) const
+	{
+		bOutWasDispatched = true;
+		const FVector TargetLocation = GetScenarioTargetLocation(Scenario);
+		const FVector OffsetLocation = GetScenarioOffsetLocation(Scenario);
+		const FRotator TargetRotation = GetScenarioRotation(Scenario);
+		AActor* const OpposingTarget = Scenario.OpposingTargetActor.Get();
+		AActor* const AlliedTarget = Scenario.AlliedTargetActor.Get();
+
+		switch (Scenario.AbilityEntry.AbilityId)
+		{
+		case EAbilityID::IdAttack: return Commands.AttackActor(OpposingTarget, true);
+		case EAbilityID::IdAttackGround: return Commands.AttackGround(TargetLocation, true);
+		case EAbilityID::IdMove: return Commands.MoveToLocation(OffsetLocation, true, TargetRotation);
+		case EAbilityID::IdPatrol: return Commands.PatrolToLocation(OffsetLocation, true);
+		case EAbilityID::IdStop: return Commands.StopCommand();
+		case EAbilityID::IdSwitchWeapon: return Commands.SwitchWeapons(true);
+		case EAbilityID::IdReverseMove: return Commands.ReverseUnitToLocation(OffsetLocation, true);
+		case EAbilityID::IdRotateTowards: return Commands.RotateTowards(TargetRotation, true);
+		case EAbilityID::IdCreateBuilding: return Commands.CreateBuildingAtLocation(OffsetLocation, TargetRotation, true);
+		case EAbilityID::IdConvertToVehicle: return Commands.ConvertToVehicle(true);
+		case EAbilityID::IdHarvestResource: return Commands.HarvestResource(OpposingTarget, true);
+		case EAbilityID::IdReturnCargo: return Commands.ReturnCargo(true);
+		case EAbilityID::IdPickupItem: return Commands.PickupItem(nullptr, true);
+		case EAbilityID::IdScavenge: return Commands.ScavengeObject(OpposingTarget, true);
+		case EAbilityID::IdDigIn: return Commands.DigIn(true);
+		case EAbilityID::IdBreakCover: return Commands.BreakCover(true);
+		case EAbilityID::IdFireRockets: return Commands.FireRockets(true);
+		case EAbilityID::IdCancelRocketFire: return Commands.CancelFireRockets(true);
+		case EAbilityID::IdThrowGrenade:
+			return Commands.ThrowGrenade(TargetLocation, true, static_cast<EGrenadeAbilityType>(Scenario.AbilityEntry.CustomType));
+		case EAbilityID::IdCancelThrowGrenade:
+			return Commands.CancelThrowingGrenade(true, static_cast<EGrenadeAbilityType>(Scenario.AbilityEntry.CustomType));
+		case EAbilityID::IdRepair: return Commands.RepairActor(AlliedTarget, true);
+		case EAbilityID::IdReturnToBase: return Commands.ReturnToBase(true);
+		case EAbilityID::IdRetreat: return Commands.RetreatToLocation(OffsetLocation, true);
+		case EAbilityID::IdEnterCargo: return Commands.EnterCargo(AlliedTarget, true);
+		case EAbilityID::IdExitCargo: return Commands.ExitCargo(true);
+		case EAbilityID::IdEnableResourceConversion:
+			Commands.NoQueue_SetResourceConversionEnabled(true);
+			return ECommandQueueError::NoError;
+		case EAbilityID::IdDisableResourceConversion:
+			Commands.NoQueue_SetResourceConversionEnabled(false);
+			return ECommandQueueError::NoError;
+		case EAbilityID::IdCapture: return Commands.CaptureActor(OpposingTarget, true);
+		case EAbilityID::IdReinforceSquad: return Commands.Reinforce(true);
+		case EAbilityID::IdApplyBehaviour:
+			return Commands.ActivateBehaviourAbility(static_cast<EBehaviourAbilityType>(Scenario.AbilityEntry.CustomType), true);
+		case EAbilityID::IdActivateMode:
+			return Commands.ActivateModeAbility(static_cast<EModeAbilityType>(Scenario.AbilityEntry.CustomType), true);
+		case EAbilityID::IdDisableMode:
+			return Commands.DisableModeAbility(static_cast<EModeAbilityType>(Scenario.AbilityEntry.CustomType), true);
+		case EAbilityID::IdFieldConstruction:
+			return Commands.FieldConstruction(
+				static_cast<EFieldConstructionType>(Scenario.AbilityEntry.CustomType),
+				true,
+				OffsetLocation,
+				TargetRotation,
+				nullptr);
+		case EAbilityID::IdAttachedWeapon:
+			return Commands.FireAttachedWeaponAbility(
+				TargetLocation,
+				true,
+				static_cast<EAttachWeaponAbilitySubType>(Scenario.AbilityEntry.CustomType));
+		case EAbilityID::IdAimAbility:
+			return Commands.AimAbility(TargetLocation, true, static_cast<EAimAbilityType>(Scenario.AbilityEntry.CustomType));
+		case EAbilityID::IdCancelAimAbility:
+			return Commands.CancelAimAbility(true, static_cast<EAimAbilityType>(Scenario.AbilityEntry.CustomType));
+		case EAbilityID::IdSwapTurret:
+			return Commands.SwapTurret(true, static_cast<ETurretSwapAbility>(Scenario.AbilityEntry.CustomType));
+		case EAbilityID::IdManAbandonedTeamWeapon:
+			return Commands.ManAbandonedTeamWeapon(OpposingTarget, true);
+		case EAbilityID::IdTowActor:
+			return Commands.TowActor(
+				OpposingTarget,
+				static_cast<ETowedActorTarget>(Scenario.AbilityEntry.CustomType),
+				true);
+		case EAbilityID::IdDetachTow: return Commands.DetachTow(true);
+		case EAbilityID::IdRegisterUnitAsBlackboardIdle: return Commands.RegisterAsBlackboardIdle(true);
+		case EAbilityID::IdResearchTechnology:
+			return Commands.ResearchTechnology(
+				static_cast<ETechnology>(Scenario.AbilityEntry.CustomType),
+				TArray<ETechnology>(),
+				true);
+		default:
+			bOutWasDispatched = false;
+			OutSkipReason = TEXT("No direct ICommands stress dispatch for ability.");
+			return ECommandQueueError::AbilityNotAllowed;
+		}
+	}
+
+	AActor* FUnitAbilityStressHelper::GetFirstValidTarget(const bool bUsePlayerTargets) const
+	{
+		const TArray<TWeakObjectPtr<AActor>>& Targets = bUsePlayerTargets ? M_PlayerTargetActors : M_EnemyTargetActors;
+		for (const TWeakObjectPtr<AActor>& Target : Targets)
+		{
+			if (AActor* TargetActor = Target.Get())
+			{
+				return TargetActor;
+			}
+		}
+
+		return nullptr;
+	}
+
+	FVector FUnitAbilityStressHelper::GetScenarioTargetLocation(const FUnitAbilityStressScenario& Scenario) const
+	{
+		if (const AActor* TargetActor = Scenario.OpposingTargetActor.Get())
+		{
+			return TargetActor->GetActorLocation();
+		}
+
+		return GetScenarioOffsetLocation(Scenario);
+	}
+
+	FVector FUnitAbilityStressHelper::GetScenarioOffsetLocation(const FUnitAbilityStressScenario& Scenario) const
+	{
+		const AActor* UnitActor = Scenario.UnitActor.Get();
+		const FVector Origin = IsValid(UnitActor) ? UnitActor->GetActorLocation() : FVector::ZeroVector;
+		const int32 AngleSeed = (M_CurrentScenarioIndex * 37) % 360;
+		const float AngleRadians = FMath::DegreesToRadians(static_cast<float>(AngleSeed));
+		return Origin + FVector(FMath::Cos(AngleRadians) * 700.0f, FMath::Sin(AngleRadians) * 700.0f, 0.0f);
+	}
+
+	FRotator FUnitAbilityStressHelper::GetScenarioRotation(const FUnitAbilityStressScenario& Scenario) const
+	{
+		const FVector FromLocation = Scenario.UnitActor.IsValid()
+			                             ? Scenario.UnitActor->GetActorLocation()
+			                             : FVector::ZeroVector;
+		const FVector ToLocation = GetScenarioTargetLocation(Scenario);
+		return (ToLocation - FromLocation).Rotation();
+	}
+
+	bool FUnitAbilityStressHelper::GetIsPlayerOwnedSource(const EUnitAbilityStressSource Source) const
+	{
+		return Source == EUnitAbilityStressSource::PlayerTank ||
+			Source == EUnitAbilityStressSource::PlayerSquad ||
+			Source == EUnitAbilityStressSource::PlayerAircraft;
+	}
+
+	bool FUnitAbilityStressHelper::GetHasCommandScenariosForActor(const AActor& UnitActor) const
+	{
+		for (const FUnitAbilityStressScenario& Scenario : M_Scenarios)
+		{
+			if (Scenario.UnitActor.Get() == &UnitActor)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	FString FUnitAbilityStressHelper::GetSourceString(const EUnitAbilityStressSource Source) const
+	{
+		switch (Source)
+		{
+		case EUnitAbilityStressSource::PlayerTank: return TEXT("PlayerTank");
+		case EUnitAbilityStressSource::EnemyVehicle: return TEXT("EnemyVehicle");
+		case EUnitAbilityStressSource::PlayerSquad: return TEXT("PlayerSquad");
+		case EUnitAbilityStressSource::EnemySquad: return TEXT("EnemySquad");
+		case EUnitAbilityStressSource::PlayerAircraft: return TEXT("PlayerAircraft");
+		case EUnitAbilityStressSource::EnemyAircraft: return TEXT("EnemyAircraft");
+		}
+
+		return TEXT("UnknownSource");
+	}
+}
+
+enum class EShippingMapTestPhase : uint8
+{
+	NotStarted,
+	NomadicBxp,
+	UnitAbilityStress,
+	Complete,
+};
+
 class FRTSNomadicBxpShippingTestRunner final : public FTickableGameObject
 {
 public:
@@ -137,6 +781,7 @@ private:
 	UWorld* GetWorld() const;
 	void FinishRun();
 	void GatherScenarios();
+	void StartUnitAbilityStress();
 	void ResumeStartGameFlowIfPaused() const;
 	void GivePlayerTestResources() const;
 	void StartNextScenario();
@@ -206,6 +851,7 @@ private:
 
 	TWeakObjectPtr<UWorld> M_World;
 	TArray<FNomadicBxpShippingScenario> M_Scenarios;
+	RTS::UnitTests::ShippingUnitAbilityStress::FUnitAbilityStressHelper M_UnitAbilityStressHelper;
 	FString M_RunReason;
 	FString M_NameFilter;
 	TArray<FString> M_ExcludeNameFilters;
@@ -213,7 +859,9 @@ private:
 	int32 M_PassedScenarioCount = 0;
 	int32 M_FailedScenarioCount = 0;
 	int32 M_MaxScenarios = 0;
+	int32 M_UnitAbilityMaxScenarios = 0;
 	float M_StartDelaySeconds = 0.0f;
+	EShippingMapTestPhase M_Phase = EShippingMapTestPhase::NotStarted;
 	bool bM_IsRunning = false;
 	bool bM_ExitOnComplete = false;
 };
@@ -397,16 +1045,26 @@ void FRTSNomadicBxpShippingTestRunner::Tick(const float DeltaTime)
 		return;
 	}
 
-	if (M_Scenarios.IsEmpty())
+	if (M_Phase == EShippingMapTestPhase::NotStarted)
 	{
 		GatherScenarios();
+		M_Phase = EShippingMapTestPhase::NomadicBxp;
 		StartNextScenario();
+		return;
+	}
+
+	if (M_Phase == EShippingMapTestPhase::UnitAbilityStress)
+	{
+		if (M_UnitAbilityStressHelper.Tick(DeltaTime))
+		{
+			FinishRun();
+		}
 		return;
 	}
 
 	if (not M_Scenarios.IsValidIndex(M_CurrentScenarioIndex))
 	{
-		FinishRun();
+		StartUnitAbilityStress();
 		return;
 	}
 
@@ -453,6 +1111,7 @@ void FRTSNomadicBxpShippingTestRunner::StartRun(const FString& Reason, const TAr
 	}
 
 	(void)FParse::Value(FCommandLine::Get(), TEXT("RTSNomadicBxpMaxScenarios="), M_MaxScenarios);
+	(void)FParse::Value(FCommandLine::Get(), TEXT("RTSUnitAbilityMaxScenarios="), M_UnitAbilityMaxScenarios);
 	M_NameFilter.Empty();
 	(void)FParse::Value(FCommandLine::Get(), TEXT("RTSNomadicBxpNameFilter="), M_NameFilter);
 	M_ExcludeNameFilters.Empty();
@@ -477,13 +1136,15 @@ void FRTSNomadicBxpShippingTestRunner::StartRun(const FString& Reason, const TAr
 	M_PassedScenarioCount = 0;
 	M_FailedScenarioCount = 0;
 	M_StartDelaySeconds = RTS::UnitTests::NomadicBxpShipping::AutoStartDelaySeconds;
+	M_Phase = EShippingMapTestPhase::NotStarted;
 	M_Scenarios.Empty();
 	bM_IsRunning = true;
 
 	UE_LOG(LogRTSNomadicBxpShippingTests, Display,
-	       TEXT("RTS_NOMADIC_BXP_TEST_BEGIN reason=%s max_scenarios=%d name_filter=%s exclude_filters=%s"),
+	       TEXT("RTS_NOMADIC_BXP_TEST_BEGIN reason=%s max_scenarios=%d unit_ability_max_scenarios=%d name_filter=%s exclude_filters=%s"),
 	       *M_RunReason,
 	       M_MaxScenarios,
+	       M_UnitAbilityMaxScenarios,
 	       *M_NameFilter,
 	       *ExcludeNameFilters);
 }
@@ -500,19 +1161,55 @@ UWorld* FRTSNomadicBxpShippingTestRunner::GetWorld() const
 
 void FRTSNomadicBxpShippingTestRunner::FinishRun()
 {
-	const bool bPassed = M_FailedScenarioCount == 0 && M_PassedScenarioCount > 0;
+	M_Phase = EShippingMapTestPhase::Complete;
+	const int32 UnitCompletedCount = M_UnitAbilityStressHelper.GetCompletedScenarioCount();
+	const int32 UnitFailedCount = M_UnitAbilityStressHelper.GetFailedScenarioCount();
+	const int32 UnitTotalCount = M_UnitAbilityStressHelper.GetScenarioCount();
+	const int32 TotalPassedCount = M_PassedScenarioCount + UnitCompletedCount;
+	const int32 TotalFailedCount = M_FailedScenarioCount + UnitFailedCount;
+	const bool bPassed = TotalFailedCount == 0 && TotalPassedCount > 0;
 	UE_LOG(LogRTSNomadicBxpShippingTests, Display,
-	       TEXT("RTS_NOMADIC_BXP_TEST_RESULT %s passed=%d failed=%d total=%d"),
+	       TEXT("RTS_NOMADIC_BXP_TEST_RESULT %s passed=%d failed=%d total=%d bxp_passed=%d bxp_failed=%d unit_completed=%d unit_attempted=%d unit_skipped=%d unit_failed=%d unit_total=%d"),
 	       bPassed ? TEXT("PASS") : TEXT("FAIL"),
+	       TotalPassedCount,
+	       TotalFailedCount,
+	       TotalPassedCount + TotalFailedCount,
 	       M_PassedScenarioCount,
 	       M_FailedScenarioCount,
-	       M_PassedScenarioCount + M_FailedScenarioCount);
+	       UnitCompletedCount,
+	       M_UnitAbilityStressHelper.GetAttemptedScenarioCount(),
+	       M_UnitAbilityStressHelper.GetSkippedScenarioCount(),
+	       UnitFailedCount,
+	       UnitTotalCount);
 
 	bM_IsRunning = false;
 
 	if (bM_ExitOnComplete)
 	{
 		FPlatformMisc::RequestExit(false);
+	}
+}
+
+void FRTSNomadicBxpShippingTestRunner::StartUnitAbilityStress()
+{
+	if (M_Phase == EShippingMapTestPhase::UnitAbilityStress || M_Phase == EShippingMapTestPhase::Complete)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		M_Phase = EShippingMapTestPhase::Complete;
+		M_FailedScenarioCount++;
+		FinishRun();
+		return;
+	}
+
+	M_Phase = EShippingMapTestPhase::UnitAbilityStress;
+	if (not M_UnitAbilityStressHelper.Start(*World, M_UnitAbilityMaxScenarios))
+	{
+		FinishRun();
 	}
 }
 
@@ -616,7 +1313,7 @@ void FRTSNomadicBxpShippingTestRunner::StartNextScenario()
 	M_CurrentScenarioIndex++;
 	if (not M_Scenarios.IsValidIndex(M_CurrentScenarioIndex))
 	{
-		FinishRun();
+		StartUnitAbilityStress();
 		return;
 	}
 

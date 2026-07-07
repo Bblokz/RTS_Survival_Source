@@ -10,6 +10,10 @@
 #include "UObject/Object.h"
 #include "GameUnitManager.generated.h"
 
+#ifndef RTS_WITH_SHIPPING_MAP_TESTS
+#define RTS_WITH_SHIPPING_MAP_TESTS 0
+#endif
+
 class AAircraftMaster;
 class ANomadicVehicle;
 class UTechnologyEffect;
@@ -161,6 +165,10 @@ public:
 	 * @param Player The player that owns the tanks
 	 */
 	TArray<ATankMaster*> GetPlayerTanks(const uint8 Player) const;
+
+#if RTS_WITH_SHIPPING_MAP_TESTS
+	TArray<AAircraftMaster*> ShippingTest_GetAircraftOfPlayer(uint8 Player) const;
+#endif
 
 	void ApplyTechToTanksOfPlayer(UTechnologyEffect* TechEffect, const TArray<ETankSubtype>& TankSubtypes, uint8 Player) const;
 	void ApplyTechToNomadicsOfPlayer(UTechnologyEffect* TechEffect, const TArray<ENomadicSubtype>& NomadicSubtypes, uint8 Player) const;

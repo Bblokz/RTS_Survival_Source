@@ -1109,6 +1109,18 @@ TArray<ATankMaster*> UGameUnitManager::GetPlayerTanks(const uint8 Player) const
 	return M_TankMastersAliveEnemy;
 }
 
+#if RTS_WITH_SHIPPING_MAP_TESTS
+TArray<AAircraftMaster*> UGameUnitManager::ShippingTest_GetAircraftOfPlayer(const uint8 Player) const
+{
+	if (Player == 1)
+	{
+		return M_AircraftMastersAlivePlayer;
+	}
+
+	return M_AircraftMastersAliveEnemy;
+}
+#endif
+
 
 
 void UGameUnitManager::IncrementTankOrNomadicCounter(ATankMaster* Tank, const uint8 Player)
