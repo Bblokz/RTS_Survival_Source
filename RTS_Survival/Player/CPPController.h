@@ -55,6 +55,10 @@
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 #include "CPPController.generated.h"
 
+#ifndef RTS_WITH_SHIPPING_MAP_TESTS
+#define RTS_WITH_SHIPPING_MAP_TESTS 0
+#endif
+
 enum class ERTSAggroBehaviour : uint8;
 class UGlobalAbility;
 enum class EGlobalAbility : uint8;
@@ -665,6 +669,12 @@ public:
 		const FBxpOptionData& BuildingExpansionTypeData,
 		const TScriptInterface<IBuildingExpansionOwner>& BuildingExpansionOwner,
 		const int ExpansionSlotIndex);
+
+#if RTS_WITH_SHIPPING_MAP_TESTS
+	void ShippingTest_ResumeStartGameFlow();
+	bool ShippingTest_GetIsBxpPlacementPreviewActive() const;
+	bool ShippingTest_PlaceLoadedBxpAtLocation(FVector& InClickedLocation);
+#endif
 
 	/** @brief function called by the Async spawner when the building expansion is spawned.
 	 * @param SpawnedBxp: The spawned building expansion.

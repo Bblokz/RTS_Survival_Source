@@ -14,6 +14,10 @@
 
 #include "RTSAsyncSpawner.generated.h"
 
+#ifndef RTS_WITH_SHIPPING_MAP_TESTS
+#define RTS_WITH_SHIPPING_MAP_TESTS 0
+#endif
+
 class UTrainerComponent;
 class IBuildingExpansionOwner;
 class ACPPController;
@@ -171,6 +175,11 @@ public:
 	 * @pre The ExpansionType mapping is set to the correct preview mesh.
 	 */
 	UStaticMesh* SyncGetBuildingExpansionPreviewMesh(EBuildingExpansionType BuildingExpansionType);
+
+#if RTS_WITH_SHIPPING_MAP_TESTS
+	bool ShippingTest_GetHasBxpPreviewMeshMapping(EBuildingExpansionType BuildingExpansionType) const;
+	bool ShippingTest_GetHasBxpSpawnClassMapping(EBuildingExpansionType BuildingExpansionType) const;
+#endif
 
 	void CancelLoadRequestForTrainer(const TWeakObjectPtr<UTrainerComponent> TrainerComponent);
 

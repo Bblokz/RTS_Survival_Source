@@ -19,6 +19,10 @@
 
 #include "CPPConstructionPreview.generated.h"
 
+#ifndef RTS_WITH_SHIPPING_MAP_TESTS
+#define RTS_WITH_SHIPPING_MAP_TESTS 0
+#endif
+
 class ABuildingGridOverlay;
 struct FBxpConstructionData;
 enum class EPlayerBuildingPreviewMode : uint8;
@@ -48,6 +52,11 @@ public:
 	FVector GetBxpPreviewLocation(const FVector& ClickedLocation) const;
 
 	FName GetBxpSocketName() const;
+
+#if RTS_WITH_SHIPPING_MAP_TESTS
+	bool ShippingTest_GetHasActivePreview() const;
+	bool ShippingTest_PrimeBxpPlacementAtLocation(const FVector& InClickedLocation);
+#endif
 
 	/** @return If the building preview is overlapping with something. */
 	bool GetIsBuildingPreviewBlocked() const;

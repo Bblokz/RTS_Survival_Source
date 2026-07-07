@@ -2619,7 +2619,7 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 		}
 
 		M_TTrainingMenuWidgets[WidgetIndex]->UpdateTrainingItem(WidgetState);
-		UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[WidgetIndex], WidgetState);
+		// UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[WidgetIndex], WidgetState);
 		WidgetIndex++;
 	}
 	// Set the rest of the widgets to empty state.
@@ -2631,7 +2631,7 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 		}
 
 		M_TTrainingMenuWidgets[i]->UpdateTrainingItem(M_EmptyTrainingOptionState);
-		UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[i], M_EmptyTrainingOptionState);
+		// UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[i], M_EmptyTrainingOptionState);
 	}
 	// Check if there is an active item.
 	if (ActiveItemIndex != INDEX_NONE
@@ -2649,21 +2649,21 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 	}
 }
 
-void UTrainingMenuManager::UpdateRequirementOpacityForWidget(
-	UW_TrainingItem* TrainingItemWidget,
-	const FTrainingWidgetState& WidgetState) const
-{
-	if (not IsValid(TrainingItemWidget))
-	{
-		RTSFunctionLibrary::ReportError("Training widget is not valid."
-			"\n see UTrainingMenuManager::UpdateRequirementOpacityForWidget.");
-		return;
-	}
-
-	const bool bIsRequirementMet = WidgetState.TrainingStatus == ETrainingItemStatus::TS_Unlocked;
-	const float RenderOpacity = bIsRequirementMet ? 1.0f : M_RequirementNotMetOpacity;
-	TrainingItemWidget->SetTrainingButtonRenderOpacity(RenderOpacity);
-}
+// void UTrainingMenuManager::UpdateRequirementOpacityForWidget(
+// 	UW_TrainingItem* TrainingItemWidget,
+// 	const FTrainingWidgetState& WidgetState) const
+// {
+// 	if (not IsValid(TrainingItemWidget))
+// 	{
+// 		RTSFunctionLibrary::ReportError("Training widget is not valid."
+// 			"\n see UTrainingMenuManager::UpdateRequirementOpacityForWidget.");
+// 		return;
+// 	}
+//
+// 	const bool bIsRequirementMet = WidgetState.TrainingStatus == ETrainingItemStatus::TS_Unlocked;
+// 	const float RenderOpacity = bIsRequirementMet ? 1.0f : M_RequirementNotMetOpacity;
+// 	TrainingItemWidget->SetTrainingButtonRenderOpacity(RenderOpacity);
+// }
 
 ETrainingItemStatus UTrainingMenuManager::CheckRequirement(
 	const TObjectPtr<URTSRequirement> RequirementForTraining,

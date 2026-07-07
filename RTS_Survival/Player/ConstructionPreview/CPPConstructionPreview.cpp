@@ -125,6 +125,40 @@ FName ACPPConstructionPreview::GetBxpSocketName() const
 	return NAME_None;
 }
 
+#if RTS_WITH_SHIPPING_MAP_TESTS
+bool ACPPConstructionPreview::ShippingTest_GetHasActivePreview() const
+{
+	return GetHasActivePreview();
+}
+
+bool ACPPConstructionPreview::ShippingTest_PrimeBxpPlacementAtLocation(const FVector& InClickedLocation)
+{
+	if (not GetHasActivePreview())
+	{
+		return false;
+	}
+
+	if (M_ActivePreviewStatus == EConstructionPreviewMode::Construct_BxpSocket)
+	{
+		bool bHasValidIncline = false;
+		SetCursorPosition(InClickedLocation);
+		bM_IsValidBuildingLocation = TickSocketBxpBuildingPlacement(bHasValidIncline);
+		return bM_IsValidBuildingLocation;
+	}
+
+	if (M_ActivePreviewStatus == EConstructionPreviewMode::Construct_BxpOrigin)
+	{
+		bool bHasValidIncline = false;
+		SetCursorPosition(InClickedLocation);
+		bM_IsValidBuildingLocation = TickAtBuildingOriginBxpPlacement(bHasValidIncline);
+		return bM_IsValidBuildingLocation;
+	}
+
+	SetCursorPosition(InClickedLocation);
+	return true;
+}
+#endif
+
 
 // Called when the game starts or when spawned
 void ACPPConstructionPreview::BeginPlay()

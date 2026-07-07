@@ -18,6 +18,10 @@
 
 #include "NomadicVehicle.generated.h"
 
+#ifndef RTS_WITH_SHIPPING_MAP_TESTS
+#define RTS_WITH_SHIPPING_MAP_TESTS 0
+#endif
+
 class UAircraftOwnerComp;
 class UResourceDropOff;
 class UBoxComponent;
@@ -154,6 +158,10 @@ public:
 	UResourceDropOff* GetResourceDropOff() const { return M_ResourceDropOff; }
 
 	void SetAINomadicVehicle(AAINomadicVehicle* NewAINomadicVehicle);
+
+#if RTS_WITH_SHIPPING_MAP_TESTS
+	bool ShippingTest_ForceFinishConversionToBuilding();
+#endif
 
 	void OnMoveToBuildingLocationSucceeded();
 	void OnMoveToBuildingLocationFailed();

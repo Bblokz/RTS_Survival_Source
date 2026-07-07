@@ -1398,6 +1398,40 @@ void ANomadicVehicle::StartAsConvertedBuilding()
 	OnFinishedStandaloneRotation();
 }
 
+#if RTS_WITH_SHIPPING_MAP_TESTS
+bool ANomadicVehicle::ShippingTest_ForceFinishConversionToBuilding()
+{
+	if (M_NomadStatus == ENomadStatus::Building)
+	{
+		return true;
+	}
+
+	if (M_NomadStatus == ENomadStatus::Truck || M_NomadStatus == ENomadStatus::CreatingTruck)
+	{
+		return false;
+	}
+
+	if (M_NomadStatus == ENomadStatus::CreatingBuildingRotating)
+	{
+		OnFinishedStandaloneRotation();
+	}
+
+	if (M_NomadStatus == ENomadStatus::CreatingBuildingTruckAnim)
+	{
+		OnTruckMontageFinished();
+	}
+
+	if (M_NomadStatus != ENomadStatus::CreatingBuildingMeshAnim)
+	{
+		return M_NomadStatus == ENomadStatus::Building;
+	}
+
+	SetAllBuildingMaterialsToCache();
+	FinishReapplyingMaterials();
+	return M_NomadStatus == ENomadStatus::Building;
+}
+#endif
+
 bool ANomadicVehicle::GetIsValidAircraftOwnerComp() const
 {
 	if (IsValid(M_AircraftOwnerComp))

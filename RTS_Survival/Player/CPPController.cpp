@@ -1642,6 +1642,39 @@ void ACPPController::RebuildPackedExpansion(const FBxpOptionData& BuildingExpans
 	}
 }
 
+#if RTS_WITH_SHIPPING_MAP_TESTS
+void ACPPController::ShippingTest_ResumeStartGameFlow()
+{
+	ClickedStartGameButton();
+}
+
+bool ACPPController::ShippingTest_GetIsBxpPlacementPreviewActive() const
+{
+	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::BxpPreviewMode)
+	{
+		return false;
+	}
+
+	if (not IsValid(CPPConstructionPreviewRef))
+	{
+		return false;
+	}
+
+	return CPPConstructionPreviewRef->ShippingTest_GetHasActivePreview();
+}
+
+bool ACPPController::ShippingTest_PlaceLoadedBxpAtLocation(FVector& InClickedLocation)
+{
+	if (GetIsValidConstructionPreview() &&
+		not CPPConstructionPreviewRef->ShippingTest_PrimeBxpPlacementAtLocation(InClickedLocation))
+	{
+		return false;
+	}
+
+	return PlaceBxpIfAsyncLoaded(InClickedLocation);
+}
+#endif
+
 void ACPPController::OnBxpSpawnedAsync(
 	ABuildingExpansion* SpawnedBxp,
 	TScriptInterface<IBuildingExpansionOwner> BxpOwner,

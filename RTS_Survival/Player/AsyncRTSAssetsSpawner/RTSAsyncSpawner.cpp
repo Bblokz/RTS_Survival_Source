@@ -225,6 +225,23 @@ UStaticMesh* ARTSAsyncSpawner::SyncGetBuildingExpansionPreviewMesh(EBuildingExpa
 	}
 }
 
+#if RTS_WITH_SHIPPING_MAP_TESTS
+bool ARTSAsyncSpawner::ShippingTest_GetHasBxpPreviewMeshMapping(
+	const EBuildingExpansionType BuildingExpansionType) const
+{
+	const UStaticMesh* const* PreviewMesh = BxpPreviewMeshMap.Find(BuildingExpansionType);
+	return PreviewMesh != nullptr && IsValid(*PreviewMesh);
+}
+
+bool ARTSAsyncSpawner::ShippingTest_GetHasBxpSpawnClassMapping(
+	const EBuildingExpansionType BuildingExpansionType) const
+{
+	const TSoftClassPtr<ABuildingExpansion>* const BuildingExpansionClass = BuildingExpansionMap.Find(
+		BuildingExpansionType);
+	return BuildingExpansionClass != nullptr && not BuildingExpansionClass->IsNull();
+}
+#endif
+
 void ARTSAsyncSpawner::CancelLoadRequestForTrainer(const TWeakObjectPtr<UTrainerComponent> TrainerComponent)
 {
 	if (TrainerComponent.IsValid())
