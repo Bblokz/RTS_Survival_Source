@@ -101,6 +101,16 @@ void UW_WorldMenu::SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveD
 	ArchiveMenu->SetupArchiveWithPlayerProfileSaveData(PlayerProfileSaveData.ArchiveData);
 }
 
+void UW_WorldMenu::UpdateTurnCounter(const int32 CurrentTurn) const
+{
+	if (not GetIsValidWorldUIHeader())
+	{
+		return;
+	}
+
+	WorldUIHeader->UpdateTurnCounter(CurrentTurn);
+}
+
 void UW_WorldMenu::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
@@ -187,7 +197,7 @@ void UW_WorldMenu::InitMenu_InitArchive()
 
 void UW_WorldMenu::InitMenu_InitHeader()
 {
-	if (not WorldUIHeader)
+	if (not GetIsValidWorldUIHeader())
 	{
 		return;
 	}
@@ -225,4 +235,20 @@ bool UW_WorldMenu::GetIsValidProfileAndUIManager() const
 		return false;
 	}
 	return true;
+}
+
+bool UW_WorldMenu::GetIsValidWorldUIHeader() const
+{
+	if (IsValid(WorldUIHeader))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("WorldUIHeader"),
+		TEXT("UW_WorldMenu::GetIsValidWorldUIHeader"),
+		this
+	);
+	return false;
 }

@@ -54,6 +54,7 @@ public:
 
 	void InitWorldMenu(AWorldPlayerController* WorldPlayerController, UWorldProfileAndUIManager* PlayerProfileUIManager);
 	void SetupUIForPlayerProfile(const FPlayerData& PlayerProfileSaveData);
+	void UpdateTurnCounter(int32 CurrentTurn) const;
 	/**
 	 * @brief Opens the compact map-item panel from controller-selected world actors.
 	 * @param UIData Text and strength data authored on the clicked world map object.
@@ -113,6 +114,7 @@ private:
 	void InitMenu_InitHeader();
 	void InitMenu_InitPerkUI();
 	void InitMenu_InitCardMenu();
+	bool GetIsValidWorldUIHeader() const;
 
 	UPROPERTY()
 	TWeakObjectPtr<UWorldProfileAndUIManager> M_PlayerProfileAndUIManager;

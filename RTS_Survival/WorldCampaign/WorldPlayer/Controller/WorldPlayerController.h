@@ -8,6 +8,7 @@
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Turn/WorldTurnType.h"
+#include "PlayerTurnContext/FPlayerTurnContext.h"
 #include "WorldPrimaryClickContext/WorldPrimaryClickContext.h"
 #include "WorldPlayerController.generated.h"
 
@@ -49,6 +50,9 @@ public:
 	AGeneratorWorldCampaign* GetWorldGenerator() const;
 	UWorldStateAndSaveManager* GetWorldStateAndSaveManager() const;
 	UPlayerResourceManager* GetPlayerResourceManager() const;
+
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Turns")
+	FPlayerTurnContext GetPlayerTurnContext() const;
 
 	/**
 	 * @brief Gets the controller-owned division manager used by turn flow and Blueprint move orders.
@@ -111,14 +115,19 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	void SecondaryClick();
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Turns")
+	void BP_OnPlayerTurnStarted(const FPlayerTurnContext& PlayerTurnContext);
+
 private:
 	EWorldPrimaryClickContext M_PrimaryClickContext = EWorldPrimaryClickContext::None;
 	void PlayTurn(const EWorldTurnType TurnType); 
 	void PlayerTurn();
 	void EnemyTurn();
+	void OnEndEnemyTurn();
+	void UpdateTurnCounter(int32 CurrentTurn) const;
 
 	/**
-	 * @brief Runs the player-owned division movement pass at the end of the player turn.
+	 * @brief Runs the player-owned division movement pass at the beginning of the enemy turn.
 	 */
 	void MovePlayerDivisions();
 

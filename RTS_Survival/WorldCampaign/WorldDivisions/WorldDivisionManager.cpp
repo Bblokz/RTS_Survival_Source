@@ -24,8 +24,8 @@
 
 namespace
 {
-	constexpr int32 PlayerOwner = 0;
-	constexpr int32 EnemyOwner = 1;
+	constexpr int32 PlayerOwner = 1;
+	constexpr int32 EnemyOwner = 2;
 
 	bool GetIsWithinXYRadius(const FVector& SourceLocation,
 	                         const FVector& TargetLocation,

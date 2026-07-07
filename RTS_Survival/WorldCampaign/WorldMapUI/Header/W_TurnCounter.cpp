@@ -7,6 +7,11 @@
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
 
+void UW_TurnCounter::UpdateTurnCounter(const int32 TurnCount) const
+{
+	SetTurnCounterText(TurnCount);
+}
+
 void UW_TurnCounter::InitTurnCounter(const TArray<ERTSResourceType>& ResourceTypes, const int32 TurnCount)
 {
 	InitResourceWidgets(ResourceTypes);

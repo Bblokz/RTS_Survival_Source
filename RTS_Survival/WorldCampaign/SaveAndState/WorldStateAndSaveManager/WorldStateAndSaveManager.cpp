@@ -24,7 +24,9 @@ UWorldStateAndSaveManager::UWorldStateAndSaveManager()
 
 void UWorldStateAndSaveManager::CacheCurrentWorldState(const AGeneratorWorldCampaign& WorldGenerator)
 {
+	const int32 CachedCurrentTurn = M_WorldCampaignState.CurrentTurn;
 	M_WorldCampaignState = WorldGenerator.BuildWorldCampaignStateFromCurrentGeneration();
+	M_WorldCampaignState.CurrentTurn = CachedCurrentTurn;
 }
 
 void UWorldStateAndSaveManager::CachePlayerProfileSaveData(const FPlayerProfileSaveData& PlayerProfileSaveData)
@@ -78,6 +80,17 @@ bool UWorldStateAndSaveManager::LoadCampaignState(FWorldCampaignState& OutWorldC
 	OutWorldCampaignState = M_WorldCampaignState;
 	OutPlayerProfileSaveData = M_PlayerProfileSaveData;
 	return true;
+}
+
+int32 UWorldStateAndSaveManager::AdvanceCurrentTurn()
+{
+	M_WorldCampaignState.CurrentTurn++;
+	return M_WorldCampaignState.CurrentTurn;
+}
+
+int32 UWorldStateAndSaveManager::GetCurrentTurn() const
+{
+	return M_WorldCampaignState.CurrentTurn;
 }
 
 FWorldCampaignState UWorldStateAndSaveManager::AggregateWorldCampaignState() const

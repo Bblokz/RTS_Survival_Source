@@ -34,6 +34,8 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool SaveCampaignState();
 	bool LoadCampaignState(FWorldCampaignState& OutWorldCampaignState, FPlayerProfileSaveData& OutPlayerProfileSaveData);
+	int32 AdvanceCurrentTurn();
+	int32 GetCurrentTurn() const;
 
 	const FWorldCampaignState& GetCachedWorldCampaignState() const { return M_WorldCampaignState; }
 	const FPlayerProfileSaveData& GetCachedPlayerProfileSaveData() const { return M_PlayerProfileSaveData; }

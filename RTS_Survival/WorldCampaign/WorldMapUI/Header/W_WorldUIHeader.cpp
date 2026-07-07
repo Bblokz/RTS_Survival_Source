@@ -3,6 +3,7 @@
 
 #include "W_WorldUIHeader.h"
 
+#include "W_TurnCounter.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/WorldUIFocusState/WorldUIFocusState.h"
@@ -10,6 +11,16 @@
 void UW_WorldUIHeader::InitWorldUIHeader(UW_WorldMenu* WorldMenu)
 {
 	M_WorldMenu = WorldMenu;
+}
+
+void UW_WorldUIHeader::UpdateTurnCounter(const int32 CurrentTurn) const
+{
+	if (not GetIsValidTurnCounter())
+	{
+		return;
+	}
+
+	W_BP_HeaderTurns->UpdateTurnCounter(CurrentTurn);
 }
 
 bool UW_WorldUIHeader::EnsureButtonIsValid(const TObjectPtr<UButton>& ButtonToCheck)
@@ -107,4 +118,20 @@ bool UW_WorldUIHeader::GetIsValidWorldMenu() const
 		return false;
 	}
 	return true;
+}
+
+bool UW_WorldUIHeader::GetIsValidTurnCounter() const
+{
+	if (IsValid(W_BP_HeaderTurns))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("W_BP_HeaderTurns"),
+		TEXT("UW_WorldUIHeader::GetIsValidTurnCounter"),
+		this
+	);
+	return false;
 }

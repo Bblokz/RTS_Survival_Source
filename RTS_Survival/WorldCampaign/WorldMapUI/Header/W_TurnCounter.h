@@ -13,6 +13,8 @@ class RTS_SURVIVAL_API UW_TurnCounter : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	void UpdateTurnCounter(int32 TurnCount) const;
 
 protected:
 	void InitTurnCounter(const TArray<ERTSResourceType>& ResourceTypes, const int32 TurnCount);

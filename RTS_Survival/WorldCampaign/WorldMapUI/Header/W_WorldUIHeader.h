@@ -20,6 +20,7 @@ class RTS_SURVIVAL_API UW_WorldUIHeader : public UUserWidget
 
 public:
 	void InitWorldUIHeader(UW_WorldMenu* WorldMenu);
+	void UpdateTurnCounter(int32 CurrentTurn) const;
 
 protected:
 	UPROPERTY(meta=(BindWidget), BlueprintReadOnly)
@@ -37,7 +38,7 @@ protected:
 	TObjectPtr<UButton> M_TechTree;
 
 private:
-	static bool EnsureButtonIsValid(const TObjectPtr<UButton>& ButtonToCheck);\
+	static bool EnsureButtonIsValid(const TObjectPtr<UButton>& ButtonToCheck);
 	virtual void NativeOnInitialized() override;
 
 	UFUNCTION()
@@ -54,4 +55,5 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UW_WorldMenu> M_WorldMenu;
 	bool GetIsValidWorldMenu() const;
+	bool GetIsValidTurnCounter() const;
 }; 

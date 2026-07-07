@@ -53,19 +53,21 @@ AWorldPlayerController::AWorldPlayerController()
 
 AGeneratorWorldCampaign* AWorldPlayerController::GetWorldGenerator() const
 {
-	if (not M_WorldGenerator.IsValid())
+	if (not GetIsValidWorldGenerator())
 	{
 		return nullptr;
 	}
+
 	return M_WorldGenerator.Get();
 }
 
 UWorldStateAndSaveManager* AWorldPlayerController::GetWorldStateAndSaveManager() const
 {
-	if (not IsValid(M_WorldStateAndSaveManager))
+	if (not GetIsValidWorldStateAndSaveManager())
 	{
 		return nullptr;
 	}
+
 	return M_WorldStateAndSaveManager;
 }
 
@@ -77,6 +79,18 @@ UPlayerResourceManager* AWorldPlayerController::GetPlayerResourceManager() const
 	}
 
 	return M_PlayerResourceManager;
+}
+
+FPlayerTurnContext AWorldPlayerController::GetPlayerTurnContext() const
+{
+	FPlayerTurnContext PlayerTurnContext;
+	if (not GetIsValidWorldStateAndSaveManager())
+	{
+		return PlayerTurnContext;
+	}
+
+	PlayerTurnContext.CurrentTurn = M_WorldStateAndSaveManager->GetCurrentTurn();
+	return PlayerTurnContext;
 }
 
 UWorldDivisionManager* AWorldPlayerController::GetWorldDivisionManager() const
@@ -157,14 +171,15 @@ void AWorldPlayerController::PlayTurn(const EWorldTurnType TurnType)
 
 void AWorldPlayerController::PlayerTurn()
 {
-	if (not GetIsValidWorldGenerator())
+	if (not GetIsValidWorldGenerator() || not GetIsValidWorldStateAndSaveManager())
 	{
 		return;
 	}
 
 	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
 	M_WorldGenerator->AdjustDifficultyPercentagesForFieldDivisions(M_SelectedDifficulty.DifficultyLevel);
-	MovePlayerDivisions();
+	const FPlayerTurnContext PlayerTurnContext = GetPlayerTurnContext();
+	BP_OnPlayerTurnStarted(PlayerTurnContext);
 }
 
 void AWorldPlayerController::EnemyTurn()
@@ -173,10 +188,41 @@ void AWorldPlayerController::EnemyTurn()
 	{
 		return;
 	}
+	MovePlayerDivisions();
 
 	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
 	M_WorldGenerator->AdjustDifficultyPercentagesForFieldDivisions(M_SelectedDifficulty.DifficultyLevel);
 	MoveEnemyDivisions();
+	OnEndEnemyTurn();
+}
+
+void AWorldPlayerController::OnEndEnemyTurn()
+{
+	if (not GetIsValidWorldStateAndSaveManager())
+	{
+		return;
+	}
+
+	const int32 CurrentTurn = M_WorldStateAndSaveManager->AdvanceCurrentTurn();
+	UpdateTurnCounter(CurrentTurn);
+	M_WorldStateAndSaveManager->SaveCampaignState();
+	PlayTurn(EWorldTurnType::Player);
+}
+
+void AWorldPlayerController::UpdateTurnCounter(const int32 CurrentTurn) const
+{
+	if (not GetIsValidWorldProfileAndUIManager())
+	{
+		return;
+	}
+
+	UW_WorldMenu* WorldMenu = M_WorldProfileAndUIManager->GetWorldMenu();
+	if (not IsValid(WorldMenu))
+	{
+		return;
+	}
+
+	WorldMenu->UpdateTurnCounter(CurrentTurn);
 }
 
 void AWorldPlayerController::MovePlayerDivisions()
