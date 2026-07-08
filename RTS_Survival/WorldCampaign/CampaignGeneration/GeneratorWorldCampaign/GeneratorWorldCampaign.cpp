@@ -940,6 +940,68 @@ namespace
 		}
 	}
 
+	void BuildSortedMissionAnchorKeys(
+		const TMap<FGuid, EMapMission>& MissionsByAnchorKey,
+		TArray<FGuid>& OutMissionAnchorKeys)
+	{
+		OutMissionAnchorKeys.Reset();
+		MissionsByAnchorKey.GetKeys(OutMissionAnchorKeys);
+		OutMissionAnchorKeys.Sort([](const FGuid& Left, const FGuid& Right)
+		{
+			return AAnchorPoint::IsAnchorKeyLess(Left, Right);
+		});
+	}
+
+	bool TryPromoteEnemyHQMissionSwap(
+		AAnchorPoint* OldEnemyHQAnchor,
+		AAnchorPoint* NewEnemyHQAnchor,
+		const EMapMission MissionType)
+	{
+		if (not IsValid(OldEnemyHQAnchor) || not IsValid(NewEnemyHQAnchor))
+		{
+			return false;
+		}
+
+		OldEnemyHQAnchor->RemovePromotedWorldObject();
+		NewEnemyHQAnchor->RemovePromotedWorldObject();
+
+		AWorldMapObject* MissionObject = OldEnemyHQAnchor->OnMissionPromotion(
+			MissionType,
+			ECampaignGenerationStep::Finished);
+		AWorldMapObject* EnemyHQObject = NewEnemyHQAnchor->OnEnemyItemPromotion(
+			EMapEnemyItem::EnemyHQ,
+			ECampaignGenerationStep::Finished);
+		return IsValid(MissionObject) && IsValid(EnemyHQObject);
+	}
+
+	void RestoreEnemyHQMissionSwapPromotions(
+		AAnchorPoint* OldEnemyHQAnchor,
+		AAnchorPoint* NewEnemyHQAnchor,
+		const EMapMission MissionType)
+	{
+		if (not IsValid(OldEnemyHQAnchor) || not IsValid(NewEnemyHQAnchor))
+		{
+			return;
+		}
+
+		OldEnemyHQAnchor->RemovePromotedWorldObject();
+		NewEnemyHQAnchor->RemovePromotedWorldObject();
+
+		AWorldMapObject* RestoredEnemyHQObject = OldEnemyHQAnchor->OnEnemyItemPromotion(
+			EMapEnemyItem::EnemyHQ,
+			ECampaignGenerationStep::Finished);
+		AWorldMapObject* RestoredMissionObject = NewEnemyHQAnchor->OnMissionPromotion(
+			MissionType,
+			ECampaignGenerationStep::Finished);
+		if (IsValid(RestoredEnemyHQObject) && IsValid(RestoredMissionObject))
+		{
+			return;
+		}
+
+		RTSFunctionLibrary::ReportError(
+			TEXT("Failed to restore original enemy HQ and mission promotions after a blocked mission swap failed."));
+	}
+
 	bool IsAnchorOccupied(const FGuid& AnchorKey, const FWorldCampaignPlacementState& PlacementState)
 	{
 		if (PlacementState.PlayerHQAnchorKey == AnchorKey || PlacementState.EnemyHQAnchorKey == AnchorKey)
@@ -5368,6 +5430,42 @@ void AGeneratorWorldCampaign::PruneUnusedAnchorsAndRepairConnectivity()
 	RefreshConnectionTransactionAfterPruning();
 }
 
+void AGeneratorWorldCampaign::EnsureMissionObjectsAreReachableBeforeEnemyHQ()
+{
+	if (not M_PlacementState.PlayerHQAnchorKey.IsValid()
+		|| not M_PlacementState.EnemyHQAnchorKey.IsValid()
+		|| M_PlacementState.MissionsByAnchorKey.Num() == 0)
+	{
+		return;
+	}
+
+	const int32 MaxMissionHQSwaps = M_PlacementState.MissionsByAnchorKey.Num();
+	for (int32 SwapIndex = 0; SwapIndex < MaxMissionHQSwaps; SwapIndex++)
+	{
+		FGuid MissionAnchorKey;
+		EMapMission MissionType = EMapMission::None;
+		if (not TryFindMissionObjectReachableOnlyThroughEnemyHQ(MissionAnchorKey, MissionType))
+		{
+			return;
+		}
+
+		if (not TrySwapEnemyHQWithMissionObject(MissionAnchorKey, MissionType))
+		{
+			RTSFunctionLibrary::ReportError(
+				TEXT("Failed to swap enemy HQ with a mission object that was blocked by the enemy HQ."));
+			return;
+		}
+	}
+
+	FGuid MissionAnchorKey;
+	EMapMission MissionType = EMapMission::None;
+	if (TryFindMissionObjectReachableOnlyThroughEnemyHQ(MissionAnchorKey, MissionType))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Enemy HQ mission reachability correction still has blocked missions after the swap budget."));
+	}
+}
+
 bool AGeneratorWorldCampaign::GenerateAndValidatePrunedWorldForSeed(const int32 Seed, FString& OutFailureReason)
 {
 	const FScopedRTSModalDialogSuppression DialogSuppression;
@@ -9473,6 +9571,129 @@ void AGeneratorWorldCampaign::RefreshConnectionTransactionAfterPruning()
 
 		Transaction.SpawnedConnections = M_GeneratedConnections;
 	}
+}
+
+bool AGeneratorWorldCampaign::BuildReachableAnchorKeysWithoutEnemyHQ(TSet<FGuid>& OutReachableAnchorKeys) const
+{
+	OutReachableAnchorKeys.Reset();
+	AAnchorPoint* PlayerHQAnchor = M_PlacementState.PlayerHQAnchor.Get();
+	if (not IsValid(PlayerHQAnchor) || not M_PlacementState.EnemyHQAnchorKey.IsValid())
+	{
+		return false;
+	}
+
+	const FGuid PlayerHQAnchorKey = PlayerHQAnchor->GetAnchorKey();
+	if (not PlayerHQAnchorKey.IsValid() || PlayerHQAnchorKey == M_PlacementState.EnemyHQAnchorKey)
+	{
+		return false;
+	}
+
+	TArray<TObjectPtr<AAnchorPoint>> AnchorQueue;
+	AnchorQueue.Add(PlayerHQAnchor);
+	OutReachableAnchorKeys.Add(PlayerHQAnchorKey);
+	for (int32 QueueIndex = 0; QueueIndex < AnchorQueue.Num(); QueueIndex++)
+	{
+		AAnchorPoint* CurrentAnchor = AnchorQueue[QueueIndex].Get();
+		if (not IsValid(CurrentAnchor))
+		{
+			continue;
+		}
+
+		for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : CurrentAnchor->GetNeighborAnchors())
+		{
+			if (not IsValid(NeighborAnchor))
+			{
+				continue;
+			}
+
+			const FGuid NeighborAnchorKey = NeighborAnchor->GetAnchorKey();
+			if (not NeighborAnchorKey.IsValid()
+				|| NeighborAnchorKey == M_PlacementState.EnemyHQAnchorKey
+				|| OutReachableAnchorKeys.Contains(NeighborAnchorKey))
+			{
+				continue;
+			}
+
+			OutReachableAnchorKeys.Add(NeighborAnchorKey);
+			AnchorQueue.Add(NeighborAnchor);
+		}
+	}
+
+	return true;
+}
+
+bool AGeneratorWorldCampaign::TryFindMissionObjectReachableOnlyThroughEnemyHQ(
+	FGuid& OutMissionAnchorKey,
+	EMapMission& OutMissionType) const
+{
+	OutMissionAnchorKey = FGuid();
+	OutMissionType = EMapMission::None;
+
+	TSet<FGuid> ReachableAnchorKeysWithoutEnemyHQ;
+	if (not BuildReachableAnchorKeysWithoutEnemyHQ(ReachableAnchorKeysWithoutEnemyHQ))
+	{
+		return false;
+	}
+
+	TArray<FGuid> SortedMissionAnchorKeys;
+	BuildSortedMissionAnchorKeys(M_PlacementState.MissionsByAnchorKey, SortedMissionAnchorKeys);
+	for (const FGuid& MissionAnchorKey : SortedMissionAnchorKeys)
+	{
+		if (not MissionAnchorKey.IsValid()
+			|| MissionAnchorKey == M_PlacementState.EnemyHQAnchorKey
+			|| ReachableAnchorKeysWithoutEnemyHQ.Contains(MissionAnchorKey))
+		{
+			continue;
+		}
+
+		const EMapMission* MissionType = M_PlacementState.MissionsByAnchorKey.Find(MissionAnchorKey);
+		if (MissionType == nullptr || *MissionType == EMapMission::None)
+		{
+			continue;
+		}
+
+		OutMissionAnchorKey = MissionAnchorKey;
+		OutMissionType = *MissionType;
+		return true;
+	}
+
+	return false;
+}
+
+bool AGeneratorWorldCampaign::TrySwapEnemyHQWithMissionObject(
+	const FGuid& MissionAnchorKey,
+	const EMapMission MissionType)
+{
+	const FGuid OldEnemyHQAnchorKey = M_PlacementState.EnemyHQAnchorKey;
+	if (not MissionAnchorKey.IsValid()
+		|| MissionAnchorKey == OldEnemyHQAnchorKey
+		|| MissionType == EMapMission::None)
+	{
+		return false;
+	}
+
+	if (M_PlacementState.MissionsByAnchorKey.FindRef(MissionAnchorKey) != MissionType)
+	{
+		return false;
+	}
+
+	const TMap<FGuid, TObjectPtr<AAnchorPoint>> AnchorLookup = BuildAnchorLookup(M_PlacementState.CachedAnchors);
+	AAnchorPoint* OldEnemyHQAnchor = FindAnchorByKey(AnchorLookup, OldEnemyHQAnchorKey);
+	AAnchorPoint* NewEnemyHQAnchor = FindAnchorByKey(AnchorLookup, MissionAnchorKey);
+	if (not TryPromoteEnemyHQMissionSwap(OldEnemyHQAnchor, NewEnemyHQAnchor, MissionType))
+	{
+		RestoreEnemyHQMissionSwapPromotions(OldEnemyHQAnchor, NewEnemyHQAnchor, MissionType);
+		return false;
+	}
+
+	M_PlacementState.EnemyHQAnchor = NewEnemyHQAnchor;
+	M_PlacementState.EnemyHQAnchorKey = MissionAnchorKey;
+	M_PlacementState.MissionsByAnchorKey.Remove(MissionAnchorKey);
+	M_PlacementState.MissionsByAnchorKey.Add(OldEnemyHQAnchorKey, MissionType);
+	CampaignGenerationHelper::BuildHopDistanceCache(
+		NewEnemyHQAnchor,
+		M_DerivedData.EnemyHQHopDistancesByAnchorKey);
+	return true;
 }
 
 bool AGeneratorWorldCampaign::GetPrunedCachedAnchorsHaveOnlyGameplay(FString& OutFailureReason) const

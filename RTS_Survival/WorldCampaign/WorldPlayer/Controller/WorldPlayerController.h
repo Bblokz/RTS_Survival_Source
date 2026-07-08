@@ -28,6 +28,7 @@ class AGeneratorWorldCampaign;
 class UWorldCameraController;
 class UPlayerWorldOutliner;
 class AWorldFowManager;
+class AWorldConnectionSplineRenderer;
 class UW_AsyncWorldGeneration;
 class UWorldPlayerAudioController;
 class USoundBase;
@@ -212,6 +213,12 @@ private:
 
 	void WorldGenerated_InitCountryOccupationRegulator();
 	void WorldGenerated_SpawnWorldFowManager();
+
+	/**
+	 * @brief Spawns the connection spline renderer after generation so connected anchors are drawn as ribbons.
+	 * @note Requires the generated connection graph to exist; runs alongside the FOW manager setup.
+	 */
+	void WorldGenerated_SpawnConnectionSplineRenderer();
 	bool GetCanPrimaryClickActor(AActor* ClickedActor) const;
 
 	void OnInitialWorldSetupComplete();
@@ -274,6 +281,12 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AWorldFowManager> M_WorldFowManager;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "World Campaign|Connection Spline", meta = (AllowPrivateAccess = "true", DisplayName = "ConnectionSplineRendererClass"))
+	TSubclassOf<AWorldConnectionSplineRenderer> M_ConnectionSplineRendererClass;
+
+	UPROPERTY()
+	TWeakObjectPtr<AWorldConnectionSplineRenderer> M_ConnectionSplineRenderer;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Async Generation", meta = (AllowPrivateAccess = "true"))
 	TSubclassOf<UW_AsyncWorldGeneration> M_AsyncWorldGenerationWidgetClass;

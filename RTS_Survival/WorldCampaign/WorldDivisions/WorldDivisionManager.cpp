@@ -104,22 +104,24 @@ namespace
 		 * positive strength to friendly map objects, but negative strength to enemy missions they are suppressing.
 		 */
 		const int32 DivisionOwner = WorldDivision.GetOwningPlayer();
-		const int32 TargetOwner = GetOwnerForMapObject(&TargetObject);
-		if (DivisionOwner == PlayerOwner && TargetOwner == PlayerOwner)
+		const bool bIsMissionObject =TargetObject.IsA(AWorldMissionObject::StaticClass()); 
+		const bool bIsEnemyObject = TargetObject.IsA(AWorldEnemyObject::StaticClass());
+		const bool bIsPlayerObject = TargetObject.IsA(AWorldPlayerObject::StaticClass());
+
+		if (bIsMissionObject || bIsEnemyObject)
 		{
+			if (DivisionOwner == PlayerOwner)
+			{
+				// Player division suppresses difficulty in mission / enemy base siege.
+				return -1;
+			}
+			// Enemy division makes mission / enemy base siege harder.
 			return 1;
 		}
-
-		if (DivisionOwner == PlayerOwner && TargetObject.IsA(AWorldMissionObject::StaticClass()))
+		if (bIsPlayerObject)
 		{
-			return -1;
+			return DivisionOwner == EnemyOwner ? 1 : -1;
 		}
-
-		if (DivisionOwner == EnemyOwner && TargetOwner == EnemyOwner)
-		{
-			return 1;
-		}
-
 		return 0;
 	}
 

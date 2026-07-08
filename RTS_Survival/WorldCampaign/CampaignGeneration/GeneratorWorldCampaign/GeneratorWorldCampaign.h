@@ -540,6 +540,11 @@ public:
 	void PruneUnusedAnchorsAndRepairConnectivity();
 
 	/**
+	 * @brief Moves the enemy HQ behind missions that would otherwise require attacking it first.
+	 */
+	void EnsureMissionObjectsAreReachableBeforeEnemyHQ();
+
+	/**
 	 * @brief Broadcasts after campaign generation has reached Finished and world actors are realized.
 	 * @note BeginPlay systems that need generated anchors/items should wait for this signal.
 	 */
@@ -1401,6 +1406,26 @@ private:
 	void RemovePrunedPlacementStateEntries();
 	void RefreshCampaignGraphAfterPruning();
 	void RefreshConnectionTransactionAfterPruning();
+	bool BuildReachableAnchorKeysWithoutEnemyHQ(TSet<FGuid>& OutReachableAnchorKeys) const;
+
+	/**
+	 * @brief Finds the first deterministic mission anchor that becomes unreachable when the HQ is treated as blocked.
+	 * @param OutMissionAnchorKey Anchor key for the mission that should swap with the enemy HQ.
+	 * @param OutMissionType Mission type currently placed on that anchor.
+	 * @return true when a blocked mission exists.
+	 */
+	bool TryFindMissionObjectReachableOnlyThroughEnemyHQ(
+		FGuid& OutMissionAnchorKey,
+		EMapMission& OutMissionType) const;
+
+	/**
+	 * @brief Swaps the enemy HQ placement with the specified mission placement.
+	 * @param MissionAnchorKey Current mission anchor that should become the enemy HQ.
+	 * @param MissionType Mission type to move onto the old enemy HQ anchor.
+	 * @return true when placement state and promoted actors were both updated.
+	 */
+	bool TrySwapEnemyHQWithMissionObject(const FGuid& MissionAnchorKey, EMapMission MissionType);
+
 	bool GetPrunedCachedAnchorsHaveOnlyGameplay(FString& OutFailureReason) const;
 	bool GetPrunedConnectionsAreValid(FString& OutFailureReason) const;
 	TSet<FGuid> BuildPrunedCachedAnchorKeys() const;

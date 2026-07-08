@@ -2,6 +2,7 @@
 
 #include "WorldFowManager.h"
 
+#include "Containers/Queue.h"
 #include "Components/MeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/Texture2D.h"
@@ -17,6 +18,7 @@
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
 
 namespace WorldFowDebugConstants
 {
@@ -548,26 +550,40 @@ void AWorldFowManager::ApplyRevealRulesFromVisibleAnchors()
 
 	SetAnchorState(PlayerHQAnchor, EWorldMapFowState::Visible);
 
-	TArray<AAnchorPoint*> VisibleAnchors;
+	// Flood visibility outward from every anchor the player can already see, seeding the frontier with
+	// the current Visible set (HQ plus any anchors captured in a previous update).
+	TQueue<AAnchorPoint*> VisibleFrontier;
 	for (const TObjectPtr<AAnchorPoint>& AnchorPoint : PlacementState.CachedAnchors)
 	{
-		if (not IsValid(AnchorPoint))
+		if (IsValid(AnchorPoint) && GetAnchorState(AnchorPoint) == EWorldMapFowState::Visible)
 		{
-			continue;
-		}
-
-		if (GetAnchorState(AnchorPoint) == EWorldMapFowState::Visible)
-		{
-			VisibleAnchors.Add(AnchorPoint);
+			VisibleFrontier.Enqueue(AnchorPoint);
 		}
 	}
 
-	for (AAnchorPoint* VisibleAnchor : VisibleAnchors)
+	// A neutral anchor is never captured to reveal it, so any neutral anchor the player can reach is
+	// promoted straight to Visible instead of Explorable. Feeding that promoted anchor back into the
+	// frontier lets visibility cascade through chains of adjacent neutral anchors, while every visible
+	// anchor still surfaces its remaining hidden, non-neutral neighbors as Explorable.
+	AAnchorPoint* VisibleAnchor = nullptr;
+	while (VisibleFrontier.Dequeue(VisibleAnchor))
 	{
-		const TArray<TObjectPtr<AAnchorPoint>>& NeighborAnchors = VisibleAnchor->GetNeighborAnchors();
-		for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : NeighborAnchors)
+		for (const TObjectPtr<AAnchorPoint>& NeighborAnchor : VisibleAnchor->GetNeighborAnchors())
 		{
-			if (GetAnchorState(NeighborAnchor) == EWorldMapFowState::NotVisible)
+			if (not IsValid(NeighborAnchor))
+			{
+				continue;
+			}
+
+			if (GetAnchorHoldsNeutralObject(NeighborAnchor))
+			{
+				if (GetAnchorState(NeighborAnchor) != EWorldMapFowState::Visible)
+				{
+					SetAnchorState(NeighborAnchor, EWorldMapFowState::Visible);
+					VisibleFrontier.Enqueue(NeighborAnchor);
+				}
+			}
+			else if (GetAnchorState(NeighborAnchor) == EWorldMapFowState::NotVisible)
 			{
 				SetAnchorState(NeighborAnchor, EWorldMapFowState::Explorable);
 			}
@@ -940,6 +956,11 @@ int32 AWorldFowManager::GetPixelRadius(const float WorldRadius) const
 	const FVector2D MapSize = M_WorldFowCloud->GetMapSizeXY();
 	const float SmallestMapAxis = FMath::Max(1.f, FMath::Min(MapSize.X, MapSize.Y));
 	return FMath::Max(1, FMath::CeilToInt(WorldRadius / SmallestMapAxis * M_MaskResolution));
+}
+
+bool AWorldFowManager::GetAnchorHoldsNeutralObject(const AAnchorPoint* AnchorPoint) const
+{
+	return IsValid(AnchorPoint) && Cast<AWorldNeutralObject>(AnchorPoint->GetPromotedWorldObject()) != nullptr;
 }
 
 EWorldMapFowState AWorldFowManager::GetAnchorState(const AAnchorPoint* AnchorPoint) const

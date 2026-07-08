@@ -111,6 +111,7 @@ private:
 	void WriteMaskPixelChannel(FColor& Pixel, int32 ChannelIndex, uint8 Value) const;
 	int32 GetMaskChannelForComponent(const UWorldMapFowComponent* FowComponent) const;
 	int32 GetPixelRadius(float WorldRadius) const;
+	bool GetAnchorHoldsNeutralObject(const AAnchorPoint* AnchorPoint) const;
 	EWorldMapFowState GetAnchorState(const AAnchorPoint* AnchorPoint) const;
 	EWorldMapFowState GetConnectionStateFromConnectedAnchors(const AConnection* Connection) const;
 	FIntPoint WorldToPixel(const FVector& WorldLocation) const;

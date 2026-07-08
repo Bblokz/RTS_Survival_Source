@@ -30,6 +30,7 @@
 #include "RTS_Survival/WorldCampaign/WorldStatics/FRTS_WorldStatics.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowParticipant.h"
 #include "RTS_Survival/WorldCampaign/WorldFow/WorldFowManager.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/ConnectionSpline/WorldConnectionSplineRenderer.h"
 
 namespace WorldPlayerAsyncGenerationUIConstants
 {
@@ -738,6 +739,7 @@ void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
 	M_WorldGenerator->OnGenerationFinished().RemoveAll(this);
 	M_WorldGenerator->PruneUnusedAnchorsAndRepairConnectivity();
 	UpdateAsyncWorldGenerationWidget_PruningCompleted();
+	M_WorldGenerator->EnsureMissionObjectsAreReachableBeforeEnemyHQ();
 	LoadWorldDataIntoObjects();
 	M_WorldGenerator->InitMapObjectsBaseFortificationStrength(M_SelectedDifficulty.DifficultyLevel);
 	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
@@ -807,6 +809,7 @@ void AWorldPlayerController::OnAllWorldObjectsAndTheirDataReady()
 	HideAsyncWorldGenerationWidget();
 	WorldGenerated_InitCountryOccupationRegulator();
 	WorldGenerated_SpawnWorldFowManager();
+	WorldGenerated_SpawnConnectionSplineRenderer();
 	OnInitialWorldSetupComplete();
 }
 
@@ -841,6 +844,30 @@ void AWorldPlayerController::WorldGenerated_SpawnWorldFowManager()
 
 	M_WorldFowManager = SpawnedManager;
 	SpawnedManager->InitializeWorldFow(this, M_WorldGenerator.Get());
+}
+
+void AWorldPlayerController::WorldGenerated_SpawnConnectionSplineRenderer()
+{
+	if (not GetIsValidWorldGenerator() || not IsValid(M_ConnectionSplineRendererClass))
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	AWorldConnectionSplineRenderer* SpawnedRenderer =
+		World->SpawnActor<AWorldConnectionSplineRenderer>(M_ConnectionSplineRendererClass);
+	if (not IsValid(SpawnedRenderer))
+	{
+		return;
+	}
+
+	M_ConnectionSplineRenderer = SpawnedRenderer;
+	SpawnedRenderer->InitializeConnectionSplines(this, M_WorldGenerator.Get());
 }
 
 bool AWorldPlayerController::GetCanPrimaryClickActor(AActor* ClickedActor) const
