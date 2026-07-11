@@ -249,10 +249,11 @@ private:
 
 	/**
 	 * @brief Builds one road block: an arc of items of a single type across the road at the
-	 * given point. Radius derives from the yaw span so the arc always covers the road width.
+	 * given point. Radius derives from the yaw span so the arc's lateral reach always covers
+	 * WidthToBlock (a road width, or an intersection's full lateral extent).
 	 */
 	void BuildRoadBlockAt(const FVector2D& RoadPoint, const FVector2D& RoadDirection,
-		FScorchedCityGenResult& OutResult);
+		double WidthToBlock, FScorchedCityGenResult& OutResult);
 
 	/** @return Weighted pick into a resolved road-side entry array; INDEX_NONE when empty. */
 	int32 PickWeightedRoadSideEntry(const TArray<FScorchedResolvedRoadSideEntry>& Entries);

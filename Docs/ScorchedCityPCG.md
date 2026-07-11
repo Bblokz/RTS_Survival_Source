@@ -57,8 +57,8 @@ Two safeguards keep blocks from staying empty: short streets between large 4-way
 
 ### 5.3 Road-side objects
 
-- **Road lanterns/signs** (`RoadLanterns`): a weighted Blueprint list marched along every road at a global `Spacing`, alternating sides, offset `OffsetFromRoadEdge` from the road edge and always yawed so local +X faces the road. Bounds-aware; blocked spots (intersections, buildings, poles, other props) are skipped.
-- **Road blocks** (`RoadBlocks`): candidate spots every `Interval` along each road roll a seeded `Chance`; winners get an arc of items of **one** Blueprint type across the road. The arc radius derives from a random yaw span in `[MinYawSpanDegrees, MaxYawSpanDegrees]` so its lateral reach always equals the road width (`2·R·sin(span/2) = RoadWidth`; 180° = U shape). Item count and offsets come from the type's real bounds, items face outward, never sit on intersections, and solid obstacles just leave gaps in the block.
+- **Road lanterns/signs** (`RoadLanterns`): a weighted Blueprint list marched along every road at a global `Spacing`, alternating sides, offset `OffsetFromRoadEdge` from the road edge and always yawed so local +X faces the road. Bounds-aware; spots blocked by buildings, poles, props or the roadways themselves are skipped — but intersection footprints are allowed, so lanterns also appear on the corner areas of 4-ways.
+- **Road blocks** (`RoadBlocks`): candidate spots every `Interval` along each road roll a seeded `Chance`; winners get an arc of items of **one** Blueprint type. The arc radius derives from a random yaw span in `[MinYawSpanDegrees, MaxYawSpanDegrees]` so its lateral reach always equals the width to block (`2·R·sin(span/2) = Width`; 180° = U shape). On plain road that width is `RoadWidth`; when the spot lands on an intersection the block is instead centered on the node and sized to the intersection mesh's full lateral extent — enough blockers to seal the crossing — with at most one block per intersection. Item count and offsets come from the type's real bounds, items face outward, and solid obstacles just leave gaps in the block.
 
 ### 5.4 Auxiliary blueprints
 

@@ -68,8 +68,9 @@ namespace ScorchedCityGenConstants
 	constexpr int32 AuxiliaryPlacementAttempts = 5;
 
 	// Road blocks: items overlap-free along the arc, with a little air between them.
+	// The item cap must fit intersection-wide arcs, which are far longer than road-wide ones.
 	constexpr double RoadBlockItemSpacingFactor = 1.15;
-	constexpr int32 MaxRoadBlockItems = 32;
+	constexpr int32 MaxRoadBlockItems = 64;
 	constexpr int32 MinRoadBlockItems = 2;
 
 	// Orphan road endings are paired when closer than this many grid blocks.
@@ -1465,8 +1466,11 @@ void FScorchedCityGenerator::PlaceRoadLanterns(FScorchedCityGenResult& OutResult
 		return;
 	}
 
-	// Lanterns avoid everything already placed; blocked spots are simply skipped.
-	const uint8 BlockMask = ScorchedOccupancyMaskAll() & ~ScorchedOccupancyMask(EScorchedOccupancy::Decal);
+	// Lanterns avoid solid content and roadways, but NOT intersection footprints: the actual
+	// crossing roads still block them, so they end up on the 4-way's corner areas too.
+	const uint8 BlockMask = ScorchedOccupancyMaskAll()
+		& ~ScorchedOccupancyMask(EScorchedOccupancy::Decal)
+		& ~ScorchedOccupancyMask(EScorchedOccupancy::Intersection);
 
 	for (const FScorchedRoadEdge& Edge : M_Edges)
 	{
@@ -1533,6 +1537,10 @@ void FScorchedCityGenerator::PlaceRoadBlocks(FScorchedCityGenResult& OutResult)
 		return;
 	}
 
+	// Intersections that already received a block; a 4-way is crossed by several edges and
+	// must never collect one barrier per crossing road.
+	TSet<int32> BlockedIntersectionNodes;
+
 	for (const FScorchedRoadEdge& Edge : M_Edges)
 	{
 		const double EdgeLength = Edge.Length();
@@ -1553,16 +1561,36 @@ void FScorchedCityGenerator::PlaceRoadBlocks(FScorchedCityGenResult& OutResult)
 				break;
 			}
 
-			// Never across an intersection piece.
+			// On an intersection: block the whole crossing instead of skipping the spot.
 			FScorchedFootprint CenterProbe;
 			CenterProbe.Center = RoadPoint;
 			CenterProbe.HalfExtents = FVector2D(M_Params.RoadWidth * 0.5, M_Params.RoadWidth * 0.5);
 			if (M_Occupancy.OverlapsAny(CenterProbe, ScorchedOccupancyMask(EScorchedOccupancy::Intersection)))
 			{
+				const int32 NodeIndex = FindNearestNode(
+					RoadPoint, IntersectionMaxHalfExtent() + M_Params.RoadWidth);
+				if (NodeIndex == INDEX_NONE
+					|| M_Nodes[NodeIndex].Edges.Num() < 3
+					|| BlockedIntersectionNodes.Contains(NodeIndex))
+				{
+					continue;
+				}
+
+				// Enough blockers to span the intersection: the barrier must cover the mesh's
+				// full lateral extent perpendicular to the travel direction, not one road width.
+				FScorchedFootprint MeshFootprint;
+				MeshFootprint.HalfExtents =
+					FVector2D(M_Params.IntersectionSizeX * 0.5, M_Params.IntersectionSizeY * 0.5);
+				MeshFootprint.YawRadians = ComputeIntersectionYawAtNode(NodeIndex);
+				const FVector2D LateralDirection(-RoadDirection.Y, RoadDirection.X);
+				const double IntersectionWidth = 2.0 * MeshFootprint.SupportRadius(LateralDirection);
+
+				BlockedIntersectionNodes.Add(NodeIndex);
+				BuildRoadBlockAt(M_Nodes[NodeIndex].Position, RoadDirection, IntersectionWidth, OutResult);
 				continue;
 			}
 
-			BuildRoadBlockAt(RoadPoint, RoadDirection, OutResult);
+			BuildRoadBlockAt(RoadPoint, RoadDirection, M_Params.RoadWidth, OutResult);
 		}
 	}
 }
@@ -1570,6 +1598,7 @@ void FScorchedCityGenerator::PlaceRoadBlocks(FScorchedCityGenResult& OutResult)
 void FScorchedCityGenerator::BuildRoadBlockAt(
 	const FVector2D& RoadPoint,
 	const FVector2D& RoadDirection,
+	const double WidthToBlock,
 	FScorchedCityGenResult& OutResult)
 {
 	using namespace ScorchedCityGenConstants;
@@ -1582,13 +1611,13 @@ void FScorchedCityGenerator::BuildRoadBlockAt(
 	}
 	const FScorchedResolvedRoadSideEntry& Type = M_Params.RoadBlockTypes[TypeIndex];
 
-	// Radius from the yaw span so the arc's lateral reach always covers the road width:
-	// 2 * R * sin(Span/2) == RoadWidth. A 180 degree span becomes a U across the road.
+	// Radius from the yaw span so the arc's lateral reach always covers WidthToBlock:
+	// 2 * R * sin(Span/2) == WidthToBlock. A 180 degree span becomes a U across the road.
 	const double SpanRadians = FMath::DegreesToRadians(M_Random.FRandRange(
 		M_Params.RoadBlockMinYawSpanDegrees,
 		FMath::Max(M_Params.RoadBlockMinYawSpanDegrees, M_Params.RoadBlockMaxYawSpanDegrees)));
 	const double HalfSpanSin = FMath::Max(0.05, FMath::Sin(FMath::Min(SpanRadians, PI) * 0.5));
-	const double Radius = M_Params.RoadWidth / (2.0 * HalfSpanSin);
+	const double Radius = WidthToBlock / (2.0 * HalfSpanSin);
 
 	// The arc opens along the road; flip decides which oncoming direction it faces.
 	const double RoadYaw = FMath::Atan2(RoadDirection.Y, RoadDirection.X);
