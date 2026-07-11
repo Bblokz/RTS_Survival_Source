@@ -46,6 +46,8 @@ struct FScorchedCityGenParams
 
 	double BuildingSpacingExtra = 150.0;
 	double RoadWidth = 500.0;
+	// Vertical lift applied after ground snapping roads and intersections.
+	double RoadZOffset = 10.0;
 	// Sidewalk / setback between road edge and the closest allowed building face.
 	double RoadSetback = 200.0;
 	double MinRoadBuildingDistance = 100.0;

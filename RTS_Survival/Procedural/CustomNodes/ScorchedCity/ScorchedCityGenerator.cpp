@@ -762,7 +762,10 @@ bool FScorchedCityGenerator::TryPlaceBuildingOnLot(
 
 	const FVector2D FacingDirection(FMath::Cos(Lot.FacingYawRadians), FMath::Sin(Lot.FacingYawRadians));
 	const FVector2D LateralDirection(-FacingDirection.Y, FacingDirection.X);
-	const uint8 BlockMask = ScorchedOccupancyMaskAll();
+	const uint8 RoadMask = ScorchedOccupancyMask(EScorchedOccupancy::Road)
+		| ScorchedOccupancyMask(EScorchedOccupancy::Intersection);
+	const uint8 SpacingMask = ScorchedOccupancyMask(EScorchedOccupancy::Building)
+		| ScorchedOccupancyMask(EScorchedOccupancy::PowerPole);
 
 	for (const double YawOffset : YawOffsets)
 	{
@@ -798,7 +801,11 @@ bool FScorchedCityGenerator::TryPlaceBuildingOnLot(
 			{
 				continue;
 			}
-			if (M_Occupancy.OverlapsAny(Footprint.Inflated(Spacing), BlockMask))
+			if (M_Occupancy.OverlapsAny(Footprint, RoadMask))
+			{
+				continue;
+			}
+			if (M_Occupancy.OverlapsAny(Footprint.Inflated(Spacing), SpacingMask))
 			{
 				continue;
 			}
@@ -896,9 +903,10 @@ void FScorchedCityGenerator::PlacePowerLines(FScorchedCityGenResult& OutResult)
 		return;
 	}
 
+	const double MinUsableEdgeLength = M_Params.IntersectionSize + M_Params.PowerLines.PoleClearance * 2.0;
 	for (const FScorchedRoadEdge& Edge : M_Edges)
 	{
-		if (Edge.Length() >= M_Params.PowerLines.PowerLineSpacing)
+		if (Edge.Length() > MinUsableEdgeLength)
 		{
 			PlacePowerLinesAlongEdge(Edge, OutResult);
 		}
@@ -912,7 +920,8 @@ void FScorchedCityGenerator::PlacePowerLinesAlongEdge(
 	const FScorchedPowerLineSettings& Settings = M_Params.PowerLines;
 	const double Side = (M_Random.FRand() < 0.5) ? 1.0 : -1.0;
 	const double EdgeOffset = M_Params.RoadWidth * 0.5 + Settings.OffsetFromRoadEdge;
-	const double UsableLength = Edge.Length() - M_Params.IntersectionSize * 0.5;
+	const double IntersectionClearance = M_Params.IntersectionSize * 0.5 + Settings.PoleClearance;
+	const double UsableLength = Edge.Length() - IntersectionClearance;
 
 	uint8 BlockMask = ScorchedOccupancyMask(EScorchedOccupancy::Road)
 		| ScorchedOccupancyMask(EScorchedOccupancy::Intersection)
@@ -952,7 +961,7 @@ void FScorchedCityGenerator::PlacePowerLinesAlongEdge(
 		M_Occupancy.Add(Pole, EScorchedOccupancy::PowerPole);
 	};
 
-	double ArcDistance = M_Params.IntersectionSize;
+	double ArcDistance = IntersectionClearance;
 	while (ArcDistance < UsableLength)
 	{
 		FVector2D PolePosition;

@@ -75,6 +75,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Roads", meta = (ClampMin = "100"))
 	float RoadWidth = 500.0f;
 
+	/** @brief Vertical lift applied after ground snapping roads and intersections. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Roads")
+	float RoadZOffset = 10.0f;
+
 	/** @brief Sidewalk/setback distance between road edge and anything placed beside it. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Roads", meta = (ClampMin = "0"))
 	float RoadSetback = 200.0f;

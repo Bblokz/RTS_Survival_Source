@@ -44,6 +44,10 @@ namespace ScorchedCityPCGConstants
 	// Ground alignment trace range around the city plane.
 	constexpr double GroundTraceUp = 5000.0;
 	constexpr double GroundTraceDown = 20000.0;
+	constexpr double RoadGroundSampleSpacing = 1200.0;
+	constexpr double DefaultIntersectionRoadWidthMultiplier = 1.5;
+	constexpr double MaxIntersectionRoadWidthMultiplier = 2.0;
+	constexpr double MaxIntersectionGridBlockFraction = 0.45;
 
 	// Z half-thickness given to exported occupancy bounds points.
 	constexpr double OccupancyBoundsHalfHeight = 50.0;
@@ -122,11 +126,14 @@ namespace
 	{
 		// Parallel to FScorchedCityGenParams::Buildings.
 		TArray<UClass*> BuildingClasses;
+		TArray<double> BuildingGroundOffsets;
 
 		UStaticMesh* RoadMesh = nullptr;
 		UStaticMesh* IntersectionMesh = nullptr;
 		UClass* TwoPoleClass = nullptr;
 		UClass* SinglePoleClass = nullptr;
+		double TwoPoleGroundOffset = 0.0;
+		double SinglePoleGroundOffset = 0.0;
 
 		// Parallel to FScorchedCityGenParams::ScatterProfiles / their Meshes arrays.
 		TArray<TArray<FSoftObjectPath>> ScatterMeshPaths;
@@ -189,6 +196,9 @@ namespace
 			Resolved.SizeCategory = Entry.SizeCategory;
 			Resolved.ZonePreference = Entry.ZonePreference;
 
+			const FBox LocalBounds = MeasureActorClassBounds(World, *BuildingClass);
+			Assets.BuildingGroundOffsets.Add(LocalBounds.IsValid ? -LocalBounds.Min.Z : 0.0);
+
 			if (Entry.bUseFootprintOverride)
 			{
 				Resolved.FootprintHalfExtents = Entry.FootprintOverride * 0.5;
@@ -196,7 +206,6 @@ namespace
 			}
 			else
 			{
-				const FBox LocalBounds = MeasureActorClassBounds(World, *BuildingClass);
 				if (LocalBounds.IsValid)
 				{
 					const FVector Extent = LocalBounds.GetExtent();
@@ -218,7 +227,9 @@ namespace
 	}
 
 	void ResolveRoadAndPowerAssets(
+		FPCGContext* Context,
 		const UPCGScorchedCitySettings* Settings,
+		UWorld& World,
 		FScorchedCityGenParams& Params,
 		FScorchedCityAssets& Assets)
 	{
@@ -228,6 +239,16 @@ namespace
 		Assets.IntersectionMesh = Settings->IntersectionMesh.LoadSynchronous();
 		Assets.TwoPoleClass = Settings->PowerLineSettings.TwoPoleAsset.LoadSynchronous();
 		Assets.SinglePoleClass = Settings->PowerLineSettings.SinglePoleAsset.LoadSynchronous();
+		if (Assets.TwoPoleClass != nullptr)
+		{
+			const FBox LocalBounds = MeasureActorClassBounds(World, *Assets.TwoPoleClass);
+			Assets.TwoPoleGroundOffset = LocalBounds.IsValid ? -LocalBounds.Min.Z : 0.0;
+		}
+		if (Assets.SinglePoleClass != nullptr)
+		{
+			const FBox LocalBounds = MeasureActorClassBounds(World, *Assets.SinglePoleClass);
+			Assets.SinglePoleGroundOffset = LocalBounds.IsValid ? -LocalBounds.Min.Z : 0.0;
+		}
 
 		Params.RoadMeshLength = Settings->RoadMeshLengthOverride > 0.0f
 			? Settings->RoadMeshLengthOverride
@@ -235,11 +256,39 @@ namespace
 				? FMath::Max(100.0, Assets.RoadMesh->GetBoundingBox().GetSize().X)
 				: DefaultRoadMeshLength);
 
-		Params.IntersectionSize = Settings->IntersectionSizeOverride > 0.0f
-			? Settings->IntersectionSizeOverride
-			: (Assets.IntersectionMesh != nullptr
-				? Assets.IntersectionMesh->GetBoundingBox().GetSize().GetMax()
-				: Settings->RoadWidth * 1.5);
+		if (Settings->IntersectionSizeOverride > 0.0f)
+		{
+			Params.IntersectionSize = Settings->IntersectionSizeOverride;
+			return;
+		}
+
+		const double FallbackIntersectionSize = Settings->RoadWidth * DefaultIntersectionRoadWidthMultiplier;
+		if (Assets.IntersectionMesh == nullptr)
+		{
+			Params.IntersectionSize = FallbackIntersectionSize;
+			return;
+		}
+
+		const double RawIntersectionSize = Assets.IntersectionMesh->GetBoundingBox().GetSize().GetMax();
+		const double MaxLogicalIntersectionSize = FMath::Max(
+			static_cast<double>(Settings->RoadWidth),
+			FMath::Min(
+				static_cast<double>(Settings->RoadWidth) * MaxIntersectionRoadWidthMultiplier,
+				static_cast<double>(Settings->GridBlockSize) * MaxIntersectionGridBlockFraction));
+		Params.IntersectionSize = FMath::Clamp(
+			RawIntersectionSize,
+			static_cast<double>(Settings->RoadWidth),
+			MaxLogicalIntersectionSize);
+
+		if (not FMath::IsNearlyEqual(Params.IntersectionSize, RawIntersectionSize))
+		{
+			PCGE_LOG_C(Warning, GraphAndLog, Context,
+				FText::Format(
+					LOCTEXT("IntersectionSizeClamped",
+						"ScorchedCity: intersection mesh bounds are {0} cm, so the logical intersection size was clamped to {1} cm. Use IntersectionSizeOverride if this should be different."),
+					FText::AsNumber(RawIntersectionSize),
+					FText::AsNumber(Params.IntersectionSize)));
+		}
 	}
 
 	void ResolveScatterAssets(
@@ -338,6 +387,106 @@ namespace
 		return Actor;
 	}
 
+	FCollisionQueryParams MakeGroundTraceParams(const TArray<AActor*>& ActorsToIgnore)
+	{
+		FCollisionQueryParams TraceParams;
+		TraceParams.AddIgnoredActors(ActorsToIgnore);
+		return TraceParams;
+	}
+
+	FVector ProjectWorldPositionToGround(
+		UWorld& World,
+		const FVector& WorldPosition,
+		const FCollisionQueryParams& TraceParams,
+		const double ZOffset)
+	{
+		FHitResult GroundHit;
+		const FVector TraceStart = WorldPosition + FVector::UpVector * ScorchedCityPCGConstants::GroundTraceUp;
+		const FVector TraceEnd = WorldPosition - FVector::UpVector * ScorchedCityPCGConstants::GroundTraceDown;
+		if (World.LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, TraceParams))
+		{
+			return GroundHit.ImpactPoint + FVector::UpVector * ZOffset;
+		}
+
+		return WorldPosition + FVector::UpVector * ZOffset;
+	}
+
+	FVector ProjectCityPositionToGround(
+		UWorld& World,
+		const FVector2D& LocalPosition,
+		const FTransform& CityToWorld,
+		const FCollisionQueryParams& TraceParams,
+		const double ZOffset)
+	{
+		return ProjectWorldPositionToGround(
+			World,
+			CityToWorld.TransformPosition(FVector(LocalPosition, 0.0)),
+			TraceParams,
+			ZOffset);
+	}
+
+	void AddGroundedRoadSegmentPoints(
+		UWorld& World,
+		const FVector2D& SegmentStart,
+		const FVector2D& SegmentEnd,
+		const FTransform& CityToWorld,
+		const FCollisionQueryParams& TraceParams,
+		const double RoadZOffset,
+		const bool bIncludeStart,
+		TArray<FVector>& OutWorldPoints)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		const double SegmentLength = FVector2D::Distance(SegmentStart, SegmentEnd);
+		const int32 NumSamples = FMath::Max(1, FMath::CeilToInt32(SegmentLength / RoadGroundSampleSpacing));
+		const int32 FirstSample = bIncludeStart ? 0 : 1;
+		for (int32 SampleIndex = FirstSample; SampleIndex <= NumSamples; ++SampleIndex)
+		{
+			const double Alpha = static_cast<double>(SampleIndex) / static_cast<double>(NumSamples);
+			const FVector2D LocalPosition = FMath::Lerp(SegmentStart, SegmentEnd, Alpha);
+			OutWorldPoints.Add(ProjectCityPositionToGround(
+				World, LocalPosition, CityToWorld, TraceParams, RoadZOffset));
+		}
+	}
+
+	TArray<FVector> BuildGroundedRoadWorldPoints(
+		UWorld& World,
+		const FScorchedRoadSplineResult& Road,
+		const FTransform& CityToWorld,
+		const FCollisionQueryParams& TraceParams,
+		const double RoadZOffset)
+	{
+		TArray<FVector> WorldPoints;
+		if (Road.Points.Num() < 2)
+		{
+			return WorldPoints;
+		}
+
+		double RoadLength = 0.0;
+		for (int32 PointIndex = 1; PointIndex < Road.Points.Num(); ++PointIndex)
+		{
+			RoadLength += FVector2D::Distance(Road.Points[PointIndex - 1], Road.Points[PointIndex]);
+		}
+
+		WorldPoints.Reserve(FMath::Max(
+			Road.Points.Num(),
+			FMath::CeilToInt32(RoadLength / ScorchedCityPCGConstants::RoadGroundSampleSpacing) + 1));
+
+		for (int32 PointIndex = 1; PointIndex < Road.Points.Num(); ++PointIndex)
+		{
+			AddGroundedRoadSegmentPoints(
+				World,
+				Road.Points[PointIndex - 1],
+				Road.Points[PointIndex],
+				CityToWorld,
+				TraceParams,
+				RoadZOffset,
+				PointIndex == 1,
+				WorldPoints);
+		}
+		return WorldPoints;
+	}
+
 	/** @brief One actor per road: a spline (linear for grid streets) with chained spline meshes. */
 	void SpawnRoadSplineActor(
 		UWorld& World,
@@ -345,9 +494,18 @@ namespace
 		const FTransform& CityToWorld,
 		UStaticMesh* RoadMesh,
 		double RoadMeshLength,
+		double RoadZOffset,
 		TArray<AActor*>& OutSpawnedActors)
 	{
-		const FVector FirstWorldPoint = CityToWorld.TransformPosition(FVector(Road.Points[0], 0.0));
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(OutSpawnedActors);
+		const TArray<FVector> WorldPoints = BuildGroundedRoadWorldPoints(
+			World, Road, CityToWorld, TraceParams, RoadZOffset);
+		if (WorldPoints.Num() < 2)
+		{
+			return;
+		}
+
+		const FVector FirstWorldPoint = WorldPoints[0];
 		AActor* RoadActor = SpawnManagedEmptyActor(World, FTransform(FirstWorldPoint), TEXT("PCG_ScorchedRoad"));
 		if (RoadActor == nullptr)
 		{
@@ -361,9 +519,8 @@ namespace
 		Spline->RegisterComponent();
 
 		Spline->ClearSplinePoints(false);
-		for (const FVector2D& Point : Road.Points)
+		for (const FVector& WorldPoint : WorldPoints)
 		{
-			const FVector WorldPoint = CityToWorld.TransformPosition(FVector(Point, 0.0));
 			Spline->AddSplinePoint(WorldPoint, ESplineCoordinateSpace::World, false);
 		}
 		if (not Road.bCurved)
@@ -414,6 +571,7 @@ namespace
 		const TArray<FScorchedIntersectionSpawn>& Intersections,
 		const FTransform& CityToWorld,
 		UStaticMesh* IntersectionMesh,
+		double RoadZOffset,
 		TArray<AActor*>& OutSpawnedActors)
 	{
 		if (Intersections.IsEmpty() || IntersectionMesh == nullptr)
@@ -421,6 +579,7 @@ namespace
 			return;
 		}
 
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(OutSpawnedActors);
 		AActor* Anchor = SpawnManagedEmptyActor(
 			World, FTransform(CityToWorld.GetLocation()), TEXT("PCG_ScorchedIntersections"));
 		if (Anchor == nullptr)
@@ -439,7 +598,8 @@ namespace
 		const double CityYaw = CityYawRadians(CityToWorld);
 		for (const FScorchedIntersectionSpawn& Intersection : Intersections)
 		{
-			const FVector WorldPosition = CityToWorld.TransformPosition(FVector(Intersection.Position, 0.0));
+			const FVector WorldPosition = ProjectCityPositionToGround(
+				World, Intersection.Position, CityToWorld, TraceParams, RoadZOffset);
 			const FQuat WorldRotation(FVector::UpVector, CityYaw + Intersection.YawRadians);
 			InstancedMeshes->AddInstance(FTransform(WorldRotation, WorldPosition), true);
 		}
@@ -451,6 +611,7 @@ namespace
 		const FVector2D& LocalPosition,
 		const double LocalYawRadians,
 		const FTransform& CityToWorld,
+		const double GroundZOffset,
 		TArray<AActor*>& OutSpawnedActors)
 	{
 		if (ActorClass == nullptr)
@@ -458,7 +619,9 @@ namespace
 			return;
 		}
 
-		const FVector WorldPosition = CityToWorld.TransformPosition(FVector(LocalPosition, 0.0));
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(OutSpawnedActors);
+		const FVector WorldPosition = ProjectCityPositionToGround(
+			World, LocalPosition, CityToWorld, TraceParams, GroundZOffset);
 		const FQuat WorldRotation(FVector::UpVector, CityYawRadians(CityToWorld) + LocalYawRadians);
 
 		FActorSpawnParameters SpawnParams;
@@ -735,6 +898,7 @@ namespace
 		Params.CurvedRoadAmount = Settings->CurvedRoadAmount;
 		Params.BuildingSpacingExtra = Settings->BuildingSpacingExtra;
 		Params.RoadWidth = Settings->RoadWidth;
+		Params.RoadZOffset = Settings->RoadZOffset;
 		Params.RoadSetback = Settings->RoadSetback;
 		Params.MinRoadBuildingDistance = Settings->MinRoadBuildingDistance;
 		Params.GridBlockSize = Settings->GridBlockSize;
@@ -758,15 +922,30 @@ namespace
 	{
 		for (const FScorchedRoadSplineResult& Road : Result.RoadSplines)
 		{
-			SpawnRoadSplineActor(World, Road, CityToWorld, Assets.RoadMesh, Params.RoadMeshLength, OutSpawnedActors);
+			SpawnRoadSplineActor(
+				World,
+				Road,
+				CityToWorld,
+				Assets.RoadMesh,
+				Params.RoadMeshLength,
+				Params.RoadZOffset,
+				OutSpawnedActors);
 		}
 
-		SpawnIntersectionsActor(World, Result.Intersections, CityToWorld, Assets.IntersectionMesh, OutSpawnedActors);
+		SpawnIntersectionsActor(
+			World, Result.Intersections, CityToWorld, Assets.IntersectionMesh, Params.RoadZOffset, OutSpawnedActors);
 
 		for (const FScorchedBuildingSpawn& Building : Result.Buildings)
 		{
+			if (not Assets.BuildingClasses.IsValidIndex(Building.AssetIndex)
+				|| not Assets.BuildingGroundOffsets.IsValidIndex(Building.AssetIndex))
+			{
+				continue;
+			}
+
 			SpawnActorAtCityPosition(World, Assets.BuildingClasses[Building.AssetIndex],
-				Building.ActorPosition, Building.YawRadians, CityToWorld, OutSpawnedActors);
+				Building.ActorPosition, Building.YawRadians, CityToWorld,
+				Assets.BuildingGroundOffsets[Building.AssetIndex], OutSpawnedActors);
 		}
 
 		for (const FScorchedPoleSpawn& Pole : Result.Poles)
@@ -777,7 +956,24 @@ namespace
 			{
 				PoleClass = Pole.bTwoPole ? Assets.SinglePoleClass : Assets.TwoPoleClass;
 			}
-			SpawnActorAtCityPosition(World, PoleClass, Pole.Position, Pole.YawRadians, CityToWorld, OutSpawnedActors);
+
+			double PoleGroundOffset = 0.0;
+			if (PoleClass == Assets.TwoPoleClass)
+			{
+				PoleGroundOffset = Assets.TwoPoleGroundOffset;
+			}
+			else if (PoleClass == Assets.SinglePoleClass)
+			{
+				PoleGroundOffset = Assets.SinglePoleGroundOffset;
+			}
+			SpawnActorAtCityPosition(
+				World,
+				PoleClass,
+				Pole.Position,
+				Pole.YawRadians,
+				CityToWorld,
+				PoleGroundOffset,
+				OutSpawnedActors);
 		}
 	}
 }
@@ -809,7 +1005,7 @@ bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
 	FillScalarParams(Settings, Params);
 	Params.CityLengthX = CityLengths.X;
 	Params.CityLengthY = CityLengths.Y;
-	ResolveRoadAndPowerAssets(Settings, Params, Assets);
+	ResolveRoadAndPowerAssets(Context, Settings, World, Params, Assets);
 	ResolveBuildingAssets(Context, Settings, World, Params, Assets);
 	ResolveScatterAssets(Settings, Params, Assets);
 	Params.IsExcluded = BuildExclusionFunction(Context, CityToWorld);
