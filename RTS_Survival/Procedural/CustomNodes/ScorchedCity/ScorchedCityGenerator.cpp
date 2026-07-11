@@ -67,6 +67,11 @@ namespace ScorchedCityGenConstants
 	// Auxiliary blueprints: nearby positions tried per placement before giving up.
 	constexpr int32 AuxiliaryPlacementAttempts = 5;
 
+	// Road blocks: items overlap-free along the arc, with a little air between them.
+	constexpr double RoadBlockItemSpacingFactor = 1.15;
+	constexpr int32 MaxRoadBlockItems = 32;
+	constexpr int32 MinRoadBlockItems = 2;
+
 	// Orphan road endings are paired when closer than this many grid blocks.
 	constexpr double OrphanConnectMaxBlockFactor = 1.75;
 	// Both endings must roughly face each other for the connection to look natural.
@@ -95,6 +100,8 @@ void FScorchedCityGenerator::Generate(FScorchedCityGenResult& OutResult)
 	BuildLots();
 	PlaceBuildings(OutResult);
 	PlacePowerLines(OutResult);
+	PlaceRoadLanterns(OutResult);
+	PlaceRoadBlocks(OutResult);
 	PlaceAuxiliaryBlueprints(OutResult);
 	BuildScatter(OutResult, OutResult);
 	ExportRoads(OutResult);
@@ -1424,6 +1431,219 @@ bool FScorchedCityGenerator::TryFillLotWithAnyBuilding(FScorchedLot& Lot, FScorc
 }
 
 // ---------------------------------------------------------------------------
+// Road-side objects
+// ---------------------------------------------------------------------------
+
+int32 FScorchedCityGenerator::PickWeightedRoadSideEntry(const TArray<FScorchedResolvedRoadSideEntry>& Entries)
+{
+	double TotalWeight = 0.0;
+	for (const FScorchedResolvedRoadSideEntry& Entry : Entries)
+	{
+		TotalWeight += FMath::Max(0.0f, Entry.Weight);
+	}
+	if (TotalWeight <= 0.0)
+	{
+		return INDEX_NONE;
+	}
+
+	double Pick = M_Random.FRand() * TotalWeight;
+	for (int32 EntryIndex = 0; EntryIndex < Entries.Num(); ++EntryIndex)
+	{
+		Pick -= FMath::Max(0.0f, Entries[EntryIndex].Weight);
+		if (Pick <= 0.0)
+		{
+			return EntryIndex;
+		}
+	}
+	return Entries.Num() - 1;
+}
+
+void FScorchedCityGenerator::PlaceRoadLanterns(FScorchedCityGenResult& OutResult)
+{
+	if (M_Params.RoadLanterns.IsEmpty())
+	{
+		return;
+	}
+
+	// Lanterns avoid everything already placed; blocked spots are simply skipped.
+	const uint8 BlockMask = ScorchedOccupancyMaskAll() & ~ScorchedOccupancyMask(EScorchedOccupancy::Decal);
+
+	for (const FScorchedRoadEdge& Edge : M_Edges)
+	{
+		const double EdgeLength = Edge.Length();
+		double Side = (M_Random.FRand() < 0.5) ? 1.0 : -1.0;
+
+		for (double ArcDistance = M_Params.RoadLanternSpacing * 0.5;
+			ArcDistance < EdgeLength;
+			ArcDistance += M_Params.RoadLanternSpacing, Side = -Side)
+		{
+			FVector2D RoadPoint;
+			FVector2D RoadDirection;
+			if (not SamplePolyline(Edge.Points, ArcDistance, RoadPoint, RoadDirection))
+			{
+				break;
+			}
+
+			const int32 EntryIndex = PickWeightedRoadSideEntry(M_Params.RoadLanterns);
+			if (EntryIndex == INDEX_NONE)
+			{
+				return;
+			}
+			const FScorchedResolvedRoadSideEntry& Entry = M_Params.RoadLanterns[EntryIndex];
+
+			// Facing the road: local +X points from the object toward the road centerline.
+			const FVector2D AwayFromRoad = FVector2D(-RoadDirection.Y, RoadDirection.X) * Side;
+			const double FacingYaw = FMath::Atan2(-AwayFromRoad.Y, -AwayFromRoad.X);
+			const FVector2D PivotPosition = RoadPoint + AwayFromRoad
+				* (M_Params.RoadWidth * 0.5 + M_Params.RoadLanternOffsetFromRoadEdge + Entry.FootprintHalfExtents.X);
+
+			double SinYaw = 0.0;
+			double CosYaw = 0.0;
+			FMath::SinCos(&SinYaw, &CosYaw, FacingYaw);
+			const FVector2D& PivotOffset = Entry.PivotToFootprintCenter;
+
+			FScorchedFootprint Footprint;
+			Footprint.Center = PivotPosition + FVector2D(
+				PivotOffset.X * CosYaw - PivotOffset.Y * SinYaw,
+				PivotOffset.X * SinYaw + PivotOffset.Y * CosYaw);
+			Footprint.HalfExtents = Entry.FootprintHalfExtents;
+			Footprint.YawRadians = FacingYaw;
+
+			if (not IsFootprintInsideCity(Footprint, 0.0) || IsExcludedAt(PivotPosition)
+				|| M_Occupancy.OverlapsAny(Footprint, BlockMask))
+			{
+				continue;
+			}
+
+			M_Occupancy.Add(Footprint, EScorchedOccupancy::Auxiliary);
+
+			FScorchedAuxiliarySpawn Spawn;
+			Spawn.AssetIndex = EntryIndex;
+			Spawn.Position = PivotPosition;
+			Spawn.YawRadians = FacingYaw;
+			OutResult.RoadLanterns.Add(Spawn);
+		}
+	}
+}
+
+void FScorchedCityGenerator::PlaceRoadBlocks(FScorchedCityGenResult& OutResult)
+{
+	if (M_Params.RoadBlockTypes.IsEmpty() || M_Params.RoadBlockChance <= 0.0)
+	{
+		return;
+	}
+
+	for (const FScorchedRoadEdge& Edge : M_Edges)
+	{
+		const double EdgeLength = Edge.Length();
+		for (double ArcDistance = M_Params.RoadBlockInterval * 0.5;
+			ArcDistance < EdgeLength;
+			ArcDistance += M_Params.RoadBlockInterval)
+		{
+			// Seeded chance: either this candidate spot gets a block, or we move to the next.
+			if (M_Random.FRand() > M_Params.RoadBlockChance)
+			{
+				continue;
+			}
+
+			FVector2D RoadPoint;
+			FVector2D RoadDirection;
+			if (not SamplePolyline(Edge.Points, ArcDistance, RoadPoint, RoadDirection))
+			{
+				break;
+			}
+
+			// Never across an intersection piece.
+			FScorchedFootprint CenterProbe;
+			CenterProbe.Center = RoadPoint;
+			CenterProbe.HalfExtents = FVector2D(M_Params.RoadWidth * 0.5, M_Params.RoadWidth * 0.5);
+			if (M_Occupancy.OverlapsAny(CenterProbe, ScorchedOccupancyMask(EScorchedOccupancy::Intersection)))
+			{
+				continue;
+			}
+
+			BuildRoadBlockAt(RoadPoint, RoadDirection, OutResult);
+		}
+	}
+}
+
+void FScorchedCityGenerator::BuildRoadBlockAt(
+	const FVector2D& RoadPoint,
+	const FVector2D& RoadDirection,
+	FScorchedCityGenResult& OutResult)
+{
+	using namespace ScorchedCityGenConstants;
+
+	// One road block always uses a single item type.
+	const int32 TypeIndex = PickWeightedRoadSideEntry(M_Params.RoadBlockTypes);
+	if (TypeIndex == INDEX_NONE)
+	{
+		return;
+	}
+	const FScorchedResolvedRoadSideEntry& Type = M_Params.RoadBlockTypes[TypeIndex];
+
+	// Radius from the yaw span so the arc's lateral reach always covers the road width:
+	// 2 * R * sin(Span/2) == RoadWidth. A 180 degree span becomes a U across the road.
+	const double SpanRadians = FMath::DegreesToRadians(M_Random.FRandRange(
+		M_Params.RoadBlockMinYawSpanDegrees,
+		FMath::Max(M_Params.RoadBlockMinYawSpanDegrees, M_Params.RoadBlockMaxYawSpanDegrees)));
+	const double HalfSpanSin = FMath::Max(0.05, FMath::Sin(FMath::Min(SpanRadians, PI) * 0.5));
+	const double Radius = M_Params.RoadWidth / (2.0 * HalfSpanSin);
+
+	// The arc opens along the road; flip decides which oncoming direction it faces.
+	const double RoadYaw = FMath::Atan2(RoadDirection.Y, RoadDirection.X);
+	const double BaseAngle = RoadYaw + ((M_Random.FRand() < 0.5) ? 0.0 : PI);
+
+	// Item count from the type's real bounds so neighbors never overlap along the arc.
+	const double ItemSize = FMath::Max(20.0, Type.FootprintHalfExtents.GetMax() * 2.0);
+	const double ArcLength = Radius * SpanRadians;
+	const int32 ItemCount = FMath::Clamp(
+		FMath::FloorToInt32(ArcLength / (ItemSize * RoadBlockItemSpacingFactor)) + 1,
+		MinRoadBlockItems, MaxRoadBlockItems);
+
+	for (int32 ItemIndex = 0; ItemIndex < ItemCount; ++ItemIndex)
+	{
+		const double Alpha = (ItemCount == 1) ? 0.5 : static_cast<double>(ItemIndex) / (ItemCount - 1);
+		const double ItemAngle = BaseAngle - SpanRadians * 0.5 + SpanRadians * Alpha;
+		const FVector2D RadialDirection(FMath::Cos(ItemAngle), FMath::Sin(ItemAngle));
+		const FVector2D PivotPosition = RoadPoint + RadialDirection * Radius;
+		// Each item faces outward, toward whatever approaches the block.
+		const double ItemYaw = ItemAngle;
+
+		double SinYaw = 0.0;
+		double CosYaw = 0.0;
+		FMath::SinCos(&SinYaw, &CosYaw, ItemYaw);
+		const FVector2D& PivotOffset = Type.PivotToFootprintCenter;
+
+		FScorchedFootprint Footprint;
+		Footprint.Center = PivotPosition + FVector2D(
+			PivotOffset.X * CosYaw - PivotOffset.Y * SinYaw,
+			PivotOffset.X * SinYaw + PivotOffset.Y * CosYaw);
+		Footprint.HalfExtents = Type.FootprintHalfExtents;
+		Footprint.YawRadians = ItemYaw;
+
+		// Road blocks intentionally sit on roads; only solid obstacles reject an item,
+		// which leaves believable gaps instead of dropping the whole block.
+		const uint8 BlockMask = ScorchedOccupancyMask(EScorchedOccupancy::Building)
+			| ScorchedOccupancyMask(EScorchedOccupancy::PowerPole)
+			| ScorchedOccupancyMask(EScorchedOccupancy::Auxiliary);
+		if (not IsFootprintInsideCity(Footprint, 0.0) || IsExcludedAt(PivotPosition)
+			|| M_Occupancy.OverlapsAny(Footprint, BlockMask))
+		{
+			continue;
+		}
+
+		M_Occupancy.Add(Footprint, EScorchedOccupancy::Auxiliary);
+
+		FScorchedAuxiliarySpawn Spawn;
+		Spawn.AssetIndex = TypeIndex;
+		Spawn.Position = PivotPosition;
+		Spawn.YawRadians = ItemYaw;
+		OutResult.RoadBlockItems.Add(Spawn);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Auxiliary blueprints
 // ---------------------------------------------------------------------------
 
@@ -1576,15 +1796,12 @@ void FScorchedCityGenerator::PlacePowerLinesAlongEdge(
 	const double Side = (M_Random.FRand() < 0.5) ? 1.0 : -1.0;
 	const double EdgeOffset = M_Params.RoadWidth * 0.5 + Settings.OffsetFromRoadEdge;
 
-	// Directional per-end clearance, capped per edge so poles still fit on short streets
-	// between large 4-way pieces; individually blocked spots are skipped during the walk.
+	// Walk the whole edge: every pole spot is occupancy-tested (intersections included), so
+	// large arc clearances are redundant — they shrank the usable span below one spacing on
+	// normal streets, which meant the two-pole pair never fit and only single poles spawned.
 	const double EdgeLength = Edge.Length();
-	const double MaxEndClearance = EdgeLength * 0.4;
-	const double StartClearance = FMath::Min(
-		ComputeEdgeEndClearance(Edge, Edge.NodeA) + Settings.PoleClearance, MaxEndClearance);
-	const double EndClearance = FMath::Min(
-		ComputeEdgeEndClearance(Edge, Edge.NodeB) + Settings.PoleClearance, MaxEndClearance);
-	const double UsableLength = EdgeLength - EndClearance;
+	const double StartClearance = Settings.PoleClearance;
+	const double UsableLength = EdgeLength - Settings.PoleClearance;
 	if (UsableLength - StartClearance < Settings.PowerLineSpacing * 0.5)
 	{
 		return;

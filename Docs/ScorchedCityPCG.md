@@ -55,6 +55,11 @@ Lots are marched along both sides of every edge (width/depth scaled up on major 
 
 Two safeguards keep blocks from staying empty: short streets between large 4-ways that cannot fit a full-width lot get one **narrower centered lot** (down to ~55% width), and at `OverallDensity ≥ 0.35` a **guarantee pass** places at least one building on every street that has lots, so the random density gate can no longer leave whole squares empty.
 
+### 5.3 Road-side objects
+
+- **Road lanterns/signs** (`RoadLanterns`): a weighted Blueprint list marched along every road at a global `Spacing`, alternating sides, offset `OffsetFromRoadEdge` from the road edge and always yawed so local +X faces the road. Bounds-aware; blocked spots (intersections, buildings, poles, other props) are skipped.
+- **Road blocks** (`RoadBlocks`): candidate spots every `Interval` along each road roll a seeded `Chance`; winners get an arc of items of **one** Blueprint type across the road. The arc radius derives from a random yaw span in `[MinYawSpanDegrees, MaxYawSpanDegrees]` so its lateral reach always equals the road width (`2·R·sin(span/2) = RoadWidth`; 180° = U shape). Item count and offsets come from the type's real bounds, items face outward, never sit on intersections, and solid obstacles just leave gaps in the block.
+
 ### 5.4 Auxiliary blueprints
 
 `AuxiliaryBlueprints` entries (props, wrecks, barricades...) are placed around the squares (random points inside generated lots, `CountPerLot`) and in rings around placed buildings (`CountPerBuilding`, `Min/MaxDistanceFromBuilding` from the footprint edge) — never on roads or intersections. Per entry: `bCheckBuildingCollision` / `bCheckPoleCollision` toggle those occupancy masks; failed placements retry a few jittered positions nearby; `bOverrideScale` applies a uniform random scale in `[MinScale, MaxScale]` (footprint scaled accordingly). Placements reserve `Auxiliary` occupancy so they never stack on each other, and spawn as managed Blueprint actors with ground-projected pivots.
@@ -80,7 +85,7 @@ Road splines are trimmed per exit direction against the real (unclamped) interse
 
 ## 7. Power lines
 
-Per edge: one side chosen, poles marched at `PowerLineSpacing` with `OffsetFromRoadEdge` from the road edge, skipping near intersections. Each step places the **two-pole asset** toward the next valid pole position (yawed along the road), or the **single-pole asset** on broken rolls (`BrokenSectionChance`), endpoints, or when the next position is blocked. Pole clearance squares go into the hash grid; blocked positions produce natural gaps. Author the two-pole asset to span ~`PowerLineSpacing`; after a two-pole section the march skips one spacing so chained assets never double a pole.
+Per edge: one side chosen, poles marched at `PowerLineSpacing` with `OffsetFromRoadEdge` from the road edge; every pole spot is occupancy-tested individually (intersections included), so no arc clearance eats the street — set `PowerLineSpacing` to the two-pole asset's pole distance. Each step places the **two-pole asset** toward the next valid pole position (yawed along the road), or the **single-pole asset** on broken rolls (`BrokenSectionChance`), endpoints, or when the next position is blocked. Pole clearance squares go into the hash grid; blocked positions produce natural gaps. Author the two-pole asset to span ~`PowerLineSpacing`; after a two-pole section the march skips one spacing so chained assets never double a pole.
 
 ## 8. Editor-exposed settings
 

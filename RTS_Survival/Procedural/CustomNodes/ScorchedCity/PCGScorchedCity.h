@@ -141,6 +141,20 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Buildings", meta = (ClampMin = "400"))
 	float LotDepth = 2000.0f;
 
+	// --- Road-side objects ---
+
+	/** @brief Lanterns/signs along roads: alternating sides, facing the road, global spacing. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "RoadSide|Lanterns")
+	FScorchedRoadLanternSettings RoadLanterns;
+
+	/**
+	 * @brief Road blocks: arcs of one item type covering the road width. Interval spaces the
+	 * candidate spots, Chance is the seeded roll per spot, yaw span controls the curve
+	 * (180 degrees = U shape).
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "RoadSide|Road Blocks")
+	FScorchedRoadBlockSettings RoadBlocks;
+
 	// --- Auxiliary blueprints ---
 
 	/**

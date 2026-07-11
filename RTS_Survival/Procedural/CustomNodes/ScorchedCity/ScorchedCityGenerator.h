@@ -53,6 +53,17 @@ struct FScorchedResolvedAuxiliary
 	float MaxDistanceFromBuilding = 800.0f;
 };
 
+/** @brief Road-side blueprint (lantern/sign/road block item) with measured footprint. */
+struct FScorchedResolvedRoadSideEntry
+{
+	// Index into the matching settings array (lanterns or road blocks).
+	int32 SettingsIndex = INDEX_NONE;
+
+	FVector2D FootprintHalfExtents = FVector2D(50.0, 50.0);
+	FVector2D PivotToFootprintCenter = FVector2D::ZeroVector;
+	float Weight = 1.0f;
+};
+
 /**
  * @brief Full parameter snapshot for one generation run. Filled by the PCG element from the
  * node settings and resolved assets; everything is in city-local space (pivot at origin).
@@ -99,6 +110,18 @@ struct FScorchedCityGenParams
 
 	TArray<FScorchedResolvedBuilding> Buildings;
 	TArray<FScorchedResolvedAuxiliary> AuxiliaryBlueprints;
+
+	// Road lanterns/signs: entries plus the global spacing/offset settings.
+	TArray<FScorchedResolvedRoadSideEntry> RoadLanterns;
+	double RoadLanternSpacing = 2000.0;
+	double RoadLanternOffsetFromRoadEdge = 100.0;
+
+	// Road blocks: item types plus the global interval/chance/arc-span settings.
+	TArray<FScorchedResolvedRoadSideEntry> RoadBlockTypes;
+	double RoadBlockInterval = 8000.0;
+	double RoadBlockChance = 0.5;
+	double RoadBlockMinYawSpanDegrees = 90.0;
+	double RoadBlockMaxYawSpanDegrees = 180.0;
 
 	TArray<FScorchedScatterProfile> ScatterProfiles;
 	// Parallel to ScatterProfiles: approximate XY radius per mesh entry, for overlap checks.
@@ -216,6 +239,23 @@ private:
 		FScorchedBuildingSpawn& OutSpawn);
 	double ComputeBuildingWeightForLot(const FScorchedResolvedBuilding& Building, const FScorchedLot& Lot) const;
 	int32 PickWeightedBuildingForLot(const FScorchedLot& Lot);
+
+	// --- Road-side objects ---
+
+	/** @brief Lanterns/signs marched along every road at the global spacing, facing the road. */
+	void PlaceRoadLanterns(FScorchedCityGenResult& OutResult);
+
+	void PlaceRoadBlocks(FScorchedCityGenResult& OutResult);
+
+	/**
+	 * @brief Builds one road block: an arc of items of a single type across the road at the
+	 * given point. Radius derives from the yaw span so the arc always covers the road width.
+	 */
+	void BuildRoadBlockAt(const FVector2D& RoadPoint, const FVector2D& RoadDirection,
+		FScorchedCityGenResult& OutResult);
+
+	/** @return Weighted pick into a resolved road-side entry array; INDEX_NONE when empty. */
+	int32 PickWeightedRoadSideEntry(const TArray<FScorchedResolvedRoadSideEntry>& Entries);
 
 	// --- Auxiliary blueprints ---
 	void PlaceAuxiliaryBlueprints(FScorchedCityGenResult& OutResult);

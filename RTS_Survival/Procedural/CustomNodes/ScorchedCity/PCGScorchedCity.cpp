@@ -162,6 +162,10 @@ namespace
 		// Parallel to FScorchedCityGenParams::AuxiliaryBlueprints.
 		TArray<UClass*> AuxiliaryClasses;
 
+		// Parallel to FScorchedCityGenParams::RoadLanterns / RoadBlockTypes.
+		TArray<UClass*> RoadLanternClasses;
+		TArray<UClass*> RoadBlockClasses;
+
 		// Parallel to FScorchedCityGenParams::ScatterProfiles / their Meshes arrays.
 		TArray<TArray<FSoftObjectPath>> ScatterMeshPaths;
 
@@ -489,6 +493,68 @@ namespace
 			Params.AuxiliaryBlueprints.Add(Resolved);
 			Assets.AuxiliaryClasses.Add(AuxiliaryClass);
 		}
+	}
+
+	/** @brief Resolves one road-side blueprint list (lanterns or road block types). */
+	void ResolveRoadSideEntries(
+		FPCGContext* Context,
+		UWorld& World,
+		const TArray<FScorchedRoadSideBlueprintEntry>& Entries,
+		TArray<FScorchedResolvedRoadSideEntry>& OutResolved,
+		TArray<UClass*>& OutClasses)
+	{
+		for (int32 SettingsIndex = 0; SettingsIndex < Entries.Num(); ++SettingsIndex)
+		{
+			UClass* EntryClass = Entries[SettingsIndex].BlueprintClass.LoadSynchronous();
+			if (EntryClass == nullptr)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, Context,
+					LOCTEXT("NullRoadSideClass", "ScorchedCity: a road-side blueprint entry has no valid class and was skipped."));
+				continue;
+			}
+
+			FScorchedResolvedRoadSideEntry Resolved;
+			Resolved.SettingsIndex = SettingsIndex;
+			Resolved.Weight = Entries[SettingsIndex].Weight;
+
+			AActor* InspectionActor = SpawnTransientInspectionActor(World, *EntryClass);
+			if (IsValid(InspectionActor))
+			{
+				const FBox LocalBounds = ComputeInspectionActorLocalBounds(*InspectionActor);
+				if (LocalBounds.IsValid)
+				{
+					const FVector Extent = LocalBounds.GetExtent();
+					const FVector Center = LocalBounds.GetCenter();
+					Resolved.FootprintHalfExtents = FVector2D(Extent.X, Extent.Y);
+					Resolved.PivotToFootprintCenter = FVector2D(Center.X, Center.Y);
+				}
+				InspectionActor->Destroy();
+			}
+
+			OutResolved.Add(Resolved);
+			OutClasses.Add(EntryClass);
+		}
+	}
+
+	void ResolveRoadSideAssets(
+		FPCGContext* Context,
+		const UPCGScorchedCitySettings* Settings,
+		UWorld& World,
+		FScorchedCityGenParams& Params,
+		FScorchedCityAssets& Assets)
+	{
+		ResolveRoadSideEntries(Context, World, Settings->RoadLanterns.Blueprints,
+			Params.RoadLanterns, Assets.RoadLanternClasses);
+		Params.RoadLanternSpacing = Settings->RoadLanterns.Spacing;
+		Params.RoadLanternOffsetFromRoadEdge = Settings->RoadLanterns.OffsetFromRoadEdge;
+
+		ResolveRoadSideEntries(Context, World, Settings->RoadBlocks.Blueprints,
+			Params.RoadBlockTypes, Assets.RoadBlockClasses);
+		Params.RoadBlockInterval = Settings->RoadBlocks.Interval;
+		Params.RoadBlockChance = Settings->RoadBlocks.Chance;
+		Params.RoadBlockMinYawSpanDegrees = Settings->RoadBlocks.MinYawSpanDegrees;
+		Params.RoadBlockMaxYawSpanDegrees =
+			FMath::Max(Settings->RoadBlocks.MinYawSpanDegrees, Settings->RoadBlocks.MaxYawSpanDegrees);
 	}
 
 	void ResolveDecalAssets(
@@ -1345,6 +1411,28 @@ namespace
 				0.0, Auxiliary.UniformScale, OutSpawnedActors);
 		}
 
+		for (const FScorchedAuxiliarySpawn& Lantern : Result.RoadLanterns)
+		{
+			if (not Assets.RoadLanternClasses.IsValidIndex(Lantern.AssetIndex))
+			{
+				continue;
+			}
+			SpawnActorAtCityPosition(World, Assets.RoadLanternClasses[Lantern.AssetIndex],
+				Lantern.Position, Lantern.YawRadians, CityToWorld,
+				0.0, Lantern.UniformScale, OutSpawnedActors);
+		}
+
+		for (const FScorchedAuxiliarySpawn& RoadBlockItem : Result.RoadBlockItems)
+		{
+			if (not Assets.RoadBlockClasses.IsValidIndex(RoadBlockItem.AssetIndex))
+			{
+				continue;
+			}
+			SpawnActorAtCityPosition(World, Assets.RoadBlockClasses[RoadBlockItem.AssetIndex],
+				RoadBlockItem.Position, RoadBlockItem.YawRadians, CityToWorld,
+				0.0, RoadBlockItem.UniformScale, OutSpawnedActors);
+		}
+
 		for (const FScorchedPoleSpawn& Pole : Result.Poles)
 		{
 			// Fall back to whichever pole asset exists so broken settings still produce a city.
@@ -1400,6 +1488,7 @@ bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
 	ResolveRoadAndPowerAssets(Context, Settings, World, Params, Assets);
 	ResolveBuildingAssets(Context, Settings, World, Params, Assets);
 	ResolveAuxiliaryAssets(Context, Settings, World, Params, Assets);
+	ResolveRoadSideAssets(Context, Settings, World, Params, Assets);
 	ResolveScatterAssets(Settings, Params, Assets);
 	ResolveDecalAssets(Settings, Params, Assets);
 	Params.IsExcluded = BuildExclusionFunction(Context, CityToWorld);

@@ -259,6 +259,71 @@ struct FScorchedDecalPlacementSettings
 	float CountMultiplier = 1.0f;
 };
 
+/** @brief One Blueprint option for road-side objects (lanterns, signs) and road blocks. */
+USTRUCT(BlueprintType)
+struct FScorchedRoadSideBlueprintEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide)
+	TSoftClassPtr<AActor> BlueprintClass;
+
+	/** @brief Relative pick chance among the entries of the list. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide, meta = (ClampMin = "0"))
+	float Weight = 1.0f;
+};
+
+/**
+ * @brief Lanterns/signs spawned along roads at a fixed spacing, alternating sides and always
+ * yawed to face the road. Blocked spots (intersections, buildings, poles...) are skipped.
+ */
+USTRUCT(BlueprintType)
+struct FScorchedRoadLanternSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide)
+	TArray<FScorchedRoadSideBlueprintEntry> Blueprints;
+
+	/** @brief Distance along the road between consecutive lanterns/signs. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide, meta = (ClampMin = "200"))
+	float Spacing = 2000.0f;
+
+	/** @brief Gap between the road edge and the object's footprint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide, meta = (ClampMin = "0"))
+	float OffsetFromRoadEdge = 100.0f;
+};
+
+/**
+ * @brief Road blocks: an arc of small items (hedgehogs etc.) covering the width of a road.
+ * One block always uses a single Blueprint type; item offsets come from the type's bounds.
+ * A 180 degree yaw span forms a U across the road; smaller spans are shallower arcs.
+ */
+USTRUCT(BlueprintType)
+struct FScorchedRoadBlockSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide)
+	TArray<FScorchedRoadSideBlueprintEntry> Blueprints;
+
+	/** @brief Distance along each road between candidate road block spots. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide, meta = (ClampMin = "1000"))
+	float Interval = 8000.0f;
+
+	/** @brief Seeded chance that a candidate spot actually gets a road block; else move on. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide, meta = (ClampMin = "0", ClampMax = "1"))
+	float Chance = 0.5f;
+
+	/** @brief Smallest arc span (degrees) a road block may curve over. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide, meta = (ClampMin = "10", ClampMax = "360"))
+	float MinYawSpanDegrees = 90.0f;
+
+	/** @brief Largest arc span (degrees); 180 makes a U shape across the road. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = RoadSide, meta = (ClampMin = "10", ClampMax = "360"))
+	float MaxYawSpanDegrees = 180.0f;
+};
+
 /**
  * @brief One auxiliary Blueprint (props, wrecks, barricades...) placed around lots and
  * buildings but never on roads. Failed placements retry a few nearby positions.
@@ -538,6 +603,9 @@ struct FScorchedCityGenResult
 	TArray<FScorchedScatterCandidate> Scatter;
 	TArray<FScorchedDecalSpawn> Decals;
 	TArray<FScorchedAuxiliarySpawn> Auxiliaries;
+	// Road-side objects; AssetIndex maps into the resolved lantern / road block type arrays.
+	TArray<FScorchedAuxiliarySpawn> RoadLanterns;
+	TArray<FScorchedAuxiliarySpawn> RoadBlockItems;
 	TArray<FScorchedLot> Lots;
 	TArray<FScorchedSpatialHashGrid::FEntry> OccupiedFootprints;
 	TArray<FScorchedOrphanRoadEnd> OuterOrphanRoads;
