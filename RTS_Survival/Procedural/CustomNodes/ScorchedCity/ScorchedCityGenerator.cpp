@@ -44,6 +44,27 @@ namespace ScorchedCityGenConstants
 	constexpr int32 DecalAttemptsPerSpawn = 18;
 	constexpr double DecalRoadLengthUnit = 1000.0;
 	constexpr double DecalPowerPoleJitter = 80.0;
+
+	// Curved roads must be long enough (in segment lengths) to read as a natural curve,
+	// unless they end connected to another road.
+	constexpr double MinCurvedRoadSegmentFactor = 2.2;
+	// A walker may only snap-connect into a road when the turn required is gentle.
+	constexpr double MaxSnapConnectTurnDegrees = 70.0;
+	// Clear space (in segment lengths) required ahead of a junction before seeding a walker.
+	constexpr double CurvedSeedClearanceSegmentFactor = 1.8;
+
+	// Corner fillets: fraction of a block used as the curve radius, and arc tessellation.
+	constexpr double CornerFilletBlockFraction = 0.35;
+	constexpr double CornerFilletMaxEdgeFraction = 0.4;
+	constexpr int32 CornerFilletArcPoints = 7;
+
+	// Orphan road endings are paired when closer than this many grid blocks.
+	constexpr double OrphanConnectMaxBlockFactor = 1.75;
+	// Both endings must roughly face each other for the connection to look natural.
+	constexpr double OrphanConnectMinFacingDot = 0.15;
+	constexpr int32 OrphanCurveMaxPoints = 16;
+	// How far past an ending we probe to decide whether it sits at the city rim.
+	constexpr double OrphanRimProbeRoadWidths = 3.0;
 }
 
 FScorchedCityGenerator::FScorchedCityGenerator(const FScorchedCityGenParams& InParams)
@@ -59,6 +80,8 @@ void FScorchedCityGenerator::Generate(FScorchedCityGenResult& OutResult)
 	BuildZones();
 	BuildGridRoads();
 	BuildCurvedRoads();
+	SmoothCornerNodes();
+	ConnectOrphanRoadEnds(OutResult);
 	AddIntersectionFootprints();
 	BuildLots();
 	PlaceBuildings(OutResult);
@@ -318,7 +341,7 @@ bool FScorchedCityGenerator::IsSegmentBlockedByRoads(const FVector2D& From, cons
 bool FScorchedCityGenerator::IsConnectionSegmentBlockedByRoads(const FVector2D& From, const FVector2D& To) const
 {
 	const double SegmentLength = FVector2D::Distance(From, To);
-	const double EndpointTrim = M_Params.IntersectionSize * 0.5 + M_Params.RoadWidth * 0.25;
+	const double EndpointTrim = IntersectionMaxHalfExtent() + M_Params.RoadWidth * 0.25;
 	if (SegmentLength <= EndpointTrim * 2.0)
 	{
 		return false;
@@ -441,6 +464,18 @@ void FScorchedCityGenerator::BuildCurvedRoads()
 				continue;
 			}
 
+			// Only seed when there is space for a natural curve: the stretch right after the
+			// junction must be free of other roads.
+			const FVector2D ClearanceStart = M_Nodes[NodeIndex].Position
+				+ Direction * (IntersectionMaxHalfExtent() + M_Params.RoadWidth);
+			const FVector2D ClearanceEnd = ClearanceStart
+				+ Direction * (M_Params.CurvedRoadSegmentLength * ScorchedCityGenConstants::CurvedSeedClearanceSegmentFactor);
+			if (not IsInsideCity(ClearanceEnd, M_Params.RoadWidth)
+				|| IsSegmentBlockedByRoads(ClearanceStart, ClearanceEnd))
+			{
+				continue;
+			}
+
 			const double Heading = FMath::Atan2(Direction.Y, Direction.X)
 				+ M_Random.FRandRange(
 					-ScorchedCityGenConstants::GridConnectionHeadingJitter,
@@ -547,14 +582,21 @@ void FScorchedCityGenerator::GrowCurvedRoad(
 		const bool bRoadBlocked = Step > 0 && IsSegmentBlockedByRoads(Position, Next);
 		if (bSelfBlocked || bRoadBlocked || IsGridZoneAt(Next))
 		{
-			// Try to end in a junction with an existing road instead of a dead stop.
+			// Try to end in a junction with an existing road instead of a dead stop, but only
+			// when reaching it reads as a natural curve (no harsh turn into the junction).
 			const int32 SnapNode = FindNearestNode(Next, M_Params.GridBlockSize * 0.45);
 			if (SnapNode != INDEX_NONE
 				&& SnapNode != StartNodeIndex
-				&& not M_Nodes[SnapNode].Edges.IsEmpty()
-				&& not IsConnectionSegmentBlockedByRoads(Position, M_Nodes[SnapNode].Position))
+				&& not M_Nodes[SnapNode].Edges.IsEmpty())
 			{
-				Points.Add(M_Nodes[SnapNode].Position);
+				const FVector2D ToSnapNode = (M_Nodes[SnapNode].Position - Position).GetSafeNormal();
+				const FVector2D HeadingDirection(FMath::Cos(Heading), FMath::Sin(Heading));
+				const double MaxTurnCos = FMath::Cos(FMath::DegreesToRadians(MaxSnapConnectTurnDegrees));
+				if (FVector2D::DotProduct(ToSnapNode, HeadingDirection) >= MaxTurnCos
+					&& not IsConnectionSegmentBlockedByRoads(Position, M_Nodes[SnapNode].Position))
+				{
+					Points.Add(M_Nodes[SnapNode].Position);
+				}
 			}
 			break;
 		}
@@ -572,12 +614,30 @@ void FScorchedCityGenerator::GrowCurvedRoad(
 		}
 	}
 
-	if (Points.Num() >= 2)
+	if (Points.Num() < 2)
 	{
-		const int32 EndNode = FindOrAddNode(Points.Last(), M_Params.RoadWidth * 1.5, false);
-		Points.Last() = M_Nodes[EndNode].Position;
-		CommitEdge(StartNodeIndex, EndNode, MoveTemp(Points), true, false);
+		return;
 	}
+
+	const int32 EndNode = FindOrAddNode(Points.Last(), M_Params.RoadWidth * 1.5, false);
+	const bool bEndsConnected = EndNode != StartNodeIndex && M_Nodes[EndNode].Edges.Num() > 0;
+
+	// Discard stubs: a curved road must either join another road or be long enough to read
+	// as a deliberate curve. Looping back onto the own start node is never natural.
+	double PolylineLength = 0.0;
+	for (int32 PointIndex = 1; PointIndex < Points.Num(); ++PointIndex)
+	{
+		PolylineLength += FVector2D::Distance(Points[PointIndex - 1], Points[PointIndex]);
+	}
+	const double MinCommitLength = M_Params.CurvedRoadSegmentLength * MinCurvedRoadSegmentFactor;
+	if (EndNode == StartNodeIndex || (not bEndsConnected && PolylineLength < MinCommitLength))
+	{
+		// Nothing was committed; branch requests would hang off a road that does not exist.
+		return;
+	}
+
+	Points.Last() = M_Nodes[EndNode].Position;
+	CommitEdge(StartNodeIndex, EndNode, MoveTemp(Points), true, false);
 
 	for (const FBranchRequest& Branch : Branches)
 	{
@@ -593,18 +653,381 @@ void FScorchedCityGenerator::GrowCurvedRoad(
 
 void FScorchedCityGenerator::AddIntersectionFootprints()
 {
-	for (const FScorchedRoadNode& Node : M_Nodes)
+	for (int32 NodeIndex = 0; NodeIndex < M_Nodes.Num(); ++NodeIndex)
 	{
+		const FScorchedRoadNode& Node = M_Nodes[NodeIndex];
 		if (Node.Edges.Num() < 3)
 		{
 			continue;
 		}
 
+		// Match the spawned intersection mesh exactly: same non-square extents, same yaw.
 		FScorchedFootprint Footprint;
 		Footprint.Center = Node.Position;
-		Footprint.HalfExtents = FVector2D(M_Params.IntersectionSize * 0.5, M_Params.IntersectionSize * 0.5);
-		Footprint.YawRadians = 0.0;
+		Footprint.HalfExtents = FVector2D(M_Params.IntersectionSizeX * 0.5, M_Params.IntersectionSizeY * 0.5);
+		Footprint.YawRadians = ComputeIntersectionYawAtNode(NodeIndex);
 		M_Occupancy.Add(Footprint, EScorchedOccupancy::Intersection);
+	}
+}
+
+FVector2D FScorchedCityGenerator::EdgeDirectionAwayFromNode(
+	const FScorchedRoadEdge& Edge,
+	const int32 NodeIndex) const
+{
+	if (Edge.Points.Num() < 2)
+	{
+		return FVector2D(1.0, 0.0);
+	}
+
+	if (Edge.NodeA == NodeIndex)
+	{
+		return (Edge.Points[1] - Edge.Points[0]).GetSafeNormal();
+	}
+	return (Edge.Points[Edge.Points.Num() - 2] - Edge.Points.Last()).GetSafeNormal();
+}
+
+double FScorchedCityGenerator::ComputeIntersectionYawAtNode(const int32 NodeIndex) const
+{
+	const FScorchedRoadNode& Node = M_Nodes[NodeIndex];
+	if (Node.bGridNode || Node.Edges.IsEmpty())
+	{
+		// Grid intersections are axis-aligned in city space.
+		return 0.0;
+	}
+
+	const FVector2D Direction = EdgeDirectionAwayFromNode(M_Edges[Node.Edges[0]], NodeIndex);
+	return FMath::Atan2(Direction.Y, Direction.X);
+}
+
+double FScorchedCityGenerator::ComputeEdgeEndClearance(const FScorchedRoadEdge& Edge, const int32 NodeIndex) const
+{
+	if (not M_Nodes.IsValidIndex(NodeIndex) || M_Nodes[NodeIndex].Edges.Num() < 3)
+	{
+		// No intersection piece at this end.
+		return 0.0;
+	}
+
+	FScorchedFootprint MeshFootprint;
+	MeshFootprint.HalfExtents = FVector2D(M_Params.IntersectionSizeX * 0.5, M_Params.IntersectionSizeY * 0.5);
+	MeshFootprint.YawRadians = ComputeIntersectionYawAtNode(NodeIndex);
+	return MeshFootprint.SupportRadius(EdgeDirectionAwayFromNode(Edge, NodeIndex));
+}
+
+void FScorchedCityGenerator::RetargetEdgeEndpoint(
+	const int32 EdgeIndex,
+	const int32 OldNodeIndex,
+	const int32 NewNodeIndex,
+	const FVector2D& NewEndpointPosition)
+{
+	FScorchedRoadEdge& Edge = M_Edges[EdgeIndex];
+	if (Edge.NodeA == OldNodeIndex)
+	{
+		Edge.NodeA = NewNodeIndex;
+		Edge.Points[0] = NewEndpointPosition;
+	}
+	else
+	{
+		Edge.NodeB = NewNodeIndex;
+		Edge.Points.Last() = NewEndpointPosition;
+	}
+	M_Nodes[NewNodeIndex].Edges.Add(EdgeIndex);
+}
+
+namespace
+{
+	/** @brief Quarter-circle fillet from CornerStart to CornerEnd around ArcCenter. */
+	TArray<FVector2D> BuildCornerFilletArc(
+		const FVector2D& ArcCenter,
+		const FVector2D& CornerStart,
+		const FVector2D& CornerEnd,
+		const int32 NumPoints)
+	{
+		TArray<FVector2D> ArcPoints;
+		ArcPoints.Reserve(NumPoints);
+
+		const FVector2D StartOffset = CornerStart - ArcCenter;
+		const FVector2D EndOffset = CornerEnd - ArcCenter;
+		const double StartAngle = FMath::Atan2(StartOffset.Y, StartOffset.X);
+		double DeltaAngle = FMath::Atan2(EndOffset.Y, EndOffset.X) - StartAngle;
+		// Take the short way around (a corner fillet is always a quarter turn or less).
+		while (DeltaAngle > PI) { DeltaAngle -= 2.0 * PI; }
+		while (DeltaAngle < -PI) { DeltaAngle += 2.0 * PI; }
+		const double Radius = StartOffset.Size();
+
+		for (int32 PointIndex = 0; PointIndex < NumPoints; ++PointIndex)
+		{
+			const double Alpha = static_cast<double>(PointIndex) / (NumPoints - 1);
+			const double Angle = StartAngle + DeltaAngle * Alpha;
+			ArcPoints.Add(ArcCenter + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Radius);
+		}
+
+		// Exact endpoints so the fillet meets the shortened streets without gaps.
+		ArcPoints[0] = CornerStart;
+		ArcPoints.Last() = CornerEnd;
+		return ArcPoints;
+	}
+}
+
+void FScorchedCityGenerator::SmoothCornerNodes()
+{
+	using namespace ScorchedCityGenConstants;
+
+	// New nodes appended by the fillets are never corners themselves; cache the count.
+	const int32 NumOriginalNodes = M_Nodes.Num();
+	for (int32 NodeIndex = 0; NodeIndex < NumOriginalNodes; ++NodeIndex)
+	{
+		if (M_Nodes[NodeIndex].Edges.Num() != 2)
+		{
+			continue;
+		}
+
+		const int32 EdgeAIndex = M_Nodes[NodeIndex].Edges[0];
+		const int32 EdgeBIndex = M_Nodes[NodeIndex].Edges[1];
+		const FScorchedRoadEdge& EdgeA = M_Edges[EdgeAIndex];
+		const FScorchedRoadEdge& EdgeB = M_Edges[EdgeBIndex];
+
+		// Only plain straight streets meeting at a right angle qualify.
+		const bool bBothStraight = not EdgeA.bCurved && not EdgeB.bCurved
+			&& EdgeA.Points.Num() == 2 && EdgeB.Points.Num() == 2
+			&& EdgeAIndex != EdgeBIndex
+			&& EdgeA.NodeA != EdgeA.NodeB && EdgeB.NodeA != EdgeB.NodeB;
+		if (not bBothStraight)
+		{
+			continue;
+		}
+
+		const FVector2D DirectionA = EdgeDirectionAwayFromNode(EdgeA, NodeIndex);
+		const FVector2D DirectionB = EdgeDirectionAwayFromNode(EdgeB, NodeIndex);
+		if (FMath::Abs(FVector2D::DotProduct(DirectionA, DirectionB)) > 0.05)
+		{
+			continue;
+		}
+
+		const double FilletRadius = FMath::Min3(
+			M_Params.GridBlockSize * CornerFilletBlockFraction,
+			EdgeA.Length() * CornerFilletMaxEdgeFraction,
+			EdgeB.Length() * CornerFilletMaxEdgeFraction);
+		if (FilletRadius < M_Params.RoadWidth * 1.2)
+		{
+			continue;
+		}
+
+		const FVector2D CornerPosition = M_Nodes[NodeIndex].Position;
+		const FVector2D CornerStart = CornerPosition + DirectionA * FilletRadius;
+		const FVector2D CornerEnd = CornerPosition + DirectionB * FilletRadius;
+		const FVector2D ArcCenter = CornerPosition + DirectionA * FilletRadius + DirectionB * FilletRadius;
+		const bool bMajorFillet = EdgeA.bMajor && EdgeB.bMajor;
+
+		// Pull both streets back and bridge them with the curved fillet edge.
+		FScorchedRoadNode NewNodeA;
+		NewNodeA.Position = CornerStart;
+		const int32 NewNodeAIndex = M_Nodes.Add(NewNodeA);
+		RetargetEdgeEndpoint(EdgeAIndex, NodeIndex, NewNodeAIndex, CornerStart);
+
+		FScorchedRoadNode NewNodeB;
+		NewNodeB.Position = CornerEnd;
+		const int32 NewNodeBIndex = M_Nodes.Add(NewNodeB);
+		RetargetEdgeEndpoint(EdgeBIndex, NodeIndex, NewNodeBIndex, CornerEnd);
+
+		M_Nodes[NodeIndex].Edges.Reset();
+
+		TArray<FVector2D> ArcPoints =
+			BuildCornerFilletArc(ArcCenter, CornerStart, CornerEnd, CornerFilletArcPoints);
+		CommitEdge(NewNodeAIndex, NewNodeBIndex, MoveTemp(ArcPoints), true, bMajorFillet);
+	}
+}
+
+bool FScorchedCityGenerator::IsPolylineBlockedByRoads(
+	const TArray<FVector2D>& Points,
+	const double EndpointIgnoreDistance) const
+{
+	double TotalLength = 0.0;
+	for (int32 PointIndex = 1; PointIndex < Points.Num(); ++PointIndex)
+	{
+		TotalLength += FVector2D::Distance(Points[PointIndex - 1], Points[PointIndex]);
+	}
+
+	const uint8 RoadMask = ScorchedOccupancyMask(EScorchedOccupancy::Road)
+		| ScorchedOccupancyMask(EScorchedOccupancy::Intersection);
+
+	double ArcDistance = 0.0;
+	for (int32 PointIndex = 1; PointIndex < Points.Num(); ++PointIndex)
+	{
+		const FVector2D SegmentStart = Points[PointIndex - 1];
+		const FVector2D SegmentEnd = Points[PointIndex];
+		const double SegmentLength = FVector2D::Distance(SegmentStart, SegmentEnd);
+		const double SegmentMidDistance = ArcDistance + SegmentLength * 0.5;
+		ArcDistance += SegmentLength;
+
+		// Both endpoints legitimately touch existing roads; ignore those stretches.
+		if (SegmentMidDistance < EndpointIgnoreDistance
+			|| SegmentMidDistance > TotalLength - EndpointIgnoreDistance)
+		{
+			continue;
+		}
+
+		const FVector2D Direction = (SegmentEnd - SegmentStart).GetSafeNormal();
+		FScorchedFootprint Candidate;
+		Candidate.Center = (SegmentStart + SegmentEnd) * 0.5;
+		Candidate.HalfExtents = FVector2D(SegmentLength * 0.5, M_Params.RoadWidth * 0.45);
+		Candidate.YawRadians = FMath::Atan2(Direction.Y, Direction.X);
+		if (M_Occupancy.OverlapsAny(Candidate, RoadMask))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+namespace
+{
+	/** @brief Cubic bezier between two road endings, using their outward directions as tangents. */
+	TArray<FVector2D> BuildOrphanConnectionCurve(
+		const FVector2D& StartPosition,
+		const FVector2D& StartOutward,
+		const FVector2D& EndPosition,
+		const FVector2D& EndOutward,
+		const double SegmentLength,
+		const int32 MaxPoints)
+	{
+		const double Distance = FVector2D::Distance(StartPosition, EndPosition);
+		const FVector2D Control1 = StartPosition + StartOutward * (Distance / 3.0);
+		const FVector2D Control2 = EndPosition + EndOutward * (Distance / 3.0);
+		const int32 NumPoints = FMath::Clamp(
+			FMath::CeilToInt32(Distance / FMath::Max(100.0, SegmentLength * 0.5)) + 1, 4, MaxPoints);
+
+		TArray<FVector2D> CurvePoints;
+		CurvePoints.Reserve(NumPoints);
+		for (int32 PointIndex = 0; PointIndex < NumPoints; ++PointIndex)
+		{
+			const double Alpha = static_cast<double>(PointIndex) / (NumPoints - 1);
+			const double OneMinusAlpha = 1.0 - Alpha;
+			CurvePoints.Add(
+				StartPosition * (OneMinusAlpha * OneMinusAlpha * OneMinusAlpha)
+				+ Control1 * (3.0 * OneMinusAlpha * OneMinusAlpha * Alpha)
+				+ Control2 * (3.0 * OneMinusAlpha * Alpha * Alpha)
+				+ EndPosition * (Alpha * Alpha * Alpha));
+		}
+		return CurvePoints;
+	}
+}
+
+void FScorchedCityGenerator::ConnectOrphanRoadEnds(FScorchedCityGenResult& OutResult)
+{
+	using namespace ScorchedCityGenConstants;
+
+	struct FOrphanEnd
+	{
+		int32 NodeIndex = INDEX_NONE;
+		FVector2D Position = FVector2D::ZeroVector;
+		// Continues the road outward, past its ending.
+		FVector2D OutwardDirection = FVector2D(1.0, 0.0);
+	};
+
+	TArray<FOrphanEnd> Orphans;
+	for (int32 NodeIndex = 0; NodeIndex < M_Nodes.Num(); ++NodeIndex)
+	{
+		if (M_Nodes[NodeIndex].Edges.Num() != 1)
+		{
+			continue;
+		}
+
+		FOrphanEnd Orphan;
+		Orphan.NodeIndex = NodeIndex;
+		Orphan.Position = M_Nodes[NodeIndex].Position;
+		Orphan.OutwardDirection =
+			-EdgeDirectionAwayFromNode(M_Edges[M_Nodes[NodeIndex].Edges[0]], NodeIndex);
+		Orphans.Add(Orphan);
+	}
+
+	// Pair up endings that face each other, closest pairs first (deterministic order).
+	struct FOrphanPair
+	{
+		int32 IndexA = INDEX_NONE;
+		int32 IndexB = INDEX_NONE;
+		double Distance = 0.0;
+	};
+	TArray<FOrphanPair> Pairs;
+	const double MaxConnectDistance = M_Params.GridBlockSize * OrphanConnectMaxBlockFactor;
+
+	for (int32 IndexA = 0; IndexA < Orphans.Num(); ++IndexA)
+	{
+		for (int32 IndexB = IndexA + 1; IndexB < Orphans.Num(); ++IndexB)
+		{
+			const double Distance = FVector2D::Distance(Orphans[IndexA].Position, Orphans[IndexB].Position);
+			if (Distance > MaxConnectDistance || Distance < M_Params.RoadWidth)
+			{
+				continue;
+			}
+
+			const FVector2D AToB = (Orphans[IndexB].Position - Orphans[IndexA].Position) / Distance;
+			const bool bFacing =
+				FVector2D::DotProduct(Orphans[IndexA].OutwardDirection, AToB) > OrphanConnectMinFacingDot
+				&& FVector2D::DotProduct(Orphans[IndexB].OutwardDirection, -AToB) > OrphanConnectMinFacingDot;
+			if (bFacing)
+			{
+				Pairs.Add(FOrphanPair{IndexA, IndexB, Distance});
+			}
+		}
+	}
+	Pairs.StableSort([](const FOrphanPair& A, const FOrphanPair& B) { return A.Distance < B.Distance; });
+
+	TSet<int32> ConnectedOrphans;
+	for (const FOrphanPair& Pair : Pairs)
+	{
+		if (ConnectedOrphans.Contains(Pair.IndexA) || ConnectedOrphans.Contains(Pair.IndexB))
+		{
+			continue;
+		}
+
+		const FOrphanEnd& OrphanA = Orphans[Pair.IndexA];
+		const FOrphanEnd& OrphanB = Orphans[Pair.IndexB];
+		TArray<FVector2D> CurvePoints = BuildOrphanConnectionCurve(
+			OrphanA.Position, OrphanA.OutwardDirection,
+			OrphanB.Position, OrphanB.OutwardDirection,
+			M_Params.CurvedRoadSegmentLength, OrphanCurveMaxPoints);
+
+		bool bCurveInsideCity = true;
+		for (const FVector2D& CurvePoint : CurvePoints)
+		{
+			if (not IsInsideCity(CurvePoint, M_Params.RoadWidth * 0.5))
+			{
+				bCurveInsideCity = false;
+				break;
+			}
+		}
+
+		if (not bCurveInsideCity
+			|| IsPolylineBlockedByRoads(CurvePoints, M_Params.RoadWidth * 1.5))
+		{
+			continue;
+		}
+
+		CommitEdge(OrphanA.NodeIndex, OrphanB.NodeIndex, MoveTemp(CurvePoints), true, false);
+		ConnectedOrphans.Add(Pair.IndexA);
+		ConnectedOrphans.Add(Pair.IndexB);
+	}
+
+	// Whatever is left at the rim gets exported so other PCG logic can connect to it.
+	for (int32 OrphanIndex = 0; OrphanIndex < Orphans.Num(); ++OrphanIndex)
+	{
+		if (ConnectedOrphans.Contains(OrphanIndex))
+		{
+			continue;
+		}
+
+		const FOrphanEnd& Orphan = Orphans[OrphanIndex];
+		const FVector2D RimProbe = Orphan.Position
+			+ Orphan.OutwardDirection * (M_Params.RoadWidth * OrphanRimProbeRoadWidths);
+		if (IsInsideCity(RimProbe, 0.0))
+		{
+			continue;
+		}
+
+		FScorchedOrphanRoadEnd OrphanEnd;
+		OrphanEnd.Position = Orphan.Position;
+		OrphanEnd.YawRadians = FMath::Atan2(Orphan.OutwardDirection.Y, Orphan.OutwardDirection.X);
+		OutResult.OuterOrphanRoads.Add(OrphanEnd);
 	}
 }
 
@@ -626,11 +1049,18 @@ void FScorchedCityGenerator::BuildLotsAlongEdge(const int32 EdgeIndex)
 
 	const FScorchedRoadEdge& Edge = M_Edges[EdgeIndex];
 	const double LotWidth = M_Params.LotWidth * (Edge.bMajor ? MajorRoadLotWidthMultiplier : 1.0);
-
-	double ArcDistance = LotWidth * 0.5 + M_Params.IntersectionSize * 0.5;
 	const double EdgeLength = Edge.Length();
 
-	while (ArcDistance + LotWidth * 0.5 < EdgeLength)
+	// Directional per-end clearance, capped so a large 4-way asset can never consume the
+	// whole street: mid-block lots must survive or no buildings would spawn at all.
+	const double MaxEndClearance = EdgeLength * 0.35;
+	const double StartClearance =
+		FMath::Min(ComputeEdgeEndClearance(Edge, Edge.NodeA), MaxEndClearance);
+	const double EndClearance =
+		FMath::Min(ComputeEdgeEndClearance(Edge, Edge.NodeB), MaxEndClearance);
+
+	double ArcDistance = StartClearance + LotWidth * 0.5;
+	while (ArcDistance + LotWidth * 0.5 < EdgeLength - EndClearance)
 	{
 		FVector2D RoadPoint;
 		FVector2D RoadDirection;
@@ -943,13 +1373,11 @@ void FScorchedCityGenerator::PlacePowerLines(FScorchedCityGenResult& OutResult)
 		return;
 	}
 
-	const double MinUsableEdgeLength = M_Params.IntersectionSize + M_Params.PowerLines.PoleClearance * 2.0;
+	// Per-edge usability is decided inside PlacePowerLinesAlongEdge with capped clearances,
+	// so large intersection assets can never silence power lines city-wide.
 	for (const FScorchedRoadEdge& Edge : M_Edges)
 	{
-		if (Edge.Length() > MinUsableEdgeLength)
-		{
-			PlacePowerLinesAlongEdge(Edge, OutResult);
-		}
+		PlacePowerLinesAlongEdge(Edge, OutResult);
 	}
 }
 
@@ -960,8 +1388,20 @@ void FScorchedCityGenerator::PlacePowerLinesAlongEdge(
 	const FScorchedPowerLineSettings& Settings = M_Params.PowerLines;
 	const double Side = (M_Random.FRand() < 0.5) ? 1.0 : -1.0;
 	const double EdgeOffset = M_Params.RoadWidth * 0.5 + Settings.OffsetFromRoadEdge;
-	const double IntersectionClearance = M_Params.IntersectionSize * 0.5 + Settings.PoleClearance;
-	const double UsableLength = Edge.Length() - IntersectionClearance;
+
+	// Directional per-end clearance, capped per edge so poles still fit on short streets
+	// between large 4-way pieces; individually blocked spots are skipped during the walk.
+	const double EdgeLength = Edge.Length();
+	const double MaxEndClearance = EdgeLength * 0.4;
+	const double StartClearance = FMath::Min(
+		ComputeEdgeEndClearance(Edge, Edge.NodeA) + Settings.PoleClearance, MaxEndClearance);
+	const double EndClearance = FMath::Min(
+		ComputeEdgeEndClearance(Edge, Edge.NodeB) + Settings.PoleClearance, MaxEndClearance);
+	const double UsableLength = EdgeLength - EndClearance;
+	if (UsableLength - StartClearance < Settings.PowerLineSpacing * 0.5)
+	{
+		return;
+	}
 
 	uint8 BlockMask = ScorchedOccupancyMask(EScorchedOccupancy::Road)
 		| ScorchedOccupancyMask(EScorchedOccupancy::Intersection)
@@ -1001,7 +1441,7 @@ void FScorchedCityGenerator::PlacePowerLinesAlongEdge(
 		M_Occupancy.Add(Pole, EScorchedOccupancy::PowerPole);
 	};
 
-	double ArcDistance = IntersectionClearance;
+	double ArcDistance = StartClearance;
 	while (ArcDistance < UsableLength)
 	{
 		FVector2D PolePosition;
@@ -1459,7 +1899,7 @@ void FScorchedCityGenerator::BuildRoadDecals(FScorchedCityGenResult& OutResult)
 	{
 		FScorchedFootprint Area;
 		Area.Center = Intersection.Position;
-		Area.HalfExtents = FVector2D(M_Params.IntersectionSize * 0.5, M_Params.IntersectionSize * 0.5);
+		Area.HalfExtents = FVector2D(M_Params.IntersectionSizeX * 0.5, M_Params.IntersectionSizeY * 0.5);
 		Area.YawRadians = Intersection.YawRadians;
 		BuildDecalsInFootprint(Settings, EScorchedDecalSet::Road, Area, 1.0, Intersection.YawRadians, OutResult);
 	}
@@ -1533,34 +1973,39 @@ void FScorchedCityGenerator::ExportRoads(FScorchedCityGenResult& OutResult) cons
 
 		FScorchedIntersectionSpawn Intersection;
 		Intersection.Position = M_Nodes[NodeIndex].Position;
-		if (not M_Nodes[NodeIndex].bGridNode && not M_Nodes[NodeIndex].Edges.IsEmpty())
-		{
-			const FScorchedRoadEdge& FirstEdge = M_Edges[M_Nodes[NodeIndex].Edges[0]];
-			if (FirstEdge.Points.Num() >= 2)
-			{
-				const FVector2D Direction = FirstEdge.Points[1] - FirstEdge.Points[0];
-				Intersection.YawRadians = FMath::Atan2(Direction.Y, Direction.X);
-			}
-		}
+		Intersection.YawRadians = ComputeIntersectionYawAtNode(NodeIndex);
 		OutResult.Intersections.Add(Intersection);
 	}
 
-	const double TrimDistance = M_Params.IntersectionSize * 0.5;
+	// Trim each road end back by the intersection footprint's support along the exit
+	// direction, so splines end flush with a non-square 4-way instead of running under it.
+	// This trim is deliberately uncapped: the spline must never render below the mesh.
 	for (const FScorchedRoadEdge& Edge : M_Edges)
 	{
 		TArray<FVector2D> Points = Edge.Points;
-		if (MeshNodes.Contains(Edge.NodeA))
+		if (Points.Num() >= 2 && MeshNodes.Contains(Edge.NodeA))
 		{
-			TrimPolylineFront(Points, TrimDistance);
+			TrimPolylineFront(Points, ComputeEdgeEndClearance(Edge, Edge.NodeA));
 		}
-		if (MeshNodes.Contains(Edge.NodeB))
+		if (Points.Num() >= 2 && MeshNodes.Contains(Edge.NodeB))
 		{
 			Algo::Reverse(Points);
-			TrimPolylineFront(Points, TrimDistance);
+			TrimPolylineFront(Points, ComputeEdgeEndClearance(Edge, Edge.NodeB));
 			Algo::Reverse(Points);
 		}
 
 		if (Points.Num() < 2)
+		{
+			continue;
+		}
+
+		// Drop slivers left between two large adjacent intersections.
+		double RemainingLength = 0.0;
+		for (int32 PointIndex = 1; PointIndex < Points.Num(); ++PointIndex)
+		{
+			RemainingLength += FVector2D::Distance(Points[PointIndex - 1], Points[PointIndex]);
+		}
+		if (RemainingLength < M_Params.RoadWidth * 0.5)
 		{
 			continue;
 		}

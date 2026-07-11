@@ -115,9 +115,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Roads", meta = (ClampMin = "0"))
 	float RoadMeshLengthOverride = 0.0f;
 
-	/** @brief 0 = derive from the intersection mesh bounds. */
+	/**
+	 * @brief Footprint of the 4-way asset along its local X; 0 = derive from the mesh bounds.
+	 * Supports non-square intersections: road splines trim against the matching axis.
+	 */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Roads", meta = (ClampMin = "0"))
-	float IntersectionSizeOverride = 0.0f;
+	float IntersectionSizeOverrideX = 0.0f;
+
+	/** @brief Footprint of the 4-way asset along its local Y; 0 = derive from the mesh bounds. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Roads", meta = (ClampMin = "0"))
+	float IntersectionSizeOverrideY = 0.0f;
 
 	// --- Buildings ---
 
@@ -163,7 +170,7 @@ public:
 /**
  * @brief Execution element for ScorchedCity. Resolves assets and their real bounds, runs the
  * deterministic layout generator, spawns roads/intersections/buildings/poles as managed
- * actors and emits Scatter, OccupiedBounds and Lots point data.
+ * actors and emits Scatter, OccupiedBounds, Lots and OuterOrphanRoads point data.
  */
 class FPCGScorchedCityElement : public IPCGElement
 {

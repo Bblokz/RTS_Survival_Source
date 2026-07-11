@@ -67,8 +67,10 @@ struct FScorchedCityGenParams
 
 	// Length of one road mesh chunk; road occupancy is rasterized at this granularity.
 	double RoadMeshLength = 400.0;
-	// Side length of the square 4-way intersection asset footprint.
-	double IntersectionSize = 700.0;
+	// Real footprint of the 4-way intersection asset along its local X and Y; the asset may be
+	// non-square, so road splines are trimmed per exit direction against the matching axis.
+	double IntersectionSizeX = 700.0;
+	double IntersectionSizeY = 700.0;
 
 	TArray<FScorchedResolvedBuilding> Buildings;
 
@@ -136,6 +138,44 @@ private:
 	void AddIntersectionFootprints();
 	bool IsSegmentBlockedByRoads(const FVector2D& From, const FVector2D& To) const;
 	bool IsConnectionSegmentBlockedByRoads(const FVector2D& From, const FVector2D& To) const;
+
+	/**
+	 * @brief Replaces degree-2 corners of two perpendicular straight streets with a curved
+	 * fillet edge, so rim streets bend naturally into their flanking roads instead of butting.
+	 */
+	void SmoothCornerNodes();
+
+	/**
+	 * @brief Pairs nearby degree-1 road endings with natural curves where the path is clear;
+	 * unconnectable endings at the city rim are exported as OuterOrphanRoads.
+	 */
+	void ConnectOrphanRoadEnds(FScorchedCityGenResult& OutResult);
+
+	/** @return Normalized direction from the node into the edge's polyline. */
+	FVector2D EdgeDirectionAwayFromNode(const FScorchedRoadEdge& Edge, int32 NodeIndex) const;
+
+	/** @brief Moves one endpoint of an edge onto a different node (used by corner fillets). */
+	void RetargetEdgeEndpoint(int32 EdgeIndex, int32 OldNodeIndex, int32 NewNodeIndex,
+		const FVector2D& NewEndpointPosition);
+
+	/** @return Yaw (radians) the intersection mesh uses at this node; footprints/trims match it. */
+	double ComputeIntersectionYawAtNode(int32 NodeIndex) const;
+
+	/**
+	 * @brief How far the intersection piece at this edge end reaches along the edge; 0 when the
+	 * node has no intersection. Uncapped: callers placing content must cap it per edge so large
+	 * 4-way assets can never consume entire streets (which would silence buildings/power lines).
+	 * @return Support of the (possibly non-square) intersection footprint along the exit direction.
+	 */
+	double ComputeEdgeEndClearance(const FScorchedRoadEdge& Edge, int32 NodeIndex) const;
+
+	double IntersectionMaxHalfExtent() const
+	{
+		return 0.5 * FMath::Max(M_Params.IntersectionSizeX, M_Params.IntersectionSizeY);
+	}
+
+	/** @brief Road-overlap test along a polyline, ignoring stretches near both endpoints. */
+	bool IsPolylineBlockedByRoads(const TArray<FVector2D>& Points, double EndpointIgnoreDistance) const;
 
 	// --- Lots & buildings ---
 	void BuildLots();

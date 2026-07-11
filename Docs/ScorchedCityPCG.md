@@ -23,6 +23,7 @@ Pins:
 - **Scatter** (Point): debris points with a `Mesh` (SoftObjectPath) attribute → wire into a Static Mesh Spawner, mesh selection "By Attribute".
 - **OccupiedBounds** (Point): every reserved oriented footprint (roads, intersections, buildings, poles) with an `Occupancy` int attribute — use with Difference/filters to exclude other PCG content.
 - **Lots** (Point): generated lots with a `Used` attribute (debugging / extensions).
+- **OuterOrphanRoads** (Point): rim road endings that could not be connected with a natural curve; each point sits on the road's final outer position (ground-projected) and its rotation yaws outward, so other PCG logic can continue those roads beyond the city.
 
 ## 2. Data structures
 
@@ -42,9 +43,11 @@ Pins:
 
 - **Zoning**: macro cells of `GridBlockSize` are labelled grid/curved by hashed noise with probability `GridLayoutAmount : CurvedRoadAmount`, and dense/sparse from `OverallDensity`. Both layouts coexist in one city; zone borders are where curved roads sprout.
 - **Grid**: lattice crossings touching grid cells become nodes; neighbouring crossings connect where the street borders a grid cell → blocks, straight streets, 90° 4-way intersections. Every `MajorRoadInterval`-th line is a major road.
-- **Curved**: random-walk walkers seeded at grid/curved zone borders (or radially for pure-curved cities). Per segment: heading += rand ± maxTurn (from `CurvedRoadCurvature`), length jittered by `CurvedRoadVariation`, branch chance `CurvedRoadBranchChance`. Walkers stop at city bounds (clamped), on self-proximity, on road collision (with snap-to-node junctions), or entering grid zones.
-- Committed edges are **rasterized** into road-width oriented boxes (chunk = road mesh length) in the hash grid — this is what keeps everything else off the roads.
-- Export: 4-way mesh instances at degree≥4 nodes; road polylines trimmed back by half the intersection size around them. Splines are linear for grid streets, curved otherwise; the road mesh is chained along each spline with `USplineMeshComponent`s.
+- **Curved**: random-walk walkers seeded at grid/curved zone borders (or radially for pure-curved cities). A walker is only seeded when the stretch after the junction is clear (space for a natural curve). Per segment: heading += rand ± maxTurn (from `CurvedRoadCurvature`), length jittered by `CurvedRoadVariation`, branch chance `CurvedRoadBranchChance`. Walkers stop at city bounds (clamped), on self-proximity, on road collision (snap-to-node junctions only when the turn into the junction is ≤ ~70°), or entering grid zones. Walks that neither connect to another road nor reach a minimum curve length are discarded entirely.
+- **Corner fillets**: degree-2 corners of two perpendicular straight streets (typically at the city rim) are replaced by a curved quarter-arc edge — both streets are pulled back by the fillet radius and bridged, so rim streets bend into their flanking roads instead of butting at 90°.
+- **Orphan pass**: remaining degree-1 endings that roughly face each other within ~1.75 blocks are joined with cubic-bezier curves (only when the path is clear and inside the area). Unconnectable rim endings are exported on the OuterOrphanRoads pin.
+- Committed edges are **rasterized** into road-width oriented boxes (chunk = road mesh length) in the hash grid — this is what keeps everything else off the roads. (Fillet-shortened streets keep their original raster; slightly conservative near smoothed corners.)
+- Export: intersection mesh instances at degree≥3 nodes. The 4-way asset may be **non-square** (`IntersectionSizeX/Y`, auto-derived from mesh bounds or overridden per axis): each road end is trimmed back by the footprint's support radius along its own exit direction, so splines end flush with the piece on both axes. Splines are linear for grid streets, curved otherwise; the road mesh is chained along each spline with `USplineMeshComponent`s; leftover slivers shorter than half a road width are dropped.
 
 ## 5. Lots & buildings
 

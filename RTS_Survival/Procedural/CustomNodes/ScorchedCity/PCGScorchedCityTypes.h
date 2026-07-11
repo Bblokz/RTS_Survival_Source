@@ -433,6 +433,19 @@ struct FScorchedScatterCandidate
 	bool bAlignToGround = false;
 };
 
+/**
+ * @brief A road ending at the city rim that could not be connected to another road with a
+ * natural curve. Exported so other PCG logic can pick these up and connect to them.
+ */
+struct FScorchedOrphanRoadEnd
+{
+	// Final outer point of the road.
+	FVector2D Position = FVector2D::ZeroVector;
+
+	// Yaw (radians) pointing outward, continuing the road past its ending.
+	double YawRadians = 0.0;
+};
+
 struct FScorchedCityGenResult
 {
 	TArray<FScorchedRoadSplineResult> RoadSplines;
@@ -443,4 +456,5 @@ struct FScorchedCityGenResult
 	TArray<FScorchedDecalSpawn> Decals;
 	TArray<FScorchedLot> Lots;
 	TArray<FScorchedSpatialHashGrid::FEntry> OccupiedFootprints;
+	TArray<FScorchedOrphanRoadEnd> OuterOrphanRoads;
 };

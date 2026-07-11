@@ -34,6 +34,7 @@ namespace ScorchedCityPCGConstants
 	const FName ScatterPinLabel = TEXT("Scatter");
 	const FName OccupiedBoundsPinLabel = TEXT("OccupiedBounds");
 	const FName LotsPinLabel = TEXT("Lots");
+	const FName OuterOrphanRoadsPinLabel = TEXT("OuterOrphanRoads");
 
 	const FName ScatterMeshAttributeName = TEXT("Mesh");
 	const FName OccupancyTypeAttributeName = TEXT("Occupancy");
@@ -44,13 +45,11 @@ namespace ScorchedCityPCGConstants
 	constexpr double DefaultBuildingHalfExtent = 400.0;
 	constexpr double DefaultScatterMeshRadius = 50.0;
 
-	// Ground alignment trace range around the city plane.
-	constexpr double GroundTraceUp = 5000.0;
-	constexpr double GroundTraceDown = 20000.0;
+	// Ground alignment trace range around the city plane; generous so tall landscapes still hit.
+	constexpr double GroundTraceUp = 10000.0;
+	constexpr double GroundTraceDown = 30000.0;
 	constexpr double RoadGroundSampleSpacing = 1200.0;
 	constexpr double DefaultIntersectionRoadWidthMultiplier = 1.5;
-	constexpr double MaxIntersectionRoadWidthMultiplier = 2.0;
-	constexpr double MaxIntersectionGridBlockFraction = 0.45;
 
 	// Z half-thickness given to exported occupancy bounds points.
 	constexpr double OccupancyBoundsHalfHeight = 50.0;
@@ -125,6 +124,9 @@ TArray<FPCGPinProperties> UPCGScorchedCitySettings::OutputPinProperties() const
 	Pins.Emplace(ScorchedCityPCGConstants::ScatterPinLabel, EPCGDataType::Point);
 	Pins.Emplace(ScorchedCityPCGConstants::OccupiedBoundsPinLabel, EPCGDataType::Point);
 	Pins.Emplace(ScorchedCityPCGConstants::LotsPinLabel, EPCGDataType::Point);
+	// Rim road endings that could not be connected naturally; point rotation = outward yaw,
+	// so other PCG logic can continue those roads outside the city.
+	Pins.Emplace(ScorchedCityPCGConstants::OuterOrphanRoadsPinLabel, EPCGDataType::Point);
 	return Pins;
 }
 
@@ -139,14 +141,11 @@ namespace
 	{
 		// Parallel to FScorchedCityGenParams::Buildings.
 		TArray<UClass*> BuildingClasses;
-		TArray<double> BuildingGroundOffsets;
 
 		UStaticMesh* RoadMesh = nullptr;
 		UStaticMesh* IntersectionMesh = nullptr;
 		UClass* TwoPoleClass = nullptr;
 		UClass* SinglePoleClass = nullptr;
-		double TwoPoleGroundOffset = 0.0;
-		double SinglePoleGroundOffset = 0.0;
 
 		// Parallel to FScorchedCityGenParams::ScatterProfiles / their Meshes arrays.
 		TArray<TArray<FSoftObjectPath>> ScatterMeshPaths;
@@ -215,9 +214,6 @@ namespace
 			Resolved.SizeCategory = Entry.SizeCategory;
 			Resolved.ZonePreference = Entry.ZonePreference;
 
-			const FBox LocalBounds = MeasureActorClassBounds(World, *BuildingClass);
-			Assets.BuildingGroundOffsets.Add(LocalBounds.IsValid ? -LocalBounds.Min.Z : 0.0);
-
 			if (Entry.bUseFootprintOverride)
 			{
 				Resolved.FootprintHalfExtents = Entry.FootprintOverride * 0.5;
@@ -225,6 +221,7 @@ namespace
 			}
 			else
 			{
+				const FBox LocalBounds = MeasureActorClassBounds(World, *BuildingClass);
 				if (LocalBounds.IsValid)
 				{
 					const FVector Extent = LocalBounds.GetExtent();
@@ -258,16 +255,6 @@ namespace
 		Assets.IntersectionMesh = Settings->IntersectionMesh.LoadSynchronous();
 		Assets.TwoPoleClass = Settings->PowerLineSettings.TwoPoleAsset.LoadSynchronous();
 		Assets.SinglePoleClass = Settings->PowerLineSettings.SinglePoleAsset.LoadSynchronous();
-		if (Assets.TwoPoleClass != nullptr)
-		{
-			const FBox LocalBounds = MeasureActorClassBounds(World, *Assets.TwoPoleClass);
-			Assets.TwoPoleGroundOffset = LocalBounds.IsValid ? -LocalBounds.Min.Z : 0.0;
-		}
-		if (Assets.SinglePoleClass != nullptr)
-		{
-			const FBox LocalBounds = MeasureActorClassBounds(World, *Assets.SinglePoleClass);
-			Assets.SinglePoleGroundOffset = LocalBounds.IsValid ? -LocalBounds.Min.Z : 0.0;
-		}
 
 		Params.RoadMeshLength = Settings->RoadMeshLengthOverride > 0.0f
 			? Settings->RoadMeshLengthOverride
@@ -275,38 +262,33 @@ namespace
 				? FMath::Max(100.0, Assets.RoadMesh->GetBoundingBox().GetSize().X)
 				: DefaultRoadMeshLength);
 
-		if (Settings->IntersectionSizeOverride > 0.0f)
-		{
-			Params.IntersectionSize = Settings->IntersectionSizeOverride;
-			return;
-		}
-
+		// The 4-way asset may be non-square; keep its real X and Y footprint so road splines
+		// trim flush against the matching axis instead of overlapping the intersection piece.
+		// Overrides are authoritative. Derived (mesh-bounds) values are capped at one grid
+		// block: scorched meshes often carry overhanging props that inflate their bounds far
+		// beyond the walkable footprint, which would otherwise starve lots and power lines.
 		const double FallbackIntersectionSize = Settings->RoadWidth * DefaultIntersectionRoadWidthMultiplier;
-		if (Assets.IntersectionMesh == nullptr)
-		{
-			Params.IntersectionSize = FallbackIntersectionSize;
-			return;
-		}
+		const FVector IntersectionMeshSize = Assets.IntersectionMesh != nullptr
+			? Assets.IntersectionMesh->GetBoundingBox().GetSize()
+			: FVector(FallbackIntersectionSize, FallbackIntersectionSize, 0.0);
 
-		const double RawIntersectionSize = Assets.IntersectionMesh->GetBoundingBox().GetSize().GetMax();
-		const double MaxLogicalIntersectionSize = FMath::Max(
-			static_cast<double>(Settings->RoadWidth),
-			FMath::Min(
-				static_cast<double>(Settings->RoadWidth) * MaxIntersectionRoadWidthMultiplier,
-				static_cast<double>(Settings->GridBlockSize) * MaxIntersectionGridBlockFraction));
-		Params.IntersectionSize = FMath::Clamp(
-			RawIntersectionSize,
-			static_cast<double>(Settings->RoadWidth),
-			MaxLogicalIntersectionSize);
+		const double MaxDerivedSize = Settings->GridBlockSize;
+		Params.IntersectionSizeX = Settings->IntersectionSizeOverrideX > 0.0f
+			? Settings->IntersectionSizeOverrideX
+			: FMath::Clamp(IntersectionMeshSize.X, static_cast<double>(Settings->RoadWidth), MaxDerivedSize);
+		Params.IntersectionSizeY = Settings->IntersectionSizeOverrideY > 0.0f
+			? Settings->IntersectionSizeOverrideY
+			: FMath::Clamp(IntersectionMeshSize.Y, static_cast<double>(Settings->RoadWidth), MaxDerivedSize);
 
-		if (not FMath::IsNearlyEqual(Params.IntersectionSize, RawIntersectionSize))
+		const bool bDerivedClamped =
+			(Settings->IntersectionSizeOverrideX <= 0.0f && IntersectionMeshSize.X > MaxDerivedSize)
+			|| (Settings->IntersectionSizeOverrideY <= 0.0f && IntersectionMeshSize.Y > MaxDerivedSize);
+		if (Context != nullptr && bDerivedClamped)
 		{
 			PCGE_LOG_C(Warning, GraphAndLog, Context,
-				FText::Format(
-					LOCTEXT("IntersectionSizeClamped",
-						"ScorchedCity: intersection mesh bounds are {0} cm, so the logical intersection size was clamped to {1} cm. Use IntersectionSizeOverride if this should be different."),
-					FText::AsNumber(RawIntersectionSize),
-					FText::AsNumber(Params.IntersectionSize)));
+				LOCTEXT("IntersectionBoundsClamped",
+					"ScorchedCity: the intersection mesh bounds exceed one grid block and were clamped. "
+					"Set IntersectionSizeOverrideX/Y to the asset's real walkable footprint for exact spline trimming."));
 		}
 	}
 
@@ -889,6 +871,41 @@ namespace
 		}
 	}
 
+	/**
+	 * @brief Emits unconnected rim road endings; each point sits on the road's final outer
+	 * position (ground-projected) and its rotation yaws outward, continuing the road.
+	 */
+	void EmitOuterOrphanRoadsOutput(
+		FPCGContext* Context,
+		UWorld& World,
+		const FScorchedCityGenResult& Result,
+		const FTransform& CityToWorld,
+		const int32 RandomSeed,
+		const double RoadZOffset,
+		const TArray<AActor*>& ActorsToIgnoreInTraces)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		UPCGPointData* OrphanData = CreateOutputPointData(Context, OuterOrphanRoadsPinLabel);
+		TArray<FPCGPoint>& Points = OrphanData->GetMutablePoints();
+		Points.Reserve(Result.OuterOrphanRoads.Num());
+
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(ActorsToIgnoreInTraces);
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		for (int32 OrphanIndex = 0; OrphanIndex < Result.OuterOrphanRoads.Num(); ++OrphanIndex)
+		{
+			const FScorchedOrphanRoadEnd& Orphan = Result.OuterOrphanRoads[OrphanIndex];
+
+			FPCGPoint& Point = Points.Emplace_GetRef();
+			Point.Transform = FTransform(
+				FQuat(FVector::UpVector, CityYaw + Orphan.YawRadians),
+				ProjectCityPositionToGround(World, Orphan.Position, CityToWorld, TraceParams, RoadZOffset));
+			Point.Density = 1.0f;
+			Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, OrphanIndex);
+		}
+	}
+
 	void EmitLotsOutput(
 		FPCGContext* Context,
 		const FScorchedCityGenResult& Result,
@@ -1089,15 +1106,16 @@ namespace
 
 		for (const FScorchedBuildingSpawn& Building : Result.Buildings)
 		{
-			if (not Assets.BuildingClasses.IsValidIndex(Building.AssetIndex)
-				|| not Assets.BuildingGroundOffsets.IsValidIndex(Building.AssetIndex))
+			if (not Assets.BuildingClasses.IsValidIndex(Building.AssetIndex))
 			{
 				continue;
 			}
 
+			// Buildings are authored with their pivot at ground level: project the pivot
+			// straight onto the landscape (no bounds-based lift, which made them float).
 			SpawnActorAtCityPosition(World, Assets.BuildingClasses[Building.AssetIndex],
 				Building.ActorPosition, Building.YawRadians, CityToWorld,
-				Assets.BuildingGroundOffsets[Building.AssetIndex], OutSpawnedActors);
+				0.0, OutSpawnedActors);
 		}
 
 		for (const FScorchedPoleSpawn& Pole : Result.Poles)
@@ -1109,22 +1127,14 @@ namespace
 				PoleClass = Pole.bTwoPole ? Assets.SinglePoleClass : Assets.TwoPoleClass;
 			}
 
-			double PoleGroundOffset = 0.0;
-			if (PoleClass == Assets.TwoPoleClass)
-			{
-				PoleGroundOffset = Assets.TwoPoleGroundOffset;
-			}
-			else if (PoleClass == Assets.SinglePoleClass)
-			{
-				PoleGroundOffset = Assets.SinglePoleGroundOffset;
-			}
+			// Pole pivots are authored at their base: project them straight onto the ground.
 			SpawnActorAtCityPosition(
 				World,
 				PoleClass,
 				Pole.Position,
 				Pole.YawRadians,
 				CityToWorld,
-				PoleGroundOffset,
+				0.0,
 				OutSpawnedActors);
 		}
 
@@ -1192,6 +1202,8 @@ bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
 	EmitScatterOutput(Context, World, Result, Assets, CityToWorld, Settings->RandomSeed, SpawnedActors);
 	EmitOccupiedBoundsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
 	EmitLotsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
+	EmitOuterOrphanRoadsOutput(
+		Context, World, Result, CityToWorld, Settings->RandomSeed, Settings->RoadZOffset, SpawnedActors);
 	return true;
 }
 
