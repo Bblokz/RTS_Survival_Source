@@ -159,6 +159,9 @@ namespace
 		UClass* TwoPoleClass = nullptr;
 		UClass* SinglePoleClass = nullptr;
 
+		// Parallel to FScorchedCityGenParams::AuxiliaryBlueprints.
+		TArray<UClass*> AuxiliaryClasses;
+
 		// Parallel to FScorchedCityGenParams::ScatterProfiles / their Meshes arrays.
 		TArray<TArray<FSoftObjectPath>> ScatterMeshPaths;
 
@@ -414,7 +417,10 @@ namespace
 		FScorchedDecalPlacementSettings& Target,
 		TArray<UMaterialInterface*>& TargetMaterials)
 	{
-		Target.Density = Source.Density;
+		// The per-category multiplier is folded into the resolved density; the generator
+		// must never apply it a second time.
+		Target.Density = Source.Density * FMath::Clamp(Source.CountMultiplier, 1.0f, 20.0f);
+		Target.CountMultiplier = 1.0f;
 		Target.Scatter = Source.Scatter;
 		Target.Decals.Reset();
 		TargetMaterials.Reset();
@@ -429,6 +435,59 @@ namespace
 
 			Target.Decals.Add(Entry);
 			TargetMaterials.Add(Material);
+		}
+	}
+
+	void ResolveAuxiliaryAssets(
+		FPCGContext* Context,
+		const UPCGScorchedCitySettings* Settings,
+		UWorld& World,
+		FScorchedCityGenParams& Params,
+		FScorchedCityAssets& Assets)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		for (int32 SettingsIndex = 0; SettingsIndex < Settings->AuxiliaryBlueprints.Num(); ++SettingsIndex)
+		{
+			const FScorchedAuxiliaryBlueprintSettings& Entry = Settings->AuxiliaryBlueprints[SettingsIndex];
+			UClass* AuxiliaryClass = Entry.BlueprintClass.LoadSynchronous();
+			if (AuxiliaryClass == nullptr)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, Context,
+					LOCTEXT("NullAuxiliaryClass", "ScorchedCity: an auxiliary blueprint entry has no valid class and was skipped."));
+				continue;
+			}
+
+			FScorchedResolvedAuxiliary Resolved;
+			Resolved.SettingsIndex = SettingsIndex;
+			Resolved.CountPerBuilding = Entry.CountPerBuilding;
+			Resolved.CountPerLot = Entry.CountPerLot;
+			Resolved.bCheckBuildingCollision = Entry.bCheckBuildingCollision;
+			Resolved.bCheckPoleCollision = Entry.bCheckPoleCollision;
+			Resolved.bOverrideScale = Entry.bOverrideScale;
+			Resolved.MinScale = Entry.MinScale;
+			Resolved.MaxScale = FMath::Max(Entry.MinScale, Entry.MaxScale);
+			Resolved.MinDistanceFromBuilding = Entry.MinDistanceFromBuilding;
+			Resolved.MaxDistanceFromBuilding =
+				FMath::Max(Entry.MinDistanceFromBuilding, Entry.MaxDistanceFromBuilding);
+
+			// Real bounds so collision checks use the blueprint's true footprint.
+			AActor* InspectionActor = SpawnTransientInspectionActor(World, *AuxiliaryClass);
+			if (IsValid(InspectionActor))
+			{
+				const FBox LocalBounds = ComputeInspectionActorLocalBounds(*InspectionActor);
+				if (LocalBounds.IsValid)
+				{
+					const FVector Extent = LocalBounds.GetExtent();
+					const FVector Center = LocalBounds.GetCenter();
+					Resolved.FootprintHalfExtents = FVector2D(Extent.X, Extent.Y);
+					Resolved.PivotToFootprintCenter = FVector2D(Center.X, Center.Y);
+				}
+				InspectionActor->Destroy();
+			}
+
+			Params.AuxiliaryBlueprints.Add(Resolved);
+			Assets.AuxiliaryClasses.Add(AuxiliaryClass);
 		}
 	}
 
@@ -804,6 +863,7 @@ namespace
 		const double LocalYawRadians,
 		const FTransform& CityToWorld,
 		const double GroundZOffset,
+		const double UniformScale,
 		TArray<AActor*>& OutSpawnedActors)
 	{
 		if (ActorClass == nullptr)
@@ -819,7 +879,8 @@ namespace
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-		AActor* Actor = World.SpawnActor<AActor>(ActorClass, FTransform(WorldRotation, WorldPosition), SpawnParams);
+		AActor* Actor = World.SpawnActor<AActor>(
+			ActorClass, FTransform(WorldRotation, WorldPosition, FVector(UniformScale)), SpawnParams);
 		if (not IsValid(Actor))
 		{
 			return;
@@ -1270,7 +1331,18 @@ namespace
 			// straight onto the landscape (no bounds-based lift, which made them float).
 			SpawnActorAtCityPosition(World, Assets.BuildingClasses[Building.AssetIndex],
 				Building.ActorPosition, Building.YawRadians, CityToWorld,
-				0.0, OutSpawnedActors);
+				0.0, 1.0, OutSpawnedActors);
+		}
+
+		for (const FScorchedAuxiliarySpawn& Auxiliary : Result.Auxiliaries)
+		{
+			if (not Assets.AuxiliaryClasses.IsValidIndex(Auxiliary.AssetIndex))
+			{
+				continue;
+			}
+			SpawnActorAtCityPosition(World, Assets.AuxiliaryClasses[Auxiliary.AssetIndex],
+				Auxiliary.Position, Auxiliary.YawRadians, CityToWorld,
+				0.0, Auxiliary.UniformScale, OutSpawnedActors);
 		}
 
 		for (const FScorchedPoleSpawn& Pole : Result.Poles)
@@ -1290,6 +1362,7 @@ namespace
 				Pole.YawRadians,
 				CityToWorld,
 				0.0,
+				1.0,
 				OutSpawnedActors);
 		}
 
@@ -1326,6 +1399,7 @@ bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
 	Params.CityLengthY = CityLengths.Y;
 	ResolveRoadAndPowerAssets(Context, Settings, World, Params, Assets);
 	ResolveBuildingAssets(Context, Settings, World, Params, Assets);
+	ResolveAuxiliaryAssets(Context, Settings, World, Params, Assets);
 	ResolveScatterAssets(Settings, Params, Assets);
 	ResolveDecalAssets(Settings, Params, Assets);
 	Params.IsExcluded = BuildExclusionFunction(Context, CityToWorld);

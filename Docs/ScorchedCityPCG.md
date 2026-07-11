@@ -53,6 +53,12 @@ Pins:
 
 Lots are marched along both sides of every edge (width/depth scaled up on major roads), offset by `RoadWidth/2 + RoadSetback + MinRoadBuildingDistance`, rejected if they clip other roads or leave the city. Buildings: lots are filled majors/corners first; a density gate (dense vs sparse zone × `OverallDensity`) decides if a lot is used; a weighted pick combines designer weight, zone preference and size-vs-lot fit (large → major/corner, small → side streets); placement faces the road (`FacingYaw` + allowed rotation offsets), pushes the building to the lot front, jitters laterally, and SAT-tests the inflated footprint against everything.
 
+Two safeguards keep blocks from staying empty: short streets between large 4-ways that cannot fit a full-width lot get one **narrower centered lot** (down to ~55% width), and at `OverallDensity ≥ 0.35` a **guarantee pass** places at least one building on every street that has lots, so the random density gate can no longer leave whole squares empty.
+
+### 5.4 Auxiliary blueprints
+
+`AuxiliaryBlueprints` entries (props, wrecks, barricades...) are placed around the squares (random points inside generated lots, `CountPerLot`) and in rings around placed buildings (`CountPerBuilding`, `Min/MaxDistanceFromBuilding` from the footprint edge) — never on roads or intersections. Per entry: `bCheckBuildingCollision` / `bCheckPoleCollision` toggle those occupancy masks; failed placements retry a few jittered positions nearby; `bOverrideScale` applies a uniform random scale in `[MinScale, MaxScale]` (footprint scaled accordingly). Placements reserve `Auxiliary` occupancy so they never stack on each other, and spawn as managed Blueprint actors with ground-projected pivots.
+
 ### 5.5 Building categories & HISM batching
 
 Each building entry has a `Category`:
@@ -65,7 +71,7 @@ Per building × per profile: chance roll, count from density × zone, positions 
 
 ## 6.5 Decals
 
-Three systems share `FScorchedDecalEntry` (material, weight, min/max world size) and spawn as `UDecalComponent`s on one managed anchor actor, projected straight down (ground-snapped without ignoring spawned actors, so they land on road meshes too):
+Each decal category has a `CountMultiplier` (clamped 1–20) that scales how many decals it generates. The systems share `FScorchedDecalEntry` (material, weight, min/max world size) and spawn as `UDecalComponent`s on one managed anchor actor, projected straight down (ground-snapped without ignoring spawned actors, so they land on road meshes too):
 - **RoadDecals**: `SplineRoadDensity` (per 10 m of trimmed road spline, so never under intersections) with road-aligned yaw, plus `IntersectionDensity` (per 4-way).
 - **LotDecals**: `LotDensity` per generated lot, kept inside the lot, skipped under buildings; each placement is recorded in a local decal grid.
 - **AroundBuildingDecals**: `DensityPerBuilding`, ringed off the building footprint edge; checked against the decal grid so they **never overlap lot decals** (or each other).

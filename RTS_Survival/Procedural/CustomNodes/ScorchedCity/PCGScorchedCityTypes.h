@@ -253,6 +253,58 @@ struct FScorchedDecalPlacementSettings
 	/** @brief 0 allows tight packing, 1 asks for extra spacing between decals. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals, meta = (ClampMin = "0", ClampMax = "1"))
 	float Scatter = 0.5f;
+
+	/** @brief Multiplies the amount of decals generated for this category. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals, meta = (ClampMin = "1.0", ClampMax = "20.0"))
+	float CountMultiplier = 1.0f;
+};
+
+/**
+ * @brief One auxiliary Blueprint (props, wrecks, barricades...) placed around lots and
+ * buildings but never on roads. Failed placements retry a few nearby positions.
+ */
+USTRUCT(BlueprintType)
+struct FScorchedAuxiliaryBlueprintSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary)
+	TSoftClassPtr<AActor> BlueprintClass;
+
+	/** @brief Average number placed in a ring around each placed building. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary, meta = (ClampMin = "0"))
+	float CountPerBuilding = 0.5f;
+
+	/** @brief Average number placed inside each generated lot (around the city squares). */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary, meta = (ClampMin = "0"))
+	float CountPerLot = 0.5f;
+
+	/** @brief Whether placement tests collision against building footprints. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary)
+	bool bCheckBuildingCollision = true;
+
+	/** @brief Whether placement tests collision against power pole footprints. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary)
+	bool bCheckPoleCollision = true;
+
+	/** @brief When enabled, a uniform scale in [MinScale, MaxScale] is applied per placement. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary)
+	bool bOverrideScale = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary,
+		meta = (ClampMin = "0.01", EditCondition = "bOverrideScale"))
+	float MinScale = 0.8f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary,
+		meta = (ClampMin = "0.01", EditCondition = "bOverrideScale"))
+	float MaxScale = 1.2f;
+
+	/** @brief Ring distance range measured from the building's footprint edge. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary, meta = (ClampMin = "0"))
+	float MinDistanceFromBuilding = 100.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Auxiliary, meta = (ClampMin = "0"))
+	float MaxDistanceFromBuilding = 800.0f;
 };
 
 // ---------------------------------------------------------------------------
@@ -267,6 +319,7 @@ enum class EScorchedOccupancy : uint8
 	Building,
 	PowerPole,
 	Decal,
+	Auxiliary,
 	Count
 };
 
@@ -452,6 +505,17 @@ struct FScorchedScatterCandidate
 	bool bAlignToGround = false;
 };
 
+struct FScorchedAuxiliarySpawn
+{
+	// Index into the resolved auxiliary blueprint array.
+	int32 AssetIndex = INDEX_NONE;
+
+	// Actor pivot position (city-local).
+	FVector2D Position = FVector2D::ZeroVector;
+	double YawRadians = 0.0;
+	double UniformScale = 1.0;
+};
+
 /**
  * @brief A road ending at the city rim that could not be connected to another road with a
  * natural curve. Exported so other PCG logic can pick these up and connect to them.
@@ -473,6 +537,7 @@ struct FScorchedCityGenResult
 	TArray<FScorchedPoleSpawn> Poles;
 	TArray<FScorchedScatterCandidate> Scatter;
 	TArray<FScorchedDecalSpawn> Decals;
+	TArray<FScorchedAuxiliarySpawn> Auxiliaries;
 	TArray<FScorchedLot> Lots;
 	TArray<FScorchedSpatialHashGrid::FEntry> OccupiedFootprints;
 	TArray<FScorchedOrphanRoadEnd> OuterOrphanRoads;

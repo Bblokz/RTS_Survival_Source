@@ -141,6 +141,16 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Buildings", meta = (ClampMin = "400"))
 	float LotDepth = 2000.0f;
 
+	// --- Auxiliary blueprints ---
+
+	/**
+	 * @brief Auxiliary Blueprints (props, wrecks, barricades...) placed around the squares and
+	 * around buildings, never on roads. Per entry: optional building/pole collision checks,
+	 * retry positions on failure, and an optional min/max uniform scale override.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Auxiliary")
+	TArray<FScorchedAuxiliaryBlueprintSettings> AuxiliaryBlueprints;
+
 	// --- Scatter & power lines ---
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Scatter")

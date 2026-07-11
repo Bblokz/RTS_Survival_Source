@@ -29,6 +29,31 @@ struct FScorchedResolvedBuilding
 };
 
 /**
+ * @brief Auxiliary blueprint with its footprint already resolved (measured bounds), so the
+ * generator can place it bounds-aware around lots and buildings without touching UObjects.
+ */
+struct FScorchedResolvedAuxiliary
+{
+	// Index into the settings' AuxiliaryBlueprints array.
+	int32 SettingsIndex = INDEX_NONE;
+
+	FVector2D FootprintHalfExtents = FVector2D(100.0, 100.0);
+
+	// Offset from the actor pivot to the footprint center, in the blueprint's local space.
+	FVector2D PivotToFootprintCenter = FVector2D::ZeroVector;
+
+	float CountPerBuilding = 0.0f;
+	float CountPerLot = 0.0f;
+	bool bCheckBuildingCollision = true;
+	bool bCheckPoleCollision = true;
+	bool bOverrideScale = false;
+	float MinScale = 0.8f;
+	float MaxScale = 1.2f;
+	float MinDistanceFromBuilding = 100.0f;
+	float MaxDistanceFromBuilding = 800.0f;
+};
+
+/**
  * @brief Full parameter snapshot for one generation run. Filled by the PCG element from the
  * node settings and resolved assets; everything is in city-local space (pivot at origin).
  */
@@ -73,6 +98,7 @@ struct FScorchedCityGenParams
 	double IntersectionSizeY = 700.0;
 
 	TArray<FScorchedResolvedBuilding> Buildings;
+	TArray<FScorchedResolvedAuxiliary> AuxiliaryBlueprints;
 
 	TArray<FScorchedScatterProfile> ScatterProfiles;
 	// Parallel to ScatterProfiles: approximate XY radius per mesh entry, for overlap checks.
@@ -180,12 +206,26 @@ private:
 	// --- Lots & buildings ---
 	void BuildLots();
 	void BuildLotsAlongEdge(int32 EdgeIndex);
-	void TryCreateLot(int32 EdgeIndex, const FVector2D& RoadPoint, const FVector2D& RoadDirection, double Side);
+	void TryCreateLot(int32 EdgeIndex, const FVector2D& RoadPoint, const FVector2D& RoadDirection,
+		double Side, double LotWidth);
 	void PlaceBuildings(FScorchedCityGenResult& OutResult);
+
+	/** @return True when any building entry was successfully placed on the lot. */
+	bool TryFillLotWithAnyBuilding(FScorchedLot& Lot, FScorchedCityGenResult& OutResult);
 	bool TryPlaceBuildingOnLot(const FScorchedLot& Lot, const FScorchedResolvedBuilding& Building,
 		FScorchedBuildingSpawn& OutSpawn);
 	double ComputeBuildingWeightForLot(const FScorchedResolvedBuilding& Building, const FScorchedLot& Lot) const;
 	int32 PickWeightedBuildingForLot(const FScorchedLot& Lot);
+
+	// --- Auxiliary blueprints ---
+	void PlaceAuxiliaryBlueprints(FScorchedCityGenResult& OutResult);
+
+	/**
+	 * @brief Attempts one auxiliary placement near BasePosition; on collision, a few jittered
+	 * positions around it are tried before giving up. Roads are always avoided.
+	 * @return True when a spot was found and reserved.
+	 */
+	bool TryPlaceAuxiliaryAt(int32 AuxIndex, const FVector2D& BasePosition, FScorchedCityGenResult& OutResult);
 
 	// --- Power lines & scatter ---
 	void PlacePowerLines(FScorchedCityGenResult& OutResult);

@@ -58,6 +58,15 @@ namespace ScorchedCityGenConstants
 	constexpr double CornerFilletMaxEdgeFraction = 0.4;
 	constexpr int32 CornerFilletArcPoints = 7;
 
+	// Short streets between large 4-ways still get one narrower lot when the usable span is
+	// at least this fraction of the normal lot width; below it the face genuinely has no room.
+	constexpr double MinAdaptiveLotWidthFraction = 0.55;
+	// At or above this OverallDensity, every street with lots gets at least one building.
+	constexpr double MinDensityForEdgeFill = 0.35;
+
+	// Auxiliary blueprints: nearby positions tried per placement before giving up.
+	constexpr int32 AuxiliaryPlacementAttempts = 5;
+
 	// Orphan road endings are paired when closer than this many grid blocks.
 	constexpr double OrphanConnectMaxBlockFactor = 1.75;
 	// Both endings must roughly face each other for the connection to look natural.
@@ -86,6 +95,7 @@ void FScorchedCityGenerator::Generate(FScorchedCityGenResult& OutResult)
 	BuildLots();
 	PlaceBuildings(OutResult);
 	PlacePowerLines(OutResult);
+	PlaceAuxiliaryBlueprints(OutResult);
 	BuildScatter(OutResult, OutResult);
 	ExportRoads(OutResult);
 	BuildDecals(OutResult);
@@ -1048,7 +1058,7 @@ void FScorchedCityGenerator::BuildLotsAlongEdge(const int32 EdgeIndex)
 	using namespace ScorchedCityGenConstants;
 
 	const FScorchedRoadEdge& Edge = M_Edges[EdgeIndex];
-	const double LotWidth = M_Params.LotWidth * (Edge.bMajor ? MajorRoadLotWidthMultiplier : 1.0);
+	const double FullLotWidth = M_Params.LotWidth * (Edge.bMajor ? MajorRoadLotWidthMultiplier : 1.0);
 	const double EdgeLength = Edge.Length();
 
 	// Directional per-end clearance, capped so a large 4-way asset can never consume the
@@ -1058,9 +1068,27 @@ void FScorchedCityGenerator::BuildLotsAlongEdge(const int32 EdgeIndex)
 		FMath::Min(ComputeEdgeEndClearance(Edge, Edge.NodeA), MaxEndClearance);
 	const double EndClearance =
 		FMath::Min(ComputeEdgeEndClearance(Edge, Edge.NodeB), MaxEndClearance);
+	const double UsableSpan = EdgeLength - StartClearance - EndClearance;
 
-	double ArcDistance = StartClearance + LotWidth * 0.5;
-	while (ArcDistance + LotWidth * 0.5 < EdgeLength - EndClearance)
+	// Short street (e.g. between two large 4-ways): a full lot does not fit, but the block
+	// face should not stay empty — create one narrower centered lot when there is room.
+	if (UsableSpan < FullLotWidth)
+	{
+		if (UsableSpan >= FullLotWidth * MinAdaptiveLotWidthFraction)
+		{
+			FVector2D RoadPoint;
+			FVector2D RoadDirection;
+			if (SamplePolyline(Edge.Points, StartClearance + UsableSpan * 0.5, RoadPoint, RoadDirection))
+			{
+				TryCreateLot(EdgeIndex, RoadPoint, RoadDirection, 1.0, UsableSpan);
+				TryCreateLot(EdgeIndex, RoadPoint, RoadDirection, -1.0, UsableSpan);
+			}
+		}
+		return;
+	}
+
+	double ArcDistance = StartClearance + FullLotWidth * 0.5;
+	while (ArcDistance + FullLotWidth * 0.5 < EdgeLength - EndClearance)
 	{
 		FVector2D RoadPoint;
 		FVector2D RoadDirection;
@@ -1069,10 +1097,10 @@ void FScorchedCityGenerator::BuildLotsAlongEdge(const int32 EdgeIndex)
 			break;
 		}
 
-		TryCreateLot(EdgeIndex, RoadPoint, RoadDirection, 1.0);
-		TryCreateLot(EdgeIndex, RoadPoint, RoadDirection, -1.0);
+		TryCreateLot(EdgeIndex, RoadPoint, RoadDirection, 1.0, FullLotWidth);
+		TryCreateLot(EdgeIndex, RoadPoint, RoadDirection, -1.0, FullLotWidth);
 
-		ArcDistance += LotWidth * (1.0 + LotGapFraction);
+		ArcDistance += FullLotWidth * (1.0 + LotGapFraction);
 	}
 }
 
@@ -1080,12 +1108,12 @@ void FScorchedCityGenerator::TryCreateLot(
 	const int32 EdgeIndex,
 	const FVector2D& RoadPoint,
 	const FVector2D& RoadDirection,
-	const double Side)
+	const double Side,
+	const double LotWidth)
 {
 	using namespace ScorchedCityGenConstants;
 
 	const FScorchedRoadEdge& Edge = M_Edges[EdgeIndex];
-	const double LotWidth = M_Params.LotWidth * (Edge.bMajor ? MajorRoadLotWidthMultiplier : 1.0);
 	const double LotDepth = M_Params.LotDepth * (Edge.bMajor ? MajorRoadLotDepthMultiplier : 1.0);
 
 	// Normal pointing away from the road on the requested side.
@@ -1325,6 +1353,7 @@ void FScorchedCityGenerator::PlaceBuildings(FScorchedCityGenResult& OutResult)
 		return LotA.bCorner && not LotB.bCorner;
 	});
 
+	TSet<int32> EdgesWithBuilding;
 	for (const int32 LotIndex : LotOrder)
 	{
 		FScorchedLot& Lot = M_Lots[LotIndex];
@@ -1339,27 +1368,185 @@ void FScorchedCityGenerator::PlaceBuildings(FScorchedCityGenResult& OutResult)
 			continue;
 		}
 
-		for (int32 PickIndex = 0; PickIndex < BuildingPicksPerLot; ++PickIndex)
+		if (TryFillLotWithAnyBuilding(Lot, OutResult))
 		{
-			const int32 BuildingIndex = PickWeightedBuildingForLot(Lot);
-			if (BuildingIndex == INDEX_NONE)
-			{
-				break;
-			}
-
-			FScorchedBuildingSpawn Spawn;
-			if (not TryPlaceBuildingOnLot(Lot, M_Params.Buildings[BuildingIndex], Spawn))
-			{
-				continue;
-			}
-
-			Spawn.AssetIndex = BuildingIndex;
-			M_Occupancy.Add(Spawn.Footprint, EScorchedOccupancy::Building);
-			OutResult.Buildings.Add(Spawn);
-			Lot.bUsed = true;
-			break;
+			EdgesWithBuilding.Add(Lot.EdgeIndex);
 		}
 	}
+
+	// Guarantee pass: the density gate can randomly skip every lot of a block, leaving whole
+	// squares empty. At moderate densities, force at least one building per street that has
+	// lots, so identical blocks never differ between "filled" and "completely empty".
+	if (M_Params.OverallDensity < MinDensityForEdgeFill)
+	{
+		return;
+	}
+	for (const int32 LotIndex : LotOrder)
+	{
+		FScorchedLot& Lot = M_Lots[LotIndex];
+		if (Lot.bUsed || EdgesWithBuilding.Contains(Lot.EdgeIndex))
+		{
+			continue;
+		}
+
+		if (TryFillLotWithAnyBuilding(Lot, OutResult))
+		{
+			EdgesWithBuilding.Add(Lot.EdgeIndex);
+		}
+	}
+}
+
+bool FScorchedCityGenerator::TryFillLotWithAnyBuilding(FScorchedLot& Lot, FScorchedCityGenResult& OutResult)
+{
+	using namespace ScorchedCityGenConstants;
+
+	for (int32 PickIndex = 0; PickIndex < BuildingPicksPerLot; ++PickIndex)
+	{
+		const int32 BuildingIndex = PickWeightedBuildingForLot(Lot);
+		if (BuildingIndex == INDEX_NONE)
+		{
+			break;
+		}
+
+		FScorchedBuildingSpawn Spawn;
+		if (not TryPlaceBuildingOnLot(Lot, M_Params.Buildings[BuildingIndex], Spawn))
+		{
+			continue;
+		}
+
+		Spawn.AssetIndex = BuildingIndex;
+		M_Occupancy.Add(Spawn.Footprint, EScorchedOccupancy::Building);
+		OutResult.Buildings.Add(Spawn);
+		Lot.bUsed = true;
+		return true;
+	}
+	return false;
+}
+
+// ---------------------------------------------------------------------------
+// Auxiliary blueprints
+// ---------------------------------------------------------------------------
+
+void FScorchedCityGenerator::PlaceAuxiliaryBlueprints(FScorchedCityGenResult& OutResult)
+{
+	for (int32 AuxIndex = 0; AuxIndex < M_Params.AuxiliaryBlueprints.Num(); ++AuxIndex)
+	{
+		const FScorchedResolvedAuxiliary& Aux = M_Params.AuxiliaryBlueprints[AuxIndex];
+
+		// Around each placed building: sample a ring measured from the footprint edge.
+		if (Aux.CountPerBuilding > 0.0f)
+		{
+			for (const FScorchedBuildingSpawn& Building : OutResult.Buildings)
+			{
+				const int32 Count = ComputeDecalCount(Aux.CountPerBuilding, 1.0);
+				for (int32 SampleIndex = 0; SampleIndex < Count; ++SampleIndex)
+				{
+					const double Angle = M_Random.FRand() * 2.0 * PI;
+					const FVector2D RingDirection(FMath::Cos(Angle), FMath::Sin(Angle));
+					const double EdgeDistance = Building.Footprint.SupportRadius(RingDirection)
+						+ M_Random.FRandRange(Aux.MinDistanceFromBuilding, Aux.MaxDistanceFromBuilding);
+					TryPlaceAuxiliaryAt(
+						AuxIndex, Building.Footprint.Center + RingDirection * EdgeDistance, OutResult);
+				}
+			}
+		}
+
+		// Around the squares: sample points inside the generated lots along every block face.
+		if (Aux.CountPerLot > 0.0f)
+		{
+			for (const FScorchedLot& Lot : M_Lots)
+			{
+				const int32 Count = ComputeDecalCount(Aux.CountPerLot, 1.0);
+				for (int32 SampleIndex = 0; SampleIndex < Count; ++SampleIndex)
+				{
+					double SinYaw = 0.0;
+					double CosYaw = 0.0;
+					FMath::SinCos(&SinYaw, &CosYaw, Lot.YawRadians);
+					const FVector2D LocalOffset(
+						M_Random.FRandRange(-Lot.HalfExtents.X, Lot.HalfExtents.X),
+						M_Random.FRandRange(-Lot.HalfExtents.Y, Lot.HalfExtents.Y));
+					const FVector2D SamplePosition = Lot.Center + FVector2D(
+						LocalOffset.X * CosYaw - LocalOffset.Y * SinYaw,
+						LocalOffset.X * SinYaw + LocalOffset.Y * CosYaw);
+					TryPlaceAuxiliaryAt(AuxIndex, SamplePosition, OutResult);
+				}
+			}
+		}
+	}
+}
+
+bool FScorchedCityGenerator::TryPlaceAuxiliaryAt(
+	const int32 AuxIndex,
+	const FVector2D& BasePosition,
+	FScorchedCityGenResult& OutResult)
+{
+	using namespace ScorchedCityGenConstants;
+
+	const FScorchedResolvedAuxiliary& Aux = M_Params.AuxiliaryBlueprints[AuxIndex];
+
+	// Roads are always avoided; buildings/poles only when the entry asks for it.
+	uint8 BlockMask = ScorchedOccupancyMask(EScorchedOccupancy::Road)
+		| ScorchedOccupancyMask(EScorchedOccupancy::Intersection)
+		| ScorchedOccupancyMask(EScorchedOccupancy::Auxiliary);
+	if (Aux.bCheckBuildingCollision)
+	{
+		BlockMask |= ScorchedOccupancyMask(EScorchedOccupancy::Building);
+	}
+	if (Aux.bCheckPoleCollision)
+	{
+		BlockMask |= ScorchedOccupancyMask(EScorchedOccupancy::PowerPole);
+	}
+
+	const double Scale = Aux.bOverrideScale
+		? M_Random.FRandRange(Aux.MinScale, FMath::Max(Aux.MinScale, Aux.MaxScale))
+		: 1.0;
+	const double Yaw = M_Random.FRand() * 2.0 * PI;
+	const double JitterRadius = Aux.FootprintHalfExtents.GetMax() * Scale + M_Params.RoadWidth * 0.25;
+
+	double SinYaw = 0.0;
+	double CosYaw = 0.0;
+	FMath::SinCos(&SinYaw, &CosYaw, Yaw);
+	const FVector2D ScaledPivotOffset = Aux.PivotToFootprintCenter * Scale;
+	const FVector2D RotatedPivotOffset(
+		ScaledPivotOffset.X * CosYaw - ScaledPivotOffset.Y * SinYaw,
+		ScaledPivotOffset.X * SinYaw + ScaledPivotOffset.Y * CosYaw);
+
+	for (int32 Attempt = 0; Attempt < AuxiliaryPlacementAttempts; ++Attempt)
+	{
+		FVector2D PivotPosition = BasePosition;
+		if (Attempt > 0)
+		{
+			// Collision failed at the sampled spot: try a few positions around it.
+			const double JitterAngle = M_Random.FRand() * 2.0 * PI;
+			PivotPosition += FVector2D(FMath::Cos(JitterAngle), FMath::Sin(JitterAngle))
+				* (JitterRadius * M_Random.FRandRange(0.5, 1.5));
+		}
+
+		FScorchedFootprint Footprint;
+		Footprint.Center = PivotPosition + RotatedPivotOffset;
+		Footprint.HalfExtents = Aux.FootprintHalfExtents * Scale;
+		Footprint.YawRadians = Yaw;
+
+		if (not IsFootprintInsideCity(Footprint, 0.0) || IsExcludedAt(PivotPosition))
+		{
+			continue;
+		}
+		if (M_Occupancy.OverlapsAny(Footprint, BlockMask))
+		{
+			continue;
+		}
+
+		M_Occupancy.Add(Footprint, EScorchedOccupancy::Auxiliary);
+
+		FScorchedAuxiliarySpawn Spawn;
+		Spawn.AssetIndex = AuxIndex;
+		Spawn.Position = PivotPosition;
+		Spawn.YawRadians = Yaw;
+		Spawn.UniformScale = Scale;
+		OutResult.Auxiliaries.Add(Spawn);
+		return true;
+	}
+	return false;
 }
 
 // ---------------------------------------------------------------------------
