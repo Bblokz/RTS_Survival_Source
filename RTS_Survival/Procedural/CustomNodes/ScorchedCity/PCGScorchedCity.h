@@ -26,6 +26,8 @@ class RTS_SURVIVAL_API UPCGScorchedCitySettings : public UPCGSettings
 	GENERATED_BODY()
 
 public:
+	UPCGScorchedCitySettings();
+
 	// ~Begin UPCGSettings interface
 #if WITH_EDITOR
 	virtual FName GetDefaultNodeName() const override;
@@ -139,6 +141,23 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "PowerLines")
 	FScorchedPowerLineSettings PowerLineSettings;
+
+	// --- Decals ---
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Decals|Lot Decals")
+	FScorchedDecalPlacementSettings LotDecals;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Decals|Building Footprint Decals")
+	FScorchedDecalPlacementSettings BuildingFootprintDecals;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Decals|Road Decals")
+	FScorchedDecalPlacementSettings RoadDecals;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Decals|Destroyed Power Line Decals")
+	FScorchedDecalPlacementSettings DestroyedPowerLineDecals;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Decals|Power Line Decals")
+	FScorchedDecalPlacementSettings PowerLineDecals;
 };
 
 /**

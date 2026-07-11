@@ -19,6 +19,7 @@ namespace ScorchedCityGenConstants
 	constexpr double MinCurveTurnDegrees = 4.0;
 	constexpr double MaxCurveTurnDegrees = 38.0;
 	constexpr double SegmentLengthJitter = 0.35;
+	constexpr double GridConnectionHeadingJitter = 0.0;
 
 	// Placement retry counts; kept small because every attempt costs an occupancy query.
 	constexpr int32 BuildingPicksPerLot = 4;
@@ -39,12 +40,17 @@ namespace ScorchedCityGenConstants
 
 	// Scatter overlap tests use a square of this fraction of the mesh radius.
 	constexpr double ScatterFootprintFraction = 0.75;
+
+	constexpr int32 DecalAttemptsPerSpawn = 18;
+	constexpr double DecalRoadLengthUnit = 1000.0;
+	constexpr double DecalPowerPoleJitter = 80.0;
 }
 
 FScorchedCityGenerator::FScorchedCityGenerator(const FScorchedCityGenParams& InParams)
 	: M_Params(InParams)
 	, M_Random(InParams.RandomSeed)
 	, M_Occupancy(FMath::Clamp(InParams.GridBlockSize * 0.5, 800.0, 3000.0))
+	, M_DecalOccupancy(FMath::Clamp(InParams.GridBlockSize * 0.25, 400.0, 1500.0))
 {
 }
 
@@ -59,6 +65,7 @@ void FScorchedCityGenerator::Generate(FScorchedCityGenResult& OutResult)
 	PlacePowerLines(OutResult);
 	BuildScatter(OutResult, OutResult);
 	ExportRoads(OutResult);
+	BuildDecals(OutResult);
 
 	OutResult.Lots = M_Lots;
 	OutResult.OccupiedFootprints = M_Occupancy.GetEntries();
@@ -308,6 +315,30 @@ bool FScorchedCityGenerator::IsSegmentBlockedByRoads(const FVector2D& From, cons
 	return M_Occupancy.OverlapsAny(Candidate.Inflated(MinRoadSpacing), RoadMask);
 }
 
+bool FScorchedCityGenerator::IsConnectionSegmentBlockedByRoads(const FVector2D& From, const FVector2D& To) const
+{
+	const double SegmentLength = FVector2D::Distance(From, To);
+	const double EndpointTrim = M_Params.IntersectionSize * 0.5 + M_Params.RoadWidth * 0.25;
+	if (SegmentLength <= EndpointTrim * 2.0)
+	{
+		return false;
+	}
+
+	const FVector2D Direction = (To - From) / SegmentLength;
+	const FVector2D EffectiveFrom = From + Direction * EndpointTrim;
+	const FVector2D EffectiveTo = To - Direction * EndpointTrim;
+	const double EffectiveLength = FVector2D::Distance(EffectiveFrom, EffectiveTo);
+
+	FScorchedFootprint Candidate;
+	Candidate.Center = (EffectiveFrom + EffectiveTo) * 0.5;
+	Candidate.HalfExtents = FVector2D(EffectiveLength * 0.5, M_Params.RoadWidth * 0.45);
+	Candidate.YawRadians = FMath::Atan2(Direction.Y, Direction.X);
+
+	const uint8 RoadMask = ScorchedOccupancyMask(EScorchedOccupancy::Road)
+		| ScorchedOccupancyMask(EScorchedOccupancy::Intersection);
+	return M_Occupancy.OverlapsAny(Candidate, RoadMask);
+}
+
 // ---------------------------------------------------------------------------
 // Grid roads
 // ---------------------------------------------------------------------------
@@ -411,7 +442,9 @@ void FScorchedCityGenerator::BuildCurvedRoads()
 			}
 
 			const double Heading = FMath::Atan2(Direction.Y, Direction.X)
-				+ M_Random.FRandRange(-0.2, 0.2);
+				+ M_Random.FRandRange(
+					-ScorchedCityGenConstants::GridConnectionHeadingJitter,
+					ScorchedCityGenConstants::GridConnectionHeadingJitter);
 			--WalkerBudget;
 			GrowCurvedRoad(NodeIndex, Heading, 0, WalkerBudget);
 			if (WalkerBudget <= 0)
@@ -471,6 +504,7 @@ void FScorchedCityGenerator::GrowCurvedRoad(
 	TArray<FVector2D> Points = {M_Nodes[StartNodeIndex].Position};
 	FVector2D Position = Points[0];
 	double Heading = StartHeading;
+	const bool bStartsOnGridNode = M_Nodes[StartNodeIndex].bGridNode;
 
 	struct FBranchRequest
 	{
@@ -481,7 +515,10 @@ void FScorchedCityGenerator::GrowCurvedRoad(
 
 	for (int32 Step = 0; Step < MaxStepsPerWalker; ++Step)
 	{
-		Heading += M_Random.FRandRange(-1.0, 1.0) * MaxTurn;
+		if (not (bStartsOnGridNode && Step == 0))
+		{
+			Heading += M_Random.FRandRange(-1.0, 1.0) * MaxTurn;
+		}
 		const double SegmentLength = M_Params.CurvedRoadSegmentLength
 			* (1.0 + M_Params.CurvedRoadVariation * M_Random.FRandRange(-SegmentLengthJitter, SegmentLengthJitter));
 		FVector2D Next = Position + FVector2D(FMath::Cos(Heading), FMath::Sin(Heading)) * SegmentLength;
@@ -512,7 +549,10 @@ void FScorchedCityGenerator::GrowCurvedRoad(
 		{
 			// Try to end in a junction with an existing road instead of a dead stop.
 			const int32 SnapNode = FindNearestNode(Next, M_Params.GridBlockSize * 0.45);
-			if (SnapNode != INDEX_NONE && not M_Nodes[SnapNode].Edges.IsEmpty())
+			if (SnapNode != INDEX_NONE
+				&& SnapNode != StartNodeIndex
+				&& not M_Nodes[SnapNode].Edges.IsEmpty()
+				&& not IsConnectionSegmentBlockedByRoads(Position, M_Nodes[SnapNode].Position))
 			{
 				Points.Add(M_Nodes[SnapNode].Position);
 			}
@@ -985,6 +1025,7 @@ void FScorchedCityGenerator::PlacePowerLinesAlongEdge(
 			FScorchedPoleSpawn Spawn;
 			Spawn.bTwoPole = true;
 			Spawn.Position = PolePosition;
+			Spawn.SecondPosition = NextPolePosition;
 			Spawn.YawRadians = FMath::Atan2(Span.Y, Span.X);
 			OutResult.Poles.Add(Spawn);
 
@@ -1146,6 +1187,316 @@ void FScorchedCityGenerator::BuildScatterForBuilding(
 }
 
 // ---------------------------------------------------------------------------
+// Decals
+// ---------------------------------------------------------------------------
+
+namespace
+{
+	FVector2D RotateDecalOffset(const FVector2D& Offset, const double YawRadians)
+	{
+		double SinYaw = 0.0;
+		double CosYaw = 0.0;
+		FMath::SinCos(&SinYaw, &CosYaw, YawRadians);
+		return FVector2D(
+			Offset.X * CosYaw - Offset.Y * SinYaw,
+			Offset.X * SinYaw + Offset.Y * CosYaw);
+	}
+
+	FVector2D SampleDecalPointInFootprint(
+		const FScorchedFootprint& Footprint,
+		const double Size,
+		FRandomStream& Random)
+	{
+		const double Margin = Size * 0.5;
+		const double RangeX = FMath::Max(0.0, Footprint.HalfExtents.X - Margin);
+		const double RangeY = FMath::Max(0.0, Footprint.HalfExtents.Y - Margin);
+		const FVector2D LocalOffset(Random.FRandRange(-RangeX, RangeX), Random.FRandRange(-RangeY, RangeY));
+		return Footprint.Center + RotateDecalOffset(LocalOffset, Footprint.YawRadians);
+	}
+}
+
+int32 FScorchedCityGenerator::ComputeDecalCount(const double Density, const double UnitCount)
+{
+	const double CountFloat = FMath::Max(0.0, Density) * FMath::Max(0.0, UnitCount);
+	const int32 BaseCount = FMath::FloorToInt32(CountFloat);
+	return BaseCount + (M_Random.FRand() < CountFloat - BaseCount ? 1 : 0);
+}
+
+int32 FScorchedCityGenerator::PickWeightedDecalEntry(const FScorchedDecalPlacementSettings& Settings)
+{
+	double TotalWeight = 0.0;
+	for (const FScorchedDecalEntry& Entry : Settings.Decals)
+	{
+		TotalWeight += FMath::Max(0.0f, Entry.Weight);
+	}
+
+	if (TotalWeight <= 0.0)
+	{
+		return INDEX_NONE;
+	}
+
+	double Pick = M_Random.FRand() * TotalWeight;
+	for (int32 EntryIndex = 0; EntryIndex < Settings.Decals.Num(); ++EntryIndex)
+	{
+		Pick -= FMath::Max(0.0f, Settings.Decals[EntryIndex].Weight);
+		if (Pick <= 0.0)
+		{
+			return EntryIndex;
+		}
+	}
+	return Settings.Decals.Num() - 1;
+}
+
+bool FScorchedCityGenerator::TryReserveDecal(
+	const FScorchedDecalPlacementSettings& Settings,
+	const EScorchedDecalSet Set,
+	const int32 EntryIndex,
+	const FVector2D& Position,
+	const double YawRadians,
+	const double Size,
+	FScorchedCityGenResult& OutResult)
+{
+	if (not Settings.Decals.IsValidIndex(EntryIndex) || not IsInsideCity(Position, 0.0))
+	{
+		return false;
+	}
+
+	FScorchedFootprint Footprint;
+	Footprint.Center = Position;
+	Footprint.HalfExtents = FVector2D(Size * 0.5, Size * 0.5);
+	Footprint.YawRadians = YawRadians;
+
+	const double Separation = Size * 0.5 * FMath::Clamp(static_cast<double>(Settings.Scatter), 0.0, 1.0);
+	if (M_DecalOccupancy.OverlapsAny(Footprint.Inflated(Separation),
+		ScorchedOccupancyMask(EScorchedOccupancy::Decal)))
+	{
+		return false;
+	}
+
+	M_DecalOccupancy.Add(Footprint, EScorchedOccupancy::Decal);
+
+	FScorchedDecalSpawn Spawn;
+	Spawn.Set = Set;
+	Spawn.EntryIndex = EntryIndex;
+	Spawn.Position = Position;
+	Spawn.YawRadians = YawRadians;
+	Spawn.Size = Size;
+	OutResult.Decals.Add(Spawn);
+	return true;
+}
+
+void FScorchedCityGenerator::BuildDecals(FScorchedCityGenResult& OutResult)
+{
+	BuildBuildingFootprintDecals(OutResult);
+	BuildRoadDecals(OutResult);
+	BuildLotDecals(OutResult);
+	BuildPowerLineDecals(OutResult);
+}
+
+void FScorchedCityGenerator::BuildDecalsInFootprint(
+	const FScorchedDecalPlacementSettings& Settings,
+	const EScorchedDecalSet Set,
+	const FScorchedFootprint& Area,
+	const double UnitCount,
+	const double BaseYawRadians,
+	FScorchedCityGenResult& OutResult)
+{
+	if (Settings.Density <= 0.0f || Settings.Decals.IsEmpty())
+	{
+		return;
+	}
+
+	const int32 Count = ComputeDecalCount(Settings.Density, UnitCount);
+	for (int32 DecalIndex = 0; DecalIndex < Count; ++DecalIndex)
+	{
+		for (int32 Attempt = 0; Attempt < ScorchedCityGenConstants::DecalAttemptsPerSpawn; ++Attempt)
+		{
+			const int32 EntryIndex = PickWeightedDecalEntry(Settings);
+			if (EntryIndex == INDEX_NONE)
+			{
+				break;
+			}
+
+			const FScorchedDecalEntry& Entry = Settings.Decals[EntryIndex];
+			const double MaxScale = FMath::Max(Entry.MinScale, Entry.MaxScale);
+			const double Size = M_Random.FRandRange(Entry.MinScale, MaxScale);
+			const FVector2D Position = SampleDecalPointInFootprint(Area, Size, M_Random);
+			const double Yaw = BaseYawRadians + M_Random.FRandRange(-PI, PI);
+			if (TryReserveDecal(Settings, Set, EntryIndex, Position, Yaw, Size, OutResult))
+			{
+				break;
+			}
+		}
+	}
+}
+
+void FScorchedCityGenerator::BuildDecalsAtPoint(
+	const FScorchedDecalPlacementSettings& Settings,
+	const EScorchedDecalSet Set,
+	const FVector2D& Position,
+	const double BaseYawRadians,
+	FScorchedCityGenResult& OutResult)
+{
+	if (Settings.Density <= 0.0f || Settings.Decals.IsEmpty())
+	{
+		return;
+	}
+
+	const int32 Count = ComputeDecalCount(Settings.Density, 1.0);
+	for (int32 DecalIndex = 0; DecalIndex < Count; ++DecalIndex)
+	{
+		for (int32 Attempt = 0; Attempt < ScorchedCityGenConstants::DecalAttemptsPerSpawn; ++Attempt)
+		{
+			const int32 EntryIndex = PickWeightedDecalEntry(Settings);
+			if (EntryIndex == INDEX_NONE)
+			{
+				break;
+			}
+
+			const FScorchedDecalEntry& Entry = Settings.Decals[EntryIndex];
+			const double MaxScale = FMath::Max(Entry.MinScale, Entry.MaxScale);
+			const double Size = M_Random.FRandRange(Entry.MinScale, MaxScale);
+			const double Jitter = M_Random.FRand() * ScorchedCityGenConstants::DecalPowerPoleJitter;
+			const double JitterYaw = M_Random.FRand() * 2.0 * PI;
+			const FVector2D JitterOffset(FMath::Cos(JitterYaw) * Jitter, FMath::Sin(JitterYaw) * Jitter);
+			const double Yaw = BaseYawRadians + M_Random.FRandRange(-PI, PI);
+			if (TryReserveDecal(Settings, Set, EntryIndex, Position + JitterOffset, Yaw, Size, OutResult))
+			{
+				break;
+			}
+		}
+	}
+}
+
+void FScorchedCityGenerator::BuildRoadSplineDecals(
+	const FScorchedDecalPlacementSettings& Settings,
+	const FScorchedRoadSplineResult& Road,
+	FScorchedCityGenResult& OutResult)
+{
+	if (Settings.Density <= 0.0f || Settings.Decals.IsEmpty())
+	{
+		return;
+	}
+
+	double RoadLength = 0.0;
+	for (int32 PointIndex = 1; PointIndex < Road.Points.Num(); ++PointIndex)
+	{
+		RoadLength += FVector2D::Distance(Road.Points[PointIndex - 1], Road.Points[PointIndex]);
+	}
+
+	const double UnitCount = RoadLength / ScorchedCityGenConstants::DecalRoadLengthUnit;
+	const int32 Count = ComputeDecalCount(Settings.Density, UnitCount);
+	for (int32 DecalIndex = 0; DecalIndex < Count; ++DecalIndex)
+	{
+		for (int32 Attempt = 0; Attempt < ScorchedCityGenConstants::DecalAttemptsPerSpawn; ++Attempt)
+		{
+			const int32 EntryIndex = PickWeightedDecalEntry(Settings);
+			if (EntryIndex == INDEX_NONE)
+			{
+				break;
+			}
+
+			FVector2D RoadPoint;
+			FVector2D RoadDirection;
+			if (not SamplePolyline(Road.Points, M_Random.FRandRange(0.0, RoadLength), RoadPoint, RoadDirection))
+			{
+				break;
+			}
+
+			const FScorchedDecalEntry& Entry = Settings.Decals[EntryIndex];
+			const double MaxScale = FMath::Max(Entry.MinScale, Entry.MaxScale);
+			const double Size = M_Random.FRandRange(Entry.MinScale, MaxScale);
+			const double LateralRange = FMath::Max(0.0, M_Params.RoadWidth * 0.5 - Size * 0.5);
+			const FVector2D Normal(-RoadDirection.Y, RoadDirection.X);
+			const FVector2D DecalPosition = RoadPoint + Normal * M_Random.FRandRange(-LateralRange, LateralRange);
+			const double RoadYaw = FMath::Atan2(RoadDirection.Y, RoadDirection.X);
+			const double Yaw = RoadYaw + M_Random.FRandRange(-0.35, 0.35);
+			if (TryReserveDecal(Settings, EScorchedDecalSet::Road, EntryIndex, DecalPosition, Yaw, Size, OutResult))
+			{
+				break;
+			}
+		}
+	}
+}
+
+void FScorchedCityGenerator::BuildLotDecals(FScorchedCityGenResult& OutResult)
+{
+	const FScorchedDecalPlacementSettings& Settings = M_Params.LotDecals;
+	for (const FScorchedLot& Lot : M_Lots)
+	{
+		FScorchedFootprint Area;
+		Area.Center = Lot.Center;
+		Area.HalfExtents = Lot.HalfExtents;
+		Area.YawRadians = Lot.YawRadians;
+		BuildDecalsInFootprint(Settings, EScorchedDecalSet::Lot, Area, 1.0, Lot.YawRadians, OutResult);
+	}
+}
+
+void FScorchedCityGenerator::BuildBuildingFootprintDecals(FScorchedCityGenResult& OutResult)
+{
+	const FScorchedDecalPlacementSettings& Settings = M_Params.BuildingFootprintDecals;
+	for (const FScorchedBuildingSpawn& Building : OutResult.Buildings)
+	{
+		BuildDecalsInFootprint(
+			Settings,
+			EScorchedDecalSet::BuildingFootprint,
+			Building.Footprint,
+			1.0,
+			Building.YawRadians,
+			OutResult);
+	}
+}
+
+void FScorchedCityGenerator::BuildRoadDecals(FScorchedCityGenResult& OutResult)
+{
+	const FScorchedDecalPlacementSettings& Settings = M_Params.RoadDecals;
+	for (const FScorchedRoadSplineResult& Road : OutResult.RoadSplines)
+	{
+		BuildRoadSplineDecals(Settings, Road, OutResult);
+	}
+
+	for (const FScorchedIntersectionSpawn& Intersection : OutResult.Intersections)
+	{
+		FScorchedFootprint Area;
+		Area.Center = Intersection.Position;
+		Area.HalfExtents = FVector2D(M_Params.IntersectionSize * 0.5, M_Params.IntersectionSize * 0.5);
+		Area.YawRadians = Intersection.YawRadians;
+		BuildDecalsInFootprint(Settings, EScorchedDecalSet::Road, Area, 1.0, Intersection.YawRadians, OutResult);
+	}
+}
+
+void FScorchedCityGenerator::BuildPowerLineDecals(FScorchedCityGenResult& OutResult)
+{
+	for (const FScorchedPoleSpawn& Pole : OutResult.Poles)
+	{
+		if (Pole.bTwoPole)
+		{
+			BuildDecalsAtPoint(
+				M_Params.PowerLineDecals,
+				EScorchedDecalSet::PowerLine,
+				Pole.Position,
+				Pole.YawRadians,
+				OutResult);
+			BuildDecalsAtPoint(
+				M_Params.PowerLineDecals,
+				EScorchedDecalSet::PowerLine,
+				Pole.SecondPosition,
+				Pole.YawRadians,
+				OutResult);
+		}
+		else
+		{
+			BuildDecalsAtPoint(
+				M_Params.DestroyedPowerLineDecals,
+				EScorchedDecalSet::DestroyedPowerLine,
+				Pole.Position,
+				Pole.YawRadians,
+				OutResult);
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Export
 // ---------------------------------------------------------------------------
 
@@ -1170,11 +1521,11 @@ namespace
 
 void FScorchedCityGenerator::ExportRoads(FScorchedCityGenResult& OutResult) const
 {
-	// 4-way meshes go on nodes with 4+ connections; roads are trimmed back around them.
+	// Junction meshes go on nodes with 3+ connections; roads are trimmed back around them.
 	TSet<int32> MeshNodes;
 	for (int32 NodeIndex = 0; NodeIndex < M_Nodes.Num(); ++NodeIndex)
 	{
-		if (M_Nodes[NodeIndex].Edges.Num() < 4)
+		if (M_Nodes[NodeIndex].Edges.Num() < 3)
 		{
 			continue;
 		}

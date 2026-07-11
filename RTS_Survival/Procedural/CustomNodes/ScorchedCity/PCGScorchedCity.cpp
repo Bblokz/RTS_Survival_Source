@@ -15,13 +15,16 @@
 #include "Metadata/PCGMetadataAttribute.h"
 
 #include "CollisionQueryParams.h"
+#include "Components/DecalComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/SceneComponent.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
 #include "Engine/HitResult.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Materials/MaterialInterface.h"
 
 #define LOCTEXT_NAMESPACE "PCGScorchedCity"
 
@@ -51,6 +54,8 @@ namespace ScorchedCityPCGConstants
 
 	// Z half-thickness given to exported occupancy bounds points.
 	constexpr double OccupancyBoundsHalfHeight = 50.0;
+	constexpr double DecalProjectionDepth = 800.0;
+	constexpr double DecalSurfaceOffset = 5.0;
 
 	constexpr double MeasureSpawnDepth = -100000.0;
 }
@@ -67,6 +72,14 @@ namespace
 // ---------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------
+
+UPCGScorchedCitySettings::UPCGScorchedCitySettings()
+{
+	FScorchedDecalEntry BuildingFootprintEntry;
+	BuildingFootprintEntry.MinScale = 1200.0f;
+	BuildingFootprintEntry.MaxScale = 2400.0f;
+	BuildingFootprintDecals.Decals.Add(BuildingFootprintEntry);
+}
 
 #if WITH_EDITOR
 FName UPCGScorchedCitySettings::GetDefaultNodeName() const
@@ -137,6 +150,12 @@ namespace
 
 		// Parallel to FScorchedCityGenParams::ScatterProfiles / their Meshes arrays.
 		TArray<TArray<FSoftObjectPath>> ScatterMeshPaths;
+
+		TArray<UMaterialInterface*> LotDecalMaterials;
+		TArray<UMaterialInterface*> BuildingFootprintDecalMaterials;
+		TArray<UMaterialInterface*> RoadDecalMaterials;
+		TArray<UMaterialInterface*> DestroyedPowerLineDecalMaterials;
+		TArray<UMaterialInterface*> PowerLineDecalMaterials;
 	};
 
 	/**
@@ -325,6 +344,47 @@ namespace
 			Params.ScatterMeshRadii.Add(MoveTemp(Radii));
 			Assets.ScatterMeshPaths.Add(MoveTemp(Paths));
 		}
+	}
+
+	void ResolveDecalSettings(
+		const FScorchedDecalPlacementSettings& Source,
+		FScorchedDecalPlacementSettings& Target,
+		TArray<UMaterialInterface*>& TargetMaterials)
+	{
+		Target.Density = Source.Density;
+		Target.Scatter = Source.Scatter;
+		Target.Decals.Reset();
+		TargetMaterials.Reset();
+
+		for (const FScorchedDecalEntry& Entry : Source.Decals)
+		{
+			UMaterialInterface* Material = Entry.Material.LoadSynchronous();
+			if (Material == nullptr)
+			{
+				continue;
+			}
+
+			Target.Decals.Add(Entry);
+			TargetMaterials.Add(Material);
+		}
+	}
+
+	void ResolveDecalAssets(
+		const UPCGScorchedCitySettings* Settings,
+		FScorchedCityGenParams& Params,
+		FScorchedCityAssets& Assets)
+	{
+		ResolveDecalSettings(Settings->LotDecals, Params.LotDecals, Assets.LotDecalMaterials);
+		ResolveDecalSettings(
+			Settings->BuildingFootprintDecals,
+			Params.BuildingFootprintDecals,
+			Assets.BuildingFootprintDecalMaterials);
+		ResolveDecalSettings(Settings->RoadDecals, Params.RoadDecals, Assets.RoadDecalMaterials);
+		ResolveDecalSettings(
+			Settings->DestroyedPowerLineDecals,
+			Params.DestroyedPowerLineDecals,
+			Assets.DestroyedPowerLineDecalMaterials);
+		ResolveDecalSettings(Settings->PowerLineDecals, Params.PowerLineDecals, Assets.PowerLineDecalMaterials);
 	}
 
 	TFunction<bool(const FVector2D&)> BuildExclusionFunction(FPCGContext* Context, const FTransform& CityToWorld)
@@ -635,6 +695,93 @@ namespace
 		Actor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
 		OutSpawnedActors.Add(Actor);
 	}
+
+	UMaterialInterface* GetDecalMaterialForSpawn(
+		const FScorchedCityAssets& Assets,
+		const FScorchedDecalSpawn& Decal)
+	{
+		const TArray<UMaterialInterface*>* Materials = nullptr;
+		switch (Decal.Set)
+		{
+			case EScorchedDecalSet::Lot:
+				Materials = &Assets.LotDecalMaterials;
+				break;
+			case EScorchedDecalSet::BuildingFootprint:
+				Materials = &Assets.BuildingFootprintDecalMaterials;
+				break;
+			case EScorchedDecalSet::Road:
+				Materials = &Assets.RoadDecalMaterials;
+				break;
+			case EScorchedDecalSet::DestroyedPowerLine:
+				Materials = &Assets.DestroyedPowerLineDecalMaterials;
+				break;
+			case EScorchedDecalSet::PowerLine:
+				Materials = &Assets.PowerLineDecalMaterials;
+				break;
+			default:
+				break;
+		}
+
+		if (Materials == nullptr || not Materials->IsValidIndex(Decal.EntryIndex))
+		{
+			return nullptr;
+		}
+		return (*Materials)[Decal.EntryIndex];
+	}
+
+	void SpawnDecalsActor(
+		UWorld& World,
+		const FScorchedCityGenResult& Result,
+		const FScorchedCityAssets& Assets,
+		const FTransform& CityToWorld,
+		TArray<AActor*>& OutSpawnedActors)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		if (Result.Decals.IsEmpty())
+		{
+			return;
+		}
+
+		AActor* Anchor = SpawnManagedEmptyActor(World, FTransform(CityToWorld.GetLocation()), TEXT("PCG_ScorchedDecals"));
+		if (Anchor == nullptr)
+		{
+			return;
+		}
+		OutSpawnedActors.Add(Anchor);
+
+		USceneComponent* Root = NewObject<USceneComponent>(Anchor);
+		Anchor->SetRootComponent(Root);
+		Anchor->AddInstanceComponent(Root);
+		Root->RegisterComponent();
+
+		const double CityYaw = CityYawRadians(CityToWorld);
+		const FCollisionQueryParams TraceParams;
+		for (const FScorchedDecalSpawn& Decal : Result.Decals)
+		{
+			UMaterialInterface* Material = GetDecalMaterialForSpawn(Assets, Decal);
+			if (Material == nullptr)
+			{
+				continue;
+			}
+
+			const FVector WorldPosition = ProjectCityPositionToGround(
+				World, Decal.Position, CityToWorld, TraceParams, DecalSurfaceOffset);
+			const FRotator WorldRotation(
+				-90.0,
+				FMath::RadiansToDegrees(CityYaw + Decal.YawRadians),
+				0.0);
+
+			UDecalComponent* DecalComponent = NewObject<UDecalComponent>(Anchor);
+			DecalComponent->SetMobility(EComponentMobility::Static);
+			DecalComponent->SetDecalMaterial(Material);
+			DecalComponent->DecalSize = FVector(DecalProjectionDepth, Decal.Size, Decal.Size);
+			DecalComponent->SetWorldTransform(FTransform(WorldRotation, WorldPosition));
+			DecalComponent->AttachToComponent(Root, FAttachmentTransformRules::KeepWorldTransform);
+			Anchor->AddInstanceComponent(DecalComponent);
+			DecalComponent->RegisterComponent();
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -910,6 +1057,11 @@ namespace
 		Params.LotWidth = Settings->LotWidth;
 		Params.LotDepth = Settings->LotDepth;
 		Params.PowerLines = Settings->PowerLineSettings;
+		Params.LotDecals = Settings->LotDecals;
+		Params.BuildingFootprintDecals = Settings->BuildingFootprintDecals;
+		Params.RoadDecals = Settings->RoadDecals;
+		Params.DestroyedPowerLineDecals = Settings->DestroyedPowerLineDecals;
+		Params.PowerLineDecals = Settings->PowerLineDecals;
 	}
 
 	void SpawnCityActors(
@@ -975,6 +1127,8 @@ namespace
 				PoleGroundOffset,
 				OutSpawnedActors);
 		}
+
+		SpawnDecalsActor(World, Result, Assets, CityToWorld, OutSpawnedActors);
 	}
 }
 
@@ -1008,6 +1162,7 @@ bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
 	ResolveRoadAndPowerAssets(Context, Settings, World, Params, Assets);
 	ResolveBuildingAssets(Context, Settings, World, Params, Assets);
 	ResolveScatterAssets(Settings, Params, Assets);
+	ResolveDecalAssets(Settings, Params, Assets);
 	Params.IsExcluded = BuildExclusionFunction(Context, CityToWorld);
 	Params.IsInsideArea = BuildAreaFunction(AreaData, CityToWorld, Params.GridBlockSize);
 

@@ -216,50 +216,24 @@ struct FScorchedDecalEntry
 	float MaxScale = 400.0f;
 };
 
-/** @brief Decals projected onto roads and intersections (skid marks, cracks, scorch...). */
+/**
+ * @brief Shared settings for one decal subsection. Density units depend on the subsection
+ * (per lot/building/pole/intersection, or per 10 m of road spline).
+ */
 USTRUCT(BlueprintType)
-struct FScorchedRoadDecalSettings
+struct FScorchedDecalPlacementSettings
 {
 	GENERATED_BODY()
 
-	/** @brief Average decals per 10 meters of spline road. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals, meta = (ClampMin = "0"))
-	float SplineRoadDensity = 0.0f;
-
-	/** @brief Average decals per 4-way intersection. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals, meta = (ClampMin = "0"))
-	float IntersectionDensity = 0.0f;
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals)
 	TArray<FScorchedDecalEntry> Decals;
-};
 
-/** @brief Decals scattered inside building lots. */
-USTRUCT(BlueprintType)
-struct FScorchedLotDecalSettings
-{
-	GENERATED_BODY()
-
-	/** @brief Average decals per generated lot. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals, meta = (ClampMin = "0"))
-	float LotDensity = 0.0f;
+	float Density = 0.0f;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals)
-	TArray<FScorchedDecalEntry> Decals;
-};
-
-/** @brief Decals placed in a ring around buildings; never overlap decals placed on lots. */
-USTRUCT(BlueprintType)
-struct FScorchedBuildingDecalSettings
-{
-	GENERATED_BODY()
-
-	/** @brief Average decals per placed building (density scaler). */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals, meta = (ClampMin = "0"))
-	float DensityPerBuilding = 0.0f;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals)
-	TArray<FScorchedDecalEntry> Decals;
+	/** @brief 0 allows tight packing, 1 asks for extra spacing between decals. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decals, meta = (ClampMin = "0", ClampMax = "1"))
+	float Scatter = 0.5f;
 };
 
 // ---------------------------------------------------------------------------
@@ -273,6 +247,7 @@ enum class EScorchedOccupancy : uint8
 	Intersection,
 	Building,
 	PowerPole,
+	Decal,
 	Count
 };
 
@@ -412,6 +387,7 @@ struct FScorchedPoleSpawn
 {
 	bool bTwoPole = false;
 	FVector2D Position = FVector2D::ZeroVector;
+	FVector2D SecondPosition = FVector2D::ZeroVector;
 	double YawRadians = 0.0;
 };
 
@@ -430,14 +406,16 @@ struct FScorchedIntersectionSpawn
 /** @brief Which decal system produced a spawn; indexes the matching material array. */
 enum class EScorchedDecalSet : uint8
 {
-	Road,
 	Lot,
-	Building
+	BuildingFootprint,
+	Road,
+	DestroyedPowerLine,
+	PowerLine
 };
 
 struct FScorchedDecalSpawn
 {
-	EScorchedDecalSet Set = EScorchedDecalSet::Road;
+	EScorchedDecalSet Set = EScorchedDecalSet::Lot;
 	int32 EntryIndex = INDEX_NONE;
 	FVector2D Position = FVector2D::ZeroVector;
 	double YawRadians = 0.0;

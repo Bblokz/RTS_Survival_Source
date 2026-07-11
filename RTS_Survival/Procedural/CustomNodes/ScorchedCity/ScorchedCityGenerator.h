@@ -77,6 +77,11 @@ struct FScorchedCityGenParams
 	TArray<TArray<double>> ScatterMeshRadii;
 
 	FScorchedPowerLineSettings PowerLines;
+	FScorchedDecalPlacementSettings LotDecals;
+	FScorchedDecalPlacementSettings BuildingFootprintDecals;
+	FScorchedDecalPlacementSettings RoadDecals;
+	FScorchedDecalPlacementSettings DestroyedPowerLineDecals;
+	FScorchedDecalPlacementSettings PowerLineDecals;
 
 	// Optional exclusion test in city-local space (fed by the node's Exclusion input pin).
 	TFunction<bool(const FVector2D&)> IsExcluded;
@@ -103,6 +108,7 @@ private:
 	const FScorchedCityGenParams& M_Params;
 	FRandomStream M_Random;
 	FScorchedSpatialHashGrid M_Occupancy;
+	FScorchedSpatialHashGrid M_DecalOccupancy;
 
 	// Zone flags per macro cell (key = cell coordinates on the GridBlockSize lattice).
 	TMap<FIntPoint, uint8> M_ZoneFlags;
@@ -129,6 +135,7 @@ private:
 	void RasterizeSegment(const FVector2D& From, const FVector2D& To);
 	void AddIntersectionFootprints();
 	bool IsSegmentBlockedByRoads(const FVector2D& From, const FVector2D& To) const;
+	bool IsConnectionSegmentBlockedByRoads(const FVector2D& From, const FVector2D& To) const;
 
 	// --- Lots & buildings ---
 	void BuildLots();
@@ -145,6 +152,38 @@ private:
 	void PlacePowerLinesAlongEdge(const FScorchedRoadEdge& Edge, FScorchedCityGenResult& OutResult);
 	void BuildScatter(const FScorchedCityGenResult& ResultSoFar, FScorchedCityGenResult& OutResult);
 	void BuildScatterForBuilding(const FScorchedBuildingSpawn& Building, int32 ProfileIndex,
+		FScorchedCityGenResult& OutResult);
+	void BuildDecals(FScorchedCityGenResult& OutResult);
+	void BuildLotDecals(FScorchedCityGenResult& OutResult);
+	void BuildBuildingFootprintDecals(FScorchedCityGenResult& OutResult);
+	void BuildRoadDecals(FScorchedCityGenResult& OutResult);
+	void BuildPowerLineDecals(FScorchedCityGenResult& OutResult);
+	void BuildDecalsInFootprint(
+		const FScorchedDecalPlacementSettings& Settings,
+		EScorchedDecalSet Set,
+		const FScorchedFootprint& Area,
+		double UnitCount,
+		double BaseYawRadians,
+		FScorchedCityGenResult& OutResult);
+	void BuildDecalsAtPoint(
+		const FScorchedDecalPlacementSettings& Settings,
+		EScorchedDecalSet Set,
+		const FVector2D& Position,
+		double BaseYawRadians,
+		FScorchedCityGenResult& OutResult);
+	void BuildRoadSplineDecals(
+		const FScorchedDecalPlacementSettings& Settings,
+		const FScorchedRoadSplineResult& Road,
+		FScorchedCityGenResult& OutResult);
+	int32 PickWeightedDecalEntry(const FScorchedDecalPlacementSettings& Settings);
+	int32 ComputeDecalCount(double Density, double UnitCount);
+	bool TryReserveDecal(
+		const FScorchedDecalPlacementSettings& Settings,
+		EScorchedDecalSet Set,
+		int32 EntryIndex,
+		const FVector2D& Position,
+		double YawRadians,
+		double Size,
 		FScorchedCityGenResult& OutResult);
 
 	// --- Export & helpers ---
