@@ -68,16 +68,17 @@ void UW_WorldMenu::InitWorldMenu(AWorldPlayerController* WorldPlayerController,
 	UpdateMenuForNewFocus(EWorldUIFocusState::World);
 }
 
-void UW_WorldMenu::ShowMissionMapItemDesc(const FEnemyOrMissionMapItemUIData& UIData,
-                                             const FPrimaryReward& PrimaryReward,
-                                             const FSecondaryReward& SecondaryReward)
+void UW_WorldMenu::ShowMissionMapItemDesc(AWorldMapObject* InitiatingWorldObject,
+                                          const FEnemyOrMissionMapItemUIData& UIData,
+                                          const FPrimaryReward& PrimaryReward,
+                                          const FSecondaryReward& SecondaryReward)
 {
 	if (not MissionMapItemDesc)
 	{
 		return;
 	}
 
-	MissionMapItemDesc->SetupEnemyWidget(UIData, PrimaryReward, SecondaryReward);
+	MissionMapItemDesc->SetupEnemyWidget(InitiatingWorldObject, UIData, PrimaryReward, SecondaryReward);
 	SetMissionDescVisibility(true);
 	BP_OnMissionClicked(UIData);
 }
@@ -121,6 +122,7 @@ void UW_WorldMenu::NativeOnInitialized()
 	}
 
 	MissionMapItemDesc->InitAuxiliaryWidgets(RewardCardsViewer, StrengthEstimation);
+	MissionMapItemDesc->OnLaunchRequested().AddUObject(this, &UW_WorldMenu::HandleMissionMapItemLaunchRequested);
 }
 
 void UW_WorldMenu::UpdateUISwitch(const int32 FullUIIndex) const
@@ -220,6 +222,16 @@ void UW_WorldMenu::InitMenu_InitCardMenu()
 		return;
 	}
 	CardMenu->InitCardMenu(this);
+}
+
+void UW_WorldMenu::HandleMissionMapItemLaunchRequested(AWorldMapObject* OperationWorldObject)
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	M_PlayerController->LaunchOperationForWorldObject(OperationWorldObject);
 }
 
 bool UW_WorldMenu::GetIsValidProfileAndUIManager() const

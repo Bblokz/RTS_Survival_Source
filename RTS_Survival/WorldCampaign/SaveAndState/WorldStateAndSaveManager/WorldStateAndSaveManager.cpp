@@ -25,8 +25,10 @@ UWorldStateAndSaveManager::UWorldStateAndSaveManager()
 void UWorldStateAndSaveManager::CacheCurrentWorldState(const AGeneratorWorldCampaign& WorldGenerator)
 {
 	const int32 CachedCurrentTurn = M_WorldCampaignState.CurrentTurn;
+	const int32 CachedEnemyObjectProceduralMapIndex = M_WorldCampaignState.EnemyObjectProceduralMapIndex;
 	M_WorldCampaignState = WorldGenerator.BuildWorldCampaignStateFromCurrentGeneration();
 	M_WorldCampaignState.CurrentTurn = CachedCurrentTurn;
+	M_WorldCampaignState.EnemyObjectProceduralMapIndex = CachedEnemyObjectProceduralMapIndex;
 }
 
 void UWorldStateAndSaveManager::CachePlayerProfileSaveData(const FPlayerProfileSaveData& PlayerProfileSaveData)
@@ -91,6 +93,43 @@ int32 UWorldStateAndSaveManager::AdvanceCurrentTurn()
 int32 UWorldStateAndSaveManager::GetCurrentTurn() const
 {
 	return M_WorldCampaignState.CurrentTurn;
+}
+
+int32 UWorldStateAndSaveManager::GetWorldGenerationSeed() const
+{
+	return M_WorldCampaignState.WorldGenerationSeed;
+}
+
+int32 UWorldStateAndSaveManager::GetEnemyObjectProceduralMapIndex() const
+{
+	return M_WorldCampaignState.EnemyObjectProceduralMapIndex;
+}
+
+void UWorldStateAndSaveManager::ResetEnemyObjectProceduralMapIndex()
+{
+	M_WorldCampaignState.EnemyObjectProceduralMapIndex = 0;
+}
+
+void UWorldStateAndSaveManager::SetEnemyObjectProceduralMapIndex(const int32 NewIndex)
+{
+	M_WorldCampaignState.EnemyObjectProceduralMapIndex = FMath::Max(0, NewIndex);
+}
+
+int32 UWorldStateAndSaveManager::AdvanceEnemyObjectProceduralMapIndex(const int32 MapCount)
+{
+	if (MapCount <= 0)
+	{
+		ResetEnemyObjectProceduralMapIndex();
+		return M_WorldCampaignState.EnemyObjectProceduralMapIndex;
+	}
+
+	M_WorldCampaignState.EnemyObjectProceduralMapIndex++;
+	if (M_WorldCampaignState.EnemyObjectProceduralMapIndex >= MapCount)
+	{
+		ResetEnemyObjectProceduralMapIndex();
+	}
+
+	return M_WorldCampaignState.EnemyObjectProceduralMapIndex;
 }
 
 FWorldCampaignState UWorldStateAndSaveManager::AggregateWorldCampaignState() const

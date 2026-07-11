@@ -38,6 +38,7 @@ struct FWorldMenuSettings
 class UW_Archive;
 class UW_ArmyLayoutMenu;
 class UW_WorldPerkMenu;
+class AWorldMapObject;
 /**
  * 
  */
@@ -57,11 +58,13 @@ public:
 	void UpdateTurnCounter(int32 CurrentTurn) const;
 	/**
 	 * @brief Opens the compact map-item panel from controller-selected world actors.
+	 * @param InitiatingWorldObject World map actor that owns the displayed operation.
 	 * @param UIData Text and strength data authored on the clicked world map object.
 	 * @param PrimaryReward Rewards shown immediately and used by the card preview.
 	 * @param SecondaryReward Optional follow-up reward data shown in the reward panel.
 	 */
-	void ShowMissionMapItemDesc(const FEnemyOrMissionMapItemUIData& UIData,
+	void ShowMissionMapItemDesc(AWorldMapObject* InitiatingWorldObject,
+	                            const FEnemyOrMissionMapItemUIData& UIData,
 	                            const FPrimaryReward& PrimaryReward,
 	                            const FSecondaryReward& SecondaryReward);
 	void CollapseMissionMapItemDesc() const;
@@ -114,6 +117,7 @@ private:
 	void InitMenu_InitHeader();
 	void InitMenu_InitPerkUI();
 	void InitMenu_InitCardMenu();
+	void HandleMissionMapItemLaunchRequested(AWorldMapObject* OperationWorldObject);
 	bool GetIsValidWorldUIHeader() const;
 
 	UPROPERTY()

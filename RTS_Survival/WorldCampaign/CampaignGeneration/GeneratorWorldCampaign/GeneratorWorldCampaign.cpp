@@ -186,27 +186,6 @@ namespace
 		}
 	}
 
-	void ResetFieldDivisionReport(const FWorldDifficultyMapObjects& MapObjects)
-	{
-		for (AWorldEnemyObject* EnemyObject : MapObjects.EnemyObjects)
-		{
-			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
-				GetStrengthEstimationComponent(EnemyObject))
-			{
-				StrengthEstimationComponent->ResetFieldDivisionReport();
-			}
-		}
-
-		for (AWorldMissionObject* MissionObject : MapObjects.MissionObjects)
-		{
-			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
-				GetStrengthEstimationComponent(MissionObject))
-			{
-				StrengthEstimationComponent->ResetFieldDivisionReport();
-			}
-		}
-	}
-
 	bool GetCanApplyStrategicSupportToTarget(const AWorldMapObject* SourceObject,
 	                                         const AWorldMapObject* TargetObject,
 	                                         const float XYRadius)
@@ -5320,8 +5299,10 @@ void AGeneratorWorldCampaign::AdjustDifficultyPercentagesForStrategicSupport(
 void AGeneratorWorldCampaign::AdjustDifficultyPercentagesForFieldDivisions(
 	const ERTSGameDifficulty)
 {
-	const FWorldDifficultyMapObjects MapObjects = BuildWorldDifficultyMapObjects(M_PlacementState);
-	ResetFieldDivisionReport(MapObjects);
+	/*
+	 * Runtime divisions own this category because their influence depends on spawned actors, movement, and damage.
+	 * Keep the generator hook harmless so it cannot clear reports after UWorldDivisionManager refreshes them.
+	 */
 }
 
 const UWorldDataComponent* AGeneratorWorldCampaign::GetWorldDataComponent() const
@@ -5374,6 +5355,7 @@ FWorldCampaignState AGeneratorWorldCampaign::BuildWorldCampaignStateFromCurrentG
 {
 	FWorldCampaignState WorldCampaignState;
 	WorldCampaignState.GenerationStep = M_GenerationStep;
+	WorldCampaignState.WorldGenerationSeed = M_PlacementState.SeedUsed;
 	WorldCampaignState.PlayerHQAnchorKey = M_PlacementState.PlayerHQAnchorKey;
 	WorldCampaignState.EnemyHQAnchorKey = M_PlacementState.EnemyHQAnchorKey;
 	AddSavedAnchorsAndMapItems(WorldCampaignState);
@@ -5840,6 +5822,7 @@ void AGeneratorWorldCampaign::ApplyRestoredPlacementState(const FWorldCampaignSt
                                                           const TArray<TObjectPtr<AAnchorPoint>>& RestoredAnchors)
 {
 	CacheGeneratedState(RestoredAnchors);
+	M_PlacementState.SeedUsed = WorldCampaignState.WorldGenerationSeed;
 	M_PlacementState.PlayerHQAnchorKey = WorldCampaignState.PlayerHQAnchorKey;
 	M_PlacementState.EnemyHQAnchorKey = WorldCampaignState.EnemyHQAnchorKey;
 	if (TObjectPtr<AAnchorPoint> const* PlayerHQAnchor = AnchorsByKey.Find(WorldCampaignState.PlayerHQAnchorKey))

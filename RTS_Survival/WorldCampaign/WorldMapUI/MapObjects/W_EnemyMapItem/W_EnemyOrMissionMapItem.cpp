@@ -21,9 +21,12 @@ void UW_EnemyOrMissionMapItem::InitAuxiliaryWidgets(TWeakObjectPtr<UW_RewardCard
 	OnMissionRewardUnhovered();
 }
 
-void UW_EnemyOrMissionMapItem::SetupEnemyWidget(const FEnemyOrMissionMapItemUIData& UIData,
+void UW_EnemyOrMissionMapItem::SetupEnemyWidget(AWorldMapObject* InitiatingWorldObject,
+                                                const FEnemyOrMissionMapItemUIData& UIData,
                                                 const FPrimaryReward& PrimaryReward, const FSecondaryReward& SecondaryReward)
 {
+	M_InitiatingWorldObject = InitiatingWorldObject;
+	(void)GetIsValidInitiatingWorldObject();
 	SetTextIfValid(M_ItemRichTitle, UIData.TitleText);
 	SetTextIfValid(M_RichStrengthText, UIData.StrengthPercentageText);
 	SetTextIfValid(M_ItemRichDescription, UIData.DescriptionText);
@@ -60,6 +63,10 @@ void UW_EnemyOrMissionMapItem::NativeOnInitialized()
 		M_StrengthButton->OnHovered.AddDynamic(this, &UW_EnemyOrMissionMapItem::OnStrengthButtonHovered);
 		M_StrengthButton->OnUnhovered.AddDynamic(this, &UW_EnemyOrMissionMapItem::OnStrengthButtonUnhovered);
 	}
+	if (GetIsValidLaunchButton())
+	{
+		M_LaunchButton->OnClicked.AddDynamic(this, &UW_EnemyOrMissionMapItem::OnLaunchButtonClicked);
+	}
 	if (GetIsValidMissionReward())
 	{
 		W_BP_MissionReward->OnMissionRewardHovered().AddUObject(this, &UW_EnemyOrMissionMapItem::OnMissionRewardHovered);
@@ -84,6 +91,16 @@ void UW_EnemyOrMissionMapItem::OnStrengthButtonUnhovered()
 		return;
 	}
 	M_StrengthEstimation->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UW_EnemyOrMissionMapItem::OnLaunchButtonClicked()
+{
+	if (not GetIsValidInitiatingWorldObject())
+	{
+		return;
+	}
+
+	M_OnLaunchRequested.Broadcast(M_InitiatingWorldObject.Get());
 }
 
 void UW_EnemyOrMissionMapItem::OnMissionRewardHovered()
@@ -130,6 +147,22 @@ bool UW_EnemyOrMissionMapItem::GetIsValidStrengthButton() const
 	return false;
 }
 
+bool UW_EnemyOrMissionMapItem::GetIsValidLaunchButton() const
+{
+	if (IsValid(M_LaunchButton))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_LaunchButton",
+		"UW_EnemyOrMissionMapItem::GetIsValidLaunchButton",
+		this
+	);
+	return false;
+}
+
 bool UW_EnemyOrMissionMapItem::GetIsValidMissionReward() const
 {
 	if (IsValid(W_BP_MissionReward))
@@ -154,6 +187,22 @@ bool UW_EnemyOrMissionMapItem::EnsureIsValidRewardCardsViewer() const
 		return false;
 	}
 	return true;
+}
+
+bool UW_EnemyOrMissionMapItem::GetIsValidInitiatingWorldObject() const
+{
+	if (M_InitiatingWorldObject.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_InitiatingWorldObject",
+		"UW_EnemyOrMissionMapItem::GetIsValidInitiatingWorldObject",
+		this
+	);
+	return false;
 }
 
 bool UW_EnemyOrMissionMapItem::EnsureIsValidStrengthEstimation() const

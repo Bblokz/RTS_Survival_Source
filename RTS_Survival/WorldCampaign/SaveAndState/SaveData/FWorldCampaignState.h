@@ -147,6 +147,12 @@ struct RTS_SURVIVAL_API FWorldCampaignState
 	int32 CurrentTurn = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	int32 WorldGenerationSeed = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
+	int32 EnemyObjectProceduralMapIndex = 0;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)
 	ECampaignGenerationStep GenerationStep = ECampaignGenerationStep::Finished;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, SaveGame)

@@ -7,12 +7,14 @@
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 #include "WorldPlayerOutliner/PlayerWorldOutliner.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/GenerationHelpers/WorldCampaignGenerationHelper.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/GeneratorWorldCampaign/GeneratorWorldCampaign.h"
 #include "WorldCameraController/WorldCameraController.h"
 #include "WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
@@ -23,6 +25,7 @@
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionInfluenceComponent.h"
 #include "RTS_Survival/WorldCampaign/WorldDivisions/WorldDivisionManager.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldEnemyObject/WorldEnemyObject.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMissionObject/WorldMissionObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldNeutralObject/WorldNeutralObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldPlayerObject/WorldPlayerObject.h"
@@ -41,6 +44,11 @@ namespace WorldPlayerAsyncGenerationUIConstants
 	constexpr float PruningCompletedPercentage= 90.f;
 	constexpr float TimedProgressTargetSeconds = 720.f;
 	constexpr float TimedProgressIntervalSeconds = 1.f;
+}
+
+namespace WorldPlayerOperationMapConstants
+{
+	constexpr int32 EnemyProceduralMapSeedOffset = 23017;
 }
 
 AWorldPlayerController::AWorldPlayerController()
@@ -194,7 +202,7 @@ void AWorldPlayerController::PlayerTurn()
 	}
 
 	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
-	M_WorldGenerator->AdjustDifficultyPercentagesForFieldDivisions(M_SelectedDifficulty.DifficultyLevel);
+	RefreshWorldDivisionInfluence();
 	const FPlayerTurnContext PlayerTurnContext = GetPlayerTurnContext();
 	BP_OnPlayerTurnStarted(PlayerTurnContext);
 }
@@ -208,7 +216,7 @@ void AWorldPlayerController::EnemyTurn()
 	MovePlayerDivisions();
 
 	M_WorldGenerator->AdjustDifficultyPercentagesForStrategicSupport(M_SelectedDifficulty.DifficultyLevel);
-	M_WorldGenerator->AdjustDifficultyPercentagesForFieldDivisions(M_SelectedDifficulty.DifficultyLevel);
+	RefreshWorldDivisionInfluence();
 	MoveEnemyDivisions();
 	OnEndEnemyTurn();
 }
@@ -318,6 +326,7 @@ void AWorldPlayerController::OnClicked_EnemyMapObj(AWorldEnemyObject* EnemyMapOb
 	}
 
 	WorldMenu->ShowMissionMapItemDesc(
+		EnemyMapObj,
 		EnemyMapObj->GetMapItemUIData(),
 		EnemyMapObj->GetPrimaryReward(),
 		EnemyMapObj->GetSecondaryReward()
@@ -340,6 +349,7 @@ void AWorldPlayerController::OnClicked_MissionMapObj(AWorldMissionObject* Missio
 	}
 
 	WorldMenu->ShowMissionMapItemDesc(
+		MissionMapObj,
 		MissionMapObj->GetMapItemUIData(),
 		MissionMapObj->GetPrimaryReward(),
 		MissionMapObj->GetSecondaryReward()
@@ -565,6 +575,169 @@ void AWorldPlayerController::WorldCamera_StartCameraOvertake(
 	this->OnCameraOvertakeFinished(M_WorldCameraController->GetCurrentCameraLocation());
 }
 
+void AWorldPlayerController::LaunchOperationForWorldObject(AWorldMapObject* OperationWorldObject)
+{
+	if (bM_IsWorldPlayerInputDisabled)
+	{
+		return;
+	}
+
+	if (not IsValid(OperationWorldObject))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Cannot launch world operation because the initiating world object is invalid."));
+		return;
+	}
+
+	if (AWorldMissionObject* MissionMapObject = Cast<AWorldMissionObject>(OperationWorldObject))
+	{
+		LaunchMissionMap(MissionMapObject);
+		return;
+	}
+
+	if (AWorldEnemyObject* EnemyMapObject = Cast<AWorldEnemyObject>(OperationWorldObject))
+	{
+		LaunchEnemyMap(EnemyMapObject);
+		return;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		TEXT("Cannot launch world operation because the initiating object is not a mission or enemy object."));
+}
+
+void AWorldPlayerController::InitializeOperationMapsForCampaignSeed(const int32 WorldGenerationSeed)
+{
+	M_ShuffledEnemyObjectProceduralMaps = M_WorldOperationMapSettings.EnemyObjectProceduralMaps;
+	FRandomStream RandomStream(WorldGenerationSeed + WorldPlayerOperationMapConstants::EnemyProceduralMapSeedOffset);
+	CampaignGenerationHelper::DeterministicShuffle(M_ShuffledEnemyObjectProceduralMaps, RandomStream);
+
+	if (not GetIsValidWorldStateAndSaveManager())
+	{
+		return;
+	}
+
+	if (M_ShuffledEnemyObjectProceduralMaps.Num() == 0)
+	{
+		M_WorldStateAndSaveManager->ResetEnemyObjectProceduralMapIndex();
+		return;
+	}
+
+	if (M_ShuffledEnemyObjectProceduralMaps.IsValidIndex(
+		M_WorldStateAndSaveManager->GetEnemyObjectProceduralMapIndex()))
+	{
+		return;
+	}
+
+	M_WorldStateAndSaveManager->ResetEnemyObjectProceduralMapIndex();
+}
+
+void AWorldPlayerController::LaunchMissionMap(AWorldMissionObject* MissionMapObject)
+{
+	if (not IsValid(MissionMapObject))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot launch mission operation because the mission object is invalid."));
+		return;
+	}
+
+	TSoftObjectPtr<UWorld> MissionMap;
+	if (not TryGetMissionMap(MissionMapObject->GetMissionType(), MissionMap))
+	{
+		return;
+	}
+
+	BP_OnMissionMapLaunch(MissionMapObject, MissionMap);
+	OpenOperationMap(MissionMap);
+}
+
+void AWorldPlayerController::LaunchEnemyMap(AWorldEnemyObject* EnemyMapObject)
+{
+	if (not IsValid(EnemyMapObject))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot launch enemy operation because the enemy object is invalid."));
+		return;
+	}
+
+	TSoftObjectPtr<UWorld> EnemyMap;
+	if (not TryGetEnemyMap(EnemyMap))
+	{
+		return;
+	}
+
+	BP_OnEnemyMapLaunch(EnemyMapObject, EnemyMap);
+	const int32 PreviousMapIndex = M_WorldStateAndSaveManager->GetEnemyObjectProceduralMapIndex();
+	M_WorldStateAndSaveManager->AdvanceEnemyObjectProceduralMapIndex(M_ShuffledEnemyObjectProceduralMaps.Num());
+	if (not M_WorldStateAndSaveManager->SaveCampaignState())
+	{
+		M_WorldStateAndSaveManager->SetEnemyObjectProceduralMapIndex(PreviousMapIndex);
+		return;
+	}
+
+	OpenOperationMap(EnemyMap);
+}
+
+bool AWorldPlayerController::TryGetMissionMap(const EMapMission MissionType,
+                                              TSoftObjectPtr<UWorld>& OutMissionMap) const
+{
+	OutMissionMap.Reset();
+	const TSoftObjectPtr<UWorld>* MissionMap = M_WorldOperationMapSettings.MissionMaps.Find(MissionType);
+	if (MissionMap != nullptr && not MissionMap->IsNull())
+	{
+		OutMissionMap = *MissionMap;
+		return true;
+	}
+
+	const UEnum* MissionEnum = StaticEnum<EMapMission>();
+	const FString MissionName = MissionEnum != nullptr
+		                            ? MissionEnum->GetNameStringByValue(static_cast<int64>(MissionType))
+		                            : FString::FromInt(static_cast<int32>(MissionType));
+	RTSFunctionLibrary::ReportError(
+		FString::Printf(TEXT("No operation map is configured for mission type: %s."), *MissionName));
+	return false;
+}
+
+bool AWorldPlayerController::TryGetEnemyMap(TSoftObjectPtr<UWorld>& OutEnemyMap)
+{
+	OutEnemyMap.Reset();
+	if (M_ShuffledEnemyObjectProceduralMaps.Num() == 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("No enemy object procedural maps are configured."));
+		return false;
+	}
+
+	if (not GetIsValidWorldStateAndSaveManager())
+	{
+		return false;
+	}
+
+	int32 EnemyMapIndex = M_WorldStateAndSaveManager->GetEnemyObjectProceduralMapIndex();
+	if (not M_ShuffledEnemyObjectProceduralMaps.IsValidIndex(EnemyMapIndex))
+	{
+		M_WorldStateAndSaveManager->ResetEnemyObjectProceduralMapIndex();
+		EnemyMapIndex = M_WorldStateAndSaveManager->GetEnemyObjectProceduralMapIndex();
+	}
+
+	OutEnemyMap = M_ShuffledEnemyObjectProceduralMaps[EnemyMapIndex];
+	if (not OutEnemyMap.IsNull())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		FString::Printf(TEXT("Enemy object procedural map at shuffled index %d is not configured."), EnemyMapIndex));
+	return false;
+}
+
+void AWorldPlayerController::OpenOperationMap(const TSoftObjectPtr<UWorld>& OperationMap) const
+{
+	if (OperationMap.IsNull())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot open operation map because no map was configured."));
+		return;
+	}
+
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, OperationMap, true, FString());
+}
+
 bool AWorldPlayerController::GetIsValidWorldCameraController() const
 {
 	if (M_WorldCameraController.IsValid())
@@ -721,6 +894,7 @@ void AWorldPlayerController::BeginPlay_LoadSavedWorld()
 		return;
 	}
 
+	InitializeOperationMapsForCampaignSeed(LoadedWorldCampaignState.WorldGenerationSeed);
 	M_WorldGenerator->RestoreWorldStateFromSave(LoadedWorldCampaignState);
 	M_WorldProfileAndUIManager->SetupUIForLoadedCampaign(LoadedPlayerProfileSaveData);
 	RestoreWorldDivisionsFromSave(LoadedWorldCampaignState);
@@ -743,6 +917,8 @@ void AWorldPlayerController::OnGeneratedCampaignAsyncWorkFinished()
 	LoadWorldDataIntoObjects();
 	M_WorldGenerator->InitMapObjectsBaseFortificationStrength(M_SelectedDifficulty.DifficultyLevel);
 	M_WorldStateAndSaveManager->CacheCurrentWorldState(*M_WorldGenerator.Get());
+	M_WorldStateAndSaveManager->ResetEnemyObjectProceduralMapIndex();
+	InitializeOperationMapsForCampaignSeed(M_WorldStateAndSaveManager->GetWorldGenerationSeed());
 	const FPlayerProfileSaveData PlayerProfileSaveData =
 		M_WorldProfileAndUIManager->OnSetupUIForNewCampaign(M_PlayerFaction);
 	M_WorldStateAndSaveManager->CachePlayerProfileSaveData(PlayerProfileSaveData);

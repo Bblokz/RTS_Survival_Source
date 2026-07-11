@@ -8,6 +8,7 @@
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
+#include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Enum_MapMission.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/Turn/WorldTurnType.h"
 #include "WorldCameraController/WorldCameraController.h"
 #include "PlayerTurnContext/FPlayerTurnContext.h"
@@ -16,6 +17,7 @@
 
 class AWorldNeutralObject;
 class AWorldPlayerObject;
+class AWorldMapObject;
 class AWorldMissionObject;
 class AWorldEnemyObject;
 class AWorldDivisionBase;
@@ -32,7 +34,20 @@ class AWorldConnectionSplineRenderer;
 class UW_AsyncWorldGeneration;
 class UWorldPlayerAudioController;
 class USoundBase;
+class UWorld;
 struct FWorldCampaignState;
+
+USTRUCT(BlueprintType)
+struct FWorldOperationMapSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Operations")
+	TMap<EMapMission, TSoftObjectPtr<UWorld>> MissionMaps;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Operations")
+	TArray<TSoftObjectPtr<UWorld>> EnemyObjectProceduralMaps;
+};
 
 /**
  * @brief Controller used by the world campaign Blueprint to route Enhanced Input
@@ -110,6 +125,9 @@ public:
 		const FCameraOvertakeSettings& CameraOvertakeSettings,
 		FWorldCameraOvertakeFinishedDelegate OnCameraOvertakeFinished);
 
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Operations")
+	void LaunchOperationForWorldObject(AWorldMapObject* OperationWorldObject);
+
 	void ShowAsyncWorldGenerationWidget();
 	void HideAsyncWorldGenerationWidget();
 	void UpdateAsyncWorldGenerationWidget_AnchorPlacementStarted();
@@ -133,6 +151,12 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Turns")
 	void BP_OnPlayerTurnStarted(const FPlayerTurnContext& PlayerTurnContext);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Operations")
+	void BP_OnMissionMapLaunch(AWorldMissionObject* MissionMapObject, const TSoftObjectPtr<UWorld>& MissionMap);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Operations")
+	void BP_OnEnemyMapLaunch(AWorldEnemyObject* EnemyMapObject, const TSoftObjectPtr<UWorld>& EnemyMap);
 
 private:
 	EWorldPrimaryClickContext M_PrimaryClickContext = EWorldPrimaryClickContext::None;
@@ -158,6 +182,12 @@ private:
 	void OnClicked_NeutralMapObj(AWorldNeutralObject* NeutralMapObj);
 	void PrimaryClick_ActiveMissionItem();
 	void CollapseMissionMapItemDesc();
+	void InitializeOperationMapsForCampaignSeed(int32 WorldGenerationSeed);
+	void LaunchMissionMap(AWorldMissionObject* MissionMapObject);
+	void LaunchEnemyMap(AWorldEnemyObject* EnemyMapObject);
+	bool TryGetMissionMap(EMapMission MissionType, TSoftObjectPtr<UWorld>& OutMissionMap) const;
+	bool TryGetEnemyMap(TSoftObjectPtr<UWorld>& OutEnemyMap);
+	void OpenOperationMap(const TSoftObjectPtr<UWorld>& OperationMap) const;
 	void ShowClickedDifficultyInfluenceRadiiForActor(AActor* Actor);
 	void HideClickedDifficultyInfluenceRadii();
 	bool GetIsValidWorldCameraController() const;
@@ -293,6 +323,12 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UW_AsyncWorldGeneration> M_AsyncWorldGenerationWidget = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "World Campaign|Operations", meta = (AllowPrivateAccess = "true"))
+	FWorldOperationMapSettings M_WorldOperationMapSettings;
+
+	UPROPERTY()
+	TArray<TSoftObjectPtr<UWorld>> M_ShuffledEnemyObjectProceduralMaps;
 
 	FTimerHandle M_AsyncWorldGenerationProgressTimerHandle;
 	float M_AsyncWorldGenerationProgressElapsedSeconds = 0.f;

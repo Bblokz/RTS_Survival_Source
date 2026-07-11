@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/RichTextBlock.h"
+#include "RTS_Survival/WorldCampaign/WorldMapObjects/Objects/WorldMapObject.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_MissionReward/RewardStructs/FMissionRewardStructs.h"
 #include "W_EnemyOrMissionMapItem.generated.h"
 
@@ -13,6 +14,9 @@ class UW_StrengthEstimation;
 class UW_RewardCardsViewer;
 struct FEnemyOrMissionMapItemUIData;
 class UW_MissionReward;
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FWorldMapItemLaunchRequestedNativeDelegate, AWorldMapObject*);
+
 /**
  * @brief Used by world menu to show clicked mission or enemy map item data.
  */
@@ -26,14 +30,17 @@ public:
 
 	/**
 	 * @brief Applies map-object data after selection so Blueprint widgets stay data-only.
+	 * @param InitiatingWorldObject World map actor that owns the displayed operation.
 	 * @param UIData Text and strength data authored on the clicked world map object.
 	 * @param PrimaryReward Rewards shown immediately and used by the card preview.
 	 * @param SecondaryReward Optional follow-up reward data shown in the reward panel.
 	 */
-	void SetupEnemyWidget(const FEnemyOrMissionMapItemUIData& UIData,
+	void SetupEnemyWidget(AWorldMapObject* InitiatingWorldObject,
+	                      const FEnemyOrMissionMapItemUIData& UIData,
 	                      const FPrimaryReward& PrimaryReward,
 	                      const FSecondaryReward& SecondaryReward);
 	void ShowVisibleAnimation();
+	FWorldMapItemLaunchRequestedNativeDelegate& OnLaunchRequested() { return M_OnLaunchRequested; }
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "World Campaign|Map Item")
@@ -82,11 +89,14 @@ private:
 	void OnStrengthButtonHovered();
 	UFUNCTION()
 	void OnStrengthButtonUnhovered();
+	UFUNCTION()
+	void OnLaunchButtonClicked();
 
 	void OnMissionRewardHovered();
 	void OnMissionRewardUnhovered();
 	void SetTextIfValid(URichTextBlock* RichTextBlock, const FText& Text) const;
 	[[nodiscard]] bool GetIsValidStrengthButton() const;
+	[[nodiscard]] bool GetIsValidLaunchButton() const;
 	[[nodiscard]] bool GetIsValidMissionReward() const;
 
 	UPROPERTY()
@@ -96,4 +106,10 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UW_StrengthEstimation> M_StrengthEstimation;
 	[[nodiscard]] bool EnsureIsValidStrengthEstimation() const;
+
+	UPROPERTY()
+	TWeakObjectPtr<AWorldMapObject> M_InitiatingWorldObject;
+	[[nodiscard]] bool GetIsValidInitiatingWorldObject() const;
+
+	FWorldMapItemLaunchRequestedNativeDelegate M_OnLaunchRequested;
 };

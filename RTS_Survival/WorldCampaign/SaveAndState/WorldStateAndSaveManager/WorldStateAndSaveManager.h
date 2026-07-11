@@ -36,6 +36,11 @@ public:
 	bool LoadCampaignState(FWorldCampaignState& OutWorldCampaignState, FPlayerProfileSaveData& OutPlayerProfileSaveData);
 	int32 AdvanceCurrentTurn();
 	int32 GetCurrentTurn() const;
+	int32 GetWorldGenerationSeed() const;
+	int32 GetEnemyObjectProceduralMapIndex() const;
+	void ResetEnemyObjectProceduralMapIndex();
+	void SetEnemyObjectProceduralMapIndex(int32 NewIndex);
+	int32 AdvanceEnemyObjectProceduralMapIndex(int32 MapCount);
 
 	const FWorldCampaignState& GetCachedWorldCampaignState() const { return M_WorldCampaignState; }
 	const FPlayerProfileSaveData& GetCachedPlayerProfileSaveData() const { return M_PlayerProfileSaveData; }

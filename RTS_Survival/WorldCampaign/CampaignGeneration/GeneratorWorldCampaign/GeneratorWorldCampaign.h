@@ -525,9 +525,9 @@ public:
 	void AdjustDifficultyPercentagesForStrategicSupport(ERTSGameDifficulty GameDifficulty);
 
 	/**
-	 * @brief Clears field division strength before runtime divisions apply their current influence.
-	 * @param GameDifficulty Current campaign difficulty kept for turn-flow symmetry.
-	 * @note Runtime division influence is applied by UWorldDivisionManager, not by the generator.
+	 * @brief Legacy no-op hook; runtime field divisions own their strength refresh outside the generator.
+	 * @param GameDifficulty Unused because UWorldDivisionManager resolves current division influence.
+	 * @note Call AWorldPlayerController::RefreshWorldDivisionInfluence when reports need rebuilding.
 	 */
 	void AdjustDifficultyPercentagesForFieldDivisions(ERTSGameDifficulty GameDifficulty);
 

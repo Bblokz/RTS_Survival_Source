@@ -5,7 +5,7 @@ namespace
 	const FText& GetBaseFortificationStrengthReasonText()
 	{
 		static const FText BaseFortificationStrengthReasonText =
-			FText::FromString(TEXT("<Text_NewBad>Base Fortification Strength</>"));
+			FText::FromString(TEXT("Base Fortification Strength"));
 		return BaseFortificationStrengthReasonText;
 	}
 }

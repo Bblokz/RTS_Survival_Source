@@ -1,0 +1,847 @@
+// Copyright (C) CoreMinimal Software, Bas Blokzijl - All rights reserved.
+#include "PCGScorchedCity.h"
+
+#include "ScorchedCityGenerator.h"
+
+#include "PCGComponent.h"
+#include "PCGContext.h"
+#include "PCGManagedResource.h"
+#include "PCGPin.h"
+#include "Data/PCGPointData.h"
+#include "Data/PCGPolyLineData.h"
+#include "Data/PCGSpatialData.h"
+#include "Helpers/PCGHelpers.h"
+#include "Metadata/PCGMetadata.h"
+#include "Metadata/PCGMetadataAttribute.h"
+
+#include "CollisionQueryParams.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Components/SplineComponent.h"
+#include "Components/SplineMeshComponent.h"
+#include "Engine/HitResult.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
+
+#define LOCTEXT_NAMESPACE "PCGScorchedCity"
+
+namespace ScorchedCityPCGConstants
+{
+	const FName ExclusionPinLabel = TEXT("Exclusion");
+	const FName ScatterPinLabel = TEXT("Scatter");
+	const FName OccupiedBoundsPinLabel = TEXT("OccupiedBounds");
+	const FName LotsPinLabel = TEXT("Lots");
+
+	const FName ScatterMeshAttributeName = TEXT("Mesh");
+	const FName OccupancyTypeAttributeName = TEXT("Occupancy");
+	const FName LotUsedAttributeName = TEXT("Used");
+
+	// Fallbacks when meshes/classes cannot be measured.
+	constexpr double DefaultRoadMeshLength = 400.0;
+	constexpr double DefaultBuildingHalfExtent = 400.0;
+	constexpr double DefaultScatterMeshRadius = 50.0;
+
+	// Ground alignment trace range around the city plane.
+	constexpr double GroundTraceUp = 5000.0;
+	constexpr double GroundTraceDown = 20000.0;
+
+	// Z half-thickness given to exported occupancy bounds points.
+	constexpr double OccupancyBoundsHalfHeight = 50.0;
+
+	constexpr double MeasureSpawnDepth = -100000.0;
+}
+
+namespace
+{
+	/** @brief Signed city yaw in radians; FQuat::GetAngle() would lose the sign for negative yaws. */
+	double CityYawRadians(const FTransform& CityToWorld)
+	{
+		return FMath::DegreesToRadians(CityToWorld.GetRotation().Rotator().Yaw);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+#if WITH_EDITOR
+FName UPCGScorchedCitySettings::GetDefaultNodeName() const
+{
+	return FName(TEXT("ScorchedCity"));
+}
+
+FText UPCGScorchedCitySettings::GetDefaultNodeTitle() const
+{
+	return LOCTEXT("NodeTitle", "Scorched City");
+}
+
+FText UPCGScorchedCitySettings::GetNodeTooltipText() const
+{
+	return LOCTEXT("NodeTooltip",
+		"Generates a scorched city inside the input spatial area (typically a closed spline loop): grid and "
+		"curved roads, bounds-aware buildings on generated lots, power lines and scatter debris. The city size "
+		"derives from the area's bounds and the layout is trimmed to its shape. Roads, intersections, "
+		"buildings and poles are spawned as managed actors; Scatter outputs points with a 'Mesh' attribute "
+		"for a Static Mesh Spawner. OccupiedBounds outputs every reserved footprint for downstream exclusion. "
+		"Deterministic from RandomSeed.");
+}
+#endif
+
+FPCGElementPtr UPCGScorchedCitySettings::CreateElement() const
+{
+	return MakeShared<FPCGScorchedCityElement>();
+}
+
+TArray<FPCGPinProperties> UPCGScorchedCitySettings::InputPinProperties() const
+{
+	TArray<FPCGPinProperties> Pins;
+	// The city area (closed spline loop or other spatial data); only the first data is used.
+	Pins.Emplace_GetRef(PCGPinConstants::DefaultInputLabel, EPCGDataType::Spatial).SetRequiredPin();
+	// Optional exclusion areas: buildings and scatter are never placed where these sample > 0.
+	Pins.Emplace(ScorchedCityPCGConstants::ExclusionPinLabel, EPCGDataType::Spatial);
+	return Pins;
+}
+
+TArray<FPCGPinProperties> UPCGScorchedCitySettings::OutputPinProperties() const
+{
+	TArray<FPCGPinProperties> Pins;
+	Pins.Emplace(ScorchedCityPCGConstants::ScatterPinLabel, EPCGDataType::Point);
+	Pins.Emplace(ScorchedCityPCGConstants::OccupiedBoundsPinLabel, EPCGDataType::Point);
+	Pins.Emplace(ScorchedCityPCGConstants::LotsPinLabel, EPCGDataType::Point);
+	return Pins;
+}
+
+// ---------------------------------------------------------------------------
+// Asset resolving
+// ---------------------------------------------------------------------------
+
+namespace
+{
+	/** @brief Runtime-resolved assets, parallel to the generator's resolved parameter arrays. */
+	struct FScorchedCityAssets
+	{
+		// Parallel to FScorchedCityGenParams::Buildings.
+		TArray<UClass*> BuildingClasses;
+
+		UStaticMesh* RoadMesh = nullptr;
+		UStaticMesh* IntersectionMesh = nullptr;
+		UClass* TwoPoleClass = nullptr;
+		UClass* SinglePoleClass = nullptr;
+
+		// Parallel to FScorchedCityGenParams::ScatterProfiles / their Meshes arrays.
+		TArray<TArray<FSoftObjectPath>> ScatterMeshPaths;
+	};
+
+	/**
+	 * @brief Measures the real local-space bounds of an actor class by spawning a transient
+	 * instance far below the world; exact for Blueprints incl. construction script results.
+	 */
+	FBox MeasureActorClassBounds(UWorld& World, UClass& ActorClass)
+	{
+		const FVector SpawnLocation(0.0, 0.0, ScorchedCityPCGConstants::MeasureSpawnDepth);
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnParams.ObjectFlags |= RF_Transient;
+
+		AActor* MeasureActor = World.SpawnActor<AActor>(&ActorClass, FTransform(SpawnLocation), SpawnParams);
+		if (not IsValid(MeasureActor))
+		{
+			return FBox(EForceInit::ForceInit);
+		}
+
+		FBox WorldBounds = MeasureActor->GetComponentsBoundingBox(true, true);
+		MeasureActor->Destroy();
+
+		if (not WorldBounds.IsValid)
+		{
+			return FBox(EForceInit::ForceInit);
+		}
+		return WorldBounds.ShiftBy(-SpawnLocation);
+	}
+
+	void ResolveBuildingAssets(
+		FPCGContext* Context,
+		const UPCGScorchedCitySettings* Settings,
+		UWorld& World,
+		FScorchedCityGenParams& Params,
+		FScorchedCityAssets& Assets)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		for (int32 SettingsIndex = 0; SettingsIndex < Settings->Buildings.Num(); ++SettingsIndex)
+		{
+			const FScorchedBuildingAssetSettings& Entry = Settings->Buildings[SettingsIndex];
+			UClass* BuildingClass = Entry.BuildingClass.LoadSynchronous();
+			if (BuildingClass == nullptr)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, Context,
+					LOCTEXT("NullBuildingClass", "ScorchedCity: a building entry has no valid class and was skipped."));
+				continue;
+			}
+
+			FScorchedResolvedBuilding Resolved;
+			Resolved.SettingsIndex = SettingsIndex;
+			Resolved.Weight = Entry.Weight;
+			Resolved.MinSpacing = Entry.MinSpacing;
+			Resolved.MaxSpacing = FMath::Max(Entry.MinSpacing, Entry.MaxSpacing);
+			Resolved.RotationMode = Entry.RotationMode;
+			Resolved.SizeCategory = Entry.SizeCategory;
+			Resolved.ZonePreference = Entry.ZonePreference;
+
+			if (Entry.bUseFootprintOverride)
+			{
+				Resolved.FootprintHalfExtents = Entry.FootprintOverride * 0.5;
+				Resolved.PivotToFootprintCenter = FVector2D::ZeroVector;
+			}
+			else
+			{
+				const FBox LocalBounds = MeasureActorClassBounds(World, *BuildingClass);
+				if (LocalBounds.IsValid)
+				{
+					const FVector Extent = LocalBounds.GetExtent();
+					const FVector Center = LocalBounds.GetCenter();
+					Resolved.FootprintHalfExtents = FVector2D(Extent.X, Extent.Y);
+					Resolved.PivotToFootprintCenter = FVector2D(Center.X, Center.Y);
+				}
+				else
+				{
+					PCGE_LOG_C(Warning, GraphAndLog, Context,
+						LOCTEXT("UnmeasurableBuilding", "ScorchedCity: could not measure a building's bounds; using a default footprint. Consider a footprint override."));
+					Resolved.FootprintHalfExtents = FVector2D(DefaultBuildingHalfExtent, DefaultBuildingHalfExtent);
+				}
+			}
+
+			Params.Buildings.Add(Resolved);
+			Assets.BuildingClasses.Add(BuildingClass);
+		}
+	}
+
+	void ResolveRoadAndPowerAssets(
+		const UPCGScorchedCitySettings* Settings,
+		FScorchedCityGenParams& Params,
+		FScorchedCityAssets& Assets)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		Assets.RoadMesh = Settings->RoadMesh.LoadSynchronous();
+		Assets.IntersectionMesh = Settings->IntersectionMesh.LoadSynchronous();
+		Assets.TwoPoleClass = Settings->PowerLineSettings.TwoPoleAsset.LoadSynchronous();
+		Assets.SinglePoleClass = Settings->PowerLineSettings.SinglePoleAsset.LoadSynchronous();
+
+		Params.RoadMeshLength = Settings->RoadMeshLengthOverride > 0.0f
+			? Settings->RoadMeshLengthOverride
+			: (Assets.RoadMesh != nullptr
+				? FMath::Max(100.0, Assets.RoadMesh->GetBoundingBox().GetSize().X)
+				: DefaultRoadMeshLength);
+
+		Params.IntersectionSize = Settings->IntersectionSizeOverride > 0.0f
+			? Settings->IntersectionSizeOverride
+			: (Assets.IntersectionMesh != nullptr
+				? Assets.IntersectionMesh->GetBoundingBox().GetSize().GetMax()
+				: Settings->RoadWidth * 1.5);
+	}
+
+	void ResolveScatterAssets(
+		const UPCGScorchedCitySettings* Settings,
+		FScorchedCityGenParams& Params,
+		FScorchedCityAssets& Assets)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		for (const FScorchedScatterProfile& Profile : Settings->ScatterProfiles)
+		{
+			// Sanitized copy: null meshes removed so generator indices always map to real meshes.
+			FScorchedScatterProfile Sanitized = Profile;
+			Sanitized.Meshes.Reset();
+
+			TArray<double> Radii;
+			TArray<FSoftObjectPath> Paths;
+
+			for (const FScorchedScatterMeshEntry& Entry : Profile.Meshes)
+			{
+				const UStaticMesh* Mesh = Entry.Mesh.LoadSynchronous();
+				if (Mesh == nullptr)
+				{
+					continue;
+				}
+
+				Sanitized.Meshes.Add(Entry);
+				const FVector Extent = Mesh->GetBoundingBox().GetExtent();
+				Radii.Add(FMath::Max(DefaultScatterMeshRadius * 0.1, FMath::Max(Extent.X, Extent.Y)));
+				Paths.Add(Entry.Mesh.ToSoftObjectPath());
+			}
+
+			Params.ScatterProfiles.Add(MoveTemp(Sanitized));
+			Params.ScatterMeshRadii.Add(MoveTemp(Radii));
+			Assets.ScatterMeshPaths.Add(MoveTemp(Paths));
+		}
+	}
+
+	TFunction<bool(const FVector2D&)> BuildExclusionFunction(FPCGContext* Context, const FTransform& CityToWorld)
+	{
+		TArray<const UPCGSpatialData*> ExclusionData;
+		const TArray<FPCGTaggedData> Inputs =
+			Context->InputData.GetInputsByPin(ScorchedCityPCGConstants::ExclusionPinLabel);
+		for (const FPCGTaggedData& Input : Inputs)
+		{
+			if (const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(Input.Data))
+			{
+				ExclusionData.Add(SpatialData);
+			}
+		}
+
+		if (ExclusionData.IsEmpty())
+		{
+			return nullptr;
+		}
+
+		return [ExclusionData = MoveTemp(ExclusionData), CityToWorld](const FVector2D& LocalPosition) -> bool
+		{
+			const FVector WorldPosition = CityToWorld.TransformPosition(FVector(LocalPosition, 0.0));
+			const FBox SampleBounds(FVector(-50.0), FVector(50.0));
+			for (const UPCGSpatialData* SpatialData : ExclusionData)
+			{
+				FPCGPoint SampledPoint;
+				if (SpatialData->SamplePoint(FTransform(WorldPosition), SampleBounds, SampledPoint, nullptr)
+					&& SampledPoint.Density > 0.0f)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Actor spawning
+// ---------------------------------------------------------------------------
+
+namespace
+{
+	AActor* SpawnManagedEmptyActor(UWorld& World, const FTransform& Transform, const FString& Label)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		AActor* Actor = World.SpawnActor<AActor>(AActor::StaticClass(), Transform, SpawnParams);
+		if (not IsValid(Actor))
+		{
+			return nullptr;
+		}
+
+		Actor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
+#if WITH_EDITOR
+		Actor->SetActorLabel(Label);
+#endif
+		return Actor;
+	}
+
+	/** @brief One actor per road: a spline (linear for grid streets) with chained spline meshes. */
+	void SpawnRoadSplineActor(
+		UWorld& World,
+		const FScorchedRoadSplineResult& Road,
+		const FTransform& CityToWorld,
+		UStaticMesh* RoadMesh,
+		double RoadMeshLength,
+		TArray<AActor*>& OutSpawnedActors)
+	{
+		const FVector FirstWorldPoint = CityToWorld.TransformPosition(FVector(Road.Points[0], 0.0));
+		AActor* RoadActor = SpawnManagedEmptyActor(World, FTransform(FirstWorldPoint), TEXT("PCG_ScorchedRoad"));
+		if (RoadActor == nullptr)
+		{
+			return;
+		}
+		OutSpawnedActors.Add(RoadActor);
+
+		USplineComponent* Spline = NewObject<USplineComponent>(RoadActor);
+		RoadActor->SetRootComponent(Spline);
+		RoadActor->AddInstanceComponent(Spline);
+		Spline->RegisterComponent();
+
+		Spline->ClearSplinePoints(false);
+		for (const FVector2D& Point : Road.Points)
+		{
+			const FVector WorldPoint = CityToWorld.TransformPosition(FVector(Point, 0.0));
+			Spline->AddSplinePoint(WorldPoint, ESplineCoordinateSpace::World, false);
+		}
+		if (not Road.bCurved)
+		{
+			for (int32 PointIndex = 0; PointIndex < Spline->GetNumberOfSplinePoints(); ++PointIndex)
+			{
+				Spline->SetSplinePointType(PointIndex, ESplinePointType::Linear, false);
+			}
+		}
+		Spline->UpdateSpline();
+
+		if (RoadMesh == nullptr)
+		{
+			return;
+		}
+
+		const double SplineLength = Spline->GetSplineLength();
+		const int32 NumChunks = FMath::Max(1, FMath::RoundToInt32(SplineLength / RoadMeshLength));
+		const double ChunkLength = SplineLength / NumChunks;
+
+		for (int32 ChunkIndex = 0; ChunkIndex < NumChunks; ++ChunkIndex)
+		{
+			const double StartDistance = ChunkIndex * ChunkLength;
+			const double EndDistance = (ChunkIndex + 1) * ChunkLength;
+
+			USplineMeshComponent* SplineMesh = NewObject<USplineMeshComponent>(RoadActor);
+			SplineMesh->SetMobility(EComponentMobility::Static);
+			SplineMesh->SetStaticMesh(RoadMesh);
+			SplineMesh->SetForwardAxis(ESplineMeshAxis::X, false);
+			SplineMesh->AttachToComponent(Spline, FAttachmentTransformRules::KeepRelativeTransform);
+			RoadActor->AddInstanceComponent(SplineMesh);
+
+			const FVector StartPosition = Spline->GetLocationAtDistanceAlongSpline(StartDistance, ESplineCoordinateSpace::Local);
+			const FVector EndPosition = Spline->GetLocationAtDistanceAlongSpline(EndDistance, ESplineCoordinateSpace::Local);
+			const FVector StartTangent = Spline->GetTangentAtDistanceAlongSpline(StartDistance, ESplineCoordinateSpace::Local)
+				.GetSafeNormal() * ChunkLength;
+			const FVector EndTangent = Spline->GetTangentAtDistanceAlongSpline(EndDistance, ESplineCoordinateSpace::Local)
+				.GetSafeNormal() * ChunkLength;
+
+			SplineMesh->SetStartAndEnd(StartPosition, StartTangent, EndPosition, EndTangent, false);
+			SplineMesh->RegisterComponent();
+		}
+	}
+
+	/** @brief All 4-way intersection pieces share one ISM component for cheap rendering. */
+	void SpawnIntersectionsActor(
+		UWorld& World,
+		const TArray<FScorchedIntersectionSpawn>& Intersections,
+		const FTransform& CityToWorld,
+		UStaticMesh* IntersectionMesh,
+		TArray<AActor*>& OutSpawnedActors)
+	{
+		if (Intersections.IsEmpty() || IntersectionMesh == nullptr)
+		{
+			return;
+		}
+
+		AActor* Anchor = SpawnManagedEmptyActor(
+			World, FTransform(CityToWorld.GetLocation()), TEXT("PCG_ScorchedIntersections"));
+		if (Anchor == nullptr)
+		{
+			return;
+		}
+		OutSpawnedActors.Add(Anchor);
+
+		UInstancedStaticMeshComponent* InstancedMeshes = NewObject<UInstancedStaticMeshComponent>(Anchor);
+		Anchor->SetRootComponent(InstancedMeshes);
+		Anchor->AddInstanceComponent(InstancedMeshes);
+		InstancedMeshes->SetMobility(EComponentMobility::Static);
+		InstancedMeshes->SetStaticMesh(IntersectionMesh);
+		InstancedMeshes->RegisterComponent();
+
+		const double CityYaw = CityYawRadians(CityToWorld);
+		for (const FScorchedIntersectionSpawn& Intersection : Intersections)
+		{
+			const FVector WorldPosition = CityToWorld.TransformPosition(FVector(Intersection.Position, 0.0));
+			const FQuat WorldRotation(FVector::UpVector, CityYaw + Intersection.YawRadians);
+			InstancedMeshes->AddInstance(FTransform(WorldRotation, WorldPosition), true);
+		}
+	}
+
+	void SpawnActorAtCityPosition(
+		UWorld& World,
+		UClass* ActorClass,
+		const FVector2D& LocalPosition,
+		const double LocalYawRadians,
+		const FTransform& CityToWorld,
+		TArray<AActor*>& OutSpawnedActors)
+	{
+		if (ActorClass == nullptr)
+		{
+			return;
+		}
+
+		const FVector WorldPosition = CityToWorld.TransformPosition(FVector(LocalPosition, 0.0));
+		const FQuat WorldRotation(FVector::UpVector, CityYawRadians(CityToWorld) + LocalYawRadians);
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		AActor* Actor = World.SpawnActor<AActor>(ActorClass, FTransform(WorldRotation, WorldPosition), SpawnParams);
+		if (not IsValid(Actor))
+		{
+			return;
+		}
+		Actor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
+		OutSpawnedActors.Add(Actor);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Point data outputs
+// ---------------------------------------------------------------------------
+
+namespace
+{
+	UPCGPointData* CreateOutputPointData(FPCGContext* Context, const FName PinLabel)
+	{
+		UPCGPointData* PointData = FPCGContext::NewObject_AnyThread<UPCGPointData>(Context);
+		PointData->InitializeFromData(nullptr);
+
+		FPCGTaggedData& Output = Context->OutputData.TaggedData.Emplace_GetRef();
+		Output.Data = PointData;
+		Output.Pin = PinLabel;
+		return PointData;
+	}
+
+	/** @brief Emits scatter points (with 'Mesh' attribute), tracing to the ground when requested. */
+	void EmitScatterOutput(
+		FPCGContext* Context,
+		UWorld& World,
+		const FScorchedCityGenResult& Result,
+		const FScorchedCityAssets& Assets,
+		const FTransform& CityToWorld,
+		const int32 RandomSeed,
+		const TArray<AActor*>& ActorsToIgnoreInTraces)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		UPCGPointData* ScatterData = CreateOutputPointData(Context, ScatterPinLabel);
+		FPCGMetadataAttribute<FSoftObjectPath>* MeshAttribute =
+			ScatterData->Metadata->CreateAttribute<FSoftObjectPath>(
+				ScatterMeshAttributeName, FSoftObjectPath(), false, false);
+
+		FCollisionQueryParams TraceParams;
+		TraceParams.AddIgnoredActors(ActorsToIgnoreInTraces);
+
+		TArray<FPCGPoint>& Points = ScatterData->GetMutablePoints();
+		Points.Reserve(Result.Scatter.Num());
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		for (int32 CandidateIndex = 0; CandidateIndex < Result.Scatter.Num(); ++CandidateIndex)
+		{
+			const FScorchedScatterCandidate& Candidate = Result.Scatter[CandidateIndex];
+			FVector WorldPosition = CityToWorld.TransformPosition(FVector(Candidate.Position, 0.0));
+			FQuat WorldRotation(FVector::UpVector, CityYaw + Candidate.YawRadians);
+
+			if (Candidate.bAlignToGround)
+			{
+				FHitResult GroundHit;
+				const FVector TraceStart = WorldPosition + FVector::UpVector * GroundTraceUp;
+				const FVector TraceEnd = WorldPosition - FVector::UpVector * GroundTraceDown;
+				if (World.LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, TraceParams))
+				{
+					WorldPosition.Z = GroundHit.ImpactPoint.Z;
+					WorldRotation = FQuat::FindBetweenNormals(FVector::UpVector, GroundHit.ImpactNormal) * WorldRotation;
+				}
+			}
+
+			FPCGPoint& Point = Points.Emplace_GetRef();
+			Point.Transform = FTransform(WorldRotation, WorldPosition, FVector(Candidate.UniformScale));
+			Point.Density = 1.0f;
+			Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, CandidateIndex);
+
+			ScatterData->Metadata->InitializeOnSet(Point.MetadataEntry);
+			MeshAttribute->SetValue(
+				Point.MetadataEntry, Assets.ScatterMeshPaths[Candidate.ProfileIndex][Candidate.MeshIndex]);
+		}
+	}
+
+	/** @brief Emits every reserved oriented footprint so downstream nodes can exclude points. */
+	void EmitOccupiedBoundsOutput(
+		FPCGContext* Context,
+		const FScorchedCityGenResult& Result,
+		const FTransform& CityToWorld,
+		const int32 RandomSeed)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		UPCGPointData* BoundsData = CreateOutputPointData(Context, OccupiedBoundsPinLabel);
+		FPCGMetadataAttribute<int32>* TypeAttribute =
+			BoundsData->Metadata->CreateAttribute<int32>(OccupancyTypeAttributeName, 0, false, false);
+
+		TArray<FPCGPoint>& Points = BoundsData->GetMutablePoints();
+		Points.Reserve(Result.OccupiedFootprints.Num());
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		for (int32 EntryIndex = 0; EntryIndex < Result.OccupiedFootprints.Num(); ++EntryIndex)
+		{
+			const FScorchedSpatialHashGrid::FEntry& Entry = Result.OccupiedFootprints[EntryIndex];
+
+			FPCGPoint& Point = Points.Emplace_GetRef();
+			Point.Transform = FTransform(
+				FQuat(FVector::UpVector, CityYaw + Entry.Footprint.YawRadians),
+				CityToWorld.TransformPosition(FVector(Entry.Footprint.Center, 0.0)));
+			Point.BoundsMin = FVector(-Entry.Footprint.HalfExtents.X, -Entry.Footprint.HalfExtents.Y, -OccupancyBoundsHalfHeight);
+			Point.BoundsMax = FVector(Entry.Footprint.HalfExtents.X, Entry.Footprint.HalfExtents.Y, OccupancyBoundsHalfHeight);
+			Point.Density = 1.0f;
+			Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, EntryIndex);
+
+			BoundsData->Metadata->InitializeOnSet(Point.MetadataEntry);
+			TypeAttribute->SetValue(Point.MetadataEntry, static_cast<int32>(Entry.Type));
+		}
+	}
+
+	void EmitLotsOutput(
+		FPCGContext* Context,
+		const FScorchedCityGenResult& Result,
+		const FTransform& CityToWorld,
+		const int32 RandomSeed)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		UPCGPointData* LotsData = CreateOutputPointData(Context, LotsPinLabel);
+		FPCGMetadataAttribute<int32>* UsedAttribute =
+			LotsData->Metadata->CreateAttribute<int32>(LotUsedAttributeName, 0, false, false);
+
+		TArray<FPCGPoint>& Points = LotsData->GetMutablePoints();
+		Points.Reserve(Result.Lots.Num());
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		for (int32 LotIndex = 0; LotIndex < Result.Lots.Num(); ++LotIndex)
+		{
+			const FScorchedLot& Lot = Result.Lots[LotIndex];
+
+			FPCGPoint& Point = Points.Emplace_GetRef();
+			Point.Transform = FTransform(
+				FQuat(FVector::UpVector, CityYaw + Lot.YawRadians),
+				CityToWorld.TransformPosition(FVector(Lot.Center, 0.0)));
+			Point.BoundsMin = FVector(-Lot.HalfExtents.X, -Lot.HalfExtents.Y, 0.0);
+			Point.BoundsMax = FVector(Lot.HalfExtents.X, Lot.HalfExtents.Y, 0.0);
+			Point.Density = 1.0f;
+			Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, LotIndex);
+
+			LotsData->Metadata->InitializeOnSet(Point.MetadataEntry);
+			UsedAttribute->SetValue(Point.MetadataEntry, Lot.bUsed ? 1 : 0);
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Element
+// ---------------------------------------------------------------------------
+
+namespace
+{
+	/**
+	 * @brief Extracts the city frame from the first spatial input: the area's bounds center
+	 * becomes the city origin and the bounds size becomes the city rectangle.
+	 */
+	bool TryGetCityArea(
+		FPCGContext* Context,
+		FTransform& OutCityToWorld,
+		FVector2D& OutCityLengths,
+		const UPCGSpatialData*& OutAreaData)
+	{
+		const TArray<FPCGTaggedData> Inputs = Context->InputData.GetInputsByPin(PCGPinConstants::DefaultInputLabel);
+		for (const FPCGTaggedData& Input : Inputs)
+		{
+			const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(Input.Data);
+			if (SpatialData == nullptr)
+			{
+				continue;
+			}
+
+			const FBox Bounds = SpatialData->GetBounds();
+			if (not Bounds.IsValid)
+			{
+				continue;
+			}
+
+			OutCityToWorld = FTransform(Bounds.GetCenter());
+			OutCityLengths = FVector2D(Bounds.GetSize().X, Bounds.GetSize().Y);
+			OutAreaData = SpatialData;
+
+			if (Inputs.Num() > 1)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, Context,
+					LOCTEXT("MultipleAreas", "ScorchedCity: multiple input data; only the first spatial data is used as the city area."));
+			}
+			return true;
+		}
+		return false;
+	}
+
+	/** @brief Even-odd ray-crossing test; the polygon is implicitly closed. */
+	bool IsPointInPolygon(const TArray<FVector2D>& Polygon, const FVector2D& Position)
+	{
+		bool bInside = false;
+		for (int32 CurrentIndex = 0, PreviousIndex = Polygon.Num() - 1;
+			CurrentIndex < Polygon.Num();
+			PreviousIndex = CurrentIndex++)
+		{
+			const FVector2D& VertexA = Polygon[CurrentIndex];
+			const FVector2D& VertexB = Polygon[PreviousIndex];
+
+			const bool bCrossesRay = (VertexA.Y > Position.Y) != (VertexB.Y > Position.Y);
+			if (bCrossesRay
+				&& Position.X < (VertexB.X - VertexA.X) * (Position.Y - VertexA.Y) / (VertexB.Y - VertexA.Y) + VertexA.X)
+			{
+				bInside = not bInside;
+			}
+		}
+		return bInside;
+	}
+
+	/**
+	 * @brief Builds the city-local area test. Poly lines (spline loops) are sampled into a 2D
+	 * polygon for fast point-in-polygon checks; other spatial data falls back to density sampling.
+	 */
+	TFunction<bool(const FVector2D&)> BuildAreaFunction(
+		const UPCGSpatialData* AreaData,
+		const FTransform& CityToWorld,
+		const double GridBlockSize)
+	{
+		if (const UPCGPolyLineData* PolyLine = Cast<UPCGPolyLineData>(AreaData))
+		{
+			const double SampleStep = FMath::Clamp(GridBlockSize * 0.25, 200.0, 2000.0);
+			TArray<FVector2D> Polygon;
+
+			for (int32 SegmentIndex = 0; SegmentIndex < PolyLine->GetNumSegments(); ++SegmentIndex)
+			{
+				const double SegmentLength = PolyLine->GetSegmentLength(SegmentIndex);
+				const int32 NumSamples = FMath::Clamp(FMath::CeilToInt32(SegmentLength / SampleStep), 2, 128);
+				for (int32 SampleIndex = 0; SampleIndex < NumSamples; ++SampleIndex)
+				{
+					const double Distance = SegmentLength * SampleIndex / NumSamples;
+					const FTransform SampleTransform = PolyLine->GetTransformAtDistance(SegmentIndex, Distance, true);
+					const FVector LocalPosition = CityToWorld.InverseTransformPosition(SampleTransform.GetLocation());
+					Polygon.Add(FVector2D(LocalPosition.X, LocalPosition.Y));
+				}
+			}
+
+			if (Polygon.Num() >= 3)
+			{
+				return [Polygon = MoveTemp(Polygon)](const FVector2D& LocalPosition) -> bool
+				{
+					return IsPointInPolygon(Polygon, LocalPosition);
+				};
+			}
+		}
+
+		// Generic spatial data (volumes, surfaces, unions...): sample the density field.
+		return [AreaData, CityToWorld](const FVector2D& LocalPosition) -> bool
+		{
+			const FVector WorldPosition = CityToWorld.TransformPosition(FVector(LocalPosition, 0.0));
+			const FBox SampleBounds(FVector(-50.0), FVector(50.0));
+			FPCGPoint SampledPoint;
+			return AreaData->SamplePoint(FTransform(WorldPosition), SampleBounds, SampledPoint, nullptr)
+				&& SampledPoint.Density > 0.0f;
+		};
+	}
+
+	void FillScalarParams(const UPCGScorchedCitySettings* Settings, FScorchedCityGenParams& Params)
+	{
+		Params.RandomSeed = Settings->RandomSeed;
+		Params.OverallDensity = Settings->OverallDensity;
+		Params.GridLayoutAmount = Settings->GridLayoutAmount;
+		Params.CurvedRoadAmount = Settings->CurvedRoadAmount;
+		Params.BuildingSpacingExtra = Settings->BuildingSpacingExtra;
+		Params.RoadWidth = Settings->RoadWidth;
+		Params.RoadSetback = Settings->RoadSetback;
+		Params.MinRoadBuildingDistance = Settings->MinRoadBuildingDistance;
+		Params.GridBlockSize = Settings->GridBlockSize;
+		Params.MajorRoadInterval = Settings->MajorRoadInterval;
+		Params.CurvedRoadCurvature = Settings->CurvedRoadCurvature;
+		Params.CurvedRoadVariation = Settings->CurvedRoadVariation;
+		Params.CurvedRoadBranchChance = Settings->CurvedRoadBranchChance;
+		Params.CurvedRoadSegmentLength = Settings->CurvedRoadSegmentLength;
+		Params.LotWidth = Settings->LotWidth;
+		Params.LotDepth = Settings->LotDepth;
+		Params.PowerLines = Settings->PowerLineSettings;
+	}
+
+	void SpawnCityActors(
+		UWorld& World,
+		const FScorchedCityGenResult& Result,
+		const FScorchedCityAssets& Assets,
+		const FScorchedCityGenParams& Params,
+		const FTransform& CityToWorld,
+		TArray<AActor*>& OutSpawnedActors)
+	{
+		for (const FScorchedRoadSplineResult& Road : Result.RoadSplines)
+		{
+			SpawnRoadSplineActor(World, Road, CityToWorld, Assets.RoadMesh, Params.RoadMeshLength, OutSpawnedActors);
+		}
+
+		SpawnIntersectionsActor(World, Result.Intersections, CityToWorld, Assets.IntersectionMesh, OutSpawnedActors);
+
+		for (const FScorchedBuildingSpawn& Building : Result.Buildings)
+		{
+			SpawnActorAtCityPosition(World, Assets.BuildingClasses[Building.AssetIndex],
+				Building.ActorPosition, Building.YawRadians, CityToWorld, OutSpawnedActors);
+		}
+
+		for (const FScorchedPoleSpawn& Pole : Result.Poles)
+		{
+			// Fall back to whichever pole asset exists so broken settings still produce a city.
+			UClass* PoleClass = Pole.bTwoPole ? Assets.TwoPoleClass : Assets.SinglePoleClass;
+			if (PoleClass == nullptr)
+			{
+				PoleClass = Pole.bTwoPole ? Assets.SinglePoleClass : Assets.TwoPoleClass;
+			}
+			SpawnActorAtCityPosition(World, PoleClass, Pole.Position, Pole.YawRadians, CityToWorld, OutSpawnedActors);
+		}
+	}
+}
+
+bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
+{
+	check(Context);
+
+	const UPCGScorchedCitySettings* Settings = Context->GetInputSettings<UPCGScorchedCitySettings>();
+	UPCGComponent* SourceComponent = Context->SourceComponent.Get();
+	if (Settings == nullptr || not IsValid(SourceComponent) || not IsValid(SourceComponent->GetWorld()))
+	{
+		return true;
+	}
+	UWorld& World = *SourceComponent->GetWorld();
+
+	FTransform CityToWorld;
+	FVector2D CityLengths = FVector2D::ZeroVector;
+	const UPCGSpatialData* AreaData = nullptr;
+	if (not TryGetCityArea(Context, CityToWorld, CityLengths, AreaData))
+	{
+		PCGE_LOG(Warning, GraphAndLog, LOCTEXT("NoArea",
+			"ScorchedCity: no valid spatial input area (expected e.g. a closed spline loop)."));
+		return true;
+	}
+
+	FScorchedCityGenParams Params;
+	FScorchedCityAssets Assets;
+	FillScalarParams(Settings, Params);
+	Params.CityLengthX = CityLengths.X;
+	Params.CityLengthY = CityLengths.Y;
+	ResolveRoadAndPowerAssets(Settings, Params, Assets);
+	ResolveBuildingAssets(Context, Settings, World, Params, Assets);
+	ResolveScatterAssets(Settings, Params, Assets);
+	Params.IsExcluded = BuildExclusionFunction(Context, CityToWorld);
+	Params.IsInsideArea = BuildAreaFunction(AreaData, CityToWorld, Params.GridBlockSize);
+
+	FScorchedCityGenResult Result;
+	FScorchedCityGenerator Generator(Params);
+	Generator.Generate(Result);
+
+	if (Result.RoadSplines.IsEmpty())
+	{
+		PCGE_LOG(Warning, GraphAndLog, LOCTEXT("NoRoads",
+			"ScorchedCity: no roads were generated; check GridLayoutAmount/CurvedRoadAmount and city size vs GridBlockSize."));
+	}
+
+	TArray<AActor*> SpawnedActors;
+	SpawnCityActors(World, Result, Assets, Params, CityToWorld, SpawnedActors);
+
+	if (not SpawnedActors.IsEmpty())
+	{
+		UPCGManagedActors* ManagedActors = NewObject<UPCGManagedActors>(SourceComponent);
+		for (AActor* SpawnedActor : SpawnedActors)
+		{
+			ManagedActors->GeneratedActors.Add(SpawnedActor);
+		}
+		SourceComponent->AddToManagedResources(ManagedActors);
+	}
+
+	EmitScatterOutput(Context, World, Result, Assets, CityToWorld, Settings->RandomSeed, SpawnedActors);
+	EmitOccupiedBoundsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
+	EmitLotsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
+	return true;
+}
+
+#undef LOCTEXT_NAMESPACE

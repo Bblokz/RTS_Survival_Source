@@ -16,7 +16,7 @@ namespace
 	constexpr int32 EnemyPrimaryRewardSeedOffset = 24103;
 	constexpr int32 EnemyTypeSeedMultiplier = 97;
 	constexpr int32 EnemyBonusObjectiveSeedOffset = 24107;
-	const TCHAR BaseDifficultyReasonText[] = TEXT("<Text_NewBad>Base Fortification Strength</>");
+	const TCHAR BaseDifficultyReasonText[] = TEXT("Base Fortification Strength");
 
 	struct FEnemyPrimaryRewardRuntimePool
 	{
