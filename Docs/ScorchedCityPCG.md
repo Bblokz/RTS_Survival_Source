@@ -53,6 +53,12 @@ Pins:
 
 Lots are marched along both sides of every edge (width/depth scaled up on major roads), offset by `RoadWidth/2 + RoadSetback + MinRoadBuildingDistance`, rejected if they clip other roads or leave the city. Buildings: lots are filled majors/corners first; a density gate (dense vs sparse zone × `OverallDensity`) decides if a lot is used; a weighted pick combines designer weight, zone preference and size-vs-lot fit (large → major/corner, small → side streets); placement faces the road (`FacingYaw` + allowed rotation offsets), pushes the building to the lot front, jitters laterally, and SAT-tests the inflated footprint against everything.
 
+### 5.5 Building categories & HISM batching
+
+Each building entry has a `Category`:
+- **ScorchBuilding** (default): the Blueprint's static meshes (plain components and ISM/HISM instances, extracted once from a transient inspection instance) are batched into **one city actor** holding one Hierarchical Instanced Static Mesh component per unique mesh — the same manual "merge selected actors into HISMs" workflow, automated. Placement, footprints and ground-projected pivots are identical to actor spawning; non-mesh components/logic of the Blueprint are discarded. Instances are bulk-added per mesh so each HISM cluster tree builds once.
+- **BlueprintBuilding**: spawned as its Blueprint actor, unchanged (keeps components and logic).
+
 ## 6. Scatter
 
 Per building × per profile: chance roll, count from density × zone, positions sampled in a ring measured from the **footprint edge** (support function, so distance respects building orientation), optional clustering. Checks: exclusion input, city bounds, avoid-roads / avoid-buildings masks using the mesh's scaled radius. `bAlignToGround` line-traces down (ignoring all actors this node spawned) and aligns to the ground normal.

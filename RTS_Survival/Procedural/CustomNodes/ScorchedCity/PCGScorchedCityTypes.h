@@ -34,6 +34,18 @@ enum class EScorchedZonePreference : uint8
 	SparseZones
 };
 
+/** @brief How a building entry is turned into world geometry. */
+UENUM(BlueprintType)
+enum class EScorchedBuildingCategory : uint8
+{
+	// Scorch ruin made of many small static mesh components: all placements of these are
+	// batched into ONE actor of shared Hierarchical Instanced Static Mesh components.
+	// Big optimization; any non-mesh components/logic of the Blueprint are discarded.
+	ScorchBuilding,
+	// Spawned as its Blueprint actor, unchanged (keeps components and logic).
+	BlueprintBuilding
+};
+
 /** @brief How a building may deviate from facing its road. */
 UENUM(BlueprintType)
 enum class EScorchedBuildingRotationMode : uint8
@@ -59,6 +71,13 @@ struct FScorchedBuildingAssetSettings
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Building)
 	TSoftClassPtr<AActor> BuildingClass;
+
+	/**
+	 * @brief ScorchBuilding batches every placement of this entry into one shared HISM actor
+	 * (use for mesh-heavy ruins); BlueprintBuilding spawns the Blueprint actor as-is.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Building)
+	EScorchedBuildingCategory Category = EScorchedBuildingCategory::ScorchBuilding;
 
 	/** @brief Relative pick chance among all candidates that fit a lot. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Building, meta = (ClampMin = "0"))

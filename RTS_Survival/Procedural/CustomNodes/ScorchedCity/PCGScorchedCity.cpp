@@ -16,8 +16,10 @@
 
 #include "CollisionQueryParams.h"
 #include "Components/DecalComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Components/SplineComponent.h"
 #include "Components/SplineMeshComponent.h"
 #include "Engine/HitResult.h"
@@ -136,11 +138,21 @@ TArray<FPCGPinProperties> UPCGScorchedCitySettings::OutputPinProperties() const
 
 namespace
 {
+	/** @brief One static mesh of a scorch building, relative to the building actor's pivot. */
+	struct FScorchedBuildingMeshInstance
+	{
+		UStaticMesh* Mesh = nullptr;
+		FTransform RelativeTransform = FTransform::Identity;
+	};
+
 	/** @brief Runtime-resolved assets, parallel to the generator's resolved parameter arrays. */
 	struct FScorchedCityAssets
 	{
 		// Parallel to FScorchedCityGenParams::Buildings.
 		TArray<UClass*> BuildingClasses;
+		TArray<EScorchedBuildingCategory> BuildingCategories;
+		// Extracted meshes per entry; only filled for ScorchBuilding entries (HISM batching).
+		TArray<TArray<FScorchedBuildingMeshInstance>> BuildingMeshInstances;
 
 		UStaticMesh* RoadMesh = nullptr;
 		UStaticMesh* IntersectionMesh = nullptr;
@@ -158,10 +170,11 @@ namespace
 	};
 
 	/**
-	 * @brief Measures the real local-space bounds of an actor class by spawning a transient
-	 * instance far below the world; exact for Blueprints incl. construction script results.
+	 * @brief Spawns a transient instance of a class far below the world so its real bounds and
+	 * static mesh composition can be inspected; exact for Blueprints incl. construction scripts.
+	 * The caller must Destroy() the returned actor.
 	 */
-	FBox MeasureActorClassBounds(UWorld& World, UClass& ActorClass)
+	AActor* SpawnTransientInspectionActor(UWorld& World, UClass& ActorClass)
 	{
 		const FVector SpawnLocation(0.0, 0.0, ScorchedCityPCGConstants::MeasureSpawnDepth);
 
@@ -169,20 +182,54 @@ namespace
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		SpawnParams.ObjectFlags |= RF_Transient;
 
-		AActor* MeasureActor = World.SpawnActor<AActor>(&ActorClass, FTransform(SpawnLocation), SpawnParams);
-		if (not IsValid(MeasureActor))
-		{
-			return FBox(EForceInit::ForceInit);
-		}
+		return World.SpawnActor<AActor>(&ActorClass, FTransform(SpawnLocation), SpawnParams);
+	}
 
-		FBox WorldBounds = MeasureActor->GetComponentsBoundingBox(true, true);
-		MeasureActor->Destroy();
-
+	FBox ComputeInspectionActorLocalBounds(const AActor& InspectionActor)
+	{
+		const FBox WorldBounds = InspectionActor.GetComponentsBoundingBox(true, true);
 		if (not WorldBounds.IsValid)
 		{
 			return FBox(EForceInit::ForceInit);
 		}
-		return WorldBounds.ShiftBy(-SpawnLocation);
+		return WorldBounds.ShiftBy(-InspectionActor.GetActorLocation());
+	}
+
+	/**
+	 * @brief Collects every static mesh of the actor (plain components and ISM/HISM instances)
+	 * with its transform relative to the actor pivot, so scorch buildings can be re-rendered
+	 * as shared Hierarchical ISM instances instead of per-building actors.
+	 */
+	void ExtractStaticMeshInstances(const AActor& InspectionActor, TArray<FScorchedBuildingMeshInstance>& OutInstances)
+	{
+		const FTransform WorldToActor = InspectionActor.GetActorTransform().Inverse();
+
+		TArray<UStaticMeshComponent*> MeshComponents;
+		InspectionActor.GetComponents<UStaticMeshComponent>(MeshComponents);
+
+		for (const UStaticMeshComponent* MeshComponent : MeshComponents)
+		{
+			UStaticMesh* Mesh = MeshComponent->GetStaticMesh();
+			if (Mesh == nullptr)
+			{
+				continue;
+			}
+
+			if (const UInstancedStaticMeshComponent* Instanced = Cast<UInstancedStaticMeshComponent>(MeshComponent))
+			{
+				for (int32 InstanceIndex = 0; InstanceIndex < Instanced->GetInstanceCount(); ++InstanceIndex)
+				{
+					FTransform InstanceTransform;
+					if (Instanced->GetInstanceTransform(InstanceIndex, InstanceTransform, true))
+					{
+						OutInstances.Add({Mesh, InstanceTransform * WorldToActor});
+					}
+				}
+				continue;
+			}
+
+			OutInstances.Add({Mesh, MeshComponent->GetComponentTransform() * WorldToActor});
+		}
 	}
 
 	void ResolveBuildingAssets(
@@ -214,6 +261,16 @@ namespace
 			Resolved.SizeCategory = Entry.SizeCategory;
 			Resolved.ZonePreference = Entry.ZonePreference;
 
+			// One transient instance serves both bounds measurement and, for scorch buildings,
+			// extraction of the static meshes that get batched into shared HISM components.
+			EScorchedBuildingCategory Category = Entry.Category;
+			TArray<FScorchedBuildingMeshInstance> MeshInstances;
+			const bool bNeedsInspection =
+				Category == EScorchedBuildingCategory::ScorchBuilding || not Entry.bUseFootprintOverride;
+			AActor* InspectionActor = bNeedsInspection
+				? SpawnTransientInspectionActor(World, *BuildingClass)
+				: nullptr;
+
 			if (Entry.bUseFootprintOverride)
 			{
 				Resolved.FootprintHalfExtents = Entry.FootprintOverride * 0.5;
@@ -221,7 +278,9 @@ namespace
 			}
 			else
 			{
-				const FBox LocalBounds = MeasureActorClassBounds(World, *BuildingClass);
+				const FBox LocalBounds = IsValid(InspectionActor)
+					? ComputeInspectionActorLocalBounds(*InspectionActor)
+					: FBox(EForceInit::ForceInit);
 				if (LocalBounds.IsValid)
 				{
 					const FVector Extent = LocalBounds.GetExtent();
@@ -237,8 +296,30 @@ namespace
 				}
 			}
 
+			if (Category == EScorchedBuildingCategory::ScorchBuilding)
+			{
+				if (IsValid(InspectionActor))
+				{
+					ExtractStaticMeshInstances(*InspectionActor, MeshInstances);
+				}
+				if (MeshInstances.IsEmpty())
+				{
+					PCGE_LOG_C(Warning, GraphAndLog, Context,
+						LOCTEXT("ScorchBuildingNoMeshes",
+							"ScorchedCity: a ScorchBuilding entry has no static meshes to batch; spawning it as a Blueprint actor instead."));
+					Category = EScorchedBuildingCategory::BlueprintBuilding;
+				}
+			}
+
+			if (IsValid(InspectionActor))
+			{
+				InspectionActor->Destroy();
+			}
+
 			Params.Buildings.Add(Resolved);
 			Assets.BuildingClasses.Add(BuildingClass);
+			Assets.BuildingCategories.Add(Category);
+			Assets.BuildingMeshInstances.Add(MoveTemp(MeshInstances));
 		}
 	}
 
@@ -644,6 +725,75 @@ namespace
 				World, Intersection.Position, CityToWorld, TraceParams, RoadZOffset);
 			const FQuat WorldRotation(FVector::UpVector, CityYaw + Intersection.YawRadians);
 			InstancedMeshes->AddInstance(FTransform(WorldRotation, WorldPosition), true);
+		}
+	}
+
+	/**
+	 * @brief All scorch buildings of the city are rendered by ONE actor holding one
+	 * Hierarchical Instanced Static Mesh component per unique mesh: the same batching a
+	 * designer would do by hand, done automatically. Pivots are ground-projected like actors.
+	 */
+	void SpawnScorchBuildingsActor(
+		UWorld& World,
+		const FScorchedCityGenResult& Result,
+		const FScorchedCityAssets& Assets,
+		const FTransform& CityToWorld,
+		TArray<AActor*>& OutSpawnedActors)
+	{
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(OutSpawnedActors);
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		// Gather world transforms per unique mesh (TMap keeps insertion order: deterministic).
+		TMap<UStaticMesh*, TArray<FTransform>> MeshToTransforms;
+		for (const FScorchedBuildingSpawn& Building : Result.Buildings)
+		{
+			if (not Assets.BuildingCategories.IsValidIndex(Building.AssetIndex)
+				|| Assets.BuildingCategories[Building.AssetIndex] != EScorchedBuildingCategory::ScorchBuilding)
+			{
+				continue;
+			}
+
+			// Same placement rules as actor buildings: pivot projected onto the landscape.
+			const FVector WorldPosition = ProjectCityPositionToGround(
+				World, Building.ActorPosition, CityToWorld, TraceParams, 0.0);
+			const FTransform BuildingTransform(
+				FQuat(FVector::UpVector, CityYaw + Building.YawRadians), WorldPosition);
+
+			for (const FScorchedBuildingMeshInstance& MeshInstance : Assets.BuildingMeshInstances[Building.AssetIndex])
+			{
+				MeshToTransforms.FindOrAdd(MeshInstance.Mesh).Add(MeshInstance.RelativeTransform * BuildingTransform);
+			}
+		}
+
+		if (MeshToTransforms.IsEmpty())
+		{
+			return;
+		}
+
+		AActor* Anchor = SpawnManagedEmptyActor(
+			World, FTransform(CityToWorld.GetLocation()), TEXT("PCG_ScorchedBuildings"));
+		if (Anchor == nullptr)
+		{
+			return;
+		}
+		OutSpawnedActors.Add(Anchor);
+
+		USceneComponent* Root = NewObject<USceneComponent>(Anchor);
+		Anchor->SetRootComponent(Root);
+		Anchor->AddInstanceComponent(Root);
+		Root->RegisterComponent();
+
+		for (TPair<UStaticMesh*, TArray<FTransform>>& MeshEntry : MeshToTransforms)
+		{
+			UHierarchicalInstancedStaticMeshComponent* InstancedMeshes =
+				NewObject<UHierarchicalInstancedStaticMeshComponent>(Anchor);
+			InstancedMeshes->SetMobility(EComponentMobility::Static);
+			InstancedMeshes->SetStaticMesh(MeshEntry.Key);
+			InstancedMeshes->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
+			Anchor->AddInstanceComponent(InstancedMeshes);
+			InstancedMeshes->RegisterComponent();
+			// One bulk add per mesh so the HISM cluster tree builds once.
+			InstancedMeshes->AddInstances(MeshEntry.Value, false, true);
 		}
 	}
 
@@ -1104,9 +1254,14 @@ namespace
 		SpawnIntersectionsActor(
 			World, Result.Intersections, CityToWorld, Assets.IntersectionMesh, Params.RoadZOffset, OutSpawnedActors);
 
+		// Scorch buildings are batched into one shared HISM actor; Blueprint buildings spawn
+		// as their actors, unchanged.
+		SpawnScorchBuildingsActor(World, Result, Assets, CityToWorld, OutSpawnedActors);
+
 		for (const FScorchedBuildingSpawn& Building : Result.Buildings)
 		{
-			if (not Assets.BuildingClasses.IsValidIndex(Building.AssetIndex))
+			if (not Assets.BuildingClasses.IsValidIndex(Building.AssetIndex)
+				|| Assets.BuildingCategories[Building.AssetIndex] != EScorchedBuildingCategory::BlueprintBuilding)
 			{
 				continue;
 			}
