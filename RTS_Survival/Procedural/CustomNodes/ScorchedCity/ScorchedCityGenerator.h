@@ -196,9 +196,16 @@ private:
 
 	/**
 	 * @brief Pairs nearby degree-1 road endings with natural curves where the path is clear;
-	 * unconnectable endings at the city rim are exported as OuterOrphanRoads.
+	 * every ending that stays unconnected (including failed pairings) is exported as an
+	 * OuterOrphanRoads point so downstream PCG logic can connect to it.
 	 */
 	void ConnectOrphanRoadEnds(FScorchedCityGenResult& OutResult);
+
+	/**
+	 * @brief The 4-way mesh always has four arms, but a 3-way node only has three streets:
+	 * exports an OuterOrphanRoads point at the mesh edge of every arm that has no road.
+	 */
+	void ExportOpenIntersectionArms(FScorchedCityGenResult& OutResult) const;
 
 	/** @return Normalized direction from the node into the edge's polyline. */
 	FVector2D EdgeDirectionAwayFromNode(const FScorchedRoadEdge& Edge, int32 NodeIndex) const;

@@ -126,8 +126,8 @@ TArray<FPCGPinProperties> UPCGScorchedCitySettings::OutputPinProperties() const
 	Pins.Emplace(ScorchedCityPCGConstants::ScatterPinLabel, EPCGDataType::Point);
 	Pins.Emplace(ScorchedCityPCGConstants::OccupiedBoundsPinLabel, EPCGDataType::Point);
 	Pins.Emplace(ScorchedCityPCGConstants::LotsPinLabel, EPCGDataType::Point);
-	// Rim road endings that could not be connected naturally; point rotation = outward yaw,
-	// so other PCG logic can continue those roads outside the city.
+	// Every unconnected road ending (dead stops, failed pairings, open 4-way arms); point
+	// rotation = outward yaw, so other PCG logic can continue those roads.
 	Pins.Emplace(ScorchedCityPCGConstants::OuterOrphanRoadsPinLabel, EPCGDataType::Point);
 	return Pins;
 }
@@ -1149,8 +1149,9 @@ namespace
 	}
 
 	/**
-	 * @brief Emits unconnected rim road endings; each point sits on the road's final outer
-	 * position (ground-projected) and its rotation yaws outward, continuing the road.
+	 * @brief Emits every unconnected road ending (including open intersection arms); each
+	 * point sits on the road's final outer position (ground-projected) and its rotation yaws
+	 * outward, continuing the road.
 	 */
 	void EmitOuterOrphanRoadsOutput(
 		FPCGContext* Context,

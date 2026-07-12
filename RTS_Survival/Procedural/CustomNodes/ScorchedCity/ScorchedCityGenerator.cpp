@@ -78,8 +78,6 @@ namespace ScorchedCityGenConstants
 	// Both endings must roughly face each other for the connection to look natural.
 	constexpr double OrphanConnectMinFacingDot = 0.15;
 	constexpr int32 OrphanCurveMaxPoints = 16;
-	// How far past an ending we probe to decide whether it sits at the city rim.
-	constexpr double OrphanRimProbeRoadWidths = 3.0;
 }
 
 FScorchedCityGenerator::FScorchedCityGenerator(const FScorchedCityGenParams& InParams)
@@ -1026,7 +1024,9 @@ void FScorchedCityGenerator::ConnectOrphanRoadEnds(FScorchedCityGenResult& OutRe
 		ConnectedOrphans.Add(Pair.IndexB);
 	}
 
-	// Whatever is left at the rim gets exported so other PCG logic can connect to it.
+	// Every ending that is still unconnected gets exported — including endings whose pairing
+	// attempt failed and lattice-quantized street stubs that stop well before the area edge.
+	// A rim-distance filter proved too strict and silently dropped real endings.
 	for (int32 OrphanIndex = 0; OrphanIndex < Orphans.Num(); ++OrphanIndex)
 	{
 		if (ConnectedOrphans.Contains(OrphanIndex))
@@ -1035,17 +1035,58 @@ void FScorchedCityGenerator::ConnectOrphanRoadEnds(FScorchedCityGenResult& OutRe
 		}
 
 		const FOrphanEnd& Orphan = Orphans[OrphanIndex];
-		const FVector2D RimProbe = Orphan.Position
-			+ Orphan.OutwardDirection * (M_Params.RoadWidth * OrphanRimProbeRoadWidths);
-		if (IsInsideCity(RimProbe, 0.0))
-		{
-			continue;
-		}
-
 		FScorchedOrphanRoadEnd OrphanEnd;
 		OrphanEnd.Position = Orphan.Position;
 		OrphanEnd.YawRadians = FMath::Atan2(Orphan.OutwardDirection.Y, Orphan.OutwardDirection.X);
 		OutResult.OuterOrphanRoads.Add(OrphanEnd);
+	}
+
+	ExportOpenIntersectionArms(OutResult);
+}
+
+void FScorchedCityGenerator::ExportOpenIntersectionArms(FScorchedCityGenResult& OutResult) const
+{
+	for (int32 NodeIndex = 0; NodeIndex < M_Nodes.Num(); ++NodeIndex)
+	{
+		const FScorchedRoadNode& Node = M_Nodes[NodeIndex];
+		if (Node.Edges.Num() < 3)
+		{
+			continue;
+		}
+
+		// Match each street leaving the node to the nearest of the mesh's four arms.
+		const double MeshYaw = ComputeIntersectionYawAtNode(NodeIndex);
+		bool bArmUsed[4] = {false, false, false, false};
+		for (const int32 EdgeIndex : Node.Edges)
+		{
+			const FVector2D Direction = EdgeDirectionAwayFromNode(M_Edges[EdgeIndex], NodeIndex);
+			const double RelativeAngle = FMath::Atan2(Direction.Y, Direction.X) - MeshYaw;
+			const int32 Cardinal = ((FMath::RoundToInt32(RelativeAngle / (PI * 0.5)) % 4) + 4) % 4;
+			bArmUsed[Cardinal] = true;
+		}
+
+		FScorchedFootprint MeshFootprint;
+		MeshFootprint.HalfExtents =
+			FVector2D(M_Params.IntersectionSizeX * 0.5, M_Params.IntersectionSizeY * 0.5);
+		MeshFootprint.YawRadians = MeshYaw;
+
+		// Every arm without a street is a visible dead end of the 4-way piece: export its
+		// outer point at the mesh edge so downstream PCG logic can continue the road there.
+		for (int32 Cardinal = 0; Cardinal < 4; ++Cardinal)
+		{
+			if (bArmUsed[Cardinal])
+			{
+				continue;
+			}
+
+			const double ExitYaw = MeshYaw + Cardinal * PI * 0.5;
+			const FVector2D ExitDirection(FMath::Cos(ExitYaw), FMath::Sin(ExitYaw));
+
+			FScorchedOrphanRoadEnd OrphanEnd;
+			OrphanEnd.Position = Node.Position + ExitDirection * MeshFootprint.SupportRadius(ExitDirection);
+			OrphanEnd.YawRadians = ExitYaw;
+			OutResult.OuterOrphanRoads.Add(OrphanEnd);
+		}
 	}
 }
 
