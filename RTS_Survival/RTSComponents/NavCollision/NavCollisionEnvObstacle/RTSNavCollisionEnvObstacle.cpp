@@ -103,6 +103,30 @@ void URTSNavCollisionEnvObstacle::SetUpNavModifierVolumeAsUnionOfComponents(
 	RefreshNavigationModifiers();
 }
 
+void URTSNavCollisionEnvObstacle::SetUpNavModifierVolume(
+	const FVector& WorldCenter,
+	const FVector& LocalExtent,
+	const FQuat& WorldRotation)
+{
+	if (LocalExtent.GetMin() <= 0.0)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("EnvObstacle: Cannot set up a nav modifier with a zero or negative extent."));
+		return;
+	}
+
+	const FTransform RotationOnly(WorldRotation);
+	const FVector CenterInRotationFrame = RotationOnly.InverseTransformPosition(WorldCenter);
+	const FBox BoxInRotationFrame = FBox::BuildAABB(CenterInRotationFrame, LocalExtent);
+
+	ComponentBounds.Reset(1);
+	ComponentBounds.Add(FRotatedBox(BoxInRotationFrame, WorldRotation));
+	Bounds = FBox::BuildAABB(FVector::ZeroVector, LocalExtent)
+		.TransformBy(FTransform(WorldRotation, WorldCenter));
+	FailsafeExtent = LocalExtent;
+	RefreshNavigationModifiers();
+}
+
 void URTSNavCollisionEnvObstacle::BeginPlay()
 {
 	Super::BeginPlay();

@@ -9,6 +9,52 @@
 
 class UMaterialInterface;
 class UStaticMesh;
+class AActor;
+
+/**
+ * @brief Describes one Blueprint pole option used while populating a reinforcement road.
+ * The orientation axis lets differently-authored pole assets align consistently with the wire route.
+ */
+USTRUCT(BlueprintType)
+struct FReinforcementRoadPoleEntry
+{
+	GENERATED_BODY()
+
+	/** Blueprint actor containing an initialized UDestructibleWire component. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
+	TSoftClassPtr<AActor> PoleActor;
+
+	/** Preferred wire count; each span uses the smaller preference of its two poles. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles", meta = (ClampMin = "1"))
+	int32 PreferredAmountWires = 1;
+
+	/** Local horizontal axis aligned with the road direction. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
+	FVector Orientation = FVector::ForwardVector;
+
+	/** Distance from the road centerline; one side is selected for the entire pole chain. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles", meta = (ClampMin = "0"))
+	float OffsetFromRoad = 500.0f;
+};
+
+/**
+ * @brief Controls the assets and variable spacing for one reinforcement-road pole category.
+ * A category is eligible only when it contains at least one configured pole actor.
+ */
+USTRUCT(BlueprintType)
+struct FReinforcementRoadPoleCategory
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
+	TArray<FReinforcementRoadPoleEntry> Poles;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles", meta = (ClampMin = "100"))
+	float MinimumDistanceBetweenPoles = 1000.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles", meta = (ClampMin = "100"))
+	float MaximumDistanceBetweenPoles = 1400.0f;
+};
 
 /**
  * @brief Configures managed reinforcement-road splines generated between compatible endpoints.
@@ -49,6 +95,22 @@ public:
 	/** Optional material applied to slot zero of every generated spline mesh. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Road")
 	TSoftObjectPtr<UMaterialInterface> OverrideMaterial;
+
+	/** Large pole options and their spacing range. One eligible category is selected per road. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
+	FReinforcementRoadPoleCategory LargeElectricPoles;
+
+	/** Small pole options and their spacing range. One eligible category is selected per road. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
+	FReinforcementRoadPoleCategory SmallElectricPoles;
+
+	/** Mesh used by every wire span created between adjacent poles. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
+	TSoftObjectPtr<UStaticMesh> WireMesh;
+
+	/** Scale applied to the shared wire mesh along every generated span. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
+	FVector WireMeshScale = FVector::OneVector;
 };
 
 /**

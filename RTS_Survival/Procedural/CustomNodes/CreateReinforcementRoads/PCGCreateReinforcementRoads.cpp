@@ -19,6 +19,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/DestructableWireComponent/DestructableWireComp.h"
 
 #define LOCTEXT_NAMESPACE "PCGCreateReinforcementRoads"
 
@@ -53,6 +54,13 @@ namespace ReinforcementRoadConstants
 	constexpr double MinimumMeshLength = 100.0;
 	constexpr double DecorativeAmplitudePerCurvature = 300.0;
 	constexpr int32 DecorativeAttempts = 5;
+	constexpr double MinimumOrphanApproachLength = 500.0;
+	constexpr double MaximumOrphanApproachLength = 2400.0;
+	constexpr double OrphanApproachDistanceFactor = 0.35;
+	constexpr double OrphanApproachHandleFactor = 0.4;
+	constexpr double OrphanApproachSampleSpacing = 150.0;
+	constexpr double OrphanApproachAttemptScales[] = {1.0, 0.75, 0.5};
+	constexpr double MinimumPoleSpacing = 100.0;
 
 	enum class EConnectionType : uint8
 	{
@@ -219,12 +227,19 @@ namespace
 		return FVector2D::DotProduct(Start.Forward, Direction) >= MinimumStartDot;
 	}
 
-	double CandidateScore(const FEndpoint& Start, const FEndpoint& End)
+	double CandidateScore(
+		const FEndpoint& Start,
+		const FEndpoint& End,
+		const EConnectionType ConnectionType)
 	{
 		const FVector2D Direction = (FVector2D(End.Position) - FVector2D(Start.Position)).GetSafeNormal();
 		const double Distance = FVector2D::Distance(FVector2D(Start.Position), FVector2D(End.Position));
 		const double StartTurnPenalty = (1.0 - FVector2D::DotProduct(Start.Forward, Direction)) * 1000.0;
-		const double EndAlignmentPenalty = (1.0 - FMath::Abs(FVector2D::DotProduct(End.Forward, Direction))) * 500.0;
+		const double EndDirectionDot = FVector2D::DotProduct(End.Forward, Direction);
+		// Orphan forward points out of the city, so prefer starts on that side of the orphan road.
+		const double EndAlignmentPenalty = ConnectionType == EConnectionType::Orphan
+			? (1.0 + EndDirectionDot) * 500.0
+			: (1.0 - FMath::Abs(EndDirectionDot)) * 500.0;
 		return Distance + StartTurnPenalty + EndAlignmentPenalty;
 	}
 
@@ -243,7 +258,7 @@ namespace
 				continue;
 			}
 			OutCandidates.Add({Orphans[OrphanIndex], EConnectionType::Orphan,
-				CandidateScore(Start, Orphans[OrphanIndex])});
+				CandidateScore(Start, Orphans[OrphanIndex], EConnectionType::Orphan)});
 		}
 
 		for (int32 StartIndex = 0; StartIndex < Starts.Num(); ++StartIndex)
@@ -254,7 +269,7 @@ namespace
 				continue;
 			}
 			OutCandidates.Add({Starts[StartIndex], EConnectionType::ReinforcementStart,
-				CandidateScore(Start, Starts[StartIndex])});
+				CandidateScore(Start, Starts[StartIndex], EConnectionType::ReinforcementStart)});
 		}
 	}
 
@@ -271,7 +286,7 @@ namespace
 				continue;
 			}
 			OutCandidates.Add({Backups[BackupIndex], EConnectionType::Backup,
-				CandidateScore(Start, Backups[BackupIndex])});
+				CandidateScore(Start, Backups[BackupIndex], EConnectionType::Backup)});
 		}
 	}
 
@@ -522,9 +537,106 @@ namespace
 		return DensePath;
 	}
 
+	bool TryBuildBasePath(
+		const FVector2D& Start,
+		const FVector2D& End,
+		const FExclusionTester& Exclusions,
+		const double Clearance,
+		TArray<FVector2D>& OutPath)
+	{
+		if (Exclusions.IsSegmentClear(Start, End, Clearance))
+		{
+			OutPath = {Start, End};
+		}
+		else
+		{
+			OutPath = SimplifyPath(FindGridPath(Start, End, Exclusions, Clearance), Exclusions, Clearance);
+		}
+		return OutPath.Num() >= 2;
+	}
+
+	FVector2D EvaluateCubicBezier(
+		const FVector2D& Start,
+		const FVector2D& StartControl,
+		const FVector2D& EndControl,
+		const FVector2D& End,
+		const double Alpha)
+	{
+		const double OneMinusAlpha = 1.0 - Alpha;
+		return Start * (OneMinusAlpha * OneMinusAlpha * OneMinusAlpha)
+			+ StartControl * (3.0 * FMath::Square(OneMinusAlpha) * Alpha)
+			+ EndControl * (3.0 * OneMinusAlpha * FMath::Square(Alpha))
+			+ End * (Alpha * Alpha * Alpha);
+	}
+
+	void AppendOrphanApproach(
+		TArray<FVector2D>& InOutRoute,
+		const FVector2D& EndPosition,
+		const FVector2D& EndOutwardDirection,
+		const double ApproachLength)
+	{
+		const FVector2D ApproachStart = InOutRoute.Last();
+		const FVector2D IncomingDirection = InOutRoute.Num() >= 2
+			? (ApproachStart - InOutRoute[InOutRoute.Num() - 2]).GetSafeNormal()
+			: -EndOutwardDirection;
+		const double HandleLength = ApproachLength * OrphanApproachHandleFactor;
+		const FVector2D StartControl = ApproachStart + IncomingDirection * HandleLength;
+		const FVector2D EndControl = EndPosition + EndOutwardDirection * HandleLength;
+		const int32 SampleCount = FMath::Max(3, FMath::CeilToInt32(ApproachLength / OrphanApproachSampleSpacing));
+
+		for (int32 SampleIndex = 1; SampleIndex <= SampleCount; ++SampleIndex)
+		{
+			const double Alpha = static_cast<double>(SampleIndex) / SampleCount;
+			InOutRoute.Add(EvaluateCubicBezier(
+				ApproachStart, StartControl, EndControl, EndPosition, Alpha));
+		}
+	}
+
+	bool TryBuildOrphanRoute(
+		const FEndpoint& Start,
+		const FEndpoint& End,
+		const UPCGCreateReinforcementRoadsSettings& Settings,
+		const FExclusionTester& Exclusions,
+		const double Clearance,
+		const int32 Seed,
+		TArray<FVector2D>& OutRoute)
+	{
+		const FVector2D StartPosition(Start.Position);
+		const FVector2D EndPosition(End.Position);
+		const double DirectDistance = FVector2D::Distance(StartPosition, EndPosition);
+		const double MaximumUsefulApproach = FMath::Max(MinimumMeshLength, DirectDistance * 0.6);
+		const double PreferredApproachLength = FMath::Min(
+			MaximumUsefulApproach,
+			FMath::Clamp(DirectDistance * OrphanApproachDistanceFactor + Clearance,
+				MinimumOrphanApproachLength, MaximumOrphanApproachLength));
+
+		for (const double AttemptScale : OrphanApproachAttemptScales)
+		{
+			const double ApproachLength = PreferredApproachLength * AttemptScale;
+			const FVector2D ApproachStart = EndPosition + End.Forward * ApproachLength;
+			TArray<FVector2D> BasePath;
+			if (not TryBuildBasePath(StartPosition, ApproachStart, Exclusions, Clearance, BasePath)
+				|| PathLength(BasePath) > FVector2D::Distance(StartPosition, ApproachStart) * MaximumDetourRatio)
+			{
+				continue;
+			}
+
+			OutRoute = AddDecorativeCurves(
+				BasePath, Settings.Curvature, Settings.AmountCurvesPer1000Units, Seed, Exclusions, Clearance);
+			AppendOrphanApproach(OutRoute, EndPosition, End.Forward, ApproachLength);
+			if (Exclusions.IsPathClear(OutRoute, Clearance))
+			{
+				return true;
+			}
+		}
+		OutRoute.Reset();
+		return false;
+	}
+
 	bool TryBuildRoute2D(
 		const FEndpoint& Start,
 		const FEndpoint& End,
+		const EConnectionType ConnectionType,
 		const UPCGCreateReinforcementRoadsSettings& Settings,
 		const FExclusionTester& Exclusions,
 		const double Clearance,
@@ -538,19 +650,14 @@ namespace
 		{
 			return false;
 		}
+		if (ConnectionType == EConnectionType::Orphan)
+		{
+			return TryBuildOrphanRoute(Start, End, Settings, Exclusions, Clearance, Seed, OutRoute);
+		}
 
 		TArray<FVector2D> BasePath;
-		if (Exclusions.IsSegmentClear(StartPosition, EndPosition, Clearance))
-		{
-			BasePath = {StartPosition, EndPosition};
-		}
-		else
-		{
-			BasePath = SimplifyPath(
-				FindGridPath(StartPosition, EndPosition, Exclusions, Clearance), Exclusions, Clearance);
-		}
-
-		if (BasePath.Num() < 2 || PathLength(BasePath) > DirectDistance * MaximumDetourRatio)
+		if (not TryBuildBasePath(StartPosition, EndPosition, Exclusions, Clearance, BasePath)
+			|| PathLength(BasePath) > DirectDistance * MaximumDetourRatio)
 		{
 			return false;
 		}
@@ -560,7 +667,10 @@ namespace
 		return OutRoute.Num() >= 2 && Exclusions.IsPathClear(OutRoute, Clearance);
 	}
 
-	FVector ProjectToGround(UWorld& World, const FVector& Position, const FCollisionQueryParams& TraceParams)
+	FVector ProjectReinforcementRoadToGround(
+		UWorld& World,
+		const FVector& Position,
+		const FCollisionQueryParams& TraceParams)
 	{
 		FHitResult Hit;
 		const FVector TraceStart = Position + FVector::UpVector * ReinforcementGroundTraceUp;
@@ -588,7 +698,8 @@ namespace
 			const double Alpha = Route2D.Num() > 1
 				? static_cast<double>(PointIndex) / (Route2D.Num() - 1)
 				: 0.0;
-			Grounded.Add(ProjectToGround(World, FVector(Route2D[PointIndex], FMath::Lerp(Start.Z, End.Z, Alpha)), TraceParams));
+			Grounded.Add(ProjectReinforcementRoadToGround(
+				World, FVector(Route2D[PointIndex], FMath::Lerp(Start.Z, End.Z, Alpha)), TraceParams));
 		}
 
 		for (int32 PointIndex = 1; PointIndex < Grounded.Num(); ++PointIndex)
@@ -608,6 +719,220 @@ namespace
 				Grounded[PointIndex + 1].Z + HorizontalDistance * MaximumRoadGrade);
 		}
 		return Grounded;
+	}
+
+	double GetReinforcementRouteLength(const TArray<FVector>& Points)
+	{
+		double Length = 0.0;
+		for (int32 PointIndex = 1; PointIndex < Points.Num(); ++PointIndex)
+		{
+			Length += FVector::Distance(Points[PointIndex - 1], Points[PointIndex]);
+		}
+		return Length;
+	}
+
+	bool TrySampleReinforcementRoute(
+		const TArray<FVector>& Points,
+		const double Distance,
+		FVector& OutPosition,
+		FVector& OutDirection)
+	{
+		if (Points.Num() < 2)
+		{
+			return false;
+		}
+
+		double TraversedDistance = 0.0;
+		for (int32 PointIndex = 1; PointIndex < Points.Num(); ++PointIndex)
+		{
+			const FVector Segment = Points[PointIndex] - Points[PointIndex - 1];
+			const double SegmentLength = Segment.Length();
+			if (TraversedDistance + SegmentLength < Distance && PointIndex < Points.Num() - 1)
+			{
+				TraversedDistance += SegmentLength;
+				continue;
+			}
+
+			const double SegmentAlpha = SegmentLength > UE_DOUBLE_SMALL_NUMBER
+				? FMath::Clamp((Distance - TraversedDistance) / SegmentLength, 0.0, 1.0)
+				: 0.0;
+			OutPosition = FMath::Lerp(Points[PointIndex - 1], Points[PointIndex], SegmentAlpha);
+			OutDirection = FVector(Segment.X, Segment.Y, 0.0).GetSafeNormal();
+			return not OutDirection.IsNearlyZero();
+		}
+		return false;
+	}
+
+	TArray<int32> GetConfiguredReinforcementPoleIndices(const FReinforcementRoadPoleCategory& Category)
+	{
+		TArray<int32> ConfiguredIndices;
+		for (int32 PoleIndex = 0; PoleIndex < Category.Poles.Num(); ++PoleIndex)
+		{
+			if (not Category.Poles[PoleIndex].PoleActor.IsNull())
+			{
+				ConfiguredIndices.Add(PoleIndex);
+			}
+		}
+		return ConfiguredIndices;
+	}
+
+	const FReinforcementRoadPoleCategory* SelectReinforcementPoleCategory(
+		const UPCGCreateReinforcementRoadsSettings& Settings,
+		FRandomStream& Random)
+	{
+		TArray<const FReinforcementRoadPoleCategory*> EligibleCategories;
+		if (not GetConfiguredReinforcementPoleIndices(Settings.LargeElectricPoles).IsEmpty())
+		{
+			EligibleCategories.Add(&Settings.LargeElectricPoles);
+		}
+		if (not GetConfiguredReinforcementPoleIndices(Settings.SmallElectricPoles).IsEmpty())
+		{
+			EligibleCategories.Add(&Settings.SmallElectricPoles);
+		}
+		return EligibleCategories.IsEmpty()
+			? nullptr
+			: EligibleCategories[Random.RandRange(0, EligibleCategories.Num() - 1)];
+	}
+
+	FVector ProjectReinforcementPoleToGround(
+		UWorld& World,
+		const FVector& Position,
+		const TArray<AActor*>& ActorsToIgnore)
+	{
+		FCollisionQueryParams TraceParams;
+		TraceParams.AddIgnoredActors(ActorsToIgnore);
+		FHitResult Hit;
+		const FVector TraceStart = Position + FVector::UpVector * ReinforcementGroundTraceUp;
+		const FVector TraceEnd = Position - FVector::UpVector * ReinforcementGroundTraceDown;
+		return World.LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, TraceParams)
+			? Hit.ImpactPoint
+			: Position;
+	}
+
+	FRotator GetReinforcementPoleRotation(const FVector& RouteDirection, const FVector& PoleOrientation)
+	{
+		FVector2D LocalOrientation(PoleOrientation.X, PoleOrientation.Y);
+		if (LocalOrientation.IsNearlyZero())
+		{
+			LocalOrientation = FVector2D::UnitX();
+		}
+		const double RouteYaw = FMath::Atan2(RouteDirection.Y, RouteDirection.X);
+		const double LocalYaw = FMath::Atan2(LocalOrientation.Y, LocalOrientation.X);
+		return FRotator(0.0, FMath::RadiansToDegrees(RouteYaw - LocalYaw), 0.0);
+	}
+
+	AActor* SpawnReinforcementPoleActor(
+		UWorld& World,
+		const FReinforcementRoadPoleEntry& PoleEntry,
+		const FVector& RoutePosition,
+		const FVector& RouteDirection,
+		const double SideMultiplier,
+		const TArray<AActor*>& ActorsToIgnore,
+		const int32 RoadIndex,
+		const int32 PoleIndex)
+	{
+		UClass* PoleClass = PoleEntry.PoleActor.LoadSynchronous();
+		if (not IsValid(PoleClass) || PoleClass->HasAnyClassFlags(CLASS_Abstract))
+		{
+			return nullptr;
+		}
+
+		const FVector RoadNormal(-RouteDirection.Y, RouteDirection.X, 0.0);
+		const FVector OffsetPosition = RoutePosition
+			+ RoadNormal * SideMultiplier * PoleEntry.OffsetFromRoad;
+		const FVector GroundPosition = ProjectReinforcementPoleToGround(World, OffsetPosition, ActorsToIgnore);
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AActor* PoleActor = World.SpawnActor<AActor>(
+			PoleClass, GroundPosition, GetReinforcementPoleRotation(RouteDirection, PoleEntry.Orientation), SpawnParams);
+		if (not IsValid(PoleActor))
+		{
+			return nullptr;
+		}
+
+		PoleActor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
+#if WITH_EDITOR
+		PoleActor->SetActorLabel(FString::Printf(TEXT("PCG_ReinforcementPole_%d_%d"), RoadIndex, PoleIndex));
+#endif
+		return PoleActor;
+	}
+
+	void ConnectAdjacentReinforcementPoles(
+		UDestructibleWire* ParentWireComponent,
+		UDestructibleWire* ChildWireComponent,
+		const int32 ParentPreferredWires,
+		const int32 ChildPreferredWires,
+		UStaticMesh* WireMesh,
+		const FVector& WireMeshScale)
+	{
+		if (not IsValid(ParentWireComponent) || not IsValid(ChildWireComponent) || not IsValid(WireMesh))
+		{
+			return;
+		}
+
+		const int32 WireCount = FMath::Max(1, FMath::Min(ParentPreferredWires, ChildPreferredWires));
+		ParentWireComponent->SetupWireConnection(
+			ChildWireComponent, WireCount, WireMesh, WireMeshScale);
+	}
+
+	void SpawnReinforcementPoleChain(
+		UWorld& World,
+		const TArray<FVector>& RoutePoints,
+		const UPCGCreateReinforcementRoadsSettings& Settings,
+		UStaticMesh* WireMesh,
+		const int32 Seed,
+		const int32 RoadIndex,
+		TArray<AActor*>& InOutSpawnedActors)
+	{
+		FRandomStream Random(Seed);
+		const FReinforcementRoadPoleCategory* Category = SelectReinforcementPoleCategory(Settings, Random);
+		if (Category == nullptr)
+		{
+			return;
+		}
+
+		const TArray<int32> ConfiguredPoleIndices = GetConfiguredReinforcementPoleIndices(*Category);
+		const double MinimumSpacing = FMath::Max(
+			MinimumPoleSpacing, FMath::Min(Category->MinimumDistanceBetweenPoles, Category->MaximumDistanceBetweenPoles));
+		const double MaximumSpacing = FMath::Max(
+			MinimumSpacing, FMath::Max(Category->MinimumDistanceBetweenPoles, Category->MaximumDistanceBetweenPoles));
+		const double RouteLength = GetReinforcementRouteLength(RoutePoints);
+		const double SideMultiplier = Random.RandRange(0, 1) == 0 ? -1.0 : 1.0;
+		double PoleDistance = 0.0;
+		UDestructibleWire* PreviousWireComponent = nullptr;
+		int32 PreviousPreferredWires = 0;
+		int32 PoleIndex = 0;
+
+		while (PoleDistance <= RouteLength)
+		{
+			FVector RoutePosition;
+			FVector RouteDirection;
+			if (not TrySampleReinforcementRoute(RoutePoints, PoleDistance, RoutePosition, RouteDirection))
+			{
+				break;
+			}
+
+			const int32 EntryIndex = ConfiguredPoleIndices[Random.RandRange(0, ConfiguredPoleIndices.Num() - 1)];
+			const FReinforcementRoadPoleEntry& PoleEntry = Category->Poles[EntryIndex];
+			AActor* PoleActor = SpawnReinforcementPoleActor(
+				World, PoleEntry, RoutePosition, RouteDirection, SideMultiplier,
+				InOutSpawnedActors, RoadIndex, PoleIndex);
+			UDestructibleWire* WireComponent = IsValid(PoleActor)
+				? PoleActor->FindComponentByClass<UDestructibleWire>()
+				: nullptr;
+			if (IsValid(PoleActor))
+			{
+				InOutSpawnedActors.Add(PoleActor);
+			}
+			ConnectAdjacentReinforcementPoles(
+				PreviousWireComponent, WireComponent, PreviousPreferredWires,
+				PoleEntry.PreferredAmountWires, WireMesh, Settings.WireMeshScale);
+
+			PreviousWireComponent = WireComponent;
+			PreviousPreferredWires = PoleEntry.PreferredAmountWires;
+			PoleDistance += Random.FRandRange(MinimumSpacing, MaximumSpacing);
+			++PoleIndex;
+		}
 	}
 
 	AActor* SpawnRoadActor(
@@ -720,7 +1045,8 @@ namespace
 		for (int32 CandidateIndex = 0; CandidateIndex < Candidates.Num(); ++CandidateIndex)
 		{
 			TArray<FVector2D> Route2D;
-			if (not TryBuildRoute2D(Start, Candidates[CandidateIndex].Endpoint, Settings, Exclusions,
+			if (not TryBuildRoute2D(Start, Candidates[CandidateIndex].Endpoint, Candidates[CandidateIndex].Type,
+				Settings, Exclusions,
 				Clearance, PCGHelpers::ComputeSeed(BaseSeed, CandidateIndex), Route2D))
 			{
 				continue;
@@ -782,7 +1108,8 @@ FText UPCGCreateReinforcementRoadsSettings::GetNodeTooltipText() const
 {
 	return LOCTEXT("NodeTooltip",
 		"Creates one-use, exclusion-safe reinforcement road connections. Primary orphan/start endpoints are preferred; "
-		"backup ends are used only when no natural primary route can be planned. Roads follow and gently grade over terrain.");
+		"backup ends are used only when no natural primary route can be planned. Roads follow terrain and can spawn "
+		"connected large or small electric-pole chains alongside them.");
 }
 #endif
 
@@ -826,6 +1153,7 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 	}
 
 	UStaticMesh* RoadMesh = Settings->RoadMesh.LoadSynchronous();
+	UStaticMesh* WireMesh = Settings->WireMesh.LoadSynchronous();
 	UMaterialInterface* OverrideMaterial = Settings->OverrideMaterial.LoadSynchronous();
 	const double Clearance = ComputeRoadClearance(RoadMesh) + SplineInterpolationSafetyMargin;
 	const double MeshLength = ComputeMeshLength(RoadMesh);
@@ -876,6 +1204,9 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 		{
 			SpawnedActors.Add(RoadActor);
 		}
+		SpawnReinforcementPoleChain(
+			World, GeneratedRoute.Points, *Settings, WireMesh,
+			PCGHelpers::ComputeSeed(RouteSeed, Routes.Num()), Routes.Num(), SpawnedActors);
 		Routes.Add(MoveTemp(GeneratedRoute));
 	}
 

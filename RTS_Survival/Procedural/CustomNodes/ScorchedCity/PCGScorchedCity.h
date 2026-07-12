@@ -131,6 +131,11 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Buildings")
 	TArray<FScorchedBuildingAssetSettings> Buildings;
 
+	/** @brief Percentage of each Scorch building's measured bounds used by its weapon-trace box. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Buildings",
+		meta = (ClampMin = "1", ClampMax = "100", UIMin = "1", UIMax = "100", Units = "Percent"))
+	float ScorchBuildingCollisionBoundsPercent = 80.0f;
+
 	/** @brief Extra clearance added around every building footprint before overlap tests. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Buildings", meta = (ClampMin = "0"))
 	float BuildingSpacingExtra = 150.0f;

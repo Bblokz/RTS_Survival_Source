@@ -15,6 +15,7 @@
 #include "Metadata/PCGMetadataAttribute.h"
 
 #include "CollisionQueryParams.h"
+#include "Components/BoxComponent.h"
 #include "Components/DecalComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -27,6 +28,9 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
+#include "NavAreas/NavArea_Obstacle.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/RTSComponents/NavCollision/NavCollisionEnvObstacle/RTSNavCollisionEnvObstacle.h"
 
 #define LOCTEXT_NAMESPACE "PCGScorchedCity"
 
@@ -45,6 +49,7 @@ namespace ScorchedCityPCGConstants
 	// Fallbacks when meshes/classes cannot be measured.
 	constexpr double DefaultRoadMeshLength = 400.0;
 	constexpr double DefaultBuildingHalfExtent = 400.0;
+	constexpr double DefaultBuildingHeight = 800.0;
 	constexpr double DefaultScatterMeshRadius = 50.0;
 
 	// Ground alignment trace range around the city plane; generous so tall landscapes still hit.
@@ -153,6 +158,8 @@ namespace
 		TArray<EScorchedBuildingCategory> BuildingCategories;
 		// Extracted meshes per entry; only filled for ScorchBuilding entries (HISM batching).
 		TArray<TArray<FScorchedBuildingMeshInstance>> BuildingMeshInstances;
+		// Measured local 3D bounds per entry, used by Scorch building nav and trace volumes.
+		TArray<FBox> BuildingLocalBounds;
 
 		UStaticMesh* RoadMesh = nullptr;
 		UStaticMesh* IntersectionMesh = nullptr;
@@ -278,6 +285,10 @@ namespace
 				? SpawnTransientInspectionActor(World, *BuildingClass)
 				: nullptr;
 
+			const FBox MeasuredLocalBounds = IsValid(InspectionActor)
+				? ComputeInspectionActorLocalBounds(*InspectionActor)
+				: FBox(EForceInit::ForceInit);
+
 			if (Entry.bUseFootprintOverride)
 			{
 				Resolved.FootprintHalfExtents = Entry.FootprintOverride * 0.5;
@@ -285,13 +296,10 @@ namespace
 			}
 			else
 			{
-				const FBox LocalBounds = IsValid(InspectionActor)
-					? ComputeInspectionActorLocalBounds(*InspectionActor)
-					: FBox(EForceInit::ForceInit);
-				if (LocalBounds.IsValid)
+				if (MeasuredLocalBounds.IsValid)
 				{
-					const FVector Extent = LocalBounds.GetExtent();
-					const FVector Center = LocalBounds.GetCenter();
+					const FVector Extent = MeasuredLocalBounds.GetExtent();
+					const FVector Center = MeasuredLocalBounds.GetCenter();
 					Resolved.FootprintHalfExtents = FVector2D(Extent.X, Extent.Y);
 					Resolved.PivotToFootprintCenter = FVector2D(Center.X, Center.Y);
 				}
@@ -327,6 +335,11 @@ namespace
 			Assets.BuildingClasses.Add(BuildingClass);
 			Assets.BuildingCategories.Add(Category);
 			Assets.BuildingMeshInstances.Add(MoveTemp(MeshInstances));
+			Assets.BuildingLocalBounds.Add(MeasuredLocalBounds.IsValid
+				? MeasuredLocalBounds
+				: FBox(
+					FVector(-Resolved.FootprintHalfExtents.X, -Resolved.FootprintHalfExtents.Y, 0.0),
+					FVector(Resolved.FootprintHalfExtents.X, Resolved.FootprintHalfExtents.Y, DefaultBuildingHeight)));
 		}
 	}
 
@@ -858,11 +871,45 @@ namespace
 	 * Hierarchical Instanced Static Mesh component per unique mesh: the same batching a
 	 * designer would do by hand, done automatically. Pivots are ground-projected like actors.
 	 */
+	void AddScorchBuildingNavigationAndCollision(
+		AActor& Anchor,
+		USceneComponent& Root,
+		const FTransform& BuildingTransform,
+		const FBox& LocalBounds,
+		const double CollisionBoundsScale)
+	{
+		const FVector BoundsCenter = BuildingTransform.TransformPosition(LocalBounds.GetCenter());
+		const FQuat BoundsRotation = BuildingTransform.GetRotation();
+
+		UBoxComponent* TraceCollision = NewObject<UBoxComponent>(&Anchor);
+		TraceCollision->SetMobility(EComponentMobility::Static);
+		TraceCollision->SetBoxExtent(LocalBounds.GetExtent() * CollisionBoundsScale, false);
+		TraceCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+		TraceCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+		TraceCollision->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Block);
+		TraceCollision->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Block);
+		TraceCollision->SetGenerateOverlapEvents(false);
+		TraceCollision->SetSimulatePhysics(false);
+		TraceCollision->SetCanEverAffectNavigation(false);
+		TraceCollision->AttachToComponent(&Root, FAttachmentTransformRules::KeepWorldTransform);
+		Anchor.AddInstanceComponent(TraceCollision);
+		TraceCollision->SetWorldLocationAndRotation(BoundsCenter, BoundsRotation);
+		TraceCollision->RegisterComponent();
+
+		URTSNavCollisionEnvObstacle* NavigationModifier =
+			NewObject<URTSNavCollisionEnvObstacle>(&Anchor);
+		Anchor.AddInstanceComponent(NavigationModifier);
+		NavigationModifier->SetAreaClass(UNavArea_Obstacle::StaticClass());
+		NavigationModifier->RegisterComponent();
+		NavigationModifier->SetUpNavModifierVolume(BoundsCenter, LocalBounds.GetExtent(), BoundsRotation);
+	}
+
 	void SpawnScorchBuildingsActor(
 		UWorld& World,
 		const FScorchedCityGenResult& Result,
 		const FScorchedCityAssets& Assets,
 		const FTransform& CityToWorld,
+		const float CollisionBoundsPercent,
 		TArray<AActor*>& OutSpawnedActors)
 	{
 		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(OutSpawnedActors);
@@ -870,9 +917,12 @@ namespace
 
 		// Gather world transforms per unique mesh (TMap keeps insertion order: deterministic).
 		TMap<UStaticMesh*, TArray<FTransform>> MeshToTransforms;
+		TArray<TPair<FTransform, FBox>> BuildingPlacements;
 		for (const FScorchedBuildingSpawn& Building : Result.Buildings)
 		{
 			if (not Assets.BuildingCategories.IsValidIndex(Building.AssetIndex)
+				|| not Assets.BuildingMeshInstances.IsValidIndex(Building.AssetIndex)
+				|| not Assets.BuildingLocalBounds.IsValidIndex(Building.AssetIndex)
 				|| Assets.BuildingCategories[Building.AssetIndex] != EScorchedBuildingCategory::ScorchBuilding)
 			{
 				continue;
@@ -883,6 +933,7 @@ namespace
 				World, Building.ActorPosition, CityToWorld, TraceParams, 0.0);
 			const FTransform BuildingTransform(
 				FQuat(FVector::UpVector, CityYaw + Building.YawRadians), WorldPosition);
+			BuildingPlacements.Emplace(BuildingTransform, Assets.BuildingLocalBounds[Building.AssetIndex]);
 
 			for (const FScorchedBuildingMeshInstance& MeshInstance : Assets.BuildingMeshInstances[Building.AssetIndex])
 			{
@@ -914,11 +965,21 @@ namespace
 				NewObject<UHierarchicalInstancedStaticMeshComponent>(Anchor);
 			InstancedMeshes->SetMobility(EComponentMobility::Static);
 			InstancedMeshes->SetStaticMesh(MeshEntry.Key);
+			InstancedMeshes->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			InstancedMeshes->SetGenerateOverlapEvents(false);
+			InstancedMeshes->SetCanEverAffectNavigation(false);
 			InstancedMeshes->AttachToComponent(Root, FAttachmentTransformRules::KeepRelativeTransform);
 			Anchor->AddInstanceComponent(InstancedMeshes);
 			InstancedMeshes->RegisterComponent();
 			// One bulk add per mesh so the HISM cluster tree builds once.
 			InstancedMeshes->AddInstances(MeshEntry.Value, false, true);
+		}
+
+		const double CollisionBoundsScale = FMath::Clamp(CollisionBoundsPercent, 1.0f, 100.0f) / 100.0;
+		for (const TPair<FTransform, FBox>& BuildingPlacement : BuildingPlacements)
+		{
+			AddScorchBuildingNavigationAndCollision(
+				*Anchor, *Root, BuildingPlacement.Key, BuildingPlacement.Value, CollisionBoundsScale);
 		}
 	}
 
@@ -1361,6 +1422,7 @@ namespace
 
 	void SpawnCityActors(
 		UWorld& World,
+		const UPCGScorchedCitySettings& Settings,
 		const FScorchedCityGenResult& Result,
 		const FScorchedCityAssets& Assets,
 		const FScorchedCityGenParams& Params,
@@ -1384,7 +1446,13 @@ namespace
 
 		// Scorch buildings are batched into one shared HISM actor; Blueprint buildings spawn
 		// as their actors, unchanged.
-		SpawnScorchBuildingsActor(World, Result, Assets, CityToWorld, OutSpawnedActors);
+		SpawnScorchBuildingsActor(
+			World,
+			Result,
+			Assets,
+			CityToWorld,
+			Settings.ScorchBuildingCollisionBoundsPercent,
+			OutSpawnedActors);
 
 		for (const FScorchedBuildingSpawn& Building : Result.Buildings)
 		{
@@ -1506,7 +1574,7 @@ bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
 	}
 
 	TArray<AActor*> SpawnedActors;
-	SpawnCityActors(World, Result, Assets, Params, CityToWorld, SpawnedActors);
+	SpawnCityActors(World, *Settings, Result, Assets, Params, CityToWorld, SpawnedActors);
 
 	if (not SpawnedActors.IsEmpty())
 	{

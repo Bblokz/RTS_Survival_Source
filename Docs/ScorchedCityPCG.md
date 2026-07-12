@@ -23,7 +23,7 @@ Pins:
 - **Scatter** (Point): debris points with a `Mesh` (SoftObjectPath) attribute → wire into a Static Mesh Spawner, mesh selection "By Attribute".
 - **OccupiedBounds** (Point): every reserved oriented footprint (roads, intersections, buildings, poles) with an `Occupancy` int attribute — use with Difference/filters to exclude other PCG content.
 - **Lots** (Point): generated lots with a `Used` attribute (debugging / extensions).
-- **OuterOrphanRoads** (Point): rim road endings that could not be connected with a natural curve; each point sits on the road's final outer position (ground-projected) and its rotation yaws outward, so other PCG logic can continue those roads beyond the city.
+- **OuterOrphanRoads** (Point): every road ending that remains unconnected after the orphan-pairing pass — dead stops, endings whose pairing curve failed, and the open arms of intersection pieces that have fewer streets than mesh arms (the point sits at the mesh edge of the unused arm). Each point is ground-projected on the road's final outer position with its rotation yawing outward, so other PCG logic can continue those roads.
 
 ## 2. Data structures
 
