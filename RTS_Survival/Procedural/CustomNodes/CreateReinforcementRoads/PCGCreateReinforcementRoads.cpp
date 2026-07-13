@@ -17,7 +17,9 @@
 #include "Components/SplineMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/Actor.h"
+#include "LandscapeProxy.h"
 #include "Materials/MaterialInterface.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableWireComponent/DestructableWireComp.h"
 
@@ -42,13 +44,13 @@ namespace ReinforcementRoadConstants
 	constexpr double GroundSampleSpacing = 300.0;
 	constexpr double RouteTestSpacing = 125.0;
 	constexpr double GridCellSize = 400.0;
-	constexpr double GridMargin = 2000.0;
-	constexpr int32 MaxGridDimension = 96;
+	constexpr double GridMargin = 6000.0;
+	constexpr int32 MaxGridDimension = 160;
 	constexpr double DefaultRoadHalfWidth = 250.0;
 	constexpr double MinimumClearance = 100.0;
 	// CurveClamped interpolation can leave the sampled polyline slightly; keep that bend outside exclusions too.
 	constexpr double SplineInterpolationSafetyMargin = 150.0;
-	constexpr double MaximumDetourRatio = 1.8;
+	constexpr double MaximumDetourRatio = 4.0;
 	constexpr double MaximumStartTurnDegrees = 115.0;
 	constexpr double MaximumRoadGrade = 0.18;
 	constexpr double MinimumMeshLength = 100.0;
@@ -61,12 +63,26 @@ namespace ReinforcementRoadConstants
 	constexpr double OrphanApproachSampleSpacing = 150.0;
 	constexpr double OrphanApproachAttemptScales[] = {1.0, 0.75, 0.5};
 	constexpr double MinimumPoleSpacing = 100.0;
+	constexpr double TerrainSimplificationCostTolerance = 1.05;
+	constexpr double MinimumTerrainGrade = 0.01;
+	constexpr double MinimumElevationRange = 1.0;
+	constexpr double MinimumEndpointTerrainTransitionLength = 200.0;
+	constexpr double MaximumEndpointTerrainTransitionLength = 800.0;
+	constexpr double EndpointTerrainTransitionLengthFactor = 0.15;
+	constexpr double MaximumEndpointTerrainGrade = 0.35;
 
 	enum class EConnectionType : uint8
 	{
 		Orphan = 0,
 		ReinforcementStart = 1,
 		Backup = 2
+	};
+
+	enum class ETerrainHeightSampleState : uint8
+	{
+		NotSampled,
+		Valid,
+		Invalid
 	};
 }
 
@@ -155,6 +171,169 @@ namespace
 
 	private:
 		TArray<const UPCGSpatialData*> M_SpatialData;
+	};
+
+	class FTerrainRouteTester
+	{
+	public:
+		FTerrainRouteTester(
+			UWorld& InWorld,
+			const FVector& Start,
+			const FVector& End,
+			const UPCGCreateReinforcementRoadsSettings& Settings)
+			: M_World(InWorld),
+			  M_MaximumGrade(FMath::Max(MinimumTerrainGrade, static_cast<double>(Settings.MaximumTerrainGrade))),
+			  M_HillAvoidanceStrength(FMath::Max(0.0, static_cast<double>(Settings.HillAvoidanceStrength))),
+			  M_StartPosition(Start),
+			  M_EndPosition(End),
+			  M_EndpointTransitionLength(FMath::Clamp(
+				  FVector2D::Distance(M_StartPosition, M_EndPosition) * EndpointTerrainTransitionLengthFactor,
+				  MinimumEndpointTerrainTransitionLength, MaximumEndpointTerrainTransitionLength))
+		{
+			for (TActorIterator<ALandscapeProxy> LandscapeIterator(&M_World); LandscapeIterator; ++LandscapeIterator)
+			{
+				ALandscapeProxy* Landscape = *LandscapeIterator;
+				if (IsValid(Landscape))
+				{
+					M_Landscapes.Add(Landscape);
+				}
+			}
+
+			double StartHeight = Start.Z;
+			double EndHeight = End.Z;
+			TryGetGroundHeight(FVector2D(Start), StartHeight);
+			TryGetGroundHeight(FVector2D(End), EndHeight);
+			M_MaximumEndpointHeight = FMath::Max(StartHeight, EndHeight);
+			M_MaximumAllowedHeight = M_MaximumEndpointHeight
+				+ FMath::Max(0.0, static_cast<double>(Settings.MaximumElevationAboveEndpoints));
+		}
+
+		bool TryGetGroundHeight(const FVector2D& Position, double& OutHeight) const
+		{
+			for (const TWeakObjectPtr<ALandscapeProxy>& LandscapePointer : M_Landscapes)
+			{
+				const ALandscapeProxy* Landscape = LandscapePointer.Get();
+				if (not IsValid(Landscape))
+				{
+					continue;
+				}
+
+				const TOptional<float> LandscapeHeight = Landscape->GetHeightAtLocation(FVector(Position, 0.0));
+				if (LandscapeHeight.IsSet())
+				{
+					OutHeight = LandscapeHeight.GetValue();
+					return true;
+				}
+			}
+
+			FHitResult Hit;
+			const FVector TraceStart(Position, ReinforcementGroundTraceUp);
+			const FVector TraceEnd(Position, -ReinforcementGroundTraceDown);
+			if (not M_World.LineTraceSingleByChannel(
+				Hit, TraceStart, TraceEnd, ECC_WorldStatic, M_TraceParams))
+			{
+				return false;
+			}
+
+			OutHeight = Hit.ImpactPoint.Z;
+			return true;
+		}
+
+		bool TryGetTraversalCost(
+			const FVector2D& Start,
+			const double StartHeight,
+			const FVector2D& End,
+			const double EndHeight,
+			double& OutCost) const
+		{
+			const double HorizontalDistance = FVector2D::Distance(Start, End);
+			if (HorizontalDistance <= UE_DOUBLE_SMALL_NUMBER
+				|| StartHeight > M_MaximumAllowedHeight || EndHeight > M_MaximumAllowedHeight)
+			{
+				return false;
+			}
+
+			const double Grade = FMath::Abs(EndHeight - StartHeight) / HorizontalDistance;
+			const FVector2D SegmentCenter = (Start + End) * 0.5;
+			const bool bIsEndpointTransition = FVector2D::Distance(SegmentCenter, M_StartPosition)
+				<= M_EndpointTransitionLength
+				|| FVector2D::Distance(SegmentCenter, M_EndPosition) <= M_EndpointTransitionLength;
+			const double AllowedGrade = bIsEndpointTransition
+				? FMath::Max(M_MaximumGrade, MaximumEndpointTerrainGrade)
+				: M_MaximumGrade;
+			if (Grade > AllowedGrade)
+			{
+				return false;
+			}
+
+			const double AverageHeight = (StartHeight + EndHeight) * 0.5;
+			const double ElevationAboveEndpoints = FMath::Max(0.0, AverageHeight - M_MaximumEndpointHeight);
+			const double ElevationRange = FMath::Max(
+				MinimumElevationRange, M_MaximumAllowedHeight - M_MaximumEndpointHeight);
+			const double ElevationRatio = ElevationAboveEndpoints / ElevationRange;
+			OutCost = HorizontalDistance
+				* (1.0 + M_HillAvoidanceStrength * (Grade + ElevationRatio));
+			return true;
+		}
+
+		bool TryGetSegmentCost(
+			const FVector2D& Start,
+			const FVector2D& End,
+			double& OutCost) const
+		{
+			const double Length = FVector2D::Distance(Start, End);
+			const int32 SampleCount = FMath::Max(1, FMath::CeilToInt32(Length / RouteTestSpacing));
+			FVector2D PreviousPosition = Start;
+			double PreviousHeight = 0.0;
+			if (not TryGetGroundHeight(PreviousPosition, PreviousHeight))
+			{
+				return false;
+			}
+
+			OutCost = 0.0;
+			for (int32 SampleIndex = 1; SampleIndex <= SampleCount; ++SampleIndex)
+			{
+				const FVector2D Position = FMath::Lerp(
+					Start, End, static_cast<double>(SampleIndex) / SampleCount);
+				double Height = 0.0;
+				double StepCost = 0.0;
+				if (not TryGetGroundHeight(Position, Height)
+					|| not TryGetTraversalCost(PreviousPosition, PreviousHeight, Position, Height, StepCost))
+				{
+					return false;
+				}
+
+				OutCost += StepCost;
+				PreviousPosition = Position;
+				PreviousHeight = Height;
+			}
+			return true;
+		}
+
+		bool IsPathTraversable(const TArray<FVector2D>& Points) const
+		{
+			for (int32 PointIndex = 1; PointIndex < Points.Num(); ++PointIndex)
+			{
+				double SegmentCost = 0.0;
+				if (not TryGetSegmentCost(Points[PointIndex - 1], Points[PointIndex], SegmentCost))
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+
+	private:
+		UWorld& M_World;
+		FCollisionQueryParams M_TraceParams;
+		TArray<TWeakObjectPtr<ALandscapeProxy>> M_Landscapes;
+		double M_MaximumGrade = 0.08;
+		double M_HillAvoidanceStrength = 250.0;
+		FVector2D M_StartPosition = FVector2D::ZeroVector;
+		FVector2D M_EndPosition = FVector2D::ZeroVector;
+		double M_EndpointTransitionLength = MinimumEndpointTerrainTransitionLength;
+		double M_MaximumEndpointHeight = 0.0;
+		double M_MaximumAllowedHeight = 0.0;
 	};
 
 	TArray<FEndpoint> CollectEndpoints(FPCGContext& Context, const FName Pin)
@@ -320,6 +499,7 @@ namespace
 		const FVector2D& Start,
 		const FVector2D& End,
 		const FExclusionTester& Exclusions,
+		const FTerrainRouteTester& Terrain,
 		const double Clearance)
 	{
 		const FVector2D Minimum(
@@ -348,6 +528,37 @@ namespace
 		const int32 StartIndex = GridIndex(StartGrid.X, StartGrid.Y, Width);
 		const int32 EndIndex = GridIndex(EndGrid.X, EndGrid.Y, Width);
 		const int32 CellCount = Width * Height;
+		auto GetPositionForIndex = [Start, End, StartIndex, EndIndex, Width, GridOrigin](const int32 Index)
+		{
+			if (Index == StartIndex)
+			{
+				return Start;
+			}
+			if (Index == EndIndex)
+			{
+				return End;
+			}
+			return GridOrigin + FVector2D(GridCoordinates(Index, Width)) * GridCellSize;
+		};
+
+		TArray<double> GroundHeights;
+		GroundHeights.Init(0.0, CellCount);
+		TArray<ETerrainHeightSampleState> GroundHeightStates;
+		GroundHeightStates.Init(ETerrainHeightSampleState::NotSampled, CellCount);
+		auto TryGetGridHeight = [&Terrain, &GroundHeights, &GroundHeightStates](
+			const int32 Index,
+			const FVector2D& Position,
+			double& OutHeight)
+		{
+			if (GroundHeightStates[Index] == ETerrainHeightSampleState::NotSampled)
+			{
+				GroundHeightStates[Index] = Terrain.TryGetGroundHeight(Position, GroundHeights[Index])
+					? ETerrainHeightSampleState::Valid
+					: ETerrainHeightSampleState::Invalid;
+			}
+			OutHeight = GroundHeights[Index];
+			return GroundHeightStates[Index] == ETerrainHeightSampleState::Valid;
+		};
 
 		TArray<double> Costs;
 		Costs.Init(TNumericLimits<double>::Max(), CellCount);
@@ -358,6 +569,11 @@ namespace
 		TArray<int32> Open;
 		Open.Add(StartIndex);
 		Costs[StartIndex] = 0.0;
+		double StartHeight = 0.0;
+		if (not TryGetGridHeight(StartIndex, Start, StartHeight))
+		{
+			return {};
+		}
 
 		while (not Open.IsEmpty())
 		{
@@ -365,9 +581,9 @@ namespace
 			double BestEstimate = TNumericLimits<double>::Max();
 			for (int32 OpenIndex = 0; OpenIndex < Open.Num(); ++OpenIndex)
 			{
-				const FIntPoint Coordinates = GridCoordinates(Open[OpenIndex], Width);
+				const FVector2D OpenPosition = GetPositionForIndex(Open[OpenIndex]);
 				const double Estimate = Costs[Open[OpenIndex]]
-					+ FVector2D::Distance(FVector2D(Coordinates), FVector2D(EndGrid));
+					+ FVector2D::Distance(OpenPosition, End);
 				if (Estimate < BestEstimate)
 				{
 					BestEstimate = Estimate;
@@ -391,6 +607,12 @@ namespace
 			Closed[CurrentIndex] = true;
 
 			const FIntPoint Current = GridCoordinates(CurrentIndex, Width);
+			const FVector2D CurrentPosition = GetPositionForIndex(CurrentIndex);
+			double CurrentHeight = 0.0;
+			if (not TryGetGridHeight(CurrentIndex, CurrentPosition, CurrentHeight))
+			{
+				continue;
+			}
 			for (int32 OffsetY = -1; OffsetY <= 1; ++OffsetY)
 			{
 				for (int32 OffsetX = -1; OffsetX <= 1; ++OffsetX)
@@ -406,14 +628,22 @@ namespace
 					}
 
 					const int32 NeighborIndex = GridIndex(Neighbor.X, Neighbor.Y, Width);
-					const FVector2D NeighborPosition = GridOrigin + FVector2D(Neighbor) * GridCellSize;
+					const FVector2D NeighborPosition = GetPositionForIndex(NeighborIndex);
 					if (Closed[NeighborIndex]
 						|| (NeighborIndex != EndIndex && Exclusions.IsPositionExcluded(NeighborPosition, Clearance)))
 					{
 						continue;
 					}
 
-					const double StepCost = OffsetX != 0 && OffsetY != 0 ? UE_DOUBLE_SQRT_2 : 1.0;
+					double NeighborHeight = 0.0;
+					double StepCost = 0.0;
+					if (not TryGetGridHeight(NeighborIndex, NeighborPosition, NeighborHeight)
+						|| not Terrain.TryGetTraversalCost(
+							CurrentPosition, CurrentHeight, NeighborPosition, NeighborHeight, StepCost))
+					{
+						continue;
+					}
+
 					const double NewCost = Costs[CurrentIndex] + StepCost;
 					if (NewCost >= Costs[NeighborIndex])
 					{
@@ -428,14 +658,38 @@ namespace
 		return {};
 	}
 
+	bool TryBuildCumulativeTerrainCosts(
+		const TArray<FVector2D>& Path,
+		const FTerrainRouteTester& Terrain,
+		TArray<double>& OutCumulativeCosts)
+	{
+		OutCumulativeCosts.Init(0.0, Path.Num());
+		for (int32 PointIndex = 1; PointIndex < Path.Num(); ++PointIndex)
+		{
+			double SegmentCost = 0.0;
+			if (not Terrain.TryGetSegmentCost(Path[PointIndex - 1], Path[PointIndex], SegmentCost))
+			{
+				return false;
+			}
+			OutCumulativeCosts[PointIndex] = OutCumulativeCosts[PointIndex - 1] + SegmentCost;
+		}
+		return true;
+	}
+
 	TArray<FVector2D> SimplifyPath(
 		const TArray<FVector2D>& Path,
 		const FExclusionTester& Exclusions,
+		const FTerrainRouteTester& Terrain,
 		const double Clearance)
 	{
 		if (Path.Num() < 3)
 		{
 			return Path;
+		}
+		TArray<double> CumulativeTerrainCosts;
+		if (not TryBuildCumulativeTerrainCosts(Path, Terrain, CumulativeTerrainCosts))
+		{
+			return {};
 		}
 
 		TArray<FVector2D> Simplified;
@@ -446,7 +700,12 @@ namespace
 			int32 FurthestVisible = AnchorIndex + 1;
 			for (int32 CandidateIndex = Path.Num() - 1; CandidateIndex > AnchorIndex + 1; --CandidateIndex)
 			{
-				if (Exclusions.IsSegmentClear(Path[AnchorIndex], Path[CandidateIndex], Clearance))
+				double DirectCost = 0.0;
+				const double ExistingCost = CumulativeTerrainCosts[CandidateIndex]
+					- CumulativeTerrainCosts[AnchorIndex];
+				if (Exclusions.IsSegmentClear(Path[AnchorIndex], Path[CandidateIndex], Clearance)
+					&& Terrain.TryGetSegmentCost(Path[AnchorIndex], Path[CandidateIndex], DirectCost)
+					&& DirectCost <= ExistingCost * TerrainSimplificationCostTolerance)
 				{
 					FurthestVisible = CandidateIndex;
 					break;
@@ -493,6 +752,7 @@ namespace
 		const float CurvesPer1000Units,
 		const int32 Seed,
 		const FExclusionTester& Exclusions,
+		const FTerrainRouteTester& Terrain,
 		const double Clearance)
 	{
 		TArray<FVector2D> DensePath = DensifyPath(BasePath);
@@ -528,7 +788,7 @@ namespace
 				CurvedPath.Add(DensePath[PointIndex] + Normal * Amplitude * EndpointEnvelope * Wave);
 			}
 
-			if (Exclusions.IsPathClear(CurvedPath, Clearance))
+			if (Exclusions.IsPathClear(CurvedPath, Clearance) && Terrain.IsPathTraversable(CurvedPath))
 			{
 				return CurvedPath;
 			}
@@ -541,18 +801,31 @@ namespace
 		const FVector2D& Start,
 		const FVector2D& End,
 		const FExclusionTester& Exclusions,
+		const FTerrainRouteTester& Terrain,
 		const double Clearance,
 		TArray<FVector2D>& OutPath)
 	{
-		if (Exclusions.IsSegmentClear(Start, End, Clearance))
+		if (FVector2D::Distance(Start, End) < GridCellSize)
 		{
 			OutPath = {Start, End};
+			return Exclusions.IsSegmentClear(Start, End, Clearance) && Terrain.IsPathTraversable(OutPath);
 		}
-		else
+
+		OutPath = SimplifyPath(
+			FindGridPath(Start, End, Exclusions, Terrain, Clearance), Exclusions, Terrain, Clearance);
+		if (OutPath.Num() >= 2)
 		{
-			OutPath = SimplifyPath(FindGridPath(Start, End, Exclusions, Clearance), Exclusions, Clearance);
+			return true;
 		}
-		return OutPath.Num() >= 2;
+
+		// Grid discretization must not reject a straight corridor that passes the full terrain and exclusion checks.
+		OutPath = {Start, End};
+		if (Exclusions.IsSegmentClear(Start, End, Clearance) && Terrain.IsPathTraversable(OutPath))
+		{
+			return true;
+		}
+		OutPath.Reset();
+		return false;
 	}
 
 	FVector2D EvaluateCubicBezier(
@@ -597,6 +870,7 @@ namespace
 		const FEndpoint& End,
 		const UPCGCreateReinforcementRoadsSettings& Settings,
 		const FExclusionTester& Exclusions,
+		const FTerrainRouteTester& Terrain,
 		const double Clearance,
 		const int32 Seed,
 		TArray<FVector2D>& OutRoute)
@@ -615,16 +889,17 @@ namespace
 			const double ApproachLength = PreferredApproachLength * AttemptScale;
 			const FVector2D ApproachStart = EndPosition + End.Forward * ApproachLength;
 			TArray<FVector2D> BasePath;
-			if (not TryBuildBasePath(StartPosition, ApproachStart, Exclusions, Clearance, BasePath)
+			if (not TryBuildBasePath(StartPosition, ApproachStart, Exclusions, Terrain, Clearance, BasePath)
 				|| PathLength(BasePath) > FVector2D::Distance(StartPosition, ApproachStart) * MaximumDetourRatio)
 			{
 				continue;
 			}
 
 			OutRoute = AddDecorativeCurves(
-				BasePath, Settings.Curvature, Settings.AmountCurvesPer1000Units, Seed, Exclusions, Clearance);
+				BasePath, Settings.Curvature, Settings.AmountCurvesPer1000Units,
+				Seed, Exclusions, Terrain, Clearance);
 			AppendOrphanApproach(OutRoute, EndPosition, End.Forward, ApproachLength);
-			if (Exclusions.IsPathClear(OutRoute, Clearance))
+			if (Exclusions.IsPathClear(OutRoute, Clearance) && Terrain.IsPathTraversable(OutRoute))
 			{
 				return true;
 			}
@@ -634,6 +909,7 @@ namespace
 	}
 
 	bool TryBuildRoute2D(
+		UWorld& World,
 		const FEndpoint& Start,
 		const FEndpoint& End,
 		const EConnectionType ConnectionType,
@@ -650,21 +926,26 @@ namespace
 		{
 			return false;
 		}
+		const FTerrainRouteTester Terrain(World, Start.Position, End.Position, Settings);
 		if (ConnectionType == EConnectionType::Orphan)
 		{
-			return TryBuildOrphanRoute(Start, End, Settings, Exclusions, Clearance, Seed, OutRoute);
+			return TryBuildOrphanRoute(
+				Start, End, Settings, Exclusions, Terrain, Clearance, Seed, OutRoute);
 		}
 
 		TArray<FVector2D> BasePath;
-		if (not TryBuildBasePath(StartPosition, EndPosition, Exclusions, Clearance, BasePath)
+		if (not TryBuildBasePath(StartPosition, EndPosition, Exclusions, Terrain, Clearance, BasePath)
 			|| PathLength(BasePath) > DirectDistance * MaximumDetourRatio)
 		{
 			return false;
 		}
 
 		OutRoute = AddDecorativeCurves(
-			BasePath, Settings.Curvature, Settings.AmountCurvesPer1000Units, Seed, Exclusions, Clearance);
-		return OutRoute.Num() >= 2 && Exclusions.IsPathClear(OutRoute, Clearance);
+			BasePath, Settings.Curvature, Settings.AmountCurvesPer1000Units,
+			Seed, Exclusions, Terrain, Clearance);
+		return OutRoute.Num() >= 2
+			&& Exclusions.IsPathClear(OutRoute, Clearance)
+			&& Terrain.IsPathTraversable(OutRoute);
 	}
 
 	FVector ProjectReinforcementRoadToGround(
@@ -1045,7 +1326,7 @@ namespace
 		for (int32 CandidateIndex = 0; CandidateIndex < Candidates.Num(); ++CandidateIndex)
 		{
 			TArray<FVector2D> Route2D;
-			if (not TryBuildRoute2D(Start, Candidates[CandidateIndex].Endpoint, Candidates[CandidateIndex].Type,
+			if (not TryBuildRoute2D(World, Start, Candidates[CandidateIndex].Endpoint, Candidates[CandidateIndex].Type,
 				Settings, Exclusions,
 				Clearance, PCGHelpers::ComputeSeed(BaseSeed, CandidateIndex), Route2D))
 			{
@@ -1108,8 +1389,8 @@ FText UPCGCreateReinforcementRoadsSettings::GetNodeTooltipText() const
 {
 	return LOCTEXT("NodeTooltip",
 		"Creates one-use, exclusion-safe reinforcement road connections. Primary orphan/start endpoints are preferred; "
-		"backup ends are used only when no natural primary route can be planned. Roads follow terrain and can spawn "
-		"connected large or small electric-pole chains alongside them.");
+		"backup ends are used only when no natural primary route can be planned. Roads avoid hills and steep terrain, "
+		"and can spawn connected large or small electric-pole chains alongside them.");
 }
 #endif
 

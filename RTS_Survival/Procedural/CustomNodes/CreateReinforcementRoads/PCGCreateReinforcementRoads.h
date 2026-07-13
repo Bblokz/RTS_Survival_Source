@@ -96,6 +96,21 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Road")
 	TSoftObjectPtr<UMaterialInterface> OverrideMaterial;
 
+	/** Hard rise/run grade limit used while searching; 0.08 means an eight-percent grade. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Road|Terrain Avoidance",
+		meta = (ClampMin = "0.01", ClampMax = "0.5", PCG_Overridable))
+	float MaximumTerrainGrade = 0.08f;
+
+	/** Terrain this far above both endpoints is treated as an impassable hill. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Road|Terrain Avoidance",
+		meta = (ClampMin = "0", PCG_Overridable))
+	float MaximumElevationAboveEndpoints = 250.0f;
+
+	/** Cost multiplier that makes flatter detours preferable before the hard limits are reached. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Road|Terrain Avoidance",
+		meta = (ClampMin = "0", PCG_Overridable))
+	float HillAvoidanceStrength = 250.0f;
+
 	/** Large pole options and their spacing range. One eligible category is selected per road. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
 	FReinforcementRoadPoleCategory LargeElectricPoles;

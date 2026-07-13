@@ -9,30 +9,16 @@
 class AActor;
 
 UENUM(BlueprintType)
-enum class EFuelPipeBoundsAxis : uint8
+enum class EFuelCardinalDirection : uint8
 {
-	Automatic UMETA(DisplayName = "Automatic (Longest Horizontal Axis)"),
-	LocalX UMETA(DisplayName = "Local X"),
-	LocalY UMETA(DisplayName = "Local Y")
-};
-
-UENUM(BlueprintType)
-enum class EFuelPipePieceType : uint8
-{
-	Straight,
-	Corner
-};
-
-UENUM(BlueprintType)
-enum class EFuelPipeTurnDirection : uint8
-{
-	Either,
-	Left,
-	Right
+	PositiveX UMETA(DisplayName = "+X"),
+	NegativeX UMETA(DisplayName = "-X"),
+	PositiveY UMETA(DisplayName = "+Y"),
+	NegativeY UMETA(DisplayName = "-Y")
 };
 
 /**
- * @brief Defines one bounds-measured Blueprint that can fill a depot, tank, or dressing role.
+ * @brief Defines one bounds-measured Blueprint that can fill a depot or tank role.
  * Weight permits art-directed variety without assuming that entries share a footprint.
  */
 USTRUCT(BlueprintType)
@@ -67,8 +53,8 @@ struct FFuelSupplyActorEntry
 };
 
 /**
- * @brief Defines one destructible pipe Blueprint and how its measured local bounds represent flow.
- * Straight pieces are tiled by their own measured length; corner pieces occupy routed bends.
+ * @brief Defines an arbitrary destructible pipe Blueprint through its footprint and connector sides.
+ * Connector-aware rotation and reversible traversal let irregular authored pieces fill routed networks.
  */
 USTRUCT(BlueprintType)
 struct FFuelPipeActorEntry
@@ -78,37 +64,69 @@ struct FFuelPipeActorEntry
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset")
 	TSoftClassPtr<AActor> ActorClass;
 
-	/** @brief Pivot-centered local-X footprint size; 0 uses the pre-spawned Blueprint's measured bounds. */
+	/** @brief Pivot-centered X size; 0 uses the pre-spawned Blueprint's measured footprint. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
 	float FootprintOverrideX = 0.0f;
 
-	/** @brief Pivot-centered local-Y footprint size; 0 uses the pre-spawned Blueprint's measured bounds. */
+	/** @brief Pivot-centered Y size; 0 uses the pre-spawned Blueprint's measured footprint. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
 	float FootprintOverrideY = 0.0f;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset")
-	EFuelPipePieceType PieceType = EFuelPipePieceType::Straight;
+	/** @brief Side where traversal enters the authored piece. Default flow therefore points toward +X. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
+	EFuelCardinalDirection StartConnectorDirection = EFuelCardinalDirection::NegativeX;
+
+	/** @brief Side where traversal exits the authored piece. Use +Y/-Y to describe authored elbows. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
+	EFuelCardinalDirection EndConnectorDirection = EFuelCardinalDirection::PositiveX;
+
+	/** @brief Allows the generator to exchange start/end connectors without mirroring the actor. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
+	bool bCanReverse = true;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset", meta = (ClampMin = "0.01"))
 	float Weight = 1.0f;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds")
-	EFuelPipeBoundsAxis LengthAxis = EFuelPipeBoundsAxis::Automatic;
-
-	/** @brief Relevant to corners whose local X-to-Y flow only supports one turn direction. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
-		meta = (EditCondition = "PieceType == EFuelPipePieceType::Corner", EditConditionHides))
-	EFuelPipeTurnDirection TurnDirection = EFuelPipeTurnDirection::Either;
-
-	/** @brief Added to the bounds-inferred rotation for Blueprints with unusual authoring axes. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (Units = "deg"))
-	float YawOffsetDegrees = 0.0f;
 
 	/** @brief Amount each end may overlap its neighbor to hide seams. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections", meta = (ClampMin = "0", Units = "cm"))
 	float EndOverlap = 5.0f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections", meta = (Units = "cm"))
+	float ZOffset = 0.0f;
+};
+
+/**
+ * @brief Defines one standalone Blueprint fence piece used to enclose generated fuel tanks.
+ * Its authored forward direction and footprint allow differently oriented fence assets to mix.
+ */
+USTRUCT(BlueprintType)
+struct FFuelFenceActorEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset")
+	TSoftClassPtr<AActor> ActorClass;
+
+	/** @brief Pivot-centered X size; 0 uses the pre-spawned Blueprint's measured footprint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
+	float FootprintOverrideX = 0.0f;
+
+	/** @brief Pivot-centered Y size; 0 uses the pre-spawned Blueprint's measured footprint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
+	float FootprintOverrideY = 0.0f;
+
+	/** @brief Direction in which the unrotated fence piece extends; defaults to local +X. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds")
+	EFuelCardinalDirection AuthoredForwardDirection = EFuelCardinalDirection::PositiveX;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset", meta = (ClampMin = "0.01"))
+	float Weight = 1.0f;
+
+	/** @brief Permitted longitudinal overlap with adjacent fence pieces. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Placement", meta = (ClampMin = "0", Units = "cm"))
+	float EndOverlap = 5.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Placement", meta = (Units = "cm"))
 	float ZOffset = 0.0f;
 };
 
@@ -150,9 +168,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Assets|Fuel Pipes")
 	TArray<FFuelPipeActorEntry> FuelPipes;
 
-	/** @brief Optional containers, fences, barrels, crates, barriers, pumps, or similar actors. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Assets|Industrial Dressing")
-	TArray<FFuelSupplyActorEntry> IndustrialDressing;
+	/** @brief Standalone Blueprint fences placed around tanks after pipe routes are known. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Assets|Fuel Tank Fences")
+	TArray<FFuelFenceActorEntry> FuelTankFences;
 
 	// --- Facility layout ---
 
@@ -221,23 +239,29 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Terrain")
 	bool bProjectActorsToGround = true;
 
-	/** @brief Tilts dressing actors to terrain; depots, tanks, and pipes remain upright. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Terrain")
-	bool bAlignIndustrialDressingToGround = true;
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Terrain", meta = (ClampMin = "0", ClampMax = "89", Units = "deg"))
 	float MaxGroundSlopeDegrees = 25.0f;
 
-	// --- Industrial dressing ---
+	// --- Fuel tank fences ---
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Industrial Dressing", meta = (ClampMin = "0"))
-	int32 MinDressingActorsPerDepot = 0;
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fuel Tank Fences")
+	bool bGenerateFuelTankFences = true;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Industrial Dressing", meta = (ClampMin = "0"))
-	int32 MaxDressingActorsPerDepot = 3;
+	/** @brief Distance from each tank footprint to the surrounding fence rectangle. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fuel Tank Fences", meta = (ClampMin = "0", Units = "cm"))
+	float FenceDistanceFromTank = 600.0f;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Industrial Dressing", meta = (ClampMin = "0", Units = "cm"))
-	float DressingRadius = 3500.0f;
+	/** @brief Additional opening on both sides of every pipe crossing through a fence. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fuel Tank Fences", meta = (ClampMin = "0", Units = "cm"))
+	float FencePipeGap = 250.0f;
+
+	/** @brief Keeps fence pieces away from unrelated depots, tanks, and generated actors. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fuel Tank Fences", meta = (ClampMin = "0", Units = "cm"))
+	float FenceObstacleClearance = 50.0f;
+
+	/** @brief Leaves breathing room at enclosure corners to prevent neighboring sides from overlapping. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fuel Tank Fences", meta = (ClampMin = "0", Units = "cm"))
+	float FenceCornerClearance = 50.0f;
 };
 
 /**

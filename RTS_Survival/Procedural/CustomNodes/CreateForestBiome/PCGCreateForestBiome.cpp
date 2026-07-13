@@ -14,6 +14,8 @@
 #include "Metadata/PCGMetadata.h"
 #include "Metadata/PCGMetadataAttribute.h"
 
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
+
 #include "CollisionQueryParams.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -532,7 +534,11 @@ namespace
 		FHitResult GroundHit;
 		const FVector TraceStart = WorldPosition + FVector::UpVector * ForestBiomePCGConstants::GroundTraceUp;
 		const FVector TraceEnd = WorldPosition - FVector::UpVector * ForestBiomePCGConstants::GroundTraceDown;
-		if (World.LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, TraceParams))
+		// Trace the landscape-only channel, not ECC_WorldStatic: props (including trees) ignore it, so
+		// a placement can only ever land on the terrain. This is what keeps regeneration correct -
+		// on a force rebuild the previous generation's tree actors are still collision-active when the
+		// new traces run, and tracing WorldStatic would land new trees on top of those leftover canopies.
+		if (World.LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, TraceParams))
 		{
 			return FForestGroundHit{GroundHit.ImpactPoint, GroundHit.ImpactNormal};
 		}
