@@ -242,6 +242,10 @@ public:
 
 	// --- Terrain ---
 
+	/** @brief Moves every generated actor vertically after ground projection; negative values sink actors into the landscape. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Terrain", meta = (Units = "cm"))
+	float GlobalActorZOffset = 0.0f;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Terrain")
 	bool bProjectActorsToGround = true;
 

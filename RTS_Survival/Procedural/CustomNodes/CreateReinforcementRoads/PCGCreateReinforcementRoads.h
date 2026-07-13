@@ -130,7 +130,7 @@ public:
 
 /**
  * @brief Selects one-use road endpoints, plans exclusion-safe natural routes, follows terrain,
- * spawns managed spline meshes, and emits the final sampled paths for downstream PCG logic.
+ * spawns managed spline meshes, and emits sampled paths plus mesh-bound volumes for downstream PCG logic.
  */
 class FPCGCreateReinforcementRoadsElement : public IPCGElement
 {

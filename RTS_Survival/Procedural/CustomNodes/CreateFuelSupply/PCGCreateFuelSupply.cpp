@@ -669,7 +669,8 @@ namespace
 
 		const FTransform Transform = MakeBoundsAlignedTransform(
 			Asset.LocalBounds, Asset.LocalBounds.GetCenter(), DesiredCenter,
-			Ground.Position.Z, Rotation, FVector::OneVector, Asset.ZOffset);
+			Ground.Position.Z, Rotation, FVector::OneVector,
+			Asset.ZOffset + static_cast<double>(Settings.GlobalActorZOffset));
 		const FBox2D Footprint = ComputeFootprint(Asset.LocalBounds, Transform);
 		const double Clearance = Settings.GlobalActorClearance + Asset.BoundsClearance;
 		if (not IsFootprintSpatiallyValid(Footprint, Ground.Position.Z, IsInsideArea, Exclusions)
@@ -1370,7 +1371,8 @@ namespace
 		Placement.LocalBounds = Pipe.LocalBounds;
 		Placement.Transform = MakeBoundsAlignedTransform(
 			Pipe.LocalBounds, LocalAnchor3D, WorldAnchor,
-			Ground.Position.Z, Rotation, Scale, Pipe.ZOffset);
+			Ground.Position.Z, Rotation, Scale,
+			Pipe.ZOffset + static_cast<double>(Settings.GlobalActorZOffset));
 		Placement.Footprint = ComputeFootprint(Pipe.LocalBounds, Placement.Transform);
 		const FVector WorldVisualCenter = Placement.Transform.TransformPosition(Pipe.LocalBounds.GetCenter());
 		Placement.VisualCenter = FVector2D(WorldVisualCenter.X, WorldVisualCenter.Y);
@@ -1910,7 +1912,8 @@ namespace
 		Placement.LocalBounds = Fence.LocalBounds;
 		Placement.Transform = MakeBoundsAlignedTransform(
 			Fence.LocalBounds, Fence.LocalBounds.GetCenter(), Center,
-			Ground.Position.Z, Rotation, FVector::OneVector, Fence.ZOffset);
+			Ground.Position.Z, Rotation, FVector::OneVector,
+			Fence.ZOffset + static_cast<double>(Settings.GlobalActorZOffset));
 		Placement.Footprint = ComputeFootprint(Fence.LocalBounds, Placement.Transform);
 		Placement.VisualCenter = Center;
 		Placement.Role = EFuelPlacedRole::FuelFence;

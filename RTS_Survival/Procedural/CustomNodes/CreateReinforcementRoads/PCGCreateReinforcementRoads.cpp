@@ -8,6 +8,7 @@
 #include "PCGPin.h"
 #include "Data/PCGPointData.h"
 #include "Data/PCGSpatialData.h"
+#include "Data/PCGVolumeData.h"
 #include "Helpers/PCGHelpers.h"
 #include "Metadata/PCGMetadata.h"
 #include "Metadata/PCGMetadataAttribute.h"
@@ -33,6 +34,7 @@ namespace ReinforcementRoadConstants
 	const FName BackupRoadEndsPin = TEXT("BackupRoadEnds");
 	const FName ExcludedVolumesPin = TEXT("ExcludedVolumes");
 	const FName RoadPointsPin = TEXT("RoadPoints");
+	const FName RoadBoundsVolumePin = TEXT("RoadBoundsVolume");
 
 	const FName RoadIndexAttribute = TEXT("RoadIndex");
 	const FName PointIndexAttribute = TEXT("PointIndex");
@@ -1222,7 +1224,8 @@ namespace
 		UStaticMesh* RoadMesh,
 		UMaterialInterface* OverrideMaterial,
 		const double MeshLength,
-		const int32 RoadIndex)
+		const int32 RoadIndex,
+		TArray<FBox>& OutRoadMeshBounds)
 	{
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -1281,6 +1284,12 @@ namespace
 				.GetSafeNormal() * SegmentLength;
 			SplineMesh->SetStartAndEnd(StartPosition, StartTangent, EndPosition, EndTangent, false);
 			SplineMesh->RegisterComponent();
+			SplineMesh->UpdateBounds();
+			const FBox MeshBounds = SplineMesh->Bounds.GetBox();
+			if (MeshBounds.IsValid)
+			{
+				OutRoadMeshBounds.Add(MeshBounds);
+			}
 		}
 		return RoadActor;
 	}
@@ -1372,6 +1381,23 @@ namespace
 		Output.Pin = RoadPointsPin;
 		Output.Data = PointData;
 	}
+
+	void EmitRoadBoundsVolumes(FPCGContext& Context, const TArray<FBox>& RoadMeshBounds)
+	{
+		for (const FBox& MeshBounds : RoadMeshBounds)
+		{
+			if (not MeshBounds.IsValid)
+			{
+				continue;
+			}
+
+			UPCGVolumeData* VolumeData = FPCGContext::NewObject_AnyThread<UPCGVolumeData>(&Context);
+			VolumeData->Initialize(MeshBounds);
+			FPCGTaggedData& Output = Context.OutputData.TaggedData.Emplace_GetRef();
+			Output.Pin = RoadBoundsVolumePin;
+			Output.Data = VolumeData;
+		}
+	}
 }
 
 #if WITH_EDITOR
@@ -1390,7 +1416,7 @@ FText UPCGCreateReinforcementRoadsSettings::GetNodeTooltipText() const
 	return LOCTEXT("NodeTooltip",
 		"Creates one-use, exclusion-safe reinforcement road connections. Primary orphan/start endpoints are preferred; "
 		"backup ends are used only when no natural primary route can be planned. Roads avoid hills and steep terrain, "
-		"and can spawn connected large or small electric-pole chains alongside them.");
+		"can spawn connected electric-pole chains, and output their spline-mesh bounds as exclusion volumes.");
 }
 #endif
 
@@ -1406,7 +1432,10 @@ TArray<FPCGPinProperties> UPCGCreateReinforcementRoadsSettings::InputPinProperti
 
 TArray<FPCGPinProperties> UPCGCreateReinforcementRoadsSettings::OutputPinProperties() const
 {
-	return {FPCGPinProperties(ReinforcementRoadConstants::RoadPointsPin, EPCGDataType::Point)};
+	return {
+		FPCGPinProperties(ReinforcementRoadConstants::RoadPointsPin, EPCGDataType::Point),
+		FPCGPinProperties(ReinforcementRoadConstants::RoadBoundsVolumePin, EPCGDataType::Volume)
+	};
 }
 
 FPCGElementPtr UPCGCreateReinforcementRoadsSettings::CreateElement() const
@@ -1430,6 +1459,7 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 	if (Starts.IsEmpty())
 	{
 		EmitRoadPoints(*Context, {});
+		EmitRoadBoundsVolumes(*Context, {});
 		return true;
 	}
 
@@ -1448,6 +1478,7 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 	UsedBackups.Init(false, Backups.Num());
 	TArray<FGeneratedRoute> Routes;
 	TArray<AActor*> SpawnedActors;
+	TArray<FBox> RoadMeshBounds;
 	UWorld& World = *SourceComponent->GetWorld();
 
 	for (int32 StartIndex = 0; StartIndex < Starts.Num(); ++StartIndex)
@@ -1480,7 +1511,8 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 
 		MarkEndpointUsed(SelectedCandidate, UsedStarts, UsedOrphans, UsedBackups);
 		AActor* RoadActor = SpawnRoadActor(
-			World, GeneratedRoute.Points, RoadMesh, OverrideMaterial, MeshLength, Routes.Num());
+			World, GeneratedRoute.Points, RoadMesh, OverrideMaterial,
+			MeshLength, Routes.Num(), RoadMeshBounds);
 		if (IsValid(RoadActor))
 		{
 			SpawnedActors.Add(RoadActor);
@@ -1501,6 +1533,7 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 		SourceComponent->AddToManagedResources(ManagedActors);
 	}
 	EmitRoadPoints(*Context, Routes);
+	EmitRoadBoundsVolumes(*Context, RoadMeshBounds);
 	return true;
 }
 

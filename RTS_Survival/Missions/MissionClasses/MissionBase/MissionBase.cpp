@@ -2,6 +2,8 @@
 
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
+#include "Sound/SoundClass.h"
+#include "Sound/SoundMix.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
