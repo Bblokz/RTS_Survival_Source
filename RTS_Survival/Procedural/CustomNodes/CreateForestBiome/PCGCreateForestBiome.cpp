@@ -93,7 +93,8 @@ TArray<FPCGPinProperties> UPCGCreateForestBiomeSettings::InputPinProperties() co
 	TArray<FPCGPinProperties> Pins;
 	// The spawn volume (a PCG volume, surface or closed spline loop); only the first data is used.
 	Pins.Emplace_GetRef(PCGPinConstants::DefaultInputLabel, EPCGDataType::Spatial).SetRequiredPin();
-	// Optional excluded volume: nothing is ever placed where this samples > 0.
+	// Optional excluded area: nothing is placed where a volume/surface samples > 0, nor inside the
+	// footprint of any exclusion point's bounds (e.g. the Radixite node's flat "Field Bounds" output).
 	Pins.Emplace(ForestBiomePCGConstants::ExclusionPinLabel, EPCGDataType::Spatial);
 	return Pins;
 }
@@ -387,31 +388,105 @@ namespace
 
 	// --- Area & exclusion tests (biome-local space) ---
 
+	bool IsPointInPolygon(const TArray<FVector2D>& Polygon, const FVector2D& Position);
+
+	/**
+	 * @brief The world-space XY footprint of a single flat exclusion point. Point-data exclusions - most
+	 * importantly the Radixite node's "Field Bounds" output - describe their excluded area as ground-level
+	 * point bounds with no vertical thickness. UPCGSpatialData::SamplePoint cannot detect those (the biome
+	 * samples at its own Z, which never intersects a zero-height bounds), so their footprints are tested
+	 * directly in 2D instead. Mirrors the point-bounds handling the Radixite node already does on its own
+	 * Excluded Bounds input.
+	 */
+	struct FForestExclusionArea
+	{
+		// World-space rectangle corners: the point's local XY bounds transformed to world.
+		TArray<FVector2D> Polygon;
+		// World-space AABB of Polygon; a cheap broad-phase reject before the point-in-polygon test.
+		FBox2D Bounds = FBox2D(ForceInit);
+	};
+
+	/** @brief Builds the world-space XY footprint of one exclusion point from its (possibly flat) bounds. */
+	FForestExclusionArea MakeExclusionAreaFromPoint(const FPCGPoint& Point)
+	{
+		// A point that is degenerate on an axis (zero-size bounds) still excludes a small area around it.
+		const bool bDegenerateX = FMath::IsNearlyEqual(Point.BoundsMin.X, Point.BoundsMax.X);
+		const bool bDegenerateY = FMath::IsNearlyEqual(Point.BoundsMin.Y, Point.BoundsMax.Y);
+		const double MinX = bDegenerateX ? Point.BoundsMin.X - ForestBiomePCGConstants::AreaSampleHalfExtent : Point.BoundsMin.X;
+		const double MaxX = bDegenerateX ? Point.BoundsMax.X + ForestBiomePCGConstants::AreaSampleHalfExtent : Point.BoundsMax.X;
+		const double MinY = bDegenerateY ? Point.BoundsMin.Y - ForestBiomePCGConstants::AreaSampleHalfExtent : Point.BoundsMin.Y;
+		const double MaxY = bDegenerateY ? Point.BoundsMax.Y + ForestBiomePCGConstants::AreaSampleHalfExtent : Point.BoundsMax.Y;
+		const FVector LocalCorners[] =
+		{
+			FVector(MinX, MinY, 0.0),
+			FVector(MaxX, MinY, 0.0),
+			FVector(MaxX, MaxY, 0.0),
+			FVector(MinX, MaxY, 0.0)
+		};
+
+		FForestExclusionArea Area;
+		Area.Polygon.Reserve(UE_ARRAY_COUNT(LocalCorners));
+		for (const FVector& LocalCorner : LocalCorners)
+		{
+			const FVector2D WorldCorner(Point.Transform.TransformPosition(LocalCorner));
+			Area.Polygon.Add(WorldCorner);
+			Area.Bounds += WorldCorner;
+		}
+		return Area;
+	}
+
 	TFunction<bool(const FVector2D&)> BuildExclusionFunction(FPCGContext* Context, const FTransform& BiomeToWorld)
 	{
-		TArray<const UPCGSpatialData*> ExclusionData;
+		// Volumetric / surface / spline exclusions are density-sampled as before; flat point-bounds
+		// exclusions (which SamplePoint cannot detect) are matched against their 2D footprint instead.
+		TArray<const UPCGSpatialData*> ExclusionSpatialData;
+		TArray<FForestExclusionArea> ExclusionAreas;
 		const TArray<FPCGTaggedData> Inputs =
 			Context->InputData.GetInputsByPin(ForestBiomePCGConstants::ExclusionPinLabel);
 		for (const FPCGTaggedData& Input : Inputs)
 		{
-			if (const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(Input.Data))
+			const UPCGSpatialData* SpatialData = Cast<UPCGSpatialData>(Input.Data);
+			if (SpatialData == nullptr)
 			{
-				ExclusionData.Add(SpatialData);
+				continue;
+			}
+			if (const UPCGPointData* PointData = Cast<UPCGPointData>(SpatialData))
+			{
+				for (const FPCGPoint& Point : PointData->GetPoints())
+				{
+					ExclusionAreas.Add(MakeExclusionAreaFromPoint(Point));
+				}
+			}
+			else
+			{
+				ExclusionSpatialData.Add(SpatialData);
 			}
 		}
 
-		if (ExclusionData.IsEmpty())
+		if (ExclusionSpatialData.IsEmpty() && ExclusionAreas.IsEmpty())
 		{
 			return nullptr;
 		}
 
-		return [ExclusionData = MoveTemp(ExclusionData), BiomeToWorld](const FVector2D& LocalPosition) -> bool
+		return [ExclusionSpatialData = MoveTemp(ExclusionSpatialData), ExclusionAreas = MoveTemp(ExclusionAreas), BiomeToWorld](const FVector2D& LocalPosition) -> bool
 		{
 			const FVector WorldPosition = BiomeToWorld.TransformPosition(FVector(LocalPosition, 0.0));
+
+			// Flat point-bounds exclusions (e.g. radixite field bounds): 2D footprint test, Z-independent.
+			const FVector2D WorldXY(WorldPosition);
+			for (const FForestExclusionArea& Area : ExclusionAreas)
+			{
+				if (Area.Bounds.bIsValid && Area.Bounds.Min.X <= WorldXY.X && WorldXY.X <= Area.Bounds.Max.X
+					&& Area.Bounds.Min.Y <= WorldXY.Y && WorldXY.Y <= Area.Bounds.Max.Y
+					&& IsPointInPolygon(Area.Polygon, WorldXY))
+				{
+					return true;
+				}
+			}
 			const FBox SampleBounds(
 				FVector(-ForestBiomePCGConstants::AreaSampleHalfExtent),
 				FVector(ForestBiomePCGConstants::AreaSampleHalfExtent));
-			for (const UPCGSpatialData* SpatialData : ExclusionData)
+			for (const UPCGSpatialData* SpatialData : ExclusionSpatialData)
 			{
 				FPCGPoint SampledPoint;
 				if (SpatialData->SamplePoint(FTransform(WorldPosition), SampleBounds, SampledPoint, nullptr)

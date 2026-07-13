@@ -17,6 +17,7 @@
 #include "Engine/HitResult.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "LandscapeProxy.h"
 
 #define LOCTEXT_NAMESPACE "PCGCreateFuelSupply"
 
@@ -45,6 +46,11 @@ namespace FuelSupplyPCGConstants
 	constexpr int32 MinimumSplineSegmentSamples = 2;
 	constexpr int32 MaximumSplineSegmentSamples = 128;
 	constexpr int32 MaximumLoopCandidatesPerDepot = 2;
+	constexpr int32 ForwardTraversalCount = 1;
+	constexpr int32 BidirectionalTraversalCount = 2;
+	constexpr int32 ReverseTraversalIndex = 1;
+	constexpr int32 CoordinateAxisCount = 2;
+	constexpr int32 FenceSideCount = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +125,7 @@ namespace
 		UClass* ActorClass = nullptr;
 		FBox LocalBounds = FBox(EForceInit::ForceInit);
 		EFuelCardinalDirection StartConnectorDirection = EFuelCardinalDirection::NegativeX;
-		EFuelCardinalDirection EndConnectorDirection = EFuelCardinalDirection::PositiveX;
+		EFuelCardinalDirection ForwardDirection = EFuelCardinalDirection::PositiveX;
 		bool bCanReverse = true;
 		double Weight = 1.0;
 		double EndOverlap = 0.0;
@@ -144,6 +150,7 @@ namespace
 		FBox2D Footprint = FBox2D(EForceInit::ForceInit);
 		FVector2D VisualCenter = FVector2D::ZeroVector;
 		EFuelPlacedRole Role = EFuelPlacedRole::SupplyDepot;
+		int32 FenceOwnerTankIndex = INDEX_NONE;
 	};
 
 	struct FFuelNetworkEdge
@@ -170,6 +177,12 @@ namespace
 		int32 RoutePointIndex = INDEX_NONE;
 		double IncomingTrim = 0.0;
 		double OutgoingTrim = 0.0;
+	};
+
+	struct FFuelTankFenceGroup
+	{
+		FBox2D DesiredBounds = FBox2D(EForceInit::ForceInit);
+		int32 OwnerTankIndex = INDEX_NONE;
 	};
 
 	FName RoleToName(const EFuelPlacedRole Role)
@@ -200,17 +213,18 @@ namespace
 
 	void ApplyFootprintOverrides(FBox& InOutLocalBounds, const double OverrideX, const double OverrideY)
 	{
-		if (OverrideX > 0.0)
+		const FVector MeasuredSize = InOutLocalBounds.GetSize();
+		if (OverrideX > 0.0 && MeasuredSize.X >= FuelSupplyPCGConstants::MinimumUsableBoundsSize)
 		{
-			const double HalfOverrideX = OverrideX * 0.5;
-			InOutLocalBounds.Min.X = -HalfOverrideX;
-			InOutLocalBounds.Max.X = HalfOverrideX;
+			const double PivotRelativeScaleX = OverrideX / MeasuredSize.X;
+			InOutLocalBounds.Min.X *= PivotRelativeScaleX;
+			InOutLocalBounds.Max.X *= PivotRelativeScaleX;
 		}
-		if (OverrideY > 0.0)
+		if (OverrideY > 0.0 && MeasuredSize.Y >= FuelSupplyPCGConstants::MinimumUsableBoundsSize)
 		{
-			const double HalfOverrideY = OverrideY * 0.5;
-			InOutLocalBounds.Min.Y = -HalfOverrideY;
-			InOutLocalBounds.Max.Y = HalfOverrideY;
+			const double PivotRelativeScaleY = OverrideY / MeasuredSize.Y;
+			InOutLocalBounds.Min.Y *= PivotRelativeScaleY;
+			InOutLocalBounds.Max.Y *= PivotRelativeScaleY;
 		}
 	}
 
@@ -261,7 +275,7 @@ namespace
 	bool IsValidConnectorPair(const FResolvedFuelPipe& Pipe)
 	{
 		const FIntPoint Start = CardinalDirectionToVector(Pipe.StartConnectorDirection);
-		const FIntPoint End = CardinalDirectionToVector(Pipe.EndConnectorDirection);
+		const FIntPoint End = CardinalDirectionToVector(Pipe.ForwardDirection);
 		return Start != End;
 	}
 
@@ -318,7 +332,7 @@ namespace
 			Asset.ActorClass = ActorClass;
 			Asset.LocalBounds = LocalBounds;
 			Asset.StartConnectorDirection = Entry.StartConnectorDirection;
-			Asset.EndConnectorDirection = Entry.EndConnectorDirection;
+			Asset.ForwardDirection = Entry.ForwardDirection;
 			Asset.bCanReverse = Entry.bCanReverse;
 			Asset.Weight = FMath::Max(0.01, static_cast<double>(Entry.Weight));
 			Asset.EndOverlap = FMath::Max(0.0, static_cast<double>(Entry.EndOverlap));
@@ -365,26 +379,6 @@ namespace
 	{
 		double TotalWeight = 0.0;
 		for (const FResolvedFuelActor& Asset : Assets)
-		{
-			TotalWeight += Asset.Weight;
-		}
-
-		double Roll = Random.FRandRange(0.0f, static_cast<float>(TotalWeight));
-		for (int32 AssetIndex = 0; AssetIndex < Assets.Num(); ++AssetIndex)
-		{
-			Roll -= Assets[AssetIndex].Weight;
-			if (Roll <= 0.0)
-			{
-				return AssetIndex;
-			}
-		}
-		return Assets.Num() - 1;
-	}
-
-	int32 SelectWeightedFence(const TArray<FResolvedFuelFence>& Assets, FRandomStream& Random)
-	{
-		double TotalWeight = 0.0;
-		for (const FResolvedFuelFence& Asset : Assets)
 		{
 			TotalWeight += Asset.Weight;
 		}
@@ -519,13 +513,18 @@ namespace
 			return {Position, FVector::UpVector, false};
 		}
 
-		FHitResult Hit;
 		const FVector Start = Position + FVector::UpVector * FuelSupplyPCGConstants::GroundTraceUp;
 		const FVector End = Position - FVector::UpVector * FuelSupplyPCGConstants::GroundTraceDown;
 		FCollisionQueryParams QueryParameters;
-		if (World.LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, QueryParameters))
+		TArray<FHitResult> Hits;
+		World.LineTraceMultiByChannel(Hits, Start, End, ECC_WorldStatic, QueryParameters);
+		for (const FHitResult& Hit : Hits)
 		{
-			return {Hit.ImpactPoint, Hit.ImpactNormal, true};
+			const AActor* HitActor = Hit.GetActor();
+			if (IsValid(HitActor) && HitActor->IsA<ALandscapeProxy>())
+			{
+				return {Hit.ImpactPoint, Hit.ImpactNormal, true};
+			}
 		}
 		return {Position, FVector::UpVector, false};
 	}
@@ -541,14 +540,15 @@ namespace
 
 	FTransform MakeBoundsAlignedTransform(
 		const FBox& LocalBounds,
-		const FVector2D& DesiredVisualCenter,
+		const FVector& LocalAnchor,
+		const FVector2D& DesiredWorldAnchor,
 		const double GroundZ,
 		const FQuat& Rotation,
 		const FVector& Scale,
 		const double ZOffset)
 	{
-		const FVector ScaledLocalCenter = LocalBounds.GetCenter() * Scale;
-		const FVector RotatedCenter = Rotation.RotateVector(ScaledLocalCenter);
+		const FVector ScaledLocalAnchor = LocalAnchor * Scale;
+		const FVector RotatedAnchor = Rotation.RotateVector(ScaledLocalAnchor);
 		double RotatedMinimumZ = TNumericLimits<double>::Max();
 		for (int32 XIndex = 0; XIndex < 2; ++XIndex)
 		{
@@ -565,8 +565,8 @@ namespace
 			}
 		}
 		const FVector Location(
-			DesiredVisualCenter.X - RotatedCenter.X,
-			DesiredVisualCenter.Y - RotatedCenter.Y,
+			DesiredWorldAnchor.X - RotatedAnchor.X,
+			DesiredWorldAnchor.Y - RotatedAnchor.Y,
 			GroundZ + ZOffset - RotatedMinimumZ);
 		return FTransform(Rotation, Location, Scale);
 	}
@@ -668,7 +668,8 @@ namespace
 		}
 
 		const FTransform Transform = MakeBoundsAlignedTransform(
-			Asset.LocalBounds, DesiredCenter, Ground.Position.Z, Rotation, FVector::OneVector, Asset.ZOffset);
+			Asset.LocalBounds, Asset.LocalBounds.GetCenter(), DesiredCenter,
+			Ground.Position.Z, Rotation, FVector::OneVector, Asset.ZOffset);
 		const FBox2D Footprint = ComputeFootprint(Asset.LocalBounds, Transform);
 		const double Clearance = Settings.GlobalActorClearance + Asset.BoundsClearance;
 		if (not IsFootprintSpatiallyValid(Footprint, Ground.Position.Z, IsInsideArea, Exclusions)
@@ -739,51 +740,6 @@ namespace
 			}
 		}
 		return NumPlaced;
-	}
-
-	void PlaceIndustrialDressing(
-		UWorld& World,
-		const UPCGCreateFuelSupplySettings& Settings,
-		const FBox& AreaBounds,
-		const FFuelSupplyAreaFunction& IsInsideArea,
-		const TArray<const UPCGSpatialData*>& Exclusions,
-		const TArray<FResolvedFuelActor>& Assets,
-		const TArray<int32>& DepotIndices,
-		FRandomStream& Random,
-		TArray<FPlacedFuelActor>& InOutPlacements)
-	{
-		if (Assets.IsEmpty())
-		{
-			return;
-		}
-
-		for (const int32 DepotIndex : DepotIndices)
-		{
-			const int32 DesiredCount = Random.RandRange(
-				FMath::Min(Settings.MinDressingActorsPerDepot, Settings.MaxDressingActorsPerDepot),
-				FMath::Max(Settings.MinDressingActorsPerDepot, Settings.MaxDressingActorsPerDepot));
-			for (int32 DesiredIndex = 0; DesiredIndex < DesiredCount; ++DesiredIndex)
-			{
-				for (int32 AttemptIndex = 0; AttemptIndex < Settings.PlacementAttemptsPerActor; ++AttemptIndex)
-				{
-					const double Angle = Random.FRandRange(0.0f, 2.0f * PI);
-					const double Radius = Settings.DressingRadius * FMath::Sqrt(Random.FRand());
-					const FVector2D Center = InOutPlacements[DepotIndex].VisualCenter
-						+ Radius * FVector2D(FMath::Cos(Angle), FMath::Sin(Angle));
-					const int32 AssetIndex = SelectWeightedActor(Assets, Random);
-					FPlacedFuelActor Placement;
-					if (TryBuildActorPlacement(
-						World, Settings, Assets[AssetIndex], Center,
-						MakeGeneratedYawDegrees(Random, Settings.bUseRightAngleActorRotations), AreaBounds.GetCenter().Z,
-						IsInsideArea, Exclusions, InOutPlacements, EFuelPlacedRole::IndustrialDressing,
-						Settings.bAlignIndustrialDressingToGround, Placement))
-					{
-						InOutPlacements.Add(MoveTemp(Placement));
-						break;
-					}
-				}
-			}
-		}
 	}
 
 	bool EdgeExists(const TArray<FFuelNetworkEdge>& Edges, const int32 First, const int32 Second)
@@ -1170,6 +1126,7 @@ namespace
 		int32 PipeIndex = INDEX_NONE;
 		double YawRadians = 0.0;
 		double ConnectionLength = 0.0;
+		bool bReverseTraversal = false;
 
 		bool IsValid() const
 		{
@@ -1183,27 +1140,102 @@ namespace
 		return FVector2D(DirectionVector.X, DirectionVector.Y);
 	}
 
-	FVector2D GetLocalConnectorPosition(const FResolvedFuelPipe& Pipe, const EFuelCardinalDirection Direction)
+	EFuelCardinalDirection GetOppositeDirection(const EFuelCardinalDirection Direction)
 	{
+		switch (Direction)
+		{
+		case EFuelCardinalDirection::PositiveX:
+			return EFuelCardinalDirection::NegativeX;
+		case EFuelCardinalDirection::NegativeX:
+			return EFuelCardinalDirection::PositiveX;
+		case EFuelCardinalDirection::PositiveY:
+			return EFuelCardinalDirection::NegativeY;
+		case EFuelCardinalDirection::NegativeY:
+			return EFuelCardinalDirection::PositiveY;
+		default:
+			return EFuelCardinalDirection::PositiveX;
+		}
+	}
+
+	void SetPointToBoundsSide(
+		FVector2D& InOutPoint,
+		const FBox& LocalBounds,
+		const EFuelCardinalDirection Direction)
+	{
+		switch (Direction)
+		{
+		case EFuelCardinalDirection::PositiveX:
+			InOutPoint.X = LocalBounds.Max.X;
+			return;
+		case EFuelCardinalDirection::NegativeX:
+			InOutPoint.X = LocalBounds.Min.X;
+			return;
+		case EFuelCardinalDirection::PositiveY:
+			InOutPoint.Y = LocalBounds.Max.Y;
+			return;
+		case EFuelCardinalDirection::NegativeY:
+			InOutPoint.Y = LocalBounds.Min.Y;
+			return;
+		default:
+			return;
+		}
+	}
+
+	FVector2D GetLocalConnectorPosition(const FResolvedFuelPipe& Pipe, const bool bStartConnector)
+	{
+		const EFuelCardinalDirection Direction = bStartConnector
+			? Pipe.StartConnectorDirection : Pipe.ForwardDirection;
+		const EFuelCardinalDirection OtherDirection = bStartConnector
+			? Pipe.ForwardDirection : Pipe.StartConnectorDirection;
+		FVector2D Connector(Pipe.LocalBounds.GetCenter());
+		SetPointToBoundsSide(Connector, Pipe.LocalBounds, Direction);
+
 		const FVector2D DirectionVector = CardinalDirectionToVector2D(Direction);
-		const FVector BoundsExtent = Pipe.LocalBounds.GetExtent();
-		return FVector2D(DirectionVector.X * BoundsExtent.X, DirectionVector.Y * BoundsExtent.Y);
+		const FVector2D OtherDirectionVector = CardinalDirectionToVector2D(OtherDirection);
+		if (FMath::Abs(FVector2D::DotProduct(DirectionVector, OtherDirectionVector))
+			< FuelSupplyPCGConstants::DirectionTolerance)
+		{
+			SetPointToBoundsSide(Connector, Pipe.LocalBounds, GetOppositeDirection(OtherDirection));
+		}
+		return Connector;
+	}
+
+	FVector2D GetLocalTraversalConnector(
+		const FResolvedFuelPipe& Pipe,
+		const bool bReverseTraversal,
+		const bool bTraversalStart)
+	{
+		const bool bUseAuthoredStart = bReverseTraversal ? not bTraversalStart : bTraversalStart;
+		return GetLocalConnectorPosition(Pipe, bUseAuthoredStart);
+	}
+
+	FVector2D GetLocalPipeBendPosition(const FResolvedFuelPipe& Pipe)
+	{
+		const FVector2D StartConnector = GetLocalConnectorPosition(Pipe, true);
+		const FVector2D EndConnector = GetLocalConnectorPosition(Pipe, false);
+		const FVector2D StartDirection = CardinalDirectionToVector2D(Pipe.StartConnectorDirection);
+		return FMath::Abs(StartDirection.X) > FuelSupplyPCGConstants::DirectionTolerance
+			? FVector2D(EndConnector.X, StartConnector.Y)
+			: FVector2D(StartConnector.X, EndConnector.Y);
 	}
 
 	bool TryMatchPipeOrientation(
 		const FResolvedFuelPipe& Pipe,
 		const FVector2D& DesiredStartOutward,
 		const FVector2D& DesiredEndOutward,
-		double& OutYawRadians)
+		double& OutYawRadians,
+		bool& bOutReverseTraversal)
 	{
-		const int32 NumTraversalDirections = Pipe.bCanReverse ? 2 : 1;
+		const int32 NumTraversalDirections = Pipe.bCanReverse
+			? FuelSupplyPCGConstants::BidirectionalTraversalCount
+			: FuelSupplyPCGConstants::ForwardTraversalCount;
 		for (int32 TraversalIndex = 0; TraversalIndex < NumTraversalDirections; ++TraversalIndex)
 		{
-			const bool bReverse = TraversalIndex == 1;
+			const bool bReverse = TraversalIndex == FuelSupplyPCGConstants::ReverseTraversalIndex;
 			const EFuelCardinalDirection StartDirection =
-				bReverse ? Pipe.EndConnectorDirection : Pipe.StartConnectorDirection;
+				bReverse ? Pipe.ForwardDirection : Pipe.StartConnectorDirection;
 			const EFuelCardinalDirection EndDirection =
-				bReverse ? Pipe.StartConnectorDirection : Pipe.EndConnectorDirection;
+				bReverse ? Pipe.StartConnectorDirection : Pipe.ForwardDirection;
 			const FVector2D LocalStart = CardinalDirectionToVector2D(StartDirection);
 			const FVector2D LocalEnd = CardinalDirectionToVector2D(EndDirection);
 			const double DesiredStartYaw = FMath::Atan2(DesiredStartOutward.Y, DesiredStartOutward.X);
@@ -1213,6 +1245,7 @@ namespace
 			if (FVector2D::DotProduct(RotatedEnd, DesiredEndOutward) > 1.0 - FuelSupplyPCGConstants::DirectionTolerance)
 			{
 				OutYawRadians = CandidateYaw;
+				bOutReverseTraversal = bReverse;
 				return true;
 			}
 		}
@@ -1222,8 +1255,8 @@ namespace
 	double GetPipeConnectionLength(const FResolvedFuelPipe& Pipe)
 	{
 		return FVector2D::Distance(
-			GetLocalConnectorPosition(Pipe, Pipe.StartConnectorDirection),
-			GetLocalConnectorPosition(Pipe, Pipe.EndConnectorDirection));
+			GetLocalConnectorPosition(Pipe, true),
+			GetLocalConnectorPosition(Pipe, false));
 	}
 
 	FMatchedFuelPipe MatchStraightPipe(
@@ -1233,12 +1266,14 @@ namespace
 	{
 		FMatchedFuelPipe Match;
 		double YawRadians = 0.0;
+		bool bReverseTraversal = false;
 		if (Pipes.IsValidIndex(PipeIndex) && TryMatchPipeOrientation(
-			Pipes[PipeIndex], -FlowDirection, FlowDirection, YawRadians))
+			Pipes[PipeIndex], -FlowDirection, FlowDirection, YawRadians, bReverseTraversal))
 		{
 			Match.PipeIndex = PipeIndex;
 			Match.YawRadians = YawRadians;
 			Match.ConnectionLength = GetPipeConnectionLength(Pipes[PipeIndex]);
+			Match.bReverseTraversal = bReverseTraversal;
 		}
 		return Match;
 	}
@@ -1308,15 +1343,16 @@ namespace
 		UWorld& World,
 		const UPCGCreateFuelSupplySettings& Settings,
 		const FResolvedFuelPipe& Pipe,
-		const FVector2D& Center,
+		const FVector2D& WorldAnchor,
+		const FVector2D& LocalAnchor,
 		const double YawRadians,
 		const double LengthScale,
 		const double AreaHeight)
 	{
 		const FQuat Rotation(FVector::UpVector, YawRadians);
 		FVector Scale = FVector::OneVector;
-		const FVector2D ConnectorDelta = GetLocalConnectorPosition(Pipe, Pipe.EndConnectorDirection)
-			- GetLocalConnectorPosition(Pipe, Pipe.StartConnectorDirection);
+		const FVector2D ConnectorDelta = GetLocalConnectorPosition(Pipe, false)
+			- GetLocalConnectorPosition(Pipe, true);
 		if (FMath::Abs(ConnectorDelta.Y) > FMath::Abs(ConnectorDelta.X))
 		{
 			Scale.Y = LengthScale;
@@ -1326,15 +1362,18 @@ namespace
 			Scale.X = LengthScale;
 		}
 		const FFuelGroundResult Ground = ProjectToGround(
-			World, FVector(Center, AreaHeight), Settings.bProjectActorsToGround);
+			World, FVector(WorldAnchor, AreaHeight), Settings.bProjectActorsToGround);
+		const FVector LocalAnchor3D(LocalAnchor, Pipe.LocalBounds.GetCenter().Z);
 
 		FPlacedFuelActor Placement;
 		Placement.ActorClass = Pipe.ActorClass;
 		Placement.LocalBounds = Pipe.LocalBounds;
 		Placement.Transform = MakeBoundsAlignedTransform(
-			Pipe.LocalBounds, Center, Ground.Position.Z, Rotation, Scale, Pipe.ZOffset);
+			Pipe.LocalBounds, LocalAnchor3D, WorldAnchor,
+			Ground.Position.Z, Rotation, Scale, Pipe.ZOffset);
 		Placement.Footprint = ComputeFootprint(Pipe.LocalBounds, Placement.Transform);
-		Placement.VisualCenter = Center;
+		const FVector WorldVisualCenter = Placement.Transform.TransformPosition(Pipe.LocalBounds.GetCenter());
+		Placement.VisualCenter = FVector2D(WorldVisualCenter.X, WorldVisualCenter.Y);
 		Placement.Role = EFuelPlacedRole::FuelPipe;
 		return Placement;
 	}
@@ -1350,9 +1389,12 @@ namespace
 		for (int32 PipeIndex = 0; PipeIndex < Pipes.Num(); ++PipeIndex)
 		{
 			double YawRadians = 0.0;
-			if (TryMatchPipeOrientation(Pipes[PipeIndex], -Incoming, Outgoing, YawRadians))
+			bool bReverseTraversal = false;
+			if (TryMatchPipeOrientation(
+				Pipes[PipeIndex], -Incoming, Outgoing, YawRadians, bReverseTraversal))
 			{
-				Candidates.Add({PipeIndex, YawRadians, GetPipeConnectionLength(Pipes[PipeIndex])});
+				Candidates.Add({
+					PipeIndex, YawRadians, GetPipeConnectionLength(Pipes[PipeIndex]), bReverseTraversal});
 				TotalWeight += Pipes[PipeIndex].Weight;
 			}
 		}
@@ -1399,13 +1441,17 @@ namespace
 			}
 
 			const FResolvedFuelPipe& Pipe = Pipes[Match.PipeIndex];
+			const FVector2D LocalBend = GetLocalPipeBendPosition(Pipe);
 			FPlacedFuelActor Placement = MakePipePlacement(
-				World, Settings, Pipe, Route[PointIndex], Match.YawRadians, 1.0, AreaHeight);
-			const FVector2D Extent = Placement.Footprint.GetExtent();
+				World, Settings, Pipe, Route[PointIndex], LocalBend, Match.YawRadians, 1.0, AreaHeight);
+			const FVector2D LocalIncomingConnector = GetLocalTraversalConnector(
+				Pipe, Match.bReverseTraversal, true);
+			const FVector2D LocalOutgoingConnector = GetLocalTraversalConnector(
+				Pipe, Match.bReverseTraversal, false);
 			FFuelPipeCornerPlacement& Corner = OutCorners.Emplace_GetRef();
 			Corner.RoutePointIndex = PointIndex;
-			Corner.IncomingTrim = FMath::Abs(Incoming.X) * Extent.X + FMath::Abs(Incoming.Y) * Extent.Y;
-			Corner.OutgoingTrim = FMath::Abs(Outgoing.X) * Extent.X + FMath::Abs(Outgoing.Y) * Extent.Y;
+			Corner.IncomingTrim = FVector2D::Distance(LocalBend, LocalIncomingConnector);
+			Corner.OutgoingTrim = FVector2D::Distance(LocalBend, LocalOutgoingConnector);
 			OutPipePlacements.Add(MoveTemp(Placement));
 		}
 	}
@@ -1460,9 +1506,12 @@ namespace
 			}
 
 			const double PieceLength = NominalLength * LengthScale;
-			const FVector2D Center = SegmentStart + Direction * (Cursor + PieceLength * 0.5);
+			const FVector2D WorldConnectorMidpoint = SegmentStart + Direction * (Cursor + PieceLength * 0.5);
+			const FVector2D LocalConnectorMidpoint = 0.5 * (
+				GetLocalConnectorPosition(Pipe, true) + GetLocalConnectorPosition(Pipe, false));
 			OutPipePlacements.Add(MakePipePlacement(
-				World, Settings, Pipe, Center, Match.YawRadians, LengthScale, AreaHeight));
+				World, Settings, Pipe, WorldConnectorMidpoint, LocalConnectorMidpoint,
+				Match.YawRadians, LengthScale, AreaHeight));
 			const double Advance = FMath::Max(
 				FuelSupplyPCGConstants::MinimumRouteSegmentLength, PieceLength - Pipe.EndOverlap);
 			Cursor += Advance;
@@ -1599,8 +1648,8 @@ namespace
 	{
 		TArray<FResolvedFuelActor> Depots;
 		TArray<FResolvedFuelActor> Tanks;
-		TArray<FResolvedFuelActor> Dressing;
 		TArray<FResolvedFuelPipe> Pipes;
+		TArray<FResolvedFuelFence> Fences;
 	};
 
 	struct FGeneratedFuelSupply
@@ -1621,17 +1670,18 @@ namespace
 			LOCTEXT("SupplyDepotRole", "supply-depot"), OutAssets.Depots);
 		ResolveActorEntries(Context, World, Settings.FuelTanks,
 			LOCTEXT("FuelTankRole", "fuel-tank"), OutAssets.Tanks);
-		ResolveActorEntries(Context, World, Settings.IndustrialDressing,
-			LOCTEXT("DressingRole", "industrial-dressing"), OutAssets.Dressing);
 		ResolvePipeEntries(Context, World, Settings.FuelPipes, OutAssets.Pipes);
+		ResolveFenceEntries(Context, World, Settings.FuelTankFences, OutAssets.Fences);
 		const bool bHasStraightPipe = OutAssets.Pipes.FindByPredicate([](const FResolvedFuelPipe& Pipe)
 		{
-			return Pipe.PieceType == EFuelPipePieceType::Straight;
+			const FIntPoint Start = CardinalDirectionToVector(Pipe.StartConnectorDirection);
+			const FIntPoint End = CardinalDirectionToVector(Pipe.ForwardDirection);
+			return Start.X == -End.X && Start.Y == -End.Y;
 		}) != nullptr;
 		if (OutAssets.Depots.IsEmpty() || not bHasStraightPipe)
 		{
 			PCGE_LOG_C(Warning, GraphAndLog, Context, LOCTEXT("MissingCoreFuelAssets",
-				"CreateFuelSupply: at least one valid supply-depot and straight-pipe Blueprint are required."));
+				"CreateFuelSupply: at least one valid supply depot and a pipe with opposite connectors are required."));
 			return false;
 		}
 		return true;
@@ -1674,9 +1724,6 @@ namespace
 		{
 			OutGenerated.TankIndices.Add(PlacementIndex);
 		}
-		PlaceIndustrialDressing(
-			World, Settings, AreaBounds, IsInsideArea, Exclusions, Assets.Dressing,
-			OutGenerated.DepotIndices, Random, OutGenerated.Placements);
 		return true;
 	}
 
@@ -1687,7 +1734,8 @@ namespace
 		double MaximumPipeHalfWidth = 0.0;
 		for (const FResolvedFuelPipe& Pipe : Pipes)
 		{
-			MaximumPipeHalfWidth = FMath::Max(MaximumPipeHalfWidth, Pipe.GetHalfWidth());
+			MaximumPipeHalfWidth = FMath::Max(
+				MaximumPipeHalfWidth, 0.5 * FMath::Max(Pipe.LocalBounds.GetSize().X, Pipe.LocalBounds.GetSize().Y));
 		}
 		return MaximumPipeHalfWidth + Settings.PipeObstacleClearance;
 	}
@@ -1731,6 +1779,325 @@ namespace
 			InOutGenerated.Routes.Add(MoveTemp(Route));
 		}
 	}
+
+	double GetFenceLength(const FResolvedFuelFence& Fence)
+	{
+		const FIntPoint Forward = CardinalDirectionToVector(Fence.AuthoredForwardDirection);
+		return Forward.X != 0 ? Fence.LocalBounds.GetSize().X : Fence.LocalBounds.GetSize().Y;
+	}
+
+	int32 SelectFenceForRemainingLength(
+		const TArray<FResolvedFuelFence>& Fences,
+		const double RemainingLength)
+	{
+		constexpr double OvershootScoreMultiplier = 2.0;
+		int32 BestFenceIndex = INDEX_NONE;
+		double BestScore = TNumericLimits<double>::Max();
+		for (int32 FenceIndex = 0; FenceIndex < Fences.Num(); ++FenceIndex)
+		{
+			const FResolvedFuelFence& Fence = Fences[FenceIndex];
+			const double FenceLength = GetFenceLength(Fence);
+			const double OvershootPenalty = FenceLength > RemainingLength ? OvershootScoreMultiplier : 1.0;
+			const double Score = OvershootPenalty * FMath::Abs(RemainingLength - FenceLength) / Fence.Weight;
+			if (Score < BestScore)
+			{
+				BestScore = Score;
+				BestFenceIndex = FenceIndex;
+			}
+		}
+		return BestFenceIndex;
+	}
+
+	double SnapFenceSideLengthToPieces(
+		const TArray<FResolvedFuelFence>& Fences,
+		const double DesiredLength)
+	{
+		const int32 FenceIndex = SelectFenceForRemainingLength(Fences, DesiredLength);
+		if (FenceIndex == INDEX_NONE)
+		{
+			return DesiredLength;
+		}
+
+		const FResolvedFuelFence& Fence = Fences[FenceIndex];
+		const double FenceLength = GetFenceLength(Fence);
+		const double Advance = FMath::Max(
+			FuelSupplyPCGConstants::MinimumRouteSegmentLength, FenceLength - Fence.EndOverlap);
+		const double RequiredAdvance = FMath::Max(0.0, DesiredLength - Fence.EndOverlap);
+		const int32 PieceCount = FMath::Max(1, FMath::CeilToInt32(RequiredAdvance / Advance));
+		return Fence.EndOverlap + PieceCount * Advance;
+	}
+
+	double GetMaximumFenceLength(const TArray<FResolvedFuelFence>& Fences)
+	{
+		double MaximumLength = 0.0;
+		for (const FResolvedFuelFence& Fence : Fences)
+		{
+			MaximumLength = FMath::Max(MaximumLength, GetFenceLength(Fence));
+		}
+		return MaximumLength;
+	}
+
+	bool AbsorbOverlappingFenceGroups(
+		FBox2D& InOutDesiredBounds,
+		int32& InOutOwnerTankIndex,
+		const double MergeClearance,
+		TArray<FFuelTankFenceGroup>& InOutGroups)
+	{
+		bool bAbsorbedGroup = false;
+		for (int32 GroupIndex = InOutGroups.Num() - 1; GroupIndex >= 0; --GroupIndex)
+		{
+			const FFuelTankFenceGroup& Group = InOutGroups[GroupIndex];
+			if (not BoxesOverlapWithClearance(InOutDesiredBounds, Group.DesiredBounds, MergeClearance))
+			{
+				continue;
+			}
+
+			InOutDesiredBounds += Group.DesiredBounds.Min;
+			InOutDesiredBounds += Group.DesiredBounds.Max;
+			InOutOwnerTankIndex = Group.OwnerTankIndex;
+			InOutGroups.RemoveAt(GroupIndex, 1, EAllowShrinking::No);
+			bAbsorbedGroup = true;
+		}
+		return bAbsorbedGroup;
+	}
+
+	void BuildFuelTankFenceGroups(
+		const UPCGCreateFuelSupplySettings& Settings,
+		const TArray<FResolvedFuelFence>& Fences,
+		const FGeneratedFuelSupply& Generated,
+		TArray<FFuelTankFenceGroup>& OutGroups)
+	{
+		const double MergeClearance = GetMaximumFenceLength(Fences);
+		for (const int32 TankIndex : Generated.TankIndices)
+		{
+			if (not Generated.Placements.IsValidIndex(TankIndex))
+			{
+				continue;
+			}
+
+			const FBox2D TankBounds = Generated.Placements[TankIndex].Footprint;
+			FBox2D DesiredBounds(
+				TankBounds.Min - FVector2D(Settings.FenceDistanceFromTank),
+				TankBounds.Max + FVector2D(Settings.FenceDistanceFromTank));
+			int32 OwnerTankIndex = TankIndex;
+			while (AbsorbOverlappingFenceGroups(
+				DesiredBounds, OwnerTankIndex, MergeClearance, OutGroups))
+			{
+			}
+
+			OutGroups.Add({DesiredBounds, OwnerTankIndex});
+		}
+	}
+
+	FPlacedFuelActor MakeFencePlacement(
+		UWorld& World,
+		const UPCGCreateFuelSupplySettings& Settings,
+		const FResolvedFuelFence& Fence,
+		const FVector2D& Center,
+		const FVector2D& SideDirection,
+		const double AreaHeight,
+		const int32 TankIndex)
+	{
+		const FVector2D AuthoredForward = CardinalDirectionToVector2D(Fence.AuthoredForwardDirection);
+		const double YawRadians = FMath::Atan2(SideDirection.Y, SideDirection.X)
+			- FMath::Atan2(AuthoredForward.Y, AuthoredForward.X);
+		const FQuat Rotation(FVector::UpVector, YawRadians);
+		const FFuelGroundResult Ground = ProjectToGround(
+			World, FVector(Center, AreaHeight), Settings.bProjectActorsToGround);
+
+		FPlacedFuelActor Placement;
+		Placement.ActorClass = Fence.ActorClass;
+		Placement.LocalBounds = Fence.LocalBounds;
+		Placement.Transform = MakeBoundsAlignedTransform(
+			Fence.LocalBounds, Fence.LocalBounds.GetCenter(), Center,
+			Ground.Position.Z, Rotation, FVector::OneVector, Fence.ZOffset);
+		Placement.Footprint = ComputeFootprint(Fence.LocalBounds, Placement.Transform);
+		Placement.VisualCenter = Center;
+		Placement.Role = EFuelPlacedRole::FuelFence;
+		Placement.FenceOwnerTankIndex = TankIndex;
+		return Placement;
+	}
+
+	bool DoesSegmentIntersectBox(const FVector2D& Start, const FVector2D& End, const FBox2D& Box)
+	{
+		double MinimumTime = 0.0;
+		double MaximumTime = 1.0;
+		const FVector2D Delta = End - Start;
+		const double Starts[] = {Start.X, Start.Y};
+		const double Deltas[] = {Delta.X, Delta.Y};
+		const double Minimums[] = {Box.Min.X, Box.Min.Y};
+		const double Maximums[] = {Box.Max.X, Box.Max.Y};
+		for (int32 AxisIndex = 0; AxisIndex < FuelSupplyPCGConstants::CoordinateAxisCount; ++AxisIndex)
+		{
+			if (FMath::Abs(Deltas[AxisIndex]) < FuelSupplyPCGConstants::DirectionTolerance)
+			{
+				if (Starts[AxisIndex] < Minimums[AxisIndex] || Starts[AxisIndex] > Maximums[AxisIndex])
+				{
+					return false;
+				}
+				continue;
+			}
+
+			double FirstTime = (Minimums[AxisIndex] - Starts[AxisIndex]) / Deltas[AxisIndex];
+			double SecondTime = (Maximums[AxisIndex] - Starts[AxisIndex]) / Deltas[AxisIndex];
+			if (FirstTime > SecondTime)
+			{
+				Swap(FirstTime, SecondTime);
+			}
+			MinimumTime = FMath::Max(MinimumTime, FirstTime);
+			MaximumTime = FMath::Min(MaximumTime, SecondTime);
+			if (MinimumTime > MaximumTime)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	bool DoesFenceBlockPipeRoute(
+		const FBox2D& FenceFootprint,
+		const TArray<TArray<FVector2D>>& Routes,
+		const double PipeGap)
+	{
+		const FBox2D GapBounds(
+			FenceFootprint.Min - FVector2D(PipeGap),
+			FenceFootprint.Max + FVector2D(PipeGap));
+		for (const TArray<FVector2D>& Route : Routes)
+		{
+			for (int32 PointIndex = 0; PointIndex + 1 < Route.Num(); ++PointIndex)
+			{
+				if (DoesSegmentIntersectBox(Route[PointIndex], Route[PointIndex + 1], GapBounds))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	bool IsFenceClearOfGeneratedActors(
+		const FBox2D& FenceFootprint,
+		const TArray<FPlacedFuelActor>& Placements,
+		const int32 EnclosedTankIndex,
+		const double Clearance)
+	{
+		for (int32 PlacementIndex = 0; PlacementIndex < Placements.Num(); ++PlacementIndex)
+		{
+			const FPlacedFuelActor& Placement = Placements[PlacementIndex];
+			const bool bSameTankFence = Placement.Role == EFuelPlacedRole::FuelFence
+				&& Placement.FenceOwnerTankIndex == EnclosedTankIndex;
+			if (PlacementIndex == EnclosedTankIndex || Placement.Role == EFuelPlacedRole::FuelPipe
+				|| bSameTankFence)
+			{
+				continue;
+			}
+			if (BoxesOverlapWithClearance(FenceFootprint, Placement.Footprint, Clearance))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	void TileFenceSide(
+		UWorld& World,
+		const UPCGCreateFuelSupplySettings& Settings,
+		const FBox& AreaBounds,
+		const FFuelSupplyAreaFunction& IsInsideArea,
+		const TArray<const UPCGSpatialData*>& Exclusions,
+		const TArray<FResolvedFuelFence>& Fences,
+		const FVector2D& SideStart,
+		const FVector2D& SideEnd,
+		const int32 TankIndex,
+		FGeneratedFuelSupply& InOutGenerated)
+	{
+		const FVector2D SideDirection = (SideEnd - SideStart).GetSafeNormal();
+		const double SideLength = FVector2D::Distance(SideStart, SideEnd);
+		double Cursor = 0.0;
+		while (Cursor + FuelSupplyPCGConstants::MinimumRouteSegmentLength < SideLength)
+		{
+			const double RemainingLength = SideLength - Cursor;
+			const int32 FenceIndex = SelectFenceForRemainingLength(Fences, RemainingLength);
+			if (FenceIndex == INDEX_NONE)
+			{
+				return;
+			}
+
+			const FResolvedFuelFence& Fence = Fences[FenceIndex];
+			const double FenceLength = GetFenceLength(Fence);
+			const FVector2D Center = SideStart + SideDirection * (Cursor + FenceLength * 0.5);
+			FPlacedFuelActor Placement = MakeFencePlacement(
+				World, Settings, Fence, Center, SideDirection, AreaBounds.GetCenter().Z, TankIndex);
+			const bool bCanPlace = IsFootprintSpatiallyValid(
+				Placement.Footprint, Placement.Transform.GetLocation().Z, IsInsideArea, Exclusions)
+				&& IsFenceClearOfGeneratedActors(
+					Placement.Footprint, InOutGenerated.Placements, TankIndex, Settings.FenceObstacleClearance)
+				&& not DoesFenceBlockPipeRoute(
+					Placement.Footprint, InOutGenerated.Routes, Settings.FencePipeGap);
+			if (bCanPlace)
+			{
+				InOutGenerated.Placements.Add(MoveTemp(Placement));
+			}
+			if (FenceLength >= RemainingLength + Fence.EndOverlap)
+			{
+				break;
+			}
+
+			Cursor += FMath::Max(
+				FuelSupplyPCGConstants::MinimumRouteSegmentLength, FenceLength - Fence.EndOverlap);
+		}
+	}
+
+	void GenerateFuelTankFences(
+		UWorld& World,
+		const UPCGCreateFuelSupplySettings& Settings,
+		const FBox& AreaBounds,
+		const FFuelSupplyAreaFunction& IsInsideArea,
+		const TArray<const UPCGSpatialData*>& Exclusions,
+		const TArray<FResolvedFuelFence>& Fences,
+		FGeneratedFuelSupply& InOutGenerated)
+	{
+		if (not Settings.bGenerateFuelTankFences || Fences.IsEmpty())
+		{
+			return;
+		}
+
+		TArray<FFuelTankFenceGroup> FenceGroups;
+		BuildFuelTankFenceGroups(Settings, Fences, InOutGenerated, FenceGroups);
+		for (const FFuelTankFenceGroup& FenceGroup : FenceGroups)
+		{
+			const FBox2D DesiredFenceBounds = FenceGroup.DesiredBounds;
+			const double CornerClearance = FMath::Max(0.0, static_cast<double>(Settings.FenceCornerClearance));
+			const FVector2D DesiredFenceSize = DesiredFenceBounds.GetSize();
+			const double SnappedSideLengthX = SnapFenceSideLengthToPieces(
+				Fences, FMath::Max(0.0, DesiredFenceSize.X - 2.0 * CornerClearance));
+			const double SnappedSideLengthY = SnapFenceSideLengthToPieces(
+				Fences, FMath::Max(0.0, DesiredFenceSize.Y - 2.0 * CornerClearance));
+			const FVector2D SnappedFenceExtent(
+				0.5 * (SnappedSideLengthX + 2.0 * CornerClearance),
+				0.5 * (SnappedSideLengthY + 2.0 * CornerClearance));
+			const FVector2D FenceCenter = DesiredFenceBounds.GetCenter();
+			const FBox2D FenceBounds(FenceCenter - SnappedFenceExtent, FenceCenter + SnappedFenceExtent);
+			const FVector2D Corners[] = {
+				FVector2D(FenceBounds.Min.X + CornerClearance, FenceBounds.Min.Y),
+				FVector2D(FenceBounds.Max.X, FenceBounds.Min.Y + CornerClearance),
+				FVector2D(FenceBounds.Max.X - CornerClearance, FenceBounds.Max.Y),
+				FVector2D(FenceBounds.Min.X, FenceBounds.Max.Y - CornerClearance)
+			};
+			const FVector2D SideEnds[] = {
+				FVector2D(FenceBounds.Max.X - CornerClearance, FenceBounds.Min.Y),
+				FVector2D(FenceBounds.Max.X, FenceBounds.Max.Y - CornerClearance),
+				FVector2D(FenceBounds.Min.X + CornerClearance, FenceBounds.Max.Y),
+				FVector2D(FenceBounds.Min.X, FenceBounds.Min.Y + CornerClearance)
+			};
+			for (int32 SideIndex = 0; SideIndex < FuelSupplyPCGConstants::FenceSideCount; ++SideIndex)
+			{
+				TileFenceSide(
+					World, Settings, AreaBounds, IsInsideArea, Exclusions, Fences,
+					Corners[SideIndex], SideEnds[SideIndex], FenceGroup.OwnerTankIndex, InOutGenerated);
+			}
+		}
+	}
 }
 
 bool FPCGCreateFuelSupplyElement::ExecuteInternal(FPCGContext* Context) const
@@ -1772,6 +2139,8 @@ bool FPCGCreateFuelSupplyElement::ExecuteInternal(FPCGContext* Context) const
 
 	GenerateFuelPipeNetwork(
 		Context, World, *Settings, AreaBounds, IsInsideArea, Exclusions, Assets.Pipes, Random, Generated);
+	GenerateFuelTankFences(
+		World, *Settings, AreaBounds, IsInsideArea, Exclusions, Assets.Fences, Generated);
 	SpawnAndRegisterActors(*SourceComponent, World, Generated.Placements);
 	EmitOccupiedBounds(Context, Generated.Placements, Settings->RandomSeed);
 	EmitPipeRoutes(Context, Generated.Routes, AreaBounds.GetCenter().Z, Settings->RandomSeed);

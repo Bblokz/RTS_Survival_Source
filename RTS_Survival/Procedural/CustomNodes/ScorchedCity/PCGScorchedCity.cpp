@@ -39,11 +39,13 @@ namespace ScorchedCityPCGConstants
 	const FName ExclusionPinLabel = TEXT("Exclusion");
 	const FName ScatterPinLabel = TEXT("Scatter");
 	const FName OccupiedBoundsPinLabel = TEXT("OccupiedBounds");
+	const FName BuildingsPinLabel = TEXT("Buildings");
 	const FName LotsPinLabel = TEXT("Lots");
 	const FName OuterOrphanRoadsPinLabel = TEXT("OuterOrphanRoads");
 
 	const FName ScatterMeshAttributeName = TEXT("Mesh");
 	const FName OccupancyTypeAttributeName = TEXT("Occupancy");
+	const FName BuildingCategoryAttributeName = TEXT("Category");
 	const FName LotUsedAttributeName = TEXT("Used");
 
 	// Fallbacks when meshes/classes cannot be measured.
@@ -106,6 +108,7 @@ FText UPCGScorchedCitySettings::GetNodeTooltipText() const
 		"derives from the area's bounds and the layout is trimmed to its shape. Roads, intersections, "
 		"buildings and poles are spawned as managed actors; Scatter outputs points with a 'Mesh' attribute "
 		"for a Static Mesh Spawner. OccupiedBounds outputs every reserved footprint for downstream exclusion. "
+		"Buildings outputs one point per placed building with its measured bounds. "
 		"Deterministic from RandomSeed.");
 }
 #endif
@@ -130,6 +133,9 @@ TArray<FPCGPinProperties> UPCGScorchedCitySettings::OutputPinProperties() const
 	TArray<FPCGPinProperties> Pins;
 	Pins.Emplace(ScorchedCityPCGConstants::ScatterPinLabel, EPCGDataType::Point);
 	Pins.Emplace(ScorchedCityPCGConstants::OccupiedBoundsPinLabel, EPCGDataType::Point);
+	// One point per placed building (pivot transform + measured bounds); the 'Category'
+	// attribute distinguishes Scorch (HISM) from Blueprint buildings.
+	Pins.Emplace(ScorchedCityPCGConstants::BuildingsPinLabel, EPCGDataType::Point);
 	Pins.Emplace(ScorchedCityPCGConstants::LotsPinLabel, EPCGDataType::Point);
 	// Every unconnected road ending (dead stops, failed pairings, open 4-way arms); point
 	// rotation = outward yaw, so other PCG logic can continue those roads.
@@ -910,6 +916,7 @@ namespace
 		const FScorchedCityAssets& Assets,
 		const FTransform& CityToWorld,
 		const float CollisionBoundsPercent,
+		const float CollisionScaleMultiplier,
 		TArray<AActor*>& OutSpawnedActors)
 	{
 		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(OutSpawnedActors);
@@ -975,7 +982,9 @@ namespace
 			InstancedMeshes->AddInstances(MeshEntry.Value, false, true);
 		}
 
-		const double CollisionBoundsScale = FMath::Clamp(CollisionBoundsPercent, 1.0f, 100.0f) / 100.0;
+		const double CollisionBoundsScale =
+			FMath::Clamp(CollisionBoundsPercent, 1.0f, 100.0f) / 100.0
+			* FMath::Max(CollisionScaleMultiplier, 0.01f);
 		for (const TPair<FTransform, FBox>& BuildingPlacement : BuildingPlacements)
 		{
 			AddScorchBuildingNavigationAndCollision(
@@ -1206,6 +1215,56 @@ namespace
 
 			BoundsData->Metadata->InitializeOnSet(Point.MetadataEntry);
 			TypeAttribute->SetValue(Point.MetadataEntry, static_cast<int32>(Entry.Type));
+		}
+	}
+
+	/**
+	 * @brief Emits one point per placed building: the point transform is the building's
+	 * actual spawn transform (pivot ground-projected, city yaw applied) and the point bounds
+	 * are the measured local bounds, so the point box matches the building in the world.
+	 */
+	void EmitBuildingsOutput(
+		FPCGContext* Context,
+		UWorld& World,
+		const FScorchedCityGenResult& Result,
+		const FScorchedCityAssets& Assets,
+		const FTransform& CityToWorld,
+		const int32 RandomSeed,
+		const TArray<AActor*>& ActorsToIgnoreInTraces)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		UPCGPointData* BuildingsData = CreateOutputPointData(Context, BuildingsPinLabel);
+		FPCGMetadataAttribute<int32>* CategoryAttribute =
+			BuildingsData->Metadata->CreateAttribute<int32>(BuildingCategoryAttributeName, 0, false, false);
+
+		TArray<FPCGPoint>& Points = BuildingsData->GetMutablePoints();
+		Points.Reserve(Result.Buildings.Num());
+
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(ActorsToIgnoreInTraces);
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		for (int32 BuildingIndex = 0; BuildingIndex < Result.Buildings.Num(); ++BuildingIndex)
+		{
+			const FScorchedBuildingSpawn& Building = Result.Buildings[BuildingIndex];
+			if (not Assets.BuildingLocalBounds.IsValidIndex(Building.AssetIndex))
+			{
+				continue;
+			}
+			const FBox& LocalBounds = Assets.BuildingLocalBounds[Building.AssetIndex];
+
+			FPCGPoint& Point = Points.Emplace_GetRef();
+			Point.Transform = FTransform(
+				FQuat(FVector::UpVector, CityYaw + Building.YawRadians),
+				ProjectCityPositionToGround(World, Building.ActorPosition, CityToWorld, TraceParams, 0.0));
+			Point.BoundsMin = LocalBounds.Min;
+			Point.BoundsMax = LocalBounds.Max;
+			Point.Density = 1.0f;
+			Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, BuildingIndex);
+
+			BuildingsData->Metadata->InitializeOnSet(Point.MetadataEntry);
+			CategoryAttribute->SetValue(
+				Point.MetadataEntry, static_cast<int32>(Assets.BuildingCategories[Building.AssetIndex]));
 		}
 	}
 
@@ -1452,6 +1511,7 @@ namespace
 			Assets,
 			CityToWorld,
 			Settings.ScorchBuildingCollisionBoundsPercent,
+			Settings.ScorchBuildingCollisionScaleMultiplier,
 			OutSpawnedActors);
 
 		for (const FScorchedBuildingSpawn& Building : Result.Buildings)
@@ -1588,6 +1648,7 @@ bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
 
 	EmitScatterOutput(Context, World, Result, Assets, CityToWorld, Settings->RandomSeed, SpawnedActors);
 	EmitOccupiedBoundsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
+	EmitBuildingsOutput(Context, World, Result, Assets, CityToWorld, Settings->RandomSeed, SpawnedActors);
 	EmitLotsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
 	EmitOuterOrphanRoadsOutput(
 		Context, World, Result, CityToWorld, Settings->RandomSeed, Settings->RoadZOffset, SpawnedActors);

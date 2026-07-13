@@ -22,6 +22,7 @@ Pins:
 - **Exclusion** (Spatial, optional): buildings and scatter are never placed where these sample density > 0.
 - **Scatter** (Point): debris points with a `Mesh` (SoftObjectPath) attribute → wire into a Static Mesh Spawner, mesh selection "By Attribute".
 - **OccupiedBounds** (Point): every reserved oriented footprint (roads, intersections, buildings, poles) with an `Occupancy` int attribute — use with Difference/filters to exclude other PCG content.
+- **Buildings** (Point): one point per placed building; the transform matches the spawned building (pivot ground-projected, city yaw applied) and the point bounds are the measured local bounds. A `Category` int attribute holds the `EScorchedBuildingCategory` (0 = ScorchBuilding, 1 = BlueprintBuilding).
 - **Lots** (Point): generated lots with a `Used` attribute (debugging / extensions).
 - **OuterOrphanRoads** (Point): every road ending that remains unconnected after the orphan-pairing pass — dead stops, endings whose pairing curve failed, and the open arms of intersection pieces that have fewer streets than mesh arms (the point sits at the mesh edge of the unused arm). Each point is ground-projected on the road's final outer position with its rotation yawing outward, so other PCG logic can continue those roads.
 
@@ -69,6 +70,8 @@ Two safeguards keep blocks from staying empty: short streets between large 4-way
 Each building entry has a `Category`:
 - **ScorchBuilding** (default): the Blueprint's static meshes (plain components and ISM/HISM instances, extracted once from a transient inspection instance) are batched into **one city actor** holding one Hierarchical Instanced Static Mesh component per unique mesh — the same manual "merge selected actors into HISMs" workflow, automated. Placement, footprints and ground-projected pivots are identical to actor spawning; non-mesh components/logic of the Blueprint are discarded. Instances are bulk-added per mesh so each HISM cluster tree builds once.
 - **BlueprintBuilding**: spawned as its Blueprint actor, unchanged (keeps components and logic).
+
+Each ScorchBuilding placement gets a generated weapon-trace box and nav obstacle from its measured bounds; the box extent is scaled by `ScorchBuildingCollisionBoundsPercent` × the global `ScorchBuildingCollisionScaleMultiplier` (Blueprint buildings keep their own collision).
 
 ## 6. Scatter
 

@@ -29,12 +29,14 @@ struct FFuelSupplyActorEntry
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset")
 	TSoftClassPtr<AActor> ActorClass;
 
-	/** @brief Pivot-centered local-X footprint size; 0 uses the pre-spawned Blueprint's measured bounds. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
+	/** @brief Local-X footprint size; 0 uses the pre-spawned Blueprint's measured bounds. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
+		meta = (ClampMin = "0", Units = "cm", DisplayName = "Footprint Size X (0 = Measure)"))
 	float FootprintOverrideX = 0.0f;
 
-	/** @brief Pivot-centered local-Y footprint size; 0 uses the pre-spawned Blueprint's measured bounds. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
+	/** @brief Local-Y footprint size; 0 uses the pre-spawned Blueprint's measured bounds. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
+		meta = (ClampMin = "0", Units = "cm", DisplayName = "Footprint Size Y (0 = Measure)"))
 	float FootprintOverrideY = 0.0f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset", meta = (ClampMin = "0.01"))
@@ -64,21 +66,23 @@ struct FFuelPipeActorEntry
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset")
 	TSoftClassPtr<AActor> ActorClass;
 
-	/** @brief Pivot-centered X size; 0 uses the pre-spawned Blueprint's measured footprint. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
+	/** @brief X size that preserves the measured pivot position; 0 uses the measured footprint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
+		meta = (ClampMin = "0", Units = "cm", DisplayName = "Footprint Size X (0 = Measure)"))
 	float FootprintOverrideX = 0.0f;
 
-	/** @brief Pivot-centered Y size; 0 uses the pre-spawned Blueprint's measured footprint. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
+	/** @brief Y size that preserves the measured pivot position; 0 uses the measured footprint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
+		meta = (ClampMin = "0", Units = "cm", DisplayName = "Footprint Size Y (0 = Measure)"))
 	float FootprintOverrideY = 0.0f;
 
 	/** @brief Side where traversal enters the authored piece. Default flow therefore points toward +X. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
 	EFuelCardinalDirection StartConnectorDirection = EFuelCardinalDirection::NegativeX;
 
-	/** @brief Side where traversal exits the authored piece. Use +Y/-Y to describe authored elbows. */
+	/** @brief Authored exit/forward side. Defaults to +X; use +Y/-Y to describe elbows. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
-	EFuelCardinalDirection EndConnectorDirection = EFuelCardinalDirection::PositiveX;
+	EFuelCardinalDirection ForwardDirection = EFuelCardinalDirection::PositiveX;
 
 	/** @brief Allows the generator to exchange start/end connectors without mirroring the actor. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
@@ -107,12 +111,14 @@ struct FFuelFenceActorEntry
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset")
 	TSoftClassPtr<AActor> ActorClass;
 
-	/** @brief Pivot-centered X size; 0 uses the pre-spawned Blueprint's measured footprint. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
+	/** @brief X size that preserves the measured pivot position; 0 uses the measured footprint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
+		meta = (ClampMin = "0", Units = "cm", DisplayName = "Footprint Size X (0 = Measure)"))
 	float FootprintOverrideX = 0.0f;
 
-	/** @brief Pivot-centered Y size; 0 uses the pre-spawned Blueprint's measured footprint. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds", meta = (ClampMin = "0", Units = "cm"))
+	/** @brief Y size that preserves the measured pivot position; 0 uses the measured footprint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
+		meta = (ClampMin = "0", Units = "cm", DisplayName = "Footprint Size Y (0 = Measure)"))
 	float FootprintOverrideY = 0.0f;
 
 	/** @brief Direction in which the unrotated fence piece extends; defaults to local +X. */
@@ -259,9 +265,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fuel Tank Fences", meta = (ClampMin = "0", Units = "cm"))
 	float FenceObstacleClearance = 50.0f;
 
-	/** @brief Leaves breathing room at enclosure corners to prevent neighboring sides from overlapping. */
+	/** @brief Optional corner opening; 0 lets perpendicular sides overlap for a closed enclosure. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Fuel Tank Fences", meta = (ClampMin = "0", Units = "cm"))
-	float FenceCornerClearance = 50.0f;
+	float FenceCornerClearance = 0.0f;
 };
 
 /**

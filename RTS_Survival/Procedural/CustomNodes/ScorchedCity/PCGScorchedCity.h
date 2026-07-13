@@ -136,6 +136,14 @@ public:
 		meta = (ClampMin = "1", ClampMax = "100", UIMin = "1", UIMax = "100", Units = "Percent"))
 	float ScorchBuildingCollisionBoundsPercent = 80.0f;
 
+	/**
+	 * @brief Global multiplier on the generated collision boxes of Scorch buildings, applied on
+	 * top of ScorchBuildingCollisionBoundsPercent. Blueprint buildings keep their own collision.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Buildings",
+		meta = (ClampMin = "0.01", UIMin = "0.1", UIMax = "3"))
+	float ScorchBuildingCollisionScaleMultiplier = 1.0f;
+
 	/** @brief Extra clearance added around every building footprint before overlap tests. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Buildings", meta = (ClampMin = "0"))
 	float BuildingSpacingExtra = 150.0f;
@@ -199,7 +207,7 @@ public:
 /**
  * @brief Execution element for ScorchedCity. Resolves assets and their real bounds, runs the
  * deterministic layout generator, spawns roads/intersections/buildings/poles as managed
- * actors and emits Scatter, OccupiedBounds, Lots and OuterOrphanRoads point data.
+ * actors and emits Scatter, OccupiedBounds, Buildings, Lots and OuterOrphanRoads point data.
  */
 class FPCGScorchedCityElement : public IPCGElement
 {
