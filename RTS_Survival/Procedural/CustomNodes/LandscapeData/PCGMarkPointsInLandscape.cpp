@@ -11,12 +11,16 @@
 #include "PCGPin.h"
 #include "Data/PCGPointData.h"
 #include "Graph/PCGStackContext.h"
+#include "Helpers/PCGHelpers.h"
 #include "Utils/PCGLogErrors.h"
 
 #define LOCTEXT_NAMESPACE "PCGMarkPointsInLandscape"
 
 namespace PCGMarkPointsInLandscape::Private
 {
+	constexpr float MinimumBoundsScale = 0.01f;
+	constexpr float NoiseOffsetRange = 1000.0f;
+
 	FString GetChannelTitle(const ERTSLandscapeDataChannel Channel)
 	{
 		switch (Channel)
@@ -29,6 +33,22 @@ namespace PCGMarkPointsInLandscape::Private
 			return TEXT("Concrete (B)");
 		case ERTSLandscapeDataChannel::ExtraSand:
 			return TEXT("Extra Sand (A)");
+		}
+		return FString();
+	}
+
+	FString GetPaintModeTitle(const ERTSLandscapePointPaintMode PaintMode)
+	{
+		switch (PaintMode)
+		{
+		case ERTSLandscapePointPaintMode::Solid:
+			return TEXT("Solid Bounds");
+		case ERTSLandscapePointPaintMode::Radial:
+			return TEXT("Radial");
+		case ERTSLandscapePointPaintMode::PerlinNoise:
+			return TEXT("Perlin Noise");
+		case ERTSLandscapePointPaintMode::RadialWithNoisyBounds:
+			return TEXT("Radial With Noisy Bounds");
 		}
 		return FString();
 	}
@@ -55,8 +75,56 @@ namespace PCGMarkPointsInLandscape::Private
 			&& Point.BoundsMin.Z <= Point.BoundsMax.Z;
 	}
 
+	void ConfigureNoisyBounds(
+		const UPCGMarkPointsInLandscapeSettings& Settings,
+		FRandomStream& RandomStream,
+		FRTSLandscapeDataPointStamp& OutPointStamp)
+	{
+		if (Settings.PaintMode != ERTSLandscapePointPaintMode::RadialWithNoisyBounds)
+		{
+			return;
+		}
+
+		const float RequestedMinimum = FMath::IsFinite(Settings.NoisyRadialSettings.BoundsScaleMinimum)
+			? Settings.NoisyRadialSettings.BoundsScaleMinimum
+			: MinimumBoundsScale;
+		const float RequestedMaximum = FMath::IsFinite(Settings.NoisyRadialSettings.BoundsScaleMaximum)
+			? Settings.NoisyRadialSettings.BoundsScaleMaximum
+			: MinimumBoundsScale;
+		const float BoundsScaleMinimum = FMath::Max(
+			MinimumBoundsScale,
+			FMath::Min(RequestedMinimum, RequestedMaximum));
+		const float BoundsScaleMaximum = FMath::Max(
+			BoundsScaleMinimum,
+			FMath::Max(RequestedMinimum, RequestedMaximum));
+		const float BoundsScale = RandomStream.FRandRange(BoundsScaleMinimum, BoundsScaleMaximum);
+		const FVector BoundsCenter = (OutPointStamp.BoundsMin + OutPointStamp.BoundsMax) * 0.5f;
+		const FVector BoundsExtent = (OutPointStamp.BoundsMax - OutPointStamp.BoundsMin) * 0.5f;
+		OutPointStamp.BoundsMin = BoundsCenter - BoundsExtent * BoundsScale;
+		OutPointStamp.BoundsMax = BoundsCenter + BoundsExtent * BoundsScale;
+	}
+
+	void ConfigurePointPaint(
+		const UPCGMarkPointsInLandscapeSettings& Settings,
+		const int32 PaintSeed,
+		FRTSLandscapeDataPointStamp& OutPointStamp)
+	{
+		OutPointStamp.PaintConfiguration.PaintMode = Settings.PaintMode;
+		OutPointStamp.PaintConfiguration.RadialSettings = Settings.RadialSettings;
+		OutPointStamp.PaintConfiguration.PerlinSettings = Settings.PerlinSettings;
+		OutPointStamp.PaintConfiguration.NoisyRadialSettings = Settings.NoisyRadialSettings;
+
+		FRandomStream RandomStream(PaintSeed);
+		OutPointStamp.PaintConfiguration.NoiseOffset = FVector2D(
+			RandomStream.FRandRange(-NoiseOffsetRange, NoiseOffsetRange),
+			RandomStream.FRandRange(-NoiseOffsetRange, NoiseOffsetRange));
+		ConfigureNoisyBounds(Settings, RandomStream, OutPointStamp);
+	}
+
 	bool TryCopyPointStamp(
 		const FPCGPoint& Point,
+		const UPCGMarkPointsInLandscapeSettings& Settings,
+		const int32 PaintSeed,
 		FRTSLandscapeDataPointStamp& OutPointStamp)
 	{
 		if (not HasUsableBounds(Point))
@@ -76,28 +144,40 @@ namespace PCGMarkPointsInLandscape::Private
 		OutPointStamp.BoundsMin = Point.BoundsMin;
 		OutPointStamp.BoundsMax = Point.BoundsMax;
 		OutPointStamp.Strength = Strength;
+		ConfigurePointPaint(Settings, PaintSeed, OutPointStamp);
 		return true;
 	}
 
 	void AppendPointStamps(
 		const UPCGPointData& PointData,
+		const UPCGMarkPointsInLandscapeSettings& Settings,
+		const int32 ContextSeed,
+		int32& InOutPointOrdinal,
 		TArray<FRTSLandscapeDataPointStamp>& OutPointStamps)
 	{
 		const TArray<FPCGPoint>& Points = PointData.GetPoints();
 		OutPointStamps.Reserve(OutPointStamps.Num() + Points.Num());
 		for (const FPCGPoint& Point : Points)
 		{
+			const int32 PaintSeed = PCGHelpers::ComputeSeed(
+				ContextSeed,
+				Point.Seed,
+				InOutPointOrdinal);
+			++InOutPointOrdinal;
 			FRTSLandscapeDataPointStamp PointStamp;
-			if (TryCopyPointStamp(Point, PointStamp))
+			if (TryCopyPointStamp(Point, Settings, PaintSeed, PointStamp))
 			{
 				OutPointStamps.Add(MoveTemp(PointStamp));
 			}
 		}
 	}
 
-	TArray<FRTSLandscapeDataPointStamp> CopyPointStamps(const FPCGContext& Context)
+	TArray<FRTSLandscapeDataPointStamp> CopyPointStamps(
+		const FPCGContext& Context,
+		const UPCGMarkPointsInLandscapeSettings& Settings)
 	{
 		TArray<FRTSLandscapeDataPointStamp> PointStamps;
+		int32 PointOrdinal = 0;
 		const TArray<FPCGTaggedData>& Inputs =
 			Context.InputData.GetInputsByPin(PCGPinConstants::DefaultInputLabel);
 		for (const FPCGTaggedData& TaggedData : Inputs)
@@ -105,7 +185,12 @@ namespace PCGMarkPointsInLandscape::Private
 			const UPCGPointData* PointData = Cast<UPCGPointData>(TaggedData.Data.Get());
 			if (PointData != nullptr)
 			{
-				AppendPointStamps(*PointData, PointStamps);
+				AppendPointStamps(
+					*PointData,
+					Settings,
+					Context.GetSeed(),
+					PointOrdinal,
+					PointStamps);
 			}
 		}
 
@@ -167,7 +252,7 @@ namespace PCGMarkPointsInLandscape::Private
 
 bool UPCGMarkPointsInLandscapeSettings::UseSeed() const
 {
-	return false;
+	return true;
 }
 
 #if WITH_EDITOR
@@ -185,7 +270,7 @@ FText UPCGMarkPointsInLandscapeSettings::GetNodeTooltipText() const
 {
 	return LOCTEXT(
 		"NodeTooltip",
-		"Paints each point's transformed bounds and density into the selected Landscape data channel, then passes the points through unchanged.");
+		"Paints each point's transformed bounds and density with a solid, radial, Perlin, or noisy-radial shape, then passes the points through unchanged.");
 }
 
 EPCGSettingsType UPCGMarkPointsInLandscapeSettings::GetType() const
@@ -195,7 +280,10 @@ EPCGSettingsType UPCGMarkPointsInLandscapeSettings::GetType() const
 
 FString UPCGMarkPointsInLandscapeSettings::GetAdditionalTitleInformation() const
 {
-	return PCGMarkPointsInLandscape::Private::GetChannelTitle(Channel);
+	return FString::Printf(
+		TEXT("%s | %s"),
+		*PCGMarkPointsInLandscape::Private::GetChannelTitle(Channel),
+		*PCGMarkPointsInLandscape::Private::GetPaintModeTitle(PaintMode));
 }
 #endif
 
@@ -256,7 +344,7 @@ bool FPCGMarkPointsInLandscapeElement::ExecuteInternal(FPCGContext* Context) con
 		bShouldRegisterResource);
 
 	const TArray<FRTSLandscapeDataPointStamp> PointStamps =
-		PCGMarkPointsInLandscape::Private::CopyPointStamps(*Context);
+		PCGMarkPointsInLandscape::Private::CopyPointStamps(*Context, *Settings);
 	if (not ManagedResource->ReplacePointContribution(
 		*LandscapeDataManager,
 		Settings->Channel,

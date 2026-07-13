@@ -65,6 +65,10 @@ namespace ReinforcementRoadConstants
 	constexpr double OrphanApproachSampleSpacing = 150.0;
 	constexpr double OrphanApproachAttemptScales[] = {1.0, 0.75, 0.5};
 	constexpr double MinimumPoleSpacing = 100.0;
+	constexpr double MinimumLanternSpacing = 200.0;
+	constexpr double DefaultLanternFootprintHalfExtent = 50.0;
+	constexpr double LanternInspectionSpawnDepth = -1000000.0;
+	constexpr int32 LanternSeedSalt = 7919;
 	constexpr double TerrainSimplificationCostTolerance = 1.05;
 	constexpr double MinimumTerrainGrade = 0.01;
 	constexpr double MinimumElevationRange = 1.0;
@@ -110,6 +114,18 @@ namespace
 	{
 		TArray<FVector> Points;
 		EConnectionType Type = EConnectionType::Orphan;
+	};
+
+	struct FResolvedReinforcementLanternEntry
+	{
+		TWeakObjectPtr<UClass> ActorClass;
+		FVector2D FacingDirection = FVector2D::UnitX();
+		double Weight = 1.0;
+		double AdditionalOffsetFromRoadEdge = 0.0;
+		double FootprintHalfWidthTowardRoad = DefaultLanternFootprintHalfExtent;
+		double FootprintRadius = DefaultLanternFootprintHalfExtent;
+		float MinimumUniformScale = 1.0f;
+		float MaximumUniformScale = 1.0f;
 	};
 
 	class FExclusionTester

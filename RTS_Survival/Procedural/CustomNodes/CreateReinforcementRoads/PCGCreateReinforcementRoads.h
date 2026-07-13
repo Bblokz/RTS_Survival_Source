@@ -56,6 +56,93 @@ struct FReinforcementRoadPoleCategory
 	float MaximumDistanceBetweenPoles = 1400.0f;
 };
 
+UENUM(BlueprintType)
+enum class EReinforcementRoadLanternStartingSide : uint8
+{
+	Random,
+	Left,
+	Right
+};
+
+/**
+ * @brief Describes one weighted lantern Blueprint and its asset-specific alignment controls.
+ * The actor footprint is measured automatically so OffsetFromRoadEdge remains visually consistent.
+ */
+USTRUCT(BlueprintType)
+struct FReinforcementRoadLanternEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns")
+	TSoftClassPtr<AActor> BlueprintClass;
+
+	/** Relative selection chance among configured lantern entries. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0"))
+	float Weight = 1.0f;
+
+	/** Local horizontal direction that should point toward the road. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns")
+	FVector FacingDirection = FVector::ForwardVector;
+
+	/** Asset-specific addition to the global gap from the road edge. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns")
+	float AdditionalOffsetFromRoadEdge = 0.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0.01"))
+	float MinimumUniformScale = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0.01"))
+	float MaximumUniformScale = 1.0f;
+};
+
+/**
+ * @brief Controls a deterministic lantern chain that alternates between the two road sides.
+ * Spacing, gaps, transform variation and skipped placements can be art-directed independently.
+ */
+USTRUCT(BlueprintType)
+struct FReinforcementRoadLanternSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns")
+	TArray<FReinforcementRoadLanternEntry> Blueprints;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "200"))
+	float MinimumSpacing = 1600.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "200"))
+	float MaximumSpacing = 2200.0f;
+
+	/** Clear gap between the road mesh edge and the measured lantern footprint. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0"))
+	float OffsetFromRoadEdge = 100.0f;
+
+	/** Keeps lanterns away from both road connection endpoints. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0"))
+	float EndpointClearance = 700.0f;
+
+	/** Independent chance for each candidate; successfully spawned lanterns still alternate sides. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0", ClampMax = "1"))
+	float PlacementChance = 1.0f;
+
+	/** Random variation added to the road-edge gap. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0"))
+	float MaximumLateralJitter = 75.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0", ClampMax = "45"))
+	float MaximumYawJitterDegrees = 3.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns")
+	float GroundOffset = 0.0f;
+
+	/** Extra footprint clearance used for excluded volumes and generated roadside actors. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns", meta = (ClampMin = "0"))
+	float CollisionClearance = 50.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns")
+	EReinforcementRoadLanternStartingSide StartingSide = EReinforcementRoadLanternStartingSide::Random;
+};
+
 /**
  * @brief Configures managed reinforcement-road splines generated between compatible endpoints.
  * The node pairs each endpoint at most once and falls back to backup ends when no natural primary route exists.
@@ -126,6 +213,10 @@ public:
 	/** Scale applied to the shared wire mesh along every generated span. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Electric Poles")
 	FVector WireMeshScale = FVector::OneVector;
+
+	/** Lantern Blueprint choices and alternating roadside placement controls. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Lanterns")
+	FReinforcementRoadLanternSettings Lanterns;
 };
 
 /**

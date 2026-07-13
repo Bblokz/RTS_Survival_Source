@@ -259,6 +259,19 @@ private:
 		TArray<FColor>& InOutPixels) const;
 
 	/**
+	 * @brief Applies one sampled point footprint after validating its destination index.
+	 * @param PointStamp Value-only PCG point footprint and paint parameters.
+	 * @param Channel Logical texture channel receiving coverage.
+	 * @param Pixel Destination texture coordinate.
+	 * @param InOutPixels Full-resolution CPU mask being composed.
+	 */
+	void RasterizePointStampPixel(
+		const FRTSLandscapeDataPointStamp& PointStamp,
+		ERTSLandscapeDataChannel Channel,
+		const FIntPoint& Pixel,
+		TArray<FColor>& InOutPixels) const;
+
+	/**
 	 * @brief Composites cropped coverage by maximum so overlapping writers remain independent.
 	 * @param Contribution Owner and destination-channel metadata.
 	 * @param Raster Cropped byte coverage to composite.

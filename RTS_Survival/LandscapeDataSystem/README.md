@@ -87,6 +87,26 @@ The required input is Point data. Each point writes its transformed local
 `BoundsMin`/`BoundsMax` XY footprint. Point density becomes mask strength. Rotation
 and negative XY scale are preserved, and the points pass through unchanged.
 
+`Paint Mode` exposes only the settings relevant to the selected footprint:
+
+- **Solid Bounds** preserves the original full rectangular footprint.
+- **Radial** creates an ellipse inside the bounds. `Full Strength Radius` controls
+  the solid center, `Edge Strength` controls the value at the perimeter, and
+  `Falloff Exponent` shapes the fade between them.
+- **Perlin Noise** generates thresholded fractal coverage inside the bounds.
+  Frequency controls feature size; octaves, persistence, and lacunarity control
+  detail; threshold and transition width control breakup; minimum strength can
+  retain a continuous base coat beneath the noise.
+- **Radial With Noisy Bounds** first chooses a deterministic per-point bounds scale
+  from `Bounds Scale Minimum` through `Bounds Scale Maximum`, then applies the radial
+  fade through a directionally distorted perimeter. Noise amount, frequency,
+  octaves, and persistence control the organic edge.
+
+Noise phases and noisy bounds scales use the PCG node seed, each point seed, and the
+point's stable input order. The chosen values are copied into the manager-owned
+stamp, so rebuilding the texture does not randomize existing paint. Changing the PCG
+seed intentionally produces a new variation.
+
 For Scorched City, branch or pass the final building points through this node with
 `Channel = Scorched`, then continue to the building spawner. The marker uses exactly
 the same point bounds that describe the spawned building footprint; a separate HISM
@@ -118,9 +138,14 @@ invocation a stable contribution:
 
 ## Noise-blended areas
 
-Area masks and noise do not need different storage. Mark the desired region with a
-point footprint or volume, then combine that channel with deterministic world-space
-noise in the Landscape material, for example:
+For point-sized semantic breakup that CPU queries must also observe, use the node's
+`Perlin Noise` or `Radial With Noisy Bounds` mode. This bakes the pattern when the
+manager rebuilds; higher octave counts cost more generation time but add no per-frame
+rendering cost.
+
+For purely visual, high-frequency breakup across large areas, keep the stored mask
+simple and combine that channel with deterministic world-space noise in the
+Landscape material, for example:
 
 ```text
 NoisyArea = AreaMask * SmoothStep(LowThreshold, HighThreshold, WorldSpaceNoise)

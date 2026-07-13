@@ -32,6 +32,27 @@ namespace LandscapeDataManagerConstants
 	constexpr double HalfTexel = 0.5;
 	constexpr uint32 TexelsPerMipFilter = 4;
 	constexpr float InvalidSourceCleanupIntervalSeconds = 1.0f;
+	constexpr float MinimumFalloffExponent = 0.05f;
+	constexpr float MinimumNoiseFrequency = 0.01f;
+	constexpr float DefaultNoiseFrequency = 1.0f;
+	constexpr float MinimumNoiseLacunarity = 1.0f;
+	constexpr float MaximumNoiseLacunarity = 4.0f;
+	constexpr float NoisyBoundaryLacunarity = 2.0f;
+	constexpr float MaximumBoundaryNoiseAmount = 0.75f;
+	constexpr int32 MinimumNoiseOctaves = 1;
+	constexpr int32 MaximumNoiseOctaves = 6;
+
+	float SanitizeClampedFloat(
+		const float Value,
+		const float DefaultValue,
+		const float MinimumValue,
+		const float MaximumValue)
+	{
+		return FMath::Clamp(
+			FMath::IsFinite(Value) ? Value : DefaultValue,
+			MinimumValue,
+			MaximumValue);
+	}
 
 	int32 SanitizeMaximumResolution(const int32 RequestedResolution)
 	{
@@ -154,6 +175,211 @@ namespace LandscapeDataManagerConstants
 			FMath::Clamp(UnclippedMaximumUV.X, MinimumNormalizedValue, MaximumNormalizedValue),
 			FMath::Clamp(UnclippedMaximumUV.Y, MinimumNormalizedValue, MaximumNormalizedValue));
 		return true;
+	}
+
+	bool GetNormalizedPointPosition(
+		const FRTSLandscapeDataPointStamp& PointStamp,
+		const FVector& LocalPosition,
+		FVector2D& OutNormalizedPosition)
+	{
+		const FVector2D BoundsCenter(
+			(PointStamp.BoundsMin.X + PointStamp.BoundsMax.X) * 0.5,
+			(PointStamp.BoundsMin.Y + PointStamp.BoundsMax.Y) * 0.5);
+		const FVector2D BoundsExtent(
+			(PointStamp.BoundsMax.X - PointStamp.BoundsMin.X) * 0.5,
+			(PointStamp.BoundsMax.Y - PointStamp.BoundsMin.Y) * 0.5);
+		if (BoundsExtent.X <= UE_KINDA_SMALL_NUMBER || BoundsExtent.Y <= UE_KINDA_SMALL_NUMBER)
+		{
+			return false;
+		}
+
+		OutNormalizedPosition = FVector2D(
+			(LocalPosition.X - BoundsCenter.X) / BoundsExtent.X,
+			(LocalPosition.Y - BoundsCenter.Y) / BoundsExtent.Y);
+		return true;
+	}
+
+	float GetRadialCoverage(
+		const FVector2D& NormalizedPosition,
+		const FRTSLandscapeRadialPointPaintSettings& Settings)
+	{
+		const float Radius = NormalizedPosition.Size();
+		if (Radius > MaximumNormalizedValue)
+		{
+			return MinimumNormalizedValue;
+		}
+
+		const float FullStrengthRadius = SanitizeClampedFloat(
+			Settings.FullStrengthRadius,
+			MinimumNormalizedValue,
+			MinimumNormalizedValue,
+			MaximumNormalizedValue);
+		if (Radius <= FullStrengthRadius)
+		{
+			return MaximumNormalizedValue;
+		}
+
+		const float FadeRange = FMath::Max(
+			MaximumNormalizedValue - FullStrengthRadius,
+			UE_KINDA_SMALL_NUMBER);
+		const float FadeAlpha = FMath::Clamp(
+			(Radius - FullStrengthRadius) / FadeRange,
+			MinimumNormalizedValue,
+			MaximumNormalizedValue);
+		const float RequestedExponent = FMath::IsFinite(Settings.FalloffExponent)
+			? Settings.FalloffExponent
+			: MaximumNormalizedValue;
+		const float ShapedAlpha = FMath::Pow(
+			FadeAlpha,
+			FMath::Max(MinimumFalloffExponent, RequestedExponent));
+		const float EdgeStrength = SanitizeClampedFloat(
+			Settings.EdgeStrength,
+			MinimumNormalizedValue,
+			MinimumNormalizedValue,
+			MaximumNormalizedValue);
+		return FMath::Lerp(MaximumNormalizedValue, EdgeStrength, ShapedAlpha);
+	}
+
+	float SampleFractalPerlin(
+		FVector2D Position,
+		const int32 RequestedOctaves,
+		const float RequestedPersistence,
+		const float RequestedLacunarity)
+	{
+		const int32 Octaves = FMath::Clamp(RequestedOctaves, MinimumNoiseOctaves, MaximumNoiseOctaves);
+		const float Persistence = SanitizeClampedFloat(
+			RequestedPersistence,
+			MinimumNormalizedValue,
+			MinimumNormalizedValue,
+			MaximumNormalizedValue);
+		const float Lacunarity = SanitizeClampedFloat(
+			RequestedLacunarity,
+			NoisyBoundaryLacunarity,
+			MinimumNoiseLacunarity,
+			MaximumNoiseLacunarity);
+		float Amplitude = MaximumNormalizedValue;
+		float WeightedNoise = MinimumNormalizedValue;
+		float TotalAmplitude = MinimumNormalizedValue;
+		for (int32 Octave = 0; Octave < Octaves; ++Octave)
+		{
+			WeightedNoise += FMath::PerlinNoise2D(Position) * Amplitude;
+			TotalAmplitude += Amplitude;
+			Position *= Lacunarity;
+			Amplitude *= Persistence;
+		}
+
+		return TotalAmplitude > UE_KINDA_SMALL_NUMBER
+			? FMath::Clamp(WeightedNoise / TotalAmplitude, -MaximumNormalizedValue, MaximumNormalizedValue)
+			: MinimumNormalizedValue;
+	}
+
+	float GetPerlinCoverage(
+		const FVector2D& NormalizedPosition,
+		const FRTSLandscapeDataPointPaintConfiguration& PaintConfiguration)
+	{
+		const FRTSLandscapePerlinPointPaintSettings& Settings = PaintConfiguration.PerlinSettings;
+		const float Frequency = FMath::IsFinite(Settings.Frequency)
+			? FMath::Max(Settings.Frequency, MinimumNoiseFrequency)
+			: DefaultNoiseFrequency;
+		const FVector2D UnitPosition = (NormalizedPosition + FVector2D(1.0, 1.0)) * 0.5;
+		const float SignedNoise = SampleFractalPerlin(
+			UnitPosition * Frequency + PaintConfiguration.NoiseOffset,
+			Settings.Octaves,
+			Settings.Persistence,
+			Settings.Lacunarity);
+		const float Noise = (SignedNoise + MaximumNormalizedValue) * 0.5f;
+		const float Threshold = SanitizeClampedFloat(
+			Settings.Threshold,
+			MaximumNormalizedValue * 0.5f,
+			MinimumNormalizedValue,
+			MaximumNormalizedValue);
+		const float HalfTransition = SanitizeClampedFloat(
+			Settings.TransitionWidth,
+			MinimumNormalizedValue,
+			MinimumNormalizedValue,
+			MaximumNormalizedValue) * 0.5f;
+		const float Pattern = HalfTransition <= UE_KINDA_SMALL_NUMBER
+			? (Noise >= Threshold ? MaximumNormalizedValue : MinimumNormalizedValue)
+			: FMath::SmoothStep(Threshold - HalfTransition, Threshold + HalfTransition, Noise);
+		const float MinimumStrength = SanitizeClampedFloat(
+			Settings.MinimumStrength,
+			MinimumNormalizedValue,
+			MinimumNormalizedValue,
+			MaximumNormalizedValue);
+		return FMath::Lerp(MinimumStrength, MaximumNormalizedValue, Pattern);
+	}
+
+	float GetNoisyRadialCoverage(
+		const FVector2D& NormalizedPosition,
+		const FRTSLandscapeDataPointPaintConfiguration& PaintConfiguration)
+	{
+		const FRTSLandscapeNoisyRadialPointPaintSettings& Settings =
+			PaintConfiguration.NoisyRadialSettings;
+		const FVector2D Direction = NormalizedPosition.IsNearlyZero()
+			? FVector2D(MaximumNormalizedValue, MinimumNormalizedValue)
+			: NormalizedPosition.GetSafeNormal();
+		const float Frequency = FMath::IsFinite(Settings.BoundaryNoiseFrequency)
+			? FMath::Max(Settings.BoundaryNoiseFrequency, MinimumNoiseFrequency)
+			: DefaultNoiseFrequency;
+		const float BoundaryNoise = SampleFractalPerlin(
+			Direction * Frequency + PaintConfiguration.NoiseOffset,
+			Settings.BoundaryNoiseOctaves,
+			Settings.BoundaryNoisePersistence,
+			NoisyBoundaryLacunarity);
+		const float NoiseAmount = SanitizeClampedFloat(
+			Settings.BoundaryNoiseAmount,
+			MinimumNormalizedValue,
+			MinimumNormalizedValue,
+			MaximumBoundaryNoiseAmount);
+		const float BoundaryRadius = MaximumNormalizedValue + BoundaryNoise * NoiseAmount;
+		return GetRadialCoverage(
+			NormalizedPosition / BoundaryRadius,
+			PaintConfiguration.RadialSettings);
+	}
+
+	FBox GetPointStampRasterBounds(const FRTSLandscapeDataPointStamp& PointStamp)
+	{
+		const FBox PointBounds(PointStamp.BoundsMin, PointStamp.BoundsMax);
+		if (PointStamp.PaintConfiguration.PaintMode
+			!= ERTSLandscapePointPaintMode::RadialWithNoisyBounds)
+		{
+			return PointBounds;
+		}
+
+		const float NoiseAmount = SanitizeClampedFloat(
+			PointStamp.PaintConfiguration.NoisyRadialSettings.BoundaryNoiseAmount,
+			MinimumNormalizedValue,
+			MinimumNormalizedValue,
+			MaximumBoundaryNoiseAmount);
+		const FVector BoundsCenter = PointBounds.GetCenter();
+		FVector BoundsExtent = PointBounds.GetExtent();
+		BoundsExtent.X *= MaximumNormalizedValue + NoiseAmount;
+		BoundsExtent.Y *= MaximumNormalizedValue + NoiseAmount;
+		return FBox(BoundsCenter - BoundsExtent, BoundsCenter + BoundsExtent);
+	}
+
+	float GetPointStampCoverage(
+		const FRTSLandscapeDataPointStamp& PointStamp,
+		const FVector& LocalPosition)
+	{
+		FVector2D NormalizedPosition;
+		if (not GetNormalizedPointPosition(PointStamp, LocalPosition, NormalizedPosition))
+		{
+			return MinimumNormalizedValue;
+		}
+
+		switch (PointStamp.PaintConfiguration.PaintMode)
+		{
+		case ERTSLandscapePointPaintMode::Solid:
+			return MaximumNormalizedValue;
+		case ERTSLandscapePointPaintMode::Radial:
+			return GetRadialCoverage(NormalizedPosition, PointStamp.PaintConfiguration.RadialSettings);
+		case ERTSLandscapePointPaintMode::PerlinNoise:
+			return GetPerlinCoverage(NormalizedPosition, PointStamp.PaintConfiguration);
+		case ERTSLandscapePointPaintMode::RadialWithNoisyBounds:
+			return GetNoisyRadialCoverage(NormalizedPosition, PointStamp.PaintConfiguration);
+		}
+		return MinimumNormalizedValue;
 	}
 }
 
@@ -802,7 +1028,7 @@ void ALandscapeDataManager::RasterizePointStamp(
 		return;
 	}
 
-	const FBox LocalBounds(PointStamp.BoundsMin, PointStamp.BoundsMax);
+	const FBox LocalBounds = LandscapeDataManagerConstants::GetPointStampRasterBounds(PointStamp);
 	FIntRect PixelBounds;
 	if (not GetPixelRectForWorldBounds(LocalBounds.TransformBy(PointStamp.Transform), PixelBounds))
 	{
@@ -822,27 +1048,52 @@ void ALandscapeDataManager::RasterizePointStampRow(
 	const int32 PixelY,
 	TArray<FColor>& InOutPixels) const
 {
-	const uint8 Value = static_cast<uint8>(FMath::RoundToInt32(
-		FMath::Clamp(
-			PointStamp.Strength,
-			LandscapeDataManagerConstants::MinimumNormalizedValue,
-			LandscapeDataManagerConstants::MaximumNormalizedValue)
-		* LandscapeDataManagerConstants::MaximumChannelValue));
 	for (int32 PixelX = PixelBounds.Min.X; PixelX < PixelBounds.Max.X; ++PixelX)
 	{
-		const FVector WorldPosition = GetWorldPositionForPixel(
-			FIntPoint(PixelX, PixelY),
-			PointStamp.Transform.GetLocation().Z);
-		const FVector LocalPosition = PointStamp.Transform.InverseTransformPosition(WorldPosition);
-		if (LocalPosition.X < PointStamp.BoundsMin.X || LocalPosition.X > PointStamp.BoundsMax.X
-			|| LocalPosition.Y < PointStamp.BoundsMin.Y || LocalPosition.Y > PointStamp.BoundsMax.Y)
-		{
-			continue;
-		}
-
-		const int32 PixelIndex = PixelY * M_TextureMapping.TextureResolution.X + PixelX;
-		ApplyChannelMaximum(InOutPixels[PixelIndex], Channel, Value);
+		RasterizePointStampPixel(PointStamp, Channel, FIntPoint(PixelX, PixelY), InOutPixels);
 	}
+}
+
+void ALandscapeDataManager::RasterizePointStampPixel(
+	const FRTSLandscapeDataPointStamp& PointStamp,
+	const ERTSLandscapeDataChannel Channel,
+	const FIntPoint& Pixel,
+	TArray<FColor>& InOutPixels) const
+{
+	const FVector WorldPosition = GetWorldPositionForPixel(
+		Pixel,
+		PointStamp.Transform.GetLocation().Z);
+	const FVector LocalPosition = PointStamp.Transform.InverseTransformPosition(WorldPosition);
+	const bool bUsesNoisyBounds = PointStamp.PaintConfiguration.PaintMode
+		== ERTSLandscapePointPaintMode::RadialWithNoisyBounds;
+	if (not bUsesNoisyBounds
+		&& (LocalPosition.X < PointStamp.BoundsMin.X || LocalPosition.X > PointStamp.BoundsMax.X
+			|| LocalPosition.Y < PointStamp.BoundsMin.Y || LocalPosition.Y > PointStamp.BoundsMax.Y))
+	{
+		return;
+	}
+
+	const float Coverage = LandscapeDataManagerConstants::GetPointStampCoverage(
+		PointStamp,
+		LocalPosition);
+	const float NormalizedValue = FMath::Clamp(
+		PointStamp.Strength * Coverage,
+		LandscapeDataManagerConstants::MinimumNormalizedValue,
+		LandscapeDataManagerConstants::MaximumNormalizedValue);
+	if (NormalizedValue <= LandscapeDataManagerConstants::MinimumNormalizedValue)
+	{
+		return;
+	}
+
+	const int32 PixelIndex = Pixel.Y * M_TextureMapping.TextureResolution.X + Pixel.X;
+	if (not InOutPixels.IsValidIndex(PixelIndex))
+	{
+		return;
+	}
+
+	const uint8 Value = static_cast<uint8>(FMath::RoundToInt32(
+		NormalizedValue * LandscapeDataManagerConstants::MaximumChannelValue));
+	ApplyChannelMaximum(InOutPixels[PixelIndex], Channel, Value);
 }
 
 void ALandscapeDataManager::ApplyRasterContribution(
