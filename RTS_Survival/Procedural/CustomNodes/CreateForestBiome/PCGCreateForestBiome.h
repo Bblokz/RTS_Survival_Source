@@ -12,10 +12,13 @@
  * large trees, regular trees, bushes, foliage and auxiliary props (rocks etc.), each with its own
  * areal density. Trees spawn as their own Blueprint actors; bushes and instanced auxiliaries are
  * batched into Hierarchical Instanced Static Mesh components; foliage is emitted on the Foliage
- * output pin for a GPU Static Mesh Spawner. Categories are placed largest-first into a shared
- * occupancy grid so nothing overlaps, and nothing is ever placed inside the Exclusion input.
+ * output pin for a GPU Static Mesh Spawner. The Trees output exposes the actual spawned tree
+ * transforms and measured bounds. Categories are placed largest-first into a shared occupancy grid
+ * so nothing overlaps, and nothing is ever placed inside the Exclusion input.
  * @note Wire the Foliage output pin into a Static Mesh Spawner with mesh selection "By Attribute"
  * (attribute "Mesh").
+ * @note Trees outputs one point per successfully spawned large or regular tree; point bounds are
+ * the tree Blueprint's measured local bounds.
  */
 UCLASS(BlueprintType)
 class RTS_SURVIVAL_API UPCGCreateForestBiomeSettings : public UPCGSettings
@@ -123,7 +126,8 @@ public:
 /**
  * @brief Execution element for CreateForestBiome. Resolves assets and their measured clearance
  * radii, runs the deterministic scatter generator, spawns trees as actors, bushes and instanced
- * auxiliaries as batched HISM actors, Blueprint auxiliaries as actors, and emits foliage points.
+ * auxiliaries as batched HISM actors, Blueprint auxiliaries as actors, and emits tree and foliage
+ * points.
  */
 class FPCGCreateForestBiomeElement : public IPCGElement
 {

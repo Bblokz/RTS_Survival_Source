@@ -36,9 +36,9 @@ namespace ReinforcementRoadConstants
 	const FName RoadPointsPin = TEXT("RoadPoints");
 	const FName RoadBoundsVolumePin = TEXT("RoadBoundsVolume");
 
-	const FName RoadIndexAttribute = TEXT("RoadIndex");
-	const FName PointIndexAttribute = TEXT("PointIndex");
-	const FName ConnectionTypeAttribute = TEXT("ConnectionType");
+	const FName ReinforcementRoadIndexAttribute = TEXT("RoadIndex");
+	const FName ReinforcementPointIndexAttribute = TEXT("PointIndex");
+	const FName ReinforcementConnectionTypeAttribute = TEXT("ConnectionType");
 
 	constexpr double ReinforcementGroundTraceUp = 15000.0;
 	constexpr double ReinforcementGroundTraceDown = 40000.0;
@@ -68,6 +68,7 @@ namespace ReinforcementRoadConstants
 	constexpr double MinimumLanternSpacing = 200.0;
 	constexpr double DefaultLanternFootprintHalfExtent = 50.0;
 	constexpr double LanternInspectionSpawnDepth = -1000000.0;
+	constexpr float MinimumLanternScale = 0.01f;
 	constexpr int32 LanternSeedSalt = 7919;
 	constexpr double TerrainSimplificationCostTolerance = 1.05;
 	constexpr double MinimumTerrainGrade = 0.01;
@@ -89,6 +90,14 @@ namespace ReinforcementRoadConstants
 		NotSampled,
 		Valid,
 		Invalid
+	};
+
+	enum class EReinforcementLanternPlacementResult : uint8
+	{
+		RouteEnded,
+		Skipped,
+		Ready,
+		Spawned
 	};
 }
 
@@ -126,6 +135,16 @@ namespace
 		double FootprintRadius = DefaultLanternFootprintHalfExtent;
 		float MinimumUniformScale = 1.0f;
 		float MaximumUniformScale = 1.0f;
+	};
+
+	struct FReinforcementLanternPlacement
+	{
+		TWeakObjectPtr<UClass> ActorClass;
+		FVector PivotPosition = FVector::ZeroVector;
+		FVector DirectionTowardRoad = FVector::ForwardVector;
+		FVector LocalFacingDirection = FVector::ForwardVector;
+		double CollisionRadius = DefaultLanternFootprintHalfExtent;
+		float UniformScale = 1.0f;
 	};
 
 	class FExclusionTester
@@ -393,6 +412,66 @@ namespace
 			}
 		}
 		return FExclusionTester(MoveTemp(SpatialInputs));
+	}
+
+	FBox MeasureReinforcementLanternLocalBounds(UWorld& World, UClass& LanternClass)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnParams.ObjectFlags |= RF_Transient;
+		AActor* InspectionActor = World.SpawnActor<AActor>(
+			&LanternClass, FTransform(FVector(0.0, 0.0, LanternInspectionSpawnDepth)), SpawnParams);
+		if (not IsValid(InspectionActor))
+		{
+			return FBox(EForceInit::ForceInit);
+		}
+
+		const FBox WorldBounds = InspectionActor->GetComponentsBoundingBox(true, true);
+		const FBox LocalBounds = WorldBounds.IsValid
+			? WorldBounds.ShiftBy(-InspectionActor->GetActorLocation())
+			: FBox(EForceInit::ForceInit);
+		InspectionActor->Destroy();
+		return LocalBounds;
+	}
+
+	TArray<FResolvedReinforcementLanternEntry> ResolveReinforcementLanternEntries(
+		UWorld& World,
+		const FReinforcementRoadLanternSettings& Settings)
+	{
+		TArray<FResolvedReinforcementLanternEntry> ResolvedEntries;
+		for (const FReinforcementRoadLanternEntry& Entry : Settings.Blueprints)
+		{
+			UClass* LanternClass = Entry.BlueprintClass.LoadSynchronous();
+			if (not IsValid(LanternClass) || LanternClass->HasAnyClassFlags(CLASS_Abstract))
+			{
+				continue;
+			}
+
+			FResolvedReinforcementLanternEntry& Resolved = ResolvedEntries.Emplace_GetRef();
+			Resolved.ActorClass = LanternClass;
+			Resolved.Weight = FMath::Max(0.0, static_cast<double>(Entry.Weight));
+			Resolved.AdditionalOffsetFromRoadEdge = Entry.AdditionalOffsetFromRoadEdge;
+			Resolved.MinimumUniformScale = FMath::Max(MinimumLanternScale, Entry.MinimumUniformScale);
+			Resolved.MaximumUniformScale = FMath::Max(
+				Resolved.MinimumUniformScale, Entry.MaximumUniformScale);
+
+			Resolved.FacingDirection = FVector2D(Entry.FacingDirection.X, Entry.FacingDirection.Y).GetSafeNormal();
+			if (Resolved.FacingDirection.IsNearlyZero())
+			{
+				Resolved.FacingDirection = FVector2D::UnitX();
+			}
+
+			const FBox LocalBounds = MeasureReinforcementLanternLocalBounds(World, *LanternClass);
+			if (LocalBounds.IsValid)
+			{
+				const FVector Extent = LocalBounds.GetExtent();
+				Resolved.FootprintHalfWidthTowardRoad =
+					FMath::Abs(Resolved.FacingDirection.X) * Extent.X
+					+ FMath::Abs(Resolved.FacingDirection.Y) * Extent.Y;
+				Resolved.FootprintRadius = FMath::Max(Extent.X, Extent.Y);
+			}
+		}
+		return ResolvedEntries;
 	}
 
 	double ComputeRoadClearance(const UStaticMesh* RoadMesh)
@@ -1093,7 +1172,7 @@ namespace
 			: EligibleCategories[Random.RandRange(0, EligibleCategories.Num() - 1)];
 	}
 
-	FVector ProjectReinforcementPoleToGround(
+	FVector ProjectReinforcementRoadSideActorToGround(
 		UWorld& World,
 		const FVector& Position,
 		const TArray<AActor*>& ActorsToIgnore)
@@ -1108,16 +1187,30 @@ namespace
 			: Position;
 	}
 
-	FRotator GetReinforcementPoleRotation(const FVector& RouteDirection, const FVector& PoleOrientation)
+	FRotator GetHorizontalAxisAlignmentRotation(const FVector& DesiredDirection, const FVector& LocalOrientation)
 	{
-		FVector2D LocalOrientation(PoleOrientation.X, PoleOrientation.Y);
-		if (LocalOrientation.IsNearlyZero())
+		FVector2D LocalOrientation2D(LocalOrientation.X, LocalOrientation.Y);
+		if (LocalOrientation2D.IsNearlyZero())
 		{
-			LocalOrientation = FVector2D::UnitX();
+			LocalOrientation2D = FVector2D::UnitX();
 		}
-		const double RouteYaw = FMath::Atan2(RouteDirection.Y, RouteDirection.X);
-		const double LocalYaw = FMath::Atan2(LocalOrientation.Y, LocalOrientation.X);
-		return FRotator(0.0, FMath::RadiansToDegrees(RouteYaw - LocalYaw), 0.0);
+		const double DesiredYaw = FMath::Atan2(DesiredDirection.Y, DesiredDirection.X);
+		const double LocalYaw = FMath::Atan2(LocalOrientation2D.Y, LocalOrientation2D.X);
+		return FRotator(0.0, FMath::RadiansToDegrees(DesiredYaw - LocalYaw), 0.0);
+	}
+
+	void AddReinforcementRoadSideActorBounds(AActor* Actor, TArray<FBox>& OutActorBounds)
+	{
+		if (not IsValid(Actor))
+		{
+			return;
+		}
+
+		const FBox ActorBounds = Actor->GetComponentsBoundingBox(true, true);
+		if (ActorBounds.IsValid)
+		{
+			OutActorBounds.Add(ActorBounds);
+		}
 	}
 
 	AActor* SpawnReinforcementPoleActor(
@@ -1139,11 +1232,13 @@ namespace
 		const FVector RoadNormal(-RouteDirection.Y, RouteDirection.X, 0.0);
 		const FVector OffsetPosition = RoutePosition
 			+ RoadNormal * SideMultiplier * PoleEntry.OffsetFromRoad;
-		const FVector GroundPosition = ProjectReinforcementPoleToGround(World, OffsetPosition, ActorsToIgnore);
+		const FVector GroundPosition = ProjectReinforcementRoadSideActorToGround(
+			World, OffsetPosition, ActorsToIgnore);
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		AActor* PoleActor = World.SpawnActor<AActor>(
-			PoleClass, GroundPosition, GetReinforcementPoleRotation(RouteDirection, PoleEntry.Orientation), SpawnParams);
+			PoleClass, GroundPosition,
+			GetHorizontalAxisAlignmentRotation(RouteDirection, PoleEntry.Orientation), SpawnParams);
 		if (not IsValid(PoleActor))
 		{
 			return nullptr;
@@ -1181,7 +1276,8 @@ namespace
 		UStaticMesh* WireMesh,
 		const int32 Seed,
 		const int32 RoadIndex,
-		TArray<AActor*>& InOutSpawnedActors)
+		TArray<AActor*>& InOutSpawnedActors,
+		TArray<FBox>& InOutRoadSideActorBounds)
 	{
 		FRandomStream Random(Seed);
 		const FReinforcementRoadPoleCategory* Category = SelectReinforcementPoleCategory(Settings, Random);
@@ -1222,6 +1318,7 @@ namespace
 			if (IsValid(PoleActor))
 			{
 				InOutSpawnedActors.Add(PoleActor);
+				AddReinforcementRoadSideActorBounds(PoleActor, InOutRoadSideActorBounds);
 			}
 			ConnectAdjacentReinforcementPoles(
 				PreviousWireComponent, WireComponent, PreviousPreferredWires,
@@ -1231,6 +1328,242 @@ namespace
 			PreviousPreferredWires = PoleEntry.PreferredAmountWires;
 			PoleDistance += Random.FRandRange(MinimumSpacing, MaximumSpacing);
 			++PoleIndex;
+		}
+	}
+
+	int32 PickWeightedReinforcementLanternEntry(
+		const TArray<FResolvedReinforcementLanternEntry>& Entries,
+		FRandomStream& Random)
+	{
+		double TotalWeight = 0.0;
+		for (const FResolvedReinforcementLanternEntry& Entry : Entries)
+		{
+			TotalWeight += Entry.Weight;
+		}
+		if (TotalWeight <= 0.0)
+		{
+			return INDEX_NONE;
+		}
+
+		double Pick = Random.FRand() * TotalWeight;
+		for (int32 EntryIndex = 0; EntryIndex < Entries.Num(); ++EntryIndex)
+		{
+			if (Entries[EntryIndex].Weight <= 0.0)
+			{
+				continue;
+			}
+			Pick -= Entries[EntryIndex].Weight;
+			if (Pick <= 0.0)
+			{
+				return EntryIndex;
+			}
+		}
+		return Entries.Num() - 1;
+	}
+
+	double GetInitialReinforcementLanternSide(
+		const EReinforcementRoadLanternStartingSide StartingSide,
+		FRandomStream& Random)
+	{
+		if (StartingSide == EReinforcementRoadLanternStartingSide::Left)
+		{
+			return 1.0;
+		}
+		if (StartingSide == EReinforcementRoadLanternStartingSide::Right)
+		{
+			return -1.0;
+		}
+		return Random.RandRange(0, 1) == 0 ? -1.0 : 1.0;
+	}
+
+	bool IsReinforcementLanternFootprintBlocked(
+		const FVector& Position,
+		const double Radius,
+		const TArray<FBox>& RoadSideActorBounds)
+	{
+		for (const FBox& ActorBounds : RoadSideActorBounds)
+		{
+			if (Position.X >= ActorBounds.Min.X - Radius && Position.X <= ActorBounds.Max.X + Radius
+				&& Position.Y >= ActorBounds.Min.Y - Radius && Position.Y <= ActorBounds.Max.Y + Radius)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	AActor* SpawnReinforcementLanternActor(
+		UWorld& World,
+		UClass& LanternClass,
+		const FVector& Position,
+		const FRotator& Rotation,
+		const float UniformScale,
+		const int32 RoadIndex,
+		const int32 LanternIndex)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		const FTransform SpawnTransform(Rotation, Position, FVector(UniformScale));
+		AActor* LanternActor = World.SpawnActor<AActor>(&LanternClass, SpawnTransform, SpawnParams);
+		if (not IsValid(LanternActor))
+		{
+			return nullptr;
+		}
+
+		LanternActor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
+#if WITH_EDITOR
+		LanternActor->SetActorLabel(FString::Printf(
+			TEXT("PCG_ReinforcementLantern_%d_%d"), RoadIndex, LanternIndex));
+#endif
+		return LanternActor;
+	}
+
+	EReinforcementLanternPlacementResult TryBuildReinforcementLanternPlacement(
+		const TArray<FVector>& RoutePoints,
+		const double Distance,
+		const double Side,
+		const double RoadHalfWidth,
+		const FReinforcementRoadLanternSettings& Settings,
+		const TArray<FResolvedReinforcementLanternEntry>& Entries,
+		FRandomStream& Random,
+		FReinforcementLanternPlacement& OutPlacement)
+	{
+		FVector RoutePosition;
+		FVector RouteDirection;
+		if (not TrySampleReinforcementRoute(RoutePoints, Distance, RoutePosition, RouteDirection))
+		{
+			return EReinforcementLanternPlacementResult::RouteEnded;
+		}
+		if (Random.FRand() > FMath::Clamp(Settings.PlacementChance, 0.0f, 1.0f))
+		{
+			return EReinforcementLanternPlacementResult::Skipped;
+		}
+
+		const int32 EntryIndex = PickWeightedReinforcementLanternEntry(Entries, Random);
+		if (EntryIndex == INDEX_NONE)
+		{
+			return EReinforcementLanternPlacementResult::Skipped;
+		}
+		const FResolvedReinforcementLanternEntry& Entry = Entries[EntryIndex];
+		UClass* LanternClass = Entry.ActorClass.Get();
+		if (not IsValid(LanternClass))
+		{
+			return EReinforcementLanternPlacementResult::Skipped;
+		}
+
+		OutPlacement.UniformScale = Random.FRandRange(
+			Entry.MinimumUniformScale, Entry.MaximumUniformScale);
+		const FVector AwayFromRoad(-RouteDirection.Y * Side, RouteDirection.X * Side, 0.0);
+		const double Jitter = Random.FRandRange(-Settings.MaximumLateralJitter, Settings.MaximumLateralJitter);
+		const double RoadEdgeGap = FMath::Max(
+			0.0, static_cast<double>(Settings.OffsetFromRoadEdge) + Entry.AdditionalOffsetFromRoadEdge + Jitter);
+		OutPlacement.ActorClass = LanternClass;
+		OutPlacement.PivotPosition = RoutePosition + AwayFromRoad
+			* (RoadHalfWidth + RoadEdgeGap
+				+ Entry.FootprintHalfWidthTowardRoad * OutPlacement.UniformScale);
+		OutPlacement.DirectionTowardRoad = -AwayFromRoad;
+		OutPlacement.LocalFacingDirection = FVector(Entry.FacingDirection, 0.0);
+		OutPlacement.CollisionRadius = Entry.FootprintRadius * OutPlacement.UniformScale
+			+ Settings.CollisionClearance;
+		return EReinforcementLanternPlacementResult::Ready;
+	}
+
+	EReinforcementLanternPlacementResult TrySpawnReinforcementLantern(
+		UWorld& World,
+		const TArray<FVector>& RoutePoints,
+		const double Distance,
+		const double Side,
+		const double RoadHalfWidth,
+		const int32 RoadIndex,
+		const int32 LanternIndex,
+		const FReinforcementRoadLanternSettings& Settings,
+		const TArray<FResolvedReinforcementLanternEntry>& Entries,
+		const FExclusionTester& Exclusions,
+		FRandomStream& Random,
+		TArray<AActor*>& InOutSpawnedActors,
+		TArray<FBox>& InOutRoadSideActorBounds)
+	{
+		FReinforcementLanternPlacement Placement;
+		const EReinforcementLanternPlacementResult BuildResult = TryBuildReinforcementLanternPlacement(
+			RoutePoints, Distance, Side, RoadHalfWidth, Settings, Entries, Random, Placement);
+		if (BuildResult != EReinforcementLanternPlacementResult::Ready)
+		{
+			return BuildResult;
+		}
+		if (Exclusions.IsPositionExcluded(FVector2D(Placement.PivotPosition), Placement.CollisionRadius)
+			|| IsReinforcementLanternFootprintBlocked(
+				Placement.PivotPosition, Placement.CollisionRadius, InOutRoadSideActorBounds))
+		{
+			return EReinforcementLanternPlacementResult::Skipped;
+		}
+
+		FVector GroundPosition = ProjectReinforcementRoadSideActorToGround(
+			World, Placement.PivotPosition, InOutSpawnedActors);
+		GroundPosition.Z += Settings.GroundOffset;
+		FRotator Rotation = GetHorizontalAxisAlignmentRotation(
+			Placement.DirectionTowardRoad, Placement.LocalFacingDirection);
+		Rotation.Yaw += Random.FRandRange(-Settings.MaximumYawJitterDegrees, Settings.MaximumYawJitterDegrees);
+		UClass* LanternClass = Placement.ActorClass.Get();
+		if (not IsValid(LanternClass))
+		{
+			return EReinforcementLanternPlacementResult::Skipped;
+		}
+		AActor* LanternActor = SpawnReinforcementLanternActor(
+			World, *LanternClass, GroundPosition, Rotation,
+			Placement.UniformScale, RoadIndex, LanternIndex);
+		if (not IsValid(LanternActor))
+		{
+			return EReinforcementLanternPlacementResult::Skipped;
+		}
+
+		InOutSpawnedActors.Add(LanternActor);
+		AddReinforcementRoadSideActorBounds(LanternActor, InOutRoadSideActorBounds);
+		return EReinforcementLanternPlacementResult::Spawned;
+	}
+
+	void SpawnReinforcementLanternChain(
+		UWorld& World,
+		const TArray<FVector>& RoutePoints,
+		const double RoadHalfWidth,
+		const int32 Seed,
+		const int32 RoadIndex,
+		const FReinforcementRoadLanternSettings& Settings,
+		const TArray<FResolvedReinforcementLanternEntry>& Entries,
+		const FExclusionTester& Exclusions,
+		TArray<AActor*>& InOutSpawnedActors,
+		TArray<FBox>& InOutRoadSideActorBounds)
+	{
+		if (Entries.IsEmpty() || Settings.PlacementChance <= 0.0f)
+		{
+			return;
+		}
+
+		FRandomStream Random(Seed);
+		const double MinimumSpacing = FMath::Max(
+			MinimumLanternSpacing, FMath::Min(Settings.MinimumSpacing, Settings.MaximumSpacing));
+		const double MaximumSpacing = FMath::Max(
+			MinimumSpacing, FMath::Max(Settings.MinimumSpacing, Settings.MaximumSpacing));
+		const double RouteLength = GetReinforcementRouteLength(RoutePoints);
+		const double EndpointClearance = FMath::Max(0.0f, Settings.EndpointClearance);
+		double Distance = EndpointClearance;
+		double Side = GetInitialReinforcementLanternSide(Settings.StartingSide, Random);
+		int32 LanternIndex = 0;
+
+		while (Distance <= RouteLength - EndpointClearance)
+		{
+			const EReinforcementLanternPlacementResult Result = TrySpawnReinforcementLantern(
+				World, RoutePoints, Distance, Side, RoadHalfWidth, RoadIndex, LanternIndex,
+				Settings, Entries, Exclusions, Random, InOutSpawnedActors, InOutRoadSideActorBounds);
+			if (Result == EReinforcementLanternPlacementResult::RouteEnded)
+			{
+				break;
+			}
+			if (Result == EReinforcementLanternPlacementResult::Spawned)
+			{
+				Side = -Side;
+				++LanternIndex;
+			}
+			Distance += Random.FRandRange(MinimumSpacing, MaximumSpacing);
 		}
 	}
 
@@ -1370,9 +1703,12 @@ namespace
 	{
 		UPCGPointData* PointData = FPCGContext::NewObject_AnyThread<UPCGPointData>(&Context);
 		PointData->InitializeFromData(nullptr);
-		FPCGMetadataAttribute<int32>* RoadIndex = PointData->Metadata->CreateAttribute<int32>(RoadIndexAttribute, INDEX_NONE, false, false);
-		FPCGMetadataAttribute<int32>* PointIndex = PointData->Metadata->CreateAttribute<int32>(PointIndexAttribute, INDEX_NONE, false, false);
-		FPCGMetadataAttribute<int32>* ConnectionType = PointData->Metadata->CreateAttribute<int32>(ConnectionTypeAttribute, INDEX_NONE, false, false);
+		FPCGMetadataAttribute<int32>* RoadIndex = PointData->Metadata->CreateAttribute<int32>(
+			ReinforcementRoadIndexAttribute, INDEX_NONE, false, false);
+		FPCGMetadataAttribute<int32>* PointIndex = PointData->Metadata->CreateAttribute<int32>(
+			ReinforcementPointIndexAttribute, INDEX_NONE, false, false);
+		FPCGMetadataAttribute<int32>* ConnectionType = PointData->Metadata->CreateAttribute<int32>(
+			ReinforcementConnectionTypeAttribute, INDEX_NONE, false, false);
 
 		TArray<FPCGPoint>& OutputPoints = PointData->GetMutablePoints();
 		for (int32 RouteIndex = 0; RouteIndex < Routes.Num(); ++RouteIndex)
@@ -1432,7 +1768,7 @@ FText UPCGCreateReinforcementRoadsSettings::GetNodeTooltipText() const
 	return LOCTEXT("NodeTooltip",
 		"Creates one-use, exclusion-safe reinforcement road connections. Primary orphan/start endpoints are preferred; "
 		"backup ends are used only when no natural primary route can be planned. Roads avoid hills and steep terrain, "
-		"can spawn connected electric-pole chains, and output their spline-mesh bounds as exclusion volumes.");
+		"can spawn connected electric-pole and alternating lantern chains, and output spline-mesh exclusion volumes.");
 }
 #endif
 
@@ -1482,9 +1818,13 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 	UStaticMesh* RoadMesh = Settings->RoadMesh.LoadSynchronous();
 	UStaticMesh* WireMesh = Settings->WireMesh.LoadSynchronous();
 	UMaterialInterface* OverrideMaterial = Settings->OverrideMaterial.LoadSynchronous();
-	const double Clearance = ComputeRoadClearance(RoadMesh) + SplineInterpolationSafetyMargin;
+	const double RoadHalfWidth = ComputeRoadClearance(RoadMesh);
+	const double Clearance = RoadHalfWidth + SplineInterpolationSafetyMargin;
 	const double MeshLength = ComputeMeshLength(RoadMesh);
 	const FExclusionTester Exclusions = BuildExclusionTester(*Context);
+	UWorld& World = *SourceComponent->GetWorld();
+	const TArray<FResolvedReinforcementLanternEntry> LanternEntries =
+		ResolveReinforcementLanternEntries(World, Settings->Lanterns);
 
 	TArray<bool> UsedStarts;
 	UsedStarts.Init(false, Starts.Num());
@@ -1495,7 +1835,7 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 	TArray<FGeneratedRoute> Routes;
 	TArray<AActor*> SpawnedActors;
 	TArray<FBox> RoadMeshBounds;
-	UWorld& World = *SourceComponent->GetWorld();
+	TArray<FBox> RoadSideActorBounds;
 
 	for (int32 StartIndex = 0; StartIndex < Starts.Num(); ++StartIndex)
 	{
@@ -1535,7 +1875,12 @@ bool FPCGCreateReinforcementRoadsElement::ExecuteInternal(FPCGContext* Context) 
 		}
 		SpawnReinforcementPoleChain(
 			World, GeneratedRoute.Points, *Settings, WireMesh,
-			PCGHelpers::ComputeSeed(RouteSeed, Routes.Num()), Routes.Num(), SpawnedActors);
+			PCGHelpers::ComputeSeed(RouteSeed, Routes.Num()), Routes.Num(),
+			SpawnedActors, RoadSideActorBounds);
+		SpawnReinforcementLanternChain(
+			World, GeneratedRoute.Points, RoadHalfWidth,
+			PCGHelpers::ComputeSeed(RouteSeed, LanternSeedSalt + Routes.Num()), Routes.Num(),
+			Settings->Lanterns, LanternEntries, Exclusions, SpawnedActors, RoadSideActorBounds);
 		Routes.Add(MoveTemp(GeneratedRoute));
 	}
 

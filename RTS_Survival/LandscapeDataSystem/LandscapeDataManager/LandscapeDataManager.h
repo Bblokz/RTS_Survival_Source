@@ -77,6 +77,7 @@ public:
 	 * @param InOutContributionId Stable handle owned by the node's managed PCG resource.
 	 * @param Channel Texture channel that receives volume density.
 	 * @param SpatialData Volume inputs that remain valid only for this synchronous call.
+	 * @param PaintConfiguration Artistic shape used to modulate every sampled volume density.
 	 * @param SourceComponent Component whose completion triggers publication.
 	 * @return True when the contribution was accepted.
 	 */
@@ -84,6 +85,7 @@ public:
 		FGuid& InOutContributionId,
 		ERTSLandscapeDataChannel Channel,
 		const TArray<const UPCGSpatialData*>& SpatialData,
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 		UPCGComponent* SourceComponent);
 
 	/**
@@ -178,30 +180,38 @@ private:
 	/**
 	 * @brief Keeps distant volumes cropped independently to avoid sampling their empty union.
 	 * @param SpatialData Graph-owned inputs borrowed only during this call.
+	 * @param PaintConfiguration Artistic shape used to modulate every sampled volume density.
 	 * @param OutRasters Value-only cropped coverage generated for valid inputs.
 	 */
 	void BuildVolumeRasters(
 		const TArray<const UPCGSpatialData*>& SpatialData,
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 		TArray<FRTSLandscapeDataRasterContribution>& OutRasters) const;
 
 	/**
 	 * @brief Samples one volume now so no graph-owned UObject is retained by the manager.
 	 * @param SpatialData Volume whose density defines coverage.
+	 * @param PaintConfiguration Artistic shape used to modulate sampled volume density.
 	 * @param OutRaster Cropped Landscape-aligned coverage.
 	 * @return True when the volume overlaps the mapped Landscape.
 	 */
 	bool BuildVolumeRaster(
 		const UPCGSpatialData& SpatialData,
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 		FRTSLandscapeDataRasterContribution& OutRaster) const;
 
 	/**
 	 * @brief Extracts a row to keep synchronous UObject sampling shallow and auditable.
 	 * @param SpatialData Volume sampled at its bounds-center Z plane.
+	 * @param PaintBounds Bounds that define the artistic shape around the sampled volume.
+	 * @param PaintConfiguration Artistic shape used to modulate sampled volume density.
 	 * @param PixelY Destination texture row.
 	 * @param InOutRaster Cropped raster receiving normalized density.
 	 */
 	void RasterizeVolumeRow(
 		const UPCGSpatialData& SpatialData,
+		const FBox& PaintBounds,
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 		int32 PixelY,
 		FRTSLandscapeDataRasterContribution& InOutRaster) const;
 	bool GetPixelRectForWorldBounds(const FBox& WorldBounds, FIntRect& OutPixelBounds) const;

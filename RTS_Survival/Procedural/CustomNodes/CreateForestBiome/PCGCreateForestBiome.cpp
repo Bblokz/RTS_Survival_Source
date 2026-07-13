@@ -32,6 +32,7 @@ namespace ForestBiomePCGConstants
 {
 	const FName ExclusionPinLabel = TEXT("Exclusion");
 	const FName FoliagePinLabel = TEXT("Foliage");
+	const FName TreesPinLabel = TEXT("Trees");
 	const FName FoliageMeshAttributeName = TEXT("Mesh");
 
 	// Actors are inspected far below the world so their real bounds and meshes can be measured
@@ -76,10 +77,11 @@ FText UPCGCreateForestBiomeSettings::GetNodeTooltipText() const
 		"Scatters a forest inside the input spawn volume: large trees, regular trees, bushes, foliage "
 		"and auxiliary props (rocks etc.), each with its own count per 1000x1000 unit tile. Trees spawn "
 		"as standalone Blueprint actors; bushes and instanced auxiliaries are batched into Hierarchical "
-		"ISM actors; foliage is emitted on the Foliage output pin for a GPU Static Mesh Spawner (mesh "
-		"selection 'By Attribute', attribute 'Mesh'). Categories are placed largest-first into a shared "
-		"occupancy grid so nothing overlaps; larger auxiliaries end up more isolated than smaller ones. "
-		"Nothing is ever placed inside the Exclusion input. Deterministic from RandomSeed.");
+		"ISM actors. Trees outputs the spawned tree locations with measured bounds; foliage is emitted on "
+		"the Foliage output pin for a GPU Static Mesh Spawner (mesh selection 'By Attribute', attribute "
+		"'Mesh'). Categories are placed largest-first into a shared occupancy grid so nothing overlaps; "
+		"larger auxiliaries end up more isolated than smaller ones. Nothing is ever placed inside the "
+		"Exclusion input. Deterministic from RandomSeed.");
 }
 #endif
 
@@ -102,6 +104,8 @@ TArray<FPCGPinProperties> UPCGCreateForestBiomeSettings::InputPinProperties() co
 TArray<FPCGPinProperties> UPCGCreateForestBiomeSettings::OutputPinProperties() const
 {
 	TArray<FPCGPinProperties> Pins;
+	// Tree points retain each spawned tree's transform and measured local bounds for downstream consumers.
+	Pins.Emplace(ForestBiomePCGConstants::TreesPinLabel, EPCGDataType::Point);
 	// Foliage points carry a "Mesh" attribute; wire into a Static Mesh Spawner (By Attribute).
 	Pins.Emplace(ForestBiomePCGConstants::FoliagePinLabel, EPCGDataType::Point);
 	return Pins;
@@ -126,6 +130,8 @@ namespace
 		// Parallel to FForestBiomeGenParams::LargeTrees / RegularTrees.
 		TArray<UClass*> LargeTreeClasses;
 		TArray<UClass*> RegularTreeClasses;
+		TArray<FBox> LargeTreeLocalBounds;
+		TArray<FBox> RegularTreeLocalBounds;
 
 		// Parallel to FForestBiomeGenParams::Bushes. Classes are only used as a fallback when a
 		// bush Blueprint has no static meshes to instance.
@@ -223,7 +229,8 @@ namespace
 		const TArray<FForestBlueprintEntry>& Entries,
 		TArray<FForestResolvedProp>& OutResolved,
 		TArray<UClass*>& OutClasses,
-		TArray<TArray<FForestMeshInstance>>* OutMeshInstances)
+		TArray<TArray<FForestMeshInstance>>* OutMeshInstances,
+		TArray<FBox>* OutLocalBounds)
 	{
 		const bool bExtractMeshes = OutMeshInstances != nullptr;
 
@@ -247,11 +254,12 @@ namespace
 
 			TArray<FForestMeshInstance> MeshInstances;
 			double MeasuredRadius = ForestBiomePCGConstants::DefaultPropRadius;
-			const bool bNeedsInspection = bExtractMeshes || Entry.RadiusOverride <= 0.0f;
+			FBox LocalBounds(EForceInit::ForceInit);
+			const bool bNeedsInspection = bExtractMeshes || OutLocalBounds != nullptr || Entry.RadiusOverride <= 0.0f;
 			AActor* InspectionActor = bNeedsInspection ? SpawnTransientInspectionActor(World, *PropClass) : nullptr;
 			if (IsValid(InspectionActor))
 			{
-				const FBox LocalBounds = ComputeInspectionActorLocalBounds(*InspectionActor);
+				LocalBounds = ComputeInspectionActorLocalBounds(*InspectionActor);
 				if (LocalBounds.IsValid)
 				{
 					MeasuredRadius = RadiusFromBounds(LocalBounds);
@@ -272,6 +280,15 @@ namespace
 
 			OutResolved.Add(Resolved);
 			OutClasses.Add(PropClass);
+			if (OutLocalBounds != nullptr)
+			{
+				if (not LocalBounds.IsValid)
+				{
+					const FVector FallbackExtent(Resolved.Radius);
+					LocalBounds = FBox(-FallbackExtent, FallbackExtent);
+				}
+				OutLocalBounds->Add(LocalBounds);
+			}
 			if (bExtractMeshes)
 			{
 				OutMeshInstances->Add(MoveTemp(MeshInstances));
@@ -651,8 +668,8 @@ namespace
 		return Actor;
 	}
 
-	/** @brief Spawns one Blueprint actor at a biome-local position, ground-projected. */
-	void SpawnGroundActor(
+	/** @return The spawned Blueprint actor, or nullptr when the class was invalid or spawning failed. */
+	AActor* SpawnGroundActor(
 		UWorld& World,
 		UClass* ActorClass,
 		const FForestPlacement& Placement,
@@ -662,7 +679,7 @@ namespace
 	{
 		if (ActorClass == nullptr)
 		{
-			return;
+			return nullptr;
 		}
 
 		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(OutSpawnedActors);
@@ -670,26 +687,44 @@ namespace
 		const FForestGroundHit Ground = ProjectToGround(World, WorldPosition, TraceParams);
 		const FQuat Rotation = MakeSpawnRotation(Placement.YawRadians, Ground.Normal, bAlignToNormal);
 
-		SpawnManagedActor(
+		return SpawnManagedActor(
 			World, ActorClass, FTransform(Rotation, Ground.Position, FVector(Placement.UniformScale)), OutSpawnedActors);
 	}
+
+	/** @brief Tree output data captured from a successfully spawned tree actor. */
+	struct FForestSpawnedTree
+	{
+		FTransform Transform;
+		FBox LocalBounds = FBox(EForceInit::ForceInit);
+	};
 
 	/** @brief Spawns a solid-prop category (large or regular trees) as upright standalone actors. */
 	void SpawnTreeActors(
 		UWorld& World,
 		const TArray<FForestPlacement>& Placements,
 		const TArray<UClass*>& Classes,
+		const TArray<FBox>& LocalBounds,
 		const FTransform& BiomeToWorld,
-		TArray<AActor*>& OutSpawnedActors)
+		TArray<AActor*>& OutSpawnedActors,
+		TArray<FForestSpawnedTree>& OutSpawnedTrees)
 	{
 		for (const FForestPlacement& Placement : Placements)
 		{
-			if (not Classes.IsValidIndex(Placement.EntryIndex))
+			if (not Classes.IsValidIndex(Placement.EntryIndex) || not LocalBounds.IsValidIndex(Placement.EntryIndex))
 			{
 				continue;
 			}
 			// Trees stay vertical; only ground-projected on Z.
-			SpawnGroundActor(World, Classes[Placement.EntryIndex], Placement, BiomeToWorld, false, OutSpawnedActors);
+			AActor* SpawnedTree = SpawnGroundActor(
+				World, Classes[Placement.EntryIndex], Placement, BiomeToWorld, false, OutSpawnedActors);
+			if (not IsValid(SpawnedTree))
+			{
+				continue;
+			}
+
+			FForestSpawnedTree& TreeOutput = OutSpawnedTrees.Emplace_GetRef();
+			TreeOutput.Transform = SpawnedTree->GetActorTransform();
+			TreeOutput.LocalBounds = LocalBounds[Placement.EntryIndex];
 		}
 	}
 
@@ -851,7 +886,7 @@ namespace
 }
 
 // ---------------------------------------------------------------------------
-// Foliage output
+// Point-data output
 // ---------------------------------------------------------------------------
 
 namespace
@@ -906,6 +941,31 @@ namespace
 
 			FoliageData->Metadata->InitializeOnSet(Point.MetadataEntry);
 			MeshAttribute->SetValue(Point.MetadataEntry, Assets.FoliageMeshPaths[Placement.EntryIndex]);
+		}
+	}
+
+	/** @brief Emits one point per spawned tree, preserving its actual transform and measured bounds. */
+	void EmitTreesOutput(
+		FPCGContext* Context,
+		const TArray<FForestSpawnedTree>& SpawnedTrees,
+		const int32 RandomSeed)
+	{
+		using namespace ForestBiomePCGConstants;
+
+		UPCGPointData* TreesData = CreateOutputPointData(Context, TreesPinLabel);
+		TArray<FPCGPoint>& Points = TreesData->GetMutablePoints();
+		Points.Reserve(SpawnedTrees.Num());
+
+		for (int32 TreeIndex = 0; TreeIndex < SpawnedTrees.Num(); ++TreeIndex)
+		{
+			const FForestSpawnedTree& SpawnedTree = SpawnedTrees[TreeIndex];
+
+			FPCGPoint& Point = Points.Emplace_GetRef();
+			Point.Transform = SpawnedTree.Transform;
+			Point.BoundsMin = SpawnedTree.LocalBounds.Min;
+			Point.BoundsMax = SpawnedTree.LocalBounds.Max;
+			Point.Density = 1.0f;
+			Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, TreeIndex);
 		}
 	}
 }
@@ -974,9 +1034,13 @@ namespace
 		FForestBiomeGenParams& Params,
 		FForestBiomeAssets& Assets)
 	{
-		ResolveProps(Context, World, Settings->LargeTrees, Params.LargeTrees, Assets.LargeTreeClasses, nullptr);
-		ResolveProps(Context, World, Settings->RegularTrees, Params.RegularTrees, Assets.RegularTreeClasses, nullptr);
-		ResolveProps(Context, World, Settings->Bushes, Params.Bushes, Assets.BushClasses, &Assets.BushMeshInstances);
+		ResolveProps(
+			Context, World, Settings->LargeTrees, Params.LargeTrees, Assets.LargeTreeClasses, nullptr,
+			&Assets.LargeTreeLocalBounds);
+		ResolveProps(
+			Context, World, Settings->RegularTrees, Params.RegularTrees, Assets.RegularTreeClasses, nullptr,
+			&Assets.RegularTreeLocalBounds);
+		ResolveProps(Context, World, Settings->Bushes, Params.Bushes, Assets.BushClasses, &Assets.BushMeshInstances, nullptr);
 		ResolveFoliage(Context, Settings->Foliage, Params.Foliage, Assets.FoliageMeshPaths);
 		ResolveAuxiliaries(Context, Settings, World, Params.Auxiliaries, Assets);
 	}
@@ -986,10 +1050,15 @@ namespace
 		const FForestBiomeGenResult& Result,
 		const FForestBiomeAssets& Assets,
 		const FTransform& BiomeToWorld,
-		TArray<AActor*>& OutSpawnedActors)
+		TArray<AActor*>& OutSpawnedActors,
+		TArray<FForestSpawnedTree>& OutSpawnedTrees)
 	{
-		SpawnTreeActors(World, Result.LargeTrees, Assets.LargeTreeClasses, BiomeToWorld, OutSpawnedActors);
-		SpawnTreeActors(World, Result.RegularTrees, Assets.RegularTreeClasses, BiomeToWorld, OutSpawnedActors);
+		SpawnTreeActors(
+			World, Result.LargeTrees, Assets.LargeTreeClasses, Assets.LargeTreeLocalBounds, BiomeToWorld,
+			OutSpawnedActors, OutSpawnedTrees);
+		SpawnTreeActors(
+			World, Result.RegularTrees, Assets.RegularTreeClasses, Assets.RegularTreeLocalBounds, BiomeToWorld,
+			OutSpawnedActors, OutSpawnedTrees);
 		SpawnInstancedPlacements(
 			World, Result.Bushes, Assets.BushMeshInstances, Assets.BushClasses, BiomeToWorld,
 			TEXT("PCG_ForestBushes"), OutSpawnedActors);
@@ -1048,9 +1117,11 @@ bool FPCGCreateForestBiomeElement::ExecuteInternal(FPCGContext* Context) const
 	Generator.Generate(Result);
 
 	TArray<AActor*> SpawnedActors;
-	SpawnAllCategories(World, Result, Assets, BiomeToWorld, SpawnedActors);
+	TArray<FForestSpawnedTree> SpawnedTrees;
+	SpawnAllCategories(World, Result, Assets, BiomeToWorld, SpawnedActors, SpawnedTrees);
 	RegisterManagedActors(SourceComponent, SpawnedActors);
 
+	EmitTreesOutput(Context, SpawnedTrees, Settings->RandomSeed);
 	EmitFoliageOutput(Context, World, Result, Assets, BiomeToWorld, Settings->RandomSeed, SpawnedActors);
 	return true;
 }

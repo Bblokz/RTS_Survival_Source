@@ -97,6 +97,7 @@ bool UPCGLandscapeDataManagedResource::ReplaceVolumeContribution(
 	ALandscapeDataManager& LandscapeDataManager,
 	const ERTSLandscapeDataChannel Channel,
 	const TArray<const UPCGSpatialData*>& SpatialData,
+	const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 	UPCGComponent* SourceComponent)
 {
 	ALandscapeDataManager* RegisteredManager = M_LandscapeDataManager.Get();
@@ -110,6 +111,7 @@ bool UPCGLandscapeDataManagedResource::ReplaceVolumeContribution(
 		ReplacementContributionId,
 		Channel,
 		SpatialData,
+		PaintConfiguration,
 		SourceComponent))
 	{
 		return false;

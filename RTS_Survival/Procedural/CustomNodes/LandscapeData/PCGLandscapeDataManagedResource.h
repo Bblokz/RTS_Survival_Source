@@ -58,6 +58,7 @@ public:
 	 * @param LandscapeDataManager Manager receiving the complete replacement contribution.
 	 * @param Channel Logical texture channel to paint.
 	 * @param SpatialData Borrowed volume data valid only for the duration of this call.
+	 * @param PaintConfiguration Artistic shape used to modulate the sampled volume density.
 	 * @param SourceComponent Component used by the manager to defer texture publication safely.
 	 * @return True when the manager sampled and accepted the complete replacement.
 	 */
@@ -65,6 +66,7 @@ public:
 		ALandscapeDataManager& LandscapeDataManager,
 		ERTSLandscapeDataChannel Channel,
 		const TArray<const UPCGSpatialData*>& SpatialData,
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 		UPCGComponent* SourceComponent);
 
 	//~Begin UPCGManagedResource interface

@@ -3,6 +3,7 @@
 #include "PCGMarkVolumesInLandscape.h"
 
 #include "PCGLandscapeDataManagedResource.h"
+#include "PCGMarkLandscapeDataHelpers.h"
 #include "RTS_Survival/LandscapeDataSystem/LandscapeDataManager/LandscapeDataManager.h"
 
 #include "PCGComponent.h"
@@ -10,36 +11,12 @@
 #include "PCGNode.h"
 #include "PCGPin.h"
 #include "Data/PCGSpatialData.h"
-#include "Graph/PCGStackContext.h"
 #include "Utils/PCGLogErrors.h"
 
 #define LOCTEXT_NAMESPACE "PCGMarkVolumesInLandscape"
 
 namespace PCGMarkVolumesInLandscape::Private
 {
-	FString GetChannelTitle(const ERTSLandscapeDataChannel Channel)
-	{
-		switch (Channel)
-		{
-		case ERTSLandscapeDataChannel::Scorched:
-			return TEXT("Scorched (R)");
-		case ERTSLandscapeDataChannel::Gravel:
-			return TEXT("Gravel (G)");
-		case ERTSLandscapeDataChannel::Concrete:
-			return TEXT("Concrete (B)");
-		case ERTSLandscapeDataChannel::ExtraSand:
-			return TEXT("Extra Sand (A)");
-		}
-		return FString();
-	}
-
-	FPCGCrc GetNodeInvocationCRC(const FPCGContext& Context)
-	{
-		FPCGStack InvocationStack(*Context.Stack);
-		InvocationStack.PushFrame(Context.Node);
-		return InvocationStack.GetCrc();
-	}
-
 	TArray<const UPCGSpatialData*> BorrowVolumeData(const FPCGContext& Context)
 	{
 		TArray<const UPCGSpatialData*> SpatialData;
@@ -59,62 +36,11 @@ namespace PCGMarkVolumesInLandscape::Private
 		return SpatialData;
 	}
 
-	void PassThroughInput(FPCGContext& Context)
-	{
-		Context.InputData.GetInputsAndCrcsByPin(
-			PCGPinConstants::DefaultInputLabel,
-			Context.OutputData.TaggedData,
-			Context.OutputData.DataCrcs);
-		for (FPCGTaggedData& TaggedData : Context.OutputData.TaggedData)
-		{
-			TaggedData.Pin = PCGPinConstants::DefaultOutputLabel;
-		}
-	}
-
-	ALandscapeDataManager* FindLandscapeDataManager(
-		FPCGContext* Context,
-		UPCGComponent& SourceComponent)
-	{
-		FString FailureReason;
-		ALandscapeDataManager* LandscapeDataManager =
-			ALandscapeDataManager::FindUniqueManager(&SourceComponent, FailureReason);
-		if (not IsValid(LandscapeDataManager))
-		{
-			PCGE_LOG_C(Error, GraphAndLog, Context, FText::Format(
-				LOCTEXT("ManagerLookupFailed", "Mark Volumes In Landscape could not find its manager: {0}"),
-				FText::FromString(FailureReason)));
-			return nullptr;
-		}
-
-		return LandscapeDataManager;
-	}
-
-	UPCGLandscapeDataManagedResource* GetOrCreateManagedResource(
-		UPCGComponent& SourceComponent,
-		const uint64 SettingsUID,
-		const FPCGCrc& StackCRC,
-		bool& bOutShouldRegisterResource)
-	{
-		UPCGLandscapeDataManagedResource* ManagedResource =
-			UPCGLandscapeDataManagedResource::FindReusableResource(
-				SourceComponent,
-				SettingsUID,
-				StackCRC);
-		bOutShouldRegisterResource = ManagedResource == nullptr;
-		if (not bOutShouldRegisterResource)
-		{
-			return ManagedResource;
-		}
-
-		ManagedResource = NewObject<UPCGLandscapeDataManagedResource>(&SourceComponent);
-		ManagedResource->InitializeIdentity(SettingsUID, StackCRC);
-		return ManagedResource;
-	}
 }
 
 bool UPCGMarkVolumesInLandscapeSettings::UseSeed() const
 {
-	return false;
+	return true;
 }
 
 #if WITH_EDITOR
@@ -132,7 +58,7 @@ FText UPCGMarkVolumesInLandscapeSettings::GetNodeTooltipText() const
 {
 	return LOCTEXT(
 		"NodeTooltip",
-		"Paints each volume's XY projection into the selected Landscape data channel using its sampled volume density, then passes the volumes through unchanged.");
+		"Paints each volume's XY projection using its sampled density and selected solid, radial, Perlin, or noisy-radial shape, then passes the volumes through unchanged.");
 }
 
 EPCGSettingsType UPCGMarkVolumesInLandscapeSettings::GetType() const
@@ -142,7 +68,10 @@ EPCGSettingsType UPCGMarkVolumesInLandscapeSettings::GetType() const
 
 FString UPCGMarkVolumesInLandscapeSettings::GetAdditionalTitleInformation() const
 {
-	return PCGMarkVolumesInLandscape::Private::GetChannelTitle(Channel);
+	return FString::Printf(
+		TEXT("%s | %s"),
+		*PCGMarkLandscapeData::GetChannelTitle(Channel),
+		*PCGMarkLandscapeData::GetPaintModeTitle(PaintMode));
 }
 #endif
 
@@ -170,7 +99,7 @@ FPCGElementPtr UPCGMarkVolumesInLandscapeSettings::CreateElement() const
 bool FPCGMarkVolumesInLandscapeElement::ExecuteInternal(FPCGContext* Context) const
 {
 	check(Context);
-	PCGMarkVolumesInLandscape::Private::PassThroughInput(*Context);
+	PCGMarkLandscapeData::PassThroughInput(*Context);
 
 	const UPCGMarkVolumesInLandscapeSettings* Settings =
 		Context->GetInputSettings<UPCGMarkVolumesInLandscapeSettings>();
@@ -187,16 +116,19 @@ bool FPCGMarkVolumesInLandscapeElement::ExecuteInternal(FPCGContext* Context) co
 	}
 
 	ALandscapeDataManager* LandscapeDataManager =
-		PCGMarkVolumesInLandscape::Private::FindLandscapeDataManager(Context, *SourceComponent);
+		PCGMarkLandscapeData::FindLandscapeDataManager(
+			Context,
+			*SourceComponent,
+			LOCTEXT("NodeTitle", "Mark Volumes In Landscape"));
 	if (not IsValid(LandscapeDataManager))
 	{
 		return true;
 	}
 
-	const FPCGCrc StackCRC = PCGMarkVolumesInLandscape::Private::GetNodeInvocationCRC(*Context);
+	const FPCGCrc StackCRC = PCGMarkLandscapeData::GetNodeInvocationCRC(*Context);
 	bool bShouldRegisterResource = false;
 	UPCGLandscapeDataManagedResource* ManagedResource =
-		PCGMarkVolumesInLandscape::Private::GetOrCreateManagedResource(
+		PCGMarkLandscapeData::GetOrCreateManagedResource(
 		*SourceComponent,
 		Settings->GetStableUID(),
 		StackCRC,
@@ -204,10 +136,18 @@ bool FPCGMarkVolumesInLandscapeElement::ExecuteInternal(FPCGContext* Context) co
 
 	const TArray<const UPCGSpatialData*> SpatialData =
 		PCGMarkVolumesInLandscape::Private::BorrowVolumeData(*Context);
+	const FRTSLandscapeDataPaintConfiguration PaintConfiguration =
+		PCGMarkLandscapeData::CreatePaintConfiguration(
+			Settings->PaintMode,
+			Settings->RadialSettings,
+			Settings->PerlinSettings,
+			Settings->NoisyRadialSettings,
+			Context->GetSeed());
 	if (not ManagedResource->ReplaceVolumeContribution(
 		*LandscapeDataManager,
 		Settings->Channel,
 		SpatialData,
+		PaintConfiguration,
 		SourceComponent))
 	{
 		PCGE_LOG(Error, GraphAndLog, LOCTEXT(

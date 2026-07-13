@@ -111,14 +111,17 @@ struct FRTSLandscapeNoisyRadialPointPaintSettings
 	float BoundaryNoisePersistence = 0.5f;
 };
 
-/** @brief Value-only point paint parameters retained independently of graph-owned settings. */
-struct FRTSLandscapeDataPointPaintConfiguration
+/** @brief Value-only artistic paint parameters retained independently of graph-owned settings. */
+struct FRTSLandscapeDataPaintConfiguration
 {
 	ERTSLandscapePointPaintMode PaintMode = ERTSLandscapePointPaintMode::Solid;
 	FRTSLandscapeRadialPointPaintSettings RadialSettings;
 	FRTSLandscapePerlinPointPaintSettings PerlinSettings;
 	FRTSLandscapeNoisyRadialPointPaintSettings NoisyRadialSettings;
 	FVector2D NoiseOffset = FVector2D::ZeroVector;
+
+	// The PCG node chooses this once so a rebuild preserves its noisy-bounds variation.
+	float BoundsScale = 1.0f;
 };
 
 /**
@@ -131,7 +134,7 @@ struct FRTSLandscapeDataPointStamp
 	FVector BoundsMin = FVector::ZeroVector;
 	FVector BoundsMax = FVector::ZeroVector;
 	float Strength = 1.0f;
-	FRTSLandscapeDataPointPaintConfiguration PaintConfiguration;
+	FRTSLandscapeDataPaintConfiguration PaintConfiguration;
 };
 
 /** @brief Mapping values supplied to the Landscape material and CPU rasterizer. */

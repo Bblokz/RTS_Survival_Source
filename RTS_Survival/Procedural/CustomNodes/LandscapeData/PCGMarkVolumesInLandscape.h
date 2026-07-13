@@ -30,6 +30,27 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Landscape Data", meta = (PCG_Overridable))
 	ERTSLandscapeDataChannel Channel = ERTSLandscapeDataChannel::Scorched;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Landscape Data", meta = (PCG_Overridable))
+	ERTSLandscapePointPaintMode PaintMode = ERTSLandscapePointPaintMode::Solid;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Landscape Data|Paint Shape", meta = (
+		ShowOnlyInnerProperties,
+		EditCondition = "PaintMode == ERTSLandscapePointPaintMode::Radial || PaintMode == ERTSLandscapePointPaintMode::RadialWithNoisyBounds",
+		EditConditionHides))
+	FRTSLandscapeRadialPointPaintSettings RadialSettings;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Landscape Data|Paint Shape", meta = (
+		ShowOnlyInnerProperties,
+		EditCondition = "PaintMode == ERTSLandscapePointPaintMode::PerlinNoise",
+		EditConditionHides))
+	FRTSLandscapePerlinPointPaintSettings PerlinSettings;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Landscape Data|Paint Shape", meta = (
+		ShowOnlyInnerProperties,
+		EditCondition = "PaintMode == ERTSLandscapePointPaintMode::RadialWithNoisyBounds",
+		EditConditionHides))
+	FRTSLandscapeNoisyRadialPointPaintSettings NoisyRadialSettings;
+
 protected:
 	virtual TArray<FPCGPinProperties> InputPinProperties() const override;
 	virtual TArray<FPCGPinProperties> OutputPinProperties() const override;

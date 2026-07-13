@@ -40,12 +40,18 @@ namespace ScorchedCityPCGConstants
 	const FName ScatterPinLabel = TEXT("Scatter");
 	const FName OccupiedBoundsPinLabel = TEXT("OccupiedBounds");
 	const FName BuildingsPinLabel = TEXT("Buildings");
+	const FName RoadBoundsPinLabel = TEXT("RoadBounds");
+	const FName RoadPointsPinLabel = TEXT("RoadPoints");
+	const FName AuxiliaryPointsPinLabel = TEXT("AuxiliaryPoints");
+	const FName RoadBlockPointsPinLabel = TEXT("RoadBlockPoints");
 	const FName LotsPinLabel = TEXT("Lots");
 	const FName OuterOrphanRoadsPinLabel = TEXT("OuterOrphanRoads");
 
 	const FName ScatterMeshAttributeName = TEXT("Mesh");
 	const FName OccupancyTypeAttributeName = TEXT("Occupancy");
 	const FName BuildingCategoryAttributeName = TEXT("Category");
+	const FName AssetIndexAttributeName = TEXT("AssetIndex");
+	const FName RoadIndexAttributeName = TEXT("RoadIndex");
 	const FName LotUsedAttributeName = TEXT("Used");
 
 	// Fallbacks when meshes/classes cannot be measured.
@@ -108,7 +114,8 @@ FText UPCGScorchedCitySettings::GetNodeTooltipText() const
 		"derives from the area's bounds and the layout is trimmed to its shape. Roads, intersections, "
 		"buildings and poles are spawned as managed actors; Scatter outputs points with a 'Mesh' attribute "
 		"for a Static Mesh Spawner. OccupiedBounds outputs every reserved footprint for downstream exclusion. "
-		"Buildings outputs one point per placed building with its measured bounds. "
+		"Buildings, RoadBounds, RoadPoints, AuxiliaryPoints and RoadBlockPoints expose the placed "
+		"buildings, road footprint volumes, road centrelines, auxiliaries and road blocks as points. "
 		"Deterministic from RandomSeed.");
 }
 #endif
@@ -136,6 +143,14 @@ TArray<FPCGPinProperties> UPCGScorchedCitySettings::OutputPinProperties() const
 	// One point per placed building (pivot transform + measured bounds); the 'Category'
 	// attribute distinguishes Scorch (HISM) from Blueprint buildings.
 	Pins.Emplace(ScorchedCityPCGConstants::BuildingsPinLabel, EPCGDataType::Point);
+	// Every reserved road chunk as an oriented point-with-bounds (the road footprint volumes).
+	Pins.Emplace(ScorchedCityPCGConstants::RoadBoundsPinLabel, EPCGDataType::Point);
+	// Road centreline points (ground-projected), grouped per road via a 'RoadIndex' attribute.
+	Pins.Emplace(ScorchedCityPCGConstants::RoadPointsPinLabel, EPCGDataType::Point);
+	// One point per placed auxiliary blueprint; 'AssetIndex' identifies the entry.
+	Pins.Emplace(ScorchedCityPCGConstants::AuxiliaryPointsPinLabel, EPCGDataType::Point);
+	// One point per individual placed road block item; 'AssetIndex' identifies the type.
+	Pins.Emplace(ScorchedCityPCGConstants::RoadBlockPointsPinLabel, EPCGDataType::Point);
 	Pins.Emplace(ScorchedCityPCGConstants::LotsPinLabel, EPCGDataType::Point);
 	// Every unconnected road ending (dead stops, failed pairings, open 4-way arms); point
 	// rotation = outward yaw, so other PCG logic can continue those roads.
@@ -1219,6 +1234,138 @@ namespace
 	}
 
 	/**
+	 * @brief Emits only the reserved road chunks (Road occupancy) as oriented points with
+	 * bounds, so the road footprint volumes are available on their own pin. Points sit on the
+	 * city plane (not ground-projected), matching the OccupiedBounds output.
+	 */
+	void EmitRoadBoundsOutput(
+		FPCGContext* Context,
+		const FScorchedCityGenResult& Result,
+		const FTransform& CityToWorld,
+		const int32 RandomSeed)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		UPCGPointData* BoundsData = CreateOutputPointData(Context, RoadBoundsPinLabel);
+
+		TArray<FPCGPoint>& Points = BoundsData->GetMutablePoints();
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		int32 RoadEntryIndex = 0;
+		for (const FScorchedSpatialHashGrid::FEntry& Entry : Result.OccupiedFootprints)
+		{
+			if (Entry.Type != EScorchedOccupancy::Road)
+			{
+				continue;
+			}
+
+			FPCGPoint& Point = Points.Emplace_GetRef();
+			Point.Transform = FTransform(
+				FQuat(FVector::UpVector, CityYaw + Entry.Footprint.YawRadians),
+				CityToWorld.TransformPosition(FVector(Entry.Footprint.Center, 0.0)));
+			Point.BoundsMin = FVector(-Entry.Footprint.HalfExtents.X, -Entry.Footprint.HalfExtents.Y, -OccupancyBoundsHalfHeight);
+			Point.BoundsMax = FVector(Entry.Footprint.HalfExtents.X, Entry.Footprint.HalfExtents.Y, OccupancyBoundsHalfHeight);
+			Point.Density = 1.0f;
+			Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, RoadEntryIndex++);
+		}
+	}
+
+	/**
+	 * @brief Emits the centreline points of every road spline, ground-projected. Each point's
+	 * rotation yaws along the road; a 'RoadIndex' attribute groups the points belonging to one
+	 * road so downstream logic can rebuild individual roads.
+	 */
+	void EmitRoadPointsOutput(
+		FPCGContext* Context,
+		UWorld& World,
+		const FScorchedCityGenResult& Result,
+		const FTransform& CityToWorld,
+		const int32 RandomSeed,
+		const double RoadZOffset,
+		const TArray<AActor*>& ActorsToIgnoreInTraces)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		UPCGPointData* RoadPointsData = CreateOutputPointData(Context, RoadPointsPinLabel);
+		FPCGMetadataAttribute<int32>* RoadIndexAttribute =
+			RoadPointsData->Metadata->CreateAttribute<int32>(RoadIndexAttributeName, 0, false, false);
+
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(ActorsToIgnoreInTraces);
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		TArray<FPCGPoint>& Points = RoadPointsData->GetMutablePoints();
+		int32 EmittedIndex = 0;
+
+		for (int32 RoadIndex = 0; RoadIndex < Result.RoadSplines.Num(); ++RoadIndex)
+		{
+			const TArray<FVector2D>& RoadPoints = Result.RoadSplines[RoadIndex].Points;
+			for (int32 PointIndex = 0; PointIndex < RoadPoints.Num(); ++PointIndex)
+			{
+				// Yaw along the road: use the segment leaving this point, or the one entering
+				// the final point, so every point faces down its own road.
+				const FVector2D& Current = RoadPoints[PointIndex];
+				const FVector2D Direction = PointIndex + 1 < RoadPoints.Num()
+					? (RoadPoints[PointIndex + 1] - Current)
+					: (PointIndex > 0 ? (Current - RoadPoints[PointIndex - 1]) : FVector2D(1.0, 0.0));
+				const double LocalYaw = FMath::Atan2(Direction.Y, Direction.X);
+
+				FPCGPoint& Point = Points.Emplace_GetRef();
+				Point.Transform = FTransform(
+					FQuat(FVector::UpVector, CityYaw + LocalYaw),
+					ProjectCityPositionToGround(World, Current, CityToWorld, TraceParams, RoadZOffset));
+				Point.Density = 1.0f;
+				Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, EmittedIndex++);
+
+				RoadPointsData->Metadata->InitializeOnSet(Point.MetadataEntry);
+				RoadIndexAttribute->SetValue(Point.MetadataEntry, RoadIndex);
+			}
+		}
+	}
+
+	/**
+	 * @brief Emits one ground-projected point per FScorchedAuxiliarySpawn (auxiliaries or road
+	 * blocks): the point transform is the actor's spawn transform (pivot + city yaw + uniform
+	 * scale) and an 'AssetIndex' attribute identifies the resolved entry.
+	 */
+	void EmitAuxiliarySpawnPointsOutput(
+		FPCGContext* Context,
+		UWorld& World,
+		const TArray<FScorchedAuxiliarySpawn>& Spawns,
+		const FName PinLabel,
+		const FTransform& CityToWorld,
+		const int32 RandomSeed,
+		const TArray<AActor*>& ActorsToIgnoreInTraces)
+	{
+		using namespace ScorchedCityPCGConstants;
+
+		UPCGPointData* PointData = CreateOutputPointData(Context, PinLabel);
+		FPCGMetadataAttribute<int32>* AssetIndexAttribute =
+			PointData->Metadata->CreateAttribute<int32>(AssetIndexAttributeName, 0, false, false);
+
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(ActorsToIgnoreInTraces);
+		const double CityYaw = CityYawRadians(CityToWorld);
+
+		TArray<FPCGPoint>& Points = PointData->GetMutablePoints();
+		Points.Reserve(Spawns.Num());
+
+		for (int32 SpawnIndex = 0; SpawnIndex < Spawns.Num(); ++SpawnIndex)
+		{
+			const FScorchedAuxiliarySpawn& Spawn = Spawns[SpawnIndex];
+
+			FPCGPoint& Point = Points.Emplace_GetRef();
+			Point.Transform = FTransform(
+				FQuat(FVector::UpVector, CityYaw + Spawn.YawRadians),
+				ProjectCityPositionToGround(World, Spawn.Position, CityToWorld, TraceParams, 0.0),
+				FVector(Spawn.UniformScale));
+			Point.Density = 1.0f;
+			Point.Seed = PCGHelpers::ComputeSeed(RandomSeed, SpawnIndex);
+
+			PointData->Metadata->InitializeOnSet(Point.MetadataEntry);
+			AssetIndexAttribute->SetValue(Point.MetadataEntry, Spawn.AssetIndex);
+		}
+	}
+
+	/**
 	 * @brief Emits one point per placed building: the point transform is the building's
 	 * actual spawn transform (pivot ground-projected, city yaw applied) and the point bounds
 	 * are the measured local bounds, so the point box matches the building in the world.
@@ -1649,6 +1796,15 @@ bool FPCGScorchedCityElement::ExecuteInternal(FPCGContext* Context) const
 	EmitScatterOutput(Context, World, Result, Assets, CityToWorld, Settings->RandomSeed, SpawnedActors);
 	EmitOccupiedBoundsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
 	EmitBuildingsOutput(Context, World, Result, Assets, CityToWorld, Settings->RandomSeed, SpawnedActors);
+	EmitRoadBoundsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
+	EmitRoadPointsOutput(
+		Context, World, Result, CityToWorld, Settings->RandomSeed, Settings->RoadZOffset, SpawnedActors);
+	EmitAuxiliarySpawnPointsOutput(
+		Context, World, Result.Auxiliaries, ScorchedCityPCGConstants::AuxiliaryPointsPinLabel,
+		CityToWorld, Settings->RandomSeed, SpawnedActors);
+	EmitAuxiliarySpawnPointsOutput(
+		Context, World, Result.RoadBlockItems, ScorchedCityPCGConstants::RoadBlockPointsPinLabel,
+		CityToWorld, Settings->RandomSeed, SpawnedActors);
 	EmitLotsOutput(Context, Result, CityToWorld, Settings->RandomSeed);
 	EmitOuterOrphanRoadsOutput(
 		Context, World, Result, CityToWorld, Settings->RandomSeed, Settings->RoadZOffset, SpawnedActors);

@@ -146,7 +146,7 @@ struct FReinforcementRoadLanternSettings
 /**
  * @brief Configures managed reinforcement-road splines generated between compatible endpoints.
  * The node pairs each endpoint at most once and falls back to backup ends when no natural primary route exists.
- * @note Generated spline actors and their road meshes are owned by the executing PCG component.
+ * @note Generated roads, electric poles and lantern actors are owned by the executing PCG component.
  */
 UCLASS(BlueprintType)
 class RTS_SURVIVAL_API UPCGCreateReinforcementRoadsSettings : public UPCGSettings

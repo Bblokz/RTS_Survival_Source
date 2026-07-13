@@ -866,6 +866,26 @@ namespace MetalFieldPCGInternal
 		return Placement;
 	}
 
+	bool IsFenceFootprintClearOfNonFencePlacements(
+		const FBox2D& Footprint,
+		const TArray<FPlacedMetalActor>& Placements,
+		const double Clearance)
+	{
+		for (const FPlacedMetalActor& Placement : Placements)
+		{
+			if (Placement.Role == EMetalPlacementRole::Fence)
+			{
+				continue;
+			}
+
+			if (BoxesOverlapWithClearance(Footprint, Placement.Footprint, Clearance))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
 	void TileFenceSide(
 		UWorld& World,
 		const UPCGCreateMetalFieldSettings& Settings,
@@ -888,7 +908,8 @@ namespace MetalFieldPCGInternal
 			FPlacedMetalActor Placement = MakeFencePlacement(
 				World, Settings, Fence, Center, SideDirection, FieldCenterZ, FieldIndex);
 			const bool bCanPlace = not IsExcluded(Exclusions, FVector(Center, FieldCenterZ))
-				&& IsFootprintClear(Placement.Footprint, InOutFieldPlacements, Settings.MinActorClearance);
+				&& IsFenceFootprintClearOfNonFencePlacements(
+					Placement.Footprint, InOutFieldPlacements, Settings.MinActorClearance);
 			if (bCanPlace)
 			{
 				InOutFieldPlacements.Add(MoveTemp(Placement));

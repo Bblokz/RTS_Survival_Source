@@ -23,6 +23,10 @@ Pins:
 - **Scatter** (Point): debris points with a `Mesh` (SoftObjectPath) attribute → wire into a Static Mesh Spawner, mesh selection "By Attribute".
 - **OccupiedBounds** (Point): every reserved oriented footprint (roads, intersections, buildings, poles) with an `Occupancy` int attribute — use with Difference/filters to exclude other PCG content.
 - **Buildings** (Point): one point per placed building; the transform matches the spawned building (pivot ground-projected, city yaw applied) and the point bounds are the measured local bounds. A `Category` int attribute holds the `EScorchedBuildingCategory` (0 = ScorchBuilding, 1 = BlueprintBuilding).
+- **RoadBounds** (Point): every reserved road chunk (Road occupancy only) as an oriented point-with-bounds — the road footprint volumes on their own pin, on the city plane (not ground-projected), matching OccupiedBounds.
+- **RoadPoints** (Point): the centreline control points of every road spline, ground-projected, each rotation yawing along the road. A `RoadIndex` int attribute groups the points that belong to one road so individual roads can be rebuilt downstream.
+- **AuxiliaryPoints** (Point): one point per placed auxiliary blueprint, ground-projected with the actor's spawn yaw and uniform scale. An `AssetIndex` int attribute identifies the resolved auxiliary entry.
+- **RoadBlockPoints** (Point): one point per *individual* placed road block item (not per arc), ground-projected with spawn yaw and uniform scale. An `AssetIndex` int attribute identifies the resolved road block type.
 - **Lots** (Point): generated lots with a `Used` attribute (debugging / extensions).
 - **OuterOrphanRoads** (Point): every road ending that remains unconnected after the orphan-pairing pass — dead stops, endings whose pairing curve failed, and the open arms of intersection pieces that have fewer streets than mesh arms (the point sits at the mesh edge of the unused arm). Each point is ground-projected on the road's final outer position with its rotation yawing outward, so other PCG logic can continue those roads.
 

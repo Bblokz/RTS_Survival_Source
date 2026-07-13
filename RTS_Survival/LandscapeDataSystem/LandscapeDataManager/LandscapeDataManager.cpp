@@ -39,6 +39,7 @@ namespace LandscapeDataManagerConstants
 	constexpr float MaximumNoiseLacunarity = 4.0f;
 	constexpr float NoisyBoundaryLacunarity = 2.0f;
 	constexpr float MaximumBoundaryNoiseAmount = 0.75f;
+	constexpr float MinimumBoundsScale = 0.01f;
 	constexpr int32 MinimumNoiseOctaves = 1;
 	constexpr int32 MaximumNoiseOctaves = 6;
 
@@ -275,7 +276,7 @@ namespace LandscapeDataManagerConstants
 
 	float GetPerlinCoverage(
 		const FVector2D& NormalizedPosition,
-		const FRTSLandscapeDataPointPaintConfiguration& PaintConfiguration)
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration)
 	{
 		const FRTSLandscapePerlinPointPaintSettings& Settings = PaintConfiguration.PerlinSettings;
 		const float Frequency = FMath::IsFinite(Settings.Frequency)
@@ -311,7 +312,7 @@ namespace LandscapeDataManagerConstants
 
 	float GetNoisyRadialCoverage(
 		const FVector2D& NormalizedPosition,
-		const FRTSLandscapeDataPointPaintConfiguration& PaintConfiguration)
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration)
 	{
 		const FRTSLandscapeNoisyRadialPointPaintSettings& Settings =
 			PaintConfiguration.NoisyRadialSettings;
@@ -358,6 +359,66 @@ namespace LandscapeDataManagerConstants
 		return FBox(BoundsCenter - BoundsExtent, BoundsCenter + BoundsExtent);
 	}
 
+	FBox GetVolumePaintBounds(
+		const FBox& InputBounds,
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration)
+	{
+		if (PaintConfiguration.PaintMode != ERTSLandscapePointPaintMode::RadialWithNoisyBounds)
+		{
+			return InputBounds;
+		}
+
+		const float BoundsScale = FMath::IsFinite(PaintConfiguration.BoundsScale)
+			? FMath::Max(PaintConfiguration.BoundsScale, MinimumBoundsScale)
+			: MaximumNormalizedValue;
+		const float NoiseAmount = SanitizeClampedFloat(
+			PaintConfiguration.NoisyRadialSettings.BoundaryNoiseAmount,
+			MinimumNormalizedValue,
+			MinimumNormalizedValue,
+			MaximumBoundaryNoiseAmount);
+		const FVector BoundsCenter = InputBounds.GetCenter();
+		FVector BoundsExtent = InputBounds.GetExtent();
+		BoundsExtent.X *= BoundsScale * (MaximumNormalizedValue + NoiseAmount);
+		BoundsExtent.Y *= BoundsScale * (MaximumNormalizedValue + NoiseAmount);
+		return FBox(BoundsCenter - BoundsExtent, BoundsCenter + BoundsExtent);
+	}
+
+	bool GetNormalizedBoundsPosition(
+		const FBox& Bounds,
+		const FVector& Position,
+		FVector2D& OutNormalizedPosition)
+	{
+		const FVector BoundsExtent = Bounds.GetExtent();
+		if (BoundsExtent.X <= UE_KINDA_SMALL_NUMBER || BoundsExtent.Y <= UE_KINDA_SMALL_NUMBER)
+		{
+			return false;
+		}
+
+		const FVector BoundsCenter = Bounds.GetCenter();
+		OutNormalizedPosition = FVector2D(
+			(Position.X - BoundsCenter.X) / BoundsExtent.X,
+			(Position.Y - BoundsCenter.Y) / BoundsExtent.Y);
+		return true;
+	}
+
+	float GetPaintCoverage(
+		const FVector2D& NormalizedPosition,
+		const FRTSLandscapeDataPaintConfiguration& PaintConfiguration)
+	{
+		switch (PaintConfiguration.PaintMode)
+		{
+		case ERTSLandscapePointPaintMode::Solid:
+			return MaximumNormalizedValue;
+		case ERTSLandscapePointPaintMode::Radial:
+			return GetRadialCoverage(NormalizedPosition, PaintConfiguration.RadialSettings);
+		case ERTSLandscapePointPaintMode::PerlinNoise:
+			return GetPerlinCoverage(NormalizedPosition, PaintConfiguration);
+		case ERTSLandscapePointPaintMode::RadialWithNoisyBounds:
+			return GetNoisyRadialCoverage(NormalizedPosition, PaintConfiguration);
+		}
+		return MinimumNormalizedValue;
+	}
+
 	float GetPointStampCoverage(
 		const FRTSLandscapeDataPointStamp& PointStamp,
 		const FVector& LocalPosition)
@@ -368,18 +429,7 @@ namespace LandscapeDataManagerConstants
 			return MinimumNormalizedValue;
 		}
 
-		switch (PointStamp.PaintConfiguration.PaintMode)
-		{
-		case ERTSLandscapePointPaintMode::Solid:
-			return MaximumNormalizedValue;
-		case ERTSLandscapePointPaintMode::Radial:
-			return GetRadialCoverage(NormalizedPosition, PointStamp.PaintConfiguration.RadialSettings);
-		case ERTSLandscapePointPaintMode::PerlinNoise:
-			return GetPerlinCoverage(NormalizedPosition, PointStamp.PaintConfiguration);
-		case ERTSLandscapePointPaintMode::RadialWithNoisyBounds:
-			return GetNoisyRadialCoverage(NormalizedPosition, PointStamp.PaintConfiguration);
-		}
-		return MinimumNormalizedValue;
+		return GetPaintCoverage(NormalizedPosition, PointStamp.PaintConfiguration);
 	}
 }
 
@@ -671,6 +721,7 @@ bool ALandscapeDataManager::ReplaceVolumeContribution(
 	FGuid& InOutContributionId,
 	const ERTSLandscapeDataChannel Channel,
 	const TArray<const UPCGSpatialData*>& SpatialData,
+	const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 	UPCGComponent* SourceComponent)
 {
 	if (not EnsureInitialized())
@@ -685,7 +736,7 @@ bool ALandscapeDataManager::ReplaceVolumeContribution(
 
 	FRTSLandscapeDataManagerContribution Contribution;
 	Contribution.Channel = Channel;
-	BuildVolumeRasters(SpatialData, Contribution.Rasters);
+	BuildVolumeRasters(SpatialData, PaintConfiguration, Contribution.Rasters);
 	return StoreContribution(InOutContributionId, MoveTemp(Contribution), SourceComponent);
 }
 
@@ -797,6 +848,7 @@ void ALandscapeDataManager::DiscardPendingRemovals(
 
 void ALandscapeDataManager::BuildVolumeRasters(
 	const TArray<const UPCGSpatialData*>& SpatialData,
+	const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 	TArray<FRTSLandscapeDataRasterContribution>& OutRasters) const
 {
 	OutRasters.Reset();
@@ -809,7 +861,7 @@ void ALandscapeDataManager::BuildVolumeRasters(
 		}
 
 		FRTSLandscapeDataRasterContribution Raster;
-		if (BuildVolumeRaster(*SpatialInput, Raster))
+		if (BuildVolumeRaster(*SpatialInput, PaintConfiguration, Raster))
 		{
 			OutRasters.Add(MoveTemp(Raster));
 		}
@@ -818,9 +870,13 @@ void ALandscapeDataManager::BuildVolumeRasters(
 
 bool ALandscapeDataManager::BuildVolumeRaster(
 	const UPCGSpatialData& SpatialData,
+	const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 	FRTSLandscapeDataRasterContribution& OutRaster) const
 {
-	if (not GetPixelRectForWorldBounds(SpatialData.GetBounds(), OutRaster.PixelBounds))
+	const FBox PaintBounds = LandscapeDataManagerConstants::GetVolumePaintBounds(
+		SpatialData.GetBounds(),
+		PaintConfiguration);
+	if (not GetPixelRectForWorldBounds(PaintBounds, OutRaster.PixelBounds))
 	{
 		return false;
 	}
@@ -830,13 +886,15 @@ bool ALandscapeDataManager::BuildVolumeRaster(
 	OutRaster.Coverage.SetNumZeroed(RasterWidth * RasterHeight);
 	for (int32 PixelY = OutRaster.PixelBounds.Min.Y; PixelY < OutRaster.PixelBounds.Max.Y; ++PixelY)
 	{
-		RasterizeVolumeRow(SpatialData, PixelY, OutRaster);
+		RasterizeVolumeRow(SpatialData, PaintBounds, PaintConfiguration, PixelY, OutRaster);
 	}
 	return true;
 }
 
 void ALandscapeDataManager::RasterizeVolumeRow(
 	const UPCGSpatialData& SpatialData,
+	const FBox& PaintBounds,
+	const FRTSLandscapeDataPaintConfiguration& PaintConfiguration,
 	const int32 PixelY,
 	FRTSLandscapeDataRasterContribution& InOutRaster) const
 {
@@ -859,10 +917,26 @@ void ALandscapeDataManager::RasterizeVolumeRow(
 				LandscapeDataManagerConstants::MinimumNormalizedValue,
 				LandscapeDataManagerConstants::MaximumNormalizedValue)
 			: LandscapeDataManagerConstants::MinimumNormalizedValue;
+		FVector2D NormalizedPosition;
+		if (not LandscapeDataManagerConstants::GetNormalizedBoundsPosition(
+			PaintBounds,
+			SamplePosition,
+			NormalizedPosition))
+		{
+			continue;
+		}
+
+		const float Coverage = LandscapeDataManagerConstants::GetPaintCoverage(
+			NormalizedPosition,
+			PaintConfiguration);
+		const float NormalizedDensity = FMath::Clamp(
+			Density * Coverage,
+			LandscapeDataManagerConstants::MinimumNormalizedValue,
+			LandscapeDataManagerConstants::MaximumNormalizedValue);
 		const int32 RasterIndex = (PixelY - InOutRaster.PixelBounds.Min.Y) * RasterWidth
 			+ PixelX - InOutRaster.PixelBounds.Min.X;
 		InOutRaster.Coverage[RasterIndex] = static_cast<uint8>(FMath::RoundToInt32(
-			Density * LandscapeDataManagerConstants::MaximumChannelValue));
+			NormalizedDensity * LandscapeDataManagerConstants::MaximumChannelValue));
 	}
 }
 

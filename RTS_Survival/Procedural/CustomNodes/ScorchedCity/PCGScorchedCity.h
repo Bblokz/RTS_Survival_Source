@@ -207,7 +207,8 @@ public:
 /**
  * @brief Execution element for ScorchedCity. Resolves assets and their real bounds, runs the
  * deterministic layout generator, spawns roads/intersections/buildings/poles as managed
- * actors and emits Scatter, OccupiedBounds, Buildings, Lots and OuterOrphanRoads point data.
+ * actors and emits Scatter, OccupiedBounds, Buildings, RoadBounds, RoadPoints,
+ * AuxiliaryPoints, RoadBlockPoints, Lots and OuterOrphanRoads point data.
  */
 class FPCGScorchedCityElement : public IPCGElement
 {

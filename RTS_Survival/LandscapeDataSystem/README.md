@@ -120,6 +120,19 @@ synchronously at the volume bounds-center Z and are never retained. Exact brush
 volume sampling requires query-capable collision; a `NoCollision` brush may produce
 zero density at runtime.
 
+`Paint Mode` provides the same artistic controls as **Mark Points In Landscape**:
+
+- **Solid Bounds** retains the sampled density throughout the volume projection.
+- **Radial** multiplies the sampled density by the configured elliptical falloff.
+- **Perlin Noise** multiplies it by thresholded fractal coverage.
+- **Radial With Noisy Bounds** combines the radial falloff with a deterministic
+  organic perimeter and a seeded bounds scale.
+
+The selected volume mode is evaluated against each volume's XY bounds before its
+coverage is stored. Perlin phases and noisy-bounds scale come from the PCG node seed,
+so the result remains stable until that seed changes. The volume's own sampled density
+always remains a mask: artistic settings cannot paint outside the volume's density.
+
 Both nodes expose the data-channel enum, show the chosen channel in their node title,
 and pass input data through unchanged. A managed PCG resource gives each node-stack
 invocation a stable contribution:

@@ -3,6 +3,7 @@
 #include "PCGMarkPointsInLandscape.h"
 
 #include "PCGLandscapeDataManagedResource.h"
+#include "PCGMarkLandscapeDataHelpers.h"
 #include "RTS_Survival/LandscapeDataSystem/LandscapeDataManager/LandscapeDataManager.h"
 
 #include "PCGComponent.h"
@@ -10,7 +11,6 @@
 #include "PCGNode.h"
 #include "PCGPin.h"
 #include "Data/PCGPointData.h"
-#include "Graph/PCGStackContext.h"
 #include "Helpers/PCGHelpers.h"
 #include "Utils/PCGLogErrors.h"
 
@@ -18,48 +18,6 @@
 
 namespace PCGMarkPointsInLandscape::Private
 {
-	constexpr float MinimumBoundsScale = 0.01f;
-	constexpr float NoiseOffsetRange = 1000.0f;
-
-	FString GetChannelTitle(const ERTSLandscapeDataChannel Channel)
-	{
-		switch (Channel)
-		{
-		case ERTSLandscapeDataChannel::Scorched:
-			return TEXT("Scorched (R)");
-		case ERTSLandscapeDataChannel::Gravel:
-			return TEXT("Gravel (G)");
-		case ERTSLandscapeDataChannel::Concrete:
-			return TEXT("Concrete (B)");
-		case ERTSLandscapeDataChannel::ExtraSand:
-			return TEXT("Extra Sand (A)");
-		}
-		return FString();
-	}
-
-	FString GetPaintModeTitle(const ERTSLandscapePointPaintMode PaintMode)
-	{
-		switch (PaintMode)
-		{
-		case ERTSLandscapePointPaintMode::Solid:
-			return TEXT("Solid Bounds");
-		case ERTSLandscapePointPaintMode::Radial:
-			return TEXT("Radial");
-		case ERTSLandscapePointPaintMode::PerlinNoise:
-			return TEXT("Perlin Noise");
-		case ERTSLandscapePointPaintMode::RadialWithNoisyBounds:
-			return TEXT("Radial With Noisy Bounds");
-		}
-		return FString();
-	}
-
-	FPCGCrc GetNodeInvocationCRC(const FPCGContext& Context)
-	{
-		FPCGStack InvocationStack(*Context.Stack);
-		InvocationStack.PushFrame(Context.Node);
-		return InvocationStack.GetCrc();
-	}
-
 	bool HasUsableBounds(const FPCGPoint& Point)
 	{
 		if (Point.Transform.ContainsNaN()
@@ -77,7 +35,6 @@ namespace PCGMarkPointsInLandscape::Private
 
 	void ConfigureNoisyBounds(
 		const UPCGMarkPointsInLandscapeSettings& Settings,
-		FRandomStream& RandomStream,
 		FRTSLandscapeDataPointStamp& OutPointStamp)
 	{
 		if (Settings.PaintMode != ERTSLandscapePointPaintMode::RadialWithNoisyBounds)
@@ -85,19 +42,7 @@ namespace PCGMarkPointsInLandscape::Private
 			return;
 		}
 
-		const float RequestedMinimum = FMath::IsFinite(Settings.NoisyRadialSettings.BoundsScaleMinimum)
-			? Settings.NoisyRadialSettings.BoundsScaleMinimum
-			: MinimumBoundsScale;
-		const float RequestedMaximum = FMath::IsFinite(Settings.NoisyRadialSettings.BoundsScaleMaximum)
-			? Settings.NoisyRadialSettings.BoundsScaleMaximum
-			: MinimumBoundsScale;
-		const float BoundsScaleMinimum = FMath::Max(
-			MinimumBoundsScale,
-			FMath::Min(RequestedMinimum, RequestedMaximum));
-		const float BoundsScaleMaximum = FMath::Max(
-			BoundsScaleMinimum,
-			FMath::Max(RequestedMinimum, RequestedMaximum));
-		const float BoundsScale = RandomStream.FRandRange(BoundsScaleMinimum, BoundsScaleMaximum);
+		const float BoundsScale = OutPointStamp.PaintConfiguration.BoundsScale;
 		const FVector BoundsCenter = (OutPointStamp.BoundsMin + OutPointStamp.BoundsMax) * 0.5f;
 		const FVector BoundsExtent = (OutPointStamp.BoundsMax - OutPointStamp.BoundsMin) * 0.5f;
 		OutPointStamp.BoundsMin = BoundsCenter - BoundsExtent * BoundsScale;
@@ -109,16 +54,13 @@ namespace PCGMarkPointsInLandscape::Private
 		const int32 PaintSeed,
 		FRTSLandscapeDataPointStamp& OutPointStamp)
 	{
-		OutPointStamp.PaintConfiguration.PaintMode = Settings.PaintMode;
-		OutPointStamp.PaintConfiguration.RadialSettings = Settings.RadialSettings;
-		OutPointStamp.PaintConfiguration.PerlinSettings = Settings.PerlinSettings;
-		OutPointStamp.PaintConfiguration.NoisyRadialSettings = Settings.NoisyRadialSettings;
-
-		FRandomStream RandomStream(PaintSeed);
-		OutPointStamp.PaintConfiguration.NoiseOffset = FVector2D(
-			RandomStream.FRandRange(-NoiseOffsetRange, NoiseOffsetRange),
-			RandomStream.FRandRange(-NoiseOffsetRange, NoiseOffsetRange));
-		ConfigureNoisyBounds(Settings, RandomStream, OutPointStamp);
+		OutPointStamp.PaintConfiguration = PCGMarkLandscapeData::CreatePaintConfiguration(
+			Settings.PaintMode,
+			Settings.RadialSettings,
+			Settings.PerlinSettings,
+			Settings.NoisyRadialSettings,
+			PaintSeed);
+		ConfigureNoisyBounds(Settings, OutPointStamp);
 	}
 
 	bool TryCopyPointStamp(
@@ -197,57 +139,6 @@ namespace PCGMarkPointsInLandscape::Private
 		return PointStamps;
 	}
 
-	void PassThroughInput(FPCGContext& Context)
-	{
-		Context.InputData.GetInputsAndCrcsByPin(
-			PCGPinConstants::DefaultInputLabel,
-			Context.OutputData.TaggedData,
-			Context.OutputData.DataCrcs);
-		for (FPCGTaggedData& TaggedData : Context.OutputData.TaggedData)
-		{
-			TaggedData.Pin = PCGPinConstants::DefaultOutputLabel;
-		}
-	}
-
-	ALandscapeDataManager* FindLandscapeDataManager(
-		FPCGContext* Context,
-		UPCGComponent& SourceComponent)
-	{
-		FString FailureReason;
-		ALandscapeDataManager* LandscapeDataManager =
-			ALandscapeDataManager::FindUniqueManager(&SourceComponent, FailureReason);
-		if (not IsValid(LandscapeDataManager))
-		{
-			PCGE_LOG_C(Error, GraphAndLog, Context, FText::Format(
-				LOCTEXT("ManagerLookupFailed", "Mark Points In Landscape could not find its manager: {0}"),
-				FText::FromString(FailureReason)));
-			return nullptr;
-		}
-
-		return LandscapeDataManager;
-	}
-
-	UPCGLandscapeDataManagedResource* GetOrCreateManagedResource(
-		UPCGComponent& SourceComponent,
-		const uint64 SettingsUID,
-		const FPCGCrc& StackCRC,
-		bool& bOutShouldRegisterResource)
-	{
-		UPCGLandscapeDataManagedResource* ManagedResource =
-			UPCGLandscapeDataManagedResource::FindReusableResource(
-				SourceComponent,
-				SettingsUID,
-				StackCRC);
-		bOutShouldRegisterResource = ManagedResource == nullptr;
-		if (not bOutShouldRegisterResource)
-		{
-			return ManagedResource;
-		}
-
-		ManagedResource = NewObject<UPCGLandscapeDataManagedResource>(&SourceComponent);
-		ManagedResource->InitializeIdentity(SettingsUID, StackCRC);
-		return ManagedResource;
-	}
 }
 
 bool UPCGMarkPointsInLandscapeSettings::UseSeed() const
@@ -282,8 +173,8 @@ FString UPCGMarkPointsInLandscapeSettings::GetAdditionalTitleInformation() const
 {
 	return FString::Printf(
 		TEXT("%s | %s"),
-		*PCGMarkPointsInLandscape::Private::GetChannelTitle(Channel),
-		*PCGMarkPointsInLandscape::Private::GetPaintModeTitle(PaintMode));
+		*PCGMarkLandscapeData::GetChannelTitle(Channel),
+		*PCGMarkLandscapeData::GetPaintModeTitle(PaintMode));
 }
 #endif
 
@@ -311,7 +202,7 @@ FPCGElementPtr UPCGMarkPointsInLandscapeSettings::CreateElement() const
 bool FPCGMarkPointsInLandscapeElement::ExecuteInternal(FPCGContext* Context) const
 {
 	check(Context);
-	PCGMarkPointsInLandscape::Private::PassThroughInput(*Context);
+	PCGMarkLandscapeData::PassThroughInput(*Context);
 
 	const UPCGMarkPointsInLandscapeSettings* Settings =
 		Context->GetInputSettings<UPCGMarkPointsInLandscapeSettings>();
@@ -328,16 +219,19 @@ bool FPCGMarkPointsInLandscapeElement::ExecuteInternal(FPCGContext* Context) con
 	}
 
 	ALandscapeDataManager* LandscapeDataManager =
-		PCGMarkPointsInLandscape::Private::FindLandscapeDataManager(Context, *SourceComponent);
+		PCGMarkLandscapeData::FindLandscapeDataManager(
+			Context,
+			*SourceComponent,
+			LOCTEXT("NodeTitle", "Mark Points In Landscape"));
 	if (not IsValid(LandscapeDataManager))
 	{
 		return true;
 	}
 
-	const FPCGCrc StackCRC = PCGMarkPointsInLandscape::Private::GetNodeInvocationCRC(*Context);
+	const FPCGCrc StackCRC = PCGMarkLandscapeData::GetNodeInvocationCRC(*Context);
 	bool bShouldRegisterResource = false;
 	UPCGLandscapeDataManagedResource* ManagedResource =
-		PCGMarkPointsInLandscape::Private::GetOrCreateManagedResource(
+		PCGMarkLandscapeData::GetOrCreateManagedResource(
 		*SourceComponent,
 		Settings->GetStableUID(),
 		StackCRC,
