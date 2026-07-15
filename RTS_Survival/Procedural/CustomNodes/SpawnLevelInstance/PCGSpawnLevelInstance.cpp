@@ -202,6 +202,46 @@ namespace
 		return LocalBounds;
 	}
 
+	/** @brief Collects bounds from the actors in a streamed runtime level instance. */
+	bool TryGetRuntimeLevelInstanceBounds(
+		const ULevelInstanceSubsystem& LevelInstanceSubsystem,
+		const ALevelInstance& LevelInstanceActor,
+		FBox& OutWorldBounds)
+	{
+		if (not LevelInstanceActor.IsLoaded())
+		{
+			return false;
+		}
+
+		FBox WorldBounds(EForceInit::ForceInit);
+		bool bFoundValidBounds = false;
+		LevelInstanceSubsystem.ForEachActorInLevelInstance(&LevelInstanceActor,
+			[&WorldBounds, &bFoundValidBounds](AActor* LevelActor)
+			{
+				if (not IsValid(LevelActor))
+				{
+					return true;
+				}
+
+				const FBox ActorBounds = LevelActor->GetComponentsBoundingBox(true);
+				if (ActorBounds.IsValid)
+				{
+					WorldBounds += ActorBounds;
+					bFoundValidBounds = true;
+				}
+
+				return true;
+			});
+
+		if (not bFoundValidBounds)
+		{
+			return false;
+		}
+
+		OutWorldBounds = WorldBounds;
+		return true;
+	}
+
 	/** @brief Spawns one level instance at the given pivot point and records it in the context. */
 	void SpawnLevelInstanceAtPoint(
 		FPCGSpawnLevelInstanceContext* Context,
@@ -347,8 +387,7 @@ namespace
 			}
 
 			FBox WorldBounds(EForceInit::ForceInit);
-			if (not LevelInstanceActor->IsLoaded()
-				|| not LevelInstanceSubsystem->GetLevelInstanceBounds(LevelInstanceActor, WorldBounds))
+			if (not TryGetRuntimeLevelInstanceBounds(*LevelInstanceSubsystem, *LevelInstanceActor, WorldBounds))
 			{
 				bAllResolved = false;
 				continue;

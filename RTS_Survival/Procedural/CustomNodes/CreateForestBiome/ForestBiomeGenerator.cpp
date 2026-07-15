@@ -47,6 +47,11 @@ void FForestBiomeGenerator::Generate(FForestBiomeGenResult& OutResult)
 
 	ScatterFoliage(ComputeTargetCount(M_Params.FoliagePer1000), OutResult.Foliage);
 
+	const double GlobalDecalSizeMultiplier = PickScale(
+		true, M_Params.MinGlobalDecalSizeMultiplier, M_Params.MaxGlobalDecalSizeMultiplier);
+	ScatterDecals(
+		ComputeTargetCount(M_Params.DecalsPer1000), GlobalDecalSizeMultiplier, OutResult.Decals);
+
 	ScatterAuxiliaries(OutResult);
 }
 
@@ -178,6 +183,42 @@ void FForestBiomeGenerator::ScatterFoliage(const int32 TargetCount, TArray<FFore
 		Placement.Position = Point;
 		Placement.YawRadians = M_Random.FRandRange(0.0, ForestBiomeGenConstants::TwoPi);
 		Placement.UniformScale = Scale;
+		++Placed;
+	}
+}
+
+void FForestBiomeGenerator::ScatterDecals(
+	const int32 TargetCount,
+	const double GlobalSizeMultiplier,
+	TArray<FForestDecalPlacement>& OutPlacements)
+{
+	if (M_Params.Decals.IsEmpty() || TargetCount <= 0)
+	{
+		return;
+	}
+
+	const int32 MaxAttempts = ComputeAttemptBudget(TargetCount);
+	int32 Placed = 0;
+	for (int32 Attempt = 0; Attempt < MaxAttempts && Placed < TargetCount; ++Attempt)
+	{
+		const int32 EntryIndex = PickWeightedDecal(M_Params.Decals);
+		if (EntryIndex == INDEX_NONE)
+		{
+			return;
+		}
+
+		const FVector2D Point = RandomLocalPoint();
+		if (not IsAllowedPoint(Point))
+		{
+			continue;
+		}
+
+		const FForestResolvedDecal& Entry = M_Params.Decals[EntryIndex];
+		FForestDecalPlacement& Placement = OutPlacements.Emplace_GetRef();
+		Placement.EntryIndex = EntryIndex;
+		Placement.Position = Point;
+		Placement.YawRadians = M_Random.FRandRange(0.0, ForestBiomeGenConstants::TwoPi);
+		Placement.DecalSize = Entry.DecalSize * GlobalSizeMultiplier;
 		++Placed;
 	}
 }
@@ -343,6 +384,35 @@ int32 FForestBiomeGenerator::PickWeightedFoliage(const TArray<FForestResolvedFol
 
 	double WeightSum = 0.0;
 	for (const FForestResolvedFoliage& Entry : Entries)
+	{
+		WeightSum += FMath::Max(0.0f, Entry.Weight);
+	}
+	if (WeightSum <= 0.0)
+	{
+		return 0;
+	}
+
+	double Roll = M_Random.FRandRange(0.0, WeightSum);
+	for (int32 Index = 0; Index < Entries.Num(); ++Index)
+	{
+		Roll -= FMath::Max(0.0f, Entries[Index].Weight);
+		if (Roll <= 0.0)
+		{
+			return Index;
+		}
+	}
+	return Entries.Num() - 1;
+}
+
+int32 FForestBiomeGenerator::PickWeightedDecal(const TArray<FForestResolvedDecal>& Entries)
+{
+	if (Entries.IsEmpty())
+	{
+		return INDEX_NONE;
+	}
+
+	double WeightSum = 0.0;
+	for (const FForestResolvedDecal& Entry : Entries)
 	{
 		WeightSum += FMath::Max(0.0f, Entry.Weight);
 	}

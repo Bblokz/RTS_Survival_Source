@@ -34,6 +34,16 @@ struct FForestResolvedFoliage
 	float MaxScale = 1.2f;
 };
 
+/** @brief A decal entry with a loaded material recorded externally and its base dimensions copied. */
+struct FForestResolvedDecal
+{
+	// Index into the settings' Decals array.
+	int32 SettingsIndex = INDEX_NONE;
+
+	float Weight = 1.0f;
+	FVector DecalSize = FVector(50.0, 200.0, 200.0);
+};
+
 /**
  * @brief An auxiliary entry with its radius resolved and its size-scaled isolation distance
  * precomputed by the element, so the generator only has to compare distances.
@@ -67,6 +77,15 @@ struct FForestPlacement
 	double UniformScale = 1.0;
 };
 
+/** @brief One decal placement in biome-local XY space, including its final projected dimensions. */
+struct FForestDecalPlacement
+{
+	int32 EntryIndex = INDEX_NONE;
+	FVector2D Position = FVector2D::ZeroVector;
+	double YawRadians = 0.0;
+	FVector DecalSize = FVector(50.0, 200.0, 200.0);
+};
+
 /** @brief Everything one generation run produced, grouped by category. */
 struct FForestBiomeGenResult
 {
@@ -74,6 +93,7 @@ struct FForestBiomeGenResult
 	TArray<FForestPlacement> RegularTrees;
 	TArray<FForestPlacement> Bushes;
 	TArray<FForestPlacement> Foliage;
+	TArray<FForestDecalPlacement> Decals;
 	TArray<FForestPlacement> Auxiliaries;
 };
 
@@ -93,16 +113,20 @@ struct FForestBiomeGenParams
 	double RegularTreesPer1000 = 2.0;
 	double BushesPer1000 = 3.0;
 	double FoliagePer1000 = 8.0;
+	double DecalsPer1000 = 2.0;
 	double AuxiliariesPer1000 = 1.0;
 	double GlobalDensityMultiplier = 1.0;
 
 	// Extra spacing (cm) kept between neighbouring trees/bushes on top of their clearance radii.
 	double PropSpacing = 100.0;
+	float MinGlobalDecalSizeMultiplier = 0.8f;
+	float MaxGlobalDecalSizeMultiplier = 1.2f;
 
 	TArray<FForestResolvedProp> LargeTrees;
 	TArray<FForestResolvedProp> RegularTrees;
 	TArray<FForestResolvedProp> Bushes;
 	TArray<FForestResolvedFoliage> Foliage;
+	TArray<FForestResolvedDecal> Decals;
 	TArray<FForestResolvedAuxiliary> Auxiliaries;
 
 	// Optional exclusion test in biome-local space (fed by the node's Exclusion input pin).
@@ -115,7 +139,7 @@ struct FForestBiomeGenParams
 
 /**
  * @brief Deterministic forest scatter generator. Places large trees, regular trees, bushes,
- * foliage and auxiliaries in that order into a shared occupancy grid, so later categories only
+ * foliage, decals and auxiliaries in that order into a shared occupancy grid, so later categories only
  * take space earlier ones left free. Consumes no UObjects; the element resolves assets before and
  * spawns actors / instances / points after.
  */
@@ -157,6 +181,14 @@ private:
 	/** @brief Scatters groundcover foliage: avoids tree/bush trunks but never blocks other foliage. */
 	void ScatterFoliage(int32 TargetCount, TArray<FForestPlacement>& OutPlacements);
 
+	/**
+	 * @brief Produces ground decal placements without reserving forest-floor space.
+	 * @param TargetCount Number of placements requested from the decal density.
+	 * @param GlobalSizeMultiplier Generation-wide scale applied to each entry's base dimensions.
+	 * @param OutPlacements Receives the final local positions, rotations and dimensions.
+	 */
+	void ScatterDecals(int32 TargetCount, double GlobalSizeMultiplier, TArray<FForestDecalPlacement>& OutPlacements);
+
 	/** @brief Scatters auxiliaries largest-first so wider isolations are claimed before smaller props fill in. */
 	void ScatterAuxiliaries(FForestBiomeGenResult& OutResult);
 	void ScatterAuxiliaryEntry(int32 ResolvedIndex, int32 TargetCount, TArray<FForestPlacement>& OutPlacements);
@@ -167,4 +199,5 @@ private:
 	double PickScale(bool bOverride, float MinScale, float MaxScale);
 	int32 PickWeightedProp(const TArray<FForestResolvedProp>& Entries);
 	int32 PickWeightedFoliage(const TArray<FForestResolvedFoliage>& Entries);
+	int32 PickWeightedDecal(const TArray<FForestResolvedDecal>& Entries);
 };

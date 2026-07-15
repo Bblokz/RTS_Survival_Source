@@ -910,10 +910,30 @@ void ACPPController::TakeScreenShot(const bool bIncludeUI, const float InnerPerc
 		return;
 	}
 
-	const bool bQueued = M_ViewportScreenshotTask.Request(World, bIncludeUI, InnerPercent);
+	const bool bQueued = M_ViewportScreenshotTask.Request(World, bIncludeUI, InnerPercent, FIntPoint::ZeroValue);
 	if (not bQueued)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("TakeScreenShot: failed to queue screenshot request."));
+	}
+}
+
+void ACPPController::TakeUltraHDScreenShot()
+{
+	constexpr int32 UltraHDWidth = 3840;
+	constexpr int32 UltraHDHeight = 2160;
+	const FIntPoint UltraHDResolution(UltraHDWidth, UltraHDHeight);
+
+	UWorld* const World = GetWorld();
+	if (World == nullptr)
+	{
+		UE_LOG(LogTemp, Error, TEXT("TakeUltraHDScreenShot: World is null."));
+		return;
+	}
+
+	const bool bQueued = M_ViewportScreenshotTask.Request(World, false, 1.0f, UltraHDResolution);
+	if (not bQueued)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TakeUltraHDScreenShot: failed to queue Ultra HD screenshot request."));
 	}
 }
 

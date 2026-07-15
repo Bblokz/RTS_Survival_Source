@@ -344,6 +344,12 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void TakeScreenShot(const bool bIncludeUI, const float InnerPercent);
 
+	/**
+	 * @brief Captures a full-frame Ultra HD screenshot for sharing or reference.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void TakeUltraHDScreenShot();
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Steam Capture")
 	bool SetSteamCaptureRecordingEnabled(const bool bEnable);
 

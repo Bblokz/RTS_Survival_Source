@@ -10,7 +10,10 @@
 #include "Misc/FileHelper.h"
 #include "HAL/FileManager.h"
 
-bool FViewportScreenshotTask::Request(const UWorld* World, const bool bIncludeUI, float InnerPercent)
+bool FViewportScreenshotTask::Request(const UWorld* World,
+                                      const bool bIncludeUI,
+                                      float InnerPercent,
+                                      const FIntPoint& TargetResolution)
 {
 	if (World == nullptr)
 	{
@@ -22,6 +25,23 @@ bool FViewportScreenshotTask::Request(const UWorld* World, const bool bIncludeUI
 	if (GameViewportClient == nullptr || GameViewportClient->Viewport == nullptr)
 	{
 		UE_LOG(LogTemp, Error, TEXT("ViewportScreenshotTask: GameViewportClient/Viewport is null."));
+		return false;
+	}
+
+	const FIntPoint CaptureResolution = TargetResolution == FIntPoint::ZeroValue
+		? GameViewportClient->Viewport->GetSizeXY()
+		: TargetResolution;
+	if (CaptureResolution.X <= 0 || CaptureResolution.Y <= 0)
+	{
+		UE_LOG(LogTemp, Error, TEXT("ViewportScreenshotTask: Capture resolution is invalid (%d x %d)."),
+			CaptureResolution.X, CaptureResolution.Y);
+		return false;
+	}
+
+	if (not GetHighResScreenshotConfig().SetResolution(CaptureResolution.X, CaptureResolution.Y))
+	{
+		UE_LOG(LogTemp, Error, TEXT("ViewportScreenshotTask: Could not set capture resolution to %d x %d."),
+			CaptureResolution.X, CaptureResolution.Y);
 		return false;
 	}
 

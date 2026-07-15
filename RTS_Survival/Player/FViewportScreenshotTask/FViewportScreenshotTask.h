@@ -18,9 +18,10 @@ public:
 	 * @param World        World used to resolve the GameViewport.
 	 * @param bIncludeUI   Capture Slate UI as well.
 	 * @param InnerPercent Fraction [0..1] of the viewport (centered) to keep; 1 keeps the full frame.
+	 * @param TargetResolution Requested capture resolution. Zero uses the current viewport resolution.
 	 * @return true if the request was queued successfully, false on validation failure.
 	 */
-	bool Request(const UWorld* World, bool bIncludeUI, float InnerPercent);
+	bool Request(const UWorld* World, bool bIncludeUI, float InnerPercent, const FIntPoint& TargetResolution);
 
 	/** Unbinds the delegate if still bound (safe to call multiple times). */
 	void Shutdown();

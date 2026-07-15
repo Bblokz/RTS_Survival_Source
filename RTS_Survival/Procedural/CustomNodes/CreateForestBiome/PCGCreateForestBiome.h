@@ -9,7 +9,7 @@
 
 /**
  * @brief Settings for the CreateForestBiome node. Scatters a forest inside the input spawn volume:
- * large trees, regular trees, bushes, foliage and auxiliary props (rocks etc.), each with its own
+ * large trees, regular trees, bushes, foliage, ground decals and auxiliary props (rocks etc.), each with its own
  * areal density. Trees spawn as their own Blueprint actors; bushes and instanced auxiliaries are
  * batched into Hierarchical Instanced Static Mesh components; foliage is emitted on the Foliage
  * output pin for a GPU Static Mesh Spawner. The Trees output exposes the actual spawned tree
@@ -68,6 +68,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Main", meta = (ClampMin = "0"))
 	float FoliagePer1000Units = 8.0f;
 
+	/** @brief Average ground decals per 1000 x 1000 unit tile of the biome. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Main", meta = (ClampMin = "0"))
+	float DecalsPer1000Units = 2.0f;
+
 	/** @brief Average auxiliary props per 1000 x 1000 unit tile of the biome. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Main", meta = (ClampMin = "0"))
 	float AuxiliariesPer1000Units = 1.0f;
@@ -103,6 +107,20 @@ public:
 	/** @brief Foliage meshes emitted on the Foliage output pin for a GPU Static Mesh Spawner. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Foliage")
 	TArray<FForestFoliageEntry> Foliage;
+
+	// --- Decals ---
+
+	/** @brief Ground decals dispersed through the forest and projected onto the landscape. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Decals")
+	TArray<FForestDecalEntry> Decals;
+
+	/** @brief Lowest generation-wide multiplier applied to every selected decal entry's base size. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Decals", meta = (ClampMin = "0.01"))
+	float MinGlobalDecalSizeMultiplier = 0.8f;
+
+	/** @brief Highest generation-wide multiplier applied to every selected decal entry's base size. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Decals", meta = (ClampMin = "0.01"))
+	float MaxGlobalDecalSizeMultiplier = 1.2f;
 
 	// --- Auxiliaries ---
 

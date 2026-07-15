@@ -7,6 +7,7 @@
 #include "PCGForestBiomeTypes.generated.h"
 
 class AActor;
+class UMaterialInterface;
 class UStaticMesh;
 
 // ---------------------------------------------------------------------------
@@ -96,6 +97,27 @@ struct FForestFoliageEntry
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Foliage, meta = (ClampMin = "0.01"))
 	float MaxScale = 1.2f;
+};
+
+/**
+ * @brief One ground-projected decal that can be selected while dressing the forest floor.
+ * Its configured size is multiplied by the generation-wide decal size multiplier.
+ */
+USTRUCT(BlueprintType)
+struct FForestDecalEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decal)
+	TSoftObjectPtr<UMaterialInterface> Material;
+
+	/** @brief Relative pick chance among all forest decal entries. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decal, meta = (ClampMin = "0"))
+	float Weight = 1.0f;
+
+	/** @brief Base decal dimensions (depth, width, height) in cm before the global multiplier is applied. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Decal)
+	FVector DecalSize = FVector(50.0f, 200.0f, 200.0f);
 };
 
 /**

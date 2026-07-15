@@ -2,6 +2,7 @@
 
 #include "FMoveUnitsFromConstruction.h"
 
+#include "Engine/OverlapResult.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"

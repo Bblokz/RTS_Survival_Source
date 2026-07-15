@@ -17,6 +17,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 
 #include "CollisionQueryParams.h"
+#include "Components/DecalComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -25,6 +26,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Materials/MaterialInterface.h"
 
 #define LOCTEXT_NAMESPACE "PCGCreateForestBiome"
 
@@ -48,6 +50,7 @@ namespace ForestBiomePCGConstants
 	constexpr double DefaultAuxiliaryRadius = 150.0;
 	constexpr double MinPropRadius = 10.0;
 	constexpr double MinFoliageRadius = 5.0;
+	constexpr double MinDecalDimension = 1.0;
 
 	// Half-size of the probe used when sampling the exclusion / area spatial data.
 	constexpr double AreaSampleHalfExtent = 50.0;
@@ -74,8 +77,8 @@ FText UPCGCreateForestBiomeSettings::GetDefaultNodeTitle() const
 FText UPCGCreateForestBiomeSettings::GetNodeTooltipText() const
 {
 	return LOCTEXT("NodeTooltip",
-		"Scatters a forest inside the input spawn volume: large trees, regular trees, bushes, foliage "
-		"and auxiliary props (rocks etc.), each with its own count per 1000x1000 unit tile. Trees spawn "
+		"Scatters a forest inside the input spawn volume: large trees, regular trees, bushes, foliage, "
+		"ground decals and auxiliary props (rocks etc.), each with its own count per 1000x1000 unit tile. Trees spawn "
 		"as standalone Blueprint actors; bushes and instanced auxiliaries are batched into Hierarchical "
 		"ISM actors. Trees outputs the spawned tree locations with measured bounds; foliage is emitted on "
 		"the Foliage output pin for a GPU Static Mesh Spawner (mesh selection 'By Attribute', attribute "
@@ -140,6 +143,9 @@ namespace
 
 		// Parallel to FForestBiomeGenParams::Foliage.
 		TArray<FSoftObjectPath> FoliageMeshPaths;
+
+		// Parallel to FForestBiomeGenParams::Decals.
+		TArray<UMaterialInterface*> DecalMaterials;
 
 		// Parallel to FForestBiomeGenParams::Auxiliaries.
 		TArray<UClass*> AuxiliaryClasses;
@@ -324,6 +330,34 @@ namespace
 
 			OutResolved.Add(Resolved);
 			OutMeshPaths.Add(Entry.Mesh.ToSoftObjectPath());
+		}
+	}
+
+	void ResolveDecals(
+		FPCGContext* Context,
+		const TArray<FForestDecalEntry>& Entries,
+		TArray<FForestResolvedDecal>& OutResolved,
+		TArray<UMaterialInterface*>& OutMaterials)
+	{
+		for (int32 SettingsIndex = 0; SettingsIndex < Entries.Num(); ++SettingsIndex)
+		{
+			const FForestDecalEntry& Entry = Entries[SettingsIndex];
+			UMaterialInterface* Material = Entry.Material.LoadSynchronous();
+			if (Material == nullptr)
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, Context,
+					LOCTEXT("NullDecalMaterial", "CreateForestBiome: a decal entry has no valid material and was skipped."));
+				continue;
+			}
+
+			FForestResolvedDecal& Resolved = OutResolved.Emplace_GetRef();
+			Resolved.SettingsIndex = SettingsIndex;
+			Resolved.Weight = Entry.Weight;
+			Resolved.DecalSize = FVector(
+				FMath::Max(ForestBiomePCGConstants::MinDecalDimension, Entry.DecalSize.X),
+				FMath::Max(ForestBiomePCGConstants::MinDecalDimension, Entry.DecalSize.Y),
+				FMath::Max(ForestBiomePCGConstants::MinDecalDimension, Entry.DecalSize.Z));
+			OutMaterials.Add(Material);
 		}
 	}
 
@@ -883,6 +917,61 @@ namespace
 			SpawnGroundActor(World, Assets.AuxiliaryClasses[Placement.EntryIndex], Placement, BiomeToWorld, true, OutSpawnedActors);
 		}
 	}
+
+	/** @brief Projects forest decals straight down onto the landscape and owns them on one PCG-managed actor. */
+	void SpawnDecals(
+		UWorld& World,
+		const TArray<FForestDecalPlacement>& Placements,
+		const TArray<UMaterialInterface*>& Materials,
+		const FTransform& BiomeToWorld,
+		TArray<AActor*>& OutSpawnedActors)
+	{
+		if (Placements.IsEmpty())
+		{
+			return;
+		}
+
+		AActor* Anchor = SpawnManagedEmptyActor(
+			World, FTransform(BiomeToWorld.GetLocation()), TEXT("PCG_ForestDecals"));
+		if (Anchor == nullptr)
+		{
+			return;
+		}
+		OutSpawnedActors.Add(Anchor);
+
+		USceneComponent* Root = NewObject<USceneComponent>(Anchor);
+		Anchor->SetRootComponent(Root);
+		Anchor->AddInstanceComponent(Root);
+		Root->RegisterComponent();
+
+		const FCollisionQueryParams TraceParams = MakeGroundTraceParams(OutSpawnedActors);
+		for (const FForestDecalPlacement& Placement : Placements)
+		{
+			if (not Materials.IsValidIndex(Placement.EntryIndex))
+			{
+				continue;
+			}
+
+			UMaterialInterface* Material = Materials[Placement.EntryIndex];
+			if (Material == nullptr)
+			{
+				continue;
+			}
+
+			const FVector WorldPosition = BiomeToWorld.TransformPosition(FVector(Placement.Position, 0.0));
+			const FForestGroundHit Ground = ProjectToGround(World, WorldPosition, TraceParams);
+			const FRotator Rotation(-90.0, FMath::RadiansToDegrees(Placement.YawRadians), 0.0);
+
+			UDecalComponent* DecalComponent = NewObject<UDecalComponent>(Anchor);
+			DecalComponent->SetMobility(EComponentMobility::Static);
+			DecalComponent->SetDecalMaterial(Material);
+			DecalComponent->DecalSize = Placement.DecalSize;
+			DecalComponent->SetWorldTransform(FTransform(Rotation, Ground.Position));
+			DecalComponent->AttachToComponent(Root, FAttachmentTransformRules::KeepWorldTransform);
+			Anchor->AddInstanceComponent(DecalComponent);
+			DecalComponent->RegisterComponent();
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1022,9 +1111,12 @@ namespace
 		Params.RegularTreesPer1000 = Settings->RegularTreesPer1000Units;
 		Params.BushesPer1000 = Settings->BushesPer1000Units;
 		Params.FoliagePer1000 = Settings->FoliagePer1000Units;
+		Params.DecalsPer1000 = Settings->DecalsPer1000Units;
 		Params.AuxiliariesPer1000 = Settings->AuxiliariesPer1000Units;
 		Params.GlobalDensityMultiplier = Settings->GlobalDensityMultiplier;
 		Params.PropSpacing = Settings->PropSpacing;
+		Params.MinGlobalDecalSizeMultiplier = Settings->MinGlobalDecalSizeMultiplier;
+		Params.MaxGlobalDecalSizeMultiplier = Settings->MaxGlobalDecalSizeMultiplier;
 	}
 
 	void ResolveAllAssets(
@@ -1042,6 +1134,7 @@ namespace
 			&Assets.RegularTreeLocalBounds);
 		ResolveProps(Context, World, Settings->Bushes, Params.Bushes, Assets.BushClasses, &Assets.BushMeshInstances, nullptr);
 		ResolveFoliage(Context, Settings->Foliage, Params.Foliage, Assets.FoliageMeshPaths);
+		ResolveDecals(Context, Settings->Decals, Params.Decals, Assets.DecalMaterials);
 		ResolveAuxiliaries(Context, Settings, World, Params.Auxiliaries, Assets);
 	}
 
@@ -1062,6 +1155,7 @@ namespace
 		SpawnInstancedPlacements(
 			World, Result.Bushes, Assets.BushMeshInstances, Assets.BushClasses, BiomeToWorld,
 			TEXT("PCG_ForestBushes"), OutSpawnedActors);
+		SpawnDecals(World, Result.Decals, Assets.DecalMaterials, BiomeToWorld, OutSpawnedActors);
 		SpawnAuxiliaries(World, Result.Auxiliaries, Assets, BiomeToWorld, OutSpawnedActors);
 	}
 
