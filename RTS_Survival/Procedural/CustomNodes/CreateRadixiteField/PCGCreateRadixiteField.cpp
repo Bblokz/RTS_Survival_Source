@@ -11,10 +11,13 @@
 #include "Components/SplineComponent.h"
 #include "Data/PCGPointData.h"
 #include "Data/PCGSpatialData.h"
+#include "CollisionQueryParams.h"
 #include "Engine/HitResult.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/Actor.h"
 #include "Helpers/PCGHelpers.h"
+#include "LandscapeProxy.h"
 #include "Materials/MaterialInterface.h"
 #include "Metadata/PCGMetadata.h"
 #include "Metadata/PCGMetadataAttribute.h"
@@ -351,6 +354,45 @@ namespace
 		return false;
 	}
 
+	/**
+	 * @brief Resolves terrain exclusively from XY so the temporary spline's coarse Z cannot affect
+	 * placement, and traces only the matching landscape proxy to avoid snapping onto other actors.
+	 */
+	bool TryTraceLandscape(
+		UWorld& World,
+		const UPCGCreateRadixiteFieldSettings& Settings,
+		const FVector& Position,
+		FHitResult& OutHit)
+	{
+		const FCollisionQueryParams QueryParameters;
+		for (TActorIterator<ALandscapeProxy> LandscapeIterator(&World); LandscapeIterator; ++LandscapeIterator)
+		{
+			const ALandscapeProxy* Landscape = *LandscapeIterator;
+			if (not IsValid(Landscape))
+			{
+				continue;
+			}
+
+			const TOptional<float> LandscapeHeight = Landscape->GetHeightAtLocation(
+				FVector(Position.X, Position.Y, 0.0));
+			if (not LandscapeHeight.IsSet())
+			{
+				continue;
+			}
+
+			const FVector TracePosition(Position.X, Position.Y, LandscapeHeight.GetValue());
+			const FVector TraceStart = TracePosition + FVector::UpVector * Settings.GroundTraceUp;
+			const FVector TraceEnd = TracePosition - FVector::UpVector * Settings.GroundTraceDown;
+			if (Landscape->ActorLineTraceSingle(
+				OutHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	bool TryProjectToGround(
 		UWorld& World,
 		const UPCGCreateRadixiteFieldSettings& Settings,
@@ -358,10 +400,7 @@ namespace
 		FRadixiteGroundResult& OutGround)
 	{
 		FHitResult Hit;
-		const FVector TraceStart = Position + FVector::UpVector * Settings.GroundTraceUp;
-		const FVector TraceEnd = Position - FVector::UpVector * Settings.GroundTraceDown;
-		const FCollisionQueryParams QueryParameters;
-		if (not World.LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
+		if (not TryTraceLandscape(World, Settings, Position, Hit))
 		{
 			return false;
 		}
@@ -680,22 +719,13 @@ namespace
 			Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Ground.Normal) * Rotation;
 		}
 
-		double RotatedMinimumZ = TNumericLimits<double>::Max();
-		for (int32 XIndex = 0; XIndex < 2; ++XIndex)
-		{
-			for (int32 YIndex = 0; YIndex < 2; ++YIndex)
-			{
-				for (int32 ZIndex = 0; ZIndex < 2; ++ZIndex)
-				{
-					const FVector Corner(
-						(XIndex == 0 ? Asset.LocalBounds.Min.X : Asset.LocalBounds.Max.X) * UniformScale,
-						(YIndex == 0 ? Asset.LocalBounds.Min.Y : Asset.LocalBounds.Max.Y) * UniformScale,
-						(ZIndex == 0 ? Asset.LocalBounds.Min.Z : Asset.LocalBounds.Max.Z) * UniformScale);
-					RotatedMinimumZ = FMath::Min(RotatedMinimumZ, Rotation.RotateVector(Corner).Z);
-				}
-			}
-		}
-		const FVector Location = Ground.Position + FVector::UpVector * (Asset.ZOffset - RotatedMinimumZ);
+		const FVector LocalSurfaceAnchor(
+			Asset.LocalBounds.GetCenter().X,
+			Asset.LocalBounds.GetCenter().Y,
+			Asset.LocalBounds.Min.Z);
+		const FVector RotatedSurfaceAnchor = Rotation.RotateVector(LocalSurfaceAnchor * UniformScale);
+		const FVector OffsetDirection = bAlignToGround ? Ground.Normal : FVector::UpVector;
+		const FVector Location = Ground.Position + OffsetDirection * Asset.ZOffset - RotatedSurfaceAnchor;
 		return FTransform(Rotation, Location, FVector(UniformScale));
 	}
 

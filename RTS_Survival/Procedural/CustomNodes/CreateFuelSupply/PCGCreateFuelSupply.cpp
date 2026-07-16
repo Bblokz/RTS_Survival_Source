@@ -8,6 +8,8 @@
 #include "PCGPin.h"
 #include "Data/PCGPointData.h"
 #include "Data/PCGPolyLineData.h"
+#include "Data/PCGSplineData.h"
+#include "Data/PCGSplineInteriorSurfaceData.h"
 #include "Data/PCGSpatialData.h"
 #include "Helpers/PCGHelpers.h"
 #include "Metadata/PCGMetadata.h"
@@ -25,6 +27,7 @@ namespace FuelSupplyPCGConstants
 {
 	const FName ExclusionPinLabel = TEXT("Exclusion");
 	const FName OccupiedBoundsPinLabel = TEXT("OccupiedBounds");
+	const FName FacilityAreaPinLabel = TEXT("FacilityArea");
 	const FName PipeRoutesPinLabel = TEXT("PipeRoutes");
 	const FName RoleAttributeName = TEXT("FuelSupplyRole");
 	const FName NetworkAttributeName = TEXT("NetworkIndex");
@@ -73,7 +76,8 @@ FText UPCGCreateFuelSupplySettings::GetNodeTooltipText() const
 	return LOCTEXT("NodeTooltip",
 		"Creates bounds-aware supply depots and fuel tanks, routes a connector-authored destructible pipe "
 		"network around exclusions, and encloses tanks with standalone Blueprint fences. Fence openings "
-		"are derived from the generated pipe crossings. Deterministic from RandomSeed.");
+		"are derived from the generated pipe crossings. FacilityArea provides one continuous exclusion "
+		"surface covering the complete generated facility. Deterministic from RandomSeed.");
 }
 #endif
 
@@ -94,6 +98,7 @@ TArray<FPCGPinProperties> UPCGCreateFuelSupplySettings::OutputPinProperties() co
 {
 	TArray<FPCGPinProperties> Pins;
 	Pins.Emplace(FuelSupplyPCGConstants::OccupiedBoundsPinLabel, EPCGDataType::Point);
+	Pins.Emplace(FuelSupplyPCGConstants::FacilityAreaPinLabel, EPCGDataType::Surface);
 	Pins.Emplace(FuelSupplyPCGConstants::PipeRoutesPinLabel, EPCGDataType::Point);
 	return Pins;
 }
@@ -1625,6 +1630,49 @@ namespace
 		}
 	}
 
+	void EmitFacilityArea(
+		FPCGContext* Context,
+		const TArray<FPlacedFuelActor>& Placements,
+		const double Height)
+	{
+		FBox2D FacilityBounds(EForceInit::ForceInit);
+		for (const FPlacedFuelActor& Placement : Placements)
+		{
+			FacilityBounds += Placement.Footprint.Min;
+			FacilityBounds += Placement.Footprint.Max;
+		}
+		if (not FacilityBounds.bIsValid)
+		{
+			return;
+		}
+
+		const FVector2D Corners[] = {
+			FacilityBounds.Min,
+			FVector2D(FacilityBounds.Max.X, FacilityBounds.Min.Y),
+			FacilityBounds.Max,
+			FVector2D(FacilityBounds.Min.X, FacilityBounds.Max.Y)
+		};
+		TArray<FSplinePoint> SplinePoints;
+		SplinePoints.Reserve(UE_ARRAY_COUNT(Corners));
+		for (int32 CornerIndex = 0; CornerIndex < UE_ARRAY_COUNT(Corners); ++CornerIndex)
+		{
+			SplinePoints.Emplace(
+				static_cast<float>(CornerIndex),
+				FVector(Corners[CornerIndex], Height),
+				ESplinePointType::Linear);
+		}
+
+		UPCGSplineData* SplineData = FPCGContext::NewObject_AnyThread<UPCGSplineData>(Context);
+		SplineData->Initialize(SplinePoints, true, FTransform::Identity);
+		UPCGSplineInteriorSurfaceData* FacilityArea =
+			FPCGContext::NewObject_AnyThread<UPCGSplineInteriorSurfaceData>(Context);
+		FacilityArea->Initialize(Context, SplineData);
+
+		FPCGTaggedData& Output = Context->OutputData.TaggedData.Emplace_GetRef();
+		Output.Data = FacilityArea;
+		Output.Pin = FuelSupplyPCGConstants::FacilityAreaPinLabel;
+	}
+
 	void EmitPipeRoutes(FPCGContext* Context, const TArray<TArray<FVector2D>>& Routes, const double Height, const int32 RandomSeed)
 	{
 		UPCGPointData* PointData = CreateFuelSupplyOutputPointData(Context, FuelSupplyPCGConstants::PipeRoutesPinLabel);
@@ -2146,6 +2194,7 @@ bool FPCGCreateFuelSupplyElement::ExecuteInternal(FPCGContext* Context) const
 		World, *Settings, AreaBounds, IsInsideArea, Exclusions, Assets.Fences, Generated);
 	SpawnAndRegisterActors(*SourceComponent, World, Generated.Placements);
 	EmitOccupiedBounds(Context, Generated.Placements, Settings->RandomSeed);
+	EmitFacilityArea(Context, Generated.Placements, AreaBounds.GetCenter().Z);
 	EmitPipeRoutes(Context, Generated.Routes, AreaBounds.GetCenter().Z, Settings->RandomSeed);
 	return true;
 }

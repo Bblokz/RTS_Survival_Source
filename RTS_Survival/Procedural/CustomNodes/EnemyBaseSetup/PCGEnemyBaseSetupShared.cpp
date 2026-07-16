@@ -48,6 +48,7 @@ namespace EnemyBaseSetupSharedConstants
 {
 	constexpr double MeasureSpawnDepth = -100000.0;
 	constexpr double DefaultFootprintHalfExtent = 200.0;
+	constexpr double MinFootprintHalfExtent = 0.5;
 	constexpr double DefaultBuildingHeight = 400.0;
 
 	constexpr double GroundTraceUp = 10000.0;
@@ -180,7 +181,9 @@ namespace
 	{
 		if (Settings.bUseFootprintOverride)
 		{
-			OutEntry.FootprintHalfExtents = Settings.FootprintOverride * 0.5;
+			OutEntry.FootprintHalfExtents = FVector2D(
+				FMath::Max(EnemyBaseSetupSharedConstants::MinFootprintHalfExtent, Settings.FootprintOverride.X * 0.5),
+				FMath::Max(EnemyBaseSetupSharedConstants::MinFootprintHalfExtent, Settings.FootprintOverride.Y * 0.5));
 			OutEntry.PivotToFootprintCenter = FVector2D::ZeroVector;
 			OutLocalBounds = FBox(
 				FVector(-OutEntry.FootprintHalfExtents.X, -OutEntry.FootprintHalfExtents.Y, 0.0),
@@ -234,6 +237,7 @@ void EnemyBaseSetupShared::ResolveBlueprintList(
 		Resolved.bOverrideScale = Settings.bOverrideScale;
 		Resolved.MinScale = Settings.MinScale;
 		Resolved.MaxScale = FMath::Max(Settings.MinScale, Settings.MaxScale);
+		Resolved.SandbagFrontAxis = Settings.SandbagFrontAxis;
 
 		FBox MeasuredLocalBounds(EForceInit::ForceInit);
 		if (not Settings.bUseFootprintOverride)

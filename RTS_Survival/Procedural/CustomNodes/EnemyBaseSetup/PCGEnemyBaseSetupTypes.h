@@ -62,6 +62,16 @@ enum class EEnemySandbagCoverage : uint8
 	Surround
 };
 
+/** @brief Local horizontal axis that points out through the front face of a sandbag Blueprint. */
+UENUM(BlueprintType)
+enum class EEnemySandbagFrontAxis : uint8
+{
+	PositiveX UMETA(DisplayName = "+X"),
+	NegativeX UMETA(DisplayName = "-X"),
+	PositiveY UMETA(DisplayName = "+Y"),
+	NegativeY UMETA(DisplayName = "-Y")
+};
+
 /** @brief How symmetrical defense positions are chosen around a defended center. */
 UENUM(BlueprintType)
 enum class EEnemyDefenseFormation : uint8
@@ -105,7 +115,7 @@ enum class EEnemyPlacementCategory : uint8
 /**
  * @brief One Blueprint prop the placement picks from (a bunker, a hedgehog, a sandbag segment,
  * a decorator...). Its footprint comes from the Blueprint's measured bounds unless an override
- * is supplied; an optional uniform scale range is applied per placement.
+ * is supplied; sandbags also use the local front axis. Scale is applied per placement.
  */
 USTRUCT(BlueprintType)
 struct FEnemyBlueprintEntry
@@ -124,8 +134,12 @@ struct FEnemyBlueprintEntry
 
 	/** @brief Full footprint size (X, Y) in cm; used instead of measured bounds when enabled. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Entry,
-		meta = (EditCondition = "bUseFootprintOverride"))
+		meta = (ClampMin = "1", EditCondition = "bUseFootprintOverride"))
 	FVector2D FootprintOverride = FVector2D(400.0, 400.0);
+
+	/** @brief Local axis that faces away from the protected building when this entry is a sandbag. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Entry)
+	EEnemySandbagFrontAxis SandbagFrontAxis = EEnemySandbagFrontAxis::NegativeY;
 
 	/** @brief When enabled, a uniform scale in [MinScale, MaxScale] is applied per placement. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Entry)
@@ -242,7 +256,7 @@ struct FEnemyBarbedWireSettings
 
 /**
  * @brief A sandbag wall wrapped around a building's flanks (and optionally front / all sides).
- * One sandbag Blueprint spans SegmentLength and is chained along each covered side.
+ * Segments use a designer front axis and resolved bounds to chain without intersections.
  */
 USTRUCT(BlueprintType)
 struct FEnemySandbagSettings
@@ -252,7 +266,7 @@ struct FEnemySandbagSettings
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Sandbags")
 	bool bEnabled = true;
 
-	/** @brief Sandbag Blueprints; one is weighted-picked per segment. Author it ~SegmentLength long on +X. */
+	/** @brief Sandbag Blueprints; set each entry's bounds and local front axis for precise placement. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Sandbags",
 		meta = (EditCondition = "bEnabled"))
 	TArray<FEnemyBlueprintEntry> SandbagUnits;
@@ -262,7 +276,7 @@ struct FEnemySandbagSettings
 		meta = (EditCondition = "bEnabled"))
 	EEnemySandbagCoverage Coverage = EEnemySandbagCoverage::FlanksOnly;
 
-	/** @brief Length (cm) each sandbag Blueprint spans along its local +X; drives the chaining step. */
+	/** @brief Minimum center spacing (cm); larger resolved bounds automatically increase the spacing. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Sandbags",
 		meta = (ClampMin = "50", EditCondition = "bEnabled"))
 	float SegmentLength = 300.0f;

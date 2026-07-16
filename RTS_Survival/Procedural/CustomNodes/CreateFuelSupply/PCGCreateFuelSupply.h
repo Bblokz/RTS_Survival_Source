@@ -140,6 +140,7 @@ struct FFuelFenceActorEntry
  * @brief Generates complete, PCG-managed fuel facilities within spatial input while respecting
  * exclusion data. Every Blueprint is independently spawned for measurement and final placement.
  * @note Connect the desired area to In and optional blocking volumes to Exclusion.
+ * @note Use FacilityArea as the exclusion for generators that must stay outside the complete depot.
  */
 UCLASS(BlueprintType)
 class RTS_SURVIVAL_API UPCGCreateFuelSupplySettings : public UPCGSettings

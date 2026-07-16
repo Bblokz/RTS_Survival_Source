@@ -462,45 +462,69 @@ namespace BattlefieldAreaPCGInternal
 		return false;
 	}
 
+	/**
+	 * @brief Resolves the landscape from XY before tracing so the area's reference Z cannot affect grounding.
+	 * @param World World containing the landscape proxies.
+	 * @param Settings Trace distances used around the landscape-reported height.
+	 * @param Position Placement whose XY selects the landscape; its Z is intentionally ignored.
+	 * @param OutHit Receives the landscape surface hit.
+	 * @return True when a landscape covers the requested XY and its collision surface was hit.
+	 */
+	bool TryTraceLandscape(
+		UWorld& World,
+		const UPCGCreateBattlefieldAreaSettings& Settings,
+		const FVector& Position,
+		FHitResult& OutHit)
+	{
+		const FCollisionQueryParams QueryParameters;
+		for (TActorIterator<ALandscapeProxy> LandscapeIterator(&World); LandscapeIterator; ++LandscapeIterator)
+		{
+			const ALandscapeProxy* Landscape = *LandscapeIterator;
+			if (not IsValid(Landscape))
+			{
+				continue;
+			}
+
+			const TOptional<float> LandscapeHeight = Landscape->GetHeightAtLocation(
+				FVector(Position.X, Position.Y, 0.0));
+			if (not LandscapeHeight.IsSet())
+			{
+				continue;
+			}
+
+			const FVector LandscapePosition(Position.X, Position.Y, LandscapeHeight.GetValue());
+			const FVector TraceStart = LandscapePosition + FVector::UpVector * Settings.GroundTraceUp;
+			const FVector TraceEnd = LandscapePosition - FVector::UpVector * Settings.GroundTraceDown;
+			if (Landscape->ActorLineTraceSingle(
+				OutHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	bool TryProjectToLandscape(
 		UWorld& World,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FVector& Position,
 		FBattlefieldGroundResult& OutGround)
 	{
-		const FVector TraceStart = Position + FVector::UpVector * Settings.GroundTraceUp;
-		const FVector TraceEnd = Position - FVector::UpVector * Settings.GroundTraceDown;
-		const FCollisionQueryParams QueryParameters;
-		FHitResult ClosestLandscapeHit;
-		double ClosestDistanceSquared = TNumericLimits<double>::Max();
-		for (TActorIterator<ALandscapeProxy> LandscapeIterator(&World); LandscapeIterator; ++LandscapeIterator)
-		{
-			FHitResult LandscapeHit;
-			if (not LandscapeIterator->ActorLineTraceSingle(
-				LandscapeHit, TraceStart, TraceEnd, ECC_Visibility, QueryParameters))
-			{
-				continue;
-			}
-			const double DistanceSquared = FVector::DistSquared(TraceStart, LandscapeHit.ImpactPoint);
-			if (DistanceSquared < ClosestDistanceSquared)
-			{
-				ClosestLandscapeHit = LandscapeHit;
-				ClosestDistanceSquared = DistanceSquared;
-			}
-		}
-		if (ClosestDistanceSquared == TNumericLimits<double>::Max())
+		FHitResult LandscapeHit;
+		if (not TryTraceLandscape(World, Settings, Position, LandscapeHit))
 		{
 			return false;
 		}
 
 		const double SlopeDegrees = FMath::RadiansToDegrees(FMath::Acos(
-			FMath::Clamp(static_cast<double>(ClosestLandscapeHit.ImpactNormal.Z), -1.0, 1.0)));
+			FMath::Clamp(static_cast<double>(LandscapeHit.ImpactNormal.Z), -1.0, 1.0)));
 		if (SlopeDegrees > Settings.MaxGroundSlopeDegrees)
 		{
 			return false;
 		}
-		OutGround.Position = ClosestLandscapeHit.ImpactPoint;
-		OutGround.Normal = ClosestLandscapeHit.ImpactNormal.GetSafeNormal();
+		OutGround.Position = LandscapeHit.ImpactPoint;
+		OutGround.Normal = LandscapeHit.ImpactNormal.GetSafeNormal();
 		return true;
 	}
 
@@ -911,29 +935,6 @@ namespace BattlefieldAreaPCGInternal
 		return Rotation;
 	}
 
-	double ComputeRotatedMinimumZ(
-		const FBox& LocalBounds,
-		const FQuat& Rotation,
-		const double UniformScale)
-	{
-		double RotatedMinimumZ = TNumericLimits<double>::Max();
-		for (int32 XIndex = 0; XIndex < 2; ++XIndex)
-		{
-			for (int32 YIndex = 0; YIndex < 2; ++YIndex)
-			{
-				for (int32 ZIndex = 0; ZIndex < 2; ++ZIndex)
-				{
-					const FVector Corner(
-						(XIndex == 0 ? LocalBounds.Min.X : LocalBounds.Max.X) * UniformScale,
-						(YIndex == 0 ? LocalBounds.Min.Y : LocalBounds.Max.Y) * UniformScale,
-						(ZIndex == 0 ? LocalBounds.Min.Z : LocalBounds.Max.Z) * UniformScale);
-					RotatedMinimumZ = FMath::Min(RotatedMinimumZ, Rotation.RotateVector(Corner).Z);
-				}
-			}
-		}
-		return RotatedMinimumZ;
-	}
-
 	FTransform MakeGroundedActorTransform(
 		const FResolvedBattlefieldActor& Asset,
 		const FBattlefieldGroundResult& Ground,
@@ -942,8 +943,12 @@ namespace BattlefieldAreaPCGInternal
 		const bool bAlignToGround)
 	{
 		const FQuat Rotation = MakeActorRotation(Asset, Ground, YawDegrees, bAlignToGround);
-		const double RotatedMinimumZ = ComputeRotatedMinimumZ(Asset.LocalBounds, Rotation, UniformScale);
-		const FVector Location = Ground.Position + FVector::UpVector * (Asset.ZOffset - RotatedMinimumZ);
+		const double ScaledMinimumLocalZ = Asset.LocalBounds.Min.Z * UniformScale;
+		const double GroundNormalZ = bAlignToGround
+			? FMath::Max(static_cast<double>(Ground.Normal.Z), UE_DOUBLE_SMALL_NUMBER)
+			: 1.0;
+		const double LocationZ = Ground.Position.Z + Asset.ZOffset - ScaledMinimumLocalZ / GroundNormalZ;
+		const FVector Location(Ground.Position.X, Ground.Position.Y, LocationZ);
 		return FTransform(Rotation, Location, FVector(UniformScale));
 	}
 
@@ -1035,7 +1040,7 @@ namespace BattlefieldAreaPCGInternal
 		}
 
 		FBattlefieldGroundResult Ground;
-		if (not TryProjectToLandscape(World, Settings, FVector(Center, Boundary.Center.Z), Ground))
+		if (not TryProjectToLandscape(World, Settings, FVector(Center, 0.0), Ground))
 		{
 			return false;
 		}
@@ -1330,7 +1335,7 @@ namespace BattlefieldAreaPCGInternal
 					continue;
 				}
 				FBattlefieldGroundResult Ground;
-				if (not TryProjectToLandscape(World, Settings, FVector(Center, Boundary.Center.Z), Ground))
+				if (not TryProjectToLandscape(World, Settings, FVector(Center, 0.0), Ground))
 				{
 					continue;
 				}

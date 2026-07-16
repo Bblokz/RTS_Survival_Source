@@ -24,6 +24,7 @@ struct FEnemyResolvedEntry
 
 	// Offset from the actor pivot to the footprint center, in the Blueprint's local space.
 	FVector2D PivotToFootprintCenter = FVector2D::ZeroVector;
+	EEnemySandbagFrontAxis SandbagFrontAxis = EEnemySandbagFrontAxis::NegativeY;
 
 	float Weight = 1.0f;
 	bool bOverrideScale = false;
@@ -156,6 +157,17 @@ private:
 	FEnemyBaseSetupResult& M_Result;
 	TFunction<bool(const FVector2D&)> M_IsBlocked;
 
+	/** @brief One bounds-derived segment prepared for placement along a sandbag wall side. */
+	struct FSandbagPlacementCandidate
+	{
+		int32 EntryIndex = INDEX_NONE;
+		double UniformScale = 1.0;
+		double YawRadians = 0.0;
+		double HalfLengthAlongWall = 0.0;
+		double HalfDepthAcrossWall = 0.0;
+		double CenterOffsetFromRunStart = 0.0;
+	};
+
 	int32 PickWeightedEntry(const TArray<FEnemyResolvedEntry>& Entries) const;
 	double PickUniformScale(const FEnemyResolvedEntry& Entry) const;
 
@@ -176,6 +188,30 @@ private:
 		int32 EntryIndex,
 		const FVector2D& Position,
 		double YawRadians,
+		double ExtraSpacing,
+		uint8 AvoidMask,
+		int32 Cluster);
+
+	/**
+	 * @brief Reserves an item using a scale already chosen by bounds-aware placement logic.
+	 * @param Category Occupancy and output category assigned to the item.
+	 * @param Entries Resolved assets containing the precise bounds.
+	 * @param EntryIndex Selected asset index in Entries.
+	 * @param Position Actor-pivot position in world XY.
+	 * @param YawRadians Actor rotation around world Z.
+	 * @param UniformScale Scale used both for spawning and the reserved bounds.
+	 * @param ExtraSpacing Additional footprint inflation used only for the overlap test.
+	 * @param AvoidMask Occupancy categories that reject this placement.
+	 * @param Cluster Setup cluster assigned to the output item.
+	 * @return True when the precise scaled footprint was clear and reserved.
+	 */
+	bool TryReserveItemAtScale(
+		EEnemyPlacementCategory Category,
+		const TArray<FEnemyResolvedEntry>& Entries,
+		int32 EntryIndex,
+		const FVector2D& Position,
+		double YawRadians,
+		double UniformScale,
 		double ExtraSpacing,
 		uint8 AvoidMask,
 		int32 Cluster);
@@ -210,6 +246,24 @@ private:
 		int32 Cluster);
 
 	// --- Sandbag sides ---
+	/**
+	 * @brief Preselects a centered wall run whose mixed asset bounds fit the available side length.
+	 * @param Sandbags Resolved sandbag entries eligible for weighted selection.
+	 * @param OutwardDir World direction the sandbag fronts must face.
+	 * @param AlongDir World direction followed by the wall.
+	 * @param AvailableLength Maximum full length available for the wall run.
+	 * @param MinimumCenterSpacing Designer-authored minimum distance between segment centers.
+	 * @param OutUsedLength Receives the exact bounds-derived length of the selected run.
+	 * @return Prepared entries, scales, rotations, and projected half extents in placement order.
+	 */
+	TArray<FSandbagPlacementCandidate> BuildSandbagPlacementCandidates(
+		const TArray<FEnemyResolvedEntry>& Sandbags,
+		const FVector2D& OutwardDir,
+		const FVector2D& AlongDir,
+		double AvailableLength,
+		double MinimumCenterSpacing,
+		double& OutUsedLength) const;
+
 	void PlaceSandbagSide(
 		const TArray<FEnemyResolvedEntry>& Sandbags,
 		const FEnemySandbagSettings& Settings,

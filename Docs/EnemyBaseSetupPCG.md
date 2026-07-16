@@ -67,8 +67,13 @@ The `EditCondition` metadata reveals only the settings that fit the chosen layou
 `EEnemyObstacleFormation::Arc` exposes `ArcSpanDegrees` / `ArcRadiusOverride`; `DoubleRow` exposes
 `RowSpacing`; `EEnemyPerimeterLayout::Corners` exposes `CornerLineLength`; `FixedYaw` exposes the
 yaw. Spacing everywhere is designer-controlled: bunker spacing, obstacle spacing, wire segment
-length, sandbag segment length and distances from the line / building, and decorator / foliage /
-decal ring distances.
+length, minimum sandbag center spacing, distances from the line / building, and decorator /
+foliage / decal ring distances.
+Sandbag entries additionally expose their Blueprint's local **Sandbag Front Axis** (`+X`, `-X`,
+`+Y`, or `-Y`). Each segment is rotated so that axis faces away from the protected building.
+Sandbag chaining expands that minimum spacing when required by each entry's measured or overridden
+footprint bounds (including scale and pivot offset), keeping mixed assets from overlapping one
+another or the building.
 
 ## 5. Outputs (points with bounds)
 

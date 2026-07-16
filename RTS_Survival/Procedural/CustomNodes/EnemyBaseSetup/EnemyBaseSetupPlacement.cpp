@@ -7,10 +7,12 @@ namespace EnemyBaseSetupPlacementConstants
 	constexpr int32 MaxChainItems = 512;
 	constexpr int32 DecoratorRetryAttempts = 6;
 	constexpr double MinArcSpanRadians = 0.05;
+	constexpr double SandbagBoundsClearance = 1.0;
 
-	// Sandbag walls are adjacent by design: they only avoid other solid categories, not each other.
+	// Include other sandbags so different resolved bounds cannot intersect at runs or corners.
 	constexpr uint8 SandbagAvoidMask =
 		EnemyOccupancyMask(EEnemyPlacementCategory::Bunker)
+		| EnemyOccupancyMask(EEnemyPlacementCategory::Sandbag)
 		| EnemyOccupancyMask(EEnemyPlacementCategory::Hedgehog)
 		| EnemyOccupancyMask(EEnemyPlacementCategory::BarbedWire);
 
@@ -42,6 +44,23 @@ namespace
 		return FVector2D(
 			CosYaw * Vector.X - SinYaw * Vector.Y,
 			SinYaw * Vector.X + CosYaw * Vector.Y);
+	}
+
+	double EBS_GetSandbagFrontAxisYaw(const EEnemySandbagFrontAxis FrontAxis)
+	{
+		switch (FrontAxis)
+		{
+		case EEnemySandbagFrontAxis::PositiveX:
+			return 0.0;
+		case EEnemySandbagFrontAxis::NegativeX:
+			return PI;
+		case EEnemySandbagFrontAxis::PositiveY:
+			return HALF_PI;
+		case EEnemySandbagFrontAxis::NegativeY:
+			return -HALF_PI;
+		default:
+			return 0.0;
+		}
 	}
 }
 
@@ -157,9 +176,36 @@ bool FEnemyBaseSetupBuilder::TryReserveItem(
 		return false;
 	}
 
+	return TryReserveItemAtScale(
+		Category,
+		Entries,
+		EntryIndex,
+		Position,
+		YawRadians,
+		PickUniformScale(Entries[EntryIndex]),
+		ExtraSpacing,
+		AvoidMask,
+		Cluster);
+}
+
+bool FEnemyBaseSetupBuilder::TryReserveItemAtScale(
+	const EEnemyPlacementCategory Category,
+	const TArray<FEnemyResolvedEntry>& Entries,
+	const int32 EntryIndex,
+	const FVector2D& Position,
+	const double YawRadians,
+	const double UniformScale,
+	const double ExtraSpacing,
+	const uint8 AvoidMask,
+	const int32 Cluster)
+{
+	if (not Entries.IsValidIndex(EntryIndex))
+	{
+		return false;
+	}
+
 	const FEnemyResolvedEntry& Entry = Entries[EntryIndex];
-	const double Scale = PickUniformScale(Entry);
-	const FEnemyFootprint Footprint = MakeFootprint(Entry, Position, YawRadians, Scale);
+	const FEnemyFootprint Footprint = MakeFootprint(Entry, Position, YawRadians, UniformScale);
 
 	if (M_IsBlocked && M_IsBlocked(Footprint.Center))
 	{
@@ -178,7 +224,7 @@ bool FEnemyBaseSetupBuilder::TryReserveItem(
 	Placed.ClusterIndex = Cluster;
 	Placed.Position = Position;
 	Placed.YawRadians = YawRadians;
-	Placed.UniformScale = Scale;
+	Placed.UniformScale = UniformScale;
 	Placed.Footprint = Footprint;
 	return true;
 }
@@ -399,6 +445,60 @@ void FEnemyBaseSetupBuilder::PlaceBarbedWire(
 // Sandbag walls
 // ---------------------------------------------------------------------------
 
+TArray<FEnemyBaseSetupBuilder::FSandbagPlacementCandidate>
+FEnemyBaseSetupBuilder::BuildSandbagPlacementCandidates(
+	const TArray<FEnemyResolvedEntry>& Sandbags,
+	const FVector2D& OutwardDir,
+	const FVector2D& AlongDir,
+	const double AvailableLength,
+	const double MinimumCenterSpacing,
+	double& OutUsedLength) const
+{
+	using namespace EnemyBaseSetupPlacementConstants;
+	TArray<FSandbagPlacementCandidate> Candidates;
+	OutUsedLength = 0.0;
+	if (Sandbags.IsEmpty())
+	{
+		return Candidates;
+	}
+
+	const double DesiredFrontYaw = FMath::Atan2(OutwardDir.Y, OutwardDir.X);
+	for (int32 ItemIndex = 0; ItemIndex < MaxChainItems; ++ItemIndex)
+	{
+		const int32 EntryIndex = PickWeightedEntry(Sandbags);
+		if (not Sandbags.IsValidIndex(EntryIndex))
+		{
+			break;
+		}
+
+		const FEnemyResolvedEntry& Entry = Sandbags[EntryIndex];
+		const double UniformScale = PickUniformScale(Entry);
+		const double YawRadians = DesiredFrontYaw - EBS_GetSandbagFrontAxisYaw(Entry.SandbagFrontAxis);
+		const FEnemyFootprint BoundsAtOrigin = MakeFootprint(Entry, FVector2D::ZeroVector, YawRadians, UniformScale);
+		const double HalfLength = BoundsAtOrigin.SupportRadius(AlongDir);
+		const double CenterOffset = Candidates.IsEmpty()
+			? HalfLength
+			: Candidates.Last().CenterOffsetFromRunStart + FMath::Max(
+				MinimumCenterSpacing,
+				Candidates.Last().HalfLengthAlongWall + HalfLength + SandbagBoundsClearance);
+		const double AddedLength = CenterOffset + HalfLength - OutUsedLength;
+		if (OutUsedLength + AddedLength > AvailableLength)
+		{
+			break;
+		}
+
+		FSandbagPlacementCandidate& Candidate = Candidates.Emplace_GetRef();
+		Candidate.EntryIndex = EntryIndex;
+		Candidate.UniformScale = UniformScale;
+		Candidate.YawRadians = YawRadians;
+		Candidate.HalfLengthAlongWall = HalfLength;
+		Candidate.HalfDepthAcrossWall = BoundsAtOrigin.SupportRadius(OutwardDir);
+		Candidate.CenterOffsetFromRunStart = CenterOffset;
+		OutUsedLength += AddedLength;
+	}
+	return Candidates;
+}
+
 void FEnemyBaseSetupBuilder::PlaceSandbagSide(
 	const TArray<FEnemyResolvedEntry>& Sandbags,
 	const FEnemySandbagSettings& Settings,
@@ -409,16 +509,33 @@ void FEnemyBaseSetupBuilder::PlaceSandbagSide(
 	const int32 Cluster)
 {
 	using namespace EnemyBaseSetupPlacementConstants;
+	if (Sandbags.IsEmpty() || AlongExtent <= 0.0)
+	{
+		return;
+	}
 
 	// The wall runs perpendicular to the outward direction.
 	const FVector2D AlongDir(-OutwardDir.Y, OutwardDir.X);
-	const FVector2D Center =
-		Building.Center + OutwardDir * (OutwardExtent + Settings.DistanceFromBuilding);
-	const double SegmentYaw = FMath::Atan2(AlongDir.Y, AlongDir.X);
+	const double AvailableLength = AlongExtent * 2.0;
+	double UsedLength = 0.0;
+	const TArray<FSandbagPlacementCandidate> Candidates = BuildSandbagPlacementCandidates(
+		Sandbags, OutwardDir, AlongDir, AvailableLength, Settings.SegmentLength, UsedLength);
 
-	PlaceChainAlong(
-		EEnemyPlacementCategory::Sandbag, Sandbags, Center, AlongDir, AlongExtent,
-		Settings.SegmentLength, SegmentYaw, 0.0, SandbagAvoidMask, Cluster);
+	for (const FSandbagPlacementCandidate& Candidate : Candidates)
+	{
+		const FEnemyResolvedEntry& Entry = Sandbags[Candidate.EntryIndex];
+		const double CenterOffset = Candidate.CenterOffsetFromRunStart - UsedLength * 0.5;
+		const double OutwardOffset = OutwardExtent + Settings.DistanceFromBuilding
+			+ Candidate.HalfDepthAcrossWall + SandbagBoundsClearance;
+		const FVector2D FootprintCenter = Building.Center + AlongDir * CenterOffset + OutwardDir * OutwardOffset;
+		const FVector2D PivotOffset = EBS_RotateVector2D(
+			Entry.PivotToFootprintCenter * Candidate.UniformScale, Candidate.YawRadians);
+		const FVector2D ActorPosition = FootprintCenter - PivotOffset;
+
+		TryReserveItemAtScale(
+			EEnemyPlacementCategory::Sandbag, Sandbags, Candidate.EntryIndex, ActorPosition,
+			Candidate.YawRadians, Candidate.UniformScale, 0.0, SandbagAvoidMask, Cluster);
+	}
 }
 
 void FEnemyBaseSetupBuilder::PlaceSandbagWall(

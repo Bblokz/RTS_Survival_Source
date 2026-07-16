@@ -50,11 +50,12 @@ Every accepted actor and decal reserves an oriented 2D rectangle. SAT overlap te
 `PlacementClearance` prevent overlaps across all section-specific and global populations. A conservative
 radius additionally keeps the complete footprint inside the non-convex spline.
 
-Every actor and decal traces each `ALandscapeProxy` directly and selects the nearest landscape hit, so
-rocks, buildings, and other static geometry above the terrain cannot occlude or supply placement Z. Actors can
-align their up axis to the landscape normal, and their measured lowest rotated bounds point is placed on
-the hit surface. `MaxGroundSlopeDegrees`, `GroundTraceUp`, and `GroundTraceDown` control which landscape
-elevations are valid.
+Every actor and decal first resolves the `ALandscapeProxy` covering its XY, then traces only that Landscape
+around its reported height. The generated area's reference Z is never used for placement, and rocks,
+buildings, or other static geometry above the terrain cannot occlude or supply placement Z. Actors can align
+their up axis to the landscape normal; their measured lower bounds plane is seated on the local landscape
+tangent instead of lifting the downhill corner to the center height. `MaxGroundSlopeDegrees`, `GroundTraceUp`,
+and `GroundTraceDown` control which landscape elevations are valid.
 
 ## Setup
 
