@@ -38,6 +38,7 @@ namespace BattlefieldAreaPCGConstants
 	constexpr double MinimumAreaDimension = 1000.0;
 	constexpr double MinimumSampleSpacing = 25.0;
 	constexpr double MinimumScale = 0.01;
+	constexpr double MinimumLandscapeTraceMargin = 100.0;
 	constexpr double FullCircleDegrees = 360.0;
 	constexpr int32 MinimumBoundaryStations = 4;
 	constexpr int32 MaximumBoundaryStations = 32;
@@ -463,9 +464,10 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	/**
-	 * @brief Resolves the landscape from XY before tracing so the area's reference Z cannot affect grounding.
+	 * @brief Brackets each landscape's complete vertical bounds so sculpted peaks and eroded ground cannot
+	 * fall outside the trace, while the placement's unrelated reference Z cannot affect grounding.
 	 * @param World World containing the landscape proxies.
-	 * @param Settings Trace distances used around the landscape-reported height.
+	 * @param Settings Safety margins added beyond the landscape's complete component bounds.
 	 * @param Position Placement whose XY selects the landscape; its Z is intentionally ignored.
 	 * @param OutHit Receives the landscape surface hit.
 	 * @return True when a landscape covers the requested XY and its collision surface was hit.
@@ -485,16 +487,26 @@ namespace BattlefieldAreaPCGInternal
 				continue;
 			}
 
-			const TOptional<float> LandscapeHeight = Landscape->GetHeightAtLocation(
-				FVector(Position.X, Position.Y, 0.0));
-			if (not LandscapeHeight.IsSet())
+			const FBox LandscapeBounds = Landscape->GetComponentsBoundingBox(true);
+			if (not LandscapeBounds.IsValid)
 			{
 				continue;
 			}
 
-			const FVector LandscapePosition(Position.X, Position.Y, LandscapeHeight.GetValue());
-			const FVector TraceStart = LandscapePosition + FVector::UpVector * Settings.GroundTraceUp;
-			const FVector TraceEnd = LandscapePosition - FVector::UpVector * Settings.GroundTraceDown;
+			const FVector LandscapeBoundsXY(Position.X, Position.Y, LandscapeBounds.GetCenter().Z);
+			if (not LandscapeBounds.IsInsideOrOn(LandscapeBoundsXY))
+			{
+				continue;
+			}
+
+			const double TraceUp = FMath::Max(
+				static_cast<double>(Settings.GroundTraceUp),
+				BattlefieldAreaPCGConstants::MinimumLandscapeTraceMargin);
+			const double TraceDown = FMath::Max(
+				static_cast<double>(Settings.GroundTraceDown),
+				BattlefieldAreaPCGConstants::MinimumLandscapeTraceMargin);
+			const FVector TraceStart(Position.X, Position.Y, LandscapeBounds.Max.Z + TraceUp);
+			const FVector TraceEnd(Position.X, Position.Y, LandscapeBounds.Min.Z - TraceDown);
 			if (Landscape->ActorLineTraceSingle(
 				OutHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
 			{
@@ -943,12 +955,13 @@ namespace BattlefieldAreaPCGInternal
 		const bool bAlignToGround)
 	{
 		const FQuat Rotation = MakeActorRotation(Asset, Ground, YawDegrees, bAlignToGround);
-		const double ScaledMinimumLocalZ = Asset.LocalBounds.Min.Z * UniformScale;
-		const double GroundNormalZ = bAlignToGround
-			? FMath::Max(static_cast<double>(Ground.Normal.Z), UE_DOUBLE_SMALL_NUMBER)
-			: 1.0;
-		const double LocationZ = Ground.Position.Z + Asset.ZOffset - ScaledMinimumLocalZ / GroundNormalZ;
-		const FVector Location(Ground.Position.X, Ground.Position.Y, LocationZ);
+		const FVector LocalSurfaceAnchor(
+			Asset.LocalBounds.GetCenter().X,
+			Asset.LocalBounds.GetCenter().Y,
+			Asset.LocalBounds.Min.Z);
+		const FVector RotatedSurfaceAnchor = Rotation.RotateVector(LocalSurfaceAnchor * UniformScale);
+		const FVector OffsetDirection = bAlignToGround ? Ground.Normal : FVector::UpVector;
+		const FVector Location = Ground.Position + OffsetDirection * Asset.ZOffset - RotatedSurfaceAnchor;
 		return FTransform(Rotation, Location, FVector(UniformScale));
 	}
 
@@ -1020,34 +1033,30 @@ namespace BattlefieldAreaPCGInternal
 		const TArray<FBattlefieldFootprint>& Occupied,
 		FPlacedBattlefieldActor& OutPlacement)
 	{
-		const double Radius = 0.5 * Asset.FootprintSize.Size() * UniformScale;
-		const double FootprintYawRadians = FMath::DegreesToRadians(YawDegrees + Asset.YawOffsetDegrees);
-		const FVector2D LocalBoundsCenter(Asset.LocalBounds.GetCenter());
-		const FVector2D BoundsCenterOffset(
-			LocalBoundsCenter.X * FMath::Cos(FootprintYawRadians)
-				- LocalBoundsCenter.Y * FMath::Sin(FootprintYawRadians),
-			LocalBoundsCenter.X * FMath::Sin(FootprintYawRadians)
-				+ LocalBoundsCenter.Y * FMath::Cos(FootprintYawRadians));
-		FBattlefieldFootprint Footprint;
-		Footprint.Center = Center + BoundsCenterOffset * UniformScale;
-		Footprint.HalfExtents = 0.5 * Asset.FootprintSize * UniformScale;
-		Footprint.YawRadians = FootprintYawRadians;
-		if (not IsDiskInsideBoundary(Boundary, Footprint.Center, Radius)
-			|| IsExcluded(Exclusions, FVector(Footprint.Center, Boundary.Center.Z))
-			|| not IsPlacementClear(Footprint, Occupied, Settings.PlacementClearance))
-		{
-			return false;
-		}
-
 		FBattlefieldGroundResult Ground;
 		if (not TryProjectToLandscape(World, Settings, FVector(Center, 0.0), Ground))
 		{
 			return false;
 		}
+
+		const FTransform Transform = MakeGroundedActorTransform(
+			Asset, Ground, UniformScale, YawDegrees, Settings.bAlignActorsToGround);
+		const double Radius = 0.5 * Asset.FootprintSize.Size() * UniformScale;
+		const double FootprintYawRadians = FMath::DegreesToRadians(YawDegrees + Asset.YawOffsetDegrees);
+		FBattlefieldFootprint Footprint;
+		Footprint.Center = FVector2D(Transform.TransformPosition(Asset.LocalBounds.GetCenter()));
+		Footprint.HalfExtents = 0.5 * Asset.FootprintSize * UniformScale;
+		Footprint.YawRadians = FootprintYawRadians;
+		if (not IsDiskInsideBoundary(Boundary, Footprint.Center, Radius)
+			|| IsExcluded(Exclusions, FVector(Footprint.Center, Ground.Position.Z))
+			|| not IsPlacementClear(Footprint, Occupied, Settings.PlacementClearance))
+		{
+			return false;
+		}
+
 		OutPlacement.ActorClass = Asset.ActorClass;
 		OutPlacement.LocalBounds = Asset.LocalBounds;
-		OutPlacement.Transform = MakeGroundedActorTransform(
-			Asset, Ground, UniformScale, YawDegrees, Settings.bAlignActorsToGround);
+		OutPlacement.Transform = Transform;
 		OutPlacement.Center = Center;
 		OutPlacement.FootprintRadius = Radius;
 		OutPlacement.Footprint = Footprint;

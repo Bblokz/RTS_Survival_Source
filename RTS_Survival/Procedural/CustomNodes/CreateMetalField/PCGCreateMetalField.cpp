@@ -512,36 +512,21 @@ namespace MetalFieldPCGInternal
 	// Transforms and footprints
 	// -----------------------------------------------------------------------
 
-	FTransform MakeBoundsAlignedTransform(
+	/** @brief Anchors the measured bottom-center to one traced surface point after scale and rotation. */
+	FTransform MakeSurfaceAnchoredTransform(
 		const FBox& LocalBounds,
-		const FVector& LocalAnchor,
-		const FVector2D& DesiredWorldAnchor,
-		const double GroundZ,
+		const FVector& SurfacePosition,
+		const FVector& OffsetDirection,
 		const FQuat& Rotation,
 		const FVector& Scale,
 		const double ZOffset)
 	{
-		const FVector ScaledLocalAnchor = LocalAnchor * Scale;
-		const FVector RotatedAnchor = Rotation.RotateVector(ScaledLocalAnchor);
-		double RotatedMinimumZ = TNumericLimits<double>::Max();
-		for (int32 XIndex = 0; XIndex < 2; ++XIndex)
-		{
-			for (int32 YIndex = 0; YIndex < 2; ++YIndex)
-			{
-				for (int32 ZIndex = 0; ZIndex < 2; ++ZIndex)
-				{
-					const FVector LocalCorner(
-						(XIndex == 0 ? LocalBounds.Min.X : LocalBounds.Max.X) * Scale.X,
-						(YIndex == 0 ? LocalBounds.Min.Y : LocalBounds.Max.Y) * Scale.Y,
-						(ZIndex == 0 ? LocalBounds.Min.Z : LocalBounds.Max.Z) * Scale.Z);
-					RotatedMinimumZ = FMath::Min(RotatedMinimumZ, Rotation.RotateVector(LocalCorner).Z);
-				}
-			}
-		}
-		const FVector Location(
-			DesiredWorldAnchor.X - RotatedAnchor.X,
-			DesiredWorldAnchor.Y - RotatedAnchor.Y,
-			GroundZ + ZOffset - RotatedMinimumZ);
+		const FVector LocalSurfaceAnchor(
+			LocalBounds.GetCenter().X,
+			LocalBounds.GetCenter().Y,
+			LocalBounds.Min.Z);
+		const FVector RotatedSurfaceAnchor = Rotation.RotateVector(LocalSurfaceAnchor * Scale);
+		const FVector Location = SurfacePosition + OffsetDirection * ZOffset - RotatedSurfaceAnchor;
 		return FTransform(Rotation, Location, Scale);
 	}
 
@@ -646,9 +631,12 @@ namespace MetalFieldPCGInternal
 			Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Ground.Normal) * Rotation;
 		}
 
-		const FTransform Transform = MakeBoundsAlignedTransform(
-			Asset.LocalBounds, Asset.LocalBounds.GetCenter(), DesiredCenter,
-			Ground.Position.Z, Rotation, FVector(Scale), Asset.ZOffset);
+		const FVector OffsetDirection = Settings.bAlignActorsToGround
+			? Ground.Normal
+			: FVector::UpVector;
+		const FTransform Transform = MakeSurfaceAnchoredTransform(
+			Asset.LocalBounds, Ground.Position, OffsetDirection,
+			Rotation, FVector(Scale), Asset.ZOffset);
 		const FBox2D Footprint = ComputeFootprint(Asset.LocalBounds, Transform);
 		const double Radius = FootprintRadiusOf(Footprint);
 		if (bConstrainToDisc
@@ -889,18 +877,25 @@ namespace MetalFieldPCGInternal
 		const FVector2D AuthoredForward = MetalCardinalToVector2D(Fence.AuthoredForwardDirection);
 		const double YawRadians = FMath::Atan2(SideDirection.Y, SideDirection.X)
 			- FMath::Atan2(AuthoredForward.Y, AuthoredForward.X);
-		const FQuat Rotation(FVector::UpVector, YawRadians);
 		FMetalGroundResult Ground;
 		if (not TryProjectGroundLenient(World, Settings, FVector(Center, FieldCenterZ), Ground))
 		{
 			return false;
 		}
+		FQuat Rotation(FVector::UpVector, YawRadians);
+		if (Settings.bAlignActorsToGround)
+		{
+			Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Ground.Normal) * Rotation;
+		}
+		const FVector OffsetDirection = Settings.bAlignActorsToGround
+			? Ground.Normal
+			: FVector::UpVector;
 
 		OutPlacement.ActorClass = Fence.ActorClass;
 		OutPlacement.LocalBounds = Fence.LocalBounds;
-		OutPlacement.Transform = MakeBoundsAlignedTransform(
-			Fence.LocalBounds, Fence.LocalBounds.GetCenter(), Center,
-			Ground.Position.Z, Rotation, FVector::OneVector, Fence.ZOffset);
+		OutPlacement.Transform = MakeSurfaceAnchoredTransform(
+			Fence.LocalBounds, Ground.Position, OffsetDirection,
+			Rotation, FVector::OneVector, Fence.ZOffset);
 		OutPlacement.Footprint = ComputeFootprint(Fence.LocalBounds, OutPlacement.Transform);
 		OutPlacement.Center = Center;
 		OutPlacement.FootprintRadius = FootprintRadiusOf(OutPlacement.Footprint);

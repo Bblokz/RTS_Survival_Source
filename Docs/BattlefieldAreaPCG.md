@@ -51,11 +51,13 @@ Every accepted actor and decal reserves an oriented 2D rectangle. SAT overlap te
 radius additionally keeps the complete footprint inside the non-convex spline.
 
 Every actor and decal first resolves the `ALandscapeProxy` covering its XY, then traces only that Landscape
-around its reported height. The generated area's reference Z is never used for placement, and rocks,
+from above its complete component bounds to below them. This brackets both sculpted peaks and eroded
+depressions even when an input point has an unrelated Z. Rocks,
 buildings, or other static geometry above the terrain cannot occlude or supply placement Z. Actors can align
 their up axis to the landscape normal; their measured lower bounds plane is seated on the local landscape
-tangent instead of lifting the downhill corner to the center height. `MaxGroundSlopeDegrees`, `GroundTraceUp`,
-and `GroundTraceDown` control which landscape elevations are valid.
+tangent instead of lifting the downhill corner to the center height. `GroundTraceUp` and `GroundTraceDown`
+provide extra safety margins beyond the full Landscape bounds, while `MaxGroundSlopeDegrees` controls which
+slopes are valid.
 
 ## Setup
 
