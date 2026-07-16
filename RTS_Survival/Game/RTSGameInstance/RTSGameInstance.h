@@ -4,6 +4,7 @@
 #include "Engine/GameInstance.h"
 #include "GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "GameInstMapLoading/RTSGameInstMapToLoad.h"
+#include "WorldMissionContext/WorldMissionContext.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTSGameInstance.generated.h"
@@ -54,6 +55,18 @@ public:
 	ERTSFaction GetPlayerFaction() const ;
 	ERTSCommander GetPlayerCommander() const ;
 
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Mission Context")
+	void SetWorldMissionContext(const FWorldMissionContext& WorldMissionContext);
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Mission Context")
+	FWorldMissionContext GetWorldMissionContext() const { return M_WorldMissionContext; }
+
+	UFUNCTION(BlueprintPure, Category = "World Campaign|Mission Context")
+	bool GetHasValidWorldMissionContext() const { return M_WorldMissionContext.GetIsValid(); }
+
+	UFUNCTION(BlueprintCallable, Category = "World Campaign|Mission Context")
+	void ResetWorldMissionContext();
+
 protected:
     // Called on init when the music manager is setup and needs to be initialized.
     UFUNCTION(BlueprintImplementableEvent, Category="Music")
@@ -95,6 +108,10 @@ private:
 	FRTSGameDifficulty M_SelectedGameDifficulty;
 	ERTSFaction M_PlayerFaction;
 	ERTSCommander M_PlayerCommander;
+
+	UPROPERTY()
+	FWorldMissionContext M_WorldMissionContext;
+
 	// Keeps track of what map to load next.
 	FRTSGameInstMapToLoad M_MapToLoad;
 

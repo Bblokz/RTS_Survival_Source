@@ -15,7 +15,9 @@
 #include "CollisionQueryParams.h"
 #include "Engine/HitResult.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/Actor.h"
+#include "LandscapeProxy.h"
 
 #define LOCTEXT_NAMESPACE "PCGCreateMetalField"
 
@@ -425,7 +427,46 @@ namespace MetalFieldPCGInternal
 		return false;
 	}
 
-	/** @brief Traces down for ground and rejects slopes steeper than the configured maximum. */
+	/**
+	 * @brief Finds the landscape from XY first so spline or bounds elevation cannot move the ground trace
+	 * away from the terrain. The trace is performed only against the matching landscape proxy.
+	 */
+	bool TryTraceLandscape(
+		UWorld& World,
+		const UPCGCreateMetalFieldSettings& Settings,
+		const FVector& Position,
+		FHitResult& OutHit)
+	{
+		const FCollisionQueryParams QueryParameters;
+		for (TActorIterator<ALandscapeProxy> LandscapeIterator(&World); LandscapeIterator; ++LandscapeIterator)
+		{
+			const ALandscapeProxy* Landscape = *LandscapeIterator;
+			if (not IsValid(Landscape))
+			{
+				continue;
+			}
+
+			const TOptional<float> LandscapeHeight = Landscape->GetHeightAtLocation(
+				FVector(Position.X, Position.Y, 0.0));
+			if (not LandscapeHeight.IsSet())
+			{
+				continue;
+			}
+
+			const FVector TracePosition(Position.X, Position.Y, LandscapeHeight.GetValue());
+			const FVector TraceStart = TracePosition + FVector::UpVector * Settings.GroundTraceUp;
+			const FVector TraceEnd = TracePosition - FVector::UpVector * Settings.GroundTraceDown;
+			if (Landscape->ActorLineTraceSingle(
+				OutHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/** @brief Traces down for landscape ground and rejects slopes steeper than the configured maximum. */
 	bool TryProjectToGround(
 		UWorld& World,
 		const UPCGCreateMetalFieldSettings& Settings,
@@ -433,10 +474,7 @@ namespace MetalFieldPCGInternal
 		FMetalGroundResult& OutGround)
 	{
 		FHitResult Hit;
-		const FVector TraceStart = Position + FVector::UpVector * Settings.GroundTraceUp;
-		const FVector TraceEnd = Position - FVector::UpVector * Settings.GroundTraceDown;
-		const FCollisionQueryParams QueryParameters;
-		if (not World.LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
+		if (not TryTraceLandscape(World, Settings, Position, Hit))
 		{
 			return false;
 		}
@@ -453,20 +491,21 @@ namespace MetalFieldPCGInternal
 	}
 
 	/** @brief Ground query that never rejects a slope; used for thin fence pieces that follow the terrain. */
-	FMetalGroundResult ProjectGroundLenient(
+	bool TryProjectGroundLenient(
 		UWorld& World,
 		const UPCGCreateMetalFieldSettings& Settings,
-		const FVector& Position)
+		const FVector& Position,
+		FMetalGroundResult& OutGround)
 	{
 		FHitResult Hit;
-		const FVector TraceStart = Position + FVector::UpVector * Settings.GroundTraceUp;
-		const FVector TraceEnd = Position - FVector::UpVector * Settings.GroundTraceDown;
-		const FCollisionQueryParams QueryParameters;
-		if (World.LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
+		if (not TryTraceLandscape(World, Settings, Position, Hit))
 		{
-			return {Hit.ImpactPoint, Hit.ImpactNormal.GetSafeNormal()};
+			return false;
 		}
-		return {Position, FVector::UpVector};
+
+		OutGround.Position = Hit.ImpactPoint;
+		OutGround.Normal = Hit.ImpactNormal.GetSafeNormal();
+		return true;
 	}
 
 	// -----------------------------------------------------------------------
@@ -837,33 +876,37 @@ namespace MetalFieldPCGInternal
 		return Fence.EndOverlap + PieceCount * Advance;
 	}
 
-	FPlacedMetalActor MakeFencePlacement(
+	bool TryMakeFencePlacement(
 		UWorld& World,
 		const UPCGCreateMetalFieldSettings& Settings,
 		const FResolvedMetalFence& Fence,
 		const FVector2D& Center,
 		const FVector2D& SideDirection,
 		const double FieldCenterZ,
-		const int32 FieldIndex)
+		const int32 FieldIndex,
+		FPlacedMetalActor& OutPlacement)
 	{
 		const FVector2D AuthoredForward = MetalCardinalToVector2D(Fence.AuthoredForwardDirection);
 		const double YawRadians = FMath::Atan2(SideDirection.Y, SideDirection.X)
 			- FMath::Atan2(AuthoredForward.Y, AuthoredForward.X);
 		const FQuat Rotation(FVector::UpVector, YawRadians);
-		const FMetalGroundResult Ground = ProjectGroundLenient(World, Settings, FVector(Center, FieldCenterZ));
+		FMetalGroundResult Ground;
+		if (not TryProjectGroundLenient(World, Settings, FVector(Center, FieldCenterZ), Ground))
+		{
+			return false;
+		}
 
-		FPlacedMetalActor Placement;
-		Placement.ActorClass = Fence.ActorClass;
-		Placement.LocalBounds = Fence.LocalBounds;
-		Placement.Transform = MakeBoundsAlignedTransform(
+		OutPlacement.ActorClass = Fence.ActorClass;
+		OutPlacement.LocalBounds = Fence.LocalBounds;
+		OutPlacement.Transform = MakeBoundsAlignedTransform(
 			Fence.LocalBounds, Fence.LocalBounds.GetCenter(), Center,
 			Ground.Position.Z, Rotation, FVector::OneVector, Fence.ZOffset);
-		Placement.Footprint = ComputeFootprint(Fence.LocalBounds, Placement.Transform);
-		Placement.Center = Center;
-		Placement.FootprintRadius = FootprintRadiusOf(Placement.Footprint);
-		Placement.FieldIndex = FieldIndex;
-		Placement.Role = EMetalPlacementRole::Fence;
-		return Placement;
+		OutPlacement.Footprint = ComputeFootprint(Fence.LocalBounds, OutPlacement.Transform);
+		OutPlacement.Center = Center;
+		OutPlacement.FootprintRadius = FootprintRadiusOf(OutPlacement.Footprint);
+		OutPlacement.FieldIndex = FieldIndex;
+		OutPlacement.Role = EMetalPlacementRole::Fence;
+		return true;
 	}
 
 	bool IsFenceFootprintClearOfNonFencePlacements(
@@ -905,9 +948,10 @@ namespace MetalFieldPCGInternal
 		{
 			const double RemainingLength = SideLength - Cursor;
 			const FVector2D Center = SideStart + SideDirection * (Cursor + FenceLength * 0.5);
-			FPlacedMetalActor Placement = MakeFencePlacement(
-				World, Settings, Fence, Center, SideDirection, FieldCenterZ, FieldIndex);
-			const bool bCanPlace = not IsExcluded(Exclusions, FVector(Center, FieldCenterZ))
+			FPlacedMetalActor Placement;
+			const bool bCanPlace = TryMakeFencePlacement(
+				World, Settings, Fence, Center, SideDirection, FieldCenterZ, FieldIndex, Placement)
+				&& not IsExcluded(Exclusions, FVector(Center, FieldCenterZ))
 				&& IsFenceFootprintClearOfNonFencePlacements(
 					Placement.Footprint, InOutFieldPlacements, Settings.MinActorClearance);
 			if (bCanPlace)

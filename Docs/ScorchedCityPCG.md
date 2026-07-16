@@ -77,6 +77,8 @@ Each building entry has a `Category`:
 
 Each ScorchBuilding placement gets a generated weapon-trace box and nav obstacle from its measured bounds; the box extent is scaled by `ScorchBuildingCollisionBoundsPercent` × the global `ScorchBuildingCollisionScaleMultiplier` (Blueprint buildings keep their own collision).
 
+Each building entry also has an optional `ZOffset` (cm, default 0): a vertical nudge applied after ground projection for prefabs whose pivot consistently sits too high or too low. It affects both Scorch and Blueprint spawns (and the emitted Buildings points) but not footprints, layout or collision size.
+
 ## 6. Scatter
 
 Per building × per profile: chance roll, count from density × zone, positions sampled in a ring measured from the **footprint edge** (support function, so distance respects building orientation), optional clustering. Checks: exclusion input, city bounds, avoid-roads / avoid-buildings masks using the mesh's scaled radius. `bAlignToGround` line-traces down (ignoring all actors this node spawned) and aligns to the ground normal.

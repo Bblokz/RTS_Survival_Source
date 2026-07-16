@@ -249,7 +249,11 @@ void UWorldDivisionManager::RefreshDivisionInfluence(const ERTSGameDifficulty Ga
 			const FWorldStrengthReason StrengthReason(
 				WorldDivision->GetStrengthReasonText(),
 				WorldDivision->GetCurrentStrengthPercentage() * InfluenceSign);
-			StrengthEstimationComponent->AddFieldDivisionReason(StrengthReason);
+			StrengthEstimationComponent->AddFieldDivisionReason(
+				WorldDivision->GetDivisionType(),
+				WorldDivision->GetDivisionKey(),
+				WorldDivision->GetOwningPlayer(),
+				StrengthReason);
 		}
 	}
 }

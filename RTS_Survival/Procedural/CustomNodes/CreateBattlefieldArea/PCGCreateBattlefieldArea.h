@@ -100,7 +100,7 @@ struct FBattlefieldDecalEntry
 /**
  * @brief Creates non-convex, spline-carved battlefield areas split into Soviet, no-man's-land, and
  * German slices. It places opposing weaponry, grouped obstacles, faction spoils, trees, and decals
- * with shared bounds-aware overlap prevention and terrain projection.
+ * with shared bounds-aware overlap prevention and per-placement landscape snapping.
  * @note Connect candidate point data to In and optional blocking spatial data to Excluded Bounds.
  */
 UCLASS(BlueprintType)
@@ -249,8 +249,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "No Man's Land|Barbed Wire", meta = (ClampMin = "1"))
 	int32 MaxBarbedWirePiecesPerRun = 8;
 
-	/** @brief End-to-end gap between measured barbed-wire pieces; negative values intentionally overlap seams. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "No Man's Land|Barbed Wire", meta = (Units = "cm"))
+	/** @brief Requested end-to-end gap between measured barbed-wire pieces. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "No Man's Land|Barbed Wire",
+		meta = (ClampMin = "0", Units = "cm"))
 	float BarbedWirePieceGap = 10.0f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "No Man's Land|Barbed Wire",

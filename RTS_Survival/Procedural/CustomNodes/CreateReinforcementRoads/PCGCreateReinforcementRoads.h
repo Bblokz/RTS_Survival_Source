@@ -175,6 +175,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Road", meta = (ClampMin = "0", PCG_Overridable))
 	float AmountCurvesPer1000Units = 0.35f;
 
+	/** Chance that decorative curvature is applied within each 1000-unit road section. 100 keeps curvature continuous. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Road", meta = (ClampMin = "0", ClampMax = "100", PCG_Overridable))
+	float CurvatureApplicationPercentagePer1000Units = 100.0f;
+
 	/** Mesh deformed along every generated spline. Its local X extent determines mesh segment length. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Road")
 	TSoftObjectPtr<UStaticMesh> RoadMesh;

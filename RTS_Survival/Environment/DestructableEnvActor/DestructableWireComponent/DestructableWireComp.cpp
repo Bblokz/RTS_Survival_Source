@@ -389,11 +389,12 @@ void UDestructibleWire::Wire_CreateSplineWires_Internal(
 		Wire_CreateCurvePoints(Start, End, Depth, CurvePoints);
 
 		// Spawn spline component.
-		const FName SplineName = MakeUniqueObjectName(this, USplineComponent::StaticClass(), *FString::Printf(TEXT("WireSpline_%d"), idx));
-		USplineComponent* SplineComp = NewObject<USplineComponent>(this, SplineName);
+		const FName SplineName = MakeUniqueObjectName(
+			OwnerWires, USplineComponent::StaticClass(), *FString::Printf(TEXT("WireSpline_%d"), idx));
+		USplineComponent* SplineComp = NewObject<USplineComponent>(OwnerWires, SplineName);
 		SplineComp->SetupAttachment(OwnerWires->GetRootComponent());
-		SplineComp->RegisterComponent();
 		OwnerWires->AddInstanceComponent(SplineComp);
+		SplineComp->RegisterComponent();
 
 		// Populate points.
 		SplineComp->ClearSplinePoints(false);
@@ -421,8 +422,10 @@ void UDestructibleWire::Wire_CreateSplineWires_Internal(
 			const FVector LTS = XForm.InverseTransformVector(TS);
 			const FVector LTE = XForm.InverseTransformVector(TE);
 
-			const FName MeshName = MakeUniqueObjectName(this, USplineMeshComponent::StaticClass(), *FString::Printf(TEXT("WireMesh_%d_%d"), idx, s));
-			USplineMeshComponent* SM = NewObject<USplineMeshComponent>(this, MeshName);
+			const FName MeshName = MakeUniqueObjectName(
+				OwnerWires, USplineMeshComponent::StaticClass(),
+				*FString::Printf(TEXT("WireMesh_%d_%d"), idx, s));
+			USplineMeshComponent* SM = NewObject<USplineMeshComponent>(OwnerWires, MeshName);
 			SM->SetStaticMesh(WireMesh);
 			SM->SetMobility(EComponentMobility::Movable);
 			SM->SetupAttachment(SplineComp);
@@ -431,8 +434,8 @@ void UDestructibleWire::Wire_CreateSplineWires_Internal(
 			SM->SetStartScale(CrossScale);
 			SM->SetEndScale(CrossScale);
 
-			SM->RegisterComponent();
 			OwnerWires->AddInstanceComponent(SM);
+			SM->RegisterComponent();
 			SM->SetStartAndEnd(LS, LTS, LE, LTE, true);
 
 			M_SplineMeshComponents.Add(SM);

@@ -4,6 +4,7 @@
 #include "Engine/DeveloperSettings.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
+#include "RTS_Survival/Game/RTSGameInstance/WorldMissionContext/WorldMissionContext.h"
 #include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/WorldCampaign/CampaignGeneration/Enums/EnemyWorldPersonality.h/EnemyWorldPersonality.h"
 #include "RTSGameInstancePIEDeveloperSettings.generated.h"
@@ -40,5 +41,10 @@ public:
 	
 	UPROPERTY(Config, EditAnywhere, Category="PIE Startup")
 	ERTSCommander PlayerCommander = ERTSCommander::BalancedCommander;
+
+	// Loaded into the game instance when directly testing an operation map in PIE.
+	UPROPERTY(Config, EditAnywhere, BlueprintReadWrite, Category = "PIE Startup|World Mission Context",
+		meta = (ShowOnlyInnerProperties))
+	FWorldMissionContext WorldMissionContext;
 	
 };

@@ -49,6 +49,15 @@ namespace WorldPlayerAsyncGenerationUIConstants
 namespace WorldPlayerOperationMapConstants
 {
 	constexpr int32 EnemyProceduralMapSeedOffset = 23017;
+
+	int32 BuildOperationSeed(const int32 CampaignSeed,
+	                         const FGuid& SourceAnchorKey,
+	                         const uint8 OperationTypeValue)
+	{
+		uint32 OperationSeedHash = HashCombine(GetTypeHash(CampaignSeed), GetTypeHash(SourceAnchorKey));
+		OperationSeedHash = HashCombine(OperationSeedHash, GetTypeHash(OperationTypeValue));
+		return static_cast<int32>(OperationSeedHash & static_cast<uint32>(MAX_int32));
+	}
 }
 
 AWorldPlayerController::AWorldPlayerController()
@@ -645,6 +654,11 @@ void AWorldPlayerController::LaunchMissionMap(AWorldMissionObject* MissionMapObj
 		return;
 	}
 
+	if (not PopulateWorldMissionContextForMissionMap(MissionMapObject))
+	{
+		return;
+	}
+
 	BP_OnMissionMapLaunch(MissionMapObject, MissionMap);
 	OpenOperationMap(MissionMap);
 }
@@ -663,16 +677,121 @@ void AWorldPlayerController::LaunchEnemyMap(AWorldEnemyObject* EnemyMapObject)
 		return;
 	}
 
+	if (not PopulateWorldMissionContextForEnemyMap(EnemyMapObject))
+	{
+		return;
+	}
+
 	BP_OnEnemyMapLaunch(EnemyMapObject, EnemyMap);
 	const int32 PreviousMapIndex = M_WorldStateAndSaveManager->GetEnemyObjectProceduralMapIndex();
 	M_WorldStateAndSaveManager->AdvanceEnemyObjectProceduralMapIndex(M_ShuffledEnemyObjectProceduralMaps.Num());
 	if (not M_WorldStateAndSaveManager->SaveCampaignState())
 	{
 		M_WorldStateAndSaveManager->SetEnemyObjectProceduralMapIndex(PreviousMapIndex);
+		if (URTSGameInstance* RTSGameInstance = Cast<URTSGameInstance>(GetGameInstance()))
+		{
+			RTSGameInstance->ResetWorldMissionContext();
+		}
 		return;
 	}
 
 	OpenOperationMap(EnemyMap);
+}
+
+bool AWorldPlayerController::PopulateWorldMissionContextForMissionMap(
+	const AWorldMissionObject* MissionMapObject) const
+{
+	if (not IsValid(MissionMapObject))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Cannot populate world mission context because the mission object is invalid."));
+		return false;
+	}
+
+	URTSGameInstance* RTSGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (not IsValid(RTSGameInstance))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Cannot populate world mission context because the RTS game instance is invalid."));
+		return false;
+	}
+
+	const UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+		MissionMapObject->GetWorldStrengthEstimationComponent();
+	if (not IsValid(StrengthEstimationComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Cannot populate world mission context because the mission strength component is invalid."));
+		return false;
+	}
+
+	FWorldMissionContext WorldMissionContext;
+	WorldMissionContext.OperationType = EMapItemType::Mission;
+	WorldMissionContext.MissionType = MissionMapObject->GetMissionType();
+	WorldMissionContext.SourceAnchorKey = MissionMapObject->GetAnchorKey();
+	WorldMissionContext.OperationSeed = WorldPlayerOperationMapConstants::BuildOperationSeed(
+		M_CampaignSettings.GenerationSeed,
+		WorldMissionContext.SourceAnchorKey,
+		static_cast<uint8>(WorldMissionContext.MissionType));
+	WorldMissionContext.StrengthContributions = StrengthEstimationComponent->GetStrengthContributions();
+	WorldMissionContext.bIsInitialized = true;
+
+	if (not WorldMissionContext.GetIsValid())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("The populated mission operation context is invalid."));
+		return false;
+	}
+
+	RTSGameInstance->SetWorldMissionContext(WorldMissionContext);
+	return true;
+}
+
+bool AWorldPlayerController::PopulateWorldMissionContextForEnemyMap(
+	const AWorldEnemyObject* EnemyMapObject) const
+{
+	if (not IsValid(EnemyMapObject))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Cannot populate world mission context because the enemy object is invalid."));
+		return false;
+	}
+
+	URTSGameInstance* RTSGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (not IsValid(RTSGameInstance))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Cannot populate world mission context because the RTS game instance is invalid."));
+		return false;
+	}
+
+	const UWorldStrengthEstimationComponent* StrengthEstimationComponent =
+		EnemyMapObject->GetWorldStrengthEstimationComponent();
+	if (not IsValid(StrengthEstimationComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Cannot populate world mission context because the enemy strength component is invalid."));
+		return false;
+	}
+
+	FWorldMissionContext WorldMissionContext;
+	WorldMissionContext.OperationType = EMapItemType::EnemyItem;
+	WorldMissionContext.EnemyObjectType = EnemyMapObject->GetEnemyItemType();
+	WorldMissionContext.SourceAnchorKey = EnemyMapObject->GetAnchorKey();
+	WorldMissionContext.OperationSeed = WorldPlayerOperationMapConstants::BuildOperationSeed(
+		M_CampaignSettings.GenerationSeed,
+		WorldMissionContext.SourceAnchorKey,
+		static_cast<uint8>(WorldMissionContext.EnemyObjectType));
+	WorldMissionContext.StrengthContributions = StrengthEstimationComponent->GetStrengthContributions();
+	WorldMissionContext.bIsInitialized = true;
+
+	if (not WorldMissionContext.GetIsValid())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("The populated enemy operation context is invalid."));
+		return false;
+	}
+
+	RTSGameInstance->SetWorldMissionContext(WorldMissionContext);
+	return true;
 }
 
 bool AWorldPlayerController::TryGetMissionMap(const EMapMission MissionType,

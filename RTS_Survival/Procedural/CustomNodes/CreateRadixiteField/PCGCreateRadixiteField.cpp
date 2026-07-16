@@ -172,7 +172,7 @@ namespace
 		}
 	}
 
-	AActor* SpawnInspectionActor(UWorld& World, UClass& ActorClass)
+	AActor* SpawnRadixiteInspectionActor(UWorld& World, UClass& ActorClass)
 	{
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -185,7 +185,7 @@ namespace
 
 	bool TryMeasureActor(UWorld& World, UClass& ActorClass, FBox& OutLocalBounds)
 	{
-		AActor* InspectionActor = SpawnInspectionActor(World, ActorClass);
+		AActor* InspectionActor = SpawnRadixiteInspectionActor(World, ActorClass);
 		if (not IsValid(InspectionActor))
 		{
 			return false;
@@ -327,7 +327,7 @@ namespace
 		return Exclusions;
 	}
 
-	bool SpatialContains(const UPCGSpatialData& SpatialData, const FVector& Position)
+	bool DoesRadixiteSpatialDataContainPosition(const UPCGSpatialData& SpatialData, const FVector& Position)
 	{
 		const FBox SampleBounds(
 			FVector(-RadixiteFieldPCGConstants::SpatialSampleHalfExtent),
@@ -337,11 +337,13 @@ namespace
 			&& SampledPoint.Density > 0.0f;
 	}
 
-	bool IsExcluded(const TArray<const UPCGSpatialData*>& Exclusions, const FVector& Position)
+	bool IsPositionExcludedFromRadixiteField(
+		const TArray<const UPCGSpatialData*>& Exclusions,
+		const FVector& Position)
 	{
 		for (const UPCGSpatialData* Exclusion : Exclusions)
 		{
-			if (Exclusion != nullptr && SpatialContains(*Exclusion, Position))
+			if (Exclusion != nullptr && DoesRadixiteSpatialDataContainPosition(*Exclusion, Position))
 			{
 				return true;
 			}
@@ -588,7 +590,7 @@ namespace
 		{
 			return true;
 		}
-		if (IsExcluded(Exclusions, Boundary.Center)
+		if (IsPositionExcludedFromRadixiteField(Exclusions, Boundary.Center)
 			|| BoundaryOverlapsExcludedPointBounds(Boundary, Exclusions))
 		{
 			return false;
@@ -612,7 +614,7 @@ namespace
 					FMath::Lerp(Boundary.Bounds.Min.Y, Boundary.Bounds.Max.Y,
 						static_cast<double>(SampleY) / SamplesY));
 				if (IsPointInBoundary(Boundary, Position)
-					&& IsExcluded(Exclusions, FVector(Position, Boundary.Center.Z)))
+					&& IsPositionExcludedFromRadixiteField(Exclusions, FVector(Position, Boundary.Center.Z)))
 				{
 					return false;
 				}
@@ -731,7 +733,7 @@ namespace
 		const double Scale = Random.FRandRange(static_cast<float>(Asset.MinScale), static_cast<float>(Asset.MaxScale));
 		const double Radius = Asset.FootprintRadius * Scale;
 		if (not IsDiskInsideBoundary(Boundary, DesiredCenter, Radius)
-			|| IsExcluded(Exclusions, FVector(DesiredCenter, Boundary.Center.Z))
+			|| IsPositionExcludedFromRadixiteField(Exclusions, FVector(DesiredCenter, Boundary.Center.Z))
 			|| not IsActorPlacementClear(DesiredCenter, Radius, ExistingPlacements, ExtraSpacing))
 		{
 			return false;
@@ -937,7 +939,7 @@ namespace
 				const FVector2D Position = MakeRandomPointInField(Boundary, 0.95, Random);
 				const double FootprintRadius = 0.5 * Size.Size();
 				if (not IsDiskInsideBoundary(Boundary, Position, FootprintRadius)
-					|| IsExcluded(Exclusions, FVector(Position, Boundary.Center.Z)))
+					|| IsPositionExcludedFromRadixiteField(Exclusions, FVector(Position, Boundary.Center.Z)))
 				{
 					continue;
 				}

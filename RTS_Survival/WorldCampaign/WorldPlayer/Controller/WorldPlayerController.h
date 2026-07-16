@@ -185,6 +185,8 @@ private:
 	void InitializeOperationMapsForCampaignSeed(int32 WorldGenerationSeed);
 	void LaunchMissionMap(AWorldMissionObject* MissionMapObject);
 	void LaunchEnemyMap(AWorldEnemyObject* EnemyMapObject);
+	bool PopulateWorldMissionContextForMissionMap(const AWorldMissionObject* MissionMapObject) const;
+	bool PopulateWorldMissionContextForEnemyMap(const AWorldEnemyObject* EnemyMapObject) const;
 	bool TryGetMissionMap(EMapMission MissionType, TSoftObjectPtr<UWorld>& OutMissionMap) const;
 	bool TryGetEnemyMap(TSoftObjectPtr<UWorld>& OutEnemyMap);
 	void OpenOperationMap(const TSoftObjectPtr<UWorld>& OperationMap) const;

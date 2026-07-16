@@ -57,6 +57,8 @@ namespace ReinforcementRoadConstants
 	constexpr double MaximumRoadGrade = 0.18;
 	constexpr double MinimumMeshLength = 100.0;
 	constexpr double DecorativeAmplitudePerCurvature = 300.0;
+	constexpr double CurvatureApplicationInterval = 1000.0;
+	constexpr double CurvatureApplicationTransitionLength = 150.0;
 	constexpr int32 DecorativeAttempts = 5;
 	constexpr double MinimumOrphanApproachLength = 500.0;
 	constexpr double MaximumOrphanApproachLength = 2400.0;
@@ -843,10 +845,47 @@ namespace
 		return DensePath;
 	}
 
+	double GetCurvatureApplicationMultiplier(
+		const TArray<bool>& CurvatureApplicationByInterval,
+		const double DistanceAlongPath)
+	{
+		if (CurvatureApplicationByInterval.IsEmpty())
+		{
+			return 1.0;
+		}
+
+		const int32 IntervalIndex = FMath::Clamp(
+			FMath::FloorToInt32(DistanceAlongPath / CurvatureApplicationInterval),
+			0,
+			CurvatureApplicationByInterval.Num() - 1);
+		const double CurrentMultiplier = CurvatureApplicationByInterval[IntervalIndex] ? 1.0 : 0.0;
+		const double DistanceIntoInterval = FMath::Fmod(DistanceAlongPath, CurvatureApplicationInterval);
+
+		if (IntervalIndex > 0 && DistanceIntoInterval < CurvatureApplicationTransitionLength)
+		{
+			const double PreviousMultiplier = CurvatureApplicationByInterval[IntervalIndex - 1] ? 1.0 : 0.0;
+			return FMath::Lerp(PreviousMultiplier, CurrentMultiplier,
+				FMath::SmoothStep(0.0, CurvatureApplicationTransitionLength, DistanceIntoInterval));
+		}
+
+		if (IntervalIndex < CurvatureApplicationByInterval.Num() - 1
+			&& DistanceIntoInterval > CurvatureApplicationInterval - CurvatureApplicationTransitionLength)
+		{
+			const double NextMultiplier = CurvatureApplicationByInterval[IntervalIndex + 1] ? 1.0 : 0.0;
+			const double TransitionDistance = DistanceIntoInterval -
+				(CurvatureApplicationInterval - CurvatureApplicationTransitionLength);
+			return FMath::Lerp(CurrentMultiplier, NextMultiplier,
+				FMath::SmoothStep(0.0, CurvatureApplicationTransitionLength, TransitionDistance));
+		}
+
+		return CurrentMultiplier;
+	}
+
 	TArray<FVector2D> AddDecorativeCurves(
 		const TArray<FVector2D>& BasePath,
 		const float Curvature,
 		const float CurvesPer1000Units,
+		const float CurvatureApplicationPercentagePer1000Units,
 		const int32 Seed,
 		const FExclusionTester& Exclusions,
 		const FTerrainRouteTester& Terrain,
@@ -854,13 +893,27 @@ namespace
 	{
 		TArray<FVector2D> DensePath = DensifyPath(BasePath);
 		const double TotalLength = PathLength(DensePath);
-		if (DensePath.Num() < 3 || Curvature <= 0.0f || CurvesPer1000Units <= 0.0f)
+		if (DensePath.Num() < 3 || Curvature <= 0.0f || CurvesPer1000Units <= 0.0f
+			|| CurvatureApplicationPercentagePer1000Units <= 0.0f)
 		{
 			return DensePath;
 		}
 
 		const double CurveCount = FMath::Max(0.5, TotalLength * CurvesPer1000Units / 1000.0);
 		FRandomStream Random(Seed);
+		const float ClampedCurvatureApplicationPercentage = FMath::Clamp(
+			CurvatureApplicationPercentagePer1000Units, 0.0f, 100.0f);
+		TArray<bool> CurvatureApplicationByInterval;
+		if (ClampedCurvatureApplicationPercentage < 100.0f)
+		{
+			const int32 IntervalCount = FMath::CeilToInt32(TotalLength / CurvatureApplicationInterval);
+			CurvatureApplicationByInterval.Reserve(IntervalCount);
+			for (int32 IntervalIndex = 0; IntervalIndex < IntervalCount; ++IntervalIndex)
+			{
+				CurvatureApplicationByInterval.Add(Random.FRandRange(0.0f, 100.0f)
+					< ClampedCurvatureApplicationPercentage);
+			}
+		}
 		const double Phase = Random.FRandRange(0.0f, 2.0f * UE_PI);
 		double Amplitude = FMath::Min(DecorativeAmplitudePerCurvature * Curvature, TotalLength * 0.12);
 
@@ -882,7 +935,10 @@ namespace
 				const FVector2D Normal(-Tangent.Y, Tangent.X);
 				const double EndpointEnvelope = FMath::Square(FMath::Sin(UE_PI * Alpha));
 				const double Wave = FMath::Sin(2.0 * UE_PI * CurveCount * Alpha + Phase);
-				CurvedPath.Add(DensePath[PointIndex] + Normal * Amplitude * EndpointEnvelope * Wave);
+				const double ApplicationMultiplier = GetCurvatureApplicationMultiplier(
+					CurvatureApplicationByInterval, DistanceAlongPath);
+				CurvedPath.Add(DensePath[PointIndex] +
+					Normal * Amplitude * EndpointEnvelope * Wave * ApplicationMultiplier);
 			}
 
 			if (Exclusions.IsPathClear(CurvedPath, Clearance) && Terrain.IsPathTraversable(CurvedPath))
@@ -994,6 +1050,7 @@ namespace
 
 			OutRoute = AddDecorativeCurves(
 				BasePath, Settings.Curvature, Settings.AmountCurvesPer1000Units,
+				Settings.CurvatureApplicationPercentagePer1000Units,
 				Seed, Exclusions, Terrain, Clearance);
 			AppendOrphanApproach(OutRoute, EndPosition, End.Forward, ApproachLength);
 			if (Exclusions.IsPathClear(OutRoute, Clearance) && Terrain.IsPathTraversable(OutRoute))
@@ -1039,6 +1096,7 @@ namespace
 
 		OutRoute = AddDecorativeCurves(
 			BasePath, Settings.Curvature, Settings.AmountCurvesPer1000Units,
+			Settings.CurvatureApplicationPercentagePer1000Units,
 			Seed, Exclusions, Terrain, Clearance);
 		return OutRoute.Num() >= 2
 			&& Exclusions.IsPathClear(OutRoute, Clearance)

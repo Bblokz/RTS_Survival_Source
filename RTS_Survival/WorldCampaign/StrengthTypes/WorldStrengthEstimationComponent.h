@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "RTS_Survival/WorldCampaign/StrengthTypes/WorldStrengthContribution.h"
 #include "RTS_Survival/WorldCampaign/WorldMapUI/MapObjects/W_EnemyMapItem/StrengthEstimation/DataAndUtils/RTSStrengthEstimationTypes.h"
 #include "WorldStrengthEstimationComponent.generated.h"
 
@@ -27,6 +28,12 @@ public:
 	 * @return Total strength percentage currently shown to the player.
 	 */
 	int32 GetTotalStrengthPercentage() const;
+
+	/**
+	 * @brief Builds the typed contribution ledger copied into an operation map context.
+	 * @return Value-only strength contributions with their enum source identities.
+	 */
+	TArray<FWorldStrengthContribution> GetStrengthContributions() const;
 
 	/**
 	 * @brief Gets the strategic support enum values currently affecting this object.
@@ -65,9 +72,11 @@ public:
 
 	/**
 	 * @brief Adds one non-zero fortification modifier reason to the fortification category.
+	 * @param FortificationStrength Fortification enum that produced the contribution.
 	 * @param StrengthReason Reason built from an EWorldFortificationStrength definition in WorldData.
 	 */
-	void AddFortificationModifierReason(const FWorldStrengthReason& StrengthReason);
+	void AddFortificationModifierReason(EWorldFortificationStrength FortificationStrength,
+	                                    const FWorldStrengthReason& StrengthReason);
 
 	/**
 	 * @brief Clears only strategic support reasons while preserving fortification and field division data.
@@ -89,28 +98,44 @@ public:
 	                               const FWorldStrengthReason& StrengthReason);
 
 	/**
+	 * @brief Adds strategic support with the campaign anchor that supplied it.
+	 * @param StrategicSupport Strategic support enum affecting this object.
+	 * @param SourceAnchorKey Stable anchor key of the supporting world map object.
+	 * @param StrengthReason Reason built from the strategic support definition in WorldData.
+	 */
+	void AddStrategicSupportReason(EWorldStrategicSupport StrategicSupport,
+	                               const FGuid& SourceAnchorKey,
+	                               const FWorldStrengthReason& StrengthReason);
+
+	/**
 	 * @brief Clears only field division reasons while preserving fortification and strategic support data.
 	 */
 	void ResetFieldDivisionReport();
 
 	/**
 	 * @brief Adds one non-zero field division reason to the field division category.
+	 * @param FieldDivision Division enum that produced the contribution.
+	 * @param DivisionKey Stable campaign identity of the contributing division.
+	 * @param OwningPlayer Player id used to determine whether the signed contribution is friendly or hostile.
 	 * @param StrengthReason Reason supplied by the runtime field division system.
 	 */
-	void AddFieldDivisionReason(const FWorldStrengthReason& StrengthReason);
+	void AddFieldDivisionReason(EWorldFieldDivisions FieldDivision,
+	                            const FGuid& DivisionKey,
+	                            int32 OwningPlayer,
+	                            const FWorldStrengthReason& StrengthReason);
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
 		meta = (AllowPrivateAccess = "true"))
-	FWorldStrengthReason M_BaseFortificationStrengthReason;
+	FWorldStrengthContribution M_BaseFortificationStrengthContribution;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
 		meta = (AllowPrivateAccess = "true"))
-	TArray<FWorldStrengthReason> M_FortificationModifierReasons;
+	TArray<FWorldStrengthContribution> M_FortificationModifierContributions;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
 		meta = (AllowPrivateAccess = "true"))
-	TArray<FWorldStrengthReason> M_StrategicSupportReasons;
+	TArray<FWorldStrengthContribution> M_StrategicSupportContributions;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
 		meta = (AllowPrivateAccess = "true"))
@@ -118,7 +143,7 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
 		meta = (AllowPrivateAccess = "true"))
-	TArray<FWorldStrengthReason> M_FieldDivisionReasons;
+	TArray<FWorldStrengthContribution> M_FieldDivisionContributions;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "World Campaign|Strength Estimation",
 		meta = (AllowPrivateAccess = "true", ShowOnlyInnerProperties))

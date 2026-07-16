@@ -215,7 +215,10 @@ namespace
 			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
 				GetStrengthEstimationComponent(EnemyObject))
 			{
-				StrengthEstimationComponent->AddStrategicSupportReason(StrategicSupport, StrengthReason);
+				StrengthEstimationComponent->AddStrategicSupportReason(
+					StrategicSupport,
+					SourceObject->GetAnchorKey(),
+					StrengthReason);
 			}
 		}
 	}
@@ -237,7 +240,10 @@ namespace
 			if (UWorldStrengthEstimationComponent* StrengthEstimationComponent =
 				GetStrengthEstimationComponent(MissionObject))
 			{
-				StrengthEstimationComponent->AddStrategicSupportReason(StrategicSupport, StrengthReason);
+				StrengthEstimationComponent->AddStrategicSupportReason(
+					StrategicSupport,
+					SourceObject->GetAnchorKey(),
+					StrengthReason);
 			}
 		}
 	}
@@ -5227,7 +5233,9 @@ void AGeneratorWorldCampaign::InitMapObjectsBaseFortificationStrength(const ERTS
 					GameDifficulty,
 					FortificationReason))
 				{
-					StrengthEstimationComponent->AddFortificationModifierReason(FortificationReason);
+					StrengthEstimationComponent->AddFortificationModifierReason(
+						FortificationStrength,
+						FortificationReason);
 				}
 			}
 		};
@@ -5762,7 +5770,9 @@ void AGeneratorWorldCampaign::RestoreSavedMapItems(const FWorldCampaignState& Wo
 					M_CountAndDifficultyTuning.DifficultyLevel,
 					FortificationReason))
 				{
-					StrengthEstimationComponent->AddFortificationModifierReason(FortificationReason);
+					StrengthEstimationComponent->AddFortificationModifierReason(
+						FortificationStrength,
+						FortificationReason);
 				}
 			}
 		};

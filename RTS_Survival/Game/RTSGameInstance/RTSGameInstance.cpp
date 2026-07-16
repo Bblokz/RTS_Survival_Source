@@ -63,7 +63,7 @@ void URTSGameInstance::ApplyPIEStartupOverrides()
 	
 	SetPlayerFaction(PIEStartupSettings->PlayerFaction);
 	SetPlayerCommander(PIEStartupSettings->PlayerCommander);
-	
+	SetWorldMissionContext(PIEStartupSettings->WorldMissionContext);
 	
 #endif
 }
@@ -128,6 +128,16 @@ ERTSCommander URTSGameInstance::GetPlayerCommander() const
 		return ERTSCommander::NoCommander;
 	}
 	return M_PlayerCommander;
+}
+
+void URTSGameInstance::SetWorldMissionContext(const FWorldMissionContext& WorldMissionContext)
+{
+	M_WorldMissionContext = WorldMissionContext;
+}
+
+void URTSGameInstance::ResetWorldMissionContext()
+{
+	M_WorldMissionContext = FWorldMissionContext();
 }
 
 void URTSGameInstance::Shutdown()

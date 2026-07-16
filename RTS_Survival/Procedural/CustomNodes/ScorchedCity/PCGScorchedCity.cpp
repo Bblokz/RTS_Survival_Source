@@ -181,6 +181,8 @@ namespace
 		TArray<TArray<FScorchedBuildingMeshInstance>> BuildingMeshInstances;
 		// Measured local 3D bounds per entry, used by Scorch building nav and trace volumes.
 		TArray<FBox> BuildingLocalBounds;
+		// Per-entry vertical spawn offset (cm) applied after ground projection.
+		TArray<double> BuildingZOffsets;
 
 		UStaticMesh* RoadMesh = nullptr;
 		UStaticMesh* IntersectionMesh = nullptr;
@@ -355,6 +357,7 @@ namespace
 			Params.Buildings.Add(Resolved);
 			Assets.BuildingClasses.Add(BuildingClass);
 			Assets.BuildingCategories.Add(Category);
+			Assets.BuildingZOffsets.Add(Entry.ZOffset);
 			Assets.BuildingMeshInstances.Add(MoveTemp(MeshInstances));
 			Assets.BuildingLocalBounds.Add(MeasuredLocalBounds.IsValid
 				? MeasuredLocalBounds
@@ -950,9 +953,13 @@ namespace
 				continue;
 			}
 
-			// Same placement rules as actor buildings: pivot projected onto the landscape.
+			// Same placement rules as actor buildings: pivot projected onto the landscape,
+			// then nudged by the entry's designer ZOffset.
+			const double ZOffset = Assets.BuildingZOffsets.IsValidIndex(Building.AssetIndex)
+				? Assets.BuildingZOffsets[Building.AssetIndex]
+				: 0.0;
 			const FVector WorldPosition = ProjectCityPositionToGround(
-				World, Building.ActorPosition, CityToWorld, TraceParams, 0.0);
+				World, Building.ActorPosition, CityToWorld, TraceParams, ZOffset);
 			const FTransform BuildingTransform(
 				FQuat(FVector::UpVector, CityYaw + Building.YawRadians), WorldPosition);
 			BuildingPlacements.Emplace(BuildingTransform, Assets.BuildingLocalBounds[Building.AssetIndex]);
@@ -1399,11 +1406,14 @@ namespace
 				continue;
 			}
 			const FBox& LocalBounds = Assets.BuildingLocalBounds[Building.AssetIndex];
+			const double ZOffset = Assets.BuildingZOffsets.IsValidIndex(Building.AssetIndex)
+				? Assets.BuildingZOffsets[Building.AssetIndex]
+				: 0.0;
 
 			FPCGPoint& Point = Points.Emplace_GetRef();
 			Point.Transform = FTransform(
 				FQuat(FVector::UpVector, CityYaw + Building.YawRadians),
-				ProjectCityPositionToGround(World, Building.ActorPosition, CityToWorld, TraceParams, 0.0));
+				ProjectCityPositionToGround(World, Building.ActorPosition, CityToWorld, TraceParams, ZOffset));
 			Point.BoundsMin = LocalBounds.Min;
 			Point.BoundsMax = LocalBounds.Max;
 			Point.Density = 1.0f;
@@ -1670,10 +1680,14 @@ namespace
 			}
 
 			// Buildings are authored with their pivot at ground level: project the pivot
-			// straight onto the landscape (no bounds-based lift, which made them float).
+			// straight onto the landscape (no bounds-based lift, which made them float), then
+			// apply the entry's designer ZOffset.
+			const double BuildingZOffset = Assets.BuildingZOffsets.IsValidIndex(Building.AssetIndex)
+				? Assets.BuildingZOffsets[Building.AssetIndex]
+				: 0.0;
 			SpawnActorAtCityPosition(World, Assets.BuildingClasses[Building.AssetIndex],
 				Building.ActorPosition, Building.YawRadians, CityToWorld,
-				0.0, 1.0, OutSpawnedActors);
+				BuildingZOffset, 1.0, OutSpawnedActors);
 		}
 
 		for (const FScorchedAuxiliarySpawn& Auxiliary : Result.Auxiliaries)

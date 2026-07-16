@@ -107,6 +107,14 @@ struct FScorchedBuildingAssetSettings
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Building)
 	EScorchedZonePreference ZonePreference = EScorchedZonePreference::None;
+
+	/**
+	 * @brief Vertical spawn offset (cm) applied after ground projection, for entries whose pivot
+	 * consistently sits too high or too low. Negative sinks the building, positive lifts it;
+	 * 0 = spawn exactly on the ground. Does not affect footprints, layout or collision size.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Building)
+	float ZOffset = 0.0f;
 };
 
 USTRUCT(BlueprintType)
