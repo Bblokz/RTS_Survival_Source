@@ -7,6 +7,7 @@
 #include "PCGCreateFuelSupply.generated.h"
 
 class AActor;
+class ADestructibleSplineActor;
 
 UENUM(BlueprintType)
 enum class EFuelCardinalDirection : uint8
@@ -55,48 +56,17 @@ struct FFuelSupplyActorEntry
 };
 
 /**
- * @brief Defines an arbitrary destructible pipe Blueprint through its footprint and connector sides.
- * Connector-aware rotation and reversible traversal let irregular authored pieces fill routed networks.
+ * @brief Extends a placed fuel-tank asset with the number of spline connections each instance requests.
+ * Keeping this setting on tank entries lets differently authored tanks expose different connection capacity.
  */
 USTRUCT(BlueprintType)
-struct FFuelPipeActorEntry
+struct FFuelTankActorEntry : public FFuelSupplyActorEntry
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset")
-	TSoftClassPtr<AActor> ActorClass;
-
-	/** @brief X size that preserves the measured pivot position; 0 uses the measured footprint. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
-		meta = (ClampMin = "0", Units = "cm", DisplayName = "Footprint Size X (0 = Measure)"))
-	float FootprintOverrideX = 0.0f;
-
-	/** @brief Y size that preserves the measured pivot position; 0 uses the measured footprint. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Bounds",
-		meta = (ClampMin = "0", Units = "cm", DisplayName = "Footprint Size Y (0 = Measure)"))
-	float FootprintOverrideY = 0.0f;
-
-	/** @brief Side where traversal enters the authored piece. Default flow therefore points toward +X. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
-	EFuelCardinalDirection StartConnectorDirection = EFuelCardinalDirection::NegativeX;
-
-	/** @brief Authored exit/forward side. Defaults to +X; use +Y/-Y to describe elbows. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
-	EFuelCardinalDirection ForwardDirection = EFuelCardinalDirection::PositiveX;
-
-	/** @brief Allows the generator to exchange start/end connectors without mirroring the actor. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections")
-	bool bCanReverse = true;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Asset", meta = (ClampMin = "0.01"))
-	float Weight = 1.0f;
-
-	/** @brief Amount each end may overlap its neighbor to hide seams. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections", meta = (ClampMin = "0", Units = "cm"))
-	float EndOverlap = 5.0f;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Connections", meta = (Units = "cm"))
-	float ZOffset = 0.0f;
+	/** @brief Number of spline pipes requested by every generated instance of this tank asset. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pipe Connections", meta = (ClampMin = "1"))
+	int32 PipeConnections = 2;
 };
 
 /**
@@ -169,11 +139,21 @@ public:
 	TArray<FFuelSupplyActorEntry> SupplyDepots;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Assets|Fuel Tanks")
-	TArray<FFuelSupplyActorEntry> FuelTanks;
+	TArray<FFuelTankActorEntry> FuelTanks;
 
-	/** @brief Destructible pipe Blueprints. They always spawn as individual actors, never instances. */
+	/** @brief Designer-authored destructible spline class used to spawn every generated pipe connection. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Assets|Fuel Pipes")
-	TArray<FFuelPipeActorEntry> FuelPipes;
+	TSoftClassPtr<ADestructibleSplineActor> FuelPipeSplineClass;
+
+	/** @brief Authored +X length of one pipe mesh piece; also limits generated spline segment length. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Assets|Fuel Pipes",
+		meta = (ClampMin = "1", Units = "cm", DisplayName = "Pipe Size X"))
+	float FuelPipeSizeX = 500.0f;
+
+	/** @brief Authored pipe width used to keep generated splines from overlapping. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Assets|Fuel Pipes",
+		meta = (ClampMin = "1", Units = "cm", DisplayName = "Pipe Size Y"))
+	float FuelPipeSizeY = 100.0f;
 
 	/** @brief Standalone Blueprint fences placed around tanks after pipe routes are known. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Assets|Fuel Tank Fences")
@@ -225,21 +205,22 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pipe Network", meta = (ClampMin = "0", Units = "cm"))
 	float PipeObstacleClearance = 125.0f;
 
-	/** @brief Gap outside each depot/tank footprint before its first pipe piece begins. */
+	/** @brief Visible clearance between separate pipe splines; their authored widths can never overlap. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pipe Network", meta = (ClampMin = "0", Units = "cm"))
-	float ConnectionClearance = 25.0f;
+	float PipeSeparation = 25.0f;
 
-	/** @brief Permits small longitudinal scaling so routes close cleanly without partial pieces. */
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pipe Network")
-	bool bAllowPipeLengthScaling = true;
+	/** @brief Distance pipe centerlines continue inside tanks and depots so connections do not leave gaps. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pipe Network", meta = (ClampMin = "0", Units = "cm"))
+	float ConnectionOverlap = 100.0f;
 
+	/** @brief Overall corner smoothing: 0 keeps routed corners straight and 1 gives the roundest safe result. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pipe Network",
-		meta = (ClampMin = "0.1", ClampMax = "1.0", EditCondition = "bAllowPipeLengthScaling"))
-	float MinPipeLengthScale = 0.8f;
+		meta = (ClampMin = "0", ClampMax = "1"))
+	float PipeCurviness = 0.35f;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pipe Network",
-		meta = (ClampMin = "1.0", ClampMax = "2.0", EditCondition = "bAllowPipeLengthScaling"))
-	float MaxPipeLengthScale = 1.2f;
+	/** @brief Vertical offset applied only to the generated pipe spline points. */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Pipe Network", meta = (Units = "cm"))
+	float FuelPipeZOffset = 0.0f;
 
 	// --- Terrain ---
 

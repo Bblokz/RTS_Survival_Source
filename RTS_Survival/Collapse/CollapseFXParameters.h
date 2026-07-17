@@ -22,22 +22,22 @@ struct FCollapseParameters
 {
 	GENERATED_BODY()
 	// If set to not nothing will happen on the collapse vfx.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ECollapseVFXAdjustNiagaraParams VFXAdjustParams = ECollapseVFXAdjustNiagaraParams::Not;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float SizeMlt = 1.f;
 	
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float LifeTimeMlt = 1.f;
 	
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float ParticlesMlt = 1.f;
 	
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector GroundSmokeOffset = FVector::ZeroVector;
 	
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FLinearColor SmokeColor = FLinearColor::White;
 	
 	
@@ -87,13 +87,13 @@ struct FCollapseForce
 {
 	GENERATED_BODY()
 	// Offset added to the location of the GeoCollection component.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector ForceLocationOffset = FVector::ZeroVector;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Force = 4000.f;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float Radius = 10.f;
 };
 
@@ -102,14 +102,14 @@ struct FCollapseDuration
 {
 	GENERATED_BODY()
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float CollapsedGeometryLifeTime = 8;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bDestroyOwningActorAfterCollapse = false;
 
 	// If false the geo component is destroyed by the CollapseMesh function after life time.
 	// Otherwise, the geometry is kept visible but physics is disabled.
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bKeepGeometryVisibleAfterLifeTime = false;
 };

@@ -7,16 +7,15 @@
 #include "PCGManagedResource.h"
 #include "PCGPin.h"
 #include "Components/DecalComponent.h"
+#include "Components/MeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SplineComponent.h"
 #include "Data/PCGPointData.h"
 #include "Data/PCGSpatialData.h"
-#include "Engine/HitResult.h"
+#include "Elements/PCGProjectionParams.h"
 #include "Engine/World.h"
-#include "EngineUtils.h"
 #include "GameFramework/Actor.h"
 #include "Helpers/PCGHelpers.h"
-#include "LandscapeProxy.h"
 #include "Materials/MaterialInterface.h"
 #include "Metadata/PCGMetadata.h"
 #include "Metadata/PCGMetadataAttribute.h"
@@ -38,7 +37,6 @@ namespace BattlefieldAreaPCGConstants
 	constexpr double MinimumAreaDimension = 1000.0;
 	constexpr double MinimumSampleSpacing = 25.0;
 	constexpr double MinimumScale = 0.01;
-	constexpr double MinimumLandscapeTraceMargin = 100.0;
 	constexpr double FullCircleDegrees = 360.0;
 	constexpr int32 MinimumBoundaryStations = 4;
 	constexpr int32 MaximumBoundaryStations = 32;
@@ -139,6 +137,7 @@ namespace BattlefieldAreaPCGInternal
 	{
 		FVector Position = FVector::ZeroVector;
 		FVector Normal = FVector::UpVector;
+		FQuat SurfaceRotation = FQuat::Identity;
 	};
 
 	struct FBattlefieldBoundary
@@ -265,6 +264,24 @@ namespace BattlefieldAreaPCGInternal
 			SpawnParameters);
 	}
 
+	FBox GetInspectionActorMeshBounds(const AActor& InspectionActor)
+	{
+		TInlineComponentArray<UMeshComponent*> MeshComponents;
+		InspectionActor.GetComponents(MeshComponents, true);
+		FBox MeshBounds(EForceInit::ForceInit);
+		for (const UMeshComponent* MeshComponent : MeshComponents)
+		{
+			if (not IsValid(MeshComponent)
+				|| not MeshComponent->IsVisible()
+				|| MeshComponent->Bounds.SphereRadius <= UE_SMALL_NUMBER)
+			{
+				continue;
+			}
+			MeshBounds += MeshComponent->Bounds.GetBox();
+		}
+		return MeshBounds;
+	}
+
 	bool TryMeasureActor(UWorld& World, UClass& ActorClass, FBox& OutLocalBounds)
 	{
 		AActor* InspectionActor = SpawnInspectionActor(World, ActorClass);
@@ -273,8 +290,8 @@ namespace BattlefieldAreaPCGInternal
 			return false;
 		}
 
-		OutLocalBounds = InspectionActor->GetComponentsBoundingBox(true, true)
-			.ShiftBy(-InspectionActor->GetActorLocation());
+		const FBox MeshWorldBounds = GetInspectionActorMeshBounds(*InspectionActor);
+		OutLocalBounds = MeshWorldBounds.ShiftBy(-InspectionActor->GetActorLocation());
 		InspectionActor->Destroy();
 		if (not OutLocalBounds.IsValid)
 		{
@@ -464,79 +481,50 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	/**
-	 * @brief Brackets each landscape's complete vertical bounds so sculpted peaks and eroded ground cannot
-	 * fall outside the trace, while the placement's unrelated reference Z cannot affect grounding.
-	 * @param World World containing the landscape proxies.
-	 * @param Settings Safety margins added beyond the landscape's complete component bounds.
-	 * @param Position Placement whose XY selects the landscape; its Z is intentionally ignored.
-	 * @param OutHit Receives the landscape surface hit.
-	 * @return True when a landscape covers the requested XY and its collision surface was hit.
+	 * @brief Uses Unreal PCG's cached landscape projection path so terrain height and normal come from
+	 * the same interpolated data as the built-in Projection node without per-point world traces.
+	 * @param LandscapeData Cached PCG landscape surface used as the projection target.
+	 * @param Settings Terrain validation settings applied after projection.
+	 * @param Position World XY to project; no source Z is required.
+	 * @param OutGround Receives the projected position, normal, and surface rotation.
+	 * @return True when PCG landscape data covers the XY and the projected slope is accepted.
 	 */
-	bool TryTraceLandscape(
-		UWorld& World,
-		const UPCGCreateBattlefieldAreaSettings& Settings,
-		const FVector& Position,
-		FHitResult& OutHit)
-	{
-		const FCollisionQueryParams QueryParameters;
-		for (TActorIterator<ALandscapeProxy> LandscapeIterator(&World); LandscapeIterator; ++LandscapeIterator)
-		{
-			const ALandscapeProxy* Landscape = *LandscapeIterator;
-			if (not IsValid(Landscape))
-			{
-				continue;
-			}
-
-			const FBox LandscapeBounds = Landscape->GetComponentsBoundingBox(true);
-			if (not LandscapeBounds.IsValid)
-			{
-				continue;
-			}
-
-			const FVector LandscapeBoundsXY(Position.X, Position.Y, LandscapeBounds.GetCenter().Z);
-			if (not LandscapeBounds.IsInsideOrOn(LandscapeBoundsXY))
-			{
-				continue;
-			}
-
-			const double TraceUp = FMath::Max(
-				static_cast<double>(Settings.GroundTraceUp),
-				BattlefieldAreaPCGConstants::MinimumLandscapeTraceMargin);
-			const double TraceDown = FMath::Max(
-				static_cast<double>(Settings.GroundTraceDown),
-				BattlefieldAreaPCGConstants::MinimumLandscapeTraceMargin);
-			const FVector TraceStart(Position.X, Position.Y, LandscapeBounds.Max.Z + TraceUp);
-			const FVector TraceEnd(Position.X, Position.Y, LandscapeBounds.Min.Z - TraceDown);
-			if (Landscape->ActorLineTraceSingle(
-				OutHit, TraceStart, TraceEnd, ECC_WorldStatic, QueryParameters))
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
 	bool TryProjectToLandscape(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
-		const FVector& Position,
+		const FVector2D& Position,
 		FBattlefieldGroundResult& OutGround)
 	{
-		FHitResult LandscapeHit;
-		if (not TryTraceLandscape(World, Settings, Position, LandscapeHit))
+		static const FPCGProjectionParams ProjectionParameters;
+		static const FBox ProjectionBounds(
+			FVector(-BattlefieldAreaPCGConstants::SpatialSampleHalfExtent),
+			FVector(BattlefieldAreaPCGConstants::SpatialSampleHalfExtent));
+		FPCGPoint ProjectedPoint;
+		if (not LandscapeData.ProjectPoint(
+			FTransform(FVector(Position, 0.0)),
+			ProjectionBounds,
+			ProjectionParameters,
+			ProjectedPoint,
+			nullptr))
+		{
+			return false;
+		}
+
+		const FVector GroundNormal = ProjectedPoint.Transform.GetUnitAxis(EAxis::Z).GetSafeNormal();
+		if (GroundNormal.IsNearlyZero())
 		{
 			return false;
 		}
 
 		const double SlopeDegrees = FMath::RadiansToDegrees(FMath::Acos(
-			FMath::Clamp(static_cast<double>(LandscapeHit.ImpactNormal.Z), -1.0, 1.0)));
+			FMath::Clamp(static_cast<double>(GroundNormal.Z), -1.0, 1.0)));
 		if (SlopeDegrees > Settings.MaxGroundSlopeDegrees)
 		{
 			return false;
 		}
-		OutGround.Position = LandscapeHit.ImpactPoint;
-		OutGround.Normal = LandscapeHit.ImpactNormal.GetSafeNormal();
+		OutGround.Position = ProjectedPoint.Transform.GetLocation();
+		OutGround.Normal = GroundNormal;
+		OutGround.SurfaceRotation = ProjectedPoint.Transform.GetRotation().GetNormalized();
 		return true;
 	}
 
@@ -939,12 +927,14 @@ namespace BattlefieldAreaPCGInternal
 		const double YawDegrees,
 		const bool bAlignToGround)
 	{
-		FQuat Rotation(FVector::UpVector, FMath::DegreesToRadians(YawDegrees + Asset.YawOffsetDegrees));
-		if (bAlignToGround)
+		const FQuat YawRotation(
+			FVector::UpVector,
+			FMath::DegreesToRadians(YawDegrees + Asset.YawOffsetDegrees));
+		if (not bAlignToGround)
 		{
-			Rotation = FQuat::FindBetweenNormals(FVector::UpVector, Ground.Normal) * Rotation;
+			return YawRotation;
 		}
-		return Rotation;
+		return Ground.SurfaceRotation * YawRotation;
 	}
 
 	FTransform MakeGroundedActorTransform(
@@ -1018,8 +1008,28 @@ namespace BattlefieldAreaPCGInternal
 		return true;
 	}
 
+	FBattlefieldFootprint MakeApproximateActorFootprint(
+		const FResolvedBattlefieldActor& Asset,
+		const FVector2D& Center,
+		const double UniformScale,
+		const double YawDegrees)
+	{
+		const double FootprintYawRadians = FMath::DegreesToRadians(YawDegrees + Asset.YawOffsetDegrees);
+		const FVector2D LocalBoundsCenter(Asset.LocalBounds.GetCenter());
+		const FVector2D BoundsCenterOffset(
+			LocalBoundsCenter.X * FMath::Cos(FootprintYawRadians)
+				- LocalBoundsCenter.Y * FMath::Sin(FootprintYawRadians),
+			LocalBoundsCenter.X * FMath::Sin(FootprintYawRadians)
+				+ LocalBoundsCenter.Y * FMath::Cos(FootprintYawRadians));
+		FBattlefieldFootprint Footprint;
+		Footprint.Center = Center + BoundsCenterOffset * UniformScale;
+		Footprint.HalfExtents = 0.5 * Asset.FootprintSize * UniformScale;
+		Footprint.YawRadians = FootprintYawRadians;
+		return Footprint;
+	}
+
 	bool TryMakeActorPlacement(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1033,23 +1043,27 @@ namespace BattlefieldAreaPCGInternal
 		const TArray<FBattlefieldFootprint>& Occupied,
 		FPlacedBattlefieldActor& OutPlacement)
 	{
+		const double Radius = 0.5 * Asset.FootprintSize.Size() * UniformScale;
+		FBattlefieldFootprint Footprint = MakeApproximateActorFootprint(
+			Asset, Center, UniformScale, YawDegrees);
+		if (not IsDiskInsideBoundary(Boundary, Footprint.Center, Radius)
+			|| not IsPlacementClear(Footprint, Occupied, Settings.PlacementClearance))
+		{
+			return false;
+		}
+
 		FBattlefieldGroundResult Ground;
-		if (not TryProjectToLandscape(World, Settings, FVector(Center, 0.0), Ground))
+		if (not TryProjectToLandscape(LandscapeData, Settings, Center, Ground))
 		{
 			return false;
 		}
 
 		const FTransform Transform = MakeGroundedActorTransform(
 			Asset, Ground, UniformScale, YawDegrees, Settings.bAlignActorsToGround);
-		const double Radius = 0.5 * Asset.FootprintSize.Size() * UniformScale;
-		const double FootprintYawRadians = FMath::DegreesToRadians(YawDegrees + Asset.YawOffsetDegrees);
-		FBattlefieldFootprint Footprint;
 		Footprint.Center = FVector2D(Transform.TransformPosition(Asset.LocalBounds.GetCenter()));
-		Footprint.HalfExtents = 0.5 * Asset.FootprintSize * UniformScale;
-		Footprint.YawRadians = FootprintYawRadians;
 		if (not IsDiskInsideBoundary(Boundary, Footprint.Center, Radius)
-			|| IsExcluded(Exclusions, FVector(Footprint.Center, Ground.Position.Z))
-			|| not IsPlacementClear(Footprint, Occupied, Settings.PlacementClearance))
+			|| not IsPlacementClear(Footprint, Occupied, Settings.PlacementClearance)
+			|| IsExcluded(Exclusions, FVector(Footprint.Center, Ground.Position.Z)))
 		{
 			return false;
 		}
@@ -1088,7 +1102,7 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	void PlaceScatteredActors(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1120,7 +1134,7 @@ namespace BattlefieldAreaPCGInternal
 				const FVector2D LocalPosition = MakeRandomLocalPoint(
 					Boundary, SliceRange, Spread, Settings.SliceEdgePadding, Random);
 				FPlacedBattlefieldActor Placement;
-				if (TryMakeActorPlacement(World, Settings, Boundary, Exclusions, Asset,
+				if (TryMakeActorPlacement(LandscapeData, Settings, Boundary, Exclusions, Asset,
 					LocalToWorld(Boundary, LocalPosition), Scale, BaseYawDegrees, AreaIndex,
 					Role, Slice, InOutOccupied, Placement))
 				{
@@ -1138,7 +1152,7 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	bool TryBuildBarbedWireRun(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1166,7 +1180,7 @@ namespace BattlefieldAreaPCGInternal
 			const FVector2D Center = LocalToWorld(Boundary, AnchorLocal) + RunDirection * Offset;
 			FPlacedBattlefieldActor Placement;
 			const double ActorYaw = RunYaw - Asset.AuthoredLengthYawDegrees;
-			if (not TryMakeActorPlacement(World, Settings, Boundary, Exclusions, Asset, Center,
+			if (not TryMakeActorPlacement(LandscapeData, Settings, Boundary, Exclusions, Asset, Center,
 				Scale, ActorYaw, AreaIndex, EBattlefieldPlacementRole::BarbedWire,
 				EBattlefieldSlice::NoMansLand, StagedOccupied, Placement))
 			{
@@ -1179,7 +1193,7 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	void PlaceBarbedWireRuns(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1203,7 +1217,7 @@ namespace BattlefieldAreaPCGInternal
 			{
 				const int32 AssetIndex = PickWeightedAssetIndex(Assets, Random);
 				TArray<FPlacedBattlefieldActor> Run;
-				if (not TryBuildBarbedWireRun(World, Settings, Boundary, Exclusions, Assets[AssetIndex],
+				if (not TryBuildBarbedWireRun(LandscapeData, Settings, Boundary, Exclusions, Assets[AssetIndex],
 					PieceCount, AreaIndex, Random, InOutOccupied, Run))
 				{
 					continue;
@@ -1218,7 +1232,7 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	bool TryBuildHedgehogGroup(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1249,7 +1263,7 @@ namespace BattlefieldAreaPCGInternal
 				const FResolvedBattlefieldActor& Asset = Assets[PickWeightedAssetIndex(Assets, Random)];
 				const double Scale = Random.FRandRange(static_cast<float>(Asset.MinScale), static_cast<float>(Asset.MaxScale));
 				FPlacedBattlefieldActor Placement;
-				if (TryMakeActorPlacement(World, Settings, Boundary, Exclusions, Asset, Center, Scale,
+				if (TryMakeActorPlacement(LandscapeData, Settings, Boundary, Exclusions, Asset, Center, Scale,
 					Random.FRandRange(0.0f, static_cast<float>(BattlefieldAreaPCGConstants::FullCircleDegrees)),
 					AreaIndex, EBattlefieldPlacementRole::Hedgehog, EBattlefieldSlice::NoMansLand,
 					StagedOccupied, Placement))
@@ -1270,7 +1284,7 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	void PlaceHedgehogGroups(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1293,7 +1307,7 @@ namespace BattlefieldAreaPCGInternal
 			for (int32 Attempt = 0; Attempt < FMath::Max(1, Settings.PlacementAttemptsPerItem); ++Attempt)
 			{
 				TArray<FPlacedBattlefieldActor> Group;
-				if (not TryBuildHedgehogGroup(World, Settings, Boundary, Exclusions, Assets,
+				if (not TryBuildHedgehogGroup(LandscapeData, Settings, Boundary, Exclusions, Assets,
 					HedgehogCount, AreaIndex, Random, InOutOccupied, Group))
 				{
 					continue;
@@ -1308,7 +1322,7 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	void PlaceDecals(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1338,13 +1352,13 @@ namespace BattlefieldAreaPCGInternal
 				Footprint.HalfExtents = 0.5 * Size;
 				Footprint.YawRadians = Random.FRandRange(0.0f, static_cast<float>(2.0 * PI));
 				if (not IsDiskInsideBoundary(Boundary, Center, Radius)
-					|| IsExcluded(Exclusions, FVector(Center, Boundary.Center.Z))
 					|| not IsPlacementClear(Footprint, InOutOccupied, Settings.PlacementClearance))
 				{
 					continue;
 				}
 				FBattlefieldGroundResult Ground;
-				if (not TryProjectToLandscape(World, Settings, FVector(Center, 0.0), Ground))
+				if (not TryProjectToLandscape(LandscapeData, Settings, Center, Ground)
+					|| IsExcluded(Exclusions, FVector(Center, Ground.Position.Z)))
 				{
 					continue;
 				}
@@ -1399,7 +1413,7 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	void PlaceFactionSections(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1411,12 +1425,12 @@ namespace BattlefieldAreaPCGInternal
 	{
 		const double SovietFacingYaw = GetBoundaryForwardYawDegrees(Boundary);
 		const double GermanFacingYaw = SovietFacingYaw + 180.0;
-		PlaceScatteredActors(World, Settings, Boundary, Exclusions, Assets.SovietWeaponry,
+		PlaceScatteredActors(LandscapeData, Settings, Boundary, Exclusions, Assets.SovietWeaponry,
 			Boundary.SovietRange, Settings.MinSovietWeaponryPerArea, Settings.MaxSovietWeaponryPerArea,
 			Settings.SovietWeaponrySpread, SovietFacingYaw, AreaIndex,
 			EBattlefieldPlacementRole::SovietWeaponry, EBattlefieldSlice::Soviet,
 			Random, OutActors, InOutOccupied);
-		PlaceScatteredActors(World, Settings, Boundary, Exclusions, Assets.GermanWeaponry,
+		PlaceScatteredActors(LandscapeData, Settings, Boundary, Exclusions, Assets.GermanWeaponry,
 			Boundary.GermanRange, Settings.MinGermanWeaponryPerArea, Settings.MaxGermanWeaponryPerArea,
 			Settings.GermanWeaponrySpread, GermanFacingYaw, AreaIndex,
 			EBattlefieldPlacementRole::GermanWeaponry, EBattlefieldSlice::German,
@@ -1424,7 +1438,7 @@ namespace BattlefieldAreaPCGInternal
 	}
 
 	void PlaceSpoilsAndTrees(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const FBattlefieldBoundary& Boundary,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1436,23 +1450,23 @@ namespace BattlefieldAreaPCGInternal
 	{
 		const double RandomYaw = Random.FRandRange(0.0f,
 			static_cast<float>(BattlefieldAreaPCGConstants::FullCircleDegrees));
-		PlaceScatteredActors(World, Settings, Boundary, Exclusions, Assets.SovietSpoils,
+		PlaceScatteredActors(LandscapeData, Settings, Boundary, Exclusions, Assets.SovietSpoils,
 			Boundary.SovietRange, Settings.MinSovietSpoilsPerArea, Settings.MaxSovietSpoilsPerArea,
 			1.0, RandomYaw, AreaIndex, EBattlefieldPlacementRole::SovietSpoils,
 			EBattlefieldSlice::Soviet, Random, OutActors, InOutOccupied);
-		PlaceScatteredActors(World, Settings, Boundary, Exclusions, Assets.GermanSpoils,
+		PlaceScatteredActors(LandscapeData, Settings, Boundary, Exclusions, Assets.GermanSpoils,
 			Boundary.GermanRange, Settings.MinGermanSpoilsPerArea, Settings.MaxGermanSpoilsPerArea,
 			1.0, RandomYaw, AreaIndex, EBattlefieldPlacementRole::GermanSpoils,
 			EBattlefieldSlice::German, Random, OutActors, InOutOccupied);
 		const FVector2D WholeAreaRange(-0.5 * Boundary.Length, 0.5 * Boundary.Length);
-		PlaceScatteredActors(World, Settings, Boundary, Exclusions, Assets.Trees, WholeAreaRange,
+		PlaceScatteredActors(LandscapeData, Settings, Boundary, Exclusions, Assets.Trees, WholeAreaRange,
 			Settings.MinTreesPerArea, Settings.MaxTreesPerArea, 1.0, RandomYaw, AreaIndex,
 			EBattlefieldPlacementRole::Tree, EBattlefieldSlice::Global,
 			Random, OutActors, InOutOccupied);
 	}
 
 	void GenerateAreaContents(
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		const TArray<const UPCGSpatialData*>& Exclusions,
 		const FResolvedBattlefieldAssets& Assets,
@@ -1461,15 +1475,15 @@ namespace BattlefieldAreaPCGInternal
 		FGeneratedBattlefieldArea& OutArea)
 	{
 		TArray<FBattlefieldFootprint> Occupied;
-		PlaceFactionSections(World, Settings, OutArea.Boundary, Exclusions, Assets,
+		PlaceFactionSections(LandscapeData, Settings, OutArea.Boundary, Exclusions, Assets,
 			AreaIndex, Random, OutArea.Actors, Occupied);
-		PlaceBarbedWireRuns(World, Settings, OutArea.Boundary, Exclusions, Assets.BarbedWire,
+		PlaceBarbedWireRuns(LandscapeData, Settings, OutArea.Boundary, Exclusions, Assets.BarbedWire,
 			AreaIndex, Random, OutArea.Actors, Occupied);
-		PlaceHedgehogGroups(World, Settings, OutArea.Boundary, Exclusions, Assets.Hedgehogs,
+		PlaceHedgehogGroups(LandscapeData, Settings, OutArea.Boundary, Exclusions, Assets.Hedgehogs,
 			AreaIndex, Random, OutArea.Actors, Occupied);
-		PlaceSpoilsAndTrees(World, Settings, OutArea.Boundary, Exclusions, Assets,
+		PlaceSpoilsAndTrees(LandscapeData, Settings, OutArea.Boundary, Exclusions, Assets,
 			AreaIndex, Random, OutArea.Actors, Occupied);
-		PlaceDecals(World, Settings, OutArea.Boundary, Exclusions, Assets.Decals,
+		PlaceDecals(LandscapeData, Settings, OutArea.Boundary, Exclusions, Assets.Decals,
 			AreaIndex, Random, OutArea.Decals, Occupied);
 	}
 
@@ -1483,7 +1497,7 @@ namespace BattlefieldAreaPCGInternal
 
 	void GenerateAreas(
 		FPCGContext* Context,
-		UWorld& World,
+		const UPCGSpatialData& LandscapeData,
 		const UPCGCreateBattlefieldAreaSettings& Settings,
 		TArray<FBattlefieldCandidate> Candidates,
 		const TArray<const UPCGSpatialData*>& Exclusions,
@@ -1509,7 +1523,7 @@ namespace BattlefieldAreaPCGInternal
 			{
 				continue;
 			}
-			GenerateAreaContents(World, Settings, Exclusions, Assets, OutAreas.Num(), Random, Area);
+			GenerateAreaContents(LandscapeData, Settings, Exclusions, Assets, OutAreas.Num(), Random, Area);
 			OutAreas.Add(MoveTemp(Area));
 		}
 
@@ -1775,11 +1789,22 @@ bool FPCGCreateBattlefieldAreaElement::ExecuteInternal(FPCGContext* Context) con
 		return true;
 	}
 
+	const UPCGSpatialData* LandscapeData = Cast<UPCGSpatialData>(SourceComponent->GetLandscapePCGData());
+	if (not IsValid(LandscapeData))
+	{
+		PCGE_LOG(Error, GraphAndLog,
+			LOCTEXT("NoLandscapeData",
+				"CreateBattlefieldArea: the source PCG component could not provide Landscape projection data."));
+		EmitAreaBounds(Context, {}, Settings->RandomSeed);
+		EmitPlacements(Context, {}, Settings->RandomSeed);
+		return true;
+	}
+
 	FResolvedBattlefieldAssets Assets;
 	ResolveAllAssets(Context, World, *Settings, Assets);
 	FRandomStream Random(Settings->RandomSeed);
 	TArray<FGeneratedBattlefieldArea> Areas;
-	GenerateAreas(Context, World, *Settings, MoveTemp(Candidates), CollectExclusions(Context),
+	GenerateAreas(Context, *LandscapeData, *Settings, MoveTemp(Candidates), CollectExclusions(Context),
 		Assets, Random, Areas);
 	SpawnAndRegisterAreas(*SourceComponent, World, Areas);
 	EmitAreaBounds(Context, Areas, Settings->RandomSeed);

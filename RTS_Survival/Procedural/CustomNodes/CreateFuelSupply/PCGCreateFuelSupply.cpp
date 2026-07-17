@@ -20,6 +20,8 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "LandscapeProxy.h"
+#include "Components/SplineComponent.h"
+#include "RTS_Survival/Environment/Splines/DestructibleSpline/DestructibleSplineActor.h"
 
 #define LOCTEXT_NAMESPACE "PCGCreateFuelSupply"
 
@@ -44,16 +46,17 @@ namespace FuelSupplyPCGConstants
 	constexpr double MinimumRouteGridSize = 100.0;
 	constexpr double FootprintSampleSpacing = 200.0;
 	constexpr double SplineAreaSampleSpacing = 500.0;
+	constexpr double MinimumPipeSplineSampleSpacing = 1.0;
+	constexpr double PipeBoundsHalfHeight = 5.0;
+	constexpr double CurvinessReductionDivisor = 4.0;
 	constexpr int32 MinimumRouteSearchCells = 100;
 	constexpr int32 MaximumFootprintSamplesPerAxis = 32;
 	constexpr int32 MinimumSplineSegmentSamples = 2;
 	constexpr int32 MaximumSplineSegmentSamples = 128;
 	constexpr int32 MaximumLoopCandidatesPerDepot = 2;
-	constexpr int32 ForwardTraversalCount = 1;
-	constexpr int32 BidirectionalTraversalCount = 2;
-	constexpr int32 ReverseTraversalIndex = 1;
 	constexpr int32 CoordinateAxisCount = 2;
 	constexpr int32 FenceSideCount = 4;
+	constexpr int32 PipeCurveSafetyAttempts = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,8 +77,8 @@ FText UPCGCreateFuelSupplySettings::GetDefaultNodeTitle() const
 FText UPCGCreateFuelSupplySettings::GetNodeTooltipText() const
 {
 	return LOCTEXT("NodeTooltip",
-		"Creates bounds-aware supply depots and fuel tanks, routes a connector-authored destructible pipe "
-		"network around exclusions, and encloses tanks with standalone Blueprint fences. Fence openings "
+		"Creates bounds-aware supply depots and fuel tanks, routes designer-authored destructible spline pipes "
+		"around exclusions and each other, and encloses tanks with standalone Blueprint fences. Fence openings "
 		"are derived from the generated pipe crossings. FacilityArea provides one continuous exclusion "
 		"surface covering the complete generated facility. Deterministic from RandomSeed.");
 }
@@ -123,18 +126,7 @@ namespace
 		double BoundsClearance = 0.0;
 		double ZOffset = 0.0;
 		double YawOffsetDegrees = 0.0;
-	};
-
-	struct FResolvedFuelPipe
-	{
-		UClass* ActorClass = nullptr;
-		FBox LocalBounds = FBox(EForceInit::ForceInit);
-		EFuelCardinalDirection StartConnectorDirection = EFuelCardinalDirection::NegativeX;
-		EFuelCardinalDirection ForwardDirection = EFuelCardinalDirection::PositiveX;
-		bool bCanReverse = true;
-		double Weight = 1.0;
-		double EndOverlap = 0.0;
-		double ZOffset = 0.0;
+		int32 PipeConnections = 0;
 	};
 
 	struct FResolvedFuelFence
@@ -156,12 +148,22 @@ namespace
 		FVector2D VisualCenter = FVector2D::ZeroVector;
 		EFuelPlacedRole Role = EFuelPlacedRole::SupplyDepot;
 		int32 FenceOwnerTankIndex = INDEX_NONE;
+		int32 PipeConnections = 0;
 	};
 
 	struct FFuelNetworkEdge
 	{
 		int32 StartIndex = INDEX_NONE;
 		int32 EndIndex = INDEX_NONE;
+		double StartLaneOffset = 0.0;
+		double EndLaneOffset = 0.0;
+	};
+
+	struct FGeneratedFuelPipeSpline
+	{
+		UClass* ActorClass = nullptr;
+		TArray<FVector> WorldPoints;
+		TArray<FVector> WorldTangents;
 	};
 
 	struct FFuelGroundResult
@@ -175,13 +177,6 @@ namespace
 	{
 		int32 CellIndex = INDEX_NONE;
 		double Score = 0.0;
-	};
-
-	struct FFuelPipeCornerPlacement
-	{
-		int32 RoutePointIndex = INDEX_NONE;
-		double IncomingTrim = 0.0;
-		double OutgoingTrim = 0.0;
 	};
 
 	struct FFuelTankFenceGroup
@@ -277,13 +272,6 @@ namespace
 		}
 	}
 
-	bool IsValidConnectorPair(const FResolvedFuelPipe& Pipe)
-	{
-		const FIntPoint Start = CardinalDirectionToVector(Pipe.StartConnectorDirection);
-		const FIntPoint End = CardinalDirectionToVector(Pipe.ForwardDirection);
-		return Start != End;
-	}
-
 	void ResolveActorEntries(
 		FPCGContext* Context,
 		UWorld& World,
@@ -314,13 +302,13 @@ namespace
 		}
 	}
 
-	void ResolvePipeEntries(
+	void ResolveTankEntries(
 		FPCGContext* Context,
 		UWorld& World,
-		const TArray<FFuelPipeActorEntry>& Entries,
-		TArray<FResolvedFuelPipe>& OutAssets)
+		const TArray<FFuelTankActorEntry>& Entries,
+		TArray<FResolvedFuelActor>& OutAssets)
 	{
-		for (const FFuelPipeActorEntry& Entry : Entries)
+		for (const FFuelTankActorEntry& Entry : Entries)
 		{
 			UClass* ActorClass = Entry.ActorClass.LoadSynchronous();
 			FBox LocalBounds(EForceInit::ForceInit);
@@ -328,26 +316,19 @@ namespace
 				|| not TryMeasureActorClass(
 					World, *ActorClass, Entry.FootprintOverrideX, Entry.FootprintOverrideY, LocalBounds))
 			{
-				PCGE_LOG_C(Warning, GraphAndLog, Context,
-					LOCTEXT("InvalidFuelPipe", "CreateFuelSupply: skipped an invalid or bounds-less fuel-pipe Blueprint."));
+				PCGE_LOG_C(Warning, GraphAndLog, Context, LOCTEXT("InvalidFuelTank",
+					"CreateFuelSupply: skipped an invalid or bounds-less fuel-tank Blueprint."));
 				continue;
 			}
 
-			FResolvedFuelPipe& Asset = OutAssets.Emplace_GetRef();
+			FResolvedFuelActor& Asset = OutAssets.Emplace_GetRef();
 			Asset.ActorClass = ActorClass;
 			Asset.LocalBounds = LocalBounds;
-			Asset.StartConnectorDirection = Entry.StartConnectorDirection;
-			Asset.ForwardDirection = Entry.ForwardDirection;
-			Asset.bCanReverse = Entry.bCanReverse;
 			Asset.Weight = FMath::Max(0.01, static_cast<double>(Entry.Weight));
-			Asset.EndOverlap = FMath::Max(0.0, static_cast<double>(Entry.EndOverlap));
+			Asset.BoundsClearance = FMath::Max(0.0, static_cast<double>(Entry.BoundsClearance));
 			Asset.ZOffset = Entry.ZOffset;
-			if (not IsValidConnectorPair(Asset))
-			{
-				PCGE_LOG_C(Warning, GraphAndLog, Context, LOCTEXT("InvalidPipeConnectorPair",
-					"CreateFuelSupply: skipped a pipe whose start and end connectors use the same side."));
-				OutAssets.Pop(EAllowShrinking::No);
-			}
+			Asset.YawOffsetDegrees = Entry.YawOffsetDegrees;
+			Asset.PipeConnections = FMath::Max(1, Entry.PipeConnections);
 		}
 	}
 
@@ -690,6 +671,7 @@ namespace
 		OutPlacement.Footprint = Footprint;
 		OutPlacement.VisualCenter = DesiredCenter;
 		OutPlacement.Role = Role;
+		OutPlacement.PipeConnections = Asset.PipeConnections;
 		return true;
 	}
 
@@ -833,6 +815,46 @@ namespace
 		}
 	}
 
+	double GetPipeConnectionLaneOffset(
+		const UPCGCreateFuelSupplySettings& Settings,
+		const int32 LaneIndex)
+	{
+		if (LaneIndex == 0)
+		{
+			return 0.0;
+		}
+
+		const int32 LaneMagnitude = (LaneIndex + 1) / 2;
+		const double LaneSign = LaneIndex % 2 == 1 ? 1.0 : -1.0;
+		const double PipeWidth = FMath::Max(1.0, static_cast<double>(Settings.FuelPipeSizeY));
+		const double Separation = FMath::Max(0.0, static_cast<double>(Settings.PipeSeparation));
+		return LaneSign * LaneMagnitude * (PipeWidth + Separation);
+	}
+
+	int32 FindClosestPlacement(
+		const TArray<FPlacedFuelActor>& Placements,
+		const int32 SourceIndex,
+		const TArray<int32>& CandidateIndices)
+	{
+		int32 ClosestIndex = INDEX_NONE;
+		double ClosestDistanceSquared = TNumericLimits<double>::Max();
+		for (const int32 CandidateIndex : CandidateIndices)
+		{
+			if (CandidateIndex == SourceIndex)
+			{
+				continue;
+			}
+			const double DistanceSquared = FVector2D::DistSquared(
+				Placements[SourceIndex].VisualCenter, Placements[CandidateIndex].VisualCenter);
+			if (DistanceSquared < ClosestDistanceSquared)
+			{
+				ClosestDistanceSquared = DistanceSquared;
+				ClosestIndex = CandidateIndex;
+			}
+		}
+		return ClosestIndex;
+	}
+
 	void AddTankEdges(
 		const TArray<FPlacedFuelActor>& Placements,
 		const TArray<int32>& DepotIndices,
@@ -843,34 +865,70 @@ namespace
 		{
 			return;
 		}
+
+		// Create every tank's required depot connection before any tank-to-tank connections.
 		for (const int32 TankIndex : TankIndices)
 		{
-			int32 ClosestDepot = DepotIndices[0];
-			double ClosestDistanceSquared = TNumericLimits<double>::Max();
-			for (const int32 DepotIndex : DepotIndices)
+			const int32 ClosestDepot = FindClosestPlacement(Placements, TankIndex, DepotIndices);
+			if (ClosestDepot != INDEX_NONE)
 			{
-				const double DistanceSquared = FVector2D::DistSquared(
-					Placements[TankIndex].VisualCenter, Placements[DepotIndex].VisualCenter);
-				if (DistanceSquared < ClosestDistanceSquared)
+				OutEdges.Add({TankIndex, ClosestDepot});
+			}
+		}
+
+		// The second connection is always the nearest other tank when one exists.
+		for (const int32 TankIndex : TankIndices)
+		{
+			if (Placements[TankIndex].PipeConnections < 2)
+			{
+				continue;
+			}
+			const int32 ClosestTank = FindClosestPlacement(Placements, TankIndex, TankIndices);
+			if (ClosestTank != INDEX_NONE && not EdgeExists(OutEdges, TankIndex, ClosestTank))
+			{
+				OutEdges.Add({TankIndex, ClosestTank});
+			}
+		}
+
+		// Additional requests alternate beside the two required connection routes.
+		for (const int32 TankIndex : TankIndices)
+		{
+			const int32 ClosestDepot = FindClosestPlacement(Placements, TankIndex, DepotIndices);
+			const int32 ClosestTank = FindClosestPlacement(Placements, TankIndex, TankIndices);
+			for (int32 ConnectionIndex = 2;
+				ConnectionIndex < Placements[TankIndex].PipeConnections;
+				++ConnectionIndex)
+			{
+				const bool bUsesDepotConnection = ConnectionIndex % 2 == 0 || ClosestTank == INDEX_NONE;
+				const int32 TargetIndex = bUsesDepotConnection ? ClosestDepot : ClosestTank;
+				if (TargetIndex != INDEX_NONE)
 				{
-					ClosestDistanceSquared = DistanceSquared;
-					ClosestDepot = DepotIndex;
+					OutEdges.Add({TankIndex, TargetIndex});
 				}
 			}
-			OutEdges.Add({TankIndex, ClosestDepot});
 		}
 	}
 
-	double DistanceToBoxBoundary(const FBox2D& Box, const FVector2D& Direction)
+	void AssignPipeConnectionLanes(
+		const UPCGCreateFuelSupplySettings& Settings,
+		const int32 NumPlacements,
+		TArray<FFuelNetworkEdge>& InOutEdges)
 	{
-		const FVector2D Extent = Box.GetExtent();
-		const double XDistance = FMath::Abs(Direction.X) > FuelSupplyPCGConstants::DirectionTolerance
-			? Extent.X / FMath::Abs(Direction.X)
-			: TNumericLimits<double>::Max();
-		const double YDistance = FMath::Abs(Direction.Y) > FuelSupplyPCGConstants::DirectionTolerance
-			? Extent.Y / FMath::Abs(Direction.Y)
-			: TNumericLimits<double>::Max();
-		return FMath::Min(XDistance, YDistance);
+		TArray<int32> NextLaneByPlacement;
+		NextLaneByPlacement.Init(0, NumPlacements);
+		for (FFuelNetworkEdge& Edge : InOutEdges)
+		{
+			if (NextLaneByPlacement.IsValidIndex(Edge.StartIndex))
+			{
+				Edge.StartLaneOffset = GetPipeConnectionLaneOffset(
+					Settings, NextLaneByPlacement[Edge.StartIndex]++);
+			}
+			if (NextLaneByPlacement.IsValidIndex(Edge.EndIndex))
+			{
+				Edge.EndLaneOffset = GetPipeConnectionLaneOffset(
+					Settings, NextLaneByPlacement[Edge.EndIndex]++);
+			}
+		}
 	}
 
 	bool IsRoutePointValid(
@@ -983,6 +1041,37 @@ namespace
 		return Grid;
 	}
 
+	bool DoesSegmentOverlapExistingPipeRoutes(
+		const FVector2D& SegmentStart,
+		const FVector2D& SegmentEnd,
+		const TArray<TArray<FVector2D>>& ExistingPipeRoutes,
+		const double MinimumCenterDistance)
+	{
+		const FVector Start3D(SegmentStart, 0.0);
+		const FVector End3D(SegmentEnd, 0.0);
+		for (const TArray<FVector2D>& ExistingRoute : ExistingPipeRoutes)
+		{
+			for (int32 PointIndex = 0; PointIndex + 1 < ExistingRoute.Num(); ++PointIndex)
+			{
+				FVector ClosestOnNewSegment;
+				FVector ClosestOnExistingSegment;
+				FMath::SegmentDistToSegmentSafe(
+					Start3D,
+					End3D,
+					FVector(ExistingRoute[PointIndex], 0.0),
+					FVector(ExistingRoute[PointIndex + 1], 0.0),
+					ClosestOnNewSegment,
+					ClosestOnExistingSegment);
+				if (FVector::DistSquared(ClosestOnNewSegment, ClosestOnExistingSegment)
+					< FMath::Square(MinimumCenterDistance))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	void TryAddRouteNeighbor(
 		const FFuelRoutingGrid& Grid,
 		const FIntPoint& NeighborCell,
@@ -992,6 +1081,8 @@ namespace
 		const TArray<const UPCGSpatialData*>& Exclusions,
 		const TArray<FPlacedFuelActor>& Placements,
 		const FFuelNetworkEdge& Edge,
+		const TArray<TArray<FVector2D>>& ExistingPipeRoutes,
+		const double MinimumPipeCenterDistance,
 		TBitArray<>& Closed,
 		TArray<double>& Costs,
 		TArray<int32>& Previous,
@@ -1009,9 +1100,16 @@ namespace
 		}
 
 		const FVector2D NeighborPosition = CellToPosition(NeighborCell, Grid.AreaBounds, Grid.CellSize);
+		const FIntPoint CurrentCell(CurrentIndex % Grid.GridSize.X, CurrentIndex / Grid.GridSize.X);
+		const FVector2D CurrentPosition = CellToPosition(CurrentCell, Grid.AreaBounds, Grid.CellSize);
 		if (NeighborIndex != Grid.EndIndex && not IsRoutePointValid(
 			NeighborPosition, Grid.AreaBounds.GetCenter().Z, PipeRadius, IsInsideArea, Exclusions,
 			Placements, Edge.StartIndex, Edge.EndIndex))
+		{
+			return;
+		}
+		if (DoesSegmentOverlapExistingPipeRoutes(
+			CurrentPosition, NeighborPosition, ExistingPipeRoutes, MinimumPipeCenterDistance))
 		{
 			return;
 		}
@@ -1035,6 +1133,8 @@ namespace
 		const TArray<const UPCGSpatialData*>& Exclusions,
 		const TArray<FPlacedFuelActor>& Placements,
 		const FFuelNetworkEdge& Edge,
+		const TArray<TArray<FVector2D>>& ExistingPipeRoutes,
+		const double MinimumPipeCenterDistance,
 		TArray<int32>& OutPrevious)
 	{
 		const int32 NumCells = Grid.GridSize.X * Grid.GridSize.Y;
@@ -1070,7 +1170,8 @@ namespace
 			{
 				TryAddRouteNeighbor(
 					Grid, CurrentCell + Offset, CurrentIndex, PipeRadius, IsInsideArea, Exclusions,
-					Placements, Edge, Closed, Costs, OutPrevious, Open);
+					Placements, Edge, ExistingPipeRoutes, MinimumPipeCenterDistance,
+					Closed, Costs, OutPrevious, Open);
 			}
 		}
 		return Grid.EndIndex == Grid.StartIndex || OutPrevious[Grid.EndIndex] != INDEX_NONE;
@@ -1100,6 +1201,48 @@ namespace
 		SimplifyRoute(OutRoute);
 	}
 
+	double DistanceFromPointToBoxBoundary(
+		const FBox2D& Box,
+		const FVector2D& Position,
+		const FVector2D& Direction)
+	{
+		const double XDistance = Direction.X > FuelSupplyPCGConstants::DirectionTolerance
+			? (Box.Max.X - Position.X) / Direction.X
+			: (Direction.X < -FuelSupplyPCGConstants::DirectionTolerance
+				? (Box.Min.X - Position.X) / Direction.X : TNumericLimits<double>::Max());
+		const double YDistance = Direction.Y > FuelSupplyPCGConstants::DirectionTolerance
+			? (Box.Max.Y - Position.Y) / Direction.Y
+			: (Direction.Y < -FuelSupplyPCGConstants::DirectionTolerance
+				? (Box.Min.Y - Position.Y) / Direction.Y : TNumericLimits<double>::Max());
+		return FMath::Max(0.0, FMath::Min(XDistance, YDistance));
+	}
+
+	FVector2D MakeConnectionPoint(
+		const FPlacedFuelActor& Placement,
+		const FVector2D& OutwardDirection,
+		const FVector2D& LaneDirection,
+		const double LaneOffset,
+		const double ConnectionOverlap)
+	{
+		FVector2D OffsetCenter = Placement.VisualCenter + LaneDirection * LaneOffset;
+		const FVector2D FootprintExtent = Placement.Footprint.GetExtent();
+		const FVector2D ConnectionInset(
+			FMath::Min(ConnectionOverlap, FootprintExtent.X),
+			FMath::Min(ConnectionOverlap, FootprintExtent.Y));
+		OffsetCenter.X = FMath::Clamp(
+			OffsetCenter.X,
+			Placement.Footprint.Min.X + ConnectionInset.X,
+			Placement.Footprint.Max.X - ConnectionInset.X);
+		OffsetCenter.Y = FMath::Clamp(
+			OffsetCenter.Y,
+			Placement.Footprint.Min.Y + ConnectionInset.Y,
+			Placement.Footprint.Max.Y - ConnectionInset.Y);
+		const double BoundaryDistance = DistanceFromPointToBoxBoundary(
+			Placement.Footprint, OffsetCenter, OutwardDirection);
+		const double ConnectionDistance = FMath::Max(0.0, BoundaryDistance - ConnectionOverlap);
+		return OffsetCenter + OutwardDirection * ConnectionDistance;
+	}
+
 	bool FindRoute(
 		const UPCGCreateFuelSupplySettings& Settings,
 		const FBox& AreaBounds,
@@ -1108,18 +1251,24 @@ namespace
 		const TArray<FPlacedFuelActor>& Placements,
 		const FFuelNetworkEdge& Edge,
 		const double PipeRadius,
+		const TArray<TArray<FVector2D>>& ExistingPipeRoutes,
+		const double MinimumPipeCenterDistance,
 		TArray<FVector2D>& OutRoute)
 	{
 		const FPlacedFuelActor& StartPlacement = Placements[Edge.StartIndex];
 		const FPlacedFuelActor& EndPlacement = Placements[Edge.EndIndex];
 		const FVector2D Direction = (EndPlacement.VisualCenter - StartPlacement.VisualCenter).GetSafeNormal();
-		const FVector2D Start = StartPlacement.VisualCenter + Direction
-			* (DistanceToBoxBoundary(StartPlacement.Footprint, Direction) + Settings.ConnectionClearance);
-		const FVector2D End = EndPlacement.VisualCenter - Direction
-			* (DistanceToBoxBoundary(EndPlacement.Footprint, -Direction) + Settings.ConnectionClearance);
+		const FVector2D LaneDirection(-Direction.Y, Direction.X);
+		const double ConnectionOverlap = FMath::Max(0.0, static_cast<double>(Settings.ConnectionOverlap));
+		const FVector2D Start = MakeConnectionPoint(
+			StartPlacement, Direction, LaneDirection, Edge.StartLaneOffset, ConnectionOverlap);
+		const FVector2D End = MakeConnectionPoint(
+			EndPlacement, -Direction, LaneDirection, Edge.EndLaneOffset, ConnectionOverlap);
 		TArray<int32> Previous;
 		const FFuelRoutingGrid Grid = BuildRoutingGrid(Settings, AreaBounds, Start, End);
-		if (not SearchRoutingGrid(Grid, PipeRadius, IsInsideArea, Exclusions, Placements, Edge, Previous))
+		if (not SearchRoutingGrid(
+			Grid, PipeRadius, IsInsideArea, Exclusions, Placements, Edge,
+			ExistingPipeRoutes, MinimumPipeCenterDistance, Previous))
 		{
 			return false;
 		}
@@ -1127,18 +1276,6 @@ namespace
 		return OutRoute.Num() >= 2;
 	}
 
-	struct FMatchedFuelPipe
-	{
-		int32 PipeIndex = INDEX_NONE;
-		double YawRadians = 0.0;
-		double ConnectionLength = 0.0;
-		bool bReverseTraversal = false;
-
-		bool IsValid() const
-		{
-			return PipeIndex != INDEX_NONE;
-		}
-	};
 
 	FVector2D CardinalDirectionToVector2D(const EFuelCardinalDirection Direction)
 	{
@@ -1146,426 +1283,322 @@ namespace
 		return FVector2D(DirectionVector.X, DirectionVector.Y);
 	}
 
-	EFuelCardinalDirection GetOppositeDirection(const EFuelCardinalDirection Direction)
-	{
-		switch (Direction)
-		{
-		case EFuelCardinalDirection::PositiveX:
-			return EFuelCardinalDirection::NegativeX;
-		case EFuelCardinalDirection::NegativeX:
-			return EFuelCardinalDirection::PositiveX;
-		case EFuelCardinalDirection::PositiveY:
-			return EFuelCardinalDirection::NegativeY;
-		case EFuelCardinalDirection::NegativeY:
-			return EFuelCardinalDirection::PositiveY;
-		default:
-			return EFuelCardinalDirection::PositiveX;
-		}
-	}
-
-	void SetPointToBoundsSide(
-		FVector2D& InOutPoint,
-		const FBox& LocalBounds,
-		const EFuelCardinalDirection Direction)
-	{
-		switch (Direction)
-		{
-		case EFuelCardinalDirection::PositiveX:
-			InOutPoint.X = LocalBounds.Max.X;
-			return;
-		case EFuelCardinalDirection::NegativeX:
-			InOutPoint.X = LocalBounds.Min.X;
-			return;
-		case EFuelCardinalDirection::PositiveY:
-			InOutPoint.Y = LocalBounds.Max.Y;
-			return;
-		case EFuelCardinalDirection::NegativeY:
-			InOutPoint.Y = LocalBounds.Min.Y;
-			return;
-		default:
-			return;
-		}
-	}
-
-	FVector2D GetLocalConnectorPosition(const FResolvedFuelPipe& Pipe, const bool bStartConnector)
-	{
-		const EFuelCardinalDirection Direction = bStartConnector
-			? Pipe.StartConnectorDirection : Pipe.ForwardDirection;
-		const EFuelCardinalDirection OtherDirection = bStartConnector
-			? Pipe.ForwardDirection : Pipe.StartConnectorDirection;
-		FVector2D Connector(Pipe.LocalBounds.GetCenter());
-		SetPointToBoundsSide(Connector, Pipe.LocalBounds, Direction);
-
-		const FVector2D DirectionVector = CardinalDirectionToVector2D(Direction);
-		const FVector2D OtherDirectionVector = CardinalDirectionToVector2D(OtherDirection);
-		if (FMath::Abs(FVector2D::DotProduct(DirectionVector, OtherDirectionVector))
-			< FuelSupplyPCGConstants::DirectionTolerance)
-		{
-			SetPointToBoundsSide(Connector, Pipe.LocalBounds, GetOppositeDirection(OtherDirection));
-		}
-		return Connector;
-	}
-
-	FVector2D GetLocalTraversalConnector(
-		const FResolvedFuelPipe& Pipe,
-		const bool bReverseTraversal,
-		const bool bTraversalStart)
-	{
-		const bool bUseAuthoredStart = bReverseTraversal ? not bTraversalStart : bTraversalStart;
-		return GetLocalConnectorPosition(Pipe, bUseAuthoredStart);
-	}
-
-	FVector2D GetLocalPipeBendPosition(const FResolvedFuelPipe& Pipe)
-	{
-		const FVector2D StartConnector = GetLocalConnectorPosition(Pipe, true);
-		const FVector2D EndConnector = GetLocalConnectorPosition(Pipe, false);
-		const FVector2D StartDirection = CardinalDirectionToVector2D(Pipe.StartConnectorDirection);
-		return FMath::Abs(StartDirection.X) > FuelSupplyPCGConstants::DirectionTolerance
-			? FVector2D(EndConnector.X, StartConnector.Y)
-			: FVector2D(StartConnector.X, EndConnector.Y);
-	}
-
-	bool TryMatchPipeOrientation(
-		const FResolvedFuelPipe& Pipe,
-		const FVector2D& DesiredStartOutward,
-		const FVector2D& DesiredEndOutward,
-		double& OutYawRadians,
-		bool& bOutReverseTraversal)
-	{
-		const int32 NumTraversalDirections = Pipe.bCanReverse
-			? FuelSupplyPCGConstants::BidirectionalTraversalCount
-			: FuelSupplyPCGConstants::ForwardTraversalCount;
-		for (int32 TraversalIndex = 0; TraversalIndex < NumTraversalDirections; ++TraversalIndex)
-		{
-			const bool bReverse = TraversalIndex == FuelSupplyPCGConstants::ReverseTraversalIndex;
-			const EFuelCardinalDirection StartDirection =
-				bReverse ? Pipe.ForwardDirection : Pipe.StartConnectorDirection;
-			const EFuelCardinalDirection EndDirection =
-				bReverse ? Pipe.StartConnectorDirection : Pipe.ForwardDirection;
-			const FVector2D LocalStart = CardinalDirectionToVector2D(StartDirection);
-			const FVector2D LocalEnd = CardinalDirectionToVector2D(EndDirection);
-			const double DesiredStartYaw = FMath::Atan2(DesiredStartOutward.Y, DesiredStartOutward.X);
-			const double LocalStartYaw = FMath::Atan2(LocalStart.Y, LocalStart.X);
-			const double CandidateYaw = DesiredStartYaw - LocalStartYaw;
-			const FVector2D RotatedEnd = LocalEnd.GetRotated(FMath::RadiansToDegrees(CandidateYaw));
-			if (FVector2D::DotProduct(RotatedEnd, DesiredEndOutward) > 1.0 - FuelSupplyPCGConstants::DirectionTolerance)
-			{
-				OutYawRadians = CandidateYaw;
-				bOutReverseTraversal = bReverse;
-				return true;
-			}
-		}
-		return false;
-	}
-
-	double GetPipeConnectionLength(const FResolvedFuelPipe& Pipe)
-	{
-		return FVector2D::Distance(
-			GetLocalConnectorPosition(Pipe, true),
-			GetLocalConnectorPosition(Pipe, false));
-	}
-
-	FMatchedFuelPipe MatchStraightPipe(
-		const TArray<FResolvedFuelPipe>& Pipes,
-		const int32 PipeIndex,
-		const FVector2D& FlowDirection)
-	{
-		FMatchedFuelPipe Match;
-		double YawRadians = 0.0;
-		bool bReverseTraversal = false;
-		if (Pipes.IsValidIndex(PipeIndex) && TryMatchPipeOrientation(
-			Pipes[PipeIndex], -FlowDirection, FlowDirection, YawRadians, bReverseTraversal))
-		{
-			Match.PipeIndex = PipeIndex;
-			Match.YawRadians = YawRadians;
-			Match.ConnectionLength = GetPipeConnectionLength(Pipes[PipeIndex]);
-			Match.bReverseTraversal = bReverseTraversal;
-		}
-		return Match;
-	}
-
-	bool CanStraightPipeCloseLength(
-		const UPCGCreateFuelSupplySettings& Settings,
-		const TArray<FResolvedFuelPipe>& Pipes,
-		const FVector2D& FlowDirection,
-		const double Length)
-	{
-		const double MinimumScale = Settings.bAllowPipeLengthScaling
-			? FMath::Min(Settings.MinPipeLengthScale, Settings.MaxPipeLengthScale) : 1.0;
-		const double MaximumScale = Settings.bAllowPipeLengthScaling
-			? FMath::Max(Settings.MinPipeLengthScale, Settings.MaxPipeLengthScale) : 1.0;
-		for (int32 PipeIndex = 0; PipeIndex < Pipes.Num(); ++PipeIndex)
-		{
-			const FMatchedFuelPipe Match = MatchStraightPipe(Pipes, PipeIndex, FlowDirection);
-			if (Match.IsValid() && Length >= Match.ConnectionLength * MinimumScale
-				&& Length <= Match.ConnectionLength * MaximumScale + Pipes[PipeIndex].EndOverlap)
-			{
-				return true;
-			}
-		}
-		return false;
-	}
-
-	FMatchedFuelPipe SelectStraightPipeForLength(
-		const UPCGCreateFuelSupplySettings& Settings,
-		const TArray<FResolvedFuelPipe>& Pipes,
-		const FVector2D& FlowDirection,
-		const double RemainingLength)
-	{
-		FMatchedFuelPipe BestMatch;
-		double BestScore = TNumericLimits<double>::Max();
-		for (int32 PipeIndex = 0; PipeIndex < Pipes.Num(); ++PipeIndex)
-		{
-			FMatchedFuelPipe Match = MatchStraightPipe(Pipes, PipeIndex, FlowDirection);
-			if (not Match.IsValid())
-			{
-				continue;
-			}
-			const FResolvedFuelPipe& Pipe = Pipes[PipeIndex];
-			const double Advance = FMath::Max(
-				FuelSupplyPCGConstants::MinimumRouteSegmentLength, Match.ConnectionLength - Pipe.EndOverlap);
-			const double ResidualLength = RemainingLength - Advance;
-			const double MinimumScale = Settings.bAllowPipeLengthScaling
-				? FMath::Min(Settings.MinPipeLengthScale, Settings.MaxPipeLengthScale) : 1.0;
-			const double MaximumScale = Settings.bAllowPipeLengthScaling
-				? FMath::Max(Settings.MinPipeLengthScale, Settings.MaxPipeLengthScale) : 1.0;
-			const bool bClosesNow = RemainingLength >= Match.ConnectionLength * MinimumScale
-				&& RemainingLength <= Match.ConnectionLength * MaximumScale + Pipe.EndOverlap;
-			const bool bLeavesClosableRemainder = ResidualLength > 0.0
-				&& CanStraightPipeCloseLength(Settings, Pipes, FlowDirection, ResidualLength);
-			const double FitPenalty = bClosesNow ? 0.0 : (bLeavesClosableRemainder ? 1.0 : 2.0);
-			const double Score = FitPenalty * RemainingLength
-				+ FMath::Abs(RemainingLength - Match.ConnectionLength) / Pipe.Weight;
-			if (Score < BestScore)
-			{
-				BestScore = Score;
-				BestMatch = Match;
-			}
-		}
-		return BestMatch;
-	}
-
-	FPlacedFuelActor MakePipePlacement(
-		UWorld& World,
-		const UPCGCreateFuelSupplySettings& Settings,
-		const FResolvedFuelPipe& Pipe,
-		const FVector2D& WorldAnchor,
-		const FVector2D& LocalAnchor,
-		const double YawRadians,
-		const double LengthScale,
-		const double AreaHeight)
-	{
-		const FQuat Rotation(FVector::UpVector, YawRadians);
-		FVector Scale = FVector::OneVector;
-		const FVector2D ConnectorDelta = GetLocalConnectorPosition(Pipe, false)
-			- GetLocalConnectorPosition(Pipe, true);
-		if (FMath::Abs(ConnectorDelta.Y) > FMath::Abs(ConnectorDelta.X))
-		{
-			Scale.Y = LengthScale;
-		}
-		else
-		{
-			Scale.X = LengthScale;
-		}
-		const FFuelGroundResult Ground = ProjectToGround(
-			World, FVector(WorldAnchor, AreaHeight), Settings.bProjectActorsToGround);
-		const FVector LocalAnchor3D(LocalAnchor, Pipe.LocalBounds.GetCenter().Z);
-
-		FPlacedFuelActor Placement;
-		Placement.ActorClass = Pipe.ActorClass;
-		Placement.LocalBounds = Pipe.LocalBounds;
-		Placement.Transform = MakeBoundsAlignedTransform(
-			Pipe.LocalBounds, LocalAnchor3D, WorldAnchor,
-			Ground.Position.Z, Rotation, Scale,
-			Pipe.ZOffset + static_cast<double>(Settings.GlobalActorZOffset));
-		Placement.Footprint = ComputeFootprint(Pipe.LocalBounds, Placement.Transform);
-		const FVector WorldVisualCenter = Placement.Transform.TransformPosition(Pipe.LocalBounds.GetCenter());
-		Placement.VisualCenter = FVector2D(WorldVisualCenter.X, WorldVisualCenter.Y);
-		Placement.Role = EFuelPlacedRole::FuelPipe;
-		return Placement;
-	}
-
-	FMatchedFuelPipe SelectCornerPipe(
-		const TArray<FResolvedFuelPipe>& Pipes,
-		const FVector2D& Incoming,
-		const FVector2D& Outgoing,
-		FRandomStream& Random)
-	{
-		TArray<FMatchedFuelPipe> Candidates;
-		double TotalWeight = 0.0;
-		for (int32 PipeIndex = 0; PipeIndex < Pipes.Num(); ++PipeIndex)
-		{
-			double YawRadians = 0.0;
-			bool bReverseTraversal = false;
-			if (TryMatchPipeOrientation(
-				Pipes[PipeIndex], -Incoming, Outgoing, YawRadians, bReverseTraversal))
-			{
-				Candidates.Add({
-					PipeIndex, YawRadians, GetPipeConnectionLength(Pipes[PipeIndex]), bReverseTraversal});
-				TotalWeight += Pipes[PipeIndex].Weight;
-			}
-		}
-		if (Candidates.IsEmpty())
-		{
-			return FMatchedFuelPipe();
-		}
-
-		double Roll = Random.FRandRange(0.0f, static_cast<float>(TotalWeight));
-		for (const FMatchedFuelPipe& Candidate : Candidates)
-		{
-			Roll -= Pipes[Candidate.PipeIndex].Weight;
-			if (Roll <= 0.0)
-			{
-				return Candidate;
-			}
-		}
-		return Candidates.Last();
-	}
-
-	void BuildCornerPlacements(
-		UWorld& World,
-		const UPCGCreateFuelSupplySettings& Settings,
-		const TArray<FResolvedFuelPipe>& Pipes,
+	void BuildSubdividedPipeRoute(
 		const TArray<FVector2D>& Route,
-		const double AreaHeight,
-		FRandomStream& Random,
-		TArray<FFuelPipeCornerPlacement>& OutCorners,
-		TArray<FPlacedFuelActor>& OutPipePlacements)
+		const double MaximumSegmentLength,
+		TArray<FVector2D>& OutPoints)
 	{
-		for (int32 PointIndex = 1; PointIndex + 1 < Route.Num(); ++PointIndex)
+		if (Route.IsEmpty())
 		{
-			const FVector2D Incoming = (Route[PointIndex] - Route[PointIndex - 1]).GetSafeNormal();
-			const FVector2D Outgoing = (Route[PointIndex + 1] - Route[PointIndex]).GetSafeNormal();
-			const double Cross = Incoming.X * Outgoing.Y - Incoming.Y * Outgoing.X;
-			if (FMath::Abs(Cross) < FuelSupplyPCGConstants::DirectionTolerance)
-			{
-				continue;
-			}
-			const FMatchedFuelPipe Match = SelectCornerPipe(Pipes, Incoming, Outgoing, Random);
-			if (not Match.IsValid())
-			{
-				continue;
-			}
-
-			const FResolvedFuelPipe& Pipe = Pipes[Match.PipeIndex];
-			const FVector2D LocalBend = GetLocalPipeBendPosition(Pipe);
-			FPlacedFuelActor Placement = MakePipePlacement(
-				World, Settings, Pipe, Route[PointIndex], LocalBend, Match.YawRadians, 1.0, AreaHeight);
-			const FVector2D LocalIncomingConnector = GetLocalTraversalConnector(
-				Pipe, Match.bReverseTraversal, true);
-			const FVector2D LocalOutgoingConnector = GetLocalTraversalConnector(
-				Pipe, Match.bReverseTraversal, false);
-			FFuelPipeCornerPlacement& Corner = OutCorners.Emplace_GetRef();
-			Corner.RoutePointIndex = PointIndex;
-			Corner.IncomingTrim = FVector2D::Distance(LocalBend, LocalIncomingConnector);
-			Corner.OutgoingTrim = FVector2D::Distance(LocalBend, LocalOutgoingConnector);
-			OutPipePlacements.Add(MoveTemp(Placement));
+			return;
 		}
-	}
 
-	const FFuelPipeCornerPlacement* FindCorner(
-		const TArray<FFuelPipeCornerPlacement>& Corners,
-		const int32 RoutePointIndex)
-	{
-		return Corners.FindByPredicate([RoutePointIndex](const FFuelPipeCornerPlacement& Corner)
-		{
-			return Corner.RoutePointIndex == RoutePointIndex;
-		});
-	}
-
-	void TileStraightPipeSegment(
-		UWorld& World,
-		const UPCGCreateFuelSupplySettings& Settings,
-		const TArray<FResolvedFuelPipe>& Pipes,
-		const FVector2D& SegmentStart,
-		const FVector2D& SegmentEnd,
-		const double AreaHeight,
-		TArray<FPlacedFuelActor>& OutPipePlacements)
-	{
-		const FVector2D Direction = (SegmentEnd - SegmentStart).GetSafeNormal();
-		const double SegmentLength = FVector2D::Distance(SegmentStart, SegmentEnd);
-		double Cursor = 0.0;
-		while (Cursor + FuelSupplyPCGConstants::MinimumRouteSegmentLength < SegmentLength)
-		{
-			const double Remaining = SegmentLength - Cursor;
-			const FMatchedFuelPipe Match = SelectStraightPipeForLength(Settings, Pipes, Direction, Remaining);
-			if (not Match.IsValid())
-			{
-				return;
-			}
-			const FResolvedFuelPipe& Pipe = Pipes[Match.PipeIndex];
-			const double NominalLength = Match.ConnectionLength;
-			double LengthScale = 1.0;
-			const double MinimumScale = FMath::Min(Settings.MinPipeLengthScale, Settings.MaxPipeLengthScale);
-			const double MaximumScale = FMath::Max(Settings.MinPipeLengthScale, Settings.MaxPipeLengthScale);
-			if (Settings.bAllowPipeLengthScaling && Remaining <= NominalLength * MaximumScale)
-			{
-				const double DesiredScale = Remaining / NominalLength;
-				if (DesiredScale < MinimumScale)
-				{
-					break;
-				}
-				LengthScale = FMath::Min(DesiredScale, MaximumScale);
-			}
-			else if (NominalLength > Remaining + Pipe.EndOverlap)
-			{
-				break;
-			}
-
-			const double PieceLength = NominalLength * LengthScale;
-			const FVector2D WorldConnectorMidpoint = SegmentStart + Direction * (Cursor + PieceLength * 0.5);
-			const FVector2D LocalConnectorMidpoint = 0.5 * (
-				GetLocalConnectorPosition(Pipe, true) + GetLocalConnectorPosition(Pipe, false));
-			OutPipePlacements.Add(MakePipePlacement(
-				World, Settings, Pipe, WorldConnectorMidpoint, LocalConnectorMidpoint,
-				Match.YawRadians, LengthScale, AreaHeight));
-			const double Advance = FMath::Max(
-				FuelSupplyPCGConstants::MinimumRouteSegmentLength, PieceLength - Pipe.EndOverlap);
-			Cursor += Advance;
-			if (PieceLength >= Remaining - FuelSupplyPCGConstants::MinimumRouteSegmentLength)
-			{
-				break;
-			}
-		}
-	}
-
-	void TileStraightPipes(
-		UWorld& World,
-		const UPCGCreateFuelSupplySettings& Settings,
-		const TArray<FResolvedFuelPipe>& Pipes,
-		const TArray<FVector2D>& Route,
-		const TArray<FFuelPipeCornerPlacement>& Corners,
-		const double AreaHeight,
-		TArray<FPlacedFuelActor>& OutPipePlacements)
-	{
+		OutPoints.Add(Route[0]);
 		for (int32 SegmentIndex = 0; SegmentIndex + 1 < Route.Num(); ++SegmentIndex)
 		{
-			const FVector2D Direction = (Route[SegmentIndex + 1] - Route[SegmentIndex]).GetSafeNormal();
-			double StartTrim = 0.0;
-			double EndTrim = 0.0;
-			if (const FFuelPipeCornerPlacement* StartCorner = FindCorner(Corners, SegmentIndex))
+			const FVector2D& SegmentStart = Route[SegmentIndex];
+			const FVector2D& SegmentEnd = Route[SegmentIndex + 1];
+			const double SegmentLength = FVector2D::Distance(SegmentStart, SegmentEnd);
+			const int32 NumPieces = FMath::Max(1, FMath::CeilToInt32(SegmentLength / MaximumSegmentLength));
+			for (int32 PieceIndex = 1; PieceIndex <= NumPieces; ++PieceIndex)
 			{
-				StartTrim = StartCorner->OutgoingTrim;
+				OutPoints.Add(FMath::Lerp(
+					SegmentStart, SegmentEnd, static_cast<double>(PieceIndex) / NumPieces));
 			}
-			if (const FFuelPipeCornerPlacement* EndCorner = FindCorner(Corners, SegmentIndex + 1))
-			{
-				EndTrim = EndCorner->IncomingTrim;
-			}
+		}
+	}
 
-			const FVector2D SegmentStart = Route[SegmentIndex] + Direction * StartTrim;
-			const FVector2D SegmentEnd = Route[SegmentIndex + 1] - Direction * EndTrim;
-			if (FVector2D::Distance(SegmentStart, SegmentEnd)
-				< FuelSupplyPCGConstants::MinimumRouteSegmentLength)
+	void BuildPipeSplineTangents(
+		const TArray<FVector2D>& Points,
+		const double Curviness,
+		TArray<FVector2D>& OutTangents)
+	{
+		OutTangents.Init(FVector2D::ZeroVector, Points.Num());
+		if (Points.Num() < 2 || Curviness <= 0.0)
+		{
+			return;
+		}
+
+		OutTangents[0] = (Points[1] - Points[0]) * Curviness;
+		OutTangents.Last() = (Points.Last() - Points[Points.Num() - 2]) * Curviness;
+		for (int32 PointIndex = 1; PointIndex + 1 < Points.Num(); ++PointIndex)
+		{
+			OutTangents[PointIndex] = 0.5 * (Points[PointIndex + 1] - Points[PointIndex - 1]) * Curviness;
+		}
+	}
+
+	FVector2D EvaluatePipeSplineSegment(
+		const FVector2D& Start,
+		const FVector2D& StartTangent,
+		const FVector2D& End,
+		const FVector2D& EndTangent,
+		const double Alpha)
+	{
+		const double AlphaSquared = Alpha * Alpha;
+		const double AlphaCubed = AlphaSquared * Alpha;
+		return Start * (2.0 * AlphaCubed - 3.0 * AlphaSquared + 1.0)
+			+ StartTangent * (AlphaCubed - 2.0 * AlphaSquared + Alpha)
+			+ End * (-2.0 * AlphaCubed + 3.0 * AlphaSquared)
+			+ EndTangent * (AlphaCubed - AlphaSquared);
+	}
+
+	void SamplePipeSplinePath(
+		const UPCGCreateFuelSupplySettings& Settings,
+		const TArray<FVector2D>& Points,
+		const TArray<FVector2D>& Tangents,
+		TArray<FVector2D>& OutSampledPath)
+	{
+		if (Points.Num() < 2 || Points.Num() != Tangents.Num())
+		{
+			return;
+		}
+
+		const double PipeSizeX = FMath::Max(1.0, static_cast<double>(Settings.FuelPipeSizeX));
+		const double PipeSizeY = FMath::Max(1.0, static_cast<double>(Settings.FuelPipeSizeY));
+		const double SampleSpacing = FMath::Max(
+			FuelSupplyPCGConstants::MinimumPipeSplineSampleSpacing,
+			FMath::Min(PipeSizeX / FuelSupplyPCGConstants::CurvinessReductionDivisor, PipeSizeY * 0.5));
+		OutSampledPath.Add(Points[0]);
+		for (int32 SegmentIndex = 0; SegmentIndex + 1 < Points.Num(); ++SegmentIndex)
+		{
+			const double ChordLength = FVector2D::Distance(Points[SegmentIndex], Points[SegmentIndex + 1]);
+			const int32 NumSamples = FMath::Max(1, FMath::CeilToInt32(ChordLength / SampleSpacing));
+			for (int32 SampleIndex = 1; SampleIndex <= NumSamples; ++SampleIndex)
+			{
+				const double Alpha = static_cast<double>(SampleIndex) / NumSamples;
+				OutSampledPath.Add(EvaluatePipeSplineSegment(
+					Points[SegmentIndex], Tangents[SegmentIndex],
+					Points[SegmentIndex + 1], Tangents[SegmentIndex + 1], Alpha));
+			}
+		}
+	}
+
+	bool IsPipeSplinePathValid(
+		const TArray<FVector2D>& SampledPath,
+		const double AreaHeight,
+		const double PipeRadius,
+		const double MinimumPipeCenterDistance,
+		const FFuelSupplyAreaFunction& IsInsideArea,
+		const TArray<const UPCGSpatialData*>& Exclusions,
+		const TArray<FPlacedFuelActor>& Placements,
+		const FFuelNetworkEdge& Edge,
+		const TArray<TArray<FVector2D>>& ExistingPipeRoutes)
+	{
+		for (const FVector2D& Point : SampledPath)
+		{
+			if (not IsRoutePointValid(
+				Point, AreaHeight, PipeRadius, IsInsideArea, Exclusions,
+				Placements, Edge.StartIndex, Edge.EndIndex))
+			{
+				return false;
+			}
+		}
+		for (int32 PointIndex = 0; PointIndex + 1 < SampledPath.Num(); ++PointIndex)
+		{
+			if (DoesSegmentOverlapExistingPipeRoutes(
+				SampledPath[PointIndex], SampledPath[PointIndex + 1],
+				ExistingPipeRoutes, MinimumPipeCenterDistance))
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	void ProjectPipeSplineToTerrain(
+		UWorld& World,
+		const UPCGCreateFuelSupplySettings& Settings,
+		const double AreaHeight,
+		const double Curviness,
+		const TArray<FVector2D>& Points,
+		const TArray<FVector2D>& Tangents,
+		FGeneratedFuelPipeSpline& OutSpline)
+	{
+		const double ZOffset = Settings.GlobalActorZOffset + Settings.FuelPipeZOffset;
+		OutSpline.WorldPoints.Reserve(Points.Num());
+		for (const FVector2D& Point : Points)
+		{
+			const FFuelGroundResult Ground = ProjectToGround(
+				World, FVector(Point, AreaHeight), Settings.bProjectActorsToGround);
+			OutSpline.WorldPoints.Add(FVector(Point, Ground.Position.Z + ZOffset));
+		}
+
+		OutSpline.WorldTangents.Reserve(Tangents.Num());
+		for (int32 PointIndex = 0; PointIndex < Tangents.Num(); ++PointIndex)
+		{
+			double ZTangent = 0.0;
+			if (Curviness > 0.0 && OutSpline.WorldPoints.Num() >= 2)
+			{
+				if (PointIndex == 0)
+				{
+					ZTangent = (OutSpline.WorldPoints[1].Z - OutSpline.WorldPoints[0].Z) * Curviness;
+				}
+				else if (PointIndex + 1 == OutSpline.WorldPoints.Num())
+				{
+					ZTangent = (OutSpline.WorldPoints[PointIndex].Z
+						- OutSpline.WorldPoints[PointIndex - 1].Z) * Curviness;
+				}
+				else
+				{
+					ZTangent = 0.5 * (OutSpline.WorldPoints[PointIndex + 1].Z
+						- OutSpline.WorldPoints[PointIndex - 1].Z) * Curviness;
+				}
+			}
+			OutSpline.WorldTangents.Add(FVector(Tangents[PointIndex], ZTangent));
+		}
+	}
+
+	bool TryBuildSafePipeSpline(
+		UWorld& World,
+		const UPCGCreateFuelSupplySettings& Settings,
+		const double AreaHeight,
+		const double PipeRadius,
+		const double MinimumPipeCenterDistance,
+		const TArray<FVector2D>& Route,
+		const FFuelSupplyAreaFunction& IsInsideArea,
+		const TArray<const UPCGSpatialData*>& Exclusions,
+		const TArray<FPlacedFuelActor>& Placements,
+		const FFuelNetworkEdge& Edge,
+		const TArray<TArray<FVector2D>>& ExistingPipeRoutes,
+		UClass& PipeClass,
+		FGeneratedFuelPipeSpline& OutSpline,
+		TArray<FVector2D>& OutSampledPath)
+	{
+		TArray<FVector2D> PipePoints;
+		BuildSubdividedPipeRoute(
+			Route, FMath::Max(1.0, static_cast<double>(Settings.FuelPipeSizeX)), PipePoints);
+		for (int32 AttemptIndex = 0;
+			AttemptIndex < FuelSupplyPCGConstants::PipeCurveSafetyAttempts;
+			++AttemptIndex)
+		{
+			const double CurvinessScale = 1.0
+				- static_cast<double>(AttemptIndex)
+				/ (FuelSupplyPCGConstants::PipeCurveSafetyAttempts - 1);
+			const double Curviness = FMath::Clamp(
+				static_cast<double>(Settings.PipeCurviness), 0.0, 1.0) * CurvinessScale;
+			TArray<FVector2D> Tangents;
+			BuildPipeSplineTangents(PipePoints, Curviness, Tangents);
+			TArray<FVector2D> SampledPath;
+			SamplePipeSplinePath(Settings, PipePoints, Tangents, SampledPath);
+			if (not IsPipeSplinePathValid(
+				SampledPath, AreaHeight, PipeRadius, MinimumPipeCenterDistance,
+				IsInsideArea, Exclusions, Placements, Edge, ExistingPipeRoutes))
 			{
 				continue;
 			}
-			TileStraightPipeSegment(
-				World, Settings, Pipes, SegmentStart, SegmentEnd, AreaHeight, OutPipePlacements);
+
+			OutSpline.ActorClass = &PipeClass;
+			ProjectPipeSplineToTerrain(
+				World, Settings, AreaHeight, Curviness, PipePoints, Tangents, OutSpline);
+			OutSampledPath = MoveTemp(SampledPath);
+			return true;
 		}
+		return false;
+	}
+
+	void AppendPipeOccupiedBounds(
+		const UPCGCreateFuelSupplySettings& Settings,
+		const TArray<FVector2D>& SampledPath,
+		const double Height,
+		TArray<FPlacedFuelActor>& InOutPlacements)
+	{
+		const double HalfWidth = 0.5 * FMath::Max(1.0, static_cast<double>(Settings.FuelPipeSizeY));
+		for (int32 PointIndex = 0; PointIndex + 1 < SampledPath.Num(); ++PointIndex)
+		{
+			const FVector2D& Start = SampledPath[PointIndex];
+			const FVector2D& End = SampledPath[PointIndex + 1];
+			const FVector2D Direction = (End - Start).GetSafeNormal();
+			const double SegmentLength = FVector2D::Distance(Start, End);
+			if (SegmentLength < FuelSupplyPCGConstants::MinimumRouteSegmentLength)
+			{
+				continue;
+			}
+
+			FPlacedFuelActor& Placement = InOutPlacements.Emplace_GetRef();
+			Placement.LocalBounds = FBox(
+				FVector(-0.5 * SegmentLength, -HalfWidth, -FuelSupplyPCGConstants::PipeBoundsHalfHeight),
+				FVector(0.5 * SegmentLength, HalfWidth, FuelSupplyPCGConstants::PipeBoundsHalfHeight));
+			Placement.Transform = FTransform(
+				FQuat(FVector::UpVector, FMath::Atan2(Direction.Y, Direction.X)),
+				FVector(0.5 * (Start + End), Height));
+			Placement.Footprint = FBox2D(
+				FVector2D(FMath::Min(Start.X, End.X) - HalfWidth, FMath::Min(Start.Y, End.Y) - HalfWidth),
+				FVector2D(FMath::Max(Start.X, End.X) + HalfWidth, FMath::Max(Start.Y, End.Y) + HalfWidth));
+			Placement.VisualCenter = 0.5 * (Start + End);
+			Placement.Role = EFuelPlacedRole::FuelPipe;
+		}
+	}
+
+	bool ConfigureGeneratedSpline(
+		ADestructibleSplineActor& SplineActor,
+		const FGeneratedFuelPipeSpline& GeneratedSpline)
+	{
+		if (SplineActor.Spline == nullptr
+			|| GeneratedSpline.WorldPoints.Num() < 2
+			|| GeneratedSpline.WorldPoints.Num() != GeneratedSpline.WorldTangents.Num())
+		{
+			return false;
+		}
+
+		SplineActor.Spline->ClearSplinePoints(false);
+		for (int32 PointIndex = 0; PointIndex < GeneratedSpline.WorldPoints.Num(); ++PointIndex)
+		{
+			SplineActor.Spline->AddSplinePoint(
+				GeneratedSpline.WorldPoints[PointIndex], ESplineCoordinateSpace::World, false);
+			const FVector& Tangent = GeneratedSpline.WorldTangents[PointIndex];
+			const ESplinePointType::Type PointType = Tangent.IsNearlyZero()
+				? ESplinePointType::Linear : ESplinePointType::CurveCustomTangent;
+			SplineActor.Spline->SetSplinePointType(PointIndex, PointType, false);
+			SplineActor.Spline->SetTangentsAtSplinePoint(
+				PointIndex, Tangent, Tangent, ESplineCoordinateSpace::World, false);
+		}
+		SplineActor.Spline->UpdateSpline();
+		return true;
+	}
+
+	ADestructibleSplineActor* SpawnManagedPipeSpline(
+		UWorld& World,
+		const FGeneratedFuelPipeSpline& GeneratedSpline)
+	{
+		if (GeneratedSpline.ActorClass == nullptr
+			|| not GeneratedSpline.ActorClass->IsChildOf(ADestructibleSplineActor::StaticClass()))
+		{
+			return nullptr;
+		}
+
+		const TSubclassOf<ADestructibleSplineActor> SplineClass(GeneratedSpline.ActorClass);
+		ADestructibleSplineActor* SplineActor = World.SpawnActorDeferred<ADestructibleSplineActor>(
+			SplineClass, FTransform::Identity, nullptr, nullptr,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (not IsValid(SplineActor) || not ConfigureGeneratedSpline(*SplineActor, GeneratedSpline))
+		{
+			if (IsValid(SplineActor))
+			{
+				SplineActor->Destroy();
+			}
+			return nullptr;
+		}
+
+		SplineActor->FinishSpawning(FTransform::Identity);
+		if (not ConfigureGeneratedSpline(*SplineActor, GeneratedSpline))
+		{
+			SplineActor->Destroy();
+			return nullptr;
+		}
+		SplineActor->RebuildSpline();
+		SplineActor->Tags.Add(PCGHelpers::DefaultPCGActorTag);
+#if WITH_EDITOR
+		SplineActor->SetActorLabel(TEXT("PCG_FuelSupply_FuelPipeSpline"));
+#endif
+		return SplineActor;
 	}
 
 	AActor* SpawnManagedActor(UWorld& World, const FPlacedFuelActor& Placement)
 	{
+		if (Placement.ActorClass == nullptr)
+		{
+			return nullptr;
+		}
 		FActorSpawnParameters SpawnParameters;
 		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		AActor* Actor = World.SpawnActor<AActor>(Placement.ActorClass, Placement.Transform, SpawnParameters);
@@ -1583,7 +1616,8 @@ namespace
 	void SpawnAndRegisterActors(
 		UPCGComponent& SourceComponent,
 		UWorld& World,
-		const TArray<FPlacedFuelActor>& Placements)
+		const TArray<FPlacedFuelActor>& Placements,
+		const TArray<FGeneratedFuelPipeSpline>& PipeSplines)
 	{
 		UPCGManagedActors* ManagedActors = NewObject<UPCGManagedActors>(&SourceComponent);
 		for (const FPlacedFuelActor& Placement : Placements)
@@ -1591,6 +1625,13 @@ namespace
 			if (AActor* Actor = SpawnManagedActor(World, Placement))
 			{
 				ManagedActors->GeneratedActors.Add(Actor);
+			}
+		}
+		for (const FGeneratedFuelPipeSpline& PipeSpline : PipeSplines)
+		{
+			if (ADestructibleSplineActor* SplineActor = SpawnManagedPipeSpline(World, PipeSpline))
+			{
+				ManagedActors->GeneratedActors.Add(SplineActor);
 			}
 		}
 		if (not ManagedActors->GeneratedActors.IsEmpty())
@@ -1698,7 +1739,7 @@ namespace
 	{
 		TArray<FResolvedFuelActor> Depots;
 		TArray<FResolvedFuelActor> Tanks;
-		TArray<FResolvedFuelPipe> Pipes;
+		UClass* PipeSplineClass = nullptr;
 		TArray<FResolvedFuelFence> Fences;
 	};
 
@@ -1708,6 +1749,7 @@ namespace
 		TArray<int32> DepotIndices;
 		TArray<int32> TankIndices;
 		TArray<TArray<FVector2D>> Routes;
+		TArray<FGeneratedFuelPipeSpline> PipeSplines;
 	};
 
 	bool ResolveFuelSupplyAssets(
@@ -1718,20 +1760,15 @@ namespace
 	{
 		ResolveActorEntries(Context, World, Settings.SupplyDepots,
 			LOCTEXT("SupplyDepotRole", "supply-depot"), OutAssets.Depots);
-		ResolveActorEntries(Context, World, Settings.FuelTanks,
-			LOCTEXT("FuelTankRole", "fuel-tank"), OutAssets.Tanks);
-		ResolvePipeEntries(Context, World, Settings.FuelPipes, OutAssets.Pipes);
+		ResolveTankEntries(Context, World, Settings.FuelTanks, OutAssets.Tanks);
+		OutAssets.PipeSplineClass = Settings.FuelPipeSplineClass.LoadSynchronous();
 		ResolveFenceEntries(Context, World, Settings.FuelTankFences, OutAssets.Fences);
-		const bool bHasStraightPipe = OutAssets.Pipes.FindByPredicate([](const FResolvedFuelPipe& Pipe)
-		{
-			const FIntPoint Start = CardinalDirectionToVector(Pipe.StartConnectorDirection);
-			const FIntPoint End = CardinalDirectionToVector(Pipe.ForwardDirection);
-			return Start.X == -End.X && Start.Y == -End.Y;
-		}) != nullptr;
-		if (OutAssets.Depots.IsEmpty() || not bHasStraightPipe)
+		const bool bHasValidPipeClass = OutAssets.PipeSplineClass != nullptr
+			&& OutAssets.PipeSplineClass->IsChildOf(ADestructibleSplineActor::StaticClass());
+		if (OutAssets.Depots.IsEmpty() || not bHasValidPipeClass)
 		{
 			PCGE_LOG_C(Warning, GraphAndLog, Context, LOCTEXT("MissingCoreFuelAssets",
-				"CreateFuelSupply: at least one valid supply depot and a pipe with opposite connectors are required."));
+				"CreateFuelSupply: at least one valid supply depot and an ADestructibleSplineActor-derived pipe class are required."));
 			return false;
 		}
 		return true;
@@ -1778,16 +1815,12 @@ namespace
 	}
 
 	double GetPipeRouteRadius(
-		const UPCGCreateFuelSupplySettings& Settings,
-		const TArray<FResolvedFuelPipe>& Pipes)
+		const UPCGCreateFuelSupplySettings& Settings)
 	{
-		double MaximumPipeHalfWidth = 0.0;
-		for (const FResolvedFuelPipe& Pipe : Pipes)
-		{
-			MaximumPipeHalfWidth = FMath::Max(
-				MaximumPipeHalfWidth, 0.5 * FMath::Max(Pipe.LocalBounds.GetSize().X, Pipe.LocalBounds.GetSize().Y));
-		}
-		return MaximumPipeHalfWidth + Settings.PipeObstacleClearance;
+		const double PipeWidth = FMath::Max(1.0, static_cast<double>(Settings.FuelPipeSizeY));
+		const double ObstacleClearance = FMath::Max(
+			0.0, static_cast<double>(Settings.PipeObstacleClearance));
+		return 0.5 * PipeWidth + ObstacleClearance;
 	}
 
 	void GenerateFuelPipeNetwork(
@@ -1797,36 +1830,56 @@ namespace
 		const FBox& AreaBounds,
 		const FFuelSupplyAreaFunction& IsInsideArea,
 		const TArray<const UPCGSpatialData*>& Exclusions,
-		const TArray<FResolvedFuelPipe>& Pipes,
+		UClass& PipeSplineClass,
 		FRandomStream& Random,
 		FGeneratedFuelSupply& InOutGenerated)
 	{
 		TArray<FFuelNetworkEdge> Edges;
 		BuildDepotSpanningEdges(InOutGenerated.Placements, InOutGenerated.DepotIndices, Edges);
 		AddDepotLoopEdges(Settings, InOutGenerated.Placements, InOutGenerated.DepotIndices, Random, Edges);
-		AddTankEdges(InOutGenerated.Placements, InOutGenerated.DepotIndices, InOutGenerated.TankIndices, Edges);
+		AddTankEdges(
+			InOutGenerated.Placements,
+			InOutGenerated.DepotIndices, InOutGenerated.TankIndices, Edges);
+		AssignPipeConnectionLanes(Settings, InOutGenerated.Placements.Num(), Edges);
 
-		const double RouteRadius = GetPipeRouteRadius(Settings, Pipes);
-		TArray<FPlacedFuelActor> RoutingObstacles = InOutGenerated.Placements;
+		const double RouteRadius = GetPipeRouteRadius(Settings);
+		const double PipeWidth = FMath::Max(1.0, static_cast<double>(Settings.FuelPipeSizeY));
+		const double PipeSeparation = FMath::Max(0.0, static_cast<double>(Settings.PipeSeparation));
+		const double MinimumPipeCenterDistance = PipeWidth + PipeSeparation;
+		TArray<TArray<FVector2D>> ExistingPipeRoutes;
 		for (const FFuelNetworkEdge& Edge : Edges)
 		{
 			TArray<FVector2D> Route;
-			if (not FindRoute(Settings, AreaBounds, IsInsideArea, Exclusions, RoutingObstacles, Edge, RouteRadius, Route))
+			if (not FindRoute(
+				Settings, AreaBounds, IsInsideArea, Exclusions, InOutGenerated.Placements,
+				Edge, RouteRadius, ExistingPipeRoutes, MinimumPipeCenterDistance, Route))
 			{
 				PCGE_LOG_C(Warning, GraphAndLog, Context, LOCTEXT("FuelRouteFailed",
 					"CreateFuelSupply: an obstacle-free pipe route could not be found; that connection was skipped."));
 				continue;
 			}
 
-			TArray<FPlacedFuelActor> NewPipePlacements;
-			TArray<FFuelPipeCornerPlacement> Corners;
-			BuildCornerPlacements(
-				World, Settings, Pipes, Route, AreaBounds.GetCenter().Z, Random, Corners, NewPipePlacements);
-			TileStraightPipes(
-				World, Settings, Pipes, Route, Corners, AreaBounds.GetCenter().Z, NewPipePlacements);
-			RoutingObstacles.Append(NewPipePlacements);
-			InOutGenerated.Placements.Append(MoveTemp(NewPipePlacements));
-			InOutGenerated.Routes.Add(MoveTemp(Route));
+			FGeneratedFuelPipeSpline GeneratedSpline;
+			TArray<FVector2D> SampledPath;
+			if (not TryBuildSafePipeSpline(
+				World, Settings, AreaBounds.GetCenter().Z, RouteRadius, MinimumPipeCenterDistance,
+				Route, IsInsideArea, Exclusions, InOutGenerated.Placements, Edge,
+				ExistingPipeRoutes, PipeSplineClass, GeneratedSpline, SampledPath))
+			{
+				PCGE_LOG_C(Warning, GraphAndLog, Context, LOCTEXT("FuelSplineCurveFailed",
+					"CreateFuelSupply: a routed pipe could not be curved without overlapping an obstacle or another pipe; that connection was skipped."));
+				continue;
+			}
+
+			ExistingPipeRoutes.Add(SampledPath);
+			InOutGenerated.Routes.Add(MoveTemp(SampledPath));
+			InOutGenerated.PipeSplines.Add(MoveTemp(GeneratedSpline));
+		}
+
+		for (const TArray<FVector2D>& PipeRoute : InOutGenerated.Routes)
+		{
+			AppendPipeOccupiedBounds(
+				Settings, PipeRoute, AreaBounds.GetCenter().Z, InOutGenerated.Placements);
 		}
 	}
 
@@ -2189,10 +2242,11 @@ bool FPCGCreateFuelSupplyElement::ExecuteInternal(FPCGContext* Context) const
 	}
 
 	GenerateFuelPipeNetwork(
-		Context, World, *Settings, AreaBounds, IsInsideArea, Exclusions, Assets.Pipes, Random, Generated);
+		Context, World, *Settings, AreaBounds, IsInsideArea, Exclusions,
+		*Assets.PipeSplineClass, Random, Generated);
 	GenerateFuelTankFences(
 		World, *Settings, AreaBounds, IsInsideArea, Exclusions, Assets.Fences, Generated);
-	SpawnAndRegisterActors(*SourceComponent, World, Generated.Placements);
+	SpawnAndRegisterActors(*SourceComponent, World, Generated.Placements, Generated.PipeSplines);
 	EmitOccupiedBounds(Context, Generated.Placements, Settings->RandomSeed);
 	EmitFacilityArea(Context, Generated.Placements, AreaBounds.GetCenter().Z);
 	EmitPipeRoutes(Context, Generated.Routes, AreaBounds.GetCenter().Z, Settings->RandomSeed);

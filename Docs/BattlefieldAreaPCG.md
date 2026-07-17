@@ -50,14 +50,17 @@ Every accepted actor and decal reserves an oriented 2D rectangle. SAT overlap te
 `PlacementClearance` prevent overlaps across all section-specific and global populations. A conservative
 radius additionally keeps the complete footprint inside the non-convex spline.
 
-Every actor and decal first resolves the `ALandscapeProxy` covering its XY, then traces only that Landscape
-from above its complete component bounds to below them. This brackets both sculpted peaks and eroded
-depressions even when an input point has an unrelated Z. Rocks,
-buildings, or other static geometry above the terrain cannot occlude or supply placement Z. Actors can align
-their up axis to the landscape normal; their measured lower bounds plane is seated on the local landscape
-tangent instead of lifting the downhill corner to the center height. `GroundTraceUp` and `GroundTraceDown`
-provide extra safety margins beyond the full Landscape bounds, while `MaxGroundSlopeDegrees` controls which
-slopes are valid.
+Every actor and decal uses Unreal PCG's cached Landscape `ProjectPoint` path—the same projection used by the
+built-in **Projection** node. The cache resolves Landscape component data directly from world XY and
+interpolates its exact height and normal, so input Z, sculpted peaks, eroded depressions, and unrelated world
+geometry cannot affect grounding. Cheap boundary and overlap checks run before projection so rejected
+placement attempts do not perform Landscape lookups.
+
+Grounding bounds are measured from visual mesh components, including meshes owned by child actors; invisible
+collision, FX, and helper components cannot lift an actor above the terrain. The center of the visual mesh's
+lower bounds plane is seated at the projected position. `ZOffset` then moves an individual asset along the
+projected normal (or world Z when alignment is disabled). Actors can align their up axis to the projected
+normal, and `MaxGroundSlopeDegrees` controls which slopes are valid.
 
 ## Setup
 

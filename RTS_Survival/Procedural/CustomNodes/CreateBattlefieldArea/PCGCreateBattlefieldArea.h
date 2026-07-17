@@ -51,6 +51,7 @@ struct FBattlefieldActorEntry
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Placement", meta = (ClampMin = "0.01"))
 	float MaxUniformScale = 1.0f;
 
+	/** @brief Offsets the grounded visual mesh along the Landscape normal, or world Z when unaligned. */
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Placement", meta = (Units = "cm"))
 	float ZOffset = 0.0f;
 
@@ -328,10 +329,13 @@ public:
 
 	// --- Terrain ---
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Terrain", meta = (ClampMin = "0", Units = "cm"))
+	// Retained only so existing node assets deserialize cleanly after cached projection replaced traces.
+	UPROPERTY(meta = (DeprecatedProperty,
+		DeprecationMessage = "Landscape grounding now uses cached PCG projection instead of traces."))
 	float GroundTraceUp = 15000.0f;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Terrain", meta = (ClampMin = "0", Units = "cm"))
+	UPROPERTY(meta = (DeprecatedProperty,
+		DeprecationMessage = "Landscape grounding now uses cached PCG projection instead of traces."))
 	float GroundTraceDown = 40000.0f;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Terrain", meta = (ClampMin = "0", ClampMax = "89", Units = "deg"))

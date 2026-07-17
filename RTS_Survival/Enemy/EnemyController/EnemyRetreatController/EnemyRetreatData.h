@@ -4,10 +4,12 @@
 
 #include "CoreMinimal.h"
 #include "TimerManager.h"
+#include "UObject/WeakInterfacePtr.h"
+// Full include required: TWeakInterfacePtr<ICommands> below instantiates with the complete type
+// (a forward declaration breaks in unity blobs that lack another include of Commands.h).
+#include "RTS_Survival/Interfaces/Commands.h"
 
 #include "EnemyRetreatData.generated.h"
-
-class ICommands;
 
 UENUM(BlueprintType)
 enum class EPostRetreatCounterStrategy : uint8
