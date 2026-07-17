@@ -16,6 +16,7 @@
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
+#include "RTS_Survival/Environment/Splines/ProceduralDestructibleSpline/ProceduralDestructibleSplineSpawner.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -388,7 +389,7 @@ void ADestructableEnvActor::OnUnitDies(const ERTSDeathType DeathType)
 	if (IsUnitAlive())
 	{
 		SetUnitDying();
-		OnUnitDies_CheckForWireComponent();
+		OnUnitDies_NotifyConnectionComponents();
 		BP_OnUnitDies(DeathType);
 	}
 }
@@ -440,12 +441,23 @@ bool ADestructableEnvActor::GetIsOverlapByAnyTank(AActor* OtherActor)
 	return false;
 }
 
-void ADestructableEnvActor::OnUnitDies_CheckForWireComponent() const
+void ADestructableEnvActor::OnUnitDies_NotifyConnectionComponents() const
 {
 	UDestructibleWire* WireComponent = FindComponentByClass<UDestructibleWire>();
 	if (IsValid(WireComponent))
 	{
 		WireComponent->OnOwningActorDies();
+	}
+
+	TInlineComponentArray<UProceduralDestructibleSplineSpawner*> SplineSpawners;
+	GetComponents(SplineSpawners);
+	for (UProceduralDestructibleSplineSpawner* SplineSpawner : SplineSpawners)
+	{
+		if (not IsValid(SplineSpawner))
+		{
+			continue;
+		}
+		SplineSpawner->OnOwningActorDies();
 	}
 }
 

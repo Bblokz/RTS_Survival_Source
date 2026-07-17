@@ -452,6 +452,29 @@ float ADestructibleSplineActor::GetSegmentHealth(const int32 SegmentIndex) const
 
 // ------------------------- DESTRUCTION ----------------------------
 
+void ADestructibleSplineActor::DestroyAllSegments()
+{
+	if (not GetIsValidDestructionConfig())
+	{
+		return;
+	}
+
+	for (int32 SegmentIndex = 0; SegmentIndex < M_Segments.Num(); ++SegmentIndex)
+	{
+		if (IsActorBeingDestroyed())
+		{
+			return;
+		}
+
+		const FSplineDestructibleSegment& Segment = M_Segments[SegmentIndex];
+		if (Segment.bIsCollapsing || not IsValid(Segment.MeshComponent))
+		{
+			continue;
+		}
+		DestroySegment(SegmentIndex);
+	}
+}
+
 void ADestructibleSplineActor::DestroySegment(const int32 SegmentIndex)
 {
 	if (not M_Segments.IsValidIndex(SegmentIndex))

@@ -147,6 +147,13 @@ public:
 	void DestroySegment(int32 SegmentIndex);
 
 	/**
+	 * @brief Starts the configured collapse for every remaining piece so systems owning a generated
+	 * spline can tear it down without bypassing its destruction presentation.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Destruction")
+	void DestroyAllSegments();
+
+	/**
 	 * @brief Destroys the piece represented by the given component (e.g. from a weapon hit result).
 	 * @param PieceComponent The piece's spline mesh component (FHitResult::Component).
 	 */

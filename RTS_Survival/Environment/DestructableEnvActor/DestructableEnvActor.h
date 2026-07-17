@@ -279,7 +279,7 @@ protected:
 	void BP_OnVerticalDestructionComplete();
 
 private:
-	void OnUnitDies_CheckForWireComponent() const;
+	void OnUnitDies_NotifyConnectionComponents() const;
 
 	void AttemptAttachSpawnSystem(const FSwapToDestroyedMesh& CollapseParameters, UNiagaraSystem* AttachSystem);
 
