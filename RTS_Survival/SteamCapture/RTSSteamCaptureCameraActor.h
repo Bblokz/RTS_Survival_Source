@@ -5,10 +5,10 @@
 #include "RTS_Survival/SteamCapture/RTSSteamCaptureSettings.h"
 #include "RTSSteamCaptureCameraActor.generated.h"
 
+class UCameraComponent;
 class USceneCaptureComponent2D;
 class USceneComponent;
 class UTextureRenderTarget2D;
-struct FMinimalViewInfo;
 
 /**
  * @brief Hidden capture camera used by the Steam capture subsystem during PIE.
@@ -25,13 +25,13 @@ public:
 	bool InitCaptureCamera(UTextureRenderTarget2D* RenderTarget);
 
 	/**
-	 * @brief Mirrors the player's final camera view while retaining capture-specific framing controls.
-	 * @param PlayerCameraView Final camera-manager view used by the player's viewport.
+	 * @brief Mirrors the player camera while retaining capture-specific framing controls.
+	 * @param PlayerCameraComponent Camera component supplying the player view.
 	 * @param CameraSettings Capture-only transform and field-of-view adjustments.
 	 * @return True when the capture camera was synchronized successfully.
 	 */
 	bool SyncToPlayerCamera(
-		const FMinimalViewInfo& PlayerCameraView,
+		const UCameraComponent* PlayerCameraComponent,
 		const FRTSSteamCaptureCameraSettings& CameraSettings);
 	bool CaptureFrame();
 

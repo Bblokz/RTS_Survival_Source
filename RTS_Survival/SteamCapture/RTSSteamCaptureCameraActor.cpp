@@ -1,6 +1,6 @@
 #include "RTSSteamCaptureCameraActor.h"
 
-#include "Camera/CameraTypes.h"
+#include "Camera/CameraComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SceneComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -27,11 +27,7 @@ ARTSSteamCaptureCameraActor::ARTSSteamCaptureCameraActor()
 	M_SceneCaptureComponent->bCaptureEveryFrame = false;
 	M_SceneCaptureComponent->bCaptureOnMovement = false;
 	M_SceneCaptureComponent->bAlwaysPersistRenderingState = true;
-	// Final color keeps Unreal's normal view pipeline active, including the map's PostProcessVolume blend.
 	M_SceneCaptureComponent->CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
-	M_SceneCaptureComponent->ShowFlags.SetPostProcessing(true);
-	M_SceneCaptureComponent->ShowFlags.SetColorGrading(true);
-	M_SceneCaptureComponent->ShowFlags.SetTonemapper(true);
 }
 
 bool ARTSSteamCaptureCameraActor::InitCaptureCamera(UTextureRenderTarget2D* RenderTarget)
@@ -51,32 +47,36 @@ bool ARTSSteamCaptureCameraActor::InitCaptureCamera(UTextureRenderTarget2D* Rend
 }
 
 bool ARTSSteamCaptureCameraActor::SyncToPlayerCamera(
-	const FMinimalViewInfo& PlayerCameraView,
+	const UCameraComponent* PlayerCameraComponent,
 	const FRTSSteamCaptureCameraSettings& CameraSettings)
 {
 	if (not GetIsValidSceneCaptureComponent())
 	{
 		return false;
 	}
+	if (not IsValid(PlayerCameraComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot sync Steam capture camera because player camera is invalid."));
+		return false;
+	}
 
-	const FTransform PlayerCameraTransform(PlayerCameraView.Rotation, PlayerCameraView.Location);
+	const FTransform PlayerCameraTransform = PlayerCameraComponent->GetComponentTransform();
 	const FVector WorldOffset = PlayerCameraTransform.TransformVectorNoScale(CameraSettings.M_LocalLocationOffset);
 	const FQuat CaptureRotation = PlayerCameraTransform.GetRotation() * CameraSettings.M_RotationOffset.Quaternion();
 	SetActorLocationAndRotation(PlayerCameraTransform.GetLocation() + WorldOffset, CaptureRotation);
 
 	const float BaseFovDegrees = CameraSettings.bM_MatchPlayerCameraFov
-		                             ? PlayerCameraView.FOV
+		                             ? PlayerCameraComponent->FieldOfView
 		                             : CameraSettings.M_CaptureFovDegrees;
 	M_SceneCaptureComponent->FOVAngle = FMath::Clamp(
 		BaseFovDegrees * CameraSettings.M_FovMultiplier,
 		RTSSteamCaptureCameraConstants::MinFovDegrees,
 		RTSSteamCaptureCameraConstants::MaxFovDegrees);
 
-	M_SceneCaptureComponent->ProjectionType = PlayerCameraView.ProjectionMode;
-	M_SceneCaptureComponent->OrthoWidth = PlayerCameraView.OrthoWidth;
-	// Scene capture blends the map's PostProcessVolume first, then applies these player-camera overrides.
-	M_SceneCaptureComponent->PostProcessSettings = PlayerCameraView.PostProcessSettings;
-	M_SceneCaptureComponent->PostProcessBlendWeight = PlayerCameraView.PostProcessBlendWeight;
+	M_SceneCaptureComponent->ProjectionType = PlayerCameraComponent->ProjectionMode;
+	M_SceneCaptureComponent->OrthoWidth = PlayerCameraComponent->OrthoWidth;
+	M_SceneCaptureComponent->PostProcessSettings = PlayerCameraComponent->PostProcessSettings;
+	M_SceneCaptureComponent->PostProcessBlendWeight = PlayerCameraComponent->PostProcessBlendWeight;
 	return true;
 }
 

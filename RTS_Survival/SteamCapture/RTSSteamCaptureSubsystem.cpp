@@ -1,7 +1,6 @@
 #include "RTSSteamCaptureSubsystem.h"
 
 #include "Camera/CameraComponent.h"
-#include "Camera/PlayerCameraManager.h"
 #include "Dom/JsonObject.h"
 #include "Engine/Engine.h"
 #include "Engine/TextureRenderTarget2D.h"
@@ -209,12 +208,6 @@ bool URTSSteamCaptureSubsystem::GetCanStartCapture(
 		RTSFunctionLibrary::ReportError(TEXT("Cannot start Steam capture because player camera is invalid."));
 		return false;
 	}
-	if (not IsValid(PlayerController->PlayerCameraManager))
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Cannot start Steam capture because player camera manager is invalid."));
-		return false;
-	}
-
 	return true;
 }
 
@@ -413,16 +406,9 @@ bool URTSSteamCaptureSubsystem::CaptureFramePixels(
 		return false;
 	}
 
-	const APlayerCameraManager* PlayerCameraManager = M_PlayerController->PlayerCameraManager;
-	if (not IsValid(PlayerCameraManager))
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Cannot capture Steam frame because player camera manager is invalid."));
-		return false;
-	}
-
-	if (not M_CaptureActor->SyncToPlayerCamera(
-		PlayerCameraManager->GetCameraCacheView(),
-		CaptureSettings.M_CameraSettings))
+	const ACameraPawn* CameraPawn = M_PlayerController->GetCameraPawn();
+	const UCameraComponent* PlayerCameraComponent = IsValid(CameraPawn) ? CameraPawn->GetCameraComponent() : nullptr;
+	if (not M_CaptureActor->SyncToPlayerCamera(PlayerCameraComponent, CaptureSettings.M_CameraSettings))
 	{
 		return false;
 	}
