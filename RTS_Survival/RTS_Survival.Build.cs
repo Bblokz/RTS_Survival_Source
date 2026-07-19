@@ -45,6 +45,7 @@ public class RTS_Survival : ModuleRules
 			"SlateCore",
 			"ProtoAnimatedText",
 			"Json",
+			"ImageCore",
 			"RHI", 
 			"EnhancedInput",
 			//// Saviour-added:

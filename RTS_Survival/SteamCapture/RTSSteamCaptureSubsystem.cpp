@@ -1,17 +1,14 @@
 #include "RTSSteamCaptureSubsystem.h"
 
-#include "Camera/CameraComponent.h"
 #include "Dom/JsonObject.h"
-#include "Engine/Engine.h"
-#include "Engine/TextureRenderTarget2D.h"
+#include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
 #include "HAL/PlatformProcess.h"
 #include "HAL/PlatformTime.h"
+#include "ImageCore.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "RTS_Survival/Player/CPPController.h"
-#include "RTS_Survival/Player/Camera/CameraPawn.h"
-#include "RTS_Survival/SteamCapture/RTSSteamCaptureCameraActor.h"
 #include "RTS_Survival/SteamCapture/RTSSteamCaptureSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Serialization/JsonSerializer.h"
@@ -24,7 +21,6 @@ namespace RTSSteamCaptureSubsystemConstants
 	constexpr int32 SessionGuidCharacters = 8;
 	constexpr float TargetFrameCountEpsilon = 0.001f;
 	constexpr float ManualStopMaxDurationSnapSeconds = 0.25f;
-	constexpr float DefaultDisplayGamma = 2.2f;
 	const TCHAR* const FramesDirectoryName = TEXT("Frames");
 	const TCHAR* const MetadataFileName = TEXT("metadata.json");
 	const TCHAR* const ManualStopReason = TEXT("ManualStop");
@@ -47,19 +43,7 @@ namespace
 		SettingsJson->SetNumberField(TEXT("framesPerSecond"), CaptureSettings.M_FramesPerSecond);
 		SettingsJson->SetNumberField(TEXT("maxDurationSeconds"), CaptureSettings.M_MaxDurationSeconds);
 		SettingsJson->SetBoolField(TEXT("autoStopAtMaxDuration"), CaptureSettings.bM_AutoStopAtMaxDuration);
-		SettingsJson->SetStringField(
-			TEXT("localCameraOffset"),
-			CaptureSettings.M_CameraSettings.M_LocalLocationOffset.ToString());
-		SettingsJson->SetStringField(
-			TEXT("cameraRotationOffset"),
-			CaptureSettings.M_CameraSettings.M_RotationOffset.ToString());
-		SettingsJson->SetBoolField(
-			TEXT("matchPlayerCameraFov"),
-			CaptureSettings.M_CameraSettings.bM_MatchPlayerCameraFov);
-		SettingsJson->SetNumberField(
-			TEXT("captureFovDegrees"),
-			CaptureSettings.M_CameraSettings.M_CaptureFovDegrees);
-		SettingsJson->SetNumberField(TEXT("fovMultiplier"), CaptureSettings.M_CameraSettings.M_FovMultiplier);
+		SettingsJson->SetStringField(TEXT("captureSource"), TEXT("PlayerViewport"));
 		return SettingsJson;
 	}
 }
@@ -147,10 +131,7 @@ bool URTSSteamCaptureSubsystem::StartCapture(
 	M_SessionName = BuildSessionName(*CaptureSettings);
 	M_FrameWriter.ResetFailedWriteCount();
 
-	if (not StartCapture_CreateSessionDirectory(*CaptureSettings)
-		|| not StartCapture_CreateRenderTarget()
-		|| not StartCapture_SpawnCaptureActor()
-		|| not M_CaptureActor->InitCaptureCamera(M_RenderTarget))
+	if (not StartCapture_CreateSessionDirectory(*CaptureSettings))
 	{
 		AbortStartCapture();
 		return false;
@@ -202,10 +183,11 @@ bool URTSSteamCaptureSubsystem::GetCanStartCapture(
 		return false;
 	}
 
-	const ACameraPawn* CameraPawn = PlayerController->GetCameraPawn();
-	if (not IsValid(CameraPawn) || not IsValid(CameraPawn->GetCameraComponent()))
+	const UWorld* PlayerWorld = PlayerController->GetWorld();
+	const UGameViewportClient* GameViewportClient = IsValid(PlayerWorld) ? PlayerWorld->GetGameViewport() : nullptr;
+	if (not IsValid(GameViewportClient) || GameViewportClient->Viewport == nullptr)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Cannot start Steam capture because player camera is invalid."));
+		RTSFunctionLibrary::ReportError(TEXT("Cannot start Steam capture because the player viewport is invalid."));
 		return false;
 	}
 	return true;
@@ -244,72 +226,14 @@ bool URTSSteamCaptureSubsystem::StartCapture_CreateSessionDirectory(
 	return bCreated;
 }
 
-bool URTSSteamCaptureSubsystem::StartCapture_CreateRenderTarget()
-{
-	const FName RenderTargetName = MakeUniqueObjectName(
-		this,
-		UTextureRenderTarget2D::StaticClass(),
-		TEXT("RTSSteamCaptureRenderTarget"));
-	M_RenderTarget = NewObject<UTextureRenderTarget2D>(this, RenderTargetName);
-	if (not GetIsValidRenderTarget())
-	{
-		return false;
-	}
-
-	M_RenderTarget->ClearColor = FLinearColor::Black;
-	M_RenderTarget->bAutoGenerateMips = false;
-	// The tonemapper writes display-encoded color. Keep the target linear so the RHI does not apply sRGB a second time.
-	const bool bForceLinearGamma = true;
-	M_RenderTarget->TargetGamma = IsValid(GEngine) && GEngine->DisplayGamma > 0.0f
-		                              ? GEngine->DisplayGamma
-		                              : RTSSteamCaptureSubsystemConstants::DefaultDisplayGamma;
-	M_RenderTarget->InitCustomFormat(
-		M_OutputResolution.X,
-		M_OutputResolution.Y,
-		PF_B8G8R8A8,
-		bForceLinearGamma);
-	M_RenderTarget->UpdateResourceImmediate(true);
-	return true;
-}
-
-bool URTSSteamCaptureSubsystem::StartCapture_SpawnCaptureActor()
-{
-	if (not GetIsValidPlayerController())
-	{
-		return false;
-	}
-
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Cannot spawn Steam capture camera because world is invalid."));
-		return false;
-	}
-
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = M_PlayerController.Get();
-	SpawnParams.ObjectFlags |= RF_Transient;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	M_CaptureActor = World->SpawnActor<ARTSSteamCaptureCameraActor>(
-		ARTSSteamCaptureCameraActor::StaticClass(),
-		FTransform::Identity,
-		SpawnParams);
-	return GetIsValidCaptureActor();
-}
-
 void URTSSteamCaptureSubsystem::AbortStartCapture()
 {
-	DestroyCaptureActorIfNeeded();
-	M_RenderTarget = nullptr;
 	M_PlayerController.Reset();
 	bM_IsRecording = false;
 }
 
 void URTSSteamCaptureSubsystem::ResetSessionState()
 {
-	M_CaptureActor = nullptr;
-	M_RenderTarget = nullptr;
 	M_PlayerController.Reset();
 	M_SessionDirectory.Reset();
 	M_FramesDirectory.Reset();
@@ -327,17 +251,6 @@ void URTSSteamCaptureSubsystem::ResetSessionState()
 	bM_DisableMaxDurationUntilFunctionCall = false;
 	bM_OverrideResolution = false;
 	M_OutputResolution = FIntPoint::ZeroValue;
-}
-
-void URTSSteamCaptureSubsystem::DestroyCaptureActorIfNeeded()
-{
-	if (M_CaptureActor == nullptr)
-	{
-		return;
-	}
-
-	M_CaptureActor->Destroy();
-	M_CaptureActor = nullptr;
 }
 
 void URTSSteamCaptureSubsystem::TickCapture(
@@ -370,7 +283,7 @@ void URTSSteamCaptureSubsystem::QueueDueFrames(const URTSSteamCaptureSettings& C
 	}
 
 	TArray<FColor> CurrentFramePixels;
-	if (not CaptureFramePixels(CaptureSettings, CurrentFramePixels))
+	if (not CaptureFramePixels(CurrentFramePixels))
 	{
 		return;
 	}
@@ -398,26 +311,80 @@ void URTSSteamCaptureSubsystem::QueueDueFrames(const URTSSteamCaptureSettings& C
 }
 
 bool URTSSteamCaptureSubsystem::CaptureFramePixels(
-	const URTSSteamCaptureSettings& CaptureSettings,
-	TArray<FColor>& OutFramePixels)
+	TArray<FColor>& OutFramePixels) const
 {
-	if (not GetIsValidPlayerController() || not GetIsValidCaptureActor())
+	if (not GetIsValidPlayerController())
 	{
 		return false;
 	}
 
-	const ACameraPawn* CameraPawn = M_PlayerController->GetCameraPawn();
-	const UCameraComponent* PlayerCameraComponent = IsValid(CameraPawn) ? CameraPawn->GetCameraComponent() : nullptr;
-	if (not M_CaptureActor->SyncToPlayerCamera(PlayerCameraComponent, CaptureSettings.M_CameraSettings))
-	{
-		return false;
-	}
-	if (not M_CaptureActor->CaptureFrame())
+	TArray<FColor> ViewportPixels;
+	FIntPoint ViewportResolution = FIntPoint::ZeroValue;
+	if (not ReadPlayerViewportPixels(ViewportPixels, ViewportResolution))
 	{
 		return false;
 	}
 
-	return ReadRenderTargetPixels(OutFramePixels);
+	return ResizeFrameToOutputResolution(ViewportPixels, ViewportResolution, OutFramePixels);
+}
+
+bool URTSSteamCaptureSubsystem::ReadPlayerViewportPixels(
+	TArray<FColor>& OutViewportPixels,
+	FIntPoint& OutViewportResolution) const
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot capture the player viewport because the world is invalid."));
+		return false;
+	}
+
+	const UGameViewportClient* GameViewportClient = World->GetGameViewport();
+	if (not IsValid(GameViewportClient) || GameViewportClient->Viewport == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot capture the player viewport because it is invalid."));
+		return false;
+	}
+
+	OutViewportResolution = GameViewportClient->Viewport->GetSizeXY();
+	if (OutViewportResolution.X <= 0 || OutViewportResolution.Y <= 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot capture the player viewport because its resolution is invalid."));
+		return false;
+	}
+
+	return GameViewportClient->Viewport->ReadPixels(OutViewportPixels);
+}
+
+bool URTSSteamCaptureSubsystem::ResizeFrameToOutputResolution(
+	const TArray<FColor>& ViewportPixels,
+	const FIntPoint& ViewportResolution,
+	TArray<FColor>& OutFramePixels) const
+{
+	const int32 ExpectedViewportPixelCount = ViewportResolution.X * ViewportResolution.Y;
+	if (ViewportPixels.Num() != ExpectedViewportPixelCount || M_OutputResolution.X <= 0 || M_OutputResolution.Y <= 0)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot resize Steam capture frame because its pixel data is invalid."));
+		return false;
+	}
+
+	if (ViewportResolution == M_OutputResolution)
+	{
+		OutFramePixels = ViewportPixels;
+	}
+	else
+	{
+		OutFramePixels.SetNumZeroed(M_OutputResolution.X * M_OutputResolution.Y);
+		const FImageView SourceImage(ViewportPixels.GetData(), ViewportResolution.X, ViewportResolution.Y);
+		const FImageView OutputImage(OutFramePixels.GetData(), M_OutputResolution.X, M_OutputResolution.Y);
+		FImageCore::ResizeImage(SourceImage, OutputImage);
+	}
+
+	for (FColor& FramePixel : OutFramePixels)
+	{
+		FramePixel.A = MAX_uint8;
+	}
+	return true;
 }
 
 bool URTSSteamCaptureSubsystem::QueueFrameWrite(
@@ -438,23 +405,6 @@ bool URTSSteamCaptureSubsystem::QueueFrameWrite(
 		M_OutputResolution.Y,
 		MoveTemp(FramePixels));
 	return true;
-}
-
-bool URTSSteamCaptureSubsystem::ReadRenderTargetPixels(TArray<FColor>& OutPixels) const
-{
-	if (not GetIsValidRenderTarget())
-	{
-		return false;
-	}
-
-	FTextureRenderTargetResource* RenderTargetResource = M_RenderTarget->GameThread_GetRenderTargetResource();
-	if (RenderTargetResource == nullptr)
-	{
-		RTSFunctionLibrary::ReportError(TEXT("Steam capture render target resource was invalid."));
-		return false;
-	}
-
-	return RenderTargetResource->ReadPixels(OutPixels);
 }
 
 FString URTSSteamCaptureSubsystem::BuildFramePath(const int32 FrameNumber) const
@@ -485,7 +435,7 @@ void URTSSteamCaptureSubsystem::StopCaptureInternal(
 	const FString& StopReason,
 	const bool bWaitForFrameWrites)
 {
-	if (not bM_IsRecording && M_CaptureActor == nullptr)
+	if (not bM_IsRecording)
 	{
 		return;
 	}
@@ -514,8 +464,6 @@ void URTSSteamCaptureSubsystem::StopCaptureInternal(
 	}
 
 	WriteMetadata(StopReason, StopTime);
-	DestroyCaptureActorIfNeeded();
-	M_RenderTarget = nullptr;
 	M_PlayerController.Reset();
 	bM_IsStopping = false;
 }
@@ -604,36 +552,6 @@ bool URTSSteamCaptureSubsystem::GetIsValidPlayerController() const
 		this,
 		TEXT("M_PlayerController"),
 		TEXT("GetIsValidPlayerController"),
-		this);
-	return false;
-}
-
-bool URTSSteamCaptureSubsystem::GetIsValidCaptureActor() const
-{
-	if (IsValid(M_CaptureActor))
-	{
-		return true;
-	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		TEXT("M_CaptureActor"),
-		TEXT("GetIsValidCaptureActor"),
-		this);
-	return false;
-}
-
-bool URTSSteamCaptureSubsystem::GetIsValidRenderTarget() const
-{
-	if (IsValid(M_RenderTarget))
-	{
-		return true;
-	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		TEXT("M_RenderTarget"),
-		TEXT("GetIsValidRenderTarget"),
 		this);
 	return false;
 }

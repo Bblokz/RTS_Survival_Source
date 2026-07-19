@@ -5,16 +5,12 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "RTSSteamCaptureSubsystem.generated.h"
 
-class ACameraPawn;
 class ACPPController;
-class ARTSSteamCaptureCameraActor;
-class UCameraComponent;
 class URTSSteamCaptureSettings;
-class UTextureRenderTarget2D;
 
 /**
- * @brief PIE-only world subsystem that captures fixed-aspect Steam store footage while the designer plays.
- * Gameplay only toggles recording; this subsystem owns camera mirroring, frame timing, and capture package output.
+ * @brief PIE-only world subsystem that records the rendered player viewport while the designer plays.
+ * Gameplay only toggles recording; this subsystem owns frame timing, resizing, and capture package output.
  */
 UCLASS()
 class RTS_SURVIVAL_API URTSSteamCaptureSubsystem : public UTickableWorldSubsystem
@@ -49,11 +45,6 @@ public:
 
 private:
 	UPROPERTY()
-	TObjectPtr<ARTSSteamCaptureCameraActor> M_CaptureActor;
-
-	UPROPERTY()
-	TObjectPtr<UTextureRenderTarget2D> M_RenderTarget;
-
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 	FRTSSteamCaptureFrameWriter M_FrameWriter;
 
@@ -78,17 +69,33 @@ private:
 	bool GetCanStartCapture(ACPPController* PlayerController, const URTSSteamCaptureSettings* CaptureSettings) const;
 	bool GetIsPieWorld() const;
 	bool StartCapture_CreateSessionDirectory(const URTSSteamCaptureSettings& CaptureSettings);
-	bool StartCapture_CreateRenderTarget();
-	bool StartCapture_SpawnCaptureActor();
 	void AbortStartCapture();
 	void ResetSessionState();
-	void DestroyCaptureActorIfNeeded();
 
 	void TickCapture(float DeltaTime, const URTSSteamCaptureSettings& CaptureSettings);
 	void QueueDueFrames(const URTSSteamCaptureSettings& CaptureSettings);
-	bool CaptureFramePixels(const URTSSteamCaptureSettings& CaptureSettings, TArray<FColor>& OutFramePixels);
+	bool CaptureFramePixels(TArray<FColor>& OutFramePixels) const;
+
+	/**
+	 * @brief Reads the completed main view so capture inherits the player's exposure and temporal history.
+	 * @param OutViewportPixels Display-encoded pixels from the player viewport.
+	 * @param OutViewportResolution Resolution associated with OutViewportPixels.
+	 * @return True when the viewport supplied a complete frame.
+	 */
+	bool ReadPlayerViewportPixels(TArray<FColor>& OutViewportPixels, FIntPoint& OutViewportResolution) const;
+
+	/**
+	 * @brief Preserves the viewport's final display color while adapting it to the requested recording size.
+	 * @param ViewportPixels Display-encoded pixels read from the rendered player viewport.
+	 * @param ViewportResolution Resolution associated with ViewportPixels.
+	 * @param OutFramePixels Resized display-encoded pixels ready for PNG output.
+	 * @return True when the source pixels and resolutions were valid.
+	 */
+	bool ResizeFrameToOutputResolution(
+		const TArray<FColor>& ViewportPixels,
+		const FIntPoint& ViewportResolution,
+		TArray<FColor>& OutFramePixels) const;
 	bool QueueFrameWrite(const URTSSteamCaptureSettings& CaptureSettings, TArray<FColor>&& FramePixels);
-	bool ReadRenderTargetPixels(TArray<FColor>& OutPixels) const;
 	FString BuildFramePath(int32 FrameNumber) const;
 	FString BuildSessionName(const URTSSteamCaptureSettings& CaptureSettings) const;
 	int32 GetTargetFrameCount(const URTSSteamCaptureSettings& CaptureSettings) const;
@@ -98,6 +105,4 @@ private:
 	void WriteMetadata(const FString& StopReason, const FDateTime& StopTime) const;
 
 	bool GetIsValidPlayerController() const;
-	bool GetIsValidCaptureActor() const;
-	bool GetIsValidRenderTarget() const;
 };
