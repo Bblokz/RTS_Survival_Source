@@ -1126,7 +1126,7 @@ namespace DeveloperSettings
 				// Range bonus applied to projectiles from trace weapons to fly beyond the aim radius of the weapon
 				inline constexpr float DefaultTraceRangeMlt = 1.67f;
 				// Armor pen of projectile gets divided by this after a bounce.
-				inline constexpr float AmorPenBounceDivider = 4.f;
+				inline constexpr float AmorPenBounceDivider = 3.f;
 				inline constexpr int MaxBouncesPerProjectile = 3;
 				// How much bigger the raw pen value of the projectile must at least be than the raw armor value
 				// of the plate to go through regardless of the angle.
