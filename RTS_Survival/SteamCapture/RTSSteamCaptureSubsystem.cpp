@@ -1,7 +1,9 @@
 #include "RTSSteamCaptureSubsystem.h"
 
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Dom/JsonObject.h"
+#include "Engine/Engine.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "HAL/PlatformProcess.h"
@@ -23,6 +25,7 @@ namespace RTSSteamCaptureSubsystemConstants
 	constexpr int32 SessionGuidCharacters = 8;
 	constexpr float TargetFrameCountEpsilon = 0.001f;
 	constexpr float ManualStopMaxDurationSnapSeconds = 0.25f;
+	constexpr float DefaultDisplayGamma = 2.2f;
 	const TCHAR* const FramesDirectoryName = TEXT("Frames");
 	const TCHAR* const MetadataFileName = TEXT("metadata.json");
 	const TCHAR* const ManualStopReason = TEXT("ManualStop");
@@ -206,6 +209,11 @@ bool URTSSteamCaptureSubsystem::GetCanStartCapture(
 		RTSFunctionLibrary::ReportError(TEXT("Cannot start Steam capture because player camera is invalid."));
 		return false;
 	}
+	if (not IsValid(PlayerController->PlayerCameraManager))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot start Steam capture because player camera manager is invalid."));
+		return false;
+	}
 
 	return true;
 }
@@ -257,7 +265,16 @@ bool URTSSteamCaptureSubsystem::StartCapture_CreateRenderTarget()
 
 	M_RenderTarget->ClearColor = FLinearColor::Black;
 	M_RenderTarget->bAutoGenerateMips = false;
-	M_RenderTarget->InitCustomFormat(M_OutputResolution.X, M_OutputResolution.Y, PF_B8G8R8A8, false);
+	// The tonemapper writes display-encoded color. Keep the target linear so the RHI does not apply sRGB a second time.
+	const bool bForceLinearGamma = true;
+	M_RenderTarget->TargetGamma = IsValid(GEngine) && GEngine->DisplayGamma > 0.0f
+		                              ? GEngine->DisplayGamma
+		                              : RTSSteamCaptureSubsystemConstants::DefaultDisplayGamma;
+	M_RenderTarget->InitCustomFormat(
+		M_OutputResolution.X,
+		M_OutputResolution.Y,
+		PF_B8G8R8A8,
+		bForceLinearGamma);
 	M_RenderTarget->UpdateResourceImmediate(true);
 	return true;
 }
@@ -396,9 +413,16 @@ bool URTSSteamCaptureSubsystem::CaptureFramePixels(
 		return false;
 	}
 
-	const ACameraPawn* CameraPawn = M_PlayerController->GetCameraPawn();
-	const UCameraComponent* PlayerCameraComponent = IsValid(CameraPawn) ? CameraPawn->GetCameraComponent() : nullptr;
-	if (not M_CaptureActor->SyncToPlayerCamera(PlayerCameraComponent, CaptureSettings.M_CameraSettings))
+	const APlayerCameraManager* PlayerCameraManager = M_PlayerController->PlayerCameraManager;
+	if (not IsValid(PlayerCameraManager))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cannot capture Steam frame because player camera manager is invalid."));
+		return false;
+	}
+
+	if (not M_CaptureActor->SyncToPlayerCamera(
+		PlayerCameraManager->GetCameraCacheView(),
+		CaptureSettings.M_CameraSettings))
 	{
 		return false;
 	}
@@ -444,9 +468,7 @@ bool URTSSteamCaptureSubsystem::ReadRenderTargetPixels(TArray<FColor>& OutPixels
 		return false;
 	}
 
-	FReadSurfaceDataFlags ReadFlags(RCM_UNorm);
-	ReadFlags.SetLinearToGamma(false);
-	return RenderTargetResource->ReadPixels(OutPixels, ReadFlags);
+	return RenderTargetResource->ReadPixels(OutPixels);
 }
 
 FString URTSSteamCaptureSubsystem::BuildFramePath(const int32 FrameNumber) const
