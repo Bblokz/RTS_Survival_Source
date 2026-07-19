@@ -20,7 +20,10 @@ struct RTS_SURVIVAL_API FProceduralDestructibleSplineSpawnerSettings
 {
 	GENERATED_BODY()
 
-	/** Only mesh sockets whose names contain this text are eligible. Empty text accepts every socket. */
+	/**
+	 * Only mesh sockets whose names contain this text are eligible. Empty text accepts every socket.
+	 * Connections are made only between PDSS components using the same filter.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Sockets")
 	FString SocketFilter;
 
@@ -89,6 +92,8 @@ private:
 	UFUNCTION()
 	void HandleOwningActorDestroyed(AActor* DestroyedActor);
 
+	void BindOwningUnitDiesDelegate();
+	void UnbindOwningUnitDiesDelegate();
 	void CacheEligibleSockets();
 	void RegisterWithManager();
 	void UnregisterFromManager(bool bCollapseConnections);
@@ -98,7 +103,7 @@ private:
 	bool GetIsInitialized() const;
 	bool GetIsSocketAvailable(FName SocketName) const;
 	bool ReserveSocket(FName SocketName);
-	void ReleaseSocket(FName SocketName);
+	void ReleaseUncommittedSocket(FName SocketName);
 	bool TryGetSocketTransform(FName SocketName, FTransform& OutSocketTransform) const;
 	int32 GetMaximumOwnConnections() const;
 	float GetConnectionRange() const;
@@ -162,9 +167,11 @@ private:
 	UPROPERTY()
 	TArray<FName> M_EligibleSocketNames;
 
+	// Successful connections consume their endpoint sockets until this PDSS is reinitialized or destroyed.
 	UPROPERTY()
 	TSet<FName> M_UsedSocketNames;
 
+	FDelegateHandle M_OwningUnitDiesDelegateHandle;
 	int32 M_NumOwnConnections = 0;
 	bool bM_IsInitialized = false;
 	bool bM_IsRegistered = false;

@@ -1436,6 +1436,11 @@ void ABuildingExpansion::OnInitBuildingExpansion_SetupCollision(const bool bLetB
 void ABuildingExpansion::PostInit_SetupAbilities()
 {
 	URTSComponent* RTSComp = GetRTSComponent();
+	if (not IsValid(RTSComp))
+	{
+		RTSFunctionLibrary::ReportError("No valid RTS Comp in bxp!");
+		return;
+	}
 	if (RTSComp->GetUnitType() != EAllUnitType::UNType_BuildingExpansion)
 	{
 		RTSFunctionLibrary::ReportError(

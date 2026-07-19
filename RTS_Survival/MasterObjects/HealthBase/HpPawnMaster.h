@@ -14,8 +14,6 @@ class UFowComp;
 enum class ETargetPreference : uint8;
 class RTS_SURVIVAL_API UHealthComponent;
 class RTS_SURVIVAL_API URTSComponent;
-
-DECLARE_MULTICAST_DELEGATE(FOnUnitDies);
 /**
  * @note SET IN BP
  * @note ON HEALTH COMPONENT : SetMaxHealth, SetArmor
@@ -38,6 +36,7 @@ public:
 
 	// Delegate called when the unit dies.
 	FOnUnitDies OnUnitDies;
+	virtual FOnUnitDies* GetOnUnitDiesDelegate() override { return &OnUnitDies; }
 
 	// Contains Health and primitive armor values.
 	UFUNCTION(BlueprintCallable)

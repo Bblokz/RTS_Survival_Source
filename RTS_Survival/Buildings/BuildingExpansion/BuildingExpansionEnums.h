@@ -82,6 +82,8 @@ enum class EBuildingExpansionType : uint8
 	//
 	BXT_SolarSmall UMETA(DisplayName = "Small Solar Panel Expansion"),
 	BXT_SolarLarge UMETA(DisplayName = "Large Solar Panel Expansion"),
+
+	BTX_RusIndustrialRefinery UMETA(DisplayName = "Rus Industrial Refinery"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -122,6 +124,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerMarderStugFactory");
 	case EBuildingExpansionType::BTX_RusResearchCenter:
 		return FString("BTX_RusResearchCenter");
+	case EBuildingExpansionType::BTX_RusIndustrialRefinery:
+		return FString("BTX_RusIndustrialRefinery");
 	case EBuildingExpansionType::BXT_SolarSmall:
 		return FString("BXT_SolarSmall");
 	case EBuildingExpansionType::BXT_SolarLarge:
@@ -204,6 +208,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerMarderStugFactory: return TEXT("Marder Stug Factory");
 	case EBuildingExpansionType::BTX_RusAmmoStorage: return TEXT("Ammo Storage");
 	case EBuildingExpansionType::BTX_RusResearchCenter: return TEXT("Research Center");
+	case EBuildingExpansionType::BTX_RusIndustrialRefinery: return TEXT("Industrial Refinery");
 	case EBuildingExpansionType::BTX_RusPlatformFactory: return TEXT("Platform Factory");
 	case EBuildingExpansionType::BTX_RusCoolingTowers: return TEXT("Cooling Towers");
 	case EBuildingExpansionType::BTX_RusFuelStorage1: return TEXT("Fuel Storage 1");

@@ -6723,6 +6723,26 @@ void ACPPGameState::InitAllGameBxpData()
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusResearchCenter, BxpData);
 
 	// -----------------------------------------------------------------------
+	// ----------------------- RUS INDUSTRIAL REFINERY -----------------------
+	// -----------------------------------------------------------------------
+	BxpData.ConstructionTime = T1BxpBuildTime;
+	BxpData.VisionRadius = 2 * T1BxpVisionRadius;
+	BxpData.Cost = FUnitCost({
+		{
+			ERTSResourceType::Resource_Radixite,
+			RusResearchCenter_Radixite
+		},
+		{
+			ERTSResourceType::Resource_Metal,
+			RusResearchCenter_Metal
+		},
+	});
+	BxpData.Abilities = ArmedBxpAbilities;
+	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T2NomadicBuildingHealth * 2, 10);
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusIndustrialRefinery, BxpData);
+
+	// -----------------------------------------------------------------------
 	// ------------------------- RUS COOLING TOWERS -------------------------
 	// -----------------------------------------------------------------------
 	BxpData.ConstructionTime = T1BxpBuildTime;

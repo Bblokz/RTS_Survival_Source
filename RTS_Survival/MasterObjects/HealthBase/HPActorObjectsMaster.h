@@ -13,8 +13,6 @@ struct FCollapseFX;
 struct FDestroySpawnActorsParameters;
 class RTS_SURVIVAL_API UHealthComponent;
 class RTS_SURVIVAL_API URTSComponent;
-
-DECLARE_MULTICAST_DELEGATE(FOnUnitDies);
 /**
  * @note SET IN BP
  * @note ON HEALTH COMPONENT : SetMaxHealth, SetArmor
@@ -30,7 +28,9 @@ public:
 
 	// Delegate called when the unit dies.
 	FOnUnitDies OnUnitDies;
-UFUNCTION(BlueprintCallable , NotBlueprintable)
+	virtual FOnUnitDies* GetOnUnitDiesDelegate() override { return &OnUnitDies; }
+
+	UFUNCTION(BlueprintCallable , NotBlueprintable)
 	void TakeFatalDamage();
 
 	// Destroys the actor with death animation.

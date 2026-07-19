@@ -8,6 +8,7 @@
 #include "GameFramework/Actor.h"
 #include "ProceduralDestructibleSplineManager.h"
 #include "RTS_Survival/Environment/Splines/DestructibleSpline/DestructibleSplineActor.h"
+#include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace ProceduralDestructibleSplineSpawnerConstants
@@ -18,6 +19,41 @@ namespace ProceduralDestructibleSplineSpawnerConstants
 	constexpr double BezierHandleLengthDivisor = 3.0;
 	constexpr double PieceLengthSampleDivisor = 4.0;
 	constexpr double PieceWidthSampleMultiplier = 0.5;
+	constexpr double VerticalSocketOverrideStart = 0.5;
+	constexpr double VerticalSocketOverrideFull = 0.9;
+	constexpr double VerticalSocketApproachPieceMultiplier = 1.5;
+
+	struct FEndpointCurveParameters
+	{
+		FVector Direction = FVector::ZeroVector;
+		double HandleLength = 0.0;
+	};
+
+	FEndpointCurveParameters BuildEndpointCurveParameters(
+		const FVector& DirectPath,
+		const FVector& SocketPathDirection,
+		const double Curviness,
+		const double ConnectionHandleLength,
+		const double PieceSizeX)
+	{
+		const double Verticality = FMath::Abs(SocketPathDirection.Z);
+		const double VerticalOverride = FMath::GetMappedRangeValueClamped(
+			FVector2D(VerticalSocketOverrideStart, VerticalSocketOverrideFull),
+			FVector2D(0.0, 1.0),
+			Verticality);
+		const double AlignmentStrength = FMath::Max(Curviness, VerticalOverride);
+
+		FEndpointCurveParameters Parameters;
+		Parameters.Direction = FMath::Lerp(
+			DirectPath, SocketPathDirection, AlignmentStrength).GetSafeNormal();
+		Parameters.Direction = Parameters.Direction.IsNearlyZero() ? DirectPath : Parameters.Direction;
+
+		const double LocalApproachLength = FMath::Min(
+			ConnectionHandleLength, PieceSizeX * VerticalSocketApproachPieceMultiplier);
+		Parameters.HandleLength = FMath::Lerp(
+			ConnectionHandleLength, LocalApproachLength, VerticalOverride);
+		return Parameters;
+	}
 
 	FVector EvaluateBezier(
 		const FVector& Start,
@@ -80,6 +116,7 @@ void UProceduralDestructibleSplineSpawner::BeginPlay()
 		OwningActor->OnDestroyed.AddUniqueDynamic(
 			this, &UProceduralDestructibleSplineSpawner::HandleOwningActorDestroyed);
 	}
+	BindOwningUnitDiesDelegate();
 
 	if (bM_IsInitialized)
 	{
@@ -90,6 +127,7 @@ void UProceduralDestructibleSplineSpawner::BeginPlay()
 void UProceduralDestructibleSplineSpawner::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	bM_IsShuttingDown = true;
+	UnbindOwningUnitDiesDelegate();
 	if (AActor* OwningActor = GetOwner())
 	{
 		OwningActor->OnDestroyed.RemoveDynamic(
@@ -157,6 +195,48 @@ void UProceduralDestructibleSplineSpawner::OnOwningActorDies()
 	}
 	bM_IsShuttingDown = true;
 	UnregisterFromManager(true);
+}
+
+void UProceduralDestructibleSplineSpawner::BindOwningUnitDiesDelegate()
+{
+	AActor* OwningActor = GetOwner();
+	if (not IsValid(OwningActor) || M_OwningUnitDiesDelegateHandle.IsValid())
+	{
+		return;
+	}
+
+	IHealthBarOwner* HealthBarOwner = Cast<IHealthBarOwner>(OwningActor);
+	if (HealthBarOwner == nullptr)
+	{
+		return;
+	}
+
+	FOnUnitDies* UnitDiesDelegate = HealthBarOwner->GetOnUnitDiesDelegate();
+	if (UnitDiesDelegate == nullptr)
+	{
+		return;
+	}
+	M_OwningUnitDiesDelegateHandle = UnitDiesDelegate->AddUObject(
+		this, &UProceduralDestructibleSplineSpawner::OnOwningActorDies);
+}
+
+void UProceduralDestructibleSplineSpawner::UnbindOwningUnitDiesDelegate()
+{
+	if (not M_OwningUnitDiesDelegateHandle.IsValid())
+	{
+		return;
+	}
+
+	AActor* OwningActor = GetOwner();
+	IHealthBarOwner* HealthBarOwner = Cast<IHealthBarOwner>(OwningActor);
+	FOnUnitDies* UnitDiesDelegate = HealthBarOwner == nullptr
+		? nullptr
+		: HealthBarOwner->GetOnUnitDiesDelegate();
+	if (UnitDiesDelegate != nullptr)
+	{
+		UnitDiesDelegate->Remove(M_OwningUnitDiesDelegateHandle);
+	}
+	M_OwningUnitDiesDelegateHandle.Reset();
 }
 
 void UProceduralDestructibleSplineSpawner::CacheEligibleSockets()
@@ -276,7 +356,7 @@ bool UProceduralDestructibleSplineSpawner::ReserveSocket(const FName SocketName)
 	return true;
 }
 
-void UProceduralDestructibleSplineSpawner::ReleaseSocket(const FName SocketName)
+void UProceduralDestructibleSplineSpawner::ReleaseUncommittedSocket(const FName SocketName)
 {
 	M_UsedSocketNames.Remove(SocketName);
 }
@@ -450,18 +530,23 @@ void UProceduralDestructibleSplineSpawner::BuildConnectionCurve(
 
 	const FVector DirectPath = ConnectionDelta / ConnectionDistance;
 	const double Curviness = FMath::Clamp(static_cast<double>(Settings.Curviness), 0.0, 1.0);
-	FVector StartDirection = FMath::Lerp(
-		DirectPath, StartTransform.GetUnitAxis(EAxis::X), Curviness).GetSafeNormal();
-	FVector EndDirection = FMath::Lerp(
-		DirectPath, -EndTransform.GetUnitAxis(EAxis::X), Curviness).GetSafeNormal();
-	StartDirection = StartDirection.IsNearlyZero() ? DirectPath : StartDirection;
-	EndDirection = EndDirection.IsNearlyZero() ? DirectPath : EndDirection;
-
-	const double HandleLength = ConnectionDistance / BezierHandleLengthDivisor;
-	const FVector FirstControl = Start + StartDirection * HandleLength;
-	const FVector SecondControl = End - EndDirection * HandleLength;
 	const double PieceSizeX = FMath::Max(1.0, static_cast<double>(Settings.SplinePieceSize.X));
 	const double PieceSizeY = FMath::Max(1.0, static_cast<double>(Settings.SplinePieceSize.Y));
+	const double ConnectionHandleLength = ConnectionDistance / BezierHandleLengthDivisor;
+	const FEndpointCurveParameters StartParameters = BuildEndpointCurveParameters(
+		DirectPath,
+		StartTransform.GetUnitAxis(EAxis::X),
+		Curviness,
+		ConnectionHandleLength,
+		PieceSizeX);
+	const FEndpointCurveParameters EndParameters = BuildEndpointCurveParameters(
+		DirectPath,
+		-EndTransform.GetUnitAxis(EAxis::X),
+		Curviness,
+		ConnectionHandleLength,
+		PieceSizeX);
+	const FVector FirstControl = Start + StartParameters.Direction * StartParameters.HandleLength;
+	const FVector SecondControl = End - EndParameters.Direction * EndParameters.HandleLength;
 	const double SampleSpacing = FMath::Max(
 		MinimumSampleSpacing,
 		FMath::Min(PieceSizeX / PieceLengthSampleDivisor, PieceSizeY * PieceWidthSampleMultiplier));

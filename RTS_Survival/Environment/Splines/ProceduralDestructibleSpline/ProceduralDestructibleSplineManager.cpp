@@ -56,7 +56,9 @@ void UProceduralDestructibleSplineManager::UnregisterSpawner(
 	UProceduralDestructibleSplineSpawner* Spawner,
 	const bool bCollapseConnections)
 {
-	if (not IsValid(Spawner))
+	// EndPlay can mark the component as garbage before it asks the manager to unregister. The pointer
+	// is still safe for this synchronous teardown, and its weak identity must remain matchable.
+	if (not Spawner)
 	{
 		return;
 	}
@@ -65,7 +67,7 @@ void UProceduralDestructibleSplineManager::UnregisterSpawner(
 	M_RegisteredSpawners.RemoveAllSwap(
 		[Spawner](const TWeakObjectPtr<UProceduralDestructibleSplineSpawner>& RegisteredSpawner)
 		{
-			return RegisteredSpawner.Get() == Spawner;
+			return RegisteredSpawner.Get(true) == Spawner;
 		}, EAllowShrinking::No);
 	if (IsValid(Spawner))
 	{
@@ -226,7 +228,7 @@ bool UProceduralDestructibleSplineManager::TryCreateNextConnection(
 	}
 	if (not TargetSpawner->ReserveSocket(Candidate.TargetSocket))
 	{
-		SourceSpawner.ReleaseSocket(Candidate.SourceSocket);
+		SourceSpawner.ReleaseUncommittedSocket(Candidate.SourceSocket);
 		return false;
 	}
 
@@ -280,11 +282,11 @@ void UProceduralDestructibleSplineManager::ReleaseCandidateReservations(
 {
 	if (IsValid(SourceSpawner))
 	{
-		SourceSpawner->ReleaseSocket(Candidate.SourceSocket);
+		SourceSpawner->ReleaseUncommittedSocket(Candidate.SourceSocket);
 	}
 	if (IsValid(TargetSpawner))
 	{
-		TargetSpawner->ReleaseSocket(Candidate.TargetSocket);
+		TargetSpawner->ReleaseUncommittedSocket(Candidate.TargetSocket);
 	}
 }
 
@@ -298,7 +300,9 @@ bool UProceduralDestructibleSplineManager::FindBestCandidate(
 		if (not IsValid(TargetSpawner)
 			|| TargetSpawner == &SourceSpawner
 			|| not TargetSpawner->GetIsInitialized()
-			|| TargetSpawner->GetOwner() == SourceSpawner.GetOwner())
+			|| TargetSpawner->GetOwner() == SourceSpawner.GetOwner()
+			|| not TargetSpawner->Settings.SocketFilter.Equals(
+				SourceSpawner.Settings.SocketFilter, ESearchCase::IgnoreCase))
 		{
 			continue;
 		}
@@ -427,8 +431,8 @@ void UProceduralDestructibleSplineManager::RemoveConnectionsForSpawner(
 		const int32 ConnectionIndex = M_Connections.IndexOfByPredicate(
 			[&Spawner](const FProceduralDestructibleSplineConnection& Connection)
 			{
-				return Connection.SourceSpawner.Get() == &Spawner
-					|| Connection.TargetSpawner.Get() == &Spawner;
+				return Connection.SourceSpawner.Get(true) == &Spawner
+					|| Connection.TargetSpawner.Get(true) == &Spawner;
 			});
 		if (ConnectionIndex == INDEX_NONE)
 		{
@@ -450,14 +454,11 @@ void UProceduralDestructibleSplineManager::RemoveConnectionAt(
 	const FProceduralDestructibleSplineConnection Connection = M_Connections[ConnectionIndex];
 	M_Connections.RemoveAt(ConnectionIndex, 1, EAllowShrinking::No);
 
+	// A committed connection permanently consumes both endpoint sockets. Only the source's active
+	// own-connection count is released so it may still use a different, never-consumed socket.
 	if (UProceduralDestructibleSplineSpawner* SourceSpawner = Connection.SourceSpawner.Get())
 	{
-		SourceSpawner->ReleaseSocket(Connection.SourceSocket);
 		SourceSpawner->M_NumOwnConnections = FMath::Max(0, SourceSpawner->M_NumOwnConnections - 1);
-	}
-	if (UProceduralDestructibleSplineSpawner* TargetSpawner = Connection.TargetSpawner.Get())
-	{
-		TargetSpawner->ReleaseSocket(Connection.TargetSocket);
 	}
 
 	ADestructibleSplineActor* SplineActor = Connection.SplineActor.Get();

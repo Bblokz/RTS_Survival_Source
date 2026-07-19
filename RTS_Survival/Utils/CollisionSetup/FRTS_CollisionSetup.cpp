@@ -860,7 +860,7 @@ void FRTS_CollisionSetup::SetupBuildingExpansionCollision(
 	const ECollisionChannel TraceChannelAllowHits = OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY;
 	BxpMesh->SetCollisionResponseToChannel(TraceChannelAllowHits, ECR_Block);
 	BxpMesh->SetCanEverAffectNavigation(bAffectNavmesh);
-	BxpMesh->SetReceivesDecals(false);
+	BxpMesh->SetReceivesDecals(true);
 }
 
 void FRTS_CollisionSetup::ForceBuildingPlacementResponse_Internal(

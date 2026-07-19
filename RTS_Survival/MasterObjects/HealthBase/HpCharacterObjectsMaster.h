@@ -14,8 +14,6 @@ class RTS_SURVIVAL_API UHealthComponent;
 class RTS_SURVIVAL_API URTSComponent;
 class RTS_SURVIVAL_API USelectionComponent;
 
-DECLARE_MULTICAST_DELEGATE(FOnUnitDies);
-
 
 /**
  * @note SET IN BP
@@ -33,6 +31,7 @@ public:
 
 	// Delegate called when the unit dies.
 	FOnUnitDies OnUnitDies;
+	virtual FOnUnitDies* GetOnUnitDiesDelegate() override { return &OnUnitDies; }
 
 	
 	// Destroys the actor with death animation.
