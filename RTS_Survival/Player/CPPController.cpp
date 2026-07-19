@@ -937,7 +937,12 @@ void ACPPController::TakeUltraHDScreenShot()
 	}
 }
 
-bool ACPPController::SetSteamCaptureRecordingEnabled(const bool bEnable)
+bool ACPPController::SetSteamCaptureRecordingEnabled(
+	const bool bEnable,
+	const bool bDisableMaxDurationUntilFunctionCall,
+	const bool bOverrideResolution,
+	const int32 ResolutionX,
+	const int32 ResolutionY)
 {
 #if WITH_EDITOR
 	UWorld* World = GetWorld();
@@ -960,7 +965,12 @@ bool ACPPController::SetSteamCaptureRecordingEnabled(const bool bEnable)
 	}
 
 	return bEnable
-		       ? SteamCaptureSubsystem->StartCapture(this)
+		       ? SteamCaptureSubsystem->StartCapture(
+			       this,
+			       bDisableMaxDurationUntilFunctionCall,
+			       bOverrideResolution,
+			       ResolutionX,
+			       ResolutionY)
 		       : SteamCaptureSubsystem->StopCapture();
 #else
 	RTSFunctionLibrary::ReportError(TEXT("Steam capture is editor-only and unavailable in this build."));

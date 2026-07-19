@@ -29,7 +29,21 @@ public:
 	virtual TStatId GetStatId() const override;
 	virtual bool IsTickableInEditor() const override { return false; }
 
-	bool StartCapture(ACPPController* PlayerController);
+	/**
+	 * @brief Starts a capture session with either the configured limit or explicit-stop lifetime.
+	 * @param PlayerController Controller whose camera supplies the captured view.
+	 * @param bDisableMaxDurationUntilFunctionCall True keeps recording until StopCapture is called.
+	 * @param bOverrideResolution True uses the supplied resolution instead of project settings.
+	 * @param ResolutionX Horizontal resolution used when overriding project settings.
+	 * @param ResolutionY Vertical resolution used when overriding project settings.
+	 * @return True when recording started or an existing session was already recording.
+	 */
+	bool StartCapture(
+		ACPPController* PlayerController,
+		bool bDisableMaxDurationUntilFunctionCall,
+		bool bOverrideResolution,
+		int32 ResolutionX,
+		int32 ResolutionY);
 	bool StopCapture();
 	bool GetIsRecording() const { return bM_IsRecording; }
 
@@ -55,13 +69,16 @@ private:
 	int32 M_DroppedFrameCount = 0;
 	bool bM_IsRecording = false;
 	bool bM_IsStopping = false;
+	bool bM_DisableMaxDurationUntilFunctionCall = false;
+	bool bM_OverrideResolution = false;
+	FIntPoint M_OutputResolution = FIntPoint::ZeroValue;
 	TArray<FColor> M_LastCapturedFramePixels;
 
 	const URTSSteamCaptureSettings* GetCaptureSettings() const;
 	bool GetCanStartCapture(ACPPController* PlayerController, const URTSSteamCaptureSettings* CaptureSettings) const;
 	bool GetIsPieWorld() const;
 	bool StartCapture_CreateSessionDirectory(const URTSSteamCaptureSettings& CaptureSettings);
-	bool StartCapture_CreateRenderTarget(const URTSSteamCaptureSettings& CaptureSettings);
+	bool StartCapture_CreateRenderTarget();
 	bool StartCapture_SpawnCaptureActor();
 	void AbortStartCapture();
 	void ResetSessionState();

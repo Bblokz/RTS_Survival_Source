@@ -8,7 +8,9 @@
 
 
 enum class EHealthLevel : uint8;
-// This class does not need to be modified.
+DECLARE_MULTICAST_DELEGATE(FOnUnitDies);
+
+/** @brief Marks actors whose health state can be driven through the shared health-owner contract. */
 UINTERFACE(Blueprintable)
 class UHealthBarOwner : public UInterface
 {
@@ -16,7 +18,7 @@ class UHealthBarOwner : public UInterface
 };
 
 /**
- * 
+ * @brief Receives health-state changes and optionally exposes a native unit-death notification.
  */
 class RTS_SURVIVAL_API IHealthBarOwner
 {
@@ -24,6 +26,12 @@ class RTS_SURVIVAL_API IHealthBarOwner
 
 	// Add interface functions to this class. This is the class that will be inherited to implement this interface.
 public:
+	/** Returns the native death event when this health owner provides one. */
+	virtual FOnUnitDies* GetOnUnitDiesDelegate()
+	{
+		return nullptr;
+	}
+
 	/**
 	 * Called by implemented health component.
 	 * @param PercentageLeft What percentage of health is left.

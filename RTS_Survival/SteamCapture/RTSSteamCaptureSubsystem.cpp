@@ -112,7 +112,12 @@ TStatId URTSSteamCaptureSubsystem::GetStatId() const
 	RETURN_QUICK_DECLARE_CYCLE_STAT(URTSSteamCaptureSubsystem, STATGROUP_Tickables);
 }
 
-bool URTSSteamCaptureSubsystem::StartCapture(ACPPController* PlayerController)
+bool URTSSteamCaptureSubsystem::StartCapture(
+	ACPPController* PlayerController,
+	const bool bDisableMaxDurationUntilFunctionCall,
+	const bool bOverrideResolution,
+	const int32 ResolutionX,
+	const int32 ResolutionY)
 {
 	if (bM_IsRecording)
 	{
@@ -127,13 +132,21 @@ bool URTSSteamCaptureSubsystem::StartCapture(ACPPController* PlayerController)
 
 	ResetSessionState();
 	M_PlayerController = PlayerController;
+	bM_DisableMaxDurationUntilFunctionCall = bDisableMaxDurationUntilFunctionCall;
+	bM_OverrideResolution = bOverrideResolution;
+	M_OutputResolution.X = FMath::Max(
+		1,
+		bOverrideResolution ? ResolutionX : CaptureSettings->M_OutputResolutionX);
+	M_OutputResolution.Y = FMath::Max(
+		1,
+		bOverrideResolution ? ResolutionY : CaptureSettings->M_OutputResolutionY);
 	M_SessionGuid = FGuid::NewGuid();
 	M_SessionStartDateTime = FDateTime::Now();
 	M_SessionName = BuildSessionName(*CaptureSettings);
 	M_FrameWriter.ResetFailedWriteCount();
 
 	if (not StartCapture_CreateSessionDirectory(*CaptureSettings)
-		|| not StartCapture_CreateRenderTarget(*CaptureSettings)
+		|| not StartCapture_CreateRenderTarget()
 		|| not StartCapture_SpawnCaptureActor()
 		|| not M_CaptureActor->InitCaptureCamera(M_RenderTarget))
 	{
@@ -230,12 +243,8 @@ bool URTSSteamCaptureSubsystem::StartCapture_CreateSessionDirectory(
 	return bCreated;
 }
 
-bool URTSSteamCaptureSubsystem::StartCapture_CreateRenderTarget(
-	const URTSSteamCaptureSettings& CaptureSettings)
+bool URTSSteamCaptureSubsystem::StartCapture_CreateRenderTarget()
 {
-	const int32 OutputResolutionX = FMath::Max(1, CaptureSettings.M_OutputResolutionX);
-	const int32 OutputResolutionY = FMath::Max(1, CaptureSettings.M_OutputResolutionY);
-
 	const FName RenderTargetName = MakeUniqueObjectName(
 		this,
 		UTextureRenderTarget2D::StaticClass(),
@@ -248,7 +257,7 @@ bool URTSSteamCaptureSubsystem::StartCapture_CreateRenderTarget(
 
 	M_RenderTarget->ClearColor = FLinearColor::Black;
 	M_RenderTarget->bAutoGenerateMips = false;
-	M_RenderTarget->InitCustomFormat(OutputResolutionX, OutputResolutionY, PF_B8G8R8A8, false);
+	M_RenderTarget->InitCustomFormat(M_OutputResolution.X, M_OutputResolution.Y, PF_B8G8R8A8, false);
 	M_RenderTarget->UpdateResourceImmediate(true);
 	return true;
 }
@@ -305,6 +314,9 @@ void URTSSteamCaptureSubsystem::ResetSessionState()
 	M_LastCapturedFramePixels.Empty();
 	bM_IsRecording = false;
 	bM_IsStopping = false;
+	bM_DisableMaxDurationUntilFunctionCall = false;
+	bM_OverrideResolution = false;
+	M_OutputResolution = FIntPoint::ZeroValue;
 }
 
 void URTSSteamCaptureSubsystem::DestroyCaptureActorIfNeeded()
@@ -324,7 +336,8 @@ void URTSSteamCaptureSubsystem::TickCapture(
 {
 	const float MaxDurationSeconds = FMath::Max(0.1f, CaptureSettings.M_MaxDurationSeconds);
 	const float NewRecordingElapsedSeconds = M_RecordingElapsedSeconds + DeltaTime;
-	const bool bReachedMaxDuration = CaptureSettings.bM_AutoStopAtMaxDuration
+	const bool bReachedMaxDuration = not bM_DisableMaxDurationUntilFunctionCall
+		&& CaptureSettings.bM_AutoStopAtMaxDuration
 		&& NewRecordingElapsedSeconds >= MaxDurationSeconds;
 	M_RecordingElapsedSeconds = bReachedMaxDuration
 		                            ? MaxDurationSeconds
@@ -411,8 +424,8 @@ bool URTSSteamCaptureSubsystem::QueueFrameWrite(
 	++M_CapturedFrameCount;
 	M_FrameWriter.WritePngFrameAsync(
 		BuildFramePath(M_CapturedFrameCount),
-		FMath::Max(1, CaptureSettings.M_OutputResolutionX),
-		FMath::Max(1, CaptureSettings.M_OutputResolutionY),
+		M_OutputResolution.X,
+		M_OutputResolution.Y,
 		MoveTemp(FramePixels));
 	return true;
 }
@@ -475,6 +488,7 @@ void URTSSteamCaptureSubsystem::StopCaptureInternal(
 	const URTSSteamCaptureSettings* CaptureSettings = GetCaptureSettings();
 	if (IsValid(CaptureSettings)
 		&& StopReason == RTSSteamCaptureSubsystemConstants::ManualStopReason
+		&& not bM_DisableMaxDurationUntilFunctionCall
 		&& CaptureSettings->bM_AutoStopAtMaxDuration)
 	{
 		const float MaxDurationSeconds = FMath::Max(0.1f, CaptureSettings->M_MaxDurationSeconds);
@@ -537,6 +551,12 @@ void URTSSteamCaptureSubsystem::WriteMetadata(
 	MetadataJson->SetNumberField(TEXT("failedFrameWriteCount"), M_FrameWriter.GetFailedWriteCount());
 	MetadataJson->SetNumberField(TEXT("pendingFrameWriteCount"), M_FrameWriter.GetPendingWriteCount());
 	MetadataJson->SetNumberField(TEXT("recordedSeconds"), M_RecordingElapsedSeconds);
+	MetadataJson->SetBoolField(
+		TEXT("disabledMaxDurationUntilFunctionCall"),
+		bM_DisableMaxDurationUntilFunctionCall);
+	MetadataJson->SetBoolField(TEXT("overrodeResolution"), bM_OverrideResolution);
+	MetadataJson->SetNumberField(TEXT("outputResolutionX"), M_OutputResolution.X);
+	MetadataJson->SetNumberField(TEXT("outputResolutionY"), M_OutputResolution.Y);
 	MetadataJson->SetStringField(TEXT("sessionDirectory"), M_SessionDirectory);
 	MetadataJson->SetStringField(TEXT("framesDirectory"), M_FramesDirectory);
 	if (IsValid(CaptureSettings))

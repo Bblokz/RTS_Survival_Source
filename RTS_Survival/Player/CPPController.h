@@ -350,8 +350,22 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void TakeUltraHDScreenShot();
 
+	/**
+	 * @brief Toggles Steam capture while optionally requiring a later explicit call to end the session.
+	 * @param bEnable True starts recording; false manually stops the active recording.
+	 * @param bDisableMaxDurationUntilFunctionCall True ignores the configured maximum until called with bEnable false.
+	 * @param bOverrideResolution True uses ResolutionX and ResolutionY instead of the configured resolution.
+	 * @param ResolutionX Horizontal capture resolution used when bOverrideResolution is true.
+	 * @param ResolutionY Vertical capture resolution used when bOverrideResolution is true.
+	 * @return True when the requested recorder state was applied or was already active.
+	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Steam Capture")
-	bool SetSteamCaptureRecordingEnabled(const bool bEnable);
+	bool SetSteamCaptureRecordingEnabled(
+		const bool bEnable,
+		const bool bDisableMaxDurationUntilFunctionCall = false,
+		const bool bOverrideResolution = false,
+		const int32 ResolutionX = 1,
+		const int32 ResolutionY = 1);
 
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
