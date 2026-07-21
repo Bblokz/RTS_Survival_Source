@@ -11,6 +11,7 @@
 
 class UTrackPathFollowingComponent;
 struct FAIRequestID;
+struct FNavLocation;
 struct FPathFollowingResult;
 // Forward Declaration
 class RTS_SURVIVAL_API ATankMaster;
@@ -126,54 +127,73 @@ private:
 	void OnFindPath_ClearOverlapsForNewMovement() const;
 
 	/**
-	 * @brief Runs the move request and retries once recovery teleports are applied.
+	 * @brief Ensures physics drift cannot leave a tank without a filter-valid pathfinding start.
 	 * @param Location The desired world-space destination for this command.
 	 * @param GoalAcceptanceRadius The acceptance radius used for this move request.
-	 * @return True when any attempt starts path following, false when all attempts fail.
+	 * @return True when the validated move request starts path following.
 	 */
 	bool TryMoveToLocationWithOffNavRecovery(const FVector& Location, const float GoalAcceptanceRadius);
 
 	/**
-	 * @brief Attempts to recover from an off-nav start by projecting and teleporting the controlled pawn.
-	 * @param Location Current move destination used to key retry exhaustion for this command.
-	 * @return True when recovery changed actor position and a retry should be attempted.
+	 * @brief Recovers an invalid start before MoveTo can emit a synchronous invalid completion.
+	 * @param MoveRequest Request whose agent, nav data and filter define a valid start.
+	 * @return True when the existing or recovered start can be used for pathfinding.
 	 */
-	bool TryRecoverFromOffNavStartForMoveLocation(const FVector& Location);
+	bool EnsureMoveStartIsNavigable(const FAIMoveRequest& MoveRequest);
 
 	/**
-	 * @brief Finds the nav-projected location used by off-nav recovery checks.
-	 * @param OutProjectedLocation Receives the nearest projected nav location when available.
-	 * @return True when nav projection succeeds for the current pawn location.
+	 * @brief Mirrors the normal Recast start projection with the move request's exact filter.
+	 * @param PathFindingQuery Query containing the active agent navigation context.
+	 * @return True when normal pathfinding can resolve a permitted start polygon.
 	 */
-	bool TryProjectPawnLocationToNavigation(FVector& OutProjectedLocation) const;
+	bool GetIsPathFindingStartNavigable(const FPathFindingQuery& PathFindingQuery) const;
 
 	/**
-	 * @brief Validates whether a nav projection is far enough to confidently classify the pawn as off-nav.
-	 * @param CurrentLocation Current pawn world location.
-	 * @param ProjectedLocation Projected navmesh location derived from CurrentLocation.
-	 * @return True when projection delta exceeds strict off-nav thresholds.
+	 * @brief Moves the pawn only after a bounded, filter-valid start is proven to produce a path.
+	 * @param PathFindingQuery Original move query whose start could not be resolved normally.
+	 * @return True when the pawn was safely repositioned for the original move request.
 	 */
-	bool GetIsOffNavProjectionDeltaSignificant(const FVector& CurrentLocation, const FVector& ProjectedLocation) const;
+	bool TryRecoverMoveStartToFilterValidLocation(const FPathFindingQuery& PathFindingQuery);
 
 	/**
-	 * @brief Converts a move destination into a stable key so retry exhaustion is scoped per target bucket.
-	 * @param Location Destination to quantise into a retry key.
-	 * @return Grid key used by off-nav retry tracking.
+	 * @brief Finds the nearest polygon permitted by the exact tank filter within the unit-sized recovery area.
+	 * @param PathFindingQuery Query supplying the start, nav data and filter.
+	 * @param OutRecoveryNavigationLocation Receives the permitted recovery polygon and location.
+	 * @return True when the active filter accepts the projected polygon.
 	 */
-	FIntVector BuildMoveLocationRetryKey(const FVector& Location) const;
+	bool TryProjectFilterValidRecoveryLocation(
+		const FPathFindingQuery& PathFindingQuery,
+		FNavLocation& OutRecoveryNavigationLocation) const;
 
 	/**
-	 * @brief Checks and increments the retry budget for a move target bucket.
-	 * @param Location Destination whose retry budget should be consumed.
-	 * @return True when another retry is allowed, false when the bucket is exhausted.
+	 * @brief Prevents recovery from moving a tank across an excluded region wider than the unit itself.
+	 * @param PathFindingStartLocation Original nav-agent start location.
+	 * @param RecoveryNavigationLocation Filter-valid projected location.
+	 * @return True when the projection displacement is nonzero and within the cached formation radius.
 	 */
-	bool TryConsumeOffNavRetryBudgetForLocation(const FVector& Location);
+	bool GetIsRecoveryProjectionWithinBounds(
+		const FVector& PathFindingStartLocation,
+		const FVector& RecoveryNavigationLocation) const;
 
 	/**
-	 * @brief Clears retry exhaustion state for a destination once movement succeeds.
-	 * @param Location Destination whose retry tracking should be reset.
+	 * @brief Avoids mutating physics unless the projected start can serve the original request.
+	 * @param PathFindingQuery Original move query to validate from the recovery point.
+	 * @param RecoveryNavigationLocation Filter-valid location used as the validation start.
+	 * @return True when regular or partial pathfinding succeeds from the recovery point.
 	 */
-	void ResetOffNavRetryBudgetForLocation(const FVector& Location);
+	bool GetDoesRecoveryPointProducePath(
+		const FPathFindingQuery& PathFindingQuery,
+		const FNavLocation& RecoveryNavigationLocation) const;
+
+	/**
+	 * @brief Preserves the actor/nav-agent offset while resetting inertia that caused the invalid start.
+	 * @param PathFindingQuery Query containing the original nav-agent start and exact navigation context.
+	 * @param RecoveryNavigationLocation Filter-valid nav-agent destination.
+	 * @return True when the corrected transform remains valid for the active filter.
+	 */
+	bool TryTeleportPawnToRecoveryLocation(
+		const FPathFindingQuery& PathFindingQuery,
+		const FVector& RecoveryNavigationLocation);
 	
 	UPROPERTY()
 	TObjectPtr<UTrackPathFollowingComponent> m_VehiclePathComp;
@@ -181,18 +201,12 @@ private:
 	bool bM_HasQueuedMovementCompletionAbility = false;
 	EAbilityID M_QueuedMovementCompletionAbility = EAbilityID::IdNoAbility;
 
-	// Tracks how many off-nav recovery teleports were consumed per quantised destination.
-	TMap<FIntVector, int32> M_OffNavRetriesPerLocation;
+	// Bounds recovery to the unit's stable formation footprint so barriers cannot be crossed by correction.
+	float M_FormationUnitInnerRadius = 0.0f;
 
 	void DebugFoundPathCost(const FNavPathSharedPtr& OutPath) const;
 	void DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath, const FAIMoveRequest& MoveRequest) const;
 	void DebugPathFollowingResult(const FPathFollowingResult& Result) const;
 	void DebugPathFollowingResult_Draw(const FString& DebugText, const FColor& DebugColor, const ATankMaster* ValidTankMaster) const;
-
-	inline static constexpr int32 M_MaxOffNavRecoveryRetriesPerLocation = 2;
-	inline static constexpr float M_OffNavRetryGridSizeUnits = 200.f;
-	inline static constexpr float M_OffNavProjectionDelta2DThresholdUnits = 160.f;
-	inline static constexpr float M_OffNavProjectionDeltaZThresholdUnits = 120.f;
-	inline static FVector M_OffNavProjectionExtent = FVector(300.f, 300.f, 300.f);
 
 };

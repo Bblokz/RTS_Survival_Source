@@ -112,11 +112,6 @@ void AAITankMaster::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowing
 {
 	Super::OnMoveCompleted(RequestID, Result);
 
-	if (Result.Code == EPathFollowingResult::Success)
-	{
-		ResetOffNavRetryBudgetForLocation(m_MoveToLocation);
-	}
-
 	if constexpr (DeveloperSettings::Debugging::GPathFindingCosts_Compile_DebugSymbols)
 	{
 		DebugPathFollowingResult(Result);
@@ -199,8 +194,9 @@ void AAITankMaster::OnPosses_ConfigureBlockingDectionDistanceWithRTSRadius(ATank
 	{
 		return;
 	}
-	const float RTSRadius = RTSComp->GetFormationUnitInnerRadius();
-	vehiclePathComp->UpdateBlockDetectionDistanceFromRTSRadius(RTSRadius);
+	const float FormationUnitInnerRadius = RTSComp->GetFormationUnitInnerRadius();
+	M_FormationUnitInnerRadius = FormationUnitInnerRadius;
+	vehiclePathComp->UpdateBlockDetectionDistanceFromRTSRadius(FormationUnitInnerRadius);
 }
 
 void AAITankMaster::OnFindPath_ClearOverlapsForNewMovement() const
@@ -219,121 +215,161 @@ bool AAITankMaster::TryMoveToLocationWithOffNavRecovery(const FVector& Location,
 	MoveRequest.SetAcceptanceRadius(GoalAcceptanceRadius);
 	FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(MoveRequest);
 	MoveRequest.SetNavigationFilter(DefaultNavigationFilterClass);
-	
+
+	if (not EnsureMoveStartIsNavigable(MoveRequest))
+	{
+		return false;
+	}
 
 	const FPathFollowingRequestResult MoveResult = MoveTo(MoveRequest, nullptr);
 	if (MoveResult.Code == EPathFollowingRequestResult::RequestSuccessful ||
 		MoveResult.Code == EPathFollowingRequestResult::AlreadyAtGoal)
 	{
-		ResetOffNavRetryBudgetForLocation(Location);
-		return true;
-	}
-
-	if (not TryRecoverFromOffNavStartForMoveLocation(Location))
-	{
-		return false;
-	}
-
-	const FPathFollowingRequestResult RetryResult = MoveTo(MoveRequest, nullptr);
-	if (RetryResult.Code == EPathFollowingRequestResult::RequestSuccessful ||
-		RetryResult.Code == EPathFollowingRequestResult::AlreadyAtGoal)
-	{
-		ResetOffNavRetryBudgetForLocation(Location);
 		return true;
 	}
 
 	return false;
 }
 
-bool AAITankMaster::TryRecoverFromOffNavStartForMoveLocation(const FVector& Location)
+bool AAITankMaster::EnsureMoveStartIsNavigable(const FAIMoveRequest& MoveRequest)
 {
-	APawn* ControlledPawnLocal = GetPawn();
-	if (not IsValid(ControlledPawnLocal))
-	{
-		RTSFunctionLibrary::ReportError("AAITankMaster::TryRecoverFromOffNavStartForMoveLocation invalid pawn");
-		return false;
-	}
-
-	FVector ProjectedLocation = FVector::ZeroVector;
-	if (not TryProjectPawnLocationToNavigation(ProjectedLocation))
+	FPathFindingQuery PathFindingQuery;
+	if (not BuildPathfindingQuery(MoveRequest, PathFindingQuery))
 	{
 		return false;
 	}
 
-	if (not TryConsumeOffNavRetryBudgetForLocation(Location))
+	if (GetIsPathFindingStartNavigable(PathFindingQuery))
 	{
-		return false;
+		return true;
 	}
 
-	ControlledPawnLocal->SetActorLocation(ProjectedLocation, false, nullptr, ETeleportType::TeleportPhysics);
-	return true;
+	return TryRecoverMoveStartToFilterValidLocation(PathFindingQuery);
 }
 
-bool AAITankMaster::TryProjectPawnLocationToNavigation(FVector& OutProjectedLocation) const
+bool AAITankMaster::GetIsPathFindingStartNavigable(const FPathFindingQuery& PathFindingQuery) const
 {
-	const APawn* ControlledPawnLocal = GetPawn();
-	if (not IsValid(ControlledPawnLocal))
+	const ANavigationData* NavigationData = PathFindingQuery.NavData.Get();
+	if (NavigationData == nullptr || not PathFindingQuery.QueryFilter.IsValid())
 	{
 		return false;
 	}
 
+	FNavLocation ProjectedStartLocation;
+	return NavigationData->ProjectPoint(
+		PathFindingQuery.StartLocation,
+		ProjectedStartLocation,
+		NavigationData->GetDefaultQueryExtent(),
+		PathFindingQuery.QueryFilter,
+		this);
+}
+
+bool AAITankMaster::TryRecoverMoveStartToFilterValidLocation(const FPathFindingQuery& PathFindingQuery)
+{
+	FNavLocation RecoveryNavigationLocation;
+	if (not TryProjectFilterValidRecoveryLocation(PathFindingQuery, RecoveryNavigationLocation))
+	{
+		return false;
+	}
+
+	if (not GetIsRecoveryProjectionWithinBounds(PathFindingQuery.StartLocation, RecoveryNavigationLocation.Location))
+	{
+		return false;
+	}
+
+	if (not GetDoesRecoveryPointProducePath(PathFindingQuery, RecoveryNavigationLocation))
+	{
+		return false;
+	}
+
+	return TryTeleportPawnToRecoveryLocation(PathFindingQuery, RecoveryNavigationLocation.Location);
+}
+
+bool AAITankMaster::TryProjectFilterValidRecoveryLocation(
+	const FPathFindingQuery& PathFindingQuery,
+	FNavLocation& OutRecoveryNavigationLocation) const
+{
+	const ANavigationData* NavigationData = PathFindingQuery.NavData.Get();
+	if (NavigationData == nullptr || not PathFindingQuery.QueryFilter.IsValid())
+	{
+		return false;
+	}
+
+	if (M_FormationUnitInnerRadius <= 0.0f)
+	{
+		RTSFunctionLibrary::ReportError("AAITankMaster::TryProjectFilterValidRecoveryLocation invalid formation radius");
+		return false;
+	}
+
+	const FVector DefaultQueryExtent = NavigationData->GetDefaultQueryExtent();
+	const FVector RecoveryProjectionExtent(
+		FMath::Max(DefaultQueryExtent.X, M_FormationUnitInnerRadius),
+		FMath::Max(DefaultQueryExtent.Y, M_FormationUnitInnerRadius),
+		DefaultQueryExtent.Z);
+
+	const bool bProjected = NavigationData->ProjectPoint(
+		PathFindingQuery.StartLocation,
+		OutRecoveryNavigationLocation,
+		RecoveryProjectionExtent,
+		PathFindingQuery.QueryFilter,
+		this);
+	return bProjected && OutRecoveryNavigationLocation.NodeRef != INVALID_NAVNODEREF;
+}
+
+bool AAITankMaster::GetIsRecoveryProjectionWithinBounds(
+	const FVector& PathFindingStartLocation,
+	const FVector& RecoveryNavigationLocation) const
+{
+	const FVector RecoveryDelta = RecoveryNavigationLocation - PathFindingStartLocation;
+	const float RecoveryDistance2D = RecoveryDelta.Size2D();
+	const float RecoveryDistanceZ = FMath::Abs(RecoveryDelta.Z);
+	return RecoveryDistance2D > UE_KINDA_SMALL_NUMBER &&
+		RecoveryDistance2D <= M_FormationUnitInnerRadius &&
+		RecoveryDistanceZ <= M_FormationUnitInnerRadius;
+}
+
+bool AAITankMaster::GetDoesRecoveryPointProducePath(
+	const FPathFindingQuery& PathFindingQuery,
+	const FNavLocation& RecoveryNavigationLocation) const
+{
 	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	if (NavigationSystem == nullptr)
 	{
 		return false;
 	}
 
-	FNavLocation ProjectedNavLocation;
-	const bool bProjected = NavigationSystem->ProjectPointToNavigation(
-		ControlledPawnLocal->GetActorLocation(),
-		ProjectedNavLocation,
-		M_OffNavProjectionExtent);
+	FPathFindingQuery RecoveryPathFindingQuery = PathFindingQuery;
+	RecoveryPathFindingQuery.StartLocation = RecoveryNavigationLocation.Location;
+	const FPathFindingResult RecoveryPathResult = NavigationSystem->FindPathSync(RecoveryPathFindingQuery);
+	return RecoveryPathResult.IsSuccessful() && RecoveryPathResult.Path.IsValid();
+}
 
-	if (not bProjected)
+bool AAITankMaster::TryTeleportPawnToRecoveryLocation(
+	const FPathFindingQuery& PathFindingQuery,
+	const FVector& RecoveryNavigationLocation)
+{
+	APawn* ControlledPawnLocal = GetPawn();
+	if (not IsValid(ControlledPawnLocal))
+	{
+		RTSFunctionLibrary::ReportError("AAITankMaster::TryTeleportPawnToRecoveryLocation invalid pawn");
+		return false;
+	}
+
+	const FVector RecoveryDelta = RecoveryNavigationLocation - PathFindingQuery.StartLocation;
+	const FVector RecoveryActorLocation = ControlledPawnLocal->GetActorLocation() + RecoveryDelta;
+	const bool bMovedToRecoveryLocation = ControlledPawnLocal->SetActorLocation(
+		RecoveryActorLocation,
+		false,
+		nullptr,
+		ETeleportType::ResetPhysics);
+	if (not bMovedToRecoveryLocation)
 	{
 		return false;
 	}
 
-	OutProjectedLocation = ProjectedNavLocation.Location;
-	return true;
-}
-
-bool AAITankMaster::GetIsOffNavProjectionDeltaSignificant(
-	const FVector& CurrentLocation,
-	const FVector& ProjectedLocation) const
-{
-	const FVector DeltaLocation = ProjectedLocation - CurrentLocation;
-	const float DeltaDistance2D = FVector2D(DeltaLocation.X, DeltaLocation.Y).Size();
-	const float DeltaDistanceZ = FMath::Abs(DeltaLocation.Z);
-	return DeltaDistance2D >= M_OffNavProjectionDelta2DThresholdUnits ||
-		DeltaDistanceZ >= M_OffNavProjectionDeltaZThresholdUnits;
-}
-
-FIntVector AAITankMaster::BuildMoveLocationRetryKey(const FVector& Location) const
-{
-	return FIntVector(
-		FMath::RoundToInt(Location.X / M_OffNavRetryGridSizeUnits),
-		FMath::RoundToInt(Location.Y / M_OffNavRetryGridSizeUnits),
-		FMath::RoundToInt(Location.Z / M_OffNavRetryGridSizeUnits));
-}
-
-bool AAITankMaster::TryConsumeOffNavRetryBudgetForLocation(const FVector& Location)
-{
-	const FIntVector RetryKey = BuildMoveLocationRetryKey(Location);
-	int32& RetryCount = M_OffNavRetriesPerLocation.FindOrAdd(RetryKey);
-	if (RetryCount >= M_MaxOffNavRecoveryRetriesPerLocation)
-	{
-		return false;
-	}
-
-	RetryCount++;
-	return true;
-}
-
-void AAITankMaster::ResetOffNavRetryBudgetForLocation(const FVector& Location)
-{
-	const FIntVector RetryKey = BuildMoveLocationRetryKey(Location);
-	M_OffNavRetriesPerLocation.Remove(RetryKey);
+	FPathFindingQuery VerificationQuery = PathFindingQuery;
+	VerificationQuery.StartLocation = GetNavAgentLocation();
+	return GetIsPathFindingStartNavigable(VerificationQuery);
 }
 
 void AAITankMaster::DebugFoundPathCost(const FNavPathSharedPtr& OutPath) const
