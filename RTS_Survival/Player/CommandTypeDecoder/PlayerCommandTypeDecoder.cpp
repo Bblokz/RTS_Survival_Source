@@ -439,7 +439,18 @@ bool UPlayerCommandTypeDecoder::Decode_CargoActor(AActor* ClickedActor, FTargetU
                                                   ECommandType& OutType)
 {
 	const UCargo* CargoComp = ClickedActor->FindComponentByClass<UCargo>();
-	if (not IsValid(CargoComp) || not CargoComp->GetIsEnabledAndVacant())
+	if (not IsValid(CargoComp) )
+	{
+		return false;
+	}
+	ASquadController* EnemySquad = nullptr;
+	if (CargoComp->IsOccupiedByEnemy(EnemySquad))
+	{
+		OutTarget.TargetActor = EnemySquad;
+		OutType = ECommandType::EnemyActor;
+		return true;
+	}
+	if (not CargoComp->GetIsEnabledAndVacant())
 	{
 		return false;
 	}

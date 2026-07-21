@@ -43,6 +43,11 @@ struct FCargoVacancyState
 	{
 		return M_CurrentSquads < M_MaxSquadsSupported;
 	}
+	
+	bool IsEmpty() const
+	{
+		return M_CurrentSquads == 0;
+	}
 
 	/** Register a squad as inside and refresh the derived count. */
 	void RegisterSquad(ASquadController* Squad)
@@ -177,6 +182,8 @@ public:
 	void SetIsEnabled(const bool bEnable);
 
 	bool GetIsEnabledAndVacant() const;
+	bool GetIsEmpty()const;
+	bool IsOccupiedByEnemy(ASquadController*& OutValidEnemySquad)const;
 
 	int32 GetMaxSquadsSupported() const { return M_VacancyState.M_MaxSquadsSupported; }
 	int32 GetCurrentSquads() const { return M_VacancyState.M_CurrentSquads; }

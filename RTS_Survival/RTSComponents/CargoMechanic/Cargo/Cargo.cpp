@@ -195,6 +195,34 @@ bool UCargo::GetIsEnabledAndVacant() const
 	return bM_IsEnabled && bIsVacant;
 }
 
+bool UCargo::GetIsEmpty() const
+{
+	return M_VacancyState.IsEmpty();
+}
+
+bool UCargo::IsOccupiedByEnemy(ASquadController*& OutValidEnemySquad) const
+{
+	OutValidEnemySquad = nullptr;
+	if (GetIsEmpty())
+	{
+		return false;
+	}
+	for (auto EachSquad : M_VacancyState.M_InsideSquads)
+	{
+		if (not IsValid(EachSquad))
+		{
+			continue;
+		}
+		URTSComponent* RTSComp = EachSquad->GetRTSComponent();
+		if (not IsValid(RTSComp))
+		{
+			continue;
+		}
+		return RTSComp->GetOwningPlayer() == 2;
+	}
+	return false;
+}
+
 UPrimitiveComponent* UCargo::GetCargoMesh() const
 {
 	if (M_CargoMesh.IsValid())
