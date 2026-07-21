@@ -2,15 +2,23 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/SteamCapture/RTSSteamCaptureFrameWriter.h"
+#include "RTS_Survival/SteamCapture/RTSSteamCaptureViewport.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "RTSSteamCaptureSubsystem.generated.h"
 
 class ACPPController;
 class URTSSteamCaptureSettings;
 
+enum class ERTSSteamCapturePendingStop : uint8
+{
+	None,
+	Manual,
+	MaxDuration
+};
+
 /**
- * @brief PIE-only world subsystem that records the rendered player viewport while the designer plays.
- * Gameplay only toggles recording; this subsystem owns frame timing, resizing, and capture package output.
+ * @brief PIE-only subsystem that renders the player's game view into a resolution-independent viewport.
+ * Gameplay only toggles recording; this subsystem owns view-state sharing, frame timing, and package output.
  */
 UCLASS()
 class RTS_SURVIVAL_API URTSSteamCaptureSubsystem : public UTickableWorldSubsystem
@@ -47,6 +55,9 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 	FRTSSteamCaptureFrameWriter M_FrameWriter;
+	TUniquePtr<FRTSSteamCaptureViewport> M_CaptureViewport;
+	TSharedPtr<FRTSSteamCaptureViewExtension, ESPMode::ThreadSafe> M_CaptureViewExtension;
+	FDelegateHandle M_EndFrameDelegateHandle;
 
 	FString M_SessionDirectory;
 	FString M_FramesDirectory;
@@ -63,42 +74,27 @@ private:
 	bool bM_DisableMaxDurationUntilFunctionCall = false;
 	bool bM_OverrideResolution = false;
 	FIntPoint M_OutputResolution = FIntPoint::ZeroValue;
+	ERTSSteamCapturePendingStop M_PendingStop = ERTSSteamCapturePendingStop::None;
 	TArray<FColor> M_LastCapturedFramePixels;
 
 	const URTSSteamCaptureSettings* GetCaptureSettings() const;
 	bool GetCanStartCapture(ACPPController* PlayerController, const URTSSteamCaptureSettings* CaptureSettings) const;
 	bool GetIsPieWorld() const;
 	bool StartCapture_CreateSessionDirectory(const URTSSteamCaptureSettings& CaptureSettings);
+	bool StartCapture_CreateViewport();
 	void AbortStartCapture();
 	void ResetSessionState();
+	void DestroyCaptureViewport();
 
 	void TickCapture(float DeltaTime, const URTSSteamCaptureSettings& CaptureSettings);
+	void OnEndFrame();
 	void QueueDueFrames(const URTSSteamCaptureSettings& CaptureSettings);
-	bool CaptureFramePixels(TArray<FColor>& OutFramePixels) const;
-
-	/**
-	 * @brief Reads the completed main view so capture inherits the player's exposure and temporal history.
-	 * @param OutViewportPixels Display-encoded pixels from the player viewport.
-	 * @param OutViewportResolution Resolution associated with OutViewportPixels.
-	 * @return True when the viewport supplied a complete frame.
-	 */
-	bool ReadPlayerViewportPixels(TArray<FColor>& OutViewportPixels, FIntPoint& OutViewportResolution) const;
-
-	/**
-	 * @brief Preserves the viewport's final display color while adapting it to the requested recording size.
-	 * @param ViewportPixels Display-encoded pixels read from the rendered player viewport.
-	 * @param ViewportResolution Resolution associated with ViewportPixels.
-	 * @param OutFramePixels Resized display-encoded pixels ready for PNG output.
-	 * @return True when the source pixels and resolutions were valid.
-	 */
-	bool ResizeFrameToOutputResolution(
-		const TArray<FColor>& ViewportPixels,
-		const FIntPoint& ViewportResolution,
-		TArray<FColor>& OutFramePixels) const;
+	bool CaptureFramePixels(TArray<FColor>& OutFramePixels);
 	bool QueueFrameWrite(const URTSSteamCaptureSettings& CaptureSettings, TArray<FColor>&& FramePixels);
 	FString BuildFramePath(int32 FrameNumber) const;
 	FString BuildSessionName(const URTSSteamCaptureSettings& CaptureSettings) const;
 	int32 GetTargetFrameCount(const URTSSteamCaptureSettings& CaptureSettings) const;
+	FString GetPendingStopReason() const;
 
 	void StopCaptureInternal(const FString& StopReason, bool bWaitForFrameWrites);
 	void WaitForFrameWrites(const URTSSteamCaptureSettings& CaptureSettings) const;

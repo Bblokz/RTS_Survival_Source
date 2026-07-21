@@ -91,6 +91,7 @@ enum class
 	Flamm09 UMETA(DisplayName = "Flamm 09 (Light Flame Thrower)"),
 	Ashmaker11 UMETA(DisplayName = "ashmaker 11 (Light-Medium Flame Thrower)"),
 	Flamm15 UMETA(DisplayName = "Flamm 15 (Medium Flame Thrower)"),
+	FlammIS3 UMETA(DisplayName = "Flamm IS-3 (Heavy Flame Thrower)"),
 
 	// German small calibre
 	KwK38_T_37MM UMETA(DisplayName = "KwK38 t 37MM (PZ 38(t))"),
@@ -361,6 +362,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::KwK37_75MM: return "KwK 37";
 	case EWeaponName::Flamm09: return "Flamm 09";
 	case EWeaponName::Flamm15: return "Flamm 15";
+	case EWeaponName::FlammIS3: return "Flamm IS-3";
 	case EWeaponName::Ashmaker05: return "Ashmaker 05";
 	case EWeaponName::Ashmaker11: return "Ashmaker 11";
 	case EWeaponName::RipperGun_7_62MM: return "Ripper Gun";
@@ -475,6 +477,8 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 	// ---------------------------------------------------------------------
 	case EWeaponName::Flamm15: // Medium flamethrower
 		return 800;
+	case EWeaponName::FlammIS3: // IS-3 heavy flamethrower
+		return 802;
 	case EWeaponName::Ashmaker11: // Light-medium flamethrower
 		return 798;
 	case EWeaponName::Flamm09: // Light flamethrower
@@ -661,6 +665,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "D_25T_122MM";
 	case EWeaponName::D_25T_122MM_IS3:
 		return "D_25T_122MM";
+	case EWeaponName::FlammIS3:
+		return "FlammIS3";
 	case EWeaponName::M_30S_122MM_SU122:
 		return "M_30S_122MM_SU122";
 	case EWeaponName::M1938_122MM:

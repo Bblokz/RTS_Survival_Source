@@ -75,8 +75,6 @@ bool ARTSSteamCaptureCameraActor::SyncToPlayerCamera(
 
 	M_SceneCaptureComponent->ProjectionType = PlayerCameraComponent->ProjectionMode;
 	M_SceneCaptureComponent->OrthoWidth = PlayerCameraComponent->OrthoWidth;
-	M_SceneCaptureComponent->PostProcessSettings = PlayerCameraComponent->PostProcessSettings;
-	M_SceneCaptureComponent->PostProcessBlendWeight = PlayerCameraComponent->PostProcessBlendWeight;
 	return true;
 }
 

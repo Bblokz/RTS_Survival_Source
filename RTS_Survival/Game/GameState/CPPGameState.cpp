@@ -1026,6 +1026,8 @@ void ACPPGameState::InitAllGameFlameWeapons()
 	using DeveloperSettings::GameBalance::Ranges::LightFlameRange;
 	using DeveloperSettings::GameBalance::Ranges::MediumFlameRange;
 	using DeveloperSettings::GameBalance::Weapons::FlameWeapons::FlameConeAngleUnit;
+	constexpr float Is3FlameRangeMultiplier = 2.0f;
+	constexpr float Is3FlameDamageMultiplier = 3.0f;
 
 
 	WeaponData.WeaponName = EWeaponName::Ashmaker05;
@@ -1120,6 +1122,29 @@ void ACPPGameState::InitAllGameFlameWeapons()
 	WeaponData.ShrapnelPen = 0;
 	WeaponData.ProjectileMovementSpeed = 0;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flamm15, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::FlammIS3;
+	WeaponData.DamageType = ERTSDamageType::Fire;
+	WeaponData.ShellType = EWeaponShellType::Shell_AP;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
+	WeaponData.WeaponCalibre = 50;
+	WeaponData.TNTExplosiveGrams = 0;
+	WeaponData.BaseDamage = 25 * Is3FlameDamageMultiplier;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumFlameRange * Is3FlameRangeMultiplier;
+	WeaponData.ArmorPen = 0;
+	WeaponData.ArmorPenMaxRange = 0;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 2.25;
+	WeaponData.BaseCooldown = 1;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 100;
+	WeaponData.ShrapnelRange = 0;
+	WeaponData.ShrapnelDamage = 0;
+	WeaponData.ShrapnelParticles = 0;
+	WeaponData.ShrapnelPen = 0;
+	WeaponData.ProjectileMovementSpeed = 0;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::FlammIS3, WeaponData);
 }
 
 void ACPPGameState::InitAllGameBombWeapons()
