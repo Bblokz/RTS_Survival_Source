@@ -184,12 +184,6 @@ private:
 	// Tracks how many off-nav recovery teleports were consumed per quantised destination.
 	TMap<FIntVector, int32> M_OffNavRetriesPerLocation;
 
-	/**
-	 * @brief Centralises tank-only cost-limit debug drawing so it cannot affect move execution.
-	 * @param Query Active pathfinding query used for cost diagnostics.
-	 * @param bIsHighCostStart Whether the start location is inside a high-cost area.
-	 */
-	void DebugPathCostLimit(const FPathFindingQuery& Query, bool bIsHighCostStart) const;
 	void DebugFoundPathCost(const FNavPathSharedPtr& OutPath) const;
 	void DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath, const FAIMoveRequest& MoveRequest) const;
 	void DebugPathFollowingResult(const FPathFollowingResult& Result) const;

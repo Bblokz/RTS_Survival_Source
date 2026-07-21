@@ -46,7 +46,9 @@ public class RTS_Survival : ModuleRules
 			"ProtoAnimatedText",
 			"Json",
 			"RenderCore",
-			"RHI", 
+			"RHI",
+			"MovieSceneCapture",
+			"AudioMixer",
 			"EnhancedInput",
 			//// Saviour-added:
 			//"GameFeatures",

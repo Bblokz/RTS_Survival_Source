@@ -70,6 +70,7 @@ class UTowedActorComponent;
 class AAircraftMaster;
 class UBombComponent;
 class UPlayerOutlineComponent;
+class UTrailerComponent;
 class APlayerAimAbility;
 class UAttachedWeaponAbilityComponent;
 class ATankMaster;
@@ -1666,6 +1667,9 @@ private:
 
 	UPROPERTY()
 	UPlayerOutlineComponent* M_PlayerOutlineComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Trailer Capture", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UTrailerComponent> M_TrailerComponent;
 
 	// Reference to the async spawner
 	UPROPERTY()

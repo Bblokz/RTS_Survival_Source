@@ -64,6 +64,7 @@
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
 #include "RTS_Survival/StartLocation/PlayerStartLocationMngr/PlayerStartLocationManager.h"
 #include "RTS_Survival/SteamCapture/RTSSteamCaptureSubsystem.h"
+#include "RTS_Survival/TrailerCapture/TrailerComponent.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/ERTSRadiusType.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"
@@ -261,6 +262,7 @@ ACPPController::ACPPController()
 	M_PlayerAudioController = CreateDefaultSubobject<UPlayerAudioController>(TEXT("PlayerAudioController"));
 	M_PlayerPortraitManager = CreateDefaultSubobject<UPlayerPortraitManager>(TEXT("PlayerPortraitManager"));
 	M_PlayerOutlineComponent = CreateDefaultSubobject<UPlayerOutlineComponent>(TEXT("PlayerOutlineComponent"));
+	M_TrailerComponent = CreateDefaultSubobject<UTrailerComponent>(TEXT("TrailerComponent"));
 	M_PlayerGlobabilitiesManager = CreateDefaultSubobject<
 		UGlobalAbilitiesManager>(TEXT("PlayerGlobalAbilitiesManager"));
 
