@@ -61,8 +61,8 @@ bool AAITankMaster::MoveToLocationWithGoalAcceptance(
 	}
 
 	const float GoalAcceptanceRadius = GoalAcceptanceRadiusOverride >= 0.f
-		? GoalAcceptanceRadiusOverride
-		: m_VehiclePathComp->GetGoalAcceptanceRadius();
+		                                   ? GoalAcceptanceRadiusOverride
+		                                   : m_VehiclePathComp->GetGoalAcceptanceRadius();
 	return TryMoveToLocationWithOffNavRecovery(Location, GoalAcceptanceRadius);
 }
 
@@ -297,14 +297,19 @@ bool AAITankMaster::TryProjectFilterValidRecoveryLocation(
 
 	if (M_FormationUnitInnerRadius <= 0.0f)
 	{
-		RTSFunctionLibrary::ReportError("AAITankMaster::TryProjectFilterValidRecoveryLocation invalid formation radius");
+		RTSFunctionLibrary::ReportError(
+			"AAITankMaster::TryProjectFilterValidRecoveryLocation invalid formation radius");
 		return false;
 	}
 
 	const FVector DefaultQueryExtent = NavigationData->GetDefaultQueryExtent();
 	const FVector RecoveryProjectionExtent(
-		FMath::Max(DefaultQueryExtent.X, M_FormationUnitInnerRadius),
-		FMath::Max(DefaultQueryExtent.Y, M_FormationUnitInnerRadius),
+		FMath::Max(DefaultQueryExtent.X,
+		           M_FormationUnitInnerRadius *
+		           DeveloperSettings::GamePlay::Navigation::VehicleOffNavAreaProjectionMlt),
+		FMath::Max(DefaultQueryExtent.Y,
+		           M_FormationUnitInnerRadius *
+		           DeveloperSettings::GamePlay::Navigation::VehicleOffNavAreaProjectionMlt),
 		DefaultQueryExtent.Z);
 
 	const bool bProjected = NavigationData->ProjectPoint(
@@ -563,7 +568,7 @@ void AAITankMaster::DebugPathFollowingResult_Draw(const FString& DebugText, cons
 		TankPathFollowingDebug::ResultTextDurationSeconds,
 		/*bDrawShadow=*/false
 	);
-	if(IsValid(m_VehiclePathComp))
+	if (IsValid(m_VehiclePathComp))
 	{
 		// debug draw the my stuck detection radius
 		const float MyStuckDetectionRadius = m_VehiclePathComp->GetStuckDetectionDist();

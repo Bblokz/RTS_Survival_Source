@@ -1574,6 +1574,8 @@ namespace DeveloperSettings
 
 			// If above this threshold the tank will try to unflip the vehicle.
 			inline constexpr float TankPitchRollConstrainAngle = 45.f;
+			
+			inline constexpr float VehicleOffNavAreaProjectionMlt = 1.33;
 
 			// The distance used as offset to the path finding point for units in the squad
 			// to make the squad move more spread out.
@@ -1851,9 +1853,9 @@ namespace DeveloperSettings
 	{
 		constexpr bool GNomadicSkeletalAttachments_Compile_DebugSymbols = false;
 		constexpr bool GCampaignConnectionGeneration_Compile_DebugSymbols = false;
-		constexpr bool GCampaignBacktracking_Report_Compile_DebugSymbols = true;
-		constexpr bool GCampaignBacktracking_Compile_DebugSymbols = true;
-		constexpr bool GWorldFow_Compile_DebugSymbols = true;
+		constexpr bool GCampaignBacktracking_Report_Compile_DebugSymbols = false;
+		constexpr bool GCampaignBacktracking_Compile_DebugSymbols = false;
+		constexpr bool GWorldFow_Compile_DebugSymbols = false;
 		// Overlap logic; tanks evasion.
 		constexpr bool GTankOverlaps_Compile_DebugSymbols = false;
 		constexpr bool GWpoTreeAndFoliage_Compile_DebugSymbols = false;

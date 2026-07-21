@@ -37,6 +37,12 @@
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "UnitDataHelpers/UnitDataHelpers.h"
 
+namespace
+{
+	constexpr float TankTurnRateMultiplier = 1.33f;
+	constexpr float TankTurretTurnRateMultiplier = 1.1f;
+}
+
 
 /*--------------------------------- BUILDINGS ---------------------------------*/
 ACPPGameState::ACPPGameState()
@@ -4206,8 +4212,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	TankData.MaxHealth = PumaMaxHealth;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = PumaVehicleRotationSpeed;
-	TankData.TurretRotationSpeed = PumaTurretRotationSpeed;
+	TankData.VehicleRotationSpeed = PumaVehicleRotationSpeed * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = PumaTurretRotationSpeed * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = PumaVehicleSpeedKmh;
 	TankData.VehicleReverseSpeedKmh = PumaVehicleSpeedKmh;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4228,8 +4234,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	TankData.MaxHealth = PumaMaxHealth * FlamePumaHealthMultiplier;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = PumaVehicleRotationSpeed;
-	TankData.TurretRotationSpeed = PumaTurretRotationSpeed * FlamePumaTurretRotationMultiplier;
+	TankData.VehicleRotationSpeed = PumaVehicleRotationSpeed * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = PumaTurretRotationSpeed * FlamePumaTurretRotationMultiplier * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = PumaVehicleSpeedKmh * FlamePumaTopSpeedMultiplier;
 	TankData.VehicleReverseSpeedKmh = PumaVehicleSpeedKmh * FlamePumaTopSpeedMultiplier;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4247,8 +4253,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	{
 		TankData.MaxHealth = LightTankHealthBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = 30;
-		TankData.TurretRotationSpeed = 14;
+		TankData.VehicleRotationSpeed = 30 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = 40;
 		TankData.VehicleReverseSpeedKmh = 40;
 		TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4270,8 +4276,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Sd.Kfz. 232/3
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 50;
-	TankData.TurretRotationSpeed = 20;
+	TankData.VehicleRotationSpeed = 50 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 60;
 	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4288,8 +4294,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Sd.Kfz. 250
 	TankData.MaxHealth = ArmoredCarHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 40;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 40 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 40;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4307,8 +4313,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Sd.Kfz. 9 with 37mm AA cannon
 	TankData.MaxHealth = MediumTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 30;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 30 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 40;
 	TankData.VehicleReverseSpeedKmh = 40;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4325,8 +4331,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Sd.Kfz. 251/22
 	TankData.MaxHealth = ArmoredCarHealthBase + 150;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 40;
 	TankData.VehicleReverseSpeedKmh = 40;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4344,8 +4350,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	{
 		TankData.MaxHealth = ArmoredCarHealthBase + 150;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = 40;
-		TankData.TurretRotationSpeed = 14;
+		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = 40;
 		TankData.VehicleReverseSpeedKmh = 40;
 		TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4368,8 +4374,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	{
 		TankData.MaxHealth = ArmoredCarHealthBase + 150;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = 40;
-		TankData.TurretRotationSpeed = 14;
+		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = 40;
 		TankData.VehicleReverseSpeedKmh = 40;
 		TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4387,8 +4393,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Sd.Kfz. 231
 	TankData.MaxHealth = ArmoredCarHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 50;
-	TankData.TurretRotationSpeed = 40;
+	TankData.VehicleRotationSpeed = 50 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 40 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 60;
 	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4405,8 +4411,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// Sd.Kfz. 251 (Pz IV)
 	TankData.MaxHealth = ArmoredCarHealthBase + 50;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 30;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 30 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 40;
 	TankData.VehicleReverseSpeedKmh = 40;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4426,8 +4432,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// BA-12 
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 60;
 	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4444,8 +4450,8 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	// BA-14 
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 30;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 30 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 60;
 	TankData.VehicleReverseSpeedKmh = 60;
 	TankData.VisionRadius = ArmoredCarVisionRadius;
@@ -4508,8 +4514,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Pz 38(t)
 	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 20;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4527,8 +4533,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	{
 		TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = 40;
-		TankData.TurretRotationSpeed = 30;
+		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 30 * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = 20;
 		TankData.VehicleReverseSpeedKmh = 8;
 		TankData.VisionRadius = T1TankVisionRadius;
@@ -4548,8 +4554,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Pz 38(t) Railgun
 	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 20;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 20;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4566,8 +4572,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Pz II F
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 20;
 	TankData.VehicleReverseSpeedKmh = 7;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4584,8 +4590,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Pz II Flame
 	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(LightTankHealthBase * 1.3f, 10);
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 24;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 24 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 20;
 	TankData.VehicleReverseSpeedKmh = 7;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4602,8 +4608,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Pz I Harvester
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 25;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4619,8 +4625,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Sd.Kfz. 140 (open top)
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 40;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 40 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 25;
 	TankData.VehicleReverseSpeedKmh = 11;
 	TankData.VisionRadius = OpenTopVehicleVisionRadius;
@@ -4637,8 +4643,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Pz Jäger (light TD)
 	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 18;
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = OpenTopVehicleVisionRadius;
@@ -4661,8 +4667,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Marder (light TD)
 	TankData.MaxHealth = LightMediumTankBase - OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 20;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = OpenTopVehicleVisionRadius;
@@ -4679,8 +4685,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Pz I 15cm (SPG)
 	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 6;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 6 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 18;
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = OpenTopVehicleVisionRadius;
@@ -4697,8 +4703,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// Hetzer (light TD with rockets ability per original)
 	TankData.MaxHealth = LightMediumTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 6;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 6 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 25;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4717,8 +4723,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// BT-7
 	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp - 50;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 16;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 16 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 50;
 	TankData.VehicleReverseSpeedKmh = 30;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4735,8 +4741,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// BT-7 (4)
 	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 16;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 16 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 50;
 	TankData.VehicleReverseSpeedKmh = 30;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4753,8 +4759,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// T-26
 	TankData.MaxHealth = LightTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 35;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 35 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 15;
 	TankData.VehicleReverseSpeedKmh = 7;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4771,8 +4777,8 @@ void ACPPGameState::InitAllGameLightTankData()
 	// T-70
 	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp + 25;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 55;
-	TankData.TurretRotationSpeed = 15;
+	TankData.VehicleRotationSpeed = 55 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 45;
 	TankData.VehicleReverseSpeedKmh = 20;
 	TankData.VisionRadius = T1TankVisionRadius;
@@ -4815,8 +4821,8 @@ void ACPPGameState::InitAllGameLightTankData()
 
 		TankData.MaxHealth = Su76Health;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = Su76VehicleRotationSpeed;
-		TankData.TurretRotationSpeed = Su76TurretRotationSpeed;
+		TankData.VehicleRotationSpeed = Su76VehicleRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = Su76TurretRotationSpeed * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = Su76MaxSpeedKmh;
 		TankData.VehicleReverseSpeedKmh = Su76ReverseSpeedKmh;
 		TankData.VisionRadius = OpenTopVehicleVisionRadius;
@@ -4877,8 +4883,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III J
 	TankData.MaxHealth = LightMediumTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 25;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -4895,8 +4901,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III AA
 	TankData.MaxHealth = LightMediumTankBase + 50;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 35;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 35 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 25;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -4913,8 +4919,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III J Commander (rockets)
 	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::CommandVehicleHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 20;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 25;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -4931,8 +4937,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III M
 	TankData.MaxHealth = MediumTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 22;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -4950,8 +4956,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz III FLAMM
 	TankData.MaxHealth = MediumTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 20;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 24;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -4968,8 +4974,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz IV G
 	TankData.MaxHealth = MediumTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 26;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -4985,7 +4991,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 
 
 	// PZ IV H; railgun vehicle.
-	TankData.TurretRotationSpeed = 18;
+	TankData.TurretRotationSpeed = 18 * TankTurretTurnRateMultiplier;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, PzIVH_Radixite},
 		{ERTSResourceType::Resource_VehicleParts, PzIVH_VehicleParts}
@@ -4995,7 +5001,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_H, TankData);
 
 	// PZ IV Rockets
-	TankData.TurretRotationSpeed = 18;
+	TankData.TurretRotationSpeed = 18 * TankTurretTurnRateMultiplier;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, PzIVRockets_Radixite},
 		{ERTSResourceType::Resource_VehicleParts, PzIVRockets_VehicleParts}
@@ -5008,8 +5014,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz IV F1
 	TankData.MaxHealth = MediumTankHealthBase - 150;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 26;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5026,8 +5032,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Pz IV F1 Commander
 	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::CommandVehicleHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 26;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5044,8 +5050,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Jaguar 
 	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * 1.2f, 10);
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 55;
-	TankData.TurretRotationSpeed = 35;
+	TankData.VehicleRotationSpeed = 55 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 35 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 35;
 	TankData.VehicleReverseSpeedKmh = 20;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5062,8 +5068,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// Brummbär
 	TankData.MaxHealth = MediumTankHealthBase + 400;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 30;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 30 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 22;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5080,8 +5086,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// StuG (medium TD) 
 	TankData.MaxHealth = MediumTankHealthBase - OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 45;
-	TankData.TurretRotationSpeed = 15;
+	TankData.VehicleRotationSpeed = 45 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 26;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5110,8 +5116,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// T-34/76
 	TankData.MaxHealth = MediumTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 49;
-	TankData.TurretRotationSpeed = 25;
+	TankData.VehicleRotationSpeed = 49 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 25 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 26;
 	TankData.VehicleReverseSpeedKmh = 18;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5132,8 +5138,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 
 		TankData.MaxHealth = MediumTankHealthBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = 49;
-		TankData.TurretRotationSpeed = 25;
+		TankData.VehicleRotationSpeed = 49 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 25 * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = 26;
 		TankData.VehicleReverseSpeedKmh = 18;
 		TankData.VisionRadius = T2TankVisionRadius;
@@ -5156,8 +5162,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 
 		TankData.MaxHealth = MediumTankHealthBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = 49;
-		TankData.TurretRotationSpeed = 25;
+		TankData.VehicleRotationSpeed = 49 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 25 * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = 26;
 		TankData.VehicleReverseSpeedKmh = 18;
 		TankData.VisionRadius = T2TankVisionRadius;
@@ -5176,8 +5182,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// T-34E
 	TankData.MaxHealth = MediumTankHealthBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 49;
-	TankData.TurretRotationSpeed = 25;
+	TankData.VehicleRotationSpeed = 49 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 25 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 26;
 	TankData.VehicleReverseSpeedKmh = 18;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5194,8 +5200,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// T-34/85
 	TankData.MaxHealth = MediumTankHealthBase + OneMediumTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 20;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 22;
 	TankData.VehicleReverseSpeedKmh = 18;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5212,8 +5218,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	// T-34/100
 	TankData.MaxHealth = MediumTankHealthBase + OneMediumTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 15;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 22;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5252,8 +5258,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 
 		TankData.MaxHealth = SuMediumTankDestroyerHealth;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = SuMediumTankDestroyerRotationSpeed;
-		TankData.TurretRotationSpeed = SuMediumTankDestroyerTurretRotationSpeed;
+		TankData.VehicleRotationSpeed = SuMediumTankDestroyerRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = SuMediumTankDestroyerTurretRotationSpeed * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = SuMediumTankDestroyerMaxSpeedKmh;
 		TankData.VehicleReverseSpeedKmh = SuMediumTankDestroyerReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
@@ -5270,8 +5276,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			SuMediumTankDestroyerHealth * Su85LaserHealthMlt, 10);
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = SuMediumTankDestroyerRotationSpeed;
-		TankData.TurretRotationSpeed = SuMediumTankDestroyerTurretRotationSpeed;
+		TankData.VehicleRotationSpeed = SuMediumTankDestroyerRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = SuMediumTankDestroyerTurretRotationSpeed * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = SuMediumTankDestroyerMaxSpeedKmh;
 		TankData.VehicleReverseSpeedKmh = SuMediumTankDestroyerReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
@@ -5294,8 +5300,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 
 		TankData.MaxHealth = SuMediumTankDestroyerHealth;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = SuMediumTankDestroyerRotationSpeed;
-		TankData.TurretRotationSpeed = SuMediumTankDestroyerTurretRotationSpeed;
+		TankData.VehicleRotationSpeed = SuMediumTankDestroyerRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = SuMediumTankDestroyerTurretRotationSpeed * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = SuMediumTankDestroyerMaxSpeedKmh;
 		TankData.VehicleReverseSpeedKmh = SuMediumTankDestroyerReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
@@ -5312,8 +5318,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 
 		TankData.MaxHealth = SuMediumTankDestroyerHealth;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = SuMediumTankDestroyerRotationSpeed;
-		TankData.TurretRotationSpeed = SuMediumTankDestroyerTurretRotationSpeed;
+		TankData.VehicleRotationSpeed = SuMediumTankDestroyerRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = SuMediumTankDestroyerTurretRotationSpeed * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = Su122MaxSpeedKmh;
 		TankData.VehicleReverseSpeedKmh = Su122ReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
@@ -5344,8 +5350,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 
 		TankData.MaxHealth = T3MediumTankBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = T44LaserRotationSpeed;
-		TankData.TurretRotationSpeed = T44LaserTurretRotationSpeed;
+		TankData.VehicleRotationSpeed = T44LaserRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = T44LaserTurretRotationSpeed * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = T44LaserMaxSpeedKmh;
 		TankData.VehicleReverseSpeedKmh = T44LaserReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
@@ -5408,8 +5414,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// Jagdpanther (heavy TD tier per original)
 	TankData.MaxHealth = T3MediumTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 8;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 8 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 28;
 	TankData.VehicleReverseSpeedKmh = 11;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5428,8 +5434,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// Maus.
 	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::SuperHeavyTankBase + 2 * OneHeavyTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 15;
-	TankData.TurretRotationSpeed = 8;
+	TankData.VehicleRotationSpeed = 15 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 8 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 8;
 	TankData.VehicleReverseSpeedKmh = 5;
 	TankData.VisionRadius = SuperHeavyTankVision;
@@ -5444,8 +5450,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Maus, TankData);
 	// E100 less health but more speed than Maus
 	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::SuperHeavyTankBase;
-	TankData.VehicleRotationSpeed = 20;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 20 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 12;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.Cost = FUnitCost({
@@ -5457,8 +5463,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// Panther G
 	TankData.MaxHealth = T3MediumTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 20;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 30;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5513,8 +5519,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// Panther II
 	TankData.MaxHealth = T3MediumTankBase + OneHeavyTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 40;
-	TankData.TurretRotationSpeed = 25;
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 25 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 40;
 	TankData.VehicleReverseSpeedKmh = 20;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5531,8 +5537,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// Tiger / Tiger H1
 	TankData.MaxHealth = T3HeavyTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 26;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5564,8 +5570,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// Sturm Tiger
 	TankData.MaxHealth = T3HeavyTankBase + 400;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 26;
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5588,8 +5594,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// King Tiger
 	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 15;
-	TankData.TurretRotationSpeed = 19;
+	TankData.VehicleRotationSpeed = 15 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 19 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 15;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5606,8 +5612,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// JagdTiger Tiger
 	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 20;
-	TankData.TurretRotationSpeed = 19;
+	TankData.VehicleRotationSpeed = 20 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 19 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 15;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5624,8 +5630,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// Tiger 105 (same as King Tiger with higher cost and exp)
 	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 15;
-	TankData.TurretRotationSpeed = 19;
+	TankData.VehicleRotationSpeed = 15 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 19 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 15;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5644,8 +5650,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// T-28 (uses Medium exp levels per original)
 	TankData.MaxHealth = T2HeavyTankBase - OneMediumTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 15;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 15 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 20;
 	TankData.VehicleReverseSpeedKmh = 10;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5677,8 +5683,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// T-35 (super large)
 	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(T3HeavyTankBase * 2.0f, 10);
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 15;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 15 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 12;
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5695,8 +5701,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// KV-1 (uses  T2 heavy tank as not as powerful as regular heavies)
 	TankData.MaxHealth = T2HeavyTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 15;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 15 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 12;
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = T2TankVisionRadius;
@@ -5713,8 +5719,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// KV-2 (heavy exp levels; T3 vision; higher cost)
 	TankData.MaxHealth = T2HeavyTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 15;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 15 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 12;
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5731,8 +5737,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// KV-1E (inherits KV-2 vision/speeds in your original — made explicit)
 	TankData.MaxHealth = T2HeavyTankBase + 2.0f * OneMediumTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 22;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 22 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 12;
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5752,8 +5758,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// KV-IS (same speeds/vision as KV-1E per inheritance; health uses +2 * OneLightTankShot)
 	TankData.MaxHealth = T2HeavyTankBase + 2.0f * DeveloperSettings::GameBalance::UnitHealth::OneLightTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 12;
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5770,8 +5776,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// IS-1
 	TankData.MaxHealth = T3HeavyTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 20;
 	TankData.VehicleReverseSpeedKmh = 10;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5788,8 +5794,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// IS-2
 	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 20;
 	TankData.VehicleReverseSpeedKmh = 10;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5806,8 +5812,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// IS-3 (super heavy)
 	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::SuperHeavyTankBase;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = 14;
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 17;
 	TankData.VehicleReverseSpeedKmh = 9;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5826,8 +5832,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	constexpr float Is3FlameTurretRotationMultiplier = 4.0f / 3.0f;
 	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::SuperHeavyTankBase * Is3FlameHealthMultiplier;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 25;
-	TankData.TurretRotationSpeed = FMath::RoundToInt(14.0f * Is3FlameTurretRotationMultiplier);
+	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = FMath::RoundToInt(14.0f * Is3FlameTurretRotationMultiplier) * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 17;
 	TankData.VehicleReverseSpeedKmh = 9;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5844,8 +5850,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	// KV-5 (super heavy)
 	TankData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::SuperHeavyTankBase + 2 * OneHeavyTankShotHp;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
-	TankData.VehicleRotationSpeed = 20;
-	TankData.TurretRotationSpeed = 12;
+	TankData.VehicleRotationSpeed = 20 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
 	TankData.VehicleMaxSpeedKmh = 12;
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T3TankVisionRadius;
@@ -5868,8 +5874,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 
 		TankData.MaxHealth = T3MediumTankBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = 25;
-		TankData.TurretRotationSpeed = 8;
+		TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 8 * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = 16;
 		TankData.VehicleReverseSpeedKmh = 7;
 		TankData.VisionRadius = T3TankVisionRadius;
@@ -5918,8 +5924,8 @@ void ACPPGameState::InitAllGameTrainData()
 		FTankData TankData;
 		TankData.MaxHealth = TrainHealth;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
-		TankData.VehicleRotationSpeed = TrainRotationSpeed;
-		TankData.TurretRotationSpeed = TurretRotationSpeed;
+		TankData.VehicleRotationSpeed = TrainRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = TurretRotationSpeed * TankTurretTurnRateMultiplier;
 		TankData.VehicleMaxSpeedKmh = TrainMaxSpeedKmh;
 		TankData.VehicleReverseSpeedKmh = TrainReverseSpeedKmh;
 		TankData.VisionRadius = TrainVisionRadius;
