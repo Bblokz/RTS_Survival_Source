@@ -162,6 +162,11 @@ void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FP
 {
 	OnFindPath_ClearOverlapsForNewMovement();
 	Super::FindPathForMoveRequest(MoveRequest, Query, OutPath);
+	if (OutPath.IsValid())
+	{
+		// Keep the validated corridor stable while dynamic tank modifiers rebuild around physics-driven vehicles.
+		OutPath->SetIgnoreInvalidation(true);
+	}
 
 	if constexpr (DeveloperSettings::Debugging::GPathFindingCosts_Compile_DebugSymbols)
 	{
@@ -432,7 +437,6 @@ void AAITankMaster::DebugPathPointsAndFilter(const FNavPathSharedPtr& OutPath,
 	{
 		return;
 	}
-	OutPath->SetIgnoreInvalidation(true);
 	FNavMeshPath* NavMeshPath = OutPath->CastPath<FNavMeshPath>();
 	if (not NavMeshPath)
 	{
