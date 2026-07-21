@@ -280,8 +280,7 @@ bool AAITankMaster::TryMoveToLocationWithOffNavRecovery(const FVector& Location,
 	FAIMoveRequest MoveRequest;
 	MoveRequest.SetGoalLocation(Location);
 	MoveRequest.SetAcceptanceRadius(GoalAcceptanceRadius);
-	MoveRequest.SetUsePathfinding(true);
-	MoveRequest.SetAllowPartialPath(true);
+	FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(MoveRequest);
 	MoveRequest.SetNavigationFilter(DefaultNavigationFilterClass);
 	
 

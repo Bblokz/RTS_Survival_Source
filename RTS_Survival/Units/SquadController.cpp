@@ -26,6 +26,7 @@
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
+#include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionAbilityComponent.h"
@@ -1606,12 +1607,7 @@ ESquadPathFindingError ASquadController::GeneratePaths_GenerateQuery(
 	}
 
 	FAIMoveRequest MoveRequest(MoveToLocation);
-	MoveRequest.SetUsePathfinding(true);
-	MoveRequest.SetAllowPartialPath(true);
-	// Prevent instant fail if outside nave mesh; use partial path movement.
-	MoveRequest.SetRequireNavigableEndLocation(false);
-	// Let partial path handle end position.
-	MoveRequest.SetProjectGoalLocation(false);
+	FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(MoveRequest);
 	MoveRequest.SetNavigationFilter(AIController->GetDefaultNavigationFilterClass());
 	MoveRequest.SetAcceptanceRadius(DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius);
 	MoveRequest.SetReachTestIncludesAgentRadius(false);

@@ -24,7 +24,6 @@ struct FRTSNavCollisionSettings
  * A wrapper around the regular box component; this component is used to block the navigation mesh.
  * Has collision disabled at begin play. 
  * Set navrelevancy on actor componets to affect the nav modifier radius.
- * TODO using obstacle channel as nav modifier does not update in time!! use NULL channel instead.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API URTSNavCollision : public UNavModifierComponent

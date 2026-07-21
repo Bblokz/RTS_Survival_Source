@@ -2,6 +2,7 @@
 #include "FRTSNavigationHelpers.h"
 
 #include "AIController.h"
+#include "AITypes.h"
 #include "NavigationSystem.h"
 #include "Navigation/PathFollowingComponent.h"
 // include the pawn movement component  for casting.
@@ -13,6 +14,14 @@
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/Navigation/RTSNavAI/IRTSNavAI.h"
 
+
+void FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(FAIMoveRequest& MoveRequest)
+{
+	MoveRequest.SetUsePathfinding(true);
+	MoveRequest.SetAllowPartialPath(true);
+	MoveRequest.SetRequireNavigableEndLocation(false);
+	MoveRequest.SetProjectGoalLocation(false);
+}
 
 void FRTSNavigationHelpers::SetupNavDataForTypeOnPawn(UWorld* World, APawn* InPawn)
 {

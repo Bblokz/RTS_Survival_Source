@@ -29,6 +29,7 @@
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
+#include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -872,9 +873,29 @@ void ASquadUnit::MoveToAndBindOnCompleted(const FVector& MoveToLocation, const b
 		return;
 	}
 
-	auto Result = M_AISquadUnit->MoveToLocation(MoveToLocation,
-	                                            DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius,
-	                                            true, bUsePathfinding, false, !bUsePathfinding, nullptr, true);
+	EPathFollowingRequestResult::Type Result = EPathFollowingRequestResult::Failed;
+	if (bUsePathfinding)
+	{
+		FAIMoveRequest MoveRequest(MoveToLocation);
+		FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(MoveRequest);
+		MoveRequest.SetAcceptanceRadius(DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius);
+		MoveRequest.SetReachTestIncludesAgentRadius(true);
+		MoveRequest.SetCanStrafe(false);
+		MoveRequest.SetNavigationFilter(M_AISquadUnit->GetDefaultNavigationFilterClass());
+		Result = M_AISquadUnit->MoveTo(MoveRequest);
+	}
+	else
+	{
+		Result = M_AISquadUnit->MoveToLocation(
+			MoveToLocation,
+			DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius,
+			true,
+			false,
+			false,
+			true,
+			nullptr,
+			true);
+	}
 	if (Result == EPathFollowingRequestResult::AlreadyAtGoal)
 	{
 		return;
