@@ -844,6 +844,9 @@ FString UTrailerComponent::BuildFFmpegArguments(const URTSTrailerCaptureSettings
 	const double ExactDuration = static_cast<double>(M_FrameCounters.M_QueuedOutputFrameCount) / FramesPerSecond;
 	const FString VideoCodec = GetSafeEncoderToken(Settings.M_H264Codec, TEXT("libx264"));
 	const FString VideoPreset = GetSafeEncoderToken(Settings.M_H264Preset, TEXT("slow"));
+	const FString H264MetadataFilter = VideoCodec.Equals(TEXT("libx264"), ESearchCase::IgnoreCase)
+		? TEXT("-bsf:v \"h264_metadata=video_full_range_flag=0:colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1\" ")
+		: FString();
 	const FString FramePattern = FPaths::Combine(M_SessionPaths.M_FramesDirectory, TEXT("Frame_%06d.png"));
 	const FString VideoFilter = FString::Printf(
 		TEXT("crop=%d:%d:%d:%d,format=yuv420p"),
@@ -857,7 +860,7 @@ FString UTrailerComponent::BuildFFmpegArguments(const URTSTrailerCaptureSettings
 		TEXT("-map 0:v:0 -map 1:a:0 -frames:v %d -vf \"%s\" -af apad -t %.6f -r %d ")
 		TEXT("-c:v %s -preset %s -crf %d -pix_fmt yuv420p -c:a aac -b:a %dk ")
 		TEXT("-color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv ")
-		TEXT("-movflags +faststart \"%s\""),
+		TEXT("%s-movflags +faststart \"%s\""),
 		FramesPerSecond,
 		*FramePattern,
 		*M_SessionPaths.M_AudioFile,
@@ -869,6 +872,7 @@ FString UTrailerComponent::BuildFFmpegArguments(const URTSTrailerCaptureSettings
 		*VideoPreset,
 		FMath::Clamp(Settings.M_VideoConstantRateFactor, 0, 51),
 		FMath::Max(32, Settings.M_AudioBitrateKbps),
+		*H264MetadataFilter,
 		*M_SessionPaths.M_FinalMp4File);
 }
 

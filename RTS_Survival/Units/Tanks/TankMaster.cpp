@@ -1138,14 +1138,22 @@ void ATankMaster::OnTurretOutOfRange(
 		return;
 	}
 
-	AITankController->MoveToLocationWithGoalAcceptance(TargetLocation);
-	M_LastTurretOutOfRangeMoveRequestTimeSeconds = CurrentTimeSeconds;
-	bM_HasTurretOutOfRangeMoveRequest = true;
-
 	if (GetIsValidRTSNavCollision())
 	{
 		RTSNavCollision->EnableAffectNavmesh(false);
 	}
+
+	if (not AITankController->MoveToLocationWithGoalAcceptance(TargetLocation))
+	{
+		if (GetIsValidRTSNavCollision())
+		{
+			RTSNavCollision->EnableAffectNavmesh(true);
+		}
+		return;
+	}
+
+	M_LastTurretOutOfRangeMoveRequestTimeSeconds = CurrentTimeSeconds;
+	bM_HasTurretOutOfRangeMoveRequest = true;
 }
 
 void ATankMaster::OnTurretInRange(ACPPTurretsMaster* CallingTurret)

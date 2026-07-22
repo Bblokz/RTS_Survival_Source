@@ -47,6 +47,11 @@ void UPlayerStartGameControl::PlayerStartedGame()
 	M_StartGameWidget = nullptr;
 }
 
+bool UPlayerStartGameControl::GetIsWaitingForPlayerToStart() const
+{
+	return bM_HasPausedGame;
+}
+
 void UPlayerStartGameControl::BeginPlay_InitStartGameFlow()
 {
 	if (not GetIsValidPlayerController() || not GetIsValidStartGameWidgetClass())

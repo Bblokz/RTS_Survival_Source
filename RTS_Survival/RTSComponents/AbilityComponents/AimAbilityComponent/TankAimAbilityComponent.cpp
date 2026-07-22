@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Units/Tanks/AITankMaster.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
@@ -87,8 +88,19 @@ void UTankAimAbilityComponent::RequestMoveToLocation(const FVector& MoveToLocati
 	{
 		return;
 	}
+	if (M_TankMaster->GetIsValidRTSNavCollision())
+	{
+		M_TankMaster->RTSNavCollision->EnableAffectNavmesh(false);
+	}
 	AAITankMaster* TankController = M_TankMaster->GetAIController();
-	TankController->MoveToLocationWithGoalAcceptance(MoveToLocation);
+	if (TankController->MoveToLocationWithGoalAcceptance(MoveToLocation))
+	{
+		return;
+	}
+	if (M_TankMaster->GetIsValidRTSNavCollision())
+	{
+		M_TankMaster->RTSNavCollision->EnableAffectNavmesh(true);
+	}
 }
 
 void UTankAimAbilityComponent::StopMovementForAbility()
@@ -103,6 +115,10 @@ void UTankAimAbilityComponent::StopMovementForAbility()
 	}
 	AAITankMaster* TankController = M_TankMaster->GetAIController();
 	TankController->StopMovement();
+	if (M_TankMaster->GetIsValidRTSNavCollision())
+	{
+		M_TankMaster->RTSNavCollision->EnableAffectNavmesh(true);
+	}
 }
 
 void UTankAimAbilityComponent::BeginAbilityDurationTimer()

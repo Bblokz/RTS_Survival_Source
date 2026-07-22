@@ -133,6 +133,8 @@ private:
                 const TMap<TWeakObjectPtr<AActor>, int32>& SampleCounts,
                 TArray<TPair<TWeakObjectPtr<AActor>, FVector>>& OutUniqueOverlaps) const;
 
+	
+	void OnOverlappedTankNotIdle(ICommands* OtherTank) const;
 
 
 	

@@ -24,6 +24,7 @@ public:
 	void InitPlayerStartGameControl(ACPPController* PlayerController);
 
 	void PlayerStartedGame();
+	bool GetIsWaitingForPlayerToStart() const;
 
 protected:
 	// Called when the game starts

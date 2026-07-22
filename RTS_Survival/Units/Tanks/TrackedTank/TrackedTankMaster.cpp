@@ -378,6 +378,10 @@ void ATrackedTankMaster::TerminateMoveCommand()
 	if (not CommandData->GetHasQueuedMovementCommandAfterActive())
 	{
 		FullyStopTrackedMovementCommand();
+		if (GetIsValidRTSNavCollision())
+		{
+			RTSNavCollision->EnableAffectNavmesh(true);
+		}
 	}
 
 	CheckFootPrintForOverlaps();
@@ -414,6 +418,10 @@ void ATrackedTankMaster::TerminateReverseCommand()
 	{
 		ResetTrackedReversePathFollowing();
 		FullyStopTrackedMovementCommand();
+		if (GetIsValidRTSNavCollision())
+		{
+			RTSNavCollision->EnableAffectNavmesh(true);
+		}
 	}
 	CheckFootPrintForOverlaps();
 	Super::TerminateReverseCommand();

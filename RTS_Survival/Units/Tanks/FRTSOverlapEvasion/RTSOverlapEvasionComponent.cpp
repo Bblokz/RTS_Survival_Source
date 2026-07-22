@@ -444,6 +444,21 @@ void URTSOverlapEvasionComponent::CheckFootprintForOverlaps_BuildUniqueList(
 	}
 }
 
+void URTSOverlapEvasionComponent::OnOverlappedTankNotIdle(ICommands* OtherTank) const
+{
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	{
+		OtherTank->GetCurrentActiveCommand();
+		UWorld* World = GetWorld();
+		if (not World)
+		{
+			return;
+		}
+		DrawDebugString(World, OtherTank->GetOwnerLocation() + FVector(0,0,400), "Not idle: " + Global_GetAbilityIDAsString(OtherTank->GetCurrentActiveCommand()),
+			nullptr, FColor::Red, 2);
+	}
+}
+
 
 // bool URTSOverlapEvasionComponent::GetResolveDeadlockWithOther(const AActor* OtherAlliedActor) const
 // {
@@ -476,6 +491,7 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 
 	if (not OtherCommands->GetIsUnitIdle())
 	{
+		OnOverlappedTankNotIdle(OtherCommands);
 		return;
 	}
 
