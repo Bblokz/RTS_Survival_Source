@@ -39,15 +39,19 @@ protected:
 	float ConstructionAcceptanceRad = 100.0f;
 
 	virtual void OnPossess(APawn* InPawn) override;
-	virtual void OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility) override;
+	virtual void OnQueuedMovementCompleted(
+		EAbilityID CompletedMovementAbility,
+		uint64 CommandExecutionSerial) override;
 	virtual void OnQueuedMovementFailed(
-		const EAbilityID FailedMovementAbility,
-		const EPathFollowingResult::Type FailedMovementResultCode) override;
-	virtual void OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility) override;
+		EAbilityID FailedMovementAbility,
+		uint64 CommandExecutionSerial,
+		EPathFollowingResult::Type FailedMovementResultCode) override;
+	virtual void OnQueuedMovementRequestFailed(
+		EAbilityID FailedMovementAbility,
+		uint64 CommandExecutionSerial) override;
 
 private:
 	// Location to place the building; needed in behaviour tree.
 	UPROPERTY()
 	FVector M_BuildingLocation;
 };
- 

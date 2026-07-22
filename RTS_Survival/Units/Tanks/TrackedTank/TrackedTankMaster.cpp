@@ -28,6 +28,13 @@
 
 FName ATrackedTankMaster::TrackPhysicsMovementName(TEXT("TrackPhysicsCalcMovement"));
 
+namespace TrackedMovementInvariant
+{
+	constexpr float CheckIntervalSeconds = 0.25f;
+	constexpr double OrphanGracePeriodSeconds = 0.5;
+	constexpr double NoOrphanStartTime = -1.0;
+}
+
 
 ATrackedTankMaster::ATrackedTankMaster(const FObjectInitializer& ObjectInitializer)
 	: ATankMaster(ObjectInitializer), TankAnimationBP(nullptr), ChassisMesh(NULL)
@@ -186,9 +193,13 @@ void ATrackedTankMaster::BeginPlay()
 
 void ATrackedTankMaster::BeginDestroy()
 {
-	if (UWorld* World = GetWorld(); IsValid(World) && M_EngineSoundHandle.IsValid())
+	if (UWorld* World = GetWorld(); IsValid(World))
 	{
-		World->GetTimerManager().ClearTimer(M_EngineSoundHandle);
+		if (M_EngineSoundHandle.IsValid())
+		{
+			World->GetTimerManager().ClearTimer(M_EngineSoundHandle);
+		}
+		World->GetTimerManager().ClearTimer(M_MovementCommandInvariantTimerHandle);
 	}
 	Super::BeginDestroy();
 }
@@ -209,6 +220,7 @@ void ATrackedTankMaster::Tick(float DeltaSeconds)
 
 void ATrackedTankMaster::OnUnitIdleAndNoNewCommands()
 {
+	StopMovementCommandInvariantMonitoring();
 	// Important; calls the delegate in base ICommands.
 	Super::OnUnitIdleAndNoNewCommands();
 	if (GetIsValidRTSNavCollision())
@@ -357,6 +369,7 @@ void ATrackedTankMaster::InitTrackedTank(
 
 void ATrackedTankMaster::ExecuteMoveCommand(const FVector MoveToLocation)
 {
+	StartMovementCommandInvariantMonitoring();
 	ExecuteTrackedMoveWithNavSettleDelay(MoveToLocation, false);
 	if (GetIsValidRTSNavCollision())
 	{
@@ -391,11 +404,16 @@ void ATrackedTankMaster::TerminateMoveCommandForMovementReplacement()
 {
 	Super::TerminateMoveCommandForMovementReplacement();
 	CancelPendingTrackedMove();
+	if (GetIsValidAITankController())
+	{
+		AITankController->ClearQueuedMovementRequestOwnership();
+	}
 	CheckFootPrintForOverlaps();
 }
 
 void ATrackedTankMaster::ExecuteReverseCommand(const FVector ReverseToLocation)
 {
+	StartMovementCommandInvariantMonitoring();
 	ExecuteTrackedMoveWithNavSettleDelay(ReverseToLocation, true);
 
 	if (GetIsValidRTSNavCollision())
@@ -431,6 +449,10 @@ void ATrackedTankMaster::TerminateReverseCommandForMovementReplacement()
 {
 	Super::TerminateReverseCommandForMovementReplacement();
 	CancelPendingTrackedMove();
+	if (GetIsValidAITankController())
+	{
+		AITankController->ClearQueuedMovementRequestOwnership();
+	}
 }
 
 void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay(const FVector& TargetLocation, const bool bIsReverse)
@@ -447,14 +469,16 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelayForAbility(
 	const EAbilityID CompletionAbility,
 	const float GoalAcceptanceRadiusOverride)
 {
-	if (not GetIsValidAITankController())
-	{
-		return;
-	}
-
 	UCommandData* CommandData = GetIsValidCommandData();
 	if (not IsValid(CommandData))
 	{
+		return;
+	}
+	const uint64 CommandExecutionSerial = CommandData->GetCurrentCommandExecutionSerial();
+
+	if (not GetIsValidAITankController())
+	{
+		DeferTrackedMovementRequestFailure(CompletionAbility, CommandExecutionSerial);
 		return;
 	}
 
@@ -469,6 +493,7 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelayForAbility(
 	M_QueuedMoveState.bM_HasPendingQueuedMove = true;
 	M_QueuedMoveState.bM_IsReverse = bIsReverse;
 	M_QueuedMoveState.M_CompletionAbility = CompletionAbility;
+	M_QueuedMoveState.M_CommandExecutionSerial = CommandExecutionSerial;
 	M_QueuedMoveState.M_GoalAcceptanceRadiusOverride = GoalAcceptanceRadiusOverride;
 	M_QueuedMoveState.bM_IsStationaryWhenQueued = not bShouldSkipNavSettleDelay;
 	// NOTE: This is the authoritative coalescing point for queued tracked moves.
@@ -477,6 +502,8 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelayForAbility(
 	if (GetWorld() == nullptr)
 	{
 		RTSFunctionLibrary::ReportError("ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay - World is null.");
+		M_QueuedMoveState.bM_HasPendingQueuedMove = false;
+		DeferTrackedMovementRequestFailure(CompletionAbility, CommandExecutionSerial);
 		return;
 	}
 
@@ -512,6 +539,7 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay_Deferred()
 	const FVector TargetLocation = M_QueuedMoveState.M_TargetLocation;
 	const bool bIsReverse = M_QueuedMoveState.bM_IsReverse;
 	const EAbilityID CompletionAbility = M_QueuedMoveState.M_CompletionAbility;
+	const uint64 CommandExecutionSerial = M_QueuedMoveState.M_CommandExecutionSerial;
 	const float GoalAcceptanceRadiusOverride = M_QueuedMoveState.M_GoalAcceptanceRadiusOverride;
 	M_QueuedMoveState.bM_HasPendingQueuedMove = false;
 	// NOTE: Pending flag is cleared before issuing so failure callbacks can safely enqueue a retry.
@@ -519,6 +547,7 @@ void ATrackedTankMaster::ExecuteTrackedMoveWithNavSettleDelay_Deferred()
 		TargetLocation,
 		bIsReverse,
 		CompletionAbility,
+		CommandExecutionSerial,
 		GoalAcceptanceRadiusOverride);
 }
 
@@ -542,9 +571,11 @@ void ATrackedTankMaster::ResetTrackedReversePathFollowing()
 void ATrackedTankMaster::FullyStopTrackedMovementCommand()
 {
 	CancelPendingTrackedMove();
+	StopMovementCommandInvariantMonitoring();
 	StopBehaviourTree();
 	if (GetIsValidAITankController())
 	{
+		AITankController->ClearQueuedMovementRequestOwnership();
 		AITankController->StopMovement();
 	}
 
@@ -577,14 +608,144 @@ void ATrackedTankMaster::CancelPendingTrackedMove()
 	World->GetTimerManager().ClearTimer(M_DeferredTrackedMoveHandle);
 }
 
+void ATrackedTankMaster::DeferTrackedMovementRequestFailure(
+	const EAbilityID FailedAbility,
+	const uint64 CommandExecutionSerial)
+{
+	TWeakObjectPtr<ATrackedTankMaster> WeakTank(this);
+	FTimerDelegate FailureDelegate;
+	FailureDelegate.BindLambda([WeakTank, FailedAbility, CommandExecutionSerial]()
+	{
+		if (not WeakTank.IsValid())
+		{
+			return;
+		}
+
+		WeakTank->TryDoneExecutingCommand(FailedAbility, CommandExecutionSerial);
+	});
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(FailureDelegate);
+		return;
+	}
+
+	TryDoneExecutingCommand(FailedAbility, CommandExecutionSerial);
+}
+
+void ATrackedTankMaster::StartMovementCommandInvariantMonitoring()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || World->GetTimerManager().IsTimerActive(M_MovementCommandInvariantTimerHandle))
+	{
+		return;
+	}
+
+	ResetOrphanedMovementInvariantGracePeriod();
+	World->GetTimerManager().SetTimer(
+		M_MovementCommandInvariantTimerHandle,
+		this,
+		&ATrackedTankMaster::CheckMovementCommandInvariant,
+		TrackedMovementInvariant::CheckIntervalSeconds,
+		true);
+}
+
+void ATrackedTankMaster::StopMovementCommandInvariantMonitoring()
+{
+	ResetOrphanedMovementInvariantGracePeriod();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_MovementCommandInvariantTimerHandle);
+	}
+}
+
+void ATrackedTankMaster::CheckMovementCommandInvariant()
+{
+	UCommandData* const CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData) || not CommandData->GetIsCurrentCommandAMovementCommand())
+	{
+		StopMovementCommandInvariantMonitoring();
+		return;
+	}
+
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const uint64 CommandExecutionSerial = CommandData->GetCurrentCommandExecutionSerial();
+	AAITankMaster* const TankController = GetAIController();
+	const bool bHasPendingMoveTimer = M_QueuedMoveState.bM_HasPendingQueuedMove &&
+		World->GetTimerManager().IsTimerActive(M_DeferredTrackedMoveHandle);
+	const bool bHasOwnedRequest = IsValid(TankController) &&
+		TankController->GetHasQueuedMovementRequestOwnership(CommandExecutionSerial);
+	const bool bIsPathFollowingIdle = not IsValid(TankController) ||
+		TankController->GetMoveStatus() == EPathFollowingStatus::Idle;
+
+	if (bHasPendingMoveTimer || bHasOwnedRequest || not bIsPathFollowingIdle)
+	{
+		ResetOrphanedMovementInvariantGracePeriod();
+		return;
+	}
+
+	const double CurrentTimeSeconds = World->GetTimeSeconds();
+	if (M_OrphanedMovementInvariantStartTimeSeconds < 0.0)
+	{
+		M_OrphanedMovementInvariantStartTimeSeconds = CurrentTimeSeconds;
+		return;
+	}
+
+	if (CurrentTimeSeconds - M_OrphanedMovementInvariantStartTimeSeconds <
+		TrackedMovementInvariant::OrphanGracePeriodSeconds)
+	{
+		return;
+	}
+
+	RecoverOrphanedMovementCommand(CommandData, TankController);
+}
+
+void ATrackedTankMaster::RecoverOrphanedMovementCommand(
+	UCommandData* CommandData,
+	AAITankMaster* TankController)
+{
+	if (not IsValid(CommandData))
+	{
+		return;
+	}
+
+	const EAbilityID OrphanedAbility = CommandData->GetCurrentlyActiveCommandType();
+	const uint64 CommandExecutionSerial = CommandData->GetCurrentCommandExecutionSerial();
+	RTSFunctionLibrary::ReportError(
+		"Recovered orphaned tracked movement command."
+		"\n Tank: " + GetName() +
+		"\n Ability: " + FString::FromInt(static_cast<int32>(OrphanedAbility)) +
+		"\n Command execution serial: " + FString::Printf(TEXT("%llu"), CommandExecutionSerial));
+
+	StopMovementCommandInvariantMonitoring();
+	CancelPendingTrackedMove();
+	if (IsValid(TankController))
+	{
+		TankController->ClearQueuedMovementRequestOwnership();
+	}
+	TryDoneExecutingCommand(OrphanedAbility, CommandExecutionSerial);
+}
+
+void ATrackedTankMaster::ResetOrphanedMovementInvariantGracePeriod()
+{
+	M_OrphanedMovementInvariantStartTimeSeconds = TrackedMovementInvariant::NoOrphanStartTime;
+}
+
 void ATrackedTankMaster::ExecuteTrackedMoveNow(
 	const FVector& TargetLocation,
 	const bool bIsReverse,
 	const EAbilityID CompletionAbility,
+	const uint64 CommandExecutionSerial,
 	const float GoalAcceptanceRadiusOverride)
 {
 	if (not GetIsValidAITankController())
 	{
+		DeferTrackedMovementRequestFailure(CompletionAbility, CommandExecutionSerial);
 		return;
 	}
 
@@ -595,11 +756,12 @@ void ATrackedTankMaster::ExecuteTrackedMoveNow(
 	}
 
 	AITankController->SetMoveToLocation(TargetLocation);
-	AITankController->SetQueuedMovementCompletionAbility(CompletionAbility);
-	if (not AITankController->MoveToLocationWithGoalAcceptance(TargetLocation, GoalAcceptanceRadiusOverride))
+	if (not AITankController->IssueQueuedMovementRequest(
+		TargetLocation,
+		CompletionAbility,
+		CommandExecutionSerial,
+		GoalAcceptanceRadiusOverride))
 	{
-		AITankController->SetQueuedMovementCompletionAbility(EAbilityID::IdNoAbility);
-		AITankController->OnQueuedMovementRequestFailed(CompletionAbility);
 		return;
 	}
 

@@ -844,6 +844,13 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		return;
 	}
 
+	++M_CurrentCommandExecutionSerial;
+	if (M_CurrentCommandExecutionSerial == 0)
+	{
+		// Zero is reserved for callers that do not own a command execution.
+		++M_CurrentCommandExecutionSerial;
+	}
+
 	StartCooldownForCommand(Cmd);
 
 	// Now we call ICommands methods based on the type:
@@ -3086,6 +3093,33 @@ void ICommands::DoneExecutingCommand(const EAbilityID AbilityFinished)
 		TerminateCommand(AbilityFinished);
 		CommandData->ExecuteCommand(false);
 	}
+}
+
+bool ICommands::TryDoneExecutingCommand(
+	const EAbilityID AbilityFinished,
+	const uint64 CommandExecutionSerial)
+{
+	if (not GetDoesCurrentCommandExecutionMatch(AbilityFinished, CommandExecutionSerial))
+	{
+		return false;
+	}
+
+	DoneExecutingCommand(AbilityFinished);
+	return true;
+}
+
+bool ICommands::GetDoesCurrentCommandExecutionMatch(
+	const EAbilityID ExpectedAbility,
+	const uint64 CommandExecutionSerial)
+{
+	const UCommandData* const CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData) || CommandExecutionSerial == 0)
+	{
+		return false;
+	}
+
+	return CommandData->GetCurrentlyActiveCommandType() == ExpectedAbility &&
+		CommandData->GetCurrentCommandExecutionSerial() == CommandExecutionSerial;
 }
 
 ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUnitToIdle)

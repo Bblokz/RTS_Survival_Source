@@ -70,13 +70,13 @@ namespace TrackFollowingEvasion
 	 * more strongly and starts a larger avoidance turn sooner; decreasing it keeps closer to normal path steering.
 	 * (was 0.85)
 	 */
-	constexpr float ConflictingDirectionSteeringOverrideStrength = 0.9f;
+	constexpr float ConflictingDirectionSteeringOverrideStrength = 0.4f;
 
 	/**
 	 * @brief Minimum absolute steering input enforced during orange avoidance. Increasing it produces harder, wider lateral
 	 * clearance manoeuvres; decreasing it allows gentler curves that may take longer to clear the overlap.
 	 */
-	constexpr float ConflictingDirectionMinimumSteeringMagnitude = 0.75f;
+	constexpr float ConflictingDirectionMinimumSteeringMagnitude = 0.45f;
 
 	/**
 	 * @brief Minimum direction dot product for displacing an idle vehicle and waiting instead of steering around it.

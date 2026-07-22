@@ -8,6 +8,7 @@
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "TankMaster.h"
+#include "TimerManager.h"
 
 
 #include "Navigation/PathFollowingComponent.h"
@@ -63,13 +64,72 @@ bool AAITankMaster::MoveToLocationWithGoalAcceptance(
 	const float GoalAcceptanceRadius = GoalAcceptanceRadiusOverride >= 0.f
 		                                   ? GoalAcceptanceRadiusOverride
 		                                   : m_VehiclePathComp->GetGoalAcceptanceRadius();
-	return TryMoveToLocationWithOffNavRecovery(Location, GoalAcceptanceRadius);
+	const FPathFollowingRequestResult MoveResult = TryMoveToLocationWithOffNavRecovery(
+		Location,
+		GoalAcceptanceRadius);
+	return MoveResult.Code == EPathFollowingRequestResult::RequestSuccessful ||
+		MoveResult.Code == EPathFollowingRequestResult::AlreadyAtGoal;
 }
 
-void AAITankMaster::SetQueuedMovementCompletionAbility(const EAbilityID CompletionAbility)
+bool AAITankMaster::IssueQueuedMovementRequest(
+	const FVector& Location,
+	const EAbilityID CompletionAbility,
+	const uint64 CommandExecutionSerial,
+	const float GoalAcceptanceRadiusOverride)
 {
-	M_QueuedMovementCompletionAbility = CompletionAbility;
-	bM_HasQueuedMovementCompletionAbility = CompletionAbility != EAbilityID::IdNoAbility;
+	if (CompletionAbility == EAbilityID::IdNoAbility || CommandExecutionSerial == 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"AAITankMaster::IssueQueuedMovementRequest received invalid command ownership.");
+		return false;
+	}
+	if (not GetIsValidVehiclePathComp())
+	{
+		DeferQueuedMovementRequestFailure(CompletionAbility, CommandExecutionSerial);
+		return false;
+	}
+
+	M_QueuedMovementRequest.State = EQueuedTankMovementRequestState::Issuing;
+	M_QueuedMovementRequest.RequestID = FAIRequestID::InvalidRequest;
+	M_QueuedMovementRequest.CompletionAbility = CompletionAbility;
+	M_QueuedMovementRequest.CommandExecutionSerial = CommandExecutionSerial;
+
+	const float GoalAcceptanceRadius = GoalAcceptanceRadiusOverride >= 0.f
+		                                   ? GoalAcceptanceRadiusOverride
+		                                   : m_VehiclePathComp->GetGoalAcceptanceRadius();
+	const FPathFollowingRequestResult MoveResult = TryMoveToLocationWithOffNavRecovery(
+		Location,
+		GoalAcceptanceRadius);
+
+	if (MoveResult.Code == EPathFollowingRequestResult::RequestSuccessful)
+	{
+		M_QueuedMovementRequest.State = EQueuedTankMovementRequestState::Active;
+		M_QueuedMovementRequest.RequestID = MoveResult.MoveId;
+		return true;
+	}
+
+	ResetQueuedMovementRequestOwnership();
+	if (MoveResult.Code == EPathFollowingRequestResult::AlreadyAtGoal)
+	{
+		// Unreal reports this synchronously from MoveTo. Resolve next tick so command start logic can finish first.
+		DeferQueuedMovementCompletion(CompletionAbility, CommandExecutionSerial);
+		return true;
+	}
+
+	// Request creation failure can also emit a synchronous Invalid callback. The issuing state deliberately ignored it.
+	DeferQueuedMovementRequestFailure(CompletionAbility, CommandExecutionSerial);
+	return false;
+}
+
+void AAITankMaster::ClearQueuedMovementRequestOwnership()
+{
+	ResetQueuedMovementRequestOwnership();
+}
+
+bool AAITankMaster::GetHasQueuedMovementRequestOwnership(const uint64 CommandExecutionSerial) const
+{
+	return M_QueuedMovementRequest.State != EQueuedTankMovementRequestState::None &&
+		M_QueuedMovementRequest.CommandExecutionSerial == CommandExecutionSerial;
 }
 
 void AAITankMaster::SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress)
@@ -117,44 +177,171 @@ void AAITankMaster::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowing
 		DebugPathFollowingResult(Result);
 	}
 
-	if (not bM_HasQueuedMovementCompletionAbility)
+	// MoveTo can synchronously finish the old request or an immediate result while the new request is being issued.
+	// IssueQueuedMovementRequest owns resolving the returned result after that call unwinds.
+	if (M_QueuedMovementRequest.State == EQueuedTankMovementRequestState::Issuing)
 	{
 		return;
 	}
 
-	const EAbilityID QueuedMovementAbility = M_QueuedMovementCompletionAbility;
-	bM_HasQueuedMovementCompletionAbility = false;
-	M_QueuedMovementCompletionAbility = EAbilityID::IdNoAbility;
+	const bool bOwnsCompletedRequest =
+		M_QueuedMovementRequest.State == EQueuedTankMovementRequestState::Active &&
+		RequestID.IsValid() &&
+		M_QueuedMovementRequest.RequestID.IsValid() &&
+		RequestID.GetID() == M_QueuedMovementRequest.RequestID.GetID();
+	if (not bOwnsCompletedRequest)
+	{
+		return;
+	}
+
+	const EAbilityID QueuedMovementAbility = M_QueuedMovementRequest.CompletionAbility;
+	const uint64 CommandExecutionSerial = M_QueuedMovementRequest.CommandExecutionSerial;
+	ResetQueuedMovementRequestOwnership();
+
+	if (Result.Code == EPathFollowingResult::Aborted &&
+		Result.HasFlag(FPathFollowingResultFlags::NewRequest))
+	{
+		// Replacement requests own their own completion. Never let this stale callback resolve either command.
+		return;
+	}
+
+	if (not GetDoesCommandExecutionStillOwnRequest(QueuedMovementAbility, CommandExecutionSerial))
+	{
+		return;
+	}
 
 	if (Result.Code == EPathFollowingResult::Success)
 	{
-		OnQueuedMovementCompleted(QueuedMovementAbility);
+		OnQueuedMovementCompleted(QueuedMovementAbility, CommandExecutionSerial);
 		return;
 	}
 
-	OnQueuedMovementFailed(QueuedMovementAbility, Result.Code);
+	OnQueuedMovementFailed(QueuedMovementAbility, CommandExecutionSerial, Result.Code);
 }
 
-void AAITankMaster::OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility)
+void AAITankMaster::OnQueuedMovementCompleted(
+	const EAbilityID CompletedMovementAbility,
+	const uint64 CommandExecutionSerial)
 {
 	if (not GetIsValidControlledTank())
 	{
 		return;
 	}
 
-	ControlledTank->DoneExecutingCommand(CompletedMovementAbility);
+	ControlledTank->TryDoneExecutingCommand(CompletedMovementAbility, CommandExecutionSerial);
 }
 
 void AAITankMaster::OnQueuedMovementFailed(
 	const EAbilityID FailedMovementAbility,
+	const uint64 CommandExecutionSerial,
 	const EPathFollowingResult::Type FailedMovementResultCode)
 {
-	(void)FailedMovementAbility;
 	(void)FailedMovementResultCode;
+	if (not GetIsValidControlledTank())
+	{
+		return;
+	}
+
+	ControlledTank->TryDoneExecutingCommand(FailedMovementAbility, CommandExecutionSerial);
 }
 
-void AAITankMaster::OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility)
+void AAITankMaster::OnQueuedMovementRequestFailed(
+	const EAbilityID FailedMovementAbility,
+	const uint64 CommandExecutionSerial)
 {
+	if (not GetIsValidControlledTank())
+	{
+		return;
+	}
+
+	ControlledTank->TryDoneExecutingCommand(FailedMovementAbility, CommandExecutionSerial);
+}
+
+void AAITankMaster::ResetQueuedMovementRequestOwnership()
+{
+	M_QueuedMovementRequest = FQueuedTankMovementRequest();
+}
+
+bool AAITankMaster::GetDoesCommandExecutionStillOwnRequest(
+	const EAbilityID ExpectedAbility,
+	const uint64 CommandExecutionSerial) const
+{
+	if (not GetIsValidControlledTank())
+	{
+		return false;
+	}
+
+	return ControlledTank->GetDoesCurrentCommandExecutionMatch(
+		ExpectedAbility,
+		CommandExecutionSerial);
+}
+
+void AAITankMaster::DeferQueuedMovementCompletion(
+	const EAbilityID CompletionAbility,
+	const uint64 CommandExecutionSerial)
+{
+	TWeakObjectPtr<AAITankMaster> WeakController(this);
+	FTimerDelegate CompletionDelegate;
+	CompletionDelegate.BindLambda([WeakController, CompletionAbility, CommandExecutionSerial]()
+	{
+		if (not WeakController.IsValid())
+		{
+			return;
+		}
+
+		AAITankMaster* const Controller = WeakController.Get();
+		if (not Controller->GetDoesCommandExecutionStillOwnRequest(CompletionAbility, CommandExecutionSerial))
+		{
+			return;
+		}
+
+		Controller->OnQueuedMovementCompleted(CompletionAbility, CommandExecutionSerial);
+	});
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(CompletionDelegate);
+		return;
+	}
+
+	if (GetDoesCommandExecutionStillOwnRequest(CompletionAbility, CommandExecutionSerial))
+	{
+		OnQueuedMovementCompleted(CompletionAbility, CommandExecutionSerial);
+	}
+}
+
+void AAITankMaster::DeferQueuedMovementRequestFailure(
+	const EAbilityID FailedAbility,
+	const uint64 CommandExecutionSerial)
+{
+	TWeakObjectPtr<AAITankMaster> WeakController(this);
+	FTimerDelegate FailureDelegate;
+	FailureDelegate.BindLambda([WeakController, FailedAbility, CommandExecutionSerial]()
+	{
+		if (not WeakController.IsValid())
+		{
+			return;
+		}
+
+		AAITankMaster* const Controller = WeakController.Get();
+		if (not Controller->GetDoesCommandExecutionStillOwnRequest(FailedAbility, CommandExecutionSerial))
+		{
+			return;
+		}
+
+		Controller->OnQueuedMovementRequestFailed(FailedAbility, CommandExecutionSerial);
+	});
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(FailureDelegate);
+		return;
+	}
+
+	if (GetDoesCommandExecutionStillOwnRequest(FailedAbility, CommandExecutionSerial))
+	{
+		OnQueuedMovementRequestFailed(FailedAbility, CommandExecutionSerial);
+	}
 }
 
 void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FPathFindingQuery& Query,
@@ -213,8 +400,11 @@ void AAITankMaster::OnFindPath_ClearOverlapsForNewMovement() const
 	m_VehiclePathComp->ClearOverlapsForNewMovementCommand();
 }
 
-bool AAITankMaster::TryMoveToLocationWithOffNavRecovery(const FVector& Location, const float GoalAcceptanceRadius)
+FPathFollowingRequestResult AAITankMaster::TryMoveToLocationWithOffNavRecovery(
+	const FVector& Location,
+	const float GoalAcceptanceRadius)
 {
+	FPathFollowingRequestResult FailedMoveResult;
 	FAIMoveRequest MoveRequest;
 	MoveRequest.SetGoalLocation(Location);
 	MoveRequest.SetAcceptanceRadius(GoalAcceptanceRadius);
@@ -223,17 +413,10 @@ bool AAITankMaster::TryMoveToLocationWithOffNavRecovery(const FVector& Location,
 
 	if (not EnsureMoveStartIsNavigable(MoveRequest))
 	{
-		return false;
+		return FailedMoveResult;
 	}
 
-	const FPathFollowingRequestResult MoveResult = MoveTo(MoveRequest, nullptr);
-	if (MoveResult.Code == EPathFollowingRequestResult::RequestSuccessful ||
-		MoveResult.Code == EPathFollowingRequestResult::AlreadyAtGoal)
-	{
-		return true;
-	}
-
-	return false;
+	return MoveTo(MoveRequest, nullptr);
 }
 
 bool AAITankMaster::EnsureMoveStartIsNavigable(const FAIMoveRequest& MoveRequest)

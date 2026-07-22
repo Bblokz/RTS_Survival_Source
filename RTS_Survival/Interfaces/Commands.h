@@ -236,6 +236,9 @@ public:
 
 	EAbilityID GetCurrentlyActiveCommandType() const;
 
+	/** @return The monotonically increasing token assigned to the current command execution. */
+	uint64 GetCurrentCommandExecutionSerial() const { return M_CurrentCommandExecutionSerial; }
+
 	bool GetIsQueueFull() const;
 
 	int32 GetQueuedFieldConstructionCommandCount(const EFieldConstructionType ConstructionType) const;
@@ -345,6 +348,9 @@ private:
 	/** The index of the currently active command in M_TCommands. 
 	    -1 means "no active command." */
 	int32 CurrentIndex;
+
+	// Prevents delayed asynchronous completions from resolving a newer command that reuses the same ability id.
+	uint64 M_CurrentCommandExecutionSerial = 0;
 
 	/**
 	 * The "Owner" that implements ICommands and holds this UCommandData.
@@ -807,6 +813,22 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Commands", meta = (BlueprintProtected = "true"))
 	virtual void DoneExecutingCommand(EAbilityID AbilityFinished);
+
+	/**
+	 * @brief Resolves an asynchronous command only while its original execution still owns the queue.
+	 * @param AbilityFinished Ability expected at the active queue index.
+	 * @param CommandExecutionSerial Token captured when that command execution started.
+	 * @return True when the matching command was terminated and the queue advanced.
+	 */
+	bool TryDoneExecutingCommand(EAbilityID AbilityFinished, uint64 CommandExecutionSerial);
+
+	/**
+	 * @brief Guards custom asynchronous phases that must inspect ownership before invoking their completion policy.
+	 * @param ExpectedAbility Ability expected at the active queue index.
+	 * @param CommandExecutionSerial Token captured when that command execution started.
+	 * @return True only while both the ability and execution token still match.
+	 */
+	bool GetDoesCurrentCommandExecutionMatch(EAbilityID ExpectedAbility, uint64 CommandExecutionSerial);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError EnterCargo(

@@ -58,11 +58,13 @@ void AAINomadicVehicle::OnPossess(APawn* InPawn)
 }
 
 
-void AAINomadicVehicle::OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility)
+void AAINomadicVehicle::OnQueuedMovementCompleted(
+	const EAbilityID CompletedMovementAbility,
+	const uint64 CommandExecutionSerial)
 {
 	if (CompletedMovementAbility != EAbilityID::IdCreateBuilding)
 	{
-		Super::OnQueuedMovementCompleted(CompletedMovementAbility);
+		Super::OnQueuedMovementCompleted(CompletedMovementAbility, CommandExecutionSerial);
 		return;
 	}
 
@@ -81,11 +83,15 @@ void AAINomadicVehicle::OnQueuedMovementCompleted(const EAbilityID CompletedMove
 
 void AAINomadicVehicle::OnQueuedMovementFailed(
 	const EAbilityID FailedMovementAbility,
+	const uint64 CommandExecutionSerial,
 	const EPathFollowingResult::Type FailedMovementResultCode)
 {
 	if (FailedMovementAbility != EAbilityID::IdCreateBuilding)
 	{
-		Super::OnQueuedMovementFailed(FailedMovementAbility, FailedMovementResultCode);
+		Super::OnQueuedMovementFailed(
+			FailedMovementAbility,
+			CommandExecutionSerial,
+			FailedMovementResultCode);
 		return;
 	}
 
@@ -116,11 +122,13 @@ void AAINomadicVehicle::OnQueuedMovementFailed(
 	NomadicVehicle->OnMoveToBuildingLocationSucceeded();
 }
 
-void AAINomadicVehicle::OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility)
+void AAINomadicVehicle::OnQueuedMovementRequestFailed(
+	const EAbilityID FailedMovementAbility,
+	const uint64 CommandExecutionSerial)
 {
 	if (FailedMovementAbility != EAbilityID::IdCreateBuilding)
 	{
-		Super::OnQueuedMovementRequestFailed(FailedMovementAbility);
+		Super::OnQueuedMovementRequestFailed(FailedMovementAbility, CommandExecutionSerial);
 		return;
 	}
 

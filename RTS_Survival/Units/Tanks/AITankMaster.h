@@ -27,6 +27,22 @@ struct FTankSteering
 	float RightTrack;
 };
 
+enum class EQueuedTankMovementRequestState : uint8
+{
+	None,
+	Issuing,
+	Active
+};
+
+/** Owns the queue command identity associated with one controller move request. */
+struct FQueuedTankMovementRequest
+{
+	EQueuedTankMovementRequestState State = EQueuedTankMovementRequestState::None;
+	FAIRequestID RequestID;
+	EAbilityID CompletionAbility = EAbilityID::IdNoAbility;
+	uint64 CommandExecutionSerial = 0;
+};
+
 
 /**
  * @brief AI controller for tank masters that centralises tank-only navigation handling and diagnostics.
@@ -71,18 +87,33 @@ public:
 	bool MoveToLocationWithGoalAcceptance(const FVector Location, const float GoalAcceptanceRadiusOverride = -1.f);
 
 	/**
-	 * @brief Stores which movement ability should be completed when the controller reports success.
-	 * @param CompletionAbility Queue ability id expected to complete on successful arrival.
-	 * @note This keeps DoneExecutingCommand source-of-truth in C++ when BT move task is not the movement owner.
+	 * @brief Issues a move whose terminal result may resolve only the command execution that created it.
+	 * @param Location Destination used by pathfinding.
+	 * @param CompletionAbility Queue ability that owns this movement phase.
+	 * @param CommandExecutionSerial Token captured when the owning command execution started.
+	 * @param GoalAcceptanceRadiusOverride Optional acceptance radius used instead of the vehicle default.
+	 * @return True when movement started or the already-at-goal result was accepted for deferred resolution.
 	 */
-	void SetQueuedMovementCompletionAbility(const EAbilityID CompletionAbility);
+	bool IssueQueuedMovementRequest(
+		const FVector& Location,
+		EAbilityID CompletionAbility,
+		uint64 CommandExecutionSerial,
+		float GoalAcceptanceRadiusOverride = -1.f);
+
+	/** Clears completion ownership without aborting the physical path, allowing seamless request replacement. */
+	void ClearQueuedMovementRequestOwnership();
+
+	/** @return True while the supplied command execution is issuing or owns an active request. */
+	bool GetHasQueuedMovementRequestOwnership(uint64 CommandExecutionSerial) const;
 
 	// Ensures harvesters keep UE blocked-move detection disabled throughout harvesting.
 	void SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress);
 
 	virtual void SetDefaultQueryFilter(const TSubclassOf<UNavigationQueryFilter> NewDefaultFilter) override final;
 
-	virtual void OnQueuedMovementRequestFailed(const EAbilityID FailedMovementAbility);
+	virtual void OnQueuedMovementRequestFailed(
+		EAbilityID FailedMovementAbility,
+		uint64 CommandExecutionSerial);
 protected:
 
 	virtual void OnPossess(APawn* InPawn) override;
@@ -91,10 +122,13 @@ protected:
 
 	virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
 
-	virtual void OnQueuedMovementCompleted(const EAbilityID CompletedMovementAbility);
+	virtual void OnQueuedMovementCompleted(
+		EAbilityID CompletedMovementAbility,
+		uint64 CommandExecutionSerial);
 	virtual void OnQueuedMovementFailed(
-		const EAbilityID FailedMovementAbility,
-		const EPathFollowingResult::Type FailedMovementResultCode);
+		EAbilityID FailedMovementAbility,
+		uint64 CommandExecutionSerial,
+		EPathFollowingResult::Type FailedMovementResultCode);
 
 	
 	TArray<FVector> TLocationsToDestination;
@@ -130,9 +164,11 @@ private:
 	 * @brief Ensures physics drift cannot leave a tank without a filter-valid pathfinding start.
 	 * @param Location The desired world-space destination for this command.
 	 * @param GoalAcceptanceRadius The acceptance radius used for this move request.
-	 * @return True when the validated move request starts path following.
+	 * @return Unreal request result containing both start status and the allocated request id.
 	 */
-	bool TryMoveToLocationWithOffNavRecovery(const FVector& Location, const float GoalAcceptanceRadius);
+	FPathFollowingRequestResult TryMoveToLocationWithOffNavRecovery(
+		const FVector& Location,
+		float GoalAcceptanceRadius);
 
 	/**
 	 * @brief Recovers an invalid start before MoveTo can emit a synchronous invalid completion.
@@ -198,8 +234,15 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTrackPathFollowingComponent> m_VehiclePathComp;
 
-	bool bM_HasQueuedMovementCompletionAbility = false;
-	EAbilityID M_QueuedMovementCompletionAbility = EAbilityID::IdNoAbility;
+	// Request identity and command token must remain coupled until one matching terminal callback consumes both.
+	FQueuedTankMovementRequest M_QueuedMovementRequest;
+
+	void ResetQueuedMovementRequestOwnership();
+	bool GetDoesCommandExecutionStillOwnRequest(
+		EAbilityID ExpectedAbility,
+		uint64 CommandExecutionSerial) const;
+	void DeferQueuedMovementCompletion(EAbilityID CompletionAbility, uint64 CommandExecutionSerial);
+	void DeferQueuedMovementRequestFailure(EAbilityID FailedAbility, uint64 CommandExecutionSerial);
 
 	// Bounds recovery to the unit's stable formation footprint so barriers cannot be crossed by correction.
 	float M_FormationUnitInnerRadius = 0.0f;

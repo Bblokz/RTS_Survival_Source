@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "BehaviorTree/Tasks/BTTask_MoveTo.h"
+#include "RTS_Survival/Player/Abilities.h"
 #include "Task_VehicleMoveTo.generated.h"
 
 class UTrackPathFollowingComponent;
@@ -28,7 +29,11 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Vehicle AI")
 		bool bReverseTowardsTarget = false;
 
-	UBlackboardComponent* MyBlackboard;
-	UTrackPathFollowingComponent* VehiclePathComp;
+private:
+	uint64 M_CommandExecutionSerial = 0;
+	EAbilityID M_MovementAbility = EAbilityID::IdNoAbility;
+
+	UTrackPathFollowingComponent* GetVehiclePathFollowingComponent(
+		const UBehaviorTreeComponent& OwnerComp) const;
 
 };

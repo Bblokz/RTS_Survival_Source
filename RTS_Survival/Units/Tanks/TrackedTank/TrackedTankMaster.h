@@ -36,6 +36,8 @@ struct FTrackedTankQueuedMoveState
 	bool bM_IsReverse = false;
 	// Completes the command that owns this movement after the controller reports success.
 	EAbilityID M_CompletionAbility = EAbilityID::IdNoAbility;
+	// Prevents delayed movement results from resolving a later execution of the same ability.
+	uint64 M_CommandExecutionSerial = 0;
 	// Optional request radius for movement commands that need a non-default acceptance radius.
 	float M_GoalAcceptanceRadiusOverride = -1.f;
 	// Captures whether request began from near-stationary speed to decide if nav-settle delay should be applied.
@@ -340,12 +342,15 @@ protected:
 	 * @brief Executes the already-normalized move request so queue completion and reverse mode stay in sync.
 	 * @param TargetLocation Destination that passed delay/coalescing policy.
 	 * @param bIsReverse Whether completion should map to reverse movement semantics.
-	 * @note Always set queued movement completion ability before issuing controller move request.
+	 * @param CompletionAbility Queue ability that owns the movement phase.
+	 * @param CommandExecutionSerial Token captured when the owning command execution started.
+	 * @param GoalAcceptanceRadiusOverride Acceptance radius used instead of the path component default.
 	 */
 	void ExecuteTrackedMoveNow(
 		const FVector& TargetLocation,
 		const bool bIsReverse,
 		const EAbilityID CompletionAbility,
+		uint64 CommandExecutionSerial,
 		const float GoalAcceptanceRadiusOverride);
 
 	/**
@@ -364,6 +369,26 @@ protected:
 
 	void CancelPendingTrackedMove();
 
+	/**
+	 * @brief Defers pre-controller failures so existing command-start collision sequencing can finish safely.
+	 * @param FailedAbility Queue ability whose movement could not be issued.
+	 * @param CommandExecutionSerial Token captured when the owning command execution started.
+	 */
+	void DeferTrackedMovementRequestFailure(EAbilityID FailedAbility, uint64 CommandExecutionSerial);
+
+	void StartMovementCommandInvariantMonitoring();
+	void StopMovementCommandInvariantMonitoring();
+	void CheckMovementCommandInvariant();
+	void ResetOrphanedMovementInvariantGracePeriod();
+	/**
+	 * @brief Terminates movement only after the request/pending-work invariant has remained broken past its grace period.
+	 * @param CommandData Command state whose current execution is being repaired.
+	 * @param TankController Controller used to discard any stale request ownership.
+	 */
+	void RecoverOrphanedMovementCommand(
+		UCommandData* CommandData,
+		AAITankMaster* TankController);
+
 	void HandleVoiceLineOnLevelUp() const; 
 
 	// Aggregates the currently requested move so stationary starts can wait for nav settle, while chains can repath instantly.
@@ -372,5 +397,8 @@ protected:
 
 	UPROPERTY()
 	FTimerHandle M_DeferredTrackedMoveHandle;
+
+	FTimerHandle M_MovementCommandInvariantTimerHandle;
+	double M_OrphanedMovementInvariantStartTimeSeconds = -1.0;
 
 };
