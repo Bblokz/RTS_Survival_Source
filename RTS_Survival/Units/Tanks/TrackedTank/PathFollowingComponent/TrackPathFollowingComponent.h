@@ -10,6 +10,8 @@
 
 class UTrackPhysicsMovement;
 class ATrackedTankMaster;
+class UTrackPathFollowingComponent;
+class URTSOverlapEvasionComponent;
 
 /**
  * @brief Captures overlap tracking data for allied actors while path following.
@@ -24,6 +26,84 @@ struct FOverlapActorData
 
 	UPROPERTY()
 	float TimeRegisteredSeconds = 0.f;
+};
+
+UENUM()
+enum class EOverlapPassingSide : uint8
+{
+	Left,
+	Right
+};
+
+/**
+ * @brief Caches everything needed to avoid a moving allied vehicle without hot-path discovery work.
+ */
+USTRUCT()
+struct FMovingAlliedOverlapData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> Actor;
+
+	UPROPERTY()
+	TWeakObjectPtr<UTrackPathFollowingComponent> PathFollowingComponent;
+
+	UPROPERTY()
+	float LastConfirmedCloseTimeSeconds = 0.f;
+
+	UPROPERTY()
+	float ClearanceDistanceSquared = 0.f;
+
+	EOverlapPassingSide PassingSide = EOverlapPassingSide::Right;
+	bool bYieldWhenSideBySide = false;
+};
+
+/** Caches a passive idle ally that should be steered around unless it becomes a direct obstruction. */
+USTRUCT()
+struct FIdleAlliedOverlapAvoidanceData
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> Actor;
+
+	UPROPERTY()
+	float LastConfirmedCloseTimeSeconds = 0.f;
+
+	UPROPERTY()
+	float ClearanceDistanceSquared = 0.f;
+
+	EOverlapPassingSide PassingSide = EOverlapPassingSide::Right;
+};
+
+enum class EIdleOverlapResponse : uint8
+{
+	DisplaceAndWait,
+	SteerAround
+};
+
+enum class EOverlapAdjustmentReason : uint8
+{
+	None,
+	FollowingSameDirection,
+	AvoidingConflictingDirection,
+	AvoidingIdleVehicle,
+	ResolvingDeadlock
+};
+
+/** Holds the strongest control limits produced by all current allied overlap contacts. */
+struct FOverlapAdjustment
+{
+	float DesiredSpeedCap = MAX_flt;
+	float ThrottleScale = 1.f;
+	float SteeringDirection = 0.f;
+	bool bShouldAdjustSteering = false;
+	bool bIsLimitingMovement = false;
+	bool bHasSameDirectionSpeedLimit = false;
+	EOverlapAdjustmentReason Reason = EOverlapAdjustmentReason::None;
+	TWeakObjectPtr<AActor> PrimaryActor;
+	TWeakObjectPtr<UTrackPathFollowingComponent> PrimaryPathFollowingComponent;
 };
 
 /* Enumeration defining the speed units used for speed control */
@@ -90,11 +170,41 @@ public:
 	void RegisterIdleBlockingActor(AActor* InActor);
 
 	/**
+	 * @brief Caches a moving allied overlap so per-frame avoidance needs no casts or component searches.
+	 * @param InActor Moving allied vehicle that currently overlaps this vehicle.
+	 * @param InPathFollowingComponent The other vehicle's tracked path component used to read its live destination.
+	 * @param ClearanceDistance Distance beyond which a missed end-overlap may be cleaned up safely.
+	 */
+	void RegisterMovingOverlappingActor(
+		AActor* InActor,
+		UTrackPathFollowingComponent* InPathFollowingComponent,
+		float ClearanceDistance);
+
+	/**
+	 * @brief Caches an idle ally for orange steering without disturbing its formation position.
+	 * @param InActor Idle allied vehicle currently touching this vehicle.
+	 * @param ClearanceDistance Distance beyond which missed end-overlaps may be cleaned up safely.
+	 */
+	void RegisterIdleSteeringAvoidanceActor(AActor* InActor, float ClearanceDistance);
+
+	/**
+	 * @brief Reserves displacement for idle allies lying directly in the active driving corridor.
+	 * @param InActor Idle allied vehicle being classified.
+	 * @return Whether the ally must move away or can remain stationary while this vehicle steers around it.
+	 */
+	EIdleOverlapResponse GetIdleOverlapResponse(const AActor* InActor) const;
+
+	void SetRTSOverlapEvasionComponent(URTSOverlapEvasionComponent* InOverlapEvasionComponent);
+
+	/**
 	 * @brief Returns true if any valid blocking overlaps are currently registered.
 	 * @return true when at least one valid actor is still considered blocking.
 	 */
 	void DeregisterOverlapBlockingActor(AActor* InActor);
 	bool HasBlockingOverlaps() const;
+
+	/** @return The immediate destination currently driving steering for this vehicle. */
+	FVector GetCurrentDrivingDestination() const { return VehicleCurrentDestination; }
 
 	/************/
 	/* Reverse */
@@ -558,10 +668,38 @@ private:
 	UPROPERTY()
 	TArray<FOverlapActorData> M_IdleAlliedBlockingActors;
 
+	// Moving allies use reciprocal steering/speed adjustment and must survive path replacements until physically clear.
+	UPROPERTY()
+	TArray<FMovingAlliedOverlapData> M_MovingAlliedOverlapActors;
+
+	// Idle allies normally remain in formation and are handled by orange steering rather than displacement.
+	UPROPERTY()
+	TArray<FIdleAlliedOverlapAvoidanceData> M_IdleAlliedAvoidanceActors;
+
+	UPROPERTY()
+	TWeakObjectPtr<URTSOverlapEvasionComponent> M_RTSOverlapEvasionComponent;
+
+	// Published yellow-follow dependency; other vehicles traverse these links to find cycles without allocations.
+	UPROPERTY()
+	TWeakObjectPtr<UTrackPathFollowingComponent> M_MovingOverlapYieldDependency;
+
 	static int32 M_TicksCountCheckOverlappers;
 	static float M_TimeTillDiscardOverlap;
 
-	void DebugWaitingForIdleOverlappingActors(const float DeltaTime);
+	void DebugWaitingForIdleOverlappingActors(float DeltaTime) const;
+
+	/**
+	 * @brief Makes overlap control decisions visible without adding work to non-debug builds.
+	 * @param Adjustment Aggregated reason and limiting contact for this frame.
+	 * @param FinalThrottle Throttle after overlap limiting has been applied.
+	 * @param FinalSteering Steering after overlap avoidance has been blended.
+	 * @param DeltaTime Lifetime for the in-world debug message.
+	 */
+	void DebugOverlapAdjustment(
+		const FOverlapAdjustment& Adjustment,
+		float FinalThrottle,
+		float FinalSteering,
+		float DeltaTime) const;
 
 	// Last steering command applied to the vehicle; reused while paused for overlaps.
 	float M_LastSteeringInput = 0.f;
@@ -650,6 +788,8 @@ private:
 	void RemoveExpiredOverlaps(
 		const float CurrentTimeSeconds,
 		TArray<FOverlapActorData>& TargetArray);
+	void RemoveStaleMovingOverlaps(float CurrentTimeSeconds);
+	void RemoveStaleIdleAvoidanceOverlaps(float CurrentTimeSeconds);
 	void RemoveInvalidOverlaps(TArray<FOverlapActorData>& TargetArray) const;
 	void AddOverlapActorData(
 		TArray<FOverlapActorData>& TargetArray,
@@ -660,6 +800,54 @@ private:
 	void RemoveOverlapActorFromArray(
 		TArray<FOverlapActorData>& TargetArray,
 		AActor* InActor);
+	void RemoveMovingOverlapActor(AActor* InActor);
+	void RemoveIdleSteeringAvoidanceActor(AActor* InActor);
+	EOverlapPassingSide CalculateOverlapPassingSide(const AActor* InActor) const;
+	bool GetIsValidRTSOverlapEvasionComponent() const;
+	void TryEscalateIdleAvoidanceContacts();
+
+	/**
+	 * @brief Aggregates moving-contact controls while keeping normal path steering authoritative.
+	 * @param Destination Immediate destination used by this vehicle's path steering.
+	 * @return Strongest speed and steering limits required by current moving contacts.
+	 */
+	FOverlapAdjustment CalculateOverlapAdjustment(const FVector& Destination);
+
+	/**
+	 * @brief Applies the nearest orange steering contact while preserving stronger yellow speed limits.
+	 * @param RelativeLocation Other vehicle location relative to this vehicle.
+	 * @param PassingSide Latched side used to prevent left/right oscillation.
+	 * @param OtherActor Vehicle being avoided.
+	 * @param OtherPathFollowingComponent Cached path component, or null for a stationary idle vehicle.
+	 * @param Reason Orange response type used by debug output.
+	 * @param ClosestDistanceSquared Current nearest orange contact, updated when this one is nearer.
+	 * @param Adjustment Aggregated overlap response updated by this contact.
+	 */
+	void ApplySteeringAvoidanceContact(
+		const FVector& RelativeLocation,
+		EOverlapPassingSide PassingSide,
+		AActor* OtherActor,
+		UTrackPathFollowingComponent* OtherPathFollowingComponent,
+		EOverlapAdjustmentReason Reason,
+		float& ClosestDistanceSquared,
+		FOverlapAdjustment& Adjustment) const;
+
+	/**
+	 * @brief Deterministically releases one vehicle when yellow-follow dependencies form a cycle.
+	 * @param Adjustment Current strongest overlap response, replaced with a deadlock release for the cycle winner.
+	 */
+	void ResolveMovingOverlapDeadlock(FOverlapAdjustment& Adjustment);
+	void ResetMovingOverlapYieldDependency();
+
+	/**
+	 * @brief Uses a live path target with velocity/facing fallbacks to compare physical travel intent.
+	 * @param VehicleActor Vehicle whose intended travel direction is needed.
+	 * @param VehiclePathFollowingComponent Cached path component that owns the live driving destination.
+	 * @return Normalized two-dimensional travel direction.
+	 */
+	FVector GetMovingOverlapTravelDirection(
+		const AActor* VehicleActor,
+		const UTrackPathFollowingComponent* VehiclePathFollowingComponent) const;
 	float GetCurrentWorldTimeSeconds() const;
 	void DebugRemovedOverlapActor(
 		const FString& Reason,
@@ -693,7 +881,8 @@ private:
 
 
 	// Used by FindTeleportLocation to get a direction to teleport in. 
-	FVector VehicleCurrentDestination;
+	FVector VehicleCurrentDestination = FVector::ZeroVector;
+	bool bM_HasCurrentDrivingDestination = false;
 
 	/* The average angle ahead within the sample range */
 	float AverageAheadAngle = 0.f;
@@ -755,6 +944,6 @@ private:
 	// Toggles UE's internal blocked-move detection (idempotent; safe to call every frame).
 	void SetEngineBlockDetectionSuppressed(const bool bShouldBeSuppressed);
 
-	// Convenience for the idle-blocker wait case (keeps UpdateDriving clean).
-	void UpdateEngineBlockDetectionForIdleBlockerWait(const bool bIsWaitingForIdleBlockers);
+	// Prevents deliberate overlap responses from being mistaken for a blocked path.
+	void UpdateEngineBlockDetectionForOverlapResponse(bool bShouldSuppressForOverlap);
 };

@@ -6,6 +6,7 @@
 #include "NavigationSystem.h"
 #include "DrawDebugHelpers.h"
 #include "Components/PrimitiveComponent.h"
+#include "RTS_Survival/Units/Tanks/AITankMaster.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 
 namespace
@@ -52,7 +53,17 @@ void URTSOverlapEvasionComponent::TrackOverlapMeshOfOwner(ATrackedTankMaster* co
 
 bool URTSOverlapEvasionComponent::GetIsValidOwnerTrackPathFollowingComponent() const
 {
-	return M_OwnerTrackPathFollowingComponent.IsValid();
+	if (M_OwnerTrackPathFollowingComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_OwnerTrackPathFollowingComponent"),
+		TEXT("URTSOverlapEvasionComponent::GetIsValidOwnerTrackPathFollowingComponent"),
+		this);
+	return false;
 }
 
 void URTSOverlapEvasionComponent::SetupTrackPathFollowingCompFromOwner()
@@ -73,6 +84,7 @@ void URTSOverlapEvasionComponent::SetupTrackPathFollowingCompFromOwner()
 			return;
 		}
 		M_OwnerTrackPathFollowingComponent = PathFollowingComp;
+		PathFollowingComp->SetRTSOverlapEvasionComponent(this);
 	}
 }
 
@@ -83,13 +95,9 @@ void URTSOverlapEvasionComponent::OnChassisOverlap(UPrimitiveComponent* Overlapp
                                                    bool /*bFromSweep*/,
                                                    const FHitResult& /*SweepResult*/)
 {
-	if (not M_Owner.IsValid() || not IsValid(OtherActor) || not M_OwnerCommandsInterface.GetInterface())
+	if (not M_Owner.IsValid() || not IsValid(OtherActor) || OtherActor == M_Owner.Get() ||
+		not M_OwnerCommandsInterface.GetInterface())
 	{
-		return;
-	}
-	if (M_OwnerCommandsInterface->GetIsUnitIdle())
-	{
-		// Do not try to evade others if idle ourselves
 		return;
 	}
 
@@ -104,11 +112,31 @@ void URTSOverlapEvasionComponent::OnChassisOverlap(UPrimitiveComponent* Overlapp
 		}
 		return;
 	}
+	M_PendingRemovalActors.Remove(TWeakObjectPtr<AActor>(OtherActor));
+
+	if (M_OwnerCommandsInterface->GetIsUnitIdle())
+	{
+		// Cache contacts while idle so a later move that starts inside the overlap can react immediately.
+		ICommands* const OtherCommands = Cast<ICommands>(OtherActor);
+		if (OtherCommands && not OtherCommands->GetIsUnitIdle())
+		{
+			TryRegisterMovingOverlappingTank(OtherActor, OtherCommands, OtherRtsComp);
+		}
+		else if (OtherCommands && GetIsValidOwnerTrackPathFollowingComponent())
+		{
+			const float ClearanceDistance =
+				OtherRtsComp->GetFormationUnitInnerRadius() * GOverlapClearanceRadiusScale;
+			M_OwnerTrackPathFollowingComponent->RegisterIdleSteeringAvoidanceActor(
+				OtherActor,
+				ClearanceDistance);
+		}
+		return;
+	}
 
 	const FVector ContactLocation = IsValid(OtherComp)
 		                                ? OtherComp->GetComponentLocation()
 		                                : OtherActor->GetActorLocation();
-	TryEvasion(OtherActor, OtherRtsComp, ContactLocation);
+	TryEvasion(OtherActor, OtherRtsComp, ContactLocation, true);
 }
 
 void URTSOverlapEvasionComponent::CheckFootprintForOverlaps()
@@ -337,8 +365,8 @@ void URTSOverlapEvasionComponent::ProcessFootprintOverlaps(
 			continue;
 		}
 
-		// Try to push idle allied actor out of our footprint.
-		TryEvasion(Other, OtherRTSComp, Pair.Value);
+		// Cache moving and idle allied contacts without displacing idle actors after movement has finished.
+		TryEvasion(Other, OtherRTSComp, Pair.Value, false);
 	}
 }
 
@@ -444,37 +472,113 @@ void URTSOverlapEvasionComponent::CheckFootprintForOverlaps_BuildUniqueList(
 	}
 }
 
-void URTSOverlapEvasionComponent::OnOverlappedTankNotIdle(ICommands* OtherTank) const
+void URTSOverlapEvasionComponent::TryRegisterMovingOverlappingTank(
+	AActor* OtherActor,
+	ICommands* OtherCommands,
+	const URTSComponent* OtherRTS) const
 {
-	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	if (not IsValid(OtherActor) || not OtherCommands || not IsValid(OtherRTS))
 	{
-		OtherTank->GetCurrentActiveCommand();
-		UWorld* World = GetWorld();
-		if (not World)
-		{
-			return;
-		}
-		DrawDebugString(World, OtherTank->GetOwnerLocation() + FVector(0,0,400), "Not idle: " + Global_GetAbilityIDAsString(OtherTank->GetCurrentActiveCommand()),
-			nullptr, FColor::Red, 2);
+		return;
 	}
+
+	const UCommandData* const OtherCommandData = OtherCommands->GetIsValidCommandData();
+	if (not IsValid(OtherCommandData) || not OtherCommandData->GetIsCurrentCommandAMovementCommand())
+	{
+		return;
+	}
+
+	ATrackedTankMaster* const OtherTank = Cast<ATrackedTankMaster>(OtherActor);
+	if (not IsValid(OtherTank))
+	{
+		return;
+	}
+
+	AAITankMaster* const OtherController = OtherTank->GetAIController();
+	if (not IsValid(OtherController))
+	{
+		return;
+	}
+
+	UTrackPathFollowingComponent* const OtherPathFollowingComponent =
+		Cast<UTrackPathFollowingComponent>(OtherController->GetPathFollowingComponent());
+	if (not IsValid(OtherPathFollowingComponent))
+	{
+		return;
+	}
+	if (not GetIsValidOwnerTrackPathFollowingComponent())
+	{
+		return;
+	}
+
+	const float ClearanceDistance = OtherRTS->GetFormationUnitInnerRadius() * GOverlapClearanceRadiusScale;
+	M_OwnerTrackPathFollowingComponent->RegisterMovingOverlappingActor(
+		OtherActor,
+		OtherPathFollowingComponent,
+		ClearanceDistance);
 }
 
+bool URTSOverlapEvasionComponent::TryIssueIdleVehicleEvasionCommand(
+	AActor* OtherActor,
+	ICommands* OtherCommands,
+	const URTSComponent* OtherRTS,
+	const FVector& ContactLocation) const
+{
+	if (not M_Owner.IsValid() || not IsValid(OtherActor) || not OtherCommands || not IsValid(OtherRTS))
+	{
+		return false;
+	}
 
-// bool URTSOverlapEvasionComponent::GetResolveDeadlockWithOther(const AActor* OtherAlliedActor) const
-// {
-// 	if (not M_Owner.IsValid() || not IsValid(OtherAlliedActor))
-// 	{
-// 		return false;
-// 	}
-//
-// 	// Deterministic tie-breaker: only the actor with the higher unique ID registers the overlap.
-// 	const int32 OwnerUniqueId = M_Owner->GetUniqueID();
-// 	const int32 AlliedUniqueId = OtherAlliedActor->GetUniqueID();
-// 	return OwnerUniqueId > AlliedUniqueId;
-// }
-//
-void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSComponent* OtherRTS,
-                                             const FVector& ContactLocation) const
+	FVector ProjectedLocation;
+	if (not ComputeEvasionLocation(
+		M_Owner->GetActorLocation(),
+		ContactLocation,
+		OtherRTS->GetFormationUnitInnerRadius(),
+		ProjectedLocation,
+		OtherActor))
+	{
+		return false;
+	}
+
+	const FRotator DesiredFinalRotation = OtherActor->GetActorRotation();
+	return OtherCommands->MoveToLocation(
+		ProjectedLocation,
+		true,
+		DesiredFinalRotation,
+		true) == ECommandQueueError::NoError;
+}
+
+bool URTSOverlapEvasionComponent::TryDisplaceIdleOverlappingVehicle(AActor* OtherActor) const
+{
+	if (not M_Owner.IsValid() || not IsValid(OtherActor))
+	{
+		return false;
+	}
+
+	URTSComponent* OtherRTS = nullptr;
+	if (not HaveSameOwningPlayer(OtherActor, OtherRTS))
+	{
+		return false;
+	}
+
+	ICommands* const OtherCommands = Cast<ICommands>(OtherActor);
+	if (not OtherCommands || not OtherCommands->GetIsUnitIdle())
+	{
+		return false;
+	}
+
+	return TryIssueIdleVehicleEvasionCommand(
+		OtherActor,
+		OtherCommands,
+		OtherRTS,
+		OtherActor->GetActorLocation());
+}
+
+void URTSOverlapEvasionComponent::TryEvasion(
+	AActor* const OtherActor,
+	URTSComponent* OtherRTS,
+	const FVector& ContactLocation,
+	const bool bAllowIdleDisplacement) const
 {
 	if (not M_Owner.IsValid() || not IsValid(OtherActor))
 	{
@@ -491,7 +595,7 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 
 	if (not OtherCommands->GetIsUnitIdle())
 	{
-		OnOverlappedTankNotIdle(OtherCommands);
+		TryRegisterMovingOverlappingTank(OtherActor, OtherCommands, OtherRTS);
 		return;
 	}
 
@@ -499,24 +603,27 @@ void URTSOverlapEvasionComponent::TryEvasion(AActor* const OtherActor, URTSCompo
 	{
 		return;
 	}
-
-	const float InnerRadius = OtherRTS->GetFormationUnitInnerRadius();
-	const FVector SelfLoc = M_Owner->GetActorLocation();
-	const FVector CollisionLoc = ContactLocation;
-
-	FVector ProjectedLoc;
-	if (ComputeEvasionLocation(SelfLoc, CollisionLoc, InnerRadius, ProjectedLoc, OtherActor))
+	if (not GetIsValidOwnerTrackPathFollowingComponent())
 	{
-		const FRotator DesiredFinalRotation = OtherActor->GetActorRotation();
-
-		if (OtherCommands->MoveToLocation(ProjectedLoc, true, DesiredFinalRotation, true) == ECommandQueueError::NoError)
-		{
-			if (GetIsValidOwnerTrackPathFollowingComponent())
-			{
-				M_OwnerTrackPathFollowingComponent->RegisterIdleBlockingActor(OtherActor);
-			}
-		}
+		return;
 	}
+
+	const float ClearanceDistance =
+		OtherRTS->GetFormationUnitInnerRadius() * GOverlapClearanceRadiusScale;
+	const EIdleOverlapResponse IdleOverlapResponse = bAllowIdleDisplacement
+		                                                ? M_OwnerTrackPathFollowingComponent->GetIdleOverlapResponse(
+			                                                OtherActor)
+		                                                : EIdleOverlapResponse::SteerAround;
+	if (IdleOverlapResponse == EIdleOverlapResponse::DisplaceAndWait &&
+		TryIssueIdleVehicleEvasionCommand(OtherActor, OtherCommands, OtherRTS, ContactLocation))
+	{
+		M_OwnerTrackPathFollowingComponent->RegisterIdleBlockingActor(OtherActor);
+		return;
+	}
+
+	M_OwnerTrackPathFollowingComponent->RegisterIdleSteeringAvoidanceActor(
+		OtherActor,
+		ClearanceDistance);
 }
 
 void URTSOverlapEvasionComponent::TryEvasionSquadUnit(AActor* OtherActor, const FVector& ContactLocation) const

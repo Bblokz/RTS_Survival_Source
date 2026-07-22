@@ -12,9 +12,6 @@ class ATrackedTankMaster;
 
 #include "RTSOverlapEvasionComponent.generated.h"
 
-class URTSComponent;
-class ATrackedTankMaster;
-
 /** Small state for debounced removal. */
 USTRUCT()
 struct FPendingOverlapRemoval
@@ -24,6 +21,10 @@ struct FPendingOverlapRemoval
 	int32 ClearSamples = 0;
 };
 
+/**
+ * @brief Coordinates allied vehicle overlap responses and hands persistent driving contacts to path following.
+ * @note TrackOverlapMeshOfOwner: call for every vehicle footprint mesh that should participate in evasion.
+ */
 UCLASS(ClassGroup=(RTS), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API URTSOverlapEvasionComponent : public UActorComponent
 {
@@ -44,6 +45,13 @@ public:
 	void CheckFootprintForOverlaps();
 
 	void SetOverlapEvasionEnabled(const bool bEnabled);
+
+	/**
+	 * @brief Moves a still-idle allied vehicle only after path following classifies it as a direct obstruction.
+	 * @param OtherActor Idle allied vehicle that blocks the active driving corridor.
+	 * @return True only when an evasion movement command was issued successfully.
+	 */
+	bool TryDisplaceIdleOverlappingVehicle(AActor* OtherActor) const;
 
 protected:
 	virtual void BeginPlay() override;
@@ -75,7 +83,18 @@ private:
 	                      UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
 	                      bool bFromSweep, const FHitResult& SweepResult);
 
-	void TryEvasion(AActor* OtherActor, URTSComponent* OtherRTS, const FVector& ContactLocation) const;
+	/**
+	 * @brief Classifies vehicle contacts while preventing post-movement footprint scans from using stale drive intent.
+	 * @param OtherActor Allied actor currently overlapping the footprint.
+	 * @param OtherRTS RTS data belonging to the other actor.
+	 * @param ContactLocation Best available overlap contact location.
+	 * @param bAllowIdleDisplacement Whether an active drive may escalate a direct idle obstruction to move-and-wait.
+	 */
+	void TryEvasion(
+		AActor* OtherActor,
+		URTSComponent* OtherRTS,
+		const FVector& ContactLocation,
+		bool bAllowIdleDisplacement) const;
 	void TryEvasionSquadUnit(AActor* OtherActor, const FVector& ContactLocation) const;
 
 	void SetupOwningPlayer(ATrackedTankMaster* Owner);
@@ -133,9 +152,28 @@ private:
                 const TMap<TWeakObjectPtr<AActor>, int32>& SampleCounts,
                 TArray<TPair<TWeakObjectPtr<AActor>, FVector>>& OutUniqueOverlaps) const;
 
-	
-	void OnOverlappedTankNotIdle(ICommands* OtherTank) const;
+	/**
+	 * @brief Registers only explicit movement commands so non-movement activity never enters driving avoidance.
+	 * @param OtherActor Allied vehicle currently overlapping the owner's footprint.
+	 * @param OtherCommands Command interface used once to classify the current command.
+	 * @param OtherRTS RTS data used to cache the physical-clearance distance.
+	 */
+	void TryRegisterMovingOverlappingTank(
+		AActor* OtherActor,
+		ICommands* OtherCommands,
+		const URTSComponent* OtherRTS) const;
 
-
-	
+	/**
+	 * @brief Issues the existing move-away command after the caller has chosen the extreme displacement response.
+	 * @param OtherActor Idle allied vehicle to move.
+	 * @param OtherCommands Valid command interface belonging to the idle vehicle.
+	 * @param OtherRTS RTS data providing its evasion distance.
+	 * @param ContactLocation Best available overlap contact location.
+	 * @return True when projection and command submission both succeeded.
+	 */
+	bool TryIssueIdleVehicleEvasionCommand(
+		AActor* OtherActor,
+		ICommands* OtherCommands,
+		const URTSComponent* OtherRTS,
+		const FVector& ContactLocation) const;
 };

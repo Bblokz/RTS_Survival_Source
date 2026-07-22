@@ -16,13 +16,111 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/TrackedTankMaster.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/AI/AITrackTank.h"
+#include "RTS_Survival/Units/Tanks/FRTSOverlapEvasion/RTSOverlapEvasionComponent.h"
 #include "RTS_Survival/Units/Tanks/VehicleAI/Utils/VehicleAIFunctionLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/Navigator/RTSNavigator.h"
 
 namespace TrackFollowingEvasion
 {
-	constexpr float ZOffsetDebug = 400;
+	/**
+	 * @brief Vertical offset for normal overlap debug text. Increasing it raises all red/yellow/orange messages;
+	 * decreasing it places them closer to the vehicle and can make them intersect the mesh.
+	 */
+	constexpr float ZOffsetDebug = 400.f;
+
+	/**
+	 * @brief Initial reserved capacity for simultaneously moving overlap contacts. Increasing it uses more memory per vehicle
+	 * but avoids reallocations in unusually dense traffic; decreasing it saves memory but may allocate sooner.
+	 */
+	constexpr int32 ExpectedMovingOverlapCount = 4;
+
+	/**
+	 * @brief Initial reserved capacity for stationary idle contacts steered around in orange mode. Increasing it reduces
+	 * reallocations in dense formations; decreasing it reduces reserved memory when idle overlaps are rare.
+	 */
+	constexpr int32 ExpectedIdleOverlapCount = 4;
+
+	/**
+	 * @brief Minimum direction dot product for two moving vehicles to use yellow following instead of orange avoidance.
+	 * Increasing it requires more parallel routes; decreasing it classifies wider angular differences as following.
+	 */
+	constexpr float SameDirectionDotThreshold = 0.8f;
+
+	/**
+	 * @brief Multiplier applied to the leading vehicle's speed for the yellow follower speed cap. Increasing it lets followers
+	 * stay closer to leader speed; decreasing it opens gaps faster but makes dependency queues progress more slowly.
+	 */
+	constexpr float SameDirectionLeaderSpeedScale = 0.85f;
+
+	/**
+	 * @brief Additional throttle multiplier used only by normal yellow following. Increasing it retains more engine input;
+	 * decreasing it softens closing speed more aggressively. This does not affect orange steering avoidance.
+	 */
+	constexpr float SameDirectionThrottleScale = 0.85f;
+
+	/**
+	 * @brief Throttle retained during orange steering avoidance. Keep in [0, 1]: increasing it preserves more speed through
+	 * avoidance turns, while decreasing it makes orange contacts slower and less forceful.
+	 */
+	constexpr float ConflictingDirectionThrottleScale = 1.33f;
+
+	/**
+	 * @brief Blend weight from normal path steering toward the latched orange passing side. Increasing it overrides the route
+	 * more strongly and starts a larger avoidance turn sooner; decreasing it keeps closer to normal path steering.
+	 * (was 0.85)
+	 */
+	constexpr float ConflictingDirectionSteeringOverrideStrength = 0.9f;
+
+	/**
+	 * @brief Minimum absolute steering input enforced during orange avoidance. Increasing it produces harder, wider lateral
+	 * clearance manoeuvres; decreasing it allows gentler curves that may take longer to clear the overlap.
+	 */
+	constexpr float ConflictingDirectionMinimumSteeringMagnitude = 0.75f;
+
+	/**
+	 * @brief Minimum direction dot product for displacing an idle vehicle and waiting instead of steering around it.
+	 * Increasing it narrows the forward obstruction cone and preserves more formations; decreasing it sends more idle
+	 * vehicles away. Values near 1 reserve displacement for vehicles almost exactly in the driving direction.
+	 */
+	constexpr float IdleDisplacementDirectionDotThreshold = 0.9f;
+
+	/**
+	 * @brief Longitudinal tolerance used to identify side-by-side moving vehicles and ignore contacts already behind us.
+	 * Increasing it uses the deterministic tie-break over a wider band; decreasing it assigns front/back responsibility
+	 * sooner.
+	 */
+	constexpr float SideBySideDistanceTolerance = 5.f;
+
+	/**
+	 * @brief Lateral tolerance within which a new contact defaults to passing right instead of choosing the open side.
+	 * Increasing it makes right-side defaults more common; decreasing it uses relative left/right placement more often.
+	 */
+	constexpr float CenteredPassingSideTolerance = 5.f;
+
+	/**
+	 * @brief Squared 2D vector length below which destination or velocity direction is considered unusable. Increasing it falls
+	 * back to velocity/facing sooner; decreasing it trusts smaller, potentially noisy direction vectors.
+	 */
+	constexpr float MinimumTravelDirectionSquared = 1.f;
+
+	/**
+	 * @brief Maximum yellow dependency links inspected when searching for a cycle. Increasing it detects larger cycles at a
+	 * slightly higher worst-case cost; decreasing it bounds work more tightly but can miss unusually large deadlocks.
+	 */
+	constexpr int32 DeadlockDependencyTraversalLimit = 32;
+
+	/**
+	 * @brief Extra height applied only to purple deadlock-resolution text. Increasing it separates purple text further from
+	 * normal overlap messages; decreasing it keeps the messages closer together.
+	 */
+	constexpr float DeadlockDebugAdditionalZOffset = 100.f;
+
+	/**
+	 * @brief Lifetime in seconds for purple deadlock-resolution text. Increasing it makes rare resolutions easier to notice;
+	 * decreasing it clears the message sooner and reduces persistent debug clutter.
+	 */
+	constexpr float DeadlockDebugLifetimeSeconds = 1.f;
 }
 
 namespace TrackFollowingOverlapCleanup
@@ -115,6 +213,8 @@ UTrackPathFollowingComponent::UTrackPathFollowingComponent()
 	BlockDetectionDistance = TrackFollowingBlockDetection::DefaultDistanceThresholdCentimeters;
 	BlockDetectionInterval = TrackFollowingBlockDetection::IntervalSeconds;
 	BlockDetectionSampleCount = TrackFollowingBlockDetection::SampleCount;
+	M_MovingAlliedOverlapActors.Reserve(TrackFollowingEvasion::ExpectedMovingOverlapCount);
+	M_IdleAlliedAvoidanceActors.Reserve(TrackFollowingEvasion::ExpectedIdleOverlapCount);
 }
 
 
@@ -187,6 +287,159 @@ void UTrackPathFollowingComponent::AddOverlapActorData(
 	TargetArray.Add(MoveTemp(NewOverlapData));
 }
 
+void UTrackPathFollowingComponent::RegisterMovingOverlappingActor(
+	AActor* InActor,
+	UTrackPathFollowingComponent* InPathFollowingComponent,
+	const float ClearanceDistance)
+{
+	if (not IsValid(InActor) || not IsValid(InPathFollowingComponent) || not IsValid(ControlledPawn))
+	{
+		return;
+	}
+
+	// An ally that was idle when first touched may now be executing the evasion move we gave it.
+	// Keep that contact in the stronger wait-until-clear flow instead of reclassifying its evasion as normal driving.
+	if (ContainsOverlapActor(M_IdleAlliedBlockingActors, InActor))
+	{
+		return;
+	}
+	RemoveIdleSteeringAvoidanceActor(InActor);
+
+	const float CurrentTimeSeconds = GetCurrentWorldTimeSeconds();
+	for (FMovingAlliedOverlapData& OverlapData : M_MovingAlliedOverlapActors)
+	{
+		if (OverlapData.Actor.Get() != InActor)
+		{
+			continue;
+		}
+
+		OverlapData.PathFollowingComponent = InPathFollowingComponent;
+		OverlapData.LastConfirmedCloseTimeSeconds = CurrentTimeSeconds;
+		OverlapData.ClearanceDistanceSquared = FMath::Square(ClearanceDistance);
+		return;
+	}
+
+	FMovingAlliedOverlapData NewOverlapData;
+	NewOverlapData.Actor = InActor;
+	NewOverlapData.PathFollowingComponent = InPathFollowingComponent;
+	NewOverlapData.LastConfirmedCloseTimeSeconds = CurrentTimeSeconds;
+	NewOverlapData.ClearanceDistanceSquared = FMath::Square(ClearanceDistance);
+	NewOverlapData.PassingSide = CalculateOverlapPassingSide(InActor);
+	NewOverlapData.bYieldWhenSideBySide = ControlledPawn->GetUniqueID() > InActor->GetUniqueID();
+	M_MovingAlliedOverlapActors.Add(MoveTemp(NewOverlapData));
+}
+
+void UTrackPathFollowingComponent::RegisterIdleSteeringAvoidanceActor(
+	AActor* InActor,
+	const float ClearanceDistance)
+{
+	if (not IsValid(InActor) || not IsValid(ControlledPawn))
+	{
+		return;
+	}
+	if (ContainsOverlapActor(M_IdleAlliedBlockingActors, InActor))
+	{
+		return;
+	}
+
+	RemoveMovingOverlapActor(InActor);
+	const float CurrentTimeSeconds = GetCurrentWorldTimeSeconds();
+	for (FIdleAlliedOverlapAvoidanceData& OverlapData : M_IdleAlliedAvoidanceActors)
+	{
+		if (OverlapData.Actor.Get() != InActor)
+		{
+			continue;
+		}
+
+		OverlapData.LastConfirmedCloseTimeSeconds = CurrentTimeSeconds;
+		OverlapData.ClearanceDistanceSquared = FMath::Square(ClearanceDistance);
+		return;
+	}
+
+	FIdleAlliedOverlapAvoidanceData NewOverlapData;
+	NewOverlapData.Actor = InActor;
+	NewOverlapData.LastConfirmedCloseTimeSeconds = CurrentTimeSeconds;
+	NewOverlapData.ClearanceDistanceSquared = FMath::Square(ClearanceDistance);
+	NewOverlapData.PassingSide = CalculateOverlapPassingSide(InActor);
+	M_IdleAlliedAvoidanceActors.Add(MoveTemp(NewOverlapData));
+}
+
+EIdleOverlapResponse UTrackPathFollowingComponent::GetIdleOverlapResponse(const AActor* InActor) const
+{
+	if (not IsValid(InActor) || not IsValid(ControlledPawn) || not bM_HasCurrentDrivingDestination ||
+		GetStatus() != EPathFollowingStatus::Moving)
+	{
+		return EIdleOverlapResponse::SteerAround;
+	}
+
+	FVector TravelDirection = VehicleCurrentDestination - ControlledPawn->GetActorLocation();
+	TravelDirection.Z = 0.f;
+	if (TravelDirection.SizeSquared2D() <= TrackFollowingEvasion::MinimumTravelDirectionSquared)
+	{
+		TravelDirection = ControlledPawn->GetVelocity();
+		TravelDirection.Z = 0.f;
+	}
+	if (TravelDirection.SizeSquared2D() <= TrackFollowingEvasion::MinimumTravelDirectionSquared)
+	{
+		return EIdleOverlapResponse::SteerAround;
+	}
+
+	FVector DirectionToIdleActor = InActor->GetActorLocation() - ControlledPawn->GetActorLocation();
+	DirectionToIdleActor.Z = 0.f;
+	if (DirectionToIdleActor.SizeSquared2D() <= TrackFollowingEvasion::MinimumTravelDirectionSquared)
+	{
+		return EIdleOverlapResponse::DisplaceAndWait;
+	}
+
+	const float DirectionDot = FVector::DotProduct(
+		TravelDirection.GetSafeNormal2D(),
+		DirectionToIdleActor.GetSafeNormal2D());
+	return DirectionDot >= TrackFollowingEvasion::IdleDisplacementDirectionDotThreshold
+		       ? EIdleOverlapResponse::DisplaceAndWait
+		       : EIdleOverlapResponse::SteerAround;
+}
+
+void UTrackPathFollowingComponent::SetRTSOverlapEvasionComponent(
+	URTSOverlapEvasionComponent* InOverlapEvasionComponent)
+{
+	if (not IsValid(InOverlapEvasionComponent))
+	{
+		return;
+	}
+	M_RTSOverlapEvasionComponent = InOverlapEvasionComponent;
+}
+
+bool UTrackPathFollowingComponent::GetIsValidRTSOverlapEvasionComponent() const
+{
+	if (M_RTSOverlapEvasionComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_RTSOverlapEvasionComponent"),
+		TEXT("UTrackPathFollowingComponent::GetIsValidRTSOverlapEvasionComponent"),
+		this);
+	return false;
+}
+
+EOverlapPassingSide UTrackPathFollowingComponent::CalculateOverlapPassingSide(const AActor* InActor) const
+{
+	if (not IsValid(InActor) || not IsValid(ControlledPawn))
+	{
+		return EOverlapPassingSide::Right;
+	}
+
+	const FVector RelativeLocation = InActor->GetActorLocation() - ControlledPawn->GetActorLocation();
+	const float OtherRightDistance = FVector::DotProduct(RelativeLocation, ControlledPawn->GetActorRightVector());
+	const bool bOtherIsCentered = FMath::Abs(OtherRightDistance) <=
+		TrackFollowingEvasion::CenteredPassingSideTolerance;
+	return bOtherIsCentered || OtherRightDistance < 0.f
+		       ? EOverlapPassingSide::Right
+		       : EOverlapPassingSide::Left;
+}
+
 TArray<FOverlapActorData>& UTrackPathFollowingComponent::GetOverlapBlockingActorsArray()
 {
 	return M_IdleAlliedBlockingActors;
@@ -231,6 +484,43 @@ void UTrackPathFollowingComponent::RemoveOverlapActorFromArray(
 		if (TargetArray[Index].Actor.Get() == InActor)
 		{
 			TargetArray.RemoveAt(Index);
+		}
+	}
+}
+
+void UTrackPathFollowingComponent::RemoveMovingOverlapActor(AActor* InActor)
+{
+	if (not IsValid(InActor))
+	{
+		return;
+	}
+
+	for (int32 Index = M_MovingAlliedOverlapActors.Num() - 1; Index >= 0; --Index)
+	{
+		if (M_MovingAlliedOverlapActors[Index].Actor.Get() == InActor)
+		{
+			if (M_MovingOverlapYieldDependency.Get() ==
+				M_MovingAlliedOverlapActors[Index].PathFollowingComponent.Get())
+			{
+				ResetMovingOverlapYieldDependency();
+			}
+			M_MovingAlliedOverlapActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+		}
+	}
+}
+
+void UTrackPathFollowingComponent::RemoveIdleSteeringAvoidanceActor(AActor* InActor)
+{
+	if (not IsValid(InActor))
+	{
+		return;
+	}
+
+	for (int32 Index = M_IdleAlliedAvoidanceActors.Num() - 1; Index >= 0; --Index)
+	{
+		if (M_IdleAlliedAvoidanceActors[Index].Actor.Get() == InActor)
+		{
+			M_IdleAlliedAvoidanceActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
 		}
 	}
 }
@@ -283,6 +573,95 @@ void UTrackPathFollowingComponent::RemoveExpiredOverlaps(
 	}
 }
 
+void UTrackPathFollowingComponent::RemoveStaleMovingOverlaps(const float CurrentTimeSeconds)
+{
+	if (not IsValid(ControlledPawn))
+	{
+		M_MovingAlliedOverlapActors.Reset();
+		ResetMovingOverlapYieldDependency();
+		return;
+	}
+
+	const FVector OwnerLocation = ControlledPawn->GetActorLocation();
+	for (int32 Index = M_MovingAlliedOverlapActors.Num() - 1; Index >= 0; --Index)
+	{
+		FMovingAlliedOverlapData& OverlapData = M_MovingAlliedOverlapActors[Index];
+		AActor* const OtherActor = OverlapData.Actor.Get();
+		if (not IsValid(OtherActor) || not OverlapData.PathFollowingComponent.IsValid())
+		{
+			if (M_MovingOverlapYieldDependency == OverlapData.PathFollowingComponent)
+			{
+				ResetMovingOverlapYieldDependency();
+			}
+			M_MovingAlliedOverlapActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared2D(OwnerLocation, OtherActor->GetActorLocation());
+		if (DistanceSquared <= OverlapData.ClearanceDistanceSquared)
+		{
+			OverlapData.LastConfirmedCloseTimeSeconds = CurrentTimeSeconds;
+			continue;
+		}
+
+		const float TimeOutsideClearance = CurrentTimeSeconds - OverlapData.LastConfirmedCloseTimeSeconds;
+		if (TimeOutsideClearance < M_TimeTillDiscardOverlap)
+		{
+			continue;
+		}
+
+		FOverlapActorData DebugOverlapData;
+		DebugOverlapData.Actor = OverlapData.Actor;
+		DebugOverlapData.TimeRegisteredSeconds = OverlapData.LastConfirmedCloseTimeSeconds;
+		DebugRemovedOverlapActor(TEXT("Removing stale moving overlap"), DebugOverlapData);
+		if (M_MovingOverlapYieldDependency == OverlapData.PathFollowingComponent)
+		{
+			ResetMovingOverlapYieldDependency();
+		}
+		M_MovingAlliedOverlapActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+	}
+}
+
+void UTrackPathFollowingComponent::RemoveStaleIdleAvoidanceOverlaps(const float CurrentTimeSeconds)
+{
+	if (not IsValid(ControlledPawn))
+	{
+		M_IdleAlliedAvoidanceActors.Reset();
+		return;
+	}
+
+	const FVector OwnerLocation = ControlledPawn->GetActorLocation();
+	for (int32 Index = M_IdleAlliedAvoidanceActors.Num() - 1; Index >= 0; --Index)
+	{
+		FIdleAlliedOverlapAvoidanceData& OverlapData = M_IdleAlliedAvoidanceActors[Index];
+		AActor* const OtherActor = OverlapData.Actor.Get();
+		if (not IsValid(OtherActor))
+		{
+			M_IdleAlliedAvoidanceActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+			continue;
+		}
+
+		const float DistanceSquared = FVector::DistSquared2D(OwnerLocation, OtherActor->GetActorLocation());
+		if (DistanceSquared <= OverlapData.ClearanceDistanceSquared)
+		{
+			OverlapData.LastConfirmedCloseTimeSeconds = CurrentTimeSeconds;
+			continue;
+		}
+
+		const float TimeOutsideClearance = CurrentTimeSeconds - OverlapData.LastConfirmedCloseTimeSeconds;
+		if (TimeOutsideClearance < M_TimeTillDiscardOverlap)
+		{
+			continue;
+		}
+
+		FOverlapActorData DebugOverlapData;
+		DebugOverlapData.Actor = OverlapData.Actor;
+		DebugOverlapData.TimeRegisteredSeconds = OverlapData.LastConfirmedCloseTimeSeconds;
+		DebugRemovedOverlapActor(TEXT("Removing stale idle avoidance overlap"), DebugOverlapData);
+		M_IdleAlliedAvoidanceActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+	}
+}
+
 void UTrackPathFollowingComponent::ResetOverlapBlockingActors()
 {
 	M_IdleAlliedBlockingActors.Reset();
@@ -294,7 +673,7 @@ void UTrackPathFollowingComponent::ResetOverlapBlockingActorsForCommand()
 	M_TicksCountCheckOverlappers = TrackFollowingOverlapCleanup::CleanupTickInterval;
 	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
-		RTSFunctionLibrary::PrintString(TEXT("Cleared overlap blockers for new move command."), FColor::Emerald);
+		RTSFunctionLibrary::PrintString(TEXT("Cleared idle overlap blockers for new move command."), FColor::Emerald);
 	}
 }
 
@@ -304,6 +683,8 @@ void UTrackPathFollowingComponent::RegisterIdleBlockingActor(AActor* InActor)
 	{
 		return;
 	}
+	RemoveMovingOverlapActor(InActor);
+	RemoveIdleSteeringAvoidanceActor(InActor);
 	AddOverlapActorData(M_IdleAlliedBlockingActors, InActor);
 }
 
@@ -316,12 +697,28 @@ void UTrackPathFollowingComponent::DeregisterOverlapBlockingActor(AActor* InActo
 		return;
 	}
 	RemoveOverlapActorFromArray(M_IdleAlliedBlockingActors, InActor);
+	RemoveMovingOverlapActor(InActor);
+	RemoveIdleSteeringAvoidanceActor(InActor);
 }
 
 
 bool UTrackPathFollowingComponent::HasBlockingOverlaps() const
 {
 	for (const FOverlapActorData& OverlapData : M_IdleAlliedBlockingActors)
+	{
+		if (OverlapData.Actor.IsValid())
+		{
+			return true;
+		}
+	}
+	for (const FMovingAlliedOverlapData& OverlapData : M_MovingAlliedOverlapActors)
+	{
+		if (OverlapData.Actor.IsValid() && OverlapData.PathFollowingComponent.IsValid())
+		{
+			return true;
+		}
+	}
+	for (const FIdleAlliedOverlapAvoidanceData& OverlapData : M_IdleAlliedAvoidanceActors)
 	{
 		if (OverlapData.Actor.IsValid())
 		{
@@ -465,6 +862,8 @@ void UTrackPathFollowingComponent::TickComponent(
 
 	const float CurrentTimeSeconds = GetCurrentWorldTimeSeconds();
 	RemoveExpiredOverlaps(CurrentTimeSeconds, M_IdleAlliedBlockingActors);
+	RemoveStaleMovingOverlaps(CurrentTimeSeconds);
+	RemoveStaleIdleAvoidanceOverlaps(CurrentTimeSeconds);
 }
 
 
@@ -472,6 +871,8 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 {
 	Super::OnPathUpdated();
 
+	bM_HasCurrentDrivingDestination = false;
+	ResetMovingOverlapYieldDependency();
 	// Reset stuck status
 	ResetStuck();
 	bM_IsInDeadzone = false;
@@ -485,8 +886,6 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 
 	const bool bHasIdleBlockers = (M_IdleAlliedBlockingActors.Num() > 0);
 	const bool bCanWait = bHasIdleBlockers && IsValid(ControlledPawn);
-
-	UpdateEngineBlockDetectionForIdleBlockerWait(bCanWait);
 
 	if (not bCanWait)
 	{
@@ -505,6 +904,271 @@ bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 	return true;
 }
 
+FVector UTrackPathFollowingComponent::GetMovingOverlapTravelDirection(
+	const AActor* VehicleActor,
+	const UTrackPathFollowingComponent* VehiclePathFollowingComponent) const
+{
+	if (not IsValid(VehicleActor) || not IsValid(VehiclePathFollowingComponent))
+	{
+		return FVector::ZeroVector;
+	}
+
+	FVector TravelDirection = VehiclePathFollowingComponent->GetCurrentDrivingDestination() -
+		VehicleActor->GetActorLocation();
+	TravelDirection.Z = 0.f;
+	if (TravelDirection.SizeSquared2D() <= TrackFollowingEvasion::MinimumTravelDirectionSquared)
+	{
+		TravelDirection = VehicleActor->GetVelocity();
+		TravelDirection.Z = 0.f;
+	}
+	if (TravelDirection.SizeSquared2D() <= TrackFollowingEvasion::MinimumTravelDirectionSquared)
+	{
+		TravelDirection = VehicleActor->GetActorForwardVector();
+		TravelDirection.Z = 0.f;
+	}
+
+	return TravelDirection.GetSafeNormal2D();
+}
+
+void UTrackPathFollowingComponent::TryEscalateIdleAvoidanceContacts()
+{
+	if (M_IdleAlliedAvoidanceActors.IsEmpty() || not GetIsValidRTSOverlapEvasionComponent())
+	{
+		return;
+	}
+
+	AActor* IdleActorToDisplace = nullptr;
+	for (int32 Index = M_IdleAlliedAvoidanceActors.Num() - 1; Index >= 0; --Index)
+	{
+		AActor* const OtherActor = M_IdleAlliedAvoidanceActors[Index].Actor.Get();
+		if (not IsValid(OtherActor))
+		{
+			M_IdleAlliedAvoidanceActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+			continue;
+		}
+		if (GetIdleOverlapResponse(OtherActor) != EIdleOverlapResponse::DisplaceAndWait)
+		{
+			continue;
+		}
+
+		IdleActorToDisplace = OtherActor;
+		break;
+	}
+
+	if (not IsValid(IdleActorToDisplace) ||
+		not M_RTSOverlapEvasionComponent->TryDisplaceIdleOverlappingVehicle(IdleActorToDisplace))
+	{
+		return;
+	}
+
+	RemoveIdleSteeringAvoidanceActor(IdleActorToDisplace);
+	AddOverlapActorData(M_IdleAlliedBlockingActors, IdleActorToDisplace);
+}
+
+void UTrackPathFollowingComponent::ApplySteeringAvoidanceContact(
+	const FVector& RelativeLocation,
+	const EOverlapPassingSide PassingSide,
+	AActor* OtherActor,
+	UTrackPathFollowingComponent* OtherPathFollowingComponent,
+	const EOverlapAdjustmentReason Reason,
+	float& ClosestDistanceSquared,
+	FOverlapAdjustment& Adjustment) const
+{
+	Adjustment.ThrottleScale = FMath::Min(
+		Adjustment.ThrottleScale,
+		TrackFollowingEvasion::ConflictingDirectionThrottleScale);
+	Adjustment.bIsLimitingMovement = true;
+
+	const float DistanceSquared = RelativeLocation.SizeSquared2D();
+	if (DistanceSquared >= ClosestDistanceSquared)
+	{
+		return;
+	}
+
+	ClosestDistanceSquared = DistanceSquared;
+	Adjustment.SteeringDirection = PassingSide == EOverlapPassingSide::Right ? 1.f : -1.f;
+	Adjustment.bShouldAdjustSteering = true;
+	Adjustment.Reason = Reason;
+	Adjustment.PrimaryActor = OtherActor;
+	Adjustment.PrimaryPathFollowingComponent = OtherPathFollowingComponent;
+}
+
+FOverlapAdjustment UTrackPathFollowingComponent::CalculateOverlapAdjustment(const FVector& Destination)
+{
+	FOverlapAdjustment Adjustment;
+	if ((M_MovingAlliedOverlapActors.IsEmpty() && M_IdleAlliedAvoidanceActors.IsEmpty()) ||
+		not IsValid(ControlledPawn))
+	{
+		ResetMovingOverlapYieldDependency();
+		return Adjustment;
+	}
+
+	const FVector OwnerLocation = ControlledPawn->GetActorLocation();
+	FVector OwnerTravelDirection = Destination - OwnerLocation;
+	OwnerTravelDirection.Z = 0.f;
+	if (OwnerTravelDirection.SizeSquared2D() <= TrackFollowingEvasion::MinimumTravelDirectionSquared)
+	{
+		OwnerTravelDirection = ControlledPawn->GetVelocity();
+		OwnerTravelDirection.Z = 0.f;
+	}
+	if (OwnerTravelDirection.SizeSquared2D() <= TrackFollowingEvasion::MinimumTravelDirectionSquared)
+	{
+		OwnerTravelDirection = ControlledPawn->GetActorForwardVector();
+		OwnerTravelDirection.Z = 0.f;
+	}
+	OwnerTravelDirection = OwnerTravelDirection.GetSafeNormal2D();
+
+	float ClosestConflictingDistanceSquared = MAX_flt;
+	for (int32 Index = M_MovingAlliedOverlapActors.Num() - 1; Index >= 0; --Index)
+	{
+		const FMovingAlliedOverlapData& OverlapData = M_MovingAlliedOverlapActors[Index];
+		AActor* const OtherActor = OverlapData.Actor.Get();
+		UTrackPathFollowingComponent* const OtherPathFollowingComponent =
+			OverlapData.PathFollowingComponent.Get();
+		if (not IsValid(OtherActor) || not IsValid(OtherPathFollowingComponent))
+		{
+			M_MovingAlliedOverlapActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+			continue;
+		}
+
+		FVector RelativeLocation = OtherActor->GetActorLocation() - OwnerLocation;
+		RelativeLocation.Z = 0.f;
+		const float LongitudinalDistance = FVector::DotProduct(RelativeLocation, OwnerTravelDirection);
+		const FVector OtherTravelDirection = GetMovingOverlapTravelDirection(
+			OtherActor,
+			OtherPathFollowingComponent);
+		const float DirectionDot = FVector::DotProduct(OwnerTravelDirection, OtherTravelDirection);
+
+		if (DirectionDot >= TrackFollowingEvasion::SameDirectionDotThreshold)
+		{
+			const bool bIsSideBySide = FMath::Abs(LongitudinalDistance) <=
+				TrackFollowingEvasion::SideBySideDistanceTolerance;
+			const bool bShouldYield = LongitudinalDistance > TrackFollowingEvasion::SideBySideDistanceTolerance ||
+				(bIsSideBySide && OverlapData.bYieldWhenSideBySide);
+			if (not bShouldYield)
+			{
+				continue;
+			}
+
+			const float LeaderSpeed = OtherActor->GetVelocity().Size2D();
+			const float LeaderSpeedCap = LeaderSpeed * TrackFollowingEvasion::SameDirectionLeaderSpeedScale;
+			const bool bIsStrongestSameDirectionLimit = LeaderSpeedCap < Adjustment.DesiredSpeedCap;
+			Adjustment.DesiredSpeedCap = FMath::Min(Adjustment.DesiredSpeedCap, LeaderSpeedCap);
+			Adjustment.ThrottleScale = FMath::Min(
+				Adjustment.ThrottleScale,
+				TrackFollowingEvasion::SameDirectionThrottleScale);
+			Adjustment.bIsLimitingMovement = true;
+			Adjustment.bHasSameDirectionSpeedLimit = true;
+			if (bIsStrongestSameDirectionLimit &&
+				Adjustment.Reason != EOverlapAdjustmentReason::AvoidingConflictingDirection &&
+				Adjustment.Reason != EOverlapAdjustmentReason::AvoidingIdleVehicle)
+			{
+				Adjustment.Reason = EOverlapAdjustmentReason::FollowingSameDirection;
+				Adjustment.PrimaryActor = OtherActor;
+				Adjustment.PrimaryPathFollowingComponent = OtherPathFollowingComponent;
+			}
+			continue;
+		}
+
+		if (LongitudinalDistance < -TrackFollowingEvasion::SideBySideDistanceTolerance)
+		{
+			// The other vehicle is behind us and is responsible for avoiding this contact.
+			continue;
+		}
+
+		ApplySteeringAvoidanceContact(
+			RelativeLocation,
+			OverlapData.PassingSide,
+			OtherActor,
+			OtherPathFollowingComponent,
+			EOverlapAdjustmentReason::AvoidingConflictingDirection,
+			ClosestConflictingDistanceSquared,
+			Adjustment);
+	}
+
+	for (int32 Index = M_IdleAlliedAvoidanceActors.Num() - 1; Index >= 0; --Index)
+	{
+		const FIdleAlliedOverlapAvoidanceData& OverlapData = M_IdleAlliedAvoidanceActors[Index];
+		AActor* const OtherActor = OverlapData.Actor.Get();
+		if (not IsValid(OtherActor))
+		{
+			M_IdleAlliedAvoidanceActors.RemoveAtSwap(Index, 1, EAllowShrinking::No);
+			continue;
+		}
+
+		FVector RelativeLocation = OtherActor->GetActorLocation() - OwnerLocation;
+		RelativeLocation.Z = 0.f;
+		const float LongitudinalDistance = FVector::DotProduct(RelativeLocation, OwnerTravelDirection);
+		if (LongitudinalDistance < -TrackFollowingEvasion::SideBySideDistanceTolerance)
+		{
+			continue;
+		}
+
+		ApplySteeringAvoidanceContact(
+			RelativeLocation,
+			OverlapData.PassingSide,
+			OtherActor,
+			nullptr,
+			EOverlapAdjustmentReason::AvoidingIdleVehicle,
+			ClosestConflictingDistanceSquared,
+			Adjustment);
+	}
+
+	ResolveMovingOverlapDeadlock(Adjustment);
+	return Adjustment;
+}
+
+void UTrackPathFollowingComponent::ResolveMovingOverlapDeadlock(FOverlapAdjustment& Adjustment)
+{
+	ResetMovingOverlapYieldDependency();
+	if (Adjustment.Reason != EOverlapAdjustmentReason::FollowingSameDirection ||
+		not IsValid(ControlledPawn))
+	{
+		return;
+	}
+
+	UTrackPathFollowingComponent* Dependency = Adjustment.PrimaryPathFollowingComponent.Get();
+	if (not IsValid(Dependency))
+	{
+		return;
+	}
+	M_MovingOverlapYieldDependency = Dependency;
+
+	const uint32 OwnerPriority = ControlledPawn->GetUniqueID();
+	uint32 WinningPriority = OwnerPriority;
+	for (int32 DependencyDepth = 0;
+		 DependencyDepth < TrackFollowingEvasion::DeadlockDependencyTraversalLimit;
+		 ++DependencyDepth)
+	{
+		if (Dependency == this)
+		{
+			if (OwnerPriority == WinningPriority)
+			{
+				Adjustment.DesiredSpeedCap = MAX_flt;
+				Adjustment.ThrottleScale = 1.f;
+				Adjustment.bIsLimitingMovement = false;
+				Adjustment.bHasSameDirectionSpeedLimit = false;
+				Adjustment.Reason = EOverlapAdjustmentReason::ResolvingDeadlock;
+				ResetMovingOverlapYieldDependency();
+			}
+			return;
+		}
+
+		if (not IsValid(Dependency) || not IsValid(Dependency->ControlledPawn))
+		{
+			return;
+		}
+
+		WinningPriority = FMath::Min(WinningPriority, Dependency->ControlledPawn->GetUniqueID());
+		Dependency = Dependency->M_MovingOverlapYieldDependency.Get();
+	}
+}
+
+void UTrackPathFollowingComponent::ResetMovingOverlapYieldDependency()
+{
+	M_MovingOverlapYieldDependency.Reset();
+}
+
 
 void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float DeltaTime)
 {
@@ -512,22 +1176,30 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	// TRACE_CPUPROFILER_EVENT_SCOPE(Tracks_UpdateDriving);
 	if (not M_TrackPhysicsMovement)
 	{
+		bM_HasCurrentDrivingDestination = false;
+		ResetMovingOverlapYieldDependency();
 		return;
 	}
-	VehicleCurrentDestination = Destination;
 
 	if (not bImplementsInterface || not IsValid(ControlledPawn))
 	{
+		bM_HasCurrentDrivingDestination = false;
+		ResetMovingOverlapYieldDependency();
 		// Make sure we never "stick" in suppressed mode if something becomes invalid.
-		UpdateEngineBlockDetectionForIdleBlockerWait(false);
+		UpdateEngineBlockDetectionForOverlapResponse(false);
 		return;
 	}
+	VehicleCurrentDestination = Destination;
+	bM_HasCurrentDrivingDestination = true;
 
+	TryEscalateIdleAvoidanceContacts();
 
 	// Pause throttle while overlapping idle allies being pushed aside; keep last steering.
 	// Disables engine block detection while waiting.
 	if (CheckOverlapIdleAllies(DeltaTime))
 	{
+		ResetMovingOverlapYieldDependency();
+		UpdateEngineBlockDetectionForOverlapResponse(true);
 		return;
 	}
 	// [-180 , +180]
@@ -549,6 +1221,8 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		}
 		else
 		{
+			ResetMovingOverlapYieldDependency();
+			UpdateEngineBlockDetectionForOverlapResponse(false);
 			const float SteeringScale = AbsoluteReverseFacingAngle > MaxAngleDontSlow
 				                            ? 1.f
 				                            : AbsoluteReverseFacingAngle / MaxAngleDontSlow;
@@ -580,6 +1254,11 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	// Needs TargetAngle to be in absolute value.
 	float ThrottleIncreaseValue;
 	bReversing = ShouldTrackVehicleReverse(AbsoluteTargetAngle, DestinationDistance);
+	const FOverlapAdjustment OverlapAdjustment =
+		M_MovingAlliedOverlapActors.IsEmpty() && M_IdleAlliedAvoidanceActors.IsEmpty()
+			? FOverlapAdjustment()
+			: CalculateOverlapAdjustment(Destination);
+	const bool bHasSameDirectionSpeedLimit = OverlapAdjustment.bHasSameDirectionSpeedLimit;
 	if (bReversing)
 	{
 		const float AbsoluteTurnAngle = AbsoluteTargetAngle > 90 ? 180 - AbsoluteTargetAngle : AbsoluteTargetAngle;
@@ -587,12 +1266,15 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		Steering = AbsoluteTurnAngle > MaxAngleDontSlow ? 1 : AbsoluteTurnAngle / MaxAngleDontSlow;
 		Steering *= -FMath::Sign(SignedTargetAngle);
 		// Adjust speed difference with wanted reverse speed.
+		const float OverlapLimitedReverseSpeed = FMath::Min(
+			DesiredReverseSpeed,
+			OverlapAdjustment.DesiredSpeedCap);
 		SpeedDifference = FMath::GetMappedRangeValueClamped(
 			FVector2D(-ReverseSpeedPIDThreshold, ReverseSpeedPIDThreshold), FVector2D(-1.f, 1.f),
-			DesiredReverseSpeed - M_CurrentSpeed);
+			OverlapLimitedReverseSpeed - M_CurrentSpeed);
 		ThrottleIncreaseValue = M_ReverseThrottleIncreaseForDesiredSpeed;
 		// At the timer check current speed vs max reverse speed.
-		if (M_CurrentSpeed < DesiredReverseSpeed)
+		if (not bHasSameDirectionSpeedLimit && M_CurrentSpeed < DesiredReverseSpeed)
 		{
 			M_TimeWantDesiredSpeed += DeltaTime;
 		}
@@ -607,12 +1289,16 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		Steering = AbsoluteTargetAngle > MaxAngleDontSlow ? 1 : AbsoluteTargetAngle / MaxAngleDontSlow;
 		Steering *= FMath::Sign(SignedTargetAngle);
 		// Make sure the speed difference is mapped to [-1, 1] as that is needed for the throttle input and hence the PID controller part.
+		const float OverlapLimitedDesiredSpeed = FMath::Min(
+			AdjustedDesiredSpeed,
+			OverlapAdjustment.DesiredSpeedCap);
 		SpeedDifference = FMath::GetMappedRangeValueClamped(
 			FVector2D(-DesiredSpeedThrottleThreshold, DesiredSpeedThrottleThreshold), FVector2D(-1.f, 1.f),
-			AdjustedDesiredSpeed - M_CurrentSpeed);
+			OverlapLimitedDesiredSpeed - M_CurrentSpeed);
 		ThrottleIncreaseValue = M_ThrottleIncreaseForDesiredSpeed;
 		// At the timer check the current speed vs the max forward speed.
-		if (AdjustedDesiredSpeed == DesiredSpeed && M_CurrentSpeed < DesiredSpeed)
+		if (not bHasSameDirectionSpeedLimit && AdjustedDesiredSpeed == DesiredSpeed &&
+			M_CurrentSpeed < DesiredSpeed)
 		{
 			M_TimeWantDesiredSpeed += DeltaTime;
 		}
@@ -650,6 +1336,40 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 			RTSFunctionLibrary::PrintString("Reverse deadzone, only steering!", FColor::Black);
 			DrawDebugLine(GetWorld(), GetAgentLocation(), Destination, FColor::White, false, 0.1f, 1, 3.0f);
 		}
+	}
+	if (OverlapAdjustment.bShouldAdjustSteering)
+	{
+		const float AvoidanceSteeringDirection = bReversing
+			                                         ? -OverlapAdjustment.SteeringDirection
+			                                         : OverlapAdjustment.SteeringDirection;
+		const float BlendedAvoidanceSteering = FMath::Lerp(
+			Steering,
+			AvoidanceSteeringDirection,
+			TrackFollowingEvasion::ConflictingDirectionSteeringOverrideStrength);
+		const float SteeringAlongAvoidanceDirection =
+			BlendedAvoidanceSteering * AvoidanceSteeringDirection;
+		const float AvoidanceSteeringMagnitude = FMath::Max(
+			SteeringAlongAvoidanceDirection,
+			TrackFollowingEvasion::ConflictingDirectionMinimumSteeringMagnitude);
+		Steering = FMath::Clamp(
+			AvoidanceSteeringDirection * AvoidanceSteeringMagnitude,
+			-1.f,
+			1.f);
+	}
+	CalculatedThrottleValue *= OverlapAdjustment.ThrottleScale;
+	if (bHasSameDirectionSpeedLimit)
+	{
+		M_TimeWantDesiredSpeed = 0.f;
+	}
+	UpdateEngineBlockDetectionForOverlapResponse(OverlapAdjustment.bIsLimitingMovement);
+
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	{
+		DebugOverlapAdjustment(
+			OverlapAdjustment,
+			CalculatedThrottleValue,
+			Steering,
+			DeltaTime);
 	}
 	M_LastSteeringInput = Steering;
 	M_LastThrottleInput = CalculatedThrottleValue;
@@ -1042,6 +1762,8 @@ void UTrackPathFollowingComponent::SetMoveSegment(int32 SegmentStartIndex)
 
 void UTrackPathFollowingComponent::OnPathFinished(const FPathFollowingResult& Result)
 {
+	bM_HasCurrentDrivingDestination = false;
+	ResetMovingOverlapYieldDependency();
 	SetEngineBlockDetectionSuppressed(false);
 	// // When the path ends, set all the steering and throttle to nothing, and apply the brakes
 	// UpdateVehicle(0.f, 0.f, 1.f, 0, 0);
@@ -1140,24 +1862,112 @@ float UTrackPathFollowingComponent::CalculateTrackStoppingDistance(const float V
 }
 
 
-void UTrackPathFollowingComponent::DebugWaitingForIdleOverlappingActors(const float DeltaTime)
+void UTrackPathFollowingComponent::DebugWaitingForIdleOverlappingActors(const float DeltaTime) const
 {
-	FString DebugMessage = "Wait : ";
-	for (const FOverlapActorData& OverlapData : M_IdleAlliedBlockingActors)
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
-		if (OverlapData.Actor.IsValid())
+		FString DebugMessage = TEXT("Overlap WAIT: direct idle obstruction moving aside\n");
+		for (const FOverlapActorData& OverlapData : M_IdleAlliedBlockingActors)
+		{
+			if (OverlapData.Actor.IsValid())
+			{
+				bool bValidName = false;
+				const URTSComponent* const OtherRTSComp =
+					OverlapData.Actor->FindComponentByClass<URTSComponent>();
+				const FString NameOfOther = OtherRTSComp
+					                            ? OtherRTSComp->GetDisplayName(bValidName)
+					                            : OverlapData.Actor->GetName();
+				DebugMessage += NameOfOther + TEXT(" ");
+			}
+		}
+		RTSFunctionLibrary::DrawDebugAtLocation(
+			this,
+			GetAgentLocation() + FVector(0.f, 0.f, TrackFollowingEvasion::ZOffsetDebug),
+			DebugMessage,
+			FColor::Red,
+			DeltaTime);
+	}
+}
+
+void UTrackPathFollowingComponent::DebugOverlapAdjustment(
+	const FOverlapAdjustment& Adjustment,
+	const float FinalThrottle,
+	const float FinalSteering,
+	const float DeltaTime) const
+{
+	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
+	{
+		FString OtherName = TEXT("unknown ally");
+		if (Adjustment.PrimaryActor.IsValid())
 		{
 			bool bValidName = false;
-			URTSComponent* OtherRTSComp = OverlapData.Actor->FindComponentByClass<URTSComponent>();
-			const FString NameOfOther = OtherRTSComp
-				                            ? OtherRTSComp->GetDisplayName(bValidName)
-				                            : OverlapData.Actor->GetName();
-			DebugMessage += NameOfOther + "--";
+			const URTSComponent* const OtherRTSComponent =
+				Adjustment.PrimaryActor->FindComponentByClass<URTSComponent>();
+			OtherName = OtherRTSComponent
+				            ? OtherRTSComponent->GetDisplayName(bValidName)
+				            : Adjustment.PrimaryActor->GetName();
 		}
+		FString DebugMessage;
+		FColor DebugColor = FColor::Yellow;
+		float DebugLifetime = DeltaTime;
+		float DebugZOffset = TrackFollowingEvasion::ZOffsetDebug;
+		if (Adjustment.Reason == EOverlapAdjustmentReason::ResolvingDeadlock)
+		{
+			DebugMessage = FString::Printf(
+				TEXT("Overlap DEADLOCK RESOLVED\nPriority vehicle proceeding past %s"),
+				*OtherName);
+			DebugColor = FColor::Purple;
+			DebugLifetime = TrackFollowingEvasion::DeadlockDebugLifetimeSeconds;
+			DebugZOffset += TrackFollowingEvasion::DeadlockDebugAdditionalZOffset;
+		}
+		else if (not Adjustment.bIsLimitingMovement)
+		{
+			return;
+		}
+		else if (Adjustment.Reason == EOverlapAdjustmentReason::FollowingSameDirection)
+		{
+			DebugMessage = FString::Printf(
+				TEXT("Overlap FOLLOW: slowing behind %s\nThrottle %.2f"),
+				*OtherName,
+				FinalThrottle);
+		}
+		else if (Adjustment.Reason == EOverlapAdjustmentReason::AvoidingConflictingDirection ||
+			Adjustment.Reason == EOverlapAdjustmentReason::AvoidingIdleVehicle)
+		{
+			const float AppliedPassingDirection = bReversing
+				                                      ? -Adjustment.SteeringDirection
+				                                      : Adjustment.SteeringDirection;
+			const TCHAR* PassingSide = AppliedPassingDirection >= 0.f ? TEXT("RIGHT") : TEXT("LEFT");
+			const bool bAvoidingIdleVehicle =
+				Adjustment.Reason == EOverlapAdjustmentReason::AvoidingIdleVehicle;
+			if (bAvoidingIdleVehicle)
+			{
+				DebugMessage = FString::Printf(
+					TEXT("Overlap AVOID IDLE: pass %s around %s\nThrottle %.2f | Steering %.2f"),
+					PassingSide,
+					*OtherName,
+					FinalThrottle,
+					FinalSteering);
+			}
+			else
+			{
+				DebugMessage = FString::Printf(
+					TEXT("Overlap AVOID: pass %s around %s\nThrottle %.2f | Steering %.2f"),
+					PassingSide,
+					*OtherName,
+					FinalThrottle,
+					FinalSteering);
+			}
+			DebugColor = FColor::Orange;
+		}
+
+		RTSFunctionLibrary::DrawDebugAtLocation(
+			this,
+			GetAgentLocation() + FVector(0.f, 0.f, DebugZOffset),
+			DebugMessage,
+			DebugColor,
+			DebugLifetime);
 	}
-	RTSFunctionLibrary::DrawDebugAtLocation(
-		this, GetAgentLocation() + FVector(0, 0, TrackFollowingEvasion::ZOffsetDebug),
-		DebugMessage, FColor::Red, DeltaTime);
 }
 
 
@@ -1725,7 +2535,8 @@ void UTrackPathFollowingComponent::SetEngineBlockDetectionSuppressionLock(const 
 	SetEngineBlockDetectionSuppressed(false);
 }
 
-void UTrackPathFollowingComponent::UpdateEngineBlockDetectionForIdleBlockerWait(const bool bIsWaitingForIdleBlockers)
+void UTrackPathFollowingComponent::UpdateEngineBlockDetectionForOverlapResponse(
+	const bool bShouldSuppressForOverlap)
 {
-	SetEngineBlockDetectionSuppressed(bIsWaitingForIdleBlockers);
+	SetEngineBlockDetectionSuppressed(bShouldSuppressForOverlap);
 }
