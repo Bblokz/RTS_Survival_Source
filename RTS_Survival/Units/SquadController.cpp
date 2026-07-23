@@ -905,10 +905,21 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 	}
 }
 
-void ASquadController::OnSquadUnitOutOfRange(const FVector& TargetLocation)
+void ASquadController::OnSquadUnitOutOfRange(
+	const FVector& TargetLocation,
+	const EAbilityID CombatAbility)
 {
 	// If one unit is out of range, ensure we're allowed to move (exit cargo if needed) and move everyone closer.
 	if (IsValid(CargoSquad) && CargoSquad->GetIsInsideCargo())
+	{
+		return;
+	}
+	const UCommandData* const CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData) || CommandData->GetCurrentlyActiveCommandType() != CombatAbility)
+	{
+		return;
+	}
+	if (CombatAbility != EAbilityID::IdAttack && CombatAbility != EAbilityID::IdAttackGround)
 	{
 		return;
 	}

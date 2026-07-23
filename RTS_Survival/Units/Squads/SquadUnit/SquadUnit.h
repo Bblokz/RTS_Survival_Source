@@ -474,6 +474,10 @@ private:
 	/** The current active command of the unit. */
 	EAbilityID M_ActiveCommand;
 
+	// Preserves whether range-closing movement belongs to Attack or AttackGround.
+	EAbilityID M_CombatAbilityBeforeRangeClosing = EAbilityID::IdNoAbility;
+	FAIRequestID M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
+
 	/** The squad controller managing this unit. */
 	UPROPERTY()
 	TObjectPtr<ASquadController> M_SquadController;
@@ -653,6 +657,8 @@ private:
 	void UnitDies_ScheduleDestruction();
 
 	void StopMovementAndClearPath();
+	void PrepareForRangeClosingMovement(EAbilityID MovementAbility);
+	void RestoreCombatAbilityAfterRangeClosing();
 
 	void Debug_Weapons(const FString& DebugMessage, const FColor Color);
 

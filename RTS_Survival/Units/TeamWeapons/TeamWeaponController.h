@@ -186,7 +186,9 @@ protected:
 	virtual void ExecuteBreakCover() override;
 	virtual void TerminateBreakCover() override;
 	virtual void OnUnitIdleAndNoNewCommands() override;
-	virtual void OnSquadUnitOutOfRange(const FVector& TargetLocation) override;
+	virtual void OnSquadUnitOutOfRange(
+		const FVector& TargetLocation,
+		EAbilityID CombatAbility) override;
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void UpdateControllerPositionToAverage() override;
 	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;

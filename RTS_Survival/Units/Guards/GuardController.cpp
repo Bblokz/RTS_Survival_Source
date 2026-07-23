@@ -145,14 +145,16 @@ void AGuardController::OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedCl
 	OnAllSquadUnitsLoaded();
 }
 
-void AGuardController::OnSquadUnitOutOfRange(const FVector& TargetLocation)
+void AGuardController::OnSquadUnitOutOfRange(
+	const FVector& TargetLocation,
+	const EAbilityID CombatAbility)
 {
 	if (bM_IsAutoGuardActive)
 	{
 		return;
 	}
 
-	Super::OnSquadUnitOutOfRange(TargetLocation);
+	Super::OnSquadUnitOutOfRange(TargetLocation, CombatAbility);
 }
 
 void AGuardController::SetUnitToIdleSpecificLogic()

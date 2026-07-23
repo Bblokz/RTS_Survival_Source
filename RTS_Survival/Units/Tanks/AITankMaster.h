@@ -34,13 +34,22 @@ enum class EQueuedTankMovementRequestState : uint8
 	Active
 };
 
-/** Owns the queue command identity associated with one controller move request. */
+enum class ETankMovementRequestOwner : uint8
+{
+	None,
+	QueuedCommand,
+	TurretRange
+};
+
+/** Couples one physical path request to the subsystem that is allowed to consume its result. */
 struct FQueuedTankMovementRequest
 {
 	EQueuedTankMovementRequestState State = EQueuedTankMovementRequestState::None;
+	ETankMovementRequestOwner Owner = ETankMovementRequestOwner::None;
 	FAIRequestID RequestID;
 	EAbilityID CompletionAbility = EAbilityID::IdNoAbility;
 	uint64 CommandExecutionSerial = 0;
+	uint64 TurretRangePursuitSerial = 0;
 };
 
 
@@ -100,11 +109,27 @@ public:
 		uint64 CommandExecutionSerial,
 		float GoalAcceptanceRadiusOverride = -1.f);
 
-	/** Clears completion ownership without aborting the physical path, allowing seamless request replacement. */
-	void ClearQueuedMovementRequestOwnership();
+	/**
+	 * @brief Issues auxiliary range-closing movement without granting it authority over the command queue.
+	 * @param Location Latest target location reported by the turret.
+	 * @param TurretRangePursuitSerial Token owned by the tank's current turret pursuit.
+	 * @return True when movement started or an immediate result was accepted for deferred resolution.
+	 */
+	bool IssueTurretRangeMovementRequest(
+		const FVector& Location,
+		uint64 TurretRangePursuitSerial);
+
+	/** Clears all completion ownership without aborting the physical path, allowing seamless request replacement. */
+	void ClearMovementRequestOwnership();
+
+	/** Clears only the matching turret pursuit, preventing an old cleanup from discarding a newer owner. */
+	void ClearTurretRangeMovementRequestOwnership(uint64 TurretRangePursuitSerial);
 
 	/** @return True while the supplied command execution is issuing or owns an active request. */
 	bool GetHasQueuedMovementRequestOwnership(uint64 CommandExecutionSerial) const;
+
+	/** @return True while the supplied turret pursuit is issuing or owns an active request. */
+	bool GetHasTurretRangeMovementRequestOwnership(uint64 TurretRangePursuitSerial) const;
 
 	// Ensures harvesters keep UE blocked-move detection disabled throughout harvesting.
 	void SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress);
@@ -243,6 +268,12 @@ private:
 		uint64 CommandExecutionSerial) const;
 	void DeferQueuedMovementCompletion(EAbilityID CompletionAbility, uint64 CommandExecutionSerial);
 	void DeferQueuedMovementRequestFailure(EAbilityID FailedAbility, uint64 CommandExecutionSerial);
+	void DeferTurretRangeMovementResult(
+		uint64 TurretRangePursuitSerial,
+		EPathFollowingResult::Type MovementResultCode);
+	void DispatchTurretRangeMovementResult(
+		uint64 TurretRangePursuitSerial,
+		EPathFollowingResult::Type MovementResultCode) const;
 
 	// Bounds recovery to the unit's stable formation footprint so barriers cannot be crossed by correction.
 	float M_FormationUnitInnerRadius = 0.0f;

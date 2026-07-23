@@ -44,6 +44,14 @@
 #include "RTS_Survival/FactionSystem/FactionFlags/FRTS_FactionFlags.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
+#include "TimerManager.h"
+
+namespace TurretRangeMovement
+{
+	constexpr float InvariantCheckIntervalSeconds = 0.25f;
+	constexpr double OrphanGracePeriodSeconds = 0.5;
+	constexpr double NoOrphanStartTime = -1.0;
+}
 
 namespace TankTowHelpers
 {
@@ -529,6 +537,7 @@ void ATankMaster::BeginDestroy()
 	{
 		World->GetTimerManager().ClearTimer(TimerHandle_CheckIfUpsideDown);
 		World->GetTimerManager().ClearTimer(TimerHandle_SetupMaxSpeed);
+		World->GetTimerManager().ClearTimer(M_TurretRangeMovementInvariantTimerHandle);
 		M_TankStartGameAction.OnTankDestroyed(World);
 	}
 	Super::BeginDestroy();
@@ -541,6 +550,7 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 		return;
 	}
 
+	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
 	CleanupTowRelationshipsOnDeath();
 	OnUnitDies_CheckForCargo(DeathType);
 	// Before announcer line; announcer is set to not interrupt.
@@ -758,6 +768,21 @@ void ATankMaster::ExecuteStopCommand()
 	SetTurretsToAutoEngage(false);
 }
 
+void ATankMaster::OnCommandExecutionStarting(const EAbilityID AbilityStarting)
+{
+	if (M_TurretRangePursuit.Status == ETurretRangePursuitStatus::None)
+	{
+		return;
+	}
+
+	const bool bIsMovementHandoff = AbilityStarting == EAbilityID::IdMove ||
+		AbilityStarting == EAbilityID::IdReverseMove;
+	EndTurretRangeMovement(
+		bIsMovementHandoff
+			? ETurretRangeMovementEndMode::MovementHandoff
+			: ETurretRangeMovementEndMode::FullStop);
+}
+
 void ATankMaster::ExecuteAttackCommand(AActor* Target)
 {
 	M_TargetActor = Target;
@@ -928,15 +953,7 @@ void ATankMaster::TerminateAttackCommand()
 			EachTurret->SetAutoEngageTargets(true);
 		}
 	}
-	if (not GetWasMovingForTargettedActor())
-	{
-		// no need to kill movement.
-		return;
-	}
-	bM_HasTurretOutOfRangeMoveRequest = false;
-
-	// Re-enable the nav collision and stops movements in derived trackedTank as well as stops tracks animations there.
-	OnCancelMovementToGetInRangeOfTurret();
+	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
 }
 
 void ATankMaster::TerminateMoveCommand()
@@ -987,6 +1004,7 @@ void ATankMaster::ExecuteAttackGroundCommand(const FVector GroundLocation)
 
 void ATankMaster::TerminateAttackGroundCommand()
 {
+	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
 	bM_AttackGroundActive = false;
 	M_AttackGroundLocation = FVector::ZeroVector;
 	SetTurretsToAutoEngage(false);
@@ -1116,62 +1134,30 @@ void ATankMaster::OnTurretOutOfRange(
 	const FVector TargetLocation,
 	ACPPTurretsMaster* CallingTurret)
 {
-	UWorld* World = GetWorld();
-	const bool bHasValidAIController = GetIsValidAIController();
-	const bool bCanTurretTakeControl = GetCanTurretTakeControl();
-	const bool bHasValidWorld = World != nullptr;
-	if (not bHasValidAIController || not bCanTurretTakeControl || not bHasValidWorld)
-	{
-		return;
-	}
-
-	const float CurrentTimeSeconds = World->GetTimeSeconds();
-	const bool bIsAlreadyMoving = AITankController->GetMoveStatus() == EPathFollowingStatus::Moving;
-	const float TimeSinceLastRequestSeconds = bM_HasTurretOutOfRangeMoveRequest
-		                                          ? CurrentTimeSeconds - M_LastTurretOutOfRangeMoveRequestTimeSeconds
-		                                          : DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
-	const bool bElapsedEnoughTime = TimeSinceLastRequestSeconds >=
-		DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
-
-	if (bIsAlreadyMoving && not bElapsedEnoughTime)
-	{
-		return;
-	}
-
-	if (GetIsValidRTSNavCollision())
-	{
-		RTSNavCollision->EnableAffectNavmesh(false);
-	}
-
-	if (not AITankController->MoveToLocationWithGoalAcceptance(TargetLocation))
-	{
-		if (GetIsValidRTSNavCollision())
-		{
-			RTSNavCollision->EnableAffectNavmesh(true);
-		}
-		return;
-	}
-
-	M_LastTurretOutOfRangeMoveRequestTimeSeconds = CurrentTimeSeconds;
-	bM_HasTurretOutOfRangeMoveRequest = true;
+	HandleMountedWeaponOutOfRange(
+		TargetLocation,
+		CallingTurret,
+		IsValid(CallingTurret) ? CallingTurret->GetCurrentTargetActor() : nullptr);
 }
 
 void ATankMaster::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 {
-	if (not GetIsValidAIController())
-	{
-		return;
-	}
+	HandleMountedWeaponInRange(CallingTurret);
+}
 
-	if (not GetWasMovingForTargettedActor())
-	{
-		// no need to kill movement.
-		return;
-	}
-	bM_HasTurretOutOfRangeMoveRequest = false;
+void ATankMaster::OnHullWeaponOutOfRange(
+	const FVector TargetLocation,
+	UHullWeaponComponent* CallingHullWeapon)
+{
+	HandleMountedWeaponOutOfRange(
+		TargetLocation,
+		CallingHullWeapon,
+		IsValid(CallingHullWeapon) ? CallingHullWeapon->GetCurrentTargetActor() : nullptr);
+}
 
-	// Re-enable the nav collision and stops movements in derived trackedTank as well as stops tracks animations there.
-	OnCancelMovementToGetInRangeOfTurret();
+void ATankMaster::OnHullWeaponInRange(UHullWeaponComponent* CallingHullWeapon)
+{
+	HandleMountedWeaponInRange(CallingHullWeapon);
 }
 
 void ATankMaster::OnCancelMovementToGetInRangeOfTurret()
@@ -1186,6 +1172,13 @@ void ATankMaster::OnMountedWeaponTargetDestroyed(ACPPTurretsMaster* CallingTurre
                                                  UHullWeaponComponent* CallingHullWeapon, AActor* DestroyedActor,
                                                  const bool bWasDestroyedByOwnWeapons)
 {
+	UObject* const CallingWeapon = IsValid(CallingTurret)
+		                               ? static_cast<UObject*>(CallingTurret)
+		                               : static_cast<UObject*>(CallingHullWeapon);
+	if (GetDoesWeaponOwnCurrentPursuit(CallingWeapon))
+	{
+		EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
+	}
 	if (CallingTurret)
 	{
 		OnTurretKilledActor(CallingTurret, DestroyedActor);
@@ -1401,7 +1394,251 @@ bool ATankMaster::RepairAIControllerReference()
 bool ATankMaster::GetCanTurretTakeControl() const
 {
 	const bool bIsIdle = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdIdle;
-	return UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack || bIsIdle;
+	const EAbilityID ActiveAbility = UnitCommandData->GetCurrentlyActiveCommandType();
+	return ActiveAbility == EAbilityID::IdAttack ||
+		ActiveAbility == EAbilityID::IdAttackGround ||
+		bIsIdle;
+}
+
+bool ATankMaster::GetDoesWeaponOwnCurrentPursuit(const UObject* CallingWeapon) const
+{
+	return IsValid(CallingWeapon) &&
+		M_TurretRangePursuit.Status != ETurretRangePursuitStatus::None &&
+		M_TurretRangePursuit.OwningWeapon.Get() == CallingWeapon;
+}
+
+void ATankMaster::HandleMountedWeaponOutOfRange(
+	const FVector& TargetLocation,
+	UObject* CallingWeapon,
+	AActor* TargetActor)
+{
+	UWorld* const World = GetWorld();
+	const bool bCanIssueMovement = GetIsValidAIController() && IsValid(World) && IsValid(CallingWeapon);
+	if (not bCanIssueMovement)
+	{
+		return;
+	}
+	if (not GetCanTurretTakeControl())
+	{
+		if (GetDoesWeaponOwnCurrentPursuit(CallingWeapon))
+		{
+			EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
+		}
+		return;
+	}
+
+	const double CurrentTimeSeconds = World->GetTimeSeconds();
+	if (M_TurretRangePursuit.Status == ETurretRangePursuitStatus::FailureBackoff &&
+		CurrentTimeSeconds < M_TurretRangePursuit.RetryNotBeforeTimeSeconds)
+	{
+		return;
+	}
+	if (M_TurretRangePursuit.Status == ETurretRangePursuitStatus::Active &&
+		not GetDoesWeaponOwnCurrentPursuit(CallingWeapon))
+	{
+		return;
+	}
+
+	const double TimeSinceLastRequestSeconds =
+		CurrentTimeSeconds - M_TurretRangePursuit.LastRequestTimeSeconds;
+	const bool bElapsedEnoughTime = M_TurretRangePursuit.Status != ETurretRangePursuitStatus::Active ||
+		TimeSinceLastRequestSeconds >=
+		DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
+	if (not bElapsedEnoughTime)
+	{
+		return;
+	}
+
+	BeginTurretRangeMovementRequest(TargetLocation, CallingWeapon, TargetActor, CurrentTimeSeconds);
+}
+
+void ATankMaster::HandleMountedWeaponInRange(UObject* CallingWeapon)
+{
+	if (not GetDoesWeaponOwnCurrentPursuit(CallingWeapon))
+	{
+		return;
+	}
+	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
+}
+
+void ATankMaster::BeginTurretRangeMovementRequest(
+	const FVector& TargetLocation,
+	UObject* CallingWeapon,
+	AActor* TargetActor,
+	const double CurrentTimeSeconds)
+{
+	if (not IsValid(CallingWeapon) || not GetIsValidAIController())
+	{
+		return;
+	}
+
+	AITankController->ClearTurretRangeMovementRequestOwnership(M_TurretRangePursuit.RequestSerial);
+	++M_TurretRangePursuitSerialCounter;
+	if (M_TurretRangePursuitSerialCounter == 0)
+	{
+		++M_TurretRangePursuitSerialCounter;
+	}
+
+	M_TurretRangePursuit.Status = ETurretRangePursuitStatus::Active;
+	M_TurretRangePursuit.RequestSerial = M_TurretRangePursuitSerialCounter;
+	M_TurretRangePursuit.OwningWeapon = CallingWeapon;
+	M_TurretRangePursuit.TargetActor = TargetActor;
+	M_TurretRangePursuit.TargetLocation = TargetLocation;
+	M_TurretRangePursuit.LastRequestTimeSeconds = CurrentTimeSeconds;
+	M_TurretRangePursuit.RetryNotBeforeTimeSeconds = 0.0;
+
+	StartTurretRangeMovementInvariantMonitoring();
+	if (GetIsValidRTSNavCollision())
+	{
+		RTSNavCollision->EnableAffectNavmesh(false);
+	}
+	AITankController->IssueTurretRangeMovementRequest(
+		TargetLocation,
+		M_TurretRangePursuit.RequestSerial);
+}
+
+void ATankMaster::OnTurretRangeMovementRequestFinished(
+	const uint64 TurretRangePursuitSerial,
+	const EPathFollowingResult::Type MovementResultCode)
+{
+	const bool bOwnsResult = M_TurretRangePursuit.Status == ETurretRangePursuitStatus::Active &&
+		M_TurretRangePursuit.RequestSerial == TurretRangePursuitSerial;
+	if (not bOwnsResult)
+	{
+		return;
+	}
+
+	const ETurretRangePursuitStatus NextStatus = MovementResultCode == EPathFollowingResult::Success
+		                                                  ? ETurretRangePursuitStatus::None
+		                                                  : ETurretRangePursuitStatus::FailureBackoff;
+	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop, NextStatus);
+}
+
+void ATankMaster::EndTurretRangeMovement(
+	const ETurretRangeMovementEndMode EndMode,
+	const ETurretRangePursuitStatus NextStatus)
+{
+	if (M_TurretRangePursuit.Status == ETurretRangePursuitStatus::None)
+	{
+		return;
+	}
+
+	const FTankTurretRangePursuitState PreviousPursuit = M_TurretRangePursuit;
+	const bool bWasActivelyMoving = PreviousPursuit.Status == ETurretRangePursuitStatus::Active;
+	if (GetIsValidAIController())
+	{
+		AITankController->ClearTurretRangeMovementRequestOwnership(PreviousPursuit.RequestSerial);
+	}
+	StopTurretRangeMovementInvariantMonitoring();
+	M_TurretRangePursuit = FTankTurretRangePursuitState();
+
+	if (NextStatus == ETurretRangePursuitStatus::FailureBackoff)
+	{
+		M_TurretRangePursuit.Status = NextStatus;
+		M_TurretRangePursuit.OwningWeapon = PreviousPursuit.OwningWeapon;
+		M_TurretRangePursuit.TargetActor = PreviousPursuit.TargetActor;
+		M_TurretRangePursuit.TargetLocation = PreviousPursuit.TargetLocation;
+		if (const UWorld* World = GetWorld())
+		{
+			M_TurretRangePursuit.RetryNotBeforeTimeSeconds = World->GetTimeSeconds() +
+				DeveloperSettings::GamePlay::Turret::MoveToTargetReissueElapsedSeconds;
+		}
+	}
+
+	if (not bWasActivelyMoving || EndMode == ETurretRangeMovementEndMode::MovementHandoff)
+	{
+		return;
+	}
+	if (GetIsValidAIController())
+	{
+		AITankController->StopMovement();
+	}
+	OnCancelMovementToGetInRangeOfTurret();
+}
+
+void ATankMaster::StartTurretRangeMovementInvariantMonitoring()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || World->GetTimerManager().IsTimerActive(M_TurretRangeMovementInvariantTimerHandle))
+	{
+		return;
+	}
+
+	ResetTurretRangeMovementOrphanGracePeriod();
+	World->GetTimerManager().SetTimer(
+		M_TurretRangeMovementInvariantTimerHandle,
+		this,
+		&ATankMaster::CheckTurretRangeMovementInvariant,
+		TurretRangeMovement::InvariantCheckIntervalSeconds,
+		true);
+}
+
+void ATankMaster::StopTurretRangeMovementInvariantMonitoring()
+{
+	ResetTurretRangeMovementOrphanGracePeriod();
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_TurretRangeMovementInvariantTimerHandle);
+	}
+}
+
+void ATankMaster::CheckTurretRangeMovementInvariant()
+{
+	if (M_TurretRangePursuit.Status != ETurretRangePursuitStatus::Active)
+	{
+		StopTurretRangeMovementInvariantMonitoring();
+		return;
+	}
+	if (not M_TurretRangePursuit.OwningWeapon.IsValid() || not GetCanTurretTakeControl())
+	{
+		EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
+		return;
+	}
+
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	AAITankMaster* const TankController = GetAIController();
+	const bool bOwnsRequest = IsValid(TankController) &&
+		TankController->GetHasTurretRangeMovementRequestOwnership(M_TurretRangePursuit.RequestSerial);
+	const bool bIsPathFollowingIdle = not IsValid(TankController) ||
+		TankController->GetMoveStatus() == EPathFollowingStatus::Idle;
+	if (bOwnsRequest && not bIsPathFollowingIdle)
+	{
+		ResetTurretRangeMovementOrphanGracePeriod();
+		return;
+	}
+	if (not bIsPathFollowingIdle)
+	{
+		return;
+	}
+
+	const double CurrentTimeSeconds = World->GetTimeSeconds();
+	if (M_TurretRangeOrphanStartTimeSeconds < 0.0)
+	{
+		M_TurretRangeOrphanStartTimeSeconds = CurrentTimeSeconds;
+		return;
+	}
+	if (CurrentTimeSeconds - M_TurretRangeOrphanStartTimeSeconds <
+		TurretRangeMovement::OrphanGracePeriodSeconds)
+	{
+		return;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		"Recovered orphaned turret range movement."
+		"\n Tank: " + GetName() +
+		"\n Pursuit serial: " + FString::Printf(TEXT("%llu"), M_TurretRangePursuit.RequestSerial));
+	EndTurretRangeMovement(
+		ETurretRangeMovementEndMode::FullStop,
+		ETurretRangePursuitStatus::FailureBackoff);
+}
+
+void ATankMaster::ResetTurretRangeMovementOrphanGracePeriod()
+{
+	M_TurretRangeOrphanStartTimeSeconds = TurretRangeMovement::NoOrphanStartTime;
 }
 
 void ATankMaster::SetMaxSpeedOnVehicleMovementComponent()
@@ -1546,18 +1783,6 @@ bool ATankMaster::GetIsValidRTSNavCollision() const
 		"RTSNavCollision",
 		"ATankMaster::GetIsValidRTSNavCollision");
 	return false;
-}
-
-bool ATankMaster::GetWasMovingForTargettedActor() const
-{
-	if (not bM_HasTurretOutOfRangeMoveRequest)
-	{
-		return false;
-	}
-	const bool bIsIdle = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdIdle;
-	const bool bWasAttacking = UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack ||
-		UnitCommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttackGround;
-	return bIsIdle || bWasAttacking;
 }
 
 void ATankMaster::BeginPlay_SetupCollisionVsBuildings()

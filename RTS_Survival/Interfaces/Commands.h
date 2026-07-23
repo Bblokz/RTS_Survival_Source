@@ -830,6 +830,9 @@ public:
 	 */
 	bool GetDoesCurrentCommandExecutionMatch(EAbilityID ExpectedAbility, uint64 CommandExecutionSerial);
 
+	/** Called after a command gains its execution serial and before its ability-specific execution begins. */
+	virtual void OnCommandExecutionStarting(EAbilityID AbilityStarting);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError EnterCargo(
 		AActor* CarrierActor,

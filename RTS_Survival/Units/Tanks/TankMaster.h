@@ -40,6 +40,38 @@ class UCargo;
 class ATeamWeaponController;
 class ATeamWeapon;
 
+enum class ETurretRangePursuitStatus : uint8
+{
+	None,
+	Active,
+	FailureBackoff
+};
+
+enum class ETurretRangeMovementEndMode : uint8
+{
+	FullStop,
+	MovementHandoff
+};
+
+USTRUCT()
+struct FTankTurretRangePursuitState
+{
+	GENERATED_BODY()
+
+	ETurretRangePursuitStatus Status = ETurretRangePursuitStatus::None;
+	uint64 RequestSerial = 0;
+
+	UPROPERTY()
+	TWeakObjectPtr<UObject> OwningWeapon;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> TargetActor;
+
+	FVector TargetLocation = FVector::ZeroVector;
+	double LastRequestTimeSeconds = 0.0;
+	double RetryNotBeforeTimeSeconds = 0.0;
+};
+
 USTRUCT()
 struct FTankStartGameAction
 {
@@ -291,6 +323,7 @@ protected:
 	// COMMAND INTERFACE OVERWRITES ------------------------------------------------------------------------------------
 
 	virtual void ExecuteStopCommand() override;
+	virtual void OnCommandExecutionStarting(EAbilityID AbilityStarting) override;
 
 	/** @copydoc ICommands::ExecuteAttackCommand
 	 * Sets all Turrets to engage the specified target.
@@ -404,6 +437,10 @@ protected:
      * @note This is an ITurretOwner function. 
 	 */
 	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override ;
+	virtual void OnHullWeaponOutOfRange(
+		const FVector TargetLocation,
+		UHullWeaponComponent* CallingHullWeapon) override;
+	virtual void OnHullWeaponInRange(UHullWeaponComponent* CallingHullWeapon) override;
 	
 	virtual void OnCancelMovementToGetInRangeOfTurret();
 
@@ -478,8 +515,6 @@ private:
 	// The direction the mesh needs to face.
 	FRotator M_RotateToDirection;
 	
-	bool GetWasMovingForTargettedActor()const;
-
 	void BeginPlay_SetupCollisionVsBuildings();
 	void BeginPlay_SetFactionFlagPrimitiveDataIndex();
 
@@ -520,9 +555,11 @@ private:
 	UPROPERTY()
 	AActor* M_TargetActor;
 
-	// Tracks the most recent turret-driven move request so we can throttle reissues while already moving.
-	bool bM_HasTurretOutOfRangeMoveRequest = false;
-	float M_LastTurretOutOfRangeMoveRequestTimeSeconds = 0.0f;
+	// Couples turret range notifications to one exact auxiliary controller request and target identity.
+	FTankTurretRangePursuitState M_TurretRangePursuit;
+	uint64 M_TurretRangePursuitSerialCounter = 0;
+	FTimerHandle M_TurretRangeMovementInvariantTimerHandle;
+	double M_TurretRangeOrphanStartTimeSeconds = -1.0;
 
 	UPROPERTY()
 	USpatialVoiceLinePlayer* M_SpatialVoiceLinePlayer;
@@ -566,6 +603,50 @@ private:
 
 	/** @return Whether the current active ability of the tank allows for the turret to take control */
 	bool GetCanTurretTakeControl() const;
+	bool GetDoesWeaponOwnCurrentPursuit(const UObject* CallingWeapon) const;
+	/**
+	 * @brief Keeps one mounted weapon responsible for range-closing so competing weapons cannot cancel each other.
+	 * @param TargetLocation The current location the vehicle must approach.
+	 * @param CallingWeapon The mounted weapon requesting range-closing ownership.
+	 * @param TargetActor The actor being pursued, if the weapon has an actor target.
+	 */
+	void HandleMountedWeaponOutOfRange(
+		const FVector& TargetLocation,
+		UObject* CallingWeapon,
+		AActor* TargetActor);
+	void HandleMountedWeaponInRange(UObject* CallingWeapon);
+	void StartTurretRangeMovementInvariantMonitoring();
+	void StopTurretRangeMovementInvariantMonitoring();
+	void CheckTurretRangeMovementInvariant();
+	void ResetTurretRangeMovementOrphanGracePeriod();
+	/**
+	 * @brief Replaces only the request owned by the same weapon and binds its exact request identity.
+	 * @param TargetLocation The current destination for the range-closing request.
+	 * @param CallingWeapon The mounted weapon that owns the request.
+	 * @param TargetActor The actor being pursued, if present.
+	 * @param CurrentTimeSeconds The issue time used to throttle request replacement.
+	 */
+	void BeginTurretRangeMovementRequest(
+		const FVector& TargetLocation,
+		UObject* CallingWeapon,
+		AActor* TargetActor,
+		double CurrentTimeSeconds);
+	/**
+	 * @brief Accepts a terminal result only while the same pursuit generation still owns the request.
+	 * @param TurretRangePursuitSerial The pursuit generation associated with the completed request.
+	 * @param MovementResultCode The path-following terminal result.
+	 */
+	void OnTurretRangeMovementRequestFinished(
+		uint64 TurretRangePursuitSerial,
+		EPathFollowingResult::Type MovementResultCode);
+	/**
+	 * @brief Centralizes cleanup while preserving nav state during an intentional movement handoff.
+	 * @param EndMode Whether cleanup stops locomotion or hands it to a queued movement command.
+	 * @param NextStatus The bounded post-cleanup state, normally none or failure backoff.
+	 */
+	void EndTurretRangeMovement(
+		ETurretRangeMovementEndMode EndMode,
+		ETurretRangePursuitStatus NextStatus = ETurretRangePursuitStatus::None);
 
 	// Plays a little after beginplay to set max vehicle speed on the vehicle movement component.
 	FTimerHandle TimerHandle_SetupMaxSpeed;

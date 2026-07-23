@@ -850,6 +850,7 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		// Zero is reserved for callers that do not own a command execution.
 		++M_CurrentCommandExecutionSerial;
 	}
+	M_Owner->OnCommandExecutionStarting(Cmd.CommandType);
 
 	StartCooldownForCommand(Cmd);
 
@@ -3120,6 +3121,11 @@ bool ICommands::GetDoesCurrentCommandExecutionMatch(
 
 	return CommandData->GetCurrentlyActiveCommandType() == ExpectedAbility &&
 		CommandData->GetCurrentCommandExecutionSerial() == CommandExecutionSerial;
+}
+
+void ICommands::OnCommandExecutionStarting(const EAbilityID AbilityStarting)
+{
+	(void)AbilityStarting;
 }
 
 ECommandQueueError ICommands::EnterCargo(AActor* CarrierActor, const bool bSetUnitToIdle)

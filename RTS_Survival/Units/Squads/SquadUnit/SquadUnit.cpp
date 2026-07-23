@@ -524,9 +524,8 @@ void ASquadUnit::OnSpecificTargetInRange()
 	{
 		// Unit was moving closer now no longer needs to be.
 		StopMovementAndClearPath();
-		// Continue attacking.
-		M_ActiveCommand = EAbilityID::IdAttack;
-		Debug_Weapons("Was in range but now close enough: Attack", FColor::Red);
+		RestoreCombatAbilityAfterRangeClosing();
+		Debug_Weapons("Was in range but now close enough: resume combat", FColor::Red);
 	}
 }
 
@@ -542,8 +541,14 @@ void ASquadUnit::OnSpecificTargetOutOfRange(const FVector& TargetLocation)
 		Debug_Weapons("Unit is already moving closer to target, waiting...", FColor::Red);
 		return;
 	}
+	const bool bIsCombatCommand = M_ActiveCommand == EAbilityID::IdAttack ||
+		M_ActiveCommand == EAbilityID::IdAttackGround;
+	if (not bIsCombatCommand)
+	{
+		return;
+	}
 	// If one unit is out of range; notify the squad controller to move the full squad closer.
-	M_SquadController->OnSquadUnitOutOfRange(TargetLocation);
+	M_SquadController->OnSquadUnitOutOfRange(TargetLocation, M_ActiveCommand);
 }
 
 void ASquadUnit::OnSpecificTargetDestroyedOrInvisible()
@@ -551,7 +556,7 @@ void ASquadUnit::OnSpecificTargetDestroyedOrInvisible()
 	if (M_ActiveCommand == EAbilityID::IdNoAbility_MoveCloserToTarget)
 	{
 		StopMovementAndClearPath();
-		M_ActiveCommand = EAbilityID::IdAttack;
+		RestoreCombatAbilityAfterRangeClosing();
 	}
 	OnCommandComplete();
 }
@@ -820,6 +825,7 @@ void ASquadUnit::PostInitializeComp_SetupAnimBP()
 void ASquadUnit::ExecuteMoveToSelfPathFinding(const FVector& MoveToLocation, const EAbilityID AbilityToMoveFor,
                                               const bool bUsePathfinding)
 {
+	PrepareForRangeClosingMovement(AbilityToMoveFor);
 	// Used to indicate what to do when move completes.
 	M_ActiveCommand = AbilityToMoveFor;
 	MoveToAndBindOnCompleted(MoveToLocation, bUsePathfinding, AbilityToMoveFor);
@@ -830,6 +836,7 @@ void ASquadUnit::ExecuteMoveAlongPath(const FNavPathSharedPtr& Path, const EAbil
 	if (!GetIsValidAISquadUnit() || !Path.IsValid())
 		return;
 
+	PrepareForRangeClosingMovement(AbilityToMoveFor);
 	M_ActiveCommand = AbilityToMoveFor;
 	M_CurrentPath = Path;
 
@@ -839,7 +846,19 @@ void ASquadUnit::ExecuteMoveAlongPath(const FNavPathSharedPtr& Path, const EAbil
 	MoveRequest.SetAcceptanceRadius(DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius);
 	MoveRequest.SetGoalLocation(Path->GetDestinationLocation());
 
-	M_AISquadUnit->RequestMove(MoveRequest, Path);
+	const FAIRequestID RequestID = M_AISquadUnit->RequestMove(MoveRequest, Path);
+	if (AbilityToMoveFor == EAbilityID::IdNoAbility_MoveCloserToTarget)
+	{
+		M_RangeClosingRequestID = RequestID;
+	}
+	if (not RequestID.IsValid())
+	{
+		OnMoveToSelfPathFindingFailed(
+			EPathFollowingRequestResult::Failed,
+			Path->GetDestinationLocation(),
+			AbilityToMoveFor);
+		return;
+	}
 
 	// Bind OnMoveCompleted.
 	if (!M_AISquadUnit->ReceiveMoveCompleted.IsAlreadyBound(this, &ASquadUnit::OnMoveCompleted))
@@ -898,6 +917,10 @@ void ASquadUnit::MoveToAndBindOnCompleted(const FVector& MoveToLocation, const b
 	}
 	if (Result == EPathFollowingRequestResult::AlreadyAtGoal)
 	{
+		if (MoveContext == EAbilityID::IdNoAbility_MoveCloserToTarget)
+		{
+			RestoreCombatAbilityAfterRangeClosing();
+		}
 		return;
 	}
 
@@ -905,6 +928,10 @@ void ASquadUnit::MoveToAndBindOnCompleted(const FVector& MoveToLocation, const b
 	{
 		OnMoveToSelfPathFindingFailed(Result, MoveToLocation, MoveContext);
 		return;
+	}
+	if (MoveContext == EAbilityID::IdNoAbility_MoveCloserToTarget)
+	{
+		M_RangeClosingRequestID = M_AISquadUnit->GetCurrentMoveRequestID();
 	}
 
 	if (!M_AISquadUnit->ReceiveMoveCompleted.IsAlreadyBound(this, &ASquadUnit::OnMoveCompleted))
@@ -960,6 +987,8 @@ void ASquadUnit::ExecuteAttackCommand(AActor* TargetActor)
 {
 	M_TargetActor = TargetActor;
 	M_ActiveCommand = EAbilityID::IdAttack;
+	M_CombatAbilityBeforeRangeClosing = EAbilityID::IdAttack;
+	M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
 	if (GetIsValidWeapon())
 	{
 		M_InfantryWeapon->SetEngageSpecificTarget(TargetActor);
@@ -969,6 +998,8 @@ void ASquadUnit::ExecuteAttackCommand(AActor* TargetActor)
 void ASquadUnit::ExecuteAttackGroundCommand(const FVector& TargetLocation)
 {
 	M_ActiveCommand = EAbilityID::IdAttackGround;
+	M_CombatAbilityBeforeRangeClosing = EAbilityID::IdAttackGround;
+	M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
 	if (GetIsValidWeapon())
 	{
 		M_InfantryWeapon->SetEngageGroundLocation(TargetLocation);
@@ -984,6 +1015,8 @@ void ASquadUnit::TerminateAttackGroundCommand()
 		Debug_Weapons("Terminate attack GRND; stop moving closer", FColor::Red);
 	}
 	M_ActiveCommand = EAbilityID::IdIdle;
+	M_CombatAbilityBeforeRangeClosing = EAbilityID::IdNoAbility;
+	M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
 	Debug_Weapons("Terminate attack ground; idle", FColor::Red);
 	if (GetIsValidWeapon())
 	{
@@ -1000,6 +1033,8 @@ void ASquadUnit::TerminateAttackCommand()
 		Debug_Weapons("Terminate attack; stop moving closer", FColor::Red);
 	}
 	M_ActiveCommand = EAbilityID::IdIdle;
+	M_CombatAbilityBeforeRangeClosing = EAbilityID::IdNoAbility;
+	M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
 	Debug_Weapons("Terminate attack; idle", FColor::Red);
 	if (GetIsValidWeapon())
 	{
@@ -1475,6 +1510,11 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 	case EAbilityID::IdAimAbility:
 		break;
 	case EAbilityID::IdNoAbility_MoveCloserToTarget:
+		if (not M_RangeClosingRequestID.IsValid() ||
+			RequestID.GetID() != M_RangeClosingRequestID.GetID())
+		{
+			return;
+		}
 		OnMoveCompleted_MoveCloserToTarget();
 		break;
 	case EAbilityID::IdFieldConstruction:
@@ -1541,7 +1581,7 @@ void ASquadUnit::OnMoveCompleted_Capture() const
 void ASquadUnit::OnMoveCompleted_MoveCloserToTarget()
 {
 	// Moved closer to target, still attacking.
-	M_ActiveCommand = EAbilityID::IdAttack;
+	RestoreCombatAbilityAfterRangeClosing();
 	Debug_Weapons("Unit Finished moving closer to target", FColor::Purple);
 }
 
@@ -1818,6 +1858,41 @@ void ASquadUnit::StopMovementAndClearPath()
 	}
 }
 
+void ASquadUnit::PrepareForRangeClosingMovement(const EAbilityID MovementAbility)
+{
+	if (MovementAbility != EAbilityID::IdNoAbility_MoveCloserToTarget)
+	{
+		return;
+	}
+
+	EAbilityID CombatAbility = M_ActiveCommand;
+	if (GetIsValidSquadController())
+	{
+		const UCommandData* const CommandData = M_SquadController->GetIsValidCommandData();
+		if (IsValid(CommandData))
+		{
+			const EAbilityID SquadCombatAbility = CommandData->GetCurrentlyActiveCommandType();
+			if (SquadCombatAbility == EAbilityID::IdAttack || SquadCombatAbility == EAbilityID::IdAttackGround)
+			{
+				CombatAbility = SquadCombatAbility;
+			}
+		}
+	}
+
+	if (CombatAbility == EAbilityID::IdAttack || CombatAbility == EAbilityID::IdAttackGround)
+	{
+		M_CombatAbilityBeforeRangeClosing = CombatAbility;
+	}
+}
+
+void ASquadUnit::RestoreCombatAbilityAfterRangeClosing()
+{
+	M_ActiveCommand = M_CombatAbilityBeforeRangeClosing == EAbilityID::IdAttackGround
+		                  ? EAbilityID::IdAttackGround
+		                  : EAbilityID::IdAttack;
+	M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
+}
+
 void ASquadUnit::Debug_Weapons(const FString& DebugMessage, const FColor Color)
 {
 	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
@@ -1853,6 +1928,10 @@ void ASquadUnit::OnMoveToSelfPathFindingFailed(const EPathFollowingRequestResult
 		"\n Request Result: " + UEnum::GetValueAsString(RequestResult);
 
 	RTSFunctionLibrary::ReportError(BaseMessage);
+	if (MoveContext == EAbilityID::IdNoAbility_MoveCloserToTarget)
+	{
+		RestoreCombatAbilityAfterRangeClosing();
+	}
 }
 
 void ASquadUnit::OnMoveToActorRequestFailed(const AActor* TargetActor, const EAbilityID AbilityToMoveFor,

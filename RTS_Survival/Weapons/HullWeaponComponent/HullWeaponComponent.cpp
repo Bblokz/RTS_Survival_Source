@@ -828,6 +828,14 @@ void UHullWeaponComponent::SpecificEngage()
 	const FVector TargetLocation = M_TargetingData.GetActiveTargetLocation();
 	const FVector OwnerLocation = GetOwner()->GetActorLocation();
 	const bool bIsInRange = GetIsTargetInRange(TargetLocation, OwnerLocation);
+	if (not bIsInRange)
+	{
+		AllWeaponsStopFire(false, false);
+		TurretOwner.GetInterface()->OnHullWeaponOutOfRange(TargetLocation, this);
+		return;
+	}
+
+	TurretOwner.GetInterface()->OnHullWeaponInRange(this);
 
 	if (not GetIsTargetWithinYaw())
 	{

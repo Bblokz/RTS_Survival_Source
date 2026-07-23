@@ -771,7 +771,7 @@ void ANomadicVehicle::TerminateCreateBuildingCommand()
 	{
 		M_ConversionProgressBar->StopProgressBar();
 		CancelPendingTrackedMove();
-		AINomadicVehicle->ClearQueuedMovementRequestOwnership();
+		AINomadicVehicle->ClearMovementRequestOwnership();
 		AINomadicVehicle->StopMovement();
 		// The static preview remains hidden but collision-enabled while the truck is rotating or playing
 		// its montage, so every create-building cancellation must remove it before returning to truck mode.

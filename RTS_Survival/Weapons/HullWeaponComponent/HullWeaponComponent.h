@@ -70,6 +70,8 @@ public:
 	UFUNCTION(BlueprintCallable)
     void SetEngageGroundLocation(const FVector& GroundLocation);
 
+	AActor* GetCurrentTargetActor() const { return M_TargetingData.GetTargetActor(); }
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void DisableHullWeapon();
 

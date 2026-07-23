@@ -89,7 +89,9 @@ bool AAITankMaster::IssueQueuedMovementRequest(
 		return false;
 	}
 
+	ResetQueuedMovementRequestOwnership();
 	M_QueuedMovementRequest.State = EQueuedTankMovementRequestState::Issuing;
+	M_QueuedMovementRequest.Owner = ETankMovementRequestOwner::QueuedCommand;
 	M_QueuedMovementRequest.RequestID = FAIRequestID::InvalidRequest;
 	M_QueuedMovementRequest.CompletionAbility = CompletionAbility;
 	M_QueuedMovementRequest.CommandExecutionSerial = CommandExecutionSerial;
@@ -121,15 +123,77 @@ bool AAITankMaster::IssueQueuedMovementRequest(
 	return false;
 }
 
-void AAITankMaster::ClearQueuedMovementRequestOwnership()
+bool AAITankMaster::IssueTurretRangeMovementRequest(
+	const FVector& Location,
+	const uint64 TurretRangePursuitSerial)
+{
+	if (TurretRangePursuitSerial == 0)
+	{
+		RTSFunctionLibrary::ReportError(
+			"AAITankMaster::IssueTurretRangeMovementRequest received an invalid pursuit serial.");
+		return false;
+	}
+	if (not GetIsValidVehiclePathComp())
+	{
+		DeferTurretRangeMovementResult(TurretRangePursuitSerial, EPathFollowingResult::Invalid);
+		return false;
+	}
+
+	ResetQueuedMovementRequestOwnership();
+	M_QueuedMovementRequest.State = EQueuedTankMovementRequestState::Issuing;
+	M_QueuedMovementRequest.Owner = ETankMovementRequestOwner::TurretRange;
+	M_QueuedMovementRequest.RequestID = FAIRequestID::InvalidRequest;
+	M_QueuedMovementRequest.CompletionAbility = EAbilityID::IdNoAbility;
+	M_QueuedMovementRequest.CommandExecutionSerial = 0;
+	M_QueuedMovementRequest.TurretRangePursuitSerial = TurretRangePursuitSerial;
+
+	const FPathFollowingRequestResult MoveResult = TryMoveToLocationWithOffNavRecovery(
+		Location,
+		m_VehiclePathComp->GetGoalAcceptanceRadius());
+	if (MoveResult.Code == EPathFollowingRequestResult::RequestSuccessful)
+	{
+		M_QueuedMovementRequest.State = EQueuedTankMovementRequestState::Active;
+		M_QueuedMovementRequest.RequestID = MoveResult.MoveId;
+		return true;
+	}
+
+	ResetQueuedMovementRequestOwnership();
+	const EPathFollowingResult::Type ImmediateResult =
+		MoveResult.Code == EPathFollowingRequestResult::AlreadyAtGoal
+			? EPathFollowingResult::Success
+			: EPathFollowingResult::Invalid;
+	DeferTurretRangeMovementResult(TurretRangePursuitSerial, ImmediateResult);
+	return MoveResult.Code == EPathFollowingRequestResult::AlreadyAtGoal;
+}
+
+void AAITankMaster::ClearMovementRequestOwnership()
 {
 	ResetQueuedMovementRequestOwnership();
 }
 
+void AAITankMaster::ClearTurretRangeMovementRequestOwnership(const uint64 TurretRangePursuitSerial)
+{
+	const bool bOwnsMatchingTurretPursuit =
+		M_QueuedMovementRequest.Owner == ETankMovementRequestOwner::TurretRange &&
+		M_QueuedMovementRequest.TurretRangePursuitSerial == TurretRangePursuitSerial;
+	if (bOwnsMatchingTurretPursuit)
+	{
+		ResetQueuedMovementRequestOwnership();
+	}
+}
+
 bool AAITankMaster::GetHasQueuedMovementRequestOwnership(const uint64 CommandExecutionSerial) const
 {
-	return M_QueuedMovementRequest.State != EQueuedTankMovementRequestState::None &&
+	return M_QueuedMovementRequest.Owner == ETankMovementRequestOwner::QueuedCommand &&
+		M_QueuedMovementRequest.State != EQueuedTankMovementRequestState::None &&
 		M_QueuedMovementRequest.CommandExecutionSerial == CommandExecutionSerial;
+}
+
+bool AAITankMaster::GetHasTurretRangeMovementRequestOwnership(const uint64 TurretRangePursuitSerial) const
+{
+	return M_QueuedMovementRequest.Owner == ETankMovementRequestOwner::TurretRange &&
+		M_QueuedMovementRequest.State != EQueuedTankMovementRequestState::None &&
+		M_QueuedMovementRequest.TurretRangePursuitSerial == TurretRangePursuitSerial;
 }
 
 void AAITankMaster::SetHarvesterMoveBlockDetectionSuppressed(const bool bShouldSuppress)
@@ -194,14 +258,25 @@ void AAITankMaster::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowing
 		return;
 	}
 
+	const ETankMovementRequestOwner RequestOwner = M_QueuedMovementRequest.Owner;
 	const EAbilityID QueuedMovementAbility = M_QueuedMovementRequest.CompletionAbility;
 	const uint64 CommandExecutionSerial = M_QueuedMovementRequest.CommandExecutionSerial;
+	const uint64 TurretRangePursuitSerial = M_QueuedMovementRequest.TurretRangePursuitSerial;
 	ResetQueuedMovementRequestOwnership();
 
 	if (Result.Code == EPathFollowingResult::Aborted &&
 		Result.HasFlag(FPathFollowingResultFlags::NewRequest))
 	{
 		// Replacement requests own their own completion. Never let this stale callback resolve either command.
+		return;
+	}
+	if (RequestOwner == ETankMovementRequestOwner::TurretRange)
+	{
+		DispatchTurretRangeMovementResult(TurretRangePursuitSerial, Result.Code);
+		return;
+	}
+	if (RequestOwner != ETankMovementRequestOwner::QueuedCommand)
+	{
 		return;
 	}
 
@@ -342,6 +417,47 @@ void AAITankMaster::DeferQueuedMovementRequestFailure(
 	{
 		OnQueuedMovementRequestFailed(FailedAbility, CommandExecutionSerial);
 	}
+}
+
+void AAITankMaster::DeferTurretRangeMovementResult(
+	const uint64 TurretRangePursuitSerial,
+	const EPathFollowingResult::Type MovementResultCode)
+{
+	TWeakObjectPtr<AAITankMaster> WeakController(this);
+	FTimerDelegate ResultDelegate;
+	ResultDelegate.BindLambda([WeakController, TurretRangePursuitSerial, MovementResultCode]()
+	{
+		if (not WeakController.IsValid())
+		{
+			return;
+		}
+
+		WeakController->DispatchTurretRangeMovementResult(
+			TurretRangePursuitSerial,
+			MovementResultCode);
+	});
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimerForNextTick(ResultDelegate);
+		return;
+	}
+
+	DispatchTurretRangeMovementResult(TurretRangePursuitSerial, MovementResultCode);
+}
+
+void AAITankMaster::DispatchTurretRangeMovementResult(
+	const uint64 TurretRangePursuitSerial,
+	const EPathFollowingResult::Type MovementResultCode) const
+{
+	if (not GetIsValidControlledTank())
+	{
+		return;
+	}
+
+	ControlledTank->OnTurretRangeMovementRequestFinished(
+		TurretRangePursuitSerial,
+		MovementResultCode);
 }
 
 void AAITankMaster::FindPathForMoveRequest(const FAIMoveRequest& MoveRequest, FPathFindingQuery& Query,

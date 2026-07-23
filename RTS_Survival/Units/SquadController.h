@@ -424,7 +424,14 @@ public:
 	virtual void
 	OnRTSUnitSpawned(const bool bSetDisabled, const float TimeNotSelectable, const FVector MoveTo) override;
 
-	virtual void OnSquadUnitOutOfRange(const FVector& TargetLocation);
+	/**
+	 * @brief Starts auxiliary squad movement only while the reporting unit still belongs to the active combat command.
+	 * @param TargetLocation Current actor or attack-ground location that is outside weapon range.
+	 * @param CombatAbility Attack context that must still own the squad command queue.
+	 */
+	virtual void OnSquadUnitOutOfRange(
+		const FVector& TargetLocation,
+		EAbilityID CombatAbility);
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	virtual bool GetSquadAlreadyHasTeamWeapon() const;
 

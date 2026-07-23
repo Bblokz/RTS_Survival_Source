@@ -406,7 +406,7 @@ void ATrackedTankMaster::TerminateMoveCommandForMovementReplacement()
 	CancelPendingTrackedMove();
 	if (GetIsValidAITankController())
 	{
-		AITankController->ClearQueuedMovementRequestOwnership();
+		AITankController->ClearMovementRequestOwnership();
 	}
 	CheckFootPrintForOverlaps();
 }
@@ -451,7 +451,7 @@ void ATrackedTankMaster::TerminateReverseCommandForMovementReplacement()
 	CancelPendingTrackedMove();
 	if (GetIsValidAITankController())
 	{
-		AITankController->ClearQueuedMovementRequestOwnership();
+		AITankController->ClearMovementRequestOwnership();
 	}
 }
 
@@ -575,7 +575,7 @@ void ATrackedTankMaster::FullyStopTrackedMovementCommand()
 	StopBehaviourTree();
 	if (GetIsValidAITankController())
 	{
-		AITankController->ClearQueuedMovementRequestOwnership();
+		AITankController->ClearMovementRequestOwnership();
 		AITankController->StopMovement();
 	}
 
@@ -726,7 +726,7 @@ void ATrackedTankMaster::RecoverOrphanedMovementCommand(
 	CancelPendingTrackedMove();
 	if (IsValid(TankController))
 	{
-		TankController->ClearQueuedMovementRequestOwnership();
+		TankController->ClearMovementRequestOwnership();
 	}
 	TryDoneExecutingCommand(OrphanedAbility, CommandExecutionSerial);
 }

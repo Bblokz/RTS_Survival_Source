@@ -64,7 +64,9 @@ protected:
 	virtual void LoadSquadUnitsAsync() override;
 	virtual void OnAllSquadUnitsLoaded() override;
 	virtual void OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedClass) override;
-	virtual void OnSquadUnitOutOfRange(const FVector& TargetLocation) override;
+	virtual void OnSquadUnitOutOfRange(
+		const FVector& TargetLocation,
+		EAbilityID CombatAbility) override;
 	virtual void SetUnitToIdleSpecificLogic() override;
 	virtual void StopMovement() override;
 	virtual void UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected, ERTSDeathType DeathType) override;

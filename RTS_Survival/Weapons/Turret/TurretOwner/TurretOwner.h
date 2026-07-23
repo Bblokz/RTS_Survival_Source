@@ -48,6 +48,18 @@ protected:
 	 */
 	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) = 0;
 
+	/** Auxiliary range notification for fixed hull-mounted weapons. */
+	virtual void OnHullWeaponOutOfRange(
+		const FVector TargetLocation,
+		UHullWeaponComponent* CallingHullWeapon)
+	{
+	}
+
+	/** Auxiliary in-range notification for fixed hull-mounted weapons. */
+	virtual void OnHullWeaponInRange(UHullWeaponComponent* CallingHullWeapon)
+	{
+	}
+
 	/**
 	 * @param CallingTurret The turret that destroyed its target.
 	 * @param CallingHullWeapon The Hull Weapon that destroyed the target.

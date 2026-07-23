@@ -631,11 +631,13 @@ void ATeamWeaponController::OnUnitIdleAndNoNewCommands()
 	}
 }
 
-void ATeamWeaponController::OnSquadUnitOutOfRange(const FVector& TargetLocation)
+void ATeamWeaponController::OnSquadUnitOutOfRange(
+	const FVector& TargetLocation,
+	const EAbilityID CombatAbility)
 {
 	if (bM_IsTeamWeaponAbandoned)
 	{
-		Super::OnSquadUnitOutOfRange(TargetLocation);
+		Super::OnSquadUnitOutOfRange(TargetLocation, CombatAbility);
 	}
 	// do not move guards or operators; the team weapon dictates the movement!
 }
