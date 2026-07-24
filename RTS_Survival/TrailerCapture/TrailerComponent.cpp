@@ -153,7 +153,7 @@ bool UTrailerComponent::StartRecording(
 	M_RecordingFrameRate = FMath::Max(1, Settings->M_FramesPerSecond);
 	M_StartDateTime = FDateTime::Now();
 	M_SessionGuid = FGuid::NewGuid();
-	if (not ResolveOutputGeometry(*Settings, bOverrideResolution, ResolutionX, ResolutionY)
+	if (not ResolveOutputGeometry(bOverrideResolution, ResolutionX, ResolutionY)
 		|| not CreateSessionDirectories(*Settings)
 		|| not InitializeViewportCapture())
 	{
@@ -282,20 +282,26 @@ bool UTrailerComponent::GetIsSupportedBuildAndWorld() const
 }
 
 bool UTrailerComponent::ResolveOutputGeometry(
-	const URTSTrailerCaptureSettings& Settings,
 	const bool bOverrideResolution,
 	const int32 ResolutionX,
 	const int32 ResolutionY)
 {
-	const int32 OutputWidth = bOverrideResolution ? ResolutionX : Settings.M_DefaultResolutionX;
-	const int32 OutputHeight = bOverrideResolution ? ResolutionY : Settings.M_DefaultResolutionY;
-	if (OutputWidth <= 0 || OutputHeight <= 0 || OutputWidth % 2 != 0 || OutputHeight % 2 != 0)
+	if (not bOverrideResolution)
+	{
+		return true;
+	}
+	return SetOutputSize(FIntPoint(ResolutionX, ResolutionY));
+}
+
+bool UTrailerComponent::SetOutputSize(const FIntPoint& OutputSize)
+{
+	if (OutputSize.X <= 0 || OutputSize.Y <= 0 || OutputSize.X % 2 != 0 || OutputSize.Y % 2 != 0)
 	{
 		SetLastError(TEXT("Trailer output dimensions must be positive even numbers for yuv420p encoding."));
 		return false;
 	}
 
-	M_CaptureGeometry.M_OutputSize = FIntPoint(OutputWidth, OutputHeight);
+	M_CaptureGeometry.M_OutputSize = OutputSize;
 	return true;
 }
 
@@ -369,6 +375,17 @@ bool UTrailerComponent::InitializeViewportCapture()
 		SetLastError(TEXT("The game viewport has an invalid size."));
 		return false;
 	}
+	if (not bM_OverrideResolution
+		&& (M_CaptureGeometry.M_SourceViewportSize.X % 2 != 0
+			|| M_CaptureGeometry.M_SourceViewportSize.Y % 2 != 0))
+	{
+		SetLastError(TEXT("The native game viewport must have positive even dimensions for yuv420p encoding."));
+		return false;
+	}
+	if (not bM_OverrideResolution)
+	{
+		M_CaptureGeometry.M_OutputSize = M_CaptureGeometry.M_SourceViewportSize;
+	}
 	if (not CalculateCaptureGeometry())
 	{
 		return false;
@@ -385,6 +402,13 @@ bool UTrailerComponent::InitializeViewportCapture()
 
 bool UTrailerComponent::CalculateCaptureGeometry()
 {
+	if (not bM_OverrideResolution)
+	{
+		M_CaptureGeometry.M_CaptureSize = M_CaptureGeometry.M_SourceViewportSize;
+		M_CaptureGeometry.M_CropOffset = FIntPoint::ZeroValue;
+		return true;
+	}
+
 	const double SourceAspect = static_cast<double>(M_CaptureGeometry.M_SourceViewportSize.X)
 		/ static_cast<double>(M_CaptureGeometry.M_SourceViewportSize.Y);
 	const double OutputAspect = static_cast<double>(M_CaptureGeometry.M_OutputSize.X)

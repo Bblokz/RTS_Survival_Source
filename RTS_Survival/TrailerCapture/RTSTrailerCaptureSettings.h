@@ -6,8 +6,6 @@
 
 namespace RTSTrailerCaptureDefaults
 {
-	inline constexpr int32 OutputResolutionX = 1920;
-	inline constexpr int32 OutputResolutionY = 1080;
 	inline constexpr int32 FramesPerSecond = 60;
 	inline constexpr float MaximumDurationSeconds = 120.0f;
 	inline constexpr int32 VideoConstantRateFactor = 16;
@@ -28,12 +26,6 @@ class RTS_SURVIVAL_API URTSTrailerCaptureSettings : public UDeveloperSettings
 
 public:
 	URTSTrailerCaptureSettings();
-
-	UPROPERTY(Config, EditAnywhere, Category="Trailer Capture|Output", meta=(ClampMin="2", UIMin="2"))
-	int32 M_DefaultResolutionX = RTSTrailerCaptureDefaults::OutputResolutionX;
-
-	UPROPERTY(Config, EditAnywhere, Category="Trailer Capture|Output", meta=(ClampMin="2", UIMin="2"))
-	int32 M_DefaultResolutionY = RTSTrailerCaptureDefaults::OutputResolutionY;
 
 	// Relative paths are placed under the project's Saved directory.
 	UPROPERTY(Config, EditAnywhere, Category="Trailer Capture|Output")

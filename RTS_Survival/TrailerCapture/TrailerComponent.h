@@ -71,7 +71,7 @@ public:
 
 	/**
 	 * @brief Starts a bounded viewport/audio session so the final file matches the requested delivery size.
-	 * @param bOverrideResolution Whether to use the supplied resolution instead of project settings.
+	 * @param bOverrideResolution Whether to use the supplied resolution instead of the native viewport size.
 	 * @param ResolutionX Requested output width when overriding.
 	 * @param ResolutionY Requested output height when overriding.
 	 * @return True when capture was initialized and a first backbuffer was requested.
@@ -112,17 +112,17 @@ private:
 
 	/**
 	 * @brief Selects and validates the delivery size before allocating GPU capture resources.
-	 * @param Settings Project defaults used when bOverrideResolution is false.
-	 * @param bOverrideResolution Whether the supplied dimensions take precedence.
+	 * Native mode defers selection until the player viewport is available.
+	 * @param bOverrideResolution Whether the supplied dimensions take precedence over the viewport.
 	 * @param ResolutionX Supplied delivery width.
 	 * @param ResolutionY Supplied delivery height.
-	 * @return True when the selected size is compatible with yuv420p.
+	 * @return True when the override is valid or native viewport selection can proceed.
 	 */
 	bool ResolveOutputGeometry(
-		const URTSTrailerCaptureSettings& Settings,
 		bool bOverrideResolution,
 		int32 ResolutionX,
 		int32 ResolutionY);
+	bool SetOutputSize(const FIntPoint& OutputSize);
 	bool CreateSessionDirectories(const URTSTrailerCaptureSettings& Settings);
 	bool InitializeViewportCapture();
 	bool CalculateCaptureGeometry();

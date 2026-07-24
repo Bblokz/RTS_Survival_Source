@@ -1736,7 +1736,7 @@ namespace DeveloperSettings
 		// still checking for collision with the landscape.
 		inline constexpr float SightDistanceMouse = 10000;
 
-		inline constexpr float MinZoomLimit = 300.f;
+		inline constexpr float MinZoomLimit = 150.f;
 		// corresponds with 8500 range in the game (weapon on left side engaging weapon just visible on right side)
 		// inline constexpr float MaxZoomLimit = 4200.f;
 		inline constexpr float MaxZoomLimit = 4800.f;

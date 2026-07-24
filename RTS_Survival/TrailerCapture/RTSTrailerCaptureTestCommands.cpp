@@ -185,10 +185,12 @@ namespace RTSTrailerCaptureTest
 			const float RecordingSeconds,
 			const int32 ResolutionX,
 			const int32 ResolutionY,
+			const bool bOverrideResolution,
 			const bool bQuitWhenDone)
 			: M_Resolution(FMath::Max(2, ResolutionX), FMath::Max(2, ResolutionY))
 			, M_RecordingSeconds(FMath::Max(0.5f, RecordingSeconds))
 			, M_RunStartSeconds(FPlatformTime::Seconds())
+			, bM_OverrideResolution(bOverrideResolution)
 			, bM_QuitWhenDone(bQuitWhenDone)
 		{
 		}
@@ -285,7 +287,10 @@ namespace RTSTrailerCaptureTest
 			{
 				return Finish(false, TEXT("TrailerComponent was not available after the FoW wait."));
 			}
-			if (not TrailerComponent->StartRecording(true, M_Resolution.X, M_Resolution.Y))
+			if (not TrailerComponent->StartRecording(
+				bM_OverrideResolution,
+				M_Resolution.X,
+				M_Resolution.Y))
 			{
 				return Finish(false, TEXT("StartRecording failed: ") + TrailerComponent->GetLastError());
 			}
@@ -296,9 +301,10 @@ namespace RTSTrailerCaptureTest
 			UE_LOG(
 				LogRTSTrailerCaptureTest,
 				Display,
-				TEXT("RTS_TRAILER_TEST_CAPTURE_STARTED FowWait=%.3f Duration=%.3f Resolution=%dx%d"),
+				TEXT("RTS_TRAILER_TEST_CAPTURE_STARTED FowWait=%.3f Duration=%.3f Mode=%s RequestedResolution=%dx%d"),
 				WaitedSeconds,
 				M_RecordingSeconds,
+				bM_OverrideResolution ? TEXT("Override") : TEXT("Native"),
 				M_Resolution.X,
 				M_Resolution.Y);
 			return true;
@@ -488,6 +494,7 @@ namespace RTSTrailerCaptureTest
 		bool bM_RequestedMissionOpen = false;
 		bool bM_PlayedVerificationTone = false;
 		bool bM_OverrodeAppVolumeMultiplier = false;
+		bool bM_OverrideResolution = true;
 		bool bM_QuitWhenDone = false;
 	};
 
@@ -518,6 +525,7 @@ namespace RTSTrailerCaptureTest
 		const float RecordingSeconds = Args.Num() >= 1 ? FCString::Atof(*Args[0]) : DefaultRecordingSeconds;
 		const int32 ResolutionX = Args.Num() >= 2 ? FCString::Atoi(*Args[1]) : DefaultResolutionX;
 		const int32 ResolutionY = Args.Num() >= 3 ? FCString::Atoi(*Args[2]) : DefaultResolutionY;
+		bool bOverrideResolution = true;
 		bool bQuitWhenDone = false;
 		for (const FString& Arg : Args)
 		{
@@ -528,12 +536,18 @@ namespace RTSTrailerCaptureTest
 			{
 				bQuitWhenDone = true;
 			}
+			if (NormalizedArgument.Equals(TEXT("Native"), ESearchCase::IgnoreCase)
+				|| NormalizedArgument.Equals(TEXT("Viewport"), ESearchCase::IgnoreCase))
+			{
+				bOverrideResolution = false;
+			}
 		}
 
 		const TSharedRef<FRTSTrailerGerMissionTestRun> TestRun = MakeShared<FRTSTrailerGerMissionTestRun>(
 			RecordingSeconds,
 			ResolutionX,
 			ResolutionY,
+			bOverrideResolution,
 			bQuitWhenDone);
 		GActiveTestRun = TestRun;
 		UE_LOG(LogRTSTrailerCaptureTest, Display, TEXT("RTS_TRAILER_TEST_SETUP_STARTED"));
@@ -552,7 +566,7 @@ namespace RTSTrailerCaptureTest
 	FAutoConsoleCommandWithWorldAndArgs GRunGerFirstMissionTestCommand(
 		TEXT("RTS.Trailer.RunGerFirstMissionTest"),
 		TEXT("Opens Ger_FirstMission, confirms Start, waits five seconds for FoW, records and verifies completion. ")
-		TEXT("Args: [RecordingSeconds] [ResolutionX] [ResolutionY] [Quit]."),
+		TEXT("Args: [RecordingSeconds] [ResolutionX] [ResolutionY] [Native] [Quit]."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&RunGerFirstMissionTestCommand));
 }
 
