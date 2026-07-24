@@ -71,6 +71,7 @@ public:
 
 	/**
 	 * @brief Starts a bounded viewport/audio session so the final file matches the requested delivery size.
+	 * May be called again after the prior take reaches Completed or Failed.
 	 * @param bOverrideResolution Whether to use the supplied resolution instead of the native viewport size.
 	 * @param ResolutionX Requested output width when overriding.
 	 * @param ResolutionY Requested output height when overriding.
@@ -126,6 +127,7 @@ private:
 	bool CreateSessionDirectories(const URTSTrailerCaptureSettings& Settings);
 	bool InitializeViewportCapture();
 	bool CalculateCaptureGeometry();
+	bool GetIsWorldViewAvailable() const;
 	bool GetIsViewportSizeUnchanged() const;
 	bool InitializeAudioCapture(const URTSTrailerCaptureSettings& Settings);
 
@@ -165,6 +167,7 @@ private:
 	void AppendEncoderOutput();
 	void CloseEncoderResources();
 	void DeleteSuccessfulIntermediates() const;
+	void ShowCompletionPopup() const;
 
 	void ResetSessionState();
 	void ReleaseAudioDelegate();

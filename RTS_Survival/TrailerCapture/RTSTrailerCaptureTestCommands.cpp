@@ -3,8 +3,10 @@
 #if PLATFORM_WINDOWS && (WITH_EDITOR || UE_BUILD_DEVELOPMENT)
 
 #include "AudioDevice.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Containers/Ticker.h"
 #include "Engine/Engine.h"
+#include "Engine/LatentActionManager.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
@@ -37,8 +39,10 @@ namespace RTSTrailerCaptureTest
 	constexpr int32 VerificationToneSampleRate = 48000;
 	constexpr int32 DefaultResolutionX = 1280;
 	constexpr int32 DefaultResolutionY = 720;
+	constexpr int32 MaximumTestTakeCount = 10;
 	const TCHAR* const MissionMapLoadPath = TEXT("/Game/RTS_Survival/Maps/GerMissions/Ger_FirstMission");
 	const TCHAR* const MissionMapName = TEXT("Ger_FirstMission");
+	const TCHAR* const TakeCountArgumentPrefix = TEXT("Takes=");
 
 	enum class ERTSTrailerTestPhase : uint8
 	{
@@ -142,6 +146,26 @@ namespace RTSTrailerCaptureTest
 		return not StartGameControl->GetIsWaitingForPlayerToStart();
 	}
 
+	bool EnsureTestWorldRenderingEnabled(UWorld& World)
+	{
+		if (UGameplayStatics::GetEnableWorldRendering(&World))
+		{
+			return true;
+		}
+
+		UGameplayStatics::SetEnableWorldRendering(&World, true);
+		if (not UGameplayStatics::GetEnableWorldRendering(&World))
+		{
+			return false;
+		}
+
+		UE_LOG(
+			LogRTSTrailerCaptureTest,
+			Warning,
+			TEXT("RTS_TRAILER_TEST_WORLD_RENDERING_REENABLED"));
+		return true;
+	}
+
 	class FRTSTrailerStartConfirmationRequest
 	{
 	public:
@@ -185,10 +209,12 @@ namespace RTSTrailerCaptureTest
 			const float RecordingSeconds,
 			const int32 ResolutionX,
 			const int32 ResolutionY,
+			const int32 TakeCount,
 			const bool bOverrideResolution,
 			const bool bQuitWhenDone)
 			: M_Resolution(FMath::Max(2, ResolutionX), FMath::Max(2, ResolutionY))
 			, M_RecordingSeconds(FMath::Max(0.5f, RecordingSeconds))
+			, M_TotalTakeCount(FMath::Clamp(TakeCount, 1, MaximumTestTakeCount))
 			, M_RunStartSeconds(FPlatformTime::Seconds())
 			, bM_OverrideResolution(bOverrideResolution)
 			, bM_QuitWhenDone(bQuitWhenDone)
@@ -197,6 +223,12 @@ namespace RTSTrailerCaptureTest
 
 		bool Tick(float DeltaTime)
 		{
+			if (bM_IsTicking)
+			{
+				return true;
+			}
+			TGuardValue<bool> TickGuard(bM_IsTicking, true);
+
 			switch (M_Phase)
 			{
 			case ERTSTrailerTestPhase::WaitingForMissionWorld: return TickWaitingForMissionWorld();
@@ -279,6 +311,18 @@ namespace RTSTrailerCaptureTest
 			}
 
 			UWorld* World = M_MissionWorld.Get();
+			if (not IsValid(World) || not EnsureTestWorldRenderingEnabled(*World))
+			{
+				return Finish(false, TEXT("World rendering could not be enabled for the trailer test."));
+			}
+			if (World->CachedViewInfoRenderedLastFrame.IsEmpty())
+			{
+				if (WaitedSeconds < StartConfirmationTimeoutSeconds)
+				{
+					return true;
+				}
+				return Finish(false, TEXT("Timed out waiting for the player viewport to render a valid world view."));
+			}
 			ACPPController* PlayerController = IsValid(World) ? FindLocalPlayerController(*World) : nullptr;
 			UTrailerComponent* TrailerComponent = IsValid(PlayerController)
 				? PlayerController->FindComponentByClass<UTrailerComponent>()
@@ -287,6 +331,24 @@ namespace RTSTrailerCaptureTest
 			{
 				return Finish(false, TEXT("TrailerComponent was not available after the FoW wait."));
 			}
+			if (not bM_ClearedControllerLatentCaptureSequence)
+			{
+				World->GetLatentActionManager().RemoveActionsForObject(PlayerController);
+				bM_ClearedControllerLatentCaptureSequence = true;
+				UE_LOG(
+					LogRTSTrailerCaptureTest,
+					Display,
+					TEXT("RTS_TRAILER_TEST_CONTROLLER_LATENT_ACTIONS_CLEARED"));
+			}
+			const APlayerCameraManager* CameraManager = PlayerController->PlayerCameraManager;
+			UE_LOG(
+				LogRTSTrailerCaptureTest,
+				Display,
+				TEXT("RTS_TRAILER_TEST_VIEW_READY ViewCount=%d ViewTarget=%s FadeEnabled=%s FadeAmount=%.3f"),
+				World->CachedViewInfoRenderedLastFrame.Num(),
+				*GetNameSafe(PlayerController->GetViewTarget()),
+				IsValid(CameraManager) && CameraManager->bEnableFading ? TEXT("true") : TEXT("false"),
+				IsValid(CameraManager) ? CameraManager->FadeAmount : -1.0f);
 			if (not TrailerComponent->StartRecording(
 				bM_OverrideResolution,
 				M_Resolution.X,
@@ -301,7 +363,9 @@ namespace RTSTrailerCaptureTest
 			UE_LOG(
 				LogRTSTrailerCaptureTest,
 				Display,
-				TEXT("RTS_TRAILER_TEST_CAPTURE_STARTED FowWait=%.3f Duration=%.3f Mode=%s RequestedResolution=%dx%d"),
+				TEXT("RTS_TRAILER_TEST_CAPTURE_STARTED Take=%d/%d FowWait=%.3f Duration=%.3f Mode=%s RequestedResolution=%dx%d"),
+				M_CurrentTakeNumber,
+				M_TotalTakeCount,
 				WaitedSeconds,
 				M_RecordingSeconds,
 				bM_OverrideResolution ? TEXT("Override") : TEXT("Native"),
@@ -401,6 +465,12 @@ namespace RTSTrailerCaptureTest
 
 		void BeginAudioVerification()
 		{
+			if (bM_OverrodeAppVolumeMultiplier)
+			{
+				MaintainAudioVerification();
+				return;
+			}
+
 			M_PreviousAppVolumeMultiplier = FApp::GetVolumeMultiplier();
 			M_PreviousUnfocusedVolumeMultiplier = FApp::GetUnfocusedVolumeMultiplier();
 			FApp::SetUnfocusedVolumeMultiplier(1.0f);
@@ -434,7 +504,7 @@ namespace RTSTrailerCaptureTest
 
 			if (TrailerComponent->GetRecordingState() == ERTSTrailerRecordingState::Completed)
 			{
-				return Finish(true, TrailerComponent->GetLastOutputPath());
+				return HandleCompletedTake(*TrailerComponent);
 			}
 			if (TrailerComponent->GetRecordingState() == ERTSTrailerRecordingState::Failed)
 			{
@@ -450,6 +520,35 @@ namespace RTSTrailerCaptureTest
 				return true;
 			}
 			return Finish(false, TEXT("Timed out waiting for trailer finalization and encoding."));
+		}
+
+		bool HandleCompletedTake(const UTrailerComponent& TrailerComponent)
+		{
+			const FString OutputPath = TrailerComponent.GetLastOutputPath();
+			if (OutputPath.IsEmpty() || M_CompletedOutputPaths.Contains(OutputPath))
+			{
+				return Finish(false, TEXT("A completed take did not produce a unique MP4 output path."));
+			}
+
+			M_CompletedOutputPaths.Add(OutputPath);
+			UE_LOG(
+				LogRTSTrailerCaptureTest,
+				Display,
+				TEXT("RTS_TRAILER_TEST_TAKE_SUCCESS Take=%d/%d MP4=\"%s\""),
+				M_CurrentTakeNumber,
+				M_TotalTakeCount,
+				*OutputPath);
+			if (M_CurrentTakeNumber >= M_TotalTakeCount)
+			{
+				return Finish(true, OutputPath);
+			}
+
+			++M_CurrentTakeNumber;
+			M_VerificationTone.Reset();
+			bM_PlayedVerificationTone = false;
+			M_Phase = ERTSTrailerTestPhase::WaitingForFowReveal;
+			M_PhaseStartSeconds = FPlatformTime::Seconds();
+			return true;
 		}
 
 		UTrailerComponent* FindTrailerComponent() const
@@ -484,9 +583,12 @@ namespace RTSTrailerCaptureTest
 
 		TWeakObjectPtr<UWorld> M_MissionWorld;
 		TStrongObjectPtr<USoundWaveProcedural> M_VerificationTone;
+		TSet<FString> M_CompletedOutputPaths;
 		ERTSTrailerTestPhase M_Phase = ERTSTrailerTestPhase::WaitingForMissionWorld;
 		FIntPoint M_Resolution = FIntPoint::ZeroValue;
 		float M_RecordingSeconds = 0.0f;
+		int32 M_CurrentTakeNumber = 1;
+		int32 M_TotalTakeCount = 1;
 		double M_RunStartSeconds = 0.0;
 		double M_PhaseStartSeconds = 0.0;
 		float M_PreviousAppVolumeMultiplier = 1.0f;
@@ -496,6 +598,8 @@ namespace RTSTrailerCaptureTest
 		bool bM_OverrodeAppVolumeMultiplier = false;
 		bool bM_OverrideResolution = true;
 		bool bM_QuitWhenDone = false;
+		bool bM_IsTicking = false;
+		bool bM_ClearedControllerLatentCaptureSequence = false;
 	};
 
 	TWeakPtr<FRTSTrailerGerMissionTestRun> GActiveTestRun;
@@ -525,6 +629,7 @@ namespace RTSTrailerCaptureTest
 		const float RecordingSeconds = Args.Num() >= 1 ? FCString::Atof(*Args[0]) : DefaultRecordingSeconds;
 		const int32 ResolutionX = Args.Num() >= 2 ? FCString::Atoi(*Args[1]) : DefaultResolutionX;
 		const int32 ResolutionY = Args.Num() >= 3 ? FCString::Atoi(*Args[2]) : DefaultResolutionY;
+		int32 TakeCount = 1;
 		bool bOverrideResolution = true;
 		bool bQuitWhenDone = false;
 		for (const FString& Arg : Args)
@@ -541,16 +646,29 @@ namespace RTSTrailerCaptureTest
 			{
 				bOverrideResolution = false;
 			}
+			if (NormalizedArgument.StartsWith(TakeCountArgumentPrefix, ESearchCase::IgnoreCase))
+			{
+				const int32 PrefixLength = FCString::Strlen(TakeCountArgumentPrefix);
+				TakeCount = FMath::Clamp(
+					FCString::Atoi(*NormalizedArgument.RightChop(PrefixLength)),
+					1,
+					MaximumTestTakeCount);
+			}
 		}
 
 		const TSharedRef<FRTSTrailerGerMissionTestRun> TestRun = MakeShared<FRTSTrailerGerMissionTestRun>(
 			RecordingSeconds,
 			ResolutionX,
 			ResolutionY,
+			TakeCount,
 			bOverrideResolution,
 			bQuitWhenDone);
 		GActiveTestRun = TestRun;
-		UE_LOG(LogRTSTrailerCaptureTest, Display, TEXT("RTS_TRAILER_TEST_SETUP_STARTED"));
+		UE_LOG(
+			LogRTSTrailerCaptureTest,
+			Display,
+			TEXT("RTS_TRAILER_TEST_SETUP_STARTED Takes=%d"),
+			TakeCount);
 		FTSTicker::GetCoreTicker().AddTicker(
 			FTickerDelegate::CreateLambda([TestRun](const float DeltaTime)
 			{
@@ -566,7 +684,7 @@ namespace RTSTrailerCaptureTest
 	FAutoConsoleCommandWithWorldAndArgs GRunGerFirstMissionTestCommand(
 		TEXT("RTS.Trailer.RunGerFirstMissionTest"),
 		TEXT("Opens Ger_FirstMission, confirms Start, waits five seconds for FoW, records and verifies completion. ")
-		TEXT("Args: [RecordingSeconds] [ResolutionX] [ResolutionY] [Native] [Quit]."),
+		TEXT("Args: [RecordingSeconds] [ResolutionX] [ResolutionY] [Native] [Takes=N] [Quit]."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&RunGerFirstMissionTestCommand));
 }
 

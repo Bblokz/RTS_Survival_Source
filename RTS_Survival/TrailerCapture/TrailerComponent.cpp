@@ -9,7 +9,9 @@
 #include "HAL/FileManager.h"
 #include "HAL/PlatformFileManager.h"
 #include "HAL/PlatformTime.h"
+#include "Misc/App.h"
 #include "Misc/FileHelper.h"
+#include "Misc/MessageDialog.h"
 #include "Misc/Paths.h"
 #include "RTSTrailerCaptureSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -349,6 +351,16 @@ bool UTrailerComponent::InitializeViewportCapture()
 		SetLastError(TEXT("The game viewport client is unavailable."));
 		return false;
 	}
+	if (GameViewportClient->bDisableWorldRendering)
+	{
+		SetLastError(TEXT("World rendering is disabled. Close UI such as the tech tree before recording a trailer."));
+		return false;
+	}
+	if (World->CachedViewInfoRenderedLastFrame.IsEmpty())
+	{
+		SetLastError(TEXT("The player viewport has not rendered a valid world view yet. Wait until gameplay is visible before recording."));
+		return false;
+	}
 
 	FSceneViewport* RawSceneViewport = GameViewportClient->GetGameViewport();
 	TSharedPtr<SViewport> ViewportWidget = GameViewportClient->GetGameViewportWidget();
@@ -472,6 +484,15 @@ bool UTrailerComponent::InitializeAudioCapture(const URTSTrailerCaptureSettings&
 	return true;
 }
 
+bool UTrailerComponent::GetIsWorldViewAvailable() const
+{
+	const UWorld* World = GetWorld();
+	const UGameViewportClient* GameViewportClient = IsValid(World) ? World->GetGameViewport() : nullptr;
+	return IsValid(GameViewportClient)
+		&& not GameViewportClient->bDisableWorldRendering
+		&& not World->CachedViewInfoRenderedLastFrame.IsEmpty();
+}
+
 bool UTrailerComponent::GetIsViewportSizeUnchanged() const
 {
 	if (M_FrameGrabber == nullptr)
@@ -492,6 +513,13 @@ void UTrailerComponent::TickRecording(const URTSTrailerCaptureSettings& Settings
 		return;
 	}
 
+	if (not GetIsWorldViewAvailable())
+	{
+		BeginCaptureFailure(
+			TEXT("The player viewport stopped rendering a valid world view during trailer recording."),
+			TEXT("WorldViewUnavailable"));
+		return;
+	}
 	if (not GetIsViewportSizeUnchanged())
 	{
 		BeginCaptureFailure(TEXT("The player viewport was resized during trailer recording."), TEXT("ViewportResized"));
@@ -671,6 +699,12 @@ void UTrailerComponent::RequestFrameForIndex(const int32 FrameIndex)
 
 void UTrailerComponent::TickFinalizing(const URTSTrailerCaptureSettings& Settings)
 {
+	if (not bM_CaptureFailed && not GetIsWorldViewAvailable())
+	{
+		BeginCaptureFailure(
+			TEXT("The player viewport stopped rendering a valid world view during trailer finalization."),
+			TEXT("WorldViewUnavailable"));
+	}
 	if (not bM_CaptureFailed && not GetIsViewportSizeUnchanged())
 	{
 		BeginCaptureFailure(TEXT("The player viewport was resized during trailer finalization."), TEXT("ViewportResized"));
@@ -979,6 +1013,7 @@ void UTrailerComponent::FinishSuccessfulSession(const URTSTrailerCaptureSettings
 		DeleteSuccessfulIntermediates();
 	}
 	WriteMetadata(true);
+	ShowCompletionPopup();
 
 	if (not bM_CompletionBroadcast)
 	{
@@ -1017,6 +1052,28 @@ void UTrailerComponent::DeleteSuccessfulIntermediates() const
 {
 	IFileManager::Get().Delete(*M_SessionPaths.M_AudioFile, false, true, true);
 	IFileManager::Get().DeleteDirectory(*M_SessionPaths.M_FramesDirectory, false, true);
+}
+
+void UTrailerComponent::ShowCompletionPopup() const
+{
+	const UWorld* World = GetWorld();
+	if (FApp::IsUnattended() || not IsValid(World)
+		|| (World->WorldType != EWorldType::PIE && World->WorldType != EWorldType::Game))
+	{
+		return;
+	}
+
+	const FText Message = FText::Format(
+		NSLOCTEXT(
+			"RTSTrailerCapture",
+			"CaptureCompleteMessage",
+			"The trailer MP4 is ready:\n\n{0}\n\nYou can now stop play safely."),
+		FText::FromString(FPaths::ConvertRelativePathToFull(M_LastOutputPath)));
+	FMessageDialog::Open(
+		EAppMsgCategory::Success,
+		EAppMsgType::Ok,
+		Message,
+		NSLOCTEXT("RTSTrailerCapture", "CaptureCompleteTitle", "Trailer Capture Complete"));
 }
 
 void UTrailerComponent::AbortForEndPlay()

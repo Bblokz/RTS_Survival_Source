@@ -497,7 +497,7 @@ void ACPPGameState::BeginPlay()
 	StartClock();
 	if (GEngine)
 	{
-		GEngine->Exec(GetWorld(), TEXT("stat fps"));
+		// GEngine->Exec(GetWorld(), TEXT("stat fps"));
 		// Cap the FPS to 60
 		// GEngine->Exec(GetWorld(), TEXT("t.MaxFPS 60"));
 	}
