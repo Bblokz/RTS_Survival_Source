@@ -65,6 +65,25 @@ The offscreen viewport contains final display-encoded color after Unreal's tonem
 
 The previous double-sRGB encoding made the capture differ from the player even when the post-process settings were otherwise correct.
 
+## Master-audio capture and synchronization
+
+When `Record Audio` is enabled, record the audio device's main submix. This is the mixed output path that contains the same voices, music, sound classes, submix effects, and volume state that reach the player. Do not substitute microphone capture, per-actor audio, or a manually reconstructed mix.
+
+- Start and stop recording on the same world audio device and the same main-submix object.
+- A silent buffer can be correct when the player heard silence. `hasNonSilentSamples` is diagnostic metadata, not a production failure condition.
+- Stop the submix recorder exactly once before the session state and weak submix reference are cleared.
+- Unreal's submix output recorder owns one recording buffer per submix. Do not overlap Steam capture audio with another feature recording the main submix, because a second start resets that shared buffer.
+
+Audio remains at the device's native sample rate and channel count. Its final duration must be derived from the image sequence:
+
+`round(written PNG frame count * audio sample rate / session FPS)`
+
+Trim an overlong audio tail or append silence when the mixer returns fewer samples. Never derive the final WAV duration from wall-clock stop time; render hitches and asynchronous PNG writes would make that drift from the FFmpeg timeline. Keep the session FPS immutable after capture starts, and validate the written WAV from disk for PCM format, sample rate, channel count, and exact sample-frame length.
+
+The default capture rate is 60 FPS. An FFmpeg image-sequence input must use the same session FPS recorded in `metadata.json`; `Audio.wav` can then be muxed without resampling or time stretching.
+
+Unreal accumulates submix recording samples in memory until stop. Duration-unlimited capture removes the 12-second session limit but does not make audio storage streaming; re-evaluate this design before supporting multi-hour captures.
+
 ## Approaches that must not be reintroduced
 
 - Reading the visible PIE viewport and resizing it to the requested resolution.
@@ -85,3 +104,5 @@ After changing this rendering path:
 5. Test an exposure transition and verify the capture follows the player without causing the visible viewport exposure to pulse or reset.
 6. Check dark and mid-tone colors for signs of a second sRGB conversion.
 7. Start and manually stop a duration-unlimited recording and verify the final due frame and metadata are written.
+8. With `Record Audio` enabled, verify `Audio.wav` has the metadata channel count/sample rate and exactly `capturedFrameCount / framesPerSecond` duration.
+9. Run the `RTS.SteamCapture.Audio` automation-test group.

@@ -1,6 +1,8 @@
 #include "RTSSteamCaptureSubsystem.h"
 
+#include "AudioDevice.h"
 #include "CanvasTypes.h"
+#include "DSP/AlignedBuffer.h"
 #include "Dom/JsonObject.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
@@ -14,6 +16,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
+#include "Sound/SoundSubmix.h"
 #include "UnrealClient.h"
 
 namespace RTSSteamCaptureSubsystemConstants
@@ -23,6 +26,7 @@ namespace RTSSteamCaptureSubsystemConstants
 	constexpr float TargetFrameCountEpsilon = 0.001f;
 	constexpr float ManualStopMaxDurationSnapSeconds = 0.25f;
 	const TCHAR* const FramesDirectoryName = TEXT("Frames");
+	const TCHAR* const AudioFileName = TEXT("Audio.wav");
 	const TCHAR* const MetadataFileName = TEXT("metadata.json");
 	const TCHAR* const ManualStopReason = TEXT("ManualStop");
 	const TCHAR* const MaxDurationStopReason = TEXT("MaxDuration");
@@ -113,7 +117,8 @@ bool URTSSteamCaptureSubsystem::StartCapture(
 	const bool bDisableMaxDurationUntilFunctionCall,
 	const bool bOverrideResolution,
 	const int32 ResolutionX,
-	const int32 ResolutionY)
+	const int32 ResolutionY,
+	const bool bRecordAudio)
 {
 	if (bM_IsRecording)
 	{
@@ -130,6 +135,8 @@ bool URTSSteamCaptureSubsystem::StartCapture(
 	M_PlayerController = PlayerController;
 	bM_DisableMaxDurationUntilFunctionCall = bDisableMaxDurationUntilFunctionCall;
 	bM_OverrideResolution = bOverrideResolution;
+	M_AudioSession.bM_RecordAudio = bRecordAudio;
+	M_RecordingFrameRate = FMath::Max(1, CaptureSettings->M_FramesPerSecond);
 	M_OutputResolution.X = FMath::Max(
 		1,
 		bOverrideResolution ? ResolutionX : CaptureSettings->M_OutputResolutionX);
@@ -142,7 +149,8 @@ bool URTSSteamCaptureSubsystem::StartCapture(
 	M_FrameWriter.ResetFailedWriteCount();
 
 	if (not StartCapture_CreateSessionDirectory(*CaptureSettings)
-		|| not StartCapture_CreateViewport())
+		|| not StartCapture_CreateViewport()
+		|| not StartCapture_StartAudio(*CaptureSettings))
 	{
 		AbortStartCapture();
 		return false;
@@ -225,6 +233,9 @@ bool URTSSteamCaptureSubsystem::StartCapture_CreateSessionDirectory(
 	M_FramesDirectory = FPaths::Combine(
 		M_SessionDirectory,
 		RTSSteamCaptureSubsystemConstants::FramesDirectoryName);
+	M_AudioSession.M_AudioFilePath = FPaths::Combine(
+		M_SessionDirectory,
+		RTSSteamCaptureSubsystemConstants::AudioFileName);
 	M_MetadataPath = FPaths::Combine(
 		M_SessionDirectory,
 		RTSSteamCaptureSubsystemConstants::MetadataFileName);
@@ -261,6 +272,33 @@ bool URTSSteamCaptureSubsystem::StartCapture_CreateViewport()
 	return M_CaptureViewExtension != nullptr;
 }
 
+bool URTSSteamCaptureSubsystem::StartCapture_StartAudio(
+	const URTSSteamCaptureSettings& CaptureSettings)
+{
+	if (not M_AudioSession.bM_RecordAudio)
+	{
+		return true;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return FailAudioCapture(TEXT("Cannot start Steam capture audio because the world is invalid."));
+	}
+
+	M_AudioSession.M_AudioDevice = World->GetAudioDevice();
+	if (not M_AudioSession.M_AudioDevice)
+	{
+		return FailAudioCapture(TEXT("Cannot record Steam capture audio because no audio device is available."));
+	}
+
+	USoundSubmix& MainSubmix = M_AudioSession.M_AudioDevice->GetMainSubmixObject();
+	const float ExpectedDuration = FMath::Max(0.1f, CaptureSettings.M_MaxDurationSeconds);
+	M_AudioSession.M_AudioDevice->StartRecording(&MainSubmix, ExpectedDuration);
+	M_AudioSession.bM_RecordingStarted = true;
+	return true;
+}
+
 void URTSSteamCaptureSubsystem::AbortStartCapture()
 {
 	DestroyCaptureViewport();
@@ -281,7 +319,9 @@ void URTSSteamCaptureSubsystem::ResetSessionState()
 	M_CapturedFrameCount = 0;
 	M_DuplicatedFrameCount = 0;
 	M_DroppedFrameCount = 0;
+	M_RecordingFrameRate = 0;
 	M_LastCapturedFramePixels.Empty();
+	M_AudioSession = FRTSSteamCaptureAudioSessionState();
 	bM_IsRecording = false;
 	bM_IsStopping = false;
 	bM_DisableMaxDurationUntilFunctionCall = false;
@@ -343,7 +383,7 @@ void URTSSteamCaptureSubsystem::OnEndFrame()
 
 void URTSSteamCaptureSubsystem::QueueDueFrames(const URTSSteamCaptureSettings& CaptureSettings)
 {
-	const int32 TargetFrameCount = GetTargetFrameCount(CaptureSettings);
+	const int32 TargetFrameCount = GetTargetFrameCount();
 	if (M_CapturedFrameCount >= TargetFrameCount)
 	{
 		return;
@@ -468,11 +508,9 @@ FString URTSSteamCaptureSubsystem::BuildSessionName(
 	return FString::Printf(TEXT("%s_%s_%s"), *Prefix, *Stamp, *GuidText);
 }
 
-int32 URTSSteamCaptureSubsystem::GetTargetFrameCount(
-	const URTSSteamCaptureSettings& CaptureSettings) const
+int32 URTSSteamCaptureSubsystem::GetTargetFrameCount() const
 {
-	const int32 FramesPerSecond = FMath::Max(1, CaptureSettings.M_FramesPerSecond);
-	const float TargetFrameCount = M_RecordingElapsedSeconds * static_cast<float>(FramesPerSecond);
+	const float TargetFrameCount = M_RecordingElapsedSeconds * static_cast<float>(M_RecordingFrameRate);
 	return FMath::FloorToInt(TargetFrameCount + RTSSteamCaptureSubsystemConstants::TargetFrameCountEpsilon);
 }
 
@@ -488,6 +526,93 @@ FString URTSSteamCaptureSubsystem::GetPendingStopReason() const
 	default:
 		return TEXT("UnknownStop");
 	}
+}
+
+bool URTSSteamCaptureSubsystem::StopCapture_SaveAudio()
+{
+	if (not M_AudioSession.bM_RecordAudio)
+	{
+		return true;
+	}
+	if (not M_AudioSession.bM_RecordingStarted)
+	{
+		return FailAudioCapture(TEXT("Steam capture audio was requested but master submix recording was not active."));
+	}
+	if (not M_AudioSession.M_AudioDevice)
+	{
+		return FailAudioCapture(TEXT("Cannot stop Steam capture audio because the audio device is unavailable."));
+	}
+
+	USoundSubmix& MainSubmix = M_AudioSession.M_AudioDevice->GetMainSubmixObject();
+	float ChannelCount = 0.0f;
+	float SampleRate = 0.0f;
+	Audio::FAlignedFloatBuffer& MasterOutputSamples = M_AudioSession.M_AudioDevice->StopRecording(
+		&MainSubmix,
+		ChannelCount,
+		SampleRate);
+	M_AudioSession.bM_RecordingStarted = false;
+
+	const int32 RoundedChannelCount = FMath::RoundToInt(ChannelCount);
+	const int32 RoundedSampleRate = FMath::RoundToInt(SampleRate);
+	if (MasterOutputSamples.IsEmpty() || RoundedChannelCount <= 0 || RoundedSampleRate <= 0)
+	{
+		M_AudioSession.M_AudioDevice.Reset();
+		return FailAudioCapture(TEXT("The player master submix did not return recordable audio samples."));
+	}
+
+	const bool bSavedAudio = SaveCapturedAudio(
+		MasterOutputSamples,
+		RoundedChannelCount,
+		RoundedSampleRate);
+	M_AudioSession.M_AudioDevice.Reset();
+	return bSavedAudio;
+}
+
+bool URTSSteamCaptureSubsystem::SaveCapturedAudio(
+	const TArrayView<const float> MasterOutputSamples,
+	const int32 ChannelCount,
+	const int32 SampleRate)
+{
+	FString SaveError;
+	if (not FRTSSteamCaptureAudio::SaveSynchronizedWave(
+		MasterOutputSamples,
+		ChannelCount,
+		SampleRate,
+		M_CapturedFrameCount,
+		M_RecordingFrameRate,
+		M_AudioSession.M_AudioFilePath,
+		M_AudioSession.M_Result,
+		SaveError))
+	{
+		return FailAudioCapture(SaveError);
+	}
+	M_AudioSession.bM_FileSaved = true;
+	return ValidateSavedAudio();
+}
+
+bool URTSSteamCaptureSubsystem::ValidateSavedAudio()
+{
+	FString ValidationError;
+	if (not FRTSSteamCaptureAudio::ValidateWaveFile(
+		M_AudioSession.M_AudioFilePath,
+		M_AudioSession.M_Result.M_ChannelCount,
+		M_AudioSession.M_Result.M_SampleRate,
+		M_AudioSession.M_Result.M_SynchronizedSampleFrameCount,
+		M_AudioSession.M_WaveInfo,
+		ValidationError))
+	{
+		return FailAudioCapture(ValidationError);
+	}
+
+	M_AudioSession.bM_FileValidated = true;
+	return true;
+}
+
+bool URTSSteamCaptureSubsystem::FailAudioCapture(const FString& ErrorMessage)
+{
+	M_AudioSession.M_LastError = ErrorMessage;
+	RTSFunctionLibrary::ReportError(ErrorMessage);
+	return false;
 }
 
 void URTSSteamCaptureSubsystem::StopCaptureInternal(
@@ -517,6 +642,7 @@ void URTSSteamCaptureSubsystem::StopCaptureInternal(
 		}
 	}
 
+	StopCapture_SaveAudio();
 	if (bWaitForFrameWrites && IsValid(CaptureSettings) && CaptureSettings->bM_WaitForFrameWritesOnStop)
 	{
 		WaitForFrameWrites(*CaptureSettings);
@@ -557,28 +683,11 @@ void URTSSteamCaptureSubsystem::WriteMetadata(
 
 	const URTSSteamCaptureSettings* CaptureSettings = GetCaptureSettings();
 	TSharedRef<FJsonObject> MetadataJson = MakeShared<FJsonObject>();
-	MetadataJson->SetStringField(TEXT("sessionName"), M_SessionName);
-	MetadataJson->SetStringField(TEXT("sessionGuid"), M_SessionGuid.ToString(EGuidFormats::Digits));
-	MetadataJson->SetStringField(TEXT("startTimeLocal"), M_SessionStartDateTime.ToIso8601());
-	MetadataJson->SetStringField(TEXT("stopTimeLocal"), StopTime.ToIso8601());
-	MetadataJson->SetStringField(TEXT("stopReason"), StopReason);
-	MetadataJson->SetNumberField(TEXT("capturedFrameCount"), M_CapturedFrameCount);
-	MetadataJson->SetNumberField(TEXT("duplicatedFrameCount"), M_DuplicatedFrameCount);
-	MetadataJson->SetNumberField(TEXT("droppedFrameCount"), M_DroppedFrameCount);
-	MetadataJson->SetNumberField(TEXT("failedFrameWriteCount"), M_FrameWriter.GetFailedWriteCount());
-	MetadataJson->SetNumberField(TEXT("pendingFrameWriteCount"), M_FrameWriter.GetPendingWriteCount());
-	MetadataJson->SetNumberField(TEXT("recordedSeconds"), M_RecordingElapsedSeconds);
-	MetadataJson->SetBoolField(
-		TEXT("disabledMaxDurationUntilFunctionCall"),
-		bM_DisableMaxDurationUntilFunctionCall);
-	MetadataJson->SetBoolField(TEXT("overrodeResolution"), bM_OverrideResolution);
-	MetadataJson->SetNumberField(TEXT("outputResolutionX"), M_OutputResolution.X);
-	MetadataJson->SetNumberField(TEXT("outputResolutionY"), M_OutputResolution.Y);
-	MetadataJson->SetStringField(TEXT("sessionDirectory"), M_SessionDirectory);
-	MetadataJson->SetStringField(TEXT("framesDirectory"), M_FramesDirectory);
+	AddSessionMetadata(MetadataJson, StopReason, StopTime);
+	AddAudioMetadata(MetadataJson);
 	if (IsValid(CaptureSettings))
 	{
-		MetadataJson->SetNumberField(TEXT("targetFrameCount"), GetTargetFrameCount(*CaptureSettings));
+		MetadataJson->SetNumberField(TEXT("targetFrameCount"), GetTargetFrameCount());
 		MetadataJson->SetObjectField(TEXT("settings"), BuildSettingsMetadata(*CaptureSettings));
 	}
 
@@ -600,6 +709,71 @@ void URTSSteamCaptureSubsystem::WriteMetadata(
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Failed to save Steam capture metadata: ") + M_MetadataPath);
 	}
+}
+
+void URTSSteamCaptureSubsystem::AddSessionMetadata(
+	const TSharedRef<FJsonObject>& MetadataJson,
+	const FString& StopReason,
+	const FDateTime& StopTime) const
+{
+	MetadataJson->SetStringField(TEXT("sessionName"), M_SessionName);
+	MetadataJson->SetStringField(TEXT("sessionGuid"), M_SessionGuid.ToString(EGuidFormats::Digits));
+	MetadataJson->SetStringField(TEXT("startTimeLocal"), M_SessionStartDateTime.ToIso8601());
+	MetadataJson->SetStringField(TEXT("stopTimeLocal"), StopTime.ToIso8601());
+	MetadataJson->SetStringField(TEXT("stopReason"), StopReason);
+	MetadataJson->SetNumberField(TEXT("capturedFrameCount"), M_CapturedFrameCount);
+	MetadataJson->SetNumberField(TEXT("duplicatedFrameCount"), M_DuplicatedFrameCount);
+	MetadataJson->SetNumberField(TEXT("droppedFrameCount"), M_DroppedFrameCount);
+	MetadataJson->SetNumberField(TEXT("failedFrameWriteCount"), M_FrameWriter.GetFailedWriteCount());
+	MetadataJson->SetNumberField(TEXT("pendingFrameWriteCount"), M_FrameWriter.GetPendingWriteCount());
+	MetadataJson->SetNumberField(TEXT("recordedSeconds"), M_RecordingElapsedSeconds);
+	MetadataJson->SetNumberField(TEXT("framesPerSecond"), M_RecordingFrameRate);
+	MetadataJson->SetNumberField(
+		TEXT("videoDurationSeconds"),
+		M_RecordingFrameRate > 0
+			? static_cast<double>(M_CapturedFrameCount) / M_RecordingFrameRate
+			: 0.0);
+	MetadataJson->SetBoolField(
+		TEXT("disabledMaxDurationUntilFunctionCall"),
+		bM_DisableMaxDurationUntilFunctionCall);
+	MetadataJson->SetBoolField(TEXT("overrodeResolution"), bM_OverrideResolution);
+	MetadataJson->SetNumberField(TEXT("outputResolutionX"), M_OutputResolution.X);
+	MetadataJson->SetNumberField(TEXT("outputResolutionY"), M_OutputResolution.Y);
+	MetadataJson->SetStringField(TEXT("sessionDirectory"), M_SessionDirectory);
+	MetadataJson->SetStringField(TEXT("framesDirectory"), M_FramesDirectory);
+}
+
+void URTSSteamCaptureSubsystem::AddAudioMetadata(
+	const TSharedRef<FJsonObject>& MetadataJson) const
+{
+	const double VideoDurationSeconds = M_RecordingFrameRate > 0
+		? static_cast<double>(M_CapturedFrameCount) / M_RecordingFrameRate
+		: 0.0;
+	TSharedRef<FJsonObject> AudioJson = MakeShared<FJsonObject>();
+	AudioJson->SetBoolField(TEXT("requested"), M_AudioSession.bM_RecordAudio);
+	AudioJson->SetBoolField(TEXT("fileSaved"), M_AudioSession.bM_FileSaved);
+	AudioJson->SetBoolField(TEXT("fileValidated"), M_AudioSession.bM_FileValidated);
+	AudioJson->SetStringField(TEXT("file"), M_AudioSession.M_AudioFilePath);
+	AudioJson->SetStringField(TEXT("error"), M_AudioSession.M_LastError);
+	AudioJson->SetNumberField(TEXT("sampleRate"), M_AudioSession.M_WaveInfo.M_SampleRate);
+	AudioJson->SetNumberField(TEXT("channelCount"), M_AudioSession.M_WaveInfo.M_ChannelCount);
+	AudioJson->SetNumberField(TEXT("bitsPerSample"), M_AudioSession.M_WaveInfo.M_BitsPerSample);
+	AudioJson->SetNumberField(TEXT("sourceSampleFrameCount"), M_AudioSession.M_Result.M_SourceSampleFrameCount);
+	AudioJson->SetNumberField(
+		TEXT("synchronizedSampleFrameCount"),
+		M_AudioSession.M_Result.M_SynchronizedSampleFrameCount);
+	AudioJson->SetNumberField(TEXT("trimmedSampleFrameCount"), M_AudioSession.M_Result.M_TrimmedSampleFrameCount);
+	AudioJson->SetNumberField(TEXT("paddedSampleFrameCount"), M_AudioSession.M_Result.M_PaddedSampleFrameCount);
+	AudioJson->SetNumberField(TEXT("durationSeconds"), M_AudioSession.M_WaveInfo.M_DurationSeconds);
+	AudioJson->SetNumberField(
+		TEXT("durationDeltaFromVideoSeconds"),
+		M_AudioSession.M_WaveInfo.M_DurationSeconds - VideoDurationSeconds);
+	AudioJson->SetNumberField(TEXT("peakAmplitude"), M_AudioSession.M_WaveInfo.M_PeakAmplitude);
+	AudioJson->SetNumberField(
+		TEXT("rootMeanSquareAmplitude"),
+		M_AudioSession.M_WaveInfo.M_RootMeanSquareAmplitude);
+	AudioJson->SetBoolField(TEXT("hasNonSilentSamples"), M_AudioSession.M_WaveInfo.bM_HasNonSilentSamples);
+	MetadataJson->SetObjectField(TEXT("audio"), AudioJson);
 }
 
 bool URTSSteamCaptureSubsystem::GetIsValidPlayerController() const

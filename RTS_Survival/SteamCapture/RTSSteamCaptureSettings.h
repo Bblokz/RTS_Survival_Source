@@ -8,7 +8,7 @@ namespace RTSSteamCaptureDefaults
 {
 	inline constexpr int32 OutputResolutionX = 1170;
 	inline constexpr int32 OutputResolutionY = 658;
-	inline constexpr int32 FramesPerSecond = 30;
+	inline constexpr int32 FramesPerSecond = 60;
 	inline constexpr float MaxDurationSeconds = 12.0f;
 	inline constexpr int32 MaxPendingFrameWrites = 90;
 	inline constexpr float MaxFrameWriteFlushSeconds = 60.0f;

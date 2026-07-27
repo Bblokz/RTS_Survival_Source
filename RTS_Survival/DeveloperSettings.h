@@ -1744,6 +1744,7 @@ namespace DeveloperSettings
 		inline constexpr float DefaultTerrainHeight = 110.f;
 		inline constexpr float ZoomSpeed = 150.f;
 		inline constexpr float CameraPanSpeed = 5.f;
+		
 		// 25 degrees to make skybox not visible.
 		inline constexpr float CameraPitchLimit = 18.f;
 		inline constexpr float DefaultCameraMovementSpeed = 15.f;

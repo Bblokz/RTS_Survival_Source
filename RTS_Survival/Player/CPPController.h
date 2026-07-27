@@ -358,6 +358,7 @@ public:
 	 * @param bOverrideResolution True uses ResolutionX and ResolutionY instead of the configured resolution.
 	 * @param ResolutionX Horizontal capture resolution used when bOverrideResolution is true.
 	 * @param ResolutionY Vertical capture resolution used when bOverrideResolution is true.
+	 * @param bRecordAudio True records everything heard through the player's master mix into a synchronized WAV.
 	 * @return True when the requested recorder state was applied or was already active.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Steam Capture")
@@ -366,7 +367,8 @@ public:
 		const bool bDisableMaxDurationUntilFunctionCall = false,
 		const bool bOverrideResolution = false,
 		const int32 ResolutionX = 1,
-		const int32 ResolutionY = 1);
+		const int32 ResolutionY = 1,
+		const bool bRecordAudio = false);
 
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
