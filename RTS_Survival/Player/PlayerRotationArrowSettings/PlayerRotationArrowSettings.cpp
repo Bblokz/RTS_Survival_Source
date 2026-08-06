@@ -7,7 +7,8 @@
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 
 void FPlayerRotationArrowSettings::InitRotationArrowAction(const FVector2D& InitialMouseScreenLocation,
-                                                           const FVector& InitialMouseProjectedLocation, const FRotationArrowTeamWeaponSettings TeamWeaponSettings)
+	const FVector& InitialMouseProjectedLocation,
+	const FRotationArrowArcSettings& ArcSettings)
 {
 	if (not EnsureRotationActorIsValid())
 	{
@@ -17,7 +18,7 @@ void FPlayerRotationArrowSettings::InitRotationArrowAction(const FVector2D& Init
 	bM_RotationArrowInitialized = true;
 	RotationArrowActor->SetActorHiddenInGame(true);
 	M_OriginalMouseScreenLocation = InitialMouseScreenLocation;
-	InitRotationArrowAction_TeamWeaponArcRadius(InitialMouseProjectedLocation, TeamWeaponSettings);
+	InitRotationArrowAction_ArcRadius(InitialMouseProjectedLocation, ArcSettings);
 	if constexpr (DeveloperSettings::Debugging::GPlayerRotationArrow_Compile_DebugSymbols)
 	{
 		const FString StartLocationAsString = RotationArrowActor->GetActorLocation().ToString();
@@ -26,48 +27,54 @@ void FPlayerRotationArrowSettings::InitRotationArrowAction(const FVector2D& Init
 }
 
 
-void FPlayerRotationArrowSettings::InitRotationArrowAction_TeamWeaponArcRadius(const FVector& InitialMouseProjectedLocation,
-                                                                                const FRotationArrowTeamWeaponSettings& TeamWeaponSettings)
+void FPlayerRotationArrowSettings::InitRotationArrowAction_ArcRadius(
+	const FVector& InitialMouseProjectedLocation,
+	const FRotationArrowArcSettings& ArcSettings)
 {
-	const bool bShouldShowArcRadius = TeamWeaponSettings.bIsOnlyTeamWeaponSelected
-		&& TeamWeaponSettings.TeamWeaponArc > 0.0f
-		&& TeamWeaponSettings.TeamWeaponRange > 100.0f;
+	constexpr float MinimumVisibleArcRange = 100.0f;
+	const bool bShouldShowArcRadius = ArcSettings.ArcAngle > 0.0f
+		&& ArcSettings.WeaponRange > MinimumVisibleArcRange;
 
 	if (not bShouldShowArcRadius)
 	{
 		return;
 	}
 
-	M_TeamWeaponArcRadiusId = URTSBlueprintFunctionLibrary::CreateRTSRadius(
+	M_ArcRadiusId = URTSBlueprintFunctionLibrary::CreateRTSRadius(
 		RotationArrowActor,
 		InitialMouseProjectedLocation,
-		TeamWeaponSettings.TeamWeaponRange,
+		ArcSettings.WeaponRange,
 		ERTSRadiusType::FullCircle_TeamWeaponArc
 	);
 
-	if (M_TeamWeaponArcRadiusId < 0)
+	if (M_ArcRadiusId < 0)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("FPlayerRotationArrowSettings::InitRotationArrowAction failed to create team weapon arc radius."));
+		RTSFunctionLibrary::ReportError(
+			TEXT("FPlayerRotationArrowSettings::InitRotationArrowAction failed to create a weapon arc radius."));
 		return;
 	}
 
-	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(RotationArrowActor, M_TeamWeaponArcRadiusId, RotationArrowActor, ArrowOffset);
-	URTSBlueprintFunctionLibrary::UpdateRTSRadiusArc(RotationArrowActor, M_TeamWeaponArcRadiusId, TeamWeaponSettings.TeamWeaponArc);
+	URTSBlueprintFunctionLibrary::AttachRTSRadiusToActor(
+		RotationArrowActor,
+		M_ArcRadiusId,
+		RotationArrowActor,
+		ArrowOffset);
+	URTSBlueprintFunctionLibrary::UpdateRTSRadiusArc(RotationArrowActor, M_ArcRadiusId, ArcSettings.ArcAngle);
 }
 
-void FPlayerRotationArrowSettings::HideTeamWeaponArcRadius()
+void FPlayerRotationArrowSettings::HideArcRadius()
 {
-	if (M_TeamWeaponArcRadiusId < 0)
+	if (M_ArcRadiusId < 0)
 	{
 		return;
 	}
 
 	if (EnsureRotationActorIsValid())
 	{
-		URTSBlueprintFunctionLibrary::HideRTSRadiusById(RotationArrowActor, M_TeamWeaponArcRadiusId);
+		URTSBlueprintFunctionLibrary::HideRTSRadiusById(RotationArrowActor, M_ArcRadiusId);
 	}
 
-	M_TeamWeaponArcRadiusId = -1;
+	M_ArcRadiusId = -1;
 }
 
 void FPlayerRotationArrowSettings::TickArrowRotation(const FVector2D& MouseScreenLocation,
@@ -139,7 +146,7 @@ void FPlayerRotationArrowSettings::ResetForNextRotation()
 {
 	bM_RotationArrowInitialized = false;
 	bM_MouseMovedEnough = false;
-	HideTeamWeaponArcRadius();
+	HideArcRadius();
 	if (EnsureRotationActorIsValid())
 	{
 		RotationArrowActor->SetActorHiddenInGame(true);

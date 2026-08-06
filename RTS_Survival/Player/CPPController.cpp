@@ -2083,7 +2083,7 @@ void ACPPController::SecondaryClickStart()
 		M_SecondaryStartMouseProjectedLocation = HitResult.Location;
 		M_SecondaryStartClickedActor = HitResult.GetActor();
 		PlayerRotationArrow.InitRotationArrowAction(MouseScreenPosition, HitResult.Location,
-		                                            GetTeamWeaponSettingsForRotationArrow());
+		                                            GetRotationArrowArcSettings());
 	}
 	else
 	{
@@ -2182,30 +2182,86 @@ void ACPPController::RotateRight()
 	}
 }
 
-FRotationArrowTeamWeaponSettings ACPPController::GetTeamWeaponSettingsForRotationArrow()
+FRotationArrowArcSettings ACPPController::GetRotationArrowArcSettings()
 {
 	EnsureSelectionsAreRTSValid();
-	FRotationArrowTeamWeaponSettings Settings;
-	const bool bPawnsSelected = not TSelectedPawnMasters.IsEmpty();
-	const bool bActorsSelected = not TSelectedActorsMasters.IsEmpty();
-	if (bPawnsSelected || bActorsSelected)
+	FRotationArrowArcSettings ArcSettings;
+	const int32 SelectedUnitCount = TSelectedSquadControllers.Num()
+		+ TSelectedPawnMasters.Num()
+		+ TSelectedActorsMasters.Num();
+	if (SelectedUnitCount != 1)
 	{
-		// Not just one team weapon selected.
-		return Settings;
+		return ArcSettings;
 	}
-	if (TSelectedSquadControllers.Num() != 1)
+
+	if (TSelectedSquadControllers.Num() == 1)
 	{
-		return Settings;
+		const ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(
+			TSelectedSquadControllers[0]);
+		if (not IsValid(TeamWeaponController))
+		{
+			return ArcSettings;
+		}
+
+		ArcSettings.ArcAngle = TeamWeaponController->GetTeamWeaponArc();
+		ArcSettings.WeaponRange = TeamWeaponController->GetTeamWeaponRange();
+		return ArcSettings;
 	}
-	ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(TSelectedSquadControllers[0]);
-	if (not IsValid(TeamWeaponController))
+
+	if (TSelectedPawnMasters.Num() != 1)
 	{
-		return Settings;
+		return ArcSettings;
 	}
-	Settings.TeamWeaponArc = TeamWeaponController->GetTeamWeaponArc();
-	Settings.TeamWeaponRange = TeamWeaponController->GetTeamWeaponRange();
-	Settings.bIsOnlyTeamWeaponSelected = true;
-	return Settings;
+
+	const ATankMaster* TankMaster = Cast<ATankMaster>(TSelectedPawnMasters[0]);
+	TryGetTankRotationArrowArcSettings(TankMaster, ArcSettings);
+	return ArcSettings;
+}
+
+bool ACPPController::TryGetTankRotationArrowArcSettings(
+	const ATankMaster* TankMaster,
+	FRotationArrowArcSettings& OutArcSettings) const
+{
+	OutArcSettings = FRotationArrowArcSettings();
+	if (not IsValid(TankMaster))
+	{
+		return false;
+	}
+
+	for (ACPPTurretsMaster* Turret : TankMaster->GetTurrets())
+	{
+		if (not IsValid(Turret))
+		{
+			continue;
+		}
+
+		const TArray<UWeaponState*> TurretWeapons = Turret->GetWeapons();
+		TryUpdateRotationArrowMainWeaponSettingsFromWeapons(TurretWeapons, OutArcSettings);
+	}
+
+	return OutArcSettings.ArcAngle > 0.0f && OutArcSettings.WeaponRange > 0.0f;
+}
+
+void ACPPController::TryUpdateRotationArrowMainWeaponSettingsFromWeapons(
+	const TArray<UWeaponState*>& Weapons,
+	FRotationArrowArcSettings& InOutArcSettings) const
+{
+	for (const UWeaponState* WeaponState : Weapons)
+	{
+		if (not IsValid(WeaponState))
+		{
+			continue;
+		}
+
+		const float WeaponRange = WeaponState->GetRange();
+		if (WeaponRange <= InOutArcSettings.WeaponRange)
+		{
+			continue;
+		}
+
+		InOutArcSettings.ArcAngle = WeaponState->GetTurretYawLimit();
+		InOutArcSettings.WeaponRange = WeaponRange;
+	}
 }
 
 bool ACPPController::GetIsValidPlayerAimAbilityActor() const

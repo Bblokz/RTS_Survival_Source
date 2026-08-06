@@ -10,13 +10,13 @@ class UFormationController;
 class ACPPController;
 
 USTRUCT()
-struct FRotationArrowTeamWeaponSettings
+struct FRotationArrowArcSettings
 {
 	GENERATED_BODY()
-	bool bIsOnlyTeamWeaponSelected = false;
-	float TeamWeaponArc = 0.f;
-	float TeamWeaponRange = 0.f;
+	float ArcAngle = 0.f;
+	float WeaponRange = 0.f;
 };
+
 USTRUCT(BlueprintType)
 struct FPlayerRotationArrowSettings
 {
@@ -24,7 +24,8 @@ struct FPlayerRotationArrowSettings
 
 	void InitRotationArrowAction(
 		const FVector2D& InitialMouseScreenLocation,
-		const FVector& InitialMouseProjectedLocation, const FRotationArrowTeamWeaponSettings TeamWeaponSettings);
+		const FVector& InitialMouseProjectedLocation,
+		const FRotationArrowArcSettings& ArcSettings);
 	
 	void TickArrowRotation(
 		const FVector2D& MouseScreenLocation,
@@ -54,9 +55,10 @@ private:
 
 	void ResetForNextRotation();
 
-	void InitRotationArrowAction_TeamWeaponArcRadius(const FVector& InitialMouseProjectedLocation,
-	                                                 const FRotationArrowTeamWeaponSettings& TeamWeaponSettings);
-	void HideTeamWeaponArcRadius();
+	void InitRotationArrowAction_ArcRadius(
+		const FVector& InitialMouseProjectedLocation,
+		const FRotationArrowArcSettings& ArcSettings);
+	void HideArcRadius();
 
 	void RotateArrowToProjection(const FVector& MouseProjectedLocation) const;
 
@@ -70,7 +72,7 @@ private:
 	UPROPERTY()
 	FVector2D M_OriginalMouseScreenLocation = FVector2D::ZeroVector;
 
-	int32 M_TeamWeaponArcRadiusId = -1;
+	int32 M_ArcRadiusId = -1;
 
 	void DebugArrow(const FString& Message, const FColor Color = FColor::Blue) const;
 };

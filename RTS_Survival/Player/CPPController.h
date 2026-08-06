@@ -1024,7 +1024,26 @@ private:
 	UPROPERTY()
 	bool bM_IsInTechTree;
 
-	FRotationArrowTeamWeaponSettings GetTeamWeaponSettingsForRotationArrow();
+	FRotationArrowArcSettings GetRotationArrowArcSettings();
+
+	/**
+	 * @brief Resolves the tank's longest-range turret weapon before deciding whether its orientation arc applies.
+	 * @param TankMaster Sole selected tank whose mounted weapons are inspected.
+	 * @param OutArcSettings Main turret weapon data found on the tank.
+	 * @return True when the main turret weapon has a usable limited-yaw arc.
+	 */
+	bool TryGetTankRotationArrowArcSettings(
+		const ATankMaster* TankMaster,
+		FRotationArrowArcSettings& OutArcSettings) const;
+
+	/**
+	 * @brief Preserves the longest turret-weapon range so secondary limited-yaw weapons cannot supply the arc.
+	 * @param Weapons Weapon states from one tank mount.
+	 * @param InOutArcSettings Current longest-range turret weapon data.
+	 */
+	void TryUpdateRotationArrowMainWeaponSettingsFromWeapons(
+		const TArray<UWeaponState*>& Weapons,
+		FRotationArrowArcSettings& InOutArcSettings) const;
 
 	// An actor with a simple mesh and various materials for EPlayerAimAbilityTypes.
 	// use IsPlayerAimActive to determine if the ability is active.
