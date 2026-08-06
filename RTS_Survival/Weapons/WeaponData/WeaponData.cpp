@@ -2576,7 +2576,14 @@ void UWeaponStateSplitterArchProjectile::InitSplitterArchProjectileWeapon(
 		NewMinBurstAmount,
 		bNewCreateShellCasingOnEveryRandomBurst);
 
-	const int32 ImpactPoolCapacity = FMath::Max(M_SplitterSettings.SplitSettings.SplitProjectileCount, 1);
+	const int32 SplitProjectileCount = FMath::Max(
+		M_SplitterSettings.SplitSettings.SplitProjectileCount,
+		1);
+	const int32 OverlappingVolleyCapacity = FWeaponImpactPool::RecommendCapacity(
+		WeaponData,
+		NewWeaponBurstMode,
+		NewBurstCooldown);
+	const int32 ImpactPoolCapacity = SplitProjectileCount * OverlappingVolleyCapacity;
 	M_SplitProjectileImpactPool.Initialize(
 		World,
 		M_WeaponVfx.ImpactAttenuation,
@@ -2751,25 +2758,27 @@ void UWeaponStateSplitterArchProjectile::CreateWeaponImpact(const FVector& HitLo
 		return;
 	}
 
-	UNiagaraSystem* SplitImpactNiagaraSystem = M_SplitterSettings.SplitSettings.SplitProjectileImpactNiagaraSystem;
-	if (not IsValid(SplitImpactNiagaraSystem))
+	const FRTSSurfaceImpactData* const SurfaceData = M_WeaponVfx.SurfaceImpactEffects.Find(HitSurface);
+	if (SurfaceData == nullptr)
 	{
-		Super::CreateWeaponImpact(HitLocation, HitSurface, ImpactRotation);
+		const FString SurfaceTypeString = FRTS_PhysicsHelper::GetSurfaceTypeString(HitSurface);
+		ReportErrorForWeapon(
+			"Could not find impact effect for surface type: " + SurfaceTypeString);
 		return;
 	}
 
-	USoundBase* ImpactSound = nullptr;
-	if (const FRTSSurfaceImpactData* SurfaceData = M_WeaponVfx.SurfaceImpactEffects.Find(HitSurface))
-	{
-		ImpactSound = SurfaceData->ImpactSound;
-	}
+	UNiagaraSystem* const ConfiguredSplitImpact =
+		M_SplitterSettings.SplitSettings.SplitProjectileImpactNiagaraSystem;
+	UNiagaraSystem* const ImpactNiagaraSystem = IsValid(ConfiguredSplitImpact)
+		? ConfiguredSplitImpact
+		: SurfaceData->ImpactEffect;
 
 	M_SplitProjectileImpactPool.PlayImpact(
 		HitLocation,
 		ImpactRotation,
-		SplitImpactNiagaraSystem,
+		ImpactNiagaraSystem,
 		M_WeaponVfx.ImpactScale,
-		ImpactSound);
+		SurfaceData->ImpactSound);
 }
 
 void UWeaponStateSplitterArchProjectile::SpawnSplitEffects(const FVector& SplitLocation) const
