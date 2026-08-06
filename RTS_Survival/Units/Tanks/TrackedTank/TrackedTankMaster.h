@@ -215,7 +215,7 @@ protected:
 	virtual void ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand) override;
 	// Sets the tracks back to idle.
 	virtual void TerminateRotateTowardsCommand() override;
-	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds) override;
+	virtual bool ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds) override;
 	virtual void OnRotateTowardsFinished() override;
 	/** @param bDisabled Whether to enable or disable the unit. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "RTSUnitSpawning")

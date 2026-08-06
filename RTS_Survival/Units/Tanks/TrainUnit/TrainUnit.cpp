@@ -184,10 +184,11 @@ void ATrainUnit::TerminateRotateTowardsCommand()
 {
 }
 
-void ATrainUnit::ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds)
+bool ATrainUnit::ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds)
 {
-	(void)TurnAmountDegrees;
+	(void)RemainingYawDegrees;
 	(void)DeltaSeconds;
+	return true;
 }
 
 void ATrainUnit::OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret)

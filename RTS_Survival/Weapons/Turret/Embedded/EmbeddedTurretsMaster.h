@@ -7,6 +7,14 @@
 #include "EmbeddedTurretsMaster.generated.h"
 
 class RTS_SURVIVAL_API IEmbeddedTurretInterface;
+
+enum class EEmbeddedAssaultYawLimitSide : uint8
+{
+	None,
+	Minimum,
+	Maximum
+};
+
 /**
  * Child of TurretMaster: used for turrets that are embedded in a owners's mesh.
  * Uses the interface IEmbededTurretInterface to rotate the turret on that mesh.
@@ -111,6 +119,10 @@ private:
 	bool bM_IsArtillery;
 	float M_ArtilleryDistanceUseMaxPitch;
 
+	// Keeps a hull correction from making the gun jump to the opposite stop when the hull crosses its target yaw.
+	EEmbeddedAssaultYawLimitSide M_LatchedYawLimitSide = EEmbeddedAssaultYawLimitSide::None;
+	TOptional<float> M_LastRequestedHullWorldYaw;
+
 	/**
 	 * @brief Calculate the degrees needed to turn the turret to face the target. Uses the interface to turn the turret.
 	 * @param CurrentYaw The current yaw of the turret. (In local space)
@@ -138,6 +150,9 @@ private:
 		const float& LocalTargetYaw,
 		const float& DeltaAngle,
 		const float& DeltaTime);
+
+	void RequestHullTurnForOutOfBoundsTarget(float LocalTargetYaw);
+	void ResetAssaultHullTurnState();
 
 	    // Cached once; local "forward" in tank space for Idle_Base
         float M_EmbeddedBaseLocalYaw = 0.f;

@@ -9,6 +9,11 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 
+namespace EmbeddedAssaultTurret
+{
+	constexpr float HullTurnRequestYawToleranceDegrees = 1.0f;
+}
+
 
 AEmbeddedTurretsMaster::AEmbeddedTurretsMaster():
 	EmbeddedTurretMesh(nullptr),
@@ -37,6 +42,7 @@ void AEmbeddedTurretsMaster::InitEmbeddedTurret(
     EmbeddedOwner = NewEmbeddedOwner;
     bM_IsArtillery = bIsArtillery;
     M_ArtilleryDistanceUseMaxPitch = ArtilleryDistanceUseMaxPitch;
+	ResetAssaultHullTurnState();
 
     // ---  cache base local yaw once for Idle_Base ---
     M_EmbeddedBaseLocalYaw = ComputeEmbeddedBaseLocalYaw();
@@ -225,41 +231,76 @@ void AEmbeddedTurretsMaster::AssaultTurretRotation(
 	const float& DeltaTime)
 
 {
-	float NewYaw = CurrentYaw;
-	if (FMath::Abs(DeltaAngle) <= DeltaTime * RotationSpeed)
+	const bool bTargetWithinYawLimits = LocalTargetYaw >= M_MinYaw && LocalTargetYaw <= M_MaxYaw;
+	if (bTargetWithinYawLimits)
 	{
-		// Embedded Owner is checked for validity beforehand.
-		IEmbeddedTurretInterface::Execute_SetTurretAngle(EmbeddedOwner.GetObject(), LocalTargetYaw);
-		bM_IsRotatedToEngage = true;
-		StopTurretRotation();
+		ResetAssaultHullTurnState();
+		NormalTurretRotation(CurrentYaw, LocalTargetYaw, DeltaAngle, DeltaTime);
 		return;
 	}
-	// Check if the target yaw is within the turret's yaw bounds.
-	if (LocalTargetYaw >= M_MinYaw && LocalTargetYaw <= M_MaxYaw)
+
+	if (M_LatchedYawLimitSide == EEmbeddedAssaultYawLimitSide::None)
 	{
-		// Positive or negative direction.
-		const int Direction = FMath::Sign(DeltaAngle);
-		const float YawIncreaseFactor = RotationSpeed * Direction * DeltaTime;
-		NewYaw += YawIncreaseFactor;
+		M_LatchedYawLimitSide = LocalTargetYaw > M_MaxYaw
+			? EEmbeddedAssaultYawLimitSide::Maximum
+			: EEmbeddedAssaultYawLimitSide::Minimum;
 	}
-	else
+
+	const float LatchedLimitYaw = M_LatchedYawLimitSide == EEmbeddedAssaultYawLimitSide::Maximum
+		? M_MaxYaw
+		: M_MinYaw;
+	IEmbeddedTurretInterface::Execute_SetTurretAngle(EmbeddedOwner.GetObject(), LatchedLimitYaw);
+	bM_IsRotatedToEngage = false;
+	bM_IsFullyRotatedToTarget = false;
+
+	if (bIsTargetRotatorUpdated)
 	{
-		// The target is out of yaw bounds. Turn the turret to its min or max yaw, depending on the target's position.
-		NewYaw = (DeltaAngle > 0) ? M_MaxYaw : M_MinYaw;
-		// Only update when the target rotator is updated otherwise spamming this will overshoot the hull. 
-		if (bIsTargetRotatorUpdated)
-		{
-			EmbeddedOwner->Execute_TurnBase(EmbeddedOwner.GetObject(), LocalTargetYaw);
-			bIsTargetRotatorUpdated = false;
-		}
+		RequestHullTurnForOutOfBoundsTarget(LocalTargetYaw);
+		bIsTargetRotatorUpdated = false;
 	}
-	IEmbeddedTurretInterface::Execute_SetTurretAngle(EmbeddedOwner.GetObject(), NewYaw);
+
 	if constexpr (DeveloperSettings::Debugging::GEmbedded_Turret_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("Rotating", FColor::Purple);
 		RTSFunctionLibrary::PrintString("Target yaw :" + FString::SanitizeFloat(LocalTargetYaw)
 		                                + "\n current yaw: " + FString::SanitizeFloat(CurrentYaw), FColor::Red);
 	}
+}
+
+void AEmbeddedTurretsMaster::RequestHullTurnForOutOfBoundsTarget(const float LocalTargetYaw)
+{
+	if (not GetIsValidEmbeddedTurretMesh())
+	{
+		return;
+	}
+
+	const float OwnerWorldYaw = EmbeddedTurretMesh->GetComponentRotation().Yaw;
+	const float RequestedHullWorldYaw = FRotator::NormalizeAxis(OwnerWorldYaw + LocalTargetYaw);
+	if (M_LastRequestedHullWorldYaw.IsSet())
+	{
+		const float RequestDeltaDegrees = FMath::FindDeltaAngleDegrees(
+			M_LastRequestedHullWorldYaw.GetValue(),
+			RequestedHullWorldYaw);
+		if (FMath::Abs(RequestDeltaDegrees)
+			<= EmbeddedAssaultTurret::HullTurnRequestYawToleranceDegrees)
+		{
+			return;
+		}
+	}
+
+	const bool bHullTurnAccepted = IEmbeddedTurretInterface::Execute_TurnBase(
+		EmbeddedOwner.GetObject(),
+		LocalTargetYaw);
+	if (bHullTurnAccepted)
+	{
+		M_LastRequestedHullWorldYaw = RequestedHullWorldYaw;
+	}
+}
+
+void AEmbeddedTurretsMaster::ResetAssaultHullTurnState()
+{
+	M_LatchedYawLimitSide = EEmbeddedAssaultYawLimitSide::None;
+	M_LastRequestedHullWorldYaw.Reset();
 }
 
 float AEmbeddedTurretsMaster::ComputeEmbeddedBaseLocalYaw() const
@@ -282,7 +323,8 @@ float AEmbeddedTurretsMaster::ClampYawToLimits(const float InYaw) const
 
 void AEmbeddedTurretsMaster::SetEmbeddedIdleBaseTarget()
 {
-    const float BaseYaw = bM_IsAssaultTurret
+	ResetAssaultHullTurnState();
+	const float BaseYaw = bM_IsAssaultTurret
         ? ClampYawToLimits(M_EmbeddedBaseLocalYaw)
         : M_EmbeddedBaseLocalYaw;
 

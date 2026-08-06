@@ -42,7 +42,7 @@ public:
 
 	virtual void ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand) override;
 	virtual void TerminateRotateTowardsCommand() override;
-	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds) override;
+	virtual bool ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds) override;
 
 	virtual void OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret) override;
 	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override;
