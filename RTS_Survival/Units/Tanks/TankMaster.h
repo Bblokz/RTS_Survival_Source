@@ -503,7 +503,13 @@ protected:
 
 	virtual EAnnouncerVoiceLineType OverrideAnnouncerDeathVoiceLine(const EAnnouncerVoiceLineType OriginalLine) const;
 
-	virtual void ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds);
+	/**
+	 * @brief Lets kinematic and physics-driven tanks decide completion from the motion they actually apply.
+	 * @param RemainingYawDegrees Signed shortest yaw still required.
+	 * @param DeltaSeconds Time available for this rotation update.
+	 * @return True only when the vehicle has physically completed the requested rotation.
+	 */
+	virtual bool ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds);
 
 private:
 	// Whether the vehicle is currently Turning.

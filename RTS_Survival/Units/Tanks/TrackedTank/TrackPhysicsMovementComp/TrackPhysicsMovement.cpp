@@ -24,6 +24,10 @@ namespace TrackPhysicsMovementConstants
 	constexpr int32 GroundTraceFailureHoldFrames = 6;
 	/** @brief Preserve the small deadzone roll-bias used by the previous fallback implementation. */
 	constexpr float DeadzoneFallbackAngularVelocityXDegrees = -1.0f;
+	/** @brief Residual planar speed below which async braking can safely stop updating. */
+	constexpr float SettlingPlanarSpeedTolerance = 2.0f;
+	/** @brief Residual yaw rate below which async braking can safely stop updating. */
+	constexpr float SettlingYawRateToleranceDegrees = 1.0f;
 }
 
 
@@ -89,7 +93,8 @@ void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 {
 	Super::AsyncTick(DeltaTime);
 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_AsyncTick);
-	if (not M_IsFollowingPath.Load())
+	const ETrackPhysicsMovementState MovementState = M_MovementState.Load();
+	if (MovementState == ETrackPhysicsMovementState::Inactive)
 	{
 		return;
 	}
@@ -109,11 +114,16 @@ void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 	FVector GroundNormal;
 	if (not GetDesiredPlanarVelocityStrategyB(RigidBody, DeltaTime, DesiredPlanarVelocity, GroundNormal))
 	{
+		ApplyYawTorqueStrategyB(RigidBody);
 		return;
 	}
 
 	ApplyDriveForceStrategyB(RigidBody, DesiredPlanarVelocity, GroundNormal);
 	ApplyYawTorqueStrategyB(RigidBody);
+	if (MovementState == ETrackPhysicsMovementState::Settling)
+	{
+		TryCompleteSettling(RigidBody, GroundNormal);
+	}
 }
 
 void UTrackPhysicsMovement::UpdateTankMovement(
@@ -136,7 +146,7 @@ void UTrackPhysicsMovement::UpdateTankMovement(
 	const float DesiredYawRate = Steering * M_TurnRate;
 	M_CurrentThrottle.Store(Throttle);
 	M_CurrentSteeringInDeg.Store(DesiredYawRate);
-	M_IsFollowingPath.Store(true);
+	M_MovementState.Store(ETrackPhysicsMovementState::Following);
 
 	if (Throttle != 0)
 	{
@@ -156,9 +166,9 @@ void UTrackPhysicsMovement::UpdateTankMovement(
 
 void UTrackPhysicsMovement::OnPathFollowingFinished()
 {
-	M_IsFollowingPath.Store(false);
 	M_CurrentThrottle.Store(0.0f);
 	M_CurrentSteeringInDeg.Store(0.0f);
+	M_MovementState.Store(ETrackPhysicsMovementState::Settling);
 
 	if (not GetIsValidTankAnimationBP())
 	{
@@ -166,6 +176,28 @@ void UTrackPhysicsMovement::OnPathFollowingFinished()
 	}
 
 	M_TankAnimationBP->SetChassisAnimToIdle();
+}
+
+void UTrackPhysicsMovement::TryCompleteSettling(
+	const Chaos::FRigidBodyHandle_Internal* RigidBody,
+	const FVector& GroundNormal)
+{
+	const FVector PlanarVelocity = FVector::VectorPlaneProject(RigidBody->V(), GroundNormal);
+	if (PlanarVelocity.Size() > TrackPhysicsMovementConstants::SettlingPlanarSpeedTolerance)
+	{
+		return;
+	}
+
+	const FVector UpDirection = RigidBody->R().GetUpVector();
+	const float CurrentYawRateDegrees = FMath::RadiansToDegrees(
+		FVector::DotProduct(RigidBody->W(), UpDirection));
+	if (FMath::Abs(CurrentYawRateDegrees) > TrackPhysicsMovementConstants::SettlingYawRateToleranceDegrees)
+	{
+		return;
+	}
+
+	ETrackPhysicsMovementState ExpectedState = ETrackPhysicsMovementState::Settling;
+	M_MovementState.CompareExchange(ExpectedState, ETrackPhysicsMovementState::Inactive);
 }
 
 // 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_PhysicsMovement);

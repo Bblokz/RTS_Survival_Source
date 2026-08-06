@@ -35,6 +35,13 @@ namespace TrackedMovementInvariant
 	constexpr double NoOrphanStartTime = -1.0;
 }
 
+namespace TrackedRotateTowards
+{
+	constexpr float FullSteeringYawErrorDegrees = 20.0f;
+	constexpr float CompletionYawToleranceDegrees = 1.0f;
+	constexpr float CompletionYawRateToleranceDegrees = 1.0f;
+}
+
 
 ATrackedTankMaster::ATrackedTankMaster(const FObjectInitializer& ObjectInitializer)
 	: ATankMaster(ObjectInitializer), TankAnimationBP(nullptr), ChassisMesh(NULL)
@@ -801,21 +808,27 @@ void ATrackedTankMaster::TerminateRotateTowardsCommand()
 	Super::TerminateRotateTowardsCommand();
 }
 
-void ATrackedTankMaster::ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds)
+bool ATrackedTankMaster::ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds)
 {
-	if (not GetIsValidTrackPhysicsMovement() or ChassisMesh == nullptr)
+	if (not GetIsValidTrackPhysicsMovement() or not IsValid(ChassisMesh))
 	{
-		Super::ApplyRotateTowardsStep(TurnAmountDegrees, DeltaSeconds);
-		return;
+		return Super::ApplyRotateTowardsStep(RemainingYawDegrees, DeltaSeconds);
 	}
 
-	const float RotationSpeedPerTick = TurnRate * DeltaSeconds;
-	if (FMath::IsNearlyZero(RotationSpeedPerTick, KINDA_SMALL_NUMBER))
-	{
-		return;
-	}
-
-	const float SteeringCommand = FMath::Clamp(TurnAmountDegrees / RotationSpeedPerTick, -1.0f, 1.0f);
+	const FVector AngularVelocityDegrees = ChassisMesh->GetPhysicsAngularVelocityInDegrees();
+	const float CurrentYawRateDegrees = FVector::DotProduct(
+		AngularVelocityDegrees,
+		ChassisMesh->GetUpVector());
+	const bool bYawWithinTolerance = FMath::Abs(RemainingYawDegrees)
+		<= TrackedRotateTowards::CompletionYawToleranceDegrees;
+	const bool bYawRateWithinTolerance = FMath::Abs(CurrentYawRateDegrees)
+		<= TrackedRotateTowards::CompletionYawRateToleranceDegrees;
+	const float SteeringCommand = bYawWithinTolerance
+		? 0.0f
+		: FMath::Clamp(
+			RemainingYawDegrees / TrackedRotateTowards::FullSteeringYawErrorDegrees,
+			-1.0f,
+			1.0f);
 	const float CurrentPlanarSpeed = ChassisMesh->GetComponentVelocity().Size2D();
 	constexpr float RotateTowardsThrottle = 0.0f;
 	TrackPhysicsMovement->UpdateTankMovement(
@@ -823,6 +836,7 @@ void ATrackedTankMaster::ApplyRotateTowardsStep(const float TurnAmountDegrees, c
 		CurrentPlanarSpeed,
 		RotateTowardsThrottle,
 		SteeringCommand);
+	return bYawWithinTolerance && bYawRateWithinTolerance;
 }
 
 void ATrackedTankMaster::OnRotateTowardsFinished()

@@ -445,27 +445,15 @@ void ATankMaster::Tick(float DeltaSeconds)
 	}
 
 	const FRotator CurrentRotation = GetActorRotation();
-	FRotator RotationDifference = M_RotateToDirection - CurrentRotation;
-
-	// Normalize to [-180,180] range
-	RotationDifference.Normalize();
-	float TurnAmount = FMath::Sign(RotationDifference.Yaw) * TurnRate * DeltaSeconds;
-	bool bFinishedRotateTowardsThisTick = false;
-
-	// If we'd overshoot, clamp the turn
-	if (FMath::Abs(TurnAmount) > FMath::Abs(RotationDifference.Yaw))
-	{
-		TurnAmount = RotationDifference.Yaw;
-		bM_NeedToTurnTowardsTarget = false;
-		bFinishedRotateTowardsThisTick = true;
-	}
-
-	ApplyRotateTowardsStep(TurnAmount, DeltaSeconds);
-	if (not bFinishedRotateTowardsThisTick)
+	const float RemainingYawDegrees = FMath::FindDeltaAngleDegrees(
+		CurrentRotation.Yaw,
+		M_RotateToDirection.Yaw);
+	if (not ApplyRotateTowardsStep(RemainingYawDegrees, DeltaSeconds))
 	{
 		return;
 	}
 
+	bM_NeedToTurnTowardsTarget = false;
 	OnRotateTowardsFinished();
 	if (bM_IsRotationAQueueCommand)
 	{
@@ -476,20 +464,26 @@ void ATankMaster::Tick(float DeltaSeconds)
 	OnFinishedStandaloneRotation();
 }
 
-void ATankMaster::ApplyRotateTowardsStep(const float TurnAmountDegrees, const float DeltaSeconds)
+bool ATankMaster::ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds)
 {
 	constexpr float MinRotateDeltaSeconds = KINDA_SMALL_NUMBER;
 	if (DeltaSeconds < MinRotateDeltaSeconds)
 	{
-		return;
+		return false;
 	}
 
+	const float MaximumTurnThisFrame = TurnRate * DeltaSeconds;
+	const float TurnAmountDegrees = FMath::Clamp(
+		RemainingYawDegrees,
+		-MaximumTurnThisFrame,
+		MaximumTurnThisFrame);
 	FHitResult SweepHitResult;
 	AddActorWorldRotation(
 		FRotator(0.0f, TurnAmountDegrees, 0.0f),
 		true,
 		&SweepHitResult,
 		ETeleportType::TeleportPhysics);
+	return FMath::Abs(RemainingYawDegrees) <= MaximumTurnThisFrame;
 }
 
 void ATankMaster::OnRotateTowardsFinished()

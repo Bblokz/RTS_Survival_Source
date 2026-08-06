@@ -106,6 +106,13 @@ struct FTrackPhysicsMovementTuning
 	float MinimumYawInertia = 1.0f;
 };
 
+enum class ETrackPhysicsMovementState : uint8
+{
+	Inactive,
+	Following,
+	Settling
+};
+
 /**
  * @brief Receives throttle/steering commands from path following and applies them on async physics tick.
  * Uses a bounded force and torque correction model so Chaos gravity and terrain contact stay visible.
@@ -209,6 +216,15 @@ private:
 		const Chaos::FRigidBodyHandle_Internal* RigidBody,
 		FVector& OutAngularVelocityDegrees) const;
 
+	/**
+	 * @brief Ends async settling only after the rigid body has lost meaningful planar and yaw motion.
+	 * @param RigidBody Async rigid body used for authoritative velocity measurements.
+	 * @param GroundNormal Current terrain normal used to isolate planar velocity.
+	 */
+	void TryCompleteSettling(
+		const Chaos::FRigidBodyHandle_Internal* RigidBody,
+		const FVector& GroundNormal);
+
 	bool GetIsValidTankMesh() const;
 	bool GetIsValidTankAnimationBP() const;
 	bool GetIsValidMovementDependencies() const;
@@ -277,7 +293,7 @@ private:
 	TAtomic<float> M_CurrentThrottle{0.0f};
 	TAtomic<float> M_TrackForceMultiplier;
 	TAtomic<float> M_CurrentSteeringInDeg{0.0f};
-	TAtomic<bool> M_IsFollowingPath{false};
+	TAtomic<ETrackPhysicsMovementState> M_MovementState{ETrackPhysicsMovementState::Inactive};
 
 	mutable TAtomic<float> M_CachedGroundNormalX{0.0f};
 	mutable TAtomic<float> M_CachedGroundNormalY{0.0f};
