@@ -17,6 +17,8 @@ struct FFindPlayerUnitBulkLocations;
 struct FResultPlayerUnitBulkLocations;
 struct FFindConstructionLocations;
 struct FResultConstructionLocations;
+struct FFindMineLocations;
+struct FResultMineLocations;
 struct FEnemyBasePointCoreBuildings;
 struct FEnemyBasePointSatelliteBuildings;
 
@@ -129,5 +131,12 @@ namespace FStrategicAIHelpers
 		const FFindConstructionLocations& Request,
 		const TArray<FEnemyBasePointCoreBuildings>& CachedEnemyBaseCoreBuildings,
 		const TArray<FEnemyBasePointSatelliteBuildings>& CachedEnemyBaseSatelliteBuildings);
+
+	/**
+	 * @brief Builds tactical mine candidates without reading game-thread objects on the async worker.
+	 * @param Request Base, player, defense, and sampled-road snapshot plus compact mine placement settings.
+	 * @return Road-bound and outer-defense-arc mine candidates filtered outside every enemy base.
+	 */
+	FResultMineLocations BuildMineLocationsResult(const FFindMineLocations& Request);
 
 }

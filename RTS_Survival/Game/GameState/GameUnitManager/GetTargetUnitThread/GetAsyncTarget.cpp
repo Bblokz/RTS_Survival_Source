@@ -298,6 +298,14 @@ void FGetAsyncTarget::ProcessStrategicAIRequests()
 					M_EnemyBaseClusterAsyncCache.SatelliteBuildingsByBase));
 		}
 
+		Results.MineLocationsResults.Reserve(
+			Request.RequestBatch.FindMineLocationsRequests.Num());
+		for (const FFindMineLocations& MineLocationsRequest : Request.RequestBatch.FindMineLocationsRequests)
+		{
+			Results.MineLocationsResults.Add(
+				FStrategicAIHelpers::BuildMineLocationsResult(MineLocationsRequest));
+		}
+
 		TFunction<void(const FStrategicAIResultBatch&)> Callback = MoveTemp(Request.Callback);
 		AsyncTask(ENamedThreads::GameThread,
 			[Callback = MoveTemp(Callback), Results = MoveTemp(Results)]() mutable

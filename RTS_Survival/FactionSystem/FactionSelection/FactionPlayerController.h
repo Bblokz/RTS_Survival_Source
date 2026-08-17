@@ -15,6 +15,7 @@ class AFactionUnitPreview;
 class ARTSAsyncSpawner;
 class ICommands;
 class UAudioComponent;
+class URTSGameInstance;
 class USoundBase;
 class UUserWidget;
 class UWorld;
@@ -79,9 +80,9 @@ struct FUnitPreviewActions
  * @details Widget flow handled by this controller:
  * - Start: show the faction selection menu and preview units while the player browses.
  * - Launch Campaign: store the selected faction, remove the menu, and show the faction difficulty picker.
- * - Difficulty Selected: store the chosen difficulty and its percentage, remove the picker, and show world generation settings.
- * - World Generation Settings: when confirmed, store campaign settings, difficulty, and faction in the game instance,
- *   then load the campaign world. Back returns to the difficulty picker and repeats the flow.
+ * - Difficulty Selected: store the chosen difficulty, then either load the requested map or show campaign settings.
+ * - Campaign Generation Settings: when confirmed, store the settings and load the requested campaign map.
+ *   Back returns to the difficulty picker and repeats the campaign flow.
  */
 UCLASS()
 class RTS_SURVIVAL_API AFactionPlayerController : public APlayerController
@@ -115,7 +116,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionWorldGenerationSettings> M_FactionWorldGenerationSettingsClass;
 
-	// This is not used if the game instance has a valid map to load set; in which case we take that map instead.
+	// Used as the campaign request fallback when pre-game setup was opened without a launch request.
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSoftObjectPtr<UWorld> M_CampaignWorld;
 
@@ -175,10 +176,15 @@ private:
 	void InitFactionSelectionMenu();
 	void InitFactionDifficultyPicker();
 	void InitFactionWorldGenerationSettings();
+	void ShowFactionWorldGenerationSettings();
 	void BeginPlay_InitFactionBanners();
 	void InitPreviewReferences();
 	void NotifyFactionBannersOfFactionChange();
 	void InitInputModeForWidget(UUserWidget* WidgetToFocus);
+	URTSGameInstance* GetRTSGameInstance() const;
+	bool EnsurePreGameLaunchRequest(URTSGameInstance* RTSGameInstance) const;
+	void ContinueAfterFactionDifficultySelected(URTSGameInstance* RTSGameInstance);
+	void LoadPreGameLaunchDestination(URTSGameInstance* RTSGameInstance);
 	/**
 	 * @brief Captures the async spawn completion to update preview state and start idle actions.
 	 * @param TrainingOption The option that was requested for preview spawning.

@@ -127,7 +127,19 @@ void AFactionPlayerController::HandleFactionSelectionChanged(const ERTSFaction S
 
 void AFactionPlayerController::HandleLaunchCampaignRequested(const ERTSFaction SelectedFaction)
 {
+	URTSGameInstance* RTSGameInstance = GetRTSGameInstance();
+	if (RTSGameInstance == nullptr)
+	{
+		return;
+	}
+
+	if (not EnsurePreGameLaunchRequest(RTSGameInstance))
+	{
+		return;
+	}
+
 	M_SelectedFaction = SelectedFaction;
+	RTSGameInstance->SetPlayerFaction(M_SelectedFaction);
 
 	if (GetIsValidFactionSelectionMenu())
 	{
@@ -143,9 +155,21 @@ void AFactionPlayerController::HandleFactionDifficultyChosen(
 	const int32 DifficultyPercentage,
 	const ERTSGameDifficulty SelectedDifficulty)
 {
+	URTSGameInstance* RTSGameInstance = GetRTSGameInstance();
+	if (RTSGameInstance == nullptr)
+	{
+		return;
+	}
+
+	if (not EnsurePreGameLaunchRequest(RTSGameInstance))
+	{
+		return;
+	}
+
 	M_SelectedGameDifficulty.DifficultyPercentage = DifficultyPercentage;
 	M_SelectedGameDifficulty.DifficultyLevel = SelectedDifficulty;
 	M_SelectedGameDifficulty.bIsInitialized = true;
+	RTSGameInstance->SetSelectedGameDifficulty(M_SelectedGameDifficulty);
 
 	if (GetIsValidFactionDifficultyPicker())
 	{
@@ -153,14 +177,7 @@ void AFactionPlayerController::HandleFactionDifficultyChosen(
 		M_FactionDifficultyPicker.Reset();
 	}
 
-	InitFactionWorldGenerationSettings();
-
-	if (GetIsValidFactionWorldGenerationSettings())
-	{
-		M_FactionWorldGenerationSettings->SetDifficultyText(M_SelectedGameDifficulty.DifficultyLevel);
-	}
-
-	InitInputModeForWidget(M_FactionWorldGenerationSettings.Get());
+	ContinueAfterFactionDifficultySelected(RTSGameInstance);
 }
 
 void AFactionPlayerController::HandleWorldGenerationBackRequested()
@@ -193,17 +210,22 @@ void AFactionPlayerController::HandleWorldGenerationSettingsGenerated(const FCam
 		return;
 	}
 
-	if (GetIsValidFactionWorldGenerationSettings())
-	{
-		M_FactionWorldGenerationSettings->RemoveFromParent();
-		M_FactionWorldGenerationSettings.Reset();
-	}
-
-	URTSGameInstance* RTSGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	URTSGameInstance* RTSGameInstance = GetRTSGameInstance();
 	if (RTSGameInstance == nullptr)
 	{
+		return;
+	}
+
+	if (not EnsurePreGameLaunchRequest(RTSGameInstance))
+	{
+		return;
+	}
+
+	const FRTSPreGameLaunchRequest LaunchRequest = RTSGameInstance->GetPreGameLaunchRequest();
+	if (LaunchRequest.SetupFlow != ERTSPreGameSetupFlow::FactionAndDifficultyLoadCampaign)
+	{
 		RTSFunctionLibrary::ReportError(
-			"AFactionPlayerController::HandleWorldGenerationSettingsGenerated - Failed to get RTS game instance."
+			"AFactionPlayerController::HandleWorldGenerationSettingsGenerated - The launch request was not a campaign flow."
 		);
 		return;
 	}
@@ -212,18 +234,13 @@ void AFactionPlayerController::HandleWorldGenerationSettingsGenerated(const FCam
 	RTSGameInstance->SetPlayerFaction(M_SelectedFaction);
 	RTSGameInstance->SetSelectedGameDifficulty(M_SelectedGameDifficulty);
 
-	if (M_CampaignWorld.IsNull())
+	if (GetIsValidFactionWorldGenerationSettings())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-			this,
-			"M_CampaignWorld",
-			"AFactionPlayerController::HandleWorldGenerationSettingsGenerated",
-			this
-		);
-		return;
+		M_FactionWorldGenerationSettings->RemoveFromParent();
+		M_FactionWorldGenerationSettings.Reset();
 	}
 
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, M_CampaignWorld);
+	LoadPreGameLaunchDestination(RTSGameInstance);
 }
 
 void AFactionPlayerController::HandleAnnouncementFinished()
@@ -347,6 +364,110 @@ void AFactionPlayerController::InitFactionWorldGenerationSettings()
 	WorldGenerationSettings->AddToViewport();
 	WorldGenerationSettings->SetFactionPlayerController(this);
 	M_FactionWorldGenerationSettings = WorldGenerationSettings;
+}
+
+void AFactionPlayerController::ShowFactionWorldGenerationSettings()
+{
+	InitFactionWorldGenerationSettings();
+	if (not GetIsValidFactionWorldGenerationSettings())
+	{
+		return;
+	}
+
+	M_FactionWorldGenerationSettings->SetDifficultyText(M_SelectedGameDifficulty.DifficultyLevel);
+	InitInputModeForWidget(M_FactionWorldGenerationSettings.Get());
+}
+
+URTSGameInstance* AFactionPlayerController::GetRTSGameInstance() const
+{
+	URTSGameInstance* RTSGameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (IsValid(RTSGameInstance))
+	{
+		return RTSGameInstance;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"RTSGameInstance",
+		"GetRTSGameInstance",
+		this
+	);
+	return nullptr;
+}
+
+bool AFactionPlayerController::EnsurePreGameLaunchRequest(URTSGameInstance* RTSGameInstance) const
+{
+	if (not IsValid(RTSGameInstance))
+	{
+		return false;
+	}
+
+	if (RTSGameInstance->GetPreGameLaunchRequest().GetIsValid())
+	{
+		return true;
+	}
+
+	if (M_CampaignWorld.IsNull())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_CampaignWorld",
+			"EnsurePreGameLaunchRequest",
+			this
+		);
+		return false;
+	}
+
+	RTSGameInstance->SetPreGameLaunchRequest(
+		ERTSPreGameSetupFlow::FactionAndDifficultyLoadCampaign,
+		M_CampaignWorld
+	);
+	return RTSGameInstance->GetPreGameLaunchRequest().GetIsValid();
+}
+
+void AFactionPlayerController::ContinueAfterFactionDifficultySelected(URTSGameInstance* RTSGameInstance)
+{
+	if (not IsValid(RTSGameInstance))
+	{
+		return;
+	}
+
+	const FRTSPreGameLaunchRequest LaunchRequest = RTSGameInstance->GetPreGameLaunchRequest();
+	switch (LaunchRequest.SetupFlow)
+	{
+	case ERTSPreGameSetupFlow::FactionAndDifficulty:
+		LoadPreGameLaunchDestination(RTSGameInstance);
+		return;
+	case ERTSPreGameSetupFlow::FactionAndDifficultyLoadCampaign:
+		ShowFactionWorldGenerationSettings();
+		return;
+	case ERTSPreGameSetupFlow::NotInitialised:
+	default:
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::ContinueAfterFactionDifficultySelected - Setup flow was not initialized."
+		);
+	}
+}
+
+void AFactionPlayerController::LoadPreGameLaunchDestination(URTSGameInstance* RTSGameInstance)
+{
+	if (not IsValid(RTSGameInstance))
+	{
+		return;
+	}
+
+	const FRTSPreGameLaunchRequest LaunchRequest = RTSGameInstance->GetPreGameLaunchRequest();
+	if (not LaunchRequest.GetIsValid())
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::LoadPreGameLaunchDestination - Launch request was not initialized."
+		);
+		return;
+	}
+
+	const TSoftObjectPtr<UWorld> DestinationMap = LaunchRequest.DestinationMap;
+	RTSGameInstance->ResetPreGameLaunchRequest();
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, DestinationMap);
 }
 
 void AFactionPlayerController::BeginPlay_InitFactionBanners()

@@ -18,6 +18,13 @@ namespace StrategicAIHelperConstants
 	constexpr float MaxConstructionArcAngleDegrees = 170.f;
 	constexpr float CoreBuildingConstructionExclusionRadiusXY = 6000.f;
 	constexpr float SatelliteBuildingConstructionExclusionRadiusXY = 3000.f;
+	constexpr float MineArcHalfAngleDegrees = 45.f;
+	constexpr float MinMineArcOffsetScale = 1.5f;
+	constexpr float MineLocationDuplicateDistanceXY = 350.f;
+	constexpr float RoadMineSearchOuterMarginScale = 0.5f;
+	constexpr float RoadMineLateralScoreScale = 0.25f;
+	constexpr int32 MaxRoadMineLocationsPerBase = 8;
+	constexpr int32 MaxMineArcLocationsPerDefensePosition = 64;
 }
 
 namespace StrategicAIHelperUtilities
@@ -959,6 +966,203 @@ namespace StrategicAIHelperUtilities
 			Request.CleanupDistance,
 			CachedEnemyBaseCoreBuildings,
 			CachedEnemyBaseSatelliteBuildings);
+	}
+
+	bool GetIsOutsideAllMineBaseExclusions(
+		const FVector& CandidateLocation,
+		const TArray<FVector>& EnemyBaseLocations,
+		const float BaseExclusionRadius)
+	{
+		const float ExclusionRadiusSq = FMath::Square(FMath::Max(0.f, BaseExclusionRadius));
+		return not EnemyBaseLocations.ContainsByPredicate(
+			[&CandidateLocation, ExclusionRadiusSq](const FVector& BaseLocation)
+			{
+				return FVector::DistSquared2D(CandidateLocation, BaseLocation) <= ExclusionRadiusSq;
+			});
+	}
+
+	bool TryAddUniqueMineLocation(TArray<FVector>& OutLocations, const FVector& CandidateLocation)
+	{
+		const float DuplicateDistanceSq = FMath::Square(
+			StrategicAIHelperConstants::MineLocationDuplicateDistanceXY);
+		const bool bAlreadyPresent = OutLocations.ContainsByPredicate(
+			[&CandidateLocation, DuplicateDistanceSq](const FVector& ExistingLocation)
+			{
+				return FVector::DistSquared2D(CandidateLocation, ExistingLocation) < DuplicateDistanceSq;
+			});
+		if (bAlreadyPresent)
+		{
+			return false;
+		}
+
+		OutLocations.Add(CandidateLocation);
+		return true;
+	}
+
+	void AppendDefenseArcMineLocations(
+		const FFindMineLocations& Request,
+		const FDefensePositions& DefensePosition,
+		TArray<FVector>& OutLocations)
+	{
+		FVector PlayerBulkLocation = FVector::ZeroVector;
+		if (not TryGetClosestPlayerBulkLocation(
+			DefensePosition.Location,
+			Request.PlayerBulkLocations,
+			PlayerBulkLocation))
+		{
+			return;
+		}
+
+		FVector DirectionToPlayer = PlayerBulkLocation - DefensePosition.Location;
+		DirectionToPlayer.Z = 0.f;
+		const float DistanceToPlayer = DirectionToPlayer.Size();
+		const float MineOffset = FMath::Max(0.f, Request.MaxOffsetTowardsPlayer)
+			* FMath::Max(StrategicAIHelperConstants::MinMineArcOffsetScale, Request.MineArcOffsetScale);
+		if (DistanceToPlayer <= MineOffset || MineOffset <= 0.f)
+		{
+			return;
+		}
+
+		DirectionToPlayer /= DistanceToPlayer;
+		const int32 LocationCount = FMath::Clamp(
+			Request.MineArcLocationCount,
+			1,
+			StrategicAIHelperConstants::MaxMineArcLocationsPerDefensePosition);
+		for (int32 LocationIndex = 0; LocationIndex < LocationCount; ++LocationIndex)
+		{
+			const float ArcAlpha = LocationCount == 1
+				? 0.5f
+				: static_cast<float>(LocationIndex) / static_cast<float>(LocationCount - 1);
+			const float YawOffset = FMath::Lerp(
+				-StrategicAIHelperConstants::MineArcHalfAngleDegrees,
+				StrategicAIHelperConstants::MineArcHalfAngleDegrees,
+				ArcAlpha);
+			const FVector CandidateLocation = DefensePosition.Location
+				+ DirectionToPlayer.RotateAngleAxis(YawOffset, FVector::UpVector) * MineOffset;
+			if (GetIsOutsideAllMineBaseExclusions(
+				CandidateLocation,
+				Request.EnemyBaseLocations,
+				Request.BaseExclusionRadius))
+			{
+				(void)TryAddUniqueMineLocation(OutLocations, CandidateLocation);
+			}
+		}
+	}
+
+	TArray<FVector> BuildDefenseArcMineLocations(const FFindMineLocations& Request)
+	{
+		TArray<FVector> MineLocations;
+		const int32 LocationCountPerDefensePosition = FMath::Clamp(
+			Request.MineArcLocationCount,
+			1,
+			StrategicAIHelperConstants::MaxMineArcLocationsPerDefensePosition);
+		MineLocations.Reserve(Request.DefensePositions.Num() * LocationCountPerDefensePosition);
+		for (const FDefensePositions& DefensePosition : Request.DefensePositions)
+		{
+			AppendDefenseArcMineLocations(Request, DefensePosition, MineLocations);
+		}
+		return MineLocations;
+	}
+
+	struct FRoadMineLocationCandidate
+	{
+		FVector Location = FVector::ZeroVector;
+		float Score = 0.f;
+	};
+
+	TArray<FRoadMineLocationCandidate> BuildRoadMineCandidatesForBase(
+		const FFindMineLocations& Request,
+		const FVector& BaseLocation)
+	{
+		FVector PlayerBulkLocation = FVector::ZeroVector;
+		if (not TryGetClosestPlayerBulkLocation(BaseLocation, Request.PlayerBulkLocations, PlayerBulkLocation))
+		{
+			return {};
+		}
+
+		FVector DirectionToPlayer = PlayerBulkLocation - BaseLocation;
+		DirectionToPlayer.Z = 0.f;
+		const float DistanceToPlayer = DirectionToPlayer.Size();
+		if (DistanceToPlayer <= 0.f)
+		{
+			return {};
+		}
+
+		DirectionToPlayer /= DistanceToPlayer;
+		const float ScaledMineOffset = FMath::Max(0.f, Request.MaxOffsetTowardsPlayer)
+			* FMath::Max(StrategicAIHelperConstants::MinMineArcOffsetScale, Request.MineArcOffsetScale);
+		const float PreferredDistance = FMath::Max(0.f, Request.BaseExclusionRadius) + ScaledMineOffset;
+		const float MaxSearchDistance = PreferredDistance
+			+ ScaledMineOffset * StrategicAIHelperConstants::RoadMineSearchOuterMarginScale;
+		TArray<FRoadMineLocationCandidate> Candidates;
+		for (const FVector& RoadSampleLocation : Request.RoadSplineSampleLocations)
+		{
+			if (RoadSampleLocation.IsNearlyZero())
+			{
+				continue;
+			}
+
+			FVector DeltaFromBase = RoadSampleLocation - BaseLocation;
+			DeltaFromBase.Z = 0.f;
+			const float DistanceFromBase = DeltaFromBase.Size();
+			const float ForwardDistance = FVector::DotProduct(DeltaFromBase, DirectionToPlayer);
+			if (DistanceFromBase > MaxSearchDistance || ForwardDistance <= 0.f || ForwardDistance >= DistanceToPlayer)
+			{
+				continue;
+			}
+
+			if (not GetIsOutsideAllMineBaseExclusions(
+				RoadSampleLocation,
+				Request.EnemyBaseLocations,
+				Request.BaseExclusionRadius))
+			{
+				continue;
+			}
+
+			const FVector RightVector(-DirectionToPlayer.Y, DirectionToPlayer.X, 0.f);
+			const float LateralDistance = FMath::Abs(FVector::DotProduct(DeltaFromBase, RightVector));
+			FRoadMineLocationCandidate& Candidate = Candidates.AddDefaulted_GetRef();
+			Candidate.Location = RoadSampleLocation;
+			Candidate.Score = FMath::Abs(DistanceFromBase - PreferredDistance)
+				+ LateralDistance * StrategicAIHelperConstants::RoadMineLateralScoreScale;
+		}
+		return Candidates;
+	}
+
+	void AppendRoadMineLocationsForBase(
+		const FFindMineLocations& Request,
+		const FVector& BaseLocation,
+		TArray<FVector>& OutLocations)
+	{
+		TArray<FRoadMineLocationCandidate> Candidates = BuildRoadMineCandidatesForBase(Request, BaseLocation);
+		Candidates.Sort([](const FRoadMineLocationCandidate& Left, const FRoadMineLocationCandidate& Right)
+		{
+			return Left.Score < Right.Score;
+		});
+		int32 AddedLocationCount = 0;
+		for (const FRoadMineLocationCandidate& Candidate : Candidates)
+		{
+			if (TryAddUniqueMineLocation(OutLocations, Candidate.Location))
+			{
+				++AddedLocationCount;
+			}
+			if (AddedLocationCount >= StrategicAIHelperConstants::MaxRoadMineLocationsPerBase)
+			{
+				return;
+			}
+		}
+	}
+
+	TArray<FVector> BuildRoadMineLocations(const FFindMineLocations& Request)
+	{
+		TArray<FVector> MineLocations;
+		MineLocations.Reserve(
+			Request.EnemyBaseLocations.Num() * StrategicAIHelperConstants::MaxRoadMineLocationsPerBase);
+		for (const FVector& BaseLocation : Request.EnemyBaseLocations)
+		{
+			AppendRoadMineLocationsForBase(Request, BaseLocation, MineLocations);
+		}
+		return MineLocations;
 	}
 
 }
@@ -2032,5 +2236,19 @@ FResultConstructionLocations FStrategicAIHelpers::BuildConstructionLocationsResu
 		Request,
 		CachedEnemyBaseCoreBuildings,
 		CachedEnemyBaseSatelliteBuildings);
+	return Result;
+}
+
+FResultMineLocations FStrategicAIHelpers::BuildMineLocationsResult(const FFindMineLocations& Request)
+{
+	FResultMineLocations Result;
+	Result.RequestID = Request.RequestID;
+	if (Request.EnemyBaseLocations.IsEmpty() || Request.PlayerBulkLocations.IsEmpty())
+	{
+		return Result;
+	}
+
+	Result.RoadMineLocations = StrategicAIHelperUtilities::BuildRoadMineLocations(Request);
+	Result.DefenseArcMineLocations = StrategicAIHelperUtilities::BuildDefenseArcMineLocations(Request);
 	return Result;
 }
