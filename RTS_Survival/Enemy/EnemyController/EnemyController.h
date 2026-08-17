@@ -380,6 +380,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyStrategicAIComponent* GetEnemyStrategicAIComponent() const;
 
+	// Starts strategic thinking when this controller is configured to wait for a mission trigger.
+	void StartStrategicAIThinkingFromMission();
+
 	UGlobalAbilitiesManager* GetEnemyGlobalAbilitiesManager() const;
 	const FEnemyGlobalAbilityAISettings& GetEnemyGlobalAbilityAISettings() const;
 

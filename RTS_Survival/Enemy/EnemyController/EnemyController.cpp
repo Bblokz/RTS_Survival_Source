@@ -687,6 +687,22 @@ UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() con
 	return M_EnemyStrategicAIComponent;
 }
 
+void AEnemyController::StartStrategicAIThinkingFromMission()
+{
+	if (M_EnemyAIMissionSettings.StrategicAIThinkingStartCondition !=
+		EEnemyStrategicAIThinkingStartCondition::StartAfterMissionTrigger)
+	{
+		return;
+	}
+
+	if (not GetIsValidEnemyStrategicAIComponent())
+	{
+		return;
+	}
+
+	M_EnemyStrategicAIComponent->StartStrategicAIThinkingTimer();
+}
+
 UEnemyFieldConstructionComponent* AEnemyController::GetEnemyFieldConstructionComponent() const
 {
 	return M_FieldConstructionComponent;

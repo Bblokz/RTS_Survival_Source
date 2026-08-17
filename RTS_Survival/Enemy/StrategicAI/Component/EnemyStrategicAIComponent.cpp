@@ -2,12 +2,13 @@
 
 #include "EnemyStrategicAIComponent.h"
 
-
+#include "Components/SplineComponent.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
+#include "RTS_Survival/Environment/Splines/RoadSplineActor.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardQueries/BlackboardQueryHelpers.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticDecisionTree.h"
 #include "RTS_Survival/Enemy/StrategicAI/StochasticDecisionTree/StochasticHelpers/StochasticHelpers.h"
@@ -19,9 +20,15 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+
+namespace EnemyStrategicAIMineLocationConstants
+{
+	constexpr float RoadSplineSampleSpacing = 750.f;
+}
 
 UEnemyStrategicAIComponent::UEnemyStrategicAIComponent()
 {
@@ -35,10 +42,30 @@ void UEnemyStrategicAIComponent::InitStrategicAIComponent(AEnemyController* Enem
 	M_StochasticDecisionTree = StochasticDecisionTree;
 	M_EnemyController = EnemyController;
 	CacheGenerationSeedFromGameInstance();
-	const float Now = GetWorld()->GetTimeSeconds();
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const float Now = World->GetTimeSeconds();
 	PreThinKStep_InitThinkingTimers(Now);
 	CacheGenerationSeedFromGameInstance();
-	StartStrategicAIThinkingTimer();
+
+	const FEnemyAIMissionSettings& MissionSettings = M_Blackboard.StrategicAIMissionSettings;
+	switch (MissionSettings.StrategicAIThinkingStartCondition)
+	{
+	case EEnemyStrategicAIThinkingStartCondition::StartImmediatelyAtGameStart:
+		StartStrategicAIThinkingTimer();
+		return;
+	case EEnemyStrategicAIThinkingStartCondition::StartAfterSpecifiedSeconds:
+		StartStrategicAIThinkingTimerAfterDelay(MissionSettings.StrategicAIThinkingStartDelaySeconds);
+		return;
+	case EEnemyStrategicAIThinkingStartCondition::StartAfterMissionTrigger:
+		return;
+	default:
+		RTSFunctionLibrary::ReportError("Enemy strategic AI has an unsupported thinking start condition.");
+	}
 }
 
 
@@ -83,6 +110,11 @@ void UEnemyStrategicAIComponent::QueueFindConstructionLocationsRequest(
 	M_PendingRequests.FindConstructionLocationsRequests.Add(Request);
 }
 
+void UEnemyStrategicAIComponent::QueueFindMineLocationsRequest(const FFindMineLocations& Request)
+{
+	M_PendingRequests.FindMineLocationsRequests.Add(Request);
+}
+
 void UEnemyStrategicAIComponent::QueueFindPlayerHeavyTankFlankLocationsRequest(
 	const FFindClosestFlankableEnemyHeavy& Request)
 {
@@ -114,6 +146,31 @@ FStrategicAIBlackboard& UEnemyStrategicAIComponent::GetEditableStrategicAIBlackb
 FEnemyStrategicTrainingState& UEnemyStrategicAIComponent::GetEditableEnemyTrainingState()
 {
 	return M_TrainingState;
+}
+
+void UEnemyStrategicAIComponent::RegisterDroppedUnitWithBlackboardWhenReady(AActor* DroppedUnit)
+{
+	if (not IsValid(DroppedUnit))
+	{
+		return;
+	}
+
+	const URTSComponent* RTSComponent = DroppedUnit->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent) || RTSComponent->GetOwningPlayer() == 1)
+	{
+		return;
+	}
+
+	ASquadController* SquadController = Cast<ASquadController>(DroppedUnit);
+	if (not IsValid(SquadController) || SquadController->GetIsSquadFullyLoadedAndInitialized())
+	{
+		RegisterDroppedUnitWithBlackboard(DroppedUnit);
+		return;
+	}
+
+	SquadController->OnSquadFullyLoaded.AddUObject(
+		this,
+		&UEnemyStrategicAIComponent::OnDroppedSquadFullyLoaded);
 }
 
 
@@ -207,6 +264,12 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 	M_ConstructionLocationsThinkTimer.ThinkStepDelegate.BindUObject(
 		this, &UEnemyStrategicAIComponent::ConstructionLocations_ThinkStep);
 	M_AIThinkTimers.Add(&M_ConstructionLocationsThinkTimer);
+
+	M_MineLocationsThinkTimer.LastTimeThought = Now;
+	M_MineLocationsThinkTimer.ThinkingInterval = EnemyAISettings::ThinkingTimers::UpdateMineLocations_Interval;
+	M_MineLocationsThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::MineLocations_ThinkStep);
+	M_AIThinkTimers.Add(&M_MineLocationsThinkTimer);
 
 	M_PlayerHeavyTankFlankLocationsThinkTimer.LastTimeThought = Now;
 	M_PlayerHeavyTankFlankLocationsThinkTimer.ThinkingInterval =
@@ -325,6 +388,87 @@ void UEnemyStrategicAIComponent::FillConstructionLocationsTimerRequest(
 		}
 
 		RequestToFill.PlayerBulkLocations.Add(PlayerUnitBulk.BulkLocation);
+	}
+}
+
+void UEnemyStrategicAIComponent::MineLocations_ThinkStep()
+{
+	FFindMineLocations RequestToQueue = FindMineLocations_TimerRequest;
+	FillMineLocationsTimerRequest(RequestToQueue);
+	const bool bHasCandidateSources = not RequestToQueue.DefensePositions.IsEmpty()
+		|| not RequestToQueue.RoadSplineSampleLocations.IsEmpty();
+	if (RequestToQueue.EnemyBaseLocations.IsEmpty()
+		|| RequestToQueue.PlayerBulkLocations.IsEmpty()
+		|| not bHasCandidateSources)
+	{
+		return;
+	}
+
+	QueueFindMineLocationsRequest(RequestToQueue);
+}
+
+void UEnemyStrategicAIComponent::FillMineLocationsTimerRequest(FFindMineLocations& RequestToFill) const
+{
+	RequestToFill.DefensePositions = M_Blackboard.CurrentBaseDefensePositions;
+	FillMineBaseLocationPayload(RequestToFill);
+	FillMinePlayerBulkLocationPayload(RequestToFill);
+	FillMineRoadSplineSamplePayload(RequestToFill);
+}
+
+void UEnemyStrategicAIComponent::FillMineBaseLocationPayload(FFindMineLocations& RequestToFill) const
+{
+	RequestToFill.EnemyBaseLocations.Reset();
+	RequestToFill.EnemyBaseLocations.Reserve(M_Blackboard.EnemyBasePoints.Num());
+	for (const FEnemyBasePointCoreBuildings& BasePoint : M_Blackboard.EnemyBasePoints)
+	{
+		if (not BasePoint.BaseLocation.IsNearlyZero())
+		{
+			RequestToFill.EnemyBaseLocations.Add(BasePoint.BaseLocation);
+		}
+	}
+}
+
+void UEnemyStrategicAIComponent::FillMinePlayerBulkLocationPayload(FFindMineLocations& RequestToFill) const
+{
+	RequestToFill.PlayerBulkLocations.Reset();
+	RequestToFill.PlayerBulkLocations.Reserve(
+		M_Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks.Num());
+	for (const FPlayerUnitBulkLocation& PlayerUnitBulk : M_Blackboard.CurrentPlayerUnitBulkLocations.PlayerUnitBulks)
+	{
+		if (not PlayerUnitBulk.BulkLocation.IsNearlyZero())
+		{
+			RequestToFill.PlayerBulkLocations.Add(PlayerUnitBulk.BulkLocation);
+		}
+	}
+}
+
+void UEnemyStrategicAIComponent::FillMineRoadSplineSamplePayload(FFindMineLocations& RequestToFill) const
+{
+	RequestToFill.RoadSplineSampleLocations.Reset();
+	for (const TWeakObjectPtr<ARoadSplineActor>& RoadSplineActor : M_Blackboard.RoadSplineActors)
+	{
+		if (not RoadSplineActor.IsValid() || not IsValid(RoadSplineActor->RoadSpline))
+		{
+			continue;
+		}
+
+		const USplineComponent* RoadSpline = RoadSplineActor->RoadSpline;
+		const float SplineLength = RoadSpline->GetSplineLength();
+		for (float Distance = 0.f;
+			Distance < SplineLength;
+			Distance += EnemyStrategicAIMineLocationConstants::RoadSplineSampleSpacing)
+		{
+			RequestToFill.RoadSplineSampleLocations.Add(RoadSpline->GetLocationAtDistanceAlongSpline(
+				Distance,
+				ESplineCoordinateSpace::World));
+		}
+
+		if (SplineLength > 0.f)
+		{
+			RequestToFill.RoadSplineSampleLocations.Add(RoadSpline->GetLocationAtDistanceAlongSpline(
+				SplineLength,
+				ESplineCoordinateSpace::World));
+		}
 	}
 }
 
@@ -874,6 +1018,39 @@ void UEnemyStrategicAIComponent::OnBlackboardSquadFullyLoaded(ASquadController* 
 	IssueOrdersToSpawnedBlackboardUnit(SquadController);
 }
 
+void UEnemyStrategicAIComponent::OnDroppedSquadFullyLoaded(ASquadController* SquadController)
+{
+	if (not IsValid(SquadController))
+	{
+		return;
+	}
+
+	SquadController->OnSquadFullyLoaded.RemoveAll(this);
+	RegisterDroppedUnitWithBlackboard(SquadController);
+}
+
+void UEnemyStrategicAIComponent::RegisterDroppedUnitWithBlackboard(AActor* DroppedUnit)
+{
+	if (not IsValid(DroppedUnit) || M_Blackboard.IdleDirectControlUnits.Contains(DroppedUnit))
+	{
+		return;
+	}
+
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return;
+	}
+
+	UEnemyDirectControlComponent* EnemyDirectControlComponent =
+		M_EnemyController->GetEnemyDirectControlComponent();
+	if (not GetIsValidEnemyDirectControlComponent(EnemyDirectControlComponent))
+	{
+		return;
+	}
+
+	EnemyDirectControlComponent->RegisterDirectControlUnit(DroppedUnit);
+}
+
 void UEnemyStrategicAIComponent::IssueOrdersToSpawnedBlackboardUnit(AActor* SpawnedActor)
 {
 	ICommands* Commands = Cast<ICommands>(SpawnedActor);
@@ -1161,8 +1338,37 @@ int32 UEnemyStrategicAIComponent::GetSeededIndex(const int32 OptionCount, const 
 
 void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer()
 {
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	FTimerManager& TimerManager = World->GetTimerManager();
+	if (TimerManager.IsTimerActive(M_StrategicAIThinkingTimerHandle))
+	{
+		return;
+	}
+
 	if (not EnsureEnemyControllerIsValid())
 	{
+		return;
+	}
+
+	TimerManager.ClearTimer(M_StrategicAIStartDelayTimerHandle);
+	TimerManager.SetTimer(
+		M_StrategicAIThinkingTimerHandle,
+		this,
+		&UEnemyStrategicAIComponent::StrategicAiThinkingLoop,
+		EnemyAISettings::EnemyStrategicAIThinkingSpeed,
+		true);
+}
+
+void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimerAfterDelay(const float DelaySeconds)
+{
+	if (DelaySeconds <= 0.f)
+	{
+		StartStrategicAIThinkingTimer();
 		return;
 	}
 
@@ -1173,11 +1379,11 @@ void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer()
 	}
 
 	World->GetTimerManager().SetTimer(
-		M_StrategicAIThinkingTimerHandle,
+		M_StrategicAIStartDelayTimerHandle,
 		this,
-		&UEnemyStrategicAIComponent::StrategicAiThinkingLoop,
-		EnemyAISettings::EnemyStrategicAIThinkingSpeed,
-		true);
+		&UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer,
+		DelaySeconds,
+		false);
 }
 
 
@@ -1211,6 +1417,7 @@ void UEnemyStrategicAIComponent::StopStrategicAIThinkingTimer()
 {
 	if (UWorld* World = GetWorld())
 	{
+		World->GetTimerManager().ClearTimer(M_StrategicAIStartDelayTimerHandle);
 		World->GetTimerManager().ClearTimer(M_StrategicAIThinkingTimerHandle);
 	}
 }
@@ -1225,7 +1432,8 @@ void UEnemyStrategicAIComponent::ProcessStrategicAIRequests()
 		&& M_PendingRequests.FindEnemyBaseClustersRequests.IsEmpty()
 		&& M_PendingRequests.FindLocationsUnderPlayerAttackRequests.IsEmpty()
 		&& M_PendingRequests.FindPlayerUnitBulkLocationsRequests.IsEmpty()
-		&& M_PendingRequests.FindConstructionLocationsRequests.IsEmpty())
+		&& M_PendingRequests.FindConstructionLocationsRequests.IsEmpty()
+		&& M_PendingRequests.FindMineLocationsRequests.IsEmpty())
 	{
 		return;
 	}
@@ -1263,6 +1471,7 @@ void UEnemyStrategicAIComponent::OnStrategicAIResultsReceived(const FStrategicAI
 	ProcessLocationsUnderPlayerAttackResults(ResultBatch.LocationsUnderPlayerAttackResults);
 	ProcessPlayerUnitBulkLocationsResults(ResultBatch.PlayerUnitBulkLocationsResults);
 	ProcessConstructionLocationsResults(ResultBatch.ConstructionLocationsResults);
+	ProcessMineLocationsResults(ResultBatch.MineLocationsResults);
 }
 
 void UEnemyStrategicAIComponent::ProcessClosestFlankableEnemyHeavyResults(
@@ -1408,6 +1617,22 @@ void UEnemyStrategicAIComponent::ProcessConstructionLocationsResults(
 	}
 }
 
+void UEnemyStrategicAIComponent::ProcessMineLocationsResults(
+	const TArray<FResultMineLocations>& MineLocationsResults)
+{
+	if (MineLocationsResults.IsEmpty())
+	{
+		return;
+	}
+
+	M_Blackboard.CurrentMineLocations = MineLocationsResults.Last();
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols
+		&& EnemyAISettings::Debugging::MineLocationsDebugging)
+	{
+		DebugMineLocations();
+	}
+}
+
 bool UEnemyStrategicAIComponent::GetIsValidEnemyDirectControlComponent(
 	UEnemyDirectControlComponent* EnemyDirectControlComponent) const
 {
@@ -1507,6 +1732,37 @@ void UEnemyStrategicAIComponent::DebugConstructionLocations() const
 			ConstructionLocationColor,
 			ConstructionLocationDebugDuration,
 			TEXT("Construction Location"));
+	}
+}
+
+void UEnemyStrategicAIComponent::DebugMineLocations() const
+{
+	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols
+		&& EnemyAISettings::Debugging::MineLocationsDebugging)
+	{
+		using namespace EnemyAISettings::Debugging;
+		const auto DrawMineLocation = [this](const FVector& MineLocation)
+		{
+			DrawDebugSphere(
+				GetWorld(),
+				MineLocation,
+				MineLocationDebuggingRadius,
+				12,
+				MineLocationColor,
+				false,
+				MineLocationDebugDuration,
+				0,
+				2.f);
+		};
+
+		for (const FVector& RoadMineLocation : M_Blackboard.CurrentMineLocations.RoadMineLocations)
+		{
+			DrawMineLocation(RoadMineLocation);
+		}
+		for (const FVector& DefenseArcMineLocation : M_Blackboard.CurrentMineLocations.DefenseArcMineLocations)
+		{
+			DrawMineLocation(DefenseArcMineLocation);
+		}
 	}
 }
 

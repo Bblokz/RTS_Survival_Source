@@ -13,11 +13,28 @@ enum class EEnemyStrategicAIBehaviour :uint8
 	PreferAggressive,
 };
 
+UENUM(BlueprintType)
+enum class EEnemyStrategicAIThinkingStartCondition : uint8
+{
+	StartImmediatelyAtGameStart,
+	StartAfterSpecifiedSeconds,
+	StartAfterMissionTrigger,
+};
+
 
 USTRUCT(Blueprintable)
 struct FEnemyAIMissionSettings
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Strategic AI|Startup")
+	EEnemyStrategicAIThinkingStartCondition StrategicAIThinkingStartCondition =
+		EEnemyStrategicAIThinkingStartCondition::StartImmediatelyAtGameStart;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Strategic AI|Startup",
+		meta=(EditCondition="StrategicAIThinkingStartCondition == EEnemyStrategicAIThinkingStartCondition::StartAfterSpecifiedSeconds",
+			EditConditionHides, ClampMin="0.0", UIMin="0.0"))
+	float StrategicAIThinkingStartDelaySeconds = 0.f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EEnemyStrategicAIBehaviour StrategicAIBehaviour = EEnemyStrategicAIBehaviour::NotInitialized;
