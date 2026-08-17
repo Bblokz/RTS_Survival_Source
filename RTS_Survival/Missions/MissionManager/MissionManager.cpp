@@ -2299,6 +2299,17 @@ void AMissionManager::PropagateGameDifficultyToEnemyStrategicAI(const FRTSGameDi
 	StrategicAIBlackboard.GameDifficulty = GameDifficulty;
 }
 
+void AMissionManager::StartEnemyStrategicAIThinkingFromMission() const
+{
+	AEnemyController* EnemyAIController = FRTS_Statics::GetEnemyController(this);
+	if (not EnsureEnemyControllerIsValid(EnemyAIController))
+	{
+		return;
+	}
+
+	EnemyAIController->StartStrategicAIThinkingFromMission();
+}
+
 
 void AMissionManager::TriggerDefeat(const ERTSDefeatType DefeatType)
 {

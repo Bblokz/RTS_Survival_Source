@@ -9,6 +9,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
@@ -2845,13 +2847,22 @@ void AAircraftMaster::AircraftDrop_SpawnSquad(const ESquadSubtype SquadSubtype, 
 	}
 
 	const FTrainingOption SquadTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+	UEnemyStrategicAIComponent* EnemyStrategicAIComponent = AircraftDrop_GetEnemyStrategicAIComponent();
+	UObject* CallbackOwner = IsValid(EnemyStrategicAIComponent)
+		? static_cast<UObject*>(EnemyStrategicAIComponent)
+		: static_cast<UObject*>(const_cast<AAircraftMaster*>(this));
+	const TWeakObjectPtr<UEnemyStrategicAIComponent> WeakEnemyStrategicAIComponent(EnemyStrategicAIComponent);
 	AsyncSpawner->AsyncSpawnOptionAtLocation(
 		SquadTrainingOption,
 		AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex),
-		const_cast<AAircraftMaster*>(this),
+		CallbackOwner,
 		SquadIndex,
-		[](const FTrainingOption&, AActor*, const int32)
+		[WeakEnemyStrategicAIComponent](const FTrainingOption&, AActor* SpawnedActor, const int32)
 		{
+			if (WeakEnemyStrategicAIComponent.IsValid())
+			{
+				WeakEnemyStrategicAIComponent->RegisterDroppedUnitWithBlackboardWhenReady(SpawnedActor);
+			}
 		},
 		FRotator::ZeroRotator);
 }
@@ -2911,6 +2922,35 @@ void AAircraftMaster::AircraftDrop_DetachTank()
 	{
 		TankSelectionComponent->SetCanBeSelected(true);
 	}
+
+	AircraftDrop_RegisterEnemyPayloadUnit(Tank);
+}
+
+void AAircraftMaster::AircraftDrop_RegisterEnemyPayloadUnit(AActor* DroppedUnit) const
+{
+	UEnemyStrategicAIComponent* EnemyStrategicAIComponent = AircraftDrop_GetEnemyStrategicAIComponent();
+	if (not IsValid(EnemyStrategicAIComponent))
+	{
+		return;
+	}
+
+	EnemyStrategicAIComponent->RegisterDroppedUnitWithBlackboardWhenReady(DroppedUnit);
+}
+
+UEnemyStrategicAIComponent* AAircraftMaster::AircraftDrop_GetEnemyStrategicAIComponent() const
+{
+	if (M_AircraftDropRequest.OwningPlayer == 1)
+	{
+		return nullptr;
+	}
+
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	if (not IsValid(EnemyController))
+	{
+		return nullptr;
+	}
+
+	return EnemyController->GetEnemyStrategicAIComponent();
 }
 
 void AAircraftMaster::AircraftDrop_PlayDropOffSound() const

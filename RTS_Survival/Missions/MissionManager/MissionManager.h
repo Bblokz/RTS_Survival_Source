@@ -210,6 +210,7 @@ public:
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
 	void SetMissionWidgetManagerVisibility(const bool bVisible) const;
+	void StartEnemyStrategicAIThinkingFromMission() const;
 	
 	UFUNCTION(BlueprintCallable ,NotBlueprintable, Category="Global Abilities")
 	void AddOnAllUnitsLostOfTypeGlobalAbility(FMissionLostAllUnitsGlobalAbilityCheck GlobalAbilityCheck);

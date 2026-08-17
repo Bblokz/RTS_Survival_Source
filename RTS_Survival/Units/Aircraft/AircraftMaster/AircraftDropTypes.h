@@ -42,6 +42,9 @@ struct FAircraftDropRequest
 	EAircraftDropPayloadType PayloadType = EAircraftDropPayloadType::None;
 
 	UPROPERTY(BlueprintReadWrite)
+	int32 OwningPlayer = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadWrite)
 	FVector ExecuteLocation = FVector::ZeroVector;
 
 	UPROPERTY(BlueprintReadWrite)

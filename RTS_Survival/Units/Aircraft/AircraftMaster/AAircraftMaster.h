@@ -18,6 +18,7 @@ enum class ETargetPreference : uint8;
 struct FRTSVerticalAnimTextSettings;
 struct FAircraftReloadManager;
 class UAircraftAnimInstance;
+class UEnemyStrategicAIComponent;
 class UAircraftTargetAcquisition;
 class UAircraftWeapon;
 class UAircraftMovement;
@@ -639,6 +640,8 @@ private:
 	void AircraftDrop_SpawnSquad(ESquadSubtype SquadSubtype, int32 SquadIndex) const;
 	void AircraftDrop_AttachTank();
 	void AircraftDrop_DetachTank();
+	void AircraftDrop_RegisterEnemyPayloadUnit(AActor* DroppedUnit) const;
+	UEnemyStrategicAIComponent* AircraftDrop_GetEnemyStrategicAIComponent() const;
 	void AircraftDrop_PlayDropOffSound() const;
 	FVector AircraftDrop_GetProjectedSquadSpawnLocation(int32 SquadIndex) const;
 
