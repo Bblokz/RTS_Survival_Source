@@ -1023,6 +1023,77 @@ struct FResultConstructionLocations
 };
 
 /**
+ * @brief Requests potential mine positions on tactical roads and on a screen beyond hedgehog arcs.
+ * Runtime payload arrays are filled from the strategic blackboard before async processing.
+ */
+USTRUCT(BlueprintType)
+struct FFindMineLocations
+{
+	GENERATED_BODY()
+
+	FFindMineLocations();
+
+	/** Identifier copied into the result so async responses remain paired with their request. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 RequestID;
+
+	/** Base center radius in which mine candidates are always rejected. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
+	float BaseExclusionRadius;
+
+	/** Outer arc distance measured from a defense point toward the selected player bulk. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
+	float MaxOffsetTowardsPlayer;
+
+	/** Multiplies MaxOffsetTowardsPlayer so the mine screen stays farther out than hedgehogs. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1.5"))
+	float MineArcOffsetScale;
+
+	/** Number of mine candidates generated on each outer defense arc. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1", ClampMax = "64"))
+	int32 MineArcLocationCount;
+
+	/** Enemy base centers copied from the blackboard for async proximity and exclusion checks. */
+	UPROPERTY()
+	TArray<FVector> EnemyBaseLocations;
+
+	/** Existing base defense anchors used to place the farther non-road mine arcs. */
+	UPROPERTY()
+	TArray<FDefensePositions> DefensePositions;
+
+	/** Player force centers used to keep road and arc candidates between bases and player forces. */
+	UPROPERTY()
+	TArray<FVector> PlayerBulkLocations;
+
+	/** Plain  worldspace spline samples captured on the game thread; no UObject crosses to the worker. */
+	UPROPERTY()
+	TArray<FVector> RoadSplineSampleLocations;
+};
+
+/**
+ * @brief Returns potential mine locations split by road-bound and outer-defense-arc origin.
+ */
+USTRUCT(BlueprintType)
+struct FResultMineLocations
+{
+	GENERATED_BODY()
+
+	FResultMineLocations();
+
+	/** Identifier copied from the request. */
+	UPROPERTY(BlueprintReadOnly)
+	int32 RequestID;
+
+	/** Tactical road samples near bases, outside every base exclusion radius. */
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FVector> RoadMineLocations;
+
+	/** Mine-screen points farther toward player forces than the hedgehog outer arc. */
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FVector> DefenseArcMineLocations;
+};
+
+/**
  * @brief Describes one location threat analysis query for player attack pressure.
  * Used by async strategic AI to determine which defended points are under meaningful player attack risk.
  */
@@ -1324,6 +1395,10 @@ struct FStrategicAIRequestBatch
 	/** Batches construction-location queries so future build orders can consume cleaned placement points. */
 	UPROPERTY()
 	TArray<FFindConstructionLocations> FindConstructionLocationsRequests;
+
+	/** Batches tactical mine-location queries using game-thread snapshots only. */
+	UPROPERTY()
+	TArray<FFindMineLocations> FindMineLocationsRequests;
 };
 
 /**
@@ -1391,4 +1466,8 @@ struct FStrategicAIResultBatch
 	/** Returns cleaned construction locations in request order for deterministic consumption. */
 	UPROPERTY()
 	TArray<FResultConstructionLocations> ConstructionLocationsResults;
+
+	/** Returns tactical road and outer-defense-arc mine locations in request order. */
+	UPROPERTY()
+	TArray<FResultMineLocations> MineLocationsResults;
 };

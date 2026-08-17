@@ -39,6 +39,9 @@ struct FStrategicAIBlackboard
 
 	UPROPERTY()
 	FResultConstructionLocations CurrentConstructionLocations;
+
+	UPROPERTY()
+	FResultMineLocations CurrentMineLocations;
 	
 	UPROPERTY()
 	TArray<TWeakObjectPtr<ARoadSplineActor>> RoadSplineActors;

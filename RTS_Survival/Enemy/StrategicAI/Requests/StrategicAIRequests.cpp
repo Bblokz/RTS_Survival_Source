@@ -135,6 +135,20 @@ FResultConstructionLocations::FResultConstructionLocations()
 {
 }
 
+FFindMineLocations::FFindMineLocations()
+	: RequestID(0)
+	, BaseExclusionRadius(6000.f)
+	, MaxOffsetTowardsPlayer(2200.f)
+	, MineArcOffsetScale(2.5f)
+	, MineArcLocationCount(8)
+{
+}
+
+FResultMineLocations::FResultMineLocations()
+	: RequestID(0)
+{
+}
+
 FFindLocationsUnderPlayerAttack::FFindLocationsUnderPlayerAttack()
 	: RequestID(0)
 	, MaxInfluenceRadius(9000.f)

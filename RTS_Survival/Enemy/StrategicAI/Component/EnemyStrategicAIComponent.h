@@ -176,6 +176,7 @@ public:
 
 	// Called at begin play of enemy controller.
 	void InitStrategicAIComponent(AEnemyController* EnemyController, UStochasticDecisionTree* StochasticDecisionTree);
+	void StartStrategicAIThinkingTimer();
 
 	void QueueFindClosestFlankableEnemyHeavyRequest(const FFindClosestFlankableEnemyHeavy& Request);
 	void QueueGetPlayerUnitCountsAndBaseRequest(const FGetPlayerUnitCountsAndBase& Request);
@@ -184,6 +185,7 @@ public:
 	void QueueFindLocationsUnderPlayerAttackRequest(const FFindLocationsUnderPlayerAttack& Request);
 	void QueueFindPlayerUnitBulkLocationsRequest(const FFindPlayerUnitBulkLocations& Request);
 	void QueueFindConstructionLocationsRequest(const FFindConstructionLocations& Request);
+	void QueueFindMineLocationsRequest(const FFindMineLocations& Request);
 	void QueueFindPlayerHeavyTankFlankLocationsRequest(const FFindClosestFlankableEnemyHeavy& Request);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -193,6 +195,7 @@ public:
 	const FStrategicAIBlackboard& GetStrategicAIBlackboard() const;
 	FStrategicAIBlackboard& GetEditableStrategicAIBlackboard();
 	FEnemyStrategicTrainingState& GetEditableEnemyTrainingState();
+	void RegisterDroppedUnitWithBlackboardWhenReady(AActor* DroppedUnit);
 
 	// This request is periodically used to find the bases owned by the AI.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -213,6 +216,10 @@ public:
 	// This request is periodically used to build construction locations from base defense points.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindConstructionLocations FindConstructionLocations_TimerRequest;
+
+	// This request periodically finds road-bound and farther outer-arc mine locations.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FFindMineLocations FindMineLocations_TimerRequest;
 	
 	// This request is periodically used to find combat-active player heavy tanks to flank.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -253,8 +260,10 @@ private:
 	bool GetIsAllowedUnitTraining()const;
 
 	FTimerHandle M_StrategicAIThinkingTimerHandle;
+	FTimerHandle M_StrategicAIStartDelayTimerHandle;
 
 	void PreThinKStep_InitThinkingTimers(const float Now);
+	void StartStrategicAIThinkingTimerAfterDelay(const float DelaySeconds);
 
 	FAIThinkingTimerData M_AIBaseLocationThinkTimer;
 	void AIBaseLocation_ThinkStep();
@@ -272,6 +281,13 @@ private:
 	FAIThinkingTimerData M_ConstructionLocationsThinkTimer;
 	void ConstructionLocations_ThinkStep();
 	void FillConstructionLocationsTimerRequest(FFindConstructionLocations& RequestToFill) const;
+
+	FAIThinkingTimerData M_MineLocationsThinkTimer;
+	void MineLocations_ThinkStep();
+	void FillMineLocationsTimerRequest(FFindMineLocations& RequestToFill) const;
+	void FillMineBaseLocationPayload(FFindMineLocations& RequestToFill) const;
+	void FillMinePlayerBulkLocationPayload(FFindMineLocations& RequestToFill) const;
+	void FillMineRoadSplineSamplePayload(FFindMineLocations& RequestToFill) const;
 
 	FAIThinkingTimerData M_PlayerHeavyTankFlankLocationsThinkTimer;
 	void PlayerHeavyTankFlankLocations_ThinkStep();
@@ -394,6 +410,8 @@ private:
 		const FVector& TrainingLocation);
 	void OnBlackboardSquadFullyLoaded(ASquadController* SquadController);
 	void IssueOrdersToSpawnedBlackboardUnit(AActor* SpawnedActor);
+	void OnDroppedSquadFullyLoaded(ASquadController* SquadController);
+	void RegisterDroppedUnitWithBlackboard(AActor* DroppedUnit);
 	bool TryGetRandomBlackboardDefensePosition(FDefensePositions& OutDefensePosition) const;
 	void DebugTrainedUnit(const FTrainingOption& TrainingOption, const FVector& TrainingLocation) const;
 
@@ -431,7 +449,6 @@ private:
 	bool EnsureStochasticDecisionTreeIsValid() const;
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
-	void StartStrategicAIThinkingTimer();
 	void StopStrategicAIThinkingTimer();
 
 	FAIThinkingTimerData M_EnemyGlobalAbilityThinkTimer;
@@ -466,6 +483,7 @@ private:
 		const TArray<FResultPlayerUnitBulkLocations>& PlayerUnitBulkLocationsResults);
 	void ProcessConstructionLocationsResults(
 		const TArray<FResultConstructionLocations>& ConstructionLocationsResults);
+	void ProcessMineLocationsResults(const TArray<FResultMineLocations>& MineLocationsResults);
 	bool GetIsValidEnemyDirectControlComponent(UEnemyDirectControlComponent* EnemyDirectControlComponent) const;
 	void FillRetreatRequestExcludedUnits(FFindAlliedTanksToRetreat& RequestToFill) const;
 	int32 M_CachedGenerationSeed = 0;
@@ -478,6 +496,7 @@ private:
 	void DebugBlackboardLocationsUnderAttack() const;
 	void DebugBlackboardBulkPlayerUnits()const;
 	void DebugConstructionLocations() const;
+	void DebugMineLocations() const;
 	void DebugPoint(const FVector& Point, const float Radius,
 	                const FColor& Color, const float Duration, const FString& Text)const;
 	void DebugBlackboardUnitCounts() const;

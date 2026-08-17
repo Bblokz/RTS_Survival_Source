@@ -3,7 +3,7 @@
 
 FStrategicAIBlackboard::FStrategicAIBlackboard()
 	: EnemyBasePoints(), CurrentBaseDefensePositions(), CurrentPlayerUnitCounts(), CurrentLocationsUnderPlayerAttack(),
-	  CurrentPlayerUnitBulkLocations(), CurrentConstructionLocations(), RoadSplineActors(),
+	  CurrentPlayerUnitBulkLocations(), CurrentConstructionLocations(), CurrentMineLocations(), RoadSplineActors(),
 	  StrategicAIMissionSettings(), GameDifficulty()
 {
 }
