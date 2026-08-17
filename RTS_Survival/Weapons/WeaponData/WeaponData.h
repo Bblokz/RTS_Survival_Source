@@ -1064,7 +1064,6 @@ protected:
 private:
 	/**
 	 * @brief Spawns a trace from the provided location using the collision channel of this weapon state.
-	 * @param PitchAndYaw
 	 * @pre WeaponOwner is valid.
 	 */
 	void FireTrace(const FVector& Direction);

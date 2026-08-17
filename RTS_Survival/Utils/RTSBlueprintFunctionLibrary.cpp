@@ -1654,21 +1654,25 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerAdvancedHeavyTank_TigerII
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PantherII));
 }
 
-TSoftObjectPtr<UWorld> URTSBlueprintFunctionLibrary::GetRTSMapToLoad(const UObject* WorldContextObject)
+FRTSPreGameLaunchRequest URTSBlueprintFunctionLibrary::GetRTSPreGameLaunchRequest(
+	const UObject* WorldContextObject)
 {
 	if (not IsValid(WorldContextObject))
 	{
-		return nullptr;
+		return FRTSPreGameLaunchRequest();
 	}
 	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(WorldContextObject);
 	if (not IsValid(GameInstance))
 	{
-		return nullptr;
+		return FRTSPreGameLaunchRequest();
 	}
-	return GameInstance->GetMapToLoad();
+	return GameInstance->GetPreGameLaunchRequest();
 }
 
-void URTSBlueprintFunctionLibrary::SetRTSMapToLoad(const UObject* WorldContextObject, TSoftObjectPtr<UWorld> MapToLoad)
+void URTSBlueprintFunctionLibrary::SetRTSPreGameLaunchRequest(
+	const UObject* WorldContextObject,
+	const ERTSPreGameSetupFlow SetupFlow,
+	const TSoftObjectPtr<UWorld> DestinationMap)
 {
 	if (not IsValid(WorldContextObject))
 	{
@@ -1679,7 +1683,7 @@ void URTSBlueprintFunctionLibrary::SetRTSMapToLoad(const UObject* WorldContextOb
 	{
 		return;
 	}
-	GameInstance->SetMapToLoad(MapToLoad);
+	GameInstance->SetPreGameLaunchRequest(SetupFlow, DestinationMap);
 }
 
 

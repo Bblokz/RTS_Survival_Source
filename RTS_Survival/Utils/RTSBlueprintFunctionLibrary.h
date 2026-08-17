@@ -9,6 +9,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/CardSystem/ERTSCard/ERTSCard.h"
 #include "RTS_Survival/Game/GameState/GameDecalManager/GameDecalManager.h"
+#include "RTS_Survival/Game/RTSGameInstance/GameInstPreGameLaunchRequest/RTSPreGameLaunchRequest.h"
 #include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "RTS_Survival/Resources/ResourceSceneSetup/ResourceSceneSetup.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
@@ -737,8 +738,20 @@ public:
 
 
 	// Game instance helpers.
-	TSoftObjectPtr<UWorld> GetRTSMapToLoad(const UObject* WorldContextObject);
-	void SetRTSMapToLoad(const UObject* WorldContextObject, TSoftObjectPtr<UWorld> MapToLoad);
+	UFUNCTION(
+		BlueprintPure,
+		Category = "RTS|Pre-Game Setup",
+		meta = (WorldContext = "WorldContextObject"))
+	static FRTSPreGameLaunchRequest GetRTSPreGameLaunchRequest(const UObject* WorldContextObject);
+
+	UFUNCTION(
+		BlueprintCallable,
+		Category = "RTS|Pre-Game Setup",
+		meta = (WorldContext = "WorldContextObject"))
+	static void SetRTSPreGameLaunchRequest(
+		const UObject* WorldContextObject,
+		const ERTSPreGameSetupFlow SetupFlow,
+		const TSoftObjectPtr<UWorld> DestinationMap);
 	
 	// 
 

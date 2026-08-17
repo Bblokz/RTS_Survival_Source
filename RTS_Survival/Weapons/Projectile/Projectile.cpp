@@ -286,11 +286,16 @@ void AProjectile::SetupProjectileForNewLaunch(
 	USoundCue* BounceSound,
 	const FVector& ImpactScale,
 	const FVector& BounceScale,
-	const float ProjectileSpeed, const FVector& LaunchLocation,
-	const FRotator& LaunchRotation, USoundAttenuation* ImpactAttenuation, USoundConcurrency* ImpactConcurrency,
-	const FProjectileVfxSettings&
-	ProjectileVfxSettings, const EWeaponShellType ShellType, const TArray<AActor*>& ActorsToIgnore, const int32
-	WeaponCalibre, const bool bCanArmorOverPenetrate, const float PostPenArmorPenCarryOver,
+	const float ProjectileSpeed, 
+	const FVector& LaunchLocation,
+	const FRotator& LaunchRotation,
+	USoundAttenuation* ImpactAttenuation,
+	USoundConcurrency* ImpactConcurrency,
+	const FProjectileVfxSettings& ProjectileVfxSettings,
+	const EWeaponShellType ShellType, const TArray<AActor*>& ActorsToIgnore,
+	const int32	WeaponCalibre,
+	const bool bCanArmorOverPenetrate,
+	const float PostPenArmorPenCarryOver,
 	const float FloorArmorPenPercentageNeededAllowOverpen)
 {
 	M_ShellType = ShellType;
