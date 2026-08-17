@@ -83,19 +83,31 @@ bool URTSGameInstance::GetShouldApplyPIEStartupOverrides() const
 #endif
 }
 
-void URTSGameInstance::SetMapToLoad(TSoftObjectPtr<UWorld> MapToLoad)
+void URTSGameInstance::SetPreGameLaunchRequest(
+	const ERTSPreGameSetupFlow SetupFlow,
+	const TSoftObjectPtr<UWorld> DestinationMap)
 {
-	M_MapToLoad.SetMapToLoad(MapToLoad);
+	const FRTSPreGameLaunchRequest NewLaunchRequest(SetupFlow, DestinationMap);
+	if (not NewLaunchRequest.GetIsValid())
+	{
+		M_PreGameLaunchRequest.Reset();
+		RTSFunctionLibrary::ReportError(
+			"URTSGameInstance::SetPreGameLaunchRequest - Setup flow or destination map was not initialized."
+		);
+		return;
+	}
+
+	M_PreGameLaunchRequest = NewLaunchRequest;
 }
 
-void URTSGameInstance::ResetMapToLoadToNull()
+void URTSGameInstance::ResetPreGameLaunchRequest()
 {
-	M_MapToLoad.Reset();
+	M_PreGameLaunchRequest.Reset();
 }
 
-TSoftObjectPtr<UWorld> URTSGameInstance::GetMapToLoad() const
+FRTSPreGameLaunchRequest URTSGameInstance::GetPreGameLaunchRequest() const
 {
-	return M_MapToLoad.GetMapToLoad();
+	return M_PreGameLaunchRequest;
 }
 
 void URTSGameInstance::SetCampaignGenerationSettings(const FCampaignGenerationSettings& Settings)

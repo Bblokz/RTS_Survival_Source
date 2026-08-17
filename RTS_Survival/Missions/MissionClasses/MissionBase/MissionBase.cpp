@@ -144,6 +144,16 @@ void UMissionBase::TriggerMissionFromArray(const int32 TriggerableMissionIndex)
 	GetMissionManagerChecked()->ActivateNewMission(MissionToTrigger);
 }
 
+void UMissionBase::StartEnemyStrategicAIThinking()
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->StartEnemyStrategicAIThinkingFromMission();
+}
+
 void UMissionBase::OnEnemyUnitsDestroyedCallback(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType)
 {
 	BP_OnCallBackEnemyActorsDestroyed(ID, EnemyUnitQueryType);

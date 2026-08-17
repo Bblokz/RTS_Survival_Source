@@ -642,6 +642,9 @@ protected:
 		const TArray<TSubclassOf<AActor>>& ActorClasses,
 		const FVector& Location);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Enemy AI")
+	void StartEnemyStrategicAIThinking();
+
 	virtual auto OnMissionStart() -> void;
 
 	UFUNCTION(BlueprintImplementableEvent)

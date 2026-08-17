@@ -218,6 +218,7 @@ FAircraftDropRequest UGA_AircraftDrop::BuildBaseDropRequest(
 	FAircraftDropRequest DropRequest;
 	DropRequest.State = EAircraftDropRequestState::MovingToDropLocation;
 	DropRequest.PayloadType = PayloadType;
+	DropRequest.OwningPlayer = GetOwningPlayer();
 	DropRequest.ExecuteLocation = TargetLocation;
 	DropRequest.RetreatLocation = GetGlobalAbilityManager()->GetAircraftBombingRetreatLocation(this, TargetLocation);
 	DropRequest.RetreatLocation.Y += AircraftDropSpacing * static_cast<float>(AircraftIndex);

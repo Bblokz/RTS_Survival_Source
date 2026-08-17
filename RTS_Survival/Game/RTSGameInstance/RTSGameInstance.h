@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
-#include "GameInstMapLoading/RTSGameInstMapToLoad.h"
+#include "GameInstPreGameLaunchRequest/RTSPreGameLaunchRequest.h"
 #include "WorldMissionContext/WorldMissionContext.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
@@ -42,9 +42,11 @@ public:
     UFUNCTION(BlueprintCallable, Category="Music")
     URTSMusicManager* GetMusicManager() const { return MusicManager; }
 
-	void SetMapToLoad(TSoftObjectPtr<UWorld> MapToLoad);
-	void ResetMapToLoadToNull();
-	TSoftObjectPtr<UWorld> GetMapToLoad() const;
+	void SetPreGameLaunchRequest(
+		const ERTSPreGameSetupFlow SetupFlow,
+		const TSoftObjectPtr<UWorld> DestinationMap);
+	void ResetPreGameLaunchRequest();
+	FRTSPreGameLaunchRequest GetPreGameLaunchRequest() const;
 
 	void SetCampaignGenerationSettings(const FCampaignGenerationSettings& Settings);
 	FCampaignGenerationSettings GetCampaignGenerationSettings() const;
@@ -112,7 +114,8 @@ private:
 	UPROPERTY()
 	FWorldMissionContext M_WorldMissionContext;
 
-	// Keeps track of what map to load next.
-	FRTSGameInstMapToLoad M_MapToLoad;
+	// Keeps the selected setup flow and destination alive across pre-game map transitions.
+	UPROPERTY()
+	FRTSPreGameLaunchRequest M_PreGameLaunchRequest;
 
 };
