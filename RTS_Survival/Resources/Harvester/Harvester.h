@@ -131,6 +131,12 @@ protected:
 	
 
 private:
+	enum class EDropOffMoveDestination : uint8
+	{
+		DropOffPoint,
+		BackupLocation
+	};
+
 	void HarvestAIExecuteAction(EHarvesterAIAction Action);
 
 	// Calls DoneExecutingCommand(EAbilityID::IdHarvestResource) on the owner to finish the harvest command.
@@ -203,6 +209,22 @@ private:
 	void HarvestAIAction_MoveToDropOff();
 
 	/**
+	 * @brief Centralizes drop-off move requests so a failed primary destination can safely switch to its backup.
+	 * @param TargetLocation The location supplied to the AI move request.
+	 * @param MoveDestination Whether this request targets the normal drop-off point or its backup.
+	 * @return Whether movement started or the harvester was already within the acceptance radius.
+	 */
+	bool TryRequestMoveToDropOffLocation(
+		const FVector& TargetLocation,
+		EDropOffMoveDestination MoveDestination);
+
+	// Requests the projected backup once, then preserves the existing unstuck behavior if that also fails.
+	void HandleDropOffNavigationFailure();
+
+	// Retries the destination that failed before recovery so a backup is not replaced by the original drop-off point.
+	void RetryDropOffNavigationAfterRecovery();
+
+	/**
 	 * @brief Callback function for when the move to the drop-off is finished.
 	 * @param RequestID The ID of the move request.
 	 * @param Result The result of the path following.
@@ -211,6 +233,12 @@ private:
 
 	/** @return Whether the harvester location is within acceptance radius of GoalLocation. */
 	bool GetIsHarvesterCloseEnoughToGoal(const FVector& GoalLocation) const;
+
+	/** @return Whether the current drop-off destination is within its destination-specific acceptance radius. */
+	bool GetIsHarvesterCloseEnoughToCurrentDropOffGoal() const;
+
+	/** @return The projected backup point when active; otherwise the current normal drop-off point. */
+	FVector GetCurrentDropOffReferenceLocation() const;
 
 
 	// Harvests the target resource.
@@ -294,6 +322,9 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UResourceDropOff> M_TargetDropOff;
+
+	FVector M_CurrentDropOffMoveGoal;
+	EDropOffMoveDestination M_DropOffMoveDestination;
 
 	TWeakInterfacePtr<ICommands> M_CommandOwner;
 	TWeakInterfacePtr<IHarvesterInterface> M_IOwnerHarvesterInterface;

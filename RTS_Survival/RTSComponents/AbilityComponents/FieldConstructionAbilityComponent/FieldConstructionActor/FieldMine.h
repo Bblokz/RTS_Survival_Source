@@ -108,7 +108,7 @@ private:
 	float M_CachedDamage = 0.f;
 	bool bM_HasTriggered = false;
 
-	void BeginPlay_DisableMineMeshCollision();
+	void BeginPlay_SetupMineMeshCollision();
 	void BeginPlay_CacheAnimatedTextSubsystem();
 	void BeginPlay_SetupTriggerSphere();
 

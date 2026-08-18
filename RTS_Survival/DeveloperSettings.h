@@ -1603,7 +1603,13 @@ namespace DeveloperSettings
 			inline constexpr float SquadUnitScavengeDistance = 350.f;
 
 			// Extent used to project potential harvester positions to the navmesh.
-			inline constexpr float HarvesterPositionProjectedExtent = 450.f;
+			inline constexpr float HarvesterPositionProjectedExtent = 850.f;
+
+			// Distance beyond the cached building-mesh bounds used to place a backup drop-off destination.
+			inline constexpr float HarvesterBackupDropOffMeshClearance = 100.f;
+
+			// Extra 2D arrival tolerance around a projected backup drop-off destination.
+			inline constexpr float HarvesterBackupDropOffAcceptanceMargin = 200.f;
 
 			inline constexpr float MinTimeBetweenDropOffNotificationHarvester = 12.5f;
 
@@ -1897,7 +1903,7 @@ namespace DeveloperSettings
 		constexpr bool GPlayerClickAndAction_Compile_DebugSymbols = false;
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting
-		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
+		constexpr bool GHarvestResources_Compile_DebugSymbols = true;
 		constexpr bool ResourcesShowOccupyingHarvesters = false;
 		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;

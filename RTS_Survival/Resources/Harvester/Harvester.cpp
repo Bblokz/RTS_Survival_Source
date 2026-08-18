@@ -26,7 +26,8 @@ UHarvester::UHarvester()
 	: M_HarvestStatus(), M_AllowedResources(),
 	  M_PlayerResourceManager(nullptr), M_AIController(nullptr),
 	  bM_IsAbleToHarvest(true), M_TargetResourceType(), M_OwnerMeshComponent(nullptr), M_ResourceAcceptanceRadius(0),
-	  M_HarvestingTime(0)
+	  M_HarvestingTime(0), M_CurrentDropOffMoveGoal(FVector::ZeroVector),
+	  M_DropOffMoveDestination(EDropOffMoveDestination::DropOffPoint)
 {
 	TargetResource = nullptr;
 	PrimaryComponentTick.bCanEverTick = false;
@@ -1042,36 +1043,112 @@ void UHarvester::HarvestAIAction_MoveToDropOff()
 		HarvestAIExecuteAction(EHarvesterAIAction::FinishHarvestCommand);
 		return;
 	}
-	if (M_TargetDropOff.IsValid())
+	if (not M_TargetDropOff.IsValid())
 	{
-		const FVector HarvesterLocation = GetHarvesterLocation();
-		const FVector TargetLocation = M_TargetDropOff->GetDropOffLocationNotThreadSafe();
-		const float AcceptanceRadius = M_ResourceAcceptanceRadius;
+		return;
+	}
 
-		const EPathFollowingRequestResult::Type MoveResult = M_AIController->MoveToLocation(
-			TargetLocation, AcceptanceRadius);
-		if (MoveResult == EPathFollowingRequestResult::RequestSuccessful)
+	const FVector TargetLocation = M_TargetDropOff->GetDropOffLocationNotThreadSafe();
+	if (TryRequestMoveToDropOffLocation(TargetLocation, EDropOffMoveDestination::DropOffPoint))
+	{
+		return;
+	}
+
+	HarvestDebug("Harvester failed to request movement to the normal drop-off point; try its backup location.",
+	             FColor::Orange);
+	HandleDropOffNavigationFailure();
+}
+
+bool UHarvester::TryRequestMoveToDropOffLocation(
+	const FVector& TargetLocation,
+	const EDropOffMoveDestination MoveDestination)
+{
+	M_CurrentDropOffMoveGoal = TargetLocation;
+	M_DropOffMoveDestination = MoveDestination;
+	const EPathFollowingRequestResult::Type MoveResult = M_AIController->MoveToLocation(
+		TargetLocation,
+		M_ResourceAcceptanceRadius);
+	if (MoveResult == EPathFollowingRequestResult::RequestSuccessful)
+	{
+		if (UPathFollowingComponent* PathFollowingComponent = M_AIController->GetPathFollowingComponent())
 		{
-			if (UPathFollowingComponent* PathFollowingComponent = M_AIController->GetPathFollowingComponent())
-			{
-				PathFollowingComponent->OnRequestFinished.
-				                        AddUObject(this, &UHarvester::OnMoveToDropOffFinished);
-			}
+			PathFollowingComponent->OnRequestFinished.AddUObject(this, &UHarvester::OnMoveToDropOffFinished);
 		}
-		else if ((FVector::Distance(HarvesterLocation, TargetLocation) < AcceptanceRadius))
+		return true;
+	}
+
+	if (not GetIsHarvesterCloseEnoughToCurrentDropOffGoal())
+	{
+		return false;
+	}
+
+	HarvestDebug("Drop-off move request was not started because the harvester is already close enough.",
+	             FColor::Orange);
+	OnMoveToDropOffFinished(FAIRequestID(), FPathFollowingResult(EPathFollowingResult::Success));
+	return true;
+}
+
+void UHarvester::HandleDropOffNavigationFailure()
+{
+	const FVector HarvesterLocation = GetHarvesterLocation();
+	if (M_DropOffMoveDestination == EDropOffMoveDestination::DropOffPoint && M_TargetDropOff.IsValid())
+	{
+		FVector BackupDropOffLocation;
+		if (not M_TargetDropOff->GetProjectedBackupDropOffLocation(HarvesterLocation, BackupDropOffLocation))
 		{
-			HarvestDebug("Move request to DropOff failed but harver is close enough!", FColor::Orange);
-			OnMoveToDropOffFinished(FAIRequestID(), FPathFollowingResult(EPathFollowingResult::Success));
+			HarvestDebug("Could not project the drop-off backup location; only now use unstuck recovery.",
+			             FColor::Orange);
 		}
 		else
 		{
-			HarvestDebug("Harvester failed to REQUEST move to DROPOFF and is not close enough!"
-			             "\n Unstuck...", FColor::Orange);
-			UnstuckHarvesterTowardsLocation(HarvesterLocation,
-			                                TargetLocation,
-			                                EHarvesterAIAction::MoveToDropOff);
+			HarvestDebug("Using projected backup location for the failed drop-off path.", FColor::Orange);
+			if (TryRequestMoveToDropOffLocation(
+				BackupDropOffLocation,
+				EDropOffMoveDestination::BackupLocation))
+			{
+				return;
+			}
+			HarvestDebug("Move request to the projected drop-off backup failed; only now use unstuck recovery.",
+			             FColor::Orange);
 		}
 	}
+	else
+	{
+		HarvestDebug("Navigation to the projected drop-off backup failed; only now use unstuck recovery.",
+		             FColor::Orange);
+	}
+
+	UnstuckHarvesterTowardsLocation(
+		HarvesterLocation,
+		M_CurrentDropOffMoveGoal,
+		EHarvesterAIAction::MoveToDropOff);
+}
+
+void UHarvester::RetryDropOffNavigationAfterRecovery()
+{
+	if (not GetHasTargetDropOffCapacity())
+	{
+		HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindDropOff);
+		return;
+	}
+
+	if (M_DropOffMoveDestination != EDropOffMoveDestination::BackupLocation)
+	{
+		HarvestAIExecuteAction(EHarvesterAIAction::MoveToDropOff);
+		return;
+	}
+
+	M_HarvestStatus = EHarvesterAIAction::MoveToDropOff;
+	HarvestDebug("Recovery finished; retry the retained projected drop-off backup location.", FColor::Orange);
+	const FVector RetainedBackupLocation = M_CurrentDropOffMoveGoal;
+	if (TryRequestMoveToDropOffLocation(
+		RetainedBackupLocation,
+		EDropOffMoveDestination::BackupLocation))
+	{
+		return;
+	}
+
+	HandleDropOffNavigationFailure();
 }
 
 void UHarvester::OnMoveToDropOffFinished(FAIRequestID RequestID, const FPathFollowingResult& Result)
@@ -1088,38 +1165,65 @@ void UHarvester::OnMoveToDropOffFinished(FAIRequestID RequestID, const FPathFoll
 		}
 	}
 
-	if (!GetHasTargetDropOffCapacity())
+	if (not GetHasTargetDropOffCapacity())
 	{
 		HarvestDebug("Drop off not valid or FULL, find new one!", FColor::Cyan);
 		HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindDropOff);
 		return;
 	}
 
-	if (Result.Code == EPathFollowingResult::Success && GetIsHarvesterCloseEnoughToGoal(M_TargetDropOff->GetDropOffLocationNotThreadSafe()))
+	if (Result.Code == EPathFollowingResult::Success && GetIsHarvesterCloseEnoughToCurrentDropOffGoal())
 	{
 		HarvestDebug("at drop off location; Drop off resources", FColor::Green);
 		HarvestAIExecuteAction(EHarvesterAIAction::DropOff);
 		return;
 	}
 
-	const FVector TargetLocation = M_TargetDropOff->GetDropOffLocationNotThreadSafe();
-	if (GetIsHarvesterCloseEnoughToGoal(TargetLocation))
+	if (GetIsHarvesterCloseEnoughToCurrentDropOffGoal())
 	{
 		HarvestDebug("Harvester failed to reach drop of by request but is close enough!", FColor::Orange);
 		HarvestAIExecuteAction(EHarvesterAIAction::DropOff);
 		return;
 	}
-	// NEW: Try proper unstuck first; only teleport if allowed once for this goal.
-	HarvestDebug("Move to drop-off ended before reaching goal; attempt UNSTUCK (no instant teleport)", FColor::Orange);
-	UnstuckHarvesterTowardsLocation(GetHarvesterLocation(),
-	                                TargetLocation,
-	                                EHarvesterAIAction::MoveToDropOff);
+	HarvestDebug("Move to drop-off ended before reaching its goal; try drop-off fallback navigation.",
+	             FColor::Orange);
+	HandleDropOffNavigationFailure();
 }
 
 bool UHarvester::GetIsHarvesterCloseEnoughToGoal(const FVector& GoalLocation) const
 {
 	const FVector HarvesterLocation = GetHarvesterLocation();
 	return FVector::Distance(HarvesterLocation, GoalLocation) < M_ResourceAcceptanceRadius;
+}
+
+bool UHarvester::GetIsHarvesterCloseEnoughToCurrentDropOffGoal() const
+{
+	const FVector DropOffReferenceLocation = GetCurrentDropOffReferenceLocation();
+	if (M_DropOffMoveDestination != EDropOffMoveDestination::BackupLocation)
+	{
+		return GetIsHarvesterCloseEnoughToGoal(DropOffReferenceLocation);
+	}
+
+	using DeveloperSettings::GamePlay::Navigation::HarvesterBackupDropOffAcceptanceMargin;
+	const float BackupAcceptanceRadius = M_ResourceAcceptanceRadius
+		+ HarvesterBackupDropOffAcceptanceMargin;
+	return FVector::DistSquared2D(GetHarvesterLocation(), DropOffReferenceLocation)
+		<= FMath::Square(BackupAcceptanceRadius);
+}
+
+FVector UHarvester::GetCurrentDropOffReferenceLocation() const
+{
+	if (M_DropOffMoveDestination == EDropOffMoveDestination::BackupLocation)
+	{
+		return M_CurrentDropOffMoveGoal;
+	}
+
+	if (M_TargetDropOff.IsValid())
+	{
+		return M_TargetDropOff->GetDropOffLocationNotThreadSafe();
+	}
+
+	return M_CurrentDropOffMoveGoal;
 }
 
 void UHarvester::HarvestAIAction_HarvestTargetResource()
@@ -1247,6 +1351,12 @@ void UHarvester::OnFinishedUnStuck(FAIRequestID RequestID, const FPathFollowingR
 		                                              : EHarvesterAIAction::MoveToDropOff;
 	if (Result.Flags == EPathFollowingResult::Success)
 	{
+		if (ActionAfterUnstuck == EHarvesterAIAction::MoveToDropOff)
+		{
+			RetryDropOffNavigationAfterRecovery();
+			return;
+		}
+
 		HarvestAIExecuteAction(ActionAfterUnstuck);
 		return;
 	}
@@ -1268,7 +1378,7 @@ void UHarvester::OnFinishedUnStuck(FAIRequestID RequestID, const FPathFollowingR
 		if (M_TargetDropOff.IsValid())
 		{
 			TeleportHarvesterTowardsLocation(GetHarvesterLocation(),
-			                                 M_TargetDropOff->GetDropOffLocationNotThreadSafe(),
+			                                 GetCurrentDropOffReferenceLocation(),
 			                                 ActionAfterUnstuck);
 			return;
 		}
@@ -1317,6 +1427,12 @@ void UHarvester::TeleportHarvesterTowardsLocation(
 	if (TryTeleportHarvesterToLocation(ProjectedPoint))
 	{
 		HarvestDebug("Successfully teleported harvester closer to Goal (guarded)", FColor::Purple);
+		if (ActionOnTeleportSuccessful == EHarvesterAIAction::MoveToDropOff)
+		{
+			RetryDropOffNavigationAfterRecovery();
+			return;
+		}
+
 		HarvestAIExecuteAction(ActionOnTeleportSuccessful);
 		return;
 	}

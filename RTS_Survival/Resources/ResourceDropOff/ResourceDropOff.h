@@ -12,8 +12,13 @@
 
 class UPlayerResourceManager;
 class IResourceStorageOwner;
+class UMeshComponent;
 
 
+/**
+ * @brief Attach to resource-storage actors so harvesters can find safe delivery locations and deposit cargo.
+ * @note InitResourceDropOff: call in Blueprint to configure the supported resources, building mesh, and drop-off socket.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UResourceDropOff : public UActorComponent
 {
@@ -61,6 +66,16 @@ public:
 	/** @return The drop off location. NOT THREAD SAFE! */
 	FVector GetDropOffLocationNotThreadSafe() const;
 
+	/**
+	 * @brief Provides a navmesh location outside the building when its normal drop-off point cannot be reached.
+	 * @param HarvesterLocation The location used to choose the building side facing the requesting harvester.
+	 * @param OutBackupLocation Receives the projected backup location when one can be found.
+	 * @return Whether a backup location was successfully projected to the navmesh.
+	 */
+	bool GetProjectedBackupDropOffLocation(
+		const FVector& HarvesterLocation,
+		FVector& OutBackupLocation) const;
+
 	/** @return Whether the drop off has capcity left for the specified amount. */
 	bool GetHasCapacityForDropOff(ERTSResourceType ResourceType, int32 Amount) const;
 
@@ -102,7 +117,7 @@ private:
 	void DebugDroppingOff(const ERTSResourceType ResourceType, const int32 Amount);
 
 	UPROPERTY()
-	UMeshComponent* M_OwnerMeshComponent;
+	TWeakObjectPtr<UMeshComponent> M_OwnerMeshComponent;
 
 	FName M_DropOffSocketName;
 
@@ -124,4 +139,15 @@ private:
 	void CreateTextOfDropOff(const ERTSResourceType ResourceType, const int32 Amount) const;
 
 	bool GetIsValidPlayerResourceManager() const;
+	bool GetIsValidOwnerMeshComponent() const;
+
+	/**
+	 * @brief Uses current mesh bounds and the approached building side so runtime mesh changes remain respected.
+	 * @param Owner The actor whose local X/Y axes define the building's front, back, left, and right sides.
+	 * @param DirectionToHarvester Normalized horizontal world direction from the owner to the harvester.
+	 * @return World distance along DirectionToHarvester required to pass the selected X or Y mesh face.
+	 */
+	float GetOwnerMeshDistanceTowardsHarvester(
+		const AActor& Owner,
+		const FVector& DirectionToHarvester) const;
 };

@@ -3,6 +3,7 @@
 
 #include "ResourceDropOff.h"
 
+#include "NavigationSystem.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "Components/MeshComponent.h"
 #include "RTS_Survival/Game/GameState/GameResourceManager/GameResourceManager.h"
@@ -17,7 +18,8 @@
 
 
 // Sets default values for this component's properties
-UResourceDropOff::UResourceDropOff(): M_OwnerMeshComponent(nullptr)
+UResourceDropOff::UResourceDropOff()
+	: M_OwnerMeshComponent(nullptr)
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	bIsDropOffActive = true;
@@ -103,18 +105,79 @@ void UResourceDropOff::RemoveResources(ERTSResourceType ResourceType, int32 Amou
 FVector UResourceDropOff::GetDropOffLocationNotThreadSafe() const
 {
 	const TWeakObjectPtr<AActor> Owner = GetOwner();
-	if (Owner.IsValid(false, false))
+	if (not Owner.IsValid(false, false))
 	{
-		if (IsValid(M_OwnerMeshComponent))
-		{
-			return M_OwnerMeshComponent->GetSocketLocation(M_DropOffSocketName);
-		}
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "OwnerMeshComponent", "GetDropOffLocationNotThreadSafe");
+		RTSFunctionLibrary::ReportError("Owner is not valid on resource dropoff!"
+			"\n ResourceDropOff: " + GetName());
+		return FVector::ZeroVector;
+	}
+
+	if (not GetIsValidOwnerMeshComponent())
+	{
 		return Owner->GetActorLocation();
 	}
-	RTSFunctionLibrary::ReportError("Owner is not valid on resource dropoff!"
-		"\n ResourceDropOff: " + GetName());
-	return FVector(0.f, 0.f, 0.f);
+
+	return M_OwnerMeshComponent->GetSocketLocation(M_DropOffSocketName);
+}
+
+bool UResourceDropOff::GetProjectedBackupDropOffLocation(
+	const FVector& HarvesterLocation,
+	FVector& OutBackupLocation) const
+{
+	using DeveloperSettings::GamePlay::Navigation::HarvesterBackupDropOffMeshClearance;
+	using DeveloperSettings::GamePlay::Navigation::HarvesterPositionProjectedExtent;
+
+	if (not GetIsValidOwnerMeshComponent())
+	{
+		return false;
+	}
+
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		RTSFunctionLibrary::ReportError("Cannot calculate a backup drop-off location without a valid owner!"
+			"\n ResourceDropOff: " + GetName());
+		return false;
+	}
+
+	FVector DirectionToHarvester = HarvesterLocation - Owner->GetActorLocation();
+	DirectionToHarvester.Z = 0.f;
+	if (not DirectionToHarvester.Normalize())
+	{
+		DirectionToHarvester = Owner->GetActorForwardVector().GetSafeNormal2D();
+	}
+
+	const float OwnerMeshDistance = GetOwnerMeshDistanceTowardsHarvester(*Owner, DirectionToHarvester);
+	if (OwnerMeshDistance <= 0.f)
+	{
+		return false;
+	}
+
+	const float BackupLocationOffset = OwnerMeshDistance
+		+ HarvesterBackupDropOffMeshClearance;
+	const FVector OwnerLocation = Owner->GetActorLocation();
+	const FVector UnprojectedBackupLocation = OwnerLocation
+		+ DirectionToHarvester * BackupLocationOffset;
+
+	const UNavigationSystemV1* NavigationSystem =
+		FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (not IsValid(NavigationSystem))
+	{
+		return false;
+	}
+
+	FNavLocation ProjectedBackupLocation;
+	const FVector ProjectionExtent(HarvesterPositionProjectedExtent);
+	if (not NavigationSystem->ProjectPointToNavigation(
+		UnprojectedBackupLocation,
+		ProjectedBackupLocation,
+		ProjectionExtent))
+	{
+		return false;
+	}
+
+	OutBackupLocation = ProjectedBackupLocation.Location;
+	return true;
 }
 
 bool UResourceDropOff::GetHasCapacityForDropOff(const ERTSResourceType ResourceType, const int32 Amount) const
@@ -356,7 +419,7 @@ void UResourceDropOff::UpdateDropOffVisuals(const ERTSResourceType ResourceTypeC
 
 void UResourceDropOff::CreateTextOfDropOff(const ERTSResourceType ResourceType, const int32 Amount) const
 {
-	if (Amount <= 0 || not IsValid(M_OwnerMeshComponent))
+	if (Amount <= 0 || not GetIsValidOwnerMeshComponent())
 	{
 		return;
 	}
@@ -390,4 +453,48 @@ bool UResourceDropOff::GetIsValidPlayerResourceManager() const
 		"UResourceDropOff::GetIsValidPlayerResourceManager",
 		this);
 	return false;
+}
+
+bool UResourceDropOff::GetIsValidOwnerMeshComponent() const
+{
+	if (M_OwnerMeshComponent.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_OwnerMeshComponent",
+		"UResourceDropOff::GetIsValidOwnerMeshComponent",
+		this);
+	return false;
+}
+
+float UResourceDropOff::GetOwnerMeshDistanceTowardsHarvester(
+	const AActor& Owner,
+	const FVector& DirectionToHarvester) const
+{
+	if (not GetIsValidOwnerMeshComponent())
+	{
+		return 0.f;
+	}
+
+	const FTransform MeshToOwnerTransform = M_OwnerMeshComponent->GetComponentTransform().GetRelativeTransform(
+		Owner.GetActorTransform());
+	const FBox OwnerSpaceMeshBounds = M_OwnerMeshComponent->CalcBounds(MeshToOwnerTransform).GetBox();
+	const FVector OwnerSpaceDirection = Owner.GetActorTransform().InverseTransformVectorNoScale(
+		DirectionToHarvester).GetSafeNormal2D();
+
+	const bool bIsHarvesterToLeftOrRight = FMath::Abs(OwnerSpaceDirection.Y)
+		> FMath::Abs(OwnerSpaceDirection.X);
+	const EAxis::Type SelectedHorizontalAxis = bIsHarvesterToLeftOrRight ? EAxis::Y : EAxis::X;
+	const float DirectionOnSelectedAxis = OwnerSpaceDirection.GetComponentForAxis(SelectedHorizontalAxis);
+	const float OwnerSpaceBound = DirectionOnSelectedAxis >= 0.f
+		? OwnerSpaceMeshBounds.Max.GetComponentForAxis(SelectedHorizontalAxis)
+		: -OwnerSpaceMeshBounds.Min.GetComponentForAxis(SelectedHorizontalAxis);
+	const float OwnerScaleOnSelectedAxis = Owner.GetActorScale3D().GetAbs().GetComponentForAxis(
+		SelectedHorizontalAxis);
+	const float DirectionMagnitudeOnSelectedAxis = FMath::Abs(DirectionOnSelectedAxis);
+	return FMath::Max(OwnerSpaceBound, 0.f) * OwnerScaleOnSelectedAxis
+		/ FMath::Max(DirectionMagnitudeOnSelectedAxis, UE_SMALL_NUMBER);
 }

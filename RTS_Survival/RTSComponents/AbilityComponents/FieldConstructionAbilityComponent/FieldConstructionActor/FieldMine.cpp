@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
@@ -30,7 +31,7 @@ void AFieldMine::BeginPlay()
 {
 	Super::BeginPlay();
 
-	BeginPlay_DisableMineMeshCollision();
+	BeginPlay_SetupMineMeshCollision();
 	BeginPlay_CacheAnimatedTextSubsystem();
 	BeginPlay_SetupTriggerSphere();
 
@@ -56,23 +57,38 @@ void AFieldMine::PostInitializeComponents()
 	M_TriggerSphere = FindComponentByClass<USphereComponent>();
 }
 
-void AFieldMine::OnUnitDies(const ERTSDeathType DeathType)
+void AFieldMine::OnUnitDies(const ERTSDeathType /*DeathType*/)
 {
-	// DO NOT call super as it will kill the mine prematurely.
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+
+	// Do not call Super because mines use their normal detonation path for death handling.
 	SetUnitDying();
-	
+	HandleMineDetonation();
 }
 
-void AFieldMine::BeginPlay_DisableMineMeshCollision()
+void AFieldMine::BeginPlay_SetupMineMeshCollision()
 {
 	if (not GetIsValidFieldConstructionMesh())
 	{
 		return;
 	}
 
-	FieldConstructionMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	FieldConstructionMesh->SetCanEverAffectNavigation(false);
-	FieldConstructionMesh->SetReceivesDecals(false);
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+
+	constexpr bool bBlockAlliedProjectiles = true;
+	constexpr bool bOverlapTanks = false;
+	FRTS_CollisionSetup::SetupFieldConstructionMeshCollision(
+		FieldConstructionMesh,
+		M_RTSComponent->GetOwningPlayer(),
+		bBlockAlliedProjectiles,
+		bOverlapTanks);
+	FieldConstructionMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PROJECTILE, ECR_Block);
 }
 
 void AFieldMine::BeginPlay_CacheAnimatedTextSubsystem()
