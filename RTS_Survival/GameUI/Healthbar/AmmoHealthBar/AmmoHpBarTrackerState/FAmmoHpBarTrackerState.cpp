@@ -220,8 +220,8 @@ void FAmmoHpBarTrackerState::VerifyTrackingActive()
 	}
 	if (not M_TrackWeapon->OnMagConsumed.IsBound())
 	{
-		RTSFunctionLibrary::DisplayNotification(FText::FromString("Did not bind to mag consumed delegate!"
-			"\n Weapon : " + M_TrackWeapon->GetName()));
+		RTSFunctionLibrary::ReportError("Did not bind to mag consumed delegate!"
+			"\n Weapon : " + M_TrackWeapon->GetName());
 		SetupTrackingLogic();
 	}
 }

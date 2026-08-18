@@ -19,6 +19,7 @@
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/Missions/Defeat/RTSDefeatType.h"
+#include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/RemoveDontLoseCommanderPost.h"
 #include "MissionManager.generated.h"
 
 
@@ -31,6 +32,7 @@ struct FMissionCargoSquadWithVehicleSpawnState;
 class ACPPController;
 class UW_MissionWidgetManager;
 class UMissionBase;
+class UDontLoseCommanderMission;
 class UW_GameDifficultyPicker;
 class UW_Defeat;
 class UW_Victory;
@@ -312,6 +314,14 @@ public:
 	 */
 	void ActivateNewMission(UMissionBase* NewMission);
 	bool GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase> MissionClass) const;
+	/**
+	 * @brief Completes the active commander-loss mission before optionally creating its replacement.
+	 * @param PostRemovalAction Determines whether a replacement mission should be activated.
+	 * @param MissionClassToActivate Optional replacement class instantiated with this manager as its owner.
+	 */
+	void RemoveDontLoseCommanderMission(
+		ERemoveDontLoseCommanderPost PostRemovalAction,
+		TSubclassOf<UMissionBase> MissionClassToActivate);
 
 	/**
 	 * Array of mission objects created as subobjects of the manager.
@@ -498,7 +508,6 @@ private:
 	UPROPERTY()
 	TObjectPtr<UW_Victory> M_VictoryWidget;
 
-	void TriggerDefeat_LostHQ();
 	void TriggerDefeat_LockPauseAndShowWidget();
 	void TriggerDefeat_ShowDefeatWidget();
 	bool GetIsValidDefeatWidgetClass() const;
@@ -514,6 +523,8 @@ private:
 	bool EnsureMissionWidgetIsValid() const;
 	/** @return True when this mission in not in the active array and valid. */
 	bool EnsureMissionIsNotAlreadyActivated(UMissionBase* Mission);
+	UDontLoseCommanderMission* FindActiveDontLoseCommanderMission() const;
+	void CreateAndActivateMission(TSubclassOf<UMissionBase> MissionClassToActivate);
 
 	FMissionSoundSettings M_MissionSoundSettings;
 

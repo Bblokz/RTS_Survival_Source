@@ -6,6 +6,7 @@
 
 #include "PCGComponent.h"
 #include "PCGContext.h"
+#include "PCGModule.h"
 #include "PCGPin.h"
 #include "Engine/World.h"
 

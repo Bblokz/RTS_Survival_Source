@@ -2,12 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/GameUI/Archive/ArchiveItemTypes/ArchiveItemTypes.h"
+#include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Missions/MissionManager/EnemyUnitQueryType.h"
 #include "RTS_Survival/Missions/MissionManager/MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Missions/MissionManager/MissionSpawnCommandQueueOrder.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionTrackingType.h"
+#include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/RemoveDontLoseCommanderPost.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
@@ -204,6 +206,16 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
 	void TriggerMissionFromArray(const int32 TriggerableMissionIndex);
+
+	/**
+	 * @brief Ends the active commander-loss guard and optionally replaces it with a newly created mission.
+	 * @param PostRemovalAction Whether the manager should only remove the guard or activate a replacement.
+	 * @param MissionClassToActivate Optional mission class used when PostRemovalAction requests activation.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "MissionEnding")
+	void RemoveDontLoseCommanderMission(
+		ERemoveDontLoseCommanderPost PostRemovalAction,
+		TSubclassOf<UMissionBase> MissionClassToActivate = nullptr);
 
 	void OnEnemyUnitsDestroyedCallback(const int32 ID, const EEnemyUnitQueryType EnemyUnitQueryType);
 
@@ -450,6 +462,44 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Units")
 	int32 DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraftSubtype>& AircraftTypes) const;
+
+	/**
+	 * @brief Uses the mission manager as world context so mission blueprints can register fixed minimap icons safely.
+	 * @param IconId Stable ID used to remove or swap this icon later.
+	 * @param IconType Data asset key deciding which custom texture and size to draw.
+	 * @param WorldLocation World-space location represented by this icon.
+	 * @param WorldRotation World-space rotation projected onto minimap 2D space for this icon.
+	 * @return The added ID on success; NAME_None if the icon could not be added.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	FName AddCustomMiniMapIcon(const FName IconId,
+	                           const EMinimapIconType IconType,
+	                           const FVector WorldLocation,
+	                           const FRotator WorldRotation);
+
+	/**
+	 * @brief Uses the mission manager as world context so mission blueprints can register actor-following icons safely.
+	 * @param IconId Stable ID used to remove or swap this icon later.
+	 * @param IconType Data asset key deciding which custom texture and size to draw.
+	 * @param WorldLocation Initial world-space location cached before the actor location is refreshed.
+	 * @param AttachedActor Actor whose location and optionally rotation drives this icon until it becomes invalid.
+	 * @param StaticWorldRotation Rotation used when the icon should not follow actor rotation.
+	 * @param bUseStaticRotation True when the supplied static rotation should be used at all times.
+	 * @return The added ID on success; NAME_None if the icon could not be added.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	FName AddCustomMiniMapIconAttachedToActor(const FName IconId,
+	                                          const EMinimapIconType IconType,
+	                                          const FVector WorldLocation,
+	                                          AActor* AttachedActor,
+	                                          const FRotator StaticWorldRotation,
+	                                          const bool bUseStaticRotation);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	bool RemoveCustomMiniMapIcon(const FName IconId);
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	bool SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	AEnemyController* GetEnemyControllerChecked() const;

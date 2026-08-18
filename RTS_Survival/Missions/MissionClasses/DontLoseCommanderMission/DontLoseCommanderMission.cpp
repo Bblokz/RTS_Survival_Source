@@ -17,6 +17,11 @@ namespace DontLoseCommanderMissionConstants
 
 void UDontLoseCommanderMission::OnMissionStart()
 {
+	if (GetIsMissionComplete())
+	{
+		return;
+	}
+
 	Super::OnMissionStart();
 	if (not MissionState.bIsTriggered)
 	{
@@ -31,12 +36,14 @@ void UDontLoseCommanderMission::OnMissionStart()
 
 void UDontLoseCommanderMission::OnMissionComplete()
 {
+	bM_HasTriggeredCommanderLossFlow = true;
 	ClearMissionTimers();
 	Super::OnMissionComplete();
 }
 
 void UDontLoseCommanderMission::OnMissionFailed()
 {
+	bM_HasTriggeredCommanderLossFlow = true;
 	ClearMissionTimers();
 	Super::OnMissionFailed();
 }
@@ -112,7 +119,7 @@ void UDontLoseCommanderMission::BindToCommandVehicleDeath()
 
 void UDontLoseCommanderMission::HandleCommandVehicleDied()
 {
-	if (bM_HasTriggeredCommanderLossFlow)
+	if (GetIsMissionComplete() || bM_HasTriggeredCommanderLossFlow)
 	{
 		return;
 	}
@@ -153,6 +160,12 @@ void UDontLoseCommanderMission::ScheduleMissionDefeat()
 	}
 
 	const float DefeatDelaySeconds = FMath::Max(0.0f, M_DefeatDelayAfterCommanderLost);
+	if (DefeatDelaySeconds <= KINDA_SMALL_NUMBER)
+	{
+		HandleTriggerDefeatDelayed();
+		return;
+	}
+
 	World->GetTimerManager().SetTimer(
 		M_DefeatAfterCommanderLostHandle,
 		this,
@@ -163,11 +176,21 @@ void UDontLoseCommanderMission::ScheduleMissionDefeat()
 
 void UDontLoseCommanderMission::HandleRetryFindCommandVehicle()
 {
+	if (GetIsMissionComplete())
+	{
+		return;
+	}
+
 	TryFindAndBindPlayerCommandVehicle();
 }
 
 void UDontLoseCommanderMission::HandleTriggerDefeatDelayed()
 {
+	if (GetIsMissionComplete())
+	{
+		return;
+	}
+
 	AMissionManager* MissionManager = GetMissionManagerChecked();
 	if (not IsValid(MissionManager))
 	{

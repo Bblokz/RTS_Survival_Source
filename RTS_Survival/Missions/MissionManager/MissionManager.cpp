@@ -5,6 +5,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
+#include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/DontLoseCommanderMission.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Missions/MissionManager/MissionTriggerVolumesManager/MissionTriggerVolumesManager.h"
 #include "RTS_Survival/Missions/TriggerAreas/TriggerArea.h"
@@ -389,6 +390,7 @@ void AMissionManager::ExecuteGlobalAbility(UGlobalAbility* GlobalAbility, const 
 	if (not IsValid(GlobalAbility))
 	{
 		RTSFunctionLibrary::ReportError("Global Ability is invalid, see Execute global ability on mission manager");
+		return;
 	}
 	UGlobalAbilitiesManager* AbilitiesManager = nullptr;
 	ACPPController* PlayerController = FRTS_Statics::GetRTSController(this);
@@ -710,6 +712,85 @@ bool AMissionManager::GetHasCompletedMissionClassExact(TSubclassOf<UMissionBase>
 	}
 
 	return M_CompletedMissionClassPaths.Contains(MissionClassRaw->GetClassPathName());
+}
+
+void AMissionManager::RemoveDontLoseCommanderMission(
+	const ERemoveDontLoseCommanderPost PostRemovalAction,
+	const TSubclassOf<UMissionBase> MissionClassToActivate)
+{
+	UDontLoseCommanderMission* DontLoseCommanderMission = FindActiveDontLoseCommanderMission();
+	if (not IsValid(DontLoseCommanderMission))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission manager could not remove DontLoseCommanderMission because no active matching mission was found.");
+		return;
+	}
+
+	UMissionBase* ConfiguredNextMission = DontLoseCommanderMission->NextMission;
+	DontLoseCommanderMission->NextMission = nullptr;
+	UMissionBase* MissionToComplete = DontLoseCommanderMission;
+	MissionToComplete->OnMissionComplete();
+	DontLoseCommanderMission->NextMission = ConfiguredNextMission;
+
+	if (PostRemovalAction == ERemoveDontLoseCommanderPost::NoAction)
+	{
+		return;
+	}
+
+	if (PostRemovalAction != ERemoveDontLoseCommanderPost::ActivateNewMission)
+	{
+		RTSFunctionLibrary::ReportError("Mission manager received an unsupported commander mission post-removal action.");
+		return;
+	}
+
+	CreateAndActivateMission(MissionClassToActivate);
+}
+
+UDontLoseCommanderMission* AMissionManager::FindActiveDontLoseCommanderMission() const
+{
+	for (UMissionBase* ActiveMission : M_ActiveMissions)
+	{
+		if (not IsValid(ActiveMission))
+		{
+			continue;
+		}
+
+		if (ActiveMission->IsA(UDontLoseCommanderMission::StaticClass()))
+		{
+			return Cast<UDontLoseCommanderMission>(ActiveMission);
+		}
+	}
+
+	return nullptr;
+}
+
+void AMissionManager::CreateAndActivateMission(const TSubclassOf<UMissionBase> MissionClassToActivate)
+{
+	UClass* MissionClass = MissionClassToActivate.Get();
+	if (not IsValid(MissionClass))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission manager was asked to activate a new mission after removing DontLoseCommanderMission, "
+			"but no valid mission class was provided.");
+		return;
+	}
+
+	if (MissionClass->HasAnyClassFlags(CLASS_Abstract))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission manager cannot activate the abstract mission class provided after removing DontLoseCommanderMission.");
+		return;
+	}
+
+	UMissionBase* NewMission = NewObject<UMissionBase>(this, MissionClass);
+	if (not IsValid(NewMission))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Mission manager failed to create the mission requested after removing DontLoseCommanderMission.");
+		return;
+	}
+
+	ActivateNewMission(NewMission);
 }
 
 void AMissionManager::SpawnTowedTeamWeapon(const ETankSubtype TankSubtype, const ESquadSubtype SquadSubtype,
@@ -2319,59 +2400,8 @@ void AMissionManager::TriggerDefeat(const ERTSDefeatType DefeatType)
 		return;
 	}
 
-	if (DefeatType == ERTSDefeatType::LostHQ)
-	{
-		TriggerDefeat_LostHQ();
-		return;
-	}
-
 	PlayEndStateMusic(ERTSMusicType::Defeat);
 	TriggerDefeat_LockPauseAndShowWidget();
-}
-
-void AMissionManager::TriggerDefeat_LostHQ()
-{
-	if (not EnsureValidPlayerController())
-	{
-		return;
-	}
-
-	const float AnnouncerDelaySeconds = FMath::Max(
-		0.0f,
-		M_PlayerController->PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::LostHQ, true, true)
-	);
-	if (AnnouncerDelaySeconds <= KINDA_SMALL_NUMBER)
-	{
-		TriggerDefeat_LockPauseAndShowWidget();
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (not World)
-	{
-		RTSFunctionLibrary::ReportError("Mission manager failed TriggerDefeat_LostHQ because world is invalid.");
-		return;
-	}
-
-	const TWeakObjectPtr<AMissionManager> WeakMissionManager = this;
-	FTimerDelegate DefeatTimerDelegate;
-	DefeatTimerDelegate.BindLambda([WeakMissionManager]()
-	{
-		if (not WeakMissionManager.IsValid())
-		{
-			return;
-		}
-
-		WeakMissionManager->TriggerDefeat_LockPauseAndShowWidget();
-	});
-
-	FTimerHandle DefeatDelayTimerHandle;
-	World->GetTimerManager().SetTimer(
-		DefeatDelayTimerHandle,
-		DefeatTimerDelegate,
-		AnnouncerDelaySeconds,
-		false
-	);
 }
 
 void AMissionManager::TriggerDefeat_LockPauseAndShowWidget()

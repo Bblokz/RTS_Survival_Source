@@ -144,6 +144,18 @@ void UMissionBase::TriggerMissionFromArray(const int32 TriggerableMissionIndex)
 	GetMissionManagerChecked()->ActivateNewMission(MissionToTrigger);
 }
 
+void UMissionBase::RemoveDontLoseCommanderMission(
+	const ERemoveDontLoseCommanderPost PostRemovalAction,
+	const TSubclassOf<UMissionBase> MissionClassToActivate)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->RemoveDontLoseCommanderMission(PostRemovalAction, MissionClassToActivate);
+}
+
 void UMissionBase::StartEnemyStrategicAIThinking()
 {
 	if (not GetIsValidMissionManager())
@@ -212,6 +224,70 @@ int32 UMissionBase::DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraf
 
 	constexpr uint8 PlayerTeamId = 1;
 	return GameUnitManager->GetPlayerAircraftCountOfTypes(PlayerTeamId, AircraftTypes);
+}
+
+FName UMissionBase::AddCustomMiniMapIcon(const FName IconId,
+	                                    const EMinimapIconType IconType,
+	                                    const FVector WorldLocation,
+	                                    const FRotator WorldRotation)
+{
+	AMissionManager* const MissionManager = GetMissionManagerChecked();
+	if (MissionManager == nullptr)
+	{
+		return NAME_None;
+	}
+
+	return URTSBlueprintFunctionLibrary::BP_AddCustomMiniMapIcon(
+		MissionManager,
+		IconId,
+		IconType,
+		WorldLocation,
+		WorldRotation);
+}
+
+FName UMissionBase::AddCustomMiniMapIconAttachedToActor(const FName IconId,
+	                                                   const EMinimapIconType IconType,
+	                                                   const FVector WorldLocation,
+	                                                   AActor* AttachedActor,
+	                                                   const FRotator StaticWorldRotation,
+	                                                   const bool bUseStaticRotation)
+{
+	AMissionManager* const MissionManager = GetMissionManagerChecked();
+	if (MissionManager == nullptr)
+	{
+		return NAME_None;
+	}
+
+	return URTSBlueprintFunctionLibrary::BP_AddCustomMiniMapIconAttachedToActor(
+		MissionManager,
+		IconId,
+		IconType,
+		WorldLocation,
+		AttachedActor,
+		StaticWorldRotation,
+		bUseStaticRotation);
+}
+
+bool UMissionBase::RemoveCustomMiniMapIcon(const FName IconId)
+{
+	AMissionManager* const MissionManager = GetMissionManagerChecked();
+	if (MissionManager == nullptr)
+	{
+		return false;
+	}
+
+	return URTSBlueprintFunctionLibrary::BP_RemoveCustomMiniMapIcon(MissionManager, IconId);
+}
+
+bool UMissionBase::SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType)
+{
+	AMissionManager* const MissionManager = GetMissionManagerChecked();
+	if (MissionManager == nullptr)
+	{
+		return false;
+	}
+
+	return URTSBlueprintFunctionLibrary::BP_SwapCustomMiniMapIcon(MissionManager, IconId, NewIconType);
 }
 
 ATriggerArea* UMissionBase::CreateTriggerAreaSphere(const FVector& Location,
@@ -506,11 +582,11 @@ void UMissionBase::BeginDestroy()
 
 AMissionManager* UMissionBase::GetMissionManagerChecked() const
 {
-	if (not M_MissionManager.IsValid())
+	if (not GetIsValidMissionManager())
 	{
-		RTSFunctionLibrary::ReportError("Mission manager not valid for mission: " + GetName());
 		return nullptr;
 	}
+
 	return M_MissionManager.Get();
 }
 

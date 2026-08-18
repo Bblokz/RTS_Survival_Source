@@ -124,6 +124,7 @@ enum class EAnnouncerVoiceLineType : uint8
 	VehicleWillTowClickedActor,
 	ResearchComplete,
 	TechnologyRequired,
+	DefeatLostHQ,
 };
 
 USTRUCT(BlueprintType)
