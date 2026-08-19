@@ -133,6 +133,6 @@ struct FAttackWave
 	// Settings used when bIsRandomPatrolWithAttackMoveWave is true.
 	FRandomPatrolWithAttackMoveSettings RandomPatrolWithAttackMoveSettings = {};
 
-	UPROPERTY()
-	TArray<AActor*> SpawnedWaveUnits;
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AActor>> SpawnedWaveUnits;
 };

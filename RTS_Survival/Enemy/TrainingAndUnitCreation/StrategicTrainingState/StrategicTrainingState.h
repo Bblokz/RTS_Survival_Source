@@ -109,6 +109,10 @@ struct FEnemyStrategicTrainingState
 	UPROPERTY()
 	int32 TrainingPoints = 0;
 
+	// Carries sub-point income between think steps so short intervals and timer hitches preserve the authored rate.
+	UPROPERTY()
+	float TrainingPointIncomeRemainder = 0.f;
+
 	// Contains the result of TrainingRequirements_ThinkStep which checks if the correct building expansion is built
 	// to unlock each tech level. 
 	UPROPERTY()

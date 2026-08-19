@@ -254,7 +254,11 @@ public:
 		const FString& SourceDebugName,
 		const EAITrainingFocusSpecialty BaseSpecialtyPressure) const override;
 
-	// Any-tank requirements default to medium tank pressure as a flexible future-production fallback.
+	// Allows an any-tank gate to preserve the owning action's intended tank family when production is needed.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	EAITrainingFocus MissingUnitFocusPressure = EAITrainingFocus::MediumTanks;
+
+	// Larger missing tank groups should create proportionally stronger pressure.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	int32 AmountIdleTanksNeeded = 3;
 

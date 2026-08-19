@@ -197,6 +197,30 @@ public:
 	FEnemyStrategicTrainingState& GetEditableEnemyTrainingState();
 	void RegisterDroppedUnitWithBlackboardWhenReady(AActor* DroppedUnit);
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	void ShippingTest_RunTrainingPressureThinkStep();
+	void ShippingTest_AccumulateTrainingPointIncomeForElapsedSeconds(const float ElapsedSeconds);
+	void ShippingTest_EnablePressureOnlyTrainingMode()
+	{
+		bM_ShippingTest_PressureOnlyTraining = true;
+	}
+
+	int32 ShippingTest_GetTrainingSpawnRequestCount() const
+	{
+		return M_ShippingTest_TrainingSpawnRequestCount;
+	}
+
+	int32 ShippingTest_GetTrainingSpawnSuccessCount() const
+	{
+		return M_ShippingTest_TrainingSpawnSuccessCount;
+	}
+
+	int32 ShippingTest_GetActiveTrainingSpawnBatchCount() const
+	{
+		return M_ActiveTrainingSpawnBatches.Num();
+	}
+#endif
+
 	// This request is periodically used to find the bases owned by the AI.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindEnemyBaseClusters FindEnemyBase_TimerRequest;
@@ -256,6 +280,11 @@ private:
 	// Each paid batch owns its own timer so overlapping training batches do not interrupt each other.
 	TArray<FEnemyStrategicAITrainingSpawnBatch> M_ActiveTrainingSpawnBatches;
 	int32 M_NextTrainingSpawnBatchID = 1;
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	int32 M_ShippingTest_TrainingSpawnRequestCount = 0;
+	int32 M_ShippingTest_TrainingSpawnSuccessCount = 0;
+	bool bM_ShippingTest_PressureOnlyTraining = false;
+#endif
 	bool GetIsAllowedDirectControlUnits()const;
 	bool GetIsAllowedUnitTraining()const;
 
@@ -442,6 +471,7 @@ private:
 
 	FAIThinkingTimerData M_TrainingPointsThinkTimer;
 	void GetTrainingPoints_ThinkStep();
+	void AccumulateTrainingPointIncomeForElapsedSeconds(const float ElapsedSeconds);
 
 	TArray<FAIThinkingTimerData*> M_AIThinkTimers;
 

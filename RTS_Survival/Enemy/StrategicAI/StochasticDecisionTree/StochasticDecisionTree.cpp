@@ -826,10 +826,10 @@ void UStochasticDecisionTree::CreateFlankingAttack(UStrategicAISubAction* SubAct
 	const TArray<TPair<FVector, TWeakObjectPtr<AActor>>> TotalLocations = GetTotalAggregatedWeakActorLocations(
 		FlankingPositions);
 	const int32 MaxIndex = FMath::Min(CommandUnits.Num(), TotalLocations.Num()) - 1;
-	// The first order given needs to overwrite whatever else was in the queue.
-	bool bRestOrderQueue = true;
 	for (int32 i = 0; i <= MaxIndex; ++i)
 	{
+		// Each unit's first order needs to overwrite whatever else was in its queue.
+		bool bResetOrderQueue = true;
 		ICommands* CommandUnit = CommandUnits[i];
 		const FVector TargetLocation = TotalLocations[i].Key;
 		const bool bIsValidTarget = TotalLocations[i].Value.IsValid();
@@ -837,12 +837,17 @@ void UStochasticDecisionTree::CreateFlankingAttack(UStrategicAISubAction* SubAct
 		{
 			const FRotator FinalRotation = UKismetMathLibrary::FindLookAtRotation(
 				TargetLocation, TotalLocations[i].Value->GetActorLocation());
-			(void)IssueMoveOrder(CommandUnit, TargetLocation, bRestOrderQueue, FinalRotation);
-			bRestOrderQueue = false;
+			if (IssueMoveOrder(CommandUnit, TargetLocation, bResetOrderQueue, FinalRotation))
+			{
+				bResetOrderQueue = false;
+			}
 			// The to flank actor is valid so we move, attack and then add back to blackboard.
-			(void)IssueAttackOrder(CommandUnit, TotalLocations[i].Value, bRestOrderQueue);
+			if (IssueAttackOrder(CommandUnit, TotalLocations[i].Value, bResetOrderQueue))
+			{
+				bResetOrderQueue = false;
+			}
 		}
-		if (not IssueRegisterWithBlackboardOrder(CommandUnit, bRestOrderQueue))
+		if (not IssueRegisterWithBlackboardOrder(CommandUnit, bResetOrderQueue))
 		{
 			RTSFunctionLibrary::ReportError("Failed to register unit with blackboard after attack-move orders"
 				"for flanking attack");
@@ -855,7 +860,8 @@ void UStochasticDecisionTree::CreateFlankingAttack(UStrategicAISubAction* SubAct
 		for(int j = MaxIndex + 1; j <= MaxIndexUnits; ++j)
 		{
 			ICommands* CommandUnit = CommandUnits[j];
-			if (not IssueRegisterWithBlackboardOrder(CommandUnit, bRestOrderQueue))
+			constexpr bool bResetOrderQueue = true;
+			if (not IssueRegisterWithBlackboardOrder(CommandUnit, bResetOrderQueue))
 			{
 				RTSFunctionLibrary::ReportError("Failed to register unit with blackboard after attack-move orders"
 					"for flanking attack for excess units that had no flank location");
@@ -1270,6 +1276,11 @@ FWeakActorLocations UStochasticDecisionTree::ProjectHeavyTankFlankLocations(
 	const FWeakActorLocations& FlankLocations) const
 {
 	FWeakActorLocations ProjectedFlankLocations;
+	if (not FlankLocations.Actor.IsValid())
+	{
+		return ProjectedFlankLocations;
+	}
+
 	ProjectedFlankLocations.Actor = FlankLocations.Actor;
 	for (const FVector& EachFlankLocation : FlankLocations.Locations)
 	{

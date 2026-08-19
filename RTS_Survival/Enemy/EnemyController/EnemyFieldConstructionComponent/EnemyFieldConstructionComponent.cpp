@@ -198,6 +198,11 @@ TArray<AActor*> UEnemyFieldConstructionComponent::GetHazmatUnitsAlreadyAssignedT
 void UEnemyFieldConstructionComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Re-bind the owning controller at runtime; constructor-time InitFieldConstructionComponent(this)
+	// captures the class default object for a placed controller.
+	M_EnemyController = Cast<AEnemyController>(GetOwner());
+
 	CacheGenerationSeedFromGameInstance();
 }
 
@@ -213,6 +218,14 @@ void UEnemyFieldConstructionComponent::EndPlay(const EEndPlayReason::Type EndPla
 
 bool UEnemyFieldConstructionComponent::EnsureEnemyControllerIsValid()
 {
+	// Always re-bind to the actual owner so a stale reference (e.g. the class default object captured at
+	// construction) can never be used; fall back to the cached value only if the owner is momentarily
+	// unavailable (e.g. during teardown).
+	if (AEnemyController* OwningController = Cast<AEnemyController>(GetOwner()))
+	{
+		M_EnemyController = OwningController;
+		return true;
+	}
 	if (M_EnemyController.IsValid())
 	{
 		return true;
@@ -220,8 +233,7 @@ bool UEnemyFieldConstructionComponent::EnsureEnemyControllerIsValid()
 
 	RTSFunctionLibrary::ReportError(TEXT("EnemyFieldConstructionComponent has no valid enemy controller! "
 		"\n see UEnemyFieldConstructionComponent::EnsureEnemyControllerIsValid"));
-	M_EnemyController = Cast<AEnemyController>(GetOwner());
-	return M_EnemyController.IsValid();
+	return false;
 }
 
 void UEnemyFieldConstructionComponent::CacheGenerationSeedFromGameInstance()

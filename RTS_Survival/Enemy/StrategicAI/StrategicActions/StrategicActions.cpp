@@ -515,8 +515,10 @@ USubAction_FlankPlayerHeavies::USubAction_FlankPlayerHeavies()
 	M_SpecialtyPressure = EAITrainingFocusSpecialty::AntiTank;
 	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIDoesBlackboardHaveHeavyTankFlankPositions>(
 		TEXT("DoesBlackboardHaveHeavyFlankPositions")));
-	AddNativeVisibleRequirement(CreateDefaultSubobject<UStrategicAIHasAtLeastAnyIdleTanks>(
-		TEXT("HasAnyXTanksRequirement")));
+	UStrategicAIHasAtLeastAnyIdleTanks* HasAnyTanksRequirement =
+		CreateDefaultSubobject<UStrategicAIHasAtLeastAnyIdleTanks>(TEXT("HasAnyXTanksRequirement"));
+	HasAnyTanksRequirement->MissingUnitFocusPressure = EAITrainingFocus::LightTanks;
+	AddNativeVisibleRequirement(HasAnyTanksRequirement);
 }
 
 FString USubAction_FlankPlayerHeavies::GetDebugString() const

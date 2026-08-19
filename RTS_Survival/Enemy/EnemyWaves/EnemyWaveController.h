@@ -5,6 +5,9 @@
 #include "CoreMinimal.h"
 #include "AttackWave.h"
 #include "Components/ActorComponent.h"
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+#include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
+#endif
 #include "EnemyWaveController.generated.h"
 
 
@@ -14,6 +17,34 @@ class AEnemyController;
 class ARTSAsyncSpawner;
 class UNavigationSystemV1;
 class URTSGameInstance;
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+/**
+ * @brief Value-only record correlating one completed wave iteration with its synchronously created formation.
+ */
+struct FEnemyAIShippingWaveFormationHandoff
+{
+	int32 WaveID = INDEX_NONE;
+	int32 WaveIteration = 0;
+	int32 FormationID = INDEX_NONE;
+	int32 CreatedFormationCount = 0;
+	int32 ResolvedSpawnActorCount = 0;
+	int32 AcceptedSquadCount = 0;
+	int32 AcceptedTankCount = 0;
+	int32 AcceptedUnitCount = 0;
+	int32 FormationUnitCount = 0;
+	int32 RequestedWaypointCount = 0;
+	int32 FormationWaypointCount = 0;
+	int32 FormationPatrolPointCount = 0;
+	EEnemyAIShippingFormationKind ExpectedFormationKind = EEnemyAIShippingFormationKind::Unknown;
+	EEnemyAIShippingFormationKind ActualFormationKind = EEnemyAIShippingFormationKind::Unknown;
+	FVector RequestedFirstDestination = FVector::ZeroVector;
+	FVector RequestedFinalDestination = FVector::ZeroVector;
+	bool bFormationCreated = false;
+	bool bFormationKindMatches = false;
+	bool bFormationUnitCountMatches = false;
+};
+#endif
 
 /**
  * @brief Coordinates the spawning and iteration of enemy attack waves for the enemy controller.
@@ -172,12 +203,40 @@ public:
 	void InitWaveController(
 		AEnemyController* EnemyController);
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	int32 ShippingTest_GetCompletedAttackMoveWaveCount() const
+	{
+		return M_ShippingTest_CompletedAttackMoveWaveCount;
+	}
+
+	int32 ShippingTest_GetCompletedPatrolWaveCount() const
+	{
+		return M_ShippingTest_CompletedPatrolWaveCount;
+	}
+
+	int32 ShippingTest_GetFailedSpawnCount() const
+	{
+		return M_ShippingTest_FailedSpawnCount;
+	}
+
+	int32 ShippingTest_GetActiveWaveCount() const
+	{
+		return M_AttackWaves.Num();
+	}
+
+	TArray<FEnemyAIShippingWaveFormationHandoff> ShippingTest_GetFormationHandoffHistory() const
+	{
+		return M_ShippingTest_FormationHandoffHistory;
+	}
+#endif
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
 private:
 
+	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 	// Cached navigation system for attack move wave projections.
 	UPROPERTY()
@@ -186,8 +245,43 @@ private:
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 	float GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt = 0) const;
+	UPROPERTY(Transient)
 	TArray<FAttackWave> M_AttackWaves;
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	int32 M_ShippingTest_CompletedAttackMoveWaveCount = 0;
+	int32 M_ShippingTest_CompletedPatrolWaveCount = 0;
+	int32 M_ShippingTest_FailedSpawnCount = 0;
+	TArray<FEnemyAIShippingWaveFormationHandoff> M_ShippingTest_FormationHandoffHistory;
+
+	TArray<int32> ShippingTest_GetFormationHistoryIDs();
+	int32 ShippingTest_GetNextWaveIteration(const int32 WaveID) const;
+
+	/**
+	 * @brief Makes wave-to-formation creation failures observable without retaining either controller or its actors.
+	 * @param CompletedWave Value snapshot of the completed wave iteration.
+	 * @param WaveSquads Valid squads accepted for the formation request.
+	 * @param WaveTanks Valid tanks accepted for the formation request.
+	 * @param FormationHistoryIDsBefore IDs recorded immediately before the synchronous formation request.
+	 */
+	void ShippingTest_RecordFormationHandoff(
+		const FAttackWave& CompletedWave,
+		const TArray<ASquadController*>& WaveSquads,
+		const TArray<ATankMaster*>& WaveTanks,
+		const TArray<int32>& FormationHistoryIDsBefore);
+
+	/**
+	 * @brief Resolves the one new formation and copies its value-only creation state into the handoff record.
+	 * @param InOutHandoff Record that receives the new formation identity, kind, and accepted unit count.
+	 * @param FormationHistoryIDsBefore IDs that existed before the formation request.
+	 */
+	void ShippingTest_ResolveFormationHandoff(
+		FEnemyAIShippingWaveFormationHandoff& InOutHandoff,
+		const TArray<int32>& FormationHistoryIDsBefore);
+	EEnemyAIShippingFormationKind ShippingTest_GetExpectedFormationKind(const FAttackWave& CompletedWave) const;
+#endif
 	void RemoveAttackWaveByIDAndInvalidateTimer(FAttackWave* AttackWave);
+	FAttackWave* FindAttackWaveByID(const int32 UniqueID);
 	FAttackWave* GetAttackWaveByID(const int32 UniqueID);
 
 	bool CreateNewAttackWaveStruct(
@@ -219,39 +313,96 @@ private:
 	void OnAttackWaveCreatorDied(FAttackWave* AttackWave);
 	
 	/**
-	 * @briefWill only spawn as many units as allowed by the wave supply
-	* Only returns true if at least one spawn request was successful, false otherwise.
-	* @post The async spawner is spawning the selected units and will use @See OnUnitSpawnedForWave
-	* when a unit was spawned.
-	*/ 
+	 * @brief Reserves supply before requests so inline callbacks cannot overdraw the wave budget.
+	 * @return True when at least one request was submitted and its completion is handled by this function.
+	 */
 	bool SpawnUnitsForAttackWave(FAttackWave* AttackWave);
+
+	/**
+	 * @brief Keeps supply reservation separate from request submission so callbacks see the final pending count.
+	 * @param Element The configured wave element whose option may consume one supply.
+	 * @param OutPickedOption Receives the option when supply was reserved.
+	 * @return Whether an option was selected and one unit of wave supply was reserved.
+	 */
+	bool TryReserveSupplyForWaveElement(
+		const FAttackWaveElement& Element,
+		FTrainingOption& OutPickedOption);
+
+	/**
+	 * @brief Resolves callback and rejected-request paths through one shared completion state.
+	 * @param TrainingOption The reserved option submitted to the async spawner.
+	 * @param SpawnLocation The configured world location for this request.
+	 * @param WaveID Stable identity used because inline callbacks may move or remove array elements.
+	 */
+	void SubmitSpawnRequestForWave(
+		const FTrainingOption& TrainingOption,
+		const FVector& SpawnLocation,
+		const int32 WaveID);
 
 	bool GetRandomAttackWaveElementOption(const FAttackWaveElement& Element, FTrainingOption& OutPickedOption) const;
 
 	/**
-	 * @brief Adds the spawned actor to the wave of the provided ID if the actor is valid; returns the wave supply back
-	 * to the enemy controller otherwise.
-	 *
+	 * @brief Resolves a reserved request without retaining a pointer into the mutable wave array.
+	 * @param TrainingOption The option whose supply was reserved for this callback.
+	 * @param SpawnedActor The spawned unit, or null when loading or spawning failed.
+	 * @param ID Stable wave identity forwarded by the async spawner.
 	 */
 	void OnUnitSpawnedForWave(
 		const FTrainingOption& TrainingOption,
 		AActor* SpawnedActor,
 		const int32 ID);
+
+	/**
+	 * @brief Refunds and resolves a failed request exactly once through the caller's resolution guard.
+	 * @param TrainingOption The option whose reserved supply must be refunded.
+	 * @param WaveID Stable wave identity used to update the pending count when the wave still exists.
+	 */
 	void OnWaveUnitFailedToSpawn(
 		const FTrainingOption& TrainingOption,
 		const int32 WaveID);
+	void CompletePendingSpawnForWave(const int32 WaveID);
+	void FinalizeWaveIterationWithoutSpawnedUnits(const int32 WaveID);
+	void RefundSupplyForFailedWaveSpawn();
+
+	/**
+	 * @brief Re-fetches the record after formation setup may have mutated the wave array.
+	 * @param WaveID Stable identity of the completed wave iteration.
+	 * @param bIsSingleWave Whether the record must be removed instead of scheduling another iteration.
+	 */
+	void FinishWaveAfterFormationStarted(const int32 WaveID, const bool bIsSingleWave);
 
 	void OnWaveCompletedSpawn(FAttackWave* Wave);
+
+	/**
+	 * @brief Uses a value snapshot because formation setup can re-enter systems that mutate the wave array.
+	 * @param CompletedWave Stable settings and waypoints for the completed spawn iteration.
+	 * @param WaveSquads Valid squads extracted from the spawned actor list.
+	 * @param WaveTanks Valid tanks extracted from the spawned actor list.
+	 * @param AverageSpawnLocation Formation origin calculated before movement starts.
+	 */
+	void StartMovementForCompletedWave(
+		const FAttackWave& CompletedWave,
+		const TArray<ASquadController*>& WaveSquads,
+		const TArray<ATankMaster*>& WaveTanks,
+		const FVector& AverageSpawnLocation) const;
+
 	FVector GetAverageSpawnLocation(
 		const TArray<ASquadController*>& SquadControllers,
 		const TArray<ATankMaster*>& TankMasters) const;
 
-	// Gets the tanks and squads from the wave, will destroy actors that are not of those types.
-	// Assumes valid Enemy controller is set.
-	void ExtractTanksAndSquadsFromWaveActors(
+	/**
+	 * @brief Filters the completed spawn set before supply ownership transfers to a formation.
+	 * @param OutTankMasters Receives valid spawned tanks.
+	 * @param OutSquadControllers Receives valid spawned squad controllers.
+	 * @param InWaveActors Actors resolved by this wave iteration.
+	 * @return Number of invalid actors whose reserved supply was refunded.
+	 */
+	int32 ExtractTanksAndSquadsFromWaveActors(
 		TArray<ATankMaster*>& OutTankMasters,
-		TArray<ASquadController*>& OutSquadControllers, const TArray<AActor*>& InWaveActors) const;
+		TArray<ASquadController*>& OutSquadControllers,
+		const TArray<TObjectPtr<AActor>>& InWaveActors) const;
 
+	UPROPERTY()
 	TWeakObjectPtr<ARTSAsyncSpawner> M_AsyncSpawner;
 	bool GetIsValidAsyncSpawner();
 

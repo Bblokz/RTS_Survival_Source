@@ -23,6 +23,60 @@ FORCEINLINE uint32 GetTypeHash(const TWeakInterfacePtr<ICommands>& WeakPtr)
 	return ::GetTypeHash(WeakPtr.GetObject());
 }
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+enum class EEnemyAIShippingFormationKind : uint8
+{
+	Unknown,
+	Move,
+	AttackMove,
+	RandomPatrolWithAttackMove
+};
+
+enum class EEnemyAIShippingFormationEndReason : uint8
+{
+	None,
+	FinalDestination,
+	ExplicitRemoval,
+	UnitsRemoved,
+	InvalidUnits,
+	MissingWaypoints
+};
+
+/**
+ * @brief Value-only history used by the isolated Shipping target to verify formation progress across GC.
+ */
+struct FEnemyAIShippingFormationProgress
+{
+	int32 FormationID = INDEX_NONE;
+	EEnemyAIShippingFormationKind FormationKind = EEnemyAIShippingFormationKind::Unknown;
+	EEnemyAIShippingFormationEndReason EndReason = EEnemyAIShippingFormationEndReason::None;
+	int32 InitialSquadCount = 0;
+	int32 InitialTankCount = 0;
+	int32 InitialUnitCount = 0;
+	int32 CurrentUnitCount = 0;
+	int32 InitialWaypointCount = 0;
+	int32 PatrolPointCount = 0;
+	int32 CurrentWaypointIndex = INDEX_NONE;
+	int32 CurrentPatrolPointIndex = INDEX_NONE;
+	int32 UnitWaypointArrivalCount = 0;
+	int32 FormationWaypointAdvanceCount = 0;
+	int32 FinalDestinationReachedCount = 0;
+	int32 PatrolPointArrivalCount = 0;
+	int32 PatrolGuardIterationCount = 0;
+	int32 PatrolPointAdvanceCount = 0;
+	int32 CombatHoldCount = 0;
+	int32 CombatTimeoutAdvanceCount = 0;
+	int32 MovementErrorCount = 0;
+	FVector FirstDestination = FVector::ZeroVector;
+	FVector FinalDestination = FVector::ZeroVector;
+	bool bIsActive = false;
+	bool bReachedFinalDestination = false;
+};
+#endif
+
+/**
+ * @brief Owns formation movement state for enemy units and advances it from movement callbacks and periodic checks.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UEnemyFormationController : public UActorComponent
 {
@@ -89,12 +143,21 @@ public:
 	TArray<AActor*> RemoveUnitsFromAnyFormation(const TArray<ASquadController*>& SquadControllers,
 	                                            const TArray<ATankMaster*>& TankMasters);
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	TArray<FEnemyAIShippingFormationProgress> ShippingTest_GetFormationProgressHistory() const;
+	TArray<int32> ShippingTest_GetActiveFormationIDs() const;
+	bool ShippingTest_GetFormationProgressByID(
+		const int32 FormationID,
+		FEnemyAIShippingFormationProgress& OutProgress) const;
+#endif
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 	bool EnsureEnemyControllerIsValid();
 	void CacheGenerationSeedFromGameInstance();
@@ -103,6 +166,28 @@ private:
 
 
 	TMap<int32, FFormationData> M_ActiveFormations;
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	mutable TMap<int32, FEnemyAIShippingFormationProgress> M_ShippingTest_FormationProgressByID;
+
+	void ShippingTest_RecordFormationCreated(const FFormationData& Formation) const;
+	void ShippingTest_UpdateFormationState(const FFormationData& Formation) const;
+	void ShippingTest_MarkFormationInactive(
+		const int32 FormationID,
+		const EEnemyAIShippingFormationEndReason EndReason) const;
+	void ShippingTest_RecordUnitWaypointArrival(const int32 FormationID) const;
+	void ShippingTest_RecordFormationWaypointAdvance(const FFormationData& Formation) const;
+	void ShippingTest_RecordFinalDestination(const FFormationData& Formation) const;
+	void ShippingTest_RecordPatrolPointArrival(const FFormationData& Formation) const;
+	void ShippingTest_RecordPatrolGuardIteration(const FFormationData& Formation) const;
+	void ShippingTest_RecordPatrolPointAdvance(const FFormationData& Formation) const;
+	void ShippingTest_RecordCombatDecision(
+		const FFormationData& Formation,
+		const bool bHasCombatUnits,
+		const bool bCanAdvance) const;
+	void ShippingTest_RecordMovementErrorForUnit(const TWeakInterfacePtr<ICommands>& Unit) const;
+	void ShippingTest_PruneFormationProgressHistory() const;
+#endif
 
 	/**
 	 * @brief Check if formations are still going.

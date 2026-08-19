@@ -386,6 +386,14 @@ public:
 	UGlobalAbilitiesManager* GetEnemyGlobalAbilitiesManager() const;
 	const FEnemyGlobalAbilityAISettings& GetEnemyGlobalAbilityAISettings() const;
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	UEnemyWaveController* ShippingTest_GetEnemyWaveController() const;
+	const TArray<FEnemyGlobalAbilityLoadoutEntry>& ShippingTest_GetEnemyGlobalAbilityLoadout() const
+	{
+		return M_EnemyGlobalAbilityLoadout;
+	}
+#endif
+
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyFieldConstructionComponent* GetEnemyFieldConstructionComponent() const;

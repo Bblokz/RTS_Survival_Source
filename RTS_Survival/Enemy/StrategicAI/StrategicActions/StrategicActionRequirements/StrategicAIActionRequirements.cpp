@@ -280,7 +280,7 @@ void UStrategicAIHasAtLeastAnyIdleTanks::AddMissingUnitTrainingPressureContribut
 {
 	AddUnitPressureContribution(
 		OutPressureContributions,
-		EAITrainingFocus::MediumTanks,
+		MissingUnitFocusPressure,
 		GetRequirementSpecialtyPressure(BaseSpecialtyPressure),
 		GetRequirementPressureAmount(PressureAmount, AmountIdleTanksNeeded),
 		SourceDebugName);

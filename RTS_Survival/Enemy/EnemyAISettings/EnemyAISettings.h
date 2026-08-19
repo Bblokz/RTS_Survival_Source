@@ -37,7 +37,7 @@ namespace EnemyAISettings
 		// How often the enemy AI updates training pressure from strategic sub-actions.
 		inline float UpdateEnemyTrainingPressure_Interval = 12.f * DEV_AI_ThinkTimers_Scaling;
 		// How often the enemy AI gets new training points depending on the setting in the EnemyController
-		// Ensure this is a multiple of 60 as the training points are calculated per minute.
+		// Income uses actual elapsed world time, so this cadence can be tuned independently from the per-minute rate.
 		inline float UpdateEnemyTrainingPoints_Interval = 60.f* DEV_AI_ThinkTimers_Scaling;
 		// Fallback cadence for the enemy global ability think step when the map settings are invalid.
 		inline constexpr float UpdateEnemyGlobalAbility_Interval = 1.f;

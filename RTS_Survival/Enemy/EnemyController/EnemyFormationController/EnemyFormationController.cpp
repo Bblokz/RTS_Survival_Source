@@ -27,6 +27,9 @@ namespace EnemyFormationConstants
 	const float FindTeleportLocationProjectionExtent = 0.2f;
 	const int32 TeleportProjectionAttempts = 8;
 	const int32 GuardProjectionAttempts = 6;
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	const int32 ShippingTestMaxFormationProgressHistory = 512;
+#endif
 }
 
 UEnemyFormationController::UEnemyFormationController()
@@ -232,6 +235,273 @@ void UEnemyFormationController::GetActiveFormationData(TArray<FFormationData>& O
 	}
 }
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+TArray<FEnemyAIShippingFormationProgress>
+UEnemyFormationController::ShippingTest_GetFormationProgressHistory() const
+{
+	TArray<FEnemyAIShippingFormationProgress> ProgressHistory;
+	M_ShippingTest_FormationProgressByID.GenerateValueArray(ProgressHistory);
+	ProgressHistory.Sort([](
+		const FEnemyAIShippingFormationProgress& Left,
+		const FEnemyAIShippingFormationProgress& Right)
+	{
+		return Left.FormationID < Right.FormationID;
+	});
+	return ProgressHistory;
+}
+
+TArray<int32> UEnemyFormationController::ShippingTest_GetActiveFormationIDs() const
+{
+	TArray<int32> FormationIDs;
+	M_ActiveFormations.GenerateKeyArray(FormationIDs);
+	FormationIDs.Sort();
+	return FormationIDs;
+}
+
+bool UEnemyFormationController::ShippingTest_GetFormationProgressByID(
+	const int32 FormationID,
+	FEnemyAIShippingFormationProgress& OutProgress) const
+{
+	const FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(FormationID);
+	if (not Progress)
+	{
+		return false;
+	}
+
+	OutProgress = *Progress;
+	return true;
+}
+
+void UEnemyFormationController::ShippingTest_RecordFormationCreated(const FFormationData& Formation) const
+{
+	ShippingTest_PruneFormationProgressHistory();
+
+	FEnemyAIShippingFormationProgress Progress;
+	Progress.FormationID = Formation.FormationID;
+	Progress.bIsActive = true;
+	Progress.InitialWaypointCount = Formation.FormationWaypoints.Num();
+	Progress.PatrolPointCount = Formation.M_RandomPatrolWithAttackMoveState.M_PatrolPoints.Num();
+	Progress.CurrentWaypointIndex = Formation.CurrentWaypointIndex;
+	Progress.CurrentPatrolPointIndex =
+		Formation.M_RandomPatrolWithAttackMoveState.M_CurrentPatrolPointIndex;
+	if (Formation.bIsRandomPatrolWithAttackMoveFormation)
+	{
+		Progress.FormationKind = EEnemyAIShippingFormationKind::RandomPatrolWithAttackMove;
+	}
+	else if (Formation.bIsAttackMoveFormation)
+	{
+		Progress.FormationKind = EEnemyAIShippingFormationKind::AttackMove;
+	}
+	else
+	{
+		Progress.FormationKind = EEnemyAIShippingFormationKind::Move;
+	}
+
+	for (const FFormationUnitData& FormationUnit : Formation.FormationUnits)
+	{
+		if (not FormationUnit.IsValidFormationUnit())
+		{
+			continue;
+		}
+
+		if (FormationUnit.Unit->GetIsSquadUnit())
+		{
+			Progress.InitialSquadCount++;
+			continue;
+		}
+		Progress.InitialTankCount++;
+	}
+
+	Progress.InitialUnitCount = Progress.InitialSquadCount + Progress.InitialTankCount;
+	Progress.CurrentUnitCount = Progress.InitialUnitCount;
+	if (not Formation.FormationWaypoints.IsEmpty())
+	{
+		Progress.FirstDestination = Formation.FormationWaypoints[0];
+		Progress.FinalDestination = Formation.FormationWaypoints.Last();
+	}
+
+	M_ShippingTest_FormationProgressByID.Add(Formation.FormationID, Progress);
+}
+
+void UEnemyFormationController::ShippingTest_UpdateFormationState(const FFormationData& Formation) const
+{
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(Formation.FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	Progress->CurrentUnitCount = Formation.FormationUnits.Num();
+	Progress->CurrentWaypointIndex = Formation.CurrentWaypointIndex;
+	Progress->CurrentPatrolPointIndex =
+		Formation.M_RandomPatrolWithAttackMoveState.M_CurrentPatrolPointIndex;
+}
+
+void UEnemyFormationController::ShippingTest_MarkFormationInactive(
+	const int32 FormationID,
+	const EEnemyAIShippingFormationEndReason EndReason) const
+{
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	Progress->bIsActive = false;
+	Progress->EndReason = EndReason;
+}
+
+void UEnemyFormationController::ShippingTest_RecordUnitWaypointArrival(const int32 FormationID) const
+{
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	Progress->UnitWaypointArrivalCount++;
+}
+
+void UEnemyFormationController::ShippingTest_RecordFormationWaypointAdvance(
+	const FFormationData& Formation) const
+{
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(Formation.FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	Progress->FormationWaypointAdvanceCount++;
+	ShippingTest_UpdateFormationState(Formation);
+}
+
+void UEnemyFormationController::ShippingTest_RecordFinalDestination(const FFormationData& Formation) const
+{
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(Formation.FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	Progress->FinalDestinationReachedCount++;
+	Progress->bReachedFinalDestination = true;
+	ShippingTest_UpdateFormationState(Formation);
+}
+
+void UEnemyFormationController::ShippingTest_RecordPatrolPointArrival(const FFormationData& Formation) const
+{
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(Formation.FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	Progress->PatrolPointArrivalCount++;
+	ShippingTest_UpdateFormationState(Formation);
+}
+
+void UEnemyFormationController::ShippingTest_RecordPatrolGuardIteration(const FFormationData& Formation) const
+{
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(Formation.FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	Progress->PatrolGuardIterationCount++;
+}
+
+void UEnemyFormationController::ShippingTest_RecordPatrolPointAdvance(const FFormationData& Formation) const
+{
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(Formation.FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	Progress->PatrolPointAdvanceCount++;
+	ShippingTest_UpdateFormationState(Formation);
+}
+
+void UEnemyFormationController::ShippingTest_RecordCombatDecision(
+	const FFormationData& Formation,
+	const bool bHasCombatUnits,
+	const bool bCanAdvance) const
+{
+	if (not bHasCombatUnits)
+	{
+		return;
+	}
+
+	FEnemyAIShippingFormationProgress* Progress = M_ShippingTest_FormationProgressByID.Find(Formation.FormationID);
+	if (not Progress)
+	{
+		return;
+	}
+
+	if (bCanAdvance)
+	{
+		Progress->CombatTimeoutAdvanceCount++;
+		return;
+	}
+	Progress->CombatHoldCount++;
+}
+
+void UEnemyFormationController::ShippingTest_RecordMovementErrorForUnit(
+	const TWeakInterfacePtr<ICommands>& Unit) const
+{
+	for (const TPair<int32, FFormationData>& FormationPair : M_ActiveFormations)
+	{
+		for (const FFormationUnitData& FormationUnit : FormationPair.Value.FormationUnits)
+		{
+			if (FormationUnit.Unit != Unit)
+			{
+				continue;
+			}
+
+			FEnemyAIShippingFormationProgress* Progress =
+				M_ShippingTest_FormationProgressByID.Find(FormationPair.Key);
+			if (not Progress)
+			{
+				return;
+			}
+
+			Progress->MovementErrorCount++;
+			return;
+		}
+	}
+}
+
+void UEnemyFormationController::ShippingTest_PruneFormationProgressHistory() const
+{
+	if (M_ShippingTest_FormationProgressByID.Num() <
+		EnemyFormationConstants::ShippingTestMaxFormationProgressHistory)
+	{
+		return;
+	}
+
+	int32 OldestInactiveFormationID = MAX_int32;
+	int32 OldestFormationID = MAX_int32;
+	for (const TPair<int32, FEnemyAIShippingFormationProgress>& ProgressPair :
+		M_ShippingTest_FormationProgressByID)
+	{
+		OldestFormationID = FMath::Min(OldestFormationID, ProgressPair.Key);
+		if (not ProgressPair.Value.bIsActive)
+		{
+			OldestInactiveFormationID = FMath::Min(OldestInactiveFormationID, ProgressPair.Key);
+		}
+	}
+
+	const int32 FormationIDToRemove = OldestInactiveFormationID != MAX_int32
+		? OldestInactiveFormationID
+		: OldestFormationID;
+	if (FormationIDToRemove != MAX_int32)
+	{
+		M_ShippingTest_FormationProgressByID.Remove(FormationIDToRemove);
+	}
+}
+#endif
+
 void UEnemyFormationController::RemoveActiveFormationsByID(const TArray<int32>& FormationIDs)
 {
 	for (const int32 FormationID : FormationIDs)
@@ -257,6 +527,11 @@ void UEnemyFormationController::RemoveActiveFormationsByID(const TArray<int32>& 
 			FormationUnit.Unit->OnUnitIdleAndNoNewCommandsDelegate.Remove(FormationUnit.MovementCompleteHandle);
 		}
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+		ShippingTest_MarkFormationInactive(
+			FormationID,
+			EEnemyAIShippingFormationEndReason::ExplicitRemoval);
+#endif
 		M_ActiveFormations.Remove(FormationID);
 	}
 
@@ -329,10 +604,19 @@ TArray<AActor*> UEnemyFormationController::RemoveUnitsFromAnyFormation(
 		{
 			FormationsToRemove.Add(FormationPair.Key);
 		}
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+		ShippingTest_UpdateFormationState(FormationData);
+#endif
 	}
 
 	for (const int32 FormationID : FormationsToRemove)
 	{
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+		ShippingTest_MarkFormationInactive(
+			FormationID,
+			EEnemyAIShippingFormationEndReason::UnitsRemoved);
+#endif
 		M_ActiveFormations.Remove(FormationID);
 	}
 	return ActorsRemoved;
@@ -341,6 +625,11 @@ TArray<AActor*> UEnemyFormationController::RemoveUnitsFromAnyFormation(
 void UEnemyFormationController::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Re-bind the owning controller at runtime; constructor-time InitFormationController(this) captures the
+	// class default object for a placed controller.
+	M_EnemyController = Cast<AEnemyController>(GetOwner());
+
 	CacheGenerationSeedFromGameInstance();
 }
 
@@ -355,14 +644,25 @@ void UEnemyFormationController::EndPlay(const EEndPlayReason::Type EndPlayReason
 
 bool UEnemyFormationController::EnsureEnemyControllerIsValid()
 {
+	// Always re-bind to the actual owner so a stale reference (e.g. the class default object captured at
+	// construction) can never be used; fall back to the cached value only if the owner is momentarily
+	// unavailable (e.g. during teardown).
+	if (AEnemyController* OwningController = Cast<AEnemyController>(GetOwner()))
+	{
+		M_EnemyController = OwningController;
+		return true;
+	}
 	if (M_EnemyController.IsValid())
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportError(TEXT("EnemyFormationController has no valid enemy controller! "
-		"\n see UEnemyFormationController::EnsureEnemyControllerIsValid"));
-	M_EnemyController = Cast<AEnemyController>(GetOwner());
-	return M_EnemyController.IsValid();
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_EnemyController"),
+		TEXT("UEnemyFormationController::EnsureEnemyControllerIsValid"),
+		this);
+	return false;
 }
 
 void UEnemyFormationController::CacheGenerationSeedFromGameInstance()
@@ -429,7 +729,7 @@ void UEnemyFormationController::CheckFormations()
 	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
 	// May delete formations in this loop; so snapshot keys first and re-fetch live data each iteration.
 	TArray<int32> FormationIDs;
-	M_ActiveFormations.GetKeys(FormationIDs);
+	M_ActiveFormations.GenerateKeyArray(FormationIDs);
 	for (const int32 FormationID : FormationIDs)
 	{
 		FFormationData* Formation = M_ActiveFormations.Find(FormationID);
@@ -818,6 +1118,10 @@ void UEnemyFormationController::HandleAttackMoveFormation(
 		bHasCombatUnits,
 		CombatUnits);
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordCombatDecision(Formation, bHasCombatUnits, bCanAdvance);
+#endif
+
 	if (bHasCombatUnits && not bCanAdvance)
 	{
 		IssueAttackMoveHelpOrders(Formation, CombatUnits);
@@ -850,15 +1154,22 @@ void UEnemyFormationController::HandleRandomPatrolWithAttackMoveFormation(FForma
 	const float CurrentTimeSeconds = World->GetTimeSeconds();
 	bool bHasCombatUnits = false;
 	TArray<const FFormationUnitData*> CombatUnits;
-	GetCanAttackMoveFormationAdvance(
+	const bool bCanAdvance = GetCanAttackMoveFormationAdvance(
 		Formation,
 		CurrentTimeSeconds,
 		bHasCombatUnits,
 		CombatUnits);
 
-	if (bHasCombatUnits)
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordCombatDecision(Formation, bHasCombatUnits, bCanAdvance);
+#endif
+
+	if (not bCanAdvance)
 	{
-		IssueAttackMoveHelpOrders(Formation, CombatUnits);
+		if (bHasCombatUnits)
+		{
+			IssueAttackMoveHelpOrders(Formation, CombatUnits);
+		}
 		return;
 	}
 
@@ -868,6 +1179,9 @@ void UEnemyFormationController::HandleRandomPatrolWithAttackMoveFormation(FForma
 		PatrolState.bM_IsGuardingCurrentPatrolPoint = true;
 		PatrolState.M_CurrentGuardIteration = 0;
 		PatrolState.M_NextGuardIterationTimeSeconds = CurrentTimeSeconds;
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+		ShippingTest_RecordPatrolPointArrival(Formation);
+#endif
 	}
 
 	if (GetCanRandomPatrolGuardIterationExecute(Formation, CurrentTimeSeconds))
@@ -910,6 +1224,10 @@ void UEnemyFormationController::ExecuteRandomPatrolGuardIteration(FFormationData
 	{
 		return;
 	}
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordPatrolGuardIteration(Formation);
+#endif
 
 	for (FFormationUnitData& FormationUnit : Formation.FormationUnits)
 	{
@@ -994,6 +1312,10 @@ void UEnemyFormationController::TryAdvanceRandomPatrolFormation(FFormationData& 
 	Formation.FormationWaypoints = {NextPatrolLocation};
 	Formation.FormationWaypointDirections = {NextPatrolDirection};
 	Formation.CurrentWaypointIndex = 0;
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordPatrolPointAdvance(Formation);
+#endif
 
 	for (FFormationUnitData& EachUnit : Formation.FormationUnits)
 	{
@@ -1393,6 +1715,9 @@ void UEnemyFormationController::SaveNewFormation(const FFormationData& NewFormat
 	using EnemyAISettings::EnemyFormationCheckInterval;
 	// store into the map _before_ any callbacks fire
 	M_ActiveFormations.Add(NewFormation.FormationID, NewFormation);
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordFormationCreated(NewFormation);
+#endif
 	if (not M_FormationCheckTimerHandle.IsValid())
 	{
 		FTimerDelegate TimerDelegate;
@@ -1530,6 +1855,9 @@ void UEnemyFormationController::OnUnitMovementError(const TWeakInterfacePtr<ICom
 	{
 		return;
 	}
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordMovementErrorForUnit(Unit);
+#endif
 	const FString BaseError = "Could not move unit for enemy formation.";
 	const FString UnitName = Unit->GetOwnerName();
 	switch (Error)
@@ -1569,6 +1897,9 @@ void UEnemyFormationController::OnUnitReachedFWaypoint(TWeakInterfacePtr<IComman
 	}
 	// Unbind the delegate for this unit.
 	(void)Unit->OnUnitIdleAndNoNewCommandsDelegate.Remove(UnitInFormation->MovementCompleteHandle);
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordUnitWaypointArrival(FormationID);
+#endif
 	// Note: this also marks this formation unit as "bHasReachedNextDestination".
 	const bool bAllUnitsReached = Formation->CheckIfFormationReachedCurrentWayPoint(Unit, this);
 	if (Formation->bIsAttackMoveFormation)
@@ -1629,6 +1960,9 @@ bool UEnemyFormationController::GetUnitInFormation(
 void UEnemyFormationController::OnCompleteFormationReached(FFormationData* Formation)
 {
 	Formation->CurrentWaypointIndex++;
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordFormationWaypointAdvance(*Formation);
+#endif
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_Compile_DebugSymbols)
 	{
 		DebugFormationReached(Formation);
@@ -1652,6 +1986,9 @@ void UEnemyFormationController::OnCompleteFormationReached(FFormationData* Forma
 
 void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationData* Formation)
 {
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordFinalDestination(*Formation);
+#endif
 	if (M_ActiveFormations.Num() == 0)
 	{
 		GetWorld()->GetTimerManager().ClearTimer(M_FormationCheckTimerHandle);
@@ -1681,6 +2018,11 @@ void UEnemyFormationController::OnFormationReachedFinalDestination(FFormationDat
 		OnFormationUnitInvalidAddBackSupply(InvalidUnitsInFormation);
 	}
 	// remove only after we iterated otherwise we have dead mem.
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_MarkFormationInactive(
+		Formation->FormationID,
+		EEnemyAIShippingFormationEndReason::FinalDestination);
+#endif
 	M_ActiveFormations.Remove(Formation->FormationID);
 }
 
@@ -1770,6 +2112,11 @@ void UEnemyFormationController::StartFormationMovement(FFormationData& Formation
 	{
 		// remove this formation as no valid waypoitns found.
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+		ShippingTest_MarkFormationInactive(
+			Formation.FormationID,
+			EEnemyAIShippingFormationEndReason::MissingWaypoints);
+#endif
 		M_ActiveFormations.Remove(Formation.FormationID);
 		return;
 	}
@@ -1937,6 +2284,10 @@ void UEnemyFormationController::CleanupInvalidFormations()
 			RefundUnitWaveSupply(RemovedCount);
 		}
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+		ShippingTest_UpdateFormationState(Formation);
+#endif
+
 		if (Formation.FormationUnits.IsEmpty())
 		{
 			ToRemove.Add(Formation.FormationID);
@@ -1945,6 +2296,11 @@ void UEnemyFormationController::CleanupInvalidFormations()
 
 	for (int32 ID : ToRemove)
 	{
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+		ShippingTest_MarkFormationInactive(
+			ID,
+			EEnemyAIShippingFormationEndReason::InvalidUnits);
+#endif
 		M_ActiveFormations.Remove(ID);
 	}
 }

@@ -546,6 +546,19 @@ bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 	}
 
 	Blackboard.IdleDirectControlUnits.Add(IdleUnitEntry);
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	M_ShippingTest_SuccessfulRegistrationCount++;
+	if (IdleUnitEntry.UnitType == EAllUnitType::UNType_Squad)
+	{
+		M_ShippingTest_SuccessfulSquadRegistrationCount++;
+	}
+	else if (IdleUnitEntry.UnitType == EAllUnitType::UNType_Tank)
+	{
+		M_ShippingTest_SuccessfulTankRegistrationCount++;
+	}
+#endif
+
 	DebugReportRegisterDeregister("RegisterDirectControlUnit added unit: " + UnitActor->GetName());
 	return true;
 }

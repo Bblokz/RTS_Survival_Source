@@ -48,6 +48,9 @@ class UPlayerTechManager;
 class UGlobalAbility;
 class UW_GlobalAbilityPanel;
 
+/**
+ * @brief Owns a controller's loaded global abilities and maintains their shared runtime state.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UGlobalAbilitiesManager : public UActorComponent
 {
@@ -125,6 +128,8 @@ private:
 	void CheckRequirements();
 	void StartPlayerRequirementTimer();
 	void ClearPlayerRequirementTimer();
+	void StartCooldownTimer();
+	void ClearCooldownTimer();
 	void ReleaseLoadedAbilities();
 	void UpdateAbilityAvailability(UGlobalAbility* Ability);
 	void UpdateAbilityItemAvailability(const UGlobalAbility* Ability, const bool bIsEnabled, const bool bUseGreyTint) const;
@@ -148,6 +153,7 @@ private:
 	TArray<TObjectPtr<UGlobalAbility>> M_GlobalAbilities;
 
 	FTimerHandle M_CheckRequirementsTimerHandle;
+	FTimerHandle M_CooldownTimerHandle;
 
 	bool TryGenerateLocationOnAircraftEdgeLine(const FVector& AircraftEdgeCenterLocation,
 													const FVector& FowManagerPosition, const FVector& PlayerStart,

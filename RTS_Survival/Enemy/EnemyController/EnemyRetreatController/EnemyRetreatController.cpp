@@ -35,6 +35,17 @@ void UEnemyRetreatController::InitRetreatController(AEnemyController* EnemyContr
 	CacheGenerationSeedFromGameInstance();
 }
 
+void UEnemyRetreatController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Re-bind the owning controller at runtime; constructor-time InitRetreatController(this) captures the
+	// class default object for a placed controller.
+	M_EnemyController = Cast<AEnemyController>(GetOwner());
+
+	CacheGenerationSeedFromGameInstance();
+}
+
 void UEnemyRetreatController::StartRetreat(
 	const TArray<FRetreatElement>& RetreatingSquadControllers,
 	const TArray<FRetreatElement>& ReverseRetreatUnits,
@@ -113,7 +124,10 @@ void UEnemyRetreatController::StartRetreat(
 
 bool UEnemyRetreatController::EnsureEnemyControllerIsValid() const
 {
-	if (M_EnemyController.IsValid())
+	// The cached controller must be this component's actual owner; a mismatch means a stale reference
+	// (e.g. the class default object captured at construction) and is treated as invalid.
+	const AEnemyController* EnemyController = M_EnemyController.Get();
+	if (IsValid(EnemyController) && EnemyController == GetOwner())
 	{
 		return true;
 	}

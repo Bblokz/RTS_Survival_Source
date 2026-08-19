@@ -27,17 +27,19 @@ namespace FEnemyNavigationAIHelpers
 	constexpr float DebugLineThickness = 2.f;
 	constexpr int32 DebugSphereSegments = 12;
 	constexpr float DebugPointSize = 12.f;
+	constexpr float MinimumSampleSpacing = 100.f;
 
 	FVector GetProjectionExtent(const float ProjectionScale)
 	{
-		return DeveloperSettings::GamePlay::Navigation::RTSToNavProjectionExtent * ProjectionScale;
+		return DeveloperSettings::GamePlay::Navigation::RTSToNavProjectionExtent * FMath::Abs(ProjectionScale);
 	}
 
 	float GetSampleSpacing(const FVector& ProjectionExtent, const float SampleDensityScalar)
 	{
 		const float SafeDensityScalar = FMath::Max(SampleDensityScalar, MinSampleDensityScalar);
-		const float BaseSpacing = FMath::Max(ProjectionExtent.X, ProjectionExtent.Y);
-		return BaseSpacing / SafeDensityScalar;
+		const FVector AbsoluteProjectionExtent = ProjectionExtent.GetAbs();
+		const float BaseSpacing = FMath::Max(AbsoluteProjectionExtent.X, AbsoluteProjectionExtent.Y);
+		return FMath::Max(MinimumSampleSpacing, BaseSpacing / SafeDensityScalar);
 	}
 
 	TArray<FVector> BuildProjectionOffsets(
@@ -146,6 +148,12 @@ namespace FEnemyNavigationAIHelpers
 		const FVector& ProjectionExtent)
 	{
 		TArray<FVector> ProjectedPoints;
+		if (not IsInGameThread())
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("Enemy navigation default-cost batch projection attempted to access Recast off the game thread."));
+			return ProjectedPoints;
+		}
 
 		if (not IsValid(RecastNavMesh) || SamplePoints.IsEmpty())
 		{
@@ -203,10 +211,14 @@ void UEnemyNavigationAIComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Bind the owning controller at runtime, before any of this component's logic uses it. The
+	// constructor-time InitNavigationAIComponent(this) captures the class default object for a placed
+	// controller (the owner reference deserializes back to the CDO), so it must be re-established here.
+	M_EnemyController = Cast<AEnemyController>(GetOwner());
+
 	CacheGenerationSeedFromGameInstance();
 	CacheRecastNavMesh();
-	CacheRoadSplineActors();
-	PropagateRoadSplineActorsToEnemyAIBlackBoard();
+	EnsureRoadSplineActorsCachedAndPropagated();
 }
 
 void UEnemyNavigationAIComponent::CacheGenerationSeedFromGameInstance()
@@ -406,15 +418,19 @@ void UEnemyNavigationAIComponent::FindDefaultNavCostPointsAlongClosestRoadSpline
 
 bool UEnemyNavigationAIComponent::EnsureEnemyControllerIsValid() const
 {
-	if (M_EnemyController.IsValid())
+	// The cached controller must be this component's actual owner; a mismatch means a stale reference
+	// (e.g. the class default object captured at construction) and is treated as invalid.
+	const AEnemyController* EnemyController = M_EnemyController.Get();
+	if (IsValid(EnemyController) && EnemyController == GetOwner())
 	{
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		TEXT("M_EnemyController"),
-		TEXT("EnsureEnemyControllerIsValid"));
+		TEXT("EnsureEnemyControllerIsValid"),
+		this);
 	return false;
 }
 
@@ -425,10 +441,11 @@ bool UEnemyNavigationAIComponent::GetIsValidRecastNavMesh() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		TEXT("M_RecastNavMesh"),
-		TEXT("GetIsValidRecastNavMesh"));
+		TEXT("GetIsValidRecastNavMesh"),
+		this);
 	return false;
 }
 
@@ -472,9 +489,40 @@ void UEnemyNavigationAIComponent::CacheRoadSplineActors()
 	}
 }
 
+void UEnemyNavigationAIComponent::EnsureRoadSplineActorsCachedAndPropagated()
+{
+	constexpr int32 MaxRoadSplineCacheRetryAttempts = 60;
+	constexpr float RoadSplineCacheRetryIntervalSeconds = 1.f;
+
+	CacheRoadSplineActors();
+	PropagateRoadSplineActorsToEnemyAIBlackBoard();
+
+	// Success is measured by the strategic blackboard actually holding the splines, not by the local cache:
+	// caching can return zero before the level's placed road spline actors register, and propagation can
+	// no-op if the strategic component is not ready yet. Retry until the blackboard is populated.
+	if (GetBlackboardHasRoadSplines() || M_RoadSplineCacheRetryAttempts >= MaxRoadSplineCacheRetryAttempts)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	M_RoadSplineCacheRetryAttempts++;
+	World->GetTimerManager().SetTimer(
+		M_RoadSplineCacheRetryTimerHandle,
+		this,
+		&UEnemyNavigationAIComponent::EnsureRoadSplineActorsCachedAndPropagated,
+		RoadSplineCacheRetryIntervalSeconds,
+		false);
+}
+
 void UEnemyNavigationAIComponent::PropagateRoadSplineActorsToEnemyAIBlackBoard() const
 {
-	if(not EnsureEnemyControllerIsValid())
+	if (not EnsureEnemyControllerIsValid())
 	{
 		return;
 	}
@@ -486,6 +534,9 @@ void UEnemyNavigationAIComponent::PropagateRoadSplineActorsToEnemyAIBlackBoard()
 								  "at begin play in UEnemyNavigationAIComponent!");
 		return;
 	}
+	// Rebuild the blackboard's spline list so repeated propagation attempts stay idempotent.
+	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
+	Blackboard.RoadSplineActors.Reset();
 	for(auto EachSpline :M_RoadSplineActors)
 	{
 		if(not EachSpline.IsValid())
@@ -493,9 +544,21 @@ void UEnemyNavigationAIComponent::PropagateRoadSplineActorsToEnemyAIBlackBoard()
 			continue;
 		}
 
-	StrategicAIComponent->GetEditableStrategicAIBlackboard().RoadSplineActors.Add(EachSpline.Get());
-		
+	Blackboard.RoadSplineActors.Add(EachSpline.Get());
+
 	}
+}
+
+bool UEnemyNavigationAIComponent::GetBlackboardHasRoadSplines() const
+{
+	if (not M_EnemyController.IsValid())
+	{
+		return false;
+	}
+
+	const UEnemyStrategicAIComponent* StrategicAIComponent = M_EnemyController->GetEnemyStrategicAIComponent();
+	return IsValid(StrategicAIComponent)
+		&& StrategicAIComponent->GetStrategicAIBlackboard().RoadSplineActors.Num() > 0;
 }
 
 bool UEnemyNavigationAIComponent::TryProjectPointToNavigation(
@@ -671,37 +734,50 @@ void UEnemyNavigationAIComponent::QueueDefaultCostBatchProjectionAsync(
 	TFunction<void(const TArray<FVector>&)> OnPointsFound,
 	const FString& DebugContext)
 {
-	TWeakObjectPtr<UEnemyNavigationAIComponent> WeakThis(this);
-	TWeakObjectPtr<ARecastNavMesh> WeakRecastNavMesh = M_RecastNavMesh;
+	const TWeakObjectPtr<UEnemyNavigationAIComponent> WeakThis(this);
 	TFunction<void(const TArray<FVector>&)> PointsFoundCallback = MoveTemp(OnPointsFound);
 
-	AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask,
-	          [WeakThis, WeakRecastNavMesh, ProjectionExtent, SamplePoints, PointsFoundCallback, DebugContext]() mutable
-	          {
-		          if (not WeakRecastNavMesh.IsValid())
-		          {
-			          AsyncTask(ENamedThreads::GameThread, [PointsFoundCallback]()
-			          {
-				          PointsFoundCallback({});
-			          });
-			          return;
-		          }
+	AsyncTask(
+		ENamedThreads::GameThread,
+		[WeakThis,
+		 ProjectionExtent,
+		 SamplePoints,
+		 PointsFoundCallback = MoveTemp(PointsFoundCallback),
+		 DebugContext]() mutable
+		{
+			UEnemyNavigationAIComponent* NavigationComponent = WeakThis.Get();
+			UWorld* World = IsValid(NavigationComponent) ? NavigationComponent->GetWorld() : nullptr;
+			if (not IsValid(NavigationComponent)
+				|| not NavigationComponent->HasBegunPlay()
+				|| not IsValid(World)
+				|| World->bIsTearingDown
+				|| not NavigationComponent->GetIsValidRecastNavMesh())
+			{
+				if (PointsFoundCallback)
+				{
+					PointsFoundCallback({});
+				}
+				return;
+			}
 
-		          const TArray<FVector> ProjectedPoints = FEnemyNavigationAIHelpers::ProjectDefaultCostPoints(
-			          WeakRecastNavMesh.Get(),
-			          SamplePoints,
-			          ProjectionExtent);
+			const TArray<FVector> ProjectedPoints = FEnemyNavigationAIHelpers::ProjectDefaultCostPoints(
+				NavigationComponent->M_RecastNavMesh.Get(),
+				SamplePoints,
+				ProjectionExtent);
+			if (PointsFoundCallback)
+			{
+				PointsFoundCallback(ProjectedPoints);
+			}
 
-		          AsyncTask(ENamedThreads::GameThread,
-		                    [WeakThis, PointsFoundCallback, ProjectedPoints, DebugContext]() mutable
-		                    {
-			                    PointsFoundCallback(ProjectedPoints);
-			                    if (WeakThis.IsValid())
-			                    {
-				                    WeakThis->DebugBatchResult(ProjectedPoints, DebugContext);
-			                    }
-		                    });
-	          });
+			NavigationComponent = WeakThis.Get();
+			World = IsValid(NavigationComponent) ? NavigationComponent->GetWorld() : nullptr;
+			if (not IsValid(NavigationComponent) || not IsValid(World) || World->bIsTearingDown)
+			{
+				return;
+			}
+
+			NavigationComponent->DebugBatchResult(ProjectedPoints, DebugContext);
+		});
 }
 
 void UEnemyNavigationAIComponent::DebugProjectionAttempt(

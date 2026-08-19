@@ -148,6 +148,19 @@ FEnemyStrategicTrainingState& UEnemyStrategicAIComponent::GetEditableEnemyTraini
 	return M_TrainingState;
 }
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+void UEnemyStrategicAIComponent::ShippingTest_RunTrainingPressureThinkStep()
+{
+	TrainingPressure_ThinkStep();
+}
+
+void UEnemyStrategicAIComponent::ShippingTest_AccumulateTrainingPointIncomeForElapsedSeconds(
+	const float ElapsedSeconds)
+{
+	AccumulateTrainingPointIncomeForElapsedSeconds(ElapsedSeconds);
+}
+#endif
+
 void UEnemyStrategicAIComponent::RegisterDroppedUnitWithBlackboardWhenReady(AActor* DroppedUnit)
 {
 	if (not IsValid(DroppedUnit))
@@ -177,6 +190,10 @@ void UEnemyStrategicAIComponent::RegisterDroppedUnitWithBlackboardWhenReady(AAct
 void UEnemyStrategicAIComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Bind the owning controller at runtime so it is valid before InitStrategicAIComponent (called from the
+	// controller's BeginPlay) runs, and is never left pointing at the class default object.
+	M_EnemyController = Cast<AEnemyController>(GetOwner());
 }
 
 void UEnemyStrategicAIComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -317,6 +334,8 @@ void UEnemyStrategicAIComponent::AIBaseLocation_ThinkStep()
 void UEnemyStrategicAIComponent::AddPlayerUnitLocationsForDefensePositionsOfEnemyBases(
 	FFindEnemyBaseClusters& OutFindBaseRequest)
 {
+	OutFindBaseRequest.PlayerUnitLocationsToDefendAgainst.Reset();
+
 	if (BlackboardQueries::HasValidPlayerAttackingLocations(M_Blackboard))
 	{
 		for (const auto& EachUnderAttLoc : M_Blackboard.CurrentLocationsUnderPlayerAttack.
@@ -526,8 +545,15 @@ The next training think step can evaluate fresh pressure again.
  */
 void UEnemyStrategicAIComponent::Training_ThinkStep()
 {
-	
+
 	TRACE_CPUPROFILER_EVENT_SCOPE("StrategicAI_TrainingThinkStep");
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	if (bM_ShippingTest_PressureOnlyTraining)
+	{
+		return;
+	}
+#endif
+
 	// Reserved batches are handled first so saved pressure cannot be replaced by cheaper random picks.
 	// “Do I currently have at least ReservedTrainingBatch.TrainingPointCost training points?”
 	if (Training_HandleReservedTrainingBatchIfAny())
@@ -940,6 +966,10 @@ void UEnemyStrategicAIComponent::TrainingSpawnBatchTimerTick(const int32 BatchID
 			WeakThis->OnBlackboardUnitSpawned(SpawnedTrainingOption, SpawnedActor, ID, TrainingLocation);
 		}, FRotator::ZeroRotator);
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	M_ShippingTest_TrainingSpawnRequestCount += bRequestStarted ? 1 : 0;
+#endif
+
 	if (not bRequestStarted)
 	{
 		RTSFunctionLibrary::ReportError(
@@ -984,6 +1014,10 @@ void UEnemyStrategicAIComponent::OnBlackboardUnitSpawned(
 	{
 		return;
 	}
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	M_ShippingTest_TrainingSpawnSuccessCount++;
+#endif
 
 	DebugTrainedUnit(TrainingOption, TrainingLocation);
 	if (TrainingOption.UnitType != EAllUnitType::UNType_Squad)
@@ -1131,8 +1165,11 @@ bool UEnemyStrategicAIComponent::GetValidTrainingSpawnTransform(FTransform& OutT
 				RTSFunctionLibrary::PrintString(
 					"Enemy strategic AI cannot create training batch because it cannot get valid spawn "
 					"transform from random enemy base cluster either.", FColor::Red);
-				return false;
 			}
+			RTSFunctionLibrary::ReportError(
+				"Enemy strategic AI could not get a valid training spawn transform from a trainer or enemy base.");
+
+			return false;
 		}
 		return true;
 	}
@@ -1154,8 +1191,6 @@ bool UEnemyStrategicAIComponent::GetValidTrainerComponentLocationFromBlackboard(
 		}
 		return true;
 	}
-	RTSFunctionLibrary::ReportError(
-		"Enemy strategic AI could not get valid trainer component location from blackboard.");
 	return false;
 }
 
@@ -1262,15 +1297,36 @@ void UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep()
 
 void UEnemyStrategicAIComponent::GetTrainingPoints_ThinkStep()
 {
-	const int32 MultiplierPerInterval = FMath::Max(
-		1, EnemyAISettings::ThinkingTimers::UpdateEnemyTrainingPoints_Interval / 60);
-	M_TrainingState.TrainingPoints += M_TrainingState.EnemyLevelTraining.TrainingPointsPerMinute *
-		MultiplierPerInterval;
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const float ElapsedSeconds = FMath::Max(
+		0.f,
+		World->GetTimeSeconds() - M_TrainingPointsThinkTimer.LastTimeThought);
+	AccumulateTrainingPointIncomeForElapsedSeconds(ElapsedSeconds);
+}
+
+void UEnemyStrategicAIComponent::AccumulateTrainingPointIncomeForElapsedSeconds(const float ElapsedSeconds)
+{
+	constexpr float SecondsPerMinute = 60.f;
+	const float SafeElapsedSeconds = FMath::Max(0.f, ElapsedSeconds);
+	const float EarnedTrainingPoints = M_TrainingState.TrainingPointIncomeRemainder
+		+ M_TrainingState.EnemyLevelTraining.TrainingPointsPerMinute * SafeElapsedSeconds / SecondsPerMinute;
+	const int32 WholeTrainingPoints = FMath::FloorToInt(EarnedTrainingPoints);
+
+	M_TrainingState.TrainingPoints += WholeTrainingPoints;
+	M_TrainingState.TrainingPointIncomeRemainder = EarnedTrainingPoints - WholeTrainingPoints;
 }
 
 bool UEnemyStrategicAIComponent::EnsureEnemyControllerIsValid() const
 {
-	if (M_EnemyController.IsValid())
+	// The cached controller must be this component's actual owner; a mismatch means a stale reference
+	// (e.g. the class default object captured at construction) and is treated as invalid.
+	const AEnemyController* EnemyController = M_EnemyController.Get();
+	if (IsValid(EnemyController) && EnemyController == GetOwner())
 	{
 		return true;
 	}
@@ -1846,7 +1902,6 @@ void UEnemyStrategicAIComponent::EnemyGlobalAbility_ThinkStep()
 		return;
 	}
 
-	GlobalAbilitiesManager->TickGlobalAbilityCooldowns();
 	UGlobalAbility* AbilityToExecute = nullptr;
 	FVector TargetLocation = FVector::ZeroVector;
 	if (not TryPickEnemyGlobalAbilityAndTarget(AbilityToExecute, TargetLocation))

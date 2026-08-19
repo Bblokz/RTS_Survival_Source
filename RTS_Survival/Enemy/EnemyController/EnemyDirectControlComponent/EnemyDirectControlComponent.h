@@ -43,6 +43,23 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	TArray<AActor*> GetRegisteredDirectControlUnits() const;
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	int32 ShippingTest_GetSuccessfulRegistrationCount() const
+	{
+		return M_ShippingTest_SuccessfulRegistrationCount;
+	}
+
+	int32 ShippingTest_GetSuccessfulSquadRegistrationCount() const
+	{
+		return M_ShippingTest_SuccessfulSquadRegistrationCount;
+	}
+
+	int32 ShippingTest_GetSuccessfulTankRegistrationCount() const
+	{
+		return M_ShippingTest_SuccessfulTankRegistrationCount;
+	}
+#endif
+
 	/** @brief Randomly drains up to Max units from idle entries and removes each pick immediately to avoid re-selection.
 	 *  @param MaxUnitsToPick Upper limit for how many idle entries may be consumed from the blackboard.
 	 *  @return Typed pick result built from the entries that were removed.
@@ -118,6 +135,12 @@ protected:
 private:
 	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	int32 M_ShippingTest_SuccessfulRegistrationCount = 0;
+	int32 M_ShippingTest_SuccessfulSquadRegistrationCount = 0;
+	int32 M_ShippingTest_SuccessfulTankRegistrationCount = 0;
+#endif
 
 	FTimerHandle M_DirectControlTickTimerHandle;
 

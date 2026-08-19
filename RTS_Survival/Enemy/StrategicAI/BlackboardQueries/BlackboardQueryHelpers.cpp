@@ -310,11 +310,12 @@ bool BlackboardQueries::HasValidPlayerUnitBulkLocations(const FStrategicAIBlackb
 
 bool BlackboardQueries::HasValidPlayerHeavyTankFLankLocations(const FStrategicAIBlackboard& Blackboard)
 {
-	for (auto EachHeavyTankFlanking : Blackboard.AgreggatedHeavyTankFlankingResults)
+	for (const FResultClosestFlankableEnemyHeavy& EachHeavyTankFlanking :
+		Blackboard.AgreggatedHeavyTankFlankingResults)
 	{
-		for (auto EachHeavyTank : EachHeavyTankFlanking.FlankLocationsAroundHeavyTank)
+		for (const FWeakActorLocations& EachHeavyTank : EachHeavyTankFlanking.FlankLocationsAroundHeavyTank)
 		{
-			if (not EachHeavyTank.Locations.IsEmpty())
+			if (EachHeavyTank.Actor.IsValid() && not EachHeavyTank.Locations.IsEmpty())
 			{
 				return true;
 			}
@@ -337,14 +338,20 @@ TArray<FVector> BlackboardQueries::GetRandomLocationsOfIdleUnits(
 		return TArray<FVector>();
 	}
 
-	const int32 MaxLocationsToPick = FMath::Min(PreferredAmount, Blackboard.IdleDirectControlUnits.Num());
 	TArray<int32> RemainingIdleUnitIndices;
 	RemainingIdleUnitIndices.Reserve(Blackboard.IdleDirectControlUnits.Num());
 
 	for (int32 IdleUnitIndex = 0; IdleUnitIndex < Blackboard.IdleDirectControlUnits.Num(); ++IdleUnitIndex)
 	{
+		if (not Blackboard.IdleDirectControlUnits[IdleUnitIndex].IsValid())
+		{
+			continue;
+		}
+
 		RemainingIdleUnitIndices.Add(IdleUnitIndex);
 	}
+
+	const int32 MaxLocationsToPick = FMath::Min(PreferredAmount, RemainingIdleUnitIndices.Num());
 
 	TArray<FVector> PickedLocations;
 	PickedLocations.Reserve(MaxLocationsToPick);
@@ -358,8 +365,13 @@ TArray<FVector> BlackboardQueries::GetRandomLocationsOfIdleUnits(
 		const int32 PickedIdleUnitIndex = RemainingIdleUnitIndices[RandomRemainingIndex];
 		RemainingIdleUnitIndices.RemoveAtSwap(RandomRemainingIndex, 1, EAllowShrinking::No);
 
-		const FVector IdleUnitLocation = Blackboard.IdleDirectControlUnits[PickedIdleUnitIndex].Get()->
-			GetActorLocation();
+		const AActor* IdleUnit = Blackboard.IdleDirectControlUnits[PickedIdleUnitIndex].Get();
+		if (not IsValid(IdleUnit))
+		{
+			continue;
+		}
+
+		const FVector IdleUnitLocation = IdleUnit->GetActorLocation();
 		if (SeenLocations.Contains(IdleUnitLocation))
 		{
 			continue;

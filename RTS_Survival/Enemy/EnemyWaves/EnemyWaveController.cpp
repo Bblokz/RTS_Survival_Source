@@ -13,6 +13,12 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+namespace EnemyWaveShippingTestConstants
+{
+	const int32 MaxFormationHandoffHistory = 512;
+}
+#endif
 
 UEnemyWaveController::UEnemyWaveController()
 {
@@ -401,20 +407,35 @@ void UEnemyWaveController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Re-bind the owning controller at runtime; constructor-time InitWaveController(this) captures the
+	// class default object for a placed controller, which would route completed-wave formations to the CDO.
+	M_EnemyController = Cast<AEnemyController>(GetOwner());
+
 	M_NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
 	CacheGenerationSeedFromGameInstance();
 }
 
 bool UEnemyWaveController::EnsureEnemyControllerIsValid()
 {
+	// Always re-bind to the actual owner so a stale reference (e.g. the class default object captured at
+	// construction) can never be used; fall back to the cached value only if the owner is momentarily
+	// unavailable (e.g. during teardown).
+	if (AEnemyController* OwningController = Cast<AEnemyController>(GetOwner()))
+	{
+		M_EnemyController = OwningController;
+		return true;
+	}
 	if (M_EnemyController.IsValid())
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportError(TEXT("EnemyWaveController has no valid enemy controller! "
-		"\n see UEnemyWaveController::EnsureEnemyControllerIsValid"));
-	M_EnemyController = Cast<AEnemyController>(GetOwner());
-	return M_EnemyController.IsValid();
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_EnemyController"),
+		TEXT("UEnemyWaveController::EnsureEnemyControllerIsValid"),
+		this);
+	return false;
 }
 
 void UEnemyWaveController::CacheGenerationSeedFromGameInstance()
@@ -480,15 +501,21 @@ void UEnemyWaveController::RemoveAttackWaveByIDAndInvalidateTimer(FAttackWave* A
 
 FAttackWave* UEnemyWaveController::GetAttackWaveByID(const int32 UniqueID)
 {
-	for (auto& EachWave : M_AttackWaves)
+	FAttackWave* AttackWave = FindAttackWaveByID(UniqueID);
+	if (AttackWave)
 	{
-		if (EachWave.UniqueWaveID == UniqueID)
-		{
-			return &EachWave;
-		}
+		return AttackWave;
 	}
 	RTSFunctionLibrary::ReportError("Could not find attack wave with ID: " + FString::FromInt(UniqueID));
 	return nullptr;
+}
+
+FAttackWave* UEnemyWaveController::FindAttackWaveByID(const int32 UniqueID)
+{
+	return M_AttackWaves.FindByPredicate([UniqueID](const FAttackWave& Wave)
+	{
+		return Wave.UniqueWaveID == UniqueID;
+	});
 }
 
 bool UEnemyWaveController::CreateNewAttackWaveStruct(const int32 UniqueID, const EEnemyWaveType WaveType,
@@ -568,17 +595,15 @@ bool UEnemyWaveController::CreateAttackWaveTimer(FAttackWave* AttackWave, const 
 			// The wave is removed; nothing to do.
 			return;
 		}
-		// If the spawning fails then there is no call to on OnWaveCompletedSpawn which means we need to
-		// set the next timer iteration here as this is normally done automatically after a wave spawned all untis
-		// and started formation movement.
-		if (not WeakThis->SpawnUnitsForAttackWave(Wave))
+		if (WeakThis->SpawnUnitsForAttackWave(Wave))
 		{
-			RTSFunctionLibrary::PrintString(
-				"Wave iteration could not spawn any units possibly due "
-				"to no wave supply left. skipping this iteration.");
-			// Set timer again for next iteration.
-			(void)WeakThis->CreateAttackWaveTimer(Wave, false);
+			return;
 		}
+
+		RTSFunctionLibrary::PrintString(
+			"Wave iteration could not submit any spawn requests, possibly due "
+			"to no wave supply left. Skipping this iteration.");
+		WeakThis->FinalizeWaveIterationWithoutSpawnedUnits(ID);
 	};
 	AttackWave->WaveDelegate.BindLambda(OnWaveIteration);
 	if (bInstantStart)
@@ -662,74 +687,131 @@ void UEnemyWaveController::OnAttackWaveCreatorDied(FAttackWave* AttackWave)
 
 bool UEnemyWaveController::SpawnUnitsForAttackWave(FAttackWave* AttackWave)
 {
-	if (!AttackWave || !GetIsValidAsyncSpawner() || !EnsureEnemyControllerIsValid())
+	if (not AttackWave || not GetIsValidAsyncSpawner() || not EnsureEnemyControllerIsValid())
+	{
 		return false;
+	}
 
-	// Reset the counter and clear previous actors.
+	const int32 WaveID = AttackWave->UniqueWaveID;
+	const TArray<FAttackWaveElement> WaveElements = AttackWave->WaveElements;
 	AttackWave->ResetForSpawningNewWave();
 
 	struct FPendingSpawn
 	{
-		FTrainingOption Option;
-		FVector Location;
+		FTrainingOption TrainingOption;
+		FVector SpawnLocation;
 	};
-	TArray<FPendingSpawn> PendingSpawns;
-	PendingSpawns.Reserve(AttackWave->WaveElements.Num());
 
-	// Pick the units we will try to spawn, and reserve their supply.
-	for (auto& Element : AttackWave->WaveElements)
+	TArray<FPendingSpawn> PendingSpawns;
+	PendingSpawns.Reserve(WaveElements.Num());
+
+	for (const FAttackWaveElement& Element : WaveElements)
 	{
 		FTrainingOption PickedOption;
-		if (!GetRandomAttackWaveElementOption(Element, PickedOption))
-			continue;
-
-		if (M_EnemyController->GetEnemyWaveSupply() <= 0)
+		if (not TryReserveSupplyForWaveElement(Element, PickedOption))
 		{
-			RTSFunctionLibrary::PrintString(
-				"Enemy has no wave supply left; skipping this element.");
 			continue;
 		}
 
-		// We consume one supply for this unit so that we don't spawn more than we can afford in this loop.
-		M_EnemyController->AddToWaveSupply(-1);
 		PendingSpawns.Add({PickedOption, Element.SpawnLocation});
 	}
 
-	// Tell the wave how many callbacks we expect
-	const int32 NumToSpawn = PendingSpawns.Num();
-	AttackWave->AwaitingSpawnsTillStartMoving = NumToSpawn;
-	if (NumToSpawn == 0)
+	FAttackWave* CurrentWave = FindAttackWaveByID(WaveID);
+	if (not CurrentWave)
+	{
+		for (const FPendingSpawn& PendingSpawn : PendingSpawns)
+		{
+			OnWaveUnitFailedToSpawn(PendingSpawn.TrainingOption, WaveID);
+		}
+		return not PendingSpawns.IsEmpty();
+	}
+
+	CurrentWave->AwaitingSpawnsTillStartMoving = PendingSpawns.Num();
+	if (PendingSpawns.IsEmpty())
 	{
 		return false;
 	}
 
-	TWeakObjectPtr<UEnemyWaveController> WeakThis(this);
-	for (auto& SpawnInfo : PendingSpawns)
+	for (const FPendingSpawn& PendingSpawn : PendingSpawns)
 	{
-		auto OnSpawned = [WeakThis](const FTrainingOption& Opt, AActor* Actor, int32 WaveID)
-		{
-			if (WeakThis.IsValid())
-			{
-				// Callback to determine when the wave is fully spawned.
-				WeakThis->OnUnitSpawnedForWave(Opt, Actor, WaveID);
-			}
-		};
-
-		//If this ever fails, give the supply back immediately,
-		// and decrement our awaiting counter to not hang forever.
-		if (!M_AsyncSpawner->AsyncSpawnOptionAtLocation(
-			SpawnInfo.Option,
-			SpawnInfo.Location,
-			this,
-			AttackWave->UniqueWaveID,
-			OnSpawned, FRotator::ZeroRotator))
-		{
-			M_EnemyController->AddToWaveSupply(1);
-			AttackWave->AwaitingSpawnsTillStartMoving--;
-		}
+		SubmitSpawnRequestForWave(
+			PendingSpawn.TrainingOption,
+			PendingSpawn.SpawnLocation,
+			WaveID);
 	}
 
 	return true;
+}
+
+bool UEnemyWaveController::TryReserveSupplyForWaveElement(
+	const FAttackWaveElement& Element,
+	FTrainingOption& OutPickedOption)
+{
+	if (not GetRandomAttackWaveElementOption(Element, OutPickedOption))
+	{
+		return false;
+	}
+	if (M_EnemyController->GetEnemyWaveSupply() <= 0)
+	{
+		RTSFunctionLibrary::PrintString("Enemy has no wave supply left; skipping this element.");
+		return false;
+	}
+
+	M_EnemyController->AddToWaveSupply(-1);
+	return true;
+}
+
+void UEnemyWaveController::SubmitSpawnRequestForWave(
+	const FTrainingOption& TrainingOption,
+	const FVector& SpawnLocation,
+	const int32 WaveID)
+{
+	if (not FindAttackWaveByID(WaveID) || not GetIsValidAsyncSpawner())
+	{
+		OnWaveUnitFailedToSpawn(TrainingOption, WaveID);
+		return;
+	}
+
+	ARTSAsyncSpawner* AsyncSpawner = M_AsyncSpawner.Get();
+	if (not IsValid(AsyncSpawner))
+	{
+		OnWaveUnitFailedToSpawn(TrainingOption, WaveID);
+		return;
+	}
+
+	const TSharedRef<bool> RequestResolved = MakeShared<bool>(false);
+	const TWeakObjectPtr<UEnemyWaveController> WeakThis(this);
+	auto OnSpawned = [WeakThis, RequestResolved, WaveID](
+		const FTrainingOption& SpawnedTrainingOption,
+		AActor* SpawnedActor,
+		const int32)
+	{
+		if (*RequestResolved)
+		{
+			return;
+		}
+
+		*RequestResolved = true;
+		if (WeakThis.IsValid())
+		{
+			WeakThis->OnUnitSpawnedForWave(SpawnedTrainingOption, SpawnedActor, WaveID);
+		}
+	};
+
+	const bool bRequestStarted = AsyncSpawner->AsyncSpawnOptionAtLocation(
+		TrainingOption,
+		SpawnLocation,
+		this,
+		WaveID,
+		OnSpawned,
+		FRotator::ZeroRotator);
+	if (bRequestStarted || *RequestResolved)
+	{
+		return;
+	}
+
+	*RequestResolved = true;
+	OnWaveUnitFailedToSpawn(TrainingOption, WaveID);
 }
 
 bool UEnemyWaveController::GetRandomAttackWaveElementOption(const FAttackWaveElement& Element,
@@ -750,58 +832,127 @@ bool UEnemyWaveController::GetRandomAttackWaveElementOption(const FAttackWaveEle
 void UEnemyWaveController::OnUnitSpawnedForWave(const FTrainingOption& TrainingOption, AActor* SpawnedActor,
                                                 const int32 ID)
 {
-	FAttackWave* AttackWave = GetAttackWaveByID(ID);
-	if (not AttackWave)
-	{
-		// We subtracted one when we enqueued this spawn—give it back.
-		if (EnsureEnemyControllerIsValid())
-		{
-			M_EnemyController->AddToWaveSupply(1);
-		}
-		return;
-	}
 	if (not IsValid(SpawnedActor))
 	{
 		OnWaveUnitFailedToSpawn(TrainingOption, ID);
-	}
-	else
-	{
-		AttackWave->SpawnedWaveUnits.Add(SpawnedActor);
+		return;
 	}
 
-	AttackWave->AwaitingSpawnsTillStartMoving--;
-	// Did we just spawn the last wave unit?
-	if (AttackWave->AwaitingSpawnsTillStartMoving <= 0)
+	FAttackWave* AttackWave = FindAttackWaveByID(ID);
+	if (not AttackWave)
 	{
-		OnWaveCompletedSpawn(AttackWave);
+		RTSFunctionLibrary::ReportError(
+			"Spawned a wave unit after its wave was removed. Destroying the orphaned unit.");
+		SpawnedActor->Destroy();
+		OnWaveUnitFailedToSpawn(TrainingOption, ID);
+		return;
 	}
+
+	AttackWave->SpawnedWaveUnits.Add(SpawnedActor);
+	CompletePendingSpawnForWave(ID);
 }
 
 void UEnemyWaveController::OnWaveUnitFailedToSpawn(
 	const FTrainingOption& TrainingOption,
 	const int32 WaveID)
 {
-	// If the wave is gone, we need to refund here too.
-	FAttackWave* AttackWave = GetAttackWaveByID(WaveID);
-	if (!AttackWave)
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	M_ShippingTest_FailedSpawnCount++;
+#endif
+
+	const bool bWaveExists = FindAttackWaveByID(WaveID) != nullptr;
+	const FString OptionName = TrainingOption.GetDisplayName();
+	RTSFunctionLibrary::ReportError(
+		"Wave unit failed to spawn: " + OptionName +
+		" (wave " + FString::FromInt(WaveID) + "). Refunding supply.");
+	RefundSupplyForFailedWaveSpawn();
+
+	if (bWaveExists)
 	{
-		if (EnsureEnemyControllerIsValid())
-		{
-			M_EnemyController->AddToWaveSupply(1);
-		}
+		CompletePendingSpawnForWave(WaveID);
+	}
+}
+
+void UEnemyWaveController::CompletePendingSpawnForWave(const int32 WaveID)
+{
+	FAttackWave* AttackWave = FindAttackWaveByID(WaveID);
+	if (not AttackWave)
+	{
 		return;
 	}
-	// Make sure we do not hang waiting for this unit that never spawned!
-	AttackWave->AwaitingSpawnsTillStartMoving--;
-	const FString OptName = TrainingOption.GetDisplayName();
-	RTSFunctionLibrary::ReportError(
-		"Wave unit failed to spawn: " + OptName +
-		" (wave " + FString::FromInt(WaveID) + "). Refunding supply.");
-
-	// Refund supply for this one unit
-	if (EnsureEnemyControllerIsValid())
+	if (AttackWave->AwaitingSpawnsTillStartMoving <= 0)
 	{
-		M_EnemyController->AddToWaveSupply(1);
+		RTSFunctionLibrary::ReportError(
+			"Received an extra wave spawn completion for wave " + FString::FromInt(WaveID) + ".");
+		return;
+	}
+
+	AttackWave->AwaitingSpawnsTillStartMoving--;
+	if (AttackWave->AwaitingSpawnsTillStartMoving > 0)
+	{
+		return;
+	}
+	if (AttackWave->SpawnedWaveUnits.IsEmpty())
+	{
+		FinalizeWaveIterationWithoutSpawnedUnits(WaveID);
+		return;
+	}
+
+	OnWaveCompletedSpawn(AttackWave);
+}
+
+void UEnemyWaveController::FinalizeWaveIterationWithoutSpawnedUnits(const int32 WaveID)
+{
+	FAttackWave* AttackWave = FindAttackWaveByID(WaveID);
+	if (not AttackWave)
+	{
+		return;
+	}
+	if (AttackWave->bIsSingleWave)
+	{
+		RemoveAttackWaveByIDAndInvalidateTimer(AttackWave);
+		return;
+	}
+
+	constexpr bool bInstantStart = false;
+	if (not CreateAttackWaveTimer(AttackWave, bInstantStart))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to schedule the next iteration after a wave spawned no valid units.");
+		FAttackWave* FailedWave = FindAttackWaveByID(WaveID);
+		RemoveAttackWaveByIDAndInvalidateTimer(FailedWave);
+	}
+}
+
+void UEnemyWaveController::RefundSupplyForFailedWaveSpawn()
+{
+	if (not EnsureEnemyControllerIsValid())
+	{
+		return;
+	}
+
+	M_EnemyController->AddToWaveSupply(1);
+}
+
+void UEnemyWaveController::FinishWaveAfterFormationStarted(const int32 WaveID, const bool bIsSingleWave)
+{
+	FAttackWave* CurrentWave = FindAttackWaveByID(WaveID);
+	if (not CurrentWave)
+	{
+		return;
+	}
+	if (bIsSingleWave)
+	{
+		RemoveAttackWaveByIDAndInvalidateTimer(CurrentWave);
+		return;
+	}
+
+	constexpr bool bInstantStartWave = false;
+	if (not CreateAttackWaveTimer(CurrentWave, bInstantStartWave))
+	{
+		RTSFunctionLibrary::ReportError("Failed to schedule the next completed attack wave iteration.");
+		FAttackWave* FailedWave = FindAttackWaveByID(WaveID);
+		RemoveAttackWaveByIDAndInvalidateTimer(FailedWave);
 	}
 }
 
@@ -813,38 +964,87 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 		return;
 	}
 
+	const FAttackWave CompletedWave = *Wave;
+	const int32 WaveID = CompletedWave.UniqueWaveID;
 	TArray<ATankMaster*> WaveTanks;
 	TArray<ASquadController*> WaveSquads;
-	ExtractTanksAndSquadsFromWaveActors(WaveTanks, WaveSquads, Wave->SpawnedWaveUnits);
+	const int32 InvalidSpawnedActorCount = ExtractTanksAndSquadsFromWaveActors(
+		WaveTanks,
+		WaveSquads,
+		CompletedWave.SpawnedWaveUnits);
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	M_ShippingTest_FailedSpawnCount += InvalidSpawnedActorCount;
+#else
+	(void)InvalidSpawnedActorCount;
+#endif
+
+	if (WaveTanks.IsEmpty() && WaveSquads.IsEmpty())
+	{
+		FinalizeWaveIterationWithoutSpawnedUnits(WaveID);
+		return;
+	}
+
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	if (CompletedWave.bIsAttackMoveWave && not CompletedWave.bIsRandomPatrolWithAttackMoveWave)
+	{
+		M_ShippingTest_CompletedAttackMoveWaveCount++;
+	}
+	if (CompletedWave.bIsRandomPatrolWithAttackMoveWave)
+	{
+		M_ShippingTest_CompletedPatrolWaveCount++;
+	}
+#endif
+
 	const FVector AverageSpawnLocation = GetAverageSpawnLocation(WaveSquads, WaveTanks);
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	const TArray<int32> FormationHistoryIDsBefore = ShippingTest_GetFormationHistoryIDs();
+#endif
+	StartMovementForCompletedWave(CompletedWave, WaveSquads, WaveTanks, AverageSpawnLocation);
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+	ShippingTest_RecordFormationHandoff(
+		CompletedWave,
+		WaveSquads,
+		WaveTanks,
+		FormationHistoryIDsBefore);
+#endif
+	FinishWaveAfterFormationStarted(WaveID, CompletedWave.bIsSingleWave);
+}
+
+void UEnemyWaveController::StartMovementForCompletedWave(
+	const FAttackWave& CompletedWave,
+	const TArray<ASquadController*>& WaveSquads,
+	const TArray<ATankMaster*>& WaveTanks,
+	const FVector& AverageSpawnLocation) const
+{
 	// Start the formation movement using the enemy formation controller; note that at this point
 	// all the wave resources are paid for and that if a wave unit dies during the formation or after
 	// the enemy formation controller will callback on the enemy controller to adjust the wave supply accordingly.
-	if (Wave->bIsAttackMoveWave)
+	if (CompletedWave.bIsAttackMoveWave)
 	{
 		M_EnemyController->MoveAttackMoveFormationToLocation(
 			WaveSquads,
 			WaveTanks,
-			Wave->Waypoints,
-			Wave->FinalWaypointDirection,
-			Wave->MaxFormationWidth,
-			Wave->FormationOffsetMlt,
-			Wave->AttackMoveSettings,
+			CompletedWave.Waypoints,
+			CompletedWave.FinalWaypointDirection,
+			CompletedWave.MaxFormationWidth,
+			CompletedWave.FormationOffsetMlt,
+			CompletedWave.AttackMoveSettings,
 			AverageSpawnLocation);
 	}
-	else if (Wave->bIsRandomPatrolWithAttackMoveWave)
+	else if (CompletedWave.bIsRandomPatrolWithAttackMoveWave)
 	{
 		M_EnemyController->MoveRandomPatrolWithAttackMoveFormation(
 			WaveSquads,
 			WaveTanks,
-			Wave->Waypoints,
-			Wave->RandomPatrolWithAttackMoveSettings.OverrideFirstPatrolPointIndex,
-			Wave->RandomPatrolWithAttackMoveSettings.AmountIterationsAtPatrolPoint,
-			Wave->RandomPatrolWithAttackMoveSettings.GuardTimePerPatrolPointIteration,
-			Wave->RandomPatrolWithAttackMoveSettings.GuardSphereRadius,
-			Wave->MaxFormationWidth,
-			Wave->FormationOffsetMlt,
-			Wave->RandomPatrolWithAttackMoveSettings.AttackMoveSettings,
+			CompletedWave.Waypoints,
+			CompletedWave.RandomPatrolWithAttackMoveSettings.OverrideFirstPatrolPointIndex,
+			CompletedWave.RandomPatrolWithAttackMoveSettings.AmountIterationsAtPatrolPoint,
+			CompletedWave.RandomPatrolWithAttackMoveSettings.GuardTimePerPatrolPointIteration,
+			CompletedWave.RandomPatrolWithAttackMoveSettings.GuardSphereRadius,
+			CompletedWave.MaxFormationWidth,
+			CompletedWave.FormationOffsetMlt,
+			CompletedWave.RandomPatrolWithAttackMoveSettings.AttackMoveSettings,
 			AverageSpawnLocation);
 	}
 	else
@@ -852,22 +1052,145 @@ void UEnemyWaveController::OnWaveCompletedSpawn(FAttackWave* Wave)
 		M_EnemyController->MoveFormationToLocation(
 			WaveSquads,
 			WaveTanks,
-			Wave->Waypoints,
-			Wave->FinalWaypointDirection,
-			Wave->MaxFormationWidth,
-			Wave->FormationOffsetMlt,
+			CompletedWave.Waypoints,
+			CompletedWave.FinalWaypointDirection,
+			CompletedWave.MaxFormationWidth,
+			CompletedWave.FormationOffsetMlt,
 			AverageSpawnLocation);
 	}
+}
 
-	if (Wave->bIsSingleWave)
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+TArray<int32> UEnemyWaveController::ShippingTest_GetFormationHistoryIDs()
+{
+	if (not EnsureEnemyControllerIsValid())
 	{
-		RemoveAttackWaveByIDAndInvalidateTimer(Wave);
+		return {};
+	}
+
+	UEnemyFormationController* FormationController = M_EnemyController->GetEnemyFormationController();
+	if (not IsValid(FormationController))
+	{
+		return {};
+	}
+
+	const TArray<FEnemyAIShippingFormationProgress> FormationHistory =
+		FormationController->ShippingTest_GetFormationProgressHistory();
+	TArray<int32> FormationIDs;
+	FormationIDs.Reserve(FormationHistory.Num());
+	for (const FEnemyAIShippingFormationProgress& Progress : FormationHistory)
+	{
+		FormationIDs.Add(Progress.FormationID);
+	}
+	return FormationIDs;
+}
+
+int32 UEnemyWaveController::ShippingTest_GetNextWaveIteration(const int32 WaveID) const
+{
+	for (int32 HandoffIndex = M_ShippingTest_FormationHandoffHistory.Num() - 1;
+		HandoffIndex >= 0;
+		--HandoffIndex)
+	{
+		const FEnemyAIShippingWaveFormationHandoff& PreviousHandoff =
+			M_ShippingTest_FormationHandoffHistory[HandoffIndex];
+		if (PreviousHandoff.WaveID == WaveID)
+		{
+			return PreviousHandoff.WaveIteration + 1;
+		}
+	}
+	return 1;
+}
+
+void UEnemyWaveController::ShippingTest_RecordFormationHandoff(
+	const FAttackWave& CompletedWave,
+	const TArray<ASquadController*>& WaveSquads,
+	const TArray<ATankMaster*>& WaveTanks,
+	const TArray<int32>& FormationHistoryIDsBefore)
+{
+	FEnemyAIShippingWaveFormationHandoff Handoff;
+	Handoff.WaveID = CompletedWave.UniqueWaveID;
+	Handoff.WaveIteration = ShippingTest_GetNextWaveIteration(CompletedWave.UniqueWaveID);
+	Handoff.ResolvedSpawnActorCount = CompletedWave.SpawnedWaveUnits.Num();
+	Handoff.AcceptedSquadCount = WaveSquads.Num();
+	Handoff.AcceptedTankCount = WaveTanks.Num();
+	Handoff.AcceptedUnitCount = WaveSquads.Num() + WaveTanks.Num();
+	Handoff.RequestedWaypointCount = CompletedWave.Waypoints.Num();
+	Handoff.ExpectedFormationKind = ShippingTest_GetExpectedFormationKind(CompletedWave);
+	if (not CompletedWave.Waypoints.IsEmpty())
+	{
+		Handoff.RequestedFirstDestination = CompletedWave.Waypoints[0];
+		Handoff.RequestedFinalDestination = CompletedWave.Waypoints.Last();
+	}
+
+	ShippingTest_ResolveFormationHandoff(Handoff, FormationHistoryIDsBefore);
+	if (M_ShippingTest_FormationHandoffHistory.Num() >=
+		EnemyWaveShippingTestConstants::MaxFormationHandoffHistory)
+	{
+		M_ShippingTest_FormationHandoffHistory.RemoveAt(0, 1, false);
+	}
+	M_ShippingTest_FormationHandoffHistory.Add(Handoff);
+}
+
+void UEnemyWaveController::ShippingTest_ResolveFormationHandoff(
+	FEnemyAIShippingWaveFormationHandoff& InOutHandoff,
+	const TArray<int32>& FormationHistoryIDsBefore)
+{
+	const TArray<int32> FormationHistoryIDsAfter = ShippingTest_GetFormationHistoryIDs();
+	TArray<int32> NewFormationIDs;
+	for (const int32 FormationID : FormationHistoryIDsAfter)
+	{
+		if (not FormationHistoryIDsBefore.Contains(FormationID))
+		{
+			NewFormationIDs.Add(FormationID);
+		}
+	}
+
+	InOutHandoff.CreatedFormationCount = NewFormationIDs.Num();
+	InOutHandoff.bFormationCreated = NewFormationIDs.Num() == 1;
+	if (not InOutHandoff.bFormationCreated || not EnsureEnemyControllerIsValid())
+	{
 		return;
 	}
 
-	const bool bInstantStartWave = false;
-	CreateAttackWaveTimer(Wave, bInstantStartWave);
+	UEnemyFormationController* FormationController = M_EnemyController->GetEnemyFormationController();
+	if (not IsValid(FormationController))
+	{
+		return;
+	}
+
+	FEnemyAIShippingFormationProgress FormationProgress;
+	if (not FormationController->ShippingTest_GetFormationProgressByID(
+		NewFormationIDs[0],
+		FormationProgress))
+	{
+		return;
+	}
+
+	InOutHandoff.FormationID = FormationProgress.FormationID;
+	InOutHandoff.FormationUnitCount = FormationProgress.InitialUnitCount;
+	InOutHandoff.FormationWaypointCount = FormationProgress.InitialWaypointCount;
+	InOutHandoff.FormationPatrolPointCount = FormationProgress.PatrolPointCount;
+	InOutHandoff.ActualFormationKind = FormationProgress.FormationKind;
+	InOutHandoff.bFormationKindMatches =
+		InOutHandoff.ExpectedFormationKind == InOutHandoff.ActualFormationKind;
+	InOutHandoff.bFormationUnitCountMatches =
+		InOutHandoff.AcceptedUnitCount == InOutHandoff.FormationUnitCount;
 }
+
+EEnemyAIShippingFormationKind UEnemyWaveController::ShippingTest_GetExpectedFormationKind(
+	const FAttackWave& CompletedWave) const
+{
+	if (CompletedWave.bIsRandomPatrolWithAttackMoveWave)
+	{
+		return EEnemyAIShippingFormationKind::RandomPatrolWithAttackMove;
+	}
+	if (CompletedWave.bIsAttackMoveWave)
+	{
+		return EEnemyAIShippingFormationKind::AttackMove;
+	}
+	return EEnemyAIShippingFormationKind::Move;
+}
+#endif
 
 FVector UEnemyWaveController::GetAverageSpawnLocation(
 	const TArray<ASquadController*>& SquadControllers,
@@ -907,15 +1230,18 @@ FVector UEnemyWaveController::GetAverageSpawnLocation(
 	return AccumulatedLocation / static_cast<float>(ValidUnitCount);
 }
 
-void UEnemyWaveController::ExtractTanksAndSquadsFromWaveActors(TArray<ATankMaster*>& OutTankMasters,
-                                                               TArray<ASquadController*>& OutSquadControllers,
-                                                               const TArray<AActor*>& InWaveActors) const
+int32 UEnemyWaveController::ExtractTanksAndSquadsFromWaveActors(
+	TArray<ATankMaster*>& OutTankMasters,
+	TArray<ASquadController*>& OutSquadControllers,
+	const TArray<TObjectPtr<AActor>>& InWaveActors) const
 {
-	for (const auto EachWaveActor : InWaveActors)
+	int32 InvalidActorCount = 0;
+	for (AActor* EachWaveActor : InWaveActors)
 	{
 		if (not IsValid(EachWaveActor))
 		{
 			M_EnemyController->AddToWaveSupply(1);
+			InvalidActorCount++;
 			continue;
 		}
 		if (EachWaveActor->IsA<ATankMaster>())
@@ -932,8 +1258,11 @@ void UEnemyWaveController::ExtractTanksAndSquadsFromWaveActors(TArray<ATankMaste
 			"Invalid wave actor type! Expected TankMaster or SquadController, got: " + EachWaveActor->GetClass()->
 			GetName());
 		M_EnemyController->AddToWaveSupply(1);
+		InvalidActorCount++;
 		EachWaveActor->Destroy();
 	}
+
+	return InvalidActorCount;
 }
 
 
@@ -943,8 +1272,19 @@ bool UEnemyWaveController::GetIsValidAsyncSpawner()
 	{
 		return true;
 	}
+
 	M_AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this);
-	return M_AsyncSpawner.IsValid();
+	if (M_AsyncSpawner.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_AsyncSpawner"),
+		TEXT("UEnemyWaveController::GetIsValidAsyncSpawner"),
+		this);
+	return false;
 }
 
 bool UEnemyWaveController::GetIsValidWave(const EEnemyWaveType WaveType,

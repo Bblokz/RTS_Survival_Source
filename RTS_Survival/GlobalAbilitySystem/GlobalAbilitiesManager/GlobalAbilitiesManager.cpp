@@ -133,6 +133,7 @@ void UGlobalAbilitiesManager::BeginPlay()
 void UGlobalAbilitiesManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	ClearPlayerRequirementTimer();
+	ClearCooldownTimer();
 	ReleaseLoadedAbilities();
 	Super::EndPlay(EndPlayReason);
 }
@@ -420,6 +421,10 @@ void UGlobalAbilitiesManager::LoadGlobalAbilities(TArray<EGlobalAbility> Ability
 		{
 			continue;
 		}
+		// The enum key the template is registered under is authoritative for the loaded ability's type.
+		// Stamping it here keeps FindLoadedAbilityByType and per-ability loadout overrides (e.g. enemy
+		// cooldown overrides) correct even when a template's own M_AbilityType was authored inconsistently.
+		AbilityCopy->M_AbilityType = AbilityEnum;
 		AbilityCopy->InitGlobalAbility(M_OwningPlayer, this, Cast<ACPPController>(GetOwner()));
 		AbilitiesLoadedCopyUObjects.Add(AbilityCopy);
 	}
@@ -429,6 +434,7 @@ void UGlobalAbilitiesManager::LoadGlobalAbilities(TArray<EGlobalAbility> Ability
 void UGlobalAbilitiesManager::OnLoadedAbilities(TArray<TObjectPtr<UGlobalAbility>> AbilitiesLoadedCopyUObjects)
 {
 	M_GlobalAbilities = AbilitiesLoadedCopyUObjects;
+	StartCooldownTimer();
 	if (IsPlayerAbilityManager())
 	{
 		InitAbilityPanel(AbilitiesLoadedCopyUObjects);
@@ -475,6 +481,41 @@ void UGlobalAbilitiesManager::ClearPlayerRequirementTimer()
 	M_CheckRequirementsTimerHandle.Invalidate();
 }
 
+void UGlobalAbilitiesManager::StartCooldownTimer()
+{
+	if (not IsEnemyAbilityManager())
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	constexpr float CooldownTickInterval = 1.f;
+	World->GetTimerManager().SetTimer(
+		M_CooldownTimerHandle,
+		this,
+		&UGlobalAbilitiesManager::TickGlobalAbilityCooldowns,
+		CooldownTickInterval,
+		true);
+}
+
+void UGlobalAbilitiesManager::ClearCooldownTimer()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		M_CooldownTimerHandle.Invalidate();
+		return;
+	}
+
+	World->GetTimerManager().ClearTimer(M_CooldownTimerHandle);
+	M_CooldownTimerHandle.Invalidate();
+}
+
 void UGlobalAbilitiesManager::ReleaseLoadedAbilities()
 {
 	for (UGlobalAbility* Ability : M_GlobalAbilities)
@@ -509,7 +550,9 @@ void UGlobalAbilitiesManager::UpdateAbilityAvailability(UGlobalAbility* Ability)
 	}
 	if (Ability->M_AbilityCosts.CoolDownRemaining > 0)
 	{
-		Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(0, Ability->M_AbilityCosts.CoolDownRemaining - 1);
+		Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(
+			0,
+			Ability->M_AbilityCosts.CoolDownRemaining - 1);
 	}
 	const bool bMeetsRequirements = QueryRequirementForAbility(Ability);
 	const bool bCanPayCost = QueryCostsForAbility(Ability);

@@ -687,6 +687,18 @@ UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() con
 	return M_EnemyStrategicAIComponent;
 }
 
+#if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
+UEnemyWaveController* AEnemyController::ShippingTest_GetEnemyWaveController() const
+{
+	if (not GetIsValidWaveController())
+	{
+		return nullptr;
+	}
+
+	return M_WaveController;
+}
+#endif
+
 void AEnemyController::StartStrategicAIThinkingFromMission()
 {
 	if (M_EnemyAIMissionSettings.StrategicAIThinkingStartCondition !=
@@ -725,9 +737,10 @@ void AEnemyController::AddTrainingComponentToAIBlackboard(UTrainerComponent* Ene
 		RTSFunctionLibrary::ReportError("Enemy trainer component provided for blackboard is not valid!");
 		return;
 	}
-	if(not EnemyTrainer->GetTrainerSettings().bIsEnemyTrainer)
+	if (not EnemyTrainer->GetTrainerSettings().bIsEnemyTrainer)
 	{
 		RTSFunctionLibrary::ReportError("Provided trainer component for blackboard is not set up as enemy trainer!");
+		return;
 	}
 	UEnemyStrategicAIComponent* const StrategicAIComponent = GetEnemyStrategicAIComponent();
 	if (not IsValid(StrategicAIComponent))
@@ -743,6 +756,9 @@ void AEnemyController::AddTrainingComponentToAIBlackboard(UTrainerComponent* Ene
 void AEnemyController::BeginPlay()
 {
 	Super::BeginPlay();
+	// Each enemy sub-component re-binds its owning-controller reference to GetOwner() in its own BeginPlay
+	// (run during Super::BeginPlay above), so by this point they all point at this live controller rather
+	// than the class default object. The strategic component and decision tree are bound at runtime below.
 	CacheGenerationSeedFromGameInstance();
 	BeginPlay_MoveAISettingsToStrategicAIBlackboard();
 	BeginPlay_InitStochasticDecisionTree();

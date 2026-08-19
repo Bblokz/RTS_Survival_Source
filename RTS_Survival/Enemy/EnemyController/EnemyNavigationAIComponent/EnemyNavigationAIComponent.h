@@ -99,6 +99,7 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	UPROPERTY()
 	TWeakObjectPtr<AEnemyController> M_EnemyController = nullptr;
 
 	UPROPERTY()
@@ -115,6 +116,14 @@ private:
 	void CacheRecastNavMesh();
 	void CacheRoadSplineActors();
 	void PropagateRoadSplineActorsToEnemyAIBlackBoard() const;
+
+	// Caches road splines and propagates them to the strategic blackboard. If none are found yet (this
+	// component can begin play before the level's placed road spline actors are registered), it retries on
+	// a short timer up to a bounded number of attempts so registration is robust to actor init ordering.
+	void EnsureRoadSplineActorsCachedAndPropagated();
+	bool GetBlackboardHasRoadSplines() const;
+	FTimerHandle M_RoadSplineCacheRetryTimerHandle;
+	int32 M_RoadSplineCacheRetryAttempts = 0;
 
 	bool TryProjectPointToNavigation(
 		const FVector& OriginalLocation,
