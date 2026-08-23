@@ -24,6 +24,8 @@
 #include "RTS_Survival/Player/Camera/CameraController/PlayerCameraController.h"
 #include "RTS_Survival/Player/PlayerAudioController/PlayerAudioController.h"
 #include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -77,6 +79,7 @@ void UMissionBase::OnMissionComplete()
 	}
 	M_AbilityCooldownCommands = nullptr;
 	Tracking_ClearState();
+	EnemyInBuilding_ClearTracking();
 	DebugMission("Completed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -100,6 +103,7 @@ void UMissionBase::OnMissionFailed()
 	}
 	M_AbilityCooldownCommands = nullptr;
 	Tracking_ClearState();
+	EnemyInBuilding_ClearTracking();
 	DebugMission("Failed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -539,6 +543,7 @@ void UMissionBase::OnCleanUpMission()
 	}
 
 	Tracking_ClearState();
+	EnemyInBuilding_ClearTracking();
 	M_AbilityCooldownCommands = nullptr;
 	if (GetIsValidMissionManager())
 	{
@@ -570,6 +575,7 @@ void UMissionBase::BeginDestroy()
 		M_ActiveCinematicTakeOverSession->RequestCancel();
 	}
 
+	EnemyInBuilding_ClearTracking();
 	UObject::BeginDestroy();
 	if (GetWorld())
 	{
@@ -860,6 +866,44 @@ void UMissionBase::PlayPortrait(const ERTSPortraitTypes PortraitType, USoundBase
 		return;
 	}
 	PlayerPortraitManager->PlayPortrait(PortraitType, VoiceLine);
+}
+
+void UMissionBase::StartCommandVehicleWarningSystem(
+	const float HealthPercentageTrigger,
+	const float TimeBetweenTriggers,
+	const FMissionCommandVehicleWarningPortraitSettings& PortraitSettings,
+	UNiagaraSystem* OneShotVFX,
+	const FVector CommanderOffset,
+	const FVector VFXScale,
+	USoundBase* OneShotSound,
+	USoundAttenuation* SoundAttenuation,
+	USoundConcurrency* SoundConcurrency)
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->StartCommandVehicleWarningSystem(
+		HealthPercentageTrigger,
+		TimeBetweenTriggers,
+		PortraitSettings,
+		OneShotVFX,
+		CommanderOffset,
+		VFXScale,
+		OneShotSound,
+		SoundAttenuation,
+		SoundConcurrency);
+}
+
+void UMissionBase::StopCommandVehicleWarningSystem()
+{
+	if (not GetIsValidMissionManager())
+	{
+		return;
+	}
+
+	GetMissionManagerChecked()->StopCommandVehicleWarningSystem();
 }
 
 void UMissionBase::PlayPlayerAnnouncerLine(const EAnnouncerVoiceLineType AnnouncerLineType) const
@@ -1291,6 +1335,106 @@ void UMissionBase::Tracking_ClearState()
 	M_TrackedActors.Empty();
 	M_TrackingHasCountedInvalid.Empty();
 	M_MissionTrackingRuntimeState = FMissionTrackingRuntimeState();
+}
+
+void UMissionBase::OnEnemyInBuilding(const TArray<AActor*>& BuildingsToTrack, const int32 HowOftenTrigger)
+{
+	EnemyInBuilding_ClearTracking();
+
+	if (HowOftenTrigger <= 0)
+	{
+		return;
+	}
+
+	M_EnemyInBuildingTriggersRemaining = HowOftenTrigger;
+	for (AActor* Building : BuildingsToTrack)
+	{
+		if (not IsValid(Building))
+		{
+			continue;
+		}
+
+		UCargo* CargoComponent = Building->FindComponentByClass<UCargo>();
+		if (not IsValid(CargoComponent))
+		{
+			continue;
+		}
+
+		const bool bAlreadyTracked = M_EnemyInBuildingCargoComponents.ContainsByPredicate(
+			[CargoComponent](const TWeakObjectPtr<UCargo>& TrackedCargo)
+			{
+				return TrackedCargo.Get() == CargoComponent;
+			});
+		if (bAlreadyTracked)
+		{
+			continue;
+		}
+
+		CargoComponent->GetOnSquadEnteredCargo().AddUObject(
+			this, &UMissionBase::EnemyInBuilding_OnSquadEntered);
+		M_EnemyInBuildingCargoComponents.Add(CargoComponent);
+	}
+
+	if (M_EnemyInBuildingCargoComponents.IsEmpty())
+	{
+		M_EnemyInBuildingTriggersRemaining = 0;
+	}
+}
+
+void UMissionBase::EnemyInBuilding_OnSquadEntered(UCargo* CargoComponent, ASquadController* EnteringSquad)
+{
+	if (M_EnemyInBuildingTriggersRemaining <= 0 || not EnemyInBuilding_GetIsEnemySquad(EnteringSquad))
+	{
+		return;
+	}
+
+	AActor* Building = IsValid(CargoComponent) ? CargoComponent->GetCargoOwnerActor() : nullptr;
+	if (not IsValid(Building))
+	{
+		return;
+	}
+
+	--M_EnemyInBuildingTriggersRemaining;
+	if (M_EnemyInBuildingTriggersRemaining == 0)
+	{
+		EnemyInBuilding_ClearTracking();
+	}
+
+	BP_OnEnemyEnteredBuilding(Building);
+}
+
+bool UMissionBase::EnemyInBuilding_GetIsEnemySquad(const ASquadController* EnteringSquad) const
+{
+	if (not IsValid(EnteringSquad))
+	{
+		return false;
+	}
+
+	const URTSComponent* RTSComponent = EnteringSquad->GetRTSComponent();
+	if (not IsValid(RTSComponent))
+	{
+		return false;
+	}
+
+	constexpr uint8 EnemyPlayerIndex = 2;
+	return RTSComponent->GetOwningPlayer() == EnemyPlayerIndex;
+}
+
+void UMissionBase::EnemyInBuilding_ClearTracking()
+{
+	for (const TWeakObjectPtr<UCargo>& TrackedCargo : M_EnemyInBuildingCargoComponents)
+	{
+		UCargo* CargoComponent = TrackedCargo.Get();
+		if (not IsValid(CargoComponent))
+		{
+			continue;
+		}
+
+		CargoComponent->GetOnSquadEnteredCargo().RemoveAll(this);
+	}
+
+	M_EnemyInBuildingCargoComponents.Empty();
+	M_EnemyInBuildingTriggersRemaining = 0;
 }
 
 bool UMissionBase::Tracking_ConfigureActors(const EMissionTrackingType TrackingType,

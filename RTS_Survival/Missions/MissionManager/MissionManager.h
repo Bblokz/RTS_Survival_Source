@@ -8,6 +8,7 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "EnemyUnitQueryType.h"
 #include "MissionCargoSquadWithVehicleSpawnState.h"
+#include "MissionCommandVehicleWarningState.h"
 #include "MissionSpawnCommandQueueState.h"
 #include "MissionTowTeamWeaponSpawnState.h"
 #include "MissionLostAllUnitsGlobalAbilityCheck.h"
@@ -38,6 +39,7 @@ class UW_Defeat;
 class UW_Victory;
 class AActor;
 class UObject;
+class USceneComponent;
 class AEnemyController;
 class UMissionTriggerVolumesManager;
 class ATriggerArea;
@@ -235,6 +237,31 @@ public:
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void PlaySound2DForMission(USoundBase* SoundToPlay) const;
+
+	/**
+	 * @brief Starts or replaces the one manager-owned low-health warning session for the player command vehicle.
+	 * @param HealthPercentageTrigger Health fraction below which warnings may trigger.
+	 * @param TimeBetweenTriggers Minimum seconds between warnings while the vehicle remains below the threshold.
+	 * @param PortraitSettings Optional portrait and shuffled voice-line cycle.
+	 * @param OneShotVFX Optional Niagara one-shot attached to the command vehicle.
+	 * @param CommanderOffset Relative offset shared by the one-shot sound and VFX.
+	 * @param VFXScale Relative scale applied to the Niagara one-shot.
+	 * @param OneShotSound Optional spatial sound attached to the command vehicle.
+	 * @param SoundAttenuation Optional attenuation settings for OneShotSound.
+	 * @param SoundConcurrency Optional concurrency settings for OneShotSound.
+	 */
+	void StartCommandVehicleWarningSystem(
+		float HealthPercentageTrigger,
+		float TimeBetweenTriggers,
+		const FMissionCommandVehicleWarningPortraitSettings& PortraitSettings,
+		UNiagaraSystem* OneShotVFX,
+		const FVector& CommanderOffset,
+		const FVector& VFXScale,
+		USoundBase* OneShotSound,
+		USoundAttenuation* SoundAttenuation,
+		USoundConcurrency* SoundConcurrency);
+
+	void StopCommandVehicleWarningSystem();
 	/**
 	 * @brief Routes mission callback scheduling to the dedicated scheduler component.
 	 * @param Callback Delegate to execute on schedule.
@@ -587,6 +614,16 @@ private:
 	FVector AddLostAllUnitsCheckOffset(const FVector& Location, const FVector2D& XYOffset) const;
 	bool TryProjectLostAllUnitsGlobalAbilityLocation(const FVector& Location, FVector& OutProjectedLocation) const;
 	void ExecuteLostAllUnitsGlobalAbility(FMissionLostAllUnitsGlobalAbilityCheck& LostAllUnitsCheck, const FVector& ExecuteLocation);
+
+	UPROPERTY(Transient)
+	FMissionCommandVehicleWarningState M_CommandVehicleWarningState;
+
+	void TickCommandVehicleWarningSystem();
+	void TriggerCommandVehicleWarning();
+	void SpawnCommandVehicleWarningEffects(ATankMaster* CommandVehicle);
+	void SpawnCommandVehicleWarningVFX(USceneComponent* AttachComponent);
+	void SpawnCommandVehicleWarningSound(USceneComponent* AttachComponent);
+	void PlayCommandVehicleWarningPortrait();
 
 	UFUNCTION()
 	void OnLostAllUnitsGlobalAbilityEnded(UGlobalAbility* GlobalAbility);

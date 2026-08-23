@@ -3,6 +3,11 @@
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
+#include "Components/SceneComponent.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/DontLoseCommanderMission.h"
@@ -19,16 +24,19 @@
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Sound/SoundCue.h"
+#include "Sound/SoundBase.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/DeveloperSettings/RTSGameInstancePIEDeveloperSettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "NavigationSystem.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 
 void FMissionSeededSpawnBatchState::Init(UMissionBase* Mission, const int32 CallbackID)
@@ -416,6 +424,61 @@ void AMissionManager::PlaySound2DForMission(USoundBase* SoundToPlay) const
 		return;
 	}
 	UGameplayStatics::PlaySound2D(World, SoundToPlay, 1, 1, 0);
+}
+
+void AMissionManager::StartCommandVehicleWarningSystem(
+	const float HealthPercentageTrigger,
+	const float TimeBetweenTriggers,
+	const FMissionCommandVehicleWarningPortraitSettings& PortraitSettings,
+	UNiagaraSystem* OneShotVFX,
+	const FVector& CommanderOffset,
+	const FVector& VFXScale,
+	USoundBase* OneShotSound,
+	USoundAttenuation* SoundAttenuation,
+	USoundConcurrency* SoundConcurrency)
+{
+	StopCommandVehicleWarningSystem();
+
+	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Command vehicle warning system could not start because GameUnitManager is invalid.");
+		return;
+	}
+
+	ATankMaster* CommandVehicle = GameUnitManager->GetPlayerCommandVehicle();
+	if (not RTSFunctionLibrary::RTSIsValid(CommandVehicle))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Command vehicle warning system could not start because no living player command vehicle was found.");
+		return;
+	}
+
+	UHealthComponent* HealthComponent = CommandVehicle->GetHealthComponent();
+	if (not IsValid(HealthComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Command vehicle warning system could not start because the command vehicle health component is invalid.");
+		return;
+	}
+
+	M_CommandVehicleWarningState.Init(
+		CommandVehicle,
+		HealthPercentageTrigger,
+		TimeBetweenTriggers,
+		PortraitSettings,
+		OneShotVFX,
+		CommanderOffset,
+		VFXScale,
+		OneShotSound,
+		SoundAttenuation,
+		SoundConcurrency);
+}
+
+void AMissionManager::StopCommandVehicleWarningSystem()
+{
+	M_CommandVehicleWarningState.Reset();
 }
 
 int32 AMissionManager::ScheduleMissionCallback(
@@ -1073,6 +1136,8 @@ void AMissionManager::SetMissionManagerWidgetClass(TSubclassOf<UW_MissionWidgetM
 
 void AMissionManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	StopCommandVehicleWarningSystem();
+
 	for (const TPair<TWeakObjectPtr<AActor>, int32>& TrackedActorPair : M_TrackedEnemyActorRefCounts)
 	{
 		AActor* TrackedActor = TrackedActorPair.Key.Get();
@@ -1129,6 +1194,161 @@ void AMissionManager::Tick(float DeltaSeconds)
 	RemoveFinishedSpawnCommandQueueRequests();
 	RemoveCompletedEnemyUnitDestroyedCallbacks();
 	TickLostAllUnitsGlobalAbilityChecks();
+	TickCommandVehicleWarningSystem();
+}
+
+void AMissionManager::TickCommandVehicleWarningSystem()
+{
+	if (not M_CommandVehicleWarningState.GetIsActive())
+	{
+		return;
+	}
+
+	ATankMaster* CommandVehicle = M_CommandVehicleWarningState.GetCommandVehicle();
+	if (not RTSFunctionLibrary::RTSIsValid(CommandVehicle))
+	{
+		StopCommandVehicleWarningSystem();
+		return;
+	}
+
+	UHealthComponent* HealthComponent = CommandVehicle->GetHealthComponent();
+	if (not IsValid(HealthComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Command vehicle warning tracking stopped because the health component became invalid.");
+		StopCommandVehicleWarningSystem();
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		StopCommandVehicleWarningSystem();
+		return;
+	}
+
+	if (not M_CommandVehicleWarningState.TryBeginTrigger(
+		HealthComponent->GetHealthPercentage(),
+		World->GetTimeSeconds()))
+	{
+		return;
+	}
+
+	TriggerCommandVehicleWarning();
+}
+
+void AMissionManager::TriggerCommandVehicleWarning()
+{
+	ATankMaster* CommandVehicle = M_CommandVehicleWarningState.GetCommandVehicle();
+	if (not RTSFunctionLibrary::RTSIsValid(CommandVehicle))
+	{
+		StopCommandVehicleWarningSystem();
+		return;
+	}
+
+	M_CommandVehicleWarningState.CleanupTransientEffects();
+	SpawnCommandVehicleWarningEffects(CommandVehicle);
+	PlayCommandVehicleWarningPortrait();
+}
+
+void AMissionManager::SpawnCommandVehicleWarningEffects(ATankMaster* CommandVehicle)
+{
+	if (not RTSFunctionLibrary::RTSIsValid(CommandVehicle))
+	{
+		return;
+	}
+
+	USceneComponent* AttachComponent = CommandVehicle->GetRootComponent();
+	if (not IsValid(AttachComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Command vehicle warning could not spawn attached effects because the vehicle root is invalid.");
+		return;
+	}
+
+	SpawnCommandVehicleWarningVFX(AttachComponent);
+	SpawnCommandVehicleWarningSound(AttachComponent);
+}
+
+void AMissionManager::SpawnCommandVehicleWarningVFX(USceneComponent* AttachComponent)
+{
+	if (not IsValid(AttachComponent))
+	{
+		return;
+	}
+
+	UNiagaraSystem* OneShotVFX = M_CommandVehicleWarningState.GetOneShotVFX();
+	if (not IsValid(OneShotVFX))
+	{
+		return;
+	}
+
+	UNiagaraComponent* NiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+		OneShotVFX,
+		AttachComponent,
+		NAME_None,
+		M_CommandVehicleWarningState.GetCommanderOffset(),
+		FRotator::ZeroRotator,
+		M_CommandVehicleWarningState.GetVFXScale(),
+		EAttachLocation::KeepRelativeOffset,
+		true,
+		ENCPoolMethod::None,
+		true,
+		true);
+	M_CommandVehicleWarningState.SetWarningNiagaraComponent(NiagaraComponent);
+}
+
+void AMissionManager::SpawnCommandVehicleWarningSound(USceneComponent* AttachComponent)
+{
+	if (not IsValid(AttachComponent))
+	{
+		return;
+	}
+
+	USoundBase* OneShotSound = M_CommandVehicleWarningState.GetOneShotSound();
+	if (not IsValid(OneShotSound))
+	{
+		return;
+	}
+
+	constexpr float DefaultVolumeMultiplier = 1.0f;
+	constexpr float DefaultPitchMultiplier = 1.0f;
+	constexpr float StartTimeSeconds = 0.0f;
+	UAudioComponent* AudioComponent = UGameplayStatics::SpawnSoundAttached(
+		OneShotSound,
+		AttachComponent,
+		NAME_None,
+		M_CommandVehicleWarningState.GetCommanderOffset(),
+		EAttachLocation::KeepRelativeOffset,
+		true,
+		DefaultVolumeMultiplier,
+		DefaultPitchMultiplier,
+		StartTimeSeconds,
+		M_CommandVehicleWarningState.GetSoundAttenuation(),
+		M_CommandVehicleWarningState.GetSoundConcurrency(),
+		true);
+	M_CommandVehicleWarningState.SetWarningAudioComponent(AudioComponent);
+}
+
+void AMissionManager::PlayCommandVehicleWarningPortrait()
+{
+	USoundBase* PortraitVoiceLine = M_CommandVehicleWarningState.GetNextPortraitVoiceLine();
+	if (not IsValid(PortraitVoiceLine))
+	{
+		return;
+	}
+
+	UPlayerPortraitManager* PlayerPortraitManager = FRTS_Statics::GetPlayerPortraitManager(this);
+	if (not IsValid(PlayerPortraitManager))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Command vehicle warning could not play its portrait because PlayerPortraitManager is invalid.");
+		return;
+	}
+
+	PlayerPortraitManager->PlayPortrait(
+		M_CommandVehicleWarningState.GetPortraitType(),
+		PortraitVoiceLine);
 }
 
 

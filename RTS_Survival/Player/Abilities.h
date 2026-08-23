@@ -69,6 +69,7 @@ enum class EAbilityID : uint8
 	IdDetachTow,
 	IdRegisterUnitAsBlackboardIdle,
 	IdResearchTechnology,
+	IdActivateShield,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
@@ -126,6 +127,7 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdManAbandonedTeamWeapon: return TEXT("Man Abandoned Team Weapon");
 	case EAbilityID::IdTowActor: return TEXT("Tow Actor");
 	case EAbilityID::IdDetachTow: return TEXT("Detach Tow");
+	case EAbilityID::IdActivateShield: return TEXT("Activate Shield");
 	case EAbilityID::IdRegisterUnitAsBlackboardIdle: return TEXT("Register Unit As Blackboard Idle");
 	case EAbilityID::IdResearchTechnology: return TEXT("Research Technology");
 	default: return TEXT("Unknown Ability");

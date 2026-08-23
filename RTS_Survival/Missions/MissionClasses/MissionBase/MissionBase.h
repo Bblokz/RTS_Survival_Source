@@ -7,6 +7,7 @@
 #include "RTS_Survival/Missions/MissionManager/EnemyUnitQueryType.h"
 #include "RTS_Survival/Missions/MissionManager/MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Missions/MissionManager/MissionSpawnCommandQueueOrder.h"
+#include "RTS_Survival/Missions/MissionManager/MissionCommandVehicleWarningState.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetState/MissionWidgetState.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionTrackingType.h"
 #include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/RemoveDontLoseCommanderPost.h"
@@ -34,6 +35,7 @@ class ATankMaster;
 class ANomadicVehicle;
 class AScavengeableObject;
 class UPlayerCameraController;
+class UCargo;
 struct FMovePlayerCamera;
 struct FTrainingOption;
 class ARTSAsyncSpawner;
@@ -513,6 +515,34 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Sounds")
 	void PlayPortrait(ERTSPortraitTypes PortraitType, USoundBase* VoiceLine) const;
 
+	/**
+	 * @brief Relays a persistent command-vehicle low-health warning setup to the mission manager.
+	 * @param HealthPercentageTrigger Health fraction below which warnings may trigger.
+	 * @param TimeBetweenTriggers Minimum seconds between warnings while health remains below the threshold.
+	 * @param PortraitSettings Optional portrait and shuffled voice-line cycle.
+	 * @param OneShotVFX Optional Niagara one-shot attached to the command vehicle.
+	 * @param CommanderOffset Relative offset shared by the one-shot sound and VFX.
+	 * @param VFXScale Relative scale applied to the Niagara one-shot.
+	 * @param OneShotSound Optional spatial sound attached to the command vehicle.
+	 * @param SoundAttenuation Optional attenuation settings for OneShotSound.
+	 * @param SoundConcurrency Optional concurrency settings for OneShotSound.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Command Vehicle Warning")
+	void StartCommandVehicleWarningSystem(
+		float HealthPercentageTrigger,
+		float TimeBetweenTriggers,
+		const FMissionCommandVehicleWarningPortraitSettings& PortraitSettings,
+		UNiagaraSystem* OneShotVFX,
+		FVector CommanderOffset,
+		FVector VFXScale,
+		USoundBase* OneShotSound,
+		USoundAttenuation* SoundAttenuation,
+		USoundConcurrency* SoundConcurrency);
+
+	/** Stops the manager-owned command-vehicle warning session and removes any active temporary effects. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Command Vehicle Warning")
+	void StopCommandVehicleWarningSystem();
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Sounds")
 	void PlayPlayerAnnouncerLine(EAnnouncerVoiceLineType AnnouncerLineType) const;
 
@@ -578,6 +608,17 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Tracking")
 	void BP_OnTrackedActorInvalidated(AActor* TrackedActor, int32 TrackingIndex, int32 CurrentCount, int32 MaxCount);
+
+	/**
+	 * @brief Observes cargo entry so missions can react to enemies occupying important buildings.
+	 * @param BuildingsToTrack Actors whose cargo components should be observed as one shared tracker.
+	 * @param HowOftenTrigger Number of enemy entries allowed before all registrations are removed.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Tracking")
+	void OnEnemyInBuilding(const TArray<AActor*>& BuildingsToTrack, const int32 HowOftenTrigger);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|Tracking")
+	void BP_OnEnemyEnteredBuilding(AActor* Building);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallbackOnScavengableObjectScavenged(AScavengeableObject* ScavengableObject);
@@ -1070,6 +1111,12 @@ private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> M_TrackedActors;
 
+	// Cargo components observed by the shared enemy-entry trigger counter.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UCargo>> M_EnemyInBuildingCargoComponents;
+
+	int32 M_EnemyInBuildingTriggersRemaining = 0;
+
 	FTimerHandle M_TrackingValidityTimerHandle;
 
 	FTimerHandle M_AbilityCooldownPollingTimerHandle;
@@ -1102,6 +1149,9 @@ private:
 	FText Tracking_BuildTitleText() const;
 	bool Tracking_GetHasReachedMaxCount() const;
 	void Tracking_OnReachedMaxCount();
+	void EnemyInBuilding_OnSquadEntered(UCargo* CargoComponent, ASquadController* EnteringSquad);
+	bool EnemyInBuilding_GetIsEnemySquad(const ASquadController* EnteringSquad) const;
+	void EnemyInBuilding_ClearTracking();
 
 	bool bM_IgnoreTriggerOnMissionStart = false;
 };
