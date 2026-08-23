@@ -8,6 +8,8 @@
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
@@ -71,6 +73,31 @@ namespace
 		const float DamageScaler = FMath::Pow(1.f - ArmorProgress, FMath::Max(ArmorPenFallOff, 0.f));
 		return FMath::Clamp(DamageScaler, 0.f, 1.f);
 	}
+
+	bool GetWasDamageAbsorbedByShield(
+		AActor& HitActor,
+		const float DamageToApply,
+		const EShieldDamageSource ShieldDamageSource,
+		const FVector& ImpactLocation)
+	{
+		IShieldOwner* ShieldOwner = Cast<IShieldOwner>(&HitActor);
+		if (ShieldOwner == nullptr)
+		{
+			return false;
+		}
+
+		UShieldComponent* ShieldComponent = ShieldOwner->GetShield();
+		if (not IsValid(ShieldComponent))
+		{
+			return false;
+		}
+
+		FShieldDamageRequest DamageRequest;
+		DamageRequest.BaseDamage = DamageToApply;
+		DamageRequest.DamageSource = ShieldDamageSource;
+		DamageRequest.ImpactLocation = ImpactLocation;
+		return ShieldComponent->ApplyShieldDamage(DamageRequest) == EShieldDamageResult::Absorbed;
+	}
 }
 
 FRTS_AOE::FRTS_AOE() = default;
@@ -118,6 +145,7 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 	const float DamageFalloffExponent,
 	const ERTSDamageType DamageType,
 	const ETriggerOverlapLogic OverlapLogic,
+	const EShieldDamageSource ShieldDamageSource,
 	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
 {
 	if (not IsValid(DamageCauser))
@@ -139,7 +167,7 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 		SafeRadius,
 		BuildObjectQueryParams(OverlapLogic),
 		ActorsToIgnore,
-		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType](
+		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType, ShieldDamageSource](
 		TArray<FHitResult>&& HitResults)
 		{
 			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
@@ -162,6 +190,14 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 				{
 					continue;
 				}
+				if (GetWasDamageAbsorbedByShield(
+					*HitActor,
+					DamageToApply,
+					ShieldDamageSource,
+					HitLocation))
+				{
+					continue;
+				}
 
 				ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
 			}
@@ -179,6 +215,7 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	const float MaxArmorPen,
 	const ERTSDamageType DamageType,
 	const ETriggerOverlapLogic OverlapLogic,
+	const EShieldDamageSource ShieldDamageSource,
 	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
 {
 	if (not IsValid(DamageCauser))
@@ -212,7 +249,8 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 			SafeFullArmorPen,
 			SafeArmorPenFalloff,
 			SafeMaxArmorPen,
-			DamageType
+			DamageType,
+			ShieldDamageSource
 		](TArray<FHitResult>&& HitResults)
 		{
 			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
@@ -232,6 +270,14 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 					SafeFalloffExponent,
 					EnemyLocation);
 				if (DamageToApply <= 0.f)
+				{
+					continue;
+				}
+				if (GetWasDamageAbsorbedByShield(
+					*HitActor,
+					DamageToApply,
+					ShieldDamageSource,
+					EnemyLocation))
 				{
 					continue;
 				}
@@ -292,6 +338,7 @@ void FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
 	const float DamageFalloffExponent,
 	const ERTSDamageType DamageType,
 	const ETriggerOverlapLogic OverlapLogic,
+	const EShieldDamageSource ShieldDamageSource,
 	TFunction<void(UArmorCalculation*, AActor*)> OnArmorComponentHit,
 	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
 {
@@ -321,6 +368,7 @@ void FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
 			SafeRadius,
 			SafeFalloffExponent,
 			DamageType,
+			ShieldDamageSource,
 			OnArmorComponentHit = MoveTemp(OnArmorComponentHit)
 		](TArray<FHitResult>&& HitResults) mutable
 		{
@@ -346,6 +394,14 @@ void FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
 					SafeFalloffExponent,
 					HitLocation);
 				if (DamageToApply <= 0.f)
+				{
+					continue;
+				}
+				if (GetWasDamageAbsorbedByShield(
+					*HitActor,
+					DamageToApply,
+					ShieldDamageSource,
+					HitLocation))
 				{
 					continue;
 				}

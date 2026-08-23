@@ -6,6 +6,7 @@
 #include "Engine/DamageEvents.h"
 
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldTypes.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
 
 class UBehaviour;
@@ -46,6 +47,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	 * @param DamageType Damage type to assign to the generated damage event.
 	 * @param OverlapLogic Determines whether to target player units, enemies or both.
 	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
+	 * @param ShieldDamageSource Identifies shieldable AOE versus explicitly bypassing mine damage.
 	 */
 	static void DealDamageInRadiusAsync(
 		AActor* DamageCauser,
@@ -55,6 +57,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 		float DamageFalloffExponent,
 		ERTSDamageType DamageType,
 		ETriggerOverlapLogic OverlapLogic,
+		EShieldDamageSource ShieldDamageSource,
 		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
 	);
 
@@ -71,6 +74,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	 * @param DamageType Damage type to assign to the generated damage event.
 	 * @param OverlapLogic Determines whether to target player units, enemies or both.
 	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
+	 * @param ShieldDamageSource Identifies shieldable AOE versus explicitly bypassing mine damage.
 	 */
 	static void DealDamageVsRearArmorInRadiusAsync(
 		AActor* DamageCauser,
@@ -83,6 +87,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 		float MaxArmorPen,
 		ERTSDamageType DamageType,
 		ETriggerOverlapLogic OverlapLogic,
+		EShieldDamageSource ShieldDamageSource,
 		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
 	);
 
@@ -97,6 +102,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	 * @param OverlapLogic Determines whether to target player units, enemies or both.
 	 * @param OnArmorComponentHit Custom handler invoked when an actor with armor is hit.
 	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
+	 * @param ShieldDamageSource Identifies shieldable AOE versus explicitly bypassing mine damage.
 	 */
 	static void DealDamageAndCustomArmorHandlingInRadiusAsync(
 		AActor* DamageCauser,
@@ -106,6 +112,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 		float DamageFalloffExponent,
 		ERTSDamageType DamageType,
 		ETriggerOverlapLogic OverlapLogic,
+		EShieldDamageSource ShieldDamageSource,
 		TFunction<void(UArmorCalculation*, AActor*)> OnArmorComponentHit,
 		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
 	);

@@ -8,6 +8,7 @@
 #include "RTS_Survival/Resources/Harvester/HarvesterInterface/HarvesterInterface.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/CargoOwner/CargoOwner.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
@@ -35,6 +36,7 @@ class UTurretSwapComp;
 class UVehicleFireFeedbackComponent;
 class UVehicleTowComponent;
 class UTowedActorComponent;
+class UShieldComponent;
 class UCargoSquad;
 class UCargo;
 class ATeamWeaponController;
@@ -133,7 +135,7 @@ private:
 UCLASS()
 class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurretOwner,
                                      public IHarvesterInterface, public IRTSNavAgentInterface, public ICargoOwner,
-                                     public IAimOffsetProvider
+                                     public IAimOffsetProvider, public IShieldOwner
 {
 	GENERATED_BODY()
 
@@ -145,9 +147,12 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 	friend class UTurretSwapComp;
 	friend struct FMissionTowTeamWeaponSpawnState;
 	friend class RTS_SURVIVAL_API UBehVehicleStunned;
+	friend class UShieldComponent;
 
 public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
+
+	virtual UShieldComponent* GetShield() const override { return M_ShieldComponent.Get(); }
 	
 	void SetAudioCompsDisabled(const bool bDisable);
 
@@ -512,6 +517,8 @@ protected:
 	virtual bool ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds);
 
 private:
+	void ClearShieldComponentCache(const UShieldComponent* ShieldComponent);
+
 	// Whether the vehicle is currently Turning.
 	bool bM_NeedToTurnTowardsTarget;
 
@@ -599,6 +606,10 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UTowedActorComponent> M_TowedActorComponent;
+
+	// Optional shield is found once so weapon systems can use IShieldOwner without component searches.
+	UPROPERTY()
+	TObjectPtr<UShieldComponent> M_ShieldComponent = nullptr;
 
 	// For adjusting the rotation.
 	FTimerHandle TimerHandle_CheckIfUpsideDown;

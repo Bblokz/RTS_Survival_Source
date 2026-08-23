@@ -14,6 +14,8 @@
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
@@ -610,6 +612,12 @@ void ATankMaster::PostInitializeComponents()
 	M_VehicleTowComponent = FindComponentByClass<UVehicleTowComponent>();
 	M_TowedActorComponent = FindComponentByClass<UTowedActorComponent>();
 
+	M_ShieldComponent = FindComponentByClass<UShieldComponent>();
+	if (UArmorCalculation* ArmorCalculation = FindComponentByClass<UArmorCalculation>())
+	{
+		ArmorCalculation->SetShieldComponent(M_ShieldComponent.Get());
+	}
+
 	TArray<USceneComponent*> SceneComponents;
 	GetRootComponent()->GetChildrenComponents(true, SceneComponents);
 	for (const auto EachSceneComp : SceneComponents)
@@ -760,6 +768,16 @@ void ATankMaster::OnUnitIdleAndNoNewCommands()
 void ATankMaster::ExecuteStopCommand()
 {
 	SetTurretsToAutoEngage(false);
+}
+
+void ATankMaster::ClearShieldComponentCache(const UShieldComponent* ShieldComponent)
+{
+	if (M_ShieldComponent.Get() != ShieldComponent)
+	{
+		return;
+	}
+
+	M_ShieldComponent = nullptr;
 }
 
 void ATankMaster::OnCommandExecutionStarting(const EAbilityID AbilityStarting)

@@ -4,6 +4,7 @@
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
@@ -16,6 +17,26 @@ FRTS_CollisionSetup::FRTS_CollisionSetup()
 
 FRTS_CollisionSetup::~FRTS_CollisionSetup()
 {
+}
+
+void FRTS_CollisionSetup::SetupShieldCollision(UStaticMeshComponent* ShieldMesh, const int32 OwningPlayer)
+{
+	if (not IsValid(ShieldMesh))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("SetupShieldCollision received an invalid shield mesh."));
+		return;
+	}
+
+	ShieldMesh->SetCollisionObjectType(ECC_WorldDynamic);
+	ShieldMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	ShieldMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
+	ShieldMesh->SetCollisionResponseToChannel(
+		OwningPlayer == 1 ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
+		ECR_Block);
+	ShieldMesh->SetGenerateOverlapEvents(false);
+	ShieldMesh->SetCanEverAffectNavigation(false);
+	ShieldMesh->SetSimulatePhysics(false);
+	ShieldMesh->SetReceivesDecals(false);
 }
 
 void FRTS_CollisionSetup::ForceBuildingPlacementResponseOnActor(
