@@ -388,6 +388,7 @@ void ABombActor::HandleAoe(const FVector& HitLocation, AActor* PrimaryHitActor)
 		MaxArmorDamaged,
 		M_WeaponData.DamageType,
 		OverlapLogic,
+		EShieldDamageSource::AreaOfEffect,
 		ActorsToIgnore);
 }
 

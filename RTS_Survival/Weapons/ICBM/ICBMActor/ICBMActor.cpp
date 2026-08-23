@@ -429,6 +429,7 @@ void AICBMActor::ApplyAOEDamage(const FVector& ImpactLocation, AActor* PrimaryHi
 		MaxArmorDamaged,
 		M_LaunchSettings.WeaponData.DamageType,
 		OverlapLogic,
+		EShieldDamageSource::AreaOfEffect,
 		ActorsToIgnore);
 }
 

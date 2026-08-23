@@ -6,6 +6,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponOwner/WeaponOwner.h"
 
@@ -644,16 +646,42 @@ void UWeaponStateFlameThrower::OnHitValidActors(const TArray<AActor*>& ValidHitA
 	bool bKilledAnActor = false;
 	AActor* LastKilledActor = nullptr;
 	const float DamageWithFlux = FRTSWeaponHelpers::GetDamageWithFlux(WeaponData.BaseDamage, WeaponData.DamageFlux);
-	for (auto eachValidHitActor : ValidHitActors)
+	for (AActor* EachValidHitActor : ValidHitActors)
 	{
-		if (FluxDamageHitActor_DidActorDie(eachValidHitActor, DamageWithFlux))
+		if (GetWasFlameDamageAbsorbed(EachValidHitActor, DamageWithFlux))
+		{
+			continue;
+		}
+
+		if (FluxDamageHitActor_DidActorDie(EachValidHitActor, DamageWithFlux))
 		{
 			bKilledAnActor = true;
-			LastKilledActor = eachValidHitActor;
+			LastKilledActor = EachValidHitActor;
 		}
 	}
 	if (bKilledAnActor)
 	{
 		OnActorKilled(LastKilledActor);
 	}
+}
+
+bool UWeaponStateFlameThrower::GetWasFlameDamageAbsorbed(AActor* HitActor, const float DamageToApply) const
+{
+	IShieldOwner* ShieldOwner = Cast<IShieldOwner>(HitActor);
+	if (ShieldOwner == nullptr)
+	{
+		return false;
+	}
+
+	UShieldComponent* ShieldComponent = ShieldOwner->GetShield();
+	if (not IsValid(ShieldComponent))
+	{
+		return false;
+	}
+
+	FShieldDamageRequest DamageRequest;
+	DamageRequest.BaseDamage = DamageToApply;
+	DamageRequest.DamageSource = EShieldDamageSource::Flamethrower;
+	DamageRequest.ImpactLocation = HitActor->GetActorLocation();
+	return ShieldComponent->ApplyShieldDamage(DamageRequest) == EShieldDamageResult::Absorbed;
 }

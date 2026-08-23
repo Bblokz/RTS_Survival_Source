@@ -6,6 +6,7 @@
 
 class UCapsuleComponent;
 class USphereComponent;
+class UStaticMeshComponent;
 
 // We use the camera trace channel to ge info from units the player is looking at.
 class RTS_SURVIVAL_API FRTS_CollisionSetup
@@ -48,6 +49,13 @@ public:
 	static void SetupArmorCalculationMeshCollision(UMeshComponent* ArmorMesh,
 	                                               const uint8 OwningPlayer,
 	                                               const bool bAffectNavMesh);
+
+	/**
+	 * @brief Restricts an active shield to the single weapon trace channel that can damage its owner.
+	 * @param ShieldMesh Runtime sphere mesh used by the shield component.
+	 * @param OwningPlayer Owner used to select the player/enemy weapon trace channel.
+	 */
+	static void SetupShieldCollision(UStaticMeshComponent* ShieldMesh, int32 OwningPlayer);
 
 	static void SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshComponent, bool bIsPlayer1);
 

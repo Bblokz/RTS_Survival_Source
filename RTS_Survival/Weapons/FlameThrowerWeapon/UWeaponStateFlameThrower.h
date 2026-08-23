@@ -131,6 +131,7 @@ private:
 	void OnSingleRayAsyncComplete(const int32 Serial, const int32 RayIndex, FTraceDatum& TraceDatum);
 	void OnIterationAllRaysComplete();
 	void OnHitValidActors(const TArray<AActor*>& ValidHitActors);
+	bool GetWasFlameDamageAbsorbed(AActor* HitActor, float DamageToApply) const;
 
 	// Helpers to build the cone rays (up to spec’d patterns).
 	void BuildRayYawOffsets(TArray<float>& OutYawDegrees) const;
