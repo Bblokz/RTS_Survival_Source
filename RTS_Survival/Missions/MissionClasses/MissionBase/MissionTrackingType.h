@@ -7,5 +7,6 @@ enum class EMissionTrackingType : uint8
 {
 	NoTracking UMETA(DisplayName = "NoTracking"),
 	TrackDestructablesCollapse UMETA(DisplayName = "TrackDestructablesCollapse"),
-	TrackOnActorsDestroyed UMETA(DisplayName = "TrackOnActorsDestroyed")
+	TrackOnActorsDestroyed UMETA(DisplayName = "TrackOnActorsDestroyed"),
+	TrackScavengablesScavenged UMETA(DisplayName = "TrackScavengablesScavenged")
 };

@@ -72,6 +72,17 @@ private:
 	                                   FSlateWindowElementList& OutDrawElements,
 	                                   const int32 LayerId) const;
 
+	int32 DrawCustomMiniMapText(const FGeometry& AllottedGeometry,
+	                          FSlateWindowElementList& OutDrawElements,
+	                          const int32 LayerId) const;
+
+	void DrawCustomMiniMapTextEntry(const FRTSMinimapTextDrawData& TextDrawData,
+	                                const FGeometry& MiniMapGeometry,
+	                                const FGeometry& AllottedGeometry,
+	                                const FVector2D& MiniMapSize,
+	                                FSlateWindowElementList& OutDrawElements,
+	                                const int32 LayerId) const;
+
 	void DrawCustomMiniMapTextureIcon(const FRTSMinimapCustomIconDrawData& IconDrawData,
 	                                  const FGeometry& MiniMapGeometry,
 	                                  const FGeometry& AllottedGeometry,

@@ -5,7 +5,11 @@
 
 #include "Components/Image.h"
 #include "Engine/Texture2D.h"
+#include "Fonts/FontMeasure.h"
+#include "Framework/Application/SlateApplication.h"
 #include "Rendering/DrawElements.h"
+#include "Rendering/SlateRenderer.h"
+#include "Styling/CoreStyle.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -104,7 +108,8 @@ int32 UW_MiniMap::NativePaint(const FPaintArgs& Args,
 		bParentEnabled);
 
 	const int32 IconLayerId = DrawMiniMapUnitColorIcons(AllottedGeometry, OutDrawElements, NextLayerId);
-	return DrawCustomMiniMapTextureIcons(AllottedGeometry, OutDrawElements, IconLayerId);
+	const int32 CustomIconLayerId = DrawCustomMiniMapTextureIcons(AllottedGeometry, OutDrawElements, IconLayerId);
+	return DrawCustomMiniMapText(AllottedGeometry, OutDrawElements, CustomIconLayerId);
 }
 
 int32 UW_MiniMap::DrawMiniMapUnitColorIcons(const FGeometry& AllottedGeometry,
@@ -281,6 +286,105 @@ void UW_MiniMap::DrawCustomMiniMapTextureIcon(const FRTSMinimapCustomIconDrawDat
 		TOptional<FVector2D>(IconSize * 0.5f),
 		FSlateDrawElement::RelativeToElement,
 		FLinearColor::White);
+}
+
+int32 UW_MiniMap::DrawCustomMiniMapText(const FGeometry& AllottedGeometry,
+	                                    FSlateWindowElementList& OutDrawElements,
+	                                    const int32 LayerId) const
+{
+	const AFowManager* const FowManager = GetIsValidFowManager();
+	if (not IsValid(FowManager))
+	{
+		return LayerId;
+	}
+
+	const UImage* const MiniMapImage = GetIsValidMiniMapImg();
+	if (not IsValid(MiniMapImage))
+	{
+		return LayerId;
+	}
+
+	const FGeometry MiniMapGeometry = MiniMapImage->GetCachedGeometry();
+	const FVector2D MiniMapSize = MiniMapGeometry.GetLocalSize();
+	if (MiniMapSize.X <= 0.0f || MiniMapSize.Y <= 0.0f)
+	{
+		return LayerId;
+	}
+
+	const TArray<FRTSMinimapTextDrawData>& TextDrawData = FowManager->GetCustomMiniMapTextDrawData();
+	if (TextDrawData.IsEmpty())
+	{
+		return LayerId;
+	}
+
+	const int32 TextLayerId = LayerId + 1;
+	for (const FRTSMinimapTextDrawData& EachText : TextDrawData)
+	{
+		DrawCustomMiniMapTextEntry(
+			EachText,
+			MiniMapGeometry,
+			AllottedGeometry,
+			MiniMapSize,
+			OutDrawElements,
+			TextLayerId);
+	}
+
+	return TextLayerId;
+}
+
+void UW_MiniMap::DrawCustomMiniMapTextEntry(const FRTSMinimapTextDrawData& TextDrawData,
+	                                         const FGeometry& MiniMapGeometry,
+	                                         const FGeometry& AllottedGeometry,
+	                                         const FVector2D& MiniMapSize,
+	                                         FSlateWindowElementList& OutDrawElements,
+	                                         const int32 LayerId) const
+{
+	if (TextDrawData.M_Text.IsEmpty() || TextDrawData.M_TextSizePixels <= 0.0f
+		|| not FSlateApplication::IsInitialized())
+	{
+		return;
+	}
+
+	constexpr int32 TextOutlineSizePixels = 1;
+	const FName BoldTypefaceName(TEXT("Bold"));
+	const FSlateFontInfo FontInfo = FCoreStyle::GetDefaultFontStyle(
+		BoldTypefaceName,
+		TextDrawData.M_TextSizePixels,
+		FFontOutlineSettings(TextOutlineSizePixels));
+	FSlateRenderer* const SlateRenderer = FSlateApplication::Get().GetRenderer();
+	if (SlateRenderer == nullptr)
+	{
+		return;
+	}
+
+	const TSharedRef<FSlateFontMeasure> FontMeasure =
+		SlateRenderer->GetFontMeasureService();
+	const FVector2D TextSize = FontMeasure->Measure(TextDrawData.M_Text, FontInfo);
+	if (TextSize.X <= 0.0f || TextSize.Y <= 0.0f)
+	{
+		return;
+	}
+
+	const FVector2D TextCenterLocalToMiniMap = FVector2D(
+		TextDrawData.M_UV.X * MiniMapSize.X,
+		TextDrawData.M_UV.Y * MiniMapSize.Y);
+	const FVector2D TextCenterAbsolute = MiniMapGeometry.LocalToAbsolute(TextCenterLocalToMiniMap);
+	const FVector2D TextTopLeftInWidget = AllottedGeometry.AbsoluteToLocal(TextCenterAbsolute)
+		- (TextSize * 0.5f);
+	const float CounterRotationRadians = FMath::DegreesToRadians(-GetRenderTransformAngle());
+	const FPaintGeometry TextGeometry = AllottedGeometry.ToPaintGeometry(
+		TextSize,
+		FSlateLayoutTransform(TextTopLeftInWidget),
+		FSlateRenderTransform(FQuat2D(CounterRotationRadians)));
+
+	FSlateDrawElement::MakeText(
+		OutDrawElements,
+		LayerId,
+		TextGeometry,
+		TextDrawData.M_Text,
+		FontInfo,
+		ESlateDrawEffect::None,
+		TextDrawData.M_TextColor);
 }
 
 void UW_MiniMap::RefreshCustomMiniMapIconBrushes()

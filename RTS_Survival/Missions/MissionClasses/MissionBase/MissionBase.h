@@ -131,6 +131,24 @@ struct FMissionTrackingRuntimeState
 };
 
 USTRUCT()
+struct FMissionTrackingMiniMapRuntimeState
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bM_IsEnabled = false;
+
+	UPROPERTY()
+	float M_TextSizePixels = 0.0f;
+
+	UPROPERTY()
+	FLinearColor M_TextColor = FLinearColor::White;
+
+	UPROPERTY()
+	TArray<FName> M_TextIds;
+};
+
+USTRUCT()
 struct FMissionCinematicAudioRuntimeState
 {
 	GENERATED_BODY()
@@ -602,6 +620,29 @@ protected:
 	                      const FString& Partitive,
 	                      const FString& Postfix,
 	                      const ERTSRichText RichCountType);
+
+	/**
+	 * @brief Starts regular mission tracking and mirrors its shared progress over every remaining actor on the minimap.
+	 * @param TrackingType Completion event used for each supplied actor.
+	 * @param ActorsToTrack Source actors used by both regular and minimap tracking.
+	 * @param ValidityCheckInterval Optional backup poll interval; values <= 0 disable the timer.
+	 * @param Prefix Optional mission-title text rendered before the rich count block.
+	 * @param Partitive Separator used between current and maximum count in both displays.
+	 * @param Postfix Optional mission-title text rendered after the rich count block.
+	 * @param RichCountType Rich-text style applied to the mission widget count.
+	 * @param MiniMapTextSizePixels Slate font size used for actor-attached minimap progress.
+	 * @param MiniMapTextColor Tint applied to actor-attached minimap progress.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Tracking")
+	void TrackActorsWithMiniMapProgress(const EMissionTrackingType TrackingType,
+	                                    const TArray<AActor*>& ActorsToTrack,
+	                                    const float ValidityCheckInterval,
+	                                    const FString& Prefix,
+	                                    const FString& Partitive,
+	                                    const FString& Postfix,
+	                                    const ERTSRichText RichCountType,
+	                                    const float MiniMapTextSizePixels = 14.0f,
+	                                    const FLinearColor MiniMapTextColor = FLinearColor::White);
 
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackDestructibleCollapse(ADestructableEnvActor* ActorCollapsed);
@@ -1095,6 +1136,9 @@ private:
 	UPROPERTY()
 	FMissionTrackingRuntimeState M_MissionTrackingRuntimeState;
 
+	UPROPERTY()
+	FMissionTrackingMiniMapRuntimeState M_MissionTrackingMiniMapRuntimeState;
+
 	// Keeps a safe per-mission cache for temporary cinematic audio overrides.
 	UPROPERTY(Transient)
 	mutable FMissionCinematicAudioRuntimeState M_CinematicAudioRuntimeState;
@@ -1110,6 +1154,9 @@ private:
 	// Tracked actors that still need to be observed for invalidation.
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> M_TrackedActors;
+
+	// Native delegate handles are retained so repeated tracking setup cannot leave stale callbacks behind.
+	TArray<FDelegateHandle> M_TrackingEventDelegateHandles;
 
 	// Cargo components observed by the shared enemy-entry trigger counter.
 	UPROPERTY()
@@ -1133,18 +1180,96 @@ private:
 
 	int32 M_NextAsyncSpawnId = 1;
 
+	uint32 M_TrackingMiniMapGeneration = 0;
+
+	uint32 M_TrackingSessionGeneration = 0;
+
 	void TextOnlyMission_SetAutoCompleteTimer();
+	/**
+	 * @brief Centralizes setup so regular and minimap-enabled tracking have identical completion semantics.
+	 * @param TrackingType Completion event used for each supplied actor.
+	 * @param ActorsToTrack Actors whose completion or invalidation advances progress.
+	 * @param ValidityCheckInterval Optional backup poll interval; values <= 0 disable the timer.
+	 * @param Prefix Optional mission-title prefix.
+	 * @param Partitive Separator used between current and maximum count.
+	 * @param Postfix Optional mission-title postfix.
+	 * @param RichCountType Rich-text style used by the mission title.
+	 * @param bAddMiniMapProgressText Whether actor-attached minimap progress should be created.
+	 * @param MiniMapTextSizePixels Slate font size used by minimap progress.
+	 * @param MiniMapTextColor Tint applied to minimap progress.
+	 */
+	void Tracking_Start(const EMissionTrackingType TrackingType,
+	                    const TArray<AActor*>& ActorsToTrack,
+	                    const float ValidityCheckInterval,
+	                    const FString& Prefix,
+	                    const FString& Partitive,
+	                    const FString& Postfix,
+	                    const ERTSRichText RichCountType,
+	                    const bool bAddMiniMapProgressText,
+	                    const float MiniMapTextSizePixels,
+	                    const FLinearColor& MiniMapTextColor);
+	/**
+	 * @brief Rejects setup that would silently complete, never receive callbacks, or create invalid Slate text.
+	 * @param TrackingType Completion event requested by the caller.
+	 * @param ActorsToTrack Actors expected to participate in tracking.
+	 * @param ValidityCheckInterval Optional finite backup poll interval.
+	 * @param bAddMiniMapProgressText Whether minimap text settings need validation.
+	 * @param MiniMapTextSizePixels Slate font size requested by the caller.
+	 * @return True when the shared tracking setup can safely proceed.
+	 */
+	bool Tracking_GetCanStart(const EMissionTrackingType TrackingType,
+	                          const TArray<AActor*>& ActorsToTrack,
+	                          const float ValidityCheckInterval,
+	                          const bool bAddMiniMapProgressText,
+	                          const float MiniMapTextSizePixels) const;
+	/**
+	 * @brief Stores one validated setup in the shared runtime state before actor callbacks can fire.
+	 * @param TrackingType Completion event used for each actor.
+	 * @param MaxCount Original number of tracking entries.
+	 * @param Prefix Optional mission-title prefix.
+	 * @param Partitive Separator used between current and maximum count.
+	 * @param Postfix Optional mission-title postfix.
+	 * @param RichCountType Rich-text style used by the mission title.
+	 * @param bAddMiniMapProgressText Whether actor-attached minimap progress is enabled.
+	 * @param MiniMapTextSizePixels Slate font size used by minimap progress.
+	 * @param MiniMapTextColor Tint applied to minimap progress.
+	 */
+	void Tracking_InitializeRuntimeState(const EMissionTrackingType TrackingType,
+	                                     const int32 MaxCount,
+	                                     const FString& Prefix,
+	                                     const FString& Partitive,
+	                                     const FString& Postfix,
+	                                     const ERTSRichText RichCountType,
+	                                     const bool bAddMiniMapProgressText,
+	                                     const float MiniMapTextSizePixels,
+	                                     const FLinearColor& MiniMapTextColor);
+	/**
+	 * @brief Finishes setup only if actor configuration did not synchronously replace or complete this session.
+	 * @param ValidityCheckInterval Optional backup poll interval; values <= 0 disable the timer.
+	 * @param TrackingSessionGeneration Session token captured before actor callbacks were registered.
+	 */
+	void Tracking_FinalizeStart(const float ValidityCheckInterval, const uint32 TrackingSessionGeneration);
 	void Tracking_ClearState();
+	void Tracking_ClearRegisteredCallbacks();
+	void Tracking_ClearMiniMapProgressText();
+	bool Tracking_GetIsSupportedType(const EMissionTrackingType TrackingType) const;
 	bool Tracking_ConfigureActors(const EMissionTrackingType TrackingType, const TArray<AActor*>& ActorsToTrack);
 	void Tracking_ConfigureDestructableActorAtIndex(AActor* ActorToTrack, const int32 TrackingIndex);
 	void Tracking_ConfigureActorDestroyedAtIndex(AActor* ActorToTrack, const int32 TrackingIndex);
+	void Tracking_ConfigureScavengableActorAtIndex(AActor* ActorToTrack, const int32 TrackingIndex);
 	void Tracking_RegisterDestructableCallbacks(ADestructableEnvActor* DestructableActor, const int32 TrackingIndex);
 	void Tracking_RegisterActorDestroyedCallback(AActor* ActorToTrack);
+	void Tracking_RegisterScavengableCallbacks(AScavengeableObject* ScavengableObject, const int32 TrackingIndex);
 	UFUNCTION()
 	void Tracking_OnTrackedActorDestroyed(AActor* DestroyedActor);
 	void Tracking_StartBackupValidityTimer(const float ValidityCheckInterval);
 	void Tracking_OnActorInvalidatedByIndex(const int32 TrackingIndex);
 	void Tracking_CheckForInvalidActorsByTimer();
+	void Tracking_SetupMiniMapProgressText();
+	void Tracking_RemoveMiniMapProgressTextAtIndex(const int32 TrackingIndex);
+	void Tracking_UpdateMiniMapProgressText();
+	FName Tracking_CreateMiniMapTextId(const int32 TrackingIndex) const;
+	FText Tracking_BuildMiniMapProgressText() const;
 	void Tracking_ApplyWidgetTitleUpdate();
 	FText Tracking_BuildTitleText() const;
 	bool Tracking_GetHasReachedMaxCount() const;

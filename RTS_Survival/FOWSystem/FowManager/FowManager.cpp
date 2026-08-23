@@ -57,6 +57,8 @@ AFowManager::AFowManager(const FObjectInitializer& ObjectInitializer)
 	M_BeginPlayBoundsTransferAttempts = 0;
 	M_CustomMiniMapIcons = {};
 	M_CachedCustomMiniMapIconDrawData = {};
+	M_CustomMiniMapTexts = {};
+	M_CachedCustomMiniMapTextDrawData = {};
 }
 
 void AFowManager::AddFowParticipant(UFowComp* FowComp)
@@ -206,9 +208,15 @@ const TArray<FRTSMinimapCustomIconDrawData>& AFowManager::GetCustomMiniMapIconDr
 	return M_CachedCustomMiniMapIconDrawData;
 }
 
+const TArray<FRTSMinimapTextDrawData>& AFowManager::GetCustomMiniMapTextDrawData() const
+{
+	return M_CachedCustomMiniMapTextDrawData;
+}
+
 void AFowManager::RefreshCustomMiniMapIconDrawDataForMiniMap()
 {
 	RefreshCustomMiniMapIconDrawDataCache();
+	RefreshCustomMiniMapTextDrawDataCache();
 }
 
 void AFowManager::AppendCustomMiniMapIconBrushData(TArray<FRTSMinimapIconBrushData>& OutBrushData) const
@@ -334,6 +342,104 @@ bool AFowManager::SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconTy
 
 	CustomIcon->M_IconType = NewIconType;
 	RefreshCustomMiniMapIconDrawDataCache();
+	return true;
+}
+
+FName AFowManager::AddCustomMiniMapTextAttachedToActor(const FName TextId,
+	                                                    AActor* AttachedActor,
+	                                                    const FText& Text,
+	                                                    const float TextSizePixels,
+	                                                    const FLinearColor& TextColor)
+{
+	if (not GetCanAddCustomMiniMapText(TextId, AttachedActor, TextSizePixels))
+	{
+		return NAME_None;
+	}
+
+	FFowManagerActorAttachedMinimapText& NewCustomText = M_CustomMiniMapTexts.Add(TextId);
+	NewCustomText.M_TextId = TextId;
+	NewCustomText.M_Text = Text;
+	NewCustomText.M_TextSizePixels = TextSizePixels;
+	NewCustomText.M_TextColor = TextColor;
+	NewCustomText.M_WorldLocation = AttachedActor->GetActorLocation();
+	NewCustomText.M_AttachedActor = AttachedActor;
+
+	RefreshCustomMiniMapTextDrawDataCache();
+	return TextId;
+}
+
+bool AFowManager::GetCanAddCustomMiniMapText(const FName TextId,
+	                                         const AActor* AttachedActor,
+	                                         const float TextSizePixels) const
+{
+	if (TextId.IsNone())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot add custom minimap text because the supplied text ID is NAME_None."
+			"\n See function: AFowManager::GetCanAddCustomMiniMapText");
+		return false;
+	}
+
+	if (not IsValid(AttachedActor))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot add custom minimap text because the attached actor is invalid."
+			"\n See function: AFowManager::GetCanAddCustomMiniMapText");
+		return false;
+	}
+
+	if (not FMath::IsFinite(TextSizePixels) || TextSizePixels <= 0.0f)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot add custom minimap text because TextSizePixels must be finite and larger than zero."
+			"\n See function: AFowManager::GetCanAddCustomMiniMapText");
+		return false;
+	}
+
+	if (M_CustomMiniMapTexts.Contains(TextId))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot add custom minimap text because the supplied text ID already exists."
+			"\n Text ID: " + TextId.ToString() +
+			"\n See function: AFowManager::GetCanAddCustomMiniMapText");
+		return false;
+	}
+
+	return true;
+}
+
+bool AFowManager::UpdateCustomMiniMapText(const FName TextId, const FText& NewText)
+{
+	if (TextId.IsNone())
+	{
+		return false;
+	}
+
+	FFowManagerActorAttachedMinimapText* const CustomText = M_CustomMiniMapTexts.Find(TextId);
+	if (CustomText == nullptr)
+	{
+		return false;
+	}
+
+	CustomText->M_Text = NewText;
+	RefreshCustomMiniMapTextDrawDataCache();
+	return true;
+}
+
+bool AFowManager::RemoveCustomMiniMapText(const FName TextId)
+{
+	if (TextId.IsNone())
+	{
+		return false;
+	}
+
+	const int32 RemovedTexts = M_CustomMiniMapTexts.Remove(TextId);
+	if (RemovedTexts <= 0)
+	{
+		return false;
+	}
+
+	RefreshCustomMiniMapTextDrawDataCache();
 	return true;
 }
 
@@ -501,6 +607,31 @@ void AFowManager::RefreshCustomMiniMapIconDrawDataCache()
 	}
 }
 
+void AFowManager::RefreshCustomMiniMapTextDrawDataCache()
+{
+	M_CachedCustomMiniMapTextDrawData.Reset();
+	M_CachedCustomMiniMapTextDrawData.Reserve(M_CustomMiniMapTexts.Num());
+
+	TArray<FName> InvalidAttachedTextIds;
+	for (TPair<FName, FFowManagerActorAttachedMinimapText>& CustomTextPair : M_CustomMiniMapTexts)
+	{
+		FFowManagerActorAttachedMinimapText& CustomText = CustomTextPair.Value;
+		if (not CustomText.M_AttachedActor.IsValid())
+		{
+			InvalidAttachedTextIds.Add(CustomTextPair.Key);
+			continue;
+		}
+
+		CustomText.M_WorldLocation = CustomText.M_AttachedActor->GetActorLocation();
+		AppendCustomMiniMapTextDrawData(CustomText);
+	}
+
+	for (const FName InvalidAttachedTextId : InvalidAttachedTextIds)
+	{
+		M_CustomMiniMapTexts.Remove(InvalidAttachedTextId);
+	}
+}
+
 bool AFowManager::GetIsValidMinimapIconDataAsset() const
 {
 	if (IsValid(M_MinimapIconDataAsset))
@@ -620,6 +751,26 @@ void AFowManager::AppendCustomMiniMapIconDrawData(const FFowManagerCustomMinimap
 	NewIcon.M_IconSizePixels = MinimapIcon->M_SizeXY;
 	NewIcon.M_RotationDegrees = GetCustomMinimapIconRotationDegrees(CustomIcon.M_WorldRotation);
 	NewIcon.M_IconType = CustomIcon.M_IconType;
+}
+
+void AFowManager::AppendCustomMiniMapTextDrawData(const FFowManagerActorAttachedMinimapText& CustomText)
+{
+	if (CustomText.M_Text.IsEmpty() || CustomText.M_TextSizePixels <= 0.0f)
+	{
+		return;
+	}
+
+	FVector2D TextUV = FVector2D::ZeroVector;
+	if (not GetMiniMapUVFromWorldLocation(CustomText.M_WorldLocation, TextUV))
+	{
+		return;
+	}
+
+	FRTSMinimapTextDrawData& NewText = M_CachedCustomMiniMapTextDrawData.AddDefaulted_GetRef();
+	NewText.M_UV = TextUV;
+	NewText.M_Text = CustomText.M_Text;
+	NewText.M_TextSizePixels = CustomText.M_TextSizePixels;
+	NewText.M_TextColor = CustomText.M_TextColor;
 }
 
 bool AFowManager::UpdateCustomMinimapIconAttachedActorTransform(FFowManagerCustomMinimapIcon& CustomIcon) const

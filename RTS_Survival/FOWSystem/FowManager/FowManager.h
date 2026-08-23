@@ -44,6 +44,30 @@ struct FFowManagerCustomMinimapIcon
 	bool bM_UseStaticRotation = false;
 };
 
+USTRUCT()
+struct FFowManagerActorAttachedMinimapText
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FName M_TextId = NAME_None;
+
+	UPROPERTY()
+	FText M_Text = FText::GetEmpty();
+
+	UPROPERTY()
+	float M_TextSizePixels = 0.0f;
+
+	UPROPERTY()
+	FLinearColor M_TextColor = FLinearColor::White;
+
+	UPROPERTY()
+	FVector M_WorldLocation = FVector::ZeroVector;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_AttachedActor = nullptr;
+};
+
 /**
  * @brief The fow manager keeps track of all the fow components and updates the fow render targets,
  * post process material and niagara systems.
@@ -129,6 +153,7 @@ public:
 	FLinearColor GetMiniMapIconColorValue(const ERTSMinimapIconColor IconColor) const;
 	const TArray<FRTSMinimapIconDrawData>& GetMiniMapIconDrawData() const;
 	const TArray<FRTSMinimapCustomIconDrawData>& GetCustomMiniMapIconDrawData() const;
+	const TArray<FRTSMinimapTextDrawData>& GetCustomMiniMapTextDrawData() const;
 	void RefreshCustomMiniMapIconDrawDataForMiniMap();
 	void AppendCustomMiniMapIconBrushData(TArray<FRTSMinimapIconBrushData>& OutBrushData) const;
 
@@ -167,6 +192,25 @@ public:
 	bool RemoveCustomMiniMapIcon(const FName IconId);
 
 	bool SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType);
+
+	/**
+	 * @brief Registers text that follows an actor without coupling its lifetime to a particular gameplay system.
+	 * @param TextId Stable ID used to update or remove the text later.
+	 * @param AttachedActor Actor whose world location drives the text while it remains valid.
+	 * @param Text Text rendered at the actor's minimap location.
+	 * @param TextSizePixels Slate font size used by the minimap paint layer.
+	 * @param TextColor Tint applied to the rendered text.
+	 * @return The added ID on success; NAME_None if the text could not be added.
+	 */
+	FName AddCustomMiniMapTextAttachedToActor(const FName TextId,
+	                                          AActor* AttachedActor,
+	                                          const FText& Text,
+	                                          const float TextSizePixels,
+	                                          const FLinearColor& TextColor);
+
+	bool UpdateCustomMiniMapText(const FName TextId, const FText& NewText);
+
+	bool RemoveCustomMiniMapText(const FName TextId);
 
 protected:
 	/**
@@ -365,6 +409,19 @@ private:
 
 	void RefreshCustomMiniMapIconDrawDataCache();
 
+	void RefreshCustomMiniMapTextDrawDataCache();
+
+	/**
+	 * @brief Prevents invalid or colliding runtime text entries from entering the draw cache.
+	 * @param TextId Stable ID requested by the caller.
+	 * @param AttachedActor Actor expected to drive the text location.
+	 * @param TextSizePixels Slate font size requested by the caller.
+	 * @return True when the text entry can be registered safely.
+	 */
+	bool GetCanAddCustomMiniMapText(const FName TextId,
+	                                const AActor* AttachedActor,
+	                                const float TextSizePixels) const;
+
 	bool GetIsValidMinimapIconDataAsset() const;
 
 	bool GetCanAddCustomMiniMapIcon(const FName IconId, const EMinimapIconType IconType) const;
@@ -376,6 +433,8 @@ private:
 	void AppendCustomMiniMapIconDrawData(const FFowManagerCustomMinimapIcon& CustomIcon);
 
 	bool UpdateCustomMinimapIconAttachedActorTransform(FFowManagerCustomMinimapIcon& CustomIcon) const;
+
+	void AppendCustomMiniMapTextDrawData(const FFowManagerActorAttachedMinimapText& CustomText);
 
 	float GetCustomMinimapIconRotationDegrees(const FRotator& WorldRotation) const;
 
@@ -502,6 +561,11 @@ private:
 	TMap<FName, FFowManagerCustomMinimapIcon> M_CustomMiniMapIcons;
 
 	TArray<FRTSMinimapCustomIconDrawData> M_CachedCustomMiniMapIconDrawData;
+
+	UPROPERTY()
+	TMap<FName, FFowManagerActorAttachedMinimapText> M_CustomMiniMapTexts;
+
+	TArray<FRTSMinimapTextDrawData> M_CachedCustomMiniMapTextDrawData;
 
 	mutable bool bM_HasReportedMissingMinimapIconDataAsset = false;
 

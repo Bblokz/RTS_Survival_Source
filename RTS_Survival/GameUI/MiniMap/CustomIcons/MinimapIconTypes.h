@@ -39,6 +39,14 @@ struct FRTSMinimapCustomIconDrawData
 	EMinimapIconType M_IconType = EMinimapIconType::None;
 };
 
+struct FRTSMinimapTextDrawData
+{
+	FVector2D M_UV = FVector2D::ZeroVector;
+	FText M_Text = FText::GetEmpty();
+	float M_TextSizePixels = 0.0f;
+	FLinearColor M_TextColor = FLinearColor::White;
+};
+
 struct FRTSMinimapIconBrushData
 {
 	EMinimapIconType M_IconType = EMinimapIconType::None;
