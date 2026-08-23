@@ -362,6 +362,8 @@ void UCargo::OnSquadEntered(ASquadController* SquadController)
 	{
 		UpdateGarrisonWidgetForSquad(SquadController, SlotIndex, /*bIsEntering=*/true);
 	}
+
+	M_OnSquadEnteredCargo.Broadcast(this, SquadController);
 }
 
 void UCargo::OnSquadExited(ASquadController* SquadController, const TArray<ASquadUnit*>& Units)

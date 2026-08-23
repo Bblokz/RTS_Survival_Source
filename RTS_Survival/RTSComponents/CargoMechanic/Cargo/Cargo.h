@@ -17,6 +17,8 @@ class ASquadUnit;
 class ASquadController;
 class ATankMaster;
 
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnSquadEnteredCargo, UCargo*, ASquadController*);
+
 /**
  * @brief Tracks how many squads may occupy this cargo and who is currently inside.
  *
@@ -231,6 +233,9 @@ public:
 
 	void OnSquadEntered(ASquadController* SquadController);
 
+	/** @return Delegate broadcast after a squad has fully entered this cargo. */
+	FOnSquadEnteredCargo& GetOnSquadEnteredCargo() { return M_OnSquadEnteredCargo; }
+
 	/**
 	 * @brief Release all seats held by the provided squad.
 	 * @param SquadController Squad that exits the cargo.
@@ -282,6 +287,8 @@ private:
 	/** Vacancy state for squads (capacity, inside set, and derived count). */
 	UPROPERTY()
 	FCargoVacancyState M_VacancyState;
+
+	FOnSquadEnteredCargo M_OnSquadEnteredCargo;
 
 	// Called by the health component via call back once the health component has set up the widget.
 	void OnHealthBarWidgetInit(UHealthComponent* InitializedComponent);

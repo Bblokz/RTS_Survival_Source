@@ -10,6 +10,8 @@
 
 #include "ArmorCalculation.generated.h"
 
+class UShieldComponent;
+
 
 USTRUCT(BlueprintType)
 struct FArmorSettings
@@ -71,6 +73,9 @@ class RTS_SURVIVAL_API UArmorCalculation : public UActorComponent
 
 public:
 	UArmorCalculation();
+
+	void SetShieldComponent(UShieldComponent* ShieldComponent);
+	UShieldComponent* GetShieldComponent() const { return M_ShieldComponent.Get(); }
 
 	// Removes any registered meshes and their armor plates.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ArmorSettings")
@@ -141,6 +146,10 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	// Optional non-owning shield link supplied by the tank during component initialization.
+	UPROPERTY()
+	TWeakObjectPtr<UShieldComponent> M_ShieldComponent;
+
 	// Holds the armor configuration for up to three meshes.
 	UPROPERTY()
 	FArmorSetup M_ArmorSetup;

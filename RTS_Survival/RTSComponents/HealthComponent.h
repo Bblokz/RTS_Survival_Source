@@ -32,6 +32,8 @@ enum class EHealthLevel : uint8;
 class ACameraPawn;
 class UProgressBar;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnHealthBarVisibilityChanged, ESlateVisibility);
+
 USTRUCT()
 struct FHealthComponentSelectionDelegateHandles
 {
@@ -149,6 +151,15 @@ public:
 	// Not null checked; may still be loading; if so overwrite OnWigetInitialized.
 	UW_HealthBar* GetHealthBarWidget() const;
 
+	/** @return The actual current health widget visibility, or Hidden before widget creation. */
+	ESlateVisibility GetHealthBarVisibility() const;
+
+	/** Broadcasts every actual health-widget visibility update for dependent UI such as shield bars. */
+	FOnHealthBarVisibilityChanged& GetOnHealthBarVisibilityChanged()
+	{
+		return M_OnHealthBarVisibilityChanged;
+	}
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -218,6 +229,7 @@ private:
 	bool Widget_GetIsValidWidgetComponent() const;
 	bool Widget_GetIsValidWidgetClass() const;
 	void Widget_OnFailedToCreateWidgetComponent() const;
+	void SetHealthBarVisibility(ESlateVisibility NewVisibility) const;
 
 
 	/** @brief Updates the visuals for the heathBar to correctly represent the amount of health that is left. */
@@ -267,6 +279,8 @@ private:
 
 	// The selection component used to determine whether the HealthBar should be displayed.
 	TWeakObjectPtr<USelectionComponent> M_SelectionComponent;
+
+	mutable FOnHealthBarVisibilityChanged M_OnHealthBarVisibilityChanged;
 
 	void OnUnitSelected() const;
 	void OnUnitDeselected() const;

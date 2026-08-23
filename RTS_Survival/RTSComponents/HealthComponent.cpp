@@ -41,7 +41,7 @@ void UHealthComponent::MakeHealthBarInvisible() const
 {
 	if (Widget_GetIsValidHealthBarWidget())
 	{
-		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		SetHealthBarVisibility(ESlateVisibility::Hidden);
 	}
 }
 
@@ -51,14 +51,14 @@ void UHealthComponent::OnHideAllGameUI(const bool bHide)
 	// Always record the global state, even if the widget isn't created yet.
 	bWasHiddenByAllGameUI = bHide;
 
-	if (!M_HealthBarWidget.IsValid())
+	if (not IsValid(M_HealthBarWidget.Get()))
 	{
 		return;
 	}
 
 	if (bHide)
 	{
-		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		SetHealthBarVisibility(ESlateVisibility::Hidden);
 		return;
 	}
 
@@ -71,7 +71,7 @@ void UHealthComponent::HideHealthBar()
 {
 	if (Widget_GetIsValidWidgetComponent())
 	{
-		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		SetHealthBarVisibility(ESlateVisibility::Hidden);
 	}
 }
 
@@ -372,6 +372,17 @@ UW_HealthBar* UHealthComponent::GetHealthBarWidget() const
 		return M_HealthBarWidget.Get();
 	}
 	return nullptr;
+}
+
+ESlateVisibility UHealthComponent::GetHealthBarVisibility() const
+{
+	const UW_HealthBar* HealthBarWidget = M_HealthBarWidget.Get();
+	if (not IsValid(HealthBarWidget))
+	{
+		return ESlateVisibility::Hidden;
+	}
+
+	return HealthBarWidget->GetVisibility();
 }
 
 void UHealthComponent::InitFireThresholdData(const float NewMaxFireThreshold, const float NewFireRecovery)
@@ -749,14 +760,14 @@ void UHealthComponent::Debug(const FString& Message, const FColor& Color) const
 
 void UHealthComponent::ApplyHealthBarVisibilityPolicy(const float CurrentPct) const
 {
-	if (!M_HealthBarWidget.IsValid())
+	if (not IsValid(M_HealthBarWidget.Get()))
 	{
 		return;
 	}
 
 	if (bWasHiddenByAllGameUI)
 	{
-		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		SetHealthBarVisibility(ESlateVisibility::Hidden);
 		return;
 	}
 
@@ -765,7 +776,7 @@ void UHealthComponent::ApplyHealthBarVisibilityPolicy(const float CurrentPct) co
 			? ESlateVisibility::Visible
 			: ESlateVisibility::Hidden;
 
-	M_HealthBarWidget->SetVisibility(Target);
+	SetHealthBarVisibility(Target);
 }
 
 
@@ -983,7 +994,7 @@ void UHealthComponent::UpdateVisibilityAfterSettingsChange()
 
 	if (bWasHiddenByAllGameUI)
 	{
-		M_HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		SetHealthBarVisibility(ESlateVisibility::Hidden);
 		return;
 	}
 
@@ -992,7 +1003,7 @@ void UHealthComponent::UpdateVisibilityAfterSettingsChange()
 		const USelectionComponent* const SelectionComponent = M_SelectionComponent.Get();
 		if (IsValid(SelectionComponent) && SelectionComponent->GetIsSelected())
 		{
-			M_HealthBarWidget->SetVisibility(ESlateVisibility::Visible);
+			SetHealthBarVisibility(ESlateVisibility::Visible);
 			return;
 		}
 	}
@@ -1036,7 +1047,7 @@ void UHealthComponent::OnUnitHovered() const
 	{
 		return;
 	}
-	M_HealthBarWidget->SetVisibility(ESlateVisibility::Visible);
+	SetHealthBarVisibility(ESlateVisibility::Visible);
 }
 
 void UHealthComponent::OnUnitUnhovered() const
@@ -1064,7 +1075,19 @@ void UHealthComponent::OnUnitSelected() const
 		return;
 	}
 
-	M_HealthBarWidget->SetVisibility(ESlateVisibility::Visible);
+	SetHealthBarVisibility(ESlateVisibility::Visible);
+}
+
+void UHealthComponent::SetHealthBarVisibility(const ESlateVisibility NewVisibility) const
+{
+	UW_HealthBar* HealthBarWidget = M_HealthBarWidget.Get();
+	if (not IsValid(HealthBarWidget))
+	{
+		return;
+	}
+
+	HealthBarWidget->SetVisibility(NewVisibility);
+	M_OnHealthBarVisibilityChanged.Broadcast(NewVisibility);
 }
 
 void UHealthComponent::OnUnitDeselected() const
