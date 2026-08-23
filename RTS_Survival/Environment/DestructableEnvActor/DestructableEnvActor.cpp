@@ -171,6 +171,7 @@ void ADestructableEnvActor::AOE_DealDamageInRadiusAsync(
 		DamageFalloffExponent,
 		DamageType,
 		OverlapLogic,
+		EShieldDamageSource::AreaOfEffect,
 		BuildActorsToIgnoreWeakArray(ActorsToIgnore));
 }
 
@@ -197,6 +198,7 @@ void ADestructableEnvActor::AOE_DealDamageVsRearArmorInRadiusAsync(
 		MaxArmorPen,
 		DamageType,
 		OverlapLogic,
+		EShieldDamageSource::AreaOfEffect,
 		BuildActorsToIgnoreWeakArray(ActorsToIgnore));
 }
 
@@ -218,6 +220,7 @@ void ADestructableEnvActor::AOE_DealDamageAndCustomArmorHandlingInRadiusAsync(
 		DamageFalloffExponent,
 		DamageType,
 		OverlapLogic,
+		EShieldDamageSource::AreaOfEffect,
 		[WeakThis](UArmorCalculation* ArmorCalculation, AActor* HitActor)
 		{
 			if (not WeakThis.IsValid())

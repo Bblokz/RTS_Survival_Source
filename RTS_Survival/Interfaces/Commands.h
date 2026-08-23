@@ -264,6 +264,7 @@ private:
 	inline bool GetIsPrimarySelected() const { return M_ActionUIManager.IsValid(); };
 
 	bool GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedAbility);
+	bool GetCanQueuedShieldActivationExecute() const;
 	bool GetIsQueuedCommandAbilityIdStillOnUnit(EAbilityID AbilityId) const;
 	bool GetDoesQueuedCommandRequireSubtypeEntry(EAbilityID AbilityId) const;
 	FUnitAbilityEntry* GetAbilityEntryForQueuedCommandSubtype(const FQueueCommand& QueuedCommand);
@@ -846,6 +847,9 @@ public:
 	                                   const bool bSetUnitToIdle);
 	virtual ECommandQueueError DetachTow(const bool bSetUnitToIdle);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Commands")
+	virtual ECommandQueueError ActivateShield(const bool bSetUnitToIdle);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError RegisterAsBlackboardIdle(const bool bSetUnitToIdle);
 
@@ -870,6 +874,7 @@ public:
 	virtual void OnActorBeingTowed(AActor* TowingVehicle, class UVehicleTowComponent* TowComp);
 
 	virtual void ExecuteDetachTowCommand();
+	virtual void ExecuteActivateShieldCommand();
 	
 	/**
 	 * @return The command data used by this unit. Like MoveToLocations and TargetActors.
@@ -1040,6 +1045,7 @@ protected:
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype);
 	virtual void TerminateTowActorCommand();
 	virtual void TerminateDetachTowCommand();
+	virtual void TerminateActivateShieldCommand();
 	void ExecuteRegisterUnitAsBlackboardIdleCommand();
 	void TerminateRegisterUnitAsBlackboardIdleCommand();
 

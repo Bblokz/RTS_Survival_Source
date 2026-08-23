@@ -2,7 +2,9 @@
 
 ## Status
 
-This design is ready for implementation. The open behavior questions have been resolved.
+Implemented in native code. The open behavior questions have been resolved, and the
+`RTS_SurvivalEditor Win64 Development` target compiles successfully. Tank Blueprint defaults still need to select
+the desired material, derived shield-bar widget, radius, capacity, behavior, cooldown, and ability index.
 
 The shield is a tank-owned defensive layer implemented by a dedicated actor component. It has its own capacity, damage reduction, runtime sphere mesh, collision, lifetime/recharge state, command-card ability, and screen-space widget. It must not become part of armor or health, and it must not reuse `FResistanceAndDamageReductionData`.
 

@@ -23,6 +23,8 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/ResearchTechnologyAbilityComponent/ResearchTechnologyAbilityComp.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 
@@ -511,6 +513,10 @@ const FQueueCommand* UCommandData::GetCurrentQueuedCommand() const
 bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedCommand)
 {
 	const EAbilityID CommandType = QueuedCommand.CommandType;
+	if (CommandType == EAbilityID::IdActivateShield && not GetCanQueuedShieldActivationExecute())
+	{
+		return false;
+	}
 
 	if (not IsAbilityRequiredOnCommandCard(CommandType))
 	{
@@ -554,6 +560,23 @@ bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedCom
 	}
 
 	return true;
+}
+
+bool UCommandData::GetCanQueuedShieldActivationExecute() const
+{
+	if (M_Owner == nullptr)
+	{
+		return false;
+	}
+
+	IShieldOwner* ShieldOwner = Cast<IShieldOwner>(M_Owner->GetOwnerActor());
+	if (ShieldOwner == nullptr)
+	{
+		return false;
+	}
+
+	const UShieldComponent* ShieldComponent = ShieldOwner->GetShield();
+	return IsValid(ShieldComponent) && ShieldComponent->CanActivateShield();
 }
 
 bool UCommandData::GetIsQueuedCommandAbilityIdStillOnUnit(const EAbilityID AbilityId) const
@@ -1051,6 +1074,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 	case EAbilityID::IdDetachTow:
 		{
 			M_Owner->ExecuteDetachTowCommand();
+		}
+		break;
+	case EAbilityID::IdActivateShield:
+		{
+			M_Owner->ExecuteActivateShieldCommand();
 		}
 		break;
 	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
@@ -3217,6 +3245,53 @@ ECommandQueueError ICommands::DetachTow(const bool bSetUnitToIdle)
 	                                              FRotator::ZeroRotator);
 }
 
+ECommandQueueError ICommands::ActivateShield(const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(
+		EAbilityID::IdActivateShield);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
+
+	IShieldOwner* ShieldOwner = Cast<IShieldOwner>(GetOwnerActor());
+	UShieldComponent* ShieldComponent = ShieldOwner == nullptr ? nullptr : ShieldOwner->GetShield();
+	if (not IsValid(ShieldComponent) || not ShieldComponent->CanActivateShield() ||
+		GetHasCommandInQueue(EAbilityID::IdActivateShield))
+	{
+		return ECommandQueueError::AbilityNotAllowed;
+	}
+
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+
+	return UnitCommandData->AddAbilityToTCommands(EAbilityID::IdActivateShield);
+}
+
+void ICommands::ExecuteActivateShieldCommand()
+{
+	IShieldOwner* ShieldOwner = Cast<IShieldOwner>(GetOwnerActor());
+	UShieldComponent* ShieldComponent = ShieldOwner == nullptr ? nullptr : ShieldOwner->GetShield();
+	if (IsValid(ShieldComponent))
+	{
+		ShieldComponent->ActivateShield(FShieldActivationOverrides());
+	}
+
+	DoneExecutingCommand(EAbilityID::IdActivateShield);
+}
+
+void ICommands::TerminateActivateShieldCommand()
+{
+}
+
 ECommandQueueError ICommands::RegisterAsBlackboardIdle(const bool bSetUnitToIdle)
 {
 	UCommandData* UnitCommandData = GetIsValidCommandData();
@@ -3484,6 +3559,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdDetachTow:
 		TerminateDetachTowCommand();
+		break;
+	case EAbilityID::IdActivateShield:
+		TerminateActivateShieldCommand();
 		break;
 	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
 		TerminateRegisterUnitAsBlackboardIdleCommand();
