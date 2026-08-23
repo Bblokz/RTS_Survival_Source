@@ -1,50 +1,29 @@
-﻿you have to implement a new weapon system and add it to the weapondata.h
-make sure all the weapon owners get new functions to add it like how they have
-	UFUNCTION(BlueprintCallable)
-	virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) = 0; already.
-	
-	the weapon will be derived form the projectile weapon and will use its own setup struct.
-	we will call it URailgunWeaponState and it needs its own settings struct.
-	
-	in that struct we need: all settings a regular projectile weapon has; put that regular struct as a member
-	and a sound base as well as att and concurrency for it for the sound called ReloadSound.
-	it also needs a multiplier for projectilespeed; that will be applied after in the init of this weapon the UWeaponSTate
-	base class has loaded the settings from the game state; we multiply the projectile speed by that value.
-	
-	IMPORTANT: make sure that the function void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSystem Type) const
-    will scale the naigara system differently when it is a railgun system. what we need is that the weapon calibre will also be supplied to 	SetupNiagaraWithPrjVfxSettings(ProjectileVfxSettings);
-    and then to 		ScaleNiagaraSystemDependingOnType(NewSettings.ProjectileNiagaraSystem);
- in there check if it is a rail gun and if so use a new fvector saved at the weapon settings of the DeveloperSettings namespace and multiply it by a
- scalar that depends on the weapon calibre; a minimum the scalar is always goning to be one but make sure as the calibre goes over 30 it will scale up so  that it reaches
- twice the size at a calibre of 120. do make sure this only affects one axis of scaling by default the X one but make sure that in that function it 
- is easy to change later ( a local constant that defines the axis to scale)
- for attachedrockets still do 	if (Type == EProjectileNiagaraSystem::AttachedRocket)
-                              	{
-                              		M_NiagaraComponent->SetWorldScale3D(FVector(1.0f, 1.0f, 1.0f));
-                              		// Also restart to recreate rocket.
-                              		M_NiagaraComponent->ReinitializeSystem();
-                              	}
-                              	
-                              	and for others still do 		M_NiagaraComponent->SetWorldScale3D(M_BasicScale);
-  
-  
-  
-  IMPORTANT NOTE: make sure 		if (GetCanSetParametersOnSystem(NewSettings.ProjectileNiagaraSystem)) returns true
-  for railgun weapons and that it will allow for setting the color param and widgth param on  the niagara system (eventhough
-  this railgun will use a different niagara from regular projectiles; we assume they support these same user params!)
+﻿You are going to implement a new EAbilityID called IdSupportUnit
+
+it will also need its own enum to differentiate different support abilities, called ESupportAbilityType
+which will be used like how we use other abilities with sub enums as well. (see behaviour ability for example)
+
+This will essentially be a support ability where one unit targets another allied unit and provides support. I want to keep 'abstraction hooks' so that the effect / what it looks like when a support unit supports another can be filled in at blueprint level 
+so we need bp events like
+BP_OnSupportingTank(ATankMaster* AlliedTank)
+BP_OnStopSupportingTank (ATankMaster* AlliedTank ) 
+BP_OnSupportingSquad(ASquadController* AlliedSquad)
+BP_OnStopSupportingSquad (ASquadController * AlliedSquad ) 
+
+I think it would be best if those bp events are part of a new blueprint-friendly interface called UnitSupporter
+
+this abiltiy ID needs to be driven by a component like aim abilities, behaviour abilities have as well so we add the component which then has 
+settings for the ability index and cooldown, in this case also add settings for resources in case the designer wants the support ability 
+to cost more than just time.
+
+we also need some kind of flag system so that the designer can easily set SupportTargets in a data type called that name.
+Where possible targets are : Buildings (BuildingExpansions, Expanded Nomadic trucks) , Tanks (but not expanded nomadics; only in  truck form!),
+Squads
+
+so note that aircraft are both not support units nor targets for any support units!
+
+also a bp friendly specific support ability struct with:
+the SupportTargets datatype.
+float SupportRange
 
 
-	make sure that when the weapon reloads it plays that sound with the settings att and concurrency 
-	
-	further more we need to add a new shell type to EWeaponShellType called Shell_Railgun
-	but make sure that like AP rounds the settings of the weapon data do not get altered when this round is used;
-	it is purely cosmetic in that way (rail gun weapons will only support this round so the base settings as defined the game
-	state will do and dont need changing)
-i have already added a railgun type to EProjectileNiagaraSystem	.
-
-here is the idea for this weapon; it will be set up to use the railgun EProjectileNiagaraSystem and that will make the
-projectile select a different niagara system for it.
-
-
-so that is it; after your work ensure we have the new weapon available for all weapon owners with the customizable 
-projectile speed, reload sound, and the new niagara system settings for the railgun. also make sure that the scaling of the niagara system works correctly and that the sound plays on reload with the correct settings.
