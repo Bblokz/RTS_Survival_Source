@@ -29,6 +29,7 @@ struct FProjectilePoolSettings
 
 class UArmorCalculation;
 class UAudioComponent;
+class UPrimitiveComponent;
 class UProjectileMovementComponent;
 class UWeaponStateProjectile;
 class URTSCameraShakeSubsystem;
@@ -330,6 +331,9 @@ private:
 
 	UPROPERTY()
 	TArray<AActor*> M_ActorsToIgnore;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UPrimitiveComponent>> M_ComponentsToIgnore;
 
 	UPROPERTY()
 	float M_Range = 0;
@@ -683,6 +687,15 @@ private:
 	void SpawnBounce(const FVector& Location, const FRotator& BounceDirection) const;
 
 	void OnHitArmorCalcComponent(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult, AActor* HitActor);
+
+	/**
+	 * @brief Stops shield-absorbed rounds without routing them into armor, while pass-through rounds continue tracing.
+	 * @param ArmorCalculation Armor component linked to the tank's optional shield.
+	 * @param HitResult Trace hit used to verify that the shield mesh itself was struck.
+	 * @return True when the hit was a shield interaction and normal hit processing must stop for this trace.
+	 */
+	bool HandleShieldHit(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult);
+	void SpawnShieldAbsorbedImpact(const FVector& Location, const FRotator& ImpactRotation) const;
 	FORCEINLINE void ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,
 	                                             AActor* HitActor);
 	FORCEINLINE void ArmorCalc_FireProjectile(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,

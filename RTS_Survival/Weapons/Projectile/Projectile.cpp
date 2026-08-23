@@ -12,6 +12,7 @@
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
@@ -332,6 +333,7 @@ void AProjectile::SetupProjectileForNewLaunch(
 	M_ImpactConcurrency = ImpactConcurrency;
 	M_ActorsToIgnore.Empty();
 	M_ActorsToIgnore = ActorsToIgnore;
+	M_ComponentsToIgnore.Empty();
 	M_WeaponCalibre = WeaponCalibre;
 	M_ProjectileTraceRadius = 0.0f;
 
@@ -401,6 +403,7 @@ void AProjectile::ApplyBarrageProjectileLaunchData(
 	M_ImpactAttenuation = WeaponVfx.ImpactAttenuation;
 	M_ImpactConcurrency = WeaponVfx.ImpactConcurrency;
 	M_ActorsToIgnore = ActorsToIgnore;
+	M_ComponentsToIgnore.Empty();
 	M_WeaponCalibre = FMath::RoundToInt(WeaponData.WeaponCalibre);
 	M_ProjectileTraceRadius = 0.0f;
 	M_MaxBounces = DeveloperSettings::GameBalance::Weapons::Projectiles::MaxBouncesPerProjectile;
@@ -1821,6 +1824,14 @@ void AProjectile::PerformAsyncLineTrace()
 	TraceParams.bTraceComplex = false;
 	TraceParams.bReturnPhysicalMaterial = true;
 	TraceParams.AddIgnoredActors(M_ActorsToIgnore);
+	for (const TWeakObjectPtr<UPrimitiveComponent>& IgnoredComponent : M_ComponentsToIgnore)
+	{
+		UPrimitiveComponent* Component = IgnoredComponent.Get();
+		if (IsValid(Component))
+		{
+			TraceParams.AddIgnoredComponent(Component);
+		}
+	}
 
 	const int32 TraceRequestId = ++M_TraceRequestId;
 	bM_TraceInFlight = true;
@@ -1899,6 +1910,11 @@ void AProjectile::OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDa
 		HitResult, HitActor);
 	if (IsValid(ArmorCalculationComp))
 	{
+		if (HandleShieldHit(ArmorCalculationComp, HitResult))
+		{
+			return;
+		}
+
 		OnHitArmorCalcComponent(ArmorCalculationComp, HitResult, HitActor);
 		return;
 	}
@@ -1911,6 +1927,75 @@ void AProjectile::OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDa
 		HitResult.Location,
 		SurfaceType,
 		MakeImpactOutwardRotationZ(HitResult), 1.f);
+}
+
+bool AProjectile::HandleShieldHit(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult)
+{
+	if (not IsValid(ArmorCalculation))
+	{
+		return false;
+	}
+
+	UShieldComponent* ShieldComponent = ArmorCalculation->GetShieldComponent();
+	UPrimitiveComponent* HitComponent = HitResult.GetComponent();
+	if (not IsValid(ShieldComponent) || not IsValid(HitComponent) ||
+		HitComponent != ShieldComponent->GetShieldMeshComponent())
+	{
+		return false;
+	}
+
+	const TWeakObjectPtr<UPrimitiveComponent> ShieldMeshToIgnore(HitComponent);
+	FShieldDamageRequest DamageRequest;
+	DamageRequest.BaseDamage = M_FullDamage;
+	DamageRequest.RangeAdjustedArmorPenetration = GetArmorPenAtRange();
+	DamageRequest.ShellType = M_ShellType;
+	DamageRequest.DamageSource = EShieldDamageSource::Projectile;
+	DamageRequest.ImpactLocation = HitResult.ImpactPoint;
+
+	const EShieldDamageResult DamageResult = ShieldComponent->ApplyShieldDamage(DamageRequest);
+	if (DamageResult == EShieldDamageResult::NotHandled)
+	{
+		return false;
+	}
+
+	if (DamageResult == EShieldDamageResult::PassThrough)
+	{
+		if (ShieldMeshToIgnore.IsValid())
+		{
+			M_ComponentsToIgnore.AddUnique(ShieldMeshToIgnore);
+		}
+		return true;
+	}
+
+	ProjectileHitPropagateNotification(false);
+	SpawnShieldAbsorbedImpact(HitResult.ImpactPoint, MakeImpactOutwardRotationZ(HitResult));
+	OnProjectileDormant();
+	return true;
+}
+
+void AProjectile::SpawnShieldAbsorbedImpact(const FVector& Location, const FRotator& ImpactRotation) const
+{
+	if (M_ProjectileOwner != nullptr)
+	{
+		M_ProjectileOwner->CreateWeaponImpact(Location, ERTSSurfaceType::Air, ImpactRotation);
+		return;
+	}
+
+	const FRTSSurfaceImpactData* ImpactData = FindImpactData(M_ImpactVfx, ERTSSurfaceType::Air);
+	if (ImpactData == nullptr)
+	{
+		ReportMissingSurface(this, ERTSSurfaceType::Air);
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	PlayNiagaraAt(World, ImpactData->ImpactEffect, Location, ImpactRotation, M_ImpactScale);
+	PlaySoundAt(World, ImpactData->ImpactSound, Location, ImpactRotation, M_ImpactAttenuation, M_ImpactConcurrency);
 }
 
 
@@ -2524,6 +2609,7 @@ void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 		MaxArmorDamaged,
 		ERTSDamageType::Kinetic,
 		OverlapLogic,
+		EShieldDamageSource::Shrapnel,
 		ActorsToIgnore
 	);
 }

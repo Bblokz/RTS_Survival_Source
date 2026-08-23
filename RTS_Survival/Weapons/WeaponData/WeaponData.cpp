@@ -17,6 +17,8 @@
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/Weapons/RTSWeaponVFXSettings/RTSWeaponVFXSettings.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "Trace/Trace.h"
@@ -1962,6 +1964,118 @@ void UWeaponStateTrace::FireTrace(const FVector& Direction)
 	);
 }
 
+bool UWeaponStateTrace::ContinueTracePastShield(
+	const FHitResult& ShieldHit,
+	const float ProjectileLaunchTime,
+	const FVector& LaunchLocation,
+	const FVector& TraceEnd,
+	TArray<TWeakObjectPtr<UPrimitiveComponent>> IgnoredShieldComponents)
+{
+	UWorld* TraceWorld = World;
+	if (TraceWorld == nullptr)
+	{
+		return false;
+	}
+
+	UPrimitiveComponent* ShieldMesh = ShieldHit.GetComponent();
+	if (IsValid(ShieldMesh))
+	{
+		IgnoredShieldComponents.AddUnique(ShieldMesh);
+	}
+
+	const FVector TraceDirection = (TraceEnd - ShieldHit.ImpactPoint).GetSafeNormal();
+	constexpr float ShieldContinuationOffset = 1.0f;
+	const FVector ContinuationStart = ShieldHit.ImpactPoint + TraceDirection * ShieldContinuationOffset;
+	if (TraceDirection.IsNearlyZero() || ContinuationStart.Equals(TraceEnd))
+	{
+		return false;
+	}
+
+	FCollisionQueryParams TraceParams(FName(TEXT("ContinueTracePastShield")), true, nullptr);
+	TraceParams.bTraceComplex = false;
+	TraceParams.bReturnPhysicalMaterial = true;
+	TraceParams.AddIgnoredActors(ActorsToIgnore);
+	for (const TWeakObjectPtr<UPrimitiveComponent>& IgnoredShieldComponent : IgnoredShieldComponents)
+	{
+		UPrimitiveComponent* IgnoredComponent = IgnoredShieldComponent.Get();
+		if (IsValid(IgnoredComponent))
+		{
+			TraceParams.AddIgnoredComponent(IgnoredComponent);
+		}
+	}
+
+	const TWeakObjectPtr<UWeaponStateTrace> WeakThis(this);
+	FTraceDelegate TraceDelegate;
+	TraceDelegate.BindLambda(
+		[WeakThis, ProjectileLaunchTime, LaunchLocation, TraceEnd, IgnoredShieldComponents](
+			const FTraceHandle& TraceHandle, FTraceDatum& TraceDatum)
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+
+			WeakThis->OnAsyncTraceComplete(
+				TraceDatum,
+				ProjectileLaunchTime,
+				LaunchLocation,
+				TraceEnd,
+				IgnoredShieldComponents);
+		});
+
+	TraceWorld->AsyncLineTraceByChannel(
+		EAsyncTraceType::Single,
+		ContinuationStart,
+		TraceEnd,
+		TraceChannel,
+		TraceParams,
+		FCollisionResponseParams::DefaultResponseParam,
+		&TraceDelegate);
+	return true;
+}
+
+EShieldDamageResult UWeaponStateTrace::HandleTraceShieldHit(
+	const FHitResult& TraceHit,
+	const FVector& LaunchLocation) const
+{
+	AActor* HitActor = TraceHit.GetActor();
+	IShieldOwner* ShieldOwner = Cast<IShieldOwner>(HitActor);
+	if (ShieldOwner == nullptr)
+	{
+		return EShieldDamageResult::NotHandled;
+	}
+
+	UShieldComponent* ShieldComponent = ShieldOwner->GetShield();
+	if (not IsValid(ShieldComponent) || TraceHit.GetComponent() != ShieldComponent->GetShieldMeshComponent())
+	{
+		return EShieldDamageResult::NotHandled;
+	}
+
+	FShieldDamageRequest DamageRequest;
+	DamageRequest.BaseDamage = WeaponData.BaseDamage;
+	DamageRequest.RangeAdjustedArmorPenetration = CalculateTraceArmorPenAtImpact(
+		LaunchLocation,
+		TraceHit.ImpactPoint);
+	DamageRequest.ShellType = WeaponData.ShellType;
+	DamageRequest.DamageSource = EShieldDamageSource::Hitscan;
+	DamageRequest.ImpactLocation = TraceHit.ImpactPoint;
+	return ShieldComponent->ApplyShieldDamage(DamageRequest);
+}
+
+float UWeaponStateTrace::CalculateTraceArmorPenAtImpact(
+	const FVector& LaunchLocation,
+	const FVector& ImpactLocation) const
+{
+	if (WeaponData.Range <= KINDA_SMALL_NUMBER)
+	{
+		return WeaponData.ArmorPen;
+	}
+
+	const float DistanceTravelled = FVector::Dist(LaunchLocation, ImpactLocation);
+	const float InterpolationFactor = FMath::Clamp(DistanceTravelled / WeaponData.Range, 0.0f, 1.0f);
+	return FMath::Lerp(WeaponData.ArmorPen, WeaponData.ArmorPenMaxRange, InterpolationFactor);
+}
+
 bool UWeaponStateTrace::DidTracePen(const FHitResult& TraceHit, AActor*& OutHitActor) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(TRACEWEAPON::SearchArmorCalc);
@@ -2031,7 +2145,8 @@ void UWeaponStateTrace::OnAsyncTraceComplete(
 	FTraceDatum& TraceDatum,
 	const float ProjectileLaunchTime,
 	const FVector& LaunchLocation,
-	const FVector& TraceEnd)
+	const FVector& TraceEnd,
+	TArray<TWeakObjectPtr<UPrimitiveComponent>> IgnoredShieldComponents)
 {
 	// Use Trace end on no-hit.
 	FVector EndLocation = TraceEnd;
@@ -2049,7 +2164,28 @@ void UWeaponStateTrace::OnAsyncTraceComplete(
 		}
 		if (IsValid(TraceHit.GetActor()))
 		{
-			OnAsyncTraceHitValidActor(TraceHit, EndLocation, ImpactRotation, SurfaceTypeHit);
+			const EShieldDamageResult ShieldDamageResult = HandleTraceShieldHit(TraceHit, LaunchLocation);
+			if (ShieldDamageResult == EShieldDamageResult::PassThrough)
+			{
+				if (ContinueTracePastShield(
+					TraceHit,
+					ProjectileLaunchTime,
+					LaunchLocation,
+					TraceEnd,
+					MoveTemp(IgnoredShieldComponents)))
+				{
+					return;
+				}
+			}
+			else if (ShieldDamageResult == EShieldDamageResult::Absorbed)
+			{
+				EndLocation = TraceHit.ImpactPoint;
+				CreateWeaponImpact(TraceHit.ImpactPoint, ERTSSurfaceType::Air, ImpactRotation);
+			}
+			else
+			{
+				OnAsyncTraceHitValidActor(TraceHit, EndLocation, ImpactRotation, SurfaceTypeHit);
+			}
 		}
 		else
 		{

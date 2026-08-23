@@ -19,7 +19,9 @@
 class URTSCameraShakeSubsystem;
 class URTSOptimizer;
 enum class EProjectileNiagaraSystem : uint8;
+enum class EShieldDamageResult : uint8;
 class UArmorCalculation;
+class UPrimitiveComponent;
 class ASmallArmsProjectileManager;
 class USoundBase;
 class USoundAttenuation;
@@ -1059,7 +1061,8 @@ protected:
 		FTraceDatum& TraceDatum,
 		const float ProjectileLaunchTime,
 		const FVector& LaunchLocation,
-		const FVector& TraceEnd);
+		const FVector& TraceEnd,
+		TArray<TWeakObjectPtr<UPrimitiveComponent>> IgnoredShieldComponents = {});
 
 private:
 	/**
@@ -1067,6 +1070,24 @@ private:
 	 * @pre WeaponOwner is valid.
 	 */
 	void FireTrace(const FVector& Direction);
+
+	/**
+	 * @brief Continues a hitscan after a pass-through shield without allowing that shield to block armor behind it.
+	 * @param ShieldHit Shield surface hit that supplies the continuation point and ignored component.
+	 * @param ProjectileLaunchTime Original shot time retained for the visual projectile.
+	 * @param LaunchLocation Original muzzle location retained for the visual projectile.
+	 * @param TraceEnd Original hitscan endpoint.
+	 * @param IgnoredShieldComponents Shield meshes already crossed by this shot.
+	 * @return True when the continuation trace was submitted.
+	 */
+	bool ContinueTracePastShield(
+		const FHitResult& ShieldHit,
+		float ProjectileLaunchTime,
+		const FVector& LaunchLocation,
+		const FVector& TraceEnd,
+		TArray<TWeakObjectPtr<UPrimitiveComponent>> IgnoredShieldComponents);
+	EShieldDamageResult HandleTraceShieldHit(const FHitResult& TraceHit, const FVector& LaunchLocation) const;
+	float CalculateTraceArmorPenAtImpact(const FVector& LaunchLocation, const FVector& ImpactLocation) const;
 	bool DidTracePen(const FHitResult& TraceHit, AActor*& OutHitActor) const;
 	bool DidTracePenArmorCalcComponent(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult) const;
 
