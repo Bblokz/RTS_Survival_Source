@@ -3,6 +3,7 @@
 #include "DynamicMesh/MeshTransforms.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h" // For RTSFunctionLibrary::ReportError
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -12,6 +13,11 @@ UArmorCalculation::UArmorCalculation()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
+}
+
+void UArmorCalculation::SetShieldComponent(UShieldComponent* ShieldComponent)
+{
+	M_ShieldComponent = ShieldComponent;
 }
 
 static TMap<EArmorPlate, float> StaticArmorHierarchy =

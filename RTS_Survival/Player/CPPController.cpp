@@ -58,6 +58,7 @@
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
+#include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
@@ -4841,6 +4842,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdDetachTow:
 		this->DirectActionButtonDetachTow();
 		break;
+	case EAbilityID::IdActivateShield:
+		this->DirectActionButtonActivateShield();
+		break;
 	default:
 		// execute a button on the next click
 		bM_IsActionButtonActive = true;
@@ -5782,6 +5786,32 @@ void ACPPController::DirectActionButtonDetachTow()
 			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdDetachTow),
 			false);
 	}
+}
+
+void ACPPController::DirectActionButtonActivateShield()
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExecuted = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (ASelectablePawnMaster* SelectedPawn : TSelectedPawnMasters)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(SelectedPawn) || Cast<IShieldOwner>(SelectedPawn) == nullptr)
+		{
+			continue;
+		}
+
+		CommandsExecuted += SelectedPawn->ActivateShield(bResetCommandQueueFirst) == ECommandQueueError::NoError;
+	}
+
+	if (CommandsExecuted <= 0)
+	{
+		return;
+	}
+
+	PlayVoiceLineForPrimarySelected(
+		FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdActivateShield),
+		false);
 }
 
 void ACPPController::DirectActionButtonBreakCover()

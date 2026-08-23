@@ -1517,6 +1517,7 @@ private:
 	void DirectActionButtonRetreat();
 	void DirectActionButtonExitCargo();
 	void DirectActionButtonDetachTow();
+	void DirectActionButtonActivateShield();
 
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();

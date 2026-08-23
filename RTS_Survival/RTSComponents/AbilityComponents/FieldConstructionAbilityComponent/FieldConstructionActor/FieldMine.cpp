@@ -307,6 +307,7 @@ void AFieldMine::ApplyAoeDamage(const FVector& Epicenter)
 		MineSettings.MaxArmorPen,
 		ERTSDamageType::Kinetic,
 		GetOverlapLogicForMineOwner(),
+		EShieldDamageSource::Mine,
 		ActorsToIgnore);
 }
 

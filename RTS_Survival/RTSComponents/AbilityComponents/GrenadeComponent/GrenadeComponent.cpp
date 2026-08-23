@@ -163,6 +163,7 @@ void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, cons
 			DamageParams.MaxArmorPen,
 			ERTSDamageType::Kinetic,
 			OverlapLogic,
+			EShieldDamageSource::Shrapnel,
 			ActorsToIgnore);
 	}
 
