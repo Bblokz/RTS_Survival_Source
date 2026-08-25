@@ -17,6 +17,7 @@ class ASquadController;
 enum class ERTSResourceType : uint8;
 
 DECLARE_MULTICAST_DELEGATE(FOnScavenged);
+DECLARE_MULTICAST_DELEGATE(FOnScavengedOrDestroyed);
 
 USTRUCT()
 struct FScavengeRewardSound
@@ -82,6 +83,9 @@ public:
 	/** @return Whether this scavenges object is enabled. */
 	bool GetCanScavenge() const;
 
+	/** @return Whether scavenging or destruction has already made this object unavailable. */
+	bool GetIsScavengedOrDestroyed() const;
+
 	FVector GetScavLocationClosestToPosition(const FVector& Position) const;
 
 	inline float GetScavengeTime() const { return ScavengeTime; };
@@ -96,10 +100,15 @@ public:
 	// Called when scavenging completes successfully.
 	FOnScavenged OnScavenged;
 
+	// Called exactly once when scavenging or destruction first makes this object unavailable.
+	FOnScavengedOrDestroyed OnScavengedOrDestroyed;
+
 protected:
 	virtual void PostInitializeComponents() override;
 
 	virtual void BeginPlay() override;
+
+	virtual void Destroyed() override;
 
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -189,6 +198,7 @@ private:
 
 	void OnUnitDies_StopScavSquadIfValid();
 	void OnUnitDies_StopTimersAndDisableScavObj();
+	void BroadcastScavengedOrDestroyedOnce();
 	void MakeScavengingSquadStopScavenging_AndDisableScavObj();
 	void HandleScavengeCompletionForSquad();
 	bool GetIsValidScavengingSquad() const;
@@ -305,4 +315,6 @@ private:
 	FScavengeRewardSound M_ScavRewardSoundSettings;
 
 	bool bM_DestroyedByScavenging = false;
+
+	bool bM_HasBroadcastScavengedOrDestroyed = false;
 };

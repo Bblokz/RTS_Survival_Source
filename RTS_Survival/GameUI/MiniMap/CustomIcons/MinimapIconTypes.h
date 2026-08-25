@@ -31,6 +31,24 @@ struct FMinimapIcon
 	TObjectPtr<UTexture2D> M_Texture = nullptr;
 };
 
+USTRUCT(BlueprintType)
+struct FMinimapIconTextPayload
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MiniMap|Text")
+	bool bAlsoWriteText = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MiniMap|Text")
+	FText Text = NSLOCTEXT("MinimapIconTextPayload", "DefaultText", "Attack");
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MiniMap|Text", meta = (ClampMin = "1.0", UIMin = "1.0"))
+	float TextSizePixels = 8.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MiniMap|Text")
+	FLinearColor TextColor = FLinearColor::Red;
+};
+
 struct FRTSMinimapCustomIconDrawData
 {
 	FVector2D M_UV = FVector2D::ZeroVector;

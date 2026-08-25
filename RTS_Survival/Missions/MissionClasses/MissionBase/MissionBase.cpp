@@ -6,6 +6,7 @@
 #include "Sound/SoundMix.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
@@ -81,6 +82,7 @@ void UMissionBase::OnMissionComplete()
 	M_AbilityCooldownCommands = nullptr;
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
+	TeamWeaponSquadTracking_Clear();
 	DebugMission("Completed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -105,6 +107,7 @@ void UMissionBase::OnMissionFailed()
 	M_AbilityCooldownCommands = nullptr;
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
+	TeamWeaponSquadTracking_Clear();
 	DebugMission("Failed mission " + GetName());
 	if (GetMissionManagerChecked())
 	{
@@ -234,7 +237,8 @@ int32 UMissionBase::DoesPlayerHaveAnyAircraftMastersOfType(const TArray<EAircraf
 FName UMissionBase::AddCustomMiniMapIcon(const FName IconId,
 	                                    const EMinimapIconType IconType,
 	                                    const FVector WorldLocation,
-	                                    const FRotator WorldRotation)
+	                                    const FRotator WorldRotation,
+	                                    const FMinimapIconTextPayload TextPayload)
 {
 	AMissionManager* const MissionManager = GetMissionManagerChecked();
 	if (MissionManager == nullptr)
@@ -247,7 +251,8 @@ FName UMissionBase::AddCustomMiniMapIcon(const FName IconId,
 		IconId,
 		IconType,
 		WorldLocation,
-		WorldRotation);
+		WorldRotation,
+		TextPayload);
 }
 
 FName UMissionBase::AddCustomMiniMapIconAttachedToActor(const FName IconId,
@@ -255,7 +260,8 @@ FName UMissionBase::AddCustomMiniMapIconAttachedToActor(const FName IconId,
 	                                                   const FVector WorldLocation,
 	                                                   AActor* AttachedActor,
 	                                                   const FRotator StaticWorldRotation,
-	                                                   const bool bUseStaticRotation)
+	                                                   const bool bUseStaticRotation,
+	                                                   const FMinimapIconTextPayload TextPayload)
 {
 	AMissionManager* const MissionManager = GetMissionManagerChecked();
 	if (MissionManager == nullptr)
@@ -270,7 +276,8 @@ FName UMissionBase::AddCustomMiniMapIconAttachedToActor(const FName IconId,
 		WorldLocation,
 		AttachedActor,
 		StaticWorldRotation,
-		bUseStaticRotation);
+		bUseStaticRotation,
+		TextPayload);
 }
 
 bool UMissionBase::RemoveCustomMiniMapIcon(const FName IconId)
@@ -545,6 +552,7 @@ void UMissionBase::OnCleanUpMission()
 
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
+	TeamWeaponSquadTracking_Clear();
 	M_AbilityCooldownCommands = nullptr;
 	if (GetIsValidMissionManager())
 	{
@@ -578,6 +586,7 @@ void UMissionBase::BeginDestroy()
 
 	Tracking_ClearState();
 	EnemyInBuilding_ClearTracking();
+	TeamWeaponSquadTracking_Clear();
 	UObject::BeginDestroy();
 	if (GetWorld())
 	{
@@ -1531,7 +1540,7 @@ void UMissionBase::Tracking_ClearRegisteredCallbacks()
 		{
 			if (AScavengeableObject* const ScavengableObject = Cast<AScavengeableObject>(TrackedActor))
 			{
-				ScavengableObject->OnScavenged.Remove(DelegateHandle);
+				ScavengableObject->OnScavengedOrDestroyed.Remove(DelegateHandle);
 			}
 		}
 	}
@@ -1754,6 +1763,12 @@ void UMissionBase::Tracking_ConfigureScavengableActorAtIndex(AActor* ActorToTrac
 		return;
 	}
 
+	if (ScavengableObject->GetIsScavengedOrDestroyed())
+	{
+		Tracking_OnActorInvalidatedByIndex(TrackingIndex);
+		return;
+	}
+
 	Tracking_RegisterScavengableCallbacks(ScavengableObject, TrackingIndex);
 }
 
@@ -1805,7 +1820,7 @@ void UMissionBase::Tracking_RegisterScavengableCallbacks(AScavengeableObject* Sc
 
 	const TWeakObjectPtr<UMissionBase> WeakThis(this);
 	const uint32 TrackingSessionGeneration = M_TrackingSessionGeneration;
-	const FDelegateHandle DelegateHandle = ScavengableObject->OnScavenged.AddLambda(
+	const FDelegateHandle DelegateHandle = ScavengableObject->OnScavengedOrDestroyed.AddLambda(
 		[WeakThis, TrackingIndex, TrackingSessionGeneration]()
 	{
 		if (not WeakThis.IsValid()
@@ -2190,6 +2205,97 @@ void UMissionBase::RegisterCallbackOnTankDies(ATankMaster* Tank)
 		}
 	};
 	Tank->OnUnitDies.AddLambda(MissionCallBack);
+}
+
+void UMissionBase::RegisterCallbackOnSquadTWAbandonedOrLostWeapon(
+	ATeamWeaponController* TeamWeaponSquad)
+{
+	if (not EnsureTeamWeaponSquadIsValid(TeamWeaponSquad))
+	{
+		return;
+	}
+
+	const int32 ExistingTrackingIndex = M_TeamWeaponSquadCallbackTracking.IndexOfByPredicate(
+		[TeamWeaponSquad](const FMissionTeamWeaponSquadCallbackTracking& Tracking)
+		{
+			return Tracking.M_TeamWeaponSquad.Get() == TeamWeaponSquad;
+		});
+	if (ExistingTrackingIndex != INDEX_NONE)
+	{
+		TeamWeaponSquadTracking_RemoveAt(ExistingTrackingIndex);
+	}
+
+	FMissionTeamWeaponSquadCallbackTracking& Tracking = M_TeamWeaponSquadCallbackTracking.Emplace_GetRef();
+	Tracking.M_TeamWeaponSquad = TeamWeaponSquad;
+	Tracking.M_AbandonedDelegateHandle = TeamWeaponSquad->OnTeamWeaponAbandonedForInsufficientCrew.AddUObject(
+		this,
+		&UMissionBase::TeamWeaponSquadTracking_OnTriggered);
+	Tracking.M_LostWeaponDelegateHandle = TeamWeaponSquad->OnControlledTeamWeaponLost.AddUObject(
+		this,
+		&UMissionBase::TeamWeaponSquadTracking_OnTriggered);
+}
+
+bool UMissionBase::EnsureTeamWeaponSquadIsValid(const ATeamWeaponController* TeamWeaponSquad) const
+{
+	if (IsValid(TeamWeaponSquad))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		TEXT("TeamWeaponSquad is invalid in UMissionBase::RegisterCallbackOnSquadTWAbandonedOrLostWeapon"));
+	return false;
+}
+
+void UMissionBase::TeamWeaponSquadTracking_OnTriggered(ATeamWeaponController* TeamWeaponSquad)
+{
+	const int32 TrackingIndex = M_TeamWeaponSquadCallbackTracking.IndexOfByPredicate(
+		[TeamWeaponSquad](const FMissionTeamWeaponSquadCallbackTracking& Tracking)
+		{
+			return Tracking.M_TeamWeaponSquad.Get() == TeamWeaponSquad;
+		});
+	if (TrackingIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<ATeamWeaponController> TeamWeaponSquadToCallback = TeamWeaponSquad;
+	TeamWeaponSquadTracking_RemoveAt(TrackingIndex);
+	if (not TeamWeaponSquadToCallback.IsValid())
+	{
+		return;
+	}
+
+	BP_OnCallbackSquadTWAbandonedOrLostWeapon(TeamWeaponSquadToCallback.Get());
+}
+
+void UMissionBase::TeamWeaponSquadTracking_RemoveAt(const int32 TrackingIndex)
+{
+	if (not M_TeamWeaponSquadCallbackTracking.IsValidIndex(TrackingIndex))
+	{
+		return;
+	}
+
+	const FMissionTeamWeaponSquadCallbackTracking Tracking =
+		M_TeamWeaponSquadCallbackTracking[TrackingIndex];
+	M_TeamWeaponSquadCallbackTracking.RemoveAtSwap(TrackingIndex);
+
+	ATeamWeaponController* TeamWeaponSquad = Tracking.M_TeamWeaponSquad.Get();
+	if (not IsValid(TeamWeaponSquad))
+	{
+		return;
+	}
+
+	TeamWeaponSquad->OnTeamWeaponAbandonedForInsufficientCrew.Remove(Tracking.M_AbandonedDelegateHandle);
+	TeamWeaponSquad->OnControlledTeamWeaponLost.Remove(Tracking.M_LostWeaponDelegateHandle);
+}
+
+void UMissionBase::TeamWeaponSquadTracking_Clear()
+{
+	while (not M_TeamWeaponSquadCallbackTracking.IsEmpty())
+	{
+		TeamWeaponSquadTracking_RemoveAt(M_TeamWeaponSquadCallbackTracking.Num() - 1);
+	}
 }
 
 void UMissionBase::RegisterCallbackOnBXPDies(ABuildingExpansion* BuildingExpansion)

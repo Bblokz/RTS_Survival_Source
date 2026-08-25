@@ -31,6 +31,7 @@ enum class EBuildingExpansionType : uint8;
 enum class EAircraftSubtype : uint8;
 class AEnemyController;
 class ASquadController;
+class ATeamWeaponController;
 class ATankMaster;
 class ANomadicVehicle;
 class AScavengeableObject;
@@ -170,6 +171,18 @@ struct FMissionCinematicAudioRuntimeState
 
 	UPROPERTY()
 	float M_CachedVfxVolume = RTSGameUserSettingsRanges::DefaultVolume;
+};
+
+USTRUCT()
+struct FMissionTeamWeaponSquadCallbackTracking
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<ATeamWeaponController> M_TeamWeaponSquad;
+
+	FDelegateHandle M_AbandonedDelegateHandle;
+	FDelegateHandle M_LostWeaponDelegateHandle;
 };
 
 /**
@@ -489,13 +502,16 @@ protected:
 	 * @param IconType Data asset key deciding which custom texture and size to draw.
 	 * @param WorldLocation World-space location represented by this icon.
 	 * @param WorldRotation World-space rotation projected onto minimap 2D space for this icon.
+	 * @param TextPayload Optional text rendered at the same minimap location as the icon.
 	 * @return The added ID on success; NAME_None if the icon could not be added.
 	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap",
+		meta = (AdvancedDisplay = "TextPayload"))
 	FName AddCustomMiniMapIcon(const FName IconId,
 	                           const EMinimapIconType IconType,
 	                           const FVector WorldLocation,
-	                           const FRotator WorldRotation);
+	                           const FRotator WorldRotation,
+	                           const FMinimapIconTextPayload TextPayload);
 
 	/**
 	 * @brief Uses the mission manager as world context so mission blueprints can register actor-following icons safely.
@@ -505,15 +521,18 @@ protected:
 	 * @param AttachedActor Actor whose location and optionally rotation drives this icon until it becomes invalid.
 	 * @param StaticWorldRotation Rotation used when the icon should not follow actor rotation.
 	 * @param bUseStaticRotation True when the supplied static rotation should be used at all times.
+	 * @param TextPayload Optional text rendered at the same actor-driven minimap location as the icon.
 	 * @return The added ID on success; NAME_None if the icon could not be added.
 	 */
-	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap",
+		meta = (AdvancedDisplay = "TextPayload"))
 	FName AddCustomMiniMapIconAttachedToActor(const FName IconId,
 	                                          const EMinimapIconType IconType,
 	                                          const FVector WorldLocation,
 	                                          AActor* AttachedActor,
 	                                          const FRotator StaticWorldRotation,
-	                                          const bool bUseStaticRotation);
+	                                          const bool bUseStaticRotation,
+	                                          const FMinimapIconTextPayload TextPayload);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
 	bool RemoveCustomMiniMapIcon(const FName IconId);
@@ -684,6 +703,16 @@ protected:
 	
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackTankDies(ATankMaster* Tank);
+
+	/**
+	 * @brief Lets a mission react once when a team-weapon squad can no longer operate its tracked weapon.
+	 * @param TeamWeaponSquad Squad to observe for insufficient crew or loss of its controlled weapon actor.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void RegisterCallbackOnSquadTWAbandonedOrLostWeapon(ATeamWeaponController* TeamWeaponSquad);
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void BP_OnCallbackSquadTWAbandonedOrLostWeapon(ATeamWeaponController* TeamWeaponSquad);
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallbackOnBXPDies(ABuildingExpansion* BuildingExpansion);
@@ -1158,6 +1187,10 @@ private:
 	// Native delegate handles are retained so repeated tracking setup cannot leave stale callbacks behind.
 	TArray<FDelegateHandle> M_TrackingEventDelegateHandles;
 
+	// Keeps both team-weapon failure signals paired so the first signal can remove the complete request.
+	UPROPERTY()
+	TArray<FMissionTeamWeaponSquadCallbackTracking> M_TeamWeaponSquadCallbackTracking;
+
 	// Cargo components observed by the shared enemy-entry trigger counter.
 	UPROPERTY()
 	TArray<TWeakObjectPtr<UCargo>> M_EnemyInBuildingCargoComponents;
@@ -1277,6 +1310,10 @@ private:
 	void EnemyInBuilding_OnSquadEntered(UCargo* CargoComponent, ASquadController* EnteringSquad);
 	bool EnemyInBuilding_GetIsEnemySquad(const ASquadController* EnteringSquad) const;
 	void EnemyInBuilding_ClearTracking();
+	bool EnsureTeamWeaponSquadIsValid(const ATeamWeaponController* TeamWeaponSquad) const;
+	void TeamWeaponSquadTracking_OnTriggered(ATeamWeaponController* TeamWeaponSquad);
+	void TeamWeaponSquadTracking_RemoveAt(const int32 TrackingIndex);
+	void TeamWeaponSquadTracking_Clear();
 
 	bool bM_IgnoreTriggerOnMissionStart = false;
 };

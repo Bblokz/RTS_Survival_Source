@@ -11,12 +11,20 @@
 #include "TeamWeaponController.generated.h"
 
 class ATeamWeapon;
+class ATeamWeaponController;
 class UAnimatedTextWidgetPoolManager;
 class AActor;
 class UCrewPosition;
 class UDigInComponent;
 class UTowedActorComponent;
 class UVehicleTowComponent;
+
+DECLARE_MULTICAST_DELEGATE_OneParam(
+	FOnTeamWeaponAbandonedForInsufficientCrew,
+	ATeamWeaponController*);
+DECLARE_MULTICAST_DELEGATE_OneParam(
+	FOnControlledTeamWeaponLost,
+	ATeamWeaponController*);
 
 
 USTRUCT()
@@ -147,6 +155,8 @@ class RTS_SURVIVAL_API ATeamWeaponController : public ASquadController, public I
 
 public:
 	ATeamWeaponController();
+	FOnTeamWeaponAbandonedForInsufficientCrew OnTeamWeaponAbandonedForInsufficientCrew;
+	FOnControlledTeamWeaponLost OnControlledTeamWeaponLost;
 	bool RequestInternalRotateTowards(const FRotator& DesiredRotation);
 	bool GetIsReadyDeployed() const;
 	void OnControlledTeamWeaponDied();
@@ -229,6 +239,10 @@ private:
 	void SetTeamWeaponState(const ETeamWeaponState NewState);
 	void TryAbandonTeamWeaponForInsufficientCrew();
 	void AbandonTeamWeapon();
+	void RegisterControlledTeamWeaponDestroyedCallback();
+	void RemoveControlledTeamWeaponDestroyedCallback();
+	UFUNCTION()
+	void HandleControlledTeamWeaponDestroyed(AActor* DestroyedActor);
 	bool GetIsGameShuttingDown() const;
 	bool GetIsValidTeamWeapon() const;
 	bool GetIsPushedWeaponLeadsMovementType() const;

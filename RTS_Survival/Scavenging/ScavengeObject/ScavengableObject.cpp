@@ -180,6 +180,7 @@ void AScavengeableObject::OnScavengingComplete()
 
 	AsyncLoadAndCreateRewardWidget();
 
+	BroadcastScavengedOrDestroyedOnce();
 	OnScavenged.Broadcast();
 
 	// Trigger destruction in ADestructibleActor with BP_OnUnitDies event for collapse mesh or swap mesh logic.
@@ -479,6 +480,11 @@ bool AScavengeableObject::GetCanScavenge() const
 	return bM_IsScavengeEnabled;
 }
 
+bool AScavengeableObject::GetIsScavengedOrDestroyed() const
+{
+	return bM_HasBroadcastScavengedOrDestroyed;
+}
+
 FVector AScavengeableObject::GetScavLocationClosestToPosition(const FVector& Position) const
 {
 	if (not GetIsValidMeshComp(TEXT("GetScavLocationClosestToPosition")))
@@ -620,6 +626,13 @@ void AScavengeableObject::BeginPlay()
 	BeginPlay_LoadSoundSettings();
 }
 
+void AScavengeableObject::Destroyed()
+{
+	bM_IsScavengeEnabled = false;
+	BroadcastScavengedOrDestroyedOnce();
+	Super::Destroyed();
+}
+
 void AScavengeableObject::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
@@ -753,10 +766,16 @@ void AScavengeableObject::InitScavObject(UTimeProgressBarWidget* NewProgressBarW
 
 void AScavengeableObject::OnUnitDies(const ERTSDeathType DeathType)
 {
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+
 	OnUnitDies_StopScavSquadIfValid();
 	OnUnitDies_StopTimersAndDisableScavObj();
 	// Sets the death flag and calls BP_OnUnitDies which implements collapse mesh logic, swap logic etc.
 	Super::OnUnitDies(DeathType);
+	BroadcastScavengedOrDestroyedOnce();
 }
 
 void AScavengeableObject::OnUnitDies_StopScavSquadIfValid()
@@ -774,6 +793,17 @@ void AScavengeableObject::OnUnitDies_StopTimersAndDisableScavObj()
 	DisableProgressBarAndTimers();
 	// Ensure no other squad can target this scav object for scavenging again.
 	bM_IsScavengeEnabled = false;
+}
+
+void AScavengeableObject::BroadcastScavengedOrDestroyedOnce()
+{
+	if (bM_HasBroadcastScavengedOrDestroyed)
+	{
+		return;
+	}
+
+	bM_HasBroadcastScavengedOrDestroyed = true;
+	OnScavengedOrDestroyed.Broadcast();
 }
 
 void AScavengeableObject::MakeScavengingSquadStopScavenging_AndDisableScavObj()

@@ -86,6 +86,7 @@ bool ATeamWeaponController::TryLoadSquadUnitsFromMapSetup()
 void ATeamWeaponController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	RestorePushedMoveSpeedOverride();
+	RemoveControlledTeamWeaponDestroyedCallback();
 
 	if (GetIsValidTeamWeaponMover())
 	{
@@ -462,6 +463,7 @@ void ATeamWeaponController::OnControlledTeamWeaponDied()
 	}
 
 	AbandonTeamWeapon();
+	OnControlledTeamWeaponLost.Broadcast(this);
 }
 
 float ATeamWeaponController::GetTeamWeaponArc() const
@@ -755,6 +757,7 @@ void ATeamWeaponController::SpawnTeamWeapon()
 		M_TeamWeaponMover->OnPushedMoveArrived.AddUObject(this, &ATeamWeaponController::HandlePushedMoverArrived);
 		M_TeamWeaponMover->OnPushedMoveFailed.AddUObject(this, &ATeamWeaponController::HandlePushedMoverFailed);
 	}
+	RegisterControlledTeamWeaponDestroyedCallback();
 
 	AssignCrewToTeamWeapon();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
@@ -852,6 +855,7 @@ bool ATeamWeaponController::TrySetupTeamWeaponFromMapSetup()
 	M_TeamWeaponMover->OnPushedMoveFailed.RemoveAll(this);
 	M_TeamWeaponMover->OnPushedMoveArrived.AddUObject(this, &ATeamWeaponController::HandlePushedMoverArrived);
 	M_TeamWeaponMover->OnPushedMoveFailed.AddUObject(this, &ATeamWeaponController::HandlePushedMoverFailed);
+	RegisterControlledTeamWeaponDestroyedCallback();
 	return true;
 }
 
@@ -925,6 +929,7 @@ bool ATeamWeaponController::AdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamW
 	M_TeamWeaponMover->InitMover(M_TeamWeapon, this);
 	M_TeamWeaponMover->OnPushedMoveArrived.AddUObject(this, &ATeamWeaponController::HandlePushedMoverArrived);
 	M_TeamWeaponMover->OnPushedMoveFailed.AddUObject(this, &ATeamWeaponController::HandlePushedMoverFailed);
+	RegisterControlledTeamWeaponDestroyedCallback();
 
 	M_TeamWeapon->OnTeamWeaponRemanned();
 	bM_IsTeamWeaponAbandoned = false;
@@ -2765,6 +2770,7 @@ void ATeamWeaponController::TryAbandonTeamWeaponForInsufficientCrew()
 	}
 
 	AbandonTeamWeapon();
+	OnTeamWeaponAbandonedForInsufficientCrew.Broadcast(this);
 }
 
 void ATeamWeaponController::AbandonTeamWeapon()
@@ -2774,6 +2780,7 @@ void ATeamWeaponController::AbandonTeamWeapon()
 		return;
 	}
 
+	RemoveControlledTeamWeaponDestroyedCallback();
 	ResetTowRelationshipOnTeamWeaponSide(true, true);
 
 	SetTeamWeaponState(ETeamWeaponState::Abandoned);
@@ -2816,6 +2823,46 @@ void ATeamWeaponController::AbandonTeamWeapon()
 	M_TeamWeapon = nullptr;
 	M_TeamWeaponMover = nullptr;
 	bM_IsTeamWeaponAbandoned = true;
+}
+
+void ATeamWeaponController::RegisterControlledTeamWeaponDestroyedCallback()
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	M_TeamWeapon->OnDestroyed.AddUniqueDynamic(
+		this,
+		&ATeamWeaponController::HandleControlledTeamWeaponDestroyed);
+}
+
+void ATeamWeaponController::RemoveControlledTeamWeaponDestroyedCallback()
+{
+	ATeamWeapon* TeamWeapon = M_TeamWeapon.Get();
+	if (TeamWeapon == nullptr)
+	{
+		return;
+	}
+
+	TeamWeapon->OnDestroyed.RemoveDynamic(
+		this,
+		&ATeamWeaponController::HandleControlledTeamWeaponDestroyed);
+}
+
+void ATeamWeaponController::HandleControlledTeamWeaponDestroyed(AActor* DestroyedActor)
+{
+	if (GetIsGameShuttingDown() || bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
+	if (M_TeamWeapon.Get() != DestroyedActor)
+	{
+		return;
+	}
+
+	OnControlledTeamWeaponLost.Broadcast(this);
 }
 
 

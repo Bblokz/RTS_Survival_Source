@@ -38,6 +38,9 @@ struct FFowManagerCustomMinimapIcon
 	TWeakObjectPtr<AActor> M_AttachedActor = nullptr;
 
 	UPROPERTY()
+	FMinimapIconTextPayload M_TextPayload;
+
+	UPROPERTY()
 	bool bM_IsAttachedToActor = false;
 
 	UPROPERTY()
@@ -164,12 +167,14 @@ public:
 	 * @param IconType Data asset key deciding which texture and size to draw.
 	 * @param WorldLocation World-space location represented by this icon.
 	 * @param WorldRotation World-space rotation projected onto minimap 2D space for this icon.
+	 * @param TextPayload Optional text rendered at the same minimap location as the icon.
 	 * @return The added ID on success; NAME_None if the icon could not be added.
 	 */
 	FName AddCustomMiniMapIcon(const FName IconId,
 	                           const EMinimapIconType IconType,
 	                           const FVector& WorldLocation,
-	                           const FRotator& WorldRotation);
+	                           const FRotator& WorldRotation,
+	                           const FMinimapIconTextPayload& TextPayload);
 
 	/**
 	 * @brief Adds an always-visible texture icon that follows an actor while it remains valid.
@@ -180,6 +185,7 @@ public:
 	 * @param AttachedActor Actor whose location and optionally rotation drives this icon until it becomes invalid.
 	 * @param StaticWorldRotation Rotation used when the icon should not follow actor rotation.
 	 * @param bUseStaticRotation True when the supplied static rotation should be used at all times.
+	 * @param TextPayload Optional text rendered at the same actor-driven minimap location as the icon.
 	 * @return The added ID on success; NAME_None if the icon could not be added.
 	 */
 	FName AddCustomMiniMapIconAttachedToActor(const FName IconId,
@@ -187,7 +193,8 @@ public:
 	                                          const FVector& WorldLocation,
 	                                          AActor* AttachedActor,
 	                                          const FRotator& StaticWorldRotation,
-	                                          const bool bUseStaticRotation);
+	                                          const bool bUseStaticRotation,
+	                                          const FMinimapIconTextPayload& TextPayload);
 
 	bool RemoveCustomMiniMapIcon(const FName IconId);
 
@@ -426,6 +433,8 @@ private:
 
 	bool GetCanAddCustomMiniMapIcon(const FName IconId, const EMinimapIconType IconType) const;
 
+	bool GetIsValidCustomMiniMapIconTextPayload(const FMinimapIconTextPayload& TextPayload) const;
+
 	void BeginPlay_InitMinimapIconDataAsset();
 
 	const FMinimapIcon* FindValidCustomMiniMapIcon(const EMinimapIconType IconType) const;
@@ -434,7 +443,17 @@ private:
 
 	bool UpdateCustomMinimapIconAttachedActorTransform(FFowManagerCustomMinimapIcon& CustomIcon) const;
 
-	void AppendCustomMiniMapTextDrawData(const FFowManagerActorAttachedMinimapText& CustomText);
+	/**
+	 * @brief Centralizes text-to-UV conversion so every runtime minimap text source paints consistently.
+	 * @param WorldLocation World-space position to convert into minimap UV coordinates.
+	 * @param Text Text sent to the minimap Slate paint layer.
+	 * @param TextSizePixels Slate font size used by the minimap paint layer.
+	 * @param TextColor Tint applied to the rendered text.
+	 */
+	void AppendCustomMiniMapTextDrawData(const FVector& WorldLocation,
+	                                     const FText& Text,
+	                                     const float TextSizePixels,
+	                                     const FLinearColor& TextColor);
 
 	float GetCustomMinimapIconRotationDegrees(const FRotator& WorldRotation) const;
 
