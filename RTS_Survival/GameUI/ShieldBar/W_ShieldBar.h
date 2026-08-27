@@ -7,6 +7,8 @@
 
 #include "W_ShieldBar.generated.h"
 
+class UProgressBar;
+
 /**
  * @brief Base widget used by shield components to present their independent shield capacity.
  */
@@ -23,6 +25,10 @@ public:
 	float GetShieldPercentage() const;
 
 protected:
+	// Bound automatically to the UMG widget by name.
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UProgressBar> ShieldProgressBar = nullptr;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Shield")
 	void BP_OnShieldValuesChanged(float CurrentShields, float MaxShields, float ShieldPercentage);
 
