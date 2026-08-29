@@ -521,6 +521,7 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RailwayCannonTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 		World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
@@ -852,6 +853,104 @@ void AProjectile::SetupVerticalRocketLaunch(const FVector& LaunchLocation,
 		Stage2StraightSpeed,
 		Stage1Time,
 		Stage2ArcTime);
+}
+
+void AProjectile::SetupRailwayCannonLaunch(
+	const FVector& LaunchLocation,
+	const FVector& LaunchDirection,
+	const FVector& TargetLocation,
+	const float ProjectileSpeed,
+	const FRailwayCannonWeaponSettings& RailwayCannonSettings)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	StopDescentSound();
+	const FVector SafeLaunchDirection = LaunchDirection.GetSafeNormal();
+	if (SafeLaunchDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	const float SafeProjectileSpeed = FMath::Max(ProjectileSpeed, KINDA_SMALL_NUMBER);
+	const float LaunchStageSpeed = SafeProjectileSpeed * FMath::Max(
+		RailwayCannonSettings.LaunchStageSpeedMultiplier,
+		0.1f);
+	const float DirectStageSpeed = SafeProjectileSpeed * FMath::Max(
+		RailwayCannonSettings.DirectStageSpeedMultiplier,
+		0.1f);
+	const float TransitionHeight = FMath::Max(
+		RailwayCannonSettings.TransitionHeightAboveLaunch,
+		0.0f);
+
+	SetActorLocation(LaunchLocation);
+	SetActorRotation(SafeLaunchDirection.Rotation());
+	M_ProjectileMovement->Activate();
+	M_ProjectileMovement->ProjectileGravityScale = 0.0f;
+	M_ProjectileMovement->Velocity = SafeLaunchDirection * LaunchStageSpeed;
+
+	const float VerticalSpeed = M_ProjectileMovement->Velocity.Z;
+	if (TransitionHeight <= KINDA_SMALL_NUMBER || VerticalSpeed <= KINDA_SMALL_NUMBER)
+	{
+		const float DirectStageTime = FVector::Distance(LaunchLocation, TargetLocation) / DirectStageSpeed;
+		StartFlightTimers(DirectStageTime);
+		TransitionRailwayCannonToTarget(TargetLocation, DirectStageSpeed);
+		return;
+	}
+
+	const float LaunchStageTime = TransitionHeight / VerticalSpeed;
+	const FVector TransitionLocation = LaunchLocation + M_ProjectileMovement->Velocity * LaunchStageTime;
+	const float DirectStageTime = FVector::Distance(TransitionLocation, TargetLocation) / DirectStageSpeed;
+	StartFlightTimers(LaunchStageTime + DirectStageTime);
+	ScheduleRailwayCannonTransition(TargetLocation, DirectStageSpeed, LaunchStageTime);
+}
+
+void AProjectile::TransitionRailwayCannonToTarget(
+	const FVector& TargetLocation,
+	const float DirectStageSpeed)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	const FVector DirectStageDirection = (TargetLocation - GetActorLocation()).GetSafeNormal();
+	if (DirectStageDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	M_ProjectileMovement->ProjectileGravityScale = 0.0f;
+	M_ProjectileMovement->Velocity = DirectStageDirection * DirectStageSpeed;
+	SetActorRotation(DirectStageDirection.Rotation());
+}
+
+void AProjectile::ScheduleRailwayCannonTransition(
+	const FVector& TargetLocation,
+	const float DirectStageSpeed,
+	const float LaunchStageTime)
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<AProjectile> WeakThis(this);
+	World->GetTimerManager().SetTimer(
+		M_RailwayCannonTransitionTimerHandle,
+		[WeakThis, TargetLocation, DirectStageSpeed]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			WeakThis->TransitionRailwayCannonToTarget(TargetLocation, DirectStageSpeed);
+		},
+		LaunchStageTime,
+		false);
 }
 
 void AProjectile::TransitionVerticalRocketToArcOrStraight(const FVector& TargetLocation,
@@ -1613,6 +1712,7 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RailwayCannonTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
@@ -1631,6 +1731,7 @@ void AProjectile::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RailwayCannonTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
@@ -1739,6 +1840,7 @@ void AProjectile::OnProjectileDormant()
 		World->GetTimerManager().ClearTimer(M_ArcFallbackTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RailwayCannonTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}

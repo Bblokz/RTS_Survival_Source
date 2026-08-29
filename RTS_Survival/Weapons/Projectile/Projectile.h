@@ -215,6 +215,21 @@ public:
 	                               const FVerticalRocketWeaponSettings& VerticalRocketSettings);
 
 	/**
+	 * @brief Starts along the fire socket direction, then redirects once the configured height is reached.
+	 * @param LaunchLocation World-space socket location.
+	 * @param LaunchDirection World-space direction supplied by the fire socket.
+	 * @param TargetLocation Accuracy-adjusted point used by the direct second stage.
+	 * @param ProjectileSpeed Base speed before railway-stage multipliers.
+	 * @param RailwayCannonSettings Designer settings for transition height and stage speeds.
+	 */
+	void SetupRailwayCannonLaunch(
+		const FVector& LaunchLocation,
+		const FVector& LaunchDirection,
+		const FVector& TargetLocation,
+		float ProjectileSpeed,
+		const FRailwayCannonWeaponSettings& RailwayCannonSettings);
+
+	/**
 	 * @brief Starts actor-target homing after the pooled projectile was initialized with normal damage data.
 	 * @param LaunchLocation Initial missile location from the selected rocket socket.
 	 * @param TargetActor Actor to chase; fallback location is used if the actor is invalid or destroyed.
@@ -497,6 +512,12 @@ private:
 	                                       const float Stage2StraightSpeed,
 	                                       const float Stage1Time,
 	                                       const float Stage2ArcTime);
+
+	void TransitionRailwayCannonToTarget(const FVector& TargetLocation, float DirectStageSpeed);
+	void ScheduleRailwayCannonTransition(
+		const FVector& TargetLocation,
+		float DirectStageSpeed,
+		float LaunchStageTime);
 	/**
 	 * @brief Applies the second-stage arc, or immediately uses the final approach if no safe arc exists.
 	 * @param TargetLocation Final target after accuracy deviation.
@@ -747,6 +768,9 @@ private:
 
 	UPROPERTY()
 	FTimerHandle M_VerticalRocketStraightTimerHandle;
+
+	UPROPERTY()
+	FTimerHandle M_RailwayCannonTransitionTimerHandle;
 
 	UPROPERTY()
 	FTimerHandle M_HomingMissileTimerHandle;

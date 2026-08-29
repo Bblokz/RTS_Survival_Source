@@ -1117,6 +1117,33 @@ struct FInitWeaponStateProjectile : public FInitWeaponStateDirectHit
 	EProjectileNiagaraSystem ProjectileSystem = EProjectileNiagaraSystem::TankShell;
 };
 
+/** Designer settings for the two-stage railway-cannon flight path. */
+USTRUCT(BlueprintType)
+struct FRailwayCannonWeaponSettings
+{
+	GENERATED_BODY()
+
+	// The projectile switches to direct flight after climbing this far above its launch socket.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0", Units="cm"))
+	float TransitionHeightAboveLaunch = 500.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.1", UIMin="0.1"))
+	float LaunchStageSpeedMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.1", UIMin="0.1"))
+	float DirectStageSpeedMultiplier = 1.0f;
+};
+
+/** TurretsMaster-only setup data for a railway cannon weapon. */
+USTRUCT(Blueprintable, BlueprintType)
+struct FInitWeaponStateRailwayCannon : public FInitWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FRailwayCannonWeaponSettings RailwayCannonSettings;
+};
+
 USTRUCT(Blueprintable, BlueprintType)
 struct FInitWeaponStateRailgun
 {
@@ -1277,6 +1304,19 @@ protected:
 
 	EProjectileNiagaraSystem GetProjectileNiagaraSystem() const;
 
+	/**
+	 * @brief Reuses the normal projectile damage, penetration, pooling, and VFX setup for specialized flight paths.
+	 * @param ShellAdjustedData Weapon data after applying the selected shell type.
+	 * @param Projectile Pooled projectile to initialize.
+	 * @param LaunchLocation World-space launch location.
+	 * @param LaunchRotation World-space initial launch rotation.
+	 */
+	void FireProjectileWithShellAdjustedStats(
+		const FWeaponData& ShellAdjustedData,
+		AProjectile* Projectile,
+		const FVector& LaunchLocation,
+		const FRotator& LaunchRotation);
+
 private:
 	// Determines the type of projectile niagara system to set.
 	UPROPERTY()
@@ -1297,17 +1337,36 @@ private:
 
 	virtual void FireProjectile(const FVector& TargetDirection);
 
+};
+
+/**
+ * @brief Fires pooled projectiles along the socket direction before redirecting them straight at an aimed point.
+ */
+UCLASS()
+class RTS_SURVIVAL_API UWeaponStateRailwayCannon : public UWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+public:
 	/**
-	 * @brief Fires a projectile with the provided stats.
-	 * @param ShellAdjustedData The data of the weapon adjusted for the shell type.
-	 * @param Projectile The spawned projectile assumed to be valid.
-	 * @param LaunchLocation
-	 * @param LaunchRotation The Rotation the projectile should take.
-	 * @note FORCEINLINE, do not call anywhere else!!
+	 * @brief Keeps railway-cannon setup isolated to the turret path while reusing normal projectile combat data.
+	 * @param NewWeaponIndex Index assigned by the owning TurretsMaster.
+	 * @param NewWorld World used by weapon and projectile timers.
+	 * @param RailwayCannonParameters Base projectile data and two-stage flight settings.
 	 */
-	FORCEINLINE void FireProjectileWithShellAdjustedStats(const FWeaponData& ShellAdjustedData, AProjectile* Projectile,
-	                                                      const FVector& LaunchLocation,
-	                                                      const FRotator& LaunchRotation);
+	void InitRailwayCannonWeapon(
+		int32 NewWeaponIndex,
+		UWorld* NewWorld,
+		const FInitWeaponStateRailwayCannon& RailwayCannonParameters);
+
+protected:
+	virtual void FireWeaponSystem() override;
+
+private:
+	UPROPERTY()
+	FRailwayCannonWeaponSettings M_RailwayCannonSettings;
+
+	void FireRailwayCannonProjectile(const FVector& RawTargetLocation);
 };
 
 /**

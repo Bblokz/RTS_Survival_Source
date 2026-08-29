@@ -2470,6 +2470,93 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 	                                        FloorArmorPenPercentageNeededAllowOverpen);
 }
 
+void UWeaponStateRailwayCannon::InitRailwayCannonWeapon(
+	const int32 NewWeaponIndex,
+	UWorld* NewWorld,
+	const FInitWeaponStateRailwayCannon& RailwayCannonParameters)
+{
+	M_RailwayCannonSettings = RailwayCannonParameters.RailwayCannonSettings;
+	InitProjectileWeapon(
+		RailwayCannonParameters.OwningPlayer,
+		NewWeaponIndex,
+		RailwayCannonParameters.WeaponName,
+		RailwayCannonParameters.WeaponBurstMode,
+		RailwayCannonParameters.WeaponOwner,
+		RailwayCannonParameters.MeshComponent,
+		RailwayCannonParameters.FireSocketName,
+		NewWorld,
+		RailwayCannonParameters.ProjectileSystem,
+		RailwayCannonParameters.WeaponVFX,
+		RailwayCannonParameters.WeaponShellCase,
+		RailwayCannonParameters.BurstCooldown,
+		RailwayCannonParameters.SingleBurstAmountMaxBurstAmount,
+		RailwayCannonParameters.MinBurstAmount,
+		RailwayCannonParameters.CreateShellCasingOnEveryRandomBurst);
+}
+
+void UWeaponStateRailwayCannon::FireWeaponSystem()
+{
+	if (not WeaponOwner)
+	{
+		return;
+	}
+
+	FireRailwayCannonProjectile(ExplicitAimPoint);
+}
+
+void UWeaponStateRailwayCannon::FireRailwayCannonProjectile(const FVector& RawTargetLocation)
+{
+	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+	if (not ProjectileManager)
+	{
+		return;
+	}
+
+	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
+	const FVector LaunchLocation = LaunchAndForward.Key;
+	const FVector LaunchDirection = LaunchAndForward.Value.GetSafeNormal();
+	if (LaunchDirection.IsNearlyZero())
+	{
+		ReportErrorForWeapon("RAILWAY CANNON weapon has an invalid fire socket direction.");
+		return;
+	}
+	if (LaunchDirection.Z <= KINDA_SMALL_NUMBER)
+	{
+		ReportErrorForWeapon("RAILWAY CANNON fire socket must point upward for its launch stage.");
+		return;
+	}
+
+	const FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
+		RawTargetLocation,
+		WeaponData.Accuracy);
+	AProjectile* Projectile = ProjectileManager->GetDormantTankProjectile();
+	if (not IsValid(Projectile))
+	{
+		ReportErrorForWeapon("RAILWAY CANNON weapon failed to get dormant projectile from pool manager.");
+		return;
+	}
+
+	const bool bUsesUnadjustedShellData = WeaponData.ShellType == EWeaponShellType::Shell_AP
+		|| WeaponData.ShellType == EWeaponShellType::Shell_APHE
+		|| WeaponData.ShellType == EWeaponShellType::Shell_Railgun
+		|| WeaponData.ShellType == EWeaponShellType::Shell_Fire;
+	const FWeaponData ShellAdjustedData = bUsesUnadjustedShellData
+		? WeaponData
+		: GLOBAL_GetWeaponDataForShellType(WeaponData);
+
+	FireProjectileWithShellAdjustedStats(
+		ShellAdjustedData,
+		Projectile,
+		LaunchLocation,
+		LaunchDirection.Rotation());
+	Projectile->SetupRailwayCannonLaunch(
+		LaunchLocation,
+		LaunchDirection,
+		TargetLocation,
+		ShellAdjustedData.ProjectileMovementSpeed,
+		M_RailwayCannonSettings);
+}
+
 void URailgunWeaponState::InitRailgunWeapon(
 	const int32 NewWeaponIndex,
 	UWorld* NewWorld,

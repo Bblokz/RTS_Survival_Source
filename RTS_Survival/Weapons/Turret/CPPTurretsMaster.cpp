@@ -759,6 +759,33 @@ void ACPPTurretsMaster::SetupProjectileWeapon(FInitWeaponStateProjectile Project
 	}
 }
 
+void ACPPTurretsMaster::SetupRailwayCannonWeapon(FInitWeaponStateRailwayCannon RailwayCannonParameters)
+{
+	SetOwningPlayer(RailwayCannonParameters.OwningPlayer);
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		RTSFunctionLibrary::ReportError("World is null for railway cannon turret: " + GetName());
+		return;
+	}
+
+	const int32 WeaponIndex = M_TWeapons.Num();
+	UWeaponStateRailwayCannon* RailwayCannon = NewObject<UWeaponStateRailwayCannon>(this);
+	if (not IsValid(RailwayCannon))
+	{
+		RTSFunctionLibrary::ReportError("Failed to create railway cannon weapon state for turret: " + GetName());
+		return;
+	}
+
+	RailwayCannon->InitRailwayCannonWeapon(WeaponIndex, World, RailwayCannonParameters);
+	M_TWeapons.Add(RailwayCannon);
+	UpdateTurretRangeBasedOnWeapons();
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(RailwayCannon, M_ProjectileManager.Get());
+	}
+}
+
 void ACPPTurretsMaster::SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters)
 {
 	SetOwningPlayer(RailgunWeaponParameters.ProjectileWeaponParameters.OwningPlayer);
@@ -1050,7 +1077,8 @@ void ACPPTurretsMaster::GetClosestTarget()
 			{
 				WeakThis->OnTargetsFound(Targets);
 			}
-		});
+		},
+		GetMinimumTargetRange());
 }
 
 void ACPPTurretsMaster::OnTargetsFound(const TArray<AActor*>& Targets)
@@ -1058,12 +1086,18 @@ void ACPPTurretsMaster::OnTargetsFound(const TArray<AActor*>& Targets)
 	bM_IsPendingTargetSearch = false;
 	for (AActor* Target : Targets)
 	{
-		if (RTSFunctionLibrary::RTSIsVisibleTarget(Target, GetOwningPlayer()))
+		if (not RTSFunctionLibrary::RTSIsVisibleTarget(Target, GetOwningPlayer()))
 		{
-			// preserves turret state changes; stores target in struct internally 	
-			SetTarget(Target);
-			return;
+			continue;
 		}
+		if (GetIsTargetBelowMinimumRange(Target->GetActorLocation()))
+		{
+			continue;
+		}
+
+		// Preserves turret state changes; stores target in struct internally.
+		SetTarget(Target);
+		return;
 	}
 }
 
@@ -1275,10 +1309,9 @@ void ACPPTurretsMaster::AutoEngage()
 		return;
 	}
 
-	// 2) Distance gate to max range.
-	const FVector MyLoc = GetActorLocation();
+	// 2) Distance gate to this turret's supported range interval.
 	const FVector TgtLoc = TargetingData.GetActiveTargetLocation();
-	bM_IsInRange= (FVector::DistSquared(TgtLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
+	bM_IsInRange = GetIsTargetWithinWeaponRange(TgtLoc);
 	if (not bM_IsInRange)
 	{
 		StopAllWeaponsFire(true);
@@ -1313,8 +1346,12 @@ void ACPPTurretsMaster::SpecificEngage()
 
 	// Distance check
 	const FVector TgtLoc = TargetingData.GetActiveTargetLocation();
-	const FVector MyLoc = GetActorLocation();
-	bM_IsInRange = (FVector::DistSquared(TgtLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
+	if (GetIsTargetBelowMinimumRange(TgtLoc))
+	{
+		SearchForNewTargetBelowMinimumRange();
+		return;
+	}
+	bM_IsInRange = GetIsTargetWithinWeaponRange(TgtLoc);
 
 	// Still rotate even if not in range; owner reacts to range state.
 	RotateTurretToActor(nullptr /*unused*/);
@@ -1349,6 +1386,39 @@ void ACPPTurretsMaster::SpecificEngage_OnTargetInvalid()
 		const bool bDestroyedByOwnWeapons = false;
 		TurretOwner.GetInterface()->OnMountedWeaponTargetDestroyed(this, nullptr, ActorTarget, bDestroyedByOwnWeapons);
 	}
+}
+
+float ACPPTurretsMaster::GetMinimumTargetRange() const
+{
+	return 0.0f;
+}
+
+bool ACPPTurretsMaster::GetIsTargetBelowMinimumRange(const FVector& TargetLocation) const
+{
+	const float MinimumTargetRange = FMath::Max(GetMinimumTargetRange(), 0.0f);
+	if (MinimumTargetRange <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	return FVector::DistSquared(TargetLocation, GetActorLocation()) < FMath::Square(MinimumTargetRange);
+}
+
+bool ACPPTurretsMaster::GetIsTargetWithinWeaponRange(const FVector& TargetLocation) const
+{
+	if (GetIsTargetBelowMinimumRange(TargetLocation))
+	{
+		return false;
+	}
+
+	return FVector::DistSquared(TargetLocation, GetActorLocation()) <= M_WeaponRangeData.M_MaxWeaponRangeSquared;
+}
+
+void ACPPTurretsMaster::SearchForNewTargetBelowMinimumRange()
+{
+	SetAutoEngageTargets(false);
+	ResetTarget();
+	GetClosestTarget();
 }
 
 FRotator ACPPTurretsMaster::GetBaseRotation() const

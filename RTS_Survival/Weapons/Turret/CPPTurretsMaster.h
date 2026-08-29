@@ -18,6 +18,7 @@ struct FAmmoTrackerInitSettings;
 class ASmallArmsProjectileManager;
 enum class ETargetPreference : uint8;
 struct FInitWeaponStateProjectile;
+struct FInitWeaponStateRailwayCannon;
 struct FInitWeaponStateDirectHit;
 struct FInitWeaponStateProjectile;
 class ITurretOwner;
@@ -304,6 +305,10 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupProjectileWeapon(FInitWeaponStateProjectile ProjectileWeaponParameters) override;
 
+	/** RailwayCannon is intentionally exposed only by TurretsMaster weapon owners. */
+	UFUNCTION(BlueprintCallable)
+	void SetupRailwayCannonWeapon(FInitWeaponStateRailwayCannon RailwayCannonParameters);
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupRailgunWeapon(FInitWeaponStateRailgun RailgunWeaponParameters) override;
 
@@ -401,6 +406,9 @@ protected:
 	/** Unified targeting core for this weapon owner. */
 	UPROPERTY()
 	FWeaponTargetingData TargetingData;
+
+	/** @return Minimum target distance accepted by this turret; zero disables the lower range bound. */
+	virtual float GetMinimumTargetRange() const;
 
 private:
 	UPROPERTY()
@@ -524,6 +532,9 @@ private:
 	FWeaponRangeData M_WeaponRangeData;
 
 	void OnTargetsFound(const TArray<AActor*>& Targets);
+	bool GetIsTargetBelowMinimumRange(const FVector& TargetLocation) const;
+	bool GetIsTargetWithinWeaponRange(const FVector& TargetLocation) const;
+	void SearchForNewTargetBelowMinimumRange();
 
 	bool bM_IsPendingTargetSearch;
 
