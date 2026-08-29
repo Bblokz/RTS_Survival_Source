@@ -32,6 +32,11 @@ class UBehaviour;
 
 DECLARE_MULTICAST_DELEGATE(FOnDestructibleCollapse);
 
+// Broadcast exactly once when this actor dies from losing all health or being crushed (i.e. from
+// OnUnitDies), NOT on plain actor destruction. Listeners (e.g. ADestructibleSplineActor mutual
+// destruction) can react to the health/crush death specifically.
+DECLARE_MULTICAST_DELEGATE(FOnDestructableEnvActorDied);
+
 
 /** @brief A destructable environment actor that can take damage and eventually collapse.
 * When damaged and no Health is left calls OnUnitDies.
@@ -54,6 +59,10 @@ public:
 
 	// Called when collapsed; vertically, impulse, geo swap with physics etc.
 	FOnDestructibleCollapse OnDestructibleCollapse;
+
+	// Fires once when this actor dies from health loss or a crush (OnUnitDies). Distinct from
+	// OnDestructibleCollapse, which also fires for non-lethal collapse presentations.
+	FOnDestructableEnvActorDied OnDestructableEnvActorDied;
 
 
 	/**

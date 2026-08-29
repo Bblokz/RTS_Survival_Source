@@ -16,6 +16,8 @@ class UGeometryCollection;
 class UStaticMesh;
 class UMaterialInterface;
 class IRTSNavAgentInterface;
+class ABuildingExpansion;
+class ADestructableEnvActor;
 
 /**
  * @brief Authoring + runtime state for a single destructible piece on the spline.
@@ -133,6 +135,24 @@ public:
 	/** SFX/VFX played at the destroyed piece's center when its collapse starts (both destruction types). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Destruction")
 	FCollapseFX CollapseFX;
+
+	/**
+	 * Building expansions on the map whose death is linked to this spline. When ANY of these dies from
+	 * losing all health or being crushed (not plain actor destruction), the ENTIRE spline is destroyed
+	 * via its regular death path (DestroyAllSegments). Assign level instances in the details panel.
+	 * @note Only the death->spline direction is wired here; destroying the spline does not kill these.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mutual Destruction")
+	TArray<TObjectPtr<ABuildingExpansion>> MutualDestructionBuildingExpansions;
+
+	/**
+	 * Destructable env actors on the map whose death is linked to this spline. When ANY of these dies
+	 * from losing all health or being crushed (not plain actor destruction), the ENTIRE spline is
+	 * destroyed via its regular death path (DestroyAllSegments). Assign level instances in the details panel.
+	 * @note Only the death->spline direction is wired here; destroying the spline does not kill these.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Mutual Destruction")
+	TArray<TObjectPtr<ADestructableEnvActor>> MutualDestructionEnvActors;
 
 	/** Editor button to force a rebuild after changing the spline or settings. */
 	UFUNCTION(CallInEditor, Category="Spline")
@@ -279,6 +299,20 @@ private:
 	 * configured destruction with deform parameters re-expressed relative to that center.
 	 */
 	void SpawnCollapseProxy(const FSplineDestructibleSegment& Segment);
+
+	// ------------------------- MUTUAL DESTRUCTION ---------------------
+
+	/** Subscribes to the death delegate of every valid linked BXP / env actor (game world only). */
+	void BindMutualDestructionListeners();
+
+	/** Removes this actor's subscriptions from every still-valid linked actor (teardown). */
+	void UnbindMutualDestructionListeners();
+
+	/**
+	 * @brief Death handler for any linked BXP / env actor: tears the whole spline down via its regular
+	 * death path (DestroyAllSegments). Idempotent — later linked deaths become no-ops.
+	 */
+	void HandleMutualDestructionActorDied();
 
 	// ------------------------- STATE ----------------------------------
 

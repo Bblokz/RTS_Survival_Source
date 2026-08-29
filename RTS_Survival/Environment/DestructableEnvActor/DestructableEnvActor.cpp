@@ -393,6 +393,8 @@ void ADestructableEnvActor::OnUnitDies(const ERTSDeathType DeathType)
 	{
 		SetUnitDying();
 		OnUnitDies_NotifyConnectionComponents();
+		// Before the BP event: BP_OnUnitDies may destroy this actor immediately (mirrors ABuildingExpansion).
+		OnDestructableEnvActorDied.Broadcast();
 		BP_OnUnitDies(DeathType);
 	}
 }

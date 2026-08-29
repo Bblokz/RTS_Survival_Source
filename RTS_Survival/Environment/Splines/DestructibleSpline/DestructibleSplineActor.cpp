@@ -7,6 +7,8 @@
 #include "Engine/DamageEvents.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "SplinePieceCollapseProxy.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -54,10 +56,16 @@ void ADestructibleSplineActor::BeginPlay()
 	M_SegmentIndexByComponent.Empty();
 
 	BuildSpline();
+
+	// After the pieces exist so a same-frame linked death has a spline to tear down.
+	BindMutualDestructionListeners();
 }
 
 void ADestructibleSplineActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// Drop mutual-destruction subscriptions before the bookkeeping so we never fire into a torn-down spline.
+	UnbindMutualDestructionListeners();
+
 	// Components are destroyed with the actor; just drop the bookkeeping.
 	// Running collapse proxies own their lifecycle (weak-owner utilities), no teardown needed here.
 	M_Segments.Empty();
@@ -602,4 +610,72 @@ void ADestructibleSplineActor::SpawnCollapseProxy(const FSplineDestructibleSegme
 			VerticalCollapseSettings, CollapseFX);
 		break;
 	}
+}
+
+// ------------------------- MUTUAL DESTRUCTION ---------------------
+
+void ADestructibleSplineActor::BindMutualDestructionListeners()
+{
+	// Delegates only exist / matter in a running game world; editor preview stays unbound.
+	const UWorld* World = GetWorld();
+	if (not World || not World->IsGameWorld())
+	{
+		return;
+	}
+
+	// Non-dynamic multicast delegates hold a weak reference to the bound object, so a subscription can
+	// never call into a destroyed spline (GC-safe); we still RemoveAll on EndPlay for tidy teardown.
+	for (const TObjectPtr<ABuildingExpansion>& Bxp : MutualDestructionBuildingExpansions)
+	{
+		if (not IsValid(Bxp))
+		{
+			continue;
+		}
+		if (FOnUnitDies* DeathDelegate = Bxp->GetOnUnitDiesDelegate())
+		{
+			DeathDelegate->AddUObject(this, &ADestructibleSplineActor::HandleMutualDestructionActorDied);
+		}
+	}
+
+	for (const TObjectPtr<ADestructableEnvActor>& EnvActor : MutualDestructionEnvActors)
+	{
+		if (not IsValid(EnvActor))
+		{
+			continue;
+		}
+		EnvActor->OnDestructableEnvActorDied.AddUObject(
+			this, &ADestructibleSplineActor::HandleMutualDestructionActorDied);
+	}
+}
+
+void ADestructibleSplineActor::UnbindMutualDestructionListeners()
+{
+	// Only still-valid actors can be unbound; ones already destroyed took their delegates with them.
+	for (const TObjectPtr<ABuildingExpansion>& Bxp : MutualDestructionBuildingExpansions)
+	{
+		if (not IsValid(Bxp))
+		{
+			continue;
+		}
+		if (FOnUnitDies* DeathDelegate = Bxp->GetOnUnitDiesDelegate())
+		{
+			DeathDelegate->RemoveAll(this);
+		}
+	}
+
+	for (const TObjectPtr<ADestructableEnvActor>& EnvActor : MutualDestructionEnvActors)
+	{
+		if (not IsValid(EnvActor))
+		{
+			continue;
+		}
+		EnvActor->OnDestructableEnvActorDied.RemoveAll(this);
+	}
+}
+
+void ADestructibleSplineActor::HandleMutualDestructionActorDied()
+{
+	// Regular spline death path: collapse every remaining piece (idempotent, so redundant linked
+	// deaths are safe no-ops) and fire BP_OnSplineFullyDestroyed once the last piece goes.
+	DestroyAllSegments();
 }
