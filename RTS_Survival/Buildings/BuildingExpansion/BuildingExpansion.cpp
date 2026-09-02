@@ -227,13 +227,13 @@ void ABuildingExpansion::FinishPackUpExpansion()
 TArray<UWeaponState*> ABuildingExpansion::GetAllWeapons() const
 {
 	TArray<UWeaponState*> ValidWeapons = {};
-	for (auto EachTurret : M_TTurrets)
+	for (const TWeakObjectPtr<ACPPTurretsMaster>& EachTurret : M_TTurrets)
 	{
 		if (not EachTurret.IsValid())
 		{
 			continue;
 		}
-		for (auto EachWeapon : EachTurret->GetWeapons())
+		for (UWeaponState* EachWeapon : EachTurret->GetWeapons())
 		{
 			if (not IsValid(EachWeapon))
 			{
@@ -242,6 +242,25 @@ TArray<UWeaponState*> ABuildingExpansion::GetAllWeapons() const
 			ValidWeapons.Add(EachWeapon);
 		}
 	}
+
+	for (UHullWeaponComponent* EachHullWeapon : HullWeapons)
+	{
+		if (not GetIsValidHullWeapon(EachHullWeapon))
+		{
+			continue;
+		}
+
+		for (UWeaponState* EachWeapon : EachHullWeapon->GetWeapons())
+		{
+			if (not IsValid(EachWeapon))
+			{
+				continue;
+			}
+
+			ValidWeapons.Add(EachWeapon);
+		}
+	}
+
 	return ValidWeapons;
 }
 

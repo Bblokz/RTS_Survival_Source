@@ -84,6 +84,14 @@ enum class EBuildingExpansionType : uint8
 	BXT_SolarLarge UMETA(DisplayName = "Large Solar Panel Expansion"),
 
 	BTX_RusIndustrialRefinery UMETA(DisplayName = "Rus Industrial Refinery"),
+
+	// Appended to preserve the serialized values of existing BXP types.
+	BTX_RusAquirfierVertical UMETA(DisplayName = "Rus Aquirfier Vertical"),
+	BTX_RusAquirfier UMETA(DisplayName = "Rus Aquirfier"),
+	BTX_RusWarehouse UMETA(DisplayName = "Rus Warehouse"),
+	BTX_RusChemicalPlant UMETA(DisplayName = "Rus Chemical Plant"),
+	BTX_RusAntenna UMETA(DisplayName = "Rus Antenna"),
+	BTX_RusMegaBunker UMETA(DisplayName = "Rus Mega Bunker"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -126,6 +134,16 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusResearchCenter");
 	case EBuildingExpansionType::BTX_RusIndustrialRefinery:
 		return FString("BTX_RusIndustrialRefinery");
+	case EBuildingExpansionType::BTX_RusAquirfierVertical:
+		return FString("BTX_RusAquirfierVertical");
+	case EBuildingExpansionType::BTX_RusAquirfier:
+		return FString("BTX_RusAquirfier");
+	case EBuildingExpansionType::BTX_RusWarehouse:
+		return FString("BTX_RusWarehouse");
+	case EBuildingExpansionType::BTX_RusChemicalPlant:
+		return FString("BTX_RusChemicalPlant");
+	case EBuildingExpansionType::BTX_RusAntenna:
+		return FString("BTX_RusAntenna");
 	case EBuildingExpansionType::BXT_SolarSmall:
 		return FString("BXT_SolarSmall");
 	case EBuildingExpansionType::BXT_SolarLarge:
@@ -148,6 +166,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusDomeBunker");
 	case EBuildingExpansionType::BTX_RusLongCamoBunker:
 		return FString("BTX_RusLongCamoBunker");
+	case EBuildingExpansionType::BTX_RusMegaBunker:
+		return FString("BTX_RusMegaBunker");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -202,6 +222,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusGuardTower: return TEXT("Guard Tower");
 	case EBuildingExpansionType::BTX_RusLongCamoBunker: return TEXT("Long Camo Bunker");
 	case EBuildingExpansionType::BTX_RusDomeBunker: return TEXT("Dome Bunker");
+	case EBuildingExpansionType::BTX_RusMegaBunker: return TEXT("Mega Bunker");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");
@@ -214,6 +235,11 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusFuelStorage1: return TEXT("Fuel Storage 1");
 	case EBuildingExpansionType::BTX_RusFuelStorage2: return TEXT("Fuel Storage 2");
 	case EBuildingExpansionType::BTX_Rus_SuppliesStorage: return TEXT("Supplies Storage");
+	case EBuildingExpansionType::BTX_RusAquirfierVertical: return TEXT("Aquirfier Vertical");
+	case EBuildingExpansionType::BTX_RusAquirfier: return TEXT("Aquirfier");
+	case EBuildingExpansionType::BTX_RusWarehouse: return TEXT("Warehouse");
+	case EBuildingExpansionType::BTX_RusChemicalPlant: return TEXT("Chemical Plant");
+	case EBuildingExpansionType::BTX_RusAntenna: return TEXT("Antenna");
 
 	case EBuildingExpansionType::BXT_SolarSmall: return TEXT("Small Solar Panel");
 	case EBuildingExpansionType::BXT_SolarLarge: return TEXT("Large Solar Panel");
