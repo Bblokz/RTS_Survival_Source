@@ -324,4 +324,90 @@ namespace BxpHelpers
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerLFactoryFuelStorage, BxpData);
 		}
 	}
+
+	namespace RusBxpData
+	{
+		/** @brief Keeps each industrial BXP's balance inputs together for map initialization. */
+		struct FRusIndustrialBxpDefinition
+		{
+			EBuildingExpansionType Type;
+			float Bunker05HealthMultiplier;
+			float ConstructionTime;
+			float VisionRadius;
+			EResistancePresetType ResistancePreset;
+		};
+
+		inline constexpr float Bunker05AdditionalHealth = 250.f;
+		inline constexpr float AquirfierVerticalHealthMultiplier = 1.5f;
+		inline constexpr float AquirfierHealthMultiplier = 2.f;
+		inline constexpr float WarehouseHealthMultiplier = 0.8f;
+		inline constexpr float ChemicalPlantHealthMultiplier = 3.f;
+		inline constexpr float AntennaHealthMultiplier = 0.65f;
+		inline constexpr float AntennaVisionRadiusMultiplier = 2.f;
+
+		// Health multipliers keep these structures scaled to the Bunker 05 shown beside them.
+		inline constexpr FRusIndustrialBxpDefinition IndustrialBxpDefinitions[] =
+		{
+			{
+				EBuildingExpansionType::BTX_RusAquirfierVertical,
+				AquirfierVerticalHealthMultiplier,
+				DeveloperSettings::GameBalance::TrainingTime::BxpT2BuildTime,
+				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T2BxpVisionRadius,
+				EResistancePresetType::ReinforcedBuildingArmor
+			},
+			{
+				EBuildingExpansionType::BTX_RusAquirfier,
+				AquirfierHealthMultiplier,
+				DeveloperSettings::GameBalance::TrainingTime::BxpT2BuildTime,
+				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T2BxpVisionRadius,
+				EResistancePresetType::ReinforcedBuildingArmor
+			},
+			{
+				EBuildingExpansionType::BTX_RusWarehouse,
+				WarehouseHealthMultiplier,
+				DeveloperSettings::GameBalance::TrainingTime::T1BxpBuildTime,
+				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T1BxpVisionRadius,
+				EResistancePresetType::BasicBuildingArmor
+			},
+			{
+				EBuildingExpansionType::BTX_RusChemicalPlant,
+				ChemicalPlantHealthMultiplier,
+				DeveloperSettings::GameBalance::TrainingTime::BxpT2BuildTime,
+				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T2BxpVisionRadius,
+				EResistancePresetType::ReinforcedBuildingArmor
+			},
+			{
+				EBuildingExpansionType::BTX_RusAntenna,
+				AntennaHealthMultiplier,
+				DeveloperSettings::GameBalance::TrainingTime::T1BxpBuildTime,
+				DeveloperSettings::GameBalance::VisionRadii::BxpVision::T2BxpVisionRadius
+				* AntennaVisionRadiusMultiplier,
+				EResistancePresetType::BasicBuildingArmor
+			}
+		};
+
+		static void InitRusIndustrialBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
+		{
+			using namespace BxpHelpers;
+			using namespace DeveloperSettings::GameBalance::UnitHealth;
+
+			const float Bunker05Health = RoundToNearestMultipleOfFive(
+				BxpHeavyBunkerHealth + Bunker05AdditionalHealth);
+
+			for (const FRusIndustrialBxpDefinition& Definition : IndustrialBxpDefinitions)
+			{
+				FBxpData BxpData;
+				BxpData.ConstructionTime = Definition.ConstructionTime;
+				BxpData.Health = RoundToNearestMultipleOfFive(
+					Bunker05Health * Definition.Bunker05HealthMultiplier);
+				BxpData.VisionRadius = Definition.VisionRadius;
+				BxpData.Cost = FUnitCost();
+				BxpData.EnergySupply = 0;
+				BxpData.Abilities = NotArmedBxpAbilities;
+				BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetResistancePresetOfType(
+					Definition.ResistancePreset, BxpData.Health);
+				InPlayerDataMap.Add(Definition.Type, BxpData);
+			}
+		}
+	}
 }

@@ -12,6 +12,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Weapons/Turret/StandaloneTurret/StandaloneTurret.h"
 #include "TacticalAIComponents/TacticalAISquad/EnemySquadTacticalAI.h"
 #include "TacticalAIComponents/TacticalAITank/EnemyTankTacticalAI.h"
 
@@ -87,6 +88,10 @@ FString URTSComponent::GetDisplayName(bool& bOutIsValidString) const
 	case EAllUnitType::UNType_Aircraft:
 		bOutIsValidString = true;
 		return Global_GetAircraftDisplayName(GetSubtypeAsAircraftSubtype());
+	case EAllUnitType::UNType_StandaloneTurret:
+		bOutIsValidString = true;
+		return StaticEnum<EStandaloneTurretSubtype>()->GetDisplayNameTextByValue(
+			static_cast<int64>(GetSubtypeAsStandaloneTurretSubtype())).ToString();
 	}
 	bOutIsValidString = false;
 	return "None";
@@ -178,6 +183,19 @@ void URTSComponent::SetUnitSubtype(
 	OnSubTypeInitialized.Broadcast();
 }
 
+void URTSComponent::SetStandaloneTurretSubtype(const EStandaloneTurretSubtype NewStandaloneTurretSubtype)
+{
+	if (NewStandaloneTurretSubtype == EStandaloneTurretSubtype::StandaloneTurret_None)
+	{
+		RTSFunctionLibrary::ReportError(
+			"No standalone turret subtype set for unit: " + GetOwner()->GetName());
+		return;
+	}
+
+	M_UnitSubType = static_cast<uint8>(NewStandaloneTurretSubtype);
+	OnSubTypeInitialized.Broadcast();
+}
+
 ETankSubtype URTSComponent::GetSubtypeAsTankSubtype() const
 {
 	// interpret the stored integer value as a tank subtype
@@ -202,6 +220,11 @@ EBuildingExpansionType URTSComponent::GetSubtypeAsBxpSubtype() const
 EAircraftSubtype URTSComponent::GetSubtypeAsAircraftSubtype() const
 {
 	return static_cast<EAircraftSubtype>(M_UnitSubType);
+}
+
+EStandaloneTurretSubtype URTSComponent::GetSubtypeAsStandaloneTurretSubtype() const
+{
+	return static_cast<EStandaloneTurretSubtype>(M_UnitSubType);
 }
 
 FTrainingOption URTSComponent::GetUnitTrainingOption() const
@@ -278,6 +301,11 @@ void URTSComponent::ChangeOwningPlayer(const uint8 NewOwningPlayer)
 					ATankMaster* Tank = Cast<ATankMaster>(ParentActor);
 					GameUnitManager->RemoveTankForPlayer(Tank, OwningPlayer);
 					GameUnitManager->AddTankForPlayer(Tank, NewOwningPlayer);
+				}
+				else if (ParentActor->IsA(AStandaloneTurret::StaticClass()))
+				{
+					GameUnitManager->RemoveActorForPlayer(ParentActor, OwningPlayer);
+					GameUnitManager->AddActorForPlayer(ParentActor, NewOwningPlayer);
 				}
 			}
 		}

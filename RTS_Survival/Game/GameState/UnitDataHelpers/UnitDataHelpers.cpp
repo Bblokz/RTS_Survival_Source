@@ -244,6 +244,12 @@ FResistanceAndDamageReductionData FUnitResistanceDataHelpers::GetUnitResistanceD
 		Data = GS->GetAircraftDataOfPlayer(RTSComp->GetSubtypeAsAircraftSubtype(), 1).ResistancesAndDamageMlt;
 		bOutFoundValidData = true;
 		break;
+	case EAllUnitType::UNType_StandaloneTurret:
+		Data = GS->GetStandaloneTurretDataOfPlayer(
+			RTSComp->GetOwningPlayer(),
+			RTSComp->GetSubtypeAsStandaloneTurretSubtype()).ResistancesAndDamageMlt;
+		bOutFoundValidData = true;
+		break;
 	}
 	return Data;
 }

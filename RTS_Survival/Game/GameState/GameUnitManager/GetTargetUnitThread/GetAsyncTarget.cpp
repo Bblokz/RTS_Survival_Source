@@ -99,6 +99,7 @@ void FGetAsyncTarget::AddTargetRequest(
 	int32 NumTargets,
 	int32 OwningPlayer,
 	ETargetPreference TargetPreference,
+	float MinimumSearchRadius,
 	TFunction<void(const TArray<uint32>&)> Callback)
 {
 	// Create a new target request
@@ -109,6 +110,7 @@ void FGetAsyncTarget::AddTargetRequest(
 	NewRequest.NumTargets = NumTargets;
 	NewRequest.OwningPlayer = OwningPlayer;
 	NewRequest.TargetPreference = TargetPreference;
+	NewRequest.MinimumSearchRadius = FMath::Max(MinimumSearchRadius, 0.0f);
 	NewRequest.Callback = MoveTemp(Callback);
 
 	// Enqueue the request
@@ -160,7 +162,7 @@ void FGetAsyncTarget::ProcessTargetRequests()
 			}
 
 			const float Distance = FVector::Dist(Request.SearchLocation, ActorLocation);
-			if (Distance > Request.SearchRadius)
+			if (Distance > Request.SearchRadius || Distance < Request.MinimumSearchRadius)
 			{
 				continue;
 			}

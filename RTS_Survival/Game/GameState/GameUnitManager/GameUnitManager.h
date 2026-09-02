@@ -77,13 +77,15 @@ public:
 	 * @param OwningPlayer The player owning this request.
 	 * @param PrefferedTarget The preferred target type.
 	 * @param Callback The callback function to invoke with the result.
+	 * @param MinimumSearchRadius Targets closer than this radius are excluded from the result.
 	 */
 	void RequestClosestTargets(
 		const FVector& SearchLocation,
 		float SearchRadius,
 		int32 NumTargets,
 		int32 OwningPlayer, ETargetPreference PrefferedTarget,
-		TFunction<void(const TArray<AActor*>&)> Callback);
+		TFunction<void(const TArray<AActor*>&)> Callback,
+		float MinimumSearchRadius = 0.0f);
 
 	/**
 	 * @brief Requests strategic AI results based on detailed unit state cached on the async thread.
@@ -304,6 +306,10 @@ private:
 
 	UPROPERTY()
 	TArray<AActor*> M_ActorsAliveEnemy;
+
+	AActor* FindGenericActorUnitForPlayer(
+		const FTrainingOption& TrainingOption,
+		int32 OwningPlayer) const;
 
 	void IncrementTankOrNomadicCounter(ATankMaster* Tank, uint8 Player);
 	void DecrementTankOrNomadicCounter(ATankMaster* Tank, uint8 Player);

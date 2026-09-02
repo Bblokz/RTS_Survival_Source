@@ -19,6 +19,7 @@
 #include "RTS_Survival/UnitData/BuildingExpansionData.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
 #include "RTS_Survival/UnitData/DigInData.h"
+#include "RTS_Survival/UnitData/StandaloneTurretData.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/ProjectileManagerCallbacks/ProjectileManagerCallBacks.h"
 
 #include "CPPGameState.generated.h"
@@ -120,6 +121,16 @@ public:
 	 * @note May return null if map does not contain the type, check always before using.
 	 */
 	FTankData GetTankDataOfPlayer(const int32 PlayerOwningTank, const ETankSubtype TankSubtype) const;
+
+	/**
+	 * @brief Keeps standalone turret balance lookup consistent with the owning player's unit data.
+	 * @param PlayerOwningTurret Player index that selects player or enemy data.
+	 * @param StandaloneTurretSubtype Subtype whose balance data is requested.
+	 * @return Configured data, or an empty struct after reporting a missing subtype.
+	 */
+	FStandaloneTurretData GetStandaloneTurretDataOfPlayer(
+		int32 PlayerOwningTurret,
+		EStandaloneTurretSubtype StandaloneTurretSubtype) const;
 
 	/**
 	 * @brief Updates tankdata with the new data struct provided.
@@ -259,6 +270,12 @@ private:
 	TMap<ETankSubtype, FTankData> M_TEnemyTankDataHashMap;
 
 	UPROPERTY()
+	TMap<EStandaloneTurretSubtype, FStandaloneTurretData> M_TPlayerStandaloneTurretDataHashMap;
+
+	UPROPERTY()
+	TMap<EStandaloneTurretSubtype, FStandaloneTurretData> M_TEnemyStandaloneTurretDataHashMap;
+
+	UPROPERTY()
 	TMap<EAircraftSubtype, FAircraftData> M_TPlayerAircraftDataHashMap;
 
 	UPROPERTY()
@@ -313,6 +330,7 @@ FBxpOptionData InitBxpOptionEntry(const EBuildingExpansionType Type,
 	void InitAllGameRocketData();
 	// Fills the TankDataHashMap of M_TPlayerTankDataHashMap with the data for each tank subtype.
 	void InitAllGameTankData();
+	void InitAllGameStandaloneTurretData();
 	void InitAllGameArmoredCarData();
 	void InitAllGameLightTankData();
 	void InitAllGameMediumTankData();

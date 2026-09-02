@@ -714,7 +714,8 @@ void UGameUnitManager::RequestClosestTargets(
 	int32 NumTargets,
 	int32 OwningPlayer,
 	ETargetPreference PrefferedTarget,
-	TFunction<void(const TArray<AActor*>&)> Callback)
+	TFunction<void(const TArray<AActor*>&)> Callback,
+	const float MinimumSearchRadius)
 {
 	if (M_AsyncTargetProcessor)
 	{
@@ -730,6 +731,7 @@ void UGameUnitManager::RequestClosestTargets(
 			NumTargets,
 			OwningPlayer,
 			PrefferedTarget,
+			MinimumSearchRadius,
 			[WeakThis, Callback = MoveTemp(Callback), OwningPlayer](const TArray<uint32>& TargetIDs)
 			{
 				if (WeakThis.IsValid())
@@ -1722,11 +1724,36 @@ AActor* UGameUnitManager::FindUnitForPlayer(const FTrainingOption& TrainingOptio
 		return FindNomadicUnitOfPlayer(static_cast<ENomadicSubtype>(TrainingOption.SubtypeValue), OwningPlayer);
 	case EAllUnitType::UNType_BuildingExpansion:
 		return FindBxpUnitOfPlayer(static_cast<EBuildingExpansionType>(TrainingOption.SubtypeValue), OwningPlayer);
+	case EAllUnitType::UNType_StandaloneTurret:
+		return FindGenericActorUnitForPlayer(TrainingOption, OwningPlayer);
 	default:
 		RTSFunctionLibrary::ReportError("Unknown unit type in GetFirstUnitOfTypeForPlayer"
 			"\n at function GetFirstUnitOfTypeForPlayer in CPPGameState.cpp");
 		return nullptr;
 	}
+	return nullptr;
+}
+
+AActor* UGameUnitManager::FindGenericActorUnitForPlayer(
+	const FTrainingOption& TrainingOption,
+	const int32 OwningPlayer) const
+{
+	constexpr int32 PlayerOwnerIndex = 1;
+	const TArray<AActor*>& Actors = OwningPlayer == PlayerOwnerIndex ? M_ActorsAlivePlayer : M_ActorsAliveEnemy;
+	for (AActor* Actor : Actors)
+	{
+		if (not IsValid(Actor))
+		{
+			continue;
+		}
+
+		const URTSComponent* RTS = Actor->FindComponentByClass<URTSComponent>();
+		if (IsValid(RTS) && RTS->GetUnitTrainingOption() == TrainingOption)
+		{
+			return Actor;
+		}
+	}
+
 	return nullptr;
 }
 

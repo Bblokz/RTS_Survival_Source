@@ -363,6 +363,9 @@ void URTSExperienceComp::SetupExperienceLevels(const FTrainingOption& UnitTypeAn
 	case EAllUnitType::UNType_Aircraft:
 		SetupAircraftExp(CppGameState, static_cast<EAircraftSubtype>(UnitTypeAndSubtype.SubtypeValue), OwningPlayer);
 		break;
+	case EAllUnitType::UNType_StandaloneTurret:
+		OnUnitTypeError("STANDALONE_TURRET");
+		break;
 	}
 }
 
@@ -392,6 +395,10 @@ void URTSExperienceComp::SetupVeterancyIconSet(const FTrainingOption& UnitTypeAn
 		break;
 	case EAllUnitType::UNType_Aircraft:
 		M_UnitExperience.M_VeterancyIconSet = EVeterancyIconSet::EVI_GerAircraft;
+		break;
+	case EAllUnitType::UNType_StandaloneTurret:
+		OnInvalidUnitForVeterancy("StandaloneTurret");
+		M_UnitExperience.M_VeterancyIconSet = EVeterancyIconSet::EVI_GerVehicles;
 		break;
 	}
 }

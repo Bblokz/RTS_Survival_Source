@@ -69,6 +69,7 @@ ACPPGameState::ACPPGameState()
 
 	InitAllGameWeaponData();
 	InitAllGameTankData();
+	InitAllGameStandaloneTurretData();
 	InitAllGameAircraftData();
 	InitAllGameNomadicData();
 	InitAllGameSquadData();
@@ -170,6 +171,26 @@ FTankData ACPPGameState::GetTankDataOfPlayer(const int32 PlayerOwningTank,
 	FString TankName = Global_GetTankSubtypeEnumAsString(TankSubtype);
 	RTSFunctionLibrary::ReportError("Could not find tank data for enemy tank: " + TankName);
 	return FTankData();
+}
+
+FStandaloneTurretData ACPPGameState::GetStandaloneTurretDataOfPlayer(
+	const int32 PlayerOwningTurret,
+	const EStandaloneTurretSubtype StandaloneTurretSubtype) const
+{
+	constexpr int32 PlayerOwnerIndex = 1;
+	const TMap<EStandaloneTurretSubtype, FStandaloneTurretData>& TurretDataMap =
+		PlayerOwningTurret == PlayerOwnerIndex
+			? M_TPlayerStandaloneTurretDataHashMap
+			: M_TEnemyStandaloneTurretDataHashMap;
+	if (const FStandaloneTurretData* StandaloneTurretData = TurretDataMap.Find(StandaloneTurretSubtype))
+	{
+		return *StandaloneTurretData;
+	}
+
+	RTSFunctionLibrary::ReportError(
+		"Could not find standalone turret data for subtype: "
+		+ UEnum::GetValueAsString(StandaloneTurretSubtype));
+	return FStandaloneTurretData();
 }
 
 bool ACPPGameState::UpgradeTankDataForPlayer(const int32 PlayerOwningTank, const ETankSubtype TankSubtype,
@@ -4039,6 +4060,43 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML_20S_152MM_SU152, WeaponData);
+
+	{
+		constexpr float TM312CalibreMM = 305.f;
+		// Produces roughly 8.5k base damage, following the bore-area progression of the 128mm and 152mm cannons.
+		constexpr float TM312ExplosiveFillerGrams = 4500.f;
+		constexpr float TM312MinRangeArmorPenMM = 520.f;
+		constexpr float TM312MaxRangeArmorPenMM = 480.f;
+		constexpr int32 TM312MagazineCapacity = 1;
+		constexpr float TM312ReloadSpeedSeconds = 60.f;
+		constexpr float TM312ShotCooldownSeconds = 1.f;
+		constexpr int32 TM312Accuracy = 95;
+
+		FWeaponData TM312WeaponData;
+		TM312WeaponData.WeaponName = EWeaponName::TM_3_12_305MM;
+		TM312WeaponData.DamageType = ERTSDamageType::Kinetic;
+		TM312WeaponData.ShellType = EWeaponShellType::Shell_AP;
+		TM312WeaponData.ShellTypes = {EWeaponShellType::Shell_AP, EWeaponShellType::Shell_HE};
+		TM312WeaponData.WeaponCalibre = TM312CalibreMM;
+		TM312WeaponData.TNTExplosiveGrams = TM312ExplosiveFillerGrams;
+		TM312WeaponData.BaseDamage = DamagePerMM * TM312WeaponData.WeaponCalibre
+			+ TM312WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		TM312WeaponData.DamageFlux = DamageFluxPercentage;
+		TM312WeaponData.Range = DeveloperSettings::GameBalance::Ranges::RailwayArtilleryRange;
+		TM312WeaponData.ArmorPen = TM312MinRangeArmorPenMM;
+		TM312WeaponData.ArmorPenMaxRange = TM312MaxRangeArmorPenMM;
+		TM312WeaponData.MagCapacity = TM312MagazineCapacity;
+		TM312WeaponData.ReloadSpeed = TM312ReloadSpeedSeconds;
+		TM312WeaponData.BaseCooldown = TM312ShotCooldownSeconds;
+		TM312WeaponData.CooldownFlux = CooldownFluxPercentage;
+		TM312WeaponData.Accuracy = TM312Accuracy;
+		TM312WeaponData.ShrapnelRange = TM312WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+		TM312WeaponData.ShrapnelDamage = TM312WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		TM312WeaponData.ShrapnelParticles = TM312WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+		TM312WeaponData.ShrapnelPen = TM312WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+		TM312WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::TM_3_12_305MM, TM312WeaponData);
+	}
 }
 
 TArray<FBxpOptionData> ACPPGameState::InitBxpOptions(
@@ -4139,6 +4197,37 @@ void ACPPGameState::InitAllGameRocketData()
 	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::JagdPantherRockets, RocketData);
 
 	M_EnemyAttachedRocketDataHashMap = M_TPlayerAttachedRocketDataHashMap;
+}
+
+void ACPPGameState::InitAllGameStandaloneTurretData()
+{
+	constexpr float BallTurret100mmMaxHealth = 1000.0f;
+	constexpr float BallTurret50mmMaxHealth = 500.0f;
+	constexpr float BallTurretRotationSpeedDegreesPerSecond = 20.0f;
+	const TArray<FUnitAbilityEntry> StandaloneTurretAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility,
+	});
+	M_TPlayerStandaloneTurretDataHashMap.Reset();
+	M_TEnemyStandaloneTurretDataHashMap.Reset();
+
+	FStandaloneTurretData BallTurretData;
+	BallTurretData.MaxHealth = BallTurret100mmMaxHealth;
+	BallTurretData.TurretRotationSpeedDegreesPerSecond = BallTurretRotationSpeedDegreesPerSecond;
+	BallTurretData.Abilities = StandaloneTurretAbilities;
+	BallTurretData.ResistancesAndDamageMlt =
+		FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BallTurretData.MaxHealth);
+	M_TPlayerStandaloneTurretDataHashMap.Add(EStandaloneTurretSubtype::BallTurret_100mm, BallTurretData);
+
+	BallTurretData.MaxHealth = BallTurret50mmMaxHealth;
+	BallTurretData.ResistancesAndDamageMlt =
+		FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BallTurretData.MaxHealth);
+	M_TPlayerStandaloneTurretDataHashMap.Add(EStandaloneTurretSubtype::BallTurret_50mm, BallTurretData);
+	M_TEnemyStandaloneTurretDataHashMap = M_TPlayerStandaloneTurretDataHashMap;
 }
 
 void ACPPGameState::InitAllGameTankData()
@@ -6596,6 +6685,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpHelpers::GerBxpData::InitRefineryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCaptureBunkersBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerBarracksBxpData(M_TPlayerBxpDataHashMap);
+	BxpHelpers::RusBxpData::InitRusIndustrialBxpData(M_TPlayerBxpDataHashMap);
 
 	BxpData.ConstructionTime = T1BxpBuildTime;
 	BxpData.Health = T1BxpHealth;
@@ -6995,6 +7085,28 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth, 10);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Bunker05_WithTurrets, BxpData);
+
+	// -----------------------------------------------------------------------
+	// ------------------------- RUS MEGA BUNKER -----------------------------
+	// -----------------------------------------------------------------------
+
+	BxpData.ConstructionTime = BxpT2BuildTime;
+	BxpData.VisionRadius = MegaBunkerVisionRadius;
+	BxpData.Cost = FUnitCost({
+		{
+			ERTSResourceType::Resource_Radixite,
+			RusBunker02_204MM_Radixite
+		},
+		{
+			ERTSResourceType::Resource_Metal,
+			RusBunker02_204MM_Metal
+		},
+	});
+	BxpData.EnergySupply = 0;
+	BxpData.Abilities = ArmedBxpAbilities;
+	BxpData.Health = BxpMegaBunkerHealth;
+	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusMegaBunker, BxpData);
 
 
 	// -----------------------------------------------------------------------

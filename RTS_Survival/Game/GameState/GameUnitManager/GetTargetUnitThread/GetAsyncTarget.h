@@ -58,6 +58,7 @@ public:
 	 * @param OwningPlayer The player that owns this request; determines which group of actors
 	 * are considered.
 	 * @param TargetPreference The preference for the target type.
+	 * @param MinimumSearchRadius Targets closer than this radius are excluded.
 	 * @param Callback The callback function to invoke with the result.
 	 */
 	void AddTargetRequest(
@@ -67,6 +68,7 @@ public:
 		int32 NumTargets,
 		int32 OwningPlayer,
 		ETargetPreference TargetPreference,
+		float MinimumSearchRadius,
 		TFunction<void(const TArray<uint32>&)> Callback);
 
 private:
@@ -79,6 +81,7 @@ private:
 		int32 NumTargets;
 		int32 OwningPlayer;
 		ETargetPreference TargetPreference;
+		float MinimumSearchRadius;
 		TFunction<void(const TArray<uint32>&)> Callback;
 	};
 

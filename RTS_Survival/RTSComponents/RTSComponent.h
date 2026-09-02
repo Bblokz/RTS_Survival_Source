@@ -80,6 +80,9 @@ public:
 		NewBxpSubType = EBuildingExpansionType::BXT_Invalid,
 		EAircraftSubtype NewAircraftSubtype = EAircraftSubtype::Aircarft_None);
 
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void SetStandaloneTurretSubtype(EStandaloneTurretSubtype NewStandaloneTurretSubtype);
+
 	/** @return The tank subtype from the stored integer value. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	ETankSubtype GetSubtypeAsTankSubtype() const;
@@ -96,6 +99,9 @@ public:
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	EAircraftSubtype GetSubtypeAsAircraftSubtype() const;
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	EStandaloneTurretSubtype GetSubtypeAsStandaloneTurretSubtype() const;
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	FTrainingOption GetUnitTrainingOption() const;
