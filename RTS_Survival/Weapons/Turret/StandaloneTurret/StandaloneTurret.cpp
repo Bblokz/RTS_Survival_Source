@@ -3,11 +3,21 @@
 #include "StandaloneTurret.h"
 
 #include "AnimStandaloneTurret.h"
+#include "NiagaraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Collapse/CollapseBySwapParameters.h"
+#include "RTS_Survival/Collapse/CollapseFXParameters.h"
+#include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
+#include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
@@ -101,6 +111,7 @@ void AStandaloneTurret::BeginPlay()
 	BeginPlay_InitAnimationInstance();
 	BeginPlay_InitTargetingAndCollision();
 	SetupCallbackToProjectileManager();
+	BeginPlay_BindMutualDestructionListeners();
 
 	if (M_Weapons.IsEmpty())
 	{
@@ -140,6 +151,7 @@ void AStandaloneTurret::BeginPlay_SetupUnitData()
 
 	M_RotationSettings.YawTurnRateDegreesPerSecond =
 		StandaloneTurretData.TurretRotationSpeedDegreesPerSecond;
+	InitAbilityArray(StandaloneTurretData.Abilities);
 	HealthComponent->InitHealthAndResistance(
 		StandaloneTurretData.ResistancesAndDamageMlt,
 		StandaloneTurretData.MaxHealth);
@@ -160,7 +172,7 @@ void AStandaloneTurret::BeginPlay_InitAnimationInstance()
 		return;
 	}
 
-	M_AimState.CurrentYawDegrees = M_AnimInstance->GetCurrentYawAngle();
+	M_AimState.CurrentYawDegrees = FRotator::NormalizeAxis(M_AnimInstance->GetCurrentYawAngle());
 	M_AimState.CurrentPitchDegrees = M_AnimInstance->GetCurrentPitchAngle();
 }
 
@@ -176,6 +188,8 @@ void AStandaloneTurret::BeginPlay_InitTargetingAndCollision()
 
 void AStandaloneTurret::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	UnbindMutualDestructionListeners();
+
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_WeaponSearchHandle);
@@ -193,12 +207,237 @@ void AStandaloneTurret::UnitDies(const ERTSDeathType DeathType)
 	}
 
 	DisableTurret();
+	SetUnitDying();
 	if (GetIsValidRTSComponent())
 	{
 		RTSComponent->DeregisterFromGameState();
 	}
+	UnitDies_RemoveFromSelection();
+	OnUnitDies.Broadcast();
 	BP_OnStandaloneTurretDies(DeathType);
-	Super::UnitDies(DeathType);
+}
+
+void AStandaloneTurret::BeginPlay_BindMutualDestructionListeners()
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World) || not World->IsGameWorld())
+	{
+		return;
+	}
+
+	for (const TWeakObjectPtr<ABuildingExpansion>& BuildingExpansion :
+		 M_MutualDestructionBuildingExpansions)
+	{
+		if (not BuildingExpansion.IsValid())
+		{
+			continue;
+		}
+
+		FOnUnitDies* UnitDiesDelegate = BuildingExpansion->GetOnUnitDiesDelegate();
+		if (UnitDiesDelegate != nullptr)
+		{
+			UnitDiesDelegate->AddUObject(this, &AStandaloneTurret::HandleMutualDestructionActorDied);
+		}
+	}
+
+	for (const TWeakObjectPtr<ADestructableEnvActor>& DestructableActor : M_MutualDestructionEnvActors)
+	{
+		if (not DestructableActor.IsValid())
+		{
+			continue;
+		}
+
+		DestructableActor->OnDestructableEnvActorDied.AddUObject(
+			this,
+			&AStandaloneTurret::HandleMutualDestructionActorDied);
+	}
+}
+
+void AStandaloneTurret::UnbindMutualDestructionListeners()
+{
+	for (const TWeakObjectPtr<ABuildingExpansion>& BuildingExpansion :
+		 M_MutualDestructionBuildingExpansions)
+	{
+		if (not BuildingExpansion.IsValid())
+		{
+			continue;
+		}
+
+		FOnUnitDies* UnitDiesDelegate = BuildingExpansion->GetOnUnitDiesDelegate();
+		if (UnitDiesDelegate != nullptr)
+		{
+			UnitDiesDelegate->RemoveAll(this);
+		}
+	}
+
+	for (const TWeakObjectPtr<ADestructableEnvActor>& DestructableActor : M_MutualDestructionEnvActors)
+	{
+		if (DestructableActor.IsValid())
+		{
+			DestructableActor->OnDestructableEnvActorDied.RemoveAll(this);
+		}
+	}
+}
+
+void AStandaloneTurret::HandleMutualDestructionActorDied()
+{
+	UnitDies(ERTSDeathType::Scavenging);
+}
+
+void AStandaloneTurret::UnitDies_RemoveFromSelection()
+{
+	if (not GetIsValidSelectionComponent() || not SelectionComponent->GetIsSelected())
+	{
+		return;
+	}
+
+	ACPPController* RTSController = Cast<ACPPController>(UGameplayStatics::GetPlayerController(this, 0));
+	if (not IsValid(RTSController))
+	{
+		SetUnitSelected(false);
+		return;
+	}
+
+	RTSController->RemoveActorFromSelectionAndUpdateUI(this);
+}
+
+void AStandaloneTurret::VerticalDestruction(
+	const FRTSVerticalCollapseSettings& CollapseSettings,
+	const FCollapseFX& CollapseFX)
+{
+	FRTSVerticalCollapseSettings NonDestroyingCollapseSettings = CollapseSettings;
+	NonDestroyingCollapseSettings.bDestroyPostVerticalCollapse = false;
+	const TWeakObjectPtr<AStandaloneTurret> WeakThis(this);
+	auto OnFinished = [WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		WeakThis->OnVerticalDestructionComplete();
+	};
+	FRTS_VerticalCollapse::StartVerticalCollapse(
+		this,
+		NonDestroyingCollapseSettings,
+		CollapseFX,
+		MoveTemp(OnFinished));
+}
+
+void AStandaloneTurret::OnVerticalDestructionComplete()
+{
+	BP_OnVerticalDestructionComplete();
+}
+
+void AStandaloneTurret::CollapseMeshWithSwapping(
+	FSwapToDestroyedMesh CollapseParameters,
+	const bool bNoLongerBlockWeaponsPostCollapse,
+	UNiagaraSystem* AttachSystem,
+	USoundCue* AttachSound,
+	const FVector AttachOffset)
+{
+	CollapseParameters.ComponentToSwapOn = PrepareDestroyedMeshSwapComponent(
+		CollapseParameters.ComponentToSwapOn);
+	if (not IsValid(CollapseParameters.ComponentToSwapOn))
+	{
+		return;
+	}
+
+	if (bNoLongerBlockWeaponsPostCollapse)
+	{
+		CollapseParameters.ComponentToSwapOn->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Ignore);
+		CollapseParameters.ComponentToSwapOn->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Ignore);
+	}
+
+	FRTS_Collapse::CollapseSwapMesh(this, CollapseParameters);
+	AttemptAttachSpawnSystem(CollapseParameters, AttachSystem);
+	if (IsValid(AttachSound))
+	{
+		constexpr float DestructionSoundVolume = 1.0f;
+		constexpr float DestructionSoundPitch = 1.0f;
+		constexpr float DestructionSoundStartTime = 0.0f;
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			AttachSound,
+			AttachOffset,
+			FRotator::ZeroRotator,
+			DestructionSoundVolume,
+			DestructionSoundPitch,
+			DestructionSoundStartTime,
+			CollapseParameters.Attenuation,
+			CollapseParameters.SoundConcurrency);
+	}
+}
+
+UMeshComponent* AStandaloneTurret::PrepareDestroyedMeshSwapComponent(UMeshComponent* ComponentToSwapOn)
+{
+	if (not IsValid(ComponentToSwapOn))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot collapse mesh with swapping for standalone turret: ComponentToSwapOn is invalid.");
+		return nullptr;
+	}
+	if (ComponentToSwapOn->IsA<UStaticMeshComponent>())
+	{
+		return ComponentToSwapOn;
+	}
+	if (not ComponentToSwapOn->IsA<USkeletalMeshComponent>())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Standalone turret destroyed-mesh swapping requires a static or skeletal mesh component on: "
+			+ GetName());
+		return nullptr;
+	}
+
+	UStaticMeshComponent* DestroyedMeshComponent = NewObject<UStaticMeshComponent>(
+		this,
+		TEXT("StandaloneTurretDestroyedMesh"));
+	if (not IsValid(DestroyedMeshComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to create the destroyed static mesh component for standalone turret: " + GetName());
+		return nullptr;
+	}
+
+	DestroyedMeshComponent->SetMobility(ComponentToSwapOn->Mobility);
+	DestroyedMeshComponent->SetupAttachment(ComponentToSwapOn);
+	DestroyedMeshComponent->SetRelativeTransform(FTransform::Identity);
+	DestroyedMeshComponent->SetCollisionEnabled(ComponentToSwapOn->GetCollisionEnabled());
+	DestroyedMeshComponent->SetCollisionObjectType(ComponentToSwapOn->GetCollisionObjectType());
+	DestroyedMeshComponent->SetCollisionResponseToChannels(ComponentToSwapOn->GetCollisionResponseToChannels());
+	DestroyedMeshComponent->SetGenerateOverlapEvents(ComponentToSwapOn->GetGenerateOverlapEvents());
+	DestroyedMeshComponent->SetCanEverAffectNavigation(ComponentToSwapOn->CanEverAffectNavigation());
+	DestroyedMeshComponent->SetReceivesDecals(true);
+	AddInstanceComponent(DestroyedMeshComponent);
+	DestroyedMeshComponent->RegisterComponent();
+
+	ComponentToSwapOn->SetVisibility(false, false);
+	ComponentToSwapOn->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	return DestroyedMeshComponent;
+}
+
+void AStandaloneTurret::AttemptAttachSpawnSystem(
+	const FSwapToDestroyedMesh& CollapseParameters,
+	UNiagaraSystem* AttachSystem)
+{
+	if (not IsValid(AttachSystem))
+	{
+		return;
+	}
+
+	UNiagaraComponent* NiagaraComponent = NewObject<UNiagaraComponent>(this);
+	if (not IsValid(NiagaraComponent))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to create attached destruction system for standalone turret: " + GetName());
+		return;
+	}
+
+	NiagaraComponent->SetAsset(AttachSystem);
+	NiagaraComponent->AttachToComponent(
+		CollapseParameters.ComponentToSwapOn,
+		FAttachmentTransformRules::KeepRelativeTransform);
+	NiagaraComponent->Activate();
 }
 
 void AStandaloneTurret::Tick(const float DeltaTime)
@@ -597,17 +836,23 @@ void AStandaloneTurret::UpdateAimSolution()
 		return;
 	}
 
-	const FVector AimOrigin = GetAimOriginLocation();
-	const FRotator LookAtRotation = (M_TargetingData.GetActiveTargetLocation() - AimOrigin).Rotation();
-	const FRotator MeshWorldRotation = M_TurretMesh->GetComponentRotation();
-	const float LocalPitch = FMath::FindDeltaAngleDegrees(MeshWorldRotation.Pitch, LookAtRotation.Pitch);
+	const FVector DirectionToTarget = M_TargetingData.GetActiveTargetLocation() - GetAimOriginLocation();
+	const FVector LocalDirectionToTarget = M_TurretMesh->GetComponentTransform().InverseTransformVectorNoScale(
+		DirectionToTarget);
+	const FRotator LocalLookAtRotation = LocalDirectionToTarget.Rotation();
+	const float LocalPitch = LocalLookAtRotation.Pitch;
 
-	M_AimState.TargetYawDegrees = FMath::FindDeltaAngleDegrees(MeshWorldRotation.Yaw, LookAtRotation.Yaw);
+	// The AO's numeric yaw matches component-local yaw: +90 aims toward +Y and -90 aims toward -Y.
+	// Its Left/Right animation asset names use the opposite naming convention, but their sample coordinates do not.
+	M_AimState.TargetYawDegrees = FRotator::NormalizeAxis(
+		FMath::FindDeltaAngleDegrees(
+			M_RotationSettings.NeutralPoseForwardYawDegrees,
+			LocalLookAtRotation.Yaw));
 	M_AimState.TargetPitchDegrees = FMath::Clamp(
 		LocalPitch,
 		M_RotationSettings.MinimumPitchDegrees,
 		M_RotationSettings.MaximumPitchDegrees);
-	M_AimState.FireDirection = LookAtRotation.Vector();
+	M_AimState.FireDirection = DirectionToTarget.GetSafeNormal();
 	M_AimState.bIsTargetWithinPitchLimits =
 		LocalPitch >= M_RotationSettings.MinimumPitchDegrees
 		&& LocalPitch <= M_RotationSettings.MaximumPitchDegrees;
@@ -616,10 +861,12 @@ void AStandaloneTurret::UpdateAimSolution()
 
 void AStandaloneTurret::UpdateAnimationSteering(const float DeltaTime)
 {
-	M_AimState.CurrentYawDegrees = FMath::FixedTurn(
-		M_AimState.CurrentYawDegrees,
-		M_AimState.TargetYawDegrees,
-		M_RotationSettings.YawTurnRateDegreesPerSecond * DeltaTime);
+	// FixedTurn returns [0, 360), while Aim Offsets consume this turret's signed [-180, 180] yaw axis.
+	M_AimState.CurrentYawDegrees = FRotator::NormalizeAxis(
+		FMath::FixedTurn(
+			M_AimState.CurrentYawDegrees,
+			M_AimState.TargetYawDegrees,
+			M_RotationSettings.YawTurnRateDegreesPerSecond * DeltaTime));
 	M_AimState.CurrentPitchDegrees = FMath::FInterpConstantTo(
 		M_AimState.CurrentPitchDegrees,
 		M_AimState.TargetPitchDegrees,

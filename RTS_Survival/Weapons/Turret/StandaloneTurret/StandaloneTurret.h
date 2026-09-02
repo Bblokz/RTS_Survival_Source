@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
+#include "RTS_Survival/Collapse/VerticalCollapse/RTSVerticalCollapseSettings.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/WeaponAIState/WeaponAIState.h"
@@ -16,9 +17,16 @@
 #include "StandaloneTurret.generated.h"
 
 class ASmallArmsProjectileManager;
+class ABuildingExpansion;
+class ADestructableEnvActor;
 class UAnimStandaloneTurret;
+class UMeshComponent;
+class UNiagaraSystem;
 class USkeletalMeshComponent;
 class UWeaponState;
+class USoundCue;
+struct FCollapseFX;
+struct FSwapToDestroyedMesh;
 struct FInitWeaponStateArchProjectile;
 struct FInitWeaponStateDirectHit;
 struct FInitWeaponStateHomingMissile;
@@ -53,6 +61,10 @@ struct FStandaloneTurretRotationSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.0", UIMin="0.0", Units="deg"))
 	float AllowedAimErrorDegrees = 4.0f;
+
+	// Component-local heading represented by AO yaw zero.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="-180.0", ClampMax="180.0", Units="deg"))
+	float NeutralPoseForwardYawDegrees = 0.0f;
 };
 
 /** Runtime yaw/pitch solution shared by animation steering and weapon fire direction. */
@@ -127,6 +139,32 @@ public:
 	UFUNCTION(BlueprintPure, Category="Standalone Turret|Components")
 	USkeletalMeshComponent* GetTurretMesh() const;
 
+	/**
+	 * @brief Lets a death Blueprint play the shared sinking destruction without forcing actor destruction.
+	 * @param CollapseSettings Movement, rotation, and timing settings; destroy-on-finish is forced off.
+	 * @param CollapseFX Optional effects played when the collapse starts.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Standalone Turret|Destruction")
+	void VerticalDestruction(
+		const FRTSVerticalCollapseSettings& CollapseSettings,
+		const FCollapseFX& CollapseFX);
+
+	/**
+	 * @brief Gives death Blueprints the existing static destroyed-mesh swap workflow.
+	 * @param CollapseParameters Static mesh component, replacement mesh, and swap effects.
+	 * @param bNoLongerBlockWeaponsPostCollapse Whether the swapped component stops blocking weapon traces.
+	 * @param AttachSystem Optional Niagara system attached to the swapped component.
+	 * @param AttachSound Optional sound played at AttachOffset.
+	 * @param AttachOffset World location used for AttachSound.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Standalone Turret|Destruction")
+	void CollapseMeshWithSwapping(
+		FSwapToDestroyedMesh CollapseParameters,
+		bool bNoLongerBlockWeaponsPostCollapse = false,
+		UNiagaraSystem* AttachSystem = nullptr,
+		USoundCue* AttachSound = nullptr,
+		FVector AttachOffset = FVector::ZeroVector);
+
 	virtual TArray<UWeaponState*> GetWeapons() override;
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, bool bRegister) override;
 	virtual void ForceSetAllWeaponsFullyReloaded() override;
@@ -164,8 +202,13 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category="Standalone Turret|Weapon")
 	void BP_OnProjectileHit(bool bBounced);
 
+	/** Called after C++ marks the turret dead; Blueprint owns the destruction sequence and eventual Destroy Actor call. */
 	UFUNCTION(BlueprintImplementableEvent, Category="Standalone Turret|Health")
 	void BP_OnStandaloneTurretDies(ERTSDeathType DeathType);
+
+	/** Called when vertical destruction finishes so Blueprint can explicitly call Destroy Actor. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Standalone Turret|Destruction")
+	void BP_OnVerticalDestructionComplete();
 
 	virtual void OnWeaponAdded(int32 WeaponIndex, UWeaponState* Weapon) override;
 	virtual void OnWeaponBehaviourChangesRange(const UWeaponState* ReportingWeaponState, float NewRange) override;
@@ -267,6 +310,22 @@ private:
 		FVector(0.0f, -25.0f, 100.0f)
 	};
 
+	/**
+	 * Building expansions whose death also kills this turret. Weak references keep the level actors
+	 * externally owned while allowing instance assignment in the details panel.
+	 */
+	UPROPERTY(EditAnywhere, Category="Standalone Turret|Mutual Destruction",
+		meta=(AllowPrivateAccess="true"))
+	TArray<TWeakObjectPtr<ABuildingExpansion>> M_MutualDestructionBuildingExpansions;
+
+	/**
+	 * Destructable environment actors whose death also kills this turret. Weak references prevent
+	 * stale actor access without extending the lifetime of the linked actors.
+	 */
+	UPROPERTY(EditAnywhere, Category="Standalone Turret|Mutual Destruction",
+		meta=(AllowPrivateAccess="true"))
+	TArray<TWeakObjectPtr<ADestructableEnvActor>> M_MutualDestructionEnvActors;
+
 	UPROPERTY()
 	TArray<TObjectPtr<UWeaponState>> M_Weapons;
 
@@ -298,6 +357,9 @@ private:
 	void BeginPlay_InitAnimationInstance();
 	void BeginPlay_SetupUnitData();
 	void BeginPlay_InitTargetingAndCollision();
+	void BeginPlay_BindMutualDestructionListeners();
+	void UnbindMutualDestructionListeners();
+	void HandleMutualDestructionActorDied();
 	void StartEngagementTimer();
 	void UpdateEngagement();
 	void UpdateAutoEngage();
@@ -325,6 +387,12 @@ private:
 	void SetupTargetableCollision() const;
 	void RefreshOwningPlayerConfiguration();
 	void CompleteActiveAttackCommand();
+	void UnitDies_RemoveFromSelection();
+	void OnVerticalDestructionComplete();
+	void AttemptAttachSpawnSystem(
+		const FSwapToDestroyedMesh& CollapseParameters,
+		UNiagaraSystem* AttachSystem);
+	UMeshComponent* PrepareDestroyedMeshSwapComponent(UMeshComponent* ComponentToSwapOn);
 	UWorld* GetWeaponSetupWorld(const FString& SetupFunctionName) const;
 	bool GetIsValidTurretMesh() const;
 	bool GetIsValidAnimInstance() const;
