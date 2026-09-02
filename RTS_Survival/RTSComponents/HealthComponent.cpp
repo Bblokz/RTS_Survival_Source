@@ -39,10 +39,8 @@ void UHealthComponent::UpdateRankIcon(const int32 NewRankLevel, const EVeterancy
 
 void UHealthComponent::MakeHealthBarInvisible() const
 {
-	if (Widget_GetIsValidHealthBarWidget())
-	{
-		SetHealthBarVisibility(ESlateVisibility::Hidden);
-	}
+	bM_IsHealthBarPermanentlyInvisible = true;
+	SetHealthBarVisibility(ESlateVisibility::Hidden);
 }
 
 
@@ -477,7 +475,7 @@ void UHealthComponent::BeginPlay_ApplyUserSettingsHealthBarVisibility()
 
 void UHealthComponent::Widget_CreateHealthBar()
 {
-	if (not Widget_GetIsValidWidgetClass() || not GetOwner())
+	if (bM_IsHealthBarPermanentlyInvisible || not Widget_GetIsValidWidgetClass() || not GetOwner())
 	{
 		return;
 	}
@@ -518,6 +516,12 @@ void UHealthComponent::OnWidgetInitialized()
 {
 	if (not Widget_GetIsValidHealthBarWidget() || not Widget_GetIsValidWidgetComponent())
 	{
+		return;
+	}
+
+	if (bM_IsHealthBarPermanentlyInvisible)
+	{
+		SetHealthBarVisibility(ESlateVisibility::Hidden);
 		return;
 	}
 
@@ -635,6 +639,11 @@ void UHealthComponent::UpdateHealthBar()
 	if (IsValid(M_ActionUIManager))
 	{
 		M_ActionUIManager->UpdateHealthBar(Percentage, MaxHealth, CurrentHealth);
+	}
+
+	if (bM_IsHealthBarPermanentlyInvisible)
+	{
+		return;
 	}
 
 	if (Widget_GetIsValidHealthBarWidget())
@@ -1081,6 +1090,26 @@ void UHealthComponent::OnUnitSelected() const
 void UHealthComponent::SetHealthBarVisibility(const ESlateVisibility NewVisibility) const
 {
 	UW_HealthBar* HealthBarWidget = M_HealthBarWidget.Get();
+	if (bM_IsHealthBarPermanentlyInvisible)
+	{
+		if (IsValid(HealthBarWidget))
+		{
+			HealthBarWidget->StopAllAnimations();
+			HealthBarWidget->SetVisibility(ESlateVisibility::Hidden);
+		}
+
+		UWidgetComponent* const HealthBarWidgetComponent = GetHealthBarWidgetComp();
+		if (IsValid(HealthBarWidgetComponent))
+		{
+			HealthBarWidgetComponent->SetVisibility(false, true);
+			HealthBarWidgetComponent->SetHiddenInGame(true, true);
+			HealthBarWidgetComponent->SetWidget(nullptr);
+		}
+
+		M_OnHealthBarVisibilityChanged.Broadcast(ESlateVisibility::Hidden);
+		return;
+	}
+
 	if (not IsValid(HealthBarWidget))
 	{
 		return;

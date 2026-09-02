@@ -6,6 +6,7 @@
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/RTSVerticalCollapseSettings.h"
+#include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizationDistance.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "RTS_Survival/Weapons/WeaponAIState/WeaponAIState.h"
@@ -29,6 +30,7 @@ class USoundBase;
 class USoundConcurrency;
 class UWeaponState;
 class USoundCue;
+class URTSStandaloneTurretOptimizer;
 struct FCollapseFX;
 struct FSwapToDestroyedMesh;
 struct FInitWeaponStateArchProjectile;
@@ -171,6 +173,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="Standalone Turret|Components")
 	USkeletalMeshComponent* GetTurretMesh() const;
 
+	void ApplyOptimizationDistance(ERTSOptimizationDistance NewOptimizationDistance);
+
 	/**
 	 * @brief Lets a death Blueprint play the shared sinking destruction without forcing actor destruction.
 	 * @param CollapseSettings Movement, rotation, and timing settings; destroy-on-finish is forced off.
@@ -309,6 +313,10 @@ private:
 		meta=(AllowPrivateAccess="true"))
 	TObjectPtr<USkeletalMeshComponent> M_TurretMesh;
 
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Standalone Turret|Components",
+		meta=(AllowPrivateAccess="true"))
+	TObjectPtr<URTSStandaloneTurretOptimizer> M_OptimizationComponent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Standalone Turret|Rotation",
 		meta=(AllowPrivateAccess="true"))
 	FStandaloneTurretRotationSettings M_RotationSettings;
@@ -378,6 +386,9 @@ private:
 	EWeaponAIState M_WeaponAIState = EWeaponAIState::None;
 
 	UPROPERTY()
+	ERTSOptimizationDistance M_OptimizationDistance = ERTSOptimizationDistance::None;
+
+	UPROPERTY()
 	TWeakObjectPtr<UAnimStandaloneTurret> M_AnimInstance;
 
 	UPROPERTY(Transient)
@@ -389,6 +400,7 @@ private:
 	FTimerHandle M_WeaponSearchHandle;
 	EStandaloneTurretRotationSoundState M_RotationSoundState = EStandaloneTurretRotationSoundState::Disabled;
 	bool bM_IsPendingTargetSearch = false;
+	bool bM_IsAimPresentationAvailable = false;
 	int32 M_CachedOwningPlayer = INDEX_NONE;
 
 	static constexpr double M_WeaponSearchTimeInterval = 0.3;
@@ -413,7 +425,19 @@ private:
 	void SetTargetActor(AActor* TargetActor);
 	void ResetTarget();
 	void UpdateAimSolution();
-	void UpdateAnimationSteering(float DeltaTime);
+	void UpdateAimSteering(float DeltaTime);
+	void AdvanceAimState(float DeltaTime);
+	/**
+	 * @brief Updates the animation and rotation sound without making either authoritative for aiming.
+	 * @param PreviousYawDegrees Logical yaw before this update.
+	 * @param YawErrorBeforeAdjustmentDegrees Logical yaw error before this update.
+	 */
+	void UpdateAimPresentation(
+		float PreviousYawDegrees,
+		float YawErrorBeforeAdjustmentDegrees);
+	bool SynchronizeAimPresentation();
+	bool GetShouldUpdateAimPresentation() const;
+	bool GetShouldPlayWeaponAnimation() const;
 	/**
 	 * @brief Uses yaw-distance hysteresis so tiny corrections do not repeatedly toggle the looping sound.
 	 * @param PreviousYawDegrees AO yaw before this tick's steering adjustment.
@@ -447,4 +471,5 @@ private:
 	bool GetIsValidTurretMesh() const;
 	bool GetIsValidAnimInstance() const;
 	bool GetIsValidRotationAudioComponent() const;
+	bool GetIsValidOptimizationComponent() const;
 };

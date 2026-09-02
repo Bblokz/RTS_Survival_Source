@@ -70,6 +70,7 @@ public:
 	// If the derived BP of this healthbar supports a rank icon then this will update it.
 	void UpdateRankIcon(const int32 NewRankLevel, const EVeterancyIconSet VeterancyIconSet) const;
 
+	/** Permanently prevents this component's world-space health widget from being rendered again. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MakeHealthBarInvisible() const;
 
@@ -311,6 +312,10 @@ private:
 
 	UPROPERTY()
 	bool bM_IsHealthBarWidgetInitialized = false;
+
+	// Remains set after permanent removal so delayed visibility updates cannot recreate or reveal the widget.
+	UPROPERTY(Transient)
+	mutable bool bM_IsHealthBarPermanentlyInvisible = false;
 
 	UPROPERTY()
 	FHealthBarVisibilitySettings M_UnitDefaultHealthBarVisibilitySettings;

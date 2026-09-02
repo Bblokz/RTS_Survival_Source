@@ -21,6 +21,7 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/RTSOptimizer/RTSStandaloneTurretOptimizer/RTSStandaloneTurretOptimizer.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -78,6 +79,8 @@ AStandaloneTurret::AStandaloneTurret(const FObjectInitializer& ObjectInitializer
 
 	M_TurretMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("StandaloneTurretMesh"));
 	SetRootComponent(M_TurretMesh);
+	M_OptimizationComponent = CreateDefaultSubobject<URTSStandaloneTurretOptimizer>(
+		TEXT("StandaloneTurretOptimizer"));
 }
 
 void AStandaloneTurret::PostInitializeComponents()
@@ -89,7 +92,8 @@ void AStandaloneTurret::PostInitializeComponents()
 	SelectionComponent = FindComponentByClass<USelectionComponent>();
 	if (not GetIsValidHealthComponent()
 		|| not GetIsValidRTSComponent()
-		|| not GetIsValidSelectionComponent())
+		|| not GetIsValidSelectionComponent()
+		|| not GetIsValidOptimizationComponent())
 	{
 		return;
 	}
@@ -124,7 +128,7 @@ void AStandaloneTurret::BeginPlay()
 		return;
 	}
 
-	if (bM_AutoEngageOnBeginPlay && GetIsValidAnimInstance())
+	if (bM_AutoEngageOnBeginPlay)
 	{
 		SetAutoEngageTargets(false);
 	}
@@ -172,10 +176,10 @@ void AStandaloneTurret::BeginPlay_InitAnimationInstance()
 	M_AnimInstance = Cast<UAnimStandaloneTurret>(M_TurretMesh->GetAnimInstance());
 	if (not GetIsValidAnimInstance())
 	{
-		SetActorTickEnabled(false);
 		return;
 	}
 
+	bM_IsAimPresentationAvailable = true;
 	M_AimState.CurrentYawDegrees = FRotator::NormalizeAxis(M_AnimInstance->GetCurrentYawAngle());
 	M_AimState.CurrentPitchDegrees = M_AnimInstance->GetCurrentPitchAngle();
 }
@@ -485,14 +489,34 @@ void AStandaloneTurret::Tick(const float DeltaTime)
 		PauseRotationSound();
 		return;
 	}
-	if (not GetIsValidTurretMesh() || not GetIsValidAnimInstance())
+	if (not GetIsValidTurretMesh())
 	{
 		PauseRotationSound();
 		return;
 	}
 
 	UpdateAimSolution();
-	UpdateAnimationSteering(DeltaTime);
+	UpdateAimSteering(DeltaTime);
+}
+
+void AStandaloneTurret::ApplyOptimizationDistance(
+	const ERTSOptimizationDistance NewOptimizationDistance)
+{
+	M_OptimizationDistance = NewOptimizationDistance;
+	if (GetShouldUpdateAimPresentation())
+	{
+		SynchronizeAimPresentation();
+		return;
+	}
+
+	PauseRotationSound();
+	if (NewOptimizationDistance == ERTSOptimizationDistance::OutFOVFar
+		&& bM_IsAimPresentationAvailable
+		&& GetIsValidAnimInstance())
+	{
+		constexpr float ImmediateMontageBlendOutTime = 0.0f;
+		M_AnimInstance->Montage_Stop(ImmediateMontageBlendOutTime);
+	}
 }
 
 void AStandaloneTurret::SetAutoEngageTargets(const bool bUseLastTarget)
@@ -687,7 +711,7 @@ void AStandaloneTurret::OnUnitIdleAndNoNewCommands()
 void AStandaloneTurret::StartEngagementTimer()
 {
 	UWorld* World = GetWorld();
-	if (not IsValid(World) || M_Weapons.IsEmpty() || not GetIsValidAnimInstance())
+	if (not IsValid(World) || M_Weapons.IsEmpty())
 	{
 		return;
 	}
@@ -898,13 +922,25 @@ void AStandaloneTurret::UpdateAimSolution()
 	UpdateAimAlignment();
 }
 
-void AStandaloneTurret::UpdateAnimationSteering(const float DeltaTime)
+void AStandaloneTurret::UpdateAimSteering(const float DeltaTime)
 {
 	const float PreviousYawDegrees = M_AimState.CurrentYawDegrees;
 	const float YawErrorBeforeAdjustmentDegrees = FMath::Abs(FMath::FindDeltaAngleDegrees(
 		M_AimState.CurrentYawDegrees,
 		M_AimState.TargetYawDegrees));
 
+	AdvanceAimState(DeltaTime);
+	if (not GetShouldUpdateAimPresentation())
+	{
+		PauseRotationSound();
+		return;
+	}
+
+	UpdateAimPresentation(PreviousYawDegrees, YawErrorBeforeAdjustmentDegrees);
+}
+
+void AStandaloneTurret::AdvanceAimState(const float DeltaTime)
+{
 	// FixedTurn returns [0, 360), while Aim Offsets consume this turret's signed [-180, 180] yaw axis.
 	M_AimState.CurrentYawDegrees = FRotator::NormalizeAxis(
 		FMath::FixedTurn(
@@ -916,11 +952,48 @@ void AStandaloneTurret::UpdateAnimationSteering(const float DeltaTime)
 		M_AimState.TargetPitchDegrees,
 		DeltaTime,
 		M_RotationSettings.PitchTurnRateDegreesPerSecond);
+	UpdateAimAlignment();
+}
+
+void AStandaloneTurret::UpdateAimPresentation(
+	const float PreviousYawDegrees,
+	const float YawErrorBeforeAdjustmentDegrees)
+{
+	if (not SynchronizeAimPresentation())
+	{
+		PauseRotationSound();
+		return;
+	}
+
+	UpdateRotationSound(PreviousYawDegrees, YawErrorBeforeAdjustmentDegrees);
+}
+
+bool AStandaloneTurret::SynchronizeAimPresentation()
+{
+	if (not bM_IsAimPresentationAvailable)
+	{
+		return false;
+	}
+	if (not GetIsValidAnimInstance())
+	{
+		bM_IsAimPresentationAvailable = false;
+		return false;
+	}
 
 	M_AnimInstance->SetYaw(M_AimState.CurrentYawDegrees);
 	M_AnimInstance->SetPitch(M_AimState.CurrentPitchDegrees);
-	UpdateRotationSound(PreviousYawDegrees, YawErrorBeforeAdjustmentDegrees);
-	UpdateAimAlignment();
+	return true;
+}
+
+bool AStandaloneTurret::GetShouldUpdateAimPresentation() const
+{
+	return M_OptimizationDistance != ERTSOptimizationDistance::OutFOVClose
+		&& M_OptimizationDistance != ERTSOptimizationDistance::OutFOVFar;
+}
+
+bool AStandaloneTurret::GetShouldPlayWeaponAnimation() const
+{
+	return M_OptimizationDistance != ERTSOptimizationDistance::OutFOVFar;
 }
 
 void AStandaloneTurret::UpdateRotationSound(
@@ -1284,6 +1357,21 @@ bool AStandaloneTurret::GetIsValidRotationAudioComponent() const
 	return false;
 }
 
+bool AStandaloneTurret::GetIsValidOptimizationComponent() const
+{
+	if (IsValid(M_OptimizationComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_OptimizationComponent",
+		"AStandaloneTurret::GetIsValidOptimizationComponent",
+		this);
+	return false;
+}
+
 void AStandaloneTurret::OnWeaponAdded(const int32 WeaponIndex, UWeaponState* Weapon)
 {
 	(void)WeaponIndex;
@@ -1340,6 +1428,11 @@ void AStandaloneTurret::PlayWeaponAnimation(
 	const int32 WeaponCalibre)
 {
 	(void)WeaponCalibre;
+	if (not GetShouldPlayWeaponAnimation())
+	{
+		return;
+	}
+
 	BP_PlayWeaponAnimation(WeaponIndex, FireMode);
 }
 
