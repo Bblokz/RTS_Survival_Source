@@ -4,6 +4,7 @@
 
 #include "AnimStandaloneTurret.h"
 #include "NiagaraComponent.h"
+#include "Components/AudioComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -34,6 +35,8 @@
 
 namespace
 {
+	constexpr float RotationSoundStopThresholdRatio = 0.5f;
+
 	template <typename TWeaponParameters>
 	void PrepareStandaloneWeaponParameters(
 		TWeaponParameters& WeaponParameters,
@@ -109,6 +112,7 @@ void AStandaloneTurret::BeginPlay()
 
 	BeginPlay_SetupUnitData();
 	BeginPlay_InitAnimationInstance();
+	BeginPlay_InitRotationAudioComponent();
 	BeginPlay_InitTargetingAndCollision();
 	SetupCallbackToProjectileManager();
 	BeginPlay_BindMutualDestructionListeners();
@@ -176,6 +180,37 @@ void AStandaloneTurret::BeginPlay_InitAnimationInstance()
 	M_AimState.CurrentPitchDegrees = M_AnimInstance->GetCurrentPitchAngle();
 }
 
+void AStandaloneTurret::BeginPlay_InitRotationAudioComponent()
+{
+	if (not IsValid(M_RotationSoundSettings.RotationSound)
+		|| not IsValid(M_RotationSoundSettings.SoundAttenuation)
+		|| not IsValid(M_RotationSoundSettings.SoundConcurrency)
+		|| not GetIsValidTurretMesh())
+	{
+		return;
+	}
+
+	M_RotationAudioComponent = NewObject<UAudioComponent>(
+		this,
+		UAudioComponent::StaticClass(),
+		TEXT("StandaloneTurretRotationAudio"));
+	if (not GetIsValidRotationAudioComponent())
+	{
+		return;
+	}
+
+	M_RotationAudioComponent->bAutoActivate = false;
+	M_RotationAudioComponent->bAutoDestroy = false;
+	M_RotationAudioComponent->bAllowSpatialization = true;
+	M_RotationAudioComponent->SetSound(M_RotationSoundSettings.RotationSound);
+	M_RotationAudioComponent->AttenuationSettings = M_RotationSoundSettings.SoundAttenuation;
+	M_RotationAudioComponent->ConcurrencySet.Add(M_RotationSoundSettings.SoundConcurrency);
+	AddInstanceComponent(M_RotationAudioComponent);
+	M_RotationAudioComponent->SetupAttachment(M_TurretMesh);
+	M_RotationAudioComponent->RegisterComponent();
+	M_RotationSoundState = EStandaloneTurretRotationSoundState::Ready;
+}
+
 void AStandaloneTurret::BeginPlay_InitTargetingAndCollision()
 {
 	if (not GetIsValidRTSComponent())
@@ -189,6 +224,7 @@ void AStandaloneTurret::BeginPlay_InitTargetingAndCollision()
 void AStandaloneTurret::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	UnbindMutualDestructionListeners();
+	StopRotationSound();
 
 	if (UWorld* World = GetWorld())
 	{
@@ -446,10 +482,12 @@ void AStandaloneTurret::Tick(const float DeltaTime)
 
 	if (M_TargetingData.GetMode() == ETargetMode::None)
 	{
+		PauseRotationSound();
 		return;
 	}
 	if (not GetIsValidTurretMesh() || not GetIsValidAnimInstance())
 	{
+		PauseRotationSound();
 		return;
 	}
 
@@ -827,6 +865,7 @@ void AStandaloneTurret::ResetTarget()
 	M_TargetingData.ResetTarget();
 	M_AimState.bIsAlignedToTarget = false;
 	M_AimState.bIsTargetWithinPitchLimits = true;
+	PauseRotationSound();
 }
 
 void AStandaloneTurret::UpdateAimSolution()
@@ -861,6 +900,11 @@ void AStandaloneTurret::UpdateAimSolution()
 
 void AStandaloneTurret::UpdateAnimationSteering(const float DeltaTime)
 {
+	const float PreviousYawDegrees = M_AimState.CurrentYawDegrees;
+	const float YawErrorBeforeAdjustmentDegrees = FMath::Abs(FMath::FindDeltaAngleDegrees(
+		M_AimState.CurrentYawDegrees,
+		M_AimState.TargetYawDegrees));
+
 	// FixedTurn returns [0, 360), while Aim Offsets consume this turret's signed [-180, 180] yaw axis.
 	M_AimState.CurrentYawDegrees = FRotator::NormalizeAxis(
 		FMath::FixedTurn(
@@ -875,7 +919,87 @@ void AStandaloneTurret::UpdateAnimationSteering(const float DeltaTime)
 
 	M_AnimInstance->SetYaw(M_AimState.CurrentYawDegrees);
 	M_AnimInstance->SetPitch(M_AimState.CurrentPitchDegrees);
+	UpdateRotationSound(PreviousYawDegrees, YawErrorBeforeAdjustmentDegrees);
 	UpdateAimAlignment();
+}
+
+void AStandaloneTurret::UpdateRotationSound(
+	const float PreviousYawDegrees,
+	const float YawErrorBeforeAdjustmentDegrees)
+{
+	if (M_RotationSoundState == EStandaloneTurretRotationSoundState::Disabled)
+	{
+		return;
+	}
+
+	const float YawMovementDegrees = FMath::Abs(FMath::FindDeltaAngleDegrees(
+		PreviousYawDegrees,
+		M_AimState.CurrentYawDegrees));
+	if (FMath::IsNearlyZero(YawMovementDegrees))
+	{
+		PauseRotationSound();
+		return;
+	}
+
+	const float StartThresholdDegrees = FMath::Max(
+		M_RotationSoundSettings.MinimumYawAdjustmentDegrees,
+		0.0f);
+	const float ActiveThresholdDegrees = StartThresholdDegrees * RotationSoundStopThresholdRatio;
+	const float RequiredAdjustmentDegrees =
+		M_RotationSoundState == EStandaloneTurretRotationSoundState::Playing
+			? ActiveThresholdDegrees
+			: StartThresholdDegrees;
+	if (YawErrorBeforeAdjustmentDegrees < RequiredAdjustmentDegrees)
+	{
+		PauseRotationSound();
+		return;
+	}
+
+	PlayRotationSound();
+}
+
+void AStandaloneTurret::PlayRotationSound()
+{
+	if (M_RotationSoundState == EStandaloneTurretRotationSoundState::Disabled
+		|| M_RotationSoundState == EStandaloneTurretRotationSoundState::Playing
+		|| not GetIsValidRotationAudioComponent())
+	{
+		return;
+	}
+
+	if (M_RotationSoundState == EStandaloneTurretRotationSoundState::Ready)
+	{
+		M_RotationAudioComponent->Play();
+	}
+	else
+	{
+		M_RotationAudioComponent->SetPaused(false);
+	}
+	M_RotationSoundState = EStandaloneTurretRotationSoundState::Playing;
+}
+
+void AStandaloneTurret::PauseRotationSound()
+{
+	if (M_RotationSoundState != EStandaloneTurretRotationSoundState::Playing
+		|| not GetIsValidRotationAudioComponent())
+	{
+		return;
+	}
+
+	M_RotationAudioComponent->SetPaused(true);
+	M_RotationSoundState = EStandaloneTurretRotationSoundState::Paused;
+}
+
+void AStandaloneTurret::StopRotationSound()
+{
+	if (M_RotationSoundState == EStandaloneTurretRotationSoundState::Disabled
+		|| not GetIsValidRotationAudioComponent())
+	{
+		return;
+	}
+
+	M_RotationAudioComponent->Stop();
+	M_RotationSoundState = EStandaloneTurretRotationSoundState::Ready;
 }
 
 void AStandaloneTurret::UpdateAimAlignment()
@@ -1141,6 +1265,21 @@ bool AStandaloneTurret::GetIsValidAnimInstance() const
 		this,
 		"M_AnimInstance",
 		"AStandaloneTurret::GetIsValidAnimInstance",
+		this);
+	return false;
+}
+
+bool AStandaloneTurret::GetIsValidRotationAudioComponent() const
+{
+	if (IsValid(M_RotationAudioComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_RotationAudioComponent",
+		"AStandaloneTurret::GetIsValidRotationAudioComponent",
 		this);
 	return false;
 }

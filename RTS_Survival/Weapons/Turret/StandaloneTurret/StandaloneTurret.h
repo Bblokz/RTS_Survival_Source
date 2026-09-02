@@ -20,9 +20,13 @@ class ASmallArmsProjectileManager;
 class ABuildingExpansion;
 class ADestructableEnvActor;
 class UAnimStandaloneTurret;
+class UAudioComponent;
 class UMeshComponent;
 class UNiagaraSystem;
 class USkeletalMeshComponent;
+class USoundAttenuation;
+class USoundBase;
+class USoundConcurrency;
 class UWeaponState;
 class USoundCue;
 struct FCollapseFX;
@@ -67,6 +71,26 @@ struct FStandaloneTurretRotationSettings
 	float NeutralPoseForwardYawDegrees = 0.0f;
 };
 
+/** Designer-facing audio assets and movement threshold for the turret's looping yaw sound. */
+USTRUCT(BlueprintType)
+struct FStandaloneTurretRotationSoundSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<USoundBase> RotationSound = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<USoundAttenuation> SoundAttenuation = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TObjectPtr<USoundConcurrency> SoundConcurrency = nullptr;
+
+	// Avoids starting the loop for small aim corrections while allowing sustained yaw tracking to remain audible.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.0", UIMin="0.0", Units="deg"))
+	float MinimumYawAdjustmentDegrees = 3.0f;
+};
+
 /** Runtime yaw/pitch solution shared by animation steering and weapon fire direction. */
 USTRUCT()
 struct FStandaloneTurretAimState
@@ -93,6 +117,14 @@ struct FStandaloneTurretAimState
 
 	UPROPERTY()
 	bool bIsTargetWithinPitchLimits = true;
+};
+
+enum class EStandaloneTurretRotationSoundState : uint8
+{
+	Disabled,
+	Ready,
+	Playing,
+	Paused
 };
 
 /**
@@ -281,6 +313,10 @@ private:
 		meta=(AllowPrivateAccess="true"))
 	FStandaloneTurretRotationSettings M_RotationSettings;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Standalone Turret|Rotation Sound",
+		meta=(AllowPrivateAccess="true"))
+	FStandaloneTurretRotationSoundSettings M_RotationSoundSettings;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Standalone Turret|Unit Data",
 		meta=(AllowPrivateAccess="true"))
 	EStandaloneTurretSubtype M_StandaloneTurretSubtype = EStandaloneTurretSubtype::StandaloneTurret_None;
@@ -344,10 +380,14 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UAnimStandaloneTurret> M_AnimInstance;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UAudioComponent> M_RotationAudioComponent;
+
 	UPROPERTY()
 	TWeakObjectPtr<ASmallArmsProjectileManager> M_ProjectileManager;
 
 	FTimerHandle M_WeaponSearchHandle;
+	EStandaloneTurretRotationSoundState M_RotationSoundState = EStandaloneTurretRotationSoundState::Disabled;
 	bool bM_IsPendingTargetSearch = false;
 	int32 M_CachedOwningPlayer = INDEX_NONE;
 
@@ -355,6 +395,7 @@ private:
 	static constexpr int32 M_TargetSearchResultCount = 3;
 
 	void BeginPlay_InitAnimationInstance();
+	void BeginPlay_InitRotationAudioComponent();
 	void BeginPlay_SetupUnitData();
 	void BeginPlay_InitTargetingAndCollision();
 	void BeginPlay_BindMutualDestructionListeners();
@@ -373,6 +414,15 @@ private:
 	void ResetTarget();
 	void UpdateAimSolution();
 	void UpdateAnimationSteering(float DeltaTime);
+	/**
+	 * @brief Uses yaw-distance hysteresis so tiny corrections do not repeatedly toggle the looping sound.
+	 * @param PreviousYawDegrees AO yaw before this tick's steering adjustment.
+	 * @param YawErrorBeforeAdjustmentDegrees Remaining yaw distance before this tick's steering adjustment.
+	 */
+	void UpdateRotationSound(float PreviousYawDegrees, float YawErrorBeforeAdjustmentDegrees);
+	void PlayRotationSound();
+	void PauseRotationSound();
+	void StopRotationSound();
 	void UpdateAimAlignment();
 	FVector GetAimOriginLocation() const;
 	bool GetIsTargetWithinWeaponRange(const FVector& TargetLocation) const;
@@ -396,4 +446,5 @@ private:
 	UWorld* GetWeaponSetupWorld(const FString& SetupFunctionName) const;
 	bool GetIsValidTurretMesh() const;
 	bool GetIsValidAnimInstance() const;
+	bool GetIsValidRotationAudioComponent() const;
 };
