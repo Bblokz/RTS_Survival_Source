@@ -9,6 +9,8 @@ class UTrainSplineMovementComponent;
 class USplineComponent;
 class UMeshComponent;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnTrainReachedSplineTarget, const FVector&);
+
 /**
  * @brief Wraps ATankMaster command/combat systems while forcing all locomotion onto one assigned spline.
  * Designers assign a road spline and move commands are projected to deterministic distances.
@@ -21,6 +23,14 @@ class RTS_SURVIVAL_API ATrainUnit : public ATankMaster
 
 public:
 	ATrainUnit(const FObjectInitializer& ObjectInitializer);
+
+	/**
+	 * @brief Lets mission systems assign or replace the authored spline before issuing movement commands.
+	 * @param InAssignedRoadSpline Spline actor that should drive this train's movement.
+	 * @return True when the spline and movement component were configured successfully.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Train")
+	bool SetAssignedRoadSpline(ARoadSplineActor* InAssignedRoadSpline);
 
 	UFUNCTION(BlueprintCallable, Category="Collision")
 	void SetupTrainMeshCollision(const TArray<UMeshComponent*>& MeshComponents);
@@ -47,6 +57,9 @@ public:
 	virtual void OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret) override;
 	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override;
 	virtual void OnUnitIdleAndNoNewCommands() override;
+
+	// Mission systems bind here to distinguish reaching a requested spline target from ordinary command idling.
+	FOnTrainReachedSplineTarget OnReachedSplineTarget;
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;

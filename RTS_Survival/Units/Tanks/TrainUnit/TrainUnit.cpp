@@ -15,6 +15,42 @@ ATrainUnit::ATrainUnit(const FObjectInitializer& ObjectInitializer)
 	M_TrainSplineMovementComponent = CreateDefaultSubobject<UTrainSplineMovementComponent>(TEXT("TrainSplineMovementComponent"));
 }
 
+bool ATrainUnit::SetAssignedRoadSpline(ARoadSplineActor* InAssignedRoadSpline)
+{
+	if (not IsValid(InAssignedRoadSpline))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"InAssignedRoadSpline",
+			"ATrainUnit::SetAssignedRoadSpline",
+			this);
+		return false;
+	}
+
+	AssignedRoadSpline = InAssignedRoadSpline;
+	M_RoadSplineComponent = nullptr;
+	if (not TryCacheRoadSplineComponentFromAssignedRoad() || not GetIsValidTrainSplineMovementComponent())
+	{
+		return false;
+	}
+
+	M_TrainSplineMovementComponent->SetAssignedRoadSpline(InAssignedRoadSpline);
+	if (not HasActorBegunPlay())
+	{
+		return true;
+	}
+
+	float CurrentDistanceAlongSpline = 0.0f;
+	if (not TryGetLocomotiveStartDistance(CurrentDistanceAlongSpline))
+	{
+		return false;
+	}
+
+	M_TrainSplineMovementComponent->SetCurrentDistanceAlongSpline(CurrentDistanceAlongSpline);
+	ApplyTrainTransforms(CurrentDistanceAlongSpline);
+	return true;
+}
+
 void ATrainUnit::SetupTrainMeshCollision(const TArray<UMeshComponent*>& MeshComponents)
 {
 	if (not GetIsValidRTSComponent())
@@ -559,5 +595,6 @@ void ATrainUnit::ApplyTrainTransforms(float LocomotiveDistance)
 
 void ATrainUnit::OnSplineMovementReachedTarget()
 {
+	OnReachedSplineTarget.Broadcast(GetActorLocation());
 	OnReachedSplineMoveTarget();
 }

@@ -355,3 +355,45 @@ Mitigations built into ADestructibleSplineActor:
 
 **Attribution detail:** nearest-piece resolution uses distance to each piece's start-end segment line
 (not piece centers), so hits near the end of a long piece are attributed to that piece, not its neighbour.
+
+---
+
+## 15. Mutual Destruction Links (added 2026-08-28)
+
+Designers can link on-the-map actors to a spline so that **when a linked actor dies, the whole spline is
+destroyed** through its regular death path. Two `EditAnywhere` arrays on `ADestructibleSplineActor`:
+
+- **`MutualDestructionBuildingExpansions`** — `TArray<TObjectPtr<ABuildingExpansion>>`
+- **`MutualDestructionEnvActors`** — `TArray<TObjectPtr<ADestructableEnvActor>>`
+
+Assign level instances in the details panel (Category "Mutual Destruction").
+
+### Trigger = death, not actor destruction
+
+Only a **health/crush death** triggers the spline teardown, never a plain `Destroy()`/level unload:
+
+| Linked type | Death signal bound | Fires on |
+|---|---|---|
+| `ABuildingExpansion` | `AHPActorObjectsMaster::OnUnitDies` (via `GetOnUnitDiesDelegate()`) | health reaches 0 (`UnitDies`) |
+| `ADestructableEnvActor` | new `OnDestructableEnvActorDied` (broadcast in `OnUnitDies`) | health reaches 0 (`TakeDamage`) or crush (`TriggerDestroyActor`) |
+
+`ADestructableEnvActor` had no death delegate (it derives from `AEnvironmentActor`, not
+`AHPActorObjectsMaster`), so `FOnDestructableEnvActorDied` was added and broadcast once inside
+`OnUnitDies` — distinct from `OnDestructibleCollapse`, which also fires for non-lethal collapse
+presentations. Both env-actor death routes (weapon health loss and vehicle crush) funnel through
+`OnUnitDies`, so one delegate covers both.
+
+On any linked death the handler calls **`DestroyAllSegments()`** — the same regular death path used
+elsewhere (collapses every remaining piece with its configured FX and fires `BP_OnSplineFullyDestroyed`).
+It is **idempotent**, so multiple linked deaths (or a death after the spline is already gone) are safe no-ops.
+
+### Shipping / GC safety
+
+- **Bindings** use non-dynamic multicast delegates via `AddUObject`, which store a `TWeakObjectPtr` to the
+  spline — a subscription can never call into a destroyed spline. Bound only in `BeginPlay` (game world
+  only, gated on `World->IsGameWorld()`), never in editor preview.
+- **Teardown**: `EndPlay` calls `RemoveAll(this)` on every still-valid linked actor's delegate. Actors that
+  already died took their delegates with them (skipped via `IsValid`).
+- **References**: the arrays are `UPROPERTY TObjectPtr` → GC-tracked hard references; UE nulls them when a
+  linked actor is destroyed, and every use is `IsValid`-guarded.
+- Direction is **death → spline only**; destroying the spline does not kill the linked actors.

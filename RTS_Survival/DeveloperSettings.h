@@ -896,6 +896,7 @@ namespace DeveloperSettings
 
 			// Static artillery range  /  howitzers
 			inline constexpr float HowitzerArtilleryRange = 22000.f * GameRangeMlt;
+			inline constexpr float RailwayArtilleryRange = 30000.f * GameRangeMlt;
 
 			// Laser weapons
 			inline constexpr float MediumLaserWeaponRange = RoundToNearestMultipleOf(MediumCannonRange * 1.2f, 100);
@@ -922,6 +923,7 @@ namespace DeveloperSettings
 				inline constexpr float T1BxpVisionRadius = 4000.f;
 				// like medium tanks.
 				inline constexpr float T2BxpVisionRadius = 4500.f;
+				inline constexpr float MegaBunkerVisionRadius = 10000.f;
 			}
 
 			namespace UnitVision
@@ -1231,6 +1233,7 @@ namespace DeveloperSettings
 			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
 			inline constexpr float T3BxpBunkerHealth = RoundToNearestMultipleOfFive(1600 * OverallHealthMlt);
 			inline constexpr float BxpHeavyBunkerHealth = RoundToNearestMultipleOfFive(2400 * OverallHealthMlt);
+			inline constexpr float BxpMegaBunkerHealth = RoundToNearestMultipleOfFive(7000 * OverallHealthMlt);
 
 			// Infantry health Settings
 			inline constexpr float BasicInfantryHealth = RoundToNearestMultipleOfFive(200.f * OverallHealthMlt);

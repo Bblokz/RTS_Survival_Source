@@ -499,6 +499,8 @@ FString FRTS_Statics::Global_GetTrainingOptionString(const FTrainingOption& Trai
 	case EAllUnitType::UNType_Aircraft:
 		UnitName = Global_GetAircraftDisplayName(static_cast<EAircraftSubtype>(TrainingOption.SubtypeValue));
 		return UnitName + " of type: " + TypeName;
+	case EAllUnitType::UNType_StandaloneTurret:
+		return "Standalone Turret of type: " + TypeName;
 	}
 	return "INVALID TRAININGOPTION";
 }
@@ -545,10 +547,14 @@ TMap<ERTSResourceType, int32> FRTS_Statics::GetResourceCostsOfTrainingOption(
 			return FRTS_Statics::BP_GetPlayerBxpData(BxpType, WorldContextObject, bIsValidCosts).Cost.ResourceCosts;
 		}
 	case EAllUnitType::UNType_Aircraft:
-
-		const EAircraftSubtype AircraftType = static_cast<EAircraftSubtype>(TrainingOption.SubtypeValue);
-		return FRTS_Statics::BP_GetAircraftDataOfPlayer(1, AircraftType, WorldContextObject, bIsValidCosts).Cost.
-			ResourceCosts;
+		{
+			const EAircraftSubtype AircraftType = static_cast<EAircraftSubtype>(TrainingOption.SubtypeValue);
+			return FRTS_Statics::BP_GetAircraftDataOfPlayer(1, AircraftType, WorldContextObject, bIsValidCosts).Cost.
+				ResourceCosts;
+		}
+	case EAllUnitType::UNType_StandaloneTurret:
+		bIsValidCosts = false;
+		return {};
 	}
 	RTSFunctionLibrary::ReportError(
 		"Error resource not found. \n At function GetResourceCostsOfTrainingOption in PlayerResourceManager.cpp."

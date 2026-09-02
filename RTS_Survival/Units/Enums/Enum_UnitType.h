@@ -14,6 +14,16 @@ enum class EAllUnitType : uint8
 	UNType_Nomadic UMETA(DisplayName = "Nomadic"),
 	UNType_BuildingExpansion UMETA(DisplayName = "Building Expansion"),
 	UNType_Aircraft UMETA(DisplayName = "Aircraft"),
+	UNType_StandaloneTurret UMETA(DisplayName = "Standalone Turret"),
+};
+
+UENUM(BlueprintType)
+enum class EStandaloneTurretSubtype : uint8
+{
+	StandaloneTurret_None UMETA(DisplayName = "No Standalone Turret Type"),
+	StandaloneTurret_Standard UMETA(DisplayName = "Standalone Turret"),
+	BallTurret_100mm UMETA(DisplayName = "Ball Turret 100mm"),
+	BallTurret_50mm UMETA(DisplayName = "Ball Turret 50mm"),
 };
 
 // When adding a new subtype do not forget to update the GetNomadicSubtypeString function.
@@ -453,6 +463,8 @@ static FString Global_GetUnitTypeString(const EAllUnitType UnitType)
 		return FString("Building Expansion");
 	case EAllUnitType::UNType_Aircraft:
 		return FString("Aircraft");
+	case EAllUnitType::UNType_StandaloneTurret:
+		return FString("Standalone Turret");
 	default:
 		return FString("Unknown Unit Type");
 	}

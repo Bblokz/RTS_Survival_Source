@@ -632,6 +632,8 @@ FString UGlobalAbilitiesManager::GetUnitRequirementDisplayName(const FTrainingOp
 		return Global_GetBxpDisplayString(static_cast<EBuildingExpansionType>(UnitId.SubtypeValue));
 	case EAllUnitType::UNType_Aircraft:
 		return Global_GetAircraftDisplayName(static_cast<EAircraftSubtype>(UnitId.SubtypeValue));
+	case EAllUnitType::UNType_StandaloneTurret:
+		return TEXT("Standalone Turret");
 	case EAllUnitType::UNType_Harvester:
 		return TEXT("Harvester");
 	default:
@@ -691,6 +693,8 @@ bool UGlobalAbilitiesManager::CheckDoesPlayerHaveUnit(const FTrainingOption& Uni
 		return CheckDoesPlayerHaveBuildingExpansion(UnitId);
 	case EAllUnitType::UNType_Aircraft:
 		return CheckDoesPlayerHaveAircraft(UnitId);
+	case EAllUnitType::UNType_StandaloneTurret:
+		return IsValid(M_GameUnitManager.Get()->FindUnitForPlayer(UnitId, UPlayerTechManager::PlayerTechOwnerIndex));
 	}
 	return true;
 }
@@ -822,6 +826,11 @@ bool UGlobalAbilitiesManager::CheckDoesEnemyHaveUnit(const FTrainingOption& Unit
 		return CheckDoesEnemyHaveBuildingExpansion(UnitId);
 	case EAllUnitType::UNType_Aircraft:
 		return CheckDoesEnemyHaveAircraft(UnitId);
+	case EAllUnitType::UNType_StandaloneTurret:
+		{
+			constexpr int32 EnemyPlayerIndex = 2;
+			return IsValid(M_GameUnitManager.Get()->FindUnitForPlayer(UnitId, EnemyPlayerIndex));
+		}
 	}
 	return true;
 }

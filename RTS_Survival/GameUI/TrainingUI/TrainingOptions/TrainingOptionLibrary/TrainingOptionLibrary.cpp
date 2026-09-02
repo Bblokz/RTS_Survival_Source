@@ -20,6 +20,12 @@ FString UTrainingOptionLibrary::GetTrainingOptionName(EAllUnitType UnitType, uin
 
 FString UTrainingOptionLibrary::GetTrainingOptionDisplayName(const EAllUnitType UnitType, const uint8 SubtypeValue)
 {
+	if (UnitType == EAllUnitType::UNType_StandaloneTurret)
+	{
+		return StaticEnum<EStandaloneTurretSubtype>()->GetDisplayNameTextByValue(
+			static_cast<int64>(SubtypeValue)).ToString();
+	}
+
 	if (UnitType == EAllUnitType::UNType_Tank)
 	{
 		const ETankSubtype TankSubtype = static_cast<ETankSubtype>(SubtypeValue);
@@ -49,6 +55,7 @@ FString UTrainingOptionLibrary::GetTrainingOptionDisplayName(const EAllUnitType 
 	RemovePrefix(SubtypeName, TEXT("Squad_"));
 	RemovePrefix(SubtypeName, TEXT("Nomadic_"));
 	RemovePrefix(SubtypeName, TEXT("Aircraft_"));
+	RemovePrefix(SubtypeName, TEXT("StandaloneTurret_"));
 
 	// --- Insert spaces between words and number groups ---
 	FString Formatted;
@@ -97,9 +104,14 @@ FString UTrainingOptionLibrary::GetEnumValueName(const EAllUnitType UnitType, co
 			const UEnum* SubtypeEnum = StaticEnum<ESquadSubtype>();
 			return SubtypeEnum->GetNameStringByValue(static_cast<int64>(SubtypeValue));
 		}
-		case EAllUnitType::UNType_Aircraft:
+	case EAllUnitType::UNType_Aircraft:
 		{
 			const UEnum* SubtypeEnum = StaticEnum<EAircraftSubtype>();
+			return SubtypeEnum->GetNameStringByValue(static_cast<int64>(SubtypeValue));
+		}
+	case EAllUnitType::UNType_StandaloneTurret:
+		{
+			const UEnum* SubtypeEnum = StaticEnum<EStandaloneTurretSubtype>();
 			return SubtypeEnum->GetNameStringByValue(static_cast<int64>(SubtypeValue));
 		}
 	default:

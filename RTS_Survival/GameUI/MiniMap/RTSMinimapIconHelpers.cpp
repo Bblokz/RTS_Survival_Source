@@ -12,7 +12,8 @@ namespace FRTSMinimapIconHelpers
 	                               const EAllUnitType UnitType,
 	                               const uint8 UnitSubtype)
 	{
-		if (UnitType == EAllUnitType::UNType_BuildingExpansion)
+		if (UnitType == EAllUnitType::UNType_BuildingExpansion
+			|| UnitType == EAllUnitType::UNType_StandaloneTurret)
 		{
 			return FowManager.GetMiniMapMediumIconSizePixels();
 		}
@@ -33,7 +34,9 @@ namespace FRTSMinimapIconHelpers
 
 		if (RTSComponent.GetOwningPlayer() == 1)
 		{
-			if (UnitType == EAllUnitType::UNType_Nomadic || UnitType == EAllUnitType::UNType_BuildingExpansion)
+			if (UnitType == EAllUnitType::UNType_Nomadic
+				|| UnitType == EAllUnitType::UNType_BuildingExpansion
+				|| UnitType == EAllUnitType::UNType_StandaloneTurret)
 			{
 				return ERTSMinimapIconColor::PlayerBuilding;
 			}

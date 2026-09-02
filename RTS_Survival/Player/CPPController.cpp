@@ -3775,6 +3775,8 @@ bool ACPPController::TryAdvancePrimaryToUnitType(const FTrainingOption& UnitID, 
 			SelectionArrayIndex, UnitID);
 		break;
 	case EAllUnitType::UNType_BuildingExpansion:
+	// Falls through.
+	case EAllUnitType::UNType_StandaloneTurret:
 		NewPrimarySelectedActor = FPlayerSelectionHelpers::GetActorAtIndexIfMatches(TSelectedActorsMasters,
 			SelectionArrayIndex, UnitID);
 		break;
@@ -3817,6 +3819,8 @@ void ACPPController::SelectOnScreenUnitsOfType(const FTrainingOption& UnitID, in
 			FPlayerSelectionHelpers::GetPawnAtIndexIfMatches(TSelectedPawnMasters, SelectionArrayIndex, UnitID);
 		break;
 	case EAllUnitType::UNType_BuildingExpansion:
+	// Falls through.
+	case EAllUnitType::UNType_StandaloneTurret:
 		BasisActor = FPlayerSelectionHelpers::GetActorAtIndexIfMatches(TSelectedActorsMasters, SelectionArrayIndex,
 		                                                               UnitID);
 		break;
