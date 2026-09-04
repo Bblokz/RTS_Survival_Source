@@ -60,6 +60,9 @@ struct FSkeletonOptimizationSettings
 
 	UPROPERTY()
 	bool bCastContactShadow = false;
+
+	UPROPERTY()
+	bool bPauseAnimations = false;
 };
 
 USTRUCT()
@@ -75,6 +78,9 @@ struct FRTSVehicleFireFeedbackOptimizationSettings
 };
 
 
+/**
+ * @brief Added to actors whose component update cost should scale with camera visibility and distance.
+ */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API URTSOptimizer : public UActorComponent
 {
@@ -105,6 +111,9 @@ protected:
 
 	void AddSkeletonToOptimize(USkeletalMeshComponent* Skeleton);
 	void AddPrimitiveComponentToOptimize(UPrimitiveComponent* PrimitiveComponent);
+	void StopSkeletalMeshAnimations();
+
+	virtual bool ShouldAlwaysConsiderOwnerInFOVAtCloseRange() const;
 
 private:
 	UPROPERTY()

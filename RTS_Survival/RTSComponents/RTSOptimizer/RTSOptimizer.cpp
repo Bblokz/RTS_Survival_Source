@@ -151,6 +151,7 @@ void URTSOptimizer::InFOVUpdateComponents()
 			continue;
 		}
 		EachSkeleton.Skeleton->VisibilityBasedAnimTickOption = EachSkeleton.BasedAnimTickOption;
+		EachSkeleton.Skeleton->bPauseAnims = EachSkeleton.bPauseAnimations;
 		EachSkeleton.Skeleton->SetComponentTickEnabled(true);
 		EachSkeleton.Skeleton->SetCastContactShadow(EachSkeleton.bCastContactShadow);
 		EachSkeleton.Skeleton->SetCastShadow(EachSkeleton.bCastDynamicShadow);
@@ -277,11 +278,33 @@ void URTSOptimizer::AddSkeletonToOptimize(USkeletalMeshComponent* Skeleton)
 	Entry.BasedAnimTickOption = Skeleton->VisibilityBasedAnimTickOption;
 	Entry.bCastDynamicShadow = Skeleton->bCastDynamicShadow;
 	Entry.bCastContactShadow = Skeleton->bCastContactShadow;
+	Entry.bPauseAnimations = Skeleton->bPauseAnims;
 
 	Skeleton->bDisableClothSimulation = true;
 	Skeleton->bDisableMorphTarget = true;
 
 	M_SkeletalMeshComponents.Add(Entry);
+}
+
+void URTSOptimizer::StopSkeletalMeshAnimations()
+{
+	for (const FSkeletonOptimizationSettings& SkeletonSettings : M_SkeletalMeshComponents)
+	{
+		if (not SkeletonSettings.Skeleton)
+		{
+			continue;
+		}
+
+		SkeletonSettings.Skeleton->bPauseAnims = true;
+		SkeletonSettings.Skeleton->VisibilityBasedAnimTickOption =
+			EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
+		SkeletonSettings.Skeleton->SetComponentTickEnabled(false);
+	}
+}
+
+bool URTSOptimizer::ShouldAlwaysConsiderOwnerInFOVAtCloseRange() const
+{
+	return true;
 }
 
 void URTSOptimizer::AddPrimitiveComponentToOptimize(UPrimitiveComponent* PrimitiveComponent)
@@ -322,7 +345,8 @@ ERTSOptimizationDistance URTSOptimizer::GetOptimizationDistanceToCamera() const
 	const float SquaredDistanceToCamera = FVector::DistSquared(OwnerLocation, CamLoc);
 	if (not InFOV)
 	{
-		if (SquaredDistanceToCamera <= DeveloperSettings::Optimization::DistanceAlwaysConsiderUnitInFOVSquared)
+		if (ShouldAlwaysConsiderOwnerInFOVAtCloseRange() &&
+			SquaredDistanceToCamera <= DeveloperSettings::Optimization::DistanceAlwaysConsiderUnitInFOVSquared)
 		{
 			return ERTSOptimizationDistance::InFOV;
 		}

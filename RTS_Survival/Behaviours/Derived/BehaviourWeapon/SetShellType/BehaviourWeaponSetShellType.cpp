@@ -68,6 +68,11 @@ bool UBehaviourWeaponSetShellType::TryChangeShellType(UWeaponState* WeaponState)
 		return false;
 	}
 
+	if (not WeaponState->GetRawWeaponData().ShellTypes.Contains(TargetShellType))
+	{
+		WeaponState->UpgradeWeaponWithExtraShellType(TargetShellType);
+	}
+
 	if (not WeaponState->ChangeWeaponShellType(TargetShellType))
 	{
 		return false;
