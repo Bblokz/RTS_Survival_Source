@@ -2309,6 +2309,19 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ShrapnelPen = 0.f;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_TankMG_7_6MM, WeaponData);
+
+	WeaponData.WeaponName = EWeaponName::Ger_TankMG_34B;
+	WeaponData.BaseCooldown = 2.f;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_TankMG_34B, WeaponData);
+	
+	WeaponData.WeaponName = EWeaponName::Ger_TankMG_42;
+	WeaponData.MagCapacity = 150;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_TankMG_42, WeaponData);
+	
+	WeaponData.WeaponName = EWeaponName::Ger_TankMG_13;
+	WeaponData.MagCapacity = 100;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_TankMG_13, WeaponData);
+	
 }
 
 void ACPPGameState::InitAllGameRailGunData()

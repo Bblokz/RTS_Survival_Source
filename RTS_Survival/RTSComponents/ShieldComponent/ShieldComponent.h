@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "ShieldTypes.h"
+#include "Components/SlateWrapperTypes.h"
 
 #include "ShieldComponent.generated.h"
 

@@ -48,6 +48,9 @@ enum class
 	MP46 UMETA(DisplayName = "MP46 9MM"),
 	FG_42_7_92MM UMETA(DisplayName = "FG42 7.92MM"),
 	Ger_TankMG_7_6MM,
+	Ger_TankMG_34B UMETA(DisplayName = "MG 34 Ausf. B"),
+	Ger_TankMG_42 UMETA(DisplayName = "Ger Tank MG 42 (Faster rate of fire)"),
+	Ger_TankMG_13 UMETA(DisplayName = "Ger Tank MG 13 (slower rate of fire)"),
 	RipperGun_7_62MM UMETA(DisplayName = "Ripper Gun 7.62MM"),
 
 	// Aircraft weapons
@@ -280,6 +283,9 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::KwKL_68_105MM: return "KwK L/68";
 	case EWeaponName::PTRS_50MM: return "PTRS 50MM";
 	case EWeaponName::Ger_TankMG_7_6MM: return "MG 34";
+	case EWeaponName::Ger_TankMG_34B: return "MG 34 Ausf. B";
+	case EWeaponName::Ger_TankMG_42: return "MG 42";
+	case EWeaponName::Ger_TankMG_13: return "MG 13";
 	case EWeaponName::Ba12_23MM: return "Ba12 23MM";
 	case EWeaponName::ZIS_S_53_85MM: return "ZiS-S-53";
 	case EWeaponName::D_5S_85MM_SU85: return "D-5S";
@@ -607,6 +613,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "KwK40_L48_75MM";
 	case EWeaponName::Ger_TankMG_7_6MM:
 		return "Ger_TankMG_7_6MM";
+	case EWeaponName::Ger_TankMG_34B:
+		return "Ger_TankMG_34B";
 	case EWeaponName::Luch_50L:
 		return "Luch_50L";
 	case EWeaponName::Luch_85L:
