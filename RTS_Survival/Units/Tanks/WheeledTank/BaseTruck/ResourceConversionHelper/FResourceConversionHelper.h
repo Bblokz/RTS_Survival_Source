@@ -26,6 +26,15 @@ private:
 	 * as determined by the vehicle*/
 	static bool UpdateAllConvertersWithConversionEnabled(ANomadicVehicle* NomadicVehicle,
 	                                                     const bool bConversionEnabled);
+	/**
+	 * @brief Keeps player intent intact while a nomadic lifecycle temporarily prevents all conversion.
+	 * @param NomadicVehicle Vehicle whose own and expansion converters must be suspended or resumed.
+	 * @param bTemporarilySuspended Whether lifecycle gating should currently prevent conversion.
+	 * @return Whether the vehicle currently has any live resource converter components.
+	 */
+	static bool UpdateAllConvertersTemporarilySuspended(ANomadicVehicle* NomadicVehicle,
+	                                                    const bool bTemporarilySuspended);
+	static bool GetHasAnyConverterComponents(const ANomadicVehicle* NomadicVehicle);
 	static void UpdateConverterAbility(ANomadicVehicle* NomadicVehicle, const bool bConversionEnabled,
 	                                   const bool bHasAnyConverterComponents);
 	static bool IsValidNomadic(const ANomadicVehicle* NomadicVehicle);

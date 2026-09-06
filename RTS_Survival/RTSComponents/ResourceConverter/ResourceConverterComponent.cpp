@@ -5,6 +5,7 @@
 #include "Components/AudioComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
 
@@ -42,6 +43,7 @@ void UResourceConverterComponent::InitResourceConverter(const FResourceConverter
 {
 	// Cache settings first.
 	M_Settings = InSettings;
+	bM_ConversionRequested = M_Settings.Tick.bStartEnabled;
 
 	// Cache RTS component on the owner.
 	AActor* Owner = GetOwner();
@@ -83,25 +85,242 @@ void UResourceConverterComponent::InitResourceConverter(const FResourceConverter
 		RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: ResourceDeltas contains more than two entries; "
 			"vertical text can only display up to two. Extras will not be shown in text."));
 	}
-	if (M_Settings.Tick.bStartEnabled)
-	{
-		SetResourceConversionEnabled(true);
-	}
+
+	bM_HasBeenInitialized = true;
+	SetupBuildingExpansionOwner();
+	RestoreOrInitializeBuildingExpansionConversionState();
+	ApplyResourceConversionState();
 }
 
 void UResourceConverterComponent::SetResourceConversionEnabled(const bool bEnabled)
 {
-	if (bEnabled == bM_Enabled)
+	bM_ConversionRequested = bEnabled;
+	if (bM_IsOwnedByBuildingExpansion && GetIsValidBuildingExpansion())
+	{
+		M_BuildingExpansion->SetSavedResourceConversionState(
+			bEnabled
+				? EBuildingExpansionResourceConversionState::Enabled
+				: EBuildingExpansionResourceConversionState::Disabled);
+	}
+
+	ApplyResourceConversionState();
+}
+
+void UResourceConverterComponent::SetResourceConversionTemporarilySuspended(const bool bSuspended)
+{
+	if (bM_TemporarilySuspended == bSuspended)
 	{
 		return;
 	}
-	bM_Enabled = bEnabled;
-	if (not bM_Enabled)
+
+	bM_TemporarilySuspended = bSuspended;
+	ApplyResourceConversionState();
+}
+
+void UResourceConverterComponent::OnBuildingExpansionAbilitiesInitialized()
+{
+	SetupBuildingExpansionOwner();
+	if (not bM_HasBeenInitialized)
 	{
-		StopResourceTimer();
+		RemoveBuildingExpansionConversionAbilities();
 		return;
 	}
-	(void)StartResourceTimer();
+
+	ApplyResourceConversionState();
+}
+
+void UResourceConverterComponent::OnBuildingExpansionOwnerAssigned()
+{
+	SetupBuildingExpansionOwner();
+	if (not bM_HasBeenInitialized)
+	{
+		RemoveBuildingExpansionConversionAbilities();
+		return;
+	}
+
+	RestoreOrInitializeBuildingExpansionConversionState();
+	ApplyResourceConversionState();
+}
+
+void UResourceConverterComponent::ApplyResourceConversionState()
+{
+	const bool bWasConversionEnabled = bM_Enabled;
+	const bool bShouldRunConversion = GetCanRunResourceConversion();
+	if (bM_Enabled != bShouldRunConversion)
+	{
+		bM_Enabled = bShouldRunConversion;
+		if (bM_Enabled)
+		{
+			bM_Enabled = StartResourceTimer();
+		}
+		else
+		{
+			StopResourceTimer();
+		}
+	}
+
+	UpdateBuildingExpansionConversionAbility();
+
+	if (bWasConversionEnabled == bM_Enabled || not bM_IsOwnedByBuildingExpansion)
+	{
+		return;
+	}
+	if (not GetIsValidBuildingExpansion())
+	{
+		return;
+	}
+
+	if (bM_Enabled)
+	{
+		M_BuildingExpansion->BP_OnResourceConversionStarted();
+		return;
+	}
+
+	M_BuildingExpansion->BP_OnResourceConversionStopped();
+}
+
+bool UResourceConverterComponent::GetCanRunResourceConversion() const
+{
+	if (not bM_HasBeenInitialized || not bM_ConversionRequested || bM_TemporarilySuspended)
+	{
+		return false;
+	}
+
+	if (not bM_IsOwnedByBuildingExpansion)
+	{
+		return true;
+	}
+
+	return GetIsValidBuildingExpansion() &&
+		M_BuildingExpansion->GetStatus() == EBuildingExpansionStatus::BXS_Built;
+}
+
+void UResourceConverterComponent::SetupBuildingExpansionOwner()
+{
+	ABuildingExpansion* BuildingExpansion = Cast<ABuildingExpansion>(GetOwner());
+	if (not IsValid(BuildingExpansion))
+	{
+		bM_IsOwnedByBuildingExpansion = false;
+		M_BuildingExpansion.Reset();
+		return;
+	}
+
+	bM_IsOwnedByBuildingExpansion = true;
+	M_BuildingExpansion = BuildingExpansion;
+	BuildingExpansion->OnBxpConstructed.RemoveAll(this);
+	BuildingExpansion->OnBxpPackingUp.RemoveAll(this);
+	BuildingExpansion->OnBxpCancelPackingUp.RemoveAll(this);
+	BuildingExpansion->OnBxpConstructed.AddUObject(
+		this, &UResourceConverterComponent::HandleBuildingExpansionConstructed);
+	BuildingExpansion->OnBxpPackingUp.AddUObject(
+		this, &UResourceConverterComponent::HandleBuildingExpansionPackingUp);
+	BuildingExpansion->OnBxpCancelPackingUp.AddUObject(
+		this, &UResourceConverterComponent::HandleBuildingExpansionPackingCancelled);
+}
+
+void UResourceConverterComponent::RestoreOrInitializeBuildingExpansionConversionState()
+{
+	if (not bM_IsOwnedByBuildingExpansion || not GetIsValidBuildingExpansion())
+	{
+		return;
+	}
+
+	const EBuildingExpansionResourceConversionState SavedState =
+		M_BuildingExpansion->GetSavedResourceConversionState();
+	if (SavedState == EBuildingExpansionResourceConversionState::Enabled)
+	{
+		bM_ConversionRequested = true;
+		return;
+	}
+	if (SavedState == EBuildingExpansionResourceConversionState::Disabled)
+	{
+		bM_ConversionRequested = false;
+		return;
+	}
+
+	M_BuildingExpansion->SetSavedResourceConversionState(
+		bM_ConversionRequested
+			? EBuildingExpansionResourceConversionState::Enabled
+			: EBuildingExpansionResourceConversionState::Disabled);
+}
+
+void UResourceConverterComponent::HandleBuildingExpansionConstructed()
+{
+	ApplyResourceConversionState();
+}
+
+void UResourceConverterComponent::HandleBuildingExpansionPackingUp()
+{
+	ApplyResourceConversionState();
+}
+
+void UResourceConverterComponent::HandleBuildingExpansionPackingCancelled()
+{
+	ApplyResourceConversionState();
+}
+
+void UResourceConverterComponent::UpdateBuildingExpansionConversionAbility()
+{
+	if (not bM_IsOwnedByBuildingExpansion || not GetIsValidBuildingExpansion())
+	{
+		return;
+	}
+
+	ABuildingExpansion* BuildingExpansion = M_BuildingExpansion.Get();
+	if (not bM_HasBeenInitialized || bM_TemporarilySuspended ||
+		BuildingExpansion->GetStatus() != EBuildingExpansionStatus::BXS_Built)
+	{
+		RemoveBuildingExpansionConversionAbilities();
+		return;
+	}
+
+	const EAbilityID DesiredAbility = bM_Enabled
+		                                    ? EAbilityID::IdDisableResourceConversion
+		                                    : EAbilityID::IdEnableResourceConversion;
+	const EAbilityID OppositeAbility = bM_Enabled
+		                                     ? EAbilityID::IdEnableResourceConversion
+		                                     : EAbilityID::IdDisableResourceConversion;
+	if (BuildingExpansion->HasAbility(DesiredAbility))
+	{
+		if (BuildingExpansion->HasAbility(OppositeAbility))
+		{
+			(void)BuildingExpansion->RemoveAbility(OppositeAbility);
+		}
+		return;
+	}
+
+	if (BuildingExpansion->HasAbility(OppositeAbility))
+	{
+		if (not BuildingExpansion->SwapAbility(OppositeAbility, DesiredAbility))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: Failed to update the building expansion "
+				"conversion ability."));
+		}
+		return;
+	}
+
+	if (not BuildingExpansion->AddAbility(DesiredAbility))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ResourceConverter: Failed to add the building expansion "
+			"conversion ability."));
+	}
+}
+
+void UResourceConverterComponent::RemoveBuildingExpansionConversionAbilities()
+{
+	if (not bM_IsOwnedByBuildingExpansion || not GetIsValidBuildingExpansion())
+	{
+		return;
+	}
+
+	if (M_BuildingExpansion->HasAbility(EAbilityID::IdEnableResourceConversion))
+	{
+		(void)M_BuildingExpansion->RemoveAbility(EAbilityID::IdEnableResourceConversion);
+	}
+	if (M_BuildingExpansion->HasAbility(EAbilityID::IdDisableResourceConversion))
+	{
+		(void)M_BuildingExpansion->RemoveAbility(EAbilityID::IdDisableResourceConversion);
+	}
 }
 
 // ===== timer control =====
@@ -213,8 +432,11 @@ bool UResourceConverterComponent::GetIsValidRTSComponent() const
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_RTSComponent"),
-	                                                      TEXT("GetIsValidRTSComponent"), GetOwner());
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_RTSComponent"),
+		TEXT("GetIsValidRTSComponent"),
+		this);
 	return false;
 }
 
@@ -224,8 +446,11 @@ bool UResourceConverterComponent::GetIsValidPlayerResourceManager() const
 	{
 		return true;
 	}
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, TEXT("M_PlayerResourceManager"),
-	                                                      TEXT("GetIsValidPlayerResourceManager"), GetOwner());
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_PlayerResourceManager"),
+		TEXT("GetIsValidPlayerResourceManager"),
+		this);
 	return false;
 }
 
@@ -235,9 +460,12 @@ bool UResourceConverterComponent::GetIsValidAnimatedTextManager() const
 	{
 		return true;
 	}
-	// This is optional; don’t spam errors every tick. Report once here, then we’ll just skip showing text.
-	RTSFunctionLibrary::ReportWarning(TEXT("ResourceConverter: AnimatedTextManager is not set/valid. "
-		"No vertical text will be shown."));
+	if (not bM_HasReportedInvalidAnimatedTextManager)
+	{
+		RTSFunctionLibrary::ReportWarning(TEXT("ResourceConverter: AnimatedTextManager is not set/valid. "
+			"No vertical text will be shown."));
+		bM_HasReportedInvalidAnimatedTextManager = true;
+	}
 	return false;
 }
 
@@ -254,6 +482,21 @@ bool UResourceConverterComponent::GetIsValidOnTickAudioComponent() const
 		TEXT("GetIsValidOnTickAudioComponent"),
 		this
 	);
+	return false;
+}
+
+bool UResourceConverterComponent::GetIsValidBuildingExpansion() const
+{
+	if (M_BuildingExpansion.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_BuildingExpansion"),
+		TEXT("GetIsValidBuildingExpansion"),
+		this);
 	return false;
 }
 
@@ -323,7 +566,7 @@ bool UResourceConverterComponent::TryApplyAllDeltasAtomic(
 void UResourceConverterComponent::ShowResourceTextAtOwner(const TMap<ERTSResourceType, int32>& AppliedDeltas) const
 {
 	// Optional manager; if missing, skip quietly (we already logged a warning once).
-	if (not M_AnimatedTextManager.IsValid())
+	if (not GetIsValidAnimatedTextManager())
 	{
 		return;
 	}
@@ -453,7 +696,7 @@ void UResourceConverterComponent::Init_SetupOptionalTickAudioComponent()
 		return;
 	}
 
-	if (IsValid(M_OnTickAudioComponent))
+	if (M_OnTickAudioComponent != nullptr && GetIsValidOnTickAudioComponent())
 	{
 		M_OnTickAudioComponent->Stop();
 		M_OnTickAudioComponent->DestroyComponent();
@@ -527,5 +770,6 @@ bool UResourceConverterComponent::GetAnimTextMgrFromWorld()
 	}
 
 	M_AnimatedTextManager = PoolManager;
+	bM_HasReportedInvalidAnimatedTextManager = false;
 	return true;
 }

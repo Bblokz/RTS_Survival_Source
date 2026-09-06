@@ -9,9 +9,9 @@ void FResourceConversionHelper::OnBxpCreatedOrDestroyed(ANomadicVehicle* Nomadic
 	{
 		return;
 	}
-	const bool bSetEnabled = GetHasConversionEnabled(NomadicVehicle);
-	const bool bHasAnyConverters = UpdateAllConvertersWithConversionEnabled(NomadicVehicle, bSetEnabled);
-	UpdateConverterAbility(NomadicVehicle, bSetEnabled, bHasAnyConverters);
+	const bool bConversionEnabled = GetHasConversionEnabled(NomadicVehicle);
+	const bool bHasAnyConverters = GetHasAnyConverterComponents(NomadicVehicle);
+	UpdateConverterAbility(NomadicVehicle, bConversionEnabled, bHasAnyConverters);
 }
 
 void FResourceConversionHelper::OnNomadicExpanded(ANomadicVehicle* NomadicVehicle, const bool bIsExpanded)
@@ -20,17 +20,15 @@ void FResourceConversionHelper::OnNomadicExpanded(ANomadicVehicle* NomadicVehicl
 	{
 		return;
 	}
+	const bool bHasAnyConverters = UpdateAllConvertersTemporarilySuspended(NomadicVehicle, not bIsExpanded);
 	if (not bIsExpanded)
 	{
-		(void)UpdateAllConvertersWithConversionEnabled(NomadicVehicle, false);
 		// Make sure the abilties are no longer on the command card as the nomadic vehicle is not expanded anymore.
 		RemoveAllConversionAbilities(NomadicVehicle);
+		return;
 	}
-	else if (GetHasConversionEnabled(NomadicVehicle))
-	{
-		const bool bHasAnyConverters = UpdateAllConvertersWithConversionEnabled(NomadicVehicle, true);
-		UpdateConverterAbility(NomadicVehicle, true, bHasAnyConverters);
-	}
+
+	UpdateConverterAbility(NomadicVehicle, GetHasConversionEnabled(NomadicVehicle), bHasAnyConverters);
 }
 
 void FResourceConversionHelper::ManuallySetConvertersEnabled(const bool bEnabled, ANomadicVehicle* NomadicVehicle)
@@ -54,8 +52,15 @@ bool FResourceConversionHelper::UpdateAllConvertersWithConversionEnabled(ANomadi
 		// Note: is idempotent.
 		Converter->SetResourceConversionEnabled(bConversionEnabled);
 	}
-	for (const auto EachBxpItem : NomadicVehicle->GetBuildingExpansions())
+	for (FBuildingExpansionItem& EachBxpItem : NomadicVehicle->GetBuildingExpansions())
 	{
+		if (EachBxpItem.ResourceConversionState !=
+			EBuildingExpansionResourceConversionState::Uninitialized)
+		{
+			EachBxpItem.ResourceConversionState = bConversionEnabled
+				                                            ? EBuildingExpansionResourceConversionState::Enabled
+				                                            : EBuildingExpansionResourceConversionState::Disabled;
+		}
 		if (not IsValid(EachBxpItem.Expansion))
 		{
 			continue;
@@ -68,6 +73,51 @@ bool FResourceConversionHelper::UpdateAllConvertersWithConversionEnabled(ANomadi
 		}
 	}
 	return bHasAnyConverters;
+}
+
+bool FResourceConversionHelper::UpdateAllConvertersTemporarilySuspended(
+	ANomadicVehicle* NomadicVehicle,
+	const bool bTemporarilySuspended)
+{
+	bool bHasAnyConverters = false;
+	if (UResourceConverterComponent* Converter = GetConverter(NomadicVehicle))
+	{
+		bHasAnyConverters = true;
+		Converter->SetResourceConversionTemporarilySuspended(bTemporarilySuspended);
+	}
+
+	for (const FBuildingExpansionItem& EachBxpItem : NomadicVehicle->GetBuildingExpansions())
+	{
+		if (not IsValid(EachBxpItem.Expansion))
+		{
+			continue;
+		}
+		if (UResourceConverterComponent* Converter = GetConverter(EachBxpItem.Expansion))
+		{
+			bHasAnyConverters = true;
+			Converter->SetResourceConversionTemporarilySuspended(bTemporarilySuspended);
+		}
+	}
+
+	return bHasAnyConverters;
+}
+
+bool FResourceConversionHelper::GetHasAnyConverterComponents(const ANomadicVehicle* NomadicVehicle)
+{
+	if (GetConverter(NomadicVehicle) != nullptr)
+	{
+		return true;
+	}
+
+	for (const FBuildingExpansionItem& EachBxpItem : NomadicVehicle->GetBuildingExpansions())
+	{
+		if (IsValid(EachBxpItem.Expansion) && GetConverter(EachBxpItem.Expansion) != nullptr)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void FResourceConversionHelper::UpdateConverterAbility(ANomadicVehicle* NomadicVehicle, const bool bConversionEnabled,
@@ -135,7 +185,7 @@ bool FResourceConversionHelper::GetHasConversionEnabled(const ANomadicVehicle* N
 
 void FResourceConversionHelper::RemoveEnableConversionAbility(ANomadicVehicle* NomadicVehicle)
 {
-	if(NomadicVehicle->HasAbility(EAbilityID::IdEnableResourceConversion))
+	if (NomadicVehicle->HasAbility(EAbilityID::IdEnableResourceConversion))
 	{
 		(void)NomadicVehicle->RemoveAbility(EAbilityID::IdEnableResourceConversion);
 	}
@@ -143,7 +193,7 @@ void FResourceConversionHelper::RemoveEnableConversionAbility(ANomadicVehicle* N
 
 void FResourceConversionHelper::RemoveDisableConversionAbility(ANomadicVehicle* NomadicVehicle)
 {
-	if(NomadicVehicle->HasAbility(EAbilityID::IdDisableResourceConversion))
+	if (NomadicVehicle->HasAbility(EAbilityID::IdDisableResourceConversion))
 	{
 		(void)NomadicVehicle->RemoveAbility(EAbilityID::IdDisableResourceConversion);
 	}

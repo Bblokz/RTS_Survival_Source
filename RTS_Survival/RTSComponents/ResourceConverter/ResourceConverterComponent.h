@@ -15,6 +15,7 @@ class URTSComponent;
 class UPlayerResourceManager;
 class UAnimatedTextWidgetPoolManager;
 class UAudioComponent;
+class ABuildingExpansion;
 
 /**
  * @brief Container for vertical text layout/styling to use with the pooled system.
@@ -128,6 +129,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Resource Converter")
 	void SetResourceConversionEnabled(const bool bEnabled);
 
+	/** Temporarily pauses conversion without changing whether the player requested conversion to be enabled. */
+	void SetResourceConversionTemporarilySuspended(const bool bSuspended);
+
+	/** Reconciles conversion abilities after a building expansion initializes its command card. */
+	void OnBuildingExpansionAbilitiesInitialized();
+
+	/** Restores persisted conversion intent after a building expansion is assigned to its owner slot. */
+	void OnBuildingExpansionOwnerAssigned();
+
 protected:
 	// Unreal component entry points
 	virtual void BeginPlay() override;
@@ -143,6 +153,21 @@ private:
 	/** Whether conversion is currently allowed to run. */
 	UPROPERTY()
 	bool bM_Enabled = false;
+
+	/** Player intent is retained while construction or packing temporarily prevents conversion. */
+	UPROPERTY()
+	bool bM_ConversionRequested = false;
+
+	UPROPERTY()
+	bool bM_TemporarilySuspended = false;
+
+	UPROPERTY()
+	bool bM_HasBeenInitialized = false;
+
+	UPROPERTY()
+	bool bM_IsOwnedByBuildingExpansion = false;
+
+	mutable bool bM_HasReportedInvalidAnimatedTextManager = false;
 
 	/** Our conversion timer handle; we do not use actor ticking. */
 	FTimerHandle M_TickTimerHandle;
@@ -165,6 +190,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UAudioComponent> M_OnTickAudioComponent = nullptr;
 
+	// Building expansion owner whose construction lifecycle gates conversion and command-card abilities.
+	UPROPERTY()
+	TWeakObjectPtr<ABuildingExpansion> M_BuildingExpansion;
+
 	// ======= Helpers / flow =======
 
 	/** Start/refresh the timer from current settings; return false if not possible. */
@@ -176,11 +205,22 @@ private:
 	/** Core tick: attempts to apply deltas; plays VFX/SFX on success. */
 	void OnResourceTick();
 
+	void ApplyResourceConversionState();
+	bool GetCanRunResourceConversion() const;
+	void SetupBuildingExpansionOwner();
+	void RestoreOrInitializeBuildingExpansionConversionState();
+	void HandleBuildingExpansionConstructed();
+	void HandleBuildingExpansionPackingUp();
+	void HandleBuildingExpansionPackingCancelled();
+	void UpdateBuildingExpansionConversionAbility();
+	void RemoveBuildingExpansionConversionAbilities();
+
 	// ---- Validity helpers with logging (rule 0.5) ----
 	bool GetIsValidRTSComponent() const;
 	bool GetIsValidPlayerResourceManager() const;
 	bool GetIsValidAnimatedTextManager() const;
 	bool GetIsValidOnTickAudioComponent() const;
+	bool GetIsValidBuildingExpansion() const;
 
 	// ---- Adapter helpers to your PlayerResourceManager API ----
 	/**
