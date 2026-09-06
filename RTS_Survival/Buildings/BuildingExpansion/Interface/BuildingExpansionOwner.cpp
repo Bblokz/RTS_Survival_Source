@@ -403,14 +403,13 @@ void IBuildingExpansionOwner::OnBxpConstructionStartUpdateExpansionData(
 			BuildingExpansionData.M_TBuildingExpansionItems[i].BxpConstructionRules.SocketName = AttachedToSocketName;
 			BuildingExpansionData.M_TBuildingExpansionItems[i].ExpansionStatus = BuildingExpansion->
 				GetBuildingExpansionStatus();
-			const auto& [Expansion, ExpansionType, ExpansionStatus, BxpConstructionRules] =
-				BuildingExpansionData.M_TBuildingExpansionItems[i];
+			const FBuildingExpansionItem& ExpansionItem = BuildingExpansionData.M_TBuildingExpansionItems[i];
 
 			// Update the main game UI with the new widget state if this is the main selected actor.
 			BuildingExpansionData.UpdateMainGameUIWithStatusChanges(i,
-			                                                        ExpansionStatus,
-			                                                        ExpansionType,
-			                                                        BxpConstructionRules);
+			                                                        ExpansionItem.ExpansionStatus,
+			                                                        ExpansionItem.ExpansionType,
+			                                                        ExpansionItem.BxpConstructionRules);
 			break;
 		}
 	}
@@ -590,6 +589,11 @@ void IBuildingExpansionOwner::ResetEntryAndUpdateUI(const int32 Index, const boo
 	BuildingExpansionData.M_TBuildingExpansionItems[Index].Expansion = nullptr;
 	BuildingExpansionData.M_TBuildingExpansionItems[Index].ExpansionStatus = Status;
 	BuildingExpansionData.M_TBuildingExpansionItems[Index].ExpansionType = Type;
+	if (not bResetForPackedUpExpansion)
+	{
+		BuildingExpansionData.M_TBuildingExpansionItems[Index].ResourceConversionState =
+			EBuildingExpansionResourceConversionState::Uninitialized;
+	}
 
 	const FBxpConstructionRules EmptyRules = FBxpConstructionRules();
 	FBxpConstructionRules NewRules;
@@ -613,15 +617,14 @@ void IBuildingExpansionOwner::ResetEntryAndUpdateUI(const int32 Index, const boo
 void IBuildingExpansionOwner::StartPackUpAllExpansions(const float TotalOwnerPackUpTime) const
 {
 	UBuildingExpansionOwnerComp& BuildingExpansionData = GetBuildingExpansionData();
-	for (const auto [Expansion, ExpansionType, ExpansionStatus, ConstructionRules] : BuildingExpansionData.
-	     M_TBuildingExpansionItems)
+	for (const FBuildingExpansionItem& ExpansionItem : BuildingExpansionData.M_TBuildingExpansionItems)
 	{
-		if (not IsValid(Expansion))
+		if (not IsValid(ExpansionItem.Expansion))
 		{
 			continue;
 		}
 
-		Expansion->StartPackUpBuildingExpansion(TotalOwnerPackUpTime);
+		ExpansionItem.Expansion->StartPackUpBuildingExpansion(TotalOwnerPackUpTime);
 	}
 }
 

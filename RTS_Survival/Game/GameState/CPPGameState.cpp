@@ -7354,6 +7354,7 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.BuildRadius = 0;
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
+		AsEconomic(EBuildingExpansionType::BTX_RefConverter)
 	});
 
 	NomadicData.MaxAmountBuildingExpansions = 2;

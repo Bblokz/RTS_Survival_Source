@@ -306,6 +306,14 @@ enum class EBuildingExpansionStatus : uint8
 	BXS_BeingUnpacked UMETA(DisplayName = "Is Being Unpacked"),
 };
 
+// Persists player conversion intent while a packed expansion has no live actor or converter component.
+enum class EBuildingExpansionResourceConversionState : uint8
+{
+	Uninitialized,
+	Enabled,
+	Disabled
+};
+
 static FString Global_GetBxpStatusString(const EBuildingExpansionStatus Status)
 {
 	switch (Status)
@@ -348,4 +356,7 @@ struct RTS_SURVIVAL_API FBuildingExpansionItem
 	// to the async spawner and once the async bxp spawn is complete they are propagated to the bxp owner to save
 	// for a specific item.
 	FBxpConstructionRules BxpConstructionRules;
+
+	EBuildingExpansionResourceConversionState ResourceConversionState =
+		EBuildingExpansionResourceConversionState::Uninitialized;
 };

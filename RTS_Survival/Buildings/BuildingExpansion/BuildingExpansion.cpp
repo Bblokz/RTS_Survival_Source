@@ -18,6 +18,7 @@
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/ResourceConverter/ResourceConverterComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/RTSComponents/TimeProgressBarWidget.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
@@ -105,6 +106,10 @@ void ABuildingExpansion::OnBuildingExpansionCreatedByOwner(const TScriptInterfac
 	M_Owner = NewOwner;
 	// Updates the Main game UI too.
 	SetStatusAndPropagateToOwner(NewStatus);
+	if (UResourceConverterComponent* ResourceConverter = FindComponentByClass<UResourceConverterComponent>())
+	{
+		ResourceConverter->OnBuildingExpansionOwnerAssigned();
+	}
 }
 
 
@@ -399,6 +404,10 @@ void ABuildingExpansion::PostInitializeComponents()
 	(void)GetIsValidBehaviourComponent();
 	BP_PostInit_SetupRTSSubtype();
 	PostInit_SetupAbilities();
+	if (UResourceConverterComponent* ResourceConverter = FindComponentByClass<UResourceConverterComponent>())
+	{
+		ResourceConverter->OnBuildingExpansionAbilitiesInitialized();
+	}
 }
 
 void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -647,6 +656,22 @@ void ABuildingExpansion::TerminateTurretSwapCommand(const ETurretSwapAbility Tur
 	}
 
 	TurretSwapComp->TerminateTurretSwap();
+}
+
+void ABuildingExpansion::NoQueue_ExecuteSetResourceConversionEnabled(const bool bEnabled)
+{
+	if (M_StatusBuildingExpansion != EBuildingExpansionStatus::BXS_Built)
+	{
+		return;
+	}
+
+	UResourceConverterComponent* ResourceConverter = FindComponentByClass<UResourceConverterComponent>();
+	if (not IsValid(ResourceConverter))
+	{
+		return;
+	}
+
+	ResourceConverter->SetResourceConversionEnabled(bEnabled);
 }
 
 void ABuildingExpansion::OnVerticalDestructionComplete()
@@ -1487,6 +1512,44 @@ void ABuildingExpansion::PostInit_SetupAbilities()
 			"\n in function ABuildingExpansion::BeginPlay_NextFrameInitAbilities"
 			"\n for expansion: " + GetName() +
 			"\n Ensure the data is set correctly in the GameState");
+	}
+}
+
+EBuildingExpansionResourceConversionState ABuildingExpansion::GetSavedResourceConversionState() const
+{
+	if (not M_Owner)
+	{
+		return EBuildingExpansionResourceConversionState::Uninitialized;
+	}
+
+	for (const FBuildingExpansionItem& ExpansionItem : M_Owner->GetBuildingExpansions())
+	{
+		if (ExpansionItem.Expansion == this)
+		{
+			return ExpansionItem.ResourceConversionState;
+		}
+	}
+
+	return EBuildingExpansionResourceConversionState::Uninitialized;
+}
+
+void ABuildingExpansion::SetSavedResourceConversionState(
+	const EBuildingExpansionResourceConversionState ResourceConversionState) const
+{
+	if (not M_Owner)
+	{
+		return;
+	}
+
+	for (FBuildingExpansionItem& ExpansionItem : M_Owner->GetBuildingExpansions())
+	{
+		if (ExpansionItem.Expansion != this)
+		{
+			continue;
+		}
+
+		ExpansionItem.ResourceConversionState = ResourceConversionState;
+		return;
 	}
 }
 

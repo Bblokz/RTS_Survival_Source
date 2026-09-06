@@ -20,6 +20,7 @@
 
 
 class UBuildingExpansionEnergyComponent;
+class UResourceConverterComponent;
 class UTurretSwapComp;
 class USoundCue;
 struct FBxpData;
@@ -40,7 +41,7 @@ DECLARE_MULTICAST_DELEGATE(FOnBxpPackingUp);
 DECLARE_MULTICAST_DELEGATE(FOnBxpCancelledPackingUp);
 
 /**
- * A building expansion actor can be added to a building in an expansion slot.
+ * @brief Used as an expansion-slot actor that constructs, packs, and unpacks functionality for a parent building.
  * These slots are stored in a TArray in the building expansion owner component called UBuildingExpansionOwnerComp.
  * To interact with this component accross multiple different derived actor classes we use the IBuildingExpansionOwner interface.
  *
@@ -54,6 +55,7 @@ class RTS_SURVIVAL_API ABuildingExpansion : public ASelectableActorObjectsMaster
 	GENERATED_BODY()
 
 	friend class UTurretSwapComp;
+	friend class UResourceConverterComponent;
 
 public:
 
@@ -284,12 +286,21 @@ protected:
 	virtual void TerminateAttachedWeaponAbilityCommand(const EAttachWeaponAbilitySubType AttachedWeaponAbilityType) override final;
 	virtual void ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType) override final;
 	virtual void TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType) override final;
+	virtual void NoQueue_ExecuteSetResourceConversionEnabled(const bool bEnabled) override final;
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Commands")
 	void BP_ExecuteTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Commands")
 	void BP_TerminateTurretSwapCommand(const ETurretSwapAbility TurretSwapAbilityType);
+
+	/** @brief Reacts when this expansion's resource converter enters its active state. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Resource Conversion")
+	void BP_OnResourceConversionStarted();
+
+	/** @brief Reacts when this expansion's active resource converter is stopped. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Resource Conversion")
+	void BP_OnResourceConversionStopped();
 
 private:
 	
@@ -485,6 +496,8 @@ private:
 
 	void OnInitBuildingExpansion_SetupCollision(const bool bLetBuildingComponentAffectNavmesh) const;
 	void PostInit_SetupAbilities();
+	EBuildingExpansionResourceConversionState GetSavedResourceConversionState() const;
+	void SetSavedResourceConversionState(EBuildingExpansionResourceConversionState ResourceConversionState) const;
 
 	void DebugDisplayMessage(const FString& Message) const;
 
