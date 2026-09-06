@@ -1896,6 +1896,7 @@ void ACPPController::InitPlayerController(
 	if (NewRTSAsyncSpawner)
 	{
 		M_RTSAsyncSpawner = NewRTSAsyncSpawner;
+		ApplyEnemyDirectorUnitOverrides();
 		InitPlayerStartLocation(SpawnCenter, bDoNotLoadPlayerProfileUnits);
 	}
 	else
@@ -1917,6 +1918,22 @@ void ACPPController::InitPlayerController(
 		RTSFunctionLibrary::ReportError(
 			"No valid hoverwidget class provided in InitPlayerController in CPPController.cpp");
 	}
+}
+
+void ACPPController::ApplyEnemyDirectorUnitOverrides() const
+{
+	if (not GetIsValidAsyncSpawner())
+	{
+		return;
+	}
+
+	const AMissionManager* const MissionManager = FRTS_Statics::GetGameMissionManager(this);
+	if (not IsValid(MissionManager))
+	{
+		return;
+	}
+
+	M_RTSAsyncSpawner->ApplyEnemyDirectorUnitOverrides(MissionManager->GetEnemyDirector());
 }
 
 void ACPPController::BeginPlay()
@@ -4623,19 +4640,27 @@ uint32 ACPPController::OrderUnitsAttackGround(const FVector& GroundLocation)
 void ACPPController::DirectActionButtonConversion(const EAbilityID ConversionAbility)
 {
 	EnsureSelectionsAreRTSValid();
-	uint32 commandsExe = 0;
-	bool bEnable = ConversionAbility == EAbilityID::IdEnableResourceConversion;
+	uint32 CommandsExecuted = 0;
+	const bool bEnable = ConversionAbility == EAbilityID::IdEnableResourceConversion;
 	for (const auto EachPawn : TSelectedPawnMasters)
 	{
+		if (not EachPawn->HasAbility(ConversionAbility))
+		{
+			continue;
+		}
 		EachPawn->NoQueue_SetResourceConversionEnabled(bEnable);
-		commandsExe++;
+		++CommandsExecuted;
 	}
 	for (const auto EachActor : TSelectedActorsMasters)
 	{
+		if (not EachActor->HasAbility(ConversionAbility))
+		{
+			continue;
+		}
 		EachActor->NoQueue_SetResourceConversionEnabled(bEnable);
-		commandsExe++;
+		++CommandsExecuted;
 	}
-	if (commandsExe > 0)
+	if (CommandsExecuted > 0)
 	{
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdGeneral_Confirm),
 		                                false, false);
@@ -4838,7 +4863,7 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	// Falls through.
 	case EAbilityID::IdDisableResourceConversion:
 	case EAbilityID::IdEnableResourceConversion:
-		this->DirectActionButtonConversion(M_ActiveAbility);
+		this->DirectActionButtonConversion(ActiveAbilityEntry.AbilityId);
 		break;
 	case EAbilityID::IdReinforceSquad:
 		this->DirectActionButtonReinforce();

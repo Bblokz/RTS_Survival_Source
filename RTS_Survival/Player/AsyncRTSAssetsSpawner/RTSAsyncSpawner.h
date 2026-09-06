@@ -11,6 +11,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/MasterObjects/ActorObjectsMaster.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "TrainingOptionClassSetup.h"
 
 #include "RTSAsyncSpawner.generated.h"
 
@@ -24,6 +25,8 @@ class ACPPController;
 enum class EBuildingExpansionType : uint8;
 class ABuildingExpansion;
 class AActor;
+enum class EEnemyDirector : uint8;
+struct FEnemyDirectorUnitOverrides;
 
 
 USTRUCT()
@@ -44,67 +47,7 @@ enum class EAsyncRequestType : uint8
 	AReq_Training
 };
 
-/**
- * Simple setup row for Nomadic subtype → unit class.
- */
-USTRUCT(BlueprintType)
-struct FNomadicTrainingOptionSetup
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Async Spawning|Training|Nomadic")
-	ENomadicSubtype NomadicSubtype = ENomadicSubtype::Nomadic_None;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Async Spawning|Training|Nomadic")
-	TSoftClassPtr<AActor> UnitClass = nullptr;
-};
-
-/**
- * Simple setup row for Tank subtype → unit class.
- */
-USTRUCT(BlueprintType)
-struct FTankTrainingOptionSetup
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Async Spawning|Training|Tank")
-	ETankSubtype TankSubtype = ETankSubtype::Tank_None;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Async Spawning|Training|Tank")
-	TSoftClassPtr<AActor> UnitClass = nullptr;
-};
-
-/**
- * Simple setup row for Squad subtype → unit class.
- */
-USTRUCT(BlueprintType)
-struct FSquadTrainingOptionSetup
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Async Spawning|Training|Squad")
-	ESquadSubtype SquadSubtype = ESquadSubtype::Squad_None;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Async Spawning|Training|Squad")
-	TSoftClassPtr<AActor> UnitClass = nullptr;
-};
-
-/**
- * Simple setup row for Aircraft subtype → unit class.
- */
-USTRUCT(BlueprintType)
-struct FAircraftTrainingOptionSetup
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Async Spawning|Training|Aircraft")
-	EAircraftSubtype AircraftSubtype = EAircraftSubtype::Aircarft_None;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Async Spawning|Training|Aircraft")
-	TSoftClassPtr<AActor> UnitClass = nullptr;
-};
-
-
+/** @brief Level-placed service that resolves configured unit types and asynchronously spawns their actor classes. */
 UCLASS()
 class RTS_SURVIVAL_API ARTSAsyncSpawner : public AActorObjectsMaster
 {
@@ -167,6 +110,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "ReferenceCasts")
 	void InitRTSAsyncSpawner(ACPPController* PlayerController);
+
+	/** Applies the selected director's sparse class replacements at most once for this spawner instance. */
+	void ApplyEnemyDirectorUnitOverrides(const EEnemyDirector EnemyDirector);
 
 	/**
 	 * Syncronously gets the preview mesh of the building expansion type.
@@ -262,6 +208,8 @@ private:
 	// Associates the concrete training option with the class to spawn using a hashmap.
 	TMap<FTrainingOption, TSoftClassPtr<AActor>> M_TrainingOptionMap;
 
+	bool bM_HasAppliedEnemyDirectorUnitOverrides = false;
+
 	// Used to load assets asynchronously.
 	FStreamableManager M_StreamableManager;
 
@@ -284,6 +232,21 @@ private:
 	 *        Logs and skips invalid / duplicate mappings.
 	 */
 	void AddTrainingOptionMapping(
+		const FTrainingOption& TrainingOption,
+		const TSoftClassPtr<AActor>& UnitClass);
+
+	void ApplyEnemyDirectorUnitOverrides(const FEnemyDirectorUnitOverrides& UnitOverrides);
+	void ApplyTankUnitOverrides(const TArray<FTankTrainingOptionSetup>& UnitOverrides);
+	void ApplySquadUnitOverrides(const TArray<FSquadTrainingOptionSetup>& UnitOverrides);
+	void ApplyNomadicUnitOverrides(const TArray<FNomadicTrainingOptionSetup>& UnitOverrides);
+	void ApplyAircraftUnitOverrides(const TArray<FAircraftTrainingOptionSetup>& UnitOverrides);
+
+	/**
+	 * @brief Preserves the base spawner configuration by replacing only a mapping that already exists.
+	 * @param TrainingOption Existing unit type and subtype whose spawn class should change.
+	 * @param UnitClass Replacement class supplied by the director Data Asset.
+	 */
+	void ApplyTrainingOptionOverride(
 		const FTrainingOption& TrainingOption,
 		const TSoftClassPtr<AActor>& UnitClass);
 

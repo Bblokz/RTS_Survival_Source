@@ -15,6 +15,7 @@
 #include "MissionScheduler/MissionScheduler.h"
 #include "RTS_Survival/Music/RTSMusicTypes.h"
 #include "RTS_Survival/Enemy/EnemyAIBehaviour/EnemyAIBehaviour.h"
+#include "RTS_Survival/Enemy/EnemyDirector/EnemyDirector.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
@@ -220,6 +221,8 @@ public:
 	void AddOnAllUnitsLostOfTypeGlobalAbility(FMissionLostAllUnitsGlobalAbilityCheck GlobalAbilityCheck);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	ERTSFaction GetPlayerFaction() const;
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
+	EEnemyDirector GetEnemyDirector() const { return M_EnemyDirector; }
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	ERTSCommander GetPlayerCommander() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -466,6 +469,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Player")
 	bool bHideGlobalAbilitiesForPlayer = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy")
+	EEnemyDirector M_EnemyDirector = EEnemyDirector::DirectorOfShield;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitMissionSounds(const FMissionSoundSettings MissionSettings);

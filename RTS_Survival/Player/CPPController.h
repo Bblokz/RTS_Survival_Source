@@ -1744,6 +1744,7 @@ private:
 	bool GetIsValidPlayerProfileLoader();
 	bool GetIsValidGameUIController() const;
 	bool GetIsValidAsyncSpawner() const;
+	void ApplyEnemyDirectorUnitOverrides() const;
 	bool GetIsValidFormationController();
 	bool GetIsValidPlayerControlGroupManager();
 	bool GetIsValidPlayerTechManager();

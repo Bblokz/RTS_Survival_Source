@@ -745,7 +745,7 @@ void UMainGameUI::SetupBuildingExpansionItems(
 		}
 	}
 	int IndexInScrollBar = -1;
-	for (const auto& [Expansion, ExpansionType, ExpansionStatus, BxpConstructionRules] : TBuildingExpansions)
+	for (const FBuildingExpansionItem& BuildingExpansion : TBuildingExpansions)
 	{
 		++IndexInScrollBar;
 		if (not GetIsValidItemBuildingExpansionWidgetAtIndex(IndexInScrollBar))
@@ -757,7 +757,9 @@ void UMainGameUI::SetupBuildingExpansionItems(
 		M_TItemBuildingExpansionWidgets[IndexInScrollBar]->SetVisibility(ESlateVisibility::Visible);
 		// Update this item widget with the new data also updates the UI in the blueprint.
 		M_TItemBuildingExpansionWidgets[IndexInScrollBar]->UpdateItemBuildingExpansionData(
-			ExpansionType, ExpansionStatus, BxpConstructionRules);
+			BuildingExpansion.ExpansionType,
+			BuildingExpansion.ExpansionStatus,
+			BuildingExpansion.BxpConstructionRules);
 		// Adjust the item to be enabled or disabled.
 		M_TItemBuildingExpansionWidgets[IndexInScrollBar]->EnableDisableItem(bAreBxpItemsEnabled);
 	}
