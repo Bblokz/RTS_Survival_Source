@@ -23,7 +23,9 @@ enum class ERTSMusicType: uint8
 	PrepareLoop,
 	TensionLoop,
 	Victory,
-	Defeat
+	Defeat,
+	DesertSongs,
+	
 	
 };
 

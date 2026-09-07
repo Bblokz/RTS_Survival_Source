@@ -172,14 +172,18 @@ void UPlayerCommandTypeDecoder::CreatePlacementEffectIfCommandExecuted(
 
 void UPlayerCommandTypeDecoder::ResetAllPlacementEffects()
 {
-	for (const auto EachVfx : M_TSpawnedSystems)
+	TArray<UNiagaraComponent*> SpawnedSystems;
+	Swap(SpawnedSystems, M_TSpawnedSystems);
+
+	for (UNiagaraComponent* SpawnedSystem : SpawnedSystems)
 	{
-		if (IsValid(EachVfx))
+		if (not IsValid(SpawnedSystem))
 		{
-			EachVfx->DestroyComponent();
+			continue;
 		}
+
+		SpawnedSystem->DestroyComponent();
 	}
-	M_TSpawnedSystems.Empty();
 }
 
 void UPlayerCommandTypeDecoder::SpawnPlacementEffectsForPrimarySelected(
