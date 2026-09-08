@@ -59,15 +59,16 @@ void UMissionTriggerVolumesManager::RemoveTriggerAreasForMissionById(UMissionBas
 		return;
 	}
 
-	for (int32 RegistrationIndex = M_RegisteredTriggerAreas.Num() - 1; RegistrationIndex >= 0; --RegistrationIndex)
+	// Destruction callbacks can remove other registrations while this batch is processed.
+	const TArray<FMissionTriggerAreaRegistration> RegistrationsToCheck = M_RegisteredTriggerAreas;
+	for (const FMissionTriggerAreaRegistration& Registration : RegistrationsToCheck)
 	{
-		const FMissionTriggerAreaRegistration& Registration = M_RegisteredTriggerAreas[RegistrationIndex];
 		if (Registration.M_Mission.Get() != Mission || Registration.M_TriggerId != TriggerId)
 		{
 			continue;
 		}
 
-		DestroyTriggerAreaAndRemoveRegistration(RegistrationIndex);
+		DestroyTriggerAreaAndRemoveRegistration(FindTriggerAreaRegistrationIndex(Registration.M_TriggerArea));
 	}
 
 	RemoveDestroyedEntries();
@@ -80,15 +81,16 @@ void UMissionTriggerVolumesManager::RemoveAllTriggerAreasForMission(UMissionBase
 		return;
 	}
 
-	for (int32 RegistrationIndex = M_RegisteredTriggerAreas.Num() - 1; RegistrationIndex >= 0; --RegistrationIndex)
+	// Destruction callbacks can remove other registrations while this batch is processed.
+	const TArray<FMissionTriggerAreaRegistration> RegistrationsToCheck = M_RegisteredTriggerAreas;
+	for (const FMissionTriggerAreaRegistration& Registration : RegistrationsToCheck)
 	{
-		const FMissionTriggerAreaRegistration& Registration = M_RegisteredTriggerAreas[RegistrationIndex];
 		if (Registration.M_Mission.Get() != Mission)
 		{
 			continue;
 		}
 
-		DestroyTriggerAreaAndRemoveRegistration(RegistrationIndex);
+		DestroyTriggerAreaAndRemoveRegistration(FindTriggerAreaRegistrationIndex(Registration.M_TriggerArea));
 	}
 
 	RemoveDestroyedEntries();
@@ -188,22 +190,16 @@ void UMissionTriggerVolumesManager::RegisterTriggerArea(UMissionBase* Mission,
 
 void UMissionTriggerVolumesManager::RemoveDestroyedEntries()
 {
-	for (int32 RegistrationIndex = M_RegisteredTriggerAreas.Num() - 1; RegistrationIndex >= 0; --RegistrationIndex)
+	// Destruction callbacks can remove other registrations while this batch is processed.
+	const TArray<FMissionTriggerAreaRegistration> RegistrationsToCheck = M_RegisteredTriggerAreas;
+	for (const FMissionTriggerAreaRegistration& Registration : RegistrationsToCheck)
 	{
-		const FMissionTriggerAreaRegistration& Registration = M_RegisteredTriggerAreas[RegistrationIndex];
 		if (Registration.M_TriggerArea.IsValid() && Registration.M_Mission.IsValid())
 		{
 			continue;
 		}
 
-		ATriggerArea* TriggerArea = Registration.M_TriggerArea.Get();
-		if (IsValid(TriggerArea))
-		{
-			TriggerArea->OnTriggerAreaOverlap.RemoveDynamic(this, &UMissionTriggerVolumesManager::OnTriggerAreaOverlap);
-			TriggerArea->Destroy();
-		}
-
-		M_RegisteredTriggerAreas.RemoveAtSwap(RegistrationIndex);
+		DestroyTriggerAreaAndRemoveRegistration(FindTriggerAreaRegistrationIndex(Registration.M_TriggerArea));
 	}
 }
 
@@ -215,13 +211,23 @@ void UMissionTriggerVolumesManager::DestroyTriggerAreaAndRemoveRegistration(cons
 	}
 
 	ATriggerArea* TriggerArea = M_RegisteredTriggerAreas[RegistrationIndex].M_TriggerArea.Get();
-	if (IsValid(TriggerArea))
-	{
-		TriggerArea->OnTriggerAreaOverlap.RemoveDynamic(this, &UMissionTriggerVolumesManager::OnTriggerAreaOverlap);
-		TriggerArea->Destroy();
-	}
-
+	// Unregister before Destroy can invoke callbacks that modify this array.
 	M_RegisteredTriggerAreas.RemoveAtSwap(RegistrationIndex);
+	if (not IsValid(TriggerArea))
+	{
+		return;
+	}
+	TriggerArea->OnTriggerAreaOverlap.RemoveDynamic(this, &UMissionTriggerVolumesManager::OnTriggerAreaOverlap);
+	TriggerArea->Destroy();
+}
+
+int32 UMissionTriggerVolumesManager::FindTriggerAreaRegistrationIndex(
+	const TWeakObjectPtr<ATriggerArea>& TriggerArea) const
+{
+	return M_RegisteredTriggerAreas.IndexOfByPredicate([TriggerArea](const FMissionTriggerAreaRegistration& Registration)
+	{
+		return Registration.M_TriggerArea.HasSameIndexAndSerialNumber(TriggerArea);
+	});
 }
 
 void UMissionTriggerVolumesManager::OnTriggerAreaOverlap(AActor* OverlappingActor, ATriggerArea* TriggerArea)
@@ -231,45 +237,44 @@ void UMissionTriggerVolumesManager::OnTriggerAreaOverlap(AActor* OverlappingActo
 		return;
 	}
 
-	for (int32 RegistrationIndex = M_RegisteredTriggerAreas.Num() - 1; RegistrationIndex >= 0; --RegistrationIndex)
+	// Each spawned trigger has one registration; resolve it again after any mission callback.
+	ProcessTriggerAreaOverlap(OverlappingActor, TriggerArea);
+	RemoveDestroyedEntries();
+}
+
+void UMissionTriggerVolumesManager::ProcessTriggerAreaOverlap(AActor* OverlappingActor, ATriggerArea* TriggerArea)
+{
+	const TWeakObjectPtr<ATriggerArea> WeakTriggerArea = TriggerArea;
+	const int32 RegistrationIndex = FindTriggerAreaRegistrationIndex(WeakTriggerArea);
+	if (not M_RegisteredTriggerAreas.IsValidIndex(RegistrationIndex))
 	{
-		FMissionTriggerAreaRegistration& Registration = M_RegisteredTriggerAreas[RegistrationIndex];
-		if (Registration.M_TriggerArea.Get() != TriggerArea)
-		{
-			continue;
-		}
-
-		UMissionBase* Mission = Registration.M_Mission.Get();
-		if (not GetIsValidMission(Mission))
-		{
-			DestroyTriggerAreaAndRemoveRegistration(RegistrationIndex);
-			continue;
-		}
-
-		const bool bHasLimitedCallbacks = Registration.M_MaxCallbacks >= 0;
-		if (bHasLimitedCallbacks && Registration.M_MaxCallbacks == 0)
-		{
-			DestroyTriggerAreaAndRemoveRegistration(RegistrationIndex);
-			continue;
-		}
-
-		const float CurrentTimeSeconds = GetWorld()->GetTimeSeconds();
-		const bool bHasPreviousCallbackTime = Registration.M_LastCallbackTime >= 0.0f;
-		if (bHasPreviousCallbackTime && CurrentTimeSeconds - Registration.M_LastCallbackTime < Registration.M_DelayBetweenCallbacks)
-		{
-			continue;
-		}
-
-		Registration.M_LastCallbackTime = CurrentTimeSeconds;
-		Registration.M_CallbackCount++;
-		Mission->OnTriggerAreaCallback(OverlappingActor, Registration.M_TriggerId, TriggerArea);
-
-		const bool bReachedCallbackLimit = bHasLimitedCallbacks && Registration.M_CallbackCount >= Registration.M_MaxCallbacks;
-		if (bReachedCallbackLimit)
-		{
-			DestroyTriggerAreaAndRemoveRegistration(RegistrationIndex);
-		}
+		return;
 	}
 
-	RemoveDestroyedEntries();
+	FMissionTriggerAreaRegistration& Registration = M_RegisteredTriggerAreas[RegistrationIndex];
+	UMissionBase* Mission = Registration.M_Mission.Get();
+	const bool bHasLimitedCallbacks = Registration.M_MaxCallbacks >= 0;
+	if (not GetIsValidMission(Mission) || (bHasLimitedCallbacks && Registration.M_MaxCallbacks == 0))
+	{
+		DestroyTriggerAreaAndRemoveRegistration(RegistrationIndex);
+		return;
+	}
+
+	const float CurrentTimeSeconds = GetWorld()->GetTimeSeconds();
+	const bool bHasPreviousCallbackTime = Registration.M_LastCallbackTime >= 0.0f;
+	if (bHasPreviousCallbackTime && CurrentTimeSeconds - Registration.M_LastCallbackTime < Registration.M_DelayBetweenCallbacks)
+	{
+		return;
+	}
+
+	Registration.M_LastCallbackTime = CurrentTimeSeconds;
+	Registration.M_CallbackCount++;
+	const bool bReachedCallbackLimit = bHasLimitedCallbacks && Registration.M_CallbackCount >= Registration.M_MaxCallbacks;
+	Mission->OnTriggerAreaCallback(OverlappingActor, Registration.M_TriggerId, TriggerArea);
+
+	// Blueprint may have removed this registration or reallocated the array. Never reuse its reference/index.
+	if (bReachedCallbackLimit)
+	{
+		DestroyTriggerAreaAndRemoveRegistration(FindTriggerAreaRegistrationIndex(WeakTriggerArea));
+	}
 }

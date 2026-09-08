@@ -96,6 +96,14 @@ private:
 
 	void RemoveDestroyedEntries();
 	void DestroyTriggerAreaAndRemoveRegistration(const int32 RegistrationIndex);
+	int32 FindTriggerAreaRegistrationIndex(const TWeakObjectPtr<ATriggerArea>& TriggerArea) const;
+
+	/**
+	 * @brief Keeps callback accounting safe when mission Blueprint removes or creates trigger registrations.
+	 * @param OverlappingActor Actor forwarded to the mission callback.
+	 * @param TriggerArea Identifies the registration across callback-driven array mutations.
+	 */
+	void ProcessTriggerAreaOverlap(AActor* OverlappingActor, ATriggerArea* TriggerArea);
 
 	UFUNCTION()
 	void OnTriggerAreaOverlap(AActor* OverlappingActor, ATriggerArea* TriggerArea);

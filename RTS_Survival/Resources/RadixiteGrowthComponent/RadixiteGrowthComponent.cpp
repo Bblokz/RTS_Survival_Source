@@ -622,7 +622,9 @@ void URadixiteGrowthComponent::DestroyAllGrowthContentImmediately()
 		RemoveBranchByIndex(BranchIndex);
 	}
 
-	for (FRadixiteGrowthNodeRecord& NodeRecord : M_GrowthNodes)
+	// OnDestroyed removes nodes from M_GrowthNodes; keep its bookkeeping live but iterate a snapshot.
+	const TArray<FRadixiteGrowthNodeRecord> GrowthNodesToDestroy = M_GrowthNodes;
+	for (const FRadixiteGrowthNodeRecord& NodeRecord : GrowthNodesToDestroy)
 	{
 		if (NodeRecord.bM_IsRootNode)
 		{

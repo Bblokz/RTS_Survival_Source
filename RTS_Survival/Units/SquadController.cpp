@@ -1202,12 +1202,15 @@ void ASquadController::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_SpawningTimer);
 	}
 	// Destroy the squad units
-	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	// Unit teardown can remove entries from the controller's live squad array.
+	const TArray<ASquadUnit*> SquadUnitsToDestroy = M_TSquadUnits;
+	for (ASquadUnit* SquadUnit : SquadUnitsToDestroy)
 	{
-		if (IsValid(SquadUnit))
+		if (not IsValid(SquadUnit))
 		{
-			SquadUnit->Destroy();
+			continue;
 		}
+		SquadUnit->Destroy();
 	}
 	Super::BeginDestroy();
 }

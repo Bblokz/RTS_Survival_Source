@@ -47,9 +47,11 @@ void UBehaviourComp::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 
 	bM_IsTickingBehaviours = true;
 	TArray<TObjectPtr<UBehaviour>> RemovalQueue;
-	for (UBehaviour* Behaviour : M_Behaviours)
+	// A behaviour tick can destroy the owner, whose EndPlay clears the live array.
+	const TArray<TObjectPtr<UBehaviour>> BehavioursToTick = M_Behaviours;
+	for (UBehaviour* Behaviour : BehavioursToTick)
 	{
-		if (Behaviour == nullptr)
+		if (not IsValid(Behaviour) || not M_Behaviours.Contains(Behaviour))
 		{
 			continue;
 		}
@@ -443,7 +445,13 @@ TArray<TObjectPtr<UBehaviour>> UBehaviourComp::FindMatchingBehaviours(const UBeh
 
 void UBehaviourComp::RemoveBehaviourInstance(UBehaviour* BehaviourInstance)
 {
-	if (BehaviourInstance == nullptr)
+	if (not IsValid(BehaviourInstance))
+	{
+		return;
+	}
+
+	// Remove first so callbacks and stale removal queues cannot remove this instance twice.
+	if (M_Behaviours.Remove(BehaviourInstance) == 0)
 	{
 		return;
 	}
@@ -451,7 +459,6 @@ void UBehaviourComp::RemoveBehaviourInstance(UBehaviour* BehaviourInstance)
 	BehaviourInstance->OnRemoved(GetOwner());
 	HandleBehaviourRemovedText(*BehaviourInstance);
 	BehaviourInstance->ConditionalBeginDestroy();
-	M_Behaviours.Remove(BehaviourInstance);
 	NotifyActionUIManagerOfBehaviourUpdate();
 }
 
@@ -474,9 +481,13 @@ UBehaviour* UBehaviourComp::CreateBehaviourInstance(const TSubclassOf<UBehaviour
 
 void UBehaviourComp::ClearAllBehaviours()
 {
-	for (UBehaviour* Behaviour : M_Behaviours)
+	// Blueprint removal callbacks may add/remove behaviours or re-enter this cleanup.
+	TArray<TObjectPtr<UBehaviour>> BehavioursToRemove;
+	Swap(BehavioursToRemove, M_Behaviours);
+	M_BehaviourAnimatedTextStates.Empty();
+	for (UBehaviour* Behaviour : BehavioursToRemove)
 	{
-		if (Behaviour == nullptr)
+		if (not IsValid(Behaviour))
 		{
 			continue;
 		}
@@ -484,9 +495,6 @@ void UBehaviourComp::ClearAllBehaviours()
 		Behaviour->OnRemoved(GetOwner());
 		Behaviour->ConditionalBeginDestroy();
 	}
-
-	M_Behaviours.Empty();
-	M_BehaviourAnimatedTextStates.Empty();
 }
 
 void UBehaviourComp::DebugDrawBehaviours(const float DurationSeconds) const

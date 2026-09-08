@@ -2,7 +2,9 @@
 
 #include "RTSMusicManager.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Sound/SoundBase.h"
 #include "TimerManager.h"
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -14,11 +16,14 @@ void URTSMusicManager::InitMusicManagerTracks(const TArray<FRTSMusicTypes>& InMu
 
 void URTSMusicManager::SetupMusicManagerForNewWorld(
     UObject* InWorldContextObject,
-    const ERTSMusicType MusicTypeStart)
+    const ERTSMusicType MusicTypeStart,
+    const ERTSMusicType MusicPlayedOnExhaustion)
 {
+    TeardownForOldWorld();
     M_WorldContextObject = InWorldContextObject;
     bM_LoopMode          = false;
     M_CurrentMusicType   = MusicTypeStart;
+    ResetMusicExhaustion(MusicPlayedOnExhaustion);
 
     const FRTSMusicTypes* DefPtr = FindMusicDef(MusicTypeStart);
     if (not DefPtr || DefPtr->MusicTracks.Num() == 0)
@@ -33,7 +38,8 @@ void URTSMusicManager::SetupMusicManagerForNewWorld(
 
 void URTSMusicManager::PlayNewMusicTracks(
     const ERTSMusicType NewMusicType,
-    const bool bFade)
+    const bool bFade,
+    const ERTSMusicType MusicPlayedOnExhaustion)
 {
     if (not EnsureValidWorldContext() || not EnsureValidAudioComponent())
     {
@@ -41,7 +47,8 @@ void URTSMusicManager::PlayNewMusicTracks(
     }
     if (M_CurrentMusicType == NewMusicType && M_AudioComponent->IsPlaying())
     {
-        // If the same music type is requested, we can just return.
+        // Keep the current song and progress when updating the same category's fallback.
+        M_MusicPlayedOnExhaustion = MusicPlayedOnExhaustion;
         return;
     }
 
@@ -55,6 +62,7 @@ void URTSMusicManager::PlayNewMusicTracks(
     }
 
     M_CurrentMusicType   = NewMusicType;
+    ResetMusicExhaustion(MusicPlayedOnExhaustion);
     M_CurrentTrackIndex  = GetNextRandomTrackIndex(*DefPtr, M_CurrentTrackIndex);
 
     if (bFade && M_AudioComponent->IsPlaying())
@@ -69,7 +77,8 @@ void URTSMusicManager::PlayNewMusicTracks(
 void URTSMusicManager::PlayMusicLoop(
     const ERTSMusicType NewMusicType,
     const int32 NumLoops,
-    const bool bFadeIntoLoop)
+    const bool bFadeIntoLoop,
+    const ERTSMusicType MusicPlayedOnExhaustion)
 {
     if (not EnsureValidWorldContext() || not EnsureValidAudioComponent())
     {
@@ -84,6 +93,7 @@ void URTSMusicManager::PlayMusicLoop(
     }
 
     SetupLoopState(NewMusicType, NumLoops, bFadeIntoLoop);
+    ResetMusicExhaustion(MusicPlayedOnExhaustion);
     M_CurrentTrackIndex = GetNextRandomTrackIndex(*DefPtr, M_CurrentTrackIndex);
 
     if (bM_LoopFade && M_AudioComponent->IsPlaying())
@@ -98,7 +108,9 @@ void URTSMusicManager::PlayMusicLoop(
 void URTSMusicManager::StopMusic()
 {
     bM_LoopMode = false;
-    if (M_AudioComponent && M_AudioComponent->IsPlaying())
+    ResetMusicExhaustion(ERTSMusicType::None);
+    CancelPendingTrackCompletion();
+    if (M_AudioComponent.Get() && M_AudioComponent->IsPlaying())
     {
         M_AudioComponent->OnAudioFinished.RemoveDynamic(
             this,
@@ -162,15 +174,61 @@ void URTSMusicManager::SetupLoopState(
     M_CurrentMusicType = MusicType;
 }
 
-void URTSMusicManager::StopAndPlayCurrentTrack() const
+void URTSMusicManager::StopAndPlayCurrentTrack()
 {
     if (not EnsureValidAudioComponent())
     {
         return;
     }
 
+    CancelPendingTrackCompletion();
     M_AudioComponent->Stop();
     PlayCurrentTrack();
+}
+
+void URTSMusicManager::CancelPendingTrackCompletion()
+{
+    if (UObject* WorldContextObject = M_WorldContextObject.Get())
+    {
+        if (UWorld* World = WorldContextObject->GetWorld())
+        {
+            World->GetTimerManager().ClearTimer(M_FadeTimerHandle);
+        }
+    }
+
+    if (UAudioComponent* AudioComponent = M_AudioComponent.Get())
+    {
+        AudioComponent->OnAudioFinished.RemoveDynamic(this, &URTSMusicManager::OnTrackFinished);
+    }
+}
+
+void URTSMusicManager::ResetMusicExhaustion(const ERTSMusicType MusicPlayedOnExhaustion)
+{
+    M_MusicPlayedOnExhaustion = MusicPlayedOnExhaustion;
+    M_CompletedTrackIndices.Reset();
+}
+
+bool URTSMusicManager::TryPlayMusicOnExhaustion()
+{
+    if (M_MusicPlayedOnExhaustion == ERTSMusicType::None)
+    {
+        return false;
+    }
+
+    const ERTSMusicType MusicTypeOnExhaustion = M_MusicPlayedOnExhaustion;
+    ResetMusicExhaustion(ERTSMusicType::None);
+    const FRTSMusicTypes* MusicDefinition = FindMusicDef(MusicTypeOnExhaustion);
+    if (not MusicDefinition || MusicDefinition->MusicTracks.IsEmpty())
+    {
+        OnNoMusicForType(MusicTypeOnExhaustion);
+        return false;
+    }
+
+    bM_LoopMode = false;
+    M_CurrentMusicType = MusicTypeOnExhaustion;
+    M_CurrentTrackIndex = GetNextRandomTrackIndex(*MusicDefinition, INDEX_NONE);
+    PlayCurrentTrack();
+    return true;
 }
 
 void URTSMusicManager::FadeOutCurrentTrack()
@@ -180,25 +238,27 @@ void URTSMusicManager::FadeOutCurrentTrack()
         return;
     }
 
-    M_AudioComponent->FadeOut(5.f, 0.f);
-    UWorld* World = GEngine->GetWorldFromContextObjectChecked(M_WorldContextObject);
+    CancelPendingTrackCompletion();
+    constexpr float FadeDurationSeconds = 5.f;
+    M_AudioComponent->FadeOut(FadeDurationSeconds, 0.f);
+    UWorld* World = GEngine->GetWorldFromContextObjectChecked(M_WorldContextObject.Get());
     World->GetTimerManager().SetTimer(
         M_FadeTimerHandle,
         this,
         &URTSMusicManager::OnFadeFinished,
-        5.f,
+        FadeDurationSeconds,
         false
     );
 }
 
-void URTSMusicManager::PlayCurrentTrack() const
+void URTSMusicManager::PlayCurrentTrack()
 {
     PlayTrack(M_CurrentTrackIndex);
 }
 
 void URTSMusicManager::DestroyAudioComponent()
 {
-    if (M_AudioComponent)
+    if (M_AudioComponent.Get())
     {
         M_AudioComponent->OnAudioFinished.RemoveDynamic(
             this,
@@ -218,7 +278,7 @@ bool URTSMusicManager::SetupAudioComponent(USoundBase* SoundToPlay)
 
     DestroyAudioComponent();
 
-    UWorld* World = GEngine->GetWorldFromContextObjectChecked(M_WorldContextObject);
+    UWorld* World = GEngine->GetWorldFromContextObjectChecked(M_WorldContextObject.Get());
     if (not World)
     {
         RTSFunctionLibrary::ReportError(
@@ -238,11 +298,8 @@ bool URTSMusicManager::SetupAudioComponent(USoundBase* SoundToPlay)
         false  // bAutoDestroy
     );
 
-    if (not IsValid(M_AudioComponent))
+    if (not EnsureValidAudioComponent())
     {
-        RTSFunctionLibrary::ReportError(
-            TEXT("RTSMusicManager: failed to spawn audio component.")
-        );
         return false;
     }
 
@@ -269,39 +326,40 @@ void URTSMusicManager::ConfigureAudioComponentForPausedPlayback() const
 
 void URTSMusicManager::OnFadeFinished()
 {
-    PlayTrack(M_CurrentTrackIndex);
+    // FadeOut stops playback; ensure it has stopped before restoring the completion delegate.
+    StopAndPlayCurrentTrack();
 }
 
 void URTSMusicManager::OnTrackFinished()
 {
-    if (bM_LoopMode)
+    if (bM_LoopMode && M_LoopsRemaining > 0)
     {
-        if (M_LoopsRemaining > 0)
-        {
-            --M_LoopsRemaining;
-            PlayCurrentTrack();
-            return;
-        }
-
-        const int32 Next = ChooseNextTrackIndex();
-        if (Next != INDEX_NONE)
-        {
-            M_CurrentTrackIndex = Next;
-            M_LoopsRemaining    = M_LoopCount;
-            PlayCurrentTrack();
-        }
+        --M_LoopsRemaining;
+        PlayCurrentTrack();
         return;
     }
 
-    const int32 Next = ChooseNextTrackIndex();
-    if (Next != INDEX_NONE)
+    M_CompletedTrackIndices.Add(M_CurrentTrackIndex);
+    int32 NextTrackIndex = ChooseNextTrackIndex();
+    if (NextTrackIndex == INDEX_NONE)
     {
-        M_CurrentTrackIndex = Next;
-        PlayCurrentTrack();
+        if (TryPlayMusicOnExhaustion())
+        {
+            return;
+        }
+        NextTrackIndex = ChooseNextTrackIndex();
     }
+    if (NextTrackIndex == INDEX_NONE)
+    {
+        return;
+    }
+
+    M_CurrentTrackIndex = NextTrackIndex;
+    M_LoopsRemaining = M_LoopCount;
+    PlayCurrentTrack();
 }
 
-void URTSMusicManager::PlayTrack(const int32 TrackIndex) const
+void URTSMusicManager::PlayTrack(const int32 TrackIndex)
 {
     if (not EnsureValidAudioComponent())
     {
@@ -317,6 +375,7 @@ void URTSMusicManager::PlayTrack(const int32 TrackIndex) const
     USoundBase* Sound = DefPtr->MusicTracks[TrackIndex];
     if (Sound)
     {
+        M_AudioComponent->OnAudioFinished.AddUniqueDynamic(this, &URTSMusicManager::OnTrackFinished);
         M_AudioComponent->SetSound(Sound);
         M_AudioComponent->Play();
     }
@@ -330,20 +389,30 @@ int32 URTSMusicManager::ChooseNextTrackIndex() const
         return INDEX_NONE;
     }
 
-    const int32 Num = DefPtr->MusicTracks.Num();
-    if (Num <= 1)
+    if (M_MusicPlayedOnExhaustion != ERTSMusicType::None)
     {
-        return Num == 1 ? 0 : INDEX_NONE;
+        return ChooseUnplayedTrackIndex(*DefPtr);
     }
 
-    int32 NewIndex;
-    do
-    {
-        NewIndex = FMath::RandRange(0, Num - 1);
-    }
-    while (NewIndex == M_CurrentTrackIndex);
+    return GetNextRandomTrackIndex(*DefPtr, M_CurrentTrackIndex);
+}
 
-    return NewIndex;
+int32 URTSMusicManager::ChooseUnplayedTrackIndex(const FRTSMusicTypes& MusicDefinition) const
+{
+    TArray<int32> UnplayedTrackIndices;
+    for (int32 TrackIndex = 0; TrackIndex < MusicDefinition.MusicTracks.Num(); ++TrackIndex)
+    {
+        if (not M_CompletedTrackIndices.Contains(TrackIndex))
+        {
+            UnplayedTrackIndices.Add(TrackIndex);
+        }
+    }
+    if (UnplayedTrackIndices.IsEmpty())
+    {
+        return INDEX_NONE;
+    }
+    const int32 RandomIndex = FMath::RandRange(0, UnplayedTrackIndices.Num() - 1);
+    return UnplayedTrackIndices[RandomIndex];
 }
 
 void URTSMusicManager::OnNoMusicForType(ERTSMusicType MusicType)
@@ -356,26 +425,26 @@ void URTSMusicManager::OnNoMusicForType(ERTSMusicType MusicType)
 
 bool URTSMusicManager::EnsureValidWorldContext() const
 {
-    if (IsValid(M_WorldContextObject))
+    if (M_WorldContextObject.IsValid())
     {
         return true;
     }
 
-    RTSFunctionLibrary::ReportError(
-        TEXT("RTSMusicManager: world context not set. Call SetupMusicManagerForNewWorld.")
+    RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+        this, TEXT("M_WorldContextObject"), TEXT("EnsureValidWorldContext"), this
     );
     return false;
 }
 
 bool URTSMusicManager::EnsureValidAudioComponent() const
 {
-    if (IsValid(M_AudioComponent))
+    if (M_AudioComponent.IsValid())
     {
         return true;
     }
 
-    RTSFunctionLibrary::ReportError(
-        TEXT("RTSMusicManager: no valid audio component.")
+    RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+        this, TEXT("M_AudioComponent"), TEXT("EnsureValidAudioComponent"), this
     );
     return false;
 }

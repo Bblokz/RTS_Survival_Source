@@ -207,16 +207,17 @@ void UGlobalAbility::DestroyMarker(UNiagaraComponent* MarkerEffect)
 
 void UGlobalAbility::DestroyAllMarkers()
 {
-	for (int32 MarkerIndex = M_SpawnedMarkerEffects.Num() - 1; MarkerIndex >= 0; --MarkerIndex)
+	// Detach the batch before destruction callbacks can change the tracked markers.
+	TArray<TObjectPtr<UNiagaraComponent>> MarkerEffectsToDestroy;
+	Swap(MarkerEffectsToDestroy, M_SpawnedMarkerEffects);
+	for (UNiagaraComponent* MarkerEffect : MarkerEffectsToDestroy)
 	{
-		UNiagaraComponent* MarkerEffect = M_SpawnedMarkerEffects[MarkerIndex];
-		if (IsValid(MarkerEffect))
+		if (not IsValid(MarkerEffect))
 		{
-			MarkerEffect->DestroyComponent();
+			continue;
 		}
+		MarkerEffect->DestroyComponent();
 	}
-
-	M_SpawnedMarkerEffects.Empty();
 }
 
 void UGlobalAbility::RemoveTrackedMarker(UNiagaraComponent* MarkerEffect)

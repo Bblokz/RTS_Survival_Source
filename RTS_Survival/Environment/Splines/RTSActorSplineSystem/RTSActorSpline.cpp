@@ -144,14 +144,17 @@ void ARTSActorSpline::BuildEditorPreview()
 void ARTSActorSpline::DestroyEditorPreview()
 {
 #if WITH_EDITOR
-	for (UChildActorComponent* Comp : M_PreviewChildActors)
+	// Destroying a child actor can re-enter preview cleanup through its teardown callbacks.
+	TArray<TObjectPtr<UChildActorComponent>> PreviewComponentsToDestroy;
+	Swap(PreviewComponentsToDestroy, M_PreviewChildActors);
+	for (UChildActorComponent* PreviewComponent : PreviewComponentsToDestroy)
 	{
-		if (IsValid(Comp))
+		if (not IsValid(PreviewComponent))
 		{
-			Comp->DestroyComponent();
+			continue;
 		}
+		PreviewComponent->DestroyComponent();
 	}
-	M_PreviewChildActors.Empty();
 #endif
 }
 

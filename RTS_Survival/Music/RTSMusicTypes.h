@@ -4,6 +4,7 @@
 
 #include "RTSMusicTypes.generated.h"
 
+class USoundBase;
 
 UENUM(BlueprintType)
 enum class ERTSMusicType: uint8
@@ -25,6 +26,9 @@ enum class ERTSMusicType: uint8
 	Victory,
 	Defeat,
 	DesertSongs,
+	PostApoNotDesert,
+	TensionOrchestra,
+	CombatOrchestra,
 	
 	
 };

@@ -989,16 +989,23 @@ void ABuildingExpansion::SpawnBuildingAttachments()
 
 void ABuildingExpansion::DestroyBuildingAttachments()
 {
+	// Detach the batch before attachment EndPlay callbacks can change it.
+	TArray<TWeakObjectPtr<AActor>> AttachmentsToDestroy;
+	Swap(AttachmentsToDestroy, M_SpawnedAttachments);
 	// Iterate over all the spawned attachment actors and destroy them
-	for (auto SpawnedActor : M_SpawnedAttachments)
+	for (const TWeakObjectPtr<AActor> SpawnedActor : AttachmentsToDestroy)
 	{
-		if (SpawnedActor.IsValid())
+		if (not SpawnedActor.IsValid())
 		{
-			SpawnedActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-			SpawnedActor->Destroy();
+			continue;
 		}
+		SpawnedActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		if (not SpawnedActor.IsValid())
+		{
+			continue;
+		}
+		SpawnedActor->Destroy();
 	}
-	M_SpawnedAttachments.Empty();
 }
 
 

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "TimerManager.h"
 #include "RTS_Survival/Music/RTSMusicTypes.h"
 #include "RTSMusicManager.generated.h"
 
@@ -66,26 +67,32 @@ public:
      * @brief Set up for a new world and play initial track.
      * @param InWorldContextObject  The context for spawning audio (typically PlayerController).
      * @param MusicTypeStart        Which music type to start immediately.
+     * @param MusicPlayedOnExhaustion Category to switch to after every starting track finishes; None keeps repeating.
      */
     UFUNCTION(BlueprintCallable, Category="Music")
-    void SetupMusicManagerForNewWorld(UObject* InWorldContextObject, ERTSMusicType MusicTypeStart);
+    void SetupMusicManagerForNewWorld(UObject* InWorldContextObject, ERTSMusicType MusicTypeStart,
+        ERTSMusicType MusicPlayedOnExhaustion = ERTSMusicType::None);
 
     /**
      * @brief Switch to a new music category at runtime.
      * @param NewMusicType  Category to play.
      * @param bFade         If true, fade out current track over 5s before switching.
+     * @param MusicPlayedOnExhaustion Category to switch to after every requested track finishes; None keeps repeating.
      */
     UFUNCTION(BlueprintCallable, Category="Music")
-    void PlayNewMusicTracks(ERTSMusicType NewMusicType, bool bFade = false);
+    void PlayNewMusicTracks(ERTSMusicType NewMusicType, bool bFade = false,
+        ERTSMusicType MusicPlayedOnExhaustion = ERTSMusicType::None);
 
     /**
      * @brief Loop the current track a number of extra times, then pick a new one.
      * @param NewMusicType   Category to play.
      * @param NumLoops       Number of extra loops (plays 1 + NumLoops).
      * @param bFadeIntoLoop  If true, fade out before first loop.
+     * @param MusicPlayedOnExhaustion Category to switch to after all tracks and their extra loops finish; None keeps repeating.
      */
     UFUNCTION(BlueprintCallable, Category="Music")
-    void PlayMusicLoop(ERTSMusicType NewMusicType, int32 NumLoops, bool bFadeIntoLoop = false);
+    void PlayMusicLoop(ERTSMusicType NewMusicType, int32 NumLoops, bool bFadeIntoLoop = false,
+        ERTSMusicType MusicPlayedOnExhaustion = ERTSMusicType::None);
 
     /** @brief Stop immediately (no fade) and cancel looping. */
     UFUNCTION(BlueprintCallable, Category="Music")
@@ -106,13 +113,21 @@ private:
     void SetupLoopState(ERTSMusicType MusicType, int32 NumLoops, bool bFadeIntoLoop);
 
     /** @brief Stops current track and immediately plays at M_CurrentTrackIndex. */
-    void StopAndPlayCurrentTrack() const;
+    void StopAndPlayCurrentTrack();
+
+    /** @brief Prevent interrupted audio from advancing the playlist or counting as completed. */
+    void CancelPendingTrackCompletion();
+
+    void ResetMusicExhaustion(ERTSMusicType MusicPlayedOnExhaustion);
+
+    /** @brief Consume the fallback once so its category can repeat normally. */
+    bool TryPlayMusicOnExhaustion();
 
     /** @brief Fades out current track over 5s, then calls OnFadeFinished(). */
     void FadeOutCurrentTrack();
 
     /** @brief Plays the track at M_CurrentTrackIndex on M_AudioComponent. */
-    void PlayCurrentTrack() const;
+    void PlayCurrentTrack();
 
     /** @brief Destroys the existing audio component if any. */
     void DestroyAudioComponent();
@@ -132,10 +147,13 @@ private:
     void OnFadeFinished();
 
     /** @brief Plays the track at the given index (internal). */
-    void PlayTrack(int32 TrackIndex) const;
+    void PlayTrack(int32 TrackIndex);
 
     /** @brief Chooses the next track index for non-looped playback. */
     int32 ChooseNextTrackIndex() const;
+
+    /** @brief Avoid repeats while waiting to exhaust the requested category. */
+    int32 ChooseUnplayedTrackIndex(const FRTSMusicTypes& MusicDefinition) const;
 
     /** @brief Reports error when no tracks exist for MusicType. */
     void OnNoMusicForType(ERTSMusicType MusicType);
@@ -154,16 +172,21 @@ private:
     /** What music type we’re currently playing. */
     ERTSMusicType M_CurrentMusicType = ERTSMusicType::None;
 
+    ERTSMusicType M_MusicPlayedOnExhaustion = ERTSMusicType::None;
+
+    // Track completion, rather than selection, so interrupted songs do not exhaust the category.
+    TSet<int32> M_CompletedTrackIndices;
+
     /** Index within the current music type’s track array. */
     int32 M_CurrentTrackIndex = INDEX_NONE;
 
     /** World context object for spawning sounds & timers. */
     UPROPERTY()
-    UObject* M_WorldContextObject = nullptr;
+    TWeakObjectPtr<UObject> M_WorldContextObject;
 
     /** The currently playing audio component. */
     UPROPERTY()
-    UAudioComponent* M_AudioComponent = nullptr;
+    TWeakObjectPtr<UAudioComponent> M_AudioComponent;
 
     /** Timer handle for fade-out callbacks. */
     FTimerHandle M_FadeTimerHandle;

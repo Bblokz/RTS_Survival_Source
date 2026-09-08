@@ -2424,44 +2424,58 @@ void ANomadicVehicle::CreateNavModifierAttachments()
 
 void ANomadicVehicle::DestroyNavModifierAttachments()
 {
-	for (UBoxComponent* BoxComponent : M_AttachedNavModifiers)
+	TArray<UBoxComponent*> NavModifiersToDestroy;
+	Swap(NavModifiersToDestroy, M_AttachedNavModifiers);
+	for (UBoxComponent* BoxComponent : NavModifiersToDestroy)
 	{
-		if (IsValid(BoxComponent))
+		if (not IsValid(BoxComponent))
 		{
-			BoxComponent->DestroyComponent();
+			continue;
 		}
+		BoxComponent->DestroyComponent();
 	}
-	M_AttachedNavModifiers.Empty();
 }
 
 void ANomadicVehicle::DestroyAllBuildingAttachments()
 {
+	// Detach all batches before any actor/component teardown can re-enter this cleanup.
+	TArray<AActor*> AttachmentsToDestroy;
+	TArray<UNiagaraComponent*> NiagaraSystemsToDestroy;
+	TArray<UAudioComponent*> SoundsToDestroy;
+	Swap(AttachmentsToDestroy, M_SpawnedAttachments);
+	Swap(NiagaraSystemsToDestroy, M_SpawnedNiagaraSystems);
+	Swap(SoundsToDestroy, M_SpawnedSoundCues);
 	// Iterate over all the spawned attachment actors and destroy them
-	for (AActor* SpawnedActor : M_SpawnedAttachments)
+	for (AActor* SpawnedActor : AttachmentsToDestroy)
 	{
-		if (IsValid(SpawnedActor))
+		if (not IsValid(SpawnedActor))
 		{
-			SpawnedActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-			SpawnedActor->Destroy();
+			continue;
 		}
+		SpawnedActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		if (not IsValid(SpawnedActor))
+		{
+			continue;
+		}
+		SpawnedActor->Destroy();
 	}
-	M_SpawnedAttachments.Empty();
 
-	for (const auto NiagaraSystem : M_SpawnedNiagaraSystems)
+	for (UNiagaraComponent* NiagaraSystem : NiagaraSystemsToDestroy)
 	{
-		if (IsValid(NiagaraSystem))
+		if (not IsValid(NiagaraSystem))
 		{
-			NiagaraSystem->DestroyComponent();
+			continue;
 		}
+		NiagaraSystem->DestroyComponent();
 	}
-	M_SpawnedNiagaraSystems.Empty();
 
-	for (const auto Sound : M_SpawnedSoundCues)
+	for (UAudioComponent* Sound : SoundsToDestroy)
 	{
-		if (IsValid(Sound))
+		if (not IsValid(Sound))
 		{
-			Sound->DestroyComponent();
+			continue;
 		}
+		Sound->DestroyComponent();
 	}
 	DestroyNavModifierAttachments();
 }
