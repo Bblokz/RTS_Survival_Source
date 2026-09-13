@@ -4215,7 +4215,9 @@ void ACPPGameState::InitAllGameRocketData()
 void ACPPGameState::InitAllGameStandaloneTurretData()
 {
 	constexpr float BallTurret100mmMaxHealth = 1000.0f;
-	constexpr float BallTurret50mmMaxHealth = 500.0f;
+	constexpr float BallTurret50mmMaxHealth = 400.0f;
+	constexpr float BallTurret85mmMaxHealth = 550.0f;
+	constexpr float RocketTurretMaxHealth = 550.0f;
 	constexpr float BallTurretRotationSpeedDegreesPerSecond = 20.0f;
 	const TArray<FUnitAbilityEntry> StandaloneTurretAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
 		EAbilityID::IdAttack, EAbilityID::IdNoAbility, EAbilityID::IdStop, EAbilityID::IdNoAbility,
@@ -4240,6 +4242,16 @@ void ACPPGameState::InitAllGameStandaloneTurretData()
 	BallTurretData.ResistancesAndDamageMlt =
 		FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BallTurretData.MaxHealth);
 	M_TPlayerStandaloneTurretDataHashMap.Add(EStandaloneTurretSubtype::BallTurret_50mm, BallTurretData);
+
+	BallTurretData.MaxHealth = BallTurret85mmMaxHealth;
+	BallTurretData.ResistancesAndDamageMlt =
+		FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BallTurretData.MaxHealth);
+	M_TPlayerStandaloneTurretDataHashMap.Add(EStandaloneTurretSubtype::BallTurret_85mm, BallTurretData);
+
+	BallTurretData.MaxHealth = RocketTurretMaxHealth;
+	BallTurretData.ResistancesAndDamageMlt =
+		FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BallTurretData.MaxHealth);
+	M_TPlayerStandaloneTurretDataHashMap.Add(EStandaloneTurretSubtype::RocketTurret, BallTurretData);
 	M_TEnemyStandaloneTurretDataHashMap = M_TPlayerStandaloneTurretDataHashMap;
 }
 

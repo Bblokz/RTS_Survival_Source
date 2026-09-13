@@ -8,6 +8,7 @@
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/WorldSubSystem/AnimatedTextWorldSubsystem.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalIcons/AnimatedIconWorldSubsystem.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -44,6 +45,25 @@ UAnimatedTextWidgetPoolManager* FRTS_Statics::GetVerticalAnimatedTextWidgetPoolM
 		}
 	}
 	return nullptr;
+}
+
+UAnimatedIconWidgetPoolManager* FRTS_Statics::GetVerticalAnimatedIconWidgetPoolManager(const UObject* WorldContextObject)
+{
+	if (not IsValid(WorldContextObject))
+	{
+		return nullptr;
+	}
+	UWorld* World = WorldContextObject->GetWorld();
+	if (not IsValid(World))
+	{
+		return nullptr;
+	}
+	UAnimatedIconWorldSubsystem* Subsystem = World->GetSubsystem<UAnimatedIconWorldSubsystem>();
+	if (not IsValid(Subsystem))
+	{
+		return nullptr;
+	}
+	return Subsystem->GetAnimatedIconWidgetPoolManager();
 }
 
 ACPPController* FRTS_Statics::GetRTSController(const UObject* WorldContextObject)

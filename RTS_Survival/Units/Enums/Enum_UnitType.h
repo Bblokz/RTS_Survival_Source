@@ -24,6 +24,8 @@ enum class EStandaloneTurretSubtype : uint8
 	StandaloneTurret_Standard UMETA(DisplayName = "Standalone Turret"),
 	BallTurret_100mm UMETA(DisplayName = "Ball Turret 100mm"),
 	BallTurret_50mm UMETA(DisplayName = "Ball Turret 50mm"),
+	BallTurret_85mm UMETA(DisplayName = "Ball Turret 85mm"),
+	RocketTurret UMETA(DisplayName = "Rocket Turret"),
 };
 
 // When adding a new subtype do not forget to update the GetNomadicSubtypeString function.

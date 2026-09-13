@@ -14,6 +14,7 @@ enum class ERTSFaction : uint8;
 class URTSGameInstance;
 class AMissionManager;
 class UAnimatedTextWidgetPoolManager;
+class UAnimatedIconWidgetPoolManager;
 class UPlayerPortraitManager;
 class AEnemyController;
 class UPlayerAudioController;
@@ -37,6 +38,7 @@ class ARTSAsyncSpawner;
 class UPlayerResourceManager;
 class ACPPController;
 
+/** @brief Gameplay code uses these world-context helpers to access shared RTS services. */
 class RTS_SURVIVAL_API FRTS_Statics
 {
 	FRTS_Statics();
@@ -46,6 +48,7 @@ public:
 
 	// ------------------ World subsystem helpers ------------
 	static UAnimatedTextWidgetPoolManager* GetVerticalAnimatedTextWidgetPoolManager(const UObject* WorldContextObject);
+	static UAnimatedIconWidgetPoolManager* GetVerticalAnimatedIconWidgetPoolManager(const UObject* WorldContextObject);
 
 	// -------------------- Begin Player Related Objects --------------------
 	/** @return A IsValid CPPController or null. */
