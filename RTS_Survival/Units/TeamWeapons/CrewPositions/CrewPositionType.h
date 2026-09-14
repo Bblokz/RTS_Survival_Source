@@ -9,5 +9,6 @@ enum class ECrewPositionType : uint8
 	None UMETA(DisplayName = "None"),
 	Gunner UMETA(DisplayName = "Gunner"),
 	Loader UMETA(DisplayName = "Loader"),
-	Commander UMETA(DisplayName = "Commander")
+	Spotter UMETA(DisplayName = "Spotter"),
+	AdditionalLoader UMETA(DisplayName = "AdditionalLoader")
 };

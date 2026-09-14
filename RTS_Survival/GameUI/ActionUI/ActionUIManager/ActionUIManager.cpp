@@ -17,6 +17,7 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Weapons/Turret/StandaloneTurret/StandaloneTurret.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -476,6 +477,11 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 		Weapons = FRTSWeaponHelpers::GetWeaponsMountedOnTank(Tank);
 		return PropagateWeaponDataToUI(Weapons);
 	}
+	if (AStandaloneTurret* StandaloneTurret = Cast<AStandaloneTurret>(SelectedActor))
+	{
+		Weapons = StandaloneTurret->GetWeapons();
+		return PropagateWeaponDataToUI(Weapons);
+	}
 	if (ASquadController* SquadController = Cast<ASquadController>(SelectedActor); IsValid(SquadController))
 	{
 		Weapons = GetWeaponsOfSquad(SquadController);
@@ -487,7 +493,7 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 		return PropagateWeaponDataToUI(Weapons);
 	}
 	RTSFunctionLibrary::ReportError(
-		"Selected actor is not a tank or squad controller or bxp."
+		"Selected actor is not an aircraft, tank, standalone turret, squad controller, or bxp."
 		"\n at function UActionUIManager::SetupWeaponUIForSelectedActor");
 	return false;
 }
