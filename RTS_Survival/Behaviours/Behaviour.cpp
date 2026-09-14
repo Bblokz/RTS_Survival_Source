@@ -101,6 +101,11 @@ const FRepeatedBehaviourTextSettings& UBehaviour::GetAnimatedTextSettings() cons
 	return AnimatedTextSettings;
 }
 
+const FRepeatedBehaviourIconSettings& UBehaviour::GetAnimatedIconSettings() const
+{
+	return AnimatedIconSettings;
+}
+
 void UBehaviour::InitializeBehaviour(UBehaviourComp* InOwningComponent)
 {
 	M_OwningComponent = InOwningComponent;

@@ -5,21 +5,26 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Behaviour.h"
+#include "Misc/TVariant.h"
 #include "BehaviourComp.generated.h"
 
 class UBehaviour;
 class URTSComponent;
 class UActionUIManager;
 class UAnimatedTextWidgetPoolManager;
+class UAnimatedIconWidgetPoolManager;
 enum class EMutatorClass : uint8;
 enum class ETankSubtype : uint8;
 
-struct FBehaviourCompAnimatedTextState
+/** @brief Stores only the selected display payload and schedules only behaviours that actually repeat. */
+struct FBehaviourCompAnimatedFeedbackState
 {
-	FBehaviourTextSettings TextSettings;
-	EBehaviourRepeatedVerticalTextStrategy RepeatStrategy = EBehaviourRepeatedVerticalTextStrategy::PerAmountRepeats;
+	TWeakObjectPtr<UBehaviour> Behaviour;
+	// Icons are first so icon-only entries never construct or copy a text string.
+	TVariant<FBehaviourIconSettings, FBehaviourTextSettings> DisplaySettings;
 	float RepeatIntervalSeconds = 0.f;
-	float TimeSinceLastTextSeconds = 0.f;
+	double NextDisplayTimeSeconds = 0.0;
+	// INDEX_NONE means infinite; other values count remaining displays after the initial one.
 	int32 RemainingRepeats = 0;
 };
 
@@ -123,6 +128,10 @@ protected:
 	                           FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FBehaviourAnimatedFeedbackTestAccess;
+#endif
+
 	/**
 	 * @brief Apply a deferred refresh-all request made while behaviour ticking was active.
 	 */
@@ -241,22 +250,28 @@ private:
 	void AddRandomMutationFromMutators(const TArray<TSubclassOf<UBehaviour>>& Mutators);
 	bool GetIsValidActionUIManager() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
-	void BeginPlay_InitAnimatedTextWidgetPoolManager();
+	bool GetIsValidAnimatedIconWidgetPoolManager() const;
+	bool EnsureAnimatedTextWidgetPoolManager();
+	bool EnsureAnimatedIconWidgetPoolManager();
+	void HandleBehaviourAddedFeedback(UBehaviour& Behaviour);
 	void HandleBehaviourAddedText(UBehaviour& Behaviour);
-	void HandleBehaviourRemovedText(const UBehaviour& Behaviour);
-	void HandleAnimatedTextTick(const float DeltaTime);
+	void HandleBehaviourAddedIcon(UBehaviour& Behaviour);
+	void HandleBehaviourRemovedFeedback(const UBehaviour& Behaviour);
+	void HandleAnimatedFeedbackTick();
 	/**
-	 * @brief Cache repeat timing so tick processing can re-use settings without re-querying behaviours.
-	 * @param Behaviour Behaviour that owns the animated text settings.
-	 * @param AnimatedTextSettings Source settings to cache.
-	 * @param RemainingRepeats Remaining repeats after the initial display (ignored for infinite repeats).
+	 * @brief Registers only successful displays with actual repeats; neither/one-shot behaviours need no state.
+	 * @param State Weak subject, selected payload and remaining count; INDEX_NONE means infinite repeats.
 	 */
-	void RegisterAnimatedTextState(UBehaviour& Behaviour, const FRepeatedBehaviourTextSettings& AnimatedTextSettings,
-	                               const int32 RemainingRepeats);
-	bool ShouldRegisterAnimatedTextState(const FRepeatedBehaviourTextSettings& AnimatedTextSettings) const;
-	bool ShowAnimatedTextForOwner(const FBehaviourTextSettings& TextSettings) const;
-	bool ShouldRepeatAnimatedText(const FBehaviourCompAnimatedTextState& TextState) const;
-	int32 GetInitialRemainingRepeats(const FRepeatedBehaviourTextSettings& AnimatedTextSettings) const;
+	void RegisterAnimatedFeedbackState(FBehaviourCompAnimatedFeedbackState&& State);
+	/**
+	 * @brief Copies only due displays before callbacks so removal or owner destruction cannot invalidate iteration.
+	 * @param StateIndex Current repeat slot, checked again before access.
+	 * @param NowSeconds Shared world game time for this scheduler pass.
+	 */
+	void AdvanceAnimatedFeedbackState(const int32 StateIndex, const double NowSeconds);
+	bool ShowAnimatedFeedback(const FBehaviourCompAnimatedFeedbackState& State);
+	bool ShowAnimatedTextForOwner(const FBehaviourTextSettings& TextSettings);
+	bool ShowAnimatedIconForOwner(const FBehaviourIconSettings& IconSettings);
 
 	UPROPERTY()
 	TArray<TObjectPtr<UBehaviour>> M_Behaviours;
@@ -286,6 +301,9 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UAnimatedTextWidgetPoolManager> M_AnimatedTextWidgetPoolManager;
 
-	// Tracks animated text repeat timing for each active behaviour.
-	TMap<TWeakObjectPtr<UBehaviour>, FBehaviourCompAnimatedTextState> M_BehaviourAnimatedTextStates;
+	UPROPERTY()
+	TWeakObjectPtr<UAnimatedIconWidgetPoolManager> M_AnimatedIconWidgetPoolManager;
+
+	// One compact scheduler for both display types. Never stores both payloads for a behaviour.
+	TArray<FBehaviourCompAnimatedFeedbackState> M_BehaviourAnimatedFeedbackStates;
 };

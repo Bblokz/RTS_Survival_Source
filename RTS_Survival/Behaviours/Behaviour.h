@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "BehaviourVerticalTextSettings/BehaviourVerticalTextSettings.h"
+#include "BehaviourVerticalIconSettings/BehaviourVerticalIconSettings.h"
 #include "BuffDebuffType/BuffDebuffType.h"
 #include "Lifetime/BehaviourLifeTime.h"
 #include "StackRule/BehaviourStackRule.h"
@@ -50,6 +51,7 @@ public:
 	bool UsesTick() const;
 	bool IsTimedBehaviour() const;
 	const FRepeatedBehaviourTextSettings& GetAnimatedTextSettings() const;
+	const FRepeatedBehaviourIconSettings& GetAnimatedIconSettings() const;
 
 	void InitializeBehaviour(UBehaviourComp* InOwningComponent);
 	void RefreshLifetime();
@@ -65,6 +67,9 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour|AnimatedText")
 	FRepeatedBehaviourTextSettings AnimatedTextSettings;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Behaviour|AnimatedIcons")
+	FRepeatedBehaviourIconSettings AnimatedIconSettings;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Behaviour")
 	EBehaviourLifeTime BehaviourLifeTime = EBehaviourLifeTime::None;
@@ -100,6 +105,10 @@ protected:
 	void BP_OnRemoved(AActor* BehaviourOwner);
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FBehaviourAnimatedFeedbackTestAccess;
+#endif
+
 	UPROPERTY()
 	TWeakObjectPtr<UBehaviourComp> M_OwningComponent;
 

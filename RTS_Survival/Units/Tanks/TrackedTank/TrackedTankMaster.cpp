@@ -103,7 +103,7 @@ void ATrackedTankMaster::SetRTSOverlapEvasionEnabled(const bool bEnabled)
 
 bool ATrackedTankMaster::DoesVehicleHaveAnyWeapons() const
 {
-	return not (Turrets.IsEmpty() || HullWeapons.IsEmpty());
+	return not (Turrets.IsEmpty() && HullWeapons.IsEmpty());
 }
 
 void ATrackedTankMaster::OnFinishedPathFollowing()

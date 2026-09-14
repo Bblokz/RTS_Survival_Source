@@ -21,6 +21,9 @@ struct FStandaloneTurretData
 	float TurretRotationSpeedDegreesPerSecond = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly)
+	float VisionRadius = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly)
 	FResistanceAndDamageReductionData ResistancesAndDamageMlt;
 
 	UPROPERTY(BlueprintReadOnly)

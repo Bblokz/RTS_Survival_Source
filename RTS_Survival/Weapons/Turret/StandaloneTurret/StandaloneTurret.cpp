@@ -16,6 +16,7 @@
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -107,6 +108,7 @@ void AStandaloneTurret::PostInitializeComponents()
 	}
 
 	RTSComponent->SetStandaloneTurretSubtype(M_StandaloneTurretSubtype);
+	PostInit_FindFowComponent();
 	BP_PostInit();
 }
 
@@ -159,10 +161,21 @@ void AStandaloneTurret::BeginPlay_SetupUnitData()
 
 	M_RotationSettings.YawTurnRateDegreesPerSecond =
 		StandaloneTurretData.TurretRotationSpeedDegreesPerSecond;
+	if (GetIsValidFowComponent())
+	{
+		FowComponent->SetVisionRadius(StandaloneTurretData.VisionRadius);
+	}
+
 	InitAbilityArray(StandaloneTurretData.Abilities);
 	HealthComponent->InitHealthAndResistance(
 		StandaloneTurretData.ResistancesAndDamageMlt,
 		StandaloneTurretData.MaxHealth);
+}
+
+void AStandaloneTurret::PostInit_FindFowComponent()
+{
+	FowComponent = FindComponentByClass<UFowComp>();
+	(void)GetIsValidFowComponent();
 }
 
 void AStandaloneTurret::BeginPlay_InitAnimationInstance()
@@ -1433,7 +1446,19 @@ void AStandaloneTurret::PlayWeaponAnimation(
 		return;
 	}
 
-	BP_PlayWeaponAnimation(WeaponIndex, FireMode);
+	switch (FireMode)
+	{
+	case EWeaponFireMode::Single:
+		BP_OnPlaySingleFireAnimation(WeaponIndex);
+		return;
+	case EWeaponFireMode::SingleBurst:
+	case EWeaponFireMode::RandomBurst:
+		BP_OnPlayBurstAnimation(WeaponIndex);
+		return;
+	default:
+		BP_PlayWeaponAnimation(WeaponIndex, FireMode);
+		return;
+	}
 }
 
 void AStandaloneTurret::OnReloadStart(const int32 WeaponIndex, const float ReloadTime)

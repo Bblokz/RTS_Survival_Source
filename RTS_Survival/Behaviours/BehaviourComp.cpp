@@ -6,6 +6,7 @@
 #include "Mutators/MutatorSettings.h"
 #include "DrawDebugHelpers.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalIcons/AnimatedIconWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -30,7 +31,6 @@ void UBehaviourComp::BeginPlay()
 {
 	Super::BeginPlay();
 
-	BeginPlay_InitAnimatedTextWidgetPoolManager();
 	BeginPlay_InitMutations();
 	UpdateComponentTickEnabled();
 }
@@ -67,7 +67,7 @@ void UBehaviourComp::TickComponent(float DeltaTime, ELevelTick TickType, FActorC
 		RemoveBehaviourInstance(BehaviourToRemove);
 	}
 
-	HandleAnimatedTextTick(DeltaTime);
+	HandleAnimatedFeedbackTick();
 	ProcessPendingOperations();
 	UpdateComponentTickEnabled();
 }
@@ -280,7 +280,7 @@ void UBehaviourComp::HandleBehaviourTick(const float DeltaTime, UBehaviour& Beha
 
 bool UBehaviourComp::ShouldComponentTick() const
 {
-	if (M_BehaviourAnimatedTextStates.Num() > 0)
+	if (not M_BehaviourAnimatedFeedbackStates.IsEmpty())
 	{
 		return true;
 	}
@@ -413,7 +413,10 @@ void UBehaviourComp::AddInitialisedBehaviour(UBehaviour* NewBehaviour)
 	NewBehaviour->InitializeBehaviour(this);
 	M_Behaviours.Add(NewBehaviour);
 	NewBehaviour->OnAdded(GetOwner());
-	HandleBehaviourAddedText(*NewBehaviour);
+	if (IsValid(NewBehaviour) && M_Behaviours.Contains(NewBehaviour))
+	{
+		HandleBehaviourAddedFeedback(*NewBehaviour);
+	}
 	UpdateComponentTickEnabled();
 }
 
@@ -456,8 +459,8 @@ void UBehaviourComp::RemoveBehaviourInstance(UBehaviour* BehaviourInstance)
 		return;
 	}
 
+	HandleBehaviourRemovedFeedback(*BehaviourInstance);
 	BehaviourInstance->OnRemoved(GetOwner());
-	HandleBehaviourRemovedText(*BehaviourInstance);
 	BehaviourInstance->ConditionalBeginDestroy();
 	NotifyActionUIManagerOfBehaviourUpdate();
 }
@@ -484,7 +487,7 @@ void UBehaviourComp::ClearAllBehaviours()
 	// Blueprint removal callbacks may add/remove behaviours or re-enter this cleanup.
 	TArray<TObjectPtr<UBehaviour>> BehavioursToRemove;
 	Swap(BehavioursToRemove, M_Behaviours);
-	M_BehaviourAnimatedTextStates.Empty();
+	M_BehaviourAnimatedFeedbackStates.Reset();
 	for (UBehaviour* Behaviour : BehavioursToRemove)
 	{
 		if (not IsValid(Behaviour))
@@ -792,173 +795,215 @@ bool UBehaviourComp::GetIsValidAnimatedTextWidgetPoolManager() const
 	{
 		return true;
 	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
-		this,
-		"M_AnimatedTextWidgetPoolManager",
-		"UBehaviourComp::GetIsValidAnimatedTextWidgetPoolManager",
-		GetOwner());
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, TEXT("M_AnimatedTextWidgetPoolManager"),
+		TEXT("GetIsValidAnimatedTextWidgetPoolManager"), this);
 	return false;
 }
 
-void UBehaviourComp::BeginPlay_InitAnimatedTextWidgetPoolManager()
+bool UBehaviourComp::GetIsValidAnimatedIconWidgetPoolManager() const
 {
-	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+	if (M_AnimatedIconWidgetPoolManager.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, TEXT("M_AnimatedIconWidgetPoolManager"),
+		TEXT("GetIsValidAnimatedIconWidgetPoolManager"), this);
+	return false;
+}
+
+bool UBehaviourComp::EnsureAnimatedTextWidgetPoolManager()
+{
+	const UAnimatedTextWidgetPoolManager* CachedManager = M_AnimatedTextWidgetPoolManager.Get();
+	if (not IsValid(CachedManager))
+	{
+		M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+	}
+	return GetIsValidAnimatedTextWidgetPoolManager();
+}
+
+bool UBehaviourComp::EnsureAnimatedIconWidgetPoolManager()
+{
+	const UAnimatedIconWidgetPoolManager* CachedManager = M_AnimatedIconWidgetPoolManager.Get();
+	if (not IsValid(CachedManager))
+	{
+		M_AnimatedIconWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedIconWidgetPoolManager(this);
+	}
+	return GetIsValidAnimatedIconWidgetPoolManager();
+}
+
+void UBehaviourComp::HandleBehaviourAddedFeedback(UBehaviour& Behaviour)
+{
+	if (Behaviour.GetAnimatedIconSettings().IconSettings.bUseIcons)
+	{
+		HandleBehaviourAddedIcon(Behaviour);
+		return;
+	}
+	HandleBehaviourAddedText(Behaviour);
 }
 
 void UBehaviourComp::HandleBehaviourAddedText(UBehaviour& Behaviour)
 {
-	const FRepeatedBehaviourTextSettings& AnimatedTextSettings = Behaviour.GetAnimatedTextSettings();
-	if (not AnimatedTextSettings.TextSettings.bUseText)
+	const FRepeatedBehaviourTextSettings& Settings = Behaviour.GetAnimatedTextSettings();
+	if (not Settings.TextSettings.bUseText)
 	{
 		return;
 	}
 
-	if (not GetIsValidAnimatedTextWidgetPoolManager())
+	FBehaviourCompAnimatedFeedbackState State;
+	State.Behaviour = &Behaviour;
+	State.DisplaySettings.Set<FBehaviourTextSettings>(Settings.TextSettings);
+	State.RepeatIntervalSeconds = Settings.RepeatInterval;
+	State.RemainingRepeats = Settings.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::InfiniteRepeats
+		? INDEX_NONE : FMath::Max(1, Settings.AmountRepeats) - 1;
+	if (not ShowAnimatedFeedback(State))
 	{
 		return;
 	}
-
-	if (not ShowAnimatedTextForOwner(AnimatedTextSettings.TextSettings))
-	{
-		return;
-	}
-
-	if (not ShouldRegisterAnimatedTextState(AnimatedTextSettings))
-	{
-		return;
-	}
-
-	const int32 RemainingRepeats = GetInitialRemainingRepeats(AnimatedTextSettings);
-	RegisterAnimatedTextState(Behaviour, AnimatedTextSettings, RemainingRepeats);
+	RegisterAnimatedFeedbackState(MoveTemp(State));
 }
 
-void UBehaviourComp::HandleBehaviourRemovedText(const UBehaviour& Behaviour)
+void UBehaviourComp::HandleBehaviourAddedIcon(UBehaviour& Behaviour)
 {
-	M_BehaviourAnimatedTextStates.Remove(&Behaviour);
+	const FRepeatedBehaviourIconSettings& Settings = Behaviour.GetAnimatedIconSettings();
+	FBehaviourCompAnimatedFeedbackState State;
+	State.Behaviour = &Behaviour;
+	State.DisplaySettings.Set<FBehaviourIconSettings>(Settings.IconSettings);
+	State.RepeatIntervalSeconds = Settings.RepeatInterval;
+	State.RemainingRepeats = Settings.RepeatStrategy == EBehaviourRepeatedVerticalIconStrategy::InfiniteRepeats
+		? INDEX_NONE : FMath::Max(1, Settings.AmountRepeats) - 1;
+	if (not ShowAnimatedFeedback(State))
+	{
+		return;
+	}
+	RegisterAnimatedFeedbackState(MoveTemp(State));
 }
 
-void UBehaviourComp::HandleAnimatedTextTick(const float DeltaTime)
+void UBehaviourComp::RegisterAnimatedFeedbackState(FBehaviourCompAnimatedFeedbackState&& State)
 {
-	if (M_BehaviourAnimatedTextStates.IsEmpty())
+	UBehaviour* Behaviour = State.Behaviour.Get();
+	if (State.RemainingRepeats == 0 || not FMath::IsFinite(State.RepeatIntervalSeconds)
+		|| State.RepeatIntervalSeconds <= 0.0f || not IsValid(Behaviour) || not M_Behaviours.Contains(Behaviour))
+	{
+		return;
+	}
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	State.NextDisplayTimeSeconds = World->GetTimeSeconds() + static_cast<double>(State.RepeatIntervalSeconds);
+	M_BehaviourAnimatedFeedbackStates.Add(MoveTemp(State));
+}
+
+void UBehaviourComp::HandleBehaviourRemovedFeedback(const UBehaviour& Behaviour)
+{
+	const TWeakObjectPtr<const UBehaviour> RemovedBehaviour = &Behaviour;
+	M_BehaviourAnimatedFeedbackStates.RemoveAllSwap(
+		[RemovedBehaviour](const FBehaviourCompAnimatedFeedbackState& State)
+		{
+			return State.Behaviour == RemovedBehaviour;
+		}, EAllowShrinking::No);
+}
+
+void UBehaviourComp::HandleAnimatedFeedbackTick()
+{
+	if (M_BehaviourAnimatedFeedbackStates.IsEmpty())
+	{
+		return;
+	}
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
 	{
 		return;
 	}
 
-	if (not GetIsValidAnimatedTextWidgetPoolManager())
+	// Widget callbacks may request behaviour mutations. Defer those like gameplay OnTick mutations.
+	TGuardValue<bool> FeedbackTickGuard(bM_IsTickingBehaviours, true);
+	const double NowSeconds = World->GetTimeSeconds();
+	for (int32 StateIndex = M_BehaviourAnimatedFeedbackStates.Num() - 1; StateIndex >= 0; --StateIndex)
+	{
+		AdvanceAnimatedFeedbackState(StateIndex, NowSeconds);
+	}
+}
+
+void UBehaviourComp::AdvanceAnimatedFeedbackState(const int32 StateIndex, const double NowSeconds)
+{
+	// Owner destruction can clear the entire scheduler during a widget visibility callback.
+	if (not M_BehaviourAnimatedFeedbackStates.IsValidIndex(StateIndex))
+	{
+		return;
+	}
+	FBehaviourCompAnimatedFeedbackState& State = M_BehaviourAnimatedFeedbackStates[StateIndex];
+	if (not State.Behaviour.IsValid())
+	{
+		M_BehaviourAnimatedFeedbackStates.RemoveAtSwap(StateIndex, 1, EAllowShrinking::No);
+		return;
+	}
+	if (NowSeconds < State.NextDisplayTimeSeconds)
 	{
 		return;
 	}
 
-	for (auto It = M_BehaviourAnimatedTextStates.CreateIterator(); It; ++It)
+	// Copy only when due. No array-held reference is used after calling the widget pool.
+	const FBehaviourCompAnimatedFeedbackState DisplayState = State;
+	State.NextDisplayTimeSeconds = NowSeconds + State.RepeatIntervalSeconds;
+	if (State.RemainingRepeats > 0)
 	{
-		const TWeakObjectPtr<UBehaviour> WeakBehaviour = It.Key();
-		if (not WeakBehaviour.IsValid())
-		{
-			It.RemoveCurrent();
-			continue;
-		}
-
-		FBehaviourCompAnimatedTextState& TextState = It.Value();
-		TextState.TimeSinceLastTextSeconds += DeltaTime;
-		if (TextState.TimeSinceLastTextSeconds < TextState.RepeatIntervalSeconds)
-		{
-			continue;
-		}
-
-		TextState.TimeSinceLastTextSeconds = 0.f;
-		if (not ShouldRepeatAnimatedText(TextState))
-		{
-			It.RemoveCurrent();
-			continue;
-		}
-
-		if (not ShowAnimatedTextForOwner(TextState.TextSettings))
-		{
-			It.RemoveCurrent();
-			continue;
-		}
-
-		if (TextState.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::PerAmountRepeats)
-		{
-			TextState.RemainingRepeats -= 1;
-			if (TextState.RemainingRepeats <= 0)
-			{
-				It.RemoveCurrent();
-			}
-		}
+		--State.RemainingRepeats;
 	}
+	if (State.RemainingRepeats == 0)
+	{
+		M_BehaviourAnimatedFeedbackStates.RemoveAtSwap(StateIndex, 1, EAllowShrinking::No);
+	}
+	if (ShowAnimatedFeedback(DisplayState))
+	{
+		return;
+	}
+	const TWeakObjectPtr<UBehaviour> FailedBehaviour = DisplayState.Behaviour;
+	M_BehaviourAnimatedFeedbackStates.RemoveAllSwap(
+		[FailedBehaviour](const FBehaviourCompAnimatedFeedbackState& RemainingState)
+		{
+			return RemainingState.Behaviour == FailedBehaviour;
+		}, EAllowShrinking::No);
 }
 
-void UBehaviourComp::RegisterAnimatedTextState(
-	UBehaviour& Behaviour,
-	const FRepeatedBehaviourTextSettings& AnimatedTextSettings,
-	const int32 RemainingRepeats)
+bool UBehaviourComp::ShowAnimatedFeedback(const FBehaviourCompAnimatedFeedbackState& State)
 {
-	FBehaviourCompAnimatedTextState TextState;
-	TextState.TextSettings = AnimatedTextSettings.TextSettings;
-	TextState.RepeatStrategy = AnimatedTextSettings.RepeatStrategy;
-	TextState.RepeatIntervalSeconds = AnimatedTextSettings.RepeatInterval;
-	TextState.TimeSinceLastTextSeconds = 0.f;
-	TextState.RemainingRepeats = RemainingRepeats;
-	M_BehaviourAnimatedTextStates.Add(&Behaviour, MoveTemp(TextState));
+	if (State.DisplaySettings.IsType<FBehaviourIconSettings>())
+	{
+		return ShowAnimatedIconForOwner(State.DisplaySettings.Get<FBehaviourIconSettings>());
+	}
+	return ShowAnimatedTextForOwner(State.DisplaySettings.Get<FBehaviourTextSettings>());
 }
 
-bool UBehaviourComp::ShouldRegisterAnimatedTextState(const FRepeatedBehaviourTextSettings& AnimatedTextSettings) const
+bool UBehaviourComp::ShowAnimatedTextForOwner(const FBehaviourTextSettings& TextSettings)
 {
-	if (AnimatedTextSettings.RepeatInterval <= 0.f)
-	{
-		return false;
-	}
-
-	if (AnimatedTextSettings.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::InfiniteRepeats)
-	{
-		return true;
-	}
-
-	return AnimatedTextSettings.AmountRepeats > 1;
-}
-
-bool UBehaviourComp::ShowAnimatedTextForOwner(const FBehaviourTextSettings& TextSettings) const
-{
-	if (not GetIsValidAnimatedTextWidgetPoolManager())
-	{
-		return false;
-	}
-
 	AActor* Owner = GetOwner();
-	if (not IsValid(Owner))
+	if (not IsValid(Owner) || not EnsureAnimatedTextWidgetPoolManager())
 	{
 		return false;
 	}
-
 	return M_AnimatedTextWidgetPoolManager->ShowAnimatedTextAttachedToActor(
-		TextSettings.TextOnSubjects,
-		Owner,
-		TextSettings.TextOffset,
-		TextSettings.bAutoWrap,
-		TextSettings.InWrapAt,
-		TextSettings.InJustification,
-		TextSettings.InSettings);
+		TextSettings.TextOnSubjects, Owner, TextSettings.TextOffset, TextSettings.bAutoWrap,
+		TextSettings.InWrapAt, TextSettings.InJustification, TextSettings.InSettings);
 }
 
-bool UBehaviourComp::ShouldRepeatAnimatedText(const FBehaviourCompAnimatedTextState& TextState) const
+bool UBehaviourComp::ShowAnimatedIconForOwner(const FBehaviourIconSettings& IconSettings)
 {
-	if (TextState.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::InfiniteRepeats)
+	if (IconSettings.IconType == ERTSVerticalAnimatedIcon::None)
 	{
-		return true;
+		return false;
 	}
-
-	return TextState.RemainingRepeats > 0;
-}
-
-int32 UBehaviourComp::GetInitialRemainingRepeats(const FRepeatedBehaviourTextSettings& AnimatedTextSettings) const
-{
-	if (AnimatedTextSettings.RepeatStrategy == EBehaviourRepeatedVerticalTextStrategy::InfiniteRepeats)
+	AActor* Owner = GetOwner();
+	if (not IsValid(Owner) || not EnsureAnimatedIconWidgetPoolManager())
 	{
-		return 0;
+		return false;
 	}
-
-	const int32 RemainingRepeats = AnimatedTextSettings.AmountRepeats - 1;
-	return RemainingRepeats > 0 ? RemainingRepeats : 0;
+	if (IconSettings.bOverrideAnimationSettings)
+	{
+		return M_AnimatedIconWidgetPoolManager->ShowAnimatedIconAttachedToActorWithSettings(
+			IconSettings.IconType, Owner, IconSettings.LocalOffset, IconSettings.AnimationSettings);
+	}
+	return M_AnimatedIconWidgetPoolManager->ShowAnimatedIconAttachedToActor(
+		IconSettings.IconType, Owner, IconSettings.LocalOffset);
 }

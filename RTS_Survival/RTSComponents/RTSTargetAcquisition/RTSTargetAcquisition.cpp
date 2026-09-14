@@ -122,19 +122,34 @@ ETargetPreference URTSTargetAcquisition::GetOwnerTargetPreference() const
 
 void URTSTargetAcquisition::OnTargetsFound(const TArray<AActor*>& Targets)
 {
-	if (not CanAggroEnemies())
+	if (not CanAggroEnemies() || not EnsureIsValidRTSComponent())
 	{
+		return;
+	}
+	if (M_OwnerRTSComponent->GetOwningPlayer() == 1)
+	{
+		
+		for (AActor* Target : Targets)
+		{
+			if (RTSFunctionLibrary::RTSIsVisibleTarget(Target, GetOwningPlayer()))
+			{
+				// preserves turret state changes; stores target in struct internally 	
+				IssueAttackClosestVisibleTargetInAggroRange(Target);
+				return;
+			}
+		}
 		return;
 	}
 	for (AActor* Target : Targets)
 	{
-		if (RTSFunctionLibrary::RTSIsVisibleTarget(Target, GetOwningPlayer()))
+		if (RTSFunctionLibrary::RTSIsValid(Target))
 		{
 			// preserves turret state changes; stores target in struct internally 	
 			IssueAttackClosestVisibleTargetInAggroRange(Target);
 			return;
 		}
 	}
+	
 }
 
 int32 URTSTargetAcquisition::GetOwningPlayer() const

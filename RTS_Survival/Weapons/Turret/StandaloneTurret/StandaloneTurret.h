@@ -230,6 +230,12 @@ protected:
 	void BP_PlayWeaponAnimation(int32 WeaponIndex, EWeaponFireMode FireMode);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Standalone Turret|Weapon")
+	void BP_OnPlaySingleFireAnimation(int32 WeaponIndex);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Standalone Turret|Weapon")
+	void BP_OnPlayBurstAnimation(int32 WeaponIndex);
+
+	UFUNCTION(BlueprintImplementableEvent, Category="Standalone Turret|Weapon")
 	void BP_ReloadWeapon(int32 WeaponIndex, float ReloadTime);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Standalone Turret|Weapon")
@@ -410,6 +416,7 @@ private:
 	void BeginPlay_InitRotationAudioComponent();
 	void BeginPlay_SetupUnitData();
 	void BeginPlay_InitTargetingAndCollision();
+	void PostInit_FindFowComponent();
 	void BeginPlay_BindMutualDestructionListeners();
 	void UnbindMutualDestructionListeners();
 	void HandleMutualDestructionActorDied();

@@ -1886,7 +1886,7 @@ namespace DeveloperSettings
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;
-		constexpr bool GTargetAcquisition_Compile_DebugSymbols = false;
+		constexpr bool GTargetAcquisition_Compile_DebugSymbols = true;
 		constexpr bool GAOELibrary_Compile_DebugSymbols = false;
 		// Damage taken on actors
 		constexpr bool GDamage_System_Compile_DebugSymbols = false;
@@ -1906,7 +1906,7 @@ namespace DeveloperSettings
 		constexpr bool GPlayerClickAndAction_Compile_DebugSymbols = false;
 		constexpr bool GPlayerSelection_Compile_DebugSymbols = false;
 		// Harvesting
-		constexpr bool GHarvestResources_Compile_DebugSymbols = true;
+		constexpr bool GHarvestResources_Compile_DebugSymbols = false;
 		constexpr bool ResourcesShowOccupyingHarvesters = false;
 		constexpr bool GWeapon_ArmorPen_Compile_DebugSymbols = false;
 		constexpr bool GArmorCalculation_Compile_DebugSymbols = false;

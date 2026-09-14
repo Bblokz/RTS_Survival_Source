@@ -92,6 +92,40 @@ do not load the catalog or allocate the pool.
 
 ## Animation and ownership
 
+### Behaviour feedback
+
+In a Behaviour Blueprint, use **Behaviour > Animated Icons > Animated Icon
+Settings**. Inside **Icon Settings**, enable **Use Icons** (disabled by default),
+choose the icon enum and actor-local offset. The catalog supplies appearance and
+animation defaults; enable **Override Animation Settings** to supply visible
+duration, fade duration and world-Z travel for this behaviour.
+
+Choose a finite repeat count (including the initial display) or infinite repeats,
+and set Repeat Interval. One or fewer displays, or a nonpositive/nonfinite
+interval, creates no repeated work. Repeats automatically keep BehaviourComp
+ticking; **Uses Tick** is only needed for gameplay OnTick logic. The existing
+two-second component cadence bounds repeat precision. A long frame produces at
+most one repeat per behaviour; the next deadline starts from that display.
+
+Selection happens when a behaviour is added: enabled icons take precedence and
+skip text entirely, even if the icon is None or unavailable. Otherwise enabled
+text is used; if both are disabled there is no feedback. Existing text settings
+and Blueprint property paths are preserved. Selection/settings are cached for
+that behaviour instance's repeats; re-add/refresh-all to apply edited settings.
+
+Both display types share one compact repeat array with a variant holding only
+the selected payload. Only repeating behaviours are stored; no-text/no-icon and
+one-shot behaviours have no scheduler entry. Pool managers are resolved lazily
+only for the selected type. A repeat does not read either enable flag again, and
+only due entries dispatch to their pool. There are no per-behaviour timers or
+new per-frame behaviour updates. Removal, expiry and cleanup stop future repeats;
+already displayed icons/text finish their pooled animations normally.
+
+Run `RTS.Behaviours.AnimatedFeedback` for disabled-default, precedence, finite
+repeat, cached-selection and cleanup coverage.
+
+### Pool lifecycle
+
 One bounded pool serves all icon types. When full, the oldest active slot is
 restarted; no widget or component is created on a Show call. Text and resource
 text pools remain independent. Slate widget trees are also built during prewarming

@@ -60,7 +60,7 @@ struct RTS_SURVIVAL_API FRepeatedBehaviourTextSettings
 	EBehaviourRepeatedVerticalTextStrategy RepeatStrategy = EBehaviourRepeatedVerticalTextStrategy::PerAmountRepeats;
 
 	// if set to one or lower it will not fire a timer but instantly create the text and that is it.
-	// Note that if this is set to more than one the behaviour should also be set to tick so it can calculate when to show the text again.
+	// BehaviourComp enables repeat scheduling automatically; the behaviour does not need to opt into gameplay OnTick.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Animated Text")
 	int32 AmountRepeats = 1;
 

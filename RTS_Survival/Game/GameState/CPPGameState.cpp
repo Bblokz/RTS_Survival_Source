@@ -2604,6 +2604,31 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ba12_23MM, WeaponData);
 
+	// AM-23 23mm autocannon, using APCR only.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::AM_23;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_APCR;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APCR};
+	WeaponData.WeaponCalibre = 23.f;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = 30.f;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = BasicSmallArmsRange + 250.f;
+	WeaponData.ArmorPen = 90.f;
+	WeaponData.ArmorPenMaxRange = 80.f;
+	WeaponData.MagCapacity = 12;
+	WeaponData.ReloadSpeed = 6.f;
+	WeaponData.BaseCooldown = 0.15f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 65.f;
+	WeaponData.ShrapnelRange = 0.f;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = 0.f;
+	WeaponData.ShrapnelPen = 0.f;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::AM_23, WeaponData);
+
 	// NS-37 (37mm flak/aircraft)
 	WeaponData.WeaponName = EWeaponName::NS_37MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -4233,6 +4258,7 @@ void ACPPGameState::InitAllGameStandaloneTurretData()
 	FStandaloneTurretData BallTurretData;
 	BallTurretData.MaxHealth = BallTurret100mmMaxHealth;
 	BallTurretData.TurretRotationSpeedDegreesPerSecond = BallTurretRotationSpeedDegreesPerSecond;
+	BallTurretData.VisionRadius = DeveloperSettings::GameBalance::VisionRadii::UnitVision::T3TankVisionRadius;
 	BallTurretData.Abilities = StandaloneTurretAbilities;
 	BallTurretData.ResistancesAndDamageMlt =
 		FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BallTurretData.MaxHealth);
