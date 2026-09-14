@@ -517,6 +517,11 @@ void ACPPTurretsMaster::OnProjectileHit(const bool bBounced)
 void ACPPTurretsMaster::OnReloadStart(const int32 WeaponIndex, const float ReloadTime)
 {
 	ReloadWeapon(WeaponIndex, ReloadTime);
+
+	if (TurretOwner)
+	{
+		TurretOwner->OnTurretWeaponReloadStart(this, WeaponIndex, ReloadTime);
+	}
 }
 
 void ACPPTurretsMaster::OnReloadFinished(const int32 /*WeaponIndex*/)

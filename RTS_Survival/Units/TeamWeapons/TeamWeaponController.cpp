@@ -24,6 +24,8 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
 
 namespace TeamWeaponControllerCrewPositionStatics
 {
@@ -38,6 +40,45 @@ namespace TeamWeaponControllerCrewPositionStatics
 		}
 
 		SquadUnit->ExecuteMoveToSelfPathFinding(TargetLocation, EAbilityID::IdMove, true);
+	}
+}
+
+namespace TeamWeaponCrewAnimationStatics
+{
+	// Crew animations follow the first weapon only; team weapons are assumed to carry a single weapon.
+	constexpr int32 PrimaryWeaponIndex = 0;
+	// Below this planar speed an operator standing inside its crew position radius counts as settled.
+	constexpr float SettledSpeedThresholdCmPerSec = 5.0f;
+
+	void PrintCrewAnimDebug(const FString& Message)
+	{
+		if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+		{
+			RTSFunctionLibrary::PrintString(Message, FColor::Cyan);
+		}
+	}
+
+	USquadUnitAnimInstance* GetOperatorAnimInstanceNoReport(const FTeamWeaponCrewAnimationSlot& Slot)
+	{
+		const ASquadUnit* Operator = Slot.M_Operator.Get();
+		if (not IsValid(Operator))
+		{
+			return nullptr;
+		}
+		USquadUnitAnimInstance* AnimInstance = Operator->GetAnimBP_SquadUnit();
+		if (not IsValid(AnimInstance))
+		{
+			return nullptr;
+		}
+		return AnimInstance;
+	}
+
+	bool GetIsSameCrewAnimationAssignment(const FTeamWeaponCrewAnimationSlot& LeftSlot,
+	                                      const FTeamWeaponCrewAnimationSlot& RightSlot)
+	{
+		return LeftSlot.M_Operator == RightSlot.M_Operator &&
+			LeftSlot.M_CrewPosition == RightSlot.M_CrewPosition &&
+			LeftSlot.M_CrewRole == RightSlot.M_CrewRole;
 	}
 }
 
@@ -85,6 +126,7 @@ bool ATeamWeaponController::TryLoadSquadUnitsFromMapSetup()
 
 void ATeamWeaponController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	DisarmAllCrewAnimations();
 	RestorePushedMoveSpeedOverride();
 	RemoveControlledTeamWeaponDestroyedCallback();
 
@@ -118,6 +160,7 @@ void ATeamWeaponController::Tick(float DeltaSeconds)
 
 	TickRotationRequest(DeltaSeconds);
 	TickTowedWeaponAnimation();
+	TickCrewAnimationArming();
 }
 
 void ATeamWeaponController::UpdateControllerPositionToAverage()
@@ -577,6 +620,12 @@ void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSele
 
 void ATeamWeaponController::OnSquadUnitCommandComplete(EAbilityID CompletedAbilityID)
 {
+	if (CompletedAbilityID == EAbilityID::IdMove)
+	{
+		// The completing unit is not passed along; the settled check finds the operator that just arrived.
+		TryArmCrewAnimationsForSettledOperators();
+	}
+
 	if (CompletedAbilityID == EAbilityID::IdAttack)
 	{
 		UCommandData* CommandData = GetIsValidCommandData();
@@ -951,6 +1000,8 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 
 	if (not GetIsValidTeamWeapon())
 	{
+		DisarmAllCrewAnimations();
+		M_CrewAnimationState.Reset();
 		return;
 	}
 
@@ -975,6 +1026,8 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 
 		M_CrewAssignment.M_Guards.Add(SquadUnit);
 	}
+
+	RebuildCrewAnimationSlots();
 
 	if (GetIsValidTeamWeaponMover())
 	{
@@ -1905,6 +1958,30 @@ bool ATeamWeaponController::TryGetCrewPositionsSorted(TArray<UCrewPosition*>& Ou
 	return OutCrewPositions.Num() > 0;
 }
 
+bool ATeamWeaponController::TryGetCrewPositionForOperatorIndex(const int32 OperatorIndex,
+                                                               UCrewPosition*& OutCrewPosition) const
+{
+	OutCrewPosition = nullptr;
+	if (OperatorIndex < 0)
+	{
+		return false;
+	}
+
+	TArray<UCrewPosition*> CrewPositions;
+	if (not TryGetCrewPositionsSorted(CrewPositions))
+	{
+		return false;
+	}
+
+	if (OperatorIndex >= CrewPositions.Num())
+	{
+		return false;
+	}
+
+	OutCrewPosition = CrewPositions[OperatorIndex];
+	return IsValid(OutCrewPosition);
+}
+
 void ATeamWeaponController::IssueMoveCrewToPositions()
 {
 	if (M_TeamWeaponState == ETeamWeaponState::Towed)
@@ -1927,21 +2004,9 @@ void ATeamWeaponController::IssueMoveCrewToPositions()
 		return;
 	}
 
-	TArray<UCrewPosition*> CrewPositions;
-	if (not TryGetCrewPositionsSorted(CrewPositions))
-	{
-		return;
-	}
-
-	const int32 CrewMoveOrderCount = FMath::Min(M_CrewAssignment.M_Operators.Num(), CrewPositions.Num());
-	if (CrewMoveOrderCount <= 0)
-	{
-		return;
-	}
-
 	const TSubclassOf<UNavigationQueryFilter> TeamWeaponQueryFilter = nullptr;
 
-	for (int32 OperatorIndex = 0; OperatorIndex < CrewMoveOrderCount; ++OperatorIndex)
+	for (int32 OperatorIndex = 0; OperatorIndex < M_CrewAssignment.M_Operators.Num(); ++OperatorIndex)
 	{
 		ASquadUnit* SquadUnit = M_CrewAssignment.M_Operators[OperatorIndex].Get();
 		if (not GetIsValidSquadUnit(SquadUnit))
@@ -1949,8 +2014,8 @@ void ATeamWeaponController::IssueMoveCrewToPositions()
 			continue;
 		}
 
-		UCrewPosition* CrewPosition = CrewPositions[OperatorIndex];
-		if (not IsValid(CrewPosition))
+		UCrewPosition* CrewPosition = nullptr;
+		if (not TryGetCrewPositionForOperatorIndex(OperatorIndex, CrewPosition))
 		{
 			continue;
 		}
@@ -2109,6 +2174,13 @@ void ATeamWeaponController::SetTeamWeaponState(const ETeamWeaponState NewState)
 	if (M_TeamWeapon != nullptr)
 	{
 		M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(NewState == ETeamWeaponState::Ready_Deployed);
+	}
+
+	// Crew montages only exist while deployed. Arming on entering Ready_Deployed is deliberately not done here:
+	// the deploy flow re-issues crew moves right after, so arming waits for the settled checks.
+	if (NewState != ETeamWeaponState::Ready_Deployed)
+	{
+		DisarmAllCrewAnimations();
 	}
 
 	ApplyCrewRoleWeaponRestrictions();
@@ -2386,6 +2458,37 @@ void ATeamWeaponController::OnFireWeapon(ACPPTurretsMaster* CallingTurret)
 		
 }
 
+void ATeamWeaponController::OnTurretWeaponReloadStart(ACPPTurretsMaster* CallingTurret, const int32 WeaponIndex,
+                                                       const float ReloadTime)
+{
+	if (CallingTurret == nullptr || CallingTurret != M_TeamWeapon.Get())
+	{
+		return;
+	}
+	if (WeaponIndex != TeamWeaponCrewAnimationStatics::PrimaryWeaponIndex)
+	{
+		return;
+	}
+	if (M_TeamWeaponState != ETeamWeaponState::Ready_Deployed || bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
+	for (const FTeamWeaponCrewAnimationSlot& Slot : M_CrewAnimationState.M_Slots)
+	{
+		if (not Slot.bM_IsArmed)
+		{
+			continue;
+		}
+		USquadUnitAnimInstance* AnimInstance = TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot);
+		if (AnimInstance == nullptr)
+		{
+			continue;
+		}
+		AnimInstance->OnTeamWeaponReloadStarted(ReloadTime);
+	}
+}
+
 void ATeamWeaponController::OnProjectileHit(const bool bBounced)
 {
 }
@@ -2538,14 +2641,7 @@ void ATeamWeaponController::SnapOperatorsToCrewPositions()
 		return;
 	}
 
-	TArray<UCrewPosition*> CrewPositions;
-	if (not TryGetCrewPositionsSorted(CrewPositions))
-	{
-		return;
-	}
-
-	const int32 CrewSnapCount = FMath::Min(M_CrewAssignment.M_Operators.Num(), CrewPositions.Num());
-	for (int32 OperatorIndex = 0; OperatorIndex < CrewSnapCount; ++OperatorIndex)
+	for (int32 OperatorIndex = 0; OperatorIndex < M_CrewAssignment.M_Operators.Num(); ++OperatorIndex)
 	{
 		ASquadUnit* SquadUnit = M_CrewAssignment.M_Operators[OperatorIndex].Get();
 		if (not GetIsValidSquadUnit(SquadUnit))
@@ -2553,8 +2649,8 @@ void ATeamWeaponController::SnapOperatorsToCrewPositions()
 			continue;
 		}
 
-		UCrewPosition* CrewPosition = CrewPositions[OperatorIndex];
-		if (not IsValid(CrewPosition))
+		UCrewPosition* CrewPosition = nullptr;
+		if (not TryGetCrewPositionForOperatorIndex(OperatorIndex, CrewPosition))
 		{
 			continue;
 		}
@@ -2573,6 +2669,9 @@ void ATeamWeaponController::SnapOperatorsToCrewPositions()
 			nullptr,
 			ETeleportType::TeleportPhysics);
 	}
+
+	// Teleported operators are settled by definition; arm right away instead of waiting for the tick fallback.
+	TryArmCrewAnimationsForSettledOperators();
 }
 
 bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const ASquadUnit* SquadUnit,
@@ -2823,6 +2922,8 @@ void ATeamWeaponController::AbandonTeamWeapon()
 	M_TeamWeapon = nullptr;
 	M_TeamWeaponMover = nullptr;
 	bM_IsTeamWeaponAbandoned = true;
+	// The Abandoned state transition already disarmed every operator; only the bookkeeping is left.
+	M_CrewAnimationState.Reset();
 }
 
 void ATeamWeaponController::RegisterControlledTeamWeaponDestroyedCallback()
@@ -3071,3 +3172,206 @@ void ATeamWeaponController::ReleaseCargoSquadUnitsFromTow()
 
 	TeamWeaponCargoSquad->ExitCargoImmediate(false);
 }
+
+// ---- Crew animations ----
+
+void ATeamWeaponController::RebuildCrewAnimationSlots()
+{
+	const ESquadSubtype NewTeamWeaponSquadSubtype = GetTeamWeaponSquadSubtypeForCrewAnimations();
+	const bool bSubtypeUnchanged = NewTeamWeaponSquadSubtype == M_CrewAnimationState.M_TeamWeaponSquadSubtype;
+
+	TArray<FTeamWeaponCrewAnimationSlot> NewSlots;
+	NewSlots.Reserve(M_CrewAssignment.M_Operators.Num());
+	for (int32 OperatorIndex = 0; OperatorIndex < M_CrewAssignment.M_Operators.Num(); ++OperatorIndex)
+	{
+		FTeamWeaponCrewAnimationSlot NewSlot;
+		NewSlot.M_Operator = M_CrewAssignment.M_Operators[OperatorIndex];
+
+		UCrewPosition* CrewPosition = nullptr;
+		if (TryGetCrewPositionForOperatorIndex(OperatorIndex, CrewPosition))
+		{
+			NewSlot.M_CrewPosition = CrewPosition;
+			NewSlot.M_CrewRole = CrewPosition->GetCrewPositionType();
+		}
+		NewSlots.Add(NewSlot);
+	}
+
+	// Keep operators armed only when their whole assignment survived; everything else is disarmed.
+	for (FTeamWeaponCrewAnimationSlot& OldSlot : M_CrewAnimationState.M_Slots)
+	{
+		if (not OldSlot.bM_IsArmed)
+		{
+			continue;
+		}
+
+		FTeamWeaponCrewAnimationSlot* MatchingNewSlot = NewSlots.FindByPredicate(
+			[&OldSlot](const FTeamWeaponCrewAnimationSlot& NewSlot)
+			{
+				return TeamWeaponCrewAnimationStatics::GetIsSameCrewAnimationAssignment(NewSlot, OldSlot);
+			});
+		if (MatchingNewSlot != nullptr && bSubtypeUnchanged)
+		{
+			MatchingNewSlot->bM_IsArmed = true;
+			continue;
+		}
+
+		DisarmCrewAnimationSlot(OldSlot);
+	}
+
+	M_CrewAnimationState.M_Slots = MoveTemp(NewSlots);
+	M_CrewAnimationState.M_TeamWeaponSquadSubtype = NewTeamWeaponSquadSubtype;
+}
+
+ESquadSubtype ATeamWeaponController::GetTeamWeaponSquadSubtypeForCrewAnimations() const
+{
+	ESquadSubtype TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+	if (GetIsValidRTSComponent())
+	{
+		TeamWeaponSquadSubtype = GetRTSComponent()->GetSubtypeAsSquadSubtype();
+	}
+	if (TeamWeaponSquadSubtype != ESquadSubtype::Squad_None)
+	{
+		return TeamWeaponSquadSubtype;
+	}
+
+	// Adopted or map placed weapons carry the authoritative subtype on the weapon actor itself.
+	if (GetIsValidTeamWeapon())
+	{
+		return M_TeamWeapon->GetSquadSubtypeFromRTSComponent();
+	}
+	return ESquadSubtype::Squad_None;
+}
+
+bool ATeamWeaponController::GetIsOperatorSettledAtCrewPosition(const FTeamWeaponCrewAnimationSlot& Slot) const
+{
+	if (not GetIsValidCrewAnimationSlotOperator(Slot))
+	{
+		return false;
+	}
+
+	const UCrewPosition* CrewPosition = Slot.M_CrewPosition.Get();
+	if (not IsValid(CrewPosition))
+	{
+		return false;
+	}
+
+	const ASquadUnit* Operator = Slot.M_Operator.Get();
+	// Never below the nav acceptance radius, otherwise a unit that legally stopped could never count as settled.
+	const float SettledRadiusCm = FMath::Max(
+		CrewPosition->GetAcceptanceRadius(),
+		DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius);
+	const float DistanceToCrewPositionCm = FVector::Dist2D(
+		Operator->GetActorLocation(),
+		CrewPosition->GetComponentLocation());
+	if (DistanceToCrewPositionCm > SettledRadiusCm)
+	{
+		return false;
+	}
+
+	return Operator->GetVelocity().Size2D() <= TeamWeaponCrewAnimationStatics::SettledSpeedThresholdCmPerSec;
+}
+
+void ATeamWeaponController::TryArmCrewAnimationsForSettledOperators()
+{
+	if (M_TeamWeaponState != ETeamWeaponState::Ready_Deployed || bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+
+	for (FTeamWeaponCrewAnimationSlot& Slot : M_CrewAnimationState.M_Slots)
+	{
+		if (Slot.bM_IsArmed || not Slot.GetHasRole())
+		{
+			continue;
+		}
+		if (not GetIsOperatorSettledAtCrewPosition(Slot))
+		{
+			continue;
+		}
+		ArmCrewAnimationSlot(Slot);
+	}
+}
+
+void ATeamWeaponController::ArmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot)
+{
+	USquadUnitAnimInstance* AnimInstance = TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot);
+	const UCrewPosition* CrewPosition = Slot.M_CrewPosition.Get();
+	if (AnimInstance == nullptr || not IsValid(CrewPosition))
+	{
+		return;
+	}
+
+	// Face the weapon the way the authored full body pose expects; the location stays where the unit settled.
+	ASquadUnit* Operator = Slot.M_Operator.Get();
+	FRotator OperatorRotation = Operator->GetActorRotation();
+	OperatorRotation.Yaw = CrewPosition->GetComponentRotation().Yaw;
+	Operator->SetActorRotation(OperatorRotation, ETeleportType::TeleportPhysics);
+
+	AnimInstance->StartTeamWeaponCrewAnimation(Slot.M_CrewRole, M_CrewAnimationState.M_TeamWeaponSquadSubtype);
+	Slot.bM_IsArmed = true;
+
+	TeamWeaponCrewAnimationStatics::PrintCrewAnimDebug(
+		"Armed crew animation: " + Operator->GetName() + " role: " + UEnum::GetValueAsString(Slot.M_CrewRole));
+}
+
+void ATeamWeaponController::DisarmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot)
+{
+	if (not Slot.bM_IsArmed)
+	{
+		return;
+	}
+	Slot.bM_IsArmed = false;
+
+	USquadUnitAnimInstance* AnimInstance = TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot);
+	if (AnimInstance == nullptr)
+	{
+		return;
+	}
+	AnimInstance->StopTeamWeaponCrewAnimation();
+}
+
+void ATeamWeaponController::DisarmAllCrewAnimations()
+{
+	for (FTeamWeaponCrewAnimationSlot& Slot : M_CrewAnimationState.M_Slots)
+	{
+		DisarmCrewAnimationSlot(Slot);
+	}
+}
+
+void ATeamWeaponController::TickCrewAnimationArming()
+{
+	if (M_TeamWeaponState != ETeamWeaponState::Ready_Deployed || bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+	if (not M_CrewAnimationState.GetHasSlotsToArm() && not M_CrewAnimationState.GetHasArmedSlots())
+	{
+		return;
+	}
+
+	// An external StopAllMontages (grenade, repair, ...) clears the anim instance side; re-arm those slots.
+	for (FTeamWeaponCrewAnimationSlot& Slot : M_CrewAnimationState.M_Slots)
+	{
+		if (not Slot.bM_IsArmed)
+		{
+			continue;
+		}
+		const USquadUnitAnimInstance* AnimInstance =
+			TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot);
+		if (AnimInstance != nullptr && AnimInstance->GetIsTeamWeaponCrewAnimationActive())
+		{
+			continue;
+		}
+		Slot.bM_IsArmed = false;
+	}
+
+	TryArmCrewAnimationsForSettledOperators();
+}
+
+bool ATeamWeaponController::GetIsValidCrewAnimationSlotOperator(const FTeamWeaponCrewAnimationSlot& Slot) const
+{
+	// Silent on purpose: an operator that just died leaves a dangling weak pointer until the crew is rebuilt.
+	return TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot) != nullptr;
+}
+
+// ---- End crew animations ----

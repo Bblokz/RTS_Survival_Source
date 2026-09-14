@@ -8,6 +8,8 @@
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "TeamWeaponMover.h"
 #include "TeamWeaponState/TeamWeaponState.h"
+#include "CrewPositions/CrewPositionType.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "TeamWeaponController.generated.h"
 
 class ATeamWeapon;
@@ -142,6 +144,74 @@ struct FTeamWeaponRotationRequest
 	bool bM_ShouldTriggerDoneExecuting = false;
 	bool bM_IsInternalTurretRotation = false;
 	EAbilityID M_CompletionAbilityId = EAbilityID::IdNoAbility;
+};
+
+/**
+ * @brief One operator of the team weapon paired with the crew position (and role) it was assigned to.
+ * Armed means the operator was settled on its crew position while deployed and its anim instance plays the role.
+ */
+USTRUCT()
+struct FTeamWeaponCrewAnimationSlot
+{
+	GENERATED_BODY()
+
+	bool GetHasRole() const { return M_CrewRole != ECrewPositionType::None; }
+
+	UPROPERTY()
+	TWeakObjectPtr<ASquadUnit> M_Operator;
+
+	UPROPERTY()
+	TWeakObjectPtr<UCrewPosition> M_CrewPosition;
+
+	ECrewPositionType M_CrewRole = ECrewPositionType::None;
+
+	// Set once the operator was settled on its crew position while Ready_Deployed and the anim instance was armed.
+	bool bM_IsArmed = false;
+};
+
+/**
+ * @brief Tracks which operator animates which crew role so arming and disarming stay deterministic.
+ * Rebuilt whenever the crew assignment changes; slots follow the sorted crew position order.
+ */
+USTRUCT()
+struct FTeamWeaponCrewAnimationState
+{
+	GENERATED_BODY()
+
+	void Reset()
+	{
+		M_Slots.Reset();
+		M_TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+	}
+
+	bool GetHasSlotsToArm() const
+	{
+		for (const FTeamWeaponCrewAnimationSlot& Slot : M_Slots)
+		{
+			if (not Slot.bM_IsArmed && Slot.GetHasRole() && Slot.M_Operator.IsValid())
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	bool GetHasArmedSlots() const
+	{
+		for (const FTeamWeaponCrewAnimationSlot& Slot : M_Slots)
+		{
+			if (Slot.bM_IsArmed)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	UPROPERTY()
+	TArray<FTeamWeaponCrewAnimationSlot> M_Slots;
+
+	ESquadSubtype M_TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
 };
 
 /**
@@ -335,11 +405,35 @@ private:
 	void ApplyCrewOffsetToPath(FNavPathSharedPtr& UnitPath, const FVector& CrewOffset) const;
 	void ApplyNonCrewOffsetToPath(FNavPathSharedPtr& UnitPath, const FVector& UnitOffset) const;
 	bool TryGetCrewPositionsSorted(TArray<UCrewPosition*>& OutCrewPositions) const;
+
+	/**
+	 * @brief Single source of truth for which crew position belongs to which operator index.
+	 * Keeps crew moves, rotation snapping and crew animations from ever disagreeing.
+	 * @param OperatorIndex Index into the crew assignment operator array.
+	 * @param OutCrewPosition The sorted crew position matched to that operator.
+	 * @return False when there is no valid crew position for the operator index.
+	 */
+	bool TryGetCrewPositionForOperatorIndex(const int32 OperatorIndex, UCrewPosition*& OutCrewPosition) const;
 	void IssueMoveCrewToPositions();
 	void ShowDeployingAnimatedText() const;
 	void ShowPackingAnimatedText() const;
 	void ShowAbandoningAnimatedText() const;
 	bool GetShouldAutoDeployOnIdle();
+
+	// ---- Crew animations ----
+	/** Rebuilds the role slots from the crew assignment; disarms operators that lost or changed their role. */
+	void RebuildCrewAnimationSlots();
+	ESquadSubtype GetTeamWeaponSquadSubtypeForCrewAnimations() const;
+	bool GetIsOperatorSettledAtCrewPosition(const FTeamWeaponCrewAnimationSlot& Slot) const;
+	/** Arms every un-armed role slot whose operator stands still on its crew position; Ready_Deployed only. */
+	void TryArmCrewAnimationsForSettledOperators();
+	void ArmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot);
+	void DisarmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot);
+	void DisarmAllCrewAnimations();
+	/** Fallback that catches operators that were already at their goal (no move completion) and external stops. */
+	void TickCrewAnimationArming();
+	bool GetIsValidCrewAnimationSlotOperator(const FTeamWeaponCrewAnimationSlot& Slot) const;
+	// ---- End crew animations ----
 
 	// ---- ITurretOwner ----
 	virtual int GetOwningPlayer() override;
@@ -351,6 +445,8 @@ private:
 		AActor* DestroyedActor,
 		const bool bWasDestroyedByOwnWeapons) override;
 	virtual void OnFireWeapon(ACPPTurretsMaster* CallingTurret) override;
+	virtual void OnTurretWeaponReloadStart(ACPPTurretsMaster* CallingTurret, const int32 WeaponIndex,
+	                                       const float ReloadTime) override;
 	virtual void OnProjectileHit(const bool bBounced) override;
 	virtual FRotator GetOwnerRotation() const override;
 	// ---- End ITurretOwner ----
@@ -391,6 +487,10 @@ private:
 
 	UPROPERTY()
 	FTeamWeaponCrewAssignment M_CrewAssignment;
+
+	// Per operator crew role and arming state for the full body crew montages.
+	UPROPERTY()
+	FTeamWeaponCrewAnimationState M_CrewAnimationState;
 
 	UPROPERTY()
 	ETeamWeaponState M_TeamWeaponState = ETeamWeaponState::Uninitialized;

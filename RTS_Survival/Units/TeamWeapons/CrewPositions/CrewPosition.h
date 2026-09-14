@@ -17,6 +17,8 @@ class RTS_SURVIVAL_API UCrewPosition : public USceneComponent
 public:
 	ECrewPositionType GetCrewPositionType() const;
 	FTransform GetCrewWorldTransform() const;
+	// Distance in cm within which an operator counts as standing on this position.
+	float GetAcceptanceRadius() const;
 
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crew Position", meta = (AllowPrivateAccess = "true"))

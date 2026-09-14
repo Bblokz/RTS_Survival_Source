@@ -17,6 +17,7 @@
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowType.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -164,6 +165,14 @@ void AStandaloneTurret::BeginPlay_SetupUnitData()
 	if (GetIsValidFowComponent())
 	{
 		FowComponent->SetVisionRadius(StandaloneTurretData.VisionRadius);
+		if (RTSComponent->GetOwningPlayer()==1)
+		{
+			FowComponent->StartFow(EFowBehaviour::Fow_Active);
+		}
+		else
+		{
+			FowComponent->StartFow(EFowBehaviour::Fow_PassiveEnemyVision);
+		}
 	}
 
 	InitAbilityArray(StandaloneTurretData.Abilities);
