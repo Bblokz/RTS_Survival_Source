@@ -1883,6 +1883,8 @@ namespace DeveloperSettings
 		constexpr bool GBuilding_Mode_Compile_DebugSymbols = false;
 		constexpr bool GTurret_Master_Compile_DebugSymbols = false;
 		constexpr bool GEmbedded_Turret_Compile_DebugSymbols = false;
+		// Team weapon crew arming, disarming and reload synced reaction montages.
+		constexpr bool GTeamWeapon_CrewAnimations_Compile_DebugSymbols = false;
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;

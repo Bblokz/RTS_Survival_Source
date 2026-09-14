@@ -6,6 +6,7 @@
 #include "Animation/AimOffsetBlendSpace.h"
 #include "Animation/AnimInstance.h"
 #include "SquadAnimationEnums/SquadAnimationEnums.h"
+#include "TeamWeaponCrewMontages/TeamWeaponCrewMontages.h"
 #include "SquadUnitAnimInstance.generated.h"
 
 
@@ -248,7 +249,45 @@ struct FAimPositionMontages
 };
 
 /**
- * 
+ * @brief Runtime state of the team weapon crew animation armed on this squad unit by its team weapon controller.
+ * Armed means the operator is settled on a deployed team weapon; the entry decides whether it loops or reacts.
+ */
+USTRUCT()
+struct FSquadUnitTeamWeaponCrewAnimRuntime
+{
+	GENERATED_BODY()
+
+	void Reset();
+
+	bool GetIsSameAssignment(const ECrewPositionType CrewRole, const ESquadSubtype TeamWeaponSquadSubtype) const
+	{
+		return bM_IsActive && M_CrewRole == CrewRole && M_TeamWeaponSquadSubtype == TeamWeaponSquadSubtype;
+	}
+
+	// Copy of the resolved entry; montages are also referenced by the EditDefaultsOnly struct so GC is safe.
+	UPROPERTY()
+	FTeamWeaponCrewMontageEntry M_ActiveEntry;
+
+	ECrewPositionType M_CrewRole = ECrewPositionType::None;
+
+	ESquadSubtype M_TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+
+	// Armed by the controller; cleared by Stop, StopAllMontages and UnitDies.
+	bool bM_IsActive = false;
+
+	// True while a loop montage (Montage or IdleLoopMontage) is expected to be playing.
+	bool bM_IsLoopPlaying = false;
+
+	// True while a reaction montage is in flight; suppresses the loop's interrupted-end handling.
+	bool bM_IsReactPlaying = false;
+
+	// The loop montage that was started last; needed to stop and to re-play it on its natural end.
+	UPROPERTY()
+	TObjectPtr<UAnimMontage> M_ActiveLoopMontage = nullptr;
+};
+
+/**
+ *
  */
 UCLASS(Blueprintable, BlueprintType)
 class RTS_SURVIVAL_API USquadUnitAnimInstance : public UAnimInstance
@@ -330,7 +369,29 @@ public:
 	void SetWeaponAimOffset(ESquadWeaponAimOffset AimOffsetType);
 
 	// attempts to unbind the selection functions from the selection component delegatges.
-	void UnitDies() const;
+	void UnitDies();
+
+	// ----- Team Weapon Crew Animations -----
+
+	/**
+	 * @brief Arms the crew animation so the operator animates only while settled on a deployed team weapon.
+	 * Idempotent for the same role and subtype; a re-arm with a different role restarts the resolution.
+	 * @param CrewRole Crew position type assigned to this operator.
+	 * @param TeamWeaponSquadSubtype Subtype of the team weapon squad used as override key.
+	 */
+	void StartTeamWeaponCrewAnimation(const ECrewPositionType CrewRole, const ESquadSubtype TeamWeaponSquadSubtype);
+
+	/** @brief Stops loop and reaction montages and returns the unit to its regular animations. */
+	void StopTeamWeaponCrewAnimation();
+
+	/**
+	 * @brief Plays the reaction montage stretched over the reload so it ends when the weapon is ready again.
+	 * @param ReloadTime Flux adjusted reload duration of the team weapon's first weapon in seconds.
+	 */
+	void OnTeamWeaponReloadStarted(const float ReloadTime);
+
+	/** @return True while armed, even when the resolved entry has no montage (the controller must not re-arm). */
+	bool GetIsTeamWeaponCrewAnimationActive() const { return M_TeamWeaponCrewAnimRuntime.bM_IsActive; }
 
 protected:
 	// Set by unit selection.
@@ -375,6 +436,12 @@ protected:
 	// Contains aim state and active aim montage to switch between aim positions.
 	UPROPERTY(EditDefaultsOnly)
 	FAimPositionMontages AimPositionMontages;
+
+	// ----- Team Weapon Crew Montages -----
+
+	// Full body montages played per crew position type while operating a deployed team weapon.
+	UPROPERTY(EditDefaultsOnly, Category = "Team Weapon Crew")
+	FTeamWeaponCrewMontages TeamWeaponCrewMontages;
 
 	UPROPERTY(BlueprintReadOnly)
 	float Speed;
@@ -431,4 +498,29 @@ private:
 
 	void OnUnitSelected();
 	void OnUnitDeselected();
+
+	// ----- Team Weapon Crew Animations -----
+
+	/** Plays the loop montage and binds the loop-ended delegate so the code can re-play it on its natural end. */
+	void PlayTeamWeaponCrewLoopMontage(UAnimMontage* LoopMontage, const float PlayRate);
+	void OnTeamWeaponCrewLoopMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void OnTeamWeaponCrewReactMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	/** Stops whichever crew montage is playing and clears the crew runtime, without touching other montages. */
+	void ClearTeamWeaponCrewAnimationRuntime(const bool bStopPlayingMontages);
+
+	/**
+	 * @brief Computes the play rate that makes the reaction montage end exactly when the reload finishes.
+	 * @param ReactMontage Montage that will be played; its asset RateScale is compensated for.
+	 * @param ReloadTime Flux adjusted reload duration in seconds.
+	 * @return Reload synced rate multiplied with the designer play rate of the active entry.
+	 */
+	float GetTeamWeaponCrewReactPlayRate(const UAnimMontage* ReactMontage, const float ReloadTime) const;
+
+	UPROPERTY()
+	FSquadUnitTeamWeaponCrewAnimRuntime M_TeamWeaponCrewAnimRuntime;
+
+	// Dedicated delegates; M_MontageEndedDelegate is rebound by StartMontage and must not be shared.
+	FOnMontageEnded M_TeamWeaponCrewLoopMontageEndedDelegate;
+	FOnMontageEnded M_TeamWeaponCrewReactMontageEndedDelegate;
 };

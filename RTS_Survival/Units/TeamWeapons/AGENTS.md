@@ -84,3 +84,20 @@ Team weapon handlers frequently coordinate crew assignment, movement mode, turre
   - direct command execution,
   - deferred post-pack/post-deploy execution,
   - internal (non-player) reposition/rotation requests.
+
+## Crew animations (operators on a deployed weapon)
+
+Design: `Source/DesignTexts/Teamweapons/AnimationsAndTWPositionIntegration.md`.
+
+- Designer data lives on `USquadUnitAnimInstance::TeamWeaponCrewMontages` (`FTeamWeaponCrewMontages`): one entry per
+  `ECrewPositionType` plus subtype overrides keyed by the **team weapon squad's** `ESquadSubtype`. Montages must use the
+  `FullBody` slot. A null montage means "play nothing" and is not an error.
+- The controller owns *when*: `FTeamWeaponCrewAnimationState` maps operator index → sorted crew position → role
+  (`TryGetCrewPositionForOperatorIndex` is the single source of truth, also used by crew moves and rotation snapping).
+- Arming requires `Ready_Deployed` **and** a settled operator (inside the crew position radius, planar speed ≈ 0).
+  Triggers: `IdMove` completion, `SnapOperatorsToCrewPositions`, and `TickCrewAnimationArming` (needed because a unit
+  already at its goal never reports move completion). `SetTeamWeaponState` disarms on every state other than
+  `Ready_Deployed`; `AssignCrewToTeamWeapon` rebuilds the slots.
+- Reacting roles (loader by default) play once per reload start of weapon index 0 via
+  `ITurretOwner::OnTurretWeaponReloadStart`, stretched to the flux-adjusted reload time. `OnFireWeapon` is not used.
+- Debug prints: `DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols`.

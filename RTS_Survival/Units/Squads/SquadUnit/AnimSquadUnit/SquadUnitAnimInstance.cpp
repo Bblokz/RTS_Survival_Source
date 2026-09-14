@@ -498,6 +498,8 @@ void USquadUnitAnimInstance::PlayWeldingMontage()
 
 void USquadUnitAnimInstance::StopAllMontages()
 {
+	// Montage_Stop without a montage stops every montage, including a crew loop; keep the crew state in sync.
+	ClearTeamWeaponCrewAnimationRuntime(false);
 	Montage_Stop(0.1f);
 }
 
@@ -522,8 +524,10 @@ void USquadUnitAnimInstance::SetWeaponAimOffset(const ESquadWeaponAimOffset AimO
 }
 
 
-void USquadUnitAnimInstance::UnitDies() const
+void USquadUnitAnimInstance::UnitDies()
 {
+	// The ragdoll stops all animation; only the bookkeeping needs clearing here.
+	ClearTeamWeaponCrewAnimationRuntime(false);
 	if (IsValid(GetSkelMeshComponent()))
 	{
 		AActor* Owner = GetSkelMeshComponent()->GetOwner();
@@ -593,11 +597,13 @@ void USquadUnitAnimInstance::OnAimPositionMontageFinished(UAnimMontage* Montage,
 
 void USquadUnitAnimInstance::SetMovementStateWithSpeed(const float& MovementSpeed)
 {
+	// Aim position transitions share the FullBody slot with the crew montages and must not interrupt them.
+	const bool bAllowAimPositionTransitions = not GetIsTeamWeaponCrewAnimationActive();
 	if (FMath::IsNearlyZero(MovementSpeed))
 	{
 		// In this case we just started aiming while idle and can choose a random aim position.
-		if (bAimToTarget && MovementState != ESquadMovementAnimState::Idle && AimPositionMontages.AimPosition ==
-			ESquadAimPosition::Standing)
+		if (bAllowAimPositionTransitions && bAimToTarget && MovementState != ESquadMovementAnimState::Idle &&
+			AimPositionMontages.AimPosition == ESquadAimPosition::Standing)
 		{
 			OnStartAimingWhileIdle();
 		}
@@ -609,7 +615,7 @@ void USquadUnitAnimInstance::SetMovementStateWithSpeed(const float& MovementSpee
 		MovementState = ESquadMovementAnimState::Running;
 		return;
 	}
-	if (MovementState != ESquadMovementAnimState::Walking)
+	if (bAllowAimPositionTransitions && MovementState != ESquadMovementAnimState::Walking)
 	{
 		OnStartWalking();
 	}
@@ -674,4 +680,223 @@ void USquadUnitAnimInstance::OnUnitSelected()
 void USquadUnitAnimInstance::OnUnitDeselected()
 {
 	bBeAlert = false;
+}
+
+// ----- Team Weapon Crew Animations -----
+
+namespace SquadUnitTeamWeaponCrewAnimStatics
+{
+	// Blend out used when a crew montage is stopped because the operator leaves the deployed weapon.
+	constexpr float CrewMontageBlendOutTime = 0.1f;
+	// Guards the division for the reload synced play rate.
+	constexpr float MinReloadTimeSeconds = 0.01f;
+
+	void PrintCrewAnimDebug(const FString& Message)
+	{
+		if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+		{
+			RTSFunctionLibrary::PrintString(Message, FColor::Cyan);
+		}
+	}
+}
+
+void FSquadUnitTeamWeaponCrewAnimRuntime::Reset()
+{
+	M_ActiveEntry = FTeamWeaponCrewMontageEntry();
+	M_CrewRole = ECrewPositionType::None;
+	M_TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+	bM_IsActive = false;
+	bM_IsLoopPlaying = false;
+	bM_IsReactPlaying = false;
+	M_ActiveLoopMontage = nullptr;
+}
+
+void USquadUnitAnimInstance::StartTeamWeaponCrewAnimation(const ECrewPositionType CrewRole,
+                                                          const ESquadSubtype TeamWeaponSquadSubtype)
+{
+	if (M_TeamWeaponCrewAnimRuntime.GetIsSameAssignment(CrewRole, TeamWeaponSquadSubtype))
+	{
+		return;
+	}
+	if (M_TeamWeaponCrewAnimRuntime.bM_IsActive)
+	{
+		StopTeamWeaponCrewAnimation();
+	}
+
+	const FTeamWeaponCrewMontageEntry* ResolvedEntry = TeamWeaponCrewMontages.ResolveEntry(
+		CrewRole, TeamWeaponSquadSubtype);
+	if (ResolvedEntry == nullptr)
+	{
+		// ECrewPositionType::None: nothing to animate; stay inactive so the controller does not retry.
+		return;
+	}
+
+	// Armed even when the entry has no montage: a missing montage is a valid designer choice (no error).
+	M_TeamWeaponCrewAnimRuntime.M_ActiveEntry = *ResolvedEntry;
+	M_TeamWeaponCrewAnimRuntime.M_CrewRole = CrewRole;
+	M_TeamWeaponCrewAnimRuntime.M_TeamWeaponSquadSubtype = TeamWeaponSquadSubtype;
+	M_TeamWeaponCrewAnimRuntime.bM_IsActive = true;
+
+	// The authored full body pose replaces any crouch; reset so no stray crouch-to-stand transition plays later.
+	AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
+	AimOffsets.UpdateAOForNewAimPosition(ESquadAimPosition::Standing);
+
+	SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+		"Crew anim armed: " + UEnum::GetValueAsString(CrewRole) + " subtype: " +
+		UEnum::GetValueAsString(TeamWeaponSquadSubtype) + " react: " +
+		(ResolvedEntry->bReactToWeaponFire ? FString("true") : FString("false")));
+
+	if (not ResolvedEntry->bReactToWeaponFire)
+	{
+		if (ResolvedEntry->GetHasMontage())
+		{
+			PlayTeamWeaponCrewLoopMontage(ResolvedEntry->Montage, ResolvedEntry->PlayRate);
+		}
+		return;
+	}
+
+	if (ResolvedEntry->GetHasIdleLoopMontage())
+	{
+		PlayTeamWeaponCrewLoopMontage(ResolvedEntry->IdleLoopMontage, ResolvedEntry->IdleLoopPlayRate);
+	}
+}
+
+void USquadUnitAnimInstance::StopTeamWeaponCrewAnimation()
+{
+	if (not M_TeamWeaponCrewAnimRuntime.bM_IsActive)
+	{
+		return;
+	}
+	SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+		"Crew anim stopped: " + UEnum::GetValueAsString(M_TeamWeaponCrewAnimRuntime.M_CrewRole));
+	ClearTeamWeaponCrewAnimationRuntime(true);
+}
+
+void USquadUnitAnimInstance::OnTeamWeaponReloadStarted(const float ReloadTime)
+{
+	if (not M_TeamWeaponCrewAnimRuntime.bM_IsActive)
+	{
+		return;
+	}
+	const FTeamWeaponCrewMontageEntry& ActiveEntry = M_TeamWeaponCrewAnimRuntime.M_ActiveEntry;
+	if (not ActiveEntry.bReactToWeaponFire || not ActiveEntry.GetHasMontage())
+	{
+		return;
+	}
+
+	const float ReactPlayRate = GetTeamWeaponCrewReactPlayRate(ActiveEntry.Montage, ReloadTime);
+	SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+		"Crew react montage: " + ActiveEntry.Montage->GetName() +
+		" reload: " + FString::SanitizeFloat(ReloadTime) +
+		" length: " + FString::SanitizeFloat(ActiveEntry.Montage->GetPlayLength()) +
+		" rate: " + FString::SanitizeFloat(ReactPlayRate));
+
+	// Set before Montage_Play: playing a montage in the same slot ends the idle loop with bInterrupted = true.
+	M_TeamWeaponCrewAnimRuntime.bM_IsReactPlaying = true;
+	M_TeamWeaponCrewAnimRuntime.bM_IsLoopPlaying = false;
+	Montage_Play(ActiveEntry.Montage, ReactPlayRate);
+
+	M_TeamWeaponCrewReactMontageEndedDelegate.Unbind();
+	M_TeamWeaponCrewReactMontageEndedDelegate.BindUObject(
+		this, &USquadUnitAnimInstance::OnTeamWeaponCrewReactMontageEnded);
+	Montage_SetEndDelegate(M_TeamWeaponCrewReactMontageEndedDelegate, ActiveEntry.Montage);
+}
+
+void USquadUnitAnimInstance::PlayTeamWeaponCrewLoopMontage(UAnimMontage* LoopMontage, const float PlayRate)
+{
+	if (not IsValid(LoopMontage))
+	{
+		return;
+	}
+	M_TeamWeaponCrewAnimRuntime.M_ActiveLoopMontage = LoopMontage;
+	M_TeamWeaponCrewAnimRuntime.bM_IsLoopPlaying = true;
+	Montage_Play(LoopMontage, PlayRate);
+
+	M_TeamWeaponCrewLoopMontageEndedDelegate.Unbind();
+	M_TeamWeaponCrewLoopMontageEndedDelegate.BindUObject(
+		this, &USquadUnitAnimInstance::OnTeamWeaponCrewLoopMontageEnded);
+	Montage_SetEndDelegate(M_TeamWeaponCrewLoopMontageEndedDelegate, LoopMontage);
+}
+
+void USquadUnitAnimInstance::OnTeamWeaponCrewLoopMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (not M_TeamWeaponCrewAnimRuntime.bM_IsActive || not M_TeamWeaponCrewAnimRuntime.bM_IsLoopPlaying)
+	{
+		return;
+	}
+	if (bInterrupted)
+	{
+		if (M_TeamWeaponCrewAnimRuntime.bM_IsReactPlaying)
+		{
+			// The reaction montage took over on purpose; it restarts the idle loop when it ends.
+			return;
+		}
+		// Something else took the FullBody slot; drop the arming so the controller can re-arm when appropriate.
+		SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug("Crew loop interrupted externally; disarming.");
+		ClearTeamWeaponCrewAnimationRuntime(false);
+		return;
+	}
+
+	// Natural end: loop by re-playing the same montage at the same rate.
+	const FTeamWeaponCrewMontageEntry& ActiveEntry = M_TeamWeaponCrewAnimRuntime.M_ActiveEntry;
+	const bool bIsIdleLoop = ActiveEntry.bReactToWeaponFire;
+	const float LoopPlayRate = bIsIdleLoop ? ActiveEntry.IdleLoopPlayRate : ActiveEntry.PlayRate;
+	PlayTeamWeaponCrewLoopMontage(M_TeamWeaponCrewAnimRuntime.M_ActiveLoopMontage, LoopPlayRate);
+}
+
+void USquadUnitAnimInstance::OnTeamWeaponCrewReactMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (not M_TeamWeaponCrewAnimRuntime.bM_IsActive)
+	{
+		return;
+	}
+	M_TeamWeaponCrewAnimRuntime.bM_IsReactPlaying = false;
+	if (bInterrupted)
+	{
+		// Either a newer reaction started (it manages its own end) or an external montage took the slot.
+		return;
+	}
+
+	const FTeamWeaponCrewMontageEntry& ActiveEntry = M_TeamWeaponCrewAnimRuntime.M_ActiveEntry;
+	if (not ActiveEntry.GetHasIdleLoopMontage())
+	{
+		return;
+	}
+	PlayTeamWeaponCrewLoopMontage(ActiveEntry.IdleLoopMontage, ActiveEntry.IdleLoopPlayRate);
+}
+
+void USquadUnitAnimInstance::ClearTeamWeaponCrewAnimationRuntime(const bool bStopPlayingMontages)
+{
+	M_TeamWeaponCrewLoopMontageEndedDelegate.Unbind();
+	M_TeamWeaponCrewReactMontageEndedDelegate.Unbind();
+
+	if (bStopPlayingMontages)
+	{
+		UAnimMontage* LoopMontage = M_TeamWeaponCrewAnimRuntime.M_ActiveLoopMontage;
+		if (IsValid(LoopMontage) && Montage_IsPlaying(LoopMontage))
+		{
+			Montage_Stop(SquadUnitTeamWeaponCrewAnimStatics::CrewMontageBlendOutTime, LoopMontage);
+		}
+		UAnimMontage* ReactMontage = M_TeamWeaponCrewAnimRuntime.M_ActiveEntry.Montage;
+		if (M_TeamWeaponCrewAnimRuntime.bM_IsReactPlaying && IsValid(ReactMontage) && Montage_IsPlaying(ReactMontage))
+		{
+			Montage_Stop(SquadUnitTeamWeaponCrewAnimStatics::CrewMontageBlendOutTime, ReactMontage);
+		}
+	}
+
+	M_TeamWeaponCrewAnimRuntime.Reset();
+}
+
+float USquadUnitAnimInstance::GetTeamWeaponCrewReactPlayRate(const UAnimMontage* ReactMontage,
+                                                              const float ReloadTime) const
+{
+	if (not IsValid(ReactMontage))
+	{
+		return 1.0f;
+	}
+	// Montage_Play's rate is multiplied by the asset RateScale while advancing; compensate so the sync stays exact.
+	const float SafeReloadTime = FMath::Max(ReloadTime, SquadUnitTeamWeaponCrewAnimStatics::MinReloadTimeSeconds);
+	const float SafeRateScale = FMath::Max(ReactMontage->RateScale, KINDA_SMALL_NUMBER);
+	const float SyncedPlayRate = ReactMontage->GetPlayLength() / (SafeReloadTime * SafeRateScale);
+	return SyncedPlayRate * M_TeamWeaponCrewAnimRuntime.M_ActiveEntry.PlayRate;
 }
