@@ -1352,7 +1352,8 @@ void UWeaponState::Reload()
 		const float ReloadSpeed = GetTimeWithFlux(WeaponData.ReloadSpeed, WeaponData.CooldownFlux);
 		World->GetTimerManager().SetTimer(M_WeaponTimerHandle, M_ReloadDel, ReloadSpeed, false);
 
-		WeaponOwner->OnReloadStart(WeaponIndex, WeaponData.ReloadSpeed);
+		// Report the flux adjusted time so reload animations end exactly when the reload timer fires.
+		WeaponOwner->OnReloadStart(WeaponIndex, ReloadSpeed);
 	}
 }
 

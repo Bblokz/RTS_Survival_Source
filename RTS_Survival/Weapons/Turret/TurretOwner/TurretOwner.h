@@ -61,6 +61,19 @@ protected:
 	}
 
 	/**
+	 * @brief Lets owners sync crew or reload animations to the actual reload timer of a turret weapon.
+	 * @param CallingTurret The turret whose weapon started reloading.
+	 * @param WeaponIndex Index of the reloading weapon on that turret.
+	 * @param ReloadTime Flux adjusted duration of the reload timer in seconds.
+	 */
+	virtual void OnTurretWeaponReloadStart(
+		ACPPTurretsMaster* CallingTurret,
+		const int32 WeaponIndex,
+		const float ReloadTime)
+	{
+	}
+
+	/**
 	 * @param CallingTurret The turret that destroyed its target.
 	 * @param CallingHullWeapon The Hull Weapon that destroyed the target.
 	 * @param DestroyedActor The actor that was destroyed. may be null.
