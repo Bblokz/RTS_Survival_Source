@@ -49,6 +49,9 @@ void UArmorCalculation::ClearArmorSetup()
 	M_ArmorSetup.MeshWithArmor0 = nullptr;
 	M_ArmorSetup.MeshWithArmor1 = nullptr;
 	M_ArmorSetup.MeshWithArmor2 = nullptr;
+	M_ArmorSetup.NumArmorPlates0 = 0;
+	M_ArmorSetup.NumArmorPlates1 = 0;
+	M_ArmorSetup.NumArmorPlates2 = 0;
 	for (int32 i = 0; i < DeveloperSettings::GameBalance::Weapons::MaxArmorPlatesPerMesh; i++)
 	{
 		M_ArmorSetup.ArmorSettings0[i].ArmorValue = 0.0f;
@@ -60,6 +63,91 @@ void UArmorCalculation::ClearArmorSetup()
 float UArmorCalculation::GetRearArmor() const
 {
 	return M_RearArmor;
+}
+
+bool UArmorCalculation::MultiplyArmorOfPlateType(
+	UMeshComponent* MeshWithArmor, const EArmorPlate PlateType, const float ArmorValueMultiplier)
+{
+	if (not FMath::IsFinite(ArmorValueMultiplier) || ArmorValueMultiplier < 0.0f)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("MultiplyArmorOfPlateType: ArmorValueMultiplier must be finite and nonnegative"));
+		return false;
+	}
+
+	const TArrayView<FArmorSettings> ArmorSettings = GetMutableArmorSettingsForMesh(MeshWithArmor);
+	bool bUpdatedArmor = false;
+	for (FArmorSettings& ArmorSetting : ArmorSettings)
+	{
+		if (ArmorSetting.ArmorType != PlateType)
+		{
+			continue;
+		}
+
+		ArmorSetting.ArmorValue *= ArmorValueMultiplier;
+		bUpdatedArmor = true;
+	}
+
+	if (bUpdatedArmor)
+	{
+		RefreshRearArmorCache();
+	}
+	return bUpdatedArmor;
+}
+
+bool UArmorCalculation::SetArmorOfPlateType(
+	UMeshComponent* MeshWithArmor, const EArmorPlate PlateType, const float NewArmorValue)
+{
+	if (not FMath::IsFinite(NewArmorValue) || NewArmorValue < 0.0f)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("SetArmorOfPlateType: NewArmorValue must be finite and nonnegative"));
+		return false;
+	}
+
+	const TArrayView<FArmorSettings> ArmorSettings = GetMutableArmorSettingsForMesh(MeshWithArmor);
+	bool bUpdatedArmor = false;
+	for (FArmorSettings& ArmorSetting : ArmorSettings)
+	{
+		if (ArmorSetting.ArmorType != PlateType)
+		{
+			continue;
+		}
+
+		ArmorSetting.ArmorValue = NewArmorValue;
+		bUpdatedArmor = true;
+	}
+
+	if (bUpdatedArmor)
+	{
+		RefreshRearArmorCache();
+	}
+	return bUpdatedArmor;
+}
+
+TArrayView<FArmorSettings> UArmorCalculation::GetMutableArmorSettingsForMesh(const UMeshComponent* MeshWithArmor)
+{
+	if (not IsValid(MeshWithArmor))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("GetMutableArmorSettingsForMesh: MeshWithArmor is invalid"));
+		return TArrayView<FArmorSettings>();
+	}
+
+	if (MeshWithArmor == M_ArmorSetup.MeshWithArmor0)
+	{
+		return MakeArrayView(M_ArmorSetup.ArmorSettings0, M_ArmorSetup.NumArmorPlates0);
+	}
+	if (MeshWithArmor == M_ArmorSetup.MeshWithArmor1)
+	{
+		return MakeArrayView(M_ArmorSetup.ArmorSettings1, M_ArmorSetup.NumArmorPlates1);
+	}
+	if (MeshWithArmor == M_ArmorSetup.MeshWithArmor2)
+	{
+		return MakeArrayView(M_ArmorSetup.ArmorSettings2, M_ArmorSetup.NumArmorPlates2);
+	}
+
+	RTSFunctionLibrary::ReportError(TEXT("GetMutableArmorSettingsForMesh: MeshWithArmor is not registered"));
+	return TArrayView<FArmorSettings>();
 }
 
 void UArmorCalculation::ApplyArmorValueMultiplierToMatchingPlates(
@@ -119,31 +207,26 @@ void UArmorCalculation::RefreshRearArmorCache()
 {
 	M_RearArmor = 0.0f;
 
-	if (TryRefreshRearArmorCacheFromSettings(M_ArmorSetup.ArmorSettings0))
+	if (TryRefreshRearArmorCacheFromSettings(
+		MakeArrayView(M_ArmorSetup.ArmorSettings0, M_ArmorSetup.NumArmorPlates0)))
 	{
 		return;
 	}
 
-	if (TryRefreshRearArmorCacheFromSettings(M_ArmorSetup.ArmorSettings1))
+	if (TryRefreshRearArmorCacheFromSettings(
+		MakeArrayView(M_ArmorSetup.ArmorSettings1, M_ArmorSetup.NumArmorPlates1)))
 	{
 		return;
 	}
 
-	TryRefreshRearArmorCacheFromSettings(M_ArmorSetup.ArmorSettings2);
+	TryRefreshRearArmorCacheFromSettings(
+		MakeArrayView(M_ArmorSetup.ArmorSettings2, M_ArmorSetup.NumArmorPlates2));
 }
 
-bool UArmorCalculation::TryRefreshRearArmorCacheFromSettings(const FArmorSettings* ArmorSettings)
+bool UArmorCalculation::TryRefreshRearArmorCacheFromSettings(const TConstArrayView<FArmorSettings> ArmorSettings)
 {
-	if (ArmorSettings == nullptr)
+	for (const FArmorSettings& ArmorSetting : ArmorSettings)
 	{
-		return false;
-	}
-
-	for (int32 ArmorPlateIndex = 0;
-	     ArmorPlateIndex < DeveloperSettings::GameBalance::Weapons::MaxArmorPlatesPerMesh;
-	     ArmorPlateIndex++)
-	{
-		const FArmorSettings& ArmorSetting = ArmorSettings[ArmorPlateIndex];
 		if (not GetIsRearHullArmor(ArmorSetting.ArmorType))
 		{
 			continue;
@@ -204,6 +287,7 @@ void UArmorCalculation::InitArmorCalculation(
 	if (M_ArmorSetup.MeshWithArmor0 == nullptr)
 	{
 		M_ArmorSetup.MeshWithArmor0 = MeshWithArmor;
+		M_ArmorSetup.NumArmorPlates0 = NumPlatesToCopy;
 		for (int32 i = 0; i < NumPlatesToCopy; i++)
 		{
 			M_ArmorSetup.ArmorSettings0[i] = ArmorSettingsForMesh[i];
@@ -212,6 +296,7 @@ void UArmorCalculation::InitArmorCalculation(
 	else if (M_ArmorSetup.MeshWithArmor1 == nullptr)
 	{
 		M_ArmorSetup.MeshWithArmor1 = MeshWithArmor;
+		M_ArmorSetup.NumArmorPlates1 = NumPlatesToCopy;
 		for (int32 i = 0; i < NumPlatesToCopy; i++)
 		{
 			M_ArmorSetup.ArmorSettings1[i] = ArmorSettingsForMesh[i];
@@ -220,6 +305,7 @@ void UArmorCalculation::InitArmorCalculation(
 	else if (M_ArmorSetup.MeshWithArmor2 == nullptr)
 	{
 		M_ArmorSetup.MeshWithArmor2 = MeshWithArmor;
+		M_ArmorSetup.NumArmorPlates2 = NumPlatesToCopy;
 		for (int32 i = 0; i < NumPlatesToCopy; i++)
 		{
 			M_ArmorSetup.ArmorSettings2[i] = ArmorSettingsForMesh[i];

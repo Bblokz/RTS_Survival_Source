@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/ArrayView.h"
 #include "Resistances/Resistances.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
@@ -55,6 +56,14 @@ struct FArmorSetup
 	UPROPERTY()
 	FArmorSettings ArmorSettings2[MaxArmorPlatesPerMesh];
 
+	// Distinguishes registered plates with zero armor from unused fixed-array entries.
+	UPROPERTY()
+	int32 NumArmorPlates0 = 0;
+	UPROPERTY()
+	int32 NumArmorPlates1 = 0;
+	UPROPERTY()
+	int32 NumArmorPlates2 = 0;
+
 	UPROPERTY()
 	TObjectPtr<UMeshComponent> MeshWithArmor0 = nullptr;
 	UPROPERTY()
@@ -91,6 +100,26 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "ArmorSettings")
 	void InitArmorCalculation(UMeshComponent* MeshWithArmor, TArray<FArmorSettings> ArmorSettingsForMesh,
 	                          const uint8 PlayerOwningArmor);
+
+	/**
+	 * @brief Allows Blueprint upgrades to scale current armor on a specific registered mesh.
+	 * @param MeshWithArmor Mesh previously supplied to InitArmorCalculation.
+	 * @param PlateType Every registered plate of this type on the mesh is updated.
+	 * @param ArmorValueMultiplier Finite, nonnegative multiplier applied to each plate's current armor.
+	 * @return True if at least one matching plate was updated.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "ArmorSettings")
+	bool MultiplyArmorOfPlateType(UMeshComponent* MeshWithArmor, EArmorPlate PlateType, float ArmorValueMultiplier);
+
+	/**
+	 * @brief Allows Blueprint armor changes to replace current values on a specific registered mesh.
+	 * @param MeshWithArmor Mesh previously supplied to InitArmorCalculation.
+	 * @param PlateType Every registered plate of this type on the mesh is updated, including zero-armor plates.
+	 * @param NewArmorValue Finite, nonnegative armor value assigned to each matching plate.
+	 * @return True if at least one matching plate was updated.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "ArmorSettings")
+	bool SetArmorOfPlateType(UMeshComponent* MeshWithArmor, EArmorPlate PlateType, float NewArmorValue);
 
 	/**
 	 * @brief Applies researched armour changes directly to the stored plate data so later hit calculations use them.
@@ -181,7 +210,8 @@ private:
 		float ArmorValueMultiplier);
 
 	void RefreshRearArmorCache();
-	bool TryRefreshRearArmorCacheFromSettings(const FArmorSettings* ArmorSettings);
+	TArrayView<FArmorSettings> GetMutableArmorSettingsForMesh(const UMeshComponent* MeshWithArmor);
+	bool TryRefreshRearArmorCacheFromSettings(TConstArrayView<FArmorSettings> ArmorSettings);
 
 	// Helper: Identifies which registered mesh corresponds to the hit component.
 	bool IdentifyHitMesh(const UPrimitiveComponent* HitComponent, const FArmorSettings*& OutSelectedArmorSettings,
