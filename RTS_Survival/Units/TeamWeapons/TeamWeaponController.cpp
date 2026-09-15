@@ -619,6 +619,20 @@ bool ATeamWeaponController::GetSquadAlreadyHasTeamWeapon() const
 	return GetHasControlledTeamWeapon();
 }
 
+bool ATeamWeaponController::TryGetOperatorDeathMontageSubtype(
+	const ASquadUnit* SquadUnit,
+	ESquadSubtype& OutTeamWeaponSquadSubtype) const
+{
+	OutTeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+	if (not IsValid(SquadUnit) || not GetIsCrewOperator(SquadUnit))
+	{
+		return false;
+	}
+
+	OutTeamWeaponSquadSubtype = GetTeamWeaponSquadSubtypeForCrewAnimations();
+	return true;
+}
+
 void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSelected,
                                             const ERTSDeathType DeathType)
 {

@@ -45,17 +45,15 @@ struct FSquadUnitRagdoll
 	FSquadUnitRagdoll();
 
 	/**
-	 * @brief Starts ragdoll simulation and destroys the active weapon for the owning unit.
+	 * @brief Starts ragdoll simulation after the death montage has completed.
 	 * @param OwningActor Actor owning this ragdoll configuration, used for error reporting and timers.
 	 * @param MeshComponent Skeletal mesh that ragdoll physics will be applied to.
 	 * @param AnimInstance Current animation instance driving the mesh; may be nullptr.
-	 * @param InfantryWeapon Infantry weapon that should be destroyed when ragdoll starts; may be nullptr.
 	 */
 	void StartRagdoll(
 		AActor* OwningActor,
 		USkeletalMeshComponent* MeshComponent,
-		USquadUnitAnimInstance* AnimInstance,
-		AInfantryWeaponMaster* InfantryWeapon);
+		USquadUnitAnimInstance* AnimInstance);
 
 
 	/** Whether this unit should use ragdoll on death. */
@@ -86,11 +84,7 @@ struct FSquadUnitRagdoll
 		meta = (EditCondition = "bApplyImpulseOnDeath"))
 	FName ImpulseBoneName;
 
-	/** Time in seconds before ragdoll physics is turned off (<= 0 disables this behaviour). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll")
-	float PhysicsTime;
-
-	/** Time in seconds after death before the unit actor is destroyed. */
+	/** Time in seconds that ragdoll physics runs after the death montage before the unit is destroyed. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll")
 	float TimeTillDeath;
 
@@ -115,14 +109,6 @@ struct FSquadUnitRagdoll
 		meta = (EditCondition = "bClampInitialVelocities"))
 	float MaxInitialSpeed;
 
-	/**
-	 * @brief Optional full-body death montages played after physics is disabled.
-	 * If non-empty and there is time left between PhysicsTime and TimeTillDeath,
-	 * the first valid montage in this list is played.
-	 */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll|Montage")
-	TArray<TObjectPtr<UAnimMontage>> DeathMontages;
-
 	/** True after ragdoll has been activated for this unit. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Ragdoll")
 	bool bIsRagdollActive;
@@ -136,11 +122,6 @@ private:
 	void SetupPhysicsAndCollision(USkeletalMeshComponent* MeshComponent) const;
 	void ApplyImpulse(USkeletalMeshComponent* MeshComponent) const;
 	void ClampInitialVelocities(USkeletalMeshComponent* MeshComponent) const;
-	void ScheduleDisablePhysics(
-		AActor* OwningActor,
-		USkeletalMeshComponent* MeshComponent,
-		USquadUnitAnimInstance* AnimInstance) const;
-	void DestroyWeapon(AInfantryWeaponMaster* InfantryWeapon) const;
 	void StartRagdoll_CreateEffect(AActor* OwningActor);
 };
 
@@ -416,7 +397,7 @@ protected:
 
 	/** The animation instance for this squad unit. */
 	UPROPERTY(BlueprintReadOnly)
-	USquadUnitAnimInstance* AnimBp_SquadUnit;
+	TObjectPtr<USquadUnitAnimInstance> AnimBp_SquadUnit;
 
 	/**
 	 * @brief Sets up the infantry weapon for this squad unit.
@@ -509,6 +490,9 @@ private:
 	 * @return True if the squad controller is valid; otherwise, false.
 	 */
 	bool GetIsValidSquadController() const;
+
+	/** @return True when the mesh-owned squad animation instance is available. */
+	bool GetIsValidAnimBpSquadUnit() const;
 
 	/** 
 	 * @return True if the AI controller is valid; otherwise, false.
@@ -637,6 +621,7 @@ private:
 	void BeginPlay_SetupSelectionHealthCompCollision() const;
 
 	void BeginPlay_SetPhysicalMaterials() const;
+	void BeginPlay_BindSelectionFunctions();
 
 	/** @brief Handles selection updates and command completion when the unit dies. */
 	void UnitDies_HandleSelectionAndCommand(bool& OutIsSelected);
@@ -646,6 +631,18 @@ private:
 
 	/** @brief Notifies the animation instance that the unit is dying. */
 	void UnitDies_NotifyAnimInstance();
+
+	/** @return Whether the animation Blueprint should select a crouched death montage for this death. */
+	bool UnitDies_GetShouldUseCrouchedDeathMontage() const;
+
+	/** Starts the selected montage and arms a bounded fallback in case the asset never completes. */
+	void UnitDies_StartDeathSequence(bool bUseCrouchedDeathMontage);
+
+	/** Continues into ragdoll or immediate destruction exactly once after the montage phase. */
+	void UnitDies_OnDeathMontageFinished();
+
+	/** @param ExpectedDuration One-pass montage duration used to bound a broken or looping asset. */
+	void UnitDies_ScheduleDeathMontageFallback(float ExpectedDuration);
 
 	/** @brief Destroys the infantry weapon if it is valid. */
 	void UnitDies_DestroyInfantryWeapon();
@@ -658,6 +655,8 @@ private:
 
 	/** @brief Schedules the destruction of the unit after a delay. */
 	void UnitDies_ScheduleDestruction();
+
+	bool bM_HasCompletedDeathMontage = false;
 
 	void StopMovementAndClearPath();
 	void PrepareForRangeClosingMovement(EAbilityID MovementAbility);

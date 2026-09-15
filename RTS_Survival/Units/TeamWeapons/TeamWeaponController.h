@@ -240,6 +240,16 @@ public:
 	const UTowedActorComponent* GetControlledTeamWeaponTowedActorComponentNoReport() const;
 	virtual bool GetSquadAlreadyHasTeamWeapon() const override;
 
+	/**
+	 * @brief Captures operator-specific death context before the dying unit is removed from the crew assignment.
+	 * @param SquadUnit Unit whose current operator assignment should be checked.
+	 * @param OutTeamWeaponSquadSubtype Team-weapon subtype used to resolve the death montage stance override.
+	 * @return True when the unit is currently assigned as a team-weapon operator.
+	 */
+	bool TryGetOperatorDeathMontageSubtype(
+		const ASquadUnit* SquadUnit,
+		ESquadSubtype& OutTeamWeaponSquadSubtype) const;
+
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad() override;
 	virtual void ExecuteDetachTowCommand() override;
 

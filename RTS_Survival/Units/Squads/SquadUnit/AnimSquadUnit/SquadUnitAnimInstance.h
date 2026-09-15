@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Animation/AimOffsetBlendSpace.h"
 #include "Animation/AnimInstance.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "SquadAnimationEnums/SquadAnimationEnums.h"
 #include "TeamWeaponCrewMontages/TeamWeaponCrewMontages.h"
 #include "SquadUnitAnimInstance.generated.h"
@@ -17,6 +18,8 @@ enum class ESquadAimPosition : uint8;
 enum class ESquadAimPositionMontage : uint8;
 enum class ESquadMovementAnimState : uint8;
 enum class ESquadWeaponMontage : uint8;
+
+DECLARE_DELEGATE(FOnSquadUnitDeathMontageFinished);
 
 // Struct to hold different Aim Offset references
 USTRUCT(BlueprintType)
@@ -249,6 +252,31 @@ struct FAimPositionMontages
 };
 
 /**
+ * @brief Supplies full-body death animations and the team-weapon stance overrides used at death.
+ * Designers configure this on the squad unit animation Blueprint defaults.
+ */
+USTRUCT(BlueprintType)
+struct FSquadUnitDeathMontages
+{
+	GENERATED_BODY()
+
+	/** @return A random valid montage for the requested death stance, or nullptr when none is usable. */
+	UAnimMontage* GetRandomDeathMontage(bool bUseCrouchedDeathMontage) const;
+
+	/** Full-body montages used when the unit dies standing. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death Montages")
+	TArray<TObjectPtr<UAnimMontage>> StandingDeathMontages;
+
+	/** Full-body montages used when the unit dies crouched or prone. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death Montages")
+	TArray<TObjectPtr<UAnimMontage>> CrouchedDeathMontages;
+
+	/** Team-weapon subtypes whose assigned operators always use a crouched death montage. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Death Montages|Team Weapon")
+	TArray<ESquadSubtype> TeamWeaponSubtypesUsingCrouchedDeathMontages;
+};
+
+/**
  * @brief Runtime state of the team weapon crew animation armed on this squad unit by its team weapon controller.
  * Armed means the operator is settled on a deployed team weapon; the entry decides whether it loops or reacts.
  */
@@ -287,7 +315,8 @@ struct FSquadUnitTeamWeaponCrewAnimRuntime
 };
 
 /**
- *
+ * @brief Drives squad-unit locomotion and selects the full-body montages used by unit gameplay.
+ * Animation Blueprint defaults provide the stance-specific and team-weapon-specific animation assets.
  */
 UCLASS(Blueprintable, BlueprintType)
 class RTS_SURVIVAL_API USquadUnitAnimInstance : public UAnimInstance
@@ -371,6 +400,28 @@ public:
 	// attempts to unbind the selection functions from the selection component delegatges.
 	void UnitDies();
 
+	/**
+	 * @brief Selects and starts the death montage while retaining a safe completion callback.
+	 * @param bUseCrouchedDeathMontage Whether to select from the crouched rather than standing array.
+	 * @param CompletionDelegate Callback used to continue death teardown after the montage ends.
+	 * @param OutExpectedDuration Expected one-pass duration, used by the owning unit as a safety timeout.
+	 * @return True only when a valid montage started playing.
+	 */
+	bool PlayDeathMontage(
+		bool bUseCrouchedDeathMontage,
+		const FOnSquadUnitDeathMontageFinished& CompletionDelegate,
+		float& OutExpectedDuration);
+
+	/**
+	 * @brief Keeps ordinary deaths stance-driven while team-weapon operators use designer subtype overrides.
+	 * @param bIsTeamWeaponOperator Whether the dying unit belongs to the controller's operator assignment.
+	 * @param TeamWeaponSquadSubtype Subtype of that operator's team weapon; ignored for ordinary units.
+	 * @return True when the crouched death montage array should be used.
+	 */
+	bool GetShouldUseCrouchedDeathMontage(
+		bool bIsTeamWeaponOperator,
+		ESquadSubtype TeamWeaponSquadSubtype) const;
+
 	// ----- Team Weapon Crew Animations -----
 
 	/**
@@ -443,6 +494,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Team Weapon Crew")
 	FTeamWeaponCrewMontages TeamWeaponCrewMontages;
 
+	// Full body death montages and the team-weapon subtypes that override the current unit stance.
+	UPROPERTY(EditDefaultsOnly, Category = "Death")
+	FSquadUnitDeathMontages DeathMontages;
+
 	UPROPERTY(BlueprintReadOnly)
 	float Speed;
 
@@ -505,6 +560,7 @@ private:
 	void PlayTeamWeaponCrewLoopMontage(UAnimMontage* LoopMontage, const float PlayRate);
 	void OnTeamWeaponCrewLoopMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void OnTeamWeaponCrewReactMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	/** Stops whichever crew montage is playing and clears the crew runtime, without touching other montages. */
 	void ClearTeamWeaponCrewAnimationRuntime(const bool bStopPlayingMontages);
@@ -523,4 +579,6 @@ private:
 	// Dedicated delegates; M_MontageEndedDelegate is rebound by StartMontage and must not be shared.
 	FOnMontageEnded M_TeamWeaponCrewLoopMontageEndedDelegate;
 	FOnMontageEnded M_TeamWeaponCrewReactMontageEndedDelegate;
+	FOnMontageEnded M_DeathMontageEndedDelegate;
+	FOnSquadUnitDeathMontageFinished M_DeathMontageCompletionDelegate;
 };

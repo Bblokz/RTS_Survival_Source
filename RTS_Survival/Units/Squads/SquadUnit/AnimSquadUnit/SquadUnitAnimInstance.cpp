@@ -357,6 +357,46 @@ FAimPositionMontages::FAimPositionMontages()
 {
 }
 
+UAnimMontage* FSquadUnitDeathMontages::GetRandomDeathMontage(const bool bUseCrouchedDeathMontage) const
+{
+	const TArray<TObjectPtr<UAnimMontage>>& Montages =
+		bUseCrouchedDeathMontage ? CrouchedDeathMontages : StandingDeathMontages;
+
+	int32 ValidMontageCount = 0;
+	for (const TObjectPtr<UAnimMontage>& Montage : Montages)
+	{
+		if (not IsValid(Montage))
+		{
+			continue;
+		}
+
+		++ValidMontageCount;
+	}
+
+	if (ValidMontageCount == 0)
+	{
+		return nullptr;
+	}
+
+	int32 SelectedValidMontageIndex = FMath::RandRange(0, ValidMontageCount - 1);
+	for (const TObjectPtr<UAnimMontage>& Montage : Montages)
+	{
+		if (not IsValid(Montage))
+		{
+			continue;
+		}
+
+		if (SelectedValidMontageIndex == 0)
+		{
+			return Montage.Get();
+		}
+
+		--SelectedValidMontageIndex;
+	}
+
+	return nullptr;
+}
+
 
 UAnimMontage* FAimPositionMontages::GetToCrouchAimPositionMontage(
 	const ESquadWeaponAimOffset AimOffsetType)
@@ -554,26 +594,98 @@ void USquadUnitAnimInstance::SetWeaponAimOffset(const ESquadWeaponAimOffset AimO
 
 void USquadUnitAnimInstance::UnitDies()
 {
-	// The ragdoll stops all animation; only the bookkeeping needs clearing here.
-	ClearTeamWeaponCrewAnimationRuntime(false);
-	if (IsValid(GetSkelMeshComponent()))
+	// Death montages own the full-body slot, so clear any montage and crew bookkeeping before selection.
+	StopAllMontages();
+
+	USkeletalMeshComponent* SkeletalMeshComponent = GetSkelMeshComponent();
+	if (not IsValid(SkeletalMeshComponent))
 	{
-		AActor* Owner = GetSkelMeshComponent()->GetOwner();
-		if (IsValid(Owner))
-		{
-			USelectionComponent* SelectionComponent = Owner->FindComponentByClass<USelectionComponent>();
-			if (IsValid(SelectionComponent))
-			{
-				SelectionComponent->OnUnitSelected.RemoveAll(this);
-				SelectionComponent->OnUnitDeselected.RemoveAll(this);
-				return;
-			}
-		}
+		RTSFunctionLibrary::ReportError("Could not find the skel mesh component in USquadUnitAnimInstance::UnitDies");
+		return;
+	}
+
+	AActor* Owner = SkeletalMeshComponent->GetOwner();
+	if (not IsValid(Owner))
+	{
+		RTSFunctionLibrary::ReportError("Could not find the owner in USquadUnitAnimInstance::UnitDies");
+		return;
+	}
+
+	USelectionComponent* SelectionComponent = Owner->FindComponentByClass<USelectionComponent>();
+	if (not IsValid(SelectionComponent))
+	{
 		RTSFunctionLibrary::ReportError(
 			"Could not find the selection component in USquadUnitAnimInstance::UnitDies");
 		return;
 	}
-	RTSFunctionLibrary::ReportError("Could not find the skel mesh component in USquadUnitAnimInstance::UnitDies");
+
+	SelectionComponent->OnUnitSelected.RemoveAll(this);
+	SelectionComponent->OnUnitDeselected.RemoveAll(this);
+}
+
+bool USquadUnitAnimInstance::PlayDeathMontage(
+	const bool bUseCrouchedDeathMontage,
+	const FOnSquadUnitDeathMontageFinished& CompletionDelegate,
+	float& OutExpectedDuration)
+{
+	OutExpectedDuration = 0.0f;
+	UAnimMontage* DeathMontage = DeathMontages.GetRandomDeathMontage(bUseCrouchedDeathMontage);
+	if (not IsValid(DeathMontage))
+	{
+		const FString StanceName = bUseCrouchedDeathMontage ? TEXT("crouched") : TEXT("standing");
+		RTSFunctionLibrary::ReportError(
+			"No valid " + StanceName + " death montage is configured on " + GetName());
+		return false;
+	}
+
+	const float DeathMontageLength = DeathMontage->GetPlayLength();
+	if (not FMath::IsFinite(DeathMontageLength) || DeathMontageLength <= KINDA_SMALL_NUMBER)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Invalid death montage duration for " + DeathMontage->GetName() + " on " + GetName());
+		return false;
+	}
+
+	const float PlayedDuration = Montage_Play(
+		DeathMontage,
+		1.0f,
+		EMontagePlayReturnType::Duration);
+	if (not FMath::IsFinite(PlayedDuration) || PlayedDuration <= KINDA_SMALL_NUMBER)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to play death montage " + DeathMontage->GetName() + " on " + GetName());
+		return false;
+	}
+
+	M_DeathMontageCompletionDelegate = CompletionDelegate;
+	M_DeathMontageEndedDelegate.Unbind();
+	M_DeathMontageEndedDelegate.BindUObject(this, &USquadUnitAnimInstance::OnDeathMontageEnded);
+	Montage_SetEndDelegate(M_DeathMontageEndedDelegate, DeathMontage);
+	OutExpectedDuration = PlayedDuration + FMath::Max(DeathMontage->BlendOut.GetBlendTime(), 0.0f);
+	return true;
+}
+
+bool USquadUnitAnimInstance::GetShouldUseCrouchedDeathMontage(
+	const bool bIsTeamWeaponOperator,
+	const ESquadSubtype TeamWeaponSquadSubtype) const
+{
+	if (bIsTeamWeaponOperator)
+	{
+		return DeathMontages.TeamWeaponSubtypesUsingCrouchedDeathMontages.Contains(TeamWeaponSquadSubtype);
+	}
+
+	return AimPositionMontages.AimPosition != ESquadAimPosition::Standing;
+}
+
+void USquadUnitAnimInstance::OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	static_cast<void>(Montage);
+	static_cast<void>(bInterrupted);
+
+	FOnSquadUnitDeathMontageFinished CompletionDelegate = M_DeathMontageCompletionDelegate;
+	M_DeathMontageCompletionDelegate.Unbind();
+	M_DeathMontageEndedDelegate.Unbind();
+	CompletionDelegate.ExecuteIfBound();
 }
 
 void USquadUnitAnimInstance::StartMontage(

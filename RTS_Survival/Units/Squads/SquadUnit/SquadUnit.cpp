@@ -33,6 +33,7 @@
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/SecondaryWeaponComp/SecondaryWeapon.h"
@@ -47,14 +48,12 @@ FSquadUnitRagdoll::FSquadUnitRagdoll()
 	  , ImpulseStrength(30000.0f)
 	  , ImpulseDirection(FVector(-1.0f, 0.0f, 0.0f))
 	  , ImpulseBoneName(TEXT("pelvis"))
-	  , PhysicsTime(1.0f)
 	  , TimeTillDeath(3.0f)
 	  , LinearDamping(0.5f)
 	  , AngularDamping(0.5f)
 	  , MassScale(1.0f)
 	  , bClampInitialVelocities(true)
 	  , MaxInitialSpeed(1200.0f)
-	  , DeathMontages()
 	  , bIsRagdollActive(false)
 {
 }
@@ -62,12 +61,8 @@ FSquadUnitRagdoll::FSquadUnitRagdoll()
 void FSquadUnitRagdoll::StartRagdoll(
 	AActor* OwningActor,
 	USkeletalMeshComponent* MeshComponent,
-	USquadUnitAnimInstance* AnimInstance,
-	AInfantryWeaponMaster* InfantryWeapon)
+	USquadUnitAnimInstance* AnimInstance)
 {
-	// Always destroy the weapon when ragdoll starts (or when death is handled if ragdoll is disabled).
-	DestroyWeapon(InfantryWeapon);
-
 	if (not bEnableRagdoll)
 	{
 		return;
@@ -86,7 +81,7 @@ void FSquadUnitRagdoll::StartRagdoll(
 	SetupPhysicsAndCollision(MeshComponent);
 	ApplyImpulse(MeshComponent);
 	ClampInitialVelocities(MeshComponent);
-	ScheduleDisablePhysics(OwningActor, MeshComponent, AnimInstance);
+	StartRagdoll_CreateEffect(OwningActor);
 
 	bIsRagdollActive = true;
 }
@@ -213,114 +208,6 @@ void FSquadUnitRagdoll::ClampInitialVelocities(USkeletalMeshComponent* MeshCompo
 		const FVector ClampedVelocity = BoneVelocity.GetSafeNormal() * MaxInitialSpeed;
 		MeshComponent->SetPhysicsLinearVelocity(ClampedVelocity, false, BoneName);
 	}
-}
-
-void FSquadUnitRagdoll::ScheduleDisablePhysics(
-	AActor* OwningActor,
-	USkeletalMeshComponent* MeshComponent,
-	USquadUnitAnimInstance* AnimInstance) const
-{
-	if (PhysicsTime <= 0.0f)
-	{
-		return;
-	}
-
-	if (not IsValid(OwningActor) || not IsValid(MeshComponent))
-	{
-		return;
-	}
-
-	UWorld* World = OwningActor->GetWorld();
-	if (not IsValid(World))
-	{
-		return;
-	}
-
-	// Prepare weak references for safety.
-	TWeakObjectPtr<USkeletalMeshComponent> MeshComponentWeak = MeshComponent;
-	TWeakObjectPtr<USquadUnitAnimInstance> AnimInstanceWeak = AnimInstance;
-
-	// Copy montages into weak pointers so we do not depend on the struct lifetime in the lambda.
-	TArray<TWeakObjectPtr<UAnimMontage>> DeathMontagesWeak;
-	DeathMontagesWeak.Reserve(DeathMontages.Num());
-	for (UAnimMontage* Montage : DeathMontages)
-	{
-		if (IsValid(Montage))
-		{
-			DeathMontagesWeak.Add(Montage);
-		}
-	}
-
-	constexpr float MinRemainingTimeForMontage = 0.2f;
-	const bool bCanPlayMontage =
-		DeathMontagesWeak.Num() > 0 && (TimeTillDeath - PhysicsTime) >= MinRemainingTimeForMontage;
-
-	FTimerDelegate DisablePhysicsDelegate;
-	DisablePhysicsDelegate.BindLambda(
-		[MeshComponentWeak, AnimInstanceWeak, DeathMontagesWeak, bCanPlayMontage]()
-		{
-			if (not MeshComponentWeak.IsValid())
-			{
-				return;
-			}
-
-			USkeletalMeshComponent* MeshComponentLocal = MeshComponentWeak.Get();
-			MeshComponentLocal->SetSimulatePhysics(false);
-			MeshComponentLocal->SetAllBodiesSimulatePhysics(false);
-			MeshComponentLocal->bBlendPhysics = false;
-
-			// Re-enable animation either way so the pose is driven by the AnimBP again.
-			MeshComponentLocal->bPauseAnims = false;
-			MeshComponentLocal->bNoSkeletonUpdate = false;
-
-			if (not bCanPlayMontage)
-			{
-				return;
-			}
-
-			if (not AnimInstanceWeak.IsValid())
-			{
-				return;
-			}
-
-			USquadUnitAnimInstance* AnimInstanceLocal = AnimInstanceWeak.Get();
-			if (not IsValid(AnimInstanceLocal))
-			{
-				return;
-			}
-
-			// Play the first valid full-body death montage.
-			for (const TWeakObjectPtr<UAnimMontage>& MontageWeak : DeathMontagesWeak)
-			{
-				if (not MontageWeak.IsValid())
-				{
-					continue;
-				}
-
-				UAnimMontage* MontageToPlay = MontageWeak.Get();
-				if (not IsValid(MontageToPlay))
-				{
-					continue;
-				}
-
-				AnimInstanceLocal->Montage_Play(MontageToPlay);
-				break;
-			}
-		});
-
-	FTimerHandle DisablePhysicsHandle;
-	World->GetTimerManager().SetTimer(DisablePhysicsHandle, DisablePhysicsDelegate, PhysicsTime, false);
-}
-
-void FSquadUnitRagdoll::DestroyWeapon(AInfantryWeaponMaster* InfantryWeapon) const
-{
-	if (not IsValid(InfantryWeapon))
-	{
-		return;
-	}
-
-	InfantryWeapon->DisableAllWeapons();
-	InfantryWeapon->Destroy();
 }
 
 void FSquadUnitRagdoll::StartRagdoll_CreateEffect(AActor* OwningActor)
@@ -649,17 +536,7 @@ void ASquadUnit::BeginPlay()
 	BeginPlay_SetupChildActorWeaponComp();
 	// Set up a timer with lambda to update the speed of the unit on the anim instance periodically.
 	BeginPlay_SetupUpdateAnimSpeed();
-
-	if (IsValid(SelectionComponent) && IsValid(AnimBp_SquadUnit))
-	{
-		// Bind the selection functions.
-		AnimBp_SquadUnit->BindSelectionFunctions(SelectionComponent);
-	}
-	else
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "SelectionComponent or AnimBp_SquadUnit",
-		                                             "ASquadUnit::BeginPlay");
-	}
+	BeginPlay_BindSelectionFunctions();
 	// Disable navigation effects.
 	BeginPlay_SetupSelectionHealthCompCollision();
 }
@@ -824,9 +701,8 @@ void ASquadUnit::PostInitializeComp_SetupAISquadUnit()
 void ASquadUnit::PostInitializeComp_SetupAnimBP()
 {
 	AnimBp_SquadUnit = Cast<USquadUnitAnimInstance>(GetMesh()->GetAnimInstance());
-	if (!IsValid(AnimBp_SquadUnit))
+	if (not GetIsValidAnimBpSquadUnit())
 	{
-		RTSFunctionLibrary::ReportNullErrorComponent(this, "AnimBp_SquadUnit", "ASquadUnit::PostInitializeComponents");
 		return;
 	}
 	AnimBp_SquadUnit->SetSquadUnitMesh(GetMesh());
@@ -1153,6 +1029,21 @@ bool ASquadUnit::GetIsValidSquadController() const
 	return false;
 }
 
+bool ASquadUnit::GetIsValidAnimBpSquadUnit() const
+{
+	if (IsValid(AnimBp_SquadUnit))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"AnimBp_SquadUnit",
+		"ASquadUnit::GetIsValidAnimBpSquadUnit",
+		this);
+	return false;
+}
+
 bool ASquadUnit::GetIsValidAISquadUnit()
 {
 	if (IsValid(M_AISquadUnit))
@@ -1276,7 +1167,7 @@ void ASquadUnit::SetupSwappedWeapon(AInfantryWeaponMaster* NewWeapon)
 
 	NewWeapon->DisableWeaponSearch(true);
 
-	if (IsValid(AnimBp_SquadUnit))
+	if (GetIsValidAnimBpSquadUnit())
 	{
 		AnimBp_SquadUnit->SetWeaponAimOffset(NewWeapon->GetAimOffsetType());
 	}
@@ -1370,7 +1261,7 @@ void ASquadUnit::OnSecondaryWeaponLoaded(
 
 bool ASquadUnit::OnSecondaryWeapon_ValidatePreconditions()
 {
-	return GetIsValidChildWeaponActor() && IsValid(AnimBp_SquadUnit) && IsValid(RTSComponent);
+	return GetIsValidChildWeaponActor() && GetIsValidAnimBpSquadUnit() && IsValid(RTSComponent);
 }
 
 void ASquadUnit::OnSecondaryWeapon_TransferPrimaryWeaponDetailsToSecondary(
@@ -1652,6 +1543,25 @@ void ASquadUnit::BeginPlay_SetPhysicalMaterials() const
 	MeshComp->SetPhysMaterialOverride(PhysicalMaterialOverride);
 }
 
+void ASquadUnit::BeginPlay_BindSelectionFunctions()
+{
+	if (not IsValid(SelectionComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(
+			this,
+			"SelectionComponent",
+			"ASquadUnit::BeginPlay_BindSelectionFunctions");
+		return;
+	}
+
+	if (not GetIsValidAnimBpSquadUnit())
+	{
+		return;
+	}
+
+	AnimBp_SquadUnit->BindSelectionFunctions(SelectionComponent);
+}
+
 void ASquadUnit::TerminateScavenging()
 {
 	if (IsValid(M_ScavengeEquipmentEffect))
@@ -1672,7 +1582,7 @@ void ASquadUnit::TerminateScavenging()
 	}
 
 	// Reset animations
-	if (IsValid(AnimBp_SquadUnit))
+	if (GetIsValidAnimBpSquadUnit())
 	{
 		if (GetHasValidScavengerComp())
 		{
@@ -1702,6 +1612,9 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 	}
 
 	SetUnitDying();
+	const bool bUseCrouchedDeathMontage = DeathType != ERTSDeathType::Scavenging &&
+		UnitDies_GetShouldUseCrouchedDeathMontage();
+
 	// Check if the no vl on death flag is set, if not determine and play death voice line.
 	if (DeathType != ERTSDeathType::Scavenging && not bM_NoDeathVoiceLineOnDeath)
 	{
@@ -1721,8 +1634,8 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 
 	if (DeathType != ERTSDeathType::Scavenging)
 	{
-		// Start ragdoll simulation and ensure the weapon is destroyed at this moment.
-		M_RagdollSettings.StartRagdoll(this, GetMesh(), AnimBp_SquadUnit, M_InfantryWeapon);
+		// The weapon must stop participating in combat immediately; the body montage plays before ragdoll.
+		UnitDies_DestroyInfantryWeapon();
 	}
 	else
 	{
@@ -1740,8 +1653,13 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 
 	OnUnitDies.Broadcast();
 
-	// Schedule the actual destruction of this unit after a short delay.
-	UnitDies_ScheduleDestruction();
+	if (DeathType == ERTSDeathType::Scavenging)
+	{
+		UnitDies_ScheduleDestruction();
+		return;
+	}
+
+	UnitDies_StartDeathSequence(bUseCrouchedDeathMontage);
 }
 
 
@@ -1773,10 +1691,104 @@ void ASquadUnit::UnitDies_RemoveFromSquadController(bool bIsSelected, const ERTS
 
 void ASquadUnit::UnitDies_NotifyAnimInstance()
 {
-	if (IsValid(AnimBp_SquadUnit))
+	if (not GetIsValidAnimBpSquadUnit())
 	{
-		AnimBp_SquadUnit->UnitDies();
+		return;
 	}
+
+	AnimBp_SquadUnit->UnitDies();
+}
+
+bool ASquadUnit::UnitDies_GetShouldUseCrouchedDeathMontage() const
+{
+	if (not GetIsValidAnimBpSquadUnit())
+	{
+		return false;
+	}
+
+	bool bIsTeamWeaponOperator = false;
+	ESquadSubtype TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+	if (GetIsValidSquadController())
+	{
+		const ATeamWeaponController* TeamWeaponController = Cast<ATeamWeaponController>(M_SquadController);
+		if (IsValid(TeamWeaponController))
+		{
+			bIsTeamWeaponOperator = TeamWeaponController->TryGetOperatorDeathMontageSubtype(
+				this,
+				TeamWeaponSquadSubtype);
+		}
+	}
+
+	return AnimBp_SquadUnit->GetShouldUseCrouchedDeathMontage(
+		bIsTeamWeaponOperator,
+		TeamWeaponSquadSubtype);
+}
+
+void ASquadUnit::UnitDies_StartDeathSequence(const bool bUseCrouchedDeathMontage)
+{
+	if (not GetIsValidAnimBpSquadUnit())
+	{
+		UnitDies_OnDeathMontageFinished();
+		return;
+	}
+
+	FOnSquadUnitDeathMontageFinished CompletionDelegate;
+	CompletionDelegate.BindUObject(this, &ASquadUnit::UnitDies_OnDeathMontageFinished);
+
+	float ExpectedDuration = 0.0f;
+	if (not AnimBp_SquadUnit->PlayDeathMontage(
+		bUseCrouchedDeathMontage,
+		CompletionDelegate,
+		ExpectedDuration))
+	{
+		UnitDies_OnDeathMontageFinished();
+		return;
+	}
+
+	UnitDies_ScheduleDeathMontageFallback(ExpectedDuration);
+}
+
+void ASquadUnit::UnitDies_OnDeathMontageFinished()
+{
+	if (bM_HasCompletedDeathMontage)
+	{
+		return;
+	}
+	bM_HasCompletedDeathMontage = true;
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_DeathTimerHandle);
+	}
+
+	if (not M_RagdollSettings.bEnableRagdoll)
+	{
+		Destroy();
+		return;
+	}
+
+	M_RagdollSettings.StartRagdoll(this, GetMesh(), AnimBp_SquadUnit);
+	UnitDies_ScheduleDestruction();
+}
+
+void ASquadUnit::UnitDies_ScheduleDeathMontageFallback(const float ExpectedDuration)
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		UnitDies_OnDeathMontageFinished();
+		return;
+	}
+
+	constexpr float DeathMontageCompletionGraceSeconds = 0.25f;
+	const float FallbackDelay = FMath::Max(ExpectedDuration, KINDA_SMALL_NUMBER) +
+		DeathMontageCompletionGraceSeconds;
+	World->GetTimerManager().SetTimer(
+		M_DeathTimerHandle,
+		this,
+		&ASquadUnit::UnitDies_OnDeathMontageFinished,
+		FallbackDelay,
+		false);
 }
 
 void ASquadUnit::UnitDies_DestroyInfantryWeapon()
@@ -1786,6 +1798,7 @@ void ASquadUnit::UnitDies_DestroyInfantryWeapon()
 		M_InfantryWeapon->DisableAllWeapons();
 		M_InfantryWeapon->Destroy();
 	}
+	M_InfantryWeapon = nullptr;
 }
 
 void ASquadUnit::UnitDies_RemoveFromAIController()
@@ -1840,6 +1853,11 @@ void ASquadUnit::UnitDies_ScheduleDestruction()
 	}
 
 	const float ClampedTimeTillDeath = FMath::Max(M_RagdollSettings.TimeTillDeath, 0.0f);
+	if (ClampedTimeTillDeath <= KINDA_SMALL_NUMBER)
+	{
+		Destroy();
+		return;
+	}
 
 	FTimerDelegate DeathDelegate;
 	TWeakObjectPtr<ASquadUnit> SquadUnitWeak = this;
@@ -2025,7 +2043,7 @@ void ASquadUnit::OnScavengeStart(UStaticMesh* ScavengeEquipment, const FName Sca
 	// create the equipment mesh if valid and attach at socket name to the mesh of the unit.
 	// Start timer on scav comp, if already done this will do nothing (done by other squad unit)
 	ScaveObj->StartScavengeTimer(GetSquadControllerChecked(), TotalScavengeTime);
-	if (not IsValid(AnimBp_SquadUnit))
+	if (not GetIsValidAnimBpSquadUnit())
 	{
 		return;
 	}
@@ -2143,7 +2161,7 @@ void ASquadUnit::BeginPlay_SetupUpdateAnimSpeed()
 
 		ASquadUnit* SquadUnit = SquadUnitWeak.Get();
 
-		if (not IsValid(SquadUnit->AnimBp_SquadUnit))
+		if (not SquadUnit->GetIsValidAnimBpSquadUnit())
 		{
 			return;
 		}
