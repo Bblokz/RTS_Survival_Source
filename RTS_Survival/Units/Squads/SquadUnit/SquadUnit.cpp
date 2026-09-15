@@ -423,6 +423,16 @@ bool ASquadUnit::GetIsSquadUnitIdleAndNotEvading() const
 	return true;
 }
 
+bool ASquadUnit::GetIsPathFollowingActive() const
+{
+	// Silent: a unit without an AI controller simply is not path following.
+	if (not IsValid(M_AISquadUnit))
+	{
+		return false;
+	}
+	return M_AISquadUnit->GetMoveStatus() != EPathFollowingStatus::Idle;
+}
+
 void ASquadUnit::MoveToEvasionLocation(const FVector& EvasionLocation)
 {
 	constexpr EAbilityID AbilityNoSquadLogic = EAbilityID::IdNoAbility_MoveToEvasionLocation;

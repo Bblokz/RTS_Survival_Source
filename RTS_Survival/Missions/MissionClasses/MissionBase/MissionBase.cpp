@@ -1,6 +1,9 @@
 ﻿#include "MissionBase.h"
 
 #include "Engine/Engine.h"
+#include "Engine/EngineTypes.h"
+#include "Components/ActorComponent.h"
+#include "Components/PrimitiveComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
@@ -34,6 +37,24 @@
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+
+namespace
+{
+	EAttachmentRule ToNativeAttachmentRule(const EMissionAttachmentRule Rule)
+	{
+		switch (Rule)
+		{
+		case EMissionAttachmentRule::KeepRelative:
+			return EAttachmentRule::KeepRelative;
+		case EMissionAttachmentRule::KeepWorld:
+			return EAttachmentRule::KeepWorld;
+		case EMissionAttachmentRule::SnapToTarget:
+			return EAttachmentRule::SnapToTarget;
+		default:
+			return EAttachmentRule::KeepRelative;
+		}
+	}
+}
 
 UMissionBase::UMissionBase()
 {
@@ -2205,6 +2226,81 @@ void UMissionBase::RegisterCallbackOnTankDies(ATankMaster* Tank)
 		}
 	};
 	Tank->OnUnitDies.AddLambda(MissionCallBack);
+}
+
+void UMissionBase::RegisterCallbackOnTankDiesAndAttach(
+	const FMissionAttachmentTransformRules& AttachmentRules,
+	const TSubclassOf<AActor> ActorClassToAttach,
+	ATankMaster* Tank)
+{
+	if (not EnsureTankIsValid(Tank) || not *ActorClassToAttach)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.Owner = Tank;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AActor* const AttachedActor = World->SpawnActor<AActor>(
+		ActorClassToAttach,
+		Tank->GetActorLocation(),
+		Tank->GetActorRotation(),
+		SpawnParameters);
+	if (not IsValid(AttachedActor))
+	{
+		return;
+	}
+
+	const FAttachmentTransformRules NativeAttachmentRules(
+		ToNativeAttachmentRule(AttachmentRules.LocationRule),
+		ToNativeAttachmentRule(AttachmentRules.RotationRule),
+		ToNativeAttachmentRule(AttachmentRules.ScaleRule),
+		AttachmentRules.bWeldSimulatedBodies);
+
+	AttachedActor->SetActorEnableCollision(false);
+	TInlineComponentArray<UActorComponent*> ActorComponents;
+	AttachedActor->GetComponents(ActorComponents);
+	for (UActorComponent* const ActorComponent : ActorComponents)
+	{
+		if (not IsValid(ActorComponent))
+		{
+			continue;
+		}
+
+		ActorComponent->SetCanEverAffectNavigation(false);
+		UPrimitiveComponent* const PrimitiveComponent = Cast<UPrimitiveComponent>(ActorComponent);
+		if (not IsValid(PrimitiveComponent))
+		{
+			continue;
+		}
+
+		PrimitiveComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		PrimitiveComponent->SetSimulatePhysics(false);
+	}
+
+	if (not AttachedActor->AttachToActor(Tank, NativeAttachmentRules))
+	{
+		AttachedActor->Destroy();
+		return;
+	}
+
+	RegisterCallbackOnTankDies(Tank);
+	const TWeakObjectPtr<AActor> WeakAttachedActor = AttachedActor;
+	Tank->OnUnitDies.AddLambda([WeakAttachedActor]()
+	{
+		if (not WeakAttachedActor.IsValid())
+		{
+			return;
+		}
+
+		WeakAttachedActor->Destroy();
+	});
 }
 
 void UMissionBase::RegisterCallbackOnSquadTWAbandonedOrLostWeapon(

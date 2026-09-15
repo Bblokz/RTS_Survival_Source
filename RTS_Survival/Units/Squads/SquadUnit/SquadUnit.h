@@ -228,6 +228,9 @@ public:
 	// Then the evasion component can order it to move out of the way.
 	bool GetIsSquadUnitIdleAndNotEvading() const;
 
+	// True while the AI controller is still moving this unit along a path, whatever ability issued the move.
+	bool GetIsPathFollowingActive() const;
+
 	// Does not trigger any logic on the squad controller, simply strafes to the location.
 	void MoveToEvasionLocation(const FVector& EvasionLocation);
 

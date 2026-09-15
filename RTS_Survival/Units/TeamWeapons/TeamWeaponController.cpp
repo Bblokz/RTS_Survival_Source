@@ -47,14 +47,27 @@ namespace TeamWeaponCrewAnimationStatics
 {
 	// Crew animations follow the first weapon only; team weapons are assumed to carry a single weapon.
 	constexpr int32 PrimaryWeaponIndex = 0;
-	// Below this planar speed an operator standing inside its crew position radius counts as settled.
-	constexpr float SettledSpeedThresholdCmPerSec = 5.0f;
+	// Below this planar speed an idle operator counts as settled; braking after a crew move ends well under this.
+	// Kept below the anim instance drop speed so arming and dropping can never flap on a braking unit.
+	constexpr float SettledSpeedThresholdCmPerSec = 30.0f;
+	// Crew moves allow partial paths, so operators may legally stop short of their spot and are snapped when armed.
+	// Beyond this distance the unit is considered stuck and is left alone rather than teleported across the map.
+	constexpr float MaxSnapToCrewPositionDistanceCm = 600.0f;
 
-	void PrintCrewAnimDebug(const FString& Message)
+	void PrintCrewAnimDebug(const AActor* Operator, const FString& Message)
 	{
 		if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
 		{
-			RTSFunctionLibrary::PrintString(Message, FColor::Cyan);
+			if (not IsValid(Operator))
+			{
+				return;
+			}
+
+			RTSFunctionLibrary::PrintString(
+				Operator->GetActorLocation(),
+				Operator,
+				Message,
+				FColor::Cyan);
 		}
 	}
 
@@ -2655,23 +2668,34 @@ void ATeamWeaponController::SnapOperatorsToCrewPositions()
 			continue;
 		}
 
-		FVector OperatorTeleportLocation = CrewPosition->GetComponentLocation();
-		if (not TryGetLandscapeTeleportLocationForCrewPosition(SquadUnit, OperatorTeleportLocation,
-		                                                       OperatorTeleportLocation))
-		{
-			continue;
-		}
-
-		SquadUnit->SetActorLocationAndRotation(
-			OperatorTeleportLocation,
-			CrewPosition->GetComponentRotation(),
-			false,
-			nullptr,
-			ETeleportType::TeleportPhysics);
+		SnapOperatorToCrewPosition(SquadUnit, CrewPosition);
 	}
 
 	// Teleported operators are settled by definition; arm right away instead of waiting for the tick fallback.
 	TryArmCrewAnimationsForSettledOperators();
+}
+
+bool ATeamWeaponController::SnapOperatorToCrewPosition(ASquadUnit* SquadUnit, const UCrewPosition* CrewPosition) const
+{
+	if (not IsValid(SquadUnit) || not IsValid(CrewPosition))
+	{
+		return false;
+	}
+
+	FVector OperatorTeleportLocation = CrewPosition->GetComponentLocation();
+	if (not TryGetLandscapeTeleportLocationForCrewPosition(SquadUnit, OperatorTeleportLocation,
+	                                                       OperatorTeleportLocation))
+	{
+		return false;
+	}
+
+	SquadUnit->SetActorLocationAndRotation(
+		OperatorTeleportLocation,
+		CrewPosition->GetComponentRotation(),
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics);
+	return true;
 }
 
 bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const ASquadUnit* SquadUnit,
@@ -3256,19 +3280,24 @@ bool ATeamWeaponController::GetIsOperatorSettledAtCrewPosition(const FTeamWeapon
 	}
 
 	const ASquadUnit* Operator = Slot.M_Operator.Get();
-	// Never below the nav acceptance radius, otherwise a unit that legally stopped could never count as settled.
-	const float SettledRadiusCm = FMath::Max(
-		CrewPosition->GetAcceptanceRadius(),
-		DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius);
-	const float DistanceToCrewPositionCm = FVector::Dist2D(
-		Operator->GetActorLocation(),
-		CrewPosition->GetComponentLocation());
-	if (DistanceToCrewPositionCm > SettledRadiusCm)
+	// Still walking its crew move (or any other move): not there yet.
+	if (Operator->GetIsPathFollowingActive())
 	{
 		return false;
 	}
 
-	return Operator->GetVelocity().Size2D() <= TeamWeaponCrewAnimationStatics::SettledSpeedThresholdCmPerSec;
+	// Let braking finish so the montage never starts on a sliding unit.
+	if (Operator->GetVelocity().Size2D() > TeamWeaponCrewAnimationStatics::SettledSpeedThresholdCmPerSec)
+	{
+		return false;
+	}
+
+	// Crew moves allow partial paths and do not project the goal, so a unit that finished its move can legally
+	// stand short of the spot; ArmCrewAnimationSlot snaps it onto the position. Only a stuck unit is skipped.
+	const float DistanceToCrewPositionCm = FVector::Dist2D(
+		Operator->GetActorLocation(),
+		CrewPosition->GetComponentLocation());
+	return DistanceToCrewPositionCm <= TeamWeaponCrewAnimationStatics::MaxSnapToCrewPositionDistanceCm;
 }
 
 void ATeamWeaponController::TryArmCrewAnimationsForSettledOperators()
@@ -3301,17 +3330,25 @@ void ATeamWeaponController::ArmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& S
 		return;
 	}
 
-	// Face the weapon the way the authored full body pose expects; the location stays where the unit settled.
+	// The full body pose is authored relative to the weapon, so put the operator exactly on its crew position
+	// (crew moves may legally end short of it). Without a landscape hit keep the reached spot but face the weapon.
 	ASquadUnit* Operator = Slot.M_Operator.Get();
-	FRotator OperatorRotation = Operator->GetActorRotation();
-	OperatorRotation.Yaw = CrewPosition->GetComponentRotation().Yaw;
-	Operator->SetActorRotation(OperatorRotation, ETeleportType::TeleportPhysics);
+	if (not SnapOperatorToCrewPosition(Operator, CrewPosition))
+	{
+		FRotator OperatorRotation = Operator->GetActorRotation();
+		OperatorRotation.Yaw = CrewPosition->GetComponentRotation().Yaw;
+		Operator->SetActorRotation(OperatorRotation, ETeleportType::TeleportPhysics);
+	}
 
 	AnimInstance->StartTeamWeaponCrewAnimation(Slot.M_CrewRole, M_CrewAnimationState.M_TeamWeaponSquadSubtype);
 	Slot.bM_IsArmed = true;
 
-	TeamWeaponCrewAnimationStatics::PrintCrewAnimDebug(
-		"Armed crew animation: " + Operator->GetName() + " role: " + UEnum::GetValueAsString(Slot.M_CrewRole));
+	if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+	{
+		TeamWeaponCrewAnimationStatics::PrintCrewAnimDebug(
+			Operator,
+			"Armed crew animation: " + Operator->GetName() + " role: " + UEnum::GetValueAsString(Slot.M_CrewRole));
+	}
 }
 
 void ATeamWeaponController::DisarmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot)
@@ -3349,23 +3386,43 @@ void ATeamWeaponController::TickCrewAnimationArming()
 		return;
 	}
 
-	// An external StopAllMontages (grenade, repair, ...) clears the anim instance side; re-arm those slots.
 	for (FTeamWeaponCrewAnimationSlot& Slot : M_CrewAnimationState.M_Slots)
 	{
 		if (not Slot.bM_IsArmed)
 		{
 			continue;
 		}
-		const USquadUnitAnimInstance* AnimInstance =
-			TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot);
-		if (AnimInstance != nullptr && AnimInstance->GetIsTeamWeaponCrewAnimationActive())
-		{
-			continue;
-		}
-		Slot.bM_IsArmed = false;
+		TickArmedCrewAnimationSlot(Slot);
 	}
 
 	TryArmCrewAnimationsForSettledOperators();
+}
+
+void ATeamWeaponController::TickArmedCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot)
+{
+	// The anim instance drops the crew animation itself on StopAllMontages or when the unit starts moving;
+	// mirror that here so the slot can be re-armed once the operator is settled again.
+	const USquadUnitAnimInstance* AnimInstance = TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot);
+	if (AnimInstance == nullptr || not AnimInstance->GetIsTeamWeaponCrewAnimationActive())
+	{
+		Slot.bM_IsArmed = false;
+		return;
+	}
+
+	// Movement that bypasses the team weapon state machine (retreat, cargo, evasion) leaves Ready_Deployed intact.
+	// Only an actual move order ends the crewing; standing slightly off the spot never does (it was snapped on arm).
+	const ASquadUnit* Operator = Slot.M_Operator.Get();
+	if (not Operator->GetIsPathFollowingActive())
+	{
+		return;
+	}
+	if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+	{
+		TeamWeaponCrewAnimationStatics::PrintCrewAnimDebug(
+			Operator,
+			"Operator was ordered to move; disarming crew animation.");
+	}
+	DisarmCrewAnimationSlot(Slot);
 }
 
 bool ATeamWeaponController::GetIsValidCrewAnimationSlotOperator(const FTeamWeaponCrewAnimationSlot& Slot) const

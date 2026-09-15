@@ -50,6 +50,35 @@ struct FMissionTimerLifetimeSettings;
 class AMissionManager;
 class ATriggerArea;
 
+UENUM(BlueprintType)
+enum class EMissionAttachmentRule : uint8
+{
+	KeepRelative,
+	KeepWorld,
+	SnapToTarget
+};
+
+/**
+ * @brief Blueprint-safe attachment settings converted to native scene attachment rules at the call site.
+ */
+USTRUCT(BlueprintType)
+struct FMissionAttachmentTransformRules
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EMissionAttachmentRule LocationRule = EMissionAttachmentRule::KeepRelative;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EMissionAttachmentRule RotationRule = EMissionAttachmentRule::KeepRelative;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EMissionAttachmentRule ScaleRule = EMissionAttachmentRule::KeepRelative;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bWeldSimulatedBodies = false;
+};
+
 
 USTRUCT(Blueprintable)
 struct FMissionState
@@ -700,6 +729,18 @@ protected:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void RegisterCallbackOnTankDies(ATankMaster* Tank);
+
+	/**
+	 * @brief Spawns an inert actor on a tank and removes it when the tank dies while preserving the normal death callback.
+	 * @param AttachmentRules Transform rules used when attaching the spawned actor to the tank.
+	 * @param ActorClassToAttach Actor class to spawn at the tank location and attach.
+	 * @param Tank Tank whose death should trigger the existing mission callback and attached actor cleanup.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void RegisterCallbackOnTankDiesAndAttach(
+		const FMissionAttachmentTransformRules& AttachmentRules,
+		const TSubclassOf<AActor> ActorClassToAttach,
+		ATankMaster* Tank);
 	
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnCallBackTankDies(ATankMaster* Tank);

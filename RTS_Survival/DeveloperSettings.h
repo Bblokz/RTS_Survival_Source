@@ -1227,13 +1227,13 @@ namespace DeveloperSettings
 
 			// Building expansions health settings.
 			inline constexpr float T1BxpHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
-			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(1300 * OverallHealthMlt);
-			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(1500 * OverallHealthMlt);
-			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
-			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(1000 * OverallHealthMlt);
-			inline constexpr float T3BxpBunkerHealth = RoundToNearestMultipleOfFive(1600 * OverallHealthMlt);
-			inline constexpr float BxpHeavyBunkerHealth = RoundToNearestMultipleOfFive(2400 * OverallHealthMlt);
-			inline constexpr float BxpMegaBunkerHealth = RoundToNearestMultipleOfFive(7000 * OverallHealthMlt);
+			inline constexpr float T2BxpHealth = RoundToNearestMultipleOfFive(1100 * OverallHealthMlt);
+			inline constexpr float BxpWallHealth = RoundToNearestMultipleOfFive(700 * OverallHealthMlt);
+			inline constexpr float BxpGateHealth = RoundToNearestMultipleOfFive(900 * OverallHealthMlt);
+			inline constexpr float T2BxpBunkerHealth = RoundToNearestMultipleOfFive(900 * OverallHealthMlt);
+			inline constexpr float T3BxpBunkerHealth = RoundToNearestMultipleOfFive(1400 * OverallHealthMlt);
+			inline constexpr float BxpHeavyBunkerHealth = RoundToNearestMultipleOfFive(2000 * OverallHealthMlt);
+			inline constexpr float BxpMegaBunkerHealth = RoundToNearestMultipleOfFive(5000 * OverallHealthMlt);
 
 			// Infantry health Settings
 			inline constexpr float BasicInfantryHealth = RoundToNearestMultipleOfFive(200.f * OverallHealthMlt);
@@ -1884,7 +1884,7 @@ namespace DeveloperSettings
 		constexpr bool GTurret_Master_Compile_DebugSymbols = false;
 		constexpr bool GEmbedded_Turret_Compile_DebugSymbols = false;
 		// Team weapon crew arming, disarming and reload synced reaction montages.
-		constexpr bool GTeamWeapon_CrewAnimations_Compile_DebugSymbols = false;
+		constexpr bool GTeamWeapon_CrewAnimations_Compile_DebugSymbols = true;
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;

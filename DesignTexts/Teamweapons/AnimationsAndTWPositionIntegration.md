@@ -253,15 +253,20 @@ Plus two dedicated delegates (do **not** reuse `M_MontageEndedDelegate`, which `
 5. If `bReactToWeaponFire == false` and `Montage` valid → `PlayCrewLoopMontage(Montage, PlayRate)`.
 6. If `bReactToWeaponFire == true` and `IdleLoopMontage` valid → `PlayCrewLoopMontage(IdleLoopMontage, IdleLoopPlayRate)`.
 
-**Loop** (`PlayCrewLoopMontage`): `Montage_Play(Montage, PlayRate)`, bind `M_CrewLoopMontageEndedDelegate` via
-`Montage_SetEndDelegate`, `bM_IsLoopPlaying = true`.
+**Loop** (`PlayCrewLoopMontage`): `Montage_Play(Montage, PlayRate)`, then chain every section of the montage
+instance to the next one (last back to first) with `Montage_SetNextSection`, so the montage loops by itself with no
+gap and without asset edits. Bind `M_CrewLoopMontageEndedDelegate` via `Montage_SetEndDelegate`,
+`bM_IsLoopPlaying = true`.
 `OnCrewLoopMontageEnded(Montage, bInterrupted)`:
 - if `not bM_IsActive` → return;
 - if `bInterrupted`: if `bM_IsReactPlaying` → return (the reaction interrupted the idle loop on purpose);
   otherwise something else took the slot → `Reset()` (the controller's tick fallback re-arms when appropriate);
-- else (natural end) → replay the same loop montage. Loops are driven by code, mirroring
-  `UTeamWeaponAnimationInstance::OnMoveLoopMontageEnded`. Montage assets should **not** use looping sections
-  (if they do, the end never fires and the asset loops by itself, which is also fine).
+- else (natural end, only possible if chaining could not keep the montage alive) → replay as a fallback.
+
+**Movement backstop**: `SetMovementStateWithSpeed` drops the crew animation (`ClearTeamWeaponCrewAnimationRuntime(true)`)
+as soon as the unit's speed exceeds a few cm/s while armed. This covers movement that bypasses the team weapon state
+machine (retreat, enter cargo, evasion). The controller notices the inactive anim instance on its tick and re-arms the
+operator once it is settled on its crew position again.
 
 **React** (`OnTeamWeaponReloadStarted`):
 - if `not bM_IsActive` or `not M_ActiveEntry.bReactToWeaponFire` or `Montage == nullptr` → return;
@@ -379,12 +384,12 @@ Member: `UPROPERTY() FTeamWeaponCrewAnimationState M_CrewAnimationState;`
 | `void RebuildCrewAnimationSlots()` | Called at the end of `AssignCrewToTeamWeapon` (after operator lists exist). Disarms operators that are no longer operators or whose role changed, then rebuilds slots: operator index `i` ↔ `TryGetCrewPositionsSorted()[i]` (the exact mapping `IssueMoveCrewToPositions`/`SnapOperatorsToCrewPositions` use). Operators beyond the position count get `None`. Caches the subtype via `GetTeamWeaponSquadSubtypeForCrewAnimations()`. |
 | `bool TryGetCrewPositionForOperatorIndex(int32, UCrewPosition*&) const` | Extracted shared helper; `IssueMoveCrewToPositions` and `SnapOperatorsToCrewPositions` should use it too so the three call sites can never disagree. |
 | `ESquadSubtype GetTeamWeaponSquadSubtypeForCrewAnimations() const` | Controller RTS component subtype; if `Squad_None` fall back to `M_TeamWeapon->GetSquadSubtypeFromRTSComponent()`. |
-| `bool GetIsOperatorSettledAtCrewPosition(const FTeamWeaponCrewAnimationSlot&) const` | 2D distance ≤ `FMath::Max(CrewPosition->GetAcceptanceRadius(), DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius)` **and** `Operator->GetVelocity().Size2D() <= SettledSpeedThresholdCmPerSec` (constant, 5 cm/s). The max() guard prevents a unit that legally stopped at the nav acceptance radius from never counting as "in position". |
+| `bool GetIsOperatorSettledAtCrewPosition(const FTeamWeaponCrewAnimationSlot&) const` | Operator has **no active path following** (`ASquadUnit::GetIsPathFollowingActive`, the AI controller move status), planar speed ≤ `SettledSpeedThresholdCmPerSec` (30 cm/s, braking finished), and 2D distance ≤ `MaxSnapToCrewPositionDistanceCm` (600 cm, stuck guard). Crew moves use partial paths without goal projection, so operators legally stop short of spots near the weapon footprint; a tight radius or a near-zero speed gate is exactly what prevented re-arming after pack → move → deploy. |
 | `void TryArmCrewAnimationsForSettledOperators()` | Only when `M_TeamWeaponState == Ready_Deployed`. For each un-armed slot with role ≠ `None`: if settled → `ArmCrewAnimationSlot`. |
-| `void ArmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot&)` | Snap the operator's yaw to the crew position yaw (rotation only, `ETeleportType::TeleportPhysics`), then `AnimInstance->StartTeamWeaponCrewAnimation(role, subtype)`, `bM_IsArmed = true`. |
+| `void ArmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot&)` | Snap the operator onto its crew position with the same landscape-trace teleport the rotation flow uses (`SnapOperatorToCrewPosition`; the full body pose is authored relative to the weapon). If no landscape is hit, only the yaw is aligned. Then `AnimInstance->StartTeamWeaponCrewAnimation(role, subtype)`, `bM_IsArmed = true`. |
 | `void DisarmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot&)` | If armed and operator + anim instance valid → `StopTeamWeaponCrewAnimation()`; `bM_IsArmed = false`. |
 | `void DisarmAllCrewAnimations()` | Loop over slots. |
-| `void TickCrewAnimationArming()` | Called from `Tick`. Runs only while `Ready_Deployed` and (`GetHasSlotsToArm()` **or** an armed slot whose anim instance reports `not GetIsTeamWeaponCrewAnimationActive()`). Re-arms the latter (self-healing after an external `StopAllMontages`) and arms settled pending slots. Bounded by operator count. |
+| `void TickCrewAnimationArming()` | Called from `Tick`. Runs only while `Ready_Deployed` and there are pending or armed slots. For armed slots: drops the arming when the anim instance reports inactive (external `StopAllMontages`, or the unit walked) and **disarms** when the operator has active path following (it was ordered to move by anything). Standing slightly off the spot never disarms. Then arms settled pending slots. Bounded by operator count. |
 | `bool GetIsValidCrewAnimationSlotOperator(const FTeamWeaponCrewAnimationSlot&) const` | Validator per AGENTS rule 0.5 (uses `GetIsValidSquadUnit` + anim instance check). |
 
 Add `float GetAcceptanceRadius() const` to `UCrewPosition`.
@@ -511,8 +516,9 @@ Crew position components on the weapon BPs typed `Gunner`/`Loader`/`Spotter`.
 
 - **Flux change** (§4.1 step 3) affects every weapon owner's reload animation duration per shot. This is the intended
   fix (animation now matches the timer) but should be called out in the commit message.
-- **Blend seams on loops**: code re-plays on the montage's natural end using the asset's blend in/out. Designers should
-  set small or zero blend times on loop montages, or author loop sections in the asset; both work.
+- **Blend seams on loops**: loops are produced by chaining the montage instance's sections back to the start, so the
+  montage never blends out between iterations and the asset needs no loop sections. The only visible seam is the
+  authored first-to-last frame difference of the animation itself.
 - **Settled threshold vs. acceptance radius**: the `max()` rule in §5.2 guards against the nav acceptance radius
   (`SquadUnitAcceptanceRadius`, currently 30 cm at `DeveloperSettings.h:1593`) ever being tuned above a crew
   position's radius (75 cm default). Without it a unit could stop legally but never arm.

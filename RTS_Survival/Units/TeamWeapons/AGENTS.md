@@ -94,10 +94,19 @@ Design: `Source/DesignTexts/Teamweapons/AnimationsAndTWPositionIntegration.md`.
   `FullBody` slot. A null montage means "play nothing" and is not an error.
 - The controller owns *when*: `FTeamWeaponCrewAnimationState` maps operator index → sorted crew position → role
   (`TryGetCrewPositionForOperatorIndex` is the single source of truth, also used by crew moves and rotation snapping).
-- Arming requires `Ready_Deployed` **and** a settled operator (inside the crew position radius, planar speed ≈ 0).
+- Arming requires `Ready_Deployed` **and** a settled operator: no active path following
+  (`ASquadUnit::GetIsPathFollowingActive`), braking finished, and not stuck more than a few metres away. Crew moves
+  allow partial paths without goal projection, so operators routinely stop short of a spot next to the weapon
+  footprint; arming therefore **snaps** the operator onto its crew position (same landscape-trace teleport the
+  rotation flow uses). Do not gate arming on a tight distance or a near-zero velocity: that is exactly what broke
+  re-arming after pack → move → deploy.
   Triggers: `IdMove` completion, `SnapOperatorsToCrewPositions`, and `TickCrewAnimationArming` (needed because a unit
   already at its goal never reports move completion). `SetTeamWeaponState` disarms on every state other than
-  `Ready_Deployed`; `AssignCrewToTeamWeapon` rebuilds the slots.
+  `Ready_Deployed`; `AssignCrewToTeamWeapon` rebuilds the slots. Armed slots are disarmed again when the operator
+  gets a path-following move from anywhere, and the anim instance drops the montage itself when the unit walks, so
+  movement that bypasses the state machine (retreat, cargo, evasion) can never leave a crew loop running.
+- Looping montages loop by per-instance section chaining (`Montage_SetNextSection`), not by asset settings; the
+  loop-ended delegate is only a fallback.
 - Reacting roles (loader by default) play once per reload start of weapon index 0 via
   `ITurretOwner::OnTurretWeaponReloadStart`, stretched to the flux-adjusted reload time. `OnFireWeapon` is not used.
 - Debug prints: `DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols`.

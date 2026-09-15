@@ -385,6 +385,8 @@ private:
 	void DetachCrewAfterRotation();
 	void SnapOperatorsToCrewPositions();
 	void SnapOperatorsToCrewPositionsDuringRotation();
+	/** Teleports one operator onto its crew position via the landscape trace; false when no landscape was hit. */
+	bool SnapOperatorToCrewPosition(ASquadUnit* SquadUnit, const UCrewPosition* CrewPosition) const;
 	bool TryGetLandscapeTeleportLocationForCrewPosition(const ASquadUnit* SquadUnit,
 	                                                    const FVector& CrewPositionLocation,
 	                                                    FVector& OutTeleportLocation) const;
@@ -424,14 +426,18 @@ private:
 	/** Rebuilds the role slots from the crew assignment; disarms operators that lost or changed their role. */
 	void RebuildCrewAnimationSlots();
 	ESquadSubtype GetTeamWeaponSquadSubtypeForCrewAnimations() const;
+	/** Settled = no active path following, braking finished, and not stuck far away from the crew position. */
 	bool GetIsOperatorSettledAtCrewPosition(const FTeamWeaponCrewAnimationSlot& Slot) const;
-	/** Arms every un-armed role slot whose operator stands still on its crew position; Ready_Deployed only. */
+	/** Arms every un-armed role slot whose operator finished getting to its crew position; Ready_Deployed only. */
 	void TryArmCrewAnimationsForSettledOperators();
+	/** Snaps the operator onto its crew position and starts the role animation on its anim instance. */
 	void ArmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot);
 	void DisarmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot);
 	void DisarmAllCrewAnimations();
 	/** Fallback that catches operators that were already at their goal (no move completion) and external stops. */
 	void TickCrewAnimationArming();
+	/** Drops the arming of a slot whose anim instance lost the animation or whose operator left its position. */
+	void TickArmedCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot);
 	bool GetIsValidCrewAnimationSlotOperator(const FTeamWeaponCrewAnimationSlot& Slot) const;
 	// ---- End crew animations ----
 

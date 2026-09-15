@@ -46,6 +46,8 @@ const FTeamWeaponCrewMontage* FTeamWeaponCrewMontages::GetMontageForRole(const E
 		return &Spotter;
 	case ECrewPositionType::AdditionalLoader:
 		return &AdditionalLoader;
+	case ECrewPositionType::Commander:
+		return &Commander;
 	case ECrewPositionType::None:
 		break;
 	}

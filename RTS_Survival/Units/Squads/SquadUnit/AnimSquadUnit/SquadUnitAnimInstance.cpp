@@ -10,6 +10,34 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "SquadAnimationEnums/SquadAnimationEnums.h"
 
+namespace SquadUnitTeamWeaponCrewAnimStatics
+{
+	// Blend out used when a crew montage is stopped because the operator leaves the deployed weapon.
+	constexpr float CrewMontageBlendOutTime = 0.1f;
+	// Guards the division for the reload synced play rate.
+	constexpr float MinReloadTimeSeconds = 0.01f;
+	// A crewing operator never walks; above this speed the crew montage is dropped no matter who moved the unit.
+	// Well above the controller's settled speed so a unit that is still braking after arming is never dropped.
+	constexpr float CrewAnimationMaxSpeedCmPerSec = 60.0f;
+
+	void PrintCrewAnimDebug(const AActor* Operator, const FString& Message)
+	{
+		if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+		{
+			if (not IsValid(Operator))
+			{
+				return;
+			}
+
+			RTSFunctionLibrary::PrintString(
+				Operator->GetActorLocation(),
+				Operator,
+				Message,
+				FColor::Cyan);
+		}
+	}
+}
+
 FAimOffsetTypes::FAimOffsetTypes()
 	: M_ActiveAimOffset(nullptr)
 	  , M_ActiveAimOffsetSequence(nullptr)
@@ -597,6 +625,20 @@ void USquadUnitAnimInstance::OnAimPositionMontageFinished(UAnimMontage* Montage,
 
 void USquadUnitAnimInstance::SetMovementStateWithSpeed(const float& MovementSpeed)
 {
+	// Backstop for movement that bypasses the team weapon state machine (retreat, cargo, evasion): a moving
+	// operator must never keep looping a full body crew montage. The controller re-arms once it is settled again.
+	if (GetIsTeamWeaponCrewAnimationActive() &&
+		MovementSpeed > SquadUnitTeamWeaponCrewAnimStatics::CrewAnimationMaxSpeedCmPerSec)
+	{
+		if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+		{
+			SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+				GetOwningActor(),
+				"Crew anim stopped: operator started moving.");
+		}
+		ClearTeamWeaponCrewAnimationRuntime(true);
+	}
+
 	// Aim position transitions share the FullBody slot with the crew montages and must not interrupt them.
 	const bool bAllowAimPositionTransitions = not GetIsTeamWeaponCrewAnimationActive();
 	if (FMath::IsNearlyZero(MovementSpeed))
@@ -684,22 +726,6 @@ void USquadUnitAnimInstance::OnUnitDeselected()
 
 // ----- Team Weapon Crew Animations -----
 
-namespace SquadUnitTeamWeaponCrewAnimStatics
-{
-	// Blend out used when a crew montage is stopped because the operator leaves the deployed weapon.
-	constexpr float CrewMontageBlendOutTime = 0.1f;
-	// Guards the division for the reload synced play rate.
-	constexpr float MinReloadTimeSeconds = 0.01f;
-
-	void PrintCrewAnimDebug(const FString& Message)
-	{
-		if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
-		{
-			RTSFunctionLibrary::PrintString(Message, FColor::Cyan);
-		}
-	}
-}
-
 void FSquadUnitTeamWeaponCrewAnimRuntime::Reset()
 {
 	M_ActiveEntry = FTeamWeaponCrewMontageEntry();
@@ -741,10 +767,14 @@ void USquadUnitAnimInstance::StartTeamWeaponCrewAnimation(const ECrewPositionTyp
 	AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
 	AimOffsets.UpdateAOForNewAimPosition(ESquadAimPosition::Standing);
 
-	SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
-		"Crew anim armed: " + UEnum::GetValueAsString(CrewRole) + " subtype: " +
-		UEnum::GetValueAsString(TeamWeaponSquadSubtype) + " react: " +
-		(ResolvedEntry->bReactToWeaponFire ? FString("true") : FString("false")));
+	if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+	{
+		SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+			GetOwningActor(),
+			"Crew anim armed: " + UEnum::GetValueAsString(CrewRole) + " subtype: " +
+			UEnum::GetValueAsString(TeamWeaponSquadSubtype) + " react: " +
+			(ResolvedEntry->bReactToWeaponFire ? FString("true") : FString("false")));
+	}
 
 	if (not ResolvedEntry->bReactToWeaponFire)
 	{
@@ -767,8 +797,12 @@ void USquadUnitAnimInstance::StopTeamWeaponCrewAnimation()
 	{
 		return;
 	}
-	SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
-		"Crew anim stopped: " + UEnum::GetValueAsString(M_TeamWeaponCrewAnimRuntime.M_CrewRole));
+	if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+	{
+		SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+			GetOwningActor(),
+			"Crew anim stopped: " + UEnum::GetValueAsString(M_TeamWeaponCrewAnimRuntime.M_CrewRole));
+	}
 	ClearTeamWeaponCrewAnimationRuntime(true);
 }
 
@@ -785,11 +819,15 @@ void USquadUnitAnimInstance::OnTeamWeaponReloadStarted(const float ReloadTime)
 	}
 
 	const float ReactPlayRate = GetTeamWeaponCrewReactPlayRate(ActiveEntry.Montage, ReloadTime);
-	SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
-		"Crew react montage: " + ActiveEntry.Montage->GetName() +
-		" reload: " + FString::SanitizeFloat(ReloadTime) +
-		" length: " + FString::SanitizeFloat(ActiveEntry.Montage->GetPlayLength()) +
-		" rate: " + FString::SanitizeFloat(ReactPlayRate));
+	if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+	{
+		SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+			GetOwningActor(),
+			"Crew react montage: " + ActiveEntry.Montage->GetName() +
+			" reload: " + FString::SanitizeFloat(ReloadTime) +
+			" length: " + FString::SanitizeFloat(ActiveEntry.Montage->GetPlayLength()) +
+			" rate: " + FString::SanitizeFloat(ReactPlayRate));
+	}
 
 	// Set before Montage_Play: playing a montage in the same slot ends the idle loop with bInterrupted = true.
 	M_TeamWeaponCrewAnimRuntime.bM_IsReactPlaying = true;
@@ -812,6 +850,18 @@ void USquadUnitAnimInstance::PlayTeamWeaponCrewLoopMontage(UAnimMontage* LoopMon
 	M_TeamWeaponCrewAnimRuntime.bM_IsLoopPlaying = true;
 	Montage_Play(LoopMontage, PlayRate);
 
+	// Chain every section to the next (last back to first) on this montage instance so the asset loops by itself
+	// with no gap and no asset edits. The end delegate below only fires when something interrupts the loop.
+	const int32 SectionCount = LoopMontage->GetNumSections();
+	for (int32 SectionIndex = 0; SectionIndex < SectionCount; ++SectionIndex)
+	{
+		const int32 NextSectionIndex = (SectionIndex + 1) % SectionCount;
+		Montage_SetNextSection(
+			LoopMontage->GetSectionName(SectionIndex),
+			LoopMontage->GetSectionName(NextSectionIndex),
+			LoopMontage);
+	}
+
 	M_TeamWeaponCrewLoopMontageEndedDelegate.Unbind();
 	M_TeamWeaponCrewLoopMontageEndedDelegate.BindUObject(
 		this, &USquadUnitAnimInstance::OnTeamWeaponCrewLoopMontageEnded);
@@ -832,12 +882,17 @@ void USquadUnitAnimInstance::OnTeamWeaponCrewLoopMontageEnded(UAnimMontage* Mont
 			return;
 		}
 		// Something else took the FullBody slot; drop the arming so the controller can re-arm when appropriate.
-		SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug("Crew loop interrupted externally; disarming.");
+		if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+		{
+			SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+				GetOwningActor(),
+				"Crew loop interrupted externally; disarming.");
+		}
 		ClearTeamWeaponCrewAnimationRuntime(false);
 		return;
 	}
 
-	// Natural end: loop by re-playing the same montage at the same rate.
+	// Natural end only happens when section chaining could not keep the montage alive; re-play as a fallback.
 	const FTeamWeaponCrewMontageEntry& ActiveEntry = M_TeamWeaponCrewAnimRuntime.M_ActiveEntry;
 	const bool bIsIdleLoop = ActiveEntry.bReactToWeaponFire;
 	const float LoopPlayRate = bIsIdleLoop ? ActiveEntry.IdleLoopPlayRate : ActiveEntry.PlayRate;

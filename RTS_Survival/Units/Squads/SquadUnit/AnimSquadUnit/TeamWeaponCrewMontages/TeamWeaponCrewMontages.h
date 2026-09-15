@@ -124,6 +124,9 @@ struct FTeamWeaponCrewMontages
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
 	FTeamWeaponCrewMontage AdditionalLoader;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	FTeamWeaponCrewMontage Commander;
+
 private:
 	const FTeamWeaponCrewMontage* GetMontageForRole(const ECrewPositionType CrewRole) const;
 };
