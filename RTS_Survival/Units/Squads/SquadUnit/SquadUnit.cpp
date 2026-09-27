@@ -1745,7 +1745,7 @@ void ASquadUnit::UnitDies_StartDeathSequence(const bool bUseCrouchedDeathMontage
 		return;
 	}
 
-	UnitDies_ScheduleDeathMontageFallback(ExpectedDuration);
+	UnitDies_ScheduleDeathMontageTransition(ExpectedDuration);
 }
 
 void ASquadUnit::UnitDies_OnDeathMontageFinished()
@@ -1771,7 +1771,7 @@ void ASquadUnit::UnitDies_OnDeathMontageFinished()
 	UnitDies_ScheduleDestruction();
 }
 
-void ASquadUnit::UnitDies_ScheduleDeathMontageFallback(const float ExpectedDuration)
+void ASquadUnit::UnitDies_ScheduleDeathMontageTransition(const float MontageDuration)
 {
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -1780,14 +1780,15 @@ void ASquadUnit::UnitDies_ScheduleDeathMontageFallback(const float ExpectedDurat
 		return;
 	}
 
-	constexpr float DeathMontageCompletionGraceSeconds = 0.25f;
-	const float FallbackDelay = FMath::Max(ExpectedDuration, KINDA_SMALL_NUMBER) +
-		DeathMontageCompletionGraceSeconds;
+	constexpr float DeathMontageCompletionFraction = 0.95f;
+	const float TransitionDelay = FMath::Max(
+		MontageDuration * DeathMontageCompletionFraction,
+		KINDA_SMALL_NUMBER);
 	World->GetTimerManager().SetTimer(
 		M_DeathTimerHandle,
 		this,
 		&ASquadUnit::UnitDies_OnDeathMontageFinished,
-		FallbackDelay,
+		TransitionDelay,
 		false);
 }
 

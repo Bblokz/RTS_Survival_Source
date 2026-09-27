@@ -404,7 +404,7 @@ public:
 	 * @brief Selects and starts the death montage while retaining a safe completion callback.
 	 * @param bUseCrouchedDeathMontage Whether to select from the crouched rather than standing array.
 	 * @param CompletionDelegate Callback used to continue death teardown after the montage ends.
-	 * @param OutExpectedDuration Expected one-pass duration, used by the owning unit as a safety timeout.
+	 * @param OutExpectedDuration Actual one-pass duration used to continue shortly before the montage ends.
 	 * @return True only when a valid montage started playing.
 	 */
 	bool PlayDeathMontage(

@@ -635,14 +635,14 @@ private:
 	/** @return Whether the animation Blueprint should select a crouched death montage for this death. */
 	bool UnitDies_GetShouldUseCrouchedDeathMontage() const;
 
-	/** Starts the selected montage and arms a bounded fallback in case the asset never completes. */
+	/** Starts the selected montage and schedules the death transition shortly before its natural end. */
 	void UnitDies_StartDeathSequence(bool bUseCrouchedDeathMontage);
 
 	/** Continues into ragdoll or immediate destruction exactly once after the montage phase. */
 	void UnitDies_OnDeathMontageFinished();
 
-	/** @param ExpectedDuration One-pass montage duration used to bound a broken or looping asset. */
-	void UnitDies_ScheduleDeathMontageFallback(float ExpectedDuration);
+	/** @param MontageDuration Actual one-pass duration used to transition at 95 percent playback. */
+	void UnitDies_ScheduleDeathMontageTransition(float MontageDuration);
 
 	/** @brief Destroys the infantry weapon if it is valid. */
 	void UnitDies_DestroyInfantryWeapon();
