@@ -29,7 +29,8 @@ enum class ERTSMusicType: uint8
 	PostApoNotDesert,
 	TensionOrchestra,
 	CombatOrchestra,
-	
+	CncTension,
+	HorrorCnc,
 	
 };
 

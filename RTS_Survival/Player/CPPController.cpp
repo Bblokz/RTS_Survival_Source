@@ -2050,7 +2050,11 @@ void ACPPController::OnActionButtonShortCut(const int32 Index)
 
 void ACPPController::SetModifierCameraMovementSpeed(const float NewSpeed)
 {
-	DeveloperSettings::UIUX::ModifierCameraMovementSpeed = NewSpeed;
+	if (not GetIsValidPlayerCameraController())
+	{
+		return;
+	}
+	M_PlayerCameraController->SetModifierCameraMovementSpeed(NewSpeed);
 }
 
 void ACPPController::SetCameraMovementSpeedMultiplier(const float NewMultiplier)
@@ -2074,12 +2078,22 @@ void ACPPController::SetCameraPanSpeedMultiplier(const float NewMultiplier)
 
 float ACPPController::GetCameraPanSpeed()
 {
-	return DeveloperSettings::UIUX::CameraPanSpeed * M_CameraPanSpeedMultiplier;
+	const UPlayerCameraController* const PlayerCameraController = GetValidPlayerCameraController();
+	if (PlayerCameraController == nullptr)
+	{
+		return FRTSCameraTuningSettings().M_CameraPanSpeed * M_CameraPanSpeedMultiplier;
+	}
+	return PlayerCameraController->GetCameraPanSpeed() * M_CameraPanSpeedMultiplier;
 }
 
 float ACPPController::GetCameraPitchLimit()
 {
-	return DeveloperSettings::UIUX::CameraPitchLimit;
+	const UPlayerCameraController* const PlayerCameraController = GetValidPlayerCameraController();
+	if (PlayerCameraController == nullptr)
+	{
+		return FRTSCameraTuningSettings().M_CameraPitchLimit;
+	}
+	return PlayerCameraController->GetCameraPitchLimit();
 }
 
 void ACPPController::SecondaryClickStart()

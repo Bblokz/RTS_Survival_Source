@@ -46,9 +46,9 @@ void UPlayerCameraController::ZoomIn()
 		return;
 	}
 	float NewLength = M_SpringArmComponent->TargetArmLength;
-	NewLength -= DeveloperSettings::UIUX::ZoomSpeed;
-	M_SpringArmComponent->TargetArmLength = FMath::Clamp(NewLength, DeveloperSettings::UIUX::MinZoomLimit,
-	                                                     DeveloperSettings::UIUX::MaxZoomLimit);
+	NewLength -= M_CachedCameraSettings.M_ZoomSpeed;
+	M_SpringArmComponent->TargetArmLength = FMath::Clamp(NewLength, M_CachedCameraSettings.M_MinZoomLimit,
+	                                                     M_CachedCameraSettings.M_MaxZoomLimit);
 	if constexpr (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
@@ -63,9 +63,9 @@ void UPlayerCameraController::ZoomOut()
 		return;
 	}
 	float NewLength = M_SpringArmComponent->TargetArmLength;
-	NewLength += DeveloperSettings::UIUX::ZoomSpeed;
-	M_SpringArmComponent->TargetArmLength = FMath::Clamp(NewLength, DeveloperSettings::UIUX::MinZoomLimit,
-	                                                     DeveloperSettings::UIUX::MaxZoomLimit);
+	NewLength += M_CachedCameraSettings.M_ZoomSpeed;
+	M_SpringArmComponent->TargetArmLength = FMath::Clamp(NewLength, M_CachedCameraSettings.M_MinZoomLimit,
+	                                                     M_CachedCameraSettings.M_MaxZoomLimit);
 	if constexpr (DeveloperSettings::Debugging::GCamera_Player_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
@@ -337,7 +337,7 @@ void UPlayerCameraController::EdgeScroll(const float DeltaTime)
 	}
 
 	// Build local‐space pan delta (X=forward, Y=right)
-	const float BaseSpeed = DeveloperSettings::UIUX::ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier * 230.0f;
+	const float BaseSpeed = M_ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier * 230.0f;
 	const FVector LocalDelta(
 		DirY * BaseSpeed * M_EdgeScrollAccelY * StrY * DeltaTime,
 		DirX * BaseSpeed * M_EdgeScrollAccelX * StrX * DeltaTime,
@@ -421,15 +421,15 @@ void UPlayerCameraController::ForwardRightMovement(const bool bOnForward, float 
 	FVector LocalDelta = FVector::ZeroVector;
 	if (bOnForward)
 	{
-		AxisX = AxisX * DeveloperSettings::UIUX::DefaultCameraMovementSpeed;
-		AxisX = AxisX * DeveloperSettings::UIUX::ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier;
+		AxisX = AxisX * M_CachedCameraSettings.M_DefaultCameraMovementSpeed;
+		AxisX = AxisX * M_ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier;
 		LocalDelta.X += AxisX;
 	}
 
 	if (bOnRight)
 	{
-		AxisY = AxisY * DeveloperSettings::UIUX::DefaultCameraMovementSpeed;
-		AxisY = AxisY * DeveloperSettings::UIUX::ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier;
+		AxisY = AxisY * M_CachedCameraSettings.M_DefaultCameraMovementSpeed;
+		AxisY = AxisY * M_ModifierCameraMovementSpeed * M_CameraMovementSpeedMultiplier;
 		LocalDelta.Y += AxisY;
 	}
 
@@ -515,6 +515,24 @@ void UPlayerCameraController::OnCameraMoveComplete()
 		M_CameraMoveQueue.RemoveAt(0);
 		MoveCameraOverTime(NextMove);
 	}
+}
+
+void UPlayerCameraController::BeginPlay()
+{
+	Super::BeginPlay();
+	CacheCameraSettings();
+}
+
+void UPlayerCameraController::CacheCameraSettings()
+{
+	const URTSCameraDeveloperSettings* const CameraDeveloperSettings = URTSCameraDeveloperSettings::Get();
+	if (CameraDeveloperSettings == nullptr)
+	{
+		RTSFunctionLibrary::ReportError("PlayerCameraController could not load URTSCameraDeveloperSettings!");
+		return;
+	}
+	M_CachedCameraSettings = CameraDeveloperSettings->GetActiveCameraSettings();
+	M_ModifierCameraMovementSpeed = M_CachedCameraSettings.M_DefaultModifierCameraMovementSpeed;
 }
 
 void UPlayerCameraController::PostInitProperties()

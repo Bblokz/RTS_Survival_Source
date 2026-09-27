@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
+#include "RTS_Survival/Camera/Settings/RTSCameraDeveloperSettings.h"
 #include "RTS_Survival/Types/MovePlayerCameraTypes.h"
 #include "PlayerCameraController.generated.h"
 
@@ -98,6 +99,29 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void ZoomOut();
 
+	/**
+	 * @brief Maximum pitch in degrees the player may tilt the camera towards the horizon.
+	 * Comes from the camera settings that were cached once when the game started.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Camera")
+	float GetCameraPitchLimit() const { return M_CachedCameraSettings.M_CameraPitchLimit; }
+
+	/**
+	 * @brief Base camera pan speed before the player's pan speed multiplier is applied.
+	 * Comes from the camera settings that were cached once when the game started.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Camera")
+	float GetCameraPanSpeed() const { return M_CachedCameraSettings.M_CameraPanSpeed; }
+
+	/**
+	 * @brief Sets the live movement speed modifier used by edge scroll and keyboard camera movement.
+	 * Starts at the value configured in the camera settings and is overwritten by input handling.
+	 */
+	void SetModifierCameraMovementSpeed(const float NewModifierSpeed) { M_ModifierCameraMovementSpeed = NewModifierSpeed; }
+
+	/** @return The zoom, pitch and speed tuning this session runs with. */
+	const FRTSCameraTuningSettings& GetCameraSettings() const { return M_CachedCameraSettings; }
+
 	UFUNCTION(BlueprintCallable, Category = "Camera")
 	void SetCameraMovementDisabled(const bool bIsDisabled) { bM_IsCameraMovementDisabled = bIsDisabled; }
 
@@ -161,13 +185,26 @@ public:
 	void MoveCameraOverTime(const FMovePlayerCamera& NewMove);
 
 
+	virtual void BeginPlay() override;
 	virtual void PostInitProperties() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 	                           FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
+	/**
+	 * @brief Copies the active (gameplay or cinematic) camera limits from the developer settings.
+	 * Called once on BeginPlay so no settings lookup happens on the zoom hot path.
+	 */
+	void CacheCameraSettings();
+
 	bool GetIsLockedOrDisabled() const;
+
+	// Zoom, pitch and speed tuning resolved once at game start; defaults match the gameplay settings.
+	FRTSCameraTuningSettings M_CachedCameraSettings = FRTSCameraTuningSettings();
+
+	// Live movement speed modifier, seeded from the cached settings and changed by input handling.
+	float M_ModifierCameraMovementSpeed = FRTSCameraTuningSettings().M_DefaultModifierCameraMovementSpeed;
 	// References
 	UPROPERTY()
 	ACameraPawn* M_PlayerCamera;

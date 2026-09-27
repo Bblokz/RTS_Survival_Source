@@ -1745,19 +1745,10 @@ namespace DeveloperSettings
 		// still checking for collision with the landscape.
 		inline constexpr float SightDistanceMouse = 10000;
 
-		inline constexpr float MinZoomLimit = 150.f;
-		// corresponds with 8500 range in the game (weapon on left side engaging weapon just visible on right side)
-		// inline constexpr float MaxZoomLimit = 4200.f;
-		inline constexpr float MaxZoomLimit = 4800.f;
+		// Camera zoom limits, zoom/pan/movement speeds and pitch limit live in URTSCameraDeveloperSettings
+		// (Project Settings -> RTS -> Camera) so they can be swapped for cinematic values.
 		inline constexpr float ZoomForPlayerStartOverview = 10000.f;
 		inline constexpr float DefaultTerrainHeight = 110.f;
-		inline constexpr float ZoomSpeed = 150.f;
-		inline constexpr float CameraPanSpeed = 5.f;
-		
-		// 25 degrees to make skybox not visible.
-		inline constexpr float CameraPitchLimit = 18.f;
-		inline constexpr float DefaultCameraMovementSpeed = 15.f;
-		inline static float ModifierCameraMovementSpeed = 1.f;
 		// How long the player needs to hover an actor to get the hover popup.
 		inline static float HoverTime = 0.5f;
 		// How much the mouse needs to have moved in pixels for the hover popup to disappear.
@@ -1884,11 +1875,11 @@ namespace DeveloperSettings
 		constexpr bool GTurret_Master_Compile_DebugSymbols = false;
 		constexpr bool GEmbedded_Turret_Compile_DebugSymbols = false;
 		// Team weapon crew arming, disarming and reload synced reaction montages.
-		constexpr bool GTeamWeapon_CrewAnimations_Compile_DebugSymbols = true;
+		constexpr bool GTeamWeapon_CrewAnimations_Compile_DebugSymbols = false;
 		// Hull Weapon components.
 		constexpr bool GHull_Weapons_Compile_DebugSymbols = false;
 		constexpr bool GTargetAimOffsets_Compile_DebugSymbols = false;
-		constexpr bool GTargetAcquisition_Compile_DebugSymbols = true;
+		constexpr bool GTargetAcquisition_Compile_DebugSymbols = false;
 		constexpr bool GAOELibrary_Compile_DebugSymbols = false;
 		// Damage taken on actors
 		constexpr bool GDamage_System_Compile_DebugSymbols = false;
@@ -1961,7 +1952,7 @@ namespace DeveloperSettings
 		// Ammo tracking system.
 		constexpr bool GAmmoTracking_Compile_DebugSymbols = false;
 		// Debug World Path Finding
-		constexpr bool GWorldCampaign_DivisionPathing_Compile_DebugSymbols = true;
+		constexpr bool GWorldCampaign_DivisionPathing_Compile_DebugSymbols = false;
 		
 	}
 }
