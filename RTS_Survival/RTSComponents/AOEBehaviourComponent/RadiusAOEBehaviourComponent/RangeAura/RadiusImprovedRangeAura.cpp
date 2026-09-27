@@ -12,6 +12,7 @@ URadiusImprovedRangeAura::URadiusImprovedRangeAura()
 	RadiusSettings.HostBehaviourIcon = EBehaviourIcon::RangeBoostRadius;
 	RadiusSettings.RadiusType = ERTSRadiusType::FullCircle_ImprovedRangeArea;
 	AOEBehaviourSettings.ApplyStrategy = EInAOEBehaviourApplyStrategy::ApplyOnlyOnEnter;
+	AOEBehaviourSettings.IconSettings.IconType = ERTSVerticalAnimatedIcon::RangeBoost;
 }
 
 void URadiusImprovedRangeAura::SetHostBehaviourUIData(UBehaviour& Behaviour) const

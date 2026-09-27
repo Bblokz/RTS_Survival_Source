@@ -661,7 +661,7 @@ bool USquadUnitAnimInstance::PlayDeathMontage(
 	M_DeathMontageEndedDelegate.Unbind();
 	M_DeathMontageEndedDelegate.BindUObject(this, &USquadUnitAnimInstance::OnDeathMontageEnded);
 	Montage_SetEndDelegate(M_DeathMontageEndedDelegate, DeathMontage);
-	OutExpectedDuration = PlayedDuration + FMath::Max(DeathMontage->BlendOut.GetBlendTime(), 0.0f);
+	OutExpectedDuration = PlayedDuration;
 	return true;
 }
 

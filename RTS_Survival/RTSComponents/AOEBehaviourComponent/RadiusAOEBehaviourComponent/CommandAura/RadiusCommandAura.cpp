@@ -12,6 +12,7 @@ URadiusCommandAura::URadiusCommandAura()
 	RadiusSettings.HostBehaviourIcon = EBehaviourIcon::MoraleBoostRadius;
 	RadiusSettings.RadiusType = ERTSRadiusType::FullCircle_CommandAura;
 	AOEBehaviourSettings.ApplyStrategy = EInAOEBehaviourApplyStrategy::ApplyOnlyOnEnter;
+	AOEBehaviourSettings.IconSettings.IconType = ERTSVerticalAnimatedIcon::CommanderBoost;
 }
 
 void URadiusCommandAura::SetHostBehaviourUIData(UBehaviour& Behaviour) const

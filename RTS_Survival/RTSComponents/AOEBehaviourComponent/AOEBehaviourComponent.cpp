@@ -9,6 +9,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalIcons/AnimatedIconWidgetPoolManager.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 
 UAOEBehaviourComponent::UAOEBehaviourComponent()
@@ -53,7 +54,7 @@ void UAOEBehaviourComponent::BeginPlay()
 	M_RTSComponent = Owner->FindComponentByClass<URTSComponent>();
 	(void)GetIsValidRTSComponent();
 
-	BeginPlay_SetupAnimatedTextWidgetPoolManager();
+	BeginPlay_SetupAnimatedFeedbackWidgetPoolManager();
 	BeginPlay_StartAoeTimer();
 }
 
@@ -125,15 +126,30 @@ const FAOEBehaviourSettings& UAOEBehaviourComponent::GetAoeBehaviourSettings() c
 	return AOEBehaviourSettings;
 }
 
-void UAOEBehaviourComponent::BeginPlay_SetupAnimatedTextWidgetPoolManager()
+void UAOEBehaviourComponent::BeginPlay_SetupAnimatedFeedbackWidgetPoolManager()
 {
-	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+	if (AOEBehaviourSettings.IconSettings.bUseIcons)
+	{
+		if (AOEBehaviourSettings.IconSettings.IconType == ERTSVerticalAnimatedIcon::None)
+		{
+			return;
+		}
+
+		M_AnimatedIconWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedIconWidgetPoolManager(this);
+		if (not GetIsValidAnimatedIconWidgetPoolManager())
+		{
+			AOEBehaviourSettings.IconSettings.bUseIcons = false;
+			AOEBehaviourSettings.TextSettings.bUseText = false;
+		}
+		return;
+	}
 
 	if (not AOEBehaviourSettings.TextSettings.bUseText)
 	{
 		return;
 	}
 
+	M_AnimatedTextWidgetPoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
 	if (not GetIsValidAnimatedTextWidgetPoolManager())
 	{
 		AOEBehaviourSettings.TextSettings.bUseText = false;
@@ -339,7 +355,7 @@ void UAOEBehaviourComponent::HandleSweepComplete(TArray<FHitResult>&& HitResults
 	OnNewlyEnteredRadius(AddedTargets);
 	OnLeftRadius(RemovedTargets);
 	OnTickComponentsInRange(BehaviourComponentsInRange);
-	ApplyTextForTargets(BehaviourComponentsInRange);
+	ApplyAnimatedFeedbackForTargets(BehaviourComponentsInRange);
 
 	M_TrackedBehaviourComponents = MoveTemp(CurrentTargets);
 }
@@ -402,6 +418,18 @@ void UAOEBehaviourComponent::UpdateTrackedComponents(
 	}
 }
 
+void UAOEBehaviourComponent::ApplyAnimatedFeedbackForTargets(
+	const TArray<UBehaviourComp*>& BehaviourComponentsInRange) const
+{
+	if (AOEBehaviourSettings.IconSettings.bUseIcons)
+	{
+		ApplyIconsForTargets(BehaviourComponentsInRange);
+		return;
+	}
+
+	ApplyTextForTargets(BehaviourComponentsInRange);
+}
+
 void UAOEBehaviourComponent::ApplyTextForTargets(const TArray<UBehaviourComp*>& BehaviourComponentsInRange) const
 {
 	if (not AOEBehaviourSettings.TextSettings.bUseText)
@@ -438,15 +466,65 @@ void UAOEBehaviourComponent::ApplyTextForTargets(const TArray<UBehaviourComp*>& 
 	}
 }
 
+void UAOEBehaviourComponent::ApplyIconsForTargets(
+	const TArray<UBehaviourComp*>& BehaviourComponentsInRange) const
+{
+	const FBehaviourIconSettings& IconSettings = AOEBehaviourSettings.IconSettings;
+	if (IconSettings.IconType == ERTSVerticalAnimatedIcon::None)
+	{
+		return;
+	}
+
+	if (not GetIsValidAnimatedIconWidgetPoolManager())
+	{
+		return;
+	}
+
+	for (UBehaviourComp* BehaviourComponent : BehaviourComponentsInRange)
+	{
+		ApplyIconForTarget(BehaviourComponent);
+	}
+}
+
+void UAOEBehaviourComponent::ApplyIconForTarget(UBehaviourComp* BehaviourComponent) const
+{
+	if (not IsValid(BehaviourComponent))
+	{
+		return;
+	}
+
+	AActor* TargetActor = BehaviourComponent->GetOwner();
+	if (not IsValid(TargetActor))
+	{
+		return;
+	}
+
+	const FBehaviourIconSettings& IconSettings = AOEBehaviourSettings.IconSettings;
+	if (IconSettings.bOverrideAnimationSettings)
+	{
+		M_AnimatedIconWidgetPoolManager->ShowAnimatedIconAttachedToActorWithSettings(
+			IconSettings.IconType,
+			TargetActor,
+			IconSettings.LocalOffset,
+			IconSettings.AnimationSettings);
+		return;
+	}
+
+	M_AnimatedIconWidgetPoolManager->ShowAnimatedIconAttachedToActor(
+		IconSettings.IconType,
+		TargetActor,
+		IconSettings.LocalOffset);
+}
+
 bool UAOEBehaviourComponent::GetIsValidRTSComponent() const
 {
 	if (not IsValid(M_RTSComponent))
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this,
 			"M_RTSComponent",
 			"GetIsValidRTSComponent",
-			GetOwner());
+			this);
 		return false;
 	}
 
@@ -457,11 +535,26 @@ bool UAOEBehaviourComponent::GetIsValidAnimatedTextWidgetPoolManager() const
 {
 	if (not M_AnimatedTextWidgetPoolManager.IsValid())
 	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this,
 			"M_AnimatedTextWidgetPoolManager",
 			"GetIsValidAnimatedTextWidgetPoolManager",
-			GetOwner());
+			this);
+		return false;
+	}
+
+	return true;
+}
+
+bool UAOEBehaviourComponent::GetIsValidAnimatedIconWidgetPoolManager() const
+{
+	if (not M_AnimatedIconWidgetPoolManager.IsValid())
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			"M_AnimatedIconWidgetPoolManager",
+			"GetIsValidAnimatedIconWidgetPoolManager",
+			this);
 		return false;
 	}
 

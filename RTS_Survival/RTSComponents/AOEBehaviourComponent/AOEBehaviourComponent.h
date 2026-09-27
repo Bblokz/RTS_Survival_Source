@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "RTS_Survival/Behaviours/BehaviourVerticalIconSettings/BehaviourVerticalIconSettings.h"
 #include "RTS_Survival/Behaviours/BehaviourVerticalTextSettings/BehaviourVerticalTextSettings.h"
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/RTSComponents/AOEBehaviourComponent/Constants/AoeBehaviourConstants.h"
@@ -11,6 +12,7 @@
 
 class UBehaviour;
 class UBehaviourComp;
+class UAnimatedIconWidgetPoolManager;
 class UAnimatedTextWidgetPoolManager;
 class URTSComponent;
 
@@ -51,6 +53,10 @@ struct RTS_SURVIVAL_API FAOEBehaviourSettings
 	/** Animated text settings for affected units. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
 	FBehaviourTextSettings TextSettings;
+
+	/** Animated icon settings for affected units. Enabled icons take precedence over animated text. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
+	FBehaviourIconSettings IconSettings;
 
 	/** Whether the component searches for distructables. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="AOE Behaviour")
@@ -123,12 +129,19 @@ protected:
 	FAOEBehaviourSettings AOEBehaviourSettings;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FAOEAnimatedFeedbackTestAccess;
+#endif
+
 	// ---- Cached references ----
 	UPROPERTY()
 	TObjectPtr<URTSComponent> M_RTSComponent = nullptr;
 
 	UPROPERTY()
 	TWeakObjectPtr<UAnimatedTextWidgetPoolManager> M_AnimatedTextWidgetPoolManager;
+
+	UPROPERTY()
+	TWeakObjectPtr<UAnimatedIconWidgetPoolManager> M_AnimatedIconWidgetPoolManager;
 
 	// ---- Runtime state ----
 	UPROPERTY()
@@ -139,7 +152,7 @@ private:
 	bool bM_AOEEnabled = true;
 
 	// ---- Timer flow ----
-	void BeginPlay_SetupAnimatedTextWidgetPoolManager();
+	void BeginPlay_SetupAnimatedFeedbackWidgetPoolManager();
 	void BeginPlay_StartAoeTimer();
 	void HandleApplyTick();
 
@@ -167,11 +180,15 @@ private:
 		const TSet<TWeakObjectPtr<UBehaviourComp>>& CurrentTargets,
 		TArray<UBehaviourComp*>& OutAddedTargets,
 		TArray<UBehaviourComp*>& OutRemovedTargets);
+	void ApplyAnimatedFeedbackForTargets(const TArray<UBehaviourComp*>& BehaviourComponentsInRange) const;
 	void ApplyTextForTargets(const TArray<UBehaviourComp*>& BehaviourComponentsInRange) const;
+	void ApplyIconsForTargets(const TArray<UBehaviourComp*>& BehaviourComponentsInRange) const;
+	void ApplyIconForTarget(UBehaviourComp* BehaviourComponent) const;
 
 	// ---- Validation ----
 	bool GetIsValidRTSComponent() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
+	bool GetIsValidAnimatedIconWidgetPoolManager() const;
 	bool GetIsValidSettings() const;
 
 	ETriggerOverlapLogic GetOverlapLogicForOwner() const;
