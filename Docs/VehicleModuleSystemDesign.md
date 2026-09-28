@@ -1,0 +1,914 @@
+# Vehicle modules — technical design
+
+**Design only.** Proposed APIs/pseudocode; no C++ files are added or changed. Reviewed against source on 27–28 September 2026. Numeric defaults require playtesting.
+
+**Owner:** `ATankMaster` and its `UArmorCalculation`. The repair gate uses the tank's actual `UHealthComponent` health percentage.
+
+## 1. Files and responsibilities
+
+| Proposed file / existing class | Responsibility |
+| --- | --- |
+| `ArmorCalculationComponent/VehicleModules/VehicleModuleTypes.h` | Enums, plain rule structs, reflected setup/state and event payloads |
+| `ArmorCalculationComponent/VehicleModules/VehicleModuleBalance.h` | **All system balance constants and constexpr rule tables** |
+| `UArmorCalculation` | Fixed module storage; plate → module lookup; damage; state transitions; batch repair mutations |
+| `ATankMaster` | Tank health repair gate, crew action, shared finishing work, behaviour bindings and capabilities |
+| `UBehaviourComp` / module behaviours | Source-owned damage effects, e.g. engine speed penalty |
+| `UHealthComponent` / `UW_HealthBar` | Central healing receipts/completion; tank-only icon changes, `ModuleBox` lookup and widget lifetime |
+| `UVehicleModuleSettings` / `UVehicleModuleDataAsset` | Shared damaged/destroyed textures, optional behaviours and image dimensions |
+| `UVehicleModuleSubsystem` | One retained module asset and enum-indexed cache per game instance |
+| Repair components / auras / healing behaviours | Call normal `UHealthComponent::Heal`; module repair follows automatically |
+
+Both headers live under `RTS_Survival/RTSComponents/`. Types must not include the balance header; balance includes the plain rule types. Define the fixed-array `FPlateModuleRuleSet` in the balance header after its capacity constant, and `FModuleDamageBatch` in `ArmorCalculation.h` after including balance. This avoids a types/settings include cycle.
+
+## 2. One balance file
+
+`VehicleModuleBalance.h` is the only definition site for module-system tuning: probabilities, damage multipliers, HP thresholds, repair settings, performance penalties, source gates, anti-spam limits and UI timing. Use `inline constexpr` values/POD tables. No duplicate values in `DeveloperSettings.h`, behaviours, Blueprint defaults or `.cpp` functions.
+
+Vehicle setup selects a constexpr class profile, running gear, component bindings and add-on coverage. **Module HP is calculated from the tank health component's MaxHealth**, with no manually authored `ModuleHp`. Class-specific HP/chance multipliers live here. Textures, image dimensions and optional behaviour classes live in the shared module asset (section 11); behaviours read numeric tuning from this header.
+
+### Core declarations
+
+```cpp
+namespace VehicleModuleBalance
+{
+    inline constexpr int32 MaxModulesPerPlate = 3;
+    inline constexpr int32 AddOnArmorCandidateIndex = 0;
+    inline constexpr int32 MaxModuleInstances = 24;
+    inline constexpr int32 ArmorPlateRuleCount = 17;
+    inline constexpr int32 ModuleTypeCount = 8; // Includes None and Wheels.
+    inline constexpr int32 VehicleProfileCount = 5;
+    inline constexpr int32 RunningGearTypeCount = 2;
+
+    // The single tank-health gate for restoring red modules to yellow.
+    inline constexpr float TankHealthRequiredForModuleRecovery01 = 0.75f;
+
+    // Percentage points above the module type's destruction threshold.
+    inline constexpr float RepairedModuleHealthMargin01 = 0.05f;
+
+    namespace DestroyedHealth01
+    {
+        inline constexpr float AddOnArmor = 0.05f;
+        inline constexpr float Tracks = 0.20f;
+        inline constexpr float Wheels = 0.20f;
+        inline constexpr float Engine = 0.15f;
+        inline constexpr float Ammo = 0.10f;
+        inline constexpr float Turret = 0.25f;
+        inline constexpr float Weapon = 0.20f;
+    }
+
+    constexpr float GetDestroyedHealthThreshold01(EVehicleModuleTypes Type);
+    constexpr float GetRecoveredHealth01(EVehicleModuleTypes Type);
+}
+```
+
+`GetRecoveredHealth01(Type) = GetDestroyedHealthThreshold01(Type) + RepairedModuleHealthMargin01`.
+
+Compile-time validation: destruction thresholds lie in `[0,1)`; recovered percentages are **strictly above their threshold and below 1**. `None` cannot be installed. Fractions use `01`, calibre uses millimetres, time uses seconds.
+
+### Other definitions in the same header
+
+| Symbol | Initial value / contents |
+| --- | --- |
+| `BasePlateRules` / `ProfilePlateRules` | Section 4 topology; constexpr class/gear variants, three entries per row |
+| `ModuleProfileRules` | Per-class, per-type HP ratios and damage-chance multipliers; section 3 |
+| `MaxRegisteredArmorMeshes` / `MaxPlateBindings` | 3 / mesh count × existing `MaxArmorPlatesPerMesh`; fixed routing capacity |
+| `ModuleTypeRules` | Yellow/red effects; section 8 |
+| `ShellModuleRules` | Source probability/energy factors; section 5 |
+| `MineModuleRule` / `SplashModuleRules` | Universal source-specific candidates, multipliers and attenuation; never local constants in the adapters |
+| `MinBallisticCalibreMm` | 20 |
+| `PenetratingModuleDamageCap01` / `NonPenModuleDamageCap01` | 0.60 / 0.20 of module MaxHP per impact |
+| `MaxNewCapabilityFailuresPerImpact` | 1 |
+| `SurvivingModuleThresholdMargin01` | 0.01; floor for a second would-be failure |
+| `PenDamageFloorFromBase` / `PenDamageCeilingFromBase` | 0.20 / 1.25 |
+| `NonPenWindowSeconds` / `NonPenWindowDamageCap01` | 1.0 / 0.20 of module MaxHP across all attackers |
+| `NonPenWindowBucketCount` | 20 fixed buckets; conservative oldest-bucket expiry |
+| `VehicleRepairTickSeconds` / `BaseWorkerRepairHpPerSecond` | 0.5 / 7.5, matching the current worker baseline |
+| `MaxModuleServiceWorkPerSecond` | 60 per tank; shared finishing-work refill rate for all healing sources |
+| `CrewRepairQuietSeconds` / `CrewRepairWarmupSeconds` | 8 / 6 |
+| `CrewRepairTankHealth01PerSecond` | 0.025 of tank MaxHP; stops at the shared recovery gate |
+| `FullModuleServiceWork` | 60 healing-work units; shared finishing pass at full tank health; also the finishing budget capacity |
+| `CompletedHealth01` / `HealthCompletionTolerance01` | 1.0 / 0.0001 |
+| `CrewShockMaxSeconds` / `CrewShockImmunitySeconds` | 4 / 8 |
+| `ModuleAnnouncementCooldownSeconds` | 5; announcements only, never delays icon changes |
+| `DefaultModuleIconWidth` / `DefaultModuleIconHeight` | 225.0 / 225.0; defaults for the presentation asset's editable dimensions |
+
+`FullModuleServiceWork` controls yellow → Healthy completion, **not** red → yellow eligibility. Quiet/warmup settings control the crew action. There is exactly one tank-health recovery gate for all module types and all healing sources.
+
+Reuse the existing repair technology's multiplier as an input. Vehicle repair paths consume this header rather than maintaining a second vehicle tuning source in `DeveloperSettings.h`.
+
+## 3. Types, setup and fixed storage
+
+```cpp
+enum class EVehicleModuleTypes : uint8
+{
+    None,
+    AddOnArmor,
+    Tracks,
+    Engine,
+    Ammo,
+    Turret,
+    Weapon,
+    Wheels
+};
+
+enum class EVehicleModuleState : uint8
+{
+    Healthy,
+    Damaged,   // Yellow.
+    Destroyed  // Red; recoverable while the tank survives.
+};
+
+struct FPlateModuleDamage
+{
+    EVehicleModuleTypes TypeToDamage;
+    float DamageMultiplier;
+    float DamageProbability;
+    EModuleTargetSelector TargetSelector;
+    EModuleNonPenPolicy NonPenPolicy;
+};
+```
+
+`EModuleTargetSelector`: singleton engine/ammo, struck running-gear side, plate-bound turret/weapon, or covering add-on zone. `EModuleNonPenPolicy`: Never, External, or MantletOnly. Rules contain numeric data, without UObjects or dynamic containers.
+
+| Struct | Fields |
+| --- | --- |
+| `FVehicleModuleSetup` | `ModuleId`, `Type`, `Binding`; HP derived on initialization, behaviour classes from shared data asset |
+| `FVehicleModule` | `Type`, `CurrentHp`, `MaxHp`, `State`, `Revision`, installed flag |
+| `FModuleBinding` | Stable mesh/plate registration ID, mount/weapon role, weak component references |
+| `FPlateModuleRuleSet` | `Entries[MaxModulesPerPlate]`; unused entries have `TypeToDamage = None` |
+| `FModuleDamageBatch` | Three `{ModuleId, Damage}` entries plus count; returned by value |
+
+```text
+UArmorCalculation::SetupModule(const FVehicleModuleSetup& Setup) -> bool
+UArmorCalculation::ValidateModuleSetup() const -> bool
+UArmorCalculation::GetModuleSnapshot(FVehicleModuleId Id) const -> FModuleSnapshot
+
+M_Modules[VehicleModuleBalance::MaxModuleInstances]
+M_Bindings[VehicleModuleBalance::MaxModuleInstances]
+M_PlateRoutes[VehicleModuleBalance::MaxPlateBindings][VehicleModuleBalance::MaxModulesPerPlate]
+
+UArmorCalculation::RebuildPlateModuleBindings()
+    -> precompute route IDs after setup / armor registration / mount change
+```
+
+`SetupModule` is Blueprint-callable. Reject invalid IDs, `None`, duplicate slots, the wrong running-gear type and missing required bindings. Repeating setup never heals an existing module. Finalization requires valid positive tank MaxHealth and profile HP ratios.
+
+Fixed slot budget: two running-gear instances, one engine, one ammo, four turrets, eight weapons, eight add-on zones. This does not increase the existing **three armor meshes × sixteen plates** limit; validate mesh coverage separately.
+
+`FSetupPlateModuleDmg` is unnecessary: C++ defines probabilities and damage multipliers. Blueprint installs modules and configures **only add-on armor coverage** through the separate function below. Do not construct per-vehicle `TMap<ModuleType, TArray<Rule>>` storage.
+
+### Class profiles, tracks/wheels and automatic module HP
+
+```text
+EVehicleModuleProfile : uint8 { ArmoredCar, LightTank, MediumTank, HeavyTank, SuperHeavyTank }
+EVehicleRunningGear : uint8 { Tracks, Wheels }
+
+UArmorCalculation::SetVehicleModuleProfile(EVehicleModuleProfile Profile) -> bool // BP
+UArmorCalculation::SetRunningGearType(EVehicleRunningGear RunningGear) -> bool  // BP
+UArmorCalculation::FinalizeVehicleModuleSetup(const UHealthComponent& TankHealth) -> bool
+UArmorCalculation::RecalculateModuleMaxHealth(float TankMaxHealth)
+
+FVehicleModuleProfileRule:
+    ModuleHealthMultiplier[ModuleTypeCount]
+    DamageChanceMultiplier[ModuleTypeCount]
+    DefaultRunningGear
+
+constexpr ModuleProfileRules[VehicleProfileCount]
+constexpr BuildProfilePlateRules(BasePlateRules, ModuleProfileRules)
+    -> ProfilePlateRules[VehicleProfileCount][RunningGearTypeCount][ArmorPlateRuleCount]
+```
+
+Default component profile = MediumTank, running gear = Tracks. Selecting ArmoredCar defaults to Wheels; other profiles default to Tracks. `SetRunningGearType(Wheels)` overrides the selected profile's default. Call these before installing modules; reject changes once installation starts. No runtime profile switching or conversion of damaged tracks into fresh wheels.
+
+There is one mutually exclusive running-gear choice for the entire tank. Two left/right instances use **either** `Tracks` **or** `Wheels`; mixed installs fail validation. Both use the same plate selectors and mobility capability, with distinct enum entries, textures, thresholds and tunable profile fields. The constexpr table builder substitutes Wheels for Tracks before applying the chosen type's chance multiplier. It never adds a second running-gear candidate.
+
+Initial profile values below: **module MaxHP / tank MaxHealth ; chance multiplier**. Tracks and Wheels have separate fields initialized to the same values shown in the running-gear column. None has zero HP/chance; all other ratios must be finite and positive.
+
+| Profile | Tracks / Wheels (each side) | Engine | Ammo | Turret | Weapon | AddOnArmor (per zone) |
+| --- | --- | --- | --- | --- | --- | --- |
+| ArmoredCar | 0.18 ; 1.15 | 0.25 ; 1.20 | 0.22 ; 1.10 | 0.22 ; 1.10 | 0.20 ; 1.10 | 0.15 ; 1.00 |
+| LightTank | 0.22 ; 1.05 | 0.30 ; 1.10 | 0.26 ; 1.05 | 0.26 ; 1.05 | 0.23 ; 1.05 | 0.18 ; 1.00 |
+| MediumTank | 0.25 ; 1.00 | 0.35 ; 1.00 | 0.30 ; 1.00 | 0.30 ; 1.00 | 0.25 ; 1.00 | 0.20 ; 1.00 |
+| HeavyTank | 0.30 ; 0.90 | 0.45 ; 0.75 | 0.36 ; 0.90 | 0.36 ; 0.90 | 0.30 ; 0.95 | 0.25 ; 1.00 |
+| SuperHeavyTank | 0.35 ; 0.85 | 0.55 ; 0.60 | 0.42 ; 0.80 | 0.42 ; 0.85 | 0.35 ; 0.90 | 0.30 ; 1.00 |
+
+```text
+ModuleMaxHp = TankHealth.GetMaxHealth() * Profile.ModuleHealthMultiplier[ModuleType]
+InitialModuleHp = ModuleMaxHp                         // new spawn only
+NewModuleHp = NewModuleMaxHp * OldModuleHealth01      // MaxHealth upgrade
+
+CompiledChance = Clamp(BaseRule.DamageProbability
+                       * Profile.DamageChanceMultiplier[ResolvedModuleType], 0, 1)
+```
+
+For equal 1,000 tank MaxHealth, a medium engine has 350 module HP; a heavy engine has 450 HP. A rear-plate engine chance of 0.65 becomes 0.4875 for HeavyTank. This controls both how often damage occurs and how much punishment the module survives.
+
+`ATankMaster::BeginPlay_SetupData_Resistances` currently calls `InitHealthAndResistance`. Finalize module HP **after** this establishes tank MaxHealth, with setup/bindings ready; do not use the health component's constructor default. Initialization is an explicit readiness step, independent of component BeginPlay ordering. On load, apply saved module health fractions after finalization.
+
+Add `UHealthComponent::OnMaxHealthChanged(OldMaxHealth, NewMaxHealth)` at the end of an actual `SetMaxHealth` change. Tank binds once → `RecalculateModuleMaxHealth`; preserve each module's percentage and state, including exact red-threshold boundaries. Reject invalid tank MaxHealth before division; leave setup disabled or existing modules unchanged and report the error. Current hull damage/healing never resizes modules; accepted healing can trigger section 7's repair milestones. All post-initialization MaxHealth writes must use this setter.
+
+Runtime work is selecting an immutable constexpr table once and multiplying by actual tank MaxHealth on initialization/upgrades. Blueprint-selected vehicle data cannot itself be constexpr. No table construction, profile switch or health-component lookup per impact. Do not infer module profiles from navigation agents or `EResistancePresetType`; those existing classifications serve different purposes.
+
+### Blueprint add-on armor coverage
+
+Modules are fixed data records. Expose this node on their owning `UArmorCalculation` component:
+
+```cpp
+/**
+ * @brief Allows vehicle-specific armor coverage while retaining shared damage rules.
+ * @param ModuleId Installed AddOnArmor module whose complete coverage is replaced.
+ * @param CoveredPlates Registered mesh/plate pairs; empty clears this module's coverage.
+ * @return True if all bindings were valid and the replacement was committed.
+ */
+UFUNCTION(BlueprintCallable, Category = "ArmorSettings|VehicleModules")
+bool SetAddOnArmorPlateCoverage(
+    FVehicleModuleId ModuleId,
+    const TArray<FAddOnArmorPlateBinding>& CoveredPlates);
+```
+
+`FAddOnArmorPlateBinding` is `USTRUCT(BlueprintType)` with `EditAnywhere, BlueprintReadWrite` fields: `TObjectPtr<UMeshComponent> MeshWithArmor` and `EArmorPlate PlateType`. It is a transient setup input; resolve it into stable registration IDs and keep only weak component references in stored bindings. A mesh/type pair covers all matching registered armor boxes on that mesh, matching the scope of existing `SetArmorOfPlateType`.
+
+```text
+Blueprint setup:
+    InitArmorCalculation(HullMesh, ...)
+    SetupModule(SideSkirtSetup)                         // Type = AddOnArmor
+    SetAddOnArmorPlateCoverage(SideSkirtId,
+        [{HullMesh, Plate_SideLeft}, {HullMesh, Plate_SideLowerLeft}])
+
+SetAddOnArmorPlateCoverage(ModuleId, CoveredPlates):
+    validate installed AddOnArmor ID and every registered mesh/type pair
+    resolve/deduplicate pairs into fixed scratch plate IDs
+    reject coverage owned by another AddOnArmor module
+    replace this module's coverage atomically; leave old coverage on failure
+    RebuildPlateModuleBindings()
+    RefreshAddOnArmorContributionsAndRearCache()
+    return true
+```
+
+- New add-on modules cover **no plates** until configured. One zone may cover several plates/meshes; each physical plate has at most one covering zone.
+- Repeated calls replace coverage without resetting HP/state. Empty input removes coverage/contribution without uninstalling or healing the module. Calls during a damage batch are rejected; apply configuration between impacts.
+- The same coverage drives both damage routing and armor contribution. Uncovered plates neither damage that add-on nor receive its armor bonus. Hits use the pre-impact armor snapshot; module damage changes subsequent impacts.
+- BP arrays exist only during setup; compile into the reserved slot in fixed `M_PlateRoutes`. No per-hit arrays, searches or extra candidate pass. Other modules' routes/probabilities are unchanged.
+- Save authored coverage by stable mesh/mount role and plate type. Rebind on load or mesh replacement; unresolved coverage is disabled and reported until registration succeeds.
+
+## 4. Compile-time plate → module mapping
+
+In `VehicleModuleBalance.h`:
+
+```text
+constexpr MakeRule(Type, Probability, DamageMultiplier, Selector, NonPenPolicy)
+    -> FPlateModuleDamage
+constexpr MakeRuleSet(First, Second = NoModuleRule, Third = NoModuleRule)
+    -> FPlateModuleRuleSet
+
+inline constexpr FPlateModuleRuleSet BasePlateRules[ArmorPlateRuleCount] = ...
+constexpr TryGetPlateRuleIndex(EArmorPlate Plate) -> checked optional index
+constexpr ValidatePlateRules() -> bool
+static_assert(ValidatePlateRules())
+```
+
+Use explicit enum-to-index conversion and validate exhaustive coverage. Every row reserves `AddOnArmorCandidateIndex` for optional add-on coverage, leaving at most two other modules. `ValidatePlateRules()` checks that layout as well as probability/multiplier ranges. Lookup is O(1), followed by at most three entries. Tuple = **module: penetrating probability / damage multiplier**; values live directly in the constexpr table.
+
+For example, the mantlet row is constructed in that header as:
+
+```cpp
+MakeRuleSet(
+    MakeRule(EVehicleModuleTypes::AddOnArmor, 1.00f, 0.25f,
+             EModuleTargetSelector::CoveringArmorZone, EModuleNonPenPolicy::External),
+    MakeRule(EVehicleModuleTypes::Weapon, 0.60f, 0.65f,
+             EModuleTargetSelector::BoundWeapon, EModuleNonPenPolicy::MantletOnly),
+    MakeRule(EVehicleModuleTypes::Turret, 0.30f, 0.45f,
+             EModuleTargetSelector::BoundTurret, EModuleNonPenPolicy::Never))
+```
+
+| `EArmorPlate` | Entry 0 | Entry 1 | Entry 2 |
+| --- | --- | --- | --- |
+| `Plate_Front` | AddOnArmor: 1.00 / 0.30 | Tracks: 0.12 / 0.30 | Ammo: 0.08 / 0.30 |
+| `Plate_FrontUpperGlacis` | AddOnArmor: 1.00 / 0.35 | Ammo: 0.10 / 0.30 | None |
+| `Plate_FrontLowerGlacis` | AddOnArmor: 1.00 / 0.25 | Tracks: 0.35 / 0.55 | Engine: 0.10 / 0.30 |
+| `Plate_SideLeft` | AddOnArmor: 1.00 / 0.30 | Tracks: 0.25 / 0.40 | Ammo: 0.30 / 0.50 |
+| `Plate_SideRight` | AddOnArmor: 1.00 / 0.30 | Tracks: 0.25 / 0.40 | Ammo: 0.30 / 0.50 |
+| `Plate_SideLowerLeft` | AddOnArmor: 1.00 / 0.20 | Tracks: 0.65 / 0.70 | Ammo: 0.15 / 0.30 |
+| `Plate_SideLowerRight` | AddOnArmor: 1.00 / 0.20 | Tracks: 0.65 / 0.70 | Ammo: 0.15 / 0.30 |
+| `Plate_Rear` | AddOnArmor: 1.00 / 0.25 | Engine: 0.65 / 0.70 | Ammo: 0.20 / 0.40 |
+| `Plate_RearLowerGlacis` | AddOnArmor: 1.00 / 0.20 | Engine: 0.60 / 0.65 | Tracks: 0.30 / 0.40 |
+| `Plate_RearUpperGlacis` | AddOnArmor: 1.00 / 0.25 | Engine: 0.65 / 0.70 | Ammo: 0.25 / 0.45 |
+| `Turret_Front` | AddOnArmor: 1.00 / 0.25 | Turret: 0.30 / 0.45 | Weapon: 0.20 / 0.40 |
+| `Turret_SideLeft` | AddOnArmor: 1.00 / 0.25 | Turret: 0.40 / 0.50 | Ammo: 0.25 / 0.45 |
+| `Turret_SideRight` | AddOnArmor: 1.00 / 0.25 | Turret: 0.40 / 0.50 | Ammo: 0.25 / 0.45 |
+| `Turret_Rear` | AddOnArmor: 1.00 / 0.25 | Turret: 0.35 / 0.50 | Ammo: 0.40 / 0.55 |
+| `Turret_SidesAndRear` | AddOnArmor: 1.00 / 0.25 | Turret: 0.40 / 0.50 | Ammo: 0.30 / 0.50 |
+| `Turret_Cupola` | AddOnArmor: 1.00 / 0.25 | Turret: 0.15 / 0.25 | Ammo: 0.10 / 0.25 |
+| `Turret_Mantlet` | AddOnArmor: 1.00 / 0.25 | Weapon: 0.60 / 0.65 | Turret: 0.30 / 0.45 |
+
+`ResolveModuleId(Rule, HitContext)` resolves one installed instance per entry:
+
+- Tracks → struck side; front/rear hits use hull-local lateral position with a stable centerline tie-break.
+- Turret/Weapon → plate-bound mount/weapon; never all weapons on the tank.
+- AddOnArmor → zone assigned by `SetAddOnArmorPlateCoverage`; an unconfigured slot is skipped. Engine/Ammo → singleton.
+- Absent instance → skip, without reallocating its probability/damage.
+
+Each fixed route contains a primary module ID and, for side-dependent running gear, an alternate ID. Resolve directly from stable plate registration and candidate index; no per-hit module search. Validate registration generations after mesh replacement. Sorting armor boxes cannot change their stable routing IDs.
+
+Casemate gun shields may use `Turret_Mantlet` with a Weapon binding and no Turret instance. Independently vulnerable secondary guns require a plate binding. Plate-to-module topology stays shared; constexpr class profiles change probabilities and substitute the selected running gear. Only add-on coverage enables/disables its reserved candidate per vehicle. It never becomes a fourth candidate or replaces another module. Validate every generated profile/gear table at compile time.
+
+## 5. `CalculateModuleDamage` and damage application
+
+### Required public entry point
+
+```cpp
+void CalculateModuleDamage(
+    EArmorPlate PlateHit,
+    float EffectiveArmor,
+    bool bPen,
+    float DamageDealt,
+    float ProjectileBaseDamage,
+    float ProjectileCalibre);
+```
+
+Keep these six values explicit. `ProjectileCalibre` is millimetres; `DamageDealt` is actual applied tank-health damage. The function does **not** recalculate penetration.
+
+The six-argument overload supports unambiguous single-instance bindings and the default kinetic source profile. Production weapon paths use an overload with a final `const FVehicleModuleHitContext& HitContext` for source-specific rules and multiple instances:
+
+```text
+FVehicleModuleHitContext:
+    StablePlateRegistrationId, HullLocalHitPosition, BoundMountId
+    ShellType, DamageType, DeliveryType, bOverpenetrating
+    ShotActivationId, ImpactOrdinal, VictimId, RuleVersion
+
+CalculateModuleDamage(PlateHit, EffectiveArmor, bPen, DamageDealt,
+                      ProjectileBaseDamage, ProjectileCalibre, HitContext)
+```
+
+Do not cache “last hit context” on the component: re-entrant impacts can overwrite it. The six-argument overload rejects ambiguous bindings. Shield absorption, invalid plate results and rejected damage never call either overload. Legacy/default-source callers must supply an explicit context whenever the omitted information would change the result.
+
+`TryMakeDefaultModuleHitContext(PlateHit)` uses a prevalidated unambiguous binding, a tank-local impact serial and stable victim ID. Reject routes requiring unavailable side/mount information; never fabricate a hit position. Serialize the serial if this path is used across saves. Actual weapons supply shot/impact identity through the production overload.
+
+### Resolver pseudocode
+
+```text
+CalculateModuleDamage(...):
+    ValidateImpactInputsAndLivingOwner(...) or return
+    RuleIndex = TryGetPlateRuleIndex(PlateHit) or return
+    Rules = M_SelectedProfilePlateRules[RuleIndex]      // const constexpr-backed reference
+    Batch = MakeEmptyModuleDamageBatch()                // fixed storage
+    Input = MakeModuleDamageInput(the six arguments, HitContext) // stack value
+    Energy = CalculateModuleDamageEnergy(Input)
+
+    for CandidateIndex in [0, MaxModulesPerPlate):
+        TryAppendCandidateDamage(Rules.Entries[CandidateIndex],
+                                 CandidateIndex, Energy, Input, Batch)
+
+    LimitBatchToEnergyBudget(Energy, Batch)
+    ApplyPerModuleDamageCaps(bPen, Batch)
+    ApplyNonPenRateBudgetIfNeeded(Input, Batch)
+    LimitNewCapabilityFailures(Batch)
+    CommitModuleDamageBatch(Batch)
+
+TryAppendCandidateDamage(...):
+    ResolveModuleId(...) or skip
+    GetIsCandidateEligibleForSource(...) or skip
+    Probability = CalculateCandidateProbability(...)
+    Roll01 = GetDeterministicModuleRoll(ShotKey, CandidateIndex)
+    if Roll01 < Probability:
+        Batch.Append(ModuleId, Energy * Rule.DamageMultiplier)
+
+CommitModuleDamageBatch(Batch):
+    DamageModule(Id, Damage, Cause) for each accepted entry
+    CommitDerivedCapabilities()
+    PublishCoalescedModuleChanges()                     // after mutation
+```
+
+`DamageModule(FVehicleModuleId, float Damage, EModuleChangeCause)` is the mutation path. A type-only overload is valid only when exactly one instance exists. Module damage never calls tank `TakeDamage` or subtracts hull health again.
+
+### Formula and source rules
+
+```text
+PenEnergy = min(Base * PenDamageCeilingFromBase,
+                max(DamageDealt, Base * PenDamageFloorFromBase))
+            * ShellRule.PenEnergyMultiplier
+NonPenEnergy = Base * ShellRule.NonPenEnergyMultiplier
+Probability = Rule.DamageProbability
+              * (bPen ? 1 : ShellRule.NonPenProbabilityMultiplier)
+ProposedDamage = Energy * Rule.DamageMultiplier
+BudgetScale = min(1, Energy / SumOfSuccessfulProposedDamage)  // zero-safe
+```
+
+`Rule.DamageProbability` already includes the class/type chance multiplier; do not multiply it again. Clamp final probability to `[0,1]`. Mine/splash adapters use their source candidates with the same profile/type factor once. The penetration floor applies only to accepted hits; explicit immunity/friendly-fire rejection blocks modules too. `EffectiveArmor` remains a validated hit/diagnostic value; do not divide damage HP by armor millimetres or override the supplied penetration result.
+
+| `ShellModuleRules` row | Pen energy multiplier | Non-pen probability multiplier | Non-pen energy multiplier |
+| --- | ---: | ---: | ---: |
+| AP / APCR | 1.00 | 0.35 | 0.15 |
+| APHE / APHEBC | 1.15 | 0.35 | 0.15 |
+| HE | 1.10 | 0.70 | 0.35 |
+| HEAT | 1.00 | 0.70 | 0.35 |
+| Railgun | 1.00; 0.70 for overpenetration | 0.35 | 0.15 |
+
+Non-penetration can damage Tracks/Wheels, AddOnArmor and mantlet-bound Weapon only. Engine, Ammo and traverse require penetration. Reject ballistic module damage below `MinBallisticCalibreMm`.
+
+`LimitNewCapabilityFailures` compares proposed HP with **each type's destruction threshold**, not zero. Allow the greatest normalized loss of remaining HP above that threshold to become red; stable table order breaks ties. Clamp additional would-be failures to `min(OldHP, MaxHP × (DestroyedThreshold + SurvivingModuleThresholdMargin01))`, so the cap cannot heal. Add-on depletion does not consume the capability-failure allowance. Discard prevented damage.
+
+Validate `1 - PenetratingModuleDamageCap01 > MaxDestroyedThreshold01` to prevent one-shot red failures from full module health. RNG keys reserve one position per candidate; skipped candidates never shift other rolls. Unsupported source profiles fail closed.
+
+## 6. Exact yellow/red transitions
+
+```text
+GetModuleState(Type, CurrentHp, MaxHp):
+    Health01 = Clamp(CurrentHp / MaxHp, 0, 1)
+    if Health01 <= GetDestroyedHealthThreshold01(Type): return Destroyed
+    if Health01 < CompletedHealth01:                    return Damaged
+    return Healthy
+
+DamageModule(Id, Damage, Cause):
+    CurrentHp = Clamp(CurrentHp - ValidatedDamage, 0, MaxHp)
+    UpdateModuleState(Id, Cause)
+
+RestoreDestroyedModulesToDamaged():
+    for each installed module with State == Destroyed:
+        CurrentHp = MaxHp * GetRecoveredHealth01(Type)
+        UpdateModuleState(Id, Repair)
+    CommitDerivedCapabilities()
+    PublishCoalescedModuleChanges()
+
+RestoreAllModulesToHealthy():
+    set installed module HP to MaxHp
+    update states and publish once
+```
+
+Example: engine MaxHP = 200, red threshold = 15%. `HP <= 30` is red. Permitted recovery sets HP to `200 × (0.15 + 0.05) = 40`, producing yellow. A track recovers to 25%, because its threshold is 20%. **There is no universal 35% restored module HP.**
+
+Full repair means tank health and every installed module are at maximum. Tank MaxHealth upgrades recalculate module MaxHP while preserving each module's health percentage. Accepted healing restores modules only at the recovery/completion milestones in section 7, without per-tick module HP increments. Recovery applies the ordinary yellow behaviour.
+
+## 7. Healing automatically repairs tank modules
+
+### One entry point for every healing source
+
+```text
+Scavenger RepairTick / TickingHealBehaviour / SingleHealBehaviour / future healing
+    -> UHealthComponent::Heal(HealAmount)
+    -> ApplyHealingInternal(HealAmount, CompletedHealth01)
+    -> ATankMaster::OnHealthHealingApplied(Receipt)
+    -> UArmorCalculation repair milestone, only when due
+
+UHealthComponent::Heal(float HealAmount) -> bool
+UHealthComponent::HealWithHealthCap(float HealAmount, float MaxHealth01) -> bool
+UHealthComponent::ApplyHealingInternal(float HealAmount, float MaxHealth01) -> bool
+UHealthComponent::GetHasDamageToRepair() const -> bool
+UHealthComponent::InitializeTankRepairOwner(ATankMaster* Tank)
+
+FHealthHealingReceipt:
+    AcceptedHealingWork
+    AppliedHullHealing
+    HealthAfter
+    MaxHealth
+    RequestedHealthCap01
+```
+
+**Every positive accepted `Heal()` call can repair modules**, regardless of who called it. Commander auras, one-shot heals, passive regeneration and new abilities need no module-specific payload, provider registration or repair-source enum. They use the health component's normal healing API. Source rules such as range, ownership and ability cost remain with the source.
+
+The health component caches a weak tank owner once after tank/module initialization. It sends a stack receipt to that tank only while module repair is pending; no owner casts, component searches, delegates to every tank or module iteration per healing pulse. It calls the tank before returning completion to the healer. Non-tank healing retains its existing path.
+
+### Central healing transaction and completion
+
+```text
+UHealthComponent::ApplyHealingInternal(Amount, HealthCap01):
+    reject dead owner, nonfinite/nonpositive Amount or invalid MaxHealth/cap
+    AcceptedWork = Amount                         // after shared healing modifiers
+    HullWork = min(AcceptedWork, max(0, MaxHealth * HealthCap01 - CurrentHealth))
+    CurrentHealth += HullWork                     // never lower HP above the cap
+    Receipt = {AcceptedWork, HullWork, CurrentHealth, MaxHealth, HealthCap01}
+    if tank has pending module repairs:
+        Tank.OnHealthHealingApplied(Receipt)       // even when HullWork == 0
+    update hull UI only if hull HP changed
+    return living owner and not GetHasDamageToRepair()
+
+UHealthComponent::Heal(Amount):
+    return ApplyHealingInternal(Amount, CompletedHealth01)
+
+UHealthComponent::HealWithHealthCap(Amount, HealthCap01):
+    return ApplyHealingInternal(Amount, HealthCap01)
+
+UHealthComponent::GetHasDamageToRepair():
+    return owner is alive and
+           (CurrentHealth < MaxHealth or cached tank NonHealthyModuleCount > 0)
+```
+
+For tanks, `Heal` returning true means **hull and modules are fully repaired**. This deliberately broadens its current hull-only completion contract: `URepairComponent::RepairTick` already uses that bool to stop repairs. Update its API comment and audit callers/overrides; squad-specific healing stays unchanged. A full-health tank with damaged modules must not early-return before producing the receipt.
+
+Use exact capped hull healing for tanks instead of the current 99% snap, so work cannot be counted both as hull healing and finishing service. `AcceptedHealingWork` is the accepted request, including unused healing at full hull HP; immunity/rejected/zero/negative healing produces no receipt. Apply healing modifiers once. Direct initialization/load setters (`SetCurrentHealth`, `SetMaxHealth`) are not healing operations and emit no receipt; all actual future healing must use `Heal` or its shared capped path.
+
+### Tank-owned gate and finishing work
+
+```text
+ATankMaster::OnHealthHealingApplied(const FHealthHealingReceipt& Receipt)
+ATankMaster::TryRecoverDestroyedModulesAfterHealing() -> bool
+ATankMaster::AccumulateFullModuleService(float Work)
+ATankMaster::GetIsVehicleFullyRepaired() const -> bool
+ATankMaster::OnModuleConditionChanged(const FModuleStateChange& Change)
+
+FVehicleModuleRepairState:
+    DestroyedModuleCount
+    NonHealthyModuleCount
+    ModuleDamageRevision
+    FullServiceAccumulatedWork
+    ServiceBudgetTokens
+    ServiceBudgetLastUpdateTime
+
+OnHealthHealingApplied(Receipt):
+    reject dead/uninitialized tank or nonpositive accepted work
+    if NonHealthyModuleCount == 0: return
+    if TryRecoverDestroyedModulesAfterHealing(): return
+    if Receipt.RequestedHealthCap01 < CompletedHealth01: return
+    if HealthComponent is not full: return
+    SurplusWork = max(0, Receipt.AcceptedHealingWork - Receipt.AppliedHullHealing)
+    AccumulateFullModuleService(SurplusWork)
+
+TryRecoverDestroyedModulesAfterHealing():
+    if DestroyedModuleCount == 0: return false
+    if HealthComponent.GetHealthPercentage()
+       < TankHealthRequiredForModuleRecovery01: return false
+    ArmorCalculation.RestoreDestroyedModulesToDamaged() // one batch call
+    return true
+
+AccumulateFullModuleService(Work):
+    if Work <= 0 or NonHealthyModuleCount == 0: return
+    FullServiceAccumulatedWork += ConsumeModuleServiceBudget(Work)
+    if FullServiceAccumulatedWork < FullModuleServiceWork: return
+    clear finishing work
+    ArmorCalculation.RestoreAllModulesToHealthy()       // one batch call
+```
+
+Cache counts from native module events and mirror the pending/nonhealthy count into the health component before mutations return. Reset finishing progress on new module damage; ordinary pauses preserve it. Rebuild counts once on setup/load. The armor component receives only recovery/completion milestones; healers never call it.
+
+One work unit equals one accepted HP of healing. Full-health surplus from **any** ordinary healing source contributes to the same finishing counter. A pulse that restores red → yellow consumes that pulse for recovery; finishing starts with a later positive pulse. A one-shot heal can therefore recover red modules but needs further healing to finish them, just like one scavenger tick.
+
+`ConsumeModuleServiceBudget` is tank-local: refill a token bucket from elapsed world time at `MaxModuleServiceWorkPerSecond`, with capacity and initial tokens `FullModuleServiceWork`. Clamp elapsed time to nonnegative; consume at most available tokens. Update lazily on finishing work, with no timer. This limits combined module finishing throughput without reducing existing hull healing or requiring healer identities. Repeated calls in the same frame do not refill it. Clear it on teardown; initialize once, never per healer.
+
+### Gate edge cases
+
+| Situation | Required behavior |
+| --- | --- |
+| Any heal raises tank health to at/above 75% | Restore current red modules in one batch |
+| Module becomes red while tank has 90% HP | Next positive accepted heal restores it; no new upward crossing required |
+| Tank has 100% HP and red modules | A healing pulse restores red → yellow despite gaining zero hull HP |
+| Tank has 100% HP and yellow modules | Positive surplus healing advances finishing work |
+| Further pulses after all modules recover | No armor calls; cached count is zero |
+| New red failure during healing | State event re-arms pending recovery |
+| Zero/rejected heal, MaxHealth upgrade or load | No recovery or finishing credit |
+| Death/re-entrant healing during callbacks | No resurrection or duplicate milestone |
+
+Re-entrant healing is deferred until the current health/module transaction and its notifications finish. Each accepted transaction produces one receipt; do not also trigger repair from health-percent delegates or `UpdateHealthBar`. Distinct heal calls are distinct work contributions; an ability must not submit the same heal through two APIs.
+
+### Crew repair uses the same rules
+
+```text
+ATankMaster::ExecuteCrewRepairCommand()
+    -> suspend movement and secure weapons
+    -> wait CrewRepairQuietSeconds after effective damage / own firing
+    -> complete CrewRepairWarmupSeconds of uninterrupted work
+    -> CrewRepairTick() until red count is zero
+
+CrewRepairTick():
+    Work = TankMaxHP * CrewRepairTankHealth01PerSecond * TickSeconds
+    HealthComponent.HealWithHealthCap(Work, TankHealthRequiredForModuleRecovery01)
+    // Common healing receipt performs module recovery.
+    // Stop on red count == 0, not Heal's full-repair return value.
+
+TerminateCrewRepairCommand()
+    -> clear timer and release only crew-service restrictions
+```
+
+The cap limits this action's healing extent, not the source types eligible for module recovery. Red recovery uses the same tank-health gate for capped and ordinary healing. A capped pulse cannot contribute to full service, even if other healing has already raised hull HP to 100%. Ordinary healing can still finish modules while the crew action exists.
+
+Crew repair is free and available without scavengers; start only while red modules exist. Meaningful hull/module damage pauses its work and restarts quiet/warmup; harmless bounces do not. Keep applied hull healing. If another heal clears the red count, cancel the crew timer through the native state event.
+
+Example: at 50% hull HP, quiet/warmup plus 10 seconds of crew healing reaches 75%, restoring red modules to yellow. At 90%, its first post-warmup pulse restores them without changing hull HP. A commander aura can independently heal to 100% and complete the finishing pass.
+
+### Existing healers and future callers
+
+| Existing integration | Required change |
+| --- | --- |
+| `UTickingHealBehaviour::OnTick` | Keep calling `HealthComponent->Heal(Amount)`; gains module repair automatically |
+| `USingleHealBehaviour::OnAdded` | Same; no tank cast or module branch |
+| `URepairComponent::RepairTick` | Keep existing `Heal` call; stop when its revised full-repair bool is true |
+| `FRTSRepairHelpers::GetIsUnitValidForRepairs` | For tanks, use `GetHasDamageToRepair()` instead of the current 99%-hull check |
+| `URadiusRepairAura::IsValidTarget` | Existing helper now includes full-health module-only targets; keep its heal behaviours |
+| Controller/right-click/completion checks | Use the same health-component eligibility/completion contract |
+
+Keep unrelated unit eligibility restrictions intact. Future healing abilities use `Heal` and, if filtering targets, `GetHasDamageToRepair`; no knowledge of module thresholds, repair stages, classes or the armor component is required. Healing streams sum naturally: four 7.5 HP/s workers supply 30 finishing work/s, and an equivalent aura supplies the same work.
+
+## 8. Behaviour hooks and effects
+
+```text
+UArmorCalculation::OnModuleConditionChanged(Change) -> ATankMaster
+ATankMaster::SyncModuleBehaviour(const FModuleStateChange& Change)
+
+Healthy   -> remove module-owned behaviour
+Damaged   -> Asset.ModulesByType[Type].DamagedBehaviourClass
+Destroyed -> Asset.ModulesByType[Type].DestroyedBehaviourClass
+
+UBehaviourComp::SetModuleBehaviour(ModuleId, DesiredClass, Context)
+UBehaviourComp::RemoveModuleBehaviour(ModuleId)
+UVehicleModuleBehaviour::OnModuleContextUpdated(Context)
+```
+
+Classes are optional `TSubclassOf<UVehicleModuleBehaviour>` values in the shared asset (section 11). `UVehicleModuleBehaviour : UBehaviour` supplies module context before `OnAdded`: instance ID, type, state, current/max HP and weak bindings. **Null means no behaviour for that state; no error, fallback behaviour or null `AddBehaviour` call.** Healthy always requests null.
+
+### Cached instance per module
+
+```text
+UBehaviourComp::M_ModuleBehaviourSlots[MaxModuleInstances]
+    -> reflected slots: owned behaviour pointer, desired class/context, generation
+
+SetModuleBehaviour(ModuleId, DesiredClass, Context):
+    validate installed module ID; obtain its fixed slot directly
+    if processing behaviours/callbacks: queue latest desired slot state; return
+    if existing instance has DesiredClass:
+        update context only; no remove/add or allocation
+        return
+    RemoveModuleBehaviour(ModuleId)                 // exact instance, if present
+    if DesiredClass is null: return                 // valid empty assignment
+    Instance = CreateBehaviourInstance(DesiredClass)
+    set module source identity and context before OnAdded
+    store GC-visible pointer; AddInitialisedBehaviour(Instance)
+```
+
+The new module API uses `SourceKey = (VehicleModule, ModuleId)` and O(1) fixed-slot lookup. `RemoveModuleBehaviour` calls existing `RemoveBehaviourInstance` for that pointer, then clears the slot; unrelated same-class instances remain active. Keep the slot synchronized with generic removal/cleanup. The component owns instances through `UPROPERTY` references; the tank caches a weak behaviour-component reference once.
+
+Existing `AddBehaviour`, `RemoveBehaviour`, `SwapBehaviour` and `TryHandleExistingBehaviour` use class/stack matching. Module instances must bypass that cross-source matching; generic matching must likewise exclude module-owned instances. Each module gets at most one active behaviour, even when several modules select the same class. Module behaviours are persistent and non-ticking in this version; lifecycle follows module state rather than a duration/expiry timer.
+
+| Transition | Operation |
+| --- | --- |
+| Healthy → yellow/red | Add the configured class, if any |
+| Yellow → red | Remove yellow instance; add red class if assigned |
+| Red → yellow | Remove red instance; add yellow class if assigned |
+| Yellow/red → Healthy | Remove this module's instance |
+| Same class configured for yellow/red | Keep instance; call `OnModuleContextUpdated` with the new state |
+| New state has no class | Remove previous instance; leave slot empty, without error |
+
+`SyncModuleBehaviour` runs only on state transitions, plus one reconciliation on load or behaviour refresh. Repeated HP loss within a state does not contact `UBehaviourComp`. Proportional add-on armor remains native. Use a fixed pending-slot bitmask while the behaviour component is iterating: the latest desired state per module wins, and drain at its existing safe processing boundary. Do not enqueue stale remove/add-by-class pairs. Batch capability/UI refresh once after replacements; avoid exposing a temporary restored-speed state between removal and addition.
+
+Example: `Engine Damaged → BP_EngineDamaged::OnAdded → RegisterVehicleSpeedLimit(SourceKey, EngineYellowSpeedMultiplier)`. Red removes that source's yellow effect and optionally adds the configured red behaviour. Recovery restores the yellow class; full service removes it. All removal callbacks unregister their own modifiers without restoring stale base values.
+
+### TankMaster Blueprint state event
+
+```cpp
+/**
+ * @brief Lets tank Blueprints react once to committed module state transitions.
+ * @param ModuleType Type of the instance whose state changed.
+ * @param NewState Committed Healthy, Damaged or Destroyed state.
+ * @param RemainingModuleHp Absolute remaining module HP, clamped to [0, MaxHp].
+ */
+UFUNCTION(BlueprintImplementableEvent, Category = "Vehicle Modules")
+void OnVehicleModuleStateChanged(
+    EVehicleModuleTypes ModuleType,
+    EVehicleModuleState NewState,
+    float RemainingModuleHp);
+```
+
+`ATankMaster::OnModuleConditionChanged(Change)` updates repair counts and requests behaviour synchronization. After the batch's native state/capabilities and behaviour operations are committed, invoke the BP event once per changed module with a copied transition payload. If behaviour work is deferred, publish after that safe drain. Emit direct Healthy → Destroyed as one event; emit red → yellow and full repair → Healthy normally. HP loss within an unchanged state, initial setup, load reconciliation and refresh do not emit transition events.
+
+Remaining HP is an **absolute value**, e.g. `40.0` for a 200-HP engine recovered to 20%. Native payloads retain `ModuleId`; the requested BP signature is type-based, so two instances of the same type can produce two events. This event is separate from the healthbar's worst-state-per-type aggregation. Re-entrant BP mutations wait until notification dispatch ends; stop dispatch on tank death/EndPlay. No implementation of the BP event is required, and BP must not reapply the native behaviour/icon work.
+
+### `ModuleTypeRules` defaults
+
+| Type | Default asset's yellow behaviour | Red capability rule |
+| --- | --- | --- |
+| Tracks / Wheels | Travel ×0.65; hull turning ×0.70 | No powered travel/turning |
+| Engine | Travel ×0.70; acceleration ×0.60 | No powered travel/turning; weapons remain available |
+| Ammo | Reload duration ×1.50 | No new reload; loaded rounds may fire |
+| Turret | Traverse ×0.50 | Traverse locked; aligned gun may fire |
+| Weapon | Dispersion ×1.25; firing-cycle duration ×1.20 | Only the bound weapon stops firing |
+| AddOnArmor | Contribution scales with module HP percentage | Add-on contribution zero; structural armor remains |
+
+All values are constexpr table fields in `VehicleModuleBalance.h`, not literals in behaviours. HP ratios are defined only in the profile table. Wheels use their own enum/icon entry. Combine engine/running-gear speed limits using the minimum, not their product. Healthy hull weapons remain usable when a turret gun is red.
+
+```text
+ATankMaster::RebuildVehicleCapabilities()
+    -> current base values + research/veterancy
+    -> ordinary behaviour modifiers
+    -> module source modifiers
+    -> hard blockers: red modules, stun, dig-in, service, death
+    -> tracked / wheeled movement and mounted weapon adapters
+```
+
+Red capability gates and add-on armor contribution remain native even when a behaviour slot is empty. Other yellow penalties come from the assigned behaviours; leaving a slot empty intentionally omits that effect. The default asset assigns the standard yellow classes above. Apply each penalty once. Stun expiry, turret swap and `SetTurretsToAutoEngage` consult combined capabilities instead of enabling equipment unconditionally.
+
+`RefreshAllBehaviours` must retain module source identity/context and rebuild module slots through `SetModuleBehaviour`, not the current class-only re-add path. Commit native modifiers/capabilities before publishing Blueprint/UI callbacks. Defer re-entrant mutations until the batch ends; death takes priority.
+
+## 9. Hit integration and allocation guarantees
+
+```text
+AProjectile::ArmorCalc_KineticProjectile / UWeaponStateTrace hit handling:
+    HandleShieldHit() -> absorbed: stop
+    GetEffectiveArmorOnHit(...) -> plate, effective armor, adjusted penetration
+    ResolveExistingPenetrationPolicy(...) -> bPen
+    ApplyExistingHullDamage(...) -> FVehicleDamageReceipt
+    if tank survived and plate/source are eligible:
+        CalculateModuleDamage(PlateHit, EffectiveArmor, bPen,
+                              Receipt.AppliedDamage, BaseDamage, Calibre, Context)
+    finish bounce / overpenetration / impact feedback without repeated hull damage
+```
+
+`FVehicleDamageReceipt` carries applied HP damage and death status. `AHpPawnMaster::TakeDamage` currently returns **0 on death / 1 on survival**. Capture actual damage after `UHealthComponent::TakeDamage(float& InOutDamage, ...)` updates the amount.
+
+| Source | Adapter rule |
+| --- | --- |
+| Projectile / hitscan | Common resolver; preserve existing penetration behavior initially |
+| HE/HEAT bounce | External modules; existing hull chip once; remove duplicate legacy “module damage”/stun handling and UI-pool gating |
+| Railgun overpenetration | One receipt per victim; global overpenetration factor |
+| Shield absorbed | No underlying module call |
+| Direct mine | `CalculateMineModuleDamage(Context)`; selected running-gear candidate, base probability 1 × class factor, normal caps |
+| Splash | `CalculateSplashModuleDamage(Context)`; external modules, attenuation/occlusion, direct victim excluded |
+| ICBM direct hit / ICBM splash | Skip module damage entirely; preserve existing hull damage/armor calculations, including surviving tanks |
+| Fire / laser / radiation / DOT | Existing hull effects until an explicit module adapter is designed |
+
+Mine/splash rules and attenuation settings also live in the balance header. An add-on candidate requires an affected plate with configured coverage; these adapters cannot bypass the coverage map. Rear-armor AOE estimates cannot become fictitious engine hits. Pool reuse needs activation/generation IDs for deduplication. Invalid plate output must not silently become `Plate_Front`.
+
+`AICBMActor::ApplyDirectDamage` already calculates armor and calls `TakeDamage`; leave module resolution out of it. `ApplyAOEDamage` uses `FRTS_AOE::DealDamageVsRearArmorInRadiusAsync`. Keep module splash opt-in at weapon adapters; if the shared AOE helper gains module support, default its module policy to Ignore so ICBMs retain the current path. Do not add tank-wide module damage inside generic `TakeDamage`.
+
+**Zero allocations:** constexpr lookup, three candidate evaluations, fixed damage buffer, module HP/state mutations and native capability snapshots. No runtime rule maps, growing arrays, per-hit component searches, formatted text or Blueprint calls in the resolver.
+
+Existing `UBehaviourComp` allocates UObjects/dynamic storage. Create/remove module behaviours only on state transitions outside the resolver; unchanged states do no behaviour work. This minimal version does not preallocate behaviour objects or promise allocation-free UMG/behaviour transitions.
+
+## 10. Existing code changes required later
+
+| Existing source / symbol | Required integration |
+| --- | --- |
+| [ArmorCalculation.cpp](../RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.cpp): `NoArmorHitGetClosest` | Fill all outputs; fix squared-distance threshold and adjusted-penetration reset before routing fallback hits |
+| Same: `EvaluateArmorPlatesForHit`, `GetArmorAtAngle` | Preserve registered zero-armor plate identity; handle near-zero cosine safely |
+| Same: armor setters/multipliers, rear cache | Separate structural/permanent armor from add-on contribution; BP coverage drives armor contribution and module routes; changes affect subsequent hits; refresh rear cache |
+| [Projectile.cpp](../RTS_Survival/Weapons/Projectile/Projectile.cpp): kinetic/bounce/overpenetration paths | Common resolved-hit module call exactly once |
+| [WeaponData.cpp](../RTS_Survival/Weapons/WeaponData/WeaponData.cpp): `DidTracePenArmorCalcComponent` | Return plate context and penetration; retain sampled damage flux |
+| [HpPawnMaster.cpp](../RTS_Survival/MasterObjects/HealthBase/HpPawnMaster.cpp), [HealthComponent.cpp](../RTS_Survival/RTSComponents/HealthComponent.cpp) | Expose real damage receipt; actor return value is not damage |
+| Same health component: `Heal`, `GetHasDamageToRepair`, `SetMaxHealth` | Central healing transaction/receipt; include modules in tank eligibility/completion; notify actual MaxHealth changes |
+| Same: `OnWidgetInitialized`, `SetHealthBarVisibility` | Initialize/rebind `ModuleBox`; flush pending icon state on visibility changes |
+| [W_HealthBar.h](../RTS_Survival/GameUI/Healthbar/W_HealthBar.h), [BehaviourButtonSettings.h](../RTS_Survival/Behaviours/ProjectSettings/BehaviourButtonSettings.h) | Existing widget/settings reference pattern; shared module asset with textures and optional classes; widget icon cache |
+| [ICBMActor.cpp](../RTS_Survival/Weapons/ICBM/ICBMActor/ICBMActor.cpp): `ApplyDirectDamage`, `ApplyAOEDamage` | Retain hull-only damage; no module adapter |
+| [TankMaster.h](../RTS_Survival/Units/Tanks/TankMaster.h) | Repair orchestration, cached counts, crew ability, behaviour synchronization and `OnVehicleModuleStateChanged` BP event |
+| [RepairComponent.cpp](../RTS_Survival/RTSComponents/RepairComponent/RepairComponent.cpp), [RepairHelpers.h](../RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h), [RadiusRepairAura.cpp](../RTS_Survival/RTSComponents/AOEBehaviourComponent/RadiusAOEBehaviourComponent/RepairAura/RadiusRepairAura.cpp) | Keep normal healing calls; tank-aware eligibility/completion includes full-health module-only targets |
+| [TickingHealBehaviour.cpp](../RTS_Survival/Behaviours/Derived/Heal/TickingHealBehaviour.cpp), [SingleHealBehaviour.cpp](../RTS_Survival/Behaviours/Derived/Heal/SingleHealBehaviour.cpp) | Existing `Heal` calls automatically recover modules; no custom tank payload |
+| [BehVehicleStunned.cpp](../RTS_Survival/Behaviours/Derived/BehaviourVehicleStunned/BehVehicleStunned.cpp), [BehaviourComp.h](../RTS_Survival/Behaviours/BehaviourComp.h) | Fixed module behaviour slots; exact-instance replacement; preserve identity through refresh/deferred operations; no stale speed restore |
+| [TurretSwapComp.h](../RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h) | Preserve condition by mount role; rebind without healing/reloading |
+| [TrackPathFollowingComponent.h](../RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h), [TrackPhysicsMovement.cpp](../RTS_Survival/Units/Tanks/TrackedTank/TrackPhysicsMovementComp/TrackPhysicsMovement.cpp) | Apply restrictions to navigation/movement; copy scalar limits into physics snapshots |
+| [Abilities.md](Abilities.md) | Crew Repair: controller, command card, `ICommands`, queue, completion/cancellation |
+
+## 11. Shared module asset and tank healthbar icons
+
+### Settings and module asset
+
+Place settings, asset and cache beside the module types under `ArmorCalculationComponent/VehicleModules/`; widget helpers stay under `GameUI/Healthbar/VehicleModules/`. Follow the existing `UBehaviourButtonSettings` config-reference pattern:
+
+```text
+UVehicleModuleSettings : UDeveloperSettings
+    UCLASS(Config=Game, DefaultConfig)
+    UPROPERTY(EditAnywhere, Config)
+    TSoftObjectPtr<UVehicleModuleDataAsset> ModuleDataAsset
+
+FVehicleModuleStateAssets : reflected struct
+    UPROPERTY(EditDefaultsOnly) TObjectPtr<UTexture2D> DamagedTexture
+    UPROPERTY(EditDefaultsOnly) TObjectPtr<UTexture2D> DestroyedTexture
+    UPROPERTY(EditDefaultsOnly) TSubclassOf<UVehicleModuleBehaviour> DamagedBehaviourClass
+    UPROPERTY(EditDefaultsOnly) TSubclassOf<UVehicleModuleBehaviour> DestroyedBehaviourClass
+
+UVehicleModuleDataAsset : UDataAsset
+    UPROPERTY(EditDefaultsOnly)
+    TMap<EVehicleModuleTypes, FVehicleModuleStateAssets> ModulesByType
+    UPROPERTY(EditDefaultsOnly)
+    FVector2D ImageSize = FVector2D(DefaultModuleIconWidth, DefaultModuleIconHeight)
+
+UVehicleModuleSubsystem : UGameInstanceSubsystem
+    InitializeModuleAssets()
+    GetModuleBehaviourClass(Type, State) const -> cached optional class
+    GetModuleIconStyle(Type, State) const -> cached texture + ImageSize
+    OnModuleAssetsReady
+```
+
+**Default image size: X = 225.0, Y = 225.0** (UMG layout units before the existing healthbar render scale). The asset supplies yellow damaged and red destroyed textures for every installed enum type, including separate Tracks and Wheels entries. Healthy/None need no texture. Validate missing entries/textures and nonpositive/nonfinite dimensions once on load; report configuration errors and skip unavailable icons without affecting gameplay.
+
+Both behaviour fields default to null and are independently optional: **no validation error for an unassigned damaged or destroyed behaviour**. Missing textures must not block valid behaviour classes. Healthy resolves to null without an asset lookup.
+
+Load the soft asset once during game initialization, retain it with `UPROPERTY() TObjectPtr<>` in the subsystem, and compile its map into a fixed enum-indexed cache of textures/classes. Retain class/texture references through the asset and include them in cooking. Gameplay asset readiness precedes tank module finalization, including on dedicated servers; only UMG work is client-only. A missing asset reports a configuration error once, then native module state/repair/capability logic can continue with empty optional behaviours.
+
+Tanks cache a weak subsystem reference; no per-tank loads, per-hit map lookups or visibility-dependent behaviour activation. If late readiness is supported, reconcile each surviving tank's current states once without replaying historic BP events, then let health components flush pending icons. Disconnect readiness callbacks at EndPlay.
+
+### Required `ModuleBox` lookup
+
+All module UI entry points live on the tank's existing `UHealthComponent`. Enable them once through `InitializeTankModulePresentation(ATankMaster* Tank)`; reject non-tank owners. Do not require `ModuleBox` on squad/building healthbars.
+
+```text
+UHealthComponent::InitializeTankModulePresentation(ATankMaster* Tank)
+UHealthComponent::Widget_FindAndCacheModuleBox() -> bool
+UHealthComponent::Widget_GetIsValidModuleBox() const -> bool
+UHealthComponent::Widget_OnModulePresentationReady()
+UHealthComponent::Widget_ReleaseModuleIcons()
+
+Widget_FindAndCacheModuleBox():
+    Widget_GetIsValidHealthBarWidget() or return false
+    M_ModuleBox = Cast<UHorizontalBox>(HealthBar.GetWidgetFromName(TEXT("ModuleBox")))
+    return Widget_GetIsValidModuleBox()
+```
+
+`Widget_GetIsValidModuleBox()` reports through `RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object`, naming **ModuleBox**, the tank and widget class if absent or the wrong type. Centralize error reporting in this validator; log once per widget generation and suspend icon writes until reinitialization. Keep `M_ModuleBox` as `UPROPERTY() TWeakObjectPtr<UHorizontalBox>`. Look it up once per widget instance, never on damage/repair ticks. The tank Blueprint healthbar must contain an initially empty `UHorizontalBox` named exactly `ModuleBox`, reserved for these icons.
+
+The health component's current `Widget_CreateHealthBar` broadcasts readiness before `OnWidgetInitialized` finishes. Use `OnWidgetInitialized` after successful base setup for the initial lookup; if tank presentation is enabled later, initialize immediately when the widget is already ready. Widget reconstruction/replacement invalidates cached children and calls the same hook once again. Missing or intentionally disabled widgets retain desired state without repeated lookup/errors. Dedicated servers skip presentation entirely.
+
+### State changes → health component → widget operations
+
+Use one icon per module **type**, showing the worst installed state: Destroyed > Damaged > Healthy. Two damaged tracks produce one Tracks icon; repairing one red track leaves the icon red while another remains red. At most six type icons can be active because Tracks/Wheels are exclusive. Every damaged type remains visible when the healthbar is shown.
+
+```text
+UArmorCalculation::CommitModuleDamageBatch / Restore...():
+    update module state and per-type damaged/destroyed counts
+    build fixed FModuleIconDeltaBatch only for changed aggregate type states
+    after native capability/state commit:
+        ATankMaster::OnModuleIconStatesChanged(DeltaBatch) // only if nonempty
+            -> HealthComponent.ApplyModuleIconStateChanges(DeltaBatch)
+
+UHealthComponent::ApplyModuleIconStateChanges(const FModuleIconDeltaBatch& Changes)
+UHealthComponent::SynchronizeModuleIconSnapshot(const FModuleIconSnapshot& Snapshot)
+UHealthComponent::Widget_FlushModuleIconChanges()
+UHealthComponent::Widget_AddModuleIcon(Type, State)
+UHealthComponent::Widget_ChangeModuleIcon(Type, State)
+UHealthComponent::Widget_RemoveModuleIcon(Type)
+
+ApplyModuleIconStateChanges(Changes):
+    update M_DesiredModuleIconStates[Type] only if different; mark dirty type bits
+    if widget/assets ready and healthbar visible: Widget_FlushModuleIconChanges()
+
+Widget_FlushModuleIconChanges():
+    for each dirty type:
+        Desired = M_DesiredModuleIconStates[Type]
+        if Desired == M_DisplayedModuleIconStates[Type]: clear dirty bit; continue
+        Healthy -> Damaged/Destroyed: Widget_AddModuleIcon(Type, Desired)
+        Damaged <-> Destroyed:        Widget_ChangeModuleIcon(Type, Desired)
+        Damaged/Destroyed -> Healthy: Widget_RemoveModuleIcon(Type)
+        record displayed state and clear dirty bit only after successful update
+```
+
+`SynchronizeModuleIconSnapshot` runs once on tank presentation initialization/load; widget recreation replays the cached desired snapshot. Ordinary HP changes within yellow/red never send an icon delta. Repair completion publishes one batch. State aggregation is independent of HP/behaviour updates needed for gameplay, such as proportional add-on armor.
+
+Widget operations, always entered through the health component:
+
+- **Add:** reuse cached `UImage` for the type, or construct once with the healthbar's `WidgetTree`; `SetBrushFromTexture(Texture, false)`, then `SetBrushSize(ImageSize)`. Add to `ModuleBox` with an Auto-sized horizontal slot and uncollapse the box. Maintain enum order and avoid duplicates. A full child-order rebuild is permitted only when membership changes.
+- **Change:** set the existing image's texture in place; keep its configured dimensions and slot. No remove/create cycle for yellow ↔ red.
+- **Remove:** `ModuleBox.RemoveChild(Image)` and collapse the box if empty. Retain the detached image for reuse for this widget's lifetime.
+
+`UW_HealthBar` owns a GC-visible fixed icon cache (`UPROPERTY` reflected slots holding `TObjectPtr<UImage>`); this keeps detached images alive. Health-component references to widget-owned images remain weak. Release caches on widget replacement/EndPlay. UMG construction/child changes are outside the allocation-free combat resolver.
+
+### Performance and visibility contract
+
+- No module UI Tick, polling timers or property bindings. `Heal()` can cause a module transition; only that transition updates icons. Ordinary healing/`UpdateHealthBar()` calls without a module state change do no module UI work.
+- Keep fixed desired/displayed state arrays and a dirty bitmask. Suppress duplicate states at the producer and health component; one notification per changed type per committed batch.
+- Hidden healthbars only update desired state. Flush accumulated changes once when `SetHealthBarVisibility` actually transitions to visible, or assets/widget become ready. The existing visibility delegate can fire repeatedly; compare visibility first.
+- Asset errors and missing ModuleBox stop retries until a readiness/rebuild event, avoiding per-hit log spam. Retain pending state for recovery.
+- A module-only hit at full hull health counts as damaged for an enabled tank healthbar's `bDisplayOnDamaged` policy. Re-evaluate that policy only when aggregate module visibility changes. Preserve selection/hover preferences, fog-of-war rules and hide-all/permanent-hide overrides.
+- After a batch, skip presentation if the tank died. Late callbacks use weak targets/generation checks; never recreate icons on a dead tank.
+
+## 12. UX, lifecycle and safety
+
+- **Yellow:** usable with its penalty. **Red:** destroyed function; tooltip says “Crew Repair available.” Healthy is neutral.
+- Crew UI displays tank-health progress to the gate, then “Modules restored to damaged.” Repair UI shows tank healing then shared finishing progress, including work supplied by auras/behaviours. No per-module repair bars.
+- `SuspendCommandForModuleFailure(Reason)` preserves destination/target and shift queue. Do not use `SetUnitToIdle`, which clears it. `ResumeSuspendedCommand()` validates current intent; new orders replace old ones.
+- `OnVehicleCapabilitiesChanged()` drives AI retreat, service requests and formation detachment. Red engines stop path retries; red guns cannot drag tanks into firing range.
+- Add-on armor: red contributes zero; otherwise `FullAddOnThickness × ModuleHealth01`. Structural armor remains separate. Cosmetic debris cannot control damage or invisibly keep blocking shells.
+- Use GC-visible owning/weak pointers and member validators; component/UObject errors use the `_Object` reporting variant.
+- Mutate modules on the game thread. Physics reads copied scalar limits. Never retain array-entry references across callbacks or mutate containers during iteration.
+- Death/`EndPlay` cancels timers/healing callbacks and invalidates generations. Same-frame death beats healing; stale callbacks cannot restore the tank.
+- Save profile/gear, module IDs/health fractions, coverage, rule version, finishing work and random generation state; reconstruct derived HP, bindings and behaviours on load. Deploy/pack and swaps preserve condition. Tactical persistence/replication wiring still needs verification.
+- Announce transitions only, using the settings-file cooldown. Enemy UI respects visibility; no hidden module HP or repair timers through fog.
+
+## 13. Implementation and verification
+
+1. **Types/settings:** constexpr class/gear/plate/source tables, derived module HP, per-type thresholds, fixed storage and BP add-on coverage.
+2. **Hit integration:** correct plate/damage receipts; projectile/trace parity; duplicate-hit protection; bounded resolver.
+3. **Effects:** shared optional behaviour classes, exact-instance swaps, TankMaster BP state event and combined movement/fire restrictions.
+4. **Healing:** central health-component receipts, tank-owned milestones, capped crew action and module-aware eligibility/completion. Ship with damage effects, not afterward.
+5. **Presentation:** shared asset textures, tank-only `ModuleBox` validation, health-component state deltas and widget lifecycle.
+6. **QA:** all five profiles, tracked, wheeled, casemate, multi-weapon and add-on tanks; AI and persistence.
+
+Required checks:
+
+- All 17 plate rows valid; maximum three candidates; missing modules do not redirect damage.
+- Two vehicles with the same profile/gear and different BP coverage route add-on hits/bonuses only to configured plates, including cupola. Other module candidates and deterministic rolls remain identical.
+- All five profiles compile valid tables; Tracks/Wheels cannot coexist. Profile selection adds no candidate and class chance multipliers apply exactly once.
+- Module MaxHP uses initialized tank MaxHealth × profile ratio. Current hull damage/healing does not resize modules; MaxHealth upgrades preserve condition, including exact red thresholds. No manual module HP setup remains.
+- Missing/wrong-type ModuleBox reports once on tanks only. Missing assets/textures and late readiness recover without polling or per-tank asset loads; packaged builds include the configured asset.
+- Healthy → yellow/red adds one image; yellow ↔ red swaps its texture; final recovery removes it. Multiple instances aggregate correctly; icon size defaults to 225 × 225.
+- Repeated damage within the same displayed state produces zero health-component icon calls and zero UMG changes. Hidden damage batches flush final state once on reveal; widget rebuilds/death leave no stale children or callbacks.
+- ICBM direct and splash damage never route to module damage, even when a tank survives.
+- Coverage replacement/clearing preserves HP; overlapping zones and invalid bindings fail atomically. Identical plate enums on different meshes stay distinct; load/swap rebinds safely. Setup arrays introduce no hit-path allocations.
+- Equality at each destruction threshold produces red; recovery sets exactly threshold plus shared margin and produces yellow.
+- Fresh modules cannot become red from one ordinary hit; multiple-failure cap uses type thresholds, not zero.
+- Tank health below/equal/above gate, overshoot, new red damage above gate, full-health red/yellow targets, no repeated recovery calls after red count clears.
+- Crew with no resources/scavengers reaches the tank-health gate, restores red → yellow and stops. Its capped pulses cannot finish modules, including at full hull HP.
+- Commander aura, ticking/single-heal behaviour, scavenger and a new caller using only `Heal` all trigger the same recovery rules. Full-health red/yellow targets remain eligible; `Heal` returns completion only after modules recover too.
+- Concurrent healing sources share finishing work and its time-based budget; emit completion once. Ordinary hull healing is not reduced by this module-only budget. Zero/rejected healing and raw setters cannot grant module repair work.
+- One receipt per accepted healing transaction, even at full hull HP. Re-entrant heals are deferred; module restoration does not recursively call `Heal`. Health UI and health-percentage notifications cannot duplicate recovery.
+- Stun expiry, research, dig-in, swaps and two instances sharing a behaviour class preserve restrictions.
+- Null yellow/red classes are silent; yellow → null red removes the old behaviour, null yellow → assigned red adds it, and recovery reverses correctly. Same-class transitions update context without recreation.
+- Module behaviour operations leave unrelated same-class instances intact; deferred swaps/refresh retain source identity. Unchanged states make no behaviour calls.
+- BP state event fires once per actual instance transition with type, new state and absolute remaining HP, including repair. No events for unchanged HP state, setup/load or refresh; death/re-entrant callbacks remain safe.
+- Shield, bounce, mine, splash, overpenetration and projectile pooling never double-apply module damage.
+- Missing UI/component, death, cancellation and re-entrant callbacks fail safely.
+- Measure resolver allocations/CPU separately from behaviour/presentation. Balance values, behaviour assets and Blueprint mesh setup remain untested until the prototype is playable.
