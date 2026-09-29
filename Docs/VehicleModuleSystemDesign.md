@@ -103,12 +103,11 @@ Compile-time validation: destruction thresholds lie in `[0,1)`; recovered percen
 | `NonPenWindowSeconds` / `NonPenWindowDamageCap01` | 1.0 / 0.20 of module MaxHP across all attackers |
 | `NonPenWindowBucketCount` | 20 fixed buckets; conservative oldest-bucket expiry |
 | `VehicleRepairTickSeconds` / `BaseWorkerRepairHpPerSecond` | 0.5 / 7.5, matching the current worker baseline |
-| `MaxModuleServiceWorkPerSecond` | 60 per tank; shared finishing-work refill rate for all healing sources |
 | `CrewRepairPriority` | Engine, Tracks, Wheels, Weapon, Turret, Ammo, AddOnArmor; stable module ID breaks ties |
 | `CrewRepairSuppressedAbilities` | `IdAttack`, `IdMove`, `IdReverseMove`, `IdRotateTowards` |
 | `CrewRepairAbilitySlotIndex` | Existing `MaxAbilitiesForActionUI - 1`; final command-card slot |
 | `CrewRepairCooldownSeconds` | 0 for EnableRepair and DisableRepair; no resource cost |
-| `FullModuleServiceWork` | 60 healing-work units; shared finishing pass at full tank health; also the finishing budget capacity |
+| `FullModuleServiceWork` | 60 healing-work units; shared finishing pass at full tank health, including surplus from the same heal |
 | `CompletedHealth01` / `HealthCompletionTolerance01` | 1.0 / 0.0001 |
 | `CrewShockMaxSeconds` / `CrewShockImmunitySeconds` | 4 / 8 |
 | `ModuleAnnouncementCooldownSeconds` | 5; announcements only, never delays icon changes |
@@ -538,7 +537,7 @@ Clamp tank hull healing to MaxHealth instead of using the current 99% snap, so w
 ```text
 ATankMaster::OnHealthHealingApplied(const FHealthHealingReceipt& Receipt)
 ATankMaster::TryRecoverDestroyedModulesAfterHealing() -> bool
-ATankMaster::AccumulateFullModuleService(float Work)
+ATankMaster::AccumulateFullModuleService(float Work) -> bool // completion reached; no armor mutation
 ATankMaster::GetIsVehicleFullyRepaired() const -> bool
 ATankMaster::OnModuleConditionChanged(const FModuleStateChange& Change)
 
@@ -547,16 +546,16 @@ FVehicleModuleRepairState:
     NonHealthyModuleCount
     ModuleDamageRevision
     FullServiceAccumulatedWork
-    ServiceBudgetTokens
-    ServiceBudgetLastUpdateTime
 
 OnHealthHealingApplied(Receipt):
     reject dead/uninitialized tank or nonpositive accepted work
     if NonHealthyModuleCount == 0: return
-    if TryRecoverDestroyedModulesAfterHealing(): return
-    if HealthComponent is not full: return
     SurplusWork = max(0, Receipt.AcceptedHealingWork - Receipt.AppliedHullHealing)
-    AccumulateFullModuleService(SurplusWork)
+    if HealthComponent is full and AccumulateFullModuleService(SurplusWork):
+        clear finishing work
+        ArmorCalculation.RestoreAllModulesToHealthy()   // one final-state batch
+        return
+    TryRecoverDestroyedModulesAfterHealing()            // recovery if full service was not reached
 
 TryRecoverDestroyedModulesAfterHealing():
     if DestroyedModuleCount == 0: return false
@@ -566,27 +565,30 @@ TryRecoverDestroyedModulesAfterHealing():
     return true
 
 AccumulateFullModuleService(Work):
-    if Work <= 0 or NonHealthyModuleCount == 0: return
-    FullServiceAccumulatedWork += ConsumeModuleServiceBudget(Work)
-    if FullServiceAccumulatedWork < FullModuleServiceWork: return
-    clear finishing work
-    ArmorCalculation.RestoreAllModulesToHealthy()       // one batch call
+    if Work <= 0 or NonHealthyModuleCount == 0: return false
+    RemainingWork = max(0, FullModuleServiceWork - FullServiceAccumulatedWork)
+    FullServiceAccumulatedWork += min(Work, RemainingWork)
+    return FullServiceAccumulatedWork >= FullModuleServiceWork
 ```
 
 Cache counts from native module events and mirror the pending/nonhealthy count into the health component before mutations return. Reset finishing progress on new module damage; ordinary pauses preserve it. Rebuild counts once on setup/load. The armor component receives only recovery/completion milestones; healers never call it.
 
-The finishing pass deliberately makes repairing a tank with damaged modules take longer than repairing hull damage alone. One work unit equals one accepted HP of healing. Full-health surplus from **any** ordinary healing source contributes to the same finishing counter. A pulse that restores red → yellow consumes that pulse for recovery; finishing starts with a later positive pulse. A one-shot heal can therefore recover red modules but needs further healing to finish them, just like one scavenger tick.
+Damaged modules require extra healing work beyond the hull repair. One work unit equals one accepted HP of healing. **Surplus from the same healing pulse counts immediately**, including a pulse that first makes red modules eligible for recovery. Reaching full tank health plus the remaining finishing work restores every damaged/destroyed module to Healthy immediately. There is no mandatory second pulse, recovery surcharge or minimum finishing duration.
 
-`ConsumeModuleServiceBudget` is tank-local: refill a token bucket from elapsed world time at `MaxModuleServiceWorkPerSecond`, with capacity and initial tokens `FullModuleServiceWork`. Clamp elapsed time to nonnegative; consume at most available tokens. Update lazily on finishing work, with no timer. This limits combined module finishing throughput without reducing existing hull healing or requiring healer identities. Repeated calls in the same frame do not refill it. Clear it on teardown; initialize once, never per healer.
+Finishing work is not rate-limited: a strong one-shot heal must deliver its full accepted healing power immediately. Only cap accumulation to the remaining requirement; discard surplus once hull and modules are all healthy. Concurrent healing sources contribute to the same counter, with no timer or refill budget.
+
+Example: a 1,000-MaxHP tank at 700 HP has red/yellow modules and zero finishing progress. `Heal(360)` spends 300 on hull HP and 60 on finishing; **all module icons disappear in that heal's update**. `Heal(300)` fills the hull and recovers reds to yellow but supplies no finishing work; a further 60 completes it. At full hull health, `Heal(60)` immediately clears red or yellow modules and their icons.
+
+Choose the final repair milestone before mutating modules. Full service commits Destroyed/Damaged → Healthy once, removes existing module behaviours and clears type icons, without briefly creating yellow behaviours/icons. The BP state event reports one transition to Healthy with MaxHp for each changed module. When less work is available, ordinary red → yellow recovery applies. Hidden healthbars cache the final Healthy state; they show no stale icon when revealed. Behaviour iteration may defer effect/UI dispatch to its safe boundary, but never to another healing pulse or repair timer.
 
 ### Gate edge cases
 
 | Situation | Required behavior |
 | --- | --- |
-| Any heal raises tank health to at/above 75% | Restore current red modules in one batch |
+| Any heal raises tank health to at/above 75% | Recover reds; if it also fills the hull and completes finishing work, restore all directly to Healthy |
 | Module becomes red while tank has 90% HP | Next positive accepted heal restores it; no new upward crossing required |
-| Tank has 100% HP and red modules | A healing pulse restores red → yellow despite gaining zero hull HP |
-| Tank has 100% HP and yellow modules | Positive surplus healing advances finishing work |
+| Tank has 100% HP and red modules | Positive healing counts entirely as finishing work; restore Healthy if sufficient, otherwise recover red → yellow |
+| Tank has 100% HP and yellow modules | Positive healing completes or advances finishing work immediately |
 | Further pulses after all modules recover | No armor calls; cached count is zero |
 | New red failure during healing | State event re-arms pending recovery |
 | Zero/rejected heal, MaxHealth upgrade or load | No recovery or finishing credit |
@@ -634,9 +636,9 @@ DestroyedModuleCount > 0, active   -> same slot = CrewRepair / DisableRepair
 DestroyedModuleCount == 0          -> stop if active; clear CrewRepair slot
 ```
 
-Initialize after `InitAbilityArray`; synchronize again after module setup/load. Reserve `CrewRepairAbilitySlotIndex = MaxAbilitiesForActionUI - 1` at tank ability initialization. The current maximum is 15, so this is index 14. Size the tank's array once to that capacity; initially the reserved entry is `IdNoAbility`. Move an authored final-slot ability to an earlier empty slot during initialization. Tank loadouts must leave one available slot: report a full-card configuration error instead of overwriting an ability or silently using another index. Generic additions skip this reserved slot.
+Initialize after `InitAbilityArray`; synchronize again after module setup/load. Reserve `CrewRepairAbilitySlotIndex = MaxAbilitiesForActionUI - 1` at tank ability initialization. The current maximum is 15, so this is index 14. **The final slot is guaranteed unused by tank loadouts.** Size the tank's array once to that capacity; initially the reserved entry is `IdNoAbility`. No ability relocation or full-card fallback is needed. Generic additions skip this reserved slot.
 
-**Codebase constraint:** `UCommandData::AddAbility` neither appends nor grows the array; an occupied requested slot can fall back to another empty slot. Add a strict reserved-slot setter for CrewRepair; do not rely on that fallback. Removal clears the entry to `FUnitAbilityEntry()`, preserving indices. Swap EnableRepair ↔ DisableRepair in place with the existing exact-subtype `SwapAbility` semantics. Preserve this reservation when abilities are rebuilt at runtime.
+**Codebase constraint:** `UCommandData::AddAbility` neither appends nor grows the array. After setup sizing, write CrewRepair only to the reserved final slot. Removal clears the entry to `FUnitAbilityEntry()`, preserving indices. Swap EnableRepair ↔ DisableRepair in place with the existing exact-subtype `SwapAbility` semantics. Preserve this reservation when abilities are rebuilt at runtime.
 
 Call `RefreshCrewRepairAbilityFromModuleState` after committed native state batches, only when red count crosses zero or active state changes. It returns without writing when the desired entry already matches. Additional red modules do not add duplicates or reset DisableRepair to EnableRepair. Update the command card once after each mutation batch through `UCommandData::UpdateActionUI`.
 
@@ -848,7 +850,7 @@ void OnVehicleModuleStateChanged(
     float RemainingModuleHp);
 ```
 
-`ATankMaster::OnModuleConditionChanged(Change)` updates repair counts and requests behaviour synchronization. After the batch's module state and behaviour-derived effects are committed, invoke the BP event once per changed module with a copied transition payload. If behaviour work is deferred, publish after that safe drain. Emit direct Healthy → Destroyed as one event; emit red → yellow and full repair → Healthy normally. HP loss within an unchanged state, initial setup, load reconciliation and refresh do not emit transition events.
+`ATankMaster::OnModuleConditionChanged(Change)` updates repair counts and requests behaviour synchronization. After the batch's module state and behaviour-derived effects are committed, invoke the BP event once per changed module with a copied transition payload. If behaviour work is deferred, publish after that safe drain. Direct Healthy → Destroyed and strong-heal Destroyed → Healthy each emit one final-state event. Recovery-only red → yellow emits its usual event. HP loss within an unchanged state, initial setup, load reconciliation and refresh do not emit transition events.
 
 Remaining HP is an **absolute value**, e.g. `40.0` for a 200-HP engine recovered to 20%. Native payloads retain `ModuleId`; the requested BP signature is type-based, so two instances of the same type can produce two events. This event is separate from the healthbar's worst-state-per-type aggregation. Re-entrant BP mutations wait until notification dispatch ends; stop dispatch on tank death/EndPlay. No implementation of the BP event is required, and BP must not reapply the native behaviour/icon work.
 
@@ -924,7 +926,7 @@ Mine/splash rules and attenuation settings also live in the balance header. An a
 | State/repair change batch | Fixed array of `MaxModuleInstances` value payloads; enough for restoring every module in one call |
 | Icon deltas/counts | Fixed enum-sized counters/state arrays; one changed-type bitmask |
 | Non-pen history | Existing constant-sized bucket ring per module; no sample list, allocation or pruning container |
-| Healing work | Stack receipt, cached counts and scalar finishing budget; no module search until a milestone |
+| Healing work | Stack receipt, cached counts and scalar finishing counter; select one final-state milestone per heal |
 | Crew work | One timer, scalar current-target time and bounded fixed-array selection at target changes; no tick allocations or card rebuilds |
 | Binding/coverage rebuild | Fixed scratch routes/plate IDs; validate then commit; Blueprint input arrays are setup-only |
 
@@ -1052,7 +1054,7 @@ Widget_FlushModuleIconChanges():
         record displayed state and clear dirty bit only after successful update
 ```
 
-`SynchronizeModuleIconSnapshot` runs once on tank presentation initialization/load; widget recreation replays the cached desired snapshot. Ordinary HP changes within yellow/red never send an icon delta. Repair completion publishes one batch. Icon aggregation does not inspect whether the state has a behaviour assignment.
+`SynchronizeModuleIconSnapshot` runs once on tank presentation initialization/load; widget recreation replays the cached desired snapshot. Ordinary HP changes within yellow/red never send an icon delta. Repair completion publishes one batch. A strong heal clearing modules removes their red/yellow icons in this update; no intermediate yellow flash or timer-delayed removal. Icon aggregation does not inspect whether the state has a behaviour assignment.
 
 Widget operations, always entered through the health component:
 
@@ -1113,9 +1115,11 @@ Required checks:
 - First red module inserts EnableRepair only in the final array slot; more reds create no duplicates. Starting switches to DisableRepair, stops physical movement/rotation and disables all turrets/hull weapons. A second Weapon module remains prohibited.
 - DisableRepair is immediate even with Shift or a busy queue. It clears the timer, restores the four removed abilities with metadata/cooldowns and releases only crew-owned locks; red modules keep an EnableRepair entry. Re-enable restarts unfinished work only.
 - External healing of all red modules auto-disables repair and removes its card entry without waiting for the timer. Partial recovery selects the next red target with full duration; same-frame healing/timer callbacks cannot double-repair or double-complete the command.
-- Queue interruption, Stop, failed startup, death and load leave no stuck DisableRepair entry or active timer. Test card-slot conflicts, overlapping behaviour ability removals, new/revoked grants, turret swaps, stale subtypes and command completion exactly once.
+- Queue interruption, Stop, failed startup, death and load leave no stuck DisableRepair entry or active timer. Verify reserved final-slot placement, overlapping behaviour ability removals, new/revoked grants, turret swaps, stale subtypes and command completion exactly once.
 - Commander aura, ticking/single-heal behaviour, scavenger and a new caller using only `Heal` all trigger the same recovery rules. Full-health red/yellow targets remain eligible; `Heal` returns completion only after modules recover too.
-- Concurrent healing sources share finishing work and its time-based budget; emit completion once. Ordinary hull healing is not reduced by this module-only budget. Zero/rejected healing and raw setters cannot grant module repair work.
+- A 700/1,000-HP tank with reds/yellows receiving 360 healing becomes fully repaired immediately; all icons and module behaviours clear, and each BP event reports Healthy once. At full hull HP, 60 healing has the same result. No yellow intermediate state or additional pulse is required.
+- Healing that exactly fills the hull with zero surplus only recovers reds to yellow; existing finishing progress reduces the additional work required. Concurrent healing adds accepted surplus once and completes once, with no rate budget. Zero/rejected healing and raw setters grant no module repair work.
+- A strong heal during CrewRepair restores modules fully, automatically clears the crew timer/card entry, and restores crew-suppressed functionality in the same safe dispatch; it cannot recreate yellow icons or finish the command twice.
 - One receipt per accepted healing transaction, even at full hull HP. Re-entrant heals are deferred; module restoration does not recursively call `Heal`. Health UI and health-percentage notifications cannot duplicate recovery.
 - Stun expiry, research, dig-in, swaps and two instances sharing a behaviour class preserve restrictions.
 - Null yellow/red classes are silent; yellow → null red removes the old behaviour, null yellow → assigned red adds it, and recovery reverses correctly. Same-class transitions update context without recreation.
