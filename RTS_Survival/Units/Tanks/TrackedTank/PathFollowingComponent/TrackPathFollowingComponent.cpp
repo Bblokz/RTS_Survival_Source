@@ -15,6 +15,7 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/TrackedTankMaster.h"
+#include "RTS_Survival/Units/Tanks/TrackedTank/TrackPhysicsMovementComp/TrackPhysicsMovement.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/AI/AITrackTank.h"
 #include "RTS_Survival/Units/Tanks/FRTSOverlapEvasion/RTSOverlapEvasionComponent.h"
 #include "RTS_Survival/Units/Tanks/VehicleAI/Utils/VehicleAIFunctionLibrary.h"
@@ -1267,14 +1268,14 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		Steering *= -FMath::Sign(SignedTargetAngle);
 		// Adjust speed difference with wanted reverse speed.
 		const float OverlapLimitedReverseSpeed = FMath::Min(
-			DesiredReverseSpeed,
+			DesiredReverseSpeed * M_MobilityTravelSpeedMultiplier,
 			OverlapAdjustment.DesiredSpeedCap);
 		SpeedDifference = FMath::GetMappedRangeValueClamped(
 			FVector2D(-ReverseSpeedPIDThreshold, ReverseSpeedPIDThreshold), FVector2D(-1.f, 1.f),
 			OverlapLimitedReverseSpeed - M_CurrentSpeed);
 		ThrottleIncreaseValue = M_ReverseThrottleIncreaseForDesiredSpeed;
 		// At the timer check current speed vs max reverse speed.
-		if (not bHasSameDirectionSpeedLimit && M_CurrentSpeed < DesiredReverseSpeed)
+		if (not bHasSameDirectionSpeedLimit && M_CurrentSpeed < DesiredReverseSpeed * M_MobilityTravelSpeedMultiplier)
 		{
 			M_TimeWantDesiredSpeed += DeltaTime;
 		}
@@ -1290,7 +1291,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		Steering *= FMath::Sign(SignedTargetAngle);
 		// Make sure the speed difference is mapped to [-1, 1] as that is needed for the throttle input and hence the PID controller part.
 		const float OverlapLimitedDesiredSpeed = FMath::Min(
-			AdjustedDesiredSpeed,
+			AdjustedDesiredSpeed * M_MobilityTravelSpeedMultiplier,
 			OverlapAdjustment.DesiredSpeedCap);
 		SpeedDifference = FMath::GetMappedRangeValueClamped(
 			FVector2D(-DesiredSpeedThrottleThreshold, DesiredSpeedThrottleThreshold), FVector2D(-1.f, 1.f),
@@ -1298,7 +1299,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		ThrottleIncreaseValue = M_ThrottleIncreaseForDesiredSpeed;
 		// At the timer check the current speed vs the max forward speed.
 		if (not bHasSameDirectionSpeedLimit && AdjustedDesiredSpeed == DesiredSpeed &&
-			M_CurrentSpeed < DesiredSpeed)
+			M_CurrentSpeed < DesiredSpeed * M_MobilityTravelSpeedMultiplier)
 		{
 			M_TimeWantDesiredSpeed += DeltaTime;
 		}
@@ -1780,9 +1781,26 @@ void UTrackPathFollowingComponent::OnPathFinished(const FPathFollowingResult& Re
 }
 
 
+void UTrackPathFollowingComponent::SetMobilityLimits(const float TravelSpeedMultiplier, const float TurnRateMultiplier,
+	                                                 const float AccelerationMultiplier)
+{
+	M_MobilityTravelSpeedMultiplier = FMath::Clamp(TravelSpeedMultiplier, 0.f, 1.f);
+	M_MobilityTurnRateMultiplier = FMath::Clamp(TurnRateMultiplier, 0.f, 1.f);
+	if (M_TrackPhysicsMovement != nullptr)
+	{
+		M_TrackPhysicsMovement->SetModuleAccelerationMultiplier(AccelerationMultiplier);
+	}
+}
+
 void UTrackPathFollowingComponent::UpdateVehicle(float Throttle, float CurrentSpeed, float DeltaTime,
                                                  float BreakAmount, float Steering)
 {
+	// Without powered travel no throttle is applied; steering is scaled by the powered turning limit.
+	if (M_MobilityTravelSpeedMultiplier <= 0.f)
+	{
+		Throttle = 0.f;
+	}
+	Steering *= M_MobilityTurnRateMultiplier;
 	if (bImplementsInterface)
 	{
 		IVehicleAIInterface::Execute_UpdateVehicle(ControlledPawn, AbsoluteTargetAngle, DestinationDistance,

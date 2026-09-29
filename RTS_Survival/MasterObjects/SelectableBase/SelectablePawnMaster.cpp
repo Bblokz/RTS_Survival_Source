@@ -163,7 +163,16 @@ UCommandData* ASelectablePawnMaster::GetIsValidCommandData()
 
 void ASelectablePawnMaster::DoneExecutingCommand(EAbilityID AbilityFinished)
 {
+	if (GetShouldIgnoreCommandCompletion(AbilityFinished))
+	{
+		return;
+	}
 	ICommands::DoneExecutingCommand(AbilityFinished);
+}
+
+bool ASelectablePawnMaster::GetShouldIgnoreCommandCompletion(const EAbilityID AbilityFinished)
+{
+	return false;
 }
 
 void ASelectablePawnMaster::StopBehaviourTree()

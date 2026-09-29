@@ -36,4 +36,13 @@ public:
 	/** Per-type pool configuration used to build the fire pools on world init. */
 	UPROPERTY(Config, EditAnywhere, Category="Fire Pool")
 	TMap<ERTSFireType, FFireSettingsForType> FireSettingsByType;
+
+	UPROPERTY(Config, EditAnywhere, Category="Fire Effect User Param Names")
+	FName ScaleMltUserParamName = FName("Scale");
+
+	UPROPERTY(Config, EditAnywhere, Category="Fire Effect User Param Names")
+	FName Fire_RGB_MltUserParamName = FName("Fire_RGB_Mlt");
+
+	UPROPERTY(Config, EditAnywhere, Category="Fire Effect User Param Names")
+	FName Smoke_RGB_MltUserParamName = FName("Smoke_RGB_Mlt");
 };

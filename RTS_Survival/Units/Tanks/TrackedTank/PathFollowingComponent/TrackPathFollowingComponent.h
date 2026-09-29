@@ -258,6 +258,15 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Alter vehicle speed")
 	void BP_SetNewVehicleSpeed(float NewSpeed, ESpeedUnits Unit);
 
+	/**
+	 * @brief Scalar mobility limits composed by the owning tank from behaviour restrictions (e.g. damaged modules);
+	 * applied on top of the desired speeds so base values are never overwritten or restored.
+	 * @param TravelSpeedMultiplier Scales forward and reverse desired speed; 0 removes powered travel.
+	 * @param TurnRateMultiplier Scales path-following steering; 0 removes powered turning.
+	 * @param AccelerationMultiplier Scales the tracked physics drive acceleration limit.
+	 */
+	void SetMobilityLimits(float TravelSpeedMultiplier, float TurnRateMultiplier, float AccelerationMultiplier);
+
 
 	/**
 	* Checks if this vehicle is stuck (on path but hasn't moved in a while according to sample data)
@@ -643,6 +652,10 @@ protected:
 	float DeadZoneReverseDistance = 600;
 
 private:
+	// Behaviour-composed mobility limits (1 = unrestricted); multiplied into the computed speed targets and steering.
+	float M_MobilityTravelSpeedMultiplier = 1.f;
+	float M_MobilityTurnRateMultiplier = 1.f;
+
 	/**
 	 * @brief If the angle to the current path point is smaller than this the tank will not slow down.
 	 * @note Will slow down if the current path point == final destination and we are within slowdown distance.

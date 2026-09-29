@@ -146,126 +146,74 @@ void UBehVehicleStunned::RestoreTurretRotation()
 	M_CachedTurretRotationSpeeds.Reset();
 }
 
-void UBehVehicleStunned::DisableMountedWeapons() const
+void UBehVehicleStunned::DisableMountedWeapons()
 {
 	if (not GetIsValidTankMaster())
 	{
 		return;
 	}
 
-	M_TankMaster->SetTurretsDisabled();
+	// Shared weapon lock: overlapping crew repair or module behaviours keep weapons disabled after the stun ends.
+	M_TankMaster->AcquireMountedWeaponLock(this);
 }
 
-void UBehVehicleStunned::EnableMountedWeapons() const
+void UBehVehicleStunned::EnableMountedWeapons()
 {
 	if (not GetIsValidTankMaster())
 	{
 		return;
 	}
 
-	M_TankMaster->SetTurretsToAutoEngage(true);
+	constexpr bool bUseLastTargetOnRestore = true;
+	M_TankMaster->ReleaseMountedWeaponLock(this, bUseLastTargetOnRestore);
 }
 
 void UBehVehicleStunned::CacheAndRemoveAbilities()
 {
-	if (not GetIsValidCommandsOwnerActor())
+	UCommandData* CommandData = GetCommandData();
+	if (not IsValid(CommandData))
 	{
 		return;
 	}
 
-	ICommands* CommandsInterface = GetCommandsInterface();
-	if (CommandsInterface == nullptr)
-	{
-		RTSFunctionLibrary::ReportFailedCastError(
-			TEXT("M_CommandsOwnerActor"),
-			TEXT("ICommands"),
-			TEXT("UBehVehicleStunned::CacheAndRemoveAbilities")
-		);
-		return;
-	}
-
-	M_RemovedAbilityEntries.Reset();
-
-	const TArray<FUnitAbilityEntry> AbilityEntries = CommandsInterface->GetUnitAbilityEntries();
-	TSet<EAbilityID> RemovedAbilityIDs;
-
-	for (const EAbilityID AbilityToRemove : M_AbilitiesToRemove)
-	{
-		if (AbilityToRemove == EAbilityID::IdNoAbility)
-		{
-			continue;
-		}
-
-		if (RemovedAbilityIDs.Contains(AbilityToRemove))
-		{
-			continue;
-		}
-
-		const int32 AbilityIndex = AbilityEntries.IndexOfByPredicate([AbilityToRemove](const FUnitAbilityEntry& AbilityEntry)
-		{
-			return AbilityEntry.AbilityId == AbilityToRemove;
-		});
-		if (AbilityIndex == INDEX_NONE)
-		{
-			continue;
-		}
-
-		const FUnitAbilityEntry AbilityEntry = AbilityEntries[AbilityIndex];
-		if (AbilityEntry.AbilityId == EAbilityID::IdNoAbility)
-		{
-			continue;
-		}
-
-		if (not CommandsInterface->RemoveAbility(AbilityEntry.AbilityId))
-		{
-			continue;
-		}
-
-		FBehVehicleStunnedRemovedAbility RemovedAbility;
-		RemovedAbility.AbilityEntry = AbilityEntry;
-		RemovedAbility.AbilityIndex = AbilityIndex;
-		M_RemovedAbilityEntries.Add(RemovedAbility);
-		RemovedAbilityIDs.Add(AbilityToRemove);
-	}
+	// Suppression keeps full entries, indices and cooldowns and shares ownership with other sources.
+	CommandData->EndAbilitySuppression(M_AbilitySuppressionHandle);
+	M_AbilitySuppressionHandle = CommandData->BeginAbilitySuppression(this, M_AbilitiesToRemove);
+	CommandData->UpdateActionUI();
 }
 
 void UBehVehicleStunned::RestoreRemovedAbilities()
 {
-	if (not GetIsValidCommandsOwnerActor())
+	UCommandData* CommandData = GetCommandData();
+	if (not IsValid(CommandData))
 	{
-		M_RemovedAbilityEntries.Reset();
+		M_AbilitySuppressionHandle.Reset();
 		return;
 	}
 
+	CommandData->EndAbilitySuppression(M_AbilitySuppressionHandle);
+	CommandData->UpdateActionUI();
+}
+
+UCommandData* UBehVehicleStunned::GetCommandData() const
+{
 	ICommands* CommandsInterface = GetCommandsInterface();
 	if (CommandsInterface == nullptr)
 	{
 		RTSFunctionLibrary::ReportFailedCastError(
 			TEXT("M_CommandsOwnerActor"),
 			TEXT("ICommands"),
-			TEXT("UBehVehicleStunned::RestoreRemovedAbilities")
+			TEXT("UBehVehicleStunned::GetCommandData")
 		);
-		M_RemovedAbilityEntries.Reset();
-		return;
+		return nullptr;
 	}
 
-	for (const FBehVehicleStunnedRemovedAbility& RemovedAbility : M_RemovedAbilityEntries)
-	{
-		if (RemovedAbility.AbilityEntry.AbilityId == EAbilityID::IdNoAbility)
-		{
-			continue;
-		}
-
-		CommandsInterface->AddAbility(RemovedAbility.AbilityEntry, RemovedAbility.AbilityIndex);
-	}
-
-	M_RemovedAbilityEntries.Reset();
+	return CommandsInterface->GetIsValidCommandData();
 }
 
 void UBehVehicleStunned::ResetCachedState()
 {
 	M_CachedTurretRotationSpeeds.Reset();
-	M_RemovedAbilityEntries.Reset();
 	M_TankMaster.Reset();
 	M_CommandsOwnerActor.Reset();
 }

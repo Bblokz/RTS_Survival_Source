@@ -2,6 +2,8 @@
 
 
 #include "HullWeaponComponent.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+
 
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
@@ -44,6 +46,12 @@ void UHullWeaponComponent::SetTargetPreference(const ETargetPreference NewTarget
 
 void UHullWeaponComponent::SetAutoEngageTargets(const bool bUseLastTarget)
 {
+	const ATankMaster* TankOwner = Cast<ATankMaster>(TurretOwner.GetObject());
+	if (IsValid(TankOwner) && TankOwner->GetHasMountedWeaponLock())
+	{
+		return;
+	}
+
 	M_WeaponAIState = EWeaponAIState::AutoEngage;
 	if (not bUseLastTarget)
 	{
@@ -55,6 +63,12 @@ void UHullWeaponComponent::SetAutoEngageTargets(const bool bUseLastTarget)
 
 void UHullWeaponComponent::SetEngageSpecificTarget(AActor* Target)
 {
+	const ATankMaster* TankOwner = Cast<ATankMaster>(TurretOwner.GetObject());
+	if (IsValid(TankOwner) && TankOwner->GetHasMountedWeaponLock())
+	{
+		return;
+	}
+
 	if (Target && M_TargetingData.GetTargetActor() == Target)
 	{
 		// Already targeting this actor.
@@ -68,6 +82,12 @@ void UHullWeaponComponent::SetEngageSpecificTarget(AActor* Target)
 
 void UHullWeaponComponent::SetEngageGroundLocation(const FVector& GroundLocation)
 {
+	const ATankMaster* TankOwner = Cast<ATankMaster>(TurretOwner.GetObject());
+	if (IsValid(TankOwner) && TankOwner->GetHasMountedWeaponLock())
+	{
+		return;
+	}
+
 	AllWeaponsStopFire(/*bStopReload*/false, /*bStopCoolDown*/false);
 	M_WeaponAIState = EWeaponAIState::AutoEngage;
 

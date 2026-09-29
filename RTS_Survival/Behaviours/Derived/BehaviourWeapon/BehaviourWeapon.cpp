@@ -30,18 +30,18 @@ const FBehaviourWeaponMultipliers& UBehaviourWeapon::GetBehaviourWeaponMultiplie
 
 void UBehaviourWeapon::OnAdded(AActor* BehaviourOwner)
 {
-	if (bM_HasInitializedPostBeginPlayLogic)
+	bM_IsActive = true;
+	if (not bM_HasInitializedPostBeginPlayLogic)
 	{
-		return;
+		SetupInitializationForOwner();
 	}
-
-	SetupInitializationForOwner();
 	// Make sure to call the bp event.
 	Super::OnAdded(BehaviourOwner);
 }
 
 void UBehaviourWeapon::OnRemoved(AActor* BehaviourOwner)
 {
+	bM_IsActive = false;
 	RemoveBehaviourFromTrackedWeapons();
 	ClearTimers();
 	// Make sure to call the bp event.
@@ -305,12 +305,27 @@ void UBehaviourWeapon::OnWeaponBehaviourStack(UWeaponState* WeaponState)
 
 void UBehaviourWeapon::PostBeginPlayLogicInitialized()
 {
-	if (bM_HasInitializedPostBeginPlayLogic)
+	if (not bM_IsActive || bM_HasInitializedPostBeginPlayLogic)
 	{
 		return;
 	}
 
 	bM_HasInitializedPostBeginPlayLogic = true;
+	TArray<UWeaponState*> Weapons;
+	if (TryGetAircraftWeapons(Weapons) || TryGetTankWeapons(Weapons) || TryGetSquadWeapons(Weapons)
+		|| TryGetBxpWeapons(Weapons))
+	{
+		ApplyBehaviourToMountedWeapons(Weapons);
+	}
+}
+
+void UBehaviourWeapon::RefreshAppliedWeaponEffects()
+{
+	if (not bM_IsActive || not bM_HasInitializedPostBeginPlayLogic)
+	{
+		return;
+	}
+	RemoveBehaviourFromTrackedWeapons();
 	TArray<UWeaponState*> Weapons;
 	if (TryGetAircraftWeapons(Weapons) || TryGetTankWeapons(Weapons) || TryGetSquadWeapons(Weapons)
 		|| TryGetBxpWeapons(Weapons))
@@ -358,6 +373,12 @@ void UBehaviourWeapon::SetupInitializationForOwner()
 {
 	if (bM_HasInitializedPostBeginPlayLogic)
 	{
+		return;
+	}
+	if (GetIsModuleOwned())
+	{
+		// Module transitions are already past tank setup and must affect weapons before state callbacks.
+		PostBeginPlayLogicInitialized();
 		return;
 	}
 

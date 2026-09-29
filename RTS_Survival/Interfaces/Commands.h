@@ -17,6 +17,7 @@
 #include "TimerManager.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "UObject/Interface.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/CrewRepairAbilityTypes.h"
 #include "Commands.generated.h"
 
 struct FUnitCost;
@@ -119,6 +120,18 @@ public:
 		return static_cast<ETechnology>(CustomType);
 	}
 
+	ECrewRepairAbilityType GetCrewRepairAbilitySubtype() const
+	{
+		return static_cast<ECrewRepairAbilityType>(CustomType);
+	}
+
+	/** @return Whether CustomType holds a valid ECrewRepairAbilityType (EnableRepair or DisableRepair). */
+	bool GetHasValidCrewRepairAbilitySubtype() const
+	{
+		return CustomType == static_cast<int32>(ECrewRepairAbilityType::EnableRepair)
+			|| CustomType == static_cast<int32>(ECrewRepairAbilityType::DisableRepair);
+	}
+
 	FQueueCommand()
 		: CommandType(EAbilityID::IdNoAbility)
 		  , TargetLocation(FVector::ZeroVector)
@@ -129,6 +142,70 @@ public:
 	}
 };
 
+
+/** @brief Identifies one active ability suppression; stale handles are ignored on release. */
+USTRUCT()
+struct FAbilitySuppressionHandle
+{
+	GENERATED_BODY()
+
+	int32 SourceIndex = INDEX_NONE;
+	uint32 Generation = 0;
+
+	bool IsValid() const
+	{
+		return SourceIndex != INDEX_NONE;
+	}
+
+	void Reset()
+	{
+		SourceIndex = INDEX_NONE;
+		Generation = 0;
+	}
+};
+
+/** @brief Backing storage of one command-card slot whose entry is hidden by at least one suppression source. */
+USTRUCT()
+struct FAbilitySuppressionSlot
+{
+	GENERATED_BODY()
+
+	// The full hidden entry, including CustomType, costs and live cooldown.
+	UPROPERTY()
+	FUnitAbilityEntry BackingEntry;
+
+	// One bit per suppression source currently hiding this slot.
+	uint32 OwnerMask = 0;
+};
+
+/** @brief One suppression owner (e.g. crew repair or a behaviour) and the ability IDs it hides. */
+USTRUCT()
+struct FAbilitySuppressionSource
+{
+	GENERATED_BODY()
+
+	static constexpr int32 MaxSuppressedAbilities = 8;
+
+	UPROPERTY()
+	TWeakObjectPtr<UObject> Source;
+
+	EAbilityID AbilityIds[MaxSuppressedAbilities] = {};
+	int32 AbilityCount = 0;
+	uint32 Generation = 0;
+	bool bIsActive = false;
+
+	bool GetSuppresses(const EAbilityID AbilityId) const
+	{
+		for (int32 AbilityIndex = 0; AbilityIndex < AbilityCount; ++AbilityIndex)
+		{
+			if (AbilityIds[AbilityIndex] == AbilityId)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+};
 
 UENUM()
 enum class ECommandQueueClearReason : uint8
@@ -180,6 +257,7 @@ public:
 
 	virtual void BeginDestroy() override;
 
+	// The effective card: suppressed entries appear as IdNoAbility until their suppression ends.
 	const TArray<FUnitAbilityEntry>& GetAbilities() const { return M_Abilities; }
 
 	TArray<EAbilityID> GetAbilityIds(const bool bExcludeNoAbility = false) const;
@@ -247,7 +325,61 @@ public:
 
 	bool StartCooldownOnAbility(const EAbilityID AbilityID, const int32 CustomType);
 
+	/**
+	 * @brief Hides abilities from the effective card while preserving their entries, indices, costs and
+	 * cooldowns; hidden cooldowns keep ticking. Overlapping sources share hidden slots.
+	 * @param Source Owner of this suppression, e.g. crew repair or a behaviour.
+	 * @param AbilityIds Abilities to hide; IdNoAbility and duplicates are ignored.
+	 * @return Handle for EndAbilitySuppression; invalid if no suppression source slot was free.
+	 */
+	FAbilitySuppressionHandle BeginAbilitySuppression(UObject* Source, TConstArrayView<EAbilityID> AbilityIds);
+
+	/** @brief Releases one suppression; an entry reappears only when no other source hides it. Idempotent. */
+	void EndAbilitySuppression(FAbilitySuppressionHandle& InOutHandle);
+
+	/** @brief Reserves the final card slot for CrewRepair; fails if the loadout already uses it. */
+	bool ReserveCrewRepairAbilitySlot();
+
+	bool GetIsCrewRepairAbilitySlotReserved() const { return bM_IsCrewRepairSlotReserved; }
+
+	/** @brief Writes only the reserved final slot; an empty entry clears it. @return True if the entry changed. */
+	bool SetCrewRepairAbilityEntry(const FUnitAbilityEntry& NewEntry);
+
+	FUnitAbilityEntry GetCrewRepairAbilityEntry() const;
+
 private:
+	// ---- Ability suppression ----
+	static constexpr int32 MaxAbilitySuppressionSources = 8;
+
+	// Card-slot backing entries; indices match M_Abilities.
+	UPROPERTY()
+	FAbilitySuppressionSlot M_AbilitySuppressionSlots[DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI];
+
+	UPROPERTY()
+	FAbilitySuppressionSource M_AbilitySuppressionSources[MaxAbilitySuppressionSources];
+
+	bool bM_IsCrewRepairSlotReserved = false;
+
+	void ApplySuppressionSourceToCard(int32 SourceIndex);
+	void EndSuppressionSource(int32 SourceIndex);
+	void HideCardSlotForSource(int32 CardIndex, int32 SourceIndex);
+	void RestoreSuppressedCardSlot(int32 CardIndex);
+	void RebuildAbilitySuppressionsForNewCard();
+	void ReleaseStaleAbilitySuppressions();
+	void HideNewlyAddedAbilityIfSuppressed(int32 CardIndex);
+	int32 FindFreeSuppressionSourceIndex() const;
+	int32 FindSuppressedBackingIndex(EAbilityID AbilityId, int32 CustomType) const;
+	bool GetIsCardSlotSuppressed(int32 CardIndex) const;
+	bool GetIsReservedCrewRepairCardIndex(int32 CardIndex) const;
+	bool GetIsCardSlotAvailableForGenericAbility(int32 CardIndex) const;
+	bool GetHasDuplicateAbilityEntry(const FUnitAbilityEntry& NewAbility) const;
+	int32 FindFreeGenericCardSlot() const;
+	bool PlaceAbilityInFreeGenericSlot(const FUnitAbilityEntry& NewAbility);
+	bool TryRemoveSuppressedBackingEntry(EAbilityID AbilityToRemove, int32 CustomType);
+	bool TrySwapSuppressedBackingEntry(EAbilityID OldAbility, int32 OldCustomType, const FUnitAbilityEntry& NewAbility);
+	bool GetHasSuppressedAbilityOnCooldown() const;
+	bool TickSuppressedAbilityCooldowns();
+	bool GetIsQueuedCrewRepairStillAllowed(const FQueueCommand& QueuedCommand);
 	// The manager that updates the ability UI for this unit.
 	// If set the unit is primary selected.
 	UPROPERTY()
@@ -847,6 +979,19 @@ public:
 	                                   const bool bSetUnitToIdle);
 	virtual ECommandQueueError DetachTow(const bool bSetUnitToIdle);
 
+	/**
+	 * @brief Action-button entry of CrewRepair; the exact card subtype must be present.
+	 * EnableRepair follows normal replacement/shift-queue semantics; DisableRepair acts immediately,
+	 * even while the queue is busy, and is never queued behind the running repair.
+	 * @param Subtype Card subtype that was pressed.
+	 * @param bSetUnitToIdle Replace the current queue when enabling (no Shift held).
+	 * @return NoError when the repair was queued or disabled.
+	 */
+	virtual ECommandQueueError CrewRepair(ECrewRepairAbilityType Subtype, bool bSetUnitToIdle);
+
+	/** @return Whether this unit's crew is currently repairing destroyed vehicle modules. */
+	virtual bool GetIsCrewRepairActive() const { return false; }
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Commands")
 	virtual ECommandQueueError ActivateShield(const bool bSetUnitToIdle);
 
@@ -874,6 +1019,7 @@ public:
 	virtual void OnActorBeingTowed(AActor* TowingVehicle, class UVehicleTowComponent* TowComp);
 
 	virtual void ExecuteDetachTowCommand();
+	virtual void ExecuteCrewRepairCommand(ECrewRepairAbilityType Subtype);
 	virtual void ExecuteActivateShieldCommand();
 	
 	/**
@@ -1045,6 +1191,9 @@ protected:
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype);
 	virtual void TerminateTowActorCommand();
 	virtual void TerminateDetachTowCommand();
+	/** @brief Queue termination of CrewRepair; the caller owns queue progression, so no DoneExecutingCommand. */
+	virtual void TerminateCrewRepairCommand(ECrewRepairAbilityType Subtype);
+	void TerminateCrewRepairCommandForCurrentQueue();
 	virtual void TerminateActivateShieldCommand();
 	void ExecuteRegisterUnitAsBlackboardIdleCommand();
 	void TerminateRegisterUnitAsBlackboardIdleCommand();

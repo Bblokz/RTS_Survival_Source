@@ -69,7 +69,8 @@ void ARTSFireManager::InitFireManager(const URTSFirePoolSettings* Settings)
 int32 ARTSFireManager::ActivateFireAtLocation(const ERTSFireType FireType,
                                               const float LifeTimeSeconds,
                                               const FVector& Location,
-                                              const FVector& Scale)
+                                              const FVector& Scale,
+                                              const FRTSFireEffectParams& EffectParams)
 {
 	if (not GetIsValidWorld())
 	{
@@ -92,9 +93,9 @@ int32 ARTSFireManager::ActivateFireAtLocation(const ERTSFireType FireType,
 
 	FRTSFirePoolEntry& Entry = Pool->M_Entries[EntryIndex];
 	const int32 FireHandle = AcquireNextFireHandle();
-	if (not ActivateEntryAtLocation(Entry, LifeTimeSeconds, Location, Scale))
+	if (not ActivateEntryAtLocation(Entry, LifeTimeSeconds, Location, Scale, EffectParams))
 	{
-		ReleaseEntryToPool(*Pool, EntryIndex);
+		RestoreFailedEntryToPool(*Pool, EntryIndex);
 		return INDEX_NONE;
 	}
 
@@ -107,7 +108,8 @@ int32 ARTSFireManager::ActivateFireAttached(AActor* AttachActor,
                                             const ERTSFireType FireType,
                                             const float LifeTimeSeconds,
                                             const FVector& AttachOffset,
-                                            const FVector& Scale)
+                                            const FVector& Scale,
+                                            const FRTSFireEffectParams& EffectParams)
 {
 	if (not GetIsValidWorld())
 	{
@@ -135,12 +137,64 @@ int32 ARTSFireManager::ActivateFireAttached(AActor* AttachActor,
 
 	FRTSFirePoolEntry& Entry = Pool->M_Entries[EntryIndex];
 	const int32 FireHandle = AcquireNextFireHandle();
-	if (not ActivateEntryAttached(Entry, AttachActor, LifeTimeSeconds, AttachOffset, Scale))
+	if (not ActivateEntryAttached(Entry, AttachActor, LifeTimeSeconds, AttachOffset, Scale, EffectParams))
 	{
-		ReleaseEntryToPool(*Pool, EntryIndex);
+		RestoreFailedEntryToPool(*Pool, EntryIndex);
 		return INDEX_NONE;
 	}
 
+	Entry.M_FireHandle = FireHandle;
+	StartLifeTimeDelegateIfNeeded(FireType, EntryIndex, LifeTimeSeconds);
+	return FireHandle;
+}
+
+int32 ARTSFireManager::ActivateFireAttachedToComponent(AActor* AttachActor,
+	USceneComponent* AttachComponent,
+	const FName SocketName,
+	const FVector& RelativeOffset,
+	const ERTSFireType FireType,
+	const float LifeTimeSeconds,
+	const FVector& Scale,
+	const FRTSFireEffectParams& EffectParams)
+{
+	if (not GetIsValidWorld())
+	{
+		return INDEX_NONE;
+	}
+	if (not IsValid(AttachActor) || not IsValid(AttachComponent) || AttachComponent->GetOwner() != AttachActor)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAttachedToComponent - attachment is invalid."));
+		return INDEX_NONE;
+	}
+	if (SocketName != NAME_None && not AttachComponent->DoesSocketExist(SocketName))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAttachedToComponent - socket does not exist."));
+		return INDEX_NONE;
+	}
+
+	FRTSFirePool* Pool = M_FirePools.Find(FireType);
+	if (Pool == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAttachedToComponent - fire type not configured."));
+		return INDEX_NONE;
+	}
+
+	const int32 EntryIndex = AcquireEntryIndex(*Pool);
+	if (EntryIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateFireAttachedToComponent - failed to acquire entry."));
+		return INDEX_NONE;
+	}
+
+	FRTSFirePoolEntry& Entry = Pool->M_Entries[EntryIndex];
+	if (not ActivateEntryAttachedToComponent(Entry, AttachActor, AttachComponent, SocketName, RelativeOffset,
+		LifeTimeSeconds, Scale, EffectParams))
+	{
+		RestoreFailedEntryToPool(*Pool, EntryIndex);
+		return INDEX_NONE;
+	}
+
+	const int32 FireHandle = AcquireNextFireHandle();
 	Entry.M_FireHandle = FireHandle;
 	StartLifeTimeDelegateIfNeeded(FireType, EntryIndex, LifeTimeSeconds);
 	return FireHandle;
@@ -259,7 +313,8 @@ void ARTSFireManager::PrepareEntryForReuse(FRTSFirePoolEntry& Entry) const
 bool ARTSFireManager::ActivateEntryAtLocation(FRTSFirePoolEntry& Entry,
                                               const float LifeTimeSeconds,
                                               const FVector& Location,
-                                              const FVector& Scale) const
+                                              const FVector& Scale,
+                                              const FRTSFireEffectParams& EffectParams) const
 {
 	if (not IsValid(Entry.M_NiagaraComponent))
 	{
@@ -270,6 +325,7 @@ bool ARTSFireManager::ActivateEntryAtLocation(FRTSFirePoolEntry& Entry,
 	Entry.M_NiagaraComponent->SetAbsolute(false, false, true);
 	Entry.M_NiagaraComponent->SetWorldLocation(Location);
 	Entry.M_NiagaraComponent->SetWorldScale3D(Scale);
+	SetFireEffectParameters(Entry.M_NiagaraComponent, EffectParams);
 	Entry.M_NiagaraComponent->SetComponentTickEnabled(true);
 	Entry.M_NiagaraComponent->SetVisibility(true, true);
 	Entry.M_NiagaraComponent->ResetSystem();
@@ -289,7 +345,8 @@ bool ARTSFireManager::ActivateEntryAttached(FRTSFirePoolEntry& Entry,
                                             AActor* AttachActor,
                                             const float LifeTimeSeconds,
                                             const FVector& AttachOffset,
-                                            const FVector& Scale) const
+                                            const FVector& Scale,
+                                            const FRTSFireEffectParams& EffectParams) const
 {
 	if (not IsValid(Entry.M_NiagaraComponent) || not IsValid(AttachActor))
 	{
@@ -310,6 +367,7 @@ bool ARTSFireManager::ActivateEntryAttached(FRTSFirePoolEntry& Entry,
 	Entry.M_NiagaraComponent->SetWorldScale3D(Scale);
 	Entry.M_NiagaraComponent->AttachToComponent(AttachRoot, FAttachmentTransformRules::KeepWorldTransform);
 	Entry.M_NiagaraComponent->SetRelativeLocation(AttachOffset);
+	SetFireEffectParameters(Entry.M_NiagaraComponent, EffectParams);
 	Entry.M_NiagaraComponent->SetComponentTickEnabled(true);
 	Entry.M_NiagaraComponent->SetVisibility(true, true);
 	Entry.M_NiagaraComponent->ResetSystem();
@@ -323,6 +381,67 @@ bool ARTSFireManager::ActivateEntryAttached(FRTSFirePoolEntry& Entry,
 	Entry.M_AttachOffset = AttachOffset;
 	Entry.M_RequestedScale = Scale;
 	return true;
+}
+
+bool ARTSFireManager::ActivateEntryAttachedToComponent(FRTSFirePoolEntry& Entry,
+	AActor* AttachActor,
+	USceneComponent* AttachComponent,
+	const FName SocketName,
+	const FVector& RelativeOffset,
+	const float LifeTimeSeconds,
+	const FVector& Scale,
+	const FRTSFireEffectParams& EffectParams) const
+{
+	if (not IsValid(Entry.M_NiagaraComponent) || not IsValid(AttachActor) || not IsValid(AttachComponent))
+	{
+		return false;
+	}
+
+	UNiagaraComponent* NiagaraComponent = Entry.M_NiagaraComponent;
+	NiagaraComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	NiagaraComponent->SetAbsolute(false, false, true);
+	if (not NiagaraComponent->AttachToComponent(AttachComponent, FAttachmentTransformRules::KeepRelativeTransform, SocketName))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::ActivateEntryAttachedToComponent - attachment failed."));
+		return false;
+	}
+	NiagaraComponent->SetRelativeLocation(RelativeOffset);
+	NiagaraComponent->SetRelativeRotation(FRotator::ZeroRotator);
+	NiagaraComponent->SetWorldScale3D(Scale);
+	SetFireEffectParameters(NiagaraComponent, EffectParams);
+	NiagaraComponent->SetComponentTickEnabled(true);
+	NiagaraComponent->SetVisibility(true, true);
+	NiagaraComponent->ResetSystem();
+	NiagaraComponent->Activate(true);
+
+	Entry.M_ActivatedAtSeconds = GetWorld()->GetTimeSeconds();
+	Entry.M_TimeActiveSeconds = LifeTimeSeconds;
+	Entry.bM_IsActive = true;
+	Entry.bM_IsAttached = true;
+	Entry.M_AttachedActor = AttachActor;
+	Entry.M_AttachOffset = RelativeOffset;
+	Entry.M_RequestedScale = Scale;
+	return true;
+}
+
+void ARTSFireManager::SetFireEffectParameters(UNiagaraComponent* NiagaraComponent,
+                                              const FRTSFireEffectParams& EffectParams) const
+{
+	if (not IsValid(NiagaraComponent))
+	{
+		return;
+	}
+
+	const URTSFirePoolSettings* Settings = GetDefault<URTSFirePoolSettings>();
+	if (not IsValid(Settings))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("ARTSFireManager::SetFireEffectParameters - fire pool settings are invalid."));
+		return;
+	}
+
+	NiagaraComponent->SetVariableFloat(Settings->ScaleMltUserParamName, EffectParams.Scale);
+	NiagaraComponent->SetVariableVec3(Settings->Fire_RGB_MltUserParamName, EffectParams.FireColorMlt);
+	NiagaraComponent->SetVariableVec3(Settings->Smoke_RGB_MltUserParamName, EffectParams.SmokeColorMlt);
 }
 
 void ARTSFireManager::ReleaseEntryToPool(FRTSFirePool& Pool, const int32 EntryIndex)
@@ -339,6 +458,17 @@ void ARTSFireManager::ReleaseEntryToPool(FRTSFirePool& Pool, const int32 EntryIn
 	}
 
 	ConfigureEntryDormant(Entry);
+	Pool.M_FreeList.Add(EntryIndex);
+}
+
+void ARTSFireManager::RestoreFailedEntryToPool(FRTSFirePool& Pool, const int32 EntryIndex)
+{
+	if (not Pool.M_Entries.IsValidIndex(EntryIndex))
+	{
+		return;
+	}
+
+	ConfigureEntryDormant(Pool.M_Entries[EntryIndex]);
 	Pool.M_FreeList.Add(EntryIndex);
 }
 

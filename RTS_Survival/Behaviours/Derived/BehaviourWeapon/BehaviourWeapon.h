@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "RTS_Survival/Behaviours/Behaviour.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBehaviour.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "TimerManager.h"
 
@@ -80,7 +80,7 @@ struct FBehaviourWeaponMultipliers
  * @note Uses async-aware initialisation so weapons that load after BeginPlay still receive behaviour changes.
  */
 UCLASS()
-class RTS_SURVIVAL_API UBehaviourWeapon : public UBehaviour
+class RTS_SURVIVAL_API UBehaviourWeapon : public UVehicleModuleBehaviour
 {
         GENERATED_BODY()
 
@@ -105,6 +105,9 @@ protected:
 
         /** @brief Remove the behaviour from the target weapon. */
         virtual void RemoveBehaviourFromWeapon(UWeaponState* WeaponState);
+
+	/** @brief Reapplies a module weapon behaviour after its yellow/red context changes. */
+	void RefreshAppliedWeaponEffects();
 
         /** @brief Hook executed when a new stack is added; override for stack-specific logic. */
         virtual void OnWeaponBehaviourStack(UWeaponState* WeaponState);
@@ -155,4 +158,5 @@ private:
 
         FTimerHandle M_PostBeginPlayTimerHandle;
         bool bM_HasInitializedPostBeginPlayLogic = false;
+	bool bM_IsActive = false;
 };

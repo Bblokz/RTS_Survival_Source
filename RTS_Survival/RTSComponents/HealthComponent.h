@@ -14,6 +14,7 @@
 #include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarVisibilitySettings.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponShellType/WeaponShellType.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBatches.h"
 
 #include "HealthComponent.generated.h"
 
@@ -31,8 +32,45 @@ class IHealthBarOwner;
 enum class EHealthLevel : uint8;
 class ACameraPawn;
 class UProgressBar;
+class ATankMaster;
+class UHorizontalBox;
+class UVehicleModuleSubsystem;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnHealthBarVisibilityChanged, ESlateVisibility);
+// Old max health, new max health; broadcast only when SetMaxHealth actually changes the value.
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnMaxHealthChanged, float, float);
+
+/** @brief Stack receipt of one accepted healing transaction, sent to a tank with pending module repairs. */
+struct FHealthHealingReceipt
+{
+	// The accepted request, including healing that found no missing hull HP.
+	float AcceptedHealingWork = 0.f;
+	float AppliedHullHealing = 0.f;
+	float HealthAfter = 0.f;
+	float MaxHealth = 0.f;
+};
+
+/** @brief Desired and displayed module icon state per type for tank healthbars; hidden bars only update desire. */
+USTRUCT()
+struct FHealthComponentModuleIconState
+{
+	GENERATED_BODY()
+
+	EVehicleModuleState DesiredStates[VehicleModuleBalance::ModuleTypeCount] = {};
+	EVehicleModuleState DisplayedStates[VehicleModuleBalance::ModuleTypeCount] = {};
+
+	// Types whose displayed icon differs from the desired one.
+	uint32 DirtyTypeMask = 0;
+
+	// Enabled once for tank owners on clients; squads and buildings never need a ModuleBox.
+	bool bIsPresentationEnabled = false;
+
+	// Suspends icon writes after a failed ModuleBox lookup until the widget is reinitialized.
+	bool bIsModuleBoxUnavailable = false;
+
+	// Any non-healthy module type counts as damage for the bDisplayOnDamaged policy.
+	bool bHasAnyNonHealthyModule = false;
+};
 
 USTRUCT()
 struct FHealthComponentSelectionDelegateHandles
@@ -115,11 +153,33 @@ public:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetCurrentHealth(const float NewCurrentHealth);
 
-	/** @return Whether the unit was healed to full health or not */
+	/**
+	 * @brief The single entry point of every healing source (repairs, auras, heal behaviours).
+	 * For tanks with vehicle modules, accepted healing also drives module recovery and finishing work.
+	 * @param HealAmount Healing work to apply.
+	 * @return Whether the unit is fully repaired; for module tanks this means hull and every module.
+	 */
 	virtual bool Heal(const float HealAmount);
 
-	/** @return Whether the current health needs repairs. */
+	/** @return Whether a living owner still needs repairs, including damaged vehicle modules of a tank. */
 	bool GetHasDamageToRepair() const;
+
+	/** @brief Called once by a tank after module finalization; enables module-aware healing receipts. */
+	void InitializeTankRepairOwner(ATankMaster* Tank);
+
+	/** @brief Mirrors the tank's non-healthy module count so repair eligibility needs no tank queries. */
+	void SetTankPendingModuleRepairCount(int32 NonHealthyModuleCount);
+
+	FOnMaxHealthChanged& GetOnMaxHealthChanged() { return M_OnMaxHealthChanged; }
+
+	/** @brief Enables the tank-only module icons in the healthbar's ModuleBox; rejects non-tank owners. */
+	void InitializeTankModulePresentation(ATankMaster* Tank);
+
+	/** @brief Stores the new desired icon states; the widget updates now if visible, otherwise on reveal. */
+	void ApplyModuleIconStateChanges(const FModuleIconDeltaBatch& Changes);
+
+	/** @brief Replaces every desired icon state, e.g. on presentation initialization or load. */
+	void SynchronizeModuleIconSnapshot(const FModuleIconStates& Snapshot);
 
 	UFUNCTION(BlueprintCallable)
 	inline float GetMaxHealth() const { return MaxHealth; };
@@ -164,6 +224,7 @@ public:
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	virtual void BeginPlay_ApplyUserSettingsHealthBarVisibility();
 
@@ -205,6 +266,56 @@ protected:
 	
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FVehicleModuleTestAccess;
+#endif
+
+	// ---- Healing transaction ----
+	bool ApplyHealingInternal(float HealAmount);
+	bool ApplyTankHealingTransaction(float HealAmount);
+	// Existing hull-only healing for owners without vehicle modules.
+	bool ApplyHullOnlyHealing(float HealAmount);
+	bool GetIsFullyRepairedLivingOwner() const;
+
+	// Set once a tank finalized its modules; receipts are only sent while module repairs are pending.
+	UPROPERTY()
+	TWeakObjectPtr<ATankMaster> M_TankRepairOwner;
+
+	int32 M_TankNonHealthyModuleCount = 0;
+
+	// Re-entrant healing is summed here and applied after the current transaction and its notifications.
+	bool bM_IsApplyingHealingTransaction = false;
+	float M_DeferredHealingWork = 0.f;
+
+	FOnMaxHealthChanged M_OnMaxHealthChanged;
+
+	// ---- Tank module icons ----
+	void Widget_OnModulePresentationReady();
+	bool Widget_FindAndCacheModuleBox();
+	bool Widget_GetIsValidModuleBox() const;
+	void Widget_ReleaseModuleIcons() const;
+	void Widget_FlushModuleIconChanges() const;
+	bool Widget_FlushModuleIconType(int32 TypeIndex, bool& bOutMembershipChanged) const;
+	bool Widget_AddModuleIcon(EVehicleModuleTypes Type, EVehicleModuleState State) const;
+	bool Widget_ChangeModuleIcon(EVehicleModuleTypes Type, EVehicleModuleState State) const;
+	void Widget_RebuildModuleIconChildren() const;
+	bool GetShouldFlushModuleIcons() const;
+	bool GetIsValidVehicleModuleSubsystem() const;
+	void SetDesiredModuleIconState(int32 TypeIndex, EVehicleModuleState State);
+	void OnDesiredModuleIconsChanged();
+	static bool GetIsVisibleSlateVisibility(ESlateVisibility Visibility);
+
+	// Mutable: visibility changes arrive through const paths but must flush pending icon state.
+	UPROPERTY()
+	mutable FHealthComponentModuleIconState M_ModuleIconState;
+
+	// Looked up once per widget instance; never on damage or repair ticks.
+	UPROPERTY()
+	mutable TWeakObjectPtr<UHorizontalBox> M_ModuleBox;
+
+	UPROPERTY()
+	TWeakObjectPtr<UVehicleModuleSubsystem> M_VehicleModuleSubsystem;
+
 	void Widget_CreateHealthBar();
 
 	bool CanTolerateFireDamage(const float Damage);

@@ -89,6 +89,14 @@ protected:
 	UFUNCTION(BlueprintCallable, Category = "Commands", meta = (BlueprintProtected = "true"))
 	virtual void DoneExecutingCommand(EAbilityID AbilityFinished) override final;
 
+	/**
+	 * @brief Lets derived pawns drop stale completions, e.g. an aborted move task finishing after a
+	 * long-running command replaced it.
+	 * @param AbilityFinished Ability reported as finished.
+	 * @return True to ignore this completion.
+	 */
+	virtual bool GetShouldIgnoreCommandCompletion(EAbilityID AbilityFinished);
+
 	/** @copydoc ICommands::StopBehaviourTree */
 	virtual void StopBehaviourTree() override;
 

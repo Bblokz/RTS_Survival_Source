@@ -21,6 +21,7 @@ class URTSOptimizer;
 enum class EProjectileNiagaraSystem : uint8;
 enum class EShieldDamageResult : uint8;
 class UArmorCalculation;
+struct FVehicleModuleDamageEvent;
 class UPrimitiveComponent;
 class ASmallArmsProjectileManager;
 class USoundBase;
@@ -601,6 +602,12 @@ public:
 	/** @return The weapon data of this weapon disregarding any changes that are made to fired projectiles by the
 	 * shell type, only returns pure primitive weapon data values. */
 	const FWeaponData& GetRawWeaponData() const;
+	UMeshComponent* GetWeaponMeshComponent() const { return MeshComponent; }
+	UObject* GetWeaponOwnerObject() const { return WeaponOwner.GetObject(); }
+
+	/** @brief Restricts only this weapon while a module-owned behaviour is active. */
+	void SetModuleFireRestriction(UObject* Source, bool bBlocked);
+	void SetModuleReloadRestriction(UObject* Source, bool bBlocked);
 
 	FWeaponVFX* GetWeaponVfx();
 	const FWeaponVFX* GetWeaponVfx() const;
@@ -718,9 +725,11 @@ protected:
 	 * Damages the hit actor with the calculated damage value also does penetration calculation setups.
 	 * @param HitActor
 	 * @param BaseDamageToFlux 
+	 * @param ModuleDamageEvent Optional vehicle module event of an armor hit; resolved once after hull damage.
 	 * @return Whether the actor was killed.
 	 */
-	bool FluxDamageHitActor_DidActorDie(AActor* HitActor, const float BaseDamageToFlux);
+	bool FluxDamageHitActor_DidActorDie(AActor* HitActor, const float BaseDamageToFlux,
+	                                     const FVehicleModuleDamageEvent* ModuleDamageEvent = nullptr);
 
 	/**
 	 * Notifies the weapon owner that the actor was killed.
@@ -795,6 +804,14 @@ protected:
 	EWeaponFireMode GetMyFireMode()const;
 
 private:
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UObject>> M_ModuleFireRestrictionSources;
+
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UObject>> M_ModuleReloadRestrictionSources;
+
+	static bool GetHasModuleRestriction(const TArray<TWeakObjectPtr<UObject>>& Sources);
+
 	// Pools world-space impact Niagara & audio per-weapon. NEW
 	UPROPERTY()
 	FWeaponImpactPool M_ImpactPool;
@@ -1088,20 +1105,35 @@ private:
 		TArray<TWeakObjectPtr<UPrimitiveComponent>> IgnoredShieldComponents);
 	EShieldDamageResult HandleTraceShieldHit(const FHitResult& TraceHit, const FVector& LaunchLocation) const;
 	float CalculateTraceArmorPenAtImpact(const FVector& LaunchLocation, const FVector& ImpactLocation) const;
-	bool DidTracePen(const FHitResult& TraceHit, AActor*& OutHitActor) const;
-	bool DidTracePenArmorCalcComponent(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult) const;
+	/**
+	 * @brief Resolves armor penetration of a trace hit and prepares its vehicle module event.
+	 * @param TraceHit The trace impact.
+	 * @param OutHitActor [out] Actor (or parent) that owns the hit component.
+	 * @param OutModuleDamageEvent [out] Module event of an armor hit; only valid when bOutHasArmorHit is true.
+	 * @param bOutHasArmorHit [out] Whether the actor has an armor calculation component.
+	 * @return Whether the trace penetrated; actors without armor calculation are always penetrated.
+	 */
+	bool DidTracePen(const FHitResult& TraceHit, AActor*& OutHitActor, FVehicleModuleDamageEvent& OutModuleDamageEvent,
+	                 bool& bOutHasArmorHit) const;
+	bool DidTracePenArmorCalcComponent(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,
+	                                   FVehicleModuleDamageEvent& OutModuleDamageEvent) const;
 
 	TWeakObjectPtr<ASmallArmsProjectileManager> M_ProjectileManager;
 
 	// Type of projectile used for the trace; alters visuals.
 	int32 M_TraceProjectileType = 1;
 
+	// Distinguishes the armor impacts of this weapon for deterministic vehicle module rolls; mutable because the
+	// const penetration query assigns each impact its identity.
+	mutable uint32 M_ModuleTraceImpactSerial = 0;
+
 	/**
 	 *  
 	 * @param HitResult 
 	 * @param HitActor The actor hit.
 	 */
-	inline void OnActorPenArmor(const FHitResult& HitResult, AActor* HitActor);
+	inline void OnActorPenArmor(const FHitResult& HitResult, AActor* HitActor,
+	                            const FVehicleModuleDamageEvent* ModuleDamageEvent = nullptr);
 
 	void OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FVector& OutEndLocation,
 	                               const FRotator& ImpactRotation, const ERTSSurfaceType SurfaceTypeHit);

@@ -9,6 +9,7 @@
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBalance.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 
 
@@ -338,7 +339,7 @@ void URepairComponent::StartRepairTarget()
 			}
 			WeakThis->RepairTick();
 		};
-		const float Rate = DeveloperSettings::GameBalance::Repair::RepairTickInterval;
+		const float Rate = GetRepairTickIntervalForTarget();
 		World->GetTimerManager().SetTimer(M_RepairTickHandle, RepairLambda, Rate, true);
 	}
 }
@@ -363,7 +364,7 @@ void URepairComponent::RepairTick()
 		OnRepairTargetOutOfRange();
 		return;
 	}
-	const float RepairAmount = DeveloperSettings::GameBalance::Repair::HpRepairedPerTick * RepairMlt;
+	const float RepairAmount = GetRepairAmountPerTickForTarget() * RepairMlt;
 	FRTSRepairHelpers::Debug_Repair("Repairing for " + FString::SanitizeFloat(RepairAmount) + " HP");
 	const bool bIsRepaired = HealthComponent->Heal(RepairAmount);
 	if (bIsRepaired)
@@ -444,4 +445,23 @@ void URepairComponent::SetSquadUnitWeaponDisabled(const bool bDisabled) const
 	{
 		InfantryWeapon->SetAutoEngageTargets(true);
 	}
+}
+
+float URepairComponent::GetRepairTickIntervalForTarget() const
+{
+	if (IsValid(M_RepairTarget) && M_RepairTarget->IsA(ATankMaster::StaticClass()))
+	{
+		return VehicleModuleBalance::VehicleRepairTickSeconds;
+	}
+	return DeveloperSettings::GameBalance::Repair::RepairTickInterval;
+}
+
+float URepairComponent::GetRepairAmountPerTickForTarget() const
+{
+	// Every accepted HP of vehicle healing also counts as module finishing work through UHealthComponent::Heal.
+	if (IsValid(M_RepairTarget) && M_RepairTarget->IsA(ATankMaster::StaticClass()))
+	{
+		return VehicleModuleBalance::BaseWorkerRepairHpPerTick;
+	}
+	return DeveloperSettings::GameBalance::Repair::HpRepairedPerTick;
 }

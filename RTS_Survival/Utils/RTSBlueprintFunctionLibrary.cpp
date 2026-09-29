@@ -90,6 +90,32 @@ FString URTSBlueprintFunctionLibrary::BP_GetTankSubtypeString(const ETankSubtype
 	return UTrainingOptionLibrary::GetEnumValueName(EAllUnitType::UNType_Tank, static_cast<uint8>(TankSubtype));
 }
 
+EVehicleModuleProfile URTSBlueprintFunctionLibrary::BP_GetVehicleModuleProfileForTankSubtype(
+	const ETankSubtype TankSubtype)
+{
+	if (Global_GetIsArmoredCar(TankSubtype))
+	{
+		return EVehicleModuleProfile::ArmoredCar;
+	}
+	if (Global_GetIsLightTank(TankSubtype))
+	{
+		return EVehicleModuleProfile::LightTank;
+	}
+	if (Global_GetIsMediumTank(TankSubtype))
+	{
+		return EVehicleModuleProfile::MediumTank;
+	}
+	if (Global_GetIsHeavyTank(TankSubtype))
+	{
+		return EVehicleModuleProfile::HeavyTank;
+	}
+
+	RTSFunctionLibrary::ReportError(FString::Printf(
+		TEXT("BP_GetVehicleModuleProfileForTankSubtype: no module profile for tank subtype %d."),
+		static_cast<int32>(TankSubtype)));
+	return EVehicleModuleProfile::MediumTank;
+}
+
 FString URTSBlueprintFunctionLibrary::BP_GetAircraftSubtypeString(EAircraftSubtype AircraftSubtype)
 {
 	return UTrainingOptionLibrary::GetEnumValueName(EAllUnitType::UNType_Aircraft, static_cast<uint8>(AircraftSubtype));
@@ -696,7 +722,8 @@ int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAtLocation(
 	const ERTSFireType FireType,
 	const float LifeTimeSeconds,
 	const FVector& Location,
-	const FVector& Scale)
+	const FVector& Scale,
+	const FRTSFireEffectParams& EffectParams)
 {
 	if (not IsValid(WorldContextObject))
 	{
@@ -715,7 +742,7 @@ int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAtLocation(
 		return INDEX_NONE;
 	}
 
-	return FireSubsystem->SpawnFireAtLocation(FireType, LifeTimeSeconds, Location, Scale);
+	return FireSubsystem->SpawnFireAtLocation(FireType, LifeTimeSeconds, Location, Scale, EffectParams);
 }
 
 int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAttached(
@@ -724,7 +751,8 @@ int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAttached(
 	const ERTSFireType FireType,
 	const float LifeTimeSeconds,
 	const FVector& AttachOffset,
-	const FVector& Scale)
+	const FVector& Scale,
+	const FRTSFireEffectParams& EffectParams)
 {
 	if (not IsValid(WorldContextObject) || not IsValid(AttachActor))
 	{
@@ -743,7 +771,7 @@ int32 URTSBlueprintFunctionLibrary::RTSSpawnFireAttached(
 		return INDEX_NONE;
 	}
 
-	return FireSubsystem->SpawnFireAttached(AttachActor, FireType, LifeTimeSeconds, AttachOffset, Scale);
+	return FireSubsystem->SpawnFireAttached(AttachActor, FireType, LifeTimeSeconds, AttachOffset, Scale, EffectParams);
 }
 
 bool URTSBlueprintFunctionLibrary::RTSStopFireByHandle(const UObject* WorldContextObject, const int32 FireHandle)

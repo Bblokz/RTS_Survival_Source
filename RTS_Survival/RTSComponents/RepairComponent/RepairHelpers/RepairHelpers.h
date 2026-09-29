@@ -52,6 +52,11 @@ namespace FRTSRepairHelpers
 		{
 			return false;
 		}
+		// Tanks stay eligible at full hull health while vehicle modules are damaged.
+		if (bIsTankDerived)
+		{
+			return HealthComponent->GetHasDamageToRepair();
+		}
 		const bool IsNearlyFullHealth = HealthComponent->GetHealthPercentage() >= 0.99f;
 		return not IsNearlyFullHealth;
 	};

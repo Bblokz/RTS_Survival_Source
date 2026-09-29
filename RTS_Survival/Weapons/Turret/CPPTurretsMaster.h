@@ -162,6 +162,7 @@ public:
 	inline float GetTurretRange() const { return M_WeaponRangeData.M_MaxWeaponRange; }
 
 	virtual TArray<UWeaponState*> GetWeapons() override final;
+	int32 GetWeaponCount() const { return M_TWeapons.Num(); }
 	int32 GetOwningPlayer();
 	float GetMaxWeaponRange() const { return FMath::Sqrt(M_WeaponRangeData.M_MaxWeaponRangeSquared); }
 
@@ -177,7 +178,10 @@ public:
 
 	void OnSetupTurret(AActor* OwnerOfTurret);
 
-	float GetTurretRotationSpeed() const { return RotationSpeed; }
+	float GetTurretRotationSpeed() const;
+	void SetModuleTraverseMultiplier(UObject* Source, float Multiplier);
+	void ClearModuleTraverseMultiplier(const UObject* Source);
+	UMeshComponent* GetModuleBindingMesh() const;
 	void SetTurretRotationSpeed(const float NewRotationSpeed) { RotationSpeed = NewRotationSpeed; }
 	AActor* GetCurrentTargetActor() const { return TargetingData.GetTargetActor(); }
 
@@ -345,6 +349,11 @@ protected:
 	// How fast the turret turns in degrees / second. 
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
 	float RotationSpeed;
+
+	// Each module behaviour owns its own traverse limit so removing one cannot clear another.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UObject>> M_ModuleTraverseSources;
+	TArray<float> M_ModuleTraverseMultipliers;
 
 	/**
 	 * @brief Called on Bp to activate reload animations. After the specified time the reload is done.

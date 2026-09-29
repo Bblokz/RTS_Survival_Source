@@ -8,6 +8,7 @@
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleDamageEvent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
@@ -45,6 +46,28 @@ namespace
 			WeakDamageCauser->GetInstigatorController(),
 			WeakDamageCauser.Get()
 		);
+	}
+
+	// Game-thread serial giving every opted-in explosion its own vehicle module roll identity.
+	uint32 GModuleSplashExplosionSerial = 0;
+
+	/**
+	 * @brief Applies AOE damage through a module damage event so external vehicle modules resolve once,
+	 * after the hull damage, from the attenuated damage this victim actually received.
+	 */
+	void ApplyDamageWithModuleSplash(
+		AActor& HitActor,
+		UArmorCalculation& ArmorCalculation,
+		const float AttenuatedDamage,
+		const FVector& Epicenter,
+		const uint32 ExplosionId,
+		const FDamageEvent& BasicDamageEvent,
+		const TWeakObjectPtr<AActor>& WeakDamageCauser)
+	{
+		FVehicleModuleDamageEvent ModuleDamageEvent = FVehicleModuleDamageEvent::MakeExplosionEvent(
+			&ArmorCalculation, EVehicleModuleDelivery::Splash, Epicenter, AttenuatedDamage, ExplosionId,
+			BasicDamageEvent.DamageTypeClass);
+		ApplyDamageToActor(HitActor, AttenuatedDamage, ModuleDamageEvent, WeakDamageCauser);
 	}
 
 	float CalculateRearArmorDamageMultiplier(
@@ -216,7 +239,8 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	const ERTSDamageType DamageType,
 	const ETriggerOverlapLogic OverlapLogic,
 	const EShieldDamageSource ShieldDamageSource,
-	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore)
+	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
+	const EVehicleModuleSplashPolicy ModuleSplashPolicy)
 {
 	if (not IsValid(DamageCauser))
 	{
@@ -234,6 +258,8 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	const float SafeMaxArmorPen = FMath::Max(MaxArmorPen, SafeFullArmorPen);
 	const float SafeArmorPenFalloff = FMath::Max(ArmorPenFallOff, 0.f);
 	const TWeakObjectPtr<AActor> WeakDamageCauser = DamageCauser;
+	const bool bDamagesVehicleModules = ModuleSplashPolicy == EVehicleModuleSplashPolicy::DamageExternalModules;
+	const uint32 ModuleExplosionId = bDamagesVehicleModules ? ++GModuleSplashExplosionSerial : 0;
 	StartAsyncSphereSweep(
 		DamageCauser,
 		Epicenter,
@@ -250,7 +276,9 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 			SafeArmorPenFalloff,
 			SafeMaxArmorPen,
 			DamageType,
-			ShieldDamageSource
+			ShieldDamageSource,
+			bDamagesVehicleModules,
+			ModuleExplosionId
 		](TArray<FHitResult>&& HitResults)
 		{
 			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
@@ -325,6 +353,13 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 					continue;
 				}
 
+				// Module splash is opt-in per weapon adapter; the default Ignore keeps ICBMs and bombs hull-only.
+				if (bDamagesVehicleModules)
+				{
+					ApplyDamageWithModuleSplash(*HitActor, *ArmorCalculation, AdjustedDamage, Epicenter,
+					                            ModuleExplosionId, DamageEvent, WeakDamageCauser);
+					continue;
+				}
 				ApplyDamageToActor(*HitActor, AdjustedDamage, DamageEvent, WeakDamageCauser);
 			}
 		});

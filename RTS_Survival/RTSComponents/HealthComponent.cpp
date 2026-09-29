@@ -185,6 +185,7 @@ void UHealthComponent::SetCurrentHealth(const float NewCurrentHealth)
 
 void UHealthComponent::SetMaxHealth(const float NewMaxHealth)
 {
+	const float OldMaxHealth = MaxHealth;
 	const float ClampedNewMaxHealth = FMath::Max(0.f, NewMaxHealth);
 
 	float NewCurrentHealth = ClampedNewMaxHealth;
@@ -203,6 +204,11 @@ void UHealthComponent::SetMaxHealth(const float NewMaxHealth)
 	}
 
 	UpdateHealthBar();
+	// Not a healing operation: listeners (vehicle modules) rescale without receiving repair work.
+	if (OldMaxHealth != MaxHealth)
+	{
+		M_OnMaxHealthChanged.Broadcast(OldMaxHealth, MaxHealth);
+	}
 }
 
 void UHealthComponent::AddHealth(const float HealthToAdd, const float DamageReductionToAdd)
@@ -212,6 +218,11 @@ void UHealthComponent::AddHealth(const float HealthToAdd, const float DamageRedu
 }
 
 bool UHealthComponent::Heal(const float HealAmount)
+{
+	return ApplyHealingInternal(HealAmount);
+}
+
+bool UHealthComponent::ApplyHullOnlyHealing(const float HealAmount)
 {
 	bool bIsFullHealth = false;
 	if (CurrentHealth + HealAmount >= MaxHealth)
@@ -234,7 +245,11 @@ bool UHealthComponent::Heal(const float HealAmount)
 
 bool UHealthComponent::GetHasDamageToRepair() const
 {
-	return CurrentHealth < MaxHealth;
+	if (CurrentHealth <= 0.f)
+	{
+		return false;
+	}
+	return CurrentHealth < MaxHealth || M_TankNonHealthyModuleCount > 0;
 }
 
 
@@ -546,6 +561,12 @@ void UHealthComponent::OnWidgetInitialized()
 		bM_ShouldApplyVisibilitySettingsOnWidgetInit = false;
 		UpdateVisibilityAfterSettingsChange();
 	}
+
+	// After base setup: (re)bind the tank's ModuleBox for this widget instance.
+	if (M_ModuleIconState.bIsPresentationEnabled)
+	{
+		Widget_OnModulePresentationReady();
+	}
 }
 
 
@@ -668,7 +689,9 @@ bool UHealthComponent::ShouldDisplayHealthForPercentage(const float NewPercentag
 		}
 		return true;
 	}
-	if (VisibilitySettings.bDisplayOnDamaged && NewPercentage < 1.0f)
+	// A damaged vehicle module at full hull health also counts as damaged.
+	const bool bIsDamaged = NewPercentage < 1.0f || M_ModuleIconState.bHasAnyNonHealthyModule;
+	if (VisibilitySettings.bDisplayOnDamaged && bIsDamaged)
 	{
 		if constexpr (DeveloperSettings::Debugging::GHealthComponent_Compile_DebugSymbols)
 		{
@@ -1115,7 +1138,13 @@ void UHealthComponent::SetHealthBarVisibility(const ESlateVisibility NewVisibili
 		return;
 	}
 
+	const bool bWasVisible = GetIsVisibleSlateVisibility(HealthBarWidget->GetVisibility());
 	HealthBarWidget->SetVisibility(NewVisibility);
+	// Hidden healthbars only store desired module icons; flush once on an actual transition to visible.
+	if (not bWasVisible && GetIsVisibleSlateVisibility(NewVisibility))
+	{
+		Widget_FlushModuleIconChanges();
+	}
 	M_OnHealthBarVisibilityChanged.Broadcast(NewVisibility);
 }
 

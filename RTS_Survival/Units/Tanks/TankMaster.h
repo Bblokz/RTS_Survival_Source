@@ -16,6 +16,8 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBatches.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/CrewRepairAbilityTypes.h"
 #include "TankMaster.generated.h"
 
 enum class ERTSAggroBehaviour : uint8;
@@ -26,6 +28,9 @@ class UDigInComponent;
 class USpatialVoiceLinePlayer;
 class ACPPResourceMaster;
 class UArmor;
+class UArmorCalculation;
+class UVehicleModuleSubsystem;
+struct FHealthHealingReceipt;
 class URTSNavCollision;
 class UBehaviour;
 class UBehaviourComp;
@@ -72,6 +77,82 @@ struct FTankTurretRangePursuitState
 	FVector TargetLocation = FVector::ZeroVector;
 	double LastRequestTimeSeconds = 0.0;
 	double RetryNotBeforeTimeSeconds = 0.0;
+};
+
+enum class ECrewRepairStatus : uint8
+{
+	Inactive,
+	Repairing,
+	// Cleanup in progress; re-entrant stop requests are ignored.
+	Stopping
+};
+
+enum class ECrewRepairStopReason : uint8
+{
+	PlayerDisabled,
+	AllModulesRecovered,
+	// The command queue terminated the command and owns queue progression.
+	QueueTermination,
+	StartFailed,
+	// Death or EndPlay: clear everything without enabling weapons or advancing commands.
+	OwnerDestroyed
+};
+
+/** @brief Session of the tank's CrewRepair action; one repeating timer per active tank, no per-module timers. */
+USTRUCT()
+struct FCrewRepairState
+{
+	GENERATED_BODY()
+
+	ECrewRepairStatus Status = ECrewRepairStatus::Inactive;
+
+	// Red module being repaired; kept until it is repaired, removed or repaired externally.
+	int32 CurrentModuleId = INDEX_NONE;
+
+	double ModuleWorkStartGameTime = 0.0;
+	float RequiredModuleSeconds = 0.f;
+
+	FTimerHandle TimerHandle;
+
+	// Incremented on every start and stop so stale timer callbacks are ignored.
+	uint32 SessionGeneration = 0;
+
+	// Execution serial of the queued Enable command owned by this session; 0 when none.
+	uint64 ActiveCommandToken = 0;
+
+	UPROPERTY()
+	FAbilitySuppressionHandle AbilitySuppressionHandle;
+
+	bool bHoldsWeaponAndMovementLock = false;
+};
+
+/** @brief One behaviour's mobility restriction; the tank composes all sources by minimum. */
+USTRUCT()
+struct FTankMobilityRestriction
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TWeakObjectPtr<UObject> Source;
+
+	float TravelSpeedMultiplier = 1.f;
+	float TurnRateMultiplier = 1.f;
+	float AccelerationMultiplier = 1.f;
+};
+
+/** @brief Cached module counts plus the ordinary-healing finishing progress of a module tank. */
+USTRUCT()
+struct FVehicleModuleRepairState
+{
+	GENERATED_BODY()
+
+	int32 DestroyedModuleCount = 0;
+	int32 NonHealthyModuleCount = 0;
+
+	// Armor damage revision the finishing work belongs to; any new module damage resets the work.
+	uint32 ModuleDamageRevision = 0;
+
+	float FullServiceAccumulatedWork = 0.f;
 };
 
 USTRUCT()
@@ -153,6 +234,94 @@ public:
 	ATankMaster(const FObjectInitializer& ObjectInitializer);
 
 	virtual UShieldComponent* GetShield() const override { return M_ShieldComponent.Get(); }
+
+	// ---- Vehicle modules ----
+
+	/**
+	 * @brief Runs once per committed native module batch: counts, behaviours, CrewRepair, card, icons,
+	 * announcements and Blueprint events. Called by this tank's UArmorCalculation only.
+	 */
+	void OnModuleStateBatchCommitted(const FModuleChangeBatch& Batch);
+
+	/** @brief Re-synchronizes a module's behaviour context after its mesh binding changed. */
+	void OnModuleBindingChanged(int32 SlotIndex);
+	/** @brief Rebinds active mounted effects when a turret or hull weapon is installed. */
+	void RefreshMountedModuleBehaviours();
+
+	/**
+	 * @brief Receipt of one accepted ordinary healing transaction; picks the single module repair
+	 * milestone of this heal (full service, red -> yellow recovery or nothing).
+	 */
+	void OnHealthHealingApplied(const FHealthHealingReceipt& Receipt);
+
+	/** @return True when hull health and every installed module are at maximum. */
+	UFUNCTION(BlueprintPure, Category = "Vehicle Modules")
+	bool GetIsVehicleFullyRepaired() const;
+
+	UFUNCTION(BlueprintPure, Category = "Vehicle Modules")
+	UArmorCalculation* GetVehicleModuleArmor() const { return M_ModuleArmor.Get(); }
+
+	/** @return Total crew seconds still needed for every red module, including the current target. */
+	UFUNCTION(BlueprintPure, Category = "Vehicle Modules")
+	float GetRemainingCrewRepairSeconds() const;
+
+	UFUNCTION(BlueprintPure, Category = "Vehicle Modules")
+	int32 GetCrewRepairTargetModuleId() const { return M_CrewRepairState.CurrentModuleId; }
+
+	/**
+	 * @brief Lets tank Blueprints react once to committed module state transitions.
+	 * @param ModuleType Type of the instance whose state changed.
+	 * @param NewState Committed Healthy, Damaged or Destroyed state.
+	 * @param RemainingModuleHp Absolute remaining module HP, clamped to [0, MaxHp].
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Vehicle Modules")
+	void OnVehicleModuleStateChanged(
+		EVehicleModuleTypes ModuleType,
+		EVehicleModuleState NewState,
+		float RemainingModuleHp);
+
+	/** @brief Module health fractions, coverage, finishing work and roll serial for tactical persistence. */
+	UFUNCTION(BlueprintCallable, Category = "Vehicle Modules")
+	FVehicleModuleSaveData ExportVehicleModuleSaveData() const;
+
+	/**
+	 * @brief Applies saved module state after module finalization; never resumes crew work or replays events.
+	 * @param SaveData Data exported from a tank with the same module setup.
+	 * @return True if the data matched this tank and was applied.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Vehicle Modules")
+	bool ImportVehicleModuleSaveData(const FVehicleModuleSaveData& SaveData);
+
+	virtual bool GetIsCrewRepairActive() const override;
+
+	// ---- Mounted weapon lock shared by CrewRepair, stuns and module behaviours ----
+
+	/** @brief Disables every turret and hull weapon until all lock sources released their lock. */
+	void AcquireMountedWeaponLock(UObject* Source);
+
+	/**
+	 * @brief Releases one lock source; weapons auto-engage again only when no other source holds a lock.
+	 * @param Source The object that acquired the lock.
+	 * @param bUseLastTargetOnRestore Forwarded to auto-engage when this was the last lock.
+	 */
+	void ReleaseMountedWeaponLock(UObject* Source, bool bUseLastTargetOnRestore);
+
+	bool GetHasMountedWeaponLock() const;
+
+	// ---- Mobility restrictions applied by behaviours (e.g. damaged running gear or engine) ----
+
+	/**
+	 * @brief Registers or replaces one source's mobility restriction; sources combine by minimum, not product.
+	 * @param Source Restricting object, e.g. a vehicle module behaviour.
+	 * @param TravelSpeedMultiplier Allowed fraction of travel speed; 0 removes powered travel.
+	 * @param TurnRateMultiplier Allowed fraction of path-following turning; 0 removes powered turning.
+	 * @param AccelerationMultiplier Allowed fraction of tracked drive acceleration.
+	 */
+	void SetMobilityRestriction(UObject* Source, float TravelSpeedMultiplier, float TurnRateMultiplier,
+	                            float AccelerationMultiplier = 1.f);
+
+	/** @brief Removes only this source's restriction; the remaining sources are recomposed. */
+	void ClearMobilityRestriction(const UObject* Source);
 	
 	void SetAudioCompsDisabled(const bool bDisable);
 
@@ -224,7 +393,9 @@ protected:
 	virtual void CheckForUpgrades();
 
 	virtual void BeginDestroy() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void UnitDies(const ERTSDeathType DeathType) override;
+	virtual bool GetShouldIgnoreCommandCompletion(EAbilityID AbilityFinished) override;
 	void CheckIfUpsideDown();
 
 	virtual void PostInitializeComponents() override;
@@ -272,6 +443,12 @@ protected:
 		if (NewTurret)
 		{
 			NewTurret->OnSetupTurret(this);
+			// Newly spawned or swapped turrets inherit an active weapon lock.
+			if (GetHasMountedWeaponLock())
+			{
+				NewTurret->DisableTurret();
+			}
+			RefreshMountedModuleBehaviours();
 		}
 	}
 
@@ -279,7 +456,7 @@ protected:
 
 	/** @brief Adds the provided HullWeapon to the array keeping track of all HullWeapons on this tank. */
 	UFUNCTION(BlueprintCallable)
-	inline void SetupHullWeapon(UHullWeaponComponent* NewHullWeapon) { HullWeapons.Add(NewHullWeapon); }
+	void SetupHullWeapon(UHullWeaponComponent* NewHullWeapon);
 
 
 	/**
@@ -397,6 +574,8 @@ protected:
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype) override;
 	virtual void TerminateTowActorCommand() override;
 	virtual void TerminateDetachTowCommand() override;
+	virtual void ExecuteCrewRepairCommand(ECrewRepairAbilityType Subtype) override;
+	virtual void TerminateCrewRepairCommand(ECrewRepairAbilityType Subtype) override;
 	bool TryTowTeamWeaponInstant(class ATeamWeaponController* TeamWeaponController, class ATeamWeapon* TeamWeaponActor);
 
 	// For the harvester that uses resources that are stored in the harvester component.
@@ -517,6 +696,77 @@ protected:
 	virtual bool ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds);
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FVehicleModuleTestAccess;
+#endif
+
+	// ---- Vehicle module integration ----
+	void BeginPlay_InitVehicleModules();
+	void BeginPlay_InitVehicleModuleBindings();
+	bool GetIsValidModuleArmor() const;
+	void RefreshModuleRepairCounts();
+	void SyncModuleBehaviour(const FModuleStateChange& Change);
+	void SyncModuleBehaviourForSlot(int32 SlotIndex);
+	void OnModuleBehavioursApplied();
+	void PublishModuleIconChanges(const FModuleChangeBatch& Batch) const;
+	void PublishModuleBlueprintEvents(const FModuleChangeBatch& Batch);
+	void AnnounceModuleTransitions(const FModuleChangeBatch& Batch);
+	void OnTankMaxHealthChanged(float OldMaxHealth, float NewMaxHealth);
+	void CleanupVehicleModuleBindings();
+
+	// ---- Ordinary healing milestones ----
+	bool TryRecoverDestroyedModulesAfterHealing();
+	// @return True when the finishing work is complete; performs no armor mutation.
+	bool AccumulateFullModuleService(float Work);
+	float GetCurrentFinishingWork() const;
+
+	// ---- CrewRepair ----
+	void InitializeCrewRepairAbilitySlot();
+	void RefreshCrewRepairAbilityFromModuleState();
+	FUnitAbilityEntry MakeCrewRepairAbilityEntry(ECrewRepairAbilityType Subtype) const;
+	bool BeginCrewRepair();
+	void AcquireCrewRepairRestrictions(UCommandData& CommandData);
+	void StopVehicleForCrewRepair();
+	bool StartCrewRepairTimer();
+	void CrewRepairTick(uint32 SessionGeneration);
+	bool SelectNextRedModuleForCrewRepair();
+	void UpdateCrewRepairAfterModuleBatch();
+	void FinishCrewRepair(ECrewRepairStopReason Reason);
+	void RestoreCrewRepairState();
+
+	UPROPERTY()
+	TWeakObjectPtr<UArmorCalculation> M_ModuleArmor;
+
+	// Shared module asset cache; weak because the game instance owns it.
+	UPROPERTY()
+	TWeakObjectPtr<UVehicleModuleSubsystem> M_VehicleModuleSubsystem;
+
+	FVehicleModuleRepairState M_ModuleRepairState;
+
+	FCrewRepairState M_CrewRepairState;
+
+	// True once the armor component finalized module HP for this tank.
+	bool bM_AreVehicleModulesInitialized = false;
+
+	// Blueprint transition events waiting for deferred module behaviour changes to be committed.
+	FModuleChangeBatch M_DeferredModuleBlueprintEvents;
+
+	FDelegateHandle M_MaxHealthChangedHandle;
+	FDelegateHandle M_ModuleBehavioursAppliedHandle;
+
+	// Game time of the last module announcement; announcements never delay icon changes.
+	double M_LastModuleAnnouncementTime = -1.0;
+
+	// Sources that currently disable all mounted weapons (crew repair, stun, ...).
+	UPROPERTY()
+	TArray<TWeakObjectPtr<UObject>> M_MountedWeaponLockSources;
+
+	// Behaviour mobility restrictions; recomposed on change so removing one never restores a stale base value.
+	UPROPERTY()
+	TArray<FTankMobilityRestriction> M_MobilityRestrictions;
+
+	void RebuildVehicleMobility();
+
 	void ClearShieldComponentCache(const UShieldComponent* ShieldComponent);
 
 	// Whether the vehicle is currently Turning.

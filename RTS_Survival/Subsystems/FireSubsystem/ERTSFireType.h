@@ -10,7 +10,10 @@ UENUM(BlueprintType)
 enum class ERTSFireType : uint8
 {
 	None UMETA(DisplayName="None"),
-	Small UMETA(DisplayName="Small"),
+	SmallOptim UMETA(DisplayName="Small"),
 	Medium UMETA(DisplayName="Medium"),
-	Large UMETA(DisplayName="Large")
+	LargeOptim UMETA(DisplayName="Large"),
+	AmmoCookOffInf,
+	TankFire,
+	
 };

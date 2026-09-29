@@ -8,6 +8,7 @@
 #include "Healthbar_TargetTypeIconState/TargetTypeIconState.h"
 #include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarSettings.h"
 #include "RTS_Survival/Units/Squads/SquadControllerHpComp/SquadWeaponIcons/SquadWeaponIconSettings/SquadWeaponIconSettings.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBalance.h"
 
 #include "W_HealthBar.generated.h"
 
@@ -62,6 +63,17 @@ public:
 
 	// Makes the target type icon invisible if not set.
 	void ChangeTargetTypeIcon(const ETargetTypeIcon Icon, const int32 OwningPlayer);
+
+	// ---- Vehicle module icons; operations are entered through the owning health component only ----
+
+	/** @return The reusable icon image of a module type (indexed by EVehicleModuleTypes), or null. */
+	UImage* GetCachedModuleIconImage(int32 ModuleTypeIndex) const;
+
+	/** @brief Keeps a detached icon image alive for reuse during this widget's lifetime. */
+	void CacheModuleIconImage(int32 ModuleTypeIndex, UImage* ModuleIconImage);
+
+	/** @brief Drops cached icon images on widget replacement or owner EndPlay. */
+	void ReleaseModuleIconImages();
 
 protected:
 	// Hides the rankicon immediatly if set.
@@ -169,5 +181,9 @@ private:
 	FString M_UnitName;
 
 	void ReportErrorWithOwner(const FString& Message) const;
+
+	// One reusable image per module type; GC-visible so detached icons survive until reused or released.
+	UPROPERTY()
+	TObjectPtr<UImage> M_ModuleIconImages[VehicleModuleBalance::ModuleTypeCount];
 
 };

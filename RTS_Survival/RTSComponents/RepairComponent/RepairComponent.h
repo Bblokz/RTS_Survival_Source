@@ -109,6 +109,10 @@ private:
 	FTimerHandle M_RepairTickHandle;
 	void RepairTick();
 
+	// Vehicle targets use the vehicle module balance tuning; buildings keep the general repair settings.
+	float GetRepairTickIntervalForTarget() const;
+	float GetRepairAmountPerTickForTarget() const;
+
 	bool GetIsRepairTargetInRange() const;
 
 	void OnRepairTargetOutOfRange();

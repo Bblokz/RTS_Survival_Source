@@ -16,6 +16,12 @@ class RTS_SURVIVAL_API UChaosTankMovementComponent : public UChaosWheeledVehicle
 	GENERATED_BODY()
 
 public:
+	/** @brief Applies the composed vehicle module limits to wheeled driving input. */
+	void SetModuleMobilityLimits(float TravelSpeedMultiplier, float TurnRateMultiplier,
+	                             float AccelerationMultiplier, float UnrestrictedMaxSpeedKmh);
+
+	virtual void PreTickGT(float DeltaTime) override;
+
 	/** @brief Sets angular momentum to zero. */
 	void KillMomentum();
 
@@ -24,5 +30,10 @@ public:
 
 	inline uint8 GetForwardGears() const { return TransmissionSetup.ForwardGearRatios.Num(); }
 	inline uint8 GetReverseGears() const { return TransmissionSetup.ReverseGearRatios.Num(); }
-	
+
+private:
+	float M_ModuleTravelSpeedMultiplier = 1.f;
+	float M_ModuleTurnRateMultiplier = 1.f;
+	float M_ModuleAccelerationMultiplier = 1.f;
+	float M_UnrestrictedMaxSpeedKmh = 0.f;
 };

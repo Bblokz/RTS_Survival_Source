@@ -3,9 +3,11 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/ERTSFireType.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/FRTSFireEffectParams.h"
 #include "RTSFireSubsystem.generated.h"
 
 class ARTSFireManager;
+class USceneComponent;
 
 /**
  * @brief World subsystem that spawns and exposes the RTS fire manager.
@@ -27,12 +29,15 @@ public:
 	 * @param LifeTimeSeconds Seconds to keep active; <= 0 keeps it active until reclaimed.
 	 * @param Location World location for the fire effect.
 	 * @param Scale World scale for the fire effect.
+	 * @param EffectParams Niagara scale and color multipliers for this activation.
+	 * @return Handle for the active fire, or INDEX_NONE if activation fails.
 	 */
 	UFUNCTION(BlueprintCallable, Category="RTS|Fire")
 	int32 SpawnFireAtLocation(ERTSFireType FireType,
 	                         float LifeTimeSeconds,
 	                         const FVector& Location,
-	                         const FVector& Scale);
+	                         const FVector& Scale,
+	                         const FRTSFireEffectParams& EffectParams);
 
 	/**
 	 * @brief Request a pooled fire effect attached to an actor.
@@ -41,13 +46,37 @@ public:
 	 * @param LifeTimeSeconds Seconds to keep active; <= 0 keeps it active until reclaimed.
 	 * @param AttachOffset Offset from the actor root while attached.
 	 * @param Scale World scale for the fire effect (ignores actor scale).
+	 * @param EffectParams Niagara scale and color multipliers for this activation.
+	 * @return Handle for the active fire, or INDEX_NONE if activation fails.
 	 */
 	UFUNCTION(BlueprintCallable, Category="RTS|Fire")
 	int32 SpawnFireAttached(AActor* AttachActor,
 	                       ERTSFireType FireType,
 	                       float LifeTimeSeconds,
 	                       const FVector& AttachOffset,
-	                       const FVector& Scale);
+	                       const FVector& Scale,
+	                       const FRTSFireEffectParams& EffectParams);
+
+	/**
+	 * @brief Keep a pooled fire aligned to a mesh socket or a component-relative offset.
+	 * @param AttachActor Actor that owns the component and fire lifetime.
+	 * @param AttachComponent Component the fire follows.
+	 * @param SocketName Socket to follow, or NAME_None for the component origin.
+	 * @param RelativeOffset Offset from the socket or component origin in its local space.
+	 * @param FireType Fire pool to use for the effect.
+	 * @param LifeTimeSeconds Seconds before recycling the fire.
+	 * @param Scale Component world scale for the fire.
+	 * @param EffectParams Niagara scale and color multipliers.
+	 * @return Handle for the active fire, or INDEX_NONE if activation fails.
+	 */
+	int32 SpawnFireAttachedToComponent(AActor* AttachActor,
+	                                 USceneComponent* AttachComponent,
+	                                 FName SocketName,
+	                                 const FVector& RelativeOffset,
+	                                 ERTSFireType FireType,
+	                                 float LifeTimeSeconds,
+	                                 const FVector& Scale,
+	                                 const FRTSFireEffectParams& EffectParams);
 
 	/**
 	 * @brief Stop and recycle a previously started pooled fire effect.

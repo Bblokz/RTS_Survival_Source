@@ -85,6 +85,13 @@ void ATrackedTankMaster::UpdateVehicle_Implementation(
 		return;
 	}
 
+	// Crew repair holds a movement lock: late path-following updates brake instead of driving.
+	if (GetIsCrewRepairActive())
+	{
+		TrackPhysicsMovement->OnPathFollowingFinished();
+		return;
+	}
+
 	TrackPhysicsMovement->UpdateTankMovement(
 		DeltaTime,
 		CurrentSpeed,

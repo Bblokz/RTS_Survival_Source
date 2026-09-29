@@ -7,11 +7,13 @@
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/FRTSFireEffectParams.h"
 #include "RTS_Survival/CardSystem/ERTSCard/ERTSCard.h"
 #include "RTS_Survival/Game/GameState/GameDecalManager/GameDecalManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstPreGameLaunchRequest/RTSPreGameLaunchRequest.h"
 #include "RTS_Survival/GameUI/MiniMap/CustomIcons/MinimapIconTypes.h"
 #include "RTS_Survival/Resources/ResourceSceneSetup/ResourceSceneSetup.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleTypes.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTSBlueprintFunctionLibrary.generated.h"
@@ -102,6 +104,7 @@ struct FAPHEBCAmmoProperties
 		DeveloperSettings::GameBalance::Weapons::Projectiles::APHEBC_ArmorPenLerpFactor * 100;
 };
 
+/** @brief Provides shared gameplay conversions and lookups to Blueprint graphs. */
 UCLASS()
 class RTS_SURVIVAL_API URTSBlueprintFunctionLibrary : public UBlueprintFunctionLibrary
 {
@@ -141,6 +144,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "TankSubtype")
 	static FString BP_GetTankSubtypeString(ETankSubtype TankSubtype);
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable, Category = "TankSubtype")
+	static EVehicleModuleProfile BP_GetVehicleModuleProfileForTankSubtype(ETankSubtype TankSubtype);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "AircraftSubtype")
 	static FString BP_GetAircraftSubtypeString(EAircraftSubtype AircraftSubtype);
@@ -335,6 +341,12 @@ public:
 
 	/**
 	 * @brief Wrapper so designers can spawn pooled fire without directly resolving the world subsystem.
+	 * @param WorldContextObject Object whose world owns the fire subsystem.
+	 * @param FireType Fire pool to use.
+	 * @param LifeTimeSeconds Duration before recycling; nonpositive values require manual stopping.
+	 * @param Location World location for the fire.
+	 * @param Scale Component world scale.
+	 * @param EffectParams Niagara scale and color multipliers for this activation.
 	 * @return Handle used to stop this specific fire later; INDEX_NONE when spawn fails.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|FireManager")
@@ -343,10 +355,18 @@ public:
 		ERTSFireType FireType,
 		float LifeTimeSeconds,
 		const FVector& Location,
-		const FVector& Scale);
+		const FVector& Scale,
+		const FRTSFireEffectParams& EffectParams);
 
 	/**
 	 * @brief Wrapper so designers can attach pooled fire to actors without directly resolving the subsystem.
+	 * @param WorldContextObject Object whose world owns the fire subsystem.
+	 * @param AttachActor Actor to attach the fire to.
+	 * @param FireType Fire pool to use.
+	 * @param LifeTimeSeconds Duration before recycling; nonpositive values require manual stopping.
+	 * @param AttachOffset Offset from the actor root while attached.
+	 * @param Scale Component world scale.
+	 * @param EffectParams Niagara scale and color multipliers for this activation.
 	 * @return Handle used to stop this specific fire later; INDEX_NONE when spawn fails.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|FireManager")
@@ -356,7 +376,8 @@ public:
 		ERTSFireType FireType,
 		float LifeTimeSeconds,
 		const FVector& AttachOffset,
-		const FVector& Scale);
+		const FVector& Scale,
+		const FRTSFireEffectParams& EffectParams);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="WorldSubsystem|FireManager")
 	static bool RTSStopFireByHandle(const UObject* WorldContextObject, int32 FireHandle);

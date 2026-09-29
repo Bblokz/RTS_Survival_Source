@@ -26,6 +26,7 @@
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBalance.h"
 
 
 UCommandData::UCommandData(const FObjectInitializer& ObjectInitializer)
@@ -62,7 +63,22 @@ void UCommandData::SetAbilities(const TArray<FUnitAbilityEntry>& Abilities)
 			"UCommandData::SetAbilities");
 		ValidAbilities.SetNum(DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI);
 	}
+	if (bM_IsCrewRepairSlotReserved)
+	{
+		// Runtime ability rebuilds preserve the reserved final slot and its current CrewRepair entry.
+		const FUnitAbilityEntry CrewRepairEntry = GetCrewRepairAbilityEntry();
+		ValidAbilities.SetNum(DeveloperSettings::GamePlay::ActionUI::MaxAbilitiesForActionUI);
+		FUnitAbilityEntry& ReservedEntry = ValidAbilities[VehicleModuleBalance::CrewRepairAbilitySlotIndex];
+		if (ReservedEntry.AbilityId != EAbilityID::IdNoAbility)
+		{
+			RTSFunctionLibrary::ReportError(TEXT("SetAbilities: the loadout uses the final command-card slot that is")
+				TEXT(" reserved for CrewRepair; dropping ") + Global_GetAbilityIDAsString(ReservedEntry.AbilityId));
+		}
+		ReservedEntry = CrewRepairEntry;
+	}
 	M_Abilities = ValidAbilities;
+	// Hidden entries are re-derived from the new grants; revoked abilities are never restored.
+	RebuildAbilitySuppressionsForNewCard();
 }
 
 void UCommandData::SetPlayerResourceManger(UPlayerResourceManager* PlayerResourceManager)
@@ -87,10 +103,12 @@ bool UCommandData::SwapAbility(const EAbilityID OldAbility, const FUnitAbilityEn
 	if (Index != INDEX_NONE)
 	{
 		M_Abilities[Index] = NewAbility;
+		HideNewlyAddedAbilityIfSuppressed(Index);
 		return true;
 	}
 
-	return false;
+	// Hidden entries are swapped in their backing storage and reappear when their suppression ends.
+	return TrySwapSuppressedBackingEntry(OldAbility, INDEX_NONE, NewAbility);
 }
 
 bool UCommandData::SwapAbility(const EAbilityID OldAbility, const int32 OldCustomType,
@@ -104,10 +122,11 @@ bool UCommandData::SwapAbility(const EAbilityID OldAbility, const int32 OldCusto
 
 	if (Index == INDEX_NONE)
 	{
-		return false;
+		return TrySwapSuppressedBackingEntry(OldAbility, OldCustomType, NewAbility);
 	}
 
 	M_Abilities[Index] = NewAbility;
+	HideNewlyAddedAbilityIfSuppressed(Index);
 	return true;
 }
 
@@ -122,14 +141,8 @@ bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 A
 	{
 		return false;
 	}
-	const FUnitAbilityEntry* DuplicateAbilityEntry = M_Abilities.FindByPredicate(
-		[NewAbility](const FUnitAbilityEntry& AbilityEntry)
-		{
-			return AbilityEntry.AbilityId == NewAbility.AbilityId
-					&& AbilityEntry.CustomType == NewAbility.CustomType;
-		});
 
-	if (DuplicateAbilityEntry != nullptr)
+	if (GetHasDuplicateAbilityEntry(NewAbility))
 	{
 		RTSFunctionLibrary::ReportError(
 			TEXT("Attempted to add an ability that already exists: ")
@@ -141,37 +154,23 @@ bool UCommandData::AddAbility(const FUnitAbilityEntry& NewAbility, const int32 A
 
 	if (AtIndex == INDEX_NONE || AtIndex < 0)
 	{
-		for (int32 i = 0; i < M_Abilities.Num(); i++)
-		{
-			if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)
-			{
-				M_Abilities[i] = NewAbility;
-				return true;
-			}
-		}
-		return false;
+		return PlaceAbilityInFreeGenericSlot(NewAbility);
 	}
-	if (AtIndex >= 0 && AtIndex < M_Abilities.Num())
+	if (AtIndex < M_Abilities.Num())
 	{
-		if (M_Abilities[AtIndex].AbilityId != EAbilityID::IdNoAbility)
+		// Hidden slots and the reserved CrewRepair slot count as occupied for generic additions.
+		if (GetIsCardSlotAvailableForGenericAbility(AtIndex))
 		{
-			const FString OwnerName = M_Owner ? M_Owner->GetOwnerName() : "Unknown Owner";
-			RTSFunctionLibrary::ReportError(
-				TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
-				TEXT(" in UCommandData::AddAbility")
-				+ "\n Owner: " + OwnerName);
-			for (int32 i = 0; i < M_Abilities.Num(); i++)
-			{
-				if (M_Abilities[i].AbilityId == EAbilityID::IdNoAbility)
-				{
-					M_Abilities[i] = NewAbility;
-					return true;
-				}
-			}
-			return false;
+			M_Abilities[AtIndex] = NewAbility;
+			HideNewlyAddedAbilityIfSuppressed(AtIndex);
+			return true;
 		}
-		M_Abilities[AtIndex] = NewAbility;
-		return true;
+		const FString OwnerName = M_Owner ? M_Owner->GetOwnerName() : "Unknown Owner";
+		RTSFunctionLibrary::ReportError(
+			TEXT("Attempted to add ability at index that is not empty: ") + FString::FromInt(AtIndex) +
+			TEXT(" in UCommandData::AddAbility")
+			+ "\n Owner: " + OwnerName);
+		return PlaceAbilityInFreeGenericSlot(NewAbility);
 	}
 	RTSFunctionLibrary::ReportError(
 		TEXT("Attempted to add ability at invalid index: ") + FString::FromInt(AtIndex) +
@@ -190,6 +189,12 @@ bool UCommandData::RemoveAbility(const EAbilityID AbilityToRemove)
 	if (Index != INDEX_NONE)
 	{
 		M_Abilities[Index] = FUnitAbilityEntry();
+		return true;
+	}
+
+	// A revoked hidden entry is dropped from its backing storage and never restored.
+	if (TryRemoveSuppressedBackingEntry(AbilityToRemove, INDEX_NONE))
+	{
 		return true;
 	}
 
@@ -215,6 +220,11 @@ bool UCommandData::RemoveAbility(const EAbilityID AbilityToRemove, const int32 C
 	if (Index != INDEX_NONE)
 	{
 		M_Abilities[Index] = FUnitAbilityEntry();
+		return true;
+	}
+
+	if (TryRemoveSuppressedBackingEntry(AbilityToRemove, CustomType))
+	{
 		return true;
 	}
 
@@ -268,7 +278,8 @@ bool UCommandData::HasAbilityOnCooldown() const
 		}
 	}
 
-	return false;
+	// Hidden cooldowns keep running in the existing scheduler.
+	return GetHasSuppressedAbilityOnCooldown();
 }
 
 void UCommandData::StartAbilityCooldownTimer()
@@ -326,6 +337,7 @@ void UCommandData::AbilityCoolDownTick()
 			bHasAnyCooldown = true;
 		}
 	}
+	bHasAnyCooldown |= TickSuppressedAbilityCooldowns();
 
 	if (not bHasAnyCooldown)
 	{
@@ -517,6 +529,10 @@ bool UCommandData::GetIsQueuedCommandStillAllowed(const FQueueCommand& QueuedCom
 	{
 		return false;
 	}
+	if (CommandType == EAbilityID::IdCrewRepair)
+	{
+		return GetIsQueuedCrewRepairStillAllowed(QueuedCommand);
+	}
 
 	if (not IsAbilityRequiredOnCommandCard(CommandType))
 	{
@@ -600,6 +616,7 @@ bool UCommandData::GetIsQueuedCommandAbilityIdStillOnUnit(const EAbilityID Abili
 bool UCommandData::GetDoesQueuedCommandRequireSubtypeEntry(const EAbilityID AbilityId) const
 {
 	return (AbilityId == EAbilityID::IdApplyBehaviour)
+		|| (AbilityId == EAbilityID::IdCrewRepair)
 		|| (AbilityId == EAbilityID::IdActivateMode)
 		|| (AbilityId == EAbilityID::IdDisableMode)
 		|| (AbilityId == EAbilityID::IdFieldConstruction)
@@ -668,6 +685,11 @@ FString UCommandData::GetQueuedCommandSubtypeSuffix(const FQueueCommand& QueuedC
 	if (QueuedCommand.CommandType == EAbilityID::IdResearchTechnology)
 	{
 		return " with technology: " + UEnum::GetValueAsString(QueuedCommand.GetResearchTechnologySubtype());
+	}
+
+	if (QueuedCommand.CommandType == EAbilityID::IdCrewRepair)
+	{
+		return " with crew repair type: " + UEnum::GetValueAsString(QueuedCommand.GetCrewRepairAbilitySubtype());
 	}
 
 	return FString{};
@@ -1075,6 +1097,9 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 		{
 			M_Owner->ExecuteDetachTowCommand();
 		}
+		break;
+	case EAbilityID::IdCrewRepair:
+		M_Owner->ExecuteCrewRepairCommand(Cmd.GetCrewRepairAbilitySubtype());
 		break;
 	case EAbilityID::IdActivateShield:
 		{
@@ -3559,6 +3584,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdDetachTow:
 		TerminateDetachTowCommand();
+		break;
+	case EAbilityID::IdCrewRepair:
+		TerminateCrewRepairCommandForCurrentQueue();
 		break;
 	case EAbilityID::IdActivateShield:
 		TerminateActivateShieldCommand();

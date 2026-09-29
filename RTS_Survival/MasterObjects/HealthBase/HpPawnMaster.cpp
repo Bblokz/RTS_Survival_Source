@@ -2,6 +2,7 @@
 
 
 #include "HpPawnMaster.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleDamageEvent.h"
 
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
@@ -86,6 +87,11 @@ float AHpPawnMaster::TakeDamage(
 			const ERTSDeathType DeathType = FRTSWeaponHelpers::TranslateDamageIntoDeathType(RtsDamageType);
 			UnitDies(DeathType);
 			return 0.0;
+		}
+		// DamageAmount now holds the hull damage actually applied; modules resolve once, only on survival.
+		if (DamageEvent.IsOfType(FVehicleModuleDamageEvent::ClassID))
+		{
+			static_cast<const FVehicleModuleDamageEvent&>(DamageEvent).ApplyModuleDamageAfterHullDamage(DamageAmount);
 		}
 		return 1.0;
 	}

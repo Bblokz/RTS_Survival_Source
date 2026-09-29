@@ -4885,6 +4885,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdDetachTow:
 		this->DirectActionButtonDetachTow();
 		break;
+	case EAbilityID::IdCrewRepair:
+		DirectActionButtonCrewRepair(static_cast<ECrewRepairAbilityType>(ActiveAbilityEntry.CustomType));
+		break;
 	case EAbilityID::IdActivateShield:
 		this->DirectActionButtonActivateShield();
 		break;
@@ -8471,4 +8474,30 @@ bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowOrde
 
 	OutTowSubtype = ETowedActorTarget::TowTeamWeapon;
 	return true;
+}
+
+void ACPPController::DirectActionButtonCrewRepair(const ECrewRepairAbilityType Subtype)
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExecuted = 0;
+	// EnableRepair follows normal queue semantics; DisableRepair is immediate regardless of Shift.
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+
+	for (AActor* EachPawn : TSelectedPawnMasters)
+	{
+		ATankMaster* SelectedTank = Cast<ATankMaster>(EachPawn);
+		if (not RTSFunctionLibrary::RTSIsValid(SelectedTank))
+		{
+			continue;
+		}
+
+		CommandsExecuted += SelectedTank->CrewRepair(Subtype, bResetCommandQueueFirst) == ECommandQueueError::NoError;
+	}
+
+	if (CommandsExecuted > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdCrewRepair),
+			false);
+	}
 }

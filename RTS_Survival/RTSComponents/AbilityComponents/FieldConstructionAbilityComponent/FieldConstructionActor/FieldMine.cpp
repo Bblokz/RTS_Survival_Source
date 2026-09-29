@@ -15,6 +15,8 @@
 // Used for weak pointer capture from GetEnemyController.
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleDamageEvent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -274,12 +276,19 @@ void AFieldMine::ApplyDirectDamage(AActor& TargetActor)
 		return;
 	}
 
-	FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(ERTSDamageType::Kinetic);
-	TargetActor.TakeDamage(
-		M_CachedDamage,
-		DamageEvent,
-		GetInstigatorController(),
-		this);
+	FDamageEvent BasicDamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(ERTSDamageType::Kinetic);
+	UArmorCalculation* TargetArmor = TargetActor.FindComponentByClass<UArmorCalculation>();
+	if (not IsValid(TargetArmor))
+	{
+		TargetActor.TakeDamage(M_CachedDamage, BasicDamageEvent, GetInstigatorController(), this);
+		return;
+	}
+
+	// Direct mine hit: the running gear nearest the mine rolls once, after the accepted hull damage.
+	FVehicleModuleDamageEvent MineDamageEvent = FVehicleModuleDamageEvent::MakeExplosionEvent(
+		TargetArmor, EVehicleModuleDelivery::Mine, GetActorLocation(), M_CachedDamage, GetUniqueID(),
+		BasicDamageEvent.DamageTypeClass);
+	TargetActor.TakeDamage(M_CachedDamage, MineDamageEvent, GetInstigatorController(), this);
 }
 
 void AFieldMine::ApplyAoeDamage(const FVector& Epicenter)
@@ -308,7 +317,9 @@ void AFieldMine::ApplyAoeDamage(const FVector& Epicenter)
 		ERTSDamageType::Kinetic,
 		GetOverlapLogicForMineOwner(),
 		EShieldDamageSource::Mine,
-		ActorsToIgnore);
+		ActorsToIgnore,
+		// The mine splash is opt-in; the directly triggered victim is excluded from the AOE.
+		EVehicleModuleSplashPolicy::DamageExternalModules);
 }
 
 void AFieldMine::ShowMineDamageText(const FVector& TextLocation) const

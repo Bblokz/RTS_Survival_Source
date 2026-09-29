@@ -164,7 +164,8 @@ void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, cons
 			ERTSDamageType::Kinetic,
 			OverlapLogic,
 			EShieldDamageSource::Shrapnel,
-			ActorsToIgnore);
+			ActorsToIgnore,
+			EVehicleModuleSplashPolicy::DamageExternalModules);
 	}
 
 	ResetGrenade();

@@ -103,7 +103,7 @@ Compile-time validation: destruction thresholds lie in `[0,1)`; recovered percen
 | `NonPenWindowSeconds` / `NonPenWindowDamageCap01` | 1.0 / 0.20 of module MaxHP across all attackers |
 | `NonPenWindowBucketCount` | 20 fixed buckets; conservative oldest-bucket expiry |
 | `VehicleRepairTickSeconds` / `BaseWorkerRepairHpPerSecond` | 0.5 / 7.5, matching the current worker baseline |
-| `CrewRepairPriority` | Engine, Tracks, Wheels, Weapon, Turret, Ammo, AddOnArmor; stable module ID breaks ties |
+| `CrewRepairPriority` | Engine, Tracks, Wheels, Weapon, Turret, Ammo, AddOnArmor; fixed module slot breaks ties |
 | `CrewRepairSuppressedAbilities` | `IdAttack`, `IdMove`, `IdReverseMove`, `IdRotateTowards` |
 | `CrewRepairAbilitySlotIndex` | Existing `MaxAbilitiesForActionUI - 1`; final command-card slot |
 | `CrewRepairCooldownSeconds` | 0 for EnableRepair and DisableRepair; no resource cost |
@@ -153,7 +153,7 @@ struct FPlateModuleDamage
 
 | Struct | Fields |
 | --- | --- |
-| `FVehicleModuleSetup` | `ModuleId`, `Type`, `Binding`; HP derived on initialization, behaviour classes from shared data asset |
+| `FVehicleModuleSetup` | `Type`, `Binding`; HP derived on initialization, ID assigned from the fixed module slot, behaviour classes from shared data asset |
 | `FVehicleModule` | `Type`, `CurrentHp`, `MaxHp`, `State`, `Revision`, installed flag |
 | `FModuleBinding` | Stable mesh/plate registration ID, mount/weapon role, weak component references |
 | `FPlateModuleRuleSet` | `Entries[MaxModulesPerPlate]`; unused entries have `TypeToDamage = None` |
@@ -161,7 +161,7 @@ struct FPlateModuleDamage
 | `FModuleChangeBatch` | `MaxModuleInstances` copied state-change payloads plus count; fixed storage for damage and full repair |
 
 ```text
-UArmorCalculation::SetupModule(const FVehicleModuleSetup& Setup) -> bool
+UArmorCalculation::SetupModule(const FVehicleModuleSetup& Setup, int32& OutModuleId) -> bool
 UArmorCalculation::ValidateModuleSetup() const -> bool
 UArmorCalculation::GetModuleSnapshot(FVehicleModuleId Id) const -> FModuleSnapshot
 
@@ -170,10 +170,10 @@ M_Bindings[VehicleModuleBalance::MaxModuleInstances]
 M_PlateRoutes[VehicleModuleBalance::MaxPlateBindings][VehicleModuleBalance::MaxModulesPerPlate]
 
 UArmorCalculation::RebuildPlateModuleBindings()
-    -> precompute route IDs after setup / armor registration / mount change
+    -> precompute route slots after setup / armor registration / mount change
 ```
 
-`SetupModule` is Blueprint-callable. Reject invalid IDs, `None`, duplicate slots, the wrong running-gear type and missing required bindings. Repeating setup never heals an existing module. Finalization requires valid positive tank MaxHealth and profile HP ratios.
+`SetupModule` is Blueprint-callable. The designer supplies no numeric ID; successful setup returns the assigned fixed slot ID through `OutModuleId` for coverage, rebind and query calls. Reject `None`, duplicate side or mount, exhausted slots, the wrong running-gear type and missing required bindings. Repeating setup never heals an existing module. Multiple turrets and add-on zones must be installed in the same order when reconstructing a saved tank so each instance keeps its slot. Finalization requires valid positive tank MaxHealth and profile HP ratios.
 
 Fixed slot budget: two running-gear instances, one engine, one ammo, four turrets, **one Weapon module maximum**, eight add-on zones: **17 module slots**. Derive capacities and type-to-slot ranges constexpr from the constants above. Reject a second Weapon module even if bound to a different gun. This does not increase the existing **three armor meshes × sixteen plates** limit; validate mesh coverage separately.
 
@@ -253,7 +253,7 @@ bool SetAddOnArmorPlateCoverage(
 ```text
 Blueprint setup:
     InitArmorCalculation(HullMesh, ...)
-    SetupModule(SideSkirtSetup)                         // Type = AddOnArmor
+    SetupModule(SideSkirtSetup, SideSkirtId)            // Type = AddOnArmor; ID is an output
     SetAddOnArmorPlateCoverage(SideSkirtId,
         [{HullMesh, Plate_SideLeft}, {HullMesh, Plate_SideLowerLeft}])
 
@@ -331,7 +331,7 @@ MakeRuleSet(
 - AddOnArmor → zone assigned by `SetAddOnArmorPlateCoverage`; an unconfigured slot is skipped. Engine/Ammo → singleton.
 - Absent instance → skip, without reallocating its probability/damage.
 
-Each fixed route contains a primary module ID and, for side-dependent running gear, an alternate ID. Resolve directly from stable plate registration and candidate index; no per-hit module search. Validate registration generations after mesh replacement. Sorting armor boxes cannot change their stable routing IDs.
+Each fixed route contains a primary module slot and, for side-dependent running gear, an alternate slot. Resolve directly from stable plate registration and candidate index; no per-hit module search. Validate registration generations after mesh replacement. Sorting armor boxes cannot change their stable routing slots.
 
 Casemate gun shields may use `Turret_Mantlet` with a Weapon binding and no Turret instance. This version models at most one damaged weapon per tank; behaviour bindings specify which gun is affected. Plate-to-module topology stays shared; constexpr class profiles change probabilities and substitute the selected running gear. Only add-on coverage enables/disables its reserved candidate per vehicle. It never becomes a fourth candidate or replaces another module. Validate every generated profile/gear table at compile time.
 
@@ -622,7 +622,7 @@ Ability display name = **CrewRepair**; C++ ID = `EAbilityID::IdCrewRepair`, foll
 | Ammo | 18 seconds |
 | AddOnArmor | 8 seconds per installed zone |
 
-All times come from the individual constexpr constants in section 2. Repairs are **sequential**, so total time is the sum for red instances: engine + two tracks = **44 seconds**. Use `CrewRepairPriority` for the next module, then stable ID order. Keep the current target until it is repaired, removed or repaired externally; newly red modules join the remaining work without resetting that target.
+All times come from the individual constexpr constants in section 2. Repairs are **sequential**, so total time is the sum for red instances: engine + two tracks = **44 seconds**. Use `CrewRepairPriority` for the next module, then fixed slot order. Keep the current target until it is repaired, removed or repaired externally; newly red modules join the remaining work without resetting that target.
 
 ### Ability registration and final command-card slot
 
@@ -1083,7 +1083,7 @@ Widget operations, always entered through the health component:
 - Use GC-visible owning/weak pointers and member validators; component/UObject errors use the `_Object` reporting variant.
 - Mutate modules on the game thread. Physics reads copied scalar limits. Never retain array-entry references across callbacks or mutate containers during iteration.
 - Death/`EndPlay` cancels timers/healing callbacks and invalidates generations. Same-frame death beats healing; stale callbacks cannot restore the tank.
-- Save profile/gear, module IDs/health fractions, coverage, rule version, finishing work and random generation state; reconstruct derived HP, bindings, behaviours and the inactive CrewRepair card state on load. Deploy/pack and swaps preserve condition. Tactical persistence/replication wiring still needs verification.
+- Save profile/gear, assigned slot IDs/health fractions, coverage, rule version, finishing work and random generation state; reconstruct derived HP, bindings, behaviours and the inactive CrewRepair card state on load. Version 1 saves with designer IDs map to installed slots by their exported module array order; multi-instance setup order must remain the same. Deploy/pack and swaps preserve condition. Tactical persistence/replication wiring still needs verification.
 - Announce transitions only, using the settings-file cooldown. Enemy UI respects visibility; no hidden module HP or repair timers through fog.
 
 ## 13. Implementation and verification

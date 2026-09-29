@@ -418,3 +418,34 @@ void UW_HealthBar::ReportErrorWithOwner(const FString& Message) const
 	}
 	RTSFunctionLibrary::ReportError(Message + "\n With owner: " + OwnerName);
 }
+
+UImage* UW_HealthBar::GetCachedModuleIconImage(const int32 ModuleTypeIndex) const
+{
+	if (ModuleTypeIndex <= 0 || ModuleTypeIndex >= VehicleModuleBalance::ModuleTypeCount)
+	{
+		return nullptr;
+	}
+	return M_ModuleIconImages[ModuleTypeIndex];
+}
+
+void UW_HealthBar::CacheModuleIconImage(const int32 ModuleTypeIndex, UImage* ModuleIconImage)
+{
+	if (ModuleTypeIndex <= 0 || ModuleTypeIndex >= VehicleModuleBalance::ModuleTypeCount)
+	{
+		ReportErrorWithOwner("CacheModuleIconImage: invalid module type index.");
+		return;
+	}
+	M_ModuleIconImages[ModuleTypeIndex] = ModuleIconImage;
+}
+
+void UW_HealthBar::ReleaseModuleIconImages()
+{
+	for (TObjectPtr<UImage>& ModuleIconImage : M_ModuleIconImages)
+	{
+		if (IsValid(ModuleIconImage))
+		{
+			ModuleIconImage->RemoveFromParent();
+		}
+		ModuleIconImage = nullptr;
+	}
+}

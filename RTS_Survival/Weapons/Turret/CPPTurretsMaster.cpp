@@ -1,6 +1,8 @@
 // Copyright (C) 2020-2023 Bas Blokzijl - All rights reserved.
 
 #include "CPPTurretsMaster.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+
 
 #include "ComponentUtils.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
@@ -53,6 +55,12 @@ void ACPPTurretsMaster::SetTargetPreference(const ETargetPreference NewTargetPre
 
 void ACPPTurretsMaster::SetAutoEngageTargets(const bool bUseLastTarget)
 {
+	const ATankMaster* TankOwner = Cast<ATankMaster>(TurretOwner.GetObject());
+	if (IsValid(TankOwner) && TankOwner->GetHasMountedWeaponLock())
+	{
+		return;
+	}
+
 	M_WeaponAIState = EWeaponAIState::AutoEngage;
 	StopAllWeaponsFire(!bUseLastTarget);
 	InitiateAutoEngageTimers();
@@ -61,6 +69,12 @@ void ACPPTurretsMaster::SetAutoEngageTargets(const bool bUseLastTarget)
 
 void ACPPTurretsMaster::SetEngageSpecificTarget(AActor* Target)
 {
+	const ATankMaster* TankOwner = Cast<ATankMaster>(TurretOwner.GetObject());
+	if (IsValid(TankOwner) && TankOwner->GetHasMountedWeaponLock())
+	{
+		return;
+	}
+
 	if (not Target)
 	{
 		return;
@@ -81,6 +95,12 @@ void ACPPTurretsMaster::SetEngageSpecificTarget(AActor* Target)
 
 void ACPPTurretsMaster::SetEngageGroundLocation(const FVector& GroundLocation)
 {
+	const ATankMaster* TankOwner = Cast<ATankMaster>(TurretOwner.GetObject());
+	if (IsValid(TankOwner) && TankOwner->GetHasMountedWeaponLock())
+	{
+		return;
+	}
+
 	if (not EnsureWorldIsValid())
 	{
 		return;
@@ -357,6 +377,57 @@ void ACPPTurretsMaster::InitChildTurret(const float NewRotationSpeed,
 	M_MaxTurretPitch = NewMaxPitch;
 	M_MinTurretPitch = NewMinPitch;
 	IdleAnimationState.M_IdleTurretRotationType = NewIdleTurretRotationType;
+}
+
+float ACPPTurretsMaster::GetTurretRotationSpeed() const
+{
+	float TraverseMultiplier = 1.f;
+	for (int32 Index = 0; Index < M_ModuleTraverseSources.Num(); ++Index)
+	{
+		if (M_ModuleTraverseSources[Index].IsValid() && M_ModuleTraverseMultipliers.IsValidIndex(Index))
+		{
+			TraverseMultiplier = FMath::Min(TraverseMultiplier, M_ModuleTraverseMultipliers[Index]);
+		}
+	}
+	return RotationSpeed * TraverseMultiplier;
+}
+
+UMeshComponent* ACPPTurretsMaster::GetModuleBindingMesh() const
+{
+	return SceneSkeletalMesh;
+}
+
+void ACPPTurretsMaster::SetModuleTraverseMultiplier(UObject* Source, const float Multiplier)
+{
+	if (not IsValid(Source))
+	{
+		return;
+	}
+	const int32 ExistingIndex = M_ModuleTraverseSources.IndexOfByPredicate(
+		[Source](const TWeakObjectPtr<UObject>& ExistingSource)
+		{
+			return ExistingSource.Get() == Source;
+		});
+	if (ExistingIndex != INDEX_NONE)
+	{
+		M_ModuleTraverseMultipliers[ExistingIndex] = FMath::Clamp(Multiplier, 0.f, 1.f);
+		return;
+	}
+	M_ModuleTraverseSources.Add(TWeakObjectPtr<UObject>(Source));
+	M_ModuleTraverseMultipliers.Add(FMath::Clamp(Multiplier, 0.f, 1.f));
+}
+
+void ACPPTurretsMaster::ClearModuleTraverseMultiplier(const UObject* Source)
+{
+	for (int32 Index = M_ModuleTraverseSources.Num() - 1; Index >= 0; --Index)
+	{
+		if (M_ModuleTraverseSources[Index].IsValid() && M_ModuleTraverseSources[Index].Get() != Source)
+		{
+			continue;
+		}
+		M_ModuleTraverseSources.RemoveAt(Index);
+		M_ModuleTraverseMultipliers.RemoveAt(Index);
+	}
 }
 
 void ACPPTurretsMaster::RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister)
@@ -1564,7 +1635,7 @@ void ACPPTurretsMaster::RotateTurret_LocalIdle(const float DeltaTime)
 		bM_IsRotatedToEngage = true;
 	}
 
-	const float Step = FMath::Clamp(RotationSpeed * DeltaTime, 0.f, FMath::Abs(DeltaYaw));
+	const float Step = FMath::Clamp(GetTurretRotationSpeed() * DeltaTime, 0.f, FMath::Abs(DeltaYaw));
 	FRotator NewLocal = CurrentLocal;
 	NewLocal.Yaw = NewLocal.Yaw + Step * FMath::Sign(DeltaYaw);
 	SceneSkeletalMesh->SetRelativeRotation(NewLocal);
@@ -1603,7 +1674,7 @@ void ACPPTurretsMaster::RotateTurret_LocalYaw_Root(const float DeltaTime)
 			return;
 		}
 
-		const float MaxStepThisFrame = RotationSpeed * DeltaTime; // deg/sec
+		const float MaxStepThisFrame = GetTurretRotationSpeed() * DeltaTime; // deg/sec
 		const float NewYaw = FMath::FixedTurn(CurrentYaw, TargetWorldYaw, MaxStepThisFrame);
 
 		FRotator NewWorldRotation = CurrentWorldRotation;
@@ -1637,7 +1708,7 @@ void ACPPTurretsMaster::RotateTurret_LocalYaw_Root(const float DeltaTime)
 		return;
 	}
 
-	const float MaxStepThisFrame = RotationSpeed * DeltaTime; // deg/sec
+		const float MaxStepThisFrame = GetTurretRotationSpeed() * DeltaTime; // deg/sec
 	const float NewYaw = FMath::FixedTurn(CurrentLocalYaw, TargetLocalYaw, MaxStepThisFrame);
 
 	FRotator NewRelativeRotation = CurrentRelativeRotation;

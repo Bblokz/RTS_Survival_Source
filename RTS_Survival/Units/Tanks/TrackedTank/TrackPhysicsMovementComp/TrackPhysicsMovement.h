@@ -167,6 +167,7 @@ public:
 
 	/** @return The last throttle value that was not zero when navigating the previously followed path. */
 	inline float GetLastNoneZeroThrottle() const { return LastNoneZeroThrottle; }
+	void SetModuleAccelerationMultiplier(float Multiplier);
 
 protected:
 	// Called when the game starts
@@ -292,6 +293,7 @@ private:
 
 	TAtomic<float> M_CurrentThrottle{0.0f};
 	TAtomic<float> M_TrackForceMultiplier;
+	TAtomic<float> M_ModuleAccelerationMultiplier{1.f};
 	TAtomic<float> M_CurrentSteeringInDeg{0.0f};
 	TAtomic<ETrackPhysicsMovementState> M_MovementState{ETrackPhysicsMovementState::Inactive};
 

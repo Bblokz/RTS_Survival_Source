@@ -12,6 +12,7 @@
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleDamageEvent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
@@ -34,6 +35,9 @@
 // --- local helpers (file-scope) ------------------------------------------------
 namespace
 {
+	// Game-thread serial giving every projectile launch a unique identity for vehicle module rolls.
+	uint32 GProjectileModuleShotSerial = 0;
+
 	constexpr float MinCurvatureVelocityMultiplier = 0.25f;
 	constexpr float MaxCurvatureVelocityMultiplier = 4.0f;
 	constexpr float RocketSwingStrengthMin = 1.0f;
@@ -1742,18 +1746,27 @@ void AProjectile::BeginDestroy()
 void AProjectile::OnHitActor(
 	AActor* HitActor,
 	const FVector& HitLocation,
-	const FRotator& HitRotation, const ERTSSurfaceType HitSurface, const float DamageMlt)
+	const FRotator& HitRotation, const ERTSSurfaceType HitSurface, const float DamageMlt,
+	const FVehicleModuleDamageEvent* ModuleDamageEvent)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(PrjWp_OnHitActor);
 	if (RTSFunctionLibrary::RTSIsValid(HitActor))
 	{
 		M_DamageEvent.HitInfo.Location = HitLocation;
-		if (HitActor->TakeDamage(M_FullDamage * DamageMlt, M_DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
+		// The module event resolves module damage once, after the pawn applied the actual hull damage.
+		const FDamageEvent& DamageEvent = ModuleDamageEvent != nullptr
+			                                  ? static_cast<const FDamageEvent&>(*ModuleDamageEvent)
+			                                  : static_cast<const FDamageEvent&>(M_DamageEvent);
+		if (HitActor->TakeDamage(M_FullDamage * DamageMlt, DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
 		{
 			M_ProjectileOwner->OnProjectileKilledActor(HitActor);
 		}
 		ApplyRadixiteDamageBehaviour(HitActor);
-		He_Heat_AttemptStunOnPen(HitActor);
+		// On vehicles with modules a non-penetrating HE/HEAT chip damages external modules instead of stunning.
+		if (not GetIsNonPenetratingVehicleModuleHit(ModuleDamageEvent))
+		{
+			He_Heat_AttemptStunOnPen(HitActor);
+		}
 		SpawnExplosionHandleAOE(HitLocation, HitRotation, HitSurface, HitActor);
 		OnProjectileDormant();
 	}
@@ -1850,6 +1863,9 @@ void AProjectile::OnProjectileDormant()
 void AProjectile::OnRestartProjectile(const FVector& NewLocation, const FRotator& LaunchRotation,
                                       const float ProjectileSpeed)
 {
+	// Pooled projectiles get a fresh activation identity so reuse never repeats module rolls.
+	M_ModuleShotActivationId = ++GProjectileModuleShotSerial;
+	M_ModuleImpactOrdinal = 0;
 	StopDescentSound();
 	SetActorHiddenInGame(false);
 	// Move projectile to new location.
@@ -2111,16 +2127,21 @@ float AProjectile::CalculateImpactAngle(const FVector& Velocity, const FVector& 
 }
 
 void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit, AActor* HitActor,
-                                         const FRotator& HitRotation)
+                                         const FRotator& HitRotation, const FVehicleModuleDamageEvent* ModuleDamageEvent)
 {
 	if (not GetIsValidProjectileMovement())
 	{
 		return;
 	}
-	if (OnBounce_HandleHeHeatModuleDamage(HitResult.Location, PlateHit, HitActor, HitRotation))
+	if (OnBounce_HandleHeHeatModuleDamage(HitResult.Location, PlateHit, HitActor, HitRotation, ModuleDamageEvent))
 	{
-		// The HE or HEAT module damage already spawned explosion, damaged actor and set to dormant.
+		// The HE or HEAT bounce already spawned explosion, damaged actor and modules and set to dormant.
 		return;
+	}
+	// Non-penetrating hit without hull damage: external modules roll once.
+	if (ModuleDamageEvent != nullptr)
+	{
+		ModuleDamageEvent->ApplyModuleDamageWithoutHullDamage();
 	}
 	ProjectileHitPropagateNotification(true);
 
@@ -2153,9 +2174,9 @@ void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArm
 
 void AProjectile::HandleHitActorAndClearTimer(AActor* HitActor, const FVector& HitLocation,
                                               const ERTSSurfaceType HitSurface, const FRotator& HitRotation,
-                                              const float DamageMlt)
+                                              const float DamageMlt, const FVehicleModuleDamageEvent* ModuleDamageEvent)
 {
-	OnHitActor(HitActor, HitLocation, HitRotation, HitSurface, DamageMlt);
+	OnHitActor(HitActor, HitLocation, HitRotation, HitSurface, DamageMlt, ModuleDamageEvent);
 	GetWorld()->GetTimerManager().ClearTimer(M_LineTraceTimerHandle);
 }
 
@@ -2243,7 +2264,8 @@ bool AProjectile::GetCanArmorOverPenetrate(const float EffectiveArmor, const flo
 
 void AProjectile::OnOverPenetratingArmorHit(AActor* HitActor, const FHitResult& HitResult,
                                             const ERTSSurfaceType HitSurface,
-                                            const FRotator& HitRotation, const float DamageMlt)
+                                            const FRotator& HitRotation, const float DamageMlt,
+                                            const FVehicleModuleDamageEvent* ModuleDamageEvent)
 {
 	if (not RTSFunctionLibrary::RTSIsValid(HitActor))
 	{
@@ -2251,7 +2273,11 @@ void AProjectile::OnOverPenetratingArmorHit(AActor* HitActor, const FHitResult& 
 	}
 
 	M_DamageEvent.HitInfo.Location = HitResult.Location;
-	if (HitActor->TakeDamage(M_FullDamage * DamageMlt, M_DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
+	// One receipt per victim; the event carries the global overpenetration energy factor.
+	const FDamageEvent& DamageEvent = ModuleDamageEvent != nullptr
+		                                  ? static_cast<const FDamageEvent&>(*ModuleDamageEvent)
+		                                  : static_cast<const FDamageEvent&>(M_DamageEvent);
+	if (HitActor->TakeDamage(M_FullDamage * DamageMlt, DamageEvent, nullptr, this) == 0 && M_ProjectileOwner)
 	{
 		M_ProjectileOwner->OnProjectileKilledActor(HitActor);
 	}
@@ -2269,15 +2295,22 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 	float AdjustedArmorPen = GetArmorPenAtRange();
 	const FVector Velocity = M_ProjectileMovement->Velocity;
 	EArmorPlate PlateHit = EArmorPlate::Plate_Front;
+	int32 PlateRegistrationId = INDEX_NONE;
 	const float EffectiveArmor = ArmorCalculation->GetEffectiveArmorOnHit(
 		HitResult.Component, HitResult.Location, Velocity,
-		HitResult.ImpactNormal, RawArmorValue, AdjustedArmorPen, PlateHit);
+		HitResult.ImpactNormal, RawArmorValue, AdjustedArmorPen, PlateHit, PlateRegistrationId);
 	const bool bShouldBounce = (EffectiveArmor >= AdjustedArmorPen) &&
 	(M_ArmorPen < DeveloperSettings::GameBalance::Weapons::Projectiles::AllowPenRegardlessOfAngleFactor *
 		RawArmorValue);
+	const bool bOverpenetrating = not bShouldBounce && GetCanArmorOverPenetrate(EffectiveArmor, AdjustedArmorPen);
+	// Existing penetration result is reused; module damage resolves exactly once for this impact.
+	const FVehicleModuleDamageEvent ModuleDamageEvent = MakeKineticModuleDamageEvent(
+		ArmorCalculation, HitResult, PlateHit, PlateRegistrationId, EffectiveArmor, not bShouldBounce,
+		bOverpenetrating);
 	if (bShouldBounce)
 	{
-		HandleProjectileBounce(HitResult, PlateHit, HitActor, MakeImpactOutwardRotationZ(HitResult));
+		HandleProjectileBounce(HitResult, PlateHit, HitActor, MakeImpactOutwardRotationZ(HitResult),
+		                       &ModuleDamageEvent);
 		return;
 	}
 	if constexpr (DeveloperSettings::Debugging::GWeapon_ArmorPen_Compile_DebugSymbols)
@@ -2289,10 +2322,10 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 
 	const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
 	constexpr float DamageMlt = 1.f;
-	if (GetCanArmorOverPenetrate(EffectiveArmor, AdjustedArmorPen))
+	if (bOverpenetrating)
 	{
 		OnOverPenetratingArmorHit(HitActor, HitResult, SurfaceTypeHit, MakeImpactOutwardRotationZ(HitResult),
-		                          DamageMlt);
+		                          DamageMlt, &ModuleDamageEvent);
 		OnArmorOverPen_DisplayText(HitResult.Location);
 		if (M_ProjectileMovement)
 		{
@@ -2306,7 +2339,33 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 		HitActor,
 		HitResult.Location,
 		SurfaceTypeHit,
-		MakeImpactOutwardRotationZ(HitResult), DamageMlt);
+		MakeImpactOutwardRotationZ(HitResult), DamageMlt, &ModuleDamageEvent);
+}
+
+FVehicleModuleDamageEvent AProjectile::MakeKineticModuleDamageEvent(
+	UArmorCalculation* ArmorCalculation,
+	const FHitResult& HitResult,
+	const EArmorPlate PlateHit,
+	const int32 PlateRegistrationId,
+	const float EffectiveArmor,
+	const bool bPenetrated,
+	const bool bOverpenetrating)
+{
+	FVehicleModuleBallisticHit BallisticHit;
+	BallisticHit.ArmorCalculation = ArmorCalculation;
+	BallisticHit.HitLocation = HitResult.Location;
+	BallisticHit.PlateHit = PlateHit;
+	BallisticHit.PlateRegistrationId = PlateRegistrationId;
+	BallisticHit.EffectiveArmor = EffectiveArmor;
+	BallisticHit.ProjectileBaseDamage = M_FullDamage;
+	BallisticHit.ProjectileCalibre = M_WeaponCalibre;
+	BallisticHit.bPenetrated = bPenetrated;
+	BallisticHit.bOverpenetrating = bOverpenetrating;
+	BallisticHit.ShellType = M_ShellType;
+	BallisticHit.ShotActivationId = M_ModuleShotActivationId;
+	// Each impact of one launch (e.g. overpenetrating several victims) gets its own roll identity.
+	BallisticHit.ImpactOrdinal = ++M_ModuleImpactOrdinal;
+	return FVehicleModuleDamageEvent::MakeBallisticEvent(BallisticHit, M_DamageEvent.DamageTypeClass);
 }
 
 void AProjectile::ArmorCalc_FireProjectile(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,
@@ -2522,9 +2581,10 @@ void AProjectile::ScaleNiagaraSystemDependingOnType(const EProjectileNiagaraSyst
 }
 
 bool AProjectile::OnBounce_HandleHeHeatModuleDamage(const FVector& Location, const EArmorPlate ArmorPlateHit,
-                                                    AActor* HitActor, const FRotator& HitRotator)
+                                                    AActor* HitActor, const FRotator& HitRotator,
+                                                    const FVehicleModuleDamageEvent* ModuleDamageEvent)
 {
-	if (M_WeaponCalibre <= 35 || not GetIsValidWidgetPoolManager())
+	if (M_WeaponCalibre <= 35)
 	{
 		return false;
 	}
@@ -2533,6 +2593,11 @@ bool AProjectile::OnBounce_HandleHeHeatModuleDamage(const FVector& Location, con
 		// Not HE or HEAT shell.
 		return false;
 	}
+	// Vehicle modules replace the legacy stun as the non-penetrating HE/HEAT effect on tanks that have them.
+	const UArmorCalculation* ModuleArmor = ModuleDamageEvent != nullptr ? ModuleDamageEvent->ArmorCalculation.Get() : nullptr;
+	const bool bTargetHasVehicleModules = IsValid(ModuleArmor) && ModuleArmor->GetAreModulesFinalized();
+	// Feedback text is optional; gameplay never depends on the UI pool.
+	const bool bCanShowText = M_AnimatedTextWidgetPoolManager.IsValid();
 	EArmorPlateDamageType ArmorPlateDamage = EArmorPlateDamageType::DamageFront;
 	// Throw die to see if we can damage this type of plate (front, sides or rear).
 	if (CanHeHeatDamageOnBounce(ArmorPlateHit, ArmorPlateDamage))
@@ -2540,12 +2605,45 @@ bool AProjectile::OnBounce_HandleHeHeatModuleDamage(const FVector& Location, con
 		const float* DamageMltPtr = DeveloperSettings::GameBalance::Weapons::ArmorAndModules::PlateTypeToHeHeatDamageMlt
 			.Find(ArmorPlateDamage);
 		const float DamageMlt = DamageMltPtr ? *DamageMltPtr : 0.1f;
-		//  damage, explosion and dormant.
-		HandleHitActorAndClearTimer(HitActor, Location, ERTSSurfaceType::Metal, HitRotator, DamageMlt);
-		CreateHeHeatBounceDamageText(Location, ArmorPlateDamage);
-		He_Heat_AttemptStunOnBounce(HitActor);
+		//  Hull chip once, explosion and dormant; external modules resolve once after the chip.
+		HandleHitActorAndClearTimer(HitActor, Location, ERTSSurfaceType::Metal, HitRotator, DamageMlt,
+		                            ModuleDamageEvent);
+		if (bCanShowText)
+		{
+			CreateHeHeatBounceDamageText(Location, ArmorPlateDamage);
+		}
+		if (not bTargetHasVehicleModules)
+		{
+			He_Heat_AttemptStunOnBounce(HitActor);
+		}
 		return true;
 	}
+	// Shattered shell: no hull damage, but external modules still roll once for the explosion.
+	if (ModuleDamageEvent != nullptr)
+	{
+		ModuleDamageEvent->ApplyModuleDamageWithoutHullDamage();
+	}
+	if (bCanShowText)
+	{
+		ShowShellShatteredText(Location);
+	}
+	SpawnBounce(Location, HitRotator);
+	OnProjectileDormant();
+	return true;
+}
+
+bool AProjectile::GetIsNonPenetratingVehicleModuleHit(const FVehicleModuleDamageEvent* ModuleDamageEvent)
+{
+	if (ModuleDamageEvent == nullptr || ModuleDamageEvent->bPenetrated)
+	{
+		return false;
+	}
+	const UArmorCalculation* ModuleArmor = ModuleDamageEvent->ArmorCalculation.Get();
+	return IsValid(ModuleArmor) && ModuleArmor->GetAreModulesFinalized();
+}
+
+void AProjectile::ShowShellShatteredText(const FVector& Location) const
+{
 	FRTSVerticalAnimTextSettings TextSettings;
 	TextSettings.DeltaZ = 75.f;
 	TextSettings.VisibleDuration = 1.f;
@@ -2557,9 +2655,6 @@ bool AProjectile::OnBounce_HandleHeHeatModuleDamage(const FVector& Location, con
 		350, ETextJustify::Type::Left,
 		TextSettings
 	);
-	SpawnBounce(Location, HitRotator);
-	OnProjectileDormant();
-	return true;
 }
 
 bool AProjectile::CanHeHeatDamageOnBounce(const EArmorPlate PlateHit,
@@ -2712,7 +2807,9 @@ void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 		ERTSDamageType::Kinetic,
 		OverlapLogic,
 		EShieldDamageSource::Shrapnel,
-		ActorsToIgnore
+		ActorsToIgnore,
+		// Shell splash reaches external vehicle modules; the directly hit actor is ignored above.
+		EVehicleModuleSplashPolicy::DamageExternalModules
 	);
 }
 

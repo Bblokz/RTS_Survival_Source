@@ -8,6 +8,7 @@
 #include "RTS_Survival/Utils/CollisionSetup/TriggerOverlapLogic.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldTypes.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleTypes.h"
 
 class UBehaviour;
 class UBehaviourComp;
@@ -75,6 +76,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	 * @param OverlapLogic Determines whether to target player units, enemies or both.
 	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
 	 * @param ShieldDamageSource Identifies shieldable AOE versus explicitly bypassing mine damage.
+	 * @param ModuleSplashPolicy Opt-in splash damage to external vehicle modules; Ignore keeps hull-only damage.
 	 */
 	static void DealDamageVsRearArmorInRadiusAsync(
 		AActor* DamageCauser,
@@ -88,7 +90,8 @@ struct RTS_SURVIVAL_API FRTS_AOE
 		ERTSDamageType DamageType,
 		ETriggerOverlapLogic OverlapLogic,
 		EShieldDamageSource ShieldDamageSource,
-		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>()
+		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>(),
+		EVehicleModuleSplashPolicy ModuleSplashPolicy = EVehicleModuleSplashPolicy::Ignore
 	);
 
 	/**

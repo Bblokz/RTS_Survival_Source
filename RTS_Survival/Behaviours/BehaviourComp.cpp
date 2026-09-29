@@ -110,7 +110,7 @@ void UBehaviourComp::RemoveBehaviour(TSubclassOf<UBehaviour> BehaviourClass)
 
 	for (UBehaviour* Behaviour : M_Behaviours)
 	{
-		if (Behaviour == nullptr)
+		if (Behaviour == nullptr || IsModuleOwnedBehaviour(Behaviour))
 		{
 			continue;
 		}
@@ -137,7 +137,7 @@ void UBehaviourComp::SwapBehaviour(TSubclassOf<UBehaviour> BehaviourClassToRepla
 
 	for (UBehaviour* Behaviour : M_Behaviours)
 	{
-		if (Behaviour == nullptr)
+		if (Behaviour == nullptr || IsModuleOwnedBehaviour(Behaviour))
 		{
 			continue;
 		}
@@ -158,7 +158,8 @@ void UBehaviourComp::RefreshAllBehaviours()
 	TArray<TSubclassOf<UBehaviour>> BehaviourClassesToReAdd;
 	for (UBehaviour* Behaviour : M_Behaviours)
 	{
-		if (Behaviour == nullptr)
+		// Module behaviours are rebuilt through their slots so they keep their source identity and context.
+		if (Behaviour == nullptr || IsModuleOwnedBehaviour(Behaviour))
 		{
 			continue;
 		}
@@ -175,37 +176,57 @@ void UBehaviourComp::RefreshAllBehaviours()
 	if (bM_IsTickingBehaviours)
 	{
 		M_PendingRefreshBehaviourClasses = MoveTemp(BehaviourClassesToReAdd);
+		bM_HasPendingModuleSlotRefresh = true;
 		return;
 	}
 
-	ClearAllBehaviours();
+	RemoveAllNonModuleBehaviours();
 
 	for (const TSubclassOf<UBehaviour>& BehaviourClass : BehaviourClassesToReAdd)
 	{
 		AddBehaviour(BehaviourClass);
 	}
+	RecreateModuleBehaviourSlots();
 }
 
 void UBehaviourComp::ProcessPendingRefreshAllBehaviours()
 {
-	if (M_PendingRefreshBehaviourClasses.IsEmpty())
+	if (M_PendingRefreshBehaviourClasses.IsEmpty() && not bM_HasPendingModuleSlotRefresh)
 	{
 		return;
 	}
 
 	const TArray<TSubclassOf<UBehaviour>> PendingRefreshBehaviourClasses = M_PendingRefreshBehaviourClasses;
 	M_PendingRefreshBehaviourClasses.Empty();
+	bM_HasPendingModuleSlotRefresh = false;
 
-	ClearAllBehaviours();
+	RemoveAllNonModuleBehaviours();
 
 	for (const TSubclassOf<UBehaviour>& BehaviourClass : PendingRefreshBehaviourClasses)
 	{
 		AddBehaviour(BehaviourClass);
 	}
+	RecreateModuleBehaviourSlots();
+}
+
+void UBehaviourComp::RemoveAllNonModuleBehaviours()
+{
+	// Snapshot: removal callbacks may add or remove behaviours.
+	const TArray<TObjectPtr<UBehaviour>> BehavioursToRemove = M_Behaviours;
+	for (UBehaviour* Behaviour : BehavioursToRemove)
+	{
+		if (IsModuleOwnedBehaviour(Behaviour))
+		{
+			continue;
+		}
+		RemoveBehaviourInstance(Behaviour);
+	}
 }
 
 void UBehaviourComp::ProcessPendingOperations()
 {
+	// Latest desired module states first, so later generic operations see the final module instances.
+	ApplyPendingModuleBehaviourSlots();
 	ProcessPendingRefreshAllBehaviours();
 	ProcessPendingRemovals();
 	ProcessPendingSwaps();
@@ -432,7 +453,7 @@ TArray<TObjectPtr<UBehaviour>> UBehaviourComp::FindMatchingBehaviours(const UBeh
 	TArray<TObjectPtr<UBehaviour>> MatchingBehaviours;
 	for (UBehaviour* Behaviour : M_Behaviours)
 	{
-		if (Behaviour == nullptr)
+		if (Behaviour == nullptr || IsModuleOwnedBehaviour(Behaviour))
 		{
 			continue;
 		}
@@ -459,6 +480,8 @@ void UBehaviourComp::RemoveBehaviourInstance(UBehaviour* BehaviourInstance)
 		return;
 	}
 
+	// Keeps module slots synchronized when a module instance is removed by any path (e.g. timed expiry).
+	ClearModuleSlotForRemovedInstance(BehaviourInstance);
 	HandleBehaviourRemovedFeedback(*BehaviourInstance);
 	BehaviourInstance->OnRemoved(GetOwner());
 	BehaviourInstance->ConditionalBeginDestroy();
@@ -488,6 +511,7 @@ void UBehaviourComp::ClearAllBehaviours()
 	TArray<TObjectPtr<UBehaviour>> BehavioursToRemove;
 	Swap(BehavioursToRemove, M_Behaviours);
 	M_BehaviourAnimatedFeedbackStates.Reset();
+	ResetModuleBehaviourSlots();
 	for (UBehaviour* Behaviour : BehavioursToRemove)
 	{
 		if (not IsValid(Behaviour))
@@ -575,7 +599,7 @@ UBehaviour* UBehaviourComp::GetBehaviourByClass(const TSubclassOf<UBehaviour>& B
 
 	for (UBehaviour* Behaviour : M_Behaviours)
 	{
-		if (Behaviour == nullptr)
+		if (Behaviour == nullptr || IsModuleOwnedBehaviour(Behaviour))
 		{
 			continue;
 		}
@@ -600,7 +624,7 @@ TArray<UBehaviour*> UBehaviourComp::GetBehavioursByClass(const TSubclassOf<UBeha
 
 	for (UBehaviour* Behaviour : M_Behaviours)
 	{
-		if (Behaviour == nullptr)
+		if (Behaviour == nullptr || IsModuleOwnedBehaviour(Behaviour))
 		{
 			continue;
 		}

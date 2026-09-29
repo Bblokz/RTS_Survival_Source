@@ -1518,6 +1518,7 @@ private:
 	void DirectActionButtonExitCargo();
 	void DirectActionButtonDetachTow();
 	void DirectActionButtonActivateShield();
+	void DirectActionButtonCrewRepair(ECrewRepairAbilityType Subtype);
 
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();

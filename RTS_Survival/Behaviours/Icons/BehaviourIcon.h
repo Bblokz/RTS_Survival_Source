@@ -70,4 +70,18 @@ enum class EBehaviourIcon : uint8
 	TechAutoCannonDamage,
 	TechFlameRange,
 	TechFlameDamage,
+	DamagedAddOnArmor,
+	DamagedTracks,
+	DamagedEngine,
+	DamagedAmmo,
+	DamagedTurret,
+	DamagedWeapon,
+	DamagedWheels,
+	DestroyedAddOnArmor,
+	DestroyedTracks,
+	DestroyedEngine,
+	DestroyedAmmo,
+	DestroyedTurret,
+	DestroyedWeapon,
+	DestroyedWheels
 };

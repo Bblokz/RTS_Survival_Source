@@ -423,7 +423,8 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 	const FVector VelocityCorrectionAcceleration =
 		VelocityError * M_RuntimeTrackPhysicsMovementTuningSnapshot.VelocityCorrectionGain;
 	const FVector ClampedVelocityCorrectionAcceleration = VelocityCorrectionAcceleration.GetClampedToMaxSize(
-		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxCorrectionAcceleration);
+		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxCorrectionAcceleration
+		* M_ModuleAccelerationMultiplier.Load());
 
 	const FVector RightDirection = RigidBody->R().GetRightVector();
 	const FVector PlanarRightDirection = FVector::VectorPlaneProject(RightDirection, GroundNormal).GetSafeNormal();
@@ -433,6 +434,11 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 	const FVector TotalAcceleration = ClampedVelocityCorrectionAcceleration + LateralDampingAcceleration;
 	const FVector DriveForce = TotalAcceleration * TankMass;
 	UAsyncTickFunctions::ATP_AddForce(M_TankMesh, DriveForce, false, NAME_None);
+}
+
+void UTrackPhysicsMovement::SetModuleAccelerationMultiplier(const float Multiplier)
+{
+	M_ModuleAccelerationMultiplier.Store(FMath::Clamp(Multiplier, 0.f, 1.f));
 }
 
 void UTrackPhysicsMovement::ApplyYawTorqueStrategyB(const Chaos::FRigidBodyHandle_Internal* RigidBody) const

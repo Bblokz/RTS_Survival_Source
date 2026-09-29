@@ -506,6 +506,8 @@ void ATankMaster::BeginPlay()
 	}
 	// Wait for bp begin play to set the subtype.
 	BeginPlay_SetupData();
+	// After MaxHealth and the ability array are initialized; Blueprint BeginPlay installed the modules.
+	BeginPlay_InitVehicleModules();
 
 	BeginPlay_SetupCollisionVsBuildings();
 	BeginPlay_SetFactionFlagPrimitiveDataIndex();
@@ -539,6 +541,16 @@ void ATankMaster::BeginDestroy()
 	Super::BeginDestroy();
 }
 
+void ATankMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// Clears the crew timer, card entry, suppression and locks without enabling weapons or advancing commands.
+	FinishCrewRepair(ECrewRepairStopReason::OwnerDestroyed);
+	CleanupVehicleModuleBindings();
+	M_MountedWeaponLockSources.Reset();
+	M_MobilityRestrictions.Reset();
+	Super::EndPlay(EndPlayReason);
+}
+
 void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 {
 	if (not IsUnitAlive())
@@ -547,6 +559,7 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 	}
 
 	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
+	FinishCrewRepair(ECrewRepairStopReason::OwnerDestroyed);
 	CleanupTowRelationshipsOnDeath();
 	OnUnitDies_CheckForCargo(DeathType);
 	// Before announcer line; announcer is set to not interrupt.
@@ -644,6 +657,11 @@ void ATankMaster::PostInitializeComponents_SetupVehicleFireFeedbackOptimizationL
 
 void ATankMaster::SetTurretsToAutoEngage(const bool bUseLastTarget)
 {
+	// Crew repair, stuns and module behaviours hold the lock; weapons restart when the last one releases it.
+	if (GetHasMountedWeaponLock())
+	{
+		return;
+	}
 	for (const auto EachTurret : Turrets)
 	{
 		if (CheckTurretIsValid(EachTurret))
@@ -680,6 +698,17 @@ void ATankMaster::SetTurretsDisabled()
 		{
 			EachHullWeapon->DisableHullWeapon();
 		}
+	}
+}
+
+void ATankMaster::SetupHullWeapon(UHullWeaponComponent* NewHullWeapon)
+{
+	HullWeapons.Add(NewHullWeapon);
+	RefreshMountedModuleBehaviours();
+	// Newly added hull weapons inherit an active weapon lock.
+	if (IsValid(NewHullWeapon) && GetHasMountedWeaponLock())
+	{
+		NewHullWeapon->DisableHullWeapon();
 	}
 }
 

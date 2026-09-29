@@ -20,6 +20,7 @@
 #include "Projectile.generated.h"
 
 enum class EProjectileNiagaraSystem : uint8;
+struct FVehicleModuleDamageEvent;
 
 struct FProjectilePoolSettings
 {
@@ -276,7 +277,7 @@ protected:
 	void OnHitActor(
 		AActor* HitActor,
 		const FVector& HitLocation, const FRotator& HitRotation, const ERTSSurfaceType HitSurface,
-		const float DamageMlt);
+		const float DamageMlt, const FVehicleModuleDamageEvent* ModuleDamageEvent = nullptr);
 
 	virtual void DamageActorWithShrapnel(AActor* HitActor);
 	void ApplyRadixiteDamageBehaviour(AActor* HitActor);
@@ -660,10 +661,11 @@ private:
 	 * @param HitResult The result of the collision trace containing details about the impact, including location and normal.
 	 * @param HitActor
 	 * @param HitRotation
+	 * @param ModuleDamageEvent Vehicle module event of this non-penetrating impact; resolved once, may be null.
 	 * @return Returns true if the projectile successfully bounces and continues its lifecycle; otherwise, returns false.
 	 */
 	void HandleProjectileBounce(const FHitResult& HitResult, const EArmorPlate PlateHit, AActor* HitActor,
-	                            const FRotator& HitRotation);
+	                            const FRotator& HitRotation, const FVehicleModuleDamageEvent* ModuleDamageEvent = nullptr);
 
 	/**
 	 * @brief Processes the event when the projectile successfully hits an actor and ensures cleanup of associated timers.
@@ -679,7 +681,8 @@ private:
 	 * @param DamageMlt
 	 */
 	void HandleHitActorAndClearTimer(AActor* HitActor, const FVector& HitLocation, const ERTSSurfaceType HitSurface,
-	                                 const FRotator& HitRotation, const float DamageMlt);
+	                                 const FRotator& HitRotation, const float DamageMlt,
+	                                 const FVehicleModuleDamageEvent* ModuleDamageEvent = nullptr);
 
 	/**
 	 * @brief Initiates and displays an explosion effect at the specified location upon projectile impact.
@@ -722,8 +725,24 @@ private:
 	FORCEINLINE void ArmorCalc_FireProjectile(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,
 	                                          AActor* HitActor);
 	bool GetCanArmorOverPenetrate(const float EffectiveArmor, const float AdjustedArmorPen) const;
+
+	/**
+	 * @brief Builds the module damage event of a kinetic armor hit so module damage resolves exactly once per impact.
+	 * @param ArmorCalculation Armor component that resolved the hit.
+	 * @param HitResult Impact on the registered armor mesh.
+	 * @param PlateHit Resolved plate.
+	 * @param PlateRegistrationId Stable plate registration used for module routing.
+	 * @param EffectiveArmor Effective armor of the impact.
+	 * @param bPenetrated Existing penetration result.
+	 * @param bOverpenetrating Whether the round continues through the victim.
+	 * @return Event passed to TakeDamage, or applied directly when the round bounces.
+	 */
+	FVehicleModuleDamageEvent MakeKineticModuleDamageEvent(UArmorCalculation* ArmorCalculation, const FHitResult& HitResult,
+	                                                       EArmorPlate PlateHit, int32 PlateRegistrationId,
+	                                                       float EffectiveArmor, bool bPenetrated, bool bOverpenetrating);
 	void OnOverPenetratingArmorHit(AActor* HitActor, const FHitResult& HitResult, const ERTSSurfaceType HitSurface,
-	                               const FRotator& HitRotation, const float DamageMlt);
+	                               const FRotator& HitRotation, const float DamageMlt,
+	                               const FVehicleModuleDamageEvent* ModuleDamageEvent);
 
 	/** @brief Only notifies if the owning player is 1. */
 	void ProjectileHitPropagateNotification(const bool bBounced);
@@ -798,6 +817,10 @@ private:
 	// Homing missiles use a visible rocket body, so sweep a small radius instead of a ray to avoid tunneling past armor.
 	float M_ProjectileTraceRadius = 0.0f;
 
+	// Identity of the current launch and its armor impacts; drives the deterministic vehicle module rolls.
+	uint32 M_ModuleShotActivationId = 0;
+	uint32 M_ModuleImpactOrdinal = 0;
+
 	// Used to ignore stale async callbacks after dormancy or relaunch state changes.
 	int32 M_TraceRequestId = 0;
 
@@ -823,12 +846,16 @@ private:
 	 * @param ArmorPlateHit The armor plate hit used to calculate the armor damage type.
 	 * @param HitActor The actor hit.
 	 * @param HitRotator The impact rotation for the he heat bounce or damage explosion.
+	 * @param ModuleDamageEvent Vehicle module event of this impact; resolved once for chip or shatter, may be null.
 	 * @return True if the explosion and dormancy are handled by this function, false otherwise.
 	 */
 	bool OnBounce_HandleHeHeatModuleDamage(const FVector& Location, EArmorPlate ArmorPlateHit, AActor* HitActor,
-	                                       const FRotator& HitRotator);
+	                                       const FRotator& HitRotator, const FVehicleModuleDamageEvent* ModuleDamageEvent);
 	bool CanHeHeatDamageOnBounce(EArmorPlate PlateHit, EArmorPlateDamageType& OutArmorPlateDamageType) const;
 	void CreateHeHeatBounceDamageText(const FVector& Location, const EArmorPlateDamageType DamageType) const;
+	void ShowShellShatteredText(const FVector& Location) const;
+	/** @return True for a non-penetrating hit on a vehicle whose modules replace the legacy stun. */
+	static bool GetIsNonPenetratingVehicleModuleHit(const FVehicleModuleDamageEvent* ModuleDamageEvent);
 	void OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated);
 	void OnArmorOverPen_DisplayText(const FVector& Location);
 	void OnArmorPen_HeDisplayText(const FVector& Location);

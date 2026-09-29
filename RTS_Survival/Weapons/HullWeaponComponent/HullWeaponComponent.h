@@ -76,6 +76,8 @@ public:
 	void DisableHullWeapon();
 
 	virtual TArray<UWeaponState*> GetWeapons() override final { return M_TWeapons; }
+	int32 GetWeaponCount() const { return M_TWeapons.Num(); }
+	UMeshComponent* GetModuleBindingMesh() const { return M_HullWeaponMesh.Get(); }
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void InitHullWeaponComponent(UMeshComponent* HullWeaponMesh, FHullWeaponSettings Settings);

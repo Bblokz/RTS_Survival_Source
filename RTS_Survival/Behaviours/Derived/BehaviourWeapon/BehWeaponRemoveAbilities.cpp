@@ -52,69 +52,33 @@ void UBehWeaponRemoveAbilities::CacheRemovedAbilities(ICommands* CommandsInterfa
 		return;
 	}
 
-	M_RemovedAbilityEntries.Reset();
-
-	const TArray<FUnitAbilityEntry> AbilityEntries = CommandsInterface->GetUnitAbilityEntries();
-	TSet<EAbilityID> RemovedAbilityIds;
-
-	for (const EAbilityID AbilityToRemove : M_AbilitiesToRemove)
+	UCommandData* CommandData = CommandsInterface->GetIsValidCommandData();
+	if (not IsValid(CommandData))
 	{
-		if (AbilityToRemove == EAbilityID::IdNoAbility)
-		{
-			continue;
-		}
-
-		if (RemovedAbilityIds.Contains(AbilityToRemove))
-		{
-			continue;
-		}
-
-		const int32 AbilityIndex = AbilityEntries.IndexOfByPredicate([AbilityToRemove](
-			const FUnitAbilityEntry& AbilityEntry)
-		{
-			return AbilityEntry.AbilityId == AbilityToRemove;
-		});
-
-		if (AbilityIndex == INDEX_NONE)
-		{
-			continue;
-		}
-
-		const FUnitAbilityEntry AbilityEntry = AbilityEntries[AbilityIndex];
-		if (AbilityEntry.AbilityId == EAbilityID::IdNoAbility)
-		{
-			continue;
-		}
-
-		if (not CommandsInterface->RemoveAbility(AbilityEntry.AbilityId))
-		{
-			continue;
-		}
-
-		FBehWeaponRemovedAbility RemovedAbility;
-		RemovedAbility.AbilityEntry = AbilityEntry;
-		RemovedAbility.AbilityIndex = AbilityIndex;
-		M_RemovedAbilityEntries.Add(RemovedAbility);
-		RemovedAbilityIds.Add(AbilityToRemove);
+		return;
 	}
+
+	// Shares suppression ownership with crew repair and stuns so overlapping removals restore correctly.
+	CommandData->EndAbilitySuppression(M_AbilitySuppressionHandle);
+	M_AbilitySuppressionHandle = CommandData->BeginAbilitySuppression(this, M_AbilitiesToRemove);
+	CommandData->UpdateActionUI();
 }
 
 void UBehWeaponRemoveAbilities::RestoreRemovedAbilities(ICommands* CommandsInterface)
 {
 	if (CommandsInterface == nullptr)
 	{
+		M_AbilitySuppressionHandle.Reset();
 		return;
 	}
 
-	for (const FBehWeaponRemovedAbility& RemovedAbility : M_RemovedAbilityEntries)
+	UCommandData* CommandData = CommandsInterface->GetIsValidCommandData();
+	if (not IsValid(CommandData))
 	{
-		if (RemovedAbility.AbilityEntry.AbilityId == EAbilityID::IdNoAbility)
-		{
-			continue;
-		}
-
-		CommandsInterface->AddAbility(RemovedAbility.AbilityEntry, RemovedAbility.AbilityIndex);
+		M_AbilitySuppressionHandle.Reset();
+		return;
 	}
 
-	M_RemovedAbilityEntries.Reset();
+	CommandData->EndAbilitySuppression(M_AbilitySuppressionHandle);
+	CommandData->UpdateActionUI();
 }

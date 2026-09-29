@@ -6,6 +6,8 @@
 #include "Components/ActorComponent.h"
 #include "Behaviour.h"
 #include "Misc/TVariant.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBalance.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBehaviour.h"
 #include "BehaviourComp.generated.h"
 
 class UBehaviour;
@@ -37,6 +39,22 @@ struct FPendingBehaviourAdd
 	TSubclassOf<UBehaviour> BehaviourClass = nullptr;
 	bool bHasCustomLifetime = false;
 	float CustomLifetimeSeconds = 0.f;
+};
+
+/** @brief The exact behaviour instance owned by one vehicle module slot plus its latest desired state. */
+USTRUCT()
+struct FBehaviourCompModuleSlot
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<UVehicleModuleBehaviour> Instance = nullptr;
+
+	UPROPERTY()
+	TSubclassOf<UVehicleModuleBehaviour> DesiredClass = nullptr;
+
+	UPROPERTY()
+	FVehicleModuleBehaviourContext DesiredContext;
 };
 
 /**
@@ -121,6 +139,28 @@ public:
 
 	void RegisterActionUIManager(UActionUIManager* ActionUIManager);
 
+	/**
+	 * @brief Keeps at most one exact behaviour instance per vehicle module, bypassing class/stack matching so
+	 * unrelated instances of the same class stay intact. Applied now, or at the next safe processing boundary.
+	 * @param SlotIndex Fixed module slot of the owning tank.
+	 * @param DesiredClass Behaviour of the module's current state; null removes the slot's instance silently.
+	 * @param Context Module identity and state supplied to the behaviour before OnAdded.
+	 */
+	void SetModuleBehaviour(int32 SlotIndex, TSubclassOf<UVehicleModuleBehaviour> DesiredClass,
+	                        const FVehicleModuleBehaviourContext& Context);
+
+	/** @brief Removes only this module's instance, if any. */
+	void RemoveModuleBehaviour(int32 SlotIndex);
+
+	/**
+	 * @brief Applies queued module slot changes unless behaviours are iterating; then they drain after the tick.
+	 * @return True when every queued module change has been applied.
+	 */
+	bool CommitModuleBehaviourChanges();
+
+	/** @brief Broadcast after queued module behaviour changes were applied at a safe boundary. */
+	FSimpleMulticastDelegate& GetOnModuleBehavioursApplied() { return M_OnModuleBehavioursApplied; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -136,6 +176,34 @@ private:
 	 * @brief Apply a deferred refresh-all request made while behaviour ticking was active.
 	 */
 	void ProcessPendingRefreshAllBehaviours();
+	void RemoveAllNonModuleBehaviours();
+
+	// ---- Vehicle module slots ----
+	bool IsModuleOwnedBehaviour(const UBehaviour* Behaviour) const;
+	bool GetIsValidModuleSlotIndex(int32 SlotIndex) const;
+	bool GetCanApplyModuleBehaviourChangesNow() const;
+	void ApplyPendingModuleBehaviourSlots();
+	void ApplyModuleBehaviourSlotsInMask(uint32 SlotMask);
+	void ApplyModuleBehaviourSlot(int32 SlotIndex);
+	void AddModuleBehaviourInstance(int32 SlotIndex);
+	void ClearModuleSlotForRemovedInstance(const UBehaviour* RemovedBehaviour);
+	// Refresh path: recreate every module instance from its desired class and context.
+	void RecreateModuleBehaviourSlots();
+	void ResetModuleBehaviourSlots();
+
+	// One reflected slot per vehicle module instance; owns the module behaviour for garbage collection.
+	UPROPERTY()
+	FBehaviourCompModuleSlot M_ModuleBehaviourSlots[VehicleModuleBalance::MaxModuleInstances];
+
+	// Slots whose desired state changed while behaviours were iterating; latest desired state wins.
+	uint32 M_PendingModuleSlotMask = 0;
+
+	bool bM_IsApplyingModuleBehaviours = false;
+
+	// Refresh requested while ticking; module slots are recreated with the deferred refresh.
+	bool bM_HasPendingModuleSlotRefresh = false;
+
+	FSimpleMulticastDelegate M_OnModuleBehavioursApplied;
 	/**
 	 * @brief Execute all pending behaviour operations after a tick loop.
 	 */

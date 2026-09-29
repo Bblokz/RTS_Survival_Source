@@ -4,26 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Behaviours/Behaviour.h"
+#include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/Abilities.h"
-#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 
 #include "BehVehicleStunned.generated.h"
 
 class ICommands;
 class ATankMaster;
 class ACPPTurretsMaster;
-
-USTRUCT()
-struct FBehVehicleStunnedRemovedAbility
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	FUnitAbilityEntry AbilityEntry;
-
-	UPROPERTY()
-	int32 AbilityIndex = INDEX_NONE;
-};
 
 /**
  * @brief Temporarily disables core vehicle combat/mobility to model a stun state.
@@ -47,12 +35,13 @@ private:
 	void SetOwnerToIdleAndStopMovement() const;
 	void ApplyTurretRotationPenalty();
 	void RestoreTurretRotation();
-	void DisableMountedWeapons() const;
-	void EnableMountedWeapons() const;
+	void DisableMountedWeapons();
+	void EnableMountedWeapons();
 	void CacheAndRemoveAbilities();
 	void RestoreRemovedAbilities();
 	void ResetCachedState();
 	ICommands* GetCommandsInterface() const;
+	UCommandData* GetCommandData() const;
 	bool GetIsValidTankMaster() const;
 	bool GetIsValidCommandsOwnerActor() const;
 
@@ -72,7 +61,7 @@ private:
 	UPROPERTY()
 	TMap<TWeakObjectPtr<ACPPTurretsMaster>, float> M_CachedTurretRotationSpeeds;
 
-	// Stores removed command entries with original indices so command-card ordering is restored on stun end.
+	// Command-card suppression owned by this stun; hidden entries keep their indices and cooldowns.
 	UPROPERTY()
-	TArray<FBehVehicleStunnedRemovedAbility> M_RemovedAbilityEntries;
+	FAbilitySuppressionHandle M_AbilitySuppressionHandle;
 };

@@ -49,7 +49,7 @@ void URTSFireSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void URTSFireSubsystem::Deinitialize()
 {
-	if (not IsValid(M_FireManager))
+	if (not GetIsValidFireManager())
 	{
 		Super::Deinitialize();
 		return;
@@ -63,28 +63,48 @@ void URTSFireSubsystem::Deinitialize()
 int32 URTSFireSubsystem::SpawnFireAtLocation(const ERTSFireType FireType,
                                              const float LifeTimeSeconds,
                                              const FVector& Location,
-                                             const FVector& Scale)
+                                             const FVector& Scale,
+                                             const FRTSFireEffectParams& EffectParams)
 {
 	if (not GetIsValidFireManager())
 	{
 		return INDEX_NONE;
 	}
 
-	return M_FireManager->ActivateFireAtLocation(FireType, LifeTimeSeconds, Location, Scale);
+	return M_FireManager->ActivateFireAtLocation(FireType, LifeTimeSeconds, Location, Scale, EffectParams);
 }
 
 int32 URTSFireSubsystem::SpawnFireAttached(AActor* AttachActor,
                                            const ERTSFireType FireType,
                                            const float LifeTimeSeconds,
                                            const FVector& AttachOffset,
-                                           const FVector& Scale)
+                                           const FVector& Scale,
+                                           const FRTSFireEffectParams& EffectParams)
 {
 	if (not GetIsValidFireManager())
 	{
 		return INDEX_NONE;
 	}
 
-	return M_FireManager->ActivateFireAttached(AttachActor, FireType, LifeTimeSeconds, AttachOffset, Scale);
+	return M_FireManager->ActivateFireAttached(AttachActor, FireType, LifeTimeSeconds, AttachOffset, Scale, EffectParams);
+}
+
+int32 URTSFireSubsystem::SpawnFireAttachedToComponent(AActor* AttachActor,
+	USceneComponent* AttachComponent,
+	const FName SocketName,
+	const FVector& RelativeOffset,
+	const ERTSFireType FireType,
+	const float LifeTimeSeconds,
+	const FVector& Scale,
+	const FRTSFireEffectParams& EffectParams)
+{
+	if (not GetIsValidFireManager())
+	{
+		return INDEX_NONE;
+	}
+
+	return M_FireManager->ActivateFireAttachedToComponent(
+		AttachActor, AttachComponent, SocketName, RelativeOffset, FireType, LifeTimeSeconds, Scale, EffectParams);
 }
 
 bool URTSFireSubsystem::StopFireByHandle(const int32 FireHandle)

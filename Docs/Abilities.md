@@ -62,6 +62,7 @@ Subtype-driven abilities store subtype in `FQueueCommand::CustomType` and cast v
 - `GetAimAbilitySubtype()`
 - `GetAttachedWeaponAbilitySubtype()`
 - `GetTurretSwapAbilitySubtype()`
+- `GetCrewRepairAbilitySubtype()`
 
 Subtype-sensitive queue validation is centralized in `UCommandData`:
 - `GetDoesQueuedCommandRequireSubtypeEntry(...)`
@@ -69,6 +70,24 @@ Subtype-sensitive queue validation is centralized in `UCommandData`:
 - `GetIsQueuedCommandStillAllowed(...)`
 
 So queued subtype abilities are revalidated against the *exact* `(AbilityId, CustomType)` entry, including cooldown.
+
+### CrewRepair (`IdCrewRepair`, `ECrewRepairAbilityType`)
+
+- Action-button only (`ACPPController::DirectActionButtonCrewRepair` → `ICommands::CrewRepair`); no right-click decoder path.
+- Lives in the **reserved final card slot** (`VehicleModuleBalance::CrewRepairAbilitySlotIndex`); only the tank writes it
+  through `UCommandData::SetCrewRepairAbilityEntry`. Generic `AddAbility` never uses that slot.
+- `EnableRepair` follows normal replacement/Shift queue semantics and is revalidated on dispatch (skipped quietly when
+  no red modules remain). `DisableRepair` is an **immediate** control action: it calls
+  `ExecuteCrewRepairCommand(DisableRepair)` directly and is never queued behind the running repair.
+- The running command completes itself exactly once through `TryDoneExecutingCommand`; `TerminateCrewRepairCommand`
+  only cleans up because the queue owns progression there.
+
+### Temporary ability removal: `BeginAbilitySuppression` / `EndAbilitySuppression`
+
+Hide abilities with `UCommandData::BeginAbilitySuppression(Source, AbilityIds)` instead of removing and re-adding them.
+Hidden entries keep their index, `CustomType`, costs and running cooldowns in per-slot backing storage; an entry
+reappears only when every suppression source that hides it has ended. Revoking (`RemoveAbility`) a hidden entry drops it
+for good. Used by CrewRepair, `UBehVehicleStunned` and `UBehWeaponRemoveAbilities`.
 
 ---
 

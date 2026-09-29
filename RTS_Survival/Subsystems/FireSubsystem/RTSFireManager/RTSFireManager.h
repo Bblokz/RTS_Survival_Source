@@ -4,6 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/ERTSFireType.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/FRTSFireEffectParams.h"
 #include "RTSFireManager.generated.h"
 
 class UNiagaraComponent;
@@ -74,12 +75,15 @@ public:
 	 * @param LifeTimeSeconds Seconds to keep active; <= 0 keeps it active until manually reclaimed.
 	 * @param Location World location to place the fire.
 	 * @param Scale World scale to apply to the fire.
+	 * @param EffectParams Niagara scale and color multipliers for this activation.
+	 * @return Handle for the active fire, or INDEX_NONE if activation fails.
 	 */
 	UFUNCTION(BlueprintCallable, Category="RTS|Fire")
 	int32 ActivateFireAtLocation(ERTSFireType FireType,
 	                            float LifeTimeSeconds,
 	                            const FVector& Location,
-	                            const FVector& Scale);
+	                            const FVector& Scale,
+	                            const FRTSFireEffectParams& EffectParams);
 
 	/**
 	 * @brief Activate pooled fire attached to an actor for a limited duration.
@@ -88,13 +92,37 @@ public:
 	 * @param LifeTimeSeconds Seconds to keep active; <= 0 keeps it active until manually reclaimed.
 	 * @param AttachOffset Offset from the actor root while attached.
 	 * @param Scale World scale to apply to the fire (does not inherit actor scale).
+	 * @param EffectParams Niagara scale and color multipliers for this activation.
+	 * @return Handle for the active fire, or INDEX_NONE if activation fails.
 	 */
 	UFUNCTION(BlueprintCallable, Category="RTS|Fire")
 	int32 ActivateFireAttached(AActor* AttachActor,
 	                          ERTSFireType FireType,
 	                          float LifeTimeSeconds,
 	                          const FVector& AttachOffset,
-	                          const FVector& Scale);
+	                          const FVector& Scale,
+	                          const FRTSFireEffectParams& EffectParams);
+
+	/**
+	 * @brief Activate pooled fire on a particular component and optional socket.
+	 * @param AttachActor Actor that owns the component and fire lifetime.
+	 * @param AttachComponent Component the fire follows.
+	 * @param SocketName Socket to follow, or NAME_None for the component origin.
+	 * @param RelativeOffset Offset from that socket or component origin.
+	 * @param FireType Fire pool to use.
+	 * @param LifeTimeSeconds Seconds before recycling the fire.
+	 * @param Scale Component world scale for the fire.
+	 * @param EffectParams Niagara scale and color multipliers.
+	 * @return Handle for the active fire, or INDEX_NONE if activation fails.
+	 */
+	int32 ActivateFireAttachedToComponent(AActor* AttachActor,
+	                                    USceneComponent* AttachComponent,
+	                                    FName SocketName,
+	                                    const FVector& RelativeOffset,
+	                                    ERTSFireType FireType,
+	                                    float LifeTimeSeconds,
+	                                    const FVector& Scale,
+	                                    const FRTSFireEffectParams& EffectParams);
 
 	UFUNCTION(BlueprintCallable, Category="RTS|Fire")
 	bool StopFireByHandle(int32 FireHandle);
@@ -115,15 +143,45 @@ private:
 	bool ActivateEntryAtLocation(FRTSFirePoolEntry& Entry,
 	                             float LifeTimeSeconds,
 	                             const FVector& Location,
-	                             const FVector& Scale) const;
+	                             const FVector& Scale,
+	                             const FRTSFireEffectParams& EffectParams) const;
 	bool ActivateEntryAttached(FRTSFirePoolEntry& Entry,
 	                           AActor* AttachActor,
 	                           float LifeTimeSeconds,
 	                           const FVector& AttachOffset,
-	                           const FVector& Scale) const;
+	                           const FVector& Scale,
+	                           const FRTSFireEffectParams& EffectParams) const;
+	/**
+	 * @brief Position a reused component against the requested hull attachment before activation.
+	 * @param Entry Pool entry being activated.
+	 * @param AttachActor Actor whose lifetime owns this fire.
+	 * @param AttachComponent Component the fire follows.
+	 * @param SocketName Optional component socket.
+	 * @param RelativeOffset Offset from the socket or component origin.
+	 * @param LifeTimeSeconds Seconds before recycling the fire.
+	 * @param Scale Component world scale.
+	 * @param EffectParams Niagara scale and color multipliers.
+	 * @return True when the component was activated.
+	 */
+	bool ActivateEntryAttachedToComponent(FRTSFirePoolEntry& Entry,
+	                                    AActor* AttachActor,
+	                                    USceneComponent* AttachComponent,
+	                                    FName SocketName,
+	                                    const FVector& RelativeOffset,
+	                                    float LifeTimeSeconds,
+	                                    const FVector& Scale,
+	                                    const FRTSFireEffectParams& EffectParams) const;
+	/**
+	 * @brief Apply per-activation values before the pooled Niagara component restarts.
+	 * @param NiagaraComponent Component being activated.
+	 * @param EffectParams User parameter values for this fire.
+	 */
+	void SetFireEffectParameters(UNiagaraComponent* NiagaraComponent,
+	                             const FRTSFireEffectParams& EffectParams) const;
 	void StartLifeTimeDelegateIfNeeded(ERTSFireType FireType, int32 EntryIndex, float LifeTimeSeconds);
 	void HandleLifeTimeExpired(ERTSFireType FireType, int32 EntryIndex, int32 ExpectedFireHandle);
 	void ReleaseEntryToPool(FRTSFirePool& Pool, int32 EntryIndex);
+	void RestoreFailedEntryToPool(FRTSFirePool& Pool, int32 EntryIndex);
 	int32 AcquireEntryIndex(FRTSFirePool& Pool);
 	int32 AcquireNextFireHandle();
 	int32 FindOldestActiveEntryIndex(const FRTSFirePool& Pool) const;
