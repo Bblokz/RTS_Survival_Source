@@ -15,6 +15,397 @@
  */
 namespace VehicleModuleBalance
 {
+	// ------------------------------------------------------------------------------------------------
+	// Editable probabilities and damage-chance multipliers
+	// ------------------------------------------------------------------------------------------------
+	/** @brief Tune each plate's module hit chance here; rows follow EArmorPlate order. */
+	namespace RuleSetProbabilities
+	{
+		// Covered add-on armor always receives its reserved candidate roll.
+		inline constexpr float CoveredAddOnArmor = 1.00f;
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_Front
+		{
+			inline constexpr float Tracks = 0.12f;
+			inline constexpr float Ammo = 0.08f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_FrontUpperGlacis
+		{
+			inline constexpr float Ammo = 0.10f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_FrontLowerGlacis
+		{
+			inline constexpr float Tracks = 0.35f;
+			inline constexpr float Engine = 0.10f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_SideLeft
+		{
+			inline constexpr float Tracks = 0.25f;
+			inline constexpr float Ammo = 0.30f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_SideRight
+		{
+			inline constexpr float Tracks = 0.25f;
+			inline constexpr float Ammo = 0.30f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_SideLowerLeft
+		{
+			inline constexpr float Tracks = 0.65f;
+			inline constexpr float Ammo = 0.15f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_SideLowerRight
+		{
+			inline constexpr float Tracks = 0.65f;
+			inline constexpr float Ammo = 0.15f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_Rear
+		{
+			inline constexpr float Engine = 0.65f;
+			inline constexpr float Ammo = 0.20f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_RearLowerGlacis
+		{
+			inline constexpr float Engine = 0.60f;
+			inline constexpr float Tracks = 0.30f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Plate_RearUpperGlacis
+		{
+			inline constexpr float Engine = 0.65f;
+			inline constexpr float Ammo = 0.25f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Turret_Front
+		{
+			inline constexpr float Turret = 0.30f;
+			inline constexpr float Weapon = 0.20f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Turret_SideLeft
+		{
+			inline constexpr float Turret = 0.40f;
+			inline constexpr float Ammo = 0.25f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Turret_SideRight
+		{
+			inline constexpr float Turret = 0.40f;
+			inline constexpr float Ammo = 0.25f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Turret_Rear
+		{
+			inline constexpr float Turret = 0.35f;
+			inline constexpr float Ammo = 0.40f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Turret_SidesAndRear
+		{
+			inline constexpr float Turret = 0.40f;
+			inline constexpr float Ammo = 0.30f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Turret_Cupola
+		{
+			inline constexpr float Turret = 0.15f;
+			inline constexpr float Ammo = 0.10f;
+		}
+		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
+		namespace Turret_Mantlet
+		{
+			inline constexpr float Weapon = 0.60f;
+			inline constexpr float Turret = 0.30f;
+		}
+	}
+
+	/** @brief Tune the chance scaling for each vehicle class and module type here. */
+	namespace ProfileDamageChanceMultipliers
+	{
+		inline constexpr float NoModule = 0.f;
+		/** @brief Scales each module damage roll for this profile, in module type order. */
+		namespace ArmoredCar
+		{
+			inline constexpr float AddOnArmor = 1.00f;
+			inline constexpr float Tracks = 1.15f;
+			inline constexpr float Engine = 1.20f;
+			inline constexpr float Ammo = 1.10f;
+			inline constexpr float Turret = 1.10f;
+			inline constexpr float Weapon = 1.10f;
+			inline constexpr float Wheels = 1.15f;
+		}
+		/** @brief Scales each module damage roll for this profile, in module type order. */
+		namespace LightTank
+		{
+			inline constexpr float AddOnArmor = 1.00f;
+			inline constexpr float Tracks = 1.05f;
+			inline constexpr float Engine = 1.10f;
+			inline constexpr float Ammo = 1.05f;
+			inline constexpr float Turret = 1.05f;
+			inline constexpr float Weapon = 1.05f;
+			inline constexpr float Wheels = 1.05f;
+		}
+		/** @brief Scales each module damage roll for this profile, in module type order. */
+		namespace MediumTank
+		{
+			inline constexpr float AddOnArmor = 1.00f;
+			inline constexpr float Tracks = 1.00f;
+			inline constexpr float Engine = 1.00f;
+			inline constexpr float Ammo = 1.00f;
+			inline constexpr float Turret = 1.00f;
+			inline constexpr float Weapon = 1.00f;
+			inline constexpr float Wheels = 1.00f;
+		}
+		/** @brief Scales each module damage roll for this profile, in module type order. */
+		namespace HeavyTank
+		{
+			inline constexpr float AddOnArmor = 1.00f;
+			inline constexpr float Tracks = 0.90f;
+			inline constexpr float Engine = 0.75f;
+			inline constexpr float Ammo = 0.90f;
+			inline constexpr float Turret = 0.90f;
+			inline constexpr float Weapon = 0.95f;
+			inline constexpr float Wheels = 0.90f;
+		}
+		/** @brief Scales each module damage roll for this profile, in module type order. */
+		namespace SuperHeavyTank
+		{
+			inline constexpr float AddOnArmor = 1.00f;
+			inline constexpr float Tracks = 0.85f;
+			inline constexpr float Engine = 0.60f;
+			inline constexpr float Ammo = 0.80f;
+			inline constexpr float Turret = 0.85f;
+			inline constexpr float Weapon = 0.90f;
+			inline constexpr float Wheels = 0.85f;
+		}
+	}
+
+	/** @brief Tune non-penetrating shell hit chances before plate and profile scaling. */
+	namespace SourceProbabilities
+	{
+		inline constexpr float KineticNonPen = 0.35f;
+		inline constexpr float ArmorPiercingHighExplosiveNonPen = 0.35f;
+		inline constexpr float HighExplosiveNonPen = 0.70f;
+		inline constexpr float HighExplosiveAntiTankNonPen = 0.70f;
+		inline constexpr float RailgunNonPen = 0.35f;
+		inline constexpr float MineRunningGear = 1.0f;
+		inline constexpr float Splash = 0.50f;
+	}
+
+	// ------------------------------------------------------------------------------------------------
+	// Editable profile module health multipliers
+	// ------------------------------------------------------------------------------------------------
+	/** @brief Tune module MaxHP as a fraction of tank MaxHealth for each vehicle class. */
+	namespace ProfileHealthMultipliers
+	{
+		inline constexpr float NoModule = 0.f;
+		/** @brief Module MaxHP / tank MaxHealth for this profile, in module type order. */
+		namespace ArmoredCar
+		{
+			inline constexpr float AddOnArmor = 0.15f;
+			inline constexpr float Tracks = 0.18f;
+			inline constexpr float Engine = 0.25f;
+			inline constexpr float Ammo = 0.22f;
+			inline constexpr float Turret = 0.22f;
+			inline constexpr float Weapon = 0.20f;
+			inline constexpr float Wheels = 0.18f;
+		}
+		/** @brief Module MaxHP / tank MaxHealth for this profile, in module type order. */
+		namespace LightTank
+		{
+			inline constexpr float AddOnArmor = 0.18f;
+			inline constexpr float Tracks = 0.22f;
+			inline constexpr float Engine = 0.30f;
+			inline constexpr float Ammo = 0.26f;
+			inline constexpr float Turret = 0.26f;
+			inline constexpr float Weapon = 0.23f;
+			inline constexpr float Wheels = 0.22f;
+		}
+		/** @brief Module MaxHP / tank MaxHealth for this profile, in module type order. */
+		namespace MediumTank
+		{
+			inline constexpr float AddOnArmor = 0.20f;
+			inline constexpr float Tracks = 0.25f;
+			inline constexpr float Engine = 0.35f;
+			inline constexpr float Ammo = 0.30f;
+			inline constexpr float Turret = 0.30f;
+			inline constexpr float Weapon = 0.25f;
+			inline constexpr float Wheels = 0.25f;
+		}
+		/** @brief Module MaxHP / tank MaxHealth for this profile, in module type order. */
+		namespace HeavyTank
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Tracks = 0.30f;
+			inline constexpr float Engine = 0.45f;
+			inline constexpr float Ammo = 0.36f;
+			inline constexpr float Turret = 0.36f;
+			inline constexpr float Weapon = 0.30f;
+			inline constexpr float Wheels = 0.30f;
+		}
+		/** @brief Module MaxHP / tank MaxHealth for this profile, in module type order. */
+		namespace SuperHeavyTank
+		{
+			inline constexpr float AddOnArmor = 0.30f;
+			inline constexpr float Tracks = 0.35f;
+			inline constexpr float Engine = 0.55f;
+			inline constexpr float Ammo = 0.42f;
+			inline constexpr float Turret = 0.42f;
+			inline constexpr float Weapon = 0.35f;
+			inline constexpr float Wheels = 0.35f;
+		}
+	}
+
+	// ------------------------------------------------------------------------------------------------
+	// Editable rule-set damage multipliers
+	// ------------------------------------------------------------------------------------------------
+	/** @brief Tune the damage dealt by each armor plate's module candidates. */
+	namespace RuleSetDamageMultipliers
+	{
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_Front
+		{
+			inline constexpr float AddOnArmor = 0.30f;
+			inline constexpr float Tracks = 0.30f;
+			inline constexpr float Ammo = 0.30f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_FrontUpperGlacis
+		{
+			inline constexpr float AddOnArmor = 0.35f;
+			inline constexpr float Ammo = 0.30f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_FrontLowerGlacis
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Tracks = 0.55f;
+			inline constexpr float Engine = 0.30f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_SideLeft
+		{
+			inline constexpr float AddOnArmor = 0.30f;
+			inline constexpr float Tracks = 0.40f;
+			inline constexpr float Ammo = 0.50f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_SideRight
+		{
+			inline constexpr float AddOnArmor = 0.30f;
+			inline constexpr float Tracks = 0.40f;
+			inline constexpr float Ammo = 0.50f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_SideLowerLeft
+		{
+			inline constexpr float AddOnArmor = 0.20f;
+			inline constexpr float Tracks = 0.70f;
+			inline constexpr float Ammo = 0.30f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_SideLowerRight
+		{
+			inline constexpr float AddOnArmor = 0.20f;
+			inline constexpr float Tracks = 0.70f;
+			inline constexpr float Ammo = 0.30f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_Rear
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Engine = 0.70f;
+			inline constexpr float Ammo = 0.40f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_RearLowerGlacis
+		{
+			inline constexpr float AddOnArmor = 0.20f;
+			inline constexpr float Engine = 0.65f;
+			inline constexpr float Tracks = 0.40f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Plate_RearUpperGlacis
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Engine = 0.70f;
+			inline constexpr float Ammo = 0.45f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Turret_Front
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Turret = 0.45f;
+			inline constexpr float Weapon = 0.40f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Turret_SideLeft
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Turret = 0.50f;
+			inline constexpr float Ammo = 0.45f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Turret_SideRight
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Turret = 0.50f;
+			inline constexpr float Ammo = 0.45f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Turret_Rear
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Turret = 0.50f;
+			inline constexpr float Ammo = 0.55f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Turret_SidesAndRear
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Turret = 0.50f;
+			inline constexpr float Ammo = 0.50f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Turret_Cupola
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Turret = 0.25f;
+			inline constexpr float Ammo = 0.25f;
+		}
+		/** @brief Damage fraction passed to each module hit on this armor plate. */
+		namespace Turret_Mantlet
+		{
+			inline constexpr float AddOnArmor = 0.25f;
+			inline constexpr float Weapon = 0.65f;
+			inline constexpr float Turret = 0.45f;
+		}
+	}
+
+	/** @brief Tune source energy and explosion damage passed into the module damage formula. */
+	namespace SourceDamageMultipliers
+	{
+		inline constexpr float KineticPenEnergy = 1.00f;
+		inline constexpr float KineticNonPenEnergy = 0.15f;
+		inline constexpr float ArmorPiercingHighExplosivePenEnergy = 1.15f;
+		inline constexpr float ArmorPiercingHighExplosiveNonPenEnergy = 0.15f;
+		inline constexpr float HighExplosivePenEnergy = 1.10f;
+		inline constexpr float HighExplosiveNonPenEnergy = 0.35f;
+		inline constexpr float HighExplosiveAntiTankPenEnergy = 1.00f;
+		inline constexpr float HighExplosiveAntiTankNonPenEnergy = 0.35f;
+		inline constexpr float RailgunPenEnergy = 1.00f;
+		inline constexpr float RailgunNonPenEnergy = 0.15f;
+		inline constexpr float MineRunningGear = 0.70f;
+		inline constexpr float Splash = 0.25f;
+	}
+
 	// Version 1 saves used designer-assigned IDs; their module array was exported in fixed slot order.
 	inline constexpr int32 DesignerAssignedModuleIdRuleVersion = 1;
 	// Bump when rule semantics change; version 1 remains readable for the module ID migration.
@@ -267,32 +658,102 @@ namespace VehicleModuleBalance
 	inline constexpr FVehicleModuleProfileRule ModuleProfileRules[VehicleProfileCount] = {
 		// ArmoredCar
 		{
-			{0.f, 0.15f, 0.18f, 0.25f, 0.22f, 0.22f, 0.20f, 0.18f},
-			{0.f, 1.00f, 1.15f, 1.20f, 1.10f, 1.10f, 1.10f, 1.15f},
+			{ProfileHealthMultipliers::NoModule,
+				ProfileHealthMultipliers::ArmoredCar::AddOnArmor,
+				ProfileHealthMultipliers::ArmoredCar::Tracks,
+				ProfileHealthMultipliers::ArmoredCar::Engine,
+				ProfileHealthMultipliers::ArmoredCar::Ammo,
+				ProfileHealthMultipliers::ArmoredCar::Turret,
+				ProfileHealthMultipliers::ArmoredCar::Weapon,
+				ProfileHealthMultipliers::ArmoredCar::Wheels},
+			{ProfileDamageChanceMultipliers::NoModule,
+				ProfileDamageChanceMultipliers::ArmoredCar::AddOnArmor,
+				ProfileDamageChanceMultipliers::ArmoredCar::Tracks,
+				ProfileDamageChanceMultipliers::ArmoredCar::Engine,
+				ProfileDamageChanceMultipliers::ArmoredCar::Ammo,
+				ProfileDamageChanceMultipliers::ArmoredCar::Turret,
+				ProfileDamageChanceMultipliers::ArmoredCar::Weapon,
+				ProfileDamageChanceMultipliers::ArmoredCar::Wheels},
 			EVehicleRunningGear::Wheels
 		},
 		// LightTank
 		{
-			{0.f, 0.18f, 0.22f, 0.30f, 0.26f, 0.26f, 0.23f, 0.22f},
-			{0.f, 1.00f, 1.05f, 1.10f, 1.05f, 1.05f, 1.05f, 1.05f},
+			{ProfileHealthMultipliers::NoModule,
+				ProfileHealthMultipliers::LightTank::AddOnArmor,
+				ProfileHealthMultipliers::LightTank::Tracks,
+				ProfileHealthMultipliers::LightTank::Engine,
+				ProfileHealthMultipliers::LightTank::Ammo,
+				ProfileHealthMultipliers::LightTank::Turret,
+				ProfileHealthMultipliers::LightTank::Weapon,
+				ProfileHealthMultipliers::LightTank::Wheels},
+			{ProfileDamageChanceMultipliers::NoModule,
+				ProfileDamageChanceMultipliers::LightTank::AddOnArmor,
+				ProfileDamageChanceMultipliers::LightTank::Tracks,
+				ProfileDamageChanceMultipliers::LightTank::Engine,
+				ProfileDamageChanceMultipliers::LightTank::Ammo,
+				ProfileDamageChanceMultipliers::LightTank::Turret,
+				ProfileDamageChanceMultipliers::LightTank::Weapon,
+				ProfileDamageChanceMultipliers::LightTank::Wheels},
 			EVehicleRunningGear::Tracks
 		},
 		// MediumTank
 		{
-			{0.f, 0.20f, 0.25f, 0.35f, 0.30f, 0.30f, 0.25f, 0.25f},
-			{0.f, 1.00f, 1.00f, 1.00f, 1.00f, 1.00f, 1.00f, 1.00f},
+			{ProfileHealthMultipliers::NoModule,
+				ProfileHealthMultipliers::MediumTank::AddOnArmor,
+				ProfileHealthMultipliers::MediumTank::Tracks,
+				ProfileHealthMultipliers::MediumTank::Engine,
+				ProfileHealthMultipliers::MediumTank::Ammo,
+				ProfileHealthMultipliers::MediumTank::Turret,
+				ProfileHealthMultipliers::MediumTank::Weapon,
+				ProfileHealthMultipliers::MediumTank::Wheels},
+			{ProfileDamageChanceMultipliers::NoModule,
+				ProfileDamageChanceMultipliers::MediumTank::AddOnArmor,
+				ProfileDamageChanceMultipliers::MediumTank::Tracks,
+				ProfileDamageChanceMultipliers::MediumTank::Engine,
+				ProfileDamageChanceMultipliers::MediumTank::Ammo,
+				ProfileDamageChanceMultipliers::MediumTank::Turret,
+				ProfileDamageChanceMultipliers::MediumTank::Weapon,
+				ProfileDamageChanceMultipliers::MediumTank::Wheels},
 			EVehicleRunningGear::Tracks
 		},
 		// HeavyTank
 		{
-			{0.f, 0.25f, 0.30f, 0.45f, 0.36f, 0.36f, 0.30f, 0.30f},
-			{0.f, 1.00f, 0.90f, 0.75f, 0.90f, 0.90f, 0.95f, 0.90f},
+			{ProfileHealthMultipliers::NoModule,
+				ProfileHealthMultipliers::HeavyTank::AddOnArmor,
+				ProfileHealthMultipliers::HeavyTank::Tracks,
+				ProfileHealthMultipliers::HeavyTank::Engine,
+				ProfileHealthMultipliers::HeavyTank::Ammo,
+				ProfileHealthMultipliers::HeavyTank::Turret,
+				ProfileHealthMultipliers::HeavyTank::Weapon,
+				ProfileHealthMultipliers::HeavyTank::Wheels},
+			{ProfileDamageChanceMultipliers::NoModule,
+				ProfileDamageChanceMultipliers::HeavyTank::AddOnArmor,
+				ProfileDamageChanceMultipliers::HeavyTank::Tracks,
+				ProfileDamageChanceMultipliers::HeavyTank::Engine,
+				ProfileDamageChanceMultipliers::HeavyTank::Ammo,
+				ProfileDamageChanceMultipliers::HeavyTank::Turret,
+				ProfileDamageChanceMultipliers::HeavyTank::Weapon,
+				ProfileDamageChanceMultipliers::HeavyTank::Wheels},
 			EVehicleRunningGear::Tracks
 		},
 		// SuperHeavyTank
 		{
-			{0.f, 0.30f, 0.35f, 0.55f, 0.42f, 0.42f, 0.35f, 0.35f},
-			{0.f, 1.00f, 0.85f, 0.60f, 0.80f, 0.85f, 0.90f, 0.85f},
+			{ProfileHealthMultipliers::NoModule,
+				ProfileHealthMultipliers::SuperHeavyTank::AddOnArmor,
+				ProfileHealthMultipliers::SuperHeavyTank::Tracks,
+				ProfileHealthMultipliers::SuperHeavyTank::Engine,
+				ProfileHealthMultipliers::SuperHeavyTank::Ammo,
+				ProfileHealthMultipliers::SuperHeavyTank::Turret,
+				ProfileHealthMultipliers::SuperHeavyTank::Weapon,
+				ProfileHealthMultipliers::SuperHeavyTank::Wheels},
+			{ProfileDamageChanceMultipliers::NoModule,
+				ProfileDamageChanceMultipliers::SuperHeavyTank::AddOnArmor,
+				ProfileDamageChanceMultipliers::SuperHeavyTank::Tracks,
+				ProfileDamageChanceMultipliers::SuperHeavyTank::Engine,
+				ProfileDamageChanceMultipliers::SuperHeavyTank::Ammo,
+				ProfileDamageChanceMultipliers::SuperHeavyTank::Turret,
+				ProfileDamageChanceMultipliers::SuperHeavyTank::Weapon,
+				ProfileDamageChanceMultipliers::SuperHeavyTank::Wheels},
 			EVehicleRunningGear::Tracks
 		}
 	};
@@ -409,63 +870,181 @@ namespace VehicleModuleBalance
 	// The reserved candidate for optional per-vehicle add-on coverage.
 	constexpr FPlateModuleDamage MakeAddOnRule(const float DamageMultiplier)
 	{
-		return MakeTypedRule(EVehicleModuleTypes::AddOnArmor, 1.00f, DamageMultiplier);
+		return MakeTypedRule(EVehicleModuleTypes::AddOnArmor,
+		                     RuleSetProbabilities::CoveredAddOnArmor, DamageMultiplier);
 	}
 
 	using EModule = EVehicleModuleTypes;
 
-	// Rows follow EArmorPlate order. Tuple = probability for penetrating hits / damage multiplier.
+	// Rows follow EArmorPlate order; candidate values are declared in the tuning sections above.
 	inline constexpr FPlateModuleRuleSet BasePlateRules[ArmorPlateRuleCount] = {
 		// Plate_Front
-		MakeRuleSet(MakeAddOnRule(0.30f), MakeTypedRule(EModule::Tracks, 0.12f, 0.30f),
-		            MakeTypedRule(EModule::Ammo, 0.08f, 0.30f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_Front::AddOnArmor),
+			MakeTypedRule(EModule::Tracks,
+			              RuleSetProbabilities::Plate_Front::Tracks,
+			              RuleSetDamageMultipliers::Plate_Front::Tracks),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_Front::Ammo,
+			              RuleSetDamageMultipliers::Plate_Front::Ammo)
+		),
 		// Plate_FrontUpperGlacis
-		MakeRuleSet(MakeAddOnRule(0.35f), MakeTypedRule(EModule::Ammo, 0.10f, 0.30f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_FrontUpperGlacis::AddOnArmor),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_FrontUpperGlacis::Ammo,
+			              RuleSetDamageMultipliers::Plate_FrontUpperGlacis::Ammo)
+		),
 		// Plate_FrontLowerGlacis
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Tracks, 0.35f, 0.55f),
-		            MakeTypedRule(EModule::Engine, 0.10f, 0.30f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_FrontLowerGlacis::AddOnArmor),
+			MakeTypedRule(EModule::Tracks,
+			              RuleSetProbabilities::Plate_FrontLowerGlacis::Tracks,
+			              RuleSetDamageMultipliers::Plate_FrontLowerGlacis::Tracks),
+			MakeTypedRule(EModule::Engine,
+			              RuleSetProbabilities::Plate_FrontLowerGlacis::Engine,
+			              RuleSetDamageMultipliers::Plate_FrontLowerGlacis::Engine)
+		),
 		// Plate_SideLeft
-		MakeRuleSet(MakeAddOnRule(0.30f), MakeTypedRule(EModule::Tracks, 0.25f, 0.40f),
-		            MakeTypedRule(EModule::Ammo, 0.30f, 0.50f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_SideLeft::AddOnArmor),
+			MakeTypedRule(EModule::Tracks,
+			              RuleSetProbabilities::Plate_SideLeft::Tracks,
+			              RuleSetDamageMultipliers::Plate_SideLeft::Tracks),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_SideLeft::Ammo,
+			              RuleSetDamageMultipliers::Plate_SideLeft::Ammo)
+		),
 		// Plate_SideRight
-		MakeRuleSet(MakeAddOnRule(0.30f), MakeTypedRule(EModule::Tracks, 0.25f, 0.40f),
-		            MakeTypedRule(EModule::Ammo, 0.30f, 0.50f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_SideRight::AddOnArmor),
+			MakeTypedRule(EModule::Tracks,
+			              RuleSetProbabilities::Plate_SideRight::Tracks,
+			              RuleSetDamageMultipliers::Plate_SideRight::Tracks),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_SideRight::Ammo,
+			              RuleSetDamageMultipliers::Plate_SideRight::Ammo)
+		),
 		// Plate_SideLowerLeft
-		MakeRuleSet(MakeAddOnRule(0.20f), MakeTypedRule(EModule::Tracks, 0.65f, 0.70f),
-		            MakeTypedRule(EModule::Ammo, 0.15f, 0.30f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_SideLowerLeft::AddOnArmor),
+			MakeTypedRule(EModule::Tracks,
+			              RuleSetProbabilities::Plate_SideLowerLeft::Tracks,
+			              RuleSetDamageMultipliers::Plate_SideLowerLeft::Tracks),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_SideLowerLeft::Ammo,
+			              RuleSetDamageMultipliers::Plate_SideLowerLeft::Ammo)
+		),
 		// Plate_SideLowerRight
-		MakeRuleSet(MakeAddOnRule(0.20f), MakeTypedRule(EModule::Tracks, 0.65f, 0.70f),
-		            MakeTypedRule(EModule::Ammo, 0.15f, 0.30f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_SideLowerRight::AddOnArmor),
+			MakeTypedRule(EModule::Tracks,
+			              RuleSetProbabilities::Plate_SideLowerRight::Tracks,
+			              RuleSetDamageMultipliers::Plate_SideLowerRight::Tracks),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_SideLowerRight::Ammo,
+			              RuleSetDamageMultipliers::Plate_SideLowerRight::Ammo)
+		),
 		// Plate_Rear
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Engine, 0.65f, 0.70f),
-		            MakeTypedRule(EModule::Ammo, 0.20f, 0.40f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_Rear::AddOnArmor),
+			MakeTypedRule(EModule::Engine,
+			              RuleSetProbabilities::Plate_Rear::Engine,
+			              RuleSetDamageMultipliers::Plate_Rear::Engine),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_Rear::Ammo,
+			              RuleSetDamageMultipliers::Plate_Rear::Ammo)
+		),
 		// Plate_RearLowerGlacis
-		MakeRuleSet(MakeAddOnRule(0.20f), MakeTypedRule(EModule::Engine, 0.60f, 0.65f),
-		            MakeTypedRule(EModule::Tracks, 0.30f, 0.40f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_RearLowerGlacis::AddOnArmor),
+			MakeTypedRule(EModule::Engine,
+			              RuleSetProbabilities::Plate_RearLowerGlacis::Engine,
+			              RuleSetDamageMultipliers::Plate_RearLowerGlacis::Engine),
+			MakeTypedRule(EModule::Tracks,
+			              RuleSetProbabilities::Plate_RearLowerGlacis::Tracks,
+			              RuleSetDamageMultipliers::Plate_RearLowerGlacis::Tracks)
+		),
 		// Plate_RearUpperGlacis
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Engine, 0.65f, 0.70f),
-		            MakeTypedRule(EModule::Ammo, 0.25f, 0.45f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Plate_RearUpperGlacis::AddOnArmor),
+			MakeTypedRule(EModule::Engine,
+			              RuleSetProbabilities::Plate_RearUpperGlacis::Engine,
+			              RuleSetDamageMultipliers::Plate_RearUpperGlacis::Engine),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_RearUpperGlacis::Ammo,
+			              RuleSetDamageMultipliers::Plate_RearUpperGlacis::Ammo)
+		),
 		// Turret_Front
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Turret, 0.30f, 0.45f),
-		            MakeTypedRule(EModule::Weapon, 0.20f, 0.40f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Turret_Front::AddOnArmor),
+			MakeTypedRule(EModule::Turret,
+			              RuleSetProbabilities::Turret_Front::Turret,
+			              RuleSetDamageMultipliers::Turret_Front::Turret),
+			MakeTypedRule(EModule::Weapon,
+			              RuleSetProbabilities::Turret_Front::Weapon,
+			              RuleSetDamageMultipliers::Turret_Front::Weapon)
+		),
 		// Turret_SideLeft
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Turret, 0.40f, 0.50f),
-		            MakeTypedRule(EModule::Ammo, 0.25f, 0.45f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Turret_SideLeft::AddOnArmor),
+			MakeTypedRule(EModule::Turret,
+			              RuleSetProbabilities::Turret_SideLeft::Turret,
+			              RuleSetDamageMultipliers::Turret_SideLeft::Turret),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Turret_SideLeft::Ammo,
+			              RuleSetDamageMultipliers::Turret_SideLeft::Ammo)
+		),
 		// Turret_SideRight
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Turret, 0.40f, 0.50f),
-		            MakeTypedRule(EModule::Ammo, 0.25f, 0.45f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Turret_SideRight::AddOnArmor),
+			MakeTypedRule(EModule::Turret,
+			              RuleSetProbabilities::Turret_SideRight::Turret,
+			              RuleSetDamageMultipliers::Turret_SideRight::Turret),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Turret_SideRight::Ammo,
+			              RuleSetDamageMultipliers::Turret_SideRight::Ammo)
+		),
 		// Turret_Rear
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Turret, 0.35f, 0.50f),
-		            MakeTypedRule(EModule::Ammo, 0.40f, 0.55f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Turret_Rear::AddOnArmor),
+			MakeTypedRule(EModule::Turret,
+			              RuleSetProbabilities::Turret_Rear::Turret,
+			              RuleSetDamageMultipliers::Turret_Rear::Turret),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Turret_Rear::Ammo,
+			              RuleSetDamageMultipliers::Turret_Rear::Ammo)
+		),
 		// Turret_SidesAndRear
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Turret, 0.40f, 0.50f),
-		            MakeTypedRule(EModule::Ammo, 0.30f, 0.50f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Turret_SidesAndRear::AddOnArmor),
+			MakeTypedRule(EModule::Turret,
+			              RuleSetProbabilities::Turret_SidesAndRear::Turret,
+			              RuleSetDamageMultipliers::Turret_SidesAndRear::Turret),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Turret_SidesAndRear::Ammo,
+			              RuleSetDamageMultipliers::Turret_SidesAndRear::Ammo)
+		),
 		// Turret_Cupola
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Turret, 0.15f, 0.25f),
-		            MakeTypedRule(EModule::Ammo, 0.10f, 0.25f)),
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Turret_Cupola::AddOnArmor),
+			MakeTypedRule(EModule::Turret,
+			              RuleSetProbabilities::Turret_Cupola::Turret,
+			              RuleSetDamageMultipliers::Turret_Cupola::Turret),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Turret_Cupola::Ammo,
+			              RuleSetDamageMultipliers::Turret_Cupola::Ammo)
+		),
 		// Turret_Mantlet
-		MakeRuleSet(MakeAddOnRule(0.25f), MakeTypedRule(EModule::Weapon, 0.60f, 0.65f),
-		            MakeTypedRule(EModule::Turret, 0.30f, 0.45f))
+		MakeRuleSet(
+			MakeAddOnRule(RuleSetDamageMultipliers::Turret_Mantlet::AddOnArmor),
+			MakeTypedRule(EModule::Weapon,
+			              RuleSetProbabilities::Turret_Mantlet::Weapon,
+			              RuleSetDamageMultipliers::Turret_Mantlet::Weapon),
+			MakeTypedRule(EModule::Turret,
+			              RuleSetProbabilities::Turret_Mantlet::Turret,
+			              RuleSetDamageMultipliers::Turret_Mantlet::Turret)
+		)
 	};
 
 	/** @return The plate row index, or INDEX_NONE for a value outside EArmorPlate. */
@@ -584,11 +1163,26 @@ namespace VehicleModuleBalance
 
 	namespace ShellModuleRules
 	{
-		inline constexpr FShellModuleRule Kinetic = MakeShellRule(1.00f, 0.35f, 0.15f);
-		inline constexpr FShellModuleRule ArmorPiercingHighExplosive = MakeShellRule(1.15f, 0.35f, 0.15f);
-		inline constexpr FShellModuleRule HighExplosive = MakeShellRule(1.10f, 0.70f, 0.35f);
-		inline constexpr FShellModuleRule HighExplosiveAntiTank = MakeShellRule(1.00f, 0.70f, 0.35f);
-		inline constexpr FShellModuleRule Railgun = MakeShellRule(1.00f, 0.35f, 0.15f);
+		inline constexpr FShellModuleRule Kinetic = MakeShellRule(
+			SourceDamageMultipliers::KineticPenEnergy,
+			SourceProbabilities::KineticNonPen,
+			SourceDamageMultipliers::KineticNonPenEnergy);
+		inline constexpr FShellModuleRule ArmorPiercingHighExplosive = MakeShellRule(
+			SourceDamageMultipliers::ArmorPiercingHighExplosivePenEnergy,
+			SourceProbabilities::ArmorPiercingHighExplosiveNonPen,
+			SourceDamageMultipliers::ArmorPiercingHighExplosiveNonPenEnergy);
+		inline constexpr FShellModuleRule HighExplosive = MakeShellRule(
+			SourceDamageMultipliers::HighExplosivePenEnergy,
+			SourceProbabilities::HighExplosiveNonPen,
+			SourceDamageMultipliers::HighExplosiveNonPenEnergy);
+		inline constexpr FShellModuleRule HighExplosiveAntiTank = MakeShellRule(
+			SourceDamageMultipliers::HighExplosiveAntiTankPenEnergy,
+			SourceProbabilities::HighExplosiveAntiTankNonPen,
+			SourceDamageMultipliers::HighExplosiveAntiTankNonPenEnergy);
+		inline constexpr FShellModuleRule Railgun = MakeShellRule(
+			SourceDamageMultipliers::RailgunPenEnergy,
+			SourceProbabilities::RailgunNonPen,
+			SourceDamageMultipliers::RailgunNonPenEnergy);
 	}
 
 	// Global penetrating-energy factor for a railgun round that overpenetrates the victim.
@@ -648,7 +1242,7 @@ namespace VehicleModuleBalance
 	};
 
 	// Base probability 1 is scaled once by the class chance factor of the resolved running gear.
-	inline constexpr FMineModuleRuleData MineModuleRule = {1.0f, 0.70f};
+	inline constexpr FMineModuleRuleData MineModuleRule = {SourceProbabilities::MineRunningGear, SourceDamageMultipliers::MineRunningGear};
 
 	/** @brief Splash reaches only external modules and is attenuated by the AOE falloff already applied. */
 	struct FSplashModuleRuleData
@@ -659,7 +1253,7 @@ namespace VehicleModuleBalance
 		float PlateProbeDistanceCm;
 	};
 
-	inline constexpr FSplashModuleRuleData SplashModuleRules = {0.50f, 0.25f, 5000.f};
+	inline constexpr FSplashModuleRuleData SplashModuleRules = {SourceProbabilities::Splash, SourceDamageMultipliers::Splash, 5000.f};
 
 	// ------------------------------------------------------------------------------------------------
 	// Default module behaviours (optional classes in the shared module data asset read these values)

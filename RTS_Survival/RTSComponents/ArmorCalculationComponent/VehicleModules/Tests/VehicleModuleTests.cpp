@@ -226,6 +226,66 @@ bool FVehicleModuleBalanceTablesTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleFrontPlateModuleRulesTest, "RTS.VehicleModules.FrontPlateModuleRules",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleFrontPlateModuleRulesTest::RunTest(const FString& Parameters)
+{
+	using namespace VehicleModuleBalance;
+	constexpr int32 FirstInternalCandidateIndex = AddOnArmorCandidateIndex + 1;
+	constexpr int32 SecondInternalCandidateIndex = FirstInternalCandidateIndex + 1;
+	constexpr EVehicleModuleProfile Profile = EVehicleModuleProfile::ArmoredCar;
+	const FPlateModuleRuleSet* Rules = GetProfilePlateRules(Profile, EVehicleRunningGear::Wheels);
+	const FPlateModuleRuleSet& Front = Rules[TryGetPlateRuleIndex(EArmorPlate::Plate_Front)];
+	const FPlateModuleRuleSet& Upper = Rules[TryGetPlateRuleIndex(EArmorPlate::Plate_FrontUpperGlacis)];
+	const FPlateModuleRuleSet& Lower = Rules[TryGetPlateRuleIndex(EArmorPlate::Plate_FrontLowerGlacis)];
+	const FPlateModuleDamage& FrontGear = Front.Entries[FirstInternalCandidateIndex];
+	const FPlateModuleDamage& FrontAmmo = Front.Entries[SecondInternalCandidateIndex];
+	const FPlateModuleDamage& UpperAmmo = Upper.Entries[FirstInternalCandidateIndex];
+	const FPlateModuleDamage& LowerGear = Lower.Entries[FirstInternalCandidateIndex];
+	const FPlateModuleDamage& LowerEngine = Lower.Entries[SecondInternalCandidateIndex];
+	const float WheelChanceMultiplier = GetDamageChanceMultiplier(Profile, EVehicleModuleTypes::Wheels);
+	const float EngineChanceMultiplier = GetDamageChanceMultiplier(Profile, EVehicleModuleTypes::Engine);
+	const float AmmoChanceMultiplier = GetDamageChanceMultiplier(Profile, EVehicleModuleTypes::Ammo);
+
+	TestEqual(TEXT("Front tracks resolve to wheels"), FrontGear.TypeToDamage, EVehicleModuleTypes::Wheels);
+	TestEqual(TEXT("Front can hit ammo"), FrontAmmo.TypeToDamage, EVehicleModuleTypes::Ammo);
+	TestEqual(TEXT("Upper front can hit ammo"), UpperAmmo.TypeToDamage, EVehicleModuleTypes::Ammo);
+	TestEqual(TEXT("Upper front has no third candidate"), Upper.Entries[SecondInternalCandidateIndex].TypeToDamage,
+	          EVehicleModuleTypes::None);
+	TestEqual(TEXT("Lower front tracks resolve to wheels"), LowerGear.TypeToDamage, EVehicleModuleTypes::Wheels);
+	TestEqual(TEXT("Lower front targets engine"), LowerEngine.TypeToDamage, EVehicleModuleTypes::Engine);
+	TestEqual(TEXT("Front gear uses side routing"), FrontGear.TargetSelector, EModuleTargetSelector::RunningGearSide);
+	TestEqual(TEXT("Lower gear uses side routing"), LowerGear.TargetSelector, EModuleTargetSelector::RunningGearSide);
+	TestEqual(TEXT("Lower engine uses singleton routing"), LowerEngine.TargetSelector, EModuleTargetSelector::Singleton);
+	TestEqual(TEXT("Front gear chance uses the wheel profile factor"), FrontGear.DamageProbability,
+	          ClampRuleValue01(RuleSetProbabilities::Plate_Front::Tracks * WheelChanceMultiplier),
+	          VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Front ammo chance uses its named probability"), FrontAmmo.DamageProbability,
+	          ClampRuleValue01(RuleSetProbabilities::Plate_Front::Ammo * AmmoChanceMultiplier),
+	          VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Upper ammo chance uses its named probability"), UpperAmmo.DamageProbability,
+	          ClampRuleValue01(RuleSetProbabilities::Plate_FrontUpperGlacis::Ammo * AmmoChanceMultiplier),
+	          VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Lower gear chance uses the wheel profile factor"), LowerGear.DamageProbability,
+	          ClampRuleValue01(RuleSetProbabilities::Plate_FrontLowerGlacis::Tracks * WheelChanceMultiplier),
+	          VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Lower engine chance uses its named probability"), LowerEngine.DamageProbability,
+	          ClampRuleValue01(RuleSetProbabilities::Plate_FrontLowerGlacis::Engine * EngineChanceMultiplier),
+	          VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Front gear uses its named damage multiplier"), FrontGear.DamageMultiplier,
+	          RuleSetDamageMultipliers::Plate_Front::Tracks, VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Front ammo uses its named damage multiplier"), FrontAmmo.DamageMultiplier,
+	          RuleSetDamageMultipliers::Plate_Front::Ammo, VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Upper ammo uses its named damage multiplier"), UpperAmmo.DamageMultiplier,
+	          RuleSetDamageMultipliers::Plate_FrontUpperGlacis::Ammo, VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Lower gear uses its named damage multiplier"), LowerGear.DamageMultiplier,
+	          RuleSetDamageMultipliers::Plate_FrontLowerGlacis::Tracks, VehicleModuleTestConstants::Tolerance);
+	TestEqual(TEXT("Lower engine uses its named damage multiplier"), LowerEngine.DamageMultiplier,
+	          RuleSetDamageMultipliers::Plate_FrontLowerGlacis::Engine, VehicleModuleTestConstants::Tolerance);
+	return true;
+}
+
 // ----------------------------------------------------------------------------------------------------
 // Command-card suppression and reserved CrewRepair slot
 // ----------------------------------------------------------------------------------------------------
