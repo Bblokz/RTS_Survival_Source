@@ -547,6 +547,9 @@ class RTS_SURVIVAL_API UWeaponState : public UObject
 
 	// To use the pooling impacts.
 	friend RTS_SURVIVAL_API AProjectile;
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FVehicleModuleTestAccess;
+#endif
 
 public:
 	UWeaponState();

@@ -27,6 +27,11 @@ namespace ArmorCalculationModuleHelpers
 	{
 		return uint64(1) << PlateRegistrationId;
 	}
+
+	bool GetUsesMeshBinding(const EVehicleModuleTypes Type)
+	{
+		return Type == EVehicleModuleTypes::Turret || Type == EVehicleModuleTypes::Weapon;
+	}
 }
 
 namespace ArmorCalculationModuleDebug
@@ -554,6 +559,40 @@ bool UArmorCalculation::RebindModuleMesh(const int32 ModuleId, UMeshComponent* N
 	FVehicleModuleBinding& Binding = M_ModuleBindings[SlotIndex];
 	Binding.ArmorMeshSlot = NewArmorMeshSlot;
 	Binding.BoundMesh = NewMesh;
+	// A gun chosen for the previous mesh may not sit on the new one; fall back to mesh matching.
+	Binding.BoundWeapon.Reset();
+	RebuildPlateModuleBindings();
+	if (M_ModuleTank.IsValid())
+	{
+		M_ModuleTank->OnModuleBindingChanged(SlotIndex);
+	}
+	return true;
+}
+
+bool UArmorCalculation::RebindWeaponModule(const int32 ModuleId, UMeshComponent* NewMesh, UWeaponState* NewWeapon)
+{
+	const int32 SlotIndex = GetModuleSlotById(ModuleId);
+	const int32 NewArmorMeshSlot = GetArmorMeshSlot(NewMesh);
+	const bool bIsWeaponModule = SlotIndex != INDEX_NONE && M_Modules[SlotIndex].Type == EVehicleModuleTypes::Weapon;
+	if (not bIsWeaponModule || NewArmorMeshSlot == INDEX_NONE || not IsValid(NewWeapon))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("RebindWeaponModule: module %d must be an installed Weapon module, the mesh registered for armor")
+			TEXT(" and the weapon valid on %s."), ModuleId, *GetNameSafe(GetOwner())));
+		return false;
+	}
+	if (bM_IsMutatingModules || bM_IsDispatchingModuleChanges)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("RebindWeaponModule: rejected during a module batch on ")
+			+ GetNameSafe(GetOwner()));
+		return false;
+	}
+
+	// Rebinding preserves HP and state; no healing or transition events.
+	FVehicleModuleBinding& Binding = M_ModuleBindings[SlotIndex];
+	Binding.ArmorMeshSlot = NewArmorMeshSlot;
+	Binding.BoundMesh = NewMesh;
+	Binding.BoundWeapon = NewWeapon;
 	RebuildPlateModuleBindings();
 	if (M_ModuleTank.IsValid())
 	{
@@ -569,6 +608,70 @@ UMeshComponent* UArmorCalculation::GetBoundMeshForSlot(const int32 SlotIndex) co
 		return nullptr;
 	}
 	return M_ModuleBindings[SlotIndex].BoundMesh.Get();
+}
+
+TWeakObjectPtr<UWeaponState> UArmorCalculation::GetBoundWeaponForSlot(const int32 SlotIndex) const
+{
+	if (SlotIndex < 0 || SlotIndex >= MaxModuleInstances)
+	{
+		return nullptr;
+	}
+	return M_ModuleBindings[SlotIndex].BoundWeapon;
+}
+
+bool UArmorCalculation::GetIsMeshRegisteredForArmor(const UMeshComponent* Mesh) const
+{
+	return GetArmorMeshSlot(Mesh) != INDEX_NONE;
+}
+
+int32 UArmorCalculation::FindModuleIdBoundToMesh(const EVehicleModuleTypes Type, const UMeshComponent* Mesh) const
+{
+	const int32 FirstSlot = GetFirstSlotForType(Type);
+	if (FirstSlot == INDEX_NONE || not IsValid(Mesh) || not ArmorCalculationModuleHelpers::GetUsesMeshBinding(Type))
+	{
+		return INDEX_NONE;
+	}
+	const int32 EndSlot = FirstSlot + GetSlotCountForType(Type);
+	for (int32 SlotIndex = FirstSlot; SlotIndex < EndSlot; ++SlotIndex)
+	{
+		const FVehicleModule& Module = M_Modules[SlotIndex];
+		if (Module.bInstalled && Module.Type == Type && M_ModuleBindings[SlotIndex].BoundMesh.Get() == Mesh)
+		{
+			return Module.ModuleId;
+		}
+	}
+	return INDEX_NONE;
+}
+
+int32 UArmorCalculation::FindOrphanedModuleIdOfType(const EVehicleModuleTypes Type) const
+{
+	const int32 FirstSlot = GetFirstSlotForType(Type);
+	if (FirstSlot == INDEX_NONE || not ArmorCalculationModuleHelpers::GetUsesMeshBinding(Type))
+	{
+		return INDEX_NONE;
+	}
+	const int32 EndSlot = FirstSlot + GetSlotCountForType(Type);
+	for (int32 SlotIndex = FirstSlot; SlotIndex < EndSlot; ++SlotIndex)
+	{
+		const FVehicleModule& Module = M_Modules[SlotIndex];
+		if (not Module.bInstalled || Module.Type != Type)
+		{
+			continue;
+		}
+		// A swapped-out turret leaves its mesh garbage before GC clears the armor registration.
+		const UMeshComponent* BoundMesh = M_ModuleBindings[SlotIndex].BoundMesh.Get();
+		if (not GetIsMeshRegisteredForArmor(BoundMesh))
+		{
+			return Module.ModuleId;
+		}
+	}
+	return INDEX_NONE;
+}
+
+int32 UArmorCalculation::FindFirstInstalledModuleIdOfType(const EVehicleModuleTypes Type) const
+{
+	const int32 SlotIndex = FindSingletonSlotOfType(Type);
+	return SlotIndex == INDEX_NONE ? INDEX_NONE : M_Modules[SlotIndex].ModuleId;
 }
 
 void UArmorCalculation::SetAddOnArmorContributionMultiplier(const int32 ModuleId, const float ContributionMultiplier)

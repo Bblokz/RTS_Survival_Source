@@ -163,6 +163,9 @@ public:
 
 	virtual TArray<UWeaponState*> GetWeapons() override final;
 	int32 GetWeaponCount() const { return M_TWeapons.Num(); }
+
+	/** @return The gun a Weapon vehicle module binds to; equal calibres keep the first weapon in array order. */
+	UWeaponState* GetLargestCalibreWeapon() const;
 	int32 GetOwningPlayer();
 	float GetMaxWeaponRange() const { return FMath::Sqrt(M_WeaponRangeData.M_MaxWeaponRangeSquared); }
 
@@ -193,6 +196,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void PostInitializeComponents() override;
 
 	UFUNCTION(BlueprintImplementableEvent)
@@ -419,7 +423,14 @@ protected:
 	/** @return Minimum target distance accepted by this turret; zero disables the lower range bound. */
 	virtual float GetMinimumTargetRange() const;
 
+	/** @return False for turrets without their own mount mesh; they never install vehicle modules on the tank. */
+	virtual bool GetHasOwnVehicleModuleMount() const { return true; }
+
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FVehicleModuleTestAccess;
+#endif
+
 	UPROPERTY()
 	TArray<UWeaponState*> M_TWeapons;
 
@@ -591,4 +602,18 @@ private:
 
 	bool GetIsValidVehicleFireFeedbackComponent() const;
 	float GetTurretRootWorldYawDegrees() const;
+
+	// ---- Automatic vehicle module registration on the owning tank ----
+
+	/** @brief Lets the owning tank install this turret's modules once Blueprint BeginPlay added every weapon. */
+	void BeginPlay_ScheduleVehicleModuleRegistration();
+	void OnVehicleModuleRegistrationTimer();
+	void EndPlay_CancelVehicleModuleRegistration();
+	bool GetIsValidModuleRegistrationTank() const;
+
+	// Tank that installs this turret's vehicle modules; weak because the tank owns this turret.
+	UPROPERTY()
+	TWeakObjectPtr<ATankMaster> M_ModuleRegistrationTank;
+
+	FTimerHandle M_ModuleRegistrationTimerHandle;
 };

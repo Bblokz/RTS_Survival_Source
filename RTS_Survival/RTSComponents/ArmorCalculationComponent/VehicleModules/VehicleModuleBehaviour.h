@@ -10,6 +10,7 @@
 
 class UArmorCalculation;
 class UMeshComponent;
+class UWeaponState;
 
 /** @brief Module identity and state supplied to a module behaviour before OnAdded. */
 USTRUCT(BlueprintType)
@@ -39,6 +40,10 @@ struct FVehicleModuleBehaviourContext
 	// Turret or gun mesh restricted by the behaviour; unset for unbound module types.
 	UPROPERTY()
 	TWeakObjectPtr<UMeshComponent> BoundMesh;
+
+	// Explicit gun of a Weapon module; explicitly null means the behaviour matches guns by BoundMesh instead.
+	UPROPERTY()
+	TWeakObjectPtr<UWeaponState> BoundWeapon;
 
 	UPROPERTY()
 	TWeakObjectPtr<UArmorCalculation> ArmorCalculation;

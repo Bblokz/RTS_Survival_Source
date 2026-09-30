@@ -177,6 +177,19 @@ UArmorCalculation::RebuildPlateModuleBindings()
 
 Fixed slot budget: two running-gear instances, one engine, one ammo, four turrets, **one Weapon module maximum**, eight add-on zones: **17 module slots**. Derive capacities and type-to-slot ranges constexpr from the constants above. Reject a second Weapon module even if bound to a different gun. This does not increase the existing **three armor meshes × sixteen plates** limit; validate mesh coverage separately.
 
+#### Turret-driven Turret and Weapon modules
+
+Tank Blueprints do not install Turret or Weapon modules for child-actor turrets; each `ACPPTurretsMaster` does it for itself:
+
+- In `BeginPlay`, a turret whose parent actor is an `ATankMaster` registers as pending with that tank and schedules a next-tick timer. The timer captures only a weak turret pointer and is cleared in `EndPlay`. Blueprint `BeginPlay` adds the weapons, so the weapon array is complete by the next tick. Embedded turrets (`GetHasOwnVehicleModuleMount() == false`) opt out: their gun sits in the hull mesh, so a casemate Weapon module remains a Blueprint `SetupModule` call.
+- The tank installs nothing while any turret is still pending. It then processes all ready turrets together, sorted by their child actor component name, so slot IDs never depend on BeginPlay or timer order.
+- Only tanks whose Blueprint installed at least one module (so modules were finalized in `BeginPlay`) accept turret modules. Module-less tanks keep their current behaviour.
+- A turret whose `GetModuleBindingMesh()` is not registered with `InitArmorCalculation` installs nothing, because module damage is routed through armor plates.
+- Turret module: an existing module bound to the mesh (installed by Blueprint or earlier) is reused. Otherwise, a module whose mesh was destroyed or unregistered (a swapped-out turret) is rebound with its HP and state. Only when neither exists is a new module installed.
+- Weapon module (still one per tank): the tank installs it on the mount of the largest-calibre gun across all armored turrets and binds that gun explicitly (`RebindWeaponModule`). It moves only to a strictly larger gun, or when its turret leaves the tank. Equal calibres keep the earlier mount and the first weapon in array order. Moving it preserves HP and state. A designer-installed Weapon module is never moved. When it is bound to a turret's mount without an explicit gun, that turret's largest gun is bound to it.
+- An explicitly bound gun makes `UVehicleModuleWeaponBehaviour` affect exactly that `UWeaponState`. Modules without an explicit gun keep the mesh match (single-weapon mounts only). `RebindModuleMesh` clears the explicit gun.
+- `ImportVehicleModuleSaveData` during pending registration queues the load and returns true. It is applied after the turret modules exist so the module counts match; a queued load that then mismatches reports an error.
+
 `FSetupPlateModuleDmg` is unnecessary: C++ defines probabilities and damage multipliers. Blueprint installs modules and configures **only add-on armor coverage** through the separate function below. Do not construct per-vehicle `TMap<ModuleType, TArray<Rule>>` storage.
 
 ### Class profiles, tracks/wheels and automatic module HP

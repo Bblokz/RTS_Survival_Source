@@ -3,6 +3,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -12,6 +13,8 @@
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Tanks/AITankMaster.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 namespace VehicleModuleTestConstants
 {
@@ -80,6 +83,41 @@ struct FVehicleModuleTestAccess
 	{
 		return Tank.UnitCommandData->GetAbilities();
 	}
+
+	/** @brief A turret that never begins play: its mount mesh and weapons exist, registration is driven manually. */
+	static ACPPTurretsMaster* SpawnTurretWithWeapons(UWorld& World, const TArray<float>& WeaponCalibres)
+	{
+		ACPPTurretsMaster* Turret = World.SpawnActorDeferred<ACPPTurretsMaster>(
+			ACPPTurretsMaster::StaticClass(), FTransform::Identity);
+		Turret->SceneSkeletalMesh = NewObject<USkeletalMeshComponent>(Turret);
+		for (const float WeaponCalibre : WeaponCalibres)
+		{
+			UWeaponState* Weapon = NewObject<UWeaponState>(Turret);
+			Weapon->WeaponData.WeaponCalibre = WeaponCalibre;
+			Turret->M_TWeapons.Add(Weapon);
+		}
+		return Turret;
+	}
+
+	static UWeaponState* GetTurretWeapon(const ACPPTurretsMaster& Turret, const int32 WeaponIndex)
+	{
+		return Turret.M_TWeapons[WeaponIndex];
+	}
+
+	static void AddPendingTurret(ATankMaster& Tank, ACPPTurretsMaster* Turret)
+	{
+		Tank.AddPendingTurretModuleRegistration(Turret);
+	}
+
+	static void MarkTurretReady(ATankMaster& Tank, ACPPTurretsMaster* Turret)
+	{
+		Tank.OnTurretReadyForModuleRegistration(Turret);
+	}
+
+	static void CancelTurret(ATankMaster& Tank, const ACPPTurretsMaster* Turret)
+	{
+		Tank.CancelTurretModuleRegistration(Turret);
+	}
 };
 
 namespace VehicleModuleTests
@@ -134,11 +172,16 @@ namespace VehicleModuleTests
 		UStaticMeshComponent* RegisterHullPlate(const EArmorPlate PlateType) const
 		{
 			UStaticMeshComponent* HullMesh = NewObject<UStaticMeshComponent>(Tank);
+			RegisterMeshPlate(HullMesh, PlateType);
+			return HullMesh;
+		}
+
+		void RegisterMeshPlate(UMeshComponent* Mesh, const EArmorPlate PlateType) const
+		{
 			FArmorSettings PlateSettings;
 			PlateSettings.ArmorType = PlateType;
 			PlateSettings.ArmorValue = 50.f;
-			Armor->InitArmorCalculation(HullMesh, {PlateSettings}, VehicleModuleTestConstants::TestPlayer);
-			return HullMesh;
+			Armor->InitArmorCalculation(Mesh, {PlateSettings}, VehicleModuleTestConstants::TestPlayer);
 		}
 	};
 }
@@ -526,6 +569,111 @@ bool FVehicleModuleLegacyIdsTest::RunTest(const FString& Parameters)
 	          Fixture.Armor->GetModuleSnapshot(EngineModuleId).MaxHp * 0.5f, Tolerance);
 	TestEqual(TEXT("Legacy add-on coverage is restored to the correct zone"),
 	          Fixture.Armor->ExportModuleState().Coverage.Num(), 1);
+	return true;
+}
+
+// ----------------------------------------------------------------------------------------------------
+// Turret-driven module registration
+// ----------------------------------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleTurretSelfRegistrationTest, "RTS.VehicleModules.TurretSelfRegistration",
+                                 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleModuleTurretSelfRegistrationTest::RunTest(const FString& Parameters)
+{
+	using namespace VehicleModuleTestConstants;
+	constexpr int32 FirstTurretModuleId = VehicleModuleBalance::SlotOffset::Turret;
+	constexpr int32 SecondTurretModuleId = FirstTurretModuleId + 1;
+	constexpr int32 WeaponModuleId = VehicleModuleBalance::SlotOffset::Weapon;
+	constexpr int32 ModulesAfterSpawn = 4;
+	constexpr int32 MainGunIndex = 1;
+	constexpr float MachineGunCalibre = 7.92f;
+	constexpr float MainGunCalibre = 75.f;
+	constexpr float SecondaryGunCalibre = 37.f;
+	constexpr float LargeGunCalibre = 88.f;
+	constexpr float TurretChipDamage = 1.f;
+
+	VehicleModuleTests::FTankFixture Fixture;
+	TestTrue(TEXT("Engine opts the tank into modules"), Fixture.Install(EngineModuleId, EVehicleModuleTypes::Engine));
+	Fixture.Finalize();
+	ATankMaster& Tank = *Fixture.Tank;
+	UArmorCalculation& Armor = *Fixture.Armor;
+
+	ACPPTurretsMaster* MainTurret = FVehicleModuleTestAccess::SpawnTurretWithWeapons(
+		*Fixture.World, {MachineGunCalibre, MainGunCalibre, MainGunCalibre});
+	ACPPTurretsMaster* SecondaryTurret = FVehicleModuleTestAccess::SpawnTurretWithWeapons(
+		*Fixture.World, {SecondaryGunCalibre});
+	ACPPTurretsMaster* UnarmoredTurret = FVehicleModuleTestAccess::SpawnTurretWithWeapons(
+		*Fixture.World, {LargeGunCalibre});
+	UMeshComponent* MainMesh = MainTurret->GetModuleBindingMesh();
+	UMeshComponent* SecondaryMesh = SecondaryTurret->GetModuleBindingMesh();
+	Fixture.RegisterMeshPlate(MainMesh, EArmorPlate::Turret_Front);
+	Fixture.RegisterMeshPlate(SecondaryMesh, EArmorPlate::Turret_Front);
+
+	for (ACPPTurretsMaster* Turret : {MainTurret, SecondaryTurret, UnarmoredTurret})
+	{
+		FVehicleModuleTestAccess::AddPendingTurret(Tank, Turret);
+	}
+	// Reverse timer order on purpose: slot IDs must follow mount order, not readiness order.
+	FVehicleModuleTestAccess::MarkTurretReady(Tank, UnarmoredTurret);
+	FVehicleModuleTestAccess::MarkTurretReady(Tank, SecondaryTurret);
+	TestEqual(TEXT("Nothing installs while a turret is still pending"), Armor.GetInstalledModuleCount(), 1);
+	FVehicleModuleTestAccess::MarkTurretReady(Tank, MainTurret);
+
+	TestEqual(TEXT("First mount gets the first turret slot"),
+	          Armor.FindModuleIdBoundToMesh(EVehicleModuleTypes::Turret, MainMesh), FirstTurretModuleId);
+	TestEqual(TEXT("Second mount gets the next turret slot"),
+	          Armor.FindModuleIdBoundToMesh(EVehicleModuleTypes::Turret, SecondaryMesh), SecondTurretModuleId);
+	TestEqual(TEXT("A mount without registered armor stays module-less"),
+	          Armor.FindModuleIdBoundToMesh(EVehicleModuleTypes::Turret, UnarmoredTurret->GetModuleBindingMesh()),
+	          static_cast<int32>(INDEX_NONE));
+	TestEqual(TEXT("The tank gets exactly one weapon module"),
+	          Armor.FindFirstInstalledModuleIdOfType(EVehicleModuleTypes::Weapon), WeaponModuleId);
+	TestTrue(TEXT("The weapon module sits on the largest armored gun's mount"),
+	         Armor.GetBoundMeshForSlot(WeaponModuleId) == MainMesh);
+	TestTrue(TEXT("Equal calibres keep the first weapon in array order"),
+	         Armor.GetBoundWeaponForSlot(WeaponModuleId).Get()
+	         == FVehicleModuleTestAccess::GetTurretWeapon(*MainTurret, MainGunIndex));
+	TestEqual(TEXT("Engine, two turrets and one weapon are installed"), Armor.GetInstalledModuleCount(),
+	          ModulesAfterSpawn);
+
+	FVehicleModuleTestAccess::AddPendingTurret(Tank, MainTurret);
+	FVehicleModuleTestAccess::MarkTurretReady(Tank, MainTurret);
+	TestEqual(TEXT("Registering a turret again installs nothing"), Armor.GetInstalledModuleCount(), ModulesAfterSpawn);
+
+	Armor.DamageModule(FirstTurretModuleId, TurretChipDamage);
+	const FVehicleModuleSaveData SaveData = Tank.ExportVehicleModuleSaveData();
+	Armor.RestoreAllModulesToHealthy();
+	FVehicleModuleTestAccess::AddPendingTurret(Tank, SecondaryTurret);
+	TestTrue(TEXT("A load during pending turret registration is accepted"), Tank.ImportVehicleModuleSaveData(SaveData));
+	TestEqual(TEXT("The load waits for the pending turret"), Fixture.GetState(FirstTurretModuleId),
+	          EVehicleModuleState::Healthy);
+	FVehicleModuleTestAccess::MarkTurretReady(Tank, SecondaryTurret);
+	TestEqual(TEXT("The deferred load applies once the turrets registered"), Fixture.GetState(FirstTurretModuleId),
+	          EVehicleModuleState::Damaged);
+
+	FVehicleModuleTestAccess::CancelTurret(Tank, MainTurret);
+	TestTrue(TEXT("A leaving turret hands the weapon module to the largest remaining gun"),
+	         Armor.GetBoundWeaponForSlot(WeaponModuleId).Get()
+	         == FVehicleModuleTestAccess::GetTurretWeapon(*SecondaryTurret, 0));
+
+	// Swap: the old mount mesh is destroyed and the new turret registers its own mesh.
+	MainMesh->MarkAsGarbage();
+	ACPPTurretsMaster* SwappedTurret = FVehicleModuleTestAccess::SpawnTurretWithWeapons(
+		*Fixture.World, {LargeGunCalibre});
+	UMeshComponent* SwappedMesh = SwappedTurret->GetModuleBindingMesh();
+	Fixture.RegisterMeshPlate(SwappedMesh, EArmorPlate::Turret_Front);
+	FVehicleModuleTestAccess::AddPendingTurret(Tank, SwappedTurret);
+	FVehicleModuleTestAccess::MarkTurretReady(Tank, SwappedTurret);
+
+	TestEqual(TEXT("The swapped turret takes over the orphaned mount module"),
+	          Armor.FindModuleIdBoundToMesh(EVehicleModuleTypes::Turret, SwappedMesh), FirstTurretModuleId);
+	TestEqual(TEXT("The mount module keeps its damage state"), Fixture.GetState(FirstTurretModuleId),
+	          EVehicleModuleState::Damaged);
+	TestTrue(TEXT("A larger swapped-in gun takes the weapon module"),
+	         Armor.GetBoundWeaponForSlot(WeaponModuleId).Get()
+	         == FVehicleModuleTestAccess::GetTurretWeapon(*SwappedTurret, 0));
+	TestEqual(TEXT("A swap installs no extra modules"), Armor.GetInstalledModuleCount(), ModulesAfterSpawn);
 	return true;
 }
 

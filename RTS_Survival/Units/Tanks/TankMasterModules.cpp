@@ -98,6 +98,8 @@ void ATankMaster::CleanupVehicleModuleBindings()
 	M_MaxHealthChangedHandle.Reset();
 	M_ModuleBehavioursAppliedHandle.Reset();
 	M_DeferredModuleBlueprintEvents.Reset();
+	// Turrets ending play after the tank then find nothing to cancel and trigger no module work.
+	M_TurretModuleRegistration = FTankTurretModuleRegistrationState();
 }
 
 bool ATankMaster::GetIsValidModuleArmor() const
@@ -237,6 +239,7 @@ void ATankMaster::SyncModuleBehaviourForSlot(const int32 SlotIndex)
 	Context.CurrentHp = Snapshot.CurrentHp;
 	Context.MaxHp = Snapshot.MaxHp;
 	Context.BoundMesh = M_ModuleArmor->GetBoundMeshForSlot(SlotIndex);
+	Context.BoundWeapon = M_ModuleArmor->GetBoundWeaponForSlot(SlotIndex);
 	Context.ArmorCalculation = M_ModuleArmor;
 	BehaviourComponent->SetModuleBehaviour(SlotIndex, DesiredClass, Context);
 }
@@ -422,6 +425,12 @@ bool ATankMaster::ImportVehicleModuleSaveData(const FVehicleModuleSaveData& Save
 	if (not bM_AreVehicleModulesInitialized || not GetIsValidModuleArmor() || not IsUnitAlive())
 	{
 		return false;
+	}
+	if (GetHasUnprocessedTurretModuleRegistrations())
+	{
+		// Turret modules install the tick after BeginPlay; importing earlier would mismatch the module count.
+		M_TurretModuleRegistration.DeferredSaveData = SaveData;
+		return true;
 	}
 	// Transient crew work is never deserialized; a live timer is not resumed after load.
 	if (GetCurrentActiveCommand() == EAbilityID::IdCrewRepair)

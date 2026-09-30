@@ -5,6 +5,7 @@
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBalance.h"
 #include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 namespace VehicleModuleWeaponConstants
 {
@@ -26,6 +27,12 @@ bool UVehicleModuleWeaponBehaviour::CheckRequirement(UWeaponState* WeaponState) 
 	if (not IsValid(WeaponState) || GetModuleContext().Type != EVehicleModuleTypes::Weapon)
 	{
 		return false;
+	}
+	// An explicit gun identity wins over mesh matching; a destroyed bound gun affects no other weapon.
+	const TWeakObjectPtr<UWeaponState>& BoundWeapon = GetModuleContext().BoundWeapon;
+	if (not BoundWeapon.IsExplicitlyNull())
+	{
+		return BoundWeapon.Get() == WeaponState;
 	}
 	UMeshComponent* BoundMesh = GetBoundMesh();
 	if (not IsValid(BoundMesh))

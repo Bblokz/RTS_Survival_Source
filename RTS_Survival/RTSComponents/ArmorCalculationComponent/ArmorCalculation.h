@@ -16,6 +16,7 @@
 class UShieldComponent;
 class ATankMaster;
 class UHealthComponent;
+class UWeaponState;
 struct FModuleDamageInput;
 
 
@@ -145,6 +146,10 @@ struct FVehicleModuleBinding
 
 	UPROPERTY()
 	TWeakObjectPtr<UMeshComponent> BoundMesh;
+
+	// Gun of a Weapon module when several guns share the bound mesh; explicitly null falls back to mesh matching.
+	UPROPERTY()
+	TWeakObjectPtr<UWeaponState> BoundWeapon;
 
 	// Add-on coverage over stable plate registration IDs (mesh slot * plates per mesh + plate index).
 	uint64 CoveredPlateMask = 0;
@@ -317,6 +322,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ArmorSettings|VehicleModules")
 	bool RebindModuleMesh(int32 ModuleId, UMeshComponent* NewMesh);
 
+	/**
+	 * @brief Binds a weapon module to one gun so a multi-gun mesh only penalizes that gun; preserves HP and state.
+	 * @param ModuleId Installed Weapon module.
+	 * @param NewMesh Registered armor mesh that owns the gun's plates.
+	 * @param NewWeapon Gun the module's behaviours affect.
+	 * @return True if the binding was replaced.
+	 */
+	bool RebindWeaponModule(int32 ModuleId, UMeshComponent* NewMesh, UWeaponState* NewWeapon);
+
 	/** @return True when installed modules, bindings and running gear form a consistent setup. */
 	bool ValidateModuleSetup() const;
 
@@ -435,6 +449,18 @@ public:
 	FModuleIconStates GetModuleIconStates() const;
 	int32 GetModuleSlotById(int32 ModuleId) const;
 	UMeshComponent* GetBoundMeshForSlot(int32 SlotIndex) const;
+	// Returned weak so callers can tell an explicitly unbound gun from a bound gun that was destroyed.
+	TWeakObjectPtr<UWeaponState> GetBoundWeaponForSlot(int32 SlotIndex) const;
+	bool GetIsMeshRegisteredForArmor(const UMeshComponent* Mesh) const;
+
+	/** @return ID of the installed module of this type bound to the mesh, or INDEX_NONE. */
+	int32 FindModuleIdBoundToMesh(EVehicleModuleTypes Type, const UMeshComponent* Mesh) const;
+
+	/** @return ID of an installed mesh-bound module whose mesh was destroyed or unregistered, or INDEX_NONE. */
+	int32 FindOrphanedModuleIdOfType(EVehicleModuleTypes Type) const;
+
+	/** @return ID of the first installed module of this type in slot order, or INDEX_NONE. */
+	int32 FindFirstInstalledModuleIdOfType(EVehicleModuleTypes Type) const;
 
 	UFUNCTION(BlueprintCallable, Category = "ArmorSettings|VehicleModules")
 	FVehicleModuleSaveData ExportModuleState() const;

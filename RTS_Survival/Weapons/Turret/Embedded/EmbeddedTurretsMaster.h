@@ -68,6 +68,9 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void BeginPlay() override;
+
+	// The gun sits in the owner's hull mesh; a casemate Weapon module stays a Blueprint SetupModule call.
+	virtual bool GetHasOwnVehicleModuleMount() const override { return false; }
 	
 	/** @brief Uses the EmbeddedTurretMesh to obtain the turret transform with yaw in local space!.
 	 * @copydoc ACPPTurretsMaster::GetTurretTransform

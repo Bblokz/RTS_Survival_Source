@@ -46,6 +46,7 @@ class UCargoSquad;
 class UCargo;
 class ATeamWeaponController;
 class ATeamWeapon;
+class UWeaponState;
 
 enum class ETurretRangePursuitStatus : uint8
 {
@@ -153,6 +154,52 @@ struct FVehicleModuleRepairState
 	uint32 ModuleDamageRevision = 0;
 
 	float FullServiceAccumulatedWork = 0.f;
+};
+
+/** @brief The turret gun that owns the tank's single Weapon module when the tank installed that module itself. */
+USTRUCT()
+struct FTankAutoWeaponModuleBinding
+{
+	GENERATED_BODY()
+
+	// INDEX_NONE until the tank installs the Weapon module; a designer-installed Weapon module is never moved.
+	int32 ModuleId = INDEX_NONE;
+
+	UPROPERTY()
+	TWeakObjectPtr<ACPPTurretsMaster> Turret;
+
+	UPROPERTY()
+	TWeakObjectPtr<UWeaponState> Weapon;
+
+	float WeaponCalibre = 0.f;
+};
+
+/**
+ * @brief Turrets install their own vehicle modules the tick after BeginPlay, once their weapons exist.
+ * The tank batches them in mount order so module slot IDs match between spawns and saves.
+ */
+USTRUCT()
+struct FTankTurretModuleRegistrationState
+{
+	GENERATED_BODY()
+
+	// Turrets that began play but whose weapon arrays are not yet guaranteed complete.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<ACPPTurretsMaster>> PendingTurrets;
+
+	// Turrets with complete weapons; installed together once no turret is pending.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<ACPPTurretsMaster>> ReadyTurrets;
+
+	// Turrets with an armored mount; the candidates for the tank's single Weapon module.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<ACPPTurretsMaster>> RegisteredTurrets;
+
+	UPROPERTY()
+	FTankAutoWeaponModuleBinding AutoWeaponModule;
+
+	// Load received before the turret modules existed; applied afterwards so the module counts match.
+	TOptional<FVehicleModuleSaveData> DeferredSaveData;
 };
 
 USTRUCT()
@@ -287,7 +334,8 @@ public:
 	/**
 	 * @brief Applies saved module state after module finalization; never resumes crew work or replays events.
 	 * @param SaveData Data exported from a tank with the same module setup.
-	 * @return True if the data matched this tank and was applied.
+	 * @return True if the data matched this tank and was applied, or was queued until the turrets installed
+	 * their modules (a queued load that then mismatches reports an error).
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Vehicle Modules")
 	bool ImportVehicleModuleSaveData(const FVehicleModuleSaveData& SaveData);
@@ -435,7 +483,10 @@ protected:
 	UPROPERTY()
 	TArray<UHullWeaponComponent*> HullWeapons;
 
-	/** @brief Adds the provided turret to the array keeping track of all turrets on this tank. */
+	/**
+	 * @brief Adds the provided turret to the array keeping track of all turrets on this tank.
+	 * Turret and Weapon vehicle modules are not set up here; turrets install those themselves after BeginPlay.
+	 */
 	UFUNCTION(BlueprintCallable)
 	inline void SetupTurret(ACPPTurretsMaster* NewTurret)
 	{
@@ -713,6 +764,27 @@ private:
 	void AnnounceModuleTransitions(const FModuleChangeBatch& Batch);
 	void OnTankMaxHealthChanged(float OldMaxHealth, float NewMaxHealth);
 	void CleanupVehicleModuleBindings();
+
+	// ---- Turret-driven module registration (called by ACPPTurretsMaster only) ----
+	void AddPendingTurretModuleRegistration(ACPPTurretsMaster* Turret);
+	void OnTurretReadyForModuleRegistration(ACPPTurretsMaster* Turret);
+	void CancelTurretModuleRegistration(const ACPPTurretsMaster* Turret);
+	bool GetHasUnprocessedTurretModuleRegistrations();
+	// Non-const: the engine's AActor::IsUnitAlive is non-const.
+	bool GetCanInstallTurretModules();
+	void ProcessReadyTurretModuleRegistrations();
+	TArray<ACPPTurretsMaster*> TakeReadyTurretsInMountOrder();
+	void RegisterTurretModulesInMountOrder(const TArray<ACPPTurretsMaster*>& TurretsInMountOrder);
+	bool RegisterModulesForTurret(ACPPTurretsMaster* Turret);
+	void EnsureTurretModuleForMesh(UMeshComponent* TurretMesh);
+	void AdoptDesignerWeaponModule(const ACPPTurretsMaster* Turret, UMeshComponent* TurretMesh);
+	void UpdateAutoWeaponModule();
+	bool FindLargestRegisteredTurretWeapon(FTankAutoWeaponModuleBinding& OutCandidate) const;
+	bool GetIsAutoWeaponModuleBindingCurrent() const;
+	void ApplyDeferredVehicleModuleSaveData();
+
+	UPROPERTY()
+	FTankTurretModuleRegistrationState M_TurretModuleRegistration;
 
 	// ---- Ordinary healing milestones ----
 	bool TryRecoverDestroyedModulesAfterHealing();

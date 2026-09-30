@@ -322,6 +322,99 @@ void ACPPTurretsMaster::BeginPlay()
 			}),
 			M_AmmoTrackingState.VerifyBindingDelay, false);
 	}
+
+	BeginPlay_ScheduleVehicleModuleRegistration();
+}
+
+void ACPPTurretsMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	EndPlay_CancelVehicleModuleRegistration();
+	Super::EndPlay(EndPlayReason);
+}
+
+void ACPPTurretsMaster::BeginPlay_ScheduleVehicleModuleRegistration()
+{
+	ATankMaster* TankOwner = Cast<ATankMaster>(GetParentActor());
+	UWorld* World = GetWorld();
+	if (not IsValid(TankOwner) || not IsValid(World) || not GetHasOwnVehicleModuleMount())
+	{
+		return;
+	}
+	M_ModuleRegistrationTank = TankOwner;
+	TankOwner->AddPendingTurretModuleRegistration(this);
+
+	// Blueprint BeginPlay adds the weapons, so the weapon array is only guaranteed complete next tick.
+	const TWeakObjectPtr<ACPPTurretsMaster> WeakTurret(this);
+	M_ModuleRegistrationTimerHandle = World->GetTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateLambda([WeakTurret]()
+		{
+			if (not WeakTurret.IsValid())
+			{
+				return;
+			}
+			WeakTurret->OnVehicleModuleRegistrationTimer();
+		}));
+}
+
+void ACPPTurretsMaster::OnVehicleModuleRegistrationTimer()
+{
+	M_ModuleRegistrationTimerHandle.Invalidate();
+	if (not GetIsValidModuleRegistrationTank())
+	{
+		return;
+	}
+	M_ModuleRegistrationTank->OnTurretReadyForModuleRegistration(this);
+}
+
+void ACPPTurretsMaster::EndPlay_CancelVehicleModuleRegistration()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ModuleRegistrationTimerHandle);
+	}
+	// No validator: the tank is commonly destroyed together with, and before, its turrets.
+	ATankMaster* TankOwner = M_ModuleRegistrationTank.Get();
+	M_ModuleRegistrationTank.Reset();
+	if (IsValid(TankOwner))
+	{
+		TankOwner->CancelTurretModuleRegistration(this);
+	}
+}
+
+bool ACPPTurretsMaster::GetIsValidModuleRegistrationTank() const
+{
+	if (M_ModuleRegistrationTank.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_ModuleRegistrationTank",
+		"GetIsValidModuleRegistrationTank",
+		this
+	);
+	return false;
+}
+
+UWeaponState* ACPPTurretsMaster::GetLargestCalibreWeapon() const
+{
+	UWeaponState* LargestWeapon = nullptr;
+	for (UWeaponState* Weapon : M_TWeapons)
+	{
+		if (not IsValid(Weapon))
+		{
+			continue;
+		}
+		// Strictly larger only, so equal calibres keep the first weapon in array order.
+		const bool bIsLarger = not IsValid(LargestWeapon)
+			|| Weapon->GetRawWeaponData().WeaponCalibre > LargestWeapon->GetRawWeaponData().WeaponCalibre;
+		if (bIsLarger)
+		{
+			LargestWeapon = Weapon;
+		}
+	}
+	return LargestWeapon;
 }
 
 void ACPPTurretsMaster::PostInitializeComponents()
