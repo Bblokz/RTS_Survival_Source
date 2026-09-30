@@ -506,8 +506,6 @@ void ATankMaster::BeginPlay()
 	}
 	// Wait for bp begin play to set the subtype.
 	BeginPlay_SetupData();
-	// After MaxHealth and the ability array are initialized; Blueprint BeginPlay installed the modules.
-	BeginPlay_InitVehicleModules();
 
 	BeginPlay_SetupCollisionVsBuildings();
 	BeginPlay_SetFactionFlagPrimitiveDataIndex();

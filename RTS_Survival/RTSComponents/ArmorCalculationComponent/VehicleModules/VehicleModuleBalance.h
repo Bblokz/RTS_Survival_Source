@@ -26,19 +26,20 @@ namespace VehicleModuleBalance
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_Front
 		{
-			inline constexpr float Tracks = 0.12f;
+			inline constexpr float Engine = 1.00f;
 			inline constexpr float Ammo = 0.08f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_FrontUpperGlacis
 		{
 			inline constexpr float Ammo = 0.10f;
+			inline constexpr float Engine = 1.00f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_FrontLowerGlacis
 		{
-			inline constexpr float Tracks = 0.35f;
-			inline constexpr float Engine = 0.10f;
+			inline constexpr float Engine = 0.35f;
+			inline constexpr float Ammo = 0.10f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideLeft
@@ -273,7 +274,7 @@ namespace VehicleModuleBalance
 		namespace Plate_Front
 		{
 			inline constexpr float AddOnArmor = 0.30f;
-			inline constexpr float Tracks = 0.30f;
+			inline constexpr float Engine = 0.30f;
 			inline constexpr float Ammo = 0.30f;
 		}
 		/** @brief Damage fraction passed to each module hit on this armor plate. */
@@ -281,13 +282,14 @@ namespace VehicleModuleBalance
 		{
 			inline constexpr float AddOnArmor = 0.35f;
 			inline constexpr float Ammo = 0.30f;
+			inline constexpr float Engine = 0.30f;
 		}
 		/** @brief Damage fraction passed to each module hit on this armor plate. */
 		namespace Plate_FrontLowerGlacis
 		{
 			inline constexpr float AddOnArmor = 0.25f;
-			inline constexpr float Tracks = 0.55f;
-			inline constexpr float Engine = 0.30f;
+			inline constexpr float Engine = 0.55f;
+			inline constexpr float Ammo = 0.30f;
 		}
 		/** @brief Damage fraction passed to each module hit on this armor plate. */
 		namespace Plate_SideLeft
@@ -881,9 +883,9 @@ namespace VehicleModuleBalance
 		// Plate_Front
 		MakeRuleSet(
 			MakeAddOnRule(RuleSetDamageMultipliers::Plate_Front::AddOnArmor),
-			MakeTypedRule(EModule::Tracks,
-			              RuleSetProbabilities::Plate_Front::Tracks,
-			              RuleSetDamageMultipliers::Plate_Front::Tracks),
+			MakeTypedRule(EModule::Engine,
+			              RuleSetProbabilities::Plate_Front::Engine,
+			              RuleSetDamageMultipliers::Plate_Front::Engine),
 			MakeTypedRule(EModule::Ammo,
 			              RuleSetProbabilities::Plate_Front::Ammo,
 			              RuleSetDamageMultipliers::Plate_Front::Ammo)
@@ -893,17 +895,20 @@ namespace VehicleModuleBalance
 			MakeAddOnRule(RuleSetDamageMultipliers::Plate_FrontUpperGlacis::AddOnArmor),
 			MakeTypedRule(EModule::Ammo,
 			              RuleSetProbabilities::Plate_FrontUpperGlacis::Ammo,
-			              RuleSetDamageMultipliers::Plate_FrontUpperGlacis::Ammo)
+			              RuleSetDamageMultipliers::Plate_FrontUpperGlacis::Ammo),
+			MakeTypedRule(EModule::Engine,
+			              RuleSetProbabilities::Plate_FrontUpperGlacis::Engine,
+			              RuleSetDamageMultipliers::Plate_FrontUpperGlacis::Engine)
 		),
 		// Plate_FrontLowerGlacis
 		MakeRuleSet(
 			MakeAddOnRule(RuleSetDamageMultipliers::Plate_FrontLowerGlacis::AddOnArmor),
-			MakeTypedRule(EModule::Tracks,
-			              RuleSetProbabilities::Plate_FrontLowerGlacis::Tracks,
-			              RuleSetDamageMultipliers::Plate_FrontLowerGlacis::Tracks),
 			MakeTypedRule(EModule::Engine,
 			              RuleSetProbabilities::Plate_FrontLowerGlacis::Engine,
-			              RuleSetDamageMultipliers::Plate_FrontLowerGlacis::Engine)
+			              RuleSetDamageMultipliers::Plate_FrontLowerGlacis::Engine),
+			MakeTypedRule(EModule::Ammo,
+			              RuleSetProbabilities::Plate_FrontLowerGlacis::Ammo,
+			              RuleSetDamageMultipliers::Plate_FrontLowerGlacis::Ammo)
 		),
 		// Plate_SideLeft
 		MakeRuleSet(

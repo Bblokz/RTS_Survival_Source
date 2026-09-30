@@ -41,7 +41,7 @@ namespace TankMasterModuleHelpers
 // Initialization
 // ----------------------------------------------------------------------------------------------------
 
-void ATankMaster::BeginPlay_InitVehicleModules()
+void ATankMaster::BeginPlay_OnModulesComplete_FinalizeVehicleModules()
 {
 	UArmorCalculation* ArmorCalculation = FindComponentByClass<UArmorCalculation>();
 	// Tanks without installed modules keep their existing behaviour.

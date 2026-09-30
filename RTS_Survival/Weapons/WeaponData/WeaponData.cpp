@@ -1,6 +1,5 @@
 ﻿// Copyright (c) Bas Blokzijl. All rights reserved.
 #include "WeaponData.h"
-#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleDamageEvent.h"
 
 #include "NiagaraComponent.h"
 #include "WeaponSystems.h"
@@ -1447,18 +1446,13 @@ void UWeaponState::OnCoolDownFinished()
 
 bool UWeaponState::FluxDamageHitActor_DidActorDie(
 	AActor* HitActor,
-	const float BaseDamageToFlux,
-	const FVehicleModuleDamageEvent* ModuleDamageEvent)
+	const float BaseDamageToFlux)
 {
 	const float Dmg = FRTSWeaponHelpers::GetDamageWithFlux(BaseDamageToFlux, WeaponData.DamageFlux);
 
 	DamageEvent.DamageTypeClass = DamageTypeClass;
-	// The module event resolves vehicle module damage once, after the pawn applied the actual hull damage.
-	const FDamageEvent& EventToApply = ModuleDamageEvent != nullptr
-		                                   ? static_cast<const FDamageEvent&>(*ModuleDamageEvent)
-		                                   : DamageEvent;
 
-	const float Result = HitActor->TakeDamage(Dmg, EventToApply, /*Instigator=*/nullptr, /*Causer=*/nullptr);
+	const float Result = HitActor->TakeDamage(Dmg, DamageEvent, /*Instigator=*/nullptr, /*Causer=*/nullptr);
 	return Result == 0.f;
 }
 
@@ -2132,58 +2126,36 @@ float UWeaponStateTrace::CalculateTraceArmorPenAtImpact(
 	return FMath::Lerp(WeaponData.ArmorPen, WeaponData.ArmorPenMaxRange, InterpolationFactor);
 }
 
-bool UWeaponStateTrace::DidTracePen(const FHitResult& TraceHit, AActor*& OutHitActor,
-                                    FVehicleModuleDamageEvent& OutModuleDamageEvent, bool& bOutHasArmorHit) const
+bool UWeaponStateTrace::DidTracePen(const FHitResult& TraceHit, AActor*& OutHitActor) const
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(TRACEWEAPON::SearchArmorCalc);
 	UArmorCalculation* ArmorCalculationComp = FRTSWeaponHelpers::GetArmorAndActorOrParentFromHit(
 		TraceHit, OutHitActor);
-	bOutHasArmorHit = IsValid(ArmorCalculationComp);
-	if (bOutHasArmorHit)
+	if (IsValid(ArmorCalculationComp))
 	{
-		return DidTracePenArmorCalcComponent(ArmorCalculationComp, TraceHit, OutModuleDamageEvent);
+		return DidTracePenArmorCalcComponent(ArmorCalculationComp, TraceHit);
 	}
 	return true;
 }
 
 bool UWeaponStateTrace::DidTracePenArmorCalcComponent(UArmorCalculation* ArmorCalculation,
-                                                      const FHitResult& HitResult,
-                                                      FVehicleModuleDamageEvent& OutModuleDamageEvent) const
+                                                      const FHitResult& HitResult) const
 {
 	float RawArmorValue = 0.0f;
 
 	EArmorPlate PlateHit = EArmorPlate::Plate_Front;
-	int32 PlateRegistrationId = INDEX_NONE;
 	float AdjustedArmorPen = WeaponData.ArmorPen;
 	const FVector ImpactDirection = HitResult.TraceEnd - HitResult.TraceStart;
 	const float EffectiveArmor = ArmorCalculation->GetEffectiveArmorOnHit(
 		HitResult.Component, HitResult.Location, ImpactDirection, HitResult.ImpactNormal, RawArmorValue,
-		AdjustedArmorPen, PlateHit, PlateRegistrationId);
-	const bool bPenetrated = EffectiveArmor < AdjustedArmorPen;
-
-	// The plate context and existing penetration result travel with the hit; damage flux is sampled later.
-	FVehicleModuleBallisticHit BallisticHit;
-	BallisticHit.ArmorCalculation = ArmorCalculation;
-	BallisticHit.HitLocation = HitResult.Location;
-	BallisticHit.PlateHit = PlateHit;
-	BallisticHit.PlateRegistrationId = PlateRegistrationId;
-	BallisticHit.EffectiveArmor = EffectiveArmor;
-	BallisticHit.ProjectileBaseDamage = WeaponData.BaseDamage;
-	BallisticHit.ProjectileCalibre = WeaponData.WeaponCalibre;
-	BallisticHit.bPenetrated = bPenetrated;
-	BallisticHit.ShellType = WeaponData.ShellType;
-	// Every trace is its own shot; the ordinal separates impacts of the same weapon state.
-	BallisticHit.ShotActivationId = GetUniqueID();
-	BallisticHit.ImpactOrdinal = ++M_ModuleTraceImpactSerial;
-	OutModuleDamageEvent = FVehicleModuleDamageEvent::MakeBallisticEvent(BallisticHit, DamageTypeClass);
-	return bPenetrated;
+		AdjustedArmorPen, PlateHit);
+	return EffectiveArmor < AdjustedArmorPen;
 }
 
 
-void UWeaponStateTrace::OnActorPenArmor(const FHitResult& HitResult, AActor* HitActor,
-                                        const FVehicleModuleDamageEvent* ModuleDamageEvent)
+void UWeaponStateTrace::OnActorPenArmor(const FHitResult& HitResult, AActor* HitActor)
 {
-	if (FluxDamageHitActor_DidActorDie(HitActor, WeaponData.BaseDamage, ModuleDamageEvent))
+	if (FluxDamageHitActor_DidActorDie(HitActor, WeaponData.BaseDamage))
 	{
 		OnActorKilled(HitActor);
 	}
@@ -2193,9 +2165,7 @@ void UWeaponStateTrace::OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FV
                                                   const FRotator& ImpactRotation, const ERTSSurfaceType SurfaceTypeHit)
 {
 	AActor* HitActor;
-	FVehicleModuleDamageEvent ModuleDamageEvent;
-	bool bHasArmorHit = false;
-	if (DidTracePen(TraceHit, HitActor, ModuleDamageEvent, bHasArmorHit))
+	if (DidTracePen(TraceHit, HitActor))
 	{
 		if constexpr (DeveloperSettings::Debugging::GArmorCalculation_Compile_DebugSymbols)
 		{
@@ -2204,17 +2174,13 @@ void UWeaponStateTrace::OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FV
 				DrawDebugString(World, TraceHit.ImpactPoint, "tracePen", nullptr, FColor::Red, 2.f);
 			}
 		}
-		OnActorPenArmor(TraceHit, HitActor, bHasArmorHit ? &ModuleDamageEvent : nullptr);
+		OnActorPenArmor(TraceHit, HitActor);
 		OutEndLocation = TraceHit.ImpactPoint;
 		CreateWeaponImpact(TraceHit.ImpactPoint, SurfaceTypeHit,
 		                   ImpactRotation);
 		return;
 	}
-	// Trace bounce: no hull damage, but external modules roll once.
-	if (bHasArmorHit)
-	{
-		ModuleDamageEvent.ApplyModuleDamageWithoutHullDamage();
-	}
+	// Trace bounce.
 	OutEndLocation = TraceHit.ImpactPoint;
 	CreateWeaponNonPenVfx(TraceHit.ImpactPoint, ImpactRotation, true);
 }

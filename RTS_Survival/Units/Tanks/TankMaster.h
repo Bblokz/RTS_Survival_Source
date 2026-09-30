@@ -370,7 +370,7 @@ public:
 
 	/** @brief Removes only this source's restriction; the remaining sources are recomposed. */
 	void ClearMobilityRestriction(const UObject* Source);
-	
+
 	void SetAudioCompsDisabled(const bool bDisable);
 
 	virtual void PropagateNewAggroStance(const ERTSAggroBehaviour NewStance) final;
@@ -429,10 +429,9 @@ public:
 
 	/** @brief Restores turret and hull weapon auto-engage after temporary aircraft transport disabling. */
 	void EnableWeaponsAfterAircraftDrop();
-	
+
 	UFUNCTION(BlueprintCallable, Category="Turrets")
 	void SetTurretsDisabled();
-	
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -671,12 +670,12 @@ protected:
 	 * @param CallingTurret The turret that is in range.
      * @note This is an ITurretOwner function. 
 	 */
-	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override ;
+	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override;
 	virtual void OnHullWeaponOutOfRange(
 		const FVector TargetLocation,
 		UHullWeaponComponent* CallingHullWeapon) override;
 	virtual void OnHullWeaponInRange(UHullWeaponComponent* CallingHullWeapon) override;
-	
+
 	virtual void OnCancelMovementToGetInRangeOfTurret();
 
 	/**
@@ -752,7 +751,9 @@ private:
 #endif
 
 	// ---- Vehicle module integration ----
-	void BeginPlay_InitVehicleModules();
+	// called from blueprints once all modules are set up in there.
+	UFUNCTION(BlueprintCallable, NotBlueprintable)
+	void BeginPlay_OnModulesComplete_FinalizeVehicleModules();
 	void BeginPlay_InitVehicleModuleBindings();
 	bool GetIsValidModuleArmor() const;
 	void RefreshModuleRepairCounts();
@@ -849,7 +850,7 @@ private:
 
 	// The direction the mesh needs to face.
 	FRotator M_RotateToDirection;
-	
+
 	void BeginPlay_SetupCollisionVsBuildings();
 	void BeginPlay_SetFactionFlagPrimitiveDataIndex();
 
