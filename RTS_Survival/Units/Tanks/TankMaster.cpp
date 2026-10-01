@@ -714,7 +714,7 @@ void ATankMaster::OnVehicleModuleStateChanged(const FModuleStateChange& Change)
 		OnModuleEngineDamaged(Change);
 		break;
 	case EVehicleModuleTypes::Ammo:
-		OnModuleAmmoDamaged(Change.NewState, RemainingModuleHp);
+		OnModuleAmmoDamaged(Change);
 		break;
 	case EVehicleModuleTypes::Turret:
 		OnModuleTurretDamaged(Change.NewState, RemainingModuleHp);

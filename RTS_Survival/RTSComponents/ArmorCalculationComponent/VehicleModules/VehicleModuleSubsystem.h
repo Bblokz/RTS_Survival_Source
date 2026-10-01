@@ -28,6 +28,9 @@ public:
 	/** @return The configured fire subclass for this profile; super-heavy tanks use HeavyTankEngineFire. */
 	TSubclassOf<UTankEngineFireBehaviour> GetEngineFireBehaviourClass(EVehicleModuleProfile Profile) const;
 
+	/** @return The configured cook-off subclass for this profile; super-heavy tanks use HeavyTankAmmoCookOff. */
+	TSubclassOf<UAmmoCookOffBehaviour> GetAmmoCookOffBehaviourClass(EVehicleModuleProfile Profile) const;
+
 	/**
 	 * @brief Resolves the healthbar icon of a non-healthy module type.
 	 * @param Type Installable module type.

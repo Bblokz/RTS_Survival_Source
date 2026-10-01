@@ -7,6 +7,7 @@
 #include "Engine/DeveloperSettings.h"
 #include "VehicleModuleBalance.h"
 #include "VehicleModuleBehaviour.h"
+#include "RTS_Survival/Behaviours/Derived/Damage/AmmoCookOff/AmmoCookOffBehaviour.h"
 #include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireBehaviour.h"
 
 #include "VehicleModuleDataAsset.generated.h"
@@ -62,6 +63,20 @@ public:
 	// Super-heavy tanks share this fire behaviour.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="EngineFire")
 	TSubclassOf<UTankEngineFireBehaviour> HeavyTankEngineFire = nullptr;
+
+	/** @brief Select Blueprint subclasses of AmmoCookOffBehaviour for each vehicle profile. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AmmoCookOff")
+	TSubclassOf<UAmmoCookOffBehaviour> ArmoredCarAmmoCookOff = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AmmoCookOff")
+	TSubclassOf<UAmmoCookOffBehaviour> LightTankAmmoCookOff = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AmmoCookOff")
+	TSubclassOf<UAmmoCookOffBehaviour> MediumTankAmmoCookOff = nullptr;
+
+	// Super-heavy tanks share this cook-off behaviour.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AmmoCookOff")
+	TSubclassOf<UAmmoCookOffBehaviour> HeavyTankAmmoCookOff = nullptr;
 
 	// Icon size in UMG units before the healthbar render scale.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Vehicle Modules")

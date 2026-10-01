@@ -31,6 +31,7 @@ class UArmor;
 class UArmorCalculation;
 class UVehicleModuleSubsystem;
 class UTankEngineFireBehaviour;
+class UAmmoCookOffBehaviour;
 struct FHealthHealingReceipt;
 class URTSNavCollision;
 class UBehaviour;
@@ -799,10 +800,12 @@ private:
 	 */
 	bool StartEngineFireChance(EVehicleModuleState EngineState, EWeaponShellType ShellType);
 	TSubclassOf<UTankEngineFireBehaviour> GetEngineFireBehaviourClass() const;
-	void ShowEngineFirePopup() const;
+	bool StartAmmoCookOffChance(EVehicleModuleState AmmoState);
+	TSubclassOf<UAmmoCookOffBehaviour> GetAmmoCookOffBehaviourClass() const;
+	void ShowModuleFirePopup(const FString& PopupText) const;
 	void OnModuleAddOnArmorDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
 	void OnModuleTracksDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
-	void OnModuleAmmoDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
+	void OnModuleAmmoDamaged(const FModuleStateChange& Change);
 	void OnModuleTurretDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
 	void OnModuleWeaponDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
 	void OnModuleWheelsDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);

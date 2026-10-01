@@ -17,6 +17,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Behaviours/Derived/Damage/AmmoCookOff/AmmoCookOffBehaviour.h"
 #include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireBehaviour.h"
 
 namespace VehicleModuleTestConstants
@@ -35,7 +36,7 @@ namespace VehicleModuleTestConstants
 /** @brief Test-only access to private module state; builds isolated tanks without Blueprint setup. */
 struct FVehicleModuleTestAccess
 {
-	static void SetEngineFireDataAsset(UVehicleModuleSubsystem& Subsystem, UVehicleModuleDataAsset* DataAsset)
+	static void SetModuleDataAsset(UVehicleModuleSubsystem& Subsystem, UVehicleModuleDataAsset* DataAsset)
 	{
 		Subsystem.M_ModuleDataAsset = DataAsset;
 	}
@@ -281,7 +282,7 @@ bool FVehicleEngineFireProfileTest::RunTest(const FString& Parameters)
 	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
 	UVehicleModuleSubsystem* Subsystem = NewObject<UVehicleModuleSubsystem>(GameInstance);
 	UVehicleModuleDataAsset* DataAsset = NewObject<UVehicleModuleDataAsset>(Subsystem);
-	FVehicleModuleTestAccess::SetEngineFireDataAsset(*Subsystem, DataAsset);
+	FVehicleModuleTestAccess::SetModuleDataAsset(*Subsystem, DataAsset);
 	const TSubclassOf<UTankEngineFireBehaviour> FireClass = UTankEngineFireBehaviour::StaticClass();
 
 	DataAsset->ArmoredCarEngineFire = FireClass;
@@ -301,6 +302,49 @@ bool FVehicleEngineFireProfileTest::RunTest(const FString& Parameters)
 		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::HeavyTank) == FireClass);
 	TestTrue(TEXT("Super-heavy tank shares heavy fire"),
 		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::SuperHeavyTank) == FireClass);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleAmmoCookOffChanceTest, "RTS.VehicleModules.AmmoCookOffChance",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleAmmoCookOffChanceTest::RunTest(const FString& Parameters)
+{
+	using VehicleModuleBalance::AmmoCookOff::GetChance;
+	TestEqual(TEXT("Damaged ammo cook-off chance"), GetChance(EVehicleModuleState::Damaged), 0.1f);
+	TestEqual(TEXT("Destroyed ammo cook-off chance"), GetChance(EVehicleModuleState::Destroyed), 0.2f);
+	TestEqual(TEXT("Healthy ammo cannot cook off"), GetChance(EVehicleModuleState::Healthy), 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleAmmoCookOffProfileTest, "RTS.VehicleModules.AmmoCookOffProfiles",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleAmmoCookOffProfileTest::RunTest(const FString& Parameters)
+{
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UVehicleModuleSubsystem* Subsystem = NewObject<UVehicleModuleSubsystem>(GameInstance);
+	UVehicleModuleDataAsset* DataAsset = NewObject<UVehicleModuleDataAsset>(Subsystem);
+	FVehicleModuleTestAccess::SetModuleDataAsset(*Subsystem, DataAsset);
+	const TSubclassOf<UAmmoCookOffBehaviour> CookOffClass = UAmmoCookOffBehaviour::StaticClass();
+
+	DataAsset->ArmoredCarAmmoCookOff = CookOffClass;
+	TestTrue(TEXT("Armored car selects its cook-off"),
+		Subsystem->GetAmmoCookOffBehaviourClass(EVehicleModuleProfile::ArmoredCar) == CookOffClass);
+	DataAsset->ArmoredCarAmmoCookOff = nullptr;
+	DataAsset->LightTankAmmoCookOff = CookOffClass;
+	TestTrue(TEXT("Light tank selects its cook-off"),
+		Subsystem->GetAmmoCookOffBehaviourClass(EVehicleModuleProfile::LightTank) == CookOffClass);
+	DataAsset->LightTankAmmoCookOff = nullptr;
+	DataAsset->MediumTankAmmoCookOff = CookOffClass;
+	TestTrue(TEXT("Medium tank selects its cook-off"),
+		Subsystem->GetAmmoCookOffBehaviourClass(EVehicleModuleProfile::MediumTank) == CookOffClass);
+	DataAsset->MediumTankAmmoCookOff = nullptr;
+	DataAsset->HeavyTankAmmoCookOff = CookOffClass;
+	TestTrue(TEXT("Heavy tank selects its cook-off"),
+		Subsystem->GetAmmoCookOffBehaviourClass(EVehicleModuleProfile::HeavyTank) == CookOffClass);
+	TestTrue(TEXT("Super-heavy tank shares heavy cook-off"),
+		Subsystem->GetAmmoCookOffBehaviourClass(EVehicleModuleProfile::SuperHeavyTank) == CookOffClass);
 	return true;
 }
 

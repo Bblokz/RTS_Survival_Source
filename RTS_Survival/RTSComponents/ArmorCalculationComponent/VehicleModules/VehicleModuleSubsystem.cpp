@@ -117,6 +117,29 @@ TSubclassOf<UTankEngineFireBehaviour> UVehicleModuleSubsystem::GetEngineFireBeha
 	}
 }
 
+TSubclassOf<UAmmoCookOffBehaviour> UVehicleModuleSubsystem::GetAmmoCookOffBehaviourClass(
+	const EVehicleModuleProfile Profile) const
+{
+	if (not GetIsValidModuleDataAsset())
+	{
+		return nullptr;
+	}
+	switch (Profile)
+	{
+	case EVehicleModuleProfile::ArmoredCar:
+		return M_ModuleDataAsset->ArmoredCarAmmoCookOff;
+	case EVehicleModuleProfile::LightTank:
+		return M_ModuleDataAsset->LightTankAmmoCookOff;
+	case EVehicleModuleProfile::MediumTank:
+		return M_ModuleDataAsset->MediumTankAmmoCookOff;
+	case EVehicleModuleProfile::HeavyTank:
+	case EVehicleModuleProfile::SuperHeavyTank:
+		return M_ModuleDataAsset->HeavyTankAmmoCookOff;
+	default:
+		return nullptr;
+	}
+}
+
 bool UVehicleModuleSubsystem::GetIsValidModuleDataAsset() const
 {
 	if (IsValid(M_ModuleDataAsset))

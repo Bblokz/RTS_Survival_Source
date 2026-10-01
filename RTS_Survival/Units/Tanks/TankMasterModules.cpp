@@ -6,6 +6,7 @@
 #include "Engine/GameInstance.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/Behaviours/Derived/Damage/AmmoCookOff/AmmoCookOffBehaviour.h"
 #include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireBehaviour.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
@@ -153,7 +154,7 @@ bool ATankMaster::StartEngineFireChance(const EVehicleModuleState EngineState, c
 		return false;
 	}
 	BehaviourComponent->AddBehaviour(FireBehaviourClass);
-	ShowEngineFirePopup();
+	ShowModuleFirePopup(TEXT("ENGINE FIRE"));
 	return true;
 }
 
@@ -170,7 +171,34 @@ TSubclassOf<UTankEngineFireBehaviour> ATankMaster::GetEngineFireBehaviourClass()
 	return M_VehicleModuleSubsystem->GetEngineFireBehaviourClass(M_ModuleArmor->GetVehicleModuleProfile());
 }
 
-void ATankMaster::ShowEngineFirePopup() const
+bool ATankMaster::StartAmmoCookOffChance(const EVehicleModuleState AmmoState)
+{
+	const float CookOffChance = AmmoCookOff::GetChance(AmmoState);
+	if (CookOffChance <= 0.f || FMath::FRand() >= CookOffChance)
+	{
+		return false;
+	}
+	const TSubclassOf<UAmmoCookOffBehaviour> CookOffBehaviourClass = GetAmmoCookOffBehaviourClass();
+	if (CookOffBehaviourClass == nullptr || not GetIsValidBehaviourComponent()
+		|| BehaviourComponent->GetBehaviourByClass(CookOffBehaviourClass) != nullptr)
+	{
+		return false;
+	}
+	BehaviourComponent->AddBehaviour(CookOffBehaviourClass);
+	ShowModuleFirePopup(TEXT("AMMO COOK OFF"));
+	return true;
+}
+
+TSubclassOf<UAmmoCookOffBehaviour> ATankMaster::GetAmmoCookOffBehaviourClass() const
+{
+	if (not GetIsValidModuleArmor() || not GetIsValidVehicleModuleSubsystem())
+	{
+		return nullptr;
+	}
+	return M_VehicleModuleSubsystem->GetAmmoCookOffBehaviourClass(M_ModuleArmor->GetVehicleModuleProfile());
+}
+
+void ATankMaster::ShowModuleFirePopup(const FString& PopupText) const
 {
 	UAnimatedTextWidgetPoolManager* PoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
 	if (not IsValid(PoolManager))
@@ -187,7 +215,7 @@ void ATankMaster::ShowEngineFirePopup() const
 	TextSettings.VisibleDuration = PopupVisibleDuration;
 	TextSettings.FadeOutDuration = PopupFadeOutDuration;
 	PoolManager->ShowAnimatedText(
-		FRTSRichTextConverter::MakeRTSRich(TEXT("ENGINE FIRE"), ERTSRichText::Text_Bad14),
+		FRTSRichTextConverter::MakeRTSRich(PopupText, ERTSRichText::Text_Bad14),
 		GetActorLocation() + FVector(0.f, 0.f, PopupHeight), false,
 		PopupWrapWidth, ETextJustify::Center, TextSettings);
 }
@@ -200,8 +228,13 @@ void ATankMaster::OnModuleTracksDamaged(const EVehicleModuleState NewState, cons
 {
 }
 
-void ATankMaster::OnModuleAmmoDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+void ATankMaster::OnModuleAmmoDamaged(const FModuleStateChange& Change)
 {
+	if (Change.Cause != EModuleChangeCause::Damage || Change.NewState == EVehicleModuleState::Healthy)
+	{
+		return;
+	}
+	(void)StartAmmoCookOffChance(Change.NewState);
 }
 
 void ATankMaster::OnModuleTurretDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
