@@ -2673,7 +2673,7 @@ void AProjectile::CreateHeHeatBounceDamageText(const FVector& Location, const EA
 	TextSettings.DeltaZ = 105.f;
 	TextSettings.VisibleDuration = 1.25f;
 	TextSettings.FadeOutDuration = 1.f;
-	FString Text = FRTSRichTextConverter::MakeRTSRich("Non-Penetrating explosion", ERTSRichText::Text_Exp);
+	FString Text = FRTSRichTextConverter::MakeRTSRich("Overpressure", ERTSRichText::Text_Exp);
 	Text += "\n";
 	Text += FRTSRichTextConverter::MakeRTSRich(Global_GetArmorPlateDamageTypeText(DamageType) + " armor damaged!",
 	                                           ERTSRichText::Text_Exp);
@@ -2809,7 +2809,8 @@ void AProjectile::HandleAoe(const FVector& HitLocation, AActor* HitActor)
 		EShieldDamageSource::Shrapnel,
 		ActorsToIgnore,
 		// Shell splash reaches external vehicle modules; the directly hit actor is ignored above.
-		EVehicleModuleSplashPolicy::DamageExternalModules
+		EVehicleModuleSplashPolicy::DamageExternalModules,
+		M_ShellType
 	);
 }
 

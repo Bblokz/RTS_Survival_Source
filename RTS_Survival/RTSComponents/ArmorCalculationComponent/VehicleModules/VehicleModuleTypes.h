@@ -76,6 +76,7 @@ enum class EModuleNonPenPolicy : uint8
 	MantletOnly
 };
 
+UENUM(BlueprintType)
 enum class EModuleChangeCause : uint8
 {
 	Damage,
@@ -183,7 +184,12 @@ struct FModuleStateChange
 	float CurrentHp = 0.f;
 	float MaxHp = 0.f;
 	EModuleChangeCause Cause = EModuleChangeCause::Damage;
+	// Shell responsible for this transition; None for repair, load and non-shell damage sources.
+	EWeaponShellType DamageShellType = static_cast<EWeaponShellType>(0);
 };
+
+static_assert(sizeof(FModuleStateChange) == 24,
+	"Keep FModuleStateChange compact because fixed batches are copied on the module damage path.");
 
 /**
  * @brief Explicit per-impact context; never cached on the component because impacts can re-enter.

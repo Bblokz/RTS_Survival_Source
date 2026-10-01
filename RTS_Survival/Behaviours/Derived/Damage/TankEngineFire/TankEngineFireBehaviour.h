@@ -9,11 +9,15 @@
 #include "TankEngineFireBehaviour.generated.h"
 
 class ATankMaster;
+class UAudioComponent;
 class URTSFireSubsystem;
+class USoundAttenuation;
+class USoundBase;
+class USoundConcurrency;
 
 /**
  * @brief Add this behaviour to a tank to burn its health and show a pooled hull fire.
- * Configure damage, attachment, and visuals in a behaviour Blueprint subclass.
+ * Configure damage, attachment, visuals, and a looping fire sound in a behaviour Blueprint subclass.
  */
 UCLASS(Blueprintable)
 class RTS_SURVIVAL_API UTankEngineFireBehaviour : public UBehaviour
@@ -33,6 +37,8 @@ private:
 	void SampleDuration();
 	void StartFireEffect();
 	void StopFireEffect();
+	void StartFireSound();
+	void StopFireSound();
 	bool GetIsValidTankMaster() const;
 	bool GetIsValidFireSubsystem() const;
 
@@ -61,11 +67,23 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Tank Engine Fire|Effect", meta=(AllowPrivateAccess="true"))
 	FTankEngineFireAttachmentRules M_AttachmentRules;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Tank Engine Fire|Sound", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<USoundBase> M_FireSound = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Tank Engine Fire|Sound", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<USoundConcurrency> M_SoundConcurrency = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Tank Engine Fire|Sound", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<USoundAttenuation> M_SoundAttenuation = nullptr;
+
 	UPROPERTY()
 	TWeakObjectPtr<ATankMaster> M_TankMaster;
 
 	UPROPERTY()
 	TWeakObjectPtr<URTSFireSubsystem> M_FireSubsystem;
+
+	UPROPERTY()
+	TWeakObjectPtr<UAudioComponent> M_FireAudioComponent;
 
 	FDamageEvent M_DamageEvent;
 	// Caps damage at the sampled lifetime even when the behaviour component ticks after expiry.

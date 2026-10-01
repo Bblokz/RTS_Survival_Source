@@ -77,6 +77,7 @@ struct RTS_SURVIVAL_API FRTS_AOE
 	 * @param ActorsToIgnore Actors that should be excluded from the sweep and from receiving damage.
 	 * @param ShieldDamageSource Identifies shieldable AOE versus explicitly bypassing mine damage.
 	 * @param ModuleSplashPolicy Opt-in splash damage to external vehicle modules; Ignore keeps hull-only damage.
+	 * @param ModuleDamageShellType Shell responsible for module splash, or Shell_None for non-shell sources.
 	 */
 	static void DealDamageVsRearArmorInRadiusAsync(
 		AActor* DamageCauser,
@@ -91,7 +92,8 @@ struct RTS_SURVIVAL_API FRTS_AOE
 		ETriggerOverlapLogic OverlapLogic,
 		EShieldDamageSource ShieldDamageSource,
 		const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore = TArray<TWeakObjectPtr<AActor>>(),
-		EVehicleModuleSplashPolicy ModuleSplashPolicy = EVehicleModuleSplashPolicy::Ignore
+		EVehicleModuleSplashPolicy ModuleSplashPolicy = EVehicleModuleSplashPolicy::Ignore,
+		EWeaponShellType ModuleDamageShellType = static_cast<EWeaponShellType>(0)
 	);
 
 	/**

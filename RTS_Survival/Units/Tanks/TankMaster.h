@@ -200,6 +200,11 @@ struct FTankTurretModuleRegistrationState
 
 	// Load received before the turret modules existed; applied afterwards so the module counts match.
 	TOptional<FVehicleModuleSaveData> DeferredSaveData;
+
+	// Blueprint module setup and initial child turret discovery must both finish before finalization.
+	bool bBlueprintModuleSetupComplete = false;
+	bool bInitialTurretsDiscovered = false;
+	FTimerHandle InitialTurretDiscoveryTimer;
 };
 
 USTRUCT()
@@ -256,6 +261,7 @@ private:
  * @note In Grandchild blueprints / The specific tank blueprints.
  * @note TRACKED TANKS: call InitTrackedTank to setup rotation speed and force multipliers.
  * @note CHAOS TANKS:  call InitChaosTank to setup the gear up and down logic and the rotation speed.
+ * @note BeginPlay_OnModulesComplete_FinalizeVehicleModules: call after the tank Blueprint installs its modules and armor.
  * @note ***********************************************************************************************
  * Uses a final overwrite on ExecuteCommandMove as both tracked and wheeled vehicle use the same VehicleAIInterface.
  * todo ResetUnitSpecificLogic with turrets.
@@ -315,17 +321,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Vehicle Modules")
 	int32 GetCrewRepairTargetModuleId() const { return M_CrewRepairState.CurrentModuleId; }
 
-	/**
-	 * @brief Lets tank Blueprints react once to committed module state transitions.
-	 * @param ModuleType Type of the instance whose state changed.
-	 * @param NewState Committed Healthy, Damaged or Destroyed state.
-	 * @param RemainingModuleHp Absolute remaining module HP, clamped to [0, MaxHp].
-	 */
-	UFUNCTION(BlueprintImplementableEvent, Category = "Vehicle Modules")
-	void OnVehicleModuleStateChanged(
-		EVehicleModuleTypes ModuleType,
-		EVehicleModuleState NewState,
-		float RemainingModuleHp);
 
 	/** @brief Module health fractions, coverage, finishing work and roll serial for tactical persistence. */
 	UFUNCTION(BlueprintCallable, Category = "Vehicle Modules")
@@ -334,8 +329,8 @@ public:
 	/**
 	 * @brief Applies saved module state after module finalization; never resumes crew work or replays events.
 	 * @param SaveData Data exported from a tank with the same module setup.
-	 * @return True if the data matched this tank and was applied, or was queued until the turrets installed
-	 * their modules (a queued load that then mismatches reports an error).
+	 * @return True if the data matched this tank and was applied, or was queued until initial turret
+	 * registration and module finalization complete (a later mismatch reports an error).
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Vehicle Modules")
 	bool ImportVehicleModuleSaveData(const FVehicleModuleSaveData& SaveData);
@@ -434,6 +429,28 @@ public:
 	void SetTurretsDisabled();
 
 protected:
+
+	/**
+	 * @brief Allows module state reactions to distinguish damage from repair.
+	 * @param Change Copied transition, including the shell responsible for damage-driven state changes.
+	 */
+	void OnVehicleModuleStateChanged(const FModuleStateChange& Change);
+
+	/**
+	 * @brief Lets tank Blueprints react once to committed module state transitions.
+	 * @param ModuleType Type of the instance whose state changed.
+	 * @param NewState Committed Healthy, Damaged or Destroyed state.
+	 * @param RemainingModuleHp Absolute remaining module HP, clamped to [0, MaxHp].
+	 * @param ChangeCause Damage or the repair operation responsible for the transition; load events are suppressed.
+	 * @note DO NOT CALL, use OnVehicleModuleStateChanged instead!
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Vehicle Modules")
+	void BPOnVehicleModuleStateChanged(
+		EVehicleModuleTypes ModuleType,
+		EVehicleModuleState NewState,
+		float RemainingModuleHp,
+		EModuleChangeCause ChangeCause);
+
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void BeginPlay() override;
@@ -751,9 +768,13 @@ private:
 #endif
 
 	// ---- Vehicle module integration ----
-	// called from blueprints once all modules are set up in there.
+	/** @brief Signals that Blueprint finished installing hull modules; turret modules join before HP is finalized.
+	 * @note BeginPlay_OnModulesComplete_FinalizeVehicleModules: call in the tank Blueprint after module and armor setup.
+	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void BeginPlay_OnModulesComplete_FinalizeVehicleModules();
+	void BeginVehicleModuleFinalization(UArmorCalculation* ArmorCalculation);
+	void FinalizeVehicleModulesAfterTurretRegistration();
 	void BeginPlay_InitVehicleModuleBindings();
 	bool GetIsValidModuleArmor() const;
 	void RefreshModuleRepairCounts();
@@ -765,6 +786,15 @@ private:
 	void AnnounceModuleTransitions(const FModuleChangeBatch& Batch);
 	void OnTankMaxHealthChanged(float OldMaxHealth, float NewMaxHealth);
 	void CleanupVehicleModuleBindings();
+	
+	// ------------ Module Damaged Updates -------------------- //
+	void OnModuleEngineDamaged(EVehicleModuleState NewState, const float RemainingModuleHp, bool bIsDueToDamage);
+	void OnModuleAddOnArmorDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
+	void OnModuleTracksDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
+	void OnModuleAmmoDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
+	void OnModuleTurretDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
+	void OnModuleWeaponDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
+	void OnModuleWheelsDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
 
 	// ---- Turret-driven module registration (called by ACPPTurretsMaster only) ----
 	void AddPendingTurretModuleRegistration(ACPPTurretsMaster* Turret);
@@ -774,6 +804,8 @@ private:
 	// Non-const: the engine's AActor::IsUnitAlive is non-const.
 	bool GetCanInstallTurretModules();
 	void ProcessReadyTurretModuleRegistrations();
+	void ScheduleInitialTurretDiscovery();
+	void DiscoverInitialTurretsAndTryFinalize();
 	TArray<ACPPTurretsMaster*> TakeReadyTurretsInMountOrder();
 	void RegisterTurretModulesInMountOrder(const TArray<ACPPTurretsMaster*>& TurretsInMountOrder);
 	bool RegisterModulesForTurret(ACPPTurretsMaster* Turret);

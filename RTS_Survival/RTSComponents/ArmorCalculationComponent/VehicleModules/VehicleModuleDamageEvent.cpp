@@ -37,7 +37,8 @@ FVehicleModuleDamageEvent FVehicleModuleDamageEvent::MakeExplosionEvent(
 	const FVector& InExplosionLocation,
 	const float SourceDamage,
 	const uint32 ShotActivationId,
-	const TSubclassOf<UDamageType> InDamageTypeClass)
+	const TSubclassOf<UDamageType> InDamageTypeClass,
+	const EWeaponShellType DamageShellType)
 {
 	FVehicleModuleDamageEvent DamageEvent;
 	DamageEvent.DamageTypeClass = InDamageTypeClass;
@@ -51,6 +52,7 @@ FVehicleModuleDamageEvent FVehicleModuleDamageEvent::MakeExplosionEvent(
 	}
 	DamageEvent.HitContext.DeliveryType = Delivery;
 	DamageEvent.HitContext.DamageType = ERTSDamageType::Kinetic;
+	DamageEvent.HitContext.ShellType = DamageShellType;
 	DamageEvent.HitContext.ShotActivationId = ShotActivationId;
 	return DamageEvent;
 }

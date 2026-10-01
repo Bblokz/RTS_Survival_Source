@@ -44,8 +44,30 @@ namespace TankMasterModuleHelpers
 void ATankMaster::BeginPlay_OnModulesComplete_FinalizeVehicleModules()
 {
 	UArmorCalculation* ArmorCalculation = FindComponentByClass<UArmorCalculation>();
-	// Tanks without installed modules keep their existing behaviour.
-	if (not IsValid(ArmorCalculation) || ArmorCalculation->GetInstalledModuleCount() <= 0)
+	if (not IsValid(ArmorCalculation))
+	{
+		return;
+	}
+	BeginVehicleModuleFinalization(ArmorCalculation);
+}
+
+void ATankMaster::BeginVehicleModuleFinalization(UArmorCalculation* ArmorCalculation)
+{
+	if (not IsValid(ArmorCalculation) || M_TurretModuleRegistration.bBlueprintModuleSetupComplete
+		|| bM_AreVehicleModulesInitialized)
+	{
+		return;
+	}
+	M_ModuleArmor = ArmorCalculation;
+	M_TurretModuleRegistration.bBlueprintModuleSetupComplete = true;
+	// Child actors and their Blueprint weapons may still be in BeginPlay. Discover mounts next tick.
+	ScheduleInitialTurretDiscovery();
+}
+
+void ATankMaster::FinalizeVehicleModulesAfterTurretRegistration()
+{
+	if (bM_AreVehicleModulesInitialized || not GetIsValidModuleArmor()
+		|| M_ModuleArmor->GetInstalledModuleCount() <= 0)
 	{
 		return;
 	}
@@ -53,20 +75,19 @@ void ATankMaster::BeginPlay_OnModulesComplete_FinalizeVehicleModules()
 	{
 		return;
 	}
-	// Explicit readiness step after InitHealthAndResistance established the real MaxHealth.
-	if (not ArmorCalculation->FinalizeVehicleModuleSetup(this, HealthComponent->GetMaxHealth()))
+	// Both tank and turret modules receive HP from the initialized hull MaxHealth at this boundary.
+	if (not M_ModuleArmor->FinalizeVehicleModuleSetup(this, HealthComponent->GetMaxHealth()))
 	{
 		return;
 	}
 
-	M_ModuleArmor = ArmorCalculation;
 	bM_AreVehicleModulesInitialized = true;
 	BeginPlay_InitVehicleModuleBindings();
 	RefreshMountedModuleBehaviours();
 	HealthComponent->InitializeTankRepairOwner(this);
 	HealthComponent->InitializeTankModulePresentation(this);
 	RefreshModuleRepairCounts();
-	HealthComponent->SynchronizeModuleIconSnapshot(ArmorCalculation->GetModuleIconStates());
+	HealthComponent->SynchronizeModuleIconSnapshot(M_ModuleArmor->GetModuleIconStates());
 	InitializeCrewRepairAbilitySlot();
 }
 
@@ -87,6 +108,10 @@ void ATankMaster::BeginPlay_InitVehicleModuleBindings()
 
 void ATankMaster::CleanupVehicleModuleBindings()
 {
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_TurretModuleRegistration.InitialTurretDiscoveryTimer);
+	}
 	if (IsValid(HealthComponent) && M_MaxHealthChangedHandle.IsValid())
 	{
 		HealthComponent->GetOnMaxHealthChanged().Remove(M_MaxHealthChangedHandle);
@@ -100,6 +125,34 @@ void ATankMaster::CleanupVehicleModuleBindings()
 	M_DeferredModuleBlueprintEvents.Reset();
 	// Turrets ending play after the tank then find nothing to cancel and trigger no module work.
 	M_TurretModuleRegistration = FTankTurretModuleRegistrationState();
+}
+
+void ATankMaster::OnModuleEngineDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp, const bool bIsDueToDamage)
+{
+}
+
+void ATankMaster::OnModuleAddOnArmorDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+{
+}
+
+void ATankMaster::OnModuleTracksDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+{
+}
+
+void ATankMaster::OnModuleAmmoDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+{
+}
+
+void ATankMaster::OnModuleTurretDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+{
+}
+
+void ATankMaster::OnModuleWeaponDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+{
+}
+
+void ATankMaster::OnModuleWheelsDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+{
 }
 
 bool ATankMaster::GetIsValidModuleArmor() const
@@ -286,8 +339,7 @@ void ATankMaster::PublishModuleBlueprintEvents(const FModuleChangeBatch& Batch)
 		{
 			continue;
 		}
-		OnVehicleModuleStateChanged(Change.Type, Change.NewState,
-		                            FMath::Clamp(Change.CurrentHp, 0.f, Change.MaxHp));
+		OnVehicleModuleStateChanged(Change);
 	}
 }
 
@@ -422,7 +474,16 @@ FVehicleModuleSaveData ATankMaster::ExportVehicleModuleSaveData() const
 
 bool ATankMaster::ImportVehicleModuleSaveData(const FVehicleModuleSaveData& SaveData)
 {
-	if (not bM_AreVehicleModulesInitialized || not GetIsValidModuleArmor() || not IsUnitAlive())
+	if (not IsUnitAlive())
+	{
+		return false;
+	}
+	if (M_TurretModuleRegistration.bBlueprintModuleSetupComplete && not bM_AreVehicleModulesInitialized)
+	{
+		M_TurretModuleRegistration.DeferredSaveData = SaveData;
+		return true;
+	}
+	if (not bM_AreVehicleModulesInitialized || not GetIsValidModuleArmor())
 	{
 		return false;
 	}

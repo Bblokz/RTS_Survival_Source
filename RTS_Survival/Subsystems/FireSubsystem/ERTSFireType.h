@@ -15,5 +15,7 @@ enum class ERTSFireType : uint8
 	LargeOptim UMETA(DisplayName="Large"),
 	AmmoCookOffInf,
 	TankFire,
+	GroundFire,
+	
 	
 };

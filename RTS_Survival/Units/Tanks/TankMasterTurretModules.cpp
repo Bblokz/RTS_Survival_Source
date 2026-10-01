@@ -3,6 +3,8 @@
 #include "TankMaster.h"
 
 #include "Components/ChildActorComponent.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -31,6 +33,11 @@ namespace TankMasterTurretModuleHelpers
 void ATankMaster::AddPendingTurretModuleRegistration(ACPPTurretsMaster* Turret)
 {
 	if (not IsValid(Turret))
+	{
+		return;
+	}
+	const TWeakObjectPtr<ACPPTurretsMaster> TurretEntry(Turret);
+	if (M_TurretModuleRegistration.ReadyTurrets.Contains(TurretEntry))
 	{
 		return;
 	}
@@ -83,16 +90,73 @@ bool ATankMaster::GetHasUnprocessedTurretModuleRegistrations()
 
 bool ATankMaster::GetCanInstallTurretModules()
 {
-	// Tanks whose Blueprint installed no modules keep their module-less behaviour.
-	if (not bM_AreVehicleModulesInitialized || not IsUnitAlive() || IsActorBeingDestroyed())
+	if (not M_TurretModuleRegistration.bBlueprintModuleSetupComplete || not IsUnitAlive()
+		|| IsActorBeingDestroyed())
 	{
 		return false;
 	}
 	return GetIsValidModuleArmor();
 }
 
+void ATankMaster::ScheduleInitialTurretDiscovery()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || IsActorBeingDestroyed())
+	{
+		return;
+	}
+	M_TurretModuleRegistration.InitialTurretDiscoveryTimer = World->GetTimerManager().SetTimerForNextTick(
+		FTimerDelegate::CreateUObject(this, &ATankMaster::DiscoverInitialTurretsAndTryFinalize));
+}
+
+void ATankMaster::DiscoverInitialTurretsAndTryFinalize()
+{
+	M_TurretModuleRegistration.InitialTurretDiscoveryTimer.Invalidate();
+	if (not M_TurretModuleRegistration.bBlueprintModuleSetupComplete || IsActorBeingDestroyed())
+	{
+		return;
+	}
+	TArray<UChildActorComponent*> MountComponents;
+	GetComponents<UChildActorComponent>(MountComponents);
+	bool bIsWaitingForChildActor = false;
+	for (UChildActorComponent* MountComponent : MountComponents)
+	{
+		if (not IsValid(MountComponent))
+		{
+			continue;
+		}
+		UClass* ChildActorClass = MountComponent->GetChildActorClass();
+		if (not IsValid(ChildActorClass) || not ChildActorClass->IsChildOf(ACPPTurretsMaster::StaticClass()))
+		{
+			continue;
+		}
+		ACPPTurretsMaster* Turret = Cast<ACPPTurretsMaster>(MountComponent->GetChildActor());
+		if (not IsValid(Turret))
+		{
+			const ACPPTurretsMaster* TurretDefaults = ChildActorClass->GetDefaultObject<ACPPTurretsMaster>();
+			bIsWaitingForChildActor |= IsValid(TurretDefaults) && TurretDefaults->GetHasOwnVehicleModuleMount();
+			continue;
+		}
+		if (Turret->GetHasOwnVehicleModuleMount())
+		{
+			AddPendingTurretModuleRegistration(Turret);
+		}
+	}
+	if (bIsWaitingForChildActor)
+	{
+		ScheduleInitialTurretDiscovery();
+		return;
+	}
+	M_TurretModuleRegistration.bInitialTurretsDiscovered = true;
+	ProcessReadyTurretModuleRegistrations();
+}
+
 void ATankMaster::ProcessReadyTurretModuleRegistrations()
 {
+	if (not M_TurretModuleRegistration.bInitialTurretsDiscovered || not GetCanInstallTurretModules())
+	{
+		return;
+	}
 	const auto IsStale = [](const TWeakObjectPtr<ACPPTurretsMaster>& Entry)
 	{
 		return not Entry.IsValid();
@@ -105,11 +169,18 @@ void ATankMaster::ProcessReadyTurretModuleRegistrations()
 	}
 
 	const TArray<ACPPTurretsMaster*> TurretsInMountOrder = TakeReadyTurretsInMountOrder();
-	if (TurretsInMountOrder.Num() > 0 && GetCanInstallTurretModules())
+	if (TurretsInMountOrder.Num() > 0)
 	{
 		RegisterTurretModulesInMountOrder(TurretsInMountOrder);
 	}
-	ApplyDeferredVehicleModuleSaveData();
+	if (not bM_AreVehicleModulesInitialized)
+	{
+		FinalizeVehicleModulesAfterTurretRegistration();
+	}
+	if (bM_AreVehicleModulesInitialized)
+	{
+		ApplyDeferredVehicleModuleSaveData();
+	}
 }
 
 TArray<ACPPTurretsMaster*> ATankMaster::TakeReadyTurretsInMountOrder()
@@ -145,6 +216,10 @@ void ATankMaster::RegisterTurretModulesInMountOrder(const TArray<ACPPTurretsMast
 	UpdateAutoWeaponModule();
 
 	// Installation after finalization does not dispatch batches; publish the new slots explicitly.
+	if (not bM_AreVehicleModulesInitialized)
+	{
+		return;
+	}
 	RefreshMountedModuleBehaviours();
 	RefreshModuleRepairCounts();
 	if (GetIsValidHealthComponent())

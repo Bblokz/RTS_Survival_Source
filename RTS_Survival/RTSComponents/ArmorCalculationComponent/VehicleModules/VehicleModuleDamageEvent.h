@@ -74,6 +74,7 @@ struct RTS_SURVIVAL_API FVehicleModuleDamageEvent : public FPointDamageEvent
 	 * @param SourceDamage Mine damage, or splash damage after the AOE falloff for this victim.
 	 * @param ShotActivationId Identity of the explosion for deterministic rolls.
 	 * @param InDamageTypeClass Damage type forwarded to TakeDamage.
+	 * @param DamageShellType Shell responsible for the explosion, or Shell_None for non-shell sources.
 	 * @return Event whose module damage is resolved once, after hull damage.
 	 */
 	static FVehicleModuleDamageEvent MakeExplosionEvent(
@@ -82,7 +83,8 @@ struct RTS_SURVIVAL_API FVehicleModuleDamageEvent : public FPointDamageEvent
 		const FVector& InExplosionLocation,
 		float SourceDamage,
 		uint32 ShotActivationId,
-		TSubclassOf<UDamageType> InDamageTypeClass);
+		TSubclassOf<UDamageType> InDamageTypeClass,
+		EWeaponShellType DamageShellType = static_cast<EWeaponShellType>(0));
 
 	/** @brief Called by the damaged pawn after accepted hull damage; rejected (zero) damage never damages modules. */
 	void ApplyModuleDamageAfterHullDamage(float AppliedHullDamage) const;

@@ -129,7 +129,8 @@ void UArmorCalculation::DamageModule(const int32 ModuleId, const float Damage)
 
 	{
 		TGuardValue<bool> MutationGuard(bM_IsMutatingModules, true);
-		SetModuleHealth(SlotIndex, M_Modules[SlotIndex].CurrentHp - Damage, EModuleChangeCause::Damage);
+		SetModuleHealth(SlotIndex, M_Modules[SlotIndex].CurrentHp - Damage, EModuleChangeCause::Damage,
+		                EWeaponShellType::Shell_None);
 		++M_ModuleDamageRevision;
 	}
 	DispatchModuleChangesAfterMutation(TakePendingModuleChanges());
@@ -223,7 +224,7 @@ FModuleChangeBatch UArmorCalculation::ResolveModuleDamage(const FModuleDamageInp
 	ApplyPerModuleDamageCaps(Input.bPen, Batch);
 	ApplyNonPenRateBudgetIfNeeded(Input, Batch);
 	LimitNewDestroyedModules(Batch);
-	return CommitModuleDamageBatch(Batch);
+	return CommitModuleDamageBatch(Batch, Input.HitContext.ShellType);
 }
 
 float UArmorCalculation::CalculateModuleDamageEnergy(const FModuleDamageInput& Input) const
@@ -468,7 +469,8 @@ void UArmorCalculation::LimitNewDestroyedModules(FModuleDamageBatch& Batch) cons
 	}
 }
 
-FModuleChangeBatch UArmorCalculation::CommitModuleDamageBatch(const FModuleDamageBatch& Batch)
+FModuleChangeBatch UArmorCalculation::CommitModuleDamageBatch(const FModuleDamageBatch& Batch,
+	const EWeaponShellType DamageShellType)
 {
 	bool bAppliedAnyDamage = false;
 	for (int32 EntryIndex = 0; EntryIndex < Batch.Count; ++EntryIndex)
@@ -479,7 +481,7 @@ FModuleChangeBatch UArmorCalculation::CommitModuleDamageBatch(const FModuleDamag
 			continue;
 		}
 		SetModuleHealth(Entry.SlotIndex, M_Modules[Entry.SlotIndex].CurrentHp - Entry.Damage,
-		                EModuleChangeCause::Damage);
+		                EModuleChangeCause::Damage, DamageShellType);
 		bAppliedAnyDamage = true;
 	}
 	if (bAppliedAnyDamage)
@@ -581,7 +583,7 @@ void UArmorCalculation::CalculateMineModuleDamage(const FVector& ExplosionLocati
 		Batch.Append(SlotIndex, MineCandidateIndex, BaseDamage * MineModuleRule.DamageMultiplier);
 		ApplyPerModuleDamageCaps(true, Batch);
 		LimitNewDestroyedModules(Batch);
-		Changes = CommitModuleDamageBatch(Batch);
+		Changes = CommitModuleDamageBatch(Batch, HitContext.ShellType);
 	}
 	DispatchModuleChangesAfterMutation(Changes);
 }
@@ -617,6 +619,7 @@ void UArmorCalculation::CalculateSplashModuleDamage(const FVector& ExplosionLoca
 	SplashContext.StablePlateRegistrationId = PlateRegistrationId;
 	SplashContext.DeliveryType = EVehicleModuleDelivery::Splash;
 	SplashContext.DamageType = ERTSDamageType::Kinetic;
+	SplashContext.ShellType = HitContext.ShellType;
 	SplashContext.ShotActivationId = HitContext.ShotActivationId;
 	SplashContext.ImpactOrdinal = HitContext.ImpactOrdinal;
 

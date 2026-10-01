@@ -158,7 +158,7 @@ struct FPlateModuleDamage
 | `FModuleBinding` | Stable mesh/plate registration ID, mount/weapon role, weak component references |
 | `FPlateModuleRuleSet` | `Entries[MaxModulesPerPlate]`; unused entries have `TypeToDamage = None` |
 | `FModuleDamageBatch` | Three `{ModuleId, Damage}` entries plus count; returned by value |
-| `FModuleChangeBatch` | `MaxModuleInstances` copied state-change payloads plus count; fixed storage for damage and full repair |
+| `FModuleChangeBatch` | `MaxModuleInstances` copied state-change payloads plus count; each payload retains its damage shell or `Shell_None` |
 
 ```text
 UArmorCalculation::SetupModule(const FVehicleModuleSetup& Setup, int32& OutModuleId) -> bool
@@ -855,17 +855,25 @@ Example: `Engine Damaged → BP_EngineDamaged::OnAdded → RegisterVehicleSpeedL
  * @param ModuleType Type of the instance whose state changed.
  * @param NewState Committed Healthy, Damaged or Destroyed state.
  * @param RemainingModuleHp Absolute remaining module HP, clamped to [0, MaxHp].
+ * @param ChangeCause Damage or the repair operation responsible for the transition; load events are suppressed.
  */
 UFUNCTION(BlueprintImplementableEvent, Category = "Vehicle Modules")
-void OnVehicleModuleStateChanged(
+void BPOnVehicleModuleStateChanged(
     EVehicleModuleTypes ModuleType,
     EVehicleModuleState NewState,
-    float RemainingModuleHp);
+    float RemainingModuleHp,
+    EModuleChangeCause ChangeCause);
 ```
 
 `ATankMaster::OnModuleConditionChanged(Change)` updates repair counts and requests behaviour synchronization. After the batch's module state and behaviour-derived effects are committed, invoke the BP event once per changed module with a copied transition payload. If behaviour work is deferred, publish after that safe drain. Direct Healthy → Destroyed and strong-heal Destroyed → Healthy each emit one final-state event. Recovery-only red → yellow emits its usual event. HP loss within an unchanged state, initial setup, load reconciliation and refresh do not emit transition events.
 
 Remaining HP is an **absolute value**, e.g. `40.0` for a 200-HP engine recovered to 20%. Native payloads retain `ModuleId`; the requested BP signature is type-based, so two instances of the same type can produce two events. This event is separate from the healthbar's worst-state-per-type aggregation. Re-entrant BP mutations wait until notification dispatch ends; stop dispatch on tank death/EndPlay. No implementation of the BP event is required, and BP must not reapply the native behaviour/icon work.
+
+The native `OnVehicleModuleStateChanged(const FModuleStateChange& Change)` callback receives the complete copied
+transition. `DamageShellType` identifies the shell that caused a damage transition and is `Shell_None` for repair,
+load, mines and other non-shell sources. Re-entrant and behaviour-deferred merges overwrite it with the source of the
+latest retained transition. The callback forwards `ChangeCause` to `BPOnVehicleModuleStateChanged`; `Load` transitions
+remain suppressed.
 
 ### `ModuleTypeRules` defaults
 

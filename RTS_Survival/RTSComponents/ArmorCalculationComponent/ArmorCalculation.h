@@ -695,7 +695,8 @@ private:
 	int32 FindGreatestNormalizedFailure(const FModuleDamageBatch& Batch,
 	                                    const bool (&bAllowedToDestroy)[VehicleModuleBalance::MaxModulesPerPlate]) const;
 	bool GetWouldEntryDestroyModule(const FModuleDamageBatch::FEntry& Entry) const;
-	FModuleChangeBatch CommitModuleDamageBatch(const FModuleDamageBatch& Batch);
+	FModuleChangeBatch CommitModuleDamageBatch(const FModuleDamageBatch& Batch,
+	                                           EWeaponShellType DamageShellType);
 	bool TryMakeDefaultModuleHitContext(EArmorPlate PlateHit, FVehicleModuleHitContext& OutHitContext);
 	int32 FindUniquePlateRegistration(EArmorPlate PlateHit) const;
 	int32 FindPlateRegistrationFacingLocation(const FVector& WorldLocation) const;
@@ -705,11 +706,15 @@ private:
 	// ------------------------------------------------------------------------------------------------
 	// Vehicle module state mutation and dispatch
 	// ------------------------------------------------------------------------------------------------
-	void SetModuleHealth(int32 SlotIndex, float NewHp, EModuleChangeCause Cause);
+	void SetModuleHealth(int32 SlotIndex, float NewHp, EModuleChangeCause Cause,
+	                     EWeaponShellType DamageShellType);
 	void UpdateModuleStateCounts(EVehicleModuleTypes Type, EVehicleModuleState PreviousState,
 	                             EVehicleModuleState NewState);
 	FModuleChangeBatch TakePendingModuleChanges();
 	void DispatchModuleChangesAfterMutation(const FModuleChangeBatch& Changes);
+	void ShowModuleStateChangePopups(const FModuleChangeBatch& Changes) const;
+	void ShowModuleDamagedPopup(const ATankMaster& Tank, EVehicleModuleTypes Type) const;
+	void ShowModuleDestroyedPopup(const ATankMaster& Tank, EVehicleModuleTypes Type) const;
 	void AppendSavedCoverageForSlot(int32 SlotIndex, FVehicleModuleSaveData& OutSaveData) const;
 	void ApplyImportedModuleHealth(const FVehicleModuleSaveData& SaveData);
 	bool GetIsValidSaveData(const FVehicleModuleSaveData& SaveData) const;

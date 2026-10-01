@@ -131,6 +131,8 @@ class RTS_SURVIVAL_API ACPPTurretsMaster : public ACPPWeaponsMaster, public IWea
 public:
 	// Public c-tor needed for call hierarchy with derived classes.
 	ACPPTurretsMaster();
+	/** @return False when this turret shares another mount and should not register a tank module. */
+	virtual bool GetHasOwnVehicleModuleMount() const { return true; }
 	
 	virtual ETargetPreference GetTargetPreference() const override {return TargetPreference;};
 	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
@@ -422,9 +424,6 @@ protected:
 
 	/** @return Minimum target distance accepted by this turret; zero disables the lower range bound. */
 	virtual float GetMinimumTargetRange() const;
-
-	/** @return False for turrets without their own mount mesh; they never install vehicle modules on the tank. */
-	virtual bool GetHasOwnVehicleModuleMount() const { return true; }
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS

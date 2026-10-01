@@ -1024,7 +1024,8 @@ int32 UArmorCalculation::FindFirstRedModuleOfType(const EVehicleModuleTypes Type
 // State mutation, repair milestones and dispatch
 // ----------------------------------------------------------------------------------------------------
 
-void UArmorCalculation::SetModuleHealth(const int32 SlotIndex, const float NewHp, const EModuleChangeCause Cause)
+void UArmorCalculation::SetModuleHealth(const int32 SlotIndex, const float NewHp, const EModuleChangeCause Cause,
+	const EWeaponShellType DamageShellType)
 {
 	FVehicleModule& Module = M_Modules[SlotIndex];
 	const float ClampedHp = FMath::Clamp(NewHp, 0.f, Module.MaxHp);
@@ -1062,6 +1063,7 @@ void UArmorCalculation::SetModuleHealth(const int32 SlotIndex, const float NewHp
 	Change.CurrentHp = Module.CurrentHp;
 	Change.MaxHp = Module.MaxHp;
 	Change.Cause = Cause;
+	Change.DamageShellType = DamageShellType;
 	M_PendingModuleChanges.AddOrMerge(Change);
 }
 
@@ -1119,8 +1121,9 @@ void UArmorCalculation::DispatchModuleChangesAfterMutation(const FModuleChangeBa
 
 	TGuardValue<bool> DispatchGuard(bM_IsDispatchingModuleChanges, true);
 	FModuleChangeBatch CurrentBatch = Changes;
-	while (not CurrentBatch.IsEmpty() && M_ModuleTank.IsValid())
+	while (not CurrentBatch.IsEmpty() && GetIsValidModuleTank())
 	{
+		ShowModuleStateChangePopups(CurrentBatch);
 		M_ModuleTank->OnModuleStateBatchCommitted(CurrentBatch);
 		CurrentBatch = TakePendingModuleChanges();
 	}
@@ -1141,7 +1144,8 @@ void UArmorCalculation::RestoreDestroyedModulesToDamaged(const EModuleChangeCaus
 			{
 				continue;
 			}
-			SetModuleHealth(SlotIndex, Module.MaxHp * GetRecoveredHealth01(Module.Type), Cause);
+			SetModuleHealth(SlotIndex, Module.MaxHp * GetRecoveredHealth01(Module.Type), Cause,
+			                EWeaponShellType::Shell_None);
 		}
 	}
 	DispatchModuleChangesAfterMutation(TakePendingModuleChanges());
@@ -1163,7 +1167,8 @@ void UArmorCalculation::RestoreAllModulesToHealthy()
 				continue;
 			}
 			// One final-state transition per module; no intermediate yellow state for red modules.
-			SetModuleHealth(SlotIndex, Module.MaxHp, EModuleChangeCause::FullService);
+			SetModuleHealth(SlotIndex, Module.MaxHp, EModuleChangeCause::FullService,
+			                EWeaponShellType::Shell_None);
 		}
 	}
 	DispatchModuleChangesAfterMutation(TakePendingModuleChanges());
@@ -1179,7 +1184,8 @@ bool UArmorCalculation::RestoreDestroyedModuleToDamaged(const int32 ModuleId)
 	{
 		TGuardValue<bool> MutationGuard(bM_IsMutatingModules, true);
 		const FVehicleModule& Module = M_Modules[SlotIndex];
-		SetModuleHealth(SlotIndex, Module.MaxHp * GetRecoveredHealth01(Module.Type), EModuleChangeCause::CrewRepair);
+		SetModuleHealth(SlotIndex, Module.MaxHp * GetRecoveredHealth01(Module.Type), EModuleChangeCause::CrewRepair,
+		                EWeaponShellType::Shell_None);
 	}
 	DispatchModuleChangesAfterMutation(TakePendingModuleChanges());
 	return true;

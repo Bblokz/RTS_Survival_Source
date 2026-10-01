@@ -41,53 +41,55 @@ namespace VehicleModuleBalance
 			inline constexpr float Engine = 0.35f;
 			inline constexpr float Ammo = 0.10f;
 		}
+		
+		inline constexpr float SideAmmoHitChance= 0.3;
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideLeft
 		{
-			inline constexpr float Tracks = 0.25f;
-			inline constexpr float Ammo = 0.30f;
+			inline constexpr float Tracks = 0.65f;
+			inline constexpr float Ammo = SideAmmoHitChance;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideRight
 		{
-			inline constexpr float Tracks = 0.25f;
-			inline constexpr float Ammo = 0.30f;
+			inline constexpr float Tracks = 0.65f;
+			inline constexpr float Ammo = SideAmmoHitChance;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideLowerLeft
 		{
 			inline constexpr float Tracks = 0.65f;
-			inline constexpr float Ammo = 0.15f;
+			inline constexpr float Ammo = SideAmmoHitChance;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideLowerRight
 		{
 			inline constexpr float Tracks = 0.65f;
-			inline constexpr float Ammo = 0.15f;
+			inline constexpr float Ammo = SideAmmoHitChance;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_Rear
 		{
-			inline constexpr float Engine = 0.65f;
-			inline constexpr float Ammo = 0.20f;
+			inline constexpr float Engine = 0.8f;
+			inline constexpr float Ammo = 0.33f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_RearLowerGlacis
 		{
-			inline constexpr float Engine = 0.60f;
+			inline constexpr float Engine = 0.8f;
 			inline constexpr float Tracks = 0.30f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_RearUpperGlacis
 		{
-			inline constexpr float Engine = 0.65f;
-			inline constexpr float Ammo = 0.25f;
+			inline constexpr float Engine = 0.8f;
+			inline constexpr float Ammo = 0.33f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Turret_Front
 		{
 			inline constexpr float Turret = 0.30f;
-			inline constexpr float Weapon = 0.20f;
+			inline constexpr float Weapon = 0.40f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Turret_SideLeft
@@ -122,7 +124,7 @@ namespace VehicleModuleBalance
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Turret_Mantlet
 		{
-			inline constexpr float Weapon = 0.60f;
+			inline constexpr float Weapon = 0.80f;
 			inline constexpr float Turret = 0.30f;
 		}
 	}

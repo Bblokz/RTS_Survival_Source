@@ -62,11 +62,12 @@ namespace
 		const FVector& Epicenter,
 		const uint32 ExplosionId,
 		const FDamageEvent& BasicDamageEvent,
-		const TWeakObjectPtr<AActor>& WeakDamageCauser)
+		const TWeakObjectPtr<AActor>& WeakDamageCauser,
+		const EWeaponShellType DamageShellType)
 	{
 		FVehicleModuleDamageEvent ModuleDamageEvent = FVehicleModuleDamageEvent::MakeExplosionEvent(
 			&ArmorCalculation, EVehicleModuleDelivery::Splash, Epicenter, AttenuatedDamage, ExplosionId,
-			BasicDamageEvent.DamageTypeClass);
+			BasicDamageEvent.DamageTypeClass, DamageShellType);
 		ApplyDamageToActor(HitActor, AttenuatedDamage, ModuleDamageEvent, WeakDamageCauser);
 	}
 
@@ -240,7 +241,8 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	const ETriggerOverlapLogic OverlapLogic,
 	const EShieldDamageSource ShieldDamageSource,
 	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
-	const EVehicleModuleSplashPolicy ModuleSplashPolicy)
+	const EVehicleModuleSplashPolicy ModuleSplashPolicy,
+	const EWeaponShellType ModuleDamageShellType)
 {
 	if (not IsValid(DamageCauser))
 	{
@@ -278,7 +280,8 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 			DamageType,
 			ShieldDamageSource,
 			bDamagesVehicleModules,
-			ModuleExplosionId
+			ModuleExplosionId,
+			ModuleDamageShellType
 		](TArray<FHitResult>&& HitResults)
 		{
 			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
@@ -357,7 +360,8 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 				if (bDamagesVehicleModules)
 				{
 					ApplyDamageWithModuleSplash(*HitActor, *ArmorCalculation, AdjustedDamage, Epicenter,
-					                            ModuleExplosionId, DamageEvent, WeakDamageCauser);
+					                            ModuleExplosionId, DamageEvent, WeakDamageCauser,
+					                            ModuleDamageShellType);
 					continue;
 				}
 				ApplyDamageToActor(*HitActor, AdjustedDamage, DamageEvent, WeakDamageCauser);

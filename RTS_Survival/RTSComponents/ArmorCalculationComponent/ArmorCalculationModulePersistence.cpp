@@ -204,7 +204,7 @@ void UArmorCalculation::ApplyImportedModuleHealth(const FVehicleModuleSaveData& 
 			const int32 SlotIndex = GetSlotForSavedModuleId(SaveData, SavedInstance.ModuleId);
 			// HP is derived from the current tank MaxHealth; the fraction is the saved quantity.
 			SetModuleHealth(SlotIndex, M_Modules[SlotIndex].MaxHp * SavedInstance.HealthFraction,
-			                EModuleChangeCause::Load);
+			                EModuleChangeCause::Load, EWeaponShellType::Shell_None);
 		}
 	}
 	// Load reconciliation publishes behaviours/icons/card but never replays Blueprint transition events.

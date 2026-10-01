@@ -699,6 +699,42 @@ void ATankMaster::SetTurretsDisabled()
 	}
 }
 
+void ATankMaster::OnVehicleModuleStateChanged(const FModuleStateChange& Change)
+{
+	const bool bIsDueToDamage = Change.Cause == EModuleChangeCause::Damage;
+	const float RemainingModuleHp = FMath::Clamp(Change.CurrentHp, 0.f, Change.MaxHp);
+	switch (Change.Type)
+	{
+	case EVehicleModuleTypes::AddOnArmor:
+		OnModuleAddOnArmorDamaged(Change.NewState, RemainingModuleHp);
+		break;
+	case EVehicleModuleTypes::Tracks:
+		OnModuleTracksDamaged(Change.NewState, RemainingModuleHp);
+		break;
+	case EVehicleModuleTypes::Engine:
+		OnModuleEngineDamaged(Change.NewState, RemainingModuleHp, bIsDueToDamage);
+		break;
+	case EVehicleModuleTypes::Ammo:
+		OnModuleAmmoDamaged(Change.NewState, RemainingModuleHp);
+		break;
+	case EVehicleModuleTypes::Turret:
+		OnModuleTurretDamaged(Change.NewState, RemainingModuleHp);
+		break;
+	case EVehicleModuleTypes::Weapon:
+		OnModuleWeaponDamaged(Change.NewState, RemainingModuleHp);
+		break;
+	case EVehicleModuleTypes::Wheels:
+		OnModuleWheelsDamaged(Change.NewState, RemainingModuleHp);
+		break;
+	case EVehicleModuleTypes::None:
+	default:
+		break;
+	}
+
+	BPOnVehicleModuleStateChanged(
+		Change.Type, Change.NewState, RemainingModuleHp, Change.Cause);
+}
+
 void ATankMaster::SetupHullWeapon(UHullWeaponComponent* NewHullWeapon)
 {
 	HullWeapons.Add(NewHullWeapon);

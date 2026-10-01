@@ -1,7 +1,10 @@
 #include "TankEngineFireBehaviour.h"
 
+#include "Components/AudioComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SoundConcurrency.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -27,11 +30,13 @@ void UTankEngineFireBehaviour::OnAdded(AActor* BehaviourOwner)
 	M_TankMaster = Cast<ATankMaster>(BehaviourOwner);
 	SampleDuration();
 	StartFireEffect();
+	StartFireSound();
 	Super::OnAdded(BehaviourOwner);
 }
 
 void UTankEngineFireBehaviour::OnRemoved(AActor* BehaviourOwner)
 {
+	StopFireSound();
 	StopFireEffect();
 	Super::OnRemoved(BehaviourOwner);
 	M_TankMaster.Reset();
@@ -141,6 +146,63 @@ void UTankEngineFireBehaviour::StopFireEffect()
 		M_FireSubsystem->StopFireByHandle(M_FireHandle);
 	}
 	M_FireHandle = INDEX_NONE;
+}
+
+void UTankEngineFireBehaviour::StartFireSound()
+{
+	if (not GetIsValidTankMaster() || not IsValid(M_FireSound))
+	{
+		return;
+	}
+
+	USceneComponent* RootComponent = M_TankMaster->GetRootComponent();
+	if (not IsValid(RootComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UTankEngineFireBehaviour::StartFireSound - tank root component is invalid."));
+		return;
+	}
+
+	UAudioComponent* FireAudioComponent = NewObject<UAudioComponent>(M_TankMaster.Get());
+	if (not IsValid(FireAudioComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UTankEngineFireBehaviour::StartFireSound - could not create fire audio component."));
+		return;
+	}
+
+	FireAudioComponent->bAutoActivate = false;
+	FireAudioComponent->bAutoDestroy = false;
+	FireAudioComponent->bAllowSpatialization = true;
+	USoundBase* FireSound = M_FireSound.Get();
+	FireAudioComponent->SetSound(FireSound);
+	FireAudioComponent->AttenuationSettings = M_SoundAttenuation;
+	USoundConcurrency* SoundConcurrency = M_SoundConcurrency.Get();
+	if (IsValid(SoundConcurrency))
+	{
+		FireAudioComponent->ConcurrencySet.Add(SoundConcurrency);
+	}
+
+	M_TankMaster->AddInstanceComponent(FireAudioComponent);
+	FireAudioComponent->SetupAttachment(RootComponent);
+	FireAudioComponent->RegisterComponent();
+	M_FireAudioComponent = FireAudioComponent;
+	if (IsValid(FireSound))
+	{
+		FireAudioComponent->Play();
+	}
+}
+
+void UTankEngineFireBehaviour::StopFireSound()
+{
+	UAudioComponent* FireAudioComponent = M_FireAudioComponent.Get();
+	if (not IsValid(FireAudioComponent))
+	{
+		M_FireAudioComponent.Reset();
+		return;
+	}
+
+	FireAudioComponent->Stop();
+	FireAudioComponent->DestroyComponent();
+	M_FireAudioComponent.Reset();
 }
 
 bool UTankEngineFireBehaviour::GetIsValidTankMaster() const

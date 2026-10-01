@@ -32,6 +32,7 @@ struct FModuleChangeBatch
 			Existing.CurrentHp = Change.CurrentHp;
 			Existing.MaxHp = Change.MaxHp;
 			Existing.Cause = Change.Cause;
+			Existing.DamageShellType = Change.DamageShellType;
 			if (Existing.PreviousState == Existing.NewState)
 			{
 				RemoveAtSwap(ChangeIndex);

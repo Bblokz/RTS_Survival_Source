@@ -49,6 +49,8 @@ struct FVehicleModuleTestAccess
 		Armor.FinalizeVehicleModuleSetup(&Tank, VehicleModuleTestConstants::TankMaxHealth);
 		Tank.M_ModuleArmor = &Armor;
 		Tank.bM_AreVehicleModulesInitialized = true;
+		Tank.M_TurretModuleRegistration.bBlueprintModuleSetupComplete = true;
+		Tank.M_TurretModuleRegistration.bInitialTurretsDiscovered = true;
 		Tank.BeginPlay_InitVehicleModuleBindings();
 		Tank.HealthComponent->InitializeTankRepairOwner(&Tank);
 		Tank.RefreshModuleRepairCounts();
@@ -112,6 +114,19 @@ struct FVehicleModuleTestAccess
 	static void MarkTurretReady(ATankMaster& Tank, ACPPTurretsMaster* Turret)
 	{
 		Tank.OnTurretReadyForModuleRegistration(Turret);
+	}
+
+	static void SignalTankBlueprintModulesComplete(ATankMaster& Tank, UArmorCalculation& Armor)
+	{
+		Tank.BeginVehicleModuleFinalization(&Armor);
+		Tank.GetWorld()->GetTimerManager().ClearTimer(
+			Tank.M_TurretModuleRegistration.InitialTurretDiscoveryTimer);
+		Tank.DiscoverInitialTurretsAndTryFinalize();
+	}
+
+	static bool GetAreTankModulesInitialized(const ATankMaster& Tank)
+	{
+		return Tank.bM_AreVehicleModulesInitialized;
 	}
 
 	static void CancelTurret(ATankMaster& Tank, const ACPPTurretsMaster* Turret)
@@ -223,6 +238,37 @@ bool FVehicleModuleBalanceTablesTest::RunTest(const FString& Parameters)
 		+ 2.f * GetCrewRepairSeconds(EVehicleModuleTypes::Tracks);
 	TestEqual(TEXT("Engine plus two tracks takes 44 crew seconds"), EngineAndTwoTracks, 44.f);
 	TestEqual(TEXT("Seventeen fixed module slots"), MaxModuleInstances, 17);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleChangeShellAttributionTest,
+	"RTS.VehicleModules.ChangeShellAttribution",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleModuleChangeShellAttributionTest::RunTest(const FString& Parameters)
+{
+	FModuleStateChange FirstChange;
+	FirstChange.SlotIndex = VehicleModuleBalance::SlotOffset::Engine;
+	FirstChange.PreviousState = EVehicleModuleState::Healthy;
+	FirstChange.NewState = EVehicleModuleState::Damaged;
+	FirstChange.DamageShellType = EWeaponShellType::Shell_AP;
+
+	FModuleChangeBatch Changes;
+	Changes.AddOrMerge(FirstChange);
+
+	FModuleStateChange LatestChange = FirstChange;
+	LatestChange.PreviousState = EVehicleModuleState::Damaged;
+	LatestChange.NewState = EVehicleModuleState::Destroyed;
+	LatestChange.DamageShellType = EWeaponShellType::Shell_HE;
+	Changes.AddOrMerge(LatestChange);
+
+	TestEqual(TEXT("Repeated transitions retain one fixed-storage record"), Changes.Count, 1);
+	TestEqual(TEXT("The first observed state remains the batch baseline"), Changes.Changes[0].PreviousState,
+	          EVehicleModuleState::Healthy);
+	TestEqual(TEXT("The final state comes from the latest transition"), Changes.Changes[0].NewState,
+	          EVehicleModuleState::Destroyed);
+	TestEqual(TEXT("The shell comes from the transition that produced the final state"),
+	          Changes.Changes[0].DamageShellType, EWeaponShellType::Shell_HE);
 	return true;
 }
 
@@ -645,6 +691,65 @@ bool FVehicleModuleLegacyIdsTest::RunTest(const FString& Parameters)
 // ----------------------------------------------------------------------------------------------------
 // Turret-driven module registration
 // ----------------------------------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleInitialTurretFinalizationTest,
+	"RTS.VehicleModules.InitialTurretFinalization",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleModuleInitialTurretFinalizationTest::RunTest(const FString& Parameters)
+{
+	using namespace VehicleModuleTestConstants;
+	constexpr float MainGunCalibre = 75.f;
+	constexpr float SecondaryGunCalibre = 37.f;
+	constexpr int32 FinalInstalledModuleCount = 4;
+	VehicleModuleTests::FTankFixture Fixture;
+	TestTrue(TEXT("Engine is installed by the tank Blueprint"),
+		Fixture.Install(EngineModuleId, EVehicleModuleTypes::Engine));
+	ACPPTurretsMaster* FirstTurret = FVehicleModuleTestAccess::SpawnTurretWithWeapons(*Fixture.World, {MainGunCalibre});
+	ACPPTurretsMaster* SecondTurret = FVehicleModuleTestAccess::SpawnTurretWithWeapons(*Fixture.World, {SecondaryGunCalibre});
+	Fixture.RegisterMeshPlate(FirstTurret->GetModuleBindingMesh(), EArmorPlate::Turret_Front);
+	Fixture.RegisterMeshPlate(SecondTurret->GetModuleBindingMesh(), EArmorPlate::Turret_Front);
+	FVehicleModuleTestAccess::AddPendingTurret(*Fixture.Tank, FirstTurret);
+	FVehicleModuleTestAccess::AddPendingTurret(*Fixture.Tank, SecondTurret);
+	FVehicleModuleTestAccess::SignalTankBlueprintModulesComplete(*Fixture.Tank, *Fixture.Armor);
+	TestFalse(TEXT("Blueprint completion waits for both turrets"),
+		FVehicleModuleTestAccess::GetAreTankModulesInitialized(*Fixture.Tank));
+	FVehicleModuleTestAccess::MarkTurretReady(*Fixture.Tank, SecondTurret);
+	TestFalse(TEXT("One ready turret does not finalize the tank"),
+		FVehicleModuleTestAccess::GetAreTankModulesInitialized(*Fixture.Tank));
+	FVehicleModuleTestAccess::MarkTurretReady(*Fixture.Tank, FirstTurret);
+	TestTrue(TEXT("Last turret readiness finalizes the tank"),
+		FVehicleModuleTestAccess::GetAreTankModulesInitialized(*Fixture.Tank));
+	TestEqual(TEXT("Tank and turrets are all installed before finalization"),
+		Fixture.Armor->GetInstalledModuleCount(), FinalInstalledModuleCount);
+	TestTrue(TEXT("Turret HP is derived during finalization"),
+		Fixture.Armor->GetModuleSnapshot(VehicleModuleBalance::SlotOffset::Turret).MaxHp > 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleEarlyTurretReadinessTest,
+	"RTS.VehicleModules.EarlyTurretReadiness",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleModuleEarlyTurretReadinessTest::RunTest(const FString& Parameters)
+{
+	constexpr float MainGunCalibre = 75.f;
+	VehicleModuleTests::FTankFixture EarlyReadyFixture;
+	ACPPTurretsMaster* EarlyTurret = FVehicleModuleTestAccess::SpawnTurretWithWeapons(
+		*EarlyReadyFixture.World, {MainGunCalibre});
+	EarlyReadyFixture.RegisterMeshPlate(EarlyTurret->GetModuleBindingMesh(), EArmorPlate::Turret_Front);
+	FVehicleModuleTestAccess::AddPendingTurret(*EarlyReadyFixture.Tank, EarlyTurret);
+	FVehicleModuleTestAccess::MarkTurretReady(*EarlyReadyFixture.Tank, EarlyTurret);
+	TestEqual(TEXT("A ready turret waits for Blueprint completion"),
+		EarlyReadyFixture.Armor->GetInstalledModuleCount(), 0);
+	FVehicleModuleTestAccess::SignalTankBlueprintModulesComplete(
+		*EarlyReadyFixture.Tank, *EarlyReadyFixture.Armor);
+	TestTrue(TEXT("Early readiness is retained and turret-only modules finalize"),
+		FVehicleModuleTestAccess::GetAreTankModulesInitialized(*EarlyReadyFixture.Tank));
+	TestTrue(TEXT("The early turret has initialized HP"),
+		EarlyReadyFixture.Armor->GetModuleSnapshot(VehicleModuleBalance::SlotOffset::Turret).MaxHp > 0.f);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleTurretSelfRegistrationTest, "RTS.VehicleModules.TurretSelfRegistration",
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

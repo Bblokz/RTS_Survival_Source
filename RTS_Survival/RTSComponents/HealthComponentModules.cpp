@@ -389,9 +389,11 @@ bool UHealthComponent::Widget_ChangeModuleIcon(const EVehicleModuleTypes Type, c
 		ModuleIconImage->SetVisibility(ESlateVisibility::Collapsed);
 		return true;
 	}
-	// Texture in place; the image keeps its configured dimensions and slot.
+	// Store the size in the brush so the Auto slot can measure it before the Slate image is built.
 	ModuleIconImage->SetBrushFromTexture(IconTexture, false);
-	ModuleIconImage->SetDesiredSizeOverride(IconSize);
+	FSlateBrush IconBrush = ModuleIconImage->GetBrush();
+	IconBrush.ImageSize = IconSize;
+	ModuleIconImage->SetBrush(IconBrush);
 	ModuleIconImage->SetVisibility(ESlateVisibility::HitTestInvisible);
 	return true;
 }
