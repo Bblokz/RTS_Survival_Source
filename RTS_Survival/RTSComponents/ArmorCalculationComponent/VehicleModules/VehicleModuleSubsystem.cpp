@@ -32,10 +32,8 @@ void UVehicleModuleSubsystem::InitializeModuleAssets()
 	}
 
 	M_ModuleDataAsset = Settings->ModuleDataAsset.LoadSynchronous();
-	if (not IsValid(M_ModuleDataAsset))
+	if (not GetIsValidModuleDataAsset())
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Failed to load the vehicle module data asset: ")
-			+ Settings->ModuleDataAsset.ToString());
 		bM_AreModuleAssetsReady = true;
 		return;
 	}
@@ -94,6 +92,40 @@ TSubclassOf<UVehicleModuleBehaviour> UVehicleModuleSubsystem::GetModuleBehaviour
 	return State == EVehicleModuleState::Destroyed
 		       ? StateAssets.DestroyedBehaviourClass
 		       : StateAssets.DamagedBehaviourClass;
+}
+
+TSubclassOf<UTankEngineFireBehaviour> UVehicleModuleSubsystem::GetEngineFireBehaviourClass(
+	const EVehicleModuleProfile Profile) const
+{
+	if (not GetIsValidModuleDataAsset())
+	{
+		return nullptr;
+	}
+	switch (Profile)
+	{
+	case EVehicleModuleProfile::ArmoredCar:
+		return M_ModuleDataAsset->ArmoredCarEngineFire;
+	case EVehicleModuleProfile::LightTank:
+		return M_ModuleDataAsset->LightTankEngineFire;
+	case EVehicleModuleProfile::MediumTank:
+		return M_ModuleDataAsset->MediumTankEngineFire;
+	case EVehicleModuleProfile::HeavyTank:
+	case EVehicleModuleProfile::SuperHeavyTank:
+		return M_ModuleDataAsset->HeavyTankEngineFire;
+	default:
+		return nullptr;
+	}
+}
+
+bool UVehicleModuleSubsystem::GetIsValidModuleDataAsset() const
+{
+	if (IsValid(M_ModuleDataAsset))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this, "M_ModuleDataAsset", "GetIsValidModuleDataAsset", this);
+	return false;
 }
 
 bool UVehicleModuleSubsystem::GetModuleIconStyle(const EVehicleModuleTypes Type, const EVehicleModuleState State,

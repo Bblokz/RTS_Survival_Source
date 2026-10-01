@@ -30,6 +30,7 @@ class ACPPResourceMaster;
 class UArmor;
 class UArmorCalculation;
 class UVehicleModuleSubsystem;
+class UTankEngineFireBehaviour;
 struct FHealthHealingReceipt;
 class URTSNavCollision;
 class UBehaviour;
@@ -777,6 +778,7 @@ private:
 	void FinalizeVehicleModulesAfterTurretRegistration();
 	void BeginPlay_InitVehicleModuleBindings();
 	bool GetIsValidModuleArmor() const;
+	bool GetIsValidVehicleModuleSubsystem() const;
 	void RefreshModuleRepairCounts();
 	void SyncModuleBehaviour(const FModuleStateChange& Change);
 	void SyncModuleBehaviourForSlot(int32 SlotIndex);
@@ -788,7 +790,16 @@ private:
 	void CleanupVehicleModuleBindings();
 	
 	// ------------ Module Damaged Updates -------------------- //
-	void OnModuleEngineDamaged(EVehicleModuleState NewState, const float RemainingModuleHp, bool bIsDueToDamage);
+	void OnModuleEngineDamaged(const FModuleStateChange& Change);
+	/**
+	 * @brief Ignites the selected tank fire only when a damaging engine transition wins its shell-specific roll.
+	 * @param EngineState Damaged or Destroyed state reached by the engine.
+	 * @param ShellType Shell that caused this transition; HE and HEAT have their own chances.
+	 * @return True when a configured fire behaviour was added or refreshed.
+	 */
+	bool StartEngineFireChance(EVehicleModuleState EngineState, EWeaponShellType ShellType);
+	TSubclassOf<UTankEngineFireBehaviour> GetEngineFireBehaviourClass() const;
+	void ShowEngineFirePopup() const;
 	void OnModuleAddOnArmorDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
 	void OnModuleTracksDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
 	void OnModuleAmmoDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);

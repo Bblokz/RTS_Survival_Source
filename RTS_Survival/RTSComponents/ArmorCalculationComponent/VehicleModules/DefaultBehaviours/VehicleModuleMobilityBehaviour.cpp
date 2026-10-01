@@ -65,9 +65,11 @@ void UVehicleModuleMobilityBehaviour::GetMobilityMultipliersForContext(float& Ou
 	OutAccelerationMultiplier = 1.f;
 	if (ModuleContext.State == EVehicleModuleState::Destroyed)
 	{
-		// No powered travel or turning; mounted weapons stay available.
-		OutTravelSpeedMultiplier = DestroyedMobilityMultiplier;
-		OutTurnRateMultiplier = DestroyedMobilityMultiplier;
+		const float SelectedDestroyedMobilityMultiplier = ModuleContext.Type == EVehicleModuleTypes::Engine
+			                                          ? DestroyedEngineMobilityMlt
+			                                          : DestroyedTrackOrWheelMobilityMlt;
+		OutTravelSpeedMultiplier = SelectedDestroyedMobilityMultiplier;
+		OutTurnRateMultiplier = SelectedDestroyedMobilityMultiplier;
 		return;
 	}
 	if (ModuleContext.State != EVehicleModuleState::Damaged)

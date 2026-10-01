@@ -6,12 +6,16 @@
 #include "Engine/GameInstance.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireBehaviour.h"
+#include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
+#include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "WheeledTank/Components/ChaosTankMovementComponent.h"
 
@@ -127,8 +131,65 @@ void ATankMaster::CleanupVehicleModuleBindings()
 	M_TurretModuleRegistration = FTankTurretModuleRegistrationState();
 }
 
-void ATankMaster::OnModuleEngineDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp, const bool bIsDueToDamage)
+void ATankMaster::OnModuleEngineDamaged(const FModuleStateChange& Change)
 {
+	if (Change.Cause != EModuleChangeCause::Damage || Change.NewState == EVehicleModuleState::Healthy)
+	{
+		return;
+	}
+	(void)StartEngineFireChance(Change.NewState, Change.DamageShellType);
+}
+
+bool ATankMaster::StartEngineFireChance(const EVehicleModuleState EngineState, const EWeaponShellType ShellType)
+{
+	const float FireChance = EngineFire::GetChance(EngineState, ShellType);
+	if (FireChance <= 0.f || FMath::FRand() >= FireChance)
+	{
+		return false;
+	}
+	const TSubclassOf<UTankEngineFireBehaviour> FireBehaviourClass = GetEngineFireBehaviourClass();
+	if (FireBehaviourClass == nullptr || not GetIsValidBehaviourComponent())
+	{
+		return false;
+	}
+	BehaviourComponent->AddBehaviour(FireBehaviourClass);
+	ShowEngineFirePopup();
+	return true;
+}
+
+TSubclassOf<UTankEngineFireBehaviour> ATankMaster::GetEngineFireBehaviourClass() const
+{
+	if (not GetIsValidModuleArmor())
+	{
+		return nullptr;
+	}
+	if (not GetIsValidVehicleModuleSubsystem())
+	{
+		return nullptr;
+	}
+	return M_VehicleModuleSubsystem->GetEngineFireBehaviourClass(M_ModuleArmor->GetVehicleModuleProfile());
+}
+
+void ATankMaster::ShowEngineFirePopup() const
+{
+	UAnimatedTextWidgetPoolManager* PoolManager = FRTS_Statics::GetVerticalAnimatedTextWidgetPoolManager(this);
+	if (not IsValid(PoolManager))
+	{
+		return;
+	}
+	constexpr float PopupHeight = 350.f;
+	constexpr float PopupDelta = 100.f;
+	constexpr float PopupVisibleDuration = 2.33f;
+	constexpr float PopupFadeOutDuration = 1.f;
+	constexpr float PopupWrapWidth = 350.f;
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = PopupDelta;
+	TextSettings.VisibleDuration = PopupVisibleDuration;
+	TextSettings.FadeOutDuration = PopupFadeOutDuration;
+	PoolManager->ShowAnimatedText(
+		FRTSRichTextConverter::MakeRTSRich(TEXT("ENGINE FIRE"), ERTSRichText::Text_Bad14),
+		GetActorLocation() + FVector(0.f, 0.f, PopupHeight), false,
+		PopupWrapWidth, ETextJustify::Center, TextSettings);
 }
 
 void ATankMaster::OnModuleAddOnArmorDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
@@ -168,6 +229,17 @@ bool ATankMaster::GetIsValidModuleArmor() const
 		"GetIsValidModuleArmor",
 		this
 	);
+	return false;
+}
+
+bool ATankMaster::GetIsValidVehicleModuleSubsystem() const
+{
+	if (M_VehicleModuleSubsystem.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this, "M_VehicleModuleSubsystem", "GetIsValidVehicleModuleSubsystem", this);
 	return false;
 }
 
@@ -279,7 +351,7 @@ void ATankMaster::SyncModuleBehaviourForSlot(const int32 SlotIndex)
 	const FVehicleModuleSnapshot Snapshot = M_ModuleArmor->GetModuleSnapshotForSlot(SlotIndex);
 	// A missing asset or unassigned class means no behaviour for this state: no error and no fallback.
 	TSubclassOf<UVehicleModuleBehaviour> DesiredClass = nullptr;
-	if (M_VehicleModuleSubsystem.IsValid())
+	if (GetIsValidVehicleModuleSubsystem())
 	{
 		DesiredClass = M_VehicleModuleSubsystem->GetModuleBehaviourClass(Snapshot.Type, Snapshot.State);
 	}

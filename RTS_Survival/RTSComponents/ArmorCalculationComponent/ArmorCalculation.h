@@ -291,6 +291,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ArmorSettings|VehicleModules")
 	bool SetVehicleModuleProfile(EVehicleModuleProfile Profile);
 
+	/** @return The selected profile used by module damage and profile-specific effects. */
+	EVehicleModuleProfile GetVehicleModuleProfile() const { return M_ModuleProfile; }
+
 	/** @brief Call before installing modules to override the profile's default running gear. */
 	UFUNCTION(BlueprintCallable, Category = "ArmorSettings|VehicleModules")
 	bool SetRunningGearType(EVehicleRunningGear RunningGear);

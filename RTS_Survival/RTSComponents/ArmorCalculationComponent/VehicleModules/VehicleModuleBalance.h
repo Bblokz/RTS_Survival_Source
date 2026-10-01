@@ -15,6 +15,36 @@
  */
 namespace VehicleModuleBalance
 {
+	/** @brief Chance to ignite an engine when damage changes its module state; HE and HEAT use separate odds. */
+	namespace EngineFire
+	{
+		inline constexpr float EngineFireChanceDamagedEngine = 0.25f;
+		inline constexpr float EngineFireChanceDestroyedEngine = 0.5f;
+		inline constexpr float EngineFireChanceDamagedEngine_HE_HEAT = 0.33f;
+		inline constexpr float EngineFireChanceDestroyedEngine_HE_HEAT = 0.8f;
+
+		/**
+		 * @brief Keeps the shell and engine state rules beside their tuning values.
+		 * @param EngineState State reached by the engine after damage.
+		 * @param ShellType Shell responsible for that state change.
+		 * @return Fire probability, or zero when the engine remains healthy.
+		 */
+		constexpr float GetChance(const EVehicleModuleState EngineState, const EWeaponShellType ShellType)
+		{
+			const bool bIsExplosiveShell = ShellType == EWeaponShellType::Shell_HE
+				|| ShellType == EWeaponShellType::Shell_HEAT;
+			switch (EngineState)
+			{
+			case EVehicleModuleState::Damaged:
+				return bIsExplosiveShell ? EngineFireChanceDamagedEngine_HE_HEAT : EngineFireChanceDamagedEngine;
+			case EVehicleModuleState::Destroyed:
+				return bIsExplosiveShell ? EngineFireChanceDestroyedEngine_HE_HEAT : EngineFireChanceDestroyedEngine;
+			default:
+				return 0.f;
+			}
+		}
+	}
+
 	// ------------------------------------------------------------------------------------------------
 	// Editable probabilities and damage-chance multipliers
 	// ------------------------------------------------------------------------------------------------
@@ -33,7 +63,7 @@ namespace VehicleModuleBalance
 		namespace Plate_FrontUpperGlacis
 		{
 			inline constexpr float Ammo = 0.10f;
-			inline constexpr float Engine = 1.00f;
+			inline constexpr float Engine = 0.15f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_FrontLowerGlacis
@@ -193,8 +223,8 @@ namespace VehicleModuleBalance
 	/** @brief Tune non-penetrating shell hit chances before plate and profile scaling. */
 	namespace SourceProbabilities
 	{
-		inline constexpr float KineticNonPen = 0.35f;
-		inline constexpr float ArmorPiercingHighExplosiveNonPen = 0.35f;
+		inline constexpr float KineticNonPen = 0.25f;
+		inline constexpr float ArmorPiercingHighExplosiveNonPen = 0.33f;
 		inline constexpr float HighExplosiveNonPen = 0.70f;
 		inline constexpr float HighExplosiveAntiTankNonPen = 0.70f;
 		inline constexpr float RailgunNonPen = 0.35f;
@@ -1272,7 +1302,8 @@ namespace VehicleModuleBalance
 		inline constexpr float EngineYellowTravelMultiplier = 0.70f;
 		inline constexpr float EngineYellowAccelerationMultiplier = 0.60f;
 		// Red running gear or engine: no powered travel or turning.
-		inline constexpr float DestroyedMobilityMultiplier = 0.0f;
+		inline constexpr float DestroyedEngineMobilityMlt = 0.0f;
+		inline constexpr float DestroyedTrackOrWheelMobilityMlt = 0.0f;
 		inline constexpr float AmmoYellowReloadDurationMultiplier = 1.50f;
 		inline constexpr float AmmoAffectedWeaponCalibreExclusiveMm = 19.f;
 		inline constexpr float TurretYellowTraverseMultiplier = 0.50f;

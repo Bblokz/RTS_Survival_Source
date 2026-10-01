@@ -701,7 +701,6 @@ void ATankMaster::SetTurretsDisabled()
 
 void ATankMaster::OnVehicleModuleStateChanged(const FModuleStateChange& Change)
 {
-	const bool bIsDueToDamage = Change.Cause == EModuleChangeCause::Damage;
 	const float RemainingModuleHp = FMath::Clamp(Change.CurrentHp, 0.f, Change.MaxHp);
 	switch (Change.Type)
 	{
@@ -712,7 +711,7 @@ void ATankMaster::OnVehicleModuleStateChanged(const FModuleStateChange& Change)
 		OnModuleTracksDamaged(Change.NewState, RemainingModuleHp);
 		break;
 	case EVehicleModuleTypes::Engine:
-		OnModuleEngineDamaged(Change.NewState, RemainingModuleHp, bIsDueToDamage);
+		OnModuleEngineDamaged(Change);
 		break;
 	case EVehicleModuleTypes::Ammo:
 		OnModuleAmmoDamaged(Change.NewState, RemainingModuleHp);

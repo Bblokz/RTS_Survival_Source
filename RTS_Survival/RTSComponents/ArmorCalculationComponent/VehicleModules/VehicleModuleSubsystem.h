@@ -25,6 +25,9 @@ public:
 	TSubclassOf<UVehicleModuleBehaviour> GetModuleBehaviourClass(EVehicleModuleTypes Type,
 	                                                             EVehicleModuleState State) const;
 
+	/** @return The configured fire subclass for this profile; super-heavy tanks use HeavyTankEngineFire. */
+	TSubclassOf<UTankEngineFireBehaviour> GetEngineFireBehaviourClass(EVehicleModuleProfile Profile) const;
+
 	/**
 	 * @brief Resolves the healthbar icon of a non-healthy module type.
 	 * @param Type Installable module type.
@@ -41,9 +44,13 @@ public:
 	FSimpleMulticastDelegate& GetOnModuleAssetsReady() { return M_OnModuleAssetsReady; }
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FVehicleModuleTestAccess;
+#endif
 	void InitializeModuleAssets();
 	void BuildModuleAssetCache();
 	void ValidateAndCacheImageSize();
+	bool GetIsValidModuleDataAsset() const;
 
 	// Retained so textures and behaviour classes stay loaded for the game instance's lifetime.
 	UPROPERTY()

@@ -6,15 +6,18 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleSubsystem.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Tanks/AITankMaster.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireBehaviour.h"
 
 namespace VehicleModuleTestConstants
 {
@@ -32,6 +35,11 @@ namespace VehicleModuleTestConstants
 /** @brief Test-only access to private module state; builds isolated tanks without Blueprint setup. */
 struct FVehicleModuleTestAccess
 {
+	static void SetEngineFireDataAsset(UVehicleModuleSubsystem& Subsystem, UVehicleModuleDataAsset* DataAsset)
+	{
+		Subsystem.M_ModuleDataAsset = DataAsset;
+	}
+
 	static void InitializeTankComponents(ATankMaster& Tank)
 	{
 		Tank.HealthComponent = NewObject<UHealthComponent>(&Tank);
@@ -214,7 +222,8 @@ bool FVehicleModuleBalanceTablesTest::RunTest(const FString& Parameters)
 	const FPlateModuleRuleSet* HeavyRules = GetProfilePlateRules(EVehicleModuleProfile::HeavyTank,
 	                                                             EVehicleRunningGear::Tracks);
 	const FPlateModuleDamage& HeavyRearEngine = HeavyRules[TryGetPlateRuleIndex(EArmorPlate::Plate_Rear)].Entries[1];
-	TestEqual(TEXT("Class chance factor is baked in once"), HeavyRearEngine.DamageProbability, 0.4875f,
+	TestEqual(TEXT("Class chance factor is baked in once"), HeavyRearEngine.DamageProbability,
+	          RuleSetProbabilities::Plate_Rear::Engine * ProfileDamageChanceMultipliers::HeavyTank::Engine,
 	          VehicleModuleTestConstants::Tolerance);
 
 	const FPlateModuleRuleSet* CarRules = GetProfilePlateRules(EVehicleModuleProfile::ArmoredCar,
@@ -238,6 +247,60 @@ bool FVehicleModuleBalanceTablesTest::RunTest(const FString& Parameters)
 		+ 2.f * GetCrewRepairSeconds(EVehicleModuleTypes::Tracks);
 	TestEqual(TEXT("Engine plus two tracks takes 44 crew seconds"), EngineAndTwoTracks, 44.f);
 	TestEqual(TEXT("Seventeen fixed module slots"), MaxModuleInstances, 17);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleEngineFireChanceTest, "RTS.VehicleModules.EngineFireChance",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleEngineFireChanceTest::RunTest(const FString& Parameters)
+{
+	using VehicleModuleBalance::EngineFire::GetChance;
+	TestEqual(TEXT("Damaged engine with AP"),
+		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_AP), 0.25f);
+	TestEqual(TEXT("Destroyed engine with AP"),
+		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_AP), 0.5f);
+	TestEqual(TEXT("Damaged engine with HE"),
+		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_HE), 0.33f);
+	TestEqual(TEXT("Damaged engine with HEAT"),
+		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_HEAT), 0.33f);
+	TestEqual(TEXT("Destroyed engine with HE"),
+		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_HE), 0.8f);
+	TestEqual(TEXT("Destroyed engine with HEAT"),
+		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_HEAT), 0.8f);
+	TestEqual(TEXT("Healthy engine cannot ignite"),
+		GetChance(EVehicleModuleState::Healthy, EWeaponShellType::Shell_HE), 0.f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleEngineFireProfileTest, "RTS.VehicleModules.EngineFireProfiles",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleEngineFireProfileTest::RunTest(const FString& Parameters)
+{
+	UGameInstance* GameInstance = NewObject<UGameInstance>(GetTransientPackage());
+	UVehicleModuleSubsystem* Subsystem = NewObject<UVehicleModuleSubsystem>(GameInstance);
+	UVehicleModuleDataAsset* DataAsset = NewObject<UVehicleModuleDataAsset>(Subsystem);
+	FVehicleModuleTestAccess::SetEngineFireDataAsset(*Subsystem, DataAsset);
+	const TSubclassOf<UTankEngineFireBehaviour> FireClass = UTankEngineFireBehaviour::StaticClass();
+
+	DataAsset->ArmoredCarEngineFire = FireClass;
+	TestTrue(TEXT("Armored car selects its fire"),
+		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::ArmoredCar) == FireClass);
+	DataAsset->ArmoredCarEngineFire = nullptr;
+	DataAsset->LightTankEngineFire = FireClass;
+	TestTrue(TEXT("Light tank selects its fire"),
+		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::LightTank) == FireClass);
+	DataAsset->LightTankEngineFire = nullptr;
+	DataAsset->MediumTankEngineFire = FireClass;
+	TestTrue(TEXT("Medium tank selects its fire"),
+		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::MediumTank) == FireClass);
+	DataAsset->MediumTankEngineFire = nullptr;
+	DataAsset->HeavyTankEngineFire = FireClass;
+	TestTrue(TEXT("Heavy tank selects its fire"),
+		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::HeavyTank) == FireClass);
+	TestTrue(TEXT("Super-heavy tank shares heavy fire"),
+		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::SuperHeavyTank) == FireClass);
 	return true;
 }
 
