@@ -7,6 +7,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
+#include "Engine/SkeletalMesh.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Interfaces/Commands.h"
@@ -31,7 +33,32 @@ namespace VehicleModuleTestConstants
 	constexpr float DestroyingDamage = 100000.f;
 	constexpr int32 ImpactsForProbabilityChecks = 64;
 	constexpr uint8 TestPlayer = 1;
+	constexpr TCHAR Panzer38TChassisMeshPath[] =
+		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Panzer38T/Meshes/SK_Tracks_PZ38_T.SK_Tracks_PZ38_T");
+	constexpr TCHAR Panzer38THullMeshPath[] =
+		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Panzer38T/Meshes/SM_Hull_PZ38_T.SM_Hull_PZ38_T");
+	constexpr TCHAR VehicleModuleDataAssetPath[] =
+		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/ModuleSystem/DA_VehicleModules.DA_VehicleModules");
 }
+
+/** @brief Exposes engine-fire attachment state so the real light-tank assets can be regression tested. */
+struct FTankEngineFireBehaviourTestAccess
+{
+	static void SetTankMaster(UTankEngineFireBehaviour& Behaviour, ATankMaster& Tank)
+	{
+		Behaviour.M_TankMaster = &Tank;
+	}
+
+	static const FTankEngineFireAttachmentRules& GetAttachmentRules(const UTankEngineFireBehaviour& Behaviour)
+	{
+		return Behaviour.M_AttachmentRules;
+	}
+
+	static UMeshComponent* FindTankMeshWithSocket(const UTankEngineFireBehaviour& Behaviour, const FName SocketName)
+	{
+		return Behaviour.FindTankMeshWithSocket(SocketName);
+	}
+};
 
 /** @brief Test-only access to private module state; builds isolated tanks without Blueprint setup. */
 struct FVehicleModuleTestAccess
@@ -302,6 +329,70 @@ bool FVehicleEngineFireProfileTest::RunTest(const FString& Parameters)
 		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::HeavyTank) == FireClass);
 	TestTrue(TEXT("Super-heavy tank shares heavy fire"),
 		Subsystem->GetEngineFireBehaviourClass(EVehicleModuleProfile::SuperHeavyTank) == FireClass);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleLightTankEngineFireAttachmentTest,
+	"RTS.VehicleModules.LightTankEngineFireAttachment",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleLightTankEngineFireAttachmentTest::RunTest(const FString& Parameters)
+{
+	UVehicleModuleDataAsset* ModuleDataAsset = LoadObject<UVehicleModuleDataAsset>(
+		nullptr, VehicleModuleTestConstants::VehicleModuleDataAssetPath);
+	if (not TestNotNull(TEXT("Vehicle module data asset loads"), ModuleDataAsset))
+	{
+		return false;
+	}
+	if (not TestNotNull(TEXT("Light tanks have an engine-fire behaviour"),
+		ModuleDataAsset->LightTankEngineFire.Get()))
+	{
+		return false;
+	}
+
+	UTankEngineFireBehaviour* EngineFireBehaviour = NewObject<UTankEngineFireBehaviour>(
+		GetTransientPackage(), ModuleDataAsset->LightTankEngineFire);
+	if (not TestNotNull(TEXT("Light-tank engine-fire behaviour can be instantiated"), EngineFireBehaviour))
+	{
+		return false;
+	}
+
+	const FTankEngineFireAttachmentRules& AttachmentRules =
+		FTankEngineFireBehaviourTestAccess::GetAttachmentRules(*EngineFireBehaviour);
+	TestEqual(TEXT("Light-tank fire uses a hull socket"), AttachmentRules.Mode,
+		ETankEngineFireAttachmentMode::HullSocket);
+	TestEqual(TEXT("Light-tank fire uses the EngineFire socket"), AttachmentRules.HullSocketName,
+		FName(TEXT("EngineFire")));
+
+	UStaticMesh* PanzerHullMesh = LoadObject<UStaticMesh>(
+		nullptr, VehicleModuleTestConstants::Panzer38THullMeshPath);
+	if (not TestNotNull(TEXT("Panzer 38(t) hull mesh loads"), PanzerHullMesh))
+	{
+		return false;
+	}
+	USkeletalMesh* PanzerChassisMesh = LoadObject<USkeletalMesh>(
+		nullptr, VehicleModuleTestConstants::Panzer38TChassisMeshPath);
+	if (not TestNotNull(TEXT("Panzer 38(t) chassis mesh loads"), PanzerChassisMesh))
+	{
+		return false;
+	}
+
+	VehicleModuleTests::FTankFixture Fixture;
+	USkeletalMeshComponent* ChassisComponent = NewObject<USkeletalMeshComponent>(Fixture.Tank);
+	ChassisComponent->SetSkeletalMeshAsset(PanzerChassisMesh);
+	Fixture.Tank->AddInstanceComponent(ChassisComponent);
+	UStaticMeshComponent* StaticHullComponent = NewObject<UStaticMeshComponent>(Fixture.Tank);
+	StaticHullComponent->SetStaticMesh(PanzerHullMesh);
+	Fixture.Tank->AddInstanceComponent(StaticHullComponent);
+	FTankEngineFireBehaviourTestAccess::SetTankMaster(*EngineFireBehaviour, *Fixture.Tank);
+
+	TestFalse(TEXT("The skeletal chassis selected by GetTankMesh does not own EngineFire"),
+		ChassisComponent->DoesSocketExist(AttachmentRules.HullSocketName));
+	TestTrue(TEXT("The Panzer 38(t) static hull owns the configured socket"),
+		StaticHullComponent->DoesSocketExist(AttachmentRules.HullSocketName));
+	TestTrue(TEXT("Engine fire resolves the mesh that actually owns the socket"),
+		FTankEngineFireBehaviourTestAccess::FindTankMeshWithSocket(
+			*EngineFireBehaviour, AttachmentRules.HullSocketName) == StaticHullComponent);
 	return true;
 }
 

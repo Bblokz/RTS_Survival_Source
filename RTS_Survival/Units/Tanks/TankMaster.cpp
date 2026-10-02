@@ -702,28 +702,30 @@ void ATankMaster::SetTurretsDisabled()
 void ATankMaster::OnVehicleModuleStateChanged(const FModuleStateChange& Change)
 {
 	const float RemainingModuleHp = FMath::Clamp(Change.CurrentHp, 0.f, Change.MaxHp);
+	const bool bIsChangeToDamagedState = Change.Cause == EModuleChangeCause::Damage
+		&& Change.NewState != EVehicleModuleState::Healthy;
 	switch (Change.Type)
 	{
 	case EVehicleModuleTypes::AddOnArmor:
-		OnModuleAddOnArmorDamaged(Change.NewState, RemainingModuleHp);
+		OnModuleAddOnArmorDamaged(Change, RemainingModuleHp, bIsChangeToDamagedState);
 		break;
 	case EVehicleModuleTypes::Tracks:
-		OnModuleTracksDamaged(Change.NewState, RemainingModuleHp);
+		OnModuleTracksDamaged(Change, RemainingModuleHp, bIsChangeToDamagedState);
 		break;
 	case EVehicleModuleTypes::Engine:
-		OnModuleEngineDamaged(Change);
+		OnModuleEngineDamaged(Change, RemainingModuleHp, bIsChangeToDamagedState);
 		break;
 	case EVehicleModuleTypes::Ammo:
-		OnModuleAmmoDamaged(Change);
+		OnModuleAmmoDamaged(Change, RemainingModuleHp, bIsChangeToDamagedState);
 		break;
 	case EVehicleModuleTypes::Turret:
-		OnModuleTurretDamaged(Change.NewState, RemainingModuleHp);
+		OnModuleTurretDamaged(Change, RemainingModuleHp, bIsChangeToDamagedState);
 		break;
 	case EVehicleModuleTypes::Weapon:
-		OnModuleWeaponDamaged(Change.NewState, RemainingModuleHp);
+		OnModuleWeaponDamaged(Change, RemainingModuleHp, bIsChangeToDamagedState);
 		break;
 	case EVehicleModuleTypes::Wheels:
-		OnModuleWheelsDamaged(Change.NewState, RemainingModuleHp);
+		OnModuleWheelsDamaged(Change, RemainingModuleHp, bIsChangeToDamagedState);
 		break;
 	case EVehicleModuleTypes::None:
 	default:

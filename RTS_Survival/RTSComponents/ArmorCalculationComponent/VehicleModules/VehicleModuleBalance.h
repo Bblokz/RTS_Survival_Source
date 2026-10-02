@@ -94,28 +94,29 @@ namespace VehicleModuleBalance
 		}
 		
 		inline constexpr float SideAmmoHitChance= 0.3;
+		inline constexpr float SideTrackHitChance= 0.6;
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideLeft
 		{
-			inline constexpr float Tracks = 0.65f;
+			inline constexpr float Tracks = SideTrackHitChance;
 			inline constexpr float Ammo = SideAmmoHitChance;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideRight
 		{
-			inline constexpr float Tracks = 0.65f;
+			inline constexpr float Tracks = SideTrackHitChance;
 			inline constexpr float Ammo = SideAmmoHitChance;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideLowerLeft
 		{
-			inline constexpr float Tracks = 0.65f;
+			inline constexpr float Tracks = SideTrackHitChance;
 			inline constexpr float Ammo = SideAmmoHitChance;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_SideLowerRight
 		{
-			inline constexpr float Tracks = 0.65f;
+			inline constexpr float Tracks = SideTrackHitChance;
 			inline constexpr float Ammo = SideAmmoHitChance;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
@@ -140,7 +141,7 @@ namespace VehicleModuleBalance
 		namespace Turret_Front
 		{
 			inline constexpr float Turret = 0.30f;
-			inline constexpr float Weapon = 0.40f;
+			inline constexpr float Weapon = 0.50f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Turret_SideLeft
@@ -157,7 +158,7 @@ namespace VehicleModuleBalance
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Turret_Rear
 		{
-			inline constexpr float Turret = 0.35f;
+			inline constexpr float Turret = 0.8f;
 			inline constexpr float Ammo = 0.40f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */

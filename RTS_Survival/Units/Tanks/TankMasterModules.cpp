@@ -132,13 +132,23 @@ void ATankMaster::CleanupVehicleModuleBindings()
 	M_TurretModuleRegistration = FTankTurretModuleRegistrationState();
 }
 
-void ATankMaster::OnModuleEngineDamaged(const FModuleStateChange& Change)
+void ATankMaster::OnModuleEngineDamaged(
+	const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState)
 {
-	if (Change.Cause != EModuleChangeCause::Damage || Change.NewState == EVehicleModuleState::Healthy)
+	if (not bIsChangeToDamagedState)
 	{
 		return;
 	}
 	(void)StartEngineFireChance(Change.NewState, Change.DamageShellType);
+	
+	if (Change.NewState == EVehicleModuleState::Destroyed)
+	{
+		PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::LostEngine, true);
+	}
+	else
+	{
+		PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::EngineDamage, false);
+	}
 }
 
 bool ATankMaster::StartEngineFireChance(const EVehicleModuleState EngineState, const EWeaponShellType ShellType)
@@ -220,33 +230,95 @@ void ATankMaster::ShowModuleFirePopup(const FString& PopupText) const
 		PopupWrapWidth, ETextJustify::Center, TextSettings);
 }
 
-void ATankMaster::OnModuleAddOnArmorDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+void ATankMaster::OnModuleAddOnArmorDamaged(
+	const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState)
 {
-}
-
-void ATankMaster::OnModuleTracksDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
-{
-}
-
-void ATankMaster::OnModuleAmmoDamaged(const FModuleStateChange& Change)
-{
-	if (Change.Cause != EModuleChangeCause::Damage || Change.NewState == EVehicleModuleState::Healthy)
+	if (not bIsChangeToDamagedState)
 	{
 		return;
 	}
+	PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::GeneralDamage,
+	                                        Change.NewState == EVehicleModuleState::Destroyed);
+}
+
+void ATankMaster::PlayVoiceLineForDamageOnRadioIfSelected(const ERTSVoiceLine VlType,
+                                                          const bool bIsDestroyedModule) const
+{
+	if (not GetIsValidSpatialVoiceLinePlayer())
+	{
+		return;
+	}
+	if (GetIsSelected() || bIsDestroyedModule)
+	{
+		M_SpatialVoiceLinePlayer->PlayVoiceLineOverRadio(VlType, true, true);
+		return;
+	}
+	M_SpatialVoiceLinePlayer->PlaySpatialVoiceLine(VlType, GetActorLocation(), true);
+}
+
+
+void ATankMaster::OnModuleTracksDamaged(
+	const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState)
+{
+	if (not bIsChangeToDamagedState)
+	{
+		return;
+	}
+	if (Change.NewState == EVehicleModuleState::Destroyed)
+	{
+		PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::LostTrack, true);
+	}
+}
+
+void ATankMaster::OnModuleAmmoDamaged(
+	const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState)
+{
+	if (not bIsChangeToDamagedState)
+	{
+		return;
+	}
+	PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::GeneralDamage,
+	                                        Change.NewState == EVehicleModuleState::Destroyed);
+
 	(void)StartAmmoCookOffChance(Change.NewState);
 }
 
-void ATankMaster::OnModuleTurretDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+void ATankMaster::OnModuleTurretDamaged(
+	const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState)
 {
+	if (not bIsChangeToDamagedState)
+	{
+		return;
+	}
+	PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::GeneralDamage,
+	                                        Change.NewState == EVehicleModuleState::Destroyed);
 }
 
-void ATankMaster::OnModuleWeaponDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+void ATankMaster::OnModuleWeaponDamaged(
+	const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState)
 {
+	if (not bIsChangeToDamagedState)
+	{
+		return;
+	}
+	
+	if (Change.NewState == EVehicleModuleState::Destroyed)
+	{
+		PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::LostGun, true);
+	}
+	PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::GeneralDamage,
+	                                        false);
 }
 
-void ATankMaster::OnModuleWheelsDamaged(const EVehicleModuleState NewState, const float RemainingModuleHp)
+void ATankMaster::OnModuleWheelsDamaged(
+	const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState)
 {
+	if (not bIsChangeToDamagedState)
+	{
+		return;
+	}
+	PlayVoiceLineForDamageOnRadioIfSelected(ERTSVoiceLine::GeneralDamage,
+	                                        Change.NewState == EVehicleModuleState::Destroyed);
 }
 
 bool ATankMaster::GetIsValidModuleArmor() const
@@ -342,8 +414,10 @@ void ATankMaster::RefreshMountedModuleBehaviours()
 	{
 		return;
 	}
-	for (const EVehicleModuleTypes Type : {EVehicleModuleTypes::Ammo, EVehicleModuleTypes::Turret,
-	                                     EVehicleModuleTypes::Weapon})
+	for (const EVehicleModuleTypes Type : {
+		     EVehicleModuleTypes::Ammo, EVehicleModuleTypes::Turret,
+		     EVehicleModuleTypes::Weapon
+	     })
 	{
 		const int32 FirstSlot = VehicleModuleBalance::GetFirstSlotForType(Type);
 		const int32 SlotCount = VehicleModuleBalance::GetSlotCountForType(Type);
@@ -669,7 +743,7 @@ bool ATankMaster::GetHasMountedWeaponLock() const
 // ----------------------------------------------------------------------------------------------------
 
 void ATankMaster::SetMobilityRestriction(UObject* Source, const float TravelSpeedMultiplier,
-	                                         const float TurnRateMultiplier, const float AccelerationMultiplier)
+                                         const float TurnRateMultiplier, const float AccelerationMultiplier)
 {
 	if (not IsValid(Source))
 	{
@@ -730,7 +804,7 @@ void ATankMaster::RebuildVehicleMobility()
 			UnrestrictedMaxSpeedKmh = TankData.VehicleMaxSpeedKmh;
 		}
 		WheeledMovement->SetModuleMobilityLimits(TravelSpeedMultiplier, TurnRateMultiplier,
-			AccelerationMultiplier, UnrestrictedMaxSpeedKmh);
+		                                         AccelerationMultiplier, UnrestrictedMaxSpeedKmh);
 	}
 
 	if (not IsValid(AITankController))

@@ -10,6 +10,7 @@
 
 class ATankMaster;
 class UAudioComponent;
+class UMeshComponent;
 class URTSFireSubsystem;
 class USoundAttenuation;
 class USoundBase;
@@ -34,11 +35,16 @@ protected:
 	virtual void OnRefreshed(UBehaviour* RefreshingBehaviour) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FTankEngineFireBehaviourTestAccess;
+#endif
+
 	void SampleDuration();
 	void StartFireEffect();
 	void StopFireEffect();
 	void StartFireSound();
 	void StopFireSound();
+	UMeshComponent* FindTankMeshWithSocket(FName SocketName) const;
 	bool GetIsValidTankMaster() const;
 	bool GetIsValidFireSubsystem() const;
 

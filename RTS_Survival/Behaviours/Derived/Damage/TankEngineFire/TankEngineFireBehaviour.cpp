@@ -1,6 +1,7 @@
 #include "TankEngineFireBehaviour.h"
 
 #include "Components/AudioComponent.h"
+#include "Components/MeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "Sound/SoundBase.h"
@@ -105,13 +106,7 @@ void UTankEngineFireBehaviour::StartFireEffect()
 		return;
 	}
 
-	USkeletalMeshComponent* HullMesh = M_TankMaster->GetTankMesh();
-	if (not IsValid(HullMesh))
-	{
-		RTSFunctionLibrary::ReportError(TEXT("UTankEngineFireBehaviour::StartFireEffect - tank hull mesh is invalid."));
-		return;
-	}
-
+	UMeshComponent* AttachmentMesh = M_TankMaster->GetTankMesh();
 	FName SocketName = NAME_None;
 	FVector HullRelativeOffset = FVector::ZeroVector;
 	if (M_AttachmentRules.Mode == ETankEngineFireAttachmentMode::HullSocket)
@@ -122,15 +117,28 @@ void UTankEngineFireBehaviour::StartFireEffect()
 			RTSFunctionLibrary::ReportError(TEXT("UTankEngineFireBehaviour::StartFireEffect - hull socket name is empty."));
 			return;
 		}
+		AttachmentMesh = FindTankMeshWithSocket(SocketName);
+		if (not IsValid(AttachmentMesh))
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("UTankEngineFireBehaviour::StartFireEffect - no tank mesh owns socket '%s'."),
+				*SocketName.ToString()));
+			return;
+		}
 	}
 	else
 	{
+		if (not IsValid(AttachmentMesh))
+		{
+			RTSFunctionLibrary::ReportError(TEXT("UTankEngineFireBehaviour::StartFireEffect - tank hull mesh is invalid."));
+			return;
+		}
 		const FVector PivotRelativeWorldLocation = M_TankMaster->GetActorTransform().TransformPositionNoScale(
 			M_AttachmentRules.TankPivotOffset);
-		HullRelativeOffset = HullMesh->GetComponentTransform().InverseTransformPosition(PivotRelativeWorldLocation);
+		HullRelativeOffset = AttachmentMesh->GetComponentTransform().InverseTransformPosition(PivotRelativeWorldLocation);
 	}
 
-	M_FireHandle = M_FireSubsystem->SpawnFireAttachedToComponent(M_TankMaster.Get(), HullMesh, SocketName,
+	M_FireHandle = M_FireSubsystem->SpawnFireAttachedToComponent(M_TankMaster.Get(), AttachmentMesh, SocketName,
 		HullRelativeOffset, M_FireType, M_LifeTimeDuration, M_FireWorldScale, M_FireEffectParams);
 }
 
@@ -203,6 +211,25 @@ void UTankEngineFireBehaviour::StopFireSound()
 	FireAudioComponent->Stop();
 	FireAudioComponent->DestroyComponent();
 	M_FireAudioComponent.Reset();
+}
+
+UMeshComponent* UTankEngineFireBehaviour::FindTankMeshWithSocket(const FName SocketName) const
+{
+	if (not GetIsValidTankMaster() || SocketName == NAME_None)
+	{
+		return nullptr;
+	}
+
+	TInlineComponentArray<UMeshComponent*> TankMeshes(M_TankMaster.Get());
+	for (UMeshComponent* TankMesh : TankMeshes)
+	{
+		if (IsValid(TankMesh) && TankMesh->DoesSocketExist(SocketName))
+		{
+			return TankMesh;
+		}
+	}
+
+	return nullptr;
 }
 
 bool UTankEngineFireBehaviour::GetIsValidTankMaster() const

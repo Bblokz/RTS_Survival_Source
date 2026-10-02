@@ -791,7 +791,8 @@ private:
 	void CleanupVehicleModuleBindings();
 	
 	// ------------ Module Damaged Updates -------------------- //
-	void OnModuleEngineDamaged(const FModuleStateChange& Change);
+	void OnModuleEngineDamaged(
+		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
 	/**
 	 * @brief Ignites the selected tank fire only when a damaging engine transition wins its shell-specific roll.
 	 * @param EngineState Damaged or Destroyed state reached by the engine.
@@ -803,12 +804,19 @@ private:
 	bool StartAmmoCookOffChance(EVehicleModuleState AmmoState);
 	TSubclassOf<UAmmoCookOffBehaviour> GetAmmoCookOffBehaviourClass() const;
 	void ShowModuleFirePopup(const FString& PopupText) const;
-	void OnModuleAddOnArmorDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
-	void OnModuleTracksDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
-	void OnModuleAmmoDamaged(const FModuleStateChange& Change);
-	void OnModuleTurretDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
-	void OnModuleWeaponDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
-	void OnModuleWheelsDamaged(EVehicleModuleState NewState, const float RemainingModuleHp);
+	void OnModuleAddOnArmorDamaged(
+		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
+	void PlayVoiceLineForDamageOnRadioIfSelected(const ERTSVoiceLine VlType, const bool bIsDestroyedModule) const;
+	void OnModuleTracksDamaged(
+		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
+	void OnModuleAmmoDamaged(
+		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
+	void OnModuleTurretDamaged(
+		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
+	void OnModuleWeaponDamaged(
+		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
+	void OnModuleWheelsDamaged(
+		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
 
 	// ---- Turret-driven module registration (called by ACPPTurretsMaster only) ----
 	void AddPendingTurretModuleRegistration(ACPPTurretsMaster* Turret);
