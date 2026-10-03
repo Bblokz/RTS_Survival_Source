@@ -689,7 +689,7 @@ bool ATankMaster::ImportVehicleModuleSaveData(const FVehicleModuleSaveData& Save
 	{
 		HealthComponent->SynchronizeModuleIconSnapshot(M_ModuleArmor->GetModuleIconStates());
 	}
-	// Exposes EnableRepair if red modules remain, never DisableRepair without an active session.
+	// Exposes EnableRepair if damaged or destroyed modules remain, never DisableRepair without an active session.
 	RefreshCrewRepairAbilityFromModuleState();
 	return true;
 }

@@ -77,7 +77,7 @@ So queued subtype abilities are revalidated against the *exact* `(AbilityId, Cus
 - Lives in the **reserved final card slot** (`VehicleModuleBalance::CrewRepairAbilitySlotIndex`); only the tank writes it
   through `UCommandData::SetCrewRepairAbilityEntry`. Generic `AddAbility` never uses that slot.
 - `EnableRepair` follows normal replacement/Shift queue semantics and is revalidated on dispatch (skipped quietly when
-  no red modules remain). `DisableRepair` is an **immediate** control action: it calls
+  no damaged or destroyed modules remain). `DisableRepair` is an **immediate** control action: it calls
   `ExecuteCrewRepairCommand(DisableRepair)` directly and is never queued behind the running repair.
 - The running command completes itself exactly once through `TryDoneExecutingCommand`; `TerminateCrewRepairCommand`
   only cleans up because the queue owns progression there.

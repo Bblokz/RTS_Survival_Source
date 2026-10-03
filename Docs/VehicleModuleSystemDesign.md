@@ -2,7 +2,7 @@
 
 **Design only.** Proposed APIs/pseudocode; no C++ files are added or changed. Reviewed against source on 27–29 September 2026. Numeric defaults require playtesting.
 
-**Owner:** `ATankMaster` and its `UArmorCalculation`. Ordinary healing uses the tank's actual `UHealthComponent` health percentage for recovery. CrewRepair instead spends time to recover red modules without changing hull HP.
+**Owner:** `ATankMaster` and its `UArmorCalculation`. Ordinary healing uses the tank's actual `UHealthComponent` health percentage for recovery. CrewRepair instead spends time to restore damaged and destroyed modules without changing hull HP.
 
 ## 1. Files and responsibilities
 
@@ -113,7 +113,7 @@ Compile-time validation: destruction thresholds lie in `[0,1)`; recovered percen
 | `ModuleAnnouncementCooldownSeconds` | 5; announcements only, never delays icon changes |
 | `DefaultModuleIconWidth` / `DefaultModuleIconHeight` | 225.0 / 225.0; defaults for the presentation asset's editable dimensions |
 
-`FullModuleServiceWork` controls yellow → Healthy completion, **not** red → yellow eligibility. Ordinary healing has one shared tank-health recovery gate. **CrewRepair is the explicit exception:** timed red → yellow recovery independent of hull health, with no hull healing or full-service credit. Crew durations are positive whole multiples of the one-second interval; validate the constexpr table at compile time. There is no extra crew quiet period or warmup.
+`FullModuleServiceWork` controls ordinary-healing yellow → Healthy completion, **not** red → yellow eligibility. Ordinary healing has one shared tank-health recovery gate. **CrewRepair is the explicit exception:** timed red → yellow and yellow → Healthy stages independent of hull health, with no hull healing or full-service credit. Crew durations are positive whole multiples of the one-second interval; validate the constexpr table at compile time. There is no extra crew quiet period or warmup.
 
 Reuse the existing repair technology's multiplier as an input. Vehicle repair paths consume this header rather than maintaining a second vehicle tuning source in `DeveloperSettings.h`.
 
@@ -611,7 +611,7 @@ Re-entrant healing is deferred until the current health/module transaction and i
 
 ### CrewRepair: timed module-only recovery
 
-CrewRepair **never changes tank health**, checks no hull-health threshold and grants no full-service work. It restores one red module at a time to `MaxHp * GetRecoveredHealth01(Type)`. Yellow/healthy modules are skipped. A tank at 10% hull HP remains at 10% after crew repair unless another source heals it.
+CrewRepair **never changes tank health**, checks no hull-health threshold and grants no full-service work. Each timed stage advances one module condition: red → yellow sets `MaxHp * GetRecoveredHealth01(Type)`, and yellow → Healthy sets `MaxHp`. Healthy modules are skipped. A tank at 10% hull HP remains at 10% after crew repair unless another source heals it.
 
 ```cpp
 // Append IdCrewRepair to EAbilityID; preserve existing enum values.
@@ -625,7 +625,7 @@ enum class ECrewRepairAbilityType : uint8
 
 Ability display name = **CrewRepair**; C++ ID = `EAbilityID::IdCrewRepair`, following existing ID naming. Store subtype in `FUnitAbilityEntry::CustomType` and `FQueueCommand::CustomType`. Both subtypes are free and have zero cooldown. EnableRepair starts only on player command; automatic card insertion does not start the timer.
 
-| Module type | Red → yellow crew time |
+| Module type | Crew time per condition stage |
 | --- | ---: |
 | Engine | 20 seconds |
 | Tracks | 12 seconds per installed side |
@@ -635,7 +635,7 @@ Ability display name = **CrewRepair**; C++ ID = `EAbilityID::IdCrewRepair`, foll
 | Ammo | 18 seconds |
 | AddOnArmor | 8 seconds per installed zone |
 
-All times come from the individual constexpr constants in section 2. Repairs are **sequential**, so total time is the sum for red instances: engine + two tracks = **44 seconds**. Use `CrewRepairPriority` for the next module, then fixed slot order. Keep the current target until it is repaired, removed or repaired externally; newly red modules join the remaining work without resetting that target.
+All times come from the individual constexpr constants in section 2. Repairs are **sequential**. A yellow module needs one stage; a red module needs two, so fully restoring a red engine plus two red tracks takes **88 seconds**. Select destroyed modules before damaged modules, then use `CrewRepairPriority` and fixed slot order within that condition. Keep the current stage until its condition changes, the module is removed, or it is repaired externally; newly nonhealthy modules join the remaining work without resetting that stage.
 
 ### Ability registration and final command-card slot
 
@@ -644,16 +644,16 @@ ATankMaster::InitializeCrewRepairAbilitySlot()
 ATankMaster::RefreshCrewRepairAbilityFromModuleState()
 ATankMaster::MakeCrewRepairAbilityEntry(ECrewRepairAbilityType Subtype) const
 
-DestroyedModuleCount > 0, inactive -> final slot = CrewRepair / EnableRepair
-DestroyedModuleCount > 0, active   -> same slot = CrewRepair / DisableRepair
-DestroyedModuleCount == 0          -> stop if active; clear CrewRepair slot
+NonHealthyModuleCount > 0, inactive -> final slot = CrewRepair / EnableRepair
+NonHealthyModuleCount > 0, active   -> same slot = CrewRepair / DisableRepair
+NonHealthyModuleCount == 0          -> stop if active; clear CrewRepair slot
 ```
 
 Initialize after `InitAbilityArray`; synchronize again after module setup/load. Reserve `CrewRepairAbilitySlotIndex = MaxAbilitiesForActionUI - 1` at tank ability initialization. The current maximum is 15, so this is index 14. **The final slot is guaranteed unused by tank loadouts.** Size the tank's array once to that capacity; initially the reserved entry is `IdNoAbility`. No ability relocation or full-card fallback is needed. Generic additions skip this reserved slot.
 
 **Codebase constraint:** `UCommandData::AddAbility` neither appends nor grows the array. After setup sizing, write CrewRepair only to the reserved final slot. Removal clears the entry to `FUnitAbilityEntry()`, preserving indices. Swap EnableRepair ↔ DisableRepair in place with the existing exact-subtype `SwapAbility` semantics. Preserve this reservation when abilities are rebuilt at runtime.
 
-Call `RefreshCrewRepairAbilityFromModuleState` after committed native state batches, only when red count crosses zero or active state changes. It returns without writing when the desired entry already matches. Additional red modules do not add duplicates or reset DisableRepair to EnableRepair. Update the command card once after each mutation batch through `UCommandData::UpdateActionUI`.
+Call `RefreshCrewRepairAbilityFromModuleState` after committed native state batches, only when the nonhealthy count crosses zero or active state changes. It returns without writing when the desired entry already matches. Additional damaged or destroyed modules do not add duplicates or reset DisableRepair to EnableRepair. Update the command card once after each mutation batch through `UCommandData::UpdateActionUI`.
 
 ### Controller → ICommands → TankMaster implementation
 
@@ -674,7 +674,7 @@ Follow [AGENTS.md](../AGENTS.md), [Player/AGENTS.md](../RTS_Survival/Player/AGEN
 
 This is action-button-only: no new right-click `ECommandType` or target decoder branch. Require the exact card entry; do not add CrewRepair to `IsAbilityRequiredOnCommandCard` exceptions. Unsupported owners reject safely.
 
-**Queue policy:** EnableRepair follows normal replacement/shift-queue semantics. A queued Enable is revalidated when dispatched and skipped if no red modules remain. Once started, its asynchronous command stays active until cancelled/completed. Swapping the card to DisableRepair must not invalidate the already-running Enable command.
+**Queue policy:** EnableRepair follows normal replacement/shift-queue semantics. A queued Enable is revalidated when dispatched and skipped if no damaged or destroyed modules remain. Once started, its asynchronous command stays active until cancelled/completed. Swapping the card to DisableRepair must not invalidate the already-running Enable command.
 
 DisableRepair is an **immediate control action** through the same controller/`ICommands` API: validate the active tank and DisableRepair entry, then call its execute override directly, without enqueueing or first clearing the queue. This works even with Shift held or while the queue is otherwise busy. Never queue Disable behind the long-running Enable. Reject duplicate Enable commands while active; stale Disable after automatic completion is a harmless no-op.
 
@@ -685,14 +685,14 @@ ATankMaster::ExecuteCrewRepairCommand(ECrewRepairAbilityType Subtype)
 ATankMaster::TerminateCrewRepairCommand(ECrewRepairAbilityType Subtype)
 ATankMaster::BeginCrewRepair() -> bool
 ATankMaster::CrewRepairTick()
-ATankMaster::SelectNextRedModuleForCrewRepair() -> bool
+ATankMaster::SelectNextModuleForCrewRepair() -> bool
 ATankMaster::FinishCrewRepair(ECrewRepairStopReason Reason)
 ATankMaster::RestoreCrewRepairState()
-UArmorCalculation::RestoreDestroyedModuleToDamaged(FVehicleModuleId Id) -> bool
+UArmorCalculation::AdvanceModuleRepairForCrew(FVehicleModuleId Id) -> bool
 
 FCrewRepairState:
     Status                                    // Inactive / Repairing / Stopping
-    CurrentModuleId, ModuleWorkStartGameTime, RequiredModuleSeconds
+    CurrentModuleId, TargetStateAtWorkStart, ModuleWorkStartGameTime, RequiredModuleSeconds
     TimerHandle, SessionGeneration, ActiveCommandToken
     AbilitySuppressionHandle, WeaponAndMovementLockHandle
 
@@ -702,14 +702,14 @@ ExecuteCrewRepairCommand(Subtype):
         complete this queued Enable command once after rollback
 
 BeginCrewRepair():
-    validate living tank, red count > 0, required components and final card slot
+    validate living tank, nonhealthy count > 0, required components and final card slot
     if already active: return false
     begin action-state transaction
     acquire crew movement/weapon locks
     SetTurretsDisabled()
     StopVehicleForCrewRepair()
     suppress Attack, Move, ReverseMove, RotateTowards entries
-    select next red module; record start game time and GetCrewRepairSeconds(Type)
+    select next destroyed, then damaged, module; record its state, start game time and GetCrewRepairSeconds(Type)
     set Status = Repairing; swap card subtype to DisableRepair
     start UObject-bound repeating timer: interval = 1 second, first delay = 1 second
     commit action/card refresh once
@@ -718,24 +718,25 @@ BeginCrewRepair():
 CrewRepairTick():
     validate living owner and current session; ignore stale timer callbacks
     if not Repairing: return
-    if DestroyedModuleCount == 0: FinishCrewRepair(AllModulesRecovered); return
-    if current target is no longer red: select next target; record a fresh start time
+    if NonHealthyModuleCount == 0: FinishCrewRepair(AllModulesRecovered); return
+    if current target no longer matches TargetStateAtWorkStart: select next target; record a fresh start time
     if GameTimeNow - ModuleWorkStartGameTime < RequiredModuleSeconds: return
-    ArmorCalculation.RestoreDestroyedModuleToDamaged(CurrentModuleId)
+    ArmorCalculation.AdvanceModuleRepairForCrew(CurrentModuleId)
     // Committed state event advances the target or auto-finishes. Return immediately.
 
-RestoreDestroyedModuleToDamaged(Id):
-    if Id is invalid or module is not Destroyed: return false
-    set HP = MaxHp * GetRecoveredHealth01(Type)
+AdvanceModuleRepairForCrew(Id):
+    if Id is invalid or module is Healthy: return false
+    if Destroyed: set HP = MaxHp * GetRecoveredHealth01(Type)
+    if Damaged: set HP = MaxHp
     commit native state/counts; dispatch ordinary behaviour/icon/BP changes
     return true
 ```
 
-One timer per active tank; no timer per module and no heap-allocated repair queue. Selection uses the fixed module array and constexpr priority. Compare elapsed game time on each one-second tick; pause freezes progress, and a target selected between ticks never completes early. Select failure with no red modules completes normally; invalid bindings/owner abort through cleanup. Unfinished time resets on manual disable/re-enable; completed yellow repairs remain. Damage does not add a quiet period or restart ongoing red-module work. A repaired module destroyed again later requires its full duration.
+One timer per active tank; no timer per module and no heap-allocated repair queue. Selection uses the fixed module array and constexpr priority. Compare elapsed game time on each one-second tick; pause freezes progress, and a target selected between ticks never completes early. Select failure with no nonhealthy modules completes normally; invalid bindings/owner abort through cleanup. Unfinished time resets on manual disable/re-enable; completed condition advances remain. Damage does not add a quiet period, but a target whose condition changes starts its newly selected stage at full duration. A repaired module destroyed again later requires both stages.
 
 `StopVehicleForCrewRepair` must stop actual movement/rotation: use `EndTurretRangeMovement`, `StopBehaviourTree`, `AITankController::StopMovement`, `StopRotating`, reset pending final rotation and clear/brake movement requests for the tracked/wheeled adapter. Prevent stale movement-completion callbacks from completing the CrewRepair command. Existing `ExecuteStopCommand()` only calls `SetTurretsToAutoEngage(false)`; it is insufficient.
 
-Existing `SetTurretsDisabled()` disables all turrets **and hull weapons**, which is appropriate during crew repair. Hold the action lock so other commands, auto-engage, patrol/attack-ground exceptions and behaviour refresh cannot restart movement/fire. These restrictions come from the explicitly activated repair action; red module state alone still imposes no effect. Other action requests that need movement/fire must first cancel repair or remain queued. Stop/cancellation uses the same cleanup.
+Existing `SetTurretsDisabled()` disables all turrets **and hull weapons**, which is appropriate during crew repair. Hold the action lock so other commands, auto-engage, patrol/attack-ground exceptions and behaviour refresh cannot restart movement/fire. These restrictions come from the explicitly activated repair action; module condition alone still imposes no effect. Other action requests that need movement/fire must first cancel repair or remain queued. Stop/cancellation uses the same cleanup.
 
 ### Restore abilities and weapons without stale state
 
@@ -749,9 +750,11 @@ FinishCrewRepair(Reason):
     set Status = Stopping; invalidate session; clear timer
     RestoreCrewRepairState()                       // release only crew-owned suppression/locks
     clear unfinished target/time; set Status = Inactive
-    if living and red count > 0: final slot = EnableRepair
+    if living and nonhealthy count > 0: final slot = EnableRepair
     else: clear CrewRepair entry
     refresh command card once
+    if Reason == AllModulesRecovered and nonhealthy count == 0:
+        play Repair over radio when selected (no force, queue if blocked), otherwise spatially
     if this session still owns the active queued Enable command
        and Reason is not external queue termination/death:
         DoneExecutingCommand(IdCrewRepair)         // exactly once, after cleanup
@@ -768,18 +771,18 @@ The native module-state batch, not the timer or UI, detects completion:
 ```text
 ATankMaster::OnModuleStateBatchCommitted():
     refresh cached red/nonhealthy counts
-    if crew is active and DestroyedModuleCount == 0:
+    if crew is active and NonHealthyModuleCount == 0:
         FinishCrewRepair(AllModulesRecovered)
-    else if crew is active and its target is no longer red:
-        discard its unfinished time; select next red target
+    else if crew is active and its target state differs from TargetStateAtWorkStart:
+        discard its unfinished time; select the next condition stage
     RefreshCrewRepairAbilityFromModuleState()
 ```
 
-Run this once after the whole batch and its behaviour changes are committed; defer cleanup until the mutation loop ends. Ordinary heals keep their usual hull threshold/full-service rules. If an aura or scavenger restores every red module first, clear the crew timer, restore removed abilities, release weapon/movement locks and remove CrewRepair from the card immediately at that batch boundary. **Undo the crew action's restrictions, never the other source's healing or completed module repairs.**
+Run this once after the whole batch and its behaviour changes are committed; defer cleanup until the mutation loop ends. Ordinary heals keep their usual hull threshold/full-service rules. If an aura or scavenger restores every module fully, clear the crew timer, restore removed abilities, release weapon/movement locks and remove CrewRepair from the card immediately at that batch boundary. **Undo the crew action's restrictions, never the other source's healing or completed module repairs.**
 
-Partial external recovery skips repaired targets and continues on remaining red modules. No red modules means remove the ability even if some modules are already Healthy rather than Yellow. Later red damage adds a fresh EnableRepair entry in the final slot, without auto-starting. A simultaneous timer/external repair cannot restore twice: the armor function checks current state, and session generation prevents stale callbacks.
+Partial external recovery advances or skips the affected target and continues through remaining destroyed and damaged modules. Recovering every red module only moves the crew into yellow-stage work; the ability is removed only when every module is Healthy. Later yellow or red damage adds a fresh EnableRepair entry in the final slot, without auto-starting. A simultaneous timer/external repair cannot restore twice: the armor function checks current state, and session generation prevents stale callbacks.
 
-On load, rebuild ordinary ability grants and module state, clear transient crew suppression/locks, and expose EnableRepair if reds remain. Do not deserialize a live timer or resume crew work automatically. This avoids restoring a card with DisableRepair but no active repair session.
+On load, rebuild ordinary ability grants and module state, clear transient crew suppression/locks, and expose EnableRepair if damaged or destroyed modules remain. Do not deserialize a live timer or resume crew work automatically. This avoids restoring a card with DisableRepair but no active repair session.
 
 ### Existing healers and future callers
 
@@ -1096,8 +1099,9 @@ Widget operations, always entered through the health component:
 
 ## 12. UX, lifecycle and safety
 
-- **Yellow:** damaged module. **Red:** destroyed module; tooltip says “Crew Repair available.” Show stat consequences only when its assigned behaviour applies them. Healthy is neutral.
-- CrewRepair appears in the final slot as EnableRepair; while active it shows DisableRepair. Tooltip/progress shows current module and total remaining crew seconds, refreshed by the active one-second timer. Remove the entry when no reds remain. Ordinary repair UI continues to show hull healing and finishing work.
+- **Yellow:** damaged module. **Red:** destroyed module; both conditions allow CrewRepair. Show stat consequences only when an assigned behaviour applies them. Healthy is neutral.
+- CrewRepair appears in the final slot as EnableRepair; while active it shows DisableRepair. Tooltip/progress shows current module and total remaining crew seconds, refreshed by the active one-second timer. Destroyed modules contribute two timed stages and damaged modules one. Remove the entry when no nonhealthy modules remain. Ordinary repair UI continues to show hull healing and finishing work.
+- When active CrewRepair ends because every module is Healthy, play `ERTSVoiceLine::Repair`: selected tanks request it over radio without forcing playback and queue it if blocked; unselected tanks request normal spatial playback. Cancellation, queue termination, startup failure and owner destruction are silent.
 - `SuspendCommandForModuleFailure(Reason)` preserves destination/target and shift queue when a behaviour applies a restriction. CrewRepair uses its explicit command policy instead: immediate Enable replaces prior orders, queued Enable waits its turn, and Disable ends the active repair command.
 - `OnVehicleCapabilitiesChanged()` lets AI react to restrictions actually applied by behaviours: blocked movement stops path retries, and a disabled gun cannot drag the tank into firing range. Red state alone never imposes a restriction.
 - Add-on armor retains its base protection unless an assigned behaviour modifies it. Default yellow/red behaviours apply the multipliers in section 8 only to covered add-on contributions. Structural armor remains separate; cosmetic debris cannot control damage.
@@ -1132,10 +1136,10 @@ Required checks:
 - Equality at each destruction threshold produces red; recovery sets exactly threshold plus shared margin and produces yellow.
 - Fresh modules cannot become red from one ordinary hit; multiple-failure cap uses type thresholds, not zero.
 - Tank health below/equal/above gate, overshoot, new red damage above gate, full-health red/yellow targets, no repeated recovery calls after red count clears.
-- CrewRepair succeeds below/equal/above the ordinary hull gate without changing hull HP or granting finishing work. Only the current red module becomes yellow, at its type's duration; engine + two tracks takes 44 seconds without interruptions.
-- First red module inserts EnableRepair only in the final array slot; more reds create no duplicates. Starting switches to DisableRepair, stops physical movement/rotation and disables all turrets/hull weapons. A second Weapon module remains prohibited.
-- DisableRepair is immediate even with Shift or a busy queue. It clears the timer, restores the four removed abilities with metadata/cooldowns and releases only crew-owned locks; red modules keep an EnableRepair entry. Re-enable restarts unfinished work only.
-- External healing of all red modules auto-disables repair and removes its card entry without waiting for the timer. Partial recovery selects the next red target with full duration; same-frame healing/timer callbacks cannot double-repair or double-complete the command.
+- CrewRepair succeeds below/equal/above the ordinary hull gate without changing hull HP or granting finishing work. Each type-duration advances red → yellow or yellow → Healthy; a red engine plus two red tracks takes 88 seconds to become fully healthy without interruptions.
+- The first yellow or red module inserts EnableRepair only in the final array slot; more nonhealthy modules create no duplicates. Starting switches to DisableRepair, stops physical movement/rotation and disables all turrets/hull weapons. A second Weapon module remains prohibited.
+- DisableRepair is immediate even with Shift or a busy queue. It clears the timer, restores the four removed abilities with metadata/cooldowns and releases only crew-owned locks; nonhealthy modules keep an EnableRepair entry. Re-enable restarts unfinished work only.
+- External healing that recovers all reds to yellow keeps CrewRepair active; only full restoration auto-disables repair and removes its card entry. A target condition change selects the next destroyed, then damaged, stage with full duration; same-frame healing/timer callbacks cannot double-repair or double-complete the command.
 - Queue interruption, Stop, failed startup, death and load leave no stuck DisableRepair entry or active timer. Verify reserved final-slot placement, overlapping behaviour ability removals, new/revoked grants, turret swaps, stale subtypes and command completion exactly once.
 - Commander aura, ticking/single-heal behaviour, scavenger and a new caller using only `Heal` all trigger the same recovery rules. Full-health red/yellow targets remain eligible; `Heal` returns completion only after modules recover too.
 - A 700/1,000-HP tank with reds/yellows receiving 360 healing becomes fully repaired immediately; all icons and module behaviours clear, and each BP event reports Healthy once. At full hull HP, 60 healing has the same result. No yellow intermediate state or additional pulse is required.

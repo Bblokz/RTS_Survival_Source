@@ -378,7 +378,7 @@ bool UCommandData::GetIsQueuedCrewRepairStillAllowed(const FQueueCommand& Queued
 	{
 		return false;
 	}
-	// A queued Enable is skipped quietly once no red modules remain (the card entry was cleared).
+	// A queued Enable is skipped quietly once no damaged or destroyed modules remain (the card entry was cleared).
 	const FUnitAbilityEntry* CrewRepairEntry = GetAbilityEntryOfCustomType(EAbilityID::IdCrewRepair,
 	                                                                     QueuedCommand.CustomType);
 	return CrewRepairEntry != nullptr && CrewRepairEntry->CooldownRemaining <= 0;

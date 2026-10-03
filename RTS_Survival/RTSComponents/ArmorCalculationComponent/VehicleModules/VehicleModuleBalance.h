@@ -661,7 +661,7 @@ namespace VehicleModuleBalance
 		return GetIsInstallableModuleType(Type) ? CrewRepairSecondsByType[GetModuleTypeIndex(Type)] : 0.f;
 	}
 
-	// Order in which the crew picks the next red module; stable module slot order breaks ties.
+	// Order within each condition tier; destroyed modules precede damaged modules and stable slot order breaks ties.
 	inline constexpr EVehicleModuleTypes CrewRepairPriority[] = {
 		EVehicleModuleTypes::Engine,
 		EVehicleModuleTypes::Tracks,

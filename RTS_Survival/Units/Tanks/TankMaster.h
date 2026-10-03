@@ -109,8 +109,9 @@ struct FCrewRepairState
 
 	ECrewRepairStatus Status = ECrewRepairStatus::Inactive;
 
-	// Red module being repaired; kept until it is repaired, removed or repaired externally.
+	// Nonhealthy module stage being repaired; kept until its condition changes or it is removed.
 	int32 CurrentModuleId = INDEX_NONE;
+	EVehicleModuleState TargetStateAtWorkStart = EVehicleModuleState::Healthy;
 
 	double ModuleWorkStartGameTime = 0.0;
 	float RequiredModuleSeconds = 0.f;
@@ -316,7 +317,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Vehicle Modules")
 	UArmorCalculation* GetVehicleModuleArmor() const { return M_ModuleArmor.Get(); }
 
-	/** @return Total crew seconds still needed for every red module, including the current target. */
+	/** @return Total crew seconds needed to make every damaged or destroyed module healthy. */
 	UFUNCTION(BlueprintPure, Category = "Vehicle Modules")
 	float GetRemainingCrewRepairSeconds() const;
 
@@ -856,9 +857,10 @@ private:
 	void StopVehicleForCrewRepair();
 	bool StartCrewRepairTimer();
 	void CrewRepairTick(uint32 SessionGeneration);
-	bool SelectNextRedModuleForCrewRepair();
+	bool SelectNextModuleForCrewRepair();
 	void UpdateCrewRepairAfterModuleBatch();
 	void FinishCrewRepair(ECrewRepairStopReason Reason);
+	void PlayCrewRepairCompletedVoiceLine() const;
 	void RestoreCrewRepairState();
 
 	UPROPERTY()

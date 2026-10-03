@@ -428,10 +428,16 @@ public:
 	// ------------------------------------------------------------------------------------------------
 	void RestoreDestroyedModulesToDamaged(EModuleChangeCause Cause);
 	void RestoreAllModulesToHealthy();
-	bool RestoreDestroyedModuleToDamaged(int32 ModuleId);
 
-	/** @return The next red module for the crew using the constexpr priority, or INDEX_NONE. */
-	int32 SelectNextRedModuleForCrewRepair() const;
+	/**
+	 * @brief Advances one CrewRepair stage without changing hull health.
+	 * @param ModuleId Installed damaged or destroyed module to repair.
+	 * @return Whether the module advanced from destroyed to damaged or damaged to healthy.
+	 */
+	bool AdvanceModuleRepairForCrew(int32 ModuleId);
+
+	/** @return The next destroyed, then damaged, module using CrewRepair priority, or INDEX_NONE. */
+	int32 SelectNextModuleForCrewRepair() const;
 
 	/**
 	 * @brief Lets an assigned add-on armor behaviour scale the add-on contribution of its covered plates.
@@ -664,7 +670,14 @@ private:
 	bool GetIsCoverageOwnedByOtherModule(int32 SlotIndex, uint64 CoverageMask) const;
 	uint64 GetCoverageMaskForPlateType(int32 ArmorMeshSlot, EArmorPlate PlateType) const;
 	void ApplyAddOnContributionForSlot(int32 SlotIndex);
-	int32 FindFirstRedModuleOfType(EVehicleModuleTypes Type) const;
+	int32 FindFirstCrewRepairModuleInState(EVehicleModuleState State) const;
+	/**
+	 * @brief Keeps CrewRepair's condition and type priority independent of module storage order.
+	 * @param Type Module type to search within.
+	 * @param State Nonhealthy state required for the result.
+	 * @return The first matching installed module ID in stable slot order, or INDEX_NONE.
+	 */
+	int32 FindFirstModuleOfTypeInState(EVehicleModuleTypes Type, EVehicleModuleState State) const;
 	void RebuildPlateModuleBindings();
 	void RefreshBoundMeshSlots();
 	void DisableAddOnCoverageForClearedRegistration();

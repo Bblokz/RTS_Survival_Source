@@ -3,6 +3,7 @@
 #include "TankMaster.h"
 
 #include "AITankMaster.h"
+#include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TimerManager.h"
@@ -13,6 +14,12 @@ namespace TankMasterCrewRepairConstants
 {
 	// Absorbs timer jitter so a module completes on the tick that reaches its full duration.
 	constexpr double ElapsedToleranceSeconds = 0.01;
+	constexpr int32 DestroyedModuleRepairStageCount = 2;
+
+	constexpr bool GetIsCrewRepairableState(const EVehicleModuleState State)
+	{
+		return State == EVehicleModuleState::Destroyed || State == EVehicleModuleState::Damaged;
+	}
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -51,10 +58,10 @@ void ATankMaster::RefreshCrewRepairAbilityFromModuleState()
 		return;
 	}
 
-	// Red modules: EnableRepair while inactive, DisableRepair while repairing; no red modules: empty slot.
+	// Nonhealthy modules expose EnableRepair while inactive and DisableRepair while the crew is working.
 	FUnitAbilityEntry DesiredEntry;
-	const bool bHasRedModules = IsUnitAlive() && M_ModuleRepairState.DestroyedModuleCount > 0;
-	if (bHasRedModules)
+	const bool bHasModulesToRepair = IsUnitAlive() && M_ModuleRepairState.NonHealthyModuleCount > 0;
+	if (bHasModulesToRepair)
 	{
 		const bool bIsRepairing = M_CrewRepairState.Status == ECrewRepairStatus::Repairing;
 		DesiredEntry = MakeCrewRepairAbilityEntry(bIsRepairing
@@ -126,11 +133,11 @@ bool ATankMaster::BeginCrewRepair()
 	}
 	UCommandData* CrewCommandData = GetIsValidCommandData();
 	if (not IsValid(CrewCommandData) || not CrewCommandData->GetIsCrewRepairAbilitySlotReserved()
-		|| not GetIsValidModuleArmor() || M_ModuleArmor->GetDestroyedModuleCount() <= 0)
+		|| not GetIsValidModuleArmor() || M_ModuleArmor->GetNonHealthyModuleCount() <= 0)
 	{
 		return false;
 	}
-	if (not SelectNextRedModuleForCrewRepair())
+	if (not SelectNextModuleForCrewRepair())
 	{
 		return false;
 	}
@@ -153,7 +160,7 @@ bool ATankMaster::BeginCrewRepair()
 
 void ATankMaster::AcquireCrewRepairRestrictions(UCommandData& CommandData)
 {
-	// Restrictions come from the explicitly activated repair action, never from red module state alone.
+	// Restrictions come from the explicitly activated repair action, never from module damage alone.
 	M_CrewRepairState.bHoldsWeaponAndMovementLock = true;
 	AcquireMountedWeaponLock(this);
 	StopVehicleForCrewRepair();
@@ -202,16 +209,21 @@ void ATankMaster::CrewRepairTick(const uint32 SessionGeneration)
 		FinishCrewRepair(ECrewRepairStopReason::OwnerDestroyed);
 		return;
 	}
-	if (M_ModuleArmor->GetDestroyedModuleCount() <= 0)
+	if (M_ModuleArmor->GetNonHealthyModuleCount() <= 0)
 	{
 		FinishCrewRepair(ECrewRepairStopReason::AllModulesRecovered);
 		return;
 	}
 	const FVehicleModuleSnapshot Target = M_ModuleArmor->GetModuleSnapshot(M_CrewRepairState.CurrentModuleId);
-	if (Target.State != EVehicleModuleState::Destroyed)
+	const bool bTargetStageIsCurrent = TankMasterCrewRepairConstants::GetIsCrewRepairableState(Target.State)
+		&& Target.State == M_CrewRepairState.TargetStateAtWorkStart;
+	if (not bTargetStageIsCurrent)
 	{
-		// The previous target left red state elsewhere; the new target starts with its full duration.
-		(void)SelectNextRedModuleForCrewRepair();
+		// The previous target changed condition elsewhere; the next stage starts with its full duration.
+		if (not SelectNextModuleForCrewRepair())
+		{
+			FinishCrewRepair(ECrewRepairStopReason::AllModulesRecovered);
+		}
 		return;
 	}
 
@@ -221,25 +233,27 @@ void ATankMaster::CrewRepairTick(const uint32 SessionGeneration)
 		return;
 	}
 	// The committed state batch advances the target or auto-finishes; nothing else to do here.
-	M_ModuleArmor->RestoreDestroyedModuleToDamaged(M_CrewRepairState.CurrentModuleId);
+	M_ModuleArmor->AdvanceModuleRepairForCrew(M_CrewRepairState.CurrentModuleId);
 }
 
-bool ATankMaster::SelectNextRedModuleForCrewRepair()
+bool ATankMaster::SelectNextModuleForCrewRepair()
 {
 	const UWorld* World = GetWorld();
 	if (not GetIsValidModuleArmor() || not IsValid(World))
 	{
 		return false;
 	}
-	const int32 NextModuleId = M_ModuleArmor->SelectNextRedModuleForCrewRepair();
+	const int32 NextModuleId = M_ModuleArmor->SelectNextModuleForCrewRepair();
 	M_CrewRepairState.CurrentModuleId = NextModuleId;
 	if (NextModuleId == INDEX_NONE)
 	{
+		M_CrewRepairState.TargetStateAtWorkStart = EVehicleModuleState::Healthy;
 		return false;
 	}
 	// Unfinished time of a previous target is discarded; a target selected between ticks never completes early.
-	const EVehicleModuleTypes TargetType = M_ModuleArmor->GetModuleSnapshot(NextModuleId).Type;
-	M_CrewRepairState.RequiredModuleSeconds = GetCrewRepairSeconds(TargetType);
+	const FVehicleModuleSnapshot Target = M_ModuleArmor->GetModuleSnapshot(NextModuleId);
+	M_CrewRepairState.TargetStateAtWorkStart = Target.State;
+	M_CrewRepairState.RequiredModuleSeconds = GetCrewRepairSeconds(Target.Type);
 	M_CrewRepairState.ModuleWorkStartGameTime = World->GetTimeSeconds();
 	return true;
 }
@@ -250,19 +264,20 @@ void ATankMaster::UpdateCrewRepairAfterModuleBatch()
 	{
 		return;
 	}
-	// Another healer may have restored every red module first; undo only the crew's restrictions.
-	if (M_ModuleRepairState.DestroyedModuleCount <= 0)
+	// Another healer may have fully restored every module first; undo only the crew's restrictions.
+	if (M_ModuleRepairState.NonHealthyModuleCount <= 0)
 	{
 		FinishCrewRepair(ECrewRepairStopReason::AllModulesRecovered);
 		return;
 	}
 	const FVehicleModuleSnapshot Target = M_ModuleArmor->GetModuleSnapshot(M_CrewRepairState.CurrentModuleId);
-	if (Target.State == EVehicleModuleState::Destroyed)
+	if (TankMasterCrewRepairConstants::GetIsCrewRepairableState(Target.State)
+		&& Target.State == M_CrewRepairState.TargetStateAtWorkStart)
 	{
-		// Newly red modules join the remaining work without resetting the current target.
+		// Newly damaged or destroyed modules join the remaining work without resetting the current stage.
 		return;
 	}
-	if (not SelectNextRedModuleForCrewRepair())
+	if (not SelectNextModuleForCrewRepair())
 	{
 		FinishCrewRepair(ECrewRepairStopReason::AllModulesRecovered);
 	}
@@ -274,6 +289,8 @@ void ATankMaster::FinishCrewRepair(const ECrewRepairStopReason Reason)
 	{
 		return;
 	}
+	const bool bCompletedAllModuleRepairs = Reason == ECrewRepairStopReason::AllModulesRecovered
+		&& M_ModuleRepairState.NonHealthyModuleCount <= 0;
 	M_CrewRepairState.Status = ECrewRepairStatus::Stopping;
 	++M_CrewRepairState.SessionGeneration;
 	if (UWorld* World = GetWorld())
@@ -282,8 +299,9 @@ void ATankMaster::FinishCrewRepair(const ECrewRepairStopReason Reason)
 	}
 
 	RestoreCrewRepairState();
-	// Unfinished work on the current target is lost; completed yellow repairs remain.
+	// Unfinished work on the current stage is lost; completed state advances remain.
 	M_CrewRepairState.CurrentModuleId = INDEX_NONE;
+	M_CrewRepairState.TargetStateAtWorkStart = EVehicleModuleState::Healthy;
 	M_CrewRepairState.ModuleWorkStartGameTime = 0.0;
 	M_CrewRepairState.RequiredModuleSeconds = 0.f;
 	const uint64 CommandToken = M_CrewRepairState.ActiveCommandToken;
@@ -299,12 +317,36 @@ void ATankMaster::FinishCrewRepair(const ECrewRepairStopReason Reason)
 	{
 		CrewCommandData->UpdateActionUI();
 	}
+	if (bCompletedAllModuleRepairs)
+	{
+		PlayCrewRepairCompletedVoiceLine();
+	}
 	// Complete the owned queued Enable exactly once, after cleanup; queue termination already progresses.
 	const bool bShouldCompleteCommand = Reason != ECrewRepairStopReason::QueueTermination && CommandToken != 0;
 	if (bShouldCompleteCommand)
 	{
 		(void)TryDoneExecutingCommand(EAbilityID::IdCrewRepair, CommandToken);
 	}
+}
+
+void ATankMaster::PlayCrewRepairCompletedVoiceLine() const
+{
+	if (not GetIsValidSpatialVoiceLinePlayer())
+	{
+		return;
+	}
+	if (GetIsSelected())
+	{
+		constexpr bool bForcePlay = false;
+		constexpr bool bQueueIfNotPlayed = true;
+		M_SpatialVoiceLinePlayer->PlayVoiceLineOverRadio(
+			ERTSVoiceLine::Repair, bForcePlay, bQueueIfNotPlayed);
+		return;
+	}
+
+	constexpr bool bIgnorePlayerCooldown = false;
+	M_SpatialVoiceLinePlayer->PlaySpatialVoiceLine(
+		ERTSVoiceLine::Repair, GetActorLocation(), bIgnorePlayerCooldown);
 }
 
 void ATankMaster::RestoreCrewRepairState()
@@ -329,7 +371,7 @@ void ATankMaster::RestoreCrewRepairState()
 
 float ATankMaster::GetRemainingCrewRepairSeconds() const
 {
-	if (not M_ModuleArmor.IsValid())
+	if (not GetIsValidModuleArmor())
 	{
 		return 0.f;
 	}
@@ -337,7 +379,16 @@ float ATankMaster::GetRemainingCrewRepairSeconds() const
 	for (int32 SlotIndex = 0; SlotIndex < MaxModuleInstances; ++SlotIndex)
 	{
 		const FVehicleModuleSnapshot Snapshot = M_ModuleArmor->GetModuleSnapshotForSlot(SlotIndex);
-		if (Snapshot.bInstalled && Snapshot.State == EVehicleModuleState::Destroyed)
+		if (not Snapshot.bInstalled)
+		{
+			continue;
+		}
+		if (Snapshot.State == EVehicleModuleState::Destroyed)
+		{
+			RemainingSeconds += TankMasterCrewRepairConstants::DestroyedModuleRepairStageCount
+				* GetCrewRepairSeconds(Snapshot.Type);
+		}
+		else if (Snapshot.State == EVehicleModuleState::Damaged)
 		{
 			RemainingSeconds += GetCrewRepairSeconds(Snapshot.Type);
 		}

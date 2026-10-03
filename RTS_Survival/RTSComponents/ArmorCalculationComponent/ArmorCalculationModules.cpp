@@ -991,28 +991,39 @@ FModuleIconStates UArmorCalculation::GetModuleIconStates() const
 	return IconStates;
 }
 
-int32 UArmorCalculation::SelectNextRedModuleForCrewRepair() const
+int32 UArmorCalculation::SelectNextModuleForCrewRepair() const
 {
-	// Constexpr priority first, then stable slot order.
+	const int32 DestroyedModuleId = FindFirstCrewRepairModuleInState(EVehicleModuleState::Destroyed);
+	if (DestroyedModuleId != INDEX_NONE)
+	{
+		return DestroyedModuleId;
+	}
+	return FindFirstCrewRepairModuleInState(EVehicleModuleState::Damaged);
+}
+
+int32 UArmorCalculation::FindFirstCrewRepairModuleInState(const EVehicleModuleState State) const
+{
+	// Type priority first, then stable slot order within the requested condition.
 	for (const EVehicleModuleTypes Type : CrewRepairPriority)
 	{
-		const int32 RedModuleId = FindFirstRedModuleOfType(Type);
-		if (RedModuleId != INDEX_NONE)
+		const int32 ModuleId = FindFirstModuleOfTypeInState(Type, State);
+		if (ModuleId != INDEX_NONE)
 		{
-			return RedModuleId;
+			return ModuleId;
 		}
 	}
 	return INDEX_NONE;
 }
 
-int32 UArmorCalculation::FindFirstRedModuleOfType(const EVehicleModuleTypes Type) const
+int32 UArmorCalculation::FindFirstModuleOfTypeInState(const EVehicleModuleTypes Type,
+	                                                   const EVehicleModuleState State) const
 {
 	const int32 FirstSlot = GetFirstSlotForType(Type);
 	const int32 EndSlot = FirstSlot + GetSlotCountForType(Type);
 	for (int32 SlotIndex = FirstSlot; SlotIndex < EndSlot; ++SlotIndex)
 	{
 		const FVehicleModule& Module = M_Modules[SlotIndex];
-		if (Module.bInstalled && Module.Type == Type && Module.State == EVehicleModuleState::Destroyed)
+		if (Module.bInstalled && Module.Type == Type && Module.State == State)
 		{
 			return Module.ModuleId;
 		}
@@ -1174,17 +1185,25 @@ void UArmorCalculation::RestoreAllModulesToHealthy()
 	DispatchModuleChangesAfterMutation(TakePendingModuleChanges());
 }
 
-bool UArmorCalculation::RestoreDestroyedModuleToDamaged(const int32 ModuleId)
+bool UArmorCalculation::AdvanceModuleRepairForCrew(const int32 ModuleId)
 {
 	const int32 SlotIndex = GetModuleSlotById(ModuleId);
-	if (SlotIndex == INDEX_NONE || M_Modules[SlotIndex].State != EVehicleModuleState::Destroyed)
+	if (SlotIndex == INDEX_NONE)
+	{
+		return false;
+	}
+	const EVehicleModuleState CurrentState = M_Modules[SlotIndex].State;
+	if (CurrentState != EVehicleModuleState::Destroyed && CurrentState != EVehicleModuleState::Damaged)
 	{
 		return false;
 	}
 	{
 		TGuardValue<bool> MutationGuard(bM_IsMutatingModules, true);
 		const FVehicleModule& Module = M_Modules[SlotIndex];
-		SetModuleHealth(SlotIndex, Module.MaxHp * GetRecoveredHealth01(Module.Type), EModuleChangeCause::CrewRepair,
+		const float RepairedHealth = CurrentState == EVehicleModuleState::Destroyed
+			                             ? Module.MaxHp * GetRecoveredHealth01(Module.Type)
+			                             : Module.MaxHp;
+		SetModuleHealth(SlotIndex, RepairedHealth, EModuleChangeCause::CrewRepair,
 		                EWeaponShellType::Shell_None);
 	}
 	DispatchModuleChangesAfterMutation(TakePendingModuleChanges());

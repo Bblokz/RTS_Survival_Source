@@ -726,10 +726,103 @@ bool FVehicleModuleHealingTest::RunTest(const FString& Parameters)
 // CrewRepair
 // ----------------------------------------------------------------------------------------------------
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleCrewRepairTest, "RTS.VehicleModules.CrewRepair",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleDamagedCrewRepairTest, "RTS.VehicleModules.CrewRepair.Damaged",
                                  EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
-bool FVehicleModuleCrewRepairTest::RunTest(const FString& Parameters)
+bool FVehicleModuleDamagedCrewRepairTest::RunTest(const FString& Parameters)
+{
+	using namespace VehicleModuleTestConstants;
+	constexpr float LowHullHealth = 200.f;
+	constexpr float DamagingChip = 1.f;
+	constexpr int32 ReservedIndex = VehicleModuleBalance::CrewRepairAbilitySlotIndex;
+	VehicleModuleTests::FTankFixture Fixture;
+	Fixture.Install(AmmoModuleId, EVehicleModuleTypes::Ammo);
+	Fixture.Finalize();
+	UHealthComponent* Health = Fixture.GetHealth();
+	Health->SetCurrentHealth(LowHullHealth);
+	const TArray<FUnitAbilityEntry>& Card = FVehicleModuleTestAccess::GetCard(*Fixture.Tank);
+
+	Fixture.Armor->DamageModule(AmmoModuleId, DamagingChip);
+	TestEqual(TEXT("A yellow module inserts CrewRepair in the final slot"), Card[ReservedIndex].AbilityId,
+	          EAbilityID::IdCrewRepair);
+	TestEqual(TEXT("A yellow module needs one crew stage"), Fixture.Tank->GetRemainingCrewRepairSeconds(),
+	          GetCrewRepairSeconds(EVehicleModuleTypes::Ammo), Tolerance);
+	FVehicleModuleTestAccess::ExecuteCrewRepair(*Fixture.Tank, ECrewRepairAbilityType::EnableRepair);
+	FVehicleModuleTestAccess::AdvanceCrewRepair(*Fixture.Tank,
+	                                           GetCrewRepairSeconds(EVehicleModuleTypes::Ammo) - CrewRepairTickSeconds);
+	TestEqual(TEXT("The damaged module needs its full duration"), Fixture.GetState(AmmoModuleId),
+	          EVehicleModuleState::Damaged);
+	FVehicleModuleTestAccess::AdvanceCrewRepair(*Fixture.Tank, CrewRepairTickSeconds);
+	TestEqual(TEXT("CrewRepair restores a damaged module to healthy"), Fixture.GetState(AmmoModuleId),
+	          EVehicleModuleState::Healthy);
+	TestFalse(TEXT("Repair stops after the final yellow module is healthy"), Fixture.Tank->GetIsCrewRepairActive());
+	TestEqual(TEXT("The entry is removed when every module is healthy"), Card[ReservedIndex].AbilityId,
+	          EAbilityID::IdNoAbility);
+	TestEqual(TEXT("Repairing a yellow module never heals the hull"), Health->GetCurrentHealth(), LowHullHealth,
+	          Tolerance);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleDestroyedCrewRepairTest, "RTS.VehicleModules.CrewRepair.Destroyed",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleModuleDestroyedCrewRepairTest::RunTest(const FString& Parameters)
+{
+	using namespace VehicleModuleTestConstants;
+	constexpr float LowHullHealth = 200.f;
+	constexpr int32 DestroyedRepairStageCount = 2;
+	constexpr int32 ReservedIndex = VehicleModuleBalance::CrewRepairAbilitySlotIndex;
+	VehicleModuleTests::FTankFixture Fixture;
+	FUnitAbilityEntry MoveEntry;
+	MoveEntry.AbilityId = EAbilityID::IdMove;
+	Fixture.Tank->GetIsValidCommandData()->SetAbilities({MoveEntry});
+	Fixture.Install(EngineModuleId, EVehicleModuleTypes::Engine);
+	Fixture.Install(AmmoModuleId, EVehicleModuleTypes::Ammo);
+	Fixture.Finalize();
+	UHealthComponent* Health = Fixture.GetHealth();
+	Health->SetCurrentHealth(LowHullHealth);
+	const TArray<FUnitAbilityEntry>& Card = FVehicleModuleTestAccess::GetCard(*Fixture.Tank);
+
+	Fixture.Armor->DamageModule(EngineModuleId, DestroyingDamage);
+	Fixture.Armor->DamageModule(AmmoModuleId, DestroyingDamage);
+	TestEqual(TEXT("Red modules insert CrewRepair in the final slot"), Card[ReservedIndex].AbilityId,
+	          EAbilityID::IdCrewRepair);
+	const float ExpectedDestroyedRepairSeconds = DestroyedRepairStageCount * (
+		GetCrewRepairSeconds(EVehicleModuleTypes::Engine) + GetCrewRepairSeconds(EVehicleModuleTypes::Ammo));
+	TestEqual(TEXT("Each destroyed module needs a red and yellow crew stage"),
+	          Fixture.Tank->GetRemainingCrewRepairSeconds(), ExpectedDestroyedRepairSeconds, Tolerance);
+	TestEqual(TEXT("The inactive entry is EnableRepair"), Card[ReservedIndex].CustomType,
+	          static_cast<int32>(ECrewRepairAbilityType::EnableRepair));
+
+	FVehicleModuleTestAccess::ExecuteCrewRepair(*Fixture.Tank, ECrewRepairAbilityType::EnableRepair);
+	TestTrue(TEXT("CrewRepair starts below the ordinary hull gate"), Fixture.Tank->GetIsCrewRepairActive());
+	TestEqual(TEXT("The active entry is DisableRepair"), Card[ReservedIndex].CustomType,
+	          static_cast<int32>(ECrewRepairAbilityType::DisableRepair));
+	TestEqual(TEXT("Move is hidden while repairing"), Card[0].AbilityId, EAbilityID::IdNoAbility);
+
+	FVehicleModuleTestAccess::AdvanceCrewRepair(
+		*Fixture.Tank, GetCrewRepairSeconds(EVehicleModuleTypes::Engine) - CrewRepairTickSeconds);
+	TestEqual(TEXT("The engine needs its full duration"), Fixture.GetState(EngineModuleId),
+	          EVehicleModuleState::Destroyed);
+	FVehicleModuleTestAccess::AdvanceCrewRepair(*Fixture.Tank, CrewRepairTickSeconds);
+	TestEqual(TEXT("The engine advances from destroyed to damaged first"), Fixture.GetState(EngineModuleId),
+	          EVehicleModuleState::Damaged);
+	TestTrue(TEXT("CrewRepair continues until yellow modules are healthy"), Fixture.Tank->GetIsCrewRepairActive());
+	TestEqual(TEXT("CrewRepair never heals the hull"), Health->GetCurrentHealth(), LowHullHealth, Tolerance);
+
+	FVehicleModuleTestAccess::ExecuteCrewRepair(*Fixture.Tank, ECrewRepairAbilityType::DisableRepair);
+	TestFalse(TEXT("DisableRepair stops immediately"), Fixture.Tank->GetIsCrewRepairActive());
+	TestEqual(TEXT("Move is restored"), Card[0].AbilityId, EAbilityID::IdMove);
+	TestEqual(TEXT("Remaining nonhealthy modules keep EnableRepair"), Card[ReservedIndex].CustomType,
+	          static_cast<int32>(ECrewRepairAbilityType::EnableRepair));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleCrewRepairExternalHealingTest,
+	"RTS.VehicleModules.CrewRepair.ExternalHealing",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleModuleCrewRepairExternalHealingTest::RunTest(const FString& Parameters)
 {
 	using namespace VehicleModuleTestConstants;
 	constexpr float LowHullHealth = 200.f;
@@ -742,39 +835,21 @@ bool FVehicleModuleCrewRepairTest::RunTest(const FString& Parameters)
 	Fixture.Install(AmmoModuleId, EVehicleModuleTypes::Ammo);
 	Fixture.Finalize();
 	UHealthComponent* Health = Fixture.GetHealth();
-
-	Fixture.Armor->DamageModule(EngineModuleId, DestroyingDamage);
-	Fixture.Armor->DamageModule(AmmoModuleId, DestroyingDamage);
 	Health->SetCurrentHealth(LowHullHealth);
 	const TArray<FUnitAbilityEntry>& Card = FVehicleModuleTestAccess::GetCard(*Fixture.Tank);
-	TestEqual(TEXT("Red modules insert CrewRepair in the final slot"), Card[ReservedIndex].AbilityId,
-	          EAbilityID::IdCrewRepair);
-	TestEqual(TEXT("The inactive entry is EnableRepair"), Card[ReservedIndex].CustomType,
-	          static_cast<int32>(ECrewRepairAbilityType::EnableRepair));
+	Fixture.Armor->DamageModule(EngineModuleId, DestroyingDamage);
+	Fixture.Armor->DamageModule(AmmoModuleId, DestroyingDamage);
 
 	FVehicleModuleTestAccess::ExecuteCrewRepair(*Fixture.Tank, ECrewRepairAbilityType::EnableRepair);
-	TestTrue(TEXT("CrewRepair starts below the ordinary hull gate"), Fixture.Tank->GetIsCrewRepairActive());
-	TestEqual(TEXT("The active entry is DisableRepair"), Card[ReservedIndex].CustomType,
+	const float HealingToRecoveryGate = TankMaxHealth * TankHealthRequiredForModuleRecovery01 - LowHullHealth;
+	Health->Heal(HealingToRecoveryGate);
+	TestTrue(TEXT("External red recovery leaves CrewRepair active for yellow modules"),
+	         Fixture.Tank->GetIsCrewRepairActive());
+	TestEqual(TEXT("Yellow modules keep DisableRepair while active"), Card[ReservedIndex].CustomType,
 	          static_cast<int32>(ECrewRepairAbilityType::DisableRepair));
-	TestEqual(TEXT("Move is hidden while repairing"), Card[0].AbilityId, EAbilityID::IdNoAbility);
-
-	FVehicleModuleTestAccess::AdvanceCrewRepair(*Fixture.Tank, 19.0);
-	TestEqual(TEXT("The engine needs its full duration"), Fixture.GetState(EngineModuleId),
-	          EVehicleModuleState::Destroyed);
-	FVehicleModuleTestAccess::AdvanceCrewRepair(*Fixture.Tank, 1.0);
-	TestEqual(TEXT("The engine is repaired first"), Fixture.GetState(EngineModuleId), EVehicleModuleState::Damaged);
-	TestEqual(TEXT("CrewRepair never heals the hull"), Health->GetCurrentHealth(), LowHullHealth, Tolerance);
-
-	FVehicleModuleTestAccess::ExecuteCrewRepair(*Fixture.Tank, ECrewRepairAbilityType::DisableRepair);
-	TestFalse(TEXT("DisableRepair stops immediately"), Fixture.Tank->GetIsCrewRepairActive());
-	TestEqual(TEXT("Move is restored"), Card[0].AbilityId, EAbilityID::IdMove);
-	TestEqual(TEXT("Remaining reds keep EnableRepair"), Card[ReservedIndex].CustomType,
-	          static_cast<int32>(ECrewRepairAbilityType::EnableRepair));
-
-	FVehicleModuleTestAccess::ExecuteCrewRepair(*Fixture.Tank, ECrewRepairAbilityType::EnableRepair);
-	Health->Heal(550.f);
-	TestFalse(TEXT("External recovery of every red module stops the crew"), Fixture.Tank->GetIsCrewRepairActive());
-	TestEqual(TEXT("No reds remain, so the entry is removed"), Card[ReservedIndex].AbilityId,
+	Health->Heal(TankMaxHealth);
+	TestFalse(TEXT("External full service stops the crew"), Fixture.Tank->GetIsCrewRepairActive());
+	TestEqual(TEXT("No nonhealthy modules remain, so the entry is removed"), Card[ReservedIndex].AbilityId,
 	          EAbilityID::IdNoAbility);
 	TestEqual(TEXT("Crew restrictions are released"), Card[0].AbilityId, EAbilityID::IdMove);
 	return true;
