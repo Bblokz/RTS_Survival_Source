@@ -1916,6 +1916,8 @@ namespace DeveloperSettings
 		constexpr bool GFowSystem_Compile_DebugSymbols = false;
 		constexpr bool GFowComponents_Compile_DebugSymbols = false;
 		constexpr bool GAsyncTargetFinding_Compile_DebugSymbols = false;
+		// Compile cover-search visualization and diagnostic commands while the first phase is being tuned.
+		constexpr bool GCoverFinder_Compile_DebugSymbols = true;
 		constexpr bool GControlGroups_Compile_DebugSymbols = false;
 		constexpr bool GMouseHover_Compile_DebugSymbols = false;
 		// Formations layout calculations.
