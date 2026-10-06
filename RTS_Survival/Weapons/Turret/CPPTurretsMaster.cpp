@@ -61,6 +61,8 @@ void ACPPTurretsMaster::SetAutoEngageTargets(const bool bUseLastTarget)
 		return;
 	}
 
+	// Rebuild from the mounted weapons before target search resumes; lock-bound state changes can leave this cache stale.
+	UpdateTurretRangeBasedOnWeapons();
 	M_WeaponAIState = EWeaponAIState::AutoEngage;
 	StopAllWeaponsFire(!bUseLastTarget);
 	InitiateAutoEngageTimers();

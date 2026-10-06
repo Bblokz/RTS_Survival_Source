@@ -18,10 +18,10 @@ namespace VehicleModuleBalance
 	/** @brief Chance to ignite an engine when damage changes its module state; HE and HEAT use separate odds. */
 		namespace EngineFire
 	{
-		inline constexpr float EngineFireChanceDamagedEngine = 0.25f;
-		inline constexpr float EngineFireChanceDestroyedEngine = 0.5f;
-		inline constexpr float EngineFireChanceDamagedEngine_HE_HEAT = 0.33f;
-		inline constexpr float EngineFireChanceDestroyedEngine_HE_HEAT = 0.8f;
+			inline constexpr float EngineFireChanceDamagedEngine = 0.25f;
+			inline constexpr float EngineFireChanceDestroyedEngine = 0.6f;
+			inline constexpr float EngineFireChanceDamagedEngine_HE_HEAT = 0.33f;
+			inline constexpr float EngineFireChanceDestroyedEngine_HE_HEAT = 0.8f;
 
 		/**
 		 * @brief Keeps the shell and engine state rules beside their tuning values.
@@ -48,8 +48,10 @@ namespace VehicleModuleBalance
 	/** @brief Chance to ignite ammunition when damage changes its module state, independent of shell type. */
 	namespace AmmoCookOff
 	{
-		inline constexpr float AmmoCookOffDamagedAmmoChance = 0.1f;
-		inline constexpr float AmmoCookOffDestroyedAmmoChance = 0.2f;
+		//inline constexpr float AmmoCookOffDamagedAmmoChance = 0.1f;
+		//inline constexpr float AmmoCookOffDestroyedAmmoChance = 0.2f;
+			inline constexpr float AmmoCookOffDamagedAmmoChance = 1.f;
+			inline constexpr float AmmoCookOffDestroyedAmmoChance = 1.f;
 
 		/** @return Cook-off probability for the resulting ammo state; healthy ammo cannot ignite here. */
 		constexpr float GetChance(const EVehicleModuleState AmmoState)

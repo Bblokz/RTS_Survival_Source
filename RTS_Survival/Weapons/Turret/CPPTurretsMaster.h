@@ -139,8 +139,7 @@ public:
 
 	/**
 	 * @brief Sets this turret to automatically engage targets in range.
-	 * To calculate whether the target is in range the first weapon in the weapon array of the turret is
-	 * used to determine possible range of engagement.
+	 * Rebuilds the engagement range from every mounted weapon before target search resumes.
 	 * @param bUseLastTarget Whether to use the last targeted actor in the first autoEngage loop.
 	 * @note Target is switched when it is out of range.
 	 */

@@ -142,6 +142,26 @@ struct FVehicleModuleTestAccess
 		return Turret.M_TWeapons[WeaponIndex];
 	}
 
+	static void SetTurretWeaponRange(ACPPTurretsMaster& Turret, const int32 WeaponIndex, const float WeaponRange)
+	{
+		if (not Turret.M_TWeapons.IsValidIndex(WeaponIndex) || not IsValid(Turret.M_TWeapons[WeaponIndex]))
+		{
+			return;
+		}
+		Turret.M_TWeapons[WeaponIndex]->WeaponData.Range = WeaponRange;
+	}
+
+	static void AddTankTurret(ATankMaster& Tank, ACPPTurretsMaster& Turret)
+	{
+		Tank.Turrets.Add(&Turret);
+		Turret.InitTurretOwner(&Tank);
+	}
+
+	static void ForceTurretCachedRange(ACPPTurretsMaster& Turret, const float WeaponRange)
+	{
+		Turret.M_WeaponRangeData.ForceSetRange(WeaponRange);
+	}
+
 	static void AddPendingTurret(ATankMaster& Tank, ACPPTurretsMaster* Turret)
 	{
 		Tank.AddPendingTurretModuleRegistration(Turret);
@@ -760,6 +780,42 @@ bool FVehicleModuleDamagedCrewRepairTest::RunTest(const FString& Parameters)
 	          EAbilityID::IdNoAbility);
 	TestEqual(TEXT("Repairing a yellow module never heals the hull"), Health->GetCurrentHealth(), LowHullHealth,
 	          Tolerance);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleCrewRepairTurretRangeTest,
+	"RTS.VehicleModules.CrewRepair.RestoresTurretMaximumRange",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleModuleCrewRepairTurretRangeTest::RunTest(const FString& Parameters)
+{
+	using namespace VehicleModuleTestConstants;
+	constexpr int32 MachineGunIndex = 0;
+	constexpr int32 MainGunIndex = 1;
+	constexpr float MachineGunCalibre = 7.92f;
+	constexpr float MainGunCalibre = 75.f;
+	constexpr float MachineGunRange = 3200.f;
+	constexpr float MainGunRange = 4200.f;
+	constexpr float DamagingChip = 1.f;
+
+	VehicleModuleTests::FTankFixture Fixture;
+	Fixture.Install(AmmoModuleId, EVehicleModuleTypes::Ammo);
+	Fixture.Finalize();
+	ACPPTurretsMaster* Turret = FVehicleModuleTestAccess::SpawnTurretWithWeapons(
+		*Fixture.World, {MachineGunCalibre, MainGunCalibre});
+	FVehicleModuleTestAccess::SetTurretWeaponRange(*Turret, MachineGunIndex, MachineGunRange);
+	FVehicleModuleTestAccess::SetTurretWeaponRange(*Turret, MainGunIndex, MainGunRange);
+	FVehicleModuleTestAccess::AddTankTurret(*Fixture.Tank, *Turret);
+
+	Fixture.Armor->DamageModule(AmmoModuleId, DamagingChip);
+	FVehicleModuleTestAccess::ExecuteCrewRepair(*Fixture.Tank, ECrewRepairAbilityType::EnableRepair);
+	// A stale cache formerly survived the disable/enable cycle and could leave the MG as the engagement range.
+	FVehicleModuleTestAccess::ForceTurretCachedRange(*Turret, MachineGunRange);
+	FVehicleModuleTestAccess::AdvanceCrewRepair(*Fixture.Tank, GetCrewRepairSeconds(EVehicleModuleTypes::Ammo));
+
+	TestFalse(TEXT("CrewRepair completes after the final module"), Fixture.Tank->GetIsCrewRepairActive());
+	TestEqual(TEXT("Re-enabled turret rebuilds its range from the longest-ranged gun"),
+	          Turret->GetMaxWeaponRange(), MainGunRange, Tolerance);
 	return true;
 }
 
