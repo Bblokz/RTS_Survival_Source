@@ -496,6 +496,15 @@ UAnimMontage* FAimPositionMontages::GetMiscFullBodyMontage(const ESquadAimPositi
 	return Welding;
 }
 
+void FSquadUnitCoverAnimRuntime::Reset()
+{
+	M_IdlePose = ESquadIdleAnimationPose::Regular;
+	M_Action = ESquadCoverAnimAction::None;
+	M_ActiveMontageAction = ESquadCoverAnimAction::None;
+	M_NextAction = ESquadCoverAnimAction::None;
+	M_ActiveMontage = nullptr;
+}
+
 USquadUnitAnimInstance::USquadUnitAnimInstance(): bBeAlert(false), MovementState(), WeaponMontages(),
                                                   bAimToTarget(false), AimPositionMontages(),
                                                   Speed(0), AimOffsetAngle(0),
@@ -528,6 +537,11 @@ void USquadUnitAnimInstance::BindSelectionFunctions(USelectionComponent* Selecti
 
 void USquadUnitAnimInstance::PlaySingleFireAnim()
 {
+	if (GetIsCoverAnimationActive() && not GetIsCoverFireAllowed())
+	{
+		return;
+	}
+
 	UAnimMontage* SelectedMontage = WeaponMontages.GetFireMontage(AimPositionMontages.AimPosition,
 	                                                              AimOffsets.M_AimOffsetType, true);
 	StartMontage(SelectedMontage, true);
@@ -535,6 +549,11 @@ void USquadUnitAnimInstance::PlaySingleFireAnim()
 
 void USquadUnitAnimInstance::PlayBurstAnim()
 {
+	if (GetIsCoverAnimationActive() && not GetIsCoverFireAllowed())
+	{
+		return;
+	}
+
 	UAnimMontage* SelectedMontage = WeaponMontages.GetFireMontage(AimPositionMontages.AimPosition,
 	                                                              AimOffsets.M_AimOffsetType, false);
 	StartMontage(SelectedMontage, true);
@@ -554,25 +573,30 @@ void USquadUnitAnimInstance::PlaySwitchWeaponMontage(const ESquadWeaponAimOffset
 
 void USquadUnitAnimInstance::PlayGrenadeThrowMontage(const float MontageTime)
 {
+	CancelCoverAnimation();
 	UAnimMontage* SelectedMontage = AimPositionMontages.GetMiscFullBodyMontage(ESquadAimPositionMontage::Misc_Grenade);
 	StartMontage(SelectedMontage, false, MontageTime);
 }
 
 void USquadUnitAnimInstance::PlayWeldingMontage()
 {
+	CancelCoverAnimation();
 	UAnimMontage* SelectedMontage = AimPositionMontages.GetMiscFullBodyMontage(ESquadAimPositionMontage::Misc_Welding);
 	StartMontage(SelectedMontage, false);
 }
 
 void USquadUnitAnimInstance::StopAllMontages()
 {
-	// Montage_Stop without a montage stops every montage, including a crew loop; keep the crew state in sync.
+	// Montage_Stop without a montage stops every montage; keep the full-body runtime owners in sync.
 	ClearTeamWeaponCrewAnimationRuntime(false);
+	ClearCoverAnimationRuntime();
 	Montage_Stop(0.1f);
 }
 
 void USquadUnitAnimInstance::SetWeaponAimOffset(const ESquadWeaponAimOffset AimOffsetType)
 {
+	CancelCoverAnimation();
+
 	switch (AimOffsetType)
 	{
 	case ESquadWeaponAimOffset::Rifle:
@@ -589,6 +613,194 @@ void USquadUnitAnimInstance::SetWeaponAimOffset(const ESquadWeaponAimOffset AimO
 		AimOffsets.UpdateAOForNewWeapon(ESquadWeaponAimOffset::Rifle);
 		AimOffsets.UpdateAOForNewAimPosition(ESquadAimPosition::Standing);
 	}
+}
+
+bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose)
+{
+	if (MovementState != ESquadMovementAnimState::Idle || GetIsTeamWeaponCrewAnimationActive())
+	{
+		return false;
+	}
+
+	CancelCoverAnimation();
+
+	UAnimMontage* EnterMontage = nullptr;
+	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		EnterMontage = CoverAnimations.Crouch.EnterCoverMontage;
+		AimPositionMontages.AimPosition = ESquadAimPosition::Crouch;
+	}
+	else if (CoverPose == ESquadIdleAnimationPose::StandingCoverLeft)
+	{
+		EnterMontage = CoverAnimations.StandingLeft.EnterCoverMontage;
+		AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
+	}
+	else if (CoverPose == ESquadIdleAnimationPose::StandingCoverRight)
+	{
+		EnterMontage = CoverAnimations.StandingRight.EnterCoverMontage;
+		AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError(
+			"USquadUnitAnimInstance::EnterCover received an unsupported idle animation pose.");
+		return false;
+	}
+
+	M_CoverAnimRuntime.M_IdlePose = CoverPose;
+	IdleAnimationPose = CoverPose;
+	if (PlayCoverMontage(EnterMontage, ESquadCoverAnimAction::Entering))
+	{
+		return true;
+	}
+
+	ClearCoverAnimationRuntime();
+	return false;
+}
+
+bool USquadUnitAnimInstance::StartStandingCoverPeek()
+{
+	if (M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Protected)
+	{
+		return false;
+	}
+
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+	if (StandingAnimationSet == nullptr)
+	{
+		return false;
+	}
+
+	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
+	return PlayCoverMontage(
+		StandingAnimationSet->ExposeFromCoverMontage,
+		ESquadCoverAnimAction::Exposing);
+}
+
+bool USquadUnitAnimInstance::ReturnToStandingCover()
+{
+	if (M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Exposed)
+	{
+		return false;
+	}
+
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+	if (StandingAnimationSet == nullptr)
+	{
+		return false;
+	}
+
+	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
+	return PlayCoverMontage(
+		StandingAnimationSet->ReturnToCoverMontage,
+		ESquadCoverAnimAction::Returning);
+}
+
+bool USquadUnitAnimInstance::ExitCover()
+{
+	if (M_CoverAnimRuntime.M_Action == ESquadCoverAnimAction::Exposed)
+	{
+		const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+		if (StandingAnimationSet == nullptr)
+		{
+			return false;
+		}
+
+		M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::Exiting;
+		if (PlayCoverMontage(
+			StandingAnimationSet->ReturnToCoverMontage,
+			ESquadCoverAnimAction::Returning))
+		{
+			return true;
+		}
+
+		M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
+		return false;
+	}
+
+	if (M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Protected)
+	{
+		return false;
+	}
+
+	return PlayExitCoverMontage();
+}
+
+void USquadUnitAnimInstance::CancelCoverAnimation()
+{
+	if (not GetIsCoverAnimationActive())
+	{
+		return;
+	}
+
+	UAnimMontage* ActiveCoverMontage = M_CoverAnimRuntime.M_ActiveMontage;
+	M_CoverMontageEndedDelegate.Unbind();
+	ClearCoverAnimationRuntime();
+
+	if (IsValid(ActiveCoverMontage) && Montage_IsPlaying(ActiveCoverMontage))
+	{
+		Montage_Stop(0.1f, ActiveCoverMontage);
+	}
+}
+
+bool USquadUnitAnimInstance::GetIsCoverAnimationActive() const
+{
+	return M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::None;
+}
+
+bool USquadUnitAnimInstance::GetIsCoverFireAllowed() const
+{
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		return M_CoverAnimRuntime.M_Action == ESquadCoverAnimAction::Protected;
+	}
+
+	return M_CoverAnimRuntime.M_Action == ESquadCoverAnimAction::Exposed;
+}
+
+UAnimSequence* USquadUnitAnimInstance::GetCurrentCoverIdlePose() const
+{
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		return CoverAnimations.Crouch.ProtectedIdlePose;
+	}
+
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+	return StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->ProtectedIdlePose;
+}
+
+UAimOffsetBlendSpace* USquadUnitAnimInstance::GetCurrentCoverAimOffset() const
+{
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		return CoverAnimations.Crouch.AimAssets.AimOffset;
+	}
+
+	if (M_CoverAnimRuntime.M_IdlePose != ESquadIdleAnimationPose::StandingPeekLeft &&
+		M_CoverAnimRuntime.M_IdlePose != ESquadIdleAnimationPose::StandingPeekRight)
+	{
+		return nullptr;
+	}
+
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+	return StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->PeekAimAssets.AimOffset;
+}
+
+UAnimSequence* USquadUnitAnimInstance::GetCurrentCoverAimBaseSequence() const
+{
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		return CoverAnimations.Crouch.AimAssets.BaseSequence;
+	}
+
+	if (M_CoverAnimRuntime.M_IdlePose != ESquadIdleAnimationPose::StandingPeekLeft &&
+		M_CoverAnimRuntime.M_IdlePose != ESquadIdleAnimationPose::StandingPeekRight)
+	{
+		return nullptr;
+	}
+
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+	return StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->PeekAimAssets.BaseSequence;
 }
 
 
@@ -737,6 +949,13 @@ void USquadUnitAnimInstance::OnAimPositionMontageFinished(UAnimMontage* Montage,
 
 void USquadUnitAnimInstance::SetMovementStateWithSpeed(const float& MovementSpeed)
 {
+	// Cover transitions may contain root motion. The cover owner explicitly exits or cancels before locomotion resumes.
+	if (GetIsCoverAnimationActive())
+	{
+		MovementState = ESquadMovementAnimState::Idle;
+		return;
+	}
+
 	// Backstop for movement that bypasses the team weapon state machine (retreat, cargo, evasion): a moving
 	// operator must never keep looping a full body crew montage. The controller re-arms once it is settled again.
 	if (GetIsTeamWeaponCrewAnimationActive() &&
@@ -836,6 +1055,212 @@ void USquadUnitAnimInstance::OnUnitDeselected()
 	bBeAlert = false;
 }
 
+void USquadUnitAnimInstance::AnimNotify_Cover_AimReady()
+{
+	if (M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Exposing)
+	{
+		return;
+	}
+
+	const ESquadIdleAnimationPose PeekPose = GetStandingPeekPose();
+	if (PeekPose == ESquadIdleAnimationPose::Regular)
+	{
+		return;
+	}
+
+	M_CoverAnimRuntime.M_IdlePose = PeekPose;
+	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Exposed;
+	IdleAnimationPose = PeekPose;
+}
+
+void USquadUnitAnimInstance::AnimNotify_Cover_BackInCover()
+{
+	if (M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Returning)
+	{
+		return;
+	}
+
+	const ESquadIdleAnimationPose ProtectedPose = GetProtectedStandingCoverPose();
+	if (ProtectedPose == ESquadIdleAnimationPose::Regular)
+	{
+		return;
+	}
+
+	M_CoverAnimRuntime.M_IdlePose = ProtectedPose;
+	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
+	IdleAnimationPose = ProtectedPose;
+}
+
+bool USquadUnitAnimInstance::PlayCoverMontage(
+	UAnimMontage* Montage,
+	const ESquadCoverAnimAction MontageAction)
+{
+	if (not IsValid(Montage))
+	{
+		RTSFunctionLibrary::ReportError(
+			"A required cover montage is not configured on " + GetName());
+		return false;
+	}
+
+	M_CoverMontageEndedDelegate.Unbind();
+	const float PlayedDuration = Montage_Play(Montage, 1.0f, EMontagePlayReturnType::Duration);
+	if (not FMath::IsFinite(PlayedDuration) || PlayedDuration <= KINDA_SMALL_NUMBER)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to play cover montage " + Montage->GetName() + " on " + GetName());
+		return false;
+	}
+
+	M_CoverAnimRuntime.M_Action = MontageAction;
+	M_CoverAnimRuntime.M_ActiveMontageAction = MontageAction;
+	M_CoverAnimRuntime.M_ActiveMontage = Montage;
+	M_CoverMontageEndedDelegate.BindUObject(this, &USquadUnitAnimInstance::OnCoverMontageEnded);
+	Montage_SetEndDelegate(M_CoverMontageEndedDelegate, Montage);
+	return true;
+}
+
+bool USquadUnitAnimInstance::PlayExitCoverMontage()
+{
+	UAnimMontage* ExitMontage = nullptr;
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		ExitMontage = CoverAnimations.Crouch.ExitCoverMontage;
+	}
+	else
+	{
+		const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+		if (StandingAnimationSet == nullptr)
+		{
+			return false;
+		}
+		ExitMontage = StandingAnimationSet->ExitCoverMontage;
+	}
+
+	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
+	return PlayCoverMontage(ExitMontage, ESquadCoverAnimAction::Exiting);
+}
+
+void USquadUnitAnimInstance::OnCoverMontageEnded(UAnimMontage* Montage, const bool bInterrupted)
+{
+	if (Montage != M_CoverAnimRuntime.M_ActiveMontage)
+	{
+		return;
+	}
+
+	const ESquadCoverAnimAction CompletedAction = M_CoverAnimRuntime.M_ActiveMontageAction;
+	const ESquadCoverAnimAction NextAction = M_CoverAnimRuntime.M_NextAction;
+	M_CoverMontageEndedDelegate.Unbind();
+	M_CoverAnimRuntime.M_ActiveMontage = nullptr;
+	M_CoverAnimRuntime.M_ActiveMontageAction = ESquadCoverAnimAction::None;
+	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
+
+	if (bInterrupted)
+	{
+		ClearCoverAnimationRuntime();
+		return;
+	}
+
+	if (CompletedAction == ESquadCoverAnimAction::Entering)
+	{
+		M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
+		return;
+	}
+
+	if (CompletedAction == ESquadCoverAnimAction::Exposing)
+	{
+		if (M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Exposed)
+		{
+			RTSFunctionLibrary::ReportError(
+				"Cover expose montage ended without a Cover_AimReady notify on " + GetName());
+			M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
+		}
+		return;
+	}
+
+	if (CompletedAction == ESquadCoverAnimAction::Returning)
+	{
+		AnimNotify_Cover_BackInCover();
+		if (NextAction == ESquadCoverAnimAction::Exiting && not PlayExitCoverMontage())
+		{
+			ClearCoverAnimationRuntime();
+		}
+		return;
+	}
+
+	if (CompletedAction == ESquadCoverAnimAction::Exiting)
+	{
+		ClearCoverAnimationRuntime();
+	}
+}
+
+void USquadUnitAnimInstance::ClearCoverAnimationRuntime()
+{
+	const bool bHadCoverPose = M_CoverAnimRuntime.M_IdlePose != ESquadIdleAnimationPose::Regular ||
+		IdleAnimationPose != ESquadIdleAnimationPose::Regular;
+	M_CoverMontageEndedDelegate.Unbind();
+	M_CoverAnimRuntime.Reset();
+	IdleAnimationPose = ESquadIdleAnimationPose::Regular;
+
+	if (not bHadCoverPose)
+	{
+		return;
+	}
+
+	AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
+	AimOffsets.UpdateAOForNewAimPosition(ESquadAimPosition::Standing);
+}
+
+const FSquadUnitStandingCoverAnimationSet* USquadUnitAnimInstance::GetStandingCoverAnimationSet() const
+{
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingCoverLeft ||
+		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekLeft)
+	{
+		return &CoverAnimations.StandingLeft;
+	}
+
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingCoverRight ||
+		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekRight)
+	{
+		return &CoverAnimations.StandingRight;
+	}
+
+	return nullptr;
+}
+
+ESquadIdleAnimationPose USquadUnitAnimInstance::GetProtectedStandingCoverPose() const
+{
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingCoverLeft ||
+		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekLeft)
+	{
+		return ESquadIdleAnimationPose::StandingCoverLeft;
+	}
+
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingCoverRight ||
+		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekRight)
+	{
+		return ESquadIdleAnimationPose::StandingCoverRight;
+	}
+
+	return ESquadIdleAnimationPose::Regular;
+}
+
+ESquadIdleAnimationPose USquadUnitAnimInstance::GetStandingPeekPose() const
+{
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingCoverLeft ||
+		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekLeft)
+	{
+		return ESquadIdleAnimationPose::StandingPeekLeft;
+	}
+
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingCoverRight ||
+		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekRight)
+	{
+		return ESquadIdleAnimationPose::StandingPeekRight;
+	}
+
+	return ESquadIdleAnimationPose::Regular;
+}
+
 // ----- Team Weapon Crew Animations -----
 
 void FSquadUnitTeamWeaponCrewAnimRuntime::Reset()
@@ -852,6 +1277,8 @@ void FSquadUnitTeamWeaponCrewAnimRuntime::Reset()
 void USquadUnitAnimInstance::StartTeamWeaponCrewAnimation(const ECrewPositionType CrewRole,
                                                           const ESquadSubtype TeamWeaponSquadSubtype)
 {
+	CancelCoverAnimation();
+
 	if (M_TeamWeaponCrewAnimRuntime.GetIsSameAssignment(CrewRole, TeamWeaponSquadSubtype))
 	{
 		return;

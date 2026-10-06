@@ -13,6 +13,7 @@
 
 class UNiagaraSystem;
 class USelectionComponent;
+class UAnimSequence;
 enum class ESquadWeaponAimOffset : uint8;
 enum class ESquadAimPosition : uint8;
 enum class ESquadAimPositionMontage : uint8;
@@ -277,6 +278,108 @@ struct FSquadUnitDeathMontages
 };
 
 /**
+ * @brief Keeps the cover aim offset and its required base pose together for AnimGraph evaluation.
+ * The first implementation is configured with the available rifle cover assets.
+ */
+USTRUCT(BlueprintType)
+struct FSquadUnitCoverAimAssets
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	TObjectPtr<UAimOffsetBlendSpace> AimOffset = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	TObjectPtr<UAnimSequence> BaseSequence = nullptr;
+};
+
+/**
+ * @brief Supplies one side of standing cover, where firing requires leaving the protected pose first.
+ * Left and right instances keep their authored root-motion transitions independent.
+ */
+USTRUCT(BlueprintType)
+struct FSquadUnitStandingCoverAnimationSet
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	TObjectPtr<UAnimSequence> ProtectedIdlePose = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	FSquadUnitCoverAimAssets PeekAimAssets;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Transitions")
+	TObjectPtr<UAnimMontage> EnterCoverMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Transitions")
+	TObjectPtr<UAnimMontage> ExitCoverMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Transitions")
+	TObjectPtr<UAnimMontage> ExposeFromCoverMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Transitions")
+	TObjectPtr<UAnimMontage> ReturnToCoverMontage = nullptr;
+};
+
+/**
+ * @brief Supplies crouch cover, whose aim offset can fire without a separate expose transition.
+ * Crouch cover is intentionally non-sided in the initial implementation.
+ */
+USTRUCT(BlueprintType)
+struct FSquadUnitCrouchCoverAnimationSet
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	TObjectPtr<UAnimSequence> ProtectedIdlePose = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	FSquadUnitCoverAimAssets AimAssets;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Transitions")
+	TObjectPtr<UAnimMontage> EnterCoverMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Transitions")
+	TObjectPtr<UAnimMontage> ExitCoverMontage = nullptr;
+};
+
+/** @brief Groups the three cover pose families configured on the master infantry animation Blueprint. */
+USTRUCT(BlueprintType)
+struct FSquadUnitCoverAnimationSets
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	FSquadUnitStandingCoverAnimationSet StandingLeft;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	FSquadUnitStandingCoverAnimationSet StandingRight;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	FSquadUnitCrouchCoverAnimationSet Crouch;
+};
+
+/**
+ * @brief Keeps cover montage ownership and notify-driven pose state coherent during transitions.
+ * Gameplay cover geometry and reservations remain owned outside the animation instance.
+ */
+USTRUCT()
+struct FSquadUnitCoverAnimRuntime
+{
+	GENERATED_BODY()
+
+	void Reset();
+
+	ESquadIdleAnimationPose M_IdlePose = ESquadIdleAnimationPose::Regular;
+	ESquadCoverAnimAction M_Action = ESquadCoverAnimAction::None;
+	ESquadCoverAnimAction M_ActiveMontageAction = ESquadCoverAnimAction::None;
+	ESquadCoverAnimAction M_NextAction = ESquadCoverAnimAction::None;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> M_ActiveMontage = nullptr;
+};
+
+/**
  * @brief Runtime state of the team weapon crew animation armed on this squad unit by its team weapon controller.
  * Armed means the operator is settled on a deployed team weapon; the entry decides whether it loops or reacts.
  */
@@ -345,6 +448,31 @@ public:
 	void BindSelectionFunctions(USelectionComponent* SelectionComponent);
 
 	inline ESquadMovementAnimState GetMovementState() const { return MovementState; }
+
+	/**
+	 * @brief Starts the full-body transition into one of the three supported protected cover poses.
+	 * @param CoverPose CrouchCover, StandingCoverLeft, or StandingCoverRight.
+	 * @return True only when the configured enter montage started.
+	 */
+	bool EnterCover(ESquadIdleAnimationPose CoverPose);
+
+	/** @return True only when a standing protected pose started its expose montage. */
+	bool StartStandingCoverPeek();
+
+	/** @return True only when an exposed standing pose started returning to protection. */
+	bool ReturnToStandingCover();
+
+	/** @return True when an exit montage started immediately or was queued after returning to protection. */
+	bool ExitCover();
+
+	/** Stops only the active cover montage and restores the regular idle animation family. */
+	void CancelCoverAnimation();
+
+	/** @return True from the start of entering cover until exit or cancellation finishes. */
+	bool GetIsCoverAnimationActive() const;
+
+	/** @return True when crouch cover or an exposed standing peek currently permits weapon fire. */
+	bool GetIsCoverFireAllowed() const;
 
 	/**
 	 * @brief Updated with the weapon, uses the signed direction angle towards the weapon's target.
@@ -452,6 +580,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	ESquadMovementAnimState MovementState;
 
+	// Selects the regular or cover-specific pose family inside the AnimGraph's idle branch.
+	UPROPERTY(BlueprintReadOnly, Category = "Cover")
+	ESquadIdleAnimationPose IdleAnimationPose = ESquadIdleAnimationPose::Regular;
+
 	// ----- Aim Offset -----
 
 	// Container for all aim offset assets and the current aim offset type.
@@ -473,6 +605,18 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
 	inline UAnimSequence* GetCurrentAOBaseSequence() const { return AimOffsets.M_ActiveAimOffsetSequence; }
 
+	/** @return Protected cover idle pose for the current cover family, or nullptr outside cover. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
+	UAnimSequence* GetCurrentCoverIdlePose() const;
+
+	/** @return Cover aim offset for crouch cover or an exposed standing peek. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
+	UAimOffsetBlendSpace* GetCurrentCoverAimOffset() const;
+
+	/** @return Base sequence paired with the current cover aim offset. */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
+	UAnimSequence* GetCurrentCoverAimBaseSequence() const;
+
 	// ----- Weapon Montages -----
 
 	UPROPERTY(EditDefaultsOnly)
@@ -487,6 +631,10 @@ protected:
 	// Contains aim state and active aim montage to switch between aim positions.
 	UPROPERTY(EditDefaultsOnly)
 	FAimPositionMontages AimPositionMontages;
+
+	// Designer-authored cover poses, aim offsets, and full-body transition montages.
+	UPROPERTY(EditDefaultsOnly, Category = "Cover")
+	FSquadUnitCoverAnimationSets CoverAnimations;
 
 	// ----- Team Weapon Crew Montages -----
 
@@ -554,6 +702,26 @@ private:
 	void OnUnitSelected();
 	void OnUnitDeselected();
 
+	// ----- Cover Animations -----
+
+	/** Named notify on cover-to-aim animations; standing-cover weapons may fire after this point. */
+	UFUNCTION()
+	void AnimNotify_Cover_AimReady();
+
+	/** Named notify on aim-to-cover animations; switches back to the protected idle pose. */
+	UFUNCTION()
+	void AnimNotify_Cover_BackInCover();
+
+	/** Starts a cover montage without sharing the generic or team-weapon completion delegates. */
+	bool PlayCoverMontage(UAnimMontage* Montage, ESquadCoverAnimAction MontageAction);
+	bool PlayExitCoverMontage();
+	void OnCoverMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void ClearCoverAnimationRuntime();
+
+	const FSquadUnitStandingCoverAnimationSet* GetStandingCoverAnimationSet() const;
+	ESquadIdleAnimationPose GetProtectedStandingCoverPose() const;
+	ESquadIdleAnimationPose GetStandingPeekPose() const;
+
 	// ----- Team Weapon Crew Animations -----
 
 	/** Plays the loop montage and binds the loop-ended delegate so the code can re-play it on its natural end. */
@@ -581,4 +749,9 @@ private:
 	FOnMontageEnded M_TeamWeaponCrewReactMontageEndedDelegate;
 	FOnMontageEnded M_DeathMontageEndedDelegate;
 	FOnSquadUnitDeathMontageFinished M_DeathMontageCompletionDelegate;
+
+	UPROPERTY(Transient)
+	FSquadUnitCoverAnimRuntime M_CoverAnimRuntime;
+
+	FOnMontageEnded M_CoverMontageEndedDelegate;
 };

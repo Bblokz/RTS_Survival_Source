@@ -48,10 +48,8 @@ namespace VehicleModuleBalance
 	/** @brief Chance to ignite ammunition when damage changes its module state, independent of shell type. */
 	namespace AmmoCookOff
 	{
-		//inline constexpr float AmmoCookOffDamagedAmmoChance = 0.1f;
-		//inline constexpr float AmmoCookOffDestroyedAmmoChance = 0.2f;
-			inline constexpr float AmmoCookOffDamagedAmmoChance = 1.f;
-			inline constexpr float AmmoCookOffDestroyedAmmoChance = 1.f;
+		inline constexpr float AmmoCookOffDamagedAmmoChance = 0.1f;
+		inline constexpr float AmmoCookOffDestroyedAmmoChance = 0.2f;
 
 		/** @return Cook-off probability for the resulting ammo state; healthy ammo cannot ignite here. */
 		constexpr float GetChance(const EVehicleModuleState AmmoState)

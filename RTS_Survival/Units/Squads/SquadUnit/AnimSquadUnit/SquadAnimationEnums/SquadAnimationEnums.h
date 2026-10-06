@@ -19,6 +19,31 @@ enum class ESquadMovementAnimState : uint8
 	Running,
 };
 
+/** Selects the pose family evaluated by the idle branch without changing locomotion state. */
+UENUM(BlueprintType)
+enum class ESquadIdleAnimationPose : uint8
+{
+	Regular,
+	CrouchCover,
+	StandingCoverLeft,
+	StandingCoverRight,
+	StandingPeekLeft,
+	StandingPeekRight,
+};
+
+/** Tracks which authored cover transition currently owns the unit's full-body animation. */
+UENUM(BlueprintType)
+enum class ESquadCoverAnimAction : uint8
+{
+	None,
+	Entering,
+	Protected,
+	Exposing,
+	Exposed,
+	Returning,
+	Exiting,
+};
+
 UENUM(BlueprintType)
 enum class ESquadAimPosition : uint8
 {
