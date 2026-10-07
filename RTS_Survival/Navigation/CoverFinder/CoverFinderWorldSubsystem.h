@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderTypes.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTestScenario.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "CoverFinderWorldSubsystem.generated.h"
 
@@ -58,15 +59,6 @@ struct FCoverFinderPerformanceAccumulator
 	int32 ValidatedStandingGapCount = 0;
 
 	void Reset(double StartSeconds);
-};
-
-/** Values used by the TestCover integration assertion after invalid weak registrations are removed. */
-struct FCoverTestValidationCounts
-{
-	TSet<int32> OwningPlayers;
-	int32 AssignedUnitCount = 0;
-	int32 OccupyingUnitCount = 0;
-	int32 MovingUnitCount = 0;
 };
 
 /**
@@ -140,15 +132,20 @@ public:
 	 * @param TargetActor Optional target whose direction and firing lane constrain the result.
 	 * @param TargetLocation Current aim location for the target-specific firing-lane trace.
 	 * @param OutCoverPoint Reserved point when successful.
+	 * @param MaximumDistanceToTarget Keeps the point inside weapon range of the target; zero disables the limit.
 	 * @return True when a currently published and unclaimed point was reserved.
 	 */
 	bool TryReserveBestCoverPoint(
 		ASquadUnit& SquadUnit,
 		AActor* TargetActor,
 		const FVector& TargetLocation,
-		FRTSCoverPoint& OutCoverPoint);
+		FRTSCoverPoint& OutCoverPoint,
+		float MaximumDistanceToTarget = 0.0f);
 
 	void ReleaseCoverReservation(const ASquadUnit& SquadUnit, int64 PointId);
+
+	// Called when a unit gave up walking to a point, so nobody else is sent to the same blocked slot for a while.
+	void ReportCoverPointUnreachable(int64 PointId);
 	bool GetIsCoverPointPublished(int64 PointId) const;
 	AActor* ResolveBlockingProvider(const FRTSCoverPoint& CoverPoint) const;
 
@@ -165,6 +162,29 @@ public:
 		const FRTSCoverPoint& CoverPoint,
 		const AActor& TargetActor,
 		const FVector& TargetLocation);
+
+	/**
+	 * @brief Decides whether an occupied point still serves the unit against its current target.
+	 * @param SquadUnit Unit occupying the point and choosing the enemy channel.
+	 * @param CoverPoint Point whose normal and posture are tested.
+	 * @param TargetActor Actor that must be the first blocking target-channel hit.
+	 * @param TargetLocation Current world-space aim location.
+	 * @return True when the point faces the target and has a direct firing lane to it.
+	 */
+	bool GetIsCoverPointValidAgainstTarget(
+		const ASquadUnit& SquadUnit,
+		const FRTSCoverPoint& CoverPoint,
+		const AActor& TargetActor,
+		const FVector& TargetLocation);
+
+	/**
+	 * @return Default horizontal step from a standing point to its exposed firing position; zero for crouch cover.
+	 * Units with an expose montage use that animation set's designer offset instead.
+	 */
+	FVector GetStandingPeekOffset(const FRTSCoverPoint& CoverPoint) const;
+
+	// False until landscape and environment geometry have both been published at least once.
+	bool GetHasCompletedFullScan() const { return bM_EnvironmentScanComplete; }
 
 	void LogPerformanceReport() const;
 	void RequestDebugCapture(const FString& ScreenshotName = FString());
@@ -186,6 +206,8 @@ private:
 	TMap<int64, int32> M_CoverPointIndices;
 	TMap<FIntPoint, TArray<int32>> M_CoverSpatialGrid;
 	TMap<int64, TWeakObjectPtr<ASquadUnit>> M_CoverReservations;
+	// Point ID to the world time at which a slot that could not be walked to may be offered again.
+	TMap<int64, float> M_UnreachableCoverPointExpiry;
 	TArray<TWeakObjectPtr<ASquadUnit>> M_RegisteredSquadUnits;
 	TArray<FBox> M_CachedNavigationTileBounds;
 	FBox M_LastScanBounds = FBox(ForceInit);
@@ -199,15 +221,14 @@ private:
 	ECoverFinderScanState M_ScanState = ECoverFinderScanState::Idle;
 	ECoverFinderScanDomain M_ActiveScanDomain = ECoverFinderScanDomain::Landscape;
 	bool bM_LandscapeScanComplete = false;
+	bool bM_EnvironmentScanComplete = false;
 	bool bM_ForceRescanAfterCurrent = false;
 	bool bM_CaptureAfterScan = false;
 	bool bM_RestoreCaptureLighting = false;
 	bool bM_CaptureLightingWasEnabled = true;
 	int32 M_CaptureFramesRemaining = 0;
 	FString M_PendingScreenshotPath;
-	float M_TestCoverValidationRemainingSeconds = 0.0f;
-	bool bM_TestCoverValidationRequested = false;
-	bool bM_CaptureTestCoverValidation = false;
+	FCoverTestScenario M_TestCoverScenario;
 
 	const URTSCoverFinderDeveloperSettings* GetCoverFinderSettings() const;
 	const ANavigationData* GetCharacterNavigationData() const;
@@ -305,6 +326,24 @@ private:
 		float& OutFirstOpenOffset);
 
 	/**
+	 * @brief Narrows the coarse opening search down to the wall edge so standing points sit a known distance from it.
+	 * @param ProtectedLocation Navigable position currently protected by the surface.
+	 * @param SearchDirection Direction from the infantry position toward the surface.
+	 * @param SideDirection Lateral direction in which the unit would step.
+	 * @param LastCoveredOffset Sampled lateral offset still protected by high cover.
+	 * @param FirstOpenOffset Sampled lateral offset beyond the high-cover edge.
+	 * @param InOutFrameWorldQueries Running query count used to enforce the hard frame cap.
+	 * @return Largest lateral offset found that is still covered, within a few centimeters of the edge.
+	 */
+	float RefineStandingEdgeOffset(
+		const FVector& ProtectedLocation,
+		const FVector& SearchDirection,
+		const FVector& SideDirection,
+		float LastCoveredOffset,
+		float FirstOpenOffset,
+		int32& InOutFrameWorldQueries);
+
+	/**
 	 * @brief Rejects narrow seams by sweeping standing-capsule positions across the configured physical opening.
 	 * @param NavigationSystem Current world navigation system.
 	 * @param NavigationData Character nav data selected by the registry.
@@ -392,20 +431,23 @@ private:
 	 * @param TargetActor Optional target; when valid the point must face away from it.
 	 * @param TargetLocation Current target position used by the directional protection test.
 	 * @param SearchRadius Maximum distance from the unit in centimeters.
+	 * @param MaximumDistanceToTarget Weapon-range limit between point and target; zero disables the limit.
 	 * @return Nearest candidates, capped to the small number that may receive line traces.
 	 */
 	TArray<FRTSCoverPoint> GatherBestTacticalCoverCandidates(
 		const ASquadUnit& SquadUnit,
 		const AActor* TargetActor,
 		const FVector& TargetLocation,
-		float SearchRadius);
+		float SearchRadius,
+		float MaximumDistanceToTarget);
 
 	FIntPoint GetCoverSpatialCell(const FVector& Location) const;
-	FVector BuildFiringLaneStart(const FRTSCoverPoint& CoverPoint) const;
+	FVector BuildFiringLaneStart(const ASquadUnit& SquadUnit, const FRTSCoverPoint& CoverPoint) const;
 	bool GetIsCandidateProtectedFromTarget(
 		const FRTSCoverPoint& CoverPoint,
 		const FVector& TargetLocation) const;
 	bool GetIsPointReservedByAnotherUnit(int64 PointId, const ASquadUnit& SquadUnit) const;
+	bool GetIsCoverPointTemporarilyUnreachable(int64 PointId) const;
 	void RebuildPublishedCoverPoints();
 	void RemoveGeneratedDuplicates(const TArray<FRTSCoverPoint>& RemovedProviderPoints);
 	void RecordSamplingFrame(double FrameStartSeconds);
@@ -413,7 +455,5 @@ private:
 	void DrawPublishedCover() const;
 	void PrepareDebugCapture();
 	void TickDebugCapture();
-	void TickTestCoverValidation(float DeltaTime);
-	FCoverTestValidationCounts GatherTestCoverValidationCounts() const;
 	void RestoreCaptureLighting();
 };

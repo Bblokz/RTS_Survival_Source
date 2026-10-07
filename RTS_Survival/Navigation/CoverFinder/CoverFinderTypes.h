@@ -138,6 +138,9 @@ struct FRTSTacticalCoverPerformance
 	int32 FiringLaneTracesLastFrame = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
+	int32 FiringLaneRejectionsLastFrame = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
 	float GameThreadMillisecondsLastFrame = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
@@ -151,6 +154,7 @@ struct FCoverFinderSettingsSnapshot
 	float MinimumCrouchCoverHeight = 90.0f;
 	float MaximumCoverSearchDistance = 175.0f;
 	float StandingPeekGapWidth = 110.0f;
+	float StandingPeekEdgeInset = 25.0f;
 	float CoverPointSpacing = 90.0f;
 	float GameThreadBudgetMilliseconds = 0.35f;
 	float AgentRadius = 42.0f;

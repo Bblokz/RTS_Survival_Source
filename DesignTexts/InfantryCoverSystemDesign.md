@@ -1,10 +1,50 @@
 # Infantry Cover System — Architecture and Phased Design
 
 Author: design pass, 2026-10-06  
-Status: **Phase 1 cover discovery implemented and validated; squad/animation integration remains future work**  
+Status: **Phase 1 cover discovery and unit-local automatic cover use implemented and validated on TestCover (2026-10-07); cover montages and squad-level assignment remain future work**  
 Test map: `/Game/RTS_Survival/Maps/TestCover/TestCover`
 
-The original analysis and longer-term design are retained below. The implemented phase-1 detector adds runtime C++ and developer settings, but does not yet alter squad commands, movement, weapons, animation Blueprints, map assets, or cargo behavior.
+The original analysis and longer-term design are retained below; sections 2, 9, and 10 describe the plan as written before the automatic cover layer existed.
+
+### Implemented automatic cover use (unit-local, parallel to the command queue)
+
+- `URTSCoverFinderWorldSubsystem` staggers `ASquadUnit::UpdateAutomaticCover` over registered units (`M_MaximumTacticalUnitUpdatesPerFrame`), and does nothing while the world is paused.
+- A unit takes cover only while its own command is `IdIdle` (squad queue idle) or `IdAttack` with its target already in weapon range. Team-weapon squads and squads inside cargo are excluded. Any commanded movement cancels cover first.
+- Selection: nearest unreserved point within `M_AutomaticCoverSearchRadius` that faces the target, lies inside 90% of weapon range, and has a target-specific firing lane. At most eight lane traces per search; a failed search waits 1.5 s before retrying.
+- Movement: one tagged AI move whose request ID is intercepted before the command-completion switch, so it can never complete or replace a queued command. It uses the same reach test as commanded moves. A unit still running past its deadline is circling the point: it is stopped and sent once more, then the point is reported unreachable to the subsystem and withheld from every unit for 30 s.
+- Firing: blocked while walking to cover, while entering, and while protected behind standing cover. Crouch cover fires once the lane is validated; standing cover exposes first. The lane is a single trace on the enemy team's trace channel from the posture's firing position, revalidated only when the target changes or moves more than 1 m. Any enemy as first hit keeps the lane open.
+- Provider ignore: the scanner tags each point with a numeric handle for the actor whose collision produced it. On entering cover the unit resolves it once and registers the actor on its weapon with reason `Cover`, same-owner only. Cargo ignores use reason `External`, so the two never remove each other.
+- Missing animations: every missing montage or pose is logged once per animation class and the gameplay state continues immediately. Without an expose montage the capsule is moved in code to the subsystem's default peek step and back.
+- The scanner ignores soldiers and what they carry, both as cover geometry and as an obstruction of a slot. Before this, an occupied point unpublished itself on the next rescan.
+
+### Cover animations and root motion
+
+Each animation set on the infantry animation Blueprint (`CoverAnimations`) carries designer offsets of type `FSquadUnitCoverLocalOffset`, expressed for a soldier facing the cover: `TowardCover` (negative is further out in front of the cover) and `Right`.
+
+| Property | Set | Meaning | Default |
+| --- | --- | --- | --- |
+| `EnterStartOffset` | Standing left, standing right | Where the unit stops before the enter montage plays. Set it to minus the travel of the enter clip. | `TowardCover = -125` |
+| `EnterStartOffset` | Crouch | Same, for the crouch enter clip. | `0, 0` |
+| `ExposedOffset` | Standing left | Where the expose montage leaves the capsule; also the origin of the firing-lane test. | `-46, -110` |
+| `ExposedOffset` | Standing right | Same for the right side. | `-44, 62` |
+
+The defaults are the root travel measured on the current clips. When a clip is replaced, run the map with cover debug symbols: the first use of each pose logs `RTS_COVER_ROOT_MOTION` (travel extracted as capsule root motion) and `RTS_COVER_ROOT_TRACK` (travel of the root track per sequence, including clips whose root motion is switched off). With `LogRTSSquadUnitCover Verbose`, every transition also logs `RTS_COVER_ALIGNMENT` with the residual between where the clip left the capsule and where the offset says it should be; add that residual to the offset to remove it.
+
+How a unit uses them:
+
+1. It walks to `cover point + EnterStartOffset`, turns to face the cover, and slides the last centimetres onto that exact location (path following stops up to an agent radius short).
+2. The enter montage plays. If the montage has extracted root motion, the root motion carries the capsule onto the cover point. If it does not (the current high-cover enter clips are the exit clips played in reverse with root motion switched off), the mesh shows the travel as a root offset from frame one, so the capsule is placed on the cover point at montage start and the montage starts without blend-in; the soldier visually stays where he stopped and walks in.
+3. Expose and return montages move the capsule by root motion. When each transition ends the capsule is slid onto the expected location (`cover point + ExposedOffset`, or the cover point), which absorbs clip drift such as the left return clip ending 29 cm short of undoing its expose clip.
+4. The animation instance reports every cover action change through `OnCoverAnimActionChanged`, so capsule alignment and the weapon release happen on the frame a transition completes. `Cover_AimReady` and `Cover_BackInCover` notifies are optional: they move the switch earlier inside a clip, and a clip without them switches when it ends.
+5. A transition whose montage does not advance (meshes that are not rendered stop ticking montages) is completed by the unit after the montage length plus 0.75 s, and the capsule is placed where the clip would have left it.
+
+The scanner anchors standing points to the wall edge: it bisects the coarse opening search down to a few centimetres and places the point `M_StandingPeekEdgeInset` (default 25 cm) inside the edge. The inset must stay smaller than the sideways step of the shortest expose clip (62 cm on the right side today), or the exposed muzzle stays behind the wall.
+
+Not wired yet: the exit montages. Leaving cover cancels the cover pose immediately so a move order is never delayed by an exit clip.
+
+### TestCover scenario
+
+`-CoverFinderValidateTestCover` on the command line, or `RTS.CoverFinder.ValidateTestCover <idle seconds> [capture]` in the console, runs `FCoverTestScenario` (cover-debug builds only). It starts the game past the start-game gate, waits for the first full scan, asserts idle cover (unique reservations, occupants on their points, command queue untouched), walks one team to the exposed side of occupied standing cover, orders attacks on contact, and logs `RTS_COVER_TEST RESULT PASS|FAIL` with a five-second combat timeline. `-CoverFinderPlayerApproaches` swaps which team walks; `-CoverFinderCombatSeconds=` changes the combat window.
 
 ### Implemented phase-1 refinements
 

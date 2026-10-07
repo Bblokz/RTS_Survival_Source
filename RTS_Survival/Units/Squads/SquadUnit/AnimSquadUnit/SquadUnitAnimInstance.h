@@ -294,6 +294,41 @@ struct FSquadUnitCoverAimAssets
 };
 
 /**
+ * Root travel measured on the shipped high-cover clips, used as the default offsets below.
+ * RTS.CoverFinder logs RTS_COVER_ROOT_MOTION for every configured montage when its pose is first used,
+ * which gives the numbers to enter after a clip is replaced.
+ */
+namespace SquadUnitCoverAnimDefaults
+{
+	// AnimRTS_ExitHighCover* played in reverse walks the root 125 cm toward the cover.
+	inline constexpr float StandingEnterStartDepth = -125.0f;
+	// Canim_HiCover2AimL ends 46 cm back and 110 cm to the left of the protected pose.
+	inline constexpr float StandingLeftExposedDepth = -46.0f;
+	inline constexpr float StandingLeftExposedRight = -110.0f;
+	// Canim_HiCover2AimR ends 44 cm back and 62 cm to the right of the protected pose.
+	inline constexpr float StandingRightExposedDepth = -44.0f;
+	inline constexpr float StandingRightExposedRight = 62.0f;
+}
+
+/**
+ * @brief A capsule position relative to the in-cover location, in the frame of a soldier facing the cover.
+ * Designers tune these so the code-side positions match where each cover animation starts or ends.
+ */
+USTRUCT(BlueprintType)
+struct FSquadUnitCoverLocalOffset
+{
+	GENERATED_BODY()
+
+	// Positive is closer to the cover surface; negative is further out in front of it.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover", meta = (Units = "cm"))
+	float TowardCover = 0.0f;
+
+	// Positive is the soldier's right-hand side while facing the cover.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover", meta = (Units = "cm"))
+	float Right = 0.0f;
+};
+
+/**
  * @brief Supplies one side of standing cover, where firing requires leaving the protected pose first.
  * Left and right instances keep their authored root-motion transitions independent.
  */
@@ -301,6 +336,17 @@ USTRUCT(BlueprintType)
 struct FSquadUnitStandingCoverAnimationSet
 {
 	GENERATED_BODY()
+
+	FSquadUnitStandingCoverAnimationSet();
+
+	// Where the unit stops before EnterCoverMontage plays, so the clip's root travel ends on the cover point.
+	// Set this to minus the travel of the enter clip; zero when the clip is authored in place.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Root Motion")
+	FSquadUnitCoverLocalOffset EnterStartOffset;
+
+	// Where ExposeFromCoverMontage leaves the unit. Also the origin of the firing-lane check for this side.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Root Motion")
+	FSquadUnitCoverLocalOffset ExposedOffset;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	TObjectPtr<UAnimSequence> ProtectedIdlePose = nullptr;
@@ -330,6 +376,10 @@ struct FSquadUnitCrouchCoverAnimationSet
 {
 	GENERATED_BODY()
 
+	// Where the unit stops before EnterCoverMontage plays. Left at zero: the crouch clip is treated as in place.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Root Motion")
+	FSquadUnitCoverLocalOffset EnterStartOffset;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	TObjectPtr<UAnimSequence> ProtectedIdlePose = nullptr;
 
@@ -348,6 +398,8 @@ USTRUCT(BlueprintType)
 struct FSquadUnitCoverAnimationSets
 {
 	GENERATED_BODY()
+
+	FSquadUnitCoverAnimationSets();
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	FSquadUnitStandingCoverAnimationSet StandingLeft;
@@ -377,7 +429,12 @@ struct FSquadUnitCoverAnimRuntime
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> M_ActiveMontage = nullptr;
+
+	// Play time of the active cover montage, so its owner can time out a transition that never ticks off screen.
+	float M_ActiveMontageSeconds = 0.0f;
 };
+
+DECLARE_DELEGATE_OneParam(FOnSquadCoverAnimActionChanged, ESquadCoverAnimAction);
 
 /**
  * @brief Runtime state of the team weapon crew animation armed on this squad unit by its team weapon controller.
@@ -475,6 +532,34 @@ public:
 	bool GetIsCoverFireAllowed() const;
 	ESquadCoverAnimAction GetCoverAnimAction() const { return M_CoverAnimRuntime.M_Action; }
 
+	// Fired on every cover action change so the owning unit can line its capsule up without waiting for a poll.
+	FOnSquadCoverAnimActionChanged OnCoverAnimActionChanged;
+
+	/** @return Designer offset of the stop position before the enter montage; zero without an enter montage. */
+	FSquadUnitCoverLocalOffset GetCoverEnterStartOffset(ESquadIdleAnimationPose CoverPose) const;
+
+	/**
+	 * @return True when the enter montage moves the capsule through extracted root motion. False means the clip
+	 * only moves the mesh, so the owner places the capsule on the cover point when the montage starts.
+	 */
+	bool GetDoesCoverEnterMontageMoveCapsule(ESquadIdleAnimationPose CoverPose) const;
+
+	/**
+	 * @brief Lets cover selection test the firing lane from where the expose montage really puts the unit.
+	 * @param CoverPose Standing cover or standing peek pose of the wanted side.
+	 * @param OutExposedOffset Designer offset of the exposed position.
+	 * @return False when that side has no expose montage, so the caller must use its own default step.
+	 */
+	bool TryGetStandingCoverExposedOffset(
+		ESquadIdleAnimationPose CoverPose,
+		FSquadUnitCoverLocalOffset& OutExposedOffset) const;
+
+	bool GetIsCoverTransitionMontageActive() const;
+	float GetActiveCoverMontageSeconds() const { return M_CoverAnimRuntime.M_ActiveMontageSeconds; }
+
+	/** Ends a cover transition whose montage is not advancing, for example on a mesh that is not rendered. */
+	void ForceCompleteCoverTransition();
+
 	/**
 	 * @brief Updated with the weapon, uses the signed direction angle towards the weapon's target.
 	 * @param Angle 
@@ -483,6 +568,7 @@ public:
 	{
 		AimOffsetAngle = Angle;
 		bAimToTarget = true;
+		RefreshCoverGraphPose();
 	}
 
 	/**
@@ -517,7 +603,11 @@ public:
 	// Stop playing all montages on the unit.
 	void StopAllMontages();
 
-	void StopAiming() { bAimToTarget = false; }
+	void StopAiming()
+	{
+		bAimToTarget = false;
+		RefreshCoverGraphPose();
+	}
 
 	/**
 	 * @brief Sets the aim offset variable according to the provided type to use the right blend space in the
@@ -584,6 +674,10 @@ protected:
 	// Selects the regular or cover-specific pose family inside the AnimGraph's idle branch.
 	UPROPERTY(BlueprintReadOnly, Category = "Cover")
 	ESquadIdleAnimationPose IdleAnimationPose = ESquadIdleAnimationPose::Regular;
+
+	// Drives the single Blend Poses by Enum in the idle branch; derived from IdleAnimationPose in C++.
+	UPROPERTY(BlueprintReadOnly, Category = "Cover")
+	ESquadCoverGraphPose CoverGraphPose = ESquadCoverGraphPose::NotInCover;
 
 	// ----- Aim Offset -----
 
@@ -713,12 +807,37 @@ private:
 	UFUNCTION()
 	void AnimNotify_Cover_BackInCover();
 
-	/** Starts a cover montage without sharing the generic or team-weapon completion delegates. */
-	bool PlayCoverMontage(UAnimMontage* Montage, ESquadCoverAnimAction MontageAction);
+	/**
+	 * @brief Starts a cover montage without sharing the generic or team-weapon completion delegates.
+	 * @param Montage Transition to play; a missing montage is logged once and reported as not started.
+	 * @param MontageAction Cover action the montage represents while it plays.
+	 * @param bStartOnFirstFrame Skips the blend-in for clips that carry an in-place root offset on frame one.
+	 * @return True when the montage is playing.
+	 */
+	bool PlayCoverMontage(
+		UAnimMontage* Montage,
+		ESquadCoverAnimAction MontageAction,
+		bool bStartOnFirstFrame = false);
 	bool PlayExitCoverMontage();
 	void OnCoverMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void CompleteCoverTransition(ESquadCoverAnimAction CompletedAction, ESquadCoverAnimAction NextAction);
+	void SetCoverAnimAction(ESquadCoverAnimAction NewAction);
+
+	// Single place where the idle pose changes, so the graph-facing cover branch can never disagree with it.
+	void SetIdleAnimationPose(ESquadIdleAnimationPose NewIdlePose);
+
+	// Called whenever the idle pose or the aiming flag changes; both decide which cover branch the graph plays.
+	void RefreshCoverGraphPose();
+	void EnterExposedCoverPose();
+	void EnterProtectedCoverPose();
+	UAnimMontage* GetCoverEnterMontage(ESquadIdleAnimationPose CoverPose) const;
+	const FSquadUnitStandingCoverAnimationSet* FindStandingCoverAnimationSet(ESquadIdleAnimationPose CoverPose) const;
 	void ClearCoverAnimationRuntime();
 	void LogMissingCoverAnimationAssets(ESquadIdleAnimationPose CoverPose) const;
+
+	/** Reports what each cover montage of this pose moves the capsule by, as the starting point for tuning offsets. */
+	void LogCoverMontageRootMotion(ESquadIdleAnimationPose CoverPose) const;
+	void LogCoverMontageRootMotion(const UAnimMontage* Montage, const TCHAR* MontageRole) const;
 
 	const FSquadUnitStandingCoverAnimationSet* GetStandingCoverAnimationSet() const;
 	ESquadIdleAnimationPose GetProtectedStandingCoverPose() const;

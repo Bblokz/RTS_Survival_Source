@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
@@ -288,6 +289,85 @@ bool FCoverFinderReservationTest::RunTest(const FString& Parameters)
 		FirstReservation.PointId,
 		SecondReservation.PointId);
 	CoverSubsystem->ReleaseCoverReservation(*FirstUnit, FirstReservation.PointId);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCoverFinderStandingPeekOffsetTest,
+	"RTS.CoverFinder.Tactical.StandingPeekOffset",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoverFinderStandingPeekOffsetTest::RunTest(const FString& Parameters)
+{
+	using namespace CoverFinderWorkerTestsPrivate;
+	const URTSCoverFinderWorldSubsystem* CoverSubsystem = NewObject<URTSCoverFinderWorldSubsystem>();
+	TestNotNull(TEXT("Cover subsystem exists"), CoverSubsystem);
+	if (not IsValid(CoverSubsystem))
+	{
+		return false;
+	}
+
+	// The normal points from the wall to the soldier, so this soldier faces -X and its left is +Y.
+	const FVector CoverNormal = FVector::ForwardVector;
+	const FVector CrouchOffset = CoverSubsystem->GetStandingPeekOffset(
+		MakeCandidate(FVector::ZeroVector, CoverNormal, ERTSCoverType::Crouch));
+	const FVector LeftOffset = CoverSubsystem->GetStandingPeekOffset(
+		MakeCandidate(FVector::ZeroVector, CoverNormal, ERTSCoverType::StandingLeft));
+	const FVector RightOffset = CoverSubsystem->GetStandingPeekOffset(
+		MakeCandidate(FVector::ZeroVector, CoverNormal, ERTSCoverType::StandingRight));
+	TestTrue(TEXT("Crouch cover fires over the top and never steps sideways"), CrouchOffset.IsNearlyZero());
+	TestTrue(TEXT("A left peek steps to the soldier's left"), LeftOffset.Y > 0.0f);
+	TestTrue(TEXT("A right peek steps to the soldier's right"), RightOffset.Y < 0.0f);
+	TestTrue(TEXT("Peeking moves along the wall, not through or away from it"),
+		FMath::IsNearlyZero(LeftOffset.X) && FMath::IsNearlyZero(RightOffset.X));
+	TestTrue(TEXT("Both sides step the same distance"), FMath::IsNearlyEqual(LeftOffset.Size(), RightOffset.Size()));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCoverFinderAnimationOffsetTest,
+	"RTS.CoverFinder.Animation.RootMotionOffsets",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoverFinderAnimationOffsetTest::RunTest(const FString& Parameters)
+{
+	using namespace CoverFinderWorkerTestsPrivate;
+	const FSquadUnitCoverAnimationSets DefaultAnimationSets;
+	TestTrue(
+		TEXT("Standing enter clips start in front of the cover, never inside it"),
+		DefaultAnimationSets.StandingLeft.EnterStartOffset.TowardCover < 0.0f &&
+		DefaultAnimationSets.StandingRight.EnterStartOffset.TowardCover < 0.0f);
+	TestTrue(
+		TEXT("Crouch cover starts on the point until a designer tunes it"),
+		FMath::IsNearlyZero(DefaultAnimationSets.Crouch.EnterStartOffset.TowardCover) &&
+		FMath::IsNearlyZero(DefaultAnimationSets.Crouch.EnterStartOffset.Right));
+	TestTrue(
+		TEXT("The left set exposes to the soldier's left and the right set to the right"),
+		DefaultAnimationSets.StandingLeft.ExposedOffset.Right < 0.0f &&
+		DefaultAnimationSets.StandingRight.ExposedOffset.Right > 0.0f);
+
+	// A unit without an animation instance has no authored exposure and must fall back to the caller's step.
+	const ASquadUnit* SquadUnit = NewObject<ASquadUnit>();
+	TestNotNull(TEXT("Transient squad unit exists"), SquadUnit);
+	if (not IsValid(SquadUnit))
+	{
+		return false;
+	}
+	const FVector DefaultStep(0.0f, 84.0f, 0.0f);
+	TestTrue(
+		TEXT("Standing cover without an expose montage uses the default step"),
+		SquadUnit->GetStandingCoverExposedWorldOffset(
+			MakeCandidate(FVector::ZeroVector, FVector::ForwardVector, ERTSCoverType::StandingLeft),
+			DefaultStep).Equals(DefaultStep));
+	TestTrue(
+		TEXT("Crouch cover never steps sideways, whatever default is offered"),
+		SquadUnit->GetStandingCoverExposedWorldOffset(
+			MakeCandidate(FVector::ZeroVector, FVector::ForwardVector, ERTSCoverType::Crouch),
+			DefaultStep).IsNearlyZero());
+	float SettledError = 0.0f;
+	TestFalse(
+		TEXT("A unit outside cover reports no settled capsule error"),
+		SquadUnit->TryGetSettledCoverCapsuleError(SettledError));
 	return true;
 }
 

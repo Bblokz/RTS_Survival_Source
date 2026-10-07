@@ -51,7 +51,9 @@ namespace CoverFinderWorldSubsystemPrivate
 	constexpr float CaptureHeightScale = 0.85f;
 	constexpr float CaptureMaximumHeight = 50000.0f;
 	constexpr int32 CaptureFrameDelay = 3;
-	constexpr int32 MaximumQueriesForOneDirection = 105;
+	constexpr int32 StandingEdgeRefinementSteps = 3;
+	// Worst case for one direction, including the edge refinement traces of both sides.
+	constexpr int32 MaximumQueriesForOneDirection = 105 + StandingEdgeRefinementSteps * 2;
 	constexpr float CoverSpatialCellSize = 500.0f;
 	constexpr float MinimumThreatProtectionDot = 0.2f;
 	constexpr float CrouchFiringHeight = 150.0f;
@@ -77,6 +79,35 @@ namespace CoverFinderWorldSubsystemPrivate
 		return ObjectQueryParams;
 	}
 
+	/** Soldiers and what they carry stand on cover points all the time and must never change the published cover. */
+	bool GetIsInfantryActor(const AActor* Actor)
+	{
+		if (not IsValid(Actor))
+		{
+			return false;
+		}
+		return IsValid(Cast<ACharacter>(Actor)) ||
+			IsValid(Cast<ACharacter>(Actor->GetAttachParentActor())) ||
+			IsValid(Cast<ACharacter>(Actor->GetOwner()));
+	}
+
+	/** @return Owning player of the actor or of the unit that owns it; INDEX_NONE for map geometry. */
+	int32 FindOwningPlayer(const AActor* Actor)
+	{
+		constexpr int32 MaximumOwnerDepth = 4;
+		const AActor* OwnershipActor = Actor;
+		for (int32 OwnerDepth = 0; OwnerDepth < MaximumOwnerDepth && IsValid(OwnershipActor); ++OwnerDepth)
+		{
+			const URTSComponent* RTSComponent = OwnershipActor->FindComponentByClass<URTSComponent>();
+			if (IsValid(RTSComponent))
+			{
+				return RTSComponent->GetOwningPlayer();
+			}
+			OwnershipActor = OwnershipActor->GetOwner();
+		}
+		return INDEX_NONE;
+	}
+
 	bool GetIsLandscapeComponent(const UPrimitiveComponent* PrimitiveComponent)
 	{
 		return IsValid(PrimitiveComponent)
@@ -94,7 +125,7 @@ namespace CoverFinderWorldSubsystemPrivate
 		{
 			return;
 		}
-		if (IsValid(Cast<ACharacter>(PrimitiveComponent->GetOwner())))
+		if (GetIsInfantryActor(PrimitiveComponent->GetOwner()))
 		{
 			return;
 		}
@@ -136,7 +167,7 @@ namespace CoverFinderWorldSubsystemPrivate
 		for (const FHitResult& HitResult : HitResults)
 		{
 			if (GetIsLandscapeComponent(HitResult.GetComponent()) ||
-				IsValid(Cast<ACharacter>(HitResult.GetActor())))
+				GetIsInfantryActor(HitResult.GetActor()))
 			{
 				continue;
 			}
@@ -168,12 +199,35 @@ namespace CoverFinderWorldSubsystemPrivate
 		});
 		for (const FHitResult& HitResult : HitResults)
 		{
-			if (IsValid(Cast<ACharacter>(HitResult.GetActor())))
+			if (GetIsInfantryActor(HitResult.GetActor()))
 			{
 				continue;
 			}
 			OutHitResult = HitResult;
 			return true;
+		}
+		return false;
+	}
+
+	bool GetHasNonInfantryOverlap(
+		const UWorld& World,
+		const FVector& ShapeCenter,
+		const FCollisionShape& CollisionShape)
+	{
+		TArray<FOverlapResult> Overlaps;
+		World.OverlapMultiByObjectType(
+			Overlaps,
+			ShapeCenter,
+			FQuat::Identity,
+			GetAllCoverObjectQueryParams(),
+			CollisionShape,
+			BuildCoverCollisionQueryParams());
+		for (const FOverlapResult& Overlap : Overlaps)
+		{
+			if (not GetIsInfantryActor(Overlap.GetActor()))
+			{
+				return true;
+			}
 		}
 		return false;
 	}
@@ -304,7 +358,7 @@ namespace CoverFinderWorldSubsystemPrivate
 
 	FAutoConsoleCommandWithWorldAndArgs GCoverFinderValidateTestCoverCommand(
 		TEXT("RTS.CoverFinder.ValidateTestCover"),
-		TEXT("After an optional delay, validates TestCover squad registration, discovered points, reservations, and cover states. Add 'capture' as the second argument."),
+		TEXT("Runs the TestCover scenario: waits for the cover scan, checks idle cover after the given seconds, then walks the enemy into contact and checks cover use in combat. Add 'capture' as the second argument."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&RunTestCoverValidationCommand));
 }
 
@@ -376,6 +430,7 @@ void URTSCoverFinderWorldSubsystem::Deinitialize()
 	M_CoverPointIndices.Reset();
 	M_CoverSpatialGrid.Reset();
 	M_CoverReservations.Reset();
+	M_UnreachableCoverPointExpiry.Reset();
 	M_RegisteredSquadUnits.Reset();
 	M_CachedNavigationTileBounds.Reset();
 	Super::Deinitialize();
@@ -416,7 +471,7 @@ void URTSCoverFinderWorldSubsystem::Tick(const float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	TickDebugCapture();
-	TickTestCoverValidation(DeltaTime);
+	M_TestCoverScenario.Tick(*this, DeltaTime);
 
 	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
 	if (IsValid(CoverSettings) && CoverSettings->bM_EnableCoverSearch && M_Worker != nullptr)
@@ -567,7 +622,8 @@ bool URTSCoverFinderWorldSubsystem::TryReserveBestCoverPoint(
 	ASquadUnit& SquadUnit,
 	AActor* TargetActor,
 	const FVector& TargetLocation,
-	FRTSCoverPoint& OutCoverPoint)
+	FRTSCoverPoint& OutCoverPoint,
+	const float MaximumDistanceToTarget)
 {
 	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
 	if (not IsValid(CoverSettings) || M_CoverPoints.IsEmpty())
@@ -579,7 +635,8 @@ bool URTSCoverFinderWorldSubsystem::TryReserveBestCoverPoint(
 		SquadUnit,
 		TargetActor,
 		TargetLocation,
-		SearchRadius);
+		SearchRadius,
+		MaximumDistanceToTarget);
 	for (const FRTSCoverPoint& CoverPoint : BestCandidates)
 	{
 		if (IsValid(TargetActor) && not GetHasTargetSpecificFiringLane(
@@ -601,14 +658,23 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::GatherBestTacticalCoverCan
 	const ASquadUnit& SquadUnit,
 	const AActor* TargetActor,
 	const FVector& TargetLocation,
-	const float SearchRadius)
+	const float SearchRadius,
+	const float MaximumDistanceToTarget)
 {
 	const FVector UnitLocation = SquadUnit.GetActorLocation();
 	TArray<FRTSCoverPoint> BestCandidates = FindCoverPointsInRadius(UnitLocation, SearchRadius);
 	M_TacticalPerformanceSnapshot.CandidateChecksLastFrame += BestCandidates.Num();
-	BestCandidates.RemoveAll([this, &SquadUnit, TargetActor, &TargetLocation](const FRTSCoverPoint& CoverPoint)
+	const bool bLimitTargetDistance = IsValid(TargetActor) && MaximumDistanceToTarget > 0.0f;
+	const float MaximumDistanceToTargetSquared = FMath::Square(MaximumDistanceToTarget);
+	BestCandidates.RemoveAll([&](const FRTSCoverPoint& CoverPoint)
 	{
-		if (GetIsPointReservedByAnotherUnit(CoverPoint.PointId, SquadUnit))
+		if (bLimitTargetDistance &&
+			FVector::DistSquared(CoverPoint.Location, TargetLocation) > MaximumDistanceToTargetSquared)
+		{
+			return true;
+		}
+		if (GetIsPointReservedByAnotherUnit(CoverPoint.PointId, SquadUnit) ||
+			GetIsCoverPointTemporarilyUnreachable(CoverPoint.PointId))
 		{
 			return true;
 		}
@@ -646,6 +712,25 @@ void URTSCoverFinderWorldSubsystem::ReleaseCoverReservation(
 	M_CoverReservations.Remove(PointId);
 }
 
+void URTSCoverFinderWorldSubsystem::ReportCoverPointUnreachable(const int64 PointId)
+{
+	const UWorld* World = GetWorld();
+	if (PointId == 0 || not IsValid(World))
+	{
+		return;
+	}
+	// Long enough to stop a queue of units trying the same slot, short enough to recover once a blocker leaves.
+	constexpr float UnreachablePointTimeoutSeconds = 30.0f;
+	M_UnreachableCoverPointExpiry.Add(PointId, World->GetTimeSeconds() + UnreachablePointTimeoutSeconds);
+}
+
+bool URTSCoverFinderWorldSubsystem::GetIsCoverPointTemporarilyUnreachable(const int64 PointId) const
+{
+	const UWorld* World = GetWorld();
+	const float* ExpiryWorldSeconds = M_UnreachableCoverPointExpiry.Find(PointId);
+	return ExpiryWorldSeconds != nullptr && IsValid(World) && World->GetTimeSeconds() < *ExpiryWorldSeconds;
+}
+
 bool URTSCoverFinderWorldSubsystem::GetIsCoverPointPublished(const int64 PointId) const
 {
 	return PointId != 0 && M_CoverPointIndices.Contains(PointId);
@@ -680,24 +765,73 @@ bool URTSCoverFinderWorldSubsystem::GetHasTargetSpecificFiringLane(
 	QueryParams.AddIgnoredActor(&SquadUnit);
 	FHitResult HitResult;
 	++M_TacticalPerformanceSnapshot.FiringLaneTracesLastFrame;
-	if (not World->LineTraceSingleByChannel(
+	const FVector LaneStart = BuildFiringLaneStart(SquadUnit, CoverPoint);
+	const bool bBlockingHit = World->LineTraceSingleByChannel(
 		HitResult,
-		BuildFiringLaneStart(CoverPoint),
+		LaneStart,
 		TargetLocation,
 		TargetTraceChannel,
-		QueryParams))
+		QueryParams);
+	const AActor* HitActor = HitResult.GetActor();
+	// Another enemy standing in front of the target is still something this unit may shoot, so the lane stays open.
+	constexpr int32 PlayerOwnedTeam = 1;
+	const int32 HitOwningPlayer = bBlockingHit
+		? CoverFinderWorldSubsystemPrivate::FindOwningPlayer(HitActor)
+		: INDEX_NONE;
+	const bool bHitOtherEnemy = HitOwningPlayer > 0 &&
+		(HitOwningPlayer == PlayerOwnedTeam) != (SquadUnit.GetOwningPlayer() == PlayerOwnedTeam);
+	const bool bHitTarget = bBlockingHit && (HitActor == &TargetActor || bHitOtherEnemy ||
+		(IsValid(HitActor) && HitActor->IsOwnedBy(&TargetActor)) ||
+		(IsValid(HitActor) && TargetActor.IsOwnedBy(HitActor)));
+	M_TacticalPerformanceSnapshot.FiringLaneRejectionsLastFrame += bHitTarget ? 0 : 1;
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSCoverFinder,
+			Verbose,
+			TEXT("Firing lane %s unit=%s type=%d target=%s hit=%s comp=%s lane_cm=%.0f hit_cm=%.0f start_z_above_target=%.0f"),
+			bHitTarget ? TEXT("open") : TEXT("rejected"),
+			*SquadUnit.GetName(),
+			static_cast<int32>(CoverPoint.CoverType),
+			*TargetActor.GetName(),
+			bBlockingHit ? *GetNameSafe(HitActor) : TEXT("nothing"),
+			bBlockingHit ? *GetNameSafe(HitResult.GetComponent()) : TEXT("-"),
+			FVector::Dist(LaneStart, TargetLocation),
+			bBlockingHit ? HitResult.Distance : -1.0f,
+			LaneStart.Z - TargetLocation.Z);
+	}
+	return bHitTarget;
+}
+
+bool URTSCoverFinderWorldSubsystem::GetIsCoverPointValidAgainstTarget(
+	const ASquadUnit& SquadUnit,
+	const FRTSCoverPoint& CoverPoint,
+	const AActor& TargetActor,
+	const FVector& TargetLocation)
+{
+	if (not GetIsCandidateProtectedFromTarget(CoverPoint, TargetLocation))
 	{
 		return false;
 	}
-	const AActor* HitActor = HitResult.GetActor();
-	return HitActor == &TargetActor ||
-		(IsValid(HitActor) && HitActor->IsOwnedBy(&TargetActor)) ||
-		(IsValid(HitActor) && TargetActor.IsOwnedBy(HitActor));
+	return GetHasTargetSpecificFiringLane(SquadUnit, CoverPoint, TargetActor, TargetLocation);
+}
+
+FVector URTSCoverFinderWorldSubsystem::GetStandingPeekOffset(const FRTSCoverPoint& CoverPoint) const
+{
+	if (CoverPoint.CoverType == ERTSCoverType::Crouch)
+	{
+		return FVector::ZeroVector;
+	}
+	constexpr float MinimumPeekOffset = 84.0f;
+	const FVector SideDirection = CoverFinderWorldSubsystemPrivate::GetStandingSideDirection(
+		-CoverPoint.CoverNormal,
+		CoverPoint.CoverType);
+	return SideDirection * FMath::Max(M_CachedAgentRadius * 2.0f, MinimumPeekOffset);
 }
 
 uint64 URTSCoverFinderWorldSubsystem::FindOrAddBlockingProviderHandle(AActor* ProviderActor)
 {
-	if (not IsValid(ProviderActor) || IsValid(Cast<ACharacter>(ProviderActor)))
+	if (not IsValid(ProviderActor) || CoverFinderWorldSubsystemPrivate::GetIsInfantryActor(ProviderActor))
 	{
 		return 0;
 	}
@@ -737,10 +871,14 @@ void URTSCoverFinderWorldSubsystem::TickTacticalCoverUnits()
 	M_TacticalPerformanceSnapshot.UnitUpdatesLastFrame = 0;
 	M_TacticalPerformanceSnapshot.CandidateChecksLastFrame = 0;
 	M_TacticalPerformanceSnapshot.FiringLaneTracesLastFrame = 0;
+	M_TacticalPerformanceSnapshot.FiringLaneRejectionsLastFrame = 0;
 	RemoveInvalidTacticalReferences();
 
 	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
-	if (not IsValid(CoverSettings) || not CoverSettings->bM_EnableAutomaticCoverUse)
+	const UWorld* World = GetWorld();
+	// Units cannot move while paused, so deciding now would only reserve points nobody can walk to.
+	const bool bWorldIsPaused = IsValid(World) && World->IsPaused();
+	if (not IsValid(CoverSettings) || not CoverSettings->bM_EnableAutomaticCoverUse || bWorldIsPaused)
 	{
 		M_TacticalPerformanceSnapshot.RegisteredUnitCount = M_RegisteredSquadUnits.Num();
 		M_TacticalPerformanceSnapshot.ReservedPointCount = M_CoverReservations.Num();
@@ -793,6 +931,16 @@ void URTSCoverFinderWorldSubsystem::RemoveInvalidTacticalReferences()
 			ReservationIterator.RemoveCurrent();
 		}
 	}
+	const UWorld* World = GetWorld();
+	const float WorldSeconds = IsValid(World) ? World->GetTimeSeconds() : 0.0f;
+	for (auto UnreachableIterator = M_UnreachableCoverPointExpiry.CreateIterator(); UnreachableIterator;
+	     ++UnreachableIterator)
+	{
+		if (WorldSeconds >= UnreachableIterator.Value())
+		{
+			UnreachableIterator.RemoveCurrent();
+		}
+	}
 	for (auto ProviderIterator = M_BlockingProviderHandles.CreateIterator(); ProviderIterator; ++ProviderIterator)
 	{
 		if (ProviderIterator.Key().IsValid())
@@ -812,17 +960,19 @@ FIntPoint URTSCoverFinderWorldSubsystem::GetCoverSpatialCell(const FVector& Loca
 		FMath::FloorToInt(Location.Y / CoverFinderWorldSubsystemPrivate::CoverSpatialCellSize));
 }
 
-FVector URTSCoverFinderWorldSubsystem::BuildFiringLaneStart(const FRTSCoverPoint& CoverPoint) const
+FVector URTSCoverFinderWorldSubsystem::BuildFiringLaneStart(
+	const ASquadUnit& SquadUnit,
+	const FRTSCoverPoint& CoverPoint) const
 {
 	if (CoverPoint.CoverType == ERTSCoverType::Crouch)
 	{
 		return CoverPoint.Location + FVector::UpVector * CoverFinderWorldSubsystemPrivate::CrouchFiringHeight;
 	}
-	const FVector SideDirection = CoverFinderWorldSubsystemPrivate::GetStandingSideDirection(
-		-CoverPoint.CoverNormal,
-		CoverPoint.CoverType);
-	const float PeekOffset = FMath::Max(M_CachedAgentRadius * 2.0f, 84.0f);
-	return CoverPoint.Location + SideDirection * PeekOffset
+	// Tested from where this unit's expose animation ends, so an open lane means the real muzzle is clear.
+	const FVector ExposedOffset = SquadUnit.GetStandingCoverExposedWorldOffset(
+		CoverPoint,
+		GetStandingPeekOffset(CoverPoint));
+	return CoverPoint.Location + ExposedOffset
 		+ FVector::UpVector * CoverFinderWorldSubsystemPrivate::StandingFiringHeight;
 }
 
@@ -938,86 +1088,12 @@ void URTSCoverFinderWorldSubsystem::RequestTestCoverValidation(
 	const float DelaySeconds,
 	const bool bCaptureScreenshot)
 {
-	const UWorld* World = GetWorld();
-	if (not IsValid(World))
+	// The scenario unpauses the game and orders squads around, so it only exists in cover-debug builds.
+	if constexpr (not DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
 		return;
 	}
-	bM_TestCoverValidationRequested = true;
-	bM_CaptureTestCoverValidation = bCaptureScreenshot;
-	M_TestCoverValidationRemainingSeconds = FMath::Max(1.0f, DelaySeconds);
-	UE_LOG(
-		LogRTSCoverFinder,
-		Display,
-		TEXT("RTS_COVER_TEST scheduled map=%s delay_seconds=%.1f"),
-		*World->GetMapName(),
-		DelaySeconds);
-}
-
-void URTSCoverFinderWorldSubsystem::TickTestCoverValidation(const float DeltaTime)
-{
-	UWorld* World = GetWorld();
-	if (not bM_TestCoverValidationRequested || not IsValid(World))
-	{
-		return;
-	}
-	M_TestCoverValidationRemainingSeconds -= FMath::Max(0.0f, DeltaTime);
-	if (M_TestCoverValidationRemainingSeconds > 0.0f)
-	{
-		return;
-	}
-	bM_TestCoverValidationRequested = false;
-	RemoveInvalidTacticalReferences();
-	const FCoverTestValidationCounts ValidationCounts = GatherTestCoverValidationCounts();
-
-	const bool bCorrectMap = World->GetMapName().Contains(TEXT("TestCover"));
-	const bool bHasBothSides = ValidationCounts.OwningPlayers.Num() >= 2;
-	const bool bHasDiscoveredCover = not M_CoverPoints.IsEmpty();
-	const bool bUnitsAreUsingCover = ValidationCounts.AssignedUnitCount > 0 ||
-		ValidationCounts.MovingUnitCount > 0 || ValidationCounts.OccupyingUnitCount > 0;
-	const bool bPassed = bCorrectMap && bHasBothSides && bHasDiscoveredCover && bUnitsAreUsingCover;
-	UE_LOG(
-		LogRTSCoverFinder,
-		Display,
-		TEXT("RTS_COVER_TEST %s map=%s registered=%d teams=%d points=%d reserved=%d assigned=%d moving=%d occupying=%d"),
-		bPassed ? TEXT("PASS") : TEXT("FAIL"),
-		*World->GetMapName(),
-		M_RegisteredSquadUnits.Num(),
-		ValidationCounts.OwningPlayers.Num(),
-		M_CoverPoints.Num(),
-		M_CoverReservations.Num(),
-		ValidationCounts.AssignedUnitCount,
-		ValidationCounts.MovingUnitCount,
-		ValidationCounts.OccupyingUnitCount);
-	if (not bPassed)
-	{
-		UE_LOG(LogRTSCoverFinder, Error, TEXT("RTS_COVER_TEST failed one or more TestCover integration assertions."));
-	}
-	LogPerformanceReport();
-	if (bM_CaptureTestCoverValidation)
-	{
-		RequestDebugCapture(TEXT("CoverFinder_TestCover_UnitValidation.png"));
-	}
-	bM_CaptureTestCoverValidation = false;
-}
-
-FCoverTestValidationCounts URTSCoverFinderWorldSubsystem::GatherTestCoverValidationCounts() const
-{
-	FCoverTestValidationCounts ValidationCounts;
-	for (const TWeakObjectPtr<ASquadUnit>& WeakSquadUnit : M_RegisteredSquadUnits)
-	{
-		const ASquadUnit* SquadUnit = WeakSquadUnit.Get();
-		if (not IsValid(SquadUnit))
-		{
-			continue;
-		}
-		ValidationCounts.OwningPlayers.Add(SquadUnit->GetOwningPlayer());
-		ValidationCounts.AssignedUnitCount += SquadUnit->GetHasCoverAssignment() ? 1 : 0;
-		ValidationCounts.OccupyingUnitCount += SquadUnit->GetIsOccupyingCover() ? 1 : 0;
-		ValidationCounts.MovingUnitCount +=
-			SquadUnit->GetCoverRuntimeState().State == ESquadUnitCoverState::MovingToCover ? 1 : 0;
-	}
-	return ValidationCounts;
+	M_TestCoverScenario.Start(DelaySeconds, bCaptureScreenshot);
 }
 
 const URTSCoverFinderDeveloperSettings* URTSCoverFinderWorldSubsystem::GetCoverFinderSettings() const
@@ -1157,6 +1233,7 @@ FCoverFinderSettingsSnapshot URTSCoverFinderWorldSubsystem::BuildSettingsSnapsho
 		60.0f,
 		300.0f);
 	Snapshot.StandingPeekGapWidth = FMath::Clamp(CoverSettings->M_StandingPeekGapWidth, 80.0f, 250.0f);
+	Snapshot.StandingPeekEdgeInset = FMath::Clamp(CoverSettings->M_StandingPeekEdgeInset, 0.0f, 80.0f);
 	Snapshot.CoverPointSpacing = FMath::Clamp(CoverSettings->M_CoverPointSpacing, 50.0f, 250.0f);
 	Snapshot.GameThreadBudgetMilliseconds = FMath::Max(0.05f, CoverSettings->M_GameThreadBudgetMilliseconds);
 	Snapshot.AgentRadius = FMath::Max(1.0f, AgentRadius);
@@ -1312,6 +1389,7 @@ void URTSCoverFinderWorldSubsystem::AcceptGenerationResult(FCoverGenerationResul
 	}
 
 	M_EnvironmentCoverPoints = MoveTemp(GenerationResult.CoverPoints);
+	bM_EnvironmentScanComplete = true;
 	RebuildPublishedCoverPoints();
 	M_LastPerformanceSnapshot.CoverPointCount = M_CoverPoints.Num();
 	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
@@ -1593,7 +1671,17 @@ bool URTSCoverFinderWorldSubsystem::SampleStandingGap(
 	}
 	++M_PerformanceAccumulator.ValidatedStandingGapCount;
 
-	const FVector RequestedCoverLocation = ProtectedLocation + SideDirection * LastCoveredOffset;
+	// The sampled opening is only accurate to one search step; expose animations step a fixed distance, so the
+	// point is anchored to the real edge instead of to wherever the sample happened to land.
+	const float EdgeOffset = RefineStandingEdgeOffset(
+		ProtectedLocation,
+		SearchDirection,
+		SideDirection,
+		LastCoveredOffset,
+		FirstOpenOffset,
+		InOutFrameWorldQueries);
+	const float CoverPointOffset = FMath::Max(0.0f, EdgeOffset - M_ActiveSettings.StandingPeekEdgeInset);
+	const FVector RequestedCoverLocation = ProtectedLocation + SideDirection * CoverPointOffset;
 	const FVector ProjectionExtent(
 		M_ActiveSettings.AgentRadius,
 		M_ActiveSettings.AgentRadius,
@@ -1611,6 +1699,36 @@ bool URTSCoverFinderWorldSubsystem::SampleStandingGap(
 	}
 	OutCoverLocation = ProjectedCoverLocation.Location;
 	return true;
+}
+
+float URTSCoverFinderWorldSubsystem::RefineStandingEdgeOffset(
+	const FVector& ProtectedLocation,
+	const FVector& SearchDirection,
+	const FVector& SideDirection,
+	const float LastCoveredOffset,
+	const float FirstOpenOffset,
+	int32& InOutFrameWorldQueries)
+{
+	float CoveredOffset = LastCoveredOffset;
+	float OpenOffset = FirstOpenOffset;
+	for (int32 RefinementStep = 0;
+		RefinementStep < CoverFinderWorldSubsystemPrivate::StandingEdgeRefinementSteps;
+		++RefinementStep)
+	{
+		const float MiddleOffset = (CoveredOffset + OpenOffset) * 0.5f;
+		const FCoverTraceObservation StandingTrace = TraceCoverHeight(
+			ProtectedLocation + SideDirection * MiddleOffset,
+			SearchDirection,
+			RTSCoverFinderConstants::StandingCoverHeight,
+			InOutFrameWorldQueries);
+		if (StandingTrace.bBlockingHit)
+		{
+			CoveredOffset = MiddleOffset;
+			continue;
+		}
+		OpenOffset = MiddleOffset;
+	}
+	return CoveredOffset;
 }
 
 bool URTSCoverFinderWorldSubsystem::FindStandingOpening(
@@ -1797,14 +1915,25 @@ bool URTSCoverFinderWorldSubsystem::GetCanInfantryOccupyLocation(
 		M_ActiveSettings.AgentHeight * 0.5f);
 	const FVector CapsuleCenter = GroundLocation
 		+ FVector::UpVector * (CapsuleHalfHeight + CoverFinderWorldSubsystemPrivate::CapsuleGroundClearance);
+	const FCollisionShape CapsuleShape = FCollisionShape::MakeCapsule(
+		M_ActiveSettings.AgentRadius,
+		CapsuleHalfHeight);
 	++InOutFrameWorldQueries;
 	++M_PerformanceAccumulator.WorldQueryCount;
-	return not World->OverlapAnyTestByObjectType(
+	if (not World->OverlapAnyTestByObjectType(
 		CapsuleCenter,
 		FQuat::Identity,
 		CoverFinderWorldSubsystemPrivate::GetAllCoverObjectQueryParams(),
-		FCollisionShape::MakeCapsule(M_ActiveSettings.AgentRadius, CapsuleHalfHeight),
-		CoverFinderWorldSubsystemPrivate::BuildCoverCollisionQueryParams());
+		CapsuleShape,
+		CoverFinderWorldSubsystemPrivate::BuildCoverCollisionQueryParams()))
+	{
+		return true;
+	}
+
+	// Only pay for the full overlap list when something is there: a soldier occupying the slot must not unpublish it.
+	++InOutFrameWorldQueries;
+	++M_PerformanceAccumulator.WorldQueryCount;
+	return not CoverFinderWorldSubsystemPrivate::GetHasNonInfantryOverlap(*World, CapsuleCenter, CapsuleShape);
 }
 
 FCoverTraceObservation URTSCoverFinderWorldSubsystem::TraceCoverHeight(

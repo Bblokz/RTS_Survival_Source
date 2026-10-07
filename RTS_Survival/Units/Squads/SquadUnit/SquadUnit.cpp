@@ -12,6 +12,7 @@
 #include "AISquadUnit/AISquadUnit.h"
 #include "AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "Components/WidgetComponent.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/GameUI/ActionUI/ItemActionUI/W_ItemActionUI.h"
 #include "Engine/StreamableManager.h"
@@ -27,6 +28,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
@@ -42,6 +44,41 @@
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCover, Log, All);
+
+namespace SquadUnitCoverMoveStatics
+{
+	// Beyond this the unit did not really reach its slot and would stand in a neighbour's place or in the open.
+	constexpr float MaximumOccupancyDistance = 90.0f;
+	// Deadline assumes the unit averages at least this share of its top speed, plus a fixed grace period.
+	constexpr float ExpectedAverageSpeedRatio = 0.5f;
+	constexpr float MinimumExpectedSpeed = 60.0f;
+	constexpr float ApproachGraceSeconds = 1.5f;
+
+	// Path following stops up to an agent radius off; this slide puts the unit on the clip's exact start position.
+	constexpr float ArrivalSettleSeconds = 0.2f;
+	// Short enough to read as weight shift, long enough to hide what a root-motion clip left over.
+	constexpr float ReconcileSlideSeconds = 0.15f;
+	constexpr float CapsuleSlideTickSeconds = 1.0f / 60.0f;
+	constexpr float CapsuleAlignmentTolerance = 1.0f;
+	// The animation refuses a cover pose until locomotion settled; after this long the unit gives the point up.
+	constexpr float MaximumEnterRequestSeconds = 3.0f;
+	// Added to a montage's length before its transition is treated as not ticking, e.g. on an unrendered mesh.
+	constexpr float TransitionDeadlineMarginSeconds = 0.75f;
+
+	ESquadIdleAnimationPose GetCoverAnimationPose(const ERTSCoverType CoverType)
+	{
+		switch (CoverType)
+		{
+		case ERTSCoverType::StandingLeft:
+			return ESquadIdleAnimationPose::StandingCoverLeft;
+		case ERTSCoverType::StandingRight:
+			return ESquadIdleAnimationPose::StandingCoverRight;
+		case ERTSCoverType::Crouch:
+		default:
+			return ESquadIdleAnimationPose::CrouchCover;
+		}
+	}
+}
 
 
 bool FSquadUnitCoverRuntimeState::GetHasAssignment() const
@@ -290,6 +327,7 @@ bool ASquadUnit::SetCoverAssignment(
 	M_CoverRuntimeState.AssignedCoverPoint = CoverPoint;
 	M_CoverRuntimeState.UseReason = UseReason;
 	M_CoverRuntimeState.State = ESquadUnitCoverState::Assigned;
+	M_CoverMoveGuard.bHasRestartedApproach = false;
 	return true;
 }
 
@@ -326,13 +364,14 @@ void ASquadUnit::UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 	}
 	if (not M_CoverRuntimeState.GetHasAssignment())
 	{
-		if (GetCanUseAutomaticCover())
+		if (not GetIsCoverSearchOnCooldown() && GetCanUseAutomaticCover())
 		{
 			TryStartAutomaticCover(CoverSubsystem);
 		}
 		return;
 	}
-	if (not CoverSubsystem.GetIsCoverPointPublished(M_CoverRuntimeState.AssignedCoverPoint.PointId))
+	if (not CoverSubsystem.GetIsCoverPointPublished(M_CoverRuntimeState.AssignedCoverPoint.PointId) ||
+		GetIsCoverAnimationOutOfSync())
 	{
 		ClearCoverState();
 		return;
@@ -345,6 +384,7 @@ void ASquadUnit::UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 		return;
 	}
 
+	SyncCoverStateWithAnimation();
 	switch (M_CoverRuntimeState.State)
 	{
 	case ESquadUnitCoverState::EnteringCover:
@@ -357,6 +397,8 @@ void ASquadUnit::UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 		UpdateExposedCover(CoverSubsystem);
 		break;
 	case ESquadUnitCoverState::MovingToCover:
+		UpdateMovingToCover(CoverSubsystem);
+		break;
 	case ESquadUnitCoverState::Assigned:
 	case ESquadUnitCoverState::LeavingCover:
 	case ESquadUnitCoverState::None:
@@ -365,9 +407,74 @@ void ASquadUnit::UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 	}
 }
 
+void ASquadUnit::UpdateMovingToCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
+{
+	const bool bPathFollowingActive = GetIsPathFollowingActive();
+	if (bPathFollowingActive && not GetHasCoverStepTimedOut())
+	{
+		return;
+	}
+	// Another system stopped the controller without the completion callback: use where the unit ended up.
+	if (not bPathFollowingActive)
+	{
+		StopCoverMovementWithoutCallback();
+		FinishCoverMovement();
+		return;
+	}
+	// Still running after the deadline means the unit is circling a point it approached too fast to turn into.
+	// From a standstill it heads straight for the point, so one restart resolves almost every case.
+	if (not M_CoverMoveGuard.bHasRestartedApproach)
+	{
+		StopCoverMovementWithoutCallback();
+		M_CoverMoveGuard.bHasRestartedApproach = true;
+		if (not StartCoverMovement())
+		{
+			ClearCoverStateInternal(false);
+		}
+		return;
+	}
+	AbandonUnreachableCoverPoint();
+}
+
+void ASquadUnit::StopCoverMovementWithoutCallback()
+{
+	M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+	if (not GetIsValidAISquadUnit())
+	{
+		return;
+	}
+	// Unbound first so the abort cannot reach the command-completion switch of an idle or attacking unit.
+	M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
+	M_AISquadUnit->StopMovement();
+}
+
+void ASquadUnit::AbandonUnreachableCoverPoint()
+{
+	const int64 UnreachablePointId = M_CoverRuntimeState.AssignedCoverPoint.PointId;
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("Cover movement of %s abandoned; distance_cm=%.0f speed=%.0f point=%lld."),
+			*GetName(),
+			FVector::Dist2D(GetActorLocation(), M_CoverRuntimeState.AssignedCoverPoint.Location),
+			GetVelocity().Size2D(),
+			UnreachablePointId);
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		if (URTSCoverFinderWorldSubsystem* CoverSubsystem = World->GetSubsystem<URTSCoverFinderWorldSubsystem>())
+		{
+			CoverSubsystem->ReportCoverPointUnreachable(UnreachablePointId);
+		}
+	}
+	ClearCoverState();
+}
+
 bool ASquadUnit::GetCanUseAutomaticCover() const
 {
-	if (GetIsPathFollowingActive())
+	if (GetIsPathFollowingActive() || not GetIsSquadEligibleForAutomaticCover())
 	{
 		return false;
 	}
@@ -382,6 +489,51 @@ bool ASquadUnit::GetCanUseAutomaticCover() const
 	return not GetIsValidSquadController() || M_SquadController->GetIsUnitIdle();
 }
 
+bool ASquadUnit::GetIsSquadEligibleForAutomaticCover() const
+{
+	// Silent: polled for every unit on every tactical update, and a unit without a squad has no restriction.
+	if (not IsValid(M_SquadController))
+	{
+		return true;
+	}
+	// Team weapon crews are positioned by their weapon and must not wander off to nearby cover.
+	if (M_SquadController->GetSquadAlreadyHasTeamWeapon())
+	{
+		return false;
+	}
+	const UCargoSquad* CargoSquad = M_SquadController->FindComponentByClass<UCargoSquad>();
+	return not IsValid(CargoSquad) || not CargoSquad->GetIsInsideCargo();
+}
+
+bool ASquadUnit::GetIsCoverSearchOnCooldown() const
+{
+	const UWorld* World = GetWorld();
+	return IsValid(World) && World->GetTimeSeconds() < M_CoverMoveGuard.NextSearchWorldSeconds;
+}
+
+void ASquadUnit::DelayNextCoverSearch(const float DelaySeconds)
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	M_CoverMoveGuard.NextSearchWorldSeconds = FMath::Max(
+		M_CoverMoveGuard.NextSearchWorldSeconds,
+		World->GetTimeSeconds() + DelaySeconds);
+}
+
+bool ASquadUnit::GetIsCoverAnimationOutOfSync() const
+{
+	// Silent: a unit without an animation instance has no pose that could disagree with its cover state.
+	if (not M_CoverRuntimeState.GetIsOccupyingCover() || not IsValid(AnimBp_SquadUnit))
+	{
+		return false;
+	}
+	// An interrupted cover montage clears the animation runtime; without this the weapon would stay blocked.
+	return not AnimBp_SquadUnit->GetIsCoverAnimationActive();
+}
+
 void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
 {
 	FVector TargetLocation = FVector::ZeroVector;
@@ -389,13 +541,21 @@ void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubs
 	const ESquadUnitCoverUseReason UseReason = IsValid(TargetActor)
 		? ESquadUnitCoverUseReason::Attack
 		: ESquadUnitCoverUseReason::AfterMoveCommand;
+	constexpr float FailedSearchRetrySeconds = 1.5f;
+	// Stay clearly inside weapon range so entering cover can never trigger range-closing squad movement.
+	constexpr float CoverWeaponRangeRatio = 0.9f;
+	const float MaximumDistanceToTarget = IsValid(TargetActor) && GetIsValidWeapon()
+		? M_InfantryWeapon->GetMaxWeaponRange() * CoverWeaponRangeRatio
+		: 0.0f;
 	FRTSCoverPoint CoverPoint;
 	if (not CoverSubsystem.TryReserveBestCoverPoint(
 		*this,
 		TargetActor,
 		TargetLocation,
-		CoverPoint))
+		CoverPoint,
+		MaximumDistanceToTarget))
 	{
+		DelayNextCoverSearch(FailedSearchRetrySeconds);
 		return;
 	}
 	if (not SetCoverAssignment(CoverPoint, UseReason))
@@ -415,11 +575,11 @@ bool ASquadUnit::StartCoverMovement()
 	{
 		return false;
 	}
-	constexpr float CoverMoveAcceptanceRadius = 35.0f;
-	FAIMoveRequest CoverMoveRequest(M_CoverRuntimeState.AssignedCoverPoint.Location);
+	// Same reach test as commanded moves: a tighter one makes running units circle the point instead of arriving.
+	FAIMoveRequest CoverMoveRequest(GetCoverEntryLocation());
 	FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(CoverMoveRequest);
-	CoverMoveRequest.SetAcceptanceRadius(CoverMoveAcceptanceRadius);
-	CoverMoveRequest.SetReachTestIncludesAgentRadius(false);
+	CoverMoveRequest.SetAcceptanceRadius(DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius);
+	CoverMoveRequest.SetReachTestIncludesAgentRadius(true);
 	CoverMoveRequest.SetCanStrafe(false);
 	CoverMoveRequest.SetNavigationFilter(M_AISquadUnit->GetDefaultNavigationFilterClass());
 	SetCoverWeaponFireBlocked(true);
@@ -427,7 +587,7 @@ bool ASquadUnit::StartCoverMovement()
 	const EPathFollowingRequestResult::Type MoveResult = M_AISquadUnit->MoveTo(CoverMoveRequest);
 	if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
 	{
-		EnterAssignedCover();
+		FinishCoverMovement();
 		return true;
 	}
 	if (MoveResult != EPathFollowingRequestResult::RequestSuccessful)
@@ -439,7 +599,44 @@ bool ASquadUnit::StartCoverMovement()
 	{
 		M_AISquadUnit->ReceiveMoveCompleted.AddDynamic(this, &ASquadUnit::OnMoveCompleted);
 	}
+	const float DeadlineSeconds = GetCoverWalkDeadlineSeconds();
+	StartCoverStepDeadline(DeadlineSeconds);
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("Cover movement started for %s request=%u point=%lld distance_cm=%.0f deadline_s=%.1f."),
+			*GetName(),
+			M_CoverMoveRequestID.GetID(),
+			M_CoverRuntimeState.AssignedCoverPoint.PointId,
+			FVector::Dist2D(GetActorLocation(), M_CoverRuntimeState.AssignedCoverPoint.Location),
+			DeadlineSeconds);
+	}
 	return M_CoverMoveRequestID.IsValid();
+}
+
+float ASquadUnit::GetCoverWalkDeadlineSeconds() const
+{
+	const UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+	const float TopSpeed = IsValid(UnitMovement) ? UnitMovement->GetMaxSpeed() : 0.0f;
+	const float ExpectedSpeed = FMath::Max(
+		SquadUnitCoverMoveStatics::MinimumExpectedSpeed,
+		TopSpeed * SquadUnitCoverMoveStatics::ExpectedAverageSpeedRatio);
+	const float WalkDistance = FVector::Dist2D(GetActorLocation(), GetCoverEntryLocation());
+	return WalkDistance / ExpectedSpeed + SquadUnitCoverMoveStatics::ApproachGraceSeconds;
+}
+
+void ASquadUnit::FinishCoverMovement()
+{
+	M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+	const float DistanceToEntry = FVector::Dist2D(GetActorLocation(), GetCoverEntryLocation());
+	if (DistanceToEntry <= SquadUnitCoverMoveStatics::MaximumOccupancyDistance)
+	{
+		EnterAssignedCover();
+		return;
+	}
+	AbandonUnreachableCoverPoint();
 }
 
 void ASquadUnit::EnterAssignedCover()
@@ -462,23 +659,330 @@ void ASquadUnit::EnterAssignedCover()
 			}
 		}
 	}
+	StartCoverStepDeadline(SquadUnitCoverMoveStatics::MaximumEnterRequestSeconds);
 	SetCoverState(ESquadUnitCoverState::EnteringCover);
-	if (not GetIsValidAnimBpSquadUnit())
+	AlignCapsuleToCoverLocation(GetCoverEntryLocation(), SquadUnitCoverMoveStatics::ArrivalSettleSeconds);
+	if (not M_CoverCapsuleSlide.bIsActive)
 	{
-		SetCoverState(ESquadUnitCoverState::Protected);
-		return;
+		UpdateEnteringCover();
 	}
-	AnimBp_SquadUnit->EnterCover(GetAssignedCoverAnimationPose());
-	UpdateEnteringCover();
 }
 
 void ASquadUnit::UpdateEnteringCover()
 {
-	if (not GetIsValidAnimBpSquadUnit() ||
-		AnimBp_SquadUnit->GetCoverAnimAction() == ESquadCoverAnimAction::Protected)
+	if (not GetIsValidAnimBpSquadUnit())
 	{
+		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.Location);
 		SetCoverState(ESquadUnitCoverState::Protected);
+		return;
 	}
+	// Once the animation owns the entry, OnCoverAnimActionChanged finishes it; before that the unit is still
+	// sliding onto the clip's start position.
+	if (AnimBp_SquadUnit->GetIsCoverAnimationActive() || M_CoverCapsuleSlide.bIsActive)
+	{
+		return;
+	}
+	// The walk pose is still active on the frame the cover move completes, so the request is repeated until accepted.
+	RequestCoverEnterAnimation();
+	if (GetHasCoverStepTimedOut() && not AnimBp_SquadUnit->GetIsCoverAnimationActive())
+	{
+		ClearCoverState();
+	}
+}
+
+void ASquadUnit::RequestCoverEnterAnimation()
+{
+	const ESquadIdleAnimationPose CoverPose = GetAssignedCoverAnimationPose();
+	const bool bEnterMontageStarted = AnimBp_SquadUnit->EnterCover(CoverPose);
+	if (not bEnterMontageStarted)
+	{
+		return;
+	}
+	// A clip without extracted root motion shows its travel as a mesh offset that starts on frame one, so the
+	// capsule goes to the cover point now and the mesh visually stays where the unit stopped.
+	if (not AnimBp_SquadUnit->GetDoesCoverEnterMontageMoveCapsule(CoverPose))
+	{
+		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.Location);
+	}
+	StartCoverTransitionDeadline();
+}
+
+void ASquadUnit::StartCoverTransitionDeadline()
+{
+	if (not GetIsValidAnimBpSquadUnit())
+	{
+		return;
+	}
+	StartCoverStepDeadline(
+		AnimBp_SquadUnit->GetActiveCoverMontageSeconds() +
+		SquadUnitCoverMoveStatics::TransitionDeadlineMarginSeconds);
+}
+
+void ASquadUnit::SyncCoverStateWithAnimation()
+{
+	// Silent: units without an animation instance advance their cover state directly.
+	if (not IsValid(AnimBp_SquadUnit))
+	{
+		return;
+	}
+	// Montages do not advance on meshes that are not rendered; gameplay must not wait for them forever.
+	if (AnimBp_SquadUnit->GetIsCoverTransitionMontageActive() && GetHasCoverStepTimedOut())
+	{
+		if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+		{
+			UE_LOG(
+				LogRTSSquadUnitCover,
+				Verbose,
+				TEXT("Cover transition %s of %s did not finish in time and was completed by the unit."),
+				*UEnum::GetValueAsString(AnimBp_SquadUnit->GetCoverAnimAction()),
+				*GetName());
+		}
+		AnimBp_SquadUnit->ForceCompleteCoverTransition();
+	}
+	OnCoverAnimActionChanged(AnimBp_SquadUnit->GetCoverAnimAction());
+}
+
+void ASquadUnit::OnCoverAnimActionChanged(const ESquadCoverAnimAction NewAction)
+{
+	if (not M_CoverRuntimeState.GetHasAssignment())
+	{
+		return;
+	}
+	switch (NewAction)
+	{
+	case ESquadCoverAnimAction::Protected:
+		OnCoverAnimReachedProtected();
+		break;
+	case ESquadCoverAnimAction::Exposed:
+		OnCoverAnimReachedExposed();
+		break;
+	default:
+		break;
+	}
+}
+
+void ASquadUnit::OnCoverAnimReachedProtected()
+{
+	const bool bWasExposed = M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed;
+	if (not bWasExposed && M_CoverRuntimeState.State != ESquadUnitCoverState::EnteringCover)
+	{
+		return;
+	}
+	LogCoverAlignmentResidual(
+		bWasExposed ? TEXT("returned") : TEXT("entered"),
+		M_CoverRuntimeState.AssignedCoverPoint.Location);
+	AlignCapsuleToCoverLocation(
+		M_CoverRuntimeState.AssignedCoverPoint.Location,
+		SquadUnitCoverMoveStatics::ReconcileSlideSeconds);
+	if (bWasExposed)
+	{
+		M_CoverValidatedTarget.Reset();
+	}
+	SetCoverState(ESquadUnitCoverState::Protected);
+}
+
+void ASquadUnit::OnCoverAnimReachedExposed()
+{
+	if (M_CoverRuntimeState.State != ESquadUnitCoverState::Protected)
+	{
+		return;
+	}
+	const FVector ExposedLocation = GetCoverExposedLocation();
+	LogCoverAlignmentResidual(TEXT("exposed"), ExposedLocation);
+	AlignCapsuleToCoverLocation(ExposedLocation, SquadUnitCoverMoveStatics::ReconcileSlideSeconds);
+	SetCoverState(ESquadUnitCoverState::Exposed);
+	SetCoverWeaponFireBlocked(not M_CoverValidatedTarget.IsValid());
+}
+
+void ASquadUnit::LogCoverAlignmentResidual(const TCHAR* ReachedPose, const FVector& ExpectedLocation) const
+{
+	if constexpr (not DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		return;
+	}
+	// What the clip left over, in the soldier's cover frame: the amount to add to that clip's designer offset.
+	const FVector Residual = GetActorLocation() - ExpectedLocation;
+	const FVector TowardCoverDirection = -M_CoverRuntimeState.AssignedCoverPoint.CoverNormal.GetSafeNormal2D();
+	const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, TowardCoverDirection);
+	UE_LOG(
+		LogRTSSquadUnitCover,
+		Verbose,
+		TEXT("RTS_COVER_ALIGNMENT unit=%s type=%s reached=%s residual_toward_cover_cm=%.1f residual_right_cm=%.1f"),
+		*GetName(),
+		*UEnum::GetValueAsString(M_CoverRuntimeState.AssignedCoverPoint.CoverType),
+		ReachedPose,
+		FVector::DotProduct(Residual, TowardCoverDirection),
+		FVector::DotProduct(Residual, RightDirection));
+}
+
+FVector ASquadUnit::GetCoverLocalOffsetInWorld(
+	const FRTSCoverPoint& CoverPoint,
+	const FSquadUnitCoverLocalOffset& LocalOffset) const
+{
+	// The normal points from the cover to the soldier, so a soldier facing the cover looks against it.
+	const FVector TowardCoverDirection = -CoverPoint.CoverNormal.GetSafeNormal2D();
+	const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, TowardCoverDirection);
+	return TowardCoverDirection * LocalOffset.TowardCover + RightDirection * LocalOffset.Right;
+}
+
+FVector ASquadUnit::GetCoverEntryLocation() const
+{
+	const FRTSCoverPoint& CoverPoint = M_CoverRuntimeState.AssignedCoverPoint;
+	// Silent: without an animation instance there is no enter clip whose travel needs room.
+	if (not IsValid(AnimBp_SquadUnit))
+	{
+		return CoverPoint.Location;
+	}
+	const FSquadUnitCoverLocalOffset EnterStartOffset = AnimBp_SquadUnit->GetCoverEnterStartOffset(
+		SquadUnitCoverMoveStatics::GetCoverAnimationPose(CoverPoint.CoverType));
+	return CoverPoint.Location + GetCoverLocalOffsetInWorld(CoverPoint, EnterStartOffset);
+}
+
+FVector ASquadUnit::GetStandingCoverExposedWorldOffset(
+	const FRTSCoverPoint& CoverPoint,
+	const FVector& DefaultWorldOffset) const
+{
+	if (CoverPoint.CoverType == ERTSCoverType::Crouch)
+	{
+		return FVector::ZeroVector;
+	}
+	FSquadUnitCoverLocalOffset ExposedOffset;
+	const bool bHasAuthoredExposure = IsValid(AnimBp_SquadUnit) &&
+		AnimBp_SquadUnit->TryGetStandingCoverExposedOffset(
+			SquadUnitCoverMoveStatics::GetCoverAnimationPose(CoverPoint.CoverType),
+			ExposedOffset);
+	return bHasAuthoredExposure ? GetCoverLocalOffsetInWorld(CoverPoint, ExposedOffset) : DefaultWorldOffset;
+}
+
+FVector ASquadUnit::GetCoverExposedLocation() const
+{
+	const FRTSCoverPoint& CoverPoint = M_CoverRuntimeState.AssignedCoverPoint;
+	const UWorld* World = GetWorld();
+	const URTSCoverFinderWorldSubsystem* CoverSubsystem = IsValid(World)
+		? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		: nullptr;
+	const FVector DefaultWorldOffset = IsValid(CoverSubsystem)
+		? CoverSubsystem->GetStandingPeekOffset(CoverPoint)
+		: FVector::ZeroVector;
+	return CoverPoint.Location + GetStandingCoverExposedWorldOffset(CoverPoint, DefaultWorldOffset);
+}
+
+bool ASquadUnit::TryGetSettledCoverCapsuleError(float& OutErrorCentimeters) const
+{
+	OutErrorCentimeters = 0.0f;
+	if (not M_CoverRuntimeState.GetIsOccupyingCover() || M_CoverCapsuleSlide.bIsActive)
+	{
+		return false;
+	}
+	const bool bIsExposed = M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed;
+	const ESquadCoverAnimAction SettledAction = bIsExposed
+		? ESquadCoverAnimAction::Exposed
+		: ESquadCoverAnimAction::Protected;
+	if (IsValid(AnimBp_SquadUnit) && AnimBp_SquadUnit->GetCoverAnimAction() != SettledAction)
+	{
+		return false;
+	}
+	const FVector ExpectedLocation = bIsExposed
+		? GetCoverExposedLocation()
+		: M_CoverRuntimeState.AssignedCoverPoint.Location;
+	OutErrorCentimeters = FVector::Dist2D(GetActorLocation(), ExpectedLocation);
+	return true;
+}
+
+void ASquadUnit::AlignCapsuleToCoverLocation(const FVector& TargetLocation, const float SlideSeconds)
+{
+	StopCoverCapsuleSlide();
+	const float DistanceToTarget = FVector::Dist2D(GetActorLocation(), TargetLocation);
+	UWorld* World = GetWorld();
+	const bool bPlaceImmediately = SlideSeconds <= 0.0f || not IsValid(World) ||
+		DistanceToTarget <= SquadUnitCoverMoveStatics::CapsuleAlignmentTolerance;
+	if (bPlaceImmediately)
+	{
+		PlaceCapsuleAtCoverLocation(TargetLocation);
+		return;
+	}
+	M_CoverCapsuleSlide.StartLocation = GetActorLocation();
+	M_CoverCapsuleSlide.TargetLocation = TargetLocation;
+	M_CoverCapsuleSlide.DurationSeconds = SlideSeconds;
+	M_CoverCapsuleSlide.ElapsedSeconds = 0.0f;
+	M_CoverCapsuleSlide.bIsActive = true;
+	World->GetTimerManager().SetTimer(
+		M_CoverCapsuleSlide.TimerHandle,
+		FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			TickCoverCapsuleSlide();
+		}),
+		SquadUnitCoverMoveStatics::CapsuleSlideTickSeconds,
+		true);
+}
+
+void ASquadUnit::TickCoverCapsuleSlide()
+{
+	if (not M_CoverCapsuleSlide.bIsActive)
+	{
+		return;
+	}
+	M_CoverCapsuleSlide.ElapsedSeconds += SquadUnitCoverMoveStatics::CapsuleSlideTickSeconds;
+	const float SlideAlpha = FMath::Clamp(
+		M_CoverCapsuleSlide.ElapsedSeconds / M_CoverCapsuleSlide.DurationSeconds,
+		0.0f,
+		1.0f);
+	PlaceCapsuleAtCoverLocation(FMath::Lerp(
+		M_CoverCapsuleSlide.StartLocation,
+		M_CoverCapsuleSlide.TargetLocation,
+		FMath::SmoothStep(0.0f, 1.0f, SlideAlpha)));
+	if (SlideAlpha < 1.0f)
+	{
+		return;
+	}
+	StopCoverCapsuleSlide();
+	if (M_CoverRuntimeState.State == ESquadUnitCoverState::EnteringCover)
+	{
+		UpdateEnteringCover();
+	}
+}
+
+void ASquadUnit::FinishCoverCapsuleSlide()
+{
+	if (not M_CoverCapsuleSlide.bIsActive)
+	{
+		return;
+	}
+	// A root-motion clip is about to move the capsule; it must start from the location the slide was heading for.
+	PlaceCapsuleAtCoverLocation(M_CoverCapsuleSlide.TargetLocation);
+	StopCoverCapsuleSlide();
+}
+
+void ASquadUnit::StopCoverCapsuleSlide()
+{
+	M_CoverCapsuleSlide.bIsActive = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_CoverCapsuleSlide.TimerHandle);
+	}
+}
+
+void ASquadUnit::PlaceCapsuleAtCoverLocation(const FVector& TargetLocation)
+{
+	// Cover locations are navmesh points at ground level; the capsule keeps its own height and re-finds the floor.
+	const FVector CapsuleLocation(TargetLocation.X, TargetLocation.Y, GetActorLocation().Z);
+	SetActorLocation(CapsuleLocation, false, nullptr, ETeleportType::TeleportPhysics);
+	if (UCharacterMovementComponent* UnitMovement = GetCharacterMovement())
+	{
+		UnitMovement->bForceNextFloorCheck = true;
+	}
+}
+
+bool ASquadUnit::GetHasCoverStepTimedOut() const
+{
+	const UWorld* World = GetWorld();
+	return IsValid(World) && World->GetTimeSeconds() > M_CoverMoveGuard.StepDeadlineWorldSeconds;
+}
+
+void ASquadUnit::StartCoverStepDeadline(const float DurationSeconds)
+{
+	const UWorld* World = GetWorld();
+	M_CoverMoveGuard.StepDeadlineWorldSeconds = IsValid(World) ? World->GetTimeSeconds() + DurationSeconds : 0.0f;
 }
 
 void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
@@ -493,7 +997,7 @@ void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 	}
 	if (GetShouldRevalidateCoverLane(*TargetActor, TargetLocation))
 	{
-		if (not CoverSubsystem.GetHasTargetSpecificFiringLane(
+		if (not CoverSubsystem.GetIsCoverPointValidAgainstTarget(
 			*this,
 			M_CoverRuntimeState.AssignedCoverPoint,
 			*TargetActor,
@@ -510,28 +1014,38 @@ void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 		SetCoverWeaponFireBlocked(false);
 		return;
 	}
+	ExposeFromStandingCover();
+}
+
+void ASquadUnit::ExposeFromStandingCover()
+{
 	SetCoverWeaponFireBlocked(true);
 	if (not GetIsValidAnimBpSquadUnit())
 	{
+		PlaceCapsuleAtCoverLocation(GetCoverExposedLocation());
 		SetCoverState(ESquadUnitCoverState::Exposed);
 		SetCoverWeaponFireBlocked(false);
 		return;
 	}
-	AnimBp_SquadUnit->StartStandingCoverPeek();
-	if (AnimBp_SquadUnit->GetCoverAnimAction() == ESquadCoverAnimAction::Exposed)
+	if (AnimBp_SquadUnit->GetCoverAnimAction() != ESquadCoverAnimAction::Protected)
 	{
-		SetCoverState(ESquadUnitCoverState::Exposed);
-		SetCoverWeaponFireBlocked(false);
+		return;
+	}
+	// OnCoverAnimReachedExposed lines the capsule up and releases the weapon once the pose is reached.
+	FinishCoverCapsuleSlide();
+	if (AnimBp_SquadUnit->StartStandingCoverPeek())
+	{
+		StartCoverTransitionDeadline();
 	}
 }
 
 void ASquadUnit::UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
 {
+	// A unit that is already stepping back must finish that before it may fire or expose again.
 	if (GetIsValidAnimBpSquadUnit() &&
-		AnimBp_SquadUnit->GetCoverAnimAction() == ESquadCoverAnimAction::Protected)
+		AnimBp_SquadUnit->GetCoverAnimAction() != ESquadCoverAnimAction::Exposed)
 	{
-		SetCoverState(ESquadUnitCoverState::Protected);
-		M_CoverValidatedTarget.Reset();
+		SetCoverWeaponFireBlocked(true);
 		return;
 	}
 
@@ -543,7 +1057,7 @@ void ASquadUnit::UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsyste
 		return;
 	}
 	if (GetShouldRevalidateCoverLane(*TargetActor, TargetLocation) &&
-		not CoverSubsystem.GetHasTargetSpecificFiringLane(
+		not CoverSubsystem.GetIsCoverPointValidAgainstTarget(
 			*this,
 			M_CoverRuntimeState.AssignedCoverPoint,
 			*TargetActor,
@@ -562,18 +1076,26 @@ void ASquadUnit::ReturnToProtectedCover()
 	M_CoverValidatedTarget.Reset();
 	if (not GetIsValidAnimBpSquadUnit())
 	{
+		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.Location);
 		SetCoverState(ESquadUnitCoverState::Protected);
 		return;
 	}
-	AnimBp_SquadUnit->ReturnToStandingCover();
-	if (AnimBp_SquadUnit->GetCoverAnimAction() == ESquadCoverAnimAction::Protected)
+	if (AnimBp_SquadUnit->GetCoverAnimAction() != ESquadCoverAnimAction::Exposed)
 	{
-		SetCoverState(ESquadUnitCoverState::Protected);
+		return;
+	}
+	// OnCoverAnimReachedProtected puts the capsule back on the point when the pose is reached.
+	FinishCoverCapsuleSlide();
+	if (AnimBp_SquadUnit->ReturnToStandingCover())
+	{
+		StartCoverTransitionDeadline();
 	}
 }
 
 void ASquadUnit::ClearCoverStateInternal(const bool bStopCoverMovement)
 {
+	// The unit is leaving its point, so an unfinished alignment is dropped where it is.
+	StopCoverCapsuleSlide();
 	if (not M_CoverRuntimeState.GetHasAssignment())
 	{
 		M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
@@ -583,6 +1105,8 @@ void ASquadUnit::ClearCoverStateInternal(const bool bStopCoverMovement)
 		return;
 	}
 
+	constexpr float CoverReacquireDelaySeconds = 0.5f;
+	DelayNextCoverSearch(CoverReacquireDelaySeconds);
 	const int64 ReservedPointId = M_CoverRuntimeState.AssignedCoverPoint.PointId;
 	AActor* IgnoredProviderActor = M_CoverIgnoredProviderActor.Get();
 	if (IsValid(IgnoredProviderActor))
@@ -708,16 +1232,7 @@ AActor* ASquadUnit::GetCurrentCoverTarget(FVector& OutTargetLocation) const
 
 ESquadIdleAnimationPose ASquadUnit::GetAssignedCoverAnimationPose() const
 {
-	switch (M_CoverRuntimeState.AssignedCoverPoint.CoverType)
-	{
-	case ERTSCoverType::StandingLeft:
-		return ESquadIdleAnimationPose::StandingCoverLeft;
-	case ERTSCoverType::StandingRight:
-		return ESquadIdleAnimationPose::StandingCoverRight;
-	case ERTSCoverType::Crouch:
-	default:
-		return ESquadIdleAnimationPose::CrouchCover;
-	}
+	return SquadUnitCoverMoveStatics::GetCoverAnimationPose(M_CoverRuntimeState.AssignedCoverPoint.CoverType);
 }
 
 bool ASquadUnit::GetShouldRevalidateCoverLane(
@@ -1206,6 +1721,7 @@ void ASquadUnit::PostInitializeComp_SetupAnimBP()
 		return;
 	}
 	AnimBp_SquadUnit->SetSquadUnitMesh(GetMesh());
+	AnimBp_SquadUnit->OnCoverAnimActionChanged.BindUObject(this, &ASquadUnit::OnCoverAnimActionChanged);
 }
 
 void ASquadUnit::ExecuteMoveToSelfPathFinding(const FVector& MoveToLocation, const EAbilityID AbilityToMoveFor,
@@ -2059,19 +2575,21 @@ void ASquadUnit::BeginPlay_SetPhysicalMaterials() const
 void ASquadUnit::OnMoveCompleted_Cover(const EPathFollowingResult::Type Result)
 {
 	M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
-	if (Result == EPathFollowingResult::Type::Success)
-	{
-		EnterAssignedCover();
-		return;
-	}
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
 		UE_LOG(
 			LogRTSSquadUnitCover,
 			Verbose,
-			TEXT("Cover movement ended for %s with %s."),
+			TEXT("Cover movement ended for %s with %s point=%lld distance_cm=%.0f."),
 			*GetName(),
-			*UEnum::GetValueAsString(Result));
+			*UEnum::GetValueAsString(Result),
+			M_CoverRuntimeState.AssignedCoverPoint.PointId,
+			FVector::Dist2D(GetActorLocation(), M_CoverRuntimeState.AssignedCoverPoint.Location));
+	}
+	if (Result == EPathFollowingResult::Type::Success)
+	{
+		FinishCoverMovement();
+		return;
 	}
 	ClearCoverStateInternal(false);
 }
@@ -2413,6 +2931,11 @@ void ASquadUnit::UnitDies_ScheduleDestruction()
 
 void ASquadUnit::StopMovementAndClearPath()
 {
+	// Stopping the controller also ends a cover move, whose completion callback is unbound below.
+	if (M_CoverRuntimeState.State == ESquadUnitCoverState::MovingToCover)
+	{
+		ClearCoverStateInternal(false);
+	}
 	if (GetIsValidAISquadUnit())
 	{
 		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);

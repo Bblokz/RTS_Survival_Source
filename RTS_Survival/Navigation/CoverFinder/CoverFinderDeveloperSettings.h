@@ -52,6 +52,11 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="50.0", UIMin="50.0", UIMax="250.0", Units="cm"))
 	float M_CoverPointSpacing = 90.0f;
 
+	// How far inside the end of a high wall a standing point is placed. Must be smaller than the sideways step of
+	// the shortest expose animation, or the peeking soldier's muzzle stays behind the wall.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="0.0", ClampMax="80.0", UIMin="0.0", UIMax="80.0", Units="cm"))
+	float M_StandingPeekEdgeInset = 25.0f;
+
 	UPROPERTY(Config, EditAnywhere, Category="Debug")
 	bool bM_DrawDetectedCover = true;
 

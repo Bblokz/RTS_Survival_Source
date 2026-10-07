@@ -27,6 +27,8 @@ class AScavengeableObject;
 class UScavengerComponent;
 enum class EWeaponName : uint8;
 enum class ESquadIdleAnimationPose : uint8;
+enum class ESquadCoverAnimAction : uint8;
+struct FSquadUnitCoverLocalOffset;
 class AWeaponPickup;
 class USecondaryWeapon;
 class AInfantryWeaponMaster;
@@ -203,13 +205,55 @@ struct FSquadUnitCoverRuntimeState
 };
 
 /**
+ * @brief Moves the capsule onto a known cover location over a few frames instead of popping it there.
+ * Lines the unit up before an enter clip and absorbs whatever a root-motion clip left over at its end.
+ */
+USTRUCT()
+struct FSquadUnitCoverCapsuleSlide
+{
+	GENERATED_BODY()
+
+	FVector StartLocation = FVector::ZeroVector;
+
+	FVector TargetLocation = FVector::ZeroVector;
+
+	float DurationSeconds = 0.0f;
+
+	float ElapsedSeconds = 0.0f;
+
+	FTimerHandle TimerHandle;
+
+	bool bIsActive = false;
+};
+
+/**
+ * @brief Stops the walk to cover from stalling with the weapon lowered.
+ * Deadlines are world times; the flags track which recovery steps the current assignment already used.
+ */
+USTRUCT()
+struct FSquadUnitCoverMoveGuard
+{
+	GENERATED_BODY()
+
+	// No new cover search starts before this time, so failed or just-cancelled searches cannot repeat every update.
+	float NextSearchWorldSeconds = 0.0f;
+
+	// Past this time the current step (walk to cover or pose hand-over) is retried or abandoned.
+	float StepDeadlineWorldSeconds = 0.0f;
+
+	// A unit circling its point is stopped and sent again once before the point is reported unreachable.
+	bool bHasRestartedApproach = false;
+};
+
+/**
  * @brief Represents a squad unit in the game.
  *
  * Cover is tracked as a subordinate tactical state in M_CoverRuntimeState and never replaces M_ActiveCommand.
  * SetCoverAssignment records the selected point and whether it supports an attack or follows a move command.
  * SetCoverState then advances the unit through movement, entry, protection, exposure, and exit without reporting
- * command completion. ClearCoverState removes the assignment; the future cover integration remains responsible for
- * finding, reserving, validating, and moving to cover points.
+ * command completion. ClearCoverState removes the assignment. URTSCoverFinderWorldSubsystem calls
+ * UpdateAutomaticCover on a staggered schedule; that update finds, reserves, walks to, and validates cover while the
+ * unit is idle or attacking a target already in range, and any commanded movement cancels it.
  */
 UCLASS()
 class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExperienceProvider,
@@ -239,6 +283,24 @@ public:
 	const FSquadUnitCoverRuntimeState& GetCoverRuntimeState() const { return M_CoverRuntimeState; }
 	bool GetHasCoverAssignment() const { return M_CoverRuntimeState.GetHasAssignment(); }
 	bool GetIsOccupyingCover() const { return M_CoverRuntimeState.GetIsOccupyingCover(); }
+	EAbilityID GetActiveCommand() const { return M_ActiveCommand; }
+
+	/**
+	 * @brief Lets cover selection test the firing lane from where this unit's expose animation really ends.
+	 * @param CoverPoint Standing point being evaluated; crouch points have no exposed step.
+	 * @param DefaultWorldOffset Step to use when the unit has no expose montage for that side.
+	 * @return World-space offset from the cover point to the exposed capsule position.
+	 */
+	FVector GetStandingCoverExposedWorldOffset(
+		const FRTSCoverPoint& CoverPoint,
+		const FVector& DefaultWorldOffset) const;
+
+	/**
+	 * @brief Measures how far a resting unit is from where the cover logic believes it stands.
+	 * @param OutErrorCentimeters Horizontal distance between the capsule and its expected cover location.
+	 * @return False while the unit is moving, sliding, or playing a cover transition.
+	 */
+	bool TryGetSettledCoverCapsuleError(float& OutErrorCentimeters) const;
 
 	/**
 	 * @brief Records a tactical cover assignment without replacing or completing the active command.
@@ -551,6 +613,12 @@ private:
 
 	FVector M_CoverValidatedTargetLocation = FVector::ZeroVector;
 
+	UPROPERTY()
+	FSquadUnitCoverCapsuleSlide M_CoverCapsuleSlide;
+
+	UPROPERTY()
+	FSquadUnitCoverMoveGuard M_CoverMoveGuard;
+
 	/** The squad controller managing this unit. */
 	UPROPERTY()
 	TObjectPtr<ASquadController> M_SquadController;
@@ -751,13 +819,54 @@ private:
 	void StopMovementAndClearPath();
 	void UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
 	bool GetCanUseAutomaticCover() const;
+	bool GetIsSquadEligibleForAutomaticCover() const;
+	bool GetIsCoverSearchOnCooldown() const;
+	bool GetHasCoverStepTimedOut() const;
+	void StartCoverStepDeadline(float DurationSeconds);
+	void DelayNextCoverSearch(float DelaySeconds);
+	bool GetIsCoverAnimationOutOfSync() const;
 	void TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
 	bool StartCoverMovement();
+	float GetCoverWalkDeadlineSeconds() const;
+	void FinishCoverMovement();
+	void StopCoverMovementWithoutCallback();
+	void AbandonUnreachableCoverPoint();
 	void EnterAssignedCover();
+	void UpdateMovingToCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
 	void UpdateEnteringCover();
 	void UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
 	void UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
 	void ReturnToProtectedCover();
+	void ExposeFromStandingCover();
+	void RequestCoverEnterAnimation();
+
+	// Bound to the animation instance so capsule and cover state follow a transition on the frame it completes.
+	void OnCoverAnimActionChanged(ESquadCoverAnimAction NewAction);
+	void OnCoverAnimReachedProtected();
+	void OnCoverAnimReachedExposed();
+
+	// Polled backstop for the callback above; also ends transitions whose montage never advanced.
+	void SyncCoverStateWithAnimation();
+	void StartCoverTransitionDeadline();
+	void LogCoverAlignmentResidual(const TCHAR* ReachedPose, const FVector& ExpectedLocation) const;
+
+	/** @return Where the unit stops before its enter clip: the cover point plus the clip's designer offset. */
+	FVector GetCoverEntryLocation() const;
+	FVector GetCoverExposedLocation() const;
+	FVector GetCoverLocalOffsetInWorld(
+		const FRTSCoverPoint& CoverPoint,
+		const FSquadUnitCoverLocalOffset& LocalOffset) const;
+
+	/**
+	 * @brief Puts the capsule on a cover location, sliding when it is visibly off and a duration is given.
+	 * @param TargetLocation Cover point, entry location, or exposed location; height is ignored.
+	 * @param SlideSeconds Zero places the capsule immediately.
+	 */
+	void AlignCapsuleToCoverLocation(const FVector& TargetLocation, float SlideSeconds);
+	void PlaceCapsuleAtCoverLocation(const FVector& TargetLocation);
+	void TickCoverCapsuleSlide();
+	void FinishCoverCapsuleSlide();
+	void StopCoverCapsuleSlide();
 	void ClearCoverStateInternal(bool bStopCoverMovement);
 	void CancelAutomaticCoverForCommandMovement();
 	void SetCoverWeaponFireBlocked(bool bBlocked) const;

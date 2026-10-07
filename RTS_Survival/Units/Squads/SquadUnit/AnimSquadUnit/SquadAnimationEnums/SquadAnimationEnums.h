@@ -31,6 +31,22 @@ enum class ESquadIdleAnimationPose : uint8
 	StandingPeekRight,
 };
 
+/**
+ * The three branches the AnimGraph's idle section needs for cover, whatever the cover type.
+ * Which idle sequence or aim offset a branch plays comes from GetCurrentCoverIdlePose,
+ * GetCurrentCoverAimOffset and GetCurrentCoverAimBaseSequence, so new cover types add no graph nodes.
+ */
+UENUM(BlueprintType)
+enum class ESquadCoverGraphPose : uint8
+{
+	// Regular idle and aim-offset setup.
+	NotInCover,
+	// Hidden behind cover: play the protected idle sequence, no aim offset.
+	CoverIdle,
+	// In a pose that can aim: crouch cover while the weapon has a target, standing cover once stepped out.
+	CoverAim,
+};
+
 /** Tracks which authored cover transition currently owns the unit's full-body animation. */
 UENUM(BlueprintType)
 enum class ESquadCoverAnimAction : uint8

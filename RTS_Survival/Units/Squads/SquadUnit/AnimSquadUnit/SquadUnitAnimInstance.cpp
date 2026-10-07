@@ -12,6 +12,27 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCoverAnimation, Log, All);
 
+namespace SquadUnitCoverAnimLogStatics
+{
+	constexpr uint32 FirstCoverPoseReportBit = 16;
+
+	/**
+	 * Missing cover assets are a Blueprint setup gap shared by every unit of that animation class,
+	 * so each gap is reported once per class instead of once per unit and transition.
+	 */
+	bool TryMarkMissingCoverAssetReported(const UObject& AnimInstance, const uint32 ReportBit)
+	{
+		static TMap<FName, uint32> ReportedBitsPerAnimClass;
+		uint32& ReportedBits = ReportedBitsPerAnimClass.FindOrAdd(AnimInstance.GetClass()->GetFName());
+		if ((ReportedBits & ReportBit) != 0)
+		{
+			return false;
+		}
+		ReportedBits |= ReportBit;
+		return true;
+	}
+}
+
 namespace SquadUnitTeamWeaponCrewAnimStatics
 {
 	// Blend out used when a crew montage is stopped because the operator leaves the deployed weapon.
@@ -498,6 +519,19 @@ UAnimMontage* FAimPositionMontages::GetMiscFullBodyMontage(const ESquadAimPositi
 	return Welding;
 }
 
+FSquadUnitStandingCoverAnimationSet::FSquadUnitStandingCoverAnimationSet()
+{
+	EnterStartOffset.TowardCover = SquadUnitCoverAnimDefaults::StandingEnterStartDepth;
+}
+
+FSquadUnitCoverAnimationSets::FSquadUnitCoverAnimationSets()
+{
+	StandingLeft.ExposedOffset.TowardCover = SquadUnitCoverAnimDefaults::StandingLeftExposedDepth;
+	StandingLeft.ExposedOffset.Right = SquadUnitCoverAnimDefaults::StandingLeftExposedRight;
+	StandingRight.ExposedOffset.TowardCover = SquadUnitCoverAnimDefaults::StandingRightExposedDepth;
+	StandingRight.ExposedOffset.Right = SquadUnitCoverAnimDefaults::StandingRightExposedRight;
+}
+
 void FSquadUnitCoverAnimRuntime::Reset()
 {
 	M_IdlePose = ESquadIdleAnimationPose::Regular;
@@ -505,6 +539,7 @@ void FSquadUnitCoverAnimRuntime::Reset()
 	M_ActiveMontageAction = ESquadCoverAnimAction::None;
 	M_NextAction = ESquadCoverAnimAction::None;
 	M_ActiveMontage = nullptr;
+	M_ActiveMontageSeconds = 0.0f;
 }
 
 USquadUnitAnimInstance::USquadUnitAnimInstance(): bBeAlert(false), MovementState(), WeaponMontages(),
@@ -626,38 +661,37 @@ bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose)
 
 	CancelCoverAnimation();
 
-	UAnimMontage* EnterMontage = nullptr;
-	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
-	{
-		EnterMontage = CoverAnimations.Crouch.EnterCoverMontage;
-		AimPositionMontages.AimPosition = ESquadAimPosition::Crouch;
-	}
-	else if (CoverPose == ESquadIdleAnimationPose::StandingCoverLeft)
-	{
-		EnterMontage = CoverAnimations.StandingLeft.EnterCoverMontage;
-		AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
-	}
-	else if (CoverPose == ESquadIdleAnimationPose::StandingCoverRight)
-	{
-		EnterMontage = CoverAnimations.StandingRight.EnterCoverMontage;
-		AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
-	}
-	else
+	const bool bIsSupportedCoverPose = CoverPose == ESquadIdleAnimationPose::CrouchCover ||
+		CoverPose == ESquadIdleAnimationPose::StandingCoverLeft ||
+		CoverPose == ESquadIdleAnimationPose::StandingCoverRight;
+	if (not bIsSupportedCoverPose)
 	{
 		RTSFunctionLibrary::ReportError(
 			"USquadUnitAnimInstance::EnterCover received an unsupported idle animation pose.");
 		return false;
 	}
+	UAnimMontage* EnterMontage = GetCoverEnterMontage(CoverPose);
+	AimPositionMontages.AimPosition = CoverPose == ESquadIdleAnimationPose::CrouchCover
+		? ESquadAimPosition::Crouch
+		: ESquadAimPosition::Standing;
 
 	M_CoverAnimRuntime.M_IdlePose = CoverPose;
-	IdleAnimationPose = CoverPose;
-	LogMissingCoverAnimationAssets(CoverPose);
-	if (PlayCoverMontage(EnterMontage, ESquadCoverAnimAction::Entering))
+	SetIdleAnimationPose(CoverPose);
+	const uint32 PoseReportBit = 1u <<
+		(SquadUnitCoverAnimLogStatics::FirstCoverPoseReportBit + static_cast<uint32>(CoverPose));
+	if (SquadUnitCoverAnimLogStatics::TryMarkMissingCoverAssetReported(*this, PoseReportBit))
+	{
+		LogMissingCoverAnimationAssets(CoverPose);
+		LogCoverMontageRootMotion(CoverPose);
+	}
+	// An in-place clip shows its root offset from frame one; blending in would slide the mesh away and back.
+	const bool bStartOnFirstFrame = not GetDoesCoverEnterMontageMoveCapsule(CoverPose);
+	if (PlayCoverMontage(EnterMontage, ESquadCoverAnimAction::Entering, bStartOnFirstFrame))
 	{
 		return true;
 	}
 
-	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
+	SetCoverAnimAction(ESquadCoverAnimAction::Protected);
 	return false;
 }
 
@@ -681,10 +715,7 @@ bool USquadUnitAnimInstance::StartStandingCoverPeek()
 	{
 		return true;
 	}
-	const ESquadIdleAnimationPose PeekPose = GetStandingPeekPose();
-	M_CoverAnimRuntime.M_IdlePose = PeekPose;
-	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Exposed;
-	IdleAnimationPose = PeekPose;
+	EnterExposedCoverPose();
 	return false;
 }
 
@@ -708,10 +739,7 @@ bool USquadUnitAnimInstance::ReturnToStandingCover()
 	{
 		return true;
 	}
-	const ESquadIdleAnimationPose ProtectedPose = GetProtectedStandingCoverPose();
-	M_CoverAnimRuntime.M_IdlePose = ProtectedPose;
-	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
-	IdleAnimationPose = ProtectedPose;
+	EnterProtectedCoverPose();
 	return false;
 }
 
@@ -780,6 +808,79 @@ bool USquadUnitAnimInstance::GetIsCoverFireAllowed() const
 	}
 
 	return M_CoverAnimRuntime.M_Action == ESquadCoverAnimAction::Exposed;
+}
+
+UAnimMontage* USquadUnitAnimInstance::GetCoverEnterMontage(const ESquadIdleAnimationPose CoverPose) const
+{
+	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		return CoverAnimations.Crouch.EnterCoverMontage;
+	}
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = FindStandingCoverAnimationSet(CoverPose);
+	return StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->EnterCoverMontage;
+}
+
+FSquadUnitCoverLocalOffset USquadUnitAnimInstance::GetCoverEnterStartOffset(
+	const ESquadIdleAnimationPose CoverPose) const
+{
+	// Without an enter montage there is no root travel to compensate, so the unit stops on the point itself.
+	if (not IsValid(GetCoverEnterMontage(CoverPose)))
+	{
+		return FSquadUnitCoverLocalOffset();
+	}
+	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		return CoverAnimations.Crouch.EnterStartOffset;
+	}
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = FindStandingCoverAnimationSet(CoverPose);
+	return StandingAnimationSet == nullptr ? FSquadUnitCoverLocalOffset() : StandingAnimationSet->EnterStartOffset;
+}
+
+bool USquadUnitAnimInstance::GetDoesCoverEnterMontageMoveCapsule(const ESquadIdleAnimationPose CoverPose) const
+{
+	const UAnimMontage* EnterMontage = GetCoverEnterMontage(CoverPose);
+	return IsValid(EnterMontage) && EnterMontage->HasRootMotion();
+}
+
+bool USquadUnitAnimInstance::TryGetStandingCoverExposedOffset(
+	const ESquadIdleAnimationPose CoverPose,
+	FSquadUnitCoverLocalOffset& OutExposedOffset) const
+{
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = FindStandingCoverAnimationSet(CoverPose);
+	if (StandingAnimationSet == nullptr || not IsValid(StandingAnimationSet->ExposeFromCoverMontage))
+	{
+		return false;
+	}
+	OutExposedOffset = StandingAnimationSet->ExposedOffset;
+	return true;
+}
+
+bool USquadUnitAnimInstance::GetIsCoverTransitionMontageActive() const
+{
+	return M_CoverAnimRuntime.M_ActiveMontageAction != ESquadCoverAnimAction::None;
+}
+
+void USquadUnitAnimInstance::ForceCompleteCoverTransition()
+{
+	if (not GetIsCoverTransitionMontageActive())
+	{
+		return;
+	}
+	const ESquadCoverAnimAction CompletedAction = M_CoverAnimRuntime.M_ActiveMontageAction;
+	const ESquadCoverAnimAction NextAction = M_CoverAnimRuntime.M_NextAction;
+	UAnimMontage* StalledMontage = M_CoverAnimRuntime.M_ActiveMontage;
+	// Unbound first so stopping the montage is not treated as an interruption that leaves cover.
+	M_CoverMontageEndedDelegate.Unbind();
+	M_CoverAnimRuntime.M_ActiveMontage = nullptr;
+	M_CoverAnimRuntime.M_ActiveMontageAction = ESquadCoverAnimAction::None;
+	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
+	M_CoverAnimRuntime.M_ActiveMontageSeconds = 0.0f;
+	if (IsValid(StalledMontage) && Montage_IsPlaying(StalledMontage))
+	{
+		constexpr float StalledMontageBlendOutSeconds = 0.1f;
+		Montage_Stop(StalledMontageBlendOutSeconds, StalledMontage);
+	}
+	CompleteCoverTransition(CompletedAction, NextAction);
 }
 
 UAnimSequence* USquadUnitAnimInstance::GetCurrentCoverIdlePose() const
@@ -1085,16 +1186,7 @@ void USquadUnitAnimInstance::AnimNotify_Cover_AimReady()
 	{
 		return;
 	}
-
-	const ESquadIdleAnimationPose PeekPose = GetStandingPeekPose();
-	if (PeekPose == ESquadIdleAnimationPose::Regular)
-	{
-		return;
-	}
-
-	M_CoverAnimRuntime.M_IdlePose = PeekPose;
-	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Exposed;
-	IdleAnimationPose = PeekPose;
+	EnterExposedCoverPose();
 }
 
 void USquadUnitAnimInstance::AnimNotify_Cover_BackInCover()
@@ -1103,35 +1195,102 @@ void USquadUnitAnimInstance::AnimNotify_Cover_BackInCover()
 	{
 		return;
 	}
+	EnterProtectedCoverPose();
+}
 
+void USquadUnitAnimInstance::EnterExposedCoverPose()
+{
+	const ESquadIdleAnimationPose PeekPose = GetStandingPeekPose();
+	if (PeekPose == ESquadIdleAnimationPose::Regular)
+	{
+		return;
+	}
+	M_CoverAnimRuntime.M_IdlePose = PeekPose;
+	SetIdleAnimationPose(PeekPose);
+	SetCoverAnimAction(ESquadCoverAnimAction::Exposed);
+}
+
+void USquadUnitAnimInstance::EnterProtectedCoverPose()
+{
 	const ESquadIdleAnimationPose ProtectedPose = GetProtectedStandingCoverPose();
 	if (ProtectedPose == ESquadIdleAnimationPose::Regular)
 	{
 		return;
 	}
-
 	M_CoverAnimRuntime.M_IdlePose = ProtectedPose;
-	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
-	IdleAnimationPose = ProtectedPose;
+	SetIdleAnimationPose(ProtectedPose);
+	SetCoverAnimAction(ESquadCoverAnimAction::Protected);
+}
+
+void USquadUnitAnimInstance::SetIdleAnimationPose(const ESquadIdleAnimationPose NewIdlePose)
+{
+	IdleAnimationPose = NewIdlePose;
+	RefreshCoverGraphPose();
+}
+
+void USquadUnitAnimInstance::RefreshCoverGraphPose()
+{
+	switch (IdleAnimationPose)
+	{
+	case ESquadIdleAnimationPose::StandingCoverLeft:
+	case ESquadIdleAnimationPose::StandingCoverRight:
+		CoverGraphPose = ESquadCoverGraphPose::CoverIdle;
+		break;
+	case ESquadIdleAnimationPose::CrouchCover:
+		// Crouch cover needs no expose transition, so it ducks whenever the weapon has nothing to aim at.
+		CoverGraphPose = bAimToTarget ? ESquadCoverGraphPose::CoverAim : ESquadCoverGraphPose::CoverIdle;
+		break;
+	case ESquadIdleAnimationPose::StandingPeekLeft:
+	case ESquadIdleAnimationPose::StandingPeekRight:
+		CoverGraphPose = ESquadCoverGraphPose::CoverAim;
+		break;
+	case ESquadIdleAnimationPose::Regular:
+	default:
+		CoverGraphPose = ESquadCoverGraphPose::NotInCover;
+		break;
+	}
+}
+
+void USquadUnitAnimInstance::SetCoverAnimAction(const ESquadCoverAnimAction NewAction)
+{
+	if (M_CoverAnimRuntime.M_Action == NewAction)
+	{
+		return;
+	}
+	M_CoverAnimRuntime.M_Action = NewAction;
+	OnCoverAnimActionChanged.ExecuteIfBound(NewAction);
 }
 
 bool USquadUnitAnimInstance::PlayCoverMontage(
 	UAnimMontage* Montage,
-	const ESquadCoverAnimAction MontageAction)
+	const ESquadCoverAnimAction MontageAction,
+	const bool bStartOnFirstFrame)
 {
 	if (not IsValid(Montage))
 	{
+		const uint32 MontageActionBit = 1u << static_cast<uint32>(MontageAction);
+		if (not SquadUnitCoverAnimLogStatics::TryMarkMissingCoverAssetReported(*this, MontageActionBit))
+		{
+			return false;
+		}
 		UE_LOG(
 			LogRTSSquadUnitCoverAnimation,
 			Warning,
 			TEXT("Cover action %s has no montage configured on %s; gameplay state will continue immediately."),
 			*UEnum::GetValueAsString(MontageAction),
-			*GetName());
+			*GetClass()->GetName());
 		return false;
 	}
 
 	M_CoverMontageEndedDelegate.Unbind();
-	const float PlayedDuration = Montage_Play(Montage, 1.0f, EMontagePlayReturnType::Duration);
+	constexpr float CoverMontagePlayRate = 1.0f;
+	const float PlayedDuration = bStartOnFirstFrame
+		? Montage_PlayWithBlendIn(
+			Montage,
+			FAlphaBlendArgs(0.0f),
+			CoverMontagePlayRate,
+			EMontagePlayReturnType::Duration)
+		: Montage_Play(Montage, CoverMontagePlayRate, EMontagePlayReturnType::Duration);
 	if (not FMath::IsFinite(PlayedDuration) || PlayedDuration <= KINDA_SMALL_NUMBER)
 	{
 		RTSFunctionLibrary::ReportError(
@@ -1139,11 +1298,12 @@ bool USquadUnitAnimInstance::PlayCoverMontage(
 		return false;
 	}
 
-	M_CoverAnimRuntime.M_Action = MontageAction;
 	M_CoverAnimRuntime.M_ActiveMontageAction = MontageAction;
 	M_CoverAnimRuntime.M_ActiveMontage = Montage;
+	M_CoverAnimRuntime.M_ActiveMontageSeconds = PlayedDuration;
 	M_CoverMontageEndedDelegate.BindUObject(this, &USquadUnitAnimInstance::OnCoverMontageEnded);
 	Montage_SetEndDelegate(M_CoverMontageEndedDelegate, Montage);
+	SetCoverAnimAction(MontageAction);
 	return true;
 }
 
@@ -1186,26 +1346,33 @@ void USquadUnitAnimInstance::OnCoverMontageEnded(UAnimMontage* Montage, const bo
 	M_CoverAnimRuntime.M_ActiveMontage = nullptr;
 	M_CoverAnimRuntime.M_ActiveMontageAction = ESquadCoverAnimAction::None;
 	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
+	M_CoverAnimRuntime.M_ActiveMontageSeconds = 0.0f;
 
 	if (bInterrupted)
 	{
 		ClearCoverAnimationRuntime();
 		return;
 	}
+	CompleteCoverTransition(CompletedAction, NextAction);
+}
 
+void USquadUnitAnimInstance::CompleteCoverTransition(
+	const ESquadCoverAnimAction CompletedAction,
+	const ESquadCoverAnimAction NextAction)
+{
 	if (CompletedAction == ESquadCoverAnimAction::Entering)
 	{
-		M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
+		SetCoverAnimAction(ESquadCoverAnimAction::Protected);
 		return;
 	}
 
+	// The Cover_AimReady and Cover_BackInCover notifies only move these switches earlier inside the clip;
+	// a clip without them simply reaches the same pose when it ends.
 	if (CompletedAction == ESquadCoverAnimAction::Exposing)
 	{
-		if (M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Exposed)
+		if (M_CoverAnimRuntime.M_Action == ESquadCoverAnimAction::Exposing)
 		{
-			RTSFunctionLibrary::ReportError(
-				"Cover expose montage ended without a Cover_AimReady notify on " + GetName());
-			M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
+			EnterExposedCoverPose();
 		}
 		return;
 	}
@@ -1232,7 +1399,7 @@ void USquadUnitAnimInstance::ClearCoverAnimationRuntime()
 		IdleAnimationPose != ESquadIdleAnimationPose::Regular;
 	M_CoverMontageEndedDelegate.Unbind();
 	M_CoverAnimRuntime.Reset();
-	IdleAnimationPose = ESquadIdleAnimationPose::Regular;
+	SetIdleAnimationPose(ESquadIdleAnimationPose::Regular);
 
 	if (not bHadCoverPose)
 	{
@@ -1262,7 +1429,7 @@ void USquadUnitAnimInstance::LogMissingCoverAnimationAssets(
 			Warning,
 			TEXT("Cover pose %s has no protected idle animation configured on %s."),
 			*UEnum::GetValueAsString(CoverPose),
-			*GetName());
+			*GetClass()->GetName());
 	}
 	if (AimAssets == nullptr || not IsValid(AimAssets->AimOffset))
 	{
@@ -1271,7 +1438,7 @@ void USquadUnitAnimInstance::LogMissingCoverAnimationAssets(
 			Warning,
 			TEXT("Cover pose %s has no aim offset configured on %s."),
 			*UEnum::GetValueAsString(CoverPose),
-			*GetName());
+			*GetClass()->GetName());
 	}
 	if (AimAssets == nullptr || not IsValid(AimAssets->BaseSequence))
 	{
@@ -1280,25 +1447,122 @@ void USquadUnitAnimInstance::LogMissingCoverAnimationAssets(
 			Warning,
 			TEXT("Cover pose %s has no aim base sequence configured on %s."),
 			*UEnum::GetValueAsString(CoverPose),
-			*GetName());
+			*GetClass()->GetName());
 	}
+}
+
+void USquadUnitAnimInstance::LogCoverMontageRootMotion(const ESquadIdleAnimationPose CoverPose) const
+{
+	if constexpr (not DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		return;
+	}
+	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		LogCoverMontageRootMotion(CoverAnimations.Crouch.EnterCoverMontage, TEXT("Crouch enter"));
+		LogCoverMontageRootMotion(CoverAnimations.Crouch.ExitCoverMontage, TEXT("Crouch exit"));
+		return;
+	}
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+	if (StandingAnimationSet == nullptr)
+	{
+		return;
+	}
+	LogCoverMontageRootMotion(StandingAnimationSet->EnterCoverMontage, TEXT("Standing enter"));
+	LogCoverMontageRootMotion(StandingAnimationSet->ExposeFromCoverMontage, TEXT("Standing expose"));
+	LogCoverMontageRootMotion(StandingAnimationSet->ReturnToCoverMontage, TEXT("Standing return"));
+	LogCoverMontageRootMotion(StandingAnimationSet->ExitCoverMontage, TEXT("Standing exit"));
+}
+
+void USquadUnitAnimInstance::LogCoverMontageRootMotion(
+	const UAnimMontage* Montage,
+	const TCHAR* MontageRole) const
+{
+	const USkeletalMeshComponent* SkeletalMeshComponent = GetSkelMeshComponent();
+	if (not IsValid(Montage) || not IsValid(SkeletalMeshComponent))
+	{
+		return;
+	}
+	// Root motion is authored in mesh space; the capsule moves by it after the mesh's relative rotation is applied.
+	const FTransform MeshSpaceRootMotion = Montage->ExtractRootMotionFromTrackRange(0.0f, Montage->GetPlayLength());
+	const FQuat MeshToActorRotation = SkeletalMeshComponent->GetRelativeRotation().Quaternion();
+	const FVector ActorSpaceTranslation = MeshToActorRotation.RotateVector(MeshSpaceRootMotion.GetTranslation());
+	UE_LOG(
+		LogRTSSquadUnitCoverAnimation,
+		Display,
+		TEXT("RTS_COVER_ROOT_MOTION pose=%s role=%s montage=%s seconds=%.2f has_root_motion=%d forward_cm=%.1f right_cm=%.1f up_cm=%.1f yaw_deg=%.1f root_motion_mode=%s"),
+		*UEnum::GetValueAsString(M_CoverAnimRuntime.M_IdlePose),
+		MontageRole,
+		*Montage->GetName(),
+		Montage->GetPlayLength(),
+		Montage->HasRootMotion() ? 1 : 0,
+		ActorSpaceTranslation.X,
+		ActorSpaceTranslation.Y,
+		ActorSpaceTranslation.Z,
+		MeshSpaceRootMotion.GetRotation().Rotator().Yaw,
+		*UEnum::GetValueAsString(RootMotionMode.GetValue()));
+
+	// Clips with root motion switched off still move the mesh by their root track; that travel is what an
+	// EnterStartOffset has to compensate, so it is reported per sequence.
+	const FSkeletonPoseBoneIndex RootBoneIndex(0);
+	for (const FSlotAnimationTrack& SlotTrack : Montage->SlotAnimTracks)
+	{
+		for (const FAnimSegment& Segment : SlotTrack.AnimTrack.AnimSegments)
+		{
+			const UAnimSequence* Sequence = Cast<UAnimSequence>(Segment.GetAnimReference());
+			if (not IsValid(Sequence))
+			{
+				continue;
+			}
+			const bool bPlaysInReverse = Segment.AnimPlayRate < 0.0f;
+			FTransform RootAtMontageStart;
+			FTransform RootAtMontageEnd;
+			Sequence->GetBoneTransform(
+				RootAtMontageStart,
+				RootBoneIndex,
+				bPlaysInReverse ? Segment.AnimEndTime : Segment.AnimStartTime,
+				true);
+			Sequence->GetBoneTransform(
+				RootAtMontageEnd,
+				RootBoneIndex,
+				bPlaysInReverse ? Segment.AnimStartTime : Segment.AnimEndTime,
+				true);
+			const FVector RootTrackTravel = MeshToActorRotation.RotateVector(
+				RootAtMontageEnd.GetTranslation() - RootAtMontageStart.GetTranslation());
+			UE_LOG(
+				LogRTSSquadUnitCoverAnimation,
+				Display,
+				TEXT("RTS_COVER_ROOT_TRACK montage=%s slot=%s sequence=%s reversed=%d sequence_root_motion_enabled=%d root_track_forward_cm=%.1f root_track_right_cm=%.1f"),
+				*Montage->GetName(),
+				*SlotTrack.SlotName.ToString(),
+				*Sequence->GetName(),
+				bPlaysInReverse ? 1 : 0,
+				Sequence->bEnableRootMotion ? 1 : 0,
+				RootTrackTravel.X,
+				RootTrackTravel.Y);
+		}
+	}
+}
+
+const FSquadUnitStandingCoverAnimationSet* USquadUnitAnimInstance::FindStandingCoverAnimationSet(
+	const ESquadIdleAnimationPose CoverPose) const
+{
+	if (CoverPose == ESquadIdleAnimationPose::StandingCoverLeft ||
+		CoverPose == ESquadIdleAnimationPose::StandingPeekLeft)
+	{
+		return &CoverAnimations.StandingLeft;
+	}
+	if (CoverPose == ESquadIdleAnimationPose::StandingCoverRight ||
+		CoverPose == ESquadIdleAnimationPose::StandingPeekRight)
+	{
+		return &CoverAnimations.StandingRight;
+	}
+	return nullptr;
 }
 
 const FSquadUnitStandingCoverAnimationSet* USquadUnitAnimInstance::GetStandingCoverAnimationSet() const
 {
-	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingCoverLeft ||
-		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekLeft)
-	{
-		return &CoverAnimations.StandingLeft;
-	}
-
-	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingCoverRight ||
-		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekRight)
-	{
-		return &CoverAnimations.StandingRight;
-	}
-
-	return nullptr;
+	return FindStandingCoverAnimationSet(M_CoverAnimRuntime.M_IdlePose);
 }
 
 ESquadIdleAnimationPose USquadUnitAnimInstance::GetProtectedStandingCoverPose() const

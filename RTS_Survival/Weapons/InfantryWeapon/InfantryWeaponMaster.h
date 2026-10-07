@@ -94,6 +94,7 @@ public:
 	AActor* GetCurrentTargetActor() const;
 	FVector GetCurrentTargetLocation();
 	bool GetIsCurrentTargetInRange();
+	float GetMaxWeaponRange() const { return M_WeaponRangeData.M_MaxWeaponRange; }
 	virtual float GetTurretYawLimit() const override;
 	virtual ETargetPreference GetTargetPreference() const override { return TargetPreference; }
 	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
