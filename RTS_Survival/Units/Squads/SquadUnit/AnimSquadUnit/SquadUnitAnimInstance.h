@@ -291,6 +291,15 @@ struct FSquadUnitCoverAimAssets
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	TObjectPtr<UAnimSequence> BaseSequence = nullptr;
+
+	// Fire feedback while aiming from this cover pose. Author these from BaseSequence on the same slot as the
+	// regular fire montages, so the cover aim offset still applies on top of the recoil.
+	// Left empty, the regular standing or crouch fire montage of the weapon is used instead.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Fire")
+	TObjectPtr<UAnimMontage> SingleFireMontage = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Fire")
+	TObjectPtr<UAnimMontage> BurstFireMontage = nullptr;
 };
 
 /**
@@ -434,6 +443,27 @@ struct FSquadUnitCoverAnimRuntime
 	float M_ActiveMontageSeconds = 0.0f;
 };
 
+/**
+ * @brief The cover assets currently offered to the AnimGraph pins.
+ * They keep their last valid value after the unit leaves a cover pose, because the graph still evaluates the
+ * branch it is blending out of, and an Aim Offset node without a blend space applies the reference pose as an
+ * additive, which scales every bone up for the length of that blend.
+ */
+USTRUCT()
+struct FSquadUnitCoverGraphAssets
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> IdlePose = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAimOffsetBlendSpace> AimOffset = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimSequence> AimBaseSequence = nullptr;
+};
+
 DECLARE_DELEGATE_OneParam(FOnSquadCoverAnimActionChanged, ESquadCoverAnimAction);
 
 /**
@@ -531,6 +561,10 @@ public:
 	/** @return True when crouch cover or an exposed standing peek currently permits weapon fire. */
 	bool GetIsCoverFireAllowed() const;
 	ESquadCoverAnimAction GetCoverAnimAction() const { return M_CoverAnimRuntime.M_Action; }
+	ESquadCoverGraphPose GetCoverGraphPose() const { return CoverGraphPose; }
+
+	/** One-line snapshot of what drives the pose right now, for cover test diagnostics. */
+	FString GetPoseDebugString() const;
 
 	// Fired on every cover action change so the owning unit can line its capsule up without waiting for a poll.
 	FOnSquadCoverAnimActionChanged OnCoverAnimActionChanged;
@@ -700,17 +734,17 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
 	inline UAnimSequence* GetCurrentAOBaseSequence() const { return AimOffsets.M_ActiveAimOffsetSequence; }
 
-	/** @return Protected cover idle pose for the current cover family, or nullptr outside cover. */
+	/** @return Protected cover idle pose of the current or most recent cover family; nullptr before any cover. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
-	UAnimSequence* GetCurrentCoverIdlePose() const;
+	UAnimSequence* GetCurrentCoverIdlePose() const { return M_CoverGraphAssets.IdlePose; }
 
-	/** @return Cover aim offset for crouch cover or an exposed standing peek. */
+	/** @return Aim offset of the current or most recent aiming cover pose; nullptr before any cover. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
-	UAimOffsetBlendSpace* GetCurrentCoverAimOffset() const;
+	UAimOffsetBlendSpace* GetCurrentCoverAimOffset() const { return M_CoverGraphAssets.AimOffset; }
 
-	/** @return Base sequence paired with the current cover aim offset. */
+	/** @return Base sequence paired with GetCurrentCoverAimOffset. */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, meta = (BlueprintThreadSafe))
-	UAnimSequence* GetCurrentCoverAimBaseSequence() const;
+	UAnimSequence* GetCurrentCoverAimBaseSequence() const { return M_CoverGraphAssets.AimBaseSequence; }
 
 	// ----- Weapon Montages -----
 
@@ -828,6 +862,24 @@ private:
 
 	// Called whenever the idle pose or the aiming flag changes; both decide which cover branch the graph plays.
 	void RefreshCoverGraphPose();
+
+	/** @return Aim assets of the cover pose the unit is aiming from right now; nullptr in any other pose. */
+	const FSquadUnitCoverAimAssets* GetActiveCoverAimAssets() const;
+
+	/**
+	 * @brief Picks the fire montage for the current pose, preferring one authored for the active cover pose.
+	 * @param bIsSingleFire Single shot or burst variant.
+	 * @return Cover fire montage when aiming from cover and one is assigned, otherwise the weapon's regular one.
+	 */
+	UAnimMontage* SelectFireMontage(bool bIsSingleFire) const;
+
+	// Assets of the cover pose that is active right now; nullptr when that pose does not use the asset.
+	UAnimSequence* ResolveCoverIdlePose() const;
+	UAimOffsetBlendSpace* ResolveCoverAimOffset() const;
+	UAnimSequence* ResolveCoverAimBaseSequence() const;
+
+	UPROPERTY(Transient)
+	FSquadUnitCoverGraphAssets M_CoverGraphAssets;
 	void EnterExposedCoverPose();
 	void EnterProtectedCoverPose();
 	UAnimMontage* GetCoverEnterMontage(ESquadIdleAnimationPose CoverPose) const;

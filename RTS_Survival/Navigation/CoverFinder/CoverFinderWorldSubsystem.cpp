@@ -674,7 +674,8 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::GatherBestTacticalCoverCan
 			return true;
 		}
 		if (GetIsPointReservedByAnotherUnit(CoverPoint.PointId, SquadUnit) ||
-			GetIsCoverPointTemporarilyUnreachable(CoverPoint.PointId))
+			GetIsCoverPointTemporarilyUnreachable(CoverPoint.PointId) ||
+			SquadUnit.GetIsCoverPointRejectedForTarget(CoverPoint.PointId))
 		{
 			return true;
 		}

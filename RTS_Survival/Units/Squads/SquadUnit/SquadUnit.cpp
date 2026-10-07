@@ -60,6 +60,7 @@ namespace SquadUnitCoverMoveStatics
 	constexpr float ReconcileSlideSeconds = 0.15f;
 	constexpr float CapsuleSlideTickSeconds = 1.0f / 60.0f;
 	constexpr float CapsuleAlignmentTolerance = 1.0f;
+	constexpr float MaximumRestingCapsuleError = 5.0f;
 	// The animation refuses a cover pose until locomotion settled; after this long the unit gives the point up.
 	constexpr float MaximumEnterRequestSeconds = 3.0f;
 	// Added to a montage's length before its transition is treated as not ticking, e.g. on an unrendered mesh.
@@ -370,17 +371,21 @@ void ASquadUnit::UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 		}
 		return;
 	}
-	if (not CoverSubsystem.GetIsCoverPointPublished(M_CoverRuntimeState.AssignedCoverPoint.PointId) ||
-		GetIsCoverAnimationOutOfSync())
+	if (not CoverSubsystem.GetIsCoverPointPublished(M_CoverRuntimeState.AssignedCoverPoint.PointId))
 	{
-		ClearCoverState();
+		LeaveCoverForReason(TEXT("point no longer published"));
+		return;
+	}
+	if (GetIsCoverAnimationOutOfSync())
+	{
+		LeaveCoverForReason(TEXT("cover pose was cleared on the animation instance"));
 		return;
 	}
 	if (M_CoverRuntimeState.State != ESquadUnitCoverState::MovingToCover &&
 		M_CoverRuntimeState.State != ESquadUnitCoverState::Assigned &&
-		not GetCanUseAutomaticCover())
+		not GetMayKeepAutomaticCover())
 	{
-		ClearCoverState();
+		LeaveCoverForReason(TEXT("unit may no longer use automatic cover"));
 		return;
 	}
 
@@ -489,6 +494,43 @@ bool ASquadUnit::GetCanUseAutomaticCover() const
 	return not GetIsValidSquadController() || M_SquadController->GetIsUnitIdle();
 }
 
+bool ASquadUnit::GetMayKeepAutomaticCover() const
+{
+	if (not GetIsSquadEligibleForAutomaticCover())
+	{
+		return false;
+	}
+	// An attack order arrives before the weapon has registered its target, so "target in range" cannot be
+	// required here. If the target really is out of range the squad starts walking, and that cancels cover.
+	if (M_ActiveCommand == EAbilityID::IdAttack)
+	{
+		return true;
+	}
+	if (M_ActiveCommand != EAbilityID::IdIdle)
+	{
+		return false;
+	}
+	return not GetIsValidSquadController() || M_SquadController->GetIsUnitIdle();
+}
+
+bool ASquadUnit::GetIsCoverPointRejectedForTarget(const int64 PointId) const
+{
+	const UWorld* World = GetWorld();
+	return PointId != 0 && PointId == M_CoverMoveGuard.RejectedPointId && IsValid(World) &&
+		World->GetTimeSeconds() < M_CoverMoveGuard.RejectedPointExpiryWorldSeconds;
+}
+
+void ASquadUnit::LeaveCoverUnusableAgainstTarget(const TCHAR* Reason)
+{
+	constexpr float RejectedPointSeconds = 12.0f;
+	const UWorld* World = GetWorld();
+	M_CoverMoveGuard.RejectedPointId = M_CoverRuntimeState.AssignedCoverPoint.PointId;
+	M_CoverMoveGuard.RejectedPointExpiryWorldSeconds = IsValid(World)
+		? World->GetTimeSeconds() + RejectedPointSeconds
+		: 0.0f;
+	LeaveCoverForReason(Reason);
+}
+
 bool ASquadUnit::GetIsSquadEligibleForAutomaticCover() const
 {
 	// Silent: polled for every unit on every tactical update, and a unit without a squad has no restriction.
@@ -541,7 +583,14 @@ void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubs
 	const ESquadUnitCoverUseReason UseReason = IsValid(TargetActor)
 		? ESquadUnitCoverUseReason::Attack
 		: ESquadUnitCoverUseReason::AfterMoveCommand;
-	constexpr float FailedSearchRetrySeconds = 1.5f;
+	constexpr float FailedSearchRetrySeconds = 3.0f;
+	// A unit in a firefight whose weapon is between targets would otherwise grab the nearest point with no
+	// regard for where the enemy is, and give it up again as soon as the next target is registered.
+	if (not IsValid(TargetActor) && GetIsUnitInCombat())
+	{
+		DelayNextCoverSearch(FailedSearchRetrySeconds);
+		return;
+	}
 	// Stay clearly inside weapon range so entering cover can never trigger range-closing squad movement.
 	constexpr float CoverWeaponRangeRatio = 0.9f;
 	const float MaximumDistanceToTarget = IsValid(TargetActor) && GetIsValidWeapon()
@@ -686,7 +735,7 @@ void ASquadUnit::UpdateEnteringCover()
 	RequestCoverEnterAnimation();
 	if (GetHasCoverStepTimedOut() && not AnimBp_SquadUnit->GetIsCoverAnimationActive())
 	{
-		ClearCoverState();
+		LeaveCoverForReason(TEXT("animation never accepted the cover pose"));
 	}
 }
 
@@ -740,6 +789,18 @@ void ASquadUnit::SyncCoverStateWithAnimation()
 		AnimBp_SquadUnit->ForceCompleteCoverTransition();
 	}
 	OnCoverAnimActionChanged(AnimBp_SquadUnit->GetCoverAnimAction());
+
+	// Other units brushing past can nudge a resting capsule off its spot; put it back so lane checks stay true.
+	float SettledCapsuleError = 0.0f;
+	if (not TryGetSettledCoverCapsuleError(SettledCapsuleError) ||
+		SettledCapsuleError <= SquadUnitCoverMoveStatics::MaximumRestingCapsuleError)
+	{
+		return;
+	}
+	const bool bIsExposed = M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed;
+	AlignCapsuleToCoverLocation(
+		bIsExposed ? GetCoverExposedLocation() : M_CoverRuntimeState.AssignedCoverPoint.Location,
+		SquadUnitCoverMoveStatics::ReconcileSlideSeconds);
 }
 
 void ASquadUnit::OnCoverAnimActionChanged(const ESquadCoverAnimAction NewAction)
@@ -1003,7 +1064,7 @@ void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 			*TargetActor,
 			TargetLocation))
 		{
-			ClearCoverState();
+			LeaveCoverUnusableAgainstTarget(TEXT("protected point is not valid against the target"));
 			return;
 		}
 		RecordValidatedCoverTarget(TargetActor, TargetLocation);
@@ -1063,7 +1124,7 @@ void ASquadUnit::UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsyste
 			*TargetActor,
 			TargetLocation))
 	{
-		ClearCoverState();
+		LeaveCoverUnusableAgainstTarget(TEXT("exposed point is not valid against the target"));
 		return;
 	}
 	RecordValidatedCoverTarget(TargetActor, TargetLocation);
@@ -1147,8 +1208,25 @@ void ASquadUnit::CancelAutomaticCoverForCommandMovement()
 {
 	if (M_CoverRuntimeState.GetHasAssignment())
 	{
-		ClearCoverStateInternal(true);
+		LeaveCoverForReason(TEXT("commanded movement"));
 	}
+}
+
+void ASquadUnit::LeaveCoverForReason(const TCHAR* Reason)
+{
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("RTS_COVER_LEAVE unit=%s state=%s type=%s command=%s reason=%s"),
+			*GetName(),
+			*UEnum::GetValueAsString(M_CoverRuntimeState.State),
+			*UEnum::GetValueAsString(M_CoverRuntimeState.AssignedCoverPoint.CoverType),
+			*UEnum::GetValueAsString(M_ActiveCommand),
+			Reason);
+	}
+	ClearCoverStateInternal(true);
 }
 
 void ASquadUnit::SetCoverWeaponFireBlocked(const bool bBlocked) const

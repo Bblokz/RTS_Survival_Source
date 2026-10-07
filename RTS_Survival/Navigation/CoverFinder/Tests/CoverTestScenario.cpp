@@ -13,6 +13,7 @@
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -34,6 +35,9 @@ namespace CoverTestScenarioPrivate
 	constexpr float AttackOrderIntervalSeconds = 6.0f;
 	constexpr int32 MaximumAttackOrdersPerSquad = 3;
 	constexpr float CombatSampleLogIntervalSeconds = 5.0f;
+	// The largest legitimate single-frame capsule move is the in-place enter snap of a standing clip.
+	constexpr float MaximumLocationJumpPerFrame = 160.0f;
+	constexpr float MaximumSaneMeshBoundsRadius = 400.0f;
 
 	bool GetIsCommandCompatibleWithCover(const EAbilityID Command)
 	{
@@ -140,6 +144,9 @@ void FCoverTestScenario::Start(const float IdleObservationSeconds, const bool bC
 	bM_IdlePhasePassed = false;
 	M_CombatTotals = FCoverTestCombatTotals();
 	M_AttackingSquads.Reset();
+	M_LastUnitLocations.Reset();
+	M_UnitLocationJumpCount = 0;
+	M_UnitMeshBlowUpCount = 0;
 	EnterPhase(ECoverTestScenarioPhase::WaitingForCoverScan);
 	UE_LOG(
 		LogRTSCoverTest,
@@ -158,6 +165,7 @@ void FCoverTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem, con
 	}
 	ResumeWorldIfPaused(*World);
 	KeepUnitAnimationTicking(*World);
+	WatchUnitsForVisualGlitches(*World);
 	M_PhaseElapsedSeconds += FMath::Max(0.0f, DeltaTime);
 
 	switch (M_Phase)
@@ -198,6 +206,89 @@ void FCoverTestScenario::KeepUnitAnimationTicking(UWorld& World) const
 		UnitMesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 		UnitMesh->SetComponentTickEnabled(true);
 	}
+}
+
+void FCoverTestScenario::WatchUnitsForVisualGlitches(UWorld& World)
+{
+	for (TActorIterator<ASquadUnit> UnitIterator(&World); UnitIterator; ++UnitIterator)
+	{
+		ASquadUnit* SquadUnit = *UnitIterator;
+		if (IsValid(SquadUnit) && SquadUnit->IsUnitAlive())
+		{
+			WatchUnitForVisualGlitches(*SquadUnit);
+		}
+	}
+}
+
+void FCoverTestScenario::WatchUnitForVisualGlitches(ASquadUnit& SquadUnit)
+{
+	const FVector UnitLocation = SquadUnit.GetActorLocation();
+	const FVector* LastLocation = M_LastUnitLocations.Find(&SquadUnit);
+	const float JumpDistance = LastLocation != nullptr ? FVector::Dist(*LastLocation, UnitLocation) : 0.0f;
+	M_LastUnitLocations.Add(&SquadUnit, UnitLocation);
+	const USkeletalMeshComponent* UnitMesh = SquadUnit.GetMesh();
+	const float MeshBoundsRadius = IsValid(UnitMesh) ? UnitMesh->Bounds.SphereRadius : 0.0f;
+	const float MeshOffset = IsValid(UnitMesh) ? FVector::Dist(UnitMesh->Bounds.Origin, UnitLocation) : 0.0f;
+	// Walking units tick their movement in coarse steps when unrendered, so only resting units are checked.
+	const bool bJumped = SquadUnit.GetIsOccupyingCover() &&
+		JumpDistance > CoverTestScenarioPrivate::MaximumLocationJumpPerFrame;
+	const bool bMeshBlewUp = MeshBoundsRadius > CoverTestScenarioPrivate::MaximumSaneMeshBoundsRadius ||
+		MeshOffset > CoverTestScenarioPrivate::MaximumSaneMeshBoundsRadius;
+	if (not bJumped && not bMeshBlewUp)
+	{
+		return;
+	}
+	M_UnitLocationJumpCount += bJumped ? 1 : 0;
+	M_UnitMeshBlowUpCount += bMeshBlewUp ? 1 : 0;
+	const USquadUnitAnimInstance* UnitAnimation = SquadUnit.GetAnimBP_SquadUnit();
+	const FSquadUnitCoverRuntimeState& CoverState = SquadUnit.GetCoverRuntimeState();
+	UE_LOG(
+		LogRTSCoverTest,
+		Warning,
+		TEXT("RTS_COVER_TEST glitch unit=%s jump_cm=%.0f mesh_radius=%.0f mesh_offset=%.0f location=%s cover_state=%s type=%s anim_action=%s graph_pose=%s command=%s"),
+		*SquadUnit.GetName(),
+		JumpDistance,
+		MeshBoundsRadius,
+		MeshOffset,
+		*UnitLocation.ToCompactString(),
+		*UEnum::GetValueAsString(CoverState.State),
+		*UEnum::GetValueAsString(CoverState.AssignedCoverPoint.CoverType),
+		IsValid(UnitAnimation) ? *UEnum::GetValueAsString(UnitAnimation->GetCoverAnimAction()) : TEXT("none"),
+		IsValid(UnitAnimation) ? *UEnum::GetValueAsString(UnitAnimation->GetCoverGraphPose()) : TEXT("none"),
+		*UEnum::GetValueAsString(SquadUnit.GetActiveCommand()));
+	if (not bMeshBlewUp || not IsValid(UnitMesh) || not IsValid(UnitAnimation))
+	{
+		return;
+	}
+	// Name the bone that is furthest out, and its scale: that tells a bad pose from a bad root or a bad scale.
+	int32 WorstBoneIndex = INDEX_NONE;
+	float WorstBoneDistance = 0.0f;
+	for (int32 BoneIndex = 0; BoneIndex < UnitMesh->GetNumBones(); ++BoneIndex)
+	{
+		const float BoneDistance = FVector::Dist(
+			UnitMesh->GetBoneTransform(BoneIndex).GetLocation(),
+			UnitLocation);
+		if (BoneDistance > WorstBoneDistance)
+		{
+			WorstBoneDistance = BoneDistance;
+			WorstBoneIndex = BoneIndex;
+		}
+	}
+	const FTransform RootTransform = UnitMesh->GetBoneTransform(0);
+	UE_LOG(
+		LogRTSCoverTest,
+		Warning,
+		TEXT("RTS_COVER_TEST glitch_pose unit=%s worst_bone=%s worst_bone_cm=%.0f worst_bone_scale=%s root_offset_cm=%.0f root_scale=%s mesh_scale=%s %s"),
+		*SquadUnit.GetName(),
+		WorstBoneIndex != INDEX_NONE ? *UnitMesh->GetBoneName(WorstBoneIndex).ToString() : TEXT("none"),
+		WorstBoneDistance,
+		WorstBoneIndex != INDEX_NONE
+			? *UnitMesh->GetBoneTransform(WorstBoneIndex).GetScale3D().ToCompactString()
+			: TEXT("-"),
+		FVector::Dist(RootTransform.GetLocation(), UnitLocation),
+		*RootTransform.GetScale3D().ToCompactString(),
+		*UnitMesh->GetComponentScale().ToCompactString(),
+		*UnitAnimation->GetPoseDebugString());
 }
 
 void FCoverTestScenario::ResumeWorldIfPaused(UWorld& World) const
@@ -349,8 +440,15 @@ void FCoverTestScenario::FinishCombatPhase(UWorld& World, URTSCoverFinderWorldSu
 	const bool bReservationsStayedUnique = M_CombatTotals.DuplicateReservationSamples == 0;
 	const bool bCommandsUntouched = M_CombatTotals.CommandInterferenceSamples == 0;
 	const bool bOccupantsStayedAligned = M_CombatTotals.MisalignedOccupantSamples == 0;
+	const bool bNoVisualGlitches = M_UnitLocationJumpCount == 0 && M_UnitMeshBlowUpCount == 0;
+	UE_LOG(
+		LogRTSCoverTest,
+		Display,
+		TEXT("RTS_COVER_TEST glitches location_jumps=%d mesh_blow_ups=%d"),
+		M_UnitLocationJumpCount,
+		M_UnitMeshBlowUpCount);
 	const bool bCombatPhasePassed = bAttackWasOrdered && bUnitsFoughtFromCover && bLanesWereValidated &&
-		bReservationsStayedUnique && bCommandsUntouched && bOccupantsStayedAligned;
+		bReservationsStayedUnique && bCommandsUntouched && bOccupantsStayedAligned && bNoVisualGlitches;
 	UE_LOG(
 		LogRTSCoverTest,
 		Display,
@@ -599,8 +697,20 @@ void FCoverTestScenario::AccumulateUnitCounts(
 		InOutCounts.MaximumSettledCapsuleError = FMath::Max(
 			InOutCounts.MaximumSettledCapsuleError,
 			SettledCapsuleError);
-		InOutCounts.OccupantsAwayFromPointCount +=
-			SettledCapsuleError > CoverTestScenarioPrivate::MaximumSettledCapsuleError ? 1 : 0;
+		const bool bIsMisaligned = SettledCapsuleError > CoverTestScenarioPrivate::MaximumSettledCapsuleError;
+		InOutCounts.OccupantsAwayFromPointCount += bIsMisaligned ? 1 : 0;
+		if (bIsMisaligned)
+		{
+			UE_LOG(
+				LogRTSCoverTest,
+				Warning,
+				TEXT("RTS_COVER_TEST misaligned unit=%s error_cm=%.1f state=%s type=%s speed=%.0f"),
+				*SquadUnit.GetName(),
+				SettledCapsuleError,
+				*UEnum::GetValueAsString(CoverState.State),
+				*UEnum::GetValueAsString(CoverType),
+				SquadUnit.GetVelocity().Size2D());
+		}
 	}
 
 	InOutCounts.EngagingFromCoverCount += bHasTargetInRange ? 1 : 0;

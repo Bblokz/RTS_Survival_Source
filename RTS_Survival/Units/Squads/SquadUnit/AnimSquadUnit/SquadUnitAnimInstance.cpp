@@ -15,6 +15,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCoverAnimation, Log, All);
 namespace SquadUnitCoverAnimLogStatics
 {
 	constexpr uint32 FirstCoverPoseReportBit = 16;
+	constexpr uint32 FirstUnplayableMontageReportBit = 8;
 
 	/**
 	 * Missing cover assets are a Blueprint setup gap shared by every unit of that animation class,
@@ -579,9 +580,7 @@ void USquadUnitAnimInstance::PlaySingleFireAnim()
 		return;
 	}
 
-	UAnimMontage* SelectedMontage = WeaponMontages.GetFireMontage(AimPositionMontages.AimPosition,
-	                                                              AimOffsets.M_AimOffsetType, true);
-	StartMontage(SelectedMontage, true);
+	StartMontage(SelectFireMontage(true), true);
 }
 
 void USquadUnitAnimInstance::PlayBurstAnim()
@@ -591,9 +590,36 @@ void USquadUnitAnimInstance::PlayBurstAnim()
 		return;
 	}
 
-	UAnimMontage* SelectedMontage = WeaponMontages.GetFireMontage(AimPositionMontages.AimPosition,
-	                                                              AimOffsets.M_AimOffsetType, false);
-	StartMontage(SelectedMontage, true);
+	StartMontage(SelectFireMontage(false), true);
+}
+
+UAnimMontage* USquadUnitAnimInstance::SelectFireMontage(const bool bIsSingleFire) const
+{
+	if (const FSquadUnitCoverAimAssets* CoverAimAssets = GetActiveCoverAimAssets())
+	{
+		UAnimMontage* CoverFireMontage = bIsSingleFire
+			? CoverAimAssets->SingleFireMontage
+			: CoverAimAssets->BurstFireMontage;
+		if (IsValid(CoverFireMontage))
+		{
+			return CoverFireMontage;
+		}
+	}
+	return WeaponMontages.GetFireMontage(AimPositionMontages.AimPosition, AimOffsets.M_AimOffsetType, bIsSingleFire);
+}
+
+const FSquadUnitCoverAimAssets* USquadUnitAnimInstance::GetActiveCoverAimAssets() const
+{
+	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		return &CoverAnimations.Crouch.AimAssets;
+	}
+	const bool bIsStandingPeek = M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekLeft ||
+		M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::StandingPeekRight;
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = bIsStandingPeek
+		? GetStandingCoverAnimationSet()
+		: nullptr;
+	return StandingAnimationSet == nullptr ? nullptr : &StandingAnimationSet->PeekAimAssets;
 }
 
 void USquadUnitAnimInstance::PlayReloadAnim(const float ReloadTime)
@@ -855,6 +881,27 @@ bool USquadUnitAnimInstance::TryGetStandingCoverExposedOffset(
 	return true;
 }
 
+FString USquadUnitAnimInstance::GetPoseDebugString() const
+{
+	const UAnimMontage* ActiveMontage = GetCurrentActiveMontage();
+	return FString::Printf(
+		TEXT("aiming=%d aim_position=%s movement=%s idle_pose=%s graph_pose=%s cover_action=%s montage=%s montage_pos=%.2f cover_ao=%s cover_ao_base=%s cover_idle=%s regular_ao=%s regular_ao_base=%s angle=%.1f"),
+		bAimToTarget ? 1 : 0,
+		*UEnum::GetValueAsString(AimPositionMontages.AimPosition),
+		*UEnum::GetValueAsString(MovementState),
+		*UEnum::GetValueAsString(IdleAnimationPose),
+		*UEnum::GetValueAsString(CoverGraphPose),
+		*UEnum::GetValueAsString(M_CoverAnimRuntime.M_Action),
+		*GetNameSafe(ActiveMontage),
+		IsValid(ActiveMontage) ? Montage_GetPosition(ActiveMontage) : -1.0f,
+		*GetNameSafe(GetCurrentCoverAimOffset()),
+		*GetNameSafe(GetCurrentCoverAimBaseSequence()),
+		*GetNameSafe(GetCurrentCoverIdlePose()),
+		*GetNameSafe(AimOffsets.M_ActiveAimOffset),
+		*GetNameSafe(AimOffsets.M_ActiveAimOffsetSequence),
+		AimOffsetAngle);
+}
+
 bool USquadUnitAnimInstance::GetIsCoverTransitionMontageActive() const
 {
 	return M_CoverAnimRuntime.M_ActiveMontageAction != ESquadCoverAnimAction::None;
@@ -883,7 +930,7 @@ void USquadUnitAnimInstance::ForceCompleteCoverTransition()
 	CompleteCoverTransition(CompletedAction, NextAction);
 }
 
-UAnimSequence* USquadUnitAnimInstance::GetCurrentCoverIdlePose() const
+UAnimSequence* USquadUnitAnimInstance::ResolveCoverIdlePose() const
 {
 	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
 	{
@@ -894,7 +941,7 @@ UAnimSequence* USquadUnitAnimInstance::GetCurrentCoverIdlePose() const
 	return StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->ProtectedIdlePose;
 }
 
-UAimOffsetBlendSpace* USquadUnitAnimInstance::GetCurrentCoverAimOffset() const
+UAimOffsetBlendSpace* USquadUnitAnimInstance::ResolveCoverAimOffset() const
 {
 	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
 	{
@@ -911,7 +958,7 @@ UAimOffsetBlendSpace* USquadUnitAnimInstance::GetCurrentCoverAimOffset() const
 	return StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->PeekAimAssets.AimOffset;
 }
 
-UAnimSequence* USquadUnitAnimInstance::GetCurrentCoverAimBaseSequence() const
+UAnimSequence* USquadUnitAnimInstance::ResolveCoverAimBaseSequence() const
 {
 	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
 	{
@@ -1033,6 +1080,12 @@ void USquadUnitAnimInstance::StartMontage(
 	if (!SelectedMontage)
 	{
 		RTSFunctionLibrary::ReportError("Selected Montage is null in USquadUnitAnimInstance::StartMontage");
+		return;
+	}
+	// Montage_Play stops every other montage in the group, which would cut a cover transition short and leave
+	// the unit half way into its pose. The full-body cover clip hides a reload or shot anyway.
+	if (bIsWeaponMontage && GetIsCoverTransitionMontageActive())
+	{
 		return;
 	}
 
@@ -1230,6 +1283,20 @@ void USquadUnitAnimInstance::SetIdleAnimationPose(const ESquadIdleAnimationPose 
 
 void USquadUnitAnimInstance::RefreshCoverGraphPose()
 {
+	// Only ever replaced by another valid asset; see FSquadUnitCoverGraphAssets for why they are never cleared.
+	if (UAnimSequence* CoverIdlePose = ResolveCoverIdlePose())
+	{
+		M_CoverGraphAssets.IdlePose = CoverIdlePose;
+	}
+	if (UAimOffsetBlendSpace* CoverAimOffset = ResolveCoverAimOffset())
+	{
+		M_CoverGraphAssets.AimOffset = CoverAimOffset;
+	}
+	if (UAnimSequence* CoverAimBaseSequence = ResolveCoverAimBaseSequence())
+	{
+		M_CoverGraphAssets.AimBaseSequence = CoverAimBaseSequence;
+	}
+
 	switch (IdleAnimationPose)
 	{
 	case ESquadIdleAnimationPose::StandingCoverLeft:
@@ -1293,8 +1360,16 @@ bool USquadUnitAnimInstance::PlayCoverMontage(
 		: Montage_Play(Montage, CoverMontagePlayRate, EMontagePlayReturnType::Duration);
 	if (not FMath::IsFinite(PlayedDuration) || PlayedDuration <= KINDA_SMALL_NUMBER)
 	{
-		RTSFunctionLibrary::ReportError(
-			"Failed to play cover montage " + Montage->GetName() + " on " + GetName());
+		// A montage the engine refuses (for example two slot tracks with the same name) fails on every use;
+		// one report per animation class is enough, and the caller continues as if no montage were configured.
+		const uint32 UnplayableMontageBit = 1u <<
+			(SquadUnitCoverAnimLogStatics::FirstUnplayableMontageReportBit + static_cast<uint32>(MontageAction));
+		if (SquadUnitCoverAnimLogStatics::TryMarkMissingCoverAssetReported(*this, UnplayableMontageBit))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Failed to play cover montage " + Montage->GetName() + " on " + GetClass()->GetName() +
+				". Check the output log for the engine's LogAnimMontage warning about this asset.");
+		}
 		return false;
 	}
 
@@ -1348,11 +1423,9 @@ void USquadUnitAnimInstance::OnCoverMontageEnded(UAnimMontage* Montage, const bo
 	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
 	M_CoverAnimRuntime.M_ActiveMontageSeconds = 0.0f;
 
-	if (bInterrupted)
-	{
-		ClearCoverAnimationRuntime();
-		return;
-	}
+	// An interruption still ends the transition; the pose it was heading for is reached without the rest of the
+	// clip, and the owning unit lines the capsule up. Leaving cover goes through CancelCoverAnimation, which
+	// unbinds this delegate first.
 	CompleteCoverTransition(CompletedAction, NextAction);
 }
 

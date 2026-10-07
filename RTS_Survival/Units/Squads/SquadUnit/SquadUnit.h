@@ -243,6 +243,11 @@ struct FSquadUnitCoverMoveGuard
 
 	// A unit circling its point is stopped and sent again once before the point is reported unreachable.
 	bool bHasRestartedApproach = false;
+
+	// The point this unit last left because it could not engage its target from there, and until when it is
+	// skipped. Without this a unit whose target flickers walks back into the same point again and again.
+	int64 RejectedPointId = 0;
+	float RejectedPointExpiryWorldSeconds = 0.0f;
 };
 
 /**
@@ -301,6 +306,9 @@ public:
 	 * @return False while the unit is moving, sliding, or playing a cover transition.
 	 */
 	bool TryGetSettledCoverCapsuleError(float& OutErrorCentimeters) const;
+
+	// Lets cover selection skip the point this unit just gave up because its target could not be engaged from it.
+	bool GetIsCoverPointRejectedForTarget(int64 PointId) const;
 
 	/**
 	 * @brief Records a tactical cover assignment without replacing or completing the active command.
@@ -819,6 +827,10 @@ private:
 	void StopMovementAndClearPath();
 	void UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
 	bool GetCanUseAutomaticCover() const;
+
+	/** @return True while a unit that already holds a point may stay, which is more lenient than taking one. */
+	bool GetMayKeepAutomaticCover() const;
+	void LeaveCoverUnusableAgainstTarget(const TCHAR* Reason);
 	bool GetIsSquadEligibleForAutomaticCover() const;
 	bool GetIsCoverSearchOnCooldown() const;
 	bool GetHasCoverStepTimedOut() const;
@@ -868,6 +880,9 @@ private:
 	void FinishCoverCapsuleSlide();
 	void StopCoverCapsuleSlide();
 	void ClearCoverStateInternal(bool bStopCoverMovement);
+
+	// Leaves cover and records why, so repeated enter and leave cycles can be traced in the log.
+	void LeaveCoverForReason(const TCHAR* Reason);
 	void CancelAutomaticCoverForCommandMovement();
 	void SetCoverWeaponFireBlocked(bool bBlocked) const;
 	void RegisterCoverProviderWeaponIgnore(AActor* ProviderActor, bool bRegister);

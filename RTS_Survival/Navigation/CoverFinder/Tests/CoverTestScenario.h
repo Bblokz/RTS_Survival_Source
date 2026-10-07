@@ -91,6 +91,10 @@ struct FCoverTestScenario
 private:
 	FCoverTestCombatTotals M_CombatTotals;
 	TArray<FCoverTestAttackingSquad> M_AttackingSquads;
+	// Last seen location per unit, to catch a capsule that jumps further in one frame than any cover step allows.
+	TMap<TWeakObjectPtr<ASquadUnit>, FVector> M_LastUnitLocations;
+	int32 M_UnitLocationJumpCount = 0;
+	int32 M_UnitMeshBlowUpCount = 0;
 	ECoverTestScenarioPhase M_Phase = ECoverTestScenarioPhase::Inactive;
 	float M_PhaseElapsedSeconds = 0.0f;
 	float M_IdleObservationSeconds = 0.0f;
@@ -103,6 +107,10 @@ private:
 
 	// Unrendered meshes stop advancing montages, which would hide every cover clip from an unattended run.
 	void KeepUnitAnimationTicking(UWorld& World) const;
+
+	// Flags units that teleport or whose mesh bounds explode, which is what a one-frame visual glitch looks like.
+	void WatchUnitsForVisualGlitches(UWorld& World);
+	void WatchUnitForVisualGlitches(ASquadUnit& SquadUnit);
 
 	// The map boots paused behind the start-game widget, which would freeze every unit in an unattended run.
 	void ResumeWorldIfPaused(UWorld& World) const;
