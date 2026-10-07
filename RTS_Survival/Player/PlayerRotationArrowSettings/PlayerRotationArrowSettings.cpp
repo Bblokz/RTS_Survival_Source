@@ -120,6 +120,16 @@ bool FPlayerRotationArrowSettings::GetIsRotationArrowActive() const
 	return bM_RotationArrowInitialized;
 }
 
+FVector FPlayerRotationArrowSettings::GetArrowGroundLocation() const
+{
+	return IsValid(RotationArrowActor) ? RotationArrowActor->GetActorLocation() - ArrowOffset : FVector::ZeroVector;
+}
+
+FRotator FPlayerRotationArrowSettings::GetArrowRotation() const
+{
+	return IsValid(RotationArrowActor) ? RotationArrowActor->GetActorRotation() : FRotator::ZeroRotator;
+}
+
 
 bool FPlayerRotationArrowSettings::EnsureRotationActorIsValid() const
 {

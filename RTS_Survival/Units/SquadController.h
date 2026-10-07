@@ -16,6 +16,7 @@
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
 #include "SquadControllerDataCallback/SquadControllerDataCallback.h"
 #include "Squads/SquadPathFinding/SquadPathFindingError.h"
+#include "Squads/SquadUnit/SquadUnitPlannedPosition.h"
 #include "Squads/SquadWeaponSwitch/SquadWeaponSwitch.h"
 #include "SquadController.generated.h"
 
@@ -250,6 +251,16 @@ struct FSquadLoadingStatus
 };
 
 /**
+ * @brief Per-soldier destinations of one player-planned move, waiting for the move command at the same location.
+ * The command queue only stores a location, so the squad matches a starting move to its plan by that location.
+ */
+struct FSquadPlannedMove
+{
+	FVector CommandLocation = FVector::ZeroVector;
+	TArray<FSquadUnitPlannedDestination> UnitDestinations;
+};
+
+/**
  * Call set SquadVisionRange to start the Fow on the squad units. 
  */
 UCLASS()
@@ -429,6 +440,16 @@ public:
 	 * @param TargetLocation Current actor or attack-ground location that is outside weapon range.
 	 * @param CombatAbility Attack context that must still own the squad command queue.
 	 */
+	/**
+	 * @brief Attaches the soldiers' individual destinations to the move command about to be issued.
+	 * Call directly before MoveToLocation with the same location; a queued move keeps its plan until it starts.
+	 * @param CommandLocation Location passed to the move command.
+	 * @param UnitDestinations Where each soldier of this squad ends up, from the squads-only move preview.
+	 */
+	void SetPlannedMoveDestinations(
+		const FVector& CommandLocation,
+		TArray<FSquadUnitPlannedDestination>&& UnitDestinations);
+
 	virtual void OnSquadUnitOutOfRange(
 		const FVector& TargetLocation,
 		EAbilityID CombatAbility);
@@ -847,6 +868,26 @@ protected:
 	FVector GetFinalPathPointOffset(const FVector& UnitOffset) const;
 
 	TArray<FVector> M_SqPath_Offsets;
+
+	// Per-soldier destinations waiting for the move command that was queued at the same location.
+	TArray<FSquadPlannedMove> M_PendingPlannedMoves;
+
+	/**
+	 * @brief Finds and removes the plan the player's preview attached to a move location.
+	 * @param MoveToLocation Location of the move command that is starting now.
+	 * @param OutPlannedMove The matching plan when one was attached.
+	 * @return False for moves issued without a plan.
+	 */
+	bool TryTakePlannedMove(const FVector& MoveToLocation, FSquadPlannedMove& OutPlannedMove);
+
+	/**
+	 * @brief Sends every soldier to its own planned destination with its own path.
+	 * The shared squad path only leads to the squad's anchor; soldiers planned onto different sides of an
+	 * obstacle need their own route.
+	 * @param PlannedMove Destinations from the squads-only move preview.
+	 * @param MoveToLocation The command's location, used for soldiers the plan does not mention.
+	 */
+	void ExecutePlannedMove(const FSquadPlannedMove& PlannedMove, const FVector& MoveToLocation);
 
 	/** The paths for each squad unit. */
 	TMap<ASquadUnit*, FNavPathSharedPtr> M_SquadUnitPaths;

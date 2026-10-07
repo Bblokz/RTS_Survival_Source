@@ -871,7 +871,7 @@ private:
 	 * @param bIsSingleFire Single shot or burst variant.
 	 * @return Cover fire montage when aiming from cover and one is assigned, otherwise the weapon's regular one.
 	 */
-	UAnimMontage* SelectFireMontage(bool bIsSingleFire) const;
+	UAnimMontage* SelectFireMontage(bool bIsSingleFire);
 
 	// Assets of the cover pose that is active right now; nullptr when that pose does not use the asset.
 	UAnimSequence* ResolveCoverIdlePose() const;

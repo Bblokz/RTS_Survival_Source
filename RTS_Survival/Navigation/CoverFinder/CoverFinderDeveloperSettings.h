@@ -28,8 +28,18 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Cover Search", meta=(ClampMin="0.05", UIMin="0.05", UIMax="2.0", Units="ms"))
 	float M_GameThreadBudgetMilliseconds = 0.35f;
 
+	// Budget for the very first scan of a map. Nothing can take cover until that scan is published, so it may
+	// cost more per frame than the periodic refreshes that follow it.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Search", meta=(ClampMin="0.05", UIMin="0.35", UIMax="10.0", Units="ms"))
+	float M_FirstScanGameThreadBudgetMilliseconds = 4.0f;
+
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover")
 	bool bM_EnableAutomaticCoverUse = true;
+
+	// With only squads selected, shows where each soldier will go under the cursor and sends them exactly there.
+	// Off, squads move with the regular formation slots again.
+	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview")
+	bool bM_EnableSquadMovePreview = true;
 
 	// Limits how far an otherwise idle or already-in-range infantry unit may reposition itself for cover.
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="100.0", UIMin="100.0", UIMax="2500.0", Units="cm"))

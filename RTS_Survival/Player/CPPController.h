@@ -84,6 +84,7 @@ struct FNomadicPreviewAttachments;
 class AScavengeableObject;
 enum class ERTSPrimaryClickContext;
 struct FPlayerRotationArrowSettings;
+class USquadMovePreviewComponent;
 enum class ERTSPauseGameOptions : uint8;
 enum class ERTSVoiceLine : uint8;
 class UPlayerAudioController;
@@ -1572,6 +1573,25 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UFormationController> M_FormationController;
+
+	// Previews and issues per-soldier positions while squads are the whole selection.
+	UPROPERTY()
+	TObjectPtr<USquadMovePreviewComponent> M_SquadMovePreview;
+
+	bool GetIsValidSquadMovePreview() const;
+
+	/** @return True when squads are selected and nothing else is, the only case the squad move preview handles. */
+	bool GetIsSquadsOnlySelection() const;
+
+	/**
+	 * @brief Feeds this frame's cursor, selection and rotation-arrow state to the squad move preview.
+	 * @param CursorHit What the cursor currently points at.
+	 * @param bCursorHit Whether CursorHit is a valid hit.
+	 */
+	void Tick_UpdateSquadMovePreview(const FHitResult& CursorHit, bool bCursorHit);
+
+	// Asks the command decoder what a secondary click on this actor would do, without issuing anything.
+	bool GetWouldSecondaryClickMove(AActor* ActorUnderCursor);
 
 	// Whether there is currently an active building preview.
 	// This is only the case if we activated a building ability but have not yet propagated a valid building

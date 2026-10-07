@@ -142,6 +142,18 @@ public:
 		FRTSCoverPoint& OutCoverPoint,
 		float MaximumDistanceToTarget = 0.0f);
 
+	/**
+	 * @brief Reserves one specific point, for a soldier whose player-planned move ended on it.
+	 * @param SquadUnit Unit that was sent to the point.
+	 * @param PointId Point shown to the player in the move preview.
+	 * @param OutCoverPoint Current published data of that point when successful.
+	 * @return False when the point is gone, taken by another unit, or currently reported unreachable.
+	 */
+	bool TryReserveCoverPointById(ASquadUnit& SquadUnit, int64 PointId, FRTSCoverPoint& OutCoverPoint);
+
+	/** @return Unit holding the reservation on a point, or nullptr when it is free. */
+	const ASquadUnit* GetCoverReservationOwner(int64 PointId) const;
+
 	void ReleaseCoverReservation(const ASquadUnit& SquadUnit, int64 PointId);
 
 	// Called when a unit gave up walking to a point, so nobody else is sent to the same blocked slot for a while.

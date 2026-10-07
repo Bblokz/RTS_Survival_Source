@@ -697,6 +697,31 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::GatherBestTacticalCoverCan
 	return BestCandidates;
 }
 
+bool URTSCoverFinderWorldSubsystem::TryReserveCoverPointById(
+	ASquadUnit& SquadUnit,
+	const int64 PointId,
+	FRTSCoverPoint& OutCoverPoint)
+{
+	const int32* CoverPointIndex = M_CoverPointIndices.Find(PointId);
+	if (CoverPointIndex == nullptr || not M_CoverPoints.IsValidIndex(*CoverPointIndex))
+	{
+		return false;
+	}
+	if (GetIsPointReservedByAnotherUnit(PointId, SquadUnit) || GetIsCoverPointTemporarilyUnreachable(PointId))
+	{
+		return false;
+	}
+	M_CoverReservations.Add(PointId, TWeakObjectPtr<ASquadUnit>(&SquadUnit));
+	OutCoverPoint = M_CoverPoints[*CoverPointIndex];
+	return true;
+}
+
+const ASquadUnit* URTSCoverFinderWorldSubsystem::GetCoverReservationOwner(const int64 PointId) const
+{
+	const TWeakObjectPtr<ASquadUnit>* ReservingUnit = M_CoverReservations.Find(PointId);
+	return ReservingUnit != nullptr ? ReservingUnit->Get() : nullptr;
+}
+
 void URTSCoverFinderWorldSubsystem::ReleaseCoverReservation(
 	const ASquadUnit& SquadUnit,
 	const int64 PointId)
@@ -905,6 +930,7 @@ void URTSCoverFinderWorldSubsystem::TickTacticalCoverUnits()
 		{
 			continue;
 		}
+		SquadUnit->UpdatePlannedMoveArrival();
 		SquadUnit->UpdateAutomaticCover(*this);
 		++M_TacticalPerformanceSnapshot.UnitUpdatesLastFrame;
 	}
@@ -1236,7 +1262,11 @@ FCoverFinderSettingsSnapshot URTSCoverFinderWorldSubsystem::BuildSettingsSnapsho
 	Snapshot.StandingPeekGapWidth = FMath::Clamp(CoverSettings->M_StandingPeekGapWidth, 80.0f, 250.0f);
 	Snapshot.StandingPeekEdgeInset = FMath::Clamp(CoverSettings->M_StandingPeekEdgeInset, 0.0f, 80.0f);
 	Snapshot.CoverPointSpacing = FMath::Clamp(CoverSettings->M_CoverPointSpacing, 50.0f, 250.0f);
-	Snapshot.GameThreadBudgetMilliseconds = FMath::Max(0.05f, CoverSettings->M_GameThreadBudgetMilliseconds);
+	Snapshot.GameThreadBudgetMilliseconds = FMath::Max(
+		0.05f,
+		bM_EnvironmentScanComplete
+			? CoverSettings->M_GameThreadBudgetMilliseconds
+			: CoverSettings->M_FirstScanGameThreadBudgetMilliseconds);
 	Snapshot.AgentRadius = FMath::Max(1.0f, AgentRadius);
 	Snapshot.AgentHeight = FMath::Max(RTSCoverFinderConstants::InfantryHeight, AgentHeight);
 	Snapshot.SurfaceDistanceTolerance = FMath::Max(

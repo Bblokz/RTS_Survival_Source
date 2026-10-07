@@ -35,6 +35,13 @@ struct FPlayerRotationArrowSettings
 	void CancelRotationArrow();
 	bool GetIsRotationArrowActive() const;
 
+	/** @return True once the drag moved far enough that releasing it will give the move order a facing. */
+	bool GetIsPlayerChoosingFacing() const { return bM_RotationArrowInitialized && bM_MouseMovedEnough; }
+
+	// Ground location the drag started on and the direction the arrow points in right now.
+	FVector GetArrowGroundLocation() const;
+	FRotator GetArrowRotation() const;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<AActor> RotationArrowClass;
 

@@ -584,6 +584,10 @@ void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubs
 		? ESquadUnitCoverUseReason::Attack
 		: ESquadUnitCoverUseReason::AfterMoveCommand;
 	constexpr float FailedSearchRetrySeconds = 3.0f;
+	if (not IsValid(TargetActor) && TryUsePlayerPlannedPosition(CoverSubsystem))
+	{
+		return;
+	}
 	// A unit in a firefight whose weapon is between targets would otherwise grab the nearest point with no
 	// regard for where the enemy is, and give it up again as soon as the next target is registered.
 	if (not IsValid(TargetActor) && GetIsUnitInCombat())
@@ -888,7 +892,320 @@ FVector ASquadUnit::GetCoverLocalOffsetInWorld(
 
 FVector ASquadUnit::GetCoverEntryLocation() const
 {
-	const FRTSCoverPoint& CoverPoint = M_CoverRuntimeState.AssignedCoverPoint;
+	return GetCoverEntryLocationForPoint(M_CoverRuntimeState.AssignedCoverPoint);
+}
+
+void ASquadUnit::ClearPlayerPlannedPosition()
+{
+	M_PlayerPlannedPosition = FSquadUnitPlannedPosition();
+}
+
+void ASquadUnit::SetPlayerPlannedPosition(const FSquadUnitPlannedPosition& PlannedPosition)
+{
+	M_PlayerPlannedPosition = PlannedPosition;
+	M_PlannedMoveRequestID = FAIRequestID::InvalidRequest;
+	M_PlannedMoveWatch = FSquadUnitPlannedMoveWatch();
+}
+
+void ASquadUnit::PlaceUnseenUnitOnPlannedPosition(const FVector& ArrivalLocation)
+{
+	const UCapsuleComponent* UnitCapsule = GetCapsuleComponent();
+	UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+	if (not IsValid(UnitCapsule) || not IsValid(UnitMovement) || not GetIsValidAISquadUnit())
+	{
+		return;
+	}
+	// Halting also aborts the path; unbound first so that abort is not taken for the end of the command.
+	M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
+	UnitMovement->StopMovementImmediately();
+	// Planned locations lie on the navmesh, at the soldier's feet.
+	SetActorLocation(
+		ArrivalLocation + FVector::UpVector * UnitCapsule->GetScaledCapsuleHalfHeight(),
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics);
+}
+
+void ASquadUnit::UpdatePlannedMoveArrival()
+{
+	constexpr float CirclingCheckDistance = 350.0f;
+	constexpr float CirclingGraceSeconds = 0.5f;
+	constexpr float UnseenToleranceSeconds = 0.5f;
+	const UWorld* World = GetWorld();
+	const bool bIsWalkingPlannedMove = M_PlayerPlannedPosition.Type != ESquadPlannedPositionType::None &&
+		M_ActiveCommand == EAbilityID::IdMove && GetIsPathFollowingActive() && IsValid(World);
+	const FVector ArrivalLocation = GetArrivalLocationForPlannedPosition(M_PlayerPlannedPosition);
+	if (not bIsWalkingPlannedMove ||
+		FVector::DistSquared2D(GetActorLocation(), ArrivalLocation) > FMath::Square(CirclingCheckDistance))
+	{
+		M_PlannedMoveWatch.NearGoalSinceWorldSeconds = -1.0f;
+		return;
+	}
+	const float WorldSeconds = World->GetTimeSeconds();
+	if (M_PlannedMoveWatch.NearGoalSinceWorldSeconds < 0.0f)
+	{
+		M_PlannedMoveWatch.NearGoalSinceWorldSeconds = WorldSeconds;
+		return;
+	}
+	// A unit walking straight in covers the last stretch well within this time, whatever its speed.
+	const UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+	const float ExpectedSpeed = FMath::Max(
+		SquadUnitCoverMoveStatics::MinimumExpectedSpeed,
+		(IsValid(UnitMovement) ? UnitMovement->GetMaxSpeed() : 0.0f) *
+		SquadUnitCoverMoveStatics::ExpectedAverageSpeedRatio);
+	const float AllowedSeconds = CirclingCheckDistance / ExpectedSpeed + CirclingGraceSeconds;
+	if (WorldSeconds - M_PlannedMoveWatch.NearGoalSinceWorldSeconds < AllowedSeconds)
+	{
+		return;
+	}
+	M_PlannedMoveWatch.NearGoalSinceWorldSeconds = -1.0f;
+	const USkeletalMeshComponent* UnitMesh = GetMesh();
+	if (IsValid(UnitMesh) && not UnitMesh->WasRecentlyRendered(UnseenToleranceSeconds))
+	{
+		PlaceUnseenUnitOnPlannedPosition(ArrivalLocation);
+		CompletePlannedMoveInPlace();
+		return;
+	}
+	if (M_PlannedMoveWatch.bHasRestartedFromStandstill)
+	{
+		CompletePlannedMoveInPlace();
+		return;
+	}
+	// From a standstill the unit heads straight for its spot instead of swinging around it. Stopping the path
+	// alone keeps the running speed, and with it the circle the unit is stuck on.
+	M_PlannedMoveWatch.bHasRestartedFromStandstill = true;
+	UCharacterMovementComponent* MovementToHalt = GetCharacterMovement();
+	if (IsValid(MovementToHalt) && GetIsValidAISquadUnit())
+	{
+		// Halting also aborts the path; unbound first so that abort is not taken for the end of the command.
+		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
+		MovementToHalt->StopMovementImmediately();
+	}
+	if (StartPlannedMoveRequest(ArrivalLocation) != ESquadPlannedMoveStart::Walking)
+	{
+		CompletePlannedMoveInPlace();
+	}
+}
+
+void ASquadUnit::ExecutePlannedMove(const FSquadUnitPlannedPosition& PlannedPosition)
+{
+	constexpr float StartRetrySeconds = 1.5f;
+	constexpr float StartRetryIntervalSeconds = 0.1f;
+	CancelAutomaticCoverForCommandMovement();
+	M_ActiveCommand = EAbilityID::IdMove;
+	SetPlayerPlannedPosition(PlannedPosition);
+	const ESquadPlannedMoveStart StartResult = StartPlannedMoveRequest(
+		GetArrivalLocationForPlannedPosition(PlannedPosition));
+	UWorld* World = GetWorld();
+	if (StartResult == ESquadPlannedMoveStart::Walking || not IsValid(World))
+	{
+		return;
+	}
+	// The squad's command must still hear from this unit, but not from inside the call that starts the command:
+	// a unit that is already there reports on the first retry, one that could not start keeps trying for a while.
+	M_PlannedMoveWatch.StartRetryDeadlineWorldSeconds = World->GetTimeSeconds() +
+		(StartResult == ESquadPlannedMoveStart::Failed ? StartRetrySeconds : 0.0f);
+	World->GetTimerManager().SetTimer(
+		M_PlannedMoveStartRetryTimer,
+		FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			RetryPlannedMoveStart();
+		}),
+		StartRetryIntervalSeconds,
+		true);
+}
+
+void ASquadUnit::RetryPlannedMoveStart()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	const bool bStillWaitingToStart = M_ActiveCommand == EAbilityID::IdMove &&
+		M_PlayerPlannedPosition.Type != ESquadPlannedPositionType::None && not GetIsPathFollowingActive();
+	if (not bStillWaitingToStart)
+	{
+		World->GetTimerManager().ClearTimer(M_PlannedMoveStartRetryTimer);
+		return;
+	}
+	if (World->GetTimeSeconds() < M_PlannedMoveWatch.StartRetryDeadlineWorldSeconds)
+	{
+		const ESquadPlannedMoveStart StartResult = StartPlannedMoveRequest(
+			GetArrivalLocationForPlannedPosition(M_PlayerPlannedPosition));
+		if (StartResult == ESquadPlannedMoveStart::Failed)
+		{
+			return;
+		}
+		if (StartResult == ESquadPlannedMoveStart::Walking)
+		{
+			World->GetTimerManager().ClearTimer(M_PlannedMoveStartRetryTimer);
+			return;
+		}
+	}
+	World->GetTimerManager().ClearTimer(M_PlannedMoveStartRetryTimer);
+	CompletePlannedMoveInPlace();
+}
+
+ESquadPlannedMoveStart ASquadUnit::StartPlannedMoveRequest(const FVector& ArrivalLocation)
+{
+	if (not GetIsValidAISquadUnit())
+	{
+		return ESquadPlannedMoveStart::Failed;
+	}
+	// Unbound while stopping so aborting the previous movement is not reported as the end of this command.
+	M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
+	M_AISquadUnit->StopMovement();
+	FAIMoveRequest MoveRequest(ArrivalLocation);
+	FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(MoveRequest);
+	MoveRequest.SetAcceptanceRadius(DeveloperSettings::GamePlay::Navigation::SquadUnitAcceptanceRadius);
+	MoveRequest.SetReachTestIncludesAgentRadius(true);
+	MoveRequest.SetCanStrafe(false);
+	MoveRequest.SetNavigationFilter(M_AISquadUnit->GetDefaultNavigationFilterClass());
+	const EPathFollowingRequestResult::Type MoveResult = M_AISquadUnit->MoveTo(MoveRequest);
+	if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+	{
+		return ESquadPlannedMoveStart::AlreadyThere;
+	}
+	if (MoveResult != EPathFollowingRequestResult::RequestSuccessful &&
+		not StartPlannedMoveFromNearestNavigableLocation(MoveRequest))
+	{
+		const UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("Planned move of %s could not start; distance_cm=%.0f root_motion=%d."),
+			*GetName(),
+			FVector::Dist2D(GetActorLocation(), ArrivalLocation),
+			IsValid(UnitMovement) && UnitMovement->HasAnimRootMotion() ? 1 : 0);
+		return ESquadPlannedMoveStart::Failed;
+	}
+	M_PlannedMoveRequestID = M_AISquadUnit->GetCurrentMoveRequestID();
+	M_AISquadUnit->ReceiveMoveCompleted.AddDynamic(this, &ASquadUnit::OnMoveCompleted);
+	return ESquadPlannedMoveStart::Walking;
+}
+
+bool ASquadUnit::StartPlannedMoveFromNearestNavigableLocation(const FAIMoveRequest& MoveRequest)
+{
+	const FVector NavigableSearchExtent(200.0f, 200.0f, 250.0f);
+	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (not IsValid(NavigationSystem))
+	{
+		return false;
+	}
+	FNavLocation NavigableStart;
+	// The soldier's own navmesh: the default one may belong to vehicles.
+	const ANavigationData* UnitNavigationData = NavigationSystem->GetNavDataForProps(
+		GetNavAgentPropertiesRef(),
+		GetActorLocation());
+	if (UnitNavigationData == nullptr)
+	{
+		return false;
+	}
+	// Projected with the filter the path will use: next to its cover a soldier can stand on navmesh that exists
+	// but that infantry paths may not start from.
+	const FSharedConstNavQueryFilter UnitQueryFilter = UNavigationQueryFilter::GetQueryFilter(
+		*UnitNavigationData,
+		M_AISquadUnit,
+		MoveRequest.GetNavigationFilter());
+	if (not NavigationSystem->ProjectPointToNavigation(
+		GetActorLocation(),
+		NavigableStart,
+		NavigableSearchExtent,
+		UnitNavigationData,
+		UnitQueryFilter))
+	{
+		return false;
+	}
+	FPathFindingQuery PathQuery;
+	if (not M_AISquadUnit->BuildPathfindingQuery(MoveRequest, NavigableStart.Location, PathQuery))
+	{
+		return false;
+	}
+	FNavPathSharedPtr PathFromNavigableStart;
+	M_AISquadUnit->FindPathForMoveRequest(MoveRequest, PathQuery, PathFromNavigableStart);
+	if (not PathFromNavigableStart.IsValid())
+	{
+		return false;
+	}
+	return M_AISquadUnit->RequestMove(MoveRequest, PathFromNavigableStart).IsValid();
+}
+
+void ASquadUnit::CompletePlannedMoveInPlace()
+{
+	UE_LOG(
+		LogRTSSquadUnitCover,
+		Verbose,
+		TEXT("Planned move of %s completed in place; distance_cm=%.0f restarted=%d."),
+		*GetName(),
+		FVector::Dist2D(GetActorLocation(), GetArrivalLocationForPlannedPosition(M_PlayerPlannedPosition)),
+		M_PlannedMoveWatch.bHasRestartedFromStandstill ? 1 : 0);
+	if (GetIsValidAISquadUnit())
+	{
+		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
+		M_AISquadUnit->StopMovement();
+	}
+	ApplyPlayerPlannedFacing();
+	OnCommandComplete();
+}
+
+FVector ASquadUnit::GetArrivalLocationForPlannedPosition(const FSquadUnitPlannedPosition& PlannedPosition) const
+{
+	return PlannedPosition.GetIsCover()
+		? GetCoverEntryLocationForPoint(PlannedPosition.CoverPoint)
+		: PlannedPosition.Location;
+}
+
+bool ASquadUnit::TryUsePlayerPlannedPosition(URTSCoverFinderWorldSubsystem& CoverSubsystem)
+{
+	constexpr float PlannedPositionRecheckSeconds = 2.0f;
+	if (M_PlayerPlannedPosition.Type == ESquadPlannedPositionType::None)
+	{
+		return false;
+	}
+	// The player put this soldier in the open on purpose; it stays there until it has something to shoot at.
+	if (M_PlayerPlannedPosition.Type == ESquadPlannedPositionType::RegularStanding)
+	{
+		DelayNextCoverSearch(PlannedPositionRecheckSeconds);
+		return true;
+	}
+	FRTSCoverPoint PlannedCoverPoint;
+	if (not CoverSubsystem.TryReserveCoverPointById(
+		*this,
+		M_PlayerPlannedPosition.CoverPoint.PointId,
+		PlannedCoverPoint))
+	{
+		// The previewed point is gone or taken; fall back to the normal search from here on.
+		M_PlayerPlannedPosition = FSquadUnitPlannedPosition();
+		return false;
+	}
+	if (not SetCoverAssignment(PlannedCoverPoint, ESquadUnitCoverUseReason::AfterMoveCommand))
+	{
+		CoverSubsystem.ReleaseCoverReservation(*this, PlannedCoverPoint.PointId);
+		return true;
+	}
+	if (not StartCoverMovement())
+	{
+		ClearCoverStateInternal(false);
+	}
+	return true;
+}
+
+void ASquadUnit::ApplyPlayerPlannedFacing()
+{
+	if (M_PlayerPlannedPosition.Type != ESquadPlannedPositionType::RegularStanding)
+	{
+		return;
+	}
+	const FVector PlannedFacing = M_PlayerPlannedPosition.Facing.GetSafeNormal2D();
+	if (not PlannedFacing.IsNearlyZero())
+	{
+		SetActorRotation(PlannedFacing.Rotation());
+	}
+}
+
+FVector ASquadUnit::GetCoverEntryLocationForPoint(const FRTSCoverPoint& CoverPoint) const
+{
 	// Silent: without an animation instance there is no enter clip whose travel needs room.
 	if (not IsValid(AnimBp_SquadUnit))
 	{
@@ -1814,6 +2131,7 @@ void ASquadUnit::ExecuteMoveToSelfPathFinding(const FVector& MoveToLocation, con
 
 void ASquadUnit::ExecuteMoveAlongPath(const FNavPathSharedPtr& Path, const EAbilityID AbilityToMoveFor)
 {
+	ClearPlayerPlannedPosition();
 	CancelAutomaticCoverForCommandMovement();
 	if (!GetIsValidAISquadUnit() || !Path.IsValid())
 		return;
@@ -1871,6 +2189,7 @@ void ASquadUnit::TerminateMovementCommandDoNotKillVelocity()
 void ASquadUnit::MoveToAndBindOnCompleted(const FVector& MoveToLocation, const bool bUsePathfinding,
                                            const EAbilityID MoveContext)
 {
+	ClearPlayerPlannedPosition();
 	CancelAutomaticCoverForCommandMovement();
 	if (!GetIsValidAISquadUnit())
 	{
@@ -1930,6 +2249,7 @@ void ASquadUnit::MoveToActorAndBindOnCompleted(
 	const float AcceptanceRadius,
 	const EAbilityID AbilityToMoveFor)
 {
+	ClearPlayerPlannedPosition();
 	CancelAutomaticCoverForCommandMovement();
 	if (!GetIsValidAISquadUnit() || !IsValid(TargetActor))
 	{
@@ -2491,6 +2811,12 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 		OnMoveCompleted_Cover(Result);
 		return;
 	}
+	const bool bIsWalkingPlannedMove = M_ActiveCommand == EAbilityID::IdMove &&
+		M_PlayerPlannedPosition.Type != ESquadPlannedPositionType::None && M_PlannedMoveRequestID.IsValid();
+	if (bIsWalkingPlannedMove && RequestID.GetID() != M_PlannedMoveRequestID.GetID())
+	{
+		return;
+	}
 	if (Result != EPathFollowingResult::Type::Success)
 	{
 		ReportPathFollowingResultError(Result);
@@ -2529,6 +2855,18 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 		break;
 	default:
 		// In case of other commands, notify the squad controller.
+		if (M_PlayerPlannedPosition.Type != ESquadPlannedPositionType::None)
+		{
+			UE_LOG(
+				LogRTSSquadUnitCover,
+				Verbose,
+				TEXT("Planned move of %s ended with %s; distance_cm=%.0f restarted=%d."),
+				*GetName(),
+				*UEnum::GetValueAsString(Result),
+				FVector::Dist2D(GetActorLocation(), GetArrivalLocationForPlannedPosition(M_PlayerPlannedPosition)),
+				M_PlannedMoveWatch.bHasRestartedFromStandstill ? 1 : 0);
+		}
+		ApplyPlayerPlannedFacing();
 		OnCommandComplete();
 	}
 }

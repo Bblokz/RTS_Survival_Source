@@ -593,7 +593,7 @@ void USquadUnitAnimInstance::PlayBurstAnim()
 	StartMontage(SelectFireMontage(false), true);
 }
 
-UAnimMontage* USquadUnitAnimInstance::SelectFireMontage(const bool bIsSingleFire) const
+UAnimMontage* USquadUnitAnimInstance::SelectFireMontage(const bool bIsSingleFire)
 {
 	if (const FSquadUnitCoverAimAssets* CoverAimAssets = GetActiveCoverAimAssets())
 	{

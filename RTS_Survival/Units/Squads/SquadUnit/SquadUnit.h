@@ -8,6 +8,7 @@
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderTypes.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnitPlannedPosition.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
@@ -205,6 +206,26 @@ struct FSquadUnitCoverRuntimeState
 };
 
 /**
+ * @brief Notices a soldier that keeps circling its player-planned destination instead of arriving.
+ * Planned destinations sit much closer together than the squad's default spread, and a running unit that is
+ * nudged off line next to its goal cannot turn tightly enough to reach it.
+ */
+USTRUCT()
+struct FSquadUnitPlannedMoveWatch
+{
+	GENERATED_BODY()
+
+	// World time at which the unit first got close to its destination while still walking; negative when not close.
+	float NearGoalSinceWorldSeconds = -1.0f;
+
+	// The unit is stopped and sent again once; if it still does not arrive it finishes its move where it stands.
+	bool bHasRestartedFromStandstill = false;
+
+	// A unit that could not start walking keeps trying until this world time, then finishes where it stands.
+	float StartRetryDeadlineWorldSeconds = -1.0f;
+};
+
+/**
  * @brief Moves the capsule onto a known cover location over a few frames instead of popping it there.
  * Lines the unit up before an enter clip and absorbs whatever a root-motion clip left over at its end.
  */
@@ -309,6 +330,20 @@ public:
 
 	// Lets cover selection skip the point this unit just gave up because its target could not be engaged from it.
 	bool GetIsCoverPointRejectedForTarget(int64 PointId) const;
+
+	/**
+	 * @brief Stores where the player's move preview put this soldier, after its squad issued the move.
+	 * A planned cover point is taken on arrival; a planned open position is held instead of wandering to cover.
+	 * @param PlannedPosition Position from the squads-only move preview.
+	 */
+	void SetPlayerPlannedPosition(const FSquadUnitPlannedPosition& PlannedPosition);
+	const FSquadUnitPlannedPosition& GetPlayerPlannedPosition() const { return M_PlayerPlannedPosition; }
+
+	/**
+	 * @return Where this soldier should stop walking for a planned position: the spot its enter animation
+	 * starts from for cover, the position itself otherwise.
+	 */
+	FVector GetArrivalLocationForPlannedPosition(const FSquadUnitPlannedPosition& PlannedPosition) const;
 
 	/**
 	 * @brief Records a tactical cover assignment without replacing or completing the active command.
@@ -624,6 +659,18 @@ private:
 	UPROPERTY()
 	FSquadUnitCoverCapsuleSlide M_CoverCapsuleSlide;
 
+	// Set by the squad when a player-planned move starts; replaced or cleared by the next commanded movement.
+	FSquadUnitPlannedPosition M_PlayerPlannedPosition;
+
+	UPROPERTY()
+	FSquadUnitPlannedMoveWatch M_PlannedMoveWatch;
+
+	FTimerHandle M_PlannedMoveStartRetryTimer;
+
+	// The request the unit currently walks its planned move with. Re-sending a planned move aborts the previous
+	// request, and that abort arrives after the new one started; it must not end the squad's command.
+	FAIRequestID M_PlannedMoveRequestID;
+
 	UPROPERTY()
 	FSquadUnitCoverMoveGuard M_CoverMoveGuard;
 
@@ -864,6 +911,44 @@ private:
 
 	/** @return Where the unit stops before its enter clip: the cover point plus the clip's designer offset. */
 	FVector GetCoverEntryLocation() const;
+	FVector GetCoverEntryLocationForPoint(const FRTSCoverPoint& CoverPoint) const;
+
+	/**
+	 * @brief Uses the player's planned position before the automatic search runs.
+	 * @param CoverSubsystem Subsystem that owns the reservation of a planned cover point.
+	 * @return True when the plan decided what the unit does, so no automatic search must follow.
+	 */
+	bool TryUsePlayerPlannedPosition(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+	void ApplyPlayerPlannedFacing();
+
+	/**
+	 * @brief Starts walking to a player-planned position as this unit's part of its squad's move command.
+	 * @param PlannedPosition Where the squads-only move preview put this soldier.
+	 */
+	void ExecutePlannedMove(const FSquadUnitPlannedPosition& PlannedPosition);
+
+	ESquadPlannedMoveStart StartPlannedMoveRequest(const FVector& ArrivalLocation);
+
+	void ClearPlayerPlannedPosition();
+
+	// Off screen the optimizer moves a soldier in steps longer than the arrival radius, so it steps over its slot
+	// back and forth; nobody can see it being put on the slot instead.
+	void PlaceUnseenUnitOnPlannedPosition(const FVector& ArrivalLocation);
+
+	// A soldier ordered away in the middle of a root-motion cover clip cannot start walking until it ended.
+	void RetryPlannedMoveStart();
+
+	/**
+	 * @brief Paths from the closest navigable spot when the unit itself stands off the navmesh.
+	 * A soldier pressed against its cover can stand inside the margin the navmesh keeps around the obstacle.
+	 * @param MoveRequest The request that could not be started from where the unit stands.
+	 * @return True when the unit is now walking.
+	 */
+	bool StartPlannedMoveFromNearestNavigableLocation(const FAIMoveRequest& MoveRequest);
+
+	// Called with the tactical cover update; finishes a planned move whose unit circles its destination.
+	void UpdatePlannedMoveArrival();
+	void CompletePlannedMoveInPlace();
 	FVector GetCoverExposedLocation() const;
 	FVector GetCoverLocalOffsetInWorld(
 		const FRTSCoverPoint& CoverPoint,

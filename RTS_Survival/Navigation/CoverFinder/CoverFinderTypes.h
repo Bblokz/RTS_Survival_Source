@@ -11,7 +11,9 @@ namespace RTSCoverFinderConstants
 	inline constexpr float LowerSupportProbeHeight = 30.0f;
 	inline constexpr int32 SearchDirectionCount = 8;
 	inline constexpr int32 ObservationChunkSize = 128;
-	inline constexpr int32 MaxWorldQueriesPerFrame = 256;
+	// Safety cap only: the millisecond budget is what paces a scan. A low cap made a large map's first scan take
+	// minutes, during which no cover existed at all.
+	inline constexpr int32 MaxWorldQueriesPerFrame = 16384;
 	inline constexpr int32 MaxSampleLocations = 1000000;
 	inline constexpr float SurfaceNormalSimilarity = 0.75f;
 	inline constexpr float DuplicateNormalSimilarity = 0.85f;

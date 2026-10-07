@@ -1691,8 +1691,72 @@ FVector ASquadController::GetFinalPathPointOffset(const FVector& UnitOffset) con
 	return UnitOffset * SqPathFinding_FinalDestSpread / SqPathFinding_OffsetDistance;
 }
 
+void ASquadController::SetPlannedMoveDestinations(
+	const FVector& CommandLocation,
+	TArray<FSquadUnitPlannedDestination>&& UnitDestinations)
+{
+	// Plans of moves that never started (queue cleared, squad stopped) must not pile up.
+	constexpr int32 MaximumPendingPlannedMoves = 8;
+	if (M_PendingPlannedMoves.Num() >= MaximumPendingPlannedMoves)
+	{
+		M_PendingPlannedMoves.RemoveAt(0);
+	}
+	FSquadPlannedMove& PlannedMove = M_PendingPlannedMoves.AddDefaulted_GetRef();
+	PlannedMove.CommandLocation = CommandLocation;
+	PlannedMove.UnitDestinations = MoveTemp(UnitDestinations);
+}
+
+bool ASquadController::TryTakePlannedMove(const FVector& MoveToLocation, FSquadPlannedMove& OutPlannedMove)
+{
+	constexpr float CommandLocationTolerance = 1.0f;
+	// Newest first: a repeated order to the same spot must use the plan that came with it.
+	for (int32 PlanIndex = M_PendingPlannedMoves.Num() - 1; PlanIndex >= 0; --PlanIndex)
+	{
+		if (not M_PendingPlannedMoves[PlanIndex].CommandLocation.Equals(MoveToLocation, CommandLocationTolerance))
+		{
+			continue;
+		}
+		OutPlannedMove = MoveTemp(M_PendingPlannedMoves[PlanIndex]);
+		M_PendingPlannedMoves.RemoveAt(PlanIndex);
+		return true;
+	}
+	return false;
+}
+
+void ASquadController::ExecutePlannedMove(const FSquadPlannedMove& PlannedMove, const FVector& MoveToLocation)
+{
+	TMap<const ASquadUnit*, const FSquadUnitPlannedPosition*> PlannedPositionPerUnit;
+	PlannedPositionPerUnit.Reserve(PlannedMove.UnitDestinations.Num());
+	for (const FSquadUnitPlannedDestination& Destination : PlannedMove.UnitDestinations)
+	{
+		PlannedPositionPerUnit.Add(Destination.SquadUnit.Get(), &Destination.Position);
+	}
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+		const FSquadUnitPlannedPosition* const* PlannedPosition = PlannedPositionPerUnit.Find(SquadUnit);
+		if (PlannedPosition == nullptr)
+		{
+			// Joined the squad after the plan was made, for example a reinforcement.
+			SquadUnit->ExecuteMoveToSelfPathFinding(MoveToLocation, EAbilityID::IdMove);
+			continue;
+		}
+		SquadUnit->ExecutePlannedMove(**PlannedPosition);
+	}
+}
+
 void ASquadController::GeneralMoveToForAbility(const FVector& MoveToLocation, const EAbilityID AbilityID)
 {
+	FSquadPlannedMove PlannedMove;
+	if (AbilityID == EAbilityID::IdMove && TryTakePlannedMove(MoveToLocation, PlannedMove))
+	{
+		ExecutePlannedMove(PlannedMove, MoveToLocation);
+		return;
+	}
+
 	// Generate paths for each squad unit
 	const ESquadPathFindingError Error = GeneratePathsForSquadUnits(MoveToLocation);
 	if (Error != ESquadPathFindingError::NoError)

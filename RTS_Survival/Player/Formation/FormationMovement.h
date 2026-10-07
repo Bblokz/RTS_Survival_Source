@@ -72,6 +72,8 @@ public:
 	 */
 	void InitFormationController(const TSharedPtr<FPlayerFormationPositionEffects>& InFormationEffectsStruct);
 	bool IsPlayerRotationOverrideActive() const;
+	FRotator GetPlayerRotationOverride() const { return M_PlayerRotationOverride; }
+	EFormation GetCurrentFormation() const { return M_CurrentFormation; }
 
 	/**
 	 * @brief Computes formation positions and spawns visual effects.

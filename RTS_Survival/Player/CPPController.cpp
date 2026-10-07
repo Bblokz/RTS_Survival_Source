@@ -2,6 +2,8 @@
 
 #include "CPPController.h"
 
+#include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewComponent.h"
+
 #include "Abilities.h"
 #include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
@@ -257,6 +259,7 @@ ACPPController::ACPPController()
 
 	M_PlayerTechManager = CreateDefaultSubobject<UPlayerTechManager>(TEXT("PlayerTechManager"));
 	M_FormationController = CreateDefaultSubobject<UFormationController>(TEXT("FormationController"));
+	M_SquadMovePreview = CreateDefaultSubobject<USquadMovePreviewComponent>(TEXT("SquadMovePreview"));
 
 
 	M_PlayerProfileLoader = CreateDefaultSubobject<UPlayerProfileLoader>(TEXT("PlayerProfileLoader"));
@@ -1045,11 +1048,66 @@ void ACPPController::Tick(float DeltaTime)
 	// ----- Tick player component updates
 	// --------------------------------------------------------
 	PlayerRotationArrow.TickArrowRotation(MouseScreenPosition, HitResultCursorProjection.Location);
+	Tick_UpdateSquadMovePreview(HitResultCursorProjection, bHit);
 	UpdateHoveringActorInfo(DeltaTime, MouseScreenPosition, HitResultCursorProjection, bHit);
 	UpdateAimAbilityAtCursorProjection(DeltaTime, HitResultCursorProjection);
 
 
 	M_LastFrameMousePosition = MouseScreenPosition;
+}
+
+bool ACPPController::GetIsValidSquadMovePreview() const
+{
+	if (IsValid(M_SquadMovePreview))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_SquadMovePreview",
+		"GetIsValidSquadMovePreview",
+		this);
+	return false;
+}
+
+bool ACPPController::GetIsSquadsOnlySelection() const
+{
+	return not TSelectedSquadControllers.IsEmpty() && TSelectedPawnMasters.IsEmpty() &&
+		TSelectedActorsMasters.IsEmpty();
+}
+
+bool ACPPController::GetWouldSecondaryClickMove(AActor* ActorUnderCursor)
+{
+	if (not IsValid(ActorUnderCursor) || not GetIsValidCommandTypeDecoder())
+	{
+		return true;
+	}
+	FTargetUnion UnusedTarget;
+	return M_CommandTypeDecoder->DecodeTargetedActor(ActorUnderCursor, UnusedTarget) == ECommandType::Movement;
+}
+
+void ACPPController::Tick_UpdateSquadMovePreview(const FHitResult& CursorHit, const bool bCursorHit)
+{
+	if (not GetIsValidSquadMovePreview())
+	{
+		return;
+	}
+	FSquadMovePreviewInput PreviewInput;
+	PreviewInput.SelectedSquads = &TSelectedSquadControllers;
+	// Building placement and ability targeting use the cursor for something else than a move order.
+	PreviewInput.bSquadsOnlyMoveContext = GetIsSquadsOnlySelection() && not GetIsPreviewBuildingActive() &&
+		not bM_IsActionButtonActive;
+	PreviewInput.bCursorOnMoveGround = PreviewInput.bSquadsOnlyMoveContext && bCursorHit &&
+		GetWouldSecondaryClickMove(CursorHit.GetActor());
+	PreviewInput.CursorLocation = CursorHit.Location;
+	PreviewInput.bFacingChosenByPlayer = PlayerRotationArrow.GetIsPlayerChoosingFacing();
+	PreviewInput.ChosenAnchorLocation = PlayerRotationArrow.GetArrowGroundLocation();
+	PreviewInput.ChosenRotation = PlayerRotationArrow.GetArrowRotation();
+	if (GetIsValidFormationController())
+	{
+		M_SquadMovePreview->SetFormationShape(M_FormationController->GetCurrentFormation());
+	}
+	M_SquadMovePreview->UpdatePreview(PreviewInput);
 }
 
 void ACPPController::SetupInputComponent()
@@ -4465,6 +4523,20 @@ uint32 ACPPController::MoveUnitsToLocation(const FVector& MoveLocation)
 
 	FRotator AfterMovementRotation = FRotator::ZeroRotator;
 	uint32 AmountCommandsExe = 0;
+
+	// With only squads selected every soldier goes to the position the preview showed for it; the formation
+	// controller only places whole squads and would discard that.
+	if (GetIsSquadsOnlySelection() && GetIsValidSquadMovePreview() && M_SquadMovePreview->TryIssuePlannedMove(
+		TSelectedSquadControllers,
+		MoveLocation,
+		M_FormationController->IsPlayerRotationOverrideActive(),
+		M_FormationController->GetPlayerRotationOverride(),
+		bIsHoldingShift,
+		AmountCommandsExe))
+	{
+		M_FormationController->OnMovementFinished();
+		return AmountCommandsExe;
+	}
 
 	M_FormationController->InitiateMovement(
 		MoveLocation, &TSelectedSquadControllers, &TSelectedPawnMasters, &TSelectedActorsMasters);
