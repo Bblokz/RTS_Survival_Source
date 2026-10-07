@@ -316,6 +316,7 @@ void UWeaponStateLaser::FireTraceIteration(const int32 PulseSerial)
 	const float ProjectileLaunchTime = World->GetTimeSeconds();
 
 	FCollisionQueryParams TraceParams(FName(TEXT("LaserFireTrace")), true, nullptr);
+	AppendIgnoredActorsToQuery(TraceParams);
 	TraceParams.bTraceComplex = false;
 	TraceParams.bReturnPhysicalMaterial = true;
 

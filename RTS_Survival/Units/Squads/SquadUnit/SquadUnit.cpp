@@ -30,6 +30,7 @@
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -39,6 +40,26 @@
 #include "RTS_Survival/Weapons/InfantryWeapon/SecondaryWeaponComp/SecondaryWeapon.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCover, Log, All);
+
+
+bool FSquadUnitCoverRuntimeState::GetHasAssignment() const
+{
+	return State != ESquadUnitCoverState::None;
+}
+
+bool FSquadUnitCoverRuntimeState::GetIsOccupyingCover() const
+{
+	return State == ESquadUnitCoverState::Protected || State == ESquadUnitCoverState::Exposed;
+}
+
+void FSquadUnitCoverRuntimeState::Reset()
+{
+	State = ESquadUnitCoverState::None;
+	UseReason = ESquadUnitCoverUseReason::None;
+	AssignedCoverPoint = FRTSCoverPoint();
+}
 
 
 FSquadUnitRagdoll::FSquadUnitRagdoll()
@@ -249,6 +270,470 @@ bool ASquadUnit::GetIsUnitInCombat() const
 		return false;
 	}
 	return RTSComponent->GetIsUnitInCombat();
+}
+
+bool ASquadUnit::SetCoverAssignment(
+	const FRTSCoverPoint& CoverPoint,
+	const ESquadUnitCoverUseReason UseReason)
+{
+	if (UseReason == ESquadUnitCoverUseReason::None)
+	{
+		RTSFunctionLibrary::ReportError(
+			"ASquadUnit::SetCoverAssignment requires a cover use reason for unit: " + GetName());
+		return false;
+	}
+	if (M_CoverRuntimeState.GetHasAssignment())
+	{
+		ClearCoverState();
+	}
+
+	M_CoverRuntimeState.AssignedCoverPoint = CoverPoint;
+	M_CoverRuntimeState.UseReason = UseReason;
+	M_CoverRuntimeState.State = ESquadUnitCoverState::Assigned;
+	return true;
+}
+
+bool ASquadUnit::SetCoverState(const ESquadUnitCoverState NewState)
+{
+	if (NewState == ESquadUnitCoverState::None)
+	{
+		ClearCoverState();
+		return true;
+	}
+
+	if (not M_CoverRuntimeState.GetHasAssignment())
+	{
+		RTSFunctionLibrary::ReportError(
+			"ASquadUnit::SetCoverState cannot advance an unassigned cover state for unit: " + GetName());
+		return false;
+	}
+
+	M_CoverRuntimeState.State = NewState;
+	return true;
+}
+
+void ASquadUnit::ClearCoverState()
+{
+	ClearCoverStateInternal(true);
+}
+
+void ASquadUnit::UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
+{
+	if (not IsUnitAlive())
+	{
+		ClearCoverStateInternal(false);
+		return;
+	}
+	if (not M_CoverRuntimeState.GetHasAssignment())
+	{
+		if (GetCanUseAutomaticCover())
+		{
+			TryStartAutomaticCover(CoverSubsystem);
+		}
+		return;
+	}
+	if (not CoverSubsystem.GetIsCoverPointPublished(M_CoverRuntimeState.AssignedCoverPoint.PointId))
+	{
+		ClearCoverState();
+		return;
+	}
+	if (M_CoverRuntimeState.State != ESquadUnitCoverState::MovingToCover &&
+		M_CoverRuntimeState.State != ESquadUnitCoverState::Assigned &&
+		not GetCanUseAutomaticCover())
+	{
+		ClearCoverState();
+		return;
+	}
+
+	switch (M_CoverRuntimeState.State)
+	{
+	case ESquadUnitCoverState::EnteringCover:
+		UpdateEnteringCover();
+		break;
+	case ESquadUnitCoverState::Protected:
+		UpdateProtectedCover(CoverSubsystem);
+		break;
+	case ESquadUnitCoverState::Exposed:
+		UpdateExposedCover(CoverSubsystem);
+		break;
+	case ESquadUnitCoverState::MovingToCover:
+	case ESquadUnitCoverState::Assigned:
+	case ESquadUnitCoverState::LeavingCover:
+	case ESquadUnitCoverState::None:
+	default:
+		break;
+	}
+}
+
+bool ASquadUnit::GetCanUseAutomaticCover() const
+{
+	if (GetIsPathFollowingActive())
+	{
+		return false;
+	}
+	if (M_ActiveCommand == EAbilityID::IdAttack)
+	{
+		return GetIsValidWeapon() && M_InfantryWeapon->GetIsCurrentTargetInRange();
+	}
+	if (M_ActiveCommand != EAbilityID::IdIdle)
+	{
+		return false;
+	}
+	return not GetIsValidSquadController() || M_SquadController->GetIsUnitIdle();
+}
+
+void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
+{
+	FVector TargetLocation = FVector::ZeroVector;
+	AActor* TargetActor = GetCurrentCoverTarget(TargetLocation);
+	const ESquadUnitCoverUseReason UseReason = IsValid(TargetActor)
+		? ESquadUnitCoverUseReason::Attack
+		: ESquadUnitCoverUseReason::AfterMoveCommand;
+	FRTSCoverPoint CoverPoint;
+	if (not CoverSubsystem.TryReserveBestCoverPoint(
+		*this,
+		TargetActor,
+		TargetLocation,
+		CoverPoint))
+	{
+		return;
+	}
+	if (not SetCoverAssignment(CoverPoint, UseReason))
+	{
+		CoverSubsystem.ReleaseCoverReservation(*this, CoverPoint.PointId);
+		return;
+	}
+	if (not StartCoverMovement())
+	{
+		ClearCoverStateInternal(false);
+	}
+}
+
+bool ASquadUnit::StartCoverMovement()
+{
+	if (not GetIsValidAISquadUnit())
+	{
+		return false;
+	}
+	constexpr float CoverMoveAcceptanceRadius = 35.0f;
+	FAIMoveRequest CoverMoveRequest(M_CoverRuntimeState.AssignedCoverPoint.Location);
+	FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(CoverMoveRequest);
+	CoverMoveRequest.SetAcceptanceRadius(CoverMoveAcceptanceRadius);
+	CoverMoveRequest.SetReachTestIncludesAgentRadius(false);
+	CoverMoveRequest.SetCanStrafe(false);
+	CoverMoveRequest.SetNavigationFilter(M_AISquadUnit->GetDefaultNavigationFilterClass());
+	SetCoverWeaponFireBlocked(true);
+	SetCoverState(ESquadUnitCoverState::MovingToCover);
+	const EPathFollowingRequestResult::Type MoveResult = M_AISquadUnit->MoveTo(CoverMoveRequest);
+	if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+	{
+		EnterAssignedCover();
+		return true;
+	}
+	if (MoveResult != EPathFollowingRequestResult::RequestSuccessful)
+	{
+		return false;
+	}
+	M_CoverMoveRequestID = M_AISquadUnit->GetCurrentMoveRequestID();
+	if (not M_AISquadUnit->ReceiveMoveCompleted.IsAlreadyBound(this, &ASquadUnit::OnMoveCompleted))
+	{
+		M_AISquadUnit->ReceiveMoveCompleted.AddDynamic(this, &ASquadUnit::OnMoveCompleted);
+	}
+	return M_CoverMoveRequestID.IsValid();
+}
+
+void ASquadUnit::EnterAssignedCover()
+{
+	M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+	const FVector CoverFacingDirection = -M_CoverRuntimeState.AssignedCoverPoint.CoverNormal.GetSafeNormal2D();
+	if (not CoverFacingDirection.IsNearlyZero())
+	{
+		SetActorRotation(CoverFacingDirection.Rotation());
+	}
+	if (UWorld* World = GetWorld())
+	{
+		if (URTSCoverFinderWorldSubsystem* CoverSubsystem = World->GetSubsystem<URTSCoverFinderWorldSubsystem>())
+		{
+			AActor* ProviderActor = CoverSubsystem->ResolveBlockingProvider(
+				M_CoverRuntimeState.AssignedCoverPoint);
+			if (IsValid(ProviderActor) && GetIsCoverProviderOwnedByUnit(*ProviderActor))
+			{
+				RegisterCoverProviderWeaponIgnore(ProviderActor, true);
+			}
+		}
+	}
+	SetCoverState(ESquadUnitCoverState::EnteringCover);
+	if (not GetIsValidAnimBpSquadUnit())
+	{
+		SetCoverState(ESquadUnitCoverState::Protected);
+		return;
+	}
+	AnimBp_SquadUnit->EnterCover(GetAssignedCoverAnimationPose());
+	UpdateEnteringCover();
+}
+
+void ASquadUnit::UpdateEnteringCover()
+{
+	if (not GetIsValidAnimBpSquadUnit() ||
+		AnimBp_SquadUnit->GetCoverAnimAction() == ESquadCoverAnimAction::Protected)
+	{
+		SetCoverState(ESquadUnitCoverState::Protected);
+	}
+}
+
+void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
+{
+	FVector TargetLocation = FVector::ZeroVector;
+	AActor* TargetActor = GetCurrentCoverTarget(TargetLocation);
+	if (not IsValid(TargetActor))
+	{
+		M_CoverValidatedTarget.Reset();
+		SetCoverWeaponFireBlocked(true);
+		return;
+	}
+	if (GetShouldRevalidateCoverLane(*TargetActor, TargetLocation))
+	{
+		if (not CoverSubsystem.GetHasTargetSpecificFiringLane(
+			*this,
+			M_CoverRuntimeState.AssignedCoverPoint,
+			*TargetActor,
+			TargetLocation))
+		{
+			ClearCoverState();
+			return;
+		}
+		RecordValidatedCoverTarget(TargetActor, TargetLocation);
+	}
+
+	if (M_CoverRuntimeState.AssignedCoverPoint.CoverType == ERTSCoverType::Crouch)
+	{
+		SetCoverWeaponFireBlocked(false);
+		return;
+	}
+	SetCoverWeaponFireBlocked(true);
+	if (not GetIsValidAnimBpSquadUnit())
+	{
+		SetCoverState(ESquadUnitCoverState::Exposed);
+		SetCoverWeaponFireBlocked(false);
+		return;
+	}
+	AnimBp_SquadUnit->StartStandingCoverPeek();
+	if (AnimBp_SquadUnit->GetCoverAnimAction() == ESquadCoverAnimAction::Exposed)
+	{
+		SetCoverState(ESquadUnitCoverState::Exposed);
+		SetCoverWeaponFireBlocked(false);
+	}
+}
+
+void ASquadUnit::UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
+{
+	if (GetIsValidAnimBpSquadUnit() &&
+		AnimBp_SquadUnit->GetCoverAnimAction() == ESquadCoverAnimAction::Protected)
+	{
+		SetCoverState(ESquadUnitCoverState::Protected);
+		M_CoverValidatedTarget.Reset();
+		return;
+	}
+
+	FVector TargetLocation = FVector::ZeroVector;
+	AActor* TargetActor = GetCurrentCoverTarget(TargetLocation);
+	if (not IsValid(TargetActor))
+	{
+		ReturnToProtectedCover();
+		return;
+	}
+	if (GetShouldRevalidateCoverLane(*TargetActor, TargetLocation) &&
+		not CoverSubsystem.GetHasTargetSpecificFiringLane(
+			*this,
+			M_CoverRuntimeState.AssignedCoverPoint,
+			*TargetActor,
+			TargetLocation))
+	{
+		ClearCoverState();
+		return;
+	}
+	RecordValidatedCoverTarget(TargetActor, TargetLocation);
+	SetCoverWeaponFireBlocked(false);
+}
+
+void ASquadUnit::ReturnToProtectedCover()
+{
+	SetCoverWeaponFireBlocked(true);
+	M_CoverValidatedTarget.Reset();
+	if (not GetIsValidAnimBpSquadUnit())
+	{
+		SetCoverState(ESquadUnitCoverState::Protected);
+		return;
+	}
+	AnimBp_SquadUnit->ReturnToStandingCover();
+	if (AnimBp_SquadUnit->GetCoverAnimAction() == ESquadCoverAnimAction::Protected)
+	{
+		SetCoverState(ESquadUnitCoverState::Protected);
+	}
+}
+
+void ASquadUnit::ClearCoverStateInternal(const bool bStopCoverMovement)
+{
+	if (not M_CoverRuntimeState.GetHasAssignment())
+	{
+		M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+		M_CoverIgnoredProviderActor.Reset();
+		M_CoverValidatedTarget.Reset();
+		M_CoverValidatedTargetLocation = FVector::ZeroVector;
+		return;
+	}
+
+	const int64 ReservedPointId = M_CoverRuntimeState.AssignedCoverPoint.PointId;
+	AActor* IgnoredProviderActor = M_CoverIgnoredProviderActor.Get();
+	if (IsValid(IgnoredProviderActor))
+	{
+		RegisterCoverProviderWeaponIgnore(IgnoredProviderActor, false);
+	}
+	M_CoverIgnoredProviderActor.Reset();
+	M_CoverValidatedTarget.Reset();
+	M_CoverValidatedTargetLocation = FVector::ZeroVector;
+	SetCoverWeaponFireBlocked(false);
+	if (GetIsValidAnimBpSquadUnit())
+	{
+		AnimBp_SquadUnit->CancelCoverAnimation();
+	}
+
+	if (bStopCoverMovement && M_CoverMoveRequestID.IsValid() && GetIsValidAISquadUnit())
+	{
+		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
+		M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+		M_AISquadUnit->StopMovement();
+	}
+	else
+	{
+		M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		if (URTSCoverFinderWorldSubsystem* CoverSubsystem = World->GetSubsystem<URTSCoverFinderWorldSubsystem>())
+		{
+			CoverSubsystem->ReleaseCoverReservation(*this, ReservedPointId);
+		}
+	}
+	M_CoverRuntimeState.Reset();
+}
+
+void ASquadUnit::CancelAutomaticCoverForCommandMovement()
+{
+	if (M_CoverRuntimeState.GetHasAssignment())
+	{
+		ClearCoverStateInternal(true);
+	}
+}
+
+void ASquadUnit::SetCoverWeaponFireBlocked(const bool bBlocked) const
+{
+	if (not GetIsValidWeapon())
+	{
+		return;
+	}
+	M_InfantryWeapon->SetCoverFireBlocked(const_cast<ASquadUnit*>(this), bBlocked);
+}
+
+void ASquadUnit::RegisterCoverProviderWeaponIgnore(AActor* ProviderActor, const bool bRegister)
+{
+	if (not IsValid(ProviderActor) || not GetIsValidWeapon())
+	{
+		return;
+	}
+	M_InfantryWeapon->RegisterCoverIgnoreActor(ProviderActor, bRegister);
+	if (bRegister)
+	{
+		M_CoverIgnoredProviderActor = ProviderActor;
+		return;
+	}
+	if (M_CoverIgnoredProviderActor.Get() == ProviderActor)
+	{
+		M_CoverIgnoredProviderActor.Reset();
+	}
+}
+
+void ASquadUnit::ApplyCurrentCoverWeaponState()
+{
+	if (not M_CoverRuntimeState.GetHasAssignment() || not GetIsValidWeapon())
+	{
+		return;
+	}
+	AActor* IgnoredProviderActor = M_CoverIgnoredProviderActor.Get();
+	if (IsValid(IgnoredProviderActor))
+	{
+		M_InfantryWeapon->RegisterCoverIgnoreActor(IgnoredProviderActor, true);
+	}
+	const bool bCrouchCanFire = M_CoverRuntimeState.State == ESquadUnitCoverState::Protected &&
+		M_CoverRuntimeState.AssignedCoverPoint.CoverType == ERTSCoverType::Crouch;
+	const bool bStandingCanFire = M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed;
+	const bool bHasValidatedTarget = M_CoverValidatedTarget.Get() != nullptr;
+	M_InfantryWeapon->SetCoverFireBlocked(
+		this,
+		not (bHasValidatedTarget && (bCrouchCanFire || bStandingCanFire)));
+}
+
+bool ASquadUnit::GetIsCoverProviderOwnedByUnit(const AActor& ProviderActor) const
+{
+	constexpr int32 MaximumOwnerDepth = 4;
+	const AActor* OwnershipActor = &ProviderActor;
+	for (int32 OwnerDepth = 0; OwnerDepth < MaximumOwnerDepth && IsValid(OwnershipActor); ++OwnerDepth)
+	{
+		const URTSComponent* ProviderRTSComponent = OwnershipActor->FindComponentByClass<URTSComponent>();
+		if (IsValid(ProviderRTSComponent))
+		{
+			return ProviderRTSComponent->GetOwningPlayer() == GetOwningPlayer();
+		}
+		OwnershipActor = OwnershipActor->GetOwner();
+	}
+	return false;
+}
+
+AActor* ASquadUnit::GetCurrentCoverTarget(FVector& OutTargetLocation) const
+{
+	OutTargetLocation = FVector::ZeroVector;
+	if (not GetIsValidWeapon())
+	{
+		return nullptr;
+	}
+	AActor* TargetActor = M_InfantryWeapon->GetCurrentTargetActor();
+	if (not IsValid(TargetActor) || not M_InfantryWeapon->GetIsCurrentTargetInRange())
+	{
+		return nullptr;
+	}
+	OutTargetLocation = M_InfantryWeapon->GetCurrentTargetLocation();
+	return TargetActor;
+}
+
+ESquadIdleAnimationPose ASquadUnit::GetAssignedCoverAnimationPose() const
+{
+	switch (M_CoverRuntimeState.AssignedCoverPoint.CoverType)
+	{
+	case ERTSCoverType::StandingLeft:
+		return ESquadIdleAnimationPose::StandingCoverLeft;
+	case ERTSCoverType::StandingRight:
+		return ESquadIdleAnimationPose::StandingCoverRight;
+	case ERTSCoverType::Crouch:
+	default:
+		return ESquadIdleAnimationPose::CrouchCover;
+	}
+}
+
+bool ASquadUnit::GetShouldRevalidateCoverLane(
+	const AActor& TargetActor,
+	const FVector& TargetLocation) const
+{
+	constexpr float TargetLaneRevalidationDistance = 100.0f;
+	return M_CoverValidatedTarget.Get() != &TargetActor ||
+		FVector::DistSquared(M_CoverValidatedTargetLocation, TargetLocation) >=
+		FMath::Square(TargetLaneRevalidationDistance);
+}
+
+void ASquadUnit::RecordValidatedCoverTarget(AActor* TargetActor, const FVector& TargetLocation)
+{
+	M_CoverValidatedTarget = TargetActor;
+	M_CoverValidatedTargetLocation = TargetLocation;
 }
 
 void ASquadUnit::OnSquadInitsData_OverwriteArmorAndResistance(const float MyMaxHealth) const
@@ -539,12 +1024,27 @@ void ASquadUnit::BeginPlay()
 	BeginPlay_BindSelectionFunctions();
 	// Disable navigation effects.
 	BeginPlay_SetupSelectionHealthCompCollision();
+	if (UWorld* World = GetWorld())
+	{
+		if (URTSCoverFinderWorldSubsystem* CoverSubsystem = World->GetSubsystem<URTSCoverFinderWorldSubsystem>())
+		{
+			CoverSubsystem->RegisterSquadUnit(this);
+		}
+	}
 }
 
 
 void ASquadUnit::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
+	ClearCoverStateInternal(false);
+	if (UWorld* World = GetWorld())
+	{
+		if (URTSCoverFinderWorldSubsystem* CoverSubsystem = World->GetSubsystem<URTSCoverFinderWorldSubsystem>())
+		{
+			CoverSubsystem->UnregisterSquadUnit(this);
+		}
+	}
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_TimerHandleUpdateAnim);
@@ -709,8 +1209,9 @@ void ASquadUnit::PostInitializeComp_SetupAnimBP()
 }
 
 void ASquadUnit::ExecuteMoveToSelfPathFinding(const FVector& MoveToLocation, const EAbilityID AbilityToMoveFor,
-                                              const bool bUsePathfinding)
+                                               const bool bUsePathfinding)
 {
+	CancelAutomaticCoverForCommandMovement();
 	PrepareForRangeClosingMovement(AbilityToMoveFor);
 	// Used to indicate what to do when move completes.
 	M_ActiveCommand = AbilityToMoveFor;
@@ -719,6 +1220,7 @@ void ASquadUnit::ExecuteMoveToSelfPathFinding(const FVector& MoveToLocation, con
 
 void ASquadUnit::ExecuteMoveAlongPath(const FNavPathSharedPtr& Path, const EAbilityID AbilityToMoveFor)
 {
+	CancelAutomaticCoverForCommandMovement();
 	if (!GetIsValidAISquadUnit() || !Path.IsValid())
 		return;
 
@@ -755,6 +1257,7 @@ void ASquadUnit::ExecuteMoveAlongPath(const FNavPathSharedPtr& Path, const EAbil
 
 void ASquadUnit::TerminateMovementCommand()
 {
+	CancelAutomaticCoverForCommandMovement();
 	M_ActiveCommand = EAbilityID::IdIdle;
 
 	// Also unbinds the OnMoveCompleted function.
@@ -763,6 +1266,7 @@ void ASquadUnit::TerminateMovementCommand()
 
 void ASquadUnit::TerminateMovementCommandDoNotKillVelocity()
 {
+	CancelAutomaticCoverForCommandMovement();
 	if (GetIsValidAISquadUnit())
 	{
 		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
@@ -771,8 +1275,9 @@ void ASquadUnit::TerminateMovementCommandDoNotKillVelocity()
 }
 
 void ASquadUnit::MoveToAndBindOnCompleted(const FVector& MoveToLocation, const bool bUsePathfinding,
-                                          const EAbilityID MoveContext)
+                                           const EAbilityID MoveContext)
 {
+	CancelAutomaticCoverForCommandMovement();
 	if (!GetIsValidAISquadUnit())
 	{
 		return;
@@ -831,6 +1336,7 @@ void ASquadUnit::MoveToActorAndBindOnCompleted(
 	const float AcceptanceRadius,
 	const EAbilityID AbilityToMoveFor)
 {
+	CancelAutomaticCoverForCommandMovement();
 	if (!GetIsValidAISquadUnit() || !IsValid(TargetActor))
 	{
 		OnMoveToActorRequestFailed(TargetActor, AbilityToMoveFor, true,
@@ -1171,6 +1677,7 @@ void ASquadUnit::SetupSwappedWeapon(AInfantryWeaponMaster* NewWeapon)
 	{
 		AnimBp_SquadUnit->SetWeaponAimOffset(NewWeapon->GetAimOffsetType());
 	}
+	ApplyCurrentCoverWeaponState();
 }
 
 void ASquadUnit::SetWeaponToAutoEngageTargets(const bool bUseLastTarget)
@@ -1313,6 +1820,7 @@ void ASquadUnit::OnSecondaryWeapon_SpawnAndInitializeNewWeapon(
 	M_InfantryWeapon->SetupOwner(this);
 	M_InfantryWeapon->SetOwningPlayer(RTSComponent->GetOwningPlayer());
 	M_InfantryWeapon->DisableWeaponSearch(true);
+	ApplyCurrentCoverWeaponState();
 	AnimBp_SquadUnit->SetWeaponAimOffset(M_InfantryWeapon->GetAimOffsetType());
 	AnimBp_SquadUnit->PlaySwitchWeaponMontage(M_InfantryWeapon->GetAimOffsetType());
 
@@ -1384,6 +1892,11 @@ void ASquadUnit::AttachEffectAtEquipmentMesh(UNiagaraSystem* Effect, const FName
 
 void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::Type Result)
 {
+	if (M_CoverMoveRequestID.IsValid() && RequestID.GetID() == M_CoverMoveRequestID.GetID())
+	{
+		OnMoveCompleted_Cover(Result);
+		return;
+	}
 	if (Result != EPathFollowingResult::Type::Success)
 	{
 		ReportPathFollowingResultError(Result);
@@ -1543,6 +2056,26 @@ void ASquadUnit::BeginPlay_SetPhysicalMaterials() const
 	MeshComp->SetPhysMaterialOverride(PhysicalMaterialOverride);
 }
 
+void ASquadUnit::OnMoveCompleted_Cover(const EPathFollowingResult::Type Result)
+{
+	M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+	if (Result == EPathFollowingResult::Type::Success)
+	{
+		EnterAssignedCover();
+		return;
+	}
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("Cover movement ended for %s with %s."),
+			*GetName(),
+			*UEnum::GetValueAsString(Result));
+	}
+	ClearCoverStateInternal(false);
+}
+
 void ASquadUnit::BeginPlay_BindSelectionFunctions()
 {
 	if (not IsValid(SelectionComponent))
@@ -1610,6 +2143,7 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 	{
 		return;
 	}
+	ClearCoverState();
 
 	SetUnitDying();
 	const bool bUseCrouchedDeathMontage = DeathType != ERTSDeathType::Scavenging &&

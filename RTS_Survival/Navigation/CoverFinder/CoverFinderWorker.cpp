@@ -101,12 +101,14 @@ namespace CoverFinderWorkerPrivate
 		const FVector& Location,
 		const FVector& CoverNormal,
 		const ERTSCoverType CoverType,
+		const uint64 BlockingProviderHandle,
 		TArray<FRTSCoverPoint>& OutCandidates)
 	{
 		FRTSCoverPoint& Candidate = OutCandidates.AddDefaulted_GetRef();
 		Candidate.Location = Location;
 		Candidate.CoverNormal = CoverNormal;
 		Candidate.CoverType = CoverType;
+		Candidate.BlockingProviderHandle = BlockingProviderHandle;
 	}
 
 	void AppendCandidatesForDirection(
@@ -136,17 +138,32 @@ namespace CoverFinderWorkerPrivate
 
 		if (not bStandingSurface)
 		{
-			AppendCandidate(Observation.ProjectedLocation, CoverNormal, ERTSCoverType::Crouch, OutCandidates);
+			AppendCandidate(
+				Observation.ProjectedLocation,
+				CoverNormal,
+				ERTSCoverType::Crouch,
+				SurfaceTrace.BlockingProviderHandle,
+				OutCandidates);
 			return;
 		}
 
 		if (DirectionObservation.bLeftGapOpen)
 		{
-			AppendCandidate(DirectionObservation.LeftCoverLocation, CoverNormal, ERTSCoverType::StandingLeft, OutCandidates);
+			AppendCandidate(
+				DirectionObservation.LeftCoverLocation,
+				CoverNormal,
+				ERTSCoverType::StandingLeft,
+				SurfaceTrace.BlockingProviderHandle,
+				OutCandidates);
 		}
 		if (DirectionObservation.bRightGapOpen)
 		{
-			AppendCandidate(DirectionObservation.RightCoverLocation, CoverNormal, ERTSCoverType::StandingRight, OutCandidates);
+			AppendCandidate(
+				DirectionObservation.RightCoverLocation,
+				CoverNormal,
+				ERTSCoverType::StandingRight,
+				SurfaceTrace.BlockingProviderHandle,
+				OutCandidates);
 		}
 	}
 
@@ -376,6 +393,12 @@ bool FCoverFinderAlgorithms::GetIsSameSurface(
 	const FCoverFinderSettingsSnapshot& Settings)
 {
 	if (not FirstTrace.bBlockingHit || not SecondTrace.bBlockingHit)
+	{
+		return false;
+	}
+	if (FirstTrace.BlockingProviderHandle != 0 &&
+		SecondTrace.BlockingProviderHandle != 0 &&
+		FirstTrace.BlockingProviderHandle != SecondTrace.BlockingProviderHandle)
 	{
 		return false;
 	}

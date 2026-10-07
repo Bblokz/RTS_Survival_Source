@@ -7,6 +7,7 @@
 #include "CoverFinderWorldSubsystem.generated.h"
 
 class ANavigationData;
+class ASquadUnit;
 class UNavigationSystemV1;
 class URTSCoverFinderDeveloperSettings;
 
@@ -59,6 +60,15 @@ struct FCoverFinderPerformanceAccumulator
 	void Reset(double StartSeconds);
 };
 
+/** Values used by the TestCover integration assertion after invalid weak registrations are removed. */
+struct FCoverTestValidationCounts
+{
+	TSet<int32> OwningPlayers;
+	int32 AssignedUnitCount = 0;
+	int32 OccupyingUnitCount = 0;
+	int32 MovingUnitCount = 0;
+};
+
 /**
  * @brief Scans Character navigation incrementally and publishes directional infantry cover found by a worker thread.
  * Callers query immutable snapshots; world collision and navigation never leave the game thread.
@@ -97,6 +107,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Cover Finder")
 	FRTSCoverFinderPerformance GetLastPerformanceSnapshot() const { return M_LastPerformanceSnapshot; }
 
+	UFUNCTION(BlueprintPure, Category="Cover Finder")
+	FRTSTacticalCoverPerformance GetTacticalPerformanceSnapshot() const { return M_TacticalPerformanceSnapshot; }
+
 	UFUNCTION(BlueprintCallable, Category="Cover Finder")
 	void ForceRescan();
 
@@ -105,7 +118,12 @@ public:
 	 * @param CoverPoints World-space points copied from the provider component at BeginPlay.
 	 * @return Non-zero registration ID used to remove exactly this provider when its actor ends play.
 	 */
-	uint64 RegisterAuthoredCoverProvider(TArray<FRTSCoverPoint>&& CoverPoints);
+	uint64 RegisterAuthoredCoverProvider(AActor* ProviderActor, TArray<FRTSCoverPoint>&& CoverPoints);
+
+	uint64 RegisterAuthoredCoverProvider(TArray<FRTSCoverPoint>&& CoverPoints)
+	{
+		return RegisterAuthoredCoverProvider(nullptr, MoveTemp(CoverPoints));
+	}
 
 	/**
 	 * @brief Removes one provider immediately and invalidates equivalent cached scan points until the next rescan.
@@ -113,8 +131,44 @@ public:
 	 */
 	void UnregisterAuthoredCoverProvider(uint64 RegistrationId);
 
+	void RegisterSquadUnit(ASquadUnit* SquadUnit);
+	void UnregisterSquadUnit(ASquadUnit* SquadUnit);
+
+	/**
+	 * @brief Reserves the best nearby point so squads can choose cover without sharing one physical slot.
+	 * @param SquadUnit Unit requesting a point; ownership is also used for target-channel selection.
+	 * @param TargetActor Optional target whose direction and firing lane constrain the result.
+	 * @param TargetLocation Current aim location for the target-specific firing-lane trace.
+	 * @param OutCoverPoint Reserved point when successful.
+	 * @return True when a currently published and unclaimed point was reserved.
+	 */
+	bool TryReserveBestCoverPoint(
+		ASquadUnit& SquadUnit,
+		AActor* TargetActor,
+		const FVector& TargetLocation,
+		FRTSCoverPoint& OutCoverPoint);
+
+	void ReleaseCoverReservation(const ASquadUnit& SquadUnit, int64 PointId);
+	bool GetIsCoverPointPublished(int64 PointId) const;
+	AActor* ResolveBlockingProvider(const FRTSCoverPoint& CoverPoint) const;
+
+	/**
+	 * @brief Validates a single target lane on the target team's collision trace channel.
+	 * @param SquadUnit Unit occupying the point and choosing the enemy channel.
+	 * @param CoverPoint Point whose posture determines the approximate muzzle origin.
+	 * @param TargetActor Actor that must be the first blocking target-channel hit.
+	 * @param TargetLocation Current world-space aim location.
+	 * @return True only when this posture has a direct lane to this target.
+	 */
+	bool GetHasTargetSpecificFiringLane(
+		const ASquadUnit& SquadUnit,
+		const FRTSCoverPoint& CoverPoint,
+		const AActor& TargetActor,
+		const FVector& TargetLocation);
+
 	void LogPerformanceReport() const;
 	void RequestDebugCapture(const FString& ScreenshotName = FString());
+	void RequestTestCoverValidation(float DelaySeconds, bool bCaptureScreenshot);
 
 private:
 	TUniquePtr<FCoverFinderWorker> M_Worker;
@@ -122,14 +176,23 @@ private:
 	FCoverFinderPerformanceAccumulator M_PerformanceAccumulator;
 	FCoverFinderSettingsSnapshot M_ActiveSettings;
 	FRTSCoverFinderPerformance M_LastPerformanceSnapshot;
+	FRTSTacticalCoverPerformance M_TacticalPerformanceSnapshot;
 	TArray<FRTSCoverPoint> M_CoverPoints;
 	TArray<FRTSCoverPoint> M_LandscapeCoverPoints;
 	TArray<FRTSCoverPoint> M_EnvironmentCoverPoints;
 	TMap<uint64, TArray<FRTSCoverPoint>> M_AuthoredCoverProviders;
+	TMap<uint64, TWeakObjectPtr<AActor>> M_BlockingProviderActors;
+	TMap<TWeakObjectPtr<AActor>, uint64> M_BlockingProviderHandles;
+	TMap<int64, int32> M_CoverPointIndices;
+	TMap<FIntPoint, TArray<int32>> M_CoverSpatialGrid;
+	TMap<int64, TWeakObjectPtr<ASquadUnit>> M_CoverReservations;
+	TArray<TWeakObjectPtr<ASquadUnit>> M_RegisteredSquadUnits;
 	TArray<FBox> M_CachedNavigationTileBounds;
 	FBox M_LastScanBounds = FBox(ForceInit);
 	uint64 M_ActiveGeneration = 0;
 	uint64 M_NextProviderRegistrationId = 1;
+	uint64 M_NextBlockingProviderHandle = 1;
+	int32 M_NextTacticalUnitIndex = 0;
 	float M_CachedAgentRadius = 0.0f;
 	float M_CachedAgentHeight = 0.0f;
 	float M_TimeUntilNextScan = 0.0f;
@@ -142,6 +205,9 @@ private:
 	bool bM_CaptureLightingWasEnabled = true;
 	int32 M_CaptureFramesRemaining = 0;
 	FString M_PendingScreenshotPath;
+	float M_TestCoverValidationRemainingSeconds = 0.0f;
+	bool bM_TestCoverValidationRequested = false;
+	bool bM_CaptureTestCoverValidation = false;
 
 	const URTSCoverFinderDeveloperSettings* GetCoverFinderSettings() const;
 	const ANavigationData* GetCharacterNavigationData() const;
@@ -315,6 +381,31 @@ private:
 		float Height,
 		int32& InOutFrameWorldQueries,
 		ECoverFinderTraceDomain TraceDomain = ECoverFinderTraceDomain::ActiveScan);
+	uint64 FindOrAddBlockingProviderHandle(AActor* ProviderActor);
+	void RebuildCoverSpatialGrid();
+	void TickTacticalCoverUnits();
+	void RemoveInvalidTacticalReferences();
+
+	/**
+	 * @brief Limits expensive firing-lane traces to nearby points that already satisfy cheap tactical checks.
+	 * @param SquadUnit Unit whose location and reservation ownership are evaluated.
+	 * @param TargetActor Optional target; when valid the point must face away from it.
+	 * @param TargetLocation Current target position used by the directional protection test.
+	 * @param SearchRadius Maximum distance from the unit in centimeters.
+	 * @return Nearest candidates, capped to the small number that may receive line traces.
+	 */
+	TArray<FRTSCoverPoint> GatherBestTacticalCoverCandidates(
+		const ASquadUnit& SquadUnit,
+		const AActor* TargetActor,
+		const FVector& TargetLocation,
+		float SearchRadius);
+
+	FIntPoint GetCoverSpatialCell(const FVector& Location) const;
+	FVector BuildFiringLaneStart(const FRTSCoverPoint& CoverPoint) const;
+	bool GetIsCandidateProtectedFromTarget(
+		const FRTSCoverPoint& CoverPoint,
+		const FVector& TargetLocation) const;
+	bool GetIsPointReservedByAnotherUnit(int64 PointId, const ASquadUnit& SquadUnit) const;
 	void RebuildPublishedCoverPoints();
 	void RemoveGeneratedDuplicates(const TArray<FRTSCoverPoint>& RemovedProviderPoints);
 	void RecordSamplingFrame(double FrameStartSeconds);
@@ -322,5 +413,7 @@ private:
 	void DrawPublishedCover() const;
 	void PrepareDebugCapture();
 	void TickDebugCapture();
+	void TickTestCoverValidation(float DeltaTime);
+	FCoverTestValidationCounts GatherTestCoverValidationCounts() const;
 	void RestoreCaptureLighting();
 };

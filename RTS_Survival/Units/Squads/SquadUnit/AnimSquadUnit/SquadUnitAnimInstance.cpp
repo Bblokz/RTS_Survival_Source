@@ -10,6 +10,8 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "SquadAnimationEnums/SquadAnimationEnums.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCoverAnimation, Log, All);
+
 namespace SquadUnitTeamWeaponCrewAnimStatics
 {
 	// Blend out used when a crew montage is stopped because the operator leaves the deployed weapon.
@@ -649,12 +651,13 @@ bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose)
 
 	M_CoverAnimRuntime.M_IdlePose = CoverPose;
 	IdleAnimationPose = CoverPose;
+	LogMissingCoverAnimationAssets(CoverPose);
 	if (PlayCoverMontage(EnterMontage, ESquadCoverAnimAction::Entering))
 	{
 		return true;
 	}
 
-	ClearCoverAnimationRuntime();
+	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
 	return false;
 }
 
@@ -672,9 +675,17 @@ bool USquadUnitAnimInstance::StartStandingCoverPeek()
 	}
 
 	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
-	return PlayCoverMontage(
+	if (PlayCoverMontage(
 		StandingAnimationSet->ExposeFromCoverMontage,
-		ESquadCoverAnimAction::Exposing);
+		ESquadCoverAnimAction::Exposing))
+	{
+		return true;
+	}
+	const ESquadIdleAnimationPose PeekPose = GetStandingPeekPose();
+	M_CoverAnimRuntime.M_IdlePose = PeekPose;
+	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Exposed;
+	IdleAnimationPose = PeekPose;
+	return false;
 }
 
 bool USquadUnitAnimInstance::ReturnToStandingCover()
@@ -691,9 +702,17 @@ bool USquadUnitAnimInstance::ReturnToStandingCover()
 	}
 
 	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
-	return PlayCoverMontage(
+	if (PlayCoverMontage(
 		StandingAnimationSet->ReturnToCoverMontage,
-		ESquadCoverAnimAction::Returning);
+		ESquadCoverAnimAction::Returning))
+	{
+		return true;
+	}
+	const ESquadIdleAnimationPose ProtectedPose = GetProtectedStandingCoverPose();
+	M_CoverAnimRuntime.M_IdlePose = ProtectedPose;
+	M_CoverAnimRuntime.M_Action = ESquadCoverAnimAction::Protected;
+	IdleAnimationPose = ProtectedPose;
+	return false;
 }
 
 bool USquadUnitAnimInstance::ExitCover()
@@ -715,6 +734,11 @@ bool USquadUnitAnimInstance::ExitCover()
 		}
 
 		M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
+		AnimNotify_Cover_BackInCover();
+		if (not PlayExitCoverMontage())
+		{
+			ClearCoverAnimationRuntime();
+		}
 		return false;
 	}
 
@@ -1097,8 +1121,12 @@ bool USquadUnitAnimInstance::PlayCoverMontage(
 {
 	if (not IsValid(Montage))
 	{
-		RTSFunctionLibrary::ReportError(
-			"A required cover montage is not configured on " + GetName());
+		UE_LOG(
+			LogRTSSquadUnitCoverAnimation,
+			Warning,
+			TEXT("Cover action %s has no montage configured on %s; gameplay state will continue immediately."),
+			*UEnum::GetValueAsString(MontageAction),
+			*GetName());
 		return false;
 	}
 
@@ -1137,7 +1165,12 @@ bool USquadUnitAnimInstance::PlayExitCoverMontage()
 	}
 
 	M_CoverAnimRuntime.M_NextAction = ESquadCoverAnimAction::None;
-	return PlayCoverMontage(ExitMontage, ESquadCoverAnimAction::Exiting);
+	if (PlayCoverMontage(ExitMontage, ESquadCoverAnimAction::Exiting))
+	{
+		return true;
+	}
+	ClearCoverAnimationRuntime();
+	return false;
 }
 
 void USquadUnitAnimInstance::OnCoverMontageEnded(UAnimMontage* Montage, const bool bInterrupted)
@@ -1208,6 +1241,47 @@ void USquadUnitAnimInstance::ClearCoverAnimationRuntime()
 
 	AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
 	AimOffsets.UpdateAOForNewAimPosition(ESquadAimPosition::Standing);
+}
+
+void USquadUnitAnimInstance::LogMissingCoverAnimationAssets(
+	const ESquadIdleAnimationPose CoverPose) const
+{
+	const bool bIsCrouchCover = CoverPose == ESquadIdleAnimationPose::CrouchCover;
+	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+	const UAnimSequence* ProtectedIdlePose = bIsCrouchCover
+		? CoverAnimations.Crouch.ProtectedIdlePose
+		: StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->ProtectedIdlePose;
+	const FSquadUnitCoverAimAssets* AimAssets = bIsCrouchCover
+		? &CoverAnimations.Crouch.AimAssets
+		: StandingAnimationSet == nullptr ? nullptr : &StandingAnimationSet->PeekAimAssets;
+
+	if (not IsValid(ProtectedIdlePose))
+	{
+		UE_LOG(
+			LogRTSSquadUnitCoverAnimation,
+			Warning,
+			TEXT("Cover pose %s has no protected idle animation configured on %s."),
+			*UEnum::GetValueAsString(CoverPose),
+			*GetName());
+	}
+	if (AimAssets == nullptr || not IsValid(AimAssets->AimOffset))
+	{
+		UE_LOG(
+			LogRTSSquadUnitCoverAnimation,
+			Warning,
+			TEXT("Cover pose %s has no aim offset configured on %s."),
+			*UEnum::GetValueAsString(CoverPose),
+			*GetName());
+	}
+	if (AimAssets == nullptr || not IsValid(AimAssets->BaseSequence))
+	{
+		UE_LOG(
+			LogRTSSquadUnitCoverAnimation,
+			Warning,
+			TEXT("Cover pose %s has no aim base sequence configured on %s."),
+			*UEnum::GetValueAsString(CoverPose),
+			*GetName());
+	}
 }
 
 const FSquadUnitStandingCoverAnimationSet* USquadUnitAnimInstance::GetStandingCoverAnimationSet() const

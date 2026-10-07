@@ -591,6 +591,48 @@ void AInfantryWeaponMaster::RegisterIgnoreActor(AActor* ActorToIgnore, const boo
 	}
 }
 
+void AInfantryWeaponMaster::RegisterCoverIgnoreActor(AActor* ActorToIgnore, const bool bRegister)
+{
+	if (not RTSFunctionLibrary::RTSIsValid(ActorToIgnore) || not GetIsValidWeaponState())
+	{
+		return;
+	}
+	WeaponState->RegisterActorToIgnoreForReason(
+		ActorToIgnore,
+		EWeaponIgnoredActorReason::Cover,
+		bRegister);
+}
+
+void AInfantryWeaponMaster::SetCoverFireBlocked(UObject* RestrictionSource, const bool bBlocked)
+{
+	if (not IsValid(RestrictionSource) || not GetIsValidWeaponState())
+	{
+		return;
+	}
+	WeaponState->SetModuleFireRestriction(RestrictionSource, bBlocked);
+}
+
+AActor* AInfantryWeaponMaster::GetCurrentTargetActor() const
+{
+	return M_TargetingData.GetTargetActor();
+}
+
+FVector AInfantryWeaponMaster::GetCurrentTargetLocation()
+{
+	return M_TargetingData.GetActiveTargetLocation();
+}
+
+bool AInfantryWeaponMaster::GetIsCurrentTargetInRange()
+{
+	if (not GetIsSquadUnitOwnerValid() || not M_TargetingData.GetIsTargetValid())
+	{
+		return false;
+	}
+	return FVector::DistSquared(
+		M_TargetingData.GetActiveTargetLocation(),
+		M_OwningSquadUnit->GetActorLocation()) <= M_WeaponRangeData.M_MaxWeaponRangeSquared;
+}
+
 float AInfantryWeaponMaster::GetTurretYawLimit() const
 {
 	return 0.f;

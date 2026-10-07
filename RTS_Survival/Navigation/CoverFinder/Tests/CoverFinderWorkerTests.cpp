@@ -3,15 +3,21 @@
 #include "Misc/AutomationTest.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 namespace CoverFinderWorkerTestsPrivate
 {
-	FCoverTraceObservation MakeTrace(const bool bBlockingHit, const float Distance)
+	FCoverTraceObservation MakeTrace(
+		const bool bBlockingHit,
+		const float Distance,
+		const uint64 BlockingProviderHandle = 0)
 	{
 		FCoverTraceObservation Trace;
 		Trace.bBlockingHit = bBlockingHit;
 		Trace.Distance = Distance;
 		Trace.ImpactNormal = FVector(-1.0f, 0.0f, 0.0f);
+		Trace.BlockingProviderHandle = BlockingProviderHandle;
 		return Trace;
 	}
 
@@ -113,6 +119,17 @@ bool FCoverFinderSurfaceAndSideTest::RunTest(const FString& Parameters)
 			UnrelatedStandingHitCandidates[0].CoverType,
 			ERTSCoverType::Crouch);
 	}
+
+	FCoverTraceObservation FirstProviderTrace = MakeTrace(true, 50.0f, 11);
+	FCoverTraceObservation SecondProviderTrace = MakeTrace(true, 50.0f, 12);
+	FCoverFinderSettingsSnapshot Settings;
+	TestFalse(
+		TEXT("Equal-height traces from different actors are not merged into one surface"),
+		FCoverFinderAlgorithms::GetIsSameSurface(FirstProviderTrace, SecondProviderTrace, Settings));
+	SecondProviderTrace.BlockingProviderHandle = FirstProviderTrace.BlockingProviderHandle;
+	TestTrue(
+		TEXT("Equal-height traces from one actor remain one surface"),
+		FCoverFinderAlgorithms::GetIsSameSurface(FirstProviderTrace, SecondProviderTrace, Settings));
 	return true;
 }
 
@@ -224,6 +241,94 @@ bool FCoverFinderSamplePlanTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Overlapping tile bounds do not duplicate grid locations"), SamplePlan.Num(), 4);
 	TestFalse(TEXT("Small plans do not report truncation"), bWasTruncated);
 	TestEqual(TEXT("Plan order starts at minimum X/Y"), SamplePlan[0], FVector::ZeroVector);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCoverFinderReservationTest,
+	"RTS.CoverFinder.Tactical.Reservations",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoverFinderReservationTest::RunTest(const FString& Parameters)
+{
+	using namespace CoverFinderWorkerTestsPrivate;
+	URTSCoverFinderWorldSubsystem* CoverSubsystem = NewObject<URTSCoverFinderWorldSubsystem>();
+	ASquadUnit* FirstUnit = NewObject<ASquadUnit>();
+	ASquadUnit* SecondUnit = NewObject<ASquadUnit>();
+	TestNotNull(TEXT("Cover subsystem exists"), CoverSubsystem);
+	TestNotNull(TEXT("First transient squad unit exists"), FirstUnit);
+	TestNotNull(TEXT("Second transient squad unit exists"), SecondUnit);
+	if (not IsValid(CoverSubsystem) || not IsValid(FirstUnit) || not IsValid(SecondUnit))
+	{
+		return false;
+	}
+
+	TArray<FRTSCoverPoint> Points;
+	Points.Add(MakeCandidate(FVector::ZeroVector, FVector::ForwardVector, ERTSCoverType::Crouch));
+	Points.Add(MakeCandidate(FVector(300.0f, 0.0f, 0.0f), FVector::ForwardVector, ERTSCoverType::Crouch));
+	CoverSubsystem->RegisterAuthoredCoverProvider(MoveTemp(Points));
+	FRTSCoverPoint FirstReservation;
+	FRTSCoverPoint SecondReservation;
+	TestTrue(
+		TEXT("First unit reserves the nearest point"),
+		CoverSubsystem->TryReserveBestCoverPoint(
+			*FirstUnit,
+			nullptr,
+			FVector::ZeroVector,
+			FirstReservation));
+	TestTrue(
+		TEXT("Second unit can reserve another point"),
+		CoverSubsystem->TryReserveBestCoverPoint(
+			*SecondUnit,
+			nullptr,
+			FVector::ZeroVector,
+			SecondReservation));
+	TestNotEqual(
+		TEXT("Two units never receive the same physical cover slot"),
+		FirstReservation.PointId,
+		SecondReservation.PointId);
+	CoverSubsystem->ReleaseCoverReservation(*FirstUnit, FirstReservation.PointId);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCoverFinderWeaponIgnoreReasonTest,
+	"RTS.CoverFinder.Tactical.WeaponIgnoreReasons",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoverFinderWeaponIgnoreReasonTest::RunTest(const FString& Parameters)
+{
+	UWeaponState* WeaponState = NewObject<UWeaponState>();
+	AActor* ProviderActor = NewObject<AActor>();
+	TestNotNull(TEXT("Transient weapon state exists"), WeaponState);
+	TestNotNull(TEXT("Transient provider actor exists"), ProviderActor);
+	if (not IsValid(WeaponState) || not IsValid(ProviderActor))
+	{
+		return false;
+	}
+
+	WeaponState->RegisterActorToIgnoreForReason(
+		ProviderActor,
+		EWeaponIgnoredActorReason::External,
+		true);
+	WeaponState->RegisterActorToIgnoreForReason(
+		ProviderActor,
+		EWeaponIgnoredActorReason::Cover,
+		true);
+	WeaponState->RegisterActorToIgnoreForReason(
+		ProviderActor,
+		EWeaponIgnoredActorReason::Cover,
+		false);
+	TestTrue(
+		TEXT("Removing cover ignore preserves the cargo or external reason"),
+		WeaponState->GetIsActorIgnored(ProviderActor));
+	WeaponState->RegisterActorToIgnoreForReason(
+		ProviderActor,
+		EWeaponIgnoredActorReason::External,
+		false);
+	TestFalse(
+		TEXT("Actor is removed only after every ignore reason clears"),
+		WeaponState->GetIsActorIgnored(ProviderActor));
 	return true;
 }
 

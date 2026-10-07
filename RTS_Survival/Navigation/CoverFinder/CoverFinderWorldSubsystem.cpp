@@ -2,6 +2,7 @@
 
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "GameFramework/Character.h"
 #include "Components/PrimitiveComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
@@ -20,7 +21,9 @@
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
 #include "RTS_Survival/Navigation/RTSNavAgentRegistery/RTSNavAgentRegistery.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/ERTSNavAgents.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "ShowFlags.h"
 #include "UnrealClient.h"
@@ -29,6 +32,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogRTSCoverFinder, Log, All);
 
 DECLARE_STATS_GROUP(TEXT("RTS Cover Finder"), STATGROUP_RTSCoverFinder, STATCAT_Advanced);
 DECLARE_CYCLE_STAT(TEXT("Game-thread sampling"), STAT_RTSCoverFinder_GameThreadSampling, STATGROUP_RTSCoverFinder);
+DECLARE_CYCLE_STAT(TEXT("Tactical cover updates"), STAT_RTSCoverFinder_TacticalUpdates, STATGROUP_RTSCoverFinder);
 
 namespace CoverFinderWorldSubsystemPrivate
 {
@@ -48,6 +52,11 @@ namespace CoverFinderWorldSubsystemPrivate
 	constexpr float CaptureMaximumHeight = 50000.0f;
 	constexpr int32 CaptureFrameDelay = 3;
 	constexpr int32 MaximumQueriesForOneDirection = 105;
+	constexpr float CoverSpatialCellSize = 500.0f;
+	constexpr float MinimumThreatProtectionDot = 0.2f;
+	constexpr float CrouchFiringHeight = 150.0f;
+	constexpr float StandingFiringHeight = 160.0f;
+	constexpr int32 MaximumCandidateLaneTests = 8;
 	const FColor CrouchCoverColor(173, 216, 230);
 	const FColor StandingCoverColor(255, 165, 0);
 
@@ -82,6 +91,10 @@ namespace CoverFinderWorldSubsystemPrivate
 		TArray<FBox>& OutEnvironmentBounds)
 	{
 		if (not IsValid(PrimitiveComponent) || GetIsLandscapeComponent(PrimitiveComponent))
+		{
+			return;
+		}
+		if (IsValid(Cast<ACharacter>(PrimitiveComponent->GetOwner())))
 		{
 			return;
 		}
@@ -122,7 +135,40 @@ namespace CoverFinderWorldSubsystemPrivate
 		});
 		for (const FHitResult& HitResult : HitResults)
 		{
-			if (GetIsLandscapeComponent(HitResult.GetComponent()))
+			if (GetIsLandscapeComponent(HitResult.GetComponent()) ||
+				IsValid(Cast<ACharacter>(HitResult.GetActor())))
+			{
+				continue;
+			}
+			OutHitResult = HitResult;
+			return true;
+		}
+		return false;
+	}
+
+	bool TraceAllCoverProviders(
+		UWorld& World,
+		const FVector& TraceStart,
+		const FVector& TraceEnd,
+		FHitResult& OutHitResult)
+	{
+		TArray<FHitResult> HitResults;
+		if (not World.LineTraceMultiByObjectType(
+			HitResults,
+			TraceStart,
+			TraceEnd,
+			GetAllCoverObjectQueryParams(),
+			BuildCoverCollisionQueryParams()))
+		{
+			return false;
+		}
+		HitResults.Sort([](const FHitResult& Left, const FHitResult& Right)
+		{
+			return Left.Distance < Right.Distance;
+		});
+		for (const FHitResult& HitResult : HitResults)
+		{
+			if (IsValid(Cast<ACharacter>(HitResult.GetActor())))
 			{
 				continue;
 			}
@@ -169,11 +215,26 @@ namespace CoverFinderWorldSubsystemPrivate
 
 	URTSCoverFinderWorldSubsystem* GetCoverSubsystem(UWorld* World)
 	{
-		if (not IsValid(World))
+		URTSCoverFinderWorldSubsystem* GameCoverSubsystem = nullptr;
+		if (IsValid(GEngine))
 		{
-			return nullptr;
+			for (const FWorldContext& WorldContext : GEngine->GetWorldContexts())
+			{
+				UWorld* CandidateWorld = WorldContext.World();
+				if (not IsValid(CandidateWorld) || not CandidateWorld->HasBegunPlay())
+				{
+					continue;
+				}
+				if (CandidateWorld->WorldType == EWorldType::Game ||
+					CandidateWorld->WorldType == EWorldType::PIE)
+				{
+					GameCoverSubsystem = CandidateWorld->GetSubsystem<URTSCoverFinderWorldSubsystem>();
+				}
+			}
 		}
-		return World->GetSubsystem<URTSCoverFinderWorldSubsystem>();
+		return IsValid(GameCoverSubsystem)
+			? GameCoverSubsystem
+			: IsValid(World) ? World->GetSubsystem<URTSCoverFinderWorldSubsystem>() : nullptr;
 	}
 
 	void RunCoverReportCommand(const TArray<FString>&, UWorld* World)
@@ -210,6 +271,22 @@ namespace CoverFinderWorldSubsystemPrivate
 		CoverSubsystem->RequestDebugCapture(ScreenshotName);
 	}
 
+	void RunTestCoverValidationCommand(const TArray<FString>& Arguments, UWorld* World)
+	{
+		URTSCoverFinderWorldSubsystem* CoverSubsystem = GetCoverSubsystem(World);
+		if (not IsValid(CoverSubsystem))
+		{
+			UE_LOG(LogRTSCoverFinder, Error, TEXT("RTS.CoverFinder.ValidateTestCover failed: subsystem is unavailable."));
+			return;
+		}
+		constexpr float DefaultValidationDelaySeconds = 15.0f;
+		const float DelaySeconds = Arguments.IsEmpty()
+			? DefaultValidationDelaySeconds
+			: FMath::Max(1.0f, FCString::Atof(*Arguments[0]));
+		const bool bCaptureScreenshot = Arguments.Num() > 1 && Arguments[1].Equals(TEXT("capture"));
+		CoverSubsystem->RequestTestCoverValidation(DelaySeconds, bCaptureScreenshot);
+	}
+
 	FAutoConsoleCommandWithWorldAndArgs GCoverFinderReportCommand(
 		TEXT("RTS.CoverFinder.Report"),
 		TEXT("Logs the latest cover scan counts and measured game-thread/worker timings."),
@@ -224,6 +301,11 @@ namespace CoverFinderWorldSubsystemPrivate
 		TEXT("RTS.CoverFinder.Capture"),
 		TEXT("Rescans, frames the cover points from above, and saves a debug screenshot. Optional filename argument."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&RunCoverCaptureCommand));
+
+	FAutoConsoleCommandWithWorldAndArgs GCoverFinderValidateTestCoverCommand(
+		TEXT("RTS.CoverFinder.ValidateTestCover"),
+		TEXT("After an optional delay, validates TestCover squad registration, discovered points, reservations, and cover states. Add 'capture' as the second argument."),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&RunTestCoverValidationCommand));
 }
 
 void FCoverFinderSamplingState::Reset()
@@ -289,6 +371,12 @@ void URTSCoverFinderWorldSubsystem::Deinitialize()
 	M_LandscapeCoverPoints.Reset();
 	M_EnvironmentCoverPoints.Reset();
 	M_AuthoredCoverProviders.Reset();
+	M_BlockingProviderActors.Reset();
+	M_BlockingProviderHandles.Reset();
+	M_CoverPointIndices.Reset();
+	M_CoverSpatialGrid.Reset();
+	M_CoverReservations.Reset();
+	M_RegisteredSquadUnits.Reset();
 	M_CachedNavigationTileBounds.Reset();
 	Super::Deinitialize();
 }
@@ -298,6 +386,7 @@ void URTSCoverFinderWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
+		constexpr float DefaultCommandLineValidationDelaySeconds = 20.0f;
 		UE_LOG(
 			LogRTSCoverFinder,
 			Display,
@@ -308,6 +397,18 @@ void URTSCoverFinderWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		{
 			RequestDebugCapture();
 		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateTestCover")))
+		{
+			float ValidationDelaySeconds = DefaultCommandLineValidationDelaySeconds;
+			FParse::Value(
+				FCommandLine::Get(),
+				TEXT("CoverFinderValidationDelay="),
+				ValidationDelaySeconds);
+			const bool bCaptureValidation = FParse::Param(
+				FCommandLine::Get(),
+				TEXT("CoverFinderValidationCapture"));
+			RequestTestCoverValidation(ValidationDelaySeconds, bCaptureValidation);
+		}
 	}
 }
 
@@ -315,29 +416,27 @@ void URTSCoverFinderWorldSubsystem::Tick(const float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	TickDebugCapture();
+	TickTestCoverValidation(DeltaTime);
 
 	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
-	if (not IsValid(CoverSettings) || not CoverSettings->bM_EnableCoverSearch || M_Worker == nullptr)
+	if (IsValid(CoverSettings) && CoverSettings->bM_EnableCoverSearch && M_Worker != nullptr)
 	{
-		return;
+		PollWorkerResults();
+		if (M_ScanState == ECoverFinderScanState::SamplingWorld)
+		{
+			ProcessWorldSampling();
+		}
+		else if (M_ScanState == ECoverFinderScanState::Idle)
+		{
+			M_TimeUntilNextScan -= DeltaTime;
+			if (M_TimeUntilNextScan <= 0.0f)
+			{
+				BeginScan();
+			}
+		}
 	}
 
-	PollWorkerResults();
-	if (M_ScanState == ECoverFinderScanState::SamplingWorld)
-	{
-		ProcessWorldSampling();
-		return;
-	}
-	if (M_ScanState != ECoverFinderScanState::Idle)
-	{
-		return;
-	}
-
-	M_TimeUntilNextScan -= DeltaTime;
-	if (M_TimeUntilNextScan <= 0.0f)
-	{
-		BeginScan();
-	}
+	TickTacticalCoverUnits();
 }
 
 TStatId URTSCoverFinderWorldSubsystem::GetStatId() const
@@ -351,11 +450,31 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::FindCoverPointsInRadius(
 {
 	TArray<FRTSCoverPoint> NearbyCoverPoints;
 	const float SearchRadiusSquared = FMath::Square(FMath::Max(0.0f, SearchRadius));
-	for (const FRTSCoverPoint& CoverPoint : M_CoverPoints)
+	const FIntPoint MinimumCell = GetCoverSpatialCell(
+		SearchLocation - FVector(SearchRadius, SearchRadius, 0.0f));
+	const FIntPoint MaximumCell = GetCoverSpatialCell(
+		SearchLocation + FVector(SearchRadius, SearchRadius, 0.0f));
+	for (int32 CellX = MinimumCell.X; CellX <= MaximumCell.X; ++CellX)
 	{
-		if (FVector::DistSquared(SearchLocation, CoverPoint.Location) <= SearchRadiusSquared)
+		for (int32 CellY = MinimumCell.Y; CellY <= MaximumCell.Y; ++CellY)
 		{
-			NearbyCoverPoints.Add(CoverPoint);
+			const TArray<int32>* CellPointIndices = M_CoverSpatialGrid.Find(FIntPoint(CellX, CellY));
+			if (CellPointIndices == nullptr)
+			{
+				continue;
+			}
+			for (const int32 CoverPointIndex : *CellPointIndices)
+			{
+				if (not M_CoverPoints.IsValidIndex(CoverPointIndex))
+				{
+					continue;
+				}
+				const FRTSCoverPoint& CoverPoint = M_CoverPoints[CoverPointIndex];
+				if (FVector::DistSquared(SearchLocation, CoverPoint.Location) <= SearchRadiusSquared)
+				{
+					NearbyCoverPoints.Add(CoverPoint);
+				}
+			}
 		}
 	}
 	return NearbyCoverPoints;
@@ -372,6 +491,7 @@ void URTSCoverFinderWorldSubsystem::ForceRescan()
 }
 
 uint64 URTSCoverFinderWorldSubsystem::RegisterAuthoredCoverProvider(
+	AActor* ProviderActor,
 	TArray<FRTSCoverPoint>&& CoverPoints)
 {
 	if (CoverPoints.IsEmpty())
@@ -385,9 +505,11 @@ uint64 URTSCoverFinderWorldSubsystem::RegisterAuthoredCoverProvider(
 		++RegistrationId;
 	}
 	M_NextProviderRegistrationId = RegistrationId + 1;
+	const uint64 BlockingProviderHandle = FindOrAddBlockingProviderHandle(ProviderActor);
 	for (FRTSCoverPoint& CoverPoint : CoverPoints)
 	{
 		CoverPoint.ProviderRegistrationId = RegistrationId;
+		CoverPoint.BlockingProviderHandle = BlockingProviderHandle;
 		CoverPoint.CoverNormal = CoverPoint.CoverNormal.GetSafeNormal2D();
 		if (CoverPoint.CoverNormal.IsNearlyZero())
 		{
@@ -418,6 +540,311 @@ void URTSCoverFinderWorldSubsystem::UnregisterAuthoredCoverProvider(const uint64
 	RebuildPublishedCoverPoints();
 	DrawPublishedCover();
 	ForceRescan();
+}
+
+void URTSCoverFinderWorldSubsystem::RegisterSquadUnit(ASquadUnit* SquadUnit)
+{
+	if (not IsValid(SquadUnit))
+	{
+		return;
+	}
+	M_RegisteredSquadUnits.AddUnique(TWeakObjectPtr<ASquadUnit>(SquadUnit));
+}
+
+void URTSCoverFinderWorldSubsystem::UnregisterSquadUnit(ASquadUnit* SquadUnit)
+{
+	if (not IsValid(SquadUnit))
+	{
+		return;
+	}
+	const int64 ReservedPointId = SquadUnit->GetCoverRuntimeState().AssignedCoverPoint.PointId;
+	ReleaseCoverReservation(*SquadUnit, ReservedPointId);
+	M_RegisteredSquadUnits.Remove(TWeakObjectPtr<ASquadUnit>(SquadUnit));
+	M_NextTacticalUnitIndex = FMath::Min(M_NextTacticalUnitIndex, M_RegisteredSquadUnits.Num());
+}
+
+bool URTSCoverFinderWorldSubsystem::TryReserveBestCoverPoint(
+	ASquadUnit& SquadUnit,
+	AActor* TargetActor,
+	const FVector& TargetLocation,
+	FRTSCoverPoint& OutCoverPoint)
+{
+	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
+	if (not IsValid(CoverSettings) || M_CoverPoints.IsEmpty())
+	{
+		return false;
+	}
+	const float SearchRadius = FMath::Max(100.0f, CoverSettings->M_AutomaticCoverSearchRadius);
+	const TArray<FRTSCoverPoint> BestCandidates = GatherBestTacticalCoverCandidates(
+		SquadUnit,
+		TargetActor,
+		TargetLocation,
+		SearchRadius);
+	for (const FRTSCoverPoint& CoverPoint : BestCandidates)
+	{
+		if (IsValid(TargetActor) && not GetHasTargetSpecificFiringLane(
+			SquadUnit,
+			CoverPoint,
+			*TargetActor,
+			TargetLocation))
+		{
+			continue;
+		}
+		M_CoverReservations.Add(CoverPoint.PointId, TWeakObjectPtr<ASquadUnit>(&SquadUnit));
+		OutCoverPoint = CoverPoint;
+		return true;
+	}
+	return false;
+}
+
+TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::GatherBestTacticalCoverCandidates(
+	const ASquadUnit& SquadUnit,
+	const AActor* TargetActor,
+	const FVector& TargetLocation,
+	const float SearchRadius)
+{
+	const FVector UnitLocation = SquadUnit.GetActorLocation();
+	TArray<FRTSCoverPoint> BestCandidates = FindCoverPointsInRadius(UnitLocation, SearchRadius);
+	M_TacticalPerformanceSnapshot.CandidateChecksLastFrame += BestCandidates.Num();
+	BestCandidates.RemoveAll([this, &SquadUnit, TargetActor, &TargetLocation](const FRTSCoverPoint& CoverPoint)
+	{
+		if (GetIsPointReservedByAnotherUnit(CoverPoint.PointId, SquadUnit))
+		{
+			return true;
+		}
+		if (CoverPoint.BlockingProviderHandle != 0 && not IsValid(ResolveBlockingProvider(CoverPoint)))
+		{
+			return true;
+		}
+		return IsValid(TargetActor) && not GetIsCandidateProtectedFromTarget(CoverPoint, TargetLocation);
+	});
+	BestCandidates.Sort([&UnitLocation](const FRTSCoverPoint& Left, const FRTSCoverPoint& Right)
+	{
+		return FVector::DistSquared(UnitLocation, Left.Location) <
+			FVector::DistSquared(UnitLocation, Right.Location);
+	});
+	if (BestCandidates.Num() > CoverFinderWorldSubsystemPrivate::MaximumCandidateLaneTests)
+	{
+		BestCandidates.SetNum(CoverFinderWorldSubsystemPrivate::MaximumCandidateLaneTests);
+	}
+	return BestCandidates;
+}
+
+void URTSCoverFinderWorldSubsystem::ReleaseCoverReservation(
+	const ASquadUnit& SquadUnit,
+	const int64 PointId)
+{
+	if (PointId == 0)
+	{
+		return;
+	}
+	const TWeakObjectPtr<ASquadUnit>* ReservingUnit = M_CoverReservations.Find(PointId);
+	if (ReservingUnit == nullptr || ReservingUnit->Get() != &SquadUnit)
+	{
+		return;
+	}
+	M_CoverReservations.Remove(PointId);
+}
+
+bool URTSCoverFinderWorldSubsystem::GetIsCoverPointPublished(const int64 PointId) const
+{
+	return PointId != 0 && M_CoverPointIndices.Contains(PointId);
+}
+
+AActor* URTSCoverFinderWorldSubsystem::ResolveBlockingProvider(const FRTSCoverPoint& CoverPoint) const
+{
+	if (CoverPoint.BlockingProviderHandle == 0)
+	{
+		return nullptr;
+	}
+	const TWeakObjectPtr<AActor>* ProviderActor = M_BlockingProviderActors.Find(
+		CoverPoint.BlockingProviderHandle);
+	return ProviderActor != nullptr ? ProviderActor->Get() : nullptr;
+}
+
+bool URTSCoverFinderWorldSubsystem::GetHasTargetSpecificFiringLane(
+	const ASquadUnit& SquadUnit,
+	const FRTSCoverPoint& CoverPoint,
+	const AActor& TargetActor,
+	const FVector& TargetLocation)
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	const ECollisionChannel TargetTraceChannel = SquadUnit.GetOwningPlayer() == 1
+		? COLLISION_TRACE_ENEMY
+		: COLLISION_TRACE_PLAYER;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RTSCoverFiringLane), true);
+	QueryParams.AddIgnoredActor(&SquadUnit);
+	FHitResult HitResult;
+	++M_TacticalPerformanceSnapshot.FiringLaneTracesLastFrame;
+	if (not World->LineTraceSingleByChannel(
+		HitResult,
+		BuildFiringLaneStart(CoverPoint),
+		TargetLocation,
+		TargetTraceChannel,
+		QueryParams))
+	{
+		return false;
+	}
+	const AActor* HitActor = HitResult.GetActor();
+	return HitActor == &TargetActor ||
+		(IsValid(HitActor) && HitActor->IsOwnedBy(&TargetActor)) ||
+		(IsValid(HitActor) && TargetActor.IsOwnedBy(HitActor));
+}
+
+uint64 URTSCoverFinderWorldSubsystem::FindOrAddBlockingProviderHandle(AActor* ProviderActor)
+{
+	if (not IsValid(ProviderActor) || IsValid(Cast<ACharacter>(ProviderActor)))
+	{
+		return 0;
+	}
+	const TWeakObjectPtr<AActor> WeakProviderActor(ProviderActor);
+	if (const uint64* ExistingHandle = M_BlockingProviderHandles.Find(WeakProviderActor))
+	{
+		return *ExistingHandle;
+	}
+
+	uint64 ProviderHandle = M_NextBlockingProviderHandle;
+	while (ProviderHandle == 0 || M_BlockingProviderActors.Contains(ProviderHandle))
+	{
+		++ProviderHandle;
+	}
+	M_NextBlockingProviderHandle = ProviderHandle + 1;
+	M_BlockingProviderActors.Add(ProviderHandle, WeakProviderActor);
+	M_BlockingProviderHandles.Add(WeakProviderActor, ProviderHandle);
+	return ProviderHandle;
+}
+
+void URTSCoverFinderWorldSubsystem::RebuildCoverSpatialGrid()
+{
+	M_CoverPointIndices.Reset();
+	M_CoverSpatialGrid.Reset();
+	for (int32 CoverPointIndex = 0; CoverPointIndex < M_CoverPoints.Num(); ++CoverPointIndex)
+	{
+		const FRTSCoverPoint& CoverPoint = M_CoverPoints[CoverPointIndex];
+		M_CoverPointIndices.Add(CoverPoint.PointId, CoverPointIndex);
+		M_CoverSpatialGrid.FindOrAdd(GetCoverSpatialCell(CoverPoint.Location)).Add(CoverPointIndex);
+	}
+}
+
+void URTSCoverFinderWorldSubsystem::TickTacticalCoverUnits()
+{
+	SCOPE_CYCLE_COUNTER(STAT_RTSCoverFinder_TacticalUpdates);
+	const double StartSeconds = FPlatformTime::Seconds();
+	M_TacticalPerformanceSnapshot.UnitUpdatesLastFrame = 0;
+	M_TacticalPerformanceSnapshot.CandidateChecksLastFrame = 0;
+	M_TacticalPerformanceSnapshot.FiringLaneTracesLastFrame = 0;
+	RemoveInvalidTacticalReferences();
+
+	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
+	if (not IsValid(CoverSettings) || not CoverSettings->bM_EnableAutomaticCoverUse)
+	{
+		M_TacticalPerformanceSnapshot.RegisteredUnitCount = M_RegisteredSquadUnits.Num();
+		M_TacticalPerformanceSnapshot.ReservedPointCount = M_CoverReservations.Num();
+		M_TacticalPerformanceSnapshot.GameThreadMillisecondsLastFrame = 0.0f;
+		return;
+	}
+
+	const int32 MaximumUpdates = FMath::Clamp(
+		CoverSettings->M_MaximumTacticalUnitUpdatesPerFrame,
+		1,
+		64);
+	const int32 UpdatesToPerform = FMath::Min(MaximumUpdates, M_RegisteredSquadUnits.Num());
+	while (M_TacticalPerformanceSnapshot.UnitUpdatesLastFrame < UpdatesToPerform &&
+		not M_RegisteredSquadUnits.IsEmpty())
+	{
+		if (M_NextTacticalUnitIndex >= M_RegisteredSquadUnits.Num())
+		{
+			M_NextTacticalUnitIndex = 0;
+		}
+		ASquadUnit* SquadUnit = M_RegisteredSquadUnits[M_NextTacticalUnitIndex].Get();
+		++M_NextTacticalUnitIndex;
+		if (not IsValid(SquadUnit))
+		{
+			continue;
+		}
+		SquadUnit->UpdateAutomaticCover(*this);
+		++M_TacticalPerformanceSnapshot.UnitUpdatesLastFrame;
+	}
+
+	M_TacticalPerformanceSnapshot.RegisteredUnitCount = M_RegisteredSquadUnits.Num();
+	M_TacticalPerformanceSnapshot.ReservedPointCount = M_CoverReservations.Num();
+	M_TacticalPerformanceSnapshot.GameThreadMillisecondsLastFrame = static_cast<float>(
+		(FPlatformTime::Seconds() - StartSeconds) * 1000.0);
+	M_TacticalPerformanceSnapshot.MaximumGameThreadMilliseconds = FMath::Max(
+		M_TacticalPerformanceSnapshot.MaximumGameThreadMilliseconds,
+		M_TacticalPerformanceSnapshot.GameThreadMillisecondsLastFrame);
+}
+
+void URTSCoverFinderWorldSubsystem::RemoveInvalidTacticalReferences()
+{
+	M_RegisteredSquadUnits.RemoveAll([](const TWeakObjectPtr<ASquadUnit>& SquadUnit)
+	{
+		return not SquadUnit.IsValid();
+	});
+	for (auto ReservationIterator = M_CoverReservations.CreateIterator(); ReservationIterator; ++ReservationIterator)
+	{
+		if (not ReservationIterator.Value().IsValid() ||
+			not M_CoverPointIndices.Contains(ReservationIterator.Key()))
+		{
+			ReservationIterator.RemoveCurrent();
+		}
+	}
+	for (auto ProviderIterator = M_BlockingProviderHandles.CreateIterator(); ProviderIterator; ++ProviderIterator)
+	{
+		if (ProviderIterator.Key().IsValid())
+		{
+			continue;
+		}
+		M_BlockingProviderActors.Remove(ProviderIterator.Value());
+		ProviderIterator.RemoveCurrent();
+	}
+	M_NextTacticalUnitIndex = FMath::Min(M_NextTacticalUnitIndex, M_RegisteredSquadUnits.Num());
+}
+
+FIntPoint URTSCoverFinderWorldSubsystem::GetCoverSpatialCell(const FVector& Location) const
+{
+	return FIntPoint(
+		FMath::FloorToInt(Location.X / CoverFinderWorldSubsystemPrivate::CoverSpatialCellSize),
+		FMath::FloorToInt(Location.Y / CoverFinderWorldSubsystemPrivate::CoverSpatialCellSize));
+}
+
+FVector URTSCoverFinderWorldSubsystem::BuildFiringLaneStart(const FRTSCoverPoint& CoverPoint) const
+{
+	if (CoverPoint.CoverType == ERTSCoverType::Crouch)
+	{
+		return CoverPoint.Location + FVector::UpVector * CoverFinderWorldSubsystemPrivate::CrouchFiringHeight;
+	}
+	const FVector SideDirection = CoverFinderWorldSubsystemPrivate::GetStandingSideDirection(
+		-CoverPoint.CoverNormal,
+		CoverPoint.CoverType);
+	const float PeekOffset = FMath::Max(M_CachedAgentRadius * 2.0f, 84.0f);
+	return CoverPoint.Location + SideDirection * PeekOffset
+		+ FVector::UpVector * CoverFinderWorldSubsystemPrivate::StandingFiringHeight;
+}
+
+bool URTSCoverFinderWorldSubsystem::GetIsCandidateProtectedFromTarget(
+	const FRTSCoverPoint& CoverPoint,
+	const FVector& TargetLocation) const
+{
+	const FVector DirectionToTarget = (TargetLocation - CoverPoint.Location).GetSafeNormal2D();
+	if (DirectionToTarget.IsNearlyZero())
+	{
+		return false;
+	}
+	return FVector::DotProduct(DirectionToTarget, -CoverPoint.CoverNormal.GetSafeNormal2D())
+		>= CoverFinderWorldSubsystemPrivate::MinimumThreatProtectionDot;
+}
+
+bool URTSCoverFinderWorldSubsystem::GetIsPointReservedByAnotherUnit(
+	const int64 PointId,
+	const ASquadUnit& SquadUnit) const
+{
+	const TWeakObjectPtr<ASquadUnit>* ReservingUnit = M_CoverReservations.Find(PointId);
+	return ReservingUnit != nullptr && ReservingUnit->IsValid() && ReservingUnit->Get() != &SquadUnit;
 }
 
 void URTSCoverFinderWorldSubsystem::LogPerformanceReport() const
@@ -471,6 +898,17 @@ void URTSCoverFinderWorldSubsystem::LogPerformanceReport() const
 		M_LastPerformanceSnapshot.MaximumGameThreadMillisecondsInOneSamplingFrame,
 		M_LastPerformanceSnapshot.WorkerMilliseconds,
 		M_LastPerformanceSnapshot.WallClockMilliseconds);
+	UE_LOG(
+		LogRTSCoverFinder,
+		Display,
+		TEXT("RTS_COVER_TACTICAL_PERF registered=%d reserved=%d updates_frame=%d candidate_checks_frame=%d lane_traces_frame=%d gt_frame_ms=%.3f gt_max_ms=%.3f"),
+		M_TacticalPerformanceSnapshot.RegisteredUnitCount,
+		M_TacticalPerformanceSnapshot.ReservedPointCount,
+		M_TacticalPerformanceSnapshot.UnitUpdatesLastFrame,
+		M_TacticalPerformanceSnapshot.CandidateChecksLastFrame,
+		M_TacticalPerformanceSnapshot.FiringLaneTracesLastFrame,
+		M_TacticalPerformanceSnapshot.GameThreadMillisecondsLastFrame,
+		M_TacticalPerformanceSnapshot.MaximumGameThreadMilliseconds);
 }
 
 void URTSCoverFinderWorldSubsystem::RequestDebugCapture(const FString& ScreenshotName)
@@ -494,6 +932,92 @@ void URTSCoverFinderWorldSubsystem::RequestDebugCapture(const FString& Screensho
 	M_PendingScreenshotPath = FPaths::Combine(ScreenshotDirectory, RequestedName);
 	bM_CaptureAfterScan = true;
 	ForceRescan();
+}
+
+void URTSCoverFinderWorldSubsystem::RequestTestCoverValidation(
+	const float DelaySeconds,
+	const bool bCaptureScreenshot)
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	bM_TestCoverValidationRequested = true;
+	bM_CaptureTestCoverValidation = bCaptureScreenshot;
+	M_TestCoverValidationRemainingSeconds = FMath::Max(1.0f, DelaySeconds);
+	UE_LOG(
+		LogRTSCoverFinder,
+		Display,
+		TEXT("RTS_COVER_TEST scheduled map=%s delay_seconds=%.1f"),
+		*World->GetMapName(),
+		DelaySeconds);
+}
+
+void URTSCoverFinderWorldSubsystem::TickTestCoverValidation(const float DeltaTime)
+{
+	UWorld* World = GetWorld();
+	if (not bM_TestCoverValidationRequested || not IsValid(World))
+	{
+		return;
+	}
+	M_TestCoverValidationRemainingSeconds -= FMath::Max(0.0f, DeltaTime);
+	if (M_TestCoverValidationRemainingSeconds > 0.0f)
+	{
+		return;
+	}
+	bM_TestCoverValidationRequested = false;
+	RemoveInvalidTacticalReferences();
+	const FCoverTestValidationCounts ValidationCounts = GatherTestCoverValidationCounts();
+
+	const bool bCorrectMap = World->GetMapName().Contains(TEXT("TestCover"));
+	const bool bHasBothSides = ValidationCounts.OwningPlayers.Num() >= 2;
+	const bool bHasDiscoveredCover = not M_CoverPoints.IsEmpty();
+	const bool bUnitsAreUsingCover = ValidationCounts.AssignedUnitCount > 0 ||
+		ValidationCounts.MovingUnitCount > 0 || ValidationCounts.OccupyingUnitCount > 0;
+	const bool bPassed = bCorrectMap && bHasBothSides && bHasDiscoveredCover && bUnitsAreUsingCover;
+	UE_LOG(
+		LogRTSCoverFinder,
+		Display,
+		TEXT("RTS_COVER_TEST %s map=%s registered=%d teams=%d points=%d reserved=%d assigned=%d moving=%d occupying=%d"),
+		bPassed ? TEXT("PASS") : TEXT("FAIL"),
+		*World->GetMapName(),
+		M_RegisteredSquadUnits.Num(),
+		ValidationCounts.OwningPlayers.Num(),
+		M_CoverPoints.Num(),
+		M_CoverReservations.Num(),
+		ValidationCounts.AssignedUnitCount,
+		ValidationCounts.MovingUnitCount,
+		ValidationCounts.OccupyingUnitCount);
+	if (not bPassed)
+	{
+		UE_LOG(LogRTSCoverFinder, Error, TEXT("RTS_COVER_TEST failed one or more TestCover integration assertions."));
+	}
+	LogPerformanceReport();
+	if (bM_CaptureTestCoverValidation)
+	{
+		RequestDebugCapture(TEXT("CoverFinder_TestCover_UnitValidation.png"));
+	}
+	bM_CaptureTestCoverValidation = false;
+}
+
+FCoverTestValidationCounts URTSCoverFinderWorldSubsystem::GatherTestCoverValidationCounts() const
+{
+	FCoverTestValidationCounts ValidationCounts;
+	for (const TWeakObjectPtr<ASquadUnit>& WeakSquadUnit : M_RegisteredSquadUnits)
+	{
+		const ASquadUnit* SquadUnit = WeakSquadUnit.Get();
+		if (not IsValid(SquadUnit))
+		{
+			continue;
+		}
+		ValidationCounts.OwningPlayers.Add(SquadUnit->GetOwningPlayer());
+		ValidationCounts.AssignedUnitCount += SquadUnit->GetHasCoverAssignment() ? 1 : 0;
+		ValidationCounts.OccupyingUnitCount += SquadUnit->GetIsOccupyingCover() ? 1 : 0;
+		ValidationCounts.MovingUnitCount +=
+			SquadUnit->GetCoverRuntimeState().State == ESquadUnitCoverState::MovingToCover ? 1 : 0;
+	}
+	return ValidationCounts;
 }
 
 const URTSCoverFinderDeveloperSettings* URTSCoverFinderWorldSubsystem::GetCoverFinderSettings() const
@@ -1304,12 +1828,11 @@ FCoverTraceObservation URTSCoverFinderWorldSubsystem::TraceCoverHeight(
 	++M_PerformanceAccumulator.WorldQueryCount;
 	if (TraceDomain == ECoverFinderTraceDomain::AllCoverProviders)
 	{
-		Observation.bBlockingHit = World->LineTraceSingleByObjectType(
-			HitResult,
+		Observation.bBlockingHit = CoverFinderWorldSubsystemPrivate::TraceAllCoverProviders(
+			*World,
 			TraceStart,
 			TraceEnd,
-			CoverFinderWorldSubsystemPrivate::GetAllCoverObjectQueryParams(),
-			CoverFinderWorldSubsystemPrivate::BuildCoverCollisionQueryParams());
+			HitResult);
 	}
 	else if (M_ActiveScanDomain == ECoverFinderScanDomain::Landscape)
 	{
@@ -1335,6 +1858,11 @@ FCoverTraceObservation URTSCoverFinderWorldSubsystem::TraceCoverHeight(
 
 	Observation.Distance = HitResult.Distance;
 	Observation.ImpactNormal = HitResult.ImpactNormal;
+	if (TraceDomain != ECoverFinderTraceDomain::ActiveScan ||
+		M_ActiveScanDomain == ECoverFinderScanDomain::Environment)
+	{
+		Observation.BlockingProviderHandle = FindOrAddBlockingProviderHandle(HitResult.GetActor());
+	}
 	return Observation;
 }
 
@@ -1359,6 +1887,7 @@ void URTSCoverFinderWorldSubsystem::RebuildPublishedCoverPoints()
 		MoveTemp(CombinedCandidates),
 		BuildPublicationSettings());
 	M_LastPerformanceSnapshot.CoverPointCount = M_CoverPoints.Num();
+	RebuildCoverSpatialGrid();
 }
 
 void URTSCoverFinderWorldSubsystem::RemoveGeneratedDuplicates(
@@ -1464,6 +1993,26 @@ void URTSCoverFinderWorldSubsystem::DrawPublishedCover() const
 			DrawLocation + ArrowDirection * CoverFinderWorldSubsystemPrivate::DebugNormalLength,
 			CoverFinderWorldSubsystemPrivate::DebugArrowHeadSize,
 			DrawColor,
+			false,
+			CoverSettings->M_DebugDrawDurationSeconds,
+			0,
+			CoverFinderWorldSubsystemPrivate::DebugLineThickness);
+	}
+	for (const TPair<int64, TWeakObjectPtr<ASquadUnit>>& Reservation : M_CoverReservations)
+	{
+		const ASquadUnit* SquadUnit = Reservation.Value.Get();
+		const int32* CoverPointIndex = M_CoverPointIndices.Find(Reservation.Key);
+		if (not IsValid(SquadUnit) || CoverPointIndex == nullptr ||
+			not M_CoverPoints.IsValidIndex(*CoverPointIndex))
+		{
+			continue;
+		}
+		DrawDebugLine(
+			World,
+			SquadUnit->GetActorLocation() + FVector::UpVector * CoverFinderWorldSubsystemPrivate::DebugPointHeight,
+			M_CoverPoints[*CoverPointIndex].Location +
+				FVector::UpVector * CoverFinderWorldSubsystemPrivate::DebugPointHeight,
+			FColor::Cyan,
 			false,
 			CoverSettings->M_DebugDrawDurationSeconds,
 			0,

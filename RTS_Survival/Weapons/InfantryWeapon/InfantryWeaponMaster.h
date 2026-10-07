@@ -84,6 +84,16 @@ public:
 	UStaticMesh* GetWeaponMesh() const { return IsValid(WeaponMesh) ? WeaponMesh->GetStaticMesh() : nullptr; }
 
 	virtual void RegisterIgnoreActor(AActor* ActorToIgnore, const bool bRegister) override;
+
+	/** Keeps cover-owned ignores independent from cargo-owned ignores for the same actor. */
+	void RegisterCoverIgnoreActor(AActor* ActorToIgnore, bool bRegister);
+
+	/** Applies the cover state as one source in the weapon's composable fire restrictions. */
+	void SetCoverFireBlocked(UObject* RestrictionSource, bool bBlocked);
+
+	AActor* GetCurrentTargetActor() const;
+	FVector GetCurrentTargetLocation();
+	bool GetIsCurrentTargetInRange();
 	virtual float GetTurretYawLimit() const override;
 	virtual ETargetPreference GetTargetPreference() const override { return TargetPreference; }
 	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) override;

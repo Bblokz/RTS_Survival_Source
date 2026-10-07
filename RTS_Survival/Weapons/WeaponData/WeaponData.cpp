@@ -799,28 +799,97 @@ void UWeaponState::UpgradeWeaponWithRangeMlt(const float RangeMlt)
 
 void UWeaponState::RegisterActorToIgnore(AActor* RTSValidActor, const bool bRegister)
 {
-	if (bRegister)
+	RegisterActorToIgnoreForReason(
+		RTSValidActor,
+		EWeaponIgnoredActorReason::External,
+		bRegister);
+}
+
+void UWeaponState::RegisterActorToIgnoreForReason(
+	AActor* RTSValidActor,
+	const EWeaponIgnoredActorReason Reason,
+	const bool bRegister)
+{
+	if (not IsValid(RTSValidActor))
 	{
-		if (ActorsToIgnore.Contains(RTSValidActor))
-		{
-			const FString ActorName = RTSValidActor ? RTSValidActor->GetName() : "InvalidActor";
-			RTSFunctionLibrary::ReportError("Attempted to ignore actor for weapon but actor is already being ignored:"
-				+ ActorName);
-			return;
-		}
-		ActorsToIgnore.Add(RTSValidActor);
+		return;
 	}
-	else
+	for (int32 EntryIndex = M_IgnoredActorEntries.Num() - 1; EntryIndex >= 0; --EntryIndex)
 	{
-		if (!ActorsToIgnore.Contains(RTSValidActor))
+		if (not M_IgnoredActorEntries[EntryIndex].Actor.IsValid())
 		{
-			const FString ActorName = RTSValidActor ? RTSValidActor->GetName() : "InvalidActor";
-			RTSFunctionLibrary::ReportError("Attempted to un-ignore actor for weapon but actor is not being ignored:"
-				+ ActorName);
-			return;
+			M_IgnoredActorEntries.RemoveAtSwap(EntryIndex);
 		}
-		ActorsToIgnore.Remove(RTSValidActor);
 	}
+
+	const uint8 ReasonMask = static_cast<uint8>(Reason);
+	for (int32 EntryIndex = 0; EntryIndex < M_IgnoredActorEntries.Num(); ++EntryIndex)
+	{
+		FWeaponIgnoredActorEntry& Entry = M_IgnoredActorEntries[EntryIndex];
+		if (Entry.Actor.Get() != RTSValidActor)
+		{
+			continue;
+		}
+		Entry.ReasonMask = bRegister
+			? Entry.ReasonMask | ReasonMask
+			: Entry.ReasonMask & ~ReasonMask;
+		if (Entry.ReasonMask == 0)
+		{
+			M_IgnoredActorEntries.RemoveAtSwap(EntryIndex);
+		}
+		return;
+	}
+
+	if (not bRegister)
+	{
+		return;
+	}
+	FWeaponIgnoredActorEntry& NewEntry = M_IgnoredActorEntries.AddDefaulted_GetRef();
+	NewEntry.Actor = RTSValidActor;
+	NewEntry.ReasonMask = ReasonMask;
+}
+
+void UWeaponState::AppendIgnoredActorsToQuery(FCollisionQueryParams& QueryParams) const
+{
+	for (const FWeaponIgnoredActorEntry& Entry : M_IgnoredActorEntries)
+	{
+		AActor* IgnoredActor = Entry.Actor.Get();
+		if (IsValid(IgnoredActor) && Entry.ReasonMask != 0)
+		{
+			QueryParams.AddIgnoredActor(IgnoredActor);
+		}
+	}
+}
+
+TArray<AActor*> UWeaponState::BuildValidIgnoredActorArray() const
+{
+	TArray<AActor*> ValidIgnoredActors;
+	ValidIgnoredActors.Reserve(M_IgnoredActorEntries.Num());
+	for (const FWeaponIgnoredActorEntry& Entry : M_IgnoredActorEntries)
+	{
+		AActor* IgnoredActor = Entry.Actor.Get();
+		if (IsValid(IgnoredActor) && Entry.ReasonMask != 0)
+		{
+			ValidIgnoredActors.Add(IgnoredActor);
+		}
+	}
+	return ValidIgnoredActors;
+}
+
+bool UWeaponState::GetIsActorIgnored(const AActor* Actor) const
+{
+	if (not IsValid(Actor))
+	{
+		return false;
+	}
+	for (const FWeaponIgnoredActorEntry& Entry : M_IgnoredActorEntries)
+	{
+		if (Entry.Actor.Get() == Actor && Entry.ReasonMask != 0)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -1986,7 +2055,7 @@ void UWeaponStateTrace::FireTrace(const FVector& Direction)
 	FCollisionQueryParams TraceParams(FName(TEXT("FireTrace")), true, nullptr);
 	TraceParams.bTraceComplex = false;
 	TraceParams.bReturnPhysicalMaterial = true;
-	TraceParams.AddIgnoredActors(ActorsToIgnore);
+	AppendIgnoredActorsToQuery(TraceParams);
 
 	// Define the delegate using a lambda
 	FTraceDelegate TraceDelegate;
@@ -2044,7 +2113,7 @@ bool UWeaponStateTrace::ContinueTracePastShield(
 	FCollisionQueryParams TraceParams(FName(TEXT("ContinueTracePastShield")), true, nullptr);
 	TraceParams.bTraceComplex = false;
 	TraceParams.bReturnPhysicalMaterial = true;
-	TraceParams.AddIgnoredActors(ActorsToIgnore);
+	AppendIgnoredActorsToQuery(TraceParams);
 	for (const TWeakObjectPtr<UPrimitiveComponent>& IgnoredShieldComponent : IgnoredShieldComponents)
 	{
 		UPrimitiveComponent* IgnoredComponent = IgnoredShieldComponent.Get();
@@ -2513,7 +2582,7 @@ void UWeaponStateProjectile::FireProjectileWithShellAdjustedStats(const FWeaponD
 	                                        LaunchLocation, LaunchRotation,
 	                                        M_WeaponVfx.ImpactAttenuation,
 	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
-	                                        ActorsToIgnore,
+	                                        BuildValidIgnoredActorArray(),
 	                                        ShellAdjustedData.WeaponCalibre,
 	                                        bCanArmorOverPenetrate,
 	                                        PostPenArmorPenCarryOver,
@@ -2804,7 +2873,7 @@ void UWeaponStateArchProjectile::FireProjectileWithShellAdjustedStats(const FWea
 	                                        LaunchLocation, LaunchRotation,
 	                                        M_WeaponVfx.ImpactAttenuation,
 	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
-	                                        ActorsToIgnore,
+	                                        BuildValidIgnoredActorArray(),
 	                                        ShellAdjustedData.WeaponCalibre);
 
 	Projectile->SetupArcedLaunch(LaunchLocation, TargetLocation, ShellAdjustedData.ProjectileMovementSpeed,
@@ -2948,7 +3017,7 @@ void UWeaponStateSplitterArchProjectile::FireProjectile(const FVector& TargetLoc
 	                                               M_WeaponVfx.ImpactConcurrency,
 	                                               ProjectileVfxSettings,
 	                                               WeaponData.ShellType,
-	                                               ActorsToIgnore,
+	                                               BuildValidIgnoredActorArray(),
 	                                               ShellAdjustedData.WeaponCalibre);
 
 	SpawnedProjectile->SetupArcedLaunch(
@@ -3209,7 +3278,7 @@ void UWeaponStateSplitterArchProjectile::LaunchSplitProjectile(const FWeaponData
 		M_WeaponVfx.ImpactConcurrency,
 		ProjectileVfxSettings,
 		WeaponData.ShellType,
-		ActorsToIgnore,
+		BuildValidIgnoredActorArray(),
 		SplitProjectileData.WeaponCalibre);
 }
 
@@ -3436,7 +3505,7 @@ void UWeaponStateRocketProjectile::FireProjectileWithShellAdjustedStats(const FW
 	                                        LaunchLocation, LaunchRotation,
 	                                        M_WeaponVfx.ImpactAttenuation,
 	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
-	                                        ActorsToIgnore,
+	                                        BuildValidIgnoredActorArray(),
 	                                        ShellAdjustedData.WeaponCalibre);
 
 	Projectile->SetupRocketSwingLaunch(LaunchLocation, TargetLocation, ShellAdjustedData.ProjectileMovementSpeed,
@@ -3558,7 +3627,7 @@ void UWeaponStateHomingMissile::FireProjectileWithShellAdjustedStats(const FWeap
 	                                        M_WeaponVfx.BounceSound, M_WeaponVfx.ImpactScale, M_WeaponVfx.BounceScale,
 	                                        ShellAdjustedData.ProjectileMovementSpeed, LaunchLocation, LaunchRotation,
 	                                        M_WeaponVfx.ImpactAttenuation, M_WeaponVfx.ImpactConcurrency,
-	                                        ProjectileVfxSettings, WeaponData.ShellType, ActorsToIgnore,
+	                                        ProjectileVfxSettings, WeaponData.ShellType, BuildValidIgnoredActorArray(),
 	                                        ShellAdjustedData.WeaponCalibre);
 	Projectile->SetupHomingMissileLaunch(
 		LaunchLocation,
@@ -3957,7 +4026,7 @@ void UVerticalRocketWeaponState::FireProjectileWithShellAdjustedStats(const FWea
 	                                        LaunchData.LaunchLocation, LaunchRotation,
 	                                        M_WeaponVfx.ImpactAttenuation,
 	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
-	                                        ActorsToIgnore,
+	                                        BuildValidIgnoredActorArray(),
 	                                        ShellAdjustedData.WeaponCalibre);
 
 	Projectile->SetupVerticalRocketLaunch(

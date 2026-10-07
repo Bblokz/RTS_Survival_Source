@@ -473,6 +473,7 @@ public:
 
 	/** @return True when crouch cover or an exposed standing peek currently permits weapon fire. */
 	bool GetIsCoverFireAllowed() const;
+	ESquadCoverAnimAction GetCoverAnimAction() const { return M_CoverAnimRuntime.M_Action; }
 
 	/**
 	 * @brief Updated with the weapon, uses the signed direction angle towards the weapon's target.
@@ -717,6 +718,7 @@ private:
 	bool PlayExitCoverMontage();
 	void OnCoverMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void ClearCoverAnimationRuntime();
+	void LogMissingCoverAnimationAssets(ESquadIdleAnimationPose CoverPose) const;
 
 	const FSquadUnitStandingCoverAnimationSet* GetStandingCoverAnimationSet() const;
 	ESquadIdleAnimationPose GetProtectedStandingCoverPose() const;

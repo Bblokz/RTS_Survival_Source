@@ -49,6 +49,9 @@ struct FRTSCoverPoint
 
 	// Zero identifies geometry-discovered cover; authored providers use their subsystem registration ID.
 	uint64 ProviderRegistrationId = 0;
+
+	// Game-thread registry handle for the actor whose collision produced this point; zero is terrain or unknown.
+	uint64 BlockingProviderHandle = 0;
 };
 
 /**
@@ -113,6 +116,34 @@ struct FRTSCoverFinderPerformance
 	float WallClockMilliseconds = 0.0f;
 };
 
+/** Lightweight game-thread totals for staggered squad cover decisions. */
+USTRUCT(BlueprintType)
+struct FRTSTacticalCoverPerformance
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
+	int32 RegisteredUnitCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
+	int32 ReservedPointCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
+	int32 UnitUpdatesLastFrame = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
+	int32 CandidateChecksLastFrame = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
+	int32 FiringLaneTracesLastFrame = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
+	float GameThreadMillisecondsLastFrame = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category="Cover|Performance")
+	float MaximumGameThreadMilliseconds = 0.0f;
+};
+
 /** Plain copied settings used by both the game thread and worker. */
 struct FCoverFinderSettingsSnapshot
 {
@@ -132,6 +163,7 @@ struct FCoverTraceObservation
 {
 	FVector ImpactNormal = FVector::ZeroVector;
 	float Distance = 0.0f;
+	uint64 BlockingProviderHandle = 0;
 	bool bBlockingHit = false;
 };
 

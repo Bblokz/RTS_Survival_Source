@@ -28,6 +28,17 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Cover Search", meta=(ClampMin="0.05", UIMin="0.05", UIMax="2.0", Units="ms"))
 	float M_GameThreadBudgetMilliseconds = 0.35f;
 
+	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover")
+	bool bM_EnableAutomaticCoverUse = true;
+
+	// Limits how far an otherwise idle or already-in-range infantry unit may reposition itself for cover.
+	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="100.0", UIMin="100.0", UIMax="2500.0", Units="cm"))
+	float M_AutomaticCoverSearchRadius = 1200.0f;
+
+	// Staggers decisions across frames; movement completion itself is still handled immediately by the AI callback.
+	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="1", ClampMax="64", UIMin="1", UIMax="32"))
+	int32 M_MaximumTacticalUnitUpdatesPerFrame = 8;
+
 	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="40.0", ClampMax="143.0", UIMin="40.0", UIMax="143.0", Units="cm"))
 	float M_MinimumCrouchCoverHeight = 90.0f;
 

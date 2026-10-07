@@ -116,6 +116,7 @@ void UWeaponStateMultiTrace::FireWeaponSystem_HandleNoValidSockets(const FVector
 	FCollisionQueryParams TraceParams(FName(TEXT("FireTrace_Multi_Fallback")), true, nullptr);
 	TraceParams.bTraceComplex = false;
 	TraceParams.bReturnPhysicalMaterial = true;
+	AppendIgnoredActorsToQuery(TraceParams);
 
 	FTraceDelegate TraceDelegate;
 	TWeakObjectPtr<UWeaponStateMultiTrace> WeakThis(this);
@@ -168,6 +169,7 @@ void UWeaponStateMultiTrace::FireWeaponSystem_FireTraceFromSocket(const FName& S
 	FCollisionQueryParams TraceParams(FName(TEXT("FireTrace_Multi")), true, nullptr);
 	TraceParams.bTraceComplex = false;
 	TraceParams.bReturnPhysicalMaterial = true;
+	AppendIgnoredActorsToQuery(TraceParams);
 
 	FTraceDelegate TraceDelegate;
 	TWeakObjectPtr<UWeaponStateMultiTrace> WeakThis(this);

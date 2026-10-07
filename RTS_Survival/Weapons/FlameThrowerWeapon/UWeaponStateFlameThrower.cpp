@@ -542,6 +542,7 @@ void UWeaponStateFlameThrower::EnqueueRayAsync(const int32 RayIndex, const FVect
 	auto& Pending = M_PendingRaysState;
 
 	FCollisionQueryParams TraceParams(FName(TEXT("FlameRay")), /*bTraceComplex*/false, /*IgnoreActor*/nullptr);
+	AppendIgnoredActorsToQuery(TraceParams);
 	TraceParams.bReturnPhysicalMaterial = false;
 
 	// Avoid self-hit from owner.

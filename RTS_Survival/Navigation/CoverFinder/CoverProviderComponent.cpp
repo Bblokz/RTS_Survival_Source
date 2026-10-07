@@ -52,7 +52,7 @@ void URTSCoverProviderComponent::RegisterCoverPoints()
 		return;
 	}
 
-	M_RegistrationId = CoverSubsystem->RegisterAuthoredCoverProvider(BuildWorldCoverPoints(*Owner));
+	M_RegistrationId = CoverSubsystem->RegisterAuthoredCoverProvider(Owner, BuildWorldCoverPoints(*Owner));
 }
 
 void URTSCoverProviderComponent::UnregisterCoverPoints()

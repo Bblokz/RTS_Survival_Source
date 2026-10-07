@@ -7,6 +7,7 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverFinderTypes.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
@@ -17,6 +18,7 @@
 
 class USquadUnitSpatialVoiceLinePlayer;
 class UCargo;
+class URTSCoverFinderWorldSubsystem;
 enum class ERTSNavAgents : uint8;
 class URTSSquadUnitOptimizer;
 class URepairComponent;
@@ -24,6 +26,7 @@ class UFowComp;
 class AScavengeableObject;
 class UScavengerComponent;
 enum class EWeaponName : uint8;
+enum class ESquadIdleAnimationPose : uint8;
 class AWeaponPickup;
 class USecondaryWeapon;
 class AInfantryWeaponMaster;
@@ -154,8 +157,59 @@ struct FSquadUnitPatrol
 	FVector PatrolEndLocation;
 };
 
+/** The unit-local lifecycle of an assigned cover point. */
+UENUM(BlueprintType)
+enum class ESquadUnitCoverState : uint8
+{
+	None UMETA(DisplayName = "None"),
+	Assigned UMETA(DisplayName = "Assigned"),
+	MovingToCover UMETA(DisplayName = "Moving To Cover"),
+	EnteringCover UMETA(DisplayName = "Entering Cover"),
+	Protected UMETA(DisplayName = "Protected"),
+	Exposed UMETA(DisplayName = "Exposed"),
+	LeavingCover UMETA(DisplayName = "Leaving Cover")
+};
+
+/** The tactical reason for using cover, kept separate from the unit's active command. */
+UENUM(BlueprintType)
+enum class ESquadUnitCoverUseReason : uint8
+{
+	None UMETA(DisplayName = "None"),
+	Attack UMETA(DisplayName = "Attack"),
+	AfterMoveCommand UMETA(DisplayName = "After Move Command")
+};
+
+/**
+ * @brief Stores the cover assignment and lifecycle without owning movement or command execution.
+ * The copied point remains a snapshot that the future cover integration must revalidate before use.
+ */
+USTRUCT(BlueprintType)
+struct FSquadUnitCoverRuntimeState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Cover")
+	ESquadUnitCoverState State = ESquadUnitCoverState::None;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Cover")
+	ESquadUnitCoverUseReason UseReason = ESquadUnitCoverUseReason::None;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Cover")
+	FRTSCoverPoint AssignedCoverPoint;
+
+	bool GetHasAssignment() const;
+	bool GetIsOccupyingCover() const;
+	void Reset();
+};
+
 /**
  * @brief Represents a squad unit in the game.
+ *
+ * Cover is tracked as a subordinate tactical state in M_CoverRuntimeState and never replaces M_ActiveCommand.
+ * SetCoverAssignment records the selected point and whether it supports an attack or follows a move command.
+ * SetCoverState then advances the unit through movement, entry, protection, exposure, and exit without reporting
+ * command completion. ClearCoverState removes the assignment; the future cover integration remains responsible for
+ * finding, reserving, validating, and moving to cover points.
  */
 UCLASS()
 class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExperienceProvider,
@@ -174,12 +228,34 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 	friend struct FSquadWeaponSwitch;
 	// for changing the way the weapon of this unit behaves when an aim ability is active.
 	friend class USquadAimAbilityComponent;
+	friend class URTSCoverFinderWorldSubsystem;
 
 public:
 	ASquadUnit(const FObjectInitializer& ObjectInitializer);
 
 	bool GetIsUnitIdle() const;
 	bool GetIsUnitInCombat( )const;
+
+	const FSquadUnitCoverRuntimeState& GetCoverRuntimeState() const { return M_CoverRuntimeState; }
+	bool GetHasCoverAssignment() const { return M_CoverRuntimeState.GetHasAssignment(); }
+	bool GetIsOccupyingCover() const { return M_CoverRuntimeState.GetIsOccupyingCover(); }
+
+	/**
+	 * @brief Records a tactical cover assignment without replacing or completing the active command.
+	 * @param CoverPoint Immutable snapshot supplied by the future cover-selection integration.
+	 * @param UseReason Why the unit should use this point while its main command continues independently.
+	 * @return True when the assignment was accepted.
+	 */
+	bool SetCoverAssignment(const FRTSCoverPoint& CoverPoint, ESquadUnitCoverUseReason UseReason);
+
+	/**
+	 * @brief Advances only the unit-local cover lifecycle and never changes the active command.
+	 * @param NewState New lifecycle state; None clears the complete cover assignment.
+	 * @return True when the state change was accepted.
+	 */
+	bool SetCoverState(ESquadUnitCoverState NewState);
+
+	void ClearCoverState();
 	
 	/** Gets the scavenger component */
 	URepairComponent* GetRepairComponent() const { return M_RepairComponent; }
@@ -458,9 +534,22 @@ private:
 	/** The current active command of the unit. */
 	EAbilityID M_ActiveCommand;
 
+	// Cover remains subordinate to the active command so tactical positioning cannot complete or replace it.
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Cover", meta = (AllowPrivateAccess = "true"))
+	FSquadUnitCoverRuntimeState M_CoverRuntimeState;
+
 	// Preserves whether range-closing movement belongs to Attack or AttackGround.
 	EAbilityID M_CombatAbilityBeforeRangeClosing = EAbilityID::IdNoAbility;
 	FAIRequestID M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
+	FAIRequestID M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_CoverIgnoredProviderActor;
+
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_CoverValidatedTarget;
+
+	FVector M_CoverValidatedTargetLocation = FVector::ZeroVector;
 
 	/** The squad controller managing this unit. */
 	UPROPERTY()
@@ -526,6 +615,7 @@ private:
 	void OnMoveCompleted_Repair() const;
 	void OnMoveCompleted_Capture() const;
 	void OnMoveCompleted_MoveCloserToTarget();
+	void OnMoveCompleted_Cover(EPathFollowingResult::Type Result);
 
         void DetermineDeathVoiceLine();
 
@@ -659,6 +749,25 @@ private:
 	bool bM_HasCompletedDeathMontage = false;
 
 	void StopMovementAndClearPath();
+	void UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+	bool GetCanUseAutomaticCover() const;
+	void TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+	bool StartCoverMovement();
+	void EnterAssignedCover();
+	void UpdateEnteringCover();
+	void UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+	void UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+	void ReturnToProtectedCover();
+	void ClearCoverStateInternal(bool bStopCoverMovement);
+	void CancelAutomaticCoverForCommandMovement();
+	void SetCoverWeaponFireBlocked(bool bBlocked) const;
+	void RegisterCoverProviderWeaponIgnore(AActor* ProviderActor, bool bRegister);
+	void ApplyCurrentCoverWeaponState();
+	bool GetIsCoverProviderOwnedByUnit(const AActor& ProviderActor) const;
+	AActor* GetCurrentCoverTarget(FVector& OutTargetLocation) const;
+	ESquadIdleAnimationPose GetAssignedCoverAnimationPose() const;
+	bool GetShouldRevalidateCoverLane(const AActor& TargetActor, const FVector& TargetLocation) const;
+	void RecordValidatedCoverTarget(AActor* TargetActor, const FVector& TargetLocation);
 	void PrepareForRangeClosingMovement(EAbilityID MovementAbility);
 	void RestoreCombatAbilityAfterRangeClosing();
 

@@ -36,6 +36,20 @@ enum class EWeaponName : uint8;
 enum class EWeaponFireMode : uint8;
 class RTS_SURVIVAL_API IWeaponOwner;
 
+enum class EWeaponIgnoredActorReason : uint8
+{
+	External = 1 << 0,
+	Cover = 1 << 1
+};
+ENUM_CLASS_FLAGS(EWeaponIgnoredActorReason)
+
+/** One weak actor plus independent systems that currently require it to be ignored. */
+struct FWeaponIgnoredActorEntry
+{
+	TWeakObjectPtr<AActor> Actor;
+	uint8 ReasonMask = 0;
+};
+
 /**
  * @brief Behaviour-driven attribute adjustments applied to weapon data.
  */
@@ -566,6 +580,11 @@ public:
 
 	// Registers or unregisters an actor to be ignored by this weapon when firing.
 	void RegisterActorToIgnore(AActor* RTSValidActor, const bool bRegister);
+	void RegisterActorToIgnoreForReason(
+		AActor* RTSValidActor,
+		EWeaponIgnoredActorReason Reason,
+		bool bRegister);
+	bool GetIsActorIgnored(const AActor* Actor) const;
 
 	FName GetWeaponSocket() const
 	{
@@ -798,8 +817,11 @@ protected:
 	UPROPERTY()
 	bool bIsAircraftWeapon = false;
 
-	UPROPERTY()
-	TArray<AActor*> ActorsToIgnore;
+	// Weak references prevent cargo or cover providers from being kept alive by a weapon.
+	TArray<FWeaponIgnoredActorEntry> M_IgnoredActorEntries;
+
+	void AppendIgnoredActorsToQuery(FCollisionQueryParams& QueryParams) const;
+	TArray<AActor*> BuildValidIgnoredActorArray() const;
 
 	EWeaponFireMode GetMyFireMode()const;
 
