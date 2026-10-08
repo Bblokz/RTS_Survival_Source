@@ -21,6 +21,10 @@ namespace CoverTrenchTestScenarioPrivate
 	constexpr float WalkTimeoutSeconds = 60.0f;
 	constexpr float StandUpTimeoutSeconds = 25.0f;
 	constexpr float CrouchAgainTimeoutSeconds = 25.0f;
+	// The reload the test starts, and how long the soldier gets to duck and to come back up after it.
+	constexpr float TestReloadSeconds = 2.5f;
+	constexpr float ReloadDuckTimeoutSeconds = 2.5f;
+	constexpr float StandUpAfterReloadTimeoutSeconds = TestReloadSeconds + 10.0f;
 	// In front of the trench, well inside rifle range.
 	constexpr float EnemyDistanceInFrontOfTrench = 1200.0f;
 	// Standing up must not move the soldier; this only allows for the floor under his feet.
@@ -120,6 +124,16 @@ void FCoverTrenchTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsyste
 	if (M_Phase == ECoverTrenchTestPhase::WaitingForStandUp)
 	{
 		TickWaitingForStandUp(*World, CoverSubsystem);
+		return;
+	}
+	if (M_Phase == ECoverTrenchTestPhase::WaitingForReloadDuck)
+	{
+		TickWaitingForReloadDuck(*World);
+		return;
+	}
+	if (M_Phase == ECoverTrenchTestPhase::WaitingForStandUpAfterReload)
+	{
+		TickWaitingForStandUpAfterReload(*World);
 		return;
 	}
 	TickWaitingForCrouchAgain(*World);
@@ -224,8 +238,7 @@ void FCoverTrenchTestScenario::TickWalkingToTrench(UWorld& World)
 		return;
 	}
 	Check(IsValid(TrenchSoldier), TEXT("a soldier took cover in the trench"));
-	ASquadUnit* Enemy = M_Enemy.Get();
-	if (not IsValid(TrenchSoldier) || not IsValid(Enemy))
+	if (not IsValid(TrenchSoldier))
 	{
 		Finish(World);
 		return;
@@ -237,6 +250,36 @@ void FCoverTrenchTestScenario::TickWalkingToTrench(UWorld& World)
 		TEXT("with nothing in sight the soldier crouches below the edge"),
 		UEnum::GetValueAsString(GetIdlePose(*TrenchSoldier)));
 
+	if (not PlaceLivingEnemyInFrontOfTrench(World))
+	{
+		Check(false, TEXT("an enemy is alive to stand up against"));
+		Finish(World);
+		return;
+	}
+	EnterPhase(World, ECoverTrenchTestPhase::WaitingForStandUp, StandUpTimeoutSeconds);
+}
+
+bool FCoverTrenchTestScenario::PlaceLivingEnemyInFrontOfTrench(UWorld& World)
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	ASquadUnit* Enemy = M_Enemy.Get();
+	if (not IsValid(Enemy) || not Enemy->IsUnitAlive())
+	{
+		Enemy = nullptr;
+		for (TActorIterator<ASquadUnit> UnitIterator(&World); UnitIterator && Enemy == nullptr; ++UnitIterator)
+		{
+			ASquadUnit* Candidate = *UnitIterator;
+			const bool bIsLivingEnemy = IsValid(Candidate) && Candidate->IsUnitAlive() &&
+				Candidate->GetOwningPlayer() != PlayerOwnedTeam;
+			Enemy = bIsLivingEnemy ? Candidate : nullptr;
+		}
+		if (not IsValid(Enemy))
+		{
+			return false;
+		}
+		M_Enemy = Enemy;
+		M_EnemyStartLocation = Enemy->GetActorLocation();
+	}
 	// Straight ahead of the firing step, where the soldier looks.
 	const FVector FacingDirection = -M_TrenchPoint.CoverNormal.GetSafeNormal2D();
 	const FVector EnemyLocation = M_TrenchPoint.Location + FacingDirection * EnemyDistanceInFrontOfTrench;
@@ -245,7 +288,7 @@ void FCoverTrenchTestScenario::TickWalkingToTrench(UWorld& World)
 		false,
 		nullptr,
 		ETeleportType::TeleportPhysics);
-	EnterPhase(World, ECoverTrenchTestPhase::WaitingForStandUp, StandUpTimeoutSeconds);
+	return true;
 }
 
 void FCoverTrenchTestScenario::TickWaitingForStandUp(
@@ -279,6 +322,66 @@ void FCoverTrenchTestScenario::TickWaitingForStandUp(
 		not TrenchSoldier->GetWouldShootOwnCover(CoverSubsystem),
 		TEXT("the soldier's weapon fires through his own trench"));
 
+	// The enemy stays in front: the soldier still has a reason to stand, so only the reload can make him duck.
+	if (ASquadUnit* StandingSoldier = M_TrenchSoldier.Get())
+	{
+		StandingSoldier->OnWeaponReloadStarted(TestReloadSeconds);
+	}
+	EnterPhase(World, ECoverTrenchTestPhase::WaitingForReloadDuck, ReloadDuckTimeoutSeconds);
+}
+
+void FCoverTrenchTestScenario::TickWaitingForReloadDuck(UWorld& World)
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	const ASquadUnit* TrenchSoldier = M_TrenchSoldier.Get();
+	const bool bHasDucked = IsValid(TrenchSoldier) && GetIsInTrenchCover(*TrenchSoldier) &&
+		TrenchSoldier->GetCoverRuntimeState().State == ESquadUnitCoverState::Protected &&
+		GetIdlePose(*TrenchSoldier) == ESquadIdleAnimationPose::TrenchCover &&
+		TrenchSoldier->GetIsReloadingInCover();
+	if (not bHasDucked && not GetHasPhaseTimedOut(World))
+	{
+		return;
+	}
+	Check(bHasDucked, TEXT("the soldier ducked behind his cover when his weapon started to reload"));
+	if (not bHasDucked)
+	{
+		Finish(World);
+		return;
+	}
+	EnterPhase(World, ECoverTrenchTestPhase::WaitingForStandUpAfterReload, StandUpAfterReloadTimeoutSeconds);
+}
+
+void FCoverTrenchTestScenario::TickWaitingForStandUpAfterReload(UWorld& World)
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	const ASquadUnit* TrenchSoldier = M_TrenchSoldier.Get();
+	const bool bIsInTrench = IsValid(TrenchSoldier) && GetIsInTrenchCover(*TrenchSoldier);
+	const bool bIsExposed = bIsInTrench &&
+		TrenchSoldier->GetCoverRuntimeState().State == ESquadUnitCoverState::Exposed;
+	if (bIsExposed && TrenchSoldier->GetIsReloadingInCover())
+	{
+		Check(false, TEXT("the soldier stays down for the whole reload"));
+		Finish(World);
+		return;
+	}
+	// The first enemy rarely survives the squad's fire this long; a fresh one gives the soldier a reason to stand.
+	const bool bReloadIsOver = bIsInTrench && not TrenchSoldier->GetIsReloadingInCover();
+	if (bReloadIsOver && not bM_HasBroughtEnemyAfterReload)
+	{
+		bM_HasBroughtEnemyAfterReload = true;
+		const bool bHasEnemy = PlaceLivingEnemyInFrontOfTrench(World);
+		Check(bHasEnemy, TEXT("an enemy is alive to stand up against after the reload"));
+		EnterPhase(World, ECoverTrenchTestPhase::WaitingForStandUpAfterReload, StandUpTimeoutSeconds);
+		return;
+	}
+	if (not bIsExposed && not GetHasPhaseTimedOut(World))
+	{
+		return;
+	}
+	Check(
+		bIsExposed,
+		TEXT("the soldier stood up again once the reload was over"),
+		IsValid(TrenchSoldier) ? UEnum::GetValueAsString(TrenchSoldier->GetCoverRuntimeState().State) : FString());
 	if (ASquadUnit* Enemy = M_Enemy.Get())
 	{
 		Enemy->SetActorLocation(M_EnemyStartLocation, false, nullptr, ETeleportType::TeleportPhysics);

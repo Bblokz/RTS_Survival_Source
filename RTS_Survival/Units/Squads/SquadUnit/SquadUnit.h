@@ -284,6 +284,9 @@ struct FSquadUnitCoverMoveGuard
 
 	// While waiting, the point is only tested against the target again from this time on.
 	float NextInvalidTargetRecheckWorldSeconds = 0.0f;
+
+	// Until this time the unit's weapon is reloading; a unit in cover does not expose itself before then.
+	float ReloadEndWorldSeconds = 0.0f;
 };
 
 /**
@@ -466,6 +469,16 @@ public:
 
 	void OnWeaponKilledTarget(AActor* KilledActor) const;
 	void OnWeaponFire();
+
+	/**
+	 * @brief Starts the reload animation; a unit that is exposed from its cover first ducks back behind it
+	 * and stays there until the reload is over.
+	 * @param ReloadTime How long the weapon takes to reload.
+	 */
+	void OnWeaponReloadStarted(float ReloadTime);
+
+	// True while a unit in cover stays down because its weapon is reloading.
+	bool GetIsReloadingInCover() const;
 	void OnProjectileHit(const bool bBounced);
 
 	/** 

@@ -110,6 +110,10 @@ Trenches are not scanned: their collision is a plane that lets tanks drive over 
 
 A trench point behaves like standing cover with no sideways step: protected is a crouch below the edge (`ESquadIdleAnimationPose::TrenchCover`), exposed is standing up in place (`TrenchPeek`), with zero enter and exposed offsets. The assets live in `CoverAnimations.Trench` on the infantry animation Blueprint, a `FSquadUnitStandingCoverAnimationSet`: `ProtectedIdlePose` for the crouch, `PeekAimAssets` for the standing aim, and optional enter, expose, return and exit montages. Left empty, the crouch falls back to `Crouch.ProtectedIdlePose` and the exposed pose to the regular standing aim (`ESquadCoverGraphPose::NotInCover`), so it works before any trench asset is assigned.
 
+### Duck to reload
+
+`CoverAnimations.CoverReload` on the infantry animation Blueprint is a full-body montage of a crouched soldier reloading. `PlayReloadAnim` plays it, scaled to the weapon's reload time, instead of the weapon's regular reload montage whenever the unit holds a cover pose; left empty, the regular montage is used. The weapon reports its reload to the soldier (`ASquadUnit::OnWeaponReloadStarted`), not straight to the animation instance: a soldier that is exposed from standing or trench cover first returns to its protected pose, and `ExposeFromStandingCover` keeps it there until the reload time has passed. While the return montage plays, the reload clip waits and then starts for the time that is left (`TryPlayPendingCoverReload`). Leaving cover stops the clip.
+
 ### Cover tests on TestCover
 
 - `-CoverFinderCountCover` logs the published points per object class and cover type and compares them with `Navigation/CoverFinder/Tests/Baselines/<Map>.txt`; `RTS_COVER_COUNT_TEST RESULT FAIL` means cover was lost. `-CoverFinderWriteCountBaseline` lowers the baseline to the run's counts where they are lower (write it several times: objects on the map are placed with some randomness), `-CoverFinderResetCountBaseline` starts it afresh.

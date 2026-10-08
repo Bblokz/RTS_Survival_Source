@@ -424,6 +424,12 @@ struct FSquadUnitCoverAnimationSets
 	// the protected pose falls back to Crouch.ProtectedIdlePose and the exposed pose to the regular standing aim.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	FSquadUnitStandingCoverAnimationSet Trench;
+
+	// Full-body reload of a crouched soldier. Played instead of the weapon's regular reload montage while the
+	// unit holds a cover position, so it ducks behind its cover to reload. Scaled to the weapon's reload time.
+	// Left empty, a unit in cover reloads with the regular montage.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	TObjectPtr<UAnimMontage> CoverReload = nullptr;
 };
 
 /**
@@ -447,6 +453,10 @@ struct FSquadUnitCoverAnimRuntime
 
 	// Play time of the active cover montage, so its owner can time out a transition that never ticks off screen.
 	float M_ActiveMontageSeconds = 0.0f;
+
+	// World time at which a reload ends that could not show its montage yet because a cover transition, such as
+	// stepping back behind the cover, was still playing; negative when no reload is waiting.
+	float M_PendingCoverReloadEndWorldSeconds = -1.0f;
 };
 
 /**
@@ -901,6 +911,19 @@ private:
 	const FSquadUnitStandingCoverAnimationSet* GetStandingCoverAnimationSet() const;
 	ESquadIdleAnimationPose GetProtectedStandingCoverPose() const;
 	ESquadIdleAnimationPose GetStandingPeekPose() const;
+
+	// True while the unit holds a cover pose in which the crouched reload makes sense.
+	bool GetIsInCoverReloadPosition() const;
+
+	/**
+	 * @brief Plays the crouched cover reload for the time the weapon's reload still has to run.
+	 * @param RemainingReloadSeconds Time left of the reload; the montage is scaled to it.
+	 */
+	void PlayCoverReloadMontage(float RemainingReloadSeconds);
+
+	// Starts the reload that waited for a cover transition, if enough of it is left to be worth showing.
+	void TryPlayPendingCoverReload();
+	void StopCoverReloadMontage();
 
 	// True for the poses a unit fires from after leaving its protected pose: both standing peeks and the trench.
 	static bool GetIsPeekPose(ESquadIdleAnimationPose CoverPose);

@@ -544,6 +544,7 @@ void FSquadUnitCoverAnimRuntime::Reset()
 	M_NextAction = ESquadCoverAnimAction::None;
 	M_ActiveMontage = nullptr;
 	M_ActiveMontageSeconds = 0.0f;
+	M_PendingCoverReloadEndWorldSeconds = -1.0f;
 }
 
 USquadUnitAnimInstance::USquadUnitAnimInstance(): bBeAlert(false), MovementState(), WeaponMontages(),
@@ -624,8 +625,61 @@ const FSquadUnitCoverAimAssets* USquadUnitAnimInstance::GetActiveCoverAimAssets(
 	return StandingAnimationSet == nullptr ? nullptr : &StandingAnimationSet->PeekAimAssets;
 }
 
+bool USquadUnitAnimInstance::GetIsInCoverReloadPosition() const
+{
+	return IsValid(CoverAnimations.CoverReload) && GetIsCoverAnimationActive() &&
+		M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Exiting;
+}
+
+void USquadUnitAnimInstance::PlayCoverReloadMontage(const float RemainingReloadSeconds)
+{
+	M_CoverAnimRuntime.M_PendingCoverReloadEndWorldSeconds = -1.0f;
+	StartMontage(CoverAnimations.CoverReload, true, RemainingReloadSeconds);
+}
+
+void USquadUnitAnimInstance::TryPlayPendingCoverReload()
+{
+	// A reload with less than this left would only flash the first frames of the clip.
+	constexpr float MinimumShownReloadSeconds = 0.4f;
+	const UWorld* World = GetWorld();
+	const float PendingEndSeconds = M_CoverAnimRuntime.M_PendingCoverReloadEndWorldSeconds;
+	M_CoverAnimRuntime.M_PendingCoverReloadEndWorldSeconds = -1.0f;
+	if (PendingEndSeconds < 0.0f || not IsValid(World) || not GetIsInCoverReloadPosition())
+	{
+		return;
+	}
+	const float RemainingReloadSeconds = PendingEndSeconds - World->GetTimeSeconds();
+	if (RemainingReloadSeconds >= MinimumShownReloadSeconds)
+	{
+		PlayCoverReloadMontage(RemainingReloadSeconds);
+	}
+}
+
+void USquadUnitAnimInstance::StopCoverReloadMontage()
+{
+	constexpr float CoverReloadBlendOutSeconds = 0.15f;
+	M_CoverAnimRuntime.M_PendingCoverReloadEndWorldSeconds = -1.0f;
+	// A soldier that leaves its cover must not slide away in a crouched full-body clip.
+	if (IsValid(CoverAnimations.CoverReload) && Montage_IsPlaying(CoverAnimations.CoverReload))
+	{
+		Montage_Stop(CoverReloadBlendOutSeconds, CoverAnimations.CoverReload);
+	}
+}
+
 void USquadUnitAnimInstance::PlayReloadAnim(const float ReloadTime)
 {
+	if (GetIsInCoverReloadPosition())
+	{
+		// Stepping back behind the cover comes first; the reload clip follows for whatever time is left.
+		const UWorld* World = GetWorld();
+		if (GetIsCoverTransitionMontageActive() && IsValid(World))
+		{
+			M_CoverAnimRuntime.M_PendingCoverReloadEndWorldSeconds = World->GetTimeSeconds() + ReloadTime;
+			return;
+		}
+		PlayCoverReloadMontage(ReloadTime);
+		return;
+	}
 	UAnimMontage* SelectedMontage = WeaponMontages.GetReloadMontage(AimOffsets.M_AimOffsetType);
 	StartMontage(SelectedMontage, true, ReloadTime);
 }
@@ -1460,6 +1514,7 @@ void USquadUnitAnimInstance::CompleteCoverTransition(
 	if (CompletedAction == ESquadCoverAnimAction::Entering)
 	{
 		SetCoverAnimAction(ESquadCoverAnimAction::Protected);
+		TryPlayPendingCoverReload();
 		return;
 	}
 
@@ -1480,6 +1535,12 @@ void USquadUnitAnimInstance::CompleteCoverTransition(
 		if (NextAction == ESquadCoverAnimAction::Exiting && not PlayExitCoverMontage())
 		{
 			ClearCoverAnimationRuntime();
+			return;
+		}
+		if (NextAction != ESquadCoverAnimAction::Exiting)
+		{
+			// Back behind the cover: now the reload that asked for the duck can be shown.
+			TryPlayPendingCoverReload();
 		}
 		return;
 	}
@@ -1494,6 +1555,7 @@ void USquadUnitAnimInstance::ClearCoverAnimationRuntime()
 {
 	const bool bHadCoverPose = M_CoverAnimRuntime.M_IdlePose != ESquadIdleAnimationPose::Regular ||
 		IdleAnimationPose != ESquadIdleAnimationPose::Regular;
+	StopCoverReloadMontage();
 	M_CoverMontageEndedDelegate.Unbind();
 	M_CoverAnimRuntime.Reset();
 	SetIdleAnimationPose(ESquadIdleAnimationPose::Regular);

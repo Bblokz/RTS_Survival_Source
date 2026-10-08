@@ -1600,9 +1600,37 @@ void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 	ExposeFromStandingCover();
 }
 
+void ASquadUnit::OnWeaponReloadStarted(const float ReloadTime)
+{
+	const UWorld* World = GetWorld();
+	M_CoverMoveGuard.ReloadEndWorldSeconds = IsValid(World) ? World->GetTimeSeconds() + ReloadTime : 0.0f;
+	// Crouch cover is ducked into by the reload clip itself; a unit that stepped out or stood up goes back first.
+	if (M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed)
+	{
+		ReturnToProtectedCover();
+	}
+	// Silent: a unit whose animation instance is not set up yet simply shows no reload.
+	if (IsValid(AnimBp_SquadUnit))
+	{
+		AnimBp_SquadUnit->PlayReloadAnim(ReloadTime);
+	}
+}
+
+bool ASquadUnit::GetIsReloadingInCover() const
+{
+	const UWorld* World = GetWorld();
+	return M_CoverRuntimeState.GetIsOccupyingCover() && IsValid(World) &&
+		World->GetTimeSeconds() < M_CoverMoveGuard.ReloadEndWorldSeconds;
+}
+
 void ASquadUnit::ExposeFromStandingCover()
 {
 	SetCoverWeaponFireBlocked(true);
+	// Stays down until the weapon is loaded again.
+	if (GetIsReloadingInCover())
+	{
+		return;
+	}
 	if (not GetIsValidAnimBpSquadUnit())
 	{
 		PlaceCapsuleAtCoverLocation(GetCoverExposedLocation());

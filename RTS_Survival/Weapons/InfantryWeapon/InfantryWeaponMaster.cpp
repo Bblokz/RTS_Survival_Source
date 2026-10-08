@@ -728,6 +728,13 @@ void AInfantryWeaponMaster::OnProjectileHit(const bool bBounced)
 
 void AInfantryWeaponMaster::OnReloadStart(const int32 /*WeaponIndex*/, const float ReloadTime)
 {
+	// The soldier decides how to reload: one in cover ducks behind it first. Silent: a weapon without an owner
+	// yet still plays its reload on the animation instance below.
+	if (IsValid(M_OwningSquadUnit))
+	{
+		M_OwningSquadUnit->OnWeaponReloadStarted(ReloadTime);
+		return;
+	}
 	if (IsSquadUnitAnimInstanceValid())
 	{
 		M_SquadUnitAnimInstance->PlayReloadAnim(ReloadTime);
