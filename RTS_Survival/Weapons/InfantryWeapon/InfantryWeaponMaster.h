@@ -88,6 +88,9 @@ public:
 	/** Keeps cover-owned ignores independent from cargo-owned ignores for the same actor. */
 	void RegisterCoverIgnoreActor(AActor* ActorToIgnore, bool bRegister);
 
+	/** @return True when this weapon's shots currently pass through the actor, for whatever reason. */
+	bool GetIsActorIgnoredByWeapon(const AActor* Actor) const;
+
 	/** Applies the cover state as one source in the weapon's composable fire restrictions. */
 	void SetCoverFireBlocked(UObject* RestrictionSource, bool bBlocked);
 

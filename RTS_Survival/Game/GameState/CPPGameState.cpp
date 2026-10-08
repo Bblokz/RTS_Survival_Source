@@ -25,6 +25,7 @@
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/FactionSystem/Factions/Factions.h"
 #include "RTS_Survival/Game/GameSettings/VeterancyFXSettings.h"
+#include "RTS_Survival/GameUI/MiniMap/MinimapTerrainCaptureComponent.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInType/DigInType.h"
@@ -81,6 +82,33 @@ ACPPGameState::ACPPGameState()
 	M_GameUnitManager = CreateDefaultSubobject<UGameUnitManager>(TEXT("GameUnitManager"));
 	M_GameExplosionsManager = CreateDefaultSubobject<UGameExplosionsManager>(TEXT("GameExplosionsManager"));
 	M_GameDecalManager = CreateDefaultSubobject<UGameDecalManager>(TEXT("GameDecalManager"));
+	M_MinimapTerrainCaptureComponent = CreateDefaultSubobject<UMinimapTerrainCaptureComponent>(
+		TEXT("MinimapTerrainCaptureComponent"));
+}
+
+UMinimapTerrainCaptureComponent* ACPPGameState::GetMinimapTerrainCaptureComponent() const
+{
+	if (not GetIsValidMinimapTerrainCaptureComponent())
+	{
+		return nullptr;
+	}
+
+	return M_MinimapTerrainCaptureComponent;
+}
+
+bool ACPPGameState::GetIsValidMinimapTerrainCaptureComponent() const
+{
+	if (IsValid(M_MinimapTerrainCaptureComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_MinimapTerrainCaptureComponent",
+		"GetIsValidMinimapTerrainCaptureComponent",
+		this);
+	return false;
 }
 
 void ACPPGameState::RegisterCallbackForSmallArmsProjectileMgr(

@@ -31,7 +31,9 @@ enum class ERTSCoverType : uint8
 {
 	Crouch UMETA(DisplayName="Crouch"),
 	StandingLeft UMETA(DisplayName="Standing - Peek Left"),
-	StandingRight UMETA(DisplayName="Standing - Peek Right")
+	StandingRight UMETA(DisplayName="Standing - Peek Right"),
+	// A firing step in a trench: the soldier crouches below the edge and stands up in place to fire.
+	TrenchStandUp UMETA(DisplayName="Trench - Stand Up")
 };
 
 /**
@@ -180,6 +182,9 @@ struct FCoverFinderSettingsSnapshot
 	int32 ThinObstacleRingSampleCount = 8;
 	int32 ThinObstacleRefreshScanCount = 6;
 	float ThinObstacleWidthPerSoldier = 70.0f;
+	float OpenFrameCoverStandOff = 60.0f;
+	int32 OpenFramePointsPerObstacle = 3;
+	bool bFindOpenFrameCover = true;
 	bool bProbeThinObstacles = true;
 	bool bReaimSlantedHits = true;
 };
@@ -200,6 +205,9 @@ struct FCoverFocusedSample
 	// Non-zero for a probe of a thin obstacle's ring: its result is kept for that obstacle and reused by the
 	// following scans instead of probing the ring again.
 	uint32 ObstacleCacheId = 0;
+
+	// Only some probes of a ring may publish open-frame cover, so a hedgehog does not get a point on every side.
+	bool bMayFindOpenFrameCover = false;
 };
 
 /** One horizontal trace result copied without any UObject or physics-scene ownership. */
@@ -222,6 +230,13 @@ struct FCoverDirectionalObservation
 	FVector RightCoverLocation = FVector::ZeroVector;
 	bool bLeftGapOpen = false;
 	bool bRightGapOpen = false;
+
+	// Set for an open-frame obstacle such as a tank hedgehog: its beams give crouch cover although they are no
+	// single surface from knee to crouch height. The soldier crouches at OpenFrameCoverLocation, a little way
+	// off the frame. Only looked for when the regular height probes found no cover in this direction.
+	FVector OpenFrameCoverLocation = FVector::ZeroVector;
+	uint64 OpenFrameProviderHandle = 0;
+	bool bOpenFrameCover = false;
 };
 
 /** World-query evidence for one navigable infantry position. */

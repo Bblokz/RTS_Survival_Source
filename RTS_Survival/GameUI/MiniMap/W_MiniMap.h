@@ -12,6 +12,7 @@
 struct FRTSMinimapCustomIconDrawData;
 class AFowManager;
 class UImage;
+class UTexture;
 class UTexture2D;
 
 /** Delegate broadcast whenever the mini‐map is clicked, giving UV in [0,1]. */
@@ -33,9 +34,16 @@ public:
 
 	AFowManager* GetIsValidFowManager() const;
 
-	/** @brief Sets up the dynamic material’s Active/Passive render targets and Fog of War manager. */
+	/**
+	 * @brief Keeps the static terrain capture and live FOW textures in one minimap material.
+	 * @param Active Live player-vision render target.
+	 * @param Passive Live explored-area render target.
+	 * @param Terrain One-shot playable-area capture owned by the game state.
+	 * @param FowManager Supplies icon and coordinate data used by the widget.
+	 */
 	void InitMiniMapRTs(const TObjectPtr<UTexture>& Active,
 	                    const TObjectPtr<UTexture>& Passive,
+	                    const TObjectPtr<UTexture>& Terrain,
 	                    const TObjectPtr<AFowManager>& FowManager);
 
 	/** Fired when the user clicks the mini-map; UV coordinates in [0,1]. */

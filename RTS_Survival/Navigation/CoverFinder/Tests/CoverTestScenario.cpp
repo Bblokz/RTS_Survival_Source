@@ -35,6 +35,11 @@ namespace CoverTestScenarioPrivate
 	constexpr float AttackOrderIntervalSeconds = 6.0f;
 	constexpr int32 MaximumAttackOrdersPerSquad = 3;
 	constexpr float CombatSampleLogIntervalSeconds = 5.0f;
+	// An advancing squad moves this far every interval and stops this close to its nearest enemy.
+	constexpr float AdvanceBoundDistance = 800.0f;
+	constexpr float AdvanceIntervalSeconds = 12.0f;
+	constexpr float AdvanceMinimumEnemyDistance = 700.0f;
+	constexpr float AttackDelayAfterAdvanceSeconds = 4.0f;
 	// The largest legitimate single-frame capsule move is the in-place enter snap of a standing clip.
 	constexpr float MaximumLocationJumpPerFrame = 160.0f;
 	constexpr float MaximumSaneMeshBoundsRadius = 400.0f;
@@ -141,6 +146,10 @@ void FCoverTestScenario::Start(const float IdleObservationSeconds, const bool bC
 	FParse::Value(FCommandLine::Get(), TEXT("CoverFinderCombatSeconds="), M_CombatObservationSeconds);
 	bM_CaptureScreenshot = bCaptureScreenshot;
 	bM_PlayerSquadsApproach = FParse::Param(FCommandLine::Get(), TEXT("CoverFinderPlayerApproaches"));
+	bM_ApproachingSquadsAdvance = FParse::Param(FCommandLine::Get(), TEXT("CoverFinderEnemyAdvance"));
+	bM_ObserveCombat = FParse::Param(FCommandLine::Get(), TEXT("CoverFinderObserveCombat"));
+	M_NextAdvanceOrderSeconds = CoverTestScenarioPrivate::AdvanceIntervalSeconds;
+	M_CombatObserver.Reset();
 	bM_IdlePhasePassed = false;
 	M_CombatTotals = FCoverTestCombatTotals();
 	M_AttackingSquads.Reset();
@@ -180,6 +189,14 @@ void FCoverTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem, con
 		}
 		break;
 	case ECoverTestScenarioPhase::ObservingCombatCover:
+		if (bM_ApproachingSquadsAdvance)
+		{
+			OrderApproachingSquadsToAdvance(*World);
+		}
+		if (bM_ObserveCombat)
+		{
+			M_CombatObserver.Tick(*World, CoverSubsystem, DeltaTime, M_PhaseElapsedSeconds);
+		}
 		TickCombatPhase(*World, CoverSubsystem);
 		if (M_PhaseElapsedSeconds >= M_CombatObservationSeconds)
 		{
@@ -344,6 +361,17 @@ void FCoverTestScenario::FinishIdlePhase(UWorld& World, const URTSCoverFinderWor
 	const bool bReservationsAreUnique = Counts.DuplicateReservationCount == 0;
 	const bool bOccupantsAreAtTheirPoints = Counts.OccupantsAwayFromPointCount == 0;
 	const bool bCommandsUntouched = Counts.CommandInterferenceCount == 0;
+	int32 UnitsShootingOwnCoverCount = 0;
+	for (TActorIterator<ASquadUnit> UnitIterator(&World); UnitIterator; ++UnitIterator)
+	{
+		const ASquadUnit* SquadUnit = *UnitIterator;
+		UnitsShootingOwnCoverCount += IsValid(SquadUnit) && SquadUnit->GetWouldShootOwnCover(CoverSubsystem) ? 1 : 0;
+	}
+	UE_LOG(
+		LogRTSCoverTest,
+		Display,
+		TEXT("RTS_COVER_TEST own_cover units_that_would_shoot_their_own_cover=%d"),
+		UnitsShootingOwnCoverCount);
 	const int32 OverCapacityThinObstacleCount = CoverSubsystem.GetOverCapacityThinObstacleCount();
 	int32 ThinObstaclePointCount = 0;
 	for (const FRTSCoverPoint& CoverPoint : CoverSubsystem.GetCoverPointsView())
@@ -358,7 +386,7 @@ void FCoverTestScenario::FinishIdlePhase(UWorld& World, const URTSCoverFinderWor
 		OverCapacityThinObstacleCount);
 	bM_IdlePhasePassed = bCorrectMap && bHasBothSides && bHasDiscoveredCover && bUnitsOccupyCover &&
 		bReservationsAreUnique && bOccupantsAreAtTheirPoints && bCommandsUntouched &&
-		OverCapacityThinObstacleCount == 0;
+		OverCapacityThinObstacleCount == 0 && UnitsShootingOwnCoverCount == 0;
 	UE_LOG(
 		LogRTSCoverTest,
 		Display,
@@ -486,6 +514,10 @@ void FCoverTestScenario::FinishCombatPhase(UWorld& World, URTSCoverFinderWorldSu
 		M_CombatTotals.DuplicateReservationSamples,
 		M_CombatTotals.CommandInterferenceSamples);
 	LogUnitStates(World);
+	if (bM_ObserveCombat)
+	{
+		M_CombatObserver.LogSummary();
+	}
 
 	const bool bPassed = bM_IdlePhasePassed && bCombatPhasePassed;
 	if (bPassed)
@@ -582,6 +614,55 @@ bool FCoverTestScenario::FindApproachLocation(
 	OutApproachLocation = TargetLocation +
 		(SquadLocation - TargetLocation).GetSafeNormal2D() * CoverTestScenarioPrivate::ApproachStandOffDistance;
 	return true;
+}
+
+void FCoverTestScenario::OrderApproachingSquadsToAdvance(UWorld& World)
+{
+	using namespace CoverTestScenarioPrivate;
+	if (M_PhaseElapsedSeconds < M_NextAdvanceOrderSeconds)
+	{
+		return;
+	}
+	M_NextAdvanceOrderSeconds = M_PhaseElapsedSeconds + AdvanceIntervalSeconds;
+	for (FCoverTestAttackingSquad& AttackingSquad : M_AttackingSquads)
+	{
+		ASquadController* SquadController = AttackingSquad.SquadController.Get();
+		if (not IsValid(SquadController) || SquadController->GetSquadUnitsCount() <= 0)
+		{
+			continue;
+		}
+		const int32 SquadOwner = GetSquadOwningPlayer(*SquadController);
+		const bool bSquadIsPlayerOwned = SquadOwner == PlayerOwnedTeam;
+		const FVector SquadLocation = SquadController->GetActorLocation();
+		const ASquadUnit* NearestEnemy = FindNearestUnitOfOtherPlayer(World, SquadLocation, SquadOwner);
+		if (bSquadIsPlayerOwned != bM_PlayerSquadsApproach || not IsValid(NearestEnemy))
+		{
+			continue;
+		}
+		const FVector ToEnemy = NearestEnemy->GetActorLocation() - SquadLocation;
+		const float BoundDistance = FMath::Min(AdvanceBoundDistance, ToEnemy.Size2D() - AdvanceMinimumEnemyDistance);
+		if (BoundDistance <= 0.0f)
+		{
+			continue;
+		}
+		const ECommandQueueError OrderResult = SquadController->MoveToLocation(
+			SquadLocation + ToEnemy.GetSafeNormal2D() * BoundDistance,
+			true,
+			FRotator::ZeroRotator);
+		// The squad attacks again once it has arrived, however many attack orders it already had.
+		AttackingSquad.AttackOrdersIssued = 0;
+		AttackingSquad.NextAttackOrderSeconds = M_PhaseElapsedSeconds + AttackDelayAfterAdvanceSeconds;
+		UE_LOG(
+			LogRTSCoverTest,
+			Display,
+			TEXT("RTS_COVER_TEST advance_order t=%.0f squad=%s owner=%d bound_cm=%.0f enemy_distance_cm=%.0f result=%s"),
+			M_PhaseElapsedSeconds,
+			*SquadController->GetName(),
+			SquadOwner,
+			BoundDistance,
+			ToEnemy.Size2D(),
+			*UEnum::GetValueAsString(OrderResult));
+	}
 }
 
 void FCoverTestScenario::OrderIdleAttackingSquadsToAttack(UWorld& World)

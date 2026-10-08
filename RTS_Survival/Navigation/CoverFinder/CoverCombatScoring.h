@@ -23,6 +23,14 @@ struct FRTSCombatCoverSettings
 	float MinimumScoreGain = 0.3f;
 };
 
+/** What a soldier in cover does when that cover turns out to be useless against its current target. */
+enum class ERTSCoverInvalidTargetDecision : uint8
+{
+	// Stay hidden for now: the weapon may switch back, or the target may move back into reach.
+	StayInCover,
+	LeaveCover
+};
+
 /** The enemies a soldier wants cover from. The first threat is the target the soldier is shooting at. */
 struct FRTSCombatCoverThreats
 {
@@ -68,6 +76,20 @@ struct FRTSCombatCoverScoring
 		const FRTSCombatCoverThreats& Threats,
 		const FRTSCombatCoverSettings& Settings,
 		float& OutScore);
+
+	/**
+	 * @brief Decides whether a soldier gives up cover it cannot engage its current target from.
+	 * A weapon changes target often in a firefight; leaving for each change puts the soldier in the open.
+	 * @param bTargetIsAttackOrder True when the target is the enemy the squad was ordered to attack; an order
+	 * is never waited out.
+	 * @param SecondsWithoutValidTarget How long the point has been useless against whatever the target was.
+	 * @param ToleranceSeconds Designer setting; zero restores leaving at once.
+	 * @return Whether to stay hidden or leave.
+	 */
+	static ERTSCoverInvalidTargetDecision DecideOnInvalidTarget(
+		bool bTargetIsAttackOrder,
+		float SecondsWithoutValidTarget,
+		float ToleranceSeconds);
 
 	/** @return True when a candidate's score is enough better than the occupied point's to be worth the walk. */
 	static bool GetIsWorthRepositioning(

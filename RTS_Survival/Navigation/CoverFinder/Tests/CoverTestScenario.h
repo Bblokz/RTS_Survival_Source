@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverCombatObserver.h"
 
 class ASquadController;
 class ASquadUnit;
@@ -105,6 +106,14 @@ private:
 	bool bM_PlayerSquadsApproach = false;
 	bool bM_IdlePhasePassed = false;
 
+	// -CoverFinderEnemyAdvance: the approaching side keeps pushing forward in bounds instead of holding at range.
+	bool bM_ApproachingSquadsAdvance = false;
+	float M_NextAdvanceOrderSeconds = 0.0f;
+
+	// -CoverFinderObserveCombat: measures how well cover shields both sides during the fight.
+	bool bM_ObserveCombat = false;
+	FCoverCombatObserver M_CombatObserver;
+
 	// Unrendered meshes stop advancing montages, which would hide every cover clip from an unattended run.
 	void KeepUnitAnimationTicking(UWorld& World) const;
 
@@ -137,6 +146,12 @@ private:
 		const ASquadController& SquadController,
 		int32 ApproachingSquadIndex,
 		FVector& OutApproachLocation) const;
+
+	/**
+	 * @brief Moves every squad of the approaching side one bound closer to its nearest enemy and lets it attack
+	 * again on arrival, so the defenders face an enemy that keeps changing position.
+	 */
+	void OrderApproachingSquadsToAdvance(UWorld& World);
 
 	/** Attack orders against unseen targets complete at once, so idle squads in contact are ordered again. */
 	void OrderIdleAttackingSquadsToAttack(UWorld& World);

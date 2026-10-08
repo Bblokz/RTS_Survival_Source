@@ -9,6 +9,8 @@
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "Components/MeshComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
@@ -66,13 +68,36 @@ namespace CoverFinderWorldSubsystemPrivate
 	constexpr int32 CaptureFrameDelay = 3;
 	constexpr int32 StandingEdgeRefinementSteps = 3;
 	// Worst case for one direction, including the edge refinement traces of both sides.
-	constexpr int32 MaximumQueriesForOneDirection = 105 + StandingEdgeRefinementSteps * 2;
+	// Heights at which an open frame is probed, and how many of them must hit a beam for it to count as cover.
+	constexpr float OpenFrameProbeHeights[] = {30.0f, 50.0f, 70.0f, 90.0f};
+	constexpr int32 MinimumOpenFrameHits = 2;
+	// The frame probes, the fire-over probe, and the projection and room check of the cover location.
+	constexpr int32 OpenFrameQueryCount = UE_ARRAY_COUNT(OpenFrameProbeHeights) + 4;
+	constexpr int32 MaximumQueriesForOneDirection = 105 + StandingEdgeRefinementSteps * 2 + OpenFrameQueryCount;
 	constexpr float CoverSpatialCellSize = 500.0f;
 	constexpr float CrouchFiringHeight = 150.0f;
 	constexpr float StandingFiringHeight = 160.0f;
 	constexpr int32 MaximumCandidateLaneTests = 8;
 	const FColor CrouchCoverColor(173, 216, 230);
 	const FColor StandingCoverColor(255, 165, 0);
+	const FColor TrenchCoverColor(220, 30, 30);
+	// How far a trench socket may sit from the navmesh and still be moved onto it.
+	const FVector TrenchSocketProjectionExtent(120.0f, 120.0f, 250.0f);
+
+	FColor GetCoverDebugColor(const ERTSCoverType CoverType)
+	{
+		switch (CoverType)
+		{
+		case ERTSCoverType::Crouch:
+			return CrouchCoverColor;
+		case ERTSCoverType::TrenchStandUp:
+			return TrenchCoverColor;
+		case ERTSCoverType::StandingLeft:
+		case ERTSCoverType::StandingRight:
+		default:
+			return StandingCoverColor;
+		}
+	}
 
 	const FCollisionObjectQueryParams& GetAllCoverObjectQueryParams()
 	{
@@ -476,6 +501,14 @@ void URTSCoverFinderWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		{
 			RequestDebugCapture();
 		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateTrenchCover")))
+		{
+			M_TrenchCoverScenario.Start();
+		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderCountCover")))
+		{
+			M_CoverCountScenario.Start(FParse::Param(FCommandLine::Get(), TEXT("CoverFinderWriteCountBaseline")));
+		}
 		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateCombatCover")))
 		{
 			M_CombatCoverScenario.Start();
@@ -501,6 +534,12 @@ void URTSCoverFinderWorldSubsystem::Tick(const float DeltaTime)
 	TickDebugCapture();
 	M_TestCoverScenario.Tick(*this, DeltaTime);
 	M_CombatCoverScenario.Tick(*this);
+	M_CoverCountScenario.Tick(*this);
+	M_TrenchCoverScenario.Tick(*this);
+	if (not bM_HasRegisteredTrenchCover)
+	{
+		RegisterTrenchCoverOnce();
+	}
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
 		TickCommandLineExplain();
@@ -576,6 +615,92 @@ void URTSCoverFinderWorldSubsystem::ForceRescan()
 		return;
 	}
 	bM_ForceRescanAfterCurrent = true;
+}
+
+void URTSCoverFinderWorldSubsystem::RegisterTrenchCoverOnce()
+{
+	bM_HasRegisteredTrenchCover = true;
+	UWorld* World = GetWorld();
+	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
+	if (not IsValid(World) || not IsValid(CoverSettings) || CoverSettings->M_TrenchActorClass.IsNull() ||
+		CoverSettings->M_TrenchCoverSocketNamePart.IsEmpty())
+	{
+		return;
+	}
+	const UClass* TrenchClass = CoverSettings->M_TrenchActorClass.LoadSynchronous();
+	if (not IsValid(TrenchClass))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cover finder: the trench actor class set in the cover settings could not be loaded."));
+		return;
+	}
+	int32 TrenchPointCount = 0;
+	for (TActorIterator<AActor> TrenchIterator(World, const_cast<UClass*>(TrenchClass)); TrenchIterator; ++TrenchIterator)
+	{
+		AActor* TrenchActor = *TrenchIterator;
+		if (not IsValid(TrenchActor))
+		{
+			continue;
+		}
+		++M_TrenchCoverActorCount;
+		TArray<FRTSCoverPoint> TrenchPoints = BuildTrenchCoverPoints(
+			*TrenchActor,
+			CoverSettings->M_TrenchCoverSocketNamePart);
+		TrenchPointCount += TrenchPoints.Num();
+		RegisterAuthoredCoverProvider(TrenchActor, MoveTemp(TrenchPoints));
+	}
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSCoverFinder,
+			Display,
+			TEXT("RTS_COVER_TRENCHES class=%s trenches=%d cover_points=%d socket_name_part=%s"),
+			*TrenchClass->GetName(),
+			M_TrenchCoverActorCount,
+			TrenchPointCount,
+			*CoverSettings->M_TrenchCoverSocketNamePart);
+	}
+}
+
+TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildTrenchCoverPoints(
+	const AActor& TrenchActor,
+	const FString& SocketNamePart) const
+{
+	TArray<FRTSCoverPoint> TrenchPoints;
+	// A trench has one mesh; its sockets mark where soldiers stand.
+	const UMeshComponent* TrenchMesh = TrenchActor.FindComponentByClass<UMeshComponent>();
+	if (not IsValid(TrenchMesh))
+	{
+		return TrenchPoints;
+	}
+	const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
+	const ANavigationData* NavigationData = GetCharacterNavigationData();
+	for (const FName& SocketName : TrenchMesh->GetAllSocketNames())
+	{
+		if (not SocketName.ToString().Contains(SocketNamePart, ESearchCase::IgnoreCase))
+		{
+			continue;
+		}
+		const FTransform SocketTransform = TrenchMesh->GetSocketTransform(SocketName, RTS_World);
+		const FVector FacingDirection = SocketTransform.GetRotation().GetForwardVector().GetSafeNormal2D();
+		FRTSCoverPoint& TrenchPoint = TrenchPoints.AddDefaulted_GetRef();
+		TrenchPoint.CoverType = ERTSCoverType::TrenchStandUp;
+		// The normal points from the cover to the soldier, so it is the opposite of where he looks.
+		TrenchPoint.CoverNormal = FacingDirection.IsNearlyZero() ? FVector::ForwardVector : -FacingDirection;
+		TrenchPoint.Location = SocketTransform.GetLocation();
+		// Soldiers walk to the point, so it is moved onto the navmesh when that is close by.
+		FNavLocation ProjectedSocketLocation;
+		const bool bIsOnNavigation = IsValid(NavigationSystem) && IsValid(NavigationData) &&
+			NavigationSystem->ProjectPointToNavigation(
+				TrenchPoint.Location,
+				ProjectedSocketLocation,
+				CoverFinderWorldSubsystemPrivate::TrenchSocketProjectionExtent,
+				NavigationData);
+		if (bIsOnNavigation)
+		{
+			TrenchPoint.Location = ProjectedSocketLocation.Location;
+		}
+	}
+	return TrenchPoints;
 }
 
 uint64 URTSCoverFinderWorldSubsystem::RegisterAuthoredCoverProvider(
@@ -937,6 +1062,45 @@ AActor* URTSCoverFinderWorldSubsystem::ResolveBlockingProvider(const FRTSCoverPo
 	return ProviderActor != nullptr ? ProviderActor->Get() : nullptr;
 }
 
+void URTSCoverFinderWorldSubsystem::GatherCoverObstacleActors(
+	const FRTSCoverPoint& CoverPoint,
+	TArray<AActor*>& OutObstacleActors) const
+{
+	// The space between the soldier and his cover, a little wider than he is and as tall.
+	constexpr float ObstacleBoxDepth = 180.0f;
+	constexpr float ObstacleBoxHalfWidth = 70.0f;
+	AActor* ProviderActor = ResolveBlockingProvider(CoverPoint);
+	if (IsValid(ProviderActor))
+	{
+		OutObstacleActors.AddUnique(ProviderActor);
+	}
+	const UWorld* World = GetWorld();
+	const FVector TowardCover = -CoverPoint.CoverNormal.GetSafeNormal2D();
+	if (not IsValid(World) || TowardCover.IsNearlyZero())
+	{
+		return;
+	}
+	const float BoxHalfHeight = M_ActiveSettings.AgentHeight * 0.5f;
+	const FVector BoxCenter = CoverPoint.Location
+		+ TowardCover * (ObstacleBoxDepth * 0.5f)
+		+ FVector::UpVector * (BoxHalfHeight + CoverFinderWorldSubsystemPrivate::CapsuleGroundClearance);
+	TArray<FOverlapResult> Overlaps;
+	World->OverlapMultiByObjectType(
+		Overlaps,
+		BoxCenter,
+		TowardCover.ToOrientationQuat(),
+		CoverFinderWorldSubsystemPrivate::GetAllCoverObjectQueryParams(),
+		FCollisionShape::MakeBox(FVector(ObstacleBoxDepth * 0.5f, ObstacleBoxHalfWidth, BoxHalfHeight)),
+		CoverFinderWorldSubsystemPrivate::BuildCoverOverlapQueryParams());
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		if (GetIsScannableEnvironmentComponent(Overlap.GetComponent()) && IsValid(Overlap.GetActor()))
+		{
+			OutObstacleActors.AddUnique(Overlap.GetActor());
+		}
+	}
+}
+
 bool URTSCoverFinderWorldSubsystem::GetHasTargetSpecificFiringLane(
 	const ASquadUnit& SquadUnit,
 	const FRTSCoverPoint& CoverPoint,
@@ -1008,7 +1172,8 @@ bool URTSCoverFinderWorldSubsystem::GetIsCoverPointValidAgainstTarget(
 
 FVector URTSCoverFinderWorldSubsystem::GetStandingPeekOffset(const FRTSCoverPoint& CoverPoint) const
 {
-	if (CoverPoint.CoverType == ERTSCoverType::Crouch)
+	// Crouch cover fires from where it is, and a soldier in a trench stands up without stepping aside.
+	if (CoverPoint.CoverType == ERTSCoverType::Crouch || CoverPoint.CoverType == ERTSCoverType::TrenchStandUp)
 	{
 		return FVector::ZeroVector;
 	}
@@ -1839,6 +2004,9 @@ FCoverFinderSettingsSnapshot URTSCoverFinderWorldSubsystem::BuildSettingsSnapsho
 	Snapshot.ThinObstacleRingSampleCount = FMath::Clamp(CoverSettings->M_ThinObstacleRingSamples, 4, 16);
 	Snapshot.ThinObstacleRefreshScanCount = FMath::Clamp(CoverSettings->M_ThinObstacleRefreshScans, 1, 60);
 	Snapshot.ThinObstacleWidthPerSoldier = FMath::Clamp(CoverSettings->M_ThinObstacleWidthPerSoldier, 20.0f, 400.0f);
+	Snapshot.OpenFrameCoverStandOff = FMath::Clamp(CoverSettings->M_OpenFrameCoverStandOff, 30.0f, 250.0f);
+	Snapshot.OpenFramePointsPerObstacle = FMath::Clamp(CoverSettings->M_OpenFramePointsPerObstacle, 1, 16);
+	Snapshot.bFindOpenFrameCover = CoverSettings->bM_FindOpenFrameCover;
 	Snapshot.bProbeThinObstacles = CoverSettings->bM_ProbeThinObstacles;
 	Snapshot.bReaimSlantedHits = CoverSettings->bM_ReaimSlantedHits;
 	Snapshot.AgentRadius = FMath::Max(1.0f, AgentRadius);
@@ -2163,7 +2331,11 @@ bool URTSCoverFinderWorldSubsystem::StartNextObservation(
 	M_SamplingState.CurrentObservation.DirectionalObservations.Reserve(
 		bIsFocusedSample ? 1 : RTSCoverFinderConstants::SearchDirectionCount);
 	M_SamplingState.CurrentFocusDirection = FocusDirection;
+	M_SamplingState.CurrentFocusDistance = bIsFocusedSample
+		? FVector::Dist2D(PlannedSample.AimLocation, ProjectedLocation.Location)
+		: 0.0f;
 	M_SamplingState.CurrentObstacleCacheId = PlannedSample.ObstacleCacheId;
+	M_SamplingState.bCurrentSampleMayFindOpenFrameCover = PlannedSample.bMayFindOpenFrameCover;
 	M_SamplingState.CurrentDirectionIndex = 0;
 	M_SamplingState.bHasCurrentObservation = true;
 	++M_PerformanceAccumulator.ProjectedSampleCount;
@@ -2213,8 +2385,22 @@ void URTSCoverFinderWorldSubsystem::SampleCurrentDirection(
 		DirectionObservation.SearchDirection,
 		M_ActiveSettings.MinimumCrouchCoverHeight,
 		InOutFrameWorldQueries);
+	// Only the ring probes of a thin obstacle look for an open frame; grid probes keep the regular rule alone.
+	const bool bMayFindOpenFrame = M_ActiveSettings.bFindOpenFrameCover &&
+		M_SamplingState.CurrentObstacleCacheId != 0 &&
+		M_SamplingState.bCurrentSampleMayFindOpenFrameCover;
 	if (not DirectionObservation.CrouchTrace.bBlockingHit)
 	{
+		if (bMayFindOpenFrame)
+		{
+			SampleOpenFrameCover(
+				NavigationSystem,
+				NavigationData,
+				ProtectedLocation,
+				M_SamplingState.CurrentFocusDistance,
+				DirectionObservation,
+				InOutFrameWorldQueries);
+		}
 		M_SamplingState.CurrentObservation.DirectionalObservations.Add(MoveTemp(DirectionObservation));
 		++M_SamplingState.CurrentDirectionIndex;
 		return;
@@ -2257,9 +2443,83 @@ void URTSCoverFinderWorldSubsystem::SampleCurrentDirection(
 			DirectionObservation,
 			InOutFrameWorldQueries);
 	}
+	if (bMayFindOpenFrame && not bCrouchSurface)
+	{
+		SampleOpenFrameCover(
+			NavigationSystem,
+			NavigationData,
+			ProtectedLocation,
+			M_SamplingState.CurrentFocusDistance,
+			DirectionObservation,
+			InOutFrameWorldQueries);
+	}
 
 	M_SamplingState.CurrentObservation.DirectionalObservations.Add(MoveTemp(DirectionObservation));
 	++M_SamplingState.CurrentDirectionIndex;
+}
+
+void URTSCoverFinderWorldSubsystem::SampleOpenFrameCover(
+	const UNavigationSystemV1& NavigationSystem,
+	const ANavigationData& NavigationData,
+	const FVector& ProbeLocation,
+	const float DistanceToObstacleCentre,
+	FCoverDirectionalObservation& InOutDirectionObservation,
+	int32& InOutFrameWorldQueries)
+{
+	UWorld* World = GetWorld();
+	const FVector ProbeDirection = InOutDirectionObservation.SearchDirection.GetSafeNormal2D();
+	if (not IsValid(World) || ProbeDirection.IsNearlyZero() || DistanceToObstacleCentre <= 0.0f)
+	{
+		return;
+	}
+	// Through the whole obstacle: a beam on its far side still stands between the soldier and the enemy.
+	const FVector ProbeReach = ProbeDirection * (DistanceToObstacleCentre * 2.0f);
+	const auto TraceThroughFrame = [&](const float Height, FHitResult& OutHit)
+	{
+		++InOutFrameWorldQueries;
+		++M_PerformanceAccumulator.WorldQueryCount;
+		const FVector TraceStart = ProbeLocation + FVector::UpVector * Height;
+		return CoverFinderWorldSubsystemPrivate::TraceEnvironmentCover(*World, TraceStart, TraceStart + ProbeReach, OutHit);
+	};
+	int32 FrameHitCount = 0;
+	float NearestBeamDistance = TNumericLimits<float>::Max();
+	AActor* FrameActor = nullptr;
+	for (const float ProbeHeight : CoverFinderWorldSubsystemPrivate::OpenFrameProbeHeights)
+	{
+		FHitResult FrameHit;
+		if (not TraceThroughFrame(ProbeHeight, FrameHit))
+		{
+			continue;
+		}
+		++FrameHitCount;
+		if (FrameHit.Distance < NearestBeamDistance)
+		{
+			NearestBeamDistance = FrameHit.Distance;
+			FrameActor = FrameHit.GetActor();
+		}
+	}
+	// A crouching soldier fires over his cover; something as tall as he is when standing is not crouch cover.
+	FHitResult FireOverHit;
+	if (FrameHitCount < CoverFinderWorldSubsystemPrivate::MinimumOpenFrameHits ||
+		TraceThroughFrame(CoverFinderWorldSubsystemPrivate::CrouchFiringHeight, FireOverHit))
+	{
+		return;
+	}
+
+	// As close as the stand-off allows, and never further away than the probe already is.
+	const FVector WantedLocation = ProbeLocation + ProbeDirection *
+		FMath::Max(0.0f, NearestBeamDistance - M_ActiveSettings.OpenFrameCoverStandOff);
+	FNavLocation ProjectedCoverLocation;
+	++InOutFrameWorldQueries;
+	++M_PerformanceAccumulator.WorldQueryCount;
+	const bool bCanStandCloser = NavigationSystem.ProjectPointToNavigation(
+		WantedLocation,
+		ProjectedCoverLocation,
+		FVector(M_ActiveSettings.AgentRadius, M_ActiveSettings.AgentRadius, M_ActiveSettings.AgentHeight),
+		&NavigationData) && GetCanInfantryOccupyLocation(ProjectedCoverLocation.Location, InOutFrameWorldQueries);
+	InOutDirectionObservation.OpenFrameCoverLocation = bCanStandCloser ? ProjectedCoverLocation.Location : ProbeLocation;
+	InOutDirectionObservation.OpenFrameProviderHandle = FindOrAddBlockingProviderHandle(FrameActor);
+	InOutDirectionObservation.bOpenFrameCover = true;
 }
 
 void URTSCoverFinderWorldSubsystem::SampleStandingSides(
@@ -2825,9 +3085,8 @@ void URTSCoverFinderWorldSubsystem::DrawPublishedCover() const
 		for (const FRTSCoverPoint& CoverPoint : M_CoverPoints)
 		{
 			const bool bCrouchCover = CoverPoint.CoverType == ERTSCoverType::Crouch;
-			const FColor DrawColor = bCrouchCover
-				? CoverFinderWorldSubsystemPrivate::CrouchCoverColor
-				: CoverFinderWorldSubsystemPrivate::StandingCoverColor;
+			const bool bTrenchCover = CoverPoint.CoverType == ERTSCoverType::TrenchStandUp;
+			const FColor DrawColor = CoverFinderWorldSubsystemPrivate::GetCoverDebugColor(CoverPoint.CoverType);
 			const FVector DrawLocation = CoverPoint.Location
 				+ FVector::UpVector * CoverFinderWorldSubsystemPrivate::DebugPointHeight;
 			DrawDebugSphere(
@@ -2840,8 +3099,11 @@ void URTSCoverFinderWorldSubsystem::DrawPublishedCover() const
 				CoverSettings->M_DebugDrawDurationSeconds,
 				0,
 				CoverFinderWorldSubsystemPrivate::DebugLineThickness);
+			// Crouch cover shows its normal, a trench where the soldier looks, standing cover the side it peeks to.
 			const FVector ArrowDirection = bCrouchCover
 				? CoverPoint.CoverNormal
+				: bTrenchCover
+				? -CoverPoint.CoverNormal
 				: CoverFinderWorldSubsystemPrivate::GetStandingSideDirection(
 					-CoverPoint.CoverNormal,
 					CoverPoint.CoverType);

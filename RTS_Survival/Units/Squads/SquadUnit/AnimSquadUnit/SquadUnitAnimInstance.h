@@ -402,7 +402,7 @@ struct FSquadUnitCrouchCoverAnimationSet
 	TObjectPtr<UAnimMontage> ExitCoverMontage = nullptr;
 };
 
-/** @brief Groups the three cover pose families configured on the master infantry animation Blueprint. */
+/** @brief Groups the cover pose families configured on the master infantry animation Blueprint. */
 USTRUCT(BlueprintType)
 struct FSquadUnitCoverAnimationSets
 {
@@ -418,6 +418,12 @@ struct FSquadUnitCoverAnimationSets
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	FSquadUnitCrouchCoverAnimationSet Crouch;
+
+	// Trench firing step: ProtectedIdlePose is the crouch below the edge, PeekAimAssets the standing aim. Both
+	// offsets default to zero because the soldier stands up in place; the montages are optional. Left empty,
+	// the protected pose falls back to Crouch.ProtectedIdlePose and the exposed pose to the regular standing aim.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	FSquadUnitStandingCoverAnimationSet Trench;
 };
 
 /**
@@ -562,6 +568,7 @@ public:
 	bool GetIsCoverFireAllowed() const;
 	ESquadCoverAnimAction GetCoverAnimAction() const { return M_CoverAnimRuntime.M_Action; }
 	ESquadCoverGraphPose GetCoverGraphPose() const { return CoverGraphPose; }
+	ESquadIdleAnimationPose GetIdleAnimationPose() const { return IdleAnimationPose; }
 
 	/** One-line snapshot of what drives the pose right now, for cover test diagnostics. */
 	FString GetPoseDebugString() const;
@@ -894,6 +901,10 @@ private:
 	const FSquadUnitStandingCoverAnimationSet* GetStandingCoverAnimationSet() const;
 	ESquadIdleAnimationPose GetProtectedStandingCoverPose() const;
 	ESquadIdleAnimationPose GetStandingPeekPose() const;
+
+	// True for the poses a unit fires from after leaving its protected pose: both standing peeks and the trench.
+	static bool GetIsPeekPose(ESquadIdleAnimationPose CoverPose);
+	static bool GetIsTrenchPose(ESquadIdleAnimationPose CoverPose);
 
 	// ----- Team Weapon Crew Animations -----
 

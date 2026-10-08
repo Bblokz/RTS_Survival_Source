@@ -277,6 +277,13 @@ struct FSquadUnitCoverMoveGuard
 
 	// A unit in cover compares its point with the ones around it no earlier than this.
 	float NextCombatEvaluationWorldSeconds = 0.0f;
+
+	// Since when the occupied point has been useless against the unit's target; negative while it is usable.
+	// The unit waits out short spells of this instead of leaving for the open on every target change.
+	float InvalidTargetSinceWorldSeconds = -1.0f;
+
+	// While waiting, the point is only tested against the target again from this time on.
+	float NextInvalidTargetRecheckWorldSeconds = 0.0f;
 };
 
 /**
@@ -335,6 +342,14 @@ public:
 	 * @return False while the unit is moving, sliding, or playing a cover transition.
 	 */
 	bool TryGetSettledCoverCapsuleError(float& OutErrorCentimeters) const;
+
+	/**
+	 * @brief For tests: tells whether a unit in cover would hit its own cover when it fires.
+	 * @param CoverSubsystem Cover service that resolves the assigned point's cover object.
+	 * @return True when the unit occupies cover made by an object that is not an enemy's, and its weapon does
+	 * not fire through that object.
+	 */
+	bool GetWouldShootOwnCover(const URTSCoverFinderWorldSubsystem& CoverSubsystem) const;
 
 	// Lets cover selection skip the point this unit just gave up because its target could not be engaged from it.
 	bool GetIsCoverPointRejectedForTarget(int64 PointId) const;
@@ -656,8 +671,9 @@ private:
 	FAIRequestID M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
 	FAIRequestID M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
 
+	// Every object the unit's weapon fires through while it holds its cover; given back when it leaves.
 	UPROPERTY()
-	TWeakObjectPtr<AActor> M_CoverIgnoredProviderActor;
+	TArray<TWeakObjectPtr<AActor>> M_CoverIgnoredObstacleActors;
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_CoverValidatedTarget;
@@ -1003,10 +1019,43 @@ private:
 	void LeaveCoverForReason(const TCHAR* Reason);
 	void CancelAutomaticCoverForCommandMovement();
 	void SetCoverWeaponFireBlocked(bool bBlocked) const;
-	void RegisterCoverProviderWeaponIgnore(AActor* ProviderActor, bool bRegister);
+	/**
+	 * @brief Lets the unit's weapon fire through its own cover for as long as it holds the point.
+	 * Covers everything in front of the unit there except what belongs to an enemy, which it must still be
+	 * able to shoot at.
+	 * @param CoverSubsystem Cover service that knows which objects make up the cover at the assigned point.
+	 */
+	void IgnoreCoverObstaclesWithWeapon(const URTSCoverFinderWorldSubsystem& CoverSubsystem);
+	void StopIgnoringCoverObstaclesWithWeapon();
 	void ApplyCurrentCoverWeaponState();
-	bool GetIsCoverProviderOwnedByUnit(const AActor& ProviderActor) const;
+	bool GetIsCoverObstacleOwnedByEnemy(const AActor& ObstacleActor) const;
 	AActor* GetCurrentCoverTarget(FVector& OutTargetLocation) const;
+
+	/**
+	 * @brief Picks the enemy the unit's cover is judged against.
+	 * Normally the weapon's target. Under an attack order it is the ordered enemy whenever that enemy is in
+	 * weapon range, also when the weapon is on someone else: the order has priority over staying in cover.
+	 * @param OutTargetLocation Where that enemy is.
+	 * @param bOutIsAttackOrderTarget True when the result is the enemy named by an attack order.
+	 * @return The enemy, or nullptr when there is nobody to judge the cover against.
+	 */
+	AActor* GetCoverJudgementTarget(FVector& OutTargetLocation, bool& bOutIsAttackOrderTarget) const;
+
+	/**
+	 * @brief Tests the occupied point against the target and decides what an unusable point means right now.
+	 * @param CoverSubsystem Cover service that owns the firing-lane test.
+	 * @param TargetActor Enemy from GetCoverJudgementTarget.
+	 * @param TargetLocation Where that enemy is.
+	 * @param bTargetIsAttackOrder True when the squad was ordered to attack this enemy.
+	 * @param OutShouldLeaveCover True when the point is unusable and the unit must give it up now.
+	 * @return True when the point is usable against the target; false while the unit waits or must leave.
+	 */
+	bool GetIsCoverUsableAgainstTarget(
+		URTSCoverFinderWorldSubsystem& CoverSubsystem,
+		AActor& TargetActor,
+		const FVector& TargetLocation,
+		bool bTargetIsAttackOrder,
+		bool& OutShouldLeaveCover);
 	ESquadIdleAnimationPose GetAssignedCoverAnimationPose() const;
 	bool GetShouldRevalidateCoverLane(const AActor& TargetActor, const FVector& TargetLocation) const;
 	void RecordValidatedCoverTarget(AActor* TargetActor, const FVector& TargetLocation);

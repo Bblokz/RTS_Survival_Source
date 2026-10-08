@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include "GameFramework/Actor.h"
 #include "CoverFinderDeveloperSettings.generated.h"
 
 /**
@@ -93,6 +94,13 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.5", UIMin="0.5", UIMax="15.0", Units="s"))
 	float M_CombatCoverReevaluationSeconds = 3.0f;
 
+	// How long a soldier stays hidden in cover that it cannot engage its current target from, before it gives
+	// the cover up. Weapons change target often and targets move; without this a soldier leaves cover for the
+	// open on every change. Zero leaves at once. A squad that was ordered to attack a specific enemy never
+	// waits: a soldier that cannot engage that enemy from its cover leaves immediately.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", ClampMax="15.0", UIMin="0.0", UIMax="10.0", Units="s"))
+	float M_CoverTargetChangeToleranceSeconds = 2.5f;
+
 	// Enemies taken into account per soldier: its own target first, then the targets of its squad mates.
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="1", ClampMax="8", UIMin="1", UIMax="8"))
 	int32 M_CombatCoverMaximumThreats = 6;
@@ -145,6 +153,21 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="20.0", ClampMax="400.0", UIMin="20.0", UIMax="400.0", Units="cm", EditCondition="bM_ProbeThinObstacles"))
 	float M_ThinObstacleWidthPerSoldier = 70.0f;
 
+	// Finds crouch cover behind thin objects that are a frame of beams instead of a solid surface, such as tank
+	// hedgehogs. The regular crouch cover rule needs one continuous surface from knee to crouch height and is not
+	// changed by this; the frame rule is only tried around a thin object where the regular rule found nothing.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(EditCondition="bM_ProbeThinObstacles"))
+	bool bM_FindOpenFrameCover = true;
+
+	// The most crouch points one such frame may get, spread evenly around it. A hedgehog is probed from every
+	// side; without a limit each side that works becomes a point.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="1", ClampMax="16", UIMin="1", UIMax="8", EditCondition="bM_FindOpenFrameCover"))
+	int32 M_OpenFramePointsPerObstacle = 3;
+
+	// How far from the nearest beam of such a frame the soldier crouches.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="30.0", ClampMax="250.0", UIMin="30.0", UIMax="250.0", Units="cm", EditCondition="bM_FindOpenFrameCover"))
+	float M_OpenFrameCoverStandOff = 60.0f;
+
 	// The cover found around a thin object is reused for this many scans before its ring is probed again, and
 	// the objects take turns, so a forest costs a fraction of its probes per scan. An object that moved is always
 	// probed again at once. Higher values are cheaper; a change next to a tree is noticed later.
@@ -160,6 +183,18 @@ public:
 	// the shortest expose animation, or the peeking soldier's muzzle stays behind the wall.
 	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="0.0", ClampMax="80.0", UIMin="0.0", UIMax="80.0", Units="cm"))
 	float M_StandingPeekEdgeInset = 25.0f;
+
+	// Every actor of this class, or of a class derived from it, is a trench. Trenches are not scanned: their
+	// collision is a flat plane so tanks can drive over them. Instead, each socket on the trench's mesh whose name
+	// contains M_TrenchCoverSocketNamePart becomes a stand-up cover point. Read once when the map starts, because
+	// trenches are never added or removed during play.
+	UPROPERTY(Config, EditAnywhere, Category="Trench Cover")
+	TSoftClassPtr<AActor> M_TrenchActorClass;
+
+	// Part of a socket name that marks a trench firing position; upper and lower case do not matter. The socket's
+	// forward axis is the direction the soldier faces.
+	UPROPERTY(Config, EditAnywhere, Category="Trench Cover")
+	FString M_TrenchCoverSocketNamePart = TEXT("cargo");
 
 	UPROPERTY(Config, EditAnywhere, Category="Debug")
 	bool bM_DrawDetectedCover = true;

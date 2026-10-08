@@ -42,6 +42,8 @@ namespace CoverFinderExplainPrivate
 			return TEXT("standing-left");
 		case ERTSCoverType::StandingRight:
 			return TEXT("standing-right");
+		case ERTSCoverType::TrenchStandUp:
+			return TEXT("trench-stand-up");
 		default:
 			return TEXT("unknown");
 		}
@@ -438,11 +440,33 @@ void URTSCoverFinderWorldSubsystem::Explain_ProbeSample(
 			const FVector SearchDirection = bAimed
 				? (AimLocation - ProjectedLocation.Location).GetSafeNormal2D()
 				: FVector::ForwardVector.RotateAngleAxis(GridYawDegrees, FVector::UpVector);
-			const FString Result = Explain_ProbeDirection(
+			FString Result = Explain_ProbeDirection(
 				*NavigationSystem,
 				*NavigationData,
 				ProjectedLocation.Location,
 				SearchDirection);
+			// A ring probe that found no regular cover gets the open-frame rule, exactly as in a scan.
+			FCoverDirectionalObservation FrameObservation;
+			FrameObservation.SearchDirection = SearchDirection;
+			const bool bRegularRuleFoundCover = Result.StartsWith(TEXT("STANDING")) || Result.StartsWith(TEXT("CROUCH")) ||
+				Result.StartsWith(TEXT("REJECTED for standing"));
+			// The explanation tries every side; a scan only lets M_OpenFramePointsPerObstacle of them publish.
+			if (bAimed && M_ActiveSettings.bFindOpenFrameCover && not bRegularRuleFoundCover)
+			{
+				SampleOpenFrameCover(
+					*NavigationSystem,
+					*NavigationData,
+					ProjectedLocation.Location,
+					FVector::Dist2D(AimLocation, ProjectedLocation.Location),
+					FrameObservation,
+					UnusedQueryCount);
+				Result = FrameObservation.bOpenFrameCover
+					? FString::Printf(
+						TEXT("CROUCH cover behind an open frame, soldier at %s; regular rule: %s"),
+						*FrameObservation.OpenFrameCoverLocation.ToCompactString(),
+						*Result)
+					: Result + TEXT("; no open frame either (too few beams in the way, or too tall to fire over)");
+			}
 			UE_LOG(
 				LogRTSCoverExplain,
 				Display,

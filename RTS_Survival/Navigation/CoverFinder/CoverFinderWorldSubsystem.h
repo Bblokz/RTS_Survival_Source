@@ -5,7 +5,9 @@
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderTypes.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverCombatTestScenario.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverCountTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTestScenario.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTrenchTestScenario.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "CoverFinderWorldSubsystem.generated.h"
 
@@ -106,6 +108,7 @@ struct FCoverFinderSamplingState
 
 	// Ring the aimed probe being sampled belongs to; zero for grid samples and re-aimed probes.
 	uint32 CurrentObstacleCacheId = 0;
+	bool bCurrentSampleMayFindOpenFrameCover = false;
 
 	// Coarse position and direction of every re-aimed probe already queued, so one tree trunk grazed from
 	// several grid positions is not probed again for each of them.
@@ -116,6 +119,9 @@ struct FCoverFinderSamplingState
 
 	// Search direction of the aimed probe being sampled; zero while a grid sample is sampled.
 	FVector CurrentFocusDirection = FVector::ZeroVector;
+
+	// Horizontal distance from the aimed probe's position to the spot it looks at.
+	float CurrentFocusDistance = 0.0f;
 	int32 NextSampleIndex = 0;
 	int32 CurrentDirectionIndex = 0;
 	bool bHasCurrentObservation = false;
@@ -270,6 +276,9 @@ public:
 		const ASquadUnit* IgnoredUnit,
 		const TSet<const ASquadUnit*>* IgnoredUnits = nullptr) const;
 
+	// Trench actors found at map start, for tests and reports.
+	int32 GetTrenchCoverActorCount() const { return M_TrenchCoverActorCount; }
+
 	// Number of thin obstacles that hold more soldiers than they have room for; zero when the limit works.
 	int32 GetOverCapacityThinObstacleCount() const;
 
@@ -282,6 +291,15 @@ public:
 	void ReportCoverPointUnreachable(int64 PointId);
 	bool GetIsCoverPointPublished(int64 PointId) const;
 	AActor* ResolveBlockingProvider(const FRTSCoverPoint& CoverPoint) const;
+
+	/**
+	 * @brief Lists the objects a soldier in this cover has directly in front of him.
+	 * The scan remembers one object per point, but a crystal cluster or a wreck with loose parts is several
+	 * actors, and a shot that clears the first still hits the next.
+	 * @param CoverPoint Point the soldier occupies.
+	 * @param OutObstacleActors Receives the point's own cover object and every other object in the same spot.
+	 */
+	void GatherCoverObstacleActors(const FRTSCoverPoint& CoverPoint, TArray<AActor*>& OutObstacleActors) const;
 
 	/**
 	 * @brief Validates a single target lane on the target team's collision trace channel.
@@ -372,6 +390,12 @@ private:
 	FString M_PendingScreenshotPath;
 	FCoverTestScenario M_TestCoverScenario;
 	FCoverCombatTestScenario M_CombatCoverScenario;
+	FCoverCountTestScenario M_CoverCountScenario;
+	FCoverTrenchTestScenario M_TrenchCoverScenario;
+
+	// Trenches never change during play, so their cover is registered once, on the first tick of the map.
+	bool bM_HasRegisteredTrenchCover = false;
+	int32 M_TrenchCoverActorCount = 0;
 
 	// Rings around the thin obstacles found while gathering the bounds of the next environment scan.
 	TArray<FCoverFocusedSample> M_PendingThinObstacleSamples;
@@ -422,6 +446,20 @@ private:
 	 * @param OutEnvironmentBounds Receives one box per overlapped navigation tile.
 	 */
 	void AppendLargeObjectScanBounds(const FBox& ExpandedObjectBounds, TArray<FBox>& OutEnvironmentBounds) const;
+
+	/**
+	 * @brief Registers the stand-up cover of every trench on the map from the sockets of its mesh.
+	 * Trenches are not found by traces: their collision is a plane that lets tanks drive over them.
+	 */
+	void RegisterTrenchCoverOnce();
+
+	/**
+	 * @brief Builds one trench's cover points from its mesh sockets.
+	 * @param TrenchActor Actor of the configured trench class.
+	 * @param SocketNamePart Part of a socket name that marks a firing position.
+	 * @return One stand-up point per matching socket, facing along the socket's forward axis.
+	 */
+	TArray<FRTSCoverPoint> BuildTrenchCoverPoints(const AActor& TrenchActor, const FString& SocketNamePart) const;
 
 	// Landscape is scanned once on its own, and soldiers stand on cover points without being cover themselves.
 	static bool GetIsScannableEnvironmentComponent(const UPrimitiveComponent* PrimitiveComponent);
@@ -509,6 +547,23 @@ private:
 	// Grid samples look in the eight fixed directions; an aimed probe only in its own.
 	int32 GetCurrentSampleDirectionCount() const;
 	FVector GetCurrentSampleDirection() const;
+
+	/**
+	 * @brief Looks for crouch cover behind an open frame of beams, which the regular height probes cannot see.
+	 * @param NavigationSystem Current world navigation system.
+	 * @param NavigationData Character nav data selected by the registry.
+	 * @param ProbeLocation Navigable position on the obstacle's ring.
+	 * @param DistanceToObstacleCentre Horizontal distance from that position to the middle of the obstacle.
+	 * @param InOutDirectionObservation Receives the cover location when enough of the frame is in the way.
+	 * @param InOutFrameWorldQueries Running query count used to enforce the hard frame cap.
+	 */
+	void SampleOpenFrameCover(
+		const UNavigationSystemV1& NavigationSystem,
+		const ANavigationData& NavigationData,
+		const FVector& ProbeLocation,
+		float DistanceToObstacleCentre,
+		FCoverDirectionalObservation& InOutDirectionObservation,
+		int32& InOutFrameWorldQueries);
 
 	/**
 	 * @brief Queues one straight-on probe for a surface that a grid probe only grazed.

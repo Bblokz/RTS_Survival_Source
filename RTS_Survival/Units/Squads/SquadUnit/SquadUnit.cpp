@@ -75,6 +75,8 @@ namespace SquadUnitCoverMoveStatics
 			return ESquadIdleAnimationPose::StandingCoverLeft;
 		case ERTSCoverType::StandingRight:
 			return ESquadIdleAnimationPose::StandingCoverRight;
+		case ERTSCoverType::TrenchStandUp:
+			return ESquadIdleAnimationPose::TrenchCover;
 		case ERTSCoverType::Crouch:
 		default:
 			return ESquadIdleAnimationPose::CrouchCover;
@@ -332,6 +334,7 @@ bool ASquadUnit::SetCoverAssignment(
 	M_CoverMoveGuard.bHasRestartedApproach = false;
 	const UWorld* World = GetWorld();
 	M_CoverMoveGuard.AssignedWorldSeconds = IsValid(World) ? World->GetTimeSeconds() : 0.0f;
+	M_CoverMoveGuard.InvalidTargetSinceWorldSeconds = -1.0f;
 	return true;
 }
 
@@ -582,7 +585,8 @@ bool ASquadUnit::GetIsCoverAnimationOutOfSync() const
 void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
 {
 	FVector TargetLocation = FVector::ZeroVector;
-	AActor* TargetActor = GetCurrentCoverTarget(TargetLocation);
+	bool bTargetIsAttackOrder = false;
+	AActor* TargetActor = GetCoverJudgementTarget(TargetLocation, bTargetIsAttackOrder);
 	const ESquadUnitCoverUseReason UseReason = IsValid(TargetActor)
 		? ESquadUnitCoverUseReason::Attack
 		: ESquadUnitCoverUseReason::AfterMoveCommand;
@@ -834,12 +838,7 @@ void ASquadUnit::EnterAssignedCover()
 	{
 		if (URTSCoverFinderWorldSubsystem* CoverSubsystem = World->GetSubsystem<URTSCoverFinderWorldSubsystem>())
 		{
-			AActor* ProviderActor = CoverSubsystem->ResolveBlockingProvider(
-				M_CoverRuntimeState.AssignedCoverPoint);
-			if (IsValid(ProviderActor) && GetIsCoverProviderOwnedByUnit(*ProviderActor))
-			{
-				RegisterCoverProviderWeaponIgnore(ProviderActor, true);
-			}
+			IgnoreCoverObstaclesWithWeapon(*CoverSubsystem);
 		}
 	}
 	StartCoverStepDeadline(SquadUnitCoverMoveStatics::MaximumEnterRequestSeconds);
@@ -1492,28 +1491,101 @@ void ASquadUnit::StartCoverStepDeadline(const float DurationSeconds)
 	M_CoverMoveGuard.StepDeadlineWorldSeconds = IsValid(World) ? World->GetTimeSeconds() + DurationSeconds : 0.0f;
 }
 
+bool ASquadUnit::GetIsCoverUsableAgainstTarget(
+	URTSCoverFinderWorldSubsystem& CoverSubsystem,
+	AActor& TargetActor,
+	const FVector& TargetLocation,
+	const bool bTargetIsAttackOrder,
+	bool& OutShouldLeaveCover)
+{
+	// While waiting hidden the lane is not traced on every update; twice a second notices a change soon enough.
+	constexpr float InvalidTargetRecheckSeconds = 0.5f;
+	OutShouldLeaveCover = false;
+	const UWorld* World = GetWorld();
+	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
+	const float WorldSeconds = IsValid(World) ? World->GetTimeSeconds() : 0.0f;
+	const bool bIsWaitingHidden = M_CoverMoveGuard.InvalidTargetSinceWorldSeconds >= 0.0f;
+	// An attack order is tested at once: its target must never be waited out.
+	if (bIsWaitingHidden && not bTargetIsAttackOrder &&
+		WorldSeconds < M_CoverMoveGuard.NextInvalidTargetRecheckWorldSeconds)
+	{
+		return false;
+	}
+	if (not bIsWaitingHidden && not GetShouldRevalidateCoverLane(TargetActor, TargetLocation))
+	{
+		return true;
+	}
+	if (CoverSubsystem.GetIsCoverPointValidAgainstTarget(
+		*this,
+		M_CoverRuntimeState.AssignedCoverPoint,
+		TargetActor,
+		TargetLocation))
+	{
+		if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+		{
+			if (bIsWaitingHidden)
+			{
+				UE_LOG(
+					LogRTSSquadUnitCover,
+					Verbose,
+					TEXT("RTS_COVER_WAIT_ENDED unit=%s kept_cover=1 waited_seconds=%.1f target=%s"),
+					*GetName(),
+					WorldSeconds - M_CoverMoveGuard.InvalidTargetSinceWorldSeconds,
+					*TargetActor.GetName());
+			}
+		}
+		M_CoverMoveGuard.InvalidTargetSinceWorldSeconds = -1.0f;
+		RecordValidatedCoverTarget(&TargetActor, TargetLocation);
+		return true;
+	}
+
+	M_CoverValidatedTarget.Reset();
+	if (not bIsWaitingHidden)
+	{
+		M_CoverMoveGuard.InvalidTargetSinceWorldSeconds = WorldSeconds;
+	}
+	M_CoverMoveGuard.NextInvalidTargetRecheckWorldSeconds = WorldSeconds + InvalidTargetRecheckSeconds;
+	const ERTSCoverInvalidTargetDecision Decision = FRTSCombatCoverScoring::DecideOnInvalidTarget(
+		bTargetIsAttackOrder,
+		WorldSeconds - M_CoverMoveGuard.InvalidTargetSinceWorldSeconds,
+		IsValid(CoverSettings) ? CoverSettings->M_CoverTargetChangeToleranceSeconds : 0.0f);
+	OutShouldLeaveCover = Decision == ERTSCoverInvalidTargetDecision::LeaveCover;
+	if (OutShouldLeaveCover)
+	{
+		M_CoverMoveGuard.InvalidTargetSinceWorldSeconds = -1.0f;
+	}
+	return false;
+}
+
 void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
 {
 	FVector TargetLocation = FVector::ZeroVector;
-	AActor* TargetActor = GetCurrentCoverTarget(TargetLocation);
+	bool bTargetIsAttackOrder = false;
+	AActor* TargetActor = GetCoverJudgementTarget(TargetLocation, bTargetIsAttackOrder);
 	if (not IsValid(TargetActor))
 	{
 		M_CoverValidatedTarget.Reset();
+		M_CoverMoveGuard.InvalidTargetSinceWorldSeconds = -1.0f;
 		SetCoverWeaponFireBlocked(true);
 		return;
 	}
-	if (GetShouldRevalidateCoverLane(*TargetActor, TargetLocation))
+	bool bShouldLeaveCover = false;
+	if (not GetIsCoverUsableAgainstTarget(
+		CoverSubsystem,
+		*TargetActor,
+		TargetLocation,
+		bTargetIsAttackOrder,
+		bShouldLeaveCover))
 	{
-		if (not CoverSubsystem.GetIsCoverPointValidAgainstTarget(
-			*this,
-			M_CoverRuntimeState.AssignedCoverPoint,
-			*TargetActor,
-			TargetLocation))
+		// Either on its way out, or hidden until the target can be engaged from here again.
+		SetCoverWeaponFireBlocked(true);
+		if (bShouldLeaveCover)
 		{
-			LeaveCoverUnusableAgainstTarget(TEXT("protected point is not valid against the target"));
-			return;
+			LeaveCoverUnusableAgainstTarget(bTargetIsAttackOrder
+				? TEXT("protected point cannot engage the attack order's target")
+				: TEXT("protected point stayed unusable against the target"));
 		}
-		RecordValidatedCoverTarget(TargetActor, TargetLocation);
+		return;
 	}
 	if (TryRepositionToBetterCombatCover(CoverSubsystem, *TargetActor, TargetLocation))
 	{
@@ -1561,20 +1633,30 @@ void ASquadUnit::UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsyste
 	}
 
 	FVector TargetLocation = FVector::ZeroVector;
-	AActor* TargetActor = GetCurrentCoverTarget(TargetLocation);
+	bool bTargetIsAttackOrder = false;
+	AActor* TargetActor = GetCoverJudgementTarget(TargetLocation, bTargetIsAttackOrder);
 	if (not IsValid(TargetActor))
 	{
 		ReturnToProtectedCover();
 		return;
 	}
-	if (GetShouldRevalidateCoverLane(*TargetActor, TargetLocation) &&
-		not CoverSubsystem.GetIsCoverPointValidAgainstTarget(
-			*this,
-			M_CoverRuntimeState.AssignedCoverPoint,
-			*TargetActor,
-			TargetLocation))
+	bool bShouldLeaveCover = false;
+	if (not GetIsCoverUsableAgainstTarget(
+		CoverSubsystem,
+		*TargetActor,
+		TargetLocation,
+		bTargetIsAttackOrder,
+		bShouldLeaveCover))
 	{
-		LeaveCoverUnusableAgainstTarget(TEXT("exposed point is not valid against the target"));
+		if (bShouldLeaveCover)
+		{
+			LeaveCoverUnusableAgainstTarget(bTargetIsAttackOrder
+				? TEXT("exposed point cannot engage the attack order's target")
+				: TEXT("exposed point stayed unusable against the target"));
+			return;
+		}
+		// Steps back behind the cover and waits there; the protected update decides what happens next.
+		ReturnToProtectedCover();
 		return;
 	}
 	if (TryRepositionToBetterCombatCover(CoverSubsystem, *TargetActor, TargetLocation))
@@ -1614,7 +1696,7 @@ void ASquadUnit::ClearCoverStateInternal(const bool bStopCoverMovement)
 	if (not M_CoverRuntimeState.GetHasAssignment())
 	{
 		M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
-		M_CoverIgnoredProviderActor.Reset();
+		StopIgnoringCoverObstaclesWithWeapon();
 		M_CoverValidatedTarget.Reset();
 		M_CoverValidatedTargetLocation = FVector::ZeroVector;
 		return;
@@ -1623,12 +1705,7 @@ void ASquadUnit::ClearCoverStateInternal(const bool bStopCoverMovement)
 	constexpr float CoverReacquireDelaySeconds = 0.5f;
 	DelayNextCoverSearch(CoverReacquireDelaySeconds);
 	const int64 ReservedPointId = M_CoverRuntimeState.AssignedCoverPoint.PointId;
-	AActor* IgnoredProviderActor = M_CoverIgnoredProviderActor.Get();
-	if (IsValid(IgnoredProviderActor))
-	{
-		RegisterCoverProviderWeaponIgnore(IgnoredProviderActor, false);
-	}
-	M_CoverIgnoredProviderActor.Reset();
+	StopIgnoringCoverObstaclesWithWeapon();
 	M_CoverValidatedTarget.Reset();
 	M_CoverValidatedTargetLocation = FVector::ZeroVector;
 	SetCoverWeaponFireBlocked(false);
@@ -1692,22 +1769,51 @@ void ASquadUnit::SetCoverWeaponFireBlocked(const bool bBlocked) const
 	M_InfantryWeapon->SetCoverFireBlocked(const_cast<ASquadUnit*>(this), bBlocked);
 }
 
-void ASquadUnit::RegisterCoverProviderWeaponIgnore(AActor* ProviderActor, const bool bRegister)
+void ASquadUnit::IgnoreCoverObstaclesWithWeapon(const URTSCoverFinderWorldSubsystem& CoverSubsystem)
 {
-	if (not IsValid(ProviderActor) || not GetIsValidWeapon())
+	StopIgnoringCoverObstaclesWithWeapon();
+	if (not GetIsValidWeapon())
 	{
 		return;
 	}
-	M_InfantryWeapon->RegisterCoverIgnoreActor(ProviderActor, bRegister);
-	if (bRegister)
+	TArray<AActor*> ObstacleActors;
+	CoverSubsystem.GatherCoverObstacleActors(M_CoverRuntimeState.AssignedCoverPoint, ObstacleActors);
+	for (AActor* ObstacleActor : ObstacleActors)
 	{
-		M_CoverIgnoredProviderActor = ProviderActor;
-		return;
+		if (not IsValid(ObstacleActor) || GetIsCoverObstacleOwnedByEnemy(*ObstacleActor))
+		{
+			continue;
+		}
+		M_InfantryWeapon->RegisterCoverIgnoreActor(ObstacleActor, true);
+		M_CoverIgnoredObstacleActors.Add(ObstacleActor);
 	}
-	if (M_CoverIgnoredProviderActor.Get() == ProviderActor)
+}
+
+void ASquadUnit::StopIgnoringCoverObstaclesWithWeapon()
+{
+	// Silent: called on every cover clear, also for a unit whose weapon is being swapped out.
+	if (IsValid(M_InfantryWeapon))
 	{
-		M_CoverIgnoredProviderActor.Reset();
+		for (const TWeakObjectPtr<AActor>& IgnoredObstacleActor : M_CoverIgnoredObstacleActors)
+		{
+			M_InfantryWeapon->RegisterCoverIgnoreActor(IgnoredObstacleActor.Get(), false);
+		}
 	}
+	M_CoverIgnoredObstacleActors.Reset();
+}
+
+bool ASquadUnit::GetWouldShootOwnCover(const URTSCoverFinderWorldSubsystem& CoverSubsystem) const
+{
+	if (not M_CoverRuntimeState.GetIsOccupyingCover() || not IsValid(M_InfantryWeapon))
+	{
+		return false;
+	}
+	const AActor* ProviderActor = CoverSubsystem.ResolveBlockingProvider(M_CoverRuntimeState.AssignedCoverPoint);
+	if (not IsValid(ProviderActor) || GetIsCoverObstacleOwnedByEnemy(*ProviderActor))
+	{
+		return false;
+	}
+	return not M_InfantryWeapon->GetIsActorIgnoredByWeapon(ProviderActor);
 }
 
 void ASquadUnit::ApplyCurrentCoverWeaponState()
@@ -1716,10 +1822,10 @@ void ASquadUnit::ApplyCurrentCoverWeaponState()
 	{
 		return;
 	}
-	AActor* IgnoredProviderActor = M_CoverIgnoredProviderActor.Get();
-	if (IsValid(IgnoredProviderActor))
+	// A weapon that was just swapped in starts with an empty ignore list.
+	for (const TWeakObjectPtr<AActor>& IgnoredObstacleActor : M_CoverIgnoredObstacleActors)
 	{
-		M_InfantryWeapon->RegisterCoverIgnoreActor(IgnoredProviderActor, true);
+		M_InfantryWeapon->RegisterCoverIgnoreActor(IgnoredObstacleActor.Get(), true);
 	}
 	const bool bCrouchCanFire = M_CoverRuntimeState.State == ESquadUnitCoverState::Protected &&
 		M_CoverRuntimeState.AssignedCoverPoint.CoverType == ERTSCoverType::Crouch;
@@ -1730,19 +1836,24 @@ void ASquadUnit::ApplyCurrentCoverWeaponState()
 		not (bHasValidatedTarget && (bCrouchCanFire || bStandingCanFire)));
 }
 
-bool ASquadUnit::GetIsCoverProviderOwnedByUnit(const AActor& ProviderActor) const
+bool ASquadUnit::GetIsCoverObstacleOwnedByEnemy(const AActor& ObstacleActor) const
 {
 	constexpr int32 MaximumOwnerDepth = 4;
-	const AActor* OwnershipActor = &ProviderActor;
+	// What an RTS component reports until a player has been assigned to it.
+	constexpr int32 UnassignedOwningPlayer = 222;
+	const AActor* OwnershipActor = &ObstacleActor;
 	for (int32 OwnerDepth = 0; OwnerDepth < MaximumOwnerDepth && IsValid(OwnershipActor); ++OwnerDepth)
 	{
-		const URTSComponent* ProviderRTSComponent = OwnershipActor->FindComponentByClass<URTSComponent>();
-		if (IsValid(ProviderRTSComponent))
+		const URTSComponent* ObstacleRTSComponent = OwnershipActor->FindComponentByClass<URTSComponent>();
+		if (IsValid(ObstacleRTSComponent))
 		{
-			return ProviderRTSComponent->GetOwningPlayer() == GetOwningPlayer();
+			const int32 ObstacleOwningPlayer = ObstacleRTSComponent->GetOwningPlayer();
+			return ObstacleOwningPlayer > 0 && ObstacleOwningPlayer != UnassignedOwningPlayer &&
+				ObstacleOwningPlayer != GetOwningPlayer();
 		}
 		OwnershipActor = OwnershipActor->GetOwner();
 	}
+	// Rocks, crystals, trees and wrecks belong to nobody.
 	return false;
 }
 
@@ -1760,6 +1871,34 @@ AActor* ASquadUnit::GetCurrentCoverTarget(FVector& OutTargetLocation) const
 	}
 	OutTargetLocation = M_InfantryWeapon->GetCurrentTargetLocation();
 	return TargetActor;
+}
+
+AActor* ASquadUnit::GetCoverJudgementTarget(FVector& OutTargetLocation, bool& bOutIsAttackOrderTarget) const
+{
+	bOutIsAttackOrderTarget = false;
+	AActor* WeaponTarget = GetCurrentCoverTarget(OutTargetLocation);
+	const bool bHasAttackOrder = M_ActiveCommand == EAbilityID::IdAttack && IsValid(M_TargetActor);
+	if (not bHasAttackOrder)
+	{
+		return WeaponTarget;
+	}
+	if (WeaponTarget == M_TargetActor)
+	{
+		bOutIsAttackOrderTarget = true;
+		return WeaponTarget;
+	}
+	// The weapon is on another enemy, or on none because this cover blocks the ordered one: the order decides.
+	const FVector OrderedTargetLocation = M_TargetActor->GetActorLocation();
+	const bool bOrderedTargetInRange = GetIsValidWeapon() &&
+		FVector::DistSquared(GetActorLocation(), OrderedTargetLocation) <=
+		FMath::Square(M_InfantryWeapon->GetMaxWeaponRange());
+	if (not bOrderedTargetInRange)
+	{
+		return WeaponTarget;
+	}
+	bOutIsAttackOrderTarget = true;
+	OutTargetLocation = OrderedTargetLocation;
+	return M_TargetActor;
 }
 
 ESquadIdleAnimationPose ASquadUnit::GetAssignedCoverAnimationPose() const

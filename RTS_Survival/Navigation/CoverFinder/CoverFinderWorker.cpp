@@ -122,6 +122,16 @@ namespace CoverFinderWorkerPrivate
 			DirectionObservation.CrouchTrace,
 			Settings))
 		{
+			// No regular cover here; an open frame found by the game thread still gives its own crouch point.
+			if (DirectionObservation.bOpenFrameCover)
+			{
+				AppendCandidate(
+					DirectionObservation.OpenFrameCoverLocation,
+					-DirectionObservation.SearchDirection.GetSafeNormal2D(),
+					ERTSCoverType::Crouch,
+					DirectionObservation.OpenFrameProviderHandle,
+					OutCandidates);
+			}
 			return;
 		}
 
@@ -454,6 +464,9 @@ bool FCoverFinderAlgorithms::AppendThinObstacleSamples(
 		FCoverFocusedSample& Sample = OutSamples.AddDefaulted_GetRef();
 		Sample.Location = ObstacleBase + FVector(FMath::Cos(AngleRadians), FMath::Sin(AngleRadians), 0.0f) * RingRadius;
 		Sample.AimLocation = ObstacleBase;
+		// Picks OpenFramePointsPerObstacle of the ring's probes at even steps around it.
+		Sample.bMayFindOpenFrameCover = (SampleIndex * Settings.OpenFramePointsPerObstacle) %
+			Settings.ThinObstacleRingSampleCount < Settings.OpenFramePointsPerObstacle;
 	}
 	return true;
 }

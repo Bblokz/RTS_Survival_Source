@@ -1495,7 +1495,7 @@ void ABuildingExpansion::PostInit_SetupAbilities()
 	if (RTSComp->GetUnitType() != EAllUnitType::UNType_BuildingExpansion)
 	{
 		RTSFunctionLibrary::ReportError(
-			"Cannot init abililties for building expansion: " + GetName() +
+			"Cannot init abililties for building expansion: " + GetClass()->GetName() +
 			"\n Building expansion is not of type BuildingExpansion. \n Ensure the building expansion is spawned correctly.");
 		return;
 	}

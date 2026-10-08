@@ -42,6 +42,86 @@ The scanner anchors standing points to the wall edge: it bisects the coarse open
 
 Not wired yet: the exit montages. Leaving cover cancels the cover pose immediately so a move order is never delayed by an exit clip.
 
+### Squads-only move preview (player planning)
+
+While only infantry squads are selected (no team weapons, nothing in cargo) and a right click would be a plain move, `ACPPController::Tick_UpdateSquadMovePreview` feeds the cursor to `USquadMovePreviewComponent`. The component is a non-scene `UActorComponent` on the controller; the formation code is untouched apart from one accessor for the rotation-arrow override.
+
+- **Planning** lives in `FSquadMovePlanner` (`Player/SquadMovePreview/SquadMovePlanner.h`), pure value logic with no world access. Squads are placed in the shape picked in the formation picker (`EFormation`, read from `UFormationController::GetCurrentFormation`): a rectangle of squads centred on the cursor, a spear or thin spear with its tip on the cursor, or a semi circle whose wings hang back and face outward. The squads that already stand furthest forward take the front rows and keep their left-to-right order inside a row, so they do not cross. A squad in the open forms a wide block with even rows (seven men stand 4 + 3) instead of a line. Each squad ranks the cover around its anchor by distance, facing agreement, and whether the previous plan already used it; soldiers without cover line up in rows behind the cover that was taken. Soldiers are matched to slots left to right.
+- **Cover use** is one `FindCoverPointsInRadius` query per replan against the published cache; points reserved by soldiers outside the selection are dropped. No traces and no scans are triggered by the preview.
+- **Throttle**: a replan happens when the cursor moved 25 cm, the facing changed, or 0.5 s passed, and never more often than every 0.04 s. Measured on TestCover: 0.012 ms average for 35 soldiers in 6 squads.
+- **Facing**: without the rotation arrow the squads face along their travel direction and take any nearby cover. While the player drags the rotation arrow the plan is anchored on the arrow's ground location, and only cover that protects against the chosen direction is used.
+- **Drawing** (debug for now): a small sphere and facing arrow per soldier — green for regular standing, orange for standing cover, light blue for crouch cover. `bM_EnableSquadMovePreview` in the cover finder settings switches the whole feature off.
+- **Issuing**: `MoveUnitsToLocation` first offers the order to `TryIssuePlannedMove`. The plan is handed to each `ASquadController` (`SetPlannedMoveDestinations`) and the normal move command is queued through the usual command path; when that command executes, `ExecutePlannedMove` sends each soldier to its own destination with its own path. Queued (shift) moves keep their plan until their turn.
+- **Arrival**: a soldier planned onto cover walks to that point's entry location and then reserves and enters exactly that point through the existing automatic-cover state machine; if the point was taken meanwhile it falls back to the normal search. A soldier planned into the open turns to the planned facing and stays there until it has a target.
+- **Arrival watchdog**: `UpdatePlannedMoveArrival` (run with the tactical cover update) notices a soldier that stays near its slot without arriving. Off screen that is the normal case: `RTSSquadUnitOptimizer` moves unseen soldiers in steps longer than the arrival radius, so they step over the slot back and forth; an unseen soldier is simply placed on its slot. A visible one is halted and re-sent once, then finishes its move where it stands, so the squad's command always completes.
+- A soldier that cannot start walking (no path from where it stands) retries for 1.5 s and paths from the nearest spot its navigation filter accepts.
+
+### Combat cover (choosing and changing cover by where the enemy is)
+
+Without a target a soldier still takes the nearest free point. With a target, `TryReserveCombatCoverPoint` scores every free point in reach with `FRTSCombatCoverScoring` (`Navigation/CoverFinder/CoverCombatScoring.h`, pure value logic) and gives the firing-lane trace only to the best few:
+
+- **Aim arc (hard limit)**: the target must be within `M_CombatCoverMaximumAimYawDegrees` (default 90, the range of the cover aim offsets) of looking straight at the cover. The same limit decides whether an occupied point is still valid.
+- **Protection**: the share of threats within `M_CombatCoverProtectedHalfAngleDegrees` (default 60) of straight ahead, times `M_CombatCoverProtectionWeight`. Threats are the soldier's own target plus the targets of its squad mates, up to `M_CombatCoverMaximumThreats`.
+- **Facing**: the cosine of the yaw to the soldier's own target, times `M_CombatCoverFacingWeight`.
+- **Travel**: the walk to the point as a fraction of `M_CombatCoverRepositionRadius`, times `M_CombatCoverTravelWeight`, subtracted.
+
+A soldier in cover with a target re-scores its point every `M_CombatCoverReevaluationSeconds` (spread per unit) once it has held it for `M_CombatCoverMinimumHoldSeconds`. It moves only when another point within the reposition radius beats the occupied one by `M_CombatCoverMinimumScoreGain`, has an open firing lane, and no squad mate is walking to cover at that moment, so a squad shifts one man at a time. `bM_EnableCombatCoverRepositioning` switches the moving off; the scored first choice stays.
+
+**Tolerating target changes.** A point that cannot engage the current target (outside the aim arc, or no firing lane) is not given up at once. The soldier stays hidden with his weapon blocked, a standing soldier steps back first, and the point is tested again every 0.5 s; it is given up after `M_CoverTargetChangeToleranceSeconds` (2.5 s). An attack order is the exception and is never waited out: `GetCoverJudgementTarget` judges the cover against the ordered enemy whenever it is in weapon range, also when the weapon is on someone else, and a point that cannot engage it is left immediately. The search for new cover uses the same enemy. Leave reasons in the log tell the two apart ("stayed unusable against the target" and "cannot engage the attack order's target"), and `RTS_COVER_WAIT_ENDED` (Verbose) marks every wait that ended with the cover kept.
+
+`-CoverFinderEnemyAdvance` and `-CoverFinderObserveCombat` on the TestCover scenario run an advancing enemy and log `RTS_COVER_OBSERVE` measurements of how well cover shields both sides; run them with `-RenderOffscreen` instead of `-NullRHI`, because without rendering the fog of war never starts and the enemy never shoots.
+
+Tests: `RTS.CoverFinder.Combat.*` (5 tests) and the map test `-CoverFinderValidateCombatCover`, which puts one soldier at the densest free cover of the map, moves an enemy to twelve bearings around it, and logs `RTS_COVER_COMBAT_TEST RESULT PASS|FAIL`. `LogRTSCoverFinder Verbose` prints one `RTS_COVER_COMBAT_SEARCH` line per search and `LogRTSSquadUnitCover Verbose` one `RTS_COVER_REPOSITION` line per move, for tuning.
+
+### Aimed probes: thin obstacles and grazing hits
+
+The grid (200 cm, eight fixed directions) only finds a thin or round object when a grid position happens to line up with it. Two kinds of aimed probe, sampled after the grid of every environment scan, remove that luck:
+
+- **Thin-obstacle ring** (`bM_ProbeThinObstacles`): an object no wider than `M_ThinObstacleMaximumWidth` (default 260 cm) gets `M_ThinObstacleRingSamples` probe positions around it, each looking at its centre. Width is taken from the collision of the overlapped body, per instance for instanced meshes, never from the visual bounds. When the whole collision is wider (a tree with branches), `MeasureTrunk` fires eight rays at crouch height toward the component's pivot and uses the box around the hits; the result is cached per component until it moves.
+- **Re-aim** (`bM_ReaimSlantedHits`): when a grid probe hits an object at a slant (alignment below 0.8), one more probe is queued straight in front of the spot it hit. Queued probes are deduplicated per 45 cm cell and 30 degrees of direction.
+
+Rings are not probed again on every scan. `FCoverThinObstacleCache` keeps, per obstacle (component plus instance index), its measured trunk and the unpublished candidates its ring produced. A ring is probed when the obstacle is new or has moved, and otherwise once every `M_ThinObstacleRefreshScans` scans (default 6), with the obstacles taking turns by cache id; in between, the cached candidates are sent straight to the worker (`EnqueueCandidateChunk`). Trunks are measured inside the sampling budget, not in the frame the scan starts. Entries of obstacles that no longer overlap the navigable world are dropped. The grid samples around every object and the re-aimed probes are still redone every scan.
+
+**Room around a thin obstacle.** A pole has cover points on every side but shelters one soldier per `M_ThinObstacleWidthPerSoldier` of its width (default 70 cm, at least one). At publication `TagThinObstacleCoverPoints` gives every generated point within the obstacle's cover radius, whichever probe found it, that obstacle's `ThinObstacleId` and `ThinObstacleCapacity`. A point is unavailable to a soldier while that many others hold points with the same id (`GetIsCoverPointAvailableToUnit`, `TryReserveCoverPointById`), and the squad move planner counts planned soldiers per id the same way, after subtracting soldiers outside the selection. The TestCover scenario fails when any thin obstacle holds more soldiers than it has room for.
+
+`RTS_COVER_AIMED_PROBES` logs the counts per scan (probed, reused, measured) and `RTS_COVER_TRUNK_MEASURED` (Verbose) each measured trunk.
+
+### Standing space
+
+A position only becomes cover when a soldier's body fits there (`GetCanInfantryOccupyLocation`). The body is a column of `M_StandingSpaceRadius` (25 cm) from `M_StandingSpaceFloorClearance` (60 cm) to `M_StandingSpaceHeight` (150 cm) above the ground, not the full navigation capsule. Infantry capsules are query-only and soldiers walk wherever the navmesh allows, so the full capsule rejected ground they stand on anyway: the dead trees on TestCover flare out up to 60 cm high at their foot, which removed every position around them.
+
+### Explain at cursor (debug)
+
+`RTS.CoverFinder.ExplainAtCursor` (or `-CoverFinderExplainAt="X=.. Y=.. Z=.."` on the command line) logs `RTS_COVER_EXPLAIN` lines and draws the probes for 15 s: published cover nearby, every obstacle with its collision size, visual size and trunk size and how it is scanned, then the result of each probe with the first check that rejected it. It lives in `CoverFinderExplain.cpp`. The command is only registered, and every function body only compiled, inside `if constexpr (GCoverFinder_Compile_DebugSymbols)`.
+
+Debug code must sit inside the taken branch of the `if constexpr`. The early-return form (`if constexpr (not Flag) { return; }` followed by the body) leaves the body in the function and fails the debug-off build with C4702.
+
+### Open-frame crouch cover (tank hedgehogs)
+
+The regular crouch rule needs one continuous surface from knee to crouch height, which a frame of crossed beams never is. `SampleOpenFrameCover` is tried only by the ring probes of a thin obstacle, and only where the regular rule found no cover in that direction, so regular crouch points are unaffected. It traces through the whole obstacle at 30, 50, 70 and 90 cm; when at least two of the four hit a beam and nothing blocks the crouch firing height, it publishes a crouch point `M_OpenFrameCoverStandOff` (60 cm) short of the nearest beam, or at the ring position when a soldier does not fit closer. `bM_FindOpenFrameCover` switches it off.
+
+### Firing through one's own cover
+
+While a soldier holds a point, his weapon ignores every object in front of him there that does not belong to an enemy (`IgnoreCoverObstaclesWithWeapon`): the point's own cover object plus whatever else overlaps a box between him and the cover (`GatherCoverObstacleActors`), because a crystal cluster or a wreck with loose parts is several actors. The ignores are removed when he leaves the point. Before, only cover owned by his own player was ignored, so neutral objects such as radixite crystals were hit.
+
+### Trench cover
+
+Trenches are not scanned: their collision is a plane that lets tanks drive over them. `M_TrenchActorClass` in the cover settings names the trench parent class; on the first tick of a map `RegisterTrenchCoverOnce` finds every actor of that class or a derived one, takes its mesh component, and registers each socket whose name contains `M_TrenchCoverSocketNamePart` ("cargo") as a `TrenchStandUp` cover point. The soldier faces along the socket's forward axis. Trenches never change during play, so this is never repeated. The points go through the authored-provider path, so the shared minimum point spacing applies to them and nothing else about scanning touches them. They draw red.
+
+A trench point behaves like standing cover with no sideways step: protected is a crouch below the edge (`ESquadIdleAnimationPose::TrenchCover`), exposed is standing up in place (`TrenchPeek`), with zero enter and exposed offsets. The assets live in `CoverAnimations.Trench` on the infantry animation Blueprint, a `FSquadUnitStandingCoverAnimationSet`: `ProtectedIdlePose` for the crouch, `PeekAimAssets` for the standing aim, and optional enter, expose, return and exit montages. Left empty, the crouch falls back to `Crouch.ProtectedIdlePose` and the exposed pose to the regular standing aim (`ESquadCoverGraphPose::NotInCover`), so it works before any trench asset is assigned.
+
+### Cover tests on TestCover
+
+- `-CoverFinderCountCover` logs the published points per object class and cover type and compares them with `Navigation/CoverFinder/Tests/Baselines/<Map>.txt`; `RTS_COVER_COUNT_TEST RESULT FAIL` means cover was lost. `-CoverFinderWriteCountBaseline` lowers the baseline to the run's counts where they are lower (write it several times: objects on the map are placed with some randomness), `-CoverFinderResetCountBaseline` starts it afresh.
+- `-CoverFinderValidateTrenchCover` sends a squad into a trench and checks crouch, stand up against an enemy in front, no movement while standing up, firing through the trench, and crouching again.
+- The idle phase of `-CoverFinderValidateTestCover` fails when a unit in cover would hit its own cover or a thin obstacle holds more soldiers than it has room for.
+
+### First scan budget
+
+Nothing can take cover, and no cover is drawn, until the first full scan of a map is published. That scan uses `M_FirstScanGameThreadBudgetMilliseconds` (default 4 ms per frame) instead of the 0.35 ms refresh budget, and the per-frame query cap is only a safety limit now. On TestCover the first scan dropped from about 1000 frames to about 35.
+
+Tests: `RTS.SquadMovePlanner.*` (8 planner tests) and the map scenario `-SquadMovePreviewValidate` on TestCover, which logs `RTS_SQUAD_PREVIEW_TEST RESULT PASS|FAIL` after checking crouch, standing and open-ground plans, the arrow filter, several squads at once, replanning cost, and that an issued plan is walked to.
+
 ### TestCover scenario
 
 `-CoverFinderValidateTestCover` on the command line, or `RTS.CoverFinder.ValidateTestCover <idle seconds> [capture]` in the console, runs `FCoverTestScenario` (cover-debug builds only). It starts the game past the start-game gate, waits for the first full scan, asserts idle cover (unique reservations, occupants on their points, command queue untouched), walks one team to the exposed side of occupied standing cover, orders attacks on contact, and logs `RTS_COVER_TEST RESULT PASS|FAIL` with a five-second combat timeline. `-CoverFinderPlayerApproaches` swaps which team walks; `-CoverFinderCombatSeconds=` changes the combat window.

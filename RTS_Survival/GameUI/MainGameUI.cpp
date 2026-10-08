@@ -25,7 +25,9 @@
 #include "Archive/W_Archive/W_Archive.h"
 #include "Components/Border.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/W_WeaponItem.h"
+#include "RTS_Survival/GameUI/MiniMap/MinimapTerrainCaptureComponent.h"
 #include "RTS_Survival/GameUI/MiniMap/W_MiniMap.h"
 #include "RTS_Survival/TechTree/TechTreeBaseWidget/TechTree.h"
 #include "Engine/AssetManager.h"
@@ -1248,9 +1250,34 @@ void UMainGameUI::InitMiniMap(const TObjectPtr<AFowManager>& FowManager, const E
 	{
 		return;
 	}
+
+	ACPPGameState* const GameState = FRTS_Statics::GetGameState(this);
+	if (not IsValid(GameState))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cannot set up the minimap terrain because the game state is invalid."
+			"\n See UMainGameUI::InitMiniMap");
+		return;
+	}
+
+	UMinimapTerrainCaptureComponent* const TerrainCaptureComponent =
+		GameState->GetMinimapTerrainCaptureComponent();
+	if (not IsValid(TerrainCaptureComponent))
+	{
+		return;
+	}
+
+	UTextureRenderTarget2D* const TerrainRenderTarget =
+		TerrainCaptureComponent->GetMinimapTerrainRenderTarget();
+	if (not IsValid(TerrainRenderTarget))
+	{
+		return;
+	}
+
 	M_MiniMap->InitMiniMapRTs(
 		FowManager->GetIsValidActiveRT(),
 		FowManager->GetIsValidPassiveRT(),
+		TerrainRenderTarget,
 		FowManager);
 	M_MiniMap->SetRenderTransform(Global_GetMiniMapTransform(StartDirection, M_MiniMap->GetRenderTransform()));
 }

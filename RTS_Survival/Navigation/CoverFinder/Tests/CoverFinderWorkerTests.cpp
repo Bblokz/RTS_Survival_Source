@@ -91,6 +91,16 @@ bool FCoverFinderThinObstacleTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("The trunk is inside the probe's reach"),
 			FVector::Dist2D(Sample.Location, TrunkBase) < Settings.MaximumCoverSearchDistance);
 	}
+	int32 OpenFrameProbeCount = 0;
+	for (const FCoverFocusedSample& Sample : RingSamples)
+	{
+		OpenFrameProbeCount += Sample.bMayFindOpenFrameCover ? 1 : 0;
+	}
+	TestEqual(TEXT("Only the configured number of ring probes may publish open-frame cover"),
+		OpenFrameProbeCount, Settings.OpenFramePointsPerObstacle);
+	TestTrue(TEXT("Those probes are spread around the ring, not bunched on one side"),
+		RingSamples[0].bMayFindOpenFrameCover && not RingSamples[1].bMayFindOpenFrameCover &&
+		RingSamples[3].bMayFindOpenFrameCover && RingSamples[6].bMayFindOpenFrameCover);
 	TestTrue(TEXT("The probes surround the trunk"),
 		FVector::DotProduct(RingSamples[0].Location - TrunkBase, RingSamples[4].Location - TrunkBase) < 0.0f);
 
@@ -447,6 +457,13 @@ bool FCoverFinderAnimationOffsetTest::RunTest(const FString& Parameters)
 		TEXT("The left set exposes to the soldier's left and the right set to the right"),
 		DefaultAnimationSets.StandingLeft.ExposedOffset.Right < 0.0f &&
 		DefaultAnimationSets.StandingRight.ExposedOffset.Right > 0.0f);
+
+	TestTrue(
+		TEXT("A soldier in a trench stands up in place: no travel into the pose and none out of it"),
+		DefaultAnimationSets.Trench.EnterStartOffset.TowardCover == 0.0f &&
+		DefaultAnimationSets.Trench.EnterStartOffset.Right == 0.0f &&
+		DefaultAnimationSets.Trench.ExposedOffset.TowardCover == 0.0f &&
+		DefaultAnimationSets.Trench.ExposedOffset.Right == 0.0f);
 
 	// A unit without an animation instance has no authored exposure and must fall back to the caller's step.
 	const ASquadUnit* SquadUnit = NewObject<ASquadUnit>();

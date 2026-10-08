@@ -72,6 +72,16 @@ bool FRTSCombatCoverScoring::TryScoreCoverPoint(
 	return true;
 }
 
+ERTSCoverInvalidTargetDecision FRTSCombatCoverScoring::DecideOnInvalidTarget(
+	const bool bTargetIsAttackOrder,
+	const float SecondsWithoutValidTarget,
+	const float ToleranceSeconds)
+{
+	const bool bMustLeave = bTargetIsAttackOrder || ToleranceSeconds <= 0.0f ||
+		SecondsWithoutValidTarget >= ToleranceSeconds;
+	return bMustLeave ? ERTSCoverInvalidTargetDecision::LeaveCover : ERTSCoverInvalidTargetDecision::StayInCover;
+}
+
 bool FRTSCombatCoverScoring::GetIsWorthRepositioning(
 	const float CurrentPointScore,
 	const float CandidateScore,

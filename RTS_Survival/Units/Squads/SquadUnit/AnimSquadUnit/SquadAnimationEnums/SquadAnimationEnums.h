@@ -29,6 +29,10 @@ enum class ESquadIdleAnimationPose : uint8
 	StandingCoverRight,
 	StandingPeekLeft,
 	StandingPeekRight,
+	// In a trench: crouched below the edge.
+	TrenchCover,
+	// In a trench: stood up in place to fire.
+	TrenchPeek,
 };
 
 /**

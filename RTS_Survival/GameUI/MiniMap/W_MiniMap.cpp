@@ -45,13 +45,14 @@ AFowManager* UW_MiniMap::GetIsValidFowManager() const
 
 void UW_MiniMap::InitMiniMapRTs(const TObjectPtr<UTexture>& Active,
                                 const TObjectPtr<UTexture>& Passive,
+                                const TObjectPtr<UTexture>& Terrain,
                                 const TObjectPtr<AFowManager>& FowManager)
 {
 	M_FowManager = FowManager;
 	bM_HasReportedMissingFowManager = false;
 
 	UImage* const MiniMapImage = GetIsValidMiniMapImg();
-	if (not Active || not Passive || not MiniMapImage || not GetIsValidFowManager())
+	if (not Active || not Passive || not Terrain || not MiniMapImage || not GetIsValidFowManager())
 	{
 		return;
 	}
@@ -65,6 +66,7 @@ void UW_MiniMap::InitMiniMapRTs(const TObjectPtr<UTexture>& Active,
 
 	DynamicMaterial->SetTextureParameterValue(FName("Active"), Active);
 	DynamicMaterial->SetTextureParameterValue(FName("Passive"), Passive);
+	DynamicMaterial->SetTextureParameterValue(FName("Terrain"), Terrain);
 	RefreshCustomMiniMapIconBrushes();
 }
 

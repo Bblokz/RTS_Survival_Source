@@ -603,6 +603,12 @@ void AInfantryWeaponMaster::RegisterCoverIgnoreActor(AActor* ActorToIgnore, cons
 		bRegister);
 }
 
+bool AInfantryWeaponMaster::GetIsActorIgnoredByWeapon(const AActor* Actor) const
+{
+	// Silent: a weapon without state has no ignore list to ask.
+	return IsValid(WeaponState) && WeaponState->GetIsActorIgnored(Actor);
+}
+
 void AInfantryWeaponMaster::SetCoverFireBlocked(UObject* RestrictionSource, const bool bBlocked)
 {
 	if (not IsValid(RestrictionSource) || not GetIsValidWeaponState())

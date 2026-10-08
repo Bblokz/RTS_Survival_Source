@@ -193,4 +193,30 @@ bool FCoverCombatRepositionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCoverCombatTargetToleranceTest,
+	"RTS.CoverFinder.Combat.ToleratesTargetChangesButNotAttackOrders",
+	CoverCombatScoringTestsPrivate::TestFlags)
+
+bool FCoverCombatTargetToleranceTest::RunTest(const FString& Parameters)
+{
+	constexpr float ToleranceSeconds = 2.5f;
+	TestEqual(TEXT("A soldier that just lost its lane stays hidden"),
+		FRTSCombatCoverScoring::DecideOnInvalidTarget(false, 0.0f, ToleranceSeconds),
+		ERTSCoverInvalidTargetDecision::StayInCover);
+	TestEqual(TEXT("It keeps waiting inside the tolerance"),
+		FRTSCombatCoverScoring::DecideOnInvalidTarget(false, 2.0f, ToleranceSeconds),
+		ERTSCoverInvalidTargetDecision::StayInCover);
+	TestEqual(TEXT("Once the tolerance is used up it gives the cover up"),
+		FRTSCombatCoverScoring::DecideOnInvalidTarget(false, 2.5f, ToleranceSeconds),
+		ERTSCoverInvalidTargetDecision::LeaveCover);
+	TestEqual(TEXT("An attack order is never waited out"),
+		FRTSCombatCoverScoring::DecideOnInvalidTarget(true, 0.0f, ToleranceSeconds),
+		ERTSCoverInvalidTargetDecision::LeaveCover);
+	TestEqual(TEXT("A tolerance of zero restores leaving at once"),
+		FRTSCombatCoverScoring::DecideOnInvalidTarget(false, 0.0f, 0.0f),
+		ERTSCoverInvalidTargetDecision::LeaveCover);
+	return true;
+}
+
 #endif

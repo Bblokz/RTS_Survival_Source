@@ -27,6 +27,7 @@
 enum class EDigInType : uint8;
 class UGameDecalManager;
 class UGameExplosionsManager;
+class UMinimapTerrainCaptureComponent;
 class ASmallArmsProjectileManager;
 class UAudioComponent;
 enum class ETankSubtype : uint8;
@@ -71,6 +72,10 @@ public:
 	inline UGameResourceManager* GetGameResourceManager() const { return M_GameResourceManager; };
 
 	inline UGameUnitManager* GetGameUnitManager() const { return M_GameUnitManager; };
+
+	/** @return The game state's minimap terrain capture component, or nullptr after reporting invalid setup. */
+	UMinimapTerrainCaptureComponent* GetMinimapTerrainCaptureComponent() const;
+
 	// BP callable so we can call init on it with the explosions mapping.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	inline UGameExplosionsManager* GetGameExplosionManager() const { return M_GameExplosionsManager; };
@@ -230,6 +235,11 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UGameDecalManager> M_GameDecalManager;
+
+	UPROPERTY(VisibleAnywhere, Category = "MiniMap")
+	TObjectPtr<UMinimapTerrainCaptureComponent> M_MinimapTerrainCaptureComponent;
+
+	bool GetIsValidMinimapTerrainCaptureComponent() const;
 
 	// Sets the reference on the ExplosionManagerSubsystem.
 	void InitExplMgrOnSubsystem();
