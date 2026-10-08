@@ -1526,25 +1526,24 @@ void USquadUnitAnimInstance::LogMissingCoverAnimationAssets(
 
 void USquadUnitAnimInstance::LogCoverMontageRootMotion(const ESquadIdleAnimationPose CoverPose) const
 {
-	if constexpr (not DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
-		return;
+		if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+		{
+			LogCoverMontageRootMotion(CoverAnimations.Crouch.EnterCoverMontage, TEXT("Crouch enter"));
+			LogCoverMontageRootMotion(CoverAnimations.Crouch.ExitCoverMontage, TEXT("Crouch exit"));
+			return;
+		}
+		const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
+		if (StandingAnimationSet == nullptr)
+		{
+			return;
+		}
+		LogCoverMontageRootMotion(StandingAnimationSet->EnterCoverMontage, TEXT("Standing enter"));
+		LogCoverMontageRootMotion(StandingAnimationSet->ExposeFromCoverMontage, TEXT("Standing expose"));
+		LogCoverMontageRootMotion(StandingAnimationSet->ReturnToCoverMontage, TEXT("Standing return"));
+		LogCoverMontageRootMotion(StandingAnimationSet->ExitCoverMontage, TEXT("Standing exit"));
 	}
-	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
-	{
-		LogCoverMontageRootMotion(CoverAnimations.Crouch.EnterCoverMontage, TEXT("Crouch enter"));
-		LogCoverMontageRootMotion(CoverAnimations.Crouch.ExitCoverMontage, TEXT("Crouch exit"));
-		return;
-	}
-	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
-	if (StandingAnimationSet == nullptr)
-	{
-		return;
-	}
-	LogCoverMontageRootMotion(StandingAnimationSet->EnterCoverMontage, TEXT("Standing enter"));
-	LogCoverMontageRootMotion(StandingAnimationSet->ExposeFromCoverMontage, TEXT("Standing expose"));
-	LogCoverMontageRootMotion(StandingAnimationSet->ReturnToCoverMontage, TEXT("Standing return"));
-	LogCoverMontageRootMotion(StandingAnimationSet->ExitCoverMontage, TEXT("Standing exit"));
 }
 
 void USquadUnitAnimInstance::LogCoverMontageRootMotion(

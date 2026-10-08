@@ -17,6 +17,8 @@
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "SquadUnit.generated.h"
 
+struct FRTSCombatCoverThreats;
+
 class USquadUnitSpatialVoiceLinePlayer;
 class UCargo;
 class URTSCoverFinderWorldSubsystem;
@@ -269,6 +271,12 @@ struct FSquadUnitCoverMoveGuard
 	// skipped. Without this a unit whose target flickers walks back into the same point again and again.
 	int64 RejectedPointId = 0;
 	float RejectedPointExpiryWorldSeconds = 0.0f;
+
+	// When the current point was assigned; a unit holds a point for a while before it may trade it for a better one.
+	float AssignedWorldSeconds = 0.0f;
+
+	// A unit in cover compares its point with the ones around it no earlier than this.
+	float NextCombatEvaluationWorldSeconds = 0.0f;
 };
 
 /**
@@ -895,6 +903,31 @@ private:
 	void UpdateEnteringCover();
 	void UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
 	void UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+
+	/**
+	 * @brief Moves a unit in cover to a clearly better point once the enemy is no longer behind its cover.
+	 * Only one unit of a squad walks at a time, so the squad keeps firing while it shifts.
+	 * @param CoverSubsystem Cover service that scores and reserves the points.
+	 * @param TargetActor The enemy this unit is shooting at.
+	 * @param TargetLocation That enemy's aim location.
+	 * @return True when the unit gave up its point for a new one.
+	 */
+	bool TryRepositionToBetterCombatCover(
+		URTSCoverFinderWorldSubsystem& CoverSubsystem,
+		AActor& TargetActor,
+		const FVector& TargetLocation);
+
+	/**
+	 * @brief Collects the enemies this unit wants cover from: its own target and those of its squad mates.
+	 * @param TargetActor The enemy this unit is shooting at.
+	 * @param TargetLocation That enemy's aim location.
+	 * @return The threats, with this unit's target first.
+	 */
+	FRTSCombatCoverThreats BuildCombatCoverThreats(const AActor& TargetActor, const FVector& TargetLocation) const;
+
+	// Cover must stay clearly inside weapon range, or entering it would make the squad walk closer again.
+	float GetMaximumCoverDistanceToTarget() const;
+	bool GetIsSquadMateWalkingToCover() const;
 	void ReturnToProtectedCover();
 	void ExposeFromStandingCover();
 	void RequestCoverEnterAnimation();

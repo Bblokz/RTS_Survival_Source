@@ -12,6 +12,9 @@ namespace SquadMovePlannerPrivate
 		FVector Right = FVector::RightVector;
 		TSet<int64> UsedCoverPointIds;
 		TArray<FVector> OccupiedLocations;
+
+		// Soldiers already planned around each thin obstacle; a pole has room for one, whatever side he takes.
+		TMap<uint32, int32> PlannedSoldiersPerThinObstacle;
 	};
 
 	/** Where one squad stands inside the selected formation shape, relative to the cursor and the facing. */
@@ -296,7 +299,11 @@ namespace SquadMovePlannerPrivate
 				return;
 			}
 			const FRTSCoverPoint& CoverPoint = Request.CoverPoints[Candidate.CoverPointIndex];
-			if (not GetIsLocationFree(InOutContext, CoverPoint.Location, Request.Settings.MinimumSlotSpacing))
+			const bool bThinObstacleIsFull = CoverPoint.ThinObstacleId != 0 &&
+				InOutContext.PlannedSoldiersPerThinObstacle.FindRef(CoverPoint.ThinObstacleId) >=
+				CoverPoint.ThinObstacleCapacity;
+			if (bThinObstacleIsFull ||
+				not GetIsLocationFree(InOutContext, CoverPoint.Location, Request.Settings.MinimumSlotSpacing))
 			{
 				continue;
 			}
@@ -307,6 +314,10 @@ namespace SquadMovePlannerPrivate
 			Position.CoverPoint = CoverPoint;
 			InOutContext.UsedCoverPointIds.Add(CoverPoint.PointId);
 			InOutContext.OccupiedLocations.Add(CoverPoint.Location);
+			if (CoverPoint.ThinObstacleId != 0)
+			{
+				++InOutContext.PlannedSoldiersPerThinObstacle.FindOrAdd(CoverPoint.ThinObstacleId);
+			}
 		}
 	}
 

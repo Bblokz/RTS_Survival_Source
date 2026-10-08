@@ -387,6 +387,100 @@ TArray<FRTSCoverPoint> FCoverFinderAlgorithms::FinalizeCandidates(
 	return AcceptedCandidates;
 }
 
+float FCoverFinderAlgorithms::GetProbeStandOffDistance(const FCoverFinderSettingsSnapshot& Settings)
+{
+	return Settings.AgentRadius + RTSCoverFinderConstants::ProbeSurfaceClearance;
+}
+
+bool FCoverFinderAlgorithms::GetIsThinObstacle(
+	const FBox& CollisionBounds,
+	const FCoverFinderSettingsSnapshot& Settings)
+{
+	if (CollisionBounds.IsValid == 0)
+	{
+		return false;
+	}
+	const FVector ObstacleSize = CollisionBounds.GetSize();
+	const bool bIsThin = FMath::Max(ObstacleSize.X, ObstacleSize.Y) <= Settings.ThinObstacleMaximumWidth;
+	const bool bIsTallEnoughForCover = ObstacleSize.Z >= Settings.MinimumCrouchCoverHeight;
+	return bIsThin && bIsTallEnoughForCover;
+}
+
+int32 FCoverFinderAlgorithms::GetThinObstacleSoldierCapacity(
+	const FBox& ObstacleBounds,
+	const FCoverFinderSettingsSnapshot& Settings)
+{
+	constexpr int32 MaximumCapacity = 255;
+	const FVector ObstacleSize = ObstacleBounds.GetSize();
+	const float ObstacleWidth = FMath::Max(ObstacleSize.X, ObstacleSize.Y);
+	return FMath::Clamp(
+		FMath::RoundToInt32(ObstacleWidth / FMath::Max(1.0f, Settings.ThinObstacleWidthPerSoldier)),
+		1,
+		MaximumCapacity);
+}
+
+float FCoverFinderAlgorithms::GetThinObstacleCoverRadius(
+	const FBox& ObstacleBounds,
+	const FCoverFinderSettingsSnapshot& Settings)
+{
+	// Standing points sit sideways of where their probe stood, toward the edge of the obstacle.
+	constexpr float SidewaysPointAllowance = 75.0f;
+	const FVector ObstacleSize = ObstacleBounds.GetSize();
+	return FVector2D(ObstacleSize.X, ObstacleSize.Y).Size() * 0.5f
+		+ GetProbeStandOffDistance(Settings)
+		+ SidewaysPointAllowance;
+}
+
+bool FCoverFinderAlgorithms::AppendThinObstacleSamples(
+	const FBox& CollisionBounds,
+	const FCoverFinderSettingsSnapshot& Settings,
+	TArray<FCoverFocusedSample>& OutSamples)
+{
+	constexpr float FullCircleDegrees = 360.0f;
+	if (not GetIsThinObstacle(CollisionBounds, Settings) || Settings.ThinObstacleRingSampleCount <= 0)
+	{
+		return false;
+	}
+	const FVector ObstacleSize = CollisionBounds.GetSize();
+	// The corners of a square post reach further out than its sides; the ring clears them as well.
+	const float RingRadius = FVector2D(ObstacleSize.X, ObstacleSize.Y).Size() * 0.5f
+		+ GetProbeStandOffDistance(Settings);
+	const FVector ObstacleBase(CollisionBounds.GetCenter().X, CollisionBounds.GetCenter().Y, CollisionBounds.Min.Z);
+	for (int32 SampleIndex = 0; SampleIndex < Settings.ThinObstacleRingSampleCount; ++SampleIndex)
+	{
+		const float AngleRadians = FMath::DegreesToRadians(
+			FullCircleDegrees * static_cast<float>(SampleIndex) /
+			static_cast<float>(Settings.ThinObstacleRingSampleCount));
+		FCoverFocusedSample& Sample = OutSamples.AddDefaulted_GetRef();
+		Sample.Location = ObstacleBase + FVector(FMath::Cos(AngleRadians), FMath::Sin(AngleRadians), 0.0f) * RingRadius;
+		Sample.AimLocation = ObstacleBase;
+	}
+	return true;
+}
+
+bool FCoverFinderAlgorithms::TryBuildReaimedSample(
+	const FVector& SampleLocation,
+	const FVector& SearchDirection,
+	const FCoverTraceObservation& SurfaceTrace,
+	const FCoverFinderSettingsSnapshot& Settings,
+	FCoverFocusedSample& OutSample)
+{
+	const FVector ProbeDirection = SearchDirection.GetSafeNormal2D();
+	if (not SurfaceTrace.bBlockingHit || ProbeDirection.IsNearlyZero())
+	{
+		return false;
+	}
+	const FVector SurfaceNormal = BuildCoverNormal(SurfaceTrace, ProbeDirection);
+	if (FVector::DotProduct(SurfaceNormal, -ProbeDirection) >= RTSCoverFinderConstants::MinimumStandingFaceAlignment)
+	{
+		return false;
+	}
+	const FVector HitLocation = SampleLocation + ProbeDirection * SurfaceTrace.Distance;
+	OutSample.Location = HitLocation + SurfaceNormal * GetProbeStandOffDistance(Settings);
+	OutSample.AimLocation = HitLocation;
+	return true;
+}
+
 bool FCoverFinderAlgorithms::GetIsSameSurface(
 	const FCoverTraceObservation& FirstTrace,
 	const FCoverTraceObservation& SecondTrace,
@@ -536,6 +630,16 @@ void FCoverFinderWorker::EnqueueObservationChunk(
 	TriggerWorker();
 }
 
+void FCoverFinderWorker::EnqueueCandidateChunk(const uint64 Generation, TArray<FRTSCoverPoint>&& Candidates)
+{
+	FWorkerRequest Request;
+	Request.Type = EWorkerRequestType::AppendCandidates;
+	Request.Generation = Generation;
+	Request.Candidates = MoveTemp(Candidates);
+	M_RequestQueue.Enqueue(MoveTemp(Request));
+	TriggerWorker();
+}
+
 void FCoverFinderWorker::EnqueueFinalizeRequest(const uint64 Generation)
 {
 	FWorkerRequest Request;
@@ -572,6 +676,9 @@ void FCoverFinderWorker::ProcessRequest(FWorkerRequest&& Request)
 		return;
 	case EWorkerRequestType::ProcessObservations:
 		ProcessObservations(MoveTemp(Request));
+		return;
+	case EWorkerRequestType::AppendCandidates:
+		ProcessAppendCandidates(MoveTemp(Request));
 		return;
 	case EWorkerRequestType::Finalize:
 		ProcessFinalize(Request);
@@ -614,6 +721,15 @@ void FCoverFinderWorker::ProcessObservations(FWorkerRequest&& Request)
 		M_ActiveSettings,
 		M_ActiveRawCandidates);
 	M_ActiveWorkerSeconds += FPlatformTime::Seconds() - StartSeconds;
+}
+
+void FCoverFinderWorker::ProcessAppendCandidates(FWorkerRequest&& Request)
+{
+	if (Request.Generation != M_ActiveGeneration)
+	{
+		return;
+	}
+	M_ActiveRawCandidates.Append(MoveTemp(Request.Candidates));
 }
 
 void FCoverFinderWorker::ProcessFinalize(const FWorkerRequest& Request)

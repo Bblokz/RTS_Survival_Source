@@ -81,6 +81,47 @@ public:
 		const FRTSCoverPoint& SecondCandidate,
 		float MinimumSpacing);
 
+	/** @return True when an obstacle with these collision bounds is probed from a ring instead of only by the grid. */
+	static bool GetIsThinObstacle(const FBox& CollisionBounds, const FCoverFinderSettingsSnapshot& Settings);
+
+	/** @return How many soldiers may take cover around a thin obstacle with these bounds at the same time. */
+	static int32 GetThinObstacleSoldierCapacity(const FBox& ObstacleBounds, const FCoverFinderSettingsSnapshot& Settings);
+
+	/** @return Horizontal distance from a thin obstacle's centre within which a cover point belongs to it. */
+	static float GetThinObstacleCoverRadius(const FBox& ObstacleBounds, const FCoverFinderSettingsSnapshot& Settings);
+
+	/** @return Distance from a probed surface at which a soldier's capsule stands just clear of it. */
+	static float GetProbeStandOffDistance(const FCoverFinderSettingsSnapshot& Settings);
+
+	/**
+	 * @brief Surrounds one thin obstacle with probes aimed at its centre, so finding its cover does not depend
+	 * on where the scan grid happens to fall.
+	 * @param CollisionBounds World bounds of the obstacle's collision, not of its visual mesh.
+	 * @param Settings Immutable settings for this generation.
+	 * @param OutSamples Receives the ring of probes; untouched when the obstacle is too wide or too low.
+	 * @return True when the obstacle was thin enough to get a ring.
+	 */
+	static bool AppendThinObstacleSamples(
+		const FBox& CollisionBounds,
+		const FCoverFinderSettingsSnapshot& Settings,
+		TArray<FCoverFocusedSample>& OutSamples);
+
+	/**
+	 * @brief Builds a second probe straight in front of a surface that a grid probe only grazed.
+	 * @param SampleLocation Navigable position the grazing probe was fired from.
+	 * @param SearchDirection Direction of the grazing probe.
+	 * @param SurfaceTrace What that probe hit.
+	 * @param Settings Immutable settings for this generation.
+	 * @param OutSample Probe that faces the hit surface squarely.
+	 * @return False when the surface was missed or already hit squarely enough.
+	 */
+	static bool TryBuildReaimedSample(
+		const FVector& SampleLocation,
+		const FVector& SearchDirection,
+		const FCoverTraceObservation& SurfaceTrace,
+		const FCoverFinderSettingsSnapshot& Settings,
+		FCoverFocusedSample& OutSample);
+
 	static bool GetIsSameSurface(
 		const FCoverTraceObservation& FirstTrace,
 		const FCoverTraceObservation& SecondTrace,
@@ -113,6 +154,9 @@ public:
 		TArray<FBox>&& TileBounds,
 		const FCoverFinderSettingsSnapshot& Settings);
 	void EnqueueObservationChunk(uint64 Generation, TArray<FCoverProbeObservation>&& Observations);
+
+	// Adds candidates that were classified in an earlier generation and are known to be unchanged.
+	void EnqueueCandidateChunk(uint64 Generation, TArray<FRTSCoverPoint>&& Candidates);
 	void EnqueueFinalizeRequest(uint64 Generation);
 
 	bool DequeueSamplePlan(FCoverSamplePlanResult& OutResult);
@@ -123,6 +167,7 @@ private:
 	{
 		BuildPlan,
 		ProcessObservations,
+		AppendCandidates,
 		Finalize
 	};
 
@@ -133,6 +178,7 @@ private:
 		FCoverFinderSettingsSnapshot Settings;
 		TArray<FBox> TileBounds;
 		TArray<FCoverProbeObservation> Observations;
+		TArray<FRTSCoverPoint> Candidates;
 	};
 
 	TQueue<FWorkerRequest, EQueueMode::Spsc> M_RequestQueue;
@@ -151,5 +197,6 @@ private:
 	void ProcessRequest(FWorkerRequest&& Request);
 	void ProcessBuildPlan(FWorkerRequest&& Request);
 	void ProcessObservations(FWorkerRequest&& Request);
+	void ProcessAppendCandidates(FWorkerRequest&& Request);
 	void ProcessFinalize(const FWorkerRequest& Request);
 };

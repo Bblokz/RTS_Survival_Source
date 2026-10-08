@@ -285,6 +285,23 @@ void USquadMovePreviewComponent::GatherAvailableCoverPoints(
 		const ASquadUnit* ReservingUnit = CoverSubsystem->GetCoverReservationOwner(CoverPoint.PointId);
 		return IsValid(ReservingUnit) && not PlannedUnits.Contains(ReservingUnit);
 	});
+	// Soldiers outside the selection already use up room around thin obstacles; the planner gets what is left.
+	for (int32 CoverPointIndex = InOutRequest.CoverPoints.Num() - 1; CoverPointIndex >= 0; --CoverPointIndex)
+	{
+		FRTSCoverPoint& CoverPoint = InOutRequest.CoverPoints[CoverPointIndex];
+		if (CoverPoint.ThinObstacleId == 0)
+		{
+			continue;
+		}
+		const int32 RoomLeft = static_cast<int32>(CoverPoint.ThinObstacleCapacity) -
+			CoverSubsystem->GetThinObstacleReservationCount(CoverPoint.ThinObstacleId, nullptr, &PlannedUnits);
+		if (RoomLeft <= 0)
+		{
+			InOutRequest.CoverPoints.RemoveAt(CoverPointIndex);
+			continue;
+		}
+		CoverPoint.ThinObstacleCapacity = static_cast<uint8>(RoomLeft);
+	}
 }
 
 FVector USquadMovePreviewComponent::ResolveFacing(

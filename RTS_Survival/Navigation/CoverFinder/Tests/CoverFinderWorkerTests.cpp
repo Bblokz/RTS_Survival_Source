@@ -66,6 +66,108 @@ namespace CoverFinderWorkerTestsPrivate
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCoverFinderThinObstacleTest,
+	"RTS.CoverFinder.Worker.ThinObstacleRing",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoverFinderThinObstacleTest::RunTest(const FString& Parameters)
+{
+	const FCoverFinderSettingsSnapshot Settings;
+	// A tree trunk: 60 cm across, four metres tall, standing away from any grid line.
+	const FVector TrunkBase(1234.0f, -567.0f, 80.0f);
+	const FBox TrunkBounds(TrunkBase - FVector(30.0f, 30.0f, 0.0f), TrunkBase + FVector(30.0f, 30.0f, 400.0f));
+	TArray<FCoverFocusedSample> RingSamples;
+	TestTrue(TEXT("A trunk is a thin obstacle"),
+		FCoverFinderAlgorithms::AppendThinObstacleSamples(TrunkBounds, Settings, RingSamples));
+	TestEqual(TEXT("The ring has the configured number of probes"),
+		RingSamples.Num(), Settings.ThinObstacleRingSampleCount);
+	const float TrunkCornerDistance = FVector2D(30.0f, 30.0f).Size();
+	for (const FCoverFocusedSample& Sample : RingSamples)
+	{
+		TestTrue(TEXT("Every probe looks at the middle of the trunk"), Sample.AimLocation.Equals(TrunkBase, 0.1f));
+		TestTrue(TEXT("Every probe stands at the foot of the trunk"), FMath::IsNearlyEqual(Sample.Location.Z, TrunkBase.Z, 0.1f));
+		TestTrue(TEXT("A soldier's capsule on the probe position clears the trunk"),
+			FVector::Dist2D(Sample.Location, TrunkBase) >= TrunkCornerDistance + Settings.AgentRadius);
+		TestTrue(TEXT("The trunk is inside the probe's reach"),
+			FVector::Dist2D(Sample.Location, TrunkBase) < Settings.MaximumCoverSearchDistance);
+	}
+	TestTrue(TEXT("The probes surround the trunk"),
+		FVector::DotProduct(RingSamples[0].Location - TrunkBase, RingSamples[4].Location - TrunkBase) < 0.0f);
+
+	// The same trunk somewhere else gets the same ring: nothing depends on where the scan grid falls.
+	const FVector Shift(73.0f, 41.0f, 0.0f);
+	TArray<FCoverFocusedSample> ShiftedSamples;
+	FCoverFinderAlgorithms::AppendThinObstacleSamples(TrunkBounds.ShiftBy(Shift), Settings, ShiftedSamples);
+	TestTrue(TEXT("A trunk in another place is probed from the same relative positions"),
+		ShiftedSamples.Num() == RingSamples.Num() &&
+		ShiftedSamples[3].Location.Equals(RingSamples[3].Location + Shift, 0.1f));
+
+	TArray<FCoverFocusedSample> RejectedSamples;
+	const FBox WallBounds(FVector::ZeroVector, FVector(600.0f, 40.0f, 300.0f));
+	TestFalse(TEXT("A wall is left to the grid"),
+		FCoverFinderAlgorithms::AppendThinObstacleSamples(WallBounds, Settings, RejectedSamples));
+	const FBox StumpBounds(FVector::ZeroVector, FVector(60.0f, 60.0f, 40.0f));
+	TestFalse(TEXT("A stump too low for crouch cover gets no ring"),
+		FCoverFinderAlgorithms::AppendThinObstacleSamples(StumpBounds, Settings, RejectedSamples));
+	TestEqual(TEXT("Rejected obstacles add no probes"), RejectedSamples.Num(), 0);
+
+	const FBox PoleBounds(FVector::ZeroVector, FVector(20.0f, 20.0f, 300.0f));
+	TestEqual(TEXT("A pole shelters one soldier"),
+		FCoverFinderAlgorithms::GetThinObstacleSoldierCapacity(PoleBounds, Settings), 1);
+	const FBox WideTrunkBounds(FVector::ZeroVector, FVector(150.0f, 140.0f, 400.0f));
+	TestEqual(TEXT("A wide trunk shelters one soldier per configured width"),
+		FCoverFinderAlgorithms::GetThinObstacleSoldierCapacity(WideTrunkBounds, Settings), 2);
+	FCoverFinderSettingsSnapshot CrowdedSettings;
+	CrowdedSettings.ThinObstacleWidthPerSoldier = 30.0f;
+	TestEqual(TEXT("A smaller width per soldier lets more share the trunk"),
+		FCoverFinderAlgorithms::GetThinObstacleSoldierCapacity(WideTrunkBounds, CrowdedSettings), 5);
+	TestTrue(TEXT("Every point of the ring lies inside the obstacle's cover radius"),
+		FVector::Dist2D(RingSamples[0].Location, TrunkBase) <
+		FCoverFinderAlgorithms::GetThinObstacleCoverRadius(TrunkBounds, Settings));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCoverFinderReaimTest,
+	"RTS.CoverFinder.Worker.ReaimsSlantedHits",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoverFinderReaimTest::RunTest(const FString& Parameters)
+{
+	const FCoverFinderSettingsSnapshot Settings;
+	const FVector SampleLocation(100.0f, 200.0f, 0.0f);
+	const FVector ProbeDirection = FVector::ForwardVector;
+	// The probe runs along +X and grazes a surface whose normal is turned 60 degrees away from facing it.
+	FCoverTraceObservation GrazingTrace;
+	GrazingTrace.bBlockingHit = true;
+	GrazingTrace.Distance = 120.0f;
+	GrazingTrace.ImpactNormal = (-ProbeDirection).RotateAngleAxis(60.0f, FVector::UpVector);
+
+	FCoverFocusedSample ReaimedSample;
+	TestTrue(TEXT("A grazing hit asks for a second look"), FCoverFinderAlgorithms::TryBuildReaimedSample(
+		SampleLocation, ProbeDirection, GrazingTrace, Settings, ReaimedSample));
+	const FVector HitLocation = SampleLocation + ProbeDirection * GrazingTrace.Distance;
+	TestTrue(TEXT("The second probe looks at the spot that was hit"), ReaimedSample.AimLocation.Equals(HitLocation, 0.1f));
+	const FVector ReaimDirection = (ReaimedSample.AimLocation - ReaimedSample.Location).GetSafeNormal2D();
+	TestTrue(TEXT("The second probe faces the surface squarely"),
+		FVector::DotProduct(ReaimDirection, -GrazingTrace.ImpactNormal) > 0.999f);
+	TestTrue(TEXT("The second probe stands a capsule clear of the surface"),
+		FMath::IsNearlyEqual(
+			FVector::Dist2D(ReaimedSample.Location, HitLocation),
+			FCoverFinderAlgorithms::GetProbeStandOffDistance(Settings),
+			0.1f));
+
+	FCoverTraceObservation SquareTrace = GrazingTrace;
+	SquareTrace.ImpactNormal = -ProbeDirection;
+	TestFalse(TEXT("A square hit needs no second look"), FCoverFinderAlgorithms::TryBuildReaimedSample(
+		SampleLocation, ProbeDirection, SquareTrace, Settings, ReaimedSample));
+	FCoverTraceObservation MissedTrace;
+	TestFalse(TEXT("A miss needs no second look"), FCoverFinderAlgorithms::TryBuildReaimedSample(
+		SampleLocation, ProbeDirection, MissedTrace, Settings, ReaimedSample));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCoverFinderClassificationTest,
 	"RTS.CoverFinder.Worker.Classification",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

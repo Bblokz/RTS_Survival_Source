@@ -32,6 +32,7 @@
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
@@ -329,6 +330,8 @@ bool ASquadUnit::SetCoverAssignment(
 	M_CoverRuntimeState.UseReason = UseReason;
 	M_CoverRuntimeState.State = ESquadUnitCoverState::Assigned;
 	M_CoverMoveGuard.bHasRestartedApproach = false;
+	const UWorld* World = GetWorld();
+	M_CoverMoveGuard.AssignedWorldSeconds = IsValid(World) ? World->GetTimeSeconds() : 0.0f;
 	return true;
 }
 
@@ -595,18 +598,18 @@ void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubs
 		DelayNextCoverSearch(FailedSearchRetrySeconds);
 		return;
 	}
-	// Stay clearly inside weapon range so entering cover can never trigger range-closing squad movement.
-	constexpr float CoverWeaponRangeRatio = 0.9f;
-	const float MaximumDistanceToTarget = IsValid(TargetActor) && GetIsValidWeapon()
-		? M_InfantryWeapon->GetMaxWeaponRange() * CoverWeaponRangeRatio
-		: 0.0f;
+	// With a target the point is picked by where the enemies are; without one the nearest point will do.
 	FRTSCoverPoint CoverPoint;
-	if (not CoverSubsystem.TryReserveBestCoverPoint(
-		*this,
-		TargetActor,
-		TargetLocation,
-		CoverPoint,
-		MaximumDistanceToTarget))
+	const bool bReservedPoint = IsValid(TargetActor)
+		? CoverSubsystem.TryReserveCombatCoverPoint(
+			*this,
+			*TargetActor,
+			BuildCombatCoverThreats(*TargetActor, TargetLocation),
+			GetMaximumCoverDistanceToTarget(),
+			nullptr,
+			CoverPoint)
+		: CoverSubsystem.TryReserveBestCoverPoint(*this, nullptr, TargetLocation, CoverPoint);
+	if (not bReservedPoint)
 	{
 		DelayNextCoverSearch(FailedSearchRetrySeconds);
 		return;
@@ -620,6 +623,133 @@ void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubs
 	{
 		ClearCoverStateInternal(false);
 	}
+}
+
+float ASquadUnit::GetMaximumCoverDistanceToTarget() const
+{
+	// Stay clearly inside weapon range so entering cover can never trigger range-closing squad movement.
+	constexpr float CoverWeaponRangeRatio = 0.9f;
+	return GetIsValidWeapon() ? M_InfantryWeapon->GetMaxWeaponRange() * CoverWeaponRangeRatio : 0.0f;
+}
+
+FRTSCombatCoverThreats ASquadUnit::BuildCombatCoverThreats(
+	const AActor& TargetActor,
+	const FVector& TargetLocation) const
+{
+	FRTSCombatCoverThreats Threats;
+	Threats.PrimaryTargetLocation = TargetLocation;
+	Threats.ThreatLocations.Add(TargetLocation);
+	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
+	// Silent: a unit without a squad only has its own target to hide from.
+	if (not IsValid(CoverSettings) || not IsValid(M_SquadController))
+	{
+		return Threats;
+	}
+	TArray<const AActor*, TInlineAllocator<8>> KnownThreatActors;
+	KnownThreatActors.Add(&TargetActor);
+	const TArray<ASquadUnit*> SquadMates = M_SquadController->GetSquadUnitsChecked();
+	for (const ASquadUnit* SquadMate : SquadMates)
+	{
+		if (Threats.ThreatLocations.Num() >= CoverSettings->M_CombatCoverMaximumThreats)
+		{
+			break;
+		}
+		if (not IsValid(SquadMate) || SquadMate == this)
+		{
+			continue;
+		}
+		FVector MateTargetLocation = FVector::ZeroVector;
+		const AActor* MateTarget = SquadMate->GetCurrentCoverTarget(MateTargetLocation);
+		if (not IsValid(MateTarget) || KnownThreatActors.Contains(MateTarget))
+		{
+			continue;
+		}
+		KnownThreatActors.Add(MateTarget);
+		Threats.ThreatLocations.Add(MateTargetLocation);
+	}
+	return Threats;
+}
+
+bool ASquadUnit::GetIsSquadMateWalkingToCover() const
+{
+	// Silent: a unit without a squad has nobody to wait for.
+	if (not IsValid(M_SquadController))
+	{
+		return false;
+	}
+	const TArray<ASquadUnit*> SquadMates = M_SquadController->GetSquadUnitsChecked();
+	for (const ASquadUnit* SquadMate : SquadMates)
+	{
+		if (IsValid(SquadMate) && SquadMate != this &&
+			SquadMate->M_CoverRuntimeState.State == ESquadUnitCoverState::MovingToCover)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool ASquadUnit::TryRepositionToBetterCombatCover(
+	URTSCoverFinderWorldSubsystem& CoverSubsystem,
+	AActor& TargetActor,
+	const FVector& TargetLocation)
+{
+	// Units of one squad are evaluated on the same frames; the spread keeps them from all deciding together.
+	constexpr float MaximumEvaluationSpreadRatio = 1.5f;
+	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
+	const UWorld* World = GetWorld();
+	if (not IsValid(CoverSettings) || not CoverSettings->bM_EnableCombatCoverRepositioning || not IsValid(World))
+	{
+		return false;
+	}
+	const float WorldSeconds = World->GetTimeSeconds();
+	if (WorldSeconds < M_CoverMoveGuard.NextCombatEvaluationWorldSeconds ||
+		WorldSeconds - M_CoverMoveGuard.AssignedWorldSeconds < CoverSettings->M_CombatCoverMinimumHoldSeconds)
+	{
+		return false;
+	}
+	M_CoverMoveGuard.NextCombatEvaluationWorldSeconds = WorldSeconds +
+		CoverSettings->M_CombatCoverReevaluationSeconds * FMath::FRandRange(1.0f, MaximumEvaluationSpreadRatio);
+	if (GetIsSquadMateWalkingToCover())
+	{
+		return false;
+	}
+	// Copied: taking the new assignment resets the runtime state that holds the occupied point.
+	const FRTSCoverPoint OccupiedPoint = M_CoverRuntimeState.AssignedCoverPoint;
+	FRTSCoverPoint BetterPoint;
+	if (not CoverSubsystem.TryReserveCombatCoverPoint(
+		*this,
+		TargetActor,
+		BuildCombatCoverThreats(TargetActor, TargetLocation),
+		GetMaximumCoverDistanceToTarget(),
+		&OccupiedPoint,
+		BetterPoint))
+	{
+		return false;
+	}
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("RTS_COVER_REPOSITION unit=%s from_type=%s to_type=%s walk_cm=%.0f old_target_yaw=%.0f new_target_yaw=%.0f"),
+			*GetName(),
+			*UEnum::GetValueAsString(OccupiedPoint.CoverType),
+			*UEnum::GetValueAsString(BetterPoint.CoverType),
+			FVector::Dist2D(GetActorLocation(), BetterPoint.Location),
+			FRTSCombatCoverScoring::GetYawToLocationDegrees(OccupiedPoint, TargetLocation),
+			FRTSCombatCoverScoring::GetYawToLocationDegrees(BetterPoint, TargetLocation));
+	}
+	if (not SetCoverAssignment(BetterPoint, ESquadUnitCoverUseReason::Attack))
+	{
+		CoverSubsystem.ReleaseCoverReservation(*this, BetterPoint.PointId);
+		return true;
+	}
+	if (not StartCoverMovement())
+	{
+		ClearCoverStateInternal(false);
+	}
+	return true;
 }
 
 bool ASquadUnit::StartCoverMovement()
@@ -861,23 +991,22 @@ void ASquadUnit::OnCoverAnimReachedExposed()
 
 void ASquadUnit::LogCoverAlignmentResidual(const TCHAR* ReachedPose, const FVector& ExpectedLocation) const
 {
-	if constexpr (not DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
-		return;
+		// What the clip left over, in the soldier's cover frame: the amount to add to that clip's designer offset.
+		const FVector Residual = GetActorLocation() - ExpectedLocation;
+		const FVector TowardCoverDirection = -M_CoverRuntimeState.AssignedCoverPoint.CoverNormal.GetSafeNormal2D();
+		const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, TowardCoverDirection);
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("RTS_COVER_ALIGNMENT unit=%s type=%s reached=%s residual_toward_cover_cm=%.1f residual_right_cm=%.1f"),
+			*GetName(),
+			*UEnum::GetValueAsString(M_CoverRuntimeState.AssignedCoverPoint.CoverType),
+			ReachedPose,
+			FVector::DotProduct(Residual, TowardCoverDirection),
+			FVector::DotProduct(Residual, RightDirection));
 	}
-	// What the clip left over, in the soldier's cover frame: the amount to add to that clip's designer offset.
-	const FVector Residual = GetActorLocation() - ExpectedLocation;
-	const FVector TowardCoverDirection = -M_CoverRuntimeState.AssignedCoverPoint.CoverNormal.GetSafeNormal2D();
-	const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, TowardCoverDirection);
-	UE_LOG(
-		LogRTSSquadUnitCover,
-		Verbose,
-		TEXT("RTS_COVER_ALIGNMENT unit=%s type=%s reached=%s residual_toward_cover_cm=%.1f residual_right_cm=%.1f"),
-		*GetName(),
-		*UEnum::GetValueAsString(M_CoverRuntimeState.AssignedCoverPoint.CoverType),
-		ReachedPose,
-		FVector::DotProduct(Residual, TowardCoverDirection),
-		FVector::DotProduct(Residual, RightDirection));
 }
 
 FVector ASquadUnit::GetCoverLocalOffsetInWorld(
@@ -1386,6 +1515,10 @@ void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 		}
 		RecordValidatedCoverTarget(TargetActor, TargetLocation);
 	}
+	if (TryRepositionToBetterCombatCover(CoverSubsystem, *TargetActor, TargetLocation))
+	{
+		return;
+	}
 
 	if (M_CoverRuntimeState.AssignedCoverPoint.CoverType == ERTSCoverType::Crouch)
 	{
@@ -1442,6 +1575,10 @@ void ASquadUnit::UpdateExposedCover(URTSCoverFinderWorldSubsystem& CoverSubsyste
 			TargetLocation))
 	{
 		LeaveCoverUnusableAgainstTarget(TEXT("exposed point is not valid against the target"));
+		return;
+	}
+	if (TryRepositionToBetterCombatCover(CoverSubsystem, *TargetActor, TargetLocation))
+	{
 		return;
 	}
 	RecordValidatedCoverTarget(TargetActor, TargetLocation);

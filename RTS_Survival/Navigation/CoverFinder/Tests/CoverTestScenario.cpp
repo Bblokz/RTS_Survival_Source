@@ -344,8 +344,21 @@ void FCoverTestScenario::FinishIdlePhase(UWorld& World, const URTSCoverFinderWor
 	const bool bReservationsAreUnique = Counts.DuplicateReservationCount == 0;
 	const bool bOccupantsAreAtTheirPoints = Counts.OccupantsAwayFromPointCount == 0;
 	const bool bCommandsUntouched = Counts.CommandInterferenceCount == 0;
+	const int32 OverCapacityThinObstacleCount = CoverSubsystem.GetOverCapacityThinObstacleCount();
+	int32 ThinObstaclePointCount = 0;
+	for (const FRTSCoverPoint& CoverPoint : CoverSubsystem.GetCoverPointsView())
+	{
+		ThinObstaclePointCount += CoverPoint.ThinObstacleId != 0 ? 1 : 0;
+	}
+	UE_LOG(
+		LogRTSCoverTest,
+		Display,
+		TEXT("RTS_COVER_TEST thin_obstacles points_around_them=%d holding_more_soldiers_than_room=%d"),
+		ThinObstaclePointCount,
+		OverCapacityThinObstacleCount);
 	bM_IdlePhasePassed = bCorrectMap && bHasBothSides && bHasDiscoveredCover && bUnitsOccupyCover &&
-		bReservationsAreUnique && bOccupantsAreAtTheirPoints && bCommandsUntouched;
+		bReservationsAreUnique && bOccupantsAreAtTheirPoints && bCommandsUntouched &&
+		OverCapacityThinObstacleCount == 0;
 	UE_LOG(
 		LogRTSCoverTest,
 		Display,

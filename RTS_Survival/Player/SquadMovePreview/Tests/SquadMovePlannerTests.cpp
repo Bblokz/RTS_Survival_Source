@@ -351,6 +351,48 @@ bool FSquadMovePlannerBehindCoverTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSquadMovePlannerThinObstacleTest,
+	"RTS.SquadMovePlanner.ThinObstacleTakesOnlyItsCapacity",
+	SquadMovePlannerTestsPrivate::TestFlags)
+
+bool FSquadMovePlannerThinObstacleTest::RunTest(const FString& Parameters)
+{
+	using namespace SquadMovePlannerTestsPrivate;
+	FSquadMovePlanRequest Request = MakeRequest(FVector(2000.0f, 0.0f, 0.0f));
+	AddSquad(Request, 5, FVector::ZeroVector);
+	// A pole at the cursor with a cover point on four sides, and room for one soldier.
+	const FVector PoleLocation(2000.0f, 0.0f, 0.0f);
+	const FVector Sides[] = {FVector::ForwardVector, -FVector::ForwardVector, FVector::RightVector, -FVector::RightVector};
+	for (int32 SideIndex = 0; SideIndex < 4; ++SideIndex)
+	{
+		FRTSCoverPoint PolePoint = MakeCover(
+			SideIndex + 1,
+			PoleLocation - Sides[SideIndex] * 100.0f,
+			Sides[SideIndex],
+			ERTSCoverType::StandingLeft);
+		PolePoint.ThinObstacleId = 7;
+		PolePoint.ThinObstacleCapacity = 1;
+		Request.CoverPoints.Add(PolePoint);
+	}
+	FSquadMovePlan Plan;
+	FSquadMovePlanner::BuildPlan(Request, Plan);
+	TestEqual(TEXT("Only one soldier is planned onto the pole"),
+		CountType(Plan, ESquadPlannedPositionType::StandingCover), 1);
+	TestEqual(TEXT("The rest of the squad forms up in the open"),
+		CountType(Plan, ESquadPlannedPositionType::RegularStanding), 4);
+
+	for (FRTSCoverPoint& PolePoint : Request.CoverPoints)
+	{
+		PolePoint.ThinObstacleCapacity = 3;
+	}
+	FSquadMovePlan RoomierPlan;
+	FSquadMovePlanner::BuildPlan(Request, RoomierPlan);
+	TestEqual(TEXT("A wider obstacle takes as many soldiers as it has room for"),
+		CountType(RoomierPlan, ESquadPlannedPositionType::StandingCover), 3);
+	return true;
+}
+
 namespace SquadMovePlannerTestsPrivate
 {
 	/** Squads of four standing side by side behind the origin, planned in the open at Anchor. */

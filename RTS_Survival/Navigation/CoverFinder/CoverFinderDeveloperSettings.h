@@ -49,6 +49,54 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="1", ClampMax="64", UIMin="1", UIMax="32"))
 	int32 M_MaximumTacticalUnitUpdatesPerFrame = 8;
 
+	// In a firefight soldiers pick cover by where the enemy is instead of taking the nearest point, and move to a
+	// clearly better point when the enemy has moved around their cover.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover")
+	bool bM_EnableCombatCoverRepositioning = true;
+
+	// How far left or right of straight ahead a soldier in cover can aim; the range of the cover aim offsets.
+	// A point from which the target is further to the side than this is never used against that target.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="20.0", ClampMax="90.0", UIMin="20.0", UIMax="90.0", Units="deg"))
+	float M_CombatCoverMaximumAimYawDegrees = 90.0f;
+
+	// An enemy within this angle of straight ahead counts as blocked by the cover. Smaller values make soldiers
+	// insist on cover that squarely faces the enemy and reposition sooner when flanked.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="10.0", ClampMax="90.0", UIMin="10.0", UIMax="90.0", Units="deg"))
+	float M_CombatCoverProtectedHalfAngleDegrees = 60.0f;
+
+	// How much it counts that the cover stands between the soldier and the enemies its squad is fighting.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="3.0"))
+	float M_CombatCoverProtectionWeight = 1.0f;
+
+	// How much it counts that the soldier's own target is straight ahead instead of off to one side.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="3.0"))
+	float M_CombatCoverFacingWeight = 0.5f;
+
+	// How much a long walk under fire counts against a point; the full weight applies at the reposition radius.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="3.0"))
+	float M_CombatCoverTravelWeight = 0.4f;
+
+	// A soldier already in cover only looks this far for a better point.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="100.0", UIMin="100.0", UIMax="2500.0", Units="cm"))
+	float M_CombatCoverRepositionRadius = 900.0f;
+
+	// A better point must beat the occupied one by this much score before the soldier leaves. Higher values
+	// keep soldiers in place; lower values make them hop between similar points.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="2.0"))
+	float M_CombatCoverMinimumScoreGain = 0.3f;
+
+	// A soldier stays at least this long on a point before it may move to a better one.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="30.0", Units="s"))
+	float M_CombatCoverMinimumHoldSeconds = 6.0f;
+
+	// How often a soldier in cover compares its point with the others around it.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.5", UIMin="0.5", UIMax="15.0", Units="s"))
+	float M_CombatCoverReevaluationSeconds = 3.0f;
+
+	// Enemies taken into account per soldier: its own target first, then the targets of its squad mates.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="1", ClampMax="8", UIMin="1", UIMax="8"))
+	int32 M_CombatCoverMaximumThreats = 6;
+
 	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="40.0", ClampMax="143.0", UIMin="40.0", UIMax="143.0", Units="cm"))
 	float M_MinimumCrouchCoverHeight = 90.0f;
 
@@ -61,6 +109,52 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="50.0", UIMin="50.0", UIMax="250.0", Units="cm"))
 	float M_CoverPointSpacing = 90.0f;
+
+	// A position only becomes cover when a soldier's body fits there. The body is tested as a column of this
+	// radius, slimmer than the navigation capsule, so a branch or ledge that merely brushes past does not count.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="10.0", ClampMax="60.0", UIMin="10.0", UIMax="60.0", Units="cm"))
+	float M_StandingSpaceRadius = 25.0f;
+
+	// Height of the top of that column above the ground. Kept below head height so branches overhead do not reject the ground under a tree;
+	// raise it if soldiers end up standing with their heads inside low geometry.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="60.0", ClampMax="200.0", UIMin="60.0", UIMax="200.0", Units="cm"))
+	float M_StandingSpaceHeight = 150.0f;
+
+	// The column starts this far above the ground, so roots, rubble and kerbs that a soldier simply stands in
+	// or steps over do not reject a position. Dead trees, for example, flare out up to 60 cm high at their foot.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="0.0", ClampMax="90.0", UIMin="0.0", UIMax="90.0", Units="cm"))
+	float M_StandingSpaceFloorClearance = 60.0f;
+
+	// Probes thin objects such as tree trunks and posts from a ring of positions around them, aimed at their
+	// centre. The regular grid only finds such an object when a grid position happens to line up with it.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification")
+	bool bM_ProbeThinObstacles = true;
+
+	// Objects no wider than this where a soldier stands against them get the ring of probes. For a tree that
+	// is the width of the trunk at crouch height, low branches and roots included, not the width of its crown.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="20.0", ClampMax="400.0", UIMin="20.0", UIMax="400.0", Units="cm", EditCondition="bM_ProbeThinObstacles"))
+	float M_ThinObstacleMaximumWidth = 300.0f;
+
+	// Probe positions around one thin object; more finds cover on more sides of it and costs more per scan.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="4", ClampMax="16", UIMin="4", UIMax="16", EditCondition="bM_ProbeThinObstacles"))
+	int32 M_ThinObstacleRingSamples = 8;
+
+	// A thin object has cover points on every side, but it only shelters one soldier per this much of its
+	// width, and always at least one. A 20 cm pole takes one soldier, a 150 cm trunk two; the rest of the squad
+	// looks for cover elsewhere. Lower values let more soldiers share one tree.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="20.0", ClampMax="400.0", UIMin="20.0", UIMax="400.0", Units="cm", EditCondition="bM_ProbeThinObstacles"))
+	float M_ThinObstacleWidthPerSoldier = 70.0f;
+
+	// The cover found around a thin object is reused for this many scans before its ring is probed again, and
+	// the objects take turns, so a forest costs a fraction of its probes per scan. An object that moved is always
+	// probed again at once. Higher values are cheaper; a change next to a tree is noticed later.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="1", ClampMax="60", UIMin="1", UIMax="60", EditCondition="bM_ProbeThinObstacles"))
+	int32 M_ThinObstacleRefreshScans = 6;
+
+	// When a grid probe only grazes an object, probes it once more from straight in front of the spot it hit,
+	// so round and diagonal surfaces are judged the same as walls that happen to line up with the grid.
+	UPROPERTY(Config, EditAnywhere, Category="Cover Classification")
+	bool bM_ReaimSlantedHits = true;
 
 	// How far inside the end of a high wall a standing point is placed. Must be smaller than the sideways step of
 	// the shortest expose animation, or the peeking soldier's muzzle stays behind the wall.
