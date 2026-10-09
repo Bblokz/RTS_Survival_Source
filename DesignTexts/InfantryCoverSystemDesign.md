@@ -130,6 +130,31 @@ A trench point behaves like standing cover with no sideways step: protected is a
 
 `RTS_COVER_PERF` reports `prone`, `prone_lost` (prone points of the previous publication that are gone) and `prone_companions`. The count test also logs `reachability` per cover type.
 
+### Taking planned cover on arrival
+
+A soldier that the squad move preview gave a cover position takes that cover the moment it gets there, without waiting for its squad. The move order's own walk is the cover approach; there is no second walk.
+
+- `ExecutePlannedMove` reserves the planned point and assigns it at once (`TryAssignPlannedCoverForWalk`): cover state `MovingToCover`, with `bWalkBelongsToMoveCommand` set. A point that is still held, usually by a squad mate about to leave it under the same order, is tried again from the tactical update while the unit walks. A waypoint with more movement queued behind it gets no cover.
+- While that flag is set the cover layer starts no walk and runs no deadlines of its own; the order's walk keeps its own watchdog (`UpdatePlannedMoveArrival`).
+- When the order's walk ends, the unit enters cover first and reports the order done second (`EnterPlannedCoverAfterWalk`, then `OnCommandComplete`). The order matters for the last unit: its report ends the squad's command, and that must find it in cover, not on its way. A walk that stopped short hands over to the regular cover walk for the rest.
+- A unit that finished ahead of its squad keeps its cover while the squad is still on that move order (`GetMayKeepAutomaticCover`), and the end of the order no longer throws it out: `CancelCoverWalkForTerminatedMovement` only ends cover the unit is still walking to.
+- Player orders keep priority through the rule that was already there: whatever the squad does next cancels cover itself when it sets the unit moving, so a unit that is entering or holding cover joins the next move at once.
+
+An approach move (below) may replace the last stretch of the order's walk. It then stands in for that walk: the order is reported done when the move is over (`bReplacedMoveCommandWalk`), also when the cover is lost in the middle of it, and never when a new order was what interrupted it.
+
+### Sliding and rolling into cover
+
+`CoverAnimations.ApproachMoves` on the infantry animation Blueprint lists full-body root-motion moves, such as a slide and a roll, that a soldier may finish its run to crouch or prone cover with. Each entry takes a root-motion sequence or a montage; a sequence is played on `ApproachMoveSlotName` ("FullBody"). Standing and trench cover never use them. `M_CoverApproachMoveChancePercent` (30) in the cover settings is how often a cover assignment asks for one; one of the entries is then picked at random.
+
+The move only plays when it will end on the cover point:
+
+- Its travel is measured from the clip's root track (`GetCoverApproachMoveTravelFrom`). A montage stops moving the capsule the moment it starts to blend out, so the travel of that last stretch is left out.
+- While walking, the unit checks 60 times a second (`TickCoverApproachWatch`) and starts the move when its distance to the cover point is within 15% of that travel. It turns so the clip's travel, sideways drift included, points at the point, and scales the root motion to the exact distance.
+- It must be running straight at the point, not from the enemy's side of the cover, on level ground, with the whole line on the navmesh and nothing solid on it (`GetCanApproachCoverInStraightLine`), and it must be on screen. The walk must be at least one and a half times the clip's travel long.
+- While the move plays, the rest of its travel is rescaled every tick to the distance still to go (`CorrectCoverApproachMoveTravel`), and the movement component ticks every frame. With the coarse movement tick the unit optimizer gives unseen soldiers, the clip ran up to twice as fast and lost half its travel.
+
+Where the move ends, the soldier takes its cover pose at once: the enter montage is skipped (`EnterCover(..., bSkipEnterMontage)`). A move that was cut short leaves the soldier to walk the rest. Weapon montages and stance transitions do not start during a move. `RTS_COVER_APPROACH_MOVE started` and `ended` (Verbose) log the distance, the scale and how far from the point the move ended. `-CoverFinderApproachAnims=PathA+PathB` on the TestCover and squad preview scenarios gives every soldier the named clips without touching the Blueprint. `-SquadMovePreviewWatch` makes a rendered squad preview run send its squad to low cover and look at it, so the moves can be seen on a player move order.
+
 ### Staying put in cover
 
 Several things used to make a soldier give up or step out of cover it was about to take again. Each has its own guard:

@@ -46,6 +46,12 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="100.0", UIMin="100.0", UIMax="2500.0", Units="cm"))
 	float M_AutomaticCoverSearchRadius = 1200.0f;
 
+	// How often a soldier running to crouch or prone cover finishes the run with one of the approach moves of
+	// its animation Blueprint (CoverAnimations > ApproachMoves), such as a slide or a roll. The move is only
+	// played when it ends exactly on the cover position; otherwise the soldier walks in as usual. Zero never.
+	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="0", ClampMax="100", UIMin="0", UIMax="100", Units="%"))
+	int32 M_CoverApproachMoveChancePercent = 30;
+
 	// Staggers decisions across frames; movement completion itself is still handled immediately by the AI callback.
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="1", ClampMax="64", UIMin="1", UIMax="32"))
 	int32 M_MaximumTacticalUnitUpdatesPerFrame = 8;

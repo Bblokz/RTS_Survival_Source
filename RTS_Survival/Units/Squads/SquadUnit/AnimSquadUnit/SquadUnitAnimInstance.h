@@ -402,6 +402,31 @@ struct FSquadUnitCrouchCoverAnimationSet
 	TObjectPtr<UAnimMontage> ExitCoverMontage = nullptr;
 };
 
+/**
+ * @brief One full-body root-motion move that carries a running soldier onto crouch or prone cover, such as a
+ * slide or a roll. The unit starts it at the distance the clip travels, so it ends on the cover position.
+ */
+USTRUCT(BlueprintType)
+struct FSquadUnitCoverApproachMove
+{
+	GENERATED_BODY()
+
+	// A root-motion animation sequence or a montage. A sequence is played on ApproachMoveSlotName.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	TObjectPtr<UAnimSequenceBase> Animation = nullptr;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover", meta = (ClampMin = "0.25", ClampMax = "3.0"))
+	float PlayRate = 1.0f;
+};
+
+/** How far one approach move carries the unit, in the unit's own frame, and how long it takes. */
+struct FSquadUnitCoverApproachTravel
+{
+	float Forward = 0.0f;
+	float Right = 0.0f;
+	float Seconds = 0.0f;
+};
+
 /** @brief Groups the cover pose families configured on the master infantry animation Blueprint. */
 USTRUCT(BlueprintType)
 struct FSquadUnitCoverAnimationSets
@@ -441,6 +466,16 @@ struct FSquadUnitCoverAnimationSets
 	// Full-body reload of a lying soldier, used in prone cover. Left empty, CoverReload is used there as well.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	TObjectPtr<UAnimMontage> ProneCoverReload = nullptr;
+
+	// Slides, rolls and the like that a soldier may finish its run to crouch or prone cover with. One is picked
+	// at random; how often they are used at all is M_CoverApproachMoveChancePercent in the cover settings.
+	// After such a move the soldier goes straight into its cover pose, without the enter montage.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	TArray<FSquadUnitCoverApproachMove> ApproachMoves;
+
+	// Slot of the AnimGraph an approach move that is a plain sequence is played on.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	FName ApproachMoveSlotName = TEXT("FullBody");
 };
 
 /**
@@ -564,11 +599,37 @@ public:
 	inline ESquadMovementAnimState GetMovementState() const { return MovementState; }
 
 	/**
-	 * @brief Starts the full-body transition into one of the three supported protected cover poses.
-	 * @param CoverPose CrouchCover, StandingCoverLeft, or StandingCoverRight.
+	 * @brief Starts the full-body transition into one of the supported protected cover poses.
+	 * @param CoverPose CrouchCover, ProneCover, StandingCoverLeft, StandingCoverRight or TrenchCover.
+	 * @param bSkipEnterMontage True after an approach move: the unit already is down at its cover, so it takes
+	 * the protected pose at once.
 	 * @return True only when the configured enter montage started.
 	 */
-	bool EnterCover(ESquadIdleAnimationPose CoverPose);
+	bool EnterCover(ESquadIdleAnimationPose CoverPose, bool bSkipEnterMontage = false);
+
+	int32 GetCoverApproachMoveCount() const { return CoverAnimations.ApproachMoves.Num(); }
+
+	/**
+	 * @brief Measures an approach move from its root motion, so the unit can start it at the right distance.
+	 * @param MoveIndex Index into CoverAnimations.ApproachMoves.
+	 * @param OutTravel Travel in the unit's frame and play time at the configured rate.
+	 * @return False when the entry has no animation or its animation does not move the root forward.
+	 */
+	bool TryGetCoverApproachMoveTravel(int32 MoveIndex, FSquadUnitCoverApproachTravel& OutTravel) const;
+
+	/** @return Distance the playing approach move will still carry the unit at a travel scale of one. */
+	float GetCoverApproachMoveRemainingTravel() const;
+
+	/** @return True when the move started playing; OnCoverApproachMoveEnded fires when it is over. */
+	bool PlayCoverApproachMove(int32 MoveIndex);
+	void StopCoverApproachMove();
+	bool GetIsCoverApproachMovePlaying() const { return M_ActiveApproachMontage != nullptr; }
+
+	// Fired when the approach move ended, whether it played out or was cut short.
+	FSimpleDelegate OnCoverApproachMoveEnded;
+
+	// Cover test support: lets an unattended run use approach moves the Blueprint has not been given yet.
+	void Debug_SetCoverApproachMoves(const TArray<UAnimSequenceBase*>& Animations);
 
 	/** @return True only when a standing protected pose started its expose montage. */
 	bool StartStandingCoverPeek();
@@ -996,4 +1057,21 @@ private:
 	FSquadUnitCoverAnimRuntime M_CoverAnimRuntime;
 
 	FOnMontageEnded M_CoverMontageEndedDelegate;
+
+	// The approach move that is playing; for a plain sequence this is the montage the engine wrapped it in.
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> M_ActiveApproachMontage = nullptr;
+
+	int32 M_ActiveApproachMoveIndex = INDEX_NONE;
+
+	/**
+	 * @brief Sums what an approach move still moves the capsule by from one point of the clip to its end.
+	 * @param MoveIndex Index into CoverAnimations.ApproachMoves.
+	 * @param StartClipTime Position in the clip to start from; zero for the whole move.
+	 * @return Travel in the unit's own frame, without the stretch that is lost to the blend out.
+	 */
+	FVector GetCoverApproachMoveTravelFrom(int32 MoveIndex, float StartClipTime) const;
+
+	FOnMontageEnded M_ApproachMontageEndedDelegate;
+	void OnApproachMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 };

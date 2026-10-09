@@ -250,6 +250,39 @@ struct FSquadUnitCoverCapsuleSlide
 };
 
 /**
+ * @brief A slide, roll or similar root-motion move that finishes a run to crouch or prone cover.
+ * The unit watches its run and starts the move at the distance the clip travels, so it ends on the cover point.
+ */
+USTRUCT()
+struct FSquadUnitCoverApproachMoveState
+{
+	GENERATED_BODY()
+
+	// Which of the animation Blueprint's approach moves this cover assignment wants; INDEX_NONE for none.
+	int32 MoveIndex = INDEX_NONE;
+
+	// Past this time the move is treated as over, for a mesh that is not rendered and does not advance it.
+	float DeadlineWorldSeconds = 0.0f;
+
+	FTimerHandle WatchTimerHandle;
+
+	// The chance is rolled once per cover assignment, not on every restart of the walk.
+	bool bHasRolledChance = false;
+
+	bool bIsPlaying = false;
+
+	// Set once a move carried the unit onto its point; the enter montage is skipped then.
+	bool bArrivedByMove = false;
+
+	// The move took the place of the unit's walk for its squad's move order. Whoever ends the move, or the
+	// cover assignment under it, then reports the order done for this unit.
+	bool bReplacedMoveCommandWalk = false;
+
+	// Movement tick interval the unit had before the move; the move itself needs a tick every frame.
+	float MovementTickIntervalBeforeMove = 0.0f;
+};
+
+/**
  * @brief Stops the walk to cover from stalling with the weapon lowered.
  * Deadlines are world times; the flags track which recovery steps the current assignment already used.
  */
@@ -260,6 +293,10 @@ struct FSquadUnitCoverMoveGuard
 
 	// No new cover search starts before this time, so failed or just-cancelled searches cannot repeat every update.
 	float NextSearchWorldSeconds = 0.0f;
+
+	// The unit is walking to this cover point as its part of its squad's move order. That walk is the approach:
+	// the cover layer starts none of its own, and takes the point the moment the order's walk ends.
+	bool bWalkBelongsToMoveCommand = false;
 
 	// Past this time the current step (walk to cover or pose hand-over) is retried or abandoned.
 	float StepDeadlineWorldSeconds = 0.0f;
@@ -728,6 +765,9 @@ private:
 	UPROPERTY()
 	FSquadUnitCoverMoveGuard M_CoverMoveGuard;
 
+	UPROPERTY()
+	FSquadUnitCoverApproachMoveState M_CoverApproachMove;
+
 	/** The squad controller managing this unit. */
 	UPROPERTY()
 	TObjectPtr<ASquadController> M_SquadController;
@@ -943,6 +983,38 @@ private:
 	float GetCoverWalkDeadlineSeconds() const;
 	void FinishCoverMovement();
 	void StopCoverMovementWithoutCallback();
+
+	// Rolls the designer's chance for this assignment and, when it comes up, starts watching the run.
+	void PlanCoverApproachMove();
+
+	// Runs many times a second during the walk: starts the move at the one distance it fits, then keeps its
+	// travel on target while it plays.
+	void TickCoverApproachWatch();
+
+	// Rescales the rest of the playing move so that it ends on the cover point, whatever slopes did to it.
+	void CorrectCoverApproachMoveTravel();
+
+	/**
+	 * @brief Checks that the straight run from here onto the cover point is free and the unit is on it already.
+	 * @param ApproachDirection Horizontal direction from the unit to its cover point.
+	 * @return True when a root-motion move along that line ends on the point without hitting anything.
+	 */
+	bool GetCanApproachCoverInStraightLine(const FVector& ApproachDirection) const;
+
+	/**
+	 * @brief Stops the walk and plays the move, turned and scaled so its travel ends on the cover point.
+	 * @param Travel Measured travel of the chosen move.
+	 * @param DistanceToCoverPoint Horizontal distance still to cover.
+	 * @param ApproachDirection Horizontal direction from the unit to its cover point.
+	 */
+	void StartCoverApproachMove(
+		const struct FSquadUnitCoverApproachTravel& Travel,
+		float DistanceToCoverPoint,
+		const FVector& ApproachDirection);
+
+	// Enters cover where the move ended, or walks the rest when it was cut short.
+	void FinishCoverApproachMove();
+	void StopCoverApproachMove();
 	void AbandonUnreachableCoverPoint();
 	void EnterAssignedCover();
 	void UpdateMovingToCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
@@ -1015,6 +1087,20 @@ private:
 	 * @return True when the plan decided what the unit does, so no automatic search must follow.
 	 */
 	bool TryUsePlayerPlannedPosition(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+
+	/**
+	 * @brief Gives a unit that is walking to a planned cover position that point right away, so the order's walk
+	 * is its approach and it need not wait for its squad before taking cover.
+	 * @param CoverSubsystem Subsystem that owns the reservation of the planned point.
+	 * @return True when the point is now assigned to this unit.
+	 */
+	bool TryAssignPlannedCoverForWalk(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+
+	// Called when the order's walk is over: takes the cover it led to, or walks whatever is left.
+	void EnterPlannedCoverAfterWalk();
+
+	// Ends a cover walk that the stopped movement command was carrying; cover the unit already holds stays.
+	void CancelCoverWalkForTerminatedMovement();
 	void ApplyPlayerPlannedFacing();
 
 	/**

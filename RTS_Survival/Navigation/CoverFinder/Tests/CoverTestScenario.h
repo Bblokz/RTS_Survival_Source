@@ -90,6 +90,10 @@ struct FCoverTestScenario
 
 	void Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem, float DeltaTime);
 
+	// -CoverFinderApproachAnims=PathA+PathB gives every soldier of the world these approach moves, once, so
+	// slides and rolls can be tried in any unattended run without assigning them on the animation Blueprint.
+	static void GiveSoldiersCommandLineApproachMoves(UWorld& World);
+
 private:
 	FCoverTestCombatTotals M_CombatTotals;
 	TArray<FCoverTestAttackingSquad> M_AttackingSquads;
@@ -117,6 +121,7 @@ private:
 
 	// -CoverFinderCloseUps: logs bone heights and saves close-up pictures of soldiers in cover.
 	FCoverPoseProbe M_PoseProbe;
+
 
 	// Unrendered meshes stop advancing montages, which would hide every cover clip from an unattended run.
 	void KeepUnitAnimationTicking(UWorld& World) const;

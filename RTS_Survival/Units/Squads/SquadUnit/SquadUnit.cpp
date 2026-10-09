@@ -31,6 +31,7 @@
 #include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
+#include "NavigationSystem.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
@@ -66,6 +67,31 @@ namespace SquadUnitCoverMoveStatics
 	constexpr float MaximumEnterRequestSeconds = 3.0f;
 	// Added to a montage's length before its transition is treated as not ticking, e.g. on an unrendered mesh.
 	constexpr float TransitionDeadlineMarginSeconds = 0.75f;
+
+	// The run is checked this often for the moment an approach move fits.
+	constexpr float ApproachWatchTickSeconds = 1.0f / 60.0f;
+	// The clip's travel is stretched or shortened by at most this much to end exactly on the point.
+	constexpr float ApproachMinimumTravelScale = 0.85f;
+	constexpr float ApproachMaximumTravelScale = 1.15f;
+	// While the move plays, its travel is corrected within these wider limits for what the ground did to it.
+	constexpr float ApproachMinimumCorrectionScale = 0.5f;
+	constexpr float ApproachMaximumCorrectionScale = 1.6f;
+	// With less of the clip's travel left than this, a correction would be a visible jerk for no gain.
+	constexpr float ApproachMinimumTravelToCorrect = 10.0f;
+	// A walk shorter than this many times the move's travel has no run-up worth ending with a slide.
+	constexpr float ApproachMinimumRunUpRatio = 1.5f;
+	// The unit must already be running at the point, not turning toward it or standing.
+	constexpr float ApproachMinimumSpeed = 200.0f;
+	constexpr float ApproachMinimumHeadingAlignment = 0.9f;
+	// The unit may come in along its cover, but not from the enemy's side of it: the move would end with the
+	// unit's back to the cover it then has to turn to.
+	constexpr float ApproachMinimumCoverFacingAlignment = 0.0f;
+	// Root motion follows the floor, but not up a ledge or down a drop.
+	constexpr float ApproachMaximumHeightDifference = 60.0f;
+	constexpr float ApproachObstacleTraceHeight = 50.0f;
+	// A unit nobody sees gains nothing from the move, and its movement ticks too coarsely to carry it out.
+	constexpr float ApproachRecentlyRenderedSeconds = 0.25f;
+	constexpr int32 PercentScale = 100;
 
 	ESquadIdleAnimationPose GetCoverAnimationPose(const ERTSCoverType CoverType)
 	{
@@ -340,6 +366,7 @@ bool ASquadUnit::SetCoverAssignment(
 	M_CoverMoveGuard.ExposedWithoutTargetSinceWorldSeconds = -1.0f;
 	M_CoverMoveGuard.PointUnpublishedSinceWorldSeconds = -1.0f;
 	M_CoverMoveGuard.EarliestExposeWorldSeconds = 0.0f;
+	M_CoverApproachMove = FSquadUnitCoverApproachMoveState();
 	return true;
 }
 
@@ -376,6 +403,10 @@ void ASquadUnit::UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 	}
 	if (not M_CoverRuntimeState.GetHasAssignment())
 	{
+		if (TryAssignPlannedCoverForWalk(CoverSubsystem))
+		{
+			return;
+		}
 		if (not GetIsCoverSearchOnCooldown() && GetCanUseAutomaticCover())
 		{
 			TryStartAutomaticCover(CoverSubsystem);
@@ -468,6 +499,21 @@ bool ASquadUnit::GetHasLostCoverPoint(const URTSCoverFinderWorldSubsystem& Cover
 
 void ASquadUnit::UpdateMovingToCover(URTSCoverFinderWorldSubsystem& CoverSubsystem)
 {
+	if (M_CoverApproachMove.bIsPlaying)
+	{
+		// The move replaced the walk; only a clip that does not advance needs help from here.
+		const UWorld* World = GetWorld();
+		if (IsValid(World) && World->GetTimeSeconds() > M_CoverApproachMove.DeadlineWorldSeconds)
+		{
+			FinishCoverApproachMove();
+		}
+		return;
+	}
+	// The move order walks the unit here and watches over that walk itself.
+	if (M_CoverMoveGuard.bWalkBelongsToMoveCommand)
+	{
+		return;
+	}
 	const bool bPathFollowingActive = GetIsPathFollowingActive();
 	if (bPathFollowingActive && not GetHasCoverStepTimedOut())
 	{
@@ -571,9 +617,11 @@ bool ASquadUnit::GetMayKeepAutomaticCover() const
 	{
 		return true;
 	}
-	// The squad received an attack order that has not reached this unit yet. Giving the point up now would
-	// only make the unit walk back into it a moment later; a real approach cancels cover when it starts.
-	return M_SquadController->GetActiveCommandID() == EAbilityID::IdAttack;
+	// The squad received an attack order that has not reached this unit yet, or is still on the move order this
+	// unit finished ahead of its squad mates. Giving the point up now would only make the unit walk back into it
+	// a moment later; whatever the squad does next cancels cover itself when it sets this unit moving.
+	const EAbilityID SquadCommand = M_SquadController->GetActiveCommandID();
+	return SquadCommand == EAbilityID::IdAttack || SquadCommand == EAbilityID::IdMove;
 }
 
 bool ASquadUnit::GetCanHoldCoverWhileSquadClosesRange() const
@@ -858,6 +906,7 @@ bool ASquadUnit::StartCoverMovement()
 	}
 	const float DeadlineSeconds = GetCoverWalkDeadlineSeconds();
 	StartCoverStepDeadline(DeadlineSeconds);
+	PlanCoverApproachMove();
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
 		UE_LOG(
@@ -882,6 +931,280 @@ float ASquadUnit::GetCoverWalkDeadlineSeconds() const
 		TopSpeed * SquadUnitCoverMoveStatics::ExpectedAverageSpeedRatio);
 	const float WalkDistance = FVector::Dist2D(GetActorLocation(), GetCoverEntryLocation());
 	return WalkDistance / ExpectedSpeed + SquadUnitCoverMoveStatics::ApproachGraceSeconds;
+}
+
+void ASquadUnit::PlanCoverApproachMove()
+{
+	using namespace SquadUnitCoverMoveStatics;
+	UWorld* World = GetWorld();
+	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
+	const bool bIsLowCover = RTSCoverTypes::GetFiresFromProtectedPose(M_CoverRuntimeState.AssignedCoverPoint.CoverType);
+	if (M_CoverApproachMove.bHasRolledChance || not bIsLowCover || not IsValid(World) ||
+		not IsValid(CoverSettings) || not IsValid(AnimBp_SquadUnit))
+	{
+		return;
+	}
+	M_CoverApproachMove.bHasRolledChance = true;
+	const int32 MoveCount = AnimBp_SquadUnit->GetCoverApproachMoveCount();
+	if (MoveCount <= 0 || FMath::RandRange(1, PercentScale) > CoverSettings->M_CoverApproachMoveChancePercent)
+	{
+		return;
+	}
+	const int32 MoveIndex = FMath::RandRange(0, MoveCount - 1);
+	FSquadUnitCoverApproachTravel Travel;
+	const float WalkDistance = FVector::Dist2D(GetActorLocation(), M_CoverRuntimeState.AssignedCoverPoint.Location);
+	if (not AnimBp_SquadUnit->TryGetCoverApproachMoveTravel(MoveIndex, Travel) ||
+		WalkDistance < FVector2D(Travel.Forward, Travel.Right).Size() * ApproachMinimumRunUpRatio)
+	{
+		return;
+	}
+	M_CoverApproachMove.MoveIndex = MoveIndex;
+	World->GetTimerManager().SetTimer(
+		M_CoverApproachMove.WatchTimerHandle,
+		FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			TickCoverApproachWatch();
+		}),
+		ApproachWatchTickSeconds,
+		true);
+}
+
+void ASquadUnit::CorrectCoverApproachMoveTravel()
+{
+	using namespace SquadUnitCoverMoveStatics;
+	// Silent: the move ends through its own callback or its deadline when the animation instance is gone.
+	if (not IsValid(AnimBp_SquadUnit))
+	{
+		return;
+	}
+	// The unit optimizer may hand out a coarse movement tick again while the move plays.
+	UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+	if (IsValid(UnitMovement) && UnitMovement->GetComponentTickInterval() > 0.0f)
+	{
+		M_CoverApproachMove.MovementTickIntervalBeforeMove = UnitMovement->GetComponentTickInterval();
+		UnitMovement->SetComponentTickInterval(0.0f);
+	}
+	const float RemainingClipTravel = AnimBp_SquadUnit->GetCoverApproachMoveRemainingTravel();
+	if (RemainingClipTravel < ApproachMinimumTravelToCorrect)
+	{
+		return;
+	}
+	const float RemainingDistance = FVector::Dist2D(GetActorLocation(), M_CoverRuntimeState.AssignedCoverPoint.Location);
+	SetAnimRootMotionTranslationScale(FMath::Clamp(
+		RemainingDistance / RemainingClipTravel,
+		ApproachMinimumCorrectionScale,
+		ApproachMaximumCorrectionScale));
+}
+
+void ASquadUnit::TickCoverApproachWatch()
+{
+	using namespace SquadUnitCoverMoveStatics;
+	if (M_CoverApproachMove.bIsPlaying)
+	{
+		CorrectCoverApproachMoveTravel();
+		return;
+	}
+	FSquadUnitCoverApproachTravel Travel;
+	const bool bStillWalkingToCover = M_CoverRuntimeState.State == ESquadUnitCoverState::MovingToCover &&
+		not M_CoverApproachMove.bIsPlaying && IsValid(AnimBp_SquadUnit) &&
+		AnimBp_SquadUnit->TryGetCoverApproachMoveTravel(M_CoverApproachMove.MoveIndex, Travel);
+	if (not bStillWalkingToCover)
+	{
+		StopCoverApproachMove();
+		return;
+	}
+	const FVector ToCoverPoint = M_CoverRuntimeState.AssignedCoverPoint.Location - GetActorLocation();
+	const float DistanceToCoverPoint = ToCoverPoint.Size2D();
+	const float TravelLength = FVector2D(Travel.Forward, Travel.Right).Size();
+	if (DistanceToCoverPoint > TravelLength * ApproachMaximumTravelScale)
+	{
+		return;
+	}
+	// Closer than the clip can be shortened to: the moment has passed and the unit walks in.
+	if (DistanceToCoverPoint < TravelLength * ApproachMinimumTravelScale)
+	{
+		StopCoverApproachMove();
+		return;
+	}
+	const FVector ApproachDirection = ToCoverPoint.GetSafeNormal2D();
+	if (GetCanApproachCoverInStraightLine(ApproachDirection))
+	{
+		StartCoverApproachMove(Travel, DistanceToCoverPoint, ApproachDirection);
+	}
+}
+
+bool ASquadUnit::GetCanApproachCoverInStraightLine(const FVector& ApproachDirection) const
+{
+	using namespace SquadUnitCoverMoveStatics;
+	UWorld* World = GetWorld();
+	const FRTSCoverPoint& CoverPoint = M_CoverRuntimeState.AssignedCoverPoint;
+	const FVector UnitFeetLocation = GetNavAgentLocation();
+	const FVector Velocity = GetVelocity();
+	const bool bRunsAtThePoint = Velocity.Size2D() >= ApproachMinimumSpeed &&
+		FVector::DotProduct(Velocity.GetSafeNormal2D(), ApproachDirection) >= ApproachMinimumHeadingAlignment;
+	const bool bComesFromBehindTheCover = FVector::DotProduct(
+		ApproachDirection,
+		-CoverPoint.CoverNormal.GetSafeNormal2D()) >= ApproachMinimumCoverFacingAlignment;
+	const bool bIsLevelEnough = FMath::Abs(CoverPoint.Location.Z - UnitFeetLocation.Z) <= ApproachMaximumHeightDifference;
+	const USkeletalMeshComponent* UnitMesh = GetMesh();
+	const bool bIsSeen = IsValid(UnitMesh) && UnitMesh->WasRecentlyRendered(ApproachRecentlyRenderedSeconds);
+	// Silent: a unit without a controller is not walking to cover in the first place.
+	if (not IsValid(World) || not bRunsAtThePoint || not bComesFromBehindTheCover || not bIsLevelEnough ||
+		not bIsSeen || not IsValid(M_AISquadUnit))
+	{
+		return false;
+	}
+	// The whole line must be navmesh: no wall, ledge or hole between the unit and its point.
+	FVector NavigationHitLocation = FVector::ZeroVector;
+	if (UNavigationSystemV1::NavigationRaycast(
+		World,
+		UnitFeetLocation,
+		CoverPoint.Location,
+		NavigationHitLocation,
+		M_AISquadUnit->GetDefaultNavigationFilterClass(),
+		M_AISquadUnit))
+	{
+		return false;
+	}
+	// And nothing solid that the navmesh ignores, such as a low object, may stand on it.
+	const FVector TraceLift = FVector::UpVector * ApproachObstacleTraceHeight;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CoverApproachMove), false, this);
+	FHitResult ObstacleHit;
+	return not World->LineTraceSingleByObjectType(
+		ObstacleHit,
+		UnitFeetLocation + TraceLift,
+		CoverPoint.Location + TraceLift,
+		FCollisionObjectQueryParams(ECC_WorldStatic),
+		QueryParams);
+}
+
+void ASquadUnit::StartCoverApproachMove(
+	const FSquadUnitCoverApproachTravel& Travel,
+	const float DistanceToCoverPoint,
+	const FVector& ApproachDirection)
+{
+	using namespace SquadUnitCoverMoveStatics;
+	UWorld* World = GetWorld();
+	const float TravelLength = FVector2D(Travel.Forward, Travel.Right).Size();
+	if (not IsValid(World) || not IsValid(AnimBp_SquadUnit) || TravelLength <= KINDA_SMALL_NUMBER)
+	{
+		StopCoverApproachMove();
+		return;
+	}
+	// Stops whichever walk brought the unit here. When that was the walk of a move order, the move now stands
+	// in for it and the order is reported done when the move is over.
+	StopCoverMovementWithoutCallback();
+	if (M_CoverMoveGuard.bWalkBelongsToMoveCommand)
+	{
+		M_CoverMoveGuard.bWalkBelongsToMoveCommand = false;
+		M_CoverApproachMove.bReplacedMoveCommandWalk = true;
+		M_PlannedMoveRequestID = FAIRequestID::InvalidRequest;
+	}
+	SetCoverWeaponFireBlocked(true);
+	// Turned so that the clip's own travel, sideways drift included, points at the cover point.
+	const float TravelYawDegrees = FMath::RadiansToDegrees(FMath::Atan2(Travel.Right, Travel.Forward));
+	SetActorRotation(FRotator(0.0f, ApproachDirection.Rotation().Yaw - TravelYawDegrees, 0.0f));
+	const float TravelScale = DistanceToCoverPoint / TravelLength;
+	SetAnimRootMotionTranslationScale(TravelScale);
+	M_CoverApproachMove.bIsPlaying = true;
+	M_CoverApproachMove.DeadlineWorldSeconds = World->GetTimeSeconds() + Travel.Seconds + TransitionDeadlineMarginSeconds;
+	// With a coarse movement tick the mesh advances the clip in between as well: the move would run fast and
+	// lose most of its travel.
+	if (UCharacterMovementComponent* UnitMovement = GetCharacterMovement())
+	{
+		M_CoverApproachMove.MovementTickIntervalBeforeMove = UnitMovement->GetComponentTickInterval();
+		UnitMovement->SetComponentTickInterval(0.0f);
+	}
+	AnimBp_SquadUnit->OnCoverApproachMoveEnded.BindUObject(this, &ASquadUnit::FinishCoverApproachMove);
+	if (not AnimBp_SquadUnit->PlayCoverApproachMove(M_CoverApproachMove.MoveIndex))
+	{
+		// Ends the same way as a move that was cut short at once: the rest is walked.
+		FinishCoverApproachMove();
+		return;
+	}
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("RTS_COVER_APPROACH_MOVE started unit=%s move=%d type=%s distance_cm=%.0f clip_travel_cm=%.0f scale=%.2f seconds=%.2f"),
+			*GetName(),
+			M_CoverApproachMove.MoveIndex,
+			*UEnum::GetValueAsString(M_CoverRuntimeState.AssignedCoverPoint.CoverType),
+			DistanceToCoverPoint,
+			TravelLength,
+			TravelScale,
+			Travel.Seconds);
+	}
+}
+
+void ASquadUnit::FinishCoverApproachMove()
+{
+	if (not M_CoverApproachMove.bIsPlaying)
+	{
+		return;
+	}
+	StopCoverApproachMove();
+	if (M_CoverRuntimeState.State != ESquadUnitCoverState::MovingToCover)
+	{
+		return;
+	}
+	const float DistanceToCoverPoint = FVector::Dist2D(
+		GetActorLocation(),
+		M_CoverRuntimeState.AssignedCoverPoint.Location);
+	const bool bArrived = DistanceToCoverPoint <= SquadUnitCoverMoveStatics::MaximumOccupancyDistance;
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSSquadUnitCover,
+			Verbose,
+			TEXT("RTS_COVER_APPROACH_MOVE ended unit=%s residual_cm=%.0f arrived=%d"),
+			*GetName(),
+			DistanceToCoverPoint,
+			bArrived ? 1 : 0);
+	}
+	const bool bReplacedMoveCommandWalk = M_CoverApproachMove.bReplacedMoveCommandWalk;
+	M_CoverApproachMove.bReplacedMoveCommandWalk = false;
+	if (bArrived)
+	{
+		M_CoverApproachMove.bArrivedByMove = true;
+		EnterAssignedCover();
+	}
+	// Cut short, for example on a slope: the rest is walked.
+	else if (not StartCoverMovement())
+	{
+		ClearCoverStateInternal(false);
+	}
+	// Last, because the squad may answer with its next order, and that order decides about this cover.
+	if (bReplacedMoveCommandWalk)
+	{
+		OnCommandComplete();
+	}
+}
+
+void ASquadUnit::StopCoverApproachMove()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_CoverApproachMove.WatchTimerHandle);
+	}
+	M_CoverApproachMove.MoveIndex = INDEX_NONE;
+	if (not M_CoverApproachMove.bIsPlaying)
+	{
+		return;
+	}
+	M_CoverApproachMove.bIsPlaying = false;
+	SetAnimRootMotionTranslationScale(1.0f);
+	if (UCharacterMovementComponent* UnitMovement = GetCharacterMovement())
+	{
+		UnitMovement->SetComponentTickInterval(M_CoverApproachMove.MovementTickIntervalBeforeMove);
+	}
+	// Silent: a unit without an animation instance never started a move.
+	if (IsValid(AnimBp_SquadUnit))
+	{
+		AnimBp_SquadUnit->OnCoverApproachMoveEnded.Unbind();
+		AnimBp_SquadUnit->StopCoverApproachMove();
+	}
 }
 
 void ASquadUnit::FinishCoverMovement()
@@ -913,7 +1236,12 @@ void ASquadUnit::EnterAssignedCover()
 	}
 	StartCoverStepDeadline(SquadUnitCoverMoveStatics::MaximumEnterRequestSeconds);
 	SetCoverState(ESquadUnitCoverState::EnteringCover);
-	AlignCapsuleToCoverLocation(GetCoverEntryLocation(), SquadUnitCoverMoveStatics::ArrivalSettleSeconds);
+	// A unit that arrived on a move order may still have been firing on the way.
+	SetCoverWeaponFireBlocked(true);
+	// An approach move ends on the point itself; the enter clip it replaces would have started a step away.
+	AlignCapsuleToCoverLocation(
+		M_CoverApproachMove.bArrivedByMove ? M_CoverRuntimeState.AssignedCoverPoint.Location : GetCoverEntryLocation(),
+		SquadUnitCoverMoveStatics::ArrivalSettleSeconds);
 	if (not M_CoverCapsuleSlide.bIsActive)
 	{
 		UpdateEnteringCover();
@@ -945,7 +1273,7 @@ void ASquadUnit::UpdateEnteringCover()
 void ASquadUnit::RequestCoverEnterAnimation()
 {
 	const ESquadIdleAnimationPose CoverPose = GetAssignedCoverAnimationPose();
-	const bool bEnterMontageStarted = AnimBp_SquadUnit->EnterCover(CoverPose);
+	const bool bEnterMontageStarted = AnimBp_SquadUnit->EnterCover(CoverPose, M_CoverApproachMove.bArrivedByMove);
 	if (not bEnterMontageStarted)
 	{
 		return;
@@ -1198,9 +1526,17 @@ void ASquadUnit::ExecutePlannedMove(const FSquadUnitPlannedPosition& PlannedPosi
 	CancelAutomaticCoverForCommandMovement(TEXT("ExecutePlannedMove"));
 	M_ActiveCommand = EAbilityID::IdMove;
 	SetPlayerPlannedPosition(PlannedPosition);
+	UWorld* World = GetWorld();
+	URTSCoverFinderWorldSubsystem* CoverSubsystem = IsValid(World)
+		? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		: nullptr;
+	// Reserved now, so nobody else takes the point while this unit is on its way.
+	if (IsValid(CoverSubsystem))
+	{
+		TryAssignPlannedCoverForWalk(*CoverSubsystem);
+	}
 	const ESquadPlannedMoveStart StartResult = StartPlannedMoveRequest(
 		GetArrivalLocationForPlannedPosition(PlannedPosition));
-	UWorld* World = GetWorld();
 	if (StartResult == ESquadPlannedMoveStart::Walking || not IsValid(World))
 	{
 		return;
@@ -1350,7 +1686,67 @@ void ASquadUnit::CompletePlannedMoveInPlace()
 		M_AISquadUnit->StopMovement();
 	}
 	ApplyPlayerPlannedFacing();
+	// Before the report: the last unit's report ends the squad's command, and that would still find this unit
+	// on its way to cover instead of in it.
+	EnterPlannedCoverAfterWalk();
 	OnCommandComplete();
+}
+
+bool ASquadUnit::TryAssignPlannedCoverForWalk(URTSCoverFinderWorldSubsystem& CoverSubsystem)
+{
+	constexpr float RefusedPointRetrySeconds = 1.0f;
+	const bool bWalksToPlannedCover = M_ActiveCommand == EAbilityID::IdMove && M_PlayerPlannedPosition.GetIsCover() &&
+		not M_CoverRuntimeState.GetHasAssignment() && not GetIsCoverSearchOnCooldown();
+	if (not bWalksToPlannedCover || not GetIsSquadEligibleForAutomaticCover())
+	{
+		return false;
+	}
+	// A waypoint the squad only passes through is no place to settle into cover.
+	const UCommandData* SquadCommandData = IsValid(M_SquadController) ? M_SquadController->GetIsValidCommandData() : nullptr;
+	if (IsValid(SquadCommandData) && SquadCommandData->GetHasQueuedMovementCommandAfterActive())
+	{
+		return false;
+	}
+	FRTSCoverPoint PlannedCoverPoint;
+	if (not CoverSubsystem.TryReserveCoverPointById(*this, M_PlayerPlannedPosition.CoverPoint.PointId, PlannedCoverPoint))
+	{
+		// Often still held by the squad mate that is about to leave it under the same order.
+		DelayNextCoverSearch(RefusedPointRetrySeconds);
+		return false;
+	}
+	if (not SetCoverAssignment(PlannedCoverPoint, ESquadUnitCoverUseReason::AfterMoveCommand))
+	{
+		CoverSubsystem.ReleaseCoverReservation(*this, PlannedCoverPoint.PointId);
+		return false;
+	}
+	SetCoverState(ESquadUnitCoverState::MovingToCover);
+	M_CoverMoveGuard.bWalkBelongsToMoveCommand = true;
+	PlanCoverApproachMove();
+	return true;
+}
+
+void ASquadUnit::EnterPlannedCoverAfterWalk()
+{
+	if (not M_CoverMoveGuard.bWalkBelongsToMoveCommand)
+	{
+		return;
+	}
+	M_CoverMoveGuard.bWalkBelongsToMoveCommand = false;
+	if (M_CoverRuntimeState.State != ESquadUnitCoverState::MovingToCover)
+	{
+		return;
+	}
+	const float DistanceToEntry = FVector::Dist2D(GetActorLocation(), GetCoverEntryLocation());
+	if (DistanceToEntry <= SquadUnitCoverMoveStatics::MaximumOccupancyDistance)
+	{
+		EnterAssignedCover();
+		return;
+	}
+	// The order's walk stopped short, for example on a partial path: the cover walk covers the rest.
+	if (not StartCoverMovement())
+	{
+		ClearCoverStateInternal(false);
+	}
 }
 
 FVector ASquadUnit::GetArrivalLocationForPlannedPosition(const FSquadUnitPlannedPosition& PlannedPosition) const
@@ -1845,6 +2241,12 @@ void ASquadUnit::ClearCoverStateInternal(const bool bStopCoverMovement)
 {
 	// The unit is leaving its point, so an unfinished alignment is dropped where it is.
 	StopCoverCapsuleSlide();
+	StopCoverApproachMove();
+	// An approach move that stood in for a move order's walk is gone with the cover; the order still has to
+	// hear from this unit, or its squad would wait for it forever.
+	const bool bOwesMoveCommandCompletion = M_CoverApproachMove.bReplacedMoveCommandWalk && IsUnitAlive();
+	M_CoverApproachMove.bReplacedMoveCommandWalk = false;
+	M_CoverMoveGuard.bWalkBelongsToMoveCommand = false;
 	if (not M_CoverRuntimeState.GetHasAssignment())
 	{
 		M_CoverMoveRequestID = FAIRequestID::InvalidRequest;
@@ -1885,10 +2287,29 @@ void ASquadUnit::ClearCoverStateInternal(const bool bStopCoverMovement)
 		}
 	}
 	M_CoverRuntimeState.Reset();
+	if (bOwesMoveCommandCompletion)
+	{
+		OnCommandComplete();
+	}
+}
+
+void ASquadUnit::CancelCoverWalkForTerminatedMovement()
+{
+	// The command is over or replaced: nothing is owed to it any more, whatever carried the unit.
+	M_CoverApproachMove.bReplacedMoveCommandWalk = false;
+	const bool bIsOnItsWayToCover = M_CoverRuntimeState.State == ESquadUnitCoverState::Assigned ||
+		M_CoverRuntimeState.State == ESquadUnitCoverState::MovingToCover;
+	// A unit that already took its cover keeps it: this is what lets it settle in before its squad mates
+	// arrive. Whatever the squad does next cancels the cover itself when it sets the unit moving.
+	if (bIsOnItsWayToCover)
+	{
+		CancelAutomaticCoverForCommandMovement(TEXT("movement command terminated"));
+	}
 }
 
 void ASquadUnit::CancelAutomaticCoverForCommandMovement(const TCHAR* MovementSource)
 {
+	M_CoverApproachMove.bReplacedMoveCommandWalk = false;
 	if (not M_CoverRuntimeState.GetHasAssignment())
 	{
 		return;
@@ -2610,7 +3031,7 @@ void ASquadUnit::ExecuteMoveAlongPath(const FNavPathSharedPtr& Path, const EAbil
 
 void ASquadUnit::TerminateMovementCommand()
 {
-	CancelAutomaticCoverForCommandMovement(TEXT("TerminateMovementCommand"));
+	CancelCoverWalkForTerminatedMovement();
 	M_ActiveCommand = EAbilityID::IdIdle;
 
 	// Also unbinds the OnMoveCompleted function.
@@ -2619,7 +3040,7 @@ void ASquadUnit::TerminateMovementCommand()
 
 void ASquadUnit::TerminateMovementCommandDoNotKillVelocity()
 {
-	CancelAutomaticCoverForCommandMovement(TEXT("TerminateMovementCommandDoNotKillVelocity"));
+	CancelCoverWalkForTerminatedMovement();
 	if (GetIsValidAISquadUnit())
 	{
 		M_AISquadUnit->ReceiveMoveCompleted.RemoveDynamic(this, &ASquadUnit::OnMoveCompleted);
@@ -3308,6 +3729,9 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 				M_PlannedMoveWatch.bHasRestartedFromStandstill ? 1 : 0);
 		}
 		ApplyPlayerPlannedFacing();
+		// Before the report: the last unit's report ends the squad's command, and that would still find this
+		// unit on its way to cover instead of in it.
+		EnterPlannedCoverAfterWalk();
 		OnCommandComplete();
 	}
 }

@@ -1,4 +1,7 @@
 #include "SquadMovePreviewTestScenario.h"
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTestScenario.h"
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -105,6 +108,25 @@ namespace SquadMovePreviewTestPrivate
 	}
 
 	/** Nearest published point of the wanted kind that no soldier outside the test squad holds. */
+	void WatchLocationFromAbove(UWorld& World, const FVector& Location)
+	{
+		constexpr float WatchHeight = 2600.0f;
+		constexpr float WatchBackOffset = 900.0f;
+		ACameraActor* Camera = World.SpawnActor<ACameraActor>();
+		ACPPController* PlayerController = FRTS_Statics::GetRTSController(&World);
+		if (not IsValid(Camera) || not IsValid(PlayerController))
+		{
+			return;
+		}
+		if (UCameraComponent* CameraComponent = Camera->GetCameraComponent())
+		{
+			CameraComponent->bConstrainAspectRatio = false;
+		}
+		const FVector CameraLocation = Location + FVector(-WatchBackOffset, 0.0f, WatchHeight);
+		Camera->SetActorLocationAndRotation(CameraLocation, (Location - CameraLocation).Rotation());
+		PlayerController->SetViewTarget(Camera);
+	}
+
 	bool FindNearestFreeCoverPoint(
 		const URTSCoverFinderWorldSubsystem& CoverSubsystem,
 		const ASquadController& TestSquad,
@@ -190,6 +212,7 @@ void FSquadMovePreviewTestScenario::Tick(USquadMovePreviewComponent& PreviewComp
 		return;
 	}
 	ResumeWorldIfPaused(*World);
+	FCoverTestScenario::GiveSoldiersCommandLineApproachMoves(*World);
 	M_PhaseElapsedSeconds += FMath::Max(0.0f, DeltaTime);
 	const URTSCoverFinderWorldSubsystem* CoverSubsystem = World->GetSubsystem<URTSCoverFinderWorldSubsystem>();
 	if (not IsValid(CoverSubsystem))
@@ -305,7 +328,14 @@ void FSquadMovePreviewTestScenario::RunPlanChecksAndIssueMove(
 	}
 	CheckSeveralSquads(PreviewComponent, PlayerSquads, StandingPoint.Location);
 	CheckPlanningCost(PreviewComponent, PlayerSquads, StandingPoint.Location);
-	IssuePlannedMove(PreviewComponent, TestSquad, StandingPoint.Location);
+	// -SquadMovePreviewWatch: a rendered run sends the squad to low cover and looks at it, so what only happens
+	// on screen and at crouch or prone cover, a slide or a roll into it, happens in this test as well.
+	const bool bWatchLowCover = FParse::Param(FCommandLine::Get(), TEXT("SquadMovePreviewWatch"));
+	if (bWatchLowCover)
+	{
+		SquadMovePreviewTestPrivate::WatchLocationFromAbove(World, CrouchPoint.Location);
+	}
+	IssuePlannedMove(PreviewComponent, TestSquad, bWatchLowCover ? CrouchPoint.Location : StandingPoint.Location);
 }
 
 void FSquadMovePreviewTestScenario::CheckPronePlan(

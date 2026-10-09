@@ -17,6 +17,9 @@ namespace SquadUnitCoverAnimLogStatics
 	constexpr uint32 FirstCoverPoseReportBit = 16;
 	constexpr uint32 FirstUnplayableMontageReportBit = 8;
 	constexpr uint32 AdditiveAimBaseReportBit = 1u << 30;
+	// Blend of an approach move that is a plain sequence; a montage brings its own.
+	constexpr float ApproachBlendInSeconds = 0.15f;
+	constexpr float ApproachBlendOutSeconds = 0.25f;
 	constexpr uint32 AimAssetSetupReportBit = 1u << 29;
 
 	/**
@@ -826,7 +829,147 @@ void USquadUnitAnimInstance::SetWeaponAimOffset(const ESquadWeaponAimOffset AimO
 	}
 }
 
-bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose)
+FVector USquadUnitAnimInstance::GetCoverApproachMoveTravelFrom(const int32 MoveIndex, const float StartClipTime) const
+{
+	const USkeletalMeshComponent* SkeletalMeshComponent = GetSkelMeshComponent();
+	if (not CoverAnimations.ApproachMoves.IsValidIndex(MoveIndex) || not IsValid(SkeletalMeshComponent) ||
+		not IsValid(CoverAnimations.ApproachMoves[MoveIndex].Animation))
+	{
+		return FVector::ZeroVector;
+	}
+	const FSquadUnitCoverApproachMove& ApproachMove = CoverAnimations.ApproachMoves[MoveIndex];
+	const UAnimMontage* Montage = Cast<UAnimMontage>(ApproachMove.Animation);
+	const UAnimSequence* Sequence = Cast<UAnimSequence>(ApproachMove.Animation);
+	const float ClipLength = ApproachMove.Animation->GetPlayLength();
+	// A montage stops moving the capsule the moment it starts to blend out, so the travel of that last stretch
+	// never arrives. The blend time is real seconds; in clip time it stretches with the play rate.
+	const float BlendOutClipSeconds = FMath::Max(ApproachMove.PlayRate, KINDA_SMALL_NUMBER) * (IsValid(Montage)
+		? Montage->BlendOut.GetBlendTime()
+		: SquadUnitCoverAnimLogStatics::ApproachBlendOutSeconds);
+	const float LastMovingClipTime = FMath::Max(0.0f, ClipLength - BlendOutClipSeconds);
+	const float FirstClipTime = FMath::Clamp(StartClipTime, 0.0f, LastMovingClipTime);
+	FVector MeshSpaceTravel = FVector::ZeroVector;
+	if (IsValid(Montage))
+	{
+		MeshSpaceTravel = Montage->ExtractRootMotionFromTrackRange(FirstClipTime, LastMovingClipTime).GetTranslation();
+	}
+	else if (IsValid(Sequence))
+	{
+		const FSkeletonPoseBoneIndex RootBoneIndex(0);
+		FTransform RootAtFirstTime;
+		FTransform RootAtLastTime;
+		Sequence->GetBoneTransform(RootAtFirstTime, RootBoneIndex, FirstClipTime, true);
+		Sequence->GetBoneTransform(RootAtLastTime, RootBoneIndex, LastMovingClipTime, true);
+		MeshSpaceTravel = RootAtLastTime.GetTranslation() - RootAtFirstTime.GetTranslation();
+	}
+	// Root motion is authored in mesh space; the capsule moves by it after the mesh's relative rotation is applied.
+	return SkeletalMeshComponent->GetRelativeRotation().Quaternion().RotateVector(MeshSpaceTravel);
+}
+
+bool USquadUnitAnimInstance::TryGetCoverApproachMoveTravel(
+	const int32 MoveIndex,
+	FSquadUnitCoverApproachTravel& OutTravel) const
+{
+	// A move that carries the unit less far than this is no approach, and its direction means nothing.
+	constexpr float MinimumForwardTravel = 50.0f;
+	if (not CoverAnimations.ApproachMoves.IsValidIndex(MoveIndex) ||
+		not IsValid(CoverAnimations.ApproachMoves[MoveIndex].Animation))
+	{
+		return false;
+	}
+	const FSquadUnitCoverApproachMove& ApproachMove = CoverAnimations.ApproachMoves[MoveIndex];
+	const FVector ActorSpaceTravel = GetCoverApproachMoveTravelFrom(MoveIndex, 0.0f);
+	OutTravel.Forward = ActorSpaceTravel.X;
+	OutTravel.Right = ActorSpaceTravel.Y;
+	OutTravel.Seconds = ApproachMove.Animation->GetPlayLength() / FMath::Max(ApproachMove.PlayRate, KINDA_SMALL_NUMBER);
+	return OutTravel.Forward >= MinimumForwardTravel;
+}
+
+float USquadUnitAnimInstance::GetCoverApproachMoveRemainingTravel() const
+{
+	if (not IsValid(M_ActiveApproachMontage))
+	{
+		return 0.0f;
+	}
+	return GetCoverApproachMoveTravelFrom(
+		M_ActiveApproachMoveIndex,
+		Montage_GetPosition(M_ActiveApproachMontage)).Size2D();
+}
+
+bool USquadUnitAnimInstance::PlayCoverApproachMove(const int32 MoveIndex)
+{
+	using SquadUnitCoverAnimLogStatics::ApproachBlendInSeconds;
+	using SquadUnitCoverAnimLogStatics::ApproachBlendOutSeconds;
+	if (not CoverAnimations.ApproachMoves.IsValidIndex(MoveIndex) || GetIsCoverAnimationActive() ||
+		GetIsTeamWeaponCrewAnimationActive())
+	{
+		return false;
+	}
+	const FSquadUnitCoverApproachMove& ApproachMove = CoverAnimations.ApproachMoves[MoveIndex];
+	UAnimMontage* PlayedMontage = Cast<UAnimMontage>(ApproachMove.Animation);
+	if (IsValid(PlayedMontage))
+	{
+		const float PlayedSeconds = Montage_Play(PlayedMontage, ApproachMove.PlayRate, EMontagePlayReturnType::Duration);
+		PlayedMontage = PlayedSeconds > KINDA_SMALL_NUMBER ? PlayedMontage : nullptr;
+	}
+	else if (IsValid(ApproachMove.Animation))
+	{
+		PlayedMontage = PlaySlotAnimationAsDynamicMontage(
+			ApproachMove.Animation,
+			CoverAnimations.ApproachMoveSlotName,
+			ApproachBlendInSeconds,
+			ApproachBlendOutSeconds,
+			ApproachMove.PlayRate);
+	}
+	if (not IsValid(PlayedMontage))
+	{
+		return false;
+	}
+	M_ActiveApproachMontage = PlayedMontage;
+	M_ActiveApproachMoveIndex = MoveIndex;
+	M_ApproachMontageEndedDelegate.BindUObject(this, &USquadUnitAnimInstance::OnApproachMontageEnded);
+	Montage_SetEndDelegate(M_ApproachMontageEndedDelegate, PlayedMontage);
+	return true;
+}
+
+void USquadUnitAnimInstance::StopCoverApproachMove()
+{
+	constexpr float ApproachStopBlendSeconds = 0.15f;
+	UAnimMontage* ApproachMontage = M_ActiveApproachMontage;
+	if (not IsValid(ApproachMontage))
+	{
+		return;
+	}
+	// Cleared first: the owner is the one stopping it and needs no end notification.
+	M_ActiveApproachMontage = nullptr;
+	M_ApproachMontageEndedDelegate.Unbind();
+	if (Montage_IsPlaying(ApproachMontage))
+	{
+		Montage_Stop(ApproachStopBlendSeconds, ApproachMontage);
+	}
+}
+
+void USquadUnitAnimInstance::OnApproachMontageEnded(UAnimMontage* Montage, const bool bInterrupted)
+{
+	if (Montage != M_ActiveApproachMontage)
+	{
+		return;
+	}
+	M_ActiveApproachMontage = nullptr;
+	M_ApproachMontageEndedDelegate.Unbind();
+	OnCoverApproachMoveEnded.ExecuteIfBound();
+}
+
+void USquadUnitAnimInstance::Debug_SetCoverApproachMoves(const TArray<UAnimSequenceBase*>& Animations)
+{
+	CoverAnimations.ApproachMoves.Reset();
+	for (UAnimSequenceBase* Animation : Animations)
+	{
+		CoverAnimations.ApproachMoves.AddDefaulted_GetRef().Animation = Animation;
+	}
+}
+
+bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose, const bool bSkipEnterMontage)
 {
 	if (MovementState != ESquadMovementAnimState::Idle || GetIsTeamWeaponCrewAnimationActive())
 	{
@@ -866,7 +1009,7 @@ bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose)
 	}
 	// An in-place clip shows its root offset from frame one; blending in would slide the mesh away and back.
 	const bool bStartOnFirstFrame = not GetDoesCoverEnterMontageMoveCapsule(CoverPose);
-	if (PlayCoverMontage(EnterMontage, ESquadCoverAnimAction::Entering, bStartOnFirstFrame))
+	if (not bSkipEnterMontage && PlayCoverMontage(EnterMontage, ESquadCoverAnimAction::Entering, bStartOnFirstFrame))
 	{
 		return true;
 	}
@@ -1271,7 +1414,7 @@ void USquadUnitAnimInstance::StartMontage(
 	}
 	// Montage_Play stops every other montage in the group, which would cut a cover transition short and leave
 	// the unit half way into its pose. The full-body cover clip hides a reload or shot anyway.
-	if (bIsWeaponMontage && GetIsCoverTransitionMontageActive())
+	if (bIsWeaponMontage && (GetIsCoverTransitionMontageActive() || GetIsCoverApproachMovePlaying()))
 	{
 		return;
 	}
@@ -1318,6 +1461,11 @@ void USquadUnitAnimInstance::SetMovementStateWithSpeed(const float& MovementSpee
 	if (GetIsCoverAnimationActive())
 	{
 		MovementState = ESquadMovementAnimState::Idle;
+		return;
+	}
+	// A slide or roll into cover moves the unit by itself; a stance transition started now would cut it short.
+	if (GetIsCoverApproachMovePlaying())
+	{
 		return;
 	}
 

@@ -174,6 +174,7 @@ void FCoverTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem, con
 		return;
 	}
 	ResumeWorldIfPaused(*World);
+	GiveSoldiersCommandLineApproachMoves(*World);
 	KeepUnitAnimationTicking(*World);
 	WatchUnitsForVisualGlitches(*World);
 	M_PhaseElapsedSeconds += FMath::Max(0.0f, DeltaTime);
@@ -208,6 +209,43 @@ void FCoverTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem, con
 	case ECoverTestScenarioPhase::Inactive:
 	default:
 		break;
+	}
+}
+
+void FCoverTestScenario::GiveSoldiersCommandLineApproachMoves(UWorld& World)
+{
+	static TWeakObjectPtr<UWorld> WorldThatHasApproachMoves;
+	FString AnimationPaths;
+	if (WorldThatHasApproachMoves.Get() == &World ||
+		not FParse::Value(FCommandLine::Get(), TEXT("CoverFinderApproachAnims="), AnimationPaths))
+	{
+		return;
+	}
+	WorldThatHasApproachMoves = &World;
+	TArray<FString> PathList;
+	AnimationPaths.ParseIntoArray(PathList, TEXT("+"));
+	TArray<UAnimSequenceBase*> Animations;
+	for (const FString& AnimationPath : PathList)
+	{
+		UAnimSequenceBase* Animation = LoadObject<UAnimSequenceBase>(nullptr, *AnimationPath);
+		UE_LOG(
+			LogRTSCoverTest,
+			Display,
+			TEXT("RTS_COVER_TEST approach_anim path=%s loaded=%d"),
+			*AnimationPath,
+			IsValid(Animation) ? 1 : 0);
+		if (IsValid(Animation))
+		{
+			Animations.Add(Animation);
+		}
+	}
+	for (TActorIterator<ASquadUnit> UnitIterator(&World); UnitIterator; ++UnitIterator)
+	{
+		USquadUnitAnimInstance* UnitAnimation = IsValid(*UnitIterator) ? UnitIterator->GetAnimBP_SquadUnit() : nullptr;
+		if (IsValid(UnitAnimation))
+		{
+			UnitAnimation->Debug_SetCoverApproachMoves(Animations);
+		}
 	}
 }
 
