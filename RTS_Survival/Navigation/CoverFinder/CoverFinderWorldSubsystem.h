@@ -61,6 +61,16 @@ struct FCoverObstacleKey
  * scratch every few seconds: how wide its trunk is, and the cover its ring of probes found last time.
  * Everything is dropped when the obstacle moves.
  */
+/** A prone point beside a crouch or standing point, after its location was checked against the world. */
+struct FCoverProneCompanionCacheEntry
+{
+	FRTSCoverPoint Companion;
+	int32 LastUsedPublicationIndex = 0;
+
+	// False when there is no room to lie down beside the point; kept so it is not checked again.
+	bool bHasLyingSpace = false;
+};
+
 struct FCoverThinObstacleCache
 {
 	FVector BoundsCenter = FVector::ZeroVector;
@@ -410,6 +420,14 @@ private:
 	TArray<FCoverPendingTrunkMeasurement> M_PendingTrunkMeasurements;
 	int32 M_PendingReusedRingObstacleCount = 0;
 
+	// Prone points placed beside crouch and standing points, by the ID of the point they belong to. Checking
+	// one against the world costs queries, so each is checked once and kept for as long as its point exists.
+	TMap<int64, FCoverProneCompanionCacheEntry> M_ProneCompanionCache;
+	int32 M_PublicationIndex = 0;
+
+	// Prone points of the previous publication that the latest one no longer has; reported with the scan timings.
+	int32 M_PronePointsLostAtLastPublication = 0;
+
 	// RTS.CoverFinder.ExplainAtCursor; only registered when cover debug symbols are compiled in.
 	IConsoleObject* M_ExplainConsoleCommand = nullptr;
 
@@ -564,6 +582,55 @@ private:
 		float DistanceToObstacleCentre,
 		FCoverDirectionalObservation& InOutDirectionObservation,
 		int32& InOutFrameWorldQueries);
+
+	/**
+	 * @brief Probes crouch and standing height where the lower probe hit, and the sides of a standing surface.
+	 * @param ProtectedLocation Navigable position the probes start from.
+	 * @param InOutDirectionObservation Holds the lower trace; receives the other traces and side openings.
+	 * @param InOutFrameWorldQueries Running query count used to enforce the hard frame cap.
+	 * @return True when lower and crouch probe hit the same surface, so regular cover rules apply.
+	 */
+	bool SampleRegularCoverHeights(
+		const UNavigationSystemV1& NavigationSystem,
+		const ANavigationData& NavigationData,
+		const FVector& ProtectedLocation,
+		FCoverDirectionalObservation& InOutDirectionObservation,
+		int32& InOutFrameWorldQueries);
+
+	/**
+	 * @brief Checks whether a soldier can lie behind what the lower probe hit: low enough to fire over, and with
+	 * navigable room to lie down at the designer's stand-off from it.
+	 * @param ProbeLocation Navigable position the lower probe started from.
+	 * @param InOutDirectionObservation Holds the lower and crouch traces; receives the prone evidence.
+	 * @param InOutFrameWorldQueries Running query count used to enforce the hard frame cap.
+	 */
+	void SampleProneCover(
+		const UNavigationSystemV1& NavigationSystem,
+		const ANavigationData& NavigationData,
+		const FVector& ProbeLocation,
+		FCoverDirectionalObservation& InOutDirectionObservation,
+		int32& InOutFrameWorldQueries);
+
+	/**
+	 * @brief Tests the room a lying soldier's body takes up, which is long and low instead of a standing column.
+	 * @param GroundLocation Navigable position of the middle of the soldier.
+	 * @param FacingDirection Horizontal direction the soldier's head points in.
+	 * @return True when no object other than the ground and other soldiers is in that room.
+	 */
+	bool GetCanInfantryLieAt(const FVector& GroundLocation, const FVector& FacingDirection) const;
+
+	/**
+	 * @brief Adds the prone points that belong beside some of the published crouch and standing points.
+	 * @param PublishedPronePointIds Prone points of the previous publication, which keep their place.
+	 */
+	void AppendProneCompanionPoints(const TSet<int64>& PublishedPronePointIds);
+
+	/**
+	 * @brief Moves a proposed prone companion onto the navmesh and checks there is room to lie there.
+	 * @param InOutCompanion Proposed point; its location is replaced by the navigable one.
+	 * @return False when the spot is off the navmesh or blocked.
+	 */
+	bool TryPlaceProneCompanion(FRTSCoverPoint& InOutCompanion) const;
 
 	/**
 	 * @brief Queues one straight-on probe for a surface that a grid probe only grazed.
@@ -807,6 +874,15 @@ private:
 	void Explain_LogObstaclesNear(
 		const FVector& GroundLocation,
 		TArray<FCoverFocusedSample>& OutThinObstacleSamples);
+
+	// Explains why the prone rule does or does not give cover in one direction.
+	FString Explain_ProneCover(
+		const UNavigationSystemV1& NavigationSystem,
+		const ANavigationData& NavigationData,
+		const FVector& ProtectedLocation,
+		const FVector& SearchDirection,
+		const FCoverTraceObservation& LowerTrace,
+		const FCoverTraceObservation& CrouchTrace);
 
 	/**
 	 * @brief Probes one position in one direction the way a scan does and says what came of it.

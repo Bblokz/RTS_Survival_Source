@@ -63,11 +63,13 @@ public:
 	 * @brief Removes spatial duplicates while preserving distinct normals and standing sides.
 	 * @param RawCandidates Candidates produced by all chunks in one generation.
 	 * @param Settings Immutable settings for this generation.
+	 * @param PreferredPronePointIds Prone points to keep when thinning them out; see AppendSpacedPronePoints.
 	 * @return Deterministically ordered points with stable value-based IDs.
 	 */
 	static TArray<FRTSCoverPoint> FinalizeCandidates(
 		TArray<FRTSCoverPoint>&& RawCandidates,
-		const FCoverFinderSettingsSnapshot& Settings);
+		const FCoverFinderSettingsSnapshot& Settings,
+		const TSet<int64>* PreferredPronePointIds = nullptr);
 
 	/**
 	 * @brief Applies the same type, direction, and spacing rule used by final publication.
@@ -121,6 +123,45 @@ public:
 		const FCoverTraceObservation& SurfaceTrace,
 		const FCoverFinderSettingsSnapshot& Settings,
 		FCoverFocusedSample& OutSample);
+
+	/**
+	 * @brief Decides from the probes of one direction whether a soldier can lie behind what the lower probe hit.
+	 * Regular cover always wins: this only passes where the hit is no crouch cover.
+	 * @param DirectionObservation Lower, crouch and fire-over probes of one direction.
+	 * @param Settings Immutable settings for this generation.
+	 * @return True for a steep enough face that tops out below the height a prone soldier fires over.
+	 */
+	static bool GetIsProneCoverEvidence(
+		const FCoverDirectionalObservation& DirectionObservation,
+		const FCoverFinderSettingsSnapshot& Settings);
+
+	/**
+	 * @brief Adds prone points sparsely: none on top of another cover point, none close to another prone point.
+	 * @param PronePoints Candidates in the order of preference.
+	 * @param Settings Immutable settings; ProneCoverPointSpacing sets how sparse the result is.
+	 * @param InOutAcceptedPoints Published points so far; receives the prone points that fit, with their IDs.
+	 * @param PreferredPointIds Points that go first, normally the ones published before. Which of two close
+	 * candidates survives would otherwise change whenever a third one comes or goes, and a soldier lying on a
+	 * point would lose it to its neighbour from one scan to the next.
+	 */
+	static void AppendSpacedPronePoints(
+		TArray<FRTSCoverPoint>&& PronePoints,
+		const FCoverFinderSettingsSnapshot& Settings,
+		TArray<FRTSCoverPoint>& InOutAcceptedPoints,
+		const TSet<int64>* PreferredPointIds = nullptr);
+
+	/**
+	 * @brief Proposes a prone point beside some of the crouch and standing points, for variety in a squad's cover.
+	 * Which points get one is decided by their ID, so the choice is the same on every scan.
+	 * @param SourcePoint Published crouch or standing point.
+	 * @param Settings Immutable settings; chance and sideways offset come from here.
+	 * @param OutCompanion Prone point facing roughly the same way; its location still needs a navigation check.
+	 * @return False when this point gets no companion.
+	 */
+	static bool TryBuildProneCompanion(
+		const FRTSCoverPoint& SourcePoint,
+		const FCoverFinderSettingsSnapshot& Settings,
+		FRTSCoverPoint& OutCompanion);
 
 	static bool GetIsSameSurface(
 		const FCoverTraceObservation& FirstTrace,

@@ -377,8 +377,8 @@ struct FSquadUnitStandingCoverAnimationSet
 };
 
 /**
- * @brief Supplies crouch cover, whose aim offset can fire without a separate expose transition.
- * Crouch cover is intentionally non-sided in the initial implementation.
+ * @brief Supplies cover a soldier fires from where it is, without a separate expose transition: crouch cover
+ * and prone cover each have one of these. Neither is sided.
  */
 USTRUCT(BlueprintType)
 struct FSquadUnitCrouchCoverAnimationSet
@@ -425,11 +425,22 @@ struct FSquadUnitCoverAnimationSets
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	FSquadUnitStandingCoverAnimationSet Trench;
 
+	// Prone cover, behind a bump in the ground or a low object. ProtectedIdlePose is the soldier lying with its
+	// head down, AimAssets the prone aim: a non-additive prone aim pose as BaseSequence and its aim offset. The
+	// enter and exit montages are optional. EnterStartOffset is where the soldier stops before going down, for a
+	// clip that dives forward. While ProtectedIdlePose is empty a soldier at a prone point uses the Crouch set.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	FSquadUnitCrouchCoverAnimationSet Prone;
+
 	// Full-body reload of a crouched soldier. Played instead of the weapon's regular reload montage while the
 	// unit holds a cover position, so it ducks behind its cover to reload. Scaled to the weapon's reload time.
 	// Left empty, a unit in cover reloads with the regular montage.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	TObjectPtr<UAnimMontage> CoverReload = nullptr;
+
+	// Full-body reload of a lying soldier, used in prone cover. Left empty, CoverReload is used there as well.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
+	TObjectPtr<UAnimMontage> ProneCoverReload = nullptr;
 };
 
 /**
@@ -938,6 +949,19 @@ private:
 
 	// True for the poses a unit fires from after leaving its protected pose: both standing peeks and the trench.
 	static bool GetIsPeekPose(ESquadIdleAnimationPose CoverPose);
+
+	// True for crouch and prone cover, which aim and fire from their protected pose.
+	static bool GetIsFireInPlacePose(ESquadIdleAnimationPose CoverPose);
+
+	/**
+	 * @brief Finds the animation set of a cover pose that fires from where it is.
+	 * @param CoverPose Crouch or prone cover; any other pose has no such set.
+	 * @return The prone set once its clips are assigned, the crouch set until then; nullptr for other poses.
+	 */
+	const FSquadUnitCrouchCoverAnimationSet* FindFireInPlaceCoverAnimationSet(ESquadIdleAnimationPose CoverPose) const;
+
+	// The reload clip for the cover pose the unit is in; nullptr when none is assigned.
+	UAnimMontage* GetCoverReloadMontage() const;
 	static bool GetIsTrenchPose(ESquadIdleAnimationPose CoverPose);
 
 	// ----- Team Weapon Crew Animations -----

@@ -73,14 +73,54 @@ namespace CoverFinderWorldSubsystemPrivate
 	constexpr int32 MinimumOpenFrameHits = 2;
 	// The frame probes, the fire-over probe, and the projection and room check of the cover location.
 	constexpr int32 OpenFrameQueryCount = UE_ARRAY_COUNT(OpenFrameProbeHeights) + 4;
-	constexpr int32 MaximumQueriesForOneDirection = 105 + StandingEdgeRefinementSteps * 2 + OpenFrameQueryCount;
+	// The fire-over probe, the projection of the lying position and the check of its room.
+	constexpr int32 ProneCoverQueryCount = 3;
+	constexpr int32 MaximumQueriesForOneDirection = 105 + StandingEdgeRefinementSteps * 2 + OpenFrameQueryCount
+		+ ProneCoverQueryCount;
+	// The sample position is used as it is when it already lies this close to the wanted stand-off.
+	constexpr float ProneStandOffTolerance = 20.0f;
+	// Room a lying soldier needs: a low capsule along the body, clear of the roots and rubble it lies in.
+	constexpr float ProneBodyRadius = 18.0f;
+	constexpr float ProneBodyHalfLength = 75.0f;
+	constexpr float ProneBodyCenterHeight = 45.0f;
+	// The body reaches further back from the soldier's middle than forward of it.
+	constexpr float ProneBodyCenterBackOffset = 35.0f;
+	constexpr float ProneFiringHeight = 70.0f;
+	// World checks of new prone companions per publication; the rest follow with the next scans.
+	constexpr int32 MaximumProneCompanionChecksPerPublication = 32;
+	const FVector ProneCompanionProjectionExtent(60.0f, 60.0f, 150.0f);
 	constexpr float CoverSpatialCellSize = 500.0f;
 	constexpr float CrouchFiringHeight = 150.0f;
 	constexpr float StandingFiringHeight = 160.0f;
 	constexpr int32 MaximumCandidateLaneTests = 8;
+	// Prone points get their own, smaller share of the firing-lane tests of one search.
+	constexpr int32 MaximumProneCandidateLaneTests = 4;
+
+	/**
+	 * Hands out the firing-lane tests of one cover search. Prone points are counted apart from the rest, so
+	 * the many prone points of rolling ground add choice without pushing a crouch or standing point out.
+	 */
+	struct FCoverLaneTestBudget
+	{
+		int32 RegularTestCount = 0;
+		int32 ProneTestCount = 0;
+
+		bool TryTakeTest(const ERTSCoverType CoverType)
+		{
+			const bool bIsProne = CoverType == ERTSCoverType::Prone;
+			int32& TestCount = bIsProne ? ProneTestCount : RegularTestCount;
+			if (TestCount >= (bIsProne ? MaximumProneCandidateLaneTests : MaximumCandidateLaneTests))
+			{
+				return false;
+			}
+			++TestCount;
+			return true;
+		}
+	};
 	const FColor CrouchCoverColor(173, 216, 230);
 	const FColor StandingCoverColor(255, 165, 0);
 	const FColor TrenchCoverColor(220, 30, 30);
+	const FColor ProneCoverColor(160, 60, 220);
 	// How far a trench socket may sit from the navmesh and still be moved onto it.
 	const FVector TrenchSocketProjectionExtent(120.0f, 120.0f, 250.0f);
 
@@ -92,6 +132,8 @@ namespace CoverFinderWorldSubsystemPrivate
 			return CrouchCoverColor;
 		case ERTSCoverType::TrenchStandUp:
 			return TrenchCoverColor;
+		case ERTSCoverType::Prone:
+			return ProneCoverColor;
 		case ERTSCoverType::StandingLeft:
 		case ERTSCoverType::StandingRight:
 		default:
@@ -468,6 +510,7 @@ void URTSCoverFinderWorldSubsystem::Deinitialize()
 	M_PendingThinObstacleSamples.Reset();
 	M_PendingReusedRingCandidates.Reset();
 	M_PendingTrunkMeasurements.Reset();
+	M_ProneCompanionCache.Reset();
 	M_ThinObstacleCaches.Reset();
 	M_ObstacleKeysByCacheId.Reset();
 	M_CoverPoints.Reset();
@@ -925,13 +968,12 @@ bool URTSCoverFinderWorldSubsystem::TryReserveCombatCoverPoint(
 			ScoredCandidates.IsEmpty() ? 0.0f : ScoredCandidates[0].Score,
 			Threats.ThreatLocations.Num());
 	}
-	const int32 LaneTestCount = FMath::Min(
-		ScoredCandidates.Num(),
-		CoverFinderWorldSubsystemPrivate::MaximumCandidateLaneTests);
-	for (int32 CandidateIndex = 0; CandidateIndex < LaneTestCount; ++CandidateIndex)
+	CoverFinderWorldSubsystemPrivate::FCoverLaneTestBudget LaneTestBudget;
+	for (const FRTSScoredCombatCoverPoint& ScoredCandidate : ScoredCandidates)
 	{
-		const FRTSCoverPoint& CoverPoint = ScoredCandidates[CandidateIndex].CoverPoint;
-		if (not GetHasTargetSpecificFiringLane(SquadUnit, CoverPoint, TargetActor, Threats.PrimaryTargetLocation))
+		const FRTSCoverPoint& CoverPoint = ScoredCandidate.CoverPoint;
+		if (not LaneTestBudget.TryTakeTest(CoverPoint.CoverType) ||
+			not GetHasTargetSpecificFiringLane(SquadUnit, CoverPoint, TargetActor, Threats.PrimaryTargetLocation))
 		{
 			continue;
 		}
@@ -972,10 +1014,11 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::GatherBestTacticalCoverCan
 		return FVector::DistSquared(UnitLocation, Left.Location) <
 			FVector::DistSquared(UnitLocation, Right.Location);
 	});
-	if (BestCandidates.Num() > CoverFinderWorldSubsystemPrivate::MaximumCandidateLaneTests)
+	CoverFinderWorldSubsystemPrivate::FCoverLaneTestBudget LaneTestBudget;
+	BestCandidates.RemoveAll([&LaneTestBudget](const FRTSCoverPoint& CoverPoint)
 	{
-		BestCandidates.SetNum(CoverFinderWorldSubsystemPrivate::MaximumCandidateLaneTests);
-	}
+		return not LaneTestBudget.TryTakeTest(CoverPoint.CoverType);
+	});
 	return BestCandidates;
 }
 
@@ -985,19 +1028,27 @@ bool URTSCoverFinderWorldSubsystem::TryReserveCoverPointById(
 	FRTSCoverPoint& OutCoverPoint)
 {
 	const int32* CoverPointIndex = M_CoverPointIndices.Find(PointId);
-	if (CoverPointIndex == nullptr || not M_CoverPoints.IsValidIndex(*CoverPointIndex))
+	const bool bIsPublished = CoverPointIndex != nullptr && M_CoverPoints.IsValidIndex(*CoverPointIndex);
+	const bool bIsTaken = bIsPublished && GetIsPointReservedByAnotherUnit(PointId, SquadUnit);
+	const bool bIsUnreachable = bIsPublished && GetIsCoverPointTemporarilyUnreachable(PointId);
+	const bool bObstacleIsFull = bIsPublished && M_CoverPoints[*CoverPointIndex].ThinObstacleId != 0 &&
+		GetThinObstacleReservationCount(M_CoverPoints[*CoverPointIndex].ThinObstacleId, &SquadUnit) >=
+		M_CoverPoints[*CoverPointIndex].ThinObstacleCapacity;
+	if (not bIsPublished || bIsTaken || bIsUnreachable || bObstacleIsFull)
 	{
-		return false;
-	}
-	if (GetIsPointReservedByAnotherUnit(PointId, SquadUnit) || GetIsCoverPointTemporarilyUnreachable(PointId))
-	{
-		return false;
-	}
-	const FRTSCoverPoint& RequestedPoint = M_CoverPoints[*CoverPointIndex];
-	const bool bObstacleIsFull = RequestedPoint.ThinObstacleId != 0 && GetThinObstacleReservationCount(
-		RequestedPoint.ThinObstacleId, &SquadUnit) >= RequestedPoint.ThinObstacleCapacity;
-	if (bObstacleIsFull)
-	{
+		if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+		{
+			UE_LOG(
+				LogRTSCoverFinder,
+				Verbose,
+				TEXT("RTS_COVER_RESERVE_REFUSED unit=%s point=%lld published=%d taken_by=%s unreachable=%d obstacle_full=%d"),
+				*SquadUnit.GetName(),
+				PointId,
+				bIsPublished ? 1 : 0,
+				bIsTaken ? *GetNameSafe(GetCoverReservationOwner(PointId)) : TEXT("nobody"),
+				bIsUnreachable ? 1 : 0,
+				bObstacleIsFull ? 1 : 0);
+		}
 		return false;
 	}
 	M_CoverReservations.Add(PointId, TWeakObjectPtr<ASquadUnit>(&SquadUnit));
@@ -1172,8 +1223,9 @@ bool URTSCoverFinderWorldSubsystem::GetIsCoverPointValidAgainstTarget(
 
 FVector URTSCoverFinderWorldSubsystem::GetStandingPeekOffset(const FRTSCoverPoint& CoverPoint) const
 {
-	// Crouch cover fires from where it is, and a soldier in a trench stands up without stepping aside.
-	if (CoverPoint.CoverType == ERTSCoverType::Crouch || CoverPoint.CoverType == ERTSCoverType::TrenchStandUp)
+	// Crouch and prone cover fire from where they are, and a soldier in a trench stands up without stepping aside.
+	if (RTSCoverTypes::GetFiresFromProtectedPose(CoverPoint.CoverType) ||
+		CoverPoint.CoverType == ERTSCoverType::TrenchStandUp)
 	{
 		return FVector::ZeroVector;
 	}
@@ -1324,6 +1376,10 @@ FVector URTSCoverFinderWorldSubsystem::BuildFiringLaneStart(
 	{
 		return CoverPoint.Location + FVector::UpVector * CoverFinderWorldSubsystemPrivate::CrouchFiringHeight;
 	}
+	if (CoverPoint.CoverType == ERTSCoverType::Prone)
+	{
+		return CoverPoint.Location + FVector::UpVector * CoverFinderWorldSubsystemPrivate::ProneFiringHeight;
+	}
 	// Tested from where this unit's expose animation ends, so an open lane means the real muzzle is clear.
 	const FVector ExposedOffset = SquadUnit.GetStandingCoverExposedWorldOffset(
 		CoverPoint,
@@ -1353,6 +1409,7 @@ void URTSCoverFinderWorldSubsystem::LogPerformanceReport() const
 	int32 CrouchCoverCount = 0;
 	int32 StandingLeftCoverCount = 0;
 	int32 StandingRightCoverCount = 0;
+	int32 ProneCoverCount = 0;
 	int32 AuthoredCoverCount = 0;
 	for (const FRTSCoverPoint& CoverPoint : M_CoverPoints)
 	{
@@ -1371,6 +1428,9 @@ void URTSCoverFinderWorldSubsystem::LogPerformanceReport() const
 		case ERTSCoverType::StandingRight:
 			++StandingRightCoverCount;
 			break;
+		case ERTSCoverType::Prone:
+			++ProneCoverCount;
+			break;
 		default:
 			break;
 		}
@@ -1378,7 +1438,7 @@ void URTSCoverFinderWorldSubsystem::LogPerformanceReport() const
 	UE_LOG(
 		LogRTSCoverFinder,
 		Display,
-		TEXT("RTS_COVER_PERF domain=%s samples=%d projected=%d queries=%d raw=%d points=%d authored=%d landscape_cached=%d environment_cached=%d crouch=%d standing_left=%d standing_right=%d high_directions=%d openings=%d valid_gaps=%d gt_total_ms=%.3f gt_avg_frame_ms=%.3f gt_max_frame_ms=%.3f worker_ms=%.3f wall_ms=%.3f"),
+		TEXT("RTS_COVER_PERF domain=%s samples=%d projected=%d queries=%d raw=%d points=%d authored=%d landscape_cached=%d environment_cached=%d crouch=%d standing_left=%d standing_right=%d prone=%d prone_lost=%d prone_companions=%d high_directions=%d openings=%d valid_gaps=%d gt_total_ms=%.3f gt_avg_frame_ms=%.3f gt_max_frame_ms=%.3f worker_ms=%.3f wall_ms=%.3f"),
 		M_ActiveScanDomain == ECoverFinderScanDomain::Landscape ? TEXT("landscape") : TEXT("environment"),
 		M_LastPerformanceSnapshot.PlannedSampleCount,
 		M_LastPerformanceSnapshot.ProjectedSampleCount,
@@ -1391,6 +1451,9 @@ void URTSCoverFinderWorldSubsystem::LogPerformanceReport() const
 		CrouchCoverCount,
 		StandingLeftCoverCount,
 		StandingRightCoverCount,
+		ProneCoverCount,
+		M_PronePointsLostAtLastPublication,
+		M_ProneCompanionCache.Num(),
 		M_LastPerformanceSnapshot.StandingSurfaceDirectionCount,
 		M_LastPerformanceSnapshot.StandingOpeningCount,
 		M_LastPerformanceSnapshot.ValidatedStandingGapCount,
@@ -1679,7 +1742,8 @@ void URTSCoverFinderWorldSubsystem::TagThinObstacleCoverPoints()
 	for (FRTSCoverPoint& CoverPoint : M_CoverPoints)
 	{
 		// Authored points are placed by a designer and keep whatever capacity the designer intended: none.
-		if (CoverPoint.ProviderRegistrationId != 0)
+		// A soldier lying beside a tree does not shelter behind its trunk, so he takes none of its room either.
+		if (CoverPoint.ProviderRegistrationId != 0 || CoverPoint.CoverType == ERTSCoverType::Prone)
 		{
 			continue;
 		}
@@ -2009,6 +2073,19 @@ FCoverFinderSettingsSnapshot URTSCoverFinderWorldSubsystem::BuildSettingsSnapsho
 	Snapshot.bFindOpenFrameCover = CoverSettings->bM_FindOpenFrameCover;
 	Snapshot.bProbeThinObstacles = CoverSettings->bM_ProbeThinObstacles;
 	Snapshot.bReaimSlantedHits = CoverSettings->bM_ReaimSlantedHits;
+	Snapshot.bFindProneCover = CoverSettings->bM_FindProneCover;
+	Snapshot.ProneCoverMaximumHeight = FMath::Clamp(
+		CoverSettings->M_ProneCoverMaximumHeight,
+		RTSCoverFinderConstants::LowerSupportProbeHeight + 1.0f,
+		Snapshot.MinimumCrouchCoverHeight - 1.0f);
+	Snapshot.ProneCoverMaximumFaceNormalZ = FMath::Cos(FMath::DegreesToRadians(
+		FMath::Clamp(CoverSettings->M_ProneCoverMinimumSlopeDegrees, 10.0f, 80.0f)));
+	Snapshot.ProneCoverStandOff = FMath::Clamp(CoverSettings->M_ProneCoverStandOff, 40.0f, 160.0f);
+	// A scan keeps every prone point it finds; they are thinned out at publication, where the points that
+	// were published before can be kept. Thinning each scan by itself would pick different ones every time.
+	Snapshot.ProneCoverPointSpacing = Snapshot.CoverPointSpacing;
+	Snapshot.ProneCompanionChancePercent = FMath::Clamp(CoverSettings->M_ProneCompanionChancePercent, 0, 100);
+	Snapshot.ProneCompanionOffset = FMath::Clamp(CoverSettings->M_ProneCompanionOffset, 80.0f, 400.0f);
 	Snapshot.AgentRadius = FMath::Max(1.0f, AgentRadius);
 	Snapshot.AgentHeight = FMath::Max(RTSCoverFinderConstants::InfantryHeight, AgentHeight);
 	Snapshot.SurfaceDistanceTolerance = FMath::Max(
@@ -2029,6 +2106,10 @@ FCoverFinderSettingsSnapshot URTSCoverFinderWorldSubsystem::BuildPublicationSett
 		CoverSettings->M_CoverPointSpacing,
 		50.0f,
 		250.0f);
+	PublicationSettings.bFindProneCover = CoverSettings->bM_FindProneCover;
+	PublicationSettings.ProneCoverPointSpacing = FMath::Clamp(CoverSettings->M_ProneCoverPointSpacing, 90.0f, 3000.0f);
+	PublicationSettings.ProneCompanionChancePercent = FMath::Clamp(CoverSettings->M_ProneCompanionChancePercent, 0, 100);
+	PublicationSettings.ProneCompanionOffset = FMath::Clamp(CoverSettings->M_ProneCompanionOffset, 80.0f, 400.0f);
 	return PublicationSettings;
 }
 
@@ -2380,69 +2461,22 @@ void URTSCoverFinderWorldSubsystem::SampleCurrentDirection(
 	FCoverDirectionalObservation DirectionObservation;
 	DirectionObservation.SearchDirection = GetCurrentSampleDirection();
 	const FVector& ProtectedLocation = M_SamplingState.CurrentObservation.ProjectedLocation;
-	DirectionObservation.CrouchTrace = TraceCoverHeight(
-		ProtectedLocation,
-		DirectionObservation.SearchDirection,
-		M_ActiveSettings.MinimumCrouchCoverHeight,
-		InOutFrameWorldQueries);
-	// Only the ring probes of a thin obstacle look for an open frame; grid probes keep the regular rule alone.
-	const bool bMayFindOpenFrame = M_ActiveSettings.bFindOpenFrameCover &&
-		M_SamplingState.CurrentObstacleCacheId != 0 &&
-		M_SamplingState.bCurrentSampleMayFindOpenFrameCover;
-	if (not DirectionObservation.CrouchTrace.bBlockingHit)
-	{
-		if (bMayFindOpenFrame)
-		{
-			SampleOpenFrameCover(
-				NavigationSystem,
-				NavigationData,
-				ProtectedLocation,
-				M_SamplingState.CurrentFocusDistance,
-				DirectionObservation,
-				InOutFrameWorldQueries);
-		}
-		M_SamplingState.CurrentObservation.DirectionalObservations.Add(MoveTemp(DirectionObservation));
-		++M_SamplingState.CurrentDirectionIndex;
-		return;
-	}
-
-	// Only grid probes ask for a second look, and only at objects: the result of that look is final.
-	const bool bMayReaim = M_ActiveSettings.bReaimSlantedHits &&
-		M_ActiveScanDomain == ECoverFinderScanDomain::Environment &&
-		not M_SamplingState.GetIsSamplingFocusedSample();
-	if (bMayReaim)
-	{
-		QueueReaimedSample(ProtectedLocation, DirectionObservation);
-	}
-
+	// Knee height first: every kind of cover needs something there, so open ground costs this one probe.
 	DirectionObservation.LowerTrace = TraceCoverHeight(
 		ProtectedLocation,
 		DirectionObservation.SearchDirection,
 		RTSCoverFinderConstants::LowerSupportProbeHeight,
 		InOutFrameWorldQueries);
-	DirectionObservation.StandingTrace = TraceCoverHeight(
+	const bool bCrouchSurface = DirectionObservation.LowerTrace.bBlockingHit && SampleRegularCoverHeights(
+		NavigationSystem,
+		NavigationData,
 		ProtectedLocation,
-		DirectionObservation.SearchDirection,
-		RTSCoverFinderConstants::StandingCoverHeight,
+		DirectionObservation,
 		InOutFrameWorldQueries);
-
-	const bool bCrouchSurface = FCoverFinderAlgorithms::GetIsSameSurface(
-		DirectionObservation.LowerTrace,
-		DirectionObservation.CrouchTrace,
-		M_ActiveSettings);
-	const bool bStandingSurface = FCoverFinderAlgorithms::GetIsSameSurface(
-		DirectionObservation.CrouchTrace,
-		DirectionObservation.StandingTrace,
-		M_ActiveSettings);
-	if (bCrouchSurface && bStandingSurface)
-	{
-		SampleStandingSides(
-			NavigationSystem,
-			NavigationData,
-			ProtectedLocation,
-			DirectionObservation,
-			InOutFrameWorldQueries);
-	}
+	// Only the ring probes of a thin obstacle look for an open frame; grid probes keep the regular rule alone.
+	const bool bMayFindOpenFrame = M_ActiveSettings.bFindOpenFrameCover &&
+		M_SamplingState.CurrentObstacleCacheId != 0 &&
+		M_SamplingState.bCurrentSampleMayFindOpenFrameCover;
 	if (bMayFindOpenFrame && not bCrouchSurface)
 	{
 		SampleOpenFrameCover(
@@ -2453,9 +2487,144 @@ void URTSCoverFinderWorldSubsystem::SampleCurrentDirection(
 			DirectionObservation,
 			InOutFrameWorldQueries);
 	}
+	const bool bMayBeProneCover = M_ActiveSettings.bFindProneCover && DirectionObservation.LowerTrace.bBlockingHit &&
+		not bCrouchSurface && not DirectionObservation.bOpenFrameCover;
+	if (bMayBeProneCover)
+	{
+		SampleProneCover(NavigationSystem, NavigationData, ProtectedLocation, DirectionObservation, InOutFrameWorldQueries);
+	}
 
 	M_SamplingState.CurrentObservation.DirectionalObservations.Add(MoveTemp(DirectionObservation));
 	++M_SamplingState.CurrentDirectionIndex;
+}
+
+bool URTSCoverFinderWorldSubsystem::SampleRegularCoverHeights(
+	const UNavigationSystemV1& NavigationSystem,
+	const ANavigationData& NavigationData,
+	const FVector& ProtectedLocation,
+	FCoverDirectionalObservation& InOutDirectionObservation,
+	int32& InOutFrameWorldQueries)
+{
+	InOutDirectionObservation.CrouchTrace = TraceCoverHeight(
+		ProtectedLocation,
+		InOutDirectionObservation.SearchDirection,
+		M_ActiveSettings.MinimumCrouchCoverHeight,
+		InOutFrameWorldQueries);
+	if (not InOutDirectionObservation.CrouchTrace.bBlockingHit)
+	{
+		return false;
+	}
+	// Only grid probes ask for a second look, and only at objects: the result of that look is final.
+	const bool bMayReaim = M_ActiveSettings.bReaimSlantedHits &&
+		M_ActiveScanDomain == ECoverFinderScanDomain::Environment &&
+		not M_SamplingState.GetIsSamplingFocusedSample();
+	if (bMayReaim)
+	{
+		QueueReaimedSample(ProtectedLocation, InOutDirectionObservation);
+	}
+	if (not FCoverFinderAlgorithms::GetIsSameSurface(
+		InOutDirectionObservation.LowerTrace,
+		InOutDirectionObservation.CrouchTrace,
+		M_ActiveSettings))
+	{
+		return false;
+	}
+	InOutDirectionObservation.StandingTrace = TraceCoverHeight(
+		ProtectedLocation,
+		InOutDirectionObservation.SearchDirection,
+		RTSCoverFinderConstants::StandingCoverHeight,
+		InOutFrameWorldQueries);
+	if (FCoverFinderAlgorithms::GetIsSameSurface(
+		InOutDirectionObservation.CrouchTrace,
+		InOutDirectionObservation.StandingTrace,
+		M_ActiveSettings))
+	{
+		SampleStandingSides(
+			NavigationSystem,
+			NavigationData,
+			ProtectedLocation,
+			InOutDirectionObservation,
+			InOutFrameWorldQueries);
+	}
+	return true;
+}
+
+void URTSCoverFinderWorldSubsystem::SampleProneCover(
+	const UNavigationSystemV1& NavigationSystem,
+	const ANavigationData& NavigationData,
+	const FVector& ProbeLocation,
+	FCoverDirectionalObservation& InOutDirectionObservation,
+	int32& InOutFrameWorldQueries)
+{
+	const FVector ProbeDirection = InOutDirectionObservation.SearchDirection.GetSafeNormal2D();
+	InOutDirectionObservation.ProneFireOverTrace = TraceCoverHeight(
+		ProbeLocation,
+		ProbeDirection,
+		M_ActiveSettings.ProneCoverMaximumHeight,
+		InOutFrameWorldQueries);
+	if (not FCoverFinderAlgorithms::GetIsProneCoverEvidence(InOutDirectionObservation, M_ActiveSettings))
+	{
+		return;
+	}
+	// The soldier lies at the stand-off from the face, wherever along the probe that face was found.
+	const float DistanceToLyingPosition = InOutDirectionObservation.LowerTrace.Distance -
+		M_ActiveSettings.ProneCoverStandOff;
+	FVector LyingLocation = ProbeLocation;
+	if (FMath::Abs(DistanceToLyingPosition) > CoverFinderWorldSubsystemPrivate::ProneStandOffTolerance)
+	{
+		FNavLocation ProjectedLyingLocation;
+		++InOutFrameWorldQueries;
+		++M_PerformanceAccumulator.WorldQueryCount;
+		if (not NavigationSystem.ProjectPointToNavigation(
+			ProbeLocation + ProbeDirection * DistanceToLyingPosition,
+			ProjectedLyingLocation,
+			FVector(M_ActiveSettings.AgentRadius, M_ActiveSettings.AgentRadius, M_ActiveSettings.AgentHeight),
+			&NavigationData))
+		{
+			return;
+		}
+		LyingLocation = ProjectedLyingLocation.Location;
+	}
+	++InOutFrameWorldQueries;
+	++M_PerformanceAccumulator.WorldQueryCount;
+	if (not GetCanInfantryLieAt(LyingLocation, ProbeDirection))
+	{
+		return;
+	}
+	InOutDirectionObservation.ProneCoverLocation = LyingLocation;
+	InOutDirectionObservation.bHasProneLyingSpace = true;
+}
+
+bool URTSCoverFinderWorldSubsystem::GetCanInfantryLieAt(
+	const FVector& GroundLocation,
+	const FVector& FacingDirection) const
+{
+	using namespace CoverFinderWorldSubsystemPrivate;
+	const UWorld* World = GetWorld();
+	const FVector BodyDirection = FacingDirection.GetSafeNormal2D();
+	if (not IsValid(World) || BodyDirection.IsNearlyZero())
+	{
+		return false;
+	}
+	const FVector BodyCenter = GroundLocation - BodyDirection * ProneBodyCenterBackOffset +
+		FVector::UpVector * ProneBodyCenterHeight;
+	TArray<FOverlapResult> Overlaps;
+	World->OverlapMultiByObjectType(
+		Overlaps,
+		BodyCenter,
+		FRotationMatrix::MakeFromZ(BodyDirection).ToQuat(),
+		GetAllCoverObjectQueryParams(),
+		FCollisionShape::MakeCapsule(ProneBodyRadius, ProneBodyHalfLength),
+		BuildCoverCollisionQueryParams());
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		// The navmesh already vouches for the ground, and a soldier lying there must not unpublish the point.
+		if (not GetIsLandscapeComponent(Overlap.GetComponent()) && not GetIsInfantryActor(Overlap.GetActor()))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 void URTSCoverFinderWorldSubsystem::SampleOpenFrameCover(
@@ -3003,12 +3172,93 @@ void URTSCoverFinderWorldSubsystem::RebuildPublishedCoverPoints()
 		CombinedCandidates.Append(ProviderEntry.Value);
 	}
 
+	TSet<int64> PublishedPronePointIds;
+	for (const FRTSCoverPoint& PublishedPoint : M_CoverPoints)
+	{
+		if (PublishedPoint.CoverType == ERTSCoverType::Prone)
+		{
+			PublishedPronePointIds.Add(PublishedPoint.PointId);
+		}
+	}
 	M_CoverPoints = FCoverFinderAlgorithms::FinalizeCandidates(
 		MoveTemp(CombinedCandidates),
-		BuildPublicationSettings());
+		BuildPublicationSettings(),
+		&PublishedPronePointIds);
+	AppendProneCompanionPoints(PublishedPronePointIds);
+	M_PronePointsLostAtLastPublication = PublishedPronePointIds.Num();
+	for (const FRTSCoverPoint& PublishedPoint : M_CoverPoints)
+	{
+		M_PronePointsLostAtLastPublication -= PublishedPronePointIds.Contains(PublishedPoint.PointId) ? 1 : 0;
+	}
 	M_LastPerformanceSnapshot.CoverPointCount = M_CoverPoints.Num();
 	TagThinObstacleCoverPoints();
 	RebuildCoverSpatialGrid();
+}
+
+void URTSCoverFinderWorldSubsystem::AppendProneCompanionPoints(const TSet<int64>& PublishedPronePointIds)
+{
+	++M_PublicationIndex;
+	const FCoverFinderSettingsSnapshot PublicationSettings = BuildPublicationSettings();
+	TArray<FRTSCoverPoint> Companions;
+	int32 WorldCheckCount = 0;
+	for (const FRTSCoverPoint& SourcePoint : M_CoverPoints)
+	{
+		FRTSCoverPoint ProposedCompanion;
+		if (not FCoverFinderAlgorithms::TryBuildProneCompanion(SourcePoint, PublicationSettings, ProposedCompanion))
+		{
+			continue;
+		}
+		FCoverProneCompanionCacheEntry* CacheEntry = M_ProneCompanionCache.Find(SourcePoint.PointId);
+		if (CacheEntry == nullptr)
+		{
+			if (WorldCheckCount >= CoverFinderWorldSubsystemPrivate::MaximumProneCompanionChecksPerPublication)
+			{
+				continue;
+			}
+			++WorldCheckCount;
+			CacheEntry = &M_ProneCompanionCache.Add(SourcePoint.PointId);
+			CacheEntry->bHasLyingSpace = TryPlaceProneCompanion(ProposedCompanion);
+			CacheEntry->Companion = ProposedCompanion;
+		}
+		CacheEntry->LastUsedPublicationIndex = M_PublicationIndex;
+		if (CacheEntry->bHasLyingSpace)
+		{
+			Companions.Add(CacheEntry->Companion);
+		}
+	}
+	for (auto CacheIterator = M_ProneCompanionCache.CreateIterator(); CacheIterator; ++CacheIterator)
+	{
+		if (CacheIterator.Value().LastUsedPublicationIndex != M_PublicationIndex)
+		{
+			CacheIterator.RemoveCurrent();
+		}
+	}
+	FCoverFinderAlgorithms::AppendSpacedPronePoints(
+		MoveTemp(Companions),
+		PublicationSettings,
+		M_CoverPoints,
+		&PublishedPronePointIds);
+}
+
+bool URTSCoverFinderWorldSubsystem::TryPlaceProneCompanion(FRTSCoverPoint& InOutCompanion) const
+{
+	const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
+	const ANavigationData* NavigationData = GetCharacterNavigationData();
+	if (not IsValid(NavigationSystem) || not IsValid(NavigationData))
+	{
+		return false;
+	}
+	FNavLocation ProjectedLocation;
+	if (not NavigationSystem->ProjectPointToNavigation(
+		InOutCompanion.Location,
+		ProjectedLocation,
+		CoverFinderWorldSubsystemPrivate::ProneCompanionProjectionExtent,
+		NavigationData))
+	{
+		return false;
+	}
+	InOutCompanion.Location = ProjectedLocation.Location;
+	return GetCanInfantryLieAt(InOutCompanion.Location, -InOutCompanion.CoverNormal);
 }
 
 void URTSCoverFinderWorldSubsystem::RemoveGeneratedDuplicates(
@@ -3084,7 +3334,7 @@ void URTSCoverFinderWorldSubsystem::DrawPublishedCover() const
 
 		for (const FRTSCoverPoint& CoverPoint : M_CoverPoints)
 		{
-			const bool bCrouchCover = CoverPoint.CoverType == ERTSCoverType::Crouch;
+			const bool bCrouchCover = RTSCoverTypes::GetFiresFromProtectedPose(CoverPoint.CoverType);
 			const bool bTrenchCover = CoverPoint.CoverType == ERTSCoverType::TrenchStandUp;
 			const FColor DrawColor = CoverFinderWorldSubsystemPrivate::GetCoverDebugColor(CoverPoint.CoverType);
 			const FVector DrawLocation = CoverPoint.Location
@@ -3099,7 +3349,8 @@ void URTSCoverFinderWorldSubsystem::DrawPublishedCover() const
 				CoverSettings->M_DebugDrawDurationSeconds,
 				0,
 				CoverFinderWorldSubsystemPrivate::DebugLineThickness);
-			// Crouch cover shows its normal, a trench where the soldier looks, standing cover the side it peeks to.
+			// Crouch and prone cover show their normal, a trench where the soldier looks, standing cover the
+			// side it peeks to.
 			const FVector ArrowDirection = bCrouchCover
 				? CoverPoint.CoverNormal
 				: bTrenchCover

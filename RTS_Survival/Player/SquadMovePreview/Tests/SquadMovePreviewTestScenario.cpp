@@ -116,11 +116,15 @@ namespace SquadMovePreviewTestPrivate
 		for (const FRTSCoverPoint& CoverPoint : CoverSubsystem.GetCoverPointsView())
 		{
 			const bool bIsCrouchCover = CoverPoint.CoverType == ERTSCoverType::Crouch;
+			const bool bIsStandingCover = CoverPoint.CoverType == ERTSCoverType::StandingLeft ||
+				CoverPoint.CoverType == ERTSCoverType::StandingRight;
 			const ASquadUnit* ReservingUnit = CoverSubsystem.GetCoverReservationOwner(CoverPoint.PointId);
 			const bool bHeldByOtherSquad = IsValid(ReservingUnit) &&
 				ReservingUnit->GetSquadControllerChecked() != &TestSquad;
 			const float DistanceSquared = FVector::DistSquared2D(SquadLocation, CoverPoint.Location);
-			if (bIsCrouchCover != bWantCrouchCover || bHeldByOtherSquad || DistanceSquared >= NearestDistanceSquared)
+			// Prone cover and trench steps are neither of the two kinds this test plans onto.
+			const bool bIsWantedKind = bWantCrouchCover ? bIsCrouchCover : bIsStandingCover;
+			if (not bIsWantedKind || bHeldByOtherSquad || DistanceSquared >= NearestDistanceSquared)
 			{
 				continue;
 			}
@@ -286,6 +290,7 @@ void FSquadMovePreviewTestScenario::RunPlanChecksAndIssueMove(
 	}
 
 	CheckCoverPlans(PreviewComponent, TestSquad, CrouchPoint, StandingPoint);
+	CheckPronePlan(PreviewComponent, CoverSubsystem, TestSquad);
 	CheckChosenFacing(PreviewComponent, TestSquad, CrouchPoint);
 	FVector OpenGroundLocation = FVector::ZeroVector;
 	const bool bFoundOpenGround = SquadMovePreviewTestPrivate::FindOpenGroundLocation(
@@ -301,6 +306,38 @@ void FSquadMovePreviewTestScenario::RunPlanChecksAndIssueMove(
 	CheckSeveralSquads(PreviewComponent, PlayerSquads, StandingPoint.Location);
 	CheckPlanningCost(PreviewComponent, PlayerSquads, StandingPoint.Location);
 	IssuePlannedMove(PreviewComponent, TestSquad, StandingPoint.Location);
+}
+
+void FSquadMovePreviewTestScenario::CheckPronePlan(
+	USquadMovePreviewComponent& PreviewComponent,
+	const URTSCoverFinderWorldSubsystem& CoverSubsystem,
+	const TArray<ASquadController*>& TestSquad)
+{
+	// A map without prone cover, or with prone cover switched off, has nothing to plan onto.
+	const FVector SquadLocation = TestSquad[0]->GetActorLocation();
+	const FRTSCoverPoint* NearestPronePoint = nullptr;
+	for (const FRTSCoverPoint& CoverPoint : CoverSubsystem.GetCoverPointsView())
+	{
+		const bool bIsFreePronePoint = CoverPoint.CoverType == ERTSCoverType::Prone &&
+			not IsValid(CoverSubsystem.GetCoverReservationOwner(CoverPoint.PointId));
+		const bool bIsNearer = NearestPronePoint == nullptr ||
+			FVector::DistSquared2D(SquadLocation, CoverPoint.Location) <
+			FVector::DistSquared2D(SquadLocation, NearestPronePoint->Location);
+		NearestPronePoint = bIsFreePronePoint && bIsNearer ? &CoverPoint : NearestPronePoint;
+	}
+	if (NearestPronePoint == nullptr)
+	{
+		return;
+	}
+	TArray<FSquadMovePreviewUnit> Units;
+	FSquadMovePlan PronePlan;
+	PreviewComponent.BuildPlanForSquads(TestSquad, NearestPronePoint->Location, false, FVector::ZeroVector, Units, PronePlan);
+	Check(
+		SquadMovePreviewTestPrivate::CountPositionsOfType(PronePlan, ESquadPlannedPositionType::ProneCover) > 0,
+		TEXT("cursor on prone cover plans prone cover"));
+	Check(
+		SquadMovePreviewTestPrivate::GetPlanUsesCoverPoint(PronePlan, NearestPronePoint->PointId),
+		TEXT("the prone point under the cursor is used"));
 }
 
 void FSquadMovePreviewTestScenario::CheckCoverPlans(
@@ -491,10 +528,11 @@ void FSquadMovePreviewTestScenario::IssuePlannedMove(
 	UE_LOG(
 		LogRTSSquadPreviewTest,
 		Display,
-		TEXT("RTS_SQUAD_PREVIEW_TEST issued soldiers=%d standing_cover=%d crouch_cover=%d regular=%d"),
+		TEXT("RTS_SQUAD_PREVIEW_TEST issued soldiers=%d standing_cover=%d crouch_cover=%d prone_cover=%d regular=%d"),
 		Units.Num(),
 		SquadMovePreviewTestPrivate::CountPositionsOfType(ExpectedPlan, ESquadPlannedPositionType::StandingCover),
 		SquadMovePreviewTestPrivate::CountPositionsOfType(ExpectedPlan, ESquadPlannedPositionType::CrouchCover),
+		SquadMovePreviewTestPrivate::CountPositionsOfType(ExpectedPlan, ESquadPlannedPositionType::ProneCover),
 		SquadMovePreviewTestPrivate::CountPositionsOfType(ExpectedPlan, ESquadPlannedPositionType::RegularStanding));
 	EnterPhase(ESquadMovePreviewTestPhase::WaitingForPlannedMove);
 }

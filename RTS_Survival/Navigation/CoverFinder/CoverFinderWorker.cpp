@@ -131,6 +131,20 @@ namespace CoverFinderWorkerPrivate
 					ERTSCoverType::Crouch,
 					DirectionObservation.OpenFrameProviderHandle,
 					OutCandidates);
+				return;
+			}
+			// Too low to crouch behind, but a soldier can lie behind it.
+			if (DirectionObservation.bHasProneLyingSpace &&
+				FCoverFinderAlgorithms::GetIsProneCoverEvidence(DirectionObservation, Settings))
+			{
+				AppendCandidate(
+					DirectionObservation.ProneCoverLocation,
+					FCoverFinderAlgorithms::BuildCoverNormal(
+						DirectionObservation.LowerTrace,
+						DirectionObservation.SearchDirection),
+					ERTSCoverType::Prone,
+					DirectionObservation.LowerTrace.BlockingProviderHandle,
+					OutCandidates);
 			}
 			return;
 		}
@@ -209,6 +223,39 @@ namespace CoverFinderWorkerPrivate
 			return Left.Location.Z < Right.Location.Z;
 		}
 		return static_cast<uint8>(Left.CoverType) < static_cast<uint8>(Right.CoverType);
+	}
+
+	FIntPoint GetBucketCell(const FVector& Location, const float CellSize)
+	{
+		return FIntPoint(FMath::FloorToInt(Location.X / CellSize), FMath::FloorToInt(Location.Y / CellSize));
+	}
+
+	/** @return True when any location in the cell's neighbourhood lies within Distance of Location. */
+	bool GetHasLocationWithin(
+		const TMap<FIntPoint, TArray<FVector>>& LocationBuckets,
+		const FVector& Location,
+		const float Distance)
+	{
+		const FIntPoint LocationCell = GetBucketCell(Location, Distance);
+		for (int32 OffsetX = -1; OffsetX <= 1; ++OffsetX)
+		{
+			for (int32 OffsetY = -1; OffsetY <= 1; ++OffsetY)
+			{
+				const TArray<FVector>* CellLocations = LocationBuckets.Find(LocationCell + FIntPoint(OffsetX, OffsetY));
+				if (CellLocations == nullptr)
+				{
+					continue;
+				}
+				if (CellLocations->ContainsByPredicate([&Location, Distance](const FVector& OtherLocation)
+				{
+					return FVector::DistSquared(OtherLocation, Location) <= FMath::Square(Distance);
+				}))
+				{
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	bool BucketContainsDuplicate(
@@ -369,14 +416,22 @@ void FCoverFinderAlgorithms::AppendClassifiedCandidates(
 
 TArray<FRTSCoverPoint> FCoverFinderAlgorithms::FinalizeCandidates(
 	TArray<FRTSCoverPoint>&& RawCandidates,
-	const FCoverFinderSettingsSnapshot& Settings)
+	const FCoverFinderSettingsSnapshot& Settings,
+	const TSet<int64>* PreferredPronePointIds)
 {
 	RawCandidates.Sort(&CoverFinderWorkerPrivate::SortCandidates);
 	TArray<FRTSCoverPoint> AcceptedCandidates;
 	AcceptedCandidates.Reserve(RawCandidates.Num());
+	TArray<FRTSCoverPoint> GeneratedPronePoints;
 	TMap<FIntPoint, TArray<int32>> SpatialBuckets;
 	for (FRTSCoverPoint& Candidate : RawCandidates)
 	{
+		// Found prone cover is thinned out after everything else has its place; authored points are never thinned.
+		if (Candidate.CoverType == ERTSCoverType::Prone && Candidate.ProviderRegistrationId == 0)
+		{
+			GeneratedPronePoints.Add(MoveTemp(Candidate));
+			continue;
+		}
 		if (CoverFinderWorkerPrivate::GetIsDuplicateCandidate(
 			Candidate,
 			Settings.CoverPointSpacing,
@@ -394,7 +449,124 @@ TArray<FRTSCoverPoint> FCoverFinderAlgorithms::FinalizeCandidates(
 			CandidateIndex,
 			SpatialBuckets);
 	}
+	AppendSpacedPronePoints(MoveTemp(GeneratedPronePoints), Settings, AcceptedCandidates, PreferredPronePointIds);
 	return AcceptedCandidates;
+}
+
+bool FCoverFinderAlgorithms::GetIsProneCoverEvidence(
+	const FCoverDirectionalObservation& DirectionObservation,
+	const FCoverFinderSettingsSnapshot& Settings)
+{
+	const FCoverTraceObservation& LowerTrace = DirectionObservation.LowerTrace;
+	if (not Settings.bFindProneCover || not LowerTrace.bBlockingHit)
+	{
+		return false;
+	}
+	if (GetIsSameSurface(LowerTrace, DirectionObservation.CrouchTrace, Settings))
+	{
+		return false;
+	}
+	if (LowerTrace.ImpactNormal.Z > Settings.ProneCoverMaximumFaceNormalZ)
+	{
+		return false;
+	}
+	const float RequiredClearDistance = LowerTrace.Distance + RTSCoverFinderConstants::ProneCoverClearDepth;
+	const auto GetIsClearBehindFace = [RequiredClearDistance](const FCoverTraceObservation& Trace)
+	{
+		return not Trace.bBlockingHit || Trace.Distance >= RequiredClearDistance;
+	};
+	return GetIsClearBehindFace(DirectionObservation.ProneFireOverTrace) &&
+		GetIsClearBehindFace(DirectionObservation.CrouchTrace);
+}
+
+void FCoverFinderAlgorithms::AppendSpacedPronePoints(
+	TArray<FRTSCoverPoint>&& PronePoints,
+	const FCoverFinderSettingsSnapshot& Settings,
+	TArray<FRTSCoverPoint>& InOutAcceptedPoints,
+	const TSet<int64>* PreferredPointIds)
+{
+	if (PronePoints.IsEmpty())
+	{
+		return;
+	}
+	for (FRTSCoverPoint& PronePoint : PronePoints)
+	{
+		PronePoint.PointId = CoverFinderWorkerPrivate::BuildStableId(PronePoint);
+	}
+	if (PreferredPointIds != nullptr)
+	{
+		PronePoints.StableSort([PreferredPointIds](const FRTSCoverPoint& Left, const FRTSCoverPoint& Right)
+		{
+			return PreferredPointIds->Contains(Left.PointId) && not PreferredPointIds->Contains(Right.PointId);
+		});
+	}
+	const float AnyPointSpacing = FMath::Max(1.0f, Settings.CoverPointSpacing);
+	const float PronePointSpacing = FMath::Max(AnyPointSpacing, Settings.ProneCoverPointSpacing);
+	TMap<FIntPoint, TArray<FVector>> AnyPointBuckets;
+	TMap<FIntPoint, TArray<FVector>> PronePointBuckets;
+	const auto AddToBuckets = [&](const FRTSCoverPoint& CoverPoint)
+	{
+		AnyPointBuckets.FindOrAdd(CoverFinderWorkerPrivate::GetBucketCell(CoverPoint.Location, AnyPointSpacing))
+			.Add(CoverPoint.Location);
+		if (CoverPoint.CoverType == ERTSCoverType::Prone)
+		{
+			PronePointBuckets.FindOrAdd(
+				CoverFinderWorkerPrivate::GetBucketCell(CoverPoint.Location, PronePointSpacing))
+				.Add(CoverPoint.Location);
+		}
+	};
+	for (const FRTSCoverPoint& AcceptedPoint : InOutAcceptedPoints)
+	{
+		AddToBuckets(AcceptedPoint);
+	}
+	for (FRTSCoverPoint& PronePoint : PronePoints)
+	{
+		const bool bIsTooClose =
+			CoverFinderWorkerPrivate::GetHasLocationWithin(AnyPointBuckets, PronePoint.Location, AnyPointSpacing) ||
+			CoverFinderWorkerPrivate::GetHasLocationWithin(PronePointBuckets, PronePoint.Location, PronePointSpacing);
+		if (bIsTooClose)
+		{
+			continue;
+		}
+		AddToBuckets(PronePoint);
+		InOutAcceptedPoints.Add(MoveTemp(PronePoint));
+	}
+}
+
+bool FCoverFinderAlgorithms::TryBuildProneCompanion(
+	const FRTSCoverPoint& SourcePoint,
+	const FCoverFinderSettingsSnapshot& Settings,
+	FRTSCoverPoint& OutCompanion)
+{
+	constexpr uint64 PercentScale = 100;
+	const bool bIsEligibleSource = SourcePoint.ProviderRegistrationId == 0 &&
+		(SourcePoint.CoverType == ERTSCoverType::Crouch ||
+			SourcePoint.CoverType == ERTSCoverType::StandingLeft ||
+			SourcePoint.CoverType == ERTSCoverType::StandingRight);
+	const uint64 SourceHash = static_cast<uint64>(SourcePoint.PointId);
+	const bool bIsChosen = static_cast<int32>(SourceHash % PercentScale) < Settings.ProneCompanionChancePercent;
+	if (not Settings.bFindProneCover || not bIsEligibleSource || not bIsChosen)
+	{
+		return false;
+	}
+	const FVector AwayFromCover = SourcePoint.CoverNormal.GetSafeNormal2D();
+	const FVector RightDirection = FVector::CrossProduct(FVector::UpVector, -AwayFromCover);
+	// A standing point sits at the end of its wall and steps out past it; the prone point goes the other way,
+	// where the wall still is.
+	const bool bGoesRight = SourcePoint.CoverType == ERTSCoverType::StandingLeft ||
+		(SourcePoint.CoverType == ERTSCoverType::Crouch && (SourceHash / PercentScale) % 2 == 0);
+	const int32 YawJitterRange = RTSCoverFinderConstants::ProneCompanionMaximumYawJitterDegrees * 2 + 1;
+	const float YawJitterDegrees = static_cast<float>(
+		static_cast<int32>((SourceHash / (PercentScale * 2)) % YawJitterRange) -
+		RTSCoverFinderConstants::ProneCompanionMaximumYawJitterDegrees);
+	OutCompanion = FRTSCoverPoint();
+	OutCompanion.Location = SourcePoint.Location +
+		RightDirection * (bGoesRight ? Settings.ProneCompanionOffset : -Settings.ProneCompanionOffset) +
+		AwayFromCover * RTSCoverFinderConstants::ProneCompanionBackOffset;
+	OutCompanion.CoverNormal = AwayFromCover.RotateAngleAxis(YawJitterDegrees, FVector::UpVector);
+	OutCompanion.CoverType = ERTSCoverType::Prone;
+	OutCompanion.BlockingProviderHandle = SourcePoint.BlockingProviderHandle;
+	return true;
 }
 
 float FCoverFinderAlgorithms::GetProbeStandOffDistance(const FCoverFinderSettingsSnapshot& Settings)
@@ -412,8 +584,11 @@ bool FCoverFinderAlgorithms::GetIsThinObstacle(
 	}
 	const FVector ObstacleSize = CollisionBounds.GetSize();
 	const bool bIsThin = FMath::Max(ObstacleSize.X, ObstacleSize.Y) <= Settings.ThinObstacleMaximumWidth;
-	const bool bIsTallEnoughForCover = ObstacleSize.Z >= Settings.MinimumCrouchCoverHeight;
-	return bIsThin && bIsTallEnoughForCover;
+	// A low object is ringed as well when a soldier may lie behind it; the grid easily steps over small ones.
+	const float MinimumCoverHeight = Settings.bFindProneCover
+		? RTSCoverFinderConstants::LowerSupportProbeHeight
+		: Settings.MinimumCrouchCoverHeight;
+	return bIsThin && ObstacleSize.Z >= MinimumCoverHeight;
 }
 
 int32 FCoverFinderAlgorithms::GetThinObstacleSoldierCapacity(
@@ -464,8 +639,10 @@ bool FCoverFinderAlgorithms::AppendThinObstacleSamples(
 		FCoverFocusedSample& Sample = OutSamples.AddDefaulted_GetRef();
 		Sample.Location = ObstacleBase + FVector(FMath::Cos(AngleRadians), FMath::Sin(AngleRadians), 0.0f) * RingRadius;
 		Sample.AimLocation = ObstacleBase;
-		// Picks OpenFramePointsPerObstacle of the ring's probes at even steps around it.
-		Sample.bMayFindOpenFrameCover = (SampleIndex * Settings.OpenFramePointsPerObstacle) %
+		// Picks OpenFramePointsPerObstacle of the ring's probes at even steps around it. An object that is only
+		// ringed for prone cover is too low to crouch behind, frame or not.
+		Sample.bMayFindOpenFrameCover = ObstacleSize.Z >= Settings.MinimumCrouchCoverHeight &&
+			(SampleIndex * Settings.OpenFramePointsPerObstacle) %
 			Settings.ThinObstacleRingSampleCount < Settings.OpenFramePointsPerObstacle;
 	}
 	return true;

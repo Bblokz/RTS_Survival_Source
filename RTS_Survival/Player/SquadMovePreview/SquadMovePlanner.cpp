@@ -171,6 +171,10 @@ namespace SquadMovePlannerPrivate
 
 	ESquadPlannedPositionType GetPlannedTypeForCover(const ERTSCoverType CoverType)
 	{
+		if (CoverType == ERTSCoverType::Prone)
+		{
+			return ESquadPlannedPositionType::ProneCover;
+		}
 		return CoverType == ERTSCoverType::Crouch
 			? ESquadPlannedPositionType::CrouchCover
 			: ESquadPlannedPositionType::StandingCover;

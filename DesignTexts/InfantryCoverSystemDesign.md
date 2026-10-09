@@ -114,6 +114,22 @@ A trench point behaves like standing cover with no sideways step: protected is a
 
 `CoverAnimations.CoverReload` on the infantry animation Blueprint is a full-body montage of a crouched soldier reloading. `PlayReloadAnim` plays it, scaled to the weapon's reload time, instead of the weapon's regular reload montage whenever the unit holds a cover pose; left empty, the regular montage is used. The weapon reports its reload to the soldier (`ASquadUnit::OnWeaponReloadStarted`), not straight to the animation instance: a soldier that is exposed from standing or trench cover first returns to its protected pose, and `ExposeFromStandingCover` keeps it there until the reload time has passed. While the return montage plays, the reload clip waits and then starts for the time that is left (`TryPlayPendingCoverReload`). Leaving cover stops the clip.
 
+### Prone cover
+
+`ERTSCoverType::Prone` is cover a soldier lies behind: a bump in the landscape or a low object. It draws purple, in the cover debug view and in the squad move preview (`ESquadPlannedPositionType::ProneCover`). Like crouch cover it fires from where it is (`RTSCoverTypes::GetFiresFromProtectedPose`).
+
+**Finding it.** Every probe direction now starts with the knee-height probe (30 cm), because every kind of cover needs something there; open ground still costs one probe per direction. Where that probe hits something that is no crouch cover, one more probe at `M_ProneCoverMaximumHeight` (60 cm) decides (`FCoverFinderAlgorithms::GetIsProneCoverEvidence`): the face must be steeper than `M_ProneCoverMinimumSlopeDegrees`, and nothing may rise above the fire-over height for 120 cm behind it, which tells a bump from the foot of a hillside or a wall. The soldier lies `M_ProneCoverStandOff` from the face; that spot is moved onto the navmesh and checked for room with a low capsule along the body (`GetCanInfantryLieAt`). The landscape scan finds bumps, the environment scan low objects, with the same code. Objects between knee and crouch height that are thin also get the ring of probes, since the grid easily steps over small ones.
+
+**Keeping it sparse.** Found prone points keep `M_ProneCoverPointSpacing` (500 cm) from each other and the regular point spacing from every other point (`AppendSpacedPronePoints`). A scan keeps all it finds; the thinning happens at publication, where points published before go first. Without that, which of two close candidates survives changed from scan to scan and soldiers kept losing their point.
+
+**Companions.** `M_ProneCompanionChancePercent` (15) of the crouch and standing points get a prone point `M_ProneCompanionOffset` (170 cm) to the side, facing the same way within 15 degrees (`TryBuildProneCompanion`). The choice follows from the point's ID, so it is the same on every scan. Each is checked against the world once and cached (`M_ProneCompanionCache`), at most 32 new ones per publication.
+
+**Using it.** Prone points have their own share of the firing-lane tests of a cover search (4, next to the 8 of the other types), so rolling ground full of prone points cannot push crouch and standing candidates out. The lane is tested from 70 cm. A prone point takes none of a thin obstacle's capacity.
+
+**Animation.** `CoverAnimations.Prone` on the infantry animation Blueprint is a `FSquadUnitCrouchCoverAnimationSet`: `ProtectedIdlePose` (lying, head down), `AimAssets` (a non-additive prone aim pose as `BaseSequence`, its aim offset, optional fire montages), optional enter and exit montages and `EnterStartOffset`. `ProneCoverReload` is the lying reload; empty, `CoverReload` is used. While `Prone.ProtectedIdlePose` is empty a soldier at a prone point uses the whole Crouch set. With it assigned, the weapon's prone fire montages are used (the crouch ones where a weapon has none). The graph needs no new nodes: prone goes through the same `CoverIdle` and `CoverAim` branches.
+
+`RTS_COVER_PERF` reports `prone`, `prone_lost` (prone points of the previous publication that are gone) and `prone_companions`. The count test also logs `reachability` per cover type.
+
 ### Staying put in cover
 
 Several things used to make a soldier give up or step out of cover it was about to take again. Each has its own guard:

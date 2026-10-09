@@ -1,6 +1,9 @@
 #include "CoverCountTestScenario.h"
 
 #include "Engine/World.h"
+#include "EngineUtils.h"
+#include "NavigationSystem.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "GameFramework/Actor.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
@@ -62,6 +65,7 @@ void FCoverCountTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem
 	}
 	bM_IsWaitingForCoverScan = false;
 	const TMap<FString, int32> Counts = GatherCounts(CoverSubsystem);
+	LogReachability(CoverSubsystem);
 	const FString BaselineFilePath = GetBaselineFilePath(World->GetName());
 	if (bM_WriteBaseline)
 	{
@@ -101,6 +105,63 @@ TMap<FString, int32> FCoverCountTestScenario::GatherCounts(const URTSCoverFinder
 	}
 	Counts.KeySort(TLess<FString>());
 	return Counts;
+}
+
+void FCoverCountTestScenario::LogReachability(const URTSCoverFinderWorldSubsystem& CoverSubsystem) const
+{
+	using namespace CoverCountTestScenarioPrivate;
+	constexpr int32 MaximumListedPoints = 12;
+	UWorld* World = CoverSubsystem.GetWorld();
+	UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(World);
+	const TActorIterator<ASquadUnit> FirstSoldier(World);
+	if (not IsValid(NavigationSystem) || not FirstSoldier)
+	{
+		return;
+	}
+	const ASquadUnit* Soldier = *FirstSoldier;
+	const ANavigationData* NavigationData = NavigationSystem->GetNavDataForProps(
+		Soldier->GetNavAgentPropertiesRef(),
+		Soldier->GetNavAgentLocation());
+	if (not IsValid(NavigationData))
+	{
+		return;
+	}
+	TMap<FString, int32> ReachablePerType;
+	TMap<FString, int32> UnreachablePerType;
+	int32 ListedPointCount = 0;
+	for (const FRTSCoverPoint& CoverPoint : CoverSubsystem.GetCoverPointsView())
+	{
+		const FString TypeName = GetCoverTypeName(CoverPoint.CoverType);
+		const FPathFindingQuery PathQuery(Soldier, *NavigationData, Soldier->GetNavAgentLocation(), CoverPoint.Location);
+		if (NavigationSystem->TestPathSync(PathQuery))
+		{
+			++ReachablePerType.FindOrAdd(TypeName);
+			continue;
+		}
+		++UnreachablePerType.FindOrAdd(TypeName);
+		if (ListedPointCount++ < MaximumListedPoints)
+		{
+			UE_LOG(
+				LogRTSCoverCountTest,
+				Display,
+				TEXT("RTS_COVER_COUNT unreachable_point type=%s source=%s location=\"X=%.0f Y=%.0f Z=%.0f\""),
+				*TypeName,
+				*GetSourceName(CoverSubsystem, CoverPoint),
+				CoverPoint.Location.X,
+				CoverPoint.Location.Y,
+				CoverPoint.Location.Z);
+		}
+	}
+	for (const TPair<FString, int32>& Reachable : ReachablePerType)
+	{
+		UE_LOG(
+			LogRTSCoverCountTest,
+			Display,
+			TEXT("RTS_COVER_COUNT reachability type=%s reachable=%d unreachable=%d"),
+			*Reachable.Key,
+			Reachable.Value,
+			UnreachablePerType.FindRef(Reachable.Key));
+	}
 }
 
 FString FCoverCountTestScenario::GetBaselineFilePath(const FString& MapName) const

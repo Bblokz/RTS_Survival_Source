@@ -122,6 +122,38 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="1", ClampMax="8", UIMin="1", UIMax="8"))
 	int32 M_CombatCoverMaximumThreats = 6;
 
+	// Finds cover a soldier lies behind: bumps in the landscape and low objects that reach knee height (30 cm)
+	// but are too low to crouch behind. Costs one extra probe only where something low was hit.
+	UPROPERTY(Config, EditAnywhere, Category="Prone Cover")
+	bool bM_FindProneCover = true;
+
+	// Prone cover must top out below this height, or the lying soldier cannot fire over it.
+	UPROPERTY(Config, EditAnywhere, Category="Prone Cover", meta=(ClampMin="35.0", ClampMax="85.0", UIMin="35.0", UIMax="85.0", Units="cm", EditCondition="bM_FindProneCover"))
+	float M_ProneCoverMaximumHeight = 60.0f;
+
+	// How steep the face of a bump must be to count. Lower values also accept gentle rises in the ground.
+	UPROPERTY(Config, EditAnywhere, Category="Prone Cover", meta=(ClampMin="10.0", ClampMax="80.0", UIMin="10.0", UIMax="80.0", Units="deg", EditCondition="bM_FindProneCover"))
+	float M_ProneCoverMinimumSlopeDegrees = 25.0f;
+
+	// Distance from the face of the cover to the middle of the lying soldier. Match it to the prone animation,
+	// so the soldier's head ends up just behind the cover.
+	UPROPERTY(Config, EditAnywhere, Category="Prone Cover", meta=(ClampMin="40.0", ClampMax="160.0", UIMin="40.0", UIMax="160.0", Units="cm", EditCondition="bM_FindProneCover"))
+	float M_ProneCoverStandOff = 90.0f;
+
+	// Prone points keep at least this distance from each other. Rolling ground would otherwise fill up with
+	// them; raise it for fewer prone points, lower it for more.
+	UPROPERTY(Config, EditAnywhere, Category="Prone Cover", meta=(ClampMin="90.0", ClampMax="3000.0", UIMin="90.0", UIMax="1500.0", Units="cm", EditCondition="bM_FindProneCover"))
+	float M_ProneCoverPointSpacing = 500.0f;
+
+	// Chance that a crouch or standing cover point gets a prone point beside it, facing roughly the same way,
+	// so a squad in cover does not all take the same pose. Zero adds none.
+	UPROPERTY(Config, EditAnywhere, Category="Prone Cover", meta=(ClampMin="0", ClampMax="100", UIMin="0", UIMax="100", Units="%", EditCondition="bM_FindProneCover"))
+	int32 M_ProneCompanionChancePercent = 15;
+
+	// How far to the side of that crouch or standing point the prone point is placed.
+	UPROPERTY(Config, EditAnywhere, Category="Prone Cover", meta=(ClampMin="80.0", ClampMax="400.0", UIMin="80.0", UIMax="400.0", Units="cm", EditCondition="bM_FindProneCover"))
+	float M_ProneCompanionOffset = 170.0f;
+
 	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="40.0", ClampMax="143.0", UIMin="40.0", UIMax="143.0", Units="cm"))
 	float M_MinimumCrouchCoverHeight = 90.0f;
 

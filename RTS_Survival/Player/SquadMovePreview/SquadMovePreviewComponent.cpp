@@ -36,6 +36,7 @@ namespace SquadMovePreviewPrivate
 	const FColor RegularStandingColor(90, 220, 90);
 	const FColor StandingCoverColor(255, 165, 0);
 	const FColor CrouchCoverColor(80, 200, 255);
+	const FColor ProneCoverColor(160, 60, 220);
 
 	FColor GetMarkerColor(const ESquadPlannedPositionType PositionType)
 	{
@@ -45,6 +46,8 @@ namespace SquadMovePreviewPrivate
 			return StandingCoverColor;
 		case ESquadPlannedPositionType::CrouchCover:
 			return CrouchCoverColor;
+		case ESquadPlannedPositionType::ProneCover:
+			return ProneCoverColor;
 		case ESquadPlannedPositionType::RegularStanding:
 		case ESquadPlannedPositionType::None:
 		default:

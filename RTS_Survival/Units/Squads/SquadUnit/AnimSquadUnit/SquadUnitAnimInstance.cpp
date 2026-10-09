@@ -680,14 +680,24 @@ UAnimMontage* USquadUnitAnimInstance::SelectFireMontage(const bool bIsSingleFire
 			return CoverFireMontage;
 		}
 	}
-	return WeaponMontages.GetFireMontage(AimPositionMontages.AimPosition, AimOffsets.M_AimOffsetType, bIsSingleFire);
+	UAnimMontage* PositionFireMontage = WeaponMontages.GetFireMontage(
+		AimPositionMontages.AimPosition,
+		AimOffsets.M_AimOffsetType,
+		bIsSingleFire);
+	// Not every weapon has a prone fire clip yet; the crouch one still shows the shot.
+	const bool bUseCrouchFallback = not IsValid(PositionFireMontage) &&
+		AimPositionMontages.AimPosition == ESquadAimPosition::Prone;
+	return bUseCrouchFallback
+		? WeaponMontages.GetFireMontage(ESquadAimPosition::Crouch, AimOffsets.M_AimOffsetType, bIsSingleFire)
+		: PositionFireMontage;
 }
 
 const FSquadUnitCoverAimAssets* USquadUnitAnimInstance::GetActiveCoverAimAssets() const
 {
-	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	if (const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet =
+		FindFireInPlaceCoverAnimationSet(M_CoverAnimRuntime.M_IdlePose))
 	{
-		return &CoverAnimations.Crouch.AimAssets;
+		return &FireInPlaceSet->AimAssets;
 	}
 	const bool bIsStandingPeek = GetIsPeekPose(M_CoverAnimRuntime.M_IdlePose);
 	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = bIsStandingPeek
@@ -698,14 +708,21 @@ const FSquadUnitCoverAimAssets* USquadUnitAnimInstance::GetActiveCoverAimAssets(
 
 bool USquadUnitAnimInstance::GetIsInCoverReloadPosition() const
 {
-	return IsValid(CoverAnimations.CoverReload) && GetIsCoverAnimationActive() &&
+	return IsValid(GetCoverReloadMontage()) && GetIsCoverAnimationActive() &&
 		M_CoverAnimRuntime.M_Action != ESquadCoverAnimAction::Exiting;
+}
+
+UAnimMontage* USquadUnitAnimInstance::GetCoverReloadMontage() const
+{
+	const bool bUsesProneReload = M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::ProneCover &&
+		IsValid(CoverAnimations.ProneCoverReload);
+	return bUsesProneReload ? CoverAnimations.ProneCoverReload : CoverAnimations.CoverReload;
 }
 
 void USquadUnitAnimInstance::PlayCoverReloadMontage(const float RemainingReloadSeconds)
 {
 	M_CoverAnimRuntime.M_PendingCoverReloadEndWorldSeconds = -1.0f;
-	StartMontage(CoverAnimations.CoverReload, true, RemainingReloadSeconds);
+	StartMontage(GetCoverReloadMontage(), true, RemainingReloadSeconds);
 }
 
 void USquadUnitAnimInstance::TryPlayPendingCoverReload()
@@ -730,10 +747,13 @@ void USquadUnitAnimInstance::StopCoverReloadMontage()
 {
 	constexpr float CoverReloadBlendOutSeconds = 0.15f;
 	M_CoverAnimRuntime.M_PendingCoverReloadEndWorldSeconds = -1.0f;
-	// A soldier that leaves its cover must not slide away in a crouched full-body clip.
-	if (IsValid(CoverAnimations.CoverReload) && Montage_IsPlaying(CoverAnimations.CoverReload))
+	// A soldier that leaves its cover must not slide away in a crouched or lying full-body clip.
+	for (UAnimMontage* ReloadMontage : {CoverAnimations.CoverReload.Get(), CoverAnimations.ProneCoverReload.Get()})
 	{
-		Montage_Stop(CoverReloadBlendOutSeconds, CoverAnimations.CoverReload);
+		if (IsValid(ReloadMontage) && Montage_IsPlaying(ReloadMontage))
+		{
+			Montage_Stop(CoverReloadBlendOutSeconds, ReloadMontage);
+		}
 	}
 }
 
@@ -815,7 +835,7 @@ bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose)
 
 	CancelCoverAnimation();
 
-	const bool bIsSupportedCoverPose = CoverPose == ESquadIdleAnimationPose::CrouchCover ||
+	const bool bIsSupportedCoverPose = GetIsFireInPlacePose(CoverPose) ||
 		CoverPose == ESquadIdleAnimationPose::StandingCoverLeft ||
 		CoverPose == ESquadIdleAnimationPose::StandingCoverRight ||
 		CoverPose == ESquadIdleAnimationPose::TrenchCover;
@@ -827,8 +847,13 @@ bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose)
 	}
 	UAnimMontage* EnterMontage = GetCoverEnterMontage(CoverPose);
 	// A trench is entered in its protected pose, which is a crouch.
-	const bool bEntersCrouched = CoverPose == ESquadIdleAnimationPose::CrouchCover || GetIsTrenchPose(CoverPose);
+	const bool bEntersCrouched = GetIsFireInPlacePose(CoverPose) || GetIsTrenchPose(CoverPose);
 	AimPositionMontages.AimPosition = bEntersCrouched ? ESquadAimPosition::Crouch : ESquadAimPosition::Standing;
+	// Decides which of the weapon's fire montages play; prone only once there is a prone pose to play them on.
+	if (FindFireInPlaceCoverAnimationSet(CoverPose) == &CoverAnimations.Prone)
+	{
+		AimPositionMontages.AimPosition = ESquadAimPosition::Prone;
+	}
 
 	M_CoverAnimRuntime.M_IdlePose = CoverPose;
 	SetIdleAnimationPose(CoverPose);
@@ -957,7 +982,7 @@ bool USquadUnitAnimInstance::GetIsCoverAnimationActive() const
 
 bool USquadUnitAnimInstance::GetIsCoverFireAllowed() const
 {
-	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	if (GetIsFireInPlacePose(M_CoverAnimRuntime.M_IdlePose))
 	{
 		return M_CoverAnimRuntime.M_Action == ESquadCoverAnimAction::Protected;
 	}
@@ -967,9 +992,9 @@ bool USquadUnitAnimInstance::GetIsCoverFireAllowed() const
 
 UAnimMontage* USquadUnitAnimInstance::GetCoverEnterMontage(const ESquadIdleAnimationPose CoverPose) const
 {
-	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+	if (const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet = FindFireInPlaceCoverAnimationSet(CoverPose))
 	{
-		return CoverAnimations.Crouch.EnterCoverMontage;
+		return FireInPlaceSet->EnterCoverMontage;
 	}
 	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = FindStandingCoverAnimationSet(CoverPose);
 	return StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->EnterCoverMontage;
@@ -983,9 +1008,9 @@ FSquadUnitCoverLocalOffset USquadUnitAnimInstance::GetCoverEnterStartOffset(
 	{
 		return FSquadUnitCoverLocalOffset();
 	}
-	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+	if (const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet = FindFireInPlaceCoverAnimationSet(CoverPose))
 	{
-		return CoverAnimations.Crouch.EnterStartOffset;
+		return FireInPlaceSet->EnterStartOffset;
 	}
 	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = FindStandingCoverAnimationSet(CoverPose);
 	return StandingAnimationSet == nullptr ? FSquadUnitCoverLocalOffset() : StandingAnimationSet->EnterStartOffset;
@@ -1061,9 +1086,10 @@ void USquadUnitAnimInstance::ForceCompleteCoverTransition()
 
 UAnimSequence* USquadUnitAnimInstance::ResolveCoverIdlePose() const
 {
-	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	if (const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet =
+		FindFireInPlaceCoverAnimationSet(M_CoverAnimRuntime.M_IdlePose))
 	{
-		return CoverAnimations.Crouch.ProtectedIdlePose;
+		return FireInPlaceSet->ProtectedIdlePose;
 	}
 
 	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
@@ -1079,9 +1105,10 @@ UAnimSequence* USquadUnitAnimInstance::ResolveCoverIdlePose() const
 
 UAimOffsetBlendSpace* USquadUnitAnimInstance::ResolveCoverAimOffset() const
 {
-	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	if (const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet =
+		FindFireInPlaceCoverAnimationSet(M_CoverAnimRuntime.M_IdlePose))
 	{
-		return CoverAnimations.Crouch.AimAssets.AimOffset;
+		return FireInPlaceSet->AimAssets.AimOffset;
 	}
 
 	if (not GetIsPeekPose(M_CoverAnimRuntime.M_IdlePose))
@@ -1095,9 +1122,10 @@ UAimOffsetBlendSpace* USquadUnitAnimInstance::ResolveCoverAimOffset() const
 
 UAnimSequence* USquadUnitAnimInstance::ResolveCoverAimBaseSequence() const
 {
-	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	if (const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet =
+		FindFireInPlaceCoverAnimationSet(M_CoverAnimRuntime.M_IdlePose))
 	{
-		return GetUsableCoverAimBaseSequence(CoverAnimations.Crouch.AimAssets.BaseSequence);
+		return GetUsableCoverAimBaseSequence(FireInPlaceSet->AimAssets.BaseSequence);
 	}
 
 	if (not GetIsPeekPose(M_CoverAnimRuntime.M_IdlePose))
@@ -1479,7 +1507,8 @@ void USquadUnitAnimInstance::RefreshCoverGraphPose()
 			: ESquadCoverGraphPose::NotInCover;
 		break;
 	case ESquadIdleAnimationPose::CrouchCover:
-		// Crouch cover needs no expose transition, so it ducks whenever the weapon has nothing to aim at.
+	case ESquadIdleAnimationPose::ProneCover:
+		// Crouch and prone cover need no expose transition, so they duck whenever the weapon has nothing to aim at.
 		// Without usable aim assets it stays in the idle crouch instead of showing a broken aim pose.
 		CoverGraphPose = bAimToTarget && IsValid(ResolveCoverAimOffset()) && IsValid(ResolveCoverAimBaseSequence())
 			? ESquadCoverGraphPose::CoverAim
@@ -1563,9 +1592,10 @@ bool USquadUnitAnimInstance::PlayCoverMontage(
 bool USquadUnitAnimInstance::PlayExitCoverMontage()
 {
 	UAnimMontage* ExitMontage = nullptr;
-	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
+	if (const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet =
+		FindFireInPlaceCoverAnimationSet(M_CoverAnimRuntime.M_IdlePose))
 	{
-		ExitMontage = CoverAnimations.Crouch.ExitCoverMontage;
+		ExitMontage = FireInPlaceSet->ExitCoverMontage;
 	}
 	else
 	{
@@ -1672,13 +1702,15 @@ void USquadUnitAnimInstance::ClearCoverAnimationRuntime()
 void USquadUnitAnimInstance::LogMissingCoverAnimationAssets(
 	const ESquadIdleAnimationPose CoverPose) const
 {
-	const bool bIsCrouchCover = CoverPose == ESquadIdleAnimationPose::CrouchCover;
+	// For prone cover without its own clips this is the crouch set the unit falls back to.
+	const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet = FindFireInPlaceCoverAnimationSet(CoverPose);
+	const bool bIsCrouchCover = FireInPlaceSet != nullptr;
 	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
 	const UAnimSequence* ProtectedIdlePose = bIsCrouchCover
-		? CoverAnimations.Crouch.ProtectedIdlePose
+		? FireInPlaceSet->ProtectedIdlePose
 		: StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->ProtectedIdlePose;
 	const FSquadUnitCoverAimAssets* AimAssets = bIsCrouchCover
-		? &CoverAnimations.Crouch.AimAssets
+		? &FireInPlaceSet->AimAssets
 		: StandingAnimationSet == nullptr ? nullptr : &StandingAnimationSet->PeekAimAssets;
 
 	if (not IsValid(ProtectedIdlePose) && not IsValid(ResolveCoverIdlePose()))
@@ -1737,6 +1769,10 @@ void USquadUnitAnimInstance::LogCoverAimAssetSetup() const
 		CoverAnimations.Crouch.AimAssets.AimOffset,
 		CoverAnimations.Crouch.AimAssets.BaseSequence);
 	LogAimAssetSetup(
+		TEXT("cover_prone"),
+		CoverAnimations.Prone.AimAssets.AimOffset,
+		CoverAnimations.Prone.AimAssets.BaseSequence);
+	LogAimAssetSetup(
 		TEXT("cover_standing_left"),
 		CoverAnimations.StandingLeft.PeekAimAssets.AimOffset,
 		CoverAnimations.StandingLeft.PeekAimAssets.BaseSequence);
@@ -1770,10 +1806,10 @@ void USquadUnitAnimInstance::LogCoverMontageRootMotion(const ESquadIdleAnimation
 		{
 			LogCoverAimAssetSetup();
 		}
-		if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+		if (const FSquadUnitCrouchCoverAnimationSet* FireInPlaceSet = FindFireInPlaceCoverAnimationSet(CoverPose))
 		{
-			LogCoverMontageRootMotion(CoverAnimations.Crouch.EnterCoverMontage, TEXT("Crouch enter"));
-			LogCoverMontageRootMotion(CoverAnimations.Crouch.ExitCoverMontage, TEXT("Crouch exit"));
+			LogCoverMontageRootMotion(FireInPlaceSet->EnterCoverMontage, TEXT("Crouch or prone enter"));
+			LogCoverMontageRootMotion(FireInPlaceSet->ExitCoverMontage, TEXT("Crouch or prone exit"));
 			return;
 		}
 		const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
@@ -1879,6 +1915,26 @@ bool USquadUnitAnimInstance::GetIsPeekPose(const ESquadIdleAnimationPose CoverPo
 	return CoverPose == ESquadIdleAnimationPose::StandingPeekLeft ||
 		CoverPose == ESquadIdleAnimationPose::StandingPeekRight ||
 		CoverPose == ESquadIdleAnimationPose::TrenchPeek;
+}
+
+bool USquadUnitAnimInstance::GetIsFireInPlacePose(const ESquadIdleAnimationPose CoverPose)
+{
+	return CoverPose == ESquadIdleAnimationPose::CrouchCover || CoverPose == ESquadIdleAnimationPose::ProneCover;
+}
+
+const FSquadUnitCrouchCoverAnimationSet* USquadUnitAnimInstance::FindFireInPlaceCoverAnimationSet(
+	const ESquadIdleAnimationPose CoverPose) const
+{
+	if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
+	{
+		return &CoverAnimations.Crouch;
+	}
+	if (CoverPose != ESquadIdleAnimationPose::ProneCover)
+	{
+		return nullptr;
+	}
+	// Until the prone clips are assigned, a soldier at a prone point crouches there.
+	return IsValid(CoverAnimations.Prone.ProtectedIdlePose) ? &CoverAnimations.Prone : &CoverAnimations.Crouch;
 }
 
 bool USquadUnitAnimInstance::GetIsTrenchPose(const ESquadIdleAnimationPose CoverPose)

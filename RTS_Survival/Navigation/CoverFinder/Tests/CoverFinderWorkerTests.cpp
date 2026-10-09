@@ -116,9 +116,15 @@ bool FCoverFinderThinObstacleTest::RunTest(const FString& Parameters)
 	const FBox WallBounds(FVector::ZeroVector, FVector(600.0f, 40.0f, 300.0f));
 	TestFalse(TEXT("A wall is left to the grid"),
 		FCoverFinderAlgorithms::AppendThinObstacleSamples(WallBounds, Settings, RejectedSamples));
+	// Lower than knee height: nothing to crouch or lie behind.
+	const FBox KerbBounds(FVector::ZeroVector, FVector(60.0f, 60.0f, 20.0f));
+	TestFalse(TEXT("A kerb too low for any cover gets no ring"),
+		FCoverFinderAlgorithms::AppendThinObstacleSamples(KerbBounds, Settings, RejectedSamples));
+	FCoverFinderSettingsSnapshot NoProneSettings;
+	NoProneSettings.bFindProneCover = false;
 	const FBox StumpBounds(FVector::ZeroVector, FVector(60.0f, 60.0f, 40.0f));
-	TestFalse(TEXT("A stump too low for crouch cover gets no ring"),
-		FCoverFinderAlgorithms::AppendThinObstacleSamples(StumpBounds, Settings, RejectedSamples));
+	TestFalse(TEXT("With prone cover off, a stump too low for crouch cover gets no ring"),
+		FCoverFinderAlgorithms::AppendThinObstacleSamples(StumpBounds, NoProneSettings, RejectedSamples));
 	TestEqual(TEXT("Rejected obstacles add no probes"), RejectedSamples.Num(), 0);
 
 	const FBox PoleBounds(FVector::ZeroVector, FVector(20.0f, 20.0f, 300.0f));

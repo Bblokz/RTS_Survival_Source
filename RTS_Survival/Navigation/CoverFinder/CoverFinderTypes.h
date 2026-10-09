@@ -23,6 +23,12 @@ namespace RTSCoverFinderConstants
 	inline constexpr int32 MaxFocusedSamples = 200000;
 	inline constexpr float SurfaceNormalSimilarity = 0.75f;
 	inline constexpr float DuplicateNormalSimilarity = 0.85f;
+	// Behind the face of prone cover nothing may rise above the soldier's line of fire for this far: that tells
+	// a bump or a low object from the foot of a hillside or of a wall.
+	inline constexpr float ProneCoverClearDepth = 120.0f;
+	// A prone companion point lies this much further from the cover than the point it was placed beside.
+	inline constexpr float ProneCompanionBackOffset = 30.0f;
+	inline constexpr int32 ProneCompanionMaximumYawJitterDegrees = 15;
 }
 
 /** Cover postures/actions produced by the geometry search. */
@@ -33,8 +39,19 @@ enum class ERTSCoverType : uint8
 	StandingLeft UMETA(DisplayName="Standing - Peek Left"),
 	StandingRight UMETA(DisplayName="Standing - Peek Right"),
 	// A firing step in a trench: the soldier crouches below the edge and stands up in place to fire.
-	TrenchStandUp UMETA(DisplayName="Trench - Stand Up")
+	TrenchStandUp UMETA(DisplayName="Trench - Stand Up"),
+	// Lying behind something knee high: a bump in the ground or a low object. Fires from where it lies.
+	Prone UMETA(DisplayName="Prone")
 };
+
+namespace RTSCoverTypes
+{
+	/** @return True for cover a soldier fires from without first stepping out or standing up. */
+	inline bool GetFiresFromProtectedPose(const ERTSCoverType CoverType)
+	{
+		return CoverType == ERTSCoverType::Crouch || CoverType == ERTSCoverType::Prone;
+	}
+}
 
 /**
  * @brief A class-agnostic infantry cover position published by the world cover service.
@@ -187,6 +204,17 @@ struct FCoverFinderSettingsSnapshot
 	bool bFindOpenFrameCover = true;
 	bool bProbeThinObstacles = true;
 	bool bReaimSlantedHits = true;
+
+	// Prone cover: something at knee height that tops out below ProneCoverMaximumHeight.
+	float ProneCoverMaximumHeight = 60.0f;
+	// Upward part of the surface normal above which a face is too gentle a slope to hide behind.
+	float ProneCoverMaximumFaceNormalZ = 0.9f;
+	float ProneCoverStandOff = 90.0f;
+	// Generated prone points keep at least this distance from each other, whichever way they face.
+	float ProneCoverPointSpacing = 500.0f;
+	float ProneCompanionOffset = 170.0f;
+	int32 ProneCompanionChancePercent = 15;
+	bool bFindProneCover = true;
 };
 
 /**
@@ -237,6 +265,12 @@ struct FCoverDirectionalObservation
 	FVector OpenFrameCoverLocation = FVector::ZeroVector;
 	uint64 OpenFrameProviderHandle = 0;
 	bool bOpenFrameCover = false;
+
+	// Probe at the height a prone soldier fires over; only made where the lower trace hit something that is
+	// no crouch cover. ProneCoverLocation is where the soldier lies, set once the game thread found room there.
+	FCoverTraceObservation ProneFireOverTrace;
+	FVector ProneCoverLocation = FVector::ZeroVector;
+	bool bHasProneLyingSpace = false;
 };
 
 /** World-query evidence for one navigable infantry position. */

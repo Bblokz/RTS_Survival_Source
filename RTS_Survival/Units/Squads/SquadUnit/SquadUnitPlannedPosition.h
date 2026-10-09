@@ -11,7 +11,8 @@ enum class ESquadPlannedPositionType : uint8
 	None,
 	RegularStanding,
 	StandingCover,
-	CrouchCover
+	CrouchCover,
+	ProneCover
 };
 
 /** What happened when a soldier was told to start walking to its planned position. */
@@ -38,12 +39,13 @@ struct FSquadUnitPlannedPosition
 
 	ESquadPlannedPositionType Type = ESquadPlannedPositionType::None;
 
-	// Only meaningful for the two cover types.
+	// Only meaningful for the cover types.
 	FRTSCoverPoint CoverPoint;
 
 	bool GetIsCover() const
 	{
-		return Type == ESquadPlannedPositionType::StandingCover || Type == ESquadPlannedPositionType::CrouchCover;
+		return Type == ESquadPlannedPositionType::StandingCover || Type == ESquadPlannedPositionType::CrouchCover ||
+			Type == ESquadPlannedPositionType::ProneCover;
 	}
 };
 

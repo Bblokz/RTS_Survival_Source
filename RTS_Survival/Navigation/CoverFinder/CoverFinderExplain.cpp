@@ -44,6 +44,8 @@ namespace CoverFinderExplainPrivate
 			return TEXT("standing-right");
 		case ERTSCoverType::TrenchStandUp:
 			return TEXT("trench-stand-up");
+		case ERTSCoverType::Prone:
+			return TEXT("prone");
 		default:
 			return TEXT("unknown");
 		}
@@ -488,6 +490,54 @@ void URTSCoverFinderWorldSubsystem::Explain_ProbeSample(
 	}
 }
 
+FString URTSCoverFinderWorldSubsystem::Explain_ProneCover(
+	const UNavigationSystemV1& NavigationSystem,
+	const ANavigationData& NavigationData,
+	const FVector& ProtectedLocation,
+	const FVector& SearchDirection,
+	const FCoverTraceObservation& LowerTrace,
+	const FCoverTraceObservation& CrouchTrace)
+{
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		if (not M_ActiveSettings.bFindProneCover)
+		{
+			return TEXT("prone cover is switched off");
+		}
+		if (not LowerTrace.bBlockingHit)
+		{
+			return TEXT("nothing at knee height either, so no prone cover");
+		}
+		int32 UnusedQueryCount = 0;
+		FCoverDirectionalObservation ProneObservation;
+		ProneObservation.SearchDirection = SearchDirection;
+		ProneObservation.LowerTrace = LowerTrace;
+		ProneObservation.CrouchTrace = CrouchTrace;
+		SampleProneCover(NavigationSystem, NavigationData, ProtectedLocation, ProneObservation, UnusedQueryCount);
+		if (ProneObservation.bHasProneLyingSpace)
+		{
+			return FString::Printf(
+				TEXT("PRONE cover behind what is at knee height %.0f cm away, soldier lies at %s"),
+				LowerTrace.Distance,
+				*ProneObservation.ProneCoverLocation.ToCompactString());
+		}
+		if (FCoverFinderAlgorithms::GetIsProneCoverEvidence(ProneObservation, M_ActiveSettings))
+		{
+			return TEXT("something to lie behind at knee height, but no navigable room to lie down at the stand-off from it");
+		}
+		return FString::Printf(
+			TEXT("no prone cover: what is at knee height %.0f cm away is %s"),
+			LowerTrace.Distance,
+			LowerTrace.ImpactNormal.Z > M_ActiveSettings.ProneCoverMaximumFaceNormalZ
+				? TEXT("too gentle a slope to lie behind")
+				: TEXT("too tall to fire over lying down, or has something tall right behind it"));
+	}
+	else
+	{
+		return FString();
+	}
+}
+
 FString URTSCoverFinderWorldSubsystem::Explain_ProbeDirection(
 	const UNavigationSystemV1& NavigationSystem,
 	const ANavigationData& NavigationData,
@@ -499,24 +549,33 @@ FString URTSCoverFinderWorldSubsystem::Explain_ProbeDirection(
 		int32 UnusedQueryCount = 0;
 		const FCoverTraceObservation CrouchTrace = TraceCoverHeight(
 			ProtectedLocation, SearchDirection, M_ActiveSettings.MinimumCrouchCoverHeight, UnusedQueryCount);
-		if (not CrouchTrace.bBlockingHit)
-		{
-			return FString::Printf(
-				TEXT("nothing at crouch height (%.0f cm) within %.0f cm"),
-				M_ActiveSettings.MinimumCrouchCoverHeight,
-				M_ActiveSettings.MaximumCoverSearchDistance);
-		}
 		const FCoverTraceObservation LowerTrace = TraceCoverHeight(
 			ProtectedLocation, SearchDirection, RTSCoverFinderConstants::LowerSupportProbeHeight, UnusedQueryCount);
-		const FCoverTraceObservation StandingTrace = TraceCoverHeight(
-			ProtectedLocation, SearchDirection, RTSCoverFinderConstants::StandingCoverHeight, UnusedQueryCount);
 		if (not FCoverFinderAlgorithms::GetIsSameSurface(LowerTrace, CrouchTrace, M_ActiveSettings))
 		{
+			const FString ProneResult = Explain_ProneCover(
+				NavigationSystem,
+				NavigationData,
+				ProtectedLocation,
+				SearchDirection,
+				LowerTrace,
+				CrouchTrace);
+			if (not CrouchTrace.bBlockingHit)
+			{
+				return FString::Printf(
+					TEXT("nothing at crouch height (%.0f cm) within %.0f cm; %s"),
+					M_ActiveSettings.MinimumCrouchCoverHeight,
+					M_ActiveSettings.MaximumCoverSearchDistance,
+					*ProneResult);
+			}
 			return FString::Printf(
-				TEXT("REJECTED, hit %s at %.0f cm but it is not one surface from knee to crouch height (overhang, gap underneath, or two objects)"),
+				TEXT("REJECTED, hit %s at %.0f cm but it is not one surface from knee to crouch height (overhang, gap underneath, or two objects); %s"),
 				*GetNameSafe(M_BlockingProviderActors.FindRef(CrouchTrace.BlockingProviderHandle).Get()),
-				CrouchTrace.Distance);
+				CrouchTrace.Distance,
+				*ProneResult);
 		}
+		const FCoverTraceObservation StandingTrace = TraceCoverHeight(
+			ProtectedLocation, SearchDirection, RTSCoverFinderConstants::StandingCoverHeight, UnusedQueryCount);
 		if (not FCoverFinderAlgorithms::GetIsSameSurface(CrouchTrace, StandingTrace, M_ActiveSettings))
 		{
 			return FString::Printf(

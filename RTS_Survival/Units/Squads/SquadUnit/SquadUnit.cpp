@@ -77,6 +77,8 @@ namespace SquadUnitCoverMoveStatics
 			return ESquadIdleAnimationPose::StandingCoverRight;
 		case ERTSCoverType::TrenchStandUp:
 			return ESquadIdleAnimationPose::TrenchCover;
+		case ERTSCoverType::Prone:
+			return ESquadIdleAnimationPose::ProneCover;
 		case ERTSCoverType::Crouch:
 		default:
 			return ESquadIdleAnimationPose::CrouchCover;
@@ -513,11 +515,14 @@ void ASquadUnit::AbandonUnreachableCoverPoint()
 		UE_LOG(
 			LogRTSSquadUnitCover,
 			Verbose,
-			TEXT("Cover movement of %s abandoned; distance_cm=%.0f speed=%.0f point=%lld."),
+			TEXT("Cover movement of %s abandoned; distance_cm=%.0f speed=%.0f point=%lld type=%s point_location=\"%s\" unit_location=\"%s\"."),
 			*GetName(),
 			FVector::Dist2D(GetActorLocation(), M_CoverRuntimeState.AssignedCoverPoint.Location),
 			GetVelocity().Size2D(),
-			UnreachablePointId);
+			UnreachablePointId,
+			*UEnum::GetValueAsString(M_CoverRuntimeState.AssignedCoverPoint.CoverType),
+			*M_CoverRuntimeState.AssignedCoverPoint.Location.ToString(),
+			*GetActorLocation().ToString());
 	}
 	if (const UWorld* World = GetWorld())
 	{
@@ -1419,7 +1424,7 @@ FVector ASquadUnit::GetStandingCoverExposedWorldOffset(
 	const FRTSCoverPoint& CoverPoint,
 	const FVector& DefaultWorldOffset) const
 {
-	if (CoverPoint.CoverType == ERTSCoverType::Crouch)
+	if (RTSCoverTypes::GetFiresFromProtectedPose(CoverPoint.CoverType))
 	{
 		return FVector::ZeroVector;
 	}
@@ -1663,7 +1668,7 @@ void ASquadUnit::UpdateProtectedCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 		return;
 	}
 
-	if (M_CoverRuntimeState.AssignedCoverPoint.CoverType == ERTSCoverType::Crouch)
+	if (RTSCoverTypes::GetFiresFromProtectedPose(M_CoverRuntimeState.AssignedCoverPoint.CoverType))
 	{
 		SetCoverWeaponFireBlocked(false);
 		return;
@@ -1988,7 +1993,7 @@ void ASquadUnit::ApplyCurrentCoverWeaponState()
 		M_InfantryWeapon->RegisterCoverIgnoreActor(IgnoredObstacleActor.Get(), true);
 	}
 	const bool bCrouchCanFire = M_CoverRuntimeState.State == ESquadUnitCoverState::Protected &&
-		M_CoverRuntimeState.AssignedCoverPoint.CoverType == ERTSCoverType::Crouch;
+		RTSCoverTypes::GetFiresFromProtectedPose(M_CoverRuntimeState.AssignedCoverPoint.CoverType);
 	const bool bStandingCanFire = M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed;
 	const bool bHasValidatedTarget = M_CoverValidatedTarget.Get() != nullptr;
 	M_InfantryWeapon->SetCoverFireBlocked(

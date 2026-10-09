@@ -54,6 +54,12 @@ private:
 	/** Records and logs one named check; a failed check fails the whole scenario. */
 	void Check(bool bPassed, const TCHAR* CheckName, const FString& Details = FString());
 
+	// Plans onto the nearest free prone point, when the map has one, and expects a prone position there.
+	void CheckPronePlan(
+		USquadMovePreviewComponent& PreviewComponent,
+		const URTSCoverFinderWorldSubsystem& CoverSubsystem,
+		const TArray<ASquadController*>& TestSquad);
+
 	void CheckCoverPlans(
 		USquadMovePreviewComponent& PreviewComponent,
 		const TArray<ASquadController*>& TestSquad,

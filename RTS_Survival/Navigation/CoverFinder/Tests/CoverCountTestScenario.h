@@ -40,4 +40,7 @@ private:
 	 * @return Number of keys whose count fell below what the tolerance allows.
 	 */
 	int32 CompareWithBaseline(const TMap<FString, int32>& Counts, const TMap<FString, int32>& Baseline) const;
+
+	// Logs per cover type how many points a soldier of the map can and cannot walk to.
+	void LogReachability(const URTSCoverFinderWorldSubsystem& CoverSubsystem) const;
 };
