@@ -9,6 +9,8 @@
  * @brief Exposes the small set of accuracy, cadence, and budget controls needed to tune infantry cover discovery.
  * Geometry classification details remain internal so maps share one predictable definition of cover.
  */
+class UStaticMesh;
+
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Infantry Cover Finder"))
 class RTS_SURVIVAL_API URTSCoverFinderDeveloperSettings : public UDeveloperSettings
 {
@@ -41,6 +43,38 @@ public:
 	// Off, squads move with the regular formation slots again.
 	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview")
 	bool bM_EnableSquadMovePreview = true;
+
+	// The meshes the preview stands on each planned position, one per stance. Standing cover uses the high
+	// cover mesh for both of its sides.
+	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview")
+	TSoftObjectPtr<UStaticMesh> M_PreviewStanceNoCover = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Stances/SM_Stance_NoCover.SM_Stance_NoCover")));
+
+	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview")
+	TSoftObjectPtr<UStaticMesh> M_PreviewStanceCrouchCover = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Stances/SM_Stance_CrouchCover.SM_Stance_CrouchCover")));
+
+	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview")
+	TSoftObjectPtr<UStaticMesh> M_PreviewStanceHighCover = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Stances/SM_Stance_HighCover.SM_Stance_HighCover")));
+
+	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview")
+	TSoftObjectPtr<UStaticMesh> M_PreviewStanceProneCover = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Stances/SM_Stance_ProneCover.SM_Stance_ProneCover")));
+
+	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview")
+	TSoftObjectPtr<UStaticMesh> M_PreviewStanceTrenchCover = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Stances/SM_Stance_TrenchCover.SM_Stance_TrenchCover")));
+
+	// Instances of each stance mesh that are created up front, so a preview never has to allocate while the
+	// cursor moves. A selection that needs more of one stance makes that stance's pool grow once.
+	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview", meta=(ClampMin="0", ClampMax="512", UIMin="0", UIMax="128"))
+	int32 M_PreviewStancePreloadCount = 32;
+
+	// Added to the yaw of every stance mesh. The stance meshes were made from character poses and look along
+	// their Y axis, like the character mesh they came from, so they are turned a quarter back.
+	UPROPERTY(Config, EditAnywhere, Category="Squad Move Preview", meta=(ClampMin="-180.0", ClampMax="180.0", UIMin="-180.0", UIMax="180.0", Units="deg"))
+	float M_PreviewStanceYawOffsetDegrees = -90.0f;
 
 	// Limits how far an otherwise idle or already-in-range infantry unit may reposition itself for cover.
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="100.0", UIMin="100.0", UIMax="2500.0", Units="cm"))

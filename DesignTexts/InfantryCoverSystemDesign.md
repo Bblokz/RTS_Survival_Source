@@ -116,7 +116,7 @@ A trench point behaves like standing cover with no sideways step: protected is a
 
 ### Prone cover
 
-`ERTSCoverType::Prone` is cover a soldier lies behind: a bump in the landscape or a low object. It draws purple, in the cover debug view and in the squad move preview (`ESquadPlannedPositionType::ProneCover`). Like crouch cover it fires from where it is (`RTSCoverTypes::GetFiresFromProtectedPose`).
+`ERTSCoverType::Prone` is cover a soldier lies behind: a bump in the landscape or a low object. It draws purple in the cover debug view; the squad move preview shows it with the prone stance mesh (`ESquadPlannedPositionType::ProneCover`). Like crouch cover it fires from where it is (`RTSCoverTypes::GetFiresFromProtectedPose`).
 
 **Finding it.** Every probe direction now starts with the knee-height probe (30 cm), because every kind of cover needs something there; open ground still costs one probe per direction. Where that probe hits something that is no crouch cover, one more probe at `M_ProneCoverMaximumHeight` (60 cm) decides (`FCoverFinderAlgorithms::GetIsProneCoverEvidence`): the face must be steeper than `M_ProneCoverMinimumSlopeDegrees`, and nothing may rise above the fire-over height for 120 cm behind it, which tells a bump from the foot of a hillside or a wall. The soldier lies `M_ProneCoverStandOff` from the face; that spot is moved onto the navmesh and checked for room with a low capsule along the body (`GetCanInfantryLieAt`). The landscape scan finds bumps, the environment scan low objects, with the same code. Objects between knee and crouch height that are thin also get the ring of probes, since the grid easily steps over small ones.
 
@@ -129,6 +129,19 @@ A trench point behaves like standing cover with no sideways step: protected is a
 **Animation.** `CoverAnimations.Prone` on the infantry animation Blueprint is a `FSquadUnitCrouchCoverAnimationSet`: `ProtectedIdlePose` (lying, head down), `AimAssets` (a non-additive prone aim pose as `BaseSequence`, its aim offset, optional fire montages), optional enter and exit montages and `EnterStartOffset`. `ProneCoverReload` is the lying reload; empty, `CoverReload` is used. While `Prone.ProtectedIdlePose` is empty a soldier at a prone point uses the whole Crouch set. With it assigned, the weapon's prone fire montages are used (the crouch ones where a weapon has none). The graph needs no new nodes: prone goes through the same `CoverIdle` and `CoverAim` branches.
 
 `RTS_COVER_PERF` reports `prone`, `prone_lost` (prone points of the previous publication that are gone) and `prone_companions`. The count test also logs `reachability` per cover type.
+
+### Stance meshes of the squad move preview
+
+The squads-only move preview shows every planned soldier position as a stance mesh, turned to the facing the soldier will have there. There is no debug drawing left in it.
+
+- `FSquadMovePreviewStances` (`Player/SquadMovePreview/SquadMovePreviewStances.h`) owns one instanced static mesh component per stance: no cover, crouch cover, high cover (both standing sides), prone cover and trench cover. The stance of a position follows from its cover type (`GetStanceForPosition`).
+- The components sit on an actor of their own. They cannot sit on the player controller, which owns the preview component: a controller is a hidden actor, and nothing a hidden actor owns is drawn.
+- Each component starts with `M_PreviewStancePreloadCount` (32) parked instances, so the preview allocates nothing while the cursor moves. A selection that needs more of one stance grows that stance's pool once. An instance costs a transform and a few bytes of bookkeeping; the 160 preloaded ones are a few kilobytes.
+- Instances are written only when the plan changes (`ShowPlan`, one batched transform update per stance that is in use), never per frame. Hiding the preview only switches the components' visibility.
+- The meshes have no collision, cast no shadow, take no decals and do not affect navigation.
+- The meshes and the preload count are set in Project Settings > Cover Finder > Squad Move Preview. `M_PreviewStanceYawOffsetDegrees` (-90) turns them: the stance meshes were made from character poses and look along their Y axis.
+
+`-SquadMovePreviewValidate` checks that every planned position has a mesh of its stance on it, looking along its facing, and that the meshes go away with the preview. Adding `-SquadMovePreviewCaptureStances` to a rendered run saves two pictures of the preview to `Saved/CoverFinderDebug/SquadPreviewStances_*.png`.
 
 ### Taking planned cover on arrival
 

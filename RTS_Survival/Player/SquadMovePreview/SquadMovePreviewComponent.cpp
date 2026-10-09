@@ -1,6 +1,5 @@
 #include "SquadMovePreviewComponent.h"
 
-#include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -24,36 +23,7 @@ namespace SquadMovePreviewPrivate
 	// Closer than this to the squads' centre, the walking direction is too noisy to derive a facing from.
 	constexpr float MinimumDistanceForAutomaticFacing = 150.0f;
 
-	constexpr float MarkerHeight = 45.0f;
-	constexpr float MarkerRadius = 22.0f;
-	constexpr int32 MarkerSegments = 10;
-	constexpr float MarkerThickness = 2.5f;
-	constexpr float FacingMarkerLength = 60.0f;
-	constexpr float FacingMarkerArrowSize = 14.0f;
 	const FVector NavigationProjectionExtent(150.0f, 150.0f, 400.0f);
-
-	// Placeholder colours until the wireframe soldier meshes exist.
-	const FColor RegularStandingColor(90, 220, 90);
-	const FColor StandingCoverColor(255, 165, 0);
-	const FColor CrouchCoverColor(80, 200, 255);
-	const FColor ProneCoverColor(160, 60, 220);
-
-	FColor GetMarkerColor(const ESquadPlannedPositionType PositionType)
-	{
-		switch (PositionType)
-		{
-		case ESquadPlannedPositionType::StandingCover:
-			return StandingCoverColor;
-		case ESquadPlannedPositionType::CrouchCover:
-			return CrouchCoverColor;
-		case ESquadPlannedPositionType::ProneCover:
-			return ProneCoverColor;
-		case ESquadPlannedPositionType::RegularStanding:
-		case ESquadPlannedPositionType::None:
-		default:
-			return RegularStandingColor;
-		}
-	}
 
 	bool GetCanPlanForSquad(const ASquadController* SquadController)
 	{
@@ -83,11 +53,23 @@ USquadMovePreviewComponent::USquadMovePreviewComponent()
 void USquadMovePreviewComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	// A dedicated server has nobody to show a preview to.
+	UWorld* World = GetWorld();
+	if (IsValid(World) && not IsRunningDedicatedServer())
+	{
+		M_Stances.Setup(*World);
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("SquadMovePreviewValidate")))
 	{
 		M_TestScenario.Start();
 		SetComponentTickEnabled(true);
 	}
+}
+
+void USquadMovePreviewComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	M_Stances.Destroy();
+	Super::EndPlay(EndPlayReason);
 }
 
 void USquadMovePreviewComponent::TickComponent(
@@ -132,6 +114,16 @@ void USquadMovePreviewComponent::SetFormationShape(const EFormation FormationSha
 
 void USquadMovePreviewComponent::UpdatePreview(const FSquadMovePreviewInput& Input)
 {
+	// The player controller calls this every tick; with nothing selected it would wipe what the map test shows.
+	if (M_TestScenario.GetOwnsPreview())
+	{
+		return;
+	}
+	ApplyPreviewInput(Input);
+}
+
+void USquadMovePreviewComponent::ApplyPreviewInput(const FSquadMovePreviewInput& Input)
+{
 	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
 	const bool bPreviewEnabled = IsValid(CoverSettings) && CoverSettings->bM_EnableSquadMovePreview;
 	const bool bHasMoveTarget = Input.bFacingChosenByPlayer || Input.bCursorOnMoveGround;
@@ -162,8 +154,16 @@ void USquadMovePreviewComponent::UpdatePreview(const FSquadMovePreviewInput& Inp
 		M_RefreshState.bFacingChosenByPlayer = Input.bFacingChosenByPlayer;
 		M_RefreshState.SelectionHash = SelectionHash;
 		M_RefreshState.PlannedAtWorldSeconds = WorldSeconds;
+		// The meshes only move when the plan did; between replans they simply stay where they stand.
+		if (M_RefreshState.bHasPlan)
+		{
+			M_Stances.ShowPlan(M_CurrentPlan);
+		}
+		else
+		{
+			M_Stances.Hide();
+		}
 	}
-	DrawCurrentPlan();
 }
 
 bool USquadMovePreviewComponent::GetShouldReplan(
@@ -372,44 +372,7 @@ void USquadMovePreviewComponent::HidePreview()
 	M_RefreshState.bHasPlan = false;
 	M_CurrentPlan.Reset();
 	M_CurrentPlanUnits.Reset();
-}
-
-void USquadMovePreviewComponent::DrawCurrentPlan() const
-{
-	const UWorld* World = GetWorld();
-	if (not M_RefreshState.bHasPlan || not IsValid(World))
-	{
-		return;
-	}
-	for (const FSquadUnitPlannedPosition& Position : M_CurrentPlan.UnitPositions)
-	{
-		if (Position.Type == ESquadPlannedPositionType::None)
-		{
-			continue;
-		}
-		const FColor MarkerColor = SquadMovePreviewPrivate::GetMarkerColor(Position.Type);
-		const FVector MarkerLocation = Position.Location + FVector::UpVector * SquadMovePreviewPrivate::MarkerHeight;
-		DrawDebugSphere(
-			World,
-			MarkerLocation,
-			SquadMovePreviewPrivate::MarkerRadius,
-			SquadMovePreviewPrivate::MarkerSegments,
-			MarkerColor,
-			false,
-			-1.0f,
-			0,
-			SquadMovePreviewPrivate::MarkerThickness);
-		DrawDebugDirectionalArrow(
-			World,
-			MarkerLocation,
-			MarkerLocation + Position.Facing * SquadMovePreviewPrivate::FacingMarkerLength,
-			SquadMovePreviewPrivate::FacingMarkerArrowSize,
-			MarkerColor,
-			false,
-			-1.0f,
-			0,
-			SquadMovePreviewPrivate::MarkerThickness);
-	}
+	M_Stances.Hide();
 }
 
 bool USquadMovePreviewComponent::TryIssuePlannedMove(

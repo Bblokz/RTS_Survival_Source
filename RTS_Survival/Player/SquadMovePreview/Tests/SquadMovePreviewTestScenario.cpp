@@ -2,6 +2,10 @@
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTestScenario.h"
+#include "Misc/Paths.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
+#include "UnrealClient.h"
+#include "Engine/StaticMesh.h"
 
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -108,10 +112,14 @@ namespace SquadMovePreviewTestPrivate
 	}
 
 	/** Nearest published point of the wanted kind that no soldier outside the test squad holds. */
-	void WatchLocationFromAbove(UWorld& World, const FVector& Location)
+	constexpr float WatchHeight = 2600.0f;
+	constexpr float WatchBackOffset = 900.0f;
+	constexpr int32 StanceCaptureFramesPerLocation = 40;
+	constexpr float StanceCaptureCameraHeight = 750.0f;
+	constexpr float StanceCaptureCameraBackOffset = 900.0f;
+
+	void WatchLocationFromAbove(UWorld& World, const FVector& Location, const float Height, const float BackOffset)
 	{
-		constexpr float WatchHeight = 2600.0f;
-		constexpr float WatchBackOffset = 900.0f;
 		ACameraActor* Camera = World.SpawnActor<ACameraActor>();
 		ACPPController* PlayerController = FRTS_Statics::GetRTSController(&World);
 		if (not IsValid(Camera) || not IsValid(PlayerController))
@@ -122,7 +130,7 @@ namespace SquadMovePreviewTestPrivate
 		{
 			CameraComponent->bConstrainAspectRatio = false;
 		}
-		const FVector CameraLocation = Location + FVector(-WatchBackOffset, 0.0f, WatchHeight);
+		const FVector CameraLocation = Location + FVector(-BackOffset, 0.0f, Height);
 		Camera->SetActorLocationAndRotation(CameraLocation, (Location - CameraLocation).Rotation());
 		PlayerController->SetViewTarget(Camera);
 	}
@@ -212,6 +220,7 @@ void FSquadMovePreviewTestScenario::Tick(USquadMovePreviewComponent& PreviewComp
 		return;
 	}
 	ResumeWorldIfPaused(*World);
+	TickStanceCapture(PreviewComponent, *World);
 	FCoverTestScenario::GiveSoldiersCommandLineApproachMoves(*World);
 	M_PhaseElapsedSeconds += FMath::Max(0.0f, DeltaTime);
 	const URTSCoverFinderWorldSubsystem* CoverSubsystem = World->GetSubsystem<URTSCoverFinderWorldSubsystem>();
@@ -314,6 +323,16 @@ void FSquadMovePreviewTestScenario::RunPlanChecksAndIssueMove(
 
 	CheckCoverPlans(PreviewComponent, TestSquad, CrouchPoint, StandingPoint);
 	CheckPronePlan(PreviewComponent, CoverSubsystem, TestSquad);
+	CheckStanceMeshes(PreviewComponent, TestSquad, CrouchPoint.Location);
+	CheckStanceMeshes(PreviewComponent, TestSquad, StandingPoint.Location);
+	if (FParse::Param(FCommandLine::Get(), TEXT("SquadMovePreviewCaptureStances")))
+	{
+		M_StanceCaptureSquads.Reset();
+		M_StanceCaptureSquads.Append(TestSquad);
+		M_StanceCaptureLocations[0] = CrouchPoint.Location;
+		M_StanceCaptureLocations[1] = StandingPoint.Location;
+		M_StanceCaptureFramesLeft = SquadMovePreviewTestPrivate::StanceCaptureFramesPerLocation * 2;
+	}
 	CheckChosenFacing(PreviewComponent, TestSquad, CrouchPoint);
 	FVector OpenGroundLocation = FVector::ZeroVector;
 	const bool bFoundOpenGround = SquadMovePreviewTestPrivate::FindOpenGroundLocation(
@@ -333,9 +352,125 @@ void FSquadMovePreviewTestScenario::RunPlanChecksAndIssueMove(
 	const bool bWatchLowCover = FParse::Param(FCommandLine::Get(), TEXT("SquadMovePreviewWatch"));
 	if (bWatchLowCover)
 	{
-		SquadMovePreviewTestPrivate::WatchLocationFromAbove(World, CrouchPoint.Location);
+		SquadMovePreviewTestPrivate::WatchLocationFromAbove(
+			World,
+			CrouchPoint.Location,
+			SquadMovePreviewTestPrivate::WatchHeight,
+			SquadMovePreviewTestPrivate::WatchBackOffset);
 	}
 	IssuePlannedMove(PreviewComponent, TestSquad, bWatchLowCover ? CrouchPoint.Location : StandingPoint.Location);
+}
+
+void FSquadMovePreviewTestScenario::CheckStanceMeshes(
+	USquadMovePreviewComponent& PreviewComponent,
+	const TArray<ASquadController*>& TestSquad,
+	const FVector& CursorLocation)
+{
+	constexpr float LocationTolerance = 1.0f;
+	constexpr float YawToleranceDegrees = 1.0f;
+	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
+	const float YawOffsetDegrees = IsValid(CoverSettings) ? CoverSettings->M_PreviewStanceYawOffsetDegrees : 0.0f;
+	FSquadMovePreviewInput Input;
+	Input.SelectedSquads = &TestSquad;
+	Input.bSquadsOnlyMoveContext = true;
+	Input.bCursorOnMoveGround = true;
+	Input.CursorLocation = CursorLocation;
+	PreviewComponent.UpdatePreview(Input);
+	const FSquadMovePlan& ShownPlan = PreviewComponent.GetCurrentPlan();
+	const FSquadMovePreviewStances& Stances = PreviewComponent.GetStances();
+	Check(
+		ShownPlan.UnitPositions.Num() > 0 && Stances.GetShownInstanceCount() == ShownPlan.UnitPositions.Num(),
+		TEXT("one stance mesh per planned soldier"),
+		FString::Printf(
+			TEXT("meshes=%d positions=%d no_cover=%d crouch=%d high=%d prone=%d trench=%d"),
+			Stances.GetShownInstanceCount(),
+			ShownPlan.UnitPositions.Num(),
+			Stances.GetShownInstanceCount(ESquadPreviewStance::NoCover),
+			Stances.GetShownInstanceCount(ESquadPreviewStance::CrouchCover),
+			Stances.GetShownInstanceCount(ESquadPreviewStance::HighCover),
+			Stances.GetShownInstanceCount(ESquadPreviewStance::ProneCover),
+			Stances.GetShownInstanceCount(ESquadPreviewStance::TrenchCover)));
+	int32 MatchedPositionCount = 0;
+	for (const FSquadUnitPlannedPosition& Position : ShownPlan.UnitPositions)
+	{
+		const ESquadPreviewStance Stance = FSquadMovePreviewStances::GetStanceForPosition(Position);
+		const float WantedYaw = Position.Facing.Rotation().Yaw + YawOffsetDegrees;
+		FTransform InstanceTransform;
+		bool bHasMatchingMesh = false;
+		for (int32 ShownIndex = 0; Stances.TryGetShownInstanceTransform(Stance, ShownIndex, InstanceTransform); ++ShownIndex)
+		{
+			const float YawError = FMath::Abs(FRotator::NormalizeAxis(InstanceTransform.Rotator().Yaw - WantedYaw));
+			bHasMatchingMesh = bHasMatchingMesh ||
+				(InstanceTransform.GetLocation().Equals(Position.Location, LocationTolerance) &&
+					YawError <= YawToleranceDegrees && InstanceTransform.GetScale3D().Equals(FVector::OneVector));
+		}
+		MatchedPositionCount += bHasMatchingMesh ? 1 : 0;
+	}
+	Check(
+		MatchedPositionCount == ShownPlan.UnitPositions.Num(),
+		TEXT("every stance mesh stands on its position, in its stance, looking along its facing"),
+		FString::Printf(TEXT("matched=%d of %d"), MatchedPositionCount, ShownPlan.UnitPositions.Num()));
+
+	Input.bSquadsOnlyMoveContext = false;
+	PreviewComponent.UpdatePreview(Input);
+	Check(Stances.GetShownInstanceCount() == 0, TEXT("the stance meshes go away with the preview"));
+}
+
+void FSquadMovePreviewTestScenario::TickStanceCapture(USquadMovePreviewComponent& PreviewComponent, UWorld& World)
+{
+	using namespace SquadMovePreviewTestPrivate;
+	if (M_StanceCaptureFramesLeft <= 0)
+	{
+		return;
+	}
+	--M_StanceCaptureFramesLeft;
+	const int32 LocationIndex = M_StanceCaptureFramesLeft >= StanceCaptureFramesPerLocation ? 0 : 1;
+	const int32 FramesLeftAtLocation = M_StanceCaptureFramesLeft % StanceCaptureFramesPerLocation;
+	TArray<ASquadController*> CaptureSquads;
+	for (const TWeakObjectPtr<ASquadController>& CaptureSquad : M_StanceCaptureSquads)
+	{
+		if (CaptureSquad.IsValid())
+		{
+			CaptureSquads.Add(CaptureSquad.Get());
+		}
+	}
+	// The player controller's own updates are held off for as long as frames are left.
+	FSquadMovePreviewInput Input;
+	Input.SelectedSquads = &CaptureSquads;
+	Input.bSquadsOnlyMoveContext = true;
+	Input.bCursorOnMoveGround = true;
+	Input.CursorLocation = M_StanceCaptureLocations[LocationIndex];
+	PreviewComponent.ApplyPreviewInput(Input);
+	if (FramesLeftAtLocation == StanceCaptureFramesPerLocation - 1)
+	{
+		WatchLocationFromAbove(World, Input.CursorLocation, StanceCaptureCameraHeight, StanceCaptureCameraBackOffset);
+	}
+	if (FramesLeftAtLocation == StanceCaptureFramesPerLocation / 2)
+	{
+		UE_LOG(
+			LogRTSSquadPreviewTest,
+			Display,
+			TEXT("RTS_SQUAD_PREVIEW_TEST stance_capture location=%d shown=%d no_cover=%d crouch=%d high=%d prone=%d trench=%d"),
+			LocationIndex,
+			PreviewComponent.GetStances().GetShownInstanceCount(),
+			PreviewComponent.GetStances().GetShownInstanceCount(ESquadPreviewStance::NoCover),
+			PreviewComponent.GetStances().GetShownInstanceCount(ESquadPreviewStance::CrouchCover),
+			PreviewComponent.GetStances().GetShownInstanceCount(ESquadPreviewStance::HighCover),
+			PreviewComponent.GetStances().GetShownInstanceCount(ESquadPreviewStance::ProneCover),
+			PreviewComponent.GetStances().GetShownInstanceCount(ESquadPreviewStance::TrenchCover));
+		FScreenshotRequest::RequestScreenshot(
+			FPaths::Combine(
+				FPaths::ProjectSavedDir(),
+				TEXT("CoverFinderDebug"),
+				FString::Printf(TEXT("SquadPreviewStances_%d.png"), LocationIndex)),
+			false,
+			false);
+	}
+	if (M_StanceCaptureFramesLeft == 0)
+	{
+		Input.bSquadsOnlyMoveContext = false;
+		PreviewComponent.ApplyPreviewInput(Input);
+	}
 }
 
 void FSquadMovePreviewTestScenario::CheckPronePlan(

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePlanner.h"
+#include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewStances.h"
 #include "RTS_Survival/Player/SquadMovePreview/Tests/SquadMovePreviewTestScenario.h"
 #include "SquadMovePreviewComponent.generated.h"
 
@@ -48,8 +49,9 @@ struct FSquadMovePreviewRefreshState
 };
 
 /**
- * @brief Shows where every soldier of the selected squads would go for the current cursor position, and issues
- * that exact plan when the player gives the move order. Only active while squads are the whole selection.
+ * @brief Shows where every soldier of the selected squads would go for the current cursor position, as a stance
+ * mesh per soldier, and issues that exact plan when the player gives the move order. Only active while squads
+ * are the whole selection.
  * The player controller calls UpdatePreview every tick and TryIssuePlannedMove from its move order.
  */
 UCLASS()
@@ -61,10 +63,13 @@ public:
 	USquadMovePreviewComponent();
 
 	/**
-	 * @brief Replans when the cursor, facing or selection changed enough, and draws the current plan.
+	 * @brief Replans when the cursor, facing or selection changed enough, and shows the plan as stance meshes.
 	 * @param Input This frame's selection, cursor and rotation-arrow state from the player controller.
 	 */
 	void UpdatePreview(const FSquadMovePreviewInput& Input);
+
+	// What UpdatePreview does once it knows the map test is not showing a preview of its own.
+	void ApplyPreviewInput(const FSquadMovePreviewInput& Input);
 
 	/**
 	 * @brief Sends the selected squads to freshly planned per-soldier positions instead of formation slots.
@@ -110,9 +115,11 @@ public:
 
 	const FSquadMovePlan& GetCurrentPlan() const { return M_CurrentPlan; }
 	bool GetIsPreviewVisible() const { return M_RefreshState.bHasPlan; }
+	const FSquadMovePreviewStances& GetStances() const { return M_Stances; }
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void TickComponent(
 		float DeltaTime,
 		ELevelTick TickType,
@@ -130,6 +137,10 @@ private:
 
 	FSquadMovePreviewTestScenario M_TestScenario;
 
+	// The stance meshes standing on the positions of the plan that is on screen.
+	UPROPERTY(Transient)
+	FSquadMovePreviewStances M_Stances;
+
 	bool GetShouldReplan(
 		const FSquadMovePreviewInput& Input,
 		const FVector& Anchor,
@@ -137,7 +148,6 @@ private:
 		uint32 SelectionHash,
 		double WorldSeconds) const;
 	void HidePreview();
-	void DrawCurrentPlan() const;
 
 	/**
 	 * @brief Copies the soldiers of the squads into planner units.

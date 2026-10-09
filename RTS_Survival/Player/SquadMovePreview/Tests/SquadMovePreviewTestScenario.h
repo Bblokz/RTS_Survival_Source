@@ -38,11 +38,21 @@ struct FSquadMovePreviewTestScenario
 	void Tick(USquadMovePreviewComponent& PreviewComponent, float DeltaTime);
 	bool GetIsRunning() const { return M_Phase != ESquadMovePreviewTestPhase::Inactive; }
 
+	// True while the scenario shows a preview of its own that the player controller's updates must not replace.
+	bool GetOwnsPreview() const { return M_StanceCaptureFramesLeft > 0; }
+
 private:
 	TArray<FSquadMovePreviewTestExpectation> M_Expectations;
 	ESquadMovePreviewTestPhase M_Phase = ESquadMovePreviewTestPhase::Inactive;
 	float M_PhaseElapsedSeconds = 0.0f;
 	int32 M_FailedCheckCount = 0;
+
+	// -SquadMovePreviewCaptureStances: keeps the preview on screen for a moment at two places and saves a
+	// picture of each, so the stance meshes can be looked at after a rendered run.
+	TArray<TWeakObjectPtr<ASquadController>> M_StanceCaptureSquads;
+	FVector M_StanceCaptureLocations[2] = {FVector::ZeroVector, FVector::ZeroVector};
+	int32 M_StanceCaptureFramesLeft = 0;
+	void TickStanceCapture(USquadMovePreviewComponent& PreviewComponent, UWorld& World);
 
 	void ResumeWorldIfPaused(UWorld& World) const;
 	void RunPlanChecksAndIssueMove(
@@ -53,6 +63,17 @@ private:
 
 	/** Records and logs one named check; a failed check fails the whole scenario. */
 	void Check(bool bPassed, const TCHAR* CheckName, const FString& Details = FString());
+
+	/**
+	 * @brief Shows the preview the way the player controller does and checks the stance meshes against the plan.
+	 * @param PreviewComponent Component under test.
+	 * @param TestSquad Squads to preview.
+	 * @param CursorLocation Where the cursor is pretended to be.
+	 */
+	void CheckStanceMeshes(
+		USquadMovePreviewComponent& PreviewComponent,
+		const TArray<ASquadController*>& TestSquad,
+		const FVector& CursorLocation);
 
 	// Plans onto the nearest free prone point, when the map has one, and expects a prone position there.
 	void CheckPronePlan(
