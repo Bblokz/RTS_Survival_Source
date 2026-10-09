@@ -114,7 +114,30 @@ A trench point behaves like standing cover with no sideways step: protected is a
 
 `CoverAnimations.CoverReload` on the infantry animation Blueprint is a full-body montage of a crouched soldier reloading. `PlayReloadAnim` plays it, scaled to the weapon's reload time, instead of the weapon's regular reload montage whenever the unit holds a cover pose; left empty, the regular montage is used. The weapon reports its reload to the soldier (`ASquadUnit::OnWeaponReloadStarted`), not straight to the animation instance: a soldier that is exposed from standing or trench cover first returns to its protected pose, and `ExposeFromStandingCover` keeps it there until the reload time has passed. While the return montage plays, the reload clip waits and then starts for the time that is left (`TryPlayPendingCoverReload`). Leaving cover stops the clip.
 
+### Staying put in cover
+
+Several things used to make a soldier give up or step out of cover it was about to take again. Each has its own guard:
+
+- **Between two targets.** A soldier that stepped out of standing or trench cover and whose weapon has no target, or swapped to an enemy this point cannot reach, holds its firing position without firing for `M_StandingCoverTargetLossHoldSeconds` (2 s) before it steps back (`HoldExposedCoverWithoutUsableTarget`). Once back, it stays hidden for at least `M_StandingCoverMinimumHiddenSeconds` (1 s). An attack order skips both waits.
+- **Squad closing range.** One soldier out of range of an attack order moves the whole squad closer. A soldier in cover whose own weapon has the ordered target in range is left where it is (`GetCanHoldCoverWhileSquadClosesRange`, checked in `ASquadController::GeneralMoveToForAbility`). A soldier that is out of range, or cannot engage the ordered target from its point, still moves: the order comes first.
+- **Attack order not passed on yet.** A unit that is still idle while its squad already executes an attack order keeps its cover (`GetMayKeepAutomaticCover`).
+- **Point missing from one scan.** A cover scan misses a point when another soldier walks through it. The occupant keeps its point and its reservation for `M_CoverPointLossToleranceSeconds` (12 s) before it leaves; cover whose object no longer exists is given up at once (`GetHasLostCoverPoint`).
+- **Weapon handed over.** A dying squad mate's weapon goes to a survivor. `SetWeaponAimOffset` no longer cancels the cover pose for that.
+
+`RTS_COVER_RETURN` (Verbose) logs why a soldier stepped back, `RTS_COVER_MOVE_CANCEL` which movement entry point took a soldier out of cover, and `RTS_COVER_KEEP_DENIED` why cover was no longer allowed.
+
+### Cover animation asset checks
+
+Two setup mistakes on the animation Blueprint are reported once per class through `ReportError`:
+
+- An aim `BaseSequence` that is an additive aim-offset sample instead of a pose. Played as a pose it scales every bone to zero and the soldier vanishes while aiming. `GetUsableCoverAimBaseSequence` uses the pose the sample was made additive against instead; when there is none, crouch cover stays in its idle crouch.
+- A `ProtectedIdlePose` whose root travels more than 10 cm. That is a transition clip; looped as an idle it makes the soldier step in and out of its cover for as long as it hides. Code cannot fix this one.
+
+`RTS_COVER_AIM_ASSETS` (Verbose, once per animation class) lists every cover and regular aim offset with its base pose and samples.
+
 ### Cover tests on TestCover
+
+- `-CoverFinderCloseUps` on the TestCover scenario logs `RTS_COVER_POSE` once a second for every soldier in cover (head and pelvis height above the feet, how far the pose carries the body off the capsule, mesh visibility, what drives the pose) and saves close-up pictures of player soldiers in cover to `Saved/CoverFinderDebug/CloseUps`. Needs `-RenderOffscreen`. A head height of a few centimetres means the pose collapsed.
 
 - `-CoverFinderCountCover` logs the published points per object class and cover type and compares them with `Navigation/CoverFinder/Tests/Baselines/<Map>.txt`; `RTS_COVER_COUNT_TEST RESULT FAIL` means cover was lost. `-CoverFinderWriteCountBaseline` lowers the baseline to the run's counts where they are lower (write it several times: objects on the map are placed with some randomness), `-CoverFinderResetCountBaseline` starts it afresh.
 - `-CoverFinderValidateTrenchCover` sends a squad into a trench and checks crouch, stand up against an enemy in front, no movement while standing up, firing through the trench, and crouching again.

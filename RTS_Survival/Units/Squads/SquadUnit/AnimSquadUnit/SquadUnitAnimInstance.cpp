@@ -16,6 +16,8 @@ namespace SquadUnitCoverAnimLogStatics
 {
 	constexpr uint32 FirstCoverPoseReportBit = 16;
 	constexpr uint32 FirstUnplayableMontageReportBit = 8;
+	constexpr uint32 AdditiveAimBaseReportBit = 1u << 30;
+	constexpr uint32 AimAssetSetupReportBit = 1u << 29;
 
 	/**
 	 * Missing cover assets are a Blueprint setup gap shared by every unit of that animation class,
@@ -31,6 +33,75 @@ namespace SquadUnitCoverAnimLogStatics
 		}
 		ReportedBits |= ReportBit;
 		return true;
+	}
+
+	FString DescribeSequenceAdditiveSetup(const UAnimSequence* Sequence)
+	{
+		if (not IsValid(Sequence))
+		{
+			return TEXT("none");
+		}
+		return FString::Printf(
+			TEXT("%s[additive=%s base_pose=%s base_seq=%s frame=%d length=%.2f root_motion=%d]"),
+			*Sequence->GetName(),
+			*UEnum::GetValueAsString(Sequence->GetAdditiveAnimType()),
+			*UEnum::GetValueAsString(Sequence->RefPoseType.GetValue()),
+			*GetNameSafe(Sequence->RefPoseSeq),
+			Sequence->RefFrameIndex,
+			Sequence->GetPlayLength(),
+			Sequence->HasRootMotion() ? 1 : 0);
+	}
+
+	// Lists what an aim offset and its base pose are built from, to compare a working pair with a broken one.
+	void LogAimAssetSetup(const TCHAR* Role, const UAimOffsetBlendSpace* AimOffset, const UAnimSequence* BaseSequence)
+	{
+		UE_LOG(
+			LogRTSSquadUnitCoverAnimation,
+			Verbose,
+			TEXT("RTS_COVER_AIM_ASSETS role=%s base=%s aim_offset=%s valid_additive=%d samples=%d"),
+			Role,
+			*DescribeSequenceAdditiveSetup(BaseSequence),
+			*GetNameSafe(AimOffset),
+			IsValid(AimOffset) && AimOffset->IsValidAdditive() ? 1 : 0,
+			IsValid(AimOffset) ? AimOffset->GetBlendSamples().Num() : 0);
+		if (not IsValid(AimOffset))
+		{
+			return;
+		}
+		for (const FBlendSample& Sample : AimOffset->GetBlendSamples())
+		{
+			UE_LOG(
+				LogRTSSquadUnitCoverAnimation,
+				Verbose,
+				TEXT("RTS_COVER_AIM_ASSETS role=%s sample=%s at=%s"),
+				Role,
+				*DescribeSequenceAdditiveSetup(Cast<UAnimSequence>(Sample.Animation)),
+				*Sample.SampleValue.ToCompactString());
+		}
+	}
+
+	/**
+	 * @brief Measures how far a clip carries the root away from where it starts.
+	 * A cover idle is held for as long as the unit hides, so a travelling clip makes the unit walk in a loop.
+	 * @return Largest distance of the root from its first frame, in centimetres.
+	 */
+	float GetLargestRootTravel(const UAnimSequence& Sequence)
+	{
+		constexpr int32 TravelSampleCount = 8;
+		const FSkeletonPoseBoneIndex RootBoneIndex(0);
+		FTransform RootAtStart;
+		Sequence.GetBoneTransform(RootAtStart, RootBoneIndex, 0.0, true);
+		float LargestTravel = 0.0f;
+		for (int32 SampleIndex = 1; SampleIndex <= TravelSampleCount; ++SampleIndex)
+		{
+			FTransform RootAtSample;
+			const double SampleTime = Sequence.GetPlayLength() * SampleIndex / TravelSampleCount;
+			Sequence.GetBoneTransform(RootAtSample, RootBoneIndex, SampleTime, true);
+			LargestTravel = FMath::Max(
+				LargestTravel,
+				static_cast<float>(FVector::Dist(RootAtSample.GetTranslation(), RootAtStart.GetTranslation())));
+		}
+		return LargestTravel;
 	}
 }
 
@@ -714,8 +785,9 @@ void USquadUnitAnimInstance::StopAllMontages()
 
 void USquadUnitAnimInstance::SetWeaponAimOffset(const ESquadWeaponAimOffset AimOffsetType)
 {
-	CancelCoverAnimation();
-
+	// A unit in cover keeps its cover pose: only the regular aim offset behind it changes, and that one is set
+	// up for standing again when the unit leaves. A squad mate's weapon is handed over on its death, which
+	// used to throw the receiving unit out of its cover.
 	switch (AimOffsetType)
 	{
 	case ESquadWeaponAimOffset::Rifle:
@@ -1025,7 +1097,7 @@ UAnimSequence* USquadUnitAnimInstance::ResolveCoverAimBaseSequence() const
 {
 	if (M_CoverAnimRuntime.M_IdlePose == ESquadIdleAnimationPose::CrouchCover)
 	{
-		return CoverAnimations.Crouch.AimAssets.BaseSequence;
+		return GetUsableCoverAimBaseSequence(CoverAnimations.Crouch.AimAssets.BaseSequence);
 	}
 
 	if (not GetIsPeekPose(M_CoverAnimRuntime.M_IdlePose))
@@ -1034,7 +1106,32 @@ UAnimSequence* USquadUnitAnimInstance::ResolveCoverAimBaseSequence() const
 	}
 
 	const FSquadUnitStandingCoverAnimationSet* StandingAnimationSet = GetStandingCoverAnimationSet();
-	return StandingAnimationSet == nullptr ? nullptr : StandingAnimationSet->PeekAimAssets.BaseSequence;
+	return StandingAnimationSet == nullptr
+		? nullptr
+		: GetUsableCoverAimBaseSequence(StandingAnimationSet->PeekAimAssets.BaseSequence);
+}
+
+UAnimSequence* USquadUnitAnimInstance::GetUsableCoverAimBaseSequence(UAnimSequence* ConfiguredBaseSequence) const
+{
+	if (not IsValid(ConfiguredBaseSequence) || not ConfiguredBaseSequence->IsValidAdditive())
+	{
+		return ConfiguredBaseSequence;
+	}
+	// The pose the additive clip was authored against is what the designer meant to put here.
+	UAnimSequence* AdditiveBasePose = ConfiguredBaseSequence->RefPoseSeq;
+	const bool bHasUsableBasePose = IsValid(AdditiveBasePose) && not AdditiveBasePose->IsValidAdditive();
+	if (SquadUnitCoverAnimLogStatics::TryMarkMissingCoverAssetReported(
+		*this,
+		SquadUnitCoverAnimLogStatics::AdditiveAimBaseReportBit))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cover aim BaseSequence " + ConfiguredBaseSequence->GetName() + " on " + GetClass()->GetName() +
+			" is an additive aim offset sample, not a pose. Played as a pose it collapses the mesh. Assign " +
+			(bHasUsableBasePose ? AdditiveBasePose->GetName() : FString("a non-additive pose")) +
+			" in CoverAnimations instead; " +
+			(bHasUsableBasePose ? "it is used automatically for now." : "the unit keeps its cover idle pose for now."));
+	}
+	return bHasUsableBasePose ? AdditiveBasePose : nullptr;
 }
 
 
@@ -1383,7 +1480,10 @@ void USquadUnitAnimInstance::RefreshCoverGraphPose()
 		break;
 	case ESquadIdleAnimationPose::CrouchCover:
 		// Crouch cover needs no expose transition, so it ducks whenever the weapon has nothing to aim at.
-		CoverGraphPose = bAimToTarget ? ESquadCoverGraphPose::CoverAim : ESquadCoverGraphPose::CoverIdle;
+		// Without usable aim assets it stays in the idle crouch instead of showing a broken aim pose.
+		CoverGraphPose = bAimToTarget && IsValid(ResolveCoverAimOffset()) && IsValid(ResolveCoverAimBaseSequence())
+			? ESquadCoverGraphPose::CoverAim
+			: ESquadCoverGraphPose::CoverIdle;
 		break;
 	case ESquadIdleAnimationPose::StandingPeekLeft:
 	case ESquadIdleAnimationPose::StandingPeekRight:
@@ -1590,6 +1690,20 @@ void USquadUnitAnimInstance::LogMissingCoverAnimationAssets(
 			*UEnum::GetValueAsString(CoverPose),
 			*GetClass()->GetName());
 	}
+	// A unit behind cover loops this clip for as long as it hides.
+	constexpr float MaximumIdlePoseRootTravel = 10.0f;
+	const float IdlePoseRootTravel = IsValid(ProtectedIdlePose)
+		? SquadUnitCoverAnimLogStatics::GetLargestRootTravel(*ProtectedIdlePose)
+		: 0.0f;
+	if (IdlePoseRootTravel > MaximumIdlePoseRootTravel)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cover ProtectedIdlePose " + ProtectedIdlePose->GetName() + " for " +
+			UEnum::GetValueAsString(CoverPose) + " on " + GetClass()->GetName() + " moves its root by " +
+			FString::SanitizeFloat(FMath::RoundToFloat(IdlePoseRootTravel)) +
+			" cm. It is a transition clip, not a pose: the unit will step in and out of its cover in a loop. "
+			"Assign a clip that stays in place.");
+	}
 	// The trench set's assets are optional: it falls back to the crouch clip and the regular standing aim.
 	if (GetIsTrenchPose(CoverPose))
 	{
@@ -1615,10 +1729,47 @@ void USquadUnitAnimInstance::LogMissingCoverAnimationAssets(
 	}
 }
 
+void USquadUnitAnimInstance::LogCoverAimAssetSetup() const
+{
+	using SquadUnitCoverAnimLogStatics::LogAimAssetSetup;
+	LogAimAssetSetup(
+		TEXT("cover_crouch"),
+		CoverAnimations.Crouch.AimAssets.AimOffset,
+		CoverAnimations.Crouch.AimAssets.BaseSequence);
+	LogAimAssetSetup(
+		TEXT("cover_standing_left"),
+		CoverAnimations.StandingLeft.PeekAimAssets.AimOffset,
+		CoverAnimations.StandingLeft.PeekAimAssets.BaseSequence);
+	LogAimAssetSetup(
+		TEXT("cover_standing_right"),
+		CoverAnimations.StandingRight.PeekAimAssets.AimOffset,
+		CoverAnimations.StandingRight.PeekAimAssets.BaseSequence);
+	LogAimAssetSetup(TEXT("regular_rifle"), AimOffsets.RifleAimOffset, AimOffsets.RifleAimOffsetSequence);
+	LogAimAssetSetup(
+		TEXT("regular_rifle_crouch"),
+		AimOffsets.RifleCrouchAimOffset,
+		AimOffsets.RifleCrouchAimOffsetSequence);
+	LogAimAssetSetup(TEXT("regular_hip_crouch"), AimOffsets.HipCrouchAimOffset, AimOffsets.HipCrouchAimOffsetSequence);
+	UE_LOG(
+		LogRTSSquadUnitCoverAnimation,
+		Verbose,
+		TEXT("RTS_COVER_AIM_ASSETS role=cover_idle crouch=%s standing_left=%s standing_right=%s"),
+		*SquadUnitCoverAnimLogStatics::DescribeSequenceAdditiveSetup(CoverAnimations.Crouch.ProtectedIdlePose),
+		*SquadUnitCoverAnimLogStatics::DescribeSequenceAdditiveSetup(CoverAnimations.StandingLeft.ProtectedIdlePose),
+		*SquadUnitCoverAnimLogStatics::DescribeSequenceAdditiveSetup(CoverAnimations.StandingRight.ProtectedIdlePose));
+}
+
 void USquadUnitAnimInstance::LogCoverMontageRootMotion(const ESquadIdleAnimationPose CoverPose) const
 {
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
+		const bool bLogAimAssetSetup = SquadUnitCoverAnimLogStatics::TryMarkMissingCoverAssetReported(
+			*this,
+			SquadUnitCoverAnimLogStatics::AimAssetSetupReportBit);
+		if (bLogAimAssetSetup)
+		{
+			LogCoverAimAssetSetup();
+		}
 		if (CoverPose == ESquadIdleAnimationPose::CrouchCover)
 		{
 			LogCoverMontageRootMotion(CoverAnimations.Crouch.EnterCoverMontage, TEXT("Crouch enter"));

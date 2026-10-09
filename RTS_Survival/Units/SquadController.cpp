@@ -1771,6 +1771,12 @@ void ASquadController::GeneralMoveToForAbility(const FVector& MoveToLocation, co
 		{
 			continue;
 		}
+		// Closing range is only needed by the units that are out of range; the others keep firing from cover.
+		if (AbilityID == EAbilityID::IdNoAbility_MoveCloserToTarget &&
+			SquadUnit->GetCanHoldCoverWhileSquadClosesRange())
+		{
+			continue;
+		}
 		const FNavPathSharedPtr* UnitPathPtr = M_SquadUnitPaths.Find(SquadUnit);
 		if (UnitPathPtr && UnitPathPtr->IsValid())
 		{

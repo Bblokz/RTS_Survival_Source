@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverCombatObserver.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverPoseProbe.h"
 
 class ASquadController;
 class ASquadUnit;
@@ -113,6 +114,9 @@ private:
 	// -CoverFinderObserveCombat: measures how well cover shields both sides during the fight.
 	bool bM_ObserveCombat = false;
 	FCoverCombatObserver M_CombatObserver;
+
+	// -CoverFinderCloseUps: logs bone heights and saves close-up pictures of soldiers in cover.
+	FCoverPoseProbe M_PoseProbe;
 
 	// Unrendered meshes stop advancing montages, which would hide every cover clip from an unattended run.
 	void KeepUnitAnimationTicking(UWorld& World) const;

@@ -150,6 +150,7 @@ void FCoverTestScenario::Start(const float IdleObservationSeconds, const bool bC
 	bM_ObserveCombat = FParse::Param(FCommandLine::Get(), TEXT("CoverFinderObserveCombat"));
 	M_NextAdvanceOrderSeconds = CoverTestScenarioPrivate::AdvanceIntervalSeconds;
 	M_CombatObserver.Reset();
+	M_PoseProbe.Start();
 	bM_IdlePhasePassed = false;
 	M_CombatTotals = FCoverTestCombatTotals();
 	M_AttackingSquads.Reset();
@@ -197,6 +198,7 @@ void FCoverTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem, con
 		{
 			M_CombatObserver.Tick(*World, CoverSubsystem, DeltaTime, M_PhaseElapsedSeconds);
 		}
+		M_PoseProbe.Tick(*World, M_PhaseElapsedSeconds);
 		TickCombatPhase(*World, CoverSubsystem);
 		if (M_PhaseElapsedSeconds >= M_CombatObservationSeconds)
 		{

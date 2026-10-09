@@ -3,6 +3,8 @@
 #include "CPPController.h"
 
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewComponent.h"
+#include "RTS_Survival/Player/Formation/FormationMovePreview/FormationMovePreviewComponent.h"
+#include "Misc/ScopeExit.h"
 
 #include "Abilities.h"
 #include "InputAction.h"
@@ -260,6 +262,7 @@ ACPPController::ACPPController()
 	M_PlayerTechManager = CreateDefaultSubobject<UPlayerTechManager>(TEXT("PlayerTechManager"));
 	M_FormationController = CreateDefaultSubobject<UFormationController>(TEXT("FormationController"));
 	M_SquadMovePreview = CreateDefaultSubobject<USquadMovePreviewComponent>(TEXT("SquadMovePreview"));
+	M_FormationMovePreview = CreateDefaultSubobject<UFormationMovePreviewComponent>(TEXT("FormationMovePreview"));
 
 
 	M_PlayerProfileLoader = CreateDefaultSubobject<UPlayerProfileLoader>(TEXT("PlayerProfileLoader"));
@@ -1049,6 +1052,7 @@ void ACPPController::Tick(float DeltaTime)
 	// --------------------------------------------------------
 	PlayerRotationArrow.TickArrowRotation(MouseScreenPosition, HitResultCursorProjection.Location);
 	Tick_UpdateSquadMovePreview(HitResultCursorProjection, bHit);
+	Tick_UpdateFormationMovePreview(HitResultCursorProjection, bHit);
 	UpdateHoveringActorInfo(DeltaTime, MouseScreenPosition, HitResultCursorProjection, bHit);
 	UpdateAimAbilityAtCursorProjection(DeltaTime, HitResultCursorProjection);
 
@@ -1108,6 +1112,74 @@ void ACPPController::Tick_UpdateSquadMovePreview(const FHitResult& CursorHit, co
 		M_SquadMovePreview->SetFormationShape(M_FormationController->GetCurrentFormation());
 	}
 	M_SquadMovePreview->UpdatePreview(PreviewInput);
+}
+
+bool ACPPController::GetIsValidFormationMovePreview() const
+{
+	if (IsValid(M_FormationMovePreview))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_FormationMovePreview",
+		"GetIsValidFormationMovePreview",
+		this);
+	return false;
+}
+
+bool ACPPController::GetIsFormationMoveContext() const
+{
+	// Squads on their own are planned per soldier by the squad move preview.
+	const bool bHasNonSquadUnitSelected = not TSelectedPawnMasters.IsEmpty() || not TSelectedActorsMasters.IsEmpty();
+	// Building placement and ability targeting use the cursor for something else than a move order.
+	return bHasNonSquadUnitSelected && not GetIsPreviewBuildingActive() && not bM_IsActionButtonActive;
+}
+
+void ACPPController::Tick_UpdateFormationMovePreview(const FHitResult& CursorHit, const bool bCursorHit)
+{
+	if (not GetIsValidFormationMovePreview())
+	{
+		return;
+	}
+	FFormationMovePreviewInput PreviewInput;
+	PreviewInput.SelectedSquads = &TSelectedSquadControllers;
+	PreviewInput.SelectedPawns = &TSelectedPawnMasters;
+	PreviewInput.SelectedActorMasters = &TSelectedActorsMasters;
+	PreviewInput.bFormationMoveContext = GetIsFormationMoveContext();
+	PreviewInput.bCursorHit = bCursorHit;
+	// While the rotation arrow is held the order goes to where the arrow stands, not to the cursor.
+	PreviewInput.bCursorOnMoveGround = PreviewInput.bFormationMoveContext && bCursorHit &&
+		not PlayerRotationArrow.GetIsRotationArrowActive() && GetWouldSecondaryClickMove(CursorHit.GetActor());
+	PreviewInput.CursorLocation = CursorHit.Location;
+	M_FormationMovePreview->UpdatePreview(PreviewInput);
+}
+
+bool ACPPController::TryBeginFormationLineDrag(const FHitResult& CursorHit)
+{
+	if (not GetIsValidFormationMovePreview() || not GetIsValidFormationController())
+	{
+		return false;
+	}
+	if (not GetIsFormationMoveContext() || not GetWouldSecondaryClickMove(CursorHit.GetActor()))
+	{
+		return false;
+	}
+	// A single unit has nothing to spread along a line; it keeps the rotation arrow to pick its facing.
+	constexpr int32 MinimumUnitsForLineDrag = 2;
+	const int32 MovableUnitCount = M_FormationController->GetMovableUnitCount(
+		TSelectedSquadControllers, TSelectedPawnMasters, TSelectedActorsMasters);
+	if (MovableUnitCount < MinimumUnitsForLineDrag)
+	{
+		return false;
+	}
+	M_FormationMovePreview->BeginDrag(CursorHit.Location);
+	return true;
+}
+
+bool ACPPController::GetIsFormationLineDragReady() const
+{
+	return GetIsValidFormationMovePreview() && M_FormationMovePreview->GetIsLineDragReady();
 }
 
 void ACPPController::SetupInputComponent()
@@ -2020,6 +2092,10 @@ void ACPPController::PostInitializeComponents()
 			FPlayerFormationPositionEffects>(PlayerFormationEffects);
 		M_FormationController->InitFormationController(FormationEffects);
 	}
+	if (GetIsValidFormationMovePreview())
+	{
+		M_FormationMovePreview->InitFormationMovePreview(M_FormationController);
+	}
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.bNoFail = true;
@@ -2172,8 +2248,12 @@ void ACPPController::SecondaryClickStart()
 	{
 		M_SecondaryStartMouseProjectedLocation = HitResult.Location;
 		M_SecondaryStartClickedActor = HitResult.GetActor();
-		PlayerRotationArrow.InitRotationArrowAction(MouseScreenPosition, HitResult.Location,
-		                                            GetRotationArrowArcSettings());
+		// Several units are spread along the dragged line; anything else turns the rotation arrow with the drag.
+		if (not TryBeginFormationLineDrag(HitResult))
+		{
+			PlayerRotationArrow.InitRotationArrowAction(MouseScreenPosition, HitResult.Location,
+			                                            GetRotationArrowArcSettings());
+		}
 	}
 	else
 	{
@@ -2188,6 +2268,14 @@ void ACPPController::SecondaryClick()
 	OnSecondaryClickFinished_CheckPrimaryClickContext();
 	EnsureSelectionsAreRTSValid();
 	PlayerRotationArrow.StopRotationArrow();
+	// The dragged line only lives for this click; whichever way the click is handled below, it is gone afterwards.
+	ON_SCOPE_EXIT
+	{
+		if (GetIsValidFormationMovePreview())
+		{
+			M_FormationMovePreview->EndDrag();
+		}
+	};
 	if (GetIsPreviewBuildingActive())
 	{
 		// as building mode was active there still wasn't a valid building location provided for the vehicle.
@@ -2201,6 +2289,12 @@ void ACPPController::SecondaryClick()
 	FVector MouseProjectedLocation;
 	AActor* ClickedActor;
 	const bool bHit = GetSecondaryClickHitActorAndLocation(ClickedActor, MouseProjectedLocation);
+	if (GetIsFormationLineDragReady())
+	{
+		// The order covers the whole line, so its click effect belongs in the middle instead of at the drag start.
+		const FFormationDragPath& DragPath = M_FormationMovePreview->GetDragPath();
+		MouseProjectedLocation = DragPath.GetLocationAtDistance(DragPath.GetLength() * 0.5f);
+	}
 	ESelectionChangeAction SelectionAction = ESelectionChangeAction::SelectionInvariant;
 	if (not bHit || not ClickedActor)
 	{
@@ -2719,24 +2813,8 @@ bool ACPPController::TryHandleDoubleSelectionOfOnScreenAlliedUnits(AActor* Click
 
 void ACPPController::PrimaryClickWhileSecondaryActive()
 {
-	if (not GetIsValidFormationController())
-	{
-		return;
-	}
-	FVector2D MouseScreenPosition;
-	if (not GetMousePosition(MouseScreenPosition.X, MouseScreenPosition.Y))
-	{
-		RTSFunctionLibrary::ReportError("Failed to get mouse position to start formation picker.");
-		return;
-	}
-	if (M_FormationController->ActivateFormationPicker(MouseScreenPosition))
-	{
-		// The next click will be consumed by the formation widget.
-		M_PrimaryClickContext = ERTSPrimaryClickContext::FormationTypePrimaryClick;
-		return;
-	}
-	RTSFunctionLibrary::DisplayNotification(
-		FText::FromString("Failed to activate formation widget, primary click context is unaltered."));
+	// The formation picker is no longer opened from here: holding secondary and dragging shapes the formation.
+	// The click is still consumed, so it cannot select or deselect anything in the middle of a drag.
 }
 
 void ACPPController::PrimaryClickFormationWidget()
@@ -4538,10 +4616,24 @@ uint32 ACPPController::MoveUnitsToLocation(const FVector& MoveLocation)
 		return AmountCommandsExe;
 	}
 
-	M_FormationController->InitiateMovement(
-		MoveLocation, &TSelectedSquadControllers, &TSelectedPawnMasters, &TSelectedActorsMasters);
+	// A line dragged with the secondary button replaces the formation shape: the units are spread along it.
+	const bool bMoveAlongDragLine = GetIsFormationLineDragReady();
+	if (bMoveAlongDragLine)
+	{
+		M_FormationController->InitiateMovementAlongDragPath(
+			M_FormationMovePreview->GetDragPath(),
+			TSelectedSquadControllers,
+			TSelectedPawnMasters,
+			TSelectedActorsMasters);
+	}
+	else
+	{
+		M_FormationController->InitiateMovement(
+			MoveLocation, &TSelectedSquadControllers, &TSelectedPawnMasters, &TSelectedActorsMasters);
+	}
 
-	const bool bArrowUsed = M_FormationController->IsPlayerRotationOverrideActive();
+	// The dragged line gives the units a facing just like the arrow does.
+	const bool bArrowUsed = M_FormationController->IsPlayerRotationOverrideActive() || bMoveAlongDragLine;
 	// If the arrow was used then force final rotation even if the vehicle got there by reversing.
 	const bool bForceFinalRotationRegardlessOfReverse = bArrowUsed;
 
@@ -7658,6 +7750,11 @@ bool ACPPController::TryHandleEscapeMenuActionButtonActive()
 
 bool ACPPController::TryHandleEscapeMenuRotationArrowActive()
 {
+	if (GetIsValidFormationMovePreview() && M_FormationMovePreview->GetIsDragActive())
+	{
+		M_FormationMovePreview->EndDrag();
+		return true;
+	}
 	if (not PlayerRotationArrow.GetIsRotationArrowActive())
 	{
 		return false;

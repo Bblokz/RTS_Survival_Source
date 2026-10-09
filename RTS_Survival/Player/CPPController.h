@@ -85,6 +85,7 @@ class AScavengeableObject;
 enum class ERTSPrimaryClickContext;
 struct FPlayerRotationArrowSettings;
 class USquadMovePreviewComponent;
+class UFormationMovePreviewComponent;
 enum class ERTSPauseGameOptions : uint8;
 enum class ERTSVoiceLine : uint8;
 class UPlayerAudioController;
@@ -1116,7 +1117,7 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<UGlobalAbility> M_ActiveGlobalAbility;
 
-	// Clicked primary when secondary is held down, opens the formation widget.
+	// Clicked primary when secondary is held down; consumed so it cannot start a selection during a drag.
 	void PrimaryClickWhileSecondaryActive();
 
 	// The formation widget is active and consumes the click.
@@ -1592,6 +1593,32 @@ private:
 
 	// Asks the command decoder what a secondary click on this actor would do, without issuing anything.
 	bool GetWouldSecondaryClickMove(AActor* ActorUnderCursor);
+
+	// Previews formation moves of selections with non-squad units and records the secondary-button line drag.
+	UPROPERTY()
+	TObjectPtr<UFormationMovePreviewComponent> M_FormationMovePreview;
+
+	bool GetIsValidFormationMovePreview() const;
+
+	/** @return True when a move order would go through the formation controller and the cursor is free for it. */
+	bool GetIsFormationMoveContext() const;
+
+	/**
+	 * @brief Feeds this frame's cursor and selection to the formation move preview.
+	 * @param CursorHit What the cursor currently points at.
+	 * @param bCursorHit Whether CursorHit is a valid hit.
+	 */
+	void Tick_UpdateFormationMovePreview(const FHitResult& CursorHit, bool bCursorHit);
+
+	/**
+	 * @brief Starts recording a line drag when the held secondary button can spread the selection along it.
+	 * @param CursorHit What the cursor pointed at when the secondary button went down.
+	 * @return False when this selection keeps the rotation arrow instead.
+	 */
+	bool TryBeginFormationLineDrag(const FHitResult& CursorHit);
+
+	/** @return True when releasing the secondary button now spreads the selection along the dragged line. */
+	bool GetIsFormationLineDragReady() const;
 
 	// Whether there is currently an active building preview.
 	// This is only the case if we activated a building ability but have not yet propagated a valid building

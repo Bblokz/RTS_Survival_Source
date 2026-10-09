@@ -101,6 +101,23 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", ClampMax="15.0", UIMin="0.0", UIMax="10.0", Units="s"))
 	float M_CoverTargetChangeToleranceSeconds = 2.5f;
 
+	// How long a soldier keeps a cover point that the latest cover scan did not find again. A scan misses a
+	// point for a moment when another soldier walks through it; without this the occupant gets up and walks back
+	// in a few seconds later. Cover whose object was destroyed is always given up at once.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", ClampMax="60.0", UIMin="0.0", UIMax="30.0", Units="s"))
+	float M_CoverPointLossToleranceSeconds = 12.0f;
+
+	// How long a soldier that stepped out of standing cover holds its firing position, without firing, after its
+	// weapon lost its target or swapped to an enemy this point cannot reach. Weapons change target all the time;
+	// without this the soldier steps back and out again on every change. Zero steps back at once.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", ClampMax="10.0", UIMin="0.0", UIMax="6.0", Units="s"))
+	float M_StandingCoverTargetLossHoldSeconds = 2.0f;
+
+	// Shortest time a soldier stays behind standing cover after stepping back before it steps out again.
+	// An attack order from the player is never delayed by this.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", ClampMax="10.0", UIMin="0.0", UIMax="6.0", Units="s"))
+	float M_StandingCoverMinimumHiddenSeconds = 1.0f;
+
 	// Enemies taken into account per soldier: its own target first, then the targets of its squad mates.
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="1", ClampMax="8", UIMin="1", UIMax="8"))
 	int32 M_CombatCoverMaximumThreats = 6;

@@ -895,6 +895,14 @@ private:
 	UAimOffsetBlendSpace* ResolveCoverAimOffset() const;
 	UAnimSequence* ResolveCoverAimBaseSequence() const;
 
+	/**
+	 * @brief Guards against an aim offset sample being assigned as the pose the aim offset is applied to.
+	 * Such an additive clip played as a pose scales every bone to zero, which makes the soldier vanish.
+	 * @param ConfiguredBaseSequence Base sequence as set up on the animation Blueprint.
+	 * @return The clip itself, the full pose it was made additive against, or nullptr when neither is usable.
+	 */
+	UAnimSequence* GetUsableCoverAimBaseSequence(UAnimSequence* ConfiguredBaseSequence) const;
+
 	UPROPERTY(Transient)
 	FSquadUnitCoverGraphAssets M_CoverGraphAssets;
 	void EnterExposedCoverPose();
@@ -903,6 +911,9 @@ private:
 	const FSquadUnitStandingCoverAnimationSet* FindStandingCoverAnimationSet(ESquadIdleAnimationPose CoverPose) const;
 	void ClearCoverAnimationRuntime();
 	void LogMissingCoverAnimationAssets(ESquadIdleAnimationPose CoverPose) const;
+
+	// Lists what every cover and regular aim offset is built from, to tell a working pair from a broken one.
+	void LogCoverAimAssetSetup() const;
 
 	/** Reports what each cover montage of this pose moves the capsule by, as the starting point for tuning offsets. */
 	void LogCoverMontageRootMotion(ESquadIdleAnimationPose CoverPose) const;

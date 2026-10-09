@@ -287,6 +287,16 @@ struct FSquadUnitCoverMoveGuard
 
 	// Until this time the unit's weapon is reloading; a unit in cover does not expose itself before then.
 	float ReloadEndWorldSeconds = 0.0f;
+
+	// Since when a stepped-out unit has had nothing it can shoot at from there; negative while it has a target.
+	// It holds its firing position for a moment instead of stepping back and out again on every target change.
+	float ExposedWithoutTargetSinceWorldSeconds = -1.0f;
+
+	// A unit that stepped back behind standing cover does not step out again before this time.
+	float EarliestExposeWorldSeconds = 0.0f;
+
+	// Since when the cover scans have no longer listed the unit's point; negative while it is listed.
+	float PointUnpublishedSinceWorldSeconds = -1.0f;
 };
 
 /**
@@ -325,6 +335,13 @@ public:
 	bool GetIsUnitInCombat( )const;
 
 	const FSquadUnitCoverRuntimeState& GetCoverRuntimeState() const { return M_CoverRuntimeState; }
+
+	/**
+	 * @brief Lets a squad that closes range for an attack order leave behind the units that do not need to move.
+	 * One unit out of range moves the whole squad, which used to pull every other unit out of its cover as well.
+	 * @return True when this unit sits in cover and its own weapon has the ordered target in range.
+	 */
+	bool GetCanHoldCoverWhileSquadClosesRange() const;
 	bool GetHasCoverAssignment() const { return M_CoverRuntimeState.GetHasAssignment(); }
 	bool GetIsOccupyingCover() const { return M_CoverRuntimeState.GetIsOccupyingCover(); }
 	EAbilityID GetActiveCommand() const { return M_ActiveCommand; }
@@ -957,7 +974,24 @@ private:
 	// Cover must stay clearly inside weapon range, or entering it would make the squad walk closer again.
 	float GetMaximumCoverDistanceToTarget() const;
 	bool GetIsSquadMateWalkingToCover() const;
-	void ReturnToProtectedCover();
+	void ReturnToProtectedCover(const TCHAR* Reason);
+
+	/**
+	 * @brief Decides whether a point that dropped out of the latest cover scan is really gone.
+	 * @return True when the cover object no longer exists or the point stayed missing past the tolerance.
+	 */
+	bool GetHasLostCoverPoint(const URTSCoverFinderWorldSubsystem& CoverSubsystem);
+
+	// Debug only: what about the unit or its squad no longer allows automatic cover.
+	void LogCoverKeepDenied() const;
+
+	/**
+	 * @brief Keeps a stepped-out unit in its firing position, without firing, through a short spell in which its
+	 * weapon has no target or one this point cannot reach. Weapons swap targets often; stepping back at once
+	 * made units step back and out again every second.
+	 * @param StepBackReason Logged when the spell outlasts the hold time and the unit steps back after all.
+	 */
+	void HoldExposedCoverWithoutUsableTarget(const TCHAR* StepBackReason);
 	void ExposeFromStandingCover();
 	void RequestCoverEnterAnimation();
 
@@ -1030,7 +1064,7 @@ private:
 
 	// Leaves cover and records why, so repeated enter and leave cycles can be traced in the log.
 	void LeaveCoverForReason(const TCHAR* Reason);
-	void CancelAutomaticCoverForCommandMovement();
+	void CancelAutomaticCoverForCommandMovement(const TCHAR* MovementSource);
 	void SetCoverWeaponFireBlocked(bool bBlocked) const;
 	/**
 	 * @brief Lets the unit's weapon fire through its own cover for as long as it holds the point.
