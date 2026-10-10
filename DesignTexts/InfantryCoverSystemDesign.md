@@ -104,9 +104,25 @@ The regular crouch rule needs one continuous surface from knee to crouch height,
 
 While a soldier holds a point, his weapon ignores every object in front of him there that does not belong to an enemy (`IgnoreCoverObstaclesWithWeapon`): the point's own cover object plus whatever else overlaps a box between him and the cover (`GatherCoverObstacleActors`), because a crystal cluster or a wreck with loose parts is several actors. The ignores are removed when he leaves the point. Before, only cover owned by his own player was ignored, so neutral objects such as radixite crystals were hit.
 
+### Cover from sockets
+
+Some actors carry their cover on mesh sockets instead of having it found by the scan: trenches, whose collision is a plane that lets tanks drive over them, and hand-placed cover such as sandbag walls. `M_SocketCoverActorClasses` in the cover settings (section "Cover From Sockets") lists the parent classes, by default `BP_TrenchMaster` and `BP_NaturalCover`. On the first tick of a map `RegisterSocketCoverOnce` finds every actor of a listed class or a class derived from one, takes its first mesh component that has sockets (an empty inherited mesh component and the health bar widget are passed over), and turns each socket into a cover point by its name:
+
+| Setting | Default | Cover type |
+| --- | --- | --- |
+| `M_TrenchCoverSocketNamePart` | `cargo` | `TrenchStandUp` |
+| `M_CrouchCoverSocketNamePart` | `crouch` | `Crouch` |
+| `M_StandingLeftCoverSocketNamePart` | `standing` | `StandingLeft` |
+| `M_StandingRightCoverSocketNamePart` | `standing_right` | `StandingRight` |
+| `M_ProneCoverSocketNamePart` | `prone` | `Prone` |
+
+Letter case does not matter. A name that contains more than one part gets the longest one (`FCoverFinderAlgorithms::TryGetSocketCoverType`), which is why `standing_right` is a right-peek point although it contains `standing`. Sockets with none of the parts are ignored. The soldier faces along the socket's forward (X) axis, and the point is moved onto the navmesh when that is close by.
+
+The points go through the authored-provider path: they win a spacing conflict with an equivalent scanned point, two sockets of the same type facing the same way closer than `M_CoverPointSpacing` (90 cm) merge into one, and socket prone points are never thinned. When the actor is destroyed its points are taken out again (`RemoveSocketCoverOfDestroyedActors`). With `LogRTSCoverFinder` on Verbose, `RTS_COVER_SOCKET` lists every socket point and `RTS_COVER_SOCKET_NONE` every listed actor that gave none.
+
 ### Trench cover
 
-Trenches are not scanned: their collision is a plane that lets tanks drive over them. `M_TrenchActorClass` in the cover settings names the trench parent class; on the first tick of a map `RegisterTrenchCoverOnce` finds every actor of that class or a derived one, takes its mesh component, and registers each socket whose name contains `M_TrenchCoverSocketNamePart` ("cargo") as a `TrenchStandUp` cover point. The soldier faces along the socket's forward axis. Trenches never change during play, so this is never repeated. The points go through the authored-provider path, so the shared minimum point spacing applies to them and nothing else about scanning touches them. They draw red.
+Trench points come from sockets, see above. They draw red.
 
 A trench point behaves like standing cover with no sideways step: protected is a crouch below the edge (`ESquadIdleAnimationPose::TrenchCover`), exposed is standing up in place (`TrenchPeek`), with zero enter and exposed offsets. The assets live in `CoverAnimations.Trench` on the infantry animation Blueprint, a `FSquadUnitStandingCoverAnimationSet`: `ProtectedIdlePose` for the crouch, `PeekAimAssets` for the standing aim, and optional enter, expose, return and exit montages. Left empty, the crouch falls back to `Crouch.ProtectedIdlePose` and the exposed pose to the regular standing aim (`ESquadCoverGraphPose::NotInCover`), so it works before any trench asset is assigned.
 

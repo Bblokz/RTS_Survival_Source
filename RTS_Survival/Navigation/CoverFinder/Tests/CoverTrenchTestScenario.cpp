@@ -153,7 +153,7 @@ bool FCoverTrenchTestScenario::SendSquadIntoTrench(UWorld& World, URTSCoverFinde
 	Check(
 		not TrenchPoints.IsEmpty(),
 		TEXT("the map has trench cover"),
-		FString::Printf(TEXT("trenches=%d points=%d"), CoverSubsystem.GetTrenchCoverActorCount(), TrenchPoints.Num()));
+		FString::Printf(TEXT("socket_cover_actors=%d trench_points=%d"), CoverSubsystem.GetSocketCoverActorCount(), TrenchPoints.Num()));
 
 	ASquadController* PlayerSquad = nullptr;
 	for (TActorIterator<ASquadController> SquadIterator(&World); SquadIterator; ++SquadIterator)

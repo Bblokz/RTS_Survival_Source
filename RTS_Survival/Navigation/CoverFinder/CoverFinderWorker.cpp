@@ -671,6 +671,33 @@ bool FCoverFinderAlgorithms::TryBuildReaimedSample(
 	return true;
 }
 
+bool FCoverFinderAlgorithms::TryGetSocketCoverType(
+	const FString& SocketName,
+	const FCoverSocketNameParts& NameParts,
+	ERTSCoverType& OutCoverType)
+{
+	const TPair<const FString*, ERTSCoverType> PartsPerType[] =
+	{
+		{&NameParts.Trench, ERTSCoverType::TrenchStandUp},
+		{&NameParts.Crouch, ERTSCoverType::Crouch},
+		{&NameParts.StandingLeft, ERTSCoverType::StandingLeft},
+		{&NameParts.StandingRight, ERTSCoverType::StandingRight},
+		{&NameParts.Prone, ERTSCoverType::Prone}
+	};
+	int32 LongestMatchLength = 0;
+	for (const TPair<const FString*, ERTSCoverType>& PartForType : PartsPerType)
+	{
+		const FString& NamePart = *PartForType.Key;
+		// The longest part is the most specific one: "standing_right" before "standing".
+		if (NamePart.Len() > LongestMatchLength && SocketName.Contains(NamePart, ESearchCase::IgnoreCase))
+		{
+			LongestMatchLength = NamePart.Len();
+			OutCoverType = PartForType.Value;
+		}
+	}
+	return LongestMatchLength > 0;
+}
+
 bool FCoverFinderAlgorithms::GetIsSameSurface(
 	const FCoverTraceObservation& FirstTrace,
 	const FCoverTraceObservation& SecondTrace,

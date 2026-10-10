@@ -163,6 +163,18 @@ public:
 		const FCoverFinderSettingsSnapshot& Settings,
 		FRTSCoverPoint& OutCompanion);
 
+	/**
+	 * @brief Reads the kind of cover a mesh socket stands for from its name.
+	 * @param SocketName Name of the socket.
+	 * @param NameParts Designer's name part per kind of cover; empty parts match nothing.
+	 * @param OutCoverType Kind of the longest name part the socket name contains, whatever the letter case.
+	 * @return False when the name contains none of the parts, so the socket is no cover point.
+	 */
+	static bool TryGetSocketCoverType(
+		const FString& SocketName,
+		const FCoverSocketNameParts& NameParts,
+		ERTSCoverType& OutCoverType);
+
 	static bool GetIsSameSurface(
 		const FCoverTraceObservation& FirstTrace,
 		const FCoverTraceObservation& SecondTrace,

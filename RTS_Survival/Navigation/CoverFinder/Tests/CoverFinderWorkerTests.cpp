@@ -292,6 +292,44 @@ bool FCoverFinderDeduplicationTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FCoverFinderSocketCoverTypeTest,
+	"RTS.CoverFinder.Worker.SocketCoverTypeFromName",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FCoverFinderSocketCoverTypeTest::RunTest(const FString& Parameters)
+{
+	FCoverSocketNameParts NameParts;
+	NameParts.Trench = TEXT("cargo");
+	NameParts.Crouch = TEXT("crouch");
+	NameParts.StandingLeft = TEXT("standing");
+	NameParts.StandingRight = TEXT("standing_right");
+	NameParts.Prone = TEXT("prone");
+	const auto TestSocketType = [this, &NameParts](const TCHAR* SocketName, const ERTSCoverType ExpectedType)
+	{
+		ERTSCoverType FoundType = ERTSCoverType::Crouch;
+		const bool bIsCoverSocket = FCoverFinderAlgorithms::TryGetSocketCoverType(SocketName, NameParts, FoundType);
+		TestTrue(FString::Printf(TEXT("%s is a cover socket"), SocketName), bIsCoverSocket);
+		TestEqual(FString::Printf(TEXT("%s has the expected cover type"), SocketName), FoundType, ExpectedType);
+	};
+	TestSocketType(TEXT("Cargo_3"), ERTSCoverType::TrenchStandUp);
+	TestSocketType(TEXT("cover_CROUCH_01"), ERTSCoverType::Crouch);
+	TestSocketType(TEXT("Standing"), ERTSCoverType::StandingLeft);
+	TestSocketType(TEXT("standing_left_2"), ERTSCoverType::StandingLeft);
+	TestSocketType(TEXT("Standing_Right_2"), ERTSCoverType::StandingRight);
+	TestSocketType(TEXT("Prone1"), ERTSCoverType::Prone);
+
+	ERTSCoverType FoundType = ERTSCoverType::Prone;
+	TestFalse(
+		TEXT("A socket with none of the name parts is no cover socket"),
+		FCoverFinderAlgorithms::TryGetSocketCoverType(TEXT("Muzzle"), NameParts, FoundType));
+	NameParts.Prone.Reset();
+	TestFalse(
+		TEXT("An empty name part matches nothing"),
+		FCoverFinderAlgorithms::TryGetSocketCoverType(TEXT("Prone1"), NameParts, FoundType));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FCoverFinderAuthoredRegistrationTest,
 	"RTS.CoverFinder.AuthoredRegistration",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

@@ -122,7 +122,23 @@ namespace CoverFinderWorldSubsystemPrivate
 	const FColor TrenchCoverColor(220, 30, 30);
 	const FColor ProneCoverColor(160, 60, 220);
 	// How far a trench socket may sit from the navmesh and still be moved onto it.
-	const FVector TrenchSocketProjectionExtent(120.0f, 120.0f, 250.0f);
+	const FVector CoverSocketProjectionExtent(120.0f, 120.0f, 250.0f);
+
+	// The first mesh of an actor is the one whose sockets mark its cover. Mesh components without any socket are
+	// passed over: a blueprint often leaves an inherited mesh component empty, and its health bar widget is a
+	// mesh component too.
+	const UMeshComponent* FindFirstMeshWithSockets(const AActor& CoverActor)
+	{
+		TInlineComponentArray<UMeshComponent*> MeshComponents(&CoverActor);
+		for (const UMeshComponent* MeshComponent : MeshComponents)
+		{
+			if (IsValid(MeshComponent) && MeshComponent->HasAnySockets())
+			{
+				return MeshComponent;
+			}
+		}
+		return nullptr;
+	}
 
 	FColor GetCoverDebugColor(const ERTSCoverType CoverType)
 	{
@@ -517,6 +533,7 @@ void URTSCoverFinderWorldSubsystem::Deinitialize()
 	M_LandscapeCoverPoints.Reset();
 	M_EnvironmentCoverPoints.Reset();
 	M_AuthoredCoverProviders.Reset();
+	M_SocketCoverProviders.Reset();
 	M_BlockingProviderActors.Reset();
 	M_BlockingProviderHandles.Reset();
 	M_CoverPointIndices.Reset();
@@ -579,9 +596,9 @@ void URTSCoverFinderWorldSubsystem::Tick(const float DeltaTime)
 	M_CombatCoverScenario.Tick(*this);
 	M_CoverCountScenario.Tick(*this);
 	M_TrenchCoverScenario.Tick(*this);
-	if (not bM_HasRegisteredTrenchCover)
+	if (not bM_HasRegisteredSocketCover)
 	{
-		RegisterTrenchCoverOnce();
+		RegisterSocketCoverOnce();
 	}
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
@@ -660,90 +677,158 @@ void URTSCoverFinderWorldSubsystem::ForceRescan()
 	bM_ForceRescanAfterCurrent = true;
 }
 
-void URTSCoverFinderWorldSubsystem::RegisterTrenchCoverOnce()
+void URTSCoverFinderWorldSubsystem::RegisterSocketCoverOnce()
 {
-	bM_HasRegisteredTrenchCover = true;
+	bM_HasRegisteredSocketCover = true;
 	UWorld* World = GetWorld();
 	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
-	if (not IsValid(World) || not IsValid(CoverSettings) || CoverSettings->M_TrenchActorClass.IsNull() ||
-		CoverSettings->M_TrenchCoverSocketNamePart.IsEmpty())
+	if (not IsValid(World) || not IsValid(CoverSettings))
 	{
 		return;
 	}
-	const UClass* TrenchClass = CoverSettings->M_TrenchActorClass.LoadSynchronous();
-	if (not IsValid(TrenchClass))
+	FCoverSocketNameParts NameParts;
+	NameParts.Trench = CoverSettings->M_TrenchCoverSocketNamePart;
+	NameParts.Crouch = CoverSettings->M_CrouchCoverSocketNamePart;
+	NameParts.StandingLeft = CoverSettings->M_StandingLeftCoverSocketNamePart;
+	NameParts.StandingRight = CoverSettings->M_StandingRightCoverSocketNamePart;
+	NameParts.Prone = CoverSettings->M_ProneCoverSocketNamePart;
+	// An actor derived from two of the listed classes is still only read once.
+	TSet<const AActor*> RegisteredActors;
+	int32 SocketPointCount = 0;
+	for (const TSoftClassPtr<AActor>& SoftCoverActorClass : CoverSettings->M_SocketCoverActorClasses)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("Cover finder: the trench actor class set in the cover settings could not be loaded."));
-		return;
-	}
-	int32 TrenchPointCount = 0;
-	for (TActorIterator<AActor> TrenchIterator(World, const_cast<UClass*>(TrenchClass)); TrenchIterator; ++TrenchIterator)
-	{
-		AActor* TrenchActor = *TrenchIterator;
-		if (not IsValid(TrenchActor))
+		UClass* CoverActorClass = SoftCoverActorClass.LoadSynchronous();
+		if (not IsValid(CoverActorClass))
 		{
+			RTSFunctionLibrary::ReportError(
+				"Cover finder: socket cover actor class " + SoftCoverActorClass.ToString() +
+				" set in the cover settings could not be loaded.");
 			continue;
 		}
-		++M_TrenchCoverActorCount;
-		TArray<FRTSCoverPoint> TrenchPoints = BuildTrenchCoverPoints(
-			*TrenchActor,
-			CoverSettings->M_TrenchCoverSocketNamePart);
-		TrenchPointCount += TrenchPoints.Num();
-		RegisterAuthoredCoverProvider(TrenchActor, MoveTemp(TrenchPoints));
+		for (TActorIterator<AActor> CoverActorIterator(World, CoverActorClass); CoverActorIterator; ++CoverActorIterator)
+		{
+			AActor* CoverActor = *CoverActorIterator;
+			if (not IsValid(CoverActor) || RegisteredActors.Contains(CoverActor))
+			{
+				continue;
+			}
+			RegisteredActors.Add(CoverActor);
+			TArray<FRTSCoverPoint> SocketPoints = BuildSocketCoverPoints(*CoverActor, NameParts);
+			SocketPointCount += SocketPoints.Num();
+			const uint64 RegistrationId = RegisterAuthoredCoverProvider(CoverActor, MoveTemp(SocketPoints));
+			if (RegistrationId != 0)
+			{
+				M_SocketCoverProviders.Add(RegistrationId, CoverActor);
+			}
+		}
 	}
+	M_SocketCoverActorCount = RegisteredActors.Num();
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
 		UE_LOG(
 			LogRTSCoverFinder,
 			Display,
-			TEXT("RTS_COVER_TRENCHES class=%s trenches=%d cover_points=%d socket_name_part=%s"),
-			*TrenchClass->GetName(),
-			M_TrenchCoverActorCount,
-			TrenchPointCount,
-			*CoverSettings->M_TrenchCoverSocketNamePart);
+			TEXT("RTS_COVER_SOCKETS classes=%d actors=%d actors_with_cover=%d cover_points=%d"),
+			CoverSettings->M_SocketCoverActorClasses.Num(),
+			M_SocketCoverActorCount,
+			M_SocketCoverProviders.Num(),
+			SocketPointCount);
 	}
 }
 
-TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildTrenchCoverPoints(
-	const AActor& TrenchActor,
-	const FString& SocketNamePart) const
+TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildSocketCoverPoints(
+	const AActor& CoverActor,
+	const FCoverSocketNameParts& NameParts) const
 {
-	TArray<FRTSCoverPoint> TrenchPoints;
-	// A trench has one mesh; its sockets mark where soldiers stand.
-	const UMeshComponent* TrenchMesh = TrenchActor.FindComponentByClass<UMeshComponent>();
-	if (not IsValid(TrenchMesh))
+	TArray<FRTSCoverPoint> SocketPoints;
+	const UMeshComponent* CoverMesh = CoverFinderWorldSubsystemPrivate::FindFirstMeshWithSockets(CoverActor);
+	if (not IsValid(CoverMesh))
 	{
-		return TrenchPoints;
+		if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+		{
+			UE_LOG(
+				LogRTSCoverFinder,
+				Verbose,
+				TEXT("RTS_COVER_SOCKET_NONE actor=%s class=%s reason=no_mesh_with_sockets"),
+				*CoverActor.GetName(),
+				*GetNameSafe(CoverActor.GetClass()));
+		}
+		return SocketPoints;
 	}
 	const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
 	const ANavigationData* NavigationData = GetCharacterNavigationData();
-	for (const FName& SocketName : TrenchMesh->GetAllSocketNames())
+	for (const FName& SocketName : CoverMesh->GetAllSocketNames())
 	{
-		if (not SocketName.ToString().Contains(SocketNamePart, ESearchCase::IgnoreCase))
+		ERTSCoverType SocketCoverType = ERTSCoverType::Crouch;
+		if (not FCoverFinderAlgorithms::TryGetSocketCoverType(SocketName.ToString(), NameParts, SocketCoverType))
 		{
 			continue;
 		}
-		const FTransform SocketTransform = TrenchMesh->GetSocketTransform(SocketName, RTS_World);
+		const FTransform SocketTransform = CoverMesh->GetSocketTransform(SocketName, RTS_World);
 		const FVector FacingDirection = SocketTransform.GetRotation().GetForwardVector().GetSafeNormal2D();
-		FRTSCoverPoint& TrenchPoint = TrenchPoints.AddDefaulted_GetRef();
-		TrenchPoint.CoverType = ERTSCoverType::TrenchStandUp;
+		FRTSCoverPoint& SocketPoint = SocketPoints.AddDefaulted_GetRef();
+		SocketPoint.CoverType = SocketCoverType;
 		// The normal points from the cover to the soldier, so it is the opposite of where he looks.
-		TrenchPoint.CoverNormal = FacingDirection.IsNearlyZero() ? FVector::ForwardVector : -FacingDirection;
-		TrenchPoint.Location = SocketTransform.GetLocation();
+		SocketPoint.CoverNormal = FacingDirection.IsNearlyZero() ? FVector::ForwardVector : -FacingDirection;
+		SocketPoint.Location = SocketTransform.GetLocation();
 		// Soldiers walk to the point, so it is moved onto the navmesh when that is close by.
 		FNavLocation ProjectedSocketLocation;
 		const bool bIsOnNavigation = IsValid(NavigationSystem) && IsValid(NavigationData) &&
 			NavigationSystem->ProjectPointToNavigation(
-				TrenchPoint.Location,
+				SocketPoint.Location,
 				ProjectedSocketLocation,
-				CoverFinderWorldSubsystemPrivate::TrenchSocketProjectionExtent,
+				CoverFinderWorldSubsystemPrivate::CoverSocketProjectionExtent,
 				NavigationData);
 		if (bIsOnNavigation)
 		{
-			TrenchPoint.Location = ProjectedSocketLocation.Location;
+			SocketPoint.Location = ProjectedSocketLocation.Location;
+		}
+		if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+		{
+			UE_LOG(
+				LogRTSCoverFinder,
+				Verbose,
+				TEXT("RTS_COVER_SOCKET actor=%s socket=%s type=%s on_navigation=%d location=%s"),
+				*CoverActor.GetName(),
+				*SocketName.ToString(),
+				*UEnum::GetValueAsString(SocketCoverType),
+				bIsOnNavigation ? 1 : 0,
+				*SocketPoint.Location.ToCompactString());
 		}
 	}
-	return TrenchPoints;
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		if (SocketPoints.IsEmpty())
+		{
+			UE_LOG(
+				LogRTSCoverFinder,
+				Verbose,
+				TEXT("RTS_COVER_SOCKET_NONE actor=%s class=%s reason=no_cover_socket_names mesh=%s sockets=%d"),
+				*CoverActor.GetName(),
+				*GetNameSafe(CoverActor.GetClass()),
+				*CoverMesh->GetName(),
+				CoverMesh->GetAllSocketNames().Num());
+		}
+	}
+	return SocketPoints;
+}
+
+void URTSCoverFinderWorldSubsystem::RemoveSocketCoverOfDestroyedActors()
+{
+	TArray<uint64, TInlineAllocator<4>> RegistrationsToRemove;
+	for (const TPair<uint64, TWeakObjectPtr<AActor>>& SocketCoverProvider : M_SocketCoverProviders)
+	{
+		if (not SocketCoverProvider.Value.IsValid())
+		{
+			RegistrationsToRemove.Add(SocketCoverProvider.Key);
+		}
+	}
+	// Unregistering republishes the cover, so it is done after the walk over the map.
+	for (const uint64 RegistrationId : RegistrationsToRemove)
+	{
+		M_SocketCoverProviders.Remove(RegistrationId);
+		UnregisterAuthoredCoverProvider(RegistrationId);
+	}
 }
 
 uint64 URTSCoverFinderWorldSubsystem::RegisterAuthoredCoverProvider(
@@ -1359,6 +1444,7 @@ void URTSCoverFinderWorldSubsystem::RemoveInvalidTacticalReferences()
 		ProviderIterator.RemoveCurrent();
 	}
 	M_NextTacticalUnitIndex = FMath::Min(M_NextTacticalUnitIndex, M_RegisteredSquadUnits.Num());
+	RemoveSocketCoverOfDestroyedActors();
 }
 
 FIntPoint URTSCoverFinderWorldSubsystem::GetCoverSpatialCell(const FVector& Location) const

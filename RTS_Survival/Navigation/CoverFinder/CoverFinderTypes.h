@@ -102,6 +102,16 @@ struct FRTSLocalCoverPoint
 	ERTSCoverType CoverType = ERTSCoverType::Crouch;
 };
 
+/** The parts of a socket name that mark each kind of cover on an actor whose cover is read from its sockets. */
+struct FCoverSocketNameParts
+{
+	FString Trench;
+	FString Crouch;
+	FString StandingLeft;
+	FString StandingRight;
+	FString Prone;
+};
+
 /** Performance totals for the latest completed cover scan. */
 USTRUCT(BlueprintType)
 struct FRTSCoverFinderPerformance

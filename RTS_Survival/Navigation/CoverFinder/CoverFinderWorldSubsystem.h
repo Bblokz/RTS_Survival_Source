@@ -286,8 +286,8 @@ public:
 		const ASquadUnit* IgnoredUnit,
 		const TSet<const ASquadUnit*>* IgnoredUnits = nullptr) const;
 
-	// Trench actors found at map start, for tests and reports.
-	int32 GetTrenchCoverActorCount() const { return M_TrenchCoverActorCount; }
+	// Actors whose cover was read from their sockets at map start, for tests and reports.
+	int32 GetSocketCoverActorCount() const { return M_SocketCoverActorCount; }
 
 	// Number of thin obstacles that hold more soldiers than they have room for; zero when the limit works.
 	int32 GetOverCapacityThinObstacleCount() const;
@@ -403,9 +403,12 @@ private:
 	FCoverCountTestScenario M_CoverCountScenario;
 	FCoverTrenchTestScenario M_TrenchCoverScenario;
 
-	// Trenches never change during play, so their cover is registered once, on the first tick of the map.
-	bool bM_HasRegisteredTrenchCover = false;
-	int32 M_TrenchCoverActorCount = 0;
+	// Cover that actors carry on their sockets is registered once, on the first tick of the map.
+	bool bM_HasRegisteredSocketCover = false;
+	int32 M_SocketCoverActorCount = 0;
+
+	// The actor behind each socket cover registration; when it is destroyed its points are taken out again.
+	TMap<uint64, TWeakObjectPtr<AActor>> M_SocketCoverProviders;
 
 	// Rings around the thin obstacles found while gathering the bounds of the next environment scan.
 	TArray<FCoverFocusedSample> M_PendingThinObstacleSamples;
@@ -466,18 +469,21 @@ private:
 	void AppendLargeObjectScanBounds(const FBox& ExpandedObjectBounds, TArray<FBox>& OutEnvironmentBounds) const;
 
 	/**
-	 * @brief Registers the stand-up cover of every trench on the map from the sockets of its mesh.
-	 * Trenches are not found by traces: their collision is a plane that lets tanks drive over them.
+	 * @brief Registers the cover of every actor of the configured socket cover classes from the sockets of its
+	 * first mesh that has sockets. Used for trenches, which traces cannot find, and for hand-placed cover such as sandbag walls.
 	 */
-	void RegisterTrenchCoverOnce();
+	void RegisterSocketCoverOnce();
 
 	/**
-	 * @brief Builds one trench's cover points from its mesh sockets.
-	 * @param TrenchActor Actor of the configured trench class.
-	 * @param SocketNamePart Part of a socket name that marks a firing position.
-	 * @return One stand-up point per matching socket, facing along the socket's forward axis.
+	 * @brief Builds one actor's cover points from the sockets of its first mesh that has sockets.
+	 * @param CoverActor Actor of one of the configured socket cover classes.
+	 * @param NameParts Part of a socket name that marks each kind of cover.
+	 * @return One point per matching socket, facing along the socket's forward axis.
 	 */
-	TArray<FRTSCoverPoint> BuildTrenchCoverPoints(const AActor& TrenchActor, const FString& SocketNamePart) const;
+	TArray<FRTSCoverPoint> BuildSocketCoverPoints(const AActor& CoverActor, const FCoverSocketNameParts& NameParts) const;
+
+	// Takes out the socket cover of actors that no longer exist, such as a sandbag wall that was destroyed.
+	void RemoveSocketCoverOfDestroyedActors();
 
 	// Landscape is scanned once on its own, and soldiers stand on cover points without being cover themselves.
 	static bool GetIsScannableEnvironmentComponent(const UPrimitiveComponent* PrimitiveComponent);

@@ -273,17 +273,36 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Cover Classification", meta=(ClampMin="0.0", ClampMax="80.0", UIMin="0.0", UIMax="80.0", Units="cm"))
 	float M_StandingPeekEdgeInset = 25.0f;
 
-	// Every actor of this class, or of a class derived from it, is a trench. Trenches are not scanned: their
-	// collision is a flat plane so tanks can drive over them. Instead, each socket on the trench's mesh whose name
-	// contains M_TrenchCoverSocketNamePart becomes a stand-up cover point. Read once when the map starts, because
-	// trenches are never added or removed during play.
-	UPROPERTY(Config, EditAnywhere, Category="Trench Cover")
-	TSoftClassPtr<AActor> M_TrenchActorClass;
+	// Actors of these classes, and of classes derived from them, carry their cover on the sockets of their first
+	// mesh that has sockets, instead of having it found by the scan: trenches, whose collision is a flat plane
+	// so tanks can drive over them, and hand-placed cover such as sandbag walls. Each socket whose name contains
+	// one of the name parts below becomes a cover point of that kind, with the socket's forward axis as the
+	// direction the soldier faces. Read once when the map starts; the points of a destroyed actor go with it.
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
+	TArray<TSoftClassPtr<AActor>> M_SocketCoverActorClasses = {
+		TSoftClassPtr<AActor>(FSoftObjectPath(
+			TEXT("/Game/RTS_Survival/Blueprints/Environment/Trenches/BP_TrenchMaster.BP_TrenchMaster_C"))),
+		TSoftClassPtr<AActor>(FSoftObjectPath(
+			TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/BP_NaturalCover.BP_NaturalCover_C")))
+	};
 
-	// Part of a socket name that marks a trench firing position; upper and lower case do not matter. The socket's
-	// forward axis is the direction the soldier faces.
-	UPROPERTY(Config, EditAnywhere, Category="Trench Cover")
+	// Parts of a socket name that mark a cover point of each kind; upper and lower case do not matter. When a
+	// name contains more than one of them, the longest wins: "standing_right_2" is a right-peek point although
+	// it also contains "standing". A part left empty finds nothing.
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
 	FString M_TrenchCoverSocketNamePart = TEXT("cargo");
+
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
+	FString M_CrouchCoverSocketNamePart = TEXT("crouch");
+
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
+	FString M_StandingLeftCoverSocketNamePart = TEXT("standing");
+
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
+	FString M_StandingRightCoverSocketNamePart = TEXT("standing_right");
+
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
+	FString M_ProneCoverSocketNamePart = TEXT("prone");
 
 	UPROPERTY(Config, EditAnywhere, Category="Debug")
 	bool bM_DrawDetectedCover = true;
