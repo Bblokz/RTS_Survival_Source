@@ -11,6 +11,22 @@
  */
 class UStaticMesh;
 
+/** One class of actors whose cover is read from mesh sockets, with how soldiers use that cover. */
+USTRUCT()
+struct FRTSSocketCoverActorClass
+{
+	GENERATED_BODY()
+
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
+	TSoftClassPtr<AActor> ActorClass;
+
+	// Off: a soldier holds the point where the socket lands on the navmesh. On: he walks to that navmesh point
+	// and is then placed on the socket itself, and put back on the navmesh point when he leaves. For actors
+	// that keep infantry navigation away from their sockets, such as a trench that blocks tanks.
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
+	bool bSnapSoldiersToSockets = false;
+};
+
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Infantry Cover Finder"))
 class RTS_SURVIVAL_API URTSCoverFinderDeveloperSettings : public UDeveloperSettings
 {
@@ -283,12 +299,20 @@ public:
 	// so tanks can drive over them, and hand-placed cover such as sandbag walls. Each socket whose name contains
 	// one of the name parts below becomes a cover point of that kind, with the socket's forward axis as the
 	// direction the soldier faces. Read once when the map starts; the points of a destroyed actor go with it.
+	// An actor that derives from more than one listed class uses the entry of the most derived one, so a
+	// subclass can be listed again with its own setting.
 	UPROPERTY(Config, EditAnywhere, Category="Cover From Sockets")
-	TArray<TSoftClassPtr<AActor>> M_SocketCoverActorClasses = {
-		TSoftClassPtr<AActor>(FSoftObjectPath(
-			TEXT("/Game/RTS_Survival/Blueprints/Environment/Trenches/BP_TrenchMaster.BP_TrenchMaster_C"))),
-		TSoftClassPtr<AActor>(FSoftObjectPath(
-			TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/BP_NaturalCover.BP_NaturalCover_C")))
+	TArray<FRTSSocketCoverActorClass> M_SocketCoverActorClasses = {
+		FRTSSocketCoverActorClass{
+			TSoftClassPtr<AActor>(FSoftObjectPath(
+				TEXT("/Game/RTS_Survival/Blueprints/Environment/Trenches/BP_TrenchMaster.BP_TrenchMaster_C"))),
+			true
+		},
+		FRTSSocketCoverActorClass{
+			TSoftClassPtr<AActor>(FSoftObjectPath(
+				TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/BP_NaturalCover.BP_NaturalCover_C"))),
+			false
+		}
 	};
 
 	// Parts of a socket name that mark a cover point of each kind; upper and lower case do not matter. When a

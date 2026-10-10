@@ -84,6 +84,14 @@ struct FRTSCoverPoint
 	// points on every side, but only room for ThinObstacleCapacity soldiers at a time.
 	uint32 ThinObstacleId = 0;
 	uint8 ThinObstacleCapacity = 0;
+
+	// Set for cover read from a socket of an actor whose class asks for it: Location is where the soldier
+	// walks to and is put back when he leaves, SnapLocation is the socket, off the navmesh, where he holds.
+	bool bSnapSoldierToSocket = false;
+	FVector SnapLocation = FVector::ZeroVector;
+
+	// Where a soldier holding the point has his feet.
+	FVector GetHoldLocation() const { return bSnapSoldierToSocket ? SnapLocation : Location; }
 };
 
 /**

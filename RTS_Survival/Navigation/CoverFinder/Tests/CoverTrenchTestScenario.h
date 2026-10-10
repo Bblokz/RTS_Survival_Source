@@ -31,6 +31,8 @@ struct FCoverTrenchTestScenario
 	void Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem);
 
 private:
+	// The squad the test ordered into the trench; other squads on the map take cover by themselves too.
+	TWeakObjectPtr<ASquadController> M_OrderedSquad;
 	TWeakObjectPtr<ASquadUnit> M_TrenchSoldier;
 	TWeakObjectPtr<ASquadUnit> M_Enemy;
 	FRTSCoverPoint M_TrenchPoint;
@@ -62,5 +64,14 @@ private:
 	void TickWaitingForReloadDuck(UWorld& World);
 	void TickWaitingForStandUpAfterReload(UWorld& World);
 	void TickWaitingForCrouchAgain(UWorld& World);
+
+	// With socket snap on for the trench: the soldier holds it with his feet on the socket.
+	void CheckFeetOnSocket();
+
+	// With socket snap on for the trench: a soldier that leaves it is back on the navmesh point and can walk.
+	void CheckLeavingSocket();
+
+	// Enemy squads on the map call their soldiers back; the one the test uses is kept at its post.
+	void KeepEnemyInFrontOfTrench(UWorld& World);
 	bool GetHasPhaseTimedOut(const UWorld& World) const;
 };

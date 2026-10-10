@@ -1,7 +1,9 @@
 #include "CoverTrenchTestScenario.h"
 
+#include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -27,6 +29,8 @@ namespace CoverTrenchTestScenarioPrivate
 	constexpr float StandUpAfterReloadTimeoutSeconds = TestReloadSeconds + 10.0f;
 	// In front of the trench, well inside rifle range.
 	constexpr float EnemyDistanceInFrontOfTrench = 1200.0f;
+	constexpr float EnemyDropHeight = 60.0f;
+	constexpr float MaximumEnemyDriftFromPost = 150.0f;
 	// Standing up must not move the soldier; this only allows for the floor under his feet.
 	constexpr float MaximumStandUpTravel = 15.0f;
 
@@ -34,6 +38,16 @@ namespace CoverTrenchTestScenarioPrivate
 	{
 		const USquadUnitAnimInstance* UnitAnimation = SquadUnit.GetAnimBP_SquadUnit();
 		return IsValid(UnitAnimation) ? UnitAnimation->GetIdleAnimationPose() : ESquadIdleAnimationPose::Regular;
+	}
+
+	// How far the soldier's feet may be from where the test expects them.
+	constexpr float MaximumFeetPlacementError = 15.0f;
+
+	FVector GetFeetLocation(const ASquadUnit& SquadUnit)
+	{
+		const UCapsuleComponent* UnitCapsule = SquadUnit.GetCapsuleComponent();
+		const float HalfHeight = IsValid(UnitCapsule) ? UnitCapsule->GetScaledCapsuleHalfHeight() : 0.0f;
+		return SquadUnit.GetActorLocation() - FVector::UpVector * HalfHeight;
 	}
 
 	bool GetIsInTrenchCover(const ASquadUnit& SquadUnit)
@@ -77,6 +91,7 @@ bool FCoverTrenchTestScenario::GetHasPhaseTimedOut(const UWorld& World) const
 
 void FCoverTrenchTestScenario::Finish(const UWorld& World)
 {
+	CheckLeavingSocket();
 	if (ASquadUnit* Enemy = M_Enemy.Get())
 	{
 		Enemy->SetActorLocation(M_EnemyStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
@@ -121,6 +136,7 @@ void FCoverTrenchTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsyste
 		TickWalkingToTrench(*World);
 		return;
 	}
+	KeepEnemyInFrontOfTrench(*World);
 	if (M_Phase == ECoverTrenchTestPhase::WaitingForStandUp)
 	{
 		TickWaitingForStandUp(*World, CoverSubsystem);
@@ -191,11 +207,17 @@ bool FCoverTrenchTestScenario::SendSquadIntoTrench(UWorld& World, URTSCoverFinde
 
 	// The trench point nearest to the squad, ordered through the same planned move a player's click issues.
 	const FVector SquadLocation = PlayerSquad->GetActorLocation();
+	// Points held on their socket come first, so the snap is tested whenever the map has such a trench.
 	TrenchPoints.Sort([&SquadLocation](const FRTSCoverPoint& Left, const FRTSCoverPoint& Right)
 	{
+		if (Left.bSnapSoldierToSocket != Right.bSnapSoldierToSocket)
+		{
+			return Left.bSnapSoldierToSocket;
+		}
 		return FVector::DistSquared(Left.Location, SquadLocation) < FVector::DistSquared(Right.Location, SquadLocation);
 	});
 	M_TrenchPoint = TrenchPoints[0];
+	M_OrderedSquad = PlayerSquad;
 	uint32 IssuedCommandCount = 0;
 	const bool bIssued = PreviewComponent->TryIssuePlannedMove(
 		{PlayerSquad},
@@ -219,6 +241,7 @@ ASquadUnit* FCoverTrenchTestScenario::FindSoldierInTrenchCover(UWorld& World) co
 		ASquadUnit* SquadUnit = *UnitIterator;
 		const bool bIsSettledInTrench = IsValid(SquadUnit) && SquadUnit->IsUnitAlive() &&
 			SquadUnit->GetOwningPlayer() == CoverTrenchTestScenarioPrivate::PlayerOwnedTeam &&
+			SquadUnit->GetSquadControllerChecked() == M_OrderedSquad.Get() &&
 			CoverTrenchTestScenarioPrivate::GetIsInTrenchCover(*SquadUnit) &&
 			SquadUnit->GetCoverRuntimeState().State == ESquadUnitCoverState::Protected;
 		if (bIsSettledInTrench)
@@ -249,6 +272,7 @@ void FCoverTrenchTestScenario::TickWalkingToTrench(UWorld& World)
 		GetIdlePose(*TrenchSoldier) == ESquadIdleAnimationPose::TrenchCover,
 		TEXT("with nothing in sight the soldier crouches below the edge"),
 		UEnum::GetValueAsString(GetIdlePose(*TrenchSoldier)));
+	CheckFeetOnSocket();
 
 	if (not PlaceLivingEnemyInFrontOfTrench(World))
 	{
@@ -283,8 +307,11 @@ bool FCoverTrenchTestScenario::PlaceLivingEnemyInFrontOfTrench(UWorld& World)
 	// Straight ahead of the firing step, where the soldier looks.
 	const FVector FacingDirection = -M_TrenchPoint.CoverNormal.GetSafeNormal2D();
 	const FVector EnemyLocation = M_TrenchPoint.Location + FacingDirection * EnemyDistanceInFrontOfTrench;
+	// Dropped onto the ground there from a little above it; where the enemy came from may lie higher or lower.
+	const UCapsuleComponent* EnemyCapsule = Enemy->GetCapsuleComponent();
+	const float EnemyHalfHeight = IsValid(EnemyCapsule) ? EnemyCapsule->GetScaledCapsuleHalfHeight() : 0.0f;
 	Enemy->SetActorLocation(
-		FVector(EnemyLocation.X, EnemyLocation.Y, M_EnemyStartLocation.Z),
+		EnemyLocation + FVector::UpVector * (EnemyHalfHeight + EnemyDropHeight),
 		false,
 		nullptr,
 		ETeleportType::TeleportPhysics);
@@ -303,7 +330,18 @@ void FCoverTrenchTestScenario::TickWaitingForStandUp(
 	{
 		return;
 	}
-	Check(bHasStoodUp, TEXT("the soldier exposed himself when an enemy appeared in front of the trench"));
+	Check(
+		bHasStoodUp,
+		TEXT("the soldier exposed himself when an enemy appeared in front of the trench"),
+		FString::Printf(
+			TEXT("soldier=%s state=%s enemy=%s enemy_alive=%d enemy_distance_cm=%.0f"),
+			*GetNameSafe(TrenchSoldier),
+			IsValid(TrenchSoldier) ? *UEnum::GetValueAsString(TrenchSoldier->GetCoverRuntimeState().State) : TEXT("-"),
+			*GetNameSafe(M_Enemy.Get()),
+			M_Enemy.IsValid() && M_Enemy->IsUnitAlive() ? 1 : 0,
+			IsValid(TrenchSoldier) && M_Enemy.IsValid()
+				? FVector::Dist(TrenchSoldier->GetActorLocation(), M_Enemy->GetActorLocation())
+				: -1.0f));
 	if (not bHasStoodUp)
 	{
 		Finish(World);
@@ -313,7 +351,7 @@ void FCoverTrenchTestScenario::TickWaitingForStandUp(
 		GetIdlePose(*TrenchSoldier) == ESquadIdleAnimationPose::TrenchPeek,
 		TEXT("exposed in a trench means standing up"),
 		UEnum::GetValueAsString(GetIdlePose(*TrenchSoldier)));
-	const float StandUpTravel = FVector::Dist2D(TrenchSoldier->GetActorLocation(), M_TrenchPoint.Location);
+	const float StandUpTravel = FVector::Dist2D(TrenchSoldier->GetActorLocation(), M_TrenchPoint.GetHoldLocation());
 	Check(
 		StandUpTravel <= MaximumStandUpTravel,
 		TEXT("standing up did not move the soldier"),
@@ -387,6 +425,67 @@ void FCoverTrenchTestScenario::TickWaitingForStandUpAfterReload(UWorld& World)
 		Enemy->SetActorLocation(M_EnemyStartLocation, false, nullptr, ETeleportType::TeleportPhysics);
 	}
 	EnterPhase(World, ECoverTrenchTestPhase::WaitingForCrouchAgain, CrouchAgainTimeoutSeconds);
+}
+
+void FCoverTrenchTestScenario::KeepEnemyInFrontOfTrench(UWorld& World)
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	const bool bEnemyIsNeeded = M_Phase == ECoverTrenchTestPhase::WaitingForStandUp ||
+		M_Phase == ECoverTrenchTestPhase::WaitingForReloadDuck ||
+		M_Phase == ECoverTrenchTestPhase::WaitingForStandUpAfterReload;
+	const ASquadUnit* Enemy = M_Enemy.Get();
+	if (not bEnemyIsNeeded || not IsValid(Enemy))
+	{
+		return;
+	}
+	const FVector EnemyPost = M_TrenchPoint.Location -
+		M_TrenchPoint.CoverNormal.GetSafeNormal2D() * EnemyDistanceInFrontOfTrench;
+	if (FVector::Dist2D(Enemy->GetActorLocation(), EnemyPost) > MaximumEnemyDriftFromPost)
+	{
+		PlaceLivingEnemyInFrontOfTrench(World);
+	}
+}
+
+void FCoverTrenchTestScenario::CheckFeetOnSocket()
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	const ASquadUnit* TrenchSoldier = M_TrenchSoldier.Get();
+	if (not IsValid(TrenchSoldier) || not M_TrenchPoint.bSnapSoldierToSocket)
+	{
+		UE_LOG(LogRTSCoverTrenchTest, Display, TEXT("RTS_COVER_TRENCH_TEST socket snap is off for this trench"));
+		return;
+	}
+	const float SocketError = FVector::Dist(GetFeetLocation(*TrenchSoldier), M_TrenchPoint.SnapLocation);
+	Check(
+		SocketError <= MaximumFeetPlacementError,
+		TEXT("the soldier holds the trench with his feet on the socket"),
+		FString::Printf(
+			TEXT("error_cm=%.1f socket_below_navmesh_cm=%.0f"),
+			SocketError,
+			M_TrenchPoint.Location.Z - M_TrenchPoint.SnapLocation.Z));
+}
+
+void FCoverTrenchTestScenario::CheckLeavingSocket()
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	ASquadUnit* TrenchSoldier = M_TrenchSoldier.Get();
+	const bool bHoldsSnappedPoint = IsValid(TrenchSoldier) && TrenchSoldier->GetIsOccupyingCover() &&
+		TrenchSoldier->GetCoverRuntimeState().AssignedCoverPoint.bSnapSoldierToSocket;
+	if (not bHoldsSnappedPoint)
+	{
+		return;
+	}
+	M_TrenchPoint = TrenchSoldier->GetCoverRuntimeState().AssignedCoverPoint;
+	TrenchSoldier->ClearCoverState();
+	const UCharacterMovementComponent* UnitMovement = TrenchSoldier->GetCharacterMovement();
+	const FVector FeetAfterLeaving = GetFeetLocation(*TrenchSoldier);
+	Check(
+		FVector::Dist(FeetAfterLeaving, M_TrenchPoint.Location) <= MaximumFeetPlacementError,
+		TEXT("leaving the trench puts the soldier back on the navmesh point"),
+		FString::Printf(TEXT("error_cm=%.1f"), FVector::Dist(FeetAfterLeaving, M_TrenchPoint.Location)));
+	Check(
+		IsValid(UnitMovement) && UnitMovement->MovementMode == MOVE_Walking,
+		TEXT("the soldier can walk again after leaving the trench"));
 }
 
 void FCoverTrenchTestScenario::TickWaitingForCrouchAgain(UWorld& World)

@@ -106,7 +106,7 @@ While a soldier holds a point, his weapon ignores every object in front of him t
 
 ### Cover from sockets
 
-Some actors carry their cover on mesh sockets instead of having it found by the scan: trenches, whose collision is a plane that lets tanks drive over them, and hand-placed cover such as sandbag walls. `M_SocketCoverActorClasses` in the cover settings (section "Cover From Sockets") lists the parent classes, by default `BP_TrenchMaster` and `BP_NaturalCover`. On the first tick of a map `RegisterSocketCoverOnce` finds every actor of a listed class or a class derived from one, takes its first mesh component that has sockets (an empty inherited mesh component and the health bar widget are passed over), and turns each socket into a cover point by its name:
+Some actors carry their cover on mesh sockets instead of having it found by the scan: trenches, whose collision is a plane that lets tanks drive over them, and hand-placed cover such as sandbag walls. `M_SocketCoverActorClasses` in the cover settings (section "Cover From Sockets") lists the parent classes, each with its own options, by default `BP_TrenchMaster` and `BP_NaturalCover`. An actor that derives from more than one listed class uses the entry of the most derived one, so a subclass can be listed again with different options. On the first tick of a map `RegisterSocketCoverOnce` finds every actor of a listed class or a class derived from one, takes its first mesh component that has sockets (an empty inherited mesh component and the health bar widget are passed over), and turns each socket into a cover point by its name:
 
 | Setting | Default | Cover type |
 | --- | --- | --- |
@@ -119,6 +119,14 @@ Some actors carry their cover on mesh sockets instead of having it found by the 
 Letter case does not matter. A name that contains more than one part gets the longest one (`FCoverFinderAlgorithms::TryGetSocketCoverType`), which is why `standing_right` is a right-peek point although it contains `standing`. Sockets with none of the parts are ignored. The soldier faces along the socket's forward (X) axis, and the point is moved onto the navmesh when that is close by.
 
 The points go through the authored-provider path: they win a spacing conflict with an equivalent scanned point, two sockets of the same type facing the same way closer than `M_CoverPointSpacing` (90 cm) merge into one, and socket prone points are never thinned. When the actor is destroyed its points are taken out again (`RemoveSocketCoverOfDestroyedActors`). With `LogRTSCoverFinder` on Verbose, `RTS_COVER_SOCKET` lists every socket point and `RTS_COVER_SOCKET_NONE` every listed actor that gave none.
+
+#### Holding a point on its socket
+
+`bSnapSoldiersToSockets` on an entry of `M_SocketCoverActorClasses` is off by default and on for `BP_TrenchMaster`. It is for actors whose sockets lie where infantry cannot walk: a trench keeps a collision plane and a navigation blocker over itself to stop tanks, so its sockets sit below the navmesh (about 120 cm on the test map).
+
+With the option on, a socket point keeps two locations. `Location` is the socket projected onto the navmesh: where the soldier walks to, what searches, reservations and spacing use, and where he is put back. `SnapLocation` is the socket itself. `FRTSCoverPoint::GetHoldLocation` returns the one a soldier holding the point has his feet on, and everything about an occupied point uses it: the enter clip's start and end, the exposed location, the resting correction and the firing lane start. A socket that could not be projected onto the navmesh is not snapped.
+
+On arrival (`EnterAssignedCover`) `SnapToCoverSocketIfWanted` switches the soldier's movement off, as the cargo system does for a garrisoned soldier, so the capsule keeps the socket's exact place and height whatever collision lies over it; the usual arrival slide then carries him from the navmesh point onto the socket. Whatever ends the cover goes through `ClearCoverStateInternal`, where `ReturnFromCoverSocket` teleports him back onto `Location` and sets him walking again before anything else moves him. A soldier that died on the socket stays there. Because movement is off, an enter clip with root motion does not carry the capsule on a snapped point; the slide that follows the clip does.
 
 ### Trench cover
 

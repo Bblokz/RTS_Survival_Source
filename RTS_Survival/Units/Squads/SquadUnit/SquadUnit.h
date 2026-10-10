@@ -325,6 +325,10 @@ struct FSquadUnitCoverMoveGuard
 	// Until this time the unit's weapon is reloading; a unit in cover does not expose itself before then.
 	float ReloadEndWorldSeconds = 0.0f;
 
+	// The unit holds its point on a cover socket off the navmesh, with its movement switched off so it keeps
+	// the socket's exact place and height. Leaving the point puts it back on the point's navmesh location.
+	bool bIsSnappedToCoverSocket = false;
+
 	// Since when a stepped-out unit has had nothing it can shoot at from there; negative while it has a target.
 	// It holds its firing position for a moment instead of stepping back and out again on every target change.
 	float ExposedWithoutTargetSinceWorldSeconds = -1.0f;
@@ -1081,6 +1085,15 @@ private:
 	FVector GetCoverEntryLocation() const;
 	FVector GetCoverEntryLocationForPoint(const FRTSCoverPoint& CoverPoint) const;
 
+	/** @return Where the enter clip starts: the entry location, moved along when the point is held on a socket. */
+	FVector GetCoverEnterClipStartLocation() const;
+
+	// For a point that is held on its socket: switches the unit's movement off so it can be placed there.
+	void SnapToCoverSocketIfWanted();
+
+	// Puts a unit that held its point on a socket back on the point's navmesh location, able to walk again.
+	void ReturnFromCoverSocket();
+
 	/**
 	 * @brief Uses the player's planned position before the automatic search runs.
 	 * @param CoverSubsystem Subsystem that owns the reservation of a planned cover point.
@@ -1138,7 +1151,8 @@ private:
 
 	/**
 	 * @brief Puts the capsule on a cover location, sliding when it is visibly off and a duration is given.
-	 * @param TargetLocation Cover point, entry location, or exposed location; height is ignored.
+	 * @param TargetLocation Cover point, entry location, or exposed location; height is ignored, unless the
+	 * unit is snapped to a cover socket: then it is where the unit's feet go.
 	 * @param SlideSeconds Zero places the capsule immediately.
 	 */
 	void AlignCapsuleToCoverLocation(const FVector& TargetLocation, float SlideSeconds);

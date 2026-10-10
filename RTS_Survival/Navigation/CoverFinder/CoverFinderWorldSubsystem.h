@@ -481,9 +481,13 @@ private:
 	 * @brief Builds one actor's cover points from the sockets of its first mesh that has sockets.
 	 * @param CoverActor Actor of one of the configured socket cover classes.
 	 * @param NameParts Part of a socket name that marks each kind of cover.
+	 * @param bSnapSoldiersToSockets Whether soldiers hold these points on the socket instead of on the navmesh.
 	 * @return One point per matching socket, facing along the socket's forward axis.
 	 */
-	TArray<FRTSCoverPoint> BuildSocketCoverPoints(const AActor& CoverActor, const FCoverSocketNameParts& NameParts) const;
+	TArray<FRTSCoverPoint> BuildSocketCoverPoints(
+		const AActor& CoverActor,
+		const FCoverSocketNameParts& NameParts,
+		bool bSnapSoldiersToSockets) const;
 
 	// Takes out the socket cover of actors that no longer exist, such as a sandbag wall that was destroyed.
 	void RemoveSocketCoverOfDestroyedActors();

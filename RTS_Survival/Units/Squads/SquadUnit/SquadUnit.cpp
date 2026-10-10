@@ -1239,9 +1239,12 @@ void ASquadUnit::EnterAssignedCover()
 	SetCoverState(ESquadUnitCoverState::EnteringCover);
 	// A unit that arrived on a move order may still have been firing on the way.
 	SetCoverWeaponFireBlocked(true);
+	SnapToCoverSocketIfWanted();
 	// An approach move ends on the point itself; the enter clip it replaces would have started a step away.
 	AlignCapsuleToCoverLocation(
-		M_CoverApproachMove.bArrivedByMove ? M_CoverRuntimeState.AssignedCoverPoint.Location : GetCoverEntryLocation(),
+		M_CoverApproachMove.bArrivedByMove
+			? M_CoverRuntimeState.AssignedCoverPoint.GetHoldLocation()
+			: GetCoverEnterClipStartLocation(),
 		SquadUnitCoverMoveStatics::ArrivalSettleSeconds);
 	if (not M_CoverCapsuleSlide.bIsActive)
 	{
@@ -1253,7 +1256,7 @@ void ASquadUnit::UpdateEnteringCover()
 {
 	if (not GetIsValidAnimBpSquadUnit())
 	{
-		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.Location);
+		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.GetHoldLocation());
 		SetCoverState(ESquadUnitCoverState::Protected);
 		return;
 	}
@@ -1283,7 +1286,7 @@ void ASquadUnit::RequestCoverEnterAnimation()
 	// capsule goes to the cover point now and the mesh visually stays where the unit stopped.
 	if (not AnimBp_SquadUnit->GetDoesCoverEnterMontageMoveCapsule(CoverPose))
 	{
-		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.Location);
+		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.GetHoldLocation());
 	}
 	StartCoverTransitionDeadline();
 }
@@ -1331,7 +1334,7 @@ void ASquadUnit::SyncCoverStateWithAnimation()
 	}
 	const bool bIsExposed = M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed;
 	AlignCapsuleToCoverLocation(
-		bIsExposed ? GetCoverExposedLocation() : M_CoverRuntimeState.AssignedCoverPoint.Location,
+		bIsExposed ? GetCoverExposedLocation() : M_CoverRuntimeState.AssignedCoverPoint.GetHoldLocation(),
 		SquadUnitCoverMoveStatics::ReconcileSlideSeconds);
 }
 
@@ -1361,12 +1364,9 @@ void ASquadUnit::OnCoverAnimReachedProtected()
 	{
 		return;
 	}
-	LogCoverAlignmentResidual(
-		bWasExposed ? TEXT("returned") : TEXT("entered"),
-		M_CoverRuntimeState.AssignedCoverPoint.Location);
-	AlignCapsuleToCoverLocation(
-		M_CoverRuntimeState.AssignedCoverPoint.Location,
-		SquadUnitCoverMoveStatics::ReconcileSlideSeconds);
+	const FVector HoldLocation = M_CoverRuntimeState.AssignedCoverPoint.GetHoldLocation();
+	LogCoverAlignmentResidual(bWasExposed ? TEXT("returned") : TEXT("entered"), HoldLocation);
+	AlignCapsuleToCoverLocation(HoldLocation, SquadUnitCoverMoveStatics::ReconcileSlideSeconds);
 	if (bWasExposed)
 	{
 		M_CoverValidatedTarget.Reset();
@@ -1426,6 +1426,50 @@ FVector ASquadUnit::GetCoverLocalOffsetInWorld(
 FVector ASquadUnit::GetCoverEntryLocation() const
 {
 	return GetCoverEntryLocationForPoint(M_CoverRuntimeState.AssignedCoverPoint);
+}
+
+FVector ASquadUnit::GetCoverEnterClipStartLocation() const
+{
+	const FRTSCoverPoint& CoverPoint = M_CoverRuntimeState.AssignedCoverPoint;
+	// The clip travels from its start to where the point is held, which a socket point moves off the navmesh.
+	return GetCoverEntryLocationForPoint(CoverPoint) + (CoverPoint.GetHoldLocation() - CoverPoint.Location);
+}
+
+void ASquadUnit::SnapToCoverSocketIfWanted()
+{
+	UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+	if (not M_CoverRuntimeState.AssignedCoverPoint.bSnapSoldierToSocket || not IsValid(UnitMovement))
+	{
+		return;
+	}
+	// A walking capsule would be pushed back up onto whatever floor lies over the socket.
+	UnitMovement->StopMovementImmediately();
+	UnitMovement->DisableMovement();
+	M_CoverMoveGuard.bIsSnappedToCoverSocket = true;
+}
+
+void ASquadUnit::ReturnFromCoverSocket()
+{
+	if (not M_CoverMoveGuard.bIsSnappedToCoverSocket)
+	{
+		return;
+	}
+	M_CoverMoveGuard.bIsSnappedToCoverSocket = false;
+	const UCapsuleComponent* UnitCapsule = GetCapsuleComponent();
+	UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+	// A soldier that died on the socket stays where he fell.
+	if (not IsUnitAlive() || not IsValid(UnitCapsule) || not IsValid(UnitMovement))
+	{
+		return;
+	}
+	SetActorLocation(
+		M_CoverRuntimeState.AssignedCoverPoint.Location +
+		FVector::UpVector * UnitCapsule->GetScaledCapsuleHalfHeight(),
+		false,
+		nullptr,
+		ETeleportType::TeleportPhysics);
+	UnitMovement->SetMovementMode(MOVE_Walking);
+	UnitMovement->bForceNextFloorCheck = true;
 }
 
 void ASquadUnit::ClearPlayerPlannedPosition()
@@ -1843,7 +1887,7 @@ FVector ASquadUnit::GetCoverExposedLocation() const
 	const FVector DefaultWorldOffset = IsValid(CoverSubsystem)
 		? CoverSubsystem->GetStandingPeekOffset(CoverPoint)
 		: FVector::ZeroVector;
-	return CoverPoint.Location + GetStandingCoverExposedWorldOffset(CoverPoint, DefaultWorldOffset);
+	return CoverPoint.GetHoldLocation() + GetStandingCoverExposedWorldOffset(CoverPoint, DefaultWorldOffset);
 }
 
 bool ASquadUnit::TryGetSettledCoverCapsuleError(float& OutErrorCentimeters) const
@@ -1863,7 +1907,7 @@ bool ASquadUnit::TryGetSettledCoverCapsuleError(float& OutErrorCentimeters) cons
 	}
 	const FVector ExpectedLocation = bIsExposed
 		? GetCoverExposedLocation()
-		: M_CoverRuntimeState.AssignedCoverPoint.Location;
+		: M_CoverRuntimeState.AssignedCoverPoint.GetHoldLocation();
 	OutErrorCentimeters = FVector::Dist2D(GetActorLocation(), ExpectedLocation);
 	return true;
 }
@@ -1871,7 +1915,13 @@ bool ASquadUnit::TryGetSettledCoverCapsuleError(float& OutErrorCentimeters) cons
 void ASquadUnit::AlignCapsuleToCoverLocation(const FVector& TargetLocation, const float SlideSeconds)
 {
 	StopCoverCapsuleSlide();
-	const float DistanceToTarget = FVector::Dist2D(GetActorLocation(), TargetLocation);
+	// A unit on a cover socket is placed by its feet, height included; any other only across the ground.
+	const UCapsuleComponent* UnitCapsule = GetCapsuleComponent();
+	const FVector FeetLocation = GetActorLocation() - FVector::UpVector *
+		(IsValid(UnitCapsule) ? UnitCapsule->GetScaledCapsuleHalfHeight() : 0.0f);
+	const float DistanceToTarget = M_CoverMoveGuard.bIsSnappedToCoverSocket
+		? FVector::Dist(FeetLocation, TargetLocation)
+		: FVector::Dist2D(FeetLocation, TargetLocation);
 	UWorld* World = GetWorld();
 	const bool bPlaceImmediately = SlideSeconds <= 0.0f || not IsValid(World) ||
 		DistanceToTarget <= SquadUnitCoverMoveStatics::CapsuleAlignmentTolerance;
@@ -1880,7 +1930,7 @@ void ASquadUnit::AlignCapsuleToCoverLocation(const FVector& TargetLocation, cons
 		PlaceCapsuleAtCoverLocation(TargetLocation);
 		return;
 	}
-	M_CoverCapsuleSlide.StartLocation = GetActorLocation();
+	M_CoverCapsuleSlide.StartLocation = FeetLocation;
 	M_CoverCapsuleSlide.TargetLocation = TargetLocation;
 	M_CoverCapsuleSlide.DurationSeconds = SlideSeconds;
 	M_CoverCapsuleSlide.ElapsedSeconds = 0.0f;
@@ -1943,6 +1993,17 @@ void ASquadUnit::StopCoverCapsuleSlide()
 
 void ASquadUnit::PlaceCapsuleAtCoverLocation(const FVector& TargetLocation)
 {
+	const UCapsuleComponent* UnitCapsule = GetCapsuleComponent();
+	if (M_CoverMoveGuard.bIsSnappedToCoverSocket && IsValid(UnitCapsule))
+	{
+		// Movement is off, so the capsule stays exactly here, whatever floor lies above or below.
+		SetActorLocation(
+			TargetLocation + FVector::UpVector * UnitCapsule->GetScaledCapsuleHalfHeight(),
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics);
+		return;
+	}
 	// Cover locations are navmesh points at ground level; the capsule keeps its own height and re-finds the floor.
 	const FVector CapsuleLocation(TargetLocation.X, TargetLocation.Y, GetActorLocation().Z);
 	SetActorLocation(CapsuleLocation, false, nullptr, ETeleportType::TeleportPhysics);
@@ -2222,7 +2283,7 @@ void ASquadUnit::ReturnToProtectedCover(const TCHAR* Reason)
 	M_CoverValidatedTarget.Reset();
 	if (not GetIsValidAnimBpSquadUnit())
 	{
-		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.Location);
+		PlaceCapsuleAtCoverLocation(M_CoverRuntimeState.AssignedCoverPoint.GetHoldLocation());
 		SetCoverState(ESquadUnitCoverState::Protected);
 		return;
 	}
@@ -2287,6 +2348,7 @@ void ASquadUnit::ClearCoverStateInternal(const bool bStopCoverMovement)
 			CoverSubsystem->ReleaseCoverReservation(*this, ReservedPointId);
 		}
 	}
+	ReturnFromCoverSocket();
 	M_CoverRuntimeState.Reset();
 	if (bOwesMoveCommandCompletion)
 	{

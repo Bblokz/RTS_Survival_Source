@@ -127,6 +127,32 @@ namespace CoverFinderWorldSubsystemPrivate
 	// The first mesh of an actor is the one whose sockets mark its cover. Mesh components without any socket are
 	// passed over: a blueprint often leaves an inherited mesh component empty, and its health bar widget is a
 	// mesh component too.
+	struct FLoadedSocketCoverClass
+	{
+		UClass* ActorClass = nullptr;
+		bool bSnapSoldiersToSockets = false;
+	};
+
+	// The listed class closest to the actor's own decides, so a subclass listed again overrules its parent.
+	const FLoadedSocketCoverClass* FindMostDerivedSocketCoverClass(
+		const AActor& CoverActor,
+		const TArray<FLoadedSocketCoverClass>& SocketCoverClasses)
+	{
+		const FLoadedSocketCoverClass* MostDerivedClass = nullptr;
+		for (const FLoadedSocketCoverClass& SocketCoverClass : SocketCoverClasses)
+		{
+			if (not CoverActor.IsA(SocketCoverClass.ActorClass))
+			{
+				continue;
+			}
+			if (MostDerivedClass == nullptr || SocketCoverClass.ActorClass->IsChildOf(MostDerivedClass->ActorClass))
+			{
+				MostDerivedClass = &SocketCoverClass;
+			}
+		}
+		return MostDerivedClass;
+	}
+
 	const UMeshComponent* FindFirstMeshWithSockets(const AActor& CoverActor)
 	{
 		TInlineComponentArray<UMeshComponent*> MeshComponents(&CoverActor);
@@ -692,20 +718,26 @@ void URTSCoverFinderWorldSubsystem::RegisterSocketCoverOnce()
 	NameParts.StandingLeft = CoverSettings->M_StandingLeftCoverSocketNamePart;
 	NameParts.StandingRight = CoverSettings->M_StandingRightCoverSocketNamePart;
 	NameParts.Prone = CoverSettings->M_ProneCoverSocketNamePart;
-	// An actor derived from two of the listed classes is still only read once.
-	TSet<const AActor*> RegisteredActors;
-	int32 SocketPointCount = 0;
-	for (const TSoftClassPtr<AActor>& SoftCoverActorClass : CoverSettings->M_SocketCoverActorClasses)
+	TArray<CoverFinderWorldSubsystemPrivate::FLoadedSocketCoverClass> SocketCoverClasses;
+	for (const FRTSSocketCoverActorClass& SocketCoverActorClass : CoverSettings->M_SocketCoverActorClasses)
 	{
-		UClass* CoverActorClass = SoftCoverActorClass.LoadSynchronous();
+		UClass* CoverActorClass = SocketCoverActorClass.ActorClass.LoadSynchronous();
 		if (not IsValid(CoverActorClass))
 		{
 			RTSFunctionLibrary::ReportError(
-				"Cover finder: socket cover actor class " + SoftCoverActorClass.ToString() +
+				"Cover finder: socket cover actor class " + SocketCoverActorClass.ActorClass.ToString() +
 				" set in the cover settings could not be loaded.");
 			continue;
 		}
-		for (TActorIterator<AActor> CoverActorIterator(World, CoverActorClass); CoverActorIterator; ++CoverActorIterator)
+		SocketCoverClasses.Add({CoverActorClass, SocketCoverActorClass.bSnapSoldiersToSockets});
+	}
+	// An actor derived from two of the listed classes is still only read once.
+	TSet<const AActor*> RegisteredActors;
+	int32 SocketPointCount = 0;
+	for (const CoverFinderWorldSubsystemPrivate::FLoadedSocketCoverClass& SocketCoverClass : SocketCoverClasses)
+	{
+		for (TActorIterator<AActor> CoverActorIterator(World, SocketCoverClass.ActorClass); CoverActorIterator;
+		     ++CoverActorIterator)
 		{
 			AActor* CoverActor = *CoverActorIterator;
 			if (not IsValid(CoverActor) || RegisteredActors.Contains(CoverActor))
@@ -713,7 +745,12 @@ void URTSCoverFinderWorldSubsystem::RegisterSocketCoverOnce()
 				continue;
 			}
 			RegisteredActors.Add(CoverActor);
-			TArray<FRTSCoverPoint> SocketPoints = BuildSocketCoverPoints(*CoverActor, NameParts);
+			const CoverFinderWorldSubsystemPrivate::FLoadedSocketCoverClass* ActorSocketCoverClass =
+				CoverFinderWorldSubsystemPrivate::FindMostDerivedSocketCoverClass(*CoverActor, SocketCoverClasses);
+			TArray<FRTSCoverPoint> SocketPoints = BuildSocketCoverPoints(
+				*CoverActor,
+				NameParts,
+				ActorSocketCoverClass != nullptr && ActorSocketCoverClass->bSnapSoldiersToSockets);
 			SocketPointCount += SocketPoints.Num();
 			const uint64 RegistrationId = RegisterAuthoredCoverProvider(CoverActor, MoveTemp(SocketPoints));
 			if (RegistrationId != 0)
@@ -738,7 +775,8 @@ void URTSCoverFinderWorldSubsystem::RegisterSocketCoverOnce()
 
 TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildSocketCoverPoints(
 	const AActor& CoverActor,
-	const FCoverSocketNameParts& NameParts) const
+	const FCoverSocketNameParts& NameParts,
+	const bool bSnapSoldiersToSockets) const
 {
 	TArray<FRTSCoverPoint> SocketPoints;
 	const UMeshComponent* CoverMesh = CoverFinderWorldSubsystemPrivate::FindFirstMeshWithSockets(CoverActor);
@@ -771,6 +809,7 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildSocketCoverPoints(
 		// The normal points from the cover to the soldier, so it is the opposite of where he looks.
 		SocketPoint.CoverNormal = FacingDirection.IsNearlyZero() ? FVector::ForwardVector : -FacingDirection;
 		SocketPoint.Location = SocketTransform.GetLocation();
+		SocketPoint.SnapLocation = SocketTransform.GetLocation();
 		// Soldiers walk to the point, so it is moved onto the navmesh when that is close by.
 		FNavLocation ProjectedSocketLocation;
 		const bool bIsOnNavigation = IsValid(NavigationSystem) && IsValid(NavigationData) &&
@@ -783,17 +822,22 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildSocketCoverPoints(
 		{
 			SocketPoint.Location = ProjectedSocketLocation.Location;
 		}
+		// Without a navmesh point to walk to and return to there is nothing to snap from.
+		SocketPoint.bSnapSoldierToSocket = bSnapSoldiersToSockets && bIsOnNavigation;
 		if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 		{
 			UE_LOG(
 				LogRTSCoverFinder,
 				Verbose,
-				TEXT("RTS_COVER_SOCKET actor=%s socket=%s type=%s on_navigation=%d location=%s"),
+				TEXT("RTS_COVER_SOCKET actor=%s socket=%s type=%s on_navigation=%d location=%s snap=%d socket_offset_cm=(%.0f flat, %.0f up)"),
 				*CoverActor.GetName(),
 				*SocketName.ToString(),
 				*UEnum::GetValueAsString(SocketCoverType),
 				bIsOnNavigation ? 1 : 0,
-				*SocketPoint.Location.ToCompactString());
+				*SocketPoint.Location.ToCompactString(),
+				SocketPoint.bSnapSoldierToSocket ? 1 : 0,
+				FVector::Dist2D(SocketPoint.SnapLocation, SocketPoint.Location),
+				SocketPoint.SnapLocation.Z - SocketPoint.Location.Z);
 		}
 	}
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
@@ -1475,17 +1519,17 @@ FVector URTSCoverFinderWorldSubsystem::BuildFiringLaneStart(
 {
 	if (CoverPoint.CoverType == ERTSCoverType::Crouch)
 	{
-		return CoverPoint.Location + FVector::UpVector * CoverFinderWorldSubsystemPrivate::CrouchFiringHeight;
+		return CoverPoint.GetHoldLocation() + FVector::UpVector * CoverFinderWorldSubsystemPrivate::CrouchFiringHeight;
 	}
 	if (CoverPoint.CoverType == ERTSCoverType::Prone)
 	{
-		return CoverPoint.Location + FVector::UpVector * CoverFinderWorldSubsystemPrivate::ProneFiringHeight;
+		return CoverPoint.GetHoldLocation() + FVector::UpVector * CoverFinderWorldSubsystemPrivate::ProneFiringHeight;
 	}
 	// Tested from where this unit's expose animation ends, so an open lane means the real muzzle is clear.
 	const FVector ExposedOffset = SquadUnit.GetStandingCoverExposedWorldOffset(
 		CoverPoint,
 		GetStandingPeekOffset(CoverPoint));
-	return CoverPoint.Location + ExposedOffset
+	return CoverPoint.GetHoldLocation() + ExposedOffset
 		+ FVector::UpVector * CoverFinderWorldSubsystemPrivate::StandingFiringHeight;
 }
 
