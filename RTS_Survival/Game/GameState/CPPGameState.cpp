@@ -7904,6 +7904,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = BaseInfantryExp;
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Untrained;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Scavengers, SquadData);
 
 	SquadData.MaxHealth = BasicInfantryHealth;
@@ -7918,6 +7919,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = BaseInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Regular;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_JagerTruppKar98k, SquadData);
 
 	SquadData.MaxHealth = ArmoredInfantryHealth;
@@ -7934,6 +7936,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = BaseInfantryExp + 5;
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Hardened;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SteelFistAssaultSquad, SquadData);
 
 
@@ -7949,6 +7952,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = BaseInfantryExp;
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Regular;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Gebirgsjagerin, SquadData);
 
 	// ----------------------------
@@ -7969,6 +7973,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = HazmatInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Vultures, SquadData);
 
 	SquadData.MaxHealth = DeveloperSettings::GameBalance::UnitHealth::ArmoredHazmatInfantryHealth;
@@ -7983,6 +7988,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = HazmatInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SniperTeam, SquadData);
 
 	// --------------------------------------------
@@ -8002,6 +8008,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = T2InfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_FeuerSturm, SquadData);
 
 
@@ -8019,6 +8026,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = T2InfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SturmPionieren, SquadData);
 
 
@@ -8039,6 +8047,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PanzerGrenadiere, SquadData);
 
 
@@ -8058,6 +8067,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(EliteInfantryExp * 1.33, 5);
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Commando;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SturmKommandos, SquadData);
 
 
@@ -8075,6 +8085,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_LightBringers, SquadData);
 
 
@@ -8092,6 +8103,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_IronStorm, SquadData);
 
 	// --------------------------------------------------
@@ -8114,6 +8126,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = HazmatInfantryExp;
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Regular;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_HazmatEngineers, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_HazmatBazooka, SquadData);
 
@@ -8129,6 +8142,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = BaseInfantryExp;
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Untrained;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Mosin, SquadData);
 
 	SquadData.MaxHealth = BasicInfantryHealth;
@@ -8143,6 +8157,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = BaseInfantryExp;
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Regular;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Okhotnik, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_LargePTRS, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_LargeMixBasic, SquadData);
@@ -8165,6 +8180,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = ArmoredInfantryExp + 8;
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_RedHammer, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_RedHamerPTRS, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_LargeMixT2, SquadData);
@@ -8181,6 +8197,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = HazmatInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_ToxicGuard, SquadData);
 
 	// --------------------------------------------
@@ -8201,6 +8218,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Kvarc77, SquadData);
 
 
@@ -8218,6 +8236,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Tucha12T, SquadData);
 
 	SquadData.MaxHealth = EliteInfantryHealth;
@@ -8233,6 +8252,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_GhostsOfStalingrad, SquadData);
 
 	SquadData.MaxHealth = CommandoInfantryHealth;
@@ -8249,6 +8269,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Commando;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_CortexOfficer, SquadData);
 
 	InitAllGameAntiTankGunTWSquadData();
@@ -8294,11 +8315,13 @@ void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0f;
 
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PaK38, SquadData);
 	SquadData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, PaK40_Radixite},
 		{ERTSResourceType::Resource_Metal, PaK40_Metal}
 	});
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PaK40, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Zis_57MM, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Zis_76MM, SquadData);
@@ -8336,6 +8359,7 @@ void ACPPGameState::InitAllGameMortarTWSquadData()
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0f;
 
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Regular;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_GrW42_80mm, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_80mm_Mortar, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_120mm_Mortar, SquadData);
@@ -8374,11 +8398,13 @@ void ACPPGameState::InitAllGameFlakTWSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0f;
 
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_37mmFlak, SquadData);
 	SquadData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, Flak88mm_Radixite},
 		{ERTSResourceType::Resource_Metal, Flak88mm_Metal}
 	});
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_88mmFlak, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Bofors, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_KS30_130MM, SquadData);
@@ -8417,6 +8443,7 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0f;
 
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_LefH18, SquadData);
 
 	FSquadData MorserSquadData = SquadData;
@@ -8424,17 +8451,20 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 		{ERTSResourceType::Resource_Radixite, Morser210mm_Radixite},
 		{ERTSResourceType::Resource_Metal, Morser210mm_Metal}
 	});
+	MorserSquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_210MM_Morser, MorserSquadData);
 
 	SquadData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, SFH18_150mm_Radixite},
 		{ERTSResourceType::Resource_Metal, SFH18_150mm_Metal}
 	});
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_SFH18_150mm, SquadData);
 	SquadData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, Nebelwerfer_Radixite},
 		{ERTSResourceType::Resource_Metal, Nebelwerfer_Metal}
 	});
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Nebelwerfer, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_M1938_122mm, SquadData);
 }
@@ -8470,6 +8500,7 @@ void ACPPGameState::InitAllGameMachineGunTWSquadData()
 	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
 	SquadData.ExperienceMultiplier = 1.0f;
 
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Hardened;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_LMGSquad, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Maxim, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_DShK, SquadData);

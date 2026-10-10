@@ -32,6 +32,11 @@ struct FSquadData
 	UPROPERTY(BlueprintReadOnly)
 	float VisionRadius = 0.0f;
 
+	// The part of its maximum health (0-1) a soldier of this squad may lose in a short time, while in cover,
+	// before it gets stressed. Zero or less: its soldiers never get stressed.
+	UPROPERTY(BlueprintReadOnly)
+	float StressTolerance = 0.0f;
+
 	UPROPERTY(BlueprintReadOnly)
 	FUnitCost Cost;
 

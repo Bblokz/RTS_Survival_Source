@@ -7,6 +7,8 @@
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverCombatTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverCountTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTestScenario.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverStressPerfScenario.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverStressTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTrenchTestScenario.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "CoverFinderWorldSubsystem.generated.h"
@@ -18,6 +20,9 @@ class UPrimitiveComponent;
 struct FOverlapResult;
 class UNavigationSystemV1;
 class URTSCoverFinderDeveloperSettings;
+class UInfantryStressBehaviour;
+class UAnimMontage;
+class UAnimSequenceBase;
 
 enum class ECoverFinderScanState : uint8
 {
@@ -278,6 +283,50 @@ public:
 	bool TryReserveCoverPointById(ASquadUnit& SquadUnit, int64 PointId, FRTSCoverPoint& OutCoverPoint);
 
 	/**
+	 * @brief Reserves cover for a stressed soldier that lies further from what frightens him. He fires blind
+	 * from there, so no firing lane is tested; the point only has to shield him from the threat.
+	 * @param SquadUnit The stressed soldier.
+	 * @param ThreatLocation Where his enemy is.
+	 * @param MaximumDisplacement How far from where he is the new point may lie.
+	 * @param MaximumDistanceToThreat Keeps him inside his weapon's range; zero or less for no limit.
+	 * @param OutCoverPoint The reserved point when successful.
+	 * @return False when no free point lies clearly further from the threat.
+	 */
+	bool TryReserveStressRetreatCoverPoint(
+		ASquadUnit& SquadUnit,
+		const FVector& ThreatLocation,
+		float MaximumDisplacement,
+		float MaximumDistanceToThreat,
+		FRTSCoverPoint& OutCoverPoint);
+
+	/** @return The behaviour class of stressed soldiers from the cover settings, loaded once per world. */
+	TSubclassOf<UInfantryStressBehaviour> GetInfantryStressBehaviourClass();
+
+	/**
+	 * @brief Hands a soldier that just got stressed a behaviour object of the configured class. Objects that
+	 * were given back are handed out again, so a long fight does not keep creating new ones.
+	 * @return The behaviour, or null when the class could not be loaded.
+	 */
+	UInfantryStressBehaviour* AcquireInfantryStressBehaviour();
+
+	// Takes back the behaviour of a soldier whose stress is over; EndOnSoldier must have been called on it.
+	void ReleaseInfantryStressBehaviour(UInfantryStressBehaviour* Behaviour);
+
+	// Stressed soldiers are ticked from here, all on one cadence, instead of each running a timer of its own.
+	void RegisterStressedUnit(ASquadUnit& SquadUnit);
+	void UnregisterStressedUnit(const ASquadUnit& SquadUnit);
+
+	/**
+	 * @brief Gives the montage that plays one spray animation on a slot. Every soldier of the world shares the
+	 * one montage per animation; without this each clip a stressed soldier plays would be a new object.
+	 * @param SprayAnimation The sequence to wrap.
+	 * @param SlotName Slot of the AnimGraph it is played on.
+	 * @param BlendSeconds Blend in and blend out time of the montage.
+	 * @return The shared montage, or null when the sequence is not valid.
+	 */
+	UAnimMontage* FindOrAddSprayMontage(UAnimSequenceBase* SprayAnimation, FName SlotName, float BlendSeconds);
+
+	/**
 	 * @brief Counts the soldiers holding cover around one thin obstacle.
 	 * @param ThinObstacleId Obstacle id carried by its cover points.
 	 * @param IgnoredUnit A unit whose own reservation does not count, or nullptr.
@@ -405,6 +454,36 @@ private:
 	FCoverCombatTestScenario M_CombatCoverScenario;
 	FCoverCountTestScenario M_CoverCountScenario;
 	FCoverTrenchTestScenario M_TrenchCoverScenario;
+	FCoverStressTestScenario M_StressScenario;
+	FCoverStressPerfScenario M_StressPerfScenario;
+
+	// Kept loaded here, so a soldier that gets stressed in the middle of a fight never waits for the class.
+	UPROPERTY(Transient)
+	TSubclassOf<UInfantryStressBehaviour> M_InfantryStressBehaviourClass;
+
+	bool bM_HasLoadedInfantryStressBehaviourClass = false;
+
+	// Behaviour objects of soldiers whose stress is over, waiting for the next soldier that gets stressed.
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UInfantryStressBehaviour>> M_FreeStressBehaviours;
+
+	UPROPERTY(Transient)
+	TMap<TObjectPtr<UAnimSequenceBase>, TObjectPtr<UAnimMontage>> M_SprayMontages;
+
+	TArray<TWeakObjectPtr<ASquadUnit>> M_StressedUnits;
+	float M_SecondsUntilStressTick = 0.0f;
+	void TickStressedUnits(float DeltaTime);
+
+	/**
+	 * @brief Visits the published cover points around a location in place, without copying them.
+	 * @param SearchLocation Centre of the search.
+	 * @param SearchRadius Maximum three-dimensional distance in centimeters.
+	 * @param Visitor Called for every point within the radius; the reference is only valid during the call.
+	 */
+	void ForEachCoverPointInRadius(
+		const FVector& SearchLocation,
+		float SearchRadius,
+		TFunctionRef<void(const FRTSCoverPoint&)> Visitor) const;
 
 	// Cover that actors carry on their sockets is registered once, on the first tick of the map.
 	bool bM_HasRegisteredSocketCover = false;

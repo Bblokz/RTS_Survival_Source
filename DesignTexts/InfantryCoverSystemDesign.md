@@ -204,6 +204,44 @@ Several things used to make a soldier give up or step out of cover it was about 
 
 `RTS_COVER_RETURN` (Verbose) logs why a soldier stepped back, `RTS_COVER_MOVE_CANCEL` which movement entry point took a soldier out of cover, and `RTS_COVER_KEEP_DENIED` why cover was no longer allowed.
 
+### Infantry stress
+
+A soldier that holds a cover point and loses health quickly gets stressed: he sprays blind fire from his cover, runs to cover further from his enemy, and sprays again from there. It is per soldier, not per squad.
+
+**Trigger.** `FSquadData::StressTolerance` is the part of his maximum health (0–1) a soldier may lose within `M_InfantryStressHealthLossWindowSeconds` (4 s). `ASquadUnit::TakeDamage` feeds the health a hit took into a meter (`FSquadUnitStressState::RecentHealthLossFraction`) that drains by one tolerance per window, so health lost more slowly than that never fills it and nothing is ticked for it. When the meter reaches the tolerance while the soldier holds a point (`Protected` or `Exposed`), `StartStress` runs. Outside cover the meter still counts but never sets stress off. How many enemies shoot at him plays no part.
+
+**Tolerance per squad.** Set per entry in `ACPPGameState::InitAllGameSquadData` and the team weapon functions after it, from the constants in `DeveloperSettings::GameBalance::InfantrySettings::StressTolerance`. `StressToleranceMlt` scales all of them.
+
+| Constant | Value | Squads |
+| --- | --- | --- |
+| `Untrained` | 0.20 | Scavengers, Mosin |
+| `Regular` | 0.25 | Jäger, Gebirgsjägerin, hazmat engineers and bazooka, Okhotnik, large PTRS and basic mix, mortar crews |
+| `Hardened` | 0.30 | SteelFist, machine gun crews |
+| `Veteran` | 0.40 | Vultures, snipers, FeuerSturm, SturmPionieren, Red Hammer squads, Toxic Guard, anti-tank, flak and artillery crews |
+| `Elite` | 0.50 | PanzerGrenadiere, LightBringers, IronStorm, Kvarc77, Tucha12T, Ghosts of Stalingrad |
+| `Commando` | 0.65 | SturmKommandos, Cortex officer |
+
+The steps are small on purpose: the tolerance is a part of the soldier's own health, and better infantry already has more health and armour, so it loses that part more slowly. In health points within the window, before armour, the tiers come to roughly 30 (Untrained), 40 (Regular), 70 (Hardened), 130 (Veteran), 200 (Elite) and 520 (Commando), against a rifle hit of about 12. A lone rifleman therefore stresses nobody; a squad concentrating on one Regular soldier does within a few seconds; a shell does at once.
+
+**The behaviour.** `UInfantryStressBehaviour` (`Behaviours/Derived/InfantryStress`) is a `UBehaviourWeapon` with magazine ×3, cooldown ×0.25, reload time ×0.25 and accuracy ×0.25. Which class is used is `M_InfantryStressBehaviourClass` in Project Settings > Infantry Cover Finder > Infantry Stress; set a Blueprint class derived from `InfantryStressBehaviour` there to change the multipliers or to add effects through `BP_OnSoldierStressed`, `BP_OnSoldierRelocates` and `BP_OnSoldierCalmedDown`. The cover subsystem loads the class when the map starts and keeps a pool of instances: a soldier borrows one when his stress starts (`AcquireInfantryStressBehaviour`, then `StartOnSoldier`, which applies the multipliers to his weapon alone and fills the larger magazine at once) and gives it back when the stress is over (`EndOnSoldier`, then `ReleaseInfantryStressBehaviour`). One instance therefore serves many soldiers, one after the other: a Blueprint class that keeps state of its own should set it up in `BP_OnSoldierStressed` and clear it in `BP_OnSoldierCalmedDown`. It does not go through the squad's `UBehaviourComp`: that component works on every weapon of the squad, and stress is one soldier's.
+
+**Animated text and icon.** The behaviour's `AnimatedTextSettings` and `AnimatedIconSettings` work as on any behaviour, but are shown over the stressed soldier instead of over the squad: `StartOnSoldier` shows the first one and the soldier's stress tick repeats it (`UpdateSoldierFeedback`). The calibre rules (`MinimalWeaponCalibreToApplyTo`, `MaximumWeaponCalibreToApplyTo`) are honoured too: a soldier whose weapon they exclude is still stressed, sprays and runs, but his weapon stays as it is.
+
+**The sequence**, driven by `TickStress`, which the cover subsystem calls every 0.2 s on the soldiers that are stressed and on nobody else (`TickStressedUnits`):
+
+1. `SprayingFromCover`, the first half of `M_InfantryStressDuration` (12 s). The behaviour is on the weapon from the frame the stress starts. While the soldier holds his point and is not reloading, weapon fire is unblocked whatever his cover type, and the animation instance plays spray animations (`SetCoverSpray`). The normal protected and exposed cover logic is skipped (`UpdateAutomaticCover`), so he neither steps out nor trades his point.
+2. `RelocatingToFartherCover`, at half time. `TryReserveStressRetreatCoverPoint` picks a free point at least 300 cm further from the threat that shields him from it, within `M_InfantryStressedCoverMaxDisplacement` (3000 cm) and within what he can run in half the stress that is left. The threat is his weapon's target, and then the point also has to stay inside 90% of weapon range; without a target it is taken to be 20 m out where his cover faces. No firing lane is tested. His walk speed and acceleration are multiplied by `M_InfantryStressSpeedMultiplier` (1.5) until the stress ends, and the usual walk into cover takes him there. A soldier under orders, or with no such point, stays and keeps spraying.
+3. `SprayingFromNewCover`, once he holds the new point: the same as step 1, with the spray list of the new cover type.
+4. `EndStress` at the end of the duration, on death and on `EndPlay`: behaviour off the weapon, speed back, spraying stopped, weapon fire back to what his cover allows. He cannot get stressed again for `M_InfantryStressRecoverySeconds` (15 s).
+
+**Animations.** `CoverAnimations` on the infantry animation Blueprint has two lists under Cover > Stress: `CrouchSprayAnimations`, used in crouch, trench and prone cover, and `StandingSprayAnimations`, used behind standing cover on either side. Entries are sequences, played on `SprayAnimationSlotName` ("FullBody"), or montages. One is picked at random; when it ends the next one starts. A reload stops the spraying, and it picks up again when the weapon is loaded. An empty list means the soldier sprays without a spray animation. A sequence is played through one montage per animation that all soldiers of the world share (`FindOrAddSprayMontage`); letting the engine wrap it on every play would create three objects per clip.
+
+**Settings**, all under Infantry Stress: `bM_EnableInfantryStress`, `M_InfantryStressBehaviourClass`, `M_InfantryStressDuration`, `M_InfantryStressHealthLossWindowSeconds`, `M_InfantryStressSpeedMultiplier`, `M_InfantryStressedCoverMaxDisplacement`, `M_InfantryStressRecoverySeconds`.
+
+**Cost.** `-CoverFinderMeasureStress` times every part on the soldiers that hold cover on the map and logs `RTS_STRESS_PERF`. On TestCover, 24 soldiers: the meter adds about 18 ns to a hit; starting a stress takes about 3.5 µs (about 10 µs when the behaviour shows an animated text), a tick 40–50 ns (so 24 soldiers stressed at once cost 5–6 µs per second), a spray clip start 0.9 µs, the search for cover further away about 5 µs once per stress, the end 0.9 µs. After the first clips have been wrapped, a stress creates no objects. The one thing that is expensive lies outside the stress code: blocking the fire of a laser weapon that is firing stops its beam effect, which took about 6 ms in these runs, and a stressed laser soldier has his fire blocked when he starts his run and possibly when his stress ends.
+
+**Logging.** `LogRTSSquadUnitStress` on Verbose: `RTS_STRESS_START`, `RTS_STRESS_RELOCATE` (with `found=0` when he stays) and `RTS_STRESS_END`.
+
 ### Cover animation asset checks
 
 Two setup mistakes on the animation Blueprint are reported once per class through `ReportError`:
@@ -219,6 +257,8 @@ Two setup mistakes on the animation Blueprint are reported once per class throug
 
 - `-CoverFinderCountCover` logs the published points per object class and cover type and compares them with `Navigation/CoverFinder/Tests/Baselines/<Map>.txt`; `RTS_COVER_COUNT_TEST RESULT FAIL` means cover was lost. `-CoverFinderWriteCountBaseline` lowers the baseline to the run's counts where they are lower (write it several times: objects on the map are placed with some randomness), `-CoverFinderResetCountBaseline` starts it afresh.
 - `-CoverFinderValidateTrenchCover` sends a squad into a trench and checks crouch, stand up against an enemy in front, no movement while standing up, firing through the trench, and crouching again.
+- `-CoverFinderValidateStress` stresses a player soldier in crouch cover and checks the weapon change, the spray animation, the run to cover further from the enemy, spraying from there, and everything back to normal afterwards. The run needs a longer stress than the default in a headless run, where unseen soldiers move slowly: add `-ini:Game:[/Script/RTS_Survival.RTSCoverFinderDeveloperSettings]:M_InfantryStressDuration=30`.
+- `-CoverFinderMeasureStress` measures what stress costs, see "Infantry stress".
 - The idle phase of `-CoverFinderValidateTestCover` fails when a unit in cover would hit its own cover or a thin obstacle holds more soldiers than it has room for.
 
 ### First scan budget

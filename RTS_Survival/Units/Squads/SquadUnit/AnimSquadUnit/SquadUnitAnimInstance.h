@@ -419,6 +419,14 @@ struct FSquadUnitCoverApproachMove
 	float PlayRate = 1.0f;
 };
 
+/** Which of the spray animation lists a stressed soldier in cover plays from. */
+enum class ESquadCoverSprayStance : uint8
+{
+	None,
+	Crouch,
+	Standing
+};
+
 /** How far one approach move carries the unit, in the unit's own frame, and how long it takes. */
 struct FSquadUnitCoverApproachTravel
 {
@@ -476,6 +484,20 @@ struct FSquadUnitCoverAnimationSets
 	// Slot of the AnimGraph an approach move that is a plain sequence is played on.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover")
 	FName ApproachMoveSlotName = TEXT("FullBody");
+
+	// Full-body blind fire of a stressed soldier in crouch, trench or prone cover. For as long as he sprays and
+	// does not reload, one of these is played after the other, each picked at random. Sequences are played on
+	// SprayAnimationSlotName; a montage uses its own slot.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Stress")
+	TArray<TObjectPtr<UAnimSequenceBase>> CrouchSprayAnimations;
+
+	// The same for a stressed soldier behind standing cover, on either side. Left empty, a soldier behind
+	// standing cover sprays without a spray animation.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Stress")
+	TArray<TObjectPtr<UAnimSequenceBase>> StandingSprayAnimations;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cover|Stress")
+	FName SprayAnimationSlotName = TEXT("FullBody");
 };
 
 /**
@@ -630,6 +652,19 @@ public:
 
 	// Cover test support: lets an unattended run use approach moves the Blueprint has not been given yet.
 	void Debug_SetCoverApproachMoves(const TArray<UAnimSequenceBase*>& Animations);
+
+	/**
+	 * @brief Keeps a stressed soldier spraying: plays the stance's spray animations one after the other until
+	 * told otherwise. Call it again whenever the soldier should be spraying; another full-body montage, such
+	 * as a reload, ends the animation that is playing, and the next call picks it up again.
+	 * @param Stance List to play from; None stops spraying.
+	 */
+	void SetCoverSpray(ESquadCoverSprayStance Stance);
+	bool GetIsCoverSprayPlaying() const { return M_ActiveSprayMontage != nullptr; }
+	int32 GetCoverSprayAnimationCount(ESquadCoverSprayStance Stance) const;
+
+	// Test-only: gives a unit spray animations when its animation Blueprint has none assigned for the stance.
+	void Debug_SetCoverSprayAnimations(ESquadCoverSprayStance Stance, const TArray<UAnimSequenceBase*>& Animations);
 
 	/** @return True only when a standing protected pose started its expose montage. */
 	bool StartStandingCoverPeek();
@@ -1074,4 +1109,24 @@ private:
 
 	FOnMontageEnded M_ApproachMontageEndedDelegate;
 	void OnApproachMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	// The spray animation that is playing, and the stance the soldier wants to keep spraying in.
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> M_ActiveSprayMontage = nullptr;
+
+	ESquadCoverSprayStance M_WantedSprayStance = ESquadCoverSprayStance::None;
+
+	FOnMontageEnded M_SprayMontageEndedDelegate;
+	const TArray<TObjectPtr<UAnimSequenceBase>>& GetCoverSprayAnimations(ESquadCoverSprayStance Stance) const;
+	bool GetCanStartCoverSpray() const;
+	void PlayRandomCoverSpray();
+
+	/**
+	 * @brief Plays a spray sequence through the montage every soldier of the world shares for it.
+	 * @param SprayAnimation One of the spray animations that is a plain sequence.
+	 * @return The montage that is playing, or null when it could not be played.
+	 */
+	UAnimMontage* PlaySharedSprayMontage(UAnimSequenceBase& SprayAnimation);
+	void StopCoverSprayMontage();
+	void OnSprayMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 };

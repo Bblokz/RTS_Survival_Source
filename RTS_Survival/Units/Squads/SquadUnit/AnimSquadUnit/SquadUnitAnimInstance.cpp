@@ -3,6 +3,8 @@
 
 #include "SquadUnitAnimInstance.h"
 
+#include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
+
 #include "Animation/AnimMontage.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/DeveloperSettings.h"
@@ -14,6 +16,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCoverAnimation, Log, All);
 
 namespace SquadUnitCoverAnimLogStatics
 {
+	constexpr float SprayBlendSeconds = 0.15f;
 	constexpr uint32 FirstCoverPoseReportBit = 16;
 	constexpr uint32 FirstUnplayableMontageReportBit = 8;
 	constexpr uint32 AdditiveAimBaseReportBit = 1u << 30;
@@ -803,6 +806,10 @@ void USquadUnitAnimInstance::StopAllMontages()
 	// Montage_Stop without a montage stops every montage; keep the full-body runtime owners in sync.
 	ClearTeamWeaponCrewAnimationRuntime(false);
 	ClearCoverAnimationRuntime();
+	// Whoever stops everything does not want the spraying to start again by itself either.
+	M_WantedSprayStance = ESquadCoverSprayStance::None;
+	M_ActiveSprayMontage = nullptr;
+	M_SprayMontageEndedDelegate.Unbind();
 	Montage_Stop(0.1f);
 }
 
@@ -958,6 +965,140 @@ void USquadUnitAnimInstance::OnApproachMontageEnded(UAnimMontage* Montage, const
 	M_ActiveApproachMontage = nullptr;
 	M_ApproachMontageEndedDelegate.Unbind();
 	OnCoverApproachMoveEnded.ExecuteIfBound();
+}
+
+const TArray<TObjectPtr<UAnimSequenceBase>>& USquadUnitAnimInstance::GetCoverSprayAnimations(
+	const ESquadCoverSprayStance Stance) const
+{
+	return Stance == ESquadCoverSprayStance::Standing
+		? CoverAnimations.StandingSprayAnimations
+		: CoverAnimations.CrouchSprayAnimations;
+}
+
+int32 USquadUnitAnimInstance::GetCoverSprayAnimationCount(const ESquadCoverSprayStance Stance) const
+{
+	return Stance == ESquadCoverSprayStance::None ? 0 : GetCoverSprayAnimations(Stance).Num();
+}
+
+void USquadUnitAnimInstance::Debug_SetCoverSprayAnimations(
+	const ESquadCoverSprayStance Stance,
+	const TArray<UAnimSequenceBase*>& Animations)
+{
+	TArray<TObjectPtr<UAnimSequenceBase>>& SprayAnimations = Stance == ESquadCoverSprayStance::Standing
+		? CoverAnimations.StandingSprayAnimations
+		: CoverAnimations.CrouchSprayAnimations;
+	SprayAnimations.Reset();
+	SprayAnimations.Append(Animations);
+}
+
+void USquadUnitAnimInstance::SetCoverSpray(const ESquadCoverSprayStance Stance)
+{
+	const bool bStanceChanged = Stance != M_WantedSprayStance;
+	M_WantedSprayStance = Stance;
+	if (Stance == ESquadCoverSprayStance::None || bStanceChanged)
+	{
+		StopCoverSprayMontage();
+	}
+	if (Stance != ESquadCoverSprayStance::None && not IsValid(M_ActiveSprayMontage))
+	{
+		PlayRandomCoverSpray();
+	}
+}
+
+bool USquadUnitAnimInstance::GetCanStartCoverSpray() const
+{
+	// A spray animation takes the whole body; starting one would cut off a cover transition, a reload or an
+	// approach move, and those all end by themselves.
+	// Asked about no montage at all, Montage_IsPlaying answers for every montage; hence the validity check.
+	const UAnimMontage* ReloadMontage = GetCoverReloadMontage();
+	const bool bIsReloading = IsValid(ReloadMontage) && Montage_IsPlaying(ReloadMontage);
+	return not GetIsCoverTransitionMontageActive() && not GetIsCoverApproachMovePlaying() &&
+		not GetIsTeamWeaponCrewAnimationActive() && not bIsReloading;
+}
+
+void USquadUnitAnimInstance::PlayRandomCoverSpray()
+{
+	using SquadUnitCoverAnimLogStatics::SprayBlendSeconds;
+	const TArray<TObjectPtr<UAnimSequenceBase>>& SprayAnimations = GetCoverSprayAnimations(M_WantedSprayStance);
+	if (SprayAnimations.IsEmpty() || not GetCanStartCoverSpray())
+	{
+		return;
+	}
+	UAnimSequenceBase* SprayAnimation = SprayAnimations[FMath::RandRange(0, SprayAnimations.Num() - 1)];
+	UAnimMontage* PlayedMontage = Cast<UAnimMontage>(SprayAnimation);
+	if (IsValid(PlayedMontage))
+	{
+		const float PlayedSeconds = Montage_Play(PlayedMontage, 1.0f, EMontagePlayReturnType::Duration);
+		PlayedMontage = PlayedSeconds > KINDA_SMALL_NUMBER ? PlayedMontage : nullptr;
+	}
+	else if (IsValid(SprayAnimation))
+	{
+		PlayedMontage = PlaySharedSprayMontage(*SprayAnimation);
+	}
+	if (not IsValid(PlayedMontage))
+	{
+		return;
+	}
+	M_ActiveSprayMontage = PlayedMontage;
+	M_SprayMontageEndedDelegate.BindUObject(this, &USquadUnitAnimInstance::OnSprayMontageEnded);
+	Montage_SetEndDelegate(M_SprayMontageEndedDelegate, PlayedMontage);
+}
+
+UAnimMontage* USquadUnitAnimInstance::PlaySharedSprayMontage(UAnimSequenceBase& SprayAnimation)
+{
+	using SquadUnitCoverAnimLogStatics::SprayBlendSeconds;
+	const UWorld* World = GetWorld();
+	URTSCoverFinderWorldSubsystem* CoverSubsystem = IsValid(World)
+		? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		: nullptr;
+	// Silent: a preview world has no cover subsystem; there the engine wraps the sequence in a montage of its own.
+	if (not IsValid(CoverSubsystem))
+	{
+		return PlaySlotAnimationAsDynamicMontage(
+			&SprayAnimation,
+			CoverAnimations.SprayAnimationSlotName,
+			SprayBlendSeconds,
+			SprayBlendSeconds);
+	}
+	UAnimMontage* SharedMontage = CoverSubsystem->FindOrAddSprayMontage(
+		&SprayAnimation,
+		CoverAnimations.SprayAnimationSlotName,
+		SprayBlendSeconds);
+	const bool bIsPlaying = IsValid(SharedMontage) &&
+		Montage_Play(SharedMontage, 1.0f, EMontagePlayReturnType::Duration) > KINDA_SMALL_NUMBER;
+	return bIsPlaying ? SharedMontage : nullptr;
+}
+
+void USquadUnitAnimInstance::StopCoverSprayMontage()
+{
+	using SquadUnitCoverAnimLogStatics::SprayBlendSeconds;
+	UAnimMontage* SprayMontage = M_ActiveSprayMontage;
+	if (not IsValid(SprayMontage))
+	{
+		return;
+	}
+	// Cleared first, so the end of the montage does not start the next animation.
+	M_ActiveSprayMontage = nullptr;
+	M_SprayMontageEndedDelegate.Unbind();
+	if (Montage_IsPlaying(SprayMontage))
+	{
+		Montage_Stop(SprayBlendSeconds, SprayMontage);
+	}
+}
+
+void USquadUnitAnimInstance::OnSprayMontageEnded(UAnimMontage* Montage, const bool bInterrupted)
+{
+	if (Montage != M_ActiveSprayMontage)
+	{
+		return;
+	}
+	M_ActiveSprayMontage = nullptr;
+	M_SprayMontageEndedDelegate.Unbind();
+	// Cut off by another montage: the soldier asks for spraying again once that one is over.
+	if (not bInterrupted && M_WantedSprayStance != ESquadCoverSprayStance::None)
+	{
+		PlayRandomCoverSpray();
+	}
 }
 
 void USquadUnitAnimInstance::Debug_SetCoverApproachMoves(const TArray<UAnimSequenceBase*>& Animations)

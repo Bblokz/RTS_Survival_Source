@@ -3224,6 +3224,7 @@ void ASquadController::OnSquadFullyReinforced()
 	FSquadData SquadData = GameState->GetSquadDataOfPlayer(
 		RTSComponent->GetOwningPlayer(),
 		RTSComponent->GetSubtypeAsSquadSubtype());
+	M_StressTolerance = SquadData.StressTolerance;
 	InitSquadData_SetValues(SquadData.MaxWalkSpeedCms,
 	                        SquadData.MaxAcceleration, SquadData.MaxHealth, SquadData.VisionRadius,
 	                        RTSComponent->GetSubtypeAsSquadSubtype(), SquadData.ResistancesAndDamageMlt);
@@ -3411,6 +3412,7 @@ void ASquadController::InitSquadData()
 	FSquadData SquadData = GameState->GetSquadDataOfPlayer(
 		RTSComponent->GetOwningPlayer(),
 		RTSComponent->GetSubtypeAsSquadSubtype());
+	M_StressTolerance = SquadData.StressTolerance;
 	InitSquadData_SetValues(SquadData.MaxWalkSpeedCms,
 	                        SquadData.MaxAcceleration, SquadData.MaxHealth, SquadData.VisionRadius,
 	                        RTSComponent->GetSubtypeAsSquadSubtype(), SquadData.ResistancesAndDamageMlt);

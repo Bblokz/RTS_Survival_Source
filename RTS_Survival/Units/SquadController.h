@@ -301,6 +301,10 @@ public:
 
 	UBehaviourComp* GetBehaviourComponentOfSquad() const;
 
+	// The part of its maximum health a soldier of this squad may lose in a short time before it gets stressed;
+	// zero until the squad's data is loaded, which means never.
+	float GetStressTolerance() const { return M_StressTolerance; }
+
 	/**
      * @brief Pure runtime count of current alive/valid squad units.
      * Uses the current squad array without compacting or mutating it.
@@ -1019,6 +1023,8 @@ protected:
 
 	// Vision range of the squad propagated to the squad units.
 	float M_SquadVisionRange = 0.0f;
+
+	float M_StressTolerance = 0.0f;
 
 	// How many units are left to spawn, if the squad is fully loaded and a timer handle
 	// to delay the initialization of the squad data if not all of the squad units are loaded in yet.

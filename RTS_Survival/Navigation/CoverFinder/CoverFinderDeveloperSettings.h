@@ -10,6 +10,7 @@
  * Geometry classification details remain internal so maps share one predictable definition of cover.
  */
 class UStaticMesh;
+class UInfantryStressBehaviour;
 
 /** One class of actors whose cover is read from mesh sockets, with how soldiers use that cover. */
 USTRUCT()
@@ -106,6 +107,40 @@ public:
 	// played when it ends exactly on the cover position; otherwise the soldier walks in as usual. Zero never.
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="0", ClampMax="100", UIMin="0", UIMax="100", Units="%"))
 	int32 M_CoverApproachMoveChancePercent = 30;
+
+	// Lets a soldier in cover that loses health quickly get stressed: it sprays blind fire, then runs to cover
+	// further from its enemy and sprays again. How much a soldier takes is the StressTolerance of its squad.
+	UPROPERTY(Config, EditAnywhere, Category="Infantry Stress")
+	bool bM_EnableInfantryStress = true;
+
+	// The behaviour a stressed soldier's weapon gets for as long as the stress lasts. Set a Blueprint class
+	// derived from InfantryStressBehaviour here to change its weapon multipliers or to add effects.
+	UPROPERTY(Config, EditAnywhere, Category="Infantry Stress")
+	TSoftClassPtr<UInfantryStressBehaviour> M_InfantryStressBehaviourClass = TSoftClassPtr<UInfantryStressBehaviour>(
+		FSoftObjectPath(TEXT("/Script/RTS_Survival.InfantryStressBehaviour")));
+
+	// How long stress lasts. The first half the soldier sprays from where he is; then he runs for cover further
+	// away and sprays from there for whatever time is left.
+	UPROPERTY(Config, EditAnywhere, Category="Infantry Stress", meta=(ClampMin="1.0", UIMin="2.0", UIMax="60.0", Units="s"))
+	float M_InfantryStressDuration = 12.0f;
+
+	// How quickly health has to be lost: a soldier gets stressed when he loses his squad's StressTolerance part
+	// of his maximum health within this time. Longer makes every soldier easier to stress.
+	UPROPERTY(Config, EditAnywhere, Category="Infantry Stress", meta=(ClampMin="0.5", UIMin="0.5", UIMax="20.0", Units="s"))
+	float M_InfantryStressHealthLossWindowSeconds = 4.0f;
+
+	// How much faster a stressed soldier runs to his new cover; kept until the stress is over.
+	UPROPERTY(Config, EditAnywhere, Category="Infantry Stress", meta=(ClampMin="1.0", ClampMax="3.0", UIMin="1.0", UIMax="2.5"))
+	float M_InfantryStressSpeedMultiplier = 1.5f;
+
+	// How far from where he is a stressed soldier may run for cover that lies further from his enemy. May be
+	// larger than the automatic cover search radius.
+	UPROPERTY(Config, EditAnywhere, Category="Infantry Stress", meta=(ClampMin="100.0", UIMin="500.0", UIMax="6000.0", Units="cm"))
+	float M_InfantryStressedCoverMaxDisplacement = 3000.0f;
+
+	// After stress has worn off, the soldier cannot get stressed again for this long.
+	UPROPERTY(Config, EditAnywhere, Category="Infantry Stress", meta=(ClampMin="0.0", UIMin="0.0", UIMax="120.0", Units="s"))
+	float M_InfantryStressRecoverySeconds = 15.0f;
 
 	// Staggers decisions across frames; movement completion itself is still handled immediately by the AI callback.
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="1", ClampMax="64", UIMin="1", UIMax="32"))

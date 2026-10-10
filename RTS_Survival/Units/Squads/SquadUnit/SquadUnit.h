@@ -31,10 +31,12 @@ class UScavengerComponent;
 enum class EWeaponName : uint8;
 enum class ESquadIdleAnimationPose : uint8;
 enum class ESquadCoverAnimAction : uint8;
+enum class ESquadCoverSprayStance : uint8;
 struct FSquadUnitCoverLocalOffset;
 class AWeaponPickup;
 class USecondaryWeapon;
 class AInfantryWeaponMaster;
+class UInfantryStressBehaviour;
 class RTS_SURVIVAL_API UWeaponState;
 class USquadUnitAnimInstance;
 class AAISquadUnit;
@@ -282,6 +284,51 @@ struct FSquadUnitCoverApproachMoveState
 	float MovementTickIntervalBeforeMove = 0.0f;
 };
 
+/** What a stressed soldier is doing; None when he is not stressed. */
+enum class ESquadUnitStressPhase : uint8
+{
+	None,
+	// First half: blind fire from the cover he was in when the stress started.
+	SprayingFromCover,
+	// Running, faster than usual, to cover further from his enemy.
+	RelocatingToFartherCover,
+	// Blind fire again, from the new cover or from the old one when none was found.
+	SprayingFromNewCover
+};
+
+/**
+ * @brief A soldier's stress: the meter that fills as he loses health quickly, and the state of the stress
+ * it sets off. Only a stressed soldier is ticked for it, by the cover subsystem.
+ */
+USTRUCT()
+struct FSquadUnitStressState
+{
+	GENERATED_BODY()
+
+	ESquadUnitStressPhase Phase = ESquadUnitStressPhase::None;
+
+	// Part of his maximum health lost recently. It drains by one stress tolerance per health loss window, so
+	// only health lost faster than that fills it; reaching the tolerance sets the stress off.
+	float RecentHealthLossFraction = 0.0f;
+	float LastHealthLossWorldSeconds = 0.0f;
+
+	// When the soldier leaves his cover for one further away, when the stress is over, and until when he
+	// cannot get stressed again after that.
+	float RelocateWorldSeconds = 0.0f;
+	float EndWorldSeconds = 0.0f;
+	float ImmuneUntilWorldSeconds = 0.0f;
+
+	// What the stress made of his movement; undone only while it is still exactly this, so a movement
+	// behaviour that changed his speed in the meantime is left alone.
+	float StressedMaxWalkSpeed = 0.0f;
+	float StressedMaxAcceleration = 0.0f;
+	float AppliedSpeedMultiplier = 1.0f;
+
+	// The weapon side of the stress; borrowed from the cover subsystem for as long as he is stressed.
+	UPROPERTY()
+	TObjectPtr<UInfantryStressBehaviour> Behaviour = nullptr;
+};
+
 /**
  * @brief Stops the walk to cover from stalling with the weapon lowered.
  * Deadlines are world times; the flags track which recovery steps the current assignment already used.
@@ -368,6 +415,8 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 	// for changing the way the weapon of this unit behaves when an aim ability is active.
 	friend class USquadAimAbilityComponent;
 	friend class URTSCoverFinderWorldSubsystem;
+	// Times the private steps of a soldier's stress one by one.
+	friend struct FCoverStressPerfScenario;
 
 public:
 	ASquadUnit(const FObjectInitializer& ObjectInitializer);
@@ -537,6 +586,13 @@ public:
 
 	// True while a unit in cover stays down because its weapon is reloading.
 	bool GetIsReloadingInCover() const;
+
+	// Stress: a soldier in cover that loses health faster than his squad's stress tolerance sprays blind fire,
+	// runs for cover further from his enemy and sprays again, for the stress duration of the cover settings.
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
+	                         AController* EventInstigator, AActor* DamageCauser) override;
+	bool GetIsStressed() const { return M_Stress.Phase != ESquadUnitStressPhase::None; }
+	const FSquadUnitStressState& GetStressState() const { return M_Stress; }
 	void OnProjectileHit(const bool bBounced);
 
 	/** 
@@ -771,6 +827,39 @@ private:
 
 	UPROPERTY()
 	FSquadUnitCoverApproachMoveState M_CoverApproachMove;
+
+	UPROPERTY()
+	FSquadUnitStressState M_Stress;
+
+	// Fills the stress meter with health the soldier just lost and sets his stress off when it is full.
+	void RecordHealthLossForStress(float HealthLost);
+	bool GetIsHoldingCoverPoint() const;
+	void StartStress();
+	void TickStress();
+	void EndStress();
+
+	// Keeps the spray animation and the weapon in step with what the stressed soldier is doing right now.
+	void UpdateStressSpray();
+	ESquadCoverSprayStance GetStressSprayStance() const;
+
+	// Halfway through his stress the soldier leaves for cover further from his enemy, when there is any.
+	void StartStressRelocation();
+
+	/**
+	 * @brief Looks for cover further from the stressed soldier's enemy that he can still reach and use.
+	 * @param CoverSubsystem Cover of the soldier's world.
+	 * @param OutFartherPoint The point, reserved for him, when there is one.
+	 * @return False when he may not leave his point or no such cover is free.
+	 */
+	bool TryReserveStressRelocationPoint(URTSCoverFinderWorldSubsystem& CoverSubsystem, FRTSCoverPoint& OutFartherPoint);
+	/**
+	 * @brief Where the stressed soldier's enemy is, to run away from.
+	 * @param OutThreatLocation His weapon's target, or else a spot out where his cover faces.
+	 * @return True when it is a real target, false when it is that estimate.
+	 */
+	bool GetStressThreatLocation(FVector& OutThreatLocation) const;
+	void ApplyStressSpeed();
+	void RemoveStressSpeed();
 
 	/** The squad controller managing this unit. */
 	UPROPERTY()

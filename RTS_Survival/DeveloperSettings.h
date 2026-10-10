@@ -1452,6 +1452,26 @@ namespace DeveloperSettings
 			inline constexpr float FastInfantryAcceleration = 1800.f;
 			inline constexpr float SlowInfantrySpeed = 400.f;
 			inline constexpr float SlowInfantryAcceleration = 1050.f;
+
+			// Stress tolerance: the part of its maximum health a soldier in cover may lose within the stress
+			// window (Project Settings > Infantry Cover Finder > Infantry Stress) before it gets stressed.
+			// Health and armour already make better infantry lose that part more slowly, so the steps between
+			// the tiers are kept small. A value of one or more can never be reached: such a soldier dies first.
+			namespace StressTolerance
+			{
+				// Scales the stress tolerance of every squad at once.
+				inline constexpr float StressToleranceMlt = 1.f;
+				// Workers and conscripts.
+				inline constexpr float Untrained = 0.2f * StressToleranceMlt;
+				// Tier 1 line infantry.
+				inline constexpr float Regular = 0.25f * StressToleranceMlt;
+				// Tier 1 armoured assault infantry and machine gun crews.
+				inline constexpr float Hardened = 0.3f * StressToleranceMlt;
+				// Tier 2 infantry, specialists and the crews of heavy team weapons.
+				inline constexpr float Veteran = 0.4f * StressToleranceMlt;
+				inline constexpr float Elite = 0.5f * StressToleranceMlt;
+				inline constexpr float Commando = 0.65f * StressToleranceMlt;
+			}
 		}
 	}
 

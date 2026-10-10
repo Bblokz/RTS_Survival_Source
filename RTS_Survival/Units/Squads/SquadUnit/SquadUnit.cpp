@@ -434,6 +434,12 @@ void ASquadUnit::UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsys
 	}
 
 	SyncCoverStateWithAnimation();
+	// A stressed soldier that holds a point neither steps out nor trades it for a better one: his stress
+	// decides what he does there.
+	if (GetIsStressed() && GetIsHoldingCoverPoint())
+	{
+		return;
+	}
 	switch (M_CoverRuntimeState.State)
 	{
 	case ESquadUnitCoverState::EnteringCover:
@@ -2143,6 +2149,11 @@ void ASquadUnit::OnWeaponReloadStarted(const float ReloadTime)
 {
 	const UWorld* World = GetWorld();
 	M_CoverMoveGuard.ReloadEndWorldSeconds = IsValid(World) ? World->GetTimeSeconds() + ReloadTime : 0.0f;
+	// The reload clip needs the whole body; the spraying picks up again when the weapon is loaded.
+	if (GetIsStressed() && IsValid(AnimBp_SquadUnit))
+	{
+		AnimBp_SquadUnit->SetCoverSpray(ESquadCoverSprayStance::None);
+	}
 	// Crouch cover is ducked into by the reload clip itself; a unit that stepped out or stood up goes back first.
 	if (M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed)
 	{
@@ -2872,6 +2883,7 @@ void ASquadUnit::BeginPlay()
 void ASquadUnit::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
+	EndStress();
 	ClearCoverStateInternal(false);
 	if (UWorld* World = GetWorld())
 	{
@@ -4005,6 +4017,9 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 	{
 		return;
 	}
+	EndStress();
+	// A soldier that dies on a cover socket stays there; leaving cover would put him back on the navmesh.
+	M_CoverMoveGuard.bIsSnappedToCoverSocket = false;
 	ClearCoverState();
 
 	SetUnitDying();

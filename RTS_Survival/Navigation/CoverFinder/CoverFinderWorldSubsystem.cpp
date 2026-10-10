@@ -1,5 +1,7 @@
 #include "CoverFinderWorldSubsystem.h"
 
+#include "RTS_Survival/Behaviours/Derived/InfantryStress/InfantryStressBehaviour.h"
+
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Character.h"
@@ -123,6 +125,9 @@ namespace CoverFinderWorldSubsystemPrivate
 	const FColor ProneCoverColor(160, 60, 220);
 	// How far a trench socket may sit from the navmesh and still be moved onto it.
 	const FVector CoverSocketProjectionExtent(120.0f, 120.0f, 250.0f);
+
+	// How often a stressed soldier checks what he should be doing.
+	constexpr float StressTickSeconds = 0.2f;
 
 	// The first mesh of an actor is the one whose sockets mark its cover. Mesh components without any socket are
 	// passed over: a blueprint often leaves an inherited mesh component empty, and its health bar widget is a
@@ -560,6 +565,9 @@ void URTSCoverFinderWorldSubsystem::Deinitialize()
 	M_EnvironmentCoverPoints.Reset();
 	M_AuthoredCoverProviders.Reset();
 	M_SocketCoverProviders.Reset();
+	M_StressedUnits.Reset();
+	M_FreeStressBehaviours.Reset();
+	M_SprayMontages.Reset();
 	M_BlockingProviderActors.Reset();
 	M_BlockingProviderHandles.Reset();
 	M_CoverPointIndices.Reset();
@@ -574,6 +582,12 @@ void URTSCoverFinderWorldSubsystem::Deinitialize()
 void URTSCoverFinderWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	// Loaded while the map starts, so the first soldier that gets stressed does not pay for it mid-fight.
+	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
+	if (IsValid(CoverSettings) && CoverSettings->bM_EnableInfantryStress)
+	{
+		GetInfantryStressBehaviourClass();
+	}
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
 		constexpr float DefaultCommandLineValidationDelaySeconds = 20.0f;
@@ -590,6 +604,14 @@ void URTSCoverFinderWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateTrenchCover")))
 		{
 			M_TrenchCoverScenario.Start();
+		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateStress")))
+		{
+			M_StressScenario.Start();
+		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderMeasureStress")))
+		{
+			M_StressPerfScenario.Start();
 		}
 		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderCountCover")))
 		{
@@ -622,6 +644,9 @@ void URTSCoverFinderWorldSubsystem::Tick(const float DeltaTime)
 	M_CombatCoverScenario.Tick(*this);
 	M_CoverCountScenario.Tick(*this);
 	M_TrenchCoverScenario.Tick(*this);
+	M_StressScenario.Tick(*this);
+	M_StressPerfScenario.Tick(*this);
+	TickStressedUnits(DeltaTime);
 	if (not bM_HasRegisteredSocketCover)
 	{
 		RegisterSocketCoverOnce();
@@ -662,6 +687,18 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::FindCoverPointsInRadius(
 	const float SearchRadius) const
 {
 	TArray<FRTSCoverPoint> NearbyCoverPoints;
+	ForEachCoverPointInRadius(SearchLocation, SearchRadius, [&NearbyCoverPoints](const FRTSCoverPoint& CoverPoint)
+	{
+		NearbyCoverPoints.Add(CoverPoint);
+	});
+	return NearbyCoverPoints;
+}
+
+void URTSCoverFinderWorldSubsystem::ForEachCoverPointInRadius(
+	const FVector& SearchLocation,
+	const float SearchRadius,
+	const TFunctionRef<void(const FRTSCoverPoint&)> Visitor) const
+{
 	const float SearchRadiusSquared = FMath::Square(FMath::Max(0.0f, SearchRadius));
 	const FIntPoint MinimumCell = GetCoverSpatialCell(
 		SearchLocation - FVector(SearchRadius, SearchRadius, 0.0f));
@@ -685,12 +722,11 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::FindCoverPointsInRadius(
 				const FRTSCoverPoint& CoverPoint = M_CoverPoints[CoverPointIndex];
 				if (FVector::DistSquared(SearchLocation, CoverPoint.Location) <= SearchRadiusSquared)
 				{
-					NearbyCoverPoints.Add(CoverPoint);
+					Visitor(CoverPoint);
 				}
 			}
 		}
 	}
-	return NearbyCoverPoints;
 }
 
 void URTSCoverFinderWorldSubsystem::ForceRescan()
@@ -1044,6 +1080,186 @@ bool URTSCoverFinderWorldSubsystem::GetIsCoverPointAvailableToUnit(
 	// A pole has cover on every side but no room for a whole squad.
 	return CoverPoint.ThinObstacleId == 0 ||
 		GetThinObstacleReservationCount(CoverPoint.ThinObstacleId, &SquadUnit) < CoverPoint.ThinObstacleCapacity;
+}
+
+bool URTSCoverFinderWorldSubsystem::TryReserveStressRetreatCoverPoint(
+	ASquadUnit& SquadUnit,
+	const FVector& ThreatLocation,
+	const float MaximumDisplacement,
+	const float MaximumDistanceToThreat,
+	FRTSCoverPoint& OutCoverPoint)
+{
+	// A point barely further away is not worth giving up cover for, and of two that are equally far from the
+	// threat the one that needs the shorter run in the open wins.
+	constexpr float MinimumRetreatGain = 300.0f;
+	constexpr float RunDistanceCostRatio = 0.5f;
+	if (M_CoverPoints.IsEmpty())
+	{
+		return false;
+	}
+	const FVector UnitLocation = SquadUnit.GetActorLocation();
+	const float CurrentThreatDistance = FVector::Dist2D(UnitLocation, ThreatLocation);
+	const FRTSCombatCoverSettings CombatSettings = BuildCombatCoverSettings();
+	// The points are looked at where they are stored: nothing is published or removed during the search.
+	const FRTSCoverPoint* BestPoint = nullptr;
+	float BestScore = 0.0f;
+	int32 CandidateCount = 0;
+	ForEachCoverPointInRadius(UnitLocation, MaximumDisplacement, [&](const FRTSCoverPoint& CoverPoint)
+	{
+		++CandidateCount;
+		const float ThreatDistance = FVector::Dist2D(CoverPoint.Location, ThreatLocation);
+		const float RetreatGain = ThreatDistance - CurrentThreatDistance;
+		const bool bOutOfWeaponRange = MaximumDistanceToThreat > 0.0f && ThreatDistance > MaximumDistanceToThreat;
+		if (RetreatGain < MinimumRetreatGain || bOutOfWeaponRange)
+		{
+			return;
+		}
+		// The cheap comparisons come first; whether the point is free and shields him is only asked of a
+		// point that would beat the best one so far.
+		const float Score = RetreatGain - RunDistanceCostRatio * FVector::Dist2D(CoverPoint.Location, UnitLocation);
+		const bool bIsBetter = BestPoint == nullptr || Score > BestScore;
+		if (bIsBetter && GetIsCoverPointAvailableToUnit(CoverPoint, SquadUnit) &&
+			FRTSCombatCoverScoring::GetCanAimAt(CoverPoint, ThreatLocation, CombatSettings))
+		{
+			BestPoint = &CoverPoint;
+			BestScore = Score;
+		}
+	});
+	M_TacticalPerformanceSnapshot.CandidateChecksLastFrame += CandidateCount;
+	if (BestPoint == nullptr)
+	{
+		return false;
+	}
+	M_CoverReservations.Add(BestPoint->PointId, TWeakObjectPtr<ASquadUnit>(&SquadUnit));
+	OutCoverPoint = *BestPoint;
+	return true;
+}
+
+TSubclassOf<UInfantryStressBehaviour> URTSCoverFinderWorldSubsystem::GetInfantryStressBehaviourClass()
+{
+	if (bM_HasLoadedInfantryStressBehaviourClass)
+	{
+		return M_InfantryStressBehaviourClass;
+	}
+	bM_HasLoadedInfantryStressBehaviourClass = true;
+	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
+	if (not IsValid(CoverSettings))
+	{
+		return nullptr;
+	}
+	M_InfantryStressBehaviourClass = CoverSettings->M_InfantryStressBehaviourClass.LoadSynchronous();
+	if (not IsValid(M_InfantryStressBehaviourClass))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Cover finder: the infantry stress behaviour class " +
+			CoverSettings->M_InfantryStressBehaviourClass.ToString() +
+			" set in Project Settings > Infantry Cover Finder > Infantry Stress could not be loaded."
+			" Stressed soldiers fall back to the native behaviour.");
+		M_InfantryStressBehaviourClass = UInfantryStressBehaviour::StaticClass();
+	}
+	return M_InfantryStressBehaviourClass;
+}
+
+UInfantryStressBehaviour* URTSCoverFinderWorldSubsystem::AcquireInfantryStressBehaviour()
+{
+	const TSubclassOf<UInfantryStressBehaviour> BehaviourClass = GetInfantryStressBehaviourClass();
+	if (not IsValid(BehaviourClass))
+	{
+		return nullptr;
+	}
+	while (not M_FreeStressBehaviours.IsEmpty())
+	{
+		UInfantryStressBehaviour* FreeBehaviour = M_FreeStressBehaviours.Pop(EAllowShrinking::No);
+		if (IsValid(FreeBehaviour) && FreeBehaviour->GetClass() == BehaviourClass)
+		{
+			return FreeBehaviour;
+		}
+	}
+	return NewObject<UInfantryStressBehaviour>(this, BehaviourClass);
+}
+
+void URTSCoverFinderWorldSubsystem::ReleaseInfantryStressBehaviour(UInfantryStressBehaviour* Behaviour)
+{
+	if (not IsValid(Behaviour))
+	{
+		return;
+	}
+	M_FreeStressBehaviours.Add(Behaviour);
+}
+
+void URTSCoverFinderWorldSubsystem::RegisterStressedUnit(ASquadUnit& SquadUnit)
+{
+	if (M_StressedUnits.IsEmpty())
+	{
+		M_SecondsUntilStressTick = CoverFinderWorldSubsystemPrivate::StressTickSeconds;
+	}
+	M_StressedUnits.AddUnique(TWeakObjectPtr<ASquadUnit>(&SquadUnit));
+}
+
+void URTSCoverFinderWorldSubsystem::UnregisterStressedUnit(const ASquadUnit& SquadUnit)
+{
+	M_StressedUnits.RemoveSingleSwap(TWeakObjectPtr<ASquadUnit>(const_cast<ASquadUnit*>(&SquadUnit)), EAllowShrinking::No);
+}
+
+void URTSCoverFinderWorldSubsystem::TickStressedUnits(const float DeltaTime)
+{
+	if (M_StressedUnits.IsEmpty())
+	{
+		return;
+	}
+	M_SecondsUntilStressTick -= DeltaTime;
+	if (M_SecondsUntilStressTick > 0.0f)
+	{
+		return;
+	}
+	M_SecondsUntilStressTick = CoverFinderWorldSubsystemPrivate::StressTickSeconds;
+	// Backwards: a soldier whose stress ends on this tick takes itself out, which moves the last one, already
+	// ticked, into its place.
+	for (int32 UnitIndex = M_StressedUnits.Num() - 1; UnitIndex >= 0; --UnitIndex)
+	{
+		if (not M_StressedUnits.IsValidIndex(UnitIndex))
+		{
+			continue;
+		}
+		ASquadUnit* StressedUnit = M_StressedUnits[UnitIndex].Get();
+		if (not IsValid(StressedUnit))
+		{
+			M_StressedUnits.RemoveAtSwap(UnitIndex, 1, EAllowShrinking::No);
+			continue;
+		}
+		StressedUnit->TickStress();
+	}
+}
+
+UAnimMontage* URTSCoverFinderWorldSubsystem::FindOrAddSprayMontage(
+	UAnimSequenceBase* SprayAnimation,
+	const FName SlotName,
+	const float BlendSeconds)
+{
+	if (not IsValid(SprayAnimation))
+	{
+		return nullptr;
+	}
+	if (const TObjectPtr<UAnimMontage>* SharedMontage = M_SprayMontages.Find(SprayAnimation))
+	{
+		const UAnimMontage* FoundMontage = SharedMontage->Get();
+		const bool bIsOnWantedSlot = IsValid(FoundMontage) && FoundMontage->SlotAnimTracks.Num() > 0 &&
+			FoundMontage->SlotAnimTracks[0].SlotName == SlotName;
+		if (bIsOnWantedSlot)
+		{
+			return SharedMontage->Get();
+		}
+	}
+	UAnimMontage* NewMontage = UAnimMontage::CreateSlotAnimationAsDynamicMontage(
+		SprayAnimation,
+		SlotName,
+		BlendSeconds,
+		BlendSeconds);
+	if (IsValid(NewMontage))
+	{
+		M_SprayMontages.Add(SprayAnimation, NewMontage);
+	}
+	return NewMontage;
 }
 
 bool URTSCoverFinderWorldSubsystem::TryReserveCombatCoverPoint(
