@@ -286,7 +286,7 @@ bool FCoverCombatObserver::GetHasUsableCoverNearby(
 	Threats.ThreatLocations.Add(AttackerLocation);
 	const TArray<FRTSCoverPoint> NearbyPoints = CoverSubsystem.FindCoverPointsInRadius(
 		SquadUnit.GetActorLocation(),
-		CoverSettings->M_AutomaticCoverSearchRadius);
+		CoverSubsystem.GetAutomaticCoverSearchRadius(SquadUnit));
 	for (const FRTSCoverPoint& CoverPoint : NearbyPoints)
 	{
 		const ASquadUnit* ReservingUnit = CoverSubsystem.GetCoverReservationOwner(CoverPoint.PointId);

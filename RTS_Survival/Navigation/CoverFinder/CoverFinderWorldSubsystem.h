@@ -265,6 +265,9 @@ public:
 	/** @return The designer's combat cover values, copied for the scoring functions. */
 	FRTSCombatCoverSettings BuildCombatCoverSettings() const;
 
+	// How far this soldier may go for cover by itself: the enemy's infantry has its own, larger radius.
+	float GetAutomaticCoverSearchRadius(const ASquadUnit& SquadUnit) const;
+
 	/**
 	 * @brief Reserves one specific point, for a soldier whose player-planned move ended on it.
 	 * @param SquadUnit Unit that was sent to the point.

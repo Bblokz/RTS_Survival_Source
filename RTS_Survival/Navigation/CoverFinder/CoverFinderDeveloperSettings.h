@@ -80,6 +80,11 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="100.0", UIMin="100.0", UIMax="2500.0", Units="cm"))
 	float M_AutomaticCoverSearchRadius = 1200.0f;
 
+	// The same limit for infantry of the enemy (player 2). Larger than the player's, so enemy squads move into
+	// cover that is further away by themselves instead of standing in the open, which makes them feel alive.
+	UPROPERTY(Config, EditAnywhere, Category="Automatic Cover", meta=(ClampMin="100.0", UIMin="100.0", UIMax="5000.0", Units="cm"))
+	float M_EnemyAutomaticCoverSearchRadius = 2500.0f;
+
 	// How often a soldier running to crouch or prone cover finishes the run with one of the approach moves of
 	// its animation Blueprint (CoverAnimations > ApproachMoves), such as a slide or a roll. The move is only
 	// played when it ends exactly on the cover position; otherwise the soldier walks in as usual. Zero never.

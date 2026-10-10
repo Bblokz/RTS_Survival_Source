@@ -904,6 +904,21 @@ void URTSCoverFinderWorldSubsystem::UnregisterSquadUnit(ASquadUnit* SquadUnit)
 	M_NextTacticalUnitIndex = FMath::Min(M_NextTacticalUnitIndex, M_RegisteredSquadUnits.Num());
 }
 
+float URTSCoverFinderWorldSubsystem::GetAutomaticCoverSearchRadius(const ASquadUnit& SquadUnit) const
+{
+	constexpr int32 EnemyOwningPlayer = 2;
+	constexpr float MinimumSearchRadius = 100.0f;
+	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
+	if (not IsValid(CoverSettings))
+	{
+		return MinimumSearchRadius;
+	}
+	const float SearchRadius = SquadUnit.GetOwningPlayer() == EnemyOwningPlayer
+		? CoverSettings->M_EnemyAutomaticCoverSearchRadius
+		: CoverSettings->M_AutomaticCoverSearchRadius;
+	return FMath::Max(MinimumSearchRadius, SearchRadius);
+}
+
 bool URTSCoverFinderWorldSubsystem::TryReserveBestCoverPoint(
 	ASquadUnit& SquadUnit,
 	AActor* TargetActor,
@@ -916,7 +931,7 @@ bool URTSCoverFinderWorldSubsystem::TryReserveBestCoverPoint(
 	{
 		return false;
 	}
-	const float SearchRadius = FMath::Max(100.0f, CoverSettings->M_AutomaticCoverSearchRadius);
+	const float SearchRadius = GetAutomaticCoverSearchRadius(SquadUnit);
 	const TArray<FRTSCoverPoint> BestCandidates = GatherBestTacticalCoverCandidates(
 		SquadUnit,
 		TargetActor,
@@ -1004,7 +1019,7 @@ bool URTSCoverFinderWorldSubsystem::TryReserveCombatCoverPoint(
 	const FVector UnitLocation = SquadUnit.GetActorLocation();
 	const float SearchRadius = OccupiedCoverPoint != nullptr
 		? CombatSettings.TravelReferenceDistance
-		: FMath::Max(100.0f, CoverSettings->M_AutomaticCoverSearchRadius);
+		: GetAutomaticCoverSearchRadius(SquadUnit);
 	// A point the unit cannot aim from any more is worth leaving for anything usable.
 	float ScoreToBeat = TNumericLimits<float>::Lowest();
 	float OccupiedScore = 0.0f;

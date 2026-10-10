@@ -86,7 +86,7 @@ bool FCoverCombatTestScenario::FindDensestFreeCoverLocation(
 	FVector& OutLocation) const
 {
 	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
-	const float SearchRadius = IsValid(CoverSettings) ? CoverSettings->M_AutomaticCoverSearchRadius : 0.0f;
+	const float SearchRadius = IsValid(CoverSettings) ? CoverSubsystem.GetAutomaticCoverSearchRadius(Soldier) : 0.0f;
 	const auto GetIsFree = [&CoverSubsystem, &Soldier](const FRTSCoverPoint& CoverPoint)
 	{
 		const ASquadUnit* ReservingUnit = CoverSubsystem.GetCoverReservationOwner(CoverPoint.PointId);
@@ -140,7 +140,7 @@ bool FCoverCombatTestScenario::GetIsBestUsablePoint(
 	}
 	const TArray<FRTSCoverPoint> NearbyPoints = CoverSubsystem.FindCoverPointsInRadius(
 		SoldierLocation,
-		CoverSettings->M_AutomaticCoverSearchRadius);
+		CoverSubsystem.GetAutomaticCoverSearchRadius(Soldier));
 	for (const FRTSCoverPoint& CoverPoint : NearbyPoints)
 	{
 		const ASquadUnit* ReservingUnit = CoverSubsystem.GetCoverReservationOwner(CoverPoint.PointId);
