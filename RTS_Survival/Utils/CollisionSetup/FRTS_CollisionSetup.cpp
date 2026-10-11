@@ -1,5 +1,6 @@
 ﻿#include "FRTS_CollisionSetup.h"
 
+#include "Components/BoxComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PrimitiveComponent.h"
@@ -86,6 +87,25 @@ void FRTS_CollisionSetup::SetupPlayerVehicleMovementMeshCollision(UMeshComponent
 	}
 }
 
+void FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(UBoxComponent* HullBlocker)
+{
+	if (not IsValid(HullBlocker))
+	{
+		RTSFunctionLibrary::ReportError("Invalid hull blocker for vehicle hull blocker collision setup.");
+		return;
+	}
+
+	HullBlocker->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	// Its own channel: hull boxes only ever meet other hull boxes, whoever owns the vehicle.
+	HullBlocker->SetCollisionObjectType(ECC_Vehicle);
+	HullBlocker->SetCollisionResponseToAllChannels(ECR_Ignore);
+	HullBlocker->SetCollisionResponseToChannel(ECC_Vehicle, ECR_Block);
+	HullBlocker->SetGenerateOverlapEvents(false);
+	HullBlocker->SetCanEverAffectNavigation(false);
+	HullBlocker->SetReceivesDecals(false);
+	HullBlocker->SetHiddenInGame(true);
+}
+
 void FRTS_CollisionSetup::SetupNomadicMvtPlayer(UMeshComponent* MovementMesh)
 {
 	if (IsValid(MovementMesh))
@@ -100,7 +120,7 @@ void FRTS_CollisionSetup::SetupNomadicMvtPlayer(UMeshComponent* MovementMesh)
 		MovementMesh->SetCollisionObjectType(COLLISION_OBJ_PLAYER);
 		MovementMesh->SetCollisionResponseToAllChannels(ECR_Block);
 		constexpr ECollisionResponse ResponseToOtherPlayerVehicle =
-			DeveloperSettings::GamePlay::Formation::LetPlayerTanksCollide
+			DeveloperSettings::GamePlay::Formation::LetPlayerNomadicVehiclesCollide
 				? ECR_Block
 				: ECR_Ignore;
 		MovementMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ResponseToOtherPlayerVehicle);
@@ -205,8 +225,12 @@ void FRTS_CollisionSetup::SetupEnemyVehicleMovementMeshCollision(UMeshComponent*
 		MovementMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PROJECTILE, ECR_Ignore);
 		MovementMesh->SetCollisionResponseToChannel(COLLISION_TRACE_PLAYER, ECR_Ignore);
 		MovementMesh->SetCollisionResponseToChannel(COLLISION_TRACE_ENEMY, ECR_Ignore);
-		// Make sure to ignore enemy tanks.
-		MovementMesh->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ECR_Ignore);
+		// Other enemy hulls are the only enemy objects that block this channel back, so only those collide.
+		constexpr ECollisionResponse ResponseToOtherEnemyVehicle =
+			DeveloperSettings::GamePlay::Formation::LetEnemyTanksCollide
+				? ECR_Block
+				: ECR_Ignore;
+		MovementMesh->SetCollisionResponseToChannel(COLLISION_OBJ_ENEMY, ResponseToOtherEnemyVehicle);
 		// Make sure to block player tanks.
 		MovementMesh->SetCollisionResponseToChannel(COLLISION_OBJ_PLAYER, ECR_Block);
 		// Ignore pickup items.

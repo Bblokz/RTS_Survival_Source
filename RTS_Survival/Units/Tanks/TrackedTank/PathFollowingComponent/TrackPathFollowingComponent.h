@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 
 #include "RTS_Survival/Units/Tanks/VehicleAI/Components/VehiclePathFollowingComponent.h"
+#include "RTS_Survival/Units/Tanks/VehicleAvoidance/RTSVehicleAvoidanceTypes.h"
 #include "TrackPathFollowingComponent.generated.h"
 
 
@@ -205,6 +206,27 @@ public:
 
 	/** @return The immediate destination currently driving steering for this vehicle. */
 	FVector GetCurrentDrivingDestination() const { return VehicleCurrentDestination; }
+
+	/** Makes this vehicle known to the vehicles around it; safe to call again after a new pawn is possessed. */
+	void RegisterVehicleForAvoidance();
+
+	bool GetIsFollowingPath() const { return GetStatus() == EPathFollowingStatus::Moving; }
+
+	const FVehicleAvoidanceState& GetVehicleAvoidanceState() const { return M_VehicleAvoidance; }
+
+	/** @return True while the vehicle stands or crawls behind other vehicles on purpose; that is not being stuck. */
+	bool GetIsWaitingForVehicles() const;
+
+	/**
+	 * @brief Lets a vehicle that cannot reach its goal see that the one in its way was sent to the same spot.
+	 * @param Location Goal of the asking vehicle.
+	 * @param Tolerance How far apart two goals may be to count as the same spot.
+	 * @return True when this vehicle stopped driving and its last move order went to that spot.
+	 */
+	bool GetHasStoppedForGoalNear(const FVector& Location, float Tolerance) const;
+
+	/** @return True when the last move order of this vehicle went to that spot, whether it still drives or not. */
+	bool GetHasGoalNear(const FVector& Location, float Tolerance) const;
 
 	/************/
 	/* Reverse */
@@ -959,4 +981,79 @@ private:
 
 	// Prevents deliberate overlap responses from being mistaken for a blocked path.
 	void UpdateEngineBlockDetectionForOverlapResponse(bool bShouldSuppressForOverlap);
+
+	// Steering around, waiting behind and squeezing past the vehicles near this one; hulls block each other.
+	FVehicleAvoidanceState M_VehicleAvoidance;
+
+	/**
+	 * @brief Weighs the nearby vehicles into a steering target and a speed limit before the hulls touch.
+	 * @param Destination Path point the vehicle is driving to.
+	 * @param DeltaTime Frame time, for the waiting and flocking timers.
+	 * @return Where to steer and how fast the vehicle may go this frame.
+	 */
+	FVehicleAvoidanceOutput UpdateVehicleAvoidance(const FVector& Destination, float DeltaTime);
+	bool BuildVehicleAvoidanceFrame(const FVector& Destination, FVehicleAvoidanceFrame& OutFrame);
+	void RefreshVehicleAvoidanceNeighbours(float DeltaTime);
+	void WeighVehicleAvoidanceNeighbours(FVehicleAvoidanceFrame& Frame);
+
+	// Keeps track of how long other vehicles hold this one back without it getting anywhere.
+	bool UpdateTimeHeldBackByVehicles(const FVehicleAvoidanceFrame& Frame, float DeltaTime);
+
+	/**
+	 * @brief Turns what the neighbours add up to into the steering target and limits for the driving code.
+	 * @param Destination Path point the vehicle is driving to.
+	 * @param Frame What the neighbours add up to this frame.
+	 * @param bIsHeldBack Whether a vehicle ahead limits the speed.
+	 * @return Where to steer, how fast to go and how hard to push or hold.
+	 */
+	FVehicleAvoidanceOutput BuildVehicleAvoidanceOutput(
+		const FVector& Destination,
+		const FVehicleAvoidanceFrame& Frame,
+		bool bIsHeldBack);
+
+	/**
+	 * @brief Limits the speed to what the gap to a vehicle in the driving corridor allows.
+	 * @param Neighbour The other vehicle.
+	 * @param Relative Its location relative to this vehicle.
+	 * @param OtherForward Its ground facing.
+	 * @param Frame Receives the lower speed cap and the vehicle that is being waited for.
+	 */
+	void ApplyNeighbourToSpeedCap(
+		const FRTSVehicleAvoidanceAgent& Neighbour,
+		const FVector2D& Relative,
+		const FVector2D& OtherForward,
+		FVehicleAvoidanceFrame& Frame) const;
+
+	/**
+	 * @brief Adds the sideways pull needed to pass a vehicle ahead and to keep hulls apart.
+	 * @param Neighbour The other vehicle.
+	 * @param Relative Its location relative to this vehicle.
+	 * @param OtherForward Its ground facing.
+	 * @param Frame Receives the sideways pull.
+	 */
+	void ApplyNeighbourToSteering(
+		const FRTSVehicleAvoidanceAgent& Neighbour,
+		const FVector2D& Relative,
+		const FVector2D& OtherForward,
+		FVehicleAvoidanceFrame& Frame);
+	float ChoosePassingSide(const APawn* Other, float Lateral, float Clearance, float Gap, FVehicleAvoidanceFrame& Frame);
+	bool GetIsNeighbourLeadingTheSameWay(const FRTSVehicleAvoidanceAgent& Neighbour, const FVehicleAvoidanceFrame& Frame) const;
+	void UpdateVehicleAvoidanceMode(const FVehicleAvoidanceFrame& Frame, float DeltaTime);
+	void TryStartFlocking(const FVehicleAvoidanceFrame& Frame);
+	void UpdateGoalBlockedByVehicles(FVehicleAvoidanceFrame& Frame, bool bIsStandingStill, float DeltaTime);
+
+	/**
+	 * @brief Decides whether the goal is kept out of reach by vehicles in a way that waiting will not solve.
+	 * @param Frame Receives why the move would end here.
+	 * @param bIsStandingStill Whether the vehicle stands behind another one.
+	 * @return How long that has to last before the vehicle settles where it is; negative to keep trying.
+	 */
+	float GetSecondsBeforeSettling(FVehicleAvoidanceFrame& Frame, bool bIsStandingStill) const;
+	void TryMakeIdleBlockerMoveAside(const FVehicleAvoidanceFrame& Frame, float DeltaTime);
+	void TryRequestRepathAroundParkedBlocker(const FVehicleAvoidanceFrame& Frame, float DeltaTime);
+	void RepathAroundParkedVehicles();
+	void UpdateBackOff(const FVehicleAvoidanceFrame& Frame, float DeltaTime, FVehicleAvoidanceOutput& Output);
+	float GetFreeDistanceBehind(const FVehicleAvoidanceFrame& Frame) const;
+	bool GetIsTeleportLocationFreeOfVehicles(const FVector& TeleportLocation) const;
+	void DebugVehicleAvoidance(const FVehicleAvoidanceFrame& Frame, float DeltaTime) const;
 };

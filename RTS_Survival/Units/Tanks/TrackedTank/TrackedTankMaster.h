@@ -15,6 +15,8 @@
 class UTankTargetAcquisition;
 class UAttachedRockets;
 class UAudioComponent;
+class UBoxComponent;
+class UPhysicalMaterial;
 class USoundBase;
 class RTS_SURVIVAL_API UChassisAnimInstance;
 class RTS_SURVIVAL_API UTrackPhysicsMovement;
@@ -85,6 +87,14 @@ public:
 	virtual USkeletalMeshComponent* GetTankMesh() const override final;
 
 	inline UTrackPhysicsMovement* GetTrackPhysicsMovement() const { return TrackPhysicsMovement; }
+
+	/**
+	 * @brief Tells where and how a parked tank is meant to stand, so it can be sent back there after making room.
+	 * Stopping a little short of a slot and being nudged since then must not become the new place.
+	 * @param OutLocation The spot its last move went to when it arrived there, else where it stands now.
+	 * @param OutRotation The facing it finished its last turn on, else how it is turned now.
+	 */
+	void GetParkedPose(FVector& OutLocation, FRotator& OutRotation) const;
 
 	inline float GetInclineAngle() const { return TrackPhysicsMovement->GetInclineAngle(); }
 
@@ -217,6 +227,7 @@ protected:
 	virtual void TerminateRotateTowardsCommand() override;
 	virtual bool ApplyRotateTowardsStep(const float RemainingYawDegrees, const float DeltaSeconds) override;
 	virtual void OnRotateTowardsFinished() override;
+	virtual void OnCommandExecutionStarting(EAbilityID AbilityStarting) override;
 	/** @param bDisabled Whether to enable or disable the unit. */
 	UFUNCTION(BlueprintImplementableEvent, Category = "RTSUnitSpawning")
 	void BP_OnRTSUnitSpawned(const bool bDisabled);
@@ -251,6 +262,54 @@ protected:
 
 private:
 	FTimerHandle M_OnSpawnedSelectionTimerHandle;
+
+	// Solid box around the hull that keeps other vehicles out; welded to the chassis, so it moves as one body.
+	UPROPERTY()
+	TObjectPtr<UBoxComponent> M_HullBlocker;
+
+	// Lets hulls slide along each other instead of grabbing and turning one another.
+	UPROPERTY()
+	TObjectPtr<UPhysicalMaterial> M_HullBlockerMaterial;
+
+	void SetupHullBlocker();
+
+	/**
+	 * @brief Puts a vehicle that appears inside another hull on the nearest free ground; solid hulls would throw it up.
+	 * @param MoveTo Where the vehicle is sent after it appears.
+	 * @return Where to send it instead: the free spot when it was only meant to stay where it appeared.
+	 */
+	FVector MoveClearOfVehiclesWhenSpawned(const FVector& MoveTo);
+
+	// How long a turn on the spot has been held up by another hull; decides when the tank works itself free.
+	float M_RotateTowardsStallSeconds = 0.0f;
+	float M_SecondsUntilRotateTowardsDisplacement = 0.0f;
+
+	/**
+	 * @brief Frees a tank whose turn on the spot is held up by a hull next to it, so the final facing is still reached.
+	 * @param bIsTurnHeldUp Whether the tank is told to turn but hardly does.
+	 * @param DeltaSeconds Frame time.
+	 * @return Throttle that creeps the tank away from the hull in its way; zero while it turns freely.
+	 */
+	float GetThrottleToFreeHeldUpTurn(bool bIsTurnHeldUp, float DeltaSeconds);
+
+	// The facing the tank finished its last turn on, kept until its next command; a shove must not undo it.
+	float M_ParkedFacingYaw = 0.0f;
+	bool bM_HasParkedFacing = false;
+	FTimerHandle M_ParkedFacingTimerHandle;
+
+	// The spot the tank last drove back to after being shoved off it, and how often; it does not keep trying forever.
+	FVector M_ParkedReturnGoal = FVector::ZeroVector;
+	int32 M_ParkedReturnAttempts = 0;
+
+	/**
+	 * @brief Sends a parked tank that was shoved off the spot its order put it on back to that spot.
+	 * Only while nothing else has commanded it since it finished its turn there.
+	 * @return True when the tank was sent back.
+	 */
+	bool TryReturnToParkedGoal();
+	void RememberParkedFacing(float FacingYaw);
+	void ForgetParkedFacing();
+	void RestoreParkedFacingWhenTurnedAway();
 
 	// Set at post init, may be left empty for nomadic vehicles that cannot digin.
 	UPROPERTY()

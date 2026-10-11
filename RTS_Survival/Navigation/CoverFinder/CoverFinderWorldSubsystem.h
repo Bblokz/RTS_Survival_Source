@@ -14,6 +14,7 @@
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTrenchTestScenario.h"
 #include "RTS_Survival/Units/Squads/Tests/SquadPerfScenario.h"
 #include "RTS_Survival/RTSComponents/MedicComponent/Tests/MedicHealTestScenario.h"
+#include "RTS_Survival/Units/Tanks/Tests/VehicleAvoidanceScenario.h"
 #endif
 #include "Subsystems/WorldSubsystem.h"
 #include "CoverFinderWorldSubsystem.generated.h"
@@ -466,6 +467,7 @@ private:
 	FCoverStressPerfScenario M_StressPerfScenario;
 	FSquadPerfScenario M_SquadPerfScenario;
 	FMedicHealTestScenario M_MedicHealScenario;
+	FVehicleAvoidanceScenario M_VehicleAvoidanceScenario;
 	void StartCommandLineMapTests();
 	void TickMapTests(float DeltaTime);
 #endif

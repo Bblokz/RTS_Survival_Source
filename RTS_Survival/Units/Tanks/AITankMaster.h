@@ -119,6 +119,14 @@ public:
 		const FVector& Location,
 		uint64 TurretRangePursuitSerial);
 
+	/**
+	 * @brief Plans the move that is under way again, for a vehicle held up by vehicles that parked on its path.
+	 * The command that owns the move keeps owning it; nothing changes when no path at least as good is found.
+	 * @param GoalLocation Where the move that is under way goes.
+	 * @return True when the vehicle now follows a new path.
+	 */
+	bool TryRepathActiveMovementRequest(const FVector& GoalLocation);
+
 	/** Clears all completion ownership without aborting the physical path, allowing seamless request replacement. */
 	void ClearMovementRequestOwnership();
 
@@ -215,6 +223,16 @@ private:
 	 * @return True when the pawn was safely repositioned for the original move request.
 	 */
 	bool TryRecoverMoveStartToFilterValidLocation(const FPathFindingQuery& PathFindingQuery);
+
+	/**
+	 * @brief Keeps the recovery from putting the tank inside another hull, now that hulls are solid.
+	 * @param PathFindingQuery Query containing the original nav-agent start and exact navigation context.
+	 * @param InOutRecoveryNavigationLocation Nearest filter-valid location; replaced by one free of vehicles when found.
+	 * @return False when every valid spot within reach is taken by another hull; the tank is then not moved.
+	 */
+	bool PreferRecoveryLocationClearOfVehicles(
+		const FPathFindingQuery& PathFindingQuery,
+		FNavLocation& InOutRecoveryNavigationLocation) const;
 
 	/**
 	 * @brief Finds the nearest polygon permitted by the exact tank filter within the unit-sized recovery area.

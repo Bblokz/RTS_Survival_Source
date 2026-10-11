@@ -10,6 +10,7 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/Engine.h"
 #include "Engine/GameViewportClient.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Components/MeshComponent.h"
@@ -646,6 +647,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_MedicHealScenario.Start();
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("VehicleAvoidanceMeasure")))
+	{
+		M_VehicleAvoidanceScenario.Start();
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderCountCover")))
 	{
 		M_CoverCountScenario.Start(FParse::Param(FCommandLine::Get(), TEXT("CoverFinderWriteCountBaseline")));
@@ -666,6 +671,7 @@ void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
 	M_StressPerfScenario.Tick(*this);
 	M_SquadPerfScenario.Tick(*this);
 	M_MedicHealScenario.Tick(*this);
+	M_VehicleAvoidanceScenario.Tick(*this, DeltaTime);
 }
 #endif
 

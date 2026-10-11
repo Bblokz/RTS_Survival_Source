@@ -28,6 +28,10 @@ namespace TrackPhysicsMovementConstants
 	constexpr float SettlingPlanarSpeedTolerance = 2.0f;
 	/** @brief Residual yaw rate below which async braking can safely stop updating. */
 	constexpr float SettlingYawRateToleranceDegrees = 1.0f;
+	/** @brief Planar speed at which a parked vehicle is taken to be shoved by another hull and starts to brace. */
+	constexpr float ShovedPlanarSpeed = 6.0f;
+	/** @brief Yaw rate at which a parked vehicle is taken to be turned by another hull and starts to brace. */
+	constexpr float ShovedYawRateDegrees = 3.0f;
 }
 
 
@@ -93,12 +97,7 @@ void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 {
 	Super::AsyncTick(DeltaTime);
 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_AsyncTick);
-	const ETrackPhysicsMovementState MovementState = M_MovementState.Load();
-	if (MovementState == ETrackPhysicsMovementState::Inactive)
-	{
-		return;
-	}
-
+	ETrackPhysicsMovementState MovementState = M_MovementState.Load();
 	if (not GetIsValidTankMesh())
 	{
 		return;
@@ -108,6 +107,14 @@ void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 	if (not RigidBody)
 	{
 		return;
+	}
+	if (MovementState == ETrackPhysicsMovementState::Inactive)
+	{
+		if (not TryBraceWhenShoved(RigidBody))
+		{
+			return;
+		}
+		MovementState = ETrackPhysicsMovementState::Settling;
 	}
 
 	FVector DesiredPlanarVelocity;
@@ -166,6 +173,7 @@ void UTrackPhysicsMovement::UpdateTankMovement(
 
 void UTrackPhysicsMovement::OnPathFollowingFinished()
 {
+	M_DriveStrength.Store(1.0f);
 	M_CurrentThrottle.Store(0.0f);
 	M_CurrentSteeringInDeg.Store(0.0f);
 	M_MovementState.Store(ETrackPhysicsMovementState::Settling);
@@ -176,6 +184,23 @@ void UTrackPhysicsMovement::OnPathFollowingFinished()
 	}
 
 	M_TankAnimationBP->SetChassisAnimToIdle();
+}
+
+bool UTrackPhysicsMovement::TryBraceWhenShoved(const Chaos::FRigidBodyHandle_Internal* RigidBody)
+{
+	const FVector LinearVelocity = RigidBody->V();
+	const float YawRateDegrees = FMath::RadiansToDegrees(
+		FVector::DotProduct(RigidBody->W(), RigidBody->R().GetUpVector()));
+	const bool bIsShoved =
+		LinearVelocity.SizeSquared2D() > FMath::Square(TrackPhysicsMovementConstants::ShovedPlanarSpeed) ||
+		FMath::Abs(YawRateDegrees) > TrackPhysicsMovementConstants::ShovedYawRateDegrees;
+	if (not bIsShoved)
+	{
+		return false;
+	}
+
+	ETrackPhysicsMovementState ExpectedState = ETrackPhysicsMovementState::Inactive;
+	return M_MovementState.CompareExchange(ExpectedState, ETrackPhysicsMovementState::Settling);
 }
 
 void UTrackPhysicsMovement::TryCompleteSettling(
@@ -424,7 +449,8 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 		VelocityError * M_RuntimeTrackPhysicsMovementTuningSnapshot.VelocityCorrectionGain;
 	const FVector ClampedVelocityCorrectionAcceleration = VelocityCorrectionAcceleration.GetClampedToMaxSize(
 		M_RuntimeTrackPhysicsMovementTuningSnapshot.MaxCorrectionAcceleration
-		* M_ModuleAccelerationMultiplier.Load());
+		* M_ModuleAccelerationMultiplier.Load()
+		* M_DriveStrength.Load());
 
 	const FVector RightDirection = RigidBody->R().GetRightVector();
 	const FVector PlanarRightDirection = FVector::VectorPlaneProject(RightDirection, GroundNormal).GetSafeNormal();
@@ -434,6 +460,11 @@ void UTrackPhysicsMovement::ApplyDriveForceStrategyB(
 	const FVector TotalAcceleration = ClampedVelocityCorrectionAcceleration + LateralDampingAcceleration;
 	const FVector DriveForce = TotalAcceleration * TankMass;
 	UAsyncTickFunctions::ATP_AddForce(M_TankMesh, DriveForce, false, NAME_None);
+}
+
+void UTrackPhysicsMovement::SetDriveStrength(const float DriveStrength)
+{
+	M_DriveStrength.Store(FMath::Clamp(DriveStrength, 0.f, 1.f));
 }
 
 void UTrackPhysicsMovement::SetModuleAccelerationMultiplier(const float Multiplier)

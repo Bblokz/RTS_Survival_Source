@@ -26,6 +26,13 @@ public:
 	 */
 	static void SetupPlayerVehicleMovementMeshCollision(UMeshComponent* MovementMesh);
 
+	/**
+	 * @brief Makes a box around a vehicle hull solid for the hull boxes of all other vehicles and nothing else.
+	 * The chassis physics is a row of spheres per track, which lets hulls slide into and over each other.
+	 * @param HullBlocker Box that is welded to the chassis.
+	 */
+	static void SetupVehicleHullBlockerCollision(UBoxComponent* HullBlocker);
+
 	// Differs from player vehicle movement mesh collision as it ignores collision with building placements.
 	static void SetupNomadicMvtPlayer(UMeshComponent* MovementMesh);
 

@@ -169,6 +169,12 @@ public:
 	inline float GetLastNoneZeroThrottle() const { return LastNoneZeroThrottle; }
 	void SetModuleAccelerationMultiplier(float Multiplier);
 
+	/**
+	 * @brief Weakens the drive of a vehicle that waits for others or leans on one, so they shove each other gently.
+	 * @param DriveStrength Part of the drive force the vehicle may use, to hold its place or to push; 1 is all of it.
+	 */
+	void SetDriveStrength(float DriveStrength);
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -225,6 +231,13 @@ private:
 	void TryCompleteSettling(
 		const Chaos::FRigidBodyHandle_Internal* RigidBody,
 		const FVector& GroundNormal);
+
+	/**
+	 * @brief Makes a parked vehicle brace when another hull shoves it, so it keeps its place and facing.
+	 * @param RigidBody Async rigid body of the parked vehicle.
+	 * @return True when the vehicle was shoved and now brakes like one that just finished driving.
+	 */
+	bool TryBraceWhenShoved(const Chaos::FRigidBodyHandle_Internal* RigidBody);
 
 	bool GetIsValidTankMesh() const;
 	bool GetIsValidTankAnimationBP() const;
@@ -294,6 +307,7 @@ private:
 	TAtomic<float> M_CurrentThrottle{0.0f};
 	TAtomic<float> M_TrackForceMultiplier;
 	TAtomic<float> M_ModuleAccelerationMultiplier{1.f};
+	TAtomic<float> M_DriveStrength{1.f};
 	TAtomic<float> M_CurrentSteeringInDeg{0.0f};
 	TAtomic<ETrackPhysicsMovementState> M_MovementState{ETrackPhysicsMovementState::Inactive};
 

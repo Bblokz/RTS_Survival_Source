@@ -1543,7 +1543,14 @@ namespace DeveloperSettings
 			// The maximum amount of priorities used in unit formation. 
 			inline constexpr uint64 MaxPriorities = 30;
 
-			inline constexpr bool LetPlayerTanksCollide = false;
+			// Hulls of the player's vehicles block each other instead of driving through one another.
+			inline constexpr bool LetPlayerTanksCollide = true;
+
+			// The same for the hulls of enemy vehicles among themselves.
+			inline constexpr bool LetEnemyTanksCollide = true;
+
+			// Nomadic vehicles become buildings; allied vehicles keep driving through them as before.
+			inline constexpr bool LetPlayerNomadicVehiclesCollide = false;
 
 			inline constexpr float SpawnFormationEdgeLenght = 800;
 

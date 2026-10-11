@@ -19,6 +19,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
+#include "VehicleAvoidance/RTSVehicleAvoidanceSubsystem.h"
 
 namespace TankPathFollowingDebug
 {
@@ -164,6 +165,55 @@ bool AAITankMaster::IssueTurretRangeMovementRequest(
 			: EPathFollowingResult::Invalid;
 	DeferTurretRangeMovementResult(TurretRangePursuitSerial, ImmediateResult);
 	return MoveResult.Code == EPathFollowingRequestResult::AlreadyAtGoal;
+}
+
+bool AAITankMaster::TryRepathActiveMovementRequest(const FVector& GoalLocation)
+{
+	if (M_QueuedMovementRequest.State != EQueuedTankMovementRequestState::Active || not GetIsValidVehiclePathComp())
+	{
+		return false;
+	}
+
+	FAIMoveRequest MoveRequest;
+	MoveRequest.SetGoalLocation(GoalLocation);
+	MoveRequest.SetAcceptanceRadius(m_VehiclePathComp->GetGoalAcceptanceRadius());
+	FRTSNavigationHelpers::ConfigureMoveRequestForPartialPathFinding(MoveRequest);
+	MoveRequest.SetNavigationFilter(DefaultNavigationFilterClass);
+	FPathFindingQuery PathFindingQuery;
+	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (NavigationSystem == nullptr || not BuildPathfindingQuery(MoveRequest, PathFindingQuery))
+	{
+		return false;
+	}
+
+	// Looked at first: a failed request would end the command and leave the vehicle where it is.
+	const FPathFindingResult NewPathResult = NavigationSystem->FindPathSync(PathFindingQuery);
+	const FNavPathSharedPtr CurrentPath = m_VehiclePathComp->GetPath();
+	if (not NewPathResult.IsSuccessful() || not NewPathResult.Path.IsValid() || not CurrentPath.IsValid())
+	{
+		return false;
+	}
+	constexpr float EndPointTolerance = 100.0f;
+	const float NewEndDistance = FVector::Dist2D(NewPathResult.Path->GetEndLocation(), GoalLocation);
+	const float CurrentEndDistance = FVector::Dist2D(CurrentPath->GetEndLocation(), GoalLocation);
+	if (NewEndDistance > CurrentEndDistance + EndPointTolerance)
+	{
+		return false;
+	}
+
+	const FQueuedTankMovementRequest ActiveRequest = M_QueuedMovementRequest;
+	if (ActiveRequest.Owner == ETankMovementRequestOwner::QueuedCommand)
+	{
+		return IssueQueuedMovementRequest(
+			GoalLocation,
+			ActiveRequest.CompletionAbility,
+			ActiveRequest.CommandExecutionSerial);
+	}
+	if (ActiveRequest.Owner == ETankMovementRequestOwner::TurretRange)
+	{
+		return IssueTurretRangeMovementRequest(GoalLocation, ActiveRequest.TurretRangePursuitSerial);
+	}
+	return false;
 }
 
 void AAITankMaster::ClearMovementRequestOwnership()
@@ -580,6 +630,11 @@ bool AAITankMaster::TryRecoverMoveStartToFilterValidLocation(const FPathFindingQ
 	{
 		return false;
 	}
+	if (not PreferRecoveryLocationClearOfVehicles(PathFindingQuery, RecoveryNavigationLocation))
+	{
+		// Hemmed in by hulls: putting the tank inside one is worse than a move that may fail from where it stands.
+		return true;
+	}
 
 	if (not GetDoesRecoveryPointProducePath(PathFindingQuery, RecoveryNavigationLocation))
 	{
@@ -587,6 +642,66 @@ bool AAITankMaster::TryRecoverMoveStartToFilterValidLocation(const FPathFindingQ
 	}
 
 	return TryTeleportPawnToRecoveryLocation(PathFindingQuery, RecoveryNavigationLocation.Location);
+}
+
+bool AAITankMaster::PreferRecoveryLocationClearOfVehicles(
+	const FPathFindingQuery& PathFindingQuery,
+	FNavLocation& InOutRecoveryNavigationLocation) const
+{
+	constexpr int32 RingCount = 3;
+	constexpr int32 SpotsOnFirstRing = 8;
+	constexpr float ProjectionHalfSize = 60.0f;
+
+	const UWorld* World = GetWorld();
+	const URTSVehicleAvoidanceSubsystem* AvoidanceSubsystem = IsValid(World)
+		                                                         ? World->GetSubsystem<URTSVehicleAvoidanceSubsystem>()
+		                                                         : nullptr;
+	const ANavigationData* NavigationData = PathFindingQuery.NavData.Get();
+	const APawn* ControlledPawnLocal = GetPawn();
+	if (not IsValid(AvoidanceSubsystem) || NavigationData == nullptr || not IsValid(ControlledPawnLocal))
+	{
+		return true;
+	}
+
+	const FVector AgentToActor = ControlledPawnLocal->GetActorLocation() - PathFindingQuery.StartLocation;
+	const auto GetIsClearOfVehicles = [&](const FVector& NavigationLocation)
+	{
+		return AvoidanceSubsystem->GetIsLocationFreeForVehicle(
+			NavigationLocation + AgentToActor,
+			ControlledPawnLocal);
+	};
+	if (GetIsClearOfVehicles(InOutRecoveryNavigationLocation.Location))
+	{
+		return true;
+	}
+
+	const FVector ProjectionExtent(ProjectionHalfSize, ProjectionHalfSize, NavigationData->GetDefaultQueryExtent().Z);
+	for (int32 RingIndex = 1; RingIndex <= RingCount; ++RingIndex)
+	{
+		const float RingDistance = M_FormationUnitInnerRadius * RingIndex / RingCount;
+		const int32 SpotCount = SpotsOnFirstRing * RingIndex;
+		for (int32 SpotIndex = 0; SpotIndex < SpotCount; ++SpotIndex)
+		{
+			const FVector Candidate = PathFindingQuery.StartLocation +
+				FRotator(0.0f, 360.0f * SpotIndex / SpotCount, 0.0f).Vector() * RingDistance;
+			FNavLocation CandidateOnNavmesh;
+			const bool bIsUsable = NavigationData->ProjectPoint(
+					Candidate,
+					CandidateOnNavmesh,
+					ProjectionExtent,
+					PathFindingQuery.QueryFilter,
+					this) &&
+				CandidateOnNavmesh.NodeRef != INVALID_NAVNODEREF &&
+				GetIsRecoveryProjectionWithinBounds(PathFindingQuery.StartLocation, CandidateOnNavmesh.Location) &&
+				GetIsClearOfVehicles(CandidateOnNavmesh.Location);
+			if (bIsUsable)
+			{
+				InOutRecoveryNavigationLocation = CandidateOnNavmesh;
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 bool AAITankMaster::TryProjectFilterValidRecoveryLocation(

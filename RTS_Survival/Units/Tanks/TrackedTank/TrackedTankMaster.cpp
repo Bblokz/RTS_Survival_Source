@@ -5,6 +5,11 @@
 
 #include "TrackedAnimationInstance.h"
 #include "Components/AudioComponent.h"
+#include "Components/BoxComponent.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "RTS_Survival/Units/Tanks/VehicleAvoidance/RTSVehicleAvoidanceSubsystem.h"
+#include "RTS_Survival/Units/Tanks/VehicleAvoidance/RTSVehicleFootprint.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "TimerManager.h"
@@ -35,11 +40,43 @@ namespace TrackedMovementInvariant
 	constexpr double NoOrphanStartTime = -1.0;
 }
 
+namespace TrackedHullBlocker
+{
+	// How far the hull box reaches above and below the track collision.
+	constexpr float ExtraHalfHeight = 120.0f;
+	constexpr float Friction = 0.05f;
+}
+
+namespace TrackedParkedFacing
+{
+	constexpr float CheckIntervalSeconds = 1.5f;
+	// Turned further away than this from the facing it was given, a parked tank turns back.
+	constexpr float ToleranceDegrees = 3.0f;
+	// A tank this close to where its last move went still counts as standing on that spot.
+	constexpr float GoalStillHeldDistance = 450.0f;
+	constexpr float RestingYawRateDegrees = 2.0f;
+	constexpr float RestingSpeed = 5.0f;
+	// Further than its goal acceptance plus this from the spot it was ordered to, a parked tank drives back.
+	constexpr float ShovedOffSlotMargin = 40.0f;
+	constexpr int32 MaximumReturnsToOneSpot = 2;
+}
+
 namespace TrackedRotateTowards
 {
 	constexpr float FullSteeringYawErrorDegrees = 20.0f;
 	constexpr float CompletionYawToleranceDegrees = 1.0f;
 	constexpr float CompletionYawRateToleranceDegrees = 1.0f;
+
+	// A turn that reaches less than this part of the asked yaw rate is held up by something.
+	constexpr float HeldUpYawRateFraction = 0.25f;
+	// Close to the wanted facing the turn is slow by itself; that is not being held up.
+	constexpr float HeldUpMinimumRemainingYawDegrees = 3.0f;
+	constexpr float HeldUpSecondsBeforeFreeing = 0.6f;
+	// Hulls further apart than this are not what holds the turn up.
+	constexpr float HeldUpNeighbourHullDistance = 60.0f;
+	// Just enough throttle to slide away from the other hull while the turn goes on.
+	constexpr float FreeingThrottle = 0.12f;
+	constexpr float SecondsBetweenDisplacements = 3.0f;
 }
 
 
@@ -262,6 +299,47 @@ void ATrackedTankMaster::SetupChassisMeshCollision()
 			FRTS_CollisionSetup::SetupEnemyVehicleMovementMeshCollision(ChassisMesh);
 		}
 	}
+	SetupHullBlocker();
+}
+
+void ATrackedTankMaster::SetupHullBlocker()
+{
+	if (IsValid(M_HullBlocker) || not IsValid(ChassisMesh))
+	{
+		return;
+	}
+	const FBox ChassisCollisionBox = RTSVehicleFootprint::GetChassisCollisionBox(ChassisMesh, FTransform::Identity);
+	if (not ChassisCollisionBox.IsValid)
+	{
+		return;
+	}
+
+	M_HullBlockerMaterial = NewObject<UPhysicalMaterial>(this, TEXT("HullBlockerMaterial"));
+	M_HullBlockerMaterial->Friction = TrackedHullBlocker::Friction;
+	M_HullBlockerMaterial->StaticFriction = TrackedHullBlocker::Friction;
+	M_HullBlockerMaterial->Restitution = 0.0f;
+	M_HullBlockerMaterial->FrictionCombineMode = EFrictionCombineMode::Min;
+	M_HullBlockerMaterial->bOverrideFrictionCombineMode = true;
+
+	M_HullBlocker = NewObject<UBoxComponent>(this, TEXT("HullBlocker"));
+	M_HullBlocker->SetupAttachment(ChassisMesh);
+	// Taller than the tracks, so one hull cannot climb onto another, and centred on the height of the track
+	// collision: a push that lands above the weight of the tank would lever its nose up. The part that reaches
+	// below the ground touches nothing, the box only meets other hull boxes.
+	const FVector BlockerExtent = ChassisCollisionBox.GetExtent() +
+		FVector(0.0f, 0.0f, TrackedHullBlocker::ExtraHalfHeight);
+	M_HullBlocker->SetRelativeLocation(ChassisCollisionBox.GetCenter());
+	M_HullBlocker->InitBoxExtent(BlockerExtent);
+	FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(M_HullBlocker);
+	M_HullBlocker->SetPhysMaterialOverride(M_HullBlockerMaterial);
+	// The tuned mass, balance and turning of the chassis must not change because of the box.
+	M_HullBlocker->UpdateBodySetup();
+	if (UBodySetup* BlockerBodySetup = M_HullBlocker->GetBodySetup();
+		IsValid(BlockerBodySetup) && BlockerBodySetup->AggGeom.BoxElems.Num() > 0)
+	{
+		BlockerBodySetup->AggGeom.BoxElems[0].SetContributeToMass(false);
+	}
+	M_HullBlocker->RegisterComponent();
 }
 
 void ATrackedTankMaster::ExecuteHarvestResourceCommand(ACPPResourceMaster* TargetResource)
@@ -837,13 +915,176 @@ bool ATrackedTankMaster::ApplyRotateTowardsStep(const float RemainingYawDegrees,
 			-1.0f,
 			1.0f);
 	const float CurrentPlanarSpeed = ChassisMesh->GetComponentVelocity().Size2D();
-	constexpr float RotateTowardsThrottle = 0.0f;
+	const float AskedYawRateDegrees = FMath::Abs(SteeringCommand) * TurnRate;
+	const bool bIsTurnHeldUp =
+		FMath::Abs(RemainingYawDegrees) > TrackedRotateTowards::HeldUpMinimumRemainingYawDegrees &&
+		FMath::Abs(CurrentYawRateDegrees) < AskedYawRateDegrees * TrackedRotateTowards::HeldUpYawRateFraction;
+	const float RotateTowardsThrottle = GetThrottleToFreeHeldUpTurn(bIsTurnHeldUp, DeltaSeconds);
 	TrackPhysicsMovement->UpdateTankMovement(
 		DeltaSeconds,
 		CurrentPlanarSpeed,
 		RotateTowardsThrottle,
 		SteeringCommand);
-	return bYawWithinTolerance && bYawRateWithinTolerance;
+	const bool bIsTurnDone = bYawWithinTolerance && bYawRateWithinTolerance;
+	if (bIsTurnDone)
+	{
+		RememberParkedFacing(GetActorRotation().Yaw + RemainingYawDegrees);
+	}
+	return bIsTurnDone;
+}
+
+void ATrackedTankMaster::OnCommandExecutionStarting(const EAbilityID AbilityStarting)
+{
+	Super::OnCommandExecutionStarting(AbilityStarting);
+	// Whatever comes next decides the facing anew.
+	ForgetParkedFacing();
+}
+
+void ATrackedTankMaster::GetParkedPose(FVector& OutLocation, FRotator& OutRotation) const
+{
+	OutLocation = GetActorLocation();
+	OutRotation = bM_HasParkedFacing ? FRotator(0.0f, M_ParkedFacingYaw, 0.0f) : GetActorRotation();
+
+	const AAITankMaster* TankController = GetAIController();
+	const UTrackPathFollowingComponent* PathFollowing = IsValid(TankController)
+		                                                    ? Cast<UTrackPathFollowingComponent>(
+			                                                    TankController->GetPathFollowingComponent())
+		                                                    : nullptr;
+	if (not IsValid(PathFollowing))
+	{
+		return;
+	}
+	const FVehicleAvoidanceState& AvoidanceState = PathFollowing->GetVehicleAvoidanceState();
+	const bool bStandsOnItsGoal = AvoidanceState.bHasLastGoalLocation &&
+		AvoidanceState.LastMoveEnd == EVehicleMoveEnd::Arrived &&
+		FVector::DistSquared2D(AvoidanceState.LastGoalLocation, OutLocation) <
+		FMath::Square(TrackedParkedFacing::GoalStillHeldDistance);
+	if (bStandsOnItsGoal)
+	{
+		OutLocation = FVector(AvoidanceState.LastGoalLocation.X, AvoidanceState.LastGoalLocation.Y, OutLocation.Z);
+	}
+}
+
+void ATrackedTankMaster::RememberParkedFacing(const float FacingYaw)
+{
+	M_ParkedFacingYaw = FacingYaw;
+	bM_HasParkedFacing = true;
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || World->GetTimerManager().IsTimerActive(M_ParkedFacingTimerHandle))
+	{
+		return;
+	}
+	World->GetTimerManager().SetTimer(
+		M_ParkedFacingTimerHandle,
+		this,
+		&ATrackedTankMaster::RestoreParkedFacingWhenTurnedAway,
+		TrackedParkedFacing::CheckIntervalSeconds,
+		true);
+}
+
+void ATrackedTankMaster::ForgetParkedFacing()
+{
+	bM_HasParkedFacing = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_ParkedFacingTimerHandle);
+	}
+}
+
+void ATrackedTankMaster::RestoreParkedFacingWhenTurnedAway()
+{
+	if (not bM_HasParkedFacing || not IsValid(ChassisMesh) || not GetIsUnitIdle())
+	{
+		return;
+	}
+	// Whoever shoved it may still be leaning on it; going back waits until the hull is left alone.
+	const float YawRateDegrees = FVector::DotProduct(
+		ChassisMesh->GetPhysicsAngularVelocityInDegrees(),
+		ChassisMesh->GetUpVector());
+	const bool bIsAtRest = FMath::Abs(YawRateDegrees) <= TrackedParkedFacing::RestingYawRateDegrees &&
+		GetVelocity().SizeSquared2D() <= FMath::Square(TrackedParkedFacing::RestingSpeed);
+	if (not bIsAtRest || TryReturnToParkedGoal())
+	{
+		return;
+	}
+	const float TurnedAwayDegrees = FMath::FindDeltaAngleDegrees(GetActorRotation().Yaw, M_ParkedFacingYaw);
+	if (FMath::Abs(TurnedAwayDegrees) <= TrackedParkedFacing::ToleranceDegrees)
+	{
+		return;
+	}
+	RotateTowards(FRotator(0.0f, M_ParkedFacingYaw, 0.0f), true);
+}
+
+bool ATrackedTankMaster::TryReturnToParkedGoal()
+{
+	if (not GetIsValidAITankController())
+	{
+		return false;
+	}
+	const UTrackPathFollowingComponent* PathFollowing =
+		Cast<UTrackPathFollowingComponent>(AITankController->GetPathFollowingComponent());
+	if (not IsValid(PathFollowing))
+	{
+		return false;
+	}
+
+	FVector ParkedLocation;
+	FRotator ParkedRotation;
+	GetParkedPose(ParkedLocation, ParkedRotation);
+	const float AllowedDistance = PathFollowing->GetGoalAcceptanceRadius() + TrackedParkedFacing::ShovedOffSlotMargin;
+	if (FVector::DistSquared2D(ParkedLocation, GetActorLocation()) <= FMath::Square(AllowedDistance))
+	{
+		return false;
+	}
+	if (FVector::DistSquared2D(ParkedLocation, M_ParkedReturnGoal) > 1.0f)
+	{
+		M_ParkedReturnGoal = ParkedLocation;
+		M_ParkedReturnAttempts = 0;
+	}
+	if (M_ParkedReturnAttempts >= TrackedParkedFacing::MaximumReturnsToOneSpot)
+	{
+		return false;
+	}
+	++M_ParkedReturnAttempts;
+	return MoveToLocation(ParkedLocation, true, ParkedRotation, true) == ECommandQueueError::NoError;
+}
+
+float ATrackedTankMaster::GetThrottleToFreeHeldUpTurn(const bool bIsTurnHeldUp, const float DeltaSeconds)
+{
+	using namespace TrackedRotateTowards;
+	M_SecondsUntilRotateTowardsDisplacement -= DeltaSeconds;
+	if (not bIsTurnHeldUp)
+	{
+		M_RotateTowardsStallSeconds = 0.0f;
+		return 0.0f;
+	}
+	M_RotateTowardsStallSeconds += DeltaSeconds;
+	if (M_RotateTowardsStallSeconds < HeldUpSecondsBeforeFreeing)
+	{
+		return 0.0f;
+	}
+
+	const UWorld* World = GetWorld();
+	URTSVehicleAvoidanceSubsystem* AvoidanceSubsystem = IsValid(World)
+		                                                   ? World->GetSubsystem<URTSVehicleAvoidanceSubsystem>()
+		                                                   : nullptr;
+	FRTSVehicleAvoidanceAgent NearestVehicle;
+	if (not IsValid(AvoidanceSubsystem) ||
+		not AvoidanceSubsystem->FindNearestVehicle(this, HeldUpNeighbourHullDistance, NearestVehicle))
+	{
+		return 0.0f;
+	}
+
+	APawn* OtherVehicle = NearestVehicle.Pawn.Get();
+	if (M_SecondsUntilRotateTowardsDisplacement <= 0.0f && EnsureRTSOverlapEvasionComponent())
+	{
+		// An idle ally makes room and comes back afterwards; anything else is slid away from below.
+		M_SecondsUntilRotateTowardsDisplacement = SecondsBetweenDisplacements;
+		RTSOverlapEvasionComponent->TryDisplaceIdleOverlappingVehicle(OtherVehicle);
+	}
+	const FVector AwayFromOther = GetActorLocation() - OtherVehicle->GetActorLocation();
+	const bool bIsOtherBehind = FVector::DotProduct(AwayFromOther, GetActorForwardVector()) >= 0.0f;
+	return bIsOtherBehind ? FreeingThrottle : -FreeingThrottle;
 }
 
 void ATrackedTankMaster::OnRotateTowardsFinished()
@@ -1266,8 +1507,36 @@ void ATrackedTankMaster::BeginPlay_SetupExperienceComponent()
 		RTSComponent->GetOwningPlayer());
 }
 
-void ATrackedTankMaster::OnRTSUnitSpawned_SetEnabled(const float TimeNotSelectable, const FVector MoveTo)
+FVector ATrackedTankMaster::MoveClearOfVehiclesWhenSpawned(const FVector& MoveTo)
 {
+	const UWorld* World = GetWorld();
+	const URTSVehicleAvoidanceSubsystem* AvoidanceSubsystem = IsValid(World)
+		                                                         ? World->GetSubsystem<URTSVehicleAvoidanceSubsystem>()
+		                                                         : nullptr;
+	const FRTSVehicleFootprint Footprint = RTSVehicleFootprint::BuildFromChassisMesh(ChassisMesh);
+	if (not IsValid(AvoidanceSubsystem) || not Footprint.GetIsValid())
+	{
+		return MoveTo;
+	}
+
+	const FVector SpawnLocation = GetActorLocation();
+	// Corner circle against corner circle: clear however the two hulls are turned.
+	const float NeededRadius = Footprint.GetCornerRadius();
+	FVector FreeLocation;
+	if (AvoidanceSubsystem->GetIsLocationFreeOfVehicles(SpawnLocation, NeededRadius, this) ||
+		not AvoidanceSubsystem->FindFreeLocationNear(SpawnLocation, NeededRadius, this, FreeLocation))
+	{
+		return MoveTo;
+	}
+	SetActorLocation(FreeLocation, false, nullptr, ETeleportType::ResetPhysics);
+	// Sent to the spot it appeared on means "stay here"; driving back would run into the vehicle that holds it.
+	const bool bWasMeantToStay = FVector::DistSquared2D(MoveTo, SpawnLocation) < FMath::Square(NeededRadius);
+	return bWasMeantToStay ? FreeLocation : MoveTo;
+}
+
+void ATrackedTankMaster::OnRTSUnitSpawned_SetEnabled(const float TimeNotSelectable, const FVector InMoveTo)
+{
+	const FVector MoveTo = MoveClearOfVehiclesWhenSpawned(InMoveTo);
 	this->SetActorHiddenInGame(false);
 	this->SetActorEnableCollision(true);
 	ChassisMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);

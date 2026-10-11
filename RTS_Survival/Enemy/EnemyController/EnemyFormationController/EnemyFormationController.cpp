@@ -12,8 +12,41 @@
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/AITankMaster.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
+#include "RTS_Survival/Units/Tanks/VehicleAvoidance/RTSVehicleAvoidanceSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+namespace EnemyFormationVehicles
+{
+	/** @return True when the unit is a vehicle that queues behind other vehicles; it will drive on by itself. */
+	bool GetIsWaitingForVehicles(const AActor* UnitActor)
+	{
+		const ATankMaster* Tank = Cast<ATankMaster>(UnitActor);
+		const AAITankMaster* TankController = IsValid(Tank) ? Tank->GetAIController() : nullptr;
+		const UTrackPathFollowingComponent* PathFollowing = IsValid(TankController)
+			                                                    ? Cast<UTrackPathFollowingComponent>(
+				                                                    TankController->GetPathFollowingComponent())
+			                                                    : nullptr;
+		return IsValid(PathFollowing) && PathFollowing->GetIsWaitingForVehicles();
+	}
+
+	/** @return False when putting a vehicle there would land it inside another hull; always true for other units. */
+	bool GetIsClearOfVehicles(const AActor* UnitActor, const FVector& Location)
+	{
+		const ATankMaster* Tank = Cast<ATankMaster>(UnitActor);
+		const UWorld* World = IsValid(Tank) ? Tank->GetWorld() : nullptr;
+		const URTSVehicleAvoidanceSubsystem* AvoidanceSubsystem = IsValid(World)
+			                                                         ? World->GetSubsystem<URTSVehicleAvoidanceSubsystem>()
+			                                                         : nullptr;
+		if (not IsValid(AvoidanceSubsystem))
+		{
+			return true;
+		}
+		return AvoidanceSubsystem->GetIsLocationFreeForVehicle(Location, Tank);
+	}
+}
 
 namespace EnemyFormationConstants
 {
@@ -822,6 +855,11 @@ void UEnemyFormationController::UpdateFormationUnitStuckState(
 		DebugFormationUnitStillMoving(FormationUnit, WaypointLocation, WaypointDirection, DistanceMovedSquared);
 		return;
 	}
+	// A vehicle that queues behind others stands still on purpose; teleporting it would put it inside their hulls.
+	if (EnemyFormationVehicles::GetIsWaitingForVehicles(FormationUnit.Unit->GetOwnerActor()))
+	{
+		return;
+	}
 
 	FormationUnit.StuckCounts++;
 	if (FormationUnit.StuckCounts <= EnemyFormationConstants::HowOftenTickStuckUnitTillTeleport)
@@ -929,6 +967,11 @@ bool UEnemyFormationController::TryTeleportStuckFormationUnit(
 			{
 				DebugTeleportAttempt(FColor::Red, RawTeleportLocation);
 			}
+			continue;
+		}
+
+		if (not EnemyFormationVehicles::GetIsClearOfVehicles(UnitActor, ProjectedTeleportLocation))
+		{
 			continue;
 		}
 
@@ -2248,6 +2291,10 @@ void UEnemyFormationController::TeleportFormationUnitInWayPointDirection(
 		const FVector HalvedOffset = FormationUnit.Offset / 2.f;
 		TeleportLocation += WaypointDirection.RotateVector(HalvedOffset);
 		TeleportLocation = ProjectLocationOnNavMesh(TeleportLocation, EnemyFormationPositionProjectionExtent, false);
+		if (not EnemyFormationVehicles::GetIsClearOfVehicles(UnitAsActor, TeleportLocation))
+		{
+			return;
+		}
 		UnitAsActor->SetActorLocation(TeleportLocation, false, nullptr, ETeleportType::ResetPhysics);
 		return;
 	}

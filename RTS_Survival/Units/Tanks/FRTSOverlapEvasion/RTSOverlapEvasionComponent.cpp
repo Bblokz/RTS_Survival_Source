@@ -57,6 +57,12 @@ bool URTSOverlapEvasionComponent::GetIsValidOwnerTrackPathFollowingComponent() c
 	{
 		return true;
 	}
+	// A vehicle spawned during play begins before its controller possesses it; look again now that it is used.
+	const_cast<URTSOverlapEvasionComponent*>(this)->SetupTrackPathFollowingCompFromOwner();
+	if (M_OwnerTrackPathFollowingComponent.IsValid())
+	{
+		return true;
+	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
@@ -540,12 +546,23 @@ bool URTSOverlapEvasionComponent::TryIssueIdleVehicleEvasionCommand(
 		return false;
 	}
 
-	const FRotator DesiredFinalRotation = OtherActor->GetActorRotation();
-	return OtherCommands->MoveToLocation(
+	FRotator DesiredFinalRotation = OtherActor->GetActorRotation();
+	FVector OriginalLocation = OtherActor->GetActorLocation();
+	if (const ATrackedTankMaster* OtherTank = Cast<ATrackedTankMaster>(OtherActor))
+	{
+		OtherTank->GetParkedPose(OriginalLocation, DesiredFinalRotation);
+	}
+	if (OtherCommands->MoveToLocation(
 		ProjectedLocation,
 		true,
 		DesiredFinalRotation,
-		true) == ECommandQueueError::NoError;
+		true) != ECommandQueueError::NoError)
+	{
+		return false;
+	}
+	// It stood there for a reason, often a formation slot: once it made room it drives back and faces as before.
+	OtherCommands->MoveToLocation(OriginalLocation, false, DesiredFinalRotation, true);
+	return true;
 }
 
 bool URTSOverlapEvasionComponent::TryDisplaceIdleOverlappingVehicle(AActor* OtherActor) const

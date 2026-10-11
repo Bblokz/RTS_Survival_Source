@@ -4,6 +4,7 @@
 #include "TrackPathFollowingComponent.h"
 
 #include "AIConfig.h"
+#include "AISystem.h"
 #include "NavigationSystem.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -116,6 +117,12 @@ namespace TrackFollowingEvasion
 	 * normal overlap messages; decreasing it keeps the messages closer together.
 	 */
 	constexpr float DeadlockDebugAdditionalZOffset = 100.f;
+
+	/**
+	 * @brief Throttle used to back away from a hull the vehicle is wedged against. Increasing it backs off further in
+	 * the same time; decreasing it keeps the vehicle closer to where it was held up.
+	 */
+	constexpr float WedgedBackOffThrottle = 0.35f;
 
 	/**
 	 * @brief Lifetime in seconds for purple deadlock-resolution text. Increasing it makes rare resolutions easier to notice;
@@ -851,6 +858,12 @@ void UTrackPathFollowingComponent::TickComponent(
 	const ELevelTick TickType,
 	FActorComponentTickFunction* ThisTickFunction)
 {
+	// Asked for while following the path last frame; a new path must not arrive in the middle of that.
+	if (M_VehicleAvoidance.bWantsRepath)
+	{
+		M_VehicleAvoidance.bWantsRepath = false;
+		RepathAroundParkedVehicles();
+	}
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	M_TicksCountCheckOverlappers -= 1;
@@ -874,6 +887,15 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 
 	bM_HasCurrentDrivingDestination = false;
 	ResetMovingOverlapYieldDependency();
+	if (not M_VehicleAvoidance.bIsRepathing)
+	{
+		M_VehicleAvoidance.ResetForNewPath();
+	}
+	if (FAISystem::IsValidLocation(OriginalMoveRequestGoalLocation))
+	{
+		M_VehicleAvoidance.LastGoalLocation = OriginalMoveRequestGoalLocation;
+		M_VehicleAvoidance.bHasLastGoalLocation = true;
+	}
 	// Reset stuck status
 	ResetStuck();
 	bM_IsInDeadzone = false;
@@ -883,7 +905,8 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 
 bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 {
-	RemoveInvalidOverlaps(M_IdleAlliedBlockingActors);
+	// Hulls that block each other never report the end of an overlap, so the wait also ends by time.
+	RemoveExpiredOverlaps(GetCurrentWorldTimeSeconds(), M_IdleAlliedBlockingActors);
 
 	const bool bHasIdleBlockers = (M_IdleAlliedBlockingActors.Num() > 0);
 	const bool bCanWait = bHasIdleBlockers && IsValid(ControlledPawn);
@@ -1203,8 +1226,9 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		UpdateEngineBlockDetectionForOverlapResponse(true);
 		return;
 	}
+	const FVehicleAvoidanceOutput AvoidanceOutput = UpdateVehicleAvoidance(Destination, DeltaTime);
 	// [-180 , +180]
-	const float SignedTargetAngle = CalculateDestinationAngle(Destination);
+	const float SignedTargetAngle = CalculateDestinationAngle(AvoidanceOutput.SteeringDestination);
 	AbsoluteTargetAngle = FMath::Abs(SignedTargetAngle);
 
 	M_CurrentSpeed = ControlledPawn->GetVelocity().Size2D();
@@ -1259,7 +1283,9 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		M_MovingAlliedOverlapActors.IsEmpty() && M_IdleAlliedAvoidanceActors.IsEmpty()
 			? FOverlapAdjustment()
 			: CalculateOverlapAdjustment(Destination);
-	const bool bHasSameDirectionSpeedLimit = OverlapAdjustment.bHasSameDirectionSpeedLimit;
+	const bool bHasSameDirectionSpeedLimit = OverlapAdjustment.bHasSameDirectionSpeedLimit ||
+		AvoidanceOutput.bIsLimitingSpeed;
+	const float VehicleSpeedCap = FMath::Min(OverlapAdjustment.DesiredSpeedCap, AvoidanceOutput.SpeedCap);
 	if (bReversing)
 	{
 		const float AbsoluteTurnAngle = AbsoluteTargetAngle > 90 ? 180 - AbsoluteTargetAngle : AbsoluteTargetAngle;
@@ -1269,7 +1295,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		// Adjust speed difference with wanted reverse speed.
 		const float OverlapLimitedReverseSpeed = FMath::Min(
 			DesiredReverseSpeed * M_MobilityTravelSpeedMultiplier,
-			OverlapAdjustment.DesiredSpeedCap);
+			VehicleSpeedCap);
 		SpeedDifference = FMath::GetMappedRangeValueClamped(
 			FVector2D(-ReverseSpeedPIDThreshold, ReverseSpeedPIDThreshold), FVector2D(-1.f, 1.f),
 			OverlapLimitedReverseSpeed - M_CurrentSpeed);
@@ -1292,7 +1318,7 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		// Make sure the speed difference is mapped to [-1, 1] as that is needed for the throttle input and hence the PID controller part.
 		const float OverlapLimitedDesiredSpeed = FMath::Min(
 			AdjustedDesiredSpeed * M_MobilityTravelSpeedMultiplier,
-			OverlapAdjustment.DesiredSpeedCap);
+			VehicleSpeedCap);
 		SpeedDifference = FMath::GetMappedRangeValueClamped(
 			FVector2D(-DesiredSpeedThrottleThreshold, DesiredSpeedThrottleThreshold), FVector2D(-1.f, 1.f),
 			OverlapLimitedDesiredSpeed - M_CurrentSpeed);
@@ -1358,11 +1384,16 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 			1.f);
 	}
 	CalculatedThrottleValue *= OverlapAdjustment.ThrottleScale;
+	CalculatedThrottleValue = FMath::Clamp(
+		CalculatedThrottleValue,
+		-AvoidanceOutput.ThrottleLimit,
+		AvoidanceOutput.ThrottleLimit);
 	if (bHasSameDirectionSpeedLimit)
 	{
 		M_TimeWantDesiredSpeed = 0.f;
 	}
-	UpdateEngineBlockDetectionForOverlapResponse(OverlapAdjustment.bIsLimitingMovement);
+	UpdateEngineBlockDetectionForOverlapResponse(
+		OverlapAdjustment.bIsLimitingMovement || AvoidanceOutput.bShouldSuppressBlockDetection);
 
 	if constexpr (DeveloperSettings::Debugging::GTankOverlaps_Compile_DebugSymbols)
 	{
@@ -1372,8 +1403,15 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 			Steering,
 			DeltaTime);
 	}
+	if (AvoidanceOutput.bShouldBackOff)
+	{
+		// Away from the hull it is wedged against, whichever way the vehicle was driving.
+		CalculatedThrottleValue = (bReversing ? 1.f : -1.f) * TrackFollowingEvasion::WedgedBackOffThrottle;
+		Steering = AvoidanceOutput.BackOffSteering;
+	}
 	M_LastSteeringInput = Steering;
 	M_LastThrottleInput = CalculatedThrottleValue;
+	M_TrackPhysicsMovement->SetDriveStrength(AvoidanceOutput.DriveStrength);
 	UpdateVehicle(CalculatedThrottleValue,
 	              M_CurrentSpeed,
 	              DeltaTime,
@@ -1655,11 +1693,14 @@ void UTrackPathFollowingComponent::UpdatePathSegment()
 			}
 		}
 
-		if (DistanceLeft < AcceptanceRadius)
+		// Vehicles that will not leave hold the goal: this is as close as it gets, so the move is done here.
+		const bool bShouldSettleNearGoal = M_VehicleAvoidance.bShouldSettleNearGoal;
+		M_VehicleAvoidance.bShouldSettleNearGoal = false;
+		if (DistanceLeft < AcceptanceRadius || bShouldSettleNearGoal)
 		{
 			OnSegmentFinished();
 
-			if (bSnapToSpline && !bIsLastPathPoint)
+			if (bSnapToSpline && !bIsLastPathPoint && not bShouldSettleNearGoal)
 			{
 				return;
 			}
@@ -1763,6 +1804,20 @@ void UTrackPathFollowingComponent::SetMoveSegment(int32 SegmentStartIndex)
 
 void UTrackPathFollowingComponent::OnPathFinished(const FPathFollowingResult& Result)
 {
+	if (M_VehicleAvoidance.LastMoveEnd == EVehicleMoveEnd::None)
+	{
+		M_VehicleAvoidance.LastMoveEnd = Result.IsSuccess()
+			                                 ? EVehicleMoveEnd::Arrived
+			                                 : (Result.Code == EPathFollowingResult::Blocked
+				                                    ? EVehicleMoveEnd::Blocked
+				                                    : EVehicleMoveEnd::Aborted);
+	}
+	if (Path.IsValid() && M_VehicleAvoidance.bHasLastGoalLocation)
+	{
+		M_VehicleAvoidance.LastPathEndToGoalDistance = FVector::Dist2D(
+			Path->GetEndLocation(),
+			M_VehicleAvoidance.LastGoalLocation);
+	}
 	bM_HasCurrentDrivingDestination = false;
 	ResetMovingOverlapYieldDependency();
 	SetEngineBlockDetectionSuppressed(false);
@@ -1817,6 +1872,7 @@ void UTrackPathFollowingComponent::Initialize()
 	ThrottlePID.ResetController(ThrottlePIDSetup);
 
 	bImplementsInterface = DoesControlledPawnImplementInterface();
+	RegisterVehicleForAvoidance();
 
 	if (!bImplementsInterface)
 	{
@@ -2115,7 +2171,8 @@ FVector UTrackPathFollowingComponent::TeleportOrCalculateUnstuckDestination(cons
 	// Attempt to find a teleport location
 	const FVector TeleportLocation = FindTeleportLocation();
 
-	if (not TeleportLocation.IsNearlyZero())
+	// Never teleport into another hull: the two would be thrown apart.
+	if (not TeleportLocation.IsNearlyZero() && GetIsTeleportLocationFreeOfVehicles(TeleportLocation))
 	{
 		// Teleport the vehicle to the new location
 		ControlledPawn->SetActorLocation(TeleportLocation, false, nullptr, ETeleportType::TeleportPhysics);
