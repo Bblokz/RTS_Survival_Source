@@ -1,5 +1,9 @@
 #include "CoverPoseProbe.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
+
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -274,3 +278,5 @@ void FCoverPoseProbe::TickPendingScreenshot(UWorld& World, const float PhaseSeco
 		M_FramesUntilScreenshot = FramesBeforeScreenshot;
 	}
 }
+
+#endif // RTS_WITH_MAP_TESTS

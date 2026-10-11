@@ -18,6 +18,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "UObject/Interface.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/CrewRepairAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/MedicComponent/HealAbilityTypes.h"
 #include "Commands.generated.h"
 
 struct FUnitCost;
@@ -992,6 +993,20 @@ public:
 	/** @return Whether this unit's crew is currently repairing destroyed vehicle modules. */
 	virtual bool GetIsCrewRepairActive() const { return false; }
 
+	/**
+	 * @brief Queues a heal order for a medic squad; its card must hold an IdHeal entry.
+	 * @param TargetActor Allied squad unit to heal, together with the injured soldiers of its squad.
+	 * @param bSetUnitToIdle Replace the current queue (no Shift held).
+	 * @return NoError when the heal order was queued.
+	 */
+	virtual ECommandQueueError HealTarget(AActor* TargetActor, bool bSetUnitToIdle);
+
+	/**
+	 * @brief Card button of the HealingDisabled entry: ends the running heal order at once and is never queued.
+	 * @return NoError when the card shows the cancel entry.
+	 */
+	virtual ECommandQueueError CancelHeal();
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Commands")
 	virtual ECommandQueueError ActivateShield(const bool bSetUnitToIdle);
 
@@ -1020,6 +1035,9 @@ public:
 
 	virtual void ExecuteDetachTowCommand();
 	virtual void ExecuteCrewRepairCommand(ECrewRepairAbilityType Subtype);
+	virtual void ExecuteHealCommand(AActor* TargetActor);
+	// Not a queue command: called directly by CancelHeal.
+	virtual void ExecuteCancelHealCommand();
 	virtual void ExecuteActivateShieldCommand();
 	
 	/**
@@ -1194,6 +1212,7 @@ protected:
 	/** @brief Queue termination of CrewRepair; the caller owns queue progression, so no DoneExecutingCommand. */
 	virtual void TerminateCrewRepairCommand(ECrewRepairAbilityType Subtype);
 	void TerminateCrewRepairCommandForCurrentQueue();
+	virtual void TerminateHealCommand();
 	virtual void TerminateActivateShieldCommand();
 	void ExecuteRegisterUnitAsBlackboardIdleCommand();
 	void TerminateRegisterUnitAsBlackboardIdleCommand();

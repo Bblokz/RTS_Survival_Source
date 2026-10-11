@@ -1,5 +1,9 @@
 #include "CoverCombatTestScenario.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
+
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
@@ -287,3 +291,5 @@ void FCoverCombatTestScenario::RunChecks(UWorld& World, URTSCoverFinderWorldSubs
 		Totals.FailedChecks,
 		*World.GetName());
 }
+
+#endif // RTS_WITH_MAP_TESTS

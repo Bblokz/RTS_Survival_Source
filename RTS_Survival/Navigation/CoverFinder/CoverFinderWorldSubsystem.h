@@ -4,12 +4,17 @@
 #include "RTS_Survival/Navigation/CoverFinder/CoverCombatScoring.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderTypes.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+#if RTS_WITH_MAP_TESTS
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverCombatTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverCountTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverStressPerfScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverStressTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTrenchTestScenario.h"
+#include "RTS_Survival/Units/Squads/Tests/SquadPerfScenario.h"
+#include "RTS_Survival/RTSComponents/MedicComponent/Tests/MedicHealTestScenario.h"
+#endif
 #include "Subsystems/WorldSubsystem.h"
 #include "CoverFinderWorldSubsystem.generated.h"
 
@@ -450,12 +455,20 @@ private:
 	bool bM_CaptureLightingWasEnabled = true;
 	int32 M_CaptureFramesRemaining = 0;
 	FString M_PendingScreenshotPath;
+
+#if RTS_WITH_MAP_TESTS
+	// Map test scenarios; not part of a shipping build. Started from the command line, ticked while they run.
 	FCoverTestScenario M_TestCoverScenario;
 	FCoverCombatTestScenario M_CombatCoverScenario;
 	FCoverCountTestScenario M_CoverCountScenario;
 	FCoverTrenchTestScenario M_TrenchCoverScenario;
 	FCoverStressTestScenario M_StressScenario;
 	FCoverStressPerfScenario M_StressPerfScenario;
+	FSquadPerfScenario M_SquadPerfScenario;
+	FMedicHealTestScenario M_MedicHealScenario;
+	void StartCommandLineMapTests();
+	void TickMapTests(float DeltaTime);
+#endif
 
 	// Kept loaded here, so a soldier that gets stressed in the middle of a fight never waits for the class.
 	UPROPERTY(Transient)

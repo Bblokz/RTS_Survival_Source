@@ -8,6 +8,7 @@
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "UObject/Object.h"
+#include "UObject/ObjectKey.h"
 #include "GameUnitManager.generated.h"
 
 #ifndef RTS_WITH_SHIPPING_MAP_TESTS
@@ -257,6 +258,14 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void BeginDestroy() override;
 
+public:
+	/**
+	 * @brief Moves a soldier's count to its current squad subtype. A soldier registers itself before its squad
+	 * controller sets its subtype; the controller calls this right after it did.
+	 * @param SquadUnit Soldier whose subtype was just set.
+	 */
+	void RecountSquadUnitSubtype(ASquadUnit* SquadUnit);
+
 private:
 	/** Initializes the GetTargetUnit M_Thread async. */
 	void Initialize();
@@ -315,6 +324,17 @@ private:
 	void DecrementTankOrNomadicCounter(ATankMaster* Tank, uint8 Player);
 	void IncrementSquadCounter(ASquadUnit* SquadUnit, uint8 Player);
 	void DecrementSquadCounter(ASquadUnit* SquadUnit, uint8 Player);
+
+	// Under which squad subtype and player each soldier is counted. A soldier registers before its squad has
+	// given it its subtype, so what is taken off the counters when it goes must be what was put on them, not
+	// whatever its subtype is by then.
+	struct FCountedSquadUnit
+	{
+		ESquadSubtype Subtype;
+		uint8 Player = 0;
+	};
+
+	TMap<TObjectKey<ASquadUnit>, FCountedSquadUnit> M_CountedSquadUnits;
 	void IncrementBxpCounter(ABuildingExpansion* Bxp, uint8 Player);
 	void DecrementBxpCounter(ABuildingExpansion* Bxp, uint8 Player);
 	void IncrementAircraftCounter(AAircraftMaster* Aircraft, uint8 Player);

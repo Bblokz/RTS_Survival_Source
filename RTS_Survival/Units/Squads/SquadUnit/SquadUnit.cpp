@@ -30,6 +30,7 @@
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
+#include "RTS_Survival/RTSComponents/MedicComponent/MedicComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
 #include "Components/CapsuleComponent.h"
 #include "NavigationSystem.h"
@@ -627,8 +628,10 @@ bool ASquadUnit::GetMayKeepAutomaticCover() const
 	// The squad received an attack order that has not reached this unit yet, or is still on the move order this
 	// unit finished ahead of its squad mates. Giving the point up now would only make the unit walk back into it
 	// a moment later; whatever the squad does next cancels cover itself when it sets this unit moving.
+	// A heal order only moves the squad's medics; their squad mates stay where they are.
 	const EAbilityID SquadCommand = M_SquadController->GetActiveCommandID();
-	return SquadCommand == EAbilityID::IdAttack || SquadCommand == EAbilityID::IdMove;
+	return SquadCommand == EAbilityID::IdAttack || SquadCommand == EAbilityID::IdMove ||
+		SquadCommand == EAbilityID::IdHeal;
 }
 
 bool ASquadUnit::GetCanHoldCoverWhileSquadClosesRange() const
@@ -2166,6 +2169,13 @@ void ASquadUnit::OnWeaponReloadStarted(const float ReloadTime)
 	}
 }
 
+FVector ASquadUnit::GetPathStartLocation() const
+{
+	return M_CoverMoveGuard.bIsSnappedToCoverSocket
+		? M_CoverRuntimeState.AssignedCoverPoint.Location
+		: GetActorLocation();
+}
+
 bool ASquadUnit::GetIsReloadingInCover() const
 {
 	const UWorld* World = GetWorld();
@@ -2633,6 +2643,11 @@ bool ASquadUnit::GetIsSquadUnitIdleAndNotEvading() const
 		// sq unit is evading.
 		return false;
 	}
+	if (M_ActiveCommand == EAbilityID::IdHeal)
+	{
+		// A medic on its way to a patient or healing it; its squad is idle, the unit is not.
+		return false;
+	}
 	if (GetIsValidSquadController())
 	{
 		// Check for other abilities.
@@ -2865,8 +2880,8 @@ void ASquadUnit::BeginPlay()
 	BeginPlay_SetPhysicalMaterials();
 	// Find the child weapon actor component.
 	BeginPlay_SetupChildActorWeaponComp();
-	// Set up a timer with lambda to update the speed of the unit on the anim instance periodically.
-	BeginPlay_SetupUpdateAnimSpeed();
+	// The speed of the unit is passed to the anim instance once a frame by its squad controller's tick
+	// (UpdateAnimationStateFromVelocity); a timer per unit used to do that several times per frame.
 	BeginPlay_BindSelectionFunctions();
 	// Disable navigation effects.
 	BeginPlay_SetupSelectionHealthCompCollision();
@@ -2894,7 +2909,6 @@ void ASquadUnit::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(M_TimerHandleUpdateAnim);
 		World->GetTimerManager().ClearTimer(M_TimerHandleWeaponSwitch);
 		World->GetTimerManager().ClearTimer(M_DeathTimerHandle);
 	}
@@ -2915,7 +2929,6 @@ void ASquadUnit::BeginDestroy()
 	Super::BeginDestroy();
 	if (UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(M_TimerHandleUpdateAnim);
 		World->GetTimerManager().ClearTimer(M_TimerHandleWeaponSwitch);
 		World->GetTimerManager().ClearTimer(M_DeathTimerHandle);
 		World->GetTimerManager().ClearTimer(M_SpawnSelectionTimerHandle);
@@ -2965,6 +2978,8 @@ void ASquadUnit::PostInitializeComponents()
 	PostInitializeComp_SetupSpatialVoiceLinePlayer();
 	// Set up the repair componet if this unit has one.
 	PostInitializeComp_InitRepairComponent();
+	// Set up the medic component if this unit has one.
+	PostInitializeComp_InitMedicComponent();
 	// Init owner on secondary weapon.
 	PostInitializeComp_InitSecondaryWeapon();
 
@@ -3004,6 +3019,40 @@ void ASquadUnit::PostInitializeComp_InitRepairComponent()
 	{
 		M_RepairComponent->SetSquadOwner(this);
 	}
+}
+
+void ASquadUnit::PostInitializeComp_InitMedicComponent()
+{
+	M_MedicComponent = FindComponentByClass<UMedicComponent>();
+	if (IsValid(M_MedicComponent))
+	{
+		M_MedicComponent->SetSquadOwner(this);
+	}
+}
+
+#if RTS_WITH_MAP_TESTS
+UMedicComponent* ASquadUnit::Debug_AddMedicComponent()
+{
+	if (IsValid(M_MedicComponent))
+	{
+		return M_MedicComponent;
+	}
+	M_MedicComponent = NewObject<UMedicComponent>(this, TEXT("DebugMedicComponent"));
+	M_MedicComponent->SetSquadOwner(this);
+	M_MedicComponent->RegisterComponent();
+	return M_MedicComponent;
+}
+#endif
+
+bool ASquadUnit::GetIsSquadInsideCargo() const
+{
+	// Silent: asked about every soldier a medic considers, and a unit without a squad is in no vehicle.
+	if (not IsValid(M_SquadController))
+	{
+		return false;
+	}
+	const UCargoSquad* CargoSquad = M_SquadController->FindComponentByClass<UCargoSquad>();
+	return IsValid(CargoSquad) && CargoSquad->GetIsInsideCargo();
 }
 
 void ASquadUnit::PostInitializeComp_InitSecondaryWeapon()
@@ -3769,6 +3818,9 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 	case EAbilityID::IdRepair:
 		OnMoveCompleted_Repair();
 		break;
+	case EAbilityID::IdHeal:
+		OnMoveCompleted_Heal(Result);
+		break;
 	case EAbilityID::IdCapture:
 		OnMoveCompleted_Capture();
 		break;
@@ -3855,6 +3907,16 @@ void ASquadUnit::OnMoveCompleted_Repair() const
 	M_RepairComponent->OnFinishedMovementForRepairAbility();
 }
 
+void ASquadUnit::OnMoveCompleted_Heal(const EPathFollowingResult::Type Result) const
+{
+	// Silent: the medic component is the only one that walks a unit for IdHeal.
+	if (not IsValid(M_MedicComponent))
+	{
+		return;
+	}
+	M_MedicComponent->OnFinishedMovementForHeal(Result == EPathFollowingResult::Aborted);
+}
+
 void ASquadUnit::OnMoveCompleted_Capture() const
 {
 	if (not GetIsValidSquadController())
@@ -3873,6 +3935,7 @@ void ASquadUnit::OnMoveCompleted_MoveCloserToTarget()
 
 void ASquadUnit::DetermineDeathVoiceLine()
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_DetermineDeathVoiceLine);
 	if (not GetIsValidSelectionComponent() || not GetIsValidSpatialVoiceLinePlayer() || not GetIsValidRTSComponent())
 	{
 		return;
@@ -4013,14 +4076,24 @@ void ASquadUnit::TerminateScavenging()
 
 void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies);
 	if (not IsUnitAlive())
 	{
 		return;
 	}
-	EndStress();
-	// A soldier that dies on a cover socket stays there; leaving cover would put him back on the navmesh.
-	M_CoverMoveGuard.bIsSnappedToCoverSocket = false;
-	ClearCoverState();
+	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_LeaveCoverAndStress);
+		EndStress();
+		// A soldier that dies on a cover socket stays there; leaving cover would put him back on the navmesh.
+		M_CoverMoveGuard.bIsSnappedToCoverSocket = false;
+		ClearCoverState();
+	}
+
+	if (IsValid(M_MedicComponent))
+	{
+		// Lets go of its patient, and of its part of a heal order, while the unit still belongs to its squad.
+		M_MedicComponent->OnOwnerDied();
+	}
 
 	SetUnitDying();
 	const bool bUseCrouchedDeathMontage = DeathType != ERTSDeathType::Scavenging &&
@@ -4062,7 +4135,10 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 	// Clean up timers, health bar, collision and deregister from the game state.
 	UnitDies_CleanupComponents();
 
-	OnUnitDies.Broadcast();
+	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_OnUnitDiesBroadcast);
+		OnUnitDies.Broadcast();
+	}
 
 	if (DeathType == ERTSDeathType::Scavenging)
 	{
@@ -4076,6 +4152,7 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 
 void ASquadUnit::UnitDies_HandleSelectionAndCommand(bool& OutIsSelected)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_HandleSelectionAndCommand);
 	OutIsSelected = false;
 	if (IsValid(SelectionComponent))
 	{
@@ -4091,6 +4168,7 @@ void ASquadUnit::UnitDies_HandleSelectionAndCommand(bool& OutIsSelected)
 
 void ASquadUnit::UnitDies_RemoveFromSquadController(bool bIsSelected, const ERTSDeathType DeathType)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_RemoveFromSquadController);
 	if (not GetIsValidSquadController())
 	{
 		return;
@@ -4102,6 +4180,7 @@ void ASquadUnit::UnitDies_RemoveFromSquadController(bool bIsSelected, const ERTS
 
 void ASquadUnit::UnitDies_NotifyAnimInstance()
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_NotifyAnimInstance);
 	if (not GetIsValidAnimBpSquadUnit())
 	{
 		return;
@@ -4137,6 +4216,7 @@ bool ASquadUnit::UnitDies_GetShouldUseCrouchedDeathMontage() const
 
 void ASquadUnit::UnitDies_StartDeathSequence(const bool bUseCrouchedDeathMontage)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_StartDeathSequence);
 	if (not GetIsValidAnimBpSquadUnit())
 	{
 		UnitDies_OnDeathMontageFinished();
@@ -4205,6 +4285,7 @@ void ASquadUnit::UnitDies_ScheduleDeathMontageTransition(const float MontageDura
 
 void ASquadUnit::UnitDies_DestroyInfantryWeapon()
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_DestroyInfantryWeapon);
 	if (IsValid(M_InfantryWeapon))
 	{
 		M_InfantryWeapon->DisableAllWeapons();
@@ -4215,6 +4296,7 @@ void ASquadUnit::UnitDies_DestroyInfantryWeapon()
 
 void ASquadUnit::UnitDies_RemoveFromAIController()
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_RemoveFromAIController);
 	if (IsValid(M_AISquadUnit))
 	{
 		if (IsValid(M_AISquadUnit->GetBrainComponent()))
@@ -4228,9 +4310,9 @@ void ASquadUnit::UnitDies_RemoveFromAIController()
 
 void ASquadUnit::UnitDies_CleanupComponents()
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_CleanupComponents);
 	if (const UWorld* World = GetWorld())
 	{
-		World->GetTimerManager().ClearTimer(M_TimerHandleUpdateAnim);
 		World->GetTimerManager().ClearTimer(M_TimerHandleWeaponSwitch);
 		World->GetTimerManager().ClearTimer(M_DeathTimerHandle);
 		World->GetTimerManager().ClearTimer(M_SpawnSelectionTimerHandle);
@@ -4238,6 +4320,7 @@ void ASquadUnit::UnitDies_CleanupComponents()
 
 	if (IsValid(HealthComponent))
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_HideHealthBar);
 		HealthComponent->MakeHealthBarInvisible();
 	}
 
@@ -4245,12 +4328,14 @@ void ASquadUnit::UnitDies_CleanupComponents()
 	{
 		if (not M_RagdollSettings.bIsRagdollActive)
 		{
+			QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_DisableMeshCollision);
 			MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
 	}
 
 	if (IsValid(RTSComponent))
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_DeregisterFromGameState);
 		RTSComponent->DeregisterFromGameState();
 	}
 }
@@ -4558,39 +4643,14 @@ void ASquadUnit::BeginPlay_SetupChildActorWeaponComp()
 	}
 }
 
-void ASquadUnit::BeginPlay_SetupUpdateAnimSpeed()
+void ASquadUnit::UpdateAnimationStateFromVelocity()
 {
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	// Silent: a unit whose animation instance is not set up yet has nothing to update.
+	if (not IsValid(AnimBp_SquadUnit))
 	{
 		return;
 	}
-
-	TWeakObjectPtr<ASquadUnit> SquadUnitWeak(this);
-
-	FTimerDelegate TimerDelUpdateAnim;
-	TimerDelUpdateAnim.BindLambda([SquadUnitWeak]()
-	{
-		if (not SquadUnitWeak.IsValid())
-		{
-			return;
-		}
-
-		ASquadUnit* SquadUnit = SquadUnitWeak.Get();
-
-		if (not SquadUnit->GetIsValidAnimBpSquadUnit())
-		{
-			return;
-		}
-
-		SquadUnit->AnimBp_SquadUnit->UpdateAnimState(SquadUnit->GetVelocity());
-	});
-
-	World->GetTimerManager().SetTimer(
-		M_TimerHandleUpdateAnim,
-		TimerDelUpdateAnim,
-		DeveloperSettings::Optimization::UpdateSquadAnimInterval,
-		true);
+	AnimBp_SquadUnit->UpdateAnimState(GetVelocity());
 }
 
 

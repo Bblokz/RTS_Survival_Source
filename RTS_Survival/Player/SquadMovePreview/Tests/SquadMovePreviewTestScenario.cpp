@@ -1,4 +1,8 @@
 #include "SquadMovePreviewTestScenario.h"
+
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTestScenario.h"
@@ -770,3 +774,5 @@ void FSquadMovePreviewTestScenario::EnterPhase(const ESquadMovePreviewTestPhase 
 	M_Phase = NewPhase;
 	M_PhaseElapsedSeconds = 0.0f;
 }
+
+#endif // RTS_WITH_MAP_TESTS

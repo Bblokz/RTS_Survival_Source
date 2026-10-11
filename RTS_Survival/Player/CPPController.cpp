@@ -5052,6 +5052,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdCrewRepair:
 		DirectActionButtonCrewRepair(static_cast<ECrewRepairAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
+	case EAbilityID::IdHeal:
+		ActivateActionButtonHeal(static_cast<EHealAbilityType>(ActiveAbilityEntry.CustomType));
+		break;
 	case EAbilityID::IdActivateShield:
 		this->DirectActionButtonActivateShield();
 		break;
@@ -5090,6 +5093,9 @@ void ACPPController::UpdateCursor()
 			break;
 		case EAbilityID::IdRepair:
 			CursorType = EMouseCursor::Type::ResizeLeftRight;
+			break;
+		case EAbilityID::IdHeal:
+			CursorType = EMouseCursor::Type::Hand;
 			break;
 		case EAbilityID::IdHarvestResource:
 			CursorType = EMouseCursor::Type::ResizeUpDown;
@@ -5164,6 +5170,9 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		break;
 	case EAbilityID::IdRepair:
 		ActionButtonRepair(ClickedActor);
+		break;
+	case EAbilityID::IdHeal:
+		ActionButtonHeal(ClickedActor);
 		break;
 	case EAbilityID::IdTowActor:
 		ActionButtonTowActorSecondClick(ClickedActor, ClickedLocation);
@@ -8643,6 +8652,64 @@ bool ACPPController::GetTowableTargetData(AActor* TowTargetActor, const ETowOrde
 
 	OutTowSubtype = ETowedActorTarget::TowTeamWeapon;
 	return true;
+}
+
+void ACPPController::ActivateActionButtonHeal(const EHealAbilityType HealAbilityType)
+{
+	if (HealAbilityType == EHealAbilityType::HealingDisabled)
+	{
+		DirectActionButtonCancelHeal();
+		return;
+	}
+	// The heal order is issued by the next click, on the squad unit to heal.
+	bM_IsActionButtonActive = true;
+	UpdateCursor();
+}
+
+void ACPPController::DirectActionButtonCancelHeal()
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExecuted = 0;
+	for (ASquadController* EachSquad : TSelectedSquadControllers)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(EachSquad))
+		{
+			continue;
+		}
+		CommandsExecuted += EachSquad->CancelHeal() == ECommandQueueError::NoError;
+	}
+
+	if (CommandsExecuted > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdHeal),
+			false);
+	}
+}
+
+void ACPPController::ActionButtonHeal(AActor* ClickedActor)
+{
+	if (not RTSFunctionLibrary::RTSIsValid(ClickedActor))
+	{
+		return;
+	}
+	EnsureSelectionsAreRTSValid();
+	uint32 CommandsExecuted = 0;
+	const bool bResetCommandQueueFirst = not bIsHoldingShift;
+	for (ASquadController* EachSquad : TSelectedSquadControllers)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(EachSquad))
+		{
+			continue;
+		}
+		// Squads without the heal ability, and so without medics, refuse the order.
+		CommandsExecuted += EachSquad->HealTarget(ClickedActor, bResetCommandQueueFirst) == ECommandQueueError::NoError;
+	}
+	const bool bResetAllPlacementEffects = not bIsHoldingShift;
+	constexpr bool bForcePlayVoiceLine = false;
+	CreateVfxAndVoiceLineForIssuedCommand(
+		bResetAllPlacementEffects, CommandsExecuted, ClickedActor->GetActorLocation(), ECommandType::Repair,
+		EAbilityID::IdHeal, bForcePlayVoiceLine);
 }
 
 void ACPPController::DirectActionButtonCrewRepair(const ECrewRepairAbilityType Subtype)

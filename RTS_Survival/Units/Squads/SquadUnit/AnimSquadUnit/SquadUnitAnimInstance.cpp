@@ -11,8 +11,43 @@
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "SquadAnimationEnums/SquadAnimationEnums.h"
+#include "UObject/ConstructorHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCoverAnimation, Log, All);
+
+namespace SquadUnitMedicAnimStatics
+{
+	constexpr float HealBlendSeconds = 0.2f;
+
+	const TCHAR* const StandingHealAnimationPaths[] =
+	{
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/Medic/Anim_Medic_StandingHeal_1.Anim_Medic_StandingHeal_1"),
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/Medic/Anim_Medic_StandingHeal_2.Anim_Medic_StandingHeal_2"),
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/Medic/Anim_Medic_StandingHeal_3.Anim_Medic_StandingHeal_3")
+	};
+
+	const TCHAR* const CrouchHealAnimationPaths[] =
+	{
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/Medic/Anim_Medic_CrouchHeal_1.Anim_Medic_CrouchHeal_1"),
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/Medic/Anim_Medic_CrouchHeal_2.Anim_Medic_CrouchHeal_2"),
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/Medic/Anim_Medic_CrouchHeal_3.Anim_Medic_CrouchHeal_3")
+	};
+
+	// Only valid inside a constructor: fills one of the animation Blueprint's default heal animation lists.
+	void AddDefaultHealAnimations(
+		const TArrayView<const TCHAR* const> AnimationPaths,
+		TArray<TObjectPtr<UAnimSequenceBase>>& OutAnimations)
+	{
+		for (const TCHAR* AnimationPath : AnimationPaths)
+		{
+			const ConstructorHelpers::FObjectFinder<UAnimSequenceBase> AnimationFinder(AnimationPath);
+			if (AnimationFinder.Succeeded())
+			{
+				OutAnimations.Add(AnimationFinder.Object);
+			}
+		}
+	}
+}
 
 namespace SquadUnitCoverAnimLogStatics
 {
@@ -630,6 +665,9 @@ USquadUnitAnimInstance::USquadUnitAnimInstance(): bBeAlert(false), MovementState
                                                   WalkingPlayRate(0), RunningPlayRate(0)
 
 {
+	using namespace SquadUnitMedicAnimStatics;
+	AddDefaultHealAnimations(StandingHealAnimationPaths, MedicHealAnimations.StandingHealAnimations);
+	AddDefaultHealAnimations(CrouchHealAnimationPaths, MedicHealAnimations.CrouchHealAnimations);
 }
 
 void USquadUnitAnimInstance::UpdateAnimState(const FVector& VectorSpeed)
@@ -810,6 +848,9 @@ void USquadUnitAnimInstance::StopAllMontages()
 	M_WantedSprayStance = ESquadCoverSprayStance::None;
 	M_ActiveSprayMontage = nullptr;
 	M_SprayMontageEndedDelegate.Unbind();
+	M_WantedHealStance = ESquadMedicHealStance::None;
+	M_ActiveHealMontage = nullptr;
+	M_HealMontageEndedDelegate.Unbind();
 	Montage_Stop(0.1f);
 }
 
@@ -980,6 +1021,7 @@ int32 USquadUnitAnimInstance::GetCoverSprayAnimationCount(const ESquadCoverSpray
 	return Stance == ESquadCoverSprayStance::None ? 0 : GetCoverSprayAnimations(Stance).Num();
 }
 
+#if RTS_WITH_MAP_TESTS
 void USquadUnitAnimInstance::Debug_SetCoverSprayAnimations(
 	const ESquadCoverSprayStance Stance,
 	const TArray<UAnimSequenceBase*>& Animations)
@@ -990,6 +1032,7 @@ void USquadUnitAnimInstance::Debug_SetCoverSprayAnimations(
 	SprayAnimations.Reset();
 	SprayAnimations.Append(Animations);
 }
+#endif
 
 void USquadUnitAnimInstance::SetCoverSpray(const ESquadCoverSprayStance Stance)
 {
@@ -1046,7 +1089,17 @@ void USquadUnitAnimInstance::PlayRandomCoverSpray()
 
 UAnimMontage* USquadUnitAnimInstance::PlaySharedSprayMontage(UAnimSequenceBase& SprayAnimation)
 {
-	using SquadUnitCoverAnimLogStatics::SprayBlendSeconds;
+	return PlaySharedSlotMontage(
+		SprayAnimation,
+		CoverAnimations.SprayAnimationSlotName,
+		SquadUnitCoverAnimLogStatics::SprayBlendSeconds);
+}
+
+UAnimMontage* USquadUnitAnimInstance::PlaySharedSlotMontage(
+	UAnimSequenceBase& Animation,
+	const FName SlotName,
+	const float BlendSeconds)
+{
 	const UWorld* World = GetWorld();
 	URTSCoverFinderWorldSubsystem* CoverSubsystem = IsValid(World)
 		? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
@@ -1054,16 +1107,9 @@ UAnimMontage* USquadUnitAnimInstance::PlaySharedSprayMontage(UAnimSequenceBase& 
 	// Silent: a preview world has no cover subsystem; there the engine wraps the sequence in a montage of its own.
 	if (not IsValid(CoverSubsystem))
 	{
-		return PlaySlotAnimationAsDynamicMontage(
-			&SprayAnimation,
-			CoverAnimations.SprayAnimationSlotName,
-			SprayBlendSeconds,
-			SprayBlendSeconds);
+		return PlaySlotAnimationAsDynamicMontage(&Animation, SlotName, BlendSeconds, BlendSeconds);
 	}
-	UAnimMontage* SharedMontage = CoverSubsystem->FindOrAddSprayMontage(
-		&SprayAnimation,
-		CoverAnimations.SprayAnimationSlotName,
-		SprayBlendSeconds);
+	UAnimMontage* SharedMontage = CoverSubsystem->FindOrAddSprayMontage(&Animation, SlotName, BlendSeconds);
 	const bool bIsPlaying = IsValid(SharedMontage) &&
 		Montage_Play(SharedMontage, 1.0f, EMontagePlayReturnType::Duration) > KINDA_SMALL_NUMBER;
 	return bIsPlaying ? SharedMontage : nullptr;
@@ -1101,6 +1147,105 @@ void USquadUnitAnimInstance::OnSprayMontageEnded(UAnimMontage* Montage, const bo
 	}
 }
 
+const TArray<TObjectPtr<UAnimSequenceBase>>& USquadUnitAnimInstance::GetMedicHealAnimations(
+	const ESquadMedicHealStance Stance) const
+{
+	return Stance == ESquadMedicHealStance::Crouch
+		? MedicHealAnimations.CrouchHealAnimations
+		: MedicHealAnimations.StandingHealAnimations;
+}
+
+int32 USquadUnitAnimInstance::GetMedicHealAnimationCount(const ESquadMedicHealStance Stance) const
+{
+	return Stance == ESquadMedicHealStance::None ? 0 : GetMedicHealAnimations(Stance).Num();
+}
+
+bool USquadUnitAnimInstance::GetIsCrouchedOrProne() const
+{
+	const bool bIsLowCoverPose = IdleAnimationPose == ESquadIdleAnimationPose::CrouchCover ||
+		IdleAnimationPose == ESquadIdleAnimationPose::TrenchCover ||
+		IdleAnimationPose == ESquadIdleAnimationPose::ProneCover;
+	return bIsLowCoverPose || AimPositionMontages.AimPosition != ESquadAimPosition::Standing;
+}
+
+void USquadUnitAnimInstance::SetMedicHeal(const ESquadMedicHealStance Stance)
+{
+	const bool bStanceChanged = Stance != M_WantedHealStance;
+	M_WantedHealStance = Stance;
+	if (Stance == ESquadMedicHealStance::None || bStanceChanged)
+	{
+		StopMedicHealMontage();
+	}
+	if (Stance != ESquadMedicHealStance::None && not IsValid(M_ActiveHealMontage))
+	{
+		PlayRandomMedicHeal();
+	}
+}
+
+void USquadUnitAnimInstance::PlayRandomMedicHeal()
+{
+	const TArray<TObjectPtr<UAnimSequenceBase>>& HealAnimations = GetMedicHealAnimations(M_WantedHealStance);
+	if (HealAnimations.IsEmpty())
+	{
+		return;
+	}
+	// The heal animation takes the whole body; a cover pose under it would show through its blends.
+	CancelCoverAnimation();
+	UAnimSequenceBase* HealAnimation = HealAnimations[FMath::RandRange(0, HealAnimations.Num() - 1)];
+	UAnimMontage* PlayedMontage = Cast<UAnimMontage>(HealAnimation);
+	if (IsValid(PlayedMontage))
+	{
+		const float PlayedSeconds = Montage_Play(PlayedMontage, 1.0f, EMontagePlayReturnType::Duration);
+		PlayedMontage = PlayedSeconds > KINDA_SMALL_NUMBER ? PlayedMontage : nullptr;
+	}
+	else if (IsValid(HealAnimation))
+	{
+		PlayedMontage = PlaySharedSlotMontage(
+			*HealAnimation,
+			MedicHealAnimations.HealAnimationSlotName,
+			SquadUnitMedicAnimStatics::HealBlendSeconds);
+	}
+	if (not IsValid(PlayedMontage))
+	{
+		return;
+	}
+	M_ActiveHealMontage = PlayedMontage;
+	M_HealMontageEndedDelegate.BindUObject(this, &USquadUnitAnimInstance::OnMedicHealMontageEnded);
+	Montage_SetEndDelegate(M_HealMontageEndedDelegate, PlayedMontage);
+}
+
+void USquadUnitAnimInstance::StopMedicHealMontage()
+{
+	UAnimMontage* HealMontage = M_ActiveHealMontage;
+	if (not IsValid(HealMontage))
+	{
+		return;
+	}
+	// Cleared first, so the end of the montage does not start the next animation.
+	M_ActiveHealMontage = nullptr;
+	M_HealMontageEndedDelegate.Unbind();
+	if (Montage_IsPlaying(HealMontage))
+	{
+		Montage_Stop(SquadUnitMedicAnimStatics::HealBlendSeconds, HealMontage);
+	}
+}
+
+void USquadUnitAnimInstance::OnMedicHealMontageEnded(UAnimMontage* Montage, const bool bInterrupted)
+{
+	if (Montage != M_ActiveHealMontage)
+	{
+		return;
+	}
+	M_ActiveHealMontage = nullptr;
+	M_HealMontageEndedDelegate.Unbind();
+	// Cut off by another montage: the medic asks for its heal animation again once that one is over.
+	if (not bInterrupted && M_WantedHealStance != ESquadMedicHealStance::None)
+	{
+		PlayRandomMedicHeal();
+	}
+}
+
+#if RTS_WITH_MAP_TESTS
 void USquadUnitAnimInstance::Debug_SetCoverApproachMoves(const TArray<UAnimSequenceBase*>& Animations)
 {
 	CoverAnimations.ApproachMoves.Reset();
@@ -1109,6 +1254,7 @@ void USquadUnitAnimInstance::Debug_SetCoverApproachMoves(const TArray<UAnimSeque
 		CoverAnimations.ApproachMoves.AddDefaulted_GetRef().Animation = Animation;
 	}
 }
+#endif
 
 bool USquadUnitAnimInstance::EnterCover(const ESquadIdleAnimationPose CoverPose, const bool bSkipEnterMontage)
 {

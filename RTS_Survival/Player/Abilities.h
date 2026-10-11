@@ -71,6 +71,9 @@ enum class EAbilityID : uint8
 	IdResearchTechnology,
 	IdActivateShield,
 	IdCrewRepair,
+	// Medic squads: heal an allied squad. The card subtype (EHealAbilityType) switches the button between
+	// picking a patient and cancelling the running heal order.
+	IdHeal,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
@@ -130,6 +133,7 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdDetachTow: return TEXT("Detach Tow");
 	case EAbilityID::IdActivateShield: return TEXT("Activate Shield");
 	case EAbilityID::IdCrewRepair: return TEXT("Crew Repair");
+	case EAbilityID::IdHeal: return TEXT("Heal");
 	case EAbilityID::IdRegisterUnitAsBlackboardIdle: return TEXT("Register Unit As Blackboard Idle");
 	case EAbilityID::IdResearchTechnology: return TEXT("Research Technology");
 	default: return TEXT("Unknown Ability");

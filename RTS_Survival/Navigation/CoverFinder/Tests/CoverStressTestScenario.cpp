@@ -1,5 +1,9 @@
 #include "CoverStressTestScenario.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
+
 #include "Animation/AnimSequenceBase.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/DamageEvents.h"
@@ -16,6 +20,7 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSCoverStressTest, Log, All);
@@ -432,8 +437,32 @@ void FCoverStressTestScenario::TickWaitingForRelocation(UWorld& World)
 		return;
 	}
 	const FRTSCoverPoint& NewPoint = Soldier->GetCoverRuntimeState().AssignedCoverPoint;
-	const float RetreatGain = FVector::Dist2D(NewPoint.Location, M_EnemyPost) -
-		FVector::Dist2D(M_FirstCoverPoint.Location, M_EnemyPost);
+	// He runs from what his weapon is aimed at, which on a map full of fighting squads need not be the enemy
+	// the test put in front of him.
+	AInfantryWeaponMaster* SoldierWeaponActor = Soldier->GetInfantryWeapon();
+	const bool bHasWeaponTarget = IsValid(SoldierWeaponActor) && IsValid(SoldierWeaponActor->GetCurrentTargetActor());
+	const FVector ThreatLocation = bHasWeaponTarget ? SoldierWeaponActor->GetCurrentTargetLocation() : M_EnemyPost;
+	const bool bStayedInFirstCover = StressPhase == ESquadUnitStressPhase::SprayingFromNewCover &&
+		NewPoint.PointId == M_FirstCoverPoint.PointId;
+	if (bStayedInFirstCover)
+	{
+		// Allowed: cover further away has to stay inside weapon range, and a soldier whose target is already
+		// near the edge of it has none. He then keeps spraying from where he is.
+		Check(
+			Soldier->GetCoverRuntimeState().GetIsOccupyingCover(),
+			TEXT("with no cover further away inside weapon range the soldier stays in his cover"),
+			FString::Printf(
+				TEXT("threat_distance_cm=%.0f has_weapon_target=%d"),
+				FVector::Dist2D(M_FirstCoverPoint.Location, ThreatLocation),
+				bHasWeaponTarget ? 1 : 0));
+		EnterPhase(
+			World,
+			ECoverStressTestPhase::WaitingForSprayFromNewCover,
+			CoverSettings->M_InfantryStressDuration + PhaseMarginSeconds);
+		return;
+	}
+	const float RetreatGain = FVector::Dist2D(NewPoint.Location, ThreatLocation) -
+		FVector::Dist2D(M_FirstCoverPoint.Location, ThreatLocation);
 	Check(
 		StressPhase == ESquadUnitStressPhase::RelocatingToFartherCover && Soldier->GetHasCoverAssignment() &&
 		NewPoint.PointId != M_FirstCoverPoint.PointId && RetreatGain >= MinimumRetreatGain,
@@ -540,3 +569,5 @@ void FCoverStressTestScenario::TickWaitingForCalm(UWorld& World)
 	Check(not Soldier->GetIsStressed(), TEXT("a soldier that just calmed down is not stressed again at once"));
 	Finish(World);
 }
+
+#endif // RTS_WITH_MAP_TESTS

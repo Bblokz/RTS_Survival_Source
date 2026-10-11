@@ -7888,6 +7888,18 @@ void ACPPGameState::InitAllGameSquadData()
 		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
+	// Medic squads: the regular squad card with the heal button on index 5; switch weapon moves up one slot.
+	constexpr int32 MedicHealAbilityIndex = 5;
+	TArray<FUnitAbilityEntry> MedicSquadAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdPatrol, EAbilityID::IdRetreat,
+		EAbilityID::IdHeal, EAbilityID::IdSwitchWeapon, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
+		EAbilityID::IdPickupItem, EAbilityID::IdEnterCargo, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility
+	});
+	// The button starts out asking for a patient; the squad swaps it to the cancel entry while it heals on order.
+	MedicSquadAbilities[MedicHealAbilityIndex].CustomType = static_cast<int32>(EHealAbilityType::HealingActive);
+
 	FSquadData SquadData;
 	// --------------------------------------------------
 	//                     Ger Infantry
@@ -7921,6 +7933,21 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceWorth = BaseInfantryExp;
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Regular;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_JagerTruppKar98k, SquadData);
+
+	SquadData.MaxHealth = BasicInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Jager_Radixite}
+	});
+	SquadData.Abilities = MedicSquadAbilities;
+	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = BaseInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Regular;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Medic, SquadData);
 
 	SquadData.MaxHealth = ArmoredInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
@@ -8144,6 +8171,21 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Untrained;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Mosin, SquadData);
+
+	SquadData.MaxHealth = BasicInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, MosinSquadRadixiteCost}
+	});
+	SquadData.Abilities = MedicSquadAbilities;
+	SquadData.ExperienceWorth = BaseInfantryExp;
+	SquadData.ExperienceLevels = GetTier1InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Regular;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Medic, SquadData);
 
 	SquadData.MaxHealth = BasicInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);

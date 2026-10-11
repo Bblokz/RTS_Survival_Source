@@ -1,5 +1,9 @@
 #include "CoverTestScenario.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
+
 #include "Engine/World.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "EngineUtils.h"
@@ -881,3 +885,5 @@ void FCoverTestScenario::EnterPhase(const ECoverTestScenarioPhase NewPhase)
 	M_Phase = NewPhase;
 	M_PhaseElapsedSeconds = 0.0f;
 }
+
+#endif // RTS_WITH_MAP_TESTS

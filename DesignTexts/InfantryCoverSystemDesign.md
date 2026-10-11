@@ -116,6 +116,8 @@ Some actors carry their cover on mesh sockets instead of having it found by the 
 | `M_StandingRightCoverSocketNamePart` | `standing_right` | `StandingRight` |
 | `M_ProneCoverSocketNamePart` | `prone` | `Prone` |
 
+A socket whose only navmesh lies more than 60 cm below it is skipped (`RTS_COVER_SOCKET_SKIPPED` on Verbose): that navmesh is a patch underneath the actor, cut off from the rest of the map, and a soldier put back on it after leaving the point could never walk anywhere again.
+
 Letter case does not matter. A name that contains more than one part gets the longest one (`FCoverFinderAlgorithms::TryGetSocketCoverType`), which is why `standing_right` is a right-peek point although it contains `standing`. Sockets with none of the parts are ignored. The soldier faces along the socket's forward (X) axis, and the point is moved onto the navmesh when that is close by.
 
 The points go through the authored-provider path: they win a spacing conflict with an equivalent scanned point, two sockets of the same type facing the same way closer than `M_CoverPointSpacing` (90 cm) merge into one, and socket prone points are never thinned. When the actor is destroyed its points are taken out again (`RemoveSocketCoverOfDestroyedActors`). With `LogRTSCoverFinder` on Verbose, `RTS_COVER_SOCKET` lists every socket point and `RTS_COVER_SOCKET_NONE` every listed actor that gave none.
@@ -242,6 +244,25 @@ The steps are small on purpose: the tolerance is a part of the soldier's own hea
 
 **Logging.** `LogRTSSquadUnitStress` on Verbose: `RTS_STRESS_START`, `RTS_STRESS_RELOCATE` (with `found=0` when he stays) and `RTS_STRESS_END`.
 
+### Squad performance: measuring and what was changed
+
+**Measuring.** `-SquadPerfMeasure` (`Units/Squads/Tests/SquadPerfScenario`) waits for the cover scan, lets the squads on the map fight for 1500 frames and then keeps every squad on the move for 1500 frames, and logs the frame time per phase as `RTS_SQUAD_PERF` (average, p50, p95, p99, maximum, soldier counts). Two switches say where the time goes: `-SquadPerfStatDump` makes the engine write its averaged stat tree for each phase (`stat dumpave`), and `-SquadPerfHitches` makes it write the stat tree of every frame over 14 ms (`stat dumphitches`). Run it rendered (`-RenderOffscreen` instead of `-NullRHI`) for numbers that mean something: without a renderer there is no fog of war, the enemy never fires, and no effects are simulated. Frame times differ a few percent between runs and the number of long frames differs more, because the fight never goes the same way twice; compare several runs.
+
+**All map tests are compiled out of shipping.** `RTS_WITH_MAP_TESTS` (`Utils/RTSMapTests/RTSMapTests.h`) is `!UE_BUILD_SHIPPING`. The scenario files, the members that host them on the cover subsystem and the squad move preview component, the command-line switches that start them, the `Debug_` hooks on the animation instance and the `friend` declaration on `ASquadUnit` are all inside `#if RTS_WITH_MAP_TESTS`. The stat scopes added for the measurements (`QUICK_SCOPE_CYCLE_COUNTER`) are compiled out wherever the engine's stats are, which includes shipping.
+
+**What the measurements found, on TestCover with 105 soldiers in 16 squads, rendered.** The squad code itself is a small part of a frame. The long frames came from four things, all fixed:
+
+- *A squad that could not walk to its attack target searched for a path three times a second.* A soldier whose target is out of range asks its squad to walk closer on every weapon update (0.3 s). When no path exists nobody starts walking, so the next update asks again: a squad path search plus one per soldier, every time. `FSquadRangeClosingGuard` now makes the squad wait after an attempt that set nobody walking (0.6 s, doubling up to 20 s) unless the target has moved 15 m; attempts that got the squad closer are never delayed (`GetMayStartRangeClosing`, `RecordRangeClosingAttempt`).
+- *A squad whose first soldier held a trench socket could not find any path.* The squad path query started from where that soldier stood, below the navmesh. It now starts from the navmesh point he is put back on (`ASquadUnit::GetPathStartLocation`).
+- *Trench sockets with navmesh only underneath them* (see "Cover from sockets") trapped the soldiers that used them.
+- *Every soldier death raised an error.* A soldier registers with the unit manager before its squad gives it its subtype, and was taken off the per-subtype counter under the subtype it had by then, so the counter went below zero and reported it. The unit manager now remembers what it counted each soldier as (`M_CountedSquadUnits`) and the squad controller re-counts a soldier when it sets its subtype (`RecountSquadUnitSubtype`). This also makes "does this player have a squad of type X" true for squads, which it never was.
+
+One change is about the average instead of the long frames: every soldier had a looping timer with a 6.7 ms interval that passed its speed to its animation instance, which the timer manager ran two or three times per frame per soldier to catch up. The squad controller's tick now does it once per frame for its soldiers (`UpdateSquadUnitAnimationStates`).
+
+Frames over 14 ms in the 3000 measured frames went from 242 to between 13 and 17, none of them from squad movement any more; the p99 of the fight phase went from 17.7 ms to about 11.7 ms and the longest frame of the move phase from 98 ms to about 23 ms.
+
+**What is left, and is not squad code.** In a fight most of the game thread's tick is the small-arms sand impact effect (`NS_SmallArms_SandImpact`): about 0.5 ms for ticking its instances on the game thread, 0.6 to 0.8 ms waiting for its collision, and about 110 ray casts per frame on each of some thirty worker threads for its particle collision. That is a setting of the Niagara asset (CPU collision per particle). The remaining long frames are error reports from content that is not set up (`ReportError` opens a dialog in editor builds, about 6 ms each): a voice line unit type left at `MAX` for `Fire` and `EnemyDestroyed`, a null montage in `StartMontage`, and an uninitialised variable in `EnemyStrategicAIComponent`.
+
 ### Cover animation asset checks
 
 Two setup mistakes on the animation Blueprint are reported once per class through `ReportError`:
@@ -259,6 +280,7 @@ Two setup mistakes on the animation Blueprint are reported once per class throug
 - `-CoverFinderValidateTrenchCover` sends a squad into a trench and checks crouch, stand up against an enemy in front, no movement while standing up, firing through the trench, and crouching again.
 - `-CoverFinderValidateStress` stresses a player soldier in crouch cover and checks the weapon change, the spray animation, the run to cover further from the enemy, spraying from there, and everything back to normal afterwards. The run needs a longer stress than the default in a headless run, where unseen soldiers move slowly: add `-ini:Game:[/Script/RTS_Survival.RTSCoverFinderDeveloperSettings]:M_InfantryStressDuration=30`.
 - `-CoverFinderMeasureStress` measures what stress costs, see "Infantry stress".
+- `-SquadPerfMeasure` measures frame times while squads fight and move, see "Squad performance".
 - The idle phase of `-CoverFinderValidateTestCover` fails when a unit in cover would hit its own cover or a thin obstacle holds more soldiers than it has room for.
 
 ### First scan budget

@@ -126,6 +126,10 @@ namespace CoverFinderWorldSubsystemPrivate
 	// How far a trench socket may sit from the navmesh and still be moved onto it.
 	const FVector CoverSocketProjectionExtent(120.0f, 120.0f, 250.0f);
 
+	// A cover socket may sit a little above the ground it belongs to, but navmesh further below it than this
+	// belongs to something else.
+	constexpr float MaximumNavigationDepthBelowCoverSocket = 60.0f;
+
 	// How often a stressed soldier checks what he should be doing.
 	constexpr float StressTickSeconds = 0.2f;
 
@@ -601,26 +605,9 @@ void URTSCoverFinderWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		{
 			RequestDebugCapture();
 		}
-		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateTrenchCover")))
-		{
-			M_TrenchCoverScenario.Start();
-		}
-		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateStress")))
-		{
-			M_StressScenario.Start();
-		}
-		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderMeasureStress")))
-		{
-			M_StressPerfScenario.Start();
-		}
-		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderCountCover")))
-		{
-			M_CoverCountScenario.Start(FParse::Param(FCommandLine::Get(), TEXT("CoverFinderWriteCountBaseline")));
-		}
-		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateCombatCover")))
-		{
-			M_CombatCoverScenario.Start();
-		}
+#if RTS_WITH_MAP_TESTS
+		StartCommandLineMapTests();
+#endif
 		if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateTestCover")))
 		{
 			float ValidationDelaySeconds = DefaultCommandLineValidationDelaySeconds;
@@ -636,16 +623,59 @@ void URTSCoverFinderWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 }
 
-void URTSCoverFinderWorldSubsystem::Tick(const float DeltaTime)
+#if RTS_WITH_MAP_TESTS
+void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 {
-	Super::Tick(DeltaTime);
-	TickDebugCapture();
+	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateTrenchCover")))
+	{
+		M_TrenchCoverScenario.Start();
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateStress")))
+	{
+		M_StressScenario.Start();
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderMeasureStress")))
+	{
+		M_StressPerfScenario.Start();
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("SquadPerfMeasure")))
+	{
+		M_SquadPerfScenario.Start();
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("MedicValidateHeal")))
+	{
+		M_MedicHealScenario.Start();
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderCountCover")))
+	{
+		M_CoverCountScenario.Start(FParse::Param(FCommandLine::Get(), TEXT("CoverFinderWriteCountBaseline")));
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateCombatCover")))
+	{
+		M_CombatCoverScenario.Start();
+	}
+}
+
+void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
+{
 	M_TestCoverScenario.Tick(*this, DeltaTime);
 	M_CombatCoverScenario.Tick(*this);
 	M_CoverCountScenario.Tick(*this);
 	M_TrenchCoverScenario.Tick(*this);
 	M_StressScenario.Tick(*this);
 	M_StressPerfScenario.Tick(*this);
+	M_SquadPerfScenario.Tick(*this);
+	M_MedicHealScenario.Tick(*this);
+}
+#endif
+
+void URTSCoverFinderWorldSubsystem::Tick(const float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	TickDebugCapture();
+#if RTS_WITH_MAP_TESTS
+	TickMapTests(DeltaTime);
+#endif
 	TickStressedUnits(DeltaTime);
 	if (not bM_HasRegisteredSocketCover)
 	{
@@ -848,15 +878,35 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildSocketCoverPoints(
 		SocketPoint.SnapLocation = SocketTransform.GetLocation();
 		// Soldiers walk to the point, so it is moved onto the navmesh when that is close by.
 		FNavLocation ProjectedSocketLocation;
-		const bool bIsOnNavigation = IsValid(NavigationSystem) && IsValid(NavigationData) &&
+		const bool bFoundNavigation = IsValid(NavigationSystem) && IsValid(NavigationData) &&
 			NavigationSystem->ProjectPointToNavigation(
 				SocketPoint.Location,
 				ProjectedSocketLocation,
 				CoverFinderWorldSubsystemPrivate::CoverSocketProjectionExtent,
 				NavigationData);
+		// Navmesh well below the socket is not where a soldier steps to from it: it is a patch underneath the
+		// actor, cut off from the rest of the map. A soldier put there could never walk anywhere again.
+		const bool bIsOnNavigation = bFoundNavigation &&
+			SocketPoint.SnapLocation.Z - ProjectedSocketLocation.Location.Z <=
+			CoverFinderWorldSubsystemPrivate::MaximumNavigationDepthBelowCoverSocket;
 		if (bIsOnNavigation)
 		{
 			SocketPoint.Location = ProjectedSocketLocation.Location;
+		}
+		else if (bFoundNavigation)
+		{
+			if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+			{
+				UE_LOG(
+					LogRTSCoverFinder,
+					Verbose,
+					TEXT("RTS_COVER_SOCKET_SKIPPED actor=%s socket=%s reason=navmesh_only_%.0f_cm_below_socket"),
+					*CoverActor.GetName(),
+					*SocketName.ToString(),
+					SocketPoint.SnapLocation.Z - ProjectedSocketLocation.Location.Z);
+			}
+			SocketPoints.Pop(EAllowShrinking::No);
+			continue;
 		}
 		// Without a navmesh point to walk to and return to there is nothing to snap from.
 		SocketPoint.bSnapSoldierToSocket = bSnapSoldiersToSockets && bIsOnNavigation;
@@ -1862,10 +1912,12 @@ void URTSCoverFinderWorldSubsystem::RequestTestCoverValidation(
 	const bool bCaptureScreenshot)
 {
 	// The scenario unpauses the game and orders squads around, so it only exists in cover-debug builds.
+#if RTS_WITH_MAP_TESTS
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
 		M_TestCoverScenario.Start(DelaySeconds, bCaptureScreenshot);
 	}
+#endif
 }
 
 const URTSCoverFinderDeveloperSettings* URTSCoverFinderWorldSubsystem::GetCoverFinderSettings() const

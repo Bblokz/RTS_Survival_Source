@@ -8,6 +8,7 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "SquadAnimationEnums/SquadAnimationEnums.h"
 #include "TeamWeaponCrewMontages/TeamWeaponCrewMontages.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "SquadUnitAnimInstance.generated.h"
 
 
@@ -427,6 +428,37 @@ enum class ESquadCoverSprayStance : uint8
 	Standing
 };
 
+/** Which of the heal animation lists a medic plays from while it tends to a patient. */
+enum class ESquadMedicHealStance : uint8
+{
+	None,
+	Standing,
+	Crouch
+};
+
+/**
+ * @brief The full-body animations a medic loops while it heals, one list per stance.
+ * Every squad unit shares the animation Blueprint, so the lists live here; only a unit with a medic component
+ * ever plays them. The defaults are the clips in Squads/SquadUnits/Anims/Medic.
+ */
+USTRUCT(BlueprintType)
+struct FSquadUnitMedicHealAnimations
+{
+	GENERATED_BODY()
+
+	// Played while the patient stands. One is picked at random after the other for as long as the medic heals.
+	// Sequences are played on HealAnimationSlotName; a montage uses its own slot.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Medic")
+	TArray<TObjectPtr<UAnimSequenceBase>> StandingHealAnimations;
+
+	// Played while the patient lies prone or crouches behind cover.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Medic")
+	TArray<TObjectPtr<UAnimSequenceBase>> CrouchHealAnimations;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Medic")
+	FName HealAnimationSlotName = TEXT("FullBody");
+};
+
 /** How far one approach move carries the unit, in the unit's own frame, and how long it takes. */
 struct FSquadUnitCoverApproachTravel
 {
@@ -650,8 +682,10 @@ public:
 	// Fired when the approach move ended, whether it played out or was cut short.
 	FSimpleDelegate OnCoverApproachMoveEnded;
 
+#if RTS_WITH_MAP_TESTS
 	// Cover test support: lets an unattended run use approach moves the Blueprint has not been given yet.
 	void Debug_SetCoverApproachMoves(const TArray<UAnimSequenceBase*>& Animations);
+#endif
 
 	/**
 	 * @brief Keeps a stressed soldier spraying: plays the stance's spray animations one after the other until
@@ -663,8 +697,24 @@ public:
 	bool GetIsCoverSprayPlaying() const { return M_ActiveSprayMontage != nullptr; }
 	int32 GetCoverSprayAnimationCount(ESquadCoverSprayStance Stance) const;
 
+#if RTS_WITH_MAP_TESTS
 	// Test-only: gives a unit spray animations when its animation Blueprint has none assigned for the stance.
 	void Debug_SetCoverSprayAnimations(ESquadCoverSprayStance Stance, const TArray<UAnimSequenceBase*>& Animations);
+#endif
+
+	/**
+	 * @brief Keeps a medic's heal animation going: plays the stance's heal animations one after the other until
+	 * told otherwise. Call it again whenever the medic should be healing; another full-body montage ends the
+	 * animation that is playing, and the next call picks it up again.
+	 * @param Stance List to play from; None stops the heal animation.
+	 */
+	void SetMedicHeal(ESquadMedicHealStance Stance);
+	bool GetIsMedicHealPlaying() const { return M_ActiveHealMontage != nullptr; }
+	ESquadMedicHealStance GetMedicHealStance() const { return M_WantedHealStance; }
+	int32 GetMedicHealAnimationCount(ESquadMedicHealStance Stance) const;
+
+	/** @return True while the unit crouches or lies down, in cover or by its aim position; a medic kneels for it. */
+	bool GetIsCrouchedOrProne() const;
 
 	/** @return True only when a standing protected pose started its expose montage. */
 	bool StartStandingCoverPeek();
@@ -894,6 +944,10 @@ protected:
 	// Full body montages played per crew position type while operating a deployed team weapon.
 	UPROPERTY(EditDefaultsOnly, Category = "Team Weapon Crew")
 	FTeamWeaponCrewMontages TeamWeaponCrewMontages;
+
+	// Full body heal animations of a medic, per stance of its patient.
+	UPROPERTY(EditDefaultsOnly, Category = "Medic")
+	FSquadUnitMedicHealAnimations MedicHealAnimations;
 
 	// Full body death montages and the team-weapon subtypes that override the current unit stance.
 	UPROPERTY(EditDefaultsOnly, Category = "Death")
@@ -1129,4 +1183,28 @@ private:
 	UAnimMontage* PlaySharedSprayMontage(UAnimSequenceBase& SprayAnimation);
 	void StopCoverSprayMontage();
 	void OnSprayMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+
+	/**
+	 * @brief Plays a plain sequence on a slot through the montage every soldier of the world shares for it,
+	 * so looping animations do not create a montage object every time they start.
+	 * @param Animation Sequence to play.
+	 * @param SlotName Slot of the AnimGraph to play it on.
+	 * @param BlendSeconds Blend in and out time of the montage.
+	 * @return The montage that is playing, or null when it could not be played.
+	 */
+	UAnimMontage* PlaySharedSlotMontage(UAnimSequenceBase& Animation, FName SlotName, float BlendSeconds);
+
+	// ----- Medic Heal Animations -----
+
+	// The heal animation that is playing, and the stance the medic wants to keep healing in.
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> M_ActiveHealMontage = nullptr;
+
+	ESquadMedicHealStance M_WantedHealStance = ESquadMedicHealStance::None;
+
+	FOnMontageEnded M_HealMontageEndedDelegate;
+	const TArray<TObjectPtr<UAnimSequenceBase>>& GetMedicHealAnimations(ESquadMedicHealStance Stance) const;
+	void PlayRandomMedicHeal();
+	void StopMedicHealMontage();
+	void OnMedicHealMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 };

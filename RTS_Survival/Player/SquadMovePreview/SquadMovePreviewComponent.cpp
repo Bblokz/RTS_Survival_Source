@@ -59,11 +59,13 @@ void USquadMovePreviewComponent::BeginPlay()
 	{
 		M_Stances.Setup(*World);
 	}
+#if RTS_WITH_MAP_TESTS
 	if (FParse::Param(FCommandLine::Get(), TEXT("SquadMovePreviewValidate")))
 	{
 		M_TestScenario.Start();
 		SetComponentTickEnabled(true);
 	}
+#endif
 }
 
 void USquadMovePreviewComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -78,11 +80,15 @@ void USquadMovePreviewComponent::TickComponent(
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+#if RTS_WITH_MAP_TESTS
 	M_TestScenario.Tick(*this, DeltaTime);
-	if (not M_TestScenario.GetIsRunning())
+	if (M_TestScenario.GetIsRunning())
 	{
-		SetComponentTickEnabled(false);
+		return;
 	}
+#endif
+	// Nothing but the map test ever needs this component to tick.
+	SetComponentTickEnabled(false);
 }
 
 bool USquadMovePreviewComponent::GetCanPlanForSquads(const TArray<ASquadController*>& Squads)
@@ -114,11 +120,13 @@ void USquadMovePreviewComponent::SetFormationShape(const EFormation FormationSha
 
 void USquadMovePreviewComponent::UpdatePreview(const FSquadMovePreviewInput& Input)
 {
+#if RTS_WITH_MAP_TESTS
 	// The player controller calls this every tick; with nothing selected it would wipe what the map test shows.
 	if (M_TestScenario.GetOwnsPreview())
 	{
 		return;
 	}
+#endif
 	ApplyPreviewInput(Input);
 }
 

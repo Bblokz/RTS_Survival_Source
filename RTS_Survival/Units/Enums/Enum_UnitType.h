@@ -403,6 +403,10 @@ enum class ESquadSubtype: uint8
 	Squad_Rus_CortexOfficer UMETA(DisplayName = "Rus Cortex Officer: heavily armored cyborg"),
 	Squad_Rus_LargeMixBasic UMETA(DisplayName = "Rus Large Mix Basic Squad"),
 	Squad_Rus_LargeMixT2 UMETA(DisplayName = "Rus Large Mix T2 Squad"),
+	// Medics: fight like a basic squad and heal injured allied squad units. Added at the end, so the values
+	// of the subtypes above, which training options store as numbers, stay what they were.
+	Squad_Ger_Medic UMETA(DisplayName = "Ger Medic"),
+	Squad_Rus_Medic UMETA(DisplayName = "Rus Medic (Soviet)"),
 };
 
 
@@ -545,6 +549,10 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "RedHamerPTRS Squad";
 	case ESquadSubtype::Squad_Rus_LargeMixT2:
 		return "Large Mix T2 Squad";
+	case ESquadSubtype::Squad_Ger_Medic:
+		return "Medic";
+	case ESquadSubtype::Squad_Rus_Medic:
+		return "Soviet Medic";
 	case ESquadSubtype::Squad_Rus_ToxicGuard:
 		return "Toxic Guard Squad";
 	case ESquadSubtype::Squad_Rus_GhostsOfStalingrad:

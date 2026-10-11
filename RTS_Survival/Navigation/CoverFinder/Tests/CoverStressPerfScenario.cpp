@@ -1,5 +1,9 @@
 #include "CoverStressPerfScenario.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
+
 #include "Engine/DamageEvents.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -264,3 +268,5 @@ void FCoverStressPerfScenario::MeasureStressLifetime(
 		Soldiers.Num() * StressTicksPerSecond * TickNanoseconds / NanosecondsPerMicrosecond,
 		IsValid(CoverSettings) ? CoverSettings->M_InfantryStressDuration : 0.0f);
 }
+
+#endif // RTS_WITH_MAP_TESTS

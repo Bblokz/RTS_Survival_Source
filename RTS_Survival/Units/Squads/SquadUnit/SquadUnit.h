@@ -15,6 +15,7 @@
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "SquadUnit.generated.h"
 
 struct FRTSCombatCoverThreats;
@@ -25,6 +26,7 @@ class URTSCoverFinderWorldSubsystem;
 enum class ERTSNavAgents : uint8;
 class URTSSquadUnitOptimizer;
 class URepairComponent;
+class UMedicComponent;
 class UFowComp;
 class AScavengeableObject;
 class UScavengerComponent;
@@ -415,8 +417,12 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 	// for changing the way the weapon of this unit behaves when an aim ability is active.
 	friend class USquadAimAbilityComponent;
 	friend class URTSCoverFinderWorldSubsystem;
+	// To walk the unit to its patients and to hold it there while it heals.
+	friend class UMedicComponent;
+#if RTS_WITH_MAP_TESTS
 	// Times the private steps of a soldier's stress one by one.
 	friend struct FCoverStressPerfScenario;
+#endif
 
 public:
 	ASquadUnit(const FObjectInitializer& ObjectInitializer);
@@ -497,6 +503,17 @@ public:
 	
 	/** Gets the scavenger component */
 	URepairComponent* GetRepairComponent() const { return M_RepairComponent; }
+
+	/** @return The medic component of a unit that heals allied squad units; nullptr for any other unit. */
+	UMedicComponent* GetMedicComponent() const { return M_MedicComponent; }
+
+	// True while this unit's squad sits inside a vehicle or another cargo holder.
+	bool GetIsSquadInsideCargo() const;
+
+#if RTS_WITH_MAP_TESTS
+	// Test-only: turns a unit of any class into a medic, for maps that have no medic unit placed on them.
+	UMedicComponent* Debug_AddMedicComponent();
+#endif
 
 	inline AInfantryWeaponMaster* GetInfantryWeapon() const { return M_InfantryWeapon; }
 	inline  USquadUnitAnimInstance * GetAnimBP_SquadUnit() const { return AnimBp_SquadUnit; }
@@ -587,6 +604,13 @@ public:
 	// True while a unit in cover stays down because its weapon is reloading.
 	bool GetIsReloadingInCover() const;
 
+	// Passes the unit's speed to its animation instance, which turns it into the movement state and the walk
+	// and run play rates. Called once a frame by the squad controller for every soldier of its squad.
+	void UpdateAnimationStateFromVelocity();
+
+	/** @return Where a path for this soldier has to start: on the navmesh, also while he holds a cover socket off it. */
+	FVector GetPathStartLocation() const;
+
 	// Stress: a soldier in cover that loses health faster than his squad's stress tolerance sprays blind fire,
 	// runs for cover further from his enemy and sprays again, for the stress duration of the cover settings.
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
@@ -654,6 +678,8 @@ protected:
 	void PostInitializeComp_SetupSpatialVoiceLinePlayer();
 	/** @brief Initialzies the Repair component with owner. */
 	void PostInitializeComp_InitRepairComponent();
+	/** @brief Initializes the Medic component with owner, for units that have one. */
+	void PostInitializeComp_InitMedicComponent();
 	/** @brief Initializes the Secondary weapon with owner. */
 	void PostInitializeComp_InitSecondaryWeapon();
 	/** @brief Sets the collision for the infantry capsule component. */
@@ -865,9 +891,6 @@ private:
 	UPROPERTY()
 	TObjectPtr<ASquadController> M_SquadController;
 
-	/** Timer handle for updating the animation. */
-	FTimerHandle M_TimerHandleUpdateAnim;
-
 	FTimerHandle M_TimerHandleWeaponSwitch;
 
 	FTimerHandle M_DeathTimerHandle;
@@ -923,6 +946,7 @@ private:
 	void OnMoveCompleted_Patrol();
 	void OnMoveCompleted_Scavenge();
 	void OnMoveCompleted_Repair() const;
+	void OnMoveCompleted_Heal(EPathFollowingResult::Type Result) const;
 	void OnMoveCompleted_Capture() const;
 	void OnMoveCompleted_MoveCloserToTarget();
 	void OnMoveCompleted_Cover(EPathFollowingResult::Type Result);
@@ -1001,6 +1025,11 @@ private:
 	UPROPERTY()
 	TObjectPtr<URepairComponent> M_RepairComponent;
 
+	// The medic component of this unit, is set at post init components automatically
+	// if the unit has one, as ASquadUnit_Medic does.
+	UPROPERTY()
+	TObjectPtr<UMedicComponent> M_MedicComponent;
+
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> M_ScavengeEquipmentMesh;
 
@@ -1015,8 +1044,6 @@ private:
 
 	/** @brief Uses ErrorReporting if no child weapon actor is found. */
 	void BeginPlay_SetupChildActorWeaponComp();
-	/** @brief Sets up a lambda function to call periodically to update the speed of the unit on the animation instance. */
-	void BeginPlay_SetupUpdateAnimSpeed();
 	// Disable affection of nav mesh on selection area, decal and healthbar.
 	void BeginPlay_SetupSelectionHealthCompCollision() const;
 

@@ -64,6 +64,8 @@ Subtype-driven abilities store subtype in `FQueueCommand::CustomType` and cast v
 - `GetTurretSwapAbilitySubtype()`
 - `GetCrewRepairAbilitySubtype()`
 
+`IdHeal` keeps its subtype (`EHealAbilityType`) on the card entry only; its queue command carries the target actor.
+
 Subtype-sensitive queue validation is centralized in `UCommandData`:
 - `GetDoesQueuedCommandRequireSubtypeEntry(...)`
 - `GetAbilityEntryForQueuedCommandSubtype(...)`
@@ -81,6 +83,24 @@ So queued subtype abilities are revalidated against the *exact* `(AbilityId, Cus
   `ExecuteCrewRepairCommand(DisableRepair)` directly and is never queued behind the running repair.
 - The running command completes itself exactly once through `TryDoneExecutingCommand`; `TerminateCrewRepairCommand`
   only cleans up because the queue owns progression there.
+
+### Heal (`IdHeal`, `EHealAbilityType`)
+
+- Squads with medics only (`ASquadUnit_Medic`, or any squad unit with a `UMedicComponent`). The medic squad
+  subtypes carry it on card index 5.
+- `HealingActive` is a second-click button: `ACPPController::ActivateActionButtonHeal` waits for a click on an allied
+  squad unit and `ActionButtonHeal` issues `ICommands::HealTarget`. No right-click decoder path.
+- `ASquadController::ExecuteHealCommand` hands the order to the squad's medic components, which heal the injured
+  soldiers of the clicked unit's squad, the clicked one first. While it runs the squad swaps its card entry to
+  `HealingDisabled`; `TerminateHealCommand` swaps it back.
+- `HealingDisabled` is an **immediate** control action (`ICommands::CancelHeal` → `ExecuteCancelHealCommand`), never
+  queued. It ends the order and keeps the medics from healing by themselves until the squad's next command.
+- The queue only checks that the card holds an `IdHeal` entry of either subtype, so a heal order for another squad
+  can replace the running one or be Shift-queued behind it.
+- The order completes itself: each medic reports through `ASquadController::OnMedicFinishedOrderedHeal`, and the
+  squad calls `DoneExecutingCommand(IdHeal)` once no medic has a patient of that squad left.
+- Medics also heal without a command while their squad is idle; `OnCommandExecutionStarting` takes them off that
+  before any command starts. `-MedicValidateHeal` runs the map test (`FMedicHealTestScenario`).
 
 ### Temporary ability removal: `BeginAbilitySuppression` / `EndAbilitySuppression`
 

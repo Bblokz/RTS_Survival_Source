@@ -4,7 +4,10 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePlanner.h"
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewStances.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+#if RTS_WITH_MAP_TESTS
 #include "RTS_Survival/Player/SquadMovePreview/Tests/SquadMovePreviewTestScenario.h"
+#endif
 #include "SquadMovePreviewComponent.generated.h"
 
 class ASquadController;
@@ -135,7 +138,10 @@ private:
 	// Facing used while the cursor sits on top of the squads, where the walking direction is undefined.
 	FVector M_LastAutomaticFacing = FVector::ForwardVector;
 
+#if RTS_WITH_MAP_TESTS
+	// Map test scenario; not part of a shipping build.
 	FSquadMovePreviewTestScenario M_TestScenario;
+#endif
 
 	// The stance meshes standing on the positions of the plan that is on screen.
 	UPROPERTY(Transient)

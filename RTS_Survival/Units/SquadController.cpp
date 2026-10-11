@@ -26,6 +26,8 @@
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceComponent.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h"
+#include "RTS_Survival/RTSComponents/MedicComponent/HealAbilityTypes.h"
+#include "RTS_Survival/RTSComponents/MedicComponent/MedicComponent.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
@@ -924,14 +926,107 @@ void ASquadController::OnSquadUnitOutOfRange(
 		return;
 	}
 
+	if (not GetMayStartRangeClosing(TargetLocation))
+	{
+		return;
+	}
+
 	FVector ProjectedLocation = ProjectLocationOnNavMesh(TargetLocation, 500, true);
 	GeneralMoveToForAbility(ProjectedLocation, EAbilityID::IdNoAbility_MoveCloserToTarget);
+	RecordRangeClosingAttempt();
 	if constexpr (DeveloperSettings::Debugging::GSquadUnit_Weapons_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString("SQUAD out of range; move closer", FColor::Red);
 	}
 }
 
+
+namespace SquadRangeClosingStatics
+{
+	// A target that moved this far, or a squad that got this much closer, is a new situation: no waiting.
+	constexpr float TargetMovedDistanceAfterWalk = 300.0f;
+	constexpr float TargetMovedDistanceAfterFailure = 1500.0f;
+	constexpr float MinimumProgressDistance = 100.0f;
+	constexpr float FirstBackoffSeconds = 0.6f;
+	constexpr float MaximumBackoffSeconds = 20.0f;
+}
+
+void ASquadController::RecordRangeClosingAttempt()
+{
+	using namespace SquadRangeClosingStatics;
+	bool bSetSomebodyWalking = false;
+	for (const ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		bSetSomebodyWalking = bSetSomebodyWalking || (IsValid(SquadUnit) &&
+			SquadUnit->GetActiveCommand() == EAbilityID::IdNoAbility_MoveCloserToTarget);
+	}
+	M_RangeClosingGuard.bLastAttemptSetNobodyWalking = not bSetSomebodyWalking;
+	const UWorld* World = GetWorld();
+	if (bSetSomebodyWalking || not IsValid(World))
+	{
+		return;
+	}
+	// No path for anybody: the wait doubles whatever the target does in the meantime.
+	M_RangeClosingGuard.BackoffSeconds = FMath::Clamp(
+		M_RangeClosingGuard.BackoffSeconds * 2.0f,
+		FirstBackoffSeconds,
+		MaximumBackoffSeconds);
+	M_RangeClosingGuard.NextAttemptWorldSeconds = World->GetTimeSeconds() + M_RangeClosingGuard.BackoffSeconds;
+}
+
+bool ASquadController::GetMayStartRangeClosing(const FVector& TargetLocation)
+{
+	using namespace SquadRangeClosingStatics;
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return true;
+	}
+	const float WorldSeconds = World->GetTimeSeconds();
+	// After an attempt that set nobody walking the target has to move a good deal further before it is worth
+	// searching again early: a few steps do not make a place that cannot be walked to reachable.
+	const float TargetMovedDistance = M_RangeClosingGuard.bLastAttemptSetNobodyWalking
+		? TargetMovedDistanceAfterFailure
+		: TargetMovedDistanceAfterWalk;
+	const bool bTargetMoved = FVector::Dist2D(TargetLocation, M_RangeClosingGuard.TargetLocationAtLastAttempt) >
+		TargetMovedDistance;
+	if (not bTargetMoved && WorldSeconds < M_RangeClosingGuard.NextAttemptWorldSeconds)
+	{
+		return false;
+	}
+	FVector SquadLocation = FVector::ZeroVector;
+	int32 LivingUnitCount = 0;
+	for (const ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (IsValid(SquadUnit))
+		{
+			SquadLocation += SquadUnit->GetActorLocation();
+			++LivingUnitCount;
+		}
+	}
+	SquadLocation = LivingUnitCount > 0 ? SquadLocation / LivingUnitCount : GetActorLocation();
+	const float DistanceToTarget = FVector::Dist2D(SquadLocation, TargetLocation);
+	const bool bGotCloser = DistanceToTarget < M_RangeClosingGuard.DistanceAtLastAttempt - MinimumProgressDistance;
+	// Each attempt that changed nothing doubles the wait, so a target that cannot be reached costs a path
+	// search every few seconds instead of on every weapon update.
+	// A failed attempt keeps its wait; RecordRangeClosingAttempt doubles it again if this one fails too.
+	const bool bIsNewSituation = (bTargetMoved || bGotCloser) && not M_RangeClosingGuard.bLastAttemptSetNobodyWalking;
+	if (bIsNewSituation)
+	{
+		M_RangeClosingGuard.BackoffSeconds = 0.0f;
+	}
+	else if (not M_RangeClosingGuard.bLastAttemptSetNobodyWalking)
+	{
+		M_RangeClosingGuard.BackoffSeconds = FMath::Clamp(
+			M_RangeClosingGuard.BackoffSeconds * 2.0f,
+			FirstBackoffSeconds,
+			MaximumBackoffSeconds);
+	}
+	M_RangeClosingGuard.NextAttemptWorldSeconds = WorldSeconds + M_RangeClosingGuard.BackoffSeconds;
+	M_RangeClosingGuard.DistanceAtLastAttempt = DistanceToTarget;
+	M_RangeClosingGuard.TargetLocationAtLastAttempt = TargetLocation;
+	return true;
+}
 
 bool ASquadController::TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon)
 {
@@ -1219,6 +1314,19 @@ void ASquadController::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	UpdateControllerPositionToAverage();
+	UpdateSquadUnitAnimationStates();
+}
+
+void ASquadController::UpdateSquadUnitAnimationStates()
+{
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Squad_UpdateUnitAnimationStates);
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (IsValid(SquadUnit))
+		{
+			SquadUnit->UpdateAnimationStateFromVelocity();
+		}
+	}
 }
 
 bool ASquadController::GetCanCaptureUnits()
@@ -1614,7 +1722,7 @@ ESquadPathFindingError ASquadController::GeneratePaths_GenerateQuery(
 {
 	// Project location to the navmesh.
 	FNavLocation NavLocation;
-	if (not NavSystem->ProjectPointToNavigation(M_TSquadUnits[0]->GetActorLocation(), NavLocation,
+	if (not NavSystem->ProjectPointToNavigation(M_TSquadUnits[0]->GetPathStartLocation(), NavLocation,
 	                                            FVector(100.0f, 100.0f, 500.0f)))
 	{
 		return ESquadPathFindingError::CannotProjectStartLocation;
@@ -1632,6 +1740,9 @@ ESquadPathFindingError ASquadController::GeneratePaths_GenerateQuery(
 	{
 		return ESquadPathFindingError::CannotBuildValidPathFindingQuery;
 	}
+	// The query was built from where the soldier stands, which for one that holds a cover socket (in a trench)
+	// lies off the navmesh; the path has to start where he will be put back to walk.
+	OutPFQuery.StartLocation = NavLocation.Location;
 	return ESquadPathFindingError::NoError;
 }
 
@@ -1758,11 +1869,17 @@ void ASquadController::GeneralMoveToForAbility(const FVector& MoveToLocation, co
 	}
 
 	// Generate paths for each squad unit
-	const ESquadPathFindingError Error = GeneratePathsForSquadUnits(MoveToLocation);
+	ESquadPathFindingError Error = ESquadPathFindingError::NoError;
+	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_Squad_GeneratePathsForUnits);
+		Error = GeneratePathsForSquadUnits(MoveToLocation);
+	}
 	if (Error != ESquadPathFindingError::NoError)
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_Squad_ReportPathError);
 		RTSFunctionLibrary::ReportError(GetSquadPathFindingErrorMsg(Error));
 	}
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Squad_AssignPathsToUnits);
 
 	// Assign paths to squad units
 	for (ASquadUnit* SquadUnit : M_TSquadUnits)
@@ -2596,6 +2713,123 @@ void ASquadController::TerminateRepairCommand()
 		{
 			RepairComp->TerminateRepair();
 		}
+	}
+}
+
+TArray<UMedicComponent*> ASquadController::GetMedicComponentsOfSquad() const
+{
+	TArray<UMedicComponent*> MedicComponents;
+	for (const ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		UMedicComponent* MedicComponent = IsValid(SquadUnit) ? SquadUnit->GetMedicComponent() : nullptr;
+		if (IsValid(MedicComponent))
+		{
+			MedicComponents.Add(MedicComponent);
+		}
+	}
+	return MedicComponents;
+}
+
+ASquadUnit* ASquadController::GetHealPatientFromTarget(AActor* TargetActor) const
+{
+	if (ASquadUnit* TargetUnit = Cast<ASquadUnit>(TargetActor))
+	{
+		return TargetUnit;
+	}
+	ASquadController* TargetSquad = Cast<ASquadController>(TargetActor);
+	if (not IsValid(TargetSquad))
+	{
+		return nullptr;
+	}
+	// Any soldier will do: the medics pick who of that squad needs them most.
+	const TArray<ASquadUnit*> TargetSquadUnits = TargetSquad->GetSquadUnitsChecked();
+	return TargetSquadUnits.IsEmpty() ? nullptr : TargetSquadUnits[0];
+}
+
+bool ASquadController::GetHasMedicOnHealOrder() const
+{
+	for (const UMedicComponent* MedicComponent : GetMedicComponentsOfSquad())
+	{
+		if (MedicComponent->GetIsOrderedHeal())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void ASquadController::SetHealAbilityCardSubtype(const EHealAbilityType NewSubtype)
+{
+	const EHealAbilityType OldSubtype = NewSubtype == EHealAbilityType::HealingActive
+		                                    ? EHealAbilityType::HealingDisabled
+		                                    : EHealAbilityType::HealingActive;
+	FUnitAbilityEntry HealAbilityEntry;
+	HealAbilityEntry.AbilityId = EAbilityID::IdHeal;
+	HealAbilityEntry.CustomType = static_cast<int32>(NewSubtype);
+	// Finds nothing, and changes nothing, when the card already shows the wanted subtype.
+	SwapAbility(EAbilityID::IdHeal, static_cast<int32>(OldSubtype), HealAbilityEntry);
+}
+
+void ASquadController::ExecuteHealCommand(AActor* TargetActor)
+{
+	if (IsValid(CargoSquad))
+	{
+		CargoSquad->CheckCargoState(EAbilityID::IdHeal);
+	}
+	EnsureSquadUnitsValid();
+	ASquadUnit* Patient = GetHealPatientFromTarget(TargetActor);
+	bM_IsStartingHealOrder = true;
+	for (UMedicComponent* MedicComponent : GetMedicComponentsOfSquad())
+	{
+		MedicComponent->StartOrderedHeal(Patient);
+	}
+	bM_IsStartingHealOrder = false;
+	if (not GetHasMedicOnHealOrder())
+	{
+		// No medics, or nobody of the target's squad is an injured ally outside a vehicle.
+		DoneExecutingCommand(EAbilityID::IdHeal);
+		return;
+	}
+	SetHealAbilityCardSubtype(EHealAbilityType::HealingDisabled);
+}
+
+void ASquadController::TerminateHealCommand()
+{
+	for (UMedicComponent* MedicComponent : GetMedicComponentsOfSquad())
+	{
+		MedicComponent->StopHealing();
+	}
+	SetHealAbilityCardSubtype(EHealAbilityType::HealingActive);
+}
+
+void ASquadController::ExecuteCancelHealCommand()
+{
+	// Otherwise the medics, idle again, would walk straight back to the patients they were told to leave.
+	for (UMedicComponent* MedicComponent : GetMedicComponentsOfSquad())
+	{
+		MedicComponent->SuppressAutoHealUntilNextCommand();
+	}
+	if (GetActiveCommandID() == EAbilityID::IdHeal)
+	{
+		DoneExecutingCommand(EAbilityID::IdHeal);
+	}
+}
+
+void ASquadController::OnMedicFinishedOrderedHeal()
+{
+	const bool bIsHealOrderRunning = GetActiveCommandID() == EAbilityID::IdHeal && not bM_IsStartingHealOrder;
+	if (not bIsHealOrderRunning || GetHasMedicOnHealOrder())
+	{
+		return;
+	}
+	DoneExecutingCommand(EAbilityID::IdHeal);
+}
+
+void ASquadController::OnCommandExecutionStarting(const EAbilityID AbilityStarting)
+{
+	for (UMedicComponent* MedicComponent : GetMedicComponentsOfSquad())
+	{
+		MedicComponent->OnSquadCommandStarting(AbilityStarting);
 	}
 }
 
@@ -3456,6 +3690,11 @@ void ASquadController::InitSquadData_SetValues(const float MaxWalkSpeed, const f
 			EachSqUnit->GetRTSComponent()->SetUnitSubtype(ENomadicSubtype::Nomadic_None, ETankSubtype::Tank_None,
 			                                              SquadSubtype);
 			EachSqUnit->GetRTSComponent()->SetUnitType(EAllUnitType::UNType_Squad);
+			// The soldier registered itself with the unit manager before it had this subtype.
+			if (UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this))
+			{
+				GameUnitManager->RecountSquadUnitSubtype(EachSqUnit);
+			}
 		}
 	}
 

@@ -1190,10 +1190,29 @@ void UGameUnitManager::IncrementSquadCounter(ASquadUnit* SquadUnit, const uint8 
 		return;
 	}
 
+	// Counted once: a soldier that is registered again first gives up what it was counted as.
+	DecrementSquadCounter(SquadUnit, Player);
+	const ESquadSubtype CountedSubtype = SquadUnit->GetRTSComponent()->GetSubtypeAsSquadSubtype();
 	TMap<ESquadSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasSquadOfType
 		: M_EnemyHasSquadOfType;
-	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, SquadUnit->GetRTSComponent()->GetSubtypeAsSquadSubtype());
+	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, CountedSubtype);
+	M_CountedSquadUnits.Add(SquadUnit, FCountedSquadUnit{CountedSubtype, Player});
+}
+
+void UGameUnitManager::RecountSquadUnitSubtype(ASquadUnit* SquadUnit)
+{
+	if (not IsValid(SquadUnit) || not IsValid(SquadUnit->GetRTSComponent()))
+	{
+		return;
+	}
+	const FCountedSquadUnit* CountedUnit = M_CountedSquadUnits.Find(SquadUnit);
+	// Not registered yet: it is counted under its subtype when it registers.
+	if (CountedUnit == nullptr || CountedUnit->Subtype == SquadUnit->GetRTSComponent()->GetSubtypeAsSquadSubtype())
+	{
+		return;
+	}
+	IncrementSquadCounter(SquadUnit, CountedUnit->Player);
 }
 
 void UGameUnitManager::DecrementSquadCounter(ASquadUnit* SquadUnit, const uint8 Player)
@@ -1203,10 +1222,16 @@ void UGameUnitManager::DecrementSquadCounter(ASquadUnit* SquadUnit, const uint8 
 		return;
 	}
 
-	TMap<ESquadSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+	// Taken off the counter it was put on; a soldier that was never counted has nothing to take off.
+	FCountedSquadUnit CountedUnit;
+	if (not M_CountedSquadUnits.RemoveAndCopyValue(SquadUnit, CountedUnit))
+	{
+		return;
+	}
+	TMap<ESquadSubtype, int32>& Counters = CountedUnit.Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasSquadOfType
 		: M_EnemyHasSquadOfType;
-	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, SquadUnit->GetRTSComponent()->GetSubtypeAsSquadSubtype(), TEXT("Squad subtype counter"));
+	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, CountedUnit.Subtype, TEXT("Squad subtype counter"));
 }
 
 void UGameUnitManager::IncrementBxpCounter(ABuildingExpansion* Bxp, const uint8 Player)

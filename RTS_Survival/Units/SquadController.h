@@ -45,6 +45,8 @@ class AScavengeableObject;
 struct FSquadWeaponSwitch;
 class USquadUnitHealthComponent;
 class USquadReinforcementComponent;
+class UMedicComponent;
+enum class EHealAbilityType : uint8;
 class USoundBase;
 class USoundAttenuation;
 class USoundConcurrency;
@@ -54,6 +56,30 @@ enum class ERTSDeathType : uint8;
 class ASquadController;
 
 // Will only start to exe the action once the squad is fully loaded.
+/**
+ * @brief Keeps a squad from asking for the same walk towards its attack target over and over.
+ * A soldier whose target is out of range asks for that walk on every weapon update, three times a second. When
+ * the target cannot be reached the walk never starts, and without this the squad would search for a path that
+ * does not exist on every one of those updates. Attempts that brought the squad closer are never delayed.
+ */
+USTRUCT()
+struct FSquadRangeClosingGuard
+{
+	GENERATED_BODY()
+
+	// No new attempt before this time; pushed further out with every attempt that made no progress.
+	float NextAttemptWorldSeconds = 0.0f;
+	float BackoffSeconds = 0.0f;
+
+	// How far the squad was from the target at the last attempt, and where the target was.
+	float DistanceAtLastAttempt = TNumericLimits<float>::Max();
+	FVector TargetLocationAtLastAttempt = FVector::ZeroVector;
+
+	// The last attempt found no path for any soldier. Such a target is only tried again after the full wait,
+	// or when it has moved a long way.
+	bool bLastAttemptSetNobodyWalking = false;
+};
+
 USTRUCT()
 struct FSquadStartGameAction
 {
@@ -425,6 +451,10 @@ public:
 	// Called once one of the units arrives at the capture actor.
 	void OnSquadUnitArrivedAtCaptureActor();
 
+	// Called by a medic of this squad that has nobody left to heal for the squad's heal order; the order is
+	// over once that holds for every medic of the squad.
+	void OnMedicFinishedOrderedHeal();
+
 	// Called once one of the units reaches the grenade throw location.
 	void OnSquadUnitArrivedAtThrowGrenadeLocation(ASquadUnit* SquadUnit);
 
@@ -641,6 +671,14 @@ protected:
 
 	virtual void ExecuteRepairCommand(AActor* TargetActor) override;
 	virtual void TerminateRepairCommand() override;
+
+	// Heal order of a squad with medics: they heal the injured soldiers of the target's squad.
+	virtual void ExecuteHealCommand(AActor* TargetActor) override;
+	virtual void TerminateHealCommand() override;
+	virtual void ExecuteCancelHealCommand() override;
+
+	// Takes the squad's medics off whatever they were healing by themselves before any command starts.
+	virtual void OnCommandExecutionStarting(EAbilityID AbilityStarting) override;
 
 	virtual void ExecuteThrowGrenadeCommand(const FVector TargetLocation,
 	                                        const EGrenadeAbilityType GrenadeAbilityType) override;
@@ -1021,10 +1059,27 @@ protected:
 	 */
 	virtual void UpdateControllerPositionToAverage();
 
+	// Once a frame every soldier's speed goes to its animation instance. Done here, in one pass over the
+	// squad, instead of from a looping timer on every soldier.
+	void UpdateSquadUnitAnimationStates();
+
 	// Vision range of the squad propagated to the squad units.
 	float M_SquadVisionRange = 0.0f;
 
 	float M_StressTolerance = 0.0f;
+
+	UPROPERTY()
+	FSquadRangeClosingGuard M_RangeClosingGuard;
+
+	/**
+	 * @brief Decides whether the squad may try to walk closer to its attack target now.
+	 * @param TargetLocation Where the target that is out of range is.
+	 * @return False while the squad waits out an attempt that got it no closer.
+	 */
+	bool GetMayStartRangeClosing(const FVector& TargetLocation);
+
+	// Looks at what the attempt that was just made did, and makes the squad wait longer when it did nothing.
+	void RecordRangeClosingAttempt();
 
 	// How many units are left to spawn, if the squad is fully loaded and a timer handle
 	// to delay the initialization of the squad data if not all of the squad units are loaded in yet.
@@ -1051,6 +1106,21 @@ protected:
 
 	void OnRepairUnitNotValidForRepairs();
 	void OnRepairTargetFullyRepaired(AActor* RepairTarget);
+
+	// Set while the squad hands a heal order to its medics, so a medic that fails at once cannot end the
+	// order before the others were asked.
+	bool bM_IsStartingHealOrder = false;
+
+	/** @return The medic components of the squad's living units; empty for a squad without medics. */
+	TArray<UMedicComponent*> GetMedicComponentsOfSquad() const;
+
+	/** @return The soldier a heal order points at: the clicked unit, or a unit of the clicked squad. */
+	ASquadUnit* GetHealPatientFromTarget(AActor* TargetActor) const;
+
+	bool GetHasMedicOnHealOrder() const;
+
+	// Swaps the IdHeal card entry between picking a patient and cancelling the running heal order.
+	void SetHealAbilityCardSubtype(EHealAbilityType NewSubtype);
 
 	// ----------------- Weapon Icon -----------------
 	void UpdateSquadWeaponIcon();

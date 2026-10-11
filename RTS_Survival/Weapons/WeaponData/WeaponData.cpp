@@ -1528,6 +1528,7 @@ bool UWeaponState::FluxDamageHitActor_DidActorDie(
 
 void UWeaponState::OnActorKilled(AActor* KilledActor) const
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Weapon_OnActorKilled);
 	if (IsValid(WeaponOwner.GetObject()))
 	{
 		WeaponOwner->OnWeaponKilledActor(WeaponIndex, KilledActor);
@@ -1537,6 +1538,7 @@ void UWeaponState::OnActorKilled(AActor* KilledActor) const
 void UWeaponState::CreateWeaponImpact(const FVector& HitLocation, const ERTSSurfaceType HitSurface,
                                       const FRotator& ImpactRotation)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Weapon_CreateWeaponImpact);
 	if (not IsValid(World))
 	{
 		return;
@@ -2224,6 +2226,7 @@ bool UWeaponStateTrace::DidTracePenArmorCalcComponent(UArmorCalculation* ArmorCa
 
 void UWeaponStateTrace::OnActorPenArmor(const FHitResult& HitResult, AActor* HitActor)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_TraceWeapon_DamageHitActor);
 	if (FluxDamageHitActor_DidActorDie(HitActor, WeaponData.BaseDamage))
 	{
 		OnActorKilled(HitActor);
@@ -2267,6 +2270,7 @@ void UWeaponStateTrace::OnAsyncTraceComplete(
 	const FVector& TraceEnd,
 	TArray<TWeakObjectPtr<UPrimitiveComponent>> IgnoredShieldComponents)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_TraceWeapon_OnAsyncTraceComplete);
 	// Use Trace end on no-hit.
 	FVector EndLocation = TraceEnd;
 	// Get the weapon state
@@ -2320,6 +2324,7 @@ void UWeaponStateTrace::OnAsyncTraceComplete(
 	}
 	if (M_ProjectileManager.IsValid())
 	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_TraceWeapon_FireTracerProjectile);
 		M_ProjectileManager->FireProjectile(
 			LaunchLocation,
 			EndLocation,

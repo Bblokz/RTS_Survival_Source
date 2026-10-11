@@ -126,10 +126,18 @@ float ACharacterObjectsMaster::TakeDamage(
 	}
 	if (IsValid(HealthComponent))
 	{
-		GotHit(DamageEvent);
-		
+		{
+			QUICK_SCOPE_CYCLE_COUNTER(STAT_CharacterObjects_GotHitBlueprintEvent);
+			GotHit(DamageEvent);
+		}
+
 		const ERTSDamageType RtsDamageType = FRTSWeaponHelpers::GetRTSDamageType(DamageEvent);
-		if (HealthComponent->TakeDamage(DamageAmount, RtsDamageType))
+		bool bDiedOfDamage = false;
+		{
+			QUICK_SCOPE_CYCLE_COUNTER(STAT_CharacterObjects_HealthComponentTakeDamage);
+			bDiedOfDamage = HealthComponent->TakeDamage(DamageAmount, RtsDamageType);
+		}
+		if (bDiedOfDamage)
 		{
 			const ERTSDeathType DeathType = FRTSWeaponHelpers::TranslateDamageIntoDeathType(RtsDamageType);
 			UnitDies(DeathType);

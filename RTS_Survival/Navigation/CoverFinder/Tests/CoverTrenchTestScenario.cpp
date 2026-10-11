@@ -1,5 +1,9 @@
 #include "CoverTrenchTestScenario.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
+
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -502,3 +506,5 @@ void FCoverTrenchTestScenario::TickWaitingForCrouchAgain(UWorld& World)
 	Check(bIsCrouchedAgain, TEXT("the soldier crouched again once the enemy was gone"));
 	Finish(World);
 }
+
+#endif // RTS_WITH_MAP_TESTS

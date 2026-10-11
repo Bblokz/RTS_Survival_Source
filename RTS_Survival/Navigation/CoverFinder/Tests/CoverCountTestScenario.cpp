@@ -1,5 +1,9 @@
 #include "CoverCountTestScenario.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
+
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "NavigationSystem.h"
@@ -264,3 +268,5 @@ int32 FCoverCountTestScenario::CompareWithBaseline(
 	}
 	return LostKeyCount;
 }
+
+#endif // RTS_WITH_MAP_TESTS

@@ -1,5 +1,9 @@
 #include "CoverCombatObserver.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+#if RTS_WITH_MAP_TESTS
+
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverCombatScoring.h"
@@ -386,3 +390,5 @@ void FCoverCombatObserver::LogSummary() const
 			Totals.SecondsToCoverSamples);
 	}
 }
+
+#endif // RTS_WITH_MAP_TESTS

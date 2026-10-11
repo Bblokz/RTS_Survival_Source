@@ -100,6 +100,7 @@ enum class EPlayerError : uint8;
 class UPlayerBuildRadiusManager;
 class URadiusComp;
 enum class ETechnology : uint8;
+enum class EHealAbilityType : uint8;
 class UTechnologyEffect;
 class UPlayerTechManager;
 class ASquadUnit;
@@ -1521,6 +1522,11 @@ private:
 	void DirectActionButtonDetachTow();
 	void DirectActionButtonActivateShield();
 	void DirectActionButtonCrewRepair(ECrewRepairAbilityType Subtype);
+
+	// The heal button either waits for a click on an injured allied squad unit or cancels the running heal order.
+	void ActivateActionButtonHeal(EHealAbilityType HealAbilityType);
+	void DirectActionButtonCancelHeal();
+	void ActionButtonHeal(AActor* ClickedActor);
 
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();

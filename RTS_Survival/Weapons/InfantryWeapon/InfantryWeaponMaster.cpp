@@ -159,22 +159,36 @@ void AInfantryWeaponMaster::AutoEngage()
 	if (GetIsTargetValidVisibleAndInRange())
 	{
 		// Let aim selection possibly rotate to a new aim point before we read the location.
-		M_TargetingData.TickAimSelection();
+		{
+			QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_AimSelection);
+			M_TargetingData.TickAimSelection();
+		}
 
 		// Save TargetPitch for weapon.
 		M_FireDirection = CalculateTargetDirection(GetActorLocation());
 
 		// Target is allowed to be reset when the unit is walking and the angle is too large.
-		if (GetIsTargetWithinAngleLimitsAndSetAO(true))
+		bool bIsWithinAngleLimits = false;
 		{
+			QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_AngleLimits);
+			bIsWithinAngleLimits = GetIsTargetWithinAngleLimitsAndSetAO(true);
+		}
+		if (bIsWithinAngleLimits)
+		{
+			QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_Fire);
 			WeaponState->Fire(M_TargetingData.GetActiveTargetLocation());
 			return;
 		}
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_StopFire);
 		WeaponState->StopFire(false, true);
 		return;
 	}
 
-	ResetTarget();
+	{
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_ResetTarget);
+		ResetTarget();
+	}
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_RequestTargets);
 	GetClosestTarget();
 }
 
@@ -250,26 +264,33 @@ void AInfantryWeaponMaster::SpecificEngage()
 			M_FireDirection = CalculateTargetDirection(GetActorLocation());
 
 			// Notify owner in range, if the owner was moving closer that movement will be stopped.
-			M_OwningSquadUnit->OnSpecificTargetInRange();
+			{
+				QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_SpecificTargetInRange);
+				M_OwningSquadUnit->OnSpecificTargetInRange();
+			}
 
 			// Do not allow the target to be reset when the unit is walking and the angle is too large.
 			if (GetIsTargetWithinAngleLimitsAndSetAO(false))
 			{
+				QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_Fire);
 				WeaponState->Fire(M_TargetingData.GetActiveTargetLocation());
 				return;
 			}
 
+			QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_StopFire);
 			WeaponState->StopFire(false, true);
 			return;
 		}
 
 		// Target is out of range.
 		Debug_Weapons("Specific target out of range");
+		QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_SpecificTargetOutOfRange);
 		M_OwningSquadUnit->OnSpecificTargetOutOfRange(TargetLocation);
 		return;
 	}
 
 	ResetTarget();
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_InfantryWeapon_SpecificTargetLost);
 	M_OwningSquadUnit->OnSpecificTargetDestroyedOrInvisible();
 	SetAutoEngageTargets(false);
 }

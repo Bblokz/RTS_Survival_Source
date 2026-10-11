@@ -1101,6 +1101,9 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 	case EAbilityID::IdCrewRepair:
 		M_Owner->ExecuteCrewRepairCommand(Cmd.GetCrewRepairAbilitySubtype());
 		break;
+	case EAbilityID::IdHeal:
+		M_Owner->ExecuteHealCommand(Cmd.TargetActor.Get());
+		break;
 	case EAbilityID::IdActivateShield:
 		{
 			M_Owner->ExecuteActivateShieldCommand();
@@ -3587,6 +3590,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdCrewRepair:
 		TerminateCrewRepairCommandForCurrentQueue();
+		break;
+	case EAbilityID::IdHeal:
+		TerminateHealCommand();
 		break;
 	case EAbilityID::IdActivateShield:
 		TerminateActivateShieldCommand();
