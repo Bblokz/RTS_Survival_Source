@@ -10,6 +10,7 @@
 #include "Misc/Paths.h"
 #include "UnrealClient.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Misc/CommandLine.h"
@@ -36,6 +37,9 @@ namespace VehicleAvoidanceScenarioPrivate
 	constexpr float ReportIntervalSeconds = 10.f;
 	constexpr float TraceIntervalSeconds = 4.f;
 	constexpr float ScreenshotIntervalSeconds = 12.f;
+	// Late enough for a hundred vehicles to be under way, and long enough to average out single frames.
+	constexpr float StatDumpStartSeconds = 55.f;
+	constexpr int32 StatDumpFrames = 1200;
 	constexpr float OverviewCameraHeight = 5500.f;
 	constexpr float ObservedTraceMinimumAge = 30.f;
 	// Hulls resting against each other touch by a few centimetres; only deeper than this counts as clipping.
@@ -78,6 +82,71 @@ namespace VehicleAvoidanceScenarioPrivate
 		return Forward.GetSafeNormal();
 	}
 
+	/** One hull box in the world: its middle, its three axes and how far it reaches along each. */
+	struct FWorldHullBox
+	{
+		FVector Center;
+		FVector Axes[3];
+		FVector Extent;
+
+		FWorldHullBox(const ATrackedTankMaster& Tank, const FBox& HullBox)
+		{
+			const FQuat Rotation = Tank.GetActorQuat();
+			Center = Tank.GetActorLocation() + Rotation.RotateVector(HullBox.GetCenter());
+			Axes[0] = Rotation.GetForwardVector();
+			Axes[1] = Rotation.GetRightVector();
+			Axes[2] = Rotation.GetUpVector();
+			Extent = HullBox.GetExtent();
+		}
+
+		float GetReachAlong(const FVector& Axis) const
+		{
+			return Extent.X * FMath::Abs(FVector::DotProduct(Axes[0], Axis)) +
+				Extent.Y * FMath::Abs(FVector::DotProduct(Axes[1], Axis)) +
+				Extent.Z * FMath::Abs(FVector::DotProduct(Axes[2], Axis));
+		}
+	};
+
+	/** @return How deep two hull boxes are inside each other in space; zero when any axis separates them. */
+	float GetHullBoxPenetrationDepth(
+		const ATrackedTankMaster& FirstTank,
+		const FBox& FirstHullBox,
+		const ATrackedTankMaster& SecondTank,
+		const FBox& SecondHullBox)
+	{
+		const FWorldHullBox First(FirstTank, FirstHullBox);
+		const FWorldHullBox Second(SecondTank, SecondHullBox);
+		const FVector CenterDelta = Second.Center - First.Center;
+		float SmallestOverlap = MAX_flt;
+		const auto TestAxis = [&](const FVector& Axis)
+		{
+			if (Axis.SizeSquared() < KINDA_SMALL_NUMBER)
+			{
+				return true;
+			}
+			const FVector UnitAxis = Axis.GetUnsafeNormal();
+			const float Overlap = First.GetReachAlong(UnitAxis) + Second.GetReachAlong(UnitAxis) -
+				FMath::Abs(FVector::DotProduct(CenterDelta, UnitAxis));
+			SmallestOverlap = FMath::Min(SmallestOverlap, Overlap);
+			return Overlap > 0.f;
+		};
+		for (int32 FirstAxis = 0; FirstAxis < 3; ++FirstAxis)
+		{
+			if (not TestAxis(First.Axes[FirstAxis]) || not TestAxis(Second.Axes[FirstAxis]))
+			{
+				return 0.f;
+			}
+			for (int32 SecondAxis = 0; SecondAxis < 3; ++SecondAxis)
+			{
+				if (not TestAxis(FVector::CrossProduct(First.Axes[FirstAxis], Second.Axes[SecondAxis])))
+				{
+					return 0.f;
+				}
+			}
+		}
+		return SmallestOverlap;
+	}
+
 	bool GetIsOnMovementCommand(ATrackedTankMaster& Tank)
 	{
 		const UCommandData* CommandData = Tank.GetIsValidCommandData();
@@ -105,6 +174,7 @@ void FVehicleAvoidanceScenario::Start()
 	FParse::Value(FCommandLine::Get(), TEXT("VehicleAvoidanceSpawn="), M_ExtraVehiclesToSpawn);
 	bM_TraceVehicles = FParse::Param(FCommandLine::Get(), TEXT("VehicleAvoidanceTrace"));
 	bM_TakeScreenshots = FParse::Param(FCommandLine::Get(), TEXT("VehicleAvoidanceScreenshots"));
+	bM_DumpStats = FParse::Param(FCommandLine::Get(), TEXT("VehicleAvoidancePerf"));
 	UE_LOG(LogRTSVehicleAvoidance, Display, TEXT("RTS_VEHICLE_AVOIDANCE scheduled drive=%d"), bM_DriveVehicles ? 1 : 0);
 }
 
@@ -209,6 +279,9 @@ void FVehicleAvoidanceScenario::CollectVehicles(UWorld& World)
 		FVehicleAvoidanceTestVehicle Vehicle;
 		Vehicle.Tank = Tank;
 		Vehicle.Footprint = Footprint;
+		Vehicle.HullBox = RTSVehicleFootprint::GetChassisCollisionBox(
+			Tank->GetTankMesh(),
+			FTransform(FQuat::Identity, FVector::ZeroVector, Tank->GetTankMesh()->GetComponentScale()));
 		Vehicle.OwningPlayer = Tank->GetRTSComponent()->GetOwningPlayer();
 		Vehicle.FirstSeenSeconds = World.GetTimeSeconds();
 		M_Vehicles.Add(Vehicle);
@@ -367,15 +440,24 @@ void FVehicleAvoidanceScenario::SamplePairs(const UWorld& World, const float Del
 			{
 				continue;
 			}
+			const float DepthInSpace = GetHullBoxPenetrationDepth(
+				*FirstTank,
+				M_Vehicles[FirstIndex].HullBox,
+				*SecondTank,
+				M_Vehicles[SecondIndex].HullBox);
+			if (DepthInSpace < CountedOverlapDepth)
+			{
+				continue;
+			}
 			FVehicleAvoidancePairStats& PairStats = GetPairStats(
 				M_Stats,
 				M_Vehicles[FirstIndex].OwningPlayer,
 				M_Vehicles[SecondIndex].OwningPlayer);
 			PairStats.OverlapPairSeconds += DeltaTime;
-			PairStats.DeepestOverlap = FMath::Max(PairStats.DeepestOverlap, Depth);
+			PairStats.DeepestOverlap = FMath::Max(PairStats.DeepestOverlap, DepthInSpace);
 			if (Depth > DeepOverlapDepth)
 			{
-				ReportNewDeepOverlap(World, FirstIndex, SecondIndex, Depth);
+				ReportNewDeepOverlap(World, FirstIndex, SecondIndex, DepthInSpace);
 			}
 			++PairStats.OverlappingPairsNow;
 		}
@@ -932,6 +1014,14 @@ void FVehicleAvoidanceScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsyst
 	if (bM_TakeScreenshots)
 	{
 		UpdateOverviewCamera(*World);
+	}
+	const bool bShouldDumpStats = bM_DumpStats && not bM_HasDumpedStats && GEngine != nullptr &&
+		NowSeconds - M_Stats.StartSeconds >= StatDumpStartSeconds;
+	if (bShouldDumpStats)
+	{
+		bM_HasDumpedStats = true;
+		ReportProgress(*World, TEXT("stat_dump_start"));
+		GEngine->Exec(World, *FString::Printf(TEXT("stat dumpave -num=%d -ms=0.001"), StatDumpFrames));
 	}
 	if (NowSeconds >= M_NextReportSeconds)
 	{

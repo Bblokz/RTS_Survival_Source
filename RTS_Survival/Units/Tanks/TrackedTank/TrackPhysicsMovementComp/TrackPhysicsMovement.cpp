@@ -28,6 +28,8 @@ namespace TrackPhysicsMovementConstants
 	constexpr float SettlingPlanarSpeedTolerance = 2.0f;
 	/** @brief Residual yaw rate below which async braking can safely stop updating. */
 	constexpr float SettlingYawRateToleranceDegrees = 1.0f;
+	/** @brief Physics steps a ground sample is used for before the ground is traced again. */
+	constexpr int32 GroundTraceReuseSteps = 2;
 	/** @brief Planar speed at which a parked vehicle is taken to be shoved by another hull and starts to brace. */
 	constexpr float ShovedPlanarSpeed = 6.0f;
 	/** @brief Yaw rate at which a parked vehicle is taken to be turned by another hull and starts to brace. */
@@ -97,7 +99,9 @@ void UTrackPhysicsMovement::AsyncTick(float DeltaTime)
 {
 	Super::AsyncTick(DeltaTime);
 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_AsyncTick);
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Vehicle_TrackPhysicsAsyncTick);
 	ETrackPhysicsMovementState MovementState = M_MovementState.Load();
+	M_AsyncTickSerial.Store(M_AsyncTickSerial.Load() + 1);
 	if (not GetIsValidTankMesh())
 	{
 		return;
@@ -294,6 +298,23 @@ bool UTrackPhysicsMovement::PerformGroundTrace(FVector& OutGroundNormal, float& 
 			this);
 		return false;
 	}
+
+	// The ground under a tank barely changes from one physics step to the next, and driving and turning both
+	// ask for it in the same step: a good sample is used again until it is a few steps old.
+	const int32 TickSerial = M_AsyncTickSerial.Load();
+	const bool bCanReuseSample = bM_HasCachedGroundTraceSample.Load() &&
+		M_ConsecutiveGroundTraceFailureCount.Load() == 0 &&
+		TickSerial - M_LastGroundTraceSerial.Load() < TrackPhysicsMovementConstants::GroundTraceReuseSteps;
+	if (bCanReuseSample)
+	{
+		OutGroundNormal = FVector(
+			M_CachedGroundNormalX.Load(),
+			M_CachedGroundNormalY.Load(),
+			M_CachedGroundNormalZ.Load());
+		OutIncline = M_CachedInclineAngle.Load();
+		return true;
+	}
+	M_LastGroundTraceSerial.Store(TickSerial);
 
 	const FVector TraceOrigin = StartLocation + FVector(0, 0, M_MeshTraceZOffset);
 	const FVector ForwardOffset = M_TankMesh->GetForwardVector() *

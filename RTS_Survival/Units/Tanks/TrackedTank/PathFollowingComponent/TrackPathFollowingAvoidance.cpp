@@ -16,6 +16,10 @@ namespace TrackFollowingAvoidance
 {
 	/** How often a driving vehicle looks up who is near; in between it follows the vehicles it already knows. */
 	constexpr float NeighbourRefreshSeconds = 0.15f;
+	/** The middle of a hull is not the vehicle's origin; neighbours are sorted out by origin with this much to spare. */
+	constexpr float HullCenterSlack = 250.f;
+	/** Vehicles start their look-ups this many frames apart, so the cost is spread instead of landing on one frame. */
+	constexpr uint32 NeighbourRefreshStaggerSteps = 8;
 	/** Centre distance within which other vehicles are kept as neighbours. Covers the longest look-ahead. */
 	constexpr float NeighbourRange = 2600.f;
 
@@ -141,7 +145,23 @@ void UTrackPathFollowingComponent::RegisterVehicleForAvoidance()
 
 	AvoidanceSubsystem->RegisterVehicle(this, Pawn);
 	M_VehicleAvoidance.bIsRegistered = true;
+	M_VehicleAvoidance.SecondsUntilNeighbourRefresh = TrackFollowingAvoidance::NeighbourRefreshSeconds *
+		(Pawn->GetUniqueID() % TrackFollowingAvoidance::NeighbourRefreshStaggerSteps) /
+		TrackFollowingAvoidance::NeighbourRefreshStaggerSteps;
 	M_VehicleAvoidance.Footprint = FRTSVehicleFootprint();
+}
+
+FVector2D UTrackPathFollowingComponent::GetGroundVelocityThisFrame() const
+{
+	if (M_GroundVelocityFrame == GFrameCounter)
+	{
+		return M_GroundVelocityThisFrame;
+	}
+	M_GroundVelocityFrame = GFrameCounter;
+	M_GroundVelocityThisFrame = IsValid(ControlledPawn)
+		                            ? FVector2D(ControlledPawn->GetVelocity())
+		                            : FVector2D::ZeroVector;
+	return M_GroundVelocityThisFrame;
 }
 
 bool UTrackPathFollowingComponent::GetIsWaitingForVehicles() const
@@ -169,6 +189,7 @@ void UTrackPathFollowingComponent::RefreshVehicleAvoidanceNeighbours(const float
 		return;
 	}
 	M_VehicleAvoidance.SecondsUntilNeighbourRefresh = TrackFollowingAvoidance::NeighbourRefreshSeconds;
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Vehicle_AvoidanceFindNeighbours);
 
 	URTSVehicleAvoidanceSubsystem* AvoidanceSubsystem = GetWorld()->GetSubsystem<URTSVehicleAvoidanceSubsystem>();
 	if (not IsValid(AvoidanceSubsystem))
@@ -205,9 +226,9 @@ bool UTrackPathFollowingComponent::BuildVehicleAvoidanceFrame(
 	OutFrame.TravelRight = FVector2D(-OutFrame.TravelDirection.Y, OutFrame.TravelDirection.X);
 	OutFrame.DriveDirection = bReversing ? -OutFrame.Forward : OutFrame.Forward;
 	OutFrame.DriveRight = FVector2D(-OutFrame.DriveDirection.Y, OutFrame.DriveDirection.X);
-	OutFrame.Speed = ControlledPawn->GetVelocity().Size2D();
+	OutFrame.Speed = GetGroundVelocityThisFrame().Size();
 	OutFrame.LookAhead = FMath::Clamp(OutFrame.Speed * LookAheadSeconds, MinimumLookAhead, MaximumLookAhead);
-	OutFrame.DistanceToGoal = GetPathLengthRemaining();
+	OutFrame.DistanceToGoal = FinalDestinationDistance;
 	OutFrame.GoalLocation = Path.IsValid() && Path->GetPathPoints().Num() > 0
 		                        ? FVector2D(Path->GetPathPoints().Last().Location)
 		                        : FVector2D(Destination);
@@ -216,17 +237,18 @@ bool UTrackPathFollowingComponent::BuildVehicleAvoidanceFrame(
 
 bool UTrackPathFollowingComponent::GetIsNeighbourLeadingTheSameWay(
 	const FRTSVehicleAvoidanceAgent& Neighbour,
+	const FVector2D& OtherVelocity,
 	const FVehicleAvoidanceFrame& Frame) const
 {
 	using namespace TrackFollowingAvoidance;
-	const APawn* Other = Neighbour.Pawn.Get();
-	const UTrackPathFollowingComponent* OtherPathFollowing = Neighbour.PathFollowingComponent.Get();
-	if (not IsValid(Other) || not IsValid(OtherPathFollowing) || not OtherPathFollowing->GetIsFollowingPath())
+	// The cheap test first: most neighbours do not drive this way at all.
+	if (FVector2D::DotProduct(OtherVelocity, Frame.TravelDirection) < SameWayMinimumSpeed)
 	{
 		return false;
 	}
-	const FVector2D OtherVelocity(Other->GetVelocity());
-	if (FVector2D::DotProduct(OtherVelocity, Frame.TravelDirection) < SameWayMinimumSpeed)
+	const APawn* Other = Neighbour.Pawn.Get();
+	const UTrackPathFollowingComponent* OtherPathFollowing = Neighbour.PathFollowingComponent.Get();
+	if (not IsValid(Other) || not IsValid(OtherPathFollowing) || not OtherPathFollowing->GetIsFollowingPath())
 	{
 		return false;
 	}
@@ -238,14 +260,24 @@ void UTrackPathFollowingComponent::ApplyNeighbourToSpeedCap(
 	const FRTSVehicleAvoidanceAgent& Neighbour,
 	const FVector2D& Relative,
 	const FVector2D& OtherForward,
+	const FVector2D& OtherVelocity,
 	FVehicleAvoidanceFrame& Frame) const
 {
 	using namespace TrackFollowingAvoidance;
 	const float Longitudinal = FVector2D::DotProduct(Relative, Frame.DriveDirection);
 	const FRTSVehicleFootprint& MyFootprint = M_VehicleAvoidance.Footprint;
-	const float FarthestReach = MyFootprint.GetCornerRadius() + Neighbour.Footprint.GetCornerRadius() +
-		Frame.LookAhead;
+	const float OtherCornerRadius = Neighbour.Footprint.GetCornerRadius();
+	const float FarthestReach = MyFootprint.GetCornerRadius() + OtherCornerRadius + Frame.LookAhead;
 	if (Longitudinal <= 0.f || Relative.SizeSquared() > FMath::Square(FarthestReach))
+	{
+		return;
+	}
+	// A hull lies inside the circle through its corners; one whose circle stays clear of the strip this vehicle
+	// drives through cannot be in the way, and needs none of the box tests below.
+	const float Lateral = FVector2D::DotProduct(Relative, Frame.DriveRight);
+	const bool bIsOutsideDrivingStrip = FMath::Abs(Lateral) > MyFootprint.HalfWidth + OtherCornerRadius ||
+		Longitudinal - OtherCornerRadius > MyFootprint.HalfLength + Frame.LookAhead;
+	if (bIsOutsideDrivingStrip)
 	{
 		return;
 	}
@@ -261,12 +293,10 @@ void UTrackPathFollowingComponent::ApplyNeighbourToSpeedCap(
 	{
 		return;
 	}
-	const float Lateral = FVector2D::DotProduct(Relative, Frame.DriveRight);
 	const float LateralReach = MyFootprint.GetReachAlong(Frame.Forward, Frame.DriveRight) +
 		Neighbour.Footprint.GetReachAlong(OtherForward, Frame.DriveRight);
 
 	const APawn* Other = Neighbour.Pawn.Get();
-	const FVector2D OtherVelocity(Other->GetVelocity());
 	const bool bIsFlocking = M_VehicleAvoidance.Mode == EVehicleAvoidanceMode::Flocking;
 	const float StopGap = bIsFlocking ? FlockingStopGap : WaitingStopGap;
 	// Follow at the speed of what is ahead, plus whatever the free gap still allows.
@@ -325,6 +355,7 @@ void UTrackPathFollowingComponent::ApplyNeighbourToSteering(
 	const FRTSVehicleAvoidanceAgent& Neighbour,
 	const FVector2D& Relative,
 	const FVector2D& OtherForward,
+	const FVector2D& OtherVelocity,
 	FVehicleAvoidanceFrame& Frame)
 {
 	using namespace TrackFollowingAvoidance;
@@ -335,9 +366,7 @@ void UTrackPathFollowingComponent::ApplyNeighbourToSteering(
 		Neighbour.Footprint.GetReachAlong(OtherForward, Frame.TravelDirection);
 	// A vehicle that comes the other way closes the gap at both speeds; it is seen from that much further off,
 	// so the two have moved aside before they meet instead of stopping nose to nose.
-	const float OncomingSpeed = FMath::Max(
-		0.f,
-		-FVector2D::DotProduct(FVector2D(Neighbour.Pawn->GetVelocity()), Frame.TravelDirection));
+	const float OncomingSpeed = FMath::Max(0.f, -FVector2D::DotProduct(OtherVelocity, Frame.TravelDirection));
 	const float LookAhead = FMath::Min(
 		Frame.LookAhead + OncomingSpeed * LookAheadSeconds,
 		MaximumOncomingLookAhead);
@@ -358,7 +387,7 @@ void UTrackPathFollowingComponent::ApplyNeighbourToSteering(
 		const float Depth = 1.f - AbsoluteLateral / Clearance;
 		float Weight = Urgency * FMath::Lerp(PassingMinimumDepthWeight, 1.f, Depth);
 		const bool bShouldFollow = M_VehicleAvoidance.Mode != EVehicleAvoidanceMode::Flocking &&
-			GetIsNeighbourLeadingTheSameWay(Neighbour, Frame);
+			GetIsNeighbourLeadingTheSameWay(Neighbour, OtherVelocity, Frame);
 		Weight *= bShouldFollow ? FollowingSteeringScale : 1.f;
 		Frame.LateralPush += Side * Weight * PassingStrength;
 	}
@@ -460,7 +489,9 @@ void UTrackPathFollowingComponent::TryMakeIdleBlockerMoveAside(
 	if (M_RTSOverlapEvasionComponent->TryDisplaceIdleOverlappingVehicle(BlockingActor))
 	{
 		RegisterIdleBlockingActor(BlockingActor);
+#if RTS_WITH_MAP_TESTS
 		++State.DisplacementsAsked;
+#endif
 	}
 }
 
@@ -626,6 +657,7 @@ FVehicleAvoidanceOutput UTrackPathFollowingComponent::UpdateVehicleAvoidance(
 	const FVector& Destination,
 	const float DeltaTime)
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Vehicle_Avoidance);
 	using namespace TrackFollowingAvoidance;
 	FVehicleAvoidanceOutput Output;
 	Output.SteeringDestination = Destination;
@@ -671,6 +703,10 @@ void UTrackPathFollowingComponent::WeighVehicleAvoidanceNeighbours(FVehicleAvoid
 {
 	using namespace TrackFollowingAvoidance;
 	const FVehicleAvoidanceState& State = M_VehicleAvoidance;
+	const float MyCornerRadius = State.Footprint.GetCornerRadius();
+	// Whether something stands on the goal only matters on the last stretch, where settling is decided.
+	const bool bShouldCheckGoal = Frame.DistanceToGoal < MyCornerRadius * NearGoalRadii;
+	const FVector2D PawnLocation(ControlledPawn->GetActorLocation());
 	for (const FRTSVehicleAvoidanceAgent& Neighbour : State.Neighbours)
 	{
 		const APawn* Other = Neighbour.Pawn.Get();
@@ -678,19 +714,45 @@ void UTrackPathFollowingComponent::WeighVehicleAvoidanceNeighbours(FVehicleAvoid
 		{
 			continue;
 		}
-		const FVector2D OtherForward = FVector2D(Other->GetActorForwardVector()).GetSafeNormal();
-		const FVector2D OtherLocation = Neighbour.Footprint.GetWorldCenter(
-			FVector2D(Other->GetActorLocation()),
-			OtherForward);
-		const FVector2D Relative = OtherLocation - Frame.Location;
-		ApplyNeighbourToSpeedCap(Neighbour, Relative, OtherForward, Frame);
-		ApplyNeighbourToSteering(Neighbour, Relative, OtherForward, Frame);
+		// Most known neighbours are too far off to slow or steer this vehicle right now; in a crowd that is nearly
+		// all of them. The reach leaves room for both hulls however they are turned, so nothing that counts is lost.
+		const FVector2D OtherPawnLocation(Other->GetActorLocation());
+		const float OtherCornerRadius = Neighbour.Footprint.GetCornerRadius();
+		const float DistanceSquared = FVector2D::DistSquared(OtherPawnLocation, PawnLocation);
+		const float FarthestReach = MaximumOncomingLookAhead + SeparationRange + HullCenterSlack +
+			2.f * (MyCornerRadius + OtherCornerRadius);
+		if (not bShouldCheckGoal && DistanceSquared > FMath::Square(FarthestReach))
+		{
+			continue;
+		}
+		const UTrackPathFollowingComponent* OtherPathFollowing = Neighbour.PathFollowingComponent.Get();
+		const FVector2D OtherVelocity = IsValid(OtherPathFollowing)
+			                                ? OtherPathFollowing->GetGroundVelocityThisFrame()
+			                                : FVector2D(Other->GetVelocity());
+		const float FarthestLookAhead = FMath::Min(
+			Frame.LookAhead + OtherVelocity.Size() * LookAheadSeconds,
+			MaximumOncomingLookAhead);
+		const float Reach = FarthestLookAhead + SeparationRange + HullCenterSlack +
+			2.f * (MyCornerRadius + OtherCornerRadius);
+		if (not bShouldCheckGoal && DistanceSquared > FMath::Square(Reach))
+		{
+			continue;
+		}
 
+		const FVector2D OtherForward = FVector2D(Other->GetActorForwardVector()).GetSafeNormal();
+		const FVector2D OtherLocation = Neighbour.Footprint.GetWorldCenter(OtherPawnLocation, OtherForward);
+		const FVector2D Relative = OtherLocation - Frame.Location;
+		ApplyNeighbourToSpeedCap(Neighbour, Relative, OtherForward, OtherVelocity, Frame);
+		ApplyNeighbourToSteering(Neighbour, Relative, OtherForward, OtherVelocity, Frame);
+		if (not bShouldCheckGoal || Frame.bIsGoalCovered ||
+			OtherVelocity.SizeSquared() >= FMath::Square(StationarySpeed))
+		{
+			continue;
+		}
 		const FVector2D OtherToGoal = Frame.GoalLocation - OtherLocation;
 		const float OtherReachToGoal = Neighbour.Footprint.GetReachAlong(OtherForward, OtherToGoal.GetSafeNormal());
-		const bool bStandsOnGoal = Other->GetVelocity().SizeSquared2D() < FMath::Square(StationarySpeed) &&
+		Frame.bIsGoalCovered =
 			OtherToGoal.SizeSquared() < FMath::Square(OtherReachToGoal + State.Footprint.HalfWidth);
-		Frame.bIsGoalCovered = Frame.bIsGoalCovered || bStandsOnGoal;
 	}
 }
 
@@ -749,9 +811,11 @@ FVehicleAvoidanceOutput UTrackPathFollowingComponent::BuildVehicleAvoidanceOutpu
 	Output.SpeedCap = Frame.SpeedCap;
 	Output.bIsLimitingSpeed = bIsHeldBack;
 	State.LastBlocker = Frame.Blocker;
-	State.LastBlockerGap = Frame.BlockerGap;
 	State.LastSpeedCap = Frame.SpeedCap;
+#if RTS_WITH_MAP_TESTS
+	State.LastBlockerGap = Frame.BlockerGap;
 	State.LastPush = Push;
+#endif
 	// After long enough without getting anywhere the engine may end the move as blocked again.
 	Output.bShouldSuppressBlockDetection = bIsHeldBack && State.BlockedSeconds < MaximumBlockedSeconds;
 	const bool bIsPushing = bIsFlocking && Frame.Blocker != nullptr && Frame.BlockerGap < PushingContactGap;

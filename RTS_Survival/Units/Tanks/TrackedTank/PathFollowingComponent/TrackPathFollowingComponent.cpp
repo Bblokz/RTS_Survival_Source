@@ -905,6 +905,10 @@ void UTrackPathFollowingComponent::OnPathUpdated()
 
 bool UTrackPathFollowingComponent::CheckOverlapIdleAllies(const float DeltaTime)
 {
+	if (M_IdleAlliedBlockingActors.IsEmpty())
+	{
+		return false;
+	}
 	// Hulls that block each other never report the end of an overlap, so the wait also ends by time.
 	RemoveExpiredOverlaps(GetCurrentWorldTimeSeconds(), M_IdleAlliedBlockingActors);
 
@@ -1226,6 +1230,8 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 		UpdateEngineBlockDetectionForOverlapResponse(true);
 		return;
 	}
+	// Measured once per frame; the avoidance and the slowdown towards the goal both use it.
+	FinalDestinationDistance = GetPathLengthRemaining();
 	const FVehicleAvoidanceOutput AvoidanceOutput = UpdateVehicleAvoidance(Destination, DeltaTime);
 	// [-180 , +180]
 	const float SignedTargetAngle = CalculateDestinationAngle(AvoidanceOutput.SteeringDestination);
@@ -1264,8 +1270,6 @@ void UTrackPathFollowingComponent::UpdateDriving(FVector Destination, float Delt
 	// Crowd simulation uses direction vector offset by about 500 units, so the destination would always be constant if using move focus
 	// However if we're stuck, use the normal destination instead, as this will be used as a reverse target
 	DestinationDistance = CalculateDestinationDistance(bIsStuck ? Destination : GetCurrentTargetLocation());
-
-	FinalDestinationDistance = GetPathLengthRemaining();
 
 	// Adjust the desired speed depending on distance to final dest.
 	// and uses the AbsoluteTargetAngle to see if the MaxAngleDontSlow is exceeded.
@@ -1587,6 +1591,7 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 {
 	UVehiclePathFollowingComponent::FollowPathSegment(DeltaTime);
 	TRACE_CPUPROFILER_EVENT_SCOPE(VehiclePathFollowing_FollowSegment);
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Vehicle_FollowPathSegment);
 
 	if (not IsValid(ControlledPawn))
 	{
@@ -1658,6 +1663,7 @@ void UTrackPathFollowingComponent::FollowPathSegment(float DeltaTime)
 
 void UTrackPathFollowingComponent::UpdatePathSegment()
 {
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_Vehicle_UpdatePathSegment);
 	UVehiclePathFollowingComponent::UpdatePathSegment();
 
 	if (GetValidControlledPawn() && Path.IsValid())
@@ -1812,12 +1818,14 @@ void UTrackPathFollowingComponent::OnPathFinished(const FPathFollowingResult& Re
 				                                    ? EVehicleMoveEnd::Blocked
 				                                    : EVehicleMoveEnd::Aborted);
 	}
+#if RTS_WITH_MAP_TESTS
 	if (Path.IsValid() && M_VehicleAvoidance.bHasLastGoalLocation)
 	{
 		M_VehicleAvoidance.LastPathEndToGoalDistance = FVector::Dist2D(
 			Path->GetEndLocation(),
 			M_VehicleAvoidance.LastGoalLocation);
 	}
+#endif
 	bM_HasCurrentDrivingDestination = false;
 	ResetMovingOverlapYieldDependency();
 	SetEngineBlockDetectionSuppressed(false);
@@ -2287,11 +2295,11 @@ float UTrackPathFollowingComponent::TrackGetSlowdownSpeed(
 
 float UTrackPathFollowingComponent::CalculateTrackMaximumSpeedWithSamples()
 {
-	TArray<FNavPathPoint> Points = Path.Get()->GetPathPoints();
+	const TArray<FNavPathPoint>& Points = Path.Get()->GetPathPoints();
 
 	// Clamp the max index
 	int MaxIndex = GetCurrentPathIndex() + CornerSlowdownSamples + 1;
-	MaxIndex = FMath::Clamp(MaxIndex, 0, (Points.Max() - 1));
+	MaxIndex = FMath::Clamp(MaxIndex, 0, (Points.Num() - 1));
 
 	float MaximumCorneringSpeed = DesiredSpeed;
 	const float TempSpeed = DesiredSpeed;
@@ -2455,11 +2463,11 @@ bool UTrackPathFollowingComponent::UpdateStuckSamples()
 
 float UTrackPathFollowingComponent::CalculateAverageAngleWithSamples(float& OutDistance)
 {
-	TArray<FNavPathPoint> Points = Path.Get()->GetPathPoints();
+	const TArray<FNavPathPoint>& Points = Path.Get()->GetPathPoints();
 
 	// Clamp the max index
 	int MaxIndex = GetCurrentPathIndex() + CornerSlowdownSamples + 1;
-	MaxIndex = FMath::Clamp(MaxIndex, 0, (Points.Max() - 1));
+	MaxIndex = FMath::Clamp(MaxIndex, 0, (Points.Num() - 1));
 
 	float Angles = 0.f;
 	int Samples = 0;
@@ -2503,11 +2511,11 @@ float UTrackPathFollowingComponent::CalculateAverageAngleWithSamples(float& OutD
 
 float UTrackPathFollowingComponent::CalculateLargestAngleWithSamples(float& OutDistance)
 {
-	TArray<FNavPathPoint> Points = Path.Get()->GetPathPoints();
+	const TArray<FNavPathPoint>& Points = Path.Get()->GetPathPoints();
 
 	// Clamp the max index
 	int MaxIndex = GetCurrentPathIndex() + CornerSlowdownSamples + 1;
-	MaxIndex = FMath::Clamp(MaxIndex, 0, (Points.Max() - 1));
+	MaxIndex = FMath::Clamp(MaxIndex, 0, (Points.Num() - 1));
 
 	float MaxAngle = 0.f;
 	float Distance = 0.f;

@@ -214,6 +214,13 @@ public:
 
 	const FVehicleAvoidanceState& GetVehicleAvoidanceState() const { return M_VehicleAvoidance; }
 
+	/**
+	 * @brief Gives the ground velocity of this vehicle; reading it from the physics body is costly and every
+	 * neighbour asks for it, so it is read once per frame and handed out from then on.
+	 * @return Velocity of the controlled vehicle on the ground plane this frame.
+	 */
+	FVector2D GetGroundVelocityThisFrame() const;
+
 	/** @return True while the vehicle stands or crawls behind other vehicles on purpose; that is not being stuck. */
 	bool GetIsWaitingForVehicles() const;
 
@@ -985,6 +992,10 @@ private:
 	// Steering around, waiting behind and squeezing past the vehicles near this one; hulls block each other.
 	FVehicleAvoidanceState M_VehicleAvoidance;
 
+	// The velocity handed out by GetGroundVelocityThisFrame and the frame it was read in.
+	mutable FVector2D M_GroundVelocityThisFrame = FVector2D::ZeroVector;
+	mutable uint64 M_GroundVelocityFrame = MAX_uint64;
+
 	/**
 	 * @brief Weighs the nearby vehicles into a steering target and a speed limit before the hulls touch.
 	 * @param Destination Path point the vehicle is driving to.
@@ -1016,12 +1027,14 @@ private:
 	 * @param Neighbour The other vehicle.
 	 * @param Relative Its location relative to this vehicle.
 	 * @param OtherForward Its ground facing.
+	 * @param OtherVelocity Its ground velocity, read once for all checks of this frame.
 	 * @param Frame Receives the lower speed cap and the vehicle that is being waited for.
 	 */
 	void ApplyNeighbourToSpeedCap(
 		const FRTSVehicleAvoidanceAgent& Neighbour,
 		const FVector2D& Relative,
 		const FVector2D& OtherForward,
+		const FVector2D& OtherVelocity,
 		FVehicleAvoidanceFrame& Frame) const;
 
 	/**
@@ -1029,15 +1042,20 @@ private:
 	 * @param Neighbour The other vehicle.
 	 * @param Relative Its location relative to this vehicle.
 	 * @param OtherForward Its ground facing.
+	 * @param OtherVelocity Its ground velocity, read once for all checks of this frame.
 	 * @param Frame Receives the sideways pull.
 	 */
 	void ApplyNeighbourToSteering(
 		const FRTSVehicleAvoidanceAgent& Neighbour,
 		const FVector2D& Relative,
 		const FVector2D& OtherForward,
+		const FVector2D& OtherVelocity,
 		FVehicleAvoidanceFrame& Frame);
 	float ChoosePassingSide(const APawn* Other, float Lateral, float Clearance, float Gap, FVehicleAvoidanceFrame& Frame);
-	bool GetIsNeighbourLeadingTheSameWay(const FRTSVehicleAvoidanceAgent& Neighbour, const FVehicleAvoidanceFrame& Frame) const;
+	bool GetIsNeighbourLeadingTheSameWay(
+		const FRTSVehicleAvoidanceAgent& Neighbour,
+		const FVector2D& OtherVelocity,
+		const FVehicleAvoidanceFrame& Frame) const;
 	void UpdateVehicleAvoidanceMode(const FVehicleAvoidanceFrame& Frame, float DeltaTime);
 	void TryStartFlocking(const FVehicleAvoidanceFrame& Frame);
 	void UpdateGoalBlockedByVehicles(FVehicleAvoidanceFrame& Frame, bool bIsStandingStill, float DeltaTime);

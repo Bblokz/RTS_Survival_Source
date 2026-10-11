@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "RTSVehicleAvoidanceSubsystem.h"
 #include "RTSVehicleFootprint.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 class AActor;
 class APawn;
@@ -77,16 +78,21 @@ struct FVehicleAvoidanceState
 	bool bIsRegistered = false;
 
 	EVehicleMoveEnd LastMoveEnd = EVehicleMoveEnd::None;
+
+	// What was decided last frame: who is being waited for, and the speed cap that tells others this vehicle
+	// waits on purpose.
+	TWeakObjectPtr<const APawn> LastBlocker;
+	float LastSpeedCap = MAX_flt;
+
+#if RTS_WITH_MAP_TESTS
+	// Only kept for the map tests to report; none of this exists in a shipping build.
 	// How far the end of the last path lay from where the order wanted the vehicle; large for a path cut short.
 	float LastPathEndToGoalDistance = 0.f;
-	// How often this vehicle told an idle ally to make room; only read by map tests.
+	// How often this vehicle told an idle ally to make room.
 	int32 DisplacementsAsked = 0;
-
-	// What was decided last frame; the speed cap also tells others that this vehicle waits on purpose.
-	TWeakObjectPtr<const APawn> LastBlocker;
 	float LastBlockerGap = 0.f;
-	float LastSpeedCap = MAX_flt;
 	float LastPush = 0.f;
+#endif
 
 	void ResetForNewPath()
 	{

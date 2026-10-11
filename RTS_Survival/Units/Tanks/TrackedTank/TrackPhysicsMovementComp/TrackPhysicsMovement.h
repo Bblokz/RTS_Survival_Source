@@ -318,5 +318,9 @@ private:
 	mutable TAtomic<int32> M_ConsecutiveGroundTraceFailureCount{0};
 	mutable TAtomic<bool> bM_HasCachedGroundTraceSample{false};
 
+	// Counts physics steps, so the ground is traced every few steps instead of several times in each one.
+	TAtomic<int32> M_AsyncTickSerial{0};
+	mutable TAtomic<int32> M_LastGroundTraceSerial{0};
+
 	float LastNoneZeroThrottle = -1;
 };

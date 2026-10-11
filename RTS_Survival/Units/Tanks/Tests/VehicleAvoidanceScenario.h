@@ -28,6 +28,8 @@ struct FVehicleAvoidanceTestVehicle
 {
 	TWeakObjectPtr<ATrackedTankMaster> Tank;
 	FRTSVehicleFootprint Footprint;
+	// The box around the chassis collision, in the space of the chassis mesh, at its real size.
+	FBox HullBox = FBox(ForceInit);
 	int32 OwningPlayer = 0;
 	bool bWasIdle = true;
 	bool bHasGoal = false;
@@ -94,6 +96,9 @@ private:
 	FVehicleAvoidanceStats M_Stats;
 
 	// With -VehicleAvoidanceScreenshots a camera hangs above the vehicles and a picture is saved now and then.
+	// With -VehicleAvoidancePerf the engine writes its averaged stat tree to the log once the map is busy.
+	bool bM_DumpStats = false;
+	bool bM_HasDumpedStats = false;
 	bool bM_TakeScreenshots = false;
 	float M_NextScreenshotSeconds = 0.f;
 	int32 M_ScreenshotCount = 0;
