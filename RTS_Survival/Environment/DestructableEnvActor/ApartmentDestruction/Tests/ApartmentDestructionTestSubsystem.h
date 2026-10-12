@@ -53,6 +53,7 @@ struct FApartmentDestructionTestWindow
 	double TotalFrameSeconds = 0.0;
 	double WorstFrameSeconds = 0.0;
 	int32 BreakEventCount = 0;
+	int64 TotalDrawCalls = 0;
 };
 
 /**
@@ -106,6 +107,11 @@ private:
 	 */
 	void FireImpactAsProjectile(const FApartmentDestructionTestImpact& Impact, const FVector& WorldLocation) const;
 	UGeometryCollectionComponent* GetTestedGeometryComponent() const;
+	// Replaces the weapon hits by a vehicle-sized box that advances through the east wall.
+	void BuildCrushScript();
+	void FireCrushStep(const FApartmentDestructionTestImpact& Impact, const FVector& WorldLocation) const;
+	/** @brief Logs which navigation area every agent finds along a line from the building's centre to outside it. */
+	void LogNavAreaProfile(UWorld& World, const FString& MapLabel) const;
 	void ReportWindow(const UWorld& World, const FString& Label);
 	void RequestScreenshot(const FString& Label);
 	void Finish(UWorld& World);
@@ -142,4 +148,6 @@ private:
 	bool bM_UseDirectStrain = false;
 	// Tests AApartmentDestructibleActor through TakeDamage instead of a bare geometry collection actor.
 	bool bM_UseGameplayActor = false;
+	// Drives a vehicle-sized box into the gameplay actor instead of firing weapons at it.
+	bool bM_UseCrushScript = false;
 };

@@ -13,9 +13,14 @@
 #include "GeometryCollection/GeometryCollection.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
 #include "GeometryCollection/GeometryCollectionClusteringUtility.h"
+#include "GeometryCollection/GeometryCollectionConvexPropertiesInterface.h"
+#include "GeometryCollection/GeometryCollectionConvexUtility.h"
 #include "GeometryCollection/GeometryCollectionObject.h"
 #include "HAL/IConsoleManager.h"
+#include "Chaos/ChaosArchive.h"
+#include "GeometryCollectionProxyData.h"
 #include "Misc/FileHelper.h"
+#include "Serialization/MemoryWriter.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSApartmentGeometryCollection, Log, All);
 
@@ -29,6 +34,34 @@ namespace RTSApartmentGeometryCollection
 	// by this margin, overlap. Without links every panel is its own island and one break releases the whole building.
 	constexpr float ConnectionBoundsMargin = 15.f;
 	const TCHAR* const NoStoreyLevelToken = TEXT("none");
+	// Optional build argument: keep the collection's own baked copy of every piece for rendering.
+	const TCHAR* const NativeRenderToken = TEXT("NativeRender");
+	// Optional build argument "Collision=Detailed|Simplified|Boxes".
+	const TCHAR* const CollisionOptionPrefix = TEXT("Collision=");
+	// Hull corners closer together than this are merged; kit panels are 20 cm thick, so this must stay below that.
+	constexpr float SimplifiedHullCornerDistance = 15.f;
+	// Share of a piece's vertices kept as collision surface samples; zero trips an engine check, so keep a few.
+	constexpr float CollisionSampleFraction = 0.05f;
+
+	/** @brief How closely the collision of a built collection follows its pieces; simpler is smaller and cheaper. */
+	enum class EApartmentCollisionDetail : uint8
+	{
+		// Engine defaults: one hull per piece, with the overlap between neighbouring hulls cut away.
+		Detailed,
+		// One coarser hull per piece; hulls of touching pieces may overlap.
+		Simplified,
+		// One box per piece: smallest, but a broken wall panel collides as the full panel.
+		Boxes
+	};
+
+	/** @brief Everything that can differ between two builds of the same pieces file. */
+	struct FApartmentCollectionBuildOptions
+	{
+		bool bInstancedRendering = true;
+		EApartmentCollisionDetail CollisionDetail = EApartmentCollisionDetail::Simplified;
+	};
+	const TCHAR* const InstancedRendererClassPath = TEXT(
+		"/Script/GeometryCollectionEngine.GeometryCollectionISMPoolRenderer");
 
 	/** @brief Makes the collection hold together as a connected structure once pieces start breaking off. */
 	void ApplyBuildingSimulationSettings(UGeometryCollection* GeometryCollectionAsset)
@@ -373,12 +406,106 @@ namespace RTSApartmentGeometryCollection
 		return true;
 	}
 
+	/**
+	 * @brief A building repeats a few dozen kit meshes many hundreds of times; drawing every piece as an instance of
+	 * its source mesh lets the cooked asset drop its own copy of all that geometry.
+	 * @param GeometryCollectionAsset Collection whose pieces are unmodified static meshes.
+	 */
+	void ApplyInstancedRendering(UGeometryCollection* GeometryCollectionAsset)
+	{
+		UClass* InstancedRendererClass = FindObject<UClass>(nullptr, InstancedRendererClassPath);
+		if (InstancedRendererClass == nullptr)
+		{
+			UE_LOG(LogRTSApartmentGeometryCollection, Error, TEXT("Renderer class '%s' not found; keeping native rendering."),
+			       InstancedRendererClassPath);
+			return;
+		}
+		GeometryCollectionAsset->CustomRendererType = InstancedRendererClass;
+		GeometryCollectionAsset->bStripOnCook = true;
+		GeometryCollectionAsset->bStripRenderDataOnCook = true;
+	}
+
+	/** @return Whether every optional argument after the two paths was understood. */
+	bool ParseBuildOptions(const TArray<FString>& Arguments, FApartmentCollectionBuildOptions& OutOptions)
+	{
+		for (int32 ArgumentIndex = RequiredArgumentCount; ArgumentIndex < Arguments.Num(); ++ArgumentIndex)
+		{
+			const FString& Argument = Arguments[ArgumentIndex];
+			FString CollisionName;
+			if (Argument.Equals(NativeRenderToken, ESearchCase::IgnoreCase))
+			{
+				OutOptions.bInstancedRendering = false;
+			}
+			else if (FParse::Value(*Argument, CollisionOptionPrefix, CollisionName)
+				&& CollisionName.Equals(TEXT("Detailed"), ESearchCase::IgnoreCase))
+			{
+				OutOptions.CollisionDetail = EApartmentCollisionDetail::Detailed;
+			}
+			else if (CollisionName.Equals(TEXT("Simplified"), ESearchCase::IgnoreCase))
+			{
+				OutOptions.CollisionDetail = EApartmentCollisionDetail::Simplified;
+			}
+			else if (CollisionName.Equals(TEXT("Boxes"), ESearchCase::IgnoreCase))
+			{
+				OutOptions.CollisionDetail = EApartmentCollisionDetail::Boxes;
+			}
+			else
+			{
+				UE_LOG(LogRTSApartmentGeometryCollection, Error, TEXT("Unknown build option '%s'."), *Argument);
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * @brief Sets how the collision shapes are derived; the shapes themselves are generated when the collection's
+	 * geometry dependent properties are updated afterwards.
+	 * @param GeometryCollectionAsset Collection that has not generated its collision yet.
+	 * @param CollisionDetail How far to simplify.
+	 */
+	void ApplyCollisionDetail(UGeometryCollection* GeometryCollectionAsset, const EApartmentCollisionDetail CollisionDetail)
+	{
+		if (CollisionDetail == EApartmentCollisionDetail::Detailed)
+		{
+			return;
+		}
+		FGeometryCollectionConvexPropertiesInterface::FConvexCreationProperties ConvexProperties =
+			GeometryCollectionAsset->GetGeometryCollection()->GetConvexProperties();
+		// Cutting overlaps away turns the simple hull of a panel into a many-sided one wherever a facing touches it.
+		ConvexProperties.RemoveOverlaps = EConvexOverlapRemoval::None;
+		ConvexProperties.SimplificationThreshold = SimplifiedHullCornerDistance;
+		GeometryCollectionAsset->GetGeometryCollection()->SetConvexProperties(ConvexProperties);
+		if (GeometryCollectionAsset->SizeSpecificData.IsEmpty())
+		{
+			GeometryCollectionAsset->SizeSpecificData.AddDefaulted();
+		}
+		for (FGeometryCollectionSizeSpecificData& SizeData : GeometryCollectionAsset->SizeSpecificData)
+		{
+			for (FGeometryCollectionCollisionTypeData& CollisionShape : SizeData.CollisionShapes)
+			{
+				// Hulls and boxes collide by themselves; the surface samples are only for level-set shapes, yet the
+				// engine stores them for every piece.
+				CollisionShape.CollisionParticles.CollisionParticlesFraction = CollisionSampleFraction;
+				if (CollisionDetail == EApartmentCollisionDetail::Boxes)
+				{
+					CollisionShape.ImplicitType = EImplicitTypeEnum::Chaos_Implicit_Box;
+				}
+			}
+		}
+	}
+
 	void BuildApartmentGeometryCollection(const TArray<FString>& Arguments)
 	{
 		if (Arguments.Num() < RequiredArgumentCount)
 		{
 			UE_LOG(LogRTSApartmentGeometryCollection, Error,
-			       TEXT("Usage: RTS.Apartment.BuildGeometryCollection <NewAssetPackagePath> <PiecesFilePath>"));
+			       TEXT("Usage: RTS.Apartment.BuildGeometryCollection <NewAssetPackagePath> <PiecesFilePath> [NativeRender] [Collision=Detailed|Simplified|Boxes]"));
+			return;
+		}
+		FApartmentCollectionBuildOptions Options;
+		if (not ParseBuildOptions(Arguments, Options))
+		{
 			return;
 		}
 		TArray<FApartmentPiece> Pieces;
@@ -415,6 +542,11 @@ namespace RTSApartmentGeometryCollection
 			return;
 		}
 		ApplyBuildingSimulationSettings(GeometryCollectionAsset);
+		ApplyCollisionDetail(GeometryCollectionAsset, Options.CollisionDetail);
+		if (Options.bInstancedRendering)
+		{
+			ApplyInstancedRendering(GeometryCollectionAsset);
+		}
 		GeometryCollectionAsset->UpdateGeometryDependentProperties();
 		GeometryCollectionAsset->InvalidateCollection();
 		GeometryCollectionAsset->RebuildRenderData();
@@ -424,10 +556,67 @@ namespace RTSApartmentGeometryCollection
 		       Pieces.Num(), GeometryCollectionAsset->GetGeometryCollection()->NumElements(FGeometryCollection::TransformGroup));
 	}
 
+	/** @return Serialized size of the collection as a cook would store it, without the given attribute. */
+	int64 MeasureCookedCollectionBytes(const FGeometryCollection& Collection, const TTuple<FName, FName>* AttributeToSkip)
+	{
+		// A cook with strip-on-cook drops these groups; simplicials cannot be copied and are rebuilt by the engine.
+		const TArray<FName> StrippedGroups{
+			FGeometryCollection::GeometryGroup, FGeometryCollection::VerticesGroup, FGeometryCollection::FacesGroup};
+		TArray<TTuple<FName, FName>> SkippedAttributes{
+			{FGeometryDynamicCollection::SimplicialsAttribute, FTransformCollection::TransformGroup}};
+		if (AttributeToSkip != nullptr)
+		{
+			SkippedAttributes.Add(*AttributeToSkip);
+		}
+		FGeometryCollection Copy;
+		Collection.CopyTo(&Copy, StrippedGroups, SkippedAttributes);
+		TArray<uint8> Bytes;
+		FMemoryWriter Writer(Bytes);
+		Chaos::FChaosArchive ChaosArchive(Writer);
+		Copy.Serialize(ChaosArchive);
+		return Bytes.Num();
+	}
+
+	void ReportGeometryCollectionSize(const TArray<FString>& Arguments)
+	{
+		constexpr int64 SmallestReportedBytes = 20000;
+		const UGeometryCollection* GeometryCollectionAsset = Arguments.IsEmpty()
+			                                                     ? nullptr
+			                                                     : LoadObject<UGeometryCollection>(nullptr, *Arguments[0]);
+		if (not IsValid(GeometryCollectionAsset) || not GeometryCollectionAsset->GetGeometryCollection().IsValid())
+		{
+			UE_LOG(LogRTSApartmentGeometryCollection, Error, TEXT("Usage: RTS.Apartment.ReportCollectionSize <AssetPath>"));
+			return;
+		}
+		const FGeometryCollection& Collection = *GeometryCollectionAsset->GetGeometryCollection();
+		const int64 TotalBytes = MeasureCookedCollectionBytes(Collection, nullptr);
+		UE_LOG(LogRTSApartmentGeometryCollection, Display, TEXT("SIZE '%s' stripped collection total=%lld bytes"),
+		       *Arguments[0], TotalBytes);
+		for (const FName& GroupName : Collection.GroupNames())
+		{
+			for (const FName& AttributeName : Collection.AttributeNames(GroupName))
+			{
+				const TTuple<FName, FName> Attribute(AttributeName, GroupName);
+				const int64 AttributeBytes = TotalBytes - MeasureCookedCollectionBytes(Collection, &Attribute);
+				if (AttributeBytes >= SmallestReportedBytes)
+				{
+					UE_LOG(LogRTSApartmentGeometryCollection, Display, TEXT("SIZE   %s.%s = %lld bytes (%d elements)"),
+					       *GroupName.ToString(), *AttributeName.ToString(), AttributeBytes, Collection.NumElements(GroupName));
+				}
+			}
+		}
+	}
+
+	FAutoConsoleCommand ReportGeometryCollectionSizeCommand(
+		TEXT("RTS.Apartment.ReportCollectionSize"),
+		TEXT("Logs which attributes of a geometry collection take the space in a cooked, stripped asset. Args: <AssetPath>"),
+		FConsoleCommandWithArgsDelegate::CreateStatic(&ReportGeometryCollectionSize));
+
 	FAutoConsoleCommand BuildGeometryCollectionCommand(
 		TEXT("RTS.Apartment.BuildGeometryCollection"),
 		TEXT("Builds a destructible apartment geometry collection from a planner pieces file, one breakable unit per slot. ")
-		TEXT("Args: <NewAssetPackagePath> <PiecesFilePath>"),
+		TEXT("Pieces are drawn as instances of their source meshes unless NativeRender is given. ")
+		TEXT("Args: <NewAssetPackagePath> <PiecesFilePath> [NativeRender] [Collision=Detailed|Simplified|Boxes]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&BuildApartmentGeometryCollection));
 
 	FAutoConsoleCommand ClusterGeometryCollectionCommand(

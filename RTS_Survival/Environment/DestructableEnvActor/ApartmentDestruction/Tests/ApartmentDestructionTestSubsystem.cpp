@@ -15,12 +15,16 @@
 #include "Misc/Paths.h"
 #include "Physics/Experimental/ChaosEventType.h"
 #include "Engine/DamageEvents.h"
+#include "NavigationSystem.h"
+#include "NavMesh/RecastNavMesh.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/ApartmentDestruction/ApartmentDestructibleActor.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/ApartmentDestruction/ApartmentFootprintNavModifier.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/RTSComponents/GeometryDamageComponent/GeometryDamageComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RHIStats.h"
 #include "UnrealClient.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSApartmentGcTest, Log, All);
@@ -30,6 +34,16 @@ namespace ApartmentDestructionTest
 	const TCHAR* const CommandLineSwitch = TEXT("ApartmentGcPrototypeTest");
 	const TCHAR* const DirectSwitch = TEXT("ApartmentGcDirect");
 	const TCHAR* const GameplayActorSwitch = TEXT("ApartmentGcGameplayActor");
+	const TCHAR* const CrushSwitch = TEXT("ApartmentGcCrush");
+	// Roughly a heavy tank.
+	const FVector CrushBoxHalfExtent(350.0, 180.0, 150.0);
+	constexpr double CrushStartOffsetEast = 1500.0;
+	constexpr double CrushStepLength = 150.0;
+	constexpr int32 CrushStepCount = 7;
+	constexpr double CrushLaneOffsetNorth = 150.0;
+	constexpr double NavProfileStep = 100.0;
+	constexpr int32 NavMapHalfSampleCount = 20;
+	const FVector NavProjectExtent(20.0, 20.0, 400.0);
 	const TCHAR* const PanelHealthSwitch = TEXT("ApartmentGcPanelHealth=");
 	// In direct mode the damage threshold is the health of one panel, in the same units as weapon damage.
 	constexpr float DefaultPanelHealth = 250.f;
@@ -146,13 +160,22 @@ bool UApartmentDestructionTestSubsystem::Tick_UnpauseAndSpawn(UWorld& World)
 	bM_UseGameplayActor = FParse::Param(FCommandLine::Get(), ApartmentDestructionTest::GameplayActorSwitch);
 	if (bM_UseGameplayActor)
 	{
+		LogNavAreaProfile(World, TEXT("baseline"));
 		SpawnGameplayActor(World);
 	}
 	else
 	{
 		SpawnPrototype(World);
 	}
-	BuildImpactScript();
+	bM_UseCrushScript = bM_UseGameplayActor && FParse::Param(FCommandLine::Get(), ApartmentDestructionTest::CrushSwitch);
+	if (bM_UseCrushScript)
+	{
+		BuildCrushScript();
+	}
+	else
+	{
+		BuildImpactScript();
+	}
 	M_NextStepSeconds = World.GetTimeSeconds() + ApartmentDestructionTest::IntactObserveSeconds;
 	return bM_UseGameplayActor ? IsValid(M_GameplayActor) : GetIsValidPrototypeActor();
 }
@@ -266,8 +289,11 @@ void UApartmentDestructionTestSubsystem::SpawnGameplayActor(UWorld& World)
 	GeometryComponent->OnChaosBreakEvent.AddDynamic(this, &UApartmentDestructionTestSubsystem::OnChaosBreak);
 	M_GameplayActor->FinishSpawning(SpawnTransform);
 	M_Camera = World.SpawnActor<ACameraActor>();
-	UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GC SPAWNED mode=gameplay_actor transforms=%d"),
-	       Collection->NumElements(FGeometryCollection::TransformGroup));
+	UE_LOG(LogRTSApartmentGcTest, Display,
+	       TEXT("RTS_APARTMENT_GC SPAWNED mode=gameplay_actor transforms=%d asset_memory_bytes=%llu custom_renderer=%s"),
+	       Collection->NumElements(FGeometryCollection::TransformGroup),
+	       static_cast<uint64>(Collection->GetResourceSizeBytes(EResourceSizeMode::EstimatedTotal)),
+	       *GetNameSafe(Collection->CustomRendererType));
 }
 
 UGeometryCollectionComponent* UApartmentDestructionTestSubsystem::GetTestedGeometryComponent() const
@@ -309,6 +335,81 @@ void UApartmentDestructionTestSubsystem::FireImpactAsProjectile(const FApartment
 	}
 	UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GC PROJECTILE_TRACE_HIT label=%s actor=%s at=%s"),
 	       *Impact.Label, *HitActor->GetName(), *Hit.Location.ToCompactString());
+}
+
+void UApartmentDestructionTestSubsystem::BuildCrushScript()
+{
+	using namespace ApartmentDestructionTest;
+	for (int32 StepIndex = 0; StepIndex < CrushStepCount; ++StepIndex)
+	{
+		FApartmentDestructionTestImpact Step;
+		Step.Label = FString::Printf(TEXT("crush_step_%d"), StepIndex);
+		Step.OffsetFromSite = FVector(CrushStartOffsetEast - StepIndex * CrushStepLength, CrushLaneOffsetNorth,
+		                              CrushBoxHalfExtent.Z);
+		M_Impacts.Add(Step);
+	}
+}
+
+void UApartmentDestructionTestSubsystem::FireCrushStep(const FApartmentDestructionTestImpact& Impact,
+                                                       const FVector& WorldLocation) const
+{
+	using namespace ApartmentDestructionTest;
+	if (not IsValid(M_GameplayActor))
+	{
+		return;
+	}
+	const int32 PiecesInside = M_GameplayActor->CrushInsideBox(
+		FBox::BuildAABB(WorldLocation, CrushBoxHalfExtent), FVector::BackwardVector);
+	UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GC CRUSH label=%s pieces_inside=%d at=%s"),
+	       *Impact.Label, PiecesInside, *WorldLocation.ToCompactString());
+}
+
+void UApartmentDestructionTestSubsystem::LogNavAreaProfile(UWorld& World, const FString& MapLabel) const
+{
+	using namespace ApartmentDestructionTest;
+	const UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(&World);
+	if (not IsValid(NavigationSystem))
+	{
+		return;
+	}
+	TInlineComponentArray<UApartmentFootprintNavModifier*> FootprintModifiers;
+	if (IsValid(M_GameplayActor))
+	{
+		M_GameplayActor->GetComponents(FootprintModifiers);
+	}
+	for (const UApartmentFootprintNavModifier* FootprintModifier : FootprintModifiers)
+	{
+		const FBox ModifierBounds = FootprintModifier->GetNavigationBounds();
+		UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GC NAV_MODIFIER name=%s area=%s min=%s max=%s"),
+		       *FootprintModifier->GetName(), *GetNameSafe(FootprintModifier->AreaClass),
+		       *ModifierBounds.Min.ToCompactString(), *ModifierBounds.Max.ToCompactString());
+	}
+	for (const ANavigationData* NavData : NavigationSystem->NavDataSet)
+	{
+		const ARecastNavMesh* NavMesh = Cast<ARecastNavMesh>(NavData);
+		if (not IsValid(NavMesh))
+		{
+			continue;
+		}
+		// One character per sample, north at the top: '#' no navigation mesh, 'r' the heavy-tank-only ring, '.' open
+		// ground, '?' any other area.
+		for (int32 RowIndex = NavMapHalfSampleCount; RowIndex >= -NavMapHalfSampleCount; --RowIndex)
+		{
+			FString Row;
+			for (int32 ColumnIndex = -NavMapHalfSampleCount; ColumnIndex <= NavMapHalfSampleCount; ++ColumnIndex)
+			{
+				const FVector SamplePoint = SiteCentre + FVector(ColumnIndex * NavProfileStep, RowIndex * NavProfileStep, 0.0);
+				FNavLocation Projected;
+				const bool bOnNavMesh = NavigationSystem->ProjectPointToNavigation(
+					SamplePoint, Projected, NavProjectExtent, NavMesh);
+				const UClass* AreaClass = bOnNavMesh ? NavMesh->GetAreaClass(NavMesh->GetPolyAreaID(Projected.NodeRef)) : nullptr;
+				const FString AreaName = GetNameSafe(AreaClass);
+				Row += AreaClass == nullptr ? TEXT("#") : AreaName.Contains(TEXT("BlockCharLightMedium")) ? TEXT("r") : AreaName.Contains(TEXT("Default")) ? TEXT(".") : TEXT("?");
+			}
+			UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GC NAVMAP %s %s %s"), *MapLabel,
+			       *NavMesh->GetConfig().Name.ToString(), *Row);
+		}
+	}
 }
 
 void UApartmentDestructionTestSubsystem::BuildImpactScript()
@@ -365,6 +466,8 @@ void UApartmentDestructionTestSubsystem::AccumulateFrame()
 	++M_Window.FrameCount;
 	M_Window.TotalFrameSeconds += FrameSeconds;
 	M_Window.WorstFrameSeconds = FMath::Max(M_Window.WorstFrameSeconds, FrameSeconds);
+	// Counted by the render thread for the frame it last finished; close enough for an average.
+	M_Window.TotalDrawCalls += GNumDrawCallsRHI[0];
 }
 
 void UApartmentDestructionTestSubsystem::AdvanceScript(UWorld& World)
@@ -373,6 +476,10 @@ void UApartmentDestructionTestSubsystem::AdvanceScript(UWorld& World)
 	const FString FinishedLabel = M_Impacts.IsValidIndex(M_NextImpactIndex) ? M_Impacts[M_NextImpactIndex].Label : TEXT("intact");
 	ReportWindow(World, FinishedLabel);
 	RequestScreenshot(FinishedLabel);
+	if (bM_UseGameplayActor)
+	{
+		LogNavAreaProfile(World, FinishedLabel);
+	}
 
 	++M_NextImpactIndex;
 	if (not M_Impacts.IsValidIndex(M_NextImpactIndex))
@@ -388,7 +495,11 @@ void UApartmentDestructionTestSubsystem::AdvanceScript(UWorld& World)
 void UApartmentDestructionTestSubsystem::FireImpact(const FApartmentDestructionTestImpact& Impact) const
 {
 	const FVector WorldLocation = ApartmentDestructionTest::SiteCentre + Impact.OffsetFromSite;
-	if (bM_UseGameplayActor)
+	if (bM_UseCrushScript)
+	{
+		FireCrushStep(Impact, WorldLocation);
+	}
+	else if (bM_UseGameplayActor)
 	{
 		FireImpactAsProjectile(Impact, WorldLocation);
 	}
@@ -454,9 +565,10 @@ void UApartmentDestructionTestSubsystem::ReportWindow(const UWorld& World, const
 		BoundsOrigin = Bounds.Origin;
 	}
 	UE_LOG(LogRTSApartmentGcTest, Display,
-	       TEXT("RTS_APARTMENT_GC WINDOW after=%s time=%.1f frames=%d avg_ms=%.2f worst_ms=%.2f breaks=%d total_breaks=%d bounds_origin=%s bounds_extent=%s"),
+	       TEXT("RTS_APARTMENT_GC WINDOW after=%s time=%.1f frames=%d avg_ms=%.2f worst_ms=%.2f avg_draw_calls=%lld breaks=%d total_breaks=%d bounds_origin=%s bounds_extent=%s"),
 	       *Label, World.GetTimeSeconds(), M_Window.FrameCount, AverageMilliseconds,
-	       M_Window.WorstFrameSeconds * SecondsToMilliseconds, M_Window.BreakEventCount, M_TotalBreakEvents,
+	       M_Window.WorstFrameSeconds * SecondsToMilliseconds,
+	       M_Window.FrameCount > 0 ? M_Window.TotalDrawCalls / M_Window.FrameCount : 0, M_Window.BreakEventCount, M_TotalBreakEvents,
 	       *BoundsOrigin.ToCompactString(), *BoundsExtent.ToCompactString());
 	M_Window = FApartmentDestructionTestWindow();
 }

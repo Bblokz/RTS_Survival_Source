@@ -3,11 +3,16 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "ApartmentFootprint.h"
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/CrushDestructionTypes/ECrushDestructionType.h"
 
 #include "ApartmentDestructibleActor.generated.h"
 
+class UApartmentFootprintNavModifier;
+class UBoxComponent;
 class UGeometryCollectionComponent;
+class UNavArea;
 
 /** @brief Tuning of how weapon hits break panels out of an apartment geometry collection. */
 USTRUCT(BlueprintType)
@@ -40,10 +45,34 @@ struct FApartmentDestructionSettings
 	float AnchoredGroundStoreyHeight = 310.f;
 };
 
+/** @brief Tuning of how vehicles break an apartment by driving into it. */
+USTRUCT(BlueprintType)
+struct FApartmentCrushSettings
+{
+	GENERATED_BODY()
+
+	// Which vehicles break panels by driving into the building; the outer ring area decides who can get there at all.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crush")
+	ECrushDestructionType CrushDestructionType = ECrushDestructionType::HeavyTank;
+
+	// Damage dealt to the panels around a vehicle every crush update; at or above the panel health they give way at once.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crush", meta = (ClampMin = "0.0"))
+	float DamagePerUpdate = 500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crush", meta = (ClampMin = "0.02"))
+	float UpdateInterval = 0.1f;
+
+	// Speed given to the pieces a vehicle pushes over, along its direction of travel.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Crush", meta = (ClampMin = "0.0"))
+	float PushSpeed = 350.f;
+};
+
 /**
  * @brief Place in a level and assign an apartment geometry collection (built with RTS.Apartment.BuildGeometryCollection)
  * as rest collection on the geometry component; weapon hits then break panels out where they land.
- * The collection's pivot must be at the footprint centre on the ground.
+ * Vehicles that drive into it crush the panels around them, and its footprint marks the navigation mesh by itself:
+ * an outer ring only heavy tanks may enter and an inner core nobody may enter.
+ * The collection's pivot must be on the ground inside the footprint.
  */
 UCLASS()
 class RTS_SURVIVAL_API AApartmentDestructibleActor : public AActor
@@ -56,17 +85,74 @@ public:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
 	                         AActor* DamageCauser) override;
 
+	/**
+	 * @brief Breaks whatever part of the building is inside the box, as a vehicle of that size driving through would.
+	 * @param WorldBox The volume the vehicle occupies.
+	 * @param PushDirection Direction the vehicle travels in; broken pieces are pushed along it.
+	 * @return The number of building pieces found inside the box.
+	 */
+	int32 CrushInsideBox(const FBox& WorldBox, const FVector& PushDirection);
+
+	/** @brief Recomputes the footprint from the rest collection; call after assigning another collection from script. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Navigation")
+	void RebuildFootprint();
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void OnConstruction(const FTransform& Transform) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Destruction")
 	FApartmentDestructionSettings DestructionSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Destruction")
+	FApartmentCrushSettings CrushSettings;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Navigation")
+	FApartmentFootprintSettings FootprintSettings;
+
+	// Area of the walls and the offset around them; the default lets only heavy tanks in.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Navigation")
+	TSoftClassPtr<UNavArea> OuterRingNavArea;
+
+	// Area of everything deeper inside; the default blocks every unit.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Navigation")
+	TSubclassOf<UNavArea> InnerCoreNavArea;
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Destruction", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UGeometryCollectionComponent> M_GeometryCollection;
 
 	bool GetIsValidGeometryCollection() const;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Navigation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UApartmentFootprintNavModifier> M_OuterRingNav;
+	bool GetIsValidOuterRingNav() const;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Navigation", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UApartmentFootprintNavModifier> M_InnerCoreNav;
+	bool GetIsValidInnerCoreNav() const;
+
+	// Covers the footprint and its offset; only tells which vehicles are close enough to crush anything.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Destruction", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UBoxComponent> M_CrushSensor;
+	bool GetIsValidCrushSensor() const;
+
+	// Vehicles inside the sensor; they are polled because a geometry collection reports no overlaps of its own.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> M_CrushingVehicles;
+
+	FTimerHandle M_CrushTimerHandle;
+
+	UFUNCTION()
+	void OnCrushSensorBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	                               UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
+	                               const FHitResult& SweepResult);
+
+	void CrushUpdate();
+	void CrushUnderVehicle(const AActor& Vehicle);
+	bool GetPassesCrushGate(const AActor* OtherActor) const;
+	void SetupCrushSensorCollision() const;
 
 	// Makes weapons the only thing that can break panels; falling debris would otherwise chain-break the building.
 	void BeginPlay_SetupWeaponOnlyDamage();
