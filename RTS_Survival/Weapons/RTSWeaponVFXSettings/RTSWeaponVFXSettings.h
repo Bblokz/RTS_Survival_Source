@@ -7,6 +7,8 @@
 #include "RTS_Survival/Weapons/WeaponData/WeaponShellType/WeaponShellType.h"
 #include "RTSWeaponVFXSettings.generated.h"
 
+class UNiagaraSystem;
+
 /**
  * @brief Central place to map shell types to designer-tunable VFX colors.
  * Fill this in Project Settings → Game → RTS Weapon VFX.
@@ -25,6 +27,22 @@ public:
 
 	UPROPERTY(EditAnywhere, Config, Category="Shell VFX")
 	TMap<EWeaponShellType, FLinearColor> ShellTypeGroundSmokeColors;
+
+	/**
+	 * The one Niagara system that draws the impacts of every trace weapon (infantry weapons, hull MGs).
+	 * Has one group of emitters per impact type and reads the impacts of a frame from user arrays.
+	 */
+	UPROPERTY(EditAnywhere, Config, Category="Trace Impact VFX")
+	TSoftObjectPtr<UNiagaraSystem> TraceImpactNiagaraSystem;
+
+	// Off: trace weapons fall back to the impact systems configured on each weapon.
+	UPROPERTY(EditAnywhere, Config, Category="Trace Impact VFX")
+	bool bUseCentralisedTraceImpactVfx = true;
+
+	// Impacts above this amount in one frame are not drawn; keeps a huge fight from flooding the system.
+	UPROPERTY(EditAnywhere, Config, Category="Trace Impact VFX", meta=(ClampMin="1", UIMin="1"))
+	int32 MaxTraceImpactsPerFrame = 256;
+
 	/** Convenience accessor. */
 	static const URTSWeaponVFXSettings* Get();
 

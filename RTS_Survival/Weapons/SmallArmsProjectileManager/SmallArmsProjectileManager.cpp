@@ -8,6 +8,7 @@
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
+#include "TraceImpactVfx/TraceImpactVfxBatcher.h"
 
 
 ASmallArmsProjectileManager::ASmallArmsProjectileManager()
@@ -17,6 +18,7 @@ ASmallArmsProjectileManager::ASmallArmsProjectileManager()
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	M_LastActivatedProjectileIndex = -1;
 	M_NiagaraComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraComponent"));
+	M_TraceImpactVfxBatcher = CreateDefaultSubobject<UTraceImpactVfxBatcher>(TEXT("TraceImpactVfxBatcher"));
 }
 
 void ASmallArmsProjectileManager::FireProjectile(

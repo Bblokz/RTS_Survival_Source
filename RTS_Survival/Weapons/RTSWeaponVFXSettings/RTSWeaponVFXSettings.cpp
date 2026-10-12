@@ -3,10 +3,14 @@
 
 #include "RTSWeaponVFXSettings.h"
 
+#include "NiagaraSystem.h"
+
 URTSWeaponVFXSettings::URTSWeaponVFXSettings()
 {
 	CategoryName = TEXT("Game");
 	SectionName = TEXT("RTS Weapon VFX");
+	TraceImpactNiagaraSystem = FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/ImpactSfxVfx/TraceImpacts/NS_TraceImpacts.NS_TraceImpacts"));
 }
 
 const URTSWeaponVFXSettings* URTSWeaponVFXSettings::Get()

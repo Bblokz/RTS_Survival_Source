@@ -21,6 +21,8 @@
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/Weapons/RTSWeaponVFXSettings/RTSWeaponVFXSettings.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxBatcher.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxPerfCounters.h"
 #include "Trace/Trace.h"
 #include "WeaponOwner/WeaponOwner.h"
 #include "Engine/StaticMesh.h"
@@ -747,21 +749,43 @@ void FWeaponImpactPool::Activate(
 	}
 
 	// --- Audio ---
-	if (Sound)
+	PlaySlotAudio(Slot, Location, Rotation, Sound);
+}
+
+void FWeaponImpactPool::PlaySlotAudio(
+	FSlot& Slot,
+	const FVector& Location,
+	const FRotator& Rotation,
+	USoundBase* Sound)
+{
+	if (not Sound)
 	{
-		if (UAudioComponent* AudioComp = GetOrCreateAudio(Slot))
-		{
-			const bool bSoundChanged = (Slot.LastSoundAsset != Sound);
-			if (bSoundChanged)
-			{
-				AudioComp->SetSound(Sound);
-				Slot.LastSoundAsset = Sound;
-			}
-			AudioComp->SetWorldLocation(Location);
-			AudioComp->SetWorldRotation(Rotation);
-			AudioComp->Play(0.f);
-		}
+		return;
 	}
+	UAudioComponent* AudioComp = GetOrCreateAudio(Slot);
+	if (not AudioComp)
+	{
+		return;
+	}
+	const bool bSoundChanged = (Slot.LastSoundAsset != Sound);
+	if (bSoundChanged)
+	{
+		AudioComp->SetSound(Sound);
+		Slot.LastSoundAsset = Sound;
+	}
+	AudioComp->SetWorldLocation(Location);
+	AudioComp->SetWorldRotation(Rotation);
+	AudioComp->Play(0.f);
+}
+
+void FWeaponImpactPool::PlaySound(const FVector& Location, USoundBase* Sound)
+{
+	// A pool that was never initialized has no slots to play on.
+	if (not Sound || Capacity < 1 || not WeaponImpactValidation::GetIsSafeWorldLocation(Location))
+	{
+		return;
+	}
+	PlaySlotAudio(NextSlot(), Location, FRotator::ZeroRotator, Sound);
 }
 
 // ===== END FWeaponShellCase ======================================================
@@ -1582,6 +1606,11 @@ void UWeaponState::CreateWeaponNonPenVfx(const FVector& HitLocation, const FRota
 }
 
 
+void UWeaponState::PlayPooledImpactSound(const FVector& HitLocation, USoundBase* Sound)
+{
+	M_ImpactPool.PlaySound(HitLocation, Sound);
+}
+
 void UWeaponState::ReportErrorForWeapon(const FString& ErrorMessage) const
 {
 	const FString MyName = UEnum::GetValueAsString(M_WeaponName);
@@ -2248,19 +2277,89 @@ void UWeaponStateTrace::OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FV
 		}
 		OnActorPenArmor(TraceHit, HitActor);
 		OutEndLocation = TraceHit.ImpactPoint;
-		CreateWeaponImpact(TraceHit.ImpactPoint, SurfaceTypeHit,
-		                   ImpactRotation);
+		CreateTraceImpact(TraceHit.ImpactPoint, SurfaceTypeHit, TraceHit.ImpactNormal, ImpactRotation);
 		return;
 	}
 	// Trace bounce.
 	OutEndLocation = TraceHit.ImpactPoint;
-	CreateWeaponNonPenVfx(TraceHit.ImpactPoint, ImpactRotation, true);
+	CreateTraceBounce(TraceHit.ImpactPoint, TraceHit.ImpactNormal, ImpactRotation);
 }
 
 void UWeaponStateTrace::OnAsyncTraceNoHit(const FVector& TraceEnd)
 {
 	// If no hits, still create impact at the TraceEnd location
-	CreateWeaponImpact(TraceEnd, ERTSSurfaceType::Air);
+	CreateTraceImpact(TraceEnd, ERTSSurfaceType::Air, FVector::UpVector, FRotator::ZeroRotator);
+}
+
+UTraceImpactVfxBatcher* UWeaponStateTrace::GetReadyTraceImpactVfxBatcher() const
+{
+	const ASmallArmsProjectileManager* ProjectileManager = M_ProjectileManager.Get();
+	if (ProjectileManager == nullptr)
+	{
+		return nullptr;
+	}
+	UTraceImpactVfxBatcher* ImpactVfxBatcher = ProjectileManager->GetTraceImpactVfxBatcher();
+	if (ImpactVfxBatcher == nullptr || not ImpactVfxBatcher->GetIsReadyToDraw())
+	{
+		return nullptr;
+	}
+	return ImpactVfxBatcher;
+}
+
+void UWeaponStateTrace::CreateTraceImpact(
+	const FVector& HitLocation,
+	const ERTSSurfaceType HitSurface,
+	const FVector& ImpactNormal,
+	const FRotator& ImpactRotation)
+{
+#if RTS_WITH_MAP_TESTS
+	const FTraceImpactVfxScopedDispatchTimer DispatchTimer(true);
+	FTraceImpactVfxPerfCounters::RecordWeaponOwner(WeaponOwner.GetObject());
+#endif
+	const FRTSSurfaceImpactData* SurfaceData = M_WeaponVfx.SurfaceImpactEffects.Find(HitSurface);
+#if RTS_WITH_MAP_TESTS
+	FTraceImpactVfxPerfCounters::RecordConfiguredSystem(
+		*FRTS_PhysicsHelper::GetSurfaceTypeString(HitSurface),
+		SurfaceData != nullptr ? SurfaceData->ImpactEffect : nullptr,
+		M_WeaponVfx.ImpactScale);
+#endif
+	UTraceImpactVfxBatcher* ImpactVfxBatcher = GetReadyTraceImpactVfxBatcher();
+	if (ImpactVfxBatcher == nullptr)
+	{
+		CreateWeaponImpact(HitLocation, HitSurface, ImpactRotation);
+		return;
+	}
+	ImpactVfxBatcher->AddImpact(
+		UTraceImpactVfxBatcher::GetImpactTypeForSurface(HitSurface),
+		HitLocation,
+		ImpactNormal,
+		static_cast<float>(M_WeaponVfx.ImpactScale.GetMax()));
+	PlayPooledImpactSound(HitLocation, SurfaceData != nullptr ? SurfaceData->ImpactSound : nullptr);
+}
+
+void UWeaponStateTrace::CreateTraceBounce(
+	const FVector& HitLocation,
+	const FVector& ImpactNormal,
+	const FRotator& ImpactRotation)
+{
+#if RTS_WITH_MAP_TESTS
+	const FTraceImpactVfxScopedDispatchTimer DispatchTimer(true);
+	FTraceImpactVfxPerfCounters::RecordWeaponOwner(WeaponOwner.GetObject());
+	FTraceImpactVfxPerfCounters::RecordConfiguredSystem(
+		TEXT("Bounce"), M_WeaponVfx.BounceEffect, M_WeaponVfx.BounceScale);
+#endif
+	UTraceImpactVfxBatcher* ImpactVfxBatcher = GetReadyTraceImpactVfxBatcher();
+	if (ImpactVfxBatcher == nullptr)
+	{
+		CreateWeaponNonPenVfx(HitLocation, ImpactRotation, true);
+		return;
+	}
+	ImpactVfxBatcher->AddImpact(
+		ETraceImpactVfxType::Bounce,
+		HitLocation,
+		ImpactNormal,
+		static_cast<float>(M_WeaponVfx.BounceScale.GetMax()));
+	PlayPooledImpactSound(HitLocation, M_WeaponVfx.BounceSound);
 }
 
 void UWeaponStateTrace::OnAsyncTraceComplete(
@@ -2303,7 +2402,8 @@ void UWeaponStateTrace::OnAsyncTraceComplete(
 			else if (ShieldDamageResult == EShieldDamageResult::Absorbed)
 			{
 				EndLocation = TraceHit.ImpactPoint;
-				CreateWeaponImpact(TraceHit.ImpactPoint, ERTSSurfaceType::Air, ImpactRotation);
+				CreateTraceImpact(
+					TraceHit.ImpactPoint, ERTSSurfaceType::Air, TraceHit.ImpactNormal, ImpactRotation);
 			}
 			else
 			{
@@ -2312,8 +2412,7 @@ void UWeaponStateTrace::OnAsyncTraceComplete(
 		}
 		else
 		{
-			CreateWeaponImpact(TraceHit.ImpactPoint, SurfaceTypeHit,
-			                   ImpactRotation);
+			CreateTraceImpact(TraceHit.ImpactPoint, SurfaceTypeHit, TraceHit.ImpactNormal, ImpactRotation);
 			EndLocation = TraceHit.ImpactPoint;
 		}
 	}

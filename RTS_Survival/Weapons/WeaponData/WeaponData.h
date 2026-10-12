@@ -23,6 +23,7 @@ enum class EShieldDamageResult : uint8;
 class UArmorCalculation;
 class UPrimitiveComponent;
 class ASmallArmsProjectileManager;
+class UTraceImpactVfxBatcher;
 class USoundBase;
 class USoundAttenuation;
 class USoundConcurrency;
@@ -498,6 +499,9 @@ public:
 		const FVector& NiagaraScale,
 		USoundBase* Sound, const bool bIsUsingHEBounceOverwrite);
 
+	/** Play only the sound of an impact; for weapons whose impact visuals are drawn elsewhere. */
+	void PlaySound(const FVector& Location, USoundBase* Sound);
+
 	void Cleanup();
 
 	/** Heuristic to size pool based on weapon stats. */
@@ -539,6 +543,9 @@ private:
 		UNiagaraSystem* NiagaraSystem,
 		const FVector& NiagaraScale,
 		USoundBase* Sound, const bool bIsUsingHeBounceOverwrite);
+
+	/** Swap the sound of the slot's audio component if needed, relocate and play it. */
+	void PlaySlotAudio(FSlot& Slot, const FVector& Location, const FRotator& Rotation, USoundBase* Sound);
 
 	// Used to scale bounce vfx of he overwrites.
 	float M_WeaponCalibre = 1.f;
@@ -776,6 +783,9 @@ protected:
 	 * @param bHandleSound
 	 */
 	void CreateWeaponNonPenVfx(const FVector& HitLocation, const FRotator& BounceNormal, bool bHandleSound);
+
+	// Plays an impact sound through this weapon's pooled audio components, without any impact visuals.
+	void PlayPooledImpactSound(const FVector& HitLocation, USoundBase* Sound);
 
 	UPROPERTY()
 	FWeaponVFX M_WeaponVfx;
@@ -1151,6 +1161,26 @@ private:
 	void OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FVector& OutEndLocation,
 	                               const FRotator& ImpactRotation, const ERTSSurfaceType SurfaceTypeHit);
 	void OnAsyncTraceNoHit(const FVector& TraceEnd);
+
+	/**
+	 * @brief Draws a trace hit with the centralised trace impact system; the impact systems configured on
+	 * the weapon are ignored, only its impact sound is used. Falls back to the weapon's own when not available.
+	 * @param HitLocation Where the trace hit.
+	 * @param HitSurface Picks the effect and the sound.
+	 * @param ImpactNormal Surface normal the effect is oriented along.
+	 * @param ImpactRotation Same orientation as a rotator, for the fallback.
+	 */
+	void CreateTraceImpact(
+		const FVector& HitLocation,
+		const ERTSSurfaceType HitSurface,
+		const FVector& ImpactNormal,
+		const FRotator& ImpactRotation);
+
+	// Same as CreateTraceImpact, for a trace that did not penetrate the armor it hit.
+	void CreateTraceBounce(const FVector& HitLocation, const FVector& ImpactNormal, const FRotator& ImpactRotation);
+
+	// Null when the centralised trace impact drawing cannot be used.
+	UTraceImpactVfxBatcher* GetReadyTraceImpactVfxBatcher() const;
 };
 
 USTRUCT(Blueprintable, BlueprintType)

@@ -15,6 +15,7 @@
 #include "RTS_Survival/Units/Squads/Tests/SquadPerfScenario.h"
 #include "RTS_Survival/RTSComponents/MedicComponent/Tests/MedicHealTestScenario.h"
 #include "RTS_Survival/Units/Tanks/Tests/VehicleAvoidanceScenario.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/Tests/TraceImpactVfxPerfScenario.h"
 #endif
 #include "Subsystems/WorldSubsystem.h"
 #include "CoverFinderWorldSubsystem.generated.h"
@@ -468,6 +469,7 @@ private:
 	FSquadPerfScenario M_SquadPerfScenario;
 	FMedicHealTestScenario M_MedicHealScenario;
 	FVehicleAvoidanceScenario M_VehicleAvoidanceScenario;
+	FTraceImpactVfxPerfScenario M_TraceImpactVfxPerfScenario;
 	void StartCommandLineMapTests();
 	void TickMapTests(float DeltaTime);
 #endif

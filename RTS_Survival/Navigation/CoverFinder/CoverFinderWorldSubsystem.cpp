@@ -651,6 +651,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_VehicleAvoidanceScenario.Start();
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("TraceImpactVfxMeasure")))
+	{
+		M_TraceImpactVfxPerfScenario.Start();
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderCountCover")))
 	{
 		M_CoverCountScenario.Start(FParse::Param(FCommandLine::Get(), TEXT("CoverFinderWriteCountBaseline")));
@@ -672,6 +676,7 @@ void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
 	M_SquadPerfScenario.Tick(*this);
 	M_MedicHealScenario.Tick(*this);
 	M_VehicleAvoidanceScenario.Tick(*this, DeltaTime);
+	M_TraceImpactVfxPerfScenario.Tick(*this);
 }
 #endif
 

@@ -58,7 +58,8 @@ public class RTS_Survival : ModuleRules
 
 		if (Target.bBuildEditor)
 		{
-			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "BlueprintGraph" });
+			// NiagaraEditor: the authoring step of the trace impact Niagara system edits emitter graphs.
+			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "BlueprintGraph", "NiagaraEditor" });
 		}
 
 		// Uncomment if you are using online features

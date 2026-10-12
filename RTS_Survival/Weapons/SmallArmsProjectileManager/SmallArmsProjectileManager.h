@@ -12,6 +12,7 @@ struct FSoA_TankProjectilesPool;
 class AProjectile;
 class UNiagaraSystem;
 class UNiagaraComponent;
+class UTraceImpactVfxBatcher;
 struct FSoA_SmallArmsProjectilesPool;
 
 UCLASS()
@@ -39,7 +40,10 @@ public:
 		const float StartTime);
 
 	AProjectile* GetDormantTankProjectile();
-	
+
+	// Draws the impacts of all trace weapons with one Niagara system.
+	UTraceImpactVfxBatcher* GetTraceImpactVfxBatcher() const { return M_TraceImpactVfxBatcher; }
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -75,6 +79,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UNiagaraComponent> M_NiagaraComponent;
+
+	UPROPERTY()
+	TObjectPtr<UTraceImpactVfxBatcher> M_TraceImpactVfxBatcher;
 
 	bool EnsureSystemIsValid(TObjectPtr<UNiagaraSystem> System) const;
 	bool EnsureWorldIsValid();
