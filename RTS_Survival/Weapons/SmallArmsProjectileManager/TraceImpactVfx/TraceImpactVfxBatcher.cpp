@@ -65,7 +65,9 @@ void UTraceImpactVfxBatcher::LogPublishedTotalsWhenAsked()
 	UE_LOG(
 		LogTemp,
 		Display,
-		TEXT("RTS_TRACE_IMPACT_VFX totals game_seconds=%.0f niagara_active=%d sand=%lld metal=%lld flesh=%lld air=%lld stone=%lld bounce=%lld"),
+		TEXT(
+			"RTS_TRACE_IMPACT_VFX totals game_seconds=%.0f niagara_active=%d sand=%lld metal=%lld flesh=%lld air=%lld stone=%lld bounce=%lld"
+		),
 		NowSeconds,
 		M_NiagaraComponent->IsActive() ? 1 : 0,
 		M_TotalPublishedByType[0], M_TotalPublishedByType[1], M_TotalPublishedByType[2],
@@ -127,10 +129,11 @@ FString UTraceImpactVfxBatcher::DescribeEmitterParticleCounts() const
 	{
 		return TEXT("no component");
 	}
-	const FNiagaraSystemInstanceControllerConstPtr InstanceController = M_NiagaraComponent->GetSystemInstanceController();
+	const FNiagaraSystemInstanceControllerConstPtr InstanceController = M_NiagaraComponent->
+		GetSystemInstanceController();
 	const FNiagaraSystemInstance* SystemInstance = InstanceController.IsValid()
-		? InstanceController->GetSystemInstance_Unsafe()
-		: nullptr;
+		                                               ? InstanceController->GetSystemInstance_Unsafe()
+		                                               : nullptr;
 	if (SystemInstance == nullptr)
 	{
 		return TEXT("no system instance");
@@ -216,7 +219,8 @@ void UTraceImpactVfxBatcher::BeginPlay_ReadEmitterSpawns(const UNiagaraSystem& T
 	for (const FNiagaraVariable& UserParameter : UserParameters)
 	{
 		const FString ParameterName = UserParameter.GetName().ToString();
-		if (UserParameter.GetType() != FNiagaraTypeDefinition::GetIntDef() || not ParameterName.EndsWith(PerImpactSuffix))
+		if (UserParameter.GetType() != FNiagaraTypeDefinition::GetIntDef() || not ParameterName.EndsWith(
+			PerImpactSuffix))
 		{
 			continue;
 		}
@@ -232,7 +236,8 @@ void UTraceImpactVfxBatcher::BeginPlay_ReadEmitterSpawns(const UNiagaraSystem& T
 			FTraceImpactVfxEmitterSpawn EmitterSpawn;
 			EmitterSpawn.TypeIndex = TypeIndex;
 			EmitterSpawn.SpawnCountParameter = FName(*(EmitterName + SpawnCountSuffix));
-			EmitterSpawn.ParticlesPerImpact = FMath::Max(1, UserParameterStore.GetParameterValue<int32>(StoredParameter));
+			EmitterSpawn.ParticlesPerImpact = FMath::Max(
+				1, UserParameterStore.GetParameterValue<int32>(StoredParameter));
 			M_EmitterSpawns.Add(EmitterSpawn);
 			break;
 		}
@@ -303,6 +308,13 @@ void UTraceImpactVfxBatcher::AddImpact(
 	{
 		return;
 	}
+	/**
+	 * @brief What one impact stores in the batch: two float4 entries in the pending lists of its impact type.
+	 * - M_PendingPositionAndScale: xyz = world location of the hit, w = scale of the effect.
+	 * - M_PendingNormal: xyz = surface normal the effect is oriented along, w = unused.
+	 * The type itself is not stored per impact; it is the list the entries are in. On the next tick the lists
+	 * of all types are put behind each other and each emitter is told where its type starts and how many it has.
+	 */
 	const int32 TypeIndex = FMath::Clamp(static_cast<int32>(ImpactType), 0, ImpactTypeCount - 1);
 	M_PendingPositionAndScale[TypeIndex].Emplace(
 		static_cast<float>(Location.X), static_cast<float>(Location.Y), static_cast<float>(Location.Z), Scale);

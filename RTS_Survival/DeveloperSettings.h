@@ -1534,6 +1534,7 @@ namespace DeveloperSettings
 					{ERTSVoiceLine::ShotConnected, 1.f},
 					{ERTSVoiceLine::UnitDies, 1.00f},
 					{ERTSVoiceLine::EnemyDestroyed, 1.f},
+					{ERTSVoiceLine::Stressed, 1.f},
 				};
 			}
 		}
@@ -1677,7 +1678,7 @@ namespace DeveloperSettings
 		namespace Projectile
 		{
 			// Projectile pool size for smallarms.
-			inline constexpr int32 SmallArmsProjectilePoolSize = 256;
+			inline constexpr int32 SmallArmsProjectilePoolSize = 1024;
 			inline constexpr int32 SmallArmsProjectileSpeed = 7500;
 			// Projectile pool size for tank projectiles.
 			inline constexpr int32 TankProjectilePoolSize = 64;

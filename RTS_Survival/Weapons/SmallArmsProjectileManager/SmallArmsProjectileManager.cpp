@@ -10,6 +10,12 @@
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "TraceImpactVfx/TraceImpactVfxBatcher.h"
 
+namespace SmallArmsProjectileManagerPrivate
+{
+	// User parameter of the projectile Niagara system that drives how many particles it spawns.
+	const FName NiagaraPoolSizeVarName = TEXT("Pool");
+}
+
 
 ASmallArmsProjectileManager::ASmallArmsProjectileManager()
 {
@@ -31,9 +37,8 @@ void ASmallArmsProjectileManager::FireProjectile(
 	{
 		return;
 	}
-	bool bIsPoolSaturated;
-	const int32 Index = FindDormantProjectileIndex(bIsPoolSaturated);
-	if (bIsPoolSaturated)
+	const int32 Index = FindDormantProjectileIndexReleasingExpired();
+	if (Index == INDEX_NONE)
 	{
 		OnPoolSaturated();
 		return;
@@ -72,6 +77,10 @@ void ASmallArmsProjectileManager::InitProjectileManager(UNiagaraSystem* Projecti
 		return;
 	}
 	M_NiagaraComponent->SetAsset(ProjectileSystem);
+	// The system spawns one particle per pool slot; a slot without a particle would never be drawn.
+	M_NiagaraComponent->SetVariableInt(
+		SmallArmsProjectileManagerPrivate::NiagaraPoolSizeVarName,
+		FSoA_SmallArmsProjectilesPool::PoolSize);
 	M_NiagaraComponent->Activate();
 	PrimaryActorTick.SetTickFunctionEnable(true);
 	M_NiagaraComponent->SetFloatParameter(FName(*NiagaraProjectileSpeedVarName),
@@ -135,7 +144,52 @@ bool ASmallArmsProjectileManager::GetIsValidNiagaraComponent()
 
 void ASmallArmsProjectileManager::OnPoolSaturated()
 {
-	RTSFunctionLibrary::ReportError("Projectile pool is saturated! No projectiles left.");
+	if (bM_HasReportedPoolSaturation)
+	{
+		return;
+	}
+	// Reported once: in a large fight this would otherwise repeat for every shot fired.
+	bM_HasReportedPoolSaturation = true;
+	RTSFunctionLibrary::ReportError("Projectile pool is saturated! No projectiles left."
+		"\n Further saturation is not reported; consider raising SmallArmsProjectilePoolSize.");
+}
+
+int32 ASmallArmsProjectileManager::FindDormantProjectileIndexReleasingExpired()
+{
+	bool bIsPoolSaturated = false;
+	const int32 DormantIndex = FindDormantProjectileIndex(bIsPoolSaturated);
+	if (not bIsPoolSaturated)
+	{
+		return DormantIndex;
+	}
+	// The tick only releases expired projectiles every so often; between ticks they still occupy their slots.
+	if (not EnsureWorldIsValid() || ReleaseExpiredProjectiles(M_World->GetTimeSeconds()) <= 0)
+	{
+		return INDEX_NONE;
+	}
+	const int32 ReleasedIndex = FindDormantProjectileIndex(bIsPoolSaturated);
+	return bIsPoolSaturated ? INDEX_NONE : ReleasedIndex;
+}
+
+int32 ASmallArmsProjectileManager::ReleaseExpiredProjectiles(const double CurrentTime)
+{
+	int32 ReleasedCount = 0;
+	for (int32 i = 0; i < FSoA_SmallArmsProjectilesPool::PoolSize; ++i)
+	{
+		if (not M_SmallArmsProjectilePool.bIsActive[i])
+		{
+			continue;
+		}
+		const FVector& TypeStartTimeLifeTime = M_SmallArmsProjectilePool.ProjectileTypesStartTimeLifeTime[i];
+		if (CurrentTime - TypeStartTimeLifeTime.Y <= TypeStartTimeLifeTime.Z)
+		{
+			continue;
+		}
+		Debug_ProjectilePooling("Projectile at index: " + FString::FromInt(i) + " has expired.");
+		M_SmallArmsProjectilePool.bIsActive[i] = false;
+		++ReleasedCount;
+	}
+	return ReleasedCount;
 }
 
 int32 ASmallArmsProjectileManager::FindDormantProjectileIndex(bool& bOutIsPoolSaturated) const
@@ -173,20 +227,7 @@ void ASmallArmsProjectileManager::UpdateProjectiles()
 	{
 		return;
 	}
-	const double CurrentTime = M_World->GetTimeSeconds();
-	for (int32 i = 0; i < FSoA_SmallArmsProjectilesPool::PoolSize; ++i)
-	{
-		if (not M_SmallArmsProjectilePool.bIsActive[i])
-		{
-			continue;
-		}
-		if (CurrentTime - M_SmallArmsProjectilePool.ProjectileTypesStartTimeLifeTime[i].Y > M_SmallArmsProjectilePool.
-			ProjectileTypesStartTimeLifeTime[i].Z)
-		{
-			Debug_ProjectilePooling("Projectile at index: " + FString::FromInt(i) + " has expired.");
-			M_SmallArmsProjectilePool.bIsActive[i] = false;
-		}
-	}
+	ReleaseExpiredProjectiles(M_World->GetTimeSeconds());
 	UpdateNiagaraWithData();
 }
 

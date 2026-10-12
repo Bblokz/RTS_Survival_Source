@@ -32,6 +32,7 @@
 #include "RTS_Survival/RTSComponents/RepairComponent/RepairComponent.h"
 #include "RTS_Survival/RTSComponents/MedicComponent/MedicComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "Components/CapsuleComponent.h"
 #include "NavigationSystem.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
@@ -629,9 +630,48 @@ bool ASquadUnit::GetMayKeepAutomaticCover() const
 	// unit finished ahead of its squad mates. Giving the point up now would only make the unit walk back into it
 	// a moment later; whatever the squad does next cancels cover itself when it sets this unit moving.
 	// A heal order only moves the squad's medics; their squad mates stay where they are.
+	// The order to enter cover and hold is carried out by this very cover.
 	const EAbilityID SquadCommand = M_SquadController->GetActiveCommandID();
 	return SquadCommand == EAbilityID::IdAttack || SquadCommand == EAbilityID::IdMove ||
-		SquadCommand == EAbilityID::IdHeal;
+		SquadCommand == EAbilityID::IdHeal || SquadCommand == EAbilityID::IdEnterCoverAndHold;
+}
+
+bool ASquadUnit::GetIsSquadOnHoldPosition() const
+{
+	// Silent: polled on tactical updates, and a unit without a squad has no stance to respect.
+	return IsValid(M_SquadController) &&
+		M_SquadController->GetEngagementStance() == ERTSAggroBehaviour::Stance_HoldPosition;
+}
+
+bool ASquadUnit::TryEnterNearbyCoverOnOrder()
+{
+	if (not IsUnitAlive() || not GetIsSquadEligibleForAutomaticCover())
+	{
+		return false;
+	}
+	if (M_CoverRuntimeState.GetHasAssignment())
+	{
+		return true;
+	}
+	const UWorld* World = GetWorld();
+	URTSCoverFinderWorldSubsystem* CoverSubsystem = IsValid(World)
+		? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		: nullptr;
+	if (not IsValid(CoverSubsystem))
+	{
+		return false;
+	}
+	// The order outranks where an earlier move preview put this soldier.
+	ClearPlayerPlannedPosition();
+	FVector TargetLocation = FVector::ZeroVector;
+	bool bTargetIsAttackOrder = false;
+	AActor* TargetActor = GetCoverJudgementTarget(TargetLocation, bTargetIsAttackOrder);
+	return TryReserveAndWalkToCover(*CoverSubsystem, TargetActor, TargetLocation);
+}
+
+bool ASquadUnit::GetIsOnItsWayIntoCover() const
+{
+	return M_CoverRuntimeState.GetHasAssignment() && not M_CoverRuntimeState.GetIsOccupyingCover();
 }
 
 bool ASquadUnit::GetCanHoldCoverWhileSquadClosesRange() const
@@ -715,9 +755,6 @@ void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubs
 	FVector TargetLocation = FVector::ZeroVector;
 	bool bTargetIsAttackOrder = false;
 	AActor* TargetActor = GetCoverJudgementTarget(TargetLocation, bTargetIsAttackOrder);
-	const ESquadUnitCoverUseReason UseReason = IsValid(TargetActor)
-		? ESquadUnitCoverUseReason::Attack
-		: ESquadUnitCoverUseReason::AfterMoveCommand;
 	constexpr float FailedSearchRetrySeconds = 3.0f;
 	if (not IsValid(TargetActor) && TryUsePlayerPlannedPosition(CoverSubsystem))
 	{
@@ -730,6 +767,15 @@ void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubs
 		DelayNextCoverSearch(FailedSearchRetrySeconds);
 		return;
 	}
+	TryReserveAndWalkToCover(CoverSubsystem, TargetActor, TargetLocation);
+}
+
+bool ASquadUnit::TryReserveAndWalkToCover(
+	URTSCoverFinderWorldSubsystem& CoverSubsystem,
+	AActor* TargetActor,
+	const FVector& TargetLocation)
+{
+	constexpr float FailedSearchRetrySeconds = 3.0f;
 	// With a target the point is picked by where the enemies are; without one the nearest point will do.
 	FRTSCoverPoint CoverPoint;
 	const bool bReservedPoint = IsValid(TargetActor)
@@ -744,17 +790,22 @@ void ASquadUnit::TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubs
 	if (not bReservedPoint)
 	{
 		DelayNextCoverSearch(FailedSearchRetrySeconds);
-		return;
+		return false;
 	}
+	const ESquadUnitCoverUseReason UseReason = IsValid(TargetActor)
+		? ESquadUnitCoverUseReason::Attack
+		: ESquadUnitCoverUseReason::AfterMoveCommand;
 	if (not SetCoverAssignment(CoverPoint, UseReason))
 	{
 		CoverSubsystem.ReleaseCoverReservation(*this, CoverPoint.PointId);
-		return;
+		return false;
 	}
 	if (not StartCoverMovement())
 	{
 		ClearCoverStateInternal(false);
+		return false;
 	}
+	return true;
 }
 
 float ASquadUnit::GetMaximumCoverDistanceToTarget() const
@@ -831,6 +882,11 @@ bool ASquadUnit::TryRepositionToBetterCombatCover(
 	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
 	const UWorld* World = GetWorld();
 	if (not IsValid(CoverSettings) || not CoverSettings->bM_EnableCombatCoverRepositioning || not IsValid(World))
+	{
+		return false;
+	}
+	// A squad on hold position keeps the cover it has; only its point becoming unusable makes it move.
+	if (GetIsSquadOnHoldPosition())
 	{
 		return false;
 	}

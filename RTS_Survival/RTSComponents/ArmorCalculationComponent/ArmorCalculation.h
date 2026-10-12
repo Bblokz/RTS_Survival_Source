@@ -291,6 +291,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ArmorSettings|VehicleModules")
 	bool SetVehicleModuleProfile(EVehicleModuleProfile Profile);
 
+	/**
+	 * @brief Lets vehicle Blueprints opt out of module fires that do not suit their vehicle role.
+	 * @param bEnableEngineFires Whether engine damage may start an engine fire.
+	 * @param bEnableAmmoCookOffs Whether ammo damage may start an ammo cook-off.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "ArmorSettings|VehicleModules")
+	void SetVehicleModuleFiresEnabled(bool bEnableEngineFires, bool bEnableAmmoCookOffs);
+
+	bool GetAreEngineFiresEnabled() const { return bM_AreEngineFiresEnabled; }
+	bool GetAreAmmoCookOffsEnabled() const { return bM_AreAmmoCookOffsEnabled; }
+
 	/** @return The selected profile used by module damage and profile-specific effects. */
 	EVehicleModuleProfile GetVehicleModuleProfile() const { return M_ModuleProfile; }
 
@@ -629,6 +640,8 @@ private:
 
 	EVehicleModuleProfile M_ModuleProfile = VehicleModuleBalance::DefaultModuleProfile;
 	EVehicleRunningGear M_RunningGear = EVehicleRunningGear::Tracks;
+	bool bM_AreEngineFiresEnabled = true;
+	bool bM_AreAmmoCookOffsEnabled = true;
 	// An explicit SetRunningGearType call overrides the profile default regardless of call order.
 	bool bM_HasExplicitRunningGear = false;
 	bool bM_HasModuleInstallationStarted = false;

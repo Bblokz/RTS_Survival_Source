@@ -70,6 +70,8 @@ enum class ERTSVoiceLine : uint8
 	VehicleOnFire,
 	GeneralDamage,
 	EngineDamage,
+	// Shouted in the world by a soldier that becomes stressed; never played over radio.
+	Stressed,
 };
 
 UENUM(Blueprintable)

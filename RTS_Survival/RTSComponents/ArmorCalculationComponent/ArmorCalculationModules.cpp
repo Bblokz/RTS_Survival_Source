@@ -168,6 +168,14 @@ bool UArmorCalculation::GetCanChangeModuleConfiguration(const TCHAR* FunctionNam
 // Profile, running gear and installation
 // ----------------------------------------------------------------------------------------------------
 
+void UArmorCalculation::SetVehicleModuleFiresEnabled(
+	const bool bEnableEngineFires,
+	const bool bEnableAmmoCookOffs)
+{
+	bM_AreEngineFiresEnabled = bEnableEngineFires;
+	bM_AreAmmoCookOffsEnabled = bEnableAmmoCookOffs;
+}
+
 bool UArmorCalculation::SetVehicleModuleProfile(const EVehicleModuleProfile Profile)
 {
 	if (not GetCanChangeModuleConfiguration(TEXT("SetVehicleModuleProfile")))

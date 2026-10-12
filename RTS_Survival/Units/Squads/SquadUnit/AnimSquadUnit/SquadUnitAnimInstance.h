@@ -1175,6 +1175,10 @@ private:
 	bool GetCanStartCoverSpray() const;
 	void PlayRandomCoverSpray();
 
+	// Without the loop the montage blends out to the cover pose after every play, which reads as ducking between
+	// bursts; looped, the soldier sprays until SetCoverSpray stops him or another montage cuts in.
+	void LoopActiveSprayMontage();
+
 	/**
 	 * @brief Plays a spray sequence through the montage every soldier of the world shares for it.
 	 * @param SprayAnimation One of the spray animations that is a plain sequence.

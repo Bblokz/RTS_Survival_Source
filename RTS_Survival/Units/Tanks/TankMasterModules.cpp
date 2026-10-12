@@ -153,6 +153,11 @@ void ATankMaster::OnModuleEngineDamaged(
 
 bool ATankMaster::StartEngineFireChance(const EVehicleModuleState EngineState, const EWeaponShellType ShellType)
 {
+	if (not GetIsValidModuleArmor() || not M_ModuleArmor->GetAreEngineFiresEnabled())
+	{
+		return false;
+	}
+
 	const float FireChance = EngineFire::GetChance(EngineState, ShellType);
 	if (FireChance <= 0.f || FMath::FRand() >= FireChance)
 	{
@@ -183,6 +188,11 @@ TSubclassOf<UTankEngineFireBehaviour> ATankMaster::GetEngineFireBehaviourClass()
 
 bool ATankMaster::StartAmmoCookOffChance(const EVehicleModuleState AmmoState)
 {
+	if (not GetIsValidModuleArmor() || not M_ModuleArmor->GetAreAmmoCookOffsEnabled())
+	{
+		return false;
+	}
+
 	const float CookOffChance = AmmoCookOff::GetChance(AmmoState);
 	if (CookOffChance <= 0.f || FMath::FRand() >= CookOffChance)
 	{

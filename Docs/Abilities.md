@@ -102,6 +102,17 @@ So queued subtype abilities are revalidated against the *exact* `(AbilityId, Cus
 - Medics also heal without a command while their squad is idle; `OnCommandExecutionStarting` takes them off that
   before any command starts. `-MedicValidateHeal` runs the map test (`FMedicHealTestScenario`).
 
+### EnterCoverAndHold (`IdEnterCoverAndHold`)
+
+- Squads only, action-button only (`ACPPController::DirectActionButtonEnterCoverAndHold` →
+  `ICommands::EnterCoverAndHold`); no subtype, no right-click decoder path. The card must hold the entry.
+- `ASquadController::ExecuteEnterCoverAndHoldCommand` asks every soldier for the best free cover nearby
+  (`ASquadUnit::TryEnterNearbyCoverOnOrder`) and polls on a timer until nobody is on its way into cover any more,
+  or a deadline passes. It then sets `ERTSAggroBehaviour::Stance_HoldPosition` and calls `DoneExecutingCommand`.
+- Soldiers that find no cover hold where they stand. An order that is replaced before the squad settled leaves the
+  stance as it was.
+- A squad on hold position never trades its cover for better cover (`TryRepositionToBetterCombatCover`).
+
 ### Temporary ability removal: `BeginAbilitySuppression` / `EndAbilitySuppression`
 
 Hide abilities with `UCommandData::BeginAbilitySuppression(Source, AbilityIds)` instead of removing and re-adding them.

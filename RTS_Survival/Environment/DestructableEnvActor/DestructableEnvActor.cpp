@@ -271,7 +271,8 @@ float ADestructableEnvActor::TakeDamage(float DamageAmount, FDamageEvent const& 
 {
 	if (DamageReduction > 0.1)
 	{
-		DamageAmount -= FMath::Max(0, DamageReduction);
+		// Never below zero: a hit weaker than the reduction does nothing instead of adding health.
+		DamageAmount = FMath::Max(0.f, DamageAmount - DamageReduction);
 	}
 	Health -= DamageAmount;
 	if constexpr (DeveloperSettings::Debugging::GDamage_System_Compile_DebugSymbols)

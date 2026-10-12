@@ -29,6 +29,7 @@ struct FSquadPerfPhaseSamples
  * while every squad is kept on the move. Logs frame time percentiles as RTS_SQUAD_PERF and, with
  * -SquadPerfStatDump, lets the engine dump its averaged stat tree over each phase to show where the time goes.
  * Started with -SquadPerfMeasure. Not part of a shipping build.
+ * @note -SquadPerfNoErrorDialogs logs reported errors instead of opening their dialog, which costs frame time.
  */
 struct FSquadPerfScenario
 {

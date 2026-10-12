@@ -438,6 +438,15 @@ public:
 	 * @return True when this unit sits in cover and its own weapon has the ordered target in range.
 	 */
 	bool GetCanHoldCoverWhileSquadClosesRange() const;
+
+	/**
+	 * @brief The squad's order to enter cover: reserves the best free point nearby and starts the walk to it.
+	 * @return True when the unit holds or is walking to a point; false when it has to stay where it is.
+	 */
+	bool TryEnterNearbyCoverOnOrder();
+
+	/** @return True from the moment a point is assigned until the unit has taken its place behind it. */
+	bool GetIsOnItsWayIntoCover() const;
 	bool GetHasCoverAssignment() const { return M_CoverRuntimeState.GetHasAssignment(); }
 	bool GetIsOccupyingCover() const { return M_CoverRuntimeState.GetIsOccupyingCover(); }
 	EAbilityID GetActiveCommand() const { return M_ActiveCommand; }
@@ -861,6 +870,7 @@ private:
 	void RecordHealthLossForStress(float HealthLost);
 	bool GetIsHoldingCoverPoint() const;
 	void StartStress();
+	void PlayStressedVoiceLine() const;
 	void TickStress();
 	void EndStress();
 
@@ -1099,6 +1109,21 @@ private:
 	void DelayNextCoverSearch(float DelaySeconds);
 	bool GetIsCoverAnimationOutOfSync() const;
 	void TryStartAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+
+	/**
+	 * @brief Reserves a cover point, by the enemy's position when there is one, and sets the unit walking to it.
+	 * @param CoverSubsystem Cover service that scores and reserves the points.
+	 * @param TargetActor Enemy the point must shield from and allow firing at; nullptr takes the nearest point.
+	 * @param TargetLocation Where that enemy is; unused without one.
+	 * @return True when the unit now has a point and is on its way to it.
+	 */
+	bool TryReserveAndWalkToCover(
+		URTSCoverFinderWorldSubsystem& CoverSubsystem,
+		AActor* TargetActor,
+		const FVector& TargetLocation);
+
+	// A squad on hold position does not trade the cover it has for better cover.
+	bool GetIsSquadOnHoldPosition() const;
 	bool StartCoverMovement();
 	float GetCoverWalkDeadlineSeconds() const;
 	void FinishCoverMovement();

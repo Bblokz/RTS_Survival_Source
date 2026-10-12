@@ -41,6 +41,26 @@ namespace VehicleModuleTestConstants
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/ModuleSystem/DA_VehicleModules.DA_VehicleModules");
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleFireConfigurationTest,
+	"RTS.VehicleModules.FireConfiguration",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FVehicleModuleFireConfigurationTest::RunTest(const FString& Parameters)
+{
+	UArmorCalculation* ArmorCalculation = NewObject<UArmorCalculation>();
+	TestTrue(TEXT("Engine fires are enabled by default"), ArmorCalculation->GetAreEngineFiresEnabled());
+	TestTrue(TEXT("Ammo cook-offs are enabled by default"), ArmorCalculation->GetAreAmmoCookOffsEnabled());
+
+	ArmorCalculation->SetVehicleModuleFiresEnabled(false, true);
+	TestFalse(TEXT("Engine fires can be disabled independently"), ArmorCalculation->GetAreEngineFiresEnabled());
+	TestTrue(TEXT("Ammo cook-offs remain enabled"), ArmorCalculation->GetAreAmmoCookOffsEnabled());
+
+	ArmorCalculation->SetVehicleModuleFiresEnabled(true, false);
+	TestTrue(TEXT("Engine fires can be re-enabled"), ArmorCalculation->GetAreEngineFiresEnabled());
+	TestFalse(TEXT("Ammo cook-offs can be disabled independently"), ArmorCalculation->GetAreAmmoCookOffsEnabled());
+	return true;
+}
+
 /** @brief Exposes engine-fire attachment state so the real light-tank assets can be regression tested. */
 struct FTankEngineFireBehaviourTestAccess
 {

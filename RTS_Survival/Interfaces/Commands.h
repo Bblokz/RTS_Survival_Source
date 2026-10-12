@@ -1007,6 +1007,13 @@ public:
 	 */
 	virtual ECommandQueueError CancelHeal();
 
+	/**
+	 * @brief Queues the order that sends a squad into nearby cover and puts it on hold position once it is there.
+	 * @param bSetUnitToIdle Replace the current queue (no Shift held).
+	 * @return NoError when the order was queued; its card must hold an IdEnterCoverAndHold entry.
+	 */
+	virtual ECommandQueueError EnterCoverAndHold(bool bSetUnitToIdle);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Commands")
 	virtual ECommandQueueError ActivateShield(const bool bSetUnitToIdle);
 
@@ -1038,6 +1045,7 @@ public:
 	virtual void ExecuteHealCommand(AActor* TargetActor);
 	// Not a queue command: called directly by CancelHeal.
 	virtual void ExecuteCancelHealCommand();
+	virtual void ExecuteEnterCoverAndHoldCommand();
 	virtual void ExecuteActivateShieldCommand();
 	
 	/**
@@ -1213,6 +1221,7 @@ protected:
 	virtual void TerminateCrewRepairCommand(ECrewRepairAbilityType Subtype);
 	void TerminateCrewRepairCommandForCurrentQueue();
 	virtual void TerminateHealCommand();
+	virtual void TerminateEnterCoverAndHoldCommand();
 	virtual void TerminateActivateShieldCommand();
 	void ExecuteRegisterUnitAsBlackboardIdleCommand();
 	void TerminateRegisterUnitAsBlackboardIdleCommand();

@@ -365,6 +365,8 @@ ECommandQueueError FMissionSpawnCommandQueueState::ExecuteSingleOrder(
 		return CommandsInterface->DigIn(bSetUnitToIdle);
 	case EAbilityID::IdBreakCover:
 		return CommandsInterface->BreakCover(bSetUnitToIdle);
+	case EAbilityID::IdEnterCoverAndHold:
+		return CommandsInterface->EnterCoverAndHold(bSetUnitToIdle);
 	case EAbilityID::IdSwitchWeapon:
 		return CommandsInterface->SwitchWeapons(bSetUnitToIdle);
 	case EAbilityID::IdFireRockets:

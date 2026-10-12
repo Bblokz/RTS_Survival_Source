@@ -1110,6 +1110,25 @@ void UHealthComponent::OnUnitSelected() const
 	SetHealthBarVisibility(ESlateVisibility::Visible);
 }
 
+void UHealthComponent::Widget_SetWidgetComponentActive(const bool bShouldBeActive) const
+{
+	UWidgetComponent* const HealthBarWidgetComponent = GetHealthBarWidgetComp();
+	if (not IsValid(HealthBarWidgetComponent))
+	{
+		return;
+	}
+	const bool bIsAlreadyInDesiredState = HealthBarWidgetComponent->IsVisible() == bShouldBeActive
+		&& HealthBarWidgetComponent->IsComponentTickEnabled() == bShouldBeActive;
+	if (bIsAlreadyInDesiredState)
+	{
+		return;
+	}
+	HealthBarWidgetComponent->SetVisibility(bShouldBeActive);
+	// Adds the bar to the screen layer or takes it out right away; the component's own tick would only do so next frame.
+	HealthBarWidgetComponent->UpdateWidget();
+	HealthBarWidgetComponent->SetComponentTickEnabled(bShouldBeActive);
+}
+
 void UHealthComponent::SetHealthBarVisibility(const ESlateVisibility NewVisibility) const
 {
 	UW_HealthBar* HealthBarWidget = M_HealthBarWidget.Get();
@@ -1140,6 +1159,7 @@ void UHealthComponent::SetHealthBarVisibility(const ESlateVisibility NewVisibili
 
 	const bool bWasVisible = GetIsVisibleSlateVisibility(HealthBarWidget->GetVisibility());
 	HealthBarWidget->SetVisibility(NewVisibility);
+	Widget_SetWidgetComponentActive(GetIsVisibleSlateVisibility(NewVisibility));
 	// Hidden healthbars only store desired module icons; flush once on an actual transition to visible.
 	if (not bWasVisible && GetIsVisibleSlateVisibility(NewVisibility))
 	{

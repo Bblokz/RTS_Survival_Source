@@ -343,6 +343,13 @@ private:
 	void Widget_OnFailedToCreateWidgetComponent() const;
 	void SetHealthBarVisibility(ESlateVisibility NewVisibility) const;
 
+	/**
+	 * @brief A hidden bar would otherwise stay in the screen layer and keep ticking, which costs every frame
+	 * for every unit on the map. Health itself does not depend on the widget component.
+	 * @param bShouldBeActive Whether the bar is shown: only then is its component on screen and ticking.
+	 */
+	void Widget_SetWidgetComponentActive(bool bShouldBeActive) const;
+
 
 	/** @brief Updates the visuals for the heathBar to correctly represent the amount of health that is left. */
 	UFUNCTION()

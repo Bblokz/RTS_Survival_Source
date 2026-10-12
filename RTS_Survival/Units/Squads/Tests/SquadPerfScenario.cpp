@@ -14,6 +14,7 @@
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 
@@ -52,6 +53,11 @@ void FSquadPerfScenario::Start()
 	M_Phase = ESquadPerfPhase::WaitingForCoverScan;
 	bM_DumpStats = FParse::Param(FCommandLine::Get(), TEXT("SquadPerfStatDump"));
 	bM_DumpHitches = FParse::Param(FCommandLine::Get(), TEXT("SquadPerfHitches"));
+	if (FParse::Param(FCommandLine::Get(), TEXT("SquadPerfNoErrorDialogs")))
+	{
+		// An error dialog costs milliseconds in an editor build; a repeating error would be measured instead of the game.
+		RTSFunctionLibrary::PushModalDialogSuppression();
+	}
 	UE_LOG(LogRTSSquadPerf, Display, TEXT("RTS_SQUAD_PERF scheduled"));
 }
 

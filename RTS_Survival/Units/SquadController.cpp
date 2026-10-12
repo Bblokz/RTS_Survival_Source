@@ -2825,6 +2825,92 @@ void ASquadController::OnMedicFinishedOrderedHeal()
 	DoneExecutingCommand(EAbilityID::IdHeal);
 }
 
+void ASquadController::ExecuteEnterCoverAndHoldCommand()
+{
+	constexpr float SettledCheckIntervalSeconds = 0.25f;
+	constexpr float MaximumOrderSeconds = 20.0f;
+	if (IsValid(CargoSquad))
+	{
+		CargoSquad->CheckCargoState(EAbilityID::IdEnterCoverAndHold);
+	}
+	EnsureSquadUnitsValid();
+	// Copied: a unit that starts its walk can call back into the squad.
+	const TArray<ASquadUnit*> SquadUnits = M_TSquadUnits;
+	for (ASquadUnit* SquadUnit : SquadUnits)
+	{
+		if (IsValid(SquadUnit))
+		{
+			SquadUnit->TryEnterNearbyCoverOnOrder();
+		}
+	}
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		DoneExecutingCommand(EAbilityID::IdEnterCoverAndHold);
+		return;
+	}
+	M_EnterCoverAndHoldDeadlineWorldSeconds = World->GetTimeSeconds() + MaximumOrderSeconds;
+	TWeakObjectPtr<ASquadController> WeakThis(this);
+	FTimerDelegate SettledCheckDelegate;
+	SettledCheckDelegate.BindLambda([WeakThis]()
+	{
+		if (WeakThis.IsValid())
+		{
+			WeakThis->UpdateEnterCoverAndHoldOrder();
+		}
+	});
+	World->GetTimerManager().SetTimer(
+		M_EnterCoverAndHoldTimer,
+		SettledCheckDelegate,
+		SettledCheckIntervalSeconds,
+		true);
+}
+
+void ASquadController::UpdateEnterCoverAndHoldOrder()
+{
+	if (GetActiveCommandID() != EAbilityID::IdEnterCoverAndHold)
+	{
+		StopEnterCoverAndHoldTimer();
+		return;
+	}
+	const UWorld* World = GetWorld();
+	const bool bIsPastDeadline = not IsValid(World) ||
+		World->GetTimeSeconds() >= M_EnterCoverAndHoldDeadlineWorldSeconds;
+	if (GetIsAnySquadUnitOnItsWayIntoCover() && not bIsPastDeadline)
+	{
+		return;
+	}
+	// Soldiers that found no cover hold where they stand.
+	SetAggroStance(ERTSAggroBehaviour::Stance_HoldPosition);
+	DoneExecutingCommand(EAbilityID::IdEnterCoverAndHold);
+}
+
+bool ASquadController::GetIsAnySquadUnitOnItsWayIntoCover() const
+{
+	for (const ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (IsValid(SquadUnit) && SquadUnit->GetIsOnItsWayIntoCover())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void ASquadController::TerminateEnterCoverAndHoldCommand()
+{
+	// An order that is replaced before the squad settled does not change its stance.
+	StopEnterCoverAndHoldTimer();
+}
+
+void ASquadController::StopEnterCoverAndHoldTimer()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_EnterCoverAndHoldTimer);
+	}
+}
+
 void ASquadController::OnCommandExecutionStarting(const EAbilityID AbilityStarting)
 {
 	for (UMedicComponent* MedicComponent : GetMedicComponentsOfSquad())

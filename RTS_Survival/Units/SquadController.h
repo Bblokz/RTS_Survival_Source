@@ -677,6 +677,10 @@ protected:
 	virtual void TerminateHealCommand() override;
 	virtual void ExecuteCancelHealCommand() override;
 
+	// Every soldier takes nearby cover; once they are all in, or could find none, the squad goes on hold position.
+	virtual void ExecuteEnterCoverAndHoldCommand() override;
+	virtual void TerminateEnterCoverAndHoldCommand() override;
+
 	// Takes the squad's medics off whatever they were healing by themselves before any command starts.
 	virtual void OnCommandExecutionStarting(EAbilityID AbilityStarting) override;
 
@@ -1121,6 +1125,16 @@ protected:
 
 	// Swaps the IdHeal card entry between picking a patient and cancelling the running heal order.
 	void SetHealAbilityCardSubtype(EHealAbilityType NewSubtype);
+
+	// Looping while the order to enter cover and hold runs; checks whether the soldiers have settled.
+	FTimerHandle M_EnterCoverAndHoldTimer;
+
+	// World time past which the order no longer waits for soldiers that are still on their way into cover.
+	float M_EnterCoverAndHoldDeadlineWorldSeconds = 0.0f;
+
+	void UpdateEnterCoverAndHoldOrder();
+	bool GetIsAnySquadUnitOnItsWayIntoCover() const;
+	void StopEnterCoverAndHoldTimer();
 
 	// ----------------- Weapon Icon -----------------
 	void UpdateSquadWeaponIcon();

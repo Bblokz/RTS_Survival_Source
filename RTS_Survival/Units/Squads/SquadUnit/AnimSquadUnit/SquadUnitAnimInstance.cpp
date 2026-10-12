@@ -1083,8 +1083,24 @@ void USquadUnitAnimInstance::PlayRandomCoverSpray()
 		return;
 	}
 	M_ActiveSprayMontage = PlayedMontage;
+	LoopActiveSprayMontage();
 	M_SprayMontageEndedDelegate.BindUObject(this, &USquadUnitAnimInstance::OnSprayMontageEnded);
 	Montage_SetEndDelegate(M_SprayMontageEndedDelegate, PlayedMontage);
+}
+
+void USquadUnitAnimInstance::LoopActiveSprayMontage()
+{
+	const UAnimMontage* SprayMontage = M_ActiveSprayMontage;
+	if (not IsValid(SprayMontage) || SprayMontage->CompositeSections.IsEmpty())
+	{
+		return;
+	}
+	// Set on this soldier's playing instance only, so the montage the soldiers share stays as it is.
+	const int32 LastSectionIndex = SprayMontage->CompositeSections.Num() - 1;
+	Montage_SetNextSection(
+		SprayMontage->GetSectionName(LastSectionIndex),
+		SprayMontage->GetSectionName(0),
+		SprayMontage);
 }
 
 UAnimMontage* USquadUnitAnimInstance::PlaySharedSprayMontage(UAnimSequenceBase& SprayAnimation)

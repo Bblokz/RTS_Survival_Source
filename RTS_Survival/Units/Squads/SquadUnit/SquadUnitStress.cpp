@@ -8,6 +8,7 @@
 #include "AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SquadUnitSpacialVoiceLinePlayer/SquadUnitSpatialVoiceLinePlayer.h"
 #include "RTS_Survival/Behaviours/Derived/InfantryStress/InfantryStressBehaviour.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
@@ -111,6 +112,7 @@ void ASquadUnit::StartStress()
 	}
 	CoverSubsystem->RegisterStressedUnit(*this);
 	UpdateStressSpray();
+	PlayStressedVoiceLine();
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
 		UE_LOG(
@@ -122,6 +124,17 @@ void ASquadUnit::StartStress()
 			StressDuration,
 			*GetNameSafe(IsValid(M_Stress.Behaviour) ? M_Stress.Behaviour->GetClass() : nullptr));
 	}
+}
+
+void ASquadUnit::PlayStressedVoiceLine() const
+{
+	if (not GetIsValidSpatialVoiceLinePlayer())
+	{
+		return;
+	}
+	// Always spatial, also when selected: the shout comes from the soldier himself, not from his radio.
+	// Forced, as a soldier in a fire fight is nearly always on the spatial cooldown of his fire voice lines.
+	SpatialVoiceLinePlayer->ForcePlaySpatialVoiceLine(ERTSVoiceLine::Stressed, GetActorLocation());
 }
 
 void ASquadUnit::TickStress()

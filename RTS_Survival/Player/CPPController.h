@@ -1531,6 +1531,9 @@ private:
 	// Commands units that can break cover to do so.
 	void DirectActionButtonBreakCover();
 
+	// Sends the selected squads into nearby cover; they go on hold position once they are in it.
+	void DirectActionButtonEnterCoverAndHold();
+
 	void DirectActionButtonAttackGround();
 	void DirectActionButtonThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);
 	void DirectActionButtonCancelThrowGrenade(const EGrenadeAbilityType GrenadeAbilityType);

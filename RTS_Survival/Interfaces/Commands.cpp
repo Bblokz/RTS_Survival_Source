@@ -1104,6 +1104,9 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 	case EAbilityID::IdHeal:
 		M_Owner->ExecuteHealCommand(Cmd.TargetActor.Get());
 		break;
+	case EAbilityID::IdEnterCoverAndHold:
+		M_Owner->ExecuteEnterCoverAndHoldCommand();
+		break;
 	case EAbilityID::IdActivateShield:
 		{
 			M_Owner->ExecuteActivateShieldCommand();
@@ -2207,6 +2210,39 @@ ECommandQueueError ICommands::BreakCover(const bool bSetUnitToIdle)
 		EAbilityID::IdBreakCover, FVector::ZeroVector, nullptr,
 		FRotator::ZeroRotator);
 	return Error;
+}
+
+ECommandQueueError ICommands::EnterCoverAndHold(const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	const ECommandQueueError AbilityError = GetIsAbilityOnCommandCardAndNotOnCooldown(
+		EAbilityID::IdEnterCoverAndHold);
+	if (AbilityError != ECommandQueueError::NoError)
+	{
+		return AbilityError;
+	}
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdEnterCoverAndHold, FVector::ZeroVector, nullptr,
+		FRotator::ZeroRotator);
+}
+
+void ICommands::ExecuteEnterCoverAndHoldCommand()
+{
+	// Unsupported owners reject safely without stalling the queue.
+	DoneExecutingCommand(EAbilityID::IdEnterCoverAndHold);
+}
+
+void ICommands::TerminateEnterCoverAndHoldCommand()
+{
 }
 
 
@@ -3593,6 +3629,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdHeal:
 		TerminateHealCommand();
+		break;
+	case EAbilityID::IdEnterCoverAndHold:
+		TerminateEnterCoverAndHoldCommand();
 		break;
 	case EAbilityID::IdActivateShield:
 		TerminateActivateShieldCommand();

@@ -74,6 +74,8 @@ private:
 	// The index of the last activated projectile.
 	int32 M_LastActivatedProjectileIndex;
 
+	bool bM_HasReportedPoolSaturation = false;
+
 	// Cached World pointer.
 	TWeakObjectPtr<UWorld> M_World;
 
@@ -91,6 +93,13 @@ private:
 	/** @return The first available projectile index.
 	 * @param bOutIsPoolSaturated if true then no projectiles are left!*/
 	int32 FindDormantProjectileIndex(bool& bOutIsPoolSaturated) const;
+
+	/** @return A free projectile index, after releasing the expired projectiles when none was free,
+	 * or INDEX_NONE when every projectile is still in flight. */
+	int32 FindDormantProjectileIndexReleasingExpired();
+
+	/** @return How many projectiles were past their lifetime and are free to use again. */
+	int32 ReleaseExpiredProjectiles(const double CurrentTime);
 
 	void SetProjectileValues(const FVector& Position,
 	                         const FVector& EndPosition,

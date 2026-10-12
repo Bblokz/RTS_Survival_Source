@@ -5055,6 +5055,9 @@ void ACPPController::ActivateActionButton(const int32 ActionButtonAbilityIndex)
 	case EAbilityID::IdHeal:
 		ActivateActionButtonHeal(static_cast<EHealAbilityType>(ActiveAbilityEntry.CustomType));
 		break;
+	case EAbilityID::IdEnterCoverAndHold:
+		DirectActionButtonEnterCoverAndHold();
+		break;
 	case EAbilityID::IdActivateShield:
 		this->DirectActionButtonActivateShield();
 		break;
@@ -6049,6 +6052,22 @@ void ACPPController::DirectActionButtonBreakCover()
 	{
 		PlayVoiceLineForPrimarySelected(FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdBreakCover),
 		                                false);
+	}
+}
+
+void ACPPController::DirectActionButtonEnterCoverAndHold()
+{
+	EnsureSelectionsAreRTSValid();
+	int32 CommandsExecuted = 0;
+	for (const auto EachSquad : TSelectedSquadControllers)
+	{
+		CommandsExecuted += EachSquad->EnterCoverAndHold(not bIsHoldingShift) == ECommandQueueError::NoError;
+	}
+	if (CommandsExecuted > 0)
+	{
+		PlayVoiceLineForPrimarySelected(
+			FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(EAbilityID::IdEnterCoverAndHold),
+			false);
 	}
 }
 
