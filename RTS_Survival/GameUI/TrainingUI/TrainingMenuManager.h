@@ -12,6 +12,7 @@
 #include "TrainingUIWidget/TrainingItemState/TrainingWidgetState.h"
 #include "TrainingMenuManager.generated.h"
 
+class UW_TrainingBuildingColumn;
 class UW_TrainingMenu;
 class UW_TrainingRequirement;
 class UPlayerResourceManager;
@@ -34,10 +35,12 @@ public:
 	/**
 	 * @brief Initializes the training manager with the training menu widget.
 	 * @param TrainingMenu Holds the training items, sub section tabs and quick navigation buttons.
+	 * @param BuildingColumn Lists the player's other buildings of the type the training menu shows.
 	 * @param TrainingDescription
 	 */
 	void InitTrainingManager(
 		UW_TrainingMenu* TrainingMenu,
+		UW_TrainingBuildingColumn* BuildingColumn,
 		UMainGameUI* MainGameUI,
 		UW_TrainingRequirement* TrainingRequirementWidget, UW_TrainingDescription* TrainingDescription);
 
@@ -46,6 +49,9 @@ public:
 
 	/** Makes the player's first expanded building of this type the primary selected unit. */
 	void OnQuickNavButtonClicked(const ENomadicSubtype Building);
+
+	/** Makes the building behind this entry of the building column the primary selected unit. */
+	void OnBuildingColumnEntryClicked(const int32 EntryIndex);
 
 	void OnTrainingItemClicked(
 		const FTrainingWidgetState& TrainingItem,
@@ -138,6 +144,25 @@ private:
 
 	/** @return The player's first building of this type whose training is enabled, null when there is none. */
 	AActor* FindFirstTrainingBuildingOfPlayer(const ENomadicSubtype Building) const;
+
+	/**
+	 * @param Building The building type to look for.
+	 * @param OutBuildings The player's buildings of that type whose training is enabled; trucks that are
+	 * not expanded are left out.
+	 */
+	void GetTrainingBuildingsOfPlayer(const ENomadicSubtype Building, TArray<AActor*>& OutBuildings) const;
+
+	UPROPERTY()
+	TObjectPtr<UW_TrainingBuildingColumn> M_BuildingColumn;
+	bool GetIsValidBuildingColumn() const;
+
+	// The buildings behind the entries of the building column, in entry order; refreshed with the column
+	// so that a click on an entry selects the building it showed.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> M_BuildingColumnBuildings;
+
+	// Gives every expanded building of the shown type an entry; a single building gets no column.
+	void RefreshBuildingColumn();
 
 	ENomadicSubtype GetBuildingOfPrimarySelectedTrainer() const;
 

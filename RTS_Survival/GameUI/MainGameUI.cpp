@@ -39,6 +39,7 @@
 #include "RTS_Survival/Player/PlayerControlGroupManager/PlayerControlGroupManager.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "TrainingUI/TrainingDescription/W_TrainingDescription.h"
+#include "TrainingUI/TrainingMenuWidget/W_TrainingBuildingColumn.h"
 #include "TrainingUI/TrainingMenuWidget/W_TrainingMenu.h"
 #include "RTS_Survival/GameUI/Archive/W_ArchiveNotificationHolder/W_ArchiveNotificationHolder.h"
 #include "RTS_Survival/GlobalAbilitySystem/UI/GlobalAbilityPanel/W_GlobalAbilityPanel.h"
@@ -537,6 +538,12 @@ void UMainGameUI::SetTrainingUIVisibility(const bool bVisible)
 		GetIsValidTrainingUIBorder())
 	{
 		return;
+	}
+	if (M_TrainingBuildingColumn)
+	{
+		M_TrainingBuildingColumn->SetVisibility(bVisible
+			                                        ? ESlateVisibility::SelfHitTestInvisible
+			                                        : ESlateVisibility::Collapsed);
 	}
 	if (bVisible)
 	{
@@ -1616,7 +1623,8 @@ void UMainGameUI::InitMainGameUI(
 	M_TrainingMenuManager = NewObject<UTrainingMenuManager>(this);
 	if (M_TrainingMenuManager)
 	{
-		M_TrainingMenuManager->InitTrainingManager(M_TrainingMenu, this, TrainingRequirementWidget,
+		M_TrainingMenuManager->InitTrainingManager(M_TrainingMenu, M_TrainingBuildingColumn, this,
+		                                           TrainingRequirementWidget,
 		                                           NewTrainingDescription);
 	}
 	else

@@ -7,30 +7,12 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSubsystem.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingUIWidget/W_TrainingItem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "TrainingMenuWidgetHelpers.h"
 #include "W_TrainingQuickNavButton.h"
 #include "W_TrainingSubSectionTab.h"
 
 namespace TrainingMenuWidgets
 {
-	// Collects in widget tree order, also through nested panels such as one horizontal box per row.
-	template <typename TWidgetType>
-	void CollectWidgetsInPanel(UPanelWidget* Panel, TArray<TWidgetType*>& OutWidgets)
-	{
-		if (not IsValid(Panel))
-		{
-			return;
-		}
-		for (UWidget* ChildWidget : Panel->GetAllChildren())
-		{
-			if (TWidgetType* TypedChild = Cast<TWidgetType>(ChildWidget))
-			{
-				OutWidgets.Add(TypedChild);
-				continue;
-			}
-			CollectWidgetsInPanel(Cast<UPanelWidget>(ChildWidget), OutWidgets);
-		}
-	}
-
 	void MakeWidgetFillHorizontalBox(const UWidget* Widget)
 	{
 		UHorizontalBoxSlot* HorizontalBoxSlot = Cast<UHorizontalBoxSlot>(Widget->Slot);

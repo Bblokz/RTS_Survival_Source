@@ -192,6 +192,19 @@ void UTrainerComponent::Init_FlattenSubSectionsIntoTrainingOptions()
 	}
 }
 
+bool UTrainerComponent::GetActiveTrainingProgress(float& OutProgress) const
+{
+	OutProgress = 0.0f;
+	const FTrainingQueueItem* ActiveItem = M_TTrainingQueue.Peek();
+	if (not ActiveItem || ActiveItem->TotalTrainingTime <= 0)
+	{
+		return false;
+	}
+	const float TimeTrained = static_cast<float>(ActiveItem->TotalTrainingTime - ActiveItem->RemainingTrainingTime);
+	OutProgress = FMath::Clamp(TimeTrained / static_cast<float>(ActiveItem->TotalTrainingTime), 0.0f, 1.0f);
+	return true;
+}
+
 int32 UTrainerComponent::GetQueuedCountInSubSection(const int32 SubSectionIndex) const
 {
 	if (not M_TrainingSubSections.IsValidIndex(SubSectionIndex))

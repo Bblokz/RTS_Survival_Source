@@ -14,6 +14,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "TrainerComponent/TrainerComponent.h"
 #include "TrainingLayout/TrainingLayoutSubsystem.h"
+#include "TrainingMenuWidget/W_TrainingBuildingColumn.h"
 #include "TrainingMenuWidget/W_TrainingMenu.h"
 #include "TrainingUIWidget/W_TrainingItem.h"
 #include "RTS_Survival/Requirement/RTSRequirement.h"
@@ -191,11 +192,17 @@ void UTrainingMenuManager::PlayAnnouncerTrainingSound(const EAnnouncerVoiceLineT
 
 void UTrainingMenuManager::InitTrainingManager(
 	UW_TrainingMenu* TrainingMenu,
+	UW_TrainingBuildingColumn* BuildingColumn,
 	UMainGameUI* MainGameUI,
 	UW_TrainingRequirement* TrainingRequirementWidget, UW_TrainingDescription* TrainingDescription)
 {
 	InitAllGameTrainingOptions();
 	M_TrainingMenu = TrainingMenu;
+	M_BuildingColumn = BuildingColumn;
+	if (GetIsValidBuildingColumn())
+	{
+		M_BuildingColumn->InitBuildingColumn(this);
+	}
 	M_TTrainingMenuWidgets.Reset();
 	if (GetIsValidTrainingMenu())
 	{
@@ -269,6 +276,23 @@ void UTrainingMenuManager::OnQuickNavButtonClicked(const ENomadicSubtype Buildin
 		return;
 	}
 	PlayerController->SelectSingleUnitFromUI(TrainingBuilding);
+}
+
+void UTrainingMenuManager::OnBuildingColumnEntryClicked(const int32 EntryIndex)
+{
+	if (not GetIsValidMainGameUI() || not M_BuildingColumnBuildings.IsValidIndex(EntryIndex))
+	{
+		return;
+	}
+	AActor* Building = M_BuildingColumnBuildings[EntryIndex].Get();
+	ACPPController* PlayerController = M_MainGameUI->GetPlayerController();
+	if (not IsValid(Building) || not IsValid(PlayerController))
+	{
+		// The building was destroyed after the last refresh.
+		RefreshBuildingColumn();
+		return;
+	}
+	PlayerController->SelectSingleUnitFromUI(Building);
 }
 
 void UTrainingMenuManager::OnTrainingItemClicked(
@@ -2683,6 +2707,7 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 	UpdateSubSectionTabsWithPrimaryTrainer();
 	UpdateWidgetsWithShownSubSection(QueueState);
 	RefreshQuickNavButtons();
+	RefreshBuildingColumn();
 
 	// Check if there is an active item.
 	if (TrainingOptions.IsValidIndex(ActiveItemIndex))
@@ -2818,11 +2843,20 @@ void UTrainingMenuManager::RefreshQuickNavButtons() const
 
 AActor* UTrainingMenuManager::FindFirstTrainingBuildingOfPlayer(const ENomadicSubtype Building) const
 {
+	TArray<AActor*> TrainingBuildings;
+	GetTrainingBuildingsOfPlayer(Building, TrainingBuildings);
+	return TrainingBuildings.IsEmpty() ? nullptr : TrainingBuildings[0];
+}
+
+void UTrainingMenuManager::GetTrainingBuildingsOfPlayer(const ENomadicSubtype Building,
+                                                        TArray<AActor*>& OutBuildings) const
+{
+	OutBuildings.Reset();
 	constexpr uint8 PlayerOwnerIndex = 1;
 	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(M_TrainingMenu);
 	if (not IsValid(GameUnitManager))
 	{
-		return nullptr;
+		return;
 	}
 	// Nomadic vehicles are stored with the tanks.
 	const TArray<ATankMaster*> PlayerTanks = GameUnitManager->GetPlayerTanks(PlayerOwnerIndex);
@@ -2849,10 +2883,61 @@ AActor* UTrainingMenuManager::FindFirstTrainingBuildingOfPlayer(const ENomadicSu
 		const UTrainerComponent* TrainerComponent = Trainer->GetTrainerComponent();
 		if (IsValid(TrainerComponent) && TrainerComponent->GetIsAbleToTrain())
 		{
-			return PlayerTank;
+			OutBuildings.Add(PlayerTank);
 		}
 	}
-	return nullptr;
+}
+
+void UTrainingMenuManager::RefreshBuildingColumn()
+{
+	if (not GetIsValidBuildingColumn())
+	{
+		return;
+	}
+	M_BuildingColumnBuildings.Reset();
+	TArray<FTrainingBuildingEntryState> EntryStates;
+
+	TArray<AActor*> SameTypeBuildings;
+	const ENomadicSubtype ShownBuilding = GetBuildingOfPrimarySelectedTrainer();
+	if (ShownBuilding != ENomadicSubtype::Nomadic_None)
+	{
+		GetTrainingBuildingsOfPlayer(ShownBuilding, SameTypeBuildings);
+	}
+
+	// A single building has no other building to switch to, so it gets no column.
+	constexpr int32 MinBuildingsForColumn = 2;
+	const int32 EntryCount = SameTypeBuildings.Num() >= MinBuildingsForColumn
+		                         ? FMath::Min(SameTypeBuildings.Num(), M_BuildingColumn->GetMaxEntries())
+		                         : 0;
+	for (int32 EntryIndex = 0; EntryIndex < EntryCount; ++EntryIndex)
+	{
+		AActor* Building = SameTypeBuildings[EntryIndex];
+		// GetTrainingBuildingsOfPlayer only returns trainers with a valid trainer component.
+		const UTrainerComponent* TrainerComponent = Cast<ITrainer>(Building)->GetTrainerComponent();
+
+		FTrainingBuildingEntryState& EntryState = EntryStates.AddDefaulted_GetRef();
+		EntryState.bIsShownBuilding = TrainerComponent == M_PrimarySelectedTrainer;
+		EntryState.bIsTraining = TrainerComponent->GetActiveTrainingProgress(EntryState.TrainingProgress);
+		M_BuildingColumnBuildings.Add(Building);
+	}
+	M_BuildingColumn->UpdateBuildingEntries(EntryStates);
+}
+
+bool UTrainingMenuManager::GetIsValidBuildingColumn() const
+{
+	if (IsValid(M_BuildingColumn))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_BuildingColumn",
+		"GetIsValidBuildingColumn",
+		this
+	);
+
+	return false;
 }
 
 ENomadicSubtype UTrainingMenuManager::GetBuildingOfPrimarySelectedTrainer() const

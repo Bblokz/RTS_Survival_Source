@@ -44,6 +44,7 @@ class UW_WeaponItem;
 class UActionUIManager;
 class UW_PlayerResource;
 class UTrainerComponent;
+class UW_TrainingBuildingColumn;
 class UW_TrainingMenu;
 class RTS_SURVIVAL_API UW_TrainingItem;
 struct RTS_SURVIVAL_API FBuildingExpansionItem;
@@ -562,6 +563,11 @@ private:
 	// The quick navigation buttons, sub section tabs and training items; placed inside the training UI border.
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
 	TObjectPtr<UW_TrainingMenu> M_TrainingMenu;
+
+	// One entry per extra building of the type the training menu shows; placed against the left edge of the
+	// training UI border and shown and hidden together with it.
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UW_TrainingBuildingColumn> M_TrainingBuildingColumn;
 
 	bool bM_WasTrainingUIHiddenDueToHoverInfoWidget = false;
 	UPROPERTY()

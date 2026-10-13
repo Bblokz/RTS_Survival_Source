@@ -150,6 +150,12 @@ public:
 	/** @return The sub sections the training menu shows as tabs; always at least one after init. */
 	const TArray<FTrainingSubSectionState>& GetTrainingSubSections() const { return M_TrainingSubSections; }
 
+	/**
+	 * @param OutProgress How far the unit in training is, from 0 to 1; 0 when nothing is in training.
+	 * @return Whether this trainer has a unit in training.
+	 */
+	bool GetActiveTrainingProgress(float& OutProgress) const;
+
 	/** @return How many queued items belong to the options of the given sub section. */
 	int32 GetQueuedCountInSubSection(const int32 SubSectionIndex) const;
 
