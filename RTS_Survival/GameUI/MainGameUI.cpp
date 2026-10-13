@@ -39,6 +39,7 @@
 #include "RTS_Survival/Player/PlayerControlGroupManager/PlayerControlGroupManager.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "TrainingUI/TrainingDescription/W_TrainingDescription.h"
+#include "TrainingUI/TrainingMenuWidget/W_TrainingMenu.h"
 #include "RTS_Survival/GameUI/Archive/W_ArchiveNotificationHolder/W_ArchiveNotificationHolder.h"
 #include "RTS_Survival/GlobalAbilitySystem/UI/GlobalAbilityPanel/W_GlobalAbilityPanel.h"
 #include "RTS_Survival/Utils/RTSInputModeDefaults.h"
@@ -1590,7 +1591,6 @@ void UMainGameUI::InitMainGameUI(
 	UW_BxpDescription* NewBxpDescriptionWidget,
 	ACPPController* NewPlayerController,
 	UBorder* NewTrainingUIBorder,
-	const TArray<UW_TrainingItem*> NewTrainingItemWidgets,
 	UW_TrainingRequirement* TrainingRequirementWidget,
 	TArray<UW_PlayerResource*> NewPlayerResourceWidgets,
 	UW_PlayerEnergyBar* NewPlayerEnergyBar,
@@ -1616,7 +1616,7 @@ void UMainGameUI::InitMainGameUI(
 	M_TrainingMenuManager = NewObject<UTrainingMenuManager>(this);
 	if (M_TrainingMenuManager)
 	{
-		M_TrainingMenuManager->InitTrainingManager(NewTrainingItemWidgets, this, TrainingRequirementWidget,
+		M_TrainingMenuManager->InitTrainingManager(M_TrainingMenu, this, TrainingRequirementWidget,
 		                                           NewTrainingDescription);
 	}
 	else

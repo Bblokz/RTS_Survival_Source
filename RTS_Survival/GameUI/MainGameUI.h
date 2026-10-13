@@ -44,6 +44,7 @@ class UW_WeaponItem;
 class UActionUIManager;
 class UW_PlayerResource;
 class UTrainerComponent;
+class UW_TrainingMenu;
 class RTS_SURVIVAL_API UW_TrainingItem;
 struct RTS_SURVIVAL_API FBuildingExpansionItem;
 enum class EBuildingExpansionStatus : uint8;
@@ -365,7 +366,6 @@ protected:
 		UW_BxpDescription* NewBxpDescriptionWidget,
 		ACPPController* NewPlayerController,
 		UBorder* NewTrainingUIBorder,
-		const TArray<UW_TrainingItem*> NewTrainingItemWidgets,
 		UW_TrainingRequirement* TrainingRequirementWidget,
 		TArray<UW_PlayerResource*> NewPlayerResourceWidgets,
 		UW_PlayerEnergyBar* NewPlayerEnergyBar,
@@ -558,6 +558,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTrainingMenuManager> M_TrainingMenuManager;
 	bool GetIsValidTrainingMenuManager() const;
+
+	// The quick navigation buttons, sub section tabs and training items; placed inside the training UI border.
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UW_TrainingMenu> M_TrainingMenu;
 
 	bool bM_WasTrainingUIHiddenDueToHoverInfoWidget = false;
 	UPROPERTY()

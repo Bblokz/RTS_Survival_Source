@@ -21,7 +21,8 @@ struct FTrainingQueueItem
 	// How long the training will take.
 	int32 RemainingTrainingTime = 0;
 
-	// The index of the widget in the training menu.
+	// The index of this item's option in the trainer's training options, counted over all sub sections.
+	// The training menu turns it into a widget of the sub section that is on screen.
 	int32 WidgetIndex = -1;
 
 	// Whether the spawning process for the unit that is trained by this item has started.

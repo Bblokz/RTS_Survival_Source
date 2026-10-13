@@ -12,6 +12,7 @@
 #include "TrainingUIWidget/TrainingItemState/TrainingWidgetState.h"
 #include "TrainingMenuManager.generated.h"
 
+class UW_TrainingMenu;
 class UW_TrainingRequirement;
 class UPlayerResourceManager;
 class UW_TrainingDescription;
@@ -31,14 +32,20 @@ class RTS_SURVIVAL_API UTrainingMenuManager : public UObject
 
 public:
 	/**
-	 * @brief Initializes the training manager with the provided training items.
-	 * @param TrainingItemsInMenu Array of training items in the menu.
+	 * @brief Initializes the training manager with the training menu widget.
+	 * @param TrainingMenu Holds the training items, sub section tabs and quick navigation buttons.
 	 * @param TrainingDescription
 	 */
 	void InitTrainingManager(
-		TArray<UW_TrainingItem*> TrainingItemsInMenu,
+		UW_TrainingMenu* TrainingMenu,
 		UMainGameUI* MainGameUI,
 		UW_TrainingRequirement* TrainingRequirementWidget, UW_TrainingDescription* TrainingDescription);
+
+	/** Shows the training items of another sub section of the primary selected trainer. */
+	void OnSubSectionTabClicked(const int32 SubSectionIndex);
+
+	/** Makes the player's first expanded building of this type the primary selected unit. */
+	void OnQuickNavButtonClicked(const ENomadicSubtype Building);
 
 	void OnTrainingItemClicked(
 		const FTrainingWidgetState& TrainingItem,
@@ -109,14 +116,43 @@ private:
 	UPROPERTY()
 	TArray<UW_TrainingItem*> M_TTrainingMenuWidgets;
 
+	UPROPERTY()
+	TObjectPtr<UW_TrainingMenu> M_TrainingMenu;
+	bool GetIsValidTrainingMenu() const;
+
+	// The sub section of the primary selected trainer whose options are on the training widgets.
+	int32 M_ShownSubSectionIndex = 0;
+
+	void UpdateSubSectionTabsWithPrimaryTrainer() const;
+	void UpdateWidgetsWithShownSubSection(const TMap<FTrainingOption, int32>& QueueState);
+	FTrainingWidgetState CreateWidgetStateForOption(const FTrainingOption& Option, const int32 QueuedCount) const;
+
+	/**
+	 * @param FlatOptionIndex Index into the training options of the primary selected trainer.
+	 * @return The widget that shows this option, or INDEX_NONE when its sub section is not on screen.
+	 */
+	int32 GetWidgetIndexOfFlatOptionIndex(const int32 FlatOptionIndex) const;
+
+	// Shows the quick navigation buttons of the buildings the player can train at right now.
+	void RefreshQuickNavButtons() const;
+
+	/** @return The player's first building of this type whose training is enabled, null when there is none. */
+	AActor* FindFirstTrainingBuildingOfPlayer(const ENomadicSubtype Building) const;
+
+	ENomadicSubtype GetBuildingOfPrimarySelectedTrainer() const;
+
 	// float M_RequirementNotMetOpacity = 0.33f;
 
 	// The widget item that currently has a clock running.
 	UPROPERTY()
 	UW_TrainingItem* M_ActiveTrainingItem;
 
+	/**
+	 * @param FlatIndexActiveOption Index of the active option in the trainer's training options; no clock
+	 * starts when that option is in a sub section that is not on screen.
+	 */
 	void StartClockOnTrainingItem(
-		const int32 IndexActiveTrainingItem,
+		const int32 FlatIndexActiveOption,
 		const int32 TimeRemaining,
 		const FTrainingOption ActiveOption,
 		const bool bIsPaused = false);
@@ -144,6 +180,8 @@ private:
 	void InitAllGameFlakTWTrainingOptions();
 	void InitAllGameArtilleryTWTrainingOptions();
 	void InitAllGameMachineGunTWTrainingOptions();
+	// Units of the faction training layouts that have no hand written entry above.
+	void InitAllGameTrainingLayoutOnlyOptions();
 
 	// Makes sure that training times are not too short to cause load issues on AsyncSpawner.
 	void PostInitTrainingOptions();

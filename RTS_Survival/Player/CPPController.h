@@ -813,6 +813,14 @@ public:
 	void RemovePawnFromSelectionAndUpdateUI(ASelectablePawnMaster* PawnToRemove);
 
 	// --------------------------- Selection UI interface
+	/**
+	 * @brief Lets UI buttons such as the training quick navigation select a unit as if the player clicked
+	 * it in the world without modifier keys: the selection is replaced by this unit and the game UI rebuilds.
+	 * @param UnitToSelect A selectable unit owned by the player; anything else leaves the selection as it is.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Selection")
+	void SelectSingleUnitFromUI(AActor* UnitToSelect);
+
 	/** Keep only units of UnitID.UnitType across all selection arrays. If the selection already contains only that type, UI remains unchanged. */
 	void OnlySelectUnitsOfType(const FTrainingOption& UnitID);
 

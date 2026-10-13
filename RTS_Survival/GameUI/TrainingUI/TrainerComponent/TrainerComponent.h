@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Containers/Queue.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutTypes.h"
 #include "TraineSettings/Trainersettings.h"
 #include "TrainingQueueItem/QueueItem.h"
 
@@ -85,7 +86,8 @@ public:
 	void UnregisterRequirementSnapshot(const int32 RequirementKey);
 
 	/** @return Able to train if the queue is not paused. */
-	inline bool GetIsAbleToTrain() const { return M_TrainingEnabled.bIsAbleToTrain; }
+	UFUNCTION(BlueprintPure, NotBlueprintable, Category = "Training")
+	bool GetIsAbleToTrain() const { return M_TrainingEnabled.bIsAbleToTrain; }
 
 	/** @return True if the queue is paused. */
 	bool GetIsPaused() const;
@@ -145,6 +147,15 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	TArray<FTrainingOption> GetTrainingOptions() const;
 
+	/** @return The sub sections the training menu shows as tabs; always at least one after init. */
+	const TArray<FTrainingSubSectionState>& GetTrainingSubSections() const { return M_TrainingSubSections; }
+
+	/** @return How many queued items belong to the options of the given sub section. */
+	int32 GetQueuedCountInSubSection(const int32 SubSectionIndex) const;
+
+	int32 GetLastViewedSubSectionIndex() const { return M_LastViewedSubSectionIndex; }
+	void SetLastViewedSubSectionIndex(const int32 SubSectionIndex) { M_LastViewedSubSectionIndex = SubSectionIndex; }
+
 	/** @return The spawner associated */
 	ARTSAsyncSpawner* GetAsyncSpawner() const;
 
@@ -182,8 +193,25 @@ protected:
 
 private:
 	// List of all training options this trainer has, set with InitUTrainerComponent which takes into account the max size
-	// supported by the UI.
+	// supported by the UI. Holds the options of all sub sections one after the other.
 	TArray<FTrainingOption> M_TTrainingOptions;
+
+	// The training options grouped the way the training menu shows them.
+	UPROPERTY()
+	TArray<FTrainingSubSectionState> M_TrainingSubSections;
+
+	// Kept on the trainer so that selecting it again returns to the tab the player last looked at.
+	int32 M_LastViewedSubSectionIndex = 0;
+
+	/**
+	 * @brief Uses the training layout of the owning building when there is one; trainers without a layout
+	 * keep the options they were initialised with in a single sub section.
+	 * @param FallbackOptions The options passed to InitUTrainerComponent.
+	 */
+	void Init_SetupTrainingOptions(const TArray<FTrainingOption>& FallbackOptions);
+	bool Init_TrySetupSubSectionsFromTrainingLayout();
+	void Init_SetupSingleSubSection(const TArray<FTrainingOption>& FallbackOptions);
+	void Init_FlattenSubSectionsIntoTrainingOptions();
 
 	// The Training queue of this trainer; is loaded into main menu when primary selected.
 	TQueue<FTrainingQueueItem, EQueueMode::Spsc> M_TTrainingQueue;

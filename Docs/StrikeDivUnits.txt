@@ -1,0 +1,68 @@
+
+nomadic types as selection sub sections:
+economy
+[harveste, scavengers, empty]
+[Nomadic_GerGammaFacility, Nomadic_GerRefinery, Nomadic_GerMetalVault]
+[Nomadic_GerArmory, Nomadic_GerCommunicationCenter, empty...]
+field defenses
+[empty...]
+factories
+[Nomadic_GerBarracks, Nomadic_GerMechanizedDepot, Nomadic_GerLightSteelForge]
+[empty, Nomadic_GerAirbase, empty]
+[empty, Nomadic_GerExperimentalUnitsFactory, empty]
+
+barracks (strike division):
+-Assault Squad 
+[scavengers, jagers, empty]
+[sturm pioniers, vultures, empty ]
+[Ironstorm, commando, empty]
+
+-Support weapons
+[Squad_Ger_37mmFlak, Squad_Ger_PaK38, empty]
+[ empty , Squad_Ger_GrW42_80mm,empty] 
+[empty, nebel werfer,  empty]
+
+-Specialists
+[Squad_Ger_Gebirgsjagerin ,Squad_Ger_SteelFistAssaultSquad, empty]
+[  Squad_Ger_PanzerGrenadiere, vulture snipers, empty]
+[empty, light bringers, empty]
+mechanised depot (strike division):
+
+Mechanised depot
+-Recons
+[221 20mm, 251 mortar, puma]
+[flame puma, sdkfz9_37mm, empty]
+[empty....]
+Support weapons 
+ [251/22 75mm, empty , empty]
+[squad SFH18, squad Flak 88, empty
+[empty....]
+
+light forge (light tank factory) (strike division)
+-Light tanks (always selected; only one subsection)
+[PZ II F, pz 38t, pzjager lazer]
+[pz 1 150mm, pz III J, empty]
+[empty, pz 38 rockets (R), empty]
+
+medium tank factory (strike division)
+-medium tanks (always selected; only one subsection)
+stug III, jaguar, hetzer
+brummbar PZ III M, pz III Flame
+(empty, ...)
+
+
+Nomadic_GerAirbase
+-Aircraft (always selected; only one subsection)
+bf109, ju87, me410
+rest is empty.
+
+Experimental unit factory (Strike division)
+-Heavy Tanks
+[ Panther D, Jagdpanther, empty]
+[empty, Panther II emtpy]
+[empty, empty, empty]
+
+-Experimental
+[E25, empty, empty]
+[empty SturmTiger, empty]
+[Squad 210 Morser, E100, empty]

@@ -80,6 +80,8 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz_231 UMETA(DisplayName = "Ger SdKfz 231 8-rad 2cm"),
 	Tank_Sdkfz_232_3 UMETA(DisplayName = "Ger SdKfz 232/3 8-rad 75mm Puma"),
 	Tank_Sdkfz9_37mm UMETA(DisplayName = "Ger ArmCar SdKfz 9 37mm"),
+	
+	
 
 	// German Light tanks.
 	Tank_PzJager UMETA(DisplayName = "Ger Light PzJager"),

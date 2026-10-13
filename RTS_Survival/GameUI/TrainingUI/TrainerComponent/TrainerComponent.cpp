@@ -6,6 +6,7 @@
 #include "RallyPointActor/RallyPoint.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSubsystem.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/Interface/Trainer.h"
 #include "RTS_Survival/Requirement/RTSRequirement.h"
@@ -18,6 +19,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/QueueHelpers/RTSQueueHelpers.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Audio/RTSVoiceLines/RTSVoicelines.h"
 
@@ -103,27 +105,7 @@ void UTrainerComponent::InitUTrainerComponent(
 	RallyPointActorClass, const bool bUseTrainingPreview)
 {
 	bM_UseTrainingPreview = bUseTrainingPreview;
-	for (int32 i = 0; i < Options.Num(); i++)
-	{
-		if (i < DeveloperSettings::GamePlay::Training::MaxTrainingOptions)
-		{
-			M_TTrainingOptions.Add(Options[i]);
-		}
-		else
-		{
-			RTSFunctionLibrary::ReportError("Too many options provided for trainer component, will not fit UI."
-				+ FString::FromInt(Options.Num()) + " options provided."
-				+ " Max options: " + FString::FromInt(
-					DeveloperSettings::GamePlay::Training::MaxTrainingOptions) +
-				"Owner name: " + GetOwnerNameForError());
-			break;
-		}
-	}
-	// Initialize counts for all training options
-	for (auto Option : M_TTrainingOptions)
-	{
-		M_TQueueCounts.Add(Option, 0);
-	}
+	Init_SetupTrainingOptions(Options);
 	if (Trainer)
 	{
 		M_OwningTrainer = Trainer;
@@ -145,6 +127,87 @@ void UTrainerComponent::InitUTrainerComponent(
 	SetTrainingEnabled(TrainerSettings.StartEnabled);
 	InitTrainerComp_StartRequirementCheckTimer();
 	// Store and spawn the rally point actor (hidden), ignoring collisions.
+}
+
+void UTrainerComponent::Init_SetupTrainingOptions(const TArray<FTrainingOption>& FallbackOptions)
+{
+	if (not Init_TrySetupSubSectionsFromTrainingLayout())
+	{
+		Init_SetupSingleSubSection(FallbackOptions);
+	}
+	Init_FlattenSubSectionsIntoTrainingOptions();
+}
+
+bool UTrainerComponent::Init_TrySetupSubSectionsFromTrainingLayout()
+{
+	const AActor* OwnerActor = GetOwner();
+	if (not IsValid(OwnerActor))
+	{
+		return false;
+	}
+	const URTSComponent* OwnerRTSComponent = OwnerActor->FindComponentByClass<URTSComponent>();
+	if (not IsValid(OwnerRTSComponent) || OwnerRTSComponent->GetUnitType() != EAllUnitType::UNType_Nomadic)
+	{
+		return false;
+	}
+	UTrainingLayoutSubsystem* TrainingLayoutSubsystem = UTrainingLayoutSubsystem::Get(this);
+	if (not IsValid(TrainingLayoutSubsystem))
+	{
+		return false;
+	}
+	return TrainingLayoutSubsystem->BuildSubSectionsForBuilding(
+		OwnerRTSComponent->GetSubtypeAsNomadicSubtype(), M_TrainingSubSections);
+}
+
+void UTrainerComponent::Init_SetupSingleSubSection(const TArray<FTrainingOption>& FallbackOptions)
+{
+	M_TrainingSubSections.Reset();
+	FTrainingSubSectionState& SubSection = M_TrainingSubSections.AddDefaulted_GetRef();
+	SubSection.Options = FallbackOptions;
+	if (SubSection.Options.Num() <= TrainingLayoutConstants::SlotsPerSubSection)
+	{
+		return;
+	}
+	RTSFunctionLibrary::ReportError("Too many options provided for trainer component, will not fit UI."
+		+ FString::FromInt(FallbackOptions.Num()) + " options provided."
+		+ " Max options without a training layout: " + FString::FromInt(
+			TrainingLayoutConstants::SlotsPerSubSection) +
+		"Owner name: " + GetOwnerNameForError());
+	SubSection.Options.SetNum(TrainingLayoutConstants::SlotsPerSubSection);
+}
+
+void UTrainerComponent::Init_FlattenSubSectionsIntoTrainingOptions()
+{
+	M_TTrainingOptions.Reset();
+	for (FTrainingSubSectionState& SubSection : M_TrainingSubSections)
+	{
+		SubSection.FirstFlatOptionIndex = M_TTrainingOptions.Num();
+		M_TTrainingOptions.Append(SubSection.Options);
+	}
+	// Initialize counts for all training options
+	M_TQueueCounts.Reset();
+	for (const FTrainingOption& Option : M_TTrainingOptions)
+	{
+		M_TQueueCounts.Add(Option, 0);
+	}
+}
+
+int32 UTrainerComponent::GetQueuedCountInSubSection(const int32 SubSectionIndex) const
+{
+	if (not M_TrainingSubSections.IsValidIndex(SubSectionIndex))
+	{
+		return 0;
+	}
+	int32 QueuedCount = 0;
+	for (const FTrainingOption& Option : M_TrainingSubSections[SubSectionIndex].Options)
+	{
+		if (Option.IsNone())
+		{
+			continue;
+		}
+		QueuedCount += M_TQueueCounts.FindRef(Option);
+	}
+	return QueuedCount;
 }
 
 void UTrainerComponent::InitTrainerAsEnemyTrainerComponent(
@@ -1083,6 +1146,8 @@ void UTrainerComponent::SetTrainingEnabled(const bool bIsAbleToTrain)
 			M_OwnerProgressBar->StopProgressBar();
 		}
 	}
+	// Set before the UI reloads: the quick navigation buttons read it to decide which buildings to show.
+	M_TrainingEnabled.bIsAbleToTrain = bIsAbleToTrain;
 	// Hide or show UI if primary selected.
 	if (GetIsPrimarySelected())
 	{
@@ -1090,7 +1155,6 @@ void UTrainerComponent::SetTrainingEnabled(const bool bIsAbleToTrain)
 		// Will also stop the clock animation if needed on training item previously activated from different trainer. 
 		M_TrainingMenuManager->RequestEnableTrainingUI(this, bIsAbleToTrain);
 	}
-	M_TrainingEnabled.bIsAbleToTrain = bIsAbleToTrain;
 	if (bIsAbleToTrain)
 	{
 		SpawnRallyPointActorIfNeeded(M_RallyPointActorClass);

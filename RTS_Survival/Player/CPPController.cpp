@@ -3307,6 +3307,43 @@ bool ACPPController::IsAnyUnitSelected() const
 	return true;
 }
 
+void ACPPController::SelectSingleUnitFromUI(AActor* UnitToSelect)
+{
+	if (not RTSFunctionLibrary::RTSIsValid(UnitToSelect))
+	{
+		return;
+	}
+	const URTSComponent* UnitRTSComponent = UnitToSelect->FindComponentByClass<URTSComponent>();
+	constexpr uint8 PlayerOwnerIndex = 1;
+	if (not IsValid(UnitRTSComponent) || UnitRTSComponent->GetOwningPlayer() != PlayerOwnerIndex)
+	{
+		return;
+	}
+
+	ESelectionChangeAction SelectionAction = ESelectionChangeAction::SelectionInvariant;
+	if (ASelectablePawnMaster* SelectablePawn = Cast<ASelectablePawnMaster>(UnitToSelect))
+	{
+		ResetSelectionArrays();
+		SelectionAction = Internal_AddPawnToSelection_UpdateDecals(SelectablePawn);
+	}
+	else if (ASelectableActorObjectsMaster* SelectableActor = Cast<ASelectableActorObjectsMaster>(UnitToSelect))
+	{
+		ResetSelectionArrays();
+		SelectionAction = Internal_AddActorToSelection_UpdateDecals(SelectableActor);
+	}
+	else if (ASquadUnit* SquadUnit = Cast<ASquadUnit>(UnitToSelect))
+	{
+		ResetSelectionArrays();
+		SelectionAction = Internal_AddSquadFromUnitToSelection_UpdateDecals(SquadUnit);
+	}
+	if (SelectionAction == ESelectionChangeAction::SelectionInvariant)
+	{
+		return;
+	}
+	// The whole selection was replaced, so the UI hierarchy always needs a rebuild.
+	UpdateUIForSelectionAction(ESelectionChangeAction::UnitAdded_RebuildUIHierarchy, UnitToSelect);
+}
+
 ESelectionChangeAction ACPPController::ClickUnit_GetSelectionAction(AActor* NotNullActor)
 {
 	if (NotNullActor->IsA(ASquadUnit::StaticClass()))

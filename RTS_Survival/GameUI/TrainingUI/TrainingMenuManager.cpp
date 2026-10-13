@@ -8,7 +8,13 @@
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
+#include "RTS_Survival/GameUI/TrainingUI/Interface/Trainer.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "TrainerComponent/TrainerComponent.h"
+#include "TrainingLayout/TrainingLayoutSubsystem.h"
+#include "TrainingMenuWidget/W_TrainingMenu.h"
 #include "TrainingUIWidget/W_TrainingItem.h"
 #include "RTS_Survival/Requirement/RTSRequirement.h"
 #include "RTS_Survival/Requirement/RTSRequirementHelpers/FRTSRequirementHelpers.h"
@@ -38,6 +44,7 @@ void UTrainingMenuManager::SetupTrainingOptionsForTrainer(
 	if (IsValid(Trainer))
 	{
 		M_PrimarySelectedTrainer = Trainer;
+		M_ShownSubSectionIndex = Trainer->GetLastViewedSubSectionIndex();
 		Trainer->SetIsPrimarySelectedTraining(true, this);
 		// Check if this unit can already train, if not we only set the reference so it can update the UI
 		// when it is able to train.
@@ -183,24 +190,29 @@ void UTrainingMenuManager::PlayAnnouncerTrainingSound(const EAnnouncerVoiceLineT
 }
 
 void UTrainingMenuManager::InitTrainingManager(
-	TArray<UW_TrainingItem*> TrainingItemsInMenu,
+	UW_TrainingMenu* TrainingMenu,
 	UMainGameUI* MainGameUI,
 	UW_TrainingRequirement* TrainingRequirementWidget, UW_TrainingDescription* TrainingDescription)
 {
 	InitAllGameTrainingOptions();
+	M_TrainingMenu = TrainingMenu;
 	M_TTrainingMenuWidgets.Reset();
-	for (int i = 0; i < TrainingItemsInMenu.Num(); i++)
+	if (GetIsValidTrainingMenu())
 	{
-		if (not IsValid(TrainingItemsInMenu[i]))
+		M_TrainingMenu->InitTrainingMenu(this);
+		for (UW_TrainingItem* TrainingItem : M_TrainingMenu->GetTrainingItems())
 		{
-			RTSFunctionLibrary::ReportError("Training item in menu is nullptr or not valid."
-				"at function UTrainingMenuManager::InitTrainingManager.");
-			continue;
+			// Initialize the training item.
+			TrainingItem->InitW_TrainingItem(this, M_TTrainingMenuWidgets.Num());
+			M_TTrainingMenuWidgets.Add(TrainingItem);
 		}
-		// Initialize the training item.
-		const int32 TrainingWidgetIndex = M_TTrainingMenuWidgets.Num();
-		TrainingItemsInMenu[i]->InitW_TrainingItem(this, TrainingWidgetIndex);
-		M_TTrainingMenuWidgets.Add(TrainingItemsInMenu[i]);
+	}
+	if (M_TTrainingMenuWidgets.Num() < TrainingLayoutConstants::SlotsPerSubSection)
+	{
+		RTSFunctionLibrary::ReportError("The training menu has fewer training items than a sub section has slots."
+			"\n Training items: " + FString::FromInt(M_TTrainingMenuWidgets.Num()) +
+			"\n Slots per sub section: " + FString::FromInt(TrainingLayoutConstants::SlotsPerSubSection) +
+			"\n See UTrainingMenuManager::InitTrainingManager.");
 	}
 	if (IsValid(MainGameUI))
 	{
@@ -219,6 +231,44 @@ void UTrainingMenuManager::InitTrainingManager(
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "TrainingInfoCanvas", "InitTrainingMasnager");
 	}
+}
+
+void UTrainingMenuManager::OnSubSectionTabClicked(const int32 SubSectionIndex)
+{
+	if (not GetIsValidPrimarySelectedTrainer())
+	{
+		return;
+	}
+	if (not M_PrimarySelectedTrainer->GetTrainingSubSections().IsValidIndex(SubSectionIndex))
+	{
+		return;
+	}
+	M_ShownSubSectionIndex = SubSectionIndex;
+	M_PrimarySelectedTrainer->SetLastViewedSubSectionIndex(SubSectionIndex);
+	// The hovered item is about to show another unit, so its requirement no longer applies.
+	SetRequirementPanelVisiblity(false);
+	UpdateWidgetsWithPrimaryQueue();
+}
+
+void UTrainingMenuManager::OnQuickNavButtonClicked(const ENomadicSubtype Building)
+{
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+	AActor* TrainingBuilding = FindFirstTrainingBuildingOfPlayer(Building);
+	if (not IsValid(TrainingBuilding))
+	{
+		// The building was packed up or destroyed after the last refresh.
+		RefreshQuickNavButtons();
+		return;
+	}
+	ACPPController* PlayerController = M_MainGameUI->GetPlayerController();
+	if (not IsValid(PlayerController))
+	{
+		return;
+	}
+	PlayerController->SelectSingleUnitFromUI(TrainingBuilding);
 }
 
 void UTrainingMenuManager::OnTrainingItemClicked(
@@ -281,39 +331,38 @@ void UTrainingMenuManager::OnTrainingItemHovered(const FTrainingWidgetState& Tra
 }
 
 void UTrainingMenuManager::StartClockOnTrainingItem(
-	const int32 IndexActiveTrainingItem,
+	const int32 FlatIndexActiveOption,
 	const int32 TimeRemaining,
 	const FTrainingOption ActiveOption,
 	const bool bIsPaused)
 {
-	if (not GetWidgetIndexInBounds(IndexActiveTrainingItem))
-	{
-		return;
-	}
 	if (M_ActiveTrainingItem)
 	{
 		// Stop clock on previous item
 		ResetActiveItem();
 	}
-	M_ActiveTrainingItem = M_TTrainingMenuWidgets[IndexActiveTrainingItem];
-	if (M_ActiveTrainingItem)
+	const int32 IndexActiveTrainingItem = GetWidgetIndexOfFlatOptionIndex(FlatIndexActiveOption);
+	if (IndexActiveTrainingItem == INDEX_NONE)
 	{
-		// Get the total training time for the active item
-		if (M_TrainingOptionsMap.Contains(ActiveOption) == false)
-		{
-			RTSFunctionLibrary::ReportError("Training option not found in map."
-				"\n see UTrainingMenuManager::StartClockOnTrainingItem."
-				"\n ActiveOption: " + ActiveOption.GetTrainingName());
-			return;
-		}
-		const int32 TotalTrainingTime = M_TrainingOptionsMap[ActiveOption].TrainingTime;
-
-		M_ActiveTrainingItem->StartClock(TimeRemaining, TotalTrainingTime, bIsPaused);
+		// The active item trains in a sub section that is not on screen.
+		return;
 	}
-	else
+	M_ActiveTrainingItem = M_TTrainingMenuWidgets[IndexActiveTrainingItem];
+	if (not M_ActiveTrainingItem)
 	{
 		ReportInvalidActiveItemForQueueClock(IndexActiveTrainingItem);
+		return;
 	}
+	// Get the total training time for the active item
+	const FTrainingOptionState* ActiveOptionState = M_TrainingOptionsMap.Find(ActiveOption);
+	if (not ActiveOptionState)
+	{
+		RTSFunctionLibrary::ReportError("Training option not found in map."
+			"\n see UTrainingMenuManager::StartClockOnTrainingItem."
+			"\n ActiveOption: " + ActiveOption.GetTrainingName());
+		return;
+	}
+	M_ActiveTrainingItem->StartClock(TimeRemaining, ActiveOptionState->TrainingTime, bIsPaused);
 }
 
 
@@ -329,6 +378,7 @@ void UTrainingMenuManager::InitAllGameTrainingOptions()
 	InitAllGameNomadicTrainingOptions();
 	InitAllGameSquadTrainingOptions();
 	InitAllGameAircraftTrainingOptions();
+	InitAllGameTrainingLayoutOnlyOptions();
 }
 
 FTrainingOptionState UTrainingMenuManager::CreateTrainingOptionState(
@@ -2470,6 +2520,48 @@ void UTrainingMenuManager::InitAllGameMachineGunTWTrainingOptions()
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_DShK);
 }
 
+void UTrainingMenuManager::InitAllGameTrainingLayoutOnlyOptions()
+{
+	using namespace DeveloperSettings::GameBalance::TrainingTime;
+
+	// Never replaces an entry made above, so a unit that gets its own entry with a requirement keeps it.
+	auto AddTankOptionIfMissing = [this](const ETankSubtype TankSubtype, const int32 TrainingTime)
+	{
+		const FTrainingOption ItemID(EAllUnitType::UNType_Tank, static_cast<uint8>(TankSubtype));
+		if (M_TrainingOptionsMap.Contains(ItemID))
+		{
+			return;
+		}
+		M_TrainingOptionsMap.Add(ItemID, CreateTrainingOptionState(
+			                         ItemID, TrainingTime, EAllUnitType::UNType_Tank, TankSubtype));
+	};
+	auto AddSquadOptionIfMissing = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime)
+	{
+		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+		if (M_TrainingOptionsMap.Contains(ItemID))
+		{
+			return;
+		}
+		M_TrainingOptionsMap.Add(ItemID, CreateTrainingOptionState(
+			                         ItemID, TrainingTime, EAllUnitType::UNType_Squad, ETankSubtype::Tank_None,
+			                         ENomadicSubtype::Nomadic_None, SquadSubtype));
+	};
+
+	AddSquadOptionIfMissing(ESquadSubtype::Squad_Ger_IronStorm, EliteInfantryTrainingTime);
+
+	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz250, ArmoredCarTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz250_37mm, ArmoredCarTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz_231, ArmoredCarTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Puma, ArmoredCarMediumCalibreTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_FlamePuma, ArmoredCarMediumCalibreTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz_232_3, ArmoredCarMediumCalibreTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz251_PZIV, ArmoredCarMediumCalibreTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Panzerwerfer, ArmoredCarMediumCalibreTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Pz38t_R, LightTankTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_PzIII_AA, MediumTankTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_PzIII_FLamm, MediumTankTrainingTime);
+}
+
 void UTrainingMenuManager::PostInitTrainingOptions()
 {
 	for (auto& Option : M_TrainingOptionsMap)
@@ -2490,6 +2582,13 @@ void UTrainingMenuManager::PostInitTrainingOptions()
 
 void UTrainingMenuManager::OnLeftClickTrainingItem(const FTrainingWidgetState& TrainingItem, const int32 Index)
 {
+	const TArray<FTrainingSubSectionState>& SubSections = M_PrimarySelectedTrainer->GetTrainingSubSections();
+	if (not SubSections.IsValidIndex(M_ShownSubSectionIndex) || TrainingItem.ItemID.IsNone())
+	{
+		return;
+	}
+	// Queue items remember their option by its index over all sub sections.
+	const int32 FlatOptionIndex = SubSections[M_ShownSubSectionIndex].FirstFlatOptionIndex + Index;
 	const bool bIsQueueEmpty = M_PrimarySelectedTrainer->GetIsQueueEmpty();
 	if (M_PrimarySelectedTrainer->GetIsPaused())
 	{
@@ -2536,7 +2635,7 @@ void UTrainingMenuManager::OnLeftClickTrainingItem(const FTrainingWidgetState& T
 		NewTrainingItem.ItemID = TrainingItem.ItemID;
 		NewTrainingItem.TotalTrainingTime = TrainingItem.TotalTrainingTime;
 		NewTrainingItem.RemainingTrainingTime = TrainingItem.TotalTrainingTime;
-		NewTrainingItem.WidgetIndex = Index;
+		NewTrainingItem.WidgetIndex = FlatOptionIndex;
 		NewTrainingItem.AsyncRequestState = EAsyncTrainingRequestState::Async_NoTrainingRequest;
 		NewTrainingItem.RemainingResourceCosts = Costs;
 		NewTrainingItem.TotalResourceCosts = Costs;
@@ -2573,70 +2672,20 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 	int32 ActiveItemIndex = INDEX_NONE;
 	int32 TimeRemaining = 0;
 	bool bIsPausedByResourceInsufficiency = false;
-	TMap<FTrainingOption, int32> QueueState = M_PrimarySelectedTrainer->GetCurrentTrainingQueueState(
+	const TMap<FTrainingOption, int32> QueueState = M_PrimarySelectedTrainer->GetCurrentTrainingQueueState(
 		ActiveItemIndex, TimeRemaining, bIsPausedByResourceInsufficiency);
 	// Get the order of the training options this unit has.
-	TArray<FTrainingOption> TrainingOptions = M_PrimarySelectedTrainer->GetTrainingOptions();
+	const TArray<FTrainingOption> TrainingOptions = M_PrimarySelectedTrainer->GetTrainingOptions();
 
-	// Stores the state the widget needs to display.
-	FTrainingWidgetState WidgetState;
-	int32 WidgetIndex = 0;
-	for (const auto EachOption : TrainingOptions)
-	{
-		if (not CheckTrainingOptionInMap(EachOption))
-		{
-			continue;
-		}
-		WidgetState.ItemID = EachOption;
-		// Set how often this option is in the queue.
-		WidgetState.Count = QueueState[EachOption];
-		// Set the time remaining for this widget to default time.
-		WidgetState.TotalTrainingTime = M_TrainingOptionsMap[EachOption].TrainingTime;
+	const int32 SubSectionCount = M_PrimarySelectedTrainer->GetTrainingSubSections().Num();
+	M_ShownSubSectionIndex = FMath::Clamp(M_ShownSubSectionIndex, 0, FMath::Max(SubSectionCount - 1, 0));
 
-		WidgetState.SecondaryRequiredUnit = FTrainingOption();
-		WidgetState.SecondaryRequiredTech = ETechnology::Tech_NONE;
-		WidgetState.RequiredUnit = FTrainingOption();
-		WidgetState.RequiredTech = ETechnology::Tech_NONE;
+	UpdateSubSectionTabsWithPrimaryTrainer();
+	UpdateWidgetsWithShownSubSection(QueueState);
+	RefreshQuickNavButtons();
 
-		WidgetState.TrainingStatus = CheckRequirement(
-			M_TrainingOptionsMap[EachOption].RTSRequirement,
-			WidgetState.RequirementCount,
-			WidgetState.RequiredUnit,
-			WidgetState.RequiredTech,
-			WidgetState.SecondaryRequiredUnit,
-			WidgetState.SecondaryRequiredTech,
-			WidgetState.TrainingStatusSecondRequirement,
-			WidgetState.bIsSecondRequirementMet,
-			WidgetState.bIsFirstRequirementMet);
-
-		if (not GetWidgetIndexInBounds(WidgetIndex))
-		{
-			RTSFunctionLibrary::ReportError("Too many training options for the UI."
-				"\n see UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue."
-				"\n Available widgets: " + FString::FromInt(M_TTrainingMenuWidgets.Num()) +
-				"\n Primary name selected: " + M_PrimarySelectedTrainer->GetName());
-			break;
-		}
-
-		M_TTrainingMenuWidgets[WidgetIndex]->UpdateTrainingItem(WidgetState);
-		// UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[WidgetIndex], WidgetState);
-		WidgetIndex++;
-	}
-	// Set the rest of the widgets to empty state.
-	for (int32 i = WidgetIndex; i < M_TTrainingMenuWidgets.Num(); i++)
-	{
-		if (not GetWidgetIndexInBounds(i))
-		{
-			continue;
-		}
-
-		M_TTrainingMenuWidgets[i]->UpdateTrainingItem(M_EmptyTrainingOptionState);
-		// UpdateRequirementOpacityForWidget(M_TTrainingMenuWidgets[i], M_EmptyTrainingOptionState);
-	}
 	// Check if there is an active item.
-	if (ActiveItemIndex != INDEX_NONE
-		&& GetWidgetIndexInBounds(ActiveItemIndex)
-		&& TrainingOptions.IsValidIndex(ActiveItemIndex))
+	if (TrainingOptions.IsValidIndex(ActiveItemIndex))
 	{
 		const bool bSetClockToPausedState = M_PrimarySelectedTrainer->GetIsPaused() || bIsPausedByResourceInsufficiency;
 		StartClockOnTrainingItem(ActiveItemIndex, TimeRemaining, TrainingOptions[ActiveItemIndex],
@@ -2647,6 +2696,194 @@ void UTrainingMenuManager::UpdateWidgetsWithPrimaryQueue()
 	{
 		ResetActiveItem();
 	}
+}
+
+void UTrainingMenuManager::UpdateSubSectionTabsWithPrimaryTrainer() const
+{
+	if (not GetIsValidTrainingMenu())
+	{
+		return;
+	}
+	const TArray<FTrainingSubSectionState>& SubSections = M_PrimarySelectedTrainer->GetTrainingSubSections();
+	TArray<FTrainingSubSectionTabState> TabStates;
+	TabStates.Reserve(SubSections.Num());
+	for (int32 SubSectionIndex = 0; SubSectionIndex < SubSections.Num(); ++SubSectionIndex)
+	{
+		FTrainingSubSectionTabState& TabState = TabStates.AddDefaulted_GetRef();
+		TabState.DisplayName = SubSections[SubSectionIndex].DisplayName;
+		TabState.QueuedCount = M_PrimarySelectedTrainer->GetQueuedCountInSubSection(SubSectionIndex);
+	}
+	M_TrainingMenu->UpdateSubSectionTabs(TabStates, M_ShownSubSectionIndex);
+}
+
+void UTrainingMenuManager::UpdateWidgetsWithShownSubSection(const TMap<FTrainingOption, int32>& QueueState)
+{
+	const TArray<FTrainingSubSectionState>& SubSections = M_PrimarySelectedTrainer->GetTrainingSubSections();
+	const TArray<FTrainingOption> NoOptions;
+	const TArray<FTrainingOption>& ShownOptions = SubSections.IsValidIndex(M_ShownSubSectionIndex)
+		                                              ? SubSections[M_ShownSubSectionIndex].Options
+		                                              : NoOptions;
+	if (ShownOptions.Num() > M_TTrainingMenuWidgets.Num())
+	{
+		RTSFunctionLibrary::ReportError("Too many training options for the UI."
+			"\n see UTrainingMenuManager::UpdateWidgetsWithShownSubSection."
+			"\n Available widgets: " + FString::FromInt(M_TTrainingMenuWidgets.Num()) +
+			"\n Primary name selected: " + M_PrimarySelectedTrainer->GetName());
+	}
+
+	// Each option keeps the slot it has in the sub section; slots without an option show the empty state.
+	for (int32 WidgetIndex = 0; WidgetIndex < M_TTrainingMenuWidgets.Num(); ++WidgetIndex)
+	{
+		const bool bSlotHasOption = ShownOptions.IsValidIndex(WidgetIndex)
+			&& not ShownOptions[WidgetIndex].IsNone()
+			&& CheckTrainingOptionInMap(ShownOptions[WidgetIndex]);
+		if (not bSlotHasOption)
+		{
+			M_TTrainingMenuWidgets[WidgetIndex]->UpdateTrainingItem(M_EmptyTrainingOptionState);
+			continue;
+		}
+		const FTrainingOption& Option = ShownOptions[WidgetIndex];
+		M_TTrainingMenuWidgets[WidgetIndex]->UpdateTrainingItem(
+			CreateWidgetStateForOption(Option, QueueState.FindRef(Option)));
+	}
+}
+
+FTrainingWidgetState UTrainingMenuManager::CreateWidgetStateForOption(const FTrainingOption& Option,
+                                                                      const int32 QueuedCount) const
+{
+	const FTrainingOptionState& OptionState = M_TrainingOptionsMap.FindChecked(Option);
+
+	// Stores the state the widget needs to display.
+	FTrainingWidgetState WidgetState;
+	WidgetState.ItemID = Option;
+	// Set how often this option is in the queue.
+	WidgetState.Count = QueuedCount;
+	// Set the time remaining for this widget to default time.
+	WidgetState.TotalTrainingTime = OptionState.TrainingTime;
+
+	WidgetState.TrainingStatus = CheckRequirement(
+		OptionState.RTSRequirement,
+		WidgetState.RequirementCount,
+		WidgetState.RequiredUnit,
+		WidgetState.RequiredTech,
+		WidgetState.SecondaryRequiredUnit,
+		WidgetState.SecondaryRequiredTech,
+		WidgetState.TrainingStatusSecondRequirement,
+		WidgetState.bIsSecondRequirementMet,
+		WidgetState.bIsFirstRequirementMet);
+	return WidgetState;
+}
+
+int32 UTrainingMenuManager::GetWidgetIndexOfFlatOptionIndex(const int32 FlatOptionIndex) const
+{
+	if (not GetIsValidPrimarySelectedTrainer())
+	{
+		return INDEX_NONE;
+	}
+	const TArray<FTrainingSubSectionState>& SubSections = M_PrimarySelectedTrainer->GetTrainingSubSections();
+	if (not SubSections.IsValidIndex(M_ShownSubSectionIndex))
+	{
+		return INDEX_NONE;
+	}
+	const FTrainingSubSectionState& ShownSubSection = SubSections[M_ShownSubSectionIndex];
+	const int32 WidgetIndex = FlatOptionIndex - ShownSubSection.FirstFlatOptionIndex;
+	if (not ShownSubSection.Options.IsValidIndex(WidgetIndex) || not M_TTrainingMenuWidgets.IsValidIndex(WidgetIndex))
+	{
+		return INDEX_NONE;
+	}
+	return WidgetIndex;
+}
+
+void UTrainingMenuManager::RefreshQuickNavButtons() const
+{
+	if (not GetIsValidTrainingMenu())
+	{
+		return;
+	}
+	UTrainingLayoutSubsystem* TrainingLayoutSubsystem = UTrainingLayoutSubsystem::Get(M_TrainingMenu);
+	if (not IsValid(TrainingLayoutSubsystem))
+	{
+		return;
+	}
+	TSet<ENomadicSubtype> AvailableBuildings;
+	for (const FTrainingQuickNavEntry& QuickNavEntry : TrainingLayoutSubsystem->GetQuickNavEntries())
+	{
+		if (IsValid(FindFirstTrainingBuildingOfPlayer(QuickNavEntry.Building)))
+		{
+			AvailableBuildings.Add(QuickNavEntry.Building);
+		}
+	}
+	M_TrainingMenu->UpdateQuickNavButtons(AvailableBuildings, GetBuildingOfPrimarySelectedTrainer());
+}
+
+AActor* UTrainingMenuManager::FindFirstTrainingBuildingOfPlayer(const ENomadicSubtype Building) const
+{
+	constexpr uint8 PlayerOwnerIndex = 1;
+	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(M_TrainingMenu);
+	if (not IsValid(GameUnitManager))
+	{
+		return nullptr;
+	}
+	// Nomadic vehicles are stored with the tanks.
+	const TArray<ATankMaster*> PlayerTanks = GameUnitManager->GetPlayerTanks(PlayerOwnerIndex);
+	for (ATankMaster* PlayerTank : PlayerTanks)
+	{
+		if (not IsValid(PlayerTank))
+		{
+			continue;
+		}
+		const URTSComponent* RTSComponent = PlayerTank->GetRTSComponent();
+		const bool bIsBuildingOfType = IsValid(RTSComponent)
+			&& RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic
+			&& RTSComponent->GetSubtypeAsNomadicSubtype() == Building;
+		if (not bIsBuildingOfType)
+		{
+			continue;
+		}
+		ITrainer* Trainer = Cast<ITrainer>(PlayerTank);
+		if (not Trainer)
+		{
+			continue;
+		}
+		// Training is only enabled while the vehicle is expanded into its building.
+		const UTrainerComponent* TrainerComponent = Trainer->GetTrainerComponent();
+		if (IsValid(TrainerComponent) && TrainerComponent->GetIsAbleToTrain())
+		{
+			return PlayerTank;
+		}
+	}
+	return nullptr;
+}
+
+ENomadicSubtype UTrainingMenuManager::GetBuildingOfPrimarySelectedTrainer() const
+{
+	if (not GetIsValidPrimarySelectedTrainer() || not IsValid(M_PrimarySelectedTrainer->GetOwner()))
+	{
+		return ENomadicSubtype::Nomadic_None;
+	}
+	const URTSComponent* RTSComponent = M_PrimarySelectedTrainer->GetOwner()->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent) || RTSComponent->GetUnitType() != EAllUnitType::UNType_Nomadic)
+	{
+		return ENomadicSubtype::Nomadic_None;
+	}
+	return RTSComponent->GetSubtypeAsNomadicSubtype();
+}
+
+bool UTrainingMenuManager::GetIsValidTrainingMenu() const
+{
+	if (IsValid(M_TrainingMenu))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_TrainingMenu",
+		"GetIsValidTrainingMenu",
+		this
+	);
+
+	return false;
 }
 
 // void UTrainingMenuManager::UpdateRequirementOpacityForWidget(

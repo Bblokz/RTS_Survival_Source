@@ -1726,9 +1726,6 @@ namespace DeveloperSettings
 
 		namespace Training
 		{
-			// The maximum amount of training options a trainer can have, supported by the widgets.
-			static int32 MaxTrainingOptions = 24;
-
 			// The maximum amount of training items a trainer can have in the queue.
 			inline constexpr uint32 MaxTrainingQueueSize = 128;
 
