@@ -1235,6 +1235,9 @@ private:
 	// Puts a unit that held its point on a socket back on the point's navmesh location, able to walk again.
 	void ReturnFromCoverSocket();
 
+	// Tells the actor that owns the socket of the assigned point that this unit took it or gave it up.
+	void NotifyCoverSocketSource(const bool bIsOnSocket);
+
 	/**
 	 * @brief Uses the player's planned position before the automatic search runs.
 	 * @param CoverSubsystem Subsystem that owns the reservation of a planned cover point.

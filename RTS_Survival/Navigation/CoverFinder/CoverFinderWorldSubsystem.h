@@ -359,6 +359,16 @@ public:
 	// Called when a unit gave up walking to a point, so nobody else is sent to the same blocked slot for a while.
 	void ReportCoverPointUnreachable(int64 PointId);
 	bool GetIsCoverPointPublished(int64 PointId) const;
+
+	/**
+	 * @brief Reads the usable cover sockets of an actor that implements IRTSCoverSocketSource again and replaces
+	 * what was published for it; sockets that disappeared are revoked so their occupants leave at once.
+	 * @param CoverActor Actor whose set of usable sockets changed, or that was spawned after the map started.
+	 */
+	void RefreshCoverSocketsOfActor(AActor* CoverActor);
+
+	// True for a short while after the point's socket was taken away by its actor, such as a wall that fell.
+	bool GetWasCoverPointRevoked(int64 PointId) const;
 	AActor* ResolveBlockingProvider(const FRTSCoverPoint& CoverPoint) const;
 
 	/**
@@ -509,6 +519,20 @@ private:
 	// The actor behind each socket cover registration; when it is destroyed its points are taken out again.
 	TMap<uint64, TWeakObjectPtr<AActor>> M_SocketCoverProviders;
 
+	// Points whose socket was taken away while its actor lives on, with the time until which that is remembered.
+	TMap<int64, float> M_RevokedCoverPointExpiry;
+
+	/** @brief An actor whose sockets could not all be placed yet, and how often that was tried. */
+	struct FActorSocketCoverRetry
+	{
+		float NextAttemptWorldSeconds = 0.0f;
+		int32 AttemptCount = 0;
+	};
+
+	// Right after a map starts the navigation mesh around a building is still taking in the building's own
+	// navigation areas, and approach locations there are not found yet.
+	TMap<TWeakObjectPtr<AActor>, FActorSocketCoverRetry> M_ActorSocketCoverRetries;
+
 	// Rings around the thin obstacles found while gathering the bounds of the next environment scan.
 	TArray<FCoverFocusedSample> M_PendingThinObstacleSamples;
 
@@ -587,6 +611,41 @@ private:
 
 	// Takes out the socket cover of actors that no longer exist, such as a sandbag wall that was destroyed.
 	void RemoveSocketCoverOfDestroyedActors();
+
+	// Registers the actors of the configured classes that list their own cover sockets; part of the map start.
+	void RegisterActorSocketCover(TSet<const AActor*>& InOutRegisteredActors);
+
+	/**
+	 * @brief Builds the cover points of an actor that lists its own sockets.
+	 * @param CoverActor The actor, for the log.
+	 * @param CoverSockets Its usable sockets.
+	 * @return One point per socket with a cover name whose approach location lies on the navigation mesh.
+	 */
+	TArray<FRTSCoverPoint> BuildActorSocketCoverPoints(
+		const AActor& CoverActor,
+		const TArray<struct FRTSActorCoverSocket>& CoverSockets,
+		int32& OutOffNavigationCount) const;
+
+	// Reads the actors again whose sockets were not all reachable yet when they were last read.
+	void RetryActorSocketCover();
+
+	/**
+	 * @brief Finds where a soldier leaves the navigation mesh to take a socket: the spot in front of it, or a
+	 * little further out, that infantry can actually walk to from the street beyond.
+	 * @param CoverSocket The socket; its approach location is the first spot tried.
+	 * @param NavigationData Infantry navigation data.
+	 * @param InfantryFilter Query filter of infantry, or null to accept any navigation mesh.
+	 * @param OutApproachLocation The accepted spot on the navigation mesh.
+	 * @return False when no spot in front of the socket can be walked to.
+	 */
+	bool TryFindWalkableApproach(
+		const struct FRTSActorCoverSocket& CoverSocket,
+		const ANavigationData& NavigationData,
+		const TSharedPtr<const struct FNavigationQueryFilter, ESPMode::ThreadSafe>& InfantryFilter,
+		FVector& OutApproachLocation) const;
+
+	// Ids of the published points that belong to one registration.
+	TSet<int64> CollectPublishedPointIds(uint64 RegistrationId) const;
 
 	// Landscape is scanned once on its own, and soldiers stand on cover points without being cover themselves.
 	static bool GetIsScannableEnvironmentComponent(const UPrimitiveComponent* PrimitiveComponent);

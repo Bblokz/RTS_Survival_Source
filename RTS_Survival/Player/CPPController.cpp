@@ -58,6 +58,7 @@
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Interfaces/SelectionProxyOwner.h"
 #include "RTS_Survival/Procedural/LandscapeDivider/RTSLandscapeDivider.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -2714,6 +2715,7 @@ void ACPPController::RegularPrimaryClick()
 	EnsureSelectionsAreRTSValid();
 	AActor* ClickedActor = HitUnderCursor.GetActor();
 	ChangeClickedActorIfIsChildActor(ClickedActor);
+	ChangeClickedActorIfHasSelectionProxy(ClickedActor);
 	FVector ClickedLocation = HitUnderCursor.Location;
 
 	if (TryHandleActiveGlobalAbilityPrimaryClick(ClickedLocation))
@@ -3242,6 +3244,22 @@ void ACPPController::ChangeClickedActorIfIsChildActor(AActor*& ClickedActor) con
 	{
 		ClickedActor = ClickedActor->GetParentActor();
 	}
+}
+
+void ACPPController::ChangeClickedActorIfHasSelectionProxy(AActor*& ClickedActor) const
+{
+	const IRTSSelectionProxyOwner* ProxyOwner = Cast<IRTSSelectionProxyOwner>(ClickedActor);
+	if (ProxyOwner == nullptr)
+	{
+		return;
+	}
+	AActor* SelectionProxy = ProxyOwner->GetSelectionProxyActor();
+	// Without a proxy the click stays on the actor itself, which is simply not selectable.
+	if (not IsValid(SelectionProxy))
+	{
+		return;
+	}
+	ClickedActor = SelectionProxy;
 }
 
 bool ACPPController::GetIsClickedUnitSelectable(AActor* ClickedActor) const
@@ -3944,6 +3962,8 @@ bool ACPPController::TryAdvancePrimaryToUnitType(const FTrainingOption& UnitID, 
 	case EAllUnitType::UNType_BuildingExpansion:
 	// Falls through.
 	case EAllUnitType::UNType_StandaloneTurret:
+	// Falls through.
+	case EAllUnitType::UNType_GarrisonBuilding:
 		NewPrimarySelectedActor = FPlayerSelectionHelpers::GetActorAtIndexIfMatches(TSelectedActorsMasters,
 			SelectionArrayIndex, UnitID);
 		break;
@@ -3988,6 +4008,8 @@ void ACPPController::SelectOnScreenUnitsOfType(const FTrainingOption& UnitID, in
 	case EAllUnitType::UNType_BuildingExpansion:
 	// Falls through.
 	case EAllUnitType::UNType_StandaloneTurret:
+	// Falls through.
+	case EAllUnitType::UNType_GarrisonBuilding:
 		BasisActor = FPlayerSelectionHelpers::GetActorAtIndexIfMatches(TSelectedActorsMasters, SelectionArrayIndex,
 		                                                               UnitID);
 		break;
@@ -5964,6 +5986,17 @@ void ACPPController::DirectActionButtonExitCargo()
 		}
 
 		CommandsExe += EachPawn->ExitCargo(bResetQueue) == ECommandQueueError::NoError;
+	}
+
+	// Buildings the player holds with soldiers inside empty themselves the same way.
+	for (ASelectableActorObjectsMaster* EachActor : TSelectedActorsMasters)
+	{
+		if (not RTSFunctionLibrary::RTSIsValid(EachActor))
+		{
+			continue;
+		}
+
+		CommandsExe += EachActor->ExitCargo(bResetQueue) == ECommandQueueError::NoError;
 	}
 
 	// Optional VO feedback if something actually executed.

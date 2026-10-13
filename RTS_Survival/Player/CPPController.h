@@ -308,6 +308,8 @@ class RTS_SURVIVAL_API ACPPController : public APlayerController
 	friend class RTS_SURVIVAL_API UPlayerProfileLoader;
 	friend class RTS_SURVIVAL_API UPlayerResourceManager;
 	friend class UMissionCinematicTakeOverSession;
+	// Map test that selects an apartment and presses its Exit Cargo button the way a click would.
+	friend class UApartmentDestructionTestSubsystem;
 	// For calling StartGameAtLocation with the picked location by the Start Location UI / Mngr.
 	friend class RTS_SURVIVAL_API UPlayerStartLocationManager;
 
@@ -1519,6 +1521,9 @@ private:
 	void DirectActionButtonReturnToBase();
 	void DirectActionButtonRetreat();
 	void DirectActionButtonExitCargo();
+
+	// A neutral building the player holds is selected through the actor it names (IRTSSelectionProxyOwner).
+	void ChangeClickedActorIfHasSelectionProxy(AActor*& ClickedActor) const;
 	void DirectActionButtonDetachTow();
 	void DirectActionButtonActivateShield();
 	void DirectActionButtonCrewRepair(ECrewRepairAbilityType Subtype);

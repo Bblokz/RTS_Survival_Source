@@ -112,9 +112,34 @@ private:
 	void FireCrushStep(const FApartmentDestructionTestImpact& Impact, const FVector& WorldLocation) const;
 	/** @brief Logs which navigation area every agent finds along a line from the building's centre to outside it. */
 	void LogNavAreaProfile(UWorld& World, const FString& MapLabel) const;
+	/**
+	 * @brief Logs how many parts stand, how many cover sockets the building still offers, how many of them the
+	 * cover finder published, and whether a soldier on each socket could fire out past the building's collision.
+	 */
+	void ReportCover(UWorld& World, const FString& Label) const;
 	void ReportWindow(const UWorld& World, const FString& Label);
 	void RequestScreenshot(const FString& Label);
 	void Finish(UWorld& World);
+
+	/**
+	 * @brief Started with -ApartmentCoverReach: asks the infantry navigation mesh for a path from the street to
+	 * the walk-to point of every cover socket of every apartment on the map, logs what cannot be reached, and quits.
+	 */
+	void Tick_CoverReach(UWorld& World);
+	// Real seconds waited before the reach test, so the navigation mesh has taken in every building's areas.
+	float M_CoverReachWaitSeconds = 0.f;
+
+	/**
+	 * @brief Started with -ApartmentGarrisonExit: waits for a player soldier to take a socket of an apartment,
+	 * checks that the apartment then has a selectable garrison actor, orders Exit Cargo on it and checks that
+	 * every soldier leaves and the garrison actor goes away. Logs RTS_APARTMENT_GARRISON lines and quits.
+	 */
+	void Tick_GarrisonExit(UWorld& World);
+	void FinishGarrisonExit(UWorld& World, bool bPassed, const FString& Details);
+	TWeakObjectPtr<AApartmentDestructibleActor> M_GarrisonApartment;
+	// World time by which the soldiers must be out, or by which one must have gone in; zero until set.
+	float M_GarrisonDeadlineSeconds = 0.f;
+	int32 M_GarrisonSoldiersAtOrder = 0;
 
 	UPROPERTY()
 	TObjectPtr<AGeometryCollectionActor> M_PrototypeActor = nullptr;

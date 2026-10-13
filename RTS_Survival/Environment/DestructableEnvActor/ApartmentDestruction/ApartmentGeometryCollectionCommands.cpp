@@ -3,6 +3,7 @@
 #if WITH_EDITOR
 
 #include "CoreMinimal.h"
+#include "ApartmentCollectionAttributes.h"
 #include "Chaos/ChaosSolverActor.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "ComponentReregisterContext.h"
@@ -42,6 +43,11 @@ namespace RTSApartmentGeometryCollection
 	constexpr float SimplifiedHullCornerDistance = 15.f;
 	// Share of a piece's vertices kept as collision surface samples; zero trips an engine check, so keep a few.
 	constexpr float CollisionSampleFraction = 0.05f;
+	// Hulls around a window or door: enough for the two sides, the sill and the lintel of a double window.
+	constexpr int32 MaximumHullsAroundOpening = 8;
+	constexpr double OpeningHullCornerDistance = 5.0;
+	// Panels are decomposed whatever share of their single hull they fill.
+	constexpr float AlwaysDecomposeVolumeRatio = 1.f;
 
 	/** @brief How closely the collision of a built collection follows its pieces; simpler is smaller and cheaper. */
 	enum class EApartmentCollisionDetail : uint8
@@ -326,6 +332,18 @@ namespace RTSApartmentGeometryCollection
 		TEXT("Moves every leaf of an apartment geometry collection directly under one root. Args: <GeometryCollectionAssetPath>"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&FlattenApartmentGeometryCollection));
 
+	/** @brief How one piece takes part in collision, as written in the pieces file. */
+	enum class EApartmentPieceCollision : uint8
+	{
+		Solid,
+		// A wall panel with a window or door: its collision must leave the opening free, so soldiers behind it
+		// can fire out and be fired at.
+		SolidAroundOpening,
+		// Dressing such as wallpaper, trims, window frames and glass: it rides along with the solid piece of its
+		// slot. Hulls of its own would close window openings again and triple the bodies to simulate.
+		None
+	};
+
 	/** @brief One kit piece of a planned building, as written by the offline planner. */
 	struct FApartmentPiece
 	{
@@ -334,17 +352,24 @@ namespace RTSApartmentGeometryCollection
 		FTransform Transform = FTransform::Identity;
 		// Pieces that share a slot (a wall panel with its facings, trims and window parts) break off as one body.
 		int32 SlotId = 0;
+		// What the slot is; decides its health in the game.
+		EApartmentPartType PartType = EApartmentPartType::Detail;
+		EApartmentPieceCollision Collision = EApartmentPieceCollision::Solid;
 	};
 
 	/**
-	 * @brief Reads "MeshPath|Material;Material|X,Y,Z|Yaw,Pitch,Roll|SlotId" lines.
+	 * @brief Reads "MeshPath|Material;Material|X,Y,Z|Yaw,Pitch,Roll|SlotId[|PartType[|Collision[|Sx,Sy,Sz]]]" lines.
 	 * @param PiecesFilePath File written by the planner export.
 	 * @param OutPieces Receives one entry per valid line, in file order.
 	 * @return Whether at least one piece was read and no line was malformed.
 	 */
 	bool LoadApartmentPieces(const FString& PiecesFilePath, TArray<FApartmentPiece>& OutPieces)
 	{
-		constexpr int32 FieldCount = 5;
+		constexpr int32 MinimumFieldCount = 5;
+		constexpr int32 PartTypeFieldIndex = 5;
+		constexpr int32 CollisionFieldIndex = 6;
+		constexpr int32 ScaleFieldIndex = 7;
+		constexpr int32 MaximumFieldCount = 8;
 		constexpr int32 VectorComponentCount = 3;
 		TArray<FString> Lines;
 		if (not FFileHelper::LoadFileToStringArray(Lines, *PiecesFilePath))
@@ -361,7 +386,7 @@ namespace RTSApartmentGeometryCollection
 			Line.ParseIntoArray(Fields, TEXT("|"), false);
 			TArray<FString> LocationTokens;
 			TArray<FString> RotationTokens;
-			if (Fields.Num() != FieldCount
+			if (Fields.Num() < MinimumFieldCount || Fields.Num() > MaximumFieldCount
 				|| Fields[2].ParseIntoArray(LocationTokens, TEXT(","), false) != VectorComponentCount
 				|| Fields[3].ParseIntoArray(RotationTokens, TEXT(","), false) != VectorComponentCount)
 			{
@@ -375,6 +400,21 @@ namespace RTSApartmentGeometryCollection
 			const FRotator Rotation(FCString::Atod(*RotationTokens[1]), FCString::Atod(*RotationTokens[0]), FCString::Atod(*RotationTokens[2]));
 			Piece.Transform = FTransform(Rotation, Location);
 			Piece.SlotId = FCString::Atoi(*Fields[4]);
+			if (Fields.IsValidIndex(PartTypeFieldIndex))
+			{
+				Piece.PartType = static_cast<EApartmentPartType>(FCString::Atoi(*Fields[PartTypeFieldIndex]));
+			}
+			if (Fields.IsValidIndex(CollisionFieldIndex))
+			{
+				Piece.Collision = static_cast<EApartmentPieceCollision>(FCString::Atoi(*Fields[CollisionFieldIndex]));
+			}
+			TArray<FString> ScaleTokens;
+			if (Fields.IsValidIndex(ScaleFieldIndex)
+				&& Fields[ScaleFieldIndex].ParseIntoArray(ScaleTokens, TEXT(","), false) == VectorComponentCount)
+			{
+				Piece.Transform.SetScale3D(FVector(FCString::Atod(*ScaleTokens[0]), FCString::Atod(*ScaleTokens[1]),
+				                                   FCString::Atod(*ScaleTokens[2])));
+			}
 			OutPieces.Add(MoveTemp(Piece));
 		}
 		return OutPieces.Num() > 0;
@@ -394,7 +434,15 @@ namespace RTSApartmentGeometryCollection
 			TArray<UMaterialInterface*> Materials;
 			for (const FString& MaterialPath : Piece.MaterialPaths)
 			{
-				Materials.Add(LoadObject<UMaterialInterface>(nullptr, *MaterialPath));
+				UMaterialInterface* Material = LoadObject<UMaterialInterface>(nullptr, *MaterialPath);
+				if (Material == nullptr)
+				{
+					// The instanced renderer asserts on a missing material; the mesh's own is wrong in colour only.
+					UE_LOG(LogRTSApartmentGeometryCollection, Warning, TEXT("Material '%s' not found; using the mesh's own."),
+					       *MaterialPath);
+					Material = Mesh->GetMaterial(Materials.Num());
+				}
+				Materials.Add(Material);
 			}
 			if (not FGeometryCollectionEngineConversion::AppendStaticMesh(
 				Mesh, Materials, Piece.Transform, GeometryCollectionAsset, false, false, false, false))
@@ -423,6 +471,103 @@ namespace RTSApartmentGeometryCollection
 		GeometryCollectionAsset->CustomRendererType = InstancedRendererClass;
 		GeometryCollectionAsset->bStripOnCook = true;
 		GeometryCollectionAsset->bStripRenderDataOnCook = true;
+	}
+
+	/**
+	 * @brief Writes what each transform is into the collection, where the apartment actor reads it back.
+	 * @param Collection Clustered collection whose first transforms are the pieces, in file order.
+	 * @param Pieces The pieces the collection was built from.
+	 */
+	void StoreSlotAttributes(FGeometryCollection& Collection, const TArray<FApartmentPiece>& Pieces)
+	{
+		TManagedArray<int32>& SlotIds = Collection.AddAttribute<int32>(
+			ApartmentCollectionAttributes::SlotId, FGeometryCollection::TransformGroup);
+		TManagedArray<int32>& PartTypes = Collection.AddAttribute<int32>(
+			ApartmentCollectionAttributes::PartType, FGeometryCollection::TransformGroup);
+		SlotIds.Fill(ApartmentCollectionAttributes::NoSlot);
+		PartTypes.Fill(static_cast<int32>(EApartmentPartType::Detail));
+		TArray<int32> RootBones;
+		FGeometryCollectionClusteringUtility::GetRootBones(&Collection, RootBones);
+		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+		{
+			const FApartmentPiece& Piece = Pieces[PieceIndex];
+			SlotIds[PieceIndex] = Piece.SlotId;
+			PartTypes[PieceIndex] = static_cast<int32>(Piece.PartType);
+			// A slot of several pieces has its own cluster; a slot of one piece hangs directly under the root.
+			const int32 ParentIndex = Collection.Parent[PieceIndex];
+			if (ParentIndex != FGeometryCollection::Invalid && not RootBones.Contains(ParentIndex))
+			{
+				SlotIds[ParentIndex] = Piece.SlotId;
+				PartTypes[ParentIndex] = static_cast<int32>(Piece.PartType);
+			}
+		}
+	}
+
+	/**
+	 * @brief Turns the dressing pieces into geometry that only rides along with its slot.
+	 * @param Collection Clustered collection whose first transforms are the pieces, in file order.
+	 * @param Pieces The pieces the collection was built from.
+	 * @return Number of pieces left without collision of their own.
+	 */
+	int32 EmbedDressingPieces(FGeometryCollection& Collection, const TArray<FApartmentPiece>& Pieces)
+	{
+		TArray<int32> RootBones;
+		FGeometryCollectionClusteringUtility::GetRootBones(&Collection, RootBones);
+		int32 EmbeddedCount = 0;
+		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+		{
+			const int32 ParentIndex = Collection.Parent[PieceIndex];
+			// Directly under the root a piece is a slot by itself and has to stay a body.
+			const bool bHasSlotCluster = ParentIndex != FGeometryCollection::Invalid && not RootBones.Contains(ParentIndex);
+			if (Pieces[PieceIndex].Collision != EApartmentPieceCollision::None || not bHasSlotCluster)
+			{
+				continue;
+			}
+			Collection.SimulationType[PieceIndex] = FGeometryCollection::ESimulationTypes::FST_None;
+			++EmbeddedCount;
+		}
+		return EmbeddedCount;
+	}
+
+	/**
+	 * @brief Replaces the single hull of every panel with a window or door by a few hulls around the opening.
+	 * @param Collection Collection whose hulls were already generated.
+	 * @param Pieces The pieces the collection was built from, in transform order.
+	 * @return Number of panels that got hulls around their opening.
+	 */
+	int32 OpenWindowsInCollision(FGeometryCollection& Collection, const TArray<FApartmentPiece>& Pieces)
+	{
+		TArray<int32> PanelsWithOpening;
+		TArray<int32> SlotsWithOpening;
+		TArray<int32> RootBones;
+		FGeometryCollectionClusteringUtility::GetRootBones(&Collection, RootBones);
+		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+		{
+			if (Pieces[PieceIndex].Collision != EApartmentPieceCollision::SolidAroundOpening)
+			{
+				continue;
+			}
+			PanelsWithOpening.Add(PieceIndex);
+			const int32 ParentIndex = Collection.Parent[PieceIndex];
+			if (ParentIndex != FGeometryCollection::Invalid && not RootBones.Contains(ParentIndex))
+			{
+				SlotsWithOpening.AddUnique(ParentIndex);
+			}
+		}
+		if (PanelsWithOpening.IsEmpty())
+		{
+			return 0;
+		}
+		FGeometryCollectionConvexUtility::FLeafConvexHullSettings HullSettings(
+			OpeningHullCornerDistance, EGenerateConvexMethod::ComputedFromGeometry);
+		HullSettings.DecompositionSettings.MaxHullsPerGeometry = MaximumHullsAroundOpening;
+		HullSettings.DecompositionSettings.MaxGeoToHullVolumeRatioToDecompose = AlwaysDecomposeVolumeRatio;
+		constexpr bool bOnlyTheGivenTransforms = true;
+		FGeometryCollectionConvexUtility::GenerateLeafConvexHulls(
+			Collection, bOnlyTheGivenTransforms, PanelsWithOpening, HullSettings);
+		// A hull of its own on the slot would close the opening again; without one the slot collides as its pieces.
+		FGeometryCollectionConvexUtility::RemoveConvexHulls(&Collection, SlotsWithOpening);
+		return PanelsWithOpening.Num();
 	}
 
 	/** @return Whether every optional argument after the two paths was understood. */
@@ -541,6 +686,8 @@ namespace RTSApartmentGeometryCollection
 		{
 			return;
 		}
+		StoreSlotAttributes(*GeometryCollectionAsset->GetGeometryCollection(), Pieces);
+		const int32 EmbeddedPieceCount = EmbedDressingPieces(*GeometryCollectionAsset->GetGeometryCollection(), Pieces);
 		ApplyBuildingSimulationSettings(GeometryCollectionAsset);
 		ApplyCollisionDetail(GeometryCollectionAsset, Options.CollisionDetail);
 		if (Options.bInstancedRendering)
@@ -548,10 +695,14 @@ namespace RTSApartmentGeometryCollection
 			ApplyInstancedRendering(GeometryCollectionAsset);
 		}
 		GeometryCollectionAsset->UpdateGeometryDependentProperties();
+		const int32 OpenedPanelCount = OpenWindowsInCollision(*GeometryCollectionAsset->GetGeometryCollection(), Pieces);
 		GeometryCollectionAsset->InvalidateCollection();
 		GeometryCollectionAsset->RebuildRenderData();
 		GeometryCollectionAsset->MarkPackageDirty();
 		FAssetRegistryModule::AssetCreated(GeometryCollectionAsset);
+		UE_LOG(LogRTSApartmentGeometryCollection, Display,
+		       TEXT("Opened the collision of %d window and door panels; %d dressing pieces ride along without collision."),
+		       OpenedPanelCount, EmbeddedPieceCount);
 		UE_LOG(LogRTSApartmentGeometryCollection, Display, TEXT("Built '%s': %d pieces, %d transforms total."), *Arguments[0],
 		       Pieces.Num(), GeometryCollectionAsset->GetGeometryCollection()->NumElements(FGeometryCollection::TransformGroup));
 	}

@@ -9,6 +9,7 @@
  * @brief Exposes the small set of accuracy, cadence, and budget controls needed to tune infantry cover discovery.
  * Geometry classification details remain internal so maps share one predictable definition of cover.
  */
+class UNavigationQueryFilter;
 class UStaticMesh;
 class UInfantryStressBehaviour;
 
@@ -349,6 +350,25 @@ public:
 			false
 		}
 	};
+
+	// Actors of these classes, and of classes derived from them, keep their own list of named cover sockets
+	// instead of carrying them on a mesh: destructible buildings, which are one geometry collection without
+	// sockets and which take a socket away again when the wall or floor it depends on is destroyed. The socket
+	// names follow the same name parts as below. Soldiers are always placed on these sockets from the nearest
+	// navigation mesh, because the sockets are inside the building.
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Actor Sockets")
+	TArray<TSoftClassPtr<AActor>> M_ActorSocketCoverClasses = {
+		TSoftClassPtr<AActor>(FSoftObjectPath(TEXT(
+			"/Game/DBK_Apartments/Blueprints/BP_ApartmentDestructibleBase.BP_ApartmentDestructibleBase_C")))
+	};
+
+	// The navigation filter of infantry. A soldier takes such a socket from a spot on the street in front of
+	// it; that spot is only accepted when infantry using this filter can walk there from further up the street.
+	// Navigation mesh under the spot is not enough: around a building it may be an area infantry may not enter.
+	UPROPERTY(Config, EditAnywhere, Category="Cover From Actor Sockets")
+	TSoftClassPtr<UNavigationQueryFilter> M_ActorSocketInfantryNavFilter = TSoftClassPtr<UNavigationQueryFilter>(
+		FSoftObjectPath(TEXT(
+			"/Game/RTS_Survival/Blueprints/Nav/Filters/RTS_NavFilter_Characters.RTS_NavFilter_Characters_C")));
 
 	// Parts of a socket name that mark a cover point of each kind; upper and lower case do not matter. When a
 	// name contains more than one of them, the longest wins: "standing_right_2" is a right-peek point although

@@ -38,6 +38,7 @@
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverSocketSource.h"
 #include "RTS_Survival/Scavenging/ScavengerComponent/ScavengerComponent.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -493,7 +494,10 @@ bool ASquadUnit::GetHasLostCoverPoint(const URTSCoverFinderWorldSubsystem& Cover
 	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
 	const bool bCoverObjectIsGone = CoverPoint.BlockingProviderHandle != 0 &&
 		not IsValid(CoverSubsystem.ResolveBlockingProvider(CoverPoint));
-	if (bCoverObjectIsGone || not IsValid(World) || not IsValid(CoverSettings))
+	// A socket its actor took away, such as the window of a wall that fell, is given up as fast as cover whose
+	// object is gone.
+	const bool bCoverWasRevoked = CoverSubsystem.GetWasCoverPointRevoked(CoverPoint.PointId);
+	if (bCoverObjectIsGone || bCoverWasRevoked || not IsValid(World) || not IsValid(CoverSettings))
 	{
 		return true;
 	}
@@ -1511,6 +1515,27 @@ void ASquadUnit::SnapToCoverSocketIfWanted()
 	UnitMovement->StopMovementImmediately();
 	UnitMovement->DisableMovement();
 	M_CoverMoveGuard.bIsSnappedToCoverSocket = true;
+	NotifyCoverSocketSource(true);
+}
+
+void ASquadUnit::NotifyCoverSocketSource(const bool bIsOnSocket)
+{
+	const UWorld* World = GetWorld();
+	const URTSCoverFinderWorldSubsystem* CoverSubsystem = IsValid(World)
+		? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		: nullptr;
+	// Silent: during world teardown there is nobody left to tell.
+	if (not IsValid(CoverSubsystem))
+	{
+		return;
+	}
+	IRTSCoverSocketSource* SocketSource = Cast<IRTSCoverSocketSource>(
+		CoverSubsystem->ResolveBlockingProvider(M_CoverRuntimeState.AssignedCoverPoint));
+	if (SocketSource == nullptr)
+	{
+		return;
+	}
+	SocketSource->OnSoldierCoverSocketChanged(this, bIsOnSocket);
 }
 
 void ASquadUnit::ReturnFromCoverSocket()
@@ -1520,6 +1545,7 @@ void ASquadUnit::ReturnFromCoverSocket()
 		return;
 	}
 	M_CoverMoveGuard.bIsSnappedToCoverSocket = false;
+	NotifyCoverSocketSource(false);
 	const UCapsuleComponent* UnitCapsule = GetCapsuleComponent();
 	UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
 	// A soldier that died on the socket stays where he fell.
@@ -4141,6 +4167,10 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 		QUICK_SCOPE_CYCLE_COUNTER(STAT_SquadUnit_UnitDies_LeaveCoverAndStress);
 		EndStress();
 		// A soldier that dies on a cover socket stays there; leaving cover would put him back on the navmesh.
+		if (M_CoverMoveGuard.bIsSnappedToCoverSocket)
+		{
+			NotifyCoverSocketSource(false);
+		}
 		M_CoverMoveGuard.bIsSnappedToCoverSocket = false;
 		ClearCoverState();
 	}

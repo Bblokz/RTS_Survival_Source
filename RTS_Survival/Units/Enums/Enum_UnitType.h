@@ -15,6 +15,8 @@ enum class EAllUnitType : uint8
 	UNType_BuildingExpansion UMETA(DisplayName = "Building Expansion"),
 	UNType_Aircraft UMETA(DisplayName = "Aircraft"),
 	UNType_StandaloneTurret UMETA(DisplayName = "Standalone Turret"),
+	// A neutral building the player holds only for as long as it has soldiers inside.
+	UNType_GarrisonBuilding UMETA(DisplayName = "Garrison Building"),
 };
 
 UENUM(BlueprintType)
@@ -471,6 +473,8 @@ static FString Global_GetUnitTypeString(const EAllUnitType UnitType)
 		return FString("Aircraft");
 	case EAllUnitType::UNType_StandaloneTurret:
 		return FString("Standalone Turret");
+	case EAllUnitType::UNType_GarrisonBuilding:
+		return FString("Garrison Building");
 	default:
 		return FString("Unknown Unit Type");
 	}

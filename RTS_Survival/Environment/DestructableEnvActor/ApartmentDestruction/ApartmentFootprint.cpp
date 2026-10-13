@@ -2,6 +2,7 @@
 
 #include "ApartmentFootprint.h"
 
+#include "ApartmentCollectionAttributes.h"
 #include "GeometryCollection/GeometryCollection.h"
 #include "GeometryCollection/GeometryCollectionAlgo.h"
 #include "GeometryCollection/GeometryCollectionObject.h"
@@ -34,9 +35,16 @@ namespace ApartmentFootprint
 	{
 		TArray<FTransform> GlobalTransforms;
 		GeometryCollectionAlgo::GlobalMatrices(Collection.Transform, Collection.Parent, GlobalTransforms);
+		// Rubble lies around the building and is no part of its outline.
+		const TManagedArray<int32>* PartTypes = Collection.FindAttribute<int32>(
+			ApartmentCollectionAttributes::PartType, FGeometryCollection::TransformGroup);
 		const auto AddPiece = [&](const FBox& LocalBox, const int32 TransformIndex)
 		{
 			if (not LocalBox.IsValid || not GlobalTransforms.IsValidIndex(TransformIndex))
+			{
+				return;
+			}
+			if (PartTypes != nullptr && (*PartTypes)[TransformIndex] == static_cast<int32>(EApartmentPartType::Rubble))
 			{
 				return;
 			}
@@ -187,10 +195,12 @@ namespace ApartmentFootprint
 	 * @param RingDepthCells How deep the ring reaches into the outline.
 	 * @param OuterOffsetCells How far the ring reaches beyond the outline.
 	 * @param OutCore Cells deeper than the ring, plus the spine of parts too narrow to have any.
-	 * @param OutRing Remaining outline cells plus the offset around the outline.
+	 * @param OutRing Remaining outline cells.
+	 * @param OutBand The offset around the outline.
 	 */
 	void SplitRingAndCore(const FGrid& Grid, const TArray<bool>& Footprint, const int32 RingDepthCells,
-	                      const int32 OuterOffsetCells, TArray<bool>& OutCore, TArray<bool>& OutRing)
+	                      const int32 OuterOffsetCells, TArray<bool>& OutCore, TArray<bool>& OutRing,
+	                      TArray<bool>& OutBand)
 	{
 		TArray<bool> IsOutside;
 		TArray<bool> AllCells;
@@ -211,6 +221,7 @@ namespace ApartmentFootprint
 
 		OutCore.Init(false, Grid.Num());
 		OutRing.Init(false, Grid.Num());
+		OutBand.Init(false, Grid.Num());
 		for (int32 CellY = 0; CellY < Grid.SizeY; ++CellY)
 		{
 			for (int32 CellX = 0; CellX < Grid.SizeX; ++CellX)
@@ -218,7 +229,7 @@ namespace ApartmentFootprint
 				const int32 CellIndex = Grid.Index(CellX, CellY);
 				if (not Footprint[CellIndex])
 				{
-					OutRing[CellIndex] = DistanceFromFootprint[CellIndex] <= OuterOffsetCells;
+					OutBand[CellIndex] = DistanceFromFootprint[CellIndex] <= OuterOffsetCells;
 					continue;
 				}
 				// A part narrower than twice the ring depth has no deep cells; its spine still has to block.
@@ -276,6 +287,34 @@ namespace ApartmentFootprint
 	}
 }
 
+bool FApartmentFootprint::TryGetPieceBounds(const FGeometryCollection& Collection, const int32 TransformIndex,
+                                            const TArray<FTransform>& GlobalTransforms, FBox& OutBounds)
+{
+	if (not GlobalTransforms.IsValidIndex(TransformIndex))
+	{
+		return false;
+	}
+	FBox LocalBounds(ForceInit);
+	const int32 GeometryIndex = Collection.TransformToGeometryIndex.IsValidIndex(TransformIndex)
+		                            ? Collection.TransformToGeometryIndex[TransformIndex]
+		                            : INDEX_NONE;
+	if (Collection.BoundingBox.IsValidIndex(GeometryIndex))
+	{
+		LocalBounds = Collection.BoundingBox[GeometryIndex];
+	}
+	else if (const TManagedArray<FBox>* StrippedBounds = Collection.FindAttribute<FBox>(
+		ApartmentFootprint::StrippedBoundsAttribute, FGeometryCollection::TransformGroup))
+	{
+		LocalBounds = (*StrippedBounds)[TransformIndex];
+	}
+	if (not LocalBounds.IsValid)
+	{
+		return false;
+	}
+	OutBounds = LocalBounds.TransformBy(GlobalTransforms[TransformIndex]);
+	return true;
+}
+
 bool FApartmentFootprint::BuildAreas(const UGeometryCollection& Collection,
                                      const FApartmentFootprintSettings& Settings,
                                      FApartmentFootprintAreas& OutAreas)
@@ -314,18 +353,19 @@ bool FApartmentFootprint::BuildAreas(const UGeometryCollection& Collection,
 	TArray<bool> Footprint;
 	TArray<bool> Core;
 	TArray<bool> Ring;
+	TArray<bool> Band;
 	MarkPieces(Grid, PieceRectangles, Occupied);
 	FillFootprint(Grid, Occupied, Footprint);
-	SplitRingAndCore(Grid, Footprint, RingDepthCells, OuterOffsetCells, Core, Ring);
+	SplitRingAndCore(Grid, Footprint, RingDepthCells, OuterOffsetCells, Core, Ring, Band);
 	MergeCellsIntoBoxes(Grid, Core, OutAreas.InnerCoreBoxes);
-	MergeCellsIntoBoxes(Grid, Ring, OutAreas.OuterRingBoxes);
-	for (const FBox2D& RingBox : OutAreas.OuterRingBoxes)
+	MergeCellsIntoBoxes(Grid, Ring, OutAreas.InnerRingBoxes);
+	MergeCellsIntoBoxes(Grid, Band, OutAreas.OuterBandBoxes);
+	for (const TArray<FBox2D>* AreaBoxes : {&OutAreas.OuterBandBoxes, &OutAreas.InnerRingBoxes, &OutAreas.InnerCoreBoxes})
 	{
-		OutAreas.TotalBounds += RingBox;
-	}
-	for (const FBox2D& CoreBox : OutAreas.InnerCoreBoxes)
-	{
-		OutAreas.TotalBounds += CoreBox;
+		for (const FBox2D& AreaBox : *AreaBoxes)
+		{
+			OutAreas.TotalBounds += AreaBox;
+		}
 	}
 	return true;
 }

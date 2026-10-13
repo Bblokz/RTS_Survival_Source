@@ -15,10 +15,17 @@
 #include "Misc/Paths.h"
 #include "Physics/Experimental/ChaosEventType.h"
 #include "Engine/DamageEvents.h"
+#include "EngineUtils.h"
+#include "NavFilters/NavigationQueryFilter.h"
 #include "NavigationSystem.h"
 #include "NavMesh/RecastNavMesh.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/ApartmentDestruction/ApartmentDestructibleActor.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/ApartmentDestruction/ApartmentFootprintNavModifier.h"
+#include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
@@ -35,6 +42,26 @@ namespace ApartmentDestructionTest
 	const TCHAR* const DirectSwitch = TEXT("ApartmentGcDirect");
 	const TCHAR* const GameplayActorSwitch = TEXT("ApartmentGcGameplayActor");
 	const TCHAR* const CrushSwitch = TEXT("ApartmentGcCrush");
+	const TCHAR* const ActorClassSwitch = TEXT("ApartmentGcActorClass=");
+	const TCHAR* const CoverReachSwitch = TEXT("ApartmentCoverReach");
+	const TCHAR* const GarrisonExitSwitch = TEXT("ApartmentGarrisonExit");
+	constexpr float GarrisonEnterTimeoutSeconds = 120.f;
+	// Card slot the garrison actor puts Exit Cargo in.
+	constexpr int32 GarrisonExitCargoButtonIndex = 0;
+	constexpr float GarrisonLeaveTimeoutSeconds = 30.f;
+	constexpr float CoverReachWaitSeconds = 25.f;
+	// Where the infantry path to a socket starts: out on the street in front of it.
+	constexpr double CoverReachStartDistances[] = {1500.0, 2500.0, 900.0};
+	const FVector CoverReachStartExtent(400.0, 400.0, 400.0);
+	const FVector CoverApproachProjectExtent(120.0, 120.0, 250.0);
+	const TCHAR* const InfantryNavFilterPath = TEXT(
+		"/Game/RTS_Survival/Blueprints/Nav/Filters/RTS_NavFilter_Characters.RTS_NavFilter_Characters_C");
+	const FName InfantryNavAgentName(TEXT("Character"));
+	// Where a soldier's muzzle is when he fires from a window, and a height that must stay behind the sill.
+	constexpr double CoverFiringHeight = 155.0;
+	constexpr double CoverSillProbeHeight = 60.0;
+	constexpr double CoverLaneLength = 260.0;
+	constexpr float CoverCountRadius = 3000.f;
 	// Roughly a heavy tank.
 	const FVector CrushBoxHalfExtent(350.0, 180.0, 150.0);
 	constexpr double CrushStartOffsetEast = 1500.0;
@@ -122,6 +149,16 @@ void UApartmentDestructionTestSubsystem::Tick(float DeltaTime)
 	{
 		bM_HasLoggedFirstTick = true;
 		UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GC FIRST_TICK world=%s"), *World->GetName());
+	}
+	if (FParse::Param(FCommandLine::Get(), ApartmentDestructionTest::CoverReachSwitch))
+	{
+		Tick_CoverReach(*World);
+		return;
+	}
+	if (FParse::Param(FCommandLine::Get(), ApartmentDestructionTest::GarrisonExitSwitch))
+	{
+		Tick_GarrisonExit(*World);
+		return;
 	}
 	if (not Tick_UnpauseAndSpawn(*World))
 	{
@@ -276,15 +313,29 @@ void UApartmentDestructionTestSubsystem::SpawnGameplayActor(UWorld& World)
 		GEngine->Exec(&World, TEXT("ShowFlag.PostProcessMaterial 0"));
 	}
 	const FTransform SpawnTransform(FRotator::ZeroRotator, SiteCentre);
-	M_GameplayActor = World.SpawnActorDeferred<AApartmentDestructibleActor>(
-		AApartmentDestructibleActor::StaticClass(), SpawnTransform);
+	// A Blueprint of one building brings its own collection, cover sockets and part health.
+	FString ActorClassPath;
+	UClass* ActorClass = AApartmentDestructibleActor::StaticClass();
+	if (FParse::Value(FCommandLine::Get(), ActorClassSwitch, ActorClassPath))
+	{
+		ActorClass = LoadClass<AApartmentDestructibleActor>(nullptr, *ActorClassPath);
+	}
+	if (ActorClass == nullptr)
+	{
+		UE_LOG(LogRTSApartmentGcTest, Error, TEXT("RTS_APARTMENT_GC could not load actor class %s"), *ActorClassPath);
+		return;
+	}
+	M_GameplayActor = World.SpawnActorDeferred<AApartmentDestructibleActor>(ActorClass, SpawnTransform);
 	if (not IsValid(M_GameplayActor))
 	{
 		return;
 	}
 	// A placed actor has its collection assigned in the editor; here it has to be in before BeginPlay runs.
 	UGeometryCollectionComponent* GeometryComponent = GetTestedGeometryComponent();
-	GeometryComponent->SetRestCollection(Collection);
+	if (ActorClassPath.IsEmpty())
+	{
+		GeometryComponent->SetRestCollection(Collection);
+	}
 	GeometryComponent->SetNotifyBreaks(true);
 	GeometryComponent->OnChaosBreakEvent.AddDynamic(this, &UApartmentDestructionTestSubsystem::OnChaosBreak);
 	M_GameplayActor->FinishSpawning(SpawnTransform);
@@ -478,6 +529,7 @@ void UApartmentDestructionTestSubsystem::AdvanceScript(UWorld& World)
 	RequestScreenshot(FinishedLabel);
 	if (bM_UseGameplayActor)
 	{
+		ReportCover(World, FinishedLabel);
 		LogNavAreaProfile(World, FinishedLabel);
 	}
 
@@ -548,6 +600,214 @@ void UApartmentDestructionTestSubsystem::FireImpactDirect(const FApartmentDestru
 	GeometryComponent->ApplyBreakingLinearVelocity(Hit.Item, ShotDirection * BreakingPieceSpeed);
 	UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GC TRACE_HIT label=%s item=%d at=%s"), *Impact.Label,
 	       Hit.Item, *Hit.ImpactPoint.ToCompactString());
+}
+
+void UApartmentDestructionTestSubsystem::FinishGarrisonExit(UWorld& World, const bool bPassed, const FString& Details)
+{
+	bM_IsFinished = true;
+	UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GARRISON RESULT %s %s"),
+	       bPassed ? TEXT("PASS") : TEXT("FAIL"), *Details);
+	GEngine->Exec(&World, TEXT("quit"));
+}
+
+void UApartmentDestructionTestSubsystem::Tick_GarrisonExit(UWorld& World)
+{
+	using namespace ApartmentDestructionTest;
+	const float Now = World.GetTimeSeconds();
+	if (M_GarrisonDeadlineSeconds <= 0.f)
+	{
+		M_GarrisonDeadlineSeconds = Now + GarrisonEnterTimeoutSeconds;
+	}
+	if (M_GarrisonApartment.IsValid())
+	{
+		// Ordered out: everyone has to leave and the building is the player's no longer.
+		const int32 StillInside = M_GarrisonApartment->GetGarrisonedSoldierCount();
+		const bool bSelectableGone = not IsValid(M_GarrisonApartment->GetSelectionProxyActor());
+		if (StillInside == 0 && bSelectableGone)
+		{
+			FinishGarrisonExit(World, true, FString::Printf(TEXT("soldiers_out=%d"), M_GarrisonSoldiersAtOrder));
+			return;
+		}
+		if (Now > M_GarrisonDeadlineSeconds)
+		{
+			FinishGarrisonExit(World, false, FString::Printf(
+				TEXT("still_inside=%d selectable_gone=%d"), StillInside, bSelectableGone ? 1 : 0));
+		}
+		return;
+	}
+	for (TActorIterator<AApartmentDestructibleActor> ApartmentIterator(&World); ApartmentIterator; ++ApartmentIterator)
+	{
+		AApartmentDestructibleActor* Apartment = *ApartmentIterator;
+		ASelectableActorObjectsMaster* Selectable = Cast<ASelectableActorObjectsMaster>(
+			Apartment->GetSelectionProxyActor());
+		if (Apartment->GetGarrisonedSoldierCount() == 0 || not IsValid(Selectable))
+		{
+			continue;
+		}
+		const URTSComponent* SelectableRTSComponent = Selectable->GetRTSComponent();
+		const USelectionComponent* SelectionComponent = Selectable->GetSelectionComponent();
+		const bool bHasExitCargo = Selectable->HasAbility(EAbilityID::IdExitCargo);
+		UE_LOG(LogRTSApartmentGcTest, Display,
+		       TEXT("RTS_APARTMENT_GARRISON ENTERED apartment=%s soldiers=%d owner=%d selectable=%d exit_cargo_on_card=%d"),
+		       *Apartment->GetActorNameOrLabel(), Apartment->GetGarrisonedSoldierCount(),
+		       IsValid(SelectableRTSComponent) ? SelectableRTSComponent->GetOwningPlayer() : -1,
+		       IsValid(SelectionComponent) && SelectionComponent->GetCanBeSelected() ? 1 : 0, bHasExitCargo ? 1 : 0);
+		M_GarrisonSoldiersAtOrder = Apartment->GetGarrisonedSoldierCount();
+		// The same path as a click on the building followed by the first button of the command card.
+		ACPPController* PlayerController = Cast<ACPPController>(World.GetFirstPlayerController());
+		if (not IsValid(PlayerController) || not bHasExitCargo)
+		{
+			FinishGarrisonExit(World, false, TEXT("no player controller or no exit cargo on the card"));
+			return;
+		}
+		AActor* ClickedActor = Apartment;
+		PlayerController->ChangeClickedActorIfHasSelectionProxy(ClickedActor);
+		const bool bClickSelectsGarrison = ClickedActor == Selectable && PlayerController->GetIsClickedUnitSelectable(ClickedActor);
+		PlayerController->UpdateUIForSelectionAction(PlayerController->ClickUnit_GetSelectionAction(ClickedActor), ClickedActor);
+		const bool bIsSelected = PlayerController->TSelectedActorsMasters.Contains(Selectable) && SelectionComponent->GetIsSelected();
+		PlayerController->ActivateActionButton(GarrisonExitCargoButtonIndex);
+		UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_GARRISON CLICK redirects=%d selected=%d"),
+		       bClickSelectsGarrison ? 1 : 0, bIsSelected ? 1 : 0);
+		if (not bClickSelectsGarrison || not bIsSelected)
+		{
+			FinishGarrisonExit(World, false, TEXT("a click on the apartment did not select its garrison"));
+			return;
+		}
+		M_GarrisonApartment = Apartment;
+		M_GarrisonDeadlineSeconds = Now + GarrisonLeaveTimeoutSeconds;
+		return;
+	}
+	if (Now > M_GarrisonDeadlineSeconds)
+	{
+		FinishGarrisonExit(World, false, TEXT("no player soldier took an apartment socket"));
+	}
+}
+
+void UApartmentDestructionTestSubsystem::Tick_CoverReach(UWorld& World)
+{
+	using namespace ApartmentDestructionTest;
+	M_CoverReachWaitSeconds += FApp::GetDeltaTime();
+	if (M_CoverReachWaitSeconds < CoverReachWaitSeconds)
+	{
+		return;
+	}
+	bM_IsFinished = true;
+	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(&World);
+	const ANavigationData* InfantryNavData = nullptr;
+	if (IsValid(NavigationSystem))
+	{
+		for (const ANavigationData* NavData : NavigationSystem->NavDataSet)
+		{
+			if (IsValid(NavData) && NavData->GetConfig().Name == InfantryNavAgentName)
+			{
+				InfantryNavData = NavData;
+			}
+		}
+	}
+	const TSubclassOf<UNavigationQueryFilter> FilterClass = LoadClass<UNavigationQueryFilter>(nullptr, InfantryNavFilterPath);
+	if (not IsValid(InfantryNavData) || FilterClass == nullptr)
+	{
+		UE_LOG(LogRTSApartmentGcTest, Error, TEXT("RTS_APARTMENT_REACH no infantry navigation data or filter"));
+		GEngine->Exec(&World, TEXT("quit"));
+		return;
+	}
+	const FSharedConstNavQueryFilter QueryFilter = UNavigationQueryFilter::GetQueryFilter(*InfantryNavData, &World, FilterClass);
+	int32 TotalSockets = 0;
+	int32 TotalOnNavigation = 0;
+	int32 TotalReachable = 0;
+	const URTSCoverFinderWorldSubsystem* CoverSubsystem = World.GetSubsystem<URTSCoverFinderWorldSubsystem>();
+	for (TActorIterator<AApartmentDestructibleActor> ApartmentIterator(&World); ApartmentIterator; ++ApartmentIterator)
+	{
+		const AApartmentDestructibleActor* Apartment = *ApartmentIterator;
+		// What the cover finder offers for this building, checked with a path query of this test's own.
+		int32 Published = 0;
+		int32 Reachable = 0;
+		for (const FRTSCoverPoint& CoverPoint : CoverSubsystem->FindCoverPointsInRadius(Apartment->GetActorLocation(), CoverCountRadius))
+		{
+			if (not CoverPoint.bSnapSoldierToSocket || CoverSubsystem->ResolveBlockingProvider(CoverPoint) != Apartment)
+			{
+				continue;
+			}
+			++Published;
+			bool bReached = false;
+			for (const double StartDistance : CoverReachStartDistances)
+			{
+				FNavLocation Start;
+				// The normal points from the cover to the soldier; the street is the other way.
+				if (not NavigationSystem->ProjectPointToNavigation(CoverPoint.Location - CoverPoint.CoverNormal * StartDistance, Start, CoverReachStartExtent, InfantryNavData, QueryFilter))
+				{
+					continue;
+				}
+				const FPathFindingQuery Query(nullptr, *InfantryNavData, Start.Location, CoverPoint.Location, QueryFilter);
+				const FPathFindingResult Result = NavigationSystem->FindPathSync(Query);
+				if (Result.IsSuccessful() && Result.Path.IsValid() && not Result.Path->IsPartial())
+				{
+					bReached = true;
+					break;
+				}
+			}
+			Reachable += bReached ? 1 : 0;
+		}
+		const int32 SocketCount = Apartment->GetUsableCoverSocketCount();
+		TotalSockets += SocketCount;
+		TotalOnNavigation += Published;
+		TotalReachable += Reachable;
+		if (Published != SocketCount || Reachable != Published)
+		{
+			UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_REACH actor=%s sockets=%d published=%d reachable=%d"),
+			       *Apartment->GetActorNameOrLabel(), SocketCount, Published, Reachable);
+		}
+	}
+	UE_LOG(LogRTSApartmentGcTest, Display, TEXT("RTS_APARTMENT_REACH TOTAL sockets=%d published=%d reachable=%d"),
+	       TotalSockets, TotalOnNavigation, TotalReachable);
+	GEngine->Exec(&World, TEXT("quit"));
+}
+
+void UApartmentDestructionTestSubsystem::ReportCover(UWorld& World, const FString& Label) const
+{
+	using namespace ApartmentDestructionTest;
+	if (not IsValid(M_GameplayActor))
+	{
+		return;
+	}
+	TArray<FRTSActorCoverSocket> UsableSockets;
+	M_GameplayActor->GetUsableCoverSockets(UsableSockets);
+	int32 OpenFiringLaneCount = 0;
+	int32 SolidSillCount = 0;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ApartmentGcCoverTest), true);
+	for (const FRTSActorCoverSocket& Socket : UsableSockets)
+	{
+		const FVector Forward = Socket.WorldTransform.GetRotation().GetForwardVector();
+		const FVector Feet = Socket.WorldTransform.GetLocation();
+		FHitResult FiringHit;
+		const FVector Muzzle = Feet + FVector::UpVector * CoverFiringHeight;
+		World.LineTraceSingleByChannel(FiringHit, Muzzle, Muzzle + Forward * CoverLaneLength, COLLISION_TRACE_ENEMY, QueryParams);
+		OpenFiringLaneCount += FiringHit.GetActor() == M_GameplayActor ? 0 : 1;
+		FHitResult SillHit;
+		const FVector Knee = Feet + FVector::UpVector * CoverSillProbeHeight;
+		World.LineTraceSingleByChannel(SillHit, Knee, Knee + Forward * CoverLaneLength, COLLISION_TRACE_ENEMY, QueryParams);
+		SolidSillCount += SillHit.GetActor() == M_GameplayActor ? 1 : 0;
+	}
+	int32 PublishedSnapPointCount = 0;
+	int32 PublishedTrenchCount = 0;
+	int32 PublishedCrouchCount = 0;
+	if (const URTSCoverFinderWorldSubsystem* CoverSubsystem = World.GetSubsystem<URTSCoverFinderWorldSubsystem>())
+	{
+		for (const FRTSCoverPoint& CoverPoint : CoverSubsystem->FindCoverPointsInRadius(SiteCentre, CoverCountRadius))
+		{
+			if (not CoverPoint.bSnapSoldierToSocket || CoverSubsystem->ResolveBlockingProvider(CoverPoint) != M_GameplayActor)
+			{
+				continue;
+			}
+			++PublishedSnapPointCount;
+			PublishedTrenchCount += CoverPoint.CoverType == ERTSCoverType::TrenchStandUp ? 1 : 0;
+			PublishedCrouchCount += CoverPoint.CoverType == ERTSCoverType::Crouch ? 1 : 0;
+		}
+	}
+	UE_LOG(LogRTSApartmentGcTest, Display,
+	       TEXT("RTS_APARTMENT_GC COVER after=%s standing_parts=%d usable_sockets=%d published_points=%d trench=%d crouch=%d open_firing_lanes=%d solid_sills=%d"),
+	       *Label, M_GameplayActor->GetStandingPartCount(), UsableSockets.Num(), PublishedSnapPointCount,
+	       PublishedTrenchCount, PublishedCrouchCount, OpenFiringLaneCount, SolidSillCount);
 }
 
 void UApartmentDestructionTestSubsystem::ReportWindow(const UWorld& World, const FString& Label)

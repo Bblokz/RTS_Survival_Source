@@ -16,6 +16,7 @@
 
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/Turret/StandaloneTurret/StandaloneTurret.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
@@ -491,6 +492,15 @@ bool UActionUIManager::SetupWeaponUIForSelectedActor(AActor* SelectedActor)
 	{
 		Weapons = BuildingExpansion->GetAllWeapons();
 		return PropagateWeaponDataToUI(Weapons);
+	}
+	const URTSComponent* SelectedRTSComponent = SelectedActor->FindComponentByClass<URTSComponent>();
+	if (IsValid(SelectedRTSComponent) && SelectedRTSComponent->GetUnitType() == EAllUnitType::UNType_GarrisonBuilding)
+	{
+		// A building the player holds with soldiers inside has no weapons of its own.
+		SetWeaponUIVisibility(false);
+		SetAmmoPickerVisiblity(false);
+		SetAmmoDescriptionWidgetVisibility(false, EWeaponShellType::Shell_None);
+		return false;
 	}
 	RTSFunctionLibrary::ReportError(
 		"Selected actor is not an aircraft, tank, standalone turret, squad controller, or bxp."

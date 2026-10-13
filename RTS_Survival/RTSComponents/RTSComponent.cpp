@@ -92,6 +92,9 @@ FString URTSComponent::GetDisplayName(bool& bOutIsValidString) const
 		bOutIsValidString = true;
 		return StaticEnum<EStandaloneTurretSubtype>()->GetDisplayNameTextByValue(
 			static_cast<int64>(GetSubtypeAsStandaloneTurretSubtype())).ToString();
+	case EAllUnitType::UNType_GarrisonBuilding:
+		bOutIsValidString = true;
+		return "Apartment Building";
 	}
 	bOutIsValidString = false;
 	return "None";

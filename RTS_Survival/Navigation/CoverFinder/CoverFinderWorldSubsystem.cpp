@@ -21,11 +21,13 @@
 #include "Misc/Paths.h"
 #include "NavMesh/RecastNavMesh.h"
 #include "NavigationData.h"
+#include "NavFilters/NavigationQueryFilter.h"
 #include "NavigationSystem.h"
 #include "PhysicsEngine/BodyInstance.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverSocketSource.h"
 #include "RTS_Survival/Navigation/RTSNavAgentRegistery/RTSNavAgentRegistery.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/ERTSNavAgents.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -126,6 +128,31 @@ namespace CoverFinderWorldSubsystemPrivate
 	const FColor ProneCoverColor(160, 60, 220);
 	// How far a trench socket may sit from the navmesh and still be moved onto it.
 	const FVector CoverSocketProjectionExtent(120.0f, 120.0f, 250.0f);
+
+	// How long a revoked point is remembered; longer than any soldier takes to notice.
+	constexpr float RevokedCoverPointMemorySeconds = 30.0f;
+
+	// How long to wait before reading an actor's sockets again when some could not be placed, and how often.
+	constexpr float ActorSocketCoverRetrySeconds = 3.0f;
+	constexpr int32 MaximumActorSocketCoverRetries = 5;
+
+	// The walk-to spot of an actor socket: tried where the actor says, then further out from the wall.
+	constexpr float ActorSocketApproachExtraDistances[] = {0.0f, 90.0f, 180.0f, 300.0f};
+	const FVector ActorSocketApproachProjectionExtent(80.0f, 80.0f, 250.0f);
+	// Where the street is looked for in front of that spot, to prove infantry can walk to it.
+	constexpr float ActorSocketStreetDistances[] = {900.0f, 1500.0f, 2500.0f};
+	const FVector ActorSocketStreetProjectionExtent(400.0f, 400.0f, 400.0f);
+
+	FCoverSocketNameParts BuildCoverSocketNameParts(const URTSCoverFinderDeveloperSettings& CoverSettings)
+	{
+		FCoverSocketNameParts NameParts;
+		NameParts.Trench = CoverSettings.M_TrenchCoverSocketNamePart;
+		NameParts.Crouch = CoverSettings.M_CrouchCoverSocketNamePart;
+		NameParts.StandingLeft = CoverSettings.M_StandingLeftCoverSocketNamePart;
+		NameParts.StandingRight = CoverSettings.M_StandingRightCoverSocketNamePart;
+		NameParts.Prone = CoverSettings.M_ProneCoverSocketNamePart;
+		return NameParts;
+	}
 
 	// A cover socket may sit a little above the ground it belongs to, but navmesh further below it than this
 	// belongs to something else.
@@ -836,6 +863,7 @@ void URTSCoverFinderWorldSubsystem::RegisterSocketCoverOnce()
 			}
 		}
 	}
+	RegisterActorSocketCover(RegisteredActors);
 	M_SocketCoverActorCount = RegisteredActors.Num();
 	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
 	{
@@ -952,6 +980,260 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildSocketCoverPoints(
 		}
 	}
 	return SocketPoints;
+}
+
+void URTSCoverFinderWorldSubsystem::RegisterActorSocketCover(TSet<const AActor*>& InOutRegisteredActors)
+{
+	UWorld* World = GetWorld();
+	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
+	if (not IsValid(World) || not IsValid(CoverSettings))
+	{
+		return;
+	}
+	for (const TSoftClassPtr<AActor>& SoftActorClass : CoverSettings->M_ActorSocketCoverClasses)
+	{
+		UClass* CoverActorClass = SoftActorClass.LoadSynchronous();
+		if (not IsValid(CoverActorClass))
+		{
+			RTSFunctionLibrary::ReportError(
+				"Cover finder: actor socket cover class " + SoftActorClass.ToString() +
+				" set in the cover settings could not be loaded.");
+			continue;
+		}
+		for (TActorIterator<AActor> CoverActorIterator(World, CoverActorClass); CoverActorIterator; ++CoverActorIterator)
+		{
+			AActor* CoverActor = *CoverActorIterator;
+			if (not IsValid(CoverActor) || InOutRegisteredActors.Contains(CoverActor))
+			{
+				continue;
+			}
+			InOutRegisteredActors.Add(CoverActor);
+			RefreshCoverSocketsOfActor(CoverActor);
+		}
+	}
+}
+
+TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildActorSocketCoverPoints(
+	const AActor& CoverActor,
+	const TArray<FRTSActorCoverSocket>& CoverSockets,
+	int32& OutOffNavigationCount) const
+{
+	OutOffNavigationCount = 0;
+	TArray<FRTSCoverPoint> SocketPoints;
+	const URTSCoverFinderDeveloperSettings* CoverSettings = GetCoverFinderSettings();
+	const UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
+	const ANavigationData* NavigationData = GetCharacterNavigationData();
+	if (not IsValid(CoverSettings) || not IsValid(NavigationSystem) || not IsValid(NavigationData))
+	{
+		return SocketPoints;
+	}
+	const FCoverSocketNameParts NameParts = CoverFinderWorldSubsystemPrivate::BuildCoverSocketNameParts(*CoverSettings);
+	const TSubclassOf<UNavigationQueryFilter> InfantryFilterClass = CoverSettings->M_ActorSocketInfantryNavFilter.LoadSynchronous();
+	const FSharedConstNavQueryFilter InfantryFilter = InfantryFilterClass != nullptr
+		? UNavigationQueryFilter::GetQueryFilter(*NavigationData, GetWorld(), InfantryFilterClass)
+		: FSharedConstNavQueryFilter();
+	int32& OffNavigationCount = OutOffNavigationCount;
+	for (const FRTSActorCoverSocket& CoverSocket : CoverSockets)
+	{
+		ERTSCoverType SocketCoverType = ERTSCoverType::Crouch;
+		if (not FCoverFinderAlgorithms::TryGetSocketCoverType(CoverSocket.SocketName.ToString(), NameParts, SocketCoverType))
+		{
+			continue;
+		}
+		// The soldier walks to the approach location and is placed on the socket from there, so only the
+		// approach location has to be on the navigation mesh.
+		FVector WalkableApproachLocation = FVector::ZeroVector;
+		if (not TryFindWalkableApproach(CoverSocket, *NavigationData, InfantryFilter, WalkableApproachLocation))
+		{
+			++OffNavigationCount;
+			continue;
+		}
+		const FVector FacingDirection = CoverSocket.WorldTransform.GetRotation().GetForwardVector().GetSafeNormal2D();
+		FRTSCoverPoint& SocketPoint = SocketPoints.AddDefaulted_GetRef();
+		SocketPoint.CoverType = SocketCoverType;
+		// The normal points from the cover to the soldier, so it is the opposite of where he looks.
+		SocketPoint.CoverNormal = FacingDirection.IsNearlyZero() ? FVector::ForwardVector : -FacingDirection;
+		SocketPoint.Location = WalkableApproachLocation;
+		SocketPoint.SnapLocation = CoverSocket.WorldTransform.GetLocation();
+		SocketPoint.bSnapSoldierToSocket = true;
+	}
+	if constexpr (DeveloperSettings::Debugging::GCoverFinder_Compile_DebugSymbols)
+	{
+		UE_LOG(
+			LogRTSCoverFinder,
+			Display,
+			TEXT("RTS_COVER_ACTOR_SOCKETS actor=%s usable_sockets=%d cover_points=%d approach_off_navigation=%d"),
+			*CoverActor.GetName(),
+			CoverSockets.Num(),
+			SocketPoints.Num(),
+			OffNavigationCount);
+	}
+	return SocketPoints;
+}
+
+bool URTSCoverFinderWorldSubsystem::TryFindWalkableApproach(
+	const FRTSActorCoverSocket& CoverSocket,
+	const ANavigationData& NavigationData,
+	const FSharedConstNavQueryFilter& InfantryFilter,
+	FVector& OutApproachLocation) const
+{
+	using namespace CoverFinderWorldSubsystemPrivate;
+	UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
+	if (not IsValid(NavigationSystem))
+	{
+		return false;
+	}
+	const FVector Facing = CoverSocket.WorldTransform.GetRotation().GetForwardVector().GetSafeNormal2D();
+	for (const float ExtraDistance : ActorSocketApproachExtraDistances)
+	{
+		FNavLocation Approach;
+		if (not NavigationSystem->ProjectPointToNavigation(
+			CoverSocket.ApproachLocation + Facing * ExtraDistance,
+			Approach,
+			ActorSocketApproachProjectionExtent,
+			&NavigationData,
+			InfantryFilter))
+		{
+			continue;
+		}
+		// Reachable means: a complete path leads here from somewhere further up the street.
+		for (const float StreetDistance : ActorSocketStreetDistances)
+		{
+			FNavLocation Street;
+			if (not NavigationSystem->ProjectPointToNavigation(
+				Approach.Location + Facing * StreetDistance,
+				Street,
+				ActorSocketStreetProjectionExtent,
+				&NavigationData,
+				InfantryFilter))
+			{
+				continue;
+			}
+			const FPathFindingQuery Query(nullptr, NavigationData, Street.Location, Approach.Location, InfantryFilter);
+			const FPathFindingResult PathResult = NavigationSystem->FindPathSync(Query);
+			if (PathResult.IsSuccessful() && PathResult.Path.IsValid() && not PathResult.Path->IsPartial())
+			{
+				OutApproachLocation = Approach.Location;
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+TSet<int64> URTSCoverFinderWorldSubsystem::CollectPublishedPointIds(const uint64 RegistrationId) const
+{
+	TSet<int64> PointIds;
+	if (RegistrationId == 0)
+	{
+		return PointIds;
+	}
+	for (const FRTSCoverPoint& PublishedPoint : M_CoverPoints)
+	{
+		if (PublishedPoint.ProviderRegistrationId == RegistrationId)
+		{
+			PointIds.Add(PublishedPoint.PointId);
+		}
+	}
+	return PointIds;
+}
+
+void URTSCoverFinderWorldSubsystem::RefreshCoverSocketsOfActor(AActor* CoverActor)
+{
+	const IRTSCoverSocketSource* CoverSocketSource = Cast<IRTSCoverSocketSource>(CoverActor);
+	const UWorld* World = GetWorld();
+	// Before the map start registration there is no navigation data to place the sockets with; that
+	// registration reads every listed actor itself.
+	if (CoverSocketSource == nullptr || not IsValid(World) || not bM_HasRegisteredSocketCover)
+	{
+		return;
+	}
+	uint64 PreviousRegistrationId = 0;
+	for (const TPair<uint64, TWeakObjectPtr<AActor>>& SocketCoverProvider : M_SocketCoverProviders)
+	{
+		if (SocketCoverProvider.Value.Get() == CoverActor)
+		{
+			PreviousRegistrationId = SocketCoverProvider.Key;
+			break;
+		}
+	}
+	const TSet<int64> PreviouslyPublishedPointIds = CollectPublishedPointIds(PreviousRegistrationId);
+	if (PreviousRegistrationId != 0)
+	{
+		M_SocketCoverProviders.Remove(PreviousRegistrationId);
+		M_AuthoredCoverProviders.Remove(PreviousRegistrationId);
+	}
+	TArray<FRTSActorCoverSocket> CoverSockets;
+	CoverSocketSource->GetUsableCoverSockets(CoverSockets);
+	int32 OffNavigationCount = 0;
+	const uint64 RegistrationId = RegisterAuthoredCoverProvider(
+		CoverActor, BuildActorSocketCoverPoints(*CoverActor, CoverSockets, OffNavigationCount));
+	if (OffNavigationCount > 0)
+	{
+		FActorSocketCoverRetry& Retry = M_ActorSocketCoverRetries.FindOrAdd(CoverActor);
+		Retry.NextAttemptWorldSeconds =
+			World->GetTimeSeconds() + CoverFinderWorldSubsystemPrivate::ActorSocketCoverRetrySeconds;
+	}
+	else
+	{
+		M_ActorSocketCoverRetries.Remove(CoverActor);
+	}
+	if (RegistrationId != 0)
+	{
+		M_SocketCoverProviders.Add(RegistrationId, CoverActor);
+	}
+	else
+	{
+		// Registering nothing does not republish, and the previous points still have to go.
+		RebuildPublishedCoverPoints();
+		DrawPublishedCover();
+	}
+	const float RememberUntilWorldSeconds =
+		World->GetTimeSeconds() + CoverFinderWorldSubsystemPrivate::RevokedCoverPointMemorySeconds;
+	for (const int64 PreviousPointId : PreviouslyPublishedPointIds)
+	{
+		if (not GetIsCoverPointPublished(PreviousPointId))
+		{
+			M_RevokedCoverPointExpiry.Add(PreviousPointId, RememberUntilWorldSeconds);
+		}
+	}
+}
+
+void URTSCoverFinderWorldSubsystem::RetryActorSocketCover()
+{
+	const UWorld* World = GetWorld();
+	if (M_ActorSocketCoverRetries.IsEmpty() || not IsValid(World))
+	{
+		return;
+	}
+	const float WorldSeconds = World->GetTimeSeconds();
+	TArray<AActor*, TInlineAllocator<8>> ActorsToRead;
+	for (auto RetryIterator = M_ActorSocketCoverRetries.CreateIterator(); RetryIterator; ++RetryIterator)
+	{
+		AActor* CoverActor = RetryIterator.Key().Get();
+		const bool bGaveUp = RetryIterator.Value().AttemptCount >=
+			CoverFinderWorldSubsystemPrivate::MaximumActorSocketCoverRetries;
+		if (not IsValid(CoverActor) || bGaveUp)
+		{
+			RetryIterator.RemoveCurrent();
+			continue;
+		}
+		if (WorldSeconds >= RetryIterator.Value().NextAttemptWorldSeconds)
+		{
+			++RetryIterator.Value().AttemptCount;
+			ActorsToRead.Add(CoverActor);
+		}
+	}
+	// Reading an actor changes the map of retries, so it is done after the walk over that map.
+	for (AActor* CoverActor : ActorsToRead)
+	{
+		RefreshCoverSocketsOfActor(CoverActor);
+	}
+}
+
+bool URTSCoverFinderWorldSubsystem::GetWasCoverPointRevoked(const int64 PointId) const
+{
+	return M_RevokedCoverPointExpiry.Contains(PointId);
 }
 
 void URTSCoverFinderWorldSubsystem::RemoveSocketCoverOfDestroyedActors()
@@ -1770,6 +2052,13 @@ void URTSCoverFinderWorldSubsystem::RemoveInvalidTacticalReferences()
 			UnreachableIterator.RemoveCurrent();
 		}
 	}
+	for (auto RevokedIterator = M_RevokedCoverPointExpiry.CreateIterator(); RevokedIterator; ++RevokedIterator)
+	{
+		if (WorldSeconds >= RevokedIterator.Value())
+		{
+			RevokedIterator.RemoveCurrent();
+		}
+	}
 	for (auto ProviderIterator = M_BlockingProviderHandles.CreateIterator(); ProviderIterator; ++ProviderIterator)
 	{
 		if (ProviderIterator.Key().IsValid())
@@ -1781,6 +2070,7 @@ void URTSCoverFinderWorldSubsystem::RemoveInvalidTacticalReferences()
 	}
 	M_NextTacticalUnitIndex = FMath::Min(M_NextTacticalUnitIndex, M_RegisteredSquadUnits.Num());
 	RemoveSocketCoverOfDestroyedActors();
+	RetryActorSocketCover();
 }
 
 FIntPoint URTSCoverFinderWorldSubsystem::GetCoverSpatialCell(const FVector& Location) const
