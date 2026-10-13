@@ -408,7 +408,12 @@ private:
 
 	// Hides all training UI, building UI and action UI.
 	void InitMainGameUI_HideWidgets();
-	void SetTrainingUIVisibility(const bool bVisible);
+	/**
+	 * @param bVisible Whether the training UI and its building column are shown.
+	 * @param bPlayAttachAnimation Off for callers that only bring the training UI back after hiding it
+	 * for a moment, where sliding it in again would be distracting.
+	 */
+	void SetTrainingUIVisibility(const bool bVisible, const bool bPlayAttachAnimation = true);
 	void OnHoverInfoWidget_HandleTrainingUI(const bool bIsHovering);
 	bool GetIsTrainingUIVisible() const;
 	// Contains all the building expansion widgets in the building UI primary scroll box.
@@ -568,6 +573,11 @@ private:
 	// training UI border and shown and hidden together with it.
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
 	TObjectPtr<UW_TrainingBuildingColumn> M_TrainingBuildingColumn;
+
+	// Played when the training UI opens, so that it slides out from under the minimap and resource panel
+	// and attaches to it. Made in the widget blueprint; without it the training UI appears at once.
+	UPROPERTY(Transient, meta = (BindWidgetAnimOptional))
+	TObjectPtr<UWidgetAnimation> M_TrainingUIAttachAnimation;
 
 	bool bM_WasTrainingUIHiddenDueToHoverInfoWidget = false;
 	UPROPERTY()

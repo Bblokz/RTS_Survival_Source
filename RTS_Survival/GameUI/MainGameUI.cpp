@@ -39,6 +39,7 @@
 #include "RTS_Survival/Player/PlayerControlGroupManager/PlayerControlGroupManager.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "TrainingUI/TrainingDescription/W_TrainingDescription.h"
+#include "Animation/WidgetAnimation.h"
 #include "TrainingUI/TrainingMenuWidget/W_TrainingBuildingColumn.h"
 #include "TrainingUI/TrainingMenuWidget/W_TrainingMenu.h"
 #include "RTS_Survival/GameUI/Archive/W_ArchiveNotificationHolder/W_ArchiveNotificationHolder.h"
@@ -532,7 +533,7 @@ void UMainGameUI::InitMainGameUI_HideWidgets()
 	}
 }
 
-void UMainGameUI::SetTrainingUIVisibility(const bool bVisible)
+void UMainGameUI::SetTrainingUIVisibility(const bool bVisible, const bool bPlayAttachAnimation)
 {
 	if (not GetIsValidTrainingMenuManager() || not GetIsValidArchiveNotificationHolder() || not
 		GetIsValidTrainingUIBorder())
@@ -547,7 +548,13 @@ void UMainGameUI::SetTrainingUIVisibility(const bool bVisible)
 	}
 	if (bVisible)
 	{
+		// Only a training UI that was closed attaches again; switching between trainers keeps it in place.
+		const bool bWasClosed = M_TrainingUIBorder->GetVisibility() != ESlateVisibility::Visible;
 		M_TrainingUIBorder->SetVisibility(ESlateVisibility::Visible);
+		if (bWasClosed && bPlayAttachAnimation && M_TrainingUIAttachAnimation)
+		{
+			PlayAnimation(M_TrainingUIAttachAnimation);
+		}
 		// Regardless of how the archive notification holder wants to handle visibility due to adding/removing notifications
 		// we set it to suppressed so it does not show up under the training UI.
 		M_ArchiveNotificationHolder->SetSuppressAchive(true);
@@ -573,7 +580,8 @@ void UMainGameUI::OnHoverInfoWidget_HandleTrainingUI(const bool bIsHovering)
 	}
 	if (bM_WasTrainingUIHiddenDueToHoverInfoWidget)
 	{
-		SetTrainingUIVisibility(true);
+		constexpr bool bPlayAttachAnimation = false;
+		SetTrainingUIVisibility(true, bPlayAttachAnimation);
 		bM_WasTrainingUIHiddenDueToHoverInfoWidget = false;
 	}
 }
