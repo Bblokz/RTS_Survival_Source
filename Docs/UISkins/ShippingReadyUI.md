@@ -1,0 +1,108 @@
+# Shipping-ready UI pass (skin 13 Frontstahl)
+
+What was changed to make the skinned game UI crisp at every resolution, where each piece lives, and how to
+undo it. Generator and editor scripts live in `D:/UE5Projects/RTS_Survival/UISkins/_generator/` (outside the
+Source repo); state files live in `Saved/UISkinSwitcher/`.
+
+## 1. No stretched panels (9-slice material)
+
+- `slice_gen.py` renders every skinned panel/button/slot as a slice set: base colour `T9_*`, normal map `T9N_*`
+  and masks `T9M_*` (R polish, G lamps, B fill), plus `slices.json` with slice margins, insets and art scale.
+  Output: `UISkins/13_Frontstahl_Gunmetal/Slice/`.
+- `ui_skin_material.py` builds `M_UISkinSlice` (UI domain, translucent, unlit). Corners draw 1:1, middles
+  tile with a phase blend near the far margin so partial tiles never seam.
+- Material output rules, which were the cause of the earlier see-through, additive-looking panels:
+  - Output linear colour with straight alpha.
+  - Do not multiply by vertex colour: Slate already multiplies UI-material output by it (tint, widget colour,
+    opacity), and the sRGB backbuffer does the encoding.
+  - Set every channel on the ComponentMask that feeds Opacity explicitly. A new mask keeps R enabled, so
+    Opacity read the dark red channel.
+- `ui_skin_slices.py` converts 462 brushes (Border, Image, Button states, ProgressBar, style assets) to
+  `MI9_*` instances. The originals are kept in `state.json` (`slice_originals`), and the skin switcher's
+  reset restores them.
+
+## 2. Texture pixels match screen pixels
+
+Art is authored at 2 texels per UI unit (`ArtScale` 2) with mips, so 1080p samples a mip, 2160p is 1:1 and
+1440p sits between them. The DPI curve is linear on the shortest side: 1080 → 1.0, 1440 → 1.33, 2160 → 2.0.
+
+## 3. Whole pixels, no idle render transforms (`ui_pixel_snap.py`)
+
+| Widget | Before | After |
+|---|---|---|
+| `BP_W_ActionUI_Item` | button render scale 1.25, icon 1.5 | ScaleBox (layout scale 1.25) in the 76 px cell, slot padding −10 (96 px), icon filled to a square 48 units; the button's (12, 1.5) content padding moved onto the hotkey slot so the icon is not squashed |
+| `BP_W_KeyBindings` (15 cells) | button render scale 1.25 | same ScaleBox cell as the action panel |
+| `W_BP_Behaviour` | button 1.25, icon 1.5 | slot padding −8 (80 px), style padding 0, icon fill with 10 px padding (60 px) |
+| `BP_W_WeaponItem` | overlay render scale 1.1 | ScaleBox 1.1, same centred footprint |
+| `BP_W_Requirement` checkboxes | render scale 2.0 | 32 px glyph brushes, style padding doubled, negative slot padding keeps the row |
+| `BP_W_EscapeMenuSettings` | −1.5 px translation | identity |
+| 56 screen-space canvas slots | offsets such as −880.448 | whole units (auto-size slots: position only) |
+
+A ScaleBox scales layout, not the finished image, so hotkey text is rasterised at its final size. Health bar
+shears, the energy bar rotation, the minimap's start rotation and the pooled timed bars' distance scale are
+intentional and stay. All widget animations end at identity.
+
+Not converted: `BP_W_ActionUI_Description` / `W_BP_GlobalAbiiltyDescription` icons (1.5; the Blueprint
+resets the brush size at runtime) and `W_MissionOverlay` text (0.8 / 0.7 render scale).
+
+## 4. Light on the metal (material)
+
+The normal map comes from the rim profile plus a luminance relief. The material adds:
+
+- tight specular highlights where `mask.r` marks polished metal (`SpecPower` 48);
+- a light sweep on hover, a glint on press, and flickering lamps (`mask.g`, accent colour);
+- non-repeating grime (`Grime`) over the tiled fill.
+
+The button states choose these effects through `Fx` (normal, hovered, pressed, disabled).
+
+## 5. Crisp edges
+
+- The generator applies a mild unsharp mask (0.35) after rendering.
+- The material draws a 1 px silhouette line found with screen derivatives, so it stays exactly one pixel wide
+  at every DPI. The line is lit on the light-facing side and dark on the far side; scalar `EdgeLine` is 0.35.
+
+## 6–8. Noise, bleed, compression
+
+- Noise is scaled so micro-detail stays at least 2 screen px.
+- Colour is bled into transparent texels.
+- Small UI uses UserInterface2D without mips. Slice sets and `T_ArchivePanel` use mips (BC7 for the archive
+  panel).
+
+## 9. Text
+
+- All font sizes are whole numbers.
+- Rich-text rows without an outline (29 rows in `DT_RichText`, `DT_Resources_RichText` and
+  `DT_DamageTypeText`) get a 1 px dark drop shadow. The original table JSON is in
+  `Saved/UISkinSwitcher/text_tables_original/`.
+- 11 plain TextBlocks on metal get the same shadow (training entries, tabs and counts, popup, HUD error
+  message, hold-to-skip).
+
+## 11. Measuring
+
+`UUISnapshotSubsystem` (`Source/RTS_Survival/GameUI/Tests/`) captures the HUD offscreen. It starts the game,
+selects the player's units and then a trainer, and at 1080p, 1440p and 2160p writes
+`Saved/UISnapshot/<selection>_<height>p.png` plus a widget reflector snapshot (`Engine/Saved/*.widgetsnapshot`).
+It runs without a visible window, next to an open editor:
+
+```
+UnrealEditor-Cmd.exe RTS_Survival.uproject /Game/RTS_Survival/Maps/UnitTests/Test_TrainingUI -game -unattended -nosound -RenderOffscreen -windowed -ResX=1920 -ResY=1080 -UISnapshot
+```
+
+It needs the Development editor target built; from Git Bash, prefix the command with `MSYS_NO_PATHCONV=1`.
+`snapshot_report.py` joins a snapshot with the brush list to report scaled or fractional widgets.
+
+Result on 2026-10-14 (Test_TrainingUI, all player units selected, 1080p, 1440p and 2160p): 1240 HUD widgets. Only
+two carry a render transform, both intentional rotations: `W_BP_GlobalAbilityPanel` (180°) and
+`BP_W_PlayerEnergyBar` (−90°).
+
+About a third of the widgets still sit at fractional pixel positions. Most come from Fill-sized boxes (the action
+grid cells), world-space health bars and centred text. Slate snaps image and box vertices to pixels when it draws
+them, so this doesn't blur anything; putting the action grid on whole pixels would need fixed instead of Fill
+sizing in `MainGameUI_HUD`.
+
+## Undo
+
+- Pixel snapping and text shadows: run `ui_pixel_snap.restore()` in the editor (state in
+  `Saved/UISkinSwitcher/pixel_snap_state.json`).
+- Slice materials and skin textures: run `ui_skin_switcher.reset()`.
+- Backups of the first six converted widget blueprints are in `Saved/UISkinSwitcher/backup_pixelsnap/`.
