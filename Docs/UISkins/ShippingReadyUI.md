@@ -307,3 +307,19 @@ sizing in `MainGameUI_HUD`.
 - **Captures:**
   - `-UISnapshotOpenFullMap` presses the real map button.
   - `-UISnapshotCloseFullMapAtStep=N` presses the close button when capture step N starts.
+
+## Dead space on the minimap and tactical map (`ui_minimap_material.py`)
+
+- **Where the dead space is:** where the terrain capture hit nothing (alpha 1), outside the playable area.
+- **Boundary:**
+  - The capture's coverage is averaged over a 12-sample ring (`BoundarySmoothPx` 3), so the stepped landscape edge
+    becomes a clean contour.
+  - A dashed cyan line follows it: `BoundaryColor`, `BoundaryLineWidthPx`, `BoundaryDashPx`, `BoundaryDashDuty`.
+    The dashes run along the edge.
+  - The terrain stops at the line and darkens slightly towards it (`BoundaryEdgeShade`).
+- **Glow:** a second jittered ring (`BoundaryGlowPx`, `BoundaryGlowStrength`) adds a soft cyan glow just outside
+  the line.
+- **Unsurveyed ground:**
+  - Diagonal hatching against the unexplored hatch direction (`HatchPeriodPx`, `HatchWidthPx`, `HatchColor`).
+  - Faint contour lines in map space (`ContourLevels`, `ContourColor`).
+- **Units:** all sizes are in screen pixels, so the minimap and the tactical map look alike.
