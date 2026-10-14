@@ -123,6 +123,10 @@ private:
 	void UpdateHotkeyFromProvider();
 	void HandleActionSlotHotkeyUpdated(const int32 ActionSlotIndex, const FText& HotkeyText);
 
+	// Stops a texture-less brush (empty slot) from being drawn as a solid white quad.
+	void HideActionImageWithoutIcon() const;
+
+	bool GetIsValidActionItemImage() const;
 	bool GetIsValidActionItemHotKey() const;
 	bool GetIsValidHotkeyProviderSubsystem() const;
 

@@ -4,6 +4,7 @@
 #include "W_ItemActionUI.h"
 
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Engine/LocalPlayer.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
@@ -16,6 +17,52 @@ void UW_ItemActionUI::UpdateItemActionUI(const EAbilityID NewAbility, const int3
 	M_Ability = NewAbility;
 	M_CustomType = CustomType;
 	OnUpdateActionUI(NewAbility, CustomType, CoolDownRemaining, CooldownTotalDuration);
+	// Abilities without an icon (IdNoAbility) leave a texture-less brush that Slate draws as a solid white quad.
+	HideActionImageWithoutIcon();
+}
+
+void UW_ItemActionUI::HideActionImageWithoutIcon() const
+{
+	if (not GetIsValidActionItemImage())
+	{
+		return;
+	}
+
+	FSlateBrush Brush = M_ActionItemImage->GetBrush();
+	const bool bHasIcon = Brush.GetResourceObject() != nullptr;
+	if (bHasIcon)
+	{
+		if (Brush.DrawAs != ESlateBrushDrawType::NoDrawType)
+		{
+			return;
+		}
+		Brush.DrawAs = ESlateBrushDrawType::Image;
+		M_ActionItemImage->SetBrush(Brush);
+		return;
+	}
+
+	if (Brush.DrawAs == ESlateBrushDrawType::NoDrawType)
+	{
+		return;
+	}
+	Brush.DrawAs = ESlateBrushDrawType::NoDrawType;
+	M_ActionItemImage->SetBrush(Brush);
+}
+
+bool UW_ItemActionUI::GetIsValidActionItemImage() const
+{
+	if (IsValid(M_ActionItemImage))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_ActionItemImage"),
+		TEXT("UW_ItemActionUI::GetIsValidActionItemImage"),
+		this
+	);
+	return false;
 }
 
 void UW_ItemActionUI::InitActionUIElement(
