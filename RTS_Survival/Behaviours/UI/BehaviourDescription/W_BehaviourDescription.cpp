@@ -5,6 +5,7 @@
 
 #include "Components/Border.h"
 #include "Components/RichTextBlock.h"
+#include "Materials/MaterialInterface.h"
 #include "RTS_Survival/Behaviours/Lifetime/BehaviourLifeTime.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
@@ -65,6 +66,12 @@ void UW_BehaviourDescription::SetupStyle(const FBehaviourUIData& InBehaviourUIDa
 		return;
 	}
 
+	if (IsValid(Style->PanelMaterial))
+	{
+		ApplyPanelMaterial(*Style);
+		return;
+	}
+
 	if (not IsValid(Style->PanelTexture))
 	{
 		const FString TypeAsString = UEnum::GetValueAsString(InBehaviourUIData.BuffDebuffType);
@@ -75,9 +82,22 @@ void UW_BehaviourDescription::SetupStyle(const FBehaviourUIData& InBehaviourUIDa
 		return;
 	}
 
+	M_AppliedPanelMaterial = nullptr;
 	M_AppliedPanelTexture = Style->PanelTexture;
 	BehaviourBorder->SetBrushFromTexture(M_AppliedPanelTexture);
-	
+}
+
+void UW_BehaviourDescription::ApplyPanelMaterial(const FBehaviourDescriptionStyle& Style)
+{
+	M_AppliedPanelTexture = nullptr;
+	M_AppliedPanelMaterial = Style.PanelMaterial;
+	FSlateBrush PanelBrush;
+	PanelBrush.SetResourceObject(M_AppliedPanelMaterial);
+	PanelBrush.ImageSize = Style.PanelBrushSize;
+	PanelBrush.DrawAs = ESlateBrushDrawType::Image;
+	PanelBrush.Tiling = ESlateBrushTileType::Both;
+	PanelBrush.Margin = FMargin(0.0f);
+	BehaviourBorder->SetBrush(PanelBrush);
 }
 
 void UW_BehaviourDescription::ClearBehaviourPanelBrush()
@@ -88,5 +108,6 @@ void UW_BehaviourDescription::ClearBehaviourPanelBrush()
 	}
 
 	M_AppliedPanelTexture = nullptr;
+	M_AppliedPanelMaterial = nullptr;
 	BehaviourBorder->SetBrush(FSlateNoResource());
 }

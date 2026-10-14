@@ -27,6 +27,7 @@
 #include "RTS_Survival/GameUI/Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/Behaviours/UI/BehaviourDescription/W_BehaviourDescription.h"
 #include "RTS_Survival/GameUI/MiniMap/FullMapView/W_FullMapView.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GameUI/MiniMap/MinimapTerrainCaptureComponent.h"
@@ -341,9 +342,38 @@ void UUISnapshotSubsystem::AddGalleryWidgetsOnce()
 		GalleryWidget->AddToViewport(UISnapshotConstants::GalleryZOrder);
 		GalleryWidget->SetPositionInViewport(Position, false);
 		ShowCollapsedGalleryParts(*GalleryWidget);
+		SetupSampleBehaviourDescription(*GalleryWidget);
 		Position.Y += UISnapshotConstants::GalleryRowHeight;
 		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT gallery added %s"), *ClassPath);
 	}
+}
+
+void UUISnapshotSubsystem::SetupSampleBehaviourDescription(UUserWidget& GalleryWidget)
+{
+	UW_BehaviourDescription* const Description = Cast<UW_BehaviourDescription>(&GalleryWidget);
+	if (not IsValid(Description))
+	{
+		return;
+	}
+	const bool bIsDebuffSample = M_BehaviourSampleIndex % 2 == 1;
+	++M_BehaviourSampleIndex;
+	FBehaviourUIData SampleData;
+	if (bIsDebuffSample)
+	{
+		SampleData.TitleText = TEXT("Suppressed");
+		SampleData.DescriptionText = TEXT("Loses <Text_Bad>-30%</> movement speed and <Text_Bad>-15%</> weapon accuracy");
+		SampleData.LifeTimeType = EBehaviourLifeTime::Timed;
+		SampleData.TotalLifeTime = 8.0f;
+		SampleData.BuffDebuffType = EBuffDebuffType::Debuff;
+	}
+	else
+	{
+		SampleData.TitleText = TEXT("Veterancy I");
+		SampleData.DescriptionText = TEXT("Gains <Text_Accent>+20%</> turret rotation speed and <Text_Accent>+10%</> weapon accuracy");
+		SampleData.LifeTimeType = EBehaviourLifeTime::Permanent;
+		SampleData.BuffDebuffType = EBuffDebuffType::Buff;
+	}
+	Description->SetupDescription(SampleData);
 }
 
 void UUISnapshotSubsystem::ShowCollapsedGalleryParts(UUserWidget& GalleryWidget)

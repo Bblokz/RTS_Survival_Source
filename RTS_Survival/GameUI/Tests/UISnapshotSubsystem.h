@@ -62,6 +62,7 @@ private:
 	bool bM_HasFinishedTruckAnims = false;
 	bool bM_HasCollapsedMission = false;
 	bool bM_HasOpenedFullMap = false;
+	int32 M_BehaviourSampleIndex = 0;
 
 	void TickWaitingForHud();
 	void TickWaitingAfterStart();
@@ -109,6 +110,8 @@ private:
 	// -UISnapshotOpenFullMap: presses the minimap's map button once; -UISnapshotCloseFullMapAtStep=N presses the
 	// full map's close button when step N starts (both through the real buttons' OnClicked).
 	void ToggleFullMapForStep();
+	// Gallery behaviour descriptions get sample data through SetupDescription (alternating buff and debuff).
+	void SetupSampleBehaviourDescription(UUserWidget& GalleryWidget);
 	bool ClickGlassButtonIn(UUserWidget* const OwnerWidget, const FName& GlassButtonName) const;
 
 	FString GetCurrentStepName() const;

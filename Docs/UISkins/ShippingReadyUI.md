@@ -323,3 +323,19 @@ sizing in `MainGameUI_HUD`.
   - Diagonal hatching against the unexplored hatch direction (`HatchPeriodPx`, `HatchWidthPx`, `HatchColor`).
   - Faint contour lines in map space (`ContourLevels`, `ContourColor`).
 - **Units:** all sizes are in screen pixels, so the minimap and the tactical map look alike.
+
+## Behaviour hover description (`ui_hud_parts.py` `apply_behaviour_panel`)
+
+- **Panel:**
+  - `UW_BehaviourDescription` used to stretch a 766 × 1260 texture over the description.
+  - `FBehaviourDescriptionStyle` now has `PanelMaterial` and `PanelBrushSize`. When a material is set, it is drawn
+    tiled at that brush size; `PanelTexture` stays as the fallback.
+- **Panels per type:** in `BP_W_BehaviourDescription`'s Class Defaults, Neutral and Buff use
+  `MI9_Custom_BehaviourPanel_64x64_u_n` (cyan corner brackets) and Debuff uses
+  `MI9_Custom_BehaviourPanelDebuff_64x64_u_n` (red brackets, warmer field). Both come from `custom_parts.py`.
+- **Title:** sits on the label plate, centred, with 14 / 4 / 14 / 5 padding and 8 below.
+- **Padding:** panel 16 / 10 / 16 / 12; the description and lifetime lines use 6 at the sides, instead of 15 / 10
+  all round.
+- **Wrapping:** the description wraps at 320 instead of 300. At 300, one word dropped to a third line at 1080p.
+- **Captures:** gallery behaviour descriptions get sample data through `SetupDescription`, alternating buff and
+  debuff: `-UISnapshotGallery=<BP_W_BehaviourDescription>+<BP_W_BehaviourDescription>`.
