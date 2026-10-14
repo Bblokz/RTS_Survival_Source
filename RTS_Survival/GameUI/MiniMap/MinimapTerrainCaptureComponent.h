@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Containers/Ticker.h"
 #include "MinimapTerrainCaptureComponent.generated.h"
 
 class AFowManager;
@@ -13,7 +14,8 @@ class UWorld;
 
 /**
  * @brief Add to the RTS game state to capture a static playable-area image for the minimap.
- * The temporary camera exists only during the initial capture; this component never ticks.
+ * The temporary camera exists only while capturing; captures repeat a few times early on (core ticker) so
+ * late-compiled materials and streamed content end up in the image. This component never ticks.
  */
 UCLASS(ClassGroup = (RTS))
 class RTS_SURVIVAL_API UMinimapTerrainCaptureComponent : public UActorComponent
@@ -29,9 +31,16 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	void BeginPlay_CapturePlayableArea();
+	void BeginPlay_ScheduleRecaptures();
+
+	/** @return True while more recaptures are pending (keeps the core ticker alive). */
+	bool TickRecapture();
+
+	bool GetIsWaitingForShaders() const;
 	bool CreateMinimapTerrainRenderTarget();
 
 	/**
@@ -64,4 +73,8 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextureRenderTarget2D> M_MinimapTerrainRenderTarget = nullptr;
+
+	FTSTicker::FDelegateHandle M_RecaptureTickerHandle;
+	double M_BeginPlayRealSeconds = 0.0;
+	int32 M_NextRecaptureIndex = 0;
 };

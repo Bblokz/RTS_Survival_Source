@@ -7,6 +7,7 @@
 #include "Engine/Texture2D.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Rendering/DrawElements.h"
 #include "Rendering/SlateRenderer.h"
 #include "Styling/CoreStyle.h"
@@ -68,6 +69,22 @@ void UW_MiniMap::InitMiniMapRTs(const TObjectPtr<UTexture>& Active,
 	DynamicMaterial->SetTextureParameterValue(FName("Passive"), Passive);
 	DynamicMaterial->SetTextureParameterValue(FName("Terrain"), Terrain);
 	RefreshCustomMiniMapIconBrushes();
+	ApplyGlassSettings();
+}
+
+void UW_MiniMap::SetGlassSettings(const FMiniMapGlassSettings& NewGlassSettings)
+{
+	M_GlassSettings = NewGlassSettings;
+	ApplyGlassSettings();
+}
+
+void UW_MiniMap::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+
+	// Also runs in the UMG designer, so edits to the glass settings preview live.
+	EnsureGlassOverlayMaterial();
+	ApplyGlassSettings();
 }
 
 void UW_MiniMap::NativeConstruct()
@@ -77,11 +94,19 @@ void UW_MiniMap::NativeConstruct()
 	ForceVolatile(true);
 	SetClipping(EWidgetClipping::ClipToBoundsAlways);
 	M_MinimapIconBrush.OutlineSettings.RoundingType = ESlateBrushRoundingType::HalfHeightRadius;
+	EnsureGlassOverlayMaterial();
+	ApplyGlassSettings();
 }
 
 void UW_MiniMap::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+
+	// The start direction rotates the widget after construction; keep the glass lit from the screen's top left.
+	if (not FMath::IsNearlyEqual(GetRenderTransformAngle(), M_GlassAppliedAngle))
+	{
+		ApplyGlassSettings();
+	}
 
 	AFowManager* const FowManager = GetIsValidFowManager();
 	if (not IsValid(FowManager))
@@ -111,7 +136,101 @@ int32 UW_MiniMap::NativePaint(const FPaintArgs& Args,
 
 	const int32 IconLayerId = DrawMiniMapUnitColorIcons(AllottedGeometry, OutDrawElements, NextLayerId);
 	const int32 CustomIconLayerId = DrawCustomMiniMapTextureIcons(AllottedGeometry, OutDrawElements, IconLayerId);
-	return DrawCustomMiniMapText(AllottedGeometry, OutDrawElements, CustomIconLayerId);
+	const int32 TextLayerId = DrawCustomMiniMapText(AllottedGeometry, OutDrawElements, CustomIconLayerId);
+	return DrawGlassOverlay(AllottedGeometry, OutDrawElements, TextLayerId);
+}
+
+void UW_MiniMap::EnsureGlassOverlayMaterial()
+{
+	if (IsValid(M_GlassOverlayMaterialInstance))
+	{
+		return;
+	}
+	UMaterialInterface* const GlassMaterial = M_GlassOverlayMaterial.LoadSynchronous();
+	if (not IsValid(GlassMaterial))
+	{
+		RTSFunctionLibrary::ReportError(
+			"MiniMap glass overlay material is not set or could not be loaded."
+			"\n See UW_MiniMap::EnsureGlassOverlayMaterial");
+		return;
+	}
+	M_GlassOverlayMaterialInstance = UMaterialInstanceDynamic::Create(GlassMaterial, this);
+	M_GlassOverlayBrush.SetResourceObject(M_GlassOverlayMaterialInstance);
+	M_GlassOverlayBrush.DrawAs = ESlateBrushDrawType::Image;
+}
+
+void UW_MiniMap::ApplyGlassSettings()
+{
+	M_GlassAppliedAngle = GetRenderTransformAngle();
+	if (IsValid(M_GlassOverlayMaterialInstance))
+	{
+		ApplyGlassParameters(*M_GlassOverlayMaterialInstance);
+	}
+	if (not IsValid(MiniMapImg))
+	{
+		return;
+	}
+	if (UMaterialInstanceDynamic* const MapMaterial = MiniMapImg->GetDynamicMaterial())
+	{
+		ApplyGlassParameters(*MapMaterial);
+	}
+}
+
+void UW_MiniMap::ApplyGlassParameters(UMaterialInstanceDynamic& MaterialInstance) const
+{
+	const FMiniMapGlassSettings& Glass = M_GlassSettings;
+	const float GlassWidth = Glass.bShowGlass ? Glass.GlassWidth : 0.0f;
+	MaterialInstance.SetScalarParameterValue(TEXT("GlassWidth"), GlassWidth);
+	MaterialInstance.SetScalarParameterValue(TEXT("GlassCornerRadius"), Glass.CornerRadius);
+	MaterialInstance.SetScalarParameterValue(TEXT("Refraction"), Glass.bShowGlass ? Glass.Refraction : 0.0f);
+	MaterialInstance.SetScalarParameterValue(TEXT("FresnelPower"), Glass.FresnelPower);
+	MaterialInstance.SetVectorParameterValue(TEXT("EdgeTint"), Glass.EdgeTint);
+	MaterialInstance.SetScalarParameterValue(TEXT("RimIntensity"), Glass.RimIntensity);
+	MaterialInstance.SetScalarParameterValue(TEXT("RimWidthPx"), Glass.RimWidthPx);
+	MaterialInstance.SetScalarParameterValue(TEXT("InnerShadow"), Glass.InnerShadow);
+	MaterialInstance.SetScalarParameterValue(TEXT("StreakIntensity"), Glass.StreakIntensity);
+	MaterialInstance.SetScalarParameterValue(TEXT("StreakAngle"), Glass.StreakAngleDegrees);
+	MaterialInstance.SetScalarParameterValue(TEXT("StreakWidth"), Glass.StreakWidth);
+	MaterialInstance.SetScalarParameterValue(TEXT("StreakOffset"), Glass.StreakOffset);
+	MaterialInstance.SetScalarParameterValue(TEXT("FrostIntensity"), Glass.FrostIntensity);
+	MaterialInstance.SetScalarParameterValue(TEXT("FrostScale"), Glass.FrostScale);
+	MaterialInstance.SetScalarParameterValue(TEXT("ScratchIntensity"), Glass.ScratchIntensity);
+	MaterialInstance.SetScalarParameterValue(TEXT("ScratchDensity"), Glass.ScratchDensity);
+	MaterialInstance.SetScalarParameterValue(TEXT("ScratchCoverage"), Glass.ScratchCoverage);
+	MaterialInstance.SetScalarParameterValue(TEXT("ScratchLength"), Glass.ScratchLength);
+	MaterialInstance.SetScalarParameterValue(TEXT("ScratchWidthPx"), Glass.ScratchWidthPx);
+	MaterialInstance.SetScalarParameterValue(TEXT("ScratchEdgeBias"), Glass.ScratchEdgeBias);
+	MaterialInstance.SetScalarParameterValue(TEXT("ScratchSeed"), Glass.ScratchSeed);
+	// Light and streak are given in screen space; undo the widget's rotation inside the shader.
+	MaterialInstance.SetScalarParameterValue(TEXT("ScreenRotation"), M_GlassAppliedAngle);
+}
+
+int32 UW_MiniMap::DrawGlassOverlay(const FGeometry& AllottedGeometry,
+                                   FSlateWindowElementList& OutDrawElements,
+                                   const int32 LayerId) const
+{
+	if (not M_GlassSettings.bShowGlass || not IsValid(M_GlassOverlayMaterialInstance) || not IsValid(MiniMapImg))
+	{
+		return LayerId;
+	}
+	const FGeometry MiniMapGeometry = MiniMapImg->GetCachedGeometry();
+	const FVector2D MiniMapSize = MiniMapGeometry.GetLocalSize();
+	if (MiniMapSize.X <= 0.0f || MiniMapSize.Y <= 0.0f)
+	{
+		return LayerId;
+	}
+	const FVector2D TopLeftInWidget = AllottedGeometry.AbsoluteToLocal(MiniMapGeometry.LocalToAbsolute(FVector2D::ZeroVector));
+	const FVector2D SizeInWidget = AllottedGeometry.AbsoluteToLocal(MiniMapGeometry.LocalToAbsolute(MiniMapSize))
+		- TopLeftInWidget;
+	const int32 GlassLayerId = LayerId + 1;
+	FSlateDrawElement::MakeBox(
+		OutDrawElements,
+		GlassLayerId,
+		AllottedGeometry.ToPaintGeometry(SizeInWidget, FSlateLayoutTransform(TopLeftInWidget)),
+		&M_GlassOverlayBrush,
+		ESlateDrawEffect::None,
+		FLinearColor::White);
+	return GlassLayerId;
 }
 
 int32 UW_MiniMap::DrawMiniMapUnitColorIcons(const FGeometry& AllottedGeometry,

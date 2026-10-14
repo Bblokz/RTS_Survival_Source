@@ -68,7 +68,12 @@ public:
 		const bool bIsHover,
 		const EAbilityID HoveredAbility,
 		const int32 HoveredAbilitySubtype) const;
-	void OnHoverSelectedUnitInfo(const bool bIsHover)const;
+	/**
+	 * @brief Polled every tick by the selected unit info; while its portrait is hovered the training UI of an
+	 * expanded nomadic building is hidden so the unit description can show, and restored on unhover.
+	 * @param bIsHover Whether the unit info border is hovered this tick.
+	 */
+	void OnHoverSelectedUnitInfo(const bool bIsHover);
 	void OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange, const float TurretYawLimit);
 	void OnClickedWeaponItemToAmmoPick();
 
@@ -117,6 +122,9 @@ public:
 	ACPPController* GetPlayerController() const;
 
 private:
+	// Last hover state of the selected unit info: the info polls every tick, only changes reach the main UI.
+	bool bM_IsSelectedUnitInfoHovered = false;
+
 	UPROPERTY()
 	UW_SelectedUnitInfo* M_SelectedUnitInfo;
 	bool GetIsValidSelectedUnitInfo() const;

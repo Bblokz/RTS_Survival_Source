@@ -6,7 +6,11 @@
 #include "Engine/SceneCapture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
+#include "Containers/Ticker.h"
 #include "Kismet/GameplayStatics.h"
+#if WITH_EDITOR
+#include "ShaderCompiler.h"
+#endif
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -15,6 +19,10 @@ namespace MinimapTerrainCaptureConstants
 {
 	constexpr float MapExtentToWidthMultiplier = 2.0f;
 	const FRotator TopDownCaptureRotation(-90.0f, 0.0f, -90.0f);
+	// Real seconds after begin play at which the capture is repeated: the first-frame capture misses materials
+	// whose shaders are still compiling and streamed-in content.
+	const float RecaptureDelaysSeconds[] = {1.0f, 4.0f, 10.0f};
+	constexpr float RecapturePollSeconds = 0.25f;
 }
 
 UMinimapTerrainCaptureComponent::UMinimapTerrainCaptureComponent()
@@ -71,6 +79,66 @@ void UMinimapTerrainCaptureComponent::BeginPlay_CapturePlayableArea()
 	}
 
 	CapturePlayableArea(*FowManager, *World);
+	BeginPlay_ScheduleRecaptures();
+}
+
+void UMinimapTerrainCaptureComponent::BeginPlay_ScheduleRecaptures()
+{
+	M_BeginPlayRealSeconds = FPlatformTime::Seconds();
+	M_NextRecaptureIndex = 0;
+	TWeakObjectPtr<UMinimapTerrainCaptureComponent> WeakThis(this);
+	// A core ticker keeps running while the game waits paused behind the start screen.
+	M_RecaptureTickerHandle = FTSTicker::GetCoreTicker().AddTicker(
+		FTickerDelegate::CreateLambda([WeakThis](const float)
+		{
+			if (not WeakThis.IsValid())
+			{
+				return false;
+			}
+			return WeakThis->TickRecapture();
+		}),
+		MinimapTerrainCaptureConstants::RecapturePollSeconds);
+}
+
+bool UMinimapTerrainCaptureComponent::TickRecapture()
+{
+	constexpr int32 RecaptureCount = UE_ARRAY_COUNT(MinimapTerrainCaptureConstants::RecaptureDelaysSeconds);
+	if (M_NextRecaptureIndex >= RecaptureCount)
+	{
+		return false;
+	}
+	const double SecondsSinceBeginPlay = FPlatformTime::Seconds() - M_BeginPlayRealSeconds;
+	if (SecondsSinceBeginPlay < MinimapTerrainCaptureConstants::RecaptureDelaysSeconds[M_NextRecaptureIndex]
+		|| GetIsWaitingForShaders())
+	{
+		return true;
+	}
+	++M_NextRecaptureIndex;
+
+	UWorld* const World = GetWorld();
+	AFowManager* const FowManager = FRTS_Statics::GetFowManager(this);
+	if (not IsValid(World) || not IsValid(FowManager) || not GetIsValidMinimapTerrainRenderTarget())
+	{
+		return false;
+	}
+	CapturePlayableArea(*FowManager, *World);
+	return M_NextRecaptureIndex < RecaptureCount;
+}
+
+bool UMinimapTerrainCaptureComponent::GetIsWaitingForShaders() const
+{
+#if WITH_EDITOR
+	return GShaderCompilingManager != nullptr && GShaderCompilingManager->GetNumRemainingJobs() > 0;
+#else
+	return false;
+#endif
+}
+
+void UMinimapTerrainCaptureComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	FTSTicker::GetCoreTicker().RemoveTicker(M_RecaptureTickerHandle);
+	M_RecaptureTickerHandle.Reset();
+	Super::EndPlay(EndPlayReason);
 }
 
 bool UMinimapTerrainCaptureComponent::CreateMinimapTerrainRenderTarget()
@@ -151,6 +219,11 @@ void UMinimapTerrainCaptureComponent::ConfigureSceneCapture(
 	SceneCaptureComponent.CaptureSource = ESceneCaptureSource::SCS_SceneColorHDR;
 	SceneCaptureComponent.PostProcessBlendWeight = 0.0f;
 	SceneCaptureComponent.ShowFlags.SetPostProcessing(false);
+	// Only the static playable area belongs in the image: units, effects and fog would be baked into the map.
+	SceneCaptureComponent.ShowFlags.SetSkeletalMeshes(false);
+	SceneCaptureComponent.ShowFlags.SetParticles(false);
+	SceneCaptureComponent.ShowFlags.SetFog(false);
+	SceneCaptureComponent.ShowFlags.SetVolumetricFog(false);
 	SceneCaptureComponent.TextureTarget = M_MinimapTerrainRenderTarget;
 }
 

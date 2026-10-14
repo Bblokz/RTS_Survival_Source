@@ -58,6 +58,7 @@ private:
 	EUISnapshotPhase M_Phase = EUISnapshotPhase::Inactive;
 
 	TWeakObjectPtr<ACPPController> M_PlayerController;
+	bool bM_HasAddedGallery = false;
 
 	void TickWaitingForHud();
 	void TickWaitingAfterStart();
@@ -69,6 +70,16 @@ private:
 
 	void BuildSteps();
 	bool TryStartGame();
+	// Writes the minimap terrain capture next to the screenshots so its framing and exposure can be reviewed.
+	void ExportMinimapTerrain() const;
+	// Maps that open on a difficulty picker (the game start tutorial) wait for it; picks Normal.
+	void DismissDifficultyPicker() const;
+	// With -UISnapshotEnergyPreview the energy bar is held at a fixed fill so its look can be reviewed.
+	void HoldEnergyPreview() const;
+	// With -UISnapshotHoverPortrait the cursor is moved onto the selected unit's portrait (unit description).
+	void HoverPortrait() const;
+	// -UISnapshotGallery=/Game/A+/Game/B adds those widgets with their designer content for review.
+	void AddGalleryWidgetsOnce();
 	void ApplyCurrentStep();
 	void CaptureCurrentStep() const;
 	void AdvanceStepOrFinish();

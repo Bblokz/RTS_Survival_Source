@@ -207,12 +207,18 @@ void UActionUIManager::OnHoverActionUIItem(
 	SetActionUIDescriptionCostsForAbility(HoveredAbility, HoveredAbilitySubtype);
 }
 
-void UActionUIManager::OnHoverSelectedUnitInfo(const bool bIsHover) const
+void UActionUIManager::OnHoverSelectedUnitInfo(const bool bIsHover)
 {
+	if (bIsHover == bM_IsSelectedUnitInfoHovered)
+	{
+		return;
+	}
+	bM_IsSelectedUnitInfoHovered = bIsHover;
 	if (not GetIsValidMainGameUI())
 	{
 		return;
 	}
+	M_MainGameUI->OnHoverSelectedUnitInfo(bIsHover);
 }
 
 void UActionUIManager::OnHoverWeaponItem(const bool bIsHover, const float WeaponHoveredRange, const float TurretYawLimit)

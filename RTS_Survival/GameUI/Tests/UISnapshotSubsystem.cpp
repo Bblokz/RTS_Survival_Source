@@ -9,6 +9,19 @@
 #include "Modules/ModuleManager.h"
 #include "UnrealClient.h"
 #include "UnrealEngine.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Kismet/KismetRenderingLibrary.h"
+#include "Blueprint/WidgetBlueprintLibrary.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Button.h"
+#include "Components/ProgressBar.h"
+#include "Components/Border.h"
+#include "Framework/Application/SlateApplication.h"
+#include "RTS_Survival/GameUI/ActionUI/SelectedUnitInfo/W_SelectedUnitInfo.h"
+#include "RTS_Survival/GameUI/Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
+#include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
+#include "RTS_Survival/GameUI/MiniMap/MinimapTerrainCaptureComponent.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectableActorObjectsMaster.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
@@ -17,6 +30,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 namespace UISnapshotConstants
 {
@@ -29,6 +43,16 @@ namespace UISnapshotConstants
 	const FIntPoint Resolutions[] = {FIntPoint(1920, 1080), FIntPoint(2560, 1440), FIntPoint(3840, 2160)};
 	const TCHAR* const CommandLineSwitch = TEXT("UISnapshot");
 	const TCHAR* const ReflectorSnapshotCommand = TEXT("WidgetReflector.TakeSnapshot 0.2");
+	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
+	const FName EnergyProgressBarName(TEXT("EnergyProgressBar"));
+	const TCHAR* const EnergyPreviewSwitch = TEXT("UISnapshotEnergyPreview");
+	constexpr float EnergyPreviewPercent = 0.62f;
+	const TCHAR* const HoverPortraitSwitch = TEXT("UISnapshotHoverPortrait");
+	const FName UnitInfoBorderName(TEXT("UnitInfoBorder"));
+	const TCHAR* const GallerySwitch = TEXT("UISnapshotGallery=");
+	const FVector2D GalleryOrigin(40.0, 140.0);
+	constexpr double GalleryRowHeight = 260.0;
+	constexpr int32 GalleryZOrder = 1000;
 }
 
 bool UUISnapshotSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -89,6 +113,8 @@ void UUISnapshotSubsystem::TickWaitingForHud()
 
 void UUISnapshotSubsystem::TickWaitingAfterStart()
 {
+	DismissDifficultyPicker();
+	AddGalleryWidgetsOnce();
 	if (GetSecondsInPhase() >= UISnapshotConstants::AfterStartSeconds)
 	{
 		EnterPhase(EUISnapshotPhase::ApplyingStep);
@@ -97,6 +123,8 @@ void UUISnapshotSubsystem::TickWaitingAfterStart()
 
 void UUISnapshotSubsystem::TickSettling()
 {
+	HoldEnergyPreview();
+	HoverPortrait();
 	if (GetSecondsInPhase() >= UISnapshotConstants::SettleSeconds)
 	{
 		CaptureCurrentStep();
@@ -165,6 +193,137 @@ bool UUISnapshotSubsystem::TryStartGame()
 	return true;
 }
 
+void UUISnapshotSubsystem::HoldEnergyPreview() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::EnergyPreviewSwitch))
+	{
+		return;
+	}
+	TArray<UUserWidget*> EnergyBars;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), EnergyBars, UW_PlayerEnergyBar::StaticClass(), false);
+	for (UUserWidget* const EnergyBar : EnergyBars)
+	{
+		if (not IsValid(EnergyBar) || not IsValid(EnergyBar->WidgetTree))
+		{
+			continue;
+		}
+		UProgressBar* const ProgressBar = Cast<UProgressBar>(
+			EnergyBar->WidgetTree->FindWidget(UISnapshotConstants::EnergyProgressBarName));
+		if (IsValid(ProgressBar))
+		{
+			ProgressBar->SetPercent(UISnapshotConstants::EnergyPreviewPercent);
+		}
+	}
+}
+
+void UUISnapshotSubsystem::HoverPortrait() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::HoverPortraitSwitch)
+		|| not FSlateApplication::IsInitialized())
+	{
+		return;
+	}
+	TArray<UUserWidget*> UnitInfos;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), UnitInfos, UW_SelectedUnitInfo::StaticClass(), false);
+	for (UUserWidget* const UnitInfo : UnitInfos)
+	{
+		if (not IsValid(UnitInfo) || not IsValid(UnitInfo->WidgetTree) || not UnitInfo->IsVisible())
+		{
+			continue;
+		}
+		const UBorder* const Border = Cast<UBorder>(UnitInfo->WidgetTree->FindWidget(UISnapshotConstants::UnitInfoBorderName));
+		if (not IsValid(Border))
+		{
+			continue;
+		}
+		FSlateApplication& SlateApplication = FSlateApplication::Get();
+		const FVector2D HoverPosition = Border->GetCachedGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5, 0.5));
+		const FVector2D LastPosition = SlateApplication.GetCursorPos();
+		SlateApplication.SetCursorPos(HoverPosition);
+		const FPointerEvent MouseMove(
+			SlateApplication.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, HoverPosition, LastPosition,
+			TSet<FKey>(), EKeys::Invalid, 0, SlateApplication.GetModifierKeys());
+		SlateApplication.ProcessMouseMoveEvent(MouseMove);
+		return;
+	}
+}
+
+void UUISnapshotSubsystem::AddGalleryWidgetsOnce()
+{
+	FString GalleryList;
+	if (bM_HasAddedGallery || not FParse::Value(FCommandLine::Get(), UISnapshotConstants::GallerySwitch, GalleryList))
+	{
+		return;
+	}
+	bM_HasAddedGallery = true;
+	TArray<FString> WidgetPaths;
+	GalleryList.ParseIntoArray(WidgetPaths, TEXT("+"));
+	FVector2D Position = UISnapshotConstants::GalleryOrigin;
+	for (const FString& WidgetPath : WidgetPaths)
+	{
+		const FString ClassPath = WidgetPath + TEXT(".") + FPaths::GetBaseFilename(WidgetPath) + TEXT("_C");
+		UClass* const WidgetClass = LoadClass<UUserWidget>(nullptr, *ClassPath);
+		if (not IsValid(WidgetClass))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT gallery class not found: %s"), *ClassPath);
+			continue;
+		}
+		UUserWidget* const GalleryWidget = CreateWidget<UUserWidget>(GetWorld(), WidgetClass);
+		if (not IsValid(GalleryWidget))
+		{
+			continue;
+		}
+		GalleryWidget->AddToViewport(UISnapshotConstants::GalleryZOrder);
+		GalleryWidget->SetPositionInViewport(Position, false);
+		GalleryWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+		Position.Y += UISnapshotConstants::GalleryRowHeight;
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT gallery added %s"), *ClassPath);
+	}
+}
+
+void UUISnapshotSubsystem::DismissDifficultyPicker() const
+{
+	TArray<UUserWidget*> Pickers;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Pickers, UW_GameDifficultyPicker::StaticClass(), false);
+	for (UUserWidget* const Picker : Pickers)
+	{
+		if (not IsValid(Picker) || not IsValid(Picker->WidgetTree))
+		{
+			continue;
+		}
+		UButton* const NormalButton = Cast<UButton>(Picker->WidgetTree->FindWidget(UISnapshotConstants::DifficultyButtonName));
+		if (IsValid(NormalButton) && Picker->IsInViewport())
+		{
+			NormalButton->OnClicked.Broadcast();
+			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT picked normal difficulty"));
+		}
+	}
+}
+
+void UUISnapshotSubsystem::ExportMinimapTerrain() const
+{
+	const ACPPGameState* const GameState = FRTS_Statics::GetGameState(this);
+	if (not IsValid(GameState))
+	{
+		return;
+	}
+	const UMinimapTerrainCaptureComponent* const TerrainCapture = GameState->GetMinimapTerrainCaptureComponent();
+	if (not IsValid(TerrainCapture))
+	{
+		return;
+	}
+	UTextureRenderTarget2D* const TerrainRenderTarget = TerrainCapture->GetMinimapTerrainRenderTarget();
+	if (not IsValid(TerrainRenderTarget))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT no minimap terrain render target"));
+		return;
+	}
+	UKismetRenderingLibrary::ExportRenderTarget(
+		GetWorld(), TerrainRenderTarget, FPaths::ProjectSavedDir() / TEXT("UISnapshot"), TEXT("minimap_terrain"));
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT exported minimap terrain %dx%d"),
+	       TerrainRenderTarget->SizeX, TerrainRenderTarget->SizeY);
+}
+
 void UUISnapshotSubsystem::ApplyCurrentStep()
 {
 	if (not M_Steps.IsValidIndex(M_StepIndex))
@@ -205,6 +364,7 @@ void UUISnapshotSubsystem::AdvanceStepOrFinish()
 void UUISnapshotSubsystem::Finish()
 {
 	EnterPhase(EUISnapshotPhase::Done);
+	ExportMinimapTerrain();
 	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT done"));
 	FPlatformMisc::RequestExit(false, TEXT("UISnapshot"));
 }

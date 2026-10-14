@@ -106,3 +106,94 @@ sizing in `MainGameUI_HUD`.
   `Saved/UISkinSwitcher/pixel_snap_state.json`).
 - Slice materials and skin textures: run `ui_skin_switcher.reset()`.
 - Backups of the first six converted widget blueprints are in `Saved/UISkinSwitcher/backup_pixelsnap/`.
+
+## Minimap panel (`ui_hud_parts.py`, `ui_minimap_material.py`, `custom_parts.py`)
+
+- **Resource counters:** `BP_W_PlayerResource.Border_53` uses a custom counter plate (`Custom_ResourceCounter`
+  slice set, drawn by `custom_parts.py`): a recessed dark field with a thin chrome rim and no bolts. The old tip
+  panel drew its visible plate on an inset fraction of the widget, so the text ran over its rim. The text now has
+  6 × 3 units of padding.
+- **Energy bar:** `M_UIEnergyGauge` (Part 0 track, 1 fill, 2 demand marker) is procedural and measured in screen
+  pixels:
+  - recessed track with cell dividers;
+  - segmented fill with a hot core and a slow upward shimmer;
+  - chevron demand marker with a drop shadow.
+
+  The fill colour still comes from C++ (`SetFillColorAndOpacity`); the Blueprint defaults are now electric cyan
+  (OK) and orange-red (deficit).
+- **Minimap:** `M_UI_MiniMap` was rebuilt and now samples the `Terrain` capture that
+  `UMinimapTerrainCaptureComponent` hands over (the old material had no Terrain input). It shows:
+  - graded and sharpened terrain;
+  - fog of war: visible at full colour, explored at half strength, unexplored faint and hatched;
+  - a pixel grid, a vignette and an anti-aliased camera trapezoid.
+
+  The brush's old cyan tint is gone.
+- **Terrain capture:** it now repeats at 1, 4 and 10 real seconds through a core ticker, which works while the
+  game is paused. In the editor it waits for the shader compiler to go idle. It hides skeletal meshes, particles
+  and fog. The first-frame capture alone had untextured placeholder materials.
+- **Testing:** run the offscreen capture with `/Game/RTS_Survival/Maps/AA_StartGameTutorial/RTS_GameStartTutorial`
+  (it picks Normal difficulty by itself). Add `-UISnapshotEnergyPreview` to hold the energy bar at 62%. It writes
+  `Saved/UISnapshot/minimap_terrain` (EXR).
+- **Undo:** run `ui_hud_parts.restore()`. The original `M_UI_MiniMap`, `W_BP_MiniMap`, `BP_W_PlayerResource` and
+  `BP_W_PlayerEnergyBar` uassets are in `Saved/UISkinSwitcher/backup_hudparts/`.
+
+## Small panels, unit description, glass buttons
+
+- **Plates:** `custom_parts.py` draws two plates with no bolts:
+  - `Custom_ResourceCounter`, a label plate;
+  - `Custom_ThinPanel`, a content panel with a 1-unit chrome rim.
+
+  `ui_hud_parts.PLATE_BORDERS` puts them on:
+  - the cost tooltip (`BP_W_CostDisplay`);
+  - the hover info box (`BP_W_HoverActor`);
+  - the expansion holder's titles and its "Place at Socket" label;
+  - every title and the resistance group in `BP_W_UnitDescription_Horizontal`.
+
+  Paddings live in `SLOT_PADDINGS` / `BORDER_PADDINGS`. A UBorder's own Padding overwrites its content slot on
+  compile, so border padding is set on the border itself.
+- **Unit description:** right-aligned in `MainGameUI_HUD` (8-unit margin), so its auto-size grows towards the
+  screen.
+- **Portrait hover:** hovering the selected unit's portrait now hides an open training UI and restores it on
+  unhover. `UActionUIManager::OnHoverSelectedUnitInfo` forwards only hover changes, because the unit info polls
+  every tick.
+- **Glass buttons:** `glass_buttons.py` makes `T_GlassButton_<Harvester|NomadTruck>_<n|h|p>` (64 units, 2×),
+  imported to `Skins/_Shared/GlassButtons`. Red is for idle harvesters, green for idle nomadic trucks. No
+  idle-unit button exists in the HUD yet.
+- **Capture switches:**
+  - `-UISnapshotHoverPortrait` hovers the portrait;
+  - `-UISnapshotGallery=/Game/A+/Game/B` places widgets with their designer content.
+
+## Idle unit buttons and barracks tabs
+
+- **Idle buttons:** `UW_IdleUnitButton` (`Source/RTS_Survival/GameUI/IdleUnits/`) is a self-building glass button
+  (texture states n/h/p with a count badge) that is disabled while nothing is idle.
+  - It counts player-owned harvesters (`UHarvester` owners) or nomadic trucks in truck mode whose active command
+    is `IdIdle`, refreshing every 0.5 s.
+  - A click selects the next idle unit and focuses the camera on it.
+- **Placement:** `ui_hud_parts.apply_idle_buttons` stacks the two buttons (40 units each) left of the resources
+  in `MainGameUI_HUD` (`M_IdleButtonsColumn`). The resource row box (`SizeBox_0`) now ends inside the panel rim:
+  it used to stick out 70 units past the screen edge. The resource icons went from 80 to 70 units.
+- **Glyphs:** `GlassButtons/Glyph_<Harvester|NomadTruck>.png` are white silhouettes cut from the unit side views.
+  `glass_buttons.py` puts them under the glass.
+- **Barracks tabs:** `W_BP_TrainingSubSectionTab` is 44 units tall (was 38) with 5 units of text bottom padding,
+  so two-line titles clear the rim. The training panel slot in the HUD is 6 units taller at the bottom.
+
+## Minimap glass
+
+- **Where to tweak:** open `W_BP_MiniMap`, go to Class Defaults, then MiniMap | Glass | Glass Settings
+  (`FMiniMapGlassSettings`). Changes preview live in the designer (`NativePreConstruct`).
+- **Runtime:** `SetGlassSettings` changes the glass while the game runs.
+- **Two layers:**
+  - `M_UI_MiniMap` bends terrain, fog and grid under the glass band (`GlassWidth`, `Refraction`).
+  - `M_UI_MiniMapGlass` (`ui_minimap_glass.py`) is drawn by `UW_MiniMap::DrawGlassOverlay` after the icons, text
+    and camera frame. It holds the Fresnel edge tint, lit rim and inner lip, the dark lip at the frame, a diagonal
+    reflection streak, frost and tapered scratches.
+- **Rotation:** light and streak are given in screen space; the widget's start-direction rotation is undone in the
+  shader (`ScreenRotation`).
+- **Settings:**
+  - band: `bShowGlass`, `GlassWidth`, `CornerRadius`, `Refraction`, `FresnelPower`, `EdgeTint` (alpha = strength);
+  - rim: `RimIntensity`, `RimWidthPx`, `InnerShadow`;
+  - reflection: `StreakIntensity`, `StreakAngleDegrees`, `StreakWidth`, `StreakOffset`;
+  - frost: `FrostIntensity`, `FrostScale`;
+  - scratches: `ScratchIntensity`, `ScratchDensity`, `ScratchCoverage`, `ScratchLength`, `ScratchWidthPx`,
+    `ScratchEdgeBias` (1 = glass band only), `ScratchSeed`.
