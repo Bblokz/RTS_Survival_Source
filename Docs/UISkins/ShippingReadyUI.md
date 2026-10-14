@@ -197,3 +197,55 @@ sizing in `MainGameUI_HUD`.
   - frost: `FrostIntensity`, `FrostScale`;
   - scratches: `ScratchIntensity`, `ScratchDensity`, `ScratchCoverage`, `ScratchLength`, `ScratchWidthPx`,
     `ScratchEdgeBias` (1 = glass band only), `ScratchSeed`.
+
+## Glass resource icons
+
+- **Material:** `M_UI_GlassResourceIcon` (`ui_glass_resource_icons.py`) puts a resource icon behind a round
+  tinted glass dome in a gunmetal bezel. It has:
+  - a lens that magnifies the centre and a tint over the icon;
+  - a glow from below and a reflection crescent;
+  - a rim highlight and a bottom bounce in the glass colour.
+
+  Parameters: `BezelWidth`, `Refraction`, `IconScale`, `Desaturate`, `TintStrength`, `GlowIntensity`,
+  `CapIntensity`, `RimIntensity`, `GlassColor`, `BezelColor`.
+- **Instances:** `MI_GlassResourceIcon_<Radixite|Metal|VehicleParts>` take their `GlassColor` from the matching
+  `DT_Resources_RichText` row (Radixite, Metal, Vehicle). Rebuilding them picks up text colour changes.
+- **Applied by:** `UW_PlayerResource::ApplyGlassResourceIcon`, right after the blueprint's `SetupResource`. The
+  per-resource map is "Glass Icon Materials" in `BP_W_PlayerResource`'s Class Defaults.
+- **Unchanged:** the flat `MI_ResourceIcon_*` instances stay as they are for the small inline icons in rich text
+  (`DT_ResourceImages_RichText`).
+- **Layout:** resource icons are 64 units; the counter plate tucks under only the lowest 8 units of the dome.
+
+## Glass panes on square buttons
+
+- **Material:** `M_UI_GlassPane` (`ui_glass_panes.py`) is a nearly clear square pane with:
+  - a hairline rim lit from the top left and a slight dark lip at the frame;
+  - a faint diagonal reflection and a very light edge tint;
+  - sparse scratches that fade towards the centre (`ScratchEdgeBias`), so icons stay fully readable.
+- **Scratch variety:** scratches are laid out in screen space, so every button shows a different part of the
+  pattern.
+- **Where:** it is an extra hit-test-invisible Image (`M_GlassPane`) above the icon in:
+  - `BP_W_ActionUI_Item` (under the hotkey);
+  - `BP_W_TrainingItem` (under the count);
+  - `W_BuildingItem` and `BP_W_OptionExpansionBuilding` (the button content became an overlay of
+    [icon, pane]).
+- **Hover:** the button's own hover animation (slice material sweep or outline) shows through the pane.
+- **Instances:** each widget type has its own (`MI_GlassPane_ActionButton`, `_TrainingItem`, `_BxpItem`,
+  `_BxpOption`), whose `InsetFrac` puts the pane on that button's inner face (SceneItem body at 0.11 plus bevel).
+  Without it the overflowing action buttons' panes overlapped and showed light bars.
+- **Undo:** run `ui_glass_panes.restore()` (state in `Saved/UISkinSwitcher/glass_panes_state.json`, backups in
+  `Saved/UISkinSwitcher/backup_glasspanes/`).
+- **Capture switches for the glass panes:**
+  - `-UISnapshotHoverAction` hovers the first action button.
+  - `-UISnapshotHoverTraining` hovers the first visible training item.
+  - `-UISnapshotDelay=N` adds N real seconds after the start.
+  - Gallery widgets now show their collapsed parts, so training items render outside the training panel.
+- **Training panel in offscreen captures:** use `-UISnapshotFinishTruckAnims -UISnapshotDelay=35` on
+  `Test_TrainingUI`.
+  - Offscreen, the trucks' unfold montage never ends (the 3D scene is not drawn, so the meshes never count as
+    rendered).
+  - The switch calls `OnTruckMontageFinished`, which is what the blueprint calls when the montage ends.
+  - The HQ then finishes converting, and selecting it opens the real training panel.
+  - Add `-UISnapshotHoverTraining` to hover the first training item.
+- **Other switches:** `-UISnapshotTickPoses` (force pose ticks) and `-UISnapshotFocusTrainer` (camera on the
+  trainer). The selection log now prints the trainer's nomad status.

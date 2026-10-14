@@ -18,6 +18,10 @@
 #include "Components/Border.h"
 #include "Framework/Application/SlateApplication.h"
 #include "RTS_Survival/GameUI/ActionUI/SelectedUnitInfo/W_SelectedUnitInfo.h"
+#include "RTS_Survival/GameUI/ActionUI/ItemActionUI/W_ItemActionUI.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingUIWidget/W_TrainingItem.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/GameUI/Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
@@ -49,6 +53,23 @@ namespace UISnapshotConstants
 	constexpr float EnergyPreviewPercent = 0.62f;
 	const TCHAR* const HoverPortraitSwitch = TEXT("UISnapshotHoverPortrait");
 	const FName UnitInfoBorderName(TEXT("UnitInfoBorder"));
+	const TCHAR* const HoverActionSwitch = TEXT("UISnapshotHoverAction");
+	const FName ActionButtonName(TEXT("M_ActionItemButton"));
+	const TCHAR* const HoverTrainingSwitch = TEXT("UISnapshotHoverTraining");
+	const FName TrainingButtonName(TEXT("M_TrainingItemButton"));
+	// Extra real seconds after the start before capturing, e.g. so nomadic trucks finish converting into buildings.
+	const TCHAR* const DelaySwitch = TEXT("UISnapshotDelay=");
+	const TCHAR* const FocusTrainerSwitch = TEXT("UISnapshotFocusTrainer");
+	// Unrendered skeletal meshes do not advance montages (the unit optimizer keeps resetting the tick option), so
+	// nomadic conversions never finish offscreen without this.
+	const TCHAR* const TickPosesSwitch = TEXT("UISnapshotTickPoses");
+	// Offscreen the truck-unfold montage never ends; this makes the call its blueprint makes when it does.
+	const TCHAR* const FinishTruckAnimsSwitch = TEXT("UISnapshotFinishTruckAnims");
+	const FName TruckMontageFinishedFunction(TEXT("OnTruckMontageFinished"));
+	constexpr double FinishTruckAnimsAfterSeconds = 1.5;
+	// Hides the glass panes (ui_glass_panes.py, widget M_GlassPane) so captures with and without them compare.
+	const TCHAR* const HideGlassSwitch = TEXT("UISnapshotHideGlass");
+	const FName GlassPaneName(TEXT("M_GlassPane"));
 	const TCHAR* const GallerySwitch = TEXT("UISnapshotGallery=");
 	const FVector2D GalleryOrigin(40.0, 140.0);
 	constexpr double GalleryRowHeight = 260.0;
@@ -80,6 +101,7 @@ void UUISnapshotSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 void UUISnapshotSubsystem::Tick(float DeltaTime)
 {
+	ForceNomadicMeshesToTickPose();
 	switch (M_Phase)
 	{
 	case EUISnapshotPhase::WaitingForHud:
@@ -114,8 +136,15 @@ void UUISnapshotSubsystem::TickWaitingForHud()
 void UUISnapshotSubsystem::TickWaitingAfterStart()
 {
 	DismissDifficultyPicker();
+	if (not bM_HasFinishedTruckAnims && GetSecondsInPhase() >= UISnapshotConstants::FinishTruckAnimsAfterSeconds)
+	{
+		bM_HasFinishedTruckAnims = true;
+		FinishTruckUnfoldAnimations();
+	}
 	AddGalleryWidgetsOnce();
-	if (GetSecondsInPhase() >= UISnapshotConstants::AfterStartSeconds)
+	double ExtraDelaySeconds = 0.0;
+	FParse::Value(FCommandLine::Get(), UISnapshotConstants::DelaySwitch, ExtraDelaySeconds);
+	if (GetSecondsInPhase() >= UISnapshotConstants::AfterStartSeconds + ExtraDelaySeconds)
 	{
 		EnterPhase(EUISnapshotPhase::ApplyingStep);
 	}
@@ -123,6 +152,7 @@ void UUISnapshotSubsystem::TickWaitingAfterStart()
 
 void UUISnapshotSubsystem::TickSettling()
 {
+	HideGlassPanes();
 	HoldEnergyPreview();
 	HoverPortrait();
 	if (GetSecondsInPhase() >= UISnapshotConstants::SettleSeconds)
@@ -190,6 +220,7 @@ bool UUISnapshotSubsystem::TryStartGame()
 		StartGameControl->PlayerStartedGame();
 	}
 	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT game started"));
+	FocusCameraOnTrainer();
 	return true;
 }
 
@@ -218,34 +249,55 @@ void UUISnapshotSubsystem::HoldEnergyPreview() const
 
 void UUISnapshotSubsystem::HoverPortrait() const
 {
-	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::HoverPortraitSwitch)
-		|| not FSlateApplication::IsInitialized())
+	if (FParse::Param(FCommandLine::Get(), UISnapshotConstants::HoverPortraitSwitch))
+	{
+		HoverFirstVisibleWidget(UW_SelectedUnitInfo::StaticClass(), UISnapshotConstants::UnitInfoBorderName);
+		return;
+	}
+	if (FParse::Param(FCommandLine::Get(), UISnapshotConstants::HoverActionSwitch))
+	{
+		HoverFirstVisibleWidget(UW_ItemActionUI::StaticClass(), UISnapshotConstants::ActionButtonName);
+		return;
+	}
+	if (FParse::Param(FCommandLine::Get(), UISnapshotConstants::HoverTrainingSwitch))
+	{
+		HoverFirstVisibleWidget(UW_TrainingItem::StaticClass(), UISnapshotConstants::TrainingButtonName);
+	}
+}
+
+void UUISnapshotSubsystem::HoverFirstVisibleWidget(UClass* const UserWidgetClass, const FName InnerWidgetName) const
+{
+	if (not FSlateApplication::IsInitialized())
 	{
 		return;
 	}
-	TArray<UUserWidget*> UnitInfos;
-	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), UnitInfos, UW_SelectedUnitInfo::StaticClass(), false);
-	for (UUserWidget* const UnitInfo : UnitInfos)
+	TArray<UUserWidget*> Candidates;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Candidates, UserWidgetClass, false);
+	for (UUserWidget* const Candidate : Candidates)
 	{
-		if (not IsValid(UnitInfo) || not IsValid(UnitInfo->WidgetTree) || not UnitInfo->IsVisible())
+		if (not IsValid(Candidate) || not IsValid(Candidate->WidgetTree) || not Candidate->IsVisible())
 		{
 			continue;
 		}
-		const UBorder* const Border = Cast<UBorder>(UnitInfo->WidgetTree->FindWidget(UISnapshotConstants::UnitInfoBorderName));
-		if (not IsValid(Border))
+		const UWidget* const Target = Candidate->WidgetTree->FindWidget(InnerWidgetName);
+		if (not IsValid(Target) || Target->GetCachedGeometry().GetLocalSize().IsNearlyZero())
 		{
 			continue;
 		}
-		FSlateApplication& SlateApplication = FSlateApplication::Get();
-		const FVector2D HoverPosition = Border->GetCachedGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5, 0.5));
-		const FVector2D LastPosition = SlateApplication.GetCursorPos();
-		SlateApplication.SetCursorPos(HoverPosition);
-		const FPointerEvent MouseMove(
-			SlateApplication.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, HoverPosition, LastPosition,
-			TSet<FKey>(), EKeys::Invalid, 0, SlateApplication.GetModifierKeys());
-		SlateApplication.ProcessMouseMoveEvent(MouseMove);
+		MoveSlateCursorTo(Target->GetCachedGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5, 0.5)));
 		return;
 	}
+}
+
+void UUISnapshotSubsystem::MoveSlateCursorTo(const FVector2D& AbsolutePosition)
+{
+	FSlateApplication& SlateApplication = FSlateApplication::Get();
+	const FVector2D LastPosition = SlateApplication.GetCursorPos();
+	SlateApplication.SetCursorPos(AbsolutePosition);
+	const FPointerEvent MouseMove(
+		SlateApplication.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, AbsolutePosition, LastPosition,
+		TSet<FKey>(), EKeys::Invalid, 0, SlateApplication.GetModifierKeys());
+	SlateApplication.ProcessMouseMoveEvent(MouseMove);
 }
 
 void UUISnapshotSubsystem::AddGalleryWidgetsOnce()
@@ -275,10 +327,28 @@ void UUISnapshotSubsystem::AddGalleryWidgetsOnce()
 		}
 		GalleryWidget->AddToViewport(UISnapshotConstants::GalleryZOrder);
 		GalleryWidget->SetPositionInViewport(Position, false);
-		GalleryWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+		ShowCollapsedGalleryParts(*GalleryWidget);
 		Position.Y += UISnapshotConstants::GalleryRowHeight;
 		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT gallery added %s"), *ClassPath);
 	}
+}
+
+void UUISnapshotSubsystem::ShowCollapsedGalleryParts(UUserWidget& GalleryWidget)
+{
+	// Widgets such as training items collapse parts of themselves until gameplay data arrives; show their design.
+	GalleryWidget.SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	if (not IsValid(GalleryWidget.WidgetTree))
+	{
+		return;
+	}
+	GalleryWidget.WidgetTree->ForEachWidget([](UWidget* const Widget)
+	{
+		if (IsValid(Widget) && not Widget->IsVisible())
+		{
+			// buttons stay hoverable (hover captures); everything else must not catch the cursor
+			Widget->SetVisibility(Widget->IsA<UButton>() ? ESlateVisibility::Visible : ESlateVisibility::SelfHitTestInvisible);
+		}
+	});
 }
 
 void UUISnapshotSubsystem::DismissDifficultyPicker() const
@@ -400,10 +470,93 @@ void UUISnapshotSubsystem::SelectPlayerUnits() const
 
 void UUISnapshotSubsystem::SelectTrainer() const
 {
-	UWorld* World = GetWorld();
-	if (not IsValid(World) || not GetIsValidPlayerController())
+	if (not GetIsValidPlayerController())
 	{
 		return;
+	}
+	AActor* const Trainer = FindPlayerTrainer();
+	if (not IsValid(Trainer))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT no player trainer on this map"));
+		return;
+	}
+	M_PlayerController->SelectSingleUnitFromUI(Trainer);
+	const ANomadicVehicle* const NomadicTrainer = Cast<ANomadicVehicle>(Trainer);
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT selected trainer %s nomad status %d"), *Trainer->GetName(),
+	       NomadicTrainer ? static_cast<int32>(NomadicTrainer->GetNomadicStatus()) : -1);
+}
+
+void UUISnapshotSubsystem::ForceNomadicMeshesToTickPose() const
+{
+	if (M_Phase == EUISnapshotPhase::Inactive || not FParse::Param(FCommandLine::Get(), UISnapshotConstants::TickPosesSwitch))
+	{
+		return;
+	}
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	for (TActorIterator<ANomadicVehicle> It(World); It; ++It)
+	{
+		TInlineComponentArray<USkeletalMeshComponent*> Meshes(*It);
+		for (USkeletalMeshComponent* const Mesh : Meshes)
+		{
+			Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+		}
+	}
+}
+
+void UUISnapshotSubsystem::HideGlassPanes() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::HideGlassSwitch))
+	{
+		return;
+	}
+	TArray<UUserWidget*> Widgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Widgets, UUserWidget::StaticClass(), false);
+	for (UUserWidget* const Widget : Widgets)
+	{
+		if (not IsValid(Widget) || not IsValid(Widget->WidgetTree))
+		{
+			continue;
+		}
+		if (UWidget* const GlassPane = Widget->WidgetTree->FindWidget(UISnapshotConstants::GlassPaneName))
+		{
+			GlassPane->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+}
+
+void UUISnapshotSubsystem::FinishTruckUnfoldAnimations() const
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World) || not FParse::Param(FCommandLine::Get(), UISnapshotConstants::FinishTruckAnimsSwitch))
+	{
+		return;
+	}
+	for (TActorIterator<ANomadicVehicle> It(World); It; ++It)
+	{
+		if (It->GetNomadicStatus() != ENomadStatus::CreatingBuildingTruckAnim)
+		{
+			continue;
+		}
+		UFunction* const MontageFinished = It->FindFunction(UISnapshotConstants::TruckMontageFinishedFunction);
+		if (MontageFinished == nullptr)
+		{
+			continue;
+		}
+		It->ProcessEvent(MontageFinished, nullptr);
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT finished truck unfold of %s"), *It->GetName());
+	}
+}
+
+AActor* UUISnapshotSubsystem::FindPlayerTrainer() const
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return nullptr;
 	}
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
@@ -411,15 +564,25 @@ void UUISnapshotSubsystem::SelectTrainer() const
 		const bool bIsPlayerTrainer = IsValid(RTSComponent)
 			&& RTSComponent->GetOwningPlayer() == UISnapshotConstants::PlayerOwnerIndex
 			&& IsValid(It->FindComponentByClass<UTrainerComponent>());
-		if (not bIsPlayerTrainer)
+		if (bIsPlayerTrainer)
 		{
-			continue;
+			return *It;
 		}
-		M_PlayerController->SelectSingleUnitFromUI(*It);
-		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT selected trainer %s"), *It->GetName());
+	}
+	return nullptr;
+}
+
+void UUISnapshotSubsystem::FocusCameraOnTrainer() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::FocusTrainerSwitch) || not GetIsValidPlayerController())
+	{
 		return;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT no player trainer on this map"));
+	// Nomadic trucks only finish converting into buildings while they are rendered.
+	if (const AActor* const Trainer = FindPlayerTrainer())
+	{
+		M_PlayerController->FocusCameraOnActor(Trainer);
+	}
 }
 
 FString UUISnapshotSubsystem::GetCurrentStepName() const

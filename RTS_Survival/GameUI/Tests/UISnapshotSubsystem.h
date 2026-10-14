@@ -59,6 +59,7 @@ private:
 
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 	bool bM_HasAddedGallery = false;
+	bool bM_HasFinishedTruckAnims = false;
 
 	void TickWaitingForHud();
 	void TickWaitingAfterStart();
@@ -76,10 +77,13 @@ private:
 	void DismissDifficultyPicker() const;
 	// With -UISnapshotEnergyPreview the energy bar is held at a fixed fill so its look can be reviewed.
 	void HoldEnergyPreview() const;
-	// With -UISnapshotHoverPortrait the cursor is moved onto the selected unit's portrait (unit description).
+	// -UISnapshotHoverPortrait / -UISnapshotHoverAction / -UISnapshotHoverTraining hover the portrait, first action button or first training item.
 	void HoverPortrait() const;
+	void HoverFirstVisibleWidget(UClass* const UserWidgetClass, const FName InnerWidgetName) const;
+	static void MoveSlateCursorTo(const FVector2D& AbsolutePosition);
 	// -UISnapshotGallery=/Game/A+/Game/B adds those widgets with their designer content for review.
 	void AddGalleryWidgetsOnce();
+	static void ShowCollapsedGalleryParts(UUserWidget& GalleryWidget);
 	void ApplyCurrentStep();
 	void CaptureCurrentStep() const;
 	void AdvanceStepOrFinish();
@@ -87,6 +91,15 @@ private:
 
 	void SelectPlayerUnits() const;
 	void SelectTrainer() const;
+	AActor* FindPlayerTrainer() const;
+	// -UISnapshotFocusTrainer keeps the camera on the trainer so a converting nomadic truck finishes its building.
+	void FocusCameraOnTrainer() const;
+	// -UISnapshotTickPoses: lets offscreen nomadic conversion montages play (meshes never count as rendered).
+	void ForceNomadicMeshesToTickPose() const;
+	// -UISnapshotFinishTruckAnims: ends the truck-unfold montage step of converting nomadic trucks.
+	void FinishTruckUnfoldAnimations() const;
+	// -UISnapshotHideGlass collapses every M_GlassPane so the same scene can be captured with and without glass.
+	void HideGlassPanes() const;
 
 	FString GetCurrentStepName() const;
 	bool GetIsValidPlayerController() const;

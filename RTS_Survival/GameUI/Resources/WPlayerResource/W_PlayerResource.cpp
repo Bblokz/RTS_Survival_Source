@@ -7,6 +7,29 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/GameUI/Resources/WPlayerResource/ResourceDescription/W_ResourceDescription.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
+#include "Components/Image.h"
+#include "Materials/MaterialInterface.h"
+
+namespace PlayerResourceGlassIcons
+{
+	const TCHAR* const RadixitePath =
+		TEXT("/Game/RTS_Survival/Blueprints/GameUI/ResourceUI/Materials/MI_GlassResourceIcon_Radixite.MI_GlassResourceIcon_Radixite");
+	const TCHAR* const MetalPath =
+		TEXT("/Game/RTS_Survival/Blueprints/GameUI/ResourceUI/Materials/MI_GlassResourceIcon_Metal.MI_GlassResourceIcon_Metal");
+	const TCHAR* const VehiclePartsPath =
+		TEXT("/Game/RTS_Survival/Blueprints/GameUI/ResourceUI/Materials/MI_GlassResourceIcon_VehicleParts.MI_GlassResourceIcon_VehicleParts");
+}
+
+UW_PlayerResource::UW_PlayerResource(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+	M_GlassIconMaterials.Add(ERTSResourceType::Resource_Radixite,
+	                         TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(PlayerResourceGlassIcons::RadixitePath)));
+	M_GlassIconMaterials.Add(ERTSResourceType::Resource_Metal,
+	                         TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(PlayerResourceGlassIcons::MetalPath)));
+	M_GlassIconMaterials.Add(ERTSResourceType::Resource_VehicleParts,
+	                         TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(PlayerResourceGlassIcons::VehiclePartsPath)));
+}
 
 void UW_PlayerResource::InitUwPlayerResource(
 	UPlayerResourceManager* NewPlayerResourceManager,
@@ -25,6 +48,36 @@ void UW_PlayerResource::InitUwPlayerResource(
 	}
 	ResourceType = NewResourceType;
 	SetupResource(NewResourceType);
+	ApplyGlassResourceIcon(NewResourceType);
+}
+
+void UW_PlayerResource::ApplyGlassResourceIcon(const ERTSResourceType NewResourceType) const
+{
+	const TSoftObjectPtr<UMaterialInterface>* const GlassIcon = M_GlassIconMaterials.Find(NewResourceType);
+	if (GlassIcon == nullptr || GlassIcon->IsNull() || not GetIsValidResourceImage())
+	{
+		return;
+	}
+	UMaterialInterface* const GlassMaterial = GlassIcon->LoadSynchronous();
+	if (not IsValid(GlassMaterial))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("Glass resource icon material could not be loaded: %s\n See UW_PlayerResource::ApplyGlassResourceIcon"),
+			*GlassIcon->ToString()));
+		return;
+	}
+	M_ResourceImage->SetBrushFromMaterial(GlassMaterial);
+}
+
+bool UW_PlayerResource::GetIsValidResourceImage() const
+{
+	if (IsValid(M_ResourceImage))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this, TEXT("M_ResourceImage"), TEXT("UW_PlayerResource::GetIsValidResourceImage"), this);
+	return false;
 }
 
 void UW_PlayerResource::NativeConstruct()
