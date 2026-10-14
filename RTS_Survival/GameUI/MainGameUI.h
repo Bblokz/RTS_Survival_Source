@@ -33,6 +33,7 @@ class UW_MissionWidgetManager;
 enum class EMiniMapStartDirection : uint8;
 class AFowManager;
 class UW_MiniMap;
+class UW_FullMapView;
 class UW_ControlGroups;
 class UW_BxpDescription;
 class UTechTree;
@@ -209,6 +210,11 @@ public:
 	void SetActionButtonHotkeysHidden(const bool bHideActionButtonHotkeys);
 
 	TObjectPtr<UW_MiniMap> GetIsValidMiniMap() const;
+
+	/** Opens the full-screen map (minimap map button) and hides the main game UI until it closes. */
+	void OpenFullMapView();
+	/** Closes the full-screen map and restores the main game UI. */
+	void CloseFullMapView();
 
 	ACPPController* GetPlayerController()const;
 
@@ -618,4 +624,8 @@ private:
 	TObjectPtr<UW_MiniMap> M_MiniMap;
 
 	bool EnsureMiniMapIsValid() const;
+
+	// Created on first open and added to the viewport; collapsed while closed.
+	UPROPERTY()
+	TObjectPtr<UW_FullMapView> M_FullMapView;
 };

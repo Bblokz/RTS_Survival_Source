@@ -140,6 +140,12 @@ public:
 	                    const TObjectPtr<UTexture>& Terrain,
 	                    const TObjectPtr<AFowManager>& FowManager);
 
+	/** Applies new glass settings at runtime (both the map refraction and the overlay). */
+	UFUNCTION(BlueprintCallable, Category = "MiniMap|Glass")
+	void SetGlassSettings(const FMiniMapGlassSettings& NewGlassSettings);
+
+	const FMiniMapGlassSettings& GetGlassSettings() const { return M_GlassSettings; }
+
 	/** Fired when the user clicks the mini-map; UV coordinates in [0,1]. */
 	UPROPERTY(BlueprintAssignable, Category="MiniMap")
 	FOnMiniMapClicked OnMiniMapClicked;
@@ -164,9 +170,6 @@ protected:
 	TSoftObjectPtr<UMaterialInterface> M_GlassOverlayMaterial = TSoftObjectPtr<UMaterialInterface>(
 		FSoftObjectPath(TEXT("/Game/RTS_Survival/Blueprints/GameUI/MiniMap/M_UI_MiniMapGlass.M_UI_MiniMapGlass")));
 
-	/** Applies new glass settings at runtime (both the map refraction and the overlay). */
-	UFUNCTION(BlueprintCallable, Category = "MiniMap|Glass")
-	void SetGlassSettings(const FMiniMapGlassSettings& NewGlassSettings);
 
 	virtual int32 NativePaint(const FPaintArgs& Args,
 	                          const FGeometry& AllottedGeometry,

@@ -1007,6 +1007,7 @@ bool ACPPController::OnCinematicTakeOver(const bool bStartCinematic)
 	if (bStartCinematic)
 	{
 		CloseEscapeMenu();
+		M_MainGameUI->CloseFullMapView();
 		HandleHoveringBlockedState();
 	}
 	bM_IsCinematicTakeOverActive = bStartCinematic;
@@ -1572,6 +1573,15 @@ void ACPPController::SetIsPlayerInTechTree(const bool bIsInTechTree)
 	{
 		PauseGame(ERTSPauseGameOptions::ForceUnpause);
 	}
+}
+
+void ACPPController::SetIsPlayerInFullMapView(const bool bIsInFullMapView)
+{
+	if (GetIsValidPlayerCameraController())
+	{
+		M_PlayerCameraController->SetIsPlayerInTechTreeOrArchive(bIsInFullMapView);
+	}
+	bM_IsInFullMapView = bIsInFullMapView;
 }
 
 void ACPPController::SetIsPlayerInArchive(const bool bIsInArchive)
@@ -8000,7 +8010,7 @@ void ACPPController::ApplyHoverRangeIndicatorSettingChanged(const bool bNewCheck
 void ACPPController::UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
                                              const FHitResult& MouseHitResult, const bool bHit)
 {
-	if (bM_IsInTechTree || bM_IsCinematicTakeOverActive)
+	if (bM_IsInTechTree || bM_IsInFullMapView || bM_IsCinematicTakeOverActive)
 	{
 		// Do not use hovering widgets while blocked by top-level UI overlays or cinematic takeover.
 		HandleHoveringBlockedState();

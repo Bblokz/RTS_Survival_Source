@@ -272,3 +272,38 @@ sizing in `MainGameUI_HUD`.
     (12 / 6 / 14 / 6 padding, 8 between button and text), instead of a fixed 200 × 50 image.
   - The `ProtoRichTextBlock`s (typewriter effect) are untouched.
   - `-UISnapshotCollapseMission` presses the collapse button for captures.
+
+## Full map view
+
+- **Open button:**
+  - `M_OpenFullMapButton` sits in `MainGameUI_HUD`, in the minimap's top right corner.
+  - It is a `UW_GlassIconButton` (`GameUI/GlassButtons`) with the `OpenFullMapView` action, at 38 units, placed by
+    `ui_hud_parts.py` `apply_full_map_button`.
+  - The button builds its own widget tree. The action calls `UMainGameUI::OpenFullMapView` on its outer main UI,
+    so it needs no wiring.
+- **View:** `UW_FullMapView` (`GameUI/MiniMap/FullMapView`) is created on first open and added to the viewport at
+  Z 400, below the archive and the tech tree. It builds its own tree:
+  - a dark backdrop that swallows clicks and the mouse wheel;
+  - a square frame sized to 86% of the screen height;
+  - a second `W_BP_MiniMap` inside the frame, with the minimap's Active/Passive/Terrain textures, fog of war
+    manager, start-direction rotation and glass (thinner band, 2.5× scratch density);
+  - the camera frame (`P1P2`/`P3P4`), copied from the minimap's material every tick.
+- **Painted labels:** A–H / 1–8 labels and grid ticks in the frame band, the "TACTICAL MAP" title and a hint line.
+- **Clicks:**
+  - A click on the large map is re-broadcast through the minimap's `OnMiniMapClicked`, so the camera pawn moves
+    as for a minimap click. The view stays open.
+  - The red close button (`T_GlassButton_MapClose`) calls `UMainGameUI::CloseFullMapView`.
+- **While open:**
+  - The main HUD is hidden.
+  - `ACPPController::SetIsPlayerInFullMapView` blocks the free camera and hover tooltips. The game does not pause.
+  - A cinematic takeover, or hiding all game UI, closes the view.
+- **Art:**
+  - `glass_buttons.py` draws the procedural glyphs: a folded map with a route (`MapOpen`, cyan glass) and an X
+    (`MapClose`, red glass).
+  - `custom_parts.py` `map_frame()` draws `Custom_MapFrame`: 256 px, an 80 px slice margin (= the 40 unit band),
+    a heavy chrome rim, a raised lip around the map, corner bolts and cyan brackets.
+  - The frame's shading depends only on the distance to the nearest edge, so the tiled edge sections do not band.
+  - The instance is `MI9_Custom_MapFrame_128x128_u_n`.
+- **Captures:**
+  - `-UISnapshotOpenFullMap` presses the real map button.
+  - `-UISnapshotCloseFullMapAtStep=N` presses the close button when capture step N starts.

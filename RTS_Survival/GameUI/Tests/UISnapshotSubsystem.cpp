@@ -26,6 +26,8 @@
 #include "UObject/UObjectIterator.h"
 #include "RTS_Survival/GameUI/Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
+#include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/GameUI/MiniMap/FullMapView/W_FullMapView.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GameUI/MiniMap/MinimapTerrainCaptureComponent.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
@@ -77,6 +79,10 @@ namespace UISnapshotConstants
 	// Presses the mission widget's collapse button once (the blueprint's OnClicked), showing the collapsed title.
 	const TCHAR* const CollapseMissionSwitch = TEXT("UISnapshotCollapseMission");
 	const FName MissionCollapseButtonName(TEXT("DescriptionButton"));
+	const TCHAR* const OpenFullMapSwitch = TEXT("UISnapshotOpenFullMap");
+	const TCHAR* const CloseFullMapAtStepSwitch = TEXT("UISnapshotCloseFullMapAtStep=");
+	const FName OpenFullMapButtonName(TEXT("M_OpenFullMapButton"));
+	const FName FullMapCloseButtonName(TEXT("CloseButton"));
 	const TCHAR* const GallerySwitch = TEXT("UISnapshotGallery=");
 	const FVector2D GalleryOrigin(40.0, 140.0);
 	constexpr double GalleryRowHeight = 260.0;
@@ -420,6 +426,7 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 	}
 	StartWeaponReloads();
 	CollapseMissionOnce();
+	ToggleFullMapForStep();
 }
 
 void UUISnapshotSubsystem::CaptureCurrentStep() const
@@ -516,6 +523,70 @@ void UUISnapshotSubsystem::ForceNomadicMeshesToTickPose() const
 			Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 		}
 	}
+}
+
+void UUISnapshotSubsystem::ToggleFullMapForStep()
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::OpenFullMapSwitch))
+	{
+		return;
+	}
+	if (not bM_HasOpenedFullMap)
+	{
+		TArray<UUserWidget*> MainGameUIs;
+		UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), MainGameUIs, UMainGameUI::StaticClass(), false);
+		for (UUserWidget* const MainGameUI : MainGameUIs)
+		{
+			if (ClickGlassButtonIn(MainGameUI, UISnapshotConstants::OpenFullMapButtonName))
+			{
+				bM_HasOpenedFullMap = true;
+				UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT pressed the map button"));
+				break;
+			}
+		}
+	}
+	int32 CloseAtStep = INDEX_NONE;
+	if (not FParse::Value(FCommandLine::Get(), UISnapshotConstants::CloseFullMapAtStepSwitch, CloseAtStep)
+		|| CloseAtStep != M_StepIndex)
+	{
+		return;
+	}
+	TArray<UUserWidget*> FullMapViews;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), FullMapViews, UW_FullMapView::StaticClass(), false);
+	for (UUserWidget* const FullMapView : FullMapViews)
+	{
+		if (ClickGlassButtonIn(FullMapView, UISnapshotConstants::FullMapCloseButtonName))
+		{
+			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT pressed the full map close button"));
+		}
+	}
+}
+
+bool UUISnapshotSubsystem::ClickGlassButtonIn(UUserWidget* const OwnerWidget, const FName& GlassButtonName) const
+{
+	if (not IsValid(OwnerWidget) || not IsValid(OwnerWidget->WidgetTree))
+	{
+		return false;
+	}
+	const UUserWidget* const GlassButton = Cast<UUserWidget>(OwnerWidget->WidgetTree->FindWidget(GlassButtonName));
+	if (not IsValid(GlassButton) || not IsValid(GlassButton->WidgetTree))
+	{
+		return false;
+	}
+	UButton* InnerButton = nullptr;
+	GlassButton->WidgetTree->ForEachWidget([&InnerButton](UWidget* const Widget)
+	{
+		if (InnerButton == nullptr)
+		{
+			InnerButton = Cast<UButton>(Widget);
+		}
+	});
+	if (not IsValid(InnerButton))
+	{
+		return false;
+	}
+	InnerButton->OnClicked.Broadcast();
+	return true;
 }
 
 void UUISnapshotSubsystem::CollapseMissionOnce()

@@ -47,6 +47,7 @@
 #include "RTS_Survival/Utils/RTSInputModeDefaults.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Missions/MissionWidgets/MissionWidgetManager/W_MissionWidgetManager.h"
+#include "RTS_Survival/GameUI/MiniMap/FullMapView/W_FullMapView.h"
 
 
 void UMainGameUI::OpenTechTree()
@@ -194,6 +195,8 @@ void UMainGameUI::OnHideAllGameUI(const bool bHide)
 		{
 			M_TechTree->SetVisibility(ESlateVisibility::Collapsed);
 		}
+		// Also gives the camera and hover tooltips back; the HUD stays hidden by bWasHiddenByAllGameUI.
+		CloseFullMapView();
 		return;
 	}
 
@@ -1405,6 +1408,49 @@ void UMainGameUI::AddTechTreeToViewport(UTechTree* TechTreeWidget)
 	SetMainMenuVisiblity(false);
 	TechTreeWidget->SetMainGameUI(this);
 	M_TechTree = TechTreeWidget;
+}
+
+void UMainGameUI::OpenFullMapView()
+{
+	if (bWasHiddenByAllGameUI || not EnsureMiniMapIsValid())
+	{
+		return;
+	}
+	if (not IsValid(M_FullMapView))
+	{
+		// Below the archive (500) and the tech tree (1000).
+		constexpr int32 FullMapViewZOrder = 400;
+		M_FullMapView = CreateWidget<UW_FullMapView>(GetOwningPlayer(), UW_FullMapView::StaticClass());
+		if (not IsValid(M_FullMapView))
+		{
+			RTSFunctionLibrary::ReportError("Could not create the full map view."
+				"\n See UMainGameUI::OpenFullMapView");
+			return;
+		}
+		M_FullMapView->AddToViewport(FullMapViewZOrder);
+	}
+	// Re-initialised on every open so it always mirrors the minimap's current textures and rotation.
+	M_FullMapView->InitFullMapView(M_MiniMap, this);
+	if (GetIsValidPlayerController())
+	{
+		M_PlayerController->SetIsPlayerInFullMapView(true);
+	}
+	SetMainMenuVisiblity(false);
+	M_FullMapView->SetVisibility(ESlateVisibility::Visible);
+}
+
+void UMainGameUI::CloseFullMapView()
+{
+	if (not IsValid(M_FullMapView) || not M_FullMapView->IsVisible())
+	{
+		return;
+	}
+	M_FullMapView->SetVisibility(ESlateVisibility::Collapsed);
+	if (GetIsValidPlayerController())
+	{
+		M_PlayerController->SetIsPlayerInFullMapView(false);
+	}
+	SetMainMenuVisiblity(true);
 }
 
 void UMainGameUI::OnCloseTechTree()

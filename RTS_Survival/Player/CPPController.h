@@ -615,6 +615,8 @@ public:
 	inline bool GetIsPlayerInTechTree() const { return bM_IsInTechTree; }
 	void SetIsPlayerInTechTree(const bool bIsInTechTree);
 	void SetIsPlayerInArchive(const bool bIsInArchive);
+	// The full map view does not pause the game; it only blocks the free camera and hover tooltips.
+	void SetIsPlayerInFullMapView(const bool bIsInFullMapView);
 
 	UMainGameUI* GetMainMenuUI() const { return M_MainGameUI; }
 	void ApplyHoverRangeIndicatorSettingChanged(bool bNewCheckUnitRangeOnHover);
@@ -2032,6 +2034,8 @@ private:
 
 	// Blocks pause input while cinematic takeover is active.
 	bool bM_IsCinematicTakeOverActive = false;
+
+	bool bM_IsInFullMapView = false;
 	
 
 	// For hotkeys related to nomadic expansion and BXPs on that nomadic.
