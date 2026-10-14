@@ -22,6 +22,8 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingUIWidget/W_TrainingItem.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "UObject/UObjectIterator.h"
 #include "RTS_Survival/GameUI/Resources/PlayerEnergyBar/W_PlayerEnergyBar.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
@@ -70,6 +72,11 @@ namespace UISnapshotConstants
 	// Hides the glass panes (ui_glass_panes.py, widget M_GlassPane) so captures with and without them compare.
 	const TCHAR* const HideGlassSwitch = TEXT("UISnapshotHideGlass");
 	const FName GlassPaneName(TEXT("M_GlassPane"));
+	// Starts a magazine reload on every weapon after each selection so the weapon items' reload bars show.
+	const TCHAR* const ReloadWeaponsSwitch = TEXT("UISnapshotReloadWeapons");
+	// Presses the mission widget's collapse button once (the blueprint's OnClicked), showing the collapsed title.
+	const TCHAR* const CollapseMissionSwitch = TEXT("UISnapshotCollapseMission");
+	const FName MissionCollapseButtonName(TEXT("DescriptionButton"));
 	const TCHAR* const GallerySwitch = TEXT("UISnapshotGallery=");
 	const FVector2D GalleryOrigin(40.0, 140.0);
 	constexpr double GalleryRowHeight = 260.0;
@@ -406,9 +413,13 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 	if (Step.Selection == EUISnapshotSelection::PlayerUnits)
 	{
 		SelectPlayerUnits();
-		return;
 	}
-	SelectTrainer();
+	else
+	{
+		SelectTrainer();
+	}
+	StartWeaponReloads();
+	CollapseMissionOnce();
 }
 
 void UUISnapshotSubsystem::CaptureCurrentStep() const
@@ -505,6 +516,51 @@ void UUISnapshotSubsystem::ForceNomadicMeshesToTickPose() const
 			Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
 		}
 	}
+}
+
+void UUISnapshotSubsystem::CollapseMissionOnce()
+{
+	if (bM_HasCollapsedMission || not FParse::Param(FCommandLine::Get(), UISnapshotConstants::CollapseMissionSwitch))
+	{
+		return;
+	}
+	TArray<UUserWidget*> Widgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Widgets, UUserWidget::StaticClass(), false);
+	for (UUserWidget* const Widget : Widgets)
+	{
+		if (not IsValid(Widget) || not IsValid(Widget->WidgetTree))
+		{
+			continue;
+		}
+		UButton* const CollapseButton = Cast<UButton>(Widget->WidgetTree->FindWidget(UISnapshotConstants::MissionCollapseButtonName));
+		if (IsValid(CollapseButton) && CollapseButton->IsVisible())
+		{
+			CollapseButton->OnClicked.Broadcast();
+			bM_HasCollapsedMission = true;
+			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT collapsed mission %s"), *Widget->GetName());
+		}
+	}
+}
+
+void UUISnapshotSubsystem::StartWeaponReloads() const
+{
+#if !UE_BUILD_SHIPPING
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::ReloadWeaponsSwitch))
+	{
+		return;
+	}
+	const UWorld* const World = GetWorld();
+	int32 ReloadCount = 0;
+	for (TObjectIterator<UWeaponState> It; It; ++It)
+	{
+		if (It->GetWorld() == World && not It->GetIsReloading())
+		{
+			It->Debug_StartReload();
+			ReloadCount += It->GetIsReloading() ? 1 : 0;
+		}
+	}
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT started %d weapon reloads"), ReloadCount);
+#endif
 }
 
 void UUISnapshotSubsystem::HideGlassPanes() const

@@ -2,6 +2,7 @@
 
 #include "AmmoButton/W_AmmoPicker.h"
 #include "Components/Border.h"
+#include "Components/ProgressBar.h"
 #include "OnHoverDescription/W_WeaponDescription.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -156,6 +157,33 @@ bool UW_WeaponItem::EnsureIsValidAmmoBorder() const
 		return false;
 	}
 	return true;
+}
+
+void UW_WeaponItem::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	UpdateReloadBar();
+}
+
+void UW_WeaponItem::UpdateReloadBar() const
+{
+	if (not IsValid(M_ReloadProgressBar))
+	{
+		return;
+	}
+	// Bomb components and empty items have no weapon state; they never show a reload.
+	const bool bIsReloading = IsValid(M_LoadedWeaponState) && M_LoadedWeaponState->GetIsReloading();
+	const ESlateVisibility WantedVisibility = bIsReloading
+		                                          ? ESlateVisibility::HitTestInvisible
+		                                          : ESlateVisibility::Collapsed;
+	if (M_ReloadProgressBar->GetVisibility() != WantedVisibility)
+	{
+		M_ReloadProgressBar->SetVisibility(WantedVisibility);
+	}
+	if (bIsReloading)
+	{
+		M_ReloadProgressBar->SetPercent(M_LoadedWeaponState->GetReloadProgress());
+	}
 }
 
 bool UW_WeaponItem::GetIsValidLoadedWeaponState() const

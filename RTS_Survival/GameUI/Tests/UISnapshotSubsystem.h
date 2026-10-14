@@ -60,6 +60,7 @@ private:
 	TWeakObjectPtr<ACPPController> M_PlayerController;
 	bool bM_HasAddedGallery = false;
 	bool bM_HasFinishedTruckAnims = false;
+	bool bM_HasCollapsedMission = false;
 
 	void TickWaitingForHud();
 	void TickWaitingAfterStart();
@@ -100,6 +101,10 @@ private:
 	void FinishTruckUnfoldAnimations() const;
 	// -UISnapshotHideGlass collapses every M_GlassPane so the same scene can be captured with and without glass.
 	void HideGlassPanes() const;
+	// -UISnapshotReloadWeapons: starts a magazine reload on every weapon (reload bars under the weapon items).
+	void StartWeaponReloads() const;
+	// -UISnapshotCollapseMission: collapses the mission dialog to its title once (captures the collapsed state).
+	void CollapseMissionOnce();
 
 	FString GetCurrentStepName() const;
 	bool GetIsValidPlayerController() const;

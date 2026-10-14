@@ -249,3 +249,26 @@ sizing in `MainGameUI_HUD`.
   - Add `-UISnapshotHoverTraining` to hover the first training item.
 - **Other switches:** `-UISnapshotTickPoses` (force pose ticks) and `-UISnapshotFocusTrainer` (camera on the
   trainer). The selection log now prints the trainer's nomad status.
+
+## Weapon items, reload bars, mission UI
+
+- **Weapon glass:** `BP_W_WeaponItem` gets a pane from `MI_GlassPane_WeaponItem` (`ui_glass_panes.py`). It is
+  stronger than on the action buttons, with no colour:
+  - rim 0.34, streak 0.09, dust 0.08;
+  - scratches 0.42 at coverage 0.62, with edge bias 0.4 so they also cross the weapon picture.
+- **Reload bar:**
+  - `UWeaponState::GetIsReloading` / `GetReloadProgress` (from the reload timer) cover full magazine reloads
+    only, not shot cooldowns.
+  - `UW_WeaponItem` binds the optional `M_ReloadProgressBar` and, in `NativeTick`, shows it only while the
+    loaded weapon reloads.
+  - The bar (`M_ReloadBarBox`, 6 units) hangs under the card (bottom aligned, negative bottom padding) and uses
+    the energy gauge track/fill instances, tinted amber.
+  - `UWeaponState::Debug_StartReload` (non-shipping) and the capture switch `-UISnapshotReloadWeapons` start
+    reloads for captures.
+- **Mission UI:**
+  - `W_BP_Mission.Border_84` (expanded dialog) and `W_BP_MissionDescription.Border_56` use the new
+    `Custom_DialogPanel`: a thin chrome rim, deep field and cyan corner brackets.
+  - The collapsed title plate (`Image_56` in `SizeBox_279`) is the label plate stretched behind the title row
+    (12 / 6 / 14 / 6 padding, 8 between button and text), instead of a fixed 200 × 50 image.
+  - The `ProtoRichTextBlock`s (typewriter effect) are untouched.
+  - `-UISnapshotCollapseMission` presses the collapse button for captures.

@@ -8,6 +8,7 @@
 
 enum class EWeaponDescriptionType : uint8;
 class UBorder;
+class UProgressBar;
 class UBombComponent;
 class UActionUIManager;
 class UW_AmmoPicker;
@@ -67,6 +68,12 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	UBorder* AmmoBorder;
+
+	// Bar hanging under the weapon item; only visible while the weapon reloads a full magazine.
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> M_ReloadProgressBar;
+
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	
 private:
 	// The weapon state that this widget is displaying, if any.
@@ -87,6 +94,9 @@ private:
 	bool EnsureIsValidWeaponDescription();
 	bool EnsureIsValidAmmoBorder() const;
 	bool GetIsValidLoadedWeaponState() const;
+
+	// Shows the reload bar with the reload progress while the loaded weapon reloads, hides it otherwise.
+	void UpdateReloadBar() const;
 
 	void SetupAmmoIcon(EWeaponDescriptionType WeaponDescriptionType, const EWeaponShellType WeaponShellType, const int32
 	                   AmountOfShellsAvailable);

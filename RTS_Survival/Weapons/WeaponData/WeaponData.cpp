@@ -1499,6 +1499,23 @@ void UWeaponState::Reload()
 	}
 }
 
+float UWeaponState::GetReloadProgress() const
+{
+	if (not bM_IsReloading || not IsValid(World))
+	{
+		return 0.0f;
+	}
+	const FTimerManager& TimerManager = World->GetTimerManager();
+	const float Elapsed = TimerManager.GetTimerElapsed(M_WeaponTimerHandle);
+	const float Remaining = TimerManager.GetTimerRemaining(M_WeaponTimerHandle);
+	const float Total = Elapsed + Remaining;
+	if (Elapsed < 0.0f || Total <= KINDA_SMALL_NUMBER)
+	{
+		return 0.0f;
+	}
+	return FMath::Clamp(Elapsed / Total, 0.0f, 1.0f);
+}
+
 void UWeaponState::OnReloadFinished()
 {
 	if (IsValid(World) && IsValid(WeaponOwner.GetObject()))

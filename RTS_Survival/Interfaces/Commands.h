@@ -1012,6 +1012,7 @@ public:
 	 * @param bSetUnitToIdle Replace the current queue (no Shift held).
 	 * @return NoError when the order was queued; its card must hold an IdEnterCoverAndHold entry.
 	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Commands")
 	virtual ECommandQueueError EnterCoverAndHold(bool bSetUnitToIdle);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Commands")

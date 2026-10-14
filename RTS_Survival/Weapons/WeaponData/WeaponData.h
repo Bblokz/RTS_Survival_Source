@@ -642,6 +642,17 @@ public:
 
 	inline int32 GetCurrentMagCapacity() const { return M_CurrentMagCapacity; };
 
+	/** @return Whether a full magazine reload is running (not the cooldown between shots). */
+	inline bool GetIsReloading() const { return bM_IsReloading; }
+
+	/** @return Progress of the running magazine reload in [0, 1]; 0 while not reloading. */
+	float GetReloadProgress() const;
+
+#if !UE_BUILD_SHIPPING
+	/** Test hook (offscreen UI captures): starts a magazine reload as if the magazine had run empty. */
+	void Debug_StartReload() { Reload(); }
+#endif
+
 	virtual FWeaponData* GetWeaponDataToUpgrade();
 
 	/**
