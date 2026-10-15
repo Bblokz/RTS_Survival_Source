@@ -183,6 +183,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gun Pit")
 	bool bKeepCrewBlueprintOffset = false;
 
+	// How hard the crew brace at every shot (UGunPitCrewAnimInstance::PlayFireFlinch); 0 for a machine gun crew
+	// whose gun fires in bursts.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gun Pit", meta = (ClampMin = "0"))
+	float CrewFireFlinchStrength = 1.f;
+
 private:
 	UPROPERTY()
 	TWeakObjectPtr<USkeletalMeshComponent> M_GunMesh;
@@ -196,6 +201,10 @@ private:
 
 	// Index in M_Rounds of the round the handler holds or the loader is carrying to the breech.
 	int32 M_RoundInFlightIndex = 0;
+
+	// True once this drill's round went into the gun; a drill may ram before the handler picks the next round
+	// (the Flak loader pushes the clip in early), and the pick then takes the round now in flight.
+	bool bM_RammedThisDrill = false;
 
 	FTimerHandle M_LoadingFinishedTimer;
 	FTimerHandle M_FirstRoundTimer;
@@ -212,6 +221,9 @@ private:
 	void PlayCrewLoadingMontages(const float DrillSeconds, const float StartPosition) const;
 	void SetCrewIdleAnimations() const;
 	void PlayCrewFireMontages() const;
+	// The gun bucks (UGunPitAnimInstance::PlayFireKick) and the crew brace at a shot.
+	void PlayGunFireKick() const;
+	void PlayCrewFireFlinch() const;
 	static void PlayMontageOnMesh(const USkeletalMeshComponent* Mesh, UAnimMontage* Montage, const float PlayRate,
 	                              const float StartPosition);
 

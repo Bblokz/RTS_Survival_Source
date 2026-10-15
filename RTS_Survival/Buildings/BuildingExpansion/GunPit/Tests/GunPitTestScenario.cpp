@@ -72,6 +72,8 @@ namespace GunPitTestPrivate
 	const TCHAR* const PitRoot = TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/");
 	const FVector PakLoaderSpot(-148.6f, 76.f, 0.f);
 	const FVector HowitzerLoaderSpot(-234.5f, 39.7f, 0.f);
+	// The Flak 37 team weapon's loader spot; his animation stands him on the gun's platform beside the feed.
+	const FVector FlakLoaderSpot(-97.92f, 85.05f, 0.f);
 	constexpr float PakViewScale = 0.8f;
 
 	const TCHAR* const DShKPitClassPath =
@@ -124,6 +126,7 @@ namespace GunPitTestPrivate
 			MakePit(TEXT("pak40"), TEXT("Pak40"), TEXT("SM_GerPit_Pak"), PakLoaderSpot, PakViewScale),
 			MakePit(TEXT("lefh18"), TEXT("LeFH18"), TEXT("SM_GerPit_Howitzer"), HowitzerLoaderSpot, 1.f),
 			MakePit(TEXT("sfh18"), TEXT("SFH18"), TEXT("SM_GerPit_Howitzer"), HowitzerLoaderSpot, 1.f),
+			MakePit(TEXT("flak37"), TEXT("Flak37"), TEXT("SM_GerPit_Flak"), FlakLoaderSpot, PakViewScale),
 		};
 	}
 
@@ -656,6 +659,7 @@ void FGunPitTestScenario::TickObserving(UWorld& World)
 		}
 		if (Pit.bCarriesRounds)
 		{
+			WatchFireReaction(World, Pit);
 			WatchDrill(World, Pit);
 			continue;
 		}
@@ -703,6 +707,38 @@ void FGunPitTestScenario::CountShots(const UWorld& World, FGunPitUnderTest& Pit)
 		       World.GetTimeSeconds(), Magazine, *GetNameSafe(Pit.Turret->GetCurrentTargetActor()));
 	}
 	Pit.LastMagazine = Magazine;
+}
+
+void FGunPitTestScenario::WatchFireReaction(UWorld& World, FGunPitUnderTest& Pit)
+{
+	FGunPitFireReactionWatch& Watch = Pit.FireReaction;
+	const USkeletalMeshComponent* GunMesh = Pit.GunMesh.Get();
+	if (Watch.bChecked || Pit.ShotSeconds.IsEmpty() || not IsValid(GunMesh))
+	{
+		return;
+	}
+	if (not Watch.GetHasStarted())
+	{
+		Watch.Start(World.GetTimeSeconds(), *GunMesh, Pit.CrewMeshes);
+		CapturePit(World, Pit, TEXT("shot_0.00"));
+		return;
+	}
+	Watch.Sample(*GunMesh, Pit.CrewMeshes);
+	// The kick peaks about 0.1 s after the shot; the crew hold the brace to 0.25 s.
+	static const float CaptureMoments[] = {0.1f, 0.25f};
+	if (Watch.CapturesTaken < UE_ARRAY_COUNT(CaptureMoments)
+		&& Watch.GetSecondsSinceShot(World.GetTimeSeconds()) >= CaptureMoments[Watch.CapturesTaken])
+	{
+		CapturePit(World, Pit, FString::Printf(TEXT("shot_%.2f"), CaptureMoments[Watch.CapturesTaken]));
+		++Watch.CapturesTaken;
+	}
+	if (not Watch.GetIsWatchOver(World.GetTimeSeconds()))
+	{
+		return;
+	}
+	Watch.bChecked = true;
+	Check(Watch.GetDidGunBuck(), Pit.Label + TEXT("_gun_bucks_on_shot"), Watch.Describe());
+	Check(Watch.GetDidCrewBrace(), Pit.Label + TEXT("_crew_brace_on_shot"), Watch.Describe());
 }
 
 void FGunPitTestScenario::CheckTraverse(FGunPitUnderTest& Pit)

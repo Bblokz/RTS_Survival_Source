@@ -9,6 +9,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
+#include "GunPitAnimInstance.h"
 #include "GunPitCrewAnimInstance.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -139,10 +140,10 @@ void UGunPitCrewComponent::InitPitCrew_GatherRounds()
 	}
 	const bool bValidCrew = M_CrewMeshes.IsValidIndex(ShellCarry.HandlerCrewIndex) &&
 		M_CrewMeshes.IsValidIndex(ShellCarry.LoaderCrewIndex);
-	// The handler fetches the next round while the loader still carries this one; the swap in OnRoundRammed
-	// relies on that order.
+	// The loader rams the round he was handed, and the handler's hands are free for the next round only after the
+	// handover; the pick may come before or after the ram (OnNextRoundPicked).
 	const bool bValidOrder = ShellCarry.HandoverFraction < ShellCarry.RamFraction &&
-		ShellCarry.PickFraction < ShellCarry.RamFraction;
+		ShellCarry.HandoverFraction < ShellCarry.PickFraction;
 	if (M_Rounds.Num() != GunPitCrew::RoundCount || not bValidCrew || not bValidOrder)
 	{
 		RTSFunctionLibrary::ReportError(FString::Printf(
@@ -163,9 +164,44 @@ void UGunPitCrewComponent::OnGunFired()
 		return;
 	}
 	PlayGunMontage(ReloadSettings.GunFireMontage, 1.f, 0.f);
+	PlayGunFireKick();
+	PlayCrewFireFlinch();
 	if (not bM_IsLoading)
 	{
 		PlayCrewFireMontages();
+	}
+}
+
+void UGunPitCrewComponent::PlayGunFireKick() const
+{
+	if (not GetIsValidGunMesh())
+	{
+		return;
+	}
+	UGunPitAnimInstance* GunAnimInstance = Cast<UGunPitAnimInstance>(M_GunMesh->GetAnimInstance());
+	if (not IsValid(GunAnimInstance))
+	{
+		return;
+	}
+	GunAnimInstance->PlayFireKick();
+}
+
+void UGunPitCrewComponent::PlayCrewFireFlinch() const
+{
+	if (CrewFireFlinchStrength <= 0.f)
+	{
+		return;
+	}
+	for (const TWeakObjectPtr<USkeletalMeshComponent>& CrewMesh : M_CrewMeshes)
+	{
+		UGunPitCrewAnimInstance* CrewAnimInstance = CrewMesh.IsValid()
+			                                            ? Cast<UGunPitCrewAnimInstance>(CrewMesh->GetAnimInstance())
+			                                            : nullptr;
+		if (not IsValid(CrewAnimInstance))
+		{
+			continue;
+		}
+		CrewAnimInstance->PlayFireFlinch(CrewFireFlinchStrength);
 	}
 }
 
@@ -347,6 +383,7 @@ void UGunPitCrewComponent::ScheduleShellCarry(const float DrillSeconds)
 	{
 		TimerManager.SetTimer(Timer, this, Event, FMath::Max(DrillSeconds * Fraction, KINDA_SMALL_NUMBER), false);
 	};
+	bM_RammedThisDrill = false;
 	Schedule(M_HandoverTimer, &UGunPitCrewComponent::OnRoundHandedOver, ShellCarry.HandoverFraction);
 	Schedule(M_RamTimer, &UGunPitCrewComponent::OnRoundRammed, ShellCarry.RamFraction);
 	Schedule(M_PickTimer, &UGunPitCrewComponent::OnNextRoundPicked, ShellCarry.PickFraction);
@@ -381,13 +418,15 @@ void UGunPitCrewComponent::OnRoundRammed()
 	{
 		Round->SetVisibility(false);
 	}
-	// The other round, picked from the crate meanwhile, is the next one to hand over.
+	// The other round (picked from the crate meanwhile, or picked next) is the next one to hand over.
 	M_RoundInFlightIndex = (M_RoundInFlightIndex + 1) % GunPitCrew::RoundCount;
+	bM_RammedThisDrill = true;
 }
 
 void UGunPitCrewComponent::OnNextRoundPicked()
 {
-	const int32 NextIndex = (M_RoundInFlightIndex + 1) % GunPitCrew::RoundCount;
+	// Before the ram the round in flight is still the loader's; after it, the round in flight is the one to pick.
+	const int32 NextIndex = bM_RammedThisDrill ? M_RoundInFlightIndex : (M_RoundInFlightIndex + 1) % GunPitCrew::RoundCount;
 	UStaticMeshComponent* NextRound = M_Rounds[NextIndex].Get();
 	if (not IsValid(NextRound))
 	{
