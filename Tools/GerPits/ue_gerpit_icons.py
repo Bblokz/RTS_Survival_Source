@@ -23,6 +23,9 @@ PITS = {
     'SFH18': ('BTX_GerSFH18Pit', 'sFH 18 Pit',
               'An sFH 18 150mm heavy howitzer behind a high sandbag wall with camo canvas. Heavy, slow-loading '
               'artillery with long reach; its crew carry each shell from the ready crate to the breech.'),
+    'Flak37': ('BTX_GerFlak37Pit', 'Flak 37 Pit',
+               'A 3.7 cm Flak 37 anti-aircraft gun in a sandbagged pit. Fires six-round clips at aircraft and ground '
+               'targets; a handler passes each clip up to the loader on the gun while the next one is fetched.'),
 }
 eal = unreal.EditorAssetLibrary
 
