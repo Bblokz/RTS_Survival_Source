@@ -429,11 +429,21 @@ void FGunPitTestScenario::CheckAttachments(FGunPitUnderTest& Pit)
 {
 	using namespace GunPitTestPrivate;
 	const USkeletalMeshComponent* GunMesh = Pit.GunMesh.Get();
+	if (not IsValid(GunMesh) || not Pit.Turret.IsValid())
+	{
+		Check(false, Pit.Label + TEXT("_gun_mesh_valid"));
+		return;
+	}
 	Check(Pit.Crew.IsValid(), Pit.Label + TEXT("_has_crew_component"));
 	Check(Pit.CrewMeshes.Num() == ExpectedCrewCount, Pit.Label + TEXT("_has_four_crew"),
 	      FString::Printf(TEXT("crew=%d"), Pit.CrewMeshes.Num()));
 	Check(Pit.Rounds.Num() == ExpectedRoundCount, Pit.Label + TEXT("_has_two_rounds"),
 	      FString::Printf(TEXT("rounds=%d"), Pit.Rounds.Num()));
+	const FTransform RootBone = GunMesh->GetBoneTransform(0, FTransform::Identity);
+	UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST %s gun mesh=%s anim=%s component_scale=%s root_bone=%s "
+	       "root_bone_scale=%s"), *Pit.Label, *GetNameSafe(GunMesh->GetSkeletalMeshAsset()),
+	       *GetNameSafe(GunMesh->GetAnimInstance()), *GunMesh->GetComponentScale().ToCompactString(),
+	       *GunMesh->GetBoneName(0).ToString(), *RootBone.GetScale3D().ToCompactString());
 	const float OriginScale = GunMesh->GetSocketTransform(PitOriginSocket).GetScale3D().GetMax();
 	Check(FMath::IsNearlyEqual(OriginScale, 1.f, MaximumScaleError), Pit.Label + TEXT("_pit_origin_unscaled"),
 	      FString::Printf(TEXT("scale=%.3f"), OriginScale));
@@ -634,6 +644,7 @@ void FGunPitTestScenario::WatchDrill(UWorld& World, FGunPitUnderTest& Pit)
 		Pit.HandoverSeconds = Now;
 		Pit.LoaderAtHandover = Holder;
 		Pit.HandoverHandDistance = GetDistanceToHand(*Round, *Holder);
+		LogHandover(Pit, *Round, *Holder);
 		CapturePit(World, Pit, TEXT("handover"));
 	}
 	if (Pit.RamSeconds < 0.f && IsValid(Round) && not Round->IsVisible())
@@ -687,6 +698,26 @@ void FGunPitTestScenario::CheckDrill(FGunPitUnderTest& Pit)
 	      Pit.Label + TEXT("_loader_hand_on_round"), FString::Printf(TEXT("distance=%.1f"), Pit.HandoverHandDistance));
 	Check(Pit.PickHandDistance >= 0.f && Pit.PickHandDistance < MaximumRoundToHandDistance,
 	      Pit.Label + TEXT("_handler_hand_on_picked_round"), FString::Printf(TEXT("distance=%.1f"), Pit.PickHandDistance));
+}
+
+void FGunPitTestScenario::LogHandover(const FGunPitUnderTest& Pit, const UStaticMeshComponent& Round,
+                                      const USkeletalMeshComponent& Loader) const
+{
+	using namespace GunPitTestPrivate;
+	if (not Pit.GunMesh.IsValid())
+	{
+		return;
+	}
+	// In the PitOrigin frame, the space of the crew bake, so the numbers compare with gerpit_*_carry.json.
+	const FTransform Frame = GetPitOriginFrame(*Pit.GunMesh);
+	const FVector RoundLocal = Frame.InverseTransformPosition(Round.GetComponentLocation());
+	const FVector RightLocal = Frame.InverseTransformPosition(Loader.GetBoneLocation(HandBone));
+	const FVector LeftLocal = Frame.InverseTransformPosition(Loader.GetBoneLocation(TEXT("hand_l")));
+	const FVector RootLocal = Frame.InverseTransformPosition(Loader.GetComponentLocation());
+	const float LoaderYaw = Frame.InverseTransformRotation(Loader.GetComponentQuat()).Rotator().Yaw;
+	UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST %s handover round=%s loader_hand_r=%s loader_hand_l=%s "
+	       "loader_root=%s loader_yaw=%.1f"), *Pit.Label, *RoundLocal.ToCompactString(), *RightLocal.ToCompactString(),
+	       *LeftLocal.ToCompactString(), *RootLocal.ToCompactString(), LoaderYaw);
 }
 
 bool FGunPitTestScenario::GetIsPitDone(const FGunPitUnderTest& Pit) const

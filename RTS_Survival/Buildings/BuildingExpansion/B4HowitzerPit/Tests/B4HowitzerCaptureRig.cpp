@@ -11,6 +11,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "Kismet/KismetRenderingLibrary.h"
+#include "Misc/CommandLine.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSB4Capture, Log, All);
 
@@ -45,6 +46,14 @@ bool FB4HowitzerCaptureRig::Init(UWorld& World, const FString& Directory)
 	Capture->bCaptureOnMovement = false;
 	// The fog of war is a post-process material; the pictures show the units, not what the player may see.
 	Capture->ShowFlags.SetPostProcessMaterial(false);
+	// -CaptureExposureBias=<stops> brightens pictures taken under a map's low evening sun.
+	float ExposureBias = 0.f;
+	if (FParse::Value(FCommandLine::Get(), TEXT("CaptureExposureBias="), ExposureBias))
+	{
+		Capture->PostProcessSettings.bOverride_AutoExposureBias = true;
+		Capture->PostProcessSettings.AutoExposureBias = ExposureBias;
+		Capture->PostProcessBlendWeight = 1.f;
+	}
 	M_Camera = Camera;
 	M_RenderTarget.Reset(RenderTarget);
 	APointLight* FillLight = World.SpawnActor<APointLight>(APointLight::StaticClass(), FTransform::Identity, SpawnParameters);

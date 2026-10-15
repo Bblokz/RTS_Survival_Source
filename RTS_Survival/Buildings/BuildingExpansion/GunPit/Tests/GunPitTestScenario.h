@@ -101,6 +101,8 @@ private:
 	void CountShots(const UWorld& World, FGunPitUnderTest& Pit) const;
 	void WatchDrill(UWorld& World, FGunPitUnderTest& Pit);
 	void CheckDrill(FGunPitUnderTest& Pit);
+	void LogHandover(const FGunPitUnderTest& Pit, const UStaticMeshComponent& Round,
+	                 const USkeletalMeshComponent& Loader) const;
 	void CheckTraverse(FGunPitUnderTest& Pit);
 	bool GetIsPitDone(const FGunPitUnderTest& Pit) const;
 

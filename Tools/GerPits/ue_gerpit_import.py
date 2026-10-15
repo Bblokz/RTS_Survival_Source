@@ -2,7 +2,8 @@
 
 Run inside the editor (bridge pyfile or the editor's Python console). Blender sources live in
 D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Scripts (gerpit_build.py, gerpit_crew.py).
-The pits use two materials only: the German camo/concrete/plank atlas and the ammo box material.
+The pits use three materials: the German camo/concrete/plank atlas, the ammo box material and the German sandbag
+material (the bags keep the game's loose sandbag UVs).
 """
 import unreal
 
@@ -14,6 +15,7 @@ INFANTRY_SKELETON = '/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/I
 MATERIALS = {
     'GerPit_Atlas': '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/GerBuildingAtlassing/M_GerCamoConcretePalet_Atlas',
     'GerPit_Ammo': '/Game/RTS_Survival/Meshes/Props/Ammo/Materials/M_Ger_AmmoBox',
+    'GerPit_Sandbag': '/Game/RTS_Survival/Meshes/Props/SandBags/Textures/M_GerSandBagScaffold_Atlas',
 }
 PITS = ['SM_GerPit_Pak', 'SM_GerPit_Howitzer']
 ROUNDS = ['SM_GerPit_Shell_75', 'SM_GerPit_Shell_105', 'SM_GerPit_Shell_150']

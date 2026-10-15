@@ -104,6 +104,28 @@ The turret pillbox is the pit's Blueprint with these changes:
 
 Six children swap only the child turret class. Tank turrets work mounted on a BXP: `SetupTurret` plus `SetTurretsToAutoEngage`, the same as the BT-7 guard tower.
 
+## 8. Three more pits from the same parts (German Pak 40, leFH 18, sFH 18)
+
+The German pits ([GerGunPits.md](../GerGunPits.md)) moved the crew logic into `UGunPitCrewComponent` / `UGunPitAnimInstance` and made the B-4 classes thin subclasses. The `-B4HowitzerValidate` run was the regression check. What was new:
+
+- **Turn the whole gun on its root bone.** An additive component-space rotation on the root bone traverses gun and crew 360°, with no turntable mesh. Pitch goes on the elevation bone, after the `DefaultSlot`.
+- **Cancel odd root bones with a socket.** Team weapon skeletons import with scaled or rotated roots (leFH ×71.66, sFH ×100 and yaw −90). A `PitOrigin` socket with the inverse transform gives a clean 1:1 frame for crew, crate and rounds.
+  - The bridge's `add_skeleton_socket` ignores transforms; set them with `set_skeleton_socket_transform`.
+  - Python can't rename a `SkeletalMeshSocket`.
+- **An additive animation played as a full pose zeroes every bone's scale.** `Anim_LeFH_18_Base` is a mesh-space rotation offset. Played alone, the leFH vanished (root scale 0, and everything on `PitOrigin` collapsed to one point). Apply it on its reference pose: `ApplyAdditive(Base = Anim_LeFH_18_TPose, Additive = Base)`. Check `additive_anim_type` before using any animation as a base pose.
+- **The bridge's rotations are `[pitch, yaw, roll]`.** `set_component_transform rotation=[0, 0, -90]` rolled the loader, spotter and commander onto their sides. The test caught it because the loader's hands were 25 cm under the deck at the handover.
+- **Reuse squad animations at their own crew positions.** Keep the crew at their Blueprint offset (`bKeepCrewBlueprintOffset`) with mesh yaw −90, exactly as a squad soldier stands. Bake only the new man (the handler) against the loader's sampled palm positions.
+- **Hand a prop over by attaching with KeepWorld at the right moment.** Timers at fixed drill fractions move the round from hand to hand; no bone-space offsets are needed. The test measures each hand's distance to the round at the moment it takes it (15–33 cm here).
+- **Find Blueprint nodes by role, not GUID.** Duplicating a Blueprint regenerates node GUIDs.
+- **Setting the same skeletal mesh again is a no-op.** To force a turret mesh override, set another mesh first, then the wanted one.
+- **The atlas material is Masked and single-sided:**
+  - Camo-net regions need their alpha.
+  - Sloped sheets must be wound so their normal faces up and out, or they show as dark fins.
+- **Give sandbags the faction's sandbag material.** Remapping the bags onto a camo panel of the building atlas made them look like tarps. German walls use `M_GerSandBagScaffold_Atlas` with the loose bags' own UVs, so the pits now use that as a third material.
+- **Map a deck plank by plank, never as one stretched region.** The planks quarter of the atlas mixes boards of different colours with flat padding between them. Spread over the deck, it gave dark and light stripes. Lay boards one by one from a single board region, and let a few pixels of the padding along one edge form the seam.
+- **Offscreen pictures show low mips:** run with `-ExecCmds="r.TextureStreaming 0"`.
+- **A save in the user's editor can fail with "MoveFile … Error Code 32"** right after a reimport, because the old mesh's bulk data file is still open. A garbage collect and a second `save_asset` work.
+
 ## Open item
 
 `SM_B4Pit_Sandbags` (from `b4_pit_props.py`) still uses the projected `box_uvs`. It has the same streaky bag sides that the RedLine pieces had, and it should switch to the pack-bag templates from section 3.

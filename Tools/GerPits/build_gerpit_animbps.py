@@ -24,6 +24,9 @@ GUNS = {
               'root': 'B_Base', 'elevation': 'B_Mantlet'},
     'LeFH18': {'skeleton': LEFH + 'Mesh/SK_FieldHaubitze_Skeleton',
                'pose': LEFH + 'Anims/Anim_LeFH_18_Base',
+               # Anim_LeFH_18_Base is additive (mesh-space rotation offset on the T-pose); played alone it zeroes the
+               # bone scales and the gun vanishes, so it is applied on top of its reference pose.
+               'additive_base': LEFH + 'Anims/Anim_LeFH_18_TPose',
                'fire': LEFH + 'Anims/Anim_LeFH_18_Fire',
                'root': 'Artillery', 'elevation': 'B_Mantlet'},
     'SFH18': {'skeleton': TW + 'LFH18/Mesh/SK_Ger_SFH18Anim_Skeleton',
@@ -52,11 +55,6 @@ def act(action, **params):
 def run_python(code):
     result = call_tool('call_action', {'action': 'execute_python', 'params': {'code': code, 'description': 'GerPit anim asset'}})
     return result.get('result', {}).get('content', [{}])[0].get('text', '')
-
-
-def asset_exists(path):
-    data = act('does_asset_exist', asset_path=path) if False else None
-    return data
 
 
 def create_anim_blueprint(gun, cfg):
@@ -100,11 +98,19 @@ def build_gun(gun, cfg):
     act('set_anim_node_property', anim_blueprint_path=abp, node_guid=seq, property_name='Sequence', property_value=cfg['pose'])
     act('set_anim_node_property', anim_blueprint_path=abp, node_guid=seq, property_name='bLoopAnimation', property_value='true')
     slot = act('add_slot_node', anim_blueprint_path=abp, slot_name='DefaultSlot', position_x=-1150, position_y=0)['node_guid']
+    pose = seq
+    if cfg.get('additive_base'):
+        base = act('add_anim_node', anim_blueprint_path=abp, node_class='AnimGraphNode_SequencePlayer', position_x=-1700, position_y=-200)['node_guid']
+        act('set_anim_node_property', anim_blueprint_path=abp, node_guid=base, property_name='Sequence', property_value=cfg['additive_base'])
+        act('set_anim_node_property', anim_blueprint_path=abp, node_guid=base, property_name='bLoopAnimation', property_value='true')
+        pose = act('add_anim_node', anim_blueprint_path=abp, node_class='AnimGraphNode_ApplyAdditive', position_x=-1300, position_y=-100)['node_guid']
+        act('connect_anim_nodes', anim_blueprint_path=abp, source_node_guid=base, target_node_guid=pose, target_pin='Base')
+        act('connect_anim_nodes', anim_blueprint_path=abp, source_node_guid=seq, target_node_guid=pose, target_pin='Additive')
     to_cs = act('add_local_to_component_space', anim_blueprint_path=abp, position_x=-950, position_y=0)['node_guid']
     pitch = modify_bone(abp, cfg['elevation'], -700, 0, 'CradlePitchRotation', 'AimPitchAlpha')
     yaw = modify_bone(abp, cfg['root'], -400, 0, 'TurntableYawRotation')
     to_ls = act('add_component_to_local_space', anim_blueprint_path=abp, position_x=-150, position_y=0)['node_guid']
-    act('connect_anim_nodes', anim_blueprint_path=abp, source_node_guid=seq, target_node_guid=slot, target_pin='Source')
+    act('connect_anim_nodes', anim_blueprint_path=abp, source_node_guid=pose, target_node_guid=slot, target_pin='Source')
     act('connect_anim_nodes', anim_blueprint_path=abp, source_node_guid=slot, target_node_guid=to_cs)
     act('connect_anim_nodes', anim_blueprint_path=abp, source_node_guid=to_cs, target_node_guid=pitch, target_pin='ComponentPose')
     act('connect_anim_nodes', anim_blueprint_path=abp, source_node_guid=pitch, target_node_guid=yaw, target_pin='ComponentPose')

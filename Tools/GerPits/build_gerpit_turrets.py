@@ -159,7 +159,8 @@ def crate_transform(carry):
     a = math.radians(yaw)
     ox = cx * math.cos(a) - cy * math.sin(a)
     oy = cx * math.sin(a) + cy * math.cos(a)
-    return [x - ox, y - oy, -cz], [0.0, 0.0, yaw]
+    # The bridge takes rotations as [pitch, yaw, roll].
+    return [x - ox, y - oy, -cz], [0.0, yaw, 0.0]
 
 
 def add_components(bp, spec, carry):
@@ -169,7 +170,7 @@ def add_components(bp, spec, carry):
     for name, location, yaw, _, _ in spec['crew']:
         act('add_component', blueprint_path=bp, component_class='SkeletalMeshComponent', component_name=name)
         act('set_skeletal_mesh_component', blueprint_path=bp, component_name=name, mesh_path=SOLDIER, anim_bp_path=CREW_ANIM_BP)
-        act('set_component_transform', blueprint_path=bp, component_name=name, location=list(location), rotation=[0.0, 0.0, yaw])
+        act('set_component_transform', blueprint_path=bp, component_name=name, location=list(location), rotation=[0.0, yaw, 0.0])
         act('edit_component_property', blueprint_path=bp, component_name=name, property_name='ComponentTags', value='("PitCrew")')
     location, rotation = crate_transform(carry)
     act('add_component', blueprint_path=bp, component_class='StaticMeshComponent', component_name='ReadyCrate')

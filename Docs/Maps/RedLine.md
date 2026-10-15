@@ -37,6 +37,7 @@ All new assets live in `/Game/RTS_Survival/Blueprints/Environment/RedLine/`.
   - `cargo_N` sockets on the trenches are trench stand-up cover.
   - `crouch_N` sockets on the MG nest and the gun bay are crouch cover.
 - **Sandbags:** the bags are the SandBagPack singles (`SM_SandBag_Single_01..03`, exported to `PackBags/` next to the generator), so their UVs match `MI_Rus_SandBag_01`. The trench lip has two uneven courses in running bond, and short stretches get a third. Gun bay banks close at the front corners and are capped at the rear.
+- **Closed ends:** every trench piece (straight, bend, communication trench, end mound) caps its parapet, rear bank and firing step where the piece ends (`cap_ends` in `redline_fieldworks.py`), so a piece placed alone shows no hollow banks. Where pieces join, the caps sit inside each other's banks.
 - **Entry gap:** the fire trench's rear bank is higher than a soldier can step. Each straight segment therefore has a 2 m gap in the middle of the rear bank. Soldiers walk in through it, and communication trenches join there.
 
 ![Inside the fire trench](RedLine_Trench.png)

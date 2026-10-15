@@ -1,0 +1,2 @@
+# Quick check: one vehicle that already has a portrait, to compare against.
+PzIV_G=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Ger_Vehicle_PanzerIV_G.Ger_Vehicle_PanzerIV_G_C

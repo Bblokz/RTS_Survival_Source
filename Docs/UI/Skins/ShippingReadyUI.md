@@ -387,3 +387,11 @@ sizing in `MainGameUI_HUD`.
     batch. The widget fills smoothly in between.
   - The full bar is the work at the start. New damage during the repair extends it.
   - Only player-owned tanks show the bar, so enemy repairs are not revealed through the fog of war.
+
+## Tactical unit icons behind glass (experimental, `ui_tactical_icons.py`)
+
+- Glass plates with a tactical icon behind lit, scratched glass (`UW_TacticalUnitIcon`,
+  `UW_TacticalUnitIconCorners`, `M_UI_TacticalIconGlass`). They were tried in the corners of the selected unit's
+  portrait on 2026-10-15, then removed from the HUD again (`ui_tactical_icons.restore()`). The feature is kept for
+  use elsewhere later.
+- Full write-up: [../TacticalUnitIcons.md](../TacticalUnitIcons.md).
