@@ -112,3 +112,7 @@ The handler's drill was then baked fresh with the B-4 crew solver. Its worst han
     - the gun turned before the first shot;
     - the crew turned with the gun;
     - the handover → ram → pick-up drill, with the hands within 34 cm of the round.
+
+## Fire feedback
+
+On every shot the gun bucks and the crew brace. See [GunPitFireFeedback.md](GunPitFireFeedback.md).

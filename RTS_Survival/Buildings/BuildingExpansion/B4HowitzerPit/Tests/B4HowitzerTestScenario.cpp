@@ -807,6 +807,7 @@ void FB4HowitzerTestScenario::TickWaitingForPitTurret(UWorld& World)
 		                                       : ECommandQueueError::AbilityNotAllowed;
 	Check(AttackError == ECommandQueueError::NoError, TEXT("pit_attack_ground_accepted"));
 	M_PitShotSeconds.Reset();
+	M_PitFireReaction = FGunPitFireReactionWatch();
 	EnterPhase(World, EB4HowitzerTestPhase::WaitingForPitShots, B4HowitzerTestPrivate::ShotsTimeoutSeconds);
 }
 
@@ -814,6 +815,7 @@ void FB4HowitzerTestScenario::TickWaitingForPitShots(UWorld& World)
 {
 	using namespace B4HowitzerTestPrivate;
 	TrackPitLoading(World);
+	WatchPitFireReaction(World);
 	if (M_PitShotSeconds.Num() < ShotsToObserve)
 	{
 		ReportPitStatus(World);
@@ -825,6 +827,23 @@ void FB4HowitzerTestScenario::TickWaitingForPitShots(UWorld& World)
 	Check(Interval > ReloadSeconds * MinimumReloadFraction && Interval < ReloadSeconds * MaximumReloadFraction,
 	      TEXT("pit_reload_interval"), FString::Printf(TEXT("seconds=%.1f"), Interval));
 	KillPit(World);
+}
+
+void FB4HowitzerTestScenario::WatchPitFireReaction(const UWorld& World)
+{
+	const USkeletalMeshComponent* GunMesh = M_PitGunMesh.Get();
+	// WatchMontages starts the watch when the gun's fire montage starts.
+	if (M_PitFireReaction.bChecked || not M_PitFireReaction.GetHasStarted() || not IsValid(GunMesh))
+	{
+		return;
+	}
+	M_PitFireReaction.Sample(*GunMesh, M_PitCrewMeshes);
+	if (not M_PitFireReaction.GetIsWatchOver(World.GetTimeSeconds()))
+	{
+		return;
+	}
+	M_PitFireReaction.bChecked = true;
+	Check(M_PitFireReaction.GetDidGunBuck(), TEXT("pit_gun_bucks_on_shot"), M_PitFireReaction.Describe());
 }
 
 void FB4HowitzerTestScenario::TrackPitLoading(const UWorld& World)
@@ -1318,6 +1337,14 @@ void FB4HowitzerTestScenario::WatchMontages(const UWorld& World)
 		if (Watch.Label == TEXT("pit_gun") && bIsPitShot)
 		{
 			M_PitShotSeconds.Add(World.GetTimeSeconds());
+		}
+		// The gun bucks with its fire montage, a moment before the loading drill marks the shot.
+		const bool bIsPitFire = Watch.Label == TEXT("pit_gun") && MontageString.Contains(TEXT("Fire"));
+		if (bIsPitFire && M_Phase == EB4HowitzerTestPhase::WaitingForPitShots && not M_PitFireReaction.GetHasStarted()
+			&& M_PitGunMesh.IsValid())
+		{
+			M_PitFireReaction.FirstIdleCrewIndex = 0;
+			M_PitFireReaction.Start(World.GetTimeSeconds(), *M_PitGunMesh, M_PitCrewMeshes);
 		}
 	}
 }

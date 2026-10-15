@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "B4HowitzerCaptureRig.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/GunPit/Tests/GunPitFireReactionWatch.h"
 
 class AActor;
 class ABuildingExpansion;
@@ -103,6 +104,7 @@ private:
 	TArray<FB4HowitzerMontageWatch> M_MontageWatches;
 	TArray<float> M_SquadShotSeconds;
 	TArray<float> M_PitShotSeconds;
+	FGunPitFireReactionWatch M_PitFireReaction;
 	TArray<FB4HowitzerCrewReach> M_CrewReach;
 	bool bM_HasLeftDeployedForMove = false;
 	bool bM_WasPitLoading = false;
@@ -167,6 +169,9 @@ private:
 	void TickObservingPlaced(UWorld& World);
 	// Times the loading drill and checks it against the reload; shared by the spawned and the placed pit.
 	void TrackPitLoading(const UWorld& World);
+	// The gun bucks after the first pit shot. The whole crew starts the crane drill at the shot, so their brace is
+	// only logged.
+	void WatchPitFireReaction(const UWorld& World);
 	void KillPit(const UWorld& World);
 	bool GetHasWreckNear(UWorld& World, const TCHAR* ClassMarker) const;
 	void CheckFinishedMontage(const UWorld& World, const FB4HowitzerMontageWatch& Watch);
