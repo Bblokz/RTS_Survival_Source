@@ -53,6 +53,7 @@ public:
 	friend class RTS_SURVIVAL_API UVerticalRocketWeaponState;
 	friend class RTS_SURVIVAL_API UWeaponStateLaser;
 	friend class RTS_SURVIVAL_API UWeaponStateMultiHitLaser;
+	friend class RTS_SURVIVAL_API URailgunWeaponState;
 	/** @return The array of weapons that this owner has. */
 	virtual TArray<UWeaponState*> GetWeapons() =0;
 	// To register or deregister actors to ignore with this weapon.
