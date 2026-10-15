@@ -54,6 +54,10 @@ GUNS = {
     '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/ML20_152MM/Pit/AnimBp_ML20Pit_Gun': {
         'bones': ['B_Turret'], 'socket': 'PitOrigin', 'jolt': 4.0, 'rock': 0.6, 'pivot': 60.0, 'muzzle': 2.0,
         'hz': 3.5, 'damping': 0.38},
+    # The Ampulomet's tube and grips jump on their tripod; the tripod, crates and crew on Traverse stay.
+    '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusAmpulometPit/Anims/AnimBp_AmpulometPit': {
+        'bones': ['Gun'], 'socket': 'PitOrigin', 'jolt': 2.5, 'rock': 0.5, 'pivot': 50.0, 'muzzle': 1.2,
+        'hz': 7.0, 'damping': 0.4},
 }
 KICK_NODE_SPACING = 160
 

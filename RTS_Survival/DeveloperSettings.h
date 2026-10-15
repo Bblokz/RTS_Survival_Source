@@ -877,8 +877,12 @@ namespace DeveloperSettings
 				inline constexpr int32 RusB4HowitzerPit_Metal = 900;
 				inline constexpr int32 RusDShKPit_Radixite = 240;
 				inline constexpr int32 RusDShKPit_Metal = 120;
+				inline constexpr int32 RusAmpulometPit_Radixite = 280;
+				inline constexpr int32 RusAmpulometPit_Metal = 140;
 				inline constexpr int32 Rus53KPit_Radixite = 320;
 				inline constexpr int32 Rus53KPit_Metal = 180;
+				inline constexpr int32 Rus53KSectorPit_Radixite = 260;
+				inline constexpr int32 Rus53KSectorPit_Metal = 140;
 				inline constexpr int32 RusML20Pit_Radixite = 1250;
 				inline constexpr int32 RusML20Pit_Metal = 700;
 				inline constexpr int32 RusBS3Pit_Radixite = 650;

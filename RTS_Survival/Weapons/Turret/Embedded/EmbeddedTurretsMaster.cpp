@@ -57,6 +57,22 @@ float AEmbeddedTurretsMaster::GetTurretYawLimit() const
 	return M_MaxYaw;
 }
 
+bool AEmbeddedTurretsMaster::GetCanTraverseToLocation(const FVector& TargetLocation) const
+{
+	if (not GetHasFixedTraverseArc() || not GetIsValidEmbeddedTurretMesh())
+	{
+		return true;
+	}
+
+	const float LocalTargetYaw = GetTargetRotation(TargetLocation, GetTurretTransform().GetLocation()).Yaw;
+	return LocalTargetYaw >= M_MinYaw && LocalTargetYaw <= M_MaxYaw;
+}
+
+bool AEmbeddedTurretsMaster::GetHasFixedTraverseArc() const
+{
+	return bIsFixedEmplacement && bM_IsAssaultTurret;
+}
+
 float AEmbeddedTurretsMaster::GetIdleAnimationYawTarget() const
 {
 	if (not bM_IsAssaultTurret)
@@ -255,7 +271,11 @@ void AEmbeddedTurretsMaster::AssaultTurretRotation(
 
 	if (bIsTargetRotatorUpdated)
 	{
-		RequestHullTurnForOutOfBoundsTarget(LocalTargetYaw);
+		// A fixed emplacement holds at its limit; there is no base to turn.
+		if (not bIsFixedEmplacement)
+		{
+			RequestHullTurnForOutOfBoundsTarget(LocalTargetYaw);
+		}
 		bIsTargetRotatorUpdated = false;
 	}
 

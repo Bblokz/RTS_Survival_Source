@@ -64,7 +64,18 @@ public:
 
 	virtual float GetTurretYawLimit() const override;
 	virtual float GetIdleAnimationYawTarget() const override;
+
+	/** @copydoc ACPPTurretsMaster::GetCanTraverseToLocation */
+	virtual bool GetCanTraverseToLocation(const FVector& TargetLocation) const override;
+
+	// Set on emplacements that cannot turn (a sector gun pit): with assault turret yaw limits from
+	// InitEmbeddedTurret the limits become a fixed arc; targets outside it are never picked and no base turn is asked.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Yaw Limits")
+	bool bIsFixedEmplacement = false;
+
 protected:
+	virtual bool GetHasFixedTraverseArc() const override;
+
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void BeginPlay() override;

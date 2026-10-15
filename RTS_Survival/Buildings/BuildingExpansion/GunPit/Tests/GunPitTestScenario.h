@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerCaptureRig.h"
 #include "GunPitFireReactionWatch.h"
+#include "GunPitSectorArcWatch.h"
 
 class AActor;
 class ACPPTurretsMaster;
@@ -19,6 +20,8 @@ enum class EGunPitTestPhase : uint8
 	WaitingForStart,
 	WaitingForTurrets,
 	WaitingForFirstRounds,
+	// Sector pits only: the gun is ordered onto a target outside its arc and must hold at the edge without firing.
+	HoldingOutsideSector,
 	Observing
 };
 
@@ -39,6 +42,8 @@ struct FGunPitUnderTest
 	int32 ExpectedCrewCount = 4;
 	bool bCarriesRounds = true;
 	bool bHasReadyCrate = true;
+	// A sector pit's gun only traverses this far either side of the pit's forward; zero turns a full circle.
+	float SectorHalfDegrees = 0.f;
 
 	TWeakObjectPtr<AActor> Pit;
 	TWeakObjectPtr<ACPPTurretsMaster> Turret;
@@ -77,6 +82,7 @@ struct FGunPitUnderTest
 	bool bDrillChecked = false;
 	bool bTraverseChecked = false;
 	FGunPitFireReactionWatch FireReaction;
+	FGunPitSectorArcWatch SectorArc;
 };
 
 /**
@@ -86,7 +92,9 @@ struct FGunPitUnderTest
  * handler's hands to the loader's and into the breech while the handler picks up the next round.
  * Started with -GerPitValidate (on TestCover); -DShKPitValidate runs the Soviet DShK pit instead (enemy owned, two
  * crew, a box-swap drill instead of rounds); -At53KPitValidate the Soviet 53-K pit (the Pak 40 pit's drill); -BS3PitValidate
- * the Soviet BS-3 pit (the Pak drill turned to fit between the trails). Pictures with -GerPitCapture=<folder>. Not in shipping.
+ * the Soviet BS-3 pit (the Pak drill turned to fit between the trails); -At53KSectorPitValidate the 53-K sector pit, whose
+ * gun must first hold at its 45 degree limit without firing on a target outside its arc. Pictures with
+ * -GerPitCapture=<folder>. Not in shipping.
  */
 struct FGunPitTestScenario
 {
@@ -110,12 +118,16 @@ private:
 	void TickWaitingForStart(UWorld& World);
 	void TickWaitingForTurrets(UWorld& World);
 	void TickWaitingForFirstRounds(UWorld& World);
+	void TickHoldingOutsideSector(UWorld& World);
 	void TickObserving(UWorld& World);
 
 	bool SpawnPits(UWorld& World);
 	bool FindTurret(FGunPitUnderTest& Pit) const;
 	void CheckAttachments(FGunPitUnderTest& Pit);
-	void OrderAttackGround(UWorld& World, FGunPitUnderTest& Pit);
+	void OrderAttackGround(UWorld& World, FGunPitUnderTest& Pit, float YawOffsetDegrees);
+	// Checks the hold at the arc's edge and the target search's arc filter, then orders a target inside the arc.
+	void CheckSectorArc(UWorld& World, FGunPitUnderTest& Pit);
+	float GetGunYawFromPitForward(const FGunPitUnderTest& Pit) const;
 	void CountShots(const UWorld& World, FGunPitUnderTest& Pit) const;
 	void WatchDrill(UWorld& World, FGunPitUnderTest& Pit);
 	void CheckDrill(FGunPitUnderTest& Pit);

@@ -113,6 +113,10 @@ enum class EBuildingExpansionType : uint8
 	BTX_RusBS3Pit UMETA(DisplayName = "Rus BS-3 Pit"),
 	// German 3.7 cm Flak 37 in a sandbag pit; a man hands the clips to the loader, the gun turns a full circle.
 	BTX_GerFlak37Pit UMETA(DisplayName = "Ger Flak 37 Pit"),
+	// Small Soviet sandbag pit with a 125mm Ampulomet on its tripod: a gunner and a loader who feeds the ampoules.
+	BTX_RusAmpulometPit UMETA(DisplayName = "Rus Ampulomet Pit"),
+	// Small square sandbag pit for the 53-K whose gun only traverses 45 degrees either way: it covers one sector.
+	BTX_Rus53KSectorPit UMETA(DisplayName = "Rus 53-K Sector Pit"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -211,6 +215,10 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusBS3Pit");
 	case EBuildingExpansionType::BTX_GerFlak37Pit:
 		return FString("BTX_GerFlak37Pit");
+	case EBuildingExpansionType::BTX_RusAmpulometPit:
+		return FString("BTX_RusAmpulometPit");
+	case EBuildingExpansionType::BTX_Rus53KSectorPit:
+		return FString("BTX_Rus53KSectorPit");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -277,6 +285,8 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusML20Pit: return TEXT("ML-20 Pit");
 	case EBuildingExpansionType::BTX_RusBS3Pit: return TEXT("BS-3 Pit");
 	case EBuildingExpansionType::BTX_GerFlak37Pit: return TEXT("Flak 37 Pit");
+	case EBuildingExpansionType::BTX_RusAmpulometPit: return TEXT("Ampulomet Pit");
+	case EBuildingExpansionType::BTX_Rus53KSectorPit: return TEXT("53-K Sector Pit");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");

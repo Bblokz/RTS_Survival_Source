@@ -61,6 +61,9 @@ namespace GunPitTestPrivate
 	// Well past the arc of a carriage gun: the whole pit gun and its crew must turn.
 	constexpr float GroundTargetYawOffsetDegrees = 60.f;
 	constexpr float MaximumAimYawErrorDegrees = 12.f;
+	// A sector pit is first ordered this far past its arc's edge, then this far inside it.
+	constexpr float SectorOutsideMarginDegrees = 35.f;
+	constexpr float SectorInsideMarginDegrees = 15.f;
 	constexpr float MaximumAttachOffset = 1.f;
 	constexpr float MaximumScaleError = 0.01f;
 	constexpr float MaximumLoaderSpotError = 30.f;
@@ -181,6 +184,26 @@ namespace GunPitTestPrivate
 		Pit.ExpectedOwner = EnemyOwner;
 		Pit.PitOriginSocket = TEXT("PitOriginBS3");
 		return {Pit};
+	}
+
+	const TCHAR* const At53KSectorPitClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Rus53KPit/Rus_BXP_53KSectorPit.Rus_BXP_53KSectorPit_C");
+	constexpr float At53KSectorHalfDegrees = 45.f;
+
+	TArray<FGunPitUnderTest> GetAt53KSectorPitToTest()
+	{
+		// The 53-K pit's loader and handover in a small square pit; the crate and commander are pulled in.
+		FGunPitUnderTest Pit = GetAt53KPitToTest()[0];
+		Pit.Label = TEXT("53ksector");
+		Pit.ClassPath = At53KSectorPitClassPath;
+		Pit.PitMeshName = TEXT("SM_53KSectorPit");
+		Pit.SectorHalfDegrees = At53KSectorHalfDegrees;
+		return {Pit};
+	}
+
+	float GetFirstTargetYawOffset(const FGunPitUnderTest& Pit)
+	{
+		return Pit.SectorHalfDegrees > 0.f ? Pit.SectorHalfDegrees + SectorOutsideMarginDegrees : GroundTargetYawOffsetDegrees;
 	}
 
 	FString GetActiveMontageName(const USkeletalMeshComponent* Mesh)
@@ -320,6 +343,10 @@ void FGunPitTestScenario::Start()
 	{
 		M_Pits = GunPitTestPrivate::GetDShKPitToTest();
 	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("At53KSectorPitValidate")))
+	{
+		M_Pits = GunPitTestPrivate::GetAt53KSectorPitToTest();
+	}
 	else if (FParse::Param(FCommandLine::Get(), TEXT("At53KPitValidate")))
 	{
 		M_Pits = GunPitTestPrivate::GetAt53KPitToTest();
@@ -354,6 +381,9 @@ void FGunPitTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem)
 		break;
 	case EGunPitTestPhase::WaitingForFirstRounds:
 		TickWaitingForFirstRounds(*World);
+		break;
+	case EGunPitTestPhase::HoldingOutsideSector:
+		TickHoldingOutsideSector(*World);
 		break;
 	case EGunPitTestPhase::Observing:
 		TickObserving(*World);
@@ -623,17 +653,78 @@ void FGunPitTestScenario::TickWaitingForFirstRounds(UWorld& World)
 			                      IsValid(Holder) ? GetDistanceToHand(*Round, *Holder) : -1.f));
 		}
 		CapturePit(World, Pit, TEXT("idle"));
-		OrderAttackGround(World, Pit);
+		OrderAttackGround(World, Pit, GetFirstTargetYawOffset(Pit));
+	}
+	const bool bHasSectorPit = M_Pits.ContainsByPredicate([](const FGunPitUnderTest& Pit)
+	{
+		return Pit.SectorHalfDegrees > 0.f;
+	});
+	if (bHasSectorPit)
+	{
+		EnterPhase(World, EGunPitTestPhase::HoldingOutsideSector, FGunPitSectorArcWatch::HoldSeconds);
+		return;
 	}
 	EnterPhase(World, EGunPitTestPhase::Observing, ObserveTimeoutSeconds);
 }
 
-void FGunPitTestScenario::OrderAttackGround(UWorld& World, FGunPitUnderTest& Pit)
+void FGunPitTestScenario::TickHoldingOutsideSector(UWorld& World)
+{
+	for (FGunPitUnderTest& Pit : M_Pits)
+	{
+		GunPitTestPrivate::SetFullHealth(Pit.Pit.Get());
+		const int32 ShotsBefore = Pit.ShotSeconds.Num();
+		CountShots(World, Pit);
+		Pit.SectorArc.Sample(GetGunYawFromPitForward(Pit), Pit.ShotSeconds.Num() > ShotsBefore);
+	}
+	ReportStatus(World);
+	if (World.GetTimeSeconds() < M_PhaseDeadlineSeconds)
+	{
+		return;
+	}
+	for (FGunPitUnderTest& Pit : M_Pits)
+	{
+		if (Pit.SectorHalfDegrees > 0.f)
+		{
+			CheckSectorArc(World, Pit);
+		}
+	}
+	EnterPhase(World, EGunPitTestPhase::Observing, GunPitTestPrivate::ObserveTimeoutSeconds);
+}
+
+void FGunPitTestScenario::CheckSectorArc(UWorld& World, FGunPitUnderTest& Pit)
+{
+	using namespace GunPitTestPrivate;
+	const FString Details = Pit.SectorArc.Describe();
+	Check(Pit.SectorArc.GetHoldsAtLimit(Pit.SectorHalfDegrees), Pit.Label + TEXT("_gun_holds_at_sector_limit"), Details);
+	Check(Pit.SectorArc.GetStaysInsideArc(Pit.SectorHalfDegrees), Pit.Label + TEXT("_gun_never_leaves_sector"), Details);
+	Check(Pit.SectorArc.GetHeldFire(), Pit.Label + TEXT("_holds_fire_outside_sector"), Details);
+	CapturePit(World, Pit, TEXT("sector_limit"));
+	const FVector OutsideTarget = Pit.GroundTarget;
+	Pit.ShotSeconds.Reset();
+	OrderAttackGround(World, Pit, Pit.SectorHalfDegrees - SectorInsideMarginDegrees);
+	// The auto-engage search uses the same test to skip targets the gun can never face.
+	const bool bSkipsOutside = Pit.Turret.IsValid() && not Pit.Turret->GetCanTraverseToLocation(OutsideTarget);
+	const bool bTakesInside = Pit.Turret.IsValid() && Pit.Turret->GetCanTraverseToLocation(Pit.GroundTarget);
+	Check(bSkipsOutside && bTakesInside, Pit.Label + TEXT("_target_search_keeps_to_sector"),
+	      FString::Printf(TEXT("skips_outside=%d takes_inside=%d"), bSkipsOutside, bTakesInside));
+}
+
+float FGunPitTestScenario::GetGunYawFromPitForward(const FGunPitUnderTest& Pit) const
+{
+	if (not Pit.GunMesh.IsValid() || not Pit.Pit.IsValid())
+	{
+		return 0.f;
+	}
+	const float GunYaw = GunPitTestPrivate::GetPitOriginFrame(*Pit.GunMesh, Pit.PitOriginSocket).Rotator().Yaw;
+	return FMath::FindDeltaAngleDegrees(Pit.Pit->GetActorRotation().Yaw, GunYaw);
+}
+
+void FGunPitTestScenario::OrderAttackGround(UWorld& World, FGunPitUnderTest& Pit, const float YawOffsetDegrees)
 {
 	using namespace GunPitTestPrivate;
 	const float TargetDistance = Pit.Turret.IsValid() ? Pit.Turret->GetTurretRange() * GroundTargetRangeFraction : 0.f;
 	const FVector Forward = Pit.Pit.IsValid() ? Pit.Pit->GetActorForwardVector().GetSafeNormal2D() : FVector::ForwardVector;
-	const FVector Direction = Forward.RotateAngleAxis(GroundTargetYawOffsetDegrees, FVector::UpVector);
+	const FVector Direction = Forward.RotateAngleAxis(YawOffsetDegrees, FVector::UpVector);
 	Pit.GroundTarget = Pit.SpawnLocation + Direction * TargetDistance;
 	ProjectToNav(World, Pit.GroundTarget, Pit.GroundTarget);
 	ICommands* Commands = Cast<ICommands>(Pit.Pit.Get());

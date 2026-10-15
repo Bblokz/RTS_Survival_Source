@@ -282,6 +282,16 @@ float ACPPTurretsMaster::GetTurretYawLimit() const
 	return 0.f;
 }
 
+bool ACPPTurretsMaster::GetCanTraverseToLocation(const FVector& TargetLocation) const
+{
+	return true;
+}
+
+bool ACPPTurretsMaster::GetHasFixedTraverseArc() const
+{
+	return false;
+}
+
 float ACPPTurretsMaster::GetIdleAnimationYawTarget() const
 {
 	return FMath::RandRange(0.f, 360.f);
@@ -1239,7 +1249,10 @@ void ACPPTurretsMaster::GetClosestTarget()
 
 	const FVector SearchLocation = GetActorLocation();
 	const float SearchRadius = M_WeaponRangeData.M_WeaponSearchRadius;
-	const int32 NumTargets = 3;
+	// The closest few can all lie outside a fixed traverse arc; ask for more so one inside it is found.
+	constexpr int32 ClosestTargetsToRequest = 3;
+	constexpr int32 ClosestTargetsToRequestWithFixedArc = 8;
+	const int32 NumTargets = GetHasFixedTraverseArc() ? ClosestTargetsToRequestWithFixedArc : ClosestTargetsToRequest;
 	bM_IsPendingTargetSearch = true;
 
 	// Request targets from the game unit manager
@@ -1269,6 +1282,10 @@ void ACPPTurretsMaster::OnTargetsFound(const TArray<AActor*>& Targets)
 			continue;
 		}
 		if (GetIsTargetBelowMinimumRange(Target->GetActorLocation()))
+		{
+			continue;
+		}
+		if (not GetCanTraverseToLocation(Target->GetActorLocation()))
 		{
 			continue;
 		}
@@ -1490,7 +1507,8 @@ void ACPPTurretsMaster::AutoEngage()
 	// 2) Distance gate to this turret's supported range interval.
 	const FVector TgtLoc = TargetingData.GetActiveTargetLocation();
 	bM_IsInRange = GetIsTargetWithinWeaponRange(TgtLoc);
-	if (not bM_IsInRange)
+	// A target that left a fixed traverse arc is dropped like one that left the range.
+	if (not bM_IsInRange || not GetCanTraverseToLocation(TgtLoc))
 	{
 		StopAllWeaponsFire(true);
 		ResetTarget();

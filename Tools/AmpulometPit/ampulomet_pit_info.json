@@ -1,0 +1,98 @@
+{
+ "units": "cm, Blender gun frame (Unreal: y negated)",
+ "bones": {
+  "Root": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "Traverse": [
+   0.0,
+   0.0,
+   98.05
+  ],
+  "Elevation": [
+   0.0,
+   0.0,
+   112.0
+  ],
+  "Gun": [
+   -20.0,
+   0.0,
+   112.0
+  ],
+  "BreechHinge": [
+   -53.78,
+   8.72,
+   112.0
+  ],
+  "BreechCap": [
+   -55.52,
+   0.0,
+   112.0
+  ],
+  "Ampoule": [
+   -45.48,
+   0.0,
+   112.0
+  ]
+ },
+ "muzzle": [
+  60.17,
+  0.0,
+  112.0
+ ],
+ "drill_seconds": 6.0,
+ "fire_seconds": 0.6,
+ "drill_fractions": {
+  "step_aside": 0.075,
+  "aside": 0.1667,
+  "lever_reach": 0.05,
+  "lever_grab": 0.1,
+  "unlocked": 0.1583,
+  "opened": 0.25,
+  "lever_free": 0.2833,
+  "ball_to_crate": 0.1667,
+  "grab_ball": 0.425,
+  "ball_show": 0.4083,
+  "lifted": 0.4917,
+  "at_mouth": 0.5917,
+  "hand_behind": 0.625,
+  "loaded": 0.6833,
+  "close_reach": 0.7167,
+  "close_grab": 0.7583,
+  "closed": 0.8417,
+  "locked": 0.8917,
+  "close_free": 0.9333,
+  "back": 0.8833,
+  "gunner_grip": 0.975
+ },
+ "loading_elevation_keys": [
+  [
+   0.0,
+   0.0
+  ],
+  [
+   0.4,
+   1.0
+  ],
+  [
+   5.35,
+   1.0
+  ],
+  [
+   5.75,
+   0.0
+  ],
+  [
+   6.0,
+   0.0
+  ]
+ ],
+ "table_top": 60.87,
+ "table_radius": 50.0,
+ "pit_inner_radius": 175.0,
+ "pit_outer_radius": 395.0,
+ "wall_height": 76.0,
+ "gun_scale": 29.0698
+}

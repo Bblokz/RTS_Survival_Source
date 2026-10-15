@@ -191,6 +191,13 @@ public:
 
 	virtual float GetTurretYawLimit() const override;
 
+	/**
+	 * @brief Lets turrets with a fixed traverse arc skip targets they could never face, so auto-engage picks one inside.
+	 * @param TargetLocation World location of a possible target.
+	 * @return False only when the turret can never turn its weapons onto the location.
+	 */
+	virtual bool GetCanTraverseToLocation(const FVector& TargetLocation) const;
+
 	void SetVehicleFireFeedbackComponent(UVehicleFireFeedbackComponent* InVehicleFireFeedbackComponent);
 
 	bool BGetIsInRangeOfTarget() const;
@@ -423,6 +430,9 @@ protected:
 
 	/** @return Minimum target distance accepted by this turret; zero disables the lower range bound. */
 	virtual float GetMinimumTargetRange() const;
+
+	/** @return True when GetCanTraverseToLocation can reject targets; the target search then asks for more candidates. */
+	virtual bool GetHasFixedTraverseArc() const;
 
 private:
 #if WITH_DEV_AUTOMATION_TESTS

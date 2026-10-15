@@ -7555,6 +7555,17 @@ void ACPPGameState::InitAllGameBxpData()
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusDShKPit, DShKPitData);
 
 	// -----------------------------------------------------------------------
+	// ----------------------- RUS AMPULOMET PIT -----------------------------
+	// -----------------------------------------------------------------------
+	// The MG pit's emplacement with an incendiary ampoule launcher: same build and toughness, a little dearer.
+	FBxpData AmpulometPitData = DShKPitData;
+	AmpulometPitData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusAmpulometPit_Radixite},
+		{ERTSResourceType::Resource_Metal, RusAmpulometPit_Metal},
+	});
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusAmpulometPit, AmpulometPitData);
+
+	// -----------------------------------------------------------------------
 	// ------------------------- RUS 53-K PIT --------------------------------
 	// -----------------------------------------------------------------------
 	// A 45mm anti-tank gun behind a thick bag wall: more health than the MG pit, the same light emplacement.
@@ -7566,6 +7577,17 @@ void ACPPGameState::InitAllGameBxpData()
 	Pit53KData.Health = T3BxpBunkerHealth;
 	Pit53KData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(Pit53KData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus53KPit, Pit53KData);
+
+	// -----------------------------------------------------------------------
+	// ---------------------- RUS 53-K SECTOR PIT ----------------------------
+	// -----------------------------------------------------------------------
+	// The same gun and wall in a smaller pit that only covers a 90 degree arc: as tough, cheaper.
+	FBxpData Pit53KSectorData = Pit53KData;
+	Pit53KSectorData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Rus53KSectorPit_Radixite},
+		{ERTSResourceType::Resource_Metal, Rus53KSectorPit_Metal},
+	});
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus53KSectorPit, Pit53KSectorData);
 
 	// -----------------------------------------------------------------------
 	// ------------------------- RUS BS-3 PIT --------------------------------
