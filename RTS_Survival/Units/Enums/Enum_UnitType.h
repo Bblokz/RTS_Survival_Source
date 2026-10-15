@@ -80,6 +80,7 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz_231 UMETA(DisplayName = "Ger SdKfz 231 8-rad 2cm"),
 	Tank_Sdkfz_232_3 UMETA(DisplayName = "Ger SdKfz 232/3 8-rad 75mm Puma"),
 	Tank_Sdkfz9_37mm UMETA(DisplayName = "Ger ArmCar SdKfz 9 37mm"),
+	Tank_Keubel UMETA(DisplayName = "Ger ArmCar Kubelwagen MG34"),
 	
 	
 
@@ -324,6 +325,7 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_Sdkfz_231:
 	case ETankSubtype::Tank_Sdkfz_232_3:
 	case ETankSubtype::Tank_Sdkfz9_37mm:
+	case ETankSubtype::Tank_Keubel:
 	case ETankSubtype::Tank_Ba12:
 	case ETankSubtype::Tank_Ba14:
 		return true;
@@ -411,6 +413,8 @@ enum class ESquadSubtype: uint8
 	// of the subtypes above, which training options store as numbers, stay what they were.
 	Squad_Ger_Medic UMETA(DisplayName = "Ger Medic"),
 	Squad_Rus_Medic UMETA(DisplayName = "Rus Medic (Soviet)"),
+	// Team weapons: artillery, appended for the same reason as the medics.
+	Squad_Rus_B4_203mm UMETA(DisplayName = "Rus B-4 203MM"),
 };
 
 
@@ -623,6 +627,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Nebelwerfer";
 	case ESquadSubtype::Squad_Rus_M1938_122mm:
 		return "M1938 122mm";
+	case ESquadSubtype::Squad_Rus_B4_203mm:
+		return "B-4 203mm";
 	case ESquadSubtype::Squad_Rus_Maxim:
 		return "Maxim Team";
 	case ESquadSubtype::Squad_Rus_DShK:

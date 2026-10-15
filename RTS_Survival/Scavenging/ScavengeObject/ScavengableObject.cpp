@@ -1,4 +1,5 @@
 ﻿#include "ScavengableObject.h"
+#include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSubsystem.h"
 
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/DeveloperSettings.h"
@@ -624,6 +625,20 @@ void AScavengeableObject::BeginPlay()
 	// get player controller.
 	GetIsValidPlayerController();
 	BeginPlay_LoadSoundSettings();
+	BeginPlay_RegisterWithMapObjectFilters();
+}
+
+void AScavengeableObject::BeginPlay_RegisterWithMapObjectFilters()
+{
+	// Only stored for the tactical map's discovered scavenge object filter; nothing runs while it is off.
+	const UWorld* const World = GetWorld();
+	URTSMapObjectFilterSubsystem* const MapObjectFilters = IsValid(World)
+		                                                       ? World->GetSubsystem<URTSMapObjectFilterSubsystem>()
+		                                                       : nullptr;
+	if (IsValid(MapObjectFilters))
+	{
+		MapObjectFilters->RegisterScavengeable(*this);
+	}
 }
 
 void AScavengeableObject::Destroyed()

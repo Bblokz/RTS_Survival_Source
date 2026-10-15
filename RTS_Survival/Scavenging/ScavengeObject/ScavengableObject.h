@@ -311,6 +311,7 @@ private:
 	// ----END Scavenge Mesh ----
 	// --------------------------
 	void BeginPlay_LoadSoundSettings();
+	void BeginPlay_RegisterWithMapObjectFilters();
 	void PlayRewardSound() const;
 	FScavengeRewardSound M_ScavRewardSoundSettings;
 

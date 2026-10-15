@@ -31,6 +31,8 @@ class UArmor;
 class UArmorCalculation;
 class UVehicleModuleSubsystem;
 class UTankEngineFireBehaviour;
+class UWidgetComponent;
+class UW_CrewRepairProgress;
 class UAmmoCookOffBehaviour;
 struct FHealthHealingReceipt;
 class URTSNavCollision;
@@ -128,6 +130,9 @@ struct FCrewRepairState
 	FAbilitySuppressionHandle AbilitySuppressionHandle;
 
 	bool bHoldsWeaponAndMovementLock = false;
+
+	// Full crew repair bar: the work left when the session started, raised when new damage adds more.
+	float ProgressBarTotalSeconds = 0.f;
 };
 
 /** @brief One behaviour's mobility restriction; the tank composes all sources by minimum. */
@@ -863,6 +868,13 @@ private:
 	void PlayCrewRepairCompletedVoiceLine() const;
 	void RestoreCrewRepairState();
 
+	// ---- CrewRepair progress bar ----
+	void ShowCrewRepairProgressBar();
+	void SyncCrewRepairProgressBar();
+	void HideCrewRepairProgressBar() const;
+	bool CreateCrewRepairProgressComponent();
+	UW_CrewRepairProgress* GetCrewRepairProgressWidget() const;
+
 	UPROPERTY()
 	TWeakObjectPtr<UArmorCalculation> M_ModuleArmor;
 
@@ -873,6 +885,10 @@ private:
 	FVehicleModuleRepairState M_ModuleRepairState;
 
 	FCrewRepairState M_CrewRepairState;
+
+	// Screen-space bar above the health bar while the crew repairs; created on the first repair, hidden in between.
+	UPROPERTY()
+	TObjectPtr<UWidgetComponent> M_CrewRepairProgressComponent;
 
 	// True once the armor component finalized module HP for this tank.
 	bool bM_AreVehicleModulesInitialized = false;

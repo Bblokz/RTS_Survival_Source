@@ -120,6 +120,7 @@ protected:
 private:
 	// Saves this resource in UGameResourceManager.
 	void RegisterWithGameResourceManager();
+	void RegisterWithMapObjectFilters();
 
 
 
