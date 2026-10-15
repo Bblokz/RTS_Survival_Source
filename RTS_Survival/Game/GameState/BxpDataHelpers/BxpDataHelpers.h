@@ -108,6 +108,7 @@ namespace BxpHelpers
 				{EBuildingExpansionType::BTX_GerPak40Pit, GerPak40Pit_Radixite, GerPak40Pit_Metal, 0.9f},
 				{EBuildingExpansionType::BTX_GerLeFH18Pit, GerLeFH18Pit_Radixite, GerLeFH18Pit_Metal, 1.1f},
 				{EBuildingExpansionType::BTX_GerSFH18Pit, GerSFH18Pit_Radixite, GerSFH18Pit_Metal, 1.25f},
+				{EBuildingExpansionType::BTX_GerFlak37Pit, GerFlak37Pit_Radixite, GerFlak37Pit_Metal, 0.9f},
 			};
 			for (const FGunPitEntry& Pit : Pits)
 			{

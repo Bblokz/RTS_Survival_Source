@@ -889,6 +889,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerLeFH18Pit_Metal = 320;
 				inline constexpr int32 GerSFH18Pit_Radixite = 950;
 				inline constexpr int32 GerSFH18Pit_Metal = 520;
+				inline constexpr int32 GerFlak37Pit_Radixite = 420;
+				inline constexpr int32 GerFlak37Pit_Metal = 220;
 			}
 
 			// ----------------------------------

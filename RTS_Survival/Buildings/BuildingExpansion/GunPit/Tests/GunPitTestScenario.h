@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerCaptureRig.h"
+#include "GunPitFireReactionWatch.h"
 
 class AActor;
 class ACPPTurretsMaster;
@@ -75,10 +76,11 @@ struct FGunPitUnderTest
 	bool bWasLoading = false;
 	bool bDrillChecked = false;
 	bool bTraverseChecked = false;
+	FGunPitFireReactionWatch FireReaction;
 };
 
 /**
- * @brief Spawns the three German gun pits (Pak 40, leFH 18, sFH 18) as the player's, orders each to attack the
+ * @brief Spawns the four German gun pits (Pak 40, leFH 18, sFH 18, Flak 37) as the player's, orders each to attack the
  * ground off its forward and checks the pit: crew, crate and rounds ride on the gun's PitOrigin at 1:1 scale, the
  * whole gun and its crew turn to the target, the gun fires, and one loading drill moves the rounds from the
  * handler's hands to the loader's and into the breech while the handler picks up the next round.
@@ -125,6 +127,8 @@ private:
 	void LogHandover(const FGunPitUnderTest& Pit, const UStaticMeshComponent& Round,
 	                 const USkeletalMeshComponent& Loader) const;
 	void CheckTraverse(FGunPitUnderTest& Pit);
+	// The gun bucks and the crew brace after the first shot (gun pit anim and crew anim instances).
+	void WatchFireReaction(UWorld& World, FGunPitUnderTest& Pit);
 	bool GetIsPitDone(const FGunPitUnderTest& Pit) const;
 
 	// Unattended runs never draw the pits; their meshes would skip the pose and never play montages.

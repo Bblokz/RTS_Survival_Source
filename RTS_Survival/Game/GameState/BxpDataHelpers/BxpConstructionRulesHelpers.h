@@ -74,6 +74,8 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_RusML20Pit, WithFootprint(FreeConstructionRules, 2000.f, 2000.f)},
 		// The BS-3 turns a full circle with its wide trails inside a square bag wall.
 		{EBuildingExpansionType::BTX_RusBS3Pit, WithFootprint(FreeConstructionRules, 1300.f, 1300.f)},
+		// The Flak 37 and its crew turn inside a ring like the Pak pit's, a little wider.
+		{EBuildingExpansionType::BTX_GerFlak37Pit, WithFootprint(FreeConstructionRules, 1100.f, 1100.f)},
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
 
 		// --- solar  ---

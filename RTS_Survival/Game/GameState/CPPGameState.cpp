@@ -1200,6 +1200,31 @@ void ACPPGameState::InitAllGameFlameWeapons()
 	WeaponData.ShrapnelPen = 0;
 	WeaponData.ProjectileMovementSpeed = 0;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::FlammIS3, WeaponData);
+
+	// ROKS-3: Soviet backpack flamethrower; reaches a little further than the Flamm 15, slightly less damage.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::ROKS3_Flamethrower;
+	WeaponData.DamageType = ERTSDamageType::Fire;
+	WeaponData.ShellType = EWeaponShellType::Shell_AP;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
+	WeaponData.WeaponCalibre = 45.f;
+	WeaponData.TNTExplosiveGrams = 0;
+	WeaponData.BaseDamage = 23;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumFlameRange * 1.15f, 5);
+	WeaponData.ArmorPen = 0;
+	WeaponData.ArmorPenMaxRange = 0;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 2.5;
+	WeaponData.BaseCooldown = 1;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 100;
+	WeaponData.ShrapnelRange = 0;
+	WeaponData.ShrapnelDamage = 0;
+	WeaponData.ShrapnelParticles = 0;
+	WeaponData.ShrapnelPen = 0;
+	WeaponData.ProjectileMovementSpeed = 0;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ROKS3_Flamethrower, WeaponData);
 }
 
 void ACPPGameState::InitAllGameBombWeapons()
@@ -1677,6 +1702,64 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * PanzerwerferProjectileSpeedMultiplier;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Rocket_50mm, WeaponData);
+
+	// Dyakonov rifle grenade launcher: 41mm VKG-40 HE grenades lobbed from a Mosin cup discharger.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::Dyakonov_RGL_41MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_HE;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
+	WeaponData.WeaponCalibre = 41;
+	WeaponData.TNTExplosiveGrams = 50;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange, 100);
+	WeaponData.ArmorPen = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM * WeaponData.WeaponCalibre)
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	WeaponData.ArmorPenMaxRange = WeaponData.ArmorPen;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 5.f;
+	WeaponData.BaseCooldown = 1.f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy + 15;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
+	WeaponData.ShrapnelDamage = 5 + WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM
+		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelPenMlt;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Dyakonov_RGL_41MM, WeaponData);
+
+	// Ampulomet M1941: 125mm incendiary ampoules (KS liquid); fire damage with a wide splash, no armour penetration.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::Ampulomet_125MM;
+	WeaponData.DamageType = ERTSDamageType::Fire;
+	WeaponData.ShellType = EWeaponShellType::Shell_Fire;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Fire};
+	WeaponData.WeaponCalibre = 125;
+	WeaponData.TNTExplosiveGrams = 0;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * 0.6f
+		+ DeveloperSettings::GameBalance::Weapons::DamagePerMM_FireProjectileBonus * WeaponData.WeaponCalibre;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::MediumCannonRange, 100);
+	WeaponData.ArmorPen = 15;
+	WeaponData.ArmorPenMaxRange = 15;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 6.f;
+	WeaponData.BaseCooldown = 1.f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy + 10;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
+	WeaponData.ShrapnelDamage = 15;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = 0;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.6f;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ampulomet_125MM, WeaponData);
 }
 
 
@@ -2349,7 +2432,55 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.WeaponName = EWeaponName::Ger_TankMG_13;
 	WeaponData.MagCapacity = 100;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_TankMG_13, WeaponData);
-	
+
+	// Korovin M1941: 7.62 Tokarev SMG with a 35-round box magazine; slower cyclic rate than the PPSh, steadier.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::Korovin_M1941_7_62MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_AP;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
+	WeaponData.WeaponCalibre = 8;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = BasicSmallArmsRange;
+	WeaponData.ArmorPen = 10.f;
+	WeaponData.ArmorPenMaxRange = 7.f;
+	WeaponData.MagCapacity = 35;
+	WeaponData.ReloadSpeed = 4.f;
+	SetSmallArmsCooldown(WeaponData, 0.6f);
+	WeaponData.Accuracy = SmgAccuracy + 12;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Korovin_M1941_7_62MM, WeaponData);
+
+	// DS-39: belt-fed heavy machine gun; longer belt and range than the MG 34, heavier to reload.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::DS39_7_62MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_AP;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_AP};
+	WeaponData.WeaponCalibre = 8.f;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = SmallArmsDamageMlt * DamagePerMM * WeaponData.WeaponCalibre;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(BasicSmallArmsRange * 1.25, 10);
+	WeaponData.ArmorPen = 13.f;
+	WeaponData.ArmorPenMaxRange = 9.f;
+	WeaponData.MagCapacity = 75;
+	WeaponData.ReloadSpeed = 7.5f;
+	WeaponData.BaseCooldown = 0.4f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = HMGAccuracy + 5;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::DS39_7_62MM, WeaponData);
 }
 
 void ACPPGameState::InitAllGameRailGunData()
@@ -2494,6 +2625,32 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RailGun80MM, WeaponData);
+
+	// Prototype coilgun: handheld electromagnetic rifle. The weapon blueprint sets a charge-up time on the railgun
+	// state; that time is added to the cooldown at init, so the base cooldown here is the time between charges.
+	WeaponData = {};
+	WeaponData.WeaponName = EWeaponName::ProtoCoilgun_20MM;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_Railgun;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
+	WeaponData.WeaponCalibre = 20;
+	WeaponData.TNTExplosiveGrams = 0.f;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
+	WeaponData.DamageFlux = DamageFluxPercentage;
+	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
+	WeaponData.ArmorPen = 135.f;
+	WeaponData.ArmorPenMaxRange = 120.f;
+	WeaponData.MagCapacity = 5;
+	WeaponData.ReloadSpeed = 9.f;
+	WeaponData.BaseCooldown = 1.f;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 90;
+	WeaponData.ShrapnelRange = 0.f;
+	WeaponData.ShrapnelDamage = 0.f;
+	WeaponData.ShrapnelParticles = 0;
+	WeaponData.ShrapnelPen = 0.f;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 1.2f;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ProtoCoilgun_20MM, WeaponData);
 }
 
 void ACPPGameState::InitAllGameLightWeapons()
@@ -2926,6 +3083,14 @@ void ACPPGameState::InitAllGameLightWeapons()
 
 	WeaponData.WeaponName = EWeaponName::Flak36_37MM_TW;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak36_37MM_TW, WeaponData);
+
+	// The pit's clip change is a handover drill: a man passes each 6-round clip up to the loader on the gun.
+	constexpr float Flak37PitReloadSpeed = 4.5f;
+	const float Flak36ReloadSpeed = WeaponData.ReloadSpeed;
+	WeaponData.WeaponName = EWeaponName::Flak36_37MM_Pit;
+	WeaponData.ReloadSpeed = Flak37PitReloadSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak36_37MM_Pit, WeaponData);
+	WeaponData.ReloadSpeed = Flak36ReloadSpeed;
 
 	// Bofors 40mm
 	WeaponData.WeaponName = EWeaponName::Bofors_40MM;
@@ -7572,6 +7737,7 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsDefense(EBuildingExpansionType::BTX_GerPak40Pit),
 		AsDefense(EBuildingExpansionType::BTX_GerLeFH18Pit),
 		AsDefense(EBuildingExpansionType::BTX_GerSFH18Pit),
+		AsDefense(EBuildingExpansionType::BTX_GerFlak37Pit),
 		AsTech(EBuildingExpansionType::BTX_GerHQRadar),
 		AsDefense(EBuildingExpansionType::BTX_GerHQPlatform),
 		AsEconomic(EBuildingExpansionType::BTX_GerHQHarvester),
