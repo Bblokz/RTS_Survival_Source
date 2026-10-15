@@ -1,0 +1,79 @@
+{
+  "systems": [
+    {
+      "target": "/Game/RTS_Survival/ImpactSfxVfx/5Artillery/Howitzer/NS_HowitzerImpact_Regular",
+      "base": "/Game/RTS_Survival/SpecialEffects/AllExplosions/Niagara/Big/NS_Explosion_Big_8",
+      "add": [
+        {
+          "from": "/Game/RTS_Survival/SpecialEffects/AllExplosions/Niagara/Sand/NS_Explosion_Sand_8",
+          "emitter": "main",
+          "name": "dirt_burst"
+        },
+        {
+          "from": "/Game/RTS_Survival/SpecialEffects/AllExplosions/Niagara/Sand/NS_Explosion_Sand_8",
+          "emitter": "dirt",
+          "name": "dirt_clods"
+        },
+        {
+          "from": "/Game/RTS_Survival/SpecialEffects/AllExplosions/Niagara/Sand/NS_Explosion_Sand_8",
+          "emitter": "dust",
+          "name": "dirt_dust"
+        }
+      ],
+      "rename": {
+        "main": "fireball"
+      },
+      "disable": [
+        "refr_sprite",
+        "refr_mesh"
+      ],
+      "spawn_scale": {
+        "spark": 0.6,
+        "spark_l": 0.6
+      }
+    },
+    {
+      "target": "/Game/RTS_Survival/ImpactSfxVfx/5Artillery/Howitzer/NS_HowitzerImpact_Sand",
+      "base": "/Game/RTS_Survival/SpecialEffects/AllExplosions/Niagara/Sand/NS_Explosion_Sand_8",
+      "add": [
+        {
+          "from": "/Game/RTS_Survival/SpecialEffects/AllExplosions/Niagara/Big/NS_Explosion_Big_8",
+          "emitter": "smoke_shockwave",
+          "name": "shockwave_smoke"
+        }
+      ],
+      "disable": [
+        "refr_sprite",
+        "refr_mesh"
+      ],
+      "spawn_scale": {
+        "spark": 0.6,
+        "spark_l": 0.6,
+        "spark001": 0.6,
+        "smoke001": 0.4
+      },
+      "user": {
+        "LifetimeMult": 1.5
+      }
+    },
+    {
+      "target": "/Game/RTS_Survival/ImpactSfxVfx/5Artillery/Howitzer/NS_HowitzerImpact_Stone",
+      "base": "/Game/RTS_Survival/SpecialEffects/AllExplosions/Niagara/Sand/NS_Explosion_Sand_8",
+      "add": [],
+      "disable": [
+        "refr_sprite",
+        "refr_mesh"
+      ],
+      "spawn_scale": {
+        "smoke001": 0.4
+      },
+      "user": {
+        "LifetimeMult": 1.4
+      },
+      "materials": {
+        "/Game/RTS_Survival/SpecialEffects/AllExplosions/Materials/MI_Explosion_Sand_11.MI_Explosion_Sand_11": "/Game/RTS_Survival/ImpactSfxVfx/5Artillery/Howitzer/Stone/MI_HowitzerStoneDust_1.MI_HowitzerStoneDust_1",
+        "/Game/RTS_Survival/SpecialEffects/AllExplosions/Materials/MI_Explosion_Sand_12.MI_Explosion_Sand_12": "/Game/RTS_Survival/ImpactSfxVfx/5Artillery/Howitzer/Stone/MI_HowitzerStoneDust_2.MI_HowitzerStoneDust_2"
+      }
+    }
+  ]
+}
