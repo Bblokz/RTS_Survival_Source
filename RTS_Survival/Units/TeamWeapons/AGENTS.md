@@ -77,7 +77,7 @@ Team weapon handlers frequently coordinate crew assignment, movement mode, turre
 
 ## Working guidance for future changes
 
-- Before adding/changing an ability here, read `Docs/Abilities.md` for queue/decoder/`ICommands` flow.
+- Before adding/changing an ability here, read `Docs/Abilities/Abilities.md` for queue/decoder/`ICommands` flow.
 - Validate both command-queue behavior and turret callback behavior in the same change.
 - Keep team weapon state transitions explicit; avoid hidden side effects.
 - Preserve the distinction between:

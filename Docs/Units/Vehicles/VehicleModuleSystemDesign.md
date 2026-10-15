@@ -657,7 +657,7 @@ Call `RefreshCrewRepairAbilityFromModuleState` after committed native state batc
 
 ### Controller → ICommands → TankMaster implementation
 
-Follow [AGENTS.md](../AGENTS.md), [Player/AGENTS.md](../RTS_Survival/Player/AGENTS.md) and [Docs/Abilities.md](Abilities.md). UI callbacks must route through the controller.
+Follow [AGENTS.md](../../../AGENTS.md), [Player/AGENTS.md](../../../RTS_Survival/Player/AGENTS.md) and [Docs/Abilities/Abilities.md](../../Abilities/Abilities.md). UI callbacks must route through the controller.
 
 | File / symbol | Required addition |
 | --- | --- |
@@ -966,24 +966,24 @@ Existing `UBehaviourComp` allocates UObjects/dynamic storage. Create/remove modu
 
 | Existing source / symbol | Required integration |
 | --- | --- |
-| [ArmorCalculation.cpp](../RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.cpp): `NoArmorHitGetClosest` | Fill all outputs; fix squared-distance threshold and adjusted-penetration reset before routing fallback hits |
+| [ArmorCalculation.cpp](../../../RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.cpp): `NoArmorHitGetClosest` | Fill all outputs; fix squared-distance threshold and adjusted-penetration reset before routing fallback hits |
 | Same: `EvaluateArmorPlatesForHit`, `GetArmorAtAngle` | Preserve registered zero-armor plate identity; handle near-zero cosine safely |
 | Same: armor setters/multipliers, rear cache | Separate structural/permanent/add-on armor; BP coverage routes hits and behaviour modifiers; only assigned behaviours alter protection on module damage; refresh rear cache when effects change |
-| [Projectile.cpp](../RTS_Survival/Weapons/Projectile/Projectile.cpp): kinetic/bounce/overpenetration paths | Common resolved-hit module call exactly once |
-| [WeaponData.cpp](../RTS_Survival/Weapons/WeaponData/WeaponData.cpp): `DidTracePenArmorCalcComponent` | Return plate context and penetration; retain sampled damage flux |
-| [HpPawnMaster.cpp](../RTS_Survival/MasterObjects/HealthBase/HpPawnMaster.cpp), [HealthComponent.cpp](../RTS_Survival/RTSComponents/HealthComponent.cpp) | Expose real damage receipt; actor return value is not damage |
+| [Projectile.cpp](../../../RTS_Survival/Weapons/Projectile/Projectile.cpp): kinetic/bounce/overpenetration paths | Common resolved-hit module call exactly once |
+| [WeaponData.cpp](../../../RTS_Survival/Weapons/WeaponData/WeaponData.cpp): `DidTracePenArmorCalcComponent` | Return plate context and penetration; retain sampled damage flux |
+| [HpPawnMaster.cpp](../../../RTS_Survival/MasterObjects/HealthBase/HpPawnMaster.cpp), [HealthComponent.cpp](../../../RTS_Survival/RTSComponents/HealthComponent.cpp) | Expose real damage receipt; actor return value is not damage |
 | Same health component: `Heal`, `GetHasDamageToRepair`, `SetMaxHealth` | Central healing transaction/receipt; include modules in tank eligibility/completion; notify actual MaxHealth changes |
 | Same: `OnWidgetInitialized`, `SetHealthBarVisibility` | Initialize/rebind `ModuleBox`; flush pending icon state on visibility changes |
-| [W_HealthBar.h](../RTS_Survival/GameUI/Healthbar/W_HealthBar.h), [BehaviourButtonSettings.h](../RTS_Survival/Behaviours/ProjectSettings/BehaviourButtonSettings.h) | Existing widget/settings reference pattern; shared module asset with textures and optional classes; widget icon cache |
-| [ICBMActor.cpp](../RTS_Survival/Weapons/ICBM/ICBMActor/ICBMActor.cpp): `ApplyDirectDamage`, `ApplyAOEDamage` | Retain hull-only damage; no module adapter |
-| [TankMaster.h](../RTS_Survival/Units/Tanks/TankMaster.h) | CrewRepair execute/terminate/timer and automatic cleanup, native counts, behaviour synchronization and BP state event |
-| [RepairComponent.cpp](../RTS_Survival/RTSComponents/RepairComponent/RepairComponent.cpp), [RepairHelpers.h](../RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h), [RadiusRepairAura.cpp](../RTS_Survival/RTSComponents/AOEBehaviourComponent/RadiusAOEBehaviourComponent/RepairAura/RadiusRepairAura.cpp) | Keep normal healing calls; tank-aware eligibility/completion includes full-health module-only targets |
-| [TickingHealBehaviour.cpp](../RTS_Survival/Behaviours/Derived/Heal/TickingHealBehaviour.cpp), [SingleHealBehaviour.cpp](../RTS_Survival/Behaviours/Derived/Heal/SingleHealBehaviour.cpp) | Existing `Heal` calls automatically recover modules; no custom tank payload |
-| [BehVehicleStunned.cpp](../RTS_Survival/Behaviours/Derived/BehaviourVehicleStunned/BehVehicleStunned.cpp), [BehaviourComp.h](../RTS_Survival/Behaviours/BehaviourComp.h) | Fixed module behaviour slots; exact-instance replacement; preserve identity through refresh/deferred operations; no stale speed restore |
-| [TurretSwapComp.h](../RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h) | Preserve condition by mount role; rebind without healing/reloading |
-| [TrackPathFollowingComponent.h](../RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h), [TrackPhysicsMovement.cpp](../RTS_Survival/Units/Tanks/TrackedTank/TrackPhysicsMovementComp/TrackPhysicsMovement.cpp) | Apply restrictions to navigation/movement; copy scalar limits into physics snapshots |
-| [Abilities.md](Abilities.md), [Commands.cpp](../RTS_Survival/Interfaces/Commands.cpp), [CPPController.cpp](../RTS_Survival/Player/CPPController.cpp) | CrewRepair enum/subtypes, final reserved slot, queued Enable, immediate Disable and single completion/termination |
-| [BehWeaponRemoveAbilities.h](../RTS_Survival/Behaviours/Derived/BehaviourWeapon/BehWeaponRemoveAbilities.h) | Share suppression ownership with CrewRepair so overlapping removals restore correctly |
+| [W_HealthBar.h](../../../RTS_Survival/GameUI/Healthbar/W_HealthBar.h), [BehaviourButtonSettings.h](../../../RTS_Survival/Behaviours/ProjectSettings/BehaviourButtonSettings.h) | Existing widget/settings reference pattern; shared module asset with textures and optional classes; widget icon cache |
+| [ICBMActor.cpp](../../../RTS_Survival/Weapons/ICBM/ICBMActor/ICBMActor.cpp): `ApplyDirectDamage`, `ApplyAOEDamage` | Retain hull-only damage; no module adapter |
+| [TankMaster.h](../../../RTS_Survival/Units/Tanks/TankMaster.h) | CrewRepair execute/terminate/timer and automatic cleanup, native counts, behaviour synchronization and BP state event |
+| [RepairComponent.cpp](../../../RTS_Survival/RTSComponents/RepairComponent/RepairComponent.cpp), [RepairHelpers.h](../../../RTS_Survival/RTSComponents/RepairComponent/RepairHelpers/RepairHelpers.h), [RadiusRepairAura.cpp](../../../RTS_Survival/RTSComponents/AOEBehaviourComponent/RadiusAOEBehaviourComponent/RepairAura/RadiusRepairAura.cpp) | Keep normal healing calls; tank-aware eligibility/completion includes full-health module-only targets |
+| [TickingHealBehaviour.cpp](../../../RTS_Survival/Behaviours/Derived/Heal/TickingHealBehaviour.cpp), [SingleHealBehaviour.cpp](../../../RTS_Survival/Behaviours/Derived/Heal/SingleHealBehaviour.cpp) | Existing `Heal` calls automatically recover modules; no custom tank payload |
+| [BehVehicleStunned.cpp](../../../RTS_Survival/Behaviours/Derived/BehaviourVehicleStunned/BehVehicleStunned.cpp), [BehaviourComp.h](../../../RTS_Survival/Behaviours/BehaviourComp.h) | Fixed module behaviour slots; exact-instance replacement; preserve identity through refresh/deferred operations; no stale speed restore |
+| [TurretSwapComp.h](../../../RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h) | Preserve condition by mount role; rebind without healing/reloading |
+| [TrackPathFollowingComponent.h](../../../RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h), [TrackPhysicsMovement.cpp](../../../RTS_Survival/Units/Tanks/TrackedTank/TrackPhysicsMovementComp/TrackPhysicsMovement.cpp) | Apply restrictions to navigation/movement; copy scalar limits into physics snapshots |
+| [Abilities.md](../../Abilities/Abilities.md), [Commands.cpp](../../../RTS_Survival/Interfaces/Commands.cpp), [CPPController.cpp](../../../RTS_Survival/Player/CPPController.cpp) | CrewRepair enum/subtypes, final reserved slot, queued Enable, immediate Disable and single completion/termination |
+| [BehWeaponRemoveAbilities.h](../../../RTS_Survival/Behaviours/Derived/BehaviourWeapon/BehWeaponRemoveAbilities.h) | Share suppression ownership with CrewRepair so overlapping removals restore correctly |
 
 ## 11. Shared module asset and tank healthbar icons
 

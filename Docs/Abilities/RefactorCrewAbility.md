@@ -2,7 +2,7 @@
 
 Implementation plan, reviewed against the current working tree on 1 October 2026. This document does not implement the refactor. Existing local C++ changes are part of the reviewed baseline and must be preserved.
 
-Read [VehicleModuleSystemDesign.md](VehicleModuleSystemDesign.md), especially sections 2, 7, 8, 12 and 13, and [Abilities.md](Abilities.md) before implementation. The vehicle-module document describes the original design; the source already implements CrewRepair and is the authority for current symbols. This is an extraction of an existing ability, not registration of a new ability.
+Read [VehicleModuleSystemDesign.md](../Units/Vehicles/VehicleModuleSystemDesign.md), especially sections 2, 7, 8, 12 and 13, and [Abilities.md](Abilities.md) before implementation. The vehicle-module document describes the original design; the source already implements CrewRepair and is the authority for current symbols. This is an extraction of an existing ability, not registration of a new ability.
 
 ## 1. Goal and boundaries
 
@@ -263,13 +263,13 @@ If a required weak reference expires, clear the component timer/local state firs
 - `TankMasterTurretModules.cpp`: retain initial discovery/finalization/deferred import ordering and module identities.
 - `ArmorCalculationModules.cpp`, `VehicleModuleBalance.h`, health component and module behaviours: retain repair mutation/priority/tuning/healing/presentation semantics.
 
-Update [Abilities.md](Abilities.md) to say the tank forwards CrewRepair and `UTankCrewRepair` writes its reserved slot through CommandData. Update the relevant owner/responsibility, function/state and lifecycle descriptions in [VehicleModuleSystemDesign.md](VehicleModuleSystemDesign.md), distinguishing the completed extraction from its historical proposed APIs. Do not leave documentation claiming the actor still owns the crew timer/session.
+Update [Abilities.md](Abilities.md) to say the tank forwards CrewRepair and `UTankCrewRepair` writes its reserved slot through CommandData. Update the relevant owner/responsibility, function/state and lifecycle descriptions in [VehicleModuleSystemDesign.md](../Units/Vehicles/VehicleModuleSystemDesign.md), distinguishing the completed extraction from its historical proposed APIs. Do not leave documentation claiming the actor still owns the crew timer/session.
 
 Blueprint assets keep the existing tank query nodes and module finalization call. The component is inherited automatically; designers should not manually add a second one. Its transient state is not save data. `FVehicleModuleSaveData` remains unchanged; save version, finishing work and stable module IDs stay with the existing module system. No active timer, generation, suppression, command token or elapsed crew work is serialized. No new replication/RPC design is part of this extraction.
 
 ## 9. Coding and lifetime requirements
 
-Follow [AGENTS.md](../AGENTS.md) for all changed C++:
+Follow [AGENTS.md](../../AGENTS.md) for all changed C++:
 
 - Add `GetIsValidTankCrewRepair()` on the actor with actor error reporting. Component member checks go through const boolean validators `GetIsValidTankOwner`, `GetIsValidCrewCommandData` and `GetIsValidModuleArmor`. The command-data validator deliberately has a distinct name from the tank's existing pointer-returning `GetIsValidCommandData` API.
 - Component validators use `RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, MemberName, ValidatorName, ContextObject)` because `UActorComponent` is not an actor. Centralize member-pointer errors there; do not repeat them at call sites. Expected pre-setup readiness is handled before requesting required validation.

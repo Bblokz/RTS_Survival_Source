@@ -514,7 +514,7 @@ Multiple flame contacts may therefore damage the shield multiple times, matching
 
 ## Ability and Command Integration
 
-Follow the full flow in `Docs/Abilities.md`.
+Follow the full flow in `Docs/Abilities/Abilities.md`.
 
 ### Ability definition and registration
 

@@ -3,7 +3,7 @@
 Run inside the editor:  import ue_b4_import; ue_b4_import.run_all()
 Steps can also be run one at a time (import_textures, make_materials, import_mesh, import_lods, import_anims,
 setup_aim_poses). Montages, the aim offset, sockets and the anim blueprint are made with the editor MCP actions;
-see Docs/Units/B4Howitzer.md.
+see Docs/Units/B4Howitzer/B4Howitzer.md.
 """
 import os
 

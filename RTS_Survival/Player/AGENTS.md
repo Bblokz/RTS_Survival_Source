@@ -14,7 +14,7 @@ When in doubt, route player-issued actions through existing `ACPPController` com
 
 ## Do not break
 
-- Keep ability enqueue/decode flow consistent with `Docs/Abilities.md`.
+- Keep ability enqueue/decode flow consistent with `Docs/Abilities/Abilities.md`.
 - Keep selection state transitions and command dispatch atomic.
 - Avoid adding direct gameplay side effects in UI callback handlers; route through existing controller command entry points.
 - Preserve pointer-validation/reporting pattern for controller-owned members.

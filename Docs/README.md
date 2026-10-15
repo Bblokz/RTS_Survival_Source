@@ -1,0 +1,17 @@
+# Docs index
+
+One folder per game area. Put new docs in the folder of the system they describe; design plans,
+refactor plans and how-tos live next to the system docs rather than in a separate "plans" folder.
+Only `Investigations/` is sorted by kind instead of by area.
+
+| Folder | What goes there | Contents |
+|---|---|---|
+| `Abilities/` | Player abilities and the `ICommands` queue, ability components | [Abilities.md](Abilities/Abilities.md) (read before adding any ability), [Shields.md](Abilities/Shields.md), [RefactorCrewAbility.md](Abilities/RefactorCrewAbility.md) |
+| `Units/` | Unit-specific docs, one subfolder per unit or unit family | [Vehicles/VehicleModuleSystemDesign.md](Units/Vehicles/VehicleModuleSystemDesign.md), [Vehicles/VehicleStunnedBehaviourPlan.md](Units/Vehicles/VehicleStunnedBehaviourPlan.md), [B4Howitzer/B4Howitzer.md](Units/B4Howitzer/B4Howitzer.md), [B4Howitzer/B4Pit_LessonsLearned.md](Units/B4Howitzer/B4Pit_LessonsLearned.md), [StrikeDivUnits.txt](Units/StrikeDivUnits.txt) (strike division training menu layout) |
+| `EnemyAI/` | `AEnemyController` and its AI subcomponents | [EnemyController_AI_Setup_Overview.md](EnemyAI/EnemyController_AI_Setup_Overview.md) |
+| `Campaign/` | World campaign map runtime | [WorldDivisions.md](Campaign/WorldDivisions.md) |
+| `Procedural/` | Custom PCG nodes | [ScorchedCityPCG.md](Procedural/ScorchedCityPCG.md), [EnemyBaseSetupPCG.md](Procedural/EnemyBaseSetupPCG.md), [BattlefieldAreaPCG.md](Procedural/BattlefieldAreaPCG.md) |
+| `Maps/` | Individual mission maps, with screenshots | [RedLine.md](Maps/RedLine.md) |
+| `UI/` | Game UI systems and the UI skin work | [AnimatedIcons.md](UI/AnimatedIcons.md), [Skins/ShippingReadyUI.md](UI/Skins/ShippingReadyUI.md) (skin mockups in `UI/Skins/`) |
+| `Testing/` | The Shipping-like test targets | [RTS_SurvivalShippingMapTests.md](Testing/RTS_SurvivalShippingMapTests.md), [RTS_SurvivalShippingCampaignMapTests.md](Testing/RTS_SurvivalShippingCampaignMapTests.md), [RTS_SurvivalShippingEnemyAITests.md](Testing/RTS_SurvivalShippingEnemyAITests.md) |
+| `Investigations/` | Audits, bug investigations and engine bug reports | [DestructionIterationAudit.md](Investigations/DestructionIterationAudit.md), [FormationCrossingInvestigation.md](Investigations/FormationCrossingInvestigation.md), [EngineBugReports/EngineBugReport_ForceDeleteReparent.md](Investigations/EngineBugReports/EngineBugReport_ForceDeleteReparent.md) (+ repro script) |
