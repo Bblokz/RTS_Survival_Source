@@ -85,6 +85,48 @@ namespace BxpHelpers
 		}
 
 
+		/**
+		 * @brief Sandbagged pits for the team weapons' guns; the gun turns a full circle and its crew hands the
+		 * rounds to the loader. The heavier the gun, the dearer and tougher the pit.
+		 * @param InPlayerDataMap Player bxp data; the enemy map is copied from it afterwards.
+		 */
+		static void InitGerGunPitBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
+		{
+			using namespace BxpHelpers;
+			using namespace DeveloperSettings::GameBalance::TrainingTime;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
+			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
+			using namespace DeveloperSettings::GameBalance::UnitHealth;
+			struct FGunPitEntry
+			{
+				EBuildingExpansionType Type;
+				int32 Radixite;
+				int32 Metal;
+				float HealthMlt;
+			};
+			const FGunPitEntry Pits[] = {
+				{EBuildingExpansionType::BTX_GerPak40Pit, GerPak40Pit_Radixite, GerPak40Pit_Metal, 0.9f},
+				{EBuildingExpansionType::BTX_GerLeFH18Pit, GerLeFH18Pit_Radixite, GerLeFH18Pit_Metal, 1.1f},
+				{EBuildingExpansionType::BTX_GerSFH18Pit, GerSFH18Pit_Radixite, GerSFH18Pit_Metal, 1.25f},
+			};
+			for (const FGunPitEntry& Pit : Pits)
+			{
+				FBxpData BxpData;
+				BxpData.ConstructionTime = BxpT2BuildTime;
+				BxpData.VisionRadius = T2BxpVisionRadius;
+				BxpData.Health = RoundToNearestMultipleOfFive(BxpHeavyBunkerHealth * Pit.HealthMlt);
+				BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
+				BxpData.Cost = FUnitCost({
+					{ERTSResourceType::Resource_Radixite, Pit.Radixite},
+					{ERTSResourceType::Resource_Metal, Pit.Metal},
+				});
+				BxpData.EnergySupply = 0;
+				BxpData.Abilities = ArmedBxpAbilities;
+				InPlayerDataMap.Add(Pit.Type, BxpData);
+			}
+		}
+
+
 		static void InitRefineryBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
 		{
 			using namespace BxpHelpers;

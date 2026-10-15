@@ -682,6 +682,18 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_TraceImpactVfxPerfScenario.Start();
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("B4HowitzerValidate")))
+	{
+		M_B4HowitzerScenario.Start();
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("GerPitValidate")))
+	{
+		M_GunPitScenario.Start();
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("RedLineTour")))
+	{
+		M_RedLineTourScenario.Start();
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderCountCover")))
 	{
 		M_CoverCountScenario.Start(FParse::Param(FCommandLine::Get(), TEXT("CoverFinderWriteCountBaseline")));
@@ -704,6 +716,9 @@ void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
 	M_MedicHealScenario.Tick(*this);
 	M_VehicleAvoidanceScenario.Tick(*this, DeltaTime);
 	M_TraceImpactVfxPerfScenario.Tick(*this);
+	M_B4HowitzerScenario.Tick(*this);
+	M_GunPitScenario.Tick(*this);
+	M_RedLineTourScenario.Tick(*this);
 }
 #endif
 

@@ -148,6 +148,8 @@ public:
 
 	UTextureRenderTarget2D* GetIsValidActiveRT() const;
 	UTextureRenderTarget2D* GetIsValidPassiveRT() const;
+	// Silent: null until the blueprint created the render targets (the fog has not started yet).
+	UTextureRenderTarget2D* GetPassiveRTIfCreated() const { return PassiveRT; }
 	inline float GetMapExtent () const { return MapExtent; }
 	inline float GetMiniMapTinyIconSizePixels() const { return MiniMapTinyIconSizePixels; }
 	inline float GetMiniMapSmallIconSizePixels() const { return MiniMapSmallIconSizePixels; }
@@ -159,6 +161,9 @@ public:
 	const TArray<FRTSMinimapTextDrawData>& GetCustomMiniMapTextDrawData() const;
 	void RefreshCustomMiniMapIconDrawDataForMiniMap();
 	void AppendCustomMiniMapIconBrushData(TArray<FRTSMinimapIconBrushData>& OutBrushData) const;
+
+	/** @return False when the location lies outside the minimap. */
+	bool GetMiniMapUVFromWorldLocation(const FVector& WorldLocation, FVector2D& OutUV) const;
 
 	/**
 	 * @brief Adds an always-visible texture icon at a fixed world location.
@@ -404,8 +409,6 @@ private:
 	 * @pre FowComp must be a valid pointer and not already in the passive participants list.
 	 */
 	void AddPassiveFowParticipant(UFowComp* FowComp);
-
-	bool GetMiniMapUVFromWorldLocation(const FVector& WorldLocation, FVector2D& OutUV) const;
 
 	FVector GetMiniMapWorldLocationForIcon(const UFowComp& FowComponent) const;
 

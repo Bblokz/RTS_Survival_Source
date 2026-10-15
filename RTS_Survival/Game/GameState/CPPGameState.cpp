@@ -3847,6 +3847,33 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Morser_18_210MM_TW, WeaponData);
 
+	// B-4 203mm: a 100 kg HE shell with about 15 kg of TNT. Local copies so the weapons below keep their values.
+	FWeaponData B4WeaponData = WeaponData;
+	B4WeaponData.WeaponName = EWeaponName::B4_203MM_TW;
+	B4WeaponData.WeaponCalibre = 203;
+	B4WeaponData.TNTExplosiveGrams = 15300;
+	B4WeaponData.BaseDamage = DamagePerMM * B4WeaponData.WeaponCalibre
+		+ B4WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	B4WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
+	B4WeaponData.ArmorPen = 40 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	B4WeaponData.ArmorPenMaxRange = 40 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	B4WeaponData.ReloadSpeed = 14;
+	B4WeaponData.Accuracy = 24;
+	B4WeaponData.ShrapnelRange = B4WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	B4WeaponData.ShrapnelDamage = B4WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	B4WeaponData.ShrapnelParticles = B4WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	B4WeaponData.ShrapnelPen = B4WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::B4_203MM_TW, B4WeaponData);
+
+	// The gun pit loads every shell with its crane and shell tray (the reload is the crew animation), but
+	// the fixed, surveyed position reaches further and lands closer.
+	B4WeaponData.WeaponName = EWeaponName::B4_203MM_Pit;
+	B4WeaponData.ReloadSpeed = 24;
+	B4WeaponData.Accuracy = 34;
+	B4WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange * 1.25f, 100);
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::B4_203MM_Pit, B4WeaponData);
+
 	// Cramped turret; stock reload.
 	WeaponData.WeaponName = EWeaponName::sIG_33_150MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -4495,6 +4522,24 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz9_37mm, TankData);
+
+	// Kubelwagen with MG34: fast, unarmoured scout car.
+	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * 0.6f, 5);
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 60 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 60 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 70;
+	TankData.VehicleReverseSpeedKmh = 25;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 0.6f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Keubel_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Keubel_VehicleParts}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Keubel, TankData);
 
 	// Sd.Kfz. 251/22
 	TankData.MaxHealth = ArmoredCarHealthBase + 150;
@@ -7187,6 +7232,43 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusMegaBunker, BxpData);
 
+	// -----------------------------------------------------------------------
+	// ------------------------- RUS B-4 HOWITZER PIT ------------------------
+	// -----------------------------------------------------------------------
+	FBxpData B4PitData = BxpData;
+	B4PitData.ConstructionTime = BxpT2BuildTime;
+	B4PitData.VisionRadius = MegaBunkerVisionRadius;
+	B4PitData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusB4HowitzerPit_Radixite},
+		{ERTSResourceType::Resource_Metal, RusB4HowitzerPit_Metal},
+	});
+	B4PitData.EnergySupply = 0;
+	B4PitData.Abilities = ArmedBxpAbilities;
+	B4PitData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth * 1.5f, 10);
+	B4PitData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(B4PitData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusB4HowitzerPit, B4PitData);
+	// The player's captured pit is the same emplacement, built from the German HQ.
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_GerCapturedB4Pit, B4PitData);
+
+	// -----------------------------------------------------------------------
+	// ------------------------- RUS TURRET PILLBOX --------------------------
+	// -----------------------------------------------------------------------
+	// A tank turret dug in on concrete: tougher than the tank it came from, armed like it.
+	FBxpData TurretPillboxData = BxpData;
+	TurretPillboxData.ConstructionTime = BxpT2BuildTime;
+	TurretPillboxData.Abilities = ArmedBxpAbilities;
+	TurretPillboxData.EnergySupply = 0;
+	TurretPillboxData.Health = BxpHeavyBunkerHealth;
+	TurretPillboxData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(
+		TurretPillboxData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusTurretPillbox, TurretPillboxData);
+
+	// -----------------------------------------------------------------------
+	// ---------------------------- GER GUN PITS -----------------------------
+	// -----------------------------------------------------------------------
+	// Sandbagged pits for the team weapons' guns, worked by a crew that hands the rounds to the loader.
+	BxpHelpers::GerBxpData::InitGerGunPitBxpData(M_TPlayerBxpDataHashMap);
+
 
 	// -----------------------------------------------------------------------
 	// ------------------------- RUS BUNKER 02 ZIS ----------------------
@@ -7318,6 +7400,10 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
 		AsDefense(EBuildingExpansionType::BTX_LeFH_150mm),
+		AsDefense(EBuildingExpansionType::BTX_GerCapturedB4Pit),
+		AsDefense(EBuildingExpansionType::BTX_GerPak40Pit),
+		AsDefense(EBuildingExpansionType::BTX_GerLeFH18Pit),
+		AsDefense(EBuildingExpansionType::BTX_GerSFH18Pit),
 		AsTech(EBuildingExpansionType::BTX_GerHQRadar),
 		AsDefense(EBuildingExpansionType::BTX_GerHQPlatform),
 		AsEconomic(EBuildingExpansionType::BTX_GerHQHarvester),
@@ -8509,6 +8595,13 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_Nebelwerfer, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_M1938_122mm, SquadData);
+
+	FSquadData B4SquadData = SquadData;
+	B4SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusB4_203mm_Radixite},
+		{ERTSResourceType::Resource_Metal, RusB4_203mm_Metal}
+	});
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_B4_203mm, B4SquadData);
 }
 
 void ACPPGameState::InitAllGameMachineGunTWSquadData()

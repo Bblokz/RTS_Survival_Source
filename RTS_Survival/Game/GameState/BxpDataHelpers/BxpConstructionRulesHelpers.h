@@ -59,6 +59,13 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BXT_88mmFlak, WithFootprint(FreeConstructionRules, 600.f, 600.f)},
 		{EBuildingExpansionType::BTX_Pak38, WithFootprint(FreeConstructionRules, 500.f, 500.f)},
 		{EBuildingExpansionType::BTX_LeFH_150mm, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
+		// Turntable gun pit: the B-4 trail sweeps a 6 m circle inside a 20 m earth berm.
+		{EBuildingExpansionType::BTX_RusB4HowitzerPit, WithFootprint(FreeConstructionRules, 2000.f, 2000.f)},
+		{EBuildingExpansionType::BTX_GerCapturedB4Pit, WithFootprint(FreeConstructionRules, 2000.f, 2000.f)},
+		{EBuildingExpansionType::BTX_RusTurretPillbox, WithFootprint(FreeConstructionRules, 900.f, 900.f)},
+		{EBuildingExpansionType::BTX_GerPak40Pit, WithFootprint(FreeConstructionRules, 1000.f, 1000.f)},
+		{EBuildingExpansionType::BTX_GerLeFH18Pit, WithFootprint(FreeConstructionRules, 1400.f, 1400.f)},
+		{EBuildingExpansionType::BTX_GerSFH18Pit, WithFootprint(FreeConstructionRules, 1400.f, 1400.f)},
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
 
 		// --- solar  ---
