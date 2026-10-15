@@ -234,7 +234,11 @@ enum class
 	M_10T_152MM UMETA(DisplayName = "M-10T 152MM (KV-2)"),
 	ML_20S_152MM_SU152 UMETA(DisplayName = "ML-20S 152MM (SU-152)"),
 	KS30_130MM_TW UMETA(DisplayName = "KS-30 130MM TW"),
-	TM_3_12_305MM UMETA(DisplayName = "TM-3-12 305MM")
+	TM_3_12_305MM UMETA(DisplayName = "TM-3-12 305MM"),
+	// Appended so serialized weapon names keep their values.
+	B4_203MM_TW UMETA(DisplayName = "B-4 203MM TW"),
+	// The fortified gun pit version: same gun, longer crane-loading cycle.
+	B4_203MM_Pit UMETA(DisplayName = "B-4 203MM Gun Pit")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -321,6 +325,8 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::M1938_122MM: return "M-1938";
 	case EWeaponName::ML_20S_152MM_SU152: return "ML-20S";
 	case EWeaponName::TM_3_12_305MM: return "TM-3-12";
+	case EWeaponName::B4_203MM_TW: return "B-4";
+	case EWeaponName::B4_203MM_Pit: return "B-4";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
 	case EWeaponName::Panzerwerfer: return "Panzerwerfer";
@@ -765,6 +771,10 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Morser_18_210MM_TW";
 	case EWeaponName::TM_3_12_305MM:
 		return "TM_3_12_305MM";
+	case EWeaponName::B4_203MM_TW:
+		return "B4_203MM_TW";
+	case EWeaponName::B4_203MM_Pit:
+		return "B4_203MM_Pit";
 
 	default:
 		{

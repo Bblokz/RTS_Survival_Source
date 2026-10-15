@@ -1430,6 +1430,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_M1938_122mm()
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_M1938_122mm));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_B4_203mm()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_B4_203mm));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_Maxim()
 {
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Maxim));

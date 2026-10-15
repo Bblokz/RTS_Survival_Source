@@ -1,0 +1,109 @@
+# Building a crewed gun pit: lessons from the B-4 pit
+
+This is what building `Rus_BXP_B4HowitzerPit` taught: a building expansion holding a team-weapon gun, with four animated crew who load it with a crane. The pillbox on RedLine (`Rus_BXP_RL_TurretPillbox`) was made from it afterwards.
+
+What the pit is and how its parts fit together is described in [B4Howitzer.md](B4Howitzer.md). This page is the how-to and the traps. Each item cost at least one test cycle.
+
+## 1. Start from an existing expansion, then undo what it brings along
+
+Duplicating a working BXP is the fastest start, but the copy carries the source's settings:
+
+| Inherited from the source | Symptom | Fix |
+|---|---|---|
+| Owner (the pit was copied from the German LeFH) | The "enemy" pit was player-owned. | Set `OwningPlayer` = 2 on the RTSComponent of the class defaults. |
+| `BuildingMeshComponent`'s own mesh (Flak88) | A pit placed in a level showed the Flak88 sandbags. | Set the mesh on the component in the class defaults (CDO), not only in `BP_InitBuildingExp`. A placed BXP never runs construction, so it only ever shows the component's template mesh. |
+| The wreck's `SetLifeSpan(12)` (from `BP_Obstacle_RusMGBunker_Destroyed`) | The destroyed pit vanished after 12 s. | Remove the node. Emplacement wrecks should stay as obstacles. |
+| The source's death graph | Wrong wreck and gun wreck spawned. | Rebuild `BP_OnUnitDies` with the bridge's `override_function` action. `ev.BP_OnUnitDies` binds to the HpPawnMaster version and leaves an out-of-date node. |
+
+Edit class defaults with Python: `unreal.get_default_object(bp.generated_class())`, then `bp.modify()`, then `save_packages`. The bridge's `set_blueprint_variable_default` fails on enum arrays.
+
+## 2. Registering a new expansion type
+
+A new `EBuildingExpansionType` needs all of these, or it silently misbehaves:
+
+1. The enum entry, plus its string and display-name cases in `BuildingExpansionEnums.h`.
+2. Game data in `ACPPGameState`: build time, abilities, health and resistances. The enemy map is a copy of the player map, so one entry serves both.
+3. Construction rules in `BxpConstructionRulesHelpers.h`, e.g. `WithFootprint(FreeConstructionRules, 900, 900)`.
+4. The spawner mapping in `RTS_BP_RTSAsyncSpawner` (class plus preview mesh).
+5. For the enemy AI: `SatteliteBuildingsForBase` on `RTS_BP_EnemyController`.
+6. For a player version: a `DT_Items` row with an option image and icon, and an `AsDefense(...)` entry in the HQ options.
+7. Store the type on the Blueprint (`PitExpansionType`) and pass it to `BP_InitBuildingExp`. That is where the RTS subtype, vision radius, abilities and health come from.
+
+**Soviet BXPs don't set their subtype early.** No Soviet expansion implements `BP_PostInit_SetupRTSSubtype`, so at PostInit their type is `BXT_Invalid`. This used to log "Could not find bxp data … BXT_Invalid" for every one of them. `PostInit_SetupAbilities` now skips quietly, and `InitBuildingExpansion` sets the abilities once the type is known.
+
+## 3. Art in Blender (headless scripts)
+
+- **Units:** work in centimetres (scene `scale_length = 0.01`). Export with `apply_unit_scale` and `FBX_SCALE_ALL`.
+- **Frame rate:** an FBX import resets the scene to 25 fps. Set 30 fps after every import, or the animations come out 1.2× too long. A 30 fps reimport over a 25 fps asset fails, so delete the old animation asset first.
+- **Sockets:** export empties named `SOCKET_<name>`, parented to the mesh.
+  - Blender +Y becomes UE −Y, and sockets arrive with roll −90 (harmless).
+  - Empty names are global in a `.blend`. Rename each piece's empties after exporting it, or the next piece gets `cargo_1.001`, which becomes `cargo_1_001` in UE.
+- **Materials:** use named material slots in Blender. Assign the real materials after import with `mesh.set_material(i, mat)`; editing a copy of `static_materials` does not persist.
+- **Collision:** use `CTF_USE_COMPLEX_AS_SIMPLE` for walk-in emplacements.
+- **LOD group:** use LargeProp for anything with hundreds of sandbags.
+- **Ground level:** put walkable floors (decks, duckboards) a few cm above 0, or raise the child actor. The pit's timber turntable sat 5 cm under the landscape and only showed in patches; the fix was raising the gun's child actor to z 4.
+
+### Sandbags
+
+- **Don't model bags with projected UVs.** A planar or box projection streaks across every side face of a bag.
+- **Use the SandBagPack singles instead.** Export `SM_SandBag_Single_01..03` from UE with `AssetExportTask` and `StaticMeshExporterFBX`. Then use them as templates: normalise them to a unit box and keep their per-loop UVs, which match `MI_Rus_SandBag_01`.
+  - The pack bags' bounds include the corner ears, so overlap neighbours by about 9 cm to press the bodies together.
+- **Make walls look real:**
+  - Lay them in running bond: each course offset half a bag.
+  - Jitter yaw, roll and size per bag, and leave the odd gap in the upper courses.
+  - Set each course back about 4 cm towards the defender.
+  - Add a rare third course on short stretches.
+  - Lay one row per straight run, so the courses don't restart at every path point.
+- **Both generators do this:** see `redline_fieldworks.py`, functions `sandbag_templates`, `add_sandbag`, `sandbag_row` and `sandbag_arc`. `b4_pit_props.py` (`build_sandbags`) has its own copies, which share the `RedLine/PackBags` FBXs.
+  - The pit's bags are 38 cm wide instead of 40, so two rows fit on the 55 cm revetment. Its entrance walls follow the sloping ramp.
+  - Reimport only the bags with `ue_b4_pit_import.import_sandbags()`.
+- **Put loose piles at ground level (z 0),** not at the berm foot (z −20). Otherwise the bottom bags are buried and a pile looks like a single bag.
+- **Close the earthworks:** where two banks meet at an outside corner, fill the quadrant; where a bank ends in open ground, cap its cross-section. Otherwise there are holes you can see through.
+
+## 4. The crew and the loading drill
+
+- **Skeleton and timing:** author the crew on the Infantry Master skeleton, frame by frame against the gun's own drill in the same Blender scene. Sample the gun geometry (trail rails, breech, tray heights) for footing and hand targets instead of guessing.
+- **Measure the shell handling, don't trust a render.** The test samples how close each crew member's hands come to the shell (`crew_handles_the_shell`, limit 45 cm). The first pass rendered the loader floating beside the cart.
+- **Copied templates keep their hidden flag.** The first crew meshes didn't render because they inherited it.
+- **One reload, one drill:** play every montage at `length / ReloadTime`, so the breech closes exactly when the weapon can fire again. Leave a small end margin (`LoadingEndMarginSeconds` 0.25). Reloads shorter than `MinReloadTimeForLoadingSequence` only recoil.
+- **Shared recoil:** the fire and reload animations share one recoil curve, so the drill can continue the recoil seamlessly instead of snapping.
+- **Reversed montages** (deploy = pack played at a negative rate) must start at their end. Otherwise they finish in 0.02 s and the gun snaps open (`PlayMontageFromPlayDirectionStart`).
+- **Blueprint components can't be parented to sockets of an inherited mesh.** Tag them instead (`B4PitCrew`, `B4PitSocket:<Socket>`) and attach them at runtime in `InitPitCrew(Turret)` from the turret's BeginPlay, keeping their Blueprint relative transform.
+- **Hook points on the turret:** the `ReloadWeapon` event starts the drill (`OnReloadStarted(ReloadTime)`). `PlaySingleFireAnimation` gives the recoil (`OnGunFired`).
+
+## 5. Editor workflow
+
+- **No editor window needed:** a windowless editor (`UnrealEditor-Cmd <uproject> -NullRHI -unattended -DisablePlugins=Fab`) exposes the UECP bridge on 9855 for graph, component and widget edits.
+  - Its `EditorActorSubsystem.spawn_actor_from_class` crashes; place actors from a Python commandlet instead.
+- **Saving maps:** landscape maps only save from a commandlet with `-AllowCommandletRendering` and without NullRHI. The landscape compiles shaders in PreSave.
+- **When the user's editor is open, it holds the asset files.** A commandlet import then fails to save, with "MoveFile was unable to move". Run the same import script through the bridge inside their editor instead, and never save a map they have open with unsaved changes.
+- **Don't save the load-dirtied StarterContent** packages that `get_dirty_content_packages` lists.
+
+## 6. Testing
+
+- **Tests are switches on a map run,** hooked into `URTSCoverFinderWorldSubsystem::StartCommandLineMapTests`:
+  - `-B4HowitzerValidate` (spawned). It starts the B-4 scenario, so the two below need it as well.
+  - `-B4HowitzerValidate -B4HowitzerObserve` (placed). On its own, `-B4HowitzerObserve` runs nothing and the map just idles.
+  - `-B4HowitzerValidate -B4HowitzerPlayerBuild` (built from the HQ like a player)
+  - `-RedLineTour` (the line on RedLine)
+- **The game boots paused:** unpause through `ACPPController::PauseGame(ForceUnpause)`.
+- **Enemy guns never fire under `-NullRHI`.** Enemy vision is a GPU Niagara readback, so nothing is ever tagged `IsInEnemyVision`. Run `-RenderOffscreen -windowed` whenever an enemy has to shoot.
+- **Nobody watches an unattended run:**
+  - Force `AlwaysTickPoseAndRefreshBones` on the meshes you follow.
+  - Reset `CharacterMovement`'s tick interval every frame. Unseen soldiers otherwise move in coarse steps and overshoot.
+- **Pictures:** scene-capture cameras (`FB4HowitzerCaptureRig`) need a fill light, the post-process material switched off (that's the fog of war), and enemy actors un-hidden.
+- **Use real numbers:** place targets from `GetTurretRange()`, since data ranges are scaled by `GameRangeMlt`. Keep test units away from the map's own fights.
+- **Player-build test:** find build spots with a ground trace (test maps may have no navmesh). Only the centre has to be inside the HQ's expansion range. Grant exactly the expansion's cost.
+
+## 7. Reusing the pit for other emplacements
+
+The turret pillbox is the pit's Blueprint with these changes:
+- the Howitzer child actor swapped for a tank turret on a `TurretMount` socket;
+- the building mesh, type, decal and selection sizes changed;
+- the wreck rebuilt in its own death function.
+
+Six children swap only the child turret class. Tank turrets work mounted on a BXP: `SetupTurret` plus `SetTurretsToAutoEngage`, the same as the BT-7 guard tower.
+
+## Open item
+
+`SM_B4Pit_Sandbags` (from `b4_pit_props.py`) still uses the projected `box_uvs`. It has the same streaky bag sides that the RedLine pieces had, and it should switch to the pack-bag templates from section 3.
