@@ -16,6 +16,9 @@
 #include "RTS_Survival/RTSComponents/MedicComponent/Tests/MedicHealTestScenario.h"
 #include "RTS_Survival/Units/Tanks/Tests/VehicleAvoidanceScenario.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/Tests/TraceImpactVfxPerfScenario.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerTestScenario.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/GunPit/Tests/GunPitTestScenario.h"
+#include "RTS_Survival/Utils/RTSMapTests/RedLine/RedLineTourScenario.h"
 #endif
 #include "Subsystems/WorldSubsystem.h"
 #include "CoverFinderWorldSubsystem.generated.h"
@@ -480,6 +483,9 @@ private:
 	FMedicHealTestScenario M_MedicHealScenario;
 	FVehicleAvoidanceScenario M_VehicleAvoidanceScenario;
 	FTraceImpactVfxPerfScenario M_TraceImpactVfxPerfScenario;
+	FB4HowitzerTestScenario M_B4HowitzerScenario;
+	FGunPitTestScenario M_GunPitScenario;
+	FRedLineTourScenario M_RedLineTourScenario;
 	void StartCommandLineMapTests();
 	void TickMapTests(float DeltaTime);
 #endif

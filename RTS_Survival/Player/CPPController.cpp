@@ -1850,6 +1850,23 @@ void ACPPController::RebuildPackedExpansion(const FBxpOptionData& BuildingExpans
 	}
 }
 
+#if RTS_WITH_MAP_TESTS
+bool ACPPController::MapTest_GetIsBxpWaitingForPlacement() const
+{
+	return M_IsBuildingPreviewModeActive == EPlayerBuildingPreviewMode::BxpPreviewMode &&
+		RTSFunctionLibrary::RTSIsValid(M_AsyncBxpRequestState.M_Expansion);
+}
+
+bool ACPPController::MapTest_PlaceLoadedBxpAtLocation(FVector& InClickedLocation)
+{
+	if (not MapTest_GetIsBxpWaitingForPlacement())
+	{
+		return false;
+	}
+	return PlaceBxpIfAsyncLoaded(InClickedLocation);
+}
+#endif
+
 #if RTS_WITH_SHIPPING_MAP_TESTS
 void ACPPController::ShippingTest_ResumeStartGameFlow()
 {

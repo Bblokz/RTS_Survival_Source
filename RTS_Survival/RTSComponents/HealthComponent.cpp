@@ -9,6 +9,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/GameUI/Healthbar/W_HealthBar.h"
+#include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -1192,6 +1193,15 @@ void UHealthComponent::OnUnitInCombat() const
 		return;
 	}
 	M_RTSComponent->SetUnitInCombat(true);
+	// Hits on player units may ping the minimap and tactical map; the subsystem throttles them.
+	const UWorld* const World = GetWorld();
+	URTSCombatPingSubsystem* const CombatPingSubsystem = IsValid(World)
+		                                                     ? World->GetSubsystem<URTSCombatPingSubsystem>()
+		                                                     : nullptr;
+	if (IsValid(CombatPingSubsystem))
+	{
+		CombatPingSubsystem->ReportUnitHit(*M_RTSComponent);
+	}
 }
 
 bool UHealthComponent::GetIsValidHeathBarOwner() const

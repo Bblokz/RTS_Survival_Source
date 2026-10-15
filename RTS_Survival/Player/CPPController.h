@@ -20,6 +20,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -702,6 +703,18 @@ public:
 		const FBxpOptionData& BuildingExpansionTypeData,
 		const TScriptInterface<IBuildingExpansionOwner>& BuildingExpansionOwner,
 		const int ExpansionSlotIndex);
+
+#if RTS_WITH_MAP_TESTS
+	/** @brief Map tests: whether the BXP of a clicked build option has loaded and waits for its placement click. */
+	bool MapTest_GetIsBxpWaitingForPlacement() const;
+
+	/**
+	 * @brief Map tests: the player's placement click for the loaded BXP; pays for it and starts its construction.
+	 * @param InClickedLocation Where the player clicks; snapped like a real click.
+	 * @return False when nothing waits for placement or the player cannot pay.
+	 */
+	bool MapTest_PlaceLoadedBxpAtLocation(FVector& InClickedLocation);
+#endif
 
 #if RTS_WITH_SHIPPING_MAP_TESTS
 	void ShippingTest_ResumeStartGameFlow();

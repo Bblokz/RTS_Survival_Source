@@ -2,6 +2,7 @@
 
 
 #include "ResourceComponent.h"
+#include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSubsystem.h"
 
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Game/GameState/GameResourceManager/GameResourceManager.h"
@@ -471,6 +472,8 @@ void UResourceComponent::InitResourceComponent(
 void UResourceComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	// The map object filters only need the resource type and owner location; they skip empty resources themselves.
+	RegisterWithMapObjectFilters();
 
 	if(not IsValid(GetOwner()))
 	{
@@ -574,6 +577,19 @@ void UResourceComponent::RegisterWithGameResourceManager()
 			RTSFunctionLibrary::ReportNullErrorInitialisation(this, "GameStateBase",
 			                                                  "RegisterWithGameResourceManager");
 		}
+	}
+}
+
+void UResourceComponent::RegisterWithMapObjectFilters()
+{
+	// Only stored for the tactical map's discovered resource filters; nothing runs while they are off.
+	const UWorld* const World = GetWorld();
+	URTSMapObjectFilterSubsystem* const MapObjectFilters = IsValid(World)
+		                                                       ? World->GetSubsystem<URTSMapObjectFilterSubsystem>()
+		                                                       : nullptr;
+	if (IsValid(MapObjectFilters))
+	{
+		MapObjectFilters->RegisterResource(*this);
 	}
 }
 
