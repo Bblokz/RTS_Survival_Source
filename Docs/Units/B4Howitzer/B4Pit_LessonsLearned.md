@@ -126,6 +126,46 @@ The German pits ([GerGunPits.md](../GerGunPits.md)) moved the crew logic into `U
 - **Offscreen pictures show low mips:** run with `-ExecCmds="r.TextureStreaming 0"`.
 - **A save in the user's editor can fail with "MoveFile … Error Code 32"** right after a reimport, because the old mesh's bulk data file is still open. A garbage collect and a second `save_asset` work.
 
+## 9. A machine-gun pit from the same parts (Soviet DShK)
+
+The DShK pit ([RusDShKPit.md](../RusDShKPit.md)) reuses the gun pit crew component and the B-4 crew solver for a weapon with no shells to hand over:
+- **Rig a static prop for a pit in Blender.** Split the mesh by loose parts into bone groups with simple bounds rules, add the mount (tripod) as new geometry UV'd into plain areas of the same texture, and keep one material.
+- **Yaw a bone other than the root when the base must stay.** `Traverse` turns the gun and crew; the tripod on `Root` stays. Put `PitOrigin` on that bone, and work out its socket transform from the base pose: bone-relative = desired × inverse(bone component transform).
+- **Swap props by trading bones.** The full and empty boxes end on each other's rest pose, so the drill loops without a pop. Drive the props and the loader's hands from one trajectory in one script.
+- **Per-shot crew motion:** `FireMontage` on a crew member starts on a shot unless it already plays. Give the short recoil and shake montages a 0.04 s blend, or they never reach full weight.
+- **Blender:** importing any FBX sets the scene to the file's frame rate (25). Reset to 30 after the last import, before exporting actions, or every clip comes out 1.2× long.
+- **Taper earth berms into openings** instead of capping them; a vertical cap shows stretched planar UVs.
+
+## 10. A new gun on an existing gun pit (Soviet 53-K)
+
+The 53-K team weapon and pit ([Rus53K.md](../Rus53K.md)) reuse two existing setups.
+
+**Share a skeleton when the gun has the same parts.** The 53-K is rigged in Blender with the ZiS-3's bone names and hierarchy, and it imports onto `SK_TW_Zis3_Skeleton`. The ZiS-3 anim BP, aim offset layout and team weapon Blueprint then only need their assets swapped.
+
+**Reuse a pit drill by comparing breech positions, not socket chains.** Measure the breech from geometry in Blender. The 53-K's breech matched the Pak 40's in x and y, so the whole Pak drill, crew spots and crate carried over.
+
+**A shared skeleton needs its own pit-origin socket per gun.** Name it after the gun (`PitOrigin53K`) and point the crate's `PitSocket:` tag at it.
+
+**Size the pit by everything that turns with the gun.** The ready crate rides on the pit origin, so it sweeps a circle. Clear its far corner, not only the trail spades.
+
+**Test the first shot, not only the settled state.** The traverse check at the first shot found a turret bug: an attack-ground order fired once along the old yaw (fixed in `SetEngageGroundLocation`).
+
+**Blender:** importing an FBX into a scene at `scale_length` 0.01 scales it ×100. Import at 1.0, then switch.
+
+## 11. A big gun, a square pit and a drill that fits any pit (Soviet BS-3)
+
+The BS-3 team weapon and pit ([RusBS3.md](../RusBS3.md)) repeat the 53-K's recipe on a gun with 5 m-wide trails.
+
+**Keep the crew drill independent of the pit.** Put every crew spot, the ready crate and the rounds in gun space on the pit-origin socket, and keep the crew on flat ground. A pit then only has to leave a clear radius around the pivot: everything that turns with the gun, plus a margin. The same turret drops into a round, square or dug-in pit.
+
+**Move a borrowed drill as one piece.** The Pak drill's handover spot and crate fell on the BS-3's trail. Turning the whole layout (loader, handler spots, crate) 20° about the breech kept every relative distance the bake depends on. Moving single spots would have meant re-tuning the handover.
+
+**Check the barrel mesh before you pick the recoiling parts.** KADO-3D's BS-3 barrel is two segments that meet hidden inside the cradle collar, so the collar has to recoil with them.
+
+**Square walls:** lay straight runs in running bond and bond the corners by alternating, per course, which pair of walls runs through.
+
+**Two editors on one project:** the second editor serves the bridge on its own port (30001). A test build on the DebugGame target avoids a Development DLL another session's editor holds.
+
 ## Open item
 
 `SM_B4Pit_Sandbags` (from `b4_pit_props.py`) still uses the projected `box_uvs`. It has the same streaky bag sides that the RedLine pieces had, and it should switch to the pack-bag templates from section 3.

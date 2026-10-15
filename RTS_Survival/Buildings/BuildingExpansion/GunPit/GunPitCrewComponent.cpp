@@ -163,6 +163,26 @@ void UGunPitCrewComponent::OnGunFired()
 		return;
 	}
 	PlayGunMontage(ReloadSettings.GunFireMontage, 1.f, 0.f);
+	if (not bM_IsLoading)
+	{
+		PlayCrewFireMontages();
+	}
+}
+
+void UGunPitCrewComponent::PlayCrewFireMontages() const
+{
+	const int32 CrewCount = FMath::Min(M_CrewMeshes.Num(), ReloadSettings.CrewAnimations.Num());
+	for (int32 CrewIndex = 0; CrewIndex < CrewCount; ++CrewIndex)
+	{
+		UAnimMontage* FireMontage = ReloadSettings.CrewAnimations[CrewIndex].FireMontage;
+		const USkeletalMeshComponent* CrewMesh = M_CrewMeshes[CrewIndex].Get();
+		const UAnimInstance* AnimInstance = IsValid(CrewMesh) ? CrewMesh->GetAnimInstance() : nullptr;
+		if (not IsValid(FireMontage) || not IsValid(AnimInstance) || AnimInstance->Montage_IsPlaying(FireMontage))
+		{
+			continue;
+		}
+		PlayMontageOnMesh(CrewMesh, FireMontage, 1.f, 0.f);
+	}
 }
 
 void UGunPitCrewComponent::OnReloadStarted(const float ReloadTime)

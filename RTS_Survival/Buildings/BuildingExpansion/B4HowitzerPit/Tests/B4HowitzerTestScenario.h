@@ -53,6 +53,22 @@ struct FB4HowitzerCrewReach
 };
 
 /**
+ * @brief Which pit the scenario spawns: the B-4 pit, or a pit built from it (-B4HowitzerPit=ML20 for the ML-20 pit),
+ * so one run checks another gun on the same crane drill with its own turret, reload time and wreck.
+ */
+struct FB4HowitzerPitVariant
+{
+	FString PitClassPath;
+	// Part of the class name of the turret the pit spawns as its child actor.
+	FString TurretClassMarker;
+	// Part of the class name of the gun wreck the pit leaves.
+	FString GunWreckMarker;
+	// Part of the name of the gun's reload montage; every shot starts it.
+	FString ReloadMontageMarker;
+	float ReloadSeconds = 0.f;
+};
+
+/**
  * @brief Spawns the B-4 team weapon squad and the B-4 howitzer pit next to the player's camera and follows them:
  * the squad loads, deploys, packs, moves, deploys again and fires on an attack-ground order; the pit attaches its
  * crew and props to the gun, fires and plays the crane loading drill stretched to its reload time.
@@ -97,6 +113,9 @@ private:
 	bool bM_IsKillingPit = false;
 	bool bM_ObservePlaced = false;
 	bool bM_PlayerBuild = false;
+	FB4HowitzerPitVariant M_PitVariant;
+	// -B4HowitzerSquadReload=<s> when -B4HowitzerSquad runs another team weapon than the B-4.
+	float M_SquadReloadSeconds = 0.f;
 	TWeakObjectPtr<ANomadicVehicle> M_Hq;
 	TWeakObjectPtr<ABuildingExpansion> M_PlayerPit;
 	int32 M_HqSlotIndex = INDEX_NONE;

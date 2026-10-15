@@ -103,6 +103,14 @@ enum class EBuildingExpansionType : uint8
 	BTX_GerPak40Pit UMETA(DisplayName = "Ger Pak 40 Pit"),
 	BTX_GerLeFH18Pit UMETA(DisplayName = "Ger leFH 18 Pit"),
 	BTX_GerSFH18Pit UMETA(DisplayName = "Ger sFH 18 Pit"),
+	// Small Soviet sandbag pit with a DShK on its tripod and a two-man crew.
+	BTX_RusDShKPit UMETA(DisplayName = "Rus DShK Pit"),
+	// Soviet 45mm 53-K anti-tank gun in a low ring of sandbags, several bags thick.
+	BTX_Rus53KPit UMETA(DisplayName = "Rus 53-K Pit"),
+	// The B-4 pit with an ML-20 152mm gun-howitzer on the turntable, loaded with the same crane drill.
+	BTX_RusML20Pit UMETA(DisplayName = "Rus ML-20 Pit"),
+	// Soviet 100mm BS-3 field gun in a square sandbag pit with an entrance at the rear.
+	BTX_RusBS3Pit UMETA(DisplayName = "Rus BS-3 Pit"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -191,6 +199,14 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerLeFH18Pit");
 	case EBuildingExpansionType::BTX_GerSFH18Pit:
 		return FString("BTX_GerSFH18Pit");
+	case EBuildingExpansionType::BTX_RusDShKPit:
+		return FString("BTX_RusDShKPit");
+	case EBuildingExpansionType::BTX_Rus53KPit:
+		return FString("BTX_Rus53KPit");
+	case EBuildingExpansionType::BTX_RusML20Pit:
+		return FString("BTX_RusML20Pit");
+	case EBuildingExpansionType::BTX_RusBS3Pit:
+		return FString("BTX_RusBS3Pit");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -252,6 +268,10 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerPak40Pit: return TEXT("Pak 40 Pit");
 	case EBuildingExpansionType::BTX_GerLeFH18Pit: return TEXT("leFH 18 Pit");
 	case EBuildingExpansionType::BTX_GerSFH18Pit: return TEXT("sFH 18 Pit");
+	case EBuildingExpansionType::BTX_RusDShKPit: return TEXT("DShK Pit");
+	case EBuildingExpansionType::BTX_Rus53KPit: return TEXT("53-K Pit");
+	case EBuildingExpansionType::BTX_RusML20Pit: return TEXT("ML-20 Pit");
+	case EBuildingExpansionType::BTX_RusBS3Pit: return TEXT("BS-3 Pit");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");

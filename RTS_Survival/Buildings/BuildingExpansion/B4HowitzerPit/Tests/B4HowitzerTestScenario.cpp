@@ -84,7 +84,7 @@ namespace B4HowitzerTestPrivate
 	constexpr float GroundTargetRangeFraction = 0.75f;
 	// Off the gun's forward so the attack-ground order also has to turn the carriage past its yaw arc.
 	constexpr float GroundTargetYawOffsetDegrees = 25.f;
-	constexpr float SquadReloadSeconds = 14.f;
+	constexpr float DefaultSquadReloadSeconds = 14.f;
 	constexpr float PitReloadSeconds = 24.f;
 	constexpr float MinimumReloadFraction = 0.8f;
 	constexpr float MaximumReloadFraction = 1.6f;
@@ -114,6 +114,35 @@ namespace B4HowitzerTestPrivate
 	const TCHAR* const PitWreckMarker = TEXT("BP_Obstacle_B4Pit_Destroyed");
 	const TCHAR* const GunWreckMarker = TEXT("DestroyedTW_B4");
 	const FName EmplacementMeshName = TEXT("SM_B4Pit_Emplacement");
+	const TCHAR* const MLTwentyPitName = TEXT("ML20");
+	const TCHAR* const MLTwentyPitClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/ML20_152MM/Pit/Rus_BXP_ML20Pit.Rus_BXP_ML20Pit_C");
+	const TCHAR* const MLTwentyPitTurretClassMarker = TEXT("RTS_BP_EmbTurret_ML20Pit");
+	const TCHAR* const MLTwentyGunWreckMarker = TEXT("DestroyedTW_ML20");
+	const TCHAR* const MLTwentyReloadMontageMarker = TEXT("ML20Pit_Reload");
+	const TCHAR* const PitReloadMontageMarker = TEXT("B4Pit_Reload");
+	// ML20_152MM_Pit's reload in ACPPGameState.
+	constexpr float MLTwentyPitReloadSeconds = 18.f;
+
+	FB4HowitzerPitVariant MakePitVariant(const FString& PitName)
+	{
+		FB4HowitzerPitVariant Variant;
+		if (PitName == MLTwentyPitName)
+		{
+			Variant.PitClassPath = MLTwentyPitClassPath;
+			Variant.TurretClassMarker = MLTwentyPitTurretClassMarker;
+			Variant.GunWreckMarker = MLTwentyGunWreckMarker;
+			Variant.ReloadMontageMarker = MLTwentyReloadMontageMarker;
+			Variant.ReloadSeconds = MLTwentyPitReloadSeconds;
+			return Variant;
+		}
+		Variant.PitClassPath = PitClassPath;
+		Variant.TurretClassMarker = PitTurretClassMarker;
+		Variant.GunWreckMarker = GunWreckMarker;
+		Variant.ReloadMontageMarker = PitReloadMontageMarker;
+		Variant.ReloadSeconds = PitReloadSeconds;
+		return Variant;
+	}
 	const FName PitOriginSocketName = TEXT("PitOrigin");
 
 	TArray<FB4HowitzerCameraView> GetSquadViews()
@@ -271,7 +300,12 @@ void FB4HowitzerTestScenario::Start()
 	FParse::Value(FCommandLine::Get(), TEXT("B4HowitzerCapture="), M_CaptureDirectory);
 	bM_ObservePlaced = FParse::Param(FCommandLine::Get(), TEXT("B4HowitzerObserve"));
 	bM_PlayerBuild = FParse::Param(FCommandLine::Get(), TEXT("B4HowitzerPlayerBuild"));
-	UE_LOG(LogRTSB4Test, Display, TEXT("RTS_B4_TEST started"));
+	M_SquadReloadSeconds = B4HowitzerTestPrivate::DefaultSquadReloadSeconds;
+	FParse::Value(FCommandLine::Get(), TEXT("B4HowitzerSquadReload="), M_SquadReloadSeconds);
+	FString PitName;
+	FParse::Value(FCommandLine::Get(), TEXT("B4HowitzerPit="), PitName);
+	M_PitVariant = B4HowitzerTestPrivate::MakePitVariant(PitName);
+	UE_LOG(LogRTSB4Test, Display, TEXT("RTS_B4_TEST started pit=%s"), *M_PitVariant.PitClassPath);
 }
 
 void FB4HowitzerTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem)
@@ -581,7 +615,7 @@ void FB4HowitzerTestScenario::TickWaitingForSquadShots(UWorld& World)
 		return;
 	}
 	const float Interval = M_SquadShotSeconds[1] - M_SquadShotSeconds[0];
-	Check(Interval > SquadReloadSeconds * MinimumReloadFraction && Interval < SquadReloadSeconds * MaximumReloadFraction,
+	Check(Interval > M_SquadReloadSeconds * MinimumReloadFraction && Interval < M_SquadReloadSeconds * MaximumReloadFraction,
 	      TEXT("squad_reload_interval"), FString::Printf(TEXT("seconds=%.1f"), Interval));
 	if (M_TeamWeapon.IsValid())
 	{
@@ -640,7 +674,7 @@ void FB4HowitzerTestScenario::ReportPitStatus(const UWorld& World)
 
 void FB4HowitzerTestScenario::SpawnPit(UWorld& World)
 {
-	UClass* PitClass = LoadClass<AActor>(nullptr, B4HowitzerTestPrivate::PitClassPath);
+	UClass* PitClass = LoadClass<AActor>(nullptr, *M_PitVariant.PitClassPath);
 	Check(IsValid(PitClass), TEXT("pit_class_loaded"));
 	if (not IsValid(PitClass))
 	{
@@ -676,7 +710,7 @@ bool FB4HowitzerTestScenario::FindPitTurret(UWorld& World)
 	for (TActorIterator<AActor> It(&World); It; ++It)
 	{
 		AActor* Actor = *It;
-		if (not IsValid(Actor) || not Actor->GetClass()->GetName().Contains(B4HowitzerTestPrivate::PitTurretClassMarker))
+		if (not IsValid(Actor) || not Actor->GetClass()->GetName().Contains(M_PitVariant.TurretClassMarker))
 		{
 			continue;
 		}
@@ -787,7 +821,8 @@ void FB4HowitzerTestScenario::TickWaitingForPitShots(UWorld& World)
 		return;
 	}
 	const float Interval = M_PitShotSeconds[1] - M_PitShotSeconds[0];
-	Check(Interval > PitReloadSeconds * MinimumReloadFraction && Interval < PitReloadSeconds * MaximumReloadFraction,
+	const float ReloadSeconds = M_PitVariant.ReloadSeconds;
+	Check(Interval > ReloadSeconds * MinimumReloadFraction && Interval < ReloadSeconds * MaximumReloadFraction,
 	      TEXT("pit_reload_interval"), FString::Printf(TEXT("seconds=%.1f"), Interval));
 	KillPit(World);
 }
@@ -804,7 +839,8 @@ void FB4HowitzerTestScenario::TrackPitLoading(const UWorld& World)
 	if (not bIsLoading && bM_WasPitLoading)
 	{
 		const float LoadingSeconds = World.GetTimeSeconds() - M_PitLoadingStartSeconds;
-		Check(FMath::IsNearlyEqual(LoadingSeconds, PitReloadSeconds, PitReloadSeconds * (1.f - MinimumReloadFraction)),
+		const float ReloadSeconds = M_PitVariant.ReloadSeconds;
+		Check(FMath::IsNearlyEqual(LoadingSeconds, ReloadSeconds, ReloadSeconds * (1.f - MinimumReloadFraction)),
 		      TEXT("pit_loading_drill_matches_reload"), FString::Printf(TEXT("seconds=%.1f"), LoadingSeconds));
 		ReportCrewReach();
 	}
@@ -1124,7 +1160,7 @@ bool FB4HowitzerTestScenario::GetHasWreckNear(UWorld& World, const TCHAR* ClassM
 void FB4HowitzerTestScenario::TickWaitingForPitDestroyed(UWorld& World)
 {
 	using namespace B4HowitzerTestPrivate;
-	const bool bHasWrecks = GetHasWreckNear(World, PitWreckMarker) && GetHasWreckNear(World, GunWreckMarker);
+	const bool bHasWrecks = GetHasWreckNear(World, PitWreckMarker) && GetHasWreckNear(World, *M_PitVariant.GunWreckMarker);
 	if (M_PitBxp.IsValid() || not bHasWrecks)
 	{
 		FinishWhenTimedOut(World, TEXT("pit_destroyed_into_wrecks"));
@@ -1278,7 +1314,7 @@ void FB4HowitzerTestScenario::WatchMontages(const UWorld& World)
 			M_SquadShotSeconds.Add(World.GetTimeSeconds());
 		}
 		// Every shot empties the one-round magazine and starts the loading drill.
-		const bool bIsPitShot = MontageString.Contains(TEXT("B4Pit_Reload"));
+		const bool bIsPitShot = MontageString.Contains(M_PitVariant.ReloadMontageMarker);
 		if (Watch.Label == TEXT("pit_gun") && bIsPitShot)
 		{
 			M_PitShotSeconds.Add(World.GetTimeSeconds());
