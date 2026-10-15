@@ -81,6 +81,7 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz_232_3 UMETA(DisplayName = "Ger SdKfz 232/3 8-rad 75mm Puma"),
 	Tank_Sdkfz9_37mm UMETA(DisplayName = "Ger ArmCar SdKfz 9 37mm"),
 	Tank_Keubel UMETA(DisplayName = "Ger ArmCar Kubelwagen MG34"),
+	Tank_Kettenkrad UMETA(DisplayName = "Ger ArmCar Kettenkrad MG34"),
 	
 	
 
@@ -137,6 +138,11 @@ enum class ETankSubtype : uint8
 	Tank_Ba12 UMETA(DisplayName = "Rus ArmCar BA-12"),
 	// has 23 mm autocannon.
 	Tank_Ba14 UMETA(DisplayName = "Rus ArmCar BA-14"),
+	// Unarmed ZiS/Zil supply trucks.
+	Tank_ZilAmmo UMETA(DisplayName = "Rus ArmCar Zil Ammo Truck"),
+	Tank_ZilFuel UMETA(DisplayName = "Rus ArmCar Zil Fuel Truck"),
+	// Unarmed fuel tanker truck.
+	Tank_SovietTanker UMETA(DisplayName = "Rus ArmCar Fuel Tanker"),
 	// Russian light tanks.
 	Tank_BT7 UMETA(DisplayName = "Rus Light BT-7"),
 	Tank_T26 UMETA(DisplayName = "Rus Light T-26"),
@@ -326,8 +332,12 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_Sdkfz_232_3:
 	case ETankSubtype::Tank_Sdkfz9_37mm:
 	case ETankSubtype::Tank_Keubel:
+	case ETankSubtype::Tank_Kettenkrad:
 	case ETankSubtype::Tank_Ba12:
 	case ETankSubtype::Tank_Ba14:
+	case ETankSubtype::Tank_ZilAmmo:
+	case ETankSubtype::Tank_ZilFuel:
+	case ETankSubtype::Tank_SovietTanker:
 		return true;
 	default:
 		return false;
@@ -415,6 +425,12 @@ enum class ESquadSubtype: uint8
 	Squad_Rus_Medic UMETA(DisplayName = "Rus Medic (Soviet)"),
 	// Team weapons: artillery, appended for the same reason as the medics.
 	Squad_Rus_B4_203mm UMETA(DisplayName = "Rus B-4 203MM"),
+	// Team weapons: anti tank guns, appended for the same reason.
+	Squad_Rus_53K_45MM UMETA(DisplayName = "Rus 53-K 45MM"),
+	// Team weapons: artillery, appended for the same reason.
+	Squad_Rus_ML20_152mm UMETA(DisplayName = "Rus ML-20 152MM"),
+	// Team weapons: anti tank guns, appended for the same reason.
+	Squad_Rus_BS3_100MM UMETA(DisplayName = "Rus BS-3 100MM"),
 };
 
 
@@ -427,6 +443,8 @@ static bool Global_GetIsAntiTankSquad(const ESquadSubtype SquadSubtype)
 	case ESquadSubtype::Squad_Ger_PaK40:
 	case ESquadSubtype::Squad_Rus_Zis_57MM:
 	case ESquadSubtype::Squad_Rus_Zis_76MM:
+	case ESquadSubtype::Squad_Rus_53K_45MM:
+	case ESquadSubtype::Squad_Rus_BS3_100MM:
 	case ESquadSubtype::Squad_Rus_Okhotnik:
 	case ESquadSubtype::Squad_Rus_LargePTRS:
 	case ESquadSubtype::Squad_Rus_LargeMixBasic:
@@ -603,6 +621,10 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "ZiS-57";
 	case ESquadSubtype::Squad_Rus_Zis_76MM:
 		return "ZiS-76";
+	case ESquadSubtype::Squad_Rus_53K_45MM:
+		return "53-K 45mm";
+	case ESquadSubtype::Squad_Rus_BS3_100MM:
+		return "BS-3 100mm";
 	case ESquadSubtype::Squad_Ger_37mmFlak:
 		return "Flak 37mm";
 	case ESquadSubtype::Squad_Ger_88mmFlak:
@@ -629,6 +651,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "M1938 122mm";
 	case ESquadSubtype::Squad_Rus_B4_203mm:
 		return "B-4 203mm";
+	case ESquadSubtype::Squad_Rus_ML20_152mm:
+		return "ML-20 152mm";
 	case ESquadSubtype::Squad_Rus_Maxim:
 		return "Maxim Team";
 	case ESquadSubtype::Squad_Rus_DShK:

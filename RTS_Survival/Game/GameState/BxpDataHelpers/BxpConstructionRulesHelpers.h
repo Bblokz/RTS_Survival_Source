@@ -66,6 +66,14 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerPak40Pit, WithFootprint(FreeConstructionRules, 1000.f, 1000.f)},
 		{EBuildingExpansionType::BTX_GerLeFH18Pit, WithFootprint(FreeConstructionRules, 1400.f, 1400.f)},
 		{EBuildingExpansionType::BTX_GerSFH18Pit, WithFootprint(FreeConstructionRules, 1400.f, 1400.f)},
+		// Small round MG pit: 2.8 m inside the bags, the earth berm runs out to about 7 m across.
+		{EBuildingExpansionType::BTX_RusDShKPit, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
+		// The 53-K and its trails inside a bag ring several bags thick.
+		{EBuildingExpansionType::BTX_Rus53KPit, WithFootprint(FreeConstructionRules, 1150.f, 1150.f)},
+		// Same emplacement as the B-4 pit.
+		{EBuildingExpansionType::BTX_RusML20Pit, WithFootprint(FreeConstructionRules, 2000.f, 2000.f)},
+		// The BS-3 turns a full circle with its wide trails inside a square bag wall.
+		{EBuildingExpansionType::BTX_RusBS3Pit, WithFootprint(FreeConstructionRules, 1300.f, 1300.f)},
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
 
 		// --- solar  ---

@@ -686,7 +686,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_B4HowitzerScenario.Start();
 	}
-	if (FParse::Param(FCommandLine::Get(), TEXT("GerPitValidate")))
+	if (FParse::Param(FCommandLine::Get(), TEXT("GerPitValidate")) ||
+		FParse::Param(FCommandLine::Get(), TEXT("DShKPitValidate")) ||
+		FParse::Param(FCommandLine::Get(), TEXT("At53KPitValidate")) ||
+		FParse::Param(FCommandLine::Get(), TEXT("BS3PitValidate")))
 	{
 		M_GunPitScenario.Start();
 	}

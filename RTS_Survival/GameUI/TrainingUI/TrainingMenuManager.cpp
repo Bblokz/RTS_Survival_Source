@@ -2454,7 +2454,9 @@ void UTrainingMenuManager::InitAllGameAntiTankGunTWTrainingOptions()
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_PaK38, MediumAntiTankGunTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_PaK40, HeavyAntiTankGunTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Zis_57MM, MediumAntiTankGunTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_53K_45MM, MediumAntiTankGunTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Zis_76MM, HeavyAntiTankGunTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_BS3_100MM, HeavyAntiTankGunTeamWeaponTrainingTime);
 }
 
 void UTrainingMenuManager::InitAllGameMortarTWTrainingOptions()
@@ -2522,6 +2524,7 @@ void UTrainingMenuManager::InitAllGameArtilleryTWTrainingOptions()
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_Nebelwerfer, MediumArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_M1938_122mm, HeavyArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_B4_203mm, HeavyArtilleryTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_ML20_152mm, HeavyArtilleryTeamWeaponTrainingTime);
 }
 
 void UTrainingMenuManager::InitAllGameMachineGunTWTrainingOptions()
@@ -2578,6 +2581,7 @@ void UTrainingMenuManager::InitAllGameTrainingLayoutOnlyOptions()
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz250_37mm, ArmoredCarTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz_231, ArmoredCarTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Keubel, ArmoredCarTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Kettenkrad, ArmoredCarTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Puma, ArmoredCarMediumCalibreTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_FlamePuma, ArmoredCarMediumCalibreTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz_232_3, ArmoredCarMediumCalibreTrainingTime);

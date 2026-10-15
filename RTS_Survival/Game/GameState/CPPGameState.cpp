@@ -2863,6 +2863,12 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::T26_45MM, WeaponData);
 
+	// 53-K 45mm anti-tank gun: the 20-K's gun on a towed carriage, with the crew's loading drill.
+	WeaponData.WeaponName = EWeaponName::M53K_45MM_TW;
+	WeaponData.ReloadSpeed = 4.5f;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::M53K_45MM_TW, WeaponData);
+	WeaponData.ReloadSpeed = 4;
+
 	// BT-7 20K (same stats)
 	WeaponData.WeaponName = EWeaponName::BT_7_20K_45MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -3874,6 +3880,32 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange * 1.25f, 100);
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::B4_203MM_Pit, B4WeaponData);
 
+	// ML-20 152mm gun-howitzer: a 43.6 kg OF-540 HE shell with about 5.9 kg of TNT; faster to load than the B-4.
+	FWeaponData ML20WeaponData = B4WeaponData;
+	ML20WeaponData.WeaponName = EWeaponName::ML20_152MM_TW;
+	ML20WeaponData.WeaponCalibre = 152;
+	ML20WeaponData.TNTExplosiveGrams = 5860;
+	ML20WeaponData.BaseDamage = DamagePerMM * ML20WeaponData.WeaponCalibre
+		+ ML20WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	ML20WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
+	ML20WeaponData.ArmorPen = 30 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	ML20WeaponData.ArmorPenMaxRange = 30 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+	ML20WeaponData.ReloadSpeed = 10;
+	ML20WeaponData.Accuracy = 26;
+	ML20WeaponData.ShrapnelRange = ML20WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	ML20WeaponData.ShrapnelDamage = ML20WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	ML20WeaponData.ShrapnelParticles = ML20WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	ML20WeaponData.ShrapnelPen = ML20WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML20_152MM_TW, ML20WeaponData);
+
+	// The ML-20 pit loads with the B-4 pit's crane drill: slower than the crew's hand loading, but surveyed in.
+	ML20WeaponData.WeaponName = EWeaponName::ML20_152MM_Pit;
+	ML20WeaponData.ReloadSpeed = 18;
+	ML20WeaponData.Accuracy = 34;
+	ML20WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange * 1.2f, 100);
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML20_152MM_Pit, ML20WeaponData);
+
 	// Cramped turret; stock reload.
 	WeaponData.WeaponName = EWeaponName::sIG_33_150MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -3996,6 +4028,14 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
 	WeaponData.Accuracy = 95;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::D_10S_100MM_SU100, WeaponData);
+
+	// BS-3 100mm field gun: the SU-100's D-10 on a towed carriage, loaded by its crew's handover drill.
+	constexpr float BS3ReloadSpeed = 9.0f;
+	const float D10SReloadSpeed = WeaponData.ReloadSpeed;
+	WeaponData.WeaponName = EWeaponName::BS3_100MM_TW;
+	WeaponData.ReloadSpeed = BS3ReloadSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::BS3_100MM_TW, WeaponData);
+	WeaponData.ReloadSpeed = D10SReloadSpeed;
 
 
 	WeaponData.WeaponName = EWeaponName::ZIS_6_107MM;
@@ -4541,6 +4581,24 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Keubel, TankData);
 
+	// Kettenkrad (Sd.Kfz. 2) with MG34: small half-track tractor, can tow.
+	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * 0.7f, 5);
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 55 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 60 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 60;
+	TankData.VehicleReverseSpeedKmh = 20;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 0.7f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Kettenkrad_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, Kettenkrad_VehicleParts}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Kettenkrad, TankData);
+
 	// Sd.Kfz. 251/22
 	TankData.MaxHealth = ArmoredCarHealthBase + 150;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
@@ -4677,6 +4735,60 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Ba14, TankData);
+
+	// Zil ammo truck: unarmed supply truck carrying ammo crates.
+	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * 0.8f, 5);
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 35 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 30 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 55;
+	TankData.VehicleReverseSpeedKmh = 20;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 0.8f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, ZilAmmo_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, ZilAmmo_VehicleParts}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_ZilAmmo, TankData);
+
+	// Zil fuel truck: unarmed supply truck carrying fuel barrels.
+	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * 0.8f, 5);
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 35 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 30 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 55;
+	TankData.VehicleReverseSpeedKmh = 20;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 0.8f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, ZilFuel_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, ZilFuel_VehicleParts}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_ZilFuel, TankData);
+
+	// Soviet fuel tanker: unarmed tanker truck.
+	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * 0.85f, 5);
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 35 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 30 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 50;
+	TankData.VehicleReverseSpeedKmh = 20;
+	TankData.VisionRadius = ArmoredCarVisionRadius;
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * 0.8f, 5);
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, SovietTanker_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, SovietTanker_VehicleParts}
+	});
+	TankData.ExperienceLevels = GetArmoredCarExpLevels();
+	TankData.ExperienceMultiplier = 1.0f;
+	TankData.Abilities = BasicTankAbilities;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SovietTanker, TankData);
 }
 
 void ACPPGameState::InitAllGameLightTankData()
@@ -7250,6 +7362,62 @@ void ACPPGameState::InitAllGameBxpData()
 	// The player's captured pit is the same emplacement, built from the German HQ.
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_GerCapturedB4Pit, B4PitData);
 
+	// The ML-20 pit: the B-4 emplacement with the lighter gun-howitzer on its turntable.
+	FBxpData ML20PitData = B4PitData;
+	ML20PitData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusML20Pit_Radixite},
+		{ERTSResourceType::Resource_Metal, RusML20Pit_Metal},
+	});
+	ML20PitData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(BxpHeavyBunkerHealth * 1.3f, 10);
+	ML20PitData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(ML20PitData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusML20Pit, ML20PitData);
+
+	// -----------------------------------------------------------------------
+	// ------------------------- RUS DSHK PIT --------------------------------
+	// -----------------------------------------------------------------------
+	// A heavy machine gun behind sandbags: light emplacement, tough for its size.
+	FBxpData DShKPitData = BxpData;
+	DShKPitData.ConstructionTime = BxpT2BuildTime;
+	DShKPitData.VisionRadius = T1BxpVisionRadius;
+	DShKPitData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusDShKPit_Radixite},
+		{ERTSResourceType::Resource_Metal, RusDShKPit_Metal},
+	});
+	DShKPitData.EnergySupply = 0;
+	DShKPitData.Abilities = ArmedBxpAbilities;
+	DShKPitData.Health = T2BxpBunkerHealth;
+	DShKPitData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(DShKPitData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusDShKPit, DShKPitData);
+
+	// -----------------------------------------------------------------------
+	// ------------------------- RUS 53-K PIT --------------------------------
+	// -----------------------------------------------------------------------
+	// A 45mm anti-tank gun behind a thick bag wall: more health than the MG pit, the same light emplacement.
+	FBxpData Pit53KData = DShKPitData;
+	Pit53KData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Rus53KPit_Radixite},
+		{ERTSResourceType::Resource_Metal, Rus53KPit_Metal},
+	});
+	Pit53KData.Health = T3BxpBunkerHealth;
+	Pit53KData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(Pit53KData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus53KPit, Pit53KData);
+
+	// -----------------------------------------------------------------------
+	// ------------------------- RUS BS-3 PIT --------------------------------
+	// -----------------------------------------------------------------------
+	// A 100mm gun behind a square bag wall: a heavier emplacement than the 53-K pit.
+	constexpr float BS3PitHealthMlt = 1.25f;
+	constexpr int32 HealthRoundingMultiple = 10;
+	FBxpData PitBS3Data = Pit53KData;
+	PitBS3Data.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusBS3Pit_Radixite},
+		{ERTSResourceType::Resource_Metal, RusBS3Pit_Metal},
+	});
+	PitBS3Data.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3BxpBunkerHealth * BS3PitHealthMlt,
+	                                                                 HealthRoundingMultiple);
+	PitBS3Data.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(PitBS3Data.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusBS3Pit, PitBS3Data);
+
 	// -----------------------------------------------------------------------
 	// ------------------------- RUS TURRET PILLBOX --------------------------
 	// -----------------------------------------------------------------------
@@ -8445,6 +8613,7 @@ void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Veteran;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PaK38, SquadData);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_53K_45MM, SquadData);
 	SquadData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, PaK40_Radixite},
 		{ERTSResourceType::Resource_Metal, PaK40_Metal}
@@ -8453,6 +8622,11 @@ void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_PaK40, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Zis_57MM, SquadData);
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Zis_76MM, SquadData);
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusBS3_100mm_Radixite},
+		{ERTSResourceType::Resource_Metal, RusBS3_100mm_Metal}
+	});
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_BS3_100MM, SquadData);
 }
 
 void ACPPGameState::InitAllGameMortarTWSquadData()
@@ -8602,6 +8776,13 @@ void ACPPGameState::InitAllGameArtilleryTWSquadData()
 		{ERTSResourceType::Resource_Metal, RusB4_203mm_Metal}
 	});
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_B4_203mm, B4SquadData);
+
+	FSquadData ML20SquadData = B4SquadData;
+	ML20SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusML20_152mm_Radixite},
+		{ERTSResourceType::Resource_Metal, RusML20_152mm_Metal}
+	});
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_ML20_152mm, ML20SquadData);
 }
 
 void ACPPGameState::InitAllGameMachineGunTWSquadData()
