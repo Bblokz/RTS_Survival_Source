@@ -1259,6 +1259,15 @@ struct FInitWeaponStateRailgun
 	// Over-penetration is allowed only when required penetration is at or below this percentage.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0"))
 	float FloorArmorPenPercentageNeededAllowOverpen = 0.5f;
+
+	// Seconds the weapon charges before every shot (coilgun); 0 fires instantly. Only used with single fire mode.
+	// The owner is told through IWeaponOwner::OnWeaponChargeUpStarted so it can animate the charge.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
+	float ChargeUpTime = 0.f;
+
+	// Played at the weapon when a charge-up starts; uses the reload sound attenuation and concurrency.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	TObjectPtr<USoundBase> ChargeUpSound = nullptr;
 };
 
 USTRUCT(BlueprintType)
@@ -1475,7 +1484,27 @@ protected:
 	virtual float GetPostPenArmorPenCarryOver() const override;
 	virtual float GetFloorArmorPenPercentageNeededAllowOverpen() const override;
 
+	// Charge-up: the launch effect starts the charge, the shot itself is fired when the charge completes.
+	virtual void CreateLaunchVfx(const FVector& LaunchLocation, const FVector& ForwardVector,
+	                             const bool bCreateShellCase = true) override;
+	virtual void FireWeaponSystem() override;
+	virtual bool GetShouldPlayWeaponAnimationBeforeFire() const override;
+	virtual void OnStopFire() override;
+	virtual void BeginDestroy() override;
+
 private:
+	bool GetUsesChargeUp() const;
+	void StartChargeUp();
+	void OnChargeUpComplete();
+	void CancelChargeUp();
+
+	UPROPERTY()
+	TObjectPtr<USoundBase> M_ChargeUpSound = nullptr;
+
+	float M_ChargeUpTime = 0.f;
+	bool bM_IsChargingUp = false;
+	FTimerHandle M_ChargeUpTimerHandle;
+
 	UPROPERTY()
 	TObjectPtr<USoundBase> M_ReloadSound = nullptr;
 

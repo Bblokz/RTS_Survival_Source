@@ -60,6 +60,8 @@ public class RTS_Survival : ModuleRules
 		{
 			// NiagaraEditor: the authoring step of the trace impact Niagara system edits emitter graphs.
 			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "BlueprintGraph", "NiagaraEditor" });
+			// Sequencer: NiagaraEditorUtilities.h (impact Niagara system authoring) includes Sequencer headers.
+			PrivateDependencyModuleNames.Add("Sequencer");
 		}
 
 		// Uncomment if you are using online features

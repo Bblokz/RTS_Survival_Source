@@ -121,6 +121,17 @@ protected:
 	UPROPERTY(BlueprintReadWrite)
 	UStaticMeshComponent* WeaponMesh;
 
+	/**
+	 * Weapons with a charge-up (coilgun) start charging here; the shot is fired ChargeUpTime seconds later.
+	 * Use it to animate the charge (coil glow, charge VFX).
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category="Weapon|ChargeUp")
+	void BP_OnWeaponChargeUpStarted(const float ChargeUpTime);
+
+	/** The charge-up was aborted before the shot; reset the charge animation. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Weapon|ChargeUp")
+	void BP_OnWeaponChargeUpCancelled();
+
 	// Determines for which type of actor target the turret will filter first.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Target")
 	ETargetPreference TargetPreference;
@@ -134,6 +145,8 @@ protected:
 	virtual bool AllowWeaponToReload(const int32 WeaponIndex) const override;
 	virtual void OnWeaponKilledActor(const int32 WeaponIndex, AActor* KilledActor) override;
 	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre) override;
+	virtual void OnWeaponChargeUpStarted(const int32 WeaponIndex, const float ChargeUpTime) override;
+	virtual void OnWeaponChargeUpCancelled(const int32 WeaponIndex) override;
 	virtual void OnProjectileHit(const bool bBounced) override;
 	virtual void OnReloadStart(const int32 WeaponIndex, const float ReloadTime) override;
 	virtual void OnReloadFinished(const int32 WeaponIndex) override;

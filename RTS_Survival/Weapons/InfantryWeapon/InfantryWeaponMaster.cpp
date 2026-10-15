@@ -739,6 +739,16 @@ void AInfantryWeaponMaster::PlayWeaponAnimation(const int32 WeaponIndex, const E
 	}
 }
 
+void AInfantryWeaponMaster::OnWeaponChargeUpStarted(const int32 /*WeaponIndex*/, const float ChargeUpTime)
+{
+	BP_OnWeaponChargeUpStarted(ChargeUpTime);
+}
+
+void AInfantryWeaponMaster::OnWeaponChargeUpCancelled(const int32 /*WeaponIndex*/)
+{
+	BP_OnWeaponChargeUpCancelled();
+}
+
 void AInfantryWeaponMaster::OnProjectileHit(const bool bBounced)
 {
 	if(IsValid(M_OwningSquadUnit))

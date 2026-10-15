@@ -2826,6 +2826,143 @@ void URailgunWeaponState::InitRailgunWeapon(
 	M_PostPenArmorPenCarryOver = RailgunParameters.PostPenArmorPenCarryOver;
 	M_FloorArmorPenPercentageNeededAllowOverpen = RailgunParameters.FloorArmorPenPercentageNeededAllowOverpen;
 	WeaponData.ProjectileMovementSpeed *= RailgunParameters.ProjectileSpeedMultiplier;
+
+	M_ChargeUpTime = FMath::Max(0.f, RailgunParameters.ChargeUpTime);
+	M_ChargeUpSound = RailgunParameters.ChargeUpSound;
+	if (M_ChargeUpTime > 0.f && GetMyFireMode() != EWeaponFireMode::Single)
+	{
+		ReportErrorForWeapon("Railgun charge-up only supports single fire mode; the charge-up is ignored.");
+		M_ChargeUpTime = 0.f;
+	}
+	// The next shot can only start charging once the previous one has been fired.
+	WeaponData.BaseCooldown += M_ChargeUpTime;
+}
+
+bool URailgunWeaponState::GetUsesChargeUp() const
+{
+	return M_ChargeUpTime > 0.f;
+}
+
+void URailgunWeaponState::CreateLaunchVfx(const FVector& LaunchLocation, const FVector& ForwardVector,
+                                          const bool bCreateShellCase)
+{
+	if (not GetUsesChargeUp())
+	{
+		Super::CreateLaunchVfx(LaunchLocation, ForwardVector, bCreateShellCase);
+		return;
+	}
+	if (bM_IsChargingUp)
+	{
+		return;
+	}
+	StartChargeUp();
+}
+
+void URailgunWeaponState::FireWeaponSystem()
+{
+	if (GetUsesChargeUp())
+	{
+		// Fired by OnChargeUpComplete once the coils are charged.
+		return;
+	}
+	Super::FireWeaponSystem();
+}
+
+bool URailgunWeaponState::GetShouldPlayWeaponAnimationBeforeFire() const
+{
+	if (GetUsesChargeUp())
+	{
+		// The fire animation plays when the charged shot leaves the barrel.
+		return false;
+	}
+	return Super::GetShouldPlayWeaponAnimationBeforeFire();
+}
+
+void URailgunWeaponState::StartChargeUp()
+{
+	if (not World)
+	{
+		ReportErrorForWeapon("Railgun has no valid world to schedule its charge-up.");
+		return;
+	}
+	bM_IsChargingUp = true;
+	if (IsValid(WeaponOwner.GetObject()))
+	{
+		WeaponOwner->OnWeaponChargeUpStarted(WeaponIndex, M_ChargeUpTime);
+	}
+	if (M_ChargeUpSound && IsValid(MeshComponent))
+	{
+		UGameplayStatics::PlaySoundAtLocation(
+			World,
+			M_ChargeUpSound,
+			MeshComponent->GetComponentLocation(),
+			MeshComponent->GetComponentRotation(),
+			1.0f,
+			1.0f,
+			0.0f,
+			M_ReloadSoundAttenuation,
+			M_ReloadSoundConcurrency);
+	}
+
+	TWeakObjectPtr<URailgunWeaponState> WeakThis(this);
+	const FTimerDelegate Del = FTimerDelegate::CreateLambda([WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+		WeakThis->OnChargeUpComplete();
+	});
+	World->GetTimerManager().SetTimer(M_ChargeUpTimerHandle, Del, M_ChargeUpTime, false);
+}
+
+void URailgunWeaponState::OnChargeUpComplete()
+{
+	bM_IsChargingUp = false;
+	if (not World || not IsValid(MeshComponent))
+	{
+		return;
+	}
+	if (IsValid(WeaponOwner.GetObject()))
+	{
+		WeaponOwner->PlayWeaponAnimation(WeaponIndex, GetMyFireMode(), WeaponData.WeaponCalibre);
+	}
+	const TPair<FVector, FVector> LaunchAndForward = GetLaunchAndForwardVector();
+	Super::CreateLaunchVfx(LaunchAndForward.Key, LaunchAndForward.Value, true);
+	Super::FireWeaponSystem();
+}
+
+void URailgunWeaponState::CancelChargeUp()
+{
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(M_ChargeUpTimerHandle);
+	}
+	if (not bM_IsChargingUp)
+	{
+		return;
+	}
+	bM_IsChargingUp = false;
+	if (IsValid(WeaponOwner.GetObject()))
+	{
+		WeaponOwner->OnWeaponChargeUpCancelled(WeaponIndex);
+	}
+}
+
+void URailgunWeaponState::OnStopFire()
+{
+	CancelChargeUp();
+	Super::OnStopFire();
+}
+
+void URailgunWeaponState::BeginDestroy()
+{
+	if (World)
+	{
+		World->GetTimerManager().ClearTimer(M_ChargeUpTimerHandle);
+	}
+	bM_IsChargingUp = false;
+	Super::BeginDestroy();
 }
 
 bool URailgunWeaponState::GetCanArmorOverPenetrate() const
