@@ -3,6 +3,11 @@
 #include "TankMaster.h"
 
 #include "AITankMaster.h"
+#include "Components/WidgetComponent.h"
+#include "RTS_Survival/GameUI/CrewRepairProgress/CrewRepairProgressSettings.h"
+#include "RTS_Survival/GameUI/CrewRepairProgress/W_CrewRepairProgress.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -153,6 +158,8 @@ bool ATankMaster::BeginCrewRepair()
 		FinishCrewRepair(ECrewRepairStopReason::StartFailed);
 		return false;
 	}
+	M_CrewRepairState.ProgressBarTotalSeconds = GetRemainingCrewRepairSeconds();
+	ShowCrewRepairProgressBar();
 	RefreshCrewRepairAbilityFromModuleState();
 	CrewCommandData->UpdateActionUI();
 	return true;
@@ -226,6 +233,7 @@ void ATankMaster::CrewRepairTick(const uint32 SessionGeneration)
 		}
 		return;
 	}
+	SyncCrewRepairProgressBar();
 
 	const double ElapsedSeconds = GetWorld()->GetTimeSeconds() - M_CrewRepairState.ModuleWorkStartGameTime;
 	if (ElapsedSeconds + TankMasterCrewRepairConstants::ElapsedToleranceSeconds < M_CrewRepairState.RequiredModuleSeconds)
@@ -275,12 +283,15 @@ void ATankMaster::UpdateCrewRepairAfterModuleBatch()
 		&& Target.State == M_CrewRepairState.TargetStateAtWorkStart)
 	{
 		// Newly damaged or destroyed modules join the remaining work without resetting the current stage.
+		SyncCrewRepairProgressBar();
 		return;
 	}
 	if (not SelectNextModuleForCrewRepair())
 	{
 		FinishCrewRepair(ECrewRepairStopReason::AllModulesRecovered);
+		return;
 	}
+	SyncCrewRepairProgressBar();
 }
 
 void ATankMaster::FinishCrewRepair(const ECrewRepairStopReason Reason)
@@ -297,6 +308,8 @@ void ATankMaster::FinishCrewRepair(const ECrewRepairStopReason Reason)
 	{
 		World->GetTimerManager().ClearTimer(M_CrewRepairState.TimerHandle);
 	}
+	HideCrewRepairProgressBar();
+	M_CrewRepairState.ProgressBarTotalSeconds = 0.f;
 
 	RestoreCrewRepairState();
 	// Unfinished work on the current stage is lost; completed state advances remain.
@@ -367,6 +380,98 @@ void ATankMaster::RestoreCrewRepairState()
 	// On death the dead-unit check inside the release keeps weapons disabled.
 	constexpr bool bUseLastTargetOnRestore = false;
 	ReleaseMountedWeaponLock(this, bUseLastTargetOnRestore);
+}
+
+// ----------------------------------------------------------------------------------------------------
+// Progress bar
+// ----------------------------------------------------------------------------------------------------
+
+void ATankMaster::ShowCrewRepairProgressBar()
+{
+	// Only the player's own crews show their progress, so enemy repairs never leak through the fog of war.
+	if (not GetIsValidRTSComponent() || RTSComponent->GetOwningPlayer() != 1)
+	{
+		return;
+	}
+	if (not CreateCrewRepairProgressComponent())
+	{
+		return;
+	}
+	M_CrewRepairProgressComponent->SetVisibility(true);
+	SyncCrewRepairProgressBar();
+}
+
+void ATankMaster::SyncCrewRepairProgressBar()
+{
+	if (M_CrewRepairState.Status != ECrewRepairStatus::Repairing)
+	{
+		return;
+	}
+	UW_CrewRepairProgress* ProgressWidget = GetCrewRepairProgressWidget();
+	if (not IsValid(ProgressWidget))
+	{
+		return;
+	}
+	const float RemainingSeconds = GetRemainingCrewRepairSeconds();
+	// New damage during the session extends the full bar instead of overflowing it.
+	M_CrewRepairState.ProgressBarTotalSeconds = FMath::Max(M_CrewRepairState.ProgressBarTotalSeconds, RemainingSeconds);
+	ProgressWidget->SyncRepairProgress(RemainingSeconds, M_CrewRepairState.ProgressBarTotalSeconds);
+}
+
+void ATankMaster::HideCrewRepairProgressBar() const
+{
+	// Not created for enemy tanks or before the first crew repair; nothing to hide then.
+	if (not IsValid(M_CrewRepairProgressComponent))
+	{
+		return;
+	}
+	M_CrewRepairProgressComponent->SetVisibility(false);
+}
+
+bool ATankMaster::CreateCrewRepairProgressComponent()
+{
+	if (IsValid(M_CrewRepairProgressComponent))
+	{
+		return true;
+	}
+	const UCrewRepairProgressSettings* Settings = GetDefault<UCrewRepairProgressSettings>();
+	UClass* WidgetClass = IsValid(Settings) ? Settings->WidgetClass.LoadSynchronous() : nullptr;
+	if (not IsValid(WidgetClass))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("No crew repair progress widget class set in Project Settings > Game > Crew Repair Progress Bar."));
+		return false;
+	}
+
+	// Anchored where the health bar is, so the bar sits right above it on every tank size.
+	const UWidgetComponent* HealthBarComponent = IsValid(HealthComponent) ? HealthComponent->GetHealthBarWidgetComp() : nullptr;
+	const FVector RelativeLocation = IsValid(HealthBarComponent)
+		                                 ? HealthBarComponent->GetRelativeLocation()
+		                                 : Settings->FallbackRelativeOffset;
+
+	UWidgetComponent* ProgressComponent = NewObject<UWidgetComponent>(this, NAME_None, RF_Transient);
+	ProgressComponent->SetupAttachment(GetRootComponent());
+	ProgressComponent->SetRelativeLocation(RelativeLocation);
+	ProgressComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	ProgressComponent->SetDrawAtDesiredSize(true);
+	// Bottom-centre pivot: the widget grows upwards from the health bar anchor.
+	ProgressComponent->SetPivot(FVector2D(0.5f, 1.f));
+	ProgressComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ProgressComponent->SetCanEverAffectNavigation(false);
+	ProgressComponent->SetWidgetClass(WidgetClass);
+	ProgressComponent->RegisterComponent();
+	ProgressComponent->InitWidget();
+	M_CrewRepairProgressComponent = ProgressComponent;
+	return true;
+}
+
+UW_CrewRepairProgress* ATankMaster::GetCrewRepairProgressWidget() const
+{
+	if (not IsValid(M_CrewRepairProgressComponent))
+	{
+		return nullptr;
+	}
+	return Cast<UW_CrewRepairProgress>(M_CrewRepairProgressComponent->GetUserWidgetObject());
 }
 
 float ATankMaster::GetRemainingCrewRepairSeconds() const

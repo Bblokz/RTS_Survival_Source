@@ -99,6 +99,7 @@ private:
 	void PlayAndWaitForMontage(const ETeamWeaponMontage MontageType, UAnimMontage* ValidMontage,
 		const float PlayRate);
 	void InstantlyFinishMontage(const ETeamWeaponMontage MontageType);
+	void PlayMontageFromPlayDirectionStart(UAnimMontage* ValidMontage, const float PlayRate);
 	FOnMontageEnded M_MontageEndedDelegate;
 	void OnPackMontageFinished(UAnimMontage* Montage, bool bInterrupted);
 	void OnDeployMontageFinished(UAnimMontage* Montage, bool bInterrupted);

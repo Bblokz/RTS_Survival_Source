@@ -379,6 +379,8 @@ private:
 	                                 const bool bIsInternalTurretRotation);
 	void SetPostDeployActionForAttack(AActor* TargetActor);
 	void SetPostDeployActionForAttackGround(const FVector& GroundLocation);
+	// Packs first when deployed; the queued post-pack rotation and post-deploy action finish the turn.
+	bool StartInternalRotateFromCurrentState(const FRotator& DesiredRotation);
 	bool GetShouldIgnoreAttackExecuteBecauseAttackAlreadyActive(AActor* NewTargetActor);
 	void ApplyCrewRoleWeaponRestrictions() const;
 	void IssueSpecificEngageForGuards(AActor* TargetActor) const;
@@ -534,6 +536,11 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_SpecificEngageTarget;
+
+	// Ground location of the attack-ground command being executed; re-issued after an internal pack-rotate-deploy
+	// because an attack-ground order has no target actor to resume on.
+	UPROPERTY()
+	FVector M_ActiveAttackGroundLocation = FVector::ZeroVector;
 
 
 	UPROPERTY()

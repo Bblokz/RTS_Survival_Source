@@ -304,6 +304,7 @@ void ATeamWeaponController::ExecuteAttackGroundCommand(const FVector GroundLocat
 
 	M_SpecificEngageTarget.Reset();
 	TerminateSpecificEngageForGuards();
+	M_ActiveAttackGroundLocation = GroundLocation;
 	SetPostDeployActionForAttackGround(GroundLocation);
 	ApplyCrewRoleWeaponRestrictions();
 
@@ -458,8 +459,18 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 	}
 
 	UCommandData* CommandData = GetIsValidCommandData();
-	const bool bHasActiveAttackCommand = CommandData != nullptr &&
-		CommandData->GetCurrentlyActiveCommandType() == EAbilityID::IdAttack;
+	const EAbilityID ActiveCommandType = CommandData != nullptr
+		                                     ? CommandData->GetCurrentlyActiveCommandType()
+		                                     : EAbilityID::IdNoAbility;
+	const bool bHasActiveAttackCommand = ActiveCommandType == EAbilityID::IdAttack;
+
+	if (ActiveCommandType == EAbilityID::IdAttackGround)
+	{
+		// Attack-ground has no target actor; resume on the ground location once redeployed facing it.
+		SetPostPackActionForRotate(DesiredRotation, EAbilityID::IdRotateTowards, false, true);
+		SetPostDeployActionForAttackGround(M_ActiveAttackGroundLocation);
+		return StartInternalRotateFromCurrentState(DesiredRotation);
+	}
 
 	AActor* TargetActorForPostDeploy = nullptr;
 	if (bHasActiveAttackCommand)
@@ -478,7 +489,11 @@ bool ATeamWeaponController::RequestInternalRotateTowards(const FRotator& Desired
 
 	SetPostPackActionForRotate(DesiredRotation, EAbilityID::IdRotateTowards, false, true);
 	SetPostDeployActionForAttack(TargetActorForPostDeploy);
+	return StartInternalRotateFromCurrentState(DesiredRotation);
+}
 
+bool ATeamWeaponController::StartInternalRotateFromCurrentState(const FRotator& DesiredRotation)
+{
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
 	{
 		StartPacking();

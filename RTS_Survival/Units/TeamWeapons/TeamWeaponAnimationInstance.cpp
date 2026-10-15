@@ -93,7 +93,7 @@ void UTeamWeaponAnimationInstance::StartMoveLoop(const bool bForward)
 	M_MoveLoopMontageEndedDelegate.Unbind();
 	M_MoveLoopMontageEndedDelegate.BindUObject(this, &UTeamWeaponAnimationInstance::OnMoveLoopMontageEnded);
 
-	Montage_Play(MoveMontage, MoveMontagePlayRate);
+	PlayMontageFromPlayDirectionStart(MoveMontage, MoveMontagePlayRate);
 	Montage_SetEndDelegate(M_MoveLoopMontageEndedDelegate, MoveMontage);
 }
 
@@ -154,9 +154,17 @@ void UTeamWeaponAnimationInstance::PlayAndWaitForMontage(const ETeamWeaponMontag
 	default:
 		return;
 	}
-	Montage_Play(ValidMontage, PlayRate);
+	PlayMontageFromPlayDirectionStart(ValidMontage, PlayRate);
 	// Bind the OnMontageEnded delegate to call OnWeaponMontageFinished with the correct MontageType
 	Montage_SetEndDelegate(M_MontageEndedDelegate, ValidMontage);
+}
+
+void UTeamWeaponAnimationInstance::PlayMontageFromPlayDirectionStart(UAnimMontage* ValidMontage, const float PlayRate)
+{
+	// Deploying plays DeployToPacked backwards. The engine clamps a start position of 0, so a reversed montage that
+	// starts there ends on its first update and the weapon snaps open; it has to start at its end instead.
+	const float StartPosition = PlayRate < 0.f ? ValidMontage->GetPlayLength() : 0.f;
+	Montage_Play(ValidMontage, PlayRate, EMontagePlayReturnType::MontageLength, StartPosition);
 }
 
 void UTeamWeaponAnimationInstance::InstantlyFinishMontage(const ETeamWeaponMontage MontageType)
