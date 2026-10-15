@@ -10,11 +10,14 @@
 #include "W_FullMapView.generated.h"
 
 class UOverlay;
+class UVerticalBox;
+class UWidget;
 class UMainGameUI;
 class UMaterialInterface;
 class USizeBox;
 class UTexture2D;
 class UW_GlassIconButton;
+class UW_MapObjectFilterToggle;
 class UW_MiniMap;
 
 /**
@@ -35,6 +38,9 @@ public:
 	 * @param OwningMainGameUI Restored when the view closes.
 	 */
 	void InitFullMapView(UW_MiniMap* SmallMiniMap, UMainGameUI* OwningMainGameUI);
+
+	/** Called by UMainGameUI when the view closes, so map object filters shown only here stop their work. */
+	void OnFullMapViewClosed() const;
 
 protected:
 	virtual void NativeOnInitialized() override;
@@ -85,6 +91,13 @@ private:
 	UPROPERTY()
 	TObjectPtr<UW_GlassIconButton> M_CloseButton;
 
+	// Left of the frame; positioned against the frame whenever the viewport size changes.
+	UPROPERTY()
+	TObjectPtr<UWidget> M_FilterPanel;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UW_MapObjectFilterToggle>> M_FilterToggles;
+
 	TWeakObjectPtr<UW_MiniMap> M_SmallMiniMap;
 	TWeakObjectPtr<UMainGameUI> M_MainGameUI;
 
@@ -95,6 +108,10 @@ private:
 	void BuildBackdrop(UOverlay& RootOverlay);
 	void BuildFrame(UOverlay& RootOverlay);
 	void BuildCloseButton(UOverlay& FrameOverlay);
+	void BuildFilterPanel(UOverlay& RootOverlay);
+	void AddFilterToggles(UVerticalBox& PanelBox);
+	void RefreshFilterToggles() const;
+	void SetIsTacticalMapOpenForFilters(const bool bIsOpen) const;
 	FSlateBrush MakeFrameBrush() const;
 
 	void InitLargeMapTextures(UW_MiniMap& SmallMiniMap) const;

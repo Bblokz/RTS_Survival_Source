@@ -1446,6 +1446,7 @@ void UMainGameUI::CloseFullMapView()
 		return;
 	}
 	M_FullMapView->SetVisibility(ESlateVisibility::Collapsed);
+	M_FullMapView->OnFullMapViewClosed();
 	if (GetIsValidPlayerController())
 	{
 		M_PlayerController->SetIsPlayerInFullMapView(false);

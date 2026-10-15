@@ -110,6 +110,13 @@ private:
 	// -UISnapshotOpenFullMap: presses the minimap's map button once; -UISnapshotCloseFullMapAtStep=N presses the
 	// full map's close button when step N starts (both through the real buttons' OnClicked).
 	void ToggleFullMapForStep();
+	// -UISnapshotCombatPings: every player unit reports a hit (the throttled path, logged) and preview pings at
+	// different ages are spread over the map, so the minimap and tactical map show the combat ping.
+	void ShowCombatPingsForStep() const;
+	// -UISnapshotMapFilters: turns every map object filter to minimap + tactical map and logs, per capture, how many
+	// objects each filter has registered and discovered.
+	void ShowMapObjectFiltersForStep() const;
+	void LogMapObjectFilterCounts() const;
 	// Gallery behaviour descriptions get sample data through SetupDescription (alternating buff and debuff).
 	void SetupSampleBehaviourDescription(UUserWidget& GalleryWidget);
 	bool ClickGlassButtonIn(UUserWidget* const OwnerWidget, const FName& GlassButtonName) const;

@@ -11,6 +11,8 @@
 
 struct FRTSMinimapCustomIconDrawData;
 class AFowManager;
+class URTSCombatPingSettings;
+struct FRTSMapObjectFilterLook;
 class UImage;
 class UMaterialInstanceDynamic;
 class UMaterialInterface;
@@ -146,6 +148,9 @@ public:
 
 	const FMiniMapGlassSettings& GetGlassSettings() const { return M_GlassSettings; }
 
+	/** The tactical map draws its combat pings at the tactical map size from the Combat Pings settings. */
+	void SetIsTacticalMapView(const bool bIsTacticalMapView) { bM_IsTacticalMapView = bIsTacticalMapView; }
+
 	/** Fired when the user clicks the mini-map; UV coordinates in [0,1]. */
 	UPROPERTY(BlueprintAssignable, Category="MiniMap")
 	FOnMiniMapClicked OnMiniMapClicked;
@@ -244,4 +249,75 @@ private:
 	int32 DrawGlassOverlay(const FGeometry& AllottedGeometry,
 	                       FSlateWindowElementList& OutDrawElements,
 	                       const int32 LayerId) const;
+
+	bool bM_IsTacticalMapView = false;
+
+	// Discovered radixite, metal and scavenge objects toggled on the tactical map; drawn under the unit icons.
+	int32 DrawMapObjectFilters(const FGeometry& AllottedGeometry,
+	                           FSlateWindowElementList& OutDrawElements,
+	                           const int32 LayerId) const;
+
+	/**
+	 * @brief Draws one filter's dots, each with an optional ring behind it so dark colours stay readable.
+	 * @param ObjectUVs Minimap UVs of the discovered objects.
+	 * @param Look Colour, size and ring of this filter.
+	 * @param MiniMapGeometry Cached geometry of the map image the UVs refer to.
+	 * @param AllottedGeometry This widget's paint geometry.
+	 * @param OutDrawElements Paint output.
+	 * @param LayerId Ring layer; the dots use the layer above it.
+	 */
+	void DrawMapObjectFilterDots(const TArray<FVector2D>& ObjectUVs,
+	                             const FRTSMapObjectFilterLook& Look,
+	                             const FGeometry& MiniMapGeometry,
+	                             const FGeometry& AllottedGeometry,
+	                             FSlateWindowElementList& OutDrawElements,
+	                             const int32 LayerId) const;
+
+	// Ripples where enemies hit player units (URTSCombatPingSubsystem); drawn over the icons, under the glass.
+	int32 DrawCombatPings(const FGeometry& AllottedGeometry,
+	                      FSlateWindowElementList& OutDrawElements,
+	                      const int32 LayerId) const;
+
+	/**
+	 * @brief Animates one ping from its age alone, so pings need no per-frame state.
+	 * @param CenterInWidget Ping centre in this widget's local space.
+	 * @param AgeSeconds Real seconds since the ping was created.
+	 * @param MaxRadius Largest ripple radius for this map.
+	 * @param Settings Look of the ping.
+	 * @param AllottedGeometry This widget's paint geometry.
+	 * @param OutDrawElements Paint output.
+	 * @param LayerId Lowest layer; the ping uses this layer and the two above it.
+	 */
+	void DrawCombatPing(const FVector2D& CenterInWidget,
+	                    const float AgeSeconds,
+	                    const float MaxRadius,
+	                    const URTSCombatPingSettings& Settings,
+	                    const FGeometry& AllottedGeometry,
+	                    FSlateWindowElementList& OutDrawElements,
+	                    const int32 LayerId) const;
+
+	void DrawCombatPingRipples(const FVector2D& CenterInWidget,
+	                           const float AgeSeconds,
+	                           const float MaxRadius,
+	                           const float Envelope,
+	                           const URTSCombatPingSettings& Settings,
+	                           const FGeometry& AllottedGeometry,
+	                           FSlateWindowElementList& OutDrawElements,
+	                           const int32 LayerId) const;
+
+	void DrawCombatPingBrackets(const FVector2D& CenterInWidget,
+	                            const float AgeSeconds,
+	                            const float MaxRadius,
+	                            const float Envelope,
+	                            const URTSCombatPingSettings& Settings,
+	                            const FGeometry& AllottedGeometry,
+	                            FSlateWindowElementList& OutDrawElements,
+	                            const int32 LayerId) const;
+
+	void DrawMiniMapDisc(const FVector2D& CenterInWidget,
+	                        const float Diameter,
+	                        const FLinearColor& Color,
+	                        const FGeometry& AllottedGeometry,
+	                        FSlateWindowElementList& OutDrawElements,
+	                        const int32 LayerId) const;
 };

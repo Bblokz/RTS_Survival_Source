@@ -12,7 +12,72 @@
 #include "Rendering/SlateRenderer.h"
 #include "Styling/CoreStyle.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
+#include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSettings.h"
+#include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
+#include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSettings.h"
+#include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+namespace MiniMapCombatPingConstants
+{
+	constexpr float FadeInSeconds = 0.12f;
+	constexpr float FadeOutSeconds = 0.6f;
+
+	// Rings start just outside the core and slow down as they reach the full radius.
+	constexpr float RippleStartRadiusShare = 0.2f;
+	constexpr float RippleEaseExponent = 2.5f;
+	constexpr float RippleStartThicknessScale = 1.6f;
+	constexpr float RippleEndThicknessScale = 0.6f;
+
+	// Brackets snap in from outside the ripples to just inside them (a lock-on), then turn slowly.
+	constexpr int32 BracketCount = 4;
+	constexpr float BracketArcDegrees = 50.f;
+	constexpr float BracketLockOnSeconds = 0.35f;
+	constexpr float BracketStartRadiusShare = 1.6f;
+	constexpr float BracketRadiusShare = 0.62f;
+	constexpr float BracketThicknessScale = 1.25f;
+	constexpr float BracketLockOnEaseExponent = 3.f;
+
+	constexpr float CoreDiameterShare = 0.32f;
+	constexpr float CorePulseAmount = 0.18f;
+	// The core is lifted towards white so it reads on red terrain and on red enemy icons.
+	constexpr float CoreWhiteBlend = 0.4f;
+
+	// Stacked discs of shrinking size fake a soft glow without a texture.
+	constexpr int32 GlowDiscCount = 3;
+	constexpr float GlowDiameterShare = 1.3f;
+
+	constexpr int32 FullCircleSegments = 48;
+	constexpr int32 MinArcSegments = 4;
+	constexpr float FullCircleDegrees = 360.f;
+
+	/** @return 0..1 opacity of the whole ping: a quick fade in and a slower fade out at the end of its lifetime. */
+	float GetPingEnvelope(const float AgeSeconds, const float LifetimeSeconds)
+	{
+		const float FadeIn = FMath::Clamp(AgeSeconds / FadeInSeconds, 0.f, 1.f);
+		const float FadeOut = FMath::Clamp((LifetimeSeconds - AgeSeconds) / FadeOutSeconds, 0.f, 1.f);
+		return FadeIn * FadeOut;
+	}
+
+	void DrawArc(const FVector2D& Center, const float Radius, const float StartDegrees, const float ArcDegrees,
+	             const float Thickness, const FLinearColor& Color, const FGeometry& AllottedGeometry,
+	             FSlateWindowElementList& OutDrawElements, const int32 LayerId)
+	{
+		const int32 SegmentCount = FMath::Max(
+			MinArcSegments, FMath::CeilToInt(FullCircleSegments * ArcDegrees / FullCircleDegrees));
+		TArray<FVector2f> Points;
+		Points.Reserve(SegmentCount + 1);
+		for (int32 PointIndex = 0; PointIndex <= SegmentCount; ++PointIndex)
+		{
+			const float AngleRadians = FMath::DegreesToRadians(
+				StartDegrees + ArcDegrees * PointIndex / static_cast<float>(SegmentCount));
+			const FVector2D Direction(FMath::Cos(AngleRadians), FMath::Sin(AngleRadians));
+			Points.Add(FVector2f(Center + Direction * Radius));
+		}
+		FSlateDrawElement::MakeLines(OutDrawElements, LayerId, AllottedGeometry.ToPaintGeometry(), MoveTemp(Points),
+		                             ESlateDrawEffect::None, Color, true, Thickness);
+	}
+}
 
 UImage* UW_MiniMap::GetIsValidMiniMapImg() const
 {
@@ -134,10 +199,12 @@ int32 UW_MiniMap::NativePaint(const FPaintArgs& Args,
 		InWidgetStyle,
 		bParentEnabled);
 
-	const int32 IconLayerId = DrawMiniMapUnitColorIcons(AllottedGeometry, OutDrawElements, NextLayerId);
+	const int32 FilterLayerId = DrawMapObjectFilters(AllottedGeometry, OutDrawElements, NextLayerId);
+	const int32 IconLayerId = DrawMiniMapUnitColorIcons(AllottedGeometry, OutDrawElements, FilterLayerId);
 	const int32 CustomIconLayerId = DrawCustomMiniMapTextureIcons(AllottedGeometry, OutDrawElements, IconLayerId);
 	const int32 TextLayerId = DrawCustomMiniMapText(AllottedGeometry, OutDrawElements, CustomIconLayerId);
-	return DrawGlassOverlay(AllottedGeometry, OutDrawElements, TextLayerId);
+	const int32 CombatPingLayerId = DrawCombatPings(AllottedGeometry, OutDrawElements, TextLayerId);
+	return DrawGlassOverlay(AllottedGeometry, OutDrawElements, CombatPingLayerId);
 }
 
 void UW_MiniMap::EnsureGlassOverlayMaterial()
@@ -547,4 +614,233 @@ const FSlateBrush* UW_MiniMap::GetCustomMiniMapIconBrush(const EMinimapIconType 
 	}
 
 	return M_CustomMinimapIconBrushes.Find(IconType);
+}
+
+int32 UW_MiniMap::DrawCombatPings(const FGeometry& AllottedGeometry,
+                                  FSlateWindowElementList& OutDrawElements,
+                                  const int32 LayerId) const
+{
+	// No subsystem in the designer; pings are checked first so the validators only run while pings exist.
+	const UWorld* const World = GetWorld();
+	const URTSCombatPingSubsystem* const CombatPingSubsystem = IsValid(World)
+		                                                           ? World->GetSubsystem<URTSCombatPingSubsystem>()
+		                                                           : nullptr;
+	if (not IsValid(CombatPingSubsystem) || CombatPingSubsystem->GetPings().IsEmpty())
+	{
+		return LayerId;
+	}
+	const AFowManager* const FowManager = GetIsValidFowManager();
+	const UImage* const MiniMapImage = GetIsValidMiniMapImg();
+	if (not IsValid(FowManager) || not IsValid(MiniMapImage))
+	{
+		return LayerId;
+	}
+	const FGeometry MiniMapGeometry = MiniMapImage->GetCachedGeometry();
+	const FVector2D MiniMapSize = MiniMapGeometry.GetLocalSize();
+	if (MiniMapSize.X <= 0.0f || MiniMapSize.Y <= 0.0f)
+	{
+		return LayerId;
+	}
+
+	const URTSCombatPingSettings* const Settings = GetDefault<URTSCombatPingSettings>();
+	const float MaxRadius = bM_IsTacticalMapView ? Settings->TacticalMapRadius : Settings->MiniMapRadius;
+	const double NowSeconds = CombatPingSubsystem->GetRealTimeSeconds();
+	for (const FRTSCombatPing& Ping : CombatPingSubsystem->GetPings())
+	{
+		const float AgeSeconds = static_cast<float>(NowSeconds - Ping.M_SpawnRealTimeSeconds);
+		FVector2D PingUV;
+		if (AgeSeconds < 0.f || AgeSeconds > Settings->PingLifetimeSeconds
+			|| not FowManager->GetMiniMapUVFromWorldLocation(Ping.M_WorldLocation, PingUV))
+		{
+			continue;
+		}
+		const FVector2D CenterAbsolute = MiniMapGeometry.LocalToAbsolute(PingUV * MiniMapSize);
+		DrawCombatPing(AllottedGeometry.AbsoluteToLocal(CenterAbsolute), AgeSeconds, MaxRadius, *Settings,
+		               AllottedGeometry, OutDrawElements, LayerId + 1);
+	}
+	// Glow, rings and core each take a layer.
+	constexpr int32 CombatPingLayerCount = 3;
+	return LayerId + CombatPingLayerCount;
+}
+
+void UW_MiniMap::DrawCombatPing(const FVector2D& CenterInWidget,
+                                const float AgeSeconds,
+                                const float MaxRadius,
+                                const URTSCombatPingSettings& Settings,
+                                const FGeometry& AllottedGeometry,
+                                FSlateWindowElementList& OutDrawElements,
+                                const int32 LayerId) const
+{
+	using namespace MiniMapCombatPingConstants;
+	const float Envelope = GetPingEnvelope(AgeSeconds, Settings.PingLifetimeSeconds);
+	if (Envelope <= 0.f)
+	{
+		return;
+	}
+	const FLinearColor& PingColor = Settings.PingColor;
+	if (Settings.GlowOpacity > 0.f)
+	{
+		const float GlowDiscOpacity = PingColor.A * Settings.GlowOpacity * Envelope / GlowDiscCount;
+		for (int32 GlowDiscIndex = 0; GlowDiscIndex < GlowDiscCount; ++GlowDiscIndex)
+		{
+			const float DiameterScale = 1.f - GlowDiscIndex / static_cast<float>(GlowDiscCount);
+			DrawMiniMapDisc(CenterInWidget, MaxRadius * GlowDiameterShare * DiameterScale,
+			                   PingColor.CopyWithNewOpacity(GlowDiscOpacity), AllottedGeometry, OutDrawElements,
+			                   LayerId);
+		}
+	}
+
+	const int32 RingLayerId = LayerId + 1;
+	DrawCombatPingRipples(CenterInWidget, AgeSeconds, MaxRadius, Envelope, Settings, AllottedGeometry,
+	                      OutDrawElements, RingLayerId);
+	if (Settings.bShowBrackets)
+	{
+		DrawCombatPingBrackets(CenterInWidget, AgeSeconds, MaxRadius, Envelope, Settings, AllottedGeometry,
+		                       OutDrawElements, RingLayerId);
+	}
+
+	const float PulsePhaseRadians = AgeSeconds / Settings.RipplePeriodSeconds * UE_TWO_PI;
+	const float CoreDiameter = MaxRadius * CoreDiameterShare
+		* (1.f + CorePulseAmount * FMath::Sin(PulsePhaseRadians));
+	const FLinearColor CoreColor = FMath::Lerp(PingColor, FLinearColor::White, CoreWhiteBlend);
+	DrawMiniMapDisc(CenterInWidget, CoreDiameter, CoreColor.CopyWithNewOpacity(PingColor.A * Envelope),
+	                   AllottedGeometry, OutDrawElements, RingLayerId + 1);
+}
+
+void UW_MiniMap::DrawCombatPingRipples(const FVector2D& CenterInWidget,
+                                       const float AgeSeconds,
+                                       const float MaxRadius,
+                                       const float Envelope,
+                                       const URTSCombatPingSettings& Settings,
+                                       const FGeometry& AllottedGeometry,
+                                       FSlateWindowElementList& OutDrawElements,
+                                       const int32 LayerId) const
+{
+	using namespace MiniMapCombatPingConstants;
+	const float Period = Settings.RipplePeriodSeconds;
+	for (int32 RippleIndex = 0; RippleIndex < Settings.RippleCount; ++RippleIndex)
+	{
+		// Rings leave the centre one after another, evenly spread over one period.
+		const float RippleAge = AgeSeconds - Period * RippleIndex / Settings.RippleCount;
+		if (RippleAge < 0.f)
+		{
+			continue;
+		}
+		const float Phase = FMath::Frac(RippleAge / Period);
+		const float Expansion = FMath::InterpEaseOut(0.f, 1.f, Phase, RippleEaseExponent);
+		const float Radius = MaxRadius * FMath::Lerp(RippleStartRadiusShare, 1.f, Expansion);
+		const float Thickness = Settings.RingThickness
+			* FMath::Lerp(RippleStartThicknessScale, RippleEndThicknessScale, Phase);
+		const float Opacity = Settings.PingColor.A * FMath::Square(1.f - Phase) * Envelope;
+		DrawArc(CenterInWidget, Radius, 0.f, FullCircleDegrees, Thickness,
+		        Settings.PingColor.CopyWithNewOpacity(Opacity), AllottedGeometry, OutDrawElements, LayerId);
+	}
+}
+
+void UW_MiniMap::DrawCombatPingBrackets(const FVector2D& CenterInWidget,
+                                        const float AgeSeconds,
+                                        const float MaxRadius,
+                                        const float Envelope,
+                                        const URTSCombatPingSettings& Settings,
+                                        const FGeometry& AllottedGeometry,
+                                        FSlateWindowElementList& OutDrawElements,
+                                        const int32 LayerId) const
+{
+	using namespace MiniMapCombatPingConstants;
+	const float LockOn = FMath::Clamp(AgeSeconds / BracketLockOnSeconds, 0.f, 1.f);
+	const float LockOnEased = FMath::InterpEaseOut(0.f, 1.f, LockOn, BracketLockOnEaseExponent);
+	const float Radius = MaxRadius * FMath::Lerp(BracketStartRadiusShare, BracketRadiusShare, LockOnEased);
+	const FLinearColor BracketColor = Settings.PingColor.CopyWithNewOpacity(
+		Settings.PingColor.A * LockOn * Envelope);
+	const float Thickness = Settings.RingThickness * BracketThicknessScale;
+	const float SpinDegrees = AgeSeconds * Settings.BracketSpinDegreesPerSecond;
+	const float BracketSpacingDegrees = FullCircleDegrees / BracketCount;
+	for (int32 BracketIndex = 0; BracketIndex < BracketCount; ++BracketIndex)
+	{
+		const float StartDegrees = SpinDegrees + BracketIndex * BracketSpacingDegrees - BracketArcDegrees * 0.5f;
+		DrawArc(CenterInWidget, Radius, StartDegrees, BracketArcDegrees, Thickness, BracketColor,
+		        AllottedGeometry, OutDrawElements, LayerId);
+	}
+}
+
+int32 UW_MiniMap::DrawMapObjectFilters(const FGeometry& AllottedGeometry,
+                                       FSlateWindowElementList& OutDrawElements,
+                                       const int32 LayerId) const
+{
+	// One cheap check while every filter is off (the default); no subsystem in the designer.
+	const UWorld* const World = GetWorld();
+	const URTSMapObjectFilterSubsystem* const MapObjectFilters = IsValid(World)
+		                                                             ? World->GetSubsystem<URTSMapObjectFilterSubsystem>()
+		                                                             : nullptr;
+	if (not IsValid(MapObjectFilters) || not MapObjectFilters->GetShouldDrawAnyFilter(bM_IsTacticalMapView))
+	{
+		return LayerId;
+	}
+	const UImage* const MiniMapImage = GetIsValidMiniMapImg();
+	if (not IsValid(MiniMapImage))
+	{
+		return LayerId;
+	}
+	const FGeometry MiniMapGeometry = MiniMapImage->GetCachedGeometry();
+	const FVector2D MiniMapSize = MiniMapGeometry.GetLocalSize();
+	if (MiniMapSize.X <= 0.0f || MiniMapSize.Y <= 0.0f)
+	{
+		return LayerId;
+	}
+
+	const URTSMapObjectFilterSettings* const Settings = GetDefault<URTSMapObjectFilterSettings>();
+	const int32 RingLayerId = LayerId + 1;
+	for (const ERTSMapObjectFilter Filter : TEnumRange<ERTSMapObjectFilter>())
+	{
+		if (MapObjectFilters->GetShouldDrawFilter(Filter, bM_IsTacticalMapView))
+		{
+			DrawMapObjectFilterDots(MapObjectFilters->GetDiscoveredObjectUVs(Filter), Settings->GetLook(Filter),
+			                        MiniMapGeometry, AllottedGeometry, OutDrawElements, RingLayerId);
+		}
+	}
+	// Rings and dots each take a layer.
+	constexpr int32 FilterLayerCount = 2;
+	return LayerId + FilterLayerCount;
+}
+
+void UW_MiniMap::DrawMapObjectFilterDots(const TArray<FVector2D>& ObjectUVs,
+                                         const FRTSMapObjectFilterLook& Look,
+                                         const FGeometry& MiniMapGeometry,
+                                         const FGeometry& AllottedGeometry,
+                                         FSlateWindowElementList& OutDrawElements,
+                                         const int32 LayerId) const
+{
+	const float DotDiameter = bM_IsTacticalMapView ? Look.TacticalMapDiameter : Look.MiniMapDiameter;
+	const bool bDrawRing = Look.OutlineWidth > 0.f && Look.OutlineColor.A > 0.f;
+	const float RingDiameter = DotDiameter + Look.OutlineWidth * 2.f;
+	const FVector2D MiniMapSize = MiniMapGeometry.GetLocalSize();
+	for (const FVector2D& ObjectUV : ObjectUVs)
+	{
+		const FVector2D CenterAbsolute = MiniMapGeometry.LocalToAbsolute(ObjectUV * MiniMapSize);
+		const FVector2D CenterInWidget = AllottedGeometry.AbsoluteToLocal(CenterAbsolute);
+		if (bDrawRing)
+		{
+			DrawMiniMapDisc(CenterInWidget, RingDiameter, Look.OutlineColor, AllottedGeometry, OutDrawElements,
+			                LayerId);
+		}
+		DrawMiniMapDisc(CenterInWidget, DotDiameter, Look.Color, AllottedGeometry, OutDrawElements, LayerId + 1);
+	}
+}
+
+void UW_MiniMap::DrawMiniMapDisc(const FVector2D& CenterInWidget,
+                                    const float Diameter,
+                                    const FLinearColor& Color,
+                                    const FGeometry& AllottedGeometry,
+                                    FSlateWindowElementList& OutDrawElements,
+                                    const int32 LayerId) const
+{
+	// The unit icon brush is a fully rounded white box: a disc once tinted.
+	const FVector2D DiscSize(Diameter, Diameter);
+	FSlateDrawElement::MakeBox(
+		OutDrawElements,
+		LayerId,
+		AllottedGeometry.ToPaintGeometry(DiscSize, FSlateLayoutTransform(CenterInWidget - DiscSize * 0.5f)),
+		&M_MinimapIconBrush,
+		ESlateDrawEffect::None,
+		Color);
 }

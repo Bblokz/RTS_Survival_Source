@@ -17,6 +17,29 @@ enum class EAbilityID : uint8;
 class UImage;
 class UButton;
 class USizeBox;
+class UMaterialInstanceDynamic;
+
+/**
+ * @brief Smooth cooldown fill of one action button; the ability entry only counts down in whole seconds,
+ * so the widget anchors an estimated end time and animates the glass pane's CooldownRemaining between updates.
+ */
+USTRUCT()
+struct FActionItemCooldownFillState
+{
+	GENERATED_BODY()
+
+	// World time at which the shown cooldown ends; kept at the earliest estimate so mid-second UI updates
+	// do not make the fill jump backwards.
+	double CooldownEndWorldTime = 0.0;
+
+	float CooldownDuration = 0.f;
+
+	// Last value pushed to the material, so the parameter is only written when it changes.
+	float AppliedRemainingFraction = 0.f;
+
+	bool bIsCoolingDown = false;
+};
+
 /**
  * @brief Widget representing a single action button in the action UI bar.
  * @note UpdateItemActionUI: call to refresh the displayed ability data for this slot.
@@ -89,16 +112,21 @@ protected:
 	UPROPERTY(meta = (BindWidget), BlueprintReadOnly)
 	UW_HotKey* M_ActionItemHotKey;
 
+	// Glass pane over the icon (M_UI_GlassPane); its CooldownRemaining parameter shows the cooldown fill.
+	UPROPERTY(meta = (BindWidgetOptional), BlueprintReadOnly)
+	UImage* M_GlassPane;
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void UpdateButtonWithGlobalSlateStyle();
 
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	virtual void NativeDestruct() override;
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure)
 	UW_ActionUIDescription* GetActionUIDescription() const;
 
 private:
-	EAbilityID M_Ability;
+	EAbilityID M_Ability = EAbilityID::IdNoAbility;
 	int32 M_CustomType = 0;
 
 	UPROPERTY()
@@ -125,6 +153,24 @@ private:
 
 	// Stops a texture-less brush (empty slot) from being drawn as a solid white quad.
 	void HideActionImageWithoutIcon() const;
+
+	FActionItemCooldownFillState M_CooldownFill;
+
+	// Dynamic instance of the glass pane material; created on the first cooldown.
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> M_GlassPaneMaterial;
+
+	/**
+	 * @brief Re-anchors the smooth fill on the whole-second cooldown the ability entry reports.
+	 * @param bIsSameAbility Whether this slot showed the same ability before the update; a new ability always re-anchors.
+	 * @param CooldownRemaining Whole seconds left on the cooldown.
+	 * @param CooldownDuration Full cooldown length in seconds.
+	 */
+	void UpdateCooldownFill(const bool bIsSameAbility, const int32 CooldownRemaining, const int32 CooldownDuration);
+	void StopCooldownFill();
+	void ApplyCooldownFillAtTime(const double WorldTimeSeconds);
+	void SetGlassPaneCooldownRemaining(const float RemainingFraction);
+	UMaterialInstanceDynamic* GetGlassPaneMaterial();
 
 	bool GetIsValidActionItemImage() const;
 	bool GetIsValidActionItemHotKey() const;

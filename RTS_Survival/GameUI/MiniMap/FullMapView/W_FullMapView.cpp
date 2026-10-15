@@ -8,6 +8,10 @@
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/SizeBox.h"
+#include "Components/TextBlock.h"
+#include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Engine/Texture2D.h"
 #include "Fonts/FontMeasure.h"
 #include "Framework/Application/SlateApplication.h"
@@ -18,6 +22,9 @@
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/GameUI/GlassButtons/W_GlassIconButton.h"
 #include "RTS_Survival/GameUI/MiniMap/W_MiniMap.h"
+#include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSettings.h"
+#include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSubsystem.h"
+#include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/W_MapObjectFilterToggle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace FullMapViewConstants
@@ -55,6 +62,20 @@ namespace FullMapViewConstants
 
 	constexpr int32 TextOutlineSize = 1;
 
+	// Filter panel left of the frame; the frame shrinks on narrow screens so the panel always fits beside it.
+	constexpr float FilterPanelWidth = 300.0f;
+	constexpr float FilterPanelGap = 28.0f;
+	constexpr float FilterPanelMinScreenMargin = 16.0f;
+	constexpr float FilterPanelPadding = 14.0f;
+	constexpr float FilterPanelCornerRadius = 6.0f;
+	constexpr float FilterPanelOutlineWidth = 1.0f;
+	constexpr float FilterToggleGap = 14.0f;
+	constexpr float FilterSubtitleGap = 2.0f;
+	const FLinearColor FilterPanelFill(0.012f, 0.016f, 0.02f, 0.82f);
+	const FLinearColor FilterPanelOutline(0.0f, 0.9f, 1.0f, 0.28f);
+	constexpr int32 FilterTitleFontSize = 13;
+	constexpr int32 FilterTitleLetterSpacing = 220;
+
 	const FName CameraFrameTopParameter(TEXT("P1P2"));
 	const FName CameraFrameBottomParameter(TEXT("P3P4"));
 	const FName ActiveVisionParameter(TEXT("Active"));
@@ -75,6 +96,13 @@ void UW_FullMapView::InitFullMapView(UW_MiniMap* SmallMiniMap, UMainGameUI* Owni
 	M_LargeMap->SetRenderTransformAngle(SmallMiniMap->GetRenderTransformAngle());
 	ApplyLargeMapGlass(*SmallMiniMap);
 	MirrorCameraFrame();
+	SetIsTacticalMapOpenForFilters(true);
+	RefreshFilterToggles();
+}
+
+void UW_FullMapView::OnFullMapViewClosed() const
+{
+	SetIsTacticalMapOpenForFilters(false);
 }
 
 void UW_FullMapView::NativeOnInitialized()
@@ -122,6 +150,7 @@ void UW_FullMapView::BuildWidgetTree()
 	WidgetTree->RootWidget = RootOverlay;
 	BuildBackdrop(*RootOverlay);
 	BuildFrame(*RootOverlay);
+	BuildFilterPanel(*RootOverlay);
 }
 
 void UW_FullMapView::BuildBackdrop(UOverlay& RootOverlay)
@@ -159,6 +188,7 @@ void UW_FullMapView::BuildFrame(UOverlay& RootOverlay)
 	else
 	{
 		M_LargeMap = WidgetTree->ConstructWidget<UW_MiniMap>(MiniMapClass, TEXT("LargeMap"));
+		M_LargeMap->SetIsTacticalMapView(true);
 		M_LargeMap->OnMiniMapClicked.AddUniqueDynamic(this, &UW_FullMapView::OnLargeMapClicked);
 		FrameBorder->SetContent(M_LargeMap);
 	}
@@ -178,6 +208,96 @@ void UW_FullMapView::BuildCloseButton(UOverlay& FrameOverlay)
 	CloseSlot->SetVerticalAlignment(VAlign_Top);
 	const float Overhang = FullMapViewConstants::CloseButtonOverhang;
 	CloseSlot->SetPadding(FMargin(0.0f, -Overhang, -Overhang, 0.0f));
+}
+
+void UW_FullMapView::BuildFilterPanel(UOverlay& RootOverlay)
+{
+	using namespace FullMapViewConstants;
+	USizeBox* const PanelSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(),
+	                                                                     TEXT("FilterPanelSizeBox"));
+	PanelSizeBox->SetWidthOverride(FilterPanelWidth);
+	M_FilterPanel = PanelSizeBox;
+	UOverlaySlot* const PanelSlot = RootOverlay.AddChildToOverlay(PanelSizeBox);
+	PanelSlot->SetHorizontalAlignment(HAlign_Left);
+	PanelSlot->SetVerticalAlignment(VAlign_Center);
+
+	UBorder* const PanelBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("FilterPanel"));
+	FSlateRoundedBoxBrush PanelBrush(FilterPanelFill, FilterPanelCornerRadius);
+	PanelBrush.OutlineSettings.Color = FilterPanelOutline;
+	PanelBrush.OutlineSettings.Width = FilterPanelOutlineWidth;
+	PanelBorder->SetBrush(PanelBrush);
+	PanelBorder->SetPadding(FMargin(FilterPanelPadding));
+	PanelSizeBox->SetContent(PanelBorder);
+
+	UVerticalBox* const PanelBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(),
+	                                                                         TEXT("FilterPanelBox"));
+	PanelBorder->SetContent(PanelBox);
+
+	UTextBlock* const TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),
+	                                                                      TEXT("FilterTitle"));
+	FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), FilterTitleFontSize,
+	                                                           FFontOutlineSettings(TextOutlineSize));
+	TitleFont.LetterSpacing = FilterTitleLetterSpacing;
+	TitleText->SetFont(TitleFont);
+	TitleText->SetColorAndOpacity(FSlateColor(GridLabelColor));
+	TitleText->SetText(NSLOCTEXT("FullMapView", "FilterTitle", "MAP FILTERS"));
+	PanelBox->AddChildToVerticalBox(TitleText);
+
+	UTextBlock* const SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(),
+	                                                                         TEXT("FilterSubtitle"));
+	SubtitleText->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Regular"), HintFontSize));
+	SubtitleText->SetColorAndOpacity(FSlateColor(HintColor));
+	SubtitleText->SetText(NSLOCTEXT("FullMapView", "FilterSubtitle", "Only what you have discovered is shown"));
+	SubtitleText->SetAutoWrapText(true);
+	UVerticalBoxSlot* const SubtitleSlot = PanelBox->AddChildToVerticalBox(SubtitleText);
+	SubtitleSlot->SetPadding(FMargin(0.0f, FilterSubtitleGap, 0.0f, 0.0f));
+
+	AddFilterToggles(*PanelBox);
+}
+
+void UW_FullMapView::AddFilterToggles(UVerticalBox& PanelBox)
+{
+	const URTSMapObjectFilterSettings* const Settings = GetDefault<URTSMapObjectFilterSettings>();
+	const TPair<ERTSMapObjectFilter, FText> FilterLabels[] = {
+		{ERTSMapObjectFilter::Radixite, NSLOCTEXT("FullMapView", "FilterRadixite", "Show discovered radixite")},
+		{ERTSMapObjectFilter::Metal, NSLOCTEXT("FullMapView", "FilterMetal", "Show discovered metal")},
+		{
+			ERTSMapObjectFilter::Scavengeables,
+			NSLOCTEXT("FullMapView", "FilterScavengeables", "Show discovered scavenge objects")
+		},
+	};
+	for (const TPair<ERTSMapObjectFilter, FText>& FilterLabel : FilterLabels)
+	{
+		UW_MapObjectFilterToggle* const FilterToggle = WidgetTree->ConstructWidget<UW_MapObjectFilterToggle>(
+			UW_MapObjectFilterToggle::StaticClass());
+		FilterToggle->SetupFilterToggle(FilterLabel.Key, FilterLabel.Value, Settings->GetLook(FilterLabel.Key).Color);
+		UVerticalBoxSlot* const ToggleSlot = PanelBox.AddChildToVerticalBox(FilterToggle);
+		ToggleSlot->SetPadding(FMargin(0.0f, FullMapViewConstants::FilterToggleGap, 0.0f, 0.0f));
+		M_FilterToggles.Add(FilterToggle);
+	}
+}
+
+void UW_FullMapView::RefreshFilterToggles() const
+{
+	for (UW_MapObjectFilterToggle* const FilterToggle : M_FilterToggles)
+	{
+		if (IsValid(FilterToggle))
+		{
+			FilterToggle->RefreshSelectedMode();
+		}
+	}
+}
+
+void UW_FullMapView::SetIsTacticalMapOpenForFilters(const bool bIsOpen) const
+{
+	const UWorld* const World = GetWorld();
+	URTSMapObjectFilterSubsystem* const MapObjectFilters = IsValid(World)
+		                                                       ? World->GetSubsystem<URTSMapObjectFilterSubsystem>()
+		                                                       : nullptr;
+	if (IsValid(MapObjectFilters))
+	{
+		MapObjectFilters->SetIsTacticalMapOpen(bIsOpen);
+	}
 }
 
 FSlateBrush UW_FullMapView::MakeFrameBrush() const
@@ -229,10 +349,23 @@ void UW_FullMapView::FitFrameToViewport(const FVector2D& ViewportSize)
 		return;
 	}
 	M_SizedForViewport = ViewportSize;
-	const float FrameSide = FMath::Min(ViewportSize.Y * M_ScreenHeightShare,
-	                                   ViewportSize.X * FullMapViewConstants::MaxScreenWidthShare);
+	using namespace FullMapViewConstants;
+	// Room for the filter panel on both sides keeps the map centred.
+	const float FilterPanelReserve = 2.0f * (FilterPanelWidth + FilterPanelGap);
+	constexpr float MinFrameSide = 200.0f;
+	const float FrameSide = FMath::Max(MinFrameSide, FMath::Min(ViewportSize.Y * M_ScreenHeightShare,
+	                                                            ViewportSize.X * MaxScreenWidthShare
+	                                                            - FilterPanelReserve));
 	M_FrameSizeBox->SetWidthOverride(FMath::RoundToFloat(FrameSide));
 	M_FrameSizeBox->SetHeightOverride(FMath::RoundToFloat(FrameSide));
+
+	UOverlaySlot* const FilterPanelSlot = IsValid(M_FilterPanel) ? Cast<UOverlaySlot>(M_FilterPanel->Slot) : nullptr;
+	if (IsValid(FilterPanelSlot))
+	{
+		const float FrameLeft = (ViewportSize.X - FrameSide) * 0.5f;
+		const float PanelLeft = FMath::Max(FilterPanelMinScreenMargin, FrameLeft - FilterPanelGap - FilterPanelWidth);
+		FilterPanelSlot->SetPadding(FMargin(FMath::RoundToFloat(PanelLeft), 0.0f, 0.0f, 0.0f));
+	}
 }
 
 void UW_FullMapView::MirrorCameraFrame() const
@@ -281,6 +414,7 @@ void UW_FullMapView::OnCloseClicked()
 	if (not GetIsValidMainGameUI())
 	{
 		SetVisibility(ESlateVisibility::Collapsed);
+		OnFullMapViewClosed();
 		return;
 	}
 	M_MainGameUI->CloseFullMapView();

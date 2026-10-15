@@ -29,6 +29,9 @@
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Behaviours/UI/BehaviourDescription/W_BehaviourDescription.h"
 #include "RTS_Survival/GameUI/MiniMap/FullMapView/W_FullMapView.h"
+#include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
+#include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSubsystem.h"
+#include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GameUI/MiniMap/MinimapTerrainCaptureComponent.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
@@ -84,6 +87,12 @@ namespace UISnapshotConstants
 	const TCHAR* const CloseFullMapAtStepSwitch = TEXT("UISnapshotCloseFullMapAtStep=");
 	const FName OpenFullMapButtonName(TEXT("M_OpenFullMapButton"));
 	const FName FullMapCloseButtonName(TEXT("CloseButton"));
+	const TCHAR* const CombatPingsSwitch = TEXT("UISnapshotCombatPings");
+	const TCHAR* const MapFiltersSwitch = TEXT("UISnapshotMapFilters");
+	const TCHAR* const MapFiltersRevealAllSwitch = TEXT("UISnapshotMapFiltersRevealAll");
+	// Preview pings as share of the map extent from its centre, with their age when the capture is taken.
+	const FVector PreviewPingOffsets[] = {FVector(-0.32, -0.26, 0.0), FVector(0.3, -0.08, 0.0), FVector(0.06, 0.34, 0.0)};
+	constexpr float PreviewPingAgesAtCapture[] = {0.3f, 0.9f, 1.7f};
 	const TCHAR* const GallerySwitch = TEXT("UISnapshotGallery=");
 	const FVector2D GalleryOrigin(40.0, 140.0);
 	constexpr double GalleryRowHeight = 260.0;
@@ -456,13 +465,17 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 	}
 	StartWeaponReloads();
 	CollapseMissionOnce();
+	// Filters first, so the tactical map's toggles show the modes when it opens.
+	ShowMapObjectFiltersForStep();
 	ToggleFullMapForStep();
+	ShowCombatPingsForStep();
 }
 
 void UUISnapshotSubsystem::CaptureCurrentStep() const
 {
 	const FString StepName = GetCurrentStepName();
 	const FString ScreenshotPath = FPaths::ProjectSavedDir() / TEXT("UISnapshot") / (StepName + TEXT(".png"));
+	LogMapObjectFilterCounts();
 	FScreenshotRequest::RequestScreenshot(ScreenshotPath, true, false);
 	IConsoleManager::Get().ProcessUserConsoleInput(UISnapshotConstants::ReflectorSnapshotCommand, *GLog, GetWorld());
 	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT capture %s -> %s"), *StepName, *ScreenshotPath);
@@ -766,4 +779,97 @@ bool UUISnapshotSubsystem::GetIsValidPlayerController() const
 		this
 	);
 	return false;
+}
+
+void UUISnapshotSubsystem::ShowCombatPingsForStep() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::CombatPingsSwitch))
+	{
+		return;
+	}
+	UWorld* const World = GetWorld();
+	const AFowManager* const FowManager = FRTS_Statics::GetFowManager(this);
+	URTSCombatPingSubsystem* const CombatPingSubsystem = IsValid(World)
+		                                                     ? World->GetSubsystem<URTSCombatPingSubsystem>()
+		                                                     : nullptr;
+	if (not IsValid(CombatPingSubsystem) || not IsValid(FowManager))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT combat pings: no ping subsystem or fog of war manager"));
+		return;
+	}
+	const int32 PingsBefore = CombatPingSubsystem->GetPings().Num();
+	int32 ReportedHits = 0;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		const URTSComponent* const RTSComponent = It->FindComponentByClass<URTSComponent>();
+		if (IsValid(RTSComponent) && RTSComponent->GetOwningPlayer() == UISnapshotConstants::PlayerOwnerIndex)
+		{
+			CombatPingSubsystem->ReportUnitHit(*RTSComponent);
+			++ReportedHits;
+		}
+	}
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT combat pings: %d hits reported, %d pings kept before, %d after"),
+	       ReportedHits, PingsBefore, CombatPingSubsystem->GetPings().Num());
+
+	const FVector MapCenter = FowManager->GetActorLocation();
+	const float MapExtent = FowManager->GetMapExtent();
+	constexpr int32 PreviewPingCount = UE_ARRAY_COUNT(UISnapshotConstants::PreviewPingAgesAtCapture);
+	for (int32 PreviewIndex = 0; PreviewIndex < PreviewPingCount; ++PreviewIndex)
+	{
+		const float AgeNowSeconds = UISnapshotConstants::PreviewPingAgesAtCapture[PreviewIndex]
+			- static_cast<float>(UISnapshotConstants::SettleSeconds);
+		CombatPingSubsystem->AddPreviewPing(
+			MapCenter + UISnapshotConstants::PreviewPingOffsets[PreviewIndex] * MapExtent, AgeNowSeconds);
+	}
+}
+
+void UUISnapshotSubsystem::ShowMapObjectFiltersForStep() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::MapFiltersSwitch))
+	{
+		return;
+	}
+	const UWorld* const World = GetWorld();
+	URTSMapObjectFilterSubsystem* const MapObjectFilters = IsValid(World)
+		                                                       ? World->GetSubsystem<URTSMapObjectFilterSubsystem>()
+		                                                       : nullptr;
+	if (not IsValid(MapObjectFilters))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT map filters: no map object filter subsystem"));
+		return;
+	}
+	// -UISnapshotMapFiltersRevealAll shows every object, so the dots can be reviewed before anything is explored.
+	if (FParse::Param(FCommandLine::Get(), UISnapshotConstants::MapFiltersRevealAllSwitch))
+	{
+		IConsoleManager::Get().ProcessUserConsoleInput(TEXT("RTS.MapObjectFilters.RevealAll 1"), *GLog, GetWorld());
+	}
+	for (const ERTSMapObjectFilter Filter : TEnumRange<ERTSMapObjectFilter>())
+	{
+		MapObjectFilters->SetFilterMode(Filter, ERTSMapObjectFilterMode::MiniMapAndTacticalMap);
+	}
+}
+
+void UUISnapshotSubsystem::LogMapObjectFilterCounts() const
+{
+	if (not FParse::Param(FCommandLine::Get(), UISnapshotConstants::MapFiltersSwitch))
+	{
+		return;
+	}
+	const UWorld* const World = GetWorld();
+	const URTSMapObjectFilterSubsystem* const MapObjectFilters = IsValid(World)
+		                                                             ? World->GetSubsystem<URTSMapObjectFilterSubsystem>()
+		                                                             : nullptr;
+	if (not IsValid(MapObjectFilters))
+	{
+		return;
+	}
+	for (const ERTSMapObjectFilter Filter : TEnumRange<ERTSMapObjectFilter>())
+	{
+		int32 RegisteredCount = 0;
+		int32 DiscoveredCount = 0;
+		MapObjectFilters->GetObjectCounts(Filter, RegisteredCount, DiscoveredCount);
+		UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT map filter %s: %d registered, %d discovered, %d dots"),
+		       *UEnum::GetValueAsString(Filter), RegisteredCount, DiscoveredCount,
+		       MapObjectFilters->GetDiscoveredObjectUVs(Filter).Num());
+	}
 }

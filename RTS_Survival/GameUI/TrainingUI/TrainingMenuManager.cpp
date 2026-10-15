@@ -2521,6 +2521,7 @@ void UTrainingMenuManager::InitAllGameArtilleryTWTrainingOptions()
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_SFH18_150mm, HeavyArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_Nebelwerfer, MediumArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_M1938_122mm, HeavyArtilleryTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_B4_203mm, HeavyArtilleryTeamWeaponTrainingTime);
 }
 
 void UTrainingMenuManager::InitAllGameMachineGunTWTrainingOptions()
@@ -2576,6 +2577,7 @@ void UTrainingMenuManager::InitAllGameTrainingLayoutOnlyOptions()
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz250, ArmoredCarTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz250_37mm, ArmoredCarTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz_231, ArmoredCarTrainingTime);
+	AddTankOptionIfMissing(ETankSubtype::Tank_Keubel, ArmoredCarTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Puma, ArmoredCarMediumCalibreTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_FlamePuma, ArmoredCarMediumCalibreTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz_232_3, ArmoredCarMediumCalibreTrainingTime);
