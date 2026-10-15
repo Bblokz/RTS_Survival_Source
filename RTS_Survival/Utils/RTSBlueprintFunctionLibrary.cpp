@@ -1435,6 +1435,21 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_B4_203mm()
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_B4_203mm));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_ML20_152mm()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_ML20_152mm));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_53K_45mm()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_53K_45MM));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_BS3_100mm()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_BS3_100MM));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetTeamWeapon_Maxim()
 {
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Maxim));

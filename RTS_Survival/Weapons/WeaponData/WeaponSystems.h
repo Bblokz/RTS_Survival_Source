@@ -238,7 +238,14 @@ enum class
 	// Appended so serialized weapon names keep their values.
 	B4_203MM_TW UMETA(DisplayName = "B-4 203MM TW"),
 	// The fortified gun pit version: same gun, longer crane-loading cycle.
-	B4_203MM_Pit UMETA(DisplayName = "B-4 203MM Gun Pit")
+	B4_203MM_Pit UMETA(DisplayName = "B-4 203MM Gun Pit"),
+	// Soviet 45mm anti-tank gun M1937 (53-K): the team weapon and its sandbag pit fire the same gun.
+	M53K_45MM_TW UMETA(DisplayName = "53-K 45MM TW"),
+	// ML-20 152mm gun-howitzer: the towed team weapon and the gun pit that loads it with the B-4's crane drill.
+	ML20_152MM_TW UMETA(DisplayName = "ML-20 152MM TW"),
+	ML20_152MM_Pit UMETA(DisplayName = "ML-20 152MM Gun Pit"),
+	// Soviet 100mm field gun M1944 (BS-3): the team weapon and its square sandbag pit fire the same gun.
+	BS3_100MM_TW UMETA(DisplayName = "BS-3 100MM TW")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -326,7 +333,11 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::ML_20S_152MM_SU152: return "ML-20S";
 	case EWeaponName::TM_3_12_305MM: return "TM-3-12";
 	case EWeaponName::B4_203MM_TW: return "B-4";
+	case EWeaponName::M53K_45MM_TW: return "53-K";
 	case EWeaponName::B4_203MM_Pit: return "B-4";
+	case EWeaponName::ML20_152MM_TW: return "ML-20";
+	case EWeaponName::ML20_152MM_Pit: return "ML-20";
+	case EWeaponName::BS3_100MM_TW: return "BS-3";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
 	case EWeaponName::Panzerwerfer: return "Panzerwerfer";
@@ -773,6 +784,14 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "TM_3_12_305MM";
 	case EWeaponName::B4_203MM_TW:
 		return "B4_203MM_TW";
+	case EWeaponName::M53K_45MM_TW:
+		return "M53K_45MM_TW";
+	case EWeaponName::ML20_152MM_TW:
+		return "ML20_152MM_TW";
+	case EWeaponName::ML20_152MM_Pit:
+		return "ML20_152MM_Pit";
+	case EWeaponName::BS3_100MM_TW:
+		return "BS3_100MM_TW";
 	case EWeaponName::B4_203MM_Pit:
 		return "B4_203MM_Pit";
 

@@ -115,6 +115,13 @@ void ACPPTurretsMaster::SetEngageGroundLocation(const FVector& GroundLocation)
 
 	TargetingData.SetTargetGround(GroundLocation);
 
+	// Aim at the ground right away, like SetTarget: otherwise a tick before the first SpecificEngage compares the
+	// turret against the stale idle yaw, reports it rotated to engage and the turret fires once before it turns.
+	SteeringState.M_TargetRotator = GetTargetRotation(TargetingData.GetActiveTargetLocation(),
+	                                                  GetTurretTransform().GetLocation());
+	bM_IsRotatedToEngage = false;
+	bM_IsFullyRotatedToTarget = false;
+
 	// Use the specific-engage loop so we get OnTurretOutOfRange / OnTurretInRange callbacks to the owner (tank).
 	InitiateSpecificTargetTimers();
 }

@@ -712,6 +712,15 @@ public:
 	static FTrainingOption GetTeamWeapon_B4_203mm();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_ML20_152mm();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_53K_45mm();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetTeamWeapon_BS3_100mm();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetTeamWeapon_Maxim();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
