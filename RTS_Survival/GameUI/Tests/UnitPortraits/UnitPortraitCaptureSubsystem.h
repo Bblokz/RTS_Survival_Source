@@ -11,7 +11,6 @@
 class ACPPController;
 class ASkyLight;
 class ASceneCapture2D;
-class ATankMaster;
 class USceneCaptureComponent2D;
 class UTextureRenderTarget2D;
 class UWeaponState;
@@ -66,7 +65,7 @@ struct FUnitPortraitShotState
 };
 
 /**
- * @brief Takes the raw action pictures for unit portraits: spawns each listed vehicle on the map's
+ * @brief Takes the raw action pictures for unit portraits: spawns each listed vehicle or gun pit on the map's
  * BP_UnitImage_LandscapeAnchor, orders it to attack the ground out of frame and saves square scene-capture pictures
  * right after its main gun fires. Started with -UnitPortraitCapture=<list file> (best with -game -RenderOffscreen so
  * nothing shows on screen); Tools/UnitPortraits has the runner and the crop-to-256 step. Not created in shipping.
@@ -95,12 +94,15 @@ private:
 	int32 M_EntryIndex = 0;
 	FString M_OutputDirectory;
 	int32 M_ShotsPerUnit = 3;
+	// Game seconds after each shot at which pictures are taken; ascending.
+	TArray<float> M_CaptureDelaysAfterShot;
 
 	TArray<FUnitPortraitCamera> M_Cameras;
 	TWeakObjectPtr<AActor> M_Anchor;
 	TWeakObjectPtr<ASkyLight> M_SkyFill;
 	TWeakObjectPtr<ACPPController> M_PlayerController;
-	TWeakObjectPtr<ATankMaster> M_Unit;
+	TWeakObjectPtr<AActor> M_Unit;
+	FVector M_UnitSpawnLocation = FVector::ZeroVector;
 	FUnitPortraitShotState M_ShotState;
 	bool bM_IsSuppressingErrorDialogs = false;
 
@@ -117,23 +119,34 @@ private:
 	float GetGameSeconds() const;
 
 	bool LoadEntries();
+	void LoadCaptureDelays();
 	bool TryStartGame();
 	// The game start tutorial opens on a difficulty picker that pauses the game; picks Normal and unpauses.
 	void KeepGameRunning() const;
 	bool FindAnchor();
 	bool CreateCameras();
+	/**
+	 * @brief Sets up one camera to look like the game view minus the fog of war, with the lighting switches applied.
+	 * @param CaptureComponent Capture of the camera actor.
+	 * @param RenderTarget Square target the camera renders into every frame.
+	 * @param View Which side of the unit the camera shows; decides whether post-process materials stay on.
+	 */
+	void ConfigureCaptureComponent(USceneCaptureComponent2D& CaptureComponent, UTextureRenderTarget2D& RenderTarget,
+	                               const FUnitPortraitView& View) const;
 	void CopyPlayerCameraPostProcess(USceneCaptureComponent2D& CaptureComponent) const;
 	// Logs the sky lights and post process volumes, for when pictures are lit differently from the game view.
 	void LogMapLighting() const;
 	void LogSunLights() const;
 	void SpawnSkyFill();
 
-	ATankMaster* SpawnUnit(const FUnitPortraitEntry& Entry) const;
-	// Unattended runs never draw the unit; its meshes would skip their pose and it could die to the map's enemies.
+	AActor* SpawnUnit(const FUnitPortraitEntry& Entry) const;
+	// Unattended runs never draw the unit; its meshes would skip their pose, it could die to the map's enemies, and
+	// hull-aimed vehicles drift off the anchor while turning.
 	void KeepUnitReady() const;
 	void AimCamerasAtUnit() const;
 	bool GetUnitVisibleBounds(FBox& OutBounds) const;
 
+	TArray<UWeaponState*> GetMountedWeapons() const;
 	UWeaponState* FindMainWeapon() const;
 	void OrderAttackGroundOutOfFrame();
 	bool GetDidMainWeaponFire();

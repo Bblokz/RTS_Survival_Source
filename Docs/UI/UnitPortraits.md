@@ -6,21 +6,23 @@ engraved on top later (not covered here). The untouched images live in
 `D:/UE_Assets/Icons/TrainingUI/GerTanks/<ArmoredCars|Light|Medium|Heavy>/NoIcon`.
 
 This used to be done by hand in PIE (order the unit to fire just out of view, take a high-res screenshot, crop,
-scale). `UUnitPortraitCaptureSubsystem` does it in an offscreen game run, so it runs while the editor stays open
+scale). `UUnitPortraitCaptureSubsystem` does it (vehicles and building expansions such as the gun pits) in an offscreen game run, so it runs while the editor stays open
 and in use.
 
 ## How it works
 
 - `BP_UnitImage_LandscapeAnchor` (`/Game/RTS_Survival/Blueprints/GameUI/ActionUI/`) marks the spot on
-  `RTS_GameStartTutorial`. The vehicle is spawned there, facing the anchor's yaw.
+  `RTS_GameStartTutorial`. The vehicle is spawned there, facing the anchor's yaw plus 90 degrees (measured: the
+  sun's cast shadow then falls under the vehicle). Hull-aimed vehicles are held on the spot while they turn.
 - The subsystem (`RTS_Survival/GameUI/Tests/UnitPortraits/`) only exists when the command line has
   `-UnitPortraitCapture=<list file>`. It is compiled out with `RTS_WITH_MAP_TESTS` (shipping builds: no code).
 - Per vehicle: spawn, wait for shaders and loads, take an `idle` picture, order attack-ground straight ahead at half
   the main gun's range (out of frame), and on each main-gun shot (magazine drops) save pictures 0, 2, 4, 9 and 18
   frames later (`shotN_t0` .. `t4`: flash, blast, tracer, smoke). After each shot the gun is reloaded instantly.
   Default 3 shots per unit.
-- Three scene-capture cameras per moment: `FrontRight`, `Right` and `FrontLeft` (1536x1536, 30 degree FOV), framed
-  on the vehicle's mesh bounds. Each picture's projected vehicle box goes to `crops.csv` next to it.
+- Three scene-capture cameras per moment: `FrontRight`, `Right` and `Front`, all from the unit's right so the gun
+  points right as in the hand-made portraits (1536x1536, 30 degree FOV), framed on the vehicle's mesh bounds
+  (meshes over 15 m or 15 m away are ignored). Each picture's projected vehicle box goes to `crops.csv` next to it.
 - The game view itself is never drawn offscreen, so `HighResShot` does not work there; scene captures do.
 
 ## Running it
@@ -51,8 +53,10 @@ has a hand-made portrait, for comparing looks after changes.
 | `-UnitPortraitCapture=<file>` | required | unit list |
 | `-UnitPortraitDir=<folder>` | `Saved/UnitPortraits` | output root |
 | `-UnitPortraitShots=N` | 3 | main-gun shots pictured per unit |
+| `-UnitPortraitShotDelays=a,b,..` | 0,0.06,0.14,0.3,0.6 | game seconds after a shot to picture; `0,0.034,0.067,0.1,0.134` takes every frame (short muzzle flashes, e.g. the leFH) |
 | `-UnitPortraitSkyFill=<x>` | 3 (`SKY_FILL`) | movable sky light with the map's sky cubemap; lifts the shadows |
-| `-UnitPortraitExposureBias=<stops>` | 0.3 (`EXPOSURE_BIAS`) | brighter or darker pictures |
+| `-UnitPortraitExposureBias=<stops>` | 1.0 (`EXPOSURE_BIAS`) | brighter or darker pictures |
+| `-UnitPortraitUnitYaw=<deg>` | 90 | vehicle yaw relative to the anchor (90 keeps the cast shadow under the vehicle) |
 | `-UnitPortraitIndirectLight=<x>` | off | post-process indirect lighting intensity |
 | `-UnitPortraitTargetYaw=<deg>` | 0 | turn the attack-ground target off the nose |
 | `-UnitPortraitFraming=<x>` | 1.25 | camera distance on the bounding sphere (crop does the tightening) |
@@ -69,11 +73,45 @@ Unreal reads the first copy of a switch, so change the runner's lighting default
   bounce light in captures (raising Indirect Lighting Intensity to 6 changed nothing). The map's sky light is
   Stationary with the specified cubemap `SunsetAmbientCubemap`.
 - Without help every shadow is pure black (about 16% of the pixels). `-UnitPortraitSkyFill=3` spawns a movable sky
-  light with that same cubemap and switches the captures to the classic sky light path; shadows then read like the
-  hand-made portraits. In one run with fill 2 the sun's cast shadow went missing; fill 3 gave the same result in two
-  runs.
+  light with that same cubemap and switches the captures to the classic sky light path. The scene only renders the
+  newest registered sky light and the map's own one re-registers a frame after start, which silently dropped the
+  fill in some runs; the map's sky light is therefore hidden while the fill is used.
+- Which flank faces the cameras matters more than the fill: from the unit's left the pictures were the shadowed
+  side. Exposure bias 1.0 brings the crops close to the hand-made portraits' brightness.
 - The fog of war is a post-process material: with post-process materials kept the picture is black, so the
   captures leave them out.
 - Auto exposure adapts at 10 stops/s in the captures so the first vehicle is not over-exposed.
 - `RTSFunctionLibrary::ReportError` dialogs (the tutorial map raises many) are answered automatically in unattended
   runs but stall a frame each; the subsystem pushes `PushModalDialogSuppression` so they are only logged.
+
+## German vehicles generated (2026-10-15)
+
+`ger_missing.txt` lists every German vehicle Blueprint without a portrait in the `NoIcon` folders; `ger_picks.txt`
+records the frame picked for each. Published (new files, nothing replaced):
+
+- ArmoredCars: Kubelwagen (idle; its Blueprint has no weapon), FlamePuma, Sdkfz250_37mm (idle; no weapon),
+  Sdkfz251_Mortar.
+- Light: Panzer38t_R, Pz38_Rail, PanzerII_F_Strike, PZII_Fire (Ger_Vehicle_PanzerII_HFire), PzJager_Laser,
+  Sdkfz_140_Rockets.
+- Medium: PZIV_F_Commander, PZIV_H, PZIV_Rockets.
+- Heavy: Panther_G (the engine had an iconed texture but no `NoIcon` source), E25, JagdTiger, Tiger1_Rail.
+
+Not made: `Ger_Vehicle_Sdkfz_9_37` (SdKfz 9 37mm). Its Blueprint has no weapon and a mesh that throws the framing
+far out; it is also not in the async spawner's setup arrays. Kubelwagen and SdKfz 250 37mm are not in the spawner
+either. Subtypes without any Blueprint (SdKfz 251 Transport, Panzerwerfer, Pz IV/70, Keugel T38, Pz I Scout) have
+nothing to picture.
+
+## German gun pits (2026-10-15)
+
+`ger_pits.txt` captures the Pak 40, leFH 18 and sFH 18 pits (`Ger_BXP_GerPit_*`) the same way: spawned on the anchor
+as a level designer places them, gun found on the child turret actor. Published to
+`D:/UE_Assets/Icons/TrainingUI/GermanPits` as `T_Ger_Pit_{Pak40,LeFH18,SFH18}.png` (picks in
+`ger_pits_picks_pak.txt`, `ger_pits_picks_howitzers.txt` and `ger_pits_picks_lefh.txt`).
+
+- The pits are larger, so crop looser: `--zoom 1.0` for the Pak pit, `--zoom 0.85` for the howitzer pits (their
+  crates then fit).
+- Use the howitzers' `t0` frame (muzzle flash). From `t1` on the blast cloud covers the pit, and in scene captures
+  it shows a hard horizontal clipped edge.
+- The leFH's muzzle flash lasts about one frame and peaks between the default moments; it was retaken with
+  `-UnitPortraitShots=5 -UnitPortraitShotDelays=0,0.034,0.067,0.1,0.134` (every frame after the shot).
+- The first try hung at frame 1 with no CPU before the game started (not in the capture code); a rerun worked.

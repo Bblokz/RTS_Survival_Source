@@ -39,6 +39,8 @@
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
@@ -50,6 +52,9 @@ namespace UnitPortraitConstants
 	const TCHAR* const ListSwitch = TEXT("UnitPortraitCapture=");
 	const TCHAR* const DirectorySwitch = TEXT("UnitPortraitDir=");
 	const TCHAR* const ShotsSwitch = TEXT("UnitPortraitShots=");
+	// Game seconds after a shot to take pictures at, comma separated, e.g. 0,0.034,0.067 for every frame at 30 fps
+	// (short muzzle flashes peak between the default moments).
+	const TCHAR* const ShotDelaysSwitch = TEXT("UnitPortraitShotDelays=");
 	const TCHAR* const ExposureBiasSwitch = TEXT("UnitPortraitExposureBias=");
 	// Scales sky and bounce light (post-process Indirect Lighting Intensity) to lift the shadows.
 	const TCHAR* const IndirectLightSwitch = TEXT("UnitPortraitIndirectLight=");
@@ -58,6 +63,7 @@ namespace UnitPortraitConstants
 	const TCHAR* const SkyFillSwitch = TEXT("UnitPortraitSkyFill=");
 	const TCHAR* const TargetYawSwitch = TEXT("UnitPortraitTargetYaw=");
 	const TCHAR* const FramingSwitch = TEXT("UnitPortraitFraming=");
+	const TCHAR* const UnitYawSwitch = TEXT("UnitPortraitUnitYaw=");
 	// Adds a copy of the first view that keeps the post-process materials, to compare against the game view's look.
 	const TCHAR* const DebugPostProcessSwitch = TEXT("UnitPortraitDebugPostProcess");
 	// Also takes a high-res screenshot of the real game view at each idle picture, as a reference for the lighting.
@@ -90,6 +96,13 @@ namespace UnitPortraitConstants
 	constexpr float MaxTargetRangeFraction = 0.9f;
 	constexpr float MinTargetDistance = 1500.f;
 	constexpr int32 DefaultShotsPerUnit = 3;
+	// The vehicle faces the anchor's yaw plus this. Compared 0/90/180/270 on the tutorial map's anchor: at 90 the
+	// sun's cast shadow falls under the vehicle and the hull reads best from these views.
+	constexpr float DefaultUnitYawFromAnchor = 90.f;
+	constexpr float MaxUnitDrift = 30.f;
+	// Meshes bigger than this, or this far from the unit, are not part of its look (helper or hidden meshes) and
+	// would zoom the camera far out. Large enough for the German gun pits (about 14 m across).
+	constexpr float MaxUnitMeshRadius = 1500.f;
 
 	// Auto exposure adapts in a few frames instead of seconds, so the first unit is not pictured over-exposed.
 	constexpr float ExposureAdaptSpeed = 10.f;
@@ -99,7 +112,7 @@ namespace UnitPortraitConstants
 	const FUnitPortraitView Views[] = {
 		{TEXT("FrontRight"), 50.f, -45.f},
 		{TEXT("Right"), 95.f, -48.f},
-		{TEXT("FrontLeft"), -55.f, -45.f}
+		{TEXT("Front"), 20.f, -45.f}
 	};
 
 	/**
@@ -152,6 +165,7 @@ void UUnitPortraitCaptureSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	FParse::Value(FCommandLine::Get(), UnitPortraitConstants::DirectorySwitch, M_OutputDirectory);
 	M_ShotsPerUnit = UnitPortraitConstants::DefaultShotsPerUnit;
 	FParse::Value(FCommandLine::Get(), UnitPortraitConstants::ShotsSwitch, M_ShotsPerUnit);
+	LoadCaptureDelays();
 	// Error dialogs are answered automatically in unattended runs, but each one stalls a frame; log them instead.
 	RTSFunctionLibrary::PushModalDialogSuppression();
 	bM_IsSuppressingErrorDialogs = true;
@@ -251,6 +265,7 @@ void UUnitPortraitCaptureSubsystem::TickSpawningUnit()
 		return;
 	}
 	M_ShotState = FUnitPortraitShotState();
+	M_UnitSpawnLocation = M_Unit->GetActorLocation();
 	if (GetIsValidPlayerController())
 	{
 		M_PlayerController->FocusCameraOnActor(M_Unit.Get());
@@ -307,11 +322,11 @@ void UUnitPortraitCaptureSubsystem::TickWaitingForShot()
 void UUnitPortraitCaptureSubsystem::TickCapturingShot()
 {
 	using namespace UnitPortraitConstants;
-	const int32 MomentCount = UE_ARRAY_COUNT(CaptureDelaysAfterShot);
+	const int32 MomentCount = M_CaptureDelaysAfterShot.Num();
 	const float SecondsSinceShot = GetGameSeconds() - M_ShotState.ShotGameSeconds;
 	// At most one picture per tick: the render targets only hold what was rendered last frame.
 	if (M_ShotState.NextMomentIndex < MomentCount
-		&& SecondsSinceShot >= CaptureDelaysAfterShot[M_ShotState.NextMomentIndex])
+		&& SecondsSinceShot >= M_CaptureDelaysAfterShot[M_ShotState.NextMomentIndex])
 	{
 		ExportCameras(FString::Printf(TEXT("shot%d_t%d"), M_ShotState.ShotCount + 1, M_ShotState.NextMomentIndex));
 		++M_ShotState.NextMomentIndex;
@@ -404,6 +419,30 @@ bool UUnitPortraitCaptureSubsystem::LoadEntries()
 	return true;
 }
 
+void UUnitPortraitCaptureSubsystem::LoadCaptureDelays()
+{
+	using namespace UnitPortraitConstants;
+	M_CaptureDelaysAfterShot = TArray<float>(CaptureDelaysAfterShot, UE_ARRAY_COUNT(CaptureDelaysAfterShot));
+	FString DelayList;
+	if (not FParse::Value(FCommandLine::Get(), ShotDelaysSwitch, DelayList, false))
+	{
+		return;
+	}
+	TArray<FString> DelayTexts;
+	DelayList.ParseIntoArray(DelayTexts, TEXT(","));
+	TArray<float> Delays;
+	for (const FString& DelayText : DelayTexts)
+	{
+		Delays.Add(FCString::Atof(*DelayText));
+	}
+	if (Delays.IsEmpty())
+	{
+		return;
+	}
+	Delays.Sort();
+	M_CaptureDelaysAfterShot = Delays;
+}
+
 bool UUnitPortraitCaptureSubsystem::TryStartGame()
 {
 	UWorld* World = GetWorld();
@@ -474,8 +513,6 @@ bool UUnitPortraitCaptureSubsystem::CreateCameras()
 	{
 		return false;
 	}
-	float ExposureBias = 0.f;
-	const bool bHasExposureBias = FParse::Value(FCommandLine::Get(), ExposureBiasSwitch, ExposureBias);
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	TArray<FUnitPortraitView> ViewsToCreate(Views, UE_ARRAY_COUNT(Views));
@@ -496,36 +533,45 @@ bool UUnitPortraitCaptureSubsystem::CreateCameras()
 			UE_LOG(LogRTSUnitPortrait, Error, TEXT("RTS_PORTRAIT camera %s could not be created"), *View.Name);
 			return false;
 		}
-		USceneCaptureComponent2D* CaptureComponent = Capture->GetCaptureComponent2D();
-		CaptureComponent->TextureTarget = RenderTarget;
-		CaptureComponent->CaptureSource = SCS_FinalColorLDR;
-		CaptureComponent->FOVAngle = FieldOfView;
-		// Rendering every frame with kept state lets auto exposure, Lumen and temporal AA settle like the game view.
-		CaptureComponent->bCaptureEveryFrame = true;
-		CaptureComponent->bCaptureOnMovement = false;
-		CaptureComponent->bAlwaysPersistRenderingState = true;
-		// The fog of war is a post-process material; the portrait shows the unit, not what the player may see.
-		CaptureComponent->ShowFlags.SetPostProcessMaterial(View.bKeepPostProcessMaterials);
-		CopyPlayerCameraPostProcess(*CaptureComponent);
-		ApplyGameViewLighting(CaptureComponent->PostProcessSettings, not M_SkyFill.IsValid());
-		CaptureComponent->PostProcessBlendWeight = 1.f;
-		float IndirectLightIntensity = 1.f;
-		if (FParse::Value(FCommandLine::Get(), IndirectLightSwitch, IndirectLightIntensity))
-		{
-			CaptureComponent->PostProcessSettings.bOverride_IndirectLightingIntensity = true;
-			CaptureComponent->PostProcessSettings.IndirectLightingIntensity = IndirectLightIntensity;
-		}
-		if (bHasExposureBias)
-		{
-			CaptureComponent->PostProcessSettings.bOverride_AutoExposureBias = true;
-			CaptureComponent->PostProcessSettings.AutoExposureBias = ExposureBias;
-		}
+		ConfigureCaptureComponent(*Capture->GetCaptureComponent2D(), *RenderTarget, View);
 		FUnitPortraitCamera& Camera = M_Cameras.AddDefaulted_GetRef();
 		Camera.View = View;
 		Camera.Capture = Capture;
 		Camera.RenderTarget.Reset(RenderTarget);
 	}
 	return true;
+}
+
+void UUnitPortraitCaptureSubsystem::ConfigureCaptureComponent(USceneCaptureComponent2D& CaptureComponent,
+                                                              UTextureRenderTarget2D& RenderTarget,
+                                                              const FUnitPortraitView& View) const
+{
+	using namespace UnitPortraitConstants;
+	CaptureComponent.TextureTarget = &RenderTarget;
+	CaptureComponent.CaptureSource = SCS_FinalColorLDR;
+	CaptureComponent.FOVAngle = FieldOfView;
+	// Rendering every frame with kept state lets auto exposure, Lumen and temporal AA settle like the game view.
+	CaptureComponent.bCaptureEveryFrame = true;
+	CaptureComponent.bCaptureOnMovement = false;
+	CaptureComponent.bAlwaysPersistRenderingState = true;
+	// The fog of war is a post-process material; the portrait shows the unit, not what the player may see.
+	CaptureComponent.ShowFlags.SetPostProcessMaterial(View.bKeepPostProcessMaterials);
+	CopyPlayerCameraPostProcess(CaptureComponent);
+	FPostProcessSettings& Settings = CaptureComponent.PostProcessSettings;
+	ApplyGameViewLighting(Settings, not M_SkyFill.IsValid());
+	CaptureComponent.PostProcessBlendWeight = 1.f;
+	float IndirectLightIntensity = 1.f;
+	if (FParse::Value(FCommandLine::Get(), IndirectLightSwitch, IndirectLightIntensity))
+	{
+		Settings.bOverride_IndirectLightingIntensity = true;
+		Settings.IndirectLightingIntensity = IndirectLightIntensity;
+	}
+	float ExposureBias = 0.f;
+	if (FParse::Value(FCommandLine::Get(), ExposureBiasSwitch, ExposureBias))
+	{
+		Settings.bOverride_AutoExposureBias = true;
+		Settings.AutoExposureBias = ExposureBias;
+	}
 }
 
 void UUnitPortraitCaptureSubsystem::CopyPlayerCameraPostProcess(USceneCaptureComponent2D& CaptureComponent) const
@@ -560,7 +606,11 @@ void UUnitPortraitCaptureSubsystem::SpawnSkyFill()
 	UTextureCube* MapSkyCubemap = nullptr;
 	for (TActorIterator<ASkyLight> It(GetWorld()); It; ++It)
 	{
-		MapSkyCubemap = It->GetLightComponent()->Cubemap;
+		USkyLightComponent* MapSkyLight = It->GetLightComponent();
+		MapSkyCubemap = MapSkyLight->Cubemap;
+		// The scene renders only the newest registered sky light; the map's one re-registers after start and would
+		// silently replace the fill (seen as black shadows in some runs), so it is taken out of the scene.
+		MapSkyLight->SetVisibility(false);
 	}
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -626,7 +676,7 @@ void UUnitPortraitCaptureSubsystem::LogMapLighting() const
 	}
 }
 
-ATankMaster* UUnitPortraitCaptureSubsystem::SpawnUnit(const FUnitPortraitEntry& Entry) const
+AActor* UUnitPortraitCaptureSubsystem::SpawnUnit(const FUnitPortraitEntry& Entry) const
 {
 	using namespace UnitPortraitConstants;
 	UWorld* World = GetWorld();
@@ -634,7 +684,8 @@ ATankMaster* UUnitPortraitCaptureSubsystem::SpawnUnit(const FUnitPortraitEntry& 
 	{
 		return nullptr;
 	}
-	UClass* UnitClass = LoadClass<ATankMaster>(nullptr, *Entry.ClassPath);
+	// Vehicles and building expansions (gun pits) alike; anything with weapons and ICommands can be pictured.
+	UClass* UnitClass = LoadClass<AActor>(nullptr, *Entry.ClassPath);
 	if (not IsValid(UnitClass))
 	{
 		return nullptr;
@@ -646,13 +697,16 @@ ATankMaster* UUnitPortraitCaptureSubsystem::SpawnUnit(const FUnitPortraitEntry& 
 	{
 		SpawnLocation = GroundHit.Location + FVector(0.f, 0.f, SpawnHeightAboveGround);
 	}
-	const FRotator SpawnRotation(0.f, M_Anchor->GetActorRotation().Yaw, 0.f);
+	float UnitYawFromAnchor = DefaultUnitYawFromAnchor;
+	FParse::Value(FCommandLine::Get(), UnitYawSwitch, UnitYawFromAnchor);
+	const FRotator SpawnRotation(0.f, M_Anchor->GetActorRotation().Yaw + UnitYawFromAnchor, 0.f);
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	ATankMaster* Unit = World->SpawnActor<ATankMaster>(UnitClass, SpawnLocation, SpawnRotation, SpawnParameters);
-	if (IsValid(Unit) && not IsValid(Unit->GetController()))
+	AActor* Unit = World->SpawnActor<AActor>(UnitClass, SpawnLocation, SpawnRotation, SpawnParameters);
+	APawn* UnitPawn = Cast<APawn>(Unit);
+	if (IsValid(UnitPawn) && not IsValid(UnitPawn->GetController()))
 	{
-		Unit->SpawnDefaultController();
+		UnitPawn->SpawnDefaultController();
 	}
 	return Unit;
 }
@@ -667,6 +721,13 @@ void UUnitPortraitCaptureSubsystem::KeepUnitReady() const
 	{
 		Health->SetCurrentHealth(Health->GetMaxHealth());
 	}
+	// Hull-aimed guns turn the vehicle and some drift off the road while doing so; keep it on the anchor.
+	const FVector UnitLocation = M_Unit->GetActorLocation();
+	if (FVector::DistSquared2D(UnitLocation, M_UnitSpawnLocation) > FMath::Square(UnitPortraitConstants::MaxUnitDrift))
+	{
+		const FVector PinnedLocation(M_UnitSpawnLocation.X, M_UnitSpawnLocation.Y, UnitLocation.Z);
+		M_Unit->SetActorLocation(PinnedLocation, false, nullptr, ETeleportType::TeleportPhysics);
+	}
 	TArray<AActor*> UnitActors;
 	M_Unit->GetAttachedActors(UnitActors, true, true);
 	UnitActors.Add(M_Unit.Get());
@@ -676,6 +737,9 @@ void UUnitPortraitCaptureSubsystem::KeepUnitReady() const
 		for (USkeletalMeshComponent* Mesh : Meshes)
 		{
 			Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+			// Gun pit crews are throttled by the optimizer too; their drill montages must play at full rate.
+			Mesh->SetComponentTickEnabled(true);
+			Mesh->SetComponentTickInterval(0.f);
 		}
 	}
 }
@@ -716,6 +780,8 @@ bool UUnitPortraitCaptureSubsystem::GetUnitVisibleBounds(FBox& OutBounds) const
 	M_Unit->GetAttachedActors(UnitActors, true, true);
 	UnitActors.Add(M_Unit.Get());
 	OutBounds = FBox(ForceInit);
+	const FVector UnitLocation = M_Unit->GetActorLocation();
+	const float MaxRadius = UnitPortraitConstants::MaxUnitMeshRadius;
 	for (const AActor* UnitActor : UnitActors)
 	{
 		// Only the vehicle's own meshes: widget components (health bars) are meshes too and would widen the frame.
@@ -723,7 +789,9 @@ bool UUnitPortraitCaptureSubsystem::GetUnitVisibleBounds(FBox& OutBounds) const
 		for (const UMeshComponent* Mesh : Meshes)
 		{
 			const bool bIsVehicleMesh = Mesh->IsA<UStaticMeshComponent>() || Mesh->IsA<USkeletalMeshComponent>();
-			if (bIsVehicleMesh && Mesh->IsVisible() && not Mesh->bHiddenInGame)
+			const bool bIsNearUnit = Mesh->Bounds.SphereRadius < MaxRadius
+				&& FVector::DistSquared(Mesh->Bounds.Origin, UnitLocation) < FMath::Square(MaxRadius);
+			if (bIsVehicleMesh && bIsNearUnit && Mesh->IsVisible() && not Mesh->bHiddenInGame)
 			{
 				OutBounds += Mesh->Bounds.GetBox();
 			}
@@ -739,7 +807,7 @@ UWeaponState* UUnitPortraitCaptureSubsystem::FindMainWeapon() const
 		return nullptr;
 	}
 	UWeaponState* MainWeapon = nullptr;
-	for (UWeaponState* Weapon : FRTSWeaponHelpers::GetWeaponsMountedOnTank(M_Unit.Get()))
+	for (UWeaponState* Weapon : GetMountedWeapons())
 	{
 		const bool bIsLarger = IsValid(Weapon) && (not IsValid(MainWeapon)
 			|| Weapon->GetRawWeaponData().WeaponCalibre > MainWeapon->GetRawWeaponData().WeaponCalibre);
@@ -749,6 +817,32 @@ UWeaponState* UUnitPortraitCaptureSubsystem::FindMainWeapon() const
 		}
 	}
 	return MainWeapon;
+}
+
+TArray<UWeaponState*> UUnitPortraitCaptureSubsystem::GetMountedWeapons() const
+{
+	if (const ATankMaster* Tank = Cast<ATankMaster>(M_Unit.Get()))
+	{
+		return FRTSWeaponHelpers::GetWeaponsMountedOnTank(Tank);
+	}
+	// Building expansions carry their guns on child turret actors (and sometimes hull weapon components).
+	TArray<UWeaponState*> Weapons;
+	TArray<AActor*> UnitActors;
+	M_Unit->GetAttachedActors(UnitActors, true, true);
+	UnitActors.Add(M_Unit.Get());
+	for (AActor* UnitActor : UnitActors)
+	{
+		if (ACPPTurretsMaster* Turret = Cast<ACPPTurretsMaster>(UnitActor))
+		{
+			Weapons.Append(Turret->GetWeapons());
+		}
+		TInlineComponentArray<UHullWeaponComponent*> HullWeapons(UnitActor);
+		for (UHullWeaponComponent* HullWeapon : HullWeapons)
+		{
+			Weapons.Append(HullWeapon->GetWeapons());
+		}
+	}
+	return Weapons;
 }
 
 void UUnitPortraitCaptureSubsystem::OrderAttackGroundOutOfFrame()
@@ -882,7 +976,8 @@ void UUnitPortraitCaptureSubsystem::DestroyUnit()
 {
 	TArray<AActor*> UnitActors;
 	M_Unit->GetAttachedActors(UnitActors, true, true);
-	AController* Controller = M_Unit->GetController();
+	const APawn* UnitPawn = Cast<APawn>(M_Unit.Get());
+	AController* Controller = IsValid(UnitPawn) ? UnitPawn->GetController() : nullptr;
 	for (AActor* UnitActor : UnitActors)
 	{
 		UnitActor->Destroy();

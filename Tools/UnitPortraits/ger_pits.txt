@@ -1,0 +1,4 @@
+# German gun pits (building expansions). Name = portrait file stem; T_Ger_Pit_ goes to TrainingUI/GermanPits.
+T_Ger_Pit_Pak40=/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Pak40.Ger_BXP_GerPit_Pak40_C
+T_Ger_Pit_LeFH18=/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_LeFH18.Ger_BXP_GerPit_LeFH18_C
+T_Ger_Pit_SFH18=/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_SFH18.Ger_BXP_GerPit_SFH18_C

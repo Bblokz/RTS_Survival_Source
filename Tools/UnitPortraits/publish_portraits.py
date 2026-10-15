@@ -17,6 +17,7 @@ FOLDER_BY_PREFIX = {
     "T_Ger_LightTank_": "GerTanks/Light/NoIcon",
     "T_Ger_MediumTank_": "GerTanks/Medium/NoIcon",
     "T_Ger_HeavyTank_": "GerTanks/Heavy/NoIcon",
+    "T_Ger_Pit_": "GermanPits",
 }
 
 

@@ -1,0 +1,2 @@
+# Picked 2026-10-15 from the ger_pits.txt run; crop --zoom 1.0 (the Pak pit is the smallest).
+T_Ger_Pit_Pak40=T_Ger_Pit_Pak40_FrontRight_shot2_t3.png

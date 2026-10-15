@@ -1,0 +1,1 @@
+T_Ger_Pit_LeFH18=/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_LeFH18.Ger_BXP_GerPit_LeFH18_C
