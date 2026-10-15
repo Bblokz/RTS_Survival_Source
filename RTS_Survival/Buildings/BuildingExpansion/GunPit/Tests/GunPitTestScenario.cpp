@@ -4,6 +4,8 @@
 
 #if RTS_WITH_MAP_TESTS
 
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Camera/PlayerCameraManager.h"
 #include "CollisionQueryParams.h"
 #include "Components/ChildActorComponent.h"
@@ -25,6 +27,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Weapons/Turret/TurretAnimInstance/TurretAnimInstance.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSGunPitTest, Log, All);
@@ -33,11 +36,9 @@ namespace GunPitTestPrivate
 {
 	const FName CrewTag = TEXT("PitCrew");
 	const FName RoundTag = TEXT("PitRound");
-	const FName PitOriginSocket = TEXT("PitOrigin");
 	const FName HandBone = TEXT("hand_r");
 	const FName ReadyCrateName = TEXT("ReadyCrate");
 
-	constexpr int32 PlayerOwner = 1;
 	constexpr int32 ExpectedCrewCount = 4;
 	constexpr int32 ExpectedRoundCount = 2;
 	constexpr int32 ShotsToObserve = 2;
@@ -72,6 +73,21 @@ namespace GunPitTestPrivate
 	const FVector PakLoaderSpot(-148.6f, 76.f, 0.f);
 	const FVector HowitzerLoaderSpot(-234.5f, 39.7f, 0.f);
 	constexpr float PakViewScale = 0.8f;
+
+	const TCHAR* const DShKPitClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusDShKPit/Rus_BXP_DShKPit.Rus_BXP_DShKPit_C");
+	constexpr int32 EnemyOwner = 2;
+	constexpr int32 DShKCrewCount = 2;
+	constexpr float DShKViewScale = 0.55f;
+	const FName AmmoBoxBone = TEXT("AmmoBox");
+	const FName SpareBoxBone = TEXT("SpareTop");
+	const FName LeftHandBone = TEXT("hand_l");
+	constexpr int32 GunnerCrewIndex = 0;
+	constexpr int32 BoxLoaderCrewIndex = 1;
+	// The loader holds a box by its ends: palm bone to box centre is half the box plus the hand.
+	constexpr float MaximumHandToBoxDistance = 35.f;
+	// The empty box goes from the gun down onto the spare stack.
+	constexpr float MinimumAmmoBoxTravel = 30.f;
 
 	TArray<FB4HowitzerCameraView> GetPitViews(const float Scale)
 	{
@@ -109,6 +125,66 @@ namespace GunPitTestPrivate
 			MakePit(TEXT("lefh18"), TEXT("LeFH18"), TEXT("SM_GerPit_Howitzer"), HowitzerLoaderSpot, 1.f),
 			MakePit(TEXT("sfh18"), TEXT("SFH18"), TEXT("SM_GerPit_Howitzer"), HowitzerLoaderSpot, 1.f),
 		};
+	}
+
+	TArray<FGunPitUnderTest> GetDShKPitToTest()
+	{
+		FGunPitUnderTest Pit;
+		Pit.Label = TEXT("dshk");
+		Pit.ClassPath = DShKPitClassPath;
+		Pit.PitMeshName = TEXT("SM_DShKPit");
+		// The crew are snapped to PitOrigin; their animations carry their spots.
+		Pit.LoaderSpot = FVector::ZeroVector;
+		Pit.ViewScale = DShKViewScale;
+		Pit.ExpectedOwner = EnemyOwner;
+		Pit.ExpectedCrewCount = DShKCrewCount;
+		Pit.bCarriesRounds = false;
+		Pit.bHasReadyCrate = false;
+		return {Pit};
+	}
+
+	const TCHAR* const At53KPitClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Rus53KPit/Rus_BXP_53KPit.Rus_BXP_53KPit_C");
+
+	TArray<FGunPitUnderTest> GetAt53KPitToTest()
+	{
+		// The German Pak 40 pit's crew and drill on the Soviet 45 mm 53-K: same spots, enemy owned.
+		FGunPitUnderTest Pit;
+		Pit.Label = TEXT("53k");
+		Pit.ClassPath = At53KPitClassPath;
+		Pit.PitMeshName = TEXT("SM_53KPit");
+		Pit.LoaderSpot = PakLoaderSpot;
+		Pit.ViewScale = PakViewScale;
+		Pit.ExpectedOwner = EnemyOwner;
+		Pit.PitOriginSocket = TEXT("PitOrigin53K");
+		return {Pit};
+	}
+
+	const TCHAR* const BS3PitClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBS3Pit/Rus_BXP_BS3Pit.Rus_BXP_BS3Pit_C");
+	// The Pak 40 pit's loader spot turned 20 degrees about the BS-3's breech, so the whole drill fits between the
+	// BS-3's wide trails (bs3_crew.py writes it to Exports/Crew/bs3_crew_layout.json).
+	const FVector BS3LoaderSpot(-184.75f, 45.22f, 0.f);
+	constexpr float BS3ViewScale = 1.25f;
+
+	TArray<FGunPitUnderTest> GetBS3PitToTest()
+	{
+		FGunPitUnderTest Pit;
+		Pit.Label = TEXT("bs3");
+		Pit.ClassPath = BS3PitClassPath;
+		Pit.PitMeshName = TEXT("SM_BS3Pit");
+		Pit.LoaderSpot = BS3LoaderSpot;
+		Pit.ViewScale = BS3ViewScale;
+		Pit.ExpectedOwner = EnemyOwner;
+		Pit.PitOriginSocket = TEXT("PitOriginBS3");
+		return {Pit};
+	}
+
+	FString GetActiveMontageName(const USkeletalMeshComponent* Mesh)
+	{
+		const UAnimInstance* AnimInstance = IsValid(Mesh) ? Mesh->GetAnimInstance() : nullptr;
+		const UAnimMontage* Montage = IsValid(AnimInstance) ? AnimInstance->GetCurrentActiveMontage() : nullptr;
+		return IsValid(Montage) ? Montage->GetName() : FString();
 	}
 
 	void ForceAnimate(USkeletalMeshComponent* Mesh)
@@ -214,7 +290,7 @@ namespace GunPitTestPrivate
 		return false;
 	}
 
-	FTransform GetPitOriginFrame(const USkeletalMeshComponent& GunMesh)
+	FTransform GetPitOriginFrame(const USkeletalMeshComponent& GunMesh, const FName PitOriginSocket)
 	{
 		FTransform Frame = GunMesh.GetSocketTransform(PitOriginSocket);
 		Frame.SetScale3D(FVector::OneVector);
@@ -237,7 +313,22 @@ void FGunPitTestScenario::Start()
 {
 	M_Phase = EGunPitTestPhase::WaitingForStart;
 	M_PhaseStartSeconds = 0.f;
-	M_Pits = GunPitTestPrivate::GetPitsToTest();
+	if (FParse::Param(FCommandLine::Get(), TEXT("DShKPitValidate")))
+	{
+		M_Pits = GunPitTestPrivate::GetDShKPitToTest();
+	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("At53KPitValidate")))
+	{
+		M_Pits = GunPitTestPrivate::GetAt53KPitToTest();
+	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("BS3PitValidate")))
+	{
+		M_Pits = GunPitTestPrivate::GetBS3PitToTest();
+	}
+	else
+	{
+		M_Pits = GunPitTestPrivate::GetPitsToTest();
+	}
 	FParse::Value(FCommandLine::Get(), TEXT("GerPitCapture="), M_CaptureDirectory);
 	UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST started"));
 }
@@ -360,7 +451,7 @@ bool FGunPitTestScenario::SpawnPits(UWorld& World)
 			return false;
 		}
 		const int32 Owner = GetOwningPlayer(Pit.Pit.Get());
-		Check(Owner == PlayerOwner, Pit.Label + TEXT("_owned_by_player"), FString::Printf(TEXT("owner=%d"), Owner));
+		Check(Owner == Pit.ExpectedOwner, Pit.Label + TEXT("_owned_as_placed"), FString::Printf(TEXT("owner=%d"), Owner));
 		TArray<UStaticMeshComponent*> StaticMeshes;
 		Pit.Pit->GetComponents<UStaticMeshComponent>(StaticMeshes);
 		const FName PitMeshName = Pit.PitMeshName;
@@ -435,23 +526,24 @@ void FGunPitTestScenario::CheckAttachments(FGunPitUnderTest& Pit)
 		return;
 	}
 	Check(Pit.Crew.IsValid(), Pit.Label + TEXT("_has_crew_component"));
-	Check(Pit.CrewMeshes.Num() == ExpectedCrewCount, Pit.Label + TEXT("_has_four_crew"),
+	Check(Pit.CrewMeshes.Num() == Pit.ExpectedCrewCount, Pit.Label + TEXT("_has_its_crew"),
 	      FString::Printf(TEXT("crew=%d"), Pit.CrewMeshes.Num()));
-	Check(Pit.Rounds.Num() == ExpectedRoundCount, Pit.Label + TEXT("_has_two_rounds"),
+	const int32 ExpectedRounds = Pit.bCarriesRounds ? ExpectedRoundCount : 0;
+	Check(Pit.Rounds.Num() == ExpectedRounds, Pit.Label + TEXT("_has_its_rounds"),
 	      FString::Printf(TEXT("rounds=%d"), Pit.Rounds.Num()));
 	const FTransform RootBone = GunMesh->GetBoneTransform(0, FTransform::Identity);
 	UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST %s gun mesh=%s anim=%s component_scale=%s root_bone=%s "
 	       "root_bone_scale=%s"), *Pit.Label, *GetNameSafe(GunMesh->GetSkeletalMeshAsset()),
 	       *GetNameSafe(GunMesh->GetAnimInstance()), *GunMesh->GetComponentScale().ToCompactString(),
 	       *GunMesh->GetBoneName(0).ToString(), *RootBone.GetScale3D().ToCompactString());
-	const float OriginScale = GunMesh->GetSocketTransform(PitOriginSocket).GetScale3D().GetMax();
+	const float OriginScale = GunMesh->GetSocketTransform(Pit.PitOriginSocket).GetScale3D().GetMax();
 	Check(FMath::IsNearlyEqual(OriginScale, 1.f, MaximumScaleError), Pit.Label + TEXT("_pit_origin_unscaled"),
 	      FString::Printf(TEXT("scale=%.3f"), OriginScale));
-	const FTransform Frame = GetPitOriginFrame(*GunMesh);
+	const FTransform Frame = GetPitOriginFrame(*GunMesh, Pit.PitOriginSocket);
 	for (const TWeakObjectPtr<USkeletalMeshComponent>& CrewMesh : Pit.CrewMeshes)
 	{
 		const bool bIsAttached = CrewMesh.IsValid() && CrewMesh->GetAttachParent() == GunMesh &&
-			CrewMesh->GetAttachSocketName() == PitOriginSocket;
+			CrewMesh->GetAttachSocketName() == Pit.PitOriginSocket;
 		const float CrewScale = CrewMesh.IsValid() ? CrewMesh->GetComponentScale().GetMax() : 0.f;
 		const FVector LocalSpot = CrewMesh.IsValid()
 			                          ? Frame.InverseTransformPosition(CrewMesh->GetComponentLocation())
@@ -463,12 +555,16 @@ void FGunPitTestScenario::CheckAttachments(FGunPitUnderTest& Pit)
 	}
 	TArray<UStaticMeshComponent*> StaticMeshes;
 	Pit.Turret->GetComponents<UStaticMeshComponent>(StaticMeshes);
-	const bool bCrateOnOrigin = StaticMeshes.ContainsByPredicate([GunMesh](const UStaticMeshComponent* Mesh)
+	const FName PitOriginSocket = Pit.PitOriginSocket;
+	const bool bCrateOnOrigin = StaticMeshes.ContainsByPredicate([GunMesh, PitOriginSocket](const UStaticMeshComponent* Mesh)
 	{
 		return IsValid(Mesh) && Mesh->GetFName() == ReadyCrateName && Mesh->GetAttachParent() == GunMesh &&
 			Mesh->GetAttachSocketName() == PitOriginSocket;
 	});
-	Check(bCrateOnOrigin, Pit.Label + TEXT("_ready_crate_on_pit_origin"));
+	if (Pit.bHasReadyCrate)
+	{
+		Check(bCrateOnOrigin, Pit.Label + TEXT("_ready_crate_on_pit_origin"));
+	}
 }
 
 void FGunPitTestScenario::TickWaitingForTurrets(UWorld& World)
@@ -501,6 +597,10 @@ void FGunPitTestScenario::TickWaitingForFirstRounds(UWorld& World)
 	// The handler holds the first round out once his idle has played for a moment.
 	const bool bAllHeld = not M_Pits.ContainsByPredicate([](const FGunPitUnderTest& Pit)
 	{
+		if (not Pit.bCarriesRounds)
+		{
+			return false;
+		}
 		const UStaticMeshComponent* Round = Pit.Crew.IsValid() ? Pit.Crew->GetRoundInFlight() : nullptr;
 		return not IsValid(Round) || not Round->IsVisible() || GetHoldingCrewMesh(*Round) == nullptr;
 	});
@@ -513,9 +613,12 @@ void FGunPitTestScenario::TickWaitingForFirstRounds(UWorld& World)
 	{
 		const UStaticMeshComponent* Round = Pit.Crew.IsValid() ? Pit.Crew->GetRoundInFlight() : nullptr;
 		const USkeletalMeshComponent* Holder = IsValid(Round) ? GetHoldingCrewMesh(*Round) : nullptr;
-		Check(IsValid(Holder) && Round->IsVisible(), Pit.Label + TEXT("_handler_holds_first_round"),
-		      FString::Printf(TEXT("holder=%s hand_distance=%.1f"), *GetNameSafe(Holder),
-		                      IsValid(Holder) ? GetDistanceToHand(*Round, *Holder) : -1.f));
+		if (Pit.bCarriesRounds)
+		{
+			Check(IsValid(Holder) && Round->IsVisible(), Pit.Label + TEXT("_handler_holds_first_round"),
+			      FString::Printf(TEXT("holder=%s hand_distance=%.1f"), *GetNameSafe(Holder),
+			                      IsValid(Holder) ? GetDistanceToHand(*Round, *Holder) : -1.f));
+		}
 		CapturePit(World, Pit, TEXT("idle"));
 		OrderAttackGround(World, Pit);
 	}
@@ -551,7 +654,16 @@ void FGunPitTestScenario::TickObserving(UWorld& World)
 		{
 			CheckTraverse(Pit);
 		}
-		WatchDrill(World, Pit);
+		if (Pit.bCarriesRounds)
+		{
+			WatchDrill(World, Pit);
+			continue;
+		}
+		const USkeletalMeshComponent* Gunner = Pit.CrewMeshes.IsValidIndex(GunPitTestPrivate::GunnerCrewIndex)
+			                                       ? Pit.CrewMeshes[GunPitTestPrivate::GunnerCrewIndex].Get()
+			                                       : nullptr;
+		Pit.bGunnerFireMontageSeen |= GunPitTestPrivate::GetActiveMontageName(Gunner).Contains(TEXT("Fire"));
+		WatchBoxDrill(World, Pit);
 	}
 	ReportStatus(World);
 	const bool bAllDone = not M_Pits.ContainsByPredicate([this](const FGunPitUnderTest& Pit)
@@ -587,8 +699,8 @@ void FGunPitTestScenario::CountShots(const UWorld& World, FGunPitUnderTest& Pit)
 	if (Pit.LastMagazine != INDEX_NONE && Magazine < Pit.LastMagazine)
 	{
 		Pit.ShotSeconds.Add(World.GetTimeSeconds());
-		UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST %s shot t=%.2f mag=%d"), *Pit.Label,
-		       World.GetTimeSeconds(), Magazine);
+		UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST %s shot t=%.2f mag=%d target=%s"), *Pit.Label,
+		       World.GetTimeSeconds(), Magazine, *GetNameSafe(Pit.Turret->GetCurrentTargetActor()));
 	}
 	Pit.LastMagazine = Magazine;
 }
@@ -602,7 +714,7 @@ void FGunPitTestScenario::CheckTraverse(FGunPitUnderTest& Pit)
 		Check(false, Pit.Label + TEXT("_gun_turned_to_target"), TEXT("no gun mesh"));
 		return;
 	}
-	const FTransform Frame = GetPitOriginFrame(*Pit.GunMesh);
+	const FTransform Frame = GetPitOriginFrame(*Pit.GunMesh, Pit.PitOriginSocket);
 	const FVector ToTarget = (Pit.GroundTarget - Frame.GetLocation()).GetSafeNormal2D();
 	const float YawError = FMath::Abs(FMath::FindDeltaAngleDegrees(Frame.Rotator().Yaw, ToTarget.Rotation().Yaw));
 	Check(YawError < MaximumAimYawErrorDegrees, Pit.Label + TEXT("_gun_turned_to_target"),
@@ -709,7 +821,7 @@ void FGunPitTestScenario::LogHandover(const FGunPitUnderTest& Pit, const UStatic
 		return;
 	}
 	// In the PitOrigin frame, the space of the crew bake, so the numbers compare with gerpit_*_carry.json.
-	const FTransform Frame = GetPitOriginFrame(*Pit.GunMesh);
+	const FTransform Frame = GetPitOriginFrame(*Pit.GunMesh, Pit.PitOriginSocket);
 	const FVector RoundLocal = Frame.InverseTransformPosition(Round.GetComponentLocation());
 	const FVector RightLocal = Frame.InverseTransformPosition(Loader.GetBoneLocation(HandBone));
 	const FVector LeftLocal = Frame.InverseTransformPosition(Loader.GetBoneLocation(TEXT("hand_l")));
@@ -718,6 +830,90 @@ void FGunPitTestScenario::LogHandover(const FGunPitUnderTest& Pit, const UStatic
 	UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST %s handover round=%s loader_hand_r=%s loader_hand_l=%s "
 	       "loader_root=%s loader_yaw=%.1f"), *Pit.Label, *RoundLocal.ToCompactString(), *RightLocal.ToCompactString(),
 	       *LeftLocal.ToCompactString(), *RootLocal.ToCompactString(), LoaderYaw);
+}
+
+void FGunPitTestScenario::WatchBoxDrill(UWorld& World, FGunPitUnderTest& Pit)
+{
+	using namespace GunPitTestPrivate;
+	if (Pit.bDrillChecked || not Pit.Crew.IsValid() || not Pit.GunMesh.IsValid())
+	{
+		return;
+	}
+	const float Now = World.GetTimeSeconds();
+	const bool bIsLoading = Pit.Crew->GetIsLoading();
+	if (bIsLoading && not Pit.bWasLoading)
+	{
+		Pit.DrillStartSeconds = Now;
+		Pit.AmmoBoxStart = Pit.GunMesh->GetBoneLocation(AmmoBoxBone);
+		Pit.NextCaptureSeconds = Now;
+	}
+	Pit.bWasLoading = bIsLoading;
+	if (Pit.DrillStartSeconds < 0.f)
+	{
+		return;
+	}
+	SampleBoxDrill(Pit);
+	if (M_CaptureRig.GetIsEnabled() && bIsLoading && Now >= Pit.NextCaptureSeconds)
+	{
+		CapturePit(World, Pit, FString::Printf(TEXT("drill_t%04.1f"), Now - Pit.DrillStartSeconds));
+		Pit.NextCaptureSeconds = Now + DrillCaptureIntervalSeconds;
+	}
+	if (not bIsLoading)
+	{
+		Pit.DrillEndSeconds = Now;
+		CheckBoxDrill(Pit);
+	}
+}
+
+void FGunPitTestScenario::SampleBoxDrill(FGunPitUnderTest& Pit) const
+{
+	using namespace GunPitTestPrivate;
+	const USkeletalMeshComponent* GunMesh = Pit.GunMesh.Get();
+	const USkeletalMeshComponent* Loader = Pit.CrewMeshes.IsValidIndex(BoxLoaderCrewIndex)
+		                                       ? Pit.CrewMeshes[BoxLoaderCrewIndex].Get()
+		                                       : nullptr;
+	if (not IsValid(GunMesh) || not IsValid(Loader))
+	{
+		return;
+	}
+	const FVector AmmoBox = GunMesh->GetBoneLocation(AmmoBoxBone);
+	const FVector SpareBox = GunMesh->GetBoneLocation(SpareBoxBone);
+	for (const FName Hand : {LeftHandBone, HandBone})
+	{
+		const FVector HandLocation = Loader->GetBoneLocation(Hand);
+		Pit.ClosestHandToAmmoBox = FMath::Min(Pit.ClosestHandToAmmoBox, FVector::Dist(HandLocation, AmmoBox));
+		Pit.ClosestHandToSpareBox = FMath::Min(Pit.ClosestHandToSpareBox, FVector::Dist(HandLocation, SpareBox));
+	}
+	Pit.AmmoBoxTravel = FMath::Max(Pit.AmmoBoxTravel, FVector::Dist(AmmoBox, Pit.AmmoBoxStart));
+	Pit.bGunReloadMontageSeen |= GetActiveMontageName(GunMesh).Contains(TEXT("Reload"));
+}
+
+void FGunPitTestScenario::CheckBoxDrill(FGunPitUnderTest& Pit)
+{
+	using namespace GunPitTestPrivate;
+	Pit.bDrillChecked = true;
+	UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST %s box drill seconds=%.2f ammo_box_travel=%.1f "
+	       "hand_to_ammo_box=%.1f hand_to_spare_box=%.1f"), *Pit.Label, Pit.DrillEndSeconds - Pit.DrillStartSeconds,
+	       Pit.AmmoBoxTravel, Pit.ClosestHandToAmmoBox, Pit.ClosestHandToSpareBox);
+	Check(Pit.bGunReloadMontageSeen, Pit.Label + TEXT("_gun_plays_box_swap"));
+	Check(Pit.AmmoBoxTravel > MinimumAmmoBoxTravel, Pit.Label + TEXT("_empty_box_taken_off"),
+	      FString::Printf(TEXT("travel=%.1f"), Pit.AmmoBoxTravel));
+	Check(Pit.ClosestHandToAmmoBox < MaximumHandToBoxDistance, Pit.Label + TEXT("_loader_handles_empty_box"),
+	      FString::Printf(TEXT("closest=%.1f"), Pit.ClosestHandToAmmoBox));
+	Check(Pit.ClosestHandToSpareBox < MaximumHandToBoxDistance, Pit.Label + TEXT("_loader_handles_full_box"),
+	      FString::Printf(TEXT("closest=%.1f"), Pit.ClosestHandToSpareBox));
+	Check(Pit.bGunnerFireMontageSeen, Pit.Label + TEXT("_gunner_shakes_when_firing"));
+}
+
+void FGunPitTestScenario::RevealPit(const FGunPitUnderTest& Pit) const
+{
+	for (AActor* Actor : {Pit.Pit.Get(), static_cast<AActor*>(Pit.Turret.Get())})
+	{
+		if (IsValid(Actor))
+		{
+			Actor->SetActorHiddenInGame(false);
+		}
+	}
 }
 
 bool FGunPitTestScenario::GetIsPitDone(const FGunPitUnderTest& Pit) const
@@ -743,16 +939,21 @@ void FGunPitTestScenario::ReportStatus(const UWorld& World)
 	{
 		return;
 	}
-	M_NextStatusSeconds = World.GetTimeSeconds() + GunPitTestPrivate::StatusIntervalSeconds;
+	// -GerPitStatusInterval=<s> logs the pits more often (e.g. to follow a traverse).
+	float StatusInterval = GunPitTestPrivate::StatusIntervalSeconds;
+	FParse::Value(FCommandLine::Get(), TEXT("GerPitStatusInterval="), StatusInterval);
+	M_NextStatusSeconds = World.GetTimeSeconds() + StatusInterval;
 	for (const FGunPitUnderTest& Pit : M_Pits)
 	{
 		const ACPPTurretsMaster* Turret = Pit.Turret.Get();
 		const UWeaponState* Weapon = IsValid(Turret) ? Turret->GetLargestCalibreWeapon() : nullptr;
-		const float OriginYaw = Pit.GunMesh.IsValid() ? GunPitTestPrivate::GetPitOriginFrame(*Pit.GunMesh).Rotator().Yaw : 0.f;
+		const float OriginYaw = Pit.GunMesh.IsValid() ? GunPitTestPrivate::GetPitOriginFrame(*Pit.GunMesh, Pit.PitOriginSocket).Rotator().Yaw : 0.f;
+		const UTurretAnimInstance* GunAnim = Pit.GunMesh.IsValid() ? Cast<UTurretAnimInstance>(Pit.GunMesh->GetAnimInstance()) : nullptr;
+		const float AnimYaw = IsValid(GunAnim) ? GunAnim->GetCurrentYawAngle() : -999.f;
 		UE_LOG(LogRTSGunPitTest, Display, TEXT("RTS_GERPIT_TEST status %s t=%.1f mag=%d reloading=%d loading=%d "
-		       "rotated_to_engage=%d pit_origin_yaw=%.1f target_yaw=%.1f shots=%d"), *Pit.Label, World.GetTimeSeconds(),
+		       "rotated_to_engage=%d pit_origin_yaw=%.1f anim_yaw=%.1f target_yaw=%.1f shots=%d"), *Pit.Label, World.GetTimeSeconds(),
 		       IsValid(Weapon) ? Weapon->GetCurrentMagCapacity() : -1, IsValid(Weapon) && Weapon->GetIsReloading(),
-		       Pit.Crew.IsValid() && Pit.Crew->GetIsLoading(), IsValid(Turret) && Turret->GetIsRotatedToEngage(), OriginYaw,
+		       Pit.Crew.IsValid() && Pit.Crew->GetIsLoading(), IsValid(Turret) && Turret->GetIsRotatedToEngage(), OriginYaw, AnimYaw,
 		       (Pit.GroundTarget - Pit.SpawnLocation).GetSafeNormal2D().Rotation().Yaw, Pit.ShotSeconds.Num());
 	}
 }
@@ -763,7 +964,8 @@ void FGunPitTestScenario::CapturePit(UWorld& World, const FGunPitUnderTest& Pit,
 	{
 		return;
 	}
-	M_CaptureRig.CaptureViews(World, GunPitTestPrivate::GetPitOriginFrame(*Pit.GunMesh),
+	RevealPit(Pit);
+	M_CaptureRig.CaptureViews(World, GunPitTestPrivate::GetPitOriginFrame(*Pit.GunMesh, Pit.PitOriginSocket),
 	                          GunPitTestPrivate::GetPitViews(Pit.ViewScale), Pit.Label + TEXT("_") + Moment);
 }
 

@@ -31,6 +31,13 @@ struct FGunPitUnderTest
 	FVector LoaderSpot = FVector::ZeroVector;
 	// The camera views are sized for the howitzer pit; the Pak pit is smaller.
 	float ViewScale = 1.f;
+	// Owner as placed (1 player, 2 enemy) and what the pit carries.
+	int32 ExpectedOwner = 1;
+	// Gun socket the crew, crate and rounds ride on.
+	FName PitOriginSocket = TEXT("PitOrigin");
+	int32 ExpectedCrewCount = 4;
+	bool bCarriesRounds = true;
+	bool bHasReadyCrate = true;
 
 	TWeakObjectPtr<AActor> Pit;
 	TWeakObjectPtr<ACPPTurretsMaster> Turret;
@@ -58,6 +65,13 @@ struct FGunPitUnderTest
 	TWeakObjectPtr<USceneComponent> LoaderAtHandover;
 	TWeakObjectPtr<USceneComponent> HolderOfNextRound;
 	float NextCaptureSeconds = 0.f;
+	// Box-swap drill (machine-gun pit): the loader moves the gun's AmmoBox and SpareTop bones by hand.
+	float ClosestHandToAmmoBox = TNumericLimits<float>::Max();
+	float ClosestHandToSpareBox = TNumericLimits<float>::Max();
+	float AmmoBoxTravel = 0.f;
+	FVector AmmoBoxStart = FVector::ZeroVector;
+	bool bGunReloadMontageSeen = false;
+	bool bGunnerFireMontageSeen = false;
 	bool bWasLoading = false;
 	bool bDrillChecked = false;
 	bool bTraverseChecked = false;
@@ -68,7 +82,9 @@ struct FGunPitUnderTest
  * ground off its forward and checks the pit: crew, crate and rounds ride on the gun's PitOrigin at 1:1 scale, the
  * whole gun and its crew turn to the target, the gun fires, and one loading drill moves the rounds from the
  * handler's hands to the loader's and into the breech while the handler picks up the next round.
- * Started with -GerPitValidate (on TestCover); pictures with -GerPitCapture=<folder>. Not in shipping.
+ * Started with -GerPitValidate (on TestCover); -DShKPitValidate runs the Soviet DShK pit instead (enemy owned, two
+ * crew, a box-swap drill instead of rounds); -At53KPitValidate the Soviet 53-K pit (the Pak 40 pit's drill); -BS3PitValidate
+ * the Soviet BS-3 pit (the Pak drill turned to fit between the trails). Pictures with -GerPitCapture=<folder>. Not in shipping.
  */
 struct FGunPitTestScenario
 {
@@ -101,6 +117,11 @@ private:
 	void CountShots(const UWorld& World, FGunPitUnderTest& Pit) const;
 	void WatchDrill(UWorld& World, FGunPitUnderTest& Pit);
 	void CheckDrill(FGunPitUnderTest& Pit);
+	void WatchBoxDrill(UWorld& World, FGunPitUnderTest& Pit);
+	void SampleBoxDrill(FGunPitUnderTest& Pit) const;
+	void CheckBoxDrill(FGunPitUnderTest& Pit);
+	// Enemy pits sit under the fog of war; the pictures must show them.
+	void RevealPit(const FGunPitUnderTest& Pit) const;
 	void LogHandover(const FGunPitUnderTest& Pit, const UStaticMeshComponent& Round,
 	                 const USkeletalMeshComponent& Loader) const;
 	void CheckTraverse(FGunPitUnderTest& Pit);

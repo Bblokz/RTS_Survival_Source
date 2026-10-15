@@ -9,6 +9,10 @@ int32 EnemyTrainingHelpers::GetSquadTrainingPointCost(const ESquadSubtype SquadT
 	{
 	case ESquadSubtype::Squad_Rus_Zis_57MM:
 		return 10;
+	case ESquadSubtype::Squad_Rus_53K_45MM:
+		return 8;
+	case ESquadSubtype::Squad_Rus_BS3_100MM:
+		return 22;
 	case ESquadSubtype::Squad_Rus_Zis_76MM:
 	case ESquadSubtype::Squad_Rus_Bofors:
 		return 15;
@@ -17,6 +21,8 @@ int32 EnemyTrainingHelpers::GetSquadTrainingPointCost(const ESquadSubtype SquadT
 		return 35;
 	case ESquadSubtype::Squad_Rus_B4_203mm:
 		return 45;
+	case ESquadSubtype::Squad_Rus_ML20_152mm:
+		return 38;
 	case ESquadSubtype::Squad_Rus_80mm_Mortar:
 		return 10;
 	case ESquadSubtype::Squad_Rus_120mm_Mortar:
@@ -60,6 +66,9 @@ int32 EnemyTrainingHelpers::GetTankTrainingPointsCost(const ETankSubtype TankTyp
 	{
 	case ETankSubtype::Tank_Ba12:
 	case ETankSubtype::Tank_Ba14:
+	case ETankSubtype::Tank_ZilAmmo:
+	case ETankSubtype::Tank_ZilFuel:
+	case ETankSubtype::Tank_SovietTanker:
 	case ETankSubtype::Tank_BT7:
 	case ETankSubtype::Tank_T26:
 	case ETankSubtype::Tank_BT7_4:

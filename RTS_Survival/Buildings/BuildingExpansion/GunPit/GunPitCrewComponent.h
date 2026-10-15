@@ -27,6 +27,11 @@ struct FGunPitCrewMemberAnimations
 	// DefaultSlot montage played once per reload, stretched to the reload time. Null: this member only idles.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gun Pit Crew")
 	TObjectPtr<UAnimMontage> ReloadMontage = nullptr;
+
+	// Optional DefaultSlot montage started on a shot unless it still plays, so a burst keeps one shake going (a
+	// machine gunner holding the grips). Null: this member does not react to shots.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Gun Pit Crew")
+	TObjectPtr<UAnimMontage> FireMontage = nullptr;
 };
 
 /** @brief Gun montages and crew animations of a gun pit. */
@@ -206,6 +211,7 @@ private:
 	void PlayGunMontage(UAnimMontage* Montage, const float PlayRate, const float StartPosition) const;
 	void PlayCrewLoadingMontages(const float DrillSeconds, const float StartPosition) const;
 	void SetCrewIdleAnimations() const;
+	void PlayCrewFireMontages() const;
 	static void PlayMontageOnMesh(const USkeletalMeshComponent* Mesh, UAnimMontage* Montage, const float PlayRate,
 	                              const float StartPosition);
 
