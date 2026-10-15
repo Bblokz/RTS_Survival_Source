@@ -1,0 +1,63 @@
+{
+ "units": "cm, Blender gun frame (Unreal: y negated)",
+ "bones": {
+  "Root": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "Traverse": [
+   0.0,
+   0.0,
+   84.0
+  ],
+  "Elevation": [
+   0.0,
+   0.0,
+   95.0
+  ],
+  "Gun": [
+   16.88,
+   0.0,
+   106.88
+  ],
+  "AmmoBox": [
+   16.32,
+   21.88,
+   101.37
+  ],
+  "SpareTop": [
+   -38.0,
+   50.0,
+   27.69
+  ]
+ },
+ "muzzle": [
+  128.16,
+  0.29,
+  107.69
+ ],
+ "drill_seconds": 6.0,
+ "fire_seconds": 0.6,
+ "drill_fractions": {
+  "reach_spare": 0.05,
+  "grab_spare": 0.15,
+  "set_temp": 0.25,
+  "grab_empty": 0.35,
+  "out_empty": 0.4083,
+  "set_stack": 0.5333,
+  "grab_full": 0.6333,
+  "beside_mount": 0.75,
+  "mount": 0.8,
+  "let_go": 0.875,
+  "back_idle": 0.9667,
+  "cock_reach": 0.8167,
+  "cock_grab": 0.8583,
+  "cock_pulled": 0.8917,
+  "cock_home": 0.9167,
+  "gunner_grip": 0.9667
+ },
+ "pit_inner_radius": 140.0,
+ "pit_outer_radius": 370.0,
+ "wall_height": 89.5
+}
