@@ -25,6 +25,8 @@ PITS = {
                'smoke_radius': 520.0},
     'SFH18': {'mesh': ROOT + '/Meshes/SM_GerPit_Howitzer', 'type': 'BTX_GerSFH18Pit', 'radius': 620.0, 'height': 110.0,
               'smoke_radius': 520.0},
+    'Flak37': {'mesh': ROOT + '/Meshes/SM_GerPit_Flak', 'type': 'BTX_GerFlak37Pit', 'radius': 520.0, 'height': 80.0,
+               'smoke_radius': 420.0},
 }
 
 

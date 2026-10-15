@@ -99,6 +99,16 @@ protected:
 	virtual void PlayWeaponAnimation(const int32 WeaponIndex, const EWeaponFireMode FireMode, const int32 WeaponCalibre) = 0;
 
 	/**
+	 * Called when a weapon with a charge-up (e.g. the coilgun) starts charging; the shot follows after ChargeUpTime.
+	 * @param WeaponIndex The charging weapon.
+	 * @param ChargeUpTime Seconds until the shot is fired.
+	 */
+	virtual void OnWeaponChargeUpStarted(const int32 WeaponIndex, const float ChargeUpTime) {}
+
+	/** Called when a charge-up is aborted before the shot (weapon stopped firing or was destroyed). */
+	virtual void OnWeaponChargeUpCancelled(const int32 WeaponIndex) {}
+
+	/**
 	 * Called when the weapon start reloading.
 	 * @param WeaponIndex The index of the weapon that is reloading.
 	 * @param ReloadTime How long the reload will take.

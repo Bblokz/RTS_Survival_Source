@@ -245,7 +245,19 @@ enum class
 	ML20_152MM_TW UMETA(DisplayName = "ML-20 152MM TW"),
 	ML20_152MM_Pit UMETA(DisplayName = "ML-20 152MM Gun Pit"),
 	// Soviet 100mm field gun M1944 (BS-3): the team weapon and its square sandbag pit fire the same gun.
-	BS3_100MM_TW UMETA(DisplayName = "BS-3 100MM TW")
+	BS3_100MM_TW UMETA(DisplayName = "BS-3 100MM TW"),
+	// The Flak 36/37 in its pit: 6-round clips handed to the loader, so the clip change takes longer than the team weapon's.
+	Flak36_37MM_Pit UMETA(DisplayName = "Flak36 37MM Gun Pit"),
+	// Soviet infantry weapons (2nd batch).
+	// 125mm ampoule launcher: lobs incendiary glass ampoules.
+	Ampulomet_125MM UMETA(DisplayName = "Ampulomet M1941 125MM (incendiary ampoule launcher)"),
+	ROKS3_Flamethrower UMETA(DisplayName = "ROKS-3 (Medium Flame Thrower)"),
+	Korovin_M1941_7_62MM UMETA(DisplayName = "Korovin M1941 7.62MM"),
+	DS39_7_62MM UMETA(DisplayName = "DS-39 7.62MM"),
+	// Cup discharger on a Mosin: high-explosive rifle grenades.
+	Dyakonov_RGL_41MM UMETA(DisplayName = "Dyakonov 41MM (rifle grenade launcher)"),
+	// Electromagnetic rifle that charges its coils before every shot.
+	ProtoCoilgun_20MM UMETA(DisplayName = "Prototype Coilgun 20MM")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -338,6 +350,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::ML20_152MM_TW: return "ML-20";
 	case EWeaponName::ML20_152MM_Pit: return "ML-20";
 	case EWeaponName::BS3_100MM_TW: return "BS-3";
+	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
 	case EWeaponName::Panzerwerfer: return "Panzerwerfer";
@@ -427,6 +440,18 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 		return "SKS";
 	case EWeaponName::PPS_43_7_62MM:
 		return "PPS-43";
+	case EWeaponName::Ampulomet_125MM:
+		return "Ampulomet";
+	case EWeaponName::ROKS3_Flamethrower:
+		return "ROKS-3";
+	case EWeaponName::Korovin_M1941_7_62MM:
+		return "Korovin";
+	case EWeaponName::DS39_7_62MM:
+		return "DS-39";
+	case EWeaponName::Dyakonov_RGL_41MM:
+		return "Dyakonov";
+	case EWeaponName::ProtoCoilgun_20MM:
+		return "Coilgun";
 
 	case EWeaponName::DEFAULT_WEAPON: return "Default Weapon";
 	default:
@@ -454,6 +479,8 @@ static bool Global_IsRifle(const EWeaponName WeaponName)
 	case EWeaponName::PTRS_41_14_5MM:
 	case EWeaponName::PanzerRifle_50mm:
 	case EWeaponName::PTRS_X_Tishina:
+	case EWeaponName::Dyakonov_RGL_41MM:
+	case EWeaponName::ProtoCoilgun_20MM:
 		return true;
 	default:
 		return false;
@@ -477,6 +504,8 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 		return 1097;
 	case EWeaponName::RailGunY:
 		return 1095;
+	case EWeaponName::ProtoCoilgun_20MM:
+		return 1090;
 	// ---------------------------------------------------------------------
 	// Handheld laser weapons (top tier, category ~1000)
 	// ---------------------------------------------------------------------
@@ -497,6 +526,10 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 		return 898;
 	case EWeaponName::PanzerRifle_50mm: // Rifle grenade launcher
 		return 895;
+	case EWeaponName::Dyakonov_RGL_41MM: // Rifle grenade launcher
+		return 893;
+	case EWeaponName::Ampulomet_125MM: // Incendiary ampoule launcher
+		return 890;
 
 
 	// ---------------------------------------------------------------------
@@ -508,6 +541,8 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 		return 802;
 	case EWeaponName::Ashmaker11: // Light-medium flamethrower
 		return 798;
+	case EWeaponName::ROKS3_Flamethrower: // Medium flamethrower
+		return 799;
 	case EWeaponName::Flamm09: // Light flamethrower
 		return 796;
 	case EWeaponName::Ashmaker05: // Very light flamethrower
@@ -546,6 +581,8 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 		return 499;
 	case EWeaponName::MG_34:
 		return 498;
+	case EWeaponName::DS39_7_62MM:
+		return 497;
 	case EWeaponName::DP_28_7_62MM:
 		return 496;
 	case EWeaponName::MP46: // Very powerful SMG, treated as low HMG tier
@@ -568,6 +605,8 @@ static int32 Global_GetWeaponValue(const EWeaponName WeaponType)
 	// ---------------------------------------------------------------------
 	case EWeaponName::PPS_43_7_62MM:
 		return 310;
+	case EWeaponName::Korovin_M1941_7_62MM:
+		return 305;
 	case EWeaponName::PPSh_41_7_62MM:
 		return 300;
 	case EWeaponName::MP40_9MM:
@@ -792,8 +831,22 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "ML20_152MM_Pit";
 	case EWeaponName::BS3_100MM_TW:
 		return "BS3_100MM_TW";
+	case EWeaponName::Flak36_37MM_Pit:
+		return "Flak36_37MM_Pit";
 	case EWeaponName::B4_203MM_Pit:
 		return "B4_203MM_Pit";
+	case EWeaponName::Ampulomet_125MM:
+		return "Ampulomet_125MM";
+	case EWeaponName::ROKS3_Flamethrower:
+		return "ROKS3_Flamethrower";
+	case EWeaponName::Korovin_M1941_7_62MM:
+		return "Korovin_M1941_7_62MM";
+	case EWeaponName::DS39_7_62MM:
+		return "DS39_7_62MM";
+	case EWeaponName::Dyakonov_RGL_41MM:
+		return "Dyakonov_RGL_41MM";
+	case EWeaponName::ProtoCoilgun_20MM:
+		return "ProtoCoilgun_20MM";
 
 	default:
 		{

@@ -50,6 +50,15 @@ HOWITZER_CREW = [
     ('Crew4', (-430.0, -230.0, 0.0), -90.0, SQUAD_ANIMS + 'Commander/AN_Infantry_Commando', None),
 ]
 
+# The Flak 37: the loader stands on the gun's platform beside the feed, the handler passes him 6-round clips from a
+# crate behind; a spotter crouches behind the left leg and the commander stands at the back.
+FLAK_CREW = [
+    ('Crew1', (-97.92, 85.05, 0.0), -90.0, CREW + '/Anim_GerPitFlak_Loader_Idle', CREW + '/Montage_GerPit_LoadFlak'),
+    ('Crew2', (0.0, 0.0, 0.0), 0.0, CREW + '/Anim_GerPitFlak_Handler_Idle', CREW + '/Montage_GerPitFlak_Handler_Reload'),
+    ('Crew3', (-240.0, -90.0, 0.0), -90.0, SQUAD_ANIMS + 'Flak/AN_Infantry_Flak_CrouchedScan', None),
+    ('Crew4', (-320.0, 60.0, 0.0), -90.0, SQUAD_ANIMS + 'Commander/AN_Infantry_Commando', None),
+]
+
 TURRET_SPECS = {
     'Pak40': {
         'base': EMBEDDED + 'pak38/RTS_BP_EmbTurret_Pak38',
@@ -79,6 +88,17 @@ TURRET_SPECS = {
                  ('init_embedded', 'TurretHeight', '143.0'),
                  ('weapon_struct', 'WeaponName', 'sFH18_150MM_TW'),
                  ('weapon_vfx', 'LaunchSound', '/Game/RTS_Survival/Sounds/WeaponSounds/HeavyCaliber/Brummbar/S_BrummbarFire.S_BrummbarFire')],
+    },
+    'Flak37': {
+        'base': EMBEDDED + '37mmFlak/RTS_BP_EmbTurret_37mmFlak',
+        'mesh': TW + 'Flak37mm/Mesh/SK_TW_Flak37MM', 'root': '37mmFlak',
+        'carry': 'flak', 'round': MESHES + '/SM_GerPit_Clip_37', 'crew': FLAK_CREW,
+        'min_reload': 3.0,
+        # Fast anti-aircraft traverse; the gun fires from the team weapon mesh's own sockets.
+        'pins': [('init_child', 'NewRotationSpeed', '45.0'), ('init_child', 'NewMaxPitch', '85.0'),
+                 ('init_child', 'NewMinPitch', '-5.0'), ('init_embedded', 'TurretHeight', '158.0'),
+                 ('weapon_struct', 'WeaponName', 'Flak36_37MM_Pit'), ('weapon_struct', 'FireSocketName', 'Launch'),
+                 ('shell_case', 'ShellCaseSocketName', 'Out')],
     },
 }
 
@@ -130,6 +150,8 @@ def find_nodes(bp):
         'weapon_vfx': one(lambda n: n.get('op') == 'make_struct' and detail(n, 'struct') == 'WeaponVFX', 'weapon vfx')['id'],
     }
     ids['fire_turret_get'] = turret_get
+    shell_cases = [n['id'] for n in nodes if n.get('op') == 'make_struct' and detail(n, 'struct') == 'WeaponShellCase']
+    ids['shell_case'] = shell_cases[0] if len(shell_cases) == 1 else None
     return ids
 
 

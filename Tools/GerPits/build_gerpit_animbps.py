@@ -33,12 +33,20 @@ GUNS = {
               'pose': TW + 'LFH18/PackAnims/Anim_SFH18_Deployed',
               'fire': TW + 'LFH18/WeaponAnim/Anim_SFH18_Fire',
               'root': '37mmFlak', 'elevation': 'Cannon_Elevate'},
+    # The Flak 37 team weapon gun; its deployed pose is additive on its T-pose like the leFH's.
+    'Flak37': {'skeleton': TW + 'Flak37mm/Mesh/ANimatedSK_38Flak_Wheeled_Skeleton',
+               'pose': TW + 'Flak37mm/FireAnims/Anim_TW_Flak37_Base',
+               'additive_base': TW + 'Flak37mm/FireAnims/Anim_TW_Flak37_TPose',
+               'fire': TW + 'Flak37mm/FireAnims/Anim_TW_Flak37_Fire',
+               'root': '37mmFlak', 'elevation': 'B_Mantlet'},
 }
 CREW_MONTAGES = {
     'Montage_GerPit_LoadPak': SQUAD_ANIMS + 'Pak/AN_Infantry_LoadPAK',
     'Montage_GerPit_LoadHowitzer': SQUAD_ANIMS + 'Howitzer/AN_Infantry_LoadHowitzer',
     'Montage_GerPitPak_Handler_Reload': ROOT + '/Crew/Anim_GerPitPak_Handler_Reload',
     'Montage_GerPitHowitzer_Handler_Reload': ROOT + '/Crew/Anim_GerPitHowitzer_Handler_Reload',
+    'Montage_GerPit_LoadFlak': SQUAD_ANIMS + 'Flak/AN_Infantry_Flak_Load_Standing',
+    'Montage_GerPitFlak_Handler_Reload': ROOT + '/Crew/Anim_GerPitFlak_Handler_Reload',
 }
 
 
@@ -125,14 +133,20 @@ def build_gun(gun, cfg):
 
 def build_crew_montages():
     for name, source in CREW_MONTAGES.items():
+        # Existing montages are kept: the pit turrets reference them.
+        check = f"import unreal; print('EXISTS', unreal.EditorAssetLibrary.does_asset_exist('{ROOT}/Crew/{name}'))"
+        if 'EXISTS True' in run_python(check):
+            continue
         result = act('create_montage', source_animation=source, name=name, save_path=f'{ROOT}/Crew')
         print('crew montage', result.get('asset_path'))
 
 
 if __name__ == '__main__':
     which = sys.argv[1] if len(sys.argv) > 1 else 'all'
+    only = set(sys.argv[2].split(',')) if len(sys.argv) > 2 else None
     if which in ('all', 'guns'):
         for gun_name, gun_cfg in GUNS.items():
-            build_gun(gun_name, gun_cfg)
+            if only is None or gun_name in only:
+                build_gun(gun_name, gun_cfg)
     if which in ('all', 'crew'):
         build_crew_montages()
