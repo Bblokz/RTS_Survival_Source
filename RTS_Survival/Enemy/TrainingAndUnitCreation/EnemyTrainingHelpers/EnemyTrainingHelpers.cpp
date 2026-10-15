@@ -15,6 +15,8 @@ int32 EnemyTrainingHelpers::GetSquadTrainingPointCost(const ESquadSubtype SquadT
 	case ESquadSubtype::Squad_Rus_KS30_130MM:
 	case ESquadSubtype::Squad_Rus_M1938_122mm:
 		return 35;
+	case ESquadSubtype::Squad_Rus_B4_203mm:
+		return 45;
 	case ESquadSubtype::Squad_Rus_80mm_Mortar:
 		return 10;
 	case ESquadSubtype::Squad_Rus_120mm_Mortar:

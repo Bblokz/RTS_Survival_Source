@@ -1501,6 +1501,12 @@ void ABuildingExpansion::PostInit_SetupAbilities()
 	}
 	bool bIsValidData = false;
 	const EBuildingExpansionType MyBxpType = RTSComp->GetSubtypeAsBxpSubtype();
+	if (MyBxpType == EBuildingExpansionType::BXT_Invalid)
+	{
+		// Blueprints that do not set their subtype in BP_PostInit_SetupRTSSubtype (all Soviet expansions, placed or
+		// built) learn it in InitBuildingExpansion, which sets the abilities from the same data.
+		return;
+	}
 	if (RTSComp->GetOwningPlayer() == 1)
 	{
 		const FBxpData BxpData = FRTS_Statics::BP_GetPlayerBxpData(MyBxpType,

@@ -308,6 +308,25 @@ sizing in `MainGameUI_HUD`.
   - `-UISnapshotOpenFullMap` presses the real map button.
   - `-UISnapshotCloseFullMapAtStep=N` presses the close button when capture step N starts.
 
+## Tactical map filters (discovered radixite, metal, scavenge objects)
+
+- **Panel:** `UW_FullMapView` builds a "MAP FILTERS" panel left of the frame (300 units wide; the frame shrinks on
+  narrow screens so it always fits). Each row is a `UW_MapObjectFilterToggle` (`GameUI/MiniMap/MapObjectFilters`):
+  swatch, label and three buttons (Off, Tactical map only, Minimap + tactical).
+- **Buttons:** `map_filter_buttons.py` draws `T_MapFilterButton_<Off|Tactical|Both>_<dim|lit>`, 56×40 units at
+  2×: scuffed gunmetal bezel, glass well and glyph (slashed eye, folded map, map + round minimap). The selected
+  option uses the `lit` face: a cyan backlight, a glowing glyph and an indicator lamp in the bottom bar. Hover and
+  press are tints. Import them with `ui_hud_parts.import_map_filter_buttons()` into `Skins/_Shared/MapFilterButtons`.
+- **Glass:** each button has a dynamic `M_UI_GlassPane` over its well (InsetFrac 0.075, 3 px corners, the weapon
+  item scratch values, its own `ScratchSeed`).
+- **Dots and discovery:** settings are in Project Settings > Game > Map Object Filters (colour, minimap and
+  tactical map diameter, ring, default mode, refresh rate, threshold). `URTSMapObjectFilterSubsystem` reads the
+  fog's explored render target back asynchronously (only while a filter is visible on an open map) and
+  `UW_MiniMap::DrawMapObjectFilters` draws the dots under the unit icons.
+- **Captures:** `-UISnapshotMapFilters` turns all three filters to "Minimap + tactical" and logs registered and
+  discovered counts. `-UISnapshotMapFiltersRevealAll` also sets the console variable
+  `RTS.MapObjectFilters.RevealAll 1` (non-shipping), which treats everything as discovered.
+
 ## Dead space on the minimap and tactical map (`ui_minimap_material.py`)
 
 - **Where the dead space is:** where the terrain capture hit nothing (alpha 1), outside the playable area.
@@ -339,3 +358,32 @@ sizing in `MainGameUI_HUD`.
 - **Wrapping:** the description wraps at 320 instead of 300. At 300, one word dropped to a third line at 1080p.
 - **Captures:** gallery behaviour descriptions get sample data through `SetupDescription`, alternating buff and
   debuff: `-UISnapshotGallery=<BP_W_BehaviourDescription>+<BP_W_BehaviourDescription>`.
+
+## Action button cooldown fill (`ui_glass_panes.py`)
+
+- **Shader:** `M_UI_GlassPane` has a `CooldownRemaining` scalar (0 = ready, 1 = just used). While it is above 0:
+  - the part still cooling down is shaded (`CooldownDim`);
+  - a lit line marks the fill level (`CooldownEdgeIntensity`, `CooldownEdgeWidthPx`), with a faint wash below it
+    (`CooldownTint`, alpha = wash strength);
+  - the fill rises from the bottom to the top of the pane as the cooldown runs out.
+- **Unchanged:** the cooldown layer sits under the rim, reflection and scratches. The button's hover shows through
+  the shade. At 0 (the default) every pane looks exactly as before, so the training, building and weapon panes are
+  unaffected.
+- **Runtime:** `UW_ItemActionUI` binds the optional `M_GlassPane`, makes a dynamic instance on the first cooldown and
+  sets `CooldownRemaining` in `NativeTick`. `UCommandData` counts cooldowns down in whole seconds, so the widget
+  anchors an estimated end time (`FActionItemCooldownFillState`) and keeps the earliest estimate. The fill is
+  smooth and never jumps backwards between updates.
+
+## Crew repair progress bar
+
+- **Widget:** `W_BP_CrewRepairProgress` (`UW_CrewRepairProgress`) shows the crew repair icon (`T_AB_Repair`) next to
+  a green bar with the dig-in bar's textures. The bottom spacer sets how far above the health bar it sits.
+- **Setup:** Project Settings > Game > Crew Repair Progress Bar (`UCrewRepairProgressSettings`), so no tank
+  Blueprint needs changes.
+- **Runtime:**
+  - `ATankMaster` creates a screen-space widget component at the health bar's anchor on the first crew repair. It
+    shows the component when the repair starts and hides it when the repair stops.
+  - The tank syncs the remaining work (`GetRemainingCrewRepairSeconds`) every repair tick and after each module
+    batch. The widget fills smoothly in between.
+  - The full bar is the work at the start. New damage during the repair extends it.
+  - Only player-owned tanks show the bar, so enemy repairs are not revealed through the fog of war.

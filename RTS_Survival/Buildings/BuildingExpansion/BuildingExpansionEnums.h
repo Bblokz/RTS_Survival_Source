@@ -92,6 +92,17 @@ enum class EBuildingExpansionType : uint8
 	BTX_RusChemicalPlant UMETA(DisplayName = "Rus Chemical Plant"),
 	BTX_RusAntenna UMETA(DisplayName = "Rus Antenna"),
 	BTX_RusMegaBunker UMETA(DisplayName = "Rus Mega Bunker"),
+	// Turntable gun pit with a B-4 203mm howitzer that its crew reloads with the crane.
+	BTX_RusB4HowitzerPit UMETA(DisplayName = "Rus B-4 Howitzer Pit"),
+	// The same pit built by the (German) player from the HQ: a captured B-4 worked by its captured crew.
+	BTX_GerCapturedB4Pit UMETA(DisplayName = "Ger Captured B-4 Pit"),
+	// Dug-in Soviet tank turret on a concrete pillbox in a trench line (RedLine); one type for every turret.
+	BTX_RusTurretPillbox UMETA(DisplayName = "Rus Turret Pillbox"),
+	// German gun pits: a low sandbag ring the Pak fires over, and a higher one shared by the two howitzers; each
+	// gun turns a full circle with its crew, who hand the rounds to the loader.
+	BTX_GerPak40Pit UMETA(DisplayName = "Ger Pak 40 Pit"),
+	BTX_GerLeFH18Pit UMETA(DisplayName = "Ger leFH 18 Pit"),
+	BTX_GerSFH18Pit UMETA(DisplayName = "Ger sFH 18 Pit"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -168,6 +179,18 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusLongCamoBunker");
 	case EBuildingExpansionType::BTX_RusMegaBunker:
 		return FString("BTX_RusMegaBunker");
+	case EBuildingExpansionType::BTX_RusB4HowitzerPit:
+		return FString("BTX_RusB4HowitzerPit");
+	case EBuildingExpansionType::BTX_GerCapturedB4Pit:
+		return FString("BTX_GerCapturedB4Pit");
+	case EBuildingExpansionType::BTX_RusTurretPillbox:
+		return FString("BTX_RusTurretPillbox");
+	case EBuildingExpansionType::BTX_GerPak40Pit:
+		return FString("BTX_GerPak40Pit");
+	case EBuildingExpansionType::BTX_GerLeFH18Pit:
+		return FString("BTX_GerLeFH18Pit");
+	case EBuildingExpansionType::BTX_GerSFH18Pit:
+		return FString("BTX_GerSFH18Pit");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -223,6 +246,12 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusLongCamoBunker: return TEXT("Long Camo Bunker");
 	case EBuildingExpansionType::BTX_RusDomeBunker: return TEXT("Dome Bunker");
 	case EBuildingExpansionType::BTX_RusMegaBunker: return TEXT("Mega Bunker");
+	case EBuildingExpansionType::BTX_RusB4HowitzerPit: return TEXT("B-4 Howitzer Pit");
+	case EBuildingExpansionType::BTX_GerCapturedB4Pit: return TEXT("Captured B-4 Pit");
+	case EBuildingExpansionType::BTX_RusTurretPillbox: return TEXT("Turret Pillbox");
+	case EBuildingExpansionType::BTX_GerPak40Pit: return TEXT("Pak 40 Pit");
+	case EBuildingExpansionType::BTX_GerLeFH18Pit: return TEXT("leFH 18 Pit");
+	case EBuildingExpansionType::BTX_GerSFH18Pit: return TEXT("sFH 18 Pit");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");

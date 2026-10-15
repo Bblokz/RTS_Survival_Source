@@ -373,6 +373,8 @@ namespace DeveloperSettings
 				inline constexpr int32 Sdkfz250_VehicleParts = 40;
 				inline constexpr int32 Sdkfz9_37mm_Radixite = 100;
 				inline constexpr int32 Sdkfz9_37mm_VehicleParts = 40;
+				inline constexpr int32 Keubel_Radixite = 60;
+				inline constexpr int32 Keubel_VehicleParts = 20;
 				inline constexpr int32 Sdkfz251_22_Radixite = 225;
 				inline constexpr int32 Sdkfz251_22_VehicleParts = 90;
 				inline constexpr int32 Sdkfz251_Mortar_Radixite = 150;
@@ -518,6 +520,8 @@ namespace DeveloperSettings
 				inline constexpr int32 LefH18_Metal = 260;
 				inline constexpr int32 Morser210mm_Radixite = 800;
 				inline constexpr int32 Morser210mm_Metal = 410;
+				inline constexpr int32 RusB4_203mm_Radixite = 900;
+				inline constexpr int32 RusB4_203mm_Metal = 450;
 				inline constexpr int32 SFH18_150mm_Radixite = 600;
 				inline constexpr int32 SFH18_150mm_Metal = 260;
 				inline constexpr int32 Nebelwerfer_Radixite = 600;
@@ -857,6 +861,14 @@ namespace DeveloperSettings
 				inline constexpr int32 RusLongCamoBunker_Metal = 220;
 				inline constexpr int32 RusDomeBunker_Radixite = 520;
 				inline constexpr int32 RusDomeBunker_Metal = 240;
+				inline constexpr int32 RusB4HowitzerPit_Radixite = 1600;
+				inline constexpr int32 RusB4HowitzerPit_Metal = 900;
+				inline constexpr int32 GerPak40Pit_Radixite = 380;
+				inline constexpr int32 GerPak40Pit_Metal = 200;
+				inline constexpr int32 GerLeFH18Pit_Radixite = 620;
+				inline constexpr int32 GerLeFH18Pit_Metal = 320;
+				inline constexpr int32 GerSFH18Pit_Radixite = 950;
+				inline constexpr int32 GerSFH18Pit_Metal = 520;
 			}
 
 			// ----------------------------------
