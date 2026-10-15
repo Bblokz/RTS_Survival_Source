@@ -119,3 +119,7 @@ The scripts reuse existing copies instead of deleting them. A windowless editor 
   - `ACPPTurretsMaster::SetEngageGroundLocation` did not set the yaw target. A turret still settling on its idle yaw could then report "rotated to engage" against the old yaw, and it fired once before turning.
   - The ground order now sets the yaw target at once, as `SetTarget` does.
   - `-GerPitValidate` and `-DShKPitValidate` still pass.
+
+## Fire feedback
+
+On every shot the gun bucks and the crew brace. See [GunPitFireFeedback.md](GunPitFireFeedback.md).

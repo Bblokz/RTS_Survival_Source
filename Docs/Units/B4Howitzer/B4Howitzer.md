@@ -101,3 +101,7 @@ a contact sheet of the pit's loading drill made that way.
 
 Under `-NullRHI` nothing is rendered, so the test forces the meshes to animate and resets the soldiers' movement
 tick every frame; the numbers are real; use the capture run to see how it looks.
+
+## Fire feedback
+
+On every shot the gun bucks (top carriage only) and the crew brace. See [../GunPitFireFeedback.md](../GunPitFireFeedback.md).
