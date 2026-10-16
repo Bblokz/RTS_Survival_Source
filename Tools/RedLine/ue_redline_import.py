@@ -4,6 +4,10 @@ Run as a commandlet:  UnrealEditor-Cmd <uproject> -run=pythonscript -script=<thi
 Meshes land in /Game/RTS_Survival/Blueprints/Environment/RedLine/Meshes with the game's earth, timber, sandbag,
 concrete and steel materials, their sockets (cargo_N trench cover, crouch_N, TurretMount) and complex collision
 so trench floors stay walkable while the parapets block.
+
+The game does not render Nanite: after (re)importing a pit or fieldwork mesh, cut it with
+Marketplace/Scritps/PitOptimize/pit_mesh_optimize.py and run Tools/GunPits/optimize_pit_meshes.py heavy, which
+imports the cut mesh and turns Nanite off (see Docs/Units/GunPitMeshes.md).
 """
 import unreal
 

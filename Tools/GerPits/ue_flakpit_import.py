@@ -7,6 +7,10 @@ Run inside the editor (bridge pyfile or the editor's Python console):
 The Flak 37 skeleton gets PitOrigin on its root bone (37mmFlak): it cancels the root's 0.8 import scale, so the crew,
 crate and clips ride on the gun at 1:1 in gun space (+X the muzzle). The socket transform is set through the bridge
 (set_skeleton_socket_transform) from the values this script prints.
+
+The game does not render Nanite: after (re)importing a pit or fieldwork mesh, cut it with
+Marketplace/Scritps/PitOptimize/pit_mesh_optimize.py and run Tools/GunPits/optimize_pit_meshes.py heavy, which
+imports the cut mesh and turns Nanite off (see Docs/Units/GunPitMeshes.md).
 """
 import unreal
 

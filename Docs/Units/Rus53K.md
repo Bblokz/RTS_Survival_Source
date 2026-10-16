@@ -181,7 +181,7 @@ The wall is two bag rows, stepped down outwards:
 - `at53k_sector_pit_build.py` writes `Exports/SM_53KSectorPit.fbx` (the BS-3 pit's square-wall generator with separate front, back and side distances).
 - `at53k_sector_crew.py` bakes the handler with the German pit solver (`gerpit_crew.py`, the Pak config with the new spots). It writes `Exports/Crew/`: the two animations, `at53k_sector_carry.json` and `at53k_sector_crew_layout.json`.
 
-**Unreal:** `Tools/AT53K/build_53k_sector_pit.py [crew,mesh,turret,bxp]` (needs a C++ build with `bIsFixedEmplacement` and `BTX_Rus53KSectorPit`).
+**Unreal:** `Tools/AT53K/build_53k_sector_pit.py [crew,mesh,turret,bxp]` (needs a C++ build with `bIsFixedEmplacement` and `BTX_Rus53KSectorPit`). Then cut the wall and turn Nanite off, see [GunPitMeshes.md](GunPitMeshes.md).
 
 ### Testing
 

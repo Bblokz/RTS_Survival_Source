@@ -19,6 +19,10 @@ The anim BP, fire montage and PitOrigin53K socket are the 53-K pit's (build_53k_
 
 Run: python build_53k_sector_pit.py [crew,mesh,turret,bxp]   (scratchpad uecp.py importable; UECP_PORT picks an
 editor other than the 9855 broker's)
+
+The game does not render Nanite: after (re)importing a pit or fieldwork mesh, cut it with
+Marketplace/Scritps/PitOptimize/pit_mesh_optimize.py and run Tools/GunPits/optimize_pit_meshes.py heavy, which
+imports the cut mesh and turns Nanite off (see Docs/Units/GunPitMeshes.md).
 """
 import json
 import math

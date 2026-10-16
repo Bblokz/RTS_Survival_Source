@@ -2,6 +2,10 @@
 
 Run inside the editor after ue_b4_import.py:  import ue_b4_pit_import; ue_b4_pit_import.run_all()
 Blender sources: b4_pit_animations.py, b4_pit_crew.py and b4_pit_props.py (AnimTeamWeapons/B4_203mm).
+
+The game does not render Nanite: after (re)importing a pit or fieldwork mesh, cut it with
+Marketplace/Scritps/PitOptimize/pit_mesh_optimize.py and run Tools/GunPits/optimize_pit_meshes.py heavy, which
+imports the cut mesh and turns Nanite off (see Docs/Units/GunPitMeshes.md).
 """
 import json
 import os

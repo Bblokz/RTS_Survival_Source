@@ -4,6 +4,10 @@ Run inside the editor (bridge pyfile or the editor's Python console). Blender so
 D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Scripts (gerpit_build.py, gerpit_crew.py).
 The pits use three materials: the German camo/concrete/plank atlas, the ammo box material and the German sandbag
 material (the bags keep the game's loose sandbag UVs).
+
+The game does not render Nanite: after (re)importing a pit or fieldwork mesh, cut it with
+Marketplace/Scritps/PitOptimize/pit_mesh_optimize.py and run Tools/GunPits/optimize_pit_meshes.py heavy, which
+imports the cut mesh and turns Nanite off (see Docs/Units/GunPitMeshes.md).
 """
 import unreal
 

@@ -9,6 +9,10 @@ D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/MGPit (Scrip
                           plain components on the gun, their animations carry their spot)
 print_socket_transforms() prints the PitOrigin and Muzzle socket transforms (bone-relative) for the bridge's
 set_skeleton_socket_transform; see Docs/Units/RusDShKPit.md.
+
+The game does not render Nanite: after (re)importing a pit or fieldwork mesh, cut it with
+Marketplace/Scritps/PitOptimize/pit_mesh_optimize.py and run Tools/GunPits/optimize_pit_meshes.py heavy, which
+imports the cut mesh and turns Nanite off (see Docs/Units/GunPitMeshes.md).
 """
 import json
 
