@@ -1753,12 +1753,16 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.ReloadSpeed = 6.f;
 	WeaponData.BaseCooldown = 1.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy + 10;
+	// A direct-fire launcher: the Bazooka's accuracy, so the ampoules do not scatter past their target.
+	constexpr int32 AmpulometAccuracy = 70;
+	WeaponData.Accuracy = AmpulometAccuracy;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
 	WeaponData.ShrapnelDamage = 15;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = 0;
-	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.6f;
+	// Fired straight at its target like the Bazooka and Panzerschreck rockets, so it flies as fast as they do.
+	constexpr float AmpulometProjectileSpeedMlt = 0.9f;
+	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * AmpulometProjectileSpeedMlt;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ampulomet_125MM, WeaponData);
 }
 

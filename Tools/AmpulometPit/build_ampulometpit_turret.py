@@ -1,17 +1,20 @@
 """Builds the Ampulomet pit turret through the editor bridge (UECP direct calls, see uecp.py).
 
-The turret is a copy of the German leFH 18 pit turret: an embedded turret with InitChildTurret / InitEmbeddedTurret,
-an arch projectile weapon (the ampoule is lobbed) and the gun pit crew wiring (InitPitCrew from BeginPlay, OnGunFired
-from PlaySingleFireAnimation, OnReloadStarted from ReloadWeapon). On top of that:
+The turret is a copy of the German leFH 18 pit turret: an embedded turret with InitChildTurret / InitEmbeddedTurret
+and the gun pit crew wiring (InitPitCrew from BeginPlay, OnGunFired from PlaySingleFireAnimation, OnReloadStarted from
+ReloadWeapon). On top of that:
   * the Ampulomet on its tripod with AnimBp_AmpulometPit (gun, crates and crew turn on the Traverse bone),
-  * the weapon is Ampulomet_125MM fired from the Muzzle socket: a low lob without the artillery descent whistle,
-    the infantry Ampulomet's launch sound, Molotov fire splashes on every surface and no shell case,
-  * not an artillery turret: it aims level at its target so the gunner's hands stay on the grips (the arc is the
-    projectile's own),
+  * the leFH's arch projectile weapon is swapped for a direct-fire projectile weapon (SetupProjectileWeapon with the
+    Bazooka projectile, like the infantry Ampulomet): the ampoule flies fast and flat at its target,
+  * the weapon is Ampulomet_125MM fired from the Muzzle socket: the infantry Ampulomet's launch sound, Molotov fire
+    splashes on every surface and no shell case,
+  * not an artillery turret: it aims level at its target so the gunner's hands stay on the grips,
   * two Soviet crew meshes, snapped to PitOrigin (their animations carry their spots): Crew1 gunner, Crew2 loader,
   * no rounds or ready crate: the ampoule and its crates are part of the gun mesh; the crew brace at every shot.
 
-Run: python build_ampulometpit_turret.py [--crew-only]   (scratchpad uecp.py importable; UECP_PORT picks the editor)
+Run: python build_ampulometpit_turret.py [--crew-only | --direct-fire-only]
+     (scratchpad uecp.py importable; UECP_PORT picks the editor)
+     --direct-fire-only swaps the weapon of an existing turret built with the old arch projectile and keeps the rest.
 """
 import json
 import sys
@@ -40,11 +43,8 @@ ROTATION_SPEED = 45.0
 MAX_PITCH = 20.0
 MIN_PITCH = -5.0
 TURRET_HEIGHT = 112.0
-# A low lob: the ampoule flies flatter than a howitzer shell.
-APEX_HEIGHT_MULTIPLIER = 0.25
-APEX_HEIGHT_OFFSET = 250.0
-MIN_APEX_OFFSET = -200.0
-CURVATURE_MULTIPLIER = 1.5
+# The infantry Ampulomet's projectile: the Bazooka rocket's flight, fast and flat (speed is in the weapon data).
+PROJECTILE_SYSTEM = 'Bazooka'
 LAUNCH_SCALE = 0.6
 SPLASH_SCALE = 1.6
 
@@ -121,15 +121,61 @@ def find_nodes():
             print('FAILED node lookup', label, [m['id'] for m in matches])
             sys.exit(1)
         return matches[0]['id']
-    return {
+
+    def every(predicate):
+        return [n['id'] for n in nodes if predicate(n)]
+    ids = {
         'init_child': one(lambda n: n.get('op') == 'call' and detail(n, 'function') == 'InitChildTurret', 'init child'),
         'init_embedded': one(lambda n: n.get('op') == 'call' and detail(n, 'function') == 'InitEmbeddedTurret', 'init embedded'),
-        'weapon': one(lambda n: n.get('op') == 'make_struct' and detail(n, 'struct') == 'InitWeaponStateArchProjectile', 'weapon'),
-        'arch': one(lambda n: n.get('op') == 'make_struct' and detail(n, 'struct') == 'ArchProjectileSettings', 'arch'),
+        'anim_bp_set': one(lambda n: n.get('op') == 'prop_set' and detail(n, 'var') == 'AnimBp', 'anim bp set'),
+        'init_pit_crew': one(lambda n: n.get('op') == 'call' and detail(n, 'function') == 'InitPitCrew', 'init pit crew'),
         'vfx': one(lambda n: n.get('op') == 'make_struct' and detail(n, 'struct') == 'WeaponVFX', 'vfx'),
         'shell': one(lambda n: n.get('op') == 'make_struct' and detail(n, 'struct') == 'WeaponShellCase', 'shell'),
-        'impacts': [n['id'] for n in nodes if n.get('op') == 'make_struct' and detail(n, 'struct') == 'RTSSurfaceImpactData'],
+        'impacts': every(lambda n: n.get('op') == 'make_struct' and detail(n, 'struct') == 'RTSSurfaceImpactData'),
+        # The leFH's arch weapon block; empty once the turret fires direct.
+        'arch_setup': every(lambda n: n.get('op') == 'call' and detail(n, 'function') == 'SetupArchProjectileWeapon'),
+        'arch_structs': every(lambda n: n.get('op') == 'make_struct'
+                              and detail(n, 'struct') in ('InitWeaponStateArchProjectile', 'ArchProjectileSettings')),
     }
+    # The self, Turret and owning player nodes that fed the arch weapon struct are reused for the direct one.
+    ids['owner_feeds'] = {}
+    for n in nodes:
+        for pin in n.get('pins', []):
+            for link in pin.get('connected_to', []):
+                feeds_arch = pin.get('direction') == 'output' and link['node_id'] in ids['arch_structs']
+                if feeds_arch and link['pin'] in ('WeaponOwner', 'MeshComponent', 'OwningPlayer'):
+                    ids['owner_feeds'][link['pin']] = (n['id'], pin['name'])
+    return ids
+
+
+def make_direct_fire(ids):
+    """Swaps SetupArchProjectileWeapon and its arch structs for SetupProjectileWeapon with the Bazooka projectile."""
+    if not ids['arch_setup']:
+        print('turret already fires direct')
+        return
+    feeds = ids['owner_feeds']
+    if sorted(feeds) != ['MeshComponent', 'OwningPlayer', 'WeaponOwner']:
+        print('FAILED owner feeds of the arch weapon', feeds)
+        sys.exit(1)
+    act('delete_nodes', blueprint_path=TURRET, graph_name='EventGraph', node_ids=ids['arch_setup'] + ids['arch_structs'])
+    connections = [
+        {'from': ids['anim_bp_set'], 'from_pin': 'then', 'to': 'amp_setup', 'to_pin': 'execute'},
+        {'from': 'amp_setup', 'from_pin': 'then', 'to': ids['init_pit_crew'], 'to_pin': 'execute'},
+        {'from': 'amp_weapon', 'from_pin': 'InitWeaponStateProjectile', 'to': 'amp_setup',
+         'to_pin': 'ProjectileWeaponParameters'},
+        {'from': ids['vfx'], 'from_pin': 'WeaponVFX', 'to': 'amp_weapon', 'to_pin': 'WeaponVFX'},
+        {'from': ids['shell'], 'from_pin': 'WeaponShellCase', 'to': 'amp_weapon', 'to_pin': 'WeaponShellCase'},
+    ]
+    for to_pin, (node, from_pin) in feeds.items():
+        connections.append({'from': node, 'from_pin': from_pin, 'to': 'amp_weapon', 'to_pin': to_pin})
+    act('build_blueprint_graph', blueprint_path=TURRET, graph_name='EventGraph',
+        nodes=[{'id': 'amp_setup', 'handle': 'fn.Self.SetupProjectileWeapon'},
+               {'id': 'amp_weapon', 'handle': 'k2.Make InitWeaponStateProjectile'}],
+        connections=connections,
+        defaults=[{'node_id': 'amp_weapon', 'pin_name': 'ProjectileSystem', 'value': PROJECTILE_SYSTEM},
+                  {'node_id': 'amp_weapon', 'pin_name': 'WeaponName', 'value': 'Ampulomet_125MM'},
+                  {'node_id': 'amp_weapon', 'pin_name': 'FireSocketName', 'value': 'Muzzle'}])
+    print('weapon swapped to a direct-fire', PROJECTILE_SYSTEM, 'projectile')
 
 
 def set_weapon():
@@ -138,10 +184,6 @@ def set_weapon():
         ('init_child', 'NewRotationSpeed', f'{ROTATION_SPEED:.1f}'), ('init_child', 'NewMaxPitch', f'{MAX_PITCH:.1f}'),
         ('init_child', 'NewMinPitch', f'{MIN_PITCH:.1f}'), ('init_embedded', 'TurretHeight', f'{TURRET_HEIGHT:.1f}'),
         ('init_embedded', 'bIsArtillery', 'false'),
-        ('weapon', 'WeaponName', 'Ampulomet_125MM'), ('weapon', 'FireSocketName', 'Muzzle'),
-        ('arch', 'ApexHeightMultiplier', f'{APEX_HEIGHT_MULTIPLIER:.3f}'), ('arch', 'ApexHeightOffset', f'{APEX_HEIGHT_OFFSET:.1f}'),
-        ('arch', 'MinApexOffset', f'{MIN_APEX_OFFSET:.1f}'), ('arch', 'CurvatureVerticalVelocityMultiplier', f'{CURVATURE_MULTIPLIER:.2f}'),
-        ('arch', 'DescentSound', ''),
         ('vfx', 'LaunchSound', LAUNCH_SOUND), ('vfx', 'LaunchScale', f'{LAUNCH_SCALE},{LAUNCH_SCALE},{LAUNCH_SCALE}'),
         ('vfx', 'ImpactScale', f'{SPLASH_SCALE},{SPLASH_SCALE},{SPLASH_SCALE}'),
         ('vfx', 'ImpactAttenuation', SMALL_CALIBER_SOUND + 'Att_SmallCaliber_WeaponImpact.Att_SmallCaliber_WeaponImpact'),
@@ -156,6 +198,14 @@ def set_weapon():
         for pin, value in (('ImpactEffect', FIRE_SPLASH), ('ImpactSound', SPLASH_SOUND)):
             act('set_pin_default', blueprint_path=TURRET, graph_name='EventGraph', node_id=node, pin_name=pin, value=value)
     print('weapon set; fire splashes on', len(ids['impacts']), 'surfaces')
+    make_direct_fire(ids)
+
+
+def compile_and_save():
+    compiled = act('compile_blueprint', blueprint_path=TURRET)
+    print('Ampulomet pit turret compile errors', compiled.get('error_count'), compiled.get('errors'), 'warnings',
+          compiled.get('warning_count'))
+    act('save_asset', asset_path=TURRET)
 
 
 def build(crew_only):
@@ -164,11 +214,12 @@ def build(crew_only):
         set_components()
         set_weapon()
     crew_settings()
-    compiled = act('compile_blueprint', blueprint_path=TURRET)
-    print('Ampulomet pit turret compile errors', compiled.get('error_count'), compiled.get('errors'), 'warnings',
-          compiled.get('warning_count'))
-    act('save_asset', asset_path=TURRET)
+    compile_and_save()
 
 
 if __name__ == '__main__':
-    build('--crew-only' in sys.argv)
+    if '--direct-fire-only' in sys.argv:
+        make_direct_fire(find_nodes())
+        compile_and_save()
+    else:
+        build('--crew-only' in sys.argv)

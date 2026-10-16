@@ -267,10 +267,12 @@ private:
 	void InitAllGameMediumWeapons();
 	void InitAllGameHeavyWeapons();
 
-	UPROPERTY()
+	// Filled by the constructor only. SkipSerialization keeps a Blueprint game state from saving a copy of the map
+	// that would override changed C++ weapon data on load (Transient does not skip a class default object).
+	UPROPERTY(SkipSerialization)
 	TMap<EWeaponName, FWeaponData> M_TPlayerWeaponDataHashMap;
 
-	UPROPERTY()
+	UPROPERTY(SkipSerialization)
 	TMap<EWeaponName, FWeaponData> M_TEnemyWeaponDataHashMap;
 
 	UPROPERTY()

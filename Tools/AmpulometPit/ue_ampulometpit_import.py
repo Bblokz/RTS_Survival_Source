@@ -5,8 +5,8 @@ D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/AmpulometPit
   Meshes/M_AmpulometPit_Gun       copy of the Soviet infantry weapon material (MM_Rus_InfantryWeapons) that may be used
                                   on skeletal meshes; the gun keeps the infantry Ampulomet's atlas UVs
   Meshes/SK_AmpulometPit_Gun      rigged Ampulomet on its tripod with the ampoule crates, new skeleton
-  Meshes/SM_AmpulometPit          the sandbag pit and gun table (RedLine earth, timber and sandbag materials, complex
-                                  collision)
+  Meshes/SM_AmpulometPit          the sandbag pit and gun pillar (RedLine earth and sandbag materials, walnut planks,
+                                  complex collision)
   Anims/Anim_AmpulometPit_*       gun base pose, shot and breech drill; the reload carries the curve
                                   AmpulometPit_LoadingElevation that levels the tube while it is loaded
   Crew/Anim_AmpulometPit_*        gunner and loader on the Infantry Master skeleton (root motion off: the crew meshes
@@ -29,7 +29,8 @@ WEAPON_MATERIAL = '/Game/RTS_Survival/Blueprints/Squads/InfantryWeapons/Russian/
 GUN_MATERIAL = MESH_DIR + '/M_AmpulometPit_Gun'
 PIT_MATERIALS = {
     'RL_Earth': '/Game/RTS_Survival/Blueprints/Environment/GroundEnvActors/Desert/MI_RTS_DesertGround_Stones',
-    'RL_Timber': '/Game/RTS_Survival/StarterContent/Materials/M_Wood_Pine',
+    # Darker than the RedLine pine: the plank top and entrance crates read as weathered wood next to the bags.
+    'RL_Timber': '/Game/RTS_Survival/StarterContent/Materials/M_Wood_Walnut',
     'RL_Sandbag': '/Game/SandBagPack/Materials/MI_Rus_SandBag_01',
 }
 GUN_ANIMS = ['Anim_AmpulometPit_Base', 'Anim_AmpulometPit_Fire', 'Anim_AmpulometPit_Reload']
@@ -130,8 +131,9 @@ def import_gun():
     for entry in materials:
         entry.set_editor_property('material_interface', material)
     mesh.set_editor_property('materials', materials)
-    eal.save_loaded_asset(mesh)
-    print('AMPPIT_IMPORT gun slots', [str(m.get_editor_property('material_slot_name')) for m in materials])
+    # A reimport over the existing mesh has silently kept the old geometry once; the save result shows it.
+    print('AMPPIT_IMPORT gun slots', [str(m.get_editor_property('material_slot_name')) for m in materials], 'saved',
+          eal.save_loaded_asset(mesh, only_if_is_dirty=False))
     return mesh
 
 
@@ -180,6 +182,11 @@ def import_pit():
     body = mesh.get_editor_property('body_setup')
     body.set_editor_property('collision_trace_flag', unreal.CollisionTraceFlag.CTF_USE_COMPLEX_AS_SIMPLE)
     mesh.set_editor_property('lod_group', 'LargeProp')
+    # A small mesh; without Nanite the walnut and sandbag materials (not flagged for Nanite) render instead of the
+    # default material.
+    nanite = mesh.get_editor_property('nanite_settings')
+    nanite.set_editor_property('enabled', False)
+    mesh.set_editor_property('nanite_settings', nanite)
     print('AMPPIT_IMPORT pit', [str(s.material_slot_name) for s in mesh.static_materials], 'tris',
           mesh.get_num_triangles(0), 'saved', eal.save_asset(path, only_if_is_dirty=False))
 
