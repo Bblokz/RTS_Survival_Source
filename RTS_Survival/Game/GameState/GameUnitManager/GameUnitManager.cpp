@@ -1121,6 +1121,16 @@ TArray<AAircraftMaster*> UGameUnitManager::ShippingTest_GetAircraftOfPlayer(cons
 
 	return M_AircraftMastersAliveEnemy;
 }
+
+TArray<ABuildingExpansion*> UGameUnitManager::MapTest_GetBxpsOfPlayer(const uint8 Player) const
+{
+	if (Player == 1)
+	{
+		return M_BxpAlivePlayer;
+	}
+
+	return M_BxpAliveEnemy;
+}
 #endif
 
 
@@ -1141,7 +1151,7 @@ void UGameUnitManager::IncrementTankOrNomadicCounter(ATankMaster* Tank, const ui
 
 	// Counted once: a vehicle that is registered again first gives up what it was counted as.
 	DecrementTankOrNomadicCounter(Tank, Player);
-	FCountedTankOrNomadic CountedVehicle;
+	FCountedUnitSubtype CountedVehicle;
 	CountedVehicle.bIsNomadic = RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic;
 	CountedVehicle.Subtype = RTSComponent->GetUnitSubType();
 	CountedVehicle.Player = Player;
@@ -1171,7 +1181,7 @@ void UGameUnitManager::DecrementTankOrNomadicCounter(ATankMaster* Tank, const ui
 
 	// Taken off the counter it was put on; a vehicle that was never counted, or was already taken off, has
 	// nothing to take off.
-	FCountedTankOrNomadic CountedVehicle;
+	FCountedUnitSubtype CountedVehicle;
 	if (not M_CountedTanksOrNomadics.RemoveAndCopyValue(Tank, CountedVehicle))
 	{
 		return;
@@ -1202,7 +1212,7 @@ void UGameUnitManager::RecountTankOrNomadicSubtype(ATankMaster* Tank)
 	}
 
 	const URTSComponent* const RTSComponent = Tank->GetRTSComponent();
-	const FCountedTankOrNomadic* const CountedVehicle = M_CountedTanksOrNomadics.Find(Tank);
+	const FCountedUnitSubtype* const CountedVehicle = M_CountedTanksOrNomadics.Find(Tank);
 	// Not registered yet: it is counted under its subtype when it registers.
 	if (CountedVehicle == nullptr)
 	{
@@ -1217,6 +1227,62 @@ void UGameUnitManager::RecountTankOrNomadicSubtype(ATankMaster* Tank)
 	// Copied first: counting the vehicle again removes the map entry this pointer points into.
 	const uint8 CountedPlayer = CountedVehicle->Player;
 	IncrementTankOrNomadicCounter(Tank, CountedPlayer);
+}
+
+void UGameUnitManager::RecountUnitSubtype(AActor* Unit)
+{
+	if (ATankMaster* Tank = Cast<ATankMaster>(Unit))
+	{
+		RecountTankOrNomadicSubtype(Tank);
+		return;
+	}
+	if (AAircraftMaster* Aircraft = Cast<AAircraftMaster>(Unit))
+	{
+		RecountAircraftSubtype(Aircraft);
+		return;
+	}
+	if (ABuildingExpansion* Bxp = Cast<ABuildingExpansion>(Unit))
+	{
+		RecountBxpSubtype(Bxp);
+	}
+}
+
+void UGameUnitManager::RecountAircraftSubtype(AAircraftMaster* Aircraft)
+{
+	if (not IsValid(Aircraft) || not IsValid(Aircraft->GetRTSComponent()))
+	{
+		return;
+	}
+
+	const FCountedUnitSubtype* const CountedAircraft = M_CountedAircraft.Find(Aircraft);
+	// Not registered yet: it is counted under its subtype when it registers.
+	if (CountedAircraft == nullptr || CountedAircraft->Subtype == Aircraft->GetRTSComponent()->GetUnitSubType())
+	{
+		return;
+	}
+
+	// Copied first: counting the aircraft again removes the map entry this pointer points into.
+	const uint8 CountedPlayer = CountedAircraft->Player;
+	IncrementAircraftCounter(Aircraft, CountedPlayer);
+}
+
+void UGameUnitManager::RecountBxpSubtype(ABuildingExpansion* Bxp)
+{
+	if (not IsValid(Bxp) || not IsValid(Bxp->GetRTSComponent()))
+	{
+		return;
+	}
+
+	const FCountedUnitSubtype* const CountedBxp = M_CountedBxps.Find(Bxp);
+	// Not registered yet: it is counted under its subtype when it registers.
+	if (CountedBxp == nullptr || CountedBxp->Subtype == Bxp->GetRTSComponent()->GetUnitSubType())
+	{
+		return;
+	}
+
+	// Copied first: counting the expansion again removes the map entry this pointer points into.
+	const uint8 CountedPlayer = CountedBxp->Player;
+	IncrementBxpCounter(Bxp, CountedPlayer);
 }
 
 void UGameUnitManager::IncrementSquadCounter(ASquadUnit* SquadUnit, const uint8 Player)
@@ -1277,23 +1343,38 @@ void UGameUnitManager::IncrementBxpCounter(ABuildingExpansion* Bxp, const uint8 
 		return;
 	}
 
+	// Counted once: an expansion that is registered again first gives up what it was counted as.
+	DecrementBxpCounter(Bxp, Player);
+	const EBuildingExpansionType CountedSubtype = Bxp->GetRTSComponent()->GetSubtypeAsBxpSubtype();
 	TMap<EBuildingExpansionType, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasBxpOfType
 		: M_EnemyHasBxpOfType;
-	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, Bxp->GetRTSComponent()->GetSubtypeAsBxpSubtype());
+	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, CountedSubtype);
+	FCountedUnitSubtype CountedBxp;
+	CountedBxp.Subtype = static_cast<uint8>(CountedSubtype);
+	CountedBxp.Player = Player;
+	M_CountedBxps.Add(Bxp, CountedBxp);
 }
 
 void UGameUnitManager::DecrementBxpCounter(ABuildingExpansion* Bxp, const uint8 Player)
 {
-	if (not IsValid(Bxp) || not IsValid(Bxp->GetRTSComponent()))
+	if (Bxp == nullptr)
 	{
 		return;
 	}
 
-	TMap<EBuildingExpansionType, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+	// Taken off the counter it was put on; an expansion that was never counted, or was already taken off, has
+	// nothing to take off.
+	FCountedUnitSubtype CountedBxp;
+	if (not M_CountedBxps.RemoveAndCopyValue(Bxp, CountedBxp))
+	{
+		return;
+	}
+	TMap<EBuildingExpansionType, int32>& Counters = CountedBxp.Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasBxpOfType
 		: M_EnemyHasBxpOfType;
-	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, Bxp->GetRTSComponent()->GetSubtypeAsBxpSubtype(), TEXT("BXP subtype counter"));
+	GameUnitManagerUnitTypeCounters::DecrementCounter(
+		Counters, static_cast<EBuildingExpansionType>(CountedBxp.Subtype), TEXT("BXP subtype counter"));
 }
 
 void UGameUnitManager::IncrementAircraftCounter(AAircraftMaster* Aircraft, const uint8 Player)
@@ -1303,23 +1384,38 @@ void UGameUnitManager::IncrementAircraftCounter(AAircraftMaster* Aircraft, const
 		return;
 	}
 
+	// Counted once: an aircraft that is registered again first gives up what it was counted as.
+	DecrementAircraftCounter(Aircraft, Player);
+	const EAircraftSubtype CountedSubtype = Aircraft->GetRTSComponent()->GetSubtypeAsAircraftSubtype();
 	TMap<EAircraftSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasAircraftOfType
 		: M_EnemyHasAircraftOfType;
-	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, Aircraft->GetRTSComponent()->GetSubtypeAsAircraftSubtype());
+	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, CountedSubtype);
+	FCountedUnitSubtype CountedAircraft;
+	CountedAircraft.Subtype = static_cast<uint8>(CountedSubtype);
+	CountedAircraft.Player = Player;
+	M_CountedAircraft.Add(Aircraft, CountedAircraft);
 }
 
 void UGameUnitManager::DecrementAircraftCounter(AAircraftMaster* Aircraft, const uint8 Player)
 {
-	if (not IsValid(Aircraft) || not IsValid(Aircraft->GetRTSComponent()))
+	if (Aircraft == nullptr)
 	{
 		return;
 	}
 
-	TMap<EAircraftSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+	// Taken off the counter it was put on; an aircraft that was never counted, or was already taken off, has
+	// nothing to take off.
+	FCountedUnitSubtype CountedAircraft;
+	if (not M_CountedAircraft.RemoveAndCopyValue(Aircraft, CountedAircraft))
+	{
+		return;
+	}
+	TMap<EAircraftSubtype, int32>& Counters = CountedAircraft.Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasAircraftOfType
 		: M_EnemyHasAircraftOfType;
-	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, Aircraft->GetRTSComponent()->GetSubtypeAsAircraftSubtype(), TEXT("Aircraft subtype counter"));
+	GameUnitManagerUnitTypeCounters::DecrementCounter(
+		Counters, static_cast<EAircraftSubtype>(CountedAircraft.Subtype), TEXT("Aircraft subtype counter"));
 }
 
 bool UGameUnitManager::GetHasPlayerTankOfType(const ETankSubtype TankSubtype) const

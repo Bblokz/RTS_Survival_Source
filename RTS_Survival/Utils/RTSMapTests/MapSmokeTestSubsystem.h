@@ -70,8 +70,8 @@ private:
 	// On the campaign map after a victory: reports the round trip once the campaign settled.
 	bool TickReturnedFromVictory();
 	void LogResult(const FString& Scenario, const bool bPassed, const FString& Details);
-	// Alive tanks and nomadic vehicles the game unit manager does not report under their own subtype; missions and
-	// global abilities read those counters.
-	int32 CountVehicleSubtypeCounterMismatches() const;
+	// Living tanks, nomadic vehicles, aircraft and building expansions the game unit manager does not report under
+	// their own subtype; missions and global abilities read those counters.
+	int32 CountUnitSubtypeCounterMismatches() const;
 	ACPPController* GetController() const;
 };

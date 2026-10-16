@@ -172,6 +172,7 @@ public:
 
 #if RTS_WITH_SHIPPING_MAP_TESTS || RTS_WITH_MAP_TESTS
 	TArray<AAircraftMaster*> ShippingTest_GetAircraftOfPlayer(uint8 Player) const;
+	TArray<ABuildingExpansion*> MapTest_GetBxpsOfPlayer(uint8 Player) const;
 #endif
 
 	void ApplyTechToTanksOfPlayer(UTechnologyEffect* TechEffect, const TArray<ETankSubtype>& TankSubtypes, uint8 Player) const;
@@ -268,11 +269,12 @@ public:
 	void RecountSquadUnitSubtype(ASquadUnit* SquadUnit);
 
 	/**
-	 * @brief Moves a tank's or nomadic vehicle's count to its current subtype. Vehicle Blueprints set the subtype
-	 * after the vehicle registered itself; URTSComponent::SetUnitSubtype calls this once the vehicle has begun play.
-	 * @param Tank Vehicle whose subtype was just set.
+	 * @brief Moves a tank's, nomadic vehicle's, aircraft's or building expansion's count to its current subtype.
+	 * Their Blueprints and init functions set the subtype after the unit registered itself;
+	 * URTSComponent::SetUnitSubtype calls this once the unit has begun play.
+	 * @param Unit Unit whose subtype was just set; other unit kinds are ignored.
 	 */
-	void RecountTankOrNomadicSubtype(ATankMaster* Tank);
+	void RecountUnitSubtype(AActor* Unit);
 
 private:
 	/** Initializes the GetTargetUnit M_Thread async. */
@@ -344,17 +346,22 @@ private:
 
 	TMap<TObjectKey<ASquadUnit>, FCountedSquadUnit> M_CountedSquadUnits;
 
-	// Under which counters (tank or nomadic), subtype and player each vehicle is counted. Vehicle Blueprints set the
-	// subtype after the vehicle registered, so what is taken off the counters when it goes must be what was put on
-	// them; a vehicle removed twice or never added then has nothing to take off.
-	struct FCountedTankOrNomadic
+	// Under which subtype and player a vehicle, aircraft or building expansion is counted (and, for vehicles,
+	// whether on the nomadic counters). Their subtype is set after they registered, so what is taken off the
+	// counters when they go must be what was put on them; a unit removed twice or never added has nothing to take off.
+	struct FCountedUnitSubtype
 	{
-		bool bIsNomadic = false;
 		uint8 Subtype = 0;
 		uint8 Player = 0;
+		bool bIsNomadic = false;
 	};
 
-	TMap<TObjectKey<ATankMaster>, FCountedTankOrNomadic> M_CountedTanksOrNomadics;
+	TMap<TObjectKey<ATankMaster>, FCountedUnitSubtype> M_CountedTanksOrNomadics;
+	TMap<TObjectKey<AAircraftMaster>, FCountedUnitSubtype> M_CountedAircraft;
+	TMap<TObjectKey<ABuildingExpansion>, FCountedUnitSubtype> M_CountedBxps;
+	void RecountTankOrNomadicSubtype(ATankMaster* Tank);
+	void RecountAircraftSubtype(AAircraftMaster* Aircraft);
+	void RecountBxpSubtype(ABuildingExpansion* Bxp);
 	void IncrementBxpCounter(ABuildingExpansion* Bxp, uint8 Player);
 	void DecrementBxpCounter(ABuildingExpansion* Bxp, uint8 Player);
 	void IncrementAircraftCounter(AAircraftMaster* Aircraft, uint8 Player);

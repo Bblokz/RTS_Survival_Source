@@ -15,6 +15,7 @@
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
 #include "Misc/ScopeLock.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/RTSGameInstance/DeveloperSettings/RTSGameInstancePIEDeveloperSettings.h"
@@ -73,26 +74,45 @@ namespace MapSmokeTestPrivate
 
 	bool GetIsVehicleCountedUnderItsSubtype(
 		const UGameUnitManager& GameUnitManager,
-		const ATankMaster* Tank,
-		const uint8 Player)
+		const URTSComponent& RTSComponent,
+		const bool bIsHumanPlayer)
 	{
-		if (not IsValid(Tank) || not IsValid(Tank->GetRTSComponent()))
+		if (RTSComponent.GetUnitType() == EAllUnitType::UNType_Nomadic)
 		{
-			return true;
-		}
-		const URTSComponent* RTSComponent = Tank->GetRTSComponent();
-		const bool bIsHumanPlayer = Player == HumanPlayer;
-		if (RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic)
-		{
-			const ENomadicSubtype NomadicSubtype = RTSComponent->GetSubtypeAsNomadicSubtype();
+			const ENomadicSubtype NomadicSubtype = RTSComponent.GetSubtypeAsNomadicSubtype();
 			return bIsHumanPlayer
 				? GameUnitManager.GetHasPlayerNomadicOfType(NomadicSubtype)
 				: GameUnitManager.GetHasEnemyNomadicOfType(NomadicSubtype);
 		}
-		const ETankSubtype TankSubtype = RTSComponent->GetSubtypeAsTankSubtype();
+		const ETankSubtype TankSubtype = RTSComponent.GetSubtypeAsTankSubtype();
 		return bIsHumanPlayer
 			? GameUnitManager.GetHasPlayerTankOfType(TankSubtype)
 			: GameUnitManager.GetHasEnemyTankOfType(TankSubtype);
+	}
+
+	// Logs and counts the living units that the game unit manager does not report under their own subtype.
+	template <typename TUnit, typename TIsCountedUnderSubtype>
+	int32 CountAndLogUncountedUnits(
+		const TArray<TUnit*>& Units,
+		const uint8 Player,
+		const TIsCountedUnderSubtype& IsCountedUnderSubtype)
+	{
+		int32 Mismatches = 0;
+		for (const TUnit* Unit : Units)
+		{
+			if (not IsValid(Unit) || not IsValid(Unit->GetRTSComponent()))
+			{
+				continue;
+			}
+			if (IsCountedUnderSubtype(*Unit->GetRTSComponent()))
+			{
+				continue;
+			}
+			++Mismatches;
+			UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST counter_mismatch player=%d unit=%s"),
+			       Player, *Unit->GetName());
+		}
+		return Mismatches;
 	}
 }
 
@@ -548,7 +568,7 @@ void UMapSmokeTestSubsystem::Finish()
 		UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST category=%s errors=%d"),
 		       *CategoryCount.Key.ToString(), CategoryCount.Value);
 	}
-	const int32 CounterMismatches = CountVehicleSubtypeCounterMismatches();
+	const int32 CounterMismatches = CountUnitSubtypeCounterMismatches();
 	const bool bPassed = Ensures == 0 && Fatals == 0 && CounterMismatches == 0;
 	UE_LOG(LogRTSMapSmokeTest, Display,
 	       TEXT("RTS_MAP_SMOKE_TEST RESULT %s map=%s errors=%d ensures=%d fatals=%d counter_mismatches=%d"),
@@ -557,7 +577,7 @@ void UMapSmokeTestSubsystem::Finish()
 	FPlatformMisc::RequestExit(false, TEXT("RTSMapSmokeTest"));
 }
 
-int32 UMapSmokeTestSubsystem::CountVehicleSubtypeCounterMismatches() const
+int32 UMapSmokeTestSubsystem::CountUnitSubtypeCounterMismatches() const
 {
 	const UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
 	if (not IsValid(GameUnitManager))
@@ -568,17 +588,32 @@ int32 UMapSmokeTestSubsystem::CountVehicleSubtypeCounterMismatches() const
 	int32 Mismatches = 0;
 	for (const uint8 Player : {MapSmokeTestPrivate::HumanPlayer, MapSmokeTestPrivate::EnemyPlayer})
 	{
-		const TArray<ATankMaster*> AliveVehicles = GameUnitManager->GetPlayerTanks(Player);
-		for (const ATankMaster* Tank : AliveVehicles)
-		{
-			if (MapSmokeTestPrivate::GetIsVehicleCountedUnderItsSubtype(*GameUnitManager, Tank, Player))
+		const bool bIsHumanPlayer = Player == MapSmokeTestPrivate::HumanPlayer;
+		const TArray<ATankMaster*> Vehicles = GameUnitManager->GetPlayerTanks(Player);
+		Mismatches += MapSmokeTestPrivate::CountAndLogUncountedUnits(Vehicles, Player,
+			[GameUnitManager, bIsHumanPlayer](const URTSComponent& RTSComponent)
 			{
-				continue;
-			}
-			++Mismatches;
-			UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST counter_mismatch player=%d vehicle=%s"),
-			       Player, *GetNameSafe(Tank));
-		}
+				return MapSmokeTestPrivate::GetIsVehicleCountedUnderItsSubtype(
+					*GameUnitManager, RTSComponent, bIsHumanPlayer);
+			});
+		const TArray<AAircraftMaster*> Aircraft = GameUnitManager->ShippingTest_GetAircraftOfPlayer(Player);
+		Mismatches += MapSmokeTestPrivate::CountAndLogUncountedUnits(Aircraft, Player,
+			[GameUnitManager, bIsHumanPlayer](const URTSComponent& RTSComponent)
+			{
+				const EAircraftSubtype AircraftSubtype = RTSComponent.GetSubtypeAsAircraftSubtype();
+				return bIsHumanPlayer
+					? GameUnitManager->GetHasPlayerAircraftOfType(AircraftSubtype)
+					: GameUnitManager->GetHasEnemyAircraftOfType(AircraftSubtype);
+			});
+		const TArray<ABuildingExpansion*> Bxps = GameUnitManager->MapTest_GetBxpsOfPlayer(Player);
+		Mismatches += MapSmokeTestPrivate::CountAndLogUncountedUnits(Bxps, Player,
+			[GameUnitManager, bIsHumanPlayer](const URTSComponent& RTSComponent)
+			{
+				const EBuildingExpansionType BxpSubtype = RTSComponent.GetSubtypeAsBxpSubtype();
+				return bIsHumanPlayer
+					? GameUnitManager->GetHasPlayerBxpOfType(BxpSubtype)
+					: GameUnitManager->GetHasEnemyBxpOfType(BxpSubtype);
+			});
 	}
 	return Mismatches;
 }
@@ -675,7 +710,7 @@ void UMapSmokeTestSubsystem::Finish()
 {
 }
 
-int32 UMapSmokeTestSubsystem::CountVehicleSubtypeCounterMismatches() const
+int32 UMapSmokeTestSubsystem::CountUnitSubtypeCounterMismatches() const
 {
 	return 0;
 }

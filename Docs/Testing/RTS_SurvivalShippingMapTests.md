@@ -32,6 +32,8 @@ The child executable it launches is:
 
 The normal shipped game target is still `RTS_Survival`. This test executable exists because it is built from the separate `RTS_SurvivalShippingMapTests` target.
 
+The Enemy AI suite (`-RTSRunEnemyAITests`) and the campaign map tests are compiled only into their own targets, `RTS_SurvivalShippingEnemyAITests` and `RTS_SurvivalShippingCampaignMapTests`. The map test executable starts the game normally when given their switches and never runs them. Build those targets in the same configuration and copy their child executables (with PDBs) next to `RTS_SurvivalShippingMapTests-Win64-<Config>.exe`; they share the package's cooked content.
+
 ## Build
 
 Build the target with UnrealBuildTool:
@@ -209,6 +211,8 @@ The test-only maps and the Soviet pits that the pit scenarios spawn are not refe
 
 The cook has no map list. It cooks the default maps and everything reachable from them by hard or soft references. An asset that only C++ names by path is never reached: settings defaults set in a constructor, widget constructors, test scenarios. `DefaultGame.ini` lists the folders of such shipped assets under `+DirectoriesToAlwaysCook`. Add to that list whenever C++ starts naming a new asset by path.
 
+A rebuilt executable can replace the one in a package only while no reflected layout (`UPROPERTY`, `USTRUCT`) has changed since the cook. Otherwise cooked Blueprints fail on the async loading thread (`FUnversionedPropertySerializer::LoadZero`, `FExportArchive::HandleBadImportIndex`). Other sessions edit the same checkout, so check for headers newer than the cook before swapping, back up the package's exe and PDB, and recook when in doubt.
+
 ### Debugger
 
 No cdb or WinDbg is installed. Rider's bundled `lldb.exe` reads the PDBs, and `Source/Tools/Debugging` drives it:
@@ -235,5 +239,5 @@ Avast CyberCapture sandboxes a freshly built executable. The audio device enumer
 ### Map smoke and menu flow tests
 
 `UMapSmokeTestSubsystem` exists in non-shipping builds only.
-- `-RTSMapSmokeTest` starts any map the way the player's "Press to start" does, picks Normal on a difficulty picker, plays for `-RTSMapSmokeTestSeconds=N` (default 180), and logs `RTS_MAP_SMOKE_TEST RESULT` with the error, ensure and fatal counts per log category. It also checks that every living tank and nomadic vehicle is counted under its own subtype in `UGameUnitManager` (`counter_mismatches`); missions and global abilities read those counters, and a mismatch fails the run.
+- `-RTSMapSmokeTest` starts any map the way the player's "Press to start" does, picks Normal on a difficulty picker, plays for `-RTSMapSmokeTestSeconds=N` (default 180), and logs `RTS_MAP_SMOKE_TEST RESULT` with the error, ensure and fatal counts per log category. It also checks that every living tank, nomadic vehicle, aircraft and building expansion is counted under its own subtype in `UGameUnitManager` (`counter_mismatches`); missions and global abilities read those counters, and a mismatch fails the run.
 - `-RTSMenuFlowTest`, started on `/Game/RTS_Survival/Blueprints/GameUI/StartGame/StartGame`, follows the shipped route instead. It presses the main menu's Load Campaign button, launches the first mission on the campaign map, and then smoke-tests that mission.
