@@ -192,3 +192,48 @@ Select-String -LiteralPath $Log -Pattern 'counter became lower than zero|subtype
 Skipped unit ability scenarios are not automatically failures. They usually mean the scenario could not produce a valid target, command, or state for that ability in the current map.
 
 Content or asset setup issues can appear as ordinary log errors during a run. If the final test result is `PASS`, the runner did not consider those errors fatal to the scenario set. Log them separately when they point at missing sockets, missing assets, invalid references, or incomplete Blueprint setup.
+
+## DebugGame package under a debugger
+
+For hunting crashes, package the same target in **DebugGame** (unoptimised game code, checks and ensures on, full PDB) and run the child executable under a debugger. E: is full, so packages go to `D:\RR_test`.
+
+The target sets `BuildEnvironment = Unique` in every configuration. Its `GlobalDefinitions` change the shared build environment, so a DebugGame build would otherwise be refused.
+
+```powershell
+& 'D:\UnrealEngine\UE5.5_ReleaseBranch\UnrealEngine\Engine\Build\BatchFiles\RunUAT.bat' BuildCookRun -project=D:\UE5Projects\RTS_Survival\RTS_Survival.uproject -noP4 -platform=Win64 -target=RTS_SurvivalShippingMapTests -clientconfig=DebugGame -build -cook -iterate -stage -pak -iostore -compressed -archive -archivedirectory=D:\RR_test\ShippingMapTests_DebugGame -nocompileeditor -unattended
+```
+
+The test-only maps and the Soviet pits that the pit scenarios spawn are not referenced by any shipped asset, so the normal cook leaves them out. Add them to the test package only:
+- `-MapsToCook=<the cooked maps>+/Game/RTS_Survival/Maps/UnitTests/UT_EnemyAI+/Game/RTS_Survival/Maps/TestCover/TestCover+/Game/RTS_Survival/Maps/GerMissions/RedLine`
+- `-cookdir=<Content>\RTS_Survival\Blueprints\Buildings\BuildingExpansions\Rus53KPit+...`
+
+The cook has no map list. It cooks the default maps and everything reachable from them by hard or soft references. An asset that only C++ names by path is never reached: settings defaults set in a constructor, widget constructors, test scenarios. `DefaultGame.ini` lists the folders of such shipped assets under `+DirectoriesToAlwaysCook`. Add to that list whenever C++ starts naming a new asset by path.
+
+### Debugger
+
+No cdb or WinDbg is installed. Rider's bundled `lldb.exe` reads the PDBs, and `Source/Tools/Debugging` drives it:
+- `run_under_lldb.sh <child exe> <log> <seconds> [game args]` launches the game under lldb. It logs every ensure break and exception with a symbolised stack, steps over ensure breaks, dumps all threads and writes a minidump on a crash, and kills the game after the time limit. Launch the child exe from `Windows/RTS_Survival/Binaries/Win64`, not the launcher.
+- `run_test_batch.sh <child exe> <log dir> <batch file>` runs a list of scenarios and writes `summary.txt` with one line per run. Environment variables:
+  - `RTS_BATCH_LANES`: runs at the same time (default 1).
+  - `RTS_BATCH_RHI`: `-RenderOffscreen` (default) or `-NullRHI`.
+  - `RTS_BATCH_CVARS`: low scalability console variables, applied by default.
+  - `RTS_BATCH_RESX` / `RTS_BATCH_RESY`: 640x360 by default.
+- Run the two lists separately:
+  - `shipping_batch_logic.txt` (missions, pits, cover, RedLine, GC stress) with `RTS_BATCH_RHI=-NullRHI`.
+  - `shipping_batch_rendered.txt` (the menu-to-victory round trip, field defenses and the focused BXP set) rendered offscreen. The BXP map holds laser weapons; under `-NullRHI` each reports its missing beam every frame and the stack dumps slow the game to about 1 fps.
+- On the integrated GPU, a mission map renders at well under 1 fps, so a rendered mission smoke test does not finish.
+- The cover scenario (`-CoverFinderValidateTestCover`) logs its result but never quits, so its batch line carries `-benchmark -seconds=300`.
+
+A `-NullRHI` run tests game logic only. Expect these, and do not read them as game bugs:
+- Every run crashes at exit in an engine static destructor (`Nanite::FFeedbackManager` → `GPUMessage::FSocket`), after the result line.
+- The fog of war never starts, so enemy turrets and infantry never acquire targets (RedLine's `pillboxes_fire_on_assault` fails).
+- Niagara never creates a component (`FApp::CanEverRender()` is false), hence errors such as "No laser beam system was set up for the laser weapon!".
+- Cooked static meshes load without render data, so `UStaticMesh::GetRenderData()` returns null. Game code that reads mesh vertices must check it (`ANomadicVehicle::InitSmokeLocations` does).
+
+Avast CyberCapture sandboxes a freshly built executable. The audio device enumerator then fails, which crashes at start-up in `WindowsMMDeviceInfoCache.cpp`, and D3D12 cannot open the discrete GPU, so the game falls back to the integrated one. Run with `-nosound`, or add `D:\RR_test` to the Avast exceptions for real-GPU runs.
+
+### Map smoke and menu flow tests
+
+`UMapSmokeTestSubsystem` exists in non-shipping builds only.
+- `-RTSMapSmokeTest` starts any map the way the player's "Press to start" does, picks Normal on a difficulty picker, plays for `-RTSMapSmokeTestSeconds=N` (default 180), and logs `RTS_MAP_SMOKE_TEST RESULT` with the error, ensure and fatal counts per log category. It also checks that every living tank and nomadic vehicle is counted under its own subtype in `UGameUnitManager` (`counter_mismatches`); missions and global abilities read those counters, and a mismatch fails the run.
+- `-RTSMenuFlowTest`, started on `/Game/RTS_Survival/Blueprints/GameUI/StartGame/StartGame`, follows the shipped route instead. It presses the main menu's Load Campaign button, launches the first mission on the campaign map, and then smoke-tests that mission.

@@ -1,0 +1,4 @@
+# Scenarios that need drawing (the UMG front end, the viewport mouse step). Run with the default -RenderOffscreen.
+victory_round_trip|1800|/Game/RTS_Survival/Blueprints/GameUI/StartGame/StartGame -RTSMenuFlowTest -RTSMapSmokeTestVictory -RTSMapSmokeTestSeconds=90
+field_defense|2400|/Game/RTS_Survival/Maps/UnitTests/UT_Nomadics -FieldDefenseValidate -benchmark -fps=30
+bxp_focused|3600|-RTSRunMapTest=NomadicBxp -RTSNomadicBxpMaxScenarios=2 -RTSNomadicBxpExcludeNameFilters=Ger_Airbase_Truck_C_1.BTX_GerHQPlatform;Ger_Airbase_Truck_C_3.BTX_GerHQPlatform;BXT_SolarSmall;BTX_GerMarderStugFactory -RTSTestExitOnComplete

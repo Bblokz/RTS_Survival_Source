@@ -23,10 +23,12 @@ public class RTS_SurvivalShippingCampaignMapTestsTarget : TargetRules
 
 		// Enables the campaign map determinism test harness. Undefined in every other target.
 		GlobalDefinitions.Add("RTS_WITH_CAMPAIGN_MAP_TESTS=1");
+		// The added definition changes the global environment, so every configuration (also a DebugGame
+		// build for debugging the harness) needs its own build environment.
+		BuildEnvironment = TargetBuildEnvironment.Unique;
 
 		if (Configuration == UnrealTargetConfiguration.Shipping)
 		{
-			BuildEnvironment = TargetBuildEnvironment.Unique;
 			bUseChecksInShipping = false;
 			bUseLoggingInShipping = true;
 		}

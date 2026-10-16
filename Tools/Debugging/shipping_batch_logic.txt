@@ -1,0 +1,19 @@
+# Game-logic scenarios; fast with RTS_BATCH_RHI=-NullRHI (no drawing, no fog of war).
+# A/B: the first mission on the packaged fallbacks, then with the PIE startup settings the editor uses.
+smoke_first_mission|1500|/Game/RTS_Survival/Maps/GerMissions/Ger_FirstMission -RTSMapSmokeTest -RTSMapSmokeTestSeconds=240
+smoke_first_mission_pie|1500|/Game/RTS_Survival/Maps/GerMissions/Ger_FirstMission -RTSMapSmokeTest -RTSMapSmokeTestSeconds=240 -RTSMapSmokeTestPIESettings
+# Garbage collection every frame: dangling UObject pointers crash quickly instead of after a long session.
+gcstress_first_mission|2400|/Game/RTS_Survival/Maps/GerMissions/Ger_FirstMission -RTSMapSmokeTest -RTSMapSmokeTestSeconds=120 -DPCVars=gc.CollectGarbageEveryFrame=1
+smoke_marder_mission|1500|/Game/RTS_Survival/Maps/GerMissions/Ger_MarderStugMission -RTSMapSmokeTest -RTSMapSmokeTestSeconds=240
+smoke_start_tutorial|1500|/Game/RTS_Survival/Maps/AA_StartGameTutorial/RTS_GameStartTutorial -RTSMapSmokeTest -RTSMapSmokeTestSeconds=240
+ger_pits|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -GerPitValidate -benchmark -fps=30
+ger_small_pits|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -GerSmallPitValidate -benchmark -fps=30
+b4_howitzer|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -B4HowitzerValidate -benchmark -fps=30
+dshk_pit|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -DShKPitValidate -benchmark -fps=30
+ampulomet_pit|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -AmpulometPitValidate -benchmark -fps=30
+at53k_pit|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -At53KPitValidate -benchmark -fps=30
+bs3_pit|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -BS3PitValidate -benchmark -fps=30
+railpak_bunker|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -RailPakBunkerValidate -benchmark -fps=30
+cover_testcover|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -CoverFinderValidateTestCover -benchmark -seconds=300 -fps=30
+redline_assault|2400|/Game/RTS_Survival/Maps/GerMissions/RedLine -RedLineTour -RedLineAssault -benchmark -fps=30
+# bxp_focused runs rendered (shipping_batch_rendered.txt): under -NullRHI every laser weapon reports a missing beam each frame and the stack dumps slow the game to about 1 fps.

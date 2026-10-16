@@ -1,0 +1,23 @@
+# Packaged-build scenarios (DebugGame test package), in priority order. name|timeout seconds|game arguments
+# The real player route: main menu -> Load Campaign -> first campaign mission (smoke) [-> victory -> campaign].
+menu_flow|1800|/Game/RTS_Survival/Blueprints/GameUI/StartGame/StartGame -RTSMenuFlowTest -RTSMapSmokeTestSeconds=180
+victory_round_trip|1800|/Game/RTS_Survival/Blueprints/GameUI/StartGame/StartGame -RTSMenuFlowTest -RTSMapSmokeTestVictory -RTSMapSmokeTestSeconds=90
+# A/B: the first mission on the packaged fallbacks, then with the PIE startup settings the editor uses.
+smoke_first_mission|1500|/Game/RTS_Survival/Maps/GerMissions/Ger_FirstMission -RTSMapSmokeTest -RTSMapSmokeTestSeconds=240
+smoke_first_mission_pie|1500|/Game/RTS_Survival/Maps/GerMissions/Ger_FirstMission -RTSMapSmokeTest -RTSMapSmokeTestSeconds=240 -RTSMapSmokeTestPIESettings
+smoke_marder_mission|1500|/Game/RTS_Survival/Maps/GerMissions/Ger_MarderStugMission -RTSMapSmokeTest -RTSMapSmokeTestSeconds=240
+smoke_start_tutorial|1500|/Game/RTS_Survival/Maps/AA_StartGameTutorial/RTS_GameStartTutorial -RTSMapSmokeTest -RTSMapSmokeTestSeconds=240
+field_defense|2400|/Game/RTS_Survival/Maps/UnitTests/UT_Nomadics -FieldDefenseValidate -benchmark -fps=30
+ger_pits|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -GerPitValidate -benchmark -fps=30
+ger_small_pits|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -GerSmallPitValidate -benchmark -fps=30
+b4_howitzer|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -B4HowitzerValidate -benchmark -fps=30
+dshk_pit|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -DShKPitValidate -benchmark -fps=30
+ampulomet_pit|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -AmpulometPitValidate -benchmark -fps=30
+at53k_pit|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -At53KPitValidate -benchmark -fps=30
+bs3_pit|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -BS3PitValidate -benchmark -fps=30
+railpak_bunker|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -RailPakBunkerValidate -benchmark -fps=30
+cover_testcover|1800|/Game/RTS_Survival/Maps/TestCover/TestCover -CoverFinderValidateTestCover -benchmark -seconds=300 -fps=30
+redline_assault|2400|/Game/RTS_Survival/Maps/GerMissions/RedLine -RedLineAssault -benchmark -fps=30
+# Garbage collection every frame: dangling UObject pointers crash quickly instead of after a long session.
+gcstress_first_mission|2400|/Game/RTS_Survival/Maps/GerMissions/Ger_FirstMission -RTSMapSmokeTest -RTSMapSmokeTestSeconds=120 -DPCVars=gc.CollectGarbageEveryFrame=1
+bxp_focused|3600|-RTSRunMapTest=NomadicBxp -RTSNomadicBxpMaxScenarios=2 -RTSNomadicBxpExcludeNameFilters=Ger_Airbase_Truck_C_1.BTX_GerHQPlatform;Ger_Airbase_Truck_C_3.BTX_GerHQPlatform;BXT_SolarSmall;BTX_GerMarderStugFactory -RTSTestExitOnComplete
