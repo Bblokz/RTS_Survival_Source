@@ -227,6 +227,8 @@ public:
 	ERTSCommander GetPlayerCommander() const;
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	FRTSGameDifficulty GetCurrentGameDifficulty() const;
+	// Lets systems poll the difficulty before it is set without GetCurrentGameDifficulty reporting an error.
+	bool GetIsGameDifficultyInitialized() const { return M_GameDifficulty.bIsInitialized; }
 	UW_Mission* OnMissionRequestSetupWidget(UMissionBase* RequestingMission);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|Timer")
 	UW_MissionTimer* CreateAndInitMissionTimerWidget(TSubclassOf<UW_MissionTimer> MissionTimerWidgetClass,

@@ -286,6 +286,7 @@ public:
 	UGrenadeComponent();
 
 	float GetGrenadeAoeRange() const;
+	float GetThrowRange() const;
 
 	/**
 	 * @brief Initializes the component with its owning squad controller.

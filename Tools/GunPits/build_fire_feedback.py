@@ -63,6 +63,11 @@ GUNS = {
     GER + 'AnimBp_GerPuppchenPit': {
         'bones': ['Gun'], 'socket': 'PitOrigin', 'jolt': 3.0, 'rock': 0.6, 'pivot': 60.0, 'muzzle': 1.5,
         'hz': 6.0, 'damping': 0.4},
+    # The Flak 88 emplacement: the barrel (Flak88_GunBarrel) recoils in its cradle and the muzzle jumps; the carriage on
+    # Flak88_Dock, which carries the loader, the handler and their rounds, stays. The pit gun has no fire montage.
+    GER + 'AnimBp_GerFlak88Pit': {
+        'bones': ['Flak88_GunBarrel'], 'socket': 'PitOrigin', 'jolt': 40.0, 'rock': 0.0, 'pivot': 120.0, 'muzzle': 0.8,
+        'hz': 1.6, 'damping': 0.7},
     GER + 'AnimBp_GerPanzerschreckPit': {
         'bones': ['Gun'], 'socket': 'PitOrigin', 'jolt': 1.8, 'rock': 0.4, 'pivot': 40.0, 'muzzle': 0.8,
         'hz': 7.0, 'damping': 0.45},

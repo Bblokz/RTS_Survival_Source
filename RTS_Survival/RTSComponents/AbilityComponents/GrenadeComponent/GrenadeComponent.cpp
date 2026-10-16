@@ -376,6 +376,11 @@ float UGrenadeComponent::GetGrenadeAoeRange() const
 	return M_Settings.AoeRange;
 }
 
+float UGrenadeComponent::GetThrowRange() const
+{
+	return M_Settings.ThrowRange;
+}
+
 void UGrenadeComponent::BeginPlay()
 {
 	Super::BeginPlay();
