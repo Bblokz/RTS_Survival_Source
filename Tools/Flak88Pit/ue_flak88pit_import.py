@@ -7,7 +7,7 @@ Run inside the editor (bridge pyfile or the editor's Python console). STEPS (set
   'sockets'  prints the sockets build_flak88pit.py puts on the gun's skeleton: the embedded 88's fire sockets
              (BulletLaunch0, BulletOut0), PitOrigin on Flak88_Dock (the turning carriage; loader, handler and their
              rounds ride on it) and PitStatic on the static root (the ammo runner stands on it). Both sit at the deck
-             top (the gun stands GUN_SINK cm below the pit's ground) with +X along the muzzle: the FBX's root bone
+             top (DECK_HEIGHT above the pit's ground, where the gun stands) with +X along the muzzle: the FBX's root bone
              carries a 180 degree turn, so the muzzle points along +X in the imported mesh's component space.
   'pit'      Meshes/SM_GerFlak88Pit: walls, niche, crate ring, deck (German pit atlas, ammo box, sandbag and the 88's
              ammo materials; complex collision; no Nanite: the sandbag material is not flagged for it)
@@ -39,10 +39,11 @@ GUN_MATERIALS = {'M_Flak88_01': FLAK88 + '/Materials/M_Flak88_01', 'M_Flak88_02'
 # The embedded 88's fire sockets (on its skeleton): bone, location, rotation (pitch, yaw, roll).
 FIRE_SOCKETS = {'BulletLaunch0': ('Flak88_GunBarrel', (-71.342887, 0.0, 1.0), (-0.122317, -179.999992, -0.001029)),
                 'BulletOut0': ('Flak88_GunBarrel', (423.073179, 0.0, 0.0), (0.000108, 54.999998, -0.000076))}
-# The gun mesh stands this far below the pit's ground and the deck is this high (flak88_pit_layout.json; copied here
+# The gun mesh stands this far below the pit's ground (it stands on it) and the deck is this high, level with the
+# tops of the gun's legs (flak88_pit_layout.json; copied here
 # because the editor's sandboxed Python cannot read the Blender export folder).
-GUN_SINK = 52.0
-DECK_HEIGHT = 4.0
+GUN_SINK = 0.0
+DECK_HEIGHT = 56.0
 asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
 eal = unreal.EditorAssetLibrary
 

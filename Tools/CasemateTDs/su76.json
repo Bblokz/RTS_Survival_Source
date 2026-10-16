@@ -1,0 +1,7 @@
+{"name":"SU76","source":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/SU76/SU76.blend","out_dir":"D:/UE5Projects/RTS_Survival/Saved/ClaudeExports/SU76","save_blend":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/SU76/SU76_Split.blend",
+ "material_slot":"M_SU76","fit_scale":[0.9,0.76,0.9],"fit_offset":[-0.085,0,0.42],
+ "hull_object":"SU_76","turret_base_box":[[-0.75,-0.26,0.94],[0.15,0.8,1.8]],
+ "mantlet_objects":["SU_76_Gun"],"barrel_objects":["SU_76_Barrel"],
+ "deck_z_raw":0.97,"pivot_raw":[0.05,0.207,1.366],"muzzle_raw":[2.278,0.207,1.366],
+ "recoil_m":0.25,"yaw_deg":15,"pitch_up_deg":25,"pitch_down_deg":5,
+ "textures":[{"src":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/lowpoly-ww2-russian-pack-1/source/Russian_Pack_1/SU_76_D.jpg","dst":"T_SU76_D.jpg"},{"src":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/lowpoly-ww2-russian-pack-1/source/Russian_Pack_1/SU_76_N.jpg","dst":"T_SU76_N.jpg"}]}

@@ -1,0 +1,7 @@
+{"name":"ISU152","source":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/ISU_152/uploads_files_2939416_ISU_152.fbx","out_dir":"D:/UE5Projects/RTS_Survival/Saved/ClaudeExports/ISU152","save_blend":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/ISU_152/ISU_152_Split.blend",
+ "material_slot":"M_ISU152","fit_scale":[1.1,1.1,1.1],"fit_offset":[-0.0892,0,-0.0469],
+ "hull_object":"ISU_152","turret_base_objects":["Gun_Mount"],
+ "mantlet_objects":["Gun"],"barrel_objects":["Barrel"],
+ "deck_z_raw":1.62,"pivot_raw":[2.75,-0.32,1.789],"muzzle_raw":[5.636,-0.32,1.789],
+ "recoil_m":0.45,"yaw_deg":8,"pitch_up_deg":20,"pitch_down_deg":3,
+ "textures":[{"src":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/ISU_152/uploads_files_2939416_ISU_152_Files/Isu_152_guards.psd","dst":"T_ISU152_Guards_D.png"},{"src":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/ISU_152/uploads_files_2939416_ISU_152_Files/Isu_152_camo_1.psd","dst":"T_ISU152_Camo_D.png"},{"src":"D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/(RUSSIAN)/ISU_152/uploads_files_2939416_ISU_152_Files/ISU_152_N.jpg","dst":"T_ISU152_N.jpg"}]}

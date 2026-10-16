@@ -15,7 +15,8 @@ Steps (default: all, in this order):
                second crew component PitRunnerCrew on PitStatic (his loop is his idle).
   runner_round sets RunnerRound's offset from the shell bone so it lies where the bake put the round
   bxp          Ger_BXP_GerPit_Flak88: a copy of the German leFH expansion with the pit mesh, BTX_GerFlak88Pit, and the
-               turret sunk GUN_SINK cm (the 88's cross arms lie under the deck)
+               turret at the layout's gun_sink below the ground (0: the 88 stands on the ground, its legs level
+               with the raised deck)
 
 Run: python build_flak88pit.py [steps,...]   (UECP_PORT picks the editor)
 """
@@ -69,7 +70,7 @@ LAUNCH_SOUND = '/Game/RTS_Survival/Sounds/WeaponSounds/HeavyCaliber/Flak88/S_Fir
 SHELL_CASE_VFX = '/Game/RTS_Survival/Blueprints/ProjectilesAndShells/Projectiles/NS_TankCasingBase.NS_TankCasingBase'
 # Selection, decal and nav extents: the walls reach 4.74 m from the pivot and the niche 5.9 m.
 PIT_RADIUS = 520.0
-PIT_HEIGHT = 110.0
+PIT_HEIGHT = 165.0
 SMOKE_RADIUS = 450.0
 SMOKES = 5
 DECAL_UNITS = 32.0
