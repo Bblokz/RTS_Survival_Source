@@ -54,8 +54,9 @@ struct FGunPitUnderTest
 	float SectorHalfDegrees = 0.f;
 	// The first shot must fly fast and flat at its target; the other pits only log their flight.
 	bool bFiresDirect = false;
-	// Height of the gun mesh above the pit actor, when the gun stands sunk in the ground (the Flak 88 emplacement:
-	// its barrel only just clears the walls); zero: not checked.
+	// Checks the gun mesh stands ExpectedGunHeight above the pit actor (the Flak 88 emplacement: its legs must stay
+	// level with the raised deck and its barrel only just clears the walls).
+	bool bChecksGunHeight = false;
 	float ExpectedGunHeight = 0.f;
 
 	TWeakObjectPtr<AActor> Pit;

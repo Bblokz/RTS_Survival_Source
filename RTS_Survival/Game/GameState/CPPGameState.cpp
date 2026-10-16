@@ -4381,6 +4381,25 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML_20S_152MM_SU152, WeaponData);
 
+	// ISU-152 gun: the SU-152's ML-20S fired as a direct-fire heavy tank destroyer gun.
+	{
+		const float Isu152RangeMlt = 1.1f;
+		const float Isu152ArmorPen = 165.f;
+		const float Isu152ArmorPenMaxRange = 155.f;
+		const float Isu152ReloadSpeed = 29.0f;
+		const int32 Isu152Accuracy = 85;
+
+		FWeaponData Isu152WeaponData = WeaponData;
+		Isu152WeaponData.WeaponName = EWeaponName::ML_20S_152MM_ISU152;
+		Isu152WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			DeveloperSettings::GameBalance::Ranges::HeavyCannonRange * Isu152RangeMlt, 100);
+		Isu152WeaponData.ArmorPen = Isu152ArmorPen;
+		Isu152WeaponData.ArmorPenMaxRange = Isu152ArmorPenMaxRange;
+		Isu152WeaponData.ReloadSpeed = Isu152ReloadSpeed;
+		Isu152WeaponData.Accuracy = Isu152Accuracy;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML_20S_152MM_ISU152, Isu152WeaponData);
+	}
+
 	{
 		constexpr float TM312CalibreMM = 305.f;
 		// Produces roughly 8.5k base damage, following the bore-area progression of the 128mm and 152mm cannons.
@@ -6400,6 +6419,36 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.4f, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SU_152, TankData);
+	}
+
+	// ISU-152 (heavy tank destroyer on the IS chassis)
+	{
+		const int32 Isu152RadixiteCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			(JagdPanther_Radixite + Tiger_Radixite) * 0.5f, 10);
+		const int32 Isu152VehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			(JagdPanther_VehicleParts + Tiger_VehicleParts) * 0.5f, 10);
+		const float Isu152VehicleRotationSpeed = 22.f;
+		const float Isu152TurretRotationSpeed = 8.f;
+		const float Isu152MaxSpeedKmh = 18.f;
+		const float Isu152ReverseSpeedKmh = 8.f;
+		const float Isu152ExpWorthMlt = 1.5f;
+
+		TankData.MaxHealth = T3HeavyTankBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = Isu152VehicleRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = Isu152TurretRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = Isu152MaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = Isu152ReverseSpeedKmh;
+		TankData.VisionRadius = T3TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Isu152RadixiteCost},
+			{ERTSResourceType::Resource_VehicleParts, Isu152VehiclePartsCost}
+		});
+		TankData.Abilities = BasicTankDestroyerAbilities;
+		TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * Isu152ExpWorthMlt, 5);
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_ISU_152, TankData);
 	}
 }
 

@@ -31,8 +31,7 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 		ETankSubtype::Tank_BT7_4,
 		ETankSubtype::Tank_T70,
 		ETankSubtype::Tank_T70F,
-		// todo finish this unit type.
-		// ETankSubtype::Tank_SU_76,
+		ETankSubtype::Tank_SU_76,
 	};
 
 	MediumTankOptions.TechLevel = EEnemyAITechLevel::MediumTanks;
