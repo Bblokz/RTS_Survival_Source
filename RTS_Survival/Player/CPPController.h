@@ -30,6 +30,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "ConstructionPreview/CPPConstructionPreview.h"
 #include "ConstructionPreview/BuildingPreviewMode/PlayerBuildingPreviewMode.h"
+#include "ConstructionPreview/FieldDefensePlacement/FieldDefensePlacementRequest.h"
 #include "Formation/FormationPositionEffects/PlayerFormationPositionEffects.h"
 #include "FViewportScreenshotTask/FViewportScreenshotTask.h"
 #include "GameInitCallbacks/MainMenuUICallbacks.h"
@@ -704,6 +705,22 @@ public:
 		const TScriptInterface<IBuildingExpansionOwner>& BuildingExpansionOwner,
 		const int ExpansionSlotIndex);
 
+	/**
+	 * @brief Starts the placement preview of a field defense the player picked in a trainer's training menu; the
+	 * placement click queues it at that trainer, which builds it at the spot once it is its turn.
+	 * @param Trainer The trainer whose queue builds the defense.
+	 * @param TrainingItem Costs, training time and widget index of the option.
+	 * @param RequirementTemplate The requirement of the option; may be null.
+	 * @note Not to be confused with the field construction ability of squads (StartFieldConstructionPreview).
+	 */
+	void StartFieldDefensePlacement(
+		UTrainerComponent* Trainer,
+		const FTrainingQueueItem& TrainingItem,
+		URTSRequirement* RequirementTemplate);
+
+	/** @brief Ends the field defense preview when it plans for this trainer, e.g. because the trainer died. */
+	void StopFieldDefensePlacementForTrainer(const UTrainerComponent* Trainer);
+
 #if RTS_WITH_MAP_TESTS
 	/** @brief Map tests: whether the BXP of a clicked build option has loaded and waits for its placement click. */
 	bool MapTest_GetIsBxpWaitingForPlacement() const;
@@ -714,6 +731,17 @@ public:
 	 * @return False when nothing waits for placement or the player cannot pay.
 	 */
 	bool MapTest_PlaceLoadedBxpAtLocation(FVector& InClickedLocation);
+
+	/** @brief Map tests: whether the player is placing a field defense. */
+	bool MapTest_GetIsFieldDefensePreviewActive() const;
+
+	/**
+	 * @brief Map tests: the placement click of the active field defense with this spot standing in for the cursor.
+	 * @param Location Ground location of the click.
+	 * @param OutInclineDegrees The incline the preview measured over the footprint.
+	 * @return Whether the spot was accepted; the trainer's queue tells whether the defense was queued.
+	 */
+	bool MapTest_PlaceFieldDefenseAt(const FVector& Location, float& OutInclineDegrees);
 #endif
 
 #if RTS_WITH_SHIPPING_MAP_TESTS
@@ -1755,6 +1783,18 @@ private:
 	void StopNomadicPreviewPlacement();
 
 	void StopFieldConstructionPlacement();
+
+	// The field defense the player is placing from a trainer's training menu.
+	UPROPERTY()
+	FFieldDefensePlacementRequest M_FieldDefensePlacementRequest;
+
+	/**
+	 * @brief Queues the planned field defense at its trainer and leaves a static preview at the spot.
+	 * @return Whether the preview ends; it stays on while shift is held and the trainer may plan more defenses.
+	 */
+	bool TryPlaceFieldDefense();
+
+	void StopFieldDefensePlacement();
 
 	/** @brief Also destroys the preview but without calling a cancel on the bxp placement.
 	 * @note used in case we found a valid location to place our preview. */

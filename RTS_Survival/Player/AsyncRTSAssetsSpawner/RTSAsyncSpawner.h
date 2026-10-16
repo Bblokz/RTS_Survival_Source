@@ -138,6 +138,18 @@ public:
 		TArray<int32> BxpItemIndices, const TScriptInterface<IBuildingExpansionOwner>& BuildingExpansionOwner, TArray<
 			FBxpOptionData> BxpTypesAndConstructionRules);
 
+	/**
+	 * @brief Loads and spawns the expansion of a trainer's field defense. Runs beside the player's own expansion
+	 * placement request, so the two never cancel each other, and several trainers may load at once.
+	 * @param BxpType The field defense to spawn.
+	 * @param OnSpawnedCallback Receives the spawned expansion, or null when loading or spawning failed; called once,
+	 * possibly before this function returns when the class is loaded already.
+	 * @return False when the type has no expansion class; the callback is then not called.
+	 */
+	bool AsyncSpawnFieldDefenseExpansion(
+		const EBuildingExpansionType BxpType,
+		TFunction<void(ABuildingExpansion* SpawnedExpansion)> OnSpawnedCallback);
+
 
 protected:
 	virtual void BeginPlay() override;
@@ -399,4 +411,16 @@ private:
 
 	// Helper to actually SpawnActor<AActor> and cast to ABuildingExpansion.
 	ABuildingExpansion* BatchBxp_SpawnExpansionActor(UClass* Cls) const;
+
+	//--------------------------- FIELD DEFENSE LOADING ------------------------------------
+
+	int32 M_NextFieldDefenseRequestId = 0;
+
+	// Field defense loads still in flight, keyed by request id; ended in EndPlay.
+	TMap<int32, TSharedPtr<FStreamableHandle>> M_FieldDefenseLoadHandles;
+
+	void OnFieldDefenseExpansionLoaded(
+		const int32 RequestId,
+		const EBuildingExpansionType BxpType,
+		const TFunction<void(ABuildingExpansion* SpawnedExpansion)>& OnSpawnedCallback);
 };

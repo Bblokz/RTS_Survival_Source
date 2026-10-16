@@ -1771,6 +1771,27 @@ namespace DeveloperSettings
 
 			// Name part that sockets need to have to be recognized as BXP sockets.
 			const FString BxpSocketTrigger = "BXP";
+
+			namespace FieldDefense
+			{
+				// Ground samples per footprint axis when checking the incline of a field defense placement.
+				inline constexpr int32 InclineSamplesPerAxis = 5;
+
+				// Keeps the outer samples just inside the footprint so they do not measure the neighbouring tiles.
+				inline constexpr float InclineSampleInset = 10.f;
+
+				// How far above and below the placement the incline traces start and end; covers steep hills.
+				inline constexpr float InclineTraceHalfHeight = 2000.f;
+
+				// How far one ground sample may lie above or below the footprint's average plane (bumps, ditches).
+				inline constexpr float MaxHeightDeviationFromPlane = 75.f;
+
+				// Half height of the box that keeps a planned field defense's footprint blocked for other buildings.
+				inline constexpr float PlannedFootprintBlockerHalfHeight = 400.f;
+
+				// Keeps the blocker of a planned footprint off the neighbouring grid tiles.
+				inline constexpr float PlannedFootprintBlockerInset = 2.f;
+			}
 		}
 
 		namespace Training
@@ -1779,6 +1800,9 @@ namespace DeveloperSettings
 			inline constexpr uint32 MaxTrainingQueueSize = 128;
 
 			inline constexpr int32 TimeRemainingStartAsyncLoading = 2;
+
+			// How many field defenses a trainer may have placed that have not started their construction yet.
+			inline constexpr int32 MaxPlannedFieldDefenses = 8;
 		}
 
 		namespace ActionUI

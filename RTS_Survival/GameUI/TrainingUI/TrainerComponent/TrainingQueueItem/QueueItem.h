@@ -36,4 +36,10 @@ struct FTrainingQueueItem
 
 	// Key into the trainer's live requirement snapshot map (or INDEX_NONE if no requirement).
 	int32 RequirementKey = INDEX_NONE;
+
+	// Key into the trainer's planned field defenses; INDEX_NONE for items that train a unit.
+	// A field defense item builds its expansion at the planned spot instead of spawning a unit at the trainer.
+	int32 FieldDefenseId = INDEX_NONE;
+
+	bool GetIsFieldDefense() const { return FieldDefenseId != INDEX_NONE; }
 };

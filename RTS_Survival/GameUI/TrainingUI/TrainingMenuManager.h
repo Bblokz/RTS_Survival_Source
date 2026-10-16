@@ -207,6 +207,8 @@ private:
 	void InitAllGameMachineGunTWTrainingOptions();
 	// Units of the faction training layouts that have no hand written entry above.
 	void InitAllGameTrainingLayoutOnlyOptions();
+	// The pits a trainer builds at a planned spot; see OnLeftClickFieldDefenseItem.
+	void InitAllGameFieldDefenseTrainingOptions();
 
 	// Makes sure that training times are not too short to cause load issues on AsyncSpawner.
 	void PostInitTrainingOptions();
@@ -214,6 +216,21 @@ private:
 	void OnLeftClickTrainingItem(
 	const FTrainingWidgetState& TrainingItem,
 	const int32 Index);
+
+	/**
+	 * @brief Field defenses are not queued on click: the player first places them, and the placement click queues
+	 * the item at the trainer. Requirements and the limit of planned defenses apply as for any training item.
+	 * @param TrainingItem The clicked field defense.
+	 * @param FlatOptionIndex The index of the option over all sub sections of the trainer.
+	 */
+	void OnLeftClickFieldDefenseItem(const FTrainingWidgetState& TrainingItem, const int32 FlatOptionIndex);
+
+	/**
+	 * @param TrainingItem The clicked option.
+	 * @param FlatOptionIndex The index of the option over all sub sections of the trainer.
+	 * @return A queue item with the option's costs and training time; without requirement snapshot.
+	 */
+	FTrainingQueueItem CreateQueueItemForOption(const FTrainingWidgetState& TrainingItem, const int32 FlatOptionIndex) const;
 
 	/**
 	 * @brief Adds a training item to the trainer's queue.

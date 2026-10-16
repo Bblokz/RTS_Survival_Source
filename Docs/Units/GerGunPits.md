@@ -2,7 +2,7 @@
 
 Four player-built defences of the German faction. Each is a sandbagged pit holding a team-weapon gun on a plank deck, with four crew. The gun and its crew turn together to face any direction. A shell handler passes every round to the loader, then fetches the next one from the ready crate.
 
-They are built from the German HQ's defence options, after the captured B-4 pit. The B-4 pit was the model; its story is in [B4Howitzer/B4Pit_LessonsLearned.md](B4Howitzer/B4Pit_LessonsLearned.md) (section 8 covers what these pits added).
+They are built from the Field Defenses tab of the German HQ's training menu: the player places a pit and the HQ's training queue builds it there (see [FieldDefenses.md](../UI/FieldDefenses.md)). The leFH 18 and sFH 18 pits need the Communication Center. The B-4 pit was the model; its story is in [B4Howitzer/B4Pit_LessonsLearned.md](B4Howitzer/B4Pit_LessonsLearned.md) (section 8 covers what these pits added).
 
 | Pit | Expansion type | Gun / weapon | Pit | Cost (radixite / metal) | Footprint |
 |---|---|---|---|---|---|

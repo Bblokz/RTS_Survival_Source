@@ -37,6 +37,10 @@
 #include "StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
+#include "RTS_Survival/Game/GameState/BxpDataHelpers/BxpConstructionRulesHelpers.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
+#include "RTS_Survival/Requirement/RTSRequirement.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
@@ -1244,6 +1248,11 @@ void ACPPController::DisplayErrorMessage(const EPlayerError Error)
 	case EPlayerError::Error_CannotBuildHere:
 		DisplayErrorMessageCpp(FText::FromString("Cannot Build here!"));
 		break;
+	case EPlayerError::Error_TooManyFieldDefensesPlanned:
+		DisplayErrorMessageCpp(FText::FromString(FString::Printf(
+			TEXT("Cannot plan more than %d field defenses ahead!"),
+			DeveloperSettings::GamePlay::Training::MaxPlannedFieldDefenses)));
+		break;
 	}
 }
 
@@ -1864,6 +1873,30 @@ bool ACPPController::MapTest_PlaceLoadedBxpAtLocation(FVector& InClickedLocation
 		return false;
 	}
 	return PlaceBxpIfAsyncLoaded(InClickedLocation);
+}
+
+bool ACPPController::MapTest_GetIsFieldDefensePreviewActive() const
+{
+	return M_IsBuildingPreviewModeActive == EPlayerBuildingPreviewMode::FieldDefensePreviewMode;
+}
+
+bool ACPPController::MapTest_PlaceFieldDefenseAt(const FVector& Location, float& OutInclineDegrees)
+{
+	OutInclineDegrees = 0.f;
+	if (not MapTest_GetIsFieldDefensePreviewActive() || not GetIsValidConstructionPreview())
+	{
+		return false;
+	}
+	if (not CPPConstructionPreviewRef->MapTest_EvaluateFieldDefensePlacement(Location, OutInclineDegrees))
+	{
+		return false;
+	}
+	FVector ClickedLocation = Location;
+	if (TryPlaceBuilding(ClickedLocation))
+	{
+		StopPreviewAndBuildingMode(true);
+	}
+	return true;
 }
 #endif
 
@@ -6562,10 +6595,56 @@ bool ACPPController::TryPlaceBuilding(FVector& ClickedLocation)
 		// Make sure to reset exclusion candidates for a new construction order.
 		M_FieldConstructionCandidate.Reset();
 		return true;
+	case EPlayerBuildingPreviewMode::FieldDefensePreviewMode:
+		return TryPlaceFieldDefense();
 	default:
 		break;
 	}
 	return true;
+}
+
+bool ACPPController::TryPlaceFieldDefense()
+{
+	UTrainerComponent* Trainer = M_FieldDefensePlacementRequest.Trainer.Get();
+	if (not IsValid(Trainer) || not Trainer->GetIsAbleToTrain() || not GetIsValidConstructionPreview())
+	{
+		// The trainer died or packed up while the player was placing.
+		return true;
+	}
+	if (not Trainer->GetCanPlanFieldDefense())
+	{
+		DisplayErrorMessage(EPlayerError::Error_TooManyFieldDefensesPlanned);
+		return true;
+	}
+	URTSRequirement* RequirementTemplate = M_FieldDefensePlacementRequest.RequirementTemplate.Get();
+	constexpr bool bIsCheckingForQueuedItem = false;
+	if (IsValid(RequirementTemplate) && not RequirementTemplate->CheckIsRequirementMet(Trainer, bIsCheckingForQueuedItem))
+	{
+		// The requirement was lost while placing; the training menu shows what is missing.
+		return true;
+	}
+	AStaticPreviewMesh* StaticPreview = CPPConstructionPreviewRef->CreateFieldDefenseStaticPreview();
+	if (not IsValid(StaticPreview))
+	{
+		return true;
+	}
+	FFieldDefensePlacement Placement;
+	Placement.BxpType = M_FieldDefensePlacementRequest.BxpType;
+	Placement.Location = CPPConstructionPreviewRef->GetFieldDefensePlacementLocation();
+	Placement.Rotation = CPPConstructionPreviewRef->GetPreviewRotation();
+	Placement.StaticPreview = StaticPreview;
+	if (not Trainer->AddFieldDefenseToQueue(M_FieldDefensePlacementRequest.TrainingItem, RequirementTemplate, Placement))
+	{
+		StaticPreview->Destroy();
+		return true;
+	}
+	constexpr bool bQueueIfNotPlayed = true;
+	constexpr bool bInterruptRegularVoiceLines = false;
+	PlayAnnouncerVoiceLine(FRTS_VoiceLineHelpers::GetAnnouncerForBxp(EBxpOptionSection::BOS_Defense),
+	                       bQueueIfNotPlayed, bInterruptRegularVoiceLines);
+	// Holding shift keeps planning more defenses of the same type.
+	const bool bKeepPlanning = bIsHoldingShift && Trainer->GetCanPlanFieldDefense();
+	return not bKeepPlanning;
 }
 
 bool ACPPController::PlaceBxpIfAsyncLoaded(FVector& InClickedLocation)
@@ -6827,6 +6906,9 @@ void ACPPController::StopBuildingPreviewMode()
 	case EPlayerBuildingPreviewMode::FieldConstructionPreviewMode:
 		StopFieldConstructionPlacement();
 		break;
+	case EPlayerBuildingPreviewMode::FieldDefensePreviewMode:
+		StopFieldDefensePlacement();
+		break;
 	case EPlayerBuildingPreviewMode::BuildingPreviewModeOFF:
 		break;
 	default:
@@ -6848,6 +6930,65 @@ void ACPPController::StopFieldConstructionPlacement()
 {
 	M_FieldConstructionCandidate.Reset();
 	StopPreviewAndBuildingMode(false);
+}
+
+void ACPPController::StopFieldDefensePlacement()
+{
+	// The request itself is reset by StopPreviewAndBuildingMode.
+	StopPreviewAndBuildingMode(false);
+}
+
+void ACPPController::StartFieldDefensePlacement(
+	UTrainerComponent* Trainer,
+	const FTrainingQueueItem& TrainingItem,
+	URTSRequirement* RequirementTemplate)
+{
+	if (not IsValid(Trainer) || not GetIsValidConstructionPreview() || not GetIsValidAsyncSpawner())
+	{
+		return;
+	}
+	if (not Trainer->GetCanPlanFieldDefense())
+	{
+		DisplayErrorMessage(EPlayerError::Error_TooManyFieldDefensesPlanned);
+		return;
+	}
+	const EBuildingExpansionType BxpType = static_cast<EBuildingExpansionType>(TrainingItem.ItemID.SubtypeValue);
+	const FBxpConstructionRules* ConstructionRules = BxpConstructionRules::TGameBxpConstructionRules.Find(BxpType);
+	UStaticMesh* FieldDefensePreviewMesh = M_RTSAsyncSpawner->SyncGetBuildingExpansionPreviewMesh(BxpType);
+	if (not ConstructionRules || not ConstructionRules->Footprint.IsSet() || not IsValid(FieldDefensePreviewMesh))
+	{
+		RTSFunctionLibrary::ReportError("Cannot plan the field defense: " + Global_GetBxpTypeEnumAsString(BxpType) +
+			"\n It needs construction rules with a footprint and a preview mesh in the async spawner."
+			"\n See ACPPController::StartFieldDefensePlacement");
+		return;
+	}
+	// Ends whatever placement was active, including the preview of another field defense.
+	StopBuildingPreviewMode();
+
+	M_FieldDefensePlacementRequest.Trainer = Trainer;
+	M_FieldDefensePlacementRequest.TrainingItem = TrainingItem;
+	M_FieldDefensePlacementRequest.RequirementTemplate = RequirementTemplate;
+	M_FieldDefensePlacementRequest.BxpType = BxpType;
+	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::FieldDefensePreviewMode;
+	// Field defenses are planned inside the player's building radii, like the buildings themselves.
+	const TArray<URadiusComp*> Radii = GetIsValidPlayerBuildRadiusManager()
+		                                   ? Get_NOMADIC_BuildRadiiAndMakeThemVisible()
+		                                   : TArray<URadiusComp*>();
+	CPPConstructionPreviewRef->StartFieldDefensePreview(FieldDefensePreviewMesh, ConstructionRules->Footprint, Radii);
+}
+
+void ACPPController::StopFieldDefensePlacementForTrainer(const UTrainerComponent* Trainer)
+{
+	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::FieldDefensePreviewMode)
+	{
+		return;
+	}
+	const UTrainerComponent* PlanningTrainer = M_FieldDefensePlacementRequest.Trainer.Get();
+	if (PlanningTrainer != nullptr && PlanningTrainer != Trainer)
+	{
+		return;
+	}
+	StopFieldDefensePlacement();
 }
 
 void ACPPController::StopBxpPreviewPlacementResetAsyncRequest(const TScriptInterface<IBuildingExpansionOwner>& BxpOwner,
@@ -7042,6 +7183,7 @@ void ACPPController::StopPreviewAndBuildingMode(const bool bIsPlacedSuccessfully
 {
 	CPPConstructionPreviewRef->StopBuildingPreview(bIsPlacedSuccessfully);
 	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::BuildingPreviewModeOFF;
+	M_FieldDefensePlacementRequest.Reset();
 	ShowPlayerBuildRadius(false);
 	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{

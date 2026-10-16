@@ -57,6 +57,12 @@ private:
 	void InitDefaultStrikeDivisionLayout();
 	void InitDefaultBreakthroughLayout();
 
-	static FTrainingLayoutBuilding MakeDefaultHeadquartersLayout();
+	/**
+	 * @brief The German headquarters layout both doctrines share; a doctrine adds its own field defenses to it.
+	 * @param DoctrineFieldDefenses Field defense slots appended after the shared ones.
+	 * @return The headquarters building layout.
+	 */
+	static FTrainingLayoutBuilding MakeDefaultHeadquartersLayout(
+		const TArray<FTrainingLayoutSlot>& DoctrineFieldDefenses = TArray<FTrainingLayoutSlot>());
 	static FTrainingLayoutBuilding MakeDefaultAirbaseLayout();
 };

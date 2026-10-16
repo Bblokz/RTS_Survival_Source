@@ -9,6 +9,7 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "UObject/Object.h"
 #include "UObject/ObjectKey.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "GameUnitManager.generated.h"
 
 #ifndef RTS_WITH_SHIPPING_MAP_TESTS
@@ -169,7 +170,7 @@ public:
 	 */
 	TArray<ATankMaster*> GetPlayerTanks(const uint8 Player) const;
 
-#if RTS_WITH_SHIPPING_MAP_TESTS
+#if RTS_WITH_SHIPPING_MAP_TESTS || RTS_WITH_MAP_TESTS
 	TArray<AAircraftMaster*> ShippingTest_GetAircraftOfPlayer(uint8 Player) const;
 #endif
 

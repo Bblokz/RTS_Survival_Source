@@ -6,6 +6,8 @@
 #include "RTS_Survival/MasterObjects/ActorObjectsMaster.h"
 #include "StaticPreviewMesh.generated.h"
 
+class UBoxComponent;
+
 
 /**
  * @brief A class to place a static mesh on which the preview is placed.
@@ -27,6 +29,14 @@ public:
 	 */
 	void SetPreviewMesh(UStaticMesh* NewPreviewMesh, UMaterialInstance* PreviewMaterial);
 
+	/**
+	 * @brief Reserves a world aligned area for building placement, so a planned footprint stays blocked while its
+	 * construction waits; the area keeps its world rotation whatever the yaw of the preview.
+	 * @param FootprintArea The world XY area to reserve.
+	 * @param CenterHeight The world height around which the area is reserved.
+	 */
+	void BlockPlacementFootprint(const FBox2D& FootprintArea, const float CenterHeight);
+
 protected:
 	virtual void BeginPlay() override;
 
@@ -34,6 +44,10 @@ private:
 	/** The static mesh on which the preview is placed. */
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> M_PreviewMesh;
+
+	// Only made for previews that reserve a footprint; the grid overlay of other previews treats it as occupied.
+	UPROPERTY()
+	TObjectPtr<UBoxComponent> M_FootprintBlocker;
 
 	// Name for the preview mesh component.
 	static FName PreviewMeshComponentName;

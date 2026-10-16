@@ -7774,14 +7774,11 @@ void ACPPGameState::InitAllGameNomadicData()
 	// Expansion radius is for BXPs that are freely placed, building radius is for other buildings.
 	NomadicData.ExpansionRadius = HQExpansionRadius;
 	NomadicData.BuildRadius = HQBuildingRadius;
+	// The German gun pits are not expansions of the HQ: they are field defenses of its training menu.
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
 		AsDefense(EBuildingExpansionType::BTX_LeFH_150mm),
 		AsDefense(EBuildingExpansionType::BTX_GerCapturedB4Pit),
-		AsDefense(EBuildingExpansionType::BTX_GerPak40Pit),
-		AsDefense(EBuildingExpansionType::BTX_GerLeFH18Pit),
-		AsDefense(EBuildingExpansionType::BTX_GerSFH18Pit),
-		AsDefense(EBuildingExpansionType::BTX_GerFlak37Pit),
 		AsTech(EBuildingExpansionType::BTX_GerHQRadar),
 		AsDefense(EBuildingExpansionType::BTX_GerHQPlatform),
 		AsEconomic(EBuildingExpansionType::BTX_GerHQHarvester),

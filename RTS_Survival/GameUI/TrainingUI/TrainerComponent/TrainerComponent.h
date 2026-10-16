@@ -6,12 +6,14 @@
 #include "Components/ActorComponent.h"
 #include "Containers/Queue.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutTypes.h"
+#include "FieldDefenses/TrainerFieldDefenses.h"
 #include "TraineSettings/Trainersettings.h"
 #include "TrainingQueueItem/QueueItem.h"
 
 #include "TrainerComponent.generated.h"
 
 
+class ABuildingExpansion;
 class USelectionComponent;
 class ARTSRallyPointActor;
 enum class ERTSResourceType : uint8;
@@ -51,6 +53,12 @@ enum class EStopTrainingQueueTimerReason : uint8
  * in here, we also spawn the controller if the asset is of the pawn class.
  * @note 4) OnTrainingOption spawned is called next which calls the OnRTSUnitSpawned with a disable flag on the spawned asset.
  * @note 5) We call OnOption spawned in this component which will teleport the actor to the correct location.
+ *
+ * @note ------- Field defenses -------
+ * @note The player places a field defense from the training menu; AddFieldDefenseToQueue queues it with a static
+ * preview at the spot. Once it becomes the active item its expansion is spawned at that spot and builds while the
+ * item trains, so the expansion's progress bar follows the queue (also through pauses). Previews and unfinished
+ * expansions die with the owner, see OnOwnerDies.
  */
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent), BlueprintType)
 class RTS_SURVIVAL_API UTrainerComponent : public UActorComponent
@@ -130,6 +138,28 @@ public:
 
 	bool RemoveLastInstanceOfTypeFromQueue(const FTrainingOption& TrainingID);
 
+	/** @return How many field defenses wait in the queue without having started their construction. */
+	int32 GetPlannedFieldDefenseCount() const { return M_FieldDefenses.GetPlannedCount(); }
+
+	/** @return Whether the player may place another field defense for this trainer. */
+	bool GetCanPlanFieldDefense() const;
+
+	/**
+	 * @brief Queues a field defense the player placed. It waits in the queue like any other item and is built at
+	 * its preview as soon as it becomes the active item.
+	 * @param TrainingItem Costs, training time and widget index of the option; the requirement key is set here.
+	 * @param RequirementTemplate Duplicated into the snapshot this item keeps checking; may be null.
+	 * @param Placement The spot, rotation, expansion type and the static preview that marks the spot.
+	 * @return False when the item could not be queued; the caller then still owns the static preview.
+	 */
+	bool AddFieldDefenseToQueue(
+		FTrainingQueueItem TrainingItem,
+		URTSRequirement* RequirementTemplate,
+		const FFieldDefensePlacement& Placement);
+
+	/** @brief The owner died: destroys the planned previews and any field defense under construction. */
+	void OnOwnerDies();
+
 	/** @return A map with for each training option of this trainer the count within the queue.
 	 * e.g. how often that option is enqueued.
 	 * @param OutActiveTrainingOptionIndex The index of the training option that is currently active.
@@ -196,8 +226,58 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	// ----------------------------- Field defenses --------------------------
+
+	// The field defenses placed from this trainer; queue items refer to them by FieldDefenseId.
+	UPROPERTY()
+	FTrainerFieldDefenses M_FieldDefenses;
+
+	/**
+	 * @return Whether the active item may spend this queue tick: always for unit items, only once the expansion of a
+	 * field defense item stands at its spot.
+	 * @post A field defense item whose turn just came has its expansion requested.
+	 */
+	bool UpdateQueue_GetIsActiveItemReadyToTrain(const FTrainingQueueItem& ActiveItem);
+
+	// Starts building the active field defense right when its turn comes instead of at the next queue tick.
+	void RequestActiveFieldDefenseIfPlanned();
+
+	void RequestFieldDefenseExpansion(const int32 FieldDefenseId);
+	void OnFieldDefenseExpansionSpawned(const int32 FieldDefenseId, ABuildingExpansion* SpawnedExpansion);
+	void StartFieldDefenseConstruction(FFieldDefensePlacement& Placement, ABuildingExpansion* Expansion);
+
+	/**
+	 * @brief Puts the progress bar and construction animation of the active field defense at the progress of its
+	 * queue item; does nothing when the active item trains a unit.
+	 * @param bIsPaused Whether the queue stands still (player pause or insufficient resources).
+	 */
+	void SyncActiveFieldDefenseProgress(const bool bIsPaused);
+
+	/** @brief Finishes the expansion of a completed field defense item and lets the trainer know. */
+	void PropagateFinishedFieldDefenseToTrainer(const FTrainingQueueItem& FinishedItem);
+
+	// Removes items whose field defense was destroyed while it was being built; runs with the requirement check.
+	void RemoveFieldDefensesWithLostConstruction();
+
+	/**
+	 * @brief Takes one field defense item out of the queue and cleans up after it as a cancel does.
+	 * @param FieldDefenseId The placement of the item to remove.
+	 * @param bRefundPaidProgress Whether the resources already paid for the item are given back.
+	 */
+	void RemoveFieldDefenseItemFromQueue(const int32 FieldDefenseId, const bool bRefundPaidProgress);
+
+	/**
+	 * @brief Destroys the previews and constructions of field defense items that a queue removal took out.
+	 * @param ItemsBeforeRemoval The queue before the removal.
+	 * @param KeptItems The items that are still queued.
+	 */
+	void DestroyFieldDefensesOfRemovedItems(
+		const TArray<FTrainingQueueItem>& ItemsBeforeRemoval,
+		const TArray<FTrainingQueueItem>& KeptItems);
+
 	// List of all training options this trainer has, set with InitUTrainerComponent which takes into account the max size
 	// supported by the UI. Holds the options of all sub sections one after the other.
 	TArray<FTrainingOption> M_TTrainingOptions;

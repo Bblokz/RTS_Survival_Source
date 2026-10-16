@@ -175,12 +175,47 @@ void UTimeProgressBarWidget::StopProgressBar()
 	M_PauseState.M_TotalPausedDuration = 0.0f;
 }
 
+void UTimeProgressBarWidget::SyncProgressBar(const float TotalTime, const float ElapsedTime, const bool bIsPaused)
+{
+	M_World = GetWorld();
+	if (TotalTime <= 0.f || not IsValid(M_World) || not IsValid(M_ProgressBar) || not IsValid(M_ProgressText))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("TimeProgressBarWidget: Cannot sync progress bar with invalid time or widgets."));
+		return;
+	}
+
+	const float CurrentTime = M_World->GetTimeSeconds();
+	M_TotalTime = TotalTime;
+	M_StartTime = CurrentTime - FMath::Clamp(ElapsedTime, 0.f, TotalTime);
+	M_PauseState.M_TotalPausedDuration = 0.0f;
+	M_PauseState.bIsPaused = bIsPaused;
+	M_PauseState.M_PausedTime = CurrentTime;
+	if (M_PauseState.bM_WasHiddenByPause)
+	{
+		SetVisibility(ESlateVisibility::Visible);
+		M_PauseState.bM_WasHiddenByPause = false;
+	}
+	M_ProgressBar->SetVisibility(ESlateVisibility::Visible);
+	M_ProgressText->SetVisibility(ESlateVisibility::Visible);
+
+	FTimerManager& TimerManager = M_World->GetTimerManager();
+	TimerManager.ClearTimer(M_ProgressUpdateHandle);
+	if (not bIsPaused)
+	{
+		TimerManager.SetTimer(M_ProgressUpdateHandle, this,
+		                      &UTimeProgressBarWidget::UpdateProgressBar,
+		                      DeveloperSettings::Optimization::UpdateIntervalProgressBar, true);
+	}
+	UpdateProgressBar();
+}
+
 float UTimeProgressBarWidget::GetTimeElapsed() const
 {
 	if (IsValid(M_World))
 	{
-		float CurrentTime = M_World->GetTimeSeconds();
-		float ElapsedTime = CurrentTime - M_StartTime - M_PauseState.M_TotalPausedDuration;
+		// While paused the bar holds at the moment it was paused; the running pause is not in the total yet.
+		const float CurrentTime = M_PauseState.bIsPaused ? M_PauseState.M_PausedTime : M_World->GetTimeSeconds();
+		const float ElapsedTime = CurrentTime - M_StartTime - M_PauseState.M_TotalPausedDuration;
 		return ElapsedTime;
 	}
 	return 0.0f;

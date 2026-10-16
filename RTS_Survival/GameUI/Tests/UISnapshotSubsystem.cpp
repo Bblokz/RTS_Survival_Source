@@ -68,6 +68,8 @@ namespace UISnapshotConstants
 	// Extra real seconds after the start before capturing, e.g. so nomadic trucks finish converting into buildings.
 	const TCHAR* const DelaySwitch = TEXT("UISnapshotDelay=");
 	const TCHAR* const FocusTrainerSwitch = TEXT("UISnapshotFocusTrainer");
+	// Opens this sub section tab of the trainer's training menu, e.g. 1 for the HQ's Field Defenses.
+	const TCHAR* const TrainingTabSwitch = TEXT("UISnapshotTrainingTab=");
 	// Unrendered skeletal meshes do not advance montages (the unit optimizer keeps resetting the tick option), so
 	// nomadic conversions never finish offscreen without this.
 	const TCHAR* const TickPosesSwitch = TEXT("UISnapshotTickPoses");
@@ -545,6 +547,26 @@ void UUISnapshotSubsystem::SelectTrainer() const
 	const ANomadicVehicle* const NomadicTrainer = Cast<ANomadicVehicle>(Trainer);
 	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT selected trainer %s nomad status %d"), *Trainer->GetName(),
 	       NomadicTrainer ? static_cast<int32>(NomadicTrainer->GetNomadicStatus()) : -1);
+	ShowTrainingTab();
+}
+
+void UUISnapshotSubsystem::ShowTrainingTab() const
+{
+	int32 TrainingTabIndex = INDEX_NONE;
+	if (not FParse::Value(FCommandLine::Get(), UISnapshotConstants::TrainingTabSwitch, TrainingTabIndex)
+		|| not GetIsValidPlayerController())
+	{
+		return;
+	}
+	const UMainGameUI* const MainGameUI = M_PlayerController->GetMainMenuUI();
+	UTrainingMenuManager* const TrainingMenuManager = IsValid(MainGameUI) ? MainGameUI->GetTrainingMenuManager() : nullptr;
+	if (not IsValid(TrainingMenuManager))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT no training menu manager to show tab %d"), TrainingTabIndex);
+		return;
+	}
+	TrainingMenuManager->OnSubSectionTabClicked(TrainingTabIndex);
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT showing training tab %d"), TrainingTabIndex);
 }
 
 void UUISnapshotSubsystem::ForceNomadicMeshesToTickPose() const

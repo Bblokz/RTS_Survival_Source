@@ -15,6 +15,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionData/FieldConstructionData.h"
 #include "RTS_Survival/RTSComponents/RadiusComp/RadiusComp.h"
 #include "SocketConstructionWidget/WSocketConstructionWidget.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 
 #include "CPPConstructionPreview.generated.h"
@@ -58,6 +59,20 @@ public:
 	bool ShippingTest_PrimeBxpPlacementAtLocation(const FVector& InClickedLocation);
 #endif
 
+#if RTS_WITH_MAP_TESTS
+	/**
+	 * @brief Map tests: judges a field defense placement with this spot standing in for the cursor, exactly as the
+	 * tick does; the field defense preview must be active.
+	 * @param CursorLocation Ground location that stands in for the cursor.
+	 * @param OutInclineDegrees The incline of the plane fitted through the footprint's ground samples.
+	 * @return Whether a placement click there would be accepted.
+	 */
+	bool MapTest_EvaluateFieldDefensePlacement(const FVector& CursorLocation, float& OutInclineDegrees);
+
+	/** @return Map tests: the world area of the last evaluated field defense footprint. */
+	FBox2D MapTest_GetFieldDefenseFootprintArea() const { return M_FieldDefenseFootprintArea; }
+#endif
+
 	/** @return If the building preview is overlapping with something. */
 	bool GetIsBuildingPreviewBlocked() const;
 
@@ -95,6 +110,29 @@ public:
 
 	void StartFieldConstructionPreview(UStaticMesh* FieldPreviewMesh,
 	                                   const FFieldConstructionData ConstructionData, const TArray<URadiusComp*>& BuildRadii);
+
+	/**
+	 * @brief Starts planning a field defense from a trainer: unlike other previews the whole grid aligned footprint
+	 * is checked for overlaps and for the incline of the ground under it.
+	 * @param FieldDefensePreviewMesh The mesh that shows the defense.
+	 * @param Footprint The area the defense needs, in world units on the building grid.
+	 * @param BuildRadii The radii the defense has to be placed in.
+	 * @note Do not call directly but use ACPPController::StartFieldDefensePlacement.
+	 */
+	void StartFieldDefensePreview(
+		UStaticMesh* FieldDefensePreviewMesh,
+		const FBuildingFootprint& Footprint,
+		const TArray<URadiusComp*>& BuildRadii);
+
+	/**
+	 * @brief Leaves a static preview at the planned spot that keeps the checked footprint blocked until the
+	 * defense replaces it, and moves the player's units out of that footprint.
+	 * @return Null when there is no field defense preview or the static preview could not be spawned.
+	 */
+	AStaticPreviewMesh* CreateFieldDefenseStaticPreview() const;
+
+	/** @return The grid snapped spot of the field defense preview: the spot whose footprint was checked. */
+	FVector GetFieldDefensePlacementLocation() const { return GetActorLocation(); }
 
 
 	inline UStaticMesh* GetPreviewMesh() const { return PreviewMesh->GetStaticMesh(); }
@@ -199,6 +237,43 @@ private:
 
 	// The tick used for field construction placement where the slope angle is disregarded entirely.
 	bool TickFieldConstructionPlacement(bool& bOutHasValidIncline);
+
+	// The tick used for planning field defenses; checks overlaps and incline over the whole footprint.
+	bool TickFieldDefensePlacement(bool& bOutHasValidIncline);
+
+	// The footprint of the field defense being planned.
+	FBuildingFootprint M_FieldDefenseFootprint;
+
+	// World XY area of the grid tiles under the planned field defense; refreshed with the grid overlaps every tick
+	// so that the incline check and the static preview's blocker cover exactly the tiles that were checked.
+	FBox2D M_FieldDefenseFootprintArea;
+
+	/**
+	 * @brief Samples the ground over the field defense footprint and fits a plane through the samples.
+	 * @return Whether the plane is flat enough and no sample lies too far above or below it (bumps, ditches).
+	 * @post M_SlopeAngle holds the incline of the fitted plane for the preview stats.
+	 */
+	bool IsFieldDefenseInclineValid();
+
+	/**
+	 * @param SampleLocation2D Where on the footprint to sample.
+	 * @param PlacementHeight The height of the preview; the trace runs well above and below it.
+	 * @param OutGroundPoint The ground at the sample.
+	 * @return Whether ground was found.
+	 */
+	bool TraceFieldDefenseGroundSample(
+		const FVector2D& SampleLocation2D,
+		const float PlacementHeight,
+		FVector& OutGroundPoint) const;
+
+	/** @return The footprint the grid overlay marks: none for nomadic previews (mesh projection is used). */
+	FBuildingFootprint GetActiveGridFootprint() const;
+
+	/** @param FootprintIndices The grid tiles under the field defense preview. */
+	void UpdateFieldDefenseFootprintArea(const TArray<int32>& FootprintIndices);
+
+	/** @return The distance between neighbouring grid tile centres, the step the preview snaps with. */
+	float GetGridStep() const;
 
 	// Snaps to the closest socket location, disregards slopes/inlcline.
 	bool TickSocketBxpBuildingPlacement(bool& bOutHasValidIncline);

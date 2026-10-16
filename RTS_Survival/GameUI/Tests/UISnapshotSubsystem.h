@@ -94,6 +94,8 @@ private:
 
 	void SelectPlayerUnits() const;
 	void SelectTrainer() const;
+	// -UISnapshotTrainingTab=N: shows that sub section of the selected trainer's training menu.
+	void ShowTrainingTab() const;
 	AActor* FindPlayerTrainer() const;
 	// -UISnapshotFocusTrainer keeps the camera on the trainer so a converting nomadic truck finishes its building.
 	void FocusCameraOnTrainer() const;

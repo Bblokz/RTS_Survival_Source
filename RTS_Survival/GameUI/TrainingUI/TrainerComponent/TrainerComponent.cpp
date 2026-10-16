@@ -22,6 +22,9 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
 #include "RTS_Survival/Audio/RTSVoiceLines/RTSVoicelines.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Player/ConstructionPreview/MoveUnitsFromConstruction/FMoveUnitsFromConstruction.h"
+#include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
 
 UTrainerComponent::UTrainerComponent()
 	: M_TTrainingOptions{},
@@ -34,6 +37,9 @@ UTrainerComponent::UTrainerComponent()
 
 void UTrainerComponent::CheckRequirementsAndRefreshUI()
 {
+	// Runs every second, also while the queue is paused, so a pit destroyed during its construction leaves the queue.
+	RemoveFieldDefensesWithLostConstruction();
+
 	// If the queue is empty we do not check the requirements for the queued items but we do need
 	// to refresh the UI in case one of the requirements no fails and the UI contains old state with items
 	// that are no longer unlocked.
@@ -302,6 +308,314 @@ bool UTrainerComponent::AddToQueue(const FTrainingQueueItem& TrainingItem)
 	return false;
 }
 
+bool UTrainerComponent::GetCanPlanFieldDefense() const
+{
+	return GetPlannedFieldDefenseCount() < DeveloperSettings::GamePlay::Training::MaxPlannedFieldDefenses;
+}
+
+bool UTrainerComponent::AddFieldDefenseToQueue(
+	FTrainingQueueItem TrainingItem,
+	URTSRequirement* RequirementTemplate,
+	const FFieldDefensePlacement& Placement)
+{
+	if (not GetCanPlanFieldDefense() || not M_TrainingEnabled.bIsAbleToTrain || not GetIsValidOwningTrainer())
+	{
+		return false;
+	}
+	if (not M_TQueueCounts.Contains(TrainingItem.ItemID))
+	{
+		RTSFunctionLibrary::ReportError("Attempted to queue a field defense that is not a training option of this "
+			"trainer.\n Option: " + TrainingItem.ItemID.GetTrainingName() +
+			"\n Owner: " + GetOwnerNameForError());
+		return false;
+	}
+	// Each queued item keeps its own snapshot so that its requirement is checked while it waits.
+	URTSRequirement* RequirementSnapshot = IsValid(RequirementTemplate)
+		                                       ? DuplicateObject<URTSRequirement>(RequirementTemplate, this)
+		                                       : nullptr;
+	TrainingItem.RequirementKey = RegisterRequirementSnapshot(RequirementSnapshot);
+	TrainingItem.FieldDefenseId = M_FieldDefenses.AddPlacement(Placement);
+	(void)AddToQueue(TrainingItem);
+	return true;
+}
+
+void UTrainerComponent::OnOwnerDies()
+{
+	// A dead trainer trains nothing; its field defenses that are not built yet die with it.
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_QueueHandle);
+		World->GetTimerManager().ClearTimer(M_RequirementCheckHandle);
+	}
+	M_FieldDefenses.DestroyAllPlacements();
+	if (GetIsValidPlayerController())
+	{
+		M_PlayerController->StopFieldDefensePlacementForTrainer(this);
+	}
+}
+
+bool UTrainerComponent::UpdateQueue_GetIsActiveItemReadyToTrain(const FTrainingQueueItem& ActiveItem)
+{
+	if (not ActiveItem.GetIsFieldDefense())
+	{
+		return true;
+	}
+	const int32 FieldDefenseId = ActiveItem.FieldDefenseId;
+	const FFieldDefensePlacement* Placement = M_FieldDefenses.FindPlacement(FieldDefenseId);
+	if (not Placement)
+	{
+		RTSFunctionLibrary::ReportError("The active field defense item has no placement; it is removed from the queue."
+			"\n Option: " + ActiveItem.ItemID.GetTrainingName() +
+			"\n Owner: " + GetOwnerNameForError());
+		RemoveFieldDefenseItemFromQueue(FieldDefenseId, true);
+		return false;
+	}
+	switch (Placement->State)
+	{
+	case EFieldDefenseConstructionState::Planned:
+		RequestFieldDefenseExpansion(FieldDefenseId);
+		return false;
+	case EFieldDefenseConstructionState::LoadingExpansion:
+		return false;
+	case EFieldDefenseConstructionState::Constructing:
+		return true;
+	}
+	return false;
+}
+
+void UTrainerComponent::RequestActiveFieldDefenseIfPlanned()
+{
+	if (M_TrainingEnabled.bIsQueueOnPause)
+	{
+		return;
+	}
+	const FTrainingQueueItem* ActiveItem = M_TTrainingQueue.Peek();
+	if (not ActiveItem || not ActiveItem->GetIsFieldDefense())
+	{
+		return;
+	}
+	const int32 FieldDefenseId = ActiveItem->FieldDefenseId;
+	const FFieldDefensePlacement* Placement = M_FieldDefenses.FindPlacement(FieldDefenseId);
+	if (Placement && Placement->State == EFieldDefenseConstructionState::Planned)
+	{
+		RequestFieldDefenseExpansion(FieldDefenseId);
+	}
+}
+
+void UTrainerComponent::RequestFieldDefenseExpansion(const int32 FieldDefenseId)
+{
+	FFieldDefensePlacement* Placement = M_FieldDefenses.FindPlacement(FieldDefenseId);
+	if (not Placement)
+	{
+		return;
+	}
+	ARTSAsyncSpawner* Spawner = GetAsyncSpawner();
+	if (not IsValid(Spawner))
+	{
+		// Stays planned; the next queue tick asks again.
+		return;
+	}
+	Placement->State = EFieldDefenseConstructionState::LoadingExpansion;
+	const EBuildingExpansionType BxpType = Placement->BxpType;
+
+	TWeakObjectPtr<UTrainerComponent> WeakThis(this);
+	const bool bIsRequested = Spawner->AsyncSpawnFieldDefenseExpansion(
+		BxpType,
+		[WeakThis, FieldDefenseId](ABuildingExpansion* SpawnedExpansion)
+		{
+			if (not WeakThis.IsValid())
+			{
+				if (IsValid(SpawnedExpansion))
+				{
+					SpawnedExpansion->Destroy();
+				}
+				return;
+			}
+			WeakThis->OnFieldDefenseExpansionSpawned(FieldDefenseId, SpawnedExpansion);
+		});
+	if (bIsRequested)
+	{
+		return;
+	}
+	RTSFunctionLibrary::ReportError("Could not request the expansion of a field defense; the item is refunded."
+		"\n Expansion: " + Global_GetBxpTypeEnumAsString(BxpType) +
+		"\n Owner: " + GetOwnerNameForError());
+	RemoveFieldDefenseItemFromQueue(FieldDefenseId, true);
+}
+
+void UTrainerComponent::OnFieldDefenseExpansionSpawned(const int32 FieldDefenseId,
+                                                       ABuildingExpansion* SpawnedExpansion)
+{
+	FFieldDefensePlacement* Placement = M_FieldDefenses.FindPlacement(FieldDefenseId);
+	if (not Placement)
+	{
+		// The item was cancelled while its expansion was loading.
+		if (IsValid(SpawnedExpansion))
+		{
+			SpawnedExpansion->Destroy();
+		}
+		return;
+	}
+	if (not IsValid(SpawnedExpansion))
+	{
+		RTSFunctionLibrary::ReportError("The expansion of a field defense failed to spawn; the item is refunded."
+			"\n Expansion: " + Global_GetBxpTypeEnumAsString(Placement->BxpType) +
+			"\n Owner: " + GetOwnerNameForError());
+		RemoveFieldDefenseItemFromQueue(FieldDefenseId, true);
+		return;
+	}
+	StartFieldDefenseConstruction(*Placement, SpawnedExpansion);
+}
+
+void UTrainerComponent::StartFieldDefenseConstruction(FFieldDefensePlacement& Placement, ABuildingExpansion* Expansion)
+{
+	Placement.Expansion = Expansion;
+	Placement.State = EFieldDefenseConstructionState::Constructing;
+	const FVector Location = Placement.Location;
+	const FRotator Rotation = Placement.Rotation;
+	AStaticPreviewMesh* StaticPreview = Placement.StaticPreview.Get();
+	Placement.StaticPreview.Reset();
+	if (IsValid(StaticPreview))
+	{
+		// Units that walked onto the spot while it waited for its turn make room for the construction.
+		FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruction(this, StaticPreview, Rotation);
+		StaticPreview->Destroy();
+	}
+	Expansion->StartFieldDefenseConstruction(Location, Rotation);
+
+	if (M_TrainingEnabled.bIsQueueOnPause)
+	{
+		SyncActiveFieldDefenseProgress(true);
+		return;
+	}
+	// Restarting the queue clock lines its ticks, the trainer's bar and the menu clock up with the construction.
+	StartQueueTimer(true);
+	RefreshTrainingMenuIfPrimary();
+}
+
+void UTrainerComponent::SyncActiveFieldDefenseProgress(const bool bIsPaused)
+{
+	const FTrainingQueueItem* ActiveItem = M_TTrainingQueue.Peek();
+	if (not ActiveItem || not ActiveItem->GetIsFieldDefense() || ActiveItem->TotalTrainingTime <= 0)
+	{
+		return;
+	}
+	const FFieldDefensePlacement* Placement = M_FieldDefenses.FindPlacement(ActiveItem->FieldDefenseId);
+	if (not Placement || Placement->State != EFieldDefenseConstructionState::Constructing)
+	{
+		return;
+	}
+	ABuildingExpansion* Expansion = Placement->Expansion.Get();
+	if (not IsValid(Expansion))
+	{
+		return;
+	}
+	const float TotalTime = static_cast<float>(ActiveItem->TotalTrainingTime);
+	const float ElapsedTime = static_cast<float>(ActiveItem->TotalTrainingTime - ActiveItem->RemainingTrainingTime);
+	Expansion->SyncFieldDefenseConstructionProgress(TotalTime, ElapsedTime, bIsPaused);
+}
+
+void UTrainerComponent::PropagateFinishedFieldDefenseToTrainer(const FTrainingQueueItem& FinishedItem)
+{
+	const FFieldDefensePlacement* Placement = M_FieldDefenses.FindPlacement(FinishedItem.FieldDefenseId);
+	ABuildingExpansion* Expansion = Placement ? Placement->Expansion.Get() : nullptr;
+	M_FieldDefenses.ReleaseFinishedPlacement(FinishedItem.FieldDefenseId);
+	if (not RTSFunctionLibrary::RTSIsValid(Expansion))
+	{
+		// Destroyed in the last second of its construction; the check that removes lost constructions missed it.
+		return;
+	}
+	Expansion->FinishFieldDefenseConstruction();
+	if (GetIsValidOwningTrainer())
+	{
+		M_OwningTrainer->OnTrainingComplete(FinishedItem.ItemID, Expansion);
+	}
+}
+
+void UTrainerComponent::RemoveFieldDefensesWithLostConstruction()
+{
+	// Collect first: every removal changes the placements.
+	const TArray<int32> LostFieldDefenseIds = M_FieldDefenses.GetIdsWithLostConstruction();
+	for (const int32 LostFieldDefenseId : LostFieldDefenseIds)
+	{
+		// The pit was destroyed by the enemy; like a regular expansion its paid construction is lost.
+		constexpr bool bRefundPaidProgress = false;
+		RemoveFieldDefenseItemFromQueue(LostFieldDefenseId, bRefundPaidProgress);
+	}
+}
+
+void UTrainerComponent::RemoveFieldDefenseItemFromQueue(const int32 FieldDefenseId, const bool bRefundPaidProgress)
+{
+	TArray<FTrainingQueueItem> Items;
+	RTSQueueHelpers::DrainQueueToArray(M_TTrainingQueue, Items);
+	const int32 RemovedIndex = Items.IndexOfByPredicate([FieldDefenseId](const FTrainingQueueItem& Item)
+	{
+		return Item.FieldDefenseId == FieldDefenseId;
+	});
+	if (RemovedIndex == INDEX_NONE)
+	{
+		RTSQueueHelpers::RequeueFromArray(M_TTrainingQueue, Items);
+		M_FieldDefenses.DestroyPlacement(FieldDefenseId);
+		return;
+	}
+	const FTrainingQueueItem RemovedItem = Items[RemovedIndex];
+	const bool bRemovedActiveItem = RemovedIndex == 0;
+	Items.RemoveAt(RemovedIndex);
+	RTSQueueHelpers::RequeueFromArray(M_TTrainingQueue, Items);
+
+	if (bRefundPaidProgress)
+	{
+		RefundManualRemoval(RemovedItem);
+	}
+	UnregisterRequirementSnapshot(RemovedItem.RequirementKey);
+	RTSQueueHelpers::DecrementQueueCountFor(RemovedItem.ItemID, M_TQueueCounts);
+	M_FieldDefenses.DestroyPlacement(FieldDefenseId);
+	if (GetIsValidOwningTrainer())
+	{
+		M_OwningTrainer->OnTrainingCancelled(RemovedItem.ItemID, bRemovedActiveItem);
+	}
+	if (bRemovedActiveItem)
+	{
+		// The next item recalculates whether the player can pay for it.
+		bM_AtInsufficientResources = false;
+		if (M_TTrainingQueue.IsEmpty())
+		{
+			StopQueueTimer(EStopTrainingQueueTimerReason::QueueCompleted_StopProgressBar);
+		}
+		else
+		{
+			StopQueueTimer(EStopTrainingQueueTimerReason::QueuePaused_RemovedActive_ResetProgressBar_QueueNotEmpty);
+			if (not M_TrainingEnabled.bIsQueueOnPause)
+			{
+				StartQueueTimer(false);
+			}
+		}
+	}
+	RefreshTrainingMenuIfPrimary();
+}
+
+void UTrainerComponent::DestroyFieldDefensesOfRemovedItems(
+	const TArray<FTrainingQueueItem>& ItemsBeforeRemoval,
+	const TArray<FTrainingQueueItem>& KeptItems)
+{
+	for (const FTrainingQueueItem& ItemBeforeRemoval : ItemsBeforeRemoval)
+	{
+		if (not ItemBeforeRemoval.GetIsFieldDefense())
+		{
+			continue;
+		}
+		const int32 FieldDefenseId = ItemBeforeRemoval.FieldDefenseId;
+		const bool bIsKept = KeptItems.ContainsByPredicate([FieldDefenseId](const FTrainingQueueItem& KeptItem)
+		{
+			return KeptItem.FieldDefenseId == FieldDefenseId;
+		});
+		if (not bIsKept)
+		{
+			M_FieldDefenses.DestroyPlacement(FieldDefenseId);
+		}
+	}
+}
+
 bool UTrainerComponent::RemoveLastQueueItemOfOption(
 	const FTrainingOption& TrainingOption,
 	bool& bOutRemovedActiveItem,
@@ -484,6 +798,9 @@ void UTrainerComponent::UpdateUIQueueForInsufficientResourceState(
 	const bool bAtInsufficientResources,
 	const FTrainingQueueItem& ActiveItem)
 {
+	// The pit under construction stops and resumes together with the queue.
+	SyncActiveFieldDefenseProgress(bAtInsufficientResources);
+
 	// Always update the progress bar, independent of primary selection.
 	if (GetIsValidProgressionBar())
 	{
@@ -610,6 +927,12 @@ bool UTrainerComponent::RemoveLastInstanceOfTypeFromQueue(const FTrainingOption&
 	// Remove the requirement snapshot if present
 	UnregisterRequirementSnapshot(RemovedItem.RequirementKey);
 
+	// A cancelled field defense takes its preview, or its unfinished pit, with it.
+	if (RemovedItem.GetIsFieldDefense())
+	{
+		M_FieldDefenses.DestroyPlacement(RemovedItem.FieldDefenseId);
+	}
+
 	// Notify trainer & adjust counts
 	M_OwningTrainer->OnTrainingCancelled(TrainingID, bRemovedActiveItem);
 	M_TQueueCounts.FindOrAdd(TrainingID) = FMath::Max(M_TQueueCounts[TrainingID] - 1, 0);
@@ -705,6 +1028,8 @@ void UTrainerComponent::StartQueueTimer(const bool bIsStartAfterPause)
 	{
 		M_OwningTrainer->OnTrainingProgressStartedOrResumed(ActiveItem->ItemID);
 	}
+	SyncActiveFieldDefenseProgress(M_TrainingEnabled.bIsQueueOnPause);
+	RequestActiveFieldDefenseIfPlanned();
 }
 
 void UTrainerComponent::StopQueueTimer(const EStopTrainingQueueTimerReason Reason)
@@ -712,6 +1037,11 @@ void UTrainerComponent::StopQueueTimer(const EStopTrainingQueueTimerReason Reaso
 	if (const UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_QueueHandle);
+	}
+	if (Reason == EStopTrainingQueueTimerReason::QueuePaused_PauseProgressBar)
+	{
+		// The pit under construction holds still together with the queue.
+		SyncActiveFieldDefenseProgress(true);
 	}
 	if (not GetIsValidProgressionBar())
 	{
@@ -744,6 +1074,11 @@ void UTrainerComponent::UpdateQueue()
 	if (!M_TTrainingQueue.IsEmpty() && !M_WaitForLoadingAsset)
 	{
 		FTrainingQueueItem* ActiveItem = M_TTrainingQueue.Peek();
+		// A field defense neither pays nor trains before its pit stands at the planned spot.
+		if (not UpdateQueue_GetIsActiveItemReadyToTrain(*ActiveItem))
+		{
+			return;
+		}
 		// Attempt to pay for this second of training.
 		if (not UpdateQueue_PauseQueueInsufficientResources(ActiveItem))
 		{
@@ -761,6 +1096,8 @@ void UTrainerComponent::UpdateQueue()
 			UpdateUIQueueForInsufficientResourceState(false, *ActiveItem);
 			bM_AtInsufficientResources = false;
 		}
+		// The pit under construction shows the progress this tick paid for.
+		SyncActiveFieldDefenseProgress(false);
 		// Starts spawning the item if not spawning yet and time remaining is below threshold.
 		DetermineSpawnActiveItem(ActiveItem);
 
@@ -918,7 +1255,7 @@ void UTrainerComponent::TrainingCompleteRemoveFromQueue()
 	// Notify trainer about the completed item (may run BP logic that hides the old preview, etc.)
 	PropagateSpawnedActorToTrainer(FinishedItem);
 
-	//  if the queue continues without pausing, notify that the NEXT item has started/resumed 
+	//  if the queue continues without pausing, notify that the NEXT item has started/resumed
 	if (!M_TrainingEnabled.bIsQueueOnPause && M_OwningTrainer.IsValid())
 	{
 		if (const FTrainingQueueItem* NewActive = M_TTrainingQueue.Peek())
@@ -927,10 +1264,17 @@ void UTrainerComponent::TrainingCompleteRemoveFromQueue()
 			M_OwningTrainer->OnTrainingProgressStartedOrResumed(NewActive->ItemID);
 		}
 	};
+	// A field defense that is next in line starts building now rather than at the next queue tick.
+	RequestActiveFieldDefenseIfPlanned();
 }
 
 void UTrainerComponent::PropagateSpawnedActorToTrainer(const FTrainingQueueItem FinishedItem)
 {
+	if (FinishedItem.GetIsFieldDefense())
+	{
+		PropagateFinishedFieldDefenseToTrainer(FinishedItem);
+		return;
+	}
 	if (not M_OwningTrainer.IsValid())
 	{
 		RTSFunctionLibrary::ReportError(
@@ -1048,6 +1392,11 @@ bool UTrainerComponent::GetIsValidOwningTrainer() const
 
 void UTrainerComponent::DetermineSpawnActiveItem(FTrainingQueueItem* ActiveItem)
 {
+	if (ActiveItem->GetIsFieldDefense())
+	{
+		// Its expansion was spawned at the planned spot when its turn came; no unit is spawned at the trainer.
+		return;
+	}
 	if (ActiveItem->AsyncRequestState == Async_NoTrainingRequest && ActiveItem->RemainingTrainingTime <=
 		DeveloperSettings::GamePlay::Training::TimeRemainingStartAsyncLoading)
 	{
@@ -1181,6 +1530,20 @@ void UTrainerComponent::BeginPlay()
 	BeginPlay_InitPlayerResourceManager();
 	// Subscribe to selection-bucket visibility updates (PrimarySameType changes).
 	BeginPlay_AddToSelectionPrimaryType();
+}
+
+void UTrainerComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (EndPlayReason == EEndPlayReason::Destroyed)
+	{
+		// Covers owners that are destroyed without dying first; the previews are saved with the trainer's owner.
+		M_FieldDefenses.DestroyAllPlacements();
+		if (GetIsValidPlayerController())
+		{
+			M_PlayerController->StopFieldDefensePlacementForTrainer(this);
+		}
+	}
+	Super::EndPlay(EndPlayReason);
 }
 
 void UTrainerComponent::SpawnRallyPointActorIfNeeded(TSubclassOf<ARTSRallyPointActor> RallyClass)
@@ -1488,6 +1851,8 @@ bool UTrainerComponent::RemoveInvalidRequirementItems_AndRefund()
 		RequeueFromArray(M_TTrainingQueue, Items);
 		return false;
 	}
+	// Field defenses that lost their requirement take their preview, or their unfinished pit, with them.
+	DestroyFieldDefensesOfRemovedItems(Items, Kept);
 
 	// 4) If active item was removed → stop/reset progress bar & cancel async
 	if (bRemovedActiveItem)

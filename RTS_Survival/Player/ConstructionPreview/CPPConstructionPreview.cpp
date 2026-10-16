@@ -99,7 +99,10 @@ FVector ACPPConstructionPreview::GetBxpPreviewLocation(const FVector& ClickedLoc
 	// Falls through.
 	case EConstructionPreviewMode::Construct_BxpSocket:
 	case EConstructionPreviewMode::Construct_BxpOrigin:
+	case EConstructionPreviewMode::Construct_FieldDefense:
 		return GetActorLocation();
+	case EConstructionPreviewMode::Construct_FieldConstruction:
+		return ClickedLocation;
 	}
 	return ClickedLocation;
 }
@@ -124,6 +127,23 @@ FName ACPPConstructionPreview::GetBxpSocketName() const
 	}
 	return NAME_None;
 }
+
+#if RTS_WITH_MAP_TESTS
+bool ACPPConstructionPreview::MapTest_EvaluateFieldDefensePlacement(const FVector& CursorLocation,
+                                                                   float& OutInclineDegrees)
+{
+	OutInclineDegrees = 0.f;
+	if (M_ActivePreviewStatus != EConstructionPreviewMode::Construct_FieldDefense)
+	{
+		return false;
+	}
+	SetCursorPosition(CursorLocation);
+	bool bHasValidIncline = false;
+	bM_IsValidBuildingLocation = TickFieldDefensePlacement(bHasValidIncline);
+	OutInclineDegrees = M_SlopeAngle;
+	return bM_IsValidBuildingLocation;
+}
+#endif
 
 #if RTS_WITH_SHIPPING_MAP_TESTS
 bool ACPPConstructionPreview::ShippingTest_GetHasActivePreview() const
@@ -190,28 +210,34 @@ void ACPPConstructionPreview::EndPlay(const EEndPlayReason::Type EndPlayReason)
 }
 
 
+float ACPPConstructionPreview::GetGridStep() const
+{
+	float Step = DeveloperSettings::GamePlay::Construction::GridSnapSize;
+	if (not EnsureIsValidGridOverlay())
+	{
+		return Step;
+	}
+	// Default to CellSize
+	Step = M_GridOverlay->GetCellSize();
+
+	// If we can, snap to actual center-to-center step (CellSize + Gap)
+	FTransform T0, T1;
+	if (M_GridOverlay->GetInstanceWorldTransform(0, T0) &&
+		M_GridOverlay->GetInstanceWorldTransform(1, T1))
+	{
+		const float StepX = FMath::Abs(T1.GetLocation().X - T0.GetLocation().X);
+		if (StepX > KINDA_SMALL_NUMBER)
+		{
+			Step = StepX;
+		}
+	}
+	return Step;
+}
+
 FVector ACPPConstructionPreview::GetGridSnapAdjusted(
 	const FVector& MouseWorldPosition, const float ExtraHeight) const
 {
-	float Snap = DeveloperSettings::GamePlay::Construction::GridSnapSize;
-
-	if (EnsureIsValidGridOverlay())
-	{
-		// Default to CellSize
-		Snap = M_GridOverlay->GetCellSize();
-
-		// If we can, snap to actual center-to-center step (CellSize + Gap)
-		FTransform T0, T1;
-		if (M_GridOverlay->GetInstanceWorldTransform(0, T0) &&
-			M_GridOverlay->GetInstanceWorldTransform(1, T1))
-		{
-			const float StepX = FMath::Abs(T1.GetLocation().X - T0.GetLocation().X);
-			if (StepX > KINDA_SMALL_NUMBER)
-			{
-				Snap = StepX;
-			}
-		}
-	}
+	const float Snap = GetGridStep();
 
 	const float X = FMath::RoundToFloat(MouseWorldPosition.X / Snap) * Snap;
 	const float Y = FMath::RoundToFloat(MouseWorldPosition.Y / Snap) * Snap;
@@ -418,6 +444,9 @@ void ACPPConstructionPreview::Tick(float DetlaTime)
 	case EConstructionPreviewMode::Construct_FieldConstruction:
 		bM_IsValidBuildingLocation = TickFieldConstructionPlacement(bIsSlopeValid);
 		break;
+	case EConstructionPreviewMode::Construct_FieldDefense:
+		bM_IsValidBuildingLocation = TickFieldDefensePlacement(bIsSlopeValid);
+		break;
 	}
 	// Update materials depending on whether we can place the preview.
 	UpdatePreviewMaterial(bM_IsValidBuildingLocation);
@@ -576,6 +605,179 @@ bool ACPPConstructionPreview::TickFieldConstructionPlacement(bool& bOutHasValidI
 
 	UpdatePreviewMaterial(true);
 	return true;
+}
+
+bool ACPPConstructionPreview::TickFieldDefensePlacement(bool& bOutHasValidIncline)
+{
+	// Move preview along grid.
+	SetActorLocation(GetGridSnapAdjusted(CursorWorldPosition));
+	// Also refreshes the footprint area that the incline check samples.
+	UpdateOverlayGridOverlaps();
+
+	bOutHasValidIncline = IsFieldDefenseInclineValid();
+	const bool bIsValidPlacement = bOutHasValidIncline
+		&& not IsOverlayFootprintOverlapping()
+		&& GetisWithinBuildRadii(GetActorLocation());
+	if constexpr (DeveloperSettings::Debugging::GConstruction_Preview_Compile_DebugSymbols)
+	{
+		if (not bIsValidPlacement)
+		{
+			RTSFunctionLibrary::PrintString("Cannot place field defense here", FColor::Red);
+		}
+	}
+	UpdatePreviewMaterial(bIsValidPlacement);
+	return bIsValidPlacement;
+}
+
+bool ACPPConstructionPreview::IsFieldDefenseInclineValid()
+{
+	using namespace DeveloperSettings::GamePlay::Construction;
+	using namespace DeveloperSettings::GamePlay::Construction::FieldDefense;
+	if (not M_FieldDefenseFootprintArea.bIsValid)
+	{
+		return false;
+	}
+	const FVector2D Center = M_FieldDefenseFootprintArea.GetCenter();
+	const FVector2D SampleHalfSize = M_FieldDefenseFootprintArea.GetExtent() - FVector2D(InclineSampleInset);
+	const float PlacementHeight = GetActorLocation().Z;
+	constexpr int32 SampleCount = InclineSamplesPerAxis * InclineSamplesPerAxis;
+	constexpr float LastSampleOnAxis = InclineSamplesPerAxis - 1;
+
+	// The samples lie on a regular grid around the centre, so the cross terms of the least squares plane cancel
+	// and its slopes are SumXZ / SumXX and SumYZ / SumYY.
+	TArray<FVector> SampleOffsets;
+	SampleOffsets.Reserve(SampleCount);
+	float SumXZ = 0.f, SumXX = 0.f, SumYZ = 0.f, SumYY = 0.f, SumZ = 0.f;
+	for (int32 SampleIndex = 0; SampleIndex < SampleCount; ++SampleIndex)
+	{
+		const float AlphaX = (SampleIndex % InclineSamplesPerAxis) / LastSampleOnAxis;
+		const float AlphaY = (SampleIndex / InclineSamplesPerAxis) / LastSampleOnAxis;
+		const FVector2D Offset(FMath::Lerp(-SampleHalfSize.X, SampleHalfSize.X, AlphaX),
+		                       FMath::Lerp(-SampleHalfSize.Y, SampleHalfSize.Y, AlphaY));
+		FVector GroundPoint;
+		if (not TraceFieldDefenseGroundSample(Center + Offset, PlacementHeight, GroundPoint))
+		{
+			// No ground under part of the footprint, for instance over a cliff edge.
+			return false;
+		}
+		SampleOffsets.Add(FVector(Offset.X, Offset.Y, GroundPoint.Z));
+		SumXZ += Offset.X * GroundPoint.Z;
+		SumXX += Offset.X * Offset.X;
+		SumYZ += Offset.Y * GroundPoint.Z;
+		SumYY += Offset.Y * Offset.Y;
+		SumZ += GroundPoint.Z;
+	}
+	const float SlopeX = SumXX > KINDA_SMALL_NUMBER ? SumXZ / SumXX : 0.f;
+	const float SlopeY = SumYY > KINDA_SMALL_NUMBER ? SumYZ / SumYY : 0.f;
+	const float PlaneHeightAtCenter = SumZ / SampleCount;
+
+	float MaxDeviationFromPlane = 0.f;
+	for (const FVector& Sample : SampleOffsets)
+	{
+		const float PlaneHeight = PlaneHeightAtCenter + SlopeX * Sample.X + SlopeY * Sample.Y;
+		MaxDeviationFromPlane = FMath::Max(MaxDeviationFromPlane, FMath::Abs(Sample.Z - PlaneHeight));
+	}
+	M_SlopeAngle = FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(SlopeX * SlopeX + SlopeY * SlopeY)));
+	return M_SlopeAngle <= DegreesAllowedOnHill && MaxDeviationFromPlane <= MaxHeightDeviationFromPlane;
+}
+
+bool ACPPConstructionPreview::TraceFieldDefenseGroundSample(
+	const FVector2D& SampleLocation2D,
+	const float PlacementHeight,
+	FVector& OutGroundPoint) const
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	using DeveloperSettings::GamePlay::Construction::FieldDefense::InclineTraceHalfHeight;
+	const FVector TraceStart(SampleLocation2D.X, SampleLocation2D.Y, PlacementHeight + InclineTraceHalfHeight);
+	const FVector TraceEnd(SampleLocation2D.X, SampleLocation2D.Y, PlacementHeight - InclineTraceHalfHeight);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(FieldDefenseInclineSample), false);
+	QueryParams.AddIgnoredActor(this);
+	if (EnsureIsValidGridOverlay())
+	{
+		QueryParams.AddIgnoredActor(M_GridOverlay);
+	}
+	FHitResult GroundHit;
+	// The landscape channel is the one the cursor uses: it is not blocked by units standing on the spot.
+	if (not World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, QueryParams))
+	{
+		return false;
+	}
+	OutGroundPoint = GroundHit.ImpactPoint;
+	return true;
+}
+
+FBuildingFootprint ACPPConstructionPreview::GetActiveGridFootprint() const
+{
+	switch (M_ActivePreviewStatus)
+	{
+	case EConstructionPreviewMode::Construct_NomadicPreview:
+		// Nomadic: always project mesh.
+		return FBuildingFootprint();
+	case EConstructionPreviewMode::Construct_FieldDefense:
+		return M_FieldDefenseFootprint;
+	default:
+		return BxpConstructionData.GetConstructionRules().Footprint;
+	}
+}
+
+void ACPPConstructionPreview::UpdateFieldDefenseFootprintArea(const TArray<int32>& FootprintIndices)
+{
+	M_FieldDefenseFootprintArea.Init();
+	const float HalfStep = GetGridStep() * 0.5f;
+	for (const int32 TileIndex : FootprintIndices)
+	{
+		FTransform TileTransform;
+		if (not EnsureIsValidGridOverlay() || not M_GridOverlay->GetInstanceWorldTransform(TileIndex, TileTransform))
+		{
+			continue;
+		}
+		const FVector2D TileCenter(TileTransform.GetLocation());
+		M_FieldDefenseFootprintArea += FBox2D(TileCenter - FVector2D(HalfStep), TileCenter + FVector2D(HalfStep));
+	}
+	if (M_FieldDefenseFootprintArea.bIsValid)
+	{
+		return;
+	}
+	// Without grid tiles the footprint is centred on the preview.
+	const FVector2D Center(GetActorLocation());
+	const FVector2D HalfSize(M_FieldDefenseFootprint.SizeX * 0.5f, M_FieldDefenseFootprint.SizeY * 0.5f);
+	M_FieldDefenseFootprintArea = FBox2D(Center - HalfSize, Center + HalfSize);
+}
+
+AStaticPreviewMesh* ACPPConstructionPreview::CreateFieldDefenseStaticPreview() const
+{
+	if (M_ActivePreviewStatus != EConstructionPreviewMode::Construct_FieldDefense)
+	{
+		RTSFunctionLibrary::ReportError("Requested a field defense static preview while not planning a field defense."
+			"\n See ACPPConstructionPreview::CreateFieldDefenseStaticPreview");
+		return nullptr;
+	}
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || not EnsureIsValidPreviewStaticMesh())
+	{
+		return nullptr;
+	}
+	const FRotator PreviewRotation = GetPreviewRotation();
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AStaticPreviewMesh* StaticPreviewMesh = World->SpawnActor<AStaticPreviewMesh>(
+		GetActorLocation(), PreviewRotation, SpawnParams);
+	if (not IsValid(StaticPreviewMesh))
+	{
+		return nullptr;
+	}
+	StaticPreviewMesh->SetPreviewMesh(PreviewMesh->GetStaticMesh(), M_ConstructionPreviewMaterial);
+	// Reserves exactly the tiles that were checked; later previews and other buildings see them as occupied.
+	StaticPreviewMesh->BlockPlacementFootprint(M_FieldDefenseFootprintArea, GetActorLocation().Z);
+	// Uses the bounds of the preview, which now include the whole footprint.
+	FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruction(
+		this, StaticPreviewMesh, PreviewRotation);
+	return StaticPreviewMesh;
 }
 
 bool ACPPConstructionPreview::TickSocketBxpBuildingPlacement(bool& bOutHasValidIncline)
@@ -863,6 +1065,30 @@ void ACPPConstructionPreview::StartFieldConstructionPreview(UStaticMesh* FieldPr
 	                                        true);
 }
 
+void ACPPConstructionPreview::StartFieldDefensePreview(
+	UStaticMesh* FieldDefensePreviewMesh,
+	const FBuildingFootprint& Footprint,
+	const TArray<URadiusComp*>& BuildRadii)
+{
+	if (not IsValid(FieldDefensePreviewMesh) || not Footprint.IsSet())
+	{
+		RTSFunctionLibrary::ReportError("Cannot start a field defense preview without a preview mesh or footprint."
+			"\n See ACPPConstructionPreview::StartFieldDefensePreview; actor: " + GetName());
+		return;
+	}
+	M_PreviewSounds.PlayConstructionSound(this, EConstructionPreviewSoundType::StartPreview);
+	M_FieldDefenseFootprint = Footprint;
+	M_FieldDefenseFootprintArea.Init();
+	bM_IsValidBuildingLocation = false;
+	// Field defenses are planned inside the player's building radii, like the buildings themselves.
+	bM_NeedWithinBuildRadius = true;
+	M_BuildRadii = BuildRadii;
+	SetGridOverlayEnabled(true);
+	// Also sets the mode of construction.
+	InitPreviewAndStatWidgetForConstruction(FieldDefensePreviewMesh, EConstructionPreviewMode::Construct_FieldDefense,
+	                                        true);
+}
+
 
 void ACPPConstructionPreview::InitPreviewAndStatWidgetForConstruction(
 	UStaticMesh* NewPreviewMesh,
@@ -928,6 +1154,9 @@ bool ACPPConstructionPreview::GetIsRotationAllowed() const
 	case EConstructionPreviewMode::Construct_BxpOrigin:
 		break;
 	case EConstructionPreviewMode::Construct_FieldConstruction:
+		bIsAllowed = true;
+		break;
+	case EConstructionPreviewMode::Construct_FieldDefense:
 		bIsAllowed = true;
 		break;
 	}
@@ -1446,40 +1675,31 @@ void ACPPConstructionPreview::UpdateOverlayGridOverlaps()
 
 	// Decide which footprinting method to use:
 	//  - Nomadic preview: always use mesh projection (existing behaviour)
-	//  - Otherwise: if rules have a non-zero footprint, use a GRID-ALIGNED rectangle
+	//  - Otherwise: if the bxp rules or the field defense have a non-zero footprint, use a GRID-ALIGNED rectangle
 	//    so the tile count is invariant under rotation; else, project the mesh.
 	TArray<int32> FootprintIndices;
-	const bool bIsNomadic = (M_ActivePreviewStatus == EConstructionPreviewMode::Construct_NomadicPreview);
-
-	if (!bIsNomadic)
+	const FBuildingFootprint Footprint = GetActiveGridFootprint();
+	if (Footprint.IsSet())
 	{
-		const FBxpConstructionRules& Rules = BxpConstructionData.GetConstructionRules();
-		const bool bHasExplicitFootprint =
-			(Rules.Footprint.SizeX > 0.f && Rules.Footprint.SizeY > 0.f);
-
-		if (bHasExplicitFootprint)
-		{
-			// Grid-aligned: ignore the preview yaw and take a fixed block centered at the snapped location.
-			// This keeps the footprint constant (e.g., 3×3) for any rotation.
-			FPreviewToGridHelpers::ComputeGridIndicesForFootprint_GridAligned(
-				/*Grid*/ M_GridOverlay,
-				         /*CenterWorld*/ GetActorLocation(), // preview actor is snapped to grid already
-				         /*FootprintX*/ Rules.Footprint.SizeX,
-				         /*FootprintY*/ Rules.Footprint.SizeY,
-				         /*Out*/ FootprintIndices);
-		}
-		else
-		{
-			// No explicit footprint → fall back to oriented mesh projection.
-			FPreviewToGridHelpers::ComputeGridIndicesUnderPreview(
-				M_GridOverlay, PreviewMesh, FootprintIndices);
-		}
+		// Grid-aligned: ignore the preview yaw and take a fixed block centered at the snapped location.
+		// This keeps the footprint constant (e.g., 3×3) for any rotation.
+		FPreviewToGridHelpers::ComputeGridIndicesForFootprint_GridAligned(
+			/*Grid*/ M_GridOverlay,
+			         /*CenterWorld*/ GetActorLocation(), // preview actor is snapped to grid already
+			         /*FootprintX*/ Footprint.SizeX,
+			         /*FootprintY*/ Footprint.SizeY,
+			         /*Out*/ FootprintIndices);
 	}
 	else
 	{
-		// Nomadic: always project mesh (as requested earlier).
+		// No explicit footprint → fall back to oriented mesh projection.
 		FPreviewToGridHelpers::ComputeGridIndicesUnderPreview(
 			M_GridOverlay, PreviewMesh, FootprintIndices);
+	}
+
+	if (M_ActivePreviewStatus == EConstructionPreviewMode::Construct_FieldDefense)
+	{
+		UpdateFieldDefenseFootprintArea(FootprintIndices);
 	}
 
 	// Apply and test overlaps.
@@ -1499,6 +1719,7 @@ float ACPPConstructionPreview::GetRotationDegrees() const
 	case EConstructionPreviewMode::Construct_BxpFree:
 	case EConstructionPreviewMode::Construct_BxpSocket:
 	case EConstructionPreviewMode::Construct_BxpOrigin:
+	case EConstructionPreviewMode::Construct_FieldDefense:
 		DeltaYaw = RotationDegrees;
 		break;
 	case EConstructionPreviewMode::Construct_FieldConstruction:

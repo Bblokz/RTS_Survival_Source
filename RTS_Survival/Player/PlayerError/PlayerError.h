@@ -23,6 +23,8 @@ enum class EPlayerError : uint8
 	Error_CannotStackBuildingAbilities,
 	Error_NoFreeTruckAvailable,
 	Error_CannotBuildHere,
+	// The trainer already has the maximum amount of field defenses waiting for their construction.
+	Error_TooManyFieldDefensesPlanned,
 };
 
 inline EAnnouncerVoiceLineType ConvertPlayerErrorToAnnouncerVoiceLineType(const EPlayerError PlayerError)

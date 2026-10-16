@@ -403,6 +403,7 @@ void UTrainingMenuManager::InitAllGameTrainingOptions()
 	InitAllGameSquadTrainingOptions();
 	InitAllGameAircraftTrainingOptions();
 	InitAllGameTrainingLayoutOnlyOptions();
+	InitAllGameFieldDefenseTrainingOptions();
 }
 
 FTrainingOptionState UTrainingMenuManager::CreateTrainingOptionState(
@@ -2592,6 +2593,45 @@ void UTrainingMenuManager::InitAllGameTrainingLayoutOnlyOptions()
 	AddTankOptionIfMissing(ETankSubtype::Tank_PzIII_FLamm, MediumTankTrainingTime);
 }
 
+void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
+{
+	// The queue item drives the construction, so the training time is the construction time of the pit.
+	using DeveloperSettings::GameBalance::TrainingTime::BxpT2BuildTime;
+	using DeveloperSettings::GameBalance::TrainingTime::GerPuppchenPitBuildTime;
+	using DeveloperSettings::GameBalance::TrainingTime::GerPanzerschreckPitBuildTime;
+	using DeveloperSettings::GameBalance::TrainingTime::GerRailPakBunkerBuildTime;
+
+	auto AddFieldDefenseTrainingOption = [this](const EBuildingExpansionType BxpType, URTSRequirement* Requirement,
+	                                            const int32 TrainingTime = BxpT2BuildTime)
+	{
+		const FTrainingOption ItemID(EAllUnitType::UNType_BuildingExpansion, static_cast<uint8>(BxpType));
+		M_TrainingOptionsMap.Add(ItemID, CreateTrainingOptionState(
+			                         ItemID, TrainingTime, EAllUnitType::UNType_BuildingExpansion,
+			                         ETankSubtype::Tank_None, ENomadicSubtype::Nomadic_None, ESquadSubtype::Squad_None,
+			                         EAircraftSubtype::Aircarft_None, Requirement));
+	};
+	// The tier II building that also unlocks the airbase and the experimental factory.
+	const FTrainingOption RequiredTierTwoBuilding(
+		EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter));
+
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerPak40Pit, nullptr);
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerFlak37Pit, nullptr);
+	// The small two-man pits: cheap, quick to build, no requirement.
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerPuppchenPit, nullptr, GerPuppchenPitBuildTime);
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerPanzerschreckPit, nullptr, GerPanzerschreckPitBuildTime);
+	AddFieldDefenseTrainingOption(
+		EBuildingExpansionType::BTX_GerLeFH18Pit,
+		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding));
+	AddFieldDefenseTrainingOption(
+		EBuildingExpansionType::BTX_GerSFH18Pit,
+		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding));
+	// Only the breakthrough doctrine's headquarters layout shows it.
+	AddFieldDefenseTrainingOption(
+		EBuildingExpansionType::BTX_GerRailPakBunker,
+		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding),
+		GerRailPakBunkerBuildTime);
+}
+
 void UTrainingMenuManager::PostInitTrainingOptions()
 {
 	for (auto& Option : M_TrainingOptionsMap)
@@ -2630,9 +2670,14 @@ void UTrainingMenuManager::OnLeftClickTrainingItem(const FTrainingWidgetState& T
 			return;
 		}
 	}
+	if (TrainingItem.ItemID.UnitType == EAllUnitType::UNType_BuildingExpansion)
+	{
+		OnLeftClickFieldDefenseItem(TrainingItem, FlatOptionIndex);
+		return;
+	}
 	//  Costs + requirement snapshot + enqueue
 	const int32 AmountAddToQueue = FRTS_Statics::IsShiftPressed(M_MainGameUI) ? 5 : 1;
-	const TMap<ERTSResourceType, int32> Costs = GetTrainingCosts(TrainingItem.ItemID);
+	const FTrainingQueueItem QueueItemTemplate = CreateQueueItemForOption(TrainingItem, FlatOptionIndex);
 
 	// Template requirement (may be null)
 	URTSRequirement* RequirementTemplate = nullptr;
@@ -2661,14 +2706,7 @@ void UTrainingMenuManager::OnLeftClickTrainingItem(const FTrainingWidgetState& T
 		const int32 RequirementKey =
 			M_PrimarySelectedTrainer->RegisterRequirementSnapshot(Snapshot);
 
-		FTrainingQueueItem NewTrainingItem;
-		NewTrainingItem.ItemID = TrainingItem.ItemID;
-		NewTrainingItem.TotalTrainingTime = TrainingItem.TotalTrainingTime;
-		NewTrainingItem.RemainingTrainingTime = TrainingItem.TotalTrainingTime;
-		NewTrainingItem.WidgetIndex = FlatOptionIndex;
-		NewTrainingItem.AsyncRequestState = EAsyncTrainingRequestState::Async_NoTrainingRequest;
-		NewTrainingItem.RemainingResourceCosts = Costs;
-		NewTrainingItem.TotalResourceCosts = Costs;
+		FTrainingQueueItem NewTrainingItem = QueueItemTemplate;
 		NewTrainingItem.RequirementKey = RequirementKey;
 
 		// Also calls OnTrainingItemAddedToQueue on the trainer that owns the primary trainer component.
@@ -2677,6 +2715,52 @@ void UTrainingMenuManager::OnLeftClickTrainingItem(const FTrainingWidgetState& T
 		PlayAnnouncerTrainingSound(EAnnouncerVoiceLineType::Training);
 		
 	}
+}
+
+void UTrainingMenuManager::OnLeftClickFieldDefenseItem(const FTrainingWidgetState& TrainingItem,
+                                                       const int32 FlatOptionIndex)
+{
+	URTSRequirement* RequirementTemplate = nullptr;
+	if (const FTrainingOptionState* OptionState = M_TrainingOptionsMap.Find(TrainingItem.ItemID))
+	{
+		RequirementTemplate = OptionState->RTSRequirement;
+	}
+	constexpr bool bIsCheckingForQueuedItem = false;
+	if (IsValid(RequirementTemplate)
+		&& not RequirementTemplate->CheckIsRequirementMet(M_PrimarySelectedTrainer, bIsCheckingForQueuedItem))
+	{
+		OnRequirementNotMetWhenAttemptingToAddToQueue(RequirementTemplate);
+		return;
+	}
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+	ACPPController* PlayerController = M_MainGameUI->GetPlayerController();
+	if (not IsValid(PlayerController))
+	{
+		return;
+	}
+	// The controller owns building placement; it checks the limit of planned field defenses and shows its error.
+	PlayerController->StartFieldDefensePlacement(
+		M_PrimarySelectedTrainer,
+		CreateQueueItemForOption(TrainingItem, FlatOptionIndex),
+		RequirementTemplate);
+}
+
+FTrainingQueueItem UTrainingMenuManager::CreateQueueItemForOption(const FTrainingWidgetState& TrainingItem,
+                                                                  const int32 FlatOptionIndex) const
+{
+	const TMap<ERTSResourceType, int32> Costs = GetTrainingCosts(TrainingItem.ItemID);
+	FTrainingQueueItem NewTrainingItem;
+	NewTrainingItem.ItemID = TrainingItem.ItemID;
+	NewTrainingItem.TotalTrainingTime = TrainingItem.TotalTrainingTime;
+	NewTrainingItem.RemainingTrainingTime = TrainingItem.TotalTrainingTime;
+	NewTrainingItem.WidgetIndex = FlatOptionIndex;
+	NewTrainingItem.AsyncRequestState = EAsyncTrainingRequestState::Async_NoTrainingRequest;
+	NewTrainingItem.RemainingResourceCosts = Costs;
+	NewTrainingItem.TotalResourceCosts = Costs;
+	return NewTrainingItem;
 }
 
 void UTrainingMenuManager::AddTrainingItemToQueue(const FTrainingQueueItem& TrainingItem)

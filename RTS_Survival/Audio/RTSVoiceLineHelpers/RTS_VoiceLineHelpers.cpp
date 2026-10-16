@@ -317,6 +317,9 @@ EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetAnnouncerForPlayerError(const 
 		return EAnnouncerVoiceLineType::ErrorNoFreeTruckAvailable;
 	case EPlayerError::Error_CannotBuildHere:
 		return EAnnouncerVoiceLineType::ErrorCannotBuildHere;
+	case EPlayerError::Error_TooManyFieldDefensesPlanned:
+		// Only the on-screen message; no announcer line says this.
+		break;
 	}
 	return EAnnouncerVoiceLineType::None;
 }

@@ -150,6 +150,95 @@ void ABuildingExpansion::StartExpansionConstructionAtLocation(
 	BP_OnStartBxpConstruction();
 }
 
+void ABuildingExpansion::StartFieldDefenseConstruction(const FVector& Location, const FRotator& Rotation)
+{
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	bM_IsFieldDefense = true;
+	// Field defenses have no expansion owner; this only sets the status.
+	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_BeingBuild);
+
+	(void)SetActorLocation(Location);
+	(void)SetActorRotation(Rotation);
+	SetActorHiddenInGame(false);
+	SetActorEnableCollision(true);
+
+	BuildingMeshComponent->SetStaticMesh(M_ConstructionMesh);
+	// The queue item drives the progress: the materials are cached here and revealed by each progress sync.
+	CacheOriginalMaterials();
+	ApplyConstructionMaterial();
+	CreateSmokeSystems(M_AmountSmokes);
+	BP_OnStartBxpConstruction();
+}
+
+void ABuildingExpansion::SyncFieldDefenseConstructionProgress(
+	const float TotalConstructionTime,
+	const float ElapsedConstructionTime,
+	const bool bIsPaused)
+{
+	if (not bM_IsFieldDefense || M_StatusBuildingExpansion != EBuildingExpansionStatus::BXS_BeingBuild)
+	{
+		return;
+	}
+	if (TotalConstructionTime <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError("Field defense construction synced with a total time of zero or less."
+			"\n See ABuildingExpansion::SyncFieldDefenseConstructionProgress for: " + GetName());
+		return;
+	}
+	if (GetIsValidProgressBarWidget())
+	{
+		M_ProgressBarWidget->SyncProgressBar(TotalConstructionTime, ElapsedConstructionTime, bIsPaused);
+	}
+	const float ConstructionProgress = FMath::Clamp(ElapsedConstructionTime / TotalConstructionTime, 0.f, 1.f);
+	RevealCachedMaterialsUpTo(FMath::FloorToInt32(ConstructionProgress * M_CachedOriginalMaterials.Num()));
+}
+
+void ABuildingExpansion::FinishFieldDefenseConstruction()
+{
+	if (not bM_IsFieldDefense || M_StatusBuildingExpansion != EBuildingExpansionStatus::BXS_BeingBuild)
+	{
+		return;
+	}
+	RevealCachedMaterialsUpTo(M_CachedOriginalMaterials.Num());
+	ResetCachedMaterials();
+	OnFinishedExpansionConstruction();
+}
+
+#if RTS_WITH_MAP_TESTS
+float ABuildingExpansion::MapTest_GetConstructionBarElapsedTime() const
+{
+	if (not M_ProgressBarWidget.IsValid())
+	{
+		return -1.f;
+	}
+	return M_ProgressBarWidget->GetTimeElapsed();
+}
+#endif
+
+void ABuildingExpansion::RevealCachedMaterialsUpTo(const int32 MaterialCount)
+{
+	if (not GetIsValidBuildingMeshComponent())
+	{
+		return;
+	}
+	const int32 TargetMaterialCount = FMath::Min(MaterialCount, M_CachedOriginalMaterials.Num());
+	if (M_MaterialIndex >= TargetMaterialCount)
+	{
+		return;
+	}
+	for (; M_MaterialIndex < TargetMaterialCount; ++M_MaterialIndex)
+	{
+		BuildingMeshComponent->SetMaterial(M_MaterialIndex, M_CachedOriginalMaterials[M_MaterialIndex]);
+	}
+	// Same spread of smoke puffs as the timed construction animation gives each revealed slot.
+	constexpr int32 FewerSmokesThanDefault = -1;
+	constexpr int32 MoreSmokesThanDefault = 2;
+	CreateSmokeSystems(M_AmountSmokes + FMath::RandRange(FewerSmokesThanDefault, MoreSmokesThanDefault));
+}
+
 void ABuildingExpansion::StartPackUpBuildingExpansion(const float TotalTime)
 {
 	DestroyBuildingAttachments();

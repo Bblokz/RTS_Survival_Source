@@ -160,6 +160,11 @@ void ANomadicVehicle::UnitDies(const ERTSDeathType DeathType)
 	{
 		M_AircraftOwnerComp->OnAirbaseDies();
 	}
+	// The planned field defenses and any pit under construction are saved with this vehicle and die with it.
+	if (IsValid(M_TrainerComponent))
+	{
+		M_TrainerComponent->OnOwnerDies();
+	}
 
 	// Calls bp event on tank of BP_OnUnitDies(); sets is alive to false.
 	Super::UnitDies(DeathType);
@@ -1398,7 +1403,7 @@ void ANomadicVehicle::StartAsConvertedBuilding()
 	OnFinishedStandaloneRotation();
 }
 
-#if RTS_WITH_SHIPPING_MAP_TESTS
+#if RTS_WITH_SHIPPING_MAP_TESTS || RTS_WITH_MAP_TESTS
 bool ANomadicVehicle::ShippingTest_ForceFinishConversionToBuilding()
 {
 	if (M_NomadStatus == ENomadStatus::Building)
@@ -1637,7 +1642,9 @@ float ANomadicVehicle::GetUnitRepairRadius()
 void ANomadicVehicle::OnTrainingProgressStartedOrResumed(const FTrainingOption& StartedOption)
 {
 	BpOnTrainingProgressStartedOrResumed(StartedOption);
-	if (UseTrainingPreview())
+	// A field defense is built at its planned spot on the map; the building shows no preview of it.
+	const bool bIsFieldDefense = StartedOption.UnitType == EAllUnitType::UNType_BuildingExpansion;
+	if (UseTrainingPreview() && not bIsFieldDefense)
 	{
 		M_TrainingPreviewHelper.OnStartOrResumeTraining(StartedOption, this);
 	}

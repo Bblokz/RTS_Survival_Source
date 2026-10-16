@@ -2,6 +2,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "TrainingLayoutTypes.generated.h"
@@ -45,6 +46,11 @@ struct FTrainingLayoutSlot
 		meta = (EditCondition = "UnitType == EAllUnitType::UNType_Aircraft", EditConditionHides))
 	EAircraftSubtype AircraftSubtype = EAircraftSubtype::Aircarft_None;
 
+	// A field defense: the player places it and the trainer's queue builds it at that spot.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training Layout",
+		meta = (EditCondition = "UnitType == EAllUnitType::UNType_BuildingExpansion", EditConditionHides))
+	EBuildingExpansionType FieldDefenseType = EBuildingExpansionType::BXT_Invalid;
+
 	FTrainingOption ToTrainingOption() const;
 
 	static FTrainingLayoutSlot Empty();
@@ -52,6 +58,7 @@ struct FTrainingLayoutSlot
 	static FTrainingLayoutSlot Squad(const ESquadSubtype InSquadSubtype);
 	static FTrainingLayoutSlot Nomadic(const ENomadicSubtype InNomadicSubtype);
 	static FTrainingLayoutSlot Aircraft(const EAircraftSubtype InAircraftSubtype);
+	static FTrainingLayoutSlot FieldDefense(const EBuildingExpansionType InFieldDefenseType);
 };
 
 /**

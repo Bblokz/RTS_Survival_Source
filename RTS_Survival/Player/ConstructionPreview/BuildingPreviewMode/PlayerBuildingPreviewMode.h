@@ -23,7 +23,9 @@ enum class EPlayerBuildingPreviewMode : uint8
 	// Preview mode is active for determening the building conversion location.
 	NomadicPreviewMode,
 	// Preview mode is active for field construction placement.
-	FieldConstructionPreviewMode
+	FieldConstructionPreviewMode,
+	// Preview mode is active for planning a field defense from a trainer's training menu.
+	FieldDefensePreviewMode
 };
 
 static FString Global_GetPlayerBuildingPreviewModeEnumAsString(const EPlayerBuildingPreviewMode Mode)
@@ -38,6 +40,8 @@ static FString Global_GetPlayerBuildingPreviewModeEnumAsString(const EPlayerBuil
 		return "NomadicPreviewMode";
 	case EPlayerBuildingPreviewMode::FieldConstructionPreviewMode:
 		return "FieldConstructionPreviewMode";
+	case EPlayerBuildingPreviewMode::FieldDefensePreviewMode:
+		return "FieldDefensePreviewMode";
 	}
 	return "Unknown";
 }
@@ -55,7 +59,9 @@ enum class EConstructionPreviewMode : uint8
 	// Used for BXps that are placed at the building origin.
 	Construct_BxpOrigin,
 	// Used for field constructions.
-	Construct_FieldConstruction
+	Construct_FieldConstruction,
+	// Used for field defenses planned from a trainer: footprint and incline are checked over the whole footprint.
+	Construct_FieldDefense
 };
 
 static FString Global_GetConstructionPreviewModeEnumAsString(const EConstructionPreviewMode Mode)
@@ -74,6 +80,8 @@ static FString Global_GetConstructionPreviewModeEnumAsString(const EConstruction
 		return "Construct_BxpOrigin";
 	case EConstructionPreviewMode::Construct_FieldConstruction:
 		return "Construct_FieldConstruction";
+	case EConstructionPreviewMode::Construct_FieldDefense:
+		return "Construct_FieldDefense";
 	default: ;
 	}
 	return "Unknown";

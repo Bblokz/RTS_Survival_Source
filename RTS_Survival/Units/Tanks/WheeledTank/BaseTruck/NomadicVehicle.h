@@ -15,6 +15,7 @@
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
 #include "RTS_Survival/Units/Tanks/TrackedTank/TrackedTankMaster.h"
 #include "TrainingPreviewHelpers/TrainingPreviewHelper.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 #include "NomadicVehicle.generated.h"
 
@@ -159,8 +160,11 @@ public:
 
 	void SetAINomadicVehicle(AAINomadicVehicle* NewAINomadicVehicle);
 
-#if RTS_WITH_SHIPPING_MAP_TESTS
+#if RTS_WITH_SHIPPING_MAP_TESTS || RTS_WITH_MAP_TESTS
+	// Also used by the unattended map tests, which never draw the truck and so never finish its montage.
 	bool ShippingTest_ForceFinishConversionToBuilding();
+	// The aircraft death test checks a wreck's pieces stay inside the airbase building.
+	const UStaticMeshComponent* MapTest_GetBuildingMeshComponent() const { return BuildingMeshComponent; }
 #endif
 
 	void OnMoveToBuildingLocationSucceeded();

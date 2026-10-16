@@ -3,6 +3,7 @@
 
 #include "TrainingOptionLibrary.h"
 
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/CardSystem/ERTSCard/CardUnitStructure.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -24,6 +25,11 @@ FString UTrainingOptionLibrary::GetTrainingOptionDisplayName(const EAllUnitType 
 	{
 		return StaticEnum<EStandaloneTurretSubtype>()->GetDisplayNameTextByValue(
 			static_cast<int64>(SubtypeValue)).ToString();
+	}
+
+	if (UnitType == EAllUnitType::UNType_BuildingExpansion)
+	{
+		return Global_GetBxpDisplayString(static_cast<EBuildingExpansionType>(SubtypeValue));
 	}
 
 	if (UnitType == EAllUnitType::UNType_Tank)
@@ -112,6 +118,12 @@ FString UTrainingOptionLibrary::GetEnumValueName(const EAllUnitType UnitType, co
 	case EAllUnitType::UNType_StandaloneTurret:
 		{
 			const UEnum* SubtypeEnum = StaticEnum<EStandaloneTurretSubtype>();
+			return SubtypeEnum->GetNameStringByValue(static_cast<int64>(SubtypeValue));
+		}
+	case EAllUnitType::UNType_BuildingExpansion:
+		{
+			// Field defenses in a training menu: their rows in the training options table are Train_BTX_...
+			const UEnum* SubtypeEnum = StaticEnum<EBuildingExpansionType>();
 			return SubtypeEnum->GetNameStringByValue(static_cast<int64>(SubtypeValue));
 		}
 	default:

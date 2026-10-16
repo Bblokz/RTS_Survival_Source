@@ -48,6 +48,14 @@ public:
     UFUNCTION(BlueprintCallable, Category= "Progress Bar Control")
     void StopProgressBar();
 
+    /**
+     * @brief Lets another clock drive the bar, so that it shows exactly the progress of that clock.
+     * @param TotalTime The time the bar takes from empty to full.
+     * @param ElapsedTime How much of the total time has passed already.
+     * @param bIsPaused Whether the bar holds still at this progress until the next sync.
+     */
+    void SyncProgressBar(const float TotalTime, const float ElapsedTime, const bool bIsPaused);
+
     /** @return How long the progress bar has been running. */
     float GetTimeElapsed() const;
 

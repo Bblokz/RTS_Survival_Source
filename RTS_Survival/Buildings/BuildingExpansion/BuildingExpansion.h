@@ -15,6 +15,7 @@
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 #include "BuildingExpansion.generated.h"
 
@@ -98,6 +99,37 @@ public:
 		const FVector& Location,
 		const FRotator& Rotation,
 		const FName& AttachedToSocketName);
+
+	/**
+	 * @brief Field defenses: builds this expansion at a spot the player planned from a trainer's queue. Unlike a
+	 * regular expansion it has no expansion owner, and the queue item drives its progress through
+	 * SyncFieldDefenseConstructionProgress instead of a construction timer.
+	 * @param Location Where the planned preview stood.
+	 * @param Rotation The rotation the player gave the preview.
+	 */
+	void StartFieldDefenseConstruction(const FVector& Location, const FRotator& Rotation);
+
+	/**
+	 * @brief Keeps the progress bar and the construction animation at the progress of the queue item that builds
+	 * this field defense, also while that queue is paused.
+	 * @param TotalConstructionTime The training time of the queue item.
+	 * @param ElapsedConstructionTime How much of that time the queue item has trained.
+	 * @param bIsPaused Whether the queue is paused, for instance by insufficient resources.
+	 */
+	void SyncFieldDefenseConstructionProgress(
+		const float TotalConstructionTime,
+		const float ElapsedConstructionTime,
+		const bool bIsPaused);
+
+	/** @brief Completes a field defense once the queue item that builds it has finished training. */
+	void FinishFieldDefenseConstruction();
+
+	inline bool GetIsFieldDefense() const { return bM_IsFieldDefense; }
+
+#if RTS_WITH_MAP_TESTS
+	/** @return Map tests: how much construction time the progress bar shows as done; negative without a bar. */
+	float MapTest_GetConstructionBarElapsedTime() const;
+#endif
 
 	/**
 	 * @brief Starts building expansion animation.
@@ -459,6 +491,17 @@ private:
 
 	// Whether this bxp is a stand alone building that has no owner.
 	bool bM_IsStandAlone;
+
+	// Set when a trainer's field defense queue item builds this bxp; such a bxp has no expansion owner and its
+	// construction progress comes from the queue item instead of the material reapply timer.
+	bool bM_IsFieldDefense = false;
+
+	/**
+	 * @brief Puts the cached original materials back on the first slots, the field defense version of the
+	 * timed construction animation.
+	 * @param MaterialCount How many slots, counted from slot zero, show their original material afterwards.
+	 */
+	void RevealCachedMaterialsUpTo(const int32 MaterialCount);
 
 	void OnBxpStandAlone();
 

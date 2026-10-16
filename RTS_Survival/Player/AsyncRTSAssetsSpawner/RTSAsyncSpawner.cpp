@@ -66,6 +66,15 @@ void ARTSAsyncSpawner::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	M_InstantPlacementRequests.Empty();
 	M_SpawnCallbacks.Empty();
 
+	for (TPair<int32, TSharedPtr<FStreamableHandle>>& FieldDefenseLoad : M_FieldDefenseLoadHandles)
+	{
+		if (FieldDefenseLoad.Value.IsValid() && not FieldDefenseLoad.Value->HasLoadCompleted())
+		{
+			FieldDefenseLoad.Value->CancelHandle();
+		}
+	}
+	M_FieldDefenseLoadHandles.Empty();
+
 	FAsyncOptionQueueItem QueueItem;
 	while (M_TrainingQueue.Dequeue(QueueItem))
 	{
@@ -1039,4 +1048,53 @@ ABuildingExpansion* ARTSAsyncSpawner::BatchBxp_TryResolveAndSpawnBxp(EBuildingEx
 			FString::Printf(TEXT("Failed to spawn Bxp for type %d"), int(Type)));
 	}
 	return Bxp;
+}
+
+bool ARTSAsyncSpawner::AsyncSpawnFieldDefenseExpansion(
+	const EBuildingExpansionType BxpType,
+	TFunction<void(ABuildingExpansion* SpawnedExpansion)> OnSpawnedCallback)
+{
+	const TSoftClassPtr<ABuildingExpansion>* const ExpansionClass = BuildingExpansionMap.Find(BxpType);
+	if (not ExpansionClass || ExpansionClass->IsNull())
+	{
+		RTSFunctionLibrary::ReportError("No expansion class mapped for the field defense: "
+			+ Global_GetBxpTypeEnumAsString(BxpType) +
+			"\n See ARTSAsyncSpawner::AsyncSpawnFieldDefenseExpansion; add it to the BuildingExpansionMap.");
+		return false;
+	}
+	const int32 RequestId = M_NextFieldDefenseRequestId++;
+	if (ExpansionClass->IsValid())
+	{
+		OnFieldDefenseExpansionLoaded(RequestId, BxpType, OnSpawnedCallback);
+		return true;
+	}
+
+	TWeakObjectPtr<ARTSAsyncSpawner> WeakThis(this);
+	const TSharedPtr<FStreamableHandle> LoadHandle = M_StreamableManager.RequestAsyncLoad(
+		ExpansionClass->ToSoftObjectPath(),
+		FStreamableDelegate::CreateLambda([WeakThis, RequestId, BxpType, OnSpawnedCallback]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				OnSpawnedCallback(nullptr);
+				return;
+			}
+			WeakThis->OnFieldDefenseExpansionLoaded(RequestId, BxpType, OnSpawnedCallback);
+		}));
+	// A load that completed inside the request already ran its callback.
+	if (LoadHandle.IsValid() && not LoadHandle->HasLoadCompleted())
+	{
+		M_FieldDefenseLoadHandles.Add(RequestId, LoadHandle);
+	}
+	return true;
+}
+
+void ARTSAsyncSpawner::OnFieldDefenseExpansionLoaded(
+	const int32 RequestId,
+	const EBuildingExpansionType BxpType,
+	const TFunction<void(ABuildingExpansion* SpawnedExpansion)>& OnSpawnedCallback)
+{
+	M_FieldDefenseLoadHandles.Remove(RequestId);
+	ABuildingExpansion* SpawnedExpansion = BatchBxp_TryResolveAndSpawnBxp(BxpType);
+	OnSpawnedCallback(SpawnedExpansion);
 }

@@ -15,8 +15,7 @@ namespace TrainingLayoutDefaults
 	const TCHAR* const TrainingOptionIconTablePath =
 		TEXT("/Game/RTS_Survival/Blueprints/GameUI/TrainingUI/DT_TrainingOptions.DT_TrainingOptions");
 
-	FTrainingLayoutSubSection MakeSubSection(const FText& DisplayName,
-	                                         std::initializer_list<FTrainingLayoutSlot> Slots)
+	FTrainingLayoutSubSection MakeSubSection(const FText& DisplayName, const TArray<FTrainingLayoutSlot>& Slots)
 	{
 		FTrainingLayoutSubSection SubSection;
 		SubSection.DisplayName = DisplayName;
@@ -27,6 +26,12 @@ namespace TrainingLayoutDefaults
 			SubSection.Slots.Add(FTrainingLayoutSlot::Empty());
 		}
 		return SubSection;
+	}
+
+	FTrainingLayoutSubSection MakeSubSection(const FText& DisplayName,
+	                                         std::initializer_list<FTrainingLayoutSlot> Slots)
+	{
+		return MakeSubSection(DisplayName, TArray<FTrainingLayoutSlot>(Slots));
 	}
 
 	FTrainingLayoutBuilding MakeBuilding(std::initializer_list<FTrainingLayoutSubSection> SubSections,
@@ -52,6 +57,8 @@ FTrainingOption FTrainingLayoutSlot::ToTrainingOption() const
 		return FTrainingOption(UnitType, static_cast<uint8>(NomadicSubtype));
 	case EAllUnitType::UNType_Aircraft:
 		return FTrainingOption(UnitType, static_cast<uint8>(AircraftSubtype));
+	case EAllUnitType::UNType_BuildingExpansion:
+		return FTrainingOption(UnitType, static_cast<uint8>(FieldDefenseType));
 	default:
 		return FTrainingOption();
 	}
@@ -91,6 +98,14 @@ FTrainingLayoutSlot FTrainingLayoutSlot::Aircraft(const EAircraftSubtype InAircr
 	FTrainingLayoutSlot LayoutSlot;
 	LayoutSlot.UnitType = EAllUnitType::UNType_Aircraft;
 	LayoutSlot.AircraftSubtype = InAircraftSubtype;
+	return LayoutSlot;
+}
+
+FTrainingLayoutSlot FTrainingLayoutSlot::FieldDefense(const EBuildingExpansionType InFieldDefenseType)
+{
+	FTrainingLayoutSlot LayoutSlot;
+	LayoutSlot.UnitType = EAllUnitType::UNType_BuildingExpansion;
+	LayoutSlot.FieldDefenseType = InFieldDefenseType;
 	return LayoutSlot;
 }
 
@@ -192,11 +207,21 @@ void UTrainingLayoutDataAsset::InitDefaultQuickNavBuildings()
 	}
 }
 
-FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout()
+FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
+	const TArray<FTrainingLayoutSlot>& DoctrineFieldDefenses)
 {
 	using namespace TrainingLayoutDefaults;
 	using Slot = FTrainingLayoutSlot;
 	constexpr bool bRequiresUnitCards = false;
+	TArray<FTrainingLayoutSlot> FieldDefenses = {
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPak40Pit),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerFlak37Pit),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPuppchenPit),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerLeFH18Pit),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerSFH18Pit),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPanzerschreckPit)
+	};
+	FieldDefenses.Append(DoctrineFieldDefenses);
 
 	return MakeBuilding({
 		                    MakeSubSection(LOCTEXT("Economy", "Economy"), {
@@ -210,7 +235,8 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 			                                   Slot::Nomadic(ENomadicSubtype::Nomadic_GerCommunicationCenter),
 			                                   Slot::Empty()
 		                                   }),
-		                    MakeSubSection(LOCTEXT("FieldDefenses", "Field Defenses"), {}),
+		                    // The trainer builds these at a spot the player places, see UTrainerComponent.
+		                    MakeSubSection(LOCTEXT("FieldDefenses", "Field Defenses"), FieldDefenses),
 		                    MakeSubSection(LOCTEXT("Factories", "Factories"), {
 			                                   Slot::Nomadic(ENomadicSubtype::Nomadic_GerBarracks),
 			                                   Slot::Nomadic(ENomadicSubtype::Nomadic_GerMechanizedDepot),
@@ -363,7 +389,10 @@ void UTrainingLayoutDataAsset::InitDefaultBreakthroughLayout()
 	TMap<ENomadicSubtype, FTrainingLayoutBuilding>& Buildings =
 		FactionLayouts.FindOrAdd(ERTSFaction::GerBreakthroughDoctrine).Buildings;
 
-	Buildings.Add(ENomadicSubtype::Nomadic_GerHq, MakeDefaultHeadquartersLayout());
+	// The rail Pak bunker is the breakthrough doctrine's own field defense.
+	Buildings.Add(ENomadicSubtype::Nomadic_GerHq, MakeDefaultHeadquartersLayout({
+		              Slot::FieldDefense(EBuildingExpansionType::BTX_GerRailPakBunker)
+	              }));
 	Buildings.Add(ENomadicSubtype::Nomadic_GerAirbase, MakeDefaultAirbaseLayout());
 
 	Buildings.Add(ENomadicSubtype::Nomadic_GerBarracks, MakeBuilding({
