@@ -27,6 +27,7 @@
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Subsystems/RadiusSubsystem/RTSRadiusPoolSubsystem/RTSRadiusPoolSubsystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSGrenadeBench, Log, All);
 
@@ -409,6 +410,7 @@ void UGrenadeBenchmarkSubsystem::StartNextScenario()
 	M_Victims.Reset();
 	M_UnitsReadyGameSeconds = -1.f;
 	bM_HasSavedExplosionPicture = false;
+	bM_HasSavedFusePicture = false;
 	const FGrenadeBenchScenario& Scenario = M_Scenarios[M_ScenarioIndex];
 	if (not SpawnScenarioUnits(Scenario))
 	{
@@ -769,9 +771,34 @@ int32 UGrenadeBenchmarkSubsystem::GetExplodedGrenadeCount() const
 	return Exploded;
 }
 
+void UGrenadeBenchmarkSubsystem::WatchFuseWarnings()
+{
+	const URTSRadiusPoolSubsystem* RadiusPool = GetWorld()->GetSubsystem<URTSRadiusPoolSubsystem>();
+	const UGrenadeComponent* GrenadeComponent = GetThrowerGrenadeComponent();
+	const FGrenadeComponentSettings* Settings = IsValid(GrenadeComponent) ? GetSettings(*GrenadeComponent) : nullptr;
+	for (FGrenadeBenchGrenade& Entry : M_ScenarioGrenades)
+	{
+		const AGrenadeActor* Grenade = Entry.Grenade.Get();
+		if (not IsValid(Grenade) || Grenade->GetGrenadeState() != EGrenadeActorState::Fusing)
+		{
+			continue;
+		}
+		const int32 WarningId = Grenade->GetFuseWarningRadiusId();
+		Entry.bShowedFuseWarning |= WarningId != INDEX_NONE && IsValid(RadiusPool) &&
+			RadiusPool->GetIsRTSRadiusIdActive(WarningId);
+		const float HalfFuse = Settings != nullptr ? Settings->FuseSecondsAfterLanding * 0.5f : 0.f;
+		if (not bM_HasSavedFusePicture && GetGameSeconds() - Entry.LandedGameSeconds >= HalfFuse)
+		{
+			bM_HasSavedFusePicture = true;
+			SavePicture(TEXT("fuse"));
+		}
+	}
+}
+
 void UGrenadeBenchmarkSubsystem::TickWaitingForExplosions()
 {
 	using namespace GrenadeBenchPrivate;
+	WatchFuseWarnings();
 	const int32 Exploded = GetExplodedGrenadeCount();
 	float FirstExplosionSeconds = -1.f;
 	for (const FGrenadeBenchGrenade& Entry : M_ScenarioGrenades)
@@ -967,6 +994,15 @@ void UGrenadeBenchmarkSubsystem::ReportScenario()
 		Settings->FuseSecondsAfterLanding <= 0.f;
 	Check(bFuseMatches, FString::Printf(TEXT("%s: fuse %.2f s after landing (setting %.2f)"), *Scenario.Name,
 	                                    AverageFuse, Settings->FuseSecondsAfterLanding));
+	if (Settings->FuseSecondsAfterLanding > 0.f)
+	{
+		const int32 WarnedGrenades = M_ScenarioGrenades.FilterByPredicate([](const FGrenadeBenchGrenade& Entry)
+		{
+			return Entry.bShowedFuseWarning;
+		}).Num();
+		Check(WarnedGrenades == Exploded, FString::Printf(TEXT("%s: %d of %d fused grenades showed the blast warning"),
+		                                                  *Scenario.Name, WarnedGrenades, Exploded));
+	}
 	if (Scenario.Target == EGrenadeBenchTarget::Infantry)
 	{
 		ReportInfantry(Scenario, *Settings, GrenadeColumns);

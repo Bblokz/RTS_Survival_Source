@@ -65,6 +65,8 @@ struct FGrenadeBenchGrenade
 	float ExplodedGameSeconds = -1.f;
 	FVector ExplosionLocation = FVector::ZeroVector;
 	FString StuckTo;
+	// The blast-radius warning was on screen while the fuse burned.
+	bool bShowedFuseWarning = false;
 };
 
 /** A target actor and its health when the order was given. */
@@ -139,6 +141,7 @@ private:
 	float M_UnitsReadyGameSeconds = -1.f;
 	int32 M_ExpectedGrenades = 0;
 	bool bM_HasSavedExplosionPicture = false;
+	bool bM_HasSavedFusePicture = false;
 
 	void EnterPhase(EGrenadeBenchPhase NewPhase);
 	float GetGameSeconds() const;
@@ -171,6 +174,8 @@ private:
 	void OnGrenadeExploded(AGrenadeActor* Grenade, const FVector& Location);
 	FGrenadeBenchGrenade* FindScenarioGrenade(const AGrenadeActor* Grenade);
 	int32 GetExplodedGrenadeCount() const;
+	// Notes which fusing grenades show their warning, and takes a picture halfway through the first fuse.
+	void WatchFuseWarnings();
 
 	void ReportScenario();
 	void ReportInfantry(const FGrenadeBenchScenario& Scenario, const FGrenadeComponentSettings& Settings,

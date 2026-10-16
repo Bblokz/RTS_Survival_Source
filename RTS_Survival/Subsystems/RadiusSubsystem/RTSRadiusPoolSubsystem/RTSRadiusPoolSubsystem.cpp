@@ -106,6 +106,7 @@ bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Typ
 	case ERTSRadiusType::FullCircle_PulseRepair:
 	case ERTSRadiusType::FullCircle_TeamWeaponArc:
 	case ERTSRadiusType::FullCircle_DifficultyRadius:
+	case ERTSRadiusType::FullCircle_GrenadeFuse:
 		return true;
 	default:
 		return false;
@@ -331,6 +332,25 @@ bool URTSRadiusPoolSubsystem::GetIsRTSRadiusIdActive(const int32 ID) const
 {
 	const APooledRadiusActor* RadiusActor = FindPooledActorById(ID);
 	return IsValid(RadiusActor) && RadiusActor->GetIsInUse();
+}
+
+void URTSRadiusPoolSubsystem::SetRTSRadiusScalarParameter(const int32 ID, const FName ParameterName,
+                                                         const float Value)
+{
+	if (not GetIsValidWorld())
+	{
+		return;
+	}
+
+	APooledRadiusActor* RadiusActor = FindPooledActorById(ID);
+	if (not IsValid(RadiusActor))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("RTS Radius Pool: Unknown id %d in SetRTSRadiusScalarParameter."), ID));
+		return;
+	}
+
+	RadiusActor->SetMaterialScalarParameter(ParameterName, Value);
 }
 
 void URTSRadiusPoolSubsystem::UpdateRTSRadiusArc(const int32 ID, const float ArcAngle)

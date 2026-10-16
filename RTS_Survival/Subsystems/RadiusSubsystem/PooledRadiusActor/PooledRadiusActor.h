@@ -59,6 +59,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Radius|Pool")
 	void UpdateArc(const float ArcAngle);
 
+	void SetMaterialScalarParameter(const FName ParameterName, const float Value);
+
 	UFUNCTION(BlueprintCallable, Category="Radius|Pool")
 	void DeactivateRadius();
 

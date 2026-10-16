@@ -23,6 +23,12 @@ fixes.
 - **Fuse after landing.** `FGrenadeComponentSettings::FuseSecondsAfterLanding`: the grenade lies (or sticks) this long
   and then explodes where it is now. 0 keeps the old instant explosion (molotov). Grenades that land where a vehicle
   drove away settle onto the ground.
+- **Fuse warning.** While a grenade fuses, the radius pool shows its blast radius on the ground
+  (`ERTSRadiusType::FullCircle_GrenadeFuse`, material `RadiusMaterials/M_GrenadeFuseWarning`, mapped in
+  `DefaultGame.ini` `TypeToMaterial`): a pulsing ring at the radius and a disc that grows from the centre and reaches
+  the ring as it explodes. Red for enemy grenades, yellow for the player's (`IsEnemyGrenade`). The material animates
+  itself from `FuseStartTime` / `FuseDuration` (game time), so nothing ticks. On a stuck grenade the circle follows
+  the vehicle. The benchmark checks every fused grenade showed it and saves a `<scenario>_fuse.png` at half the fuse.
 - **Sticky grenades.** `FGrenadeComponentSettings::bStickToVehicles` (off by default): the grenade attaches to the
   closest armored enemy vehicle hull within 150 cm of its landing spot and explodes on it. A sticky grenade ordered at
   a point within 300 cm of an enemy vehicle follows that vehicle during its flight, as long as the vehicle stays within

@@ -90,6 +90,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category="RTS|RadiusPool")
 	void UpdateRTSRadiusArc(int32 ID, float ArcAngle);
 
+	/**
+	 * @brief Sets a scalar parameter on one active radius' material, e.g. the start time of a grenade fuse.
+	 * @param ID Radius id from CreateRTSRadius.
+	 * @param ParameterName Scalar parameter of the radius material.
+	 * @param Value New value.
+	 */
+	void SetRTSRadiusScalarParameter(int32 ID, FName ParameterName, float Value);
+
 private:
 	// -------- Settings cache (loaded once at Initialize) --------
 	UPROPERTY()

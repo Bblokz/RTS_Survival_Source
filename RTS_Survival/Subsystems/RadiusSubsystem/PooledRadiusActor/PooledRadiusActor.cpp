@@ -144,6 +144,16 @@ void APooledRadiusActor::UpdateArc(const float ArcAngle)
 	M_RadiusComp->UpdateArc(ArcAngle);
 }
 
+void APooledRadiusActor::SetMaterialScalarParameter(const FName ParameterName, const float Value)
+{
+	if (not GetIsValidRadiusComp())
+	{
+		return;
+	}
+
+	M_RadiusComp->SetMaterialScalarParameter(ParameterName, Value);
+}
+
 void APooledRadiusActor::DeactivateRadius()
 {
 	if (not GetIsValidRadiusComp() || not GetIsValidRootScene())

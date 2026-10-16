@@ -231,6 +231,9 @@ public:
 	bool GetIsAvailableForThrow() const;
 	EGrenadeActorState GetGrenadeState() const { return M_State; }
 
+	// Pooled radius id of the blast-radius warning shown while the fuse burns; INDEX_NONE when none is shown.
+	int32 GetFuseWarningRadiusId() const { return M_FuseWarningRadiusId; }
+
 	// The squad's pool is going away: grenades in the air, on a fuse or burning finish first and then destroy themselves.
 	void ReleaseFromPool();
 
@@ -303,6 +306,7 @@ private:
 
 	FGrenadeBurnState M_BurnState;
 	EGrenadeActorState M_State = EGrenadeActorState::Idle;
+	int32 M_FuseWarningRadiusId = INDEX_NONE;
 	bool bM_DestroyWhenDone = false;
 
 	bool GetIsValidStaticMeshComponent() const;
@@ -318,6 +322,14 @@ private:
 	 */
 	AActor* TryStickToVehicle();
 	void SettleOnGround();
+
+	/**
+	 * @brief Shows the blast radius on the ground, filling up until the fuse runs out, so units can react.
+	 * @param FuseSeconds Seconds until the explosion.
+	 * @param bIsStuckToVehicle The warning follows the grenade when it rides on a vehicle.
+	 */
+	void ShowFuseWarning(float FuseSeconds, bool bIsStuckToVehicle);
+	void HideFuseWarning();
 	void Explode();
 	void ClearThrowTimers();
 	void DestroyIfReleased();

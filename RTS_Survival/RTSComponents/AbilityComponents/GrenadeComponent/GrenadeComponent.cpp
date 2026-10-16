@@ -7,6 +7,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/Subsystems/RadiusSubsystem/RTSRadiusPoolSubsystem/RTSRadiusPoolSubsystem.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -83,6 +84,12 @@ namespace GrenadeComponentConstants
 		return ClosestHull;
 	}
 	constexpr float GroundSettleTraceUp = 100.f;
+	// Parameters of the fuse warning material (M_GrenadeFuseWarning); it fills itself from the game time.
+	const FName FuseWarningStartTimeParameter = TEXT("FuseStartTime");
+	const FName FuseWarningDurationParameter = TEXT("FuseDuration");
+	const FName FuseWarningIsEnemyParameter = TEXT("IsEnemyGrenade");
+	// The pool hides the warning a moment after the fuse ends in case the explosion never comes.
+	constexpr float FuseWarningLifetimeMargin = 0.5f;
 	constexpr float GroundSettleTraceDown = 2000.f;
 
 	// Right-hand bone names of the skeletons in the project, tried when a mesh has no grenade socket.
@@ -165,6 +172,7 @@ void AGrenadeActor::BeginPlay()
 void AGrenadeActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	ClearThrowTimers();
+	HideFuseWarning();
 	StopBurnArea();
 	Super::EndPlay(EndPlayReason);
 }
@@ -211,6 +219,7 @@ void AGrenadeActor::SetInHand()
 void AGrenadeActor::ResetGrenade()
 {
 	ClearThrowTimers();
+	HideFuseWarning();
 	M_TrackedVehicle = nullptr;
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	DeactivateAttachedEffect();
@@ -397,6 +406,7 @@ void AGrenadeActor::OnLanded()
 		return;
 	}
 	M_State = EGrenadeActorState::Fusing;
+	ShowFuseWarning(FuseSeconds, IsValid(StuckToVehicle));
 	World->GetTimerManager().SetTimer(M_FuseTimerHandle, this, &AGrenadeActor::Explode, FuseSeconds, false);
 }
 
@@ -447,9 +457,55 @@ void AGrenadeActor::SettleOnGround()
 	}
 }
 
+void AGrenadeActor::ShowFuseWarning(const float FuseSeconds, const bool bIsStuckToVehicle)
+{
+	using namespace GrenadeComponentConstants;
+	HideFuseWarning();
+	UWorld* World = GetWorld();
+	URTSRadiusPoolSubsystem* RadiusPool = IsValid(World) ? World->GetSubsystem<URTSRadiusPoolSubsystem>() : nullptr;
+	if (not IsValid(RadiusPool))
+	{
+		return;
+	}
+	M_FuseWarningRadiusId = RadiusPool->CreateRTSRadius(GetActorLocation(), M_ThrowSettings.AoeRange,
+	                                                    ERTSRadiusType::FullCircle_GrenadeFuse,
+	                                                    FuseSeconds + FuseWarningLifetimeMargin);
+	if (M_FuseWarningRadiusId == INDEX_NONE)
+	{
+		return;
+	}
+	RadiusPool->SetRTSRadiusScalarParameter(M_FuseWarningRadiusId, FuseWarningStartTimeParameter,
+	                                        World->GetTimeSeconds());
+	RadiusPool->SetRTSRadiusScalarParameter(M_FuseWarningRadiusId, FuseWarningDurationParameter, FuseSeconds);
+	// Player grenades show in a calmer colour than the enemy's.
+	RadiusPool->SetRTSRadiusScalarParameter(M_FuseWarningRadiusId, FuseWarningIsEnemyParameter,
+	                                        M_ThrowOwningPlayer == 1 ? 0.f : 1.f);
+	if (bIsStuckToVehicle)
+	{
+		RadiusPool->AttachRTSRadiusToActorYawOnly(M_FuseWarningRadiusId, this, FVector::ZeroVector);
+	}
+}
+
+void AGrenadeActor::HideFuseWarning()
+{
+	if (M_FuseWarningRadiusId == INDEX_NONE)
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	URTSRadiusPoolSubsystem* RadiusPool = IsValid(World) ? World->GetSubsystem<URTSRadiusPoolSubsystem>() : nullptr;
+	// The pool may already have recycled it (lifetime expired or pool exhausted); only hide what is still ours.
+	if (IsValid(RadiusPool) && RadiusPool->GetIsRTSRadiusIdActive(M_FuseWarningRadiusId))
+	{
+		RadiusPool->HideRTSRadiusById(M_FuseWarningRadiusId);
+	}
+	M_FuseWarningRadiusId = INDEX_NONE;
+}
+
 void AGrenadeActor::Explode()
 {
 	ClearThrowTimers();
+	HideFuseWarning();
 	const FVector ExplosionLocation = GetActorLocation();
 	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	const FGrenadeComponentSettings& DamageParams = M_ThrowSettings;
