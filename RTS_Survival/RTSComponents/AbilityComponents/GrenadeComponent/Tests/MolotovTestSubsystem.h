@@ -119,11 +119,6 @@ private:
 	void Check(bool bCondition, const TCHAR* Description, const FString& Details = FString());
 	void Finish();
 
-	bool TryStartGame();
-	void KeepGameRunning() const;
-	bool FindTestLocation();
-	bool DropToGround(FVector& InOutLocation) const;
-	bool MoveTestLocationOntoNavMesh();
 
 	/**
 	 * @brief Spawns a squad with its owner set before BeginPlay, so it registers and fights as that player.

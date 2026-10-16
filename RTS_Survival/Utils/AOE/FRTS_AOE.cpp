@@ -5,6 +5,7 @@
 #include "Async/Async.h"
 #include "Containers/Set.h"
 #include "Engine/World.h"
+#include "Components/PrimitiveComponent.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
@@ -16,6 +17,17 @@
 
 namespace
 {
+	float CalculateDamageAtDistance(
+		const float BaseDamage,
+		const float SafeRadius,
+		const float SafeFalloffExponent,
+		const float DistanceFromEpicenter)
+	{
+		const float NormalisedDistance = FMath::Clamp(DistanceFromEpicenter / SafeRadius, 0.f, 1.f);
+		const float DamageScale = FMath::Pow(1.f - NormalisedDistance, SafeFalloffExponent);
+		return BaseDamage * DamageScale;
+	}
+
 	float CalculateDamageWithFalloff(
 		const FVector& Epicenter,
 		const float BaseDamage,
@@ -23,10 +35,8 @@ namespace
 		const float SafeFalloffExponent,
 		const FVector& HitLocation)
 	{
-		const float DistanceFromEpicenter = FVector::Dist(Epicenter, HitLocation);
-		const float NormalisedDistance = FMath::Clamp(DistanceFromEpicenter / SafeRadius, 0.f, 1.f);
-		const float DamageScale = FMath::Pow(1.f - NormalisedDistance, SafeFalloffExponent);
-		return BaseDamage * DamageScale;
+		return CalculateDamageAtDistance(BaseDamage, SafeRadius, SafeFalloffExponent,
+		                                 FVector::Dist(Epicenter, HitLocation));
 	}
 
 	void ApplyDamageToActor(
@@ -228,6 +238,166 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 		});
 }
 
+namespace
+{
+	// Everything one rear-armor explosion needs per victim; captured by value into the async sweep callback.
+	struct FRearArmorAoeParams
+	{
+		TWeakObjectPtr<AActor> WeakDamageCauser;
+		FVector Epicenter = FVector::ZeroVector;
+		float BaseDamage = 0.f;
+		float SafeRadius = 0.f;
+		float SafeFalloffExponent = 0.f;
+		float SafeFullArmorPen = 0.f;
+		float SafeArmorPenFalloff = 0.f;
+		float SafeMaxArmorPen = 0.f;
+		ERTSDamageType DamageType = ERTSDamageType::Kinetic;
+		EShieldDamageSource ShieldDamageSource = EShieldDamageSource::AreaOfEffect;
+		bool bDamagesVehicleModules = false;
+		uint32 ModuleExplosionId = 0;
+		EWeaponShellType ModuleDamageShellType = static_cast<EWeaponShellType>(0);
+	};
+
+	void ApplyRearArmorAoeToActor(
+		AActor& HitActor,
+		const float DistanceFromEpicenter,
+		const FRearArmorAoeParams& Params,
+		FDamageEvent& DamageEvent)
+	{
+		const FVector EnemyLocation = HitActor.GetActorLocation();
+		const float DamageToApply = CalculateDamageAtDistance(
+			Params.BaseDamage, Params.SafeRadius, Params.SafeFalloffExponent, DistanceFromEpicenter);
+		if (DamageToApply <= 0.f)
+		{
+			return;
+		}
+		if (GetWasDamageAbsorbedByShield(HitActor, DamageToApply, Params.ShieldDamageSource, EnemyLocation))
+		{
+			return;
+		}
+
+		UArmorCalculation* ArmorCalculation = HitActor.FindComponentByClass<UArmorCalculation>();
+		if (not IsValid(ArmorCalculation))
+		{
+			if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
+			{
+				DrawDebugString(HitActor.GetWorld(), EnemyLocation + FVector(0, 0, 100),
+				                FString::Printf(TEXT("No Armor found, dmg: %.1f"), DamageToApply), nullptr,
+				                FColor::White, 5.f);
+			}
+			ApplyDamageToActor(HitActor, DamageToApply, DamageEvent, Params.WeakDamageCauser);
+			return;
+		}
+
+		const float RearArmor = ArmorCalculation->GetRearArmor();
+		const float ArmorDamageMultiplier = CalculateRearArmorDamageMultiplier(
+			RearArmor,
+			Params.SafeFullArmorPen,
+			Params.SafeMaxArmorPen,
+			Params.SafeArmorPenFalloff);
+		const float AdjustedDamage = DamageToApply * ArmorDamageMultiplier;
+
+		if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
+		{
+			DrawDebugString(
+				HitActor.GetWorld(),
+				EnemyLocation + FVector(0.f, 0.f, 100.f),
+				FString::Printf(
+					TEXT("Rear Armor: %.1f | dmg x%.2f | %.1f -> %.1f"),
+					RearArmor,
+					ArmorDamageMultiplier,
+					DamageToApply,
+					AdjustedDamage),
+				nullptr,
+				FColor::White,
+				5.f);
+		}
+
+		if (AdjustedDamage <= 0.f)
+		{
+			return;
+		}
+
+		// Module splash is opt-in per weapon adapter; the default Ignore keeps ICBMs and bombs hull-only.
+		if (Params.bDamagesVehicleModules)
+		{
+			ApplyDamageWithModuleSplash(HitActor, *ArmorCalculation, AdjustedDamage, Params.Epicenter,
+			                            Params.ModuleExplosionId, DamageEvent, Params.WeakDamageCauser,
+			                            Params.ModuleDamageShellType);
+			return;
+		}
+		ApplyDamageToActor(HitActor, AdjustedDamage, DamageEvent, Params.WeakDamageCauser);
+	}
+
+	/**
+	 * @brief Merges the sweep's hits to one entry per actor at the smallest collision distance.
+	 * A vehicle with several colliding components is otherwise damaged once per component.
+	 */
+	TMap<TWeakObjectPtr<AActor>, float> GetClosestCollisionDistancePerActor(
+		const TArray<FHitResult>& HitResults,
+		const FVector& Epicenter)
+	{
+		TMap<TWeakObjectPtr<AActor>, float> DistancePerActor;
+		for (const FHitResult& Hit : HitResults)
+		{
+			AActor* HitActor = Hit.GetActor();
+			if (not IsValid(HitActor))
+			{
+				continue;
+			}
+			EAoeDistanceSource DistanceSource = EAoeDistanceSource::ActorOrigin;
+			const float Distance = FRTS_AOE::GetFalloffDistance(*HitActor, Hit.GetComponent(), Epicenter, DistanceSource);
+			float* KnownDistance = DistancePerActor.Find(HitActor);
+			if (KnownDistance == nullptr)
+			{
+				DistancePerActor.Add(HitActor, Distance);
+				continue;
+			}
+			*KnownDistance = FMath::Min(*KnownDistance, Distance);
+		}
+		return DistancePerActor;
+	}
+}
+
+float FRTS_AOE::GetFalloffDistance(
+	const AActor& HitActor,
+	const UPrimitiveComponent* HitComponent,
+	const FVector& Epicenter,
+	EAoeDistanceSource& OutSource)
+{
+	if (not IsValid(HitComponent))
+	{
+		OutSource = EAoeDistanceSource::ActorOrigin;
+		return FVector::Dist(Epicenter, HitActor.GetActorLocation());
+	}
+
+	FVector ClosestPoint;
+	const float CollisionDistance = HitComponent->GetClosestPointOnCollision(Epicenter, ClosestPoint);
+	if (CollisionDistance >= 0.f)
+	{
+		OutSource = EAoeDistanceSource::Collision;
+		return CollisionDistance;
+	}
+
+	// Negative means no simple collision to query; the bounds box keeps the hull distance instead of the origin.
+	OutSource = EAoeDistanceSource::BoundsBox;
+	return FMath::Sqrt(HitComponent->Bounds.GetBox().ComputeSquaredDistanceToPoint(Epicenter));
+}
+
+float FRTS_AOE::GetRearArmorDamageMultiplier(
+	const float RearArmor,
+	const float FullDmgArmorPen,
+	const float ArmorPenFallOff,
+	const float MaxArmorPen)
+{
+	const float SafeFullArmorPen = FMath::Max(FullDmgArmorPen, 0.f);
+	return CalculateRearArmorDamageMultiplier(
+		RearArmor,
+		SafeFullArmorPen,
+		FMath::Max(MaxArmorPen, SafeFullArmorPen),
+		FMath::Max(ArmorPenFallOff, 0.f));
+}
+
 void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	AActor* DamageCauser,
 	const FVector& Epicenter,
@@ -242,7 +412,8 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 	const EShieldDamageSource ShieldDamageSource,
 	const TArray<TWeakObjectPtr<AActor>>& ActorsToIgnore,
 	const EVehicleModuleSplashPolicy ModuleSplashPolicy,
-	const EWeaponShellType ModuleDamageShellType)
+	const EWeaponShellType ModuleDamageShellType,
+	const EAoeFalloffDistance FalloffDistance)
 {
 	if (not IsValid(DamageCauser))
 	{
@@ -255,36 +426,42 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		return;
 	}
 
-	const float SafeFalloffExponent = FMath::Max(DamageFalloffExponent, 0.f);
-	const float SafeFullArmorPen = FMath::Max(FullDmgArmorPen, 0.f);
-	const float SafeMaxArmorPen = FMath::Max(MaxArmorPen, SafeFullArmorPen);
-	const float SafeArmorPenFalloff = FMath::Max(ArmorPenFallOff, 0.f);
-	const TWeakObjectPtr<AActor> WeakDamageCauser = DamageCauser;
-	const bool bDamagesVehicleModules = ModuleSplashPolicy == EVehicleModuleSplashPolicy::DamageExternalModules;
-	const uint32 ModuleExplosionId = bDamagesVehicleModules ? ++GModuleSplashExplosionSerial : 0;
+	FRearArmorAoeParams Params;
+	Params.WeakDamageCauser = DamageCauser;
+	Params.Epicenter = Epicenter;
+	Params.BaseDamage = BaseDamage;
+	Params.SafeRadius = SafeRadius;
+	Params.SafeFalloffExponent = FMath::Max(DamageFalloffExponent, 0.f);
+	Params.SafeFullArmorPen = FMath::Max(FullDmgArmorPen, 0.f);
+	Params.SafeMaxArmorPen = FMath::Max(MaxArmorPen, Params.SafeFullArmorPen);
+	Params.SafeArmorPenFalloff = FMath::Max(ArmorPenFallOff, 0.f);
+	Params.DamageType = DamageType;
+	Params.ShieldDamageSource = ShieldDamageSource;
+	Params.bDamagesVehicleModules = ModuleSplashPolicy == EVehicleModuleSplashPolicy::DamageExternalModules;
+	Params.ModuleExplosionId = Params.bDamagesVehicleModules ? ++GModuleSplashExplosionSerial : 0;
+	Params.ModuleDamageShellType = ModuleDamageShellType;
 	StartAsyncSphereSweep(
 		DamageCauser,
 		Epicenter,
 		SafeRadius,
 		BuildObjectQueryParams(OverlapLogic),
 		ActorsToIgnore,
-		[
-			WeakDamageCauser,
-			Epicenter,
-			BaseDamage,
-			SafeRadius,
-			SafeFalloffExponent,
-			SafeFullArmorPen,
-			SafeArmorPenFalloff,
-			SafeMaxArmorPen,
-			DamageType,
-			ShieldDamageSource,
-			bDamagesVehicleModules,
-			ModuleExplosionId,
-			ModuleDamageShellType
-		](TArray<FHitResult>&& HitResults)
+		[Params, FalloffDistance](TArray<FHitResult>&& HitResults)
 		{
-			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
+			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(Params.DamageType);
+			if (FalloffDistance == EAoeFalloffDistance::ClosestCollision)
+			{
+				for (const TPair<TWeakObjectPtr<AActor>, float>& ActorDistance :
+				     GetClosestCollisionDistancePerActor(HitResults, Params.Epicenter))
+				{
+					// An earlier victim's damage can destroy another victim of the same explosion.
+					if (AActor* HitActor = ActorDistance.Key.Get())
+					{
+						ApplyRearArmorAoeToActor(*HitActor, ActorDistance.Value, Params, DamageEvent);
+					}
+				}
+				return;
+			}
 			for (const FHitResult& Hit : HitResults)
 			{
 				AActor* HitActor = Hit.GetActor();
@@ -292,79 +469,8 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 				{
 					continue;
 				}
-				const FVector EnemyLocation = HitActor->GetActorLocation();
-
-				const float DamageToApply = CalculateDamageWithFalloff(
-					Epicenter,
-					BaseDamage,
-					SafeRadius,
-					SafeFalloffExponent,
-					EnemyLocation);
-				if (DamageToApply <= 0.f)
-				{
-					continue;
-				}
-				if (GetWasDamageAbsorbedByShield(
-					*HitActor,
-					DamageToApply,
-					ShieldDamageSource,
-					EnemyLocation))
-				{
-					continue;
-				}
-
-				UArmorCalculation* ArmorCalculation = HitActor->FindComponentByClass<UArmorCalculation>();
-				if (not IsValid(ArmorCalculation))
-				{
-					if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
-					{
-						DrawDebugString(HitActor->GetWorld(), HitActor->GetActorLocation() + FVector(0, 0, 100),
-						                FString::Printf(TEXT("No Armor found, dmg: %.1f"), DamageToApply), nullptr,
-							FColor::White, 5.f);
-					}
-					ApplyDamageToActor(*HitActor, DamageToApply, DamageEvent, WeakDamageCauser);
-					continue;
-				}
-
-				const float RearArmor = ArmorCalculation->GetRearArmor();
-				const float ArmorDamageMultiplier = CalculateRearArmorDamageMultiplier(
-					RearArmor,
-					SafeFullArmorPen,
-					SafeMaxArmorPen,
-					SafeArmorPenFalloff);
-
-				const float AdjustedDamage = DamageToApply * ArmorDamageMultiplier;
-
-				if constexpr (DeveloperSettings::Debugging::GAOELibrary_Compile_DebugSymbols)
-				{
-					DrawDebugString(
-						HitActor->GetWorld(),
-						HitActor->GetActorLocation() + FVector(0.f, 0.f, 100.f),
-						FString::Printf(
-							TEXT("Rear Armor: %.1f | dmg x%.2f | %.1f -> %.1f"),
-							RearArmor,
-							ArmorDamageMultiplier,
-							DamageToApply,
-							AdjustedDamage),
-						nullptr,
-						FColor::White,
-						5.f);
-				}
-
-				if (AdjustedDamage <= 0.f)
-				{
-					continue;
-				}
-
-				// Module splash is opt-in per weapon adapter; the default Ignore keeps ICBMs and bombs hull-only.
-				if (bDamagesVehicleModules)
-				{
-					ApplyDamageWithModuleSplash(*HitActor, *ArmorCalculation, AdjustedDamage, Epicenter,
-					                            ModuleExplosionId, DamageEvent, WeakDamageCauser,
-					                            ModuleDamageShellType);
-					continue;
-				}
-				ApplyDamageToActor(*HitActor, AdjustedDamage, DamageEvent, WeakDamageCauser);
+				const float DistanceToOrigin = FVector::Dist(Params.Epicenter, HitActor->GetActorLocation());
+				ApplyRearArmorAoeToActor(*HitActor, DistanceToOrigin, Params, DamageEvent);
 			}
 		});
 }

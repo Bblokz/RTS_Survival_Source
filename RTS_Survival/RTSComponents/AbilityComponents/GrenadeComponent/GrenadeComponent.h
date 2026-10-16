@@ -13,6 +13,7 @@
 
 class ASquadUnit;
 class UNiagaraComponent;
+class UPrimitiveComponent;
 class UNiagaraSystem;
 class USoundBase;
 class USoundAttenuation;
@@ -102,6 +103,14 @@ struct FGrenadeComponentSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	float AoeDamageExponentReduction = 1.f;
 
+	// Seconds the grenade lies (or sticks) after landing before it explodes, so units can react; 0 explodes on impact.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades", meta=(ClampMin="0"))
+	float FuseSecondsAfterLanding = 0.f;
+
+	// A grenade landing on or next to an enemy vehicle attaches to its hull and explodes there (AT grenades).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
+	bool bStickToVehicles = false;
+
 	// Cooldown between grenade throws for the squad.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Grenades")
 	float Cooldown = 10.f;
@@ -160,8 +169,26 @@ struct FGrenadeComponentSettings
 	int32 PreferredIndex = -1;
 };
 
+// Where a pooled grenade is in its life; only Idle grenades can be handed to a thrower.
+enum class EGrenadeActorState : uint8
+{
+	Idle,
+	InHand,
+	Flying,
+	// Landed (on the ground or stuck to a vehicle) and counting down.
+	Fusing,
+	// Exploded and hidden while its burn area (molotov fire) still deals damage.
+	Burning
+};
+
+class AGrenadeActor;
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnGrenadeLanded, AGrenadeActor* /*Grenade*/, AActor* /*StuckToVehicle*/);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnGrenadeExploded, AGrenadeActor* /*Grenade*/, const FVector& /*Location*/);
+
 /**
- * @brief Simple grenade actor thrown by squads and reused through pooling.
+ * @brief Grenade actor thrown by squads and reused through pooling.
+ * Flies an arc to its target, lands (sticking to vehicles when the settings ask for it), counts down its fuse and
+ * explodes where it lies, measuring the AOE to each victim's hull.
  */
 UCLASS()
 class RTS_SURVIVAL_API AGrenadeActor : public AActor
@@ -172,17 +199,26 @@ public:
 	AGrenadeActor();
 
 	/**
-	 * @brief Launches the grenade and triggers the explosion logic after travel.
-	 * @param DamageParams Settings for damage falloff and visuals.
+	 * @brief Launches the grenade; it lands after the flight time and explodes after its fuse.
+	 * @param DamageParams Settings for damage falloff, fuse, sticking and visuals.
 	 * @param StartLocation Location where the throw starts.
 	 * @param EndLocation Target location to land at.
 	 * @param OwningPlayer Player owning the grenade for team awareness.
+	 * @param OverrideMesh Mesh to show, null keeps the current one.
 	 */
 	void ThrowAndExplode(const FGrenadeComponentSettings& DamageParams, const FVector& StartLocation,
 	                     const FVector& EndLocation, const int32 OwningPlayer, UStaticMesh* OverrideMesh);
 
 	void SetGrenadeMesh(UStaticMesh* OverrideMesh);
+	void SetInHand();
 	void ResetGrenade();
+
+	/**
+	 * @brief Makes a thrown grenade follow a vehicle during its flight, so it lands (and sticks) on it.
+	 * @param Vehicle Vehicle the throw was aimed at.
+	 * @param LocalTargetOffset Aimed point in the vehicle's local space.
+	 */
+	void TrackVehicle(AActor* Vehicle, const FVector& LocalTargetOffset);
 
 	/**
 	 * @brief Starts the optional effect on the grenade mesh socket, e.g. the burning rag of a molotov.
@@ -192,8 +228,14 @@ public:
 	void ActivateAttachedEffect(UNiagaraSystem* AttachedEffect, const FVector& EffectScale);
 	void DeactivateAttachedEffect();
 
-	// A grenade is free for a new throw when it is hidden and not still burning from an earlier impact.
 	bool GetIsAvailableForThrow() const;
+	EGrenadeActorState GetGrenadeState() const { return M_State; }
+
+	// The squad's pool is going away: grenades in the air, on a fuse or burning finish first and then destroy themselves.
+	void ReleaseFromPool();
+
+	FOnGrenadeLanded OnGrenadeLanded;
+	FOnGrenadeExploded OnGrenadeExploded;
 
 protected:
 	virtual void BeginPlay() override;
@@ -239,23 +281,46 @@ private:
 	UPROPERTY()
 	TObjectPtr<USoundConcurrency> M_ExplosionSoundConcurrency;
 
+	// Settings and owner of the throw in flight; the fuse and the explosion read them after landing.
+	UPROPERTY()
+	FGrenadeComponentSettings M_ThrowSettings;
+
+	int32 M_ThrowOwningPlayer = INDEX_NONE;
+
 	FVector M_ExplosionEffectScale;
 	float M_ThrowDuration;
 
 	FVector M_StartLocation;
 	FVector M_EndLocation;
 
+	// Vehicle the landing point follows during the flight (sticky AT grenades); usually null.
+	TWeakObjectPtr<AActor> M_TrackedVehicle;
+	FVector M_TrackedLocalOffset = FVector::ZeroVector;
+
 	FTimerHandle M_ThrowTimerHandle;
-	FTimerHandle M_ExplosionTimerHandle;
+	FTimerHandle M_LandingTimerHandle;
+	FTimerHandle M_FuseTimerHandle;
 
 	FGrenadeBurnState M_BurnState;
+	EGrenadeActorState M_State = EGrenadeActorState::Idle;
+	bool bM_DestroyWhenDone = false;
 
 	bool GetIsValidStaticMeshComponent() const;
 	bool GetIsValidAttachedEffectComponent() const;
 	void CacheEffectData(const FGrenadeComponentSettings& DamageParams);
 	void StartThrowTimer();
 	void OnTickThrow();
-	void OnExplode(const FGrenadeComponentSettings DamageParams, const int32 OwningPlayer);
+	void OnLanded();
+
+	/**
+	 * @brief Attaches the grenade to the closest enemy vehicle hull near its landing spot.
+	 * @return The vehicle it stuck to, or null when no vehicle is close enough.
+	 */
+	AActor* TryStickToVehicle();
+	void SettleOnGround();
+	void Explode();
+	void ClearThrowTimers();
+	void DestroyIfReleased();
 	// Returns the spawned impact effect so a burn area can stop it when the fire ends.
 	UNiagaraComponent* PlayExplosionFX(const FVector& ExplosionLocation) const;
 	static ETriggerOverlapLogic GetOverlapLogicForOwningPlayer(const int32 OwningPlayer);
@@ -266,8 +331,9 @@ private:
 	 * @param BurnLocation Centre of the burn area.
 	 * @param OwningPlayer Player owning the grenade, decides who takes damage.
 	 * @param ImpactEffect Impact effect to stop when the burn ends; may be null.
+	 * @return True when a burn area started.
 	 */
-	void StartBurnArea(const FGrenadeComponentSettings& DamageParams, const FVector& BurnLocation,
+	bool StartBurnArea(const FGrenadeComponentSettings& DamageParams, const FVector& BurnLocation,
 	                   const int32 OwningPlayer, UNiagaraComponent* ImpactEffect);
 	void OnBurnTick();
 	void StopBurnArea();
@@ -312,7 +378,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
-	virtual void BeginDestroy() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	struct FGrenadeThrowerState
@@ -328,6 +394,9 @@ private:
 	{
 		FVector TargetLocation = FVector::ZeroVector;
 		FVector ThrowLocation = FVector::ZeroVector;
+		// Sticky grenades only: the enemy vehicle under the target point and the aimed point on it.
+		TWeakObjectPtr<AActor> TargetVehicle = nullptr;
+		FVector TargetVehicleLocalOffset = FVector::ZeroVector;
 		bool bM_IsWaitingForArrival = false;
 		bool bM_HasStarted = false;
 	};
@@ -362,6 +431,8 @@ private:
 	void ExecuteThrowGrenade_MoveOrThrow(const FVector& TargetLocation);
 	FVector CalculateThrowMoveLocation(const FVector& TargetLocation) const;
 	void CacheThrowSequenceLocations(const FVector& TargetLocation);
+	void CacheTargetVehicle(const FVector& TargetLocation);
+	void TrackTargetVehicle(AGrenadeActor& Grenade, const FVector& ThrowStartLocation) const;
 	void StartThrowSequence();
 	void BuildThrowerStates();
 	void StartThrowForThrower(FGrenadeThrowerState& ThrowerState);

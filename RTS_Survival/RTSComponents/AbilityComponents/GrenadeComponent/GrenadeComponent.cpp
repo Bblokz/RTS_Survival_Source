@@ -2,8 +2,11 @@
 
 #include "GrenadeComponent.h"
 
+#include "Engine/OverlapResult.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -12,6 +15,7 @@
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "TimerManager.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Components/StaticMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -25,6 +29,115 @@ namespace GrenadeComponentConstants
 	const FName GrenadeSocketName = TEXT("grenade");
 	// Socket on the grenade static mesh that carries the attached effect (molotov rag flame).
 	const FName GrenadeEffectSocketName = TEXT("GrenadeEffect");
+	// A sticky grenade attaches to a vehicle hull within this distance of its landing spot.
+	constexpr float StickToVehicleSearchRadius = 150.f;
+	// A sticky grenade ordered at a point this close to an enemy vehicle hull is thrown at that vehicle.
+	constexpr float TargetVehicleSearchRadius = 300.f;
+	// A target vehicle that drove further than this many throw ranges from the thrower is no longer followed.
+	constexpr float MaxTrackedVehicleRangeMultiplier = 2.f;
+
+	ECollisionChannel GetVictimObjectType(const int32 OwningPlayer)
+	{
+		return OwningPlayer == 1 ? COLLISION_OBJ_ENEMY : COLLISION_OBJ_PLAYER;
+	}
+
+	/**
+	 * @brief Closest hull of an armored vehicle of the victim side around a location.
+	 * @param World World to search.
+	 * @param Location Search center.
+	 * @param SearchRadius Search radius.
+	 * @param VictimObjectType Collision object type of the side the grenade hurts.
+	 * @param IgnoredActor Actor to leave out (the grenade itself).
+	 * @return The hull component, or null when no armored vehicle is that close.
+	 */
+	UPrimitiveComponent* FindClosestVehicleHull(UWorld& World, const FVector& Location, const float SearchRadius,
+	                                            const ECollisionChannel VictimObjectType, const AActor* IgnoredActor)
+	{
+		FCollisionObjectQueryParams ObjectQueryParams;
+		ObjectQueryParams.AddObjectTypesToQuery(VictimObjectType);
+		const FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GrenadeFindVehicleHull), false, IgnoredActor);
+		TArray<FOverlapResult> Overlaps;
+		World.OverlapMultiByObjectType(Overlaps, Location, FQuat::Identity, ObjectQueryParams,
+		                               FCollisionShape::MakeSphere(SearchRadius), QueryParams);
+		UPrimitiveComponent* ClosestHull = nullptr;
+		float ClosestDistance = TNumericLimits<float>::Max();
+		for (const FOverlapResult& Overlap : Overlaps)
+		{
+			AActor* OverlapActor = Overlap.GetActor();
+			UPrimitiveComponent* OverlapComponent = Overlap.GetComponent();
+			// Only armored vehicles take a sticky grenade; soldiers and buildings do not.
+			if (not IsValid(OverlapActor) || not IsValid(OverlapComponent) ||
+				not IsValid(OverlapActor->FindComponentByClass<UArmorCalculation>()))
+			{
+				continue;
+			}
+			EAoeDistanceSource DistanceSource = EAoeDistanceSource::ActorOrigin;
+			const float Distance = FRTS_AOE::GetFalloffDistance(*OverlapActor, OverlapComponent, Location,
+			                                                    DistanceSource);
+			if (Distance < ClosestDistance)
+			{
+				ClosestDistance = Distance;
+				ClosestHull = OverlapComponent;
+			}
+		}
+		return ClosestHull;
+	}
+	constexpr float GroundSettleTraceUp = 100.f;
+	constexpr float GroundSettleTraceDown = 2000.f;
+
+	// Right-hand bone names of the skeletons in the project, tried when a mesh has no grenade socket.
+	const FName RightHandBoneNames[] = {TEXT("hand_r"), TEXT("Hand_R"), TEXT("RightHand"), TEXT("r_hand")};
+
+	// Not const: USkinnedMeshComponent::GetBoneNames is not.
+	FName FindRightHandBone(USkeletalMeshComponent& MeshComponent)
+	{
+		for (const FName& BoneName : RightHandBoneNames)
+		{
+			if (MeshComponent.GetBoneIndex(BoneName) != INDEX_NONE)
+			{
+				return BoneName;
+			}
+		}
+		TArray<FName> BoneNames;
+		MeshComponent.GetBoneNames(BoneNames);
+		for (const FName& BoneName : BoneNames)
+		{
+			const FString Name = BoneName.ToString().ToLower();
+			const bool bIsRightHand = Name.Contains(TEXT("hand")) && (Name.Contains(TEXT("right")) ||
+				Name.EndsWith(TEXT("_r")) || Name.StartsWith(TEXT("r_")));
+			if (bIsRightHand)
+			{
+				return BoneName;
+			}
+		}
+		return NAME_None;
+	}
+
+	/**
+	 * @brief Where a thrower holds and releases the grenade: the grenade socket, else the right hand.
+	 * A skeleton without the socket (SK_Ger_HeavilyArmored had none) used to cancel every throw of its squad.
+	 */
+	FName GetGrenadeHoldPoint(USkeletalMeshComponent& MeshComponent)
+	{
+		if (MeshComponent.DoesSocketExist(GrenadeSocketName))
+		{
+			return GrenadeSocketName;
+		}
+		const FName RightHand = FindRightHandBone(MeshComponent);
+		const USkeletalMesh* SkeletalMesh = MeshComponent.GetSkeletalMeshAsset();
+		static TSet<FString> MeshesReported;
+		const FString MeshName = IsValid(SkeletalMesh) ? SkeletalMesh->GetPathName() : TEXT("no mesh");
+		if (not MeshesReported.Contains(MeshName))
+		{
+			MeshesReported.Add(MeshName);
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("Skeletal mesh %s has no \"%s\" socket; its soldiers hold grenades at %s instead."
+					" Add the socket to its skeleton for the right grip."),
+				*MeshName, *GrenadeSocketName.ToString(),
+				RightHand.IsNone() ? TEXT("the mesh origin") : *RightHand.ToString()));
+		}
+		return RightHand;
+	}
 }
 
 AGrenadeActor::AGrenadeActor()
@@ -51,6 +164,7 @@ void AGrenadeActor::BeginPlay()
 
 void AGrenadeActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	ClearThrowTimers();
 	StopBurnArea();
 	Super::EndPlay(EndPlayReason);
 }
@@ -59,8 +173,12 @@ void AGrenadeActor::ThrowAndExplode(const FGrenadeComponentSettings& DamageParam
                                     const FVector& EndLocation, const int32 OwningPlayer, UStaticMesh* OverrideMesh)
 {
 	CacheEffectData(DamageParams);
+	M_ThrowSettings = DamageParams;
+	M_ThrowOwningPlayer = OwningPlayer;
 	M_StartLocation = StartLocation;
 	M_EndLocation = EndLocation;
+	M_TrackedVehicle = nullptr;
+	M_State = EGrenadeActorState::Flying;
 
 	SetGrenadeMesh(OverrideMesh);
 
@@ -71,22 +189,45 @@ void AGrenadeActor::ThrowAndExplode(const FGrenadeComponentSettings& DamageParam
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
-			M_ExplosionTimerHandle,
-			FTimerDelegate::CreateUObject(this, &AGrenadeActor::OnExplode, DamageParams, OwningPlayer),
+			M_LandingTimerHandle,
+			this,
+			&AGrenadeActor::OnLanded,
 			M_ThrowDuration,
 			false);
 	}
 }
 
+void AGrenadeActor::TrackVehicle(AActor* Vehicle, const FVector& LocalTargetOffset)
+{
+	M_TrackedVehicle = Vehicle;
+	M_TrackedLocalOffset = LocalTargetOffset;
+}
+
+void AGrenadeActor::SetInHand()
+{
+	M_State = EGrenadeActorState::InHand;
+}
+
 void AGrenadeActor::ResetGrenade()
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(M_ThrowTimerHandle);
-		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
-	}
+	ClearThrowTimers();
+	M_TrackedVehicle = nullptr;
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	DeactivateAttachedEffect();
 	SetActorHiddenInGame(true);
+	M_State = M_BurnState.TicksRemaining > 0 ? EGrenadeActorState::Burning : EGrenadeActorState::Idle;
+}
+
+void AGrenadeActor::ClearThrowTimers()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	World->GetTimerManager().ClearTimer(M_ThrowTimerHandle);
+	World->GetTimerManager().ClearTimer(M_LandingTimerHandle);
+	World->GetTimerManager().ClearTimer(M_FuseTimerHandle);
 }
 
 void AGrenadeActor::ActivateAttachedEffect(UNiagaraSystem* AttachedEffect, const FVector& EffectScale)
@@ -127,7 +268,27 @@ void AGrenadeActor::DeactivateAttachedEffect()
 
 bool AGrenadeActor::GetIsAvailableForThrow() const
 {
-	return IsHidden() && M_BurnState.TicksRemaining <= 0;
+	return M_State == EGrenadeActorState::Idle && not bM_DestroyWhenDone;
+}
+
+void AGrenadeActor::ReleaseFromPool()
+{
+	const bool bIsBusy = M_State == EGrenadeActorState::Flying || M_State == EGrenadeActorState::Fusing ||
+		M_State == EGrenadeActorState::Burning;
+	if (bIsBusy)
+	{
+		bM_DestroyWhenDone = true;
+		return;
+	}
+	Destroy();
+}
+
+void AGrenadeActor::DestroyIfReleased()
+{
+	if (bM_DestroyWhenDone && M_State == EGrenadeActorState::Idle)
+	{
+		Destroy();
+	}
 }
 
 void AGrenadeActor::SetGrenadeMesh(UStaticMesh* OverrideMesh)
@@ -196,26 +357,109 @@ void AGrenadeActor::OnTickThrow()
 
 	if (UWorld* World = GetWorld())
 	{
-		const float Elapsed = World->GetTimerManager().GetTimerElapsed(M_ExplosionTimerHandle);
+		// Nullable by design: only sticky grenades thrown at a vehicle follow one.
+		if (M_TrackedVehicle.IsValid())
+		{
+			M_EndLocation = M_TrackedVehicle->GetActorTransform().TransformPosition(M_TrackedLocalOffset);
+		}
+		const float Elapsed = World->GetTimerManager().GetTimerElapsed(M_LandingTimerHandle);
 		const float Alpha = FMath::Clamp(Elapsed / M_ThrowDuration, 0.f, 1.f);
 		const FVector NewLocation = CalculateArcLocation(Alpha);
 		SetActorLocation(NewLocation);
 	}
 }
 
-void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, const int32 OwningPlayer)
+void AGrenadeActor::OnLanded()
 {
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_ThrowTimerHandle);
 	}
+	if (M_TrackedVehicle.IsValid())
+	{
+		M_EndLocation = M_TrackedVehicle->GetActorTransform().TransformPosition(M_TrackedLocalOffset);
+	}
+	M_TrackedVehicle = nullptr;
+	SetActorLocation(M_EndLocation);
 
-	const FVector ExplosionLocation = M_EndLocation;
+	AActor* StuckToVehicle = M_ThrowSettings.bStickToVehicles ? TryStickToVehicle() : nullptr;
+	if (not IsValid(StuckToVehicle))
+	{
+		SettleOnGround();
+	}
+	OnGrenadeLanded.Broadcast(this, StuckToVehicle);
+
+	const float FuseSeconds = M_ThrowSettings.FuseSecondsAfterLanding;
+	UWorld* World = GetWorld();
+	if (FuseSeconds <= 0.f || not IsValid(World))
+	{
+		Explode();
+		return;
+	}
+	M_State = EGrenadeActorState::Fusing;
+	World->GetTimerManager().SetTimer(M_FuseTimerHandle, this, &AGrenadeActor::Explode, FuseSeconds, false);
+}
+
+AActor* AGrenadeActor::TryStickToVehicle()
+{
+	using namespace GrenadeComponentConstants;
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return nullptr;
+	}
+	const FVector LandingLocation = GetActorLocation();
+	UPrimitiveComponent* ClosestHull = FindClosestVehicleHull(
+		*World, LandingLocation, StickToVehicleSearchRadius, GetVictimObjectType(M_ThrowOwningPlayer), this);
+	if (not IsValid(ClosestHull))
+	{
+		return nullptr;
+	}
+
+	FVector PointOnHull;
+	if (ClosestHull->GetClosestPointOnCollision(LandingLocation, PointOnHull) < 0.f)
+	{
+		PointOnHull = ClosestHull->Bounds.GetBox().GetClosestPointTo(LandingLocation);
+	}
+	SetActorLocation(PointOnHull);
+	// Keeps the grenade on the hull while the vehicle drives on; the explosion happens where it is then.
+	AttachToComponent(ClosestHull, FAttachmentTransformRules::KeepWorldTransform);
+	return ClosestHull->GetOwner();
+}
+
+void AGrenadeActor::SettleOnGround()
+{
+	using namespace GrenadeComponentConstants;
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	// The target can be a vehicle top that drove away during the flight; drop onto the ground below.
+	const FVector From = GetActorLocation() + FVector(0.f, 0.f, GroundSettleTraceUp);
+	const FVector To = GetActorLocation() - FVector(0.f, 0.f, GroundSettleTraceDown);
+	FHitResult GroundHit;
+	const FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GrenadeSettleOnGround), false, this);
+	if (World->LineTraceSingleByObjectType(GroundHit, From, To, FCollisionObjectQueryParams(ECC_WorldStatic),
+	                                       QueryParams))
+	{
+		SetActorLocation(GroundHit.ImpactPoint);
+	}
+}
+
+void AGrenadeActor::Explode()
+{
+	ClearThrowTimers();
+	const FVector ExplosionLocation = GetActorLocation();
+	DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	const FGrenadeComponentSettings& DamageParams = M_ThrowSettings;
 	UNiagaraComponent* ImpactEffect = PlayExplosionFX(ExplosionLocation);
 	if (DamageParams.AoeRange > 0.f && DamageParams.Damage > 0.f)
 	{
-		const ETriggerOverlapLogic OverlapLogic = GetOverlapLogicForOwningPlayer(OwningPlayer);
+		const ETriggerOverlapLogic OverlapLogic = GetOverlapLogicForOwningPlayer(M_ThrowOwningPlayer);
 		const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
+		// Measured to each victim's hull: a grenade on a tank's engine deck is inside the radius of that tank.
+		constexpr EAoeFalloffDistance FalloffDistance = EAoeFalloffDistance::ClosestCollision;
 
 		FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 			this,
@@ -230,11 +474,15 @@ void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, cons
 			OverlapLogic,
 			EShieldDamageSource::Shrapnel,
 			ActorsToIgnore,
-			EVehicleModuleSplashPolicy::DamageExternalModules);
+			EVehicleModuleSplashPolicy::DamageExternalModules,
+			static_cast<EWeaponShellType>(0),
+			FalloffDistance);
 	}
 
-	StartBurnArea(DamageParams, ExplosionLocation, OwningPlayer, ImpactEffect);
+	StartBurnArea(DamageParams, ExplosionLocation, M_ThrowOwningPlayer, ImpactEffect);
+	OnGrenadeExploded.Broadcast(this, ExplosionLocation);
 	ResetGrenade();
+	DestroyIfReleased();
 }
 
 ETriggerOverlapLogic AGrenadeActor::GetOverlapLogicForOwningPlayer(const int32 OwningPlayer)
@@ -242,7 +490,7 @@ ETriggerOverlapLogic AGrenadeActor::GetOverlapLogicForOwningPlayer(const int32 O
 	return OwningPlayer == 1 ? ETriggerOverlapLogic::OverlapEnemy : ETriggerOverlapLogic::OverlapPlayer;
 }
 
-void AGrenadeActor::StartBurnArea(const FGrenadeComponentSettings& DamageParams, const FVector& BurnLocation,
+bool AGrenadeActor::StartBurnArea(const FGrenadeComponentSettings& DamageParams, const FVector& BurnLocation,
                                   const int32 OwningPlayer, UNiagaraComponent* ImpactEffect)
 {
 	StopBurnArea();
@@ -250,13 +498,13 @@ void AGrenadeActor::StartBurnArea(const FGrenadeComponentSettings& DamageParams,
 	if (not BurnSettings.GetIsBurnAreaEnabled())
 	{
 		// No burn area: the impact effect plays out on its own.
-		return;
+		return false;
 	}
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
 	{
-		return;
+		return false;
 	}
 
 	M_BurnImpactEffectComponent = ImpactEffect;
@@ -278,6 +526,7 @@ void AGrenadeActor::StartBurnArea(const FGrenadeComponentSettings& DamageParams,
 		&AGrenadeActor::OnBurnTick,
 		BurnSettings.BurnTickInterval,
 		true);
+	return true;
 }
 
 void AGrenadeActor::OnBurnTick()
@@ -301,7 +550,10 @@ void AGrenadeActor::OnBurnTick()
 		M_BurnState.DamageType,
 		M_BurnState.OverlapLogic,
 		EShieldDamageSource::Flamethrower,
-		ActorsToIgnore);
+		ActorsToIgnore,
+		EVehicleModuleSplashPolicy::Ignore,
+		static_cast<EWeaponShellType>(0),
+		EAoeFalloffDistance::ClosestCollision);
 
 	--M_BurnState.TicksRemaining;
 	if (M_BurnState.TicksRemaining <= 0)
@@ -324,6 +576,11 @@ void AGrenadeActor::StopBurnArea()
 		M_BurnImpactEffectComponent->Deactivate();
 	}
 	M_BurnImpactEffectComponent = nullptr;
+	if (M_State == EGrenadeActorState::Burning)
+	{
+		M_State = EGrenadeActorState::Idle;
+		DestroyIfReleased();
+	}
 }
 
 UNiagaraComponent* AGrenadeActor::PlayExplosionFX(const FVector& ExplosionLocation) const
@@ -389,10 +646,11 @@ void UGrenadeComponent::BeginPlay()
 	M_GrenadesRemaining = M_Settings.GrenadesPerSquad;
 }
 
-void UGrenadeComponent::BeginDestroy()
+void UGrenadeComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// Not in BeginDestroy: destroying actors during garbage collection is unsafe.
 	DestroyGrenadePool();
-	Super::BeginDestroy();
+	Super::EndPlay(EndPlayReason);
 }
 
 void UGrenadeComponent::Init(ASquadController* SquadController)
@@ -626,6 +884,47 @@ void UGrenadeComponent::CacheThrowSequenceLocations(const FVector& TargetLocatio
 	M_ThrowSequenceState.ThrowLocation = CalculateThrowMoveLocation(TargetLocation);
 	M_ThrowSequenceState.bM_IsWaitingForArrival = false;
 	M_ThrowSequenceState.bM_HasStarted = false;
+	CacheTargetVehicle(TargetLocation);
+}
+
+void UGrenadeComponent::CacheTargetVehicle(const FVector& TargetLocation)
+{
+	using namespace GrenadeComponentConstants;
+	M_ThrowSequenceState.TargetVehicle = nullptr;
+	UWorld* World = GetWorld();
+	if (not M_Settings.bStickToVehicles || not IsValid(World))
+	{
+		return;
+	}
+	const UPrimitiveComponent* TargetHull = FindClosestVehicleHull(
+		*World, TargetLocation, TargetVehicleSearchRadius, GetVictimObjectType(M_OwningPlayer), GetOwner());
+	AActor* TargetVehicle = IsValid(TargetHull) ? TargetHull->GetOwner() : nullptr;
+	if (not IsValid(TargetVehicle))
+	{
+		return;
+	}
+	// A vehicle drives on during the walk, the throw animation and the flight; aim at the clicked spot on it.
+	M_ThrowSequenceState.TargetVehicle = TargetVehicle;
+	M_ThrowSequenceState.TargetVehicleLocalOffset =
+		TargetVehicle->GetActorTransform().InverseTransformPosition(TargetLocation);
+}
+
+void UGrenadeComponent::TrackTargetVehicle(AGrenadeActor& Grenade, const FVector& ThrowStartLocation) const
+{
+	using namespace GrenadeComponentConstants;
+	// Nullable by design: only sticky grenades ordered at a vehicle have one.
+	if (not M_ThrowSequenceState.TargetVehicle.IsValid())
+	{
+		return;
+	}
+	AActor* TargetVehicle = M_ThrowSequenceState.TargetVehicle.Get();
+	const FVector VehicleTarget = TargetVehicle->GetActorTransform().TransformPosition(
+		M_ThrowSequenceState.TargetVehicleLocalOffset);
+	if (FVector::Dist2D(ThrowStartLocation, VehicleTarget) > M_Settings.ThrowRange * MaxTrackedVehicleRangeMultiplier)
+	{
+		return;
+	}
+	Grenade.TrackVehicle(TargetVehicle, M_ThrowSequenceState.TargetVehicleLocalOffset);
 }
 
 void UGrenadeComponent::StartThrowSequence()
@@ -876,6 +1175,7 @@ void UGrenadeComponent::OnThrowMontageFinished(TWeakObjectPtr<ASquadUnit> SquadU
 	DetachGrenadeFromThrower(*ThrowerState);
 	Grenade->ThrowAndExplode(M_Settings, StartLocation, M_ThrowSequenceState.TargetLocation,
 	                         M_OwningPlayer, M_Settings.GrenadeMesh);
+	TrackTargetVehicle(*Grenade, StartLocation);
 	ThrowerState->M_AttachedGrenade = nullptr;
 	ThrowerState->M_AttachedGrenadeScale = FVector::OneVector;
 	ThrowerState->M_GrenadesRemaining = FMath::Max(0, ThrowerState->M_GrenadesRemaining - 1);
@@ -933,21 +1233,16 @@ void UGrenadeComponent::AttachGrenadeToThrower(FGrenadeThrowerState& ThrowerStat
 		return;
 	}
 
-	if (not MeshComponent->DoesSocketExist(GrenadeComponentConstants::GrenadeSocketName))
-	{
-		RTSFunctionLibrary::ReportError(
-			FString::Printf(TEXT("Grenade socket missing on squad unit %s."), *SquadUnit->GetName()));
-		return;
-	}
-
+	const FName HoldPoint = GrenadeComponentConstants::GetGrenadeHoldPoint(*MeshComponent);
 	ThrowerState.M_AttachedGrenade = Grenade;
 	ThrowerState.M_AttachedGrenadeScale = Grenade->GetActorScale3D();
 	Grenade->SetGrenadeMesh(M_Settings.GrenadeMesh);
+	Grenade->SetInHand();
 	Grenade->ActivateAttachedEffect(M_Settings.AttachedGrenadeEffect, M_Settings.AttachedGrenadeEffectScale);
 	Grenade->AttachToComponent(
 		MeshComponent,
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		GrenadeComponentConstants::GrenadeSocketName);
+		HoldPoint);
 	Grenade->SetActorScale3D(ThrowerState.M_AttachedGrenadeScale);
 	Grenade->SetActorHiddenInGame(false);
 }
@@ -978,14 +1273,8 @@ FVector UGrenadeComponent::GetThrowStartLocation(const FGrenadeThrowerState& Thr
 		return SquadUnit->GetActorLocation();
 	}
 
-	if (not MeshComponent->DoesSocketExist(GrenadeComponentConstants::GrenadeSocketName))
-	{
-		RTSFunctionLibrary::ReportError(
-			FString::Printf(TEXT("Grenade socket missing on squad unit %s."), *SquadUnit->GetName()));
-		return SquadUnit->GetActorLocation();
-	}
-
-	return MeshComponent->GetSocketLocation(GrenadeComponentConstants::GrenadeSocketName);
+	const FName HoldPoint = GrenadeComponentConstants::GetGrenadeHoldPoint(*MeshComponent);
+	return HoldPoint.IsNone() ? MeshComponent->GetComponentLocation() : MeshComponent->GetSocketLocation(HoldPoint);
 }
 
 UGrenadeComponent::FGrenadeThrowerState* UGrenadeComponent::FindThrowerState(
@@ -1090,10 +1379,12 @@ AGrenadeActor* UGrenadeComponent::AcquireGrenade()
 		{
 			return Grenade.Get();
 		}
-		bIsAnyGrenadeStillBurning |= Grenade->IsHidden();
+		bIsAnyGrenadeStillBurning |= Grenade->GetGrenadeState() == EGrenadeActorState::Burning ||
+			Grenade->GetGrenadeState() == EGrenadeActorState::Fusing ||
+			Grenade->GetGrenadeState() == EGrenadeActorState::Flying;
 	}
 
-	// Grenades whose fire still burns on the ground are busy on purpose; the caller spawns a fallback grenade.
+	// Grenades still flying, on their fuse or burning are busy on purpose; the caller spawns a fallback grenade.
 	if (not bIsAnyGrenadeStillBurning)
 	{
 		RTSFunctionLibrary::ReportError(
@@ -1124,7 +1415,8 @@ void UGrenadeComponent::DestroyGrenadePool()
 	{
 		if (IsValid(Grenade))
 		{
-			Grenade->Destroy();
+			// Thrown grenades still explode; their thrower's squad dying does not defuse them.
+			Grenade->ReleaseFromPool();
 		}
 	}
 	M_GrenadePool.Empty();

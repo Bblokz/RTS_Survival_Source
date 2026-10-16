@@ -6,34 +6,21 @@
 
 #if RTS_WITH_MAP_TESTS
 
-#include "Blueprint/UserWidget.h"
-#include "Blueprint/WidgetBlueprintLibrary.h"
-#include "Blueprint/WidgetTree.h"
-#include "Components/Button.h"
+#include "GrenadeTestHelpers.h"
 #include "Components/SceneCaptureComponent2D.h"
-#include "Engine/BlueprintGeneratedClass.h"
-#include "Engine/InheritableComponentHandler.h"
-#include "Engine/SCS_Node.h"
 #include "Engine/SceneCapture2D.h"
-#include "Engine/SimpleConstructionScript.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
-#include "GameFramework/PlayerStart.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
-#include "NavigationSystem.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "UObject/UObjectIterator.h"
-#include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/CPPController.h"
-#include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
-#include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
-#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -47,8 +34,6 @@ namespace MolotovTestPrivate
 	const TCHAR* const DirectorySwitch = TEXT("MolotovDir=");
 	// X,Y of the test spot; the squads spawn around it.
 	const TCHAR* const LocationSwitch = TEXT("MolotovAt=");
-	const TCHAR* const AnchorClassPrefix = TEXT("BP_UnitImage_LandscapeAnchor");
-	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 
 	const TCHAR* const MolotovSquadClassPath = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_Mosin.Rus_Squad_Mosin_C");
 	const TCHAR* const TargetSquadClassPath = TEXT("/Game/RTS_Survival/Blueprints/Squads/Ger/Squad_Ger_Mauser.Squad_Ger_Mauser_C");
@@ -62,9 +47,6 @@ namespace MolotovTestPrivate
 	constexpr uint8 TargetPlayer = 1;
 	// Beyond the throw range, so the squad also walks into range like in a real order.
 	const FVector TargetSquadOffset(1100.f, 0.f, 0.f);
-	constexpr float NavProjectionExtent = 500.f;
-	constexpr float SpawnHeightOffset = 100.f;
-	constexpr float GroundTraceHalfHeight = 10000.f;
 	// Map anchors are not always on the navmesh; the squads must be able to walk into throw range.
 	const FVector NavSearchExtent(20000.f, 20000.f, 5000.f);
 
@@ -86,8 +68,6 @@ namespace MolotovTestPrivate
 	constexpr float EffectGoneCheckSeconds = 9.5f;
 	constexpr float BurnPictureSeconds[] = {0.4f, 1.5f, 3.f, 5.f, 6.6f, 9.5f};
 
-	constexpr int32 PictureWidth = 1280;
-	constexpr int32 PictureHeight = 720;
 	constexpr float CloseFieldOfView = 40.f;
 	constexpr float GameFieldOfView = 90.f;
 	// The RTS camera: spring arm 3000 at -70 degrees; the close view looks at the thrower from the side.
@@ -99,77 +79,6 @@ namespace MolotovTestPrivate
 	constexpr int32 FirstHoldPictureFrame = 12;
 	constexpr int32 SecondHoldPictureFrame = 30;
 	constexpr int32 BurnPictureCount = UE_ARRAY_COUNT(BurnPictureSeconds);
-
-	void OverrideRTSComponentTemplateOwners(UClass* UnitClass, const uint8 OwningPlayer,
-	                                        TArray<TPair<TWeakObjectPtr<UObject>, uint8>>& OutRestore)
-	{
-		const FByteProperty* OwnerProperty = FindFProperty<FByteProperty>(URTSComponent::StaticClass(), TEXT("OwningPlayer"));
-		if (OwnerProperty == nullptr)
-		{
-			return;
-		}
-		TArray<UActorComponent*> Templates;
-		for (UClass* Class = UnitClass; Class != nullptr; Class = Class->GetSuperClass())
-		{
-			UBlueprintGeneratedClass* BlueprintClass = Cast<UBlueprintGeneratedClass>(Class);
-			if (BlueprintClass == nullptr)
-			{
-				continue;
-			}
-			if (BlueprintClass->SimpleConstructionScript != nullptr)
-			{
-				for (const USCS_Node* Node : BlueprintClass->SimpleConstructionScript->GetAllNodes())
-				{
-					Templates.Add(Node != nullptr ? Node->ComponentTemplate : nullptr);
-				}
-			}
-			if (UInheritableComponentHandler* Handler = BlueprintClass->GetInheritableComponentHandler(false))
-			{
-				for (auto RecordIterator = Handler->CreateRecordIterator(); RecordIterator; ++RecordIterator)
-				{
-					Templates.Add(RecordIterator->ComponentTemplate);
-				}
-			}
-		}
-		for (UActorComponent* Template : Templates)
-		{
-			if (not IsValid(Template) || not Template->IsA<URTSComponent>())
-			{
-				continue;
-			}
-			uint8* OwnerValue = OwnerProperty->ContainerPtrToValuePtr<uint8>(Template);
-			OutRestore.Emplace(Template, *OwnerValue);
-			*OwnerValue = OwningPlayer;
-		}
-	}
-
-	void RestoreRTSComponentTemplateOwners(const TArray<TPair<TWeakObjectPtr<UObject>, uint8>>& Restore)
-	{
-		const FByteProperty* OwnerProperty = FindFProperty<FByteProperty>(URTSComponent::StaticClass(), TEXT("OwningPlayer"));
-		for (const TPair<TWeakObjectPtr<UObject>, uint8>& Entry : Restore)
-		{
-			if (OwnerProperty != nullptr && Entry.Key.IsValid())
-			{
-				*OwnerProperty->ContainerPtrToValuePtr<uint8>(Entry.Key.Get()) = Entry.Value;
-			}
-		}
-	}
-
-	// IsUnitAlive is not const on AActor.
-	bool GetIsLivingSoldier(ASquadUnit* Soldier)
-	{
-		return IsValid(Soldier) && Soldier->IsUnitAlive();
-	}
-
-	int32 GetLivingSoldierCount(ASquadController* Squad)
-	{
-		int32 LivingSoldiers = 0;
-		for (ASquadUnit* Soldier : Squad->GetSquadUnitsChecked())
-		{
-			LivingSoldiers += GetIsLivingSoldier(Soldier) ? 1 : 0;
-		}
-		return LivingSoldiers;
-	}
 }
 
 bool UMolotovTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -214,7 +123,7 @@ void UMolotovTestSubsystem::Tick(float DeltaTime)
 	}
 	if (M_Phase != EMolotovTestPhase::WaitingForGameStart)
 	{
-		KeepGameRunning();
+		FGrenadeTestHelpers::KeepGameRunning(*GetWorld(), M_PlayerController.Get());
 	}
 	switch (M_Phase)
 	{
@@ -273,153 +182,14 @@ void UMolotovTestSubsystem::Finish()
 	FPlatformMisc::RequestExit(false, TEXT("MolotovTest"));
 }
 
-bool UMolotovTestSubsystem::TryStartGame()
-{
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		return false;
-	}
-	M_PlayerController = Cast<ACPPController>(World->GetFirstPlayerController());
-	if (not M_PlayerController.IsValid())
-	{
-		return false;
-	}
-	UPlayerStartGameControl* StartGameControl = M_PlayerController->FindComponentByClass<UPlayerStartGameControl>();
-	if (IsValid(StartGameControl) && StartGameControl->GetIsWaitingForPlayerToStart())
-	{
-		StartGameControl->PlayerStartedGame();
-	}
-	KeepGameRunning();
-	return true;
-}
-
-void UMolotovTestSubsystem::KeepGameRunning() const
-{
-	TArray<UUserWidget*> Pickers;
-	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Pickers, UW_GameDifficultyPicker::StaticClass(), false);
-	for (UUserWidget* const Picker : Pickers)
-	{
-		if (not IsValid(Picker) || not IsValid(Picker->WidgetTree) || not Picker->IsInViewport())
-		{
-			continue;
-		}
-		UButton* const NormalButton = Cast<UButton>(Picker->WidgetTree->FindWidget(MolotovTestPrivate::DifficultyButtonName));
-		if (IsValid(NormalButton))
-		{
-			NormalButton->OnClicked.Broadcast();
-		}
-	}
-	if (M_PlayerController.IsValid() && M_PlayerController->GetIsGameOnPause())
-	{
-		M_PlayerController->PauseGame(ERTSPauseGameOptions::ForceUnpause);
-	}
-}
-
-bool UMolotovTestSubsystem::FindTestLocation()
-{
-	using namespace MolotovTestPrivate;
-	FString LocationText;
-	if (FParse::Value(FCommandLine::Get(), LocationSwitch, LocationText, false))
-	{
-		TArray<FString> Coordinates;
-		LocationText.ParseIntoArray(Coordinates, TEXT(","), true);
-		if (Coordinates.Num() >= 2)
-		{
-			M_TestLocation = FVector(FCString::Atof(*Coordinates[0]), FCString::Atof(*Coordinates[1]), 0.f);
-			DropToGround(M_TestLocation);
-			return true;
-		}
-	}
-	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
-	{
-		if (It->GetClass()->GetName().StartsWith(AnchorClassPrefix))
-		{
-			M_TestLocation = It->GetActorLocation();
-			DropToGround(M_TestLocation);
-			return true;
-		}
-	}
-	for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
-	{
-		M_TestLocation = It->GetActorLocation();
-		DropToGround(M_TestLocation);
-		return true;
-	}
-	UE_LOG(LogRTSMolotovTest, Error, TEXT("RTS_MOLOTOV_TEST no -MolotovAt, %s or player start on this map"),
-	       AnchorClassPrefix);
-	return false;
-}
-
-bool UMolotovTestSubsystem::MoveTestLocationOntoNavMesh()
-{
-	UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
-	FNavLocation NavLocation;
-	if (not IsValid(NavigationSystem) ||
-		not NavigationSystem->ProjectPointToNavigation(M_TestLocation, NavLocation, MolotovTestPrivate::NavSearchExtent))
-	{
-		return false;
-	}
-	UE_LOG(LogRTSMolotovTest, Display, TEXT("RTS_MOLOTOV_TEST test spot moved onto the navmesh: %s -> %s"),
-	       *M_TestLocation.ToCompactString(), *NavLocation.Location.ToCompactString());
-	M_TestLocation = NavLocation.Location;
-	return true;
-}
-
-bool UMolotovTestSubsystem::DropToGround(FVector& InOutLocation) const
-{
-	// Map anchors sit at camera height; squads must spawn on the ground.
-	const FVector TraceOffset(0.f, 0.f, MolotovTestPrivate::GroundTraceHalfHeight);
-	FHitResult GroundHit;
-	const FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(MolotovTestGround), false);
-	if (not GetWorld()->LineTraceSingleByChannel(GroundHit, InOutLocation + TraceOffset, InOutLocation - TraceOffset,
-	                                             ECC_Visibility, QueryParams))
-	{
-		UE_LOG(LogRTSMolotovTest, Verbose, TEXT("RTS_MOLOTOV_TEST no ground below %s yet"), *InOutLocation.ToCompactString());
-		return false;
-	}
-	InOutLocation = GroundHit.ImpactPoint;
-	return true;
-}
-
 ASquadController* UMolotovTestSubsystem::SpawnSquadForPlayer(const TCHAR* ClassPath, const FVector& Location,
                                                              const uint8 OwningPlayer) const
 {
-	using namespace MolotovTestPrivate;
-	UWorld* World = GetWorld();
-	UClass* SquadClass = LoadClass<ASquadController>(nullptr, ClassPath);
-	if (not IsValid(World) || not IsValid(SquadClass))
-	{
-		UE_LOG(LogRTSMolotovTest, Error, TEXT("RTS_MOLOTOV_TEST could not load squad class %s"), ClassPath);
-		return nullptr;
-	}
-	FVector SpawnLocation = Location;
-	DropToGround(SpawnLocation);
-	FNavLocation NavLocation;
-	UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(World);
-	if (IsValid(NavigationSystem) &&
-		NavigationSystem->ProjectPointToNavigation(Location, NavLocation, FVector(NavProjectionExtent)))
-	{
-		SpawnLocation = NavLocation.Location;
-	}
-	SpawnLocation.Z += SpawnHeightOffset;
-	const FTransform SpawnTransform(SpawnLocation);
-	// The owner must be in place before BeginPlay; Blueprint-added components take it from their template.
-	TArray<TPair<TWeakObjectPtr<UObject>, uint8>> TemplateOwnersToRestore;
-	OverrideRTSComponentTemplateOwners(SquadClass, OwningPlayer, TemplateOwnersToRestore);
-	ASquadController* Squad = World->SpawnActorDeferred<ASquadController>(
-		SquadClass, SpawnTransform, nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-	if (IsValid(Squad))
-	{
-		if (URTSComponent* RTSComponent = Squad->FindComponentByClass<URTSComponent>())
-		{
-			RTSComponent->SetOwningPlayerRuntime(OwningPlayer);
-		}
-		Squad->FinishSpawning(SpawnTransform);
-	}
-	RestoreRTSComponentTemplateOwners(TemplateOwnersToRestore);
+	ASquadController* Squad = Cast<ASquadController>(
+		FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), ClassPath, FTransform(Location), OwningPlayer));
 	UE_LOG(LogRTSMolotovTest, Display, TEXT("RTS_MOLOTOV_TEST spawned %s owner=%d at %s"),
-	       IsValid(Squad) ? *Squad->GetName() : TEXT("nothing"), OwningPlayer, *SpawnLocation.ToCompactString());
+	       IsValid(Squad) ? *Squad->GetName() : TEXT("nothing"), OwningPlayer,
+	       IsValid(Squad) ? *Squad->GetActorLocation().ToCompactString() : TEXT("-"));
 	return Squad;
 }
 
@@ -431,32 +201,12 @@ bool UMolotovTestSubsystem::CreateCameras()
 
 bool UMolotovTestSubsystem::CreateCamera(FMolotovTestCamera& OutCamera, const float FieldOfView) const
 {
-	using namespace MolotovTestPrivate;
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	ASceneCapture2D* Capture = nullptr;
+	UTextureRenderTarget2D* RenderTarget = nullptr;
+	if (not FGrenadeTestHelpers::CreateCaptureCamera(*GetWorld(), FieldOfView, Capture, RenderTarget))
 	{
 		return false;
 	}
-	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	ASceneCapture2D* Capture = World->SpawnActor<ASceneCapture2D>(ASceneCapture2D::StaticClass(), FTransform::Identity,
-	                                                               SpawnParameters);
-	UTextureRenderTarget2D* RenderTarget = UKismetRenderingLibrary::CreateRenderTarget2D(
-		World, PictureWidth, PictureHeight, RTF_RGBA8_SRGB);
-	if (not IsValid(Capture) || not IsValid(RenderTarget))
-	{
-		return false;
-	}
-	USceneCaptureComponent2D* CaptureComponent = Capture->GetCaptureComponent2D();
-	CaptureComponent->TextureTarget = RenderTarget;
-	CaptureComponent->CaptureSource = SCS_FinalColorLDR;
-	CaptureComponent->FOVAngle = FieldOfView;
-	// Rendering every frame with kept state lets auto exposure and temporal AA settle like the game view.
-	CaptureComponent->bCaptureEveryFrame = true;
-	CaptureComponent->bCaptureOnMovement = false;
-	CaptureComponent->bAlwaysPersistRenderingState = true;
-	// The fog of war is a post-process material; the pictures show the effect, not what the player may see.
-	CaptureComponent->ShowFlags.SetPostProcessMaterial(false);
 	OutCamera.Capture = Capture;
 	OutCamera.RenderTarget = RenderTarget;
 	return true;
@@ -504,12 +254,13 @@ void UMolotovTestSubsystem::TickWaitingForGameStart()
 		Finish();
 		return;
 	}
-	if (GetRealSecondsInPhase() < HudBuildSeconds || not TryStartGame())
+	if (GetRealSecondsInPhase() < HudBuildSeconds || not FGrenadeTestHelpers::TryStartGame(*GetWorld(), M_PlayerController))
 	{
 		return;
 	}
 	// Streaming levels and the navmesh can arrive a little after the game starts; retry until the start timeout.
-	if (not FindTestLocation() || not MoveTestLocationOntoNavMesh())
+	if (not FGrenadeTestHelpers::FindTestSpot(*GetWorld(), LocationSwitch, M_TestLocation) ||
+		not FGrenadeTestHelpers::ProjectOntoNavMesh(*GetWorld(), M_TestLocation, NavSearchExtent))
 	{
 		return;
 	}
@@ -536,8 +287,8 @@ void UMolotovTestSubsystem::TickWaitingForSquads()
 	using namespace MolotovTestPrivate;
 	const bool bAreSquadsReady = M_MolotovSquad.IsValid() && M_TargetSquad.IsValid() &&
 		M_MolotovSquad->GetIsSquadFullyLoadedAndInitialized() && M_TargetSquad->GetIsSquadFullyLoadedAndInitialized() &&
-		GetLivingSoldierCount(M_MolotovSquad.Get()) >= MinLivingSoldiersPerSquad &&
-		GetLivingSoldierCount(M_TargetSquad.Get()) >= MinLivingSoldiersPerSquad;
+		FGrenadeTestHelpers::GetLivingSoldierCount(*M_MolotovSquad) >= MinLivingSoldiersPerSquad &&
+		FGrenadeTestHelpers::GetLivingSoldierCount(*M_TargetSquad) >= MinLivingSoldiersPerSquad;
 	AimGameCameraAt(GetTargetSquadCentre());
 	if (bAreSquadsReady && M_SquadsReadyGameSeconds < 0.f)
 	{
@@ -713,7 +464,7 @@ FVector UMolotovTestSubsystem::GetTargetSquadCentre() const
 	int32 LivingSoldiers = 0;
 	for (ASquadUnit* Soldier : M_TargetSquad->GetSquadUnitsChecked())
 	{
-		if (MolotovTestPrivate::GetIsLivingSoldier(Soldier))
+		if (FGrenadeTestHelpers::GetIsLivingSoldier(Soldier))
 		{
 			Sum += Soldier->GetActorLocation();
 			++LivingSoldiers;
@@ -765,7 +516,7 @@ void UMolotovTestSubsystem::SilenceMolotovSquad() const
 	}
 	for (ASquadUnit* Soldier : M_MolotovSquad->GetSquadUnitsChecked())
 	{
-		if (MolotovTestPrivate::GetIsLivingSoldier(Soldier) && Soldier->GetIsValidWeapon())
+		if (FGrenadeTestHelpers::GetIsLivingSoldier(Soldier) && Soldier->GetIsValidWeapon())
 		{
 			Soldier->GetInfantryWeapon()->DisableWeaponSearch(false, false);
 		}
