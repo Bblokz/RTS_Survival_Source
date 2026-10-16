@@ -808,28 +808,28 @@ void URadixiteGrowthComponent::StartDecalShrinkAndDestroy(ADecalActor* DecalToDe
 				return;
 			}
 
-			WeakDecal->Destroy();
-			if (not WeakThis->M_ActiveDecalShrinkTimers.Contains(WeakDecal.Get()))
+			// Clearing the timer that runs this lambda destroys the lambda and its captures at once, so everything
+			// is copied to locals first and the timer is cleared last. The handle is taken out before the decal is
+			// destroyed: a destroyed actor's weak pointer no longer finds its entry, which left the timer running.
+			URadixiteGrowthComponent* const GrowthComponent = WeakThis.Get();
+			ADecalActor* const FinishedDecal = WeakDecal.Get();
+			FTimerHandle FinishedShrinkTimerHandle;
+			const bool bWasTracked = GrowthComponent->M_ActiveDecalShrinkTimers.RemoveAndCopyValue(
+				FinishedDecal, FinishedShrinkTimerHandle);
+			FinishedDecal->Destroy();
+			if (not bWasTracked)
 			{
 				return;
 			}
-
-			if (UWorld* World = WeakThis->GetWorld())
+			if (GrowthComponent->M_ActiveDecalShrinkTimers.Num() == 0
+				&& not GrowthComponent->bM_IsOwnerDestructionSequenceActive)
 			{
-				World->GetTimerManager().ClearTimer(WeakThis->M_ActiveDecalShrinkTimers[WeakDecal.Get()]);
+				GrowthComponent->TryDestroyRuntimeFxCache(GrowthComponent->M_DecalDestructionFxCacheRuntime);
 			}
-			WeakThis->M_ActiveDecalShrinkTimers.Remove(WeakDecal.Get());
-			if (WeakThis->M_ActiveDecalShrinkTimers.Num() > 0)
+			if (UWorld* World = GrowthComponent->GetWorld())
 			{
-				return;
+				World->GetTimerManager().ClearTimer(FinishedShrinkTimerHandle);
 			}
-
-			if (WeakThis->bM_IsOwnerDestructionSequenceActive)
-			{
-				return;
-			}
-
-			WeakThis->TryDestroyRuntimeFxCache(WeakThis->M_DecalDestructionFxCacheRuntime);
 		}),
 		0.03f,
 		true);
@@ -900,16 +900,19 @@ void URadixiteGrowthComponent::StartNodeSpawnVerticalAnimation(AActor* SpawnedNo
 				return;
 			}
 
-			if (not WeakThis->M_ActiveNodeSpawnAnimationTimers.Contains(WeakNodeActor.Get()))
+			// Clearing the timer that runs this lambda destroys the lambda and its captures at once, so everything
+			// is copied to locals first and the timer is cleared last.
+			URadixiteGrowthComponent* const GrowthComponent = WeakThis.Get();
+			FTimerHandle FinishedAnimationTimerHandle;
+			if (not GrowthComponent->M_ActiveNodeSpawnAnimationTimers.RemoveAndCopyValue(
+				WeakNodeActor.Get(), FinishedAnimationTimerHandle))
 			{
 				return;
 			}
-
-			if (UWorld* World = WeakThis->GetWorld())
+			if (UWorld* World = GrowthComponent->GetWorld())
 			{
-				World->GetTimerManager().ClearTimer(WeakThis->M_ActiveNodeSpawnAnimationTimers[WeakNodeActor.Get()]);
+				World->GetTimerManager().ClearTimer(FinishedAnimationTimerHandle);
 			}
-			WeakThis->M_ActiveNodeSpawnAnimationTimers.Remove(WeakNodeActor.Get());
 		}),
 		AnimationTickInterval,
 		true);
