@@ -46,6 +46,27 @@ void UEnemyRetreatController::BeginPlay()
 	CacheGenerationSeedFromGameInstance();
 }
 
+bool UEnemyRetreatController::GetIsUnitRetreating(const AActor* UnitActor) const
+{
+	if (not IsValid(UnitActor))
+	{
+		return false;
+	}
+	auto IsElementOfUnit = [UnitActor](const FRetreatElement& RetreatElement)
+	{
+		return RetreatElement.Unit.IsValid() && RetreatElement.Unit->GetOwnerActor() == UnitActor;
+	};
+	for (const FEnemyRetreatData& RetreatData : M_ActiveRetreats)
+	{
+		if (RetreatData.RetreatingSquadControllers.ContainsByPredicate(IsElementOfUnit)
+			|| RetreatData.ReverseRetreatUnits.ContainsByPredicate(IsElementOfUnit))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 void UEnemyRetreatController::StartRetreat(
 	const TArray<FRetreatElement>& RetreatingSquadControllers,
 	const TArray<FRetreatElement>& ReverseRetreatUnits,
@@ -252,6 +273,10 @@ void UEnemyRetreatController::CheckRetreatingUnits()
 		{
 			RetreatData.bM_HasAllUnitsReached = true;
 			RetreatData.AllUnitsReachedTimeSeconds = CurrentTimeSeconds;
+#if !UE_BUILD_SHIPPING
+			OnRetreatAllUnitsReachedForTest.Broadcast(RetreatData.RetreatID,
+			                                          CurrentTimeSeconds - RetreatData.RetreatStartTimeSeconds);
+#endif
 
 			if (IsValid(World))
 			{

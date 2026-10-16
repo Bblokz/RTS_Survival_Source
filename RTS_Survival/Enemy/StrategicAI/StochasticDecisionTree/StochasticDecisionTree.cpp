@@ -5,6 +5,7 @@
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
+#include "RTS_Survival/Enemy/EnemyUnitAbilityAI/EnemyOrderQueueHelpers.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyFormationController/EnemyFormationController.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
@@ -945,7 +946,9 @@ bool UStochasticDecisionTree::IssueMoveOrder(ICommands* UnitToCommand, const FVe
 	{
 		return false;
 	}
-	return UnitToCommand->MoveToLocation(TargetLocation, bResetOrderQueue, FinishedMovementRotation,
+	bool bResetQueue = bResetOrderQueue;
+	FEnemyOrderQueueHelpers::PrepareOrderBehindRunningAbility(UnitToCommand, bResetQueue);
+	return UnitToCommand->MoveToLocation(TargetLocation, bResetQueue, FinishedMovementRotation,
 	                                     true) == ECommandQueueError::NoError;
 }
 
@@ -960,7 +963,9 @@ bool UStochasticDecisionTree::IssueAttackOrder(ICommands* UnitToCommand, const T
 	{
 		return false;
 	}
-	return UnitToCommand->AttackActor(TargetActor.Get(), bResetOrderQueue) == ECommandQueueError::NoError;
+	bool bResetQueue = bResetOrderQueue;
+	FEnemyOrderQueueHelpers::PrepareOrderBehindRunningAbility(UnitToCommand, bResetQueue);
+	return UnitToCommand->AttackActor(TargetActor.Get(), bResetQueue) == ECommandQueueError::NoError;
 }
 
 bool UStochasticDecisionTree::IssueRotateOrder(
@@ -973,7 +978,9 @@ bool UStochasticDecisionTree::IssueRotateOrder(
 		return false;
 	}
 
-	return UnitToCommand->RotateTowards(TargetRotation, bResetOrderQueue) == ECommandQueueError::NoError;
+	bool bResetQueue = bResetOrderQueue;
+	FEnemyOrderQueueHelpers::PrepareOrderBehindRunningAbility(UnitToCommand, bResetQueue);
+	return UnitToCommand->RotateTowards(TargetRotation, bResetQueue) == ECommandQueueError::NoError;
 }
 
 bool UStochasticDecisionTree::IssueDigInOrder(ICommands* UnitToCommand, const bool bResetOrderQueue) const
@@ -983,7 +990,9 @@ bool UStochasticDecisionTree::IssueDigInOrder(ICommands* UnitToCommand, const bo
 		return false;
 	}
 
-	return UnitToCommand->DigIn(bResetOrderQueue) == ECommandQueueError::NoError;
+	bool bResetQueue = bResetOrderQueue;
+	FEnemyOrderQueueHelpers::PrepareOrderBehindRunningAbility(UnitToCommand, bResetQueue);
+	return UnitToCommand->DigIn(bResetQueue) == ECommandQueueError::NoError;
 }
 
 bool UStochasticDecisionTree::IssueHedgehogConstructionOrder(
@@ -996,9 +1005,11 @@ bool UStochasticDecisionTree::IssueHedgehogConstructionOrder(
 		return false;
 	}
 
+	bool bResetQueue = bResetOrderQueue;
+	FEnemyOrderQueueHelpers::PrepareOrderBehindRunningAbility(UnitToCommand, bResetQueue);
 	return UnitToCommand->FieldConstruction(
 		EFieldConstructionType::RussianHedgeHog,
-		bResetOrderQueue,
+		bResetQueue,
 		ConstructionLocation,
 		FRotator::ZeroRotator,
 		nullptr) == ECommandQueueError::NoError;
@@ -1011,7 +1022,9 @@ bool UStochasticDecisionTree::IssueRegisterWithBlackboardOrder(ICommands* UnitTo
 	{
 		return false;
 	}
-	return UnitToCommand->RegisterAsBlackboardIdle(bResetOrderQueue) == ECommandQueueError::NoError;
+	bool bResetQueue = bResetOrderQueue;
+	FEnemyOrderQueueHelpers::PrepareOrderBehindRunningAbility(UnitToCommand, bResetQueue);
+	return UnitToCommand->RegisterAsBlackboardIdle(bResetQueue) == ECommandQueueError::NoError;
 }
 
 TArray<FStrategicAIAction*> UStochasticDecisionTree::GetActionsWithValidSubActions(

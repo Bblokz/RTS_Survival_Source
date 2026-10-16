@@ -9,6 +9,11 @@
 
 class AEnemyController;
 class ICommands;
+
+#if !UE_BUILD_SHIPPING
+// Test hook: every unit of a retreat reached its retreat location, after this many seconds.
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnRetreatAllUnitsReachedForTest, int32 /*RetreatID*/, float /*SecondsTaken*/);
+#endif
 class URTSGameInstance;
 
 /**
@@ -40,6 +45,13 @@ public:
 		const EPostRetreatCounterStrategy PostRetreatCounterStrategy,
 		const float TimeTillCounterAttackAfterLastRetreatingUnitReached,
 		const float MaxTimeWaitTillCounterAttack);
+
+	// True while the unit belongs to a retreat that has not turned into its counterattack yet.
+	bool GetIsUnitRetreating(const AActor* UnitActor) const;
+
+#if !UE_BUILD_SHIPPING
+	FOnRetreatAllUnitsReachedForTest OnRetreatAllUnitsReachedForTest;
+#endif
 
 protected:
 	virtual void BeginPlay() override;

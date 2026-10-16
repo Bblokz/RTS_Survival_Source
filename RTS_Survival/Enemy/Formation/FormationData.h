@@ -19,6 +19,8 @@ struct FFormationUnitData
 	FVector Offset = FVector::ZeroVector;
 	bool bHasReachedNextDestination = false;
 	FDelegateHandle MovementCompleteHandle;
+	// Projected spot the unit was last sent to on its waypoint; the unit idling far from it was not a real arrival.
+	FVector M_WaypointDestination = FVector::ZeroVector;
 	// Tracks the last known location used for stuck detection while moving to the current waypoint.
 	FVector M_LastKnownLocation = FVector::ZeroVector;
 	bool bM_HasLastKnownLocation = false;

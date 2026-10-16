@@ -85,6 +85,8 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerPanzerschreckPit, WithFootprint(FreeConstructionRules, 400.f, 400.f)},
 		// The concrete block is 10.8 m across at its foot; the props and the rear ladder stand just outside it.
 		{EBuildingExpansionType::BTX_GerRailPakBunker, WithFootprint(FreeConstructionRules, 1250.f, 1250.f)},
+		// The square bag walls are 9.5 m across; the ammo niche bulges 1.2 m out of the left wall.
+		{EBuildingExpansionType::BTX_GerFlak88Pit, WithFootprint(FreeConstructionRules, 1200.f, 1200.f)},
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
 
 		// --- solar  ---
