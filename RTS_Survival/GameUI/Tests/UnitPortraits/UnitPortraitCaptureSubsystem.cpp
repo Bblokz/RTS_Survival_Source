@@ -101,8 +101,8 @@ namespace UnitPortraitConstants
 	constexpr float DefaultUnitYawFromAnchor = 90.f;
 	constexpr float MaxUnitDrift = 30.f;
 	// Meshes bigger than this, or this far from the unit, are not part of its look (helper or hidden meshes) and
-	// would zoom the camera far out. Large enough for the German gun pits (about 14 m across).
-	constexpr float MaxUnitMeshRadius = 1500.f;
+	// would zoom the camera far out. Large enough for the captured B-4 pit (20 m footprint).
+	constexpr float MaxUnitMeshRadius = 2500.f;
 
 	// Auto exposure adapts in a few frames instead of seconds, so the first unit is not pictured over-exposed.
 	constexpr float ExposureAdaptSpeed = 10.f;

@@ -1,0 +1,3 @@
+# German pit defences added after the first pit portraits (2026-10-15). T_Ger_Pit_ goes to TrainingUI/GermanPits.
+T_Ger_Pit_CapturedB4=/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/Ger_BXP_CapturedB4Pit.Ger_BXP_CapturedB4Pit_C
+T_Ger_Pit_Flak37=/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Flak37.Ger_BXP_GerPit_Flak37_C

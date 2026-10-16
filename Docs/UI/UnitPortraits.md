@@ -22,7 +22,7 @@ and in use.
   Default 3 shots per unit.
 - Three scene-capture cameras per moment: `FrontRight`, `Right` and `Front`, all from the unit's right so the gun
   points right as in the hand-made portraits (1536x1536, 30 degree FOV), framed on the vehicle's mesh bounds
-  (meshes over 15 m or 15 m away are ignored). Each picture's projected vehicle box goes to `crops.csv` next to it.
+  (meshes over 25 m or 25 m away are ignored). Each picture's projected vehicle box goes to `crops.csv` next to it.
 - The game view itself is never drawn offscreen, so `HighResShot` does not work there; scene captures do.
 
 ## Running it
@@ -115,3 +115,8 @@ as a level designer places them, gun found on the child turret actor. Published 
 - The leFH's muzzle flash lasts about one frame and peaks between the default moments; it was retaken with
   `-UnitPortraitShots=5 -UnitPortraitShotDelays=0,0.034,0.067,0.1,0.134` (every frame after the shot).
 - The first try hung at frame 1 with no CPU before the game started (not in the capture code); a rerun worked.
+- Later German pits (`ger_pits_new.txt`, picks in `ger_pits_new_picks.txt`): the captured B-4 pit
+  (`Ger_BXP_CapturedB4Pit`, under the Soviet B4_203MM folder) and the Flak 37 pit (`Ger_BXP_GerPit_Flak37`), both
+  run with every-frame shot delays and cropped at `--zoom 1.0`. The B-4 pit's 20 m footprint is why the mesh-size
+  cutoff for framing is 25 m. From the Right view the Flak pit's interior is in shadow but the flash frame still
+  reads best there.

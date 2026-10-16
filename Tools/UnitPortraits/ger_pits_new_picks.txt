@@ -1,0 +1,4 @@
+# Picked 2026-10-15 from the ger_pits_new.txt run (-UnitPortraitShots=4
+# -UnitPortraitShotDelays=0,0.034,0.067,0.1,0.134,0.3), crop --zoom 1.0.
+T_Ger_Pit_CapturedB4=T_Ger_Pit_CapturedB4_Right_shot2_t0.png
+T_Ger_Pit_Flak37=T_Ger_Pit_Flak37_Right_shot1_t0.png
