@@ -1132,55 +1132,91 @@ void UGameUnitManager::IncrementTankOrNomadicCounter(ATankMaster* Tank, const ui
 		return;
 	}
 
-	URTSComponent* const RTSComponent = Tank->GetRTSComponent();
+	const URTSComponent* const RTSComponent = Tank->GetRTSComponent();
 	if (not IsValid(RTSComponent))
 	{
 		RTSFunctionLibrary::ReportError("Tank has no valid RTSComponent in IncrementTankOrNomadicCounter.");
 		return;
 	}
 
-	if (RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic)
+	// Counted once: a vehicle that is registered again first gives up what it was counted as.
+	DecrementTankOrNomadicCounter(Tank, Player);
+	FCountedTankOrNomadic CountedVehicle;
+	CountedVehicle.bIsNomadic = RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic;
+	CountedVehicle.Subtype = RTSComponent->GetUnitSubType();
+	CountedVehicle.Player = Player;
+	if (CountedVehicle.bIsNomadic)
 	{
 		TMap<ENomadicSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 			? M_PlayerHasNomadicOfType
 			: M_EnemyHasNomadicOfType;
 		GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, RTSComponent->GetSubtypeAsNomadicSubtype());
-		return;
 	}
-
-	TMap<ETankSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
-		? M_PlayerHasTankOfType
-		: M_EnemyHasTankOfType;
-	GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, RTSComponent->GetSubtypeAsTankSubtype());
+	else
+	{
+		TMap<ETankSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+			? M_PlayerHasTankOfType
+			: M_EnemyHasTankOfType;
+		GameUnitManagerUnitTypeCounters::IncrementCounter(Counters, RTSComponent->GetSubtypeAsTankSubtype());
+	}
+	M_CountedTanksOrNomadics.Add(Tank, CountedVehicle);
 }
 
 void UGameUnitManager::DecrementTankOrNomadicCounter(ATankMaster* Tank, const uint8 Player)
 {
-	if (not IsValid(Tank))
+	if (Tank == nullptr)
 	{
 		return;
 	}
 
-	URTSComponent* const RTSComponent = Tank->GetRTSComponent();
-	if (not IsValid(RTSComponent))
+	// Taken off the counter it was put on; a vehicle that was never counted, or was already taken off, has
+	// nothing to take off.
+	FCountedTankOrNomadic CountedVehicle;
+	if (not M_CountedTanksOrNomadics.RemoveAndCopyValue(Tank, CountedVehicle))
 	{
-		RTSFunctionLibrary::ReportError("Tank has no valid RTSComponent in DecrementTankOrNomadicCounter.");
 		return;
 	}
 
-	if (RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic)
+	if (CountedVehicle.bIsNomadic)
 	{
-		TMap<ENomadicSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+		TMap<ENomadicSubtype, int32>& Counters = CountedVehicle.Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 			? M_PlayerHasNomadicOfType
 			: M_EnemyHasNomadicOfType;
-		GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, RTSComponent->GetSubtypeAsNomadicSubtype(), TEXT("Nomadic subtype counter"));
+		GameUnitManagerUnitTypeCounters::DecrementCounter(
+			Counters, static_cast<ENomadicSubtype>(CountedVehicle.Subtype), TEXT("Nomadic subtype counter"));
 		return;
 	}
 
-	TMap<ETankSubtype, int32>& Counters = Player == GameUnitManagerUnitTypeCounters::PlayerIndex
+	TMap<ETankSubtype, int32>& Counters = CountedVehicle.Player == GameUnitManagerUnitTypeCounters::PlayerIndex
 		? M_PlayerHasTankOfType
 		: M_EnemyHasTankOfType;
-	GameUnitManagerUnitTypeCounters::DecrementCounter(Counters, RTSComponent->GetSubtypeAsTankSubtype(), TEXT("Tank subtype counter"));
+	GameUnitManagerUnitTypeCounters::DecrementCounter(
+		Counters, static_cast<ETankSubtype>(CountedVehicle.Subtype), TEXT("Tank subtype counter"));
+}
+
+void UGameUnitManager::RecountTankOrNomadicSubtype(ATankMaster* Tank)
+{
+	if (not IsValid(Tank) || not IsValid(Tank->GetRTSComponent()))
+	{
+		return;
+	}
+
+	const URTSComponent* const RTSComponent = Tank->GetRTSComponent();
+	const FCountedTankOrNomadic* const CountedVehicle = M_CountedTanksOrNomadics.Find(Tank);
+	// Not registered yet: it is counted under its subtype when it registers.
+	if (CountedVehicle == nullptr)
+	{
+		return;
+	}
+	const bool bIsNomadic = RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic;
+	if (CountedVehicle->bIsNomadic == bIsNomadic && CountedVehicle->Subtype == RTSComponent->GetUnitSubType())
+	{
+		return;
+	}
+
+	// Copied first: counting the vehicle again removes the map entry this pointer points into.
+	const uint8 CountedPlayer = CountedVehicle->Player;
+	IncrementTankOrNomadicCounter(Tank, CountedPlayer);
 }
 
 void UGameUnitManager::IncrementSquadCounter(ASquadUnit* SquadUnit, const uint8 Player)

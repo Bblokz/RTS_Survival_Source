@@ -183,7 +183,28 @@ void URTSComponent::SetUnitSubtype(
 		RTSFunctionLibrary::ReportError("No Unit Subtype set in SetUnitSubtype"
 			"\n name of unit: " + GetOwner()->GetName());
 	}
+	RecountVehicleSubtypeInGameState();
 	OnSubTypeInitialized.Broadcast();
+}
+
+void URTSComponent::RecountVehicleSubtypeInGameState() const
+{
+	// Before BeginPlay the unit has not registered yet; it is counted under this subtype when it does.
+	if (not HasBegunPlay() || not bAddToGameState)
+	{
+		return;
+	}
+	ATankMaster* const Tank = Cast<ATankMaster>(GetOwner());
+	if (not IsValid(Tank))
+	{
+		return;
+	}
+	UGameUnitManager* const GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		return;
+	}
+	GameUnitManager->RecountTankOrNomadicSubtype(Tank);
 }
 
 void URTSComponent::SetStandaloneTurretSubtype(const EStandaloneTurretSubtype NewStandaloneTurretSubtype)

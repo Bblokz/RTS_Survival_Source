@@ -267,6 +267,13 @@ public:
 	 */
 	void RecountSquadUnitSubtype(ASquadUnit* SquadUnit);
 
+	/**
+	 * @brief Moves a tank's or nomadic vehicle's count to its current subtype. Vehicle Blueprints set the subtype
+	 * after the vehicle registered itself; URTSComponent::SetUnitSubtype calls this once the vehicle has begun play.
+	 * @param Tank Vehicle whose subtype was just set.
+	 */
+	void RecountTankOrNomadicSubtype(ATankMaster* Tank);
+
 private:
 	/** Initializes the GetTargetUnit M_Thread async. */
 	void Initialize();
@@ -336,6 +343,18 @@ private:
 	};
 
 	TMap<TObjectKey<ASquadUnit>, FCountedSquadUnit> M_CountedSquadUnits;
+
+	// Under which counters (tank or nomadic), subtype and player each vehicle is counted. Vehicle Blueprints set the
+	// subtype after the vehicle registered, so what is taken off the counters when it goes must be what was put on
+	// them; a vehicle removed twice or never added then has nothing to take off.
+	struct FCountedTankOrNomadic
+	{
+		bool bIsNomadic = false;
+		uint8 Subtype = 0;
+		uint8 Player = 0;
+	};
+
+	TMap<TObjectKey<ATankMaster>, FCountedTankOrNomadic> M_CountedTanksOrNomadics;
 	void IncrementBxpCounter(ABuildingExpansion* Bxp, uint8 Player);
 	void DecrementBxpCounter(ABuildingExpansion* Bxp, uint8 Player);
 	void IncrementAircraftCounter(AAircraftMaster* Aircraft, uint8 Player);

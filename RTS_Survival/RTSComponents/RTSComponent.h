@@ -166,6 +166,10 @@ private:
 	 */
 	bool AddUnitToGameState() const;
 
+	// A vehicle registers with the game unit manager in BeginPlay, before its Blueprint sets its subtype; this moves
+	// its count to the subtype it has now.
+	void RecountVehicleSubtypeInGameState() const;
+
 	// Can be converted to an enum subtype to provide more information about this unit.
 	uint8 M_UnitSubType;
 
