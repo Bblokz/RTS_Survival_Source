@@ -3,12 +3,15 @@
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/Units/Aircraft/AircaftHelpers/FRTSAircraftHelpers.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMovement/AircraftMovement.h"
+#include "RTS_Survival/Units/Aircraft/AircraftDeath/AircraftDeathComponent.h"
+#include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "Components/DecalComponent.h"
 #include "RTS_Survival/Weapons/AircraftWeapon/AircraftWeapon.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/AircraftTargetAcquisition/AircraftTargetAcquisition.h"
 #include "Kismet/GameplayStatics.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
@@ -43,6 +46,7 @@ AAircraftMaster::AAircraftMaster(const FObjectInitializer& ObjectInitializer)
 	M_AircraftMoveData.Path.Owner = this;
 	M_AircraftAttackData.Path.Owner = this;
 	M_AircraftWeapon = CreateDefaultSubobject<UAircraftWeapon>(TEXT("AircraftWeapon"));
+	M_DeathComponent = CreateDefaultSubobject<UAircraftDeathComponent>(TEXT("AircraftDeath"));
 }
 
 void AAircraftMaster::PropagateNewAggroStance(const ERTSAggroBehaviour NewStance)
@@ -79,6 +83,7 @@ void AAircraftMaster::BeginPlay()
 	BeginPlay_InitAircraft(GetBombOverrideMeshComp());
 	// Make sure the aircraft weapon knows if we are airborne or landed.
 	BeginPlay_PropagateStateToWpAndAnimInst();
+	BeginPlay_SetupWeaponHitCollision();
 	if (ensure(GetIsValidTargetAcquisition()))
 	{
 		M_TargetAcquisition->ActivateAcquisition();
@@ -104,6 +109,11 @@ UMeshComponent* AAircraftMaster::GetBombOverrideMeshComp_Implementation()
 
 void AAircraftMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// Removed without being shot down (a bombing run that retreats off the map): leave the unit lists too.
+	if (EndPlayReason == EEndPlayReason::Destroyed && IsUnitAlive() && IsValid(RTSComponent))
+	{
+		RTSComponent->DeregisterFromGameState();
+	}
 	Strafe_ClearTimer();
 	ReloadManager.OnAircraftDied(this);
 	if (M_AircraftOwner.IsValid())
@@ -112,6 +122,113 @@ void AAircraftMaster::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		M_AircraftOwner->RemoveAircraftFromBuilding_CloseBayDoors(this);
 	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void AAircraftMaster::UnitDies(const ERTSDeathType DeathType)
+{
+	// Not the parent's: it destroys the actor at once, the wreck has yet to fall.
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+	SetUnitDying();
+	// Before the movement stops below: the wreck falls on with the speed the aircraft had.
+	const FVector VelocityAtDeath = GetVelocity();
+	if (GetIsValidRTSComponent())
+	{
+		// Out of the target lists at once: nobody keeps shooting at the falling wreck.
+		RTSComponent->DeregisterFromGameState();
+	}
+	UnitDies_StopAllActions();
+	UnitDies_DestroyCarriedTank();
+	UnitDies_ReleaseOwnerBay();
+	UnitDies_RemoveFromSelectionAndUI();
+	OnUnitDies.Broadcast();
+	if (not GetIsValidDeathComponent())
+	{
+		Destroy();
+		return;
+	}
+	M_DeathComponent->StartDeath(VelocityAtDeath);
+}
+
+void AAircraftMaster::UnitDies_StopAllActions()
+{
+	StopWeaponFire();
+	StopBombThrowing();
+	Strafe_ClearTimer();
+	M_StrafeState.ResetRuntime();
+	M_StrafeState.bM_IsRetreatingToDestroy = false;
+	M_CarpetBombingState.ResetRuntime();
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_AircraftLandedData.Vto_PrepareHandle);
+		World->GetTimerManager().ClearTimer(M_AircraftDropStayLandedTimerHandle);
+	}
+	if (IsValid(M_TargetAcquisition))
+	{
+		// Its timers would keep ordering the wreck to attack.
+		M_TargetAcquisition->DestroyComponent();
+		M_TargetAcquisition = nullptr;
+	}
+	if (EnsureAircraftMovementIsValid())
+	{
+		M_AircraftMovement->KillMovement();
+		M_AircraftMovement->Deactivate();
+	}
+}
+
+void AAircraftMaster::UnitDies_ReleaseOwnerBay()
+{
+	ReloadManager.OnAircraftDied(this);
+	if (M_AircraftOwner.IsValid())
+	{
+		// Idempotent; EndPlay calls it again.
+		M_AircraftOwner->RemoveAircraftFromBuilding_CloseBayDoors(this);
+	}
+}
+
+void AAircraftMaster::UnitDies_RemoveFromSelectionAndUI()
+{
+	if (IsValid(SelectionComponent))
+	{
+		if (IsValid(PlayerController) && SelectionComponent->GetIsSelected())
+		{
+			PlayerController->RemovePawnFromSelectionAndUpdateUI(this);
+		}
+		SelectionComponent->SetCanBeSelected(false);
+	}
+	if (IsValid(HealthComponent))
+	{
+		HealthComponent->HideHealthBar();
+	}
+	if (IsValid(M_SelectionDecal))
+	{
+		M_SelectionDecal->SetVisibility(false);
+	}
+}
+
+void AAircraftMaster::UnitDies_DestroyCarriedTank()
+{
+	ATankMaster* CarriedTank = M_AircraftDropRequest.AttachedTank.Get();
+	if (not IsValid(CarriedTank) || CarriedTank->GetAttachParentActor() != this)
+	{
+		return;
+	}
+	CarriedTank->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	M_AircraftDropRequest.AttachedTank.Reset();
+	CarriedTank->TriggerDestroyActor(ERTSDeathType::Kinetic);
+}
+
+bool AAircraftMaster::GetIsValidDeathComponent() const
+{
+	if (IsValid(M_DeathComponent))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_DeathComponent",
+	                                                      "AAircraftMaster::GetIsValidDeathComponent", this);
+	return false;
 }
 
 void AAircraftMaster::BeginDestroy()
@@ -128,6 +245,12 @@ void AAircraftMaster::PostInitializeComponents()
 {
 	// Will setup selection component and fow component.
 	Super::PostInitializeComponents();
+	if (GetIsTargetableByAntiAir() && GetIsValidRTSComponent())
+	{
+		// Anti-air turrets only find aircraft the game unit manager knows about, and every aircraft Blueprint
+		// inherited the flag switched off; before BeginPlay, where the component registers its owner.
+		RTSComponent->SetAddToGameState(true);
+	}
 	M_AircraftMesh = FindComponentByClass<USkeletalMeshComponent>();
 	M_TargetAcquisition = FindComponentByClass<UAircraftTargetAcquisition>();
 	(void)GetIsValidTargetAcquisition();
@@ -173,6 +296,11 @@ void AAircraftMaster::InitAircraft(UDecalComponent* SelectionDecal)
 void AAircraftMaster::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	// A shot-down aircraft is flown by its death component.
+	if (not IsUnitAlive())
+	{
+		return;
+	}
 	if (not M_AnimInstAircraft || not M_AircraftMovement)
 	{
 		return;
@@ -272,6 +400,11 @@ void AAircraftMaster::Tick(float DeltaTime)
 
 void AAircraftMaster::ExecuteMoveCommand(const FVector MoveToLocation)
 {
+	// A shot-down aircraft takes no more orders; its death component flies the wreck.
+	if (not IsUnitAlive())
+	{
+		return;
+	}
 	Super::ExecuteMoveCommand(MoveToLocation);
 
 	const FVector FlightTarget(
@@ -311,6 +444,11 @@ void AAircraftMaster::TerminateMoveCommand()
 
 void AAircraftMaster::ExecuteAttackCommand(AActor* TargetActor)
 {
+	// A shot-down aircraft takes no more orders; its death component flies the wreck.
+	if (not IsUnitAlive())
+	{
+		return;
+	}
 	Super::ExecuteAttackCommand(TargetActor);
 	M_AircraftAttackData.TargetActor = TargetActor;
 	M_AircraftAttackData.TargetLocation = FVector::ZeroVector;
@@ -332,6 +470,11 @@ void AAircraftMaster::ExecuteAttackCommand(AActor* TargetActor)
 
 void AAircraftMaster::ExecuteAttackGroundCommand(const FVector GroundLocation)
 {
+	// A shot-down aircraft takes no more orders; its death component flies the wreck.
+	if (not IsUnitAlive())
+	{
+		return;
+	}
 	Super::ExecuteAttackGroundCommand(GroundLocation);
 	if (GroundLocation.IsNearlyZero())
 	{
@@ -376,6 +519,11 @@ void AAircraftMaster::TerminateAttackCommand()
 
 void AAircraftMaster::ExecuteReturnToBase()
 {
+	// A shot-down aircraft takes no more orders; its death component flies the wreck.
+	if (not IsUnitAlive())
+	{
+		return;
+	}
 	Strafe_StopAndRestoreSettings();
 	Super::ExecuteReturnToBase();
 
@@ -493,7 +641,8 @@ void AAircraftMaster::SetTargetPreference(const ETargetPreference TargetPreferen
 
 void AAircraftMaster::SetAggroStance(const ERTSAggroBehaviour NewStance)
 {
-	if (not GetIsValidTargetAcquisition())
+	// A shot-down aircraft has no target acquisition left.
+	if (not IsUnitAlive() || not GetIsValidTargetAcquisition())
 	{
 		return;
 	}
@@ -1669,6 +1818,36 @@ void AAircraftMaster::BeginPlay_InitAircraft(UMeshComponent* OverrideBombCompone
 			M_AircraftBombComponent->InitBombComponent(M_AircraftMesh, RTSComponent->GetOwningPlayer());
 		}
 	}
+}
+
+void AAircraftMaster::BeginPlay_SetupWeaponHitCollision() const
+{
+	if (not GetIsValidRTSComponent())
+	{
+		return;
+	}
+	const int32 OwningPlayer = RTSComponent->GetOwningPlayer();
+	TArray<UPrimitiveComponent*> Primitives;
+	GetComponents<UPrimitiveComponent>(Primitives);
+	bool bFoundHitComponent = false;
+	for (UPrimitiveComponent* Primitive : Primitives)
+	{
+		const bool bIsWeaponHitComponent = IsValid(Primitive)
+			&& (Primitive->GetCollisionResponseToChannel(COLLISION_TRACE_PLAYER) == ECR_Block
+				|| Primitive->GetCollisionResponseToChannel(COLLISION_TRACE_ENEMY) == ECR_Block);
+		if (not bIsWeaponHitComponent)
+		{
+			continue;
+		}
+		FRTS_CollisionSetup::SetupAircraftWeaponHitCollision(Primitive, OwningPlayer);
+		bFoundHitComponent = true;
+	}
+	if (bFoundHitComponent || not EnsureAircraftMeshIsValid())
+	{
+		return;
+	}
+	// No component of the Blueprint takes weapon hits; the aircraft mesh and its physics bodies do.
+	FRTS_CollisionSetup::SetupAircraftWeaponHitCollision(M_AircraftMesh, OwningPlayer);
 }
 
 void AAircraftMaster::BeginPlay_PropagateStateToWpAndAnimInst() const

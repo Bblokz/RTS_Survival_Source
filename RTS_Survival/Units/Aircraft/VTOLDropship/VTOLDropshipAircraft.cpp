@@ -123,6 +123,11 @@ void AVTOLDropshipAircraft::Tick(const float DeltaSeconds)
 	// Intentionally skip AAircraftMaster::Tick so regular Bezier/idle aircraft movement
 	// can never move us off the pad.
 	ASelectablePawnMaster::Tick(DeltaSeconds);
+	// Destroyed by splash damage: the death component flies the wreck, the delivery run is over.
+	if (not IsUnitAlive())
+	{
+		return;
+	}
 	ForceNeverSelectable();
 
 	switch (M_DropshipState)

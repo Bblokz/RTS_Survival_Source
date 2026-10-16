@@ -137,9 +137,12 @@ void ATeamWeapon::BeginPlay_ApplyTeamWeaponConfig(const FTeamWeaponConfig& NewCo
 	}
 	if (GetIsValidTeamWeaponMesh())
 	{
+		// A yaw arc of 0 means the gun traverses all the way round on its mount (the flak guns); only guns with an arc
+		// are turned by their crew once a target leaves it.
+		const bool bIsCrewTurnedWithinArc = not FMath::IsNearlyZero(M_TeamWeaponConfig.M_YawArc.M_MaxYaw);
 		InitEmbeddedTurret(M_TeamWeaponMesh.Get(),
 		                   M_TeamWeaponConfig.M_EmbeddedSettings.TurretHeight,
-		                   true,
+		                   bIsCrewTurnedWithinArc,
 		                   M_TeamWeaponConfig.M_YawArc.M_MinYaw,
 		                   M_TeamWeaponConfig.M_YawArc.M_MaxYaw,
 		                   this,

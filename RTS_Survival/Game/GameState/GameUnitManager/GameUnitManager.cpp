@@ -1957,6 +1957,11 @@ UGameUnitManager::GetAsyncActorData(const bool bGetPlayerUnits,
 		{
 			continue;
 		}
+		// Parked inside its airbase the aircraft is part of the building; anti-air engages it once it lifts off.
+		if (EachAircraft->GetLandedState() == EAircraftLandingState::Landed)
+		{
+			continue;
+		}
 		const uint32 ActorID = EachAircraft->GetUniqueID();
 		CurrentActorIDMapping->Add(ActorID, EachAircraft);
 		OutActorData.Add({ActorID, CreatePair(EachAircraft->GetActorLocation(), ETargetPreference::Aircraft)});

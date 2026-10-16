@@ -22,6 +22,7 @@ class UEnemyStrategicAIComponent;
 class UAircraftTargetAcquisition;
 class UAircraftWeapon;
 class UAircraftMovement;
+class UAircraftDeathComponent;
 // forward declare
 class UAircraftOwnerComp;
 
@@ -114,6 +115,9 @@ public:
 	/** @return Bomb component if present; allows attack-path points to arm/disarm bombs. */
 	UBombComponent* GetBombComponent() const;
 
+	/** @return The component that runs the burning crash once the aircraft is shot down. */
+	UAircraftDeathComponent* GetDeathComponent() const { return M_DeathComponent; }
+
 	/** @return Current landed state enum (routing hint for animation/weapon/movement). */
 	inline EAircraftLandingState GetLandedState() const { return M_LandedState; }
 
@@ -195,6 +199,14 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
 	virtual void PostInitializeComponents() override;
+
+	/** @brief Shot down: stops every action and frees its bay, then lets the death component burn and crash it;
+	 * the actor goes once the wreck has hit the ground. */
+	virtual void UnitDies(const ERTSDeathType DeathType) override;
+
+	/** @return Whether anti-air may target this aircraft: it is then registered with the game unit manager whatever
+	 * its Blueprint says. Scripted aircraft that are no combat units override this. */
+	virtual bool GetIsTargetableByAntiAir() const { return true; }
 
 	// --------------------------
 	// -- Start Blueprint Updates
@@ -280,6 +292,11 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UAircraftTargetAcquisition> M_TargetAcquisition;
 	bool GetIsValidTargetAcquisition() const;
+
+	// Burning fall and breakup; its settings can be changed per aircraft Blueprint.
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category="Death")
+	TObjectPtr<UAircraftDeathComponent> M_DeathComponent;
+	bool GetIsValidDeathComponent() const;
 
 
 	// ----------------- START EXPERIENCE INTERFACE -----------------
@@ -685,6 +702,9 @@ private:
 	/** @brief Push initial LandedState into weapons/anim to keep them consistent on spawn. */
 	void BeginPlay_PropagateStateToWpAndAnimInst() const;
 
+	/** @brief Makes the weapons of the aircraft's enemies hit it, whichever side the Blueprint was authored for. */
+	void BeginPlay_SetupWeaponHitCollision() const;
+
 
 	// -------------------------------------------------------------
 	// ----------------------- Ability Swap Start -----------------------
@@ -760,6 +780,18 @@ private:
 
 	/** @brief Owner died while we were owned: kill movement, clear caches, and recover to airborne idle. */
 	void OnOwnerDies_ResetToIdleAirborne();
+
+	/** @brief Death: no more weapon fire, bombs, timed runs, commands or movement of its own. */
+	void UnitDies_StopAllActions();
+
+	/** @brief Death: the airbase gets its bay back and the reload work for this aircraft is dropped. */
+	void UnitDies_ReleaseOwnerBay();
+
+	/** @brief Death: out of the selection, no health bar or selection decal on the falling wreck. */
+	void UnitDies_RemoveFromSelectionAndUI();
+
+	/** @brief Death: a tank carried by a drop run goes down with the aircraft. */
+	void UnitDies_DestroyCarriedTank();
 
 	// -------------------------------------------------------------
 	// ----------------------- Change Owner End -----------------------

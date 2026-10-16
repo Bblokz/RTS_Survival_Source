@@ -112,6 +112,10 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetSelectionPriority(const int32 NewSelectionPriority);
 
+	/** @brief Lets an owner that must be known to the game state (target search, counters) override its Blueprint;
+	 * only has effect before BeginPlay, where the unit registers. */
+	void SetAddToGameState(const bool bNewAddToGameState) { bAddToGameState = bNewAddToGameState; }
+
 	bool HasTechnologyApplied(const ETechnology Technology) const;
 	void AddAppliedTechnology(const ETechnology Technology);
 

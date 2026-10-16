@@ -64,6 +64,14 @@ public:
 	 */
 	static void SetupShieldCollision(UStaticMeshComponent* ShieldMesh, int32 OwningPlayer);
 
+	/**
+	 * @brief Aircraft Blueprints are authored for the player; an aircraft of the other side must be hit by the
+	 * weapons of its enemies instead. Keeps every other response of the component as the Blueprint set it.
+	 * @param HitComponent A component of the aircraft that weapons hit.
+	 * @param OwningPlayer The owner of the aircraft.
+	 */
+	static void SetupAircraftWeaponHitCollision(UPrimitiveComponent* HitComponent, int32 OwningPlayer);
+
 	static void SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshComponent, bool bIsPlayer1);
 
 	/**

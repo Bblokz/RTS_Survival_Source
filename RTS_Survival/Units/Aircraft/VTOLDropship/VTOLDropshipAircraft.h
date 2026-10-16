@@ -156,6 +156,9 @@ protected:
 	// Do not call AAircraftMaster::Tick from this override; that would re-enable regular aircraft pathing.
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PostInitializeComponents() override;
+
+	// The resource shuttle is scripted scenery for its pad, no combat unit: its Blueprint decides its registration.
+	virtual bool GetIsTargetableByAntiAir() const override { return false; }
 	virtual void OnRTSUnitSpawned(
 		bool bSetDisabled,
 		float TimeNotSelectable = 0.f,

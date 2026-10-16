@@ -40,6 +40,27 @@ void FRTS_CollisionSetup::SetupShieldCollision(UStaticMeshComponent* ShieldMesh,
 	ShieldMesh->SetReceivesDecals(false);
 }
 
+void FRTS_CollisionSetup::SetupAircraftWeaponHitCollision(UPrimitiveComponent* HitComponent, const int32 OwningPlayer)
+{
+	if (not IsValid(HitComponent))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("SetupAircraftWeaponHitCollision received an invalid component."));
+		return;
+	}
+	const bool bIsPlayerAircraft = OwningPlayer == 1;
+	if (HitComponent->GetCollisionEnabled() == ECollisionEnabled::NoCollision)
+	{
+		HitComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	}
+	HitComponent->SetCollisionObjectType(bIsPlayerAircraft ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY);
+	// Traces and projectiles of the other side hit the aircraft; those of its own side fly through it.
+	HitComponent->SetCollisionResponseToChannel(bIsPlayerAircraft ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
+	                                            ECR_Block);
+	HitComponent->SetCollisionResponseToChannel(bIsPlayerAircraft ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER,
+	                                            ECR_Ignore);
+	HitComponent->SetCollisionResponseToChannel(COLLISION_OBJ_PROJECTILE, ECR_Block);
+}
+
 void FRTS_CollisionSetup::ForceBuildingPlacementResponseOnActor(
 	AActor* Actor,
 	ECollisionResponse Response,

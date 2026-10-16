@@ -62,6 +62,8 @@ public class RTS_Survival : ModuleRules
 			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "BlueprintGraph", "NiagaraEditor" });
 			// Sequencer: NiagaraEditorUtilities.h (impact Niagara system authoring) includes Sequencer headers.
 			PrivateDependencyModuleNames.Add("Sequencer");
+			// PlanarCut and Voronoi: RTS.Aircraft.BuildCrashCollections fractures the aircraft into their crash pieces.
+			PrivateDependencyModuleNames.AddRange(new string[] { "PlanarCut", "Voronoi" });
 		}
 
 		// Uncomment if you are using online features
