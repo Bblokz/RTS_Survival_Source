@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerCaptureRig.h"
 #include "GunPitFireReactionWatch.h"
+#include "GunPitProjectileFlightWatch.h"
 #include "GunPitSectorArcWatch.h"
 
 class AActor;
@@ -42,8 +43,16 @@ struct FGunPitUnderTest
 	int32 ExpectedCrewCount = 4;
 	bool bCarriesRounds = true;
 	bool bHasReadyCrate = true;
+	// Bone drill (pits without rounds): the loader moves the gun's DrillPropBone by hand (the DShK's ammo box, the
+	// Ampulomet's ampoule) and works its DrillSecondBone (the DShK's spare box, the Ampulomet's breech cap).
+	FName DrillPropBone = TEXT("AmmoBox");
+	FName DrillSecondBone = TEXT("SpareTop");
+	// The gun bucks and the crew brace at a shot; off for the DShK, whose crew do not brace at its bursts.
+	bool bWatchesFireReaction = true;
 	// A sector pit's gun only traverses this far either side of the pit's forward; zero turns a full circle.
 	float SectorHalfDegrees = 0.f;
+	// The first shot must fly fast and flat at its target; the other pits only log their flight.
+	bool bFiresDirect = false;
 
 	TWeakObjectPtr<AActor> Pit;
 	TWeakObjectPtr<ACPPTurretsMaster> Turret;
@@ -71,17 +80,18 @@ struct FGunPitUnderTest
 	TWeakObjectPtr<USceneComponent> LoaderAtHandover;
 	TWeakObjectPtr<USceneComponent> HolderOfNextRound;
 	float NextCaptureSeconds = 0.f;
-	// Box-swap drill (machine-gun pit): the loader moves the gun's AmmoBox and SpareTop bones by hand.
-	float ClosestHandToAmmoBox = TNumericLimits<float>::Max();
-	float ClosestHandToSpareBox = TNumericLimits<float>::Max();
-	float AmmoBoxTravel = 0.f;
-	FVector AmmoBoxStart = FVector::ZeroVector;
+	// What the bone drill showed: the loader's closest hands to both bones and how far the prop travelled.
+	float ClosestHandToDrillProp = TNumericLimits<float>::Max();
+	float ClosestHandToSecondProp = TNumericLimits<float>::Max();
+	float DrillPropTravel = 0.f;
+	FVector DrillPropStart = FVector::ZeroVector;
 	bool bGunReloadMontageSeen = false;
 	bool bGunnerFireMontageSeen = false;
 	bool bWasLoading = false;
 	bool bDrillChecked = false;
 	bool bTraverseChecked = false;
 	FGunPitFireReactionWatch FireReaction;
+	FGunPitProjectileFlightWatch Flight;
 	FGunPitSectorArcWatch SectorArc;
 };
 
@@ -93,7 +103,10 @@ struct FGunPitUnderTest
  * Started with -GerPitValidate (on TestCover); -DShKPitValidate runs the Soviet DShK pit instead (enemy owned, two
  * crew, a box-swap drill instead of rounds); -At53KPitValidate the Soviet 53-K pit (the Pak 40 pit's drill); -BS3PitValidate
  * the Soviet BS-3 pit (the Pak drill turned to fit between the trails); -At53KSectorPitValidate the 53-K sector pit, whose
- * gun must first hold at its 45 degree limit without firing on a target outside its arc. Pictures with
+ * gun must first hold at its 45 degree limit without firing on a target outside its arc; -AmpulometPitValidate the
+ * Soviet Ampulomet pit (two crew, the loader feeds an ampoule through the breech); -GerSmallPitValidate the German
+ * Puppchen pit and Panzerschreck foxhole (two crew, the loader carries a rocket into the weapon); -RailPakBunkerValidate
+ * the German rail Pak bunker (the Pak 40 pit's drill on a concrete pillbox roof). Pictures with
  * -GerPitCapture=<folder>. Not in shipping.
  */
 struct FGunPitTestScenario
@@ -131,9 +144,9 @@ private:
 	void CountShots(const UWorld& World, FGunPitUnderTest& Pit) const;
 	void WatchDrill(UWorld& World, FGunPitUnderTest& Pit);
 	void CheckDrill(FGunPitUnderTest& Pit);
-	void WatchBoxDrill(UWorld& World, FGunPitUnderTest& Pit);
-	void SampleBoxDrill(FGunPitUnderTest& Pit) const;
-	void CheckBoxDrill(FGunPitUnderTest& Pit);
+	void WatchBoneDrill(UWorld& World, FGunPitUnderTest& Pit);
+	void SampleBoneDrill(FGunPitUnderTest& Pit) const;
+	void CheckBoneDrill(FGunPitUnderTest& Pit);
 	// Enemy pits sit under the fog of war; the pictures must show them.
 	void RevealPit(const FGunPitUnderTest& Pit) const;
 	void LogHandover(const FGunPitUnderTest& Pit, const UStaticMeshComponent& Round,
@@ -141,6 +154,8 @@ private:
 	void CheckTraverse(FGunPitUnderTest& Pit);
 	// The gun bucks and the crew brace after the first shot (gun pit anim and crew anim instances).
 	void WatchFireReaction(UWorld& World, FGunPitUnderTest& Pit);
+	// Follows the first shot's projectile from the muzzle to its impact and logs how it flew.
+	void WatchProjectileFlight(const UWorld& World, FGunPitUnderTest& Pit);
 	bool GetIsPitDone(const FGunPitUnderTest& Pit) const;
 
 	// Unattended runs never draw the pits; their meshes would skip the pose and never play montages.

@@ -690,7 +690,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 		FParse::Param(FCommandLine::Get(), TEXT("DShKPitValidate")) ||
 		FParse::Param(FCommandLine::Get(), TEXT("At53KPitValidate")) ||
 		FParse::Param(FCommandLine::Get(), TEXT("At53KSectorPitValidate")) ||
-		FParse::Param(FCommandLine::Get(), TEXT("BS3PitValidate")))
+		FParse::Param(FCommandLine::Get(), TEXT("RailPakBunkerValidate")) ||
+		FParse::Param(FCommandLine::Get(), TEXT("BS3PitValidate")) ||
+		FParse::Param(FCommandLine::Get(), TEXT("AmpulometPitValidate")) ||
+		FParse::Param(FCommandLine::Get(), TEXT("GerSmallPitValidate")))
 	{
 		M_GunPitScenario.Start();
 	}
