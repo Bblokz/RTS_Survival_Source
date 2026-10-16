@@ -150,3 +150,7 @@ Grep the log for `RTS_GERPIT_TEST`. With `-GerPitCapture` it saves four views pe
 ## Fire feedback
 
 On every shot the gun bucks and the crew brace. See [GunPitFireFeedback.md](GunPitFireFeedback.md).
+
+## Rail Pak bunker
+
+The breakthrough doctrine's concrete pillbox with a rail Pak 40 in this pit on its roof: see [GerRailPakBunker.md](GerRailPakBunker.md).
