@@ -99,6 +99,8 @@ namespace EnemyAISettings
 		inline constexpr float StochasticActionsAttackLocationDebugRadius = 200.f;
 		inline constexpr float RegisteringByICommandsOffset = 300.f;
 		inline constexpr bool  RegisteringByIcommandsDebugging= true;
+		// Draws which ability an enemy unit used above it (UEnemyUnitAbilityAIComponent).
+		inline constexpr bool UnitAbilityAIDebugging = false;
 	}
 
 	inline float EnemyRetreatControllerCheckInterval = 8.4f;

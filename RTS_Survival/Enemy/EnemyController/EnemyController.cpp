@@ -9,6 +9,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyNavigationAIComponent/EnemyNavigationAIComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
+#include "RTS_Survival/Enemy/EnemyUnitAbilityAI/EnemyUnitAbilityAIComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatData.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
@@ -107,6 +108,8 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	M_EnemyDirectControlComponent = CreateDefaultSubobject<UEnemyDirectControlComponent>(
 		TEXT("EnemyDirectControlComponent"));
 	M_EnemyGlobalAbilitiesManager = CreateDefaultSubobject<UGlobalAbilitiesManager>(TEXT("EnemyGlobalAbilitiesManager"));
+	M_EnemyUnitAbilityAIComponent = CreateDefaultSubobject<UEnemyUnitAbilityAIComponent>(
+		TEXT("EnemyUnitAbilityAIComponent"));
 	CacheGenerationSeedFromGameInstance();
 	if (M_FormationController)
 	{
@@ -730,6 +733,26 @@ UEnemyDirectControlComponent* AEnemyController::GetEnemyDirectControlComponent()
 	return M_EnemyDirectControlComponent;
 }
 
+UEnemyRetreatController* AEnemyController::GetEnemyRetreatController() const
+{
+	if (not GetIsValidEnemyRetreatController())
+	{
+		return nullptr;
+	}
+
+	return M_EnemyRetreatController;
+}
+
+UEnemyUnitAbilityAIComponent* AEnemyController::GetEnemyUnitAbilityAIComponent() const
+{
+	if (not GetIsValidEnemyUnitAbilityAIComponent())
+	{
+		return nullptr;
+	}
+
+	return M_EnemyUnitAbilityAIComponent;
+}
+
 void AEnemyController::AddTrainingComponentToAIBlackboard(UTrainerComponent* EnemyTrainer) const
 {
 	if(not IsValid(EnemyTrainer))
@@ -920,6 +943,20 @@ bool AEnemyController::GetIsValidEnemyRetreatController() const
 			this,
 			"M_EnemyRetreatController",
 			"AEnemyController::GetIsValidEnemyRetreatController",
+			this);
+		return false;
+	}
+	return true;
+}
+
+bool AEnemyController::GetIsValidEnemyUnitAbilityAIComponent() const
+{
+	if (not IsValid(M_EnemyUnitAbilityAIComponent))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+			this,
+			"M_EnemyUnitAbilityAIComponent",
+			"AEnemyController::GetIsValidEnemyUnitAbilityAIComponent",
 			this);
 		return false;
 	}

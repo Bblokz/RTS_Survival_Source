@@ -9,6 +9,7 @@
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
+#include "RTS_Survival/Enemy/EnemyUnitAbilityAI/EnemyOrderQueueHelpers.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -1868,8 +1869,13 @@ void UEnemyFormationController::MoveUnitToWayPoint(FFormationUnitData& Formation
 	LocationToProject = ProjectLocationOnNavMesh(LocationToProject, EnemyFormationPositionProjectionExtent, false);
 	FormationUnit.M_LastKnownLocation = FormationUnit.Unit->GetOwnerLocation();
 	FormationUnit.bM_HasLastKnownLocation = true;
+	FormationUnit.M_WaypointDestination = LocationToProject;
+	// A running grenade or aim ability finishes first; the move then follows it in the queue.
+	bool bResetOrderQueue = true;
+	FEnemyOrderQueueHelpers::PrepareOrderBehindRunningAbility(FormationUnit.Unit.Get(), bResetOrderQueue);
 	// Move the unit to the projected location.
-	const ECommandQueueError Error = FormationUnit.Unit->MoveToLocation(LocationToProject, true, WaypointDirection);
+	const ECommandQueueError Error = FormationUnit.Unit->MoveToLocation(LocationToProject, bResetOrderQueue,
+	                                                                   WaypointDirection);
 	if (Error != ECommandQueueError::NoError)
 	{
 		OnUnitMovementError(FormationUnit.Unit, Error);
@@ -1943,6 +1949,10 @@ void UEnemyFormationController::OnUnitReachedFWaypoint(TWeakInterfacePtr<IComman
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	ShippingTest_RecordUnitWaypointArrival(FormationID);
 #endif
+#if !UE_BUILD_SHIPPING
+	OnFormationUnitReachedWaypointForTest.Broadcast(Unit->GetOwnerActor(), UnitInFormation->M_WaypointDestination,
+	                                                FormationID);
+#endif
 	// Note: this also marks this formation unit as "bHasReachedNextDestination".
 	const bool bAllUnitsReached = Formation->CheckIfFormationReachedCurrentWayPoint(Unit, this);
 	if (Formation->bIsAttackMoveFormation)
@@ -1955,6 +1965,45 @@ void UEnemyFormationController::OnUnitReachedFWaypoint(TWeakInterfacePtr<IComman
 		OnCompleteFormationReached(Formation);
 	}
 	// Not all units in formation have reached yet, waiting for them to complete movement.
+}
+
+bool UEnemyFormationController::GetIsUnitMovingToFormationWaypoint(const AActor* UnitActor) const
+{
+	if (not IsValid(UnitActor))
+	{
+		return false;
+	}
+	for (const TPair<int32, FFormationData>& FormationPair : M_ActiveFormations)
+	{
+		for (const FFormationUnitData& FormationUnit : FormationPair.Value.FormationUnits)
+		{
+			if (not FormationUnit.Unit.IsValid() || FormationUnit.Unit->GetOwnerActor() != UnitActor)
+			{
+				continue;
+			}
+			return FormationUnit.MovementCompleteHandle.IsValid() && not FormationUnit.bHasReachedNextDestination;
+		}
+	}
+	return false;
+}
+
+bool UEnemyFormationController::GetIsUnitInActiveFormation(const AActor* UnitActor) const
+{
+	if (not IsValid(UnitActor))
+	{
+		return false;
+	}
+	for (const TPair<int32, FFormationData>& FormationPair : M_ActiveFormations)
+	{
+		for (const FFormationUnitData& FormationUnit : FormationPair.Value.FormationUnits)
+		{
+			if (FormationUnit.Unit.IsValid() && FormationUnit.Unit->GetOwnerActor() == UnitActor)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 bool UEnemyFormationController::GetFormationDataForIDChecked(

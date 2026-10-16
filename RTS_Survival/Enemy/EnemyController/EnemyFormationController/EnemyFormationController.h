@@ -16,6 +16,11 @@ class UEnemyDirectControlComponent;
 class UNavigationSystemV1;
 class URTSGameInstance;
 
+#if !UE_BUILD_SHIPPING
+DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnFormationUnitReachedWaypointForTest, AActor* /*UnitActor*/,
+                                       const FVector& /*WaypointDestination*/, int32 /*FormationID*/);
+#endif
+
 // Hash TWeakInterfacePtr<ICommands> by its underlying UObject*
 // Used for matching the radius of the unit with the icommand interface.
 FORCEINLINE uint32 GetTypeHash(const TWeakInterfacePtr<ICommands>& WeakPtr)
@@ -142,6 +147,18 @@ public:
 	// if the formation becomes empty because of this. Returns the array of units that needed removal.
 	TArray<AActor*> RemoveUnitsFromAnyFormation(const TArray<ASquadController*>& SquadControllers,
 	                                            const TArray<ATankMaster*>& TankMasters);
+
+	// True while the unit walks to its formation waypoint. A queued ability must not run then: the formation reads
+	// the unit going idle afterwards as reaching the waypoint.
+	bool GetIsUnitMovingToFormationWaypoint(const AActor* UnitActor) const;
+
+	// Formation units must stay free to follow the formation, e.g. never lock themselves in place.
+	bool GetIsUnitInActiveFormation(const AActor* UnitActor) const;
+
+#if !UE_BUILD_SHIPPING
+	// Test hook: a formation unit counted as having reached its waypoint, with the spot it was sent to.
+	FOnFormationUnitReachedWaypointForTest OnFormationUnitReachedWaypointForTest;
+#endif
 
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	TArray<FEnemyAIShippingFormationProgress> ShippingTest_GetFormationProgressHistory() const;

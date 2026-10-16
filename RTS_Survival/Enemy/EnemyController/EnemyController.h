@@ -28,6 +28,7 @@ class UEnemyRetreatController;
 class UEnemyNavigationAIComponent;
 class UEnemyStrategicAIComponent;
 class UEnemyDirectControlComponent;
+class UEnemyUnitAbilityAIComponent;
 class ATankMaster;
 class ASquadController;
 class URTSGameInstance;
@@ -401,6 +402,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyDirectControlComponent* GetEnemyDirectControlComponent() const;
 
+	UEnemyRetreatController* GetEnemyRetreatController() const;
+	UEnemyUnitAbilityAIComponent* GetEnemyUnitAbilityAIComponent() const;
+
 	void AddTrainingComponentToAIBlackboard(UTrainerComponent* EnemyTrainer) const;
 
 	// ------------------------------------------------------------
@@ -465,6 +469,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UEnemyDirectControlComponent> M_EnemyDirectControlComponent;
 
+	// Lets enemy squads and tanks use their behaviour and grenade abilities; runs on its own timer.
+	UPROPERTY()
+	TObjectPtr<UEnemyUnitAbilityAIComponent> M_EnemyUnitAbilityAIComponent;
+
 	UPROPERTY()
 	TObjectPtr<UGlobalAbilitiesManager> M_EnemyGlobalAbilitiesManager;
 
@@ -478,6 +486,7 @@ private:
 	bool GetIsValidEnemyStrategicAIComponent() const;
 	bool GetIsValidEnemyRetreatController() const;
 	bool GetIsValidEnemyDirectControlComponent() const;
+	bool GetIsValidEnemyUnitAbilityAIComponent() const;
 	bool GetIsValidEnemyGlobalAbilitiesManager() const;
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
