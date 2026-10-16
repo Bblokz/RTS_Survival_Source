@@ -172,3 +172,7 @@ at once.
 ## Fire feedback
 
 On every shot the gun bucks and the crew brace. See [GunPitFireFeedback.md](GunPitFireFeedback.md).
+
+## Concrete pit
+
+The ML-20 also has a concrete-apron pit (`Rus_BXP_ML20ConcretePit`): see [B4Howitzer/B4ConcretePit.md](B4Howitzer/B4ConcretePit.md).

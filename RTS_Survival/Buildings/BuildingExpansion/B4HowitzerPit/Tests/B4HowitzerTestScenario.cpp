@@ -113,7 +113,14 @@ namespace B4HowitzerTestPrivate
 	constexpr float MinimumReversedMontageFraction = 0.75f;
 	const TCHAR* const PitWreckMarker = TEXT("BP_Obstacle_B4Pit_Destroyed");
 	const TCHAR* const GunWreckMarker = TEXT("DestroyedTW_B4");
-	const FName EmplacementMeshName = TEXT("SM_B4Pit_Emplacement");
+	// The concrete-apron pits: the same turrets and drill, another emplacement.
+	const TCHAR* const ConcretePitClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/Rus_BXP_B4HowitzerConcretePit."
+			"Rus_BXP_B4HowitzerConcretePit_C");
+	const TCHAR* const MLTwentyConcretePitClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/ML20_152MM/Pit/Rus_BXP_ML20ConcretePit."
+			"Rus_BXP_ML20ConcretePit_C");
+	const FName ConcreteEmplacementMeshName = TEXT("SM_B4ConcretePit");
 	const TCHAR* const MLTwentyPitName = TEXT("ML20");
 	const TCHAR* const MLTwentyPitClassPath =
 		TEXT("/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/ML20_152MM/Pit/Rus_BXP_ML20Pit.Rus_BXP_ML20Pit_C");
@@ -124,19 +131,23 @@ namespace B4HowitzerTestPrivate
 	// ML20_152MM_Pit's reload in ACPPGameState.
 	constexpr float MLTwentyPitReloadSeconds = 18.f;
 
-	FB4HowitzerPitVariant MakePitVariant(const FString& PitName)
+	FB4HowitzerPitVariant MakePitVariant(const FString& PitName, const bool bConcretePit)
 	{
 		FB4HowitzerPitVariant Variant;
+		if (bConcretePit)
+		{
+			Variant.EmplacementMeshName = ConcreteEmplacementMeshName;
+		}
 		if (PitName == MLTwentyPitName)
 		{
-			Variant.PitClassPath = MLTwentyPitClassPath;
+			Variant.PitClassPath = bConcretePit ? MLTwentyConcretePitClassPath : MLTwentyPitClassPath;
 			Variant.TurretClassMarker = MLTwentyPitTurretClassMarker;
 			Variant.GunWreckMarker = MLTwentyGunWreckMarker;
 			Variant.ReloadMontageMarker = MLTwentyReloadMontageMarker;
 			Variant.ReloadSeconds = MLTwentyPitReloadSeconds;
 			return Variant;
 		}
-		Variant.PitClassPath = PitClassPath;
+		Variant.PitClassPath = bConcretePit ? ConcretePitClassPath : PitClassPath;
 		Variant.TurretClassMarker = PitTurretClassMarker;
 		Variant.GunWreckMarker = GunWreckMarker;
 		Variant.ReloadMontageMarker = PitReloadMontageMarker;
@@ -304,7 +315,8 @@ void FB4HowitzerTestScenario::Start()
 	FParse::Value(FCommandLine::Get(), TEXT("B4HowitzerSquadReload="), M_SquadReloadSeconds);
 	FString PitName;
 	FParse::Value(FCommandLine::Get(), TEXT("B4HowitzerPit="), PitName);
-	M_PitVariant = B4HowitzerTestPrivate::MakePitVariant(PitName);
+	M_PitVariant = B4HowitzerTestPrivate::MakePitVariant(
+		PitName, FParse::Param(FCommandLine::Get(), TEXT("B4HowitzerConcretePit")));
 	UE_LOG(LogRTSB4Test, Display, TEXT("RTS_B4_TEST started pit=%s"), *M_PitVariant.PitClassPath);
 }
 
@@ -697,10 +709,11 @@ void FB4HowitzerTestScenario::SpawnPit(UWorld& World)
 	      FString::Printf(TEXT("owner=%d"), PitOwner));
 	TArray<UStaticMeshComponent*> StaticMeshes;
 	Pit->GetComponents<UStaticMeshComponent>(StaticMeshes);
-	const bool bHasEmplacement = StaticMeshes.ContainsByPredicate([](const UStaticMeshComponent* Mesh)
+	const FName EmplacementMeshName = M_PitVariant.EmplacementMeshName;
+	const bool bHasEmplacement = StaticMeshes.ContainsByPredicate([EmplacementMeshName](const UStaticMeshComponent* Mesh)
 	{
 		return IsValid(Mesh) && IsValid(Mesh->GetStaticMesh()) &&
-			Mesh->GetStaticMesh()->GetFName() == B4HowitzerTestPrivate::EmplacementMeshName;
+			Mesh->GetStaticMesh()->GetFName() == EmplacementMeshName;
 	});
 	Check(bHasEmplacement, TEXT("pit_shows_emplacement"));
 }

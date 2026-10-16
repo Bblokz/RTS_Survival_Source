@@ -14,6 +14,7 @@ This is not the field construction ability of squads (`UFieldConstructionAbility
 | Panzerschreck Foxhole | `BTX_GerPanzerschreckPit` | none (12 s build) |
 | leFH 18 Pit | `BTX_GerLeFH18Pit` | Communication Center (the tier II building) |
 | sFH 18 Pit | `BTX_GerSFH18Pit` | Communication Center (the tier II building) |
+| Flak 88 Emplacement | `BTX_GerFlak88Pit` | Communication Center (see [../Units/GerFlak88Pit.md](../Units/GerFlak88Pit.md)) |
 
 The Communication Center is the tier II building; Bas confirmed this on 2026-10-15. It is the tier II building because every existing tier II and III requirement already points to it: the Airbase, the Experimental Units Factory and five squad options. The Armory, the other tier II building in the HQ's economy tab, is required by nothing. Commit `321b314b` ("Update T3 factory requirement to med factory + comm center") moved the T3 factory's requirement from the Armory to the Communication Center.
 
@@ -21,7 +22,7 @@ The four pits are no longer expansion options of the HQ. Their training time is 
 
 - **Slots:** `UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout`, using `FTrainingLayoutSlot::FieldDefense`.
 - **Options and requirements:** `UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions`.
-- **Icons:** the rows `Train_BTX_GerPak40Pit`, `Train_BTX_GerFlak37Pit`, `Train_BTX_GerLeFH18Pit` and `Train_BTX_GerSFH18Pit` of `DT_TrainingOptions`. They use the `SB_OptionImage_GerPit_*` brushes.
+- **Icons:** the rows `Train_BTX_GerPak40Pit`, `Train_BTX_GerFlak37Pit`, `Train_BTX_GerLeFH18Pit`, `Train_BTX_GerSFH18Pit` and `Train_BTX_GerFlak88Pit` of `DT_TrainingOptions`. They use the `SB_OptionImage_GerPit_*` brushes.
 
 ## Flow
 

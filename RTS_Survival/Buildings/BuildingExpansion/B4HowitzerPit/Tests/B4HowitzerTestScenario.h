@@ -54,7 +54,8 @@ struct FB4HowitzerCrewReach
 };
 
 /**
- * @brief Which pit the scenario spawns: the B-4 pit, or a pit built from it (-B4HowitzerPit=ML20 for the ML-20 pit),
+ * @brief Which pit the scenario spawns: the B-4 pit, or a pit built from it (-B4HowitzerPit=ML20 for the ML-20 pit;
+ * -B4HowitzerConcretePit for either one's concrete-apron Blueprint),
  * so one run checks another gun on the same crane drill with its own turret, reload time and wreck.
  */
 struct FB4HowitzerPitVariant
@@ -67,6 +68,8 @@ struct FB4HowitzerPitVariant
 	// Part of the name of the gun's reload montage; every shot starts it.
 	FString ReloadMontageMarker;
 	float ReloadSeconds = 0.f;
+	// The building mesh the pit must show: the earth emplacement, or the concrete apron of the concrete pits.
+	FName EmplacementMeshName = TEXT("SM_B4Pit_Emplacement");
 };
 
 /**

@@ -105,3 +105,7 @@ tick every frame; the numbers are real; use the capture run to see how it looks.
 ## Fire feedback
 
 On every shot the gun bucks (top carriage only) and the crew brace. See [../GunPitFireFeedback.md](../GunPitFireFeedback.md).
+
+## Concrete pit
+
+A concrete-apron emplacement for the airfield ground, with the same gun and drill: see [B4ConcretePit.md](B4ConcretePit.md).
