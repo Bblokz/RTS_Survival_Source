@@ -442,6 +442,16 @@ private:
 	 */
 	void ClearCommands(const ECommandQueueClearReason Reason);
 
+	// Keeps the running command and drops the queued commands behind it; no-op when nothing runs.
+	void ClearQueuedCommandsAfterActive();
+
+	// Puts the command in front of the running one, which is terminated now and executed again afterwards.
+	void InsertCommandBeforeActive(const FQueueCommand& NewCommand);
+
+	// While set, AddAbilityToTCommands inserts in front of the running command instead of appending.
+	// Only set through a scoped guard in ICommands::...BeforeActiveCommand.
+	bool bM_InsertNewCommandBeforeActive = false;
+
 	ECommandQueueError PayForAbilityCosts(const EAbilityID AbilityId,
 	                                      const int32 Subtype) const;
 	void RefundCommandsThatHaveNotStarted() const;
@@ -932,6 +942,33 @@ public:
 	EAbilityID GetActiveCommandID();
 
 	bool GetIsUnitIdle();
+
+	/** @return The target actor of the running command, e.g. the unit an attack command is aimed at; null if none. */
+	AActor* GetActiveCommandTargetActor();
+
+	/**
+	 * @brief Drops every queued command behind the running one so a new order can be appended right after it,
+	 * without interrupting the running command. Dropped commands are refunded like cancelled ones.
+	 */
+	void ClearQueuedCommandsAfterActive();
+
+	/**
+	 * @brief Throws a grenade before the running command; that command and the rest of the queue resume afterwards.
+	 * Used by the enemy ability AI so an attacking squad returns to its target (and its later orders) after the throw.
+	 * @param Location Where the grenade should land.
+	 * @param GrenadeAbilityType Grenade subtype on the command card.
+	 * @return Same errors as ThrowGrenade; an idle unit simply starts throwing.
+	 */
+	ECommandQueueError ThrowGrenadeBeforeActiveCommand(const FVector& Location,
+	                                                   const EGrenadeAbilityType GrenadeAbilityType);
+
+	/**
+	 * @brief Fires an aim ability before the running command; that command and the rest of the queue resume afterwards.
+	 * @param Location Where the ability is aimed.
+	 * @param AimAbilityType Aim ability subtype on the command card.
+	 * @return Same errors as AimAbility; an idle unit simply starts the ability.
+	 */
+	ECommandQueueError AimAbilityBeforeActiveCommand(const FVector& Location, const EAimAbilityType AimAbilityType);
 
 	/**
 	 * @brief Terminates the current command and clears the command queue which sets the unit to idle.

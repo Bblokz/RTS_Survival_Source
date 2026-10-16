@@ -124,6 +124,8 @@ namespace BxpHelpers
 					EBuildingExpansionType::BTX_GerRailPakBunker, GerRailPakBunker_Radixite, GerRailPakBunker_Metal,
 					1.8f, GerRailPakBunkerBuildTime
 				},
+				// A heavy gun behind thick, high bag walls: tougher than the open gun pits.
+				{EBuildingExpansionType::BTX_GerFlak88Pit, GerFlak88Pit_Radixite, GerFlak88Pit_Metal, 1.3f},
 			};
 			for (const FGunPitEntry& Pit : Pits)
 			{

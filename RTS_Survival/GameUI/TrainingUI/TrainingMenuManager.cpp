@@ -2625,6 +2625,9 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 	AddFieldDefenseTrainingOption(
 		EBuildingExpansionType::BTX_GerSFH18Pit,
 		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding));
+	AddFieldDefenseTrainingOption(
+		EBuildingExpansionType::BTX_GerFlak88Pit,
+		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding));
 	// Only the breakthrough doctrine's headquarters layout shows it.
 	AddFieldDefenseTrainingOption(
 		EBuildingExpansionType::BTX_GerRailPakBunker,

@@ -219,7 +219,8 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPuppchenPit),
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerLeFH18Pit),
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerSFH18Pit),
-		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPanzerschreckPit)
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPanzerschreckPit),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerFlak88Pit)
 	};
 	FieldDefenses.Append(DoctrineFieldDefenses);
 

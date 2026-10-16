@@ -796,7 +796,12 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	{
 		return QueueError;
 	}
-	SetRotationFlagForFinalMovementCommand(Ability, Rotation);
+	const bool bInsertBeforeActive = bM_InsertNewCommandBeforeActive && M_Owner && CurrentIndex >= 0 && CurrentIndex < NumCommands;
+	if (not bInsertBeforeActive)
+	{
+		// An inserted command is never the last one, so it leaves the final rotation of the queue alone.
+		SetRotationFlagForFinalMovementCommand(Ability, Rotation);
+	}
 	if (bM_IsSpawning)
 	{
 		// The unit has obtained its first command.
@@ -810,6 +815,14 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	NewCmd.TargetActor = TargetActor;
 	NewCmd.TargetRotator = Rotation;
 	NewCmd.CustomType = CustomType;
+
+	if (bInsertBeforeActive)
+	{
+		// Consume the request: commands added while the inserted one starts executing are appended as usual.
+		bM_InsertNewCommandBeforeActive = false;
+		InsertCommandBeforeActive(NewCmd);
+		return ECommandQueueError::NoError;
+	}
 
 	// Insert at the end
 	M_TCommands[NumCommands] = NewCmd;
@@ -1162,6 +1175,43 @@ void UCommandData::ClearCommands(const ECommandQueueClearReason Reason)
 	}
 	NumCommands = 0;
 	CurrentIndex = -1;
+}
+
+void UCommandData::InsertCommandBeforeActive(const FQueueCommand& NewCommand)
+{
+	// Stop the running command first; it stays in the queue and runs again once the new command is done.
+	M_Owner->TerminateCommand(M_TCommands[CurrentIndex].CommandType);
+	for (int32 QueueIndex = NumCommands; QueueIndex > CurrentIndex; --QueueIndex)
+	{
+		M_TCommands[QueueIndex] = M_TCommands[QueueIndex - 1];
+	}
+	M_TCommands[CurrentIndex] = NewCommand;
+	NumCommands++;
+	ExecuteCommand(true);
+}
+
+void UCommandData::ClearQueuedCommandsAfterActive()
+{
+	if (CurrentIndex < 0 || CurrentIndex >= NumCommands)
+	{
+		return;
+	}
+	const int32 FirstQueuedIndex = CurrentIndex + 1;
+	if (FirstQueuedIndex >= NumCommands)
+	{
+		return;
+	}
+	// The final rotation belonged to the last queued command; the running command is now the last one.
+	SetRotationFlagForFinalMovementCommand(M_TCommands[CurrentIndex].CommandType,
+	                                       M_TCommands[CurrentIndex].TargetRotator);
+	for (int32 QueuedIndex = FirstQueuedIndex; QueuedIndex < NumCommands; ++QueuedIndex)
+	{
+		// Copy first: the cancel handler may destroy a field construction preview held by the entry.
+		const FQueueCommand DroppedCommand = M_TCommands[QueuedIndex];
+		M_TCommands[QueuedIndex] = FQueueCommand();
+		OnCommandInQueueCancelled(DroppedCommand);
+	}
+	NumCommands = FirstQueuedIndex;
 }
 
 ECommandQueueError UCommandData::PayForAbilityCosts(const EAbilityID AbilityId,
@@ -2683,6 +2733,53 @@ EAbilityID ICommands::GetActiveCommandID()
 bool ICommands::GetIsUnitIdle()
 {
 	return GetActiveCommandID() == EAbilityID::IdIdle;
+}
+
+AActor* ICommands::GetActiveCommandTargetActor()
+{
+	const UCommandData* CommandData = GetIsValidCommandData();
+	if (not CommandData)
+	{
+		return nullptr;
+	}
+	const FQueueCommand* ActiveCommand = CommandData->GetCurrentQueuedCommand();
+	if (not ActiveCommand || not ActiveCommand->TargetActor.IsValid())
+	{
+		return nullptr;
+	}
+	return ActiveCommand->TargetActor.Get();
+}
+
+void ICommands::ClearQueuedCommandsAfterActive()
+{
+	if (UCommandData* CommandData = GetIsValidCommandData())
+	{
+		CommandData->ClearQueuedCommandsAfterActive();
+	}
+}
+
+ECommandQueueError ICommands::ThrowGrenadeBeforeActiveCommand(const FVector& Location,
+                                                              const EGrenadeAbilityType GrenadeAbilityType)
+{
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	TGuardValue<bool> InsertGuard(CommandData->bM_InsertNewCommandBeforeActive, true);
+	return ThrowGrenade(Location, false, GrenadeAbilityType);
+}
+
+ECommandQueueError ICommands::AimAbilityBeforeActiveCommand(const FVector& Location,
+                                                            const EAimAbilityType AimAbilityType)
+{
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	TGuardValue<bool> InsertGuard(CommandData->bM_InsertNewCommandBeforeActive, true);
+	return AimAbility(Location, false, AimAbilityType);
 }
 
 
