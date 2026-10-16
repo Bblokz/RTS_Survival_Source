@@ -563,6 +563,11 @@ void UPlayerCameraController::TickComponent(float DeltaTime, ELevelTick TickType
 	{
 		return;
 	}
+	// Menu maps run a controller without an RTS camera pawn; there is no camera to move or edge-scroll then.
+	if (not IsValid(M_PlayerCamera))
+	{
+		return;
+	}
 
 	// Process camera movement over time.
 	if (bM_IsCameraMoving && GetIsValidCameraPawn())

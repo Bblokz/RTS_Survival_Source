@@ -17,6 +17,7 @@
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
+#include "Misc/PackageName.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "NavMesh/RecastNavMesh.h"
@@ -48,6 +49,10 @@ namespace CoverFinderWorldSubsystemPrivate
 	constexpr float FullCircleDegrees = 360.0f;
 	constexpr float SurfaceDistanceToleranceRatio = 0.65f;
 	constexpr float MinimumSurfaceDistanceTolerance = 40.0f;
+	// A map without populated infantry navigation (menus, the campaign map) postpones the scan; the retries
+	// slow down to this interval so such maps do not query navigation every second.
+	constexpr float FirstPostponedScanRetrySeconds = 1.0f;
+	constexpr float MaxPostponedScanRetrySeconds = 8.0f;
 	// Above this footprint an object's scan area is cut down to the navigation tiles it overlaps.
 	constexpr float LargeObjectFootprintSquareCentimeters = 2500.0f * 10000.0f;
 	// Objects wider than this are walls and wrecks, not trees whose trunk is worth looking for.
@@ -1004,6 +1009,20 @@ TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildSocketCoverPoints(
 	return SocketPoints;
 }
 
+void URTSCoverFinderWorldSubsystem::ReportActorSocketCoverClassMissingInEditor(
+	const TSoftClassPtr<AActor>& SoftActorClass)
+{
+#if WITH_EDITOR
+	if (SoftActorClass.IsNull() || FPackageName::DoesPackageExist(SoftActorClass.GetLongPackageName()))
+	{
+		return;
+	}
+	RTSFunctionLibrary::ReportError(
+		"Cover finder: actor socket cover class " + SoftActorClass.ToString() +
+		" set in the cover settings does not exist.");
+#endif
+}
+
 void URTSCoverFinderWorldSubsystem::RegisterActorSocketCover(TSet<const AActor*>& InOutRegisteredActors)
 {
 	UWorld* World = GetWorld();
@@ -1014,12 +1033,12 @@ void URTSCoverFinderWorldSubsystem::RegisterActorSocketCover(TSet<const AActor*>
 	}
 	for (const TSoftClassPtr<AActor>& SoftActorClass : CoverSettings->M_ActorSocketCoverClasses)
 	{
-		UClass* CoverActorClass = SoftActorClass.LoadSynchronous();
+		// An actor in the world keeps its class loaded, so a class that is not loaded has no actors to register.
+		// A packaged build only holds the class when a cooked map places such an actor.
+		UClass* CoverActorClass = SoftActorClass.Get();
 		if (not IsValid(CoverActorClass))
 		{
-			RTSFunctionLibrary::ReportError(
-				"Cover finder: actor socket cover class " + SoftActorClass.ToString() +
-				" set in the cover settings could not be loaded.");
+			ReportActorSocketCoverClassMissingInEditor(SoftActorClass);
 			continue;
 		}
 		for (TActorIterator<AActor> CoverActorIterator(World, CoverActorClass); CoverActorIterator; ++CoverActorIterator)
@@ -2259,6 +2278,19 @@ const URTSCoverFinderDeveloperSettings* URTSCoverFinderWorldSubsystem::GetCoverF
 	return nullptr;
 }
 
+const ANavigationData* URTSCoverFinderWorldSubsystem::FindNavigationDataForAgent(
+	const FNavDataConfig& AgentConfig) const
+{
+	// No error report here: a world without navigation for this agent is a normal state for the cover finder,
+	// which then postpones its scan.
+	const UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	if (not IsValid(NavigationSystem))
+	{
+		return nullptr;
+	}
+	return NavigationSystem->GetNavDataForProps(static_cast<const FNavAgentProperties&>(AgentConfig));
+}
+
 const ANavigationData* URTSCoverFinderWorldSubsystem::GetCharacterNavigationData() const
 {
 	UWorld* World = GetWorld();
@@ -2278,7 +2310,7 @@ const ANavigationData* URTSCoverFinderWorldSubsystem::GetCharacterNavigationData
 	{
 		return nullptr;
 	}
-	return NavAgentRegistry->GetNavDataForAgent(World, *CharacterConfig);
+	return FindNavigationDataForAgent(*CharacterConfig);
 }
 
 bool URTSCoverFinderWorldSubsystem::GatherNavigationScanInputs(
@@ -2306,7 +2338,7 @@ bool URTSCoverFinderWorldSubsystem::GatherNavigationScanInputs(
 	OutAgentRadius = CharacterConfig->AgentRadius;
 	OutAgentHeight = CharacterConfig->AgentHeight;
 
-	const ANavigationData* NavigationData = NavAgentRegistry->GetNavDataForAgent(World, *CharacterConfig);
+	const ANavigationData* NavigationData = FindNavigationDataForAgent(*CharacterConfig);
 	const ARecastNavMesh* RecastNavMesh = Cast<ARecastNavMesh>(NavigationData);
 	if (not IsValid(RecastNavMesh))
 	{
@@ -2849,16 +2881,31 @@ FCoverFinderSettingsSnapshot URTSCoverFinderWorldSubsystem::BuildPublicationSett
 	return PublicationSettings;
 }
 
+void URTSCoverFinderWorldSubsystem::PostponeScanWithBackoff()
+{
+	using namespace CoverFinderWorldSubsystemPrivate;
+	const bool bIsFirstPostponement = M_PostponedScanRetrySeconds <= 0.0f;
+	M_PostponedScanRetrySeconds = bIsFirstPostponement
+		                              ? FirstPostponedScanRetrySeconds
+		                              : FMath::Min(M_PostponedScanRetrySeconds * 2.0f, MaxPostponedScanRetrySeconds);
+	M_TimeUntilNextScan = M_PostponedScanRetrySeconds;
+	if (bIsFirstPostponement)
+	{
+		UE_LOG(LogRTSCoverFinder, Warning,
+		       TEXT("Cover scan postponed: Character Recast navigation has no populated tiles; retrying."));
+	}
+}
+
 void URTSCoverFinderWorldSubsystem::BeginScan()
 {
 	const double ScanStartSeconds = FPlatformTime::Seconds();
 	TArray<FBox> ScanBounds;
 	if (not PrepareScanInputs(ScanBounds))
 	{
-		M_TimeUntilNextScan = 1.0f;
-		UE_LOG(LogRTSCoverFinder, Warning, TEXT("Cover scan postponed: Character Recast navigation has no populated tiles."));
+		PostponeScanWithBackoff();
 		return;
 	}
+	M_PostponedScanRetrySeconds = 0.0f;
 
 	++M_ActiveGeneration;
 	if (M_ActiveGeneration == 0)

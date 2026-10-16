@@ -17,13 +17,8 @@ UMaterialInterface* URTSEnergyGameSettings::GetLowEnergyMaterial() const
 	{
 		return nullptr;
 	}
-
-	if (M_CachedLowEnergyMaterial == nullptr)
-	{
-		M_CachedLowEnergyMaterial = LowEnergyMaterial.LoadSynchronous();
-	}
-
-	return M_CachedLowEnergyMaterial;
+	// Returns the loaded material directly once it is in memory.
+	return LowEnergyMaterial.LoadSynchronous();
 }
 
 TSubclassOf<ULowEnergyBehaviour> URTSEnergyGameSettings::GetLowEnergyBehaviourClass() const

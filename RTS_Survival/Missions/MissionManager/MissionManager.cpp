@@ -2,6 +2,7 @@
 
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
+#include "GameMapsSettings.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/AudioComponent.h"
 #include "Components/SceneComponent.h"
@@ -2698,6 +2699,12 @@ void AMissionManager::TriggerVictory_LockPausePlayMusicAndShowWidget(const bool 
 	}
 
 	PlayEndStateMusic(ERTSMusicType::Victory);
+	if (not M_VictoryWidget && not GetIsValidVictoryWidgetClass())
+	{
+		// Without a victory widget a paused and locked game would leave the player stuck: continue at once instead.
+		UGameplayStatics::OpenLevelBySoftObjectPtr(this, GetVictoryContinueLevel(), true, FString());
+		return;
+	}
 	M_PlayerController->PauseAndLockGame(true);
 	TriggerVictory_ShowVictoryWidget(bShowBackToMenu);
 }
@@ -2709,15 +2716,14 @@ void AMissionManager::TriggerVictory_ShowVictoryWidget(const bool bShowBackToMen
 		return;
 	}
 
-	if (not GetIsValidMapToLoadOnContinueVictory())
+	// The game is already paused and locked here, so a missing level must not stop the victory widget: the player
+	// would be stuck. A missing level is still reported, and the widget falls back to the main menu map.
+	const TSoftObjectPtr<UWorld> ContinueLevel = GetVictoryContinueLevel();
+	if (bShowBackToMenu)
 	{
-		return;
+		(void)GetIsValidMenuLevelToLoadOnVictory();
 	}
-
-	if (bShowBackToMenu && not GetIsValidMenuLevelToLoadOnVictory())
-	{
-		return;
-	}
+	const TSoftObjectPtr<UWorld> MenuLevel = GetVictoryMenuLevelOrDefaultMap();
 
 	if (not M_VictoryWidget)
 	{
@@ -2736,7 +2742,7 @@ void AMissionManager::TriggerVictory_ShowVictoryWidget(const bool bShowBackToMen
 		M_VictoryWidget = CreatedVictoryWidget;
 	}
 
-	M_VictoryWidget->TriggerVictory(M_MapToLoadOnContinueVictory, M_MenuLevelToLoadOnVictory, bShowBackToMenu);
+	M_VictoryWidget->TriggerVictory(ContinueLevel, MenuLevel, bShowBackToMenu);
 	if (M_VictoryWidget->IsInViewport())
 	{
 		return;
@@ -2760,6 +2766,24 @@ bool AMissionManager::GetIsValidVictoryWidgetClass() const
 		this
 	);
 	return false;
+}
+
+TSoftObjectPtr<UWorld> AMissionManager::GetVictoryContinueLevel() const
+{
+	return GetIsValidMapToLoadOnContinueVictory() ? M_MapToLoadOnContinueVictory : GetVictoryMenuLevelOrDefaultMap();
+}
+
+TSoftObjectPtr<UWorld> AMissionManager::GetVictoryMenuLevelOrDefaultMap() const
+{
+	if (not M_MenuLevelToLoadOnVictory.IsNull())
+	{
+		return M_MenuLevelToLoadOnVictory;
+	}
+	// The project's default map leads to the main menu, as the escape menu's exit does.
+	const UGameMapsSettings* GameMapsSettings = GetDefault<UGameMapsSettings>();
+	return GameMapsSettings != nullptr
+		       ? TSoftObjectPtr<UWorld>(FSoftObjectPath(GameMapsSettings->GetGameDefaultMap()))
+		       : TSoftObjectPtr<UWorld>();
 }
 
 bool AMissionManager::GetIsValidMapToLoadOnContinueVictory() const

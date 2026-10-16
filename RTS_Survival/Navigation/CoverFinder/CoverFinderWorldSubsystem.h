@@ -460,6 +460,8 @@ private:
 	float M_CachedAgentRadius = 0.0f;
 	float M_CachedAgentHeight = 0.0f;
 	float M_TimeUntilNextScan = 0.0f;
+	// Grows while the scan keeps being postponed for missing navigation; zero once a scan starts.
+	float M_PostponedScanRetrySeconds = 0.0f;
 	ECoverFinderScanState M_ScanState = ECoverFinderScanState::Idle;
 	ECoverFinderScanDomain M_ActiveScanDomain = ECoverFinderScanDomain::Landscape;
 	bool bM_LandscapeScanComplete = false;
@@ -620,6 +622,12 @@ private:
 
 	// Registers the actors of the configured classes that list their own cover sockets; part of the map start.
 	void RegisterActorSocketCover(TSet<const AActor*>& InOutRegisteredActors);
+	// Navigation of the agent without reporting an error when the world has none.
+	const ANavigationData* FindNavigationDataForAgent(const FNavDataConfig& AgentConfig) const;
+	void PostponeScanWithBackoff();
+	// In the editor a configured class whose asset does not exist is a settings mistake; a packaged build only
+	// leaves out classes no cooked map uses, so it stays silent there.
+	static void ReportActorSocketCoverClassMissingInEditor(const TSoftClassPtr<AActor>& SoftActorClass);
 
 	/**
 	 * @brief Builds the cover points of an actor that lists its own sockets.

@@ -298,7 +298,8 @@ bool FVehicleModuleBalanceTablesTest::RunTest(const FString& Parameters)
 	                                                           EVehicleRunningGear::Wheels);
 	const FPlateModuleDamage& CarGear = CarRules[TryGetPlateRuleIndex(EArmorPlate::Plate_SideLowerLeft)].Entries[1];
 	TestEqual(TEXT("Wheels replace tracks in the wheeled table"), CarGear.TypeToDamage, EVehicleModuleTypes::Wheels);
-	TestEqual(TEXT("Wheel chance uses the wheel factor"), CarGear.DamageProbability, 0.7475f,
+	TestEqual(TEXT("Wheel chance uses the wheel factor"), CarGear.DamageProbability,
+	          RuleSetProbabilities::Plate_SideLowerLeft::Tracks * ProfileDamageChanceMultipliers::ArmoredCar::Wheels,
 	          VehicleModuleTestConstants::Tolerance);
 
 	TestEqual(TEXT("Engine recovers to threshold plus margin"), GetRecoveredHealth01(EVehicleModuleTypes::Engine),
@@ -323,19 +324,22 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleEngineFireChanceTest, "RTS.VehicleModul
 
 bool FVehicleEngineFireChanceTest::RunTest(const FString& Parameters)
 {
-	using VehicleModuleBalance::EngineFire::GetChance;
+	// The odds are balance values; the test checks which odds each shell and state picks.
+	using namespace VehicleModuleBalance::EngineFire;
 	TestEqual(TEXT("Damaged engine with AP"),
-		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_AP), 0.25f);
+		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_AP), EngineFireChanceDamagedEngine);
 	TestEqual(TEXT("Destroyed engine with AP"),
-		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_AP), 0.5f);
+		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_AP), EngineFireChanceDestroyedEngine);
 	TestEqual(TEXT("Damaged engine with HE"),
-		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_HE), 0.33f);
+		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_HE), EngineFireChanceDamagedEngine_HE_HEAT);
 	TestEqual(TEXT("Damaged engine with HEAT"),
-		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_HEAT), 0.33f);
+		GetChance(EVehicleModuleState::Damaged, EWeaponShellType::Shell_HEAT), EngineFireChanceDamagedEngine_HE_HEAT);
 	TestEqual(TEXT("Destroyed engine with HE"),
-		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_HE), 0.8f);
+		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_HE),
+		EngineFireChanceDestroyedEngine_HE_HEAT);
 	TestEqual(TEXT("Destroyed engine with HEAT"),
-		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_HEAT), 0.8f);
+		GetChance(EVehicleModuleState::Destroyed, EWeaponShellType::Shell_HEAT),
+		EngineFireChanceDestroyedEngine_HE_HEAT);
 	TestEqual(TEXT("Healthy engine cannot ignite"),
 		GetChance(EVehicleModuleState::Healthy, EWeaponShellType::Shell_HE), 0.f);
 	return true;
@@ -771,6 +775,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleDamagedCrewRepairTest, "RTS.Vehic
 
 bool FVehicleModuleDamagedCrewRepairTest::RunTest(const FString& Parameters)
 {
+	// Crew repair durations; the editor build only found these through another file in its unity batch.
+	using namespace VehicleModuleBalance;
 	using namespace VehicleModuleTestConstants;
 	constexpr float LowHullHealth = 200.f;
 	constexpr float DamagingChip = 1.f;
@@ -809,6 +815,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleCrewRepairTurretRangeTest,
 
 bool FVehicleModuleCrewRepairTurretRangeTest::RunTest(const FString& Parameters)
 {
+	// Crew repair durations; the editor build only found these through another file in its unity batch.
+	using namespace VehicleModuleBalance;
 	using namespace VehicleModuleTestConstants;
 	constexpr int32 MachineGunIndex = 0;
 	constexpr int32 MainGunIndex = 1;
@@ -844,6 +852,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleDestroyedCrewRepairTest, "RTS.Veh
 
 bool FVehicleModuleDestroyedCrewRepairTest::RunTest(const FString& Parameters)
 {
+	// Crew repair durations; the editor build only found these through another file in its unity batch.
+	using namespace VehicleModuleBalance;
 	using namespace VehicleModuleTestConstants;
 	constexpr float LowHullHealth = 200.f;
 	constexpr int32 DestroyedRepairStageCount = 2;
@@ -900,6 +910,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleModuleCrewRepairExternalHealingTest,
 
 bool FVehicleModuleCrewRepairExternalHealingTest::RunTest(const FString& Parameters)
 {
+	// Module recovery gate; the editor build only found it through another file in its unity batch.
+	using namespace VehicleModuleBalance;
 	using namespace VehicleModuleTestConstants;
 	constexpr float LowHullHealth = 200.f;
 	constexpr int32 ReservedIndex = VehicleModuleBalance::CrewRepairAbilitySlotIndex;

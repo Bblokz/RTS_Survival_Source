@@ -549,6 +549,10 @@ private:
 	bool GetIsValidVictoryWidgetClass() const;
 	bool GetIsValidMapToLoadOnContinueVictory() const;
 	bool GetIsValidMenuLevelToLoadOnVictory() const;
+	// The configured continue level; when a mission names none it is reported and the menu level is used instead.
+	TSoftObjectPtr<UWorld> GetVictoryContinueLevel() const;
+	// The configured menu level, else the project's default map (which leads to the main menu).
+	TSoftObjectPtr<UWorld> GetVictoryMenuLevelOrDefaultMap() const;
 	void PlayEndStateMusic(ERTSMusicType MusicType) const;
 
 

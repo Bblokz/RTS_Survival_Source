@@ -222,9 +222,11 @@ void RTSFunctionLibrary::ReportError(FString Text, const bool ResetErrorSuppress
     // Log the error message
     UE_LOG(LogRTS, Error, TEXT("%s"), *Text);
 
-    // Print the call stack to the RTSlog
-    
+#if !UE_BUILD_SHIPPING
+	// Print the call stack to the RTSlog. Not in shipping: there are no symbols to resolve it with, and the
+	// stack walk on every error would cost players frame time.
 	FDebug::DumpStackTraceToLog(ELogVerbosity::Error);
+#endif
 
 #endif
 }

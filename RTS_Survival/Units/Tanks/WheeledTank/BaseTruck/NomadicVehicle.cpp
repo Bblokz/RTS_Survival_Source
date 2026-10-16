@@ -2142,6 +2142,12 @@ void ANomadicVehicle::InitSmokeLocations()
 	}
 
 	SetSmokeLocationsToRandomInBox();
+	const FStaticMeshRenderData* const RenderData = BuildingMeshComponent->GetStaticMesh()->GetRenderData();
+	// A cooked run without rendering (-NullRHI) loads meshes without render data; the random locations stay.
+	if (RenderData == nullptr || RenderData->LODResources.Num() == 0)
+	{
+		return;
+	}
 	// Save guard to check if the mesh allows CPU access otherwise it breaks shipped builds.
 	if (BuildingMeshComponent->GetStaticMesh()->bAllowCPUAccess)
 	{
