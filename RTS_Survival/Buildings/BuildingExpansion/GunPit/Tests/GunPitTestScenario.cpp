@@ -281,8 +281,8 @@ namespace GunPitTestPrivate
 	const TCHAR* const Flak88PitClassPath =
 		TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Flak88.Ger_BXP_GerPit_Flak88_C");
 	constexpr int32 Flak88CrewCount = 2;
-	// The 88 stands this far below the pit's ground (flak88_pit_layout.json gun_sink), so its cross arms lie under the deck.
-	constexpr float Flak88GunHeight = -52.f;
+	// The 88 stands on the pit's ground (flak88_pit_layout.json gun_sink 0): its legs show, level with the deck.
+	constexpr float Flak88GunHeight = 0.f;
 	// The runner's round as he takes it from the niche and as he lays it on his crate, on PitStatic
 	// (flak88_pit_crew.py: NICHE_ROUND and the drop crate's round).
 	const FVector Flak88RunnerNicheRound(112.f, -376.55f, 44.68f);
@@ -299,6 +299,7 @@ namespace GunPitTestPrivate
 		// The crew are snapped to PitOrigin; their animations carry their spots.
 		Pit.LoaderSpot = FVector::ZeroVector;
 		Pit.ExpectedCrewCount = Flak88CrewCount;
+		Pit.bChecksGunHeight = true;
 		Pit.ExpectedGunHeight = Flak88GunHeight;
 		Pit.bHasReadyCrate = false;
 		// Both men stand idle at the shot: the reload starts at the next fire attempt, after the cooldown.
@@ -710,11 +711,11 @@ void FGunPitTestScenario::CheckAttachments(FGunPitUnderTest& Pit)
 	       "root_bone_scale=%s"), *Pit.Label, *GetNameSafe(GunMesh->GetSkeletalMeshAsset()),
 	       *GetNameSafe(GunMesh->GetAnimInstance()), *GunMesh->GetComponentScale().ToCompactString(),
 	       *GunMesh->GetBoneName(0).ToString(), *RootBone.GetScale3D().ToCompactString());
-	if (not FMath::IsNearlyZero(Pit.ExpectedGunHeight) && Pit.Pit.IsValid())
+	if (Pit.bChecksGunHeight && Pit.Pit.IsValid())
 	{
 		const float GunHeight = GunMesh->GetComponentLocation().Z - Pit.Pit->GetActorLocation().Z;
 		Check(FMath::IsNearlyEqual(GunHeight, Pit.ExpectedGunHeight, MaximumGunHeightError),
-		      Pit.Label + TEXT("_gun_sunk_in_pit"), FString::Printf(TEXT("gun_height=%.1f"), GunHeight));
+		      Pit.Label + TEXT("_gun_at_pit_height"), FString::Printf(TEXT("gun_height=%.1f"), GunHeight));
 	}
 	const float OriginScale = GunMesh->GetSocketTransform(Pit.PitOriginSocket).GetScale3D().GetMax();
 	Check(FMath::IsNearlyEqual(OriginScale, 1.f, MaximumScaleError), Pit.Label + TEXT("_pit_origin_unscaled"),

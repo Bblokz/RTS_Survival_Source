@@ -1,6 +1,6 @@
 # German Flak 88 emplacement
 
-The game's 8.8 cm Flak dug in behind high, thick sandbag walls, built from the German HQ's **Field Defenses** tab ([../UI/FieldDefenses.md](../UI/FieldDefenses.md)). The walls stand so high that the barrel only just clears them.
+The game's 8.8 cm Flak, standing on its cross legs behind high, thick sandbag walls, built from the German HQ's **Field Defenses** tab ([../UI/FieldDefenses.md](../UI/FieldDefenses.md)). The walls stand so high that the barrel only just clears them.
 
 Three men keep the gun firing:
 - the **ammo runner** walks back and forth between an ammo niche in the wall and a ring of ready-round crates around the gun;
@@ -20,21 +20,21 @@ The gun, the loader and the handler turn a full circle. The runner and the ring 
 | Expansion type | `BTX_GerFlak88Pit` ("Flak 88 Emplacement") |
 | Blueprint (`.../BuildingExpansions/GerPits/`) | `Ger_BXP_GerPit_Flak88`, turret `Turrets/RTS_BP_EmbTurret_GerPit_Flak88` |
 | Weapon | `Flak37_88MM`, the embedded 88's weapon and its effects (AAShell projectile, 88 sound, shell case, heavy-calibre impacts): 5 s reload, 1 s cooldown |
-| Turret | 35 degrees per second, pitch 0 to 10 degrees: the barrel clears the walls by 6.5 cm at 0 degrees, so it may not dip |
+| Turret | 35 degrees per second, pitch 0 to 10 degrees: the barrel clears the walls by 6 cm at 0 degrees, so it may not dip |
 | Health | 1.3 × the gun pit base (`FBxpDataHelpers::InitGerGunPitBxpData`) |
 | Cost | 560 radixite, 360 metal (`DeveloperSettings::GameBalance::UnitCosts::Bxps`) |
 | Requirement | Communication Center (the tier II building), like the howitzer pits |
 | Build time | `BxpT2BuildTime` (25 s) |
 | Footprint | 1200 × 1200 |
 
-## The emplacement (`SM_GerFlak88Pit`, 34,700 triangles)
+## The emplacement (`SM_GerFlak88Pit`, 30,400 triangles)
 
 All in pit space: x forward, y right, ground at 0.
-- **Gun.** The 88 stands 52 cm below the ground (the expansion's turret child actor sits at z = −52). Its static cross arms, up to 55 cm high, end under the 4 cm plank deck. The deck has a round hole of 1.16 m radius, where the turning carriage passes below deck level. The bore is 117 cm above the deck.
-- **Walls.** Straight, three bags wide (stretchers in running bond), six courses: 107.5 cm, against the barrel's underside at about 114 cm over the walls at 0 degrees. The bags are the single bags of the German wall section `SM_Sandbags_1`, with their own UVs. The middle row is only laid where it shows: the top course, the steps and the wall ends. The square is 7.2 m inside and 9.5 m outside.
-- **Stepped corners.** From the fourth course up, each course stops one bag length shorter towards every outer corner, so each corner steps down from six courses to three.
-- **Entrance.** A gap in the rear wall, right of the centre, with cheeks that step back half a bag per course and a plank floor through it.
-- **Ammo niche.** An open-topped bay through the left wall, 1.44 m wide, bulging 1.2 m out past it, with its own two-bag walls. Fifteen 88 mm rounds (`SM_Ammo_88mm`, its own UVs) lie in a 6-5-4 pyramid on a plank rack, their brass bases towards the pit.
+- **Gun and deck.** The 88 stands on the ground with its cross legs showing. The plank floor is a deck 56 cm up, level with the tops of the legs (50 to 55 cm). The legs show through slots cut round them, and the slot sides are planked down to the ground. The crew stand on the deck, so nobody who turns with the gun walks through a leg, and the bore is 117 cm above them, where the loader lays the round. The deck has a round hole of 1.16 m radius, where the turning carriage passes below deck level. Under the crate ring the deck is closed, so the crates stand on planks.
+- **Walls.** Straight, three bags wide (stretchers in running bond), nine courses: 160 cm from the ground (104 cm above the deck), against the barrel's underside at about 166 cm over the walls at 0 degrees. The bags are the single bags of the German wall section `SM_Sandbags_1`, with their own UVs. The middle row is only laid where it shows (the top course, the steps and the wall ends); the inner row starts at the deck. The square is 7.2 m inside and 9.5 m outside. To save triangles (20,000 for the 875 bags), no bag has its underside, the inner and outer rows leave out the side facing into the wall (except at the wall ends), and the five lowest courses use only the section's lightest bags (28 to 32 triangles).
+- **Stepped corners.** From the seventh course up, each course stops one bag length shorter towards every outer corner, so each corner steps down from nine courses to six.
+- **Entrance.** A gap in the rear wall, right of the centre, with cheeks that step back half a bag per course, a landing at deck height and three plank steps down to the ground.
+- **Ammo niche.** An open-topped bay through the left wall, 1.44 m wide, bulging 1.2 m out past it, with its own two-bag walls and a floor at deck height. Fifteen 88 mm rounds (`SM_Ammo_88mm`, its own UVs) lie in a 6-5-4 pyramid on a plank rack, their brass bases towards the pit.
 - **Ready-round ring.** 24 closed crates at 2.62 m radius (the ammo box texture's "Luftdichter Patronenkasten" side), with a round lying on the runner's drop crate (rear left) and on one more.
 
 Materials: `GerPit_Atlas` (deck, rack), `GerPit_Ammo` (crates), `GerPit_Sandbag` (bags) and `Flak88Pit_Shell` (`M_Flak88_Ammo`). Nanite is off.
@@ -95,7 +95,7 @@ The import deletes and reimports the crew animations. After reimporting them, ru
 ## Testing
 
 `-GerFlak88PitValidate` on TestCover spawns the pit as the player's, orders it to attack the ground 60 degrees off its forward and checks:
-- the gun stands 52 cm below the pit's ground;
+- the gun stands on the pit's ground;
 - the two gun crew on `PitOrigin` and the runner on `PitStatic` with his round;
 - the gun and its crew turned to the target;
 - two shots;
