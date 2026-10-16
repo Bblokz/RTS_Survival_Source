@@ -2,6 +2,7 @@
 
 #include "GrenadeComponent.h"
 
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -22,6 +23,8 @@ namespace GrenadeComponentConstants
 	constexpr float ThrowInterpInterval = 0.02f;
 	constexpr float ArcHeight = 200.f;
 	const FName GrenadeSocketName = TEXT("grenade");
+	// Socket on the grenade static mesh that carries the attached effect (molotov rag flame).
+	const FName GrenadeEffectSocketName = TEXT("GrenadeEffect");
 }
 
 AGrenadeActor::AGrenadeActor()
@@ -30,6 +33,12 @@ AGrenadeActor::AGrenadeActor()
 	M_StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("GrenadeMesh"));
 	M_StaticMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetRootComponent(M_StaticMeshComponent);
+	M_AttachedEffectComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("AttachedGrenadeEffect"));
+	M_AttachedEffectComponent->SetupAttachment(M_StaticMeshComponent, GrenadeComponentConstants::GrenadeEffectSocketName);
+	M_AttachedEffectComponent->SetAutoActivate(false);
+	// Flames burn upwards whatever angle the hand or the flight holds the grenade at.
+	M_AttachedEffectComponent->SetUsingAbsoluteRotation(true);
+	M_AttachedEffectComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	M_ExplosionEffectScale = FVector::OneVector;
 	M_ThrowDuration = GrenadeComponentConstants::ThrowTime;
 }
@@ -38,6 +47,12 @@ void AGrenadeActor::BeginPlay()
 {
 	Super::BeginPlay();
 	SetActorHiddenInGame(true);
+}
+
+void AGrenadeActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	StopBurnArea();
+	Super::EndPlay(EndPlayReason);
 }
 
 void AGrenadeActor::ThrowAndExplode(const FGrenadeComponentSettings& DamageParams, const FVector& StartLocation,
@@ -70,7 +85,49 @@ void AGrenadeActor::ResetGrenade()
 		World->GetTimerManager().ClearTimer(M_ThrowTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
 	}
+	DeactivateAttachedEffect();
 	SetActorHiddenInGame(true);
+}
+
+void AGrenadeActor::ActivateAttachedEffect(UNiagaraSystem* AttachedEffect, const FVector& EffectScale)
+{
+	if (not GetIsValidAttachedEffectComponent())
+	{
+		return;
+	}
+
+	if (not AttachedEffect)
+	{
+		DeactivateAttachedEffect();
+		return;
+	}
+
+	// Re-attach so the socket of the mesh set for this throw is used.
+	M_AttachedEffectComponent->AttachToComponent(
+		M_StaticMeshComponent,
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+		GrenadeComponentConstants::GrenadeEffectSocketName);
+	M_AttachedEffectComponent->SetRelativeScale3D(EffectScale);
+	if (M_AttachedEffectComponent->GetAsset() != AttachedEffect)
+	{
+		M_AttachedEffectComponent->SetAsset(AttachedEffect);
+	}
+	M_AttachedEffectComponent->Activate(true);
+}
+
+void AGrenadeActor::DeactivateAttachedEffect()
+{
+	if (not GetIsValidAttachedEffectComponent())
+	{
+		return;
+	}
+
+	M_AttachedEffectComponent->DeactivateImmediate();
+}
+
+bool AGrenadeActor::GetIsAvailableForThrow() const
+{
+	return IsHidden() && M_BurnState.TicksRemaining <= 0;
 }
 
 void AGrenadeActor::SetGrenadeMesh(UStaticMesh* OverrideMesh)
@@ -94,6 +151,17 @@ bool AGrenadeActor::GetIsValidStaticMeshComponent() const
 	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_StaticMeshComponent", __func__, this);
+	return false;
+}
+
+bool AGrenadeActor::GetIsValidAttachedEffectComponent() const
+{
+	if (IsValid(M_AttachedEffectComponent))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_AttachedEffectComponent", __func__, this);
 	return false;
 }
 
@@ -143,13 +211,10 @@ void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, cons
 	}
 
 	const FVector ExplosionLocation = M_EndLocation;
-	PlayExplosionFX(ExplosionLocation);
+	UNiagaraComponent* ImpactEffect = PlayExplosionFX(ExplosionLocation);
 	if (DamageParams.AoeRange > 0.f && DamageParams.Damage > 0.f)
 	{
-		const ETriggerOverlapLogic OverlapLogic = OwningPlayer == 1
-			                                          ? ETriggerOverlapLogic::OverlapEnemy
-			                                          : ETriggerOverlapLogic::OverlapPlayer;
-
+		const ETriggerOverlapLogic OverlapLogic = GetOverlapLogicForOwningPlayer(OwningPlayer);
 		const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
 
 		FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
@@ -161,17 +226,107 @@ void AGrenadeActor::OnExplode(const FGrenadeComponentSettings DamageParams, cons
 			DamageParams.FullArmorPen,
 			DamageParams.ArmorPenFallOff,
 			DamageParams.MaxArmorPen,
-			ERTSDamageType::Kinetic,
+			DamageParams.DamageType,
 			OverlapLogic,
 			EShieldDamageSource::Shrapnel,
 			ActorsToIgnore,
 			EVehicleModuleSplashPolicy::DamageExternalModules);
 	}
 
+	StartBurnArea(DamageParams, ExplosionLocation, OwningPlayer, ImpactEffect);
 	ResetGrenade();
 }
 
-void AGrenadeActor::PlayExplosionFX(const FVector& ExplosionLocation) const
+ETriggerOverlapLogic AGrenadeActor::GetOverlapLogicForOwningPlayer(const int32 OwningPlayer)
+{
+	return OwningPlayer == 1 ? ETriggerOverlapLogic::OverlapEnemy : ETriggerOverlapLogic::OverlapPlayer;
+}
+
+void AGrenadeActor::StartBurnArea(const FGrenadeComponentSettings& DamageParams, const FVector& BurnLocation,
+                                  const int32 OwningPlayer, UNiagaraComponent* ImpactEffect)
+{
+	StopBurnArea();
+	const FGrenadeBurnAreaSettings& BurnSettings = DamageParams.BurnArea;
+	if (not BurnSettings.GetIsBurnAreaEnabled())
+	{
+		// No burn area: the impact effect plays out on its own.
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	M_BurnImpactEffectComponent = ImpactEffect;
+	M_BurnState.BurnLocation = BurnLocation;
+	M_BurnState.TicksRemaining = FMath::Max(
+		1, FMath::FloorToInt(BurnSettings.BurnDuration / BurnSettings.BurnTickInterval));
+	M_BurnState.DamagePerTick = BurnSettings.BurnDamagePerTick;
+	M_BurnState.Radius = BurnSettings.BurnRadius > 0.f ? BurnSettings.BurnRadius : DamageParams.AoeRange;
+	M_BurnState.DamageFalloffExponent = DamageParams.AoeDamageExponentReduction;
+	M_BurnState.FullArmorPen = DamageParams.FullArmorPen;
+	M_BurnState.ArmorPenFallOff = DamageParams.ArmorPenFallOff;
+	M_BurnState.MaxArmorPen = DamageParams.MaxArmorPen;
+	M_BurnState.DamageType = DamageParams.DamageType;
+	M_BurnState.OverlapLogic = GetOverlapLogicForOwningPlayer(OwningPlayer);
+
+	World->GetTimerManager().SetTimer(
+		M_BurnState.BurnTickTimerHandle,
+		this,
+		&AGrenadeActor::OnBurnTick,
+		BurnSettings.BurnTickInterval,
+		true);
+}
+
+void AGrenadeActor::OnBurnTick()
+{
+	if (M_BurnState.TicksRemaining <= 0)
+	{
+		StopBurnArea();
+		return;
+	}
+
+	const TArray<TWeakObjectPtr<AActor>> ActorsToIgnore;
+	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+		this,
+		M_BurnState.BurnLocation,
+		M_BurnState.Radius,
+		M_BurnState.DamagePerTick,
+		M_BurnState.DamageFalloffExponent,
+		M_BurnState.FullArmorPen,
+		M_BurnState.ArmorPenFallOff,
+		M_BurnState.MaxArmorPen,
+		M_BurnState.DamageType,
+		M_BurnState.OverlapLogic,
+		EShieldDamageSource::Flamethrower,
+		ActorsToIgnore);
+
+	--M_BurnState.TicksRemaining;
+	if (M_BurnState.TicksRemaining <= 0)
+	{
+		StopBurnArea();
+	}
+}
+
+void AGrenadeActor::StopBurnArea()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_BurnState.BurnTickTimerHandle);
+	}
+	M_BurnState.TicksRemaining = 0;
+
+	// Stop spawning new flames; live particles finish and the auto-destroying component cleans itself up.
+	if (M_BurnImpactEffectComponent.IsValid())
+	{
+		M_BurnImpactEffectComponent->Deactivate();
+	}
+	M_BurnImpactEffectComponent = nullptr;
+}
+
+UNiagaraComponent* AGrenadeActor::PlayExplosionFX(const FVector& ExplosionLocation) const
 {
 	if (M_ExplosionSound)
 	{
@@ -188,13 +343,14 @@ void AGrenadeActor::PlayExplosionFX(const FVector& ExplosionLocation) const
 	}
 	if (M_ExplosionEffect)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		return UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 			this,
 			M_ExplosionEffect,
 			ExplosionLocation,
 			FRotator::ZeroRotator,
 			M_ExplosionEffectScale);
 	}
+	return nullptr;
 }
 
 FVector AGrenadeActor::CalculateArcLocation(const float Alpha) const
@@ -782,6 +938,7 @@ void UGrenadeComponent::AttachGrenadeToThrower(FGrenadeThrowerState& ThrowerStat
 	ThrowerState.M_AttachedGrenade = Grenade;
 	ThrowerState.M_AttachedGrenadeScale = Grenade->GetActorScale3D();
 	Grenade->SetGrenadeMesh(M_Settings.GrenadeMesh);
+	Grenade->ActivateAttachedEffect(M_Settings.AttachedGrenadeEffect, M_Settings.AttachedGrenadeEffectScale);
 	Grenade->AttachToComponent(
 		MeshComponent,
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
@@ -917,16 +1074,26 @@ bool UGrenadeComponent::CanUseGrenades() const
 
 AGrenadeActor* UGrenadeComponent::AcquireGrenade()
 {
+	bool bIsAnyGrenadeStillBurning = false;
 	for (TObjectPtr<AGrenadeActor>& Grenade : M_GrenadePool)
 	{
-		if (IsValid(Grenade) && Grenade->IsHidden())
+		if (not IsValid(Grenade))
+		{
+			continue;
+		}
+		if (Grenade->GetIsAvailableForThrow())
 		{
 			return Grenade.Get();
 		}
+		bIsAnyGrenadeStillBurning |= Grenade->IsHidden();
 	}
 
-	RTSFunctionLibrary::ReportError(
-		"Grenade pool exhausted or invalid when attempting to acquire a grenade at function AquireGrenade");
+	// Grenades whose fire still burns on the ground are busy on purpose; the caller spawns a fallback grenade.
+	if (not bIsAnyGrenadeStillBurning)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Grenade pool exhausted or invalid when attempting to acquire a grenade at function AquireGrenade");
+	}
 	return nullptr;
 }
 

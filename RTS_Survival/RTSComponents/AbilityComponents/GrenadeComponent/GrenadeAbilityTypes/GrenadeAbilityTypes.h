@@ -13,4 +13,6 @@ enum class EGrenadeAbilityType : uint8
 	SmallGrenade,
 	BundleSturmKommando,
 	StickGrenadeVultures,
+	// Soviet molotov cocktail: burning rag in hand and a fire area that keeps burning after impact.
+	RusMolotov,
 };
