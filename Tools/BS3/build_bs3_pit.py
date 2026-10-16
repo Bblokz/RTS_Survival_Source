@@ -14,13 +14,20 @@
                                 layout turned 20 degrees about the breech so it fits between the trails) and 100 mm rounds
   Rus_BXP_BS3Pit                a copy of the 53-K pit expansion (enemy owned, engages when placed), type BTX_RusBS3Pit
 
-Run: python build_bs3_pit.py [crew,mesh,socket,animbp,turret,bxp]   (scratchpad uecp.py importable; UECP_PORT picks
-an editor other than the 9855 broker's)
+Run: python build_bs3_pit.py [crew,mesh,socket,animbp,turret,crate,bxp]   (scratchpad uecp.py importable; UECP_PORT
+picks an editor other than the 9855 broker's; crate only re-places the ReadyCrate on the existing turret)
+
+The game does not render Nanite: after (re)importing a pit or fieldwork mesh, cut it with
+Marketplace/Scritps/PitOptimize/pit_mesh_optimize.py and run Tools/GunPits/optimize_pit_meshes.py heavy, which
+imports the cut mesh and turns Nanite off (see Docs/Units/GunPitMeshes.md).
 """
 import json
-import math
+import os
 import sys
 from uecp import call_tool
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'GunPits'))
+import pit_crate
 
 ROOT = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBS3Pit'
 GUN = '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/BS3_100MM'
@@ -35,9 +42,6 @@ ANIM_BP = ROOT + '/Anims/AnimBp_BS3Pit'
 SANDBAG_MATERIAL = '/Game/SandBagPack/Materials/MI_Rus_SandBag_01'
 LAUNCH_SOUND = '/Game/RTS_Survival/Sounds/WeaponSounds/HeavyCaliber/DT100mm/S_FireWeapon_LB_1_100mm.S_FireWeapon_LB_1_100mm'
 PIT_ORIGIN = 'PitOriginBS3'
-# The ready crate is SM_Ger_Ammobox at half size; its pivot is off the box centre (bounds x -66..100, y -175..44).
-CRATE_SCALE = 0.5
-CRATE_MESH_CENTRE = (17.0, -65.5, 7.0)
 ROTATION_SPEED = 18.0
 MAX_PITCH = 30.0
 MIN_PITCH = -5.0
@@ -231,16 +235,13 @@ def asset_text(path, kind):
     return f"/Script/Engine.{kind}'{path}.{path.split('/')[-1]}'"
 
 
-def crate_transform(crate):
-    """Places the half-size ammo box so its centre sits on the crate spot, turned with the pick-up direction."""
-    x, y, _ = crate['location']
-    yaw = crate['yaw'] - 90.0
-    cx, cy, cz = (c * CRATE_SCALE for c in CRATE_MESH_CENTRE)
-    a = math.radians(yaw)
-    ox = cx * math.cos(a) - cy * math.sin(a)
-    oy = cx * math.sin(a) + cy * math.cos(a)
-    # The bridge takes rotations as [pitch, yaw, roll].
-    return [x - ox, y - oy, -cz], [0.0, yaw, 0.0]
+def place_crate(crate):
+    """Puts the ready crate under the round the handler picks up (the drill's crate spot)."""
+    location, rotation, scale = pit_crate.crate_transform(pit_crate.CRATE_MESH, crate)
+    act('set_static_mesh_component', blueprint_path=TURRET, component_name='ReadyCrate', mesh_path=pit_crate.CRATE_MESH)
+    act('set_component_transform', blueprint_path=TURRET, component_name='ReadyCrate', location=location, rotation=rotation,
+        scale=[scale] * 3)
+    print('ReadyCrate', location, rotation, scale)
 
 
 def crew_settings(layout, carry):
@@ -280,9 +281,7 @@ def build_turret():
         x, y = layout[name]['location']
         act('set_component_transform', blueprint_path=TURRET, component_name=name, location=[x, y, 0.0],
             rotation=[0.0, layout[name]['yaw'], 0.0])
-    location, rotation = crate_transform(layout['crate'])
-    act('set_component_transform', blueprint_path=TURRET, component_name='ReadyCrate', location=location, rotation=rotation,
-        scale=[CRATE_SCALE] * 3)
+    place_crate(layout['crate'])
     # The BS-3's origin socket has its own name on the shared ZiS-3 skeleton; the ready crate follows it.
     act('edit_component_property', blueprint_path=TURRET, component_name='ReadyCrate', property_name='ComponentTags',
         value=f'("PitSocket:{PIT_ORIGIN}")')
@@ -349,8 +348,15 @@ print('TYPE', unreal.get_default_object(bp.generated_class()).get_editor_propert
 """, 'BS3 pit expansion type')
 
 
+def replace_crate():
+    place_crate(load_json('bs3_crew_layout.json')['crate'])
+    compiled = act('compile_blueprint', blueprint_path=TURRET)
+    print('BS3 pit turret compile', compiled.get('error_count'), compiled.get('errors'))
+    act('save_asset', asset_path=TURRET)
+
+
 if __name__ == '__main__':
     steps = sys.argv[1].split(',') if len(sys.argv) > 1 else ['crew', 'mesh', 'socket', 'animbp', 'turret', 'bxp']
     for step in steps:
         {'crew': import_crew, 'mesh': import_mesh, 'socket': add_pit_origin, 'animbp': build_anim_blueprint,
-         'turret': build_turret, 'bxp': build_bxp}[step]()
+         'turret': build_turret, 'crate': replace_crate, 'bxp': build_bxp}[step]()

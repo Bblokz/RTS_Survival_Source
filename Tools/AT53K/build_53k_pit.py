@@ -14,11 +14,20 @@
   Rus_BXP_53KPit                a copy of the DShK pit expansion (enemy owned, engages when placed), type
                                 BTX_Rus53KPit
 
-Run: python build_53k_pit.py [mesh,socket,animbp,turret,bxp]
+Run: python build_53k_pit.py [mesh,socket,animbp,turret,crate,bxp]
+  crate: only re-places the ReadyCrate on the existing turret (the turret step copies the Pak 40 pit's crate)
+
+The game does not render Nanite: after (re)importing a pit or fieldwork mesh, cut it with
+Marketplace/Scritps/PitOptimize/pit_mesh_optimize.py and run Tools/GunPits/optimize_pit_meshes.py heavy, which
+imports the cut mesh and turns Nanite off (see Docs/Units/GunPitMeshes.md).
 """
 import json
+import os
 import sys
 from uecp import call_tool
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'GunPits'))
+import pit_crate
 
 ROOT = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Rus53KPit'
 GUN = '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/53K_45MM'
@@ -34,6 +43,8 @@ CREW_ANIM_BP = '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM
 SANDBAG_MATERIAL = '/Game/SandBagPack/Materials/MI_Rus_SandBag_01'
 LAUNCH_SOUND = '/Game/RTS_Survival/Sounds/WeaponSounds/MediumCaliber/45mmT26/S_FireWeapon_45mmT26.S_FireWeapon_45mmT26'
 ROUND_SCALE = 0.7
+# The Pak 40 pit's drill, whose bake holds the crate spot.
+PAK_CARRY = 'D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Crew/gerpit_pak_carry.json'
 ROTATION_SPEED = 26.0
 MAX_PITCH = 25.0
 MIN_PITCH = -8.0
@@ -215,6 +226,20 @@ def build_turret():
     act('save_asset', asset_path=TURRET)
 
 
+def replace_crate():
+    """Puts the ready crate under the round the handler picks up, without copying the Pak pit turret again."""
+    with open(PAK_CARRY) as handle:
+        crate = json.load(handle)['crate']
+    location, rotation, scale = pit_crate.crate_transform(pit_crate.CRATE_MESH, crate)
+    act('set_static_mesh_component', blueprint_path=TURRET, component_name='ReadyCrate', mesh_path=pit_crate.CRATE_MESH)
+    act('set_component_transform', blueprint_path=TURRET, component_name='ReadyCrate', location=location, rotation=rotation,
+        scale=[scale] * 3)
+    print('ReadyCrate', location, rotation, scale)
+    compiled = act('compile_blueprint', blueprint_path=TURRET)
+    print('53K pit turret compile', compiled.get('error_count'), compiled.get('errors'))
+    act('save_asset', asset_path=TURRET)
+
+
 def build_bxp():
     duplicate(DSHK_PIT, BXP)
     nodes = act('get_graph_snapshot', blueprint_path=BXP, graph_name='EventGraph', view='compact')['nodes']
@@ -253,4 +278,4 @@ if __name__ == '__main__':
     steps = sys.argv[1].split(',') if len(sys.argv) > 1 else ['mesh', 'socket', 'animbp', 'turret', 'bxp']
     for step in steps:
         {'mesh': import_mesh, 'socket': add_pit_origin, 'animbp': build_anim_blueprint, 'turret': build_turret,
-         'bxp': build_bxp}[step]()
+         'crate': replace_crate, 'bxp': build_bxp}[step]()

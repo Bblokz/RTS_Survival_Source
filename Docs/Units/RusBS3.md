@@ -67,7 +67,7 @@ The wall is sandbags only, three rows thick:
 
 Every crew spot is in gun space on `PitOriginBS3`, an identity socket on `37mmFlak`. The ready crate and both rounds ride on the gun, and the crew stand on flat ground. Nothing in the drill refers to the pit.
 
-**The rule for reusing the drill in another pit:** keep a clear radius of about **4.6 m** around the gun's pivot. That covers the spades (4.31 m) and the crate's far corner (about 4.4 m). Then copy the turret.
+**The rule for reusing the drill in another pit:** keep a clear radius of about **4.6 m** around the gun's pivot. That covers the spades (4.31 m) and the crate's far corner (about 4.2 m). Then copy the turret.
 
 | Crew | Spot (gun space, cm) | Mesh yaw | Animation |
 |---|---|---|---|
@@ -84,6 +84,8 @@ Every crew spot is in gun space on `PitOriginBS3`, an identity socket on `37mmFl
 
 The handler's drill was then baked fresh with the B-4 crew solver. Its worst hand miss is 19 cm.
 
+**The ready crate** (`SM_TankAmmoCrates_A`) lies under the round the handler picks up, its narrow side towards him. [pit_crate.py](../../Tools/GunPits/pit_crate.py) places it as in the German pits (see [GerGunPits.md](GerGunPits.md), "Ready crate"). Until 2026-10-15 it was a half-size `SM_Ger_Ammobox` 65 cm off that spot.
+
 ## Rebuilding
 
 **Blender** (`D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/BS3_100mmAT/Scripts`, Blender 4.0):
@@ -94,7 +96,7 @@ The handler's drill was then baked fresh with the B-4 crew solver. Its worst han
 **Unreal** ([Tools/BS3](../../Tools/BS3)). The scripts talk to the editor bridge through scratchpad `uecp.py`:
 1. `ue_bs3_import.py` (bridge `pyfile`) imports the materials, mesh, animations and wreck, and prints the `LaunchBS3` / `OutBS3` socket transforms. Add those sockets with `add_skeleton_socket` and `set_skeleton_socket_transform` on `B_Gun`.
 2. `build_bs3_animbp.py`, then `build_bs3_teamweapon.py`.
-3. `build_bs3_pit.py [crew,mesh,socket,animbp,turret,bxp]`.
+3. `build_bs3_pit.py [crew,mesh,socket,animbp,turret,crate,bxp]`. `crate` only re-places the ready crate on the existing turret.
 
 **A second editor:** when another editor already owns the bridge port 9855, a second editor on the project still serves its own endpoint, usually `http://127.0.0.1:30001/mcp`; its log names it. Set `UECP_PORT=30001` and `uecp.py` talks to that editor directly.
 

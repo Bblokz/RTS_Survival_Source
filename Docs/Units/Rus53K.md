@@ -60,9 +60,9 @@ The ring is sandbags only: three rows thick and stepped down outwards (4, 3 and 
 
 The inner radius is set by the **ready crate**, not by the gun:
 - the crate hangs on the gun's pit origin, so it turns with the gun;
-- its far corner reaches about 3.95 m from the pivot (the trail spades reach 2.8 m).
+- its far corner reaches about 3.9 m from the pivot (the trail spades reach 2.8 m).
 
-At a 3.8 m inner radius the crate went into the bags; at 4.4 m it clears them at every yaw.
+At a 3.8 m inner radius the old, larger crate went into the bags; at 4.4 m both clear them at every yaw.
 
 ### The reload drill (reused from the Pak 40 pit)
 
@@ -77,6 +77,8 @@ Only these change:
 - everything hangs on `PitOrigin53K`, an identity socket on `37mmFlak`.
 
 The 53-K needs its own socket because the ZiS-3 skeleton is shared and the 53-K's root bone has no import scale to cancel. The ready crate's tag must name it: `PitSocket:PitOrigin53K`.
+
+The ready crate is the Pak 40 pit's: `SM_TankAmmoCrates_A` under the round the handler picks up, its narrow side towards him (see [GerGunPits.md](GerGunPits.md), "Ready crate"). Until 2026-10-15 it was a half-size `SM_Ger_Ammobox` 65 cm off that spot, so the handler picked the round out of the air. `build_53k_pit.py crate` re-places it without copying the Pak pit turret again.
 
 ## Rebuilding
 
@@ -98,7 +100,7 @@ The 53-K needs its own socket because the ZiS-3 skeleton is shared and the 53-K'
 2. Add the `Launch53K` and `Out53K` sockets with `add_skeleton_socket` and `set_skeleton_socket_transform`.
 3. `build_53k_animbp.py` builds the montages, `AO_53K` and `AnimBp_TW_53K`.
 4. `build_53k_teamweapon.py` builds the wreck, gun, squad and spawner row.
-5. `build_53k_pit.py [mesh,socket,animbp,turret,bxp]` builds the pit.
+5. `build_53k_pit.py [mesh,socket,animbp,turret,crate,bxp]` builds the pit. The `turret` step copies the Pak 40 pit turret with its crate; `crate` only re-places the ready crate.
 
 The scripts reuse existing copies instead of deleting them. A windowless editor cannot show the "delete loaded Blueprint" dialog and dies on it.
 

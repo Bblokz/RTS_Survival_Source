@@ -57,6 +57,12 @@ The pits use three materials:
 | leFH / sFH | 0.210 | 0.476 | 0.675 |
 
   A round is attached with KeepWorld to the hand that takes it, so it never jumps. Reload times are 5.9 s (Pak), 5 s (leFH) and 14.4 s (sFH), so the drill plays at about 1.4×, 1.9× and 0.64×. The B-4 pit uses the same component (`UB4HowitzerPitCrewComponent` is a thin subclass).
+- **Ready crate** (`ReadyCrate`, `SM_TankAmmoCrates_A`): it lies under the round the handler picks up, at the drill's crate spot (`CrateRound`).
+  - Scaled ×1.173, so its top is at the drill's 44 cm and the round lies on it. It is then 51 × 69 cm.
+  - Its long side runs along the round and its narrow side faces the handler. The near edge is 20 cm in front of his feet (he picks up from 46 cm behind the round).
+  - The crate turns with the gun, so its far corner must stay inside the wall: 389 cm in the Pak pit (ring 400), 509 cm in the howitzer pits (ring 520; the posts' inner face is at 508, so it may just touch one) and 355 cm in the Flak pit (ring 430).
+  - [pit_crate.py](../../Tools/GunPits/pit_crate.py) places it. It reads the mesh bounds through the bridge, because a mesh pivot is seldom the box centre.
+  - **Fixed 2026-10-15.** The pits used `SM_Ger_Ammobox` at half size, and the scripts assumed the wrong centre for it. The crate sat 65 cm off its spot, so the handler picked the next round out of the air beside it. That box (83 × 109 cm) also cannot cover the round inside the Pak pit's 4 m ring, so the pits now use the smaller crate of the 53-K sector pit.
 
 ## The Flak 37 pit
 
@@ -118,7 +124,7 @@ Scripts, in the order they run. The Blender ones are in `D:/Blender/BlenderProje
 3. `gerpit_crew.py` (Blender 4.0, uses `b4_pit_crew`): handler drills plus the carry JSONs into `Exports/Crew`.
 4. `ue_gerpit_import.py`: meshes and handler animations.
 5. `build_gerpit_animbps.py`: anim blueprints and montages.
-6. `build_gerpit_turrets.py`: turrets. Reads the carry JSONs for the drill fractions and round poses.
+6. `build_gerpit_turrets.py`: turrets. Reads the carry JSONs for the drill fractions and round poses. `build_gerpit_turrets.py Pak40,LeFH18,SFH18,Flak37 crate` only re-places the ready crates. It keeps later edits, such as the fire feedback.
 7. `build_gerpit_bxps.py`: expansions. The spawner entries in `RTS_BP_RTSAsyncSpawner` were added by hand-run Python.
 8. `gerpit_icons.py` (Blender 5), then `ue_gerpit_icons.py`: option pictures, brushes and `DT_Items` rows.
 

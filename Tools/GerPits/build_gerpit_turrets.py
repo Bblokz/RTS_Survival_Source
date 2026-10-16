@@ -11,11 +11,16 @@ artillery weapon). On top of that every turret gets:
 Crew spots are the team weapons' own crew positions; the handler's drill and the round poses come from the Blender
 bake (gerpit_<pit>_carry.json).
 
-Run: python build_gerpit_turrets.py [Pak40,LeFH18,SFH18]
+Run: python build_gerpit_turrets.py [Pak40,LeFH18,SFH18,Flak37] [crate]
+  crate: only re-place the ReadyCrate on the existing turrets (keeps later edits such as build_fire_feedback.py's)
 """
 import json
+import os
 import sys
 from uecp import call_tool
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'GunPits'))
+import pit_crate
 
 ROOT = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits'
 CREW = ROOT + '/Crew'
@@ -27,14 +32,10 @@ TW = '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/'
 SQUAD_ANIMS = '/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/TeamWeaponAnims/'
 SOLDIER = '/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/GermanSoldier/Meshes/SK_WWII_GermanSoldier_varA'
 CREW_ANIM_BP = '/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/B4_203MM/Pit/AnimBp_B4Pit_Crew'
-AMMO_BOX = '/Game/RTS_Survival/Meshes/Props/Ammo/SM_Ger_Ammobox'
 CARRY_DIR = 'D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Crew'
-# The ready crate is SM_Ger_Ammobox at half size; its pivot is off the box centre (bounds x -66..100, y -175..44).
-CRATE_SCALE = 0.5
 # Socket on each gun's root bone that cancels the bone's import scale and rotation (leFH root x71.7, sFH root x100,
 # Pak root turned 90 degrees), so the crew, crate and rounds ride on the turning gun at 1:1 in gun space.
 PIT_ORIGIN = 'PitOrigin'
-CRATE_MESH_CENTRE = (17.0, -65.5, 7.0)
 
 PAK_CREW = [
     # (name, location, yaw, idle, reload montage); yaw -90 turns the soldier mesh to face the gun's +X.
@@ -172,17 +173,13 @@ def ue_text_vector(v):
     return f'(X={v[0]:.3f},Y={v[1]:.3f},Z={v[2]:.3f})'
 
 
-def crate_transform(carry):
-    """Places the half-size ammo box so its centre sits on the crate spot, turned with the pick-up direction."""
-    import math
-    x, y, _ = carry['crate']['location']
-    yaw = carry['crate']['yaw'] - 90.0
-    cx, cy, cz = (c * CRATE_SCALE for c in CRATE_MESH_CENTRE)
-    a = math.radians(yaw)
-    ox = cx * math.cos(a) - cy * math.sin(a)
-    oy = cx * math.sin(a) + cy * math.cos(a)
-    # The bridge takes rotations as [pitch, yaw, roll].
-    return [x - ox, y - oy, -cz], [0.0, yaw, 0.0]
+def place_crate(bp, carry):
+    """Puts the ready crate under the round the handler picks up (the drill's crate spot)."""
+    location, rotation, scale = pit_crate.crate_transform(pit_crate.CRATE_MESH, carry['crate'])
+    act('set_static_mesh_component', blueprint_path=bp, component_name='ReadyCrate', mesh_path=pit_crate.CRATE_MESH)
+    act('set_component_transform', blueprint_path=bp, component_name='ReadyCrate', location=location, rotation=rotation,
+        scale=[scale] * 3)
+    print(bp.split('/')[-1], 'ReadyCrate', location, rotation, scale)
 
 
 def add_components(bp, spec, carry):
@@ -194,11 +191,8 @@ def add_components(bp, spec, carry):
         act('set_skeletal_mesh_component', blueprint_path=bp, component_name=name, mesh_path=SOLDIER, anim_bp_path=CREW_ANIM_BP)
         act('set_component_transform', blueprint_path=bp, component_name=name, location=list(location), rotation=[0.0, yaw, 0.0])
         act('edit_component_property', blueprint_path=bp, component_name=name, property_name='ComponentTags', value='("PitCrew")')
-    location, rotation = crate_transform(carry)
     act('add_component', blueprint_path=bp, component_class='StaticMeshComponent', component_name='ReadyCrate')
-    act('set_static_mesh_component', blueprint_path=bp, component_name='ReadyCrate', mesh_path=AMMO_BOX)
-    act('set_component_transform', blueprint_path=bp, component_name='ReadyCrate', location=location, rotation=rotation,
-        scale=[CRATE_SCALE] * 3)
+    place_crate(bp, carry)
     act('edit_component_property', blueprint_path=bp, component_name='ReadyCrate', property_name='ComponentTags',
         value=f'("PitSocket:{PIT_ORIGIN}")')
     for name in ('Round1', 'Round2'):
@@ -268,20 +262,38 @@ def rewire_graph(bp, spec):
         ])
 
 
-def build(gun):
-    spec = dict(TURRET_SPECS[gun], gun=gun)
+def load_carry(spec):
     with open(f"{CARRY_DIR}/gerpit_{spec['carry']}_carry.json") as handle:
-        carry = json.load(handle)
-    bp = duplicate(spec, gun)
-    add_components(bp, spec, carry)
-    crew_settings(bp, spec, carry)
-    rewire_graph(bp, spec)
+        return json.load(handle)
+
+
+def compile_and_save(bp, gun):
     compiled = act('compile_blueprint', blueprint_path=bp)
     print(gun, 'compile errors', compiled.get('error_count'), compiled.get('errors'), 'warnings', compiled.get('warning_count'))
     act('save_asset', asset_path=bp)
 
 
+def replace_crate(gun):
+    bp = f'{TURRETS}/RTS_BP_EmbTurret_GerPit_{gun}'
+    place_crate(bp, load_carry(TURRET_SPECS[gun]))
+    compile_and_save(bp, gun)
+
+
+def build(gun):
+    spec = dict(TURRET_SPECS[gun], gun=gun)
+    carry = load_carry(spec)
+    bp = duplicate(spec, gun)
+    add_components(bp, spec, carry)
+    crew_settings(bp, spec, carry)
+    rewire_graph(bp, spec)
+    compile_and_save(bp, gun)
+
+
 if __name__ == '__main__':
     guns = sys.argv[1].split(',') if len(sys.argv) > 1 else list(TURRET_SPECS)
+    crate_only = len(sys.argv) > 2 and sys.argv[2] == 'crate'
     for gun_name in guns:
-        build(gun_name)
+        if crate_only:
+            replace_crate(gun_name)
+        else:
+            build(gun_name)
