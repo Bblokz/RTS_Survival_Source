@@ -12,6 +12,8 @@
 #include "RTS_Survival/Navigation/RTSNavAI/IRTSNavAI.h"
 #include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarVisibilitySettings.h"
 #include "RTS_Survival/Weapons/Turret/Embedded/EmbededTurretInterface.h"
+#include "CrewFormation/TeamWeaponCrewFormation.h"
+#include "TowSway/TeamWeaponTowSway.h"
 #include "TeamWeapon.generated.h"
 
 class UTeamWeaponAnimationInstance;
@@ -147,6 +149,32 @@ struct FTeamWeaponConfig
 	FRTSVerticalAnimTextSettings M_AnimatedTextSettings;
 };
 
+/** How a team weapon sits on the terrain while deployed or pushed. */
+USTRUCT(BlueprintType)
+struct FTeamWeaponGroundConformSettings
+{
+	GENERATED_BODY()
+
+	// Tilts the weapon to the slope under its footprint; off keeps it level and only puts it on the ground.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Ground")
+	bool bAlignToSlope = true;
+
+	// Half length of the footprint sampled for the slope; 0 derives it from the mesh bounds.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Ground", meta = (ClampMin = "0.0"))
+	float FootprintHalfLengthCm = 0.f;
+
+	// Half width of the footprint sampled for the slope; 0 derives it from the mesh bounds.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Ground", meta = (ClampMin = "0.0"))
+	float FootprintHalfWidthCm = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Ground", meta = (ClampMin = "0.0", ClampMax = "45.0"))
+	float MaxTiltDegrees = 20.f;
+
+	// How fast the tilt follows the ground while the weapon is pushed; higher is stiffer.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Ground", meta = (ClampMin = "0.1"))
+	float TiltFollowSpeed = 8.f;
+};
+
 USTRUCT(BlueprintType)
 struct FTeamWeaponAbandonedHealthBarState
 {
@@ -244,6 +272,29 @@ public:
 	void SetSpecificEngageTarget(AActor* TargetActor);
 	AActor* GetSpecificEngageTarget() const { return M_SpecificEngageTarget.Get(); }
 	void SetDigInHullRotationLocked(const bool bLocked);
+
+	/**
+	 * @brief Sets the weapon on the terrain: origin on the ground and tilted to the slope under its footprint.
+	 * The heading is kept; movement, rotation and aiming code only read the weapon's yaw.
+	 * @param DeltaSeconds Frame time used to ease the tilt while the weapon moves.
+	 * @param bInstant Snaps the tilt instead of easing it (spawn, deploy, detach).
+	 * @return False when there is no ground below the weapon.
+	 */
+	bool ConformToGround(const float DeltaSeconds, const bool bInstant);
+
+	// Ground below a location, stepping through units; the team weapon mesh itself blocks the landscape channel.
+	bool TryGetGroundHeightAt(const FVector& Location, float& OutGroundZ) const;
+
+	// Half length (X) and width (Y) of the part of the weapon that rests on the ground.
+	FVector2D GetFootprintHalfExtent() const;
+	const FTeamWeaponPushedCrewSettings& GetPushedCrewSettings() const { return M_PushedCrewSettings; }
+
+	// Called when a truck hooks the weapon; the sway starts from the attach pose.
+	void StartTowSway();
+	void TickTowSway(const float DeltaSeconds);
+	// The weapon keeps where it swung to but stands upright on its heading again; call after detaching.
+	void EndTowSway();
+
 	virtual float TakeDamage(
 		float DamageAmount,
 		FDamageEvent const& DamageEvent,
@@ -282,11 +333,29 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;
 
+	/**
+	 * @brief Yaw in the gun's level heading frame, pitch in its tilted frame: on a slope the tilted yaw disagrees with
+	 * the planar yaw arc check by degrees, which made the turret ask the crew to turn the gun for targets inside the arc.
+	 * @param TargetLocation World location to aim at.
+	 * @param TurretLocation World location of the turret.
+	 * @return Local aim rotation (pitch for the barrel, yaw for the traverse).
+	 */
+	virtual FRotator GetTargetRotation(const FVector& TargetLocation, const FVector& TurretLocation) const override;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Decal")
 	FTeamWeaponDecalManager M_TeamWeaponDecalManager;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|HealthBar")
 	FTeamWeaponAbandonedHealthBarState M_AbandonedHealthBarState;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Ground")
+	FTeamWeaponGroundConformSettings M_GroundConformSettings;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Tow")
+	FTeamWeaponTowSwaySettings M_TowSwaySettings;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TeamWeapon|Movement")
+	FTeamWeaponPushedCrewSettings M_PushedCrewSettings;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "TeamWeapon")
 	void BP_OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing);
@@ -375,4 +444,27 @@ private:
 	// Mirrors assault tank behavior: while dug in the embedded turret cannot rotate the weapon base.
 	UPROPERTY()
 	bool bM_IsHullRotationLocked = false;
+
+	/**
+	 * @brief Fits a plane through the ground under the footprint corners so the weapon rests on all of them.
+	 * @param Location Weapon origin.
+	 * @param HeadingRotation Yaw-only rotation of the weapon.
+	 * @param OutNormalInHeadingSpace Ground normal in the weapon's heading space.
+	 * @param OutPlaneCentreZ Height of the fitted plane below the origin.
+	 * @return False when a corner has no ground below it.
+	 */
+	bool TryGetFootprintGroundPlane(const FVector& Location, const FQuat& HeadingRotation,
+	                                FVector& OutNormalInHeadingSpace, float& OutPlaneCentreZ) const;
+	/**
+	 * @brief Pitch and roll that lay the weapon on a ground normal, without any yaw twist: an axis-angle tilt carries a
+	 * little yaw that, read back as the heading every frame, turns the gun against the mover on slopes.
+	 * @param NormalInHeadingSpace Ground normal in the weapon's heading space.
+	 * @return Rotator with yaw 0, pitch and roll clamped to the maximum tilt.
+	 */
+	FRotator GetClampedGroundTilt(const FVector& NormalInHeadingSpace) const;
+
+	// Ground tilt (pitch and roll, yaw always 0) in heading space; eased while pushed so the gun rocks over bumps.
+	FRotator M_GroundTilt = FRotator::ZeroRotator;
+
+	FTeamWeaponTowSwaySimulation M_TowSway;
 };

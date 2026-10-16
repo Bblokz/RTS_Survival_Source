@@ -169,6 +169,7 @@ void UTeamWeaponAnimationInstance::PlayMontageFromPlayDirectionStart(UAnimMontag
 
 void UTeamWeaponAnimationInstance::InstantlyFinishMontage(const ETeamWeaponMontage MontageType)
 {
+	StopPackAndDeployMontagesWithoutCallback();
 	switch (MontageType)
 	{
 	case ETeamWeaponMontage::NoMontage:
@@ -185,6 +186,25 @@ void UTeamWeaponAnimationInstance::InstantlyFinishMontage(const ETeamWeaponMonta
 		break;
 	case ETeamWeaponMontage::FireMontage:
 		break;
+	}
+}
+
+void UTeamWeaponAnimationInstance::StopPackAndDeployMontagesWithoutCallback()
+{
+	M_MontageEndedDelegate.Unbind();
+	const ETeamWeaponMontage TransitionMontageTypes[] = {ETeamWeaponMontage::DeployMontage, ETeamWeaponMontage::PackMontage};
+	for (const ETeamWeaponMontage TransitionMontageType : TransitionMontageTypes)
+	{
+		float UnusedPlayRate = 1.f;
+		UAnimMontage* TransitionMontage = GetMontageAndPlayrate(TransitionMontageType, UnusedPlayRate);
+		if (not TransitionMontage || not Montage_IsPlaying(TransitionMontage))
+		{
+			continue;
+		}
+		// The montage instance holds its own copy of the end delegate; clear that copy before stopping.
+		FOnMontageEnded NoEndCallback;
+		Montage_SetEndDelegate(NoEndCallback, TransitionMontage);
+		Montage_Stop(0.f, TransitionMontage);
 	}
 }
 

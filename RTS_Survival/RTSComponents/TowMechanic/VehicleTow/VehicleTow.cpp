@@ -187,7 +187,9 @@ void UVehicleTowComponent::AddAbilityToCommands()
 		return;
 	}
 	FUnitAbilityEntry NewAbility;
-	NewAbility.AbilityId = EAbilityID::IdTowActor;
+	// A mission can hook a gun in the frame the truck spawned, before this deferred setup ran; the swap to detach
+	// found no tow ability then, so the card must start on detach.
+	NewAbility.AbilityId = IsTowFree() ? EAbilityID::IdTowActor : EAbilityID::IdDetachTow;
 	NewAbility.CustomType = static_cast<int32>(ETowAbilityType::VehicleHook);
 	M_OwnerCommandsInterface->AddAbility(NewAbility, M_TowSettings.PreferredAbilityIndex);
 }

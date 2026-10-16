@@ -99,6 +99,8 @@ private:
 	void PlayAndWaitForMontage(const ETeamWeaponMontage MontageType, UAnimMontage* ValidMontage,
 		const float PlayRate);
 	void InstantlyFinishMontage(const ETeamWeaponMontage MontageType);
+	// A pack or deploy still playing would end later and put the opposite base pose back; stop it silently.
+	void StopPackAndDeployMontagesWithoutCallback();
 	void PlayMontageFromPlayDirectionStart(UAnimMontage* ValidMontage, const float PlayRate);
 	FOnMontageEnded M_MontageEndedDelegate;
 	void OnPackMontageFinished(UAnimMontage* Montage, bool bInterrupted);

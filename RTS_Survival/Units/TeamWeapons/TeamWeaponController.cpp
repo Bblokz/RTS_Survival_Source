@@ -43,6 +43,21 @@ namespace TeamWeaponControllerCrewPositionStatics
 	}
 }
 
+namespace TeamWeaponGuardStatics
+{
+	// A guard closer than this stands on the gun; one beyond GuardDistance times the factor has lost it.
+	constexpr float MinGuardDistanceToWeaponCm = 150.f;
+	constexpr float MaxGuardDistanceFactor = 2.5f;
+	// A guard this close to a crew position stands in an operator's way.
+	constexpr float MinGuardDistanceToCrewPositionCm = 120.f;
+	// Walking guards spread over this arc either side of straight behind the gun, a little closer than deployed.
+	constexpr float GuardTravelArcHalfDegrees = 55.f;
+	constexpr float GuardTravelDistanceFraction = 0.8f;
+	constexpr float GuardPlacementCheckIntervalSeconds = 1.5f;
+	constexpr float DetachNavProjectionRadiusCm = 500.f;
+	constexpr float GuardEngageFlowProjectionHeightCm = 300.f;
+}
+
 namespace TeamWeaponCrewAnimationStatics
 {
 	// Crew animations follow the first weapon only; team weapons are assumed to carry a single weapon.
@@ -130,6 +145,23 @@ void ATeamWeaponController::OnAllSquadUnitsLoaded()
 	Super::OnAllSquadUnitsLoaded();
 	SpawnTeamWeapon();
 	SnapOperatorsToCrewPositions();
+	StopOperatorWalksAfterSpawnSnap();
+}
+
+void ATeamWeaponController::StopOperatorWalksAfterSpawnSnap()
+{
+	// Deploying already sent the operators walking from where they spawned; the snap put them on their posts, and
+	// the old path would walk them off again into the guards.
+	for (const TWeakObjectPtr<ASquadUnit>& Operator : M_CrewAssignment.M_Operators)
+	{
+		ASquadUnit* SquadUnit = Operator.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+		SquadUnit->TerminateMovementCommand();
+	}
+	MoveGuardsToGuardPositionsIfMisplaced();
 }
 
 bool ATeamWeaponController::TryLoadSquadUnitsFromMapSetup()
@@ -172,8 +204,10 @@ void ATeamWeaponController::Tick(float DeltaSeconds)
 	}
 
 	TickRotationRequest(DeltaSeconds);
-	TickTowedWeaponAnimation();
+	TickPushedCrewFormation(DeltaSeconds);
+	TickTowedWeaponAnimation(DeltaSeconds);
 	TickCrewAnimationArming();
+	TickGuardPlacement(DeltaSeconds);
 }
 
 void ATeamWeaponController::UpdateControllerPositionToAverage()
@@ -584,6 +618,65 @@ bool ATeamWeaponController::GetHasControlledTeamWeapon() const
 	return M_TeamWeapon != nullptr && not bM_IsTeamWeaponAbandoned;
 }
 
+ATeamWeapon* ATeamWeaponController::GetControlledTeamWeaponNoReport() const
+{
+	if (bM_IsTeamWeaponAbandoned || not GetIsValidTeamWeaponNoReport())
+	{
+		return nullptr;
+	}
+	return M_TeamWeapon.Get();
+}
+
+bool ATeamWeaponController::GetIsValidTeamWeaponNoReport() const
+{
+	return IsValid(M_TeamWeapon);
+}
+
+FString ATeamWeaponController::GetOrderDebugDescription() const
+{
+	int32 ValidOperatorCount = 0;
+	for (const TWeakObjectPtr<ASquadUnit>& Operator : M_CrewAssignment.M_Operators)
+	{
+		ValidOperatorCount += Operator.IsValid() ? 1 : 0;
+	}
+	return FString::Printf(
+		TEXT("post_pack=%s post_deploy=%s operators=%d/%d valid=%d squad=%d abandoned=%d rotating=%d reposition=%d cached_reposition=%d dig_in_after_deploy=%d"),
+		*UEnum::GetValueAsString(M_PostPackAction.GetAbilityId()), *UEnum::GetValueAsString(M_PostDeployAction.GetAbilityId()),
+		M_CrewAssignment.M_Operators.Num(), M_CrewAssignment.M_RequiredOperators, ValidOperatorCount,
+		M_TSquadUnits.Num(), bM_IsTeamWeaponAbandoned ? 1 : 0, M_RotationRequest.bM_IsActive ? 1 : 0,
+		bM_HasInternalOutOfRangeReposition ? 1 : 0, bM_HasCachedOutOfRangeMoveLocation ? 1 : 0,
+		bM_ShouldExecuteDigInAfterDeploy ? 1 : 0);
+}
+
+void ATeamWeaponController::GetCrewOperators(TArray<ASquadUnit*>& OutOperators) const
+{
+	OutOperators.Reset();
+	for (const TWeakObjectPtr<ASquadUnit>& Operator : M_CrewAssignment.M_Operators)
+	{
+		OutOperators.Add(Operator.Get());
+	}
+}
+
+void ATeamWeaponController::GetCrewGuards(TArray<ASquadUnit*>& OutGuards) const
+{
+	OutGuards.Reset();
+	for (const TWeakObjectPtr<ASquadUnit>& Guard : M_CrewAssignment.M_Guards)
+	{
+		OutGuards.Add(Guard.Get());
+	}
+}
+
+bool ATeamWeaponController::TryGetOperatorCrewPositionLocation(const int32 OperatorIndex, FVector& OutLocation) const
+{
+	UCrewPosition* CrewPosition = nullptr;
+	if (not TryGetCrewPositionForOperatorIndex(OperatorIndex, CrewPosition))
+	{
+		return false;
+	}
+	OutLocation = CrewPosition->GetComponentLocation();
+	return true;
+}
+
 void ATeamWeaponController::SetTargetPreference(const ETargetPreference TargetPreference)
 {
 	// Sets on squad unit's weapons.
@@ -838,6 +931,8 @@ void ATeamWeaponController::SpawnTeamWeapon()
 
 	M_TeamWeapon->SetTeamWeaponController(this);
 	M_TeamWeapon->SetTurretOwnerActor(this);
+	// The squad spawns its controller at whatever height the spawn point had; the gun belongs on the ground.
+	M_TeamWeapon->ConformToGround(0.f, true);
 	M_TeamWeaponMover = M_TeamWeapon->GetTeamWeaponMover();
 
 	if (GetIsValidTeamWeaponMover())
@@ -1070,6 +1165,11 @@ void ATeamWeaponController::AssignCrewToTeamWeapon()
 	}
 
 	RebuildCrewAnimationSlots();
+	if (M_PushedCrewFormation.GetIsActive())
+	{
+		// A soldier died or joined mid-push: the posts are handed out again.
+		StartPushedCrewFormation();
+	}
 
 	if (GetIsValidTeamWeaponMover())
 	{
@@ -1180,30 +1280,208 @@ void ATeamWeaponController::StartMoveWithPushedWeapon(const FVector MoveToLocati
 	}
 
 	M_SquadUnitPaths.Empty();
-	UpdateCrewMoveOffsets();
 	FNavPathSharedPtr SquadPath;
 	const ESquadPathFindingError PathError = GenerateBaseSquadPath(MoveToLocation, SquadPath);
 	if (PathError != ESquadPathFindingError::NoError)
 	{
 		RTSFunctionLibrary::ReportError(GetSquadPathFindingErrorMsg(PathError));
+		// Ending the command calls the idle handler, which only redeploys a gun with no move still pending.
+		M_PostPackAction.Reset();
 		DoneExecutingCommand(EAbilityID::IdMove);
 		return;
 	}
 
-	const ESquadPathFindingError AssignError = GeneratePaths_Assign(MoveToLocation, SquadPath);
-	if (AssignError != ESquadPathFindingError::NoError)
-	{
-		RTSFunctionLibrary::ReportError(GetSquadPathFindingErrorMsg(AssignError));
-		DoneExecutingCommand(EAbilityID::IdMove);
-		return;
-	}
-
+	CancelRotationRequestForMove();
 	ApplyPushedMoveSpeedOverrideToSquad();
 	SetTeamWeaponState(ETeamWeaponState::Moving);
-	ExecuteSquadMoveAlongAssignedPaths(EAbilityID::IdMove);
+	// Paths of their own let the crew walk off ahead of the gun; the formation keeps them on their posts instead.
+	StartPushedCrewFormation();
 	M_TeamWeaponMover->StartPushedFollowPath(SquadPath);
-	M_SquadUnitPaths.Empty();
 	M_PostPackAction.Reset();
+}
+
+void ATeamWeaponController::StartPushedCrewFormation()
+{
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	TArray<FTeamWeaponFormationMember> Members;
+	BuildPushedCrewFormationMembers(Members);
+	for (const FTeamWeaponFormationMember& Member : Members)
+	{
+		ASquadUnit* SquadUnit = Member.M_Unit.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+		// Guards may still chase a target or walk to a guard spot; walking with the gun overrides both.
+		SquadUnit->TerminateAttackCommand();
+		SquadUnit->TerminateMovementCommand();
+	}
+	M_PushedCrewFormation.Start(M_TeamWeapon, Members, M_TeamWeapon->GetPushedCrewSettings());
+}
+
+void ATeamWeaponController::TickPushedCrewFormation(const float DeltaSeconds)
+{
+	if (not M_PushedCrewFormation.GetIsActive())
+	{
+		return;
+	}
+
+	const float PushedSpeedScale = M_PushedCrewFormation.Tick(DeltaSeconds);
+	if (not GetIsValidTeamWeaponMover())
+	{
+		return;
+	}
+	M_TeamWeaponMover->SetPushedSpeedScale(PushedSpeedScale);
+}
+
+void ATeamWeaponController::BuildPushedCrewFormationMembers(TArray<FTeamWeaponFormationMember>& OutMembers) const
+{
+	OutMembers.Reset();
+	const int32 OperatorCount = M_CrewAssignment.M_Operators.Num();
+	for (int32 OperatorIndex = 0; OperatorIndex < OperatorCount; ++OperatorIndex)
+	{
+		FTeamWeaponFormationMember Member;
+		Member.M_Unit = M_CrewAssignment.M_Operators[OperatorIndex];
+		Member.bM_IsOperator = true;
+		UCrewPosition* CrewPosition = nullptr;
+		if (TryGetCrewPositionForOperatorIndex(OperatorIndex, CrewPosition))
+		{
+			Member.M_CrewPosition = CrewPosition;
+		}
+		else
+		{
+			// More operators than crew positions: they walk among the guards behind the gun.
+			Member.M_LocalPostOffset = GetGuardTravelPostOffset(OperatorIndex, OperatorCount);
+		}
+		OutMembers.Add(Member);
+	}
+
+	const int32 GuardCount = M_CrewAssignment.M_Guards.Num();
+	for (int32 GuardIndex = 0; GuardIndex < GuardCount; ++GuardIndex)
+	{
+		FTeamWeaponFormationMember Member;
+		Member.M_Unit = M_CrewAssignment.M_Guards[GuardIndex];
+		Member.bM_IsOperator = false;
+		Member.M_LocalPostOffset = GetGuardTravelPostOffset(GuardIndex, GuardCount);
+		OutMembers.Add(Member);
+	}
+}
+
+FVector ATeamWeaponController::GetGuardTravelPostOffset(const int32 GuardIndex, const int32 GuardCount) const
+{
+	using namespace TeamWeaponGuardStatics;
+	// The deployed guard arc reaches beside and in front of the gun; on the move the guards follow behind it.
+	const float SpreadAlpha = (static_cast<float>(GuardIndex) + 0.5f) / FMath::Max(GuardCount, 1);
+	const float GuardAngle = FMath::Lerp(-GuardTravelArcHalfDegrees, GuardTravelArcHalfDegrees, SpreadAlpha);
+	const FVector BehindDirection = -FVector::ForwardVector;
+	return FRotator(0.f, GuardAngle, 0.f).RotateVector(BehindDirection) *
+		FMath::Max(M_GuardDistance, 0.f) * GuardTravelDistanceFraction;
+}
+
+bool ATeamWeaponController::GetIsGuardMisplaced(const ASquadUnit& Guard) const
+{
+	using namespace TeamWeaponGuardStatics;
+	const FVector GuardLocation = Guard.GetActorLocation();
+	const float DistanceToWeaponCm = FVector::Dist2D(GuardLocation, M_TeamWeapon->GetActorLocation());
+	const float MaxGuardDistanceCm = FMath::Max(M_GuardDistance, MinGuardDistanceToWeaponCm) * MaxGuardDistanceFactor;
+	if (DistanceToWeaponCm < MinGuardDistanceToWeaponCm || DistanceToWeaponCm > MaxGuardDistanceCm)
+	{
+		return true;
+	}
+	for (int32 OperatorIndex = 0; OperatorIndex < M_CrewAssignment.M_Operators.Num(); ++OperatorIndex)
+	{
+		UCrewPosition* CrewPosition = nullptr;
+		if (TryGetCrewPositionForOperatorIndex(OperatorIndex, CrewPosition) &&
+			FVector::Dist2D(GuardLocation, CrewPosition->GetComponentLocation()) < MinGuardDistanceToCrewPositionCm)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void ATeamWeaponController::MoveGuardsToGuardPositionsIfMisplaced() const
+{
+	using namespace TeamWeaponGuardStatics;
+	if (M_TeamWeaponState == ETeamWeaponState::Towed || not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
+	{
+		ASquadUnit* SquadUnit = GuardUnit.Get();
+		if (not GetIsValidSquadUnit(SquadUnit) || SquadUnit->GetIsPathFollowingActive())
+		{
+			continue;
+		}
+		if (not GetIsGuardMisplaced(*SquadUnit))
+		{
+			continue;
+		}
+		FVector GuardLocation;
+		if (not TryGetRandomGuardLocation(GuardLocation))
+		{
+			continue;
+		}
+		TeamWeaponControllerCrewPositionStatics::IssueMoveToLocationForSquadUnit(SquadUnit, GuardLocation, nullptr);
+	}
+}
+
+void ATeamWeaponController::TickGuardPlacement(const float DeltaSeconds)
+{
+	using namespace TeamWeaponGuardStatics;
+	if (M_TeamWeaponState != ETeamWeaponState::Ready_Deployed || bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+	M_SecondsUntilGuardPlacementCheck -= DeltaSeconds;
+	if (M_SecondsUntilGuardPlacementCheck > 0.f)
+	{
+		return;
+	}
+	M_SecondsUntilGuardPlacementCheck = GuardPlacementCheckIntervalSeconds;
+	MoveGuardsToGuardPositionsIfMisplaced();
+}
+
+void ATeamWeaponController::CancelRotationRequestForMove()
+{
+	if (not M_RotationRequest.bM_IsActive)
+	{
+		return;
+	}
+	// A player rotate order was already ended by the command queue; an internal turn is superseded by the move.
+	M_RotationRequest.Reset();
+	DetachCrewAfterRotation();
+}
+
+void ATeamWeaponController::IssueGuardEngageFlowMoves() const
+{
+	using namespace TeamWeaponGuardStatics;
+	if (not GetIsValidTeamWeapon())
+	{
+		return;
+	}
+
+	const float GuardEngageFlowDistanceCm = M_TeamWeapon->GetGuardEngageFlowDistanceCm();
+	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
+	{
+		ASquadUnit* SquadUnit = GuardUnit.Get();
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+		const FVector DirectionToEngageTarget = (M_GuardEngageFlowTargetLocation - SquadUnit->GetActorLocation()).
+			GetSafeNormal2D();
+		const FVector FlowLocation = ProjectLocationOnNavMesh(
+			SquadUnit->GetActorLocation() + DirectionToEngageTarget * GuardEngageFlowDistanceCm,
+			GuardEngageFlowProjectionHeightCm, false);
+		TeamWeaponControllerCrewPositionStatics::IssueMoveToLocationForSquadUnit(SquadUnit, FlowLocation, nullptr);
+	}
 }
 
 
@@ -1235,7 +1513,9 @@ void ATeamWeaponController::ApplyPushedMoveSpeedOverrideToSquad()
 		return;
 	}
 
-	const float PushedMoveSpeed = M_TeamWeapon->GetPushedMoveSpeedCmPerSec();
+	// The crew walks a little faster than the gun so it can always catch up with its posts.
+	const float PushedMoveSpeed = M_TeamWeapon->GetPushedMoveSpeedCmPerSec() *
+		M_TeamWeapon->GetPushedCrewSettings().CatchUpSpeedMultiplier;
 	M_PushedMoveOriginalUnitSpeeds.Empty();
 
 	for (ASquadUnit* SquadUnit : M_TSquadUnits)
@@ -1291,6 +1571,8 @@ void ATeamWeaponController::StartDeployingTeamWeapon()
 	}
 
 	SetTeamWeaponState(ETeamWeaponState::Deploying);
+	// The tilt eases while the gun is pushed; deployed it must rest on the ground exactly.
+	M_TeamWeapon->ConformToGround(0.f, true);
 	M_TeamWeapon->PlayDeployingMontage(true);
 	bM_HasIssuedCrewPositionMovesForCurrentDeploy = false;
 	ShowDeployingAnimatedText();
@@ -1320,6 +1602,10 @@ void ATeamWeaponController::StartDeployingTeamWeapon()
 
 void ATeamWeaponController::HandlePackingTimerFinished()
 {
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	if (bM_ShouldExecuteDigInAfterDeploy)
 	{
@@ -1332,9 +1618,15 @@ void ATeamWeaponController::HandlePackingTimerFinished()
 
 void ATeamWeaponController::HandleDeployingTimerFinished()
 {
+	// A truck hooked the gun while it was deploying; it stays packed on the truck.
+	if (M_TeamWeaponState == ETeamWeaponState::Towed)
+	{
+		return;
+	}
 	SetTeamWeaponState(ETeamWeaponState::Ready_Deployed);
 	bM_HasIssuedCrewPositionMovesForCurrentDeploy = false;
 	IssueMoveCrewToPositions();
+	MoveGuardsToGuardPositionsIfMisplaced();
 
 	if (bM_ShouldExecuteDigInAfterDeploy)
 	{
@@ -2152,6 +2444,11 @@ void ATeamWeaponController::HandlePushedMoverArrived()
 {
 	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	if (bM_HasGuardEngageFlowTargetLocation && M_SpecificEngageTarget.IsValid())
+	{
+		// The guards walked behind the gun; they step out towards the target it repositioned for.
+		IssueGuardEngageFlowMoves();
+	}
 	M_PostPackAction.Reset();
 	bM_HasCachedOutOfRangeMoveLocation = false;
 	bM_HasGuardEngageFlowTargetLocation = false;
@@ -2216,6 +2513,11 @@ void ATeamWeaponController::SetTeamWeaponState(const ETeamWeaponState NewState)
 	if (M_TeamWeapon != nullptr)
 	{
 		M_TeamWeapon->SetWeaponsEnabledForTeamWeaponState(NewState == ETeamWeaponState::Ready_Deployed);
+	}
+
+	if (NewState != ETeamWeaponState::Moving)
+	{
+		M_PushedCrewFormation.Stop();
 	}
 
 	// Crew montages only exist while deployed. Arming on entering Ready_Deployed is deliberately not done here:
@@ -2594,6 +2896,8 @@ void ATeamWeaponController::TickRotationRequest(const float DeltaSeconds)
 	}
 
 	RotateControllerAndTeamWeapon(StepYaw);
+	// Turning on a slope changes the ground under the footprint.
+	M_TeamWeapon->ConformToGround(DeltaSeconds, false);
 	SnapOperatorsToCrewPositionsDuringRotation();
 }
 
@@ -2619,6 +2923,10 @@ void ATeamWeaponController::FinishRotationRequest()
 	AActor* MainSpecificTarget = M_SpecificEngageTarget.Get();
 	const bool bHasSpecificEngageTarget = IsValid(MainSpecificTarget);
 	const bool bHasAttackIntent = bHasActiveAttackCommand || bHasPendingPostDeployAttack || bHasSpecificEngageTarget;
+	if (GetIsValidTeamWeaponNoReport())
+	{
+		M_TeamWeapon->ConformToGround(0.f, true);
+	}
 	SnapOperatorsToCrewPositionsDuringRotation();
 	M_RotationRequest.Reset();
 	DetachCrewAfterRotation();
@@ -2718,9 +3026,10 @@ bool ATeamWeaponController::SnapOperatorToCrewPosition(ASquadUnit* SquadUnit, co
 		return false;
 	}
 
+	// Upright: the crew position tilts with the gun on a slope, a soldier must not.
 	SquadUnit->SetActorLocationAndRotation(
 		OperatorTeleportLocation,
-		CrewPosition->GetComponentRotation(),
+		FRotator(0.f, CrewPosition->GetComponentRotation().Yaw, 0.f),
 		false,
 		nullptr,
 		ETeleportType::TeleportPhysics);
@@ -2753,20 +3062,27 @@ bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const
 	constexpr float TraceStartHeightCm = 500.0f;
 	constexpr float TraceLengthCm = 2000.0f;
 	constexpr float LandscapeClearanceCm = 2.0f;
-	const FVector TraceStart = CrewPositionLocation + FVector::UpVector * TraceStartHeightCm;
-	const FVector TraceEnd = TraceStart - FVector::UpVector * TraceLengthCm;
-
-	FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(TeamWeaponCrewLandscapeSnap), false, this);
-	FHitResult LandscapeHitResult;
-	const bool bDidHitLandscape = World->LineTraceSingleByChannel(
-		LandscapeHitResult,
-		TraceStart,
-		TraceEnd,
-		COLLISION_TRACE_LANDSCAPE,
-		CollisionQueryParams);
-	if (not bDidHitLandscape)
+	float GroundZ = 0.f;
+	if (GetIsValidTeamWeaponNoReport())
 	{
-		return false;
+		// The gun mesh blocks the landscape channel; its own trace steps past the gun and other units.
+		if (not M_TeamWeapon->TryGetGroundHeightAt(CrewPositionLocation, GroundZ))
+		{
+			return false;
+		}
+	}
+	else
+	{
+		const FVector TraceStart = CrewPositionLocation + FVector::UpVector * TraceStartHeightCm;
+		const FVector TraceEnd = TraceStart - FVector::UpVector * TraceLengthCm;
+		FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(TeamWeaponCrewLandscapeSnap), false, this);
+		FHitResult LandscapeHitResult;
+		if (not World->LineTraceSingleByChannel(LandscapeHitResult, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE,
+		                                        CollisionQueryParams))
+		{
+			return false;
+		}
+		GroundZ = LandscapeHitResult.ImpactPoint.Z;
 	}
 
 	const UCapsuleComponent* SquadCapsuleComponent = SquadUnit->GetCapsuleComponent();
@@ -2776,7 +3092,7 @@ bool ATeamWeaponController::TryGetLandscapeTeleportLocationForCrewPosition(const
 	}
 
 	const float ScaledCapsuleHalfHeight = SquadCapsuleComponent->GetScaledCapsuleHalfHeight();
-	OutTeleportLocation.Z = LandscapeHitResult.ImpactPoint.Z + ScaledCapsuleHalfHeight + LandscapeClearanceCm;
+	OutTeleportLocation.Z = GroundZ + ScaledCapsuleHalfHeight + LandscapeClearanceCm;
 	return true;
 }
 
@@ -3062,19 +3378,10 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 	ExecuteDetachTowCommand_ResetTowedVisualState(TeamWeaponActor);
 
 	TeamWeaponActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	FHitResult Hit;
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(this);
-	Params.AddIgnoredActor(TeamWeaponActor);
-	const FVector TraceStart = TeamWeaponActor->GetActorLocation() + FVector(0.0f, 0.0f, 300.0f);
-	const FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, 2000.0f);
-	if (UWorld* World = GetWorld())
-	{
-		if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, Params))
-		{
-			TeamWeaponActor->SetActorLocation(Hit.ImpactPoint);
-		}
-	}
+	// The gun stays where it swung to behind the truck, but upright on its heading and on the ground.
+	TeamWeaponActor->EndTowSway();
+	PlaceDetachedWeaponOnNavigableGround(*TeamWeaponActor);
+	TeamWeaponActor->ConformToGround(0.f, true);
 
 	ReleaseCargoSquadUnitsFromTow();
 
@@ -3086,6 +3393,17 @@ void ATeamWeaponController::ExecuteDetachTowCommand()
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
 	SetTeamWeaponAutoEngageEnabled(true);
 	DoneExecutingCommand(EAbilityID::IdDetachTow);
+}
+
+void ATeamWeaponController::PlaceDetachedWeaponOnNavigableGround(ATeamWeapon& TeamWeaponActor) const
+{
+	using namespace TeamWeaponGuardStatics;
+	// A gun swung out behind the truck can hang over ground the crew cannot walk (a steep bank); every later
+	// push starts its path from the gun and would fail there for good.
+	const FVector WeaponLocation = TeamWeaponActor.GetActorLocation();
+	const FVector NavigableLocation = ProjectLocationOnNavMesh(WeaponLocation, DetachNavProjectionRadiusCm, true);
+	TeamWeaponActor.SetActorLocation(FVector(NavigableLocation.X, NavigableLocation.Y, WeaponLocation.Z), false, nullptr,
+	                                 ETeleportType::TeleportPhysics);
 }
 
 void ATeamWeaponController::SetTeamWeaponAutoEngageEnabled(const bool bEnableAutoEngage) const
@@ -3115,9 +3433,11 @@ void ATeamWeaponController::TerminateDetachTowCommand()
 
 void ATeamWeaponController::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp)
 {
+	CancelPendingDeployForTow();
 	if (GetIsValidTeamWeapon())
 	{
 		M_TeamWeapon->PlayPackingMontage(false);
+		M_TeamWeapon->StartTowSway();
 		SetTeamWeaponAutoEngageEnabled(false);
 	}
 
@@ -3132,7 +3452,30 @@ void ATeamWeaponController::OnActorBeingTowed(AActor* TowingVehicle, UVehicleTow
 		CommandData->SwapAbility(EAbilityID::IdTowActor, EAbilityID::IdDetachTow);
 	}
 
-	TickTowedWeaponAnimation();
+	TickTowedWeaponAnimation(0.f);
+}
+
+void ATeamWeaponController::CancelPendingDeployForTow()
+{
+	if (UWorld* World = GetWorld(); IsValid(World))
+	{
+		World->GetTimerManager().ClearTimer(M_DeployTimer);
+	}
+	M_PostPackAction.Reset();
+	M_PostDeployAction.Reset();
+	bM_ShouldExecuteDigInAfterDeploy = false;
+	CancelInternalOutOfRangeMove();
+	if (M_RotationRequest.bM_IsActive)
+	{
+		M_RotationRequest.Reset();
+		DetachCrewAfterRotation();
+	}
+	if (GetIsValidTeamWeaponMover())
+	{
+		M_TeamWeaponMover->AbortPushedFollowPath(TEXT("Team weapon hooked to a truck"));
+		M_TeamWeaponMover->StopLegacyFollowCrew();
+	}
+	RestorePushedMoveSpeedOverride();
 }
 
 void ATeamWeaponController::ResetTowRelationshipOnTeamWeaponSide(const bool bDetachTeamWeaponActor,
@@ -3153,6 +3496,7 @@ void ATeamWeaponController::ResetTowRelationshipOnTeamWeaponSide(const bool bDet
 	if (bDetachTeamWeaponActor && IsValid(TeamWeaponActor))
 	{
 		TeamWeaponActor->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+		TeamWeaponActor->EndTowSway();
 	}
 
 	if (bReleaseCargoSquadUnits)
@@ -3174,7 +3518,7 @@ void ATeamWeaponController::ResetTowRelationshipOnTeamWeaponSide(const bool bDet
 	}
 }
 
-void ATeamWeaponController::TickTowedWeaponAnimation()
+void ATeamWeaponController::TickTowedWeaponAnimation(const float DeltaSeconds)
 {
 	if (M_TeamWeaponState != ETeamWeaponState::Towed)
 	{
@@ -3185,6 +3529,9 @@ void ATeamWeaponController::TickTowedWeaponAnimation()
 	{
 		return;
 	}
+
+	// Visual only: the gun trails, bounces and leans about the tow hook; the attachment itself stays rigid.
+	M_TeamWeapon->TickTowSway(DeltaSeconds);
 
 	UTowedActorComponent* TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport();
 	if (not IsValid(TowedActorComponent))
@@ -3440,9 +3787,10 @@ void ATeamWeaponController::TickArmedCrewAnimationSlot(FTeamWeaponCrewAnimationS
 
 	// Movement that bypasses the team weapon state machine (retreat, cargo, evasion) leaves Ready_Deployed intact.
 	// Only an actual move order ends the crewing; standing slightly off the spot never does (it was snapped on arm).
-	const ASquadUnit* Operator = Slot.M_Operator.Get();
+	ASquadUnit* Operator = Slot.M_Operator.Get();
 	if (not Operator->GetIsPathFollowingActive())
 	{
+		ResnapArmedOperatorPushedOffPost(Slot);
 		return;
 	}
 	if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
@@ -3452,6 +3800,24 @@ void ATeamWeaponController::TickArmedCrewAnimationSlot(FTeamWeaponCrewAnimationS
 			"Operator was ordered to move; disarming crew animation.");
 	}
 	DisarmCrewAnimationSlot(Slot);
+}
+
+void ATeamWeaponController::ResnapArmedOperatorPushedOffPost(const FTeamWeaponCrewAnimationSlot& Slot) const
+{
+	ASquadUnit* Operator = Slot.M_Operator.Get();
+	const UCrewPosition* CrewPosition = Slot.M_CrewPosition.Get();
+	if (not IsValid(Operator) || not IsValid(CrewPosition))
+	{
+		return;
+	}
+	// Other soldiers bump a crewing operator off his spot; his montage is authored for the spot, so put him back.
+	const float DistanceToPostCm = FVector::Dist2D(Operator->GetActorLocation(), CrewPosition->GetComponentLocation());
+	const bool bIsBraking = Operator->GetVelocity().Size2D() > TeamWeaponCrewAnimationStatics::SettledSpeedThresholdCmPerSec;
+	if (DistanceToPostCm <= CrewPosition->GetAcceptanceRadius() || bIsBraking)
+	{
+		return;
+	}
+	SnapOperatorToCrewPosition(Operator, CrewPosition);
 }
 
 bool ATeamWeaponController::GetIsValidCrewAnimationSlotOperator(const FTeamWeaponCrewAnimationSlot& Slot) const

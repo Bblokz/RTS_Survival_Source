@@ -142,7 +142,10 @@ void UTeamWeaponMover::StartPushedFollowPath(const FNavPathSharedPtr& InPath)
 	}
 
 	M_PushedPath = InPath;
-	M_CurrentPathPointIndex = 0;
+	// The first point is where the squad path search started (the squad, not the gun); driving back to it makes the
+	// gun turn round twice before it sets off.
+	M_CurrentPathPointIndex = InPath->GetPathPoints().Num() > 1 ? 1 : 0;
+	M_PushedSpeedScale = 1.f;
 	bM_IsPushedActive = true;
 	M_LastWeaponLocation = M_TeamWeapon->GetActorLocation();
 	SyncControllerTransformToWeapon();
@@ -163,6 +166,32 @@ void UTeamWeaponMover::AbortPushedFollowPath(const FString& Reason)
 bool UTeamWeaponMover::GetIsPushedFollowingPath() const
 {
 	return bM_IsPushedActive;
+}
+
+void UTeamWeaponMover::SetPushedSpeedScale(const float SpeedScale)
+{
+	M_PushedSpeedScale = FMath::Clamp(SpeedScale, 0.f, 1.f);
+}
+
+FString UTeamWeaponMover::GetPushedMoveDebugDescription() const
+{
+	const int32 PathPointCount = M_PushedPath.IsValid() ? M_PushedPath->GetPathPoints().Num() : 0;
+	FString TargetDescription = TEXT("none");
+	float HeadingErrorDegrees = 0.f;
+	if (M_PushedPath.IsValid() && M_PushedPath->GetPathPoints().IsValidIndex(M_CurrentPathPointIndex) &&
+		M_TeamWeapon.IsValid())
+	{
+		const FVector Target = M_PushedPath->GetPathPoints()[M_CurrentPathPointIndex].Location;
+		const FVector ToTarget = Target - M_TeamWeapon->GetActorLocation();
+		TargetDescription = FString::Printf(TEXT("%s dist2d=%.0f"), *Target.ToCompactString(), ToTarget.Size2D());
+		HeadingErrorDegrees = FMath::FindDeltaAngleDegrees(M_TeamWeapon->GetActorRotation().Yaw,
+		                                                   ToTarget.GetSafeNormal2D().Rotation().Yaw);
+	}
+	return FString::Printf(
+		TEXT("pushed=%d tick_enabled=%d tick_interval=%.2f point=%d/%d target=%s heading_error=%.1f speed_scale=%.2f yaw=%.1f"),
+		bM_IsPushedActive ? 1 : 0, IsComponentTickEnabled() ? 1 : 0, GetComponentTickInterval(),
+		M_CurrentPathPointIndex, PathPointCount, *TargetDescription, HeadingErrorDegrees, M_PushedSpeedScale,
+		M_TeamWeapon.IsValid() ? M_TeamWeapon->GetActorRotation().Yaw : 0.f);
 }
 
 void UTeamWeaponMover::UpdateLegacyMovement()
@@ -239,19 +268,11 @@ void UTeamWeaponMover::UpdatePushedMovement(const float DeltaSeconds)
 	}
 
 	const FVector MoveDirection = DirectionToTarget / DistanceToTarget2D;
-	const float MaxStepDistance = M_TeamWeapon->GetPushedMoveSpeedCmPerSec() * DeltaSeconds;
+	// The crew turns the gun before pushing it on, and the gun waits for operators that fell behind their post.
+	const float SpeedScale = M_PushedSpeedScale * GetTurnAlignmentSpeedScale(MoveDirection);
+	const float MaxStepDistance = M_TeamWeapon->GetPushedMoveSpeedCmPerSec() * SpeedScale * DeltaSeconds;
 	const float StepDistance = FMath::Min(MaxStepDistance, DistanceToTarget2D);
-	FVector ProposedLocation = WeaponLocation + MoveDirection * StepDistance;
-
-	FVector GroundAdjustedLocation = ProposedLocation;
-	if (TryGetGroundAdjustedLocation(ProposedLocation, GroundAdjustedLocation))
-	{
-		ProposedLocation = GroundAdjustedLocation;
-	}
-	else
-	{
-		ProposedLocation.Z = WeaponLocation.Z;
-	}
+	const FVector ProposedLocation = WeaponLocation + MoveDirection * StepDistance;
 
 	ApplyYawStepTowards(MoveDirection, DeltaSeconds);
 
@@ -261,6 +282,10 @@ void UTeamWeaponMover::UpdatePushedMovement(const float DeltaSeconds)
 		AbortPushedFollowPath(TEXT("Blocked while pushed-following path"));
 		return;
 	}
+	// Height and slope come from the ground under the whole footprint, eased so the gun rocks over bumps.
+	M_TeamWeapon->ConformToGround(DeltaSeconds, false);
+	SyncControllerTransformToWeapon();
+	AppliedLocation = M_TeamWeapon->GetActorLocation();
 
 	if (TryAdvancePathIndexIfReachedTarget(AppliedLocation, AcceptanceRadiusCm))
 	{
@@ -374,6 +399,9 @@ void UTeamWeaponMover::UpdateOwnerLocationFromCrew()
 	}
 
 	M_TeamWeapon->SetActorLocation(CrewCenter);
+	// The crew centre is at capsule height; put the gun back on the ground under it.
+	const UWorld* World = GetWorld();
+	M_TeamWeapon->ConformToGround(IsValid(World) ? World->GetDeltaSeconds() : 0.f, false);
 	SyncControllerTransformToWeapon();
 }
 
@@ -425,39 +453,23 @@ bool UTeamWeaponMover::TryAdvancePathIndexIfReachedTarget(const FVector& WeaponL
 	return true;
 }
 
-bool UTeamWeaponMover::TryGetGroundAdjustedLocation(const FVector& InProposedLocation, FVector& OutGroundAdjustedLocation) const
+float UTeamWeaponMover::GetTurnAlignmentSpeedScale(const FVector& MovementDirection) const
 {
 	if (not GetIsValidTeamWeapon())
 	{
-		return false;
+		return 1.f;
 	}
 
-	UWorld* World = M_TeamWeapon->GetWorld();
-	if (not IsValid(World))
+	const float MaxTurnWhileMovingDegrees = M_TeamWeapon->GetPushedCrewSettings().MaxTurnWhileMovingDegrees;
+	const float HeadingErrorDegrees = FMath::Abs(FMath::FindDeltaAngleDegrees(
+		M_TeamWeapon->GetActorRotation().Yaw, MovementDirection.Rotation().Yaw));
+	if (HeadingErrorDegrees >= MaxTurnWhileMovingDegrees)
 	{
-		return false;
+		return 0.f;
 	}
-
-	const FVector TraceStart = InProposedLocation + FVector::UpVector * M_TeamWeapon->GetGroundTraceStartHeightCm();
-	const FVector TraceEnd = TraceStart - FVector::UpVector * M_TeamWeapon->GetGroundTraceLengthCm();
-
-	FHitResult GroundHit;
-	FCollisionQueryParams CollisionQueryParams(SCENE_QUERY_STAT(TeamWeaponGroundTrace), false, M_TeamWeapon.Get());
-
-	const bool bDidHit = World->LineTraceSingleByChannel(
-		GroundHit,
-		TraceStart,
-		TraceEnd,
-		COLLISION_TRACE_LANDSCAPE,
-		CollisionQueryParams);
-	if (not bDidHit)
-	{
-		return false;
-	}
-
-	OutGroundAdjustedLocation = InProposedLocation;
-	OutGroundAdjustedLocation.Z = GroundHit.ImpactPoint.Z;
-	return true;
+	const float CosineAtMaxTurn = FMath::Cos(FMath::DegreesToRadians(MaxTurnWhileMovingDegrees));
+	const float CosineOfHeadingError = FMath::Cos(FMath::DegreesToRadians(HeadingErrorDegrees));
+	return FMath::Clamp((CosineOfHeadingError - CosineAtMaxTurn) / (1.f - CosineAtMaxTurn), 0.f, 1.f);
 }
 
 void UTeamWeaponMover::ApplyYawStepTowards(const FVector& MovementDirection, const float DeltaSeconds) const
@@ -504,9 +516,10 @@ void UTeamWeaponMover::SyncControllerTransformToWeapon() const
 		return;
 	}
 
+	// The controller carries the heading only; the weapon's ground tilt is visual.
 	M_TeamWeaponController->SetActorLocationAndRotation(
 		M_TeamWeapon->GetActorLocation(),
-		M_TeamWeapon->GetActorRotation(),
+		FRotator(0.f, M_TeamWeapon->GetActorRotation().Yaw, 0.f),
 		false,
 		nullptr,
 		ETeleportType::TeleportPhysics);

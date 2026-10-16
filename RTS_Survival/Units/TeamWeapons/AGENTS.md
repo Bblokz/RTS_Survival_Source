@@ -110,3 +110,24 @@ Design: `Source/DesignTexts/Teamweapons/AnimationsAndTWPositionIntegration.md`.
 - Reacting roles (loader by default) play once per reload start of weapon index 0 via
   `ITurretOwner::OnTurretWeaponReloadStart`, stretched to the flux-adjusted reload time. `OnFireWeapon` is not used.
 - Debug prints: `DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols`.
+
+## Ground contact, pushed crew and tow sway
+
+Doc and test: `Source/Docs/Units/TeamWeaponQuality.md`, `-TeamWeaponQualityValidate` (`Tests/TeamWeaponQualityTestSubsystem`).
+Run it after any change to movement, deploy, crew placement or towing.
+
+- The weapon mesh is the actor root and blocks the landscape trace channel. Ground traces for the weapon or its crew
+  go through `ATeamWeapon::TryGetGroundHeightAt` (steps through units and the gun); a plain landscape trace at a crew
+  position lands on the gun.
+- `ATeamWeapon::ConformToGround` tilts the actor to the footprint plane. Gameplay (mover, rotation requests, yaw arc,
+  controller copy) must keep reading only the yaw; never copy the tilted rotation to soldiers or the controller.
+- Pushed moves do not give soldiers paths. `FTeamWeaponPushedCrewFormation` steers operators onto their crew positions
+  and guards onto an arc behind the gun with `RequestDirectMove`; the mover's speed scale makes the gun wait for its
+  crew. `SetTeamWeaponState` stops the formation on every state but `Moving`. A soldier with path following active
+  (any other order) is left alone until that ends.
+- The mover skips path point 0 (the squad's path origin) and turns on the spot above `MaxTurnWhileMovingDegrees`.
+  A rotation request still running when a push starts is cancelled; both would turn the gun against each other.
+- Towing: `FTeamWeaponTowSwaySimulation` moves the attached actor about the hook each controller tick (visual only;
+  the attachment stays). The hitch frame uses the truck actor's rotation, not the socket's. Hooking cancels deploy and
+  pack timers, post actions, turns and pushes (`CancelPendingDeployForTow`); deploy/pack timer callbacks return when
+  towed. `EndTowSway` after detaching keeps the swung position upright.

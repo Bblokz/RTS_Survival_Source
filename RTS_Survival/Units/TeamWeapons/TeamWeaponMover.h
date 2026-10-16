@@ -51,6 +51,10 @@ public:
 	void StartPushedFollowPath(const FNavPathSharedPtr& InPath);
 	void AbortPushedFollowPath(const FString& Reason);
 	bool GetIsPushedFollowingPath() const;
+	// Fraction of the push speed the gun may use; the crew formation lowers it while operators catch up.
+	void SetPushedSpeedScale(const float SpeedScale);
+	// Path progress, speed scale and tick state; used by the team weapon map test to explain a stalled push.
+	FString GetPushedMoveDebugDescription() const;
 
 	FOnPushedMoveArrived OnPushedMoveArrived;
 	FOnPushedMoveFailed OnPushedMoveFailed;
@@ -71,7 +75,8 @@ private:
 	void UpdateOwnerLocationFromCrew();
 	void UpdateMovementAnimationState(const float DeltaSeconds);
 	bool TryAdvancePathIndexIfReachedTarget(const FVector& WeaponLocation, const float AcceptanceRadiusCm);
-	bool TryGetGroundAdjustedLocation(const FVector& InProposedLocation, FVector& OutGroundAdjustedLocation) const;
+	// 1 when the gun faces where it is pushed; drops to 0 so a large turn is made on the spot instead of sliding.
+	float GetTurnAlignmentSpeedScale(const FVector& MovementDirection) const;
 	void ApplyYawStepTowards(const FVector& MovementDirection, const float DeltaSeconds) const;
 	bool TryMoveWeaponWithSweep(const FVector& ProposedLocation, FVector& OutAppliedLocation) const;
 	void SyncControllerTransformToWeapon() const;
@@ -112,4 +117,7 @@ private:
 
 	UPROPERTY()
 	bool bM_IsPushedActive = false;
+
+	UPROPERTY()
+	float M_PushedSpeedScale = 1.f;
 };

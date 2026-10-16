@@ -7,6 +7,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInUnit/DigInUnit.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "TeamWeaponMover.h"
+#include "CrewFormation/TeamWeaponCrewFormation.h"
 #include "TeamWeaponState/TeamWeaponState.h"
 #include "CrewPositions/CrewPositionType.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
@@ -235,6 +236,16 @@ public:
 	virtual float GetSquadRange() override;
 	bool PrepareToAdoptAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	bool GetHasControlledTeamWeapon() const;
+	ETeamWeaponState GetTeamWeaponState() const { return M_TeamWeaponState; }
+	bool GetIsRotationRequestActive() const { return M_RotationRequest.bM_IsActive; }
+	// Pending actions, crew counts and flags; used by the team weapon map test to explain a gun that ignores an order.
+	FString GetOrderDebugDescription() const;
+	// Silent: null while abandoned or before the weapon spawned.
+	ATeamWeapon* GetControlledTeamWeaponNoReport() const;
+	void GetCrewOperators(TArray<ASquadUnit*>& OutOperators) const;
+	void GetCrewGuards(TArray<ASquadUnit*>& OutGuards) const;
+	// World location of the crew position the operator at this index belongs to; false when it has none.
+	bool TryGetOperatorCrewPositionLocation(const int32 OperatorIndex, FVector& OutLocation) const;
 	void SetTargetPreference(const ETargetPreference TargetPreference) override;
 	UTowedActorComponent* GetControlledTeamWeaponTowedActorComponentNoReport();
 	const UTowedActorComponent* GetControlledTeamWeaponTowedActorComponentNoReport() const;
@@ -308,6 +319,7 @@ protected:
 
 private:
 	void SpawnTeamWeapon();
+	void StopOperatorWalksAfterSpawnSnap();
 	bool TrySetupSquadUnitsAndTeamWeaponFromMapSetup();
 	bool TrySetupSquadUnitsFromMapSetup();
 	bool TrySetupTeamWeaponFromMapSetup();
@@ -325,6 +337,8 @@ private:
 	void HandleControlledTeamWeaponDestroyed(AActor* DestroyedActor);
 	bool GetIsGameShuttingDown() const;
 	bool GetIsValidTeamWeapon() const;
+	// Silent: abandoning or losing the weapon is a normal state for these callers.
+	bool GetIsValidTeamWeaponNoReport() const;
 	bool GetIsPushedWeaponLeadsMovementType() const;
 	bool GetIsValidTeamWeaponMover() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
@@ -334,7 +348,10 @@ private:
 	void SetTeamWeaponAutoEngageEnabled(const bool bEnableAutoEngage) const;
 	void ReleaseCargoSquadUnitsFromTow();
 	void ExecuteDetachTowCommand_ResetTowedVisualState(ATeamWeapon* TeamWeaponActor) const;
-	void TickTowedWeaponAnimation();
+	void PlaceDetachedWeaponOnNavigableGround(ATeamWeapon& TeamWeaponActor) const;
+	void TickTowedWeaponAnimation(const float DeltaSeconds);
+	// A deploy or pack that was under way when the truck hooked the gun must not finish on the truck.
+	void CancelPendingDeployForTow();
 
 	void BeginPlay_InitAnimatedTextWidgetPoolManager();
 
@@ -349,6 +366,24 @@ private:
 	 */
 	void StartMoveWithCrew(const FVector MoveToLocation);
 	void StartMoveWithPushedWeapon(const FVector MoveToLocation);
+
+	// ---- Pushed crew formation ----
+	/** Stops the crew's own walks and lets the formation keep them on their posts around the pushed gun. */
+	void StartPushedCrewFormation();
+	void TickPushedCrewFormation(const float DeltaSeconds);
+	void BuildPushedCrewFormationMembers(TArray<FTeamWeaponFormationMember>& OutMembers) const;
+	// Post of a guard walking behind the pushed gun, in the gun's heading space; spread over an arc behind it.
+	FVector GetGuardTravelPostOffset(const int32 GuardIndex, const int32 GuardCount) const;
+	void MoveGuardsToGuardPositionsIfMisplaced() const;
+	// Guards spawn or arrive among the crew; checked now and then while deployed so they never block a post.
+	void TickGuardPlacement(const float DeltaSeconds);
+	// An in-place turn still running when a push starts would turn the gun against the mover.
+	void CancelRotationRequestForMove();
+	// A guard on or next to a crew position shoves the operator off his post.
+	bool GetIsGuardMisplaced(const ASquadUnit& Guard) const;
+	void IssueGuardEngageFlowMoves() const;
+	// ---- End pushed crew formation ----
+
 	void ExecuteSquadMoveAlongAssignedPaths(const EAbilityID AbilityId) const;
 	void ApplyPushedMoveSpeedOverrideToSquad();
 	void RestorePushedMoveSpeedOverride();
@@ -450,6 +485,7 @@ private:
 	void TickCrewAnimationArming();
 	/** Drops the arming of a slot whose anim instance lost the animation or whose operator left its position. */
 	void TickArmedCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot);
+	void ResnapArmedOperatorPushedOffPost(const FTeamWeaponCrewAnimationSlot& Slot) const;
 	bool GetIsValidCrewAnimationSlotOperator(const FTeamWeaponCrewAnimationSlot& Slot) const;
 	// ---- End crew animations ----
 
@@ -505,6 +541,13 @@ private:
 
 	UPROPERTY()
 	FTeamWeaponCrewAssignment M_CrewAssignment;
+
+	// Keeps the crew on their posts while the gun is pushed; only active in the Moving state.
+	UPROPERTY()
+	FTeamWeaponPushedCrewFormation M_PushedCrewFormation;
+
+	// Counts down to the next deployed guard placement check.
+	float M_SecondsUntilGuardPlacementCheck = 0.f;
 
 	// Per operator crew role and arming state for the full body crew montages.
 	UPROPERTY()
