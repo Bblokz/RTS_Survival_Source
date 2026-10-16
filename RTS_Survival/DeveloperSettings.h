@@ -906,6 +906,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerPanzerschreckPit_Metal = 60;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
+				inline constexpr int32 GerFlak88Pit_Radixite = 560;
+				inline constexpr int32 GerFlak88Pit_Metal = 360;
 			}
 
 			// ----------------------------------

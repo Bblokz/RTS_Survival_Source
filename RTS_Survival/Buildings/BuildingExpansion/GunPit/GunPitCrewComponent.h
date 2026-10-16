@@ -159,6 +159,8 @@ public:
 	// The round the loader is carrying or the handler is holding out; null when no rounds are carried.
 	UStaticMeshComponent* GetRoundInFlight() const;
 
+	FName GetCrewTag() const { return CrewTag; }
+
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 

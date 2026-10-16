@@ -123,6 +123,9 @@ enum class EBuildingExpansionType : uint8
 	BTX_GerPanzerschreckPit UMETA(DisplayName = "Ger Panzerschreck Foxhole"),
 	// Breakthrough doctrine: a concrete pillbox whose sandbagged roof is the pit of a Pak 40 refitted with rails.
 	BTX_GerRailPakBunker UMETA(DisplayName = "Ger Rail Pak Bunker"),
+	// German 8.8 cm Flak dug in behind high square bag walls with stepped corners: an ammo runner brings the rounds
+	// from a niche in the wall to a ring of ready crates, where the shell handler takes them for the loader.
+	BTX_GerFlak88Pit UMETA(DisplayName = "Ger Flak 88 Emplacement"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -231,6 +234,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerPanzerschreckPit");
 	case EBuildingExpansionType::BTX_GerRailPakBunker:
 		return FString("BTX_GerRailPakBunker");
+	case EBuildingExpansionType::BTX_GerFlak88Pit:
+		return FString("BTX_GerFlak88Pit");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -302,6 +307,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerPuppchenPit: return TEXT("Puppchen Pit");
 	case EBuildingExpansionType::BTX_GerPanzerschreckPit: return TEXT("Panzerschreck Foxhole");
 	case EBuildingExpansionType::BTX_GerRailPakBunker: return TEXT("Rail Pak Bunker");
+	case EBuildingExpansionType::BTX_GerFlak88Pit: return TEXT("Flak 88 Emplacement");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");

@@ -68,6 +68,7 @@ namespace GunPitTestPrivate
 	constexpr float MaximumAttachOffset = 1.f;
 	constexpr float MaximumScaleError = 0.01f;
 	constexpr float MaximumLoaderSpotError = 30.f;
+	constexpr float MaximumGunHeightError = 1.f;
 	// From the round's pivot to the palm bone that holds it; the bake keeps the palms on the round's body.
 	constexpr float MaximumRoundToHandDistance = 70.f;
 	constexpr float StatusIntervalSeconds = 5.f;
@@ -277,6 +278,39 @@ namespace GunPitTestPrivate
 		return {Pit};
 	}
 
+	const TCHAR* const Flak88PitClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Flak88.Ger_BXP_GerPit_Flak88_C");
+	constexpr int32 Flak88CrewCount = 2;
+	// The 88 stands this far below the pit's ground (flak88_pit_layout.json gun_sink), so its cross arms lie under the deck.
+	constexpr float Flak88GunHeight = -52.f;
+	// The runner's round as he takes it from the niche and as he lays it on his crate, on PitStatic
+	// (flak88_pit_crew.py: NICHE_ROUND and the drop crate's round).
+	const FVector Flak88RunnerNicheRound(112.f, -376.55f, 44.68f);
+	const FVector Flak88RunnerDropRound(-200.70f, -168.41f, 42.4f);
+
+	TArray<FGunPitUnderTest> GetGerFlak88PitToTest()
+	{
+		// The player's 88 emplacement: the handler hands the loader rounds from the crate ring, which the runner
+		// keeps filled from the niche.
+		FGunPitUnderTest Pit;
+		Pit.Label = TEXT("flak88");
+		Pit.ClassPath = Flak88PitClassPath;
+		Pit.PitMeshName = TEXT("SM_GerFlak88Pit");
+		// The crew are snapped to PitOrigin; their animations carry their spots.
+		Pit.LoaderSpot = FVector::ZeroVector;
+		Pit.ExpectedCrewCount = Flak88CrewCount;
+		Pit.ExpectedGunHeight = Flak88GunHeight;
+		Pit.bHasReadyCrate = false;
+		// Both men stand idle at the shot: the reload starts at the next fire attempt, after the cooldown.
+		Pit.FireReaction.FirstIdleCrewIndex = 0;
+		Pit.Runner.RunnerTag = TEXT("PitRunner");
+		Pit.Runner.StaticSocket = TEXT("PitStatic");
+		Pit.Runner.RoundName = TEXT("RunnerRound");
+		Pit.Runner.NicheRound = Flak88RunnerNicheRound;
+		Pit.Runner.DropRound = Flak88RunnerDropRound;
+		return {Pit};
+	}
+
 	float GetFirstTargetYawOffset(const FGunPitUnderTest& Pit)
 	{
 		return Pit.SectorHalfDegrees > 0.f ? Pit.SectorHalfDegrees + SectorOutsideMarginDegrees : GroundTargetYawOffsetDegrees;
@@ -443,6 +477,10 @@ void FGunPitTestScenario::Start()
 	{
 		M_Pits = GunPitTestPrivate::GetGerSmallPitsToTest();
 	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("GerFlak88PitValidate")))
+	{
+		M_Pits = GunPitTestPrivate::GetGerFlak88PitToTest();
+	}
 	else
 	{
 		M_Pits = GunPitTestPrivate::GetPitsToTest();
@@ -607,7 +645,14 @@ bool FGunPitTestScenario::FindTurret(FGunPitUnderTest& Pit) const
 	{
 		return false;
 	}
-	Pit.Crew = Pit.Turret->FindComponentByClass<UGunPitCrewComponent>();
+	// A pit with a runner has a second crew component for him; the gun crew's is the one tagged CrewTag.
+	TArray<UGunPitCrewComponent*> CrewComponents;
+	Pit.Turret->GetComponents<UGunPitCrewComponent>(CrewComponents);
+	UGunPitCrewComponent* const* GunCrew = CrewComponents.FindByPredicate([](const UGunPitCrewComponent* Crew)
+	{
+		return IsValid(Crew) && Crew->GetCrewTag() == CrewTag;
+	});
+	Pit.Crew = GunCrew ? *GunCrew : nullptr;
 	TArray<USkeletalMeshComponent*> Meshes;
 	Pit.Turret->GetComponents<USkeletalMeshComponent>(Meshes);
 	Pit.CrewMeshes.Reset();
@@ -618,7 +663,15 @@ bool FGunPitTestScenario::FindTurret(FGunPitUnderTest& Pit) const
 			Pit.CrewMeshes.Add(Mesh);
 			continue;
 		}
+		if (Pit.Runner.GetIsUsed() && Mesh->ComponentHasTag(Pit.Runner.RunnerTag))
+		{
+			continue;
+		}
 		Pit.GunMesh = Mesh;
+	}
+	if (Pit.Runner.GetIsUsed())
+	{
+		Pit.Runner.Find(*Pit.Turret);
 	}
 	Pit.CrewMeshes.Sort([](const TWeakObjectPtr<USkeletalMeshComponent>& A, const TWeakObjectPtr<USkeletalMeshComponent>& B)
 	{
@@ -657,6 +710,12 @@ void FGunPitTestScenario::CheckAttachments(FGunPitUnderTest& Pit)
 	       "root_bone_scale=%s"), *Pit.Label, *GetNameSafe(GunMesh->GetSkeletalMeshAsset()),
 	       *GetNameSafe(GunMesh->GetAnimInstance()), *GunMesh->GetComponentScale().ToCompactString(),
 	       *GunMesh->GetBoneName(0).ToString(), *RootBone.GetScale3D().ToCompactString());
+	if (not FMath::IsNearlyZero(Pit.ExpectedGunHeight) && Pit.Pit.IsValid())
+	{
+		const float GunHeight = GunMesh->GetComponentLocation().Z - Pit.Pit->GetActorLocation().Z;
+		Check(FMath::IsNearlyEqual(GunHeight, Pit.ExpectedGunHeight, MaximumGunHeightError),
+		      Pit.Label + TEXT("_gun_sunk_in_pit"), FString::Printf(TEXT("gun_height=%.1f"), GunHeight));
+	}
 	const float OriginScale = GunMesh->GetSocketTransform(Pit.PitOriginSocket).GetScale3D().GetMax();
 	Check(FMath::IsNearlyEqual(OriginScale, 1.f, MaximumScaleError), Pit.Label + TEXT("_pit_origin_unscaled"),
 	      FString::Printf(TEXT("scale=%.3f"), OriginScale));
@@ -685,6 +744,11 @@ void FGunPitTestScenario::CheckAttachments(FGunPitUnderTest& Pit)
 	if (Pit.bHasReadyCrate)
 	{
 		Check(bCrateOnOrigin, Pit.Label + TEXT("_ready_crate_on_pit_origin"));
+	}
+	if (Pit.Runner.GetIsUsed())
+	{
+		Check(Pit.Runner.GetIsOnStaticSocket(*GunMesh), Pit.Label + TEXT("_runner_on_static_socket"),
+		      FString::Printf(TEXT("runner=%s"), *GetNameSafe(Pit.Runner.GetRunner())));
 	}
 }
 
@@ -845,6 +909,7 @@ void FGunPitTestScenario::TickObserving(UWorld& World)
 		{
 			WatchFireReaction(World, Pit);
 		}
+		WatchRunner(World, Pit);
 		if (Pit.bCarriesRounds)
 		{
 			WatchDrill(World, Pit);
@@ -955,6 +1020,25 @@ void FGunPitTestScenario::WatchProjectileFlight(const UWorld& World, FGunPitUnde
 	{
 		Check(Flight.GetFlewDirect(), Pit.Label + TEXT("_shot_flies_direct"), Flight.Describe());
 	}
+}
+
+void FGunPitTestScenario::WatchRunner(const UWorld& World, FGunPitUnderTest& Pit)
+{
+	FGunPitRunnerWatch& Runner = Pit.Runner;
+	if (not Runner.GetIsUsed() || Runner.bChecked || not Pit.GunMesh.IsValid())
+	{
+		return;
+	}
+	Runner.Sample(World.GetTimeSeconds(), *Pit.GunMesh);
+	if (not Runner.GetIsWatchOver(World.GetTimeSeconds()))
+	{
+		return;
+	}
+	Runner.bChecked = true;
+	const FString Details = Runner.Describe();
+	Check(Runner.GetReachedNiche(), Pit.Label + TEXT("_runner_takes_round_at_niche"), Details);
+	Check(Runner.GetReachedDrop(), Pit.Label + TEXT("_runner_lays_round_on_crate"), Details);
+	Check(Runner.GetShowedAndHidRound(), Pit.Label + TEXT("_runner_round_shows_only_when_carried"), Details);
 }
 
 void FGunPitTestScenario::CheckTraverse(FGunPitUnderTest& Pit)
@@ -1173,8 +1257,9 @@ void FGunPitTestScenario::RevealPit(const FGunPitUnderTest& Pit) const
 bool FGunPitTestScenario::GetIsPitDone(const FGunPitUnderTest& Pit) const
 {
 	const bool bFlightDone = not Pit.bFiresDirect || Pit.Flight.bChecked;
+	const bool bRunnerDone = not Pit.Runner.GetIsUsed() || Pit.Runner.bChecked;
 	return Pit.ShotSeconds.Num() >= GunPitTestPrivate::ShotsToObserve && Pit.bDrillChecked && Pit.bTraverseChecked
-		&& bFlightDone;
+		&& bFlightDone && bRunnerDone;
 }
 
 void FGunPitTestScenario::KeepMeshesAnimating() const
@@ -1182,6 +1267,7 @@ void FGunPitTestScenario::KeepMeshesAnimating() const
 	for (const FGunPitUnderTest& Pit : M_Pits)
 	{
 		GunPitTestPrivate::ForceAnimate(Pit.GunMesh.Get());
+		GunPitTestPrivate::ForceAnimate(Pit.Runner.GetRunner());
 		for (const TWeakObjectPtr<USkeletalMeshComponent>& CrewMesh : Pit.CrewMeshes)
 		{
 			GunPitTestPrivate::ForceAnimate(CrewMesh.Get());

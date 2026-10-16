@@ -4,6 +4,7 @@
 #include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerCaptureRig.h"
 #include "GunPitFireReactionWatch.h"
 #include "GunPitProjectileFlightWatch.h"
+#include "GunPitRunnerWatch.h"
 #include "GunPitSectorArcWatch.h"
 
 class AActor;
@@ -53,6 +54,9 @@ struct FGunPitUnderTest
 	float SectorHalfDegrees = 0.f;
 	// The first shot must fly fast and flat at its target; the other pits only log their flight.
 	bool bFiresDirect = false;
+	// Height of the gun mesh above the pit actor, when the gun stands sunk in the ground (the Flak 88 emplacement:
+	// its barrel only just clears the walls); zero: not checked.
+	float ExpectedGunHeight = 0.f;
 
 	TWeakObjectPtr<AActor> Pit;
 	TWeakObjectPtr<ACPPTurretsMaster> Turret;
@@ -93,6 +97,8 @@ struct FGunPitUnderTest
 	FGunPitFireReactionWatch FireReaction;
 	FGunPitProjectileFlightWatch Flight;
 	FGunPitSectorArcWatch SectorArc;
+	// The Flak 88 emplacement's ammo runner, who does not turn with the gun; unused on the other pits.
+	FGunPitRunnerWatch Runner;
 };
 
 /**
@@ -106,7 +112,9 @@ struct FGunPitUnderTest
  * gun must first hold at its 45 degree limit without firing on a target outside its arc; -AmpulometPitValidate the
  * Soviet Ampulomet pit (two crew, the loader feeds an ampoule through the breech); -GerSmallPitValidate the German
  * Puppchen pit and Panzerschreck foxhole (two crew, the loader carries a rocket into the weapon); -RailPakBunkerValidate
- * the German rail Pak bunker (the Pak 40 pit's drill on a concrete pillbox roof). Pictures with
+ * the German rail Pak bunker (the Pak 40 pit's drill on a concrete pillbox roof); -GerFlak88PitValidate the German
+ * Flak 88 emplacement (loader and handler on the gun, plus an ammo runner between the niche and the crate ring who
+ * stays put while the gun turns). Pictures with
  * -GerPitCapture=<folder>. Not in shipping.
  */
 struct FGunPitTestScenario
@@ -152,6 +160,8 @@ private:
 	void LogHandover(const FGunPitUnderTest& Pit, const UStaticMeshComponent& Round,
 	                 const USkeletalMeshComponent& Loader) const;
 	void CheckTraverse(FGunPitUnderTest& Pit);
+	// The ammo runner's round reaches the niche and his crate and only shows while he carries it.
+	void WatchRunner(const UWorld& World, FGunPitUnderTest& Pit);
 	// The gun bucks and the crew brace after the first shot (gun pit anim and crew anim instances).
 	void WatchFireReaction(UWorld& World, FGunPitUnderTest& Pit);
 	// Follows the first shot's projectile from the muzzle to its impact and logs how it flew.
