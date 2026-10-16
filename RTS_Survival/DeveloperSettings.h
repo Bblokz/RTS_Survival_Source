@@ -285,6 +285,11 @@ namespace DeveloperSettings
 			// Bxp Training Times.
 			inline constexpr int32 T1BxpBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
 			inline constexpr int32 BxpT2BuildTime = RoundToNearestMultipleOf(25.f * GameTimeMlt, 2);
+			// The small two-man field defenses go up faster than the gun pits.
+			inline constexpr int32 GerPuppchenPitBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
+			inline constexpr int32 GerPanzerschreckPitBuildTime = RoundToNearestMultipleOf(12.f * GameTimeMlt, 2);
+			// A poured concrete pillbox takes longer than a sandbag pit.
+			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
 		}
 
 
@@ -895,6 +900,12 @@ namespace DeveloperSettings
 				inline constexpr int32 GerSFH18Pit_Metal = 520;
 				inline constexpr int32 GerFlak37Pit_Radixite = 420;
 				inline constexpr int32 GerFlak37Pit_Metal = 220;
+				inline constexpr int32 GerPuppchenPit_Radixite = 280;
+				inline constexpr int32 GerPuppchenPit_Metal = 130;
+				inline constexpr int32 GerPanzerschreckPit_Radixite = 160;
+				inline constexpr int32 GerPanzerschreckPit_Metal = 60;
+				inline constexpr int32 GerRailPakBunker_Radixite = 850;
+				inline constexpr int32 GerRailPakBunker_Metal = 420;
 			}
 
 			// ----------------------------------

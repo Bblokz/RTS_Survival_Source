@@ -3698,6 +3698,24 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed * 0.9f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::PanzerSchreck, WeaponData);
 
+	// The Panzerschreck foxhole: the same rocket at the same short range; its own entry so the emplacement is balanced
+	// apart from the infantry weapon.
+	WeaponData.WeaponName = EWeaponName::PanzerSchreck_Pit;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::PanzerSchreck_Pit, WeaponData);
+
+	// Raketenwerfer 43 "Puppchen" (88mm; HEAT): the Panzerschreck's rocket with a cartridge base, fired from a small
+	// carriage through a breech: steadier and further than from the shoulder, and a quicker drill.
+	constexpr float PuppchenArmorPenMlt = 1.1f;
+	constexpr float PuppchenReloadSpeed = 6.f;
+	constexpr float PuppchenAccuracy = 78.f;
+	WeaponData.WeaponName = EWeaponName::Raketenwerfer43_88MM;
+	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::LightCannonRange;
+	WeaponData.ArmorPen *= PuppchenArmorPenMlt;
+	WeaponData.ArmorPenMaxRange *= PuppchenArmorPenMlt;
+	WeaponData.ReloadSpeed = PuppchenReloadSpeed;
+	WeaponData.Accuracy = PuppchenAccuracy;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Raketenwerfer43_88MM, WeaponData);
+
 	// Panzerwerfer (150mm; HEAT)
 	WeaponData.WeaponName = EWeaponName::Panzerwerfer;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;

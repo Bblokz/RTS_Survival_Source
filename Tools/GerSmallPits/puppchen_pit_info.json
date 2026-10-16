@@ -1,0 +1,88 @@
+{
+ "units": "cm, Blender gun frame (Unreal: y negated)",
+ "bones": {
+  "Root": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "Traverse": [
+   0.0,
+   0.0,
+   22.0
+  ],
+  "Elevation": [
+   10.0,
+   0.0,
+   58.0
+  ],
+  "Gun": [
+   -10.0,
+   0.0,
+   62.0
+  ],
+  "BreechBlock": [
+   -45.0,
+   -8.5,
+   62.0
+  ],
+  "Rocket": [
+   -11.5,
+   0.0,
+   62.0
+  ]
+ },
+ "muzzle": [
+  130.0,
+  0.0,
+  62.0
+ ],
+ "drill_seconds": 6.0,
+ "fire_seconds": 0.6,
+ "drill_fractions": {
+  "step_aside": 0.075,
+  "aside": 0.1667,
+  "handle_reach": 0.05,
+  "handle_grab": 0.1083,
+  "opened": 0.2167,
+  "handle_free": 0.2417,
+  "rocket_to_crate": 0.1667,
+  "rocket_show": 0.375,
+  "grab_rocket": 0.3917,
+  "lifted": 0.4583,
+  "lined_up": 0.55,
+  "hand_behind": 0.5833,
+  "loaded": 0.6833,
+  "close_reach": 0.7083,
+  "close_grab": 0.7417,
+  "closed": 0.8333,
+  "close_free": 0.8583,
+  "back": 0.8667,
+  "gunner_grip": 0.975
+ },
+ "loading_elevation_keys": [
+  [
+   0.0,
+   0.0
+  ],
+  [
+   0.4,
+   1.0
+  ],
+  [
+   5.0,
+   1.0
+  ],
+  [
+   5.5,
+   0.0
+  ],
+  [
+   6.0,
+   0.0
+  ]
+ ],
+ "pit_inner_radius": 140.0,
+ "wall_height": 52.0,
+ "pit_outer_radius": 198.0
+}

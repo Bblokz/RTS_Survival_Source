@@ -257,7 +257,11 @@ enum class
 	// Cup discharger on a Mosin: high-explosive rifle grenades.
 	Dyakonov_RGL_41MM UMETA(DisplayName = "Dyakonov 41MM (rifle grenade launcher)"),
 	// Electromagnetic rifle that charges its coils before every shot.
-	ProtoCoilgun_20MM UMETA(DisplayName = "Prototype Coilgun 20MM")
+	ProtoCoilgun_20MM UMETA(DisplayName = "Prototype Coilgun 20MM"),
+	// Raketenwerfer 43 "Puppchen": 88mm HEAT rockets from a small wheeled launcher loaded through a breech.
+	Raketenwerfer43_88MM UMETA(DisplayName = "Raketenwerfer 43 88MM"),
+	// The Panzerschreck foxhole's weapon: the infantry Panzerschreck, balanced on its own for a light emplacement.
+	PanzerSchreck_Pit UMETA(DisplayName = "PanzerSchreck 88MM Foxhole")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -351,6 +355,8 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::ML20_152MM_Pit: return "ML-20";
 	case EWeaponName::BS3_100MM_TW: return "BS-3";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
+	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
+	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
 	case EWeaponName::KwK44_128MM: return "KwK 44";
 	case EWeaponName::KwK44_L_36_5_75MM: return "KwK44 L/36";
 	case EWeaponName::Panzerwerfer: return "Panzerwerfer";
@@ -833,6 +839,10 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "BS3_100MM_TW";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
+	case EWeaponName::Raketenwerfer43_88MM:
+		return "Raketenwerfer43_88MM";
+	case EWeaponName::PanzerSchreck_Pit:
+		return "PanzerSchreck_Pit";
 	case EWeaponName::B4_203MM_Pit:
 		return "B4_203MM_Pit";
 	case EWeaponName::Ampulomet_125MM:

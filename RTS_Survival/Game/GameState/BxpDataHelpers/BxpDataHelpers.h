@@ -103,17 +103,32 @@ namespace BxpHelpers
 				int32 Radixite;
 				int32 Metal;
 				float HealthMlt;
+				int32 BuildTime = BxpT2BuildTime;
 			};
 			const FGunPitEntry Pits[] = {
 				{EBuildingExpansionType::BTX_GerPak40Pit, GerPak40Pit_Radixite, GerPak40Pit_Metal, 0.9f},
 				{EBuildingExpansionType::BTX_GerLeFH18Pit, GerLeFH18Pit_Radixite, GerLeFH18Pit_Metal, 1.1f},
 				{EBuildingExpansionType::BTX_GerSFH18Pit, GerSFH18Pit_Radixite, GerSFH18Pit_Metal, 1.25f},
 				{EBuildingExpansionType::BTX_GerFlak37Pit, GerFlak37Pit_Radixite, GerFlak37Pit_Metal, 0.9f},
+				// Light emplacements: a strong anti-tank weapon behind little cover.
+				{
+					EBuildingExpansionType::BTX_GerPuppchenPit, GerPuppchenPit_Radixite, GerPuppchenPit_Metal, 0.55f,
+					GerPuppchenPitBuildTime
+				},
+				{
+					EBuildingExpansionType::BTX_GerPanzerschreckPit, GerPanzerschreckPit_Radixite, GerPanzerschreckPit_Metal,
+					0.4f, GerPanzerschreckPitBuildTime
+				},
+				// A concrete pillbox with the rail Pak in its roof pit: much tougher than any sandbag pit.
+				{
+					EBuildingExpansionType::BTX_GerRailPakBunker, GerRailPakBunker_Radixite, GerRailPakBunker_Metal,
+					1.8f, GerRailPakBunkerBuildTime
+				},
 			};
 			for (const FGunPitEntry& Pit : Pits)
 			{
 				FBxpData BxpData;
-				BxpData.ConstructionTime = BxpT2BuildTime;
+				BxpData.ConstructionTime = Pit.BuildTime;
 				BxpData.VisionRadius = T2BxpVisionRadius;
 				BxpData.Health = RoundToNearestMultipleOfFive(BxpHeavyBunkerHealth * Pit.HealthMlt);
 				BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);

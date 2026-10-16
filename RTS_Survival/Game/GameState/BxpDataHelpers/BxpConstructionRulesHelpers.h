@@ -80,6 +80,11 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_RusBS3Pit, WithFootprint(FreeConstructionRules, 1300.f, 1300.f)},
 		// The Flak 37 and its crew turn inside a ring like the Pak pit's, a little wider.
 		{EBuildingExpansionType::BTX_GerFlak37Pit, WithFootprint(FreeConstructionRules, 1100.f, 1100.f)},
+		// Small field defenses: the Puppchen's 4 m bag ring with its ammo boxes, the Panzerschreck's 3.3 m foxhole.
+		{EBuildingExpansionType::BTX_GerPuppchenPit, WithFootprint(FreeConstructionRules, 500.f, 500.f)},
+		{EBuildingExpansionType::BTX_GerPanzerschreckPit, WithFootprint(FreeConstructionRules, 400.f, 400.f)},
+		// The concrete block is 10.8 m across at its foot; the props and the rear ladder stand just outside it.
+		{EBuildingExpansionType::BTX_GerRailPakBunker, WithFootprint(FreeConstructionRules, 1250.f, 1250.f)},
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
 
 		// --- solar  ---

@@ -117,6 +117,12 @@ enum class EBuildingExpansionType : uint8
 	BTX_RusAmpulometPit UMETA(DisplayName = "Rus Ampulomet Pit"),
 	// Small square sandbag pit for the 53-K whose gun only traverses 45 degrees either way: it covers one sector.
 	BTX_Rus53KSectorPit UMETA(DisplayName = "Rus 53-K Sector Pit"),
+	// Small German field defenses: a Raketenwerfer 43 "Puppchen" in a small bag ring, and a Panzerschreck team in a
+	// foxhole; each a gunner and a loader who carries the rocket in.
+	BTX_GerPuppchenPit UMETA(DisplayName = "Ger Puppchen Pit"),
+	BTX_GerPanzerschreckPit UMETA(DisplayName = "Ger Panzerschreck Foxhole"),
+	// Breakthrough doctrine: a concrete pillbox whose sandbagged roof is the pit of a Pak 40 refitted with rails.
+	BTX_GerRailPakBunker UMETA(DisplayName = "Ger Rail Pak Bunker"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -219,6 +225,12 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusAmpulometPit");
 	case EBuildingExpansionType::BTX_Rus53KSectorPit:
 		return FString("BTX_Rus53KSectorPit");
+	case EBuildingExpansionType::BTX_GerPuppchenPit:
+		return FString("BTX_GerPuppchenPit");
+	case EBuildingExpansionType::BTX_GerPanzerschreckPit:
+		return FString("BTX_GerPanzerschreckPit");
+	case EBuildingExpansionType::BTX_GerRailPakBunker:
+		return FString("BTX_GerRailPakBunker");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -287,6 +299,9 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerFlak37Pit: return TEXT("Flak 37 Pit");
 	case EBuildingExpansionType::BTX_RusAmpulometPit: return TEXT("Ampulomet Pit");
 	case EBuildingExpansionType::BTX_Rus53KSectorPit: return TEXT("53-K Sector Pit");
+	case EBuildingExpansionType::BTX_GerPuppchenPit: return TEXT("Puppchen Pit");
+	case EBuildingExpansionType::BTX_GerPanzerschreckPit: return TEXT("Panzerschreck Foxhole");
+	case EBuildingExpansionType::BTX_GerRailPakBunker: return TEXT("Rail Pak Bunker");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");

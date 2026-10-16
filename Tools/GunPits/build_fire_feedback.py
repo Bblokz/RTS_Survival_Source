@@ -58,6 +58,14 @@ GUNS = {
     '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusAmpulometPit/Anims/AnimBp_AmpulometPit': {
         'bones': ['Gun'], 'socket': 'PitOrigin', 'jolt': 2.5, 'rock': 0.5, 'pivot': 50.0, 'muzzle': 1.2,
         'hz': 7.0, 'damping': 0.4},
+    # The small German rocket weapons: the Puppchen's barrel and breech jump on the carriage; the Panzerschreck nods on
+    # the gunner's shoulder (a rocket hardly kicks). Their carriage, crate and crew on Traverse stay.
+    GER + 'AnimBp_GerPuppchenPit': {
+        'bones': ['Gun'], 'socket': 'PitOrigin', 'jolt': 3.0, 'rock': 0.6, 'pivot': 60.0, 'muzzle': 1.5,
+        'hz': 6.0, 'damping': 0.4},
+    GER + 'AnimBp_GerPanzerschreckPit': {
+        'bones': ['Gun'], 'socket': 'PitOrigin', 'jolt': 1.8, 'rock': 0.4, 'pivot': 40.0, 'muzzle': 0.8,
+        'hz': 7.0, 'damping': 0.45},
 }
 KICK_NODE_SPACING = 160
 
