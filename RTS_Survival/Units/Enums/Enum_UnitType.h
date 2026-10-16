@@ -182,6 +182,9 @@ enum class ETankSubtype : uint8
 	Tank_LightTrain UMETA(DisplayName = "Rus Train Light"),
 	Tank_MediumTrain UMETA(DisplayName = "Rus Train Medium"),
 	Tank_HeavyTrain UMETA(DisplayName = "Rus Train Heavy"),
+	// Russian heavy tank destroyer on the IS chassis. Appended so the subtypes above, which training options
+	// store as numbers, keep their values.
+	Tank_ISU_152 UMETA(DisplayName = "Rus Heavy ISU-152"),
 };
 
 
@@ -220,6 +223,7 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_IS_3_Flame:
 	case ETankSubtype::Tank_KV_5:
 	case ETankSubtype::Tank_SU_152:
+	case ETankSubtype::Tank_ISU_152:
 		return true;
 	default:
 		return false;
@@ -282,6 +286,7 @@ static bool Global_GetIsTankDestroyer(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_SU_85_L:
 	case ETankSubtype::Tank_SU_100:
 	case ETankSubtype::Tank_SU_152:
+	case ETankSubtype::Tank_ISU_152:
 		return true;
 	default:
 		return false;

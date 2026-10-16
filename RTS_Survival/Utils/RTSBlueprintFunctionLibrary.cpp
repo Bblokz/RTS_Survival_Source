@@ -1329,6 +1329,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SU_152()
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_152));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_ISU_152()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_ISU_152));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_HazmatEngineers()
 {
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_HazmatEngineers));

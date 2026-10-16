@@ -261,7 +261,9 @@ enum class
 	// Raketenwerfer 43 "Puppchen": 88mm HEAT rockets from a small wheeled launcher loaded through a breech.
 	Raketenwerfer43_88MM UMETA(DisplayName = "Raketenwerfer 43 88MM"),
 	// The Panzerschreck foxhole's weapon: the infantry Panzerschreck, balanced on its own for a light emplacement.
-	PanzerSchreck_Pit UMETA(DisplayName = "PanzerSchreck 88MM Foxhole")
+	PanzerSchreck_Pit UMETA(DisplayName = "PanzerSchreck 88MM Foxhole"),
+	// The ISU-152's casemate gun: the SU-152's ML-20S balanced as a direct-fire heavy tank destroyer gun.
+	ML_20S_152MM_ISU152 UMETA(DisplayName = "ML-20S 152MM (ISU-152)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -347,6 +349,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::M_30S_122MM_SU122: return "M-30S";
 	case EWeaponName::M1938_122MM: return "M-1938";
 	case EWeaponName::ML_20S_152MM_SU152: return "ML-20S";
+	case EWeaponName::ML_20S_152MM_ISU152: return "ML-20S";
 	case EWeaponName::TM_3_12_305MM: return "TM-3-12";
 	case EWeaponName::B4_203MM_TW: return "B-4";
 	case EWeaponName::M53K_45MM_TW: return "53-K";

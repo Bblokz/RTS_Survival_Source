@@ -1823,6 +1823,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
+
+	// Rus ISU-152
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_ISU_152)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_ISU_152,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
 }
 
 void UTrainingMenuManager::InitAllGameAircraftTrainingOptions()
