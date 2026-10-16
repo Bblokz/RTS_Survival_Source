@@ -12,7 +12,8 @@ class UStaticMeshComponent;
  * @brief Test helper for a pit crew member who stays put while the gun turns: the Flak 88 emplacement's ammo runner
  * walks a loop from the ammo niche to a ready-round crate with a round on his shell bone. Find him once the turret
  * is up, then Sample every tick; it reads whether his round reached the niche and the crate and showed only on the
- * way. Used by the gun pit test scenario (-GerFlak88PitValidate).
+ * way. Used by the gun pit test scenario (-GerFlak88PitValidate) and by the B-4 test for the concrete pits' runner
+ * (-B4HowitzerConcretePit), who rides PitOrigin and whose shell never hides.
  */
 struct FGunPitRunnerWatch
 {

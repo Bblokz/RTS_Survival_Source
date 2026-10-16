@@ -121,6 +121,24 @@ namespace B4HowitzerTestPrivate
 		TEXT("/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/ML20_152MM/Pit/Rus_BXP_ML20ConcretePit."
 			"Rus_BXP_ML20ConcretePit_C");
 	const FName ConcreteEmplacementMeshName = TEXT("SM_B4ConcretePit");
+	// The concrete pits' runner: his shell's pivot where he takes it from the ready rack and where he lays it on
+	// RackShell3 (PitOrigin frame, b4_pit_runner.py's layout; the shell meshes' pivots are off their centres).
+	const FName RunnerTag = TEXT("PitRunner");
+	const FName RunnerShellName = TEXT("RunnerShell");
+	const FVector RunnerReadyShellPivot(-306.04f, -420.51f, 92.f);
+	const FVector RunnerRackShellPivot(-460.55f, -268.f, 92.f);
+	const FVector MLTwentyRunnerReadyShellPivot(-372.71f, -362.68f, 85.9f);
+	const FVector MLTwentyRunnerRackShellPivot(-462.9f, -141.f, 85.9f);
+
+	void SetConcretePitRunner(FB4HowitzerPitVariant& Variant, const FVector& ReadyShellPivot,
+	                          const FVector& RackShellPivot)
+	{
+		Variant.Runner.RunnerTag = RunnerTag;
+		Variant.Runner.StaticSocket = PitOriginSocket;
+		Variant.Runner.RoundName = RunnerShellName;
+		Variant.Runner.NicheRound = ReadyShellPivot;
+		Variant.Runner.DropRound = RackShellPivot;
+	}
 	const TCHAR* const MLTwentyPitName = TEXT("ML20");
 	const TCHAR* const MLTwentyPitClassPath =
 		TEXT("/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/ML20_152MM/Pit/Rus_BXP_ML20Pit.Rus_BXP_ML20Pit_C");
@@ -145,7 +163,15 @@ namespace B4HowitzerTestPrivate
 			Variant.GunWreckMarker = MLTwentyGunWreckMarker;
 			Variant.ReloadMontageMarker = MLTwentyReloadMontageMarker;
 			Variant.ReloadSeconds = MLTwentyPitReloadSeconds;
+			if (bConcretePit)
+			{
+				SetConcretePitRunner(Variant, MLTwentyRunnerReadyShellPivot, MLTwentyRunnerRackShellPivot);
+			}
 			return Variant;
+		}
+		if (bConcretePit)
+		{
+			SetConcretePitRunner(Variant, RunnerReadyShellPivot, RunnerRackShellPivot);
 		}
 		Variant.PitClassPath = bConcretePit ? ConcretePitClassPath : PitClassPath;
 		Variant.TurretClassMarker = PitTurretClassMarker;
@@ -744,7 +770,15 @@ bool FB4HowitzerTestScenario::FindPitTurret(UWorld& World)
 			M_PitCrewMeshes.Add(Mesh);
 			continue;
 		}
+		if (M_PitVariant.Runner.GetIsUsed() && Mesh->ComponentHasTag(M_PitVariant.Runner.RunnerTag))
+		{
+			continue;
+		}
 		M_PitGunMesh = Mesh;
+	}
+	if (M_PitVariant.Runner.GetIsUsed())
+	{
+		M_PitVariant.Runner.Find(*M_PitTurret);
 	}
 	M_PitCrewMeshes.Sort([](const TWeakObjectPtr<USkeletalMeshComponent>& A,
 	                        const TWeakObjectPtr<USkeletalMeshComponent>& B)
@@ -795,6 +829,11 @@ void FB4HowitzerTestScenario::CheckPitAttachments()
 	const bool bIsShellOnMount = M_PitShell.IsValid() && M_PitShell->GetAttachParent() == GunMesh &&
 		M_PitShell->GetAttachSocketName() == ShellMountSocket;
 	Check(bIsShellOnMount, TEXT("shell_attached_to_shell_mount"));
+	if (M_PitVariant.Runner.GetIsUsed())
+	{
+		Check(IsValid(GunMesh) && M_PitVariant.Runner.GetIsOnStaticSocket(*GunMesh), TEXT("runner_on_pit_origin"),
+		      FString::Printf(TEXT("runner=%s"), *GetNameSafe(M_PitVariant.Runner.GetRunner())));
+	}
 }
 
 void FB4HowitzerTestScenario::TickWaitingForPitTurret(UWorld& World)
@@ -829,10 +868,16 @@ void FB4HowitzerTestScenario::TickWaitingForPitShots(UWorld& World)
 	using namespace B4HowitzerTestPrivate;
 	TrackPitLoading(World);
 	WatchPitFireReaction(World);
+	WatchPitRunner(World);
 	if (M_PitShotSeconds.Num() < ShotsToObserve)
 	{
 		ReportPitStatus(World);
 		FinishWhenTimedOut(World, TEXT("pit_fired_twice"));
+		return;
+	}
+	if (M_PitVariant.Runner.GetIsUsed() && not M_PitVariant.Runner.bChecked)
+	{
+		FinishWhenTimedOut(World, TEXT("runner_watched"));
 		return;
 	}
 	const float Interval = M_PitShotSeconds[1] - M_PitShotSeconds[0];
@@ -857,6 +902,25 @@ void FB4HowitzerTestScenario::WatchPitFireReaction(const UWorld& World)
 	}
 	M_PitFireReaction.bChecked = true;
 	Check(M_PitFireReaction.GetDidGunBuck(), TEXT("pit_gun_bucks_on_shot"), M_PitFireReaction.Describe());
+}
+
+void FB4HowitzerTestScenario::WatchPitRunner(const UWorld& World)
+{
+	FGunPitRunnerWatch& Runner = M_PitVariant.Runner;
+	const USkeletalMeshComponent* GunMesh = M_PitGunMesh.Get();
+	if (not Runner.GetIsUsed() || Runner.bChecked || not IsValid(GunMesh))
+	{
+		return;
+	}
+	Runner.Sample(World.GetTimeSeconds(), *GunMesh);
+	if (not Runner.GetIsWatchOver(World.GetTimeSeconds()))
+	{
+		return;
+	}
+	Runner.bChecked = true;
+	const FString Details = Runner.Describe();
+	Check(Runner.GetReachedNiche(), TEXT("runner_takes_shell_from_ready_rack"), Details);
+	Check(Runner.GetReachedDrop(), TEXT("runner_lays_shell_on_rack"), Details);
 }
 
 void FB4HowitzerTestScenario::TrackPitLoading(const UWorld& World)
@@ -1287,6 +1351,7 @@ void FB4HowitzerTestScenario::KeepMeshesAnimating() const
 	{
 		B4HowitzerTestPrivate::ForceAnimate(Watch.Mesh.Get());
 	}
+	B4HowitzerTestPrivate::ForceAnimate(M_PitVariant.Runner.GetRunner());
 }
 
 void FB4HowitzerTestScenario::KeepTestUnitsAliveAndMoving() const

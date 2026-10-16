@@ -4,13 +4,17 @@ A second emplacement for the two turntable howitzer pits. It is meant to stand o
 
 | Blueprint | Copy of | Changes |
 |---|---|---|
-| `B4_203MM/Pit/Rus_BXP_B4HowitzerConcretePit` | `Rus_BXP_B4HowitzerPit` | `BuildingMeshComponent`, `Sandbags` component and `BP_InitBuildingExp`'s building and construction mesh |
+| `B4_203MM/Pit/Rus_BXP_B4HowitzerConcretePit` | `Rus_BXP_B4HowitzerPit` | `BuildingMeshComponent`, `Sandbags` component and `BP_InitBuildingExp`'s building and construction mesh; `Howitzer` child actor is the concrete turret below |
 | `ML20_152MM/Pit/Rus_BXP_ML20ConcretePit` | `Rus_BXP_ML20Pit` | the same |
+| `B4_203MM/Pit/RTS_BP_EmbTurret_B4Pit_Concrete` | `RTS_BP_EmbTurret_B4Pit` | the ammo runner (see below) |
+| `ML20_152MM/Pit/RTS_BP_EmbTurret_ML20Pit_Concrete` | `RTS_BP_EmbTurret_ML20Pit` | the same |
 
 Unchanged from the earth pits:
 - the expansion types (`BTX_RusB4HowitzerPit`, `BTX_RusML20Pit`);
-- the turrets (`RTS_BP_EmbTurret_B4Pit`, `RTS_BP_EmbTurret_ML20Pit`) with the guns, weapons, crew, crane, cart, turntable and every animation and drill;
+- the guns, weapons, the four crew, crane, cart, turntable and every animation and drill of the turrets;
 - the sizes (2000 × 2000 footprint).
+
+The earth pits and their turrets have no runner.
 
 The spawner still maps each type to the earth pit, so the build menu and the AI keep placing the earth pits. Place the concrete pits in a level, or point the spawner at them.
 
@@ -38,6 +42,28 @@ The bags are cut for non-Nanite rendering at 0.25 (see [GunPitMeshes.md](../GunP
 
 Both meshes have Nanite off and complex collision.
 
+## The ammo runner
+
+A fifth crewman keeps the shell rack stocked. Like the other crew he rides the turntable (`PitOrigin`), so his walk turns with the gun. He loops for ever, independent of the loading drill:
+1. He takes the top shell from a ready rack at the turntable's rim, on the shell rack's side.
+2. He carries it to the cart pusher's (Crew2's) shell rack and lays it on the top place.
+3. He walks back.
+
+The loop is 8.5 s on the B-4 and 10.2 s on the ML-20, where he goes round behind the left trail's spade.
+
+The turret copies add these components:
+
+| Component | |
+|---|---|
+| `ReadyRack`, `ReadyShell1`, `ReadyShell2` | a turned copy of `ShellRack` and its two lower shells, tagged `B4PitSocket:PitOrigin`. The ready rack has no top shell of its own: the runner's shell lies there until he picks it up. |
+| `Runner` | `SK_RussianSoldier` with `AnimBp_B4Pit_Crew`, tag `PitRunner` |
+| `RunnerShell` | the gun's shell mesh on the runner's spare bone `ik_foot_root` (unskinned on the soldier) |
+| `PitRunnerCrew` | a second `UGunPitCrewComponent`: `CrewTag` `PitRunner`, `CrewAttachSocket` `PitOrigin`, his loop (`Pit/Crew/Anim_B4PitRunner_Loop` or `Anim_ML20PitRunner_Loop`) as the only idle, no rounds and no flinch. The turret's BeginPlay calls its `InitPitCrew` after the gun crew's. |
+
+His shell never hides. He lays it exactly on `RackShell3`, so the two become one. The moment he lets go, his shell is back on the ready rack at the far end of his walk. The pop happens away from where the eye is.
+
+The runner is built like the Flak 88 pit's runner ([GerFlak88Pit.md](../GerFlak88Pit.md)).
+
 ## Rebuilding
 
 1. Run `blender -b --factory-startup -P Marketplace/Scritps/AnimTeamWeapons/B4_203mm/b4_concrete_pit_build.py -- "<(KADO-3D)/(EXPORTS)/B4_203mm>"`.
@@ -45,9 +71,22 @@ Both meshes have Nanite off and complex collision.
    - It fails if a bag comes within the 6.5 m clear radius.
 2. Run `pit_mesh_optimize.py -- <...>/PitProps/SM_B4ConcretePit_Sandbags.fbx Sandbag=0.25`.
 3. Run `python Tools/B4Howitzer/build_b4_concrete_pit.py [mesh,bxp]`.
+4. For the runner, run `blender -b -P Marketplace/Scritps/AnimTeamWeapons/B4_203mm/b4_pit_runner.py -- [B4,ML20] [preview]` with Blender 5.
+   - It writes `Crew/Anims/Anim_<Pit>PitRunner_Loop.fbx` and `Crew/<pit>_pit_runner.json` in each gun's export folder.
+   - The json holds the ready rack's place and the shell poses.
+   - `preview` renders key moments to `PitRunnerPreview/`.
+   - The ready rack's place, his stand-off and the corners of his walk are at the top of the script (Unreal pit space).
+5. Run `python Tools/B4Howitzer/build_b4_concrete_runner.py [anims,turret,bxp] [B4,ML20]`.
+   - It imports the loop and remakes the concrete turret copies from the earth turrets.
+   - It solves `RunnerShell`'s offset on the bone from the loop and points the concrete BXPs at the copies.
+   - Run step 3's `bxp` before this step: it copies the earth BXPs, which point at the earth turrets.
 
 ## Testing
 
-- `-B4HowitzerValidate -B4HowitzerConcretePit` runs the B-4 test on the concrete pit (31 checks pass).
-- Add `-B4HowitzerPit=ML20` for the ML-20 concrete pit (30 checks pass).
+- `-B4HowitzerValidate -B4HowitzerConcretePit` runs the B-4 test on the concrete pit (33 checks pass).
+- Add `-B4HowitzerPit=ML20` for the ML-20 concrete pit (34 checks pass).
 - The flag switches the pit class and the expected building mesh (`FB4HowitzerPitVariant::EmplacementMeshName`). Pictures come with `-B4HowitzerCapture=<dir>`.
+- It also checks the runner with `FGunPitRunnerWatch` (`FB4HowitzerPitVariant::Runner`):
+  - he is on `PitOrigin`;
+  - over 24 s, his shell reaches the ready rack's top and `RackShell3`'s place (within 25 cm; both came within 0.2 cm).
+  - The ready and rack shell pivots in `B4HowitzerTestScenario.cpp` come from `b4_pit_runner.py`'s layout. Update them if the layout moves.

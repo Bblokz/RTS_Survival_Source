@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "B4HowitzerCaptureRig.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/GunPit/Tests/GunPitFireReactionWatch.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/GunPit/Tests/GunPitRunnerWatch.h"
 
 class AActor;
 class ABuildingExpansion;
@@ -70,6 +71,9 @@ struct FB4HowitzerPitVariant
 	float ReloadSeconds = 0.f;
 	// The building mesh the pit must show: the earth emplacement, or the concrete apron of the concrete pits.
 	FName EmplacementMeshName = TEXT("SM_B4Pit_Emplacement");
+	// The concrete pits' ammo runner, who rides PitOrigin and stocks the shell rack; no RunnerTag on the earth pits.
+	// His shell never hides, so only its pick-up and lay-down places are checked.
+	FGunPitRunnerWatch Runner;
 };
 
 /**
@@ -175,6 +179,7 @@ private:
 	// The gun bucks after the first pit shot. The whole crew starts the crane drill at the shot, so their brace is
 	// only logged.
 	void WatchPitFireReaction(const UWorld& World);
+	void WatchPitRunner(const UWorld& World);
 	void KillPit(const UWorld& World);
 	bool GetHasWreckNear(UWorld& World, const TCHAR* ClassMarker) const;
 	void CheckFinishedMontage(const UWorld& World, const FB4HowitzerMontageWatch& Watch);
