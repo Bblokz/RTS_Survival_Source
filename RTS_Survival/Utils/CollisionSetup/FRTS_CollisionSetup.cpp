@@ -40,25 +40,35 @@ void FRTS_CollisionSetup::SetupShieldCollision(UStaticMeshComponent* ShieldMesh,
 	ShieldMesh->SetReceivesDecals(false);
 }
 
-void FRTS_CollisionSetup::SetupAircraftWeaponHitCollision(UPrimitiveComponent* HitComponent, const int32 OwningPlayer)
+void FRTS_CollisionSetup::SetupAircraftComponentCollision(UPrimitiveComponent* AircraftComponent, const int32 OwningPlayer,
+                                                       const bool bReceivesWeaponHits)
 {
-	if (not IsValid(HitComponent))
+	if (not IsValid(AircraftComponent))
 	{
-		RTSFunctionLibrary::ReportError(TEXT("SetupAircraftWeaponHitCollision received an invalid component."));
+		RTSFunctionLibrary::ReportError(TEXT("SetupAircraftComponentCollision received an invalid component."));
+		return;
+	}
+	const ECollisionResponse VisibilityResponse = AircraftComponent->GetCollisionResponseToChannel(ECC_Visibility);
+	const ECollisionResponse CameraResponse = AircraftComponent->GetCollisionResponseToChannel(ECC_Camera);
+	const bool bEnableQueries = bReceivesWeaponHits
+		|| AircraftComponent->GetCollisionEnabled() != ECollisionEnabled::NoCollision;
+	AircraftComponent->SetSimulatePhysics(false);
+	AircraftComponent->SetGenerateOverlapEvents(false);
+	AircraftComponent->SetCanEverAffectNavigation(false);
+	AircraftComponent->SetCollisionEnabled(bEnableQueries ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
+	AircraftComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	// We use the camera trace channel to get info from units the player is looking at.
+	AircraftComponent->SetCollisionResponseToChannel(ECC_Visibility, VisibilityResponse);
+	AircraftComponent->SetCollisionResponseToChannel(ECC_Camera, CameraResponse);
+	if (not bReceivesWeaponHits)
+	{
 		return;
 	}
 	const bool bIsPlayerAircraft = OwningPlayer == 1;
-	if (HitComponent->GetCollisionEnabled() == ECollisionEnabled::NoCollision)
-	{
-		HitComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	}
-	HitComponent->SetCollisionObjectType(bIsPlayerAircraft ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY);
+	AircraftComponent->SetCollisionObjectType(bIsPlayerAircraft ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY);
 	// Traces and projectiles of the other side hit the aircraft; those of its own side fly through it.
-	HitComponent->SetCollisionResponseToChannel(bIsPlayerAircraft ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
-	                                            ECR_Block);
-	HitComponent->SetCollisionResponseToChannel(bIsPlayerAircraft ? COLLISION_TRACE_ENEMY : COLLISION_TRACE_PLAYER,
-	                                            ECR_Ignore);
-	HitComponent->SetCollisionResponseToChannel(COLLISION_OBJ_PROJECTILE, ECR_Block);
+	AircraftComponent->SetCollisionResponseToChannel(bIsPlayerAircraft ? COLLISION_TRACE_PLAYER : COLLISION_TRACE_ENEMY,
+	                                                 ECR_Block);
 }
 
 void FRTS_CollisionSetup::ForceBuildingPlacementResponseOnActor(

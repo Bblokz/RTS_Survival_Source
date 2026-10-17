@@ -8,7 +8,7 @@ class UCapsuleComponent;
 class USphereComponent;
 class UStaticMeshComponent;
 
-// We use the camera trace channel to ge info from units the player is looking at.
+/** @brief Applies the project's collision rules when units and world objects are initialized or change owners. */
 class RTS_SURVIVAL_API FRTS_CollisionSetup
 {
 public:
@@ -65,12 +65,14 @@ public:
 	static void SetupShieldCollision(UStaticMeshComponent* ShieldMesh, int32 OwningPlayer);
 
 	/**
-	 * @brief Aircraft Blueprints are authored for the player; an aircraft of the other side must be hit by the
-	 * weapons of its enemies instead. Keeps every other response of the component as the Blueprint set it.
-	 * @param HitComponent A component of the aircraft that weapons hit.
+	 * @brief Lets aircraft fly through units and map boundaries while enemy weapon queries can still hit them.
+	 * Preserves authored mouse/camera queries so aircraft selection keeps working.
+	 * @param AircraftComponent An aircraft primitive, including components that do not receive weapon hits.
 	 * @param OwningPlayer The owner of the aircraft.
+	 * @param bReceivesWeaponHits Whether this component provides weapon-hit geometry.
 	 */
-	static void SetupAircraftWeaponHitCollision(UPrimitiveComponent* HitComponent, int32 OwningPlayer);
+	static void SetupAircraftComponentCollision(UPrimitiveComponent* AircraftComponent, int32 OwningPlayer,
+	                                           bool bReceivesWeaponHits);
 
 	static void SetupCollisionForMeshAttachedToTracks(UMeshComponent* MeshComponent, bool bIsPlayer1);
 

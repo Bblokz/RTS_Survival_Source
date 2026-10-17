@@ -1554,7 +1554,10 @@ void ACPPTurretsMaster::SpecificEngage()
 
 	if (bM_IsInRange)
 	{
-		TurretOwner.GetInterface()->OnTurretInRange(this);
+		if (GetShouldReportRangeToOwner())
+		{
+			TurretOwner.GetInterface()->OnTurretInRange(this);
+		}
 		if (bM_IsRotatedToEngage)
 		{
 			if constexpr (DeveloperSettings::Debugging::GTurret_Master_Compile_DebugSymbols)
@@ -1564,7 +1567,7 @@ void ACPPTurretsMaster::SpecificEngage()
 			FireAllWeapons();
 		}
 	}
-	else
+	else if (GetShouldReportRangeToOwner())
 	{
 		TurretOwner.GetInterface()->OnTurretOutOfRange(TgtLoc, this);
 	}

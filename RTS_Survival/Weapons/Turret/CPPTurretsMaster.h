@@ -434,6 +434,9 @@ protected:
 	/** @return True when GetCanTraverseToLocation can reject targets; the target search then asks for more candidates. */
 	virtual bool GetHasFixedTraverseArc() const;
 
+	/** @return False for a secondary turret that must not drive its owner into range of an attack target. */
+	virtual bool GetShouldReportRangeToOwner() const { return true; }
+
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend struct FVehicleModuleTestAccess;

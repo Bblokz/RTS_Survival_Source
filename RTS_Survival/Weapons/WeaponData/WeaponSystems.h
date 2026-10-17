@@ -263,7 +263,9 @@ enum class
 	// The Panzerschreck foxhole's weapon: the infantry Panzerschreck, balanced on its own for a light emplacement.
 	PanzerSchreck_Pit UMETA(DisplayName = "PanzerSchreck 88MM Foxhole"),
 	// The ISU-152's casemate gun: the SU-152's ML-20S balanced as a direct-fire heavy tank destroyer gun.
-	ML_20S_152MM_ISU152 UMETA(DisplayName = "ML-20S 152MM (ISU-152)")
+	ML_20S_152MM_ISU152 UMETA(DisplayName = "ML-20S 152MM (ISU-152)"),
+	// The Maxim team weapon's water-cooled 7.62mm machine gun; it used to borrow the DShK's 12.7mm entry.
+	Maxim_M1910_7_62MM_TW UMETA(DisplayName = "Maxim M1910 7.62MM TW")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -357,6 +359,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::ML20_152MM_TW: return "ML-20";
 	case EWeaponName::ML20_152MM_Pit: return "ML-20";
 	case EWeaponName::BS3_100MM_TW: return "BS-3";
+	case EWeaponName::Maxim_M1910_7_62MM_TW: return "Maxim";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -840,6 +843,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "ML20_152MM_Pit";
 	case EWeaponName::BS3_100MM_TW:
 		return "BS3_100MM_TW";
+	case EWeaponName::Maxim_M1910_7_62MM_TW:
+		return "Maxim_M1910_7_62MM_TW";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:
