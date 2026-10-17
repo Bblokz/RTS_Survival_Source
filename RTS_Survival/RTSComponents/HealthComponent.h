@@ -195,6 +195,10 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
 	void AddHealth(const float HealthToAdd, const float DamageReductionToAdd = 0);
+
+	// Multiplier on incoming damage; temporary protections (a team weapon's dig-in) scale it and scale it back.
+	float GetDamageReductionMultiplier() const { return DamageReductionSettings.DamageReductionMlt; }
+	void SetDamageReductionMultiplier(const float NewDamageReductionMultiplier);
 	
 
 	UFUNCTION(BlueprintCallable)

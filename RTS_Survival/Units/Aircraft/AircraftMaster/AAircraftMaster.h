@@ -702,7 +702,7 @@ private:
 	/** @brief Push initial LandedState into weapons/anim to keep them consistent on spawn. */
 	void BeginPlay_PropagateStateToWpAndAnimInst() const;
 
-	/** @brief Makes the weapons of the aircraft's enemies hit it, whichever side the Blueprint was authored for. */
+	/** @brief Removes movement blockers from every aircraft primitive while retaining enemy weapon hits and selection. */
 	void BeginPlay_SetupWeaponHitCollision() const;
 
 

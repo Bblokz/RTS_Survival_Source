@@ -2400,6 +2400,17 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::DShk_12_7MM, WeaponData);
 
+	// Maxim M1910 7.62mm: the Maxim team weapon's gun. The DShK's belt and fire rhythm (the team weapon was set up
+	// with it) with a rifle-calibre round: less damage and penetration per bullet.
+	WeaponData.WeaponName = EWeaponName::Maxim_M1910_7_62MM_TW;
+	WeaponData.WeaponCalibre = 7.62f;
+	WeaponData.BaseDamage = 8.f * DamagePerMM;
+	WeaponData.ArmorPen = 13.f;
+	WeaponData.ArmorPenMaxRange = 7.f;
+	WeaponData.MagCapacity = 250;
+	WeaponData.Accuracy = HMGAccuracy;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Maxim_M1910_7_62MM_TW, WeaponData);
+
 	// German tank MG 7.6mm — KEEP ORIGINAL
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::Ger_TankMG_7_6MM;

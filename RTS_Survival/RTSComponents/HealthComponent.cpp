@@ -212,6 +212,17 @@ void UHealthComponent::SetMaxHealth(const float NewMaxHealth)
 	}
 }
 
+void UHealthComponent::SetDamageReductionMultiplier(const float NewDamageReductionMultiplier)
+{
+	if (NewDamageReductionMultiplier <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError("SetDamageReductionMultiplier needs a positive multiplier on " +
+			GetNameSafe(GetOwner()));
+		return;
+	}
+	DamageReductionSettings.DamageReductionMlt = NewDamageReductionMultiplier;
+}
+
 void UHealthComponent::AddHealth(const float HealthToAdd, const float DamageReductionToAdd)
 {
 	SetMaxHealth(GetMaxHealth() + HealthToAdd);

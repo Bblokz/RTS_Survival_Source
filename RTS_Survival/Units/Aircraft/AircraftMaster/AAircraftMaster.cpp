@@ -1832,22 +1832,21 @@ void AAircraftMaster::BeginPlay_SetupWeaponHitCollision() const
 	bool bFoundHitComponent = false;
 	for (UPrimitiveComponent* Primitive : Primitives)
 	{
-		const bool bIsWeaponHitComponent = IsValid(Primitive)
-			&& (Primitive->GetCollisionResponseToChannel(COLLISION_TRACE_PLAYER) == ECR_Block
-				|| Primitive->GetCollisionResponseToChannel(COLLISION_TRACE_ENEMY) == ECR_Block);
-		if (not bIsWeaponHitComponent)
+		if (not IsValid(Primitive))
 		{
 			continue;
 		}
-		FRTS_CollisionSetup::SetupAircraftWeaponHitCollision(Primitive, OwningPlayer);
-		bFoundHitComponent = true;
+		const bool bIsWeaponHitComponent = Primitive->GetCollisionResponseToChannel(COLLISION_TRACE_PLAYER) == ECR_Block
+			|| Primitive->GetCollisionResponseToChannel(COLLISION_TRACE_ENEMY) == ECR_Block;
+		FRTS_CollisionSetup::SetupAircraftComponentCollision(Primitive, OwningPlayer, bIsWeaponHitComponent);
+		bFoundHitComponent |= bIsWeaponHitComponent;
 	}
 	if (bFoundHitComponent || not EnsureAircraftMeshIsValid())
 	{
 		return;
 	}
 	// No component of the Blueprint takes weapon hits; the aircraft mesh and its physics bodies do.
-	FRTS_CollisionSetup::SetupAircraftWeaponHitCollision(M_AircraftMesh, OwningPlayer);
+	FRTS_CollisionSetup::SetupAircraftComponentCollision(M_AircraftMesh, OwningPlayer, true);
 }
 
 void AAircraftMaster::BeginPlay_PropagateStateToWpAndAnimInst() const
