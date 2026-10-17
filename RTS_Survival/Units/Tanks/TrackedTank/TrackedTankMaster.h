@@ -206,6 +206,12 @@ protected:
 	 */
 	virtual void TerminateMoveCommandForMovementReplacement() override;
 
+	/** @brief Drives toward the tow target as part of the tow command; the AI controller reports back when it ends. */
+	virtual bool TryStartTowApproachMove(const FVector& TowTargetLocation,
+	                                     const float ApproachAcceptanceRadius) override;
+	/** @brief Stops a tow approach drive, unless a queued move takes over driving. */
+	virtual void TerminateTowActorCommand() override;
+
 	virtual void ExecuteReverseCommand(const FVector ReverseToLocation) override;
 	virtual void TerminateReverseCommand() override;
 

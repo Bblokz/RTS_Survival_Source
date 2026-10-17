@@ -6,6 +6,7 @@
 #include "TeamWeaponController.h"
 #include "TeamWeaponMover.h"
 #include "CrewPositions/CrewPosition.h"
+#include "DigIn/TeamWeaponDigInComponent.h"
 #include "Components/DecalComponent.h"
 #include "Components/SceneComponent.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
@@ -108,6 +109,7 @@ ATeamWeapon::ATeamWeapon()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	M_OptimizationComponent = CreateDefaultSubobject<URTSOptimizer>(TEXT("RTSOptimizer"));
+	M_DigInComponent = CreateDefaultSubobject<UTeamWeaponDigInComponent>(TEXT("TeamWeaponDigIn"));
 }
 
 void ATeamWeapon::BeginPlay()
@@ -196,6 +198,10 @@ void ATeamWeapon::PlayFireAnim() const
 void ATeamWeapon::OnTeamWeaponAbandoned()
 {
 	bM_IsAbandoned = true;
+	if (IsValid(M_DigInComponent))
+	{
+		M_DigInComponent->RemoveDigIn();
+	}
 	M_TeamWeaponDecalManager.CreateDecal(this);
 	ApplyAbandonedHealthBarCustomization();
 	DisableTurret();
@@ -769,6 +775,11 @@ void ATeamWeapon::OnHealthChanged(const EHealthLevel PercentageLeft, const bool 
 
 void ATeamWeapon::UnitDies(const ERTSDeathType DeathType)
 {
+	// The pit goes with the gun.
+	if (IsValid(M_DigInComponent))
+	{
+		M_DigInComponent->RemoveDigIn();
+	}
 	if (GetIsValidTeamWeaponController())
 	{
 		M_TeamWeaponController->OnControlledTeamWeaponDied();

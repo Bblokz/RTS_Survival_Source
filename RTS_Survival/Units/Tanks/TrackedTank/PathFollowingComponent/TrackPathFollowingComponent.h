@@ -484,6 +484,9 @@ protected:
 	/** sets properties relating to path following */
 	virtual void SetMoveSegment(int32 SegmentStartIndex) override;
 
+	/** Keeps the request's goal acceptance radius, which SetMoveSegment would otherwise replace on the last segment. */
+	virtual FAIRequestID RequestMove(const FAIMoveRequest& RequestData, FNavPathSharedPtr InPath) override;
+
 	/** notify about finished movement */
 	virtual void OnPathFinished(const FPathFollowingResult& Result) override;
 	void UpdateVehicle(float Throttle, float CurrentSpeed, float DeltaTime, float BreakAmount, float Steering);
@@ -509,6 +512,10 @@ protected:
 	/* The acceptance radius used on final destination */
 	UPROPERTY(EditDefaultsOnly, Category = "Path Following|Advanced")
 	float VehicleGoalAcceptanceRadius = 50.f;
+
+	// Goal acceptance radius of the active move request. A request may ask for more room than
+	// VehicleGoalAcceptanceRadius (a tow approach ends in tow range, not on the towed gun); never for less.
+	float M_RequestedGoalAcceptanceRadius = 0.f;
 
 	/* The multiplier used against the vehicle radius to check if the vehicle has reached final destination.
 	 * default 1.1*/

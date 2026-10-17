@@ -503,6 +503,49 @@ void ATrackedTankMaster::TerminateMoveCommandForMovementReplacement()
 	CheckFootPrintForOverlaps();
 }
 
+bool ATrackedTankMaster::TryStartTowApproachMove(const FVector& TowTargetLocation,
+                                                 const float ApproachAcceptanceRadius)
+{
+	if (not GetIsValidAITankController())
+	{
+		return false;
+	}
+
+	// Same as a move: the parked hull stops cutting the navmesh so the path can start from under it.
+	if (GetIsValidRTSNavCollision())
+	{
+		RTSNavCollision->EnableAffectNavmesh(false);
+	}
+	ExecuteTrackedMoveWithNavSettleDelayForAbility(
+		TowTargetLocation,
+		false,
+		EAbilityID::IdTowActor,
+		ApproachAcceptanceRadius);
+	return true;
+}
+
+void ATrackedTankMaster::TerminateTowActorCommand()
+{
+	Super::TerminateTowActorCommand();
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (IsValid(CommandData) && CommandData->GetHasQueuedMovementCommandAfterActive())
+	{
+		// The queued move drives on from here; only the approach request is dropped.
+		CancelPendingTrackedMove();
+		if (GetIsValidAITankController())
+		{
+			AITankController->ClearMovementRequestOwnership();
+		}
+		return;
+	}
+
+	FullyStopTrackedMovementCommand();
+	if (GetIsValidRTSNavCollision())
+	{
+		RTSNavCollision->EnableAffectNavmesh(true);
+	}
+}
+
 void ATrackedTankMaster::ExecuteReverseCommand(const FVector ReverseToLocation)
 {
 	StartMovementCommandInvariantMonitoring();

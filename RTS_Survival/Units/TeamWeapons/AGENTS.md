@@ -131,3 +131,17 @@ Run it after any change to movement, deploy, crew placement or towing.
   the attachment stays). The hitch frame uses the truck actor's rotation, not the socket's. Hooking cancels deploy and
   pack timers, post actions, turns and pushes (`CancelPendingDeployForTow`); deploy/pack timer callbacks return when
   towed. `EndTowSway` after detaching keeps the swung position upright.
+
+## Dig-in (sandbag pits)
+
+Doc and test: `Source/Docs/Units/TeamWeaponDigIn.md`, `-TeamWeaponDigInValidate` (`Tests/TeamWeaponDigInTestSubsystem`).
+
+- `UTeamWeaponDigInComponent` (on `ATeamWeapon`) owns the pit and the protection (+33 % max health, damage multiplier
+  x0.8, both taken off by the same factors). The pit mesh is found by gun Blueprint name
+  (`SM_TWDigIn_<Gun>`, `_Soviet` copies and Blueprint children share it); there is no per-subtype table because some
+  squad Blueprints carry the wrong subtype.
+- `ATeamWeaponDigInWall` has a scene root: the mesh rises relative to it while building. Hits on it forward to the gun.
+  Its wall runs block navigation through nav modifiers from the mesh's `NavBox_<n>` sockets, not through the mesh.
+- The controller owns the command card (Break Cover instead of Dig In; Move, Rotate Towards and Tow off the card) and
+  must call `RemoveTeamWeaponDigIn` wherever the gun leaves its pit without Break Cover (tow hook, abandon). Anything
+  that would move a dug-in gun (out-of-range reposition) checks `GetIsTeamWeaponDigInActive` first.
