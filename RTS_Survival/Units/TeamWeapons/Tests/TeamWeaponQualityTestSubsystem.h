@@ -171,6 +171,9 @@ struct FTWQualityTowSubject
 	bool bHasLastWeaponLocation = false;
 	int32 DrivePicturesTaken = 0;
 	float NextOrderDebugLogSeconds = 3.f;
+	// Where the gun stood when the re-tow was ordered; the retow_debug lines show how far it was moved since.
+	FVector RetowOrderWeaponLocation = FVector::ZeroVector;
+	float NextRetowDebugLogSeconds = 0.f;
 	// Last logged controller state and tow links, so every change shows up once in the log.
 	FString LastLoggedTowStatus;
 };
@@ -332,6 +335,7 @@ private:
 	void TickTowMovingDetachedGun(FTWQualityTowSubject& Subject, const FTWQualityTowFrame& Frame);
 	void TickTowMeasuringAfterGunMove(FTWQualityTowSubject& Subject, const FTWQualityTowFrame& Frame);
 	void TickTowWaitingForRetow(FTWQualityTowSubject& Subject, const FTWQualityTowFrame& Frame);
+	void LogRetowApproach(const FTWQualityTowSubject& Subject, const FTWQualityTowFrame& Frame) const;
 	void TickTowSettlingRetowed(FTWQualityTowSubject& Subject, const FTWQualityTowFrame& Frame);
 	void TickTowRetowDriving(FTWQualityTowSubject& Subject, const FTWQualityTowFrame& Frame);
 	void EnterTowStep(FTWQualityTowSubject& Subject, const ETWQualityTowStep NewStep);

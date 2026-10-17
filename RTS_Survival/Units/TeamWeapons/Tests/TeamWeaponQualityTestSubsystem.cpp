@@ -34,10 +34,13 @@
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
+#include "RTS_Survival/RTSComponents/CargoMechanic/CargoSquad/CargoSquad.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 #include "RTS_Survival/RTSComponents/TowMechanic/VehicleTow/VehicleTow.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/Tanks/AITankMaster.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
@@ -54,6 +57,7 @@ namespace TeamWeaponQualityPrivate
 	const TCHAR* const LocationSwitch = TEXT("TWQualityAt=");
 	const TCHAR* const SquadsSwitch = TEXT("TWQualitySquads=");
 	const TCHAR* const TowsSwitch = TEXT("TWQualityTows=");
+	const TCHAR* const ExitCargoSwitch = TEXT("TWQualityExitCargo");
 	const TCHAR* const LegLengthSwitch = TEXT("TWQualityLegCm=");
 	const TCHAR* const SearchRadiusSwitch = TEXT("TWQualitySearchCm=");
 	const TCHAR* const AnchorClassPrefix = TEXT("BP_UnitImage_LandscapeAnchor");
@@ -97,6 +101,7 @@ namespace TeamWeaponQualityPrivate
 	// Leg index used to name the pictures of the pushed move after detaching.
 	constexpr int32 DetachedGunMoveLegIndex = 9;
 	constexpr float OrderDebugLogIntervalSeconds = 10.f;
+	constexpr float RetowDebugLogIntervalSeconds = 2.f;
 
 	constexpr float SquadRingRadiusCm = 3500.f;
 	constexpr float TowRingRadiusCm = 7000.f;
@@ -1813,9 +1818,22 @@ void UTeamWeaponQualityTestSubsystem::TickTowSettlingStopped(FTWQualityTowSubjec
 	}
 	ReportTow(Subject.Name, TEXT("tow_stopped"), Subject.Stopped, false);
 	RequestPicture(Frame.Truck, Subject.Name + TEXT("_tow_stopped"));
-	const ECommandQueueError Error = Frame.Truck->DetachTow(true);
-	UE_LOG(LogRTSTeamWeaponQuality, Display, TEXT("RTS_TWQC order subject=%s detach error=%d"),
-	       *Subject.Name, static_cast<int32>(Error));
+	const bool bExitCargo = FParse::Param(FCommandLine::Get(), ExitCargoSwitch);
+	const ECommandQueueError Error = bExitCargo ? Frame.Truck->ExitCargo(true) : Frame.Truck->DetachTow(true);
+	UE_LOG(LogRTSTeamWeaponQuality, Display, TEXT("RTS_TWQC order subject=%s %s error=%d"),
+	       *Subject.Name, bExitCargo ? TEXT("exit_cargo") : TEXT("detach"), static_cast<int32>(Error));
+	if (bExitCargo)
+	{
+		const UCargo* const TruckCargo = Frame.Truck->FindComponentByClass<UCargo>();
+		const UCargoSquad* const CrewCargo = Frame.Controller->FindComponentByClass<UCargoSquad>();
+		const UVehicleTowComponent* const VehicleTow = Frame.Truck->FindComponentByClass<UVehicleTowComponent>();
+		Check(Error == ECommandQueueError::NoError, Subject.Name, TEXT("exit_cargo_accepted"), TEXT(""));
+		Check(Frame.Weapon->GetAttachParentActor() == nullptr, Subject.Name, TEXT("exit_cargo_detaches_gun"), TEXT(""));
+		Check(IsValid(TruckCargo) && TruckCargo->GetIsEmpty(), Subject.Name, TEXT("exit_cargo_empties_truck"), TEXT(""));
+		Check(IsValid(CrewCargo) && not CrewCargo->GetIsInsideCargo(), Subject.Name,
+		      TEXT("exit_cargo_releases_crew"), TEXT(""));
+		Check(IsValid(VehicleTow) && VehicleTow->IsTowFree(), Subject.Name, TEXT("exit_cargo_clears_tow"), TEXT(""));
+	}
 	EnterTowStep(Subject, ETWQualityTowStep::WaitingForDetachDeploy);
 }
 
@@ -1931,6 +1949,8 @@ void UTeamWeaponQualityTestSubsystem::TickTowMeasuringAfterGunMove(FTWQualityTow
 		return;
 	}
 	ReportTowDeployedWindow(Subject, TEXT("deployed_after_gun_move"), Subject.AfterGunMove);
+	Subject.RetowOrderWeaponLocation = Frame.Weapon->GetActorLocation();
+	Subject.NextRetowDebugLogSeconds = 0.f;
 	const ECommandQueueError Error = Frame.Truck->TowActor(Frame.Weapon, ETowedActorTarget::TowTeamWeapon, true);
 	UE_LOG(LogRTSTeamWeaponQuality, Display, TEXT("RTS_TWQC order subject=%s retow error=%d"),
 	       *Subject.Name, static_cast<int32>(Error));
@@ -1939,6 +1959,11 @@ void UTeamWeaponQualityTestSubsystem::TickTowMeasuringAfterGunMove(FTWQualityTow
 
 void UTeamWeaponQualityTestSubsystem::TickTowWaitingForRetow(FTWQualityTowSubject& Subject, const FTWQualityTowFrame& Frame)
 {
+	if (Frame.StepSeconds >= Subject.NextRetowDebugLogSeconds)
+	{
+		Subject.NextRetowDebugLogSeconds = Frame.StepSeconds + TeamWeaponQualityPrivate::RetowDebugLogIntervalSeconds;
+		LogRetowApproach(Subject, Frame);
+	}
 	if (Frame.State == ETeamWeaponState::Towed && Frame.Weapon->GetAttachParentActor() == Frame.Truck)
 	{
 		Check(true, Subject.Name, TEXT("retowed"), TEXT(""));
@@ -1950,6 +1975,30 @@ void UTeamWeaponQualityTestSubsystem::TickTowWaitingForRetow(FTWQualityTowSubjec
 		Check(false, Subject.Name, TEXT("retowed"), TeamWeaponQualityPrivate::GetStateName(*Frame.Controller));
 		EnterTowStep(Subject, ETWQualityTowStep::Done);
 	}
+}
+
+void UTeamWeaponQualityTestSubsystem::LogRetowApproach(const FTWQualityTowSubject& Subject,
+                                                       const FTWQualityTowFrame& Frame) const
+{
+	UCommandData* const TruckCommandData = Frame.Truck->GetIsValidCommandData();
+	const EAbilityID TruckCommand = IsValid(TruckCommandData)
+		                                ? TruckCommandData->GetCurrentlyActiveCommandType()
+		                                : EAbilityID::IdNoAbility;
+	const AAITankMaster* const TruckController = Frame.Truck->GetAIController();
+	const UPathFollowingComponent* const PathFollowing = IsValid(TruckController)
+		                                                     ? TruckController->GetPathFollowingComponent()
+		                                                     : nullptr;
+	const int32 MoveStatus = IsValid(PathFollowing) ? static_cast<int32>(PathFollowing->GetStatus()) : -1;
+	const FVector PathDestination = IsValid(PathFollowing) ? PathFollowing->GetPathDestination() : FVector::ZeroVector;
+	UE_LOG(LogRTSTeamWeaponQuality, Display,
+	       TEXT("RTS_TWQC retow_debug subject=%s dist2d=%.0f truck_speed=%.0f truck_command=%s move_status=%d "
+		       "path_dest_to_gun=%.0f truck=%s gun=%s gun_moved=%.0f gun_state=%s (t=%.1f)"),
+	       *Subject.Name, FVector::Dist2D(Frame.Truck->GetActorLocation(), Frame.Weapon->GetActorLocation()),
+	       Frame.Truck->GetVelocity().Size2D(), *UEnum::GetValueAsString(TruckCommand), MoveStatus,
+	       FVector::Dist2D(PathDestination, Frame.Weapon->GetActorLocation()),
+	       *Frame.Truck->GetActorLocation().ToCompactString(), *Frame.Weapon->GetActorLocation().ToCompactString(),
+	       FVector::Dist2D(Frame.Weapon->GetActorLocation(), Subject.RetowOrderWeaponLocation),
+	       *TeamWeaponQualityPrivate::GetStateName(*Frame.Controller), Frame.StepSeconds);
 }
 
 void UTeamWeaponQualityTestSubsystem::TickTowSettlingRetowed(FTWQualityTowSubject& Subject, const FTWQualityTowFrame& Frame)

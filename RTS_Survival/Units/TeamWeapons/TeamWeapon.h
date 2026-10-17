@@ -22,6 +22,7 @@ class UHealthComponent;
 class URTSComponent;
 class UTeamWeaponMover;
 class ATeamWeaponController;
+class UTeamWeaponDigInComponent;
 class UDecalComponent;
 class UMaterialInterface;
 class UCrewPosition;
@@ -272,6 +273,7 @@ public:
 	void SetSpecificEngageTarget(AActor* TargetActor);
 	AActor* GetSpecificEngageTarget() const { return M_SpecificEngageTarget.Get(); }
 	void SetDigInHullRotationLocked(const bool bLocked);
+	UTeamWeaponDigInComponent* GetDigInComponent() const { return M_DigInComponent; }
 
 	/**
 	 * @brief Sets the weapon on the terrain: origin on the ground and tilted to the slope under its footprint.
@@ -397,6 +399,10 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<URTSOptimizer> M_OptimizationComponent;
+
+	// Sandbag pit around the gun; started and removed by the squad controller's dig-in and break-cover commands.
+	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Reference", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UTeamWeaponDigInComponent> M_DigInComponent;
 
 	UPROPERTY()
 	TWeakObjectPtr<ATeamWeaponController> M_TeamWeaponController;

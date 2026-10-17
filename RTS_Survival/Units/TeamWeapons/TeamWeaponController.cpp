@@ -10,10 +10,11 @@
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "Algo/Sort.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
-#include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInComponent.h"
+#include "DigIn/TeamWeaponDigInComponent.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "NavigationSystem.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -55,6 +56,12 @@ namespace TeamWeaponGuardStatics
 	constexpr float GuardTravelDistanceFraction = 0.8f;
 	constexpr float GuardPlacementCheckIntervalSeconds = 1.5f;
 	constexpr float DetachNavProjectionRadiusCm = 500.f;
+	// A dug-in guard further than this from its post inside the pit walks back to it.
+	constexpr float MaxDugInGuardPostDistanceCm = 80.f;
+	// A guard this far from any navmesh stands inside a wall run; it is set on the nearest walkable spot.
+	constexpr float StrandedGuardCheckRadiusCm = 40.f;
+	constexpr float StrandedGuardSearchRadiusCm = 300.f;
+	constexpr float StrandedGuardProjectionHeightCm = 250.f;
 	constexpr float GuardEngageFlowProjectionHeightCm = 300.f;
 }
 
@@ -129,15 +136,7 @@ void ATeamWeaponController::BeginPlay()
 void ATeamWeaponController::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
-	M_DigInComponent = FindComponentByClass<UDigInComponent>();
 	M_TowedActorComponent = GetControlledTeamWeaponTowedActorComponentNoReport();
-
-	if (not GetIsValidDigInComponent())
-	{
-		return;
-	}
-
-	M_DigInComponent->SetupOwner(this);
 }
 
 void ATeamWeaponController::OnAllSquadUnitsLoaded()
@@ -370,14 +369,15 @@ void ATeamWeaponController::ExecuteDigIn()
 {
 	Super::ExecuteDigIn();
 
-	if (not GetIsValidDigInComponent())
+	if (not GetIsValidTeamWeaponDigIn())
 	{
+		DoneExecutingCommand(EAbilityID::IdDigIn);
 		return;
 	}
 
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Deployed)
 	{
-		M_DigInComponent->ExecuteDigInCommand();
+		StartTeamWeaponDigIn();
 		return;
 	}
 
@@ -400,13 +400,8 @@ void ATeamWeaponController::ExecuteBreakCover()
 {
 	Super::ExecuteBreakCover();
 	bM_ShouldExecuteDigInAfterDeploy = false;
-
-	if (not GetIsValidDigInComponent())
-	{
-		return;
-	}
-
-	M_DigInComponent->TerminateDigInCommand();
+	RemoveTeamWeaponDigIn();
+	OnBreakCoverCompleted();
 }
 
 void ATeamWeaponController::TerminateBreakCover()
@@ -640,12 +635,12 @@ FString ATeamWeaponController::GetOrderDebugDescription() const
 		ValidOperatorCount += Operator.IsValid() ? 1 : 0;
 	}
 	return FString::Printf(
-		TEXT("post_pack=%s post_deploy=%s operators=%d/%d valid=%d squad=%d abandoned=%d rotating=%d reposition=%d cached_reposition=%d dig_in_after_deploy=%d"),
+		TEXT("post_pack=%s post_deploy=%s operators=%d/%d valid=%d squad=%d abandoned=%d rotating=%d reposition=%d cached_reposition=%d dig_in_after_deploy=%d dug_in=%d"),
 		*UEnum::GetValueAsString(M_PostPackAction.GetAbilityId()), *UEnum::GetValueAsString(M_PostDeployAction.GetAbilityId()),
 		M_CrewAssignment.M_Operators.Num(), M_CrewAssignment.M_RequiredOperators, ValidOperatorCount,
 		M_TSquadUnits.Num(), bM_IsTeamWeaponAbandoned ? 1 : 0, M_RotationRequest.bM_IsActive ? 1 : 0,
 		bM_HasInternalOutOfRangeReposition ? 1 : 0, bM_HasCachedOutOfRangeMoveLocation ? 1 : 0,
-		bM_ShouldExecuteDigInAfterDeploy ? 1 : 0);
+		bM_ShouldExecuteDigInAfterDeploy ? 1 : 0, GetIsTeamWeaponDigInActive() ? 1 : 0);
 }
 
 void ATeamWeaponController::GetCrewOperators(TArray<ASquadUnit*>& OutOperators) const
@@ -1386,6 +1381,13 @@ bool ATeamWeaponController::GetIsGuardMisplaced(const ASquadUnit& Guard) const
 {
 	using namespace TeamWeaponGuardStatics;
 	const FVector GuardLocation = Guard.GetActorLocation();
+	const int32 GuardIndex = M_CrewAssignment.M_Guards.IndexOfByPredicate(
+		[&Guard](const TWeakObjectPtr<ASquadUnit>& CrewGuard) { return CrewGuard.Get() == &Guard; });
+	FVector DugInGuardPost;
+	if (TryGetDugInGuardPost(GuardIndex, DugInGuardPost))
+	{
+		return FVector::Dist2D(GuardLocation, DugInGuardPost) > MaxDugInGuardPostDistanceCm;
+	}
 	const float DistanceToWeaponCm = FVector::Dist2D(GuardLocation, M_TeamWeapon->GetActorLocation());
 	const float MaxGuardDistanceCm = FMath::Max(M_GuardDistance, MinGuardDistanceToWeaponCm) * MaxGuardDistanceFactor;
 	if (DistanceToWeaponCm < MinGuardDistanceToWeaponCm || DistanceToWeaponCm > MaxGuardDistanceCm)
@@ -1412,9 +1414,9 @@ void ATeamWeaponController::MoveGuardsToGuardPositionsIfMisplaced() const
 		return;
 	}
 
-	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
+	for (int32 GuardIndex = 0; GuardIndex < M_CrewAssignment.M_Guards.Num(); ++GuardIndex)
 	{
-		ASquadUnit* SquadUnit = GuardUnit.Get();
+		ASquadUnit* SquadUnit = M_CrewAssignment.M_Guards[GuardIndex].Get();
 		if (not GetIsValidSquadUnit(SquadUnit) || SquadUnit->GetIsPathFollowingActive())
 		{
 			continue;
@@ -1424,7 +1426,11 @@ void ATeamWeaponController::MoveGuardsToGuardPositionsIfMisplaced() const
 			continue;
 		}
 		FVector GuardLocation;
-		if (not TryGetRandomGuardLocation(GuardLocation))
+		if (TryGetDugInGuardPost(GuardIndex, GuardLocation))
+		{
+			PlaceGuardOnNavMeshIfStranded(*SquadUnit);
+		}
+		else if (not TryGetRandomGuardLocation(GuardLocation))
 		{
 			continue;
 		}
@@ -1462,7 +1468,8 @@ void ATeamWeaponController::CancelRotationRequestForMove()
 void ATeamWeaponController::IssueGuardEngageFlowMoves() const
 {
 	using namespace TeamWeaponGuardStatics;
-	if (not GetIsValidTeamWeapon())
+	// Guards of a dug-in gun keep their posts inside the pit.
+	if (not GetIsValidTeamWeapon() || GetIsTeamWeaponDigInActive())
 	{
 		return;
 	}
@@ -1631,10 +1638,7 @@ void ATeamWeaponController::HandleDeployingTimerFinished()
 	if (bM_ShouldExecuteDigInAfterDeploy)
 	{
 		bM_ShouldExecuteDigInAfterDeploy = false;
-		if (GetIsValidDigInComponent())
-		{
-			M_DigInComponent->ExecuteDigInCommand();
-		}
+		StartTeamWeaponDigIn();
 		return;
 	}
 
@@ -2598,21 +2602,164 @@ bool ATeamWeaponController::GetIsValidAnimatedTextWidgetPoolManager() const
 	return false;
 }
 
-bool ATeamWeaponController::GetIsValidDigInComponent() const
+bool ATeamWeaponController::GetIsValidTeamWeaponDigIn() const
 {
-	if (IsValid(M_DigInComponent))
+	if (GetIsValidTeamWeaponNoReport() && IsValid(M_TeamWeapon->GetDigInComponent()))
 	{
 		return true;
 	}
-
-	// Team weapons can be configured without dig-in.
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_TeamWeapon->GetDigInComponent()",
+	                                                      "GetIsValidTeamWeaponDigIn", this);
 	return false;
+}
+
+bool ATeamWeaponController::GetIsTeamWeaponDigInActive() const
+{
+	if (not GetIsValidTeamWeaponNoReport())
+	{
+		return false;
+	}
+	const UTeamWeaponDigInComponent* DigInComponent = M_TeamWeapon->GetDigInComponent();
+	return IsValid(DigInComponent) && DigInComponent->GetIsDigInActive();
+}
+
+void ATeamWeaponController::StartTeamWeaponDigIn()
+{
+	bM_ShouldExecuteDigInAfterDeploy = false;
+	if (not GetIsValidTeamWeaponDigIn())
+	{
+		DoneExecutingCommand(EAbilityID::IdDigIn);
+		return;
+	}
+	UTeamWeaponDigInComponent* DigInComponent = M_TeamWeapon->GetDigInComponent();
+	if (DigInComponent->GetIsDigInActive())
+	{
+		DoneExecutingCommand(EAbilityID::IdDigIn);
+		return;
+	}
+	// Card and hull first: a pit with no build time stands at once and completes the command.
+	OnStartDigIn();
+	if (not DigInComponent->StartDigIn())
+	{
+		RemoveTeamWeaponDigIn();
+		DoneExecutingCommand(EAbilityID::IdDigIn);
+	}
+}
+
+void ATeamWeaponController::RemoveTeamWeaponDigIn()
+{
+	if (GetIsValidTeamWeaponNoReport())
+	{
+		if (UTeamWeaponDigInComponent* DigInComponent = M_TeamWeapon->GetDigInComponent())
+		{
+			DigInComponent->RemoveDigIn();
+		}
+		M_TeamWeapon->SetDigInHullRotationLocked(false);
+	}
+	RestoreCommandCardAfterDigIn();
+}
+
+void ATeamWeaponController::ApplyDigInCommandCard()
+{
+	if (M_DigInCardState.bIsApplied)
+	{
+		return;
+	}
+	M_DigInCardState.bIsApplied = true;
+	M_DigInCardState.RemovedAbilities.Reset();
+	if (HasAbility(EAbilityID::IdDigIn))
+	{
+		SwapAbility(EAbilityID::IdDigIn, EAbilityID::IdBreakCover);
+	}
+	const TArray<FUnitAbilityEntry> CardEntries = GetUnitAbilityEntries();
+	for (const EAbilityID AbilityToRemove : {EAbilityID::IdMove, EAbilityID::IdRotateTowards, EAbilityID::IdTowActor})
+	{
+		const int32 SlotIndex = CardEntries.IndexOfByPredicate([AbilityToRemove](const FUnitAbilityEntry& Entry)
+		{
+			return Entry.AbilityId == AbilityToRemove;
+		});
+		if (SlotIndex == INDEX_NONE || not RemoveAbility(AbilityToRemove))
+		{
+			continue;
+		}
+		FTeamWeaponDigInRemovedAbility RemovedAbility;
+		RemovedAbility.Entry = CardEntries[SlotIndex];
+		RemovedAbility.SlotIndex = SlotIndex;
+		M_DigInCardState.RemovedAbilities.Add(RemovedAbility);
+	}
+}
+
+void ATeamWeaponController::RestoreCommandCardAfterDigIn()
+{
+	if (not M_DigInCardState.bIsApplied)
+	{
+		return;
+	}
+	M_DigInCardState.bIsApplied = false;
+	if (HasAbility(EAbilityID::IdBreakCover))
+	{
+		SwapAbility(EAbilityID::IdBreakCover, EAbilityID::IdDigIn);
+	}
+	for (const FTeamWeaponDigInRemovedAbility& RemovedAbility : M_DigInCardState.RemovedAbilities)
+	{
+		if (not HasAbility(RemovedAbility.Entry.AbilityId))
+		{
+			AddAbility(RemovedAbility.Entry, RemovedAbility.SlotIndex);
+		}
+	}
+	M_DigInCardState.RemovedAbilities.Reset();
+}
+
+void ATeamWeaponController::HandleTurretOutOfRangeWhileDugIn()
+{
+	const EAbilityID ActiveCommand = GetCurrentActiveCommand();
+	if (ActiveCommand == EAbilityID::IdAttack || ActiveCommand == EAbilityID::IdAttackGround)
+	{
+		DoneExecutingCommand(ActiveCommand);
+	}
+}
+
+bool ATeamWeaponController::TryGetDugInGuardPost(const int32 GuardIndex, FVector& OutLocation) const
+{
+	if (not GetIsValidTeamWeaponNoReport())
+	{
+		return false;
+	}
+	const UTeamWeaponDigInComponent* DigInComponent = M_TeamWeapon->GetDigInComponent();
+	return IsValid(DigInComponent) && DigInComponent->TryGetGuardPostLocation(GuardIndex, OutLocation);
+}
+
+void ATeamWeaponController::PlaceGuardOnNavMeshIfStranded(ASquadUnit& Guard) const
+{
+	using namespace TeamWeaponGuardStatics;
+	UNavigationSystemV1* NavigationSystem = UNavigationSystemV1::GetCurrent(GetWorld());
+	if (not IsValid(NavigationSystem))
+	{
+		return;
+	}
+	const FVector GuardLocation = Guard.GetActorLocation();
+	FNavLocation NavLocation;
+	const FVector OnNavMeshExtent(StrandedGuardCheckRadiusCm, StrandedGuardCheckRadiusCm, StrandedGuardProjectionHeightCm);
+	if (NavigationSystem->ProjectPointToNavigation(GuardLocation, NavLocation, OnNavMeshExtent))
+	{
+		return;
+	}
+	const FVector SearchExtent(StrandedGuardSearchRadiusCm, StrandedGuardSearchRadiusCm, StrandedGuardProjectionHeightCm);
+	if (not NavigationSystem->ProjectPointToNavigation(GuardLocation, NavLocation, SearchExtent))
+	{
+		return;
+	}
+	const UCapsuleComponent* Capsule = Guard.GetCapsuleComponent();
+	const float HalfHeightCm = IsValid(Capsule) ? Capsule->GetScaledCapsuleHalfHeight() : 0.f;
+	Guard.SetActorLocation(NavLocation.Location + FVector(0.f, 0.f, HalfHeightCm), false, nullptr,
+	                       ETeleportType::TeleportPhysics);
 }
 
 void ATeamWeaponController::OnStartDigIn()
 {
 	bM_ShouldExecuteDigInAfterDeploy = false;
 	FinishRotationRequest();
+	ApplyDigInCommandCard();
 
 	if (GetIsValidTeamWeapon())
 	{
@@ -2622,7 +2769,13 @@ void ATeamWeaponController::OnStartDigIn()
 
 void ATeamWeaponController::OnDigInCompleted()
 {
-	DoneExecutingCommand(EAbilityID::IdDigIn);
+	// The guards walk into the pit; their posts exist once it stands.
+	MoveGuardsToGuardPositionsIfMisplaced();
+	// A stop or another order may have ended the dig-in command while the sandbags went up; the pit stays.
+	if (GetCurrentActiveCommand() == EAbilityID::IdDigIn)
+	{
+		DoneExecutingCommand(EAbilityID::IdDigIn);
+	}
 }
 
 void ATeamWeaponController::OnBreakCoverCompleted()
@@ -2668,6 +2821,11 @@ void ATeamWeaponController::OnTurretOutOfRange(const FVector TargetLocation, ACP
 
 	if (not GetIsValidTeamWeapon())
 	{
+		return;
+	}
+	if (GetIsTeamWeaponDigInActive())
+	{
+		HandleTurretOutOfRangeWhileDugIn();
 		return;
 	}
 
@@ -3107,6 +3265,11 @@ void ATeamWeaponController::MoveGuardsToRandomGuardPositions() const
 	{
 		return;
 	}
+	if (GetIsTeamWeaponDigInActive())
+	{
+		MoveGuardsToGuardPositionsIfMisplaced();
+		return;
+	}
 
 	for (const TWeakObjectPtr<ASquadUnit>& GuardUnit : M_CrewAssignment.M_Guards)
 	{
@@ -3285,6 +3448,8 @@ void ATeamWeaponController::AbandonTeamWeapon()
 
 	if (GetIsValidTeamWeapon())
 	{
+		// Nobody is left to hold the pit; a new crew digs in again.
+		RemoveTeamWeaponDigIn();
 		M_TeamWeapon->OnTeamWeaponAbandoned();
 	}
 
@@ -3464,6 +3629,8 @@ void ATeamWeaponController::CancelPendingDeployForTow()
 	M_PostPackAction.Reset();
 	M_PostDeployAction.Reset();
 	bM_ShouldExecuteDigInAfterDeploy = false;
+	// A towed gun leaves its pit behind: walls, protection and the dug-in command card go.
+	RemoveTeamWeaponDigIn();
 	CancelInternalOutOfRangeMove();
 	if (M_RotationRequest.bM_IsActive)
 	{

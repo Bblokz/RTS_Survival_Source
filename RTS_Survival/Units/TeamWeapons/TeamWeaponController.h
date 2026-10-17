@@ -11,6 +11,7 @@
 #include "TeamWeaponState/TeamWeaponState.h"
 #include "CrewPositions/CrewPositionType.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "TeamWeaponController.generated.h"
 
 class ATeamWeapon;
@@ -18,7 +19,7 @@ class ATeamWeaponController;
 class UAnimatedTextWidgetPoolManager;
 class AActor;
 class UCrewPosition;
-class UDigInComponent;
+class UTeamWeaponDigInComponent;
 class UTowedActorComponent;
 class UVehicleTowComponent;
 
@@ -215,6 +216,30 @@ struct FTeamWeaponCrewAnimationState
 	ESquadSubtype M_TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
 };
 
+/** An ability taken off the command card while the gun is dug in, and the card slot it goes back to. */
+USTRUCT()
+struct FTeamWeaponDigInRemovedAbility
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FUnitAbilityEntry Entry;
+
+	int32 SlotIndex = INDEX_NONE;
+};
+
+/** Command card while dug in: Break Cover instead of Dig In, and no moving, turning or towing out of the pit. */
+USTRUCT()
+struct FTeamWeaponDigInCardState
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FTeamWeaponDigInRemovedAbility> RemovedAbilities;
+
+	bool bIsApplied = false;
+};
+
 /**
  * @brief Squad controller that coordinates team weapon crews and keeps their weapon synchronized during moves.
  * Ensures the weapon follows the crew spacing so the emplacement stays aligned with its operators.
@@ -342,7 +367,19 @@ private:
 	bool GetIsPushedWeaponLeadsMovementType() const;
 	bool GetIsValidTeamWeaponMover() const;
 	bool GetIsValidAnimatedTextWidgetPoolManager() const;
-	bool GetIsValidDigInComponent() const;
+	// ---- Dig-in (sandbag pit on the gun's UTeamWeaponDigInComponent) ----
+	bool GetIsValidTeamWeaponDigIn() const;
+	bool GetIsTeamWeaponDigInActive() const;
+	void StartTeamWeaponDigIn();
+	// Removes the pit and its protection and gives back the command card and the hull; completes no command.
+	void RemoveTeamWeaponDigIn();
+	void ApplyDigInCommandCard();
+	void RestoreCommandCardAfterDigIn();
+	// A dug-in gun stays in its pit: an order on a target out of its range ends instead of moving the gun.
+	void HandleTurretOutOfRangeWhileDugIn();
+	bool TryGetDugInGuardPost(const int32 GuardIndex, FVector& OutLocation) const;
+	// A guard left standing where a wall run went up is off the navmesh and cannot path to its post.
+	void PlaceGuardOnNavMeshIfStranded(ASquadUnit& Guard) const;
 	bool GetIsValidTowedActorComponent() const;
 	void ResetTowRelationshipOnTeamWeaponSide(const bool bDetachTeamWeaponActor, const bool bReleaseCargoSquadUnits);
 	void SetTeamWeaponAutoEngageEnabled(const bool bEnableAutoEngage) const;
@@ -618,7 +655,7 @@ private:
 	TWeakObjectPtr<UTowedActorComponent> M_TowedActorComponent;
 
 	UPROPERTY()
-	TObjectPtr<UDigInComponent> M_DigInComponent;
+	FTeamWeaponDigInCardState M_DigInCardState;
 
 	UPROPERTY()
 	bool bM_ShouldExecuteDigInAfterDeploy = false;
