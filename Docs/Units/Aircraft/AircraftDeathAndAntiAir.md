@@ -13,8 +13,11 @@ ever engaging one:
   out of the target data; they are engaged once they lift off.
 - **Enemy aircraft could not be hit.** Aircraft collision comes from the Blueprints, which are authored for the player.
   `AAircraftMaster::BeginPlay_SetupWeaponHitCollision` sets the team channels for the real owner
-  (`FRTS_CollisionSetup::SetupAircraftWeaponHitCollision`): the other side's traces and projectiles hit it, its own
-  side's pass through; other responses stay as the Blueprint set them.
+  (`FRTS_CollisionSetup::SetupAircraftComponentCollision`): the other side's traces and projectiles hit it, its own
+  side's pass through. Every aircraft primitive is query-only (or stays disabled), ignores physical object channels,
+  and has physics, overlaps and navigation influence disabled, so aircraft pass through each other and off-map
+  boundaries. Authored mouse/camera trace responses are retained for selection. The shared projectile object channel
+  is ignored: projectile hits use the same team-specific traces and sweeps as other weapons.
 - **Only the Bofors was set to `Aircraft`.** These turret Blueprints now are too:
   `RTS_BP_EmbTurret_37mmFlak` (also used by the HQ flak platform and the flak bunker), `RTS_BP_EmbTurret_4x20mmFlak`,
   `RTS_BP_EmbTurret_88mmFlak`, `RTS_BP_EmbTurret_GerPit_Flak37`, `Ger_Turret_PZIII_AA`, `Rus_Turret_T34AA` (and its

@@ -56,6 +56,7 @@ class RTS_SURVIVAL_API ABuildingExpansion : public ASelectableActorObjectsMaster
 	GENERATED_BODY()
 
 	friend class UTurretSwapComp;
+	friend class UEmbeddedTurretMountComponent;
 	friend class UResourceConverterComponent;
 
 public:

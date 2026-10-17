@@ -468,3 +468,18 @@ Use this as a **pre-commit / pre-review safety checklist** (especially for Unrea
 
 - **Double-remove / stale handle patterns (cached index/key already removed)**  
   “Remove again” patterns can hit invalid indices or assume `Find` succeeded and dereference null. Always handle “not found” as a normal case, and invalidate cached indices/handles when removals occur.
+
+---
+
+## Local Unreal Editor Connection Memory
+
+Verified on 2026-10-17 for this Windows workstation:
+
+- The project's live editor MCP endpoint is `http://127.0.0.1:9855/uecp/RTS_Survival/mcp` (Ultimate Engine CoPilot / UECP).
+- Authenticate using `Authorization: Bearer <token>`. Read and trim the current token from `%LOCALAPPDATA%\UECP\session_token.txt` at request time. Never print, copy into documentation, commit, or ask the user to paste the token into chat.
+- An unauthenticated request returns HTTP 401. This does not mean Unreal is unavailable. Authenticated `tools/list` and `tools/call` requests succeeded.
+- This UECP server has its own tools; do not assume it implements the generic Unreal skill's `list_toolsets` / `describe_toolset` interface. Discover with `tools/list`, then `search_tools` and `get_tool_docs` as needed. Call discovered actions by name through `tools/call`.
+- For a read-only view of visible editor windows and tabs, discover and call `editor_ui_snapshot` (tested with `max_depth: 5`). Treat the returned UI state as current only when queried; do not remember previously open tabs as permanent state.
+- In the verified server build, HTTP replies advertised `Transfer-Encoding: chunked` but contained unframed JSON or server-sent events. PowerShell `Invoke-WebRequest` rejected these replies with invalid chunk errors. A working fallback used `System.Net.Sockets.TcpClient` to send an authenticated HTTP POST with UTF-8 byte `Content-Length` and `Connection: close`, then read the response with a bounded receive timeout. Separate headers from the body at `\r\n\r\n`; handle either JSON or SSE `data:` lines. Do not interpret this transport error as an authentication failure.
+- Multiple editors can share the project name. The broker URL routes to the first registered instance. Inspect `%LOCALAPPDATA%\UECP\instances\*.json` or the current project log to identify direct ports before targeting another instance; do not assume previously observed ports or process IDs remain valid.
+- Connection details can be confirmed in `D:\UE5Projects\RTS_Survival\Saved\Logs\RTS_Survival.log`. Use read-only queries to verify access before reporting the editor state, and continue to follow the Unreal skill's safety rules for mutations.

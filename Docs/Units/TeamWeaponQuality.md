@@ -22,14 +22,18 @@ UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject <map> -game -unattend
   -ResX=1280 -ResY=720 -DisablePlugins=Fab -benchmark -fps=30 "-ExecCmds=r.TextureStreaming 0"
   -TeamWeaponQualityValidate [-TWQualityAt=X,Y] [-TWQualityDir=<pictures>] [-TWQualitySearchCm=<radius, 0 = off>]
   [-TWQualitySquads=Squad_Ger_PaK40,...] [-TWQualityTows=Tank_Sdkfz250:Squad_Ger_PaK38,...] [-TWQualityLegCm=3600]
+  [-TWQualityExitCargo]
   -abslog=<log>
 ```
 
 Grep the log for `RTS_TWQC`: `metric` lines carry min/mean/p90/p95/max, `check=PASS|FAIL` lines the verdicts,
 `tow_status` every change of the towed gun's state and links, `stall` the mover state when a pushed gun stands still,
-and one `RESULT` line at the end. `Source/Tools/TeamWeaponQuality/run_twqc.sh <label> <map> [args]` runs it and writes a summary.
+`retow_debug` the truck's distance, speed, command and path state every 2 s while it drives to re-tow, and one
+`RESULT` line at the end. `Source/Tools/TeamWeaponQuality/run_twqc.sh <label> <map> [args]` runs it and writes a summary.
 
 Notes:
+- `-TWQualityExitCargo` uses the truck's Exit Cargo order instead of Detach Tow, checking that it releases both
+  the gun and its crew, empties the cargo and clears the tow before continuing the deploy, push and re-tow checks.
 - `RTS_ToCopySmall` needs `-TWQualityAt=16796,-15808`; its player start has no ground under it. Without a usable
   start the test falls back to a random navmesh point after 15 s.
 - `RTS_ToCopySmall` and `UT_Nomadics` are flat (under 60 cm relief over 140 m); slopes need another map.
@@ -74,8 +78,23 @@ Notes:
 - **Tow robustness**: hooking cancels a pending deploy/pack timer, post actions, turns and pushes; deploy/pack timers
   ignore a towed gun; the truck's deferred ability setup starts on Detach when it already tows; hooking stops pack and
   deploy montages without their end callbacks.
+- **Re-tow approach** (`ATankMaster::ExecuteTowActorCommand`): a truck out of tow range used to queue a plain move to
+  the gun's own location (50 cm goal acceptance) and a new tow behind it. It cannot stand on the gun, so it circled
+  the gun 50–85 cm from its centre until the test gave up: the move never ended and the queued tow never ran. Tracked
+  vehicles now drive as part of the tow command (`TryStartTowApproachMove`, completion ability `IdTowActor`) and stop
+  at 75 % of `AcceptanceRadiusToTow`; when the drive ends, succeeded or blocked, `AAITankMaster` hands back to
+  `ATankMaster::OnTowApproachMoveFinished`, which hooks in range or drives again (at most 3 drives).
+  `UTrackPathFollowingComponent::SetMoveSegment` used to replace any request's goal acceptance with
+  `VehicleGoalAcceptanceRadius` (50 cm); it now keeps the larger of the two, and a repath around a parked vehicle
+  keeps the request's override. Side effect: other requests asking for more room get it too (the nomadic truck's
+  `ConstructionAcceptanceRad`, 100 cm, and Behaviour Tree moves with a larger acceptable radius).
+  Before: `retowed` failed in 7 of 23 earlier runs (always the 53-K). After: 4 consecutive runs per map, both trucks
+  hooked every time (flat 267/0 each run).
 
 ## Results (2026-10-16, DebugGame, `-RenderOffscreen`)
+
+Exit Cargo regression (2026-10-17, Development, `-RenderOffscreen -TWQualityExitCargo`, flat map):
+**277 pass / 0 fail**, including five Exit Cargo checks for each towed gun, followed by deployment, push and re-tow.
 
 | Map | Run | Checks |
 |---|---|---|
@@ -105,8 +124,6 @@ them with the baseline.
 
 ## Open items
 
-- Re-towing (`TowActor` on a gun 15 m away) did not hook in 3 of about 10 runs; the truck's approach (drive to
-  the gun, retry while farther than `AcceptanceRadiusToTow`) never got close enough. Truck tow logic was not changed.
 - The towed gun's pitch target is taken from the ground under the unpitched axle; on steep banks the pitched axle
   stands up to ~30 cm closer to the truck, so the wheels can sit 10–30 cm too low there. A second ground probe at the
   pitched axle would fix it.
