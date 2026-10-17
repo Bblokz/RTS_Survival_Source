@@ -287,6 +287,7 @@ class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurre
 	// For movement orders on the AI controller directly.
 	friend class UTankAimAbilityComponent;
 	friend class UTurretSwapComp;
+	friend class UEmbeddedTurretMountComponent;
 	friend struct FMissionTowTeamWeaponSpawnState;
 	friend class RTS_SURVIVAL_API UBehVehicleStunned;
 	friend class UShieldComponent;
@@ -425,6 +426,13 @@ public:
 	virtual void GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets) const override;
 	virtual void ExecuteDetachTowCommand() override;
 	virtual void OnActorBeingTowed(AActor* TowingVehicle, UVehicleTowComponent* TowComp) override;
+
+	/**
+	 * @brief Called by the AI controller when the drive started by TryStartTowApproachMove ends, whatever the result:
+	 * hooks the target when it is in tow range now, otherwise drives again or gives up after a few attempts.
+	 * @param CommandExecutionSerial Serial of the tow command execution that issued the drive.
+	 */
+	void OnTowApproachMoveFinished(const uint64 CommandExecutionSerial);
 
 	// For mission programming.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -648,6 +656,15 @@ protected:
 
 	virtual void ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype) override;
 	virtual void TerminateTowActorCommand() override;
+
+	/**
+	 * @brief Lets vehicles drive to a tow target as part of the tow command, ending the drive once in tow range
+	 * instead of on the target itself, which a vehicle cannot reach and would circle around.
+	 * @param TowTargetLocation Where the tow target stands.
+	 * @param ApproachAcceptanceRadius Distance to the target at which the drive is done.
+	 * @return False when this vehicle has no such drive; the tow command then queues a plain move and a new tow.
+	 */
+	virtual bool TryStartTowApproachMove(const FVector& TowTargetLocation, const float ApproachAcceptanceRadius);
 	virtual void TerminateDetachTowCommand() override;
 	virtual void ExecuteCrewRepairCommand(ECrewRepairAbilityType Subtype) override;
 	virtual void TerminateCrewRepairCommand(ECrewRepairAbilityType Subtype) override;
@@ -946,9 +963,12 @@ private:
 	                               class ATeamWeaponController* TeamWeaponController,
 	                               UTowedActorComponent* TowedActorComponent,
 	                               const bool bDoneExecutingCommandAfterTow);
-	bool ExecuteTowActorCommand_GetShouldQueueMoveThenRetry(const AActor* TowTargetActor,
-	                                                        const UVehicleTowComponent* VehicleTowComp) const;
+	void ExecuteTowActorCommand_TowOrApproach(AActor* TowTargetActor, const ETowedActorTarget TowSubtype);
+	void ExecuteTowActorCommand_ApproachTarget(AActor* TowTargetActor, const ETowedActorTarget TowSubtype);
+	bool ExecuteTowActorCommand_GetIsOutOfTowRange(const AActor* TowTargetActor,
+	                                               const UVehicleTowComponent* VehicleTowComp) const;
 	bool ExecuteDetachTowCommand_TryDetachSelfFromTow();
+	void ExecuteExitCargoCommand_DetachTowedTeamWeapon();
 	void ExecuteDetachTowCommand_DetachTowedVehicle(AActor* TowedActor, UTowedActorComponent* TowedActorComponent);
 	void ExecuteDetachTowCommand_DetachTowedTeamWeapon(class ATeamWeaponController* TeamWeaponController);
 	void CleanupTowRelationshipsOnDeath();
@@ -998,6 +1018,15 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UVehicleTowComponent> M_VehicleTowComponent;
+
+	// The tow command's target, kept for when its approach drive ends and the AI controller hands control back.
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_TowApproachTarget;
+
+	ETowedActorTarget M_TowApproachSubtype = ETowedActorTarget::None;
+
+	// Drives toward the tow target in the current tow command; reset when a tow command starts, caps the retries.
+	int32 M_TowApproachAttempts = 0;
 
 	UPROPERTY()
 	TWeakObjectPtr<UTowedActorComponent> M_TowedActorComponent;

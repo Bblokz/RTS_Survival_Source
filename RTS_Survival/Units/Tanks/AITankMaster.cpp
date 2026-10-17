@@ -96,6 +96,7 @@ bool AAITankMaster::IssueQueuedMovementRequest(
 	M_QueuedMovementRequest.RequestID = FAIRequestID::InvalidRequest;
 	M_QueuedMovementRequest.CompletionAbility = CompletionAbility;
 	M_QueuedMovementRequest.CommandExecutionSerial = CommandExecutionSerial;
+	M_QueuedMovementRequest.GoalAcceptanceRadiusOverride = GoalAcceptanceRadiusOverride;
 
 	const float GoalAcceptanceRadius = GoalAcceptanceRadiusOverride >= 0.f
 		                                   ? GoalAcceptanceRadiusOverride
@@ -207,7 +208,8 @@ bool AAITankMaster::TryRepathActiveMovementRequest(const FVector& GoalLocation)
 		return IssueQueuedMovementRequest(
 			GoalLocation,
 			ActiveRequest.CompletionAbility,
-			ActiveRequest.CommandExecutionSerial);
+			ActiveRequest.CommandExecutionSerial,
+			ActiveRequest.GoalAcceptanceRadiusOverride);
 	}
 	if (ActiveRequest.Owner == ETankMovementRequestOwner::TurretRange)
 	{
@@ -352,6 +354,11 @@ void AAITankMaster::OnQueuedMovementCompleted(
 	{
 		return;
 	}
+	if (CompletedMovementAbility == EAbilityID::IdTowActor)
+	{
+		ControlledTank->OnTowApproachMoveFinished(CommandExecutionSerial);
+		return;
+	}
 
 	ControlledTank->TryDoneExecutingCommand(CompletedMovementAbility, CommandExecutionSerial);
 }
@@ -366,6 +373,12 @@ void AAITankMaster::OnQueuedMovementFailed(
 	{
 		return;
 	}
+	if (FailedMovementAbility == EAbilityID::IdTowActor)
+	{
+		// A blocked drive often ends in tow range already; the tank decides whether to hook or drive again.
+		ControlledTank->OnTowApproachMoveFinished(CommandExecutionSerial);
+		return;
+	}
 
 	ControlledTank->TryDoneExecutingCommand(FailedMovementAbility, CommandExecutionSerial);
 }
@@ -376,6 +389,11 @@ void AAITankMaster::OnQueuedMovementRequestFailed(
 {
 	if (not GetIsValidControlledTank())
 	{
+		return;
+	}
+	if (FailedMovementAbility == EAbilityID::IdTowActor)
+	{
+		ControlledTank->OnTowApproachMoveFinished(CommandExecutionSerial);
 		return;
 	}
 

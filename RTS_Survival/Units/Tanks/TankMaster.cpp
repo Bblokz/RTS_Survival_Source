@@ -983,6 +983,9 @@ void ATankMaster::TerminateReturnCargoCommand()
 
 void ATankMaster::ExecuteExitCargoCommand()
 {
+	// Release the gun and its crew together before unloading any remaining passengers.
+	ExecuteExitCargoCommand_DetachTowedTeamWeapon();
+
 	UCargo* const CargoComponent = FindComponentByClass<UCargo>();
 	if (not IsValid(CargoComponent))
 	{
@@ -992,6 +995,29 @@ void ATankMaster::ExecuteExitCargoCommand()
 
 	CargoComponent->ExitAllSquads();
 	DoneExecutingCommand(EAbilityID::IdExitCargo);
+}
+
+void ATankMaster::ExecuteExitCargoCommand_DetachTowedTeamWeapon()
+{
+	if (not GetIsValidVehicleTowComponentNoReport() || M_VehicleTowComponent->IsTowFree() ||
+		M_VehicleTowComponent->GetCurrentTowSubtype() != ETowedActorTarget::TowTeamWeapon)
+	{
+		return;
+	}
+
+	ATeamWeapon* const TeamWeaponActor = Cast<ATeamWeapon>(M_VehicleTowComponent->GetTowedActor());
+	if (not IsValid(TeamWeaponActor))
+	{
+		return;
+	}
+
+	ATeamWeaponController* const TeamWeaponController = TeamWeaponActor->GetTeamWeaponController();
+	if (not IsValid(TeamWeaponController))
+	{
+		return;
+	}
+
+	ExecuteDetachTowCommand_DetachTowedTeamWeapon(TeamWeaponController);
 }
 
 void ATankMaster::OnResourceStorageChanged(int32 PercentageResourcesLeft, const ERTSResourceType ResourceType)
@@ -1058,14 +1084,28 @@ void ATankMaster::ExecuteAttackGroundCommand(const FVector GroundLocation)
 		return;
 	}
 
+	// Registered turrets include those mounted on another turret's mesh (cupola gunners), which are not attached
+	// to the tank directly; attached ones are kept for turrets a Blueprint never registered.
+	TArray<ACPPTurretsMaster*> GroundTurrets;
+	for (ACPPTurretsMaster* Turret : Turrets)
+	{
+		if (IsValid(Turret))
+		{
+			GroundTurrets.AddUnique(Turret);
+		}
+	}
 	TArray<AActor*> Attached;
 	GetAttachedActors(Attached);
 	for (AActor* Child : Attached)
 	{
 		if (ACPPTurretsMaster* Turret = Cast<ACPPTurretsMaster>(Child))
 		{
-			Turret->SetEngageGroundLocation(GroundLocation);
+			GroundTurrets.AddUnique(Turret);
 		}
+	}
+	for (ACPPTurretsMaster* Turret : GroundTurrets)
+	{
+		Turret->SetEngageGroundLocation(GroundLocation);
 	}
 
 	if (UHullWeaponComponent* Hull = FindComponentByClass<UHullWeaponComponent>())
@@ -1914,6 +1954,30 @@ bool ATankMaster::GetIsValidTowedActorComponent() const
 
 void ATankMaster::ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedActorTarget TowSubtype)
 {
+	M_TowApproachTarget = TowTargetActor;
+	M_TowApproachSubtype = TowSubtype;
+	M_TowApproachAttempts = 0;
+	ExecuteTowActorCommand_TowOrApproach(TowTargetActor, TowSubtype);
+}
+
+void ATankMaster::OnTowApproachMoveFinished(const uint64 CommandExecutionSerial)
+{
+	if (not GetDoesCurrentCommandExecutionMatch(EAbilityID::IdTowActor, CommandExecutionSerial))
+	{
+		return;
+	}
+
+	// An invalid target ends the command in the tow-or-approach checks.
+	ExecuteTowActorCommand_TowOrApproach(M_TowApproachTarget.Get(), M_TowApproachSubtype);
+}
+
+bool ATankMaster::TryStartTowApproachMove(const FVector& TowTargetLocation, const float ApproachAcceptanceRadius)
+{
+	return false;
+}
+
+void ATankMaster::ExecuteTowActorCommand_TowOrApproach(AActor* TowTargetActor, const ETowedActorTarget TowSubtype)
+{
 	UTowedActorComponent* TowedActorComponent = nullptr;
 	ATeamWeapon* TeamWeaponActor = nullptr;
 	ATeamWeaponController* TeamWeaponController = nullptr;
@@ -1935,11 +1999,9 @@ void ATankMaster::ExecuteTowActorCommand(AActor* TowTargetActor, const ETowedAct
 		return;
 	}
 
-	if (ExecuteTowActorCommand_GetShouldQueueMoveThenRetry(TowTargetActor, M_VehicleTowComponent.Get()))
+	if (ExecuteTowActorCommand_GetIsOutOfTowRange(TowTargetActor, M_VehicleTowComponent.Get()))
 	{
-		MoveToLocation(TowTargetActor->GetActorLocation(), false, FRotator::ZeroRotator, false);
-		TowActor(TowTargetActor, TowSubtype, false);
-		DoneExecutingCommand(EAbilityID::IdTowActor);
+		ExecuteTowActorCommand_ApproachTarget(TowTargetActor, TowSubtype);
 		return;
 	}
 
@@ -2042,8 +2104,35 @@ bool ATankMaster::TryTowTeamWeapon_Internal(ATeamWeapon* TeamWeaponActor, ATeamW
 	return true;
 }
 
-bool ATankMaster::ExecuteTowActorCommand_GetShouldQueueMoveThenRetry(const AActor* TowTargetActor,
-                                                                     const UVehicleTowComponent* VehicleTowComp) const
+void ATankMaster::ExecuteTowActorCommand_ApproachTarget(AActor* TowTargetActor, const ETowedActorTarget TowSubtype)
+{
+	// A drive that ends out of range (blocked, target moved) is retried this often before the tow is given up.
+	constexpr int32 MaxTowApproachAttempts = 3;
+	// The drive ends this far inside the tow range: the path end and the target's actor location can differ a little,
+	// and the path measures in 3D where the tow range is 2D.
+	constexpr float TowApproachAcceptanceFraction = 0.75f;
+	if (M_TowApproachAttempts >= MaxTowApproachAttempts)
+	{
+		DoneExecutingCommand(EAbilityID::IdTowActor);
+		return;
+	}
+
+	M_TowApproachAttempts++;
+	const float ApproachAcceptanceRadius =
+		M_VehicleTowComponent->GetTowSettings().AcceptanceRadiusToTow * TowApproachAcceptanceFraction;
+	if (TryStartTowApproachMove(TowTargetActor->GetActorLocation(), ApproachAcceptanceRadius))
+	{
+		return;
+	}
+
+	// Without an own approach drive: move onto the target and tow again from there.
+	MoveToLocation(TowTargetActor->GetActorLocation(), false, FRotator::ZeroRotator, false);
+	TowActor(TowTargetActor, TowSubtype, false);
+	DoneExecutingCommand(EAbilityID::IdTowActor);
+}
+
+bool ATankMaster::ExecuteTowActorCommand_GetIsOutOfTowRange(const AActor* TowTargetActor,
+                                                            const UVehicleTowComponent* VehicleTowComp) const
 {
 	if (not IsValid(TowTargetActor) || not IsValid(VehicleTowComp))
 	{

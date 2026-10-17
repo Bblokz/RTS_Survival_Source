@@ -1723,6 +1723,12 @@ void UTrackPathFollowingComponent::UpdatePathSegment()
 	}
 }
 
+FAIRequestID UTrackPathFollowingComponent::RequestMove(const FAIMoveRequest& RequestData, FNavPathSharedPtr InPath)
+{
+	M_RequestedGoalAcceptanceRadius = RequestData.GetAcceptanceRadius();
+	return Super::RequestMove(RequestData, InPath);
+}
+
 void UTrackPathFollowingComponent::SetMoveSegment(int32 SegmentStartIndex)
 {
 	int32 EndSegmentIndex = SegmentStartIndex + 1;
@@ -1787,7 +1793,7 @@ void UTrackPathFollowingComponent::SetMoveSegment(int32 SegmentStartIndex)
 		const FNavPathPoint& PathPt1 = PathInstance->GetPathPoints()[EndSegmentIndex];
 
 		CurrentAcceptanceRadius = (PathInstance->GetPathPoints().Num() == (EndSegmentIndex + 1))
-			                          ? VehicleGoalAcceptanceRadius
+			                          ? FMath::Max(VehicleGoalAcceptanceRadius, M_RequestedGoalAcceptanceRadius)
 			                          // pick appropriate value base on whether we're going to nav link or not
 			                          : VehiclePathPointAcceptanceRadius;
 		AcceptanceRadius = CurrentAcceptanceRadius;

@@ -50,6 +50,8 @@ struct FQueuedTankMovementRequest
 	EAbilityID CompletionAbility = EAbilityID::IdNoAbility;
 	uint64 CommandExecutionSerial = 0;
 	uint64 TurretRangePursuitSerial = 0;
+	// Kept so a repath of this request ends as far from the goal as the original request.
+	float GoalAcceptanceRadiusOverride = -1.f;
 };
 
 
