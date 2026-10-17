@@ -42,6 +42,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="Music")
     URTSMusicManager* GetMusicManager() const { return MusicManager; }
 
+	UFUNCTION(BlueprintCallable)
 	void SetPreGameLaunchRequest(
 		const ERTSPreGameSetupFlow SetupFlow,
 		const TSoftObjectPtr<UWorld> DestinationMap);
