@@ -33,6 +33,7 @@ class ANomadicVehicle;
 class ACPPGameState;
 class URTSGameSettingsHandler;
 class UPlayerTechManager;
+class UPlayerUnitVariantManager;
 class ARTSNavigator;
 class ARTSAsyncSpawner;
 class UPlayerResourceManager;
@@ -102,6 +103,9 @@ public:
 
 	/** @return A IsValid PlayerTechManager or null. */
 	static UPlayerTechManager* GetPlayerTechManager(const UObject* WorldContextObject);
+
+	/** @return A IsValid PlayerUnitVariantManager or null (no player controller in this world). */
+	static UPlayerUnitVariantManager* GetPlayerUnitVariantManager(const UObject* WorldContextObject);
 
 	/** @return A IsValid Navigator or null. */
 	static ARTSNavigator* GetRTSNavigator(const UObject* WorldContextObject);

@@ -75,4 +75,12 @@ struct FPlayerCardSaveData
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta=(TitleProperty="BuildingType"))
 	TArray<FNomadicBuildingLayoutData> NomadicBuildingLayouts;
+
+	/**
+	 * @brief The variant the player picked per unit type, applied to every unit of that type in the mission.
+	 *
+	 * Only units with a non-Base choice need an entry; empty means every unit is its base variant.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta=(TitleProperty="Unit"))
+	TArray<FUnitVariantSelection> UnitVariantSelections;
 };

@@ -18,6 +18,7 @@
 #include "RTS_Survival/Player/PlayerAudioController/PlayerAudioController.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/Player/PortraitManager/PortraitManager.h"
 #include "RTS_Survival/Procedural/LandscapeDivider/RTSLandscapeDivider.h"
 #include "RTS_Survival/StartLocation/PlayerStartLocationMngr/PlayerStartLocationManager.h"
@@ -163,6 +164,19 @@ UPlayerTechManager* FRTS_Statics::GetPlayerTechManager(const UObject* WorldConte
 		if (IsValid(PlayerTechManager))
 		{
 			return PlayerTechManager;
+		}
+	}
+	return nullptr;
+}
+
+UPlayerUnitVariantManager* FRTS_Statics::GetPlayerUnitVariantManager(const UObject* WorldContextObject)
+{
+	if (ACPPController* RTSController = GetRTSController(WorldContextObject))
+	{
+		UPlayerUnitVariantManager* PlayerUnitVariantManager = RTSController->GetPlayerUnitVariantManager();
+		if (IsValid(PlayerUnitVariantManager))
+		{
+			return PlayerUnitVariantManager;
 		}
 	}
 	return nullptr;

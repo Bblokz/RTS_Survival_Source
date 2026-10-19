@@ -265,7 +265,15 @@ enum class
 	// The ISU-152's casemate gun: the SU-152's ML-20S balanced as a direct-fire heavy tank destroyer gun.
 	ML_20S_152MM_ISU152 UMETA(DisplayName = "ML-20S 152MM (ISU-152)"),
 	// The Maxim team weapon's water-cooled 7.62mm machine gun; it used to borrow the DShK's 12.7mm entry.
-	Maxim_M1910_7_62MM_TW UMETA(DisplayName = "Maxim M1910 7.62MM TW")
+	Maxim_M1910_7_62MM_TW UMETA(DisplayName = "Maxim M1910 7.62MM TW"),
+	// The Pz II Luchs' 20mm: the Pz II F's KwK 30 stats under its own name, so it can get its own icon.
+	KwK38_20MM_Luchs UMETA(DisplayName = "KwK38 20MM (PZ II Luchs)"),
+	// The Sd.Kfz. 7/1's quadruple 20mm: the Flak 38 stats under its own name, so it can get its own icon.
+	Flakvierling38_20MM UMETA(DisplayName = "Flakvierling 38 20MM (Sdkfz 7/1)"),
+	// The Sd.Kfz. 221's 20mm: the Sd.Kfz. 231's KwK 30 stats under its own name, so it can get its own icon.
+	Kwk30_20MM_sdkfz221 UMETA(DisplayName = "KwK30 20MM (Sdkfz 221)"),
+	// The Jagdpanzer IV/70's long 75mm: the Panther's gun in a medium tank destroyer casemate.
+	Pak42_L70_75MM UMETA(DisplayName = "Pak42 L/70 75MM (Jagdpanzer IV/70)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -360,6 +368,10 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::ML20_152MM_Pit: return "ML-20";
 	case EWeaponName::BS3_100MM_TW: return "BS-3";
 	case EWeaponName::Maxim_M1910_7_62MM_TW: return "Maxim";
+	case EWeaponName::KwK38_20MM_Luchs: return "KwK 38";
+	case EWeaponName::Flakvierling38_20MM: return "Flakvierling 38";
+	case EWeaponName::Kwk30_20MM_sdkfz221: return "KwK 30";
+	case EWeaponName::Pak42_L70_75MM: return "Pak 42 L/70";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -845,6 +857,14 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "BS3_100MM_TW";
 	case EWeaponName::Maxim_M1910_7_62MM_TW:
 		return "Maxim_M1910_7_62MM_TW";
+	case EWeaponName::KwK38_20MM_Luchs:
+		return "KwK38_20MM_Luchs";
+	case EWeaponName::Flakvierling38_20MM:
+		return "Flakvierling38_20MM";
+	case EWeaponName::Kwk30_20MM_sdkfz221:
+		return "Kwk30_20MM_sdkfz221";
+	case EWeaponName::Pak42_L70_75MM:
+		return "Pak42_L70_75MM";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:
