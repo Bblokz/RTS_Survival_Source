@@ -145,3 +145,12 @@ Doc and test: `Source/Docs/Units/TeamWeaponDigIn.md`, `-TeamWeaponDigInValidate`
 - The controller owns the command card (Break Cover instead of Dig In; Move, Rotate Towards and Tow off the card) and
   must call `RemoveTeamWeaponDigIn` wherever the gun leaves its pit without Break Cover (tow hook, abandon). Anything
   that would move a dug-in gun (out-of-range reposition) checks `GetIsTeamWeaponDigInActive` first.
+
+## Unit variants
+
+Doc: `Source/Docs/Units/UnitVariants.md` (section 5.2.1).
+
+- The controller resolves its variant in `InitSquadData` (as a squad); the gun does not exist yet at that point.
+  `ApplyUnitVariantToTeamWeapon` runs at the end of `OnAllSquadUnitsLoaded`, after `SpawnTeamWeapon`, and fires
+  `BP_ApplyUnitVariant` on `ATeamWeapon` directly or once the controller's `URTSComponent::OnUnitVariantApplied` fires.
+- An adopted gun receives the event again with its new crew's variant: gun Blueprints must set state, not accumulate.

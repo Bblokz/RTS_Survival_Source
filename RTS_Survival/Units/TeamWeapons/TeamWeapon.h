@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
+#include "RTS_Survival/Interfaces/UnitVariantReceiver.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/RTSVerticalAnimatedText/RTSVerticalAnimatedText.h"
@@ -230,7 +231,8 @@ private:
  */
 UCLASS()
 class RTS_SURVIVAL_API ATeamWeapon : public AEmbeddedTurretsMaster, public IRTSNavAIInterface,
-                                     public IAimOffsetProvider, public IHealthBarOwner, public IEmbeddedTurretInterface
+                                     public IAimOffsetProvider, public IHealthBarOwner, public IEmbeddedTurretInterface,
+                                     public IUnitVariantReceiver
 {
 	GENERATED_BODY()
 

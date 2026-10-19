@@ -32,6 +32,7 @@
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Interfaces/RTSInterface/RTSUnit.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
