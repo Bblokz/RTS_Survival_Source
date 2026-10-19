@@ -16,6 +16,7 @@
 #include "RTS_Survival/Buildings/EnergyComponent/EnergyComp.h"
 #include "RTS_Survival/GameUI/Healthbar/GarrisonHealthBar/W_GarrisonHealthBar.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
+#include "RTS_Survival/Player/ConstructionPreview/MoveUnitsFromConstruction/FMoveUnitsFromConstruction.h"
 #include "RTS_Survival/Player/PlayerBuildRadiusManager/PlayerBuildRadiusManager.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
 #include "RTS_Survival/Resources/ResourceStorageOwner/ResourceStorageLevel.h"
@@ -514,7 +515,46 @@ void ANomadicVehicle::ExecuteCreateBuildingCommand(const FVector BuildingLocatio
 	M_PendingBuildingLocation = BuildingLocation;
 	M_PendingBuildingRotation = BuildingRotation;
 	M_BuildingMoveFailureCount = 0;
+	bM_IsMovingToBuildingLocation = true;
 	MoveToBuildingLocationForConstruction();
+}
+
+EAlliedVehiclePassage ANomadicVehicle::GetAlliedVehiclePassage() const
+{
+	if (bM_IsMovingToBuildingLocation && M_NomadStatus == ENomadStatus::Truck)
+	{
+		return EAlliedVehiclePassage::PushAside;
+	}
+	return Super::GetAlliedVehiclePassage();
+}
+
+bool ANomadicVehicle::GetCanBePushedAside() const
+{
+	return GetIsInTruckMode() && not bM_IsMovingToBuildingLocation && Super::GetCanBePushedAside();
+}
+
+float ANomadicVehicle::GetAlliedPushGoalClearRadius() const
+{
+	if (not bM_IsMovingToBuildingLocation)
+	{
+		return 0.f;
+	}
+	// The placed preview has the footprint and rotation the building gets; without one the mesh bounds stand in.
+	if (IsValid(M_StaticPreviewMesh))
+	{
+		constexpr bool bIncludeNonCollidingComponents = true;
+		const FBox PreviewBounds = M_StaticPreviewMesh->GetComponentsBoundingBox(bIncludeNonCollidingComponents);
+		if (PreviewBounds.IsValid)
+		{
+			return FVector2D(PreviewBounds.GetExtent()).Size();
+		}
+	}
+	const UStaticMesh* FootprintMesh = IsValid(M_PreviewMesh) ? M_PreviewMesh : M_BuildingMesh;
+	if (not IsValid(FootprintMesh))
+	{
+		return 0.f;
+	}
+	return FVector2D(FootprintMesh->GetBounds().BoxExtent).Size();
 }
 
 UEnergyComp* ANomadicVehicle::GetEnergyComp() const
@@ -552,6 +592,12 @@ void ANomadicVehicle::StartBuildingConstruction()
 	// Destroy after start mesh animation as we need the preview mesh to block other buildings.
 	if (IsValid(M_StaticPreviewMesh))
 	{
+		// Units cleared when the building was placed may have driven back onto it since.
+		FMoveUnitsFromConstruction::MoveOverlappingUnitsForPlayer1AwayFromConstruction(
+			this,
+			M_StaticPreviewMesh,
+			M_BuildingTransform.Rotator(),
+			this);
 		M_StaticPreviewMesh->SetActorHiddenInGame(true);
 	}
 	AINomadicVehicle->StopBehaviourTree();
@@ -772,6 +818,7 @@ void ANomadicVehicle::OnFinishedConvertToBuilding_UnpackAirbase()
 void ANomadicVehicle::TerminateCreateBuildingCommand()
 {
 	Super::TerminateCreateBuildingCommand();
+	bM_IsMovingToBuildingLocation = false;
 	if (IsValid(PlayerController) && IsValid(M_ConversionProgressBar) && GetIsValidAINomadicVehicle())
 	{
 		M_ConversionProgressBar->StopProgressBar();
@@ -1536,6 +1583,7 @@ void ANomadicVehicle::MoveToBuildingLocationForConstruction()
 void ANomadicVehicle::OnMoveToBuildingLocationSucceeded()
 {
 	M_BuildingMoveFailureCount = 0;
+	bM_IsMovingToBuildingLocation = false;
 	StartBuildingConstruction();
 }
 
@@ -1557,6 +1605,7 @@ void ANomadicVehicle::CancelBuildingConstructionAfterMoveFailure()
 	RTSFunctionLibrary::ReportError(
 		"Nomadic vehicle failed to move to its building construction location twice; cancelling construction."
 		"\n Nomadic vehicle: " + GetName());
+	bM_IsMovingToBuildingLocation = false;
 	SetUnitToIdle();
 }
 

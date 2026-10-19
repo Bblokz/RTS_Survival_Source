@@ -8,6 +8,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInUnit/DigInUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Units/Tanks/FRTSOverlapEvasion/RTSOverlapEvasionComponent.h"
+#include "RTS_Survival/Units/Tanks/VehicleAvoidance/RTSAlliedVehiclePassage.h"
 #include "RTS_Survival/Units/Tanks/VehicleAI/Utils/VehicleAIInterface.h"
 #include "TrackPhysicsMovementComp/TrackPhysicsMovement.h"
 #include "TrackedTankMaster.generated.h"
@@ -95,6 +96,18 @@ public:
 	 * @param OutRotation The facing it finished its last turn on, else how it is turned now.
 	 */
 	void GetParkedPose(FVector& OutLocation, FRotator& OutRotation) const;
+
+	/** @return How this vehicle treats allied vehicles in its way; read by the avoidance and the overlap evasion. */
+	virtual EAlliedVehiclePassage GetAlliedVehiclePassage() const;
+
+	/**
+	 * @return Radius around its move goal that a vehicle pushing allies aside keeps free of them, so they do not
+	 * stand where it ends up; zero when only its path is cleared.
+	 */
+	virtual float GetAlliedPushGoalClearRadius() const { return 0.f; }
+
+	/** @return Whether an ally that pushes others aside may order this vehicle off its path; not while dug in. */
+	virtual bool GetCanBePushedAside() const;
 
 	inline float GetInclineAngle() const { return TrackPhysicsMovement->GetInclineAngle(); }
 

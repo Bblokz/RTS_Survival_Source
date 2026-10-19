@@ -34,3 +34,8 @@
 
 // should be blocked by components on both player and enemy units that allow weapon hits.
 #define COLLISION_OBJ_PROJECTILE ECC_GameTraceChannel3
+
+// Object channel of the hull blockers of enemy vehicles; those of the player use ECC_Vehicle.
+// Split by side so a harvester hull can block the hulls of the other side and pass through those of its own.
+// should be ignored by everything except vehicle hull blockers.
+#define COLLISION_OBJ_ENEMY_HULL ECC_GameTraceChannel10

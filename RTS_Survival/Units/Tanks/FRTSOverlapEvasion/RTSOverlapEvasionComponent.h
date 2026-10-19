@@ -108,6 +108,9 @@ private:
 	/** Returns true when both actors have RTSComponents with the same owning player. */
 	bool HaveSameOwningPlayer(const AActor* B, URTSComponent*& OutOtherRTSComponent) const;
 
+	/** @return True for an allied vehicle that this vehicle drives through, or that drives through it (harvesters). */
+	bool GetIsPassThroughAlliedVehicle(const AActor* OtherActor) const;
+
 	/** End-overlap callback to de-register actors from the path-following overlap wait list. */
 	UFUNCTION()
 	void OnChassisEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

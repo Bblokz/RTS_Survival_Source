@@ -901,6 +901,11 @@ void ATankMaster::TerminateRotateTowardsCommand()
 	OnRotateTowardsFinished();
 }
 
+bool ATankMaster::GetHasHarvesterComponent() const
+{
+	return IsValid(M_HarvesterComponent);
+}
+
 UHarvester* ATankMaster::GetIsHarvester()
 {
 	if (IsValid(M_HarvesterComponent))

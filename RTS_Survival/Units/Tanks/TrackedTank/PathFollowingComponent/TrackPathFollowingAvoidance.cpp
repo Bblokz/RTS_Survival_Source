@@ -7,7 +7,10 @@
 #include "AISystem.h"
 #include "GameFramework/Pawn.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/AITankMaster.h"
+#include "RTS_Survival/Units/Tanks/TrackedTank/TrackedTankMaster.h"
 #include "RTS_Survival/Units/Tanks/FRTSOverlapEvasion/RTSOverlapEvasionComponent.h"
 #include "RTS_Survival/Units/Tanks/VehicleAvoidance/RTSVehicleAvoidanceSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -127,6 +130,55 @@ namespace TrackFollowingAvoidance
 	constexpr float StationarySpeed = 25.f;
 	constexpr float MinimumDirectionLength = 1.f;
 	constexpr float DebugZOffset = 520.f;
+
+	/** How often a vehicle that pushes allies aside looks for idle ones in its way. */
+	constexpr float AllyPushCheckSeconds = 0.3f;
+	/** Room beyond touching hulls within which an ally still counts as in the way of the path or the goal. */
+	constexpr float AllyPushCorridorMargin = 100.f;
+	/** How far beyond touching hulls a pushed ally is sent, so it stands clear even when it stops a little short. */
+	constexpr float AllyPushClearance = 250.f;
+	/** Pushed allies stop cutting the navmesh once they drive; this long after the last push the path is made again. */
+	constexpr float RepathAfterAllyPushSeconds = 1.5f;
+	constexpr float AllyPushProjectionScale = 2.f;
+
+	/**
+	 * @brief Finds the point of a polyline closest to a location.
+	 * @param Route The polyline; at least one point.
+	 * @param Location Location to measure from.
+	 * @param OutSegmentDirection Receives the direction of the segment that point lies on.
+	 * @return The closest point.
+	 */
+	FVector2D GetClosestPointOnRoute(
+		const TArray<FVector2D>& Route,
+		const FVector2D& Location,
+		FVector2D& OutSegmentDirection)
+	{
+		FVector2D ClosestPoint = Route[0];
+		float ClosestDistanceSquared = FVector2D::DistSquared(Route[0], Location);
+		OutSegmentDirection = Route.Num() > 1 ? (Route[1] - Route[0]).GetSafeNormal() : FVector2D(1.f, 0.f);
+		for (int32 PointIndex = 1; PointIndex < Route.Num(); ++PointIndex)
+		{
+			const FVector2D SegmentStart = Route[PointIndex - 1];
+			const FVector2D Segment = Route[PointIndex] - SegmentStart;
+			const float SegmentLengthSquared = Segment.SizeSquared();
+			if (SegmentLengthSquared <= FMath::Square(MinimumDirectionLength))
+			{
+				continue;
+			}
+			const float Along = FMath::Clamp(
+				FVector2D::DotProduct(Location - SegmentStart, Segment) / SegmentLengthSquared, 0.f, 1.f);
+			const FVector2D PointOnSegment = SegmentStart + Segment * Along;
+			const float DistanceSquared = FVector2D::DistSquared(PointOnSegment, Location);
+			if (DistanceSquared >= ClosestDistanceSquared)
+			{
+				continue;
+			}
+			ClosestDistanceSquared = DistanceSquared;
+			ClosestPoint = PointOnSegment;
+			OutSegmentDirection = Segment.GetSafeNormal();
+		}
+		return ClosestPoint;
+	}
 }
 
 void UTrackPathFollowingComponent::RegisterVehicleForAvoidance()
@@ -206,6 +258,219 @@ void UTrackPathFollowingComponent::RefreshVehicleAvoidanceNeighbours(const float
 		ControlledPawn->GetActorLocation(),
 		TrackFollowingAvoidance::NeighbourRange,
 		M_VehicleAvoidance.Neighbours);
+	SortOutPassableAllies();
+}
+
+void UTrackPathFollowingComponent::SortOutPassableAllies()
+{
+	FVehicleAvoidanceState& State = M_VehicleAvoidance;
+	State.PushableAllies.Reset();
+	const ATrackedTankMaster* Vehicle = Cast<ATrackedTankMaster>(ControlledPawn);
+	const URTSComponent* RTSComponent = IsValid(Vehicle) ? Vehicle->GetRTSComponent() : nullptr;
+	if (not IsValid(RTSComponent))
+	{
+		State.AlliedPassage = EAlliedVehiclePassage::Avoid;
+		return;
+	}
+	State.AlliedPassage = Vehicle->GetAlliedVehiclePassage();
+	const uint8 OwningPlayer = RTSComponent->GetOwningPlayer();
+	for (int32 NeighbourIndex = State.Neighbours.Num() - 1; NeighbourIndex >= 0; --NeighbourIndex)
+	{
+		const FRTSVehicleAvoidanceAgent& Neighbour = State.Neighbours[NeighbourIndex];
+		if (Neighbour.OwningPlayer != OwningPlayer)
+		{
+			continue;
+		}
+		// Harvesters and the vehicles of their side drive through each other, so neither waits for the other.
+		// A vehicle that pushes allies aside is not held up by the idle ones it can send off; moving allies make
+		// room for it themselves and stay avoided, like allies that cannot move (deployed or dug in).
+		const ATrackedTankMaster* Ally = Cast<ATrackedTankMaster>(Neighbour.Pawn.Get());
+		const bool bIsPassedThrough = State.AlliedPassage == EAlliedVehiclePassage::PassThrough ||
+			(IsValid(Ally) && Ally->GetAlliedVehiclePassage() == EAlliedVehiclePassage::PassThrough);
+		const bool bIsPushable = State.AlliedPassage == EAlliedVehiclePassage::PushAside &&
+			GetIsAllyPushable(Neighbour.Pawn.Get());
+		if (not bIsPassedThrough && not bIsPushable)
+		{
+			continue;
+		}
+		if (bIsPushable)
+		{
+			State.PushableAllies.Add(Neighbour);
+		}
+		State.Neighbours.RemoveAtSwap(NeighbourIndex, 1, EAllowShrinking::No);
+	}
+}
+
+void UTrackPathFollowingComponent::TryPushAlliesAside(const FVehicleAvoidanceFrame& Frame, const float DeltaTime)
+{
+	using namespace TrackFollowingAvoidance;
+	FVehicleAvoidanceState& State = M_VehicleAvoidance;
+	if (State.SecondsUntilRepathAfterPush >= 0.f)
+	{
+		State.SecondsUntilRepathAfterPush -= DeltaTime;
+		if (State.SecondsUntilRepathAfterPush < 0.f)
+		{
+			State.bWantsRepath = true;
+		}
+	}
+	State.SecondsUntilAllyPushCheck -= DeltaTime;
+	if (State.AlliedPassage != EAlliedVehiclePassage::PushAside || State.PushableAllies.IsEmpty() ||
+		State.SecondsUntilAllyPushCheck > 0.f)
+	{
+		return;
+	}
+	State.SecondsUntilAllyPushCheck = AllyPushCheckSeconds;
+
+	const ATrackedTankMaster* Vehicle = Cast<ATrackedTankMaster>(ControlledPawn);
+	const float GoalClearRadius = FMath::Max(
+		State.Footprint.GetCornerRadius(),
+		IsValid(Vehicle) ? Vehicle->GetAlliedPushGoalClearRadius() : 0.f);
+	TArray<FVector2D> Route;
+	BuildRemainingPushRoute(Frame, Route);
+	for (const FRTSVehicleAvoidanceAgent& Ally : State.PushableAllies)
+	{
+		if (TryPushAllyAside(Ally, Route, GoalClearRadius))
+		{
+			State.SecondsUntilRepathAfterPush = RepathAfterAllyPushSeconds;
+		}
+	}
+}
+
+bool UTrackPathFollowingComponent::TryPushAllyAside(
+	const FRTSVehicleAvoidanceAgent& Ally,
+	const TArray<FVector2D>& Route,
+	const float GoalClearRadius)
+{
+	APawn* AllyPawn = Ally.Pawn.Get();
+	// Sorted out at the last neighbour refresh; it may have been given an order since.
+	if (not GetIsAllyPushable(AllyPawn))
+	{
+		return false;
+	}
+	const FVector2D AllyPawnLocation(AllyPawn->GetActorLocation());
+	const FVector2D AllyForward = FVector2D(AllyPawn->GetActorForwardVector()).GetSafeNormal();
+	const FVector2D AllyCenter = Ally.Footprint.GetWorldCenter(AllyPawnLocation, AllyForward);
+	FVector2D CenterTarget;
+	if (not FindAllyPushTarget(AllyCenter, Ally.Footprint.GetCornerRadius(), Route, GoalClearRadius, CenterTarget))
+	{
+		return false;
+	}
+	// The target is for the middle of the hull; the move order is for the pawn.
+	return TrySendAllyToPushTarget(AllyPawn, CenterTarget + (AllyPawnLocation - AllyCenter));
+}
+
+bool UTrackPathFollowingComponent::GetIsAllyPushable(APawn* Ally)
+{
+	const ATrackedTankMaster* AllyVehicle = Cast<ATrackedTankMaster>(Ally);
+	ICommands* AllyCommands = Cast<ICommands>(Ally);
+	// Moving allies avoid the pushing vehicle themselves; only those that stand and wait are sent off.
+	return IsValid(AllyVehicle) && AllyCommands && AllyVehicle->GetCanBePushedAside() &&
+		AllyCommands->GetIsUnitIdle();
+}
+
+void UTrackPathFollowingComponent::BuildRemainingPushRoute(
+	const FVehicleAvoidanceFrame& Frame,
+	TArray<FVector2D>& OutRoute) const
+{
+	OutRoute.Reset();
+	OutRoute.Add(Frame.Location);
+	if (Path.IsValid())
+	{
+		const TArray<FNavPathPoint>& PathPoints = Path->GetPathPoints();
+		for (int32 PointIndex = static_cast<int32>(GetNextPathIndex()); PointIndex < PathPoints.Num(); ++PointIndex)
+		{
+			OutRoute.Add(FVector2D(PathPoints[PointIndex].Location));
+		}
+	}
+	if (OutRoute.Num() == 1)
+	{
+		OutRoute.Add(Frame.GoalLocation);
+	}
+}
+
+bool UTrackPathFollowingComponent::GetIsClearOfPushRoute(
+	const FVector2D& Center,
+	const float Radius,
+	const TArray<FVector2D>& Route,
+	const float GoalClearRadius) const
+{
+	using namespace TrackFollowingAvoidance;
+	FVector2D SegmentDirection;
+	const FVector2D ClosestPoint = GetClosestPointOnRoute(Route, Center, SegmentDirection);
+	const float NeededPathDistance = M_VehicleAvoidance.Footprint.HalfWidth + Radius + AllyPushCorridorMargin;
+	const float NeededGoalDistance = GoalClearRadius + Radius + AllyPushCorridorMargin;
+	return FVector2D::DistSquared(ClosestPoint, Center) >= FMath::Square(NeededPathDistance) &&
+		FVector2D::DistSquared(Route.Last(), Center) >= FMath::Square(NeededGoalDistance);
+}
+
+bool UTrackPathFollowingComponent::FindAllyPushTarget(
+	const FVector2D& AllyCenter,
+	const float AllyRadius,
+	const TArray<FVector2D>& Route,
+	const float GoalClearRadius,
+	FVector2D& OutTarget) const
+{
+	using namespace TrackFollowingAvoidance;
+	if (Route.IsEmpty() || GetIsClearOfPushRoute(AllyCenter, AllyRadius, Route, GoalClearRadius))
+	{
+		return false;
+	}
+	FVector2D SegmentDirection;
+	const FVector2D ClosestPoint = GetClosestPointOnRoute(Route, AllyCenter, SegmentDirection);
+	const FVector2D SegmentRight(-SegmentDirection.Y, SegmentDirection.X);
+	const FVector2D ToAlly = AllyCenter - ClosestPoint;
+	// Off the path to the side it already leans to; one dead on the path goes to the right.
+	const FVector2D AwayFromPath = ToAlly.SizeSquared() > FMath::Square(MinimumDirectionLength)
+		                               ? ToAlly.GetSafeNormal()
+		                               : SegmentRight;
+	const float PathDistance = M_VehicleAvoidance.Footprint.HalfWidth + AllyRadius + AllyPushClearance;
+	const FVector2D Goal = Route.Last();
+	const FVector2D FromGoal = AllyCenter - Goal;
+	const FVector2D AwayFromGoal = FromGoal.SizeSquared() > FMath::Square(MinimumDirectionLength)
+		                               ? FromGoal.GetSafeNormal()
+		                               : AwayFromPath;
+	const FVector2D AcrossGoal(-AwayFromGoal.Y, AwayFromGoal.X);
+	const float GoalDistance = GoalClearRadius + AllyRadius + AllyPushClearance;
+	// Nearest first: straight off the path, out of the goal circle, then the far side and around the goal.
+	const FVector2D Candidates[] = {
+		ClosestPoint + AwayFromPath * PathDistance,
+		Goal + AwayFromGoal * GoalDistance,
+		ClosestPoint - AwayFromPath * PathDistance,
+		Goal + AcrossGoal * GoalDistance,
+		Goal - AcrossGoal * GoalDistance
+	};
+	for (const FVector2D& Candidate : Candidates)
+	{
+		if (GetIsClearOfPushRoute(Candidate, AllyRadius, Route, GoalClearRadius))
+		{
+			OutTarget = Candidate;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UTrackPathFollowingComponent::TrySendAllyToPushTarget(APawn* Ally, const FVector2D& Target) const
+{
+	ICommands* AllyCommands = Cast<ICommands>(Ally);
+	if (not IsValid(Ally) || not AllyCommands)
+	{
+		return false;
+	}
+	bool bWasProjected = false;
+	const FVector ProjectedTarget = RTSFunctionLibrary::GetLocationProjected(
+		Ally,
+		FVector(Target, Ally->GetActorLocation().Z),
+		true,
+		bWasProjected,
+		TrackFollowingAvoidance::AllyPushProjectionScale);
+	if (not bWasProjected)
+	{
+		return false;
+	}
+	// Not sent back afterwards: it would drive back into the path or onto the spot this vehicle ends up on.
+	return AllyCommands->MoveToLocation(ProjectedTarget, true, Ally->GetActorRotation(), true) ==
+		ECommandQueueError::NoError;
 }
 
 bool UTrackPathFollowingComponent::BuildVehicleAvoidanceFrame(
@@ -680,6 +945,7 @@ FVehicleAvoidanceOutput UTrackPathFollowingComponent::UpdateVehicleAvoidance(
 	// Counts while flocking too: a vehicle that leans on others without moving is still not getting there.
 	const bool bIsStandingStill = Frame.Speed < WaitingSpeed && Frame.Blocker != nullptr;
 	TryMakeIdleBlockerMoveAside(Frame, DeltaTime);
+	TryPushAlliesAside(Frame, DeltaTime);
 	UpdateGoalBlockedByVehicles(Frame, bIsStandingStill, DeltaTime);
 	const bool bIsHeldBack = UpdateTimeHeldBackByVehicles(Frame, DeltaTime);
 

@@ -1014,6 +1014,38 @@ private:
 	void RefreshVehicleAvoidanceNeighbours(float DeltaTime);
 	void WeighVehicleAvoidanceNeighbours(FVehicleAvoidanceFrame& Frame);
 
+	// Takes the allies this vehicle drives through or pushes aside, and harvesters of its side, out of Neighbours.
+	void SortOutPassableAllies();
+
+	// A vehicle that pushes allies aside sends the idle ones on its remaining path or goal out of its way.
+	void TryPushAlliesAside(const FVehicleAvoidanceFrame& Frame, float DeltaTime);
+
+	/**
+	 * @brief Finds where an ally has to go to stand clear of the remaining path and of the goal.
+	 * @param AllyCenter Middle of the ally's hull.
+	 * @param AllyRadius Radius of the circle through its hull corners.
+	 * @param Route This vehicle's location followed by the path points still ahead.
+	 * @param GoalClearRadius Radius around the end of the route that has to be free as well.
+	 * @param OutTarget Receives the spot to send the ally to.
+	 * @return False when the ally is not in the way, or no spot clear of path and goal was found.
+	 */
+	bool FindAllyPushTarget(
+		const FVector2D& AllyCenter,
+		float AllyRadius,
+		const TArray<FVector2D>& Route,
+		float GoalClearRadius,
+		FVector2D& OutTarget) const;
+	bool GetIsClearOfPushRoute(
+		const FVector2D& Center,
+		float Radius,
+		const TArray<FVector2D>& Route,
+		float GoalClearRadius) const;
+	void BuildRemainingPushRoute(const FVehicleAvoidanceFrame& Frame, TArray<FVector2D>& OutRoute) const;
+	bool TryPushAllyAside(const FRTSVehicleAvoidanceAgent& Ally, const TArray<FVector2D>& Route, float GoalClearRadius);
+	// An idle allied vehicle that is free to drive off; deployed buildings and dug-in tanks are not.
+	static bool GetIsAllyPushable(APawn* Ally);
+	bool TrySendAllyToPushTarget(APawn* Ally, const FVector2D& Target) const;
+
 	// Keeps track of how long other vehicles hold this one back without it getting anywhere.
 	bool UpdateTimeHeldBackByVehicles(const FVehicleAvoidanceFrame& Frame, float DeltaTime);
 

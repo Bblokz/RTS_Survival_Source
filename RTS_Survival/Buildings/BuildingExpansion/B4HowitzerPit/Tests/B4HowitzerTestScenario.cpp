@@ -5,6 +5,7 @@
 #if RTS_WITH_MAP_TESTS
 
 #include "Animation/AnimInstance.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "Animation/AnimMontage.h"
 #include "Camera/PlayerCameraManager.h"
 #include "CollisionQueryParams.h"
@@ -241,6 +242,7 @@ namespace B4HowitzerTestPrivate
 		ObjectTypes.AddObjectTypesToQuery(ECC_WorldDynamic);
 		ObjectTypes.AddObjectTypesToQuery(ECC_Pawn);
 		ObjectTypes.AddObjectTypesToQuery(ECC_Vehicle);
+		ObjectTypes.AddObjectTypesToQuery(COLLISION_OBJ_ENEMY_HULL);
 		const FVector Center = Location + FVector(0.f, 0.f, Radius);
 		World.OverlapMultiByObjectType(Overlaps, Center, FQuat::Identity, ObjectTypes, FCollisionShape::MakeSphere(Radius));
 		for (const FOverlapResult& Overlap : Overlaps)

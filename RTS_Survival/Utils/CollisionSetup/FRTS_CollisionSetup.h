@@ -27,11 +27,22 @@ public:
 	static void SetupPlayerVehicleMovementMeshCollision(UMeshComponent* MovementMesh);
 
 	/**
-	 * @brief Makes a box around a vehicle hull solid for the hull boxes of all other vehicles and nothing else.
+	 * @brief Makes a box around a vehicle hull solid for the hull boxes of other vehicles and nothing else.
 	 * The chassis physics is a row of spheres per track, which lets hulls slide into and over each other.
 	 * @param HullBlocker Box that is welded to the chassis.
+	 * @param OwningPlayer Owner of the vehicle; decides which side's hull channel the box is on.
+	 * @param bPassesThroughAllies Harvesters: the box only meets the hulls of the other side.
 	 */
-	static void SetupVehicleHullBlockerCollision(UBoxComponent* HullBlocker);
+	static void SetupVehicleHullBlockerCollision(UBoxComponent* HullBlocker, uint8 OwningPlayer,
+	                                             bool bPassesThroughAllies);
+
+	/**
+	 * @brief Vehicle movement collision for harvesters: they drive through allied vehicles and other harvesters
+	 * (overlapping them, so infantry still makes way) and stay solid for enemy vehicles.
+	 * @param MovementMesh The chassis mesh to set collision for.
+	 * @param OwningPlayer Owner of the harvester.
+	 */
+	static void SetupHarvesterMovementMeshCollision(UMeshComponent* MovementMesh, uint8 OwningPlayer);
 
 	// Differs from player vehicle movement mesh collision as it ignores collision with building placements.
 	static void SetupNomadicMvtPlayer(UMeshComponent* MovementMesh);

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTSAlliedVehiclePassage.h"
 #include "RTSVehicleAvoidanceSubsystem.h"
 #include "RTSVehicleFootprint.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
@@ -43,6 +44,14 @@ struct FVehicleAvoidanceState
 	TArray<FRTSVehicleAvoidanceAgent> Neighbours;
 	FRTSVehicleFootprint Footprint;
 	float SecondsUntilNeighbourRefresh = 0.f;
+
+	// Read from the vehicle at every neighbour refresh. Allied vehicles it passes or pushes are not in Neighbours.
+	EAlliedVehiclePassage AlliedPassage = EAlliedVehiclePassage::Avoid;
+	// Allies near a vehicle that pushes them aside; the idle ones in its way are sent off it.
+	TArray<FRTSVehicleAvoidanceAgent> PushableAllies;
+	float SecondsUntilAllyPushCheck = 0.f;
+	// Pushed allies stop cutting the navmesh once they drive; the path is planned again after that.
+	float SecondsUntilRepathAfterPush = -1.f;
 
 	EVehicleAvoidanceMode Mode = EVehicleAvoidanceMode::Driving;
 	// Time spent standing still behind other vehicles; decides when waiting turns into flocking.

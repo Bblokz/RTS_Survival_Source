@@ -131,6 +131,13 @@ public:
 	inline bool GetIsInTruckMode() const { return M_NomadStatus == ENomadStatus::Truck; }
 
 	inline ENomadStatus GetNomadicStatus() const { return M_NomadStatus; }
+
+	// While the truck drives to where it deploys, allied vehicles do not hold it up and idle ones are pushed aside.
+	virtual EAlliedVehiclePassage GetAlliedVehiclePassage() const override;
+	// The footprint of the building it deploys into is cleared of allies, not only its path.
+	virtual float GetAlliedPushGoalClearRadius() const override;
+	// Only a truck can drive off; a deployed or deploying base stays where it is.
+	virtual bool GetCanBePushedAside() const override;
 	inline UBuildRadiusComp* GetBuildRadiusComp() const { return M_RadiusComp.Get(); }
 
 	/** @return The preview mesh of the building that this unit constructs. */
@@ -411,6 +418,9 @@ protected:
 
 	UPROPERTY()
 	int32 M_BuildingMoveFailureCount = 0;
+
+	// True from the create building order until the truck reaches the building location or the order ends.
+	bool bM_IsMovingToBuildingLocation = false;
 
 	UFUNCTION(BlueprintImplementableEvent, Category="OnSpawn")
 	void BPOnRTSUnitSpawned(const bool bSetDisabled);

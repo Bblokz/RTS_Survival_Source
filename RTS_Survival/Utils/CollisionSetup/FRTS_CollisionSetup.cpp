@@ -118,7 +118,8 @@ void FRTS_CollisionSetup::SetupPlayerVehicleMovementMeshCollision(UMeshComponent
 	}
 }
 
-void FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(UBoxComponent* HullBlocker)
+void FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(UBoxComponent* HullBlocker, const uint8 OwningPlayer,
+                                                           const bool bPassesThroughAllies)
 {
 	if (not IsValid(HullBlocker))
 	{
@@ -126,15 +127,46 @@ void FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(UBoxComponent* HullBl
 		return;
 	}
 
+	const bool bIsPlayerVehicle = OwningPlayer == 1;
+	const ECollisionChannel OwnSideHullChannel = bIsPlayerVehicle ? ECC_Vehicle : COLLISION_OBJ_ENEMY_HULL;
+	const ECollisionChannel OtherSideHullChannel = bIsPlayerVehicle ? COLLISION_OBJ_ENEMY_HULL : ECC_Vehicle;
 	HullBlocker->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	// Its own channel: hull boxes only ever meet other hull boxes, whoever owns the vehicle.
-	HullBlocker->SetCollisionObjectType(ECC_Vehicle);
+	// Hull channels of their own: hull boxes only ever meet other hull boxes.
+	HullBlocker->SetCollisionObjectType(OwnSideHullChannel);
 	HullBlocker->SetCollisionResponseToAllChannels(ECR_Ignore);
-	HullBlocker->SetCollisionResponseToChannel(ECC_Vehicle, ECR_Block);
+	HullBlocker->SetCollisionResponseToChannel(OtherSideHullChannel, ECR_Block);
+	// A collision needs both boxes to block: a harvester that ignores its own side passes all allied hulls.
+	HullBlocker->SetCollisionResponseToChannel(OwnSideHullChannel, bPassesThroughAllies ? ECR_Ignore : ECR_Block);
 	HullBlocker->SetGenerateOverlapEvents(false);
 	HullBlocker->SetCanEverAffectNavigation(false);
 	HullBlocker->SetReceivesDecals(false);
 	HullBlocker->SetHiddenInGame(true);
+}
+
+void FRTS_CollisionSetup::SetupHarvesterMovementMeshCollision(UMeshComponent* MovementMesh, const uint8 OwningPlayer)
+{
+	if (not IsValid(MovementMesh))
+	{
+		RTSFunctionLibrary::ReportError("Invalid Movement Mesh for Harvester Collision Setup."
+			"\n see FRTS_CollisionSetup::SetupHarvesterMovementMeshCollision");
+		return;
+	}
+	const bool bIsPlayerHarvester = OwningPlayer == 1;
+	if (bIsPlayerHarvester)
+	{
+		SetupPlayerVehicleMovementMeshCollision(MovementMesh);
+	}
+	else
+	{
+		SetupEnemyVehicleMovementMeshCollision(MovementMesh);
+	}
+	// Allied chassis and soldiers are on the object channel of the own side. Overlap instead of block: the chassis
+	// drive through each other while soldiers keep getting the overlap that makes them step aside.
+	constexpr ECollisionResponse ResponseToAlliedVehicle =
+		DeveloperSettings::GamePlay::Formation::LetHarvestersCollideWithAllies ? ECR_Block : ECR_Overlap;
+	MovementMesh->SetCollisionResponseToChannel(
+		bIsPlayerHarvester ? COLLISION_OBJ_PLAYER : COLLISION_OBJ_ENEMY,
+		ResponseToAlliedVehicle);
 }
 
 void FRTS_CollisionSetup::SetupNomadicMvtPlayer(UMeshComponent* MovementMesh)

@@ -297,6 +297,9 @@ public:
 
 	virtual UShieldComponent* GetShield() const override { return M_ShieldComponent.Get(); }
 
+	/** @return True when the blueprint carries a harvester component; known from post init components on. */
+	bool GetHasHarvesterComponent() const;
+
 	// ---- Vehicle modules ----
 
 	/**

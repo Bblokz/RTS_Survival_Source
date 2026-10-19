@@ -290,7 +290,11 @@ void ATrackedTankMaster::SetupChassisMeshCollision()
 	}
 	if (IsValid(RTSComponent))
 	{
-		if (RTSComponent->GetOwningPlayer() == 1)
+		if (GetAlliedVehiclePassage() == EAlliedVehiclePassage::PassThrough)
+		{
+			FRTS_CollisionSetup::SetupHarvesterMovementMeshCollision(ChassisMesh, RTSComponent->GetOwningPlayer());
+		}
+		else if (RTSComponent->GetOwningPlayer() == 1)
 		{
 			FRTS_CollisionSetup::SetupPlayerVehicleMovementMeshCollision(ChassisMesh);
 		}
@@ -300,6 +304,21 @@ void ATrackedTankMaster::SetupChassisMeshCollision()
 		}
 	}
 	SetupHullBlocker();
+}
+
+EAlliedVehiclePassage ATrackedTankMaster::GetAlliedVehiclePassage() const
+{
+	if (GetHasHarvesterComponent() && not DeveloperSettings::GamePlay::Formation::LetHarvestersCollideWithAllies)
+	{
+		return EAlliedVehiclePassage::PassThrough;
+	}
+	return EAlliedVehiclePassage::Avoid;
+}
+
+bool ATrackedTankMaster::GetCanBePushedAside() const
+{
+	// The dig-in component is optional; vehicles without one can always drive off.
+	return not IsValid(M_DigInComponent) || not M_DigInComponent->GetIsDiggingInOrDugIn();
 }
 
 void ATrackedTankMaster::SetupHullBlocker()
@@ -330,7 +349,11 @@ void ATrackedTankMaster::SetupHullBlocker()
 		FVector(0.0f, 0.0f, TrackedHullBlocker::ExtraHalfHeight);
 	M_HullBlocker->SetRelativeLocation(ChassisCollisionBox.GetCenter());
 	M_HullBlocker->InitBoxExtent(BlockerExtent);
-	FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(M_HullBlocker);
+	const uint8 OwningPlayer = IsValid(RTSComponent) ? RTSComponent->GetOwningPlayer() : 0;
+	FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(
+		M_HullBlocker,
+		OwningPlayer,
+		GetAlliedVehiclePassage() == EAlliedVehiclePassage::PassThrough);
 	M_HullBlocker->SetPhysMaterialOverride(M_HullBlockerMaterial);
 	// The tuned mass, balance and turning of the chassis must not change because of the box.
 	M_HullBlocker->UpdateBodySetup();

@@ -118,6 +118,11 @@ void URTSOverlapEvasionComponent::OnChassisOverlap(UPrimitiveComponent* Overlapp
 		}
 		return;
 	}
+	// Harvesters and the vehicles of their side drive through each other; neither makes room for the other.
+	if (GetIsPassThroughAlliedVehicle(OtherActor))
+	{
+		return;
+	}
 	M_PendingRemovalActors.Remove(TWeakObjectPtr<AActor>(OtherActor));
 
 	if (M_OwnerCommandsInterface->GetIsUnitIdle())
@@ -214,6 +219,17 @@ bool URTSOverlapEvasionComponent::HaveSameOwningPlayer(const AActor* B, URTSComp
 	OutOtherRTSComponent = RTSB;
 
 	return M_OwnerOwningPlayer == RTSB->GetOwningPlayer();
+}
+
+bool URTSOverlapEvasionComponent::GetIsPassThroughAlliedVehicle(const AActor* OtherActor) const
+{
+	const ATrackedTankMaster* OtherVehicle = Cast<ATrackedTankMaster>(OtherActor);
+	if (not M_Owner.IsValid() || not IsValid(OtherVehicle))
+	{
+		return false;
+	}
+	return M_Owner->GetAlliedVehiclePassage() == EAlliedVehiclePassage::PassThrough ||
+		OtherVehicle->GetAlliedVehiclePassage() == EAlliedVehiclePassage::PassThrough;
 }
 
 void URTSOverlapEvasionComponent::OnChassisEndOverlap(UPrimitiveComponent* /*OverlappedComp*/,
@@ -366,7 +382,7 @@ void URTSOverlapEvasionComponent::ProcessFootprintOverlaps(
 
 		URTSComponent* OtherRTSComp = nullptr;
 		// Only consider allied actors (same owning player).
-		if (!HaveSameOwningPlayer(Other, OtherRTSComp))
+		if (!HaveSameOwningPlayer(Other, OtherRTSComp) || GetIsPassThroughAlliedVehicle(Other))
 		{
 			continue;
 		}

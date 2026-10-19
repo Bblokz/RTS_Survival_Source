@@ -1611,6 +1611,10 @@ namespace DeveloperSettings
 			// Nomadic vehicles become buildings; allied vehicles keep driving through them as before.
 			inline constexpr bool LetPlayerNomadicVehiclesCollide = false;
 
+			// Harvesters drive through the vehicles of their own side, other harvesters included; enemy vehicles
+			// still block them.
+			inline constexpr bool LetHarvestersCollideWithAllies = false;
+
 			inline constexpr float SpawnFormationEdgeLenght = 800;
 
 			// Determines the size of the array of formation position effects.

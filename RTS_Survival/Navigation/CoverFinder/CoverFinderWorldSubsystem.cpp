@@ -234,6 +234,8 @@ namespace CoverFinderWorldSubsystemPrivate
 			NewObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
 			NewObjectQueryParams.AddObjectTypesToQuery(ECC_PhysicsBody);
 			NewObjectQueryParams.AddObjectTypesToQuery(ECC_Vehicle);
+			// Hull boxes of enemy vehicles; those of the player are on ECC_Vehicle.
+			NewObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_ENEMY_HULL);
 			NewObjectQueryParams.AddObjectTypesToQuery(ECC_Destructible);
 			NewObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_PLAYER);
 			NewObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_ENEMY);
@@ -683,6 +685,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_VehicleAvoidanceScenario.Start();
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("AlliedPassageValidate")))
+	{
+		M_AlliedVehiclePassageScenario.Start();
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("TraceImpactVfxMeasure")))
 	{
 		M_TraceImpactVfxPerfScenario.Start();
@@ -728,6 +734,7 @@ void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
 	M_SquadPerfScenario.Tick(*this);
 	M_MedicHealScenario.Tick(*this);
 	M_VehicleAvoidanceScenario.Tick(*this, DeltaTime);
+	M_AlliedVehiclePassageScenario.Tick(*this, DeltaTime);
 	M_TraceImpactVfxPerfScenario.Tick(*this);
 	M_B4HowitzerScenario.Tick(*this);
 	M_GunPitScenario.Tick(*this);
