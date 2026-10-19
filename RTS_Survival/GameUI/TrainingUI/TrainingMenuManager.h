@@ -210,6 +210,12 @@ private:
 	// The pits a trainer builds at a planned spot; see OnLeftClickFieldDefenseItem.
 	void InitAllGameFieldDefenseTrainingOptions();
 
+	// Units marked as a tier II unlock need the communication center, the tier II building that also unlocks
+	// the airbase and the experimental factory.
+	static URTSRequirement* CreateTierTwoUnlockRequirement();
+	// For units that unlock with either the tier II building or an earlier factory of their own line.
+	static URTSRequirement* CreateTierTwoOrBuildingUnlockRequirement(const ENomadicSubtype AlternativeBuilding);
+
 	// Makes sure that training times are not too short to cause load issues on AsyncSpawner.
 	void PostInitTrainingOptions();
 

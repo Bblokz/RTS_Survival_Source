@@ -105,6 +105,7 @@ enum class ETechnology : uint8;
 enum class EHealAbilityType : uint8;
 class UTechnologyEffect;
 class UPlayerTechManager;
+class UPlayerUnitVariantManager;
 class ASquadUnit;
 union FTargetUnion;
 class UPlayerCommandTypeDecoder;
@@ -523,6 +524,7 @@ public:
 	inline UPlayerResourceManager* GetPlayerResourceManager() const { return M_PlayerResourceManager; }
 
 	inline UPlayerTechManager* GetPlayerTechManager() const { return M_PlayerTechManager; }
+	inline UPlayerUnitVariantManager* GetPlayerUnitVariantManager() const { return M_PlayerUnitVariantManager; }
 	inline UPlayerBuildRadiusManager* GetPlayerBuildRadiusManager() const { return M_PlayerBuildRadiusManager; }
 	inline ANomadicVehicle* GetPlayerHq() const { return M_PlayerHQ; }
 	inline ACameraPawn* GetCameraPawn() const { return CameraRef; }
@@ -1834,6 +1836,10 @@ private:
 	UPROPERTY()
 	UPlayerTechManager* M_PlayerTechManager;
 
+	// Answers units that pull their variant at spawn; initialised from the profile before starting units spawn.
+	UPROPERTY()
+	UPlayerUnitVariantManager* M_PlayerUnitVariantManager;
+
 	UPROPERTY()
 	UPlayerProfileLoader* M_PlayerProfileLoader;
 
@@ -1873,6 +1879,7 @@ private:
 	bool GetIsValidFormationController();
 	bool GetIsValidPlayerControlGroupManager();
 	bool GetIsValidPlayerTechManager();
+	bool GetIsValidPlayerUnitVariantManager() const;
 	bool GetIsValidPlayerGlobalAbiliesManager();
 
 	FNomadicPreviewAttachments GetNomadicPreviewAttachments(const ANomadicVehicle* NomadicVehicleToExpand) const;

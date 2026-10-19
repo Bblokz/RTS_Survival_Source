@@ -31,6 +31,7 @@
 #include "PlayerOutlineComponent/RTSOutlineRules/RTSOutlineRules.h"
 #include "PlayerResourceManager/PlayerResourceManager.h"
 #include "PlayerTechManager/PlayerTechManager.h"
+#include "PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "PortraitManager/PortraitManager.h"
 #include "RTSCheatManager/RTSCheatManager.h"
 #include "RTSPrimaryClickContext/RTSPrimaryClickContext.h"
@@ -231,6 +232,7 @@ ACPPController::ACPPController()
 	  , M_PlayerResourceManager(nullptr)
 	  , M_PlayerAudioController(nullptr)
 	  , M_PlayerTechManager(nullptr)
+	  , M_PlayerUnitVariantManager(nullptr)
 	  , M_PlayerProfileLoader(nullptr)
 	  , M_PlayerCameraController(nullptr)
 	  , M_CameraPanSpeedMultiplier(RTSGameUserSettingsRanges::DefaultCameraPanSpeedMultiplier)
@@ -265,6 +267,7 @@ ACPPController::ACPPController()
 	M_PlayerControlGroupManager = CreateDefaultSubobject<UPlayerControlGroupManager>(TEXT("PlayerControlGroupManager"));
 
 	M_PlayerTechManager = CreateDefaultSubobject<UPlayerTechManager>(TEXT("PlayerTechManager"));
+	M_PlayerUnitVariantManager = CreateDefaultSubobject<UPlayerUnitVariantManager>(TEXT("PlayerUnitVariantManager"));
 	M_FormationController = CreateDefaultSubobject<UFormationController>(TEXT("FormationController"));
 	M_SquadMovePreview = CreateDefaultSubobject<USquadMovePreviewComponent>(TEXT("SquadMovePreview"));
 	M_FormationMovePreview = CreateDefaultSubobject<UFormationMovePreviewComponent>(TEXT("FormationMovePreview"));
@@ -7406,6 +7409,17 @@ bool ACPPController::GetIsValidPlayerTechManager()
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerTechManager",
 	                                                      "GetIsValidPlayerTechManager", this);
+	return false;
+}
+
+bool ACPPController::GetIsValidPlayerUnitVariantManager() const
+{
+	if (IsValid(M_PlayerUnitVariantManager))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerUnitVariantManager",
+	                                                      "GetIsValidPlayerUnitVariantManager", this);
 	return false;
 }
 

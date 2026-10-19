@@ -609,7 +609,7 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 	}
 
 
-	// Ger Pz 38t Railgun
+	// Ger Pz 38t Railgun; unlocked by either the medium tank factory or the tier II communication center.
 	{
 		FTrainingOption ItemID = FTrainingOption(
 			EAllUnitType::UNType_Tank,
@@ -621,6 +621,64 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			LightTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_Pz38t_RailGun,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None,
+			EAircraftSubtype::Aircarft_None,
+			CreateTierTwoOrBuildingUnlockRequirement(ENomadicSubtype::Nomadic_GerMedTankFactory)
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger Pz 38t Rockets; unlocked by either the medium tank factory or the tier II communication center.
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Pz38t_R)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Pz38t_R,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None,
+			EAircraftSubtype::Aircarft_None,
+			CreateTierTwoOrBuildingUnlockRequirement(ENomadicSubtype::Nomadic_GerMedTankFactory)
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger Pz II Luchs
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_PzII_Luchs)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_PzII_Luchs,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger Wespe
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Wespe)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			MediumTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Wespe,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);
@@ -647,7 +705,7 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 
 	// GER ARMORED CARS
 
-	// Ger SdKfz 251/22
+	// Ger SdKfz 251/22; unlocked by either the light tank factory or the tier II communication center.
 	{
 		FTrainingOption ItemID = FTrainingOption(
 			EAllUnitType::UNType_Tank,
@@ -660,7 +718,9 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_Sdkfz251_22,
 			ENomadicSubtype::Nomadic_None,
-			ESquadSubtype::Squad_None
+			ESquadSubtype::Squad_None,
+			EAircraftSubtype::Aircarft_None,
+			CreateTierTwoOrBuildingUnlockRequirement(ENomadicSubtype::Nomadic_GerLightSteelForge)
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
@@ -714,6 +774,42 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			ArmoredCarTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_Sdkfz9_37mm,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger SdKfz 7/1 Flakvierling
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Sdkfz_7_Flakvierling)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			ArmoredCarTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Sdkfz_7_Flakvierling,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger SdKfz 221 20mm
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_Sdkfz_221)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			ArmoredCarTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_Sdkfz_221,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);
@@ -847,7 +943,7 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
-	// Ger Pz IV Rockets
+	// Ger Pz IV Rockets; tier II unlock.
 	{
 		FTrainingOption ItemID = FTrainingOption(
 			EAllUnitType::UNType_Tank,
@@ -860,7 +956,9 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_PZIV_Rockets,
 			ENomadicSubtype::Nomadic_None,
-			ESquadSubtype::Squad_None
+			ESquadSubtype::Squad_None,
+			EAircraftSubtype::Aircarft_None,
+			CreateTierTwoUnlockRequirement()
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
@@ -938,7 +1036,7 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
-	// Ger Brumbar
+	// Ger Brumbar; tier II unlock.
 	{
 		FTrainingOption ItemID = FTrainingOption(
 			EAllUnitType::UNType_Tank,
@@ -951,7 +1049,9 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_Brumbar,
 			ENomadicSubtype::Nomadic_None,
-			ESquadSubtype::Squad_None
+			ESquadSubtype::Squad_None,
+			EAircraftSubtype::Aircarft_None,
+			CreateTierTwoUnlockRequirement()
 		);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
@@ -2457,7 +2557,8 @@ void UTrainingMenuManager::InitAllGameAntiTankGunTWTrainingOptions()
 {
 	using namespace DeveloperSettings::GameBalance::TrainingTime;
 
-	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime)
+	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime,
+	                                          URTSRequirement* Requirement = nullptr)
 	{
 		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
 		const FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
@@ -2466,12 +2567,15 @@ void UTrainingMenuManager::InitAllGameAntiTankGunTWTrainingOptions()
 			EAllUnitType::UNType_Squad,
 			ETankSubtype::Tank_None,
 			ENomadicSubtype::Nomadic_None,
-			SquadSubtype);
+			SquadSubtype,
+			EAircraftSubtype::Aircarft_None,
+			Requirement);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	};
 
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_PaK38, MediumAntiTankGunTeamWeaponTrainingTime);
-	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_PaK40, HeavyAntiTankGunTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_PaK40, HeavyAntiTankGunTeamWeaponTrainingTime,
+	                            CreateTierTwoUnlockRequirement());
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Zis_57MM, MediumAntiTankGunTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_53K_45MM, MediumAntiTankGunTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Zis_76MM, HeavyAntiTankGunTeamWeaponTrainingTime);
@@ -2502,7 +2606,8 @@ void UTrainingMenuManager::InitAllGameMortarTWTrainingOptions()
 void UTrainingMenuManager::InitAllGameFlakTWTrainingOptions()
 {
 	using namespace DeveloperSettings::GameBalance::TrainingTime;
-	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime)
+	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime,
+	                                          URTSRequirement* Requirement = nullptr)
 	{
 		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
 		const FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
@@ -2511,12 +2616,15 @@ void UTrainingMenuManager::InitAllGameFlakTWTrainingOptions()
 			EAllUnitType::UNType_Squad,
 			ETankSubtype::Tank_None,
 			ENomadicSubtype::Nomadic_None,
-			SquadSubtype);
+			SquadSubtype,
+			EAircraftSubtype::Aircarft_None,
+			Requirement);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	};
 
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_37mmFlak, MediumFlakTeamWeaponTrainingTime);
-	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_88mmFlak, HeavyFlakTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_88mmFlak, HeavyFlakTeamWeaponTrainingTime,
+	                            CreateTierTwoUnlockRequirement());
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_Bofors, MediumFlakTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_KS30_130MM, HeavyFlakTeamWeaponTrainingTime);
 }
@@ -2524,7 +2632,8 @@ void UTrainingMenuManager::InitAllGameFlakTWTrainingOptions()
 void UTrainingMenuManager::InitAllGameArtilleryTWTrainingOptions()
 {
 	using namespace DeveloperSettings::GameBalance::TrainingTime;
-	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime)
+	auto AddTeamWeaponTrainingOption = [this](const ESquadSubtype SquadSubtype, const int32 TrainingTime,
+	                                          URTSRequirement* Requirement = nullptr)
 	{
 		const FTrainingOption ItemID(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
 		const FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
@@ -2533,13 +2642,17 @@ void UTrainingMenuManager::InitAllGameArtilleryTWTrainingOptions()
 			EAllUnitType::UNType_Squad,
 			ETankSubtype::Tank_None,
 			ENomadicSubtype::Nomadic_None,
-			SquadSubtype);
+			SquadSubtype,
+			EAircraftSubtype::Aircarft_None,
+			Requirement);
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	};
 
-	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_LefH18, MediumArtilleryTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_LefH18, MediumArtilleryTeamWeaponTrainingTime,
+	                            CreateTierTwoUnlockRequirement());
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_210MM_Morser, HeavyArtilleryTeamWeaponTrainingTime);
-	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_SFH18_150mm, HeavyArtilleryTeamWeaponTrainingTime);
+	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_SFH18_150mm, HeavyArtilleryTeamWeaponTrainingTime,
+	                            CreateTierTwoUnlockRequirement());
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Ger_Nebelwerfer, MediumArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_M1938_122mm, HeavyArtilleryTeamWeaponTrainingTime);
 	AddTeamWeaponTrainingOption(ESquadSubtype::Squad_Rus_B4_203mm, HeavyArtilleryTeamWeaponTrainingTime);
@@ -2606,7 +2719,6 @@ void UTrainingMenuManager::InitAllGameTrainingLayoutOnlyOptions()
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz_232_3, ArmoredCarMediumCalibreTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz251_PZIV, ArmoredCarMediumCalibreTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Panzerwerfer, ArmoredCarMediumCalibreTrainingTime);
-	AddTankOptionIfMissing(ETankSubtype::Tank_Pz38t_R, LightTankTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_PzIII_AA, MediumTankTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_PzIII_FLamm, MediumTankTrainingTime);
 }
@@ -2654,6 +2766,24 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 		EBuildingExpansionType::BTX_GerRailPakBunker,
 		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding),
 		GerRailPakBunkerBuildTime);
+}
+
+URTSRequirement* UTrainingMenuManager::CreateTierTwoUnlockRequirement()
+{
+	const FTrainingOption RequiredTierTwoBuilding(
+		EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter));
+	return FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding);
+}
+
+URTSRequirement* UTrainingMenuManager::CreateTierTwoOrBuildingUnlockRequirement(
+	const ENomadicSubtype AlternativeBuilding)
+{
+	const FTrainingOption RequiredAlternativeBuilding(
+		EAllUnitType::UNType_Nomadic, static_cast<uint8>(AlternativeBuilding));
+	const FTrainingOption RequiredTierTwoBuilding(
+		EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerCommunicationCenter));
+	return FRTS_RequirementHelpers::CreateOr_Unit_Unit(GetTransientPackage(), RequiredAlternativeBuilding,
+	                                                   RequiredTierTwoBuilding);
 }
 
 void UTrainingMenuManager::PostInitTrainingOptions()

@@ -10,5 +10,7 @@ enum class EPlayerAimAbilityTypes : uint8
 	AntiVehicleGrenade,
 	SmallCrosshair,
 	MediumCrosshair,
-	LargeCrosshair
+	LargeCrosshair,
+	// Append only: abilities store these values in their Blueprint defaults.
+	LargeComplexCrosshair
 };
