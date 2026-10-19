@@ -208,7 +208,14 @@ enum class ERTSCard : uint8
 
 	Card_EasterEgg,
 	// Appended to preserve existing serialized card values.
-	Card_Train_FlamePuma
+	Card_Train_FlamePuma,
+	// Training cards for the doctrine training layouts, appended for the same reason.
+	Card_Train_Pz38T_RailGun,
+	Card_Train_PZIV_Rockets,
+	Card_Train_PzII_Luchs,
+	Card_Train_Sdkfz7_Flakvierling,
+	Card_Train_Sdkfz_221,
+	Card_Train_Wespe
 };
 
 static FString Global_GetCardAsString(const ERTSCard Card)

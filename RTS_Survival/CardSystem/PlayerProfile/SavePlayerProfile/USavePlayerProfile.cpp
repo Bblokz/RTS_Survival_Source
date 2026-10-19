@@ -11,7 +11,8 @@ void USavePlayerProfile::Initialize(const TArray<ERTSCard>& PlayerAvailableCards
                                     const int32 MaxCardsInUnits,
                                     const int32 MaxCardsInTechResources,
                                     const TArray<FNomadicBuildingLayoutData>& TNomadicBuildingLayouts, const TArray<ERTSCard>& NewCardsInUnits, const
-                                    TArray<ERTSCard>& NewCardsInTechResources)
+                                    TArray<ERTSCard>& NewCardsInTechResources,
+                                    const TArray<FUnitVariantSelection>& UnitVariantSelections)
 {
     M_PLayerAvailableCards = PlayerAvailableCards;
     M_SelectedCards = SelectedCards;
@@ -20,4 +21,5 @@ void USavePlayerProfile::Initialize(const TArray<ERTSCard>& PlayerAvailableCards
     M_TNomadicBuildingLayouts = TNomadicBuildingLayouts;
 	M_CardsInUnits = NewCardsInUnits;
 	M_CardsInTechResources = NewCardsInTechResources;
+	M_UnitVariantSelections = UnitVariantSelections;
 }

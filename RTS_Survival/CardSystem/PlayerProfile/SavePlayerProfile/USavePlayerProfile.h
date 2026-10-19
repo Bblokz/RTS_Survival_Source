@@ -6,6 +6,7 @@
 #include "RTS_Survival/CardSystem/CardUI/RTSCardWidgets/W_RTSCard.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/UnitData/UnitCost.h"
+#include "RTS_Survival/Units/Variants/UnitVariantTypes.h"
 #include "USavePlayerProfile.generated.h"
 
 enum class ERTSCard : uint8;
@@ -53,7 +54,8 @@ public:
 	                int32 MaxCardsInUnits,
 	                int32 MaxCardsInTechResources,
 	                const TArray<FNomadicBuildingLayoutData>& TNomadicBuildingLayouts, const TArray<ERTSCard>& NewCardsInUnits, const
-	                TArray<ERTSCard>& NewCardsInTechResources);
+	                TArray<ERTSCard>& NewCardsInTechResources,
+	                const TArray<FUnitVariantSelection>& UnitVariantSelections = TArray<FUnitVariantSelection>());
 
 	UPROPERTY(SaveGame)
 	TArray<ERTSCard> M_PLayerAvailableCards;
@@ -75,4 +77,8 @@ public:
 
 	UPROPERTY(SaveGame)
 	TArray<FNomadicBuildingLayoutData> M_TNomadicBuildingLayouts;
+
+	// The variant the player picked per unit type; empty (all Base) for saves made before variants existed.
+	UPROPERTY(SaveGame)
+	TArray<FUnitVariantSelection> M_UnitVariantSelections;
 };

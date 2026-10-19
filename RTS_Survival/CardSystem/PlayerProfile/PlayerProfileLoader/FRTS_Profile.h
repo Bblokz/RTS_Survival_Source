@@ -37,6 +37,7 @@ public:
      * @param NomadicBuildingLayouts Per-building training layout state.
      * @param CardsInUnits         Current cards placed in the unit holder.
      * @param CardsInTechResources Current cards placed in the tech/resource holder.
+     * @param UnitVariantSelections The variant picked per unit type; empty until the variant UI exists.
      * @return A packed and normalized FPlayerCardSaveData snapshot.
      */
 	static FPlayerCardSaveData BuildPlayerCardSaveData(
@@ -46,7 +47,8 @@ public:
 		int32 MaxCardsInTechResources,
 		TArray<FNomadicBuildingLayoutData> NomadicBuildingLayouts,
 		TArray<ERTSCard> CardsInUnits,
-		TArray<ERTSCard> CardsInTechResources);
+		TArray<ERTSCard> CardsInTechResources,
+		TArray<FUnitVariantSelection> UnitVariantSelections = TArray<FUnitVariantSelection>());
 
 	/**
     * @brief Validates and cleans up the player profile by removing duplicate cards and ensuring consistency.
@@ -63,7 +65,8 @@ public:
 		int32 MaxCardsInTechResources,
 		const TArray<FNomadicBuildingLayoutData>& TNomadicBuildingLayouts,
 		const TArray<ERTSCard>& CardsInUnits,
-		const TArray<ERTSCard>& CardsInTechResources);
+		const TArray<ERTSCard>& CardsInTechResources,
+		const TArray<FUnitVariantSelection>& UnitVariantSelections = TArray<FUnitVariantSelection>());
 
 	static void DebugPrintProfile(const USavePlayerProfile* InPlayerProfile, bool bUseErrorFunction = false);
 
@@ -107,6 +110,9 @@ private:
 	static TStrongObjectPtr<USavePlayerProfile> M_TestPlayerProfile;
 
 	static void InitializeTestProfile();
+
+	// Keeps the last selection per unit and drops unit types that cannot have variants.
+	static void ValidateUnitVariantSelections(TArray<FUnitVariantSelection>& InOutSelections);
 
 
 	static bool SavePlayerProfile(USavePlayerProfile* InPlayerProfile);

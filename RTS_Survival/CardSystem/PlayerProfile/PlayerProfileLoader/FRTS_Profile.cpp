@@ -4,6 +4,7 @@
 #include "FRTS_Profile.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/CardSystem/PlayerProfile/SavePlayerProfile/USavePlayerProfile.h"
+#include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 FString FRTS_Profile::M_SaveSlotName = TEXT("PlayerProfile");
@@ -117,7 +118,8 @@ FPlayerCardSaveData FRTS_Profile::BuildPlayerCardSaveData(
 	const int32 MaxCardsInTechResources,
 	TArray<FNomadicBuildingLayoutData> NomadicBuildingLayouts,
 	TArray<ERTSCard> CardsInUnits,
-	TArray<ERTSCard> CardsInTechResources)
+	TArray<ERTSCard> CardsInTechResources,
+	TArray<FUnitVariantSelection> UnitVariantSelections)
 {
 	FPlayerCardSaveData OutCardSaveData;
 	OutCardSaveData.PlayerAvailableCards = MoveTemp(PlayerAvailableCards);
@@ -127,8 +129,10 @@ FPlayerCardSaveData FRTS_Profile::BuildPlayerCardSaveData(
 	OutCardSaveData.MaxCardsInUnits = MaxCardsInUnits;
 	OutCardSaveData.MaxCardsInTechResources = MaxCardsInTechResources;
 	OutCardSaveData.NomadicBuildingLayouts = MoveTemp(NomadicBuildingLayouts);
+	OutCardSaveData.UnitVariantSelections = MoveTemp(UnitVariantSelections);
 
 	ProfileHelpers::NormalizePlayerCardSaveData(OutCardSaveData);
+	ValidateUnitVariantSelections(OutCardSaveData.UnitVariantSelections);
 	return OutCardSaveData;
 }
 
@@ -195,6 +199,36 @@ void FRTS_Profile::ProfileValidator(USavePlayerProfile* Profile)
 				AvailableCards.RemoveAt(IndexInAvailable);
 			}
 		}
+	}
+
+	// Third Validation: one variant per unit type, only for unit types that support variants.
+	ValidateUnitVariantSelections(Profile->M_UnitVariantSelections);
+}
+
+void FRTS_Profile::ValidateUnitVariantSelections(TArray<FUnitVariantSelection>& InOutSelections)
+{
+	TSet<FTrainingOption> SeenUnits;
+	// Walk backwards so the last selection per unit wins and removals do not shift unvisited indices.
+	for (int32 SelectionIndex = InOutSelections.Num() - 1; SelectionIndex >= 0; --SelectionIndex)
+	{
+		const FTrainingOption Unit = InOutSelections[SelectionIndex].Unit;
+		if (not UPlayerUnitVariantManager::GetIsUnitTypeSupported(Unit.UnitType))
+		{
+			RTSFunctionLibrary::PrintToLog(FString::Printf(
+				TEXT("Unit variant selection for '%s' removed: this unit type has no variants."),
+				*Unit.GetTrainingName()), false);
+			InOutSelections.RemoveAt(SelectionIndex);
+			continue;
+		}
+		if (SeenUnits.Contains(Unit))
+		{
+			RTSFunctionLibrary::PrintToLog(FString::Printf(
+				TEXT("Duplicate unit variant selection for '%s' removed; the last one is kept."),
+				*Unit.GetTrainingName()), false);
+			InOutSelections.RemoveAt(SelectionIndex);
+			continue;
+		}
+		SeenUnits.Add(Unit);
 	}
 }
 
@@ -402,6 +436,15 @@ void FRTS_Profile::DebugPrintProfile(const USavePlayerProfile* InPlayerProfile, 
 	}
 	ProfileDebugString += TEXT("\n");
 
+	// M_UnitVariantSelections
+	ProfileDebugString += TEXT("Unit Variant Selections:\n");
+	for (const FUnitVariantSelection& Selection : InPlayerProfile->M_UnitVariantSelections)
+	{
+		ProfileDebugString += FString::Printf(TEXT(" - %s -> %s\n"), *Selection.Unit.GetTrainingName(),
+		                                      *Global_GetUnitVariantAsString(Selection.Variant));
+	}
+	ProfileDebugString += TEXT("\n");
+
 	// Output the debug string
 	if (bUseErrorFunction)
 	{
@@ -503,7 +546,8 @@ bool FRTS_Profile::SaveNewPlayerProfile(
 	int32 MaxCardsInTechResources,
 	const TArray<FNomadicBuildingLayoutData>& TNomadicBuildingLayouts,
 	const TArray<ERTSCard>& CardsInUnits,
-	const TArray<ERTSCard>& CardsInTechResources)
+	const TArray<ERTSCard>& CardsInTechResources,
+	const TArray<FUnitVariantSelection>& UnitVariantSelections)
 {
 	// Create a new USavePlayerProfile object
 	USavePlayerProfile* NewProfile = Cast<USavePlayerProfile>(
@@ -523,7 +567,9 @@ bool FRTS_Profile::SaveNewPlayerProfile(
 		MaxCardsInTechResources,
 		TNomadicBuildingLayouts,
 		CardsInUnits,
-		CardsInTechResources);
+		CardsInTechResources,
+		UnitVariantSelections);
+	ValidateUnitVariantSelections(NewProfile->M_UnitVariantSelections);
 
 	DebugPrintProfile(NewProfile, true);
 
