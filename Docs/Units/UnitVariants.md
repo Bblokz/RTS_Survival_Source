@@ -7,9 +7,11 @@ variants, of which the first is always the base unit. The player picks one varia
 whole army before a mission; every unit of that type the player receives during the mission then starts as
 that variant.
 
-This document is the implementation brief. Nothing in it is implemented yet. The variant *selection UI* is
-out of scope; everything that lets the selection reach the units, and everything the UI will need to know
-which units have variants to choose from, is in scope.
+This document is the implementation brief. The C++ side (sections 3 to 6 and the automation tests of 9.1) is
+implemented; where the code deviates from the brief, section 12 lists it and the affected sections say so.
+The data asset `DA_UnitVariants` and the Blueprint switches (section 8 step 10) are not made yet. The variant
+*selection UI* is out of scope; everything that lets the selection reach the units, and everything the UI will
+need to know which units have variants to choose from, is in scope.
 
 Decisions taken (the questions that led to them are in the session history; the proposed defaults were accepted,
 with one deviation: nomadic trucks were proposed as in scope by inheritance and are excluded here because the
@@ -199,6 +201,9 @@ private:
 };
 ```
 
+The shipped header adds the private editor-only helpers `ValidateEntry` / `GetIsRussianKey` and a test
+`friend`; see section 12.
+
 Rules the implementation must follow:
 
 - A subtype with **no entry** has exactly one variant (Base). Designers only add entries for units that have
@@ -210,7 +215,8 @@ Rules the implementation must follow:
   array still counts as 1.
 - `IsDataValid` reports an error (not a warning) for: an entry with 0 or more than 3 elements; a non-base
   element (index ≥ 1) with an empty `DisplayName`; a key that is the `_None` / `BXT_Invalid` enumerator; a
-  Russian subtype as key (name contains `Rus`; use `UEnum::GetNameStringByValue`). Follow
+  Russian subtype as key (enumerator name contains `Rus`, *or* display name starts with `Rus`: Russian tanks
+  such as `Tank_T34_85` only carry it in the display name "Rus Medium T-34/85"). Follow
   `UTrainingLayoutDataAsset::IsDataValid` for the style.
 - Nothing in the asset is loaded at runtime except through the settings class below.
 
@@ -331,19 +337,27 @@ private:
 };
 ```
 
+The shipped header adds a constructor, the private `StoreSelectionClamped` and `CacheVariantDataAsset`, and a
+test `friend`; see section 12.
+
 Behaviour details:
 
 - `BeginPlay` loads the asset via `UUnitVariantSettings::Get()->LoadVariantDataAsset()` and stores it. The
-  asset is `const` and owned by the asset registry; the `UPROPERTY` keeps it alive. `GetVariantDataAsset()`
-  also lazy-loads when the pointer is still null, so `InitFromProfile`, the cheats and `ResolveVariantForUnit`
+  asset is `const` and owned by the asset registry; the `UPROPERTY` keeps it alive. `InitFromProfile` and
+  `SetSelectedVariant` cache it too (`CacheVariantDataAsset`) and the const `GetVariantDataAsset()` loads it
+  without caching when the pointer is still null, so `InitFromProfile`, the cheats and `ResolveVariantForUnit`
   work whatever order they run in relative to the component's `BeginPlay`.
 - `InitFromProfile` is called from `UPlayerProfileLoader::LoadProfile` right after `ApplyTechnologies` and
-  before `LoadInUnits`. It clears the map, inserts valid entries, then calls `ApplyDebugForcedVariants()`
-  (guarded by `#if !UE_BUILD_SHIPPING`).
+  before the `bDoNotLoadPlayerUnits` early return that precedes `LoadInUnits`, through the private
+  `UPlayerProfileLoader::ApplyUnitVariantSelections`. It clears the map, inserts valid entries, then calls
+  `ApplyDebugForcedVariants()` (guarded by `#if !UE_BUILD_SHIPPING`).
 - Clamping: for every selection, if `not M_VariantDataAsset->GetIsVariantImplemented(Unit, Variant)` then
   `RTSFunctionLibrary::ReportError` with the unit's `GetTrainingName()` and the variant string, and store
-  nothing (Base). Do this once per selection, in `InitFromProfile`/`SetSelectedVariant`, never in
-  `GetSelectedVariant`, which is called per spawned unit.
+  nothing (Base). Do this once per selection, in `InitFromProfile`/`SetSelectedVariant` (both go through the
+  private `StoreSelectionClamped`), never in `GetSelectedVariant`, which is called per spawned unit. Selecting
+  `Base` removes the key.
+- `ApplyDebugForcedVariants` does **not** clamp: it only checks `GetIsUnitTypeSupported`, so a Blueprint variant
+  that has no asset entry yet can be tested (section 7 step 3).
 - `ResolveVariantForUnit`: `not IsValid(RTSComponent)` → Base; owner `!= UPlayerTechManager::PlayerTechOwnerIndex`
   → Base; `not GetIsUnitTypeSupported(UnitType)` → Base; otherwise
   `GetSelectedVariant(FTrainingOption(UnitType, RTSComponent->GetUnitSubType()))`.
@@ -404,6 +418,9 @@ private:
    test maps, editor utility worlds) → `ApplyUnitVariant_Internal(EUnitVariant::Base)` and return. Do **not**
    report an error; units legitimately exist in worlds without a player controller.
 3. `ApplyUnitVariant_Internal(Manager->ResolveVariantForUnit(this))`.
+
+`ApplyUnitVariantFromParent(Variant)` has the same `bM_HasAppliedUnitVariant` guard, so a soldier fires the event
+once even if it is later handed to another squad controller.
 
 `ApplyUnitVariant_Internal(Variant)`: store, set the flag, then if the owner actor
 `Implements<UUnitVariantReceiver>()` call `IUnitVariantReceiver::Execute_BP_ApplyUnitVariant(Owner, Variant)`;
@@ -527,8 +544,10 @@ Do this instead:
 
 - `ATeamWeapon` adds `public IUnitVariantReceiver`, so gun Blueprints get the same event.
 - `ATeamWeaponController` gets a private `ApplyUnitVariantToTeamWeapon()` called at the end of
-  `OnAllSquadUnitsLoaded`, after `SpawnTeamWeapon()`. It validates `M_TeamWeapon` and the controller's RTS
-  component, then:
+  `OnAllSquadUnitsLoaded`, after `SpawnTeamWeapon()`. It validates `M_TeamWeapon` (silently, with
+  `GetIsValidTeamWeaponNoReport`, because `SpawnTeamWeapon` already reported a failed spawn) and the controller's RTS
+  component, then (both branches go through the private `ForwardUnitVariantToTeamWeapon`; the delegate handle is
+  kept in `M_UnitVariantAppliedHandle` so it is bound once):
   - if `GetHasAppliedUnitVariant()` is already true → `IUnitVariantReceiver::Execute_BP_ApplyUnitVariant(M_TeamWeapon, GetUnitVariant())` now;
   - otherwise bind a lambda with a `TWeakObjectPtr<ATeamWeaponController>` capture to the RTS component's
     `OnUnitVariantApplied` that does the same when the controller's variant resolves later (the case where
@@ -731,3 +750,34 @@ optional; the manual check is:
 - **Idempotency.** `bM_HasAppliedUnitVariant` guards double application; never reset it on owner change.
 - **Shipping builds** compile out `ApplyDebugForcedVariants`. Guard with `#if !UE_BUILD_SHIPPING`, not a
   runtime bool, so the config list cannot leak into a release.
+
+---
+
+## 12. Implementation notes and deviations from the brief
+
+Implemented on 2026-10-19. Where the code differs from sections 3 to 9, this list is authoritative.
+
+| Area | What the code does | Why |
+|---|---|---|
+| Russian key check (3.3) | Enumerator name contains `Rus` **or** display name starts with `Rus`. | Russian tanks (`Tank_T34_85`, `Tank_KV_1`, …) only carry `Rus` in the display name. |
+| `IsDataValid` (3.3) | Shared rules live in the private static `ValidateEntry` / `GetIsRussianKey` (editor only). | One rule set for the three maps. |
+| Asset caching (3.6) | `GetVariantDataAsset() const` does not write the `UPROPERTY`; the non-const paths call `CacheVariantDataAsset`. | No `mutable` UPROPERTY. |
+| Clamp path (3.6) | `InitFromProfile` and `SetSelectedVariant` share the private `StoreSelectionClamped`; selecting `Base` removes the key. | The map only holds non-Base choices. |
+| Debug forced list (3.6, 6.2) | Not clamped against the asset; only `GetIsUnitTypeSupported` is checked. | Section 7 step 3: an unlisted Blueprint variant must be testable through this list. |
+| Profile order (4, 3.6) | `LoadProfile` calls the new private `UPlayerProfileLoader::ApplyUnitVariantSelections` after `ApplyTechnologies` and **before** the `bDoNotLoadPlayerUnits` early return. | Otherwise the no-units path never initialises the manager. |
+| Save validation (4) | `FRTS_Profile::ValidateUnitVariantSelections` (private static) runs in `ProfileValidator`, and also in `BuildPlayerCardSaveData` and `SaveNewPlayerProfile`. | Both save paths get the same dedupe / unsupported-type cleanup. |
+| `ApplyUnitVariantFromParent` (3.7) | Guarded by `bM_HasAppliedUnitVariant` like `ApplyUnitVariant`. | The interface promises the event fires once. |
+| Helper access (5) | `ATankMaster::ApplyUnitVariant` is private; `ASquadController::ApplyUnitVariant` and `ABuildingExpansion::ApplyUnitVariant` are protected, next to their `CheckForUpgrades`. | `SquadController.h` has no private section; the BXP helper sits with `CheckForUpgrades`. |
+| `ACPPController::GetIsValidPlayerUnitVariantManager` (3.6) | Declared and defined (const, reports via `ReportErrorVariableNotInitialised`), but nothing in the controller calls it yet. It does not recreate the component the way `GetIsValidPlayerTechManager` does. | Kept to the brief's wording; callers use `FRTS_Statics::GetPlayerUnitVariantManager`. |
+| Unity build | `Units/TeamWeapons/Tests/TeamWeaponDigInTestSubsystem.cpp` got an explicit `InfantryWeaponMaster.h` include. | The new .cpp files reshuffled the unity groups and exposed a missing include there. |
+| `Player/AGENTS.md` (8 step 11) | Not changed. | It lists orchestration rules, not owned components. `Units/TeamWeapons/AGENTS.md` got a short "Unit variants" section. |
+| Tests (9.1) | `Units/Variants/Tests/UnitVariantTests.cpp`, tests under `RTS.UnitVariants.*`. Private state is reached through `friend struct FUnitVariantTestAccess` (declared in the asset and the manager). The clamp test wraps `InitFromProfile` in `RTSFunctionLibrary::Push/PopModalDialogSuppression` and expects the `LogRTS` error. | No editor-only setters in shipping headers. |
+
+Run the tests headless (does not touch an open editor):
+
+```
+UnrealEditor-Cmd.exe D:\UE5Projects\RTS_Survival\RTS_Survival.uproject -ExecCmds="Automation RunTests RTS.UnitVariants; Quit" -unattended -nullrhi -nosplash -DisablePlugins=Fab -log
+```
+
+The manager clamp test also runs `ApplyDebugForcedVariants`, so a non-empty `DebugForcedVariants` list in
+`Config/DefaultGame.ini` can make it fail; clear the list before running the tests.

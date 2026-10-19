@@ -62,6 +62,14 @@ has a hand-made portrait, for comparing looks after changes.
 | `-UnitPortraitFraming=<x>` | 1.25 | camera distance on the bounding sphere (crop does the tightening) |
 | `-UnitPortraitDebugPostProcess` | off | extra camera that keeps post-process materials (shows the fog of war) |
 | `-UnitPortraitDebugViewportShot` | off | tries `HighResShot` of the game view (writes nothing offscreen) |
+| `-UnitPortraitShots=0` | - | only the idle picture; also spawns no AI controller, so the unit does not engage the map's enemies |
+| `-UnitPortraitRtsView` | off | adds a steep `RtsCamera` view like the in-game camera |
+| `-UnitPortraitFixedExposure` | off | manual exposure (the exposure bias still applies), so pictures of a comparison are exposed alike |
+
+A list entry can also change the unit's look, for comparing test materials without editing its Blueprint:
+`Name=/Game/.../BP_Unit.BP_Unit_C|Swap=/Game/.../MI_Old.MI_Old>/Game/.../MI_New.MI_New|TeamColor=r,g,b[,a]`. `Swap`
+replaces every mesh slot (turret child actors included) showing the first material; `TeamColor` writes custom
+primitive data 4-7. Used by `Tools/TeamColor` ([TeamColorShaders.md](../Rendering/TeamColorShaders.md)).
 
 Unreal reads the first copy of a switch, so change the runner's lighting defaults through `SKY_FILL=...` and
 `EXPOSURE_BIAS=...` rather than repeating the switch.
