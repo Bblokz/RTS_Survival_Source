@@ -82,8 +82,6 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz9_37mm UMETA(DisplayName = "Ger ArmCar SdKfz 9 37mm"),
 	Tank_Keubel UMETA(DisplayName = "Ger ArmCar Kubelwagen MG34"),
 	Tank_Kettenkrad UMETA(DisplayName = "Ger ArmCar Kettenkrad MG34"),
-	
-	
 
 	// German Light tanks.
 	Tank_PzJager UMETA(DisplayName = "Ger Light PzJager"),
@@ -185,6 +183,15 @@ enum class ETankSubtype : uint8
 	// Russian heavy tank destroyer on the IS chassis. Appended so the subtypes above, which training options
 	// store as numbers, keep their values.
 	Tank_ISU_152 UMETA(DisplayName = "Rus Heavy ISU-152"),
+	// German vehicles appended for the same reason.
+	// Half-track with the quadruple 20mm Flakvierling 38.
+	Tank_Sdkfz_7_Flakvierling UMETA(DisplayName = "Ger ArmCar Sdkfz7 FlakVierling"),
+	// Pz II Ausf. L reconnaissance tank: a sturdier, pricier Pz II F with the same 20mm gun.
+	Tank_PzII_Luchs UMETA(DisplayName = "Ger Light Pz II Luchs"),
+	// Four-wheeled light armoured car with a 20mm autocannon.
+	Tank_Sdkfz_221 UMETA(DisplayName = "Ger ArmCar SdKfz 221 20mm"),
+	// 105mm self-propelled howitzer on the Pz II chassis.
+	Tank_Wespe UMETA(DisplayName = "Ger Light Wespe 105mm"),
 };
 
 
@@ -306,6 +313,8 @@ static bool Global_GetIsLightTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_Pz38t_RailGun:
 	case ETankSubtype::Tank_PzII_F:
 	case ETankSubtype::Tank_PZII_Flame:
+	case ETankSubtype::Tank_PzII_Luchs:
+	case ETankSubtype::Tank_Wespe:
 	case ETankSubtype::Tank_Sdkfz_140:
 	case ETankSubtype::Tank_BT7:
 	case ETankSubtype::Tank_T26:
@@ -338,6 +347,8 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_Sdkfz9_37mm:
 	case ETankSubtype::Tank_Keubel:
 	case ETankSubtype::Tank_Kettenkrad:
+	case ETankSubtype::Tank_Sdkfz_7_Flakvierling:
+	case ETankSubtype::Tank_Sdkfz_221:
 	case ETankSubtype::Tank_Ba12:
 	case ETankSubtype::Tank_Ba14:
 	case ETankSubtype::Tank_ZilAmmo:

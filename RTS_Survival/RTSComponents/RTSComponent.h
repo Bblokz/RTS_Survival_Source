@@ -9,6 +9,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/TechTree/Technologies/Technologies.h"
+#include "RTS_Survival/Units/Variants/UnitVariantTypes.h"
 #include "RTSComponent.generated.h"
 
 
@@ -19,6 +20,7 @@ class ASquadController;
 class ATankMaster;
 class UTacticalAIComp;
 DECLARE_MULTICAST_DELEGATE(FOnSubTypeInitialized);
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnUnitVariantApplied, EUnitVariant);
 class RTS_SURVIVAL_API ACPPGameState;
 enum class EAllUnitType : uint8;
 
@@ -125,6 +127,30 @@ public:
 	void OnBuildingExpansionInitializedLookingForUpgrades(ABuildingExpansion* BuildingExpansion);
 	void OnAircraftInitializedLookingForUpgrades(AAircraftMaster* Aircraft);
 
+	// Fired once when the variant is resolved; components (e.g. UI, portraits) that care can bind here.
+	FOnUnitVariantApplied OnUnitVariantApplied;
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Unit Variant")
+	EUnitVariant GetUnitVariant() const { return M_UnitVariant; }
+
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Unit Variant")
+	bool GetHasAppliedUnitVariant() const { return bM_HasAppliedUnitVariant; }
+
+	/**
+	 * @brief Resolves the player's selection for this unit, stores it and fires BP_ApplyUnitVariant on the owner.
+	 * Call once, after owner and subtype are set and before techs are applied. Later calls are ignored.
+	 * @note An owner change later (ChangeOwningPlayer / SetOwningPlayerRuntime) does not re-resolve: a captured
+	 * enemy unit keeps Base and a player unit handed to a mission keeps its variant.
+	 */
+	void ApplyUnitVariant();
+
+	/**
+	 * @brief Used by squad units, which copy the variant of their squad controller instead of resolving one.
+	 * Ignored when a variant was already applied, like ApplyUnitVariant.
+	 * @param Variant The variant resolved by the squad controller.
+	 */
+	void ApplyUnitVariantFromParent(const EUnitVariant Variant);
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	int32 SelectionPriority = 0;
@@ -199,6 +225,13 @@ private:
 	void CreateSquadTacticalAIAtOwner();
 	UPROPERTY()
 	TWeakObjectPtr<UTacticalAIComp> M_EnemyTatcicalAIComp = nullptr;
+
+	void ApplyUnitVariant_Internal(const EUnitVariant Variant);
+
+	EUnitVariant M_UnitVariant = EUnitVariant::Base;
+
+	// Guards double application; never reset on owner change so a unit keeps the variant it began play with.
+	bool bM_HasAppliedUnitVariant = false;
 
 
 	
