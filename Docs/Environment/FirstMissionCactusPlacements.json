@@ -1,0 +1,1269 @@
+{
+  "existing_cacti": 64,
+  "road_clearance_cm": 1000,
+  "mission_point_clearance_cm": 1800,
+  "clusters": 24,
+  "placements": [
+    {
+      "cluster": 1,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Desert/BP_Desert_Dest_Cactus",
+      "size": "Tall",
+      "x": -19580.623,
+      "y": 8777.252,
+      "z": 622.345,
+      "yaw": 10.492,
+      "scale": 1.099,
+      "radius": 241.86644103830537,
+      "actor_label": "LandscapeCactus_P01_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/SM_Desert_Cactus4.SM_Desert_Cactus4"
+      ]
+    },
+    {
+      "cluster": 1,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_02",
+      "size": "Medium",
+      "x": -19420.966,
+      "y": 8105.261,
+      "z": 726.208,
+      "yaw": -128.212,
+      "scale": 1.117,
+      "radius": 189.92018666382216,
+      "actor_label": "LandscapeCactus_P01_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_02.SM_RTS_CactusBush_Medium_Green_02"
+      ]
+    },
+    {
+      "cluster": 1,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": -20533.422,
+      "y": 9349.877,
+      "z": 140.242,
+      "yaw": -89.353,
+      "scale": 0.897,
+      "radius": 103.15303891868734,
+      "actor_label": "LandscapeCactus_P01_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    },
+    {
+      "cluster": 2,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_02",
+      "size": "Medium",
+      "x": -30697.905,
+      "y": 16494.272,
+      "z": 120.938,
+      "yaw": -30.144,
+      "scale": 1.101,
+      "radius": 187.2078064284933,
+      "actor_label": "LandscapeCactus_P02_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_02.SM_RTS_CactusBush_Medium_Blue_02"
+      ]
+    },
+    {
+      "cluster": 2,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": -30251.235,
+      "y": 15490.947,
+      "z": 120.938,
+      "yaw": -97.926,
+      "scale": 0.947,
+      "radius": 161.05903387466202,
+      "actor_label": "LandscapeCactus_P02_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 2,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Large_Green_01",
+      "size": "Large",
+      "x": -31233.843,
+      "y": 16839.831,
+      "z": 120.938,
+      "yaw": 162.751,
+      "scale": 0.891,
+      "radius": 231.58498691165713,
+      "actor_label": "LandscapeCactus_P02_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Large_Green_01.SM_RTS_CactusBush_Large_Green_01"
+      ]
+    },
+    {
+      "cluster": 2,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": -31177.042,
+      "y": 16139.741,
+      "z": 120.938,
+      "yaw": 55.482,
+      "scale": 0.947,
+      "radius": 108.88008779823606,
+      "actor_label": "LandscapeCactus_P02_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 3,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": 7803.774,
+      "y": -23229.782,
+      "z": 139.688,
+      "yaw": 38.015,
+      "scale": 0.906,
+      "radius": 153.9730610724637,
+      "actor_label": "LandscapeCactus_P03_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 3,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_01",
+      "size": "Small",
+      "x": 7359.185,
+      "y": -24291.408,
+      "z": 139.688,
+      "yaw": 42.344,
+      "scale": 1.074,
+      "radius": 123.55790731892168,
+      "actor_label": "LandscapeCactus_P03_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_01.SM_RTS_CactusBush_Small_Blue_01"
+      ]
+    },
+    {
+      "cluster": 4,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": -25179.239,
+      "y": 8247.254,
+      "z": 123.281,
+      "yaw": -129.626,
+      "scale": 0.997,
+      "radius": 169.48613234107455,
+      "actor_label": "LandscapeCactus_P04_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 4,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": -26086.641,
+      "y": 8656.915,
+      "z": 122.5,
+      "yaw": 142.621,
+      "scale": 0.99,
+      "radius": 113.83877672585498,
+      "actor_label": "LandscapeCactus_P04_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 4,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_03",
+      "size": "Small",
+      "x": -25395.669,
+      "y": 9179.053,
+      "z": 122.5,
+      "yaw": 108.388,
+      "scale": 1.075,
+      "radius": 123.59701070728654,
+      "actor_label": "LandscapeCactus_P04_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_03.SM_RTS_CactusBush_Small_Blue_03"
+      ]
+    },
+    {
+      "cluster": 4,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": -24532.269,
+      "y": 9185.655,
+      "z": 122.5,
+      "yaw": 86.455,
+      "scale": 1.128,
+      "radius": 191.71794123547454,
+      "actor_label": "LandscapeCactus_P04_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 4,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_02",
+      "size": "Small",
+      "x": -25887.831,
+      "y": 9037.143,
+      "z": 122.5,
+      "yaw": -24.888,
+      "scale": 0.977,
+      "radius": 112.37463409344454,
+      "actor_label": "LandscapeCactus_P04_05",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_02.SM_RTS_CactusBush_Small_Blue_02"
+      ]
+    },
+    {
+      "cluster": 5,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Desert/BP_Desert_Dest_Cactus",
+      "size": "Tall",
+      "x": -32176.702,
+      "y": 21159.507,
+      "z": 120.938,
+      "yaw": 47.016,
+      "scale": 1.01,
+      "radius": 222.1650244692984,
+      "actor_label": "LandscapeCactus_P05_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/SM_Desert_Cactus1.SM_Desert_Cactus1"
+      ]
+    },
+    {
+      "cluster": 5,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Large_Green_03",
+      "size": "Large",
+      "x": -31601.553,
+      "y": 21615.152,
+      "z": 120.938,
+      "yaw": 123.471,
+      "scale": 1.039,
+      "radius": 270.2396488047193,
+      "actor_label": "LandscapeCactus_P05_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Large_Green_03.SM_RTS_CactusBush_Large_Green_03"
+      ]
+    },
+    {
+      "cluster": 5,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_01",
+      "size": "Small",
+      "x": -32111.132,
+      "y": 22003.987,
+      "z": 120.938,
+      "yaw": -57.111,
+      "scale": 1.081,
+      "radius": 124.26430319615763,
+      "actor_label": "LandscapeCactus_P05_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_01.SM_RTS_CactusBush_Small_Green_01"
+      ]
+    },
+    {
+      "cluster": 6,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": -6108.448,
+      "y": -34020.454,
+      "z": 220.629,
+      "yaw": 178.169,
+      "scale": 1.089,
+      "radius": 185.1287798182447,
+      "actor_label": "LandscapeCactus_P06_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 6,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_01",
+      "size": "Small",
+      "x": -5404.21,
+      "y": -32790.79,
+      "z": 162.373,
+      "yaw": 169.718,
+      "scale": 0.999,
+      "radius": 114.83947002502035,
+      "actor_label": "LandscapeCactus_P06_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_01.SM_RTS_CactusBush_Small_Green_01"
+      ]
+    },
+    {
+      "cluster": 6,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": -5759.892,
+      "y": -33388.244,
+      "z": 202.543,
+      "yaw": 132.599,
+      "scale": 0.985,
+      "radius": 113.2466020031091,
+      "actor_label": "LandscapeCactus_P06_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 6,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": -5149.755,
+      "y": -34013.586,
+      "z": 260.916,
+      "yaw": -168.935,
+      "scale": 1.044,
+      "radius": 120.10030794693016,
+      "actor_label": "LandscapeCactus_P06_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    },
+    {
+      "cluster": 7,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_01",
+      "size": "Medium",
+      "x": -20180.699,
+      "y": -3462.378,
+      "z": 141.25,
+      "yaw": -9.075,
+      "scale": 0.944,
+      "radius": 160.51110289129804,
+      "actor_label": "LandscapeCactus_P07_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_01.SM_RTS_CactusBush_Medium_Blue_01"
+      ]
+    },
+    {
+      "cluster": 7,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_02",
+      "size": "Medium",
+      "x": -20358.646,
+      "y": -4176.234,
+      "z": 141.25,
+      "yaw": 61.392,
+      "scale": 0.897,
+      "radius": 152.53026699969425,
+      "actor_label": "LandscapeCactus_P07_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_02.SM_RTS_CactusBush_Medium_Green_02"
+      ]
+    },
+    {
+      "cluster": 7,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": -19987.701,
+      "y": -4639.058,
+      "z": 141.25,
+      "yaw": -78.253,
+      "scale": 0.987,
+      "radius": 113.48153959162114,
+      "actor_label": "LandscapeCactus_P07_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    },
+    {
+      "cluster": 8,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_02",
+      "size": "Medium",
+      "x": 15288.796,
+      "y": -17992.122,
+      "z": 140.458,
+      "yaw": -177.495,
+      "scale": 0.907,
+      "radius": 154.17928545123343,
+      "actor_label": "LandscapeCactus_P08_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_02.SM_RTS_CactusBush_Medium_Green_02"
+      ]
+    },
+    {
+      "cluster": 8,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Large_Green_03",
+      "size": "Large",
+      "x": 14275.183,
+      "y": -17602.69,
+      "z": 139.265,
+      "yaw": 80.966,
+      "scale": 1.027,
+      "radius": 266.9799315334277,
+      "actor_label": "LandscapeCactus_P08_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Large_Green_03.SM_RTS_CactusBush_Large_Green_03"
+      ]
+    },
+    {
+      "cluster": 8,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": 15102.33,
+      "y": -17077.446,
+      "z": 140.469,
+      "yaw": -103.827,
+      "scale": 0.915,
+      "radius": 155.48782996636626,
+      "actor_label": "LandscapeCactus_P08_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 8,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_02",
+      "size": "Small",
+      "x": 14667.16,
+      "y": -16869.887,
+      "z": 140.469,
+      "yaw": 168.974,
+      "scale": 1.019,
+      "radius": 117.15997207708197,
+      "actor_label": "LandscapeCactus_P08_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_02.SM_RTS_CactusBush_Small_Blue_02"
+      ]
+    },
+    {
+      "cluster": 9,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Desert/BP_Desert_Dest_Cactus",
+      "size": "Tall",
+      "x": -17006.454,
+      "y": 20200.901,
+      "z": 231.684,
+      "yaw": -148.14,
+      "scale": 1.124,
+      "radius": 247.18749781844292,
+      "actor_label": "LandscapeCactus_P09_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/SM_Desert_Cactus2.SM_Desert_Cactus2"
+      ]
+    },
+    {
+      "cluster": 9,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_01",
+      "size": "Small",
+      "x": -16486.078,
+      "y": 20176.654,
+      "z": 179.116,
+      "yaw": -116.612,
+      "scale": 0.99,
+      "radius": 113.84025926875432,
+      "actor_label": "LandscapeCactus_P09_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_01.SM_RTS_CactusBush_Small_Green_01"
+      ]
+    },
+    {
+      "cluster": 10,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": -10403.738,
+      "y": -30853.479,
+      "z": 141.25,
+      "yaw": -55.277,
+      "scale": 0.925,
+      "radius": 157.17118207269968,
+      "actor_label": "LandscapeCactus_P10_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 10,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": -11316.648,
+      "y": -31575.554,
+      "z": 141.25,
+      "yaw": 19.083,
+      "scale": 0.949,
+      "radius": 109.13751889412617,
+      "actor_label": "LandscapeCactus_P10_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 10,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_03",
+      "size": "Small",
+      "x": -9992.936,
+      "y": -31467.495,
+      "z": 141.25,
+      "yaw": -82.261,
+      "scale": 1.062,
+      "radius": 122.17807520410244,
+      "actor_label": "LandscapeCactus_P10_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_03.SM_RTS_CactusBush_Small_Blue_03"
+      ]
+    },
+    {
+      "cluster": 10,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_01",
+      "size": "Medium",
+      "x": -11205.921,
+      "y": -30515.016,
+      "z": 141.25,
+      "yaw": 164.476,
+      "scale": 1.05,
+      "radius": 178.50544463108704,
+      "actor_label": "LandscapeCactus_P10_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_01.SM_RTS_CactusBush_Medium_Blue_01"
+      ]
+    },
+    {
+      "cluster": 10,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_02",
+      "size": "Medium",
+      "x": -11009.845,
+      "y": -31929.951,
+      "z": 141.25,
+      "yaw": -169.212,
+      "scale": 1.12,
+      "radius": 190.35250168378664,
+      "actor_label": "LandscapeCactus_P10_05",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_02.SM_RTS_CactusBush_Medium_Green_02"
+      ]
+    },
+    {
+      "cluster": 11,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_02",
+      "size": "Medium",
+      "x": -27150.613,
+      "y": -19392.151,
+      "z": 141.25,
+      "yaw": 87.679,
+      "scale": 0.996,
+      "radius": 169.36221822937972,
+      "actor_label": "LandscapeCactus_P11_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_02.SM_RTS_CactusBush_Medium_Green_02"
+      ]
+    },
+    {
+      "cluster": 11,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": -26441.06,
+      "y": -19428.148,
+      "z": 141.25,
+      "yaw": -3.772,
+      "scale": 0.939,
+      "radius": 159.54899855335404,
+      "actor_label": "LandscapeCactus_P11_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 11,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": -26716.358,
+      "y": -18927.084,
+      "z": 141.25,
+      "yaw": 36.541,
+      "scale": 1.106,
+      "radius": 188.05077396787965,
+      "actor_label": "LandscapeCactus_P11_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 12,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": 8033.167,
+      "y": -30985.136,
+      "z": 254.434,
+      "yaw": -135.532,
+      "scale": 0.893,
+      "radius": 151.74544788602697,
+      "actor_label": "LandscapeCactus_P12_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 12,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_01",
+      "size": "Medium",
+      "x": 7390.266,
+      "y": -31097.685,
+      "z": 140.469,
+      "yaw": 85.188,
+      "scale": 0.958,
+      "radius": 162.87861683759408,
+      "actor_label": "LandscapeCactus_P12_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_01.SM_RTS_CactusBush_Medium_Blue_01"
+      ]
+    },
+    {
+      "cluster": 12,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": 6847.421,
+      "y": -30614.59,
+      "z": 140.469,
+      "yaw": 144.627,
+      "scale": 1.005,
+      "radius": 115.57931832900844,
+      "actor_label": "LandscapeCactus_P12_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 12,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": 6486.378,
+      "y": -30907.729,
+      "z": 140.838,
+      "yaw": 61.04,
+      "scale": 1.037,
+      "radius": 119.20569314519128,
+      "actor_label": "LandscapeCactus_P12_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    },
+    {
+      "cluster": 13,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Desert/BP_Desert_Dest_Cactus",
+      "size": "Tall",
+      "x": -20911.754,
+      "y": 16733.041,
+      "z": 218.875,
+      "yaw": 28.61,
+      "scale": 1.062,
+      "radius": 233.66864083297705,
+      "actor_label": "LandscapeCactus_P13_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/SM_Desert_Cactus2.SM_Desert_Cactus2"
+      ]
+    },
+    {
+      "cluster": 13,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": -21701.658,
+      "y": 17394.324,
+      "z": 106.244,
+      "yaw": -154.232,
+      "scale": 0.907,
+      "radius": 104.35685126263921,
+      "actor_label": "LandscapeCactus_P13_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 13,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": -21105.709,
+      "y": 15756.12,
+      "z": 151.538,
+      "yaw": 38.768,
+      "scale": 0.896,
+      "radius": 152.30083538286945,
+      "actor_label": "LandscapeCactus_P13_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 14,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_02",
+      "size": "Medium",
+      "x": -15921.339,
+      "y": 2141.814,
+      "z": 378.908,
+      "yaw": -136.468,
+      "scale": 0.89,
+      "radius": 151.28151468952154,
+      "actor_label": "LandscapeCactus_P14_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_02.SM_RTS_CactusBush_Medium_Green_02"
+      ]
+    },
+    {
+      "cluster": 14,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Large_Blue_03",
+      "size": "Large",
+      "x": -16402.43,
+      "y": 1774.949,
+      "z": 355.312,
+      "yaw": 0.025,
+      "scale": 0.922,
+      "radius": 239.7137119304614,
+      "actor_label": "LandscapeCactus_P14_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Large_Blue_03.SM_RTS_CactusBush_Large_Blue_03"
+      ]
+    },
+    {
+      "cluster": 14,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_01",
+      "size": "Small",
+      "x": -16058.92,
+      "y": 1167.666,
+      "z": 355.312,
+      "yaw": 119.371,
+      "scale": 0.957,
+      "radius": 110.04868351624823,
+      "actor_label": "LandscapeCactus_P14_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_01.SM_RTS_CactusBush_Small_Blue_01"
+      ]
+    },
+    {
+      "cluster": 14,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_02",
+      "size": "Small",
+      "x": -16778.927,
+      "y": 2163.605,
+      "z": 369.265,
+      "yaw": 148.801,
+      "scale": 1.049,
+      "radius": 120.58762054314764,
+      "actor_label": "LandscapeCactus_P14_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_02.SM_RTS_CactusBush_Small_Blue_02"
+      ]
+    },
+    {
+      "cluster": 15,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": -27348.885,
+      "y": 19979.564,
+      "z": 156.257,
+      "yaw": -163.171,
+      "scale": 1.102,
+      "radius": 187.4001321476996,
+      "actor_label": "LandscapeCactus_P15_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 15,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": -26929.033,
+      "y": 20751.271,
+      "z": 179.848,
+      "yaw": 28.105,
+      "scale": 1.107,
+      "radius": 188.1362802293951,
+      "actor_label": "LandscapeCactus_P15_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 16,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_01",
+      "size": "Medium",
+      "x": -11575.655,
+      "y": -25254.268,
+      "z": 141.25,
+      "yaw": 17.829,
+      "scale": 0.942,
+      "radius": 160.11753995147825,
+      "actor_label": "LandscapeCactus_P16_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_01.SM_RTS_CactusBush_Medium_Blue_01"
+      ]
+    },
+    {
+      "cluster": 16,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_02",
+      "size": "Medium",
+      "x": -11282.606,
+      "y": -24244.303,
+      "z": 141.25,
+      "yaw": 43.393,
+      "scale": 0.933,
+      "radius": 158.6543608223542,
+      "actor_label": "LandscapeCactus_P16_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_02.SM_RTS_CactusBush_Medium_Blue_02"
+      ]
+    },
+    {
+      "cluster": 16,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": -11348.025,
+      "y": -24885.9,
+      "z": 141.25,
+      "yaw": -154.917,
+      "scale": 1.028,
+      "radius": 118.17752883391921,
+      "actor_label": "LandscapeCactus_P16_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    },
+    {
+      "cluster": 16,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Large_Green_01",
+      "size": "Large",
+      "x": -12034.852,
+      "y": -24133.859,
+      "z": 141.25,
+      "yaw": -77.003,
+      "scale": 1.059,
+      "radius": 275.37249164630543,
+      "actor_label": "LandscapeCactus_P16_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Large_Green_01.SM_RTS_CactusBush_Large_Green_01"
+      ]
+    },
+    {
+      "cluster": 16,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_02",
+      "size": "Small",
+      "x": -12200.745,
+      "y": -24830.569,
+      "z": 141.25,
+      "yaw": -111.386,
+      "scale": 1.01,
+      "radius": 116.16737437830787,
+      "actor_label": "LandscapeCactus_P16_05",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_02.SM_RTS_CactusBush_Small_Blue_02"
+      ]
+    },
+    {
+      "cluster": 17,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Desert/BP_Desert_Dest_Cactus",
+      "size": "Tall",
+      "x": 13081.902,
+      "y": 9180.898,
+      "z": 1033.436,
+      "yaw": 101.397,
+      "scale": 0.971,
+      "radius": 213.70497455137775,
+      "actor_label": "LandscapeCactus_P17_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/SM_Desert_Cactus4.SM_Desert_Cactus4"
+      ]
+    },
+    {
+      "cluster": 17,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": 13549.273,
+      "y": 9556.368,
+      "z": 956.854,
+      "yaw": 75.614,
+      "scale": 1.008,
+      "radius": 115.9607435198467,
+      "actor_label": "LandscapeCactus_P17_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    },
+    {
+      "cluster": 17,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_01",
+      "size": "Small",
+      "x": 13649.967,
+      "y": 9152.665,
+      "z": 991.975,
+      "yaw": -92.414,
+      "scale": 0.927,
+      "radius": 106.54751345657294,
+      "actor_label": "LandscapeCactus_P17_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_01.SM_RTS_CactusBush_Small_Green_01"
+      ]
+    },
+    {
+      "cluster": 18,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": -17178.531,
+      "y": 26795.663,
+      "z": 132.978,
+      "yaw": 117.768,
+      "scale": 0.973,
+      "radius": 165.48029757566215,
+      "actor_label": "LandscapeCactus_P18_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 18,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": -17129.428,
+      "y": 26259.115,
+      "z": 185.154,
+      "yaw": 135.092,
+      "scale": 0.966,
+      "radius": 164.20581748807675,
+      "actor_label": "LandscapeCactus_P18_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 18,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": -17753.532,
+      "y": 26530.119,
+      "z": 137.998,
+      "yaw": -43.637,
+      "scale": 1.034,
+      "radius": 118.87626025604776,
+      "actor_label": "LandscapeCactus_P18_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 18,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": -16395.637,
+      "y": 26583.391,
+      "z": 134.309,
+      "yaw": -148.587,
+      "scale": 0.956,
+      "radius": 109.96548247411499,
+      "actor_label": "LandscapeCactus_P18_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    },
+    {
+      "cluster": 19,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": 23824.85,
+      "y": -21108.82,
+      "z": 508.342,
+      "yaw": 129.158,
+      "scale": 0.912,
+      "radius": 155.07389235027787,
+      "actor_label": "LandscapeCactus_P19_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 19,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": 23915.654,
+      "y": -21909.99,
+      "z": 513.123,
+      "yaw": -37.363,
+      "scale": 1.099,
+      "radius": 126.33011087602043,
+      "actor_label": "LandscapeCactus_P19_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 19,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": 24480.42,
+      "y": -20290.588,
+      "z": 557.004,
+      "yaw": -46.705,
+      "scale": 1.03,
+      "radius": 175.06196347719583,
+      "actor_label": "LandscapeCactus_P19_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 20,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_02",
+      "size": "Medium",
+      "x": 20271.377,
+      "y": 13353.152,
+      "z": 161.115,
+      "yaw": 55.378,
+      "scale": 1.061,
+      "radius": 180.41772762393697,
+      "actor_label": "LandscapeCactus_P20_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_02.SM_RTS_CactusBush_Medium_Green_02"
+      ]
+    },
+    {
+      "cluster": 20,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": 20418.124,
+      "y": 12193.98,
+      "z": 161.704,
+      "yaw": -58.586,
+      "scale": 1.056,
+      "radius": 121.45766618061171,
+      "actor_label": "LandscapeCactus_P20_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    },
+    {
+      "cluster": 20,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_01",
+      "size": "Small",
+      "x": 21241.858,
+      "y": 13129.717,
+      "z": 175.171,
+      "yaw": 128.22,
+      "scale": 1.046,
+      "radius": 120.23947797524616,
+      "actor_label": "LandscapeCactus_P20_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_01.SM_RTS_CactusBush_Small_Blue_01"
+      ]
+    },
+    {
+      "cluster": 20,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_02",
+      "size": "Medium",
+      "x": 21098.301,
+      "y": 13571.773,
+      "z": 173.255,
+      "yaw": 30.347,
+      "scale": 0.995,
+      "radius": 169.15593827456212,
+      "actor_label": "LandscapeCactus_P20_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_02.SM_RTS_CactusBush_Medium_Green_02"
+      ]
+    },
+    {
+      "cluster": 21,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Desert/BP_Desert_Dest_Cactus",
+      "size": "Tall",
+      "x": -29292.999,
+      "y": 28747.364,
+      "z": 126.674,
+      "yaw": 35.176,
+      "scale": 1.09,
+      "radius": 239.7598252641592,
+      "actor_label": "LandscapeCactus_P21_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/SM_Desert_Cactus4.SM_Desert_Cactus4"
+      ]
+    },
+    {
+      "cluster": 21,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": -29980.101,
+      "y": 28226.735,
+      "z": 232.357,
+      "yaw": 94.093,
+      "scale": 1.127,
+      "radius": 191.6072470666896,
+      "actor_label": "LandscapeCactus_P21_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 22,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_01",
+      "size": "Medium",
+      "x": -28668.997,
+      "y": 2330.054,
+      "z": 141.25,
+      "yaw": 114.684,
+      "scale": 0.892,
+      "radius": 151.6679623839227,
+      "actor_label": "LandscapeCactus_P22_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_01.SM_RTS_CactusBush_Medium_Blue_01"
+      ]
+    },
+    {
+      "cluster": 22,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_02",
+      "size": "Medium",
+      "x": -28568.67,
+      "y": 1592.529,
+      "z": 141.25,
+      "yaw": 172.102,
+      "scale": 1.093,
+      "radius": 185.75747073307784,
+      "actor_label": "LandscapeCactus_P22_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_02.SM_RTS_CactusBush_Medium_Blue_02"
+      ]
+    },
+    {
+      "cluster": 22,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_03",
+      "size": "Small",
+      "x": -28451.343,
+      "y": 776.984,
+      "z": 141.25,
+      "yaw": -80.154,
+      "scale": 0.912,
+      "radius": 104.86838768099078,
+      "actor_label": "LandscapeCactus_P22_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_03.SM_RTS_CactusBush_Small_Blue_03"
+      ]
+    },
+    {
+      "cluster": 22,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_01",
+      "size": "Medium",
+      "x": -29515.046,
+      "y": 1436.136,
+      "z": 141.25,
+      "yaw": -7.752,
+      "scale": 1.013,
+      "radius": 172.13819241764398,
+      "actor_label": "LandscapeCactus_P22_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_01.SM_RTS_CactusBush_Medium_Green_01"
+      ]
+    },
+    {
+      "cluster": 22,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_02",
+      "size": "Small",
+      "x": -29081.213,
+      "y": 1459.299,
+      "z": 141.25,
+      "yaw": 11.344,
+      "scale": 1.045,
+      "radius": 120.17471518742255,
+      "actor_label": "LandscapeCactus_P22_05",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_02.SM_RTS_CactusBush_Small_Green_02"
+      ]
+    },
+    {
+      "cluster": 23,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Blue_02",
+      "size": "Medium",
+      "x": -29143.722,
+      "y": -23318.395,
+      "z": 141.25,
+      "yaw": 35.479,
+      "scale": 0.997,
+      "radius": 169.42801173428498,
+      "actor_label": "LandscapeCactus_P23_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Blue_02.SM_RTS_CactusBush_Medium_Blue_02"
+      ]
+    },
+    {
+      "cluster": 23,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Large_Blue_03",
+      "size": "Large",
+      "x": -30060.203,
+      "y": -22707.813,
+      "z": 141.25,
+      "yaw": -35.972,
+      "scale": 1.077,
+      "radius": 280.01039391736896,
+      "actor_label": "LandscapeCactus_P23_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Large_Blue_03.SM_RTS_CactusBush_Large_Blue_03"
+      ]
+    },
+    {
+      "cluster": 23,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Blue_01",
+      "size": "Small",
+      "x": -29465.029,
+      "y": -22652.378,
+      "z": 141.25,
+      "yaw": -178.061,
+      "scale": 0.89,
+      "radius": 102.3958882684149,
+      "actor_label": "LandscapeCactus_P23_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Blue_01.SM_RTS_CactusBush_Small_Blue_01"
+      ]
+    },
+    {
+      "cluster": 24,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Medium_Green_03",
+      "size": "Medium",
+      "x": 10174.801,
+      "y": 24214.067,
+      "z": 139.923,
+      "yaw": -147.599,
+      "scale": 0.954,
+      "radius": 162.16116299319802,
+      "actor_label": "LandscapeCactus_P24_01",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Medium_Green_03.SM_RTS_CactusBush_Medium_Green_03"
+      ]
+    },
+    {
+      "cluster": 24,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_01",
+      "size": "Small",
+      "x": 10376.146,
+      "y": 25115.489,
+      "z": 139.035,
+      "yaw": 31.35,
+      "scale": 1.009,
+      "radius": 116.06197016887754,
+      "actor_label": "LandscapeCactus_P24_02",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_01.SM_RTS_CactusBush_Small_Green_01"
+      ]
+    },
+    {
+      "cluster": 24,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Large_Blue_02",
+      "size": "Large",
+      "x": 11065.073,
+      "y": 23660.132,
+      "z": 134.696,
+      "yaw": 111.001,
+      "scale": 1.047,
+      "radius": 272.1123564469526,
+      "actor_label": "LandscapeCactus_P24_03",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Large_Blue_02.SM_RTS_CactusBush_Large_Blue_02"
+      ]
+    },
+    {
+      "cluster": 24,
+      "blueprint": "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/Cactus/BP_Cover_CactusBush_Small_Green_03",
+      "size": "Small",
+      "x": 11780.341,
+      "y": 24416.234,
+      "z": 140.469,
+      "yaw": 30.634,
+      "scale": 0.903,
+      "radius": 103.87071634208563,
+      "actor_label": "LandscapeCactus_P24_04",
+      "meshes": [
+        "/Game/RTS_Survival/Meshes/Desert/Cacti/CactusBush/SM_RTS_CactusBush_Small_Green_03.SM_RTS_CactusBush_Small_Green_03"
+      ]
+    }
+  ],
+  "created_count": 84
+}

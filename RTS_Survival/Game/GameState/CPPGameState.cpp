@@ -7648,6 +7648,21 @@ void ACPPGameState::InitAllGameBxpData()
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusAmpulometPit, AmpulometPitData);
 
 	// -----------------------------------------------------------------------
+	// ---------------------- RUS 120MM MORTAR PIT ---------------------------
+	// -----------------------------------------------------------------------
+	// A heavy mortar in a compact square sandbag pit: tougher and more valuable than the light weapon pits.
+	FBxpData Mortar120PitData = DShKPitData;
+	Mortar120PitData.VisionRadius = T2BxpVisionRadius;
+	Mortar120PitData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, Rus120MortarPit_Radixite},
+		{ERTSResourceType::Resource_Metal, Rus120MortarPit_Metal},
+	});
+	Mortar120PitData.Health = T3BxpBunkerHealth;
+	Mortar120PitData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(
+		Mortar120PitData.Health);
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_Rus120MortarPit, Mortar120PitData);
+
+	// -----------------------------------------------------------------------
 	// ------------------------- RUS 53-K PIT --------------------------------
 	// -----------------------------------------------------------------------
 	// A 45mm anti-tank gun behind a thick bag wall: more health than the MG pit, the same light emplacement.

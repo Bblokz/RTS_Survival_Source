@@ -126,6 +126,12 @@ enum class EBuildingExpansionType : uint8
 	// German 8.8 cm Flak dug in behind high square bag walls with stepped corners: an ammo runner brings the rounds
 	// from a niche in the wall to a ring of ready crates, where the shell handler takes them for the loader.
 	BTX_GerFlak88Pit UMETA(DisplayName = "Ger Flak 88 Emplacement"),
+	// German 8 cm mortar and its two-man crew in a square sandbag field emplacement.
+	BTX_GerMortarPit UMETA(DisplayName = "Ger Mortar Pit"),
+	// Soviet 120mm mortar and its two-man crew in a square pit built from Soviet sandbags.
+	BTX_Rus120MortarPit UMETA(DisplayName = "Rus 120mm Mortar Pit"),
+	// Twin German MG 42 positions joined by an ammunition corridor and worked by two scavenger crews.
+	BTX_GerTwinMG42Pit UMETA(DisplayName = "Ger Twin MG42 Pit"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -236,6 +242,12 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerRailPakBunker");
 	case EBuildingExpansionType::BTX_GerFlak88Pit:
 		return FString("BTX_GerFlak88Pit");
+	case EBuildingExpansionType::BTX_GerMortarPit:
+		return FString("BTX_GerMortarPit");
+	case EBuildingExpansionType::BTX_Rus120MortarPit:
+		return FString("BTX_Rus120MortarPit");
+	case EBuildingExpansionType::BTX_GerTwinMG42Pit:
+		return FString("BTX_GerTwinMG42Pit");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -308,6 +320,9 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerPanzerschreckPit: return TEXT("Panzerschreck Foxhole");
 	case EBuildingExpansionType::BTX_GerRailPakBunker: return TEXT("Rail Pak Bunker");
 	case EBuildingExpansionType::BTX_GerFlak88Pit: return TEXT("Flak 88 Emplacement");
+	case EBuildingExpansionType::BTX_GerMortarPit: return TEXT("Mortar Pit");
+	case EBuildingExpansionType::BTX_Rus120MortarPit: return TEXT("120mm Mortar Pit");
+	case EBuildingExpansionType::BTX_GerTwinMG42Pit: return TEXT("Twin MG42 Pit");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");

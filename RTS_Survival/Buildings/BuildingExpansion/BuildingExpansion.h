@@ -21,6 +21,7 @@
 
 
 class UBuildingExpansionEnergyComponent;
+class UPitAdditionalTurretComponent;
 class UResourceConverterComponent;
 class UTurretSwapComp;
 class USoundCue;
@@ -57,6 +58,7 @@ class RTS_SURVIVAL_API ABuildingExpansion : public ASelectableActorObjectsMaster
 
 	friend class UTurretSwapComp;
 	friend class UEmbeddedTurretMountComponent;
+	friend class UPitAdditionalTurretComponent;
 	friend class UResourceConverterComponent;
 
 public:

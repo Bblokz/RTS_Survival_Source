@@ -12,6 +12,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Buildings/EnergyComponent/BuildingExpansionEnergyComponent.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/PitDefense/PitDefenseComponent.h"
 #include "RTS_Survival/Collapse/CollapseBySwapParameters.h"
 #include "RTS_Survival/Collapse/CollapseFXParameters.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
@@ -529,6 +530,12 @@ void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 	SetUnitDying();
 	// Before bp event as the bp event may destroy the actor immediately.
 	OnUnitDies.Broadcast();
+	if (UPitDefenseComponent* PitDefenseComponent = FindComponentByClass<UPitDefenseComponent>())
+	{
+		DisableAllWeapons();
+		PitDefenseComponent->HandlePitDeath();
+		return;
+	}
 	BP_OnUnitDies();
 }
 

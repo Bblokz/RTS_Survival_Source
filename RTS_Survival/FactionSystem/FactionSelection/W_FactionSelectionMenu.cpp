@@ -3,7 +3,9 @@
 #include "W_FactionSelectionMenu.h"
 
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/ScrollBox.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitWidget/W_Portrait.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -222,6 +224,8 @@ void UW_FactionSelectionMenu::SelectFaction(
 	const bool bForceAudio,
 	bool& bHasPlayedAudio)
 {
+	UpdateFactionSelectionVisuals();
+
 	if (not GetIsValidPlayerController())
 	{
 		return;
@@ -243,6 +247,95 @@ void UW_FactionSelectionMenu::SelectFaction(
 	}
 
 	PopulateFactionUnits(FactionSetting);
+}
+
+void UW_FactionSelectionMenu::UpdateFactionSelectionVisuals()
+{
+	if (GetIsValidGermanBreakthroughButton())
+	{
+		UpdateFactionButtonSelection(M_GerBreakthrough, TEXT("M_GlassGerBreakthrough"),
+			M_SelectedFaction == ERTSFaction::GerBreakthroughDoctrine);
+	}
+	if (GetIsValidGermanThermoKorpsButton())
+	{
+		UpdateFactionButtonSelection(M_GerThermoKorps, TEXT("M_GlassGerThermoKorps"),
+			M_SelectedFaction == ERTSFaction::GerStrikeDivision);
+	}
+	if (GetIsValidGermanItalianGameButton())
+	{
+		UpdateFactionButtonSelection(M_GerItalianGame, TEXT("M_GlassGerItalianGame"),
+			M_SelectedFaction == ERTSFaction::GerItalianFaction);
+	}
+}
+
+void UW_FactionSelectionMenu::UpdateFactionButtonSelection(UButton* const FactionButton,
+	const FName GlassWidgetName, const bool bIsSelected)
+{
+	FButtonStyle ButtonStyle = FactionButton->GetStyle();
+	UpdateFactionSelectionBrush(ButtonStyle.Normal, bIsSelected);
+	UpdateFactionSelectionBrush(ButtonStyle.Hovered, bIsSelected);
+	FactionButton->SetStyle(ButtonStyle);
+	const FLinearColor SelectedButtonTint(1.0f, 0.82f, 0.50f, 1.0f);
+	FactionButton->SetBackgroundColor(bIsSelected ? SelectedButtonTint : FLinearColor::White);
+
+	UImage* const GlassPane = Cast<UImage>(GetWidgetFromName(GlassWidgetName));
+	if (not IsValid(GlassPane))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Faction selection menu is missing its glass image: ")
+			+ GlassWidgetName.ToString());
+		return;
+	}
+	UMaterialInstanceDynamic* const GlassMaterial = GlassPane->GetDynamicMaterial();
+	if (not IsValid(GlassMaterial))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Faction glass image needs a glass pane material: ")
+			+ GlassWidgetName.ToString());
+		return;
+	}
+
+	const FName RimParameter(TEXT("RimIntensity"));
+	const FName StreakParameter(TEXT("StreakIntensity"));
+	const FName TintParameter(TEXT("EdgeTint"));
+	constexpr float SelectedRimIntensity = 0.85f;
+	constexpr float UnselectedRimIntensity = 0.26f;
+	constexpr float SelectedStreakIntensity = 0.10f;
+	constexpr float UnselectedStreakIntensity = 0.045f;
+	const FLinearColor SelectedGlassTint(1.0f, 0.58f, 0.16f, 0.38f);
+	const FLinearColor UnselectedGlassTint(0.80f, 0.90f, 1.0f, 0.06f);
+	GlassMaterial->SetScalarParameterValue(RimParameter,
+		bIsSelected ? SelectedRimIntensity : UnselectedRimIntensity);
+	GlassMaterial->SetScalarParameterValue(StreakParameter,
+		bIsSelected ? SelectedStreakIntensity : UnselectedStreakIntensity);
+	GlassMaterial->SetVectorParameterValue(TintParameter,
+		bIsSelected ? SelectedGlassTint : UnselectedGlassTint);
+}
+
+void UW_FactionSelectionMenu::UpdateFactionSelectionBrush(FSlateBrush& Brush, const bool bIsSelected)
+{
+	UMaterialInterface* const SourceMaterial = Cast<UMaterialInterface>(Brush.GetResourceObject());
+	if (not IsValid(SourceMaterial))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Faction selection button needs a skinned UI material brush."));
+		return;
+	}
+	UMaterialInstanceDynamic* ButtonMaterial = Cast<UMaterialInstanceDynamic>(SourceMaterial);
+	if (not IsValid(ButtonMaterial))
+	{
+		ButtonMaterial = UMaterialInstanceDynamic::Create(SourceMaterial, this);
+	}
+	if (not IsValid(ButtonMaterial))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Failed to create the faction button selection material."));
+		return;
+	}
+	Brush.SetResourceObject(ButtonMaterial);
+
+	const FName EffectsParameter(TEXT("Fx"));
+	constexpr float SelectedGlintIntensity = 0.75f;
+	constexpr float UnselectedGlintIntensity = 0.0f;
+	FLinearColor Effects = ButtonMaterial->K2_GetVectorParameterValue(EffectsParameter);
+	Effects.B = bIsSelected ? SelectedGlintIntensity : UnselectedGlintIntensity;
+	ButtonMaterial->SetVectorParameterValue(EffectsParameter, Effects);
 }
 
 void UW_FactionSelectionMenu::PopulateFactionUnits(const FFactionMenuSetting& FactionSetting)

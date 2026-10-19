@@ -83,10 +83,15 @@ namespace BxpConstructionRules
 		// Small field defenses: the Puppchen's 4 m bag ring with its ammo boxes, the Panzerschreck's 3.3 m foxhole.
 		{EBuildingExpansionType::BTX_GerPuppchenPit, WithFootprint(FreeConstructionRules, 500.f, 500.f)},
 		{EBuildingExpansionType::BTX_GerPanzerschreckPit, WithFootprint(FreeConstructionRules, 400.f, 400.f)},
+		// Two four-metre-spaced MG rings plus their shared ammunition corridor fill an approximately 8 m square.
+		{EBuildingExpansionType::BTX_GerTwinMG42Pit, WithFootprint(FreeConstructionRules, 900.f, 900.f)},
 		// The concrete block is 10.8 m across at its foot; the props and the rear ladder stand just outside it.
 		{EBuildingExpansionType::BTX_GerRailPakBunker, WithFootprint(FreeConstructionRules, 1250.f, 1250.f)},
 		// The square bag walls are 9.5 m across; the ammo niche bulges 1.2 m out of the left wall.
 		{EBuildingExpansionType::BTX_GerFlak88Pit, WithFootprint(FreeConstructionRules, 1200.f, 1200.f)},
+		// Compact square mortar pits whose walls are approximately 9 m across.
+		{EBuildingExpansionType::BTX_GerMortarPit, WithFootprint(FreeConstructionRules, 1000.f, 1000.f)},
+		{EBuildingExpansionType::BTX_Rus120MortarPit, WithFootprint(FreeConstructionRules, 1000.f, 1000.f)},
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
 
 		// --- solar  ---

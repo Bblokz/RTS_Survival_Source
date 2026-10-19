@@ -172,6 +172,56 @@ void UGunPitCrewComponent::OnGunFired()
 	}
 }
 
+void UGunPitCrewComponent::PlayCrewDeathMontages(const TArray<UAnimMontage*>& DeathMontages)
+{
+	const UWorld* World = GetWorld();
+	if (IsValid(World))
+	{
+		FTimerManager& TimerManager = World->GetTimerManager();
+		for (FTimerHandle* Timer : {&M_LoadingFinishedTimer, &M_FirstRoundTimer, &M_HandoverTimer, &M_RamTimer,
+			&M_PickTimer})
+		{
+			TimerManager.ClearTimer(*Timer);
+		}
+	}
+	bM_IsLoading = false;
+
+	if (DeathMontages.IsEmpty())
+	{
+		return;
+	}
+	for (int32 CrewIndex = 0; CrewIndex < M_CrewMeshes.Num(); ++CrewIndex)
+	{
+		USkeletalMeshComponent* CrewMesh = M_CrewMeshes[CrewIndex].Get();
+		if (not IsValid(CrewMesh))
+		{
+			continue;
+		}
+		UAnimInstance* AnimInstance = CrewMesh->GetAnimInstance();
+		if (not IsValid(AnimInstance))
+		{
+			continue;
+		}
+		AnimInstance->StopAllMontages(0.1f);
+		UAnimMontage* DeathMontage = DeathMontages[CrewIndex % DeathMontages.Num()];
+		PlayMontageOnMesh(CrewMesh, DeathMontage, 1.f, 0.f);
+	}
+}
+
+TArray<USkeletalMeshComponent*> UGunPitCrewComponent::GetCrewMeshes() const
+{
+	TArray<USkeletalMeshComponent*> CrewMeshes;
+	CrewMeshes.Reserve(M_CrewMeshes.Num());
+	for (const TWeakObjectPtr<USkeletalMeshComponent>& CrewMesh : M_CrewMeshes)
+	{
+		if (USkeletalMeshComponent* ValidCrewMesh = CrewMesh.Get())
+		{
+			CrewMeshes.Add(ValidCrewMesh);
+		}
+	}
+	return CrewMeshes;
+}
+
 void UGunPitCrewComponent::PlayGunFireKick() const
 {
 	if (not GetIsValidGunMesh())

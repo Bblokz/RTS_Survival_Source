@@ -216,7 +216,9 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 	TArray<FTrainingLayoutSlot> FieldDefenses = {
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPak40Pit),
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerFlak37Pit),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerMortarPit),
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPuppchenPit),
+		Slot::FieldDefense(EBuildingExpansionType::BTX_GerTwinMG42Pit),
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerLeFH18Pit),
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerSFH18Pit),
 		Slot::FieldDefense(EBuildingExpansionType::BTX_GerPanzerschreckPit),

@@ -2618,6 +2618,7 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 	using DeveloperSettings::GameBalance::TrainingTime::GerPuppchenPitBuildTime;
 	using DeveloperSettings::GameBalance::TrainingTime::GerPanzerschreckPitBuildTime;
 	using DeveloperSettings::GameBalance::TrainingTime::GerRailPakBunkerBuildTime;
+	using DeveloperSettings::GameBalance::TrainingTime::GerTwinMG42PitBuildTime;
 
 	auto AddFieldDefenseTrainingOption = [this](const EBuildingExpansionType BxpType, URTSRequirement* Requirement,
 	                                            const int32 TrainingTime = BxpT2BuildTime)
@@ -2634,9 +2635,11 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 
 	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerPak40Pit, nullptr);
 	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerFlak37Pit, nullptr);
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerMortarPit, nullptr);
 	// The small two-man pits: cheap, quick to build, no requirement.
 	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerPuppchenPit, nullptr, GerPuppchenPitBuildTime);
 	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerPanzerschreckPit, nullptr, GerPanzerschreckPitBuildTime);
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerTwinMG42Pit, nullptr, GerTwinMG42PitBuildTime);
 	AddFieldDefenseTrainingOption(
 		EBuildingExpansionType::BTX_GerLeFH18Pit,
 		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding));

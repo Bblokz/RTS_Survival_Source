@@ -288,6 +288,7 @@ namespace DeveloperSettings
 			// The small two-man field defenses go up faster than the gun pits.
 			inline constexpr int32 GerPuppchenPitBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
 			inline constexpr int32 GerPanzerschreckPitBuildTime = RoundToNearestMultipleOf(12.f * GameTimeMlt, 2);
+			inline constexpr int32 GerTwinMG42PitBuildTime = RoundToNearestMultipleOf(18.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
 		}
@@ -904,10 +905,16 @@ namespace DeveloperSettings
 				inline constexpr int32 GerPuppchenPit_Metal = 130;
 				inline constexpr int32 GerPanzerschreckPit_Radixite = 160;
 				inline constexpr int32 GerPanzerschreckPit_Metal = 60;
+				inline constexpr int32 GerTwinMG42Pit_Radixite = 320;
+				inline constexpr int32 GerTwinMG42Pit_Metal = 140;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;
 				inline constexpr int32 GerFlak88Pit_Metal = 360;
+				inline constexpr int32 GerMortarPit_Radixite = 340;
+				inline constexpr int32 GerMortarPit_Metal = 160;
+				inline constexpr int32 Rus120MortarPit_Radixite = 480;
+				inline constexpr int32 Rus120MortarPit_Metal = 240;
 			}
 
 			// ----------------------------------

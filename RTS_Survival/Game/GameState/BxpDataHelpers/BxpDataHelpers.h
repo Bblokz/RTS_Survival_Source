@@ -119,6 +119,10 @@ namespace BxpHelpers
 					EBuildingExpansionType::BTX_GerPanzerschreckPit, GerPanzerschreckPit_Radixite, GerPanzerschreckPit_Metal,
 					0.4f, GerPanzerschreckPitBuildTime
 				},
+				{
+					EBuildingExpansionType::BTX_GerTwinMG42Pit, GerTwinMG42Pit_Radixite, GerTwinMG42Pit_Metal,
+					0.75f, GerTwinMG42PitBuildTime
+				},
 				// A concrete pillbox with the rail Pak in its roof pit: much tougher than any sandbag pit.
 				{
 					EBuildingExpansionType::BTX_GerRailPakBunker, GerRailPakBunker_Radixite, GerRailPakBunker_Metal,
@@ -126,6 +130,8 @@ namespace BxpHelpers
 				},
 				// A heavy gun behind thick, high bag walls: tougher than the open gun pits.
 				{EBuildingExpansionType::BTX_GerFlak88Pit, GerFlak88Pit_Radixite, GerFlak88Pit_Metal, 1.3f},
+				// The mortar is protected by a compact square sandbag wall, but remains a light emplacement.
+				{EBuildingExpansionType::BTX_GerMortarPit, GerMortarPit_Radixite, GerMortarPit_Metal, 0.8f},
 			};
 			for (const FGunPitEntry& Pit : Pits)
 			{

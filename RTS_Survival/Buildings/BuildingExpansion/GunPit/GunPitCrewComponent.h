@@ -156,6 +156,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Gun Pit")
 	bool GetIsLoading() const { return bM_IsLoading; }
 
+	/** Stops the loading drill and gives each valid crew mesh a varied one-shot death montage. */
+	void PlayCrewDeathMontages(const TArray<UAnimMontage*>& DeathMontages);
+
+	/** @return Valid crew meshes in their deterministic Crew1..CrewN order. */
+	TArray<USkeletalMeshComponent*> GetCrewMeshes() const;
+
 	// The round the loader is carrying or the handler is holding out; null when no rounds are carried.
 	UStaticMeshComponent* GetRoundInFlight() const;
 

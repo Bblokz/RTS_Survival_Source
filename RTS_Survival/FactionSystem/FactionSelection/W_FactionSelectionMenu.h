@@ -13,6 +13,7 @@ class AFactionPlayerController;
 class UButton;
 class UScrollBox;
 class USoundBase;
+struct FSlateBrush;
 class UW_FactionUnit;
 class UW_Portrait;
 
@@ -235,6 +236,21 @@ private:
 	 * @param bHasPlayedAudio Tracks whether this faction has already played its announcer audio.
 	 */
 	void SelectFaction(const FFactionMenuSetting& FactionSetting, const bool bForceAudio, bool& bHasPlayedAudio);
+	void UpdateFactionSelectionVisuals();
+	/**
+	 * @brief Keeps the chosen faction visible after hover ends, including selections from the audio buttons.
+	 * @param FactionButton Validated faction button whose skin receives the selection glint.
+	 * @param GlassWidgetName Matching glass image in the widget tree, layered beneath the label.
+	 * @param bIsSelected Whether this button represents the current faction.
+	 */
+	void UpdateFactionButtonSelection(UButton* FactionButton, const FName GlassWidgetName,
+	                                  const bool bIsSelected);
+	/**
+	 * @brief Gives each button its own selection glint without changing shared skin instances or hover sweeps.
+	 * @param Brush Skinned button brush that retains its dynamic material between selections.
+	 * @param bIsSelected Whether to enable the persistent selection glint.
+	 */
+	void UpdateFactionSelectionBrush(FSlateBrush& Brush, const bool bIsSelected);
 	void PopulateFactionUnits(const FFactionMenuSetting& FactionSetting);
 	void AddTankUnitWidgets(
 		const TArray<FFactionMenuTankOption>& TankOptions,
