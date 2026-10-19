@@ -21,6 +21,8 @@ enum class EAlliedPassagePhase : uint8
 	WaitingForGameStart,
 	WaitingForVehicles,
 	Driving,
+	// -AlliedPassageGroundProbe: only the vehicles already on the map are checked.
+	ProbingMapVehicles,
 	Done
 };
 
@@ -72,8 +74,6 @@ private:
 	FVector M_LaneForward = FVector::ForwardVector;
 	FVector M_LaneRight = FVector::RightVector;
 	FVector M_NomadicGoal = FVector::ZeroVector;
-	// Enemy-owned chassis drop through this map's landscape, so the enemy tank is held here as a kinematic body.
-	FVector M_EnemyHoldLocation = FVector::ZeroVector;
 
 	TArray<FAlliedPassageTestVehicle> M_Vehicles;
 	TArray<FAlliedPassageTestPair> M_Pairs;
@@ -108,6 +108,8 @@ private:
 	void TickWaitingForGameStart(UWorld& World);
 	void TickWaitingForVehicles(UWorld& World);
 	void TickDriving(UWorld& World, float DeltaTime);
+	void TickProbingMapVehicles(UWorld& World);
+	void ProbeVehicleGround(UWorld& World, const ATrackedTankMaster& Tank);
 
 	// Spawns the scenario's HQ truck on open ground; its location is where all lanes are laid out from.
 	bool FindAnchor(UWorld& World);
@@ -141,8 +143,8 @@ private:
 	void SpawnNomadicLane(UWorld& World);
 
 	bool GetAreVehiclesReady();
-	// Keeps the enemy tank on its spot without physics; see M_EnemyHoldLocation.
-	void HoldEnemyTank() const;
+	// Every vehicle, enemy ones included, must stand on the ground and not have dropped through it.
+	void CheckVehiclesStayOnGround(const TCHAR* Moment);
 	void SilenceVehicles() const;
 	void CheckCollisionSetup();
 	void OrderVehicles(UWorld& World);

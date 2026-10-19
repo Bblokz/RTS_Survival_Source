@@ -131,7 +131,8 @@ void FRTS_CollisionSetup::SetupVehicleHullBlockerCollision(UBoxComponent* HullBl
 	const ECollisionChannel OwnSideHullChannel = bIsPlayerVehicle ? ECC_Vehicle : COLLISION_OBJ_ENEMY_HULL;
 	const ECollisionChannel OtherSideHullChannel = bIsPlayerVehicle ? COLLISION_OBJ_ENEMY_HULL : ECC_Vehicle;
 	HullBlocker->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	// Hull channels of their own: hull boxes only ever meet other hull boxes.
+	// Hull channels of their own: hull boxes only ever meet other hull boxes. The welded box also changes which
+	// channel Chaos files the whole vehicle under; see COLLISION_OBJ_ENEMY_HULL for why its ini default is Block.
 	HullBlocker->SetCollisionObjectType(OwnSideHullChannel);
 	HullBlocker->SetCollisionResponseToAllChannels(ECR_Ignore);
 	HullBlocker->SetCollisionResponseToChannel(OtherSideHullChannel, ECR_Block);

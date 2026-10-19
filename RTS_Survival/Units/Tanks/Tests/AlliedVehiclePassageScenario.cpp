@@ -27,6 +27,10 @@ DEFINE_LOG_CATEGORY_STATIC(LogRTSAlliedPassage, Log, All);
 namespace AlliedPassageScenarioPrivate
 {
 	const TCHAR* const LocationSwitch = TEXT("AlliedPassageAt=");
+	// Only checks that every vehicle the map holds stands on its ground, on any map; spawns nothing.
+	const TCHAR* const GroundProbeSwitch = TEXT("AlliedPassageGroundProbe");
+	// Game seconds the map's vehicles get to drop onto, or through, the ground before they are measured.
+	constexpr float GroundProbeSettleSeconds = 8.f;
 	const TCHAR* const HarvesterClassPath = TEXT(
 		"/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Panzer1/"
 		"Ger_Harvester_Panzer1.Ger_Harvester_Panzer1_C");
@@ -36,8 +40,9 @@ namespace AlliedPassageScenarioPrivate
 	const TCHAR* const HQTruckClassPath = TEXT(
 		"/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/SKDFZ-7/"
 		"Ger_HQ_Truck.Ger_HQ_Truck_C");
-	// A German tank owned by the enemy: a Soviet T-34 spawned on this German test map fell through the ground.
-	const TCHAR* const EnemyTankClassPath = AlliedTankClassPath;
+	const TCHAR* const EnemyTankClassPath = TEXT(
+		"/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/"
+		"Rus_Vehicle_T3476.Rus_Vehicle_T3476_C");
 
 	constexpr uint8 PlayerOwner = 1;
 	constexpr uint8 EnemyOwner = 2;
@@ -66,9 +71,8 @@ namespace AlliedPassageScenarioPrivate
 	constexpr float NomadicDriveDistance = 3500.f;
 	constexpr float NomadicParkedFractions[] = {0.35f, 0.7f, 1.f};
 	constexpr float BroadsideYawOffset = 90.f;
-	// Tank origins rest this far above the ground; the held enemy tank is kept there.
-	constexpr float EnemyHoldHeightAboveGround = 5.f;
-	constexpr float EnemyHoldTolerance = 2.f;
+	// The test area is flat within AreaMaxHeightDifference; deeper than this a vehicle sank through the ground.
+	constexpr float MaxSinkBelowGround = 600.f;
 	const FVector GoalNavExtent(600.f, 600.f, 3000.f);
 
 	// Open flat ground that holds every lane is searched for around the test spot.
@@ -128,7 +132,6 @@ void FAlliedVehiclePassageScenario::Tick(URTSCoverFinderWorldSubsystem& Host, co
 	if (M_Phase != EAlliedPassagePhase::WaitingForGameStart)
 	{
 		FGrenadeTestHelpers::KeepGameRunning(*World, M_PlayerController.Get());
-		HoldEnemyTank();
 	}
 	switch (M_Phase)
 	{
@@ -140,6 +143,9 @@ void FAlliedVehiclePassageScenario::Tick(URTSCoverFinderWorldSubsystem& Host, co
 		break;
 	case EAlliedPassagePhase::Driving:
 		TickDriving(*World, DeltaTime);
+		break;
+	case EAlliedPassagePhase::ProbingMapVehicles:
+		TickProbingMapVehicles(*World);
 		break;
 	default:
 		break;
@@ -200,6 +206,11 @@ void FAlliedVehiclePassageScenario::TickWaitingForGameStart(UWorld& World)
 		}
 		return;
 	}
+	if (FParse::Param(FCommandLine::Get(), GroundProbeSwitch))
+	{
+		EnterPhase(EAlliedPassagePhase::ProbingMapVehicles);
+		return;
+	}
 	if (not FindAnchor(World))
 	{
 		Check(false, TEXT("hq_truck_spawned"), TEXT("no open test area, or the truck could not be spawned"));
@@ -209,6 +220,46 @@ void FAlliedVehiclePassageScenario::TickWaitingForGameStart(UWorld& World)
 	SpawnHarvesterLanes(World);
 	SpawnNomadicLane(World);
 	EnterPhase(EAlliedPassagePhase::WaitingForVehicles);
+}
+
+void FAlliedVehiclePassageScenario::TickProbingMapVehicles(UWorld& World)
+{
+	using namespace AlliedPassageScenarioPrivate;
+	if (GetGameSecondsInPhase() < GroundProbeSettleSeconds)
+	{
+		return;
+	}
+	int32 ProbedVehicles = 0;
+	for (TActorIterator<ATrackedTankMaster> TankIterator(&World); TankIterator; ++TankIterator)
+	{
+		ProbeVehicleGround(World, **TankIterator);
+		++ProbedVehicles;
+	}
+	Check(ProbedVehicles > 0, TEXT("map_has_vehicles"), FString::Printf(TEXT("count=%d"), ProbedVehicles));
+	Finish();
+}
+
+void FAlliedVehiclePassageScenario::ProbeVehicleGround(UWorld& World, const ATrackedTankMaster& Tank)
+{
+	using namespace AlliedPassageScenarioPrivate;
+	const USkeletalMeshComponent* Chassis = Tank.GetTankMesh();
+	const URTSComponent* RTSComponent = Tank.GetRTSComponent();
+	const FVector Location = Tank.GetActorLocation();
+	FHitResult GroundHit;
+	FCollisionQueryParams GroundQuery(SCENE_QUERY_STAT(AlliedPassageProbe), false, &Tank);
+	const bool bFoundLandscape = World.LineTraceSingleByChannel(
+		GroundHit, FVector(FVector2D(Location), AreaTraceHalfHeight), FVector(FVector2D(Location), -AreaTraceHalfHeight),
+		COLLISION_TRACE_LANDSCAPE, GroundQuery);
+	const float HeightAboveGround = bFoundLandscape ? Location.Z - GroundHit.ImpactPoint.Z : 0.f;
+	const FString Details = FString::Printf(
+		TEXT("%s owner=%d height_above_ground=%.0f ground=%s chassis_object=%d blocks_static=%d simulating=%d"),
+		*Tank.GetName(), IsValid(RTSComponent) ? RTSComponent->GetOwningPlayer() : -1, HeightAboveGround,
+		bFoundLandscape ? *GetNameSafe(GroundHit.GetActor()) : TEXT("none"),
+		IsValid(Chassis) ? static_cast<int32>(Chassis->GetCollisionObjectType()) : -1,
+		IsValid(Chassis) ? static_cast<int32>(Chassis->GetCollisionResponseToChannel(ECC_WorldStatic)) : -1,
+		IsValid(Chassis) && Chassis->IsSimulatingPhysics());
+	// Below the ground under it: it dropped through. No ground at all below it is just as wrong.
+	Check(bFoundLandscape && HeightAboveGround > -MaxSinkBelowGround, TEXT("map_vehicle_on_ground"), Details);
 }
 
 bool FAlliedVehiclePassageScenario::FindAnchor(UWorld& World)
@@ -400,10 +451,7 @@ void FAlliedVehiclePassageScenario::SpawnHarvesterLanes(UWorld& World)
 	M_OncomingTank = SpawnVehicle(World, AlliedTankClassPath, GetLanePoint(LaneHalfLength, HarvesterLaneOffset),
 	                              ReverseYaw, PlayerOwner, TEXT("oncoming_tank"));
 	// Far lane: a harvester passes a parked ally broadside, then is sent onto the spot of a parked enemy tank and
-	// must stay out of its hull. The ground is measured before the enemy stands on it.
-	M_EnemyHoldLocation = GetLanePoint(0.f, EnemyLaneOffset);
-	FGrenadeTestHelpers::DropToGround(World, M_EnemyHoldLocation);
-	M_EnemyHoldLocation.Z += EnemyHoldHeightAboveGround;
+	// must stay out of its hull.
 	M_EnemyLaneHarvester = SpawnVehicle(World, HarvesterClassPath, GetLanePoint(-LaneHalfLength, EnemyLaneOffset),
 	                                    LaneYaw, PlayerOwner, TEXT("enemy_lane_harvester"));
 	M_LaneParkedTank = SpawnVehicle(World, AlliedTankClassPath,
@@ -461,39 +509,31 @@ void FAlliedVehiclePassageScenario::TickWaitingForVehicles(UWorld& World)
 	{
 		return;
 	}
-	for (const FAlliedPassageTestVehicle& TestVehicle : M_Vehicles)
-	{
-		const ATrackedTankMaster* Tank = TestVehicle.Vehicle.Get();
-		UE_LOG(LogRTSAlliedPassage, Display, TEXT("RTS_ALLIED_PASSAGE ready %s at %s collision=%d chassis=%d"),
-		       *TestVehicle.Label, *Tank->GetActorLocation().ToCompactString(), Tank->GetActorEnableCollision(),
-		       static_cast<int32>(Tank->GetTankMesh()->GetCollisionEnabled()));
-	}
+	CheckVehiclesStayOnGround(TEXT("ready"));
 	CheckCollisionSetup();
 	OrderVehicles(World);
 	EnterPhase(EAlliedPassagePhase::Driving);
 }
 
-void FAlliedVehiclePassageScenario::HoldEnemyTank() const
+void FAlliedVehiclePassageScenario::CheckVehiclesStayOnGround(const TCHAR* Moment)
 {
 	using namespace AlliedPassageScenarioPrivate;
-	if (not M_Vehicles.IsValidIndex(M_EnemyTank))
+	for (const FAlliedPassageTestVehicle& TestVehicle : M_Vehicles)
 	{
-		return;
-	}
-	ATrackedTankMaster* EnemyTank = M_Vehicles[M_EnemyTank].Vehicle.Get();
-	USkeletalMeshComponent* Chassis = IsValid(EnemyTank) ? EnemyTank->GetTankMesh() : nullptr;
-	if (not IsValid(Chassis))
-	{
-		return;
-	}
-	// Enemy chassis fall through the landscape of this map; a kinematic hull stays put and still blocks.
-	if (Chassis->IsSimulatingPhysics())
-	{
-		Chassis->SetSimulatePhysics(false);
-	}
-	if (FVector::DistSquared(EnemyTank->GetActorLocation(), M_EnemyHoldLocation) > FMath::Square(EnemyHoldTolerance))
-	{
-		EnemyTank->SetActorLocation(M_EnemyHoldLocation, false, nullptr, ETeleportType::TeleportPhysics);
+		const ATrackedTankMaster* Tank = TestVehicle.Vehicle.Get();
+		const USkeletalMeshComponent* Chassis = IsValid(Tank) ? Tank->GetTankMesh() : nullptr;
+		if (not IsValid(Chassis))
+		{
+			continue;
+		}
+		const float HeightAboveAnchor = Tank->GetActorLocation().Z - M_Anchor.Z;
+		const FString Details = FString::Printf(
+			TEXT("%s %s height=%.0f object=%d blocks_static=%d simulating=%d"),
+			Moment, *TestVehicle.Label, HeightAboveAnchor, static_cast<int32>(Chassis->GetCollisionObjectType()),
+			static_cast<int32>(Chassis->GetCollisionResponseToChannel(ECC_WorldStatic)),
+			Chassis->IsSimulatingPhysics());
+		// Every lane is on flat ground; a vehicle far below it fell through the landscape.
+		Check(HeightAboveAnchor > -MaxSinkBelowGround, TEXT("vehicle_stays_on_ground"), Details);
 	}
 }
 
@@ -796,6 +836,7 @@ void FAlliedVehiclePassageScenario::ReportVehicles() const
 
 void FAlliedVehiclePassageScenario::EvaluateResults()
 {
+	CheckVehiclesStayOnGround(TEXT("end"));
 	EvaluateHarvesterResults();
 	EvaluateNomadicResults();
 }

@@ -37,5 +37,8 @@
 
 // Object channel of the hull blockers of enemy vehicles; those of the player use ECC_Vehicle.
 // Split by side so a harvester hull can block the hulls of the other side and pass through those of its own.
-// should be ignored by everything except vehicle hull blockers.
+// Its default response in DefaultEngine.ini MUST stay Block. Chaos pre-filters whole bodies by OR-ing the channel
+// numbers of all their shapes: an enemy chassis (EnemyObj, 19) with its welded hull box (23) is seen as channel 23,
+// and when the landscape ignores that channel the broadphase never pairs them and enemy vehicles drop through it.
+// Only the hull boxes themselves decide who they meet: they ignore every channel but the two hull channels.
 #define COLLISION_OBJ_ENEMY_HULL ECC_GameTraceChannel10
