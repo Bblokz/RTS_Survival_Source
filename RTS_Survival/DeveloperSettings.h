@@ -399,6 +399,15 @@ namespace DeveloperSettings
 				inline constexpr int32 Sdkfz231_VehicleParts = 40;
 				inline constexpr int32 Sdkfz251_PzIV_Radixite = 130;
 				inline constexpr int32 Sdkfz251_PzIV_VehicleParts = 65;
+				// A 250 with a 37mm gun: between the plain 250 and the medium calibre armoured cars.
+				inline constexpr int32 Sdkfz250_37mm_Radixite = 140;
+				inline constexpr int32 Sdkfz250_37mm_VehicleParts = 55;
+				// Lighter four-wheeled car than the 8-rad Sd.Kfz. 231.
+				inline constexpr int32 Sdkfz221_Radixite = 90;
+				inline constexpr int32 Sdkfz221_VehicleParts = 35;
+				// Rapid fire quad 20mm flak half-track, priced just above the Sd.Kfz. 9 37mm.
+				inline constexpr int32 Sdkfz7Flakvierling_Radixite = 120;
+				inline constexpr int32 Sdkfz7Flakvierling_VehicleParts = 45;
 			}
 
 			namespace LightTanks
@@ -413,6 +422,9 @@ namespace DeveloperSettings
 				inline constexpr int32 PzIIF_VehicleParts = 50;
 				inline constexpr int32 PzIIFlame_Radixite = 200;
 				inline constexpr int32 PzIIFlame_VehicleParts = 75;
+				// Same 20mm as the Pz II F but sturdier, so it costs more.
+				inline constexpr int32 PzIILuchs_Radixite = 240;
+				inline constexpr int32 PzIILuchs_VehicleParts = 65;
 				inline constexpr int32 PzIHarvester_Radixite = 300;
 				inline constexpr int32 Sdkfz140_Radixite = 225;
 				inline constexpr int32 Sdkfz140_VehicleParts = 70;
@@ -426,6 +438,9 @@ namespace DeveloperSettings
 				inline constexpr int32 PzI15cm_VehicleParts = 70;
 				inline constexpr int32 Hetzer_Radixite = 200;
 				inline constexpr int32 Hetzer_VehicleParts = 100;
+				// 105mm howitzer on a Pz II chassis: a step up from the Pz I 15cm, trained at the medium factory.
+				inline constexpr int32 Wespe_Radixite = 275;
+				inline constexpr int32 Wespe_VehicleParts = 120;
 			}
 
 			namespace MediumTanks
@@ -456,6 +471,9 @@ namespace DeveloperSettings
 				inline constexpr int32 Brumbar_VehicleParts = 400;
 				inline constexpr int32 Stug_Radixite = 300;
 				inline constexpr int32 Stug_VehicleParts = 125;
+				// Long 75mm tank destroyer: above the StuG, below the Jaguar.
+				inline constexpr int32 PzIV70_Radixite = 475;
+				inline constexpr int32 PzIV70_VehicleParts = 250;
 				inline constexpr int32 E25_Radixite = 450;
 				inline constexpr int32 E25_VehicleParts = 200;
 			}

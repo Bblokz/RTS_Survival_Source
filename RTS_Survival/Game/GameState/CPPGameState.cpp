@@ -663,40 +663,30 @@ void ACPPGameState::SetupBreakThroughTrainingOptions()
 
 	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerMechanizedDepot].TrainingOptions = {
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz250)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_221)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz250_37mm)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_140)),
-		FTrainingOption(),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_231)),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_PaK38)),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_LefH18)),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_PaK40))
 	};
 
 	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerLightSteelForge].TrainingOptions = {
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_Luchs)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_7_Flakvierling)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_F1)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Marder)),
-		FTrainingOption(),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R)),
-		FTrainingOption(),
-		FTrainingOption(),
-		FTrainingOption()
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun))
 	};
 
 	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerMedTankFactory].TrainingOptions = {
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Stug)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Marder)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_G)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Hetzer)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_H)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_70)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Brumbar)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets)),
-		FTrainingOption(),
-		FTrainingOption()
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_H)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets))
 	};
 
 	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerAirbase].TrainingOptions = {
@@ -747,45 +737,33 @@ void ACPPGameState::SetupStrikeDivisionTrainingOptions()
 		FTrainingOption()
 	};
 	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerMechanizedDepot].TrainingOptions = {
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Transport)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_140)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_221)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Mortar)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_22)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Puma)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_FlamePuma)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_231)),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_PaK38)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz9_37mm)),
-		FTrainingOption(),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_SFH18_150mm)),
-		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_88mmFlak)),
-		FTrainingOption(),
-		FTrainingOption()
+		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_88mmFlak))
 	};
 
 	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerLightSteelForge].TrainingOptions = {
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJager)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Puma)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzJagerLaser)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZII_Flame)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_232_3)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_J)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Marder)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_AA)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R)),
-		FTrainingOption(),
-		FTrainingOption(),
-		FTrainingOption()
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R))
 	};
 
 	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerMedTankFactory].TrainingOptions = {
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Stug)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_M)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Hetzer)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_FLamm)),
-		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Brumbar)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Jaguar)),
-		FTrainingOption(),
-		FTrainingOption()
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Hetzer)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Wespe)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_M)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_FLamm))
 	};
 
 	M_TPlayerNomadicDataHashMap[ENomadicSubtype::Nomadic_GerAirbase].TrainingOptions = {
@@ -2911,6 +2889,14 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.WeaponName = EWeaponName::Kwk30_20MM_sdkfz231;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Kwk30_20MM_sdkfz231, WeaponData);
 
+	// KwK30 20mm (Sd.Kfz.221): same stats as the Sd.Kfz.231, own name for its own weapon icon.
+	WeaponData.WeaponName = EWeaponName::Kwk30_20MM_sdkfz221;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Kwk30_20MM_sdkfz221, WeaponData);
+
+	// KwK38 20mm (Pz II Luchs): same stats as the Pz II F's KwK30, own name for its own weapon icon.
+	WeaponData.WeaponName = EWeaponName::KwK38_20MM_Luchs;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK38_20MM_Luchs, WeaponData);
+
 	// KwK37 20mm (same as previous block, preserved)
 	WeaponData.WeaponName = EWeaponName::Kwk37_20MM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Kwk37_20MM, WeaponData);
@@ -3078,6 +3064,10 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ShrapnelPen = 0;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flak38_20MM, WeaponData);
+
+	// Flakvierling 38 20mm (Sd.Kfz. 7/1): same stats as the Flak 38, own name for its own weapon icon.
+	WeaponData.WeaponName = EWeaponName::Flakvierling38_20MM;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flakvierling38_20MM, WeaponData);
 
 	// Flak 36 37mm
 	WeaponData.WeaponName = EWeaponName::Flak36_37MM;
@@ -3475,6 +3465,16 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK42_75MM, WeaponData);
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KWK42_75MM_PantherD, WeaponData);
+
+	// Pak42 L/70 (Jagdpanzer IV/70): the Panther's gun, loaded slower in the cramped medium casemate.
+	{
+		const float Pak42ReloadSpeed = 7.8f;
+		const int32 Pak42Accuracy = 95;
+		WeaponData.WeaponName = EWeaponName::Pak42_L70_75MM;
+		WeaponData.ReloadSpeed = Pak42ReloadSpeed;
+		WeaponData.Accuracy = Pak42Accuracy;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Pak42_L70_75MM, WeaponData);
+	}
 
 	// F-34 76mm family
 	WeaponData.WeaponName = EWeaponName::F_34_76MM;
@@ -4761,6 +4761,30 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz250, TankData);
 
+	// Sd.Kfz. 250 with 37mm gun
+	{
+		const float Sdkfz250_37mmTurretRotationSpeed = 30.f;
+		const float Sdkfz250_37mmExpWorthMlt = 1.1f;
+
+		TankData.MaxHealth = ArmoredCarHealthBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = Sdkfz250_37mmTurretRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = 40;
+		TankData.VehicleReverseSpeedKmh = 15;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			BaseArmoredCarExp * Sdkfz250_37mmExpWorthMlt, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Sdkfz250_37mm_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Sdkfz250_37mm_VehicleParts}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz250_37mm, TankData);
+	}
+
 
 	// Sd.Kfz. 9 with 37mm AA cannon
 	TankData.MaxHealth = MediumTankHealthBase;
@@ -4779,6 +4803,30 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz9_37mm, TankData);
+
+	// Sd.Kfz. 7/1 with the quad 20mm Flakvierling 38: a lighter half-track than the Sd.Kfz. 9.
+	{
+		const float FlakvierlingTurretRotationSpeed = 40.f;
+		const float FlakvierlingExpWorthMlt = 1.2f;
+
+		TankData.MaxHealth = LightTankHealthBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = FlakvierlingTurretRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = 45;
+		TankData.VehicleReverseSpeedKmh = 20;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			BaseArmoredCarExp * FlakvierlingExpWorthMlt, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Sdkfz7Flakvierling_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Sdkfz7Flakvierling_VehicleParts}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz_7_Flakvierling, TankData);
+	}
 
 	// Kubelwagen with MG34: fast, unarmoured scout car.
 	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * 0.6f, 5);
@@ -4895,6 +4943,30 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz_231, TankData);
+
+	// Sd.Kfz. 221 with 20mm: smaller and more nimble than the 8-rad Sd.Kfz. 231, but less durable.
+	{
+		const float Sdkfz221HealthMlt = 0.85f;
+		const float Sdkfz221VehicleRotationSpeed = 60.f;
+		const float Sdkfz221MaxSpeedKmh = 70.f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * Sdkfz221HealthMlt, 5);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = Sdkfz221VehicleRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 40 * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = Sdkfz221MaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = Sdkfz221MaxSpeedKmh;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = BaseArmoredCarExp;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Sdkfz221_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Sdkfz221_VehicleParts}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Sdkfz_221, TankData);
+	}
 
 	// Sd.Kfz. 251 (Pz IV)
 	TankData.MaxHealth = ArmoredCarHealthBase + 50;
@@ -5129,6 +5201,29 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzII_F, TankData);
 
+	// Pz II Luchs: the Pz II F's gun on a sturdier, more expensive hull.
+	{
+		const float LuchsHealthMlt = 1.15f;
+		const float LuchsExpWorthMlt = 1.1f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(LightTankHealthBase * LuchsHealthMlt, 10);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = 22;
+		TankData.VehicleReverseSpeedKmh = 7;
+		TankData.VisionRadius = T1TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, PzIILuchs_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, PzIILuchs_VehicleParts}
+		});
+		TankData.Abilities = BasicTankAbilities;
+		TankData.ExperienceLevels = GetLightTankExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * LuchsExpWorthMlt, 5);
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzII_Luchs, TankData);
+	}
+
 	// Pz II Flame
 	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(LightTankHealthBase * 1.3f, 10);
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
@@ -5241,6 +5336,29 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 1.5f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzI_15cm, TankData);
+
+	// Wespe (105mm SPG on the Pz II chassis): open top like the Pz I 15cm, but a full light tank hull.
+	{
+		const float WespeTurretRotationSpeed = 10.f;
+		const float WespeExpWorthMlt = 1.75f;
+
+		TankData.MaxHealth = LightTankHealthBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = WespeTurretRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = 20;
+		TankData.VehicleReverseSpeedKmh = 7;
+		TankData.VisionRadius = OpenTopVehicleVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Wespe_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Wespe_VehicleParts}
+		});
+		TankData.Abilities = BasicTankDestroyerAbilities;
+		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * WespeExpWorthMlt, 5);
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Wespe, TankData);
+	}
 
 	// Hetzer (light TD with rockets ability per original)
 	TankData.MaxHealth = LightMediumTankBase;
@@ -5642,6 +5760,28 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceWorth = BaseMediumTankExp;
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Stug, TankData);
+
+	// Jagdpanzer IV/70 (medium TD): thicker sloped front than the StuG and the Panther's gun.
+	{
+		const float PzIV70ExpWorthMlt = 1.3f;
+
+		TankData.MaxHealth = MediumTankHealthBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = 24;
+		TankData.VehicleReverseSpeedKmh = 12;
+		TankData.VisionRadius = T2TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, PzIV70_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, PzIV70_VehicleParts}
+		});
+		TankData.Abilities = BasicTankDestroyerAbilities;
+		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseMediumTankExp * PzIV70ExpWorthMlt, 5);
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_70, TankData);
+	}
 	
 	// E-25 T3 tank destroyer
 	TankData.Cost = FUnitCost({

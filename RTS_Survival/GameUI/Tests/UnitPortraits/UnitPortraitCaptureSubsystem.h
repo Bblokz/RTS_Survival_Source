@@ -12,6 +12,8 @@ class ACPPController;
 class ASkyLight;
 class ASceneCapture2D;
 class USceneCaptureComponent2D;
+class UMaterialInterface;
+class UMeshComponent;
 class UTextureRenderTarget2D;
 class UWeaponState;
 
@@ -38,11 +40,26 @@ struct FUnitPortraitView
 	bool bKeepPostProcessMaterials = false;
 };
 
+/**
+ * Optional look changes for one list entry, used to compare test materials (e.g. team colour shaders) on a real unit
+ * without editing its Blueprint or shared materials.
+ */
+struct FUnitPortraitLookOverride
+{
+	// Every mesh slot of the unit (turret included) that shows this material gets SwapToMaterialPath instead.
+	FString SwapFromMaterialPath;
+	FString SwapToMaterialPath;
+	bool bHasTeamColor = false;
+	// Written to custom primitive data on every mesh of the unit; alpha is the team colour weight.
+	FLinearColor TeamColor = FLinearColor::Transparent;
+};
+
 /** One vehicle of the capture list: the file name stem and the Blueprint class to spawn. */
 struct FUnitPortraitEntry
 {
 	FString Name;
 	FString ClassPath;
+	FUnitPortraitLookOverride LookOverride;
 };
 
 /** A scene capture per view; it renders every frame so its exposure and temporal history settle before a picture. */
@@ -140,6 +157,24 @@ private:
 	void SpawnSkyFill();
 
 	AActor* SpawnUnit(const FUnitPortraitEntry& Entry) const;
+	/**
+	 * @brief Reads the optional "|Swap=<from>><to>|TeamColor=r,g,b[,a]" fields after a list entry's class path.
+	 * @param OptionsText Everything after the first '|' of the entry.
+	 * @param OutLookOverride Filled with the fields found; untouched fields keep their defaults.
+	 */
+	static void ParseLookOverride(const FString& OptionsText, FUnitPortraitLookOverride& OutLookOverride);
+	// Applies the entry's material swap and team colour to the unit and its attached actors (turrets).
+	// Returns how many material slots were swapped.
+	int32 ApplyLookOverride() const;
+	/**
+	 * @brief Swaps the matching material slots of one mesh and writes the team colour to its primitive data.
+	 * @param Mesh Mesh of the unit or one of its attached actors.
+	 * @param LookOverride The current entry's look changes.
+	 * @param SwapToMaterial Loaded replacement material; null skips the swap.
+	 * @return How many slots of this mesh were swapped.
+	 */
+	static int32 ApplyLookOverrideToMesh(UMeshComponent& Mesh, const FUnitPortraitLookOverride& LookOverride,
+	                                     UMaterialInterface* SwapToMaterial);
 	// Unattended runs never draw the unit; its meshes would skip their pose, it could die to the map's enemies, and
 	// hull-aimed vehicles drift off the anchor while turning.
 	void KeepUnitReady() const;

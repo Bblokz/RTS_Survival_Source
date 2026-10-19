@@ -319,16 +319,16 @@ void UTrainingLayoutDataAsset::InitDefaultStrikeDivisionLayout()
 
 	Buildings.Add(ENomadicSubtype::Nomadic_GerMechanizedDepot, MakeBuilding({
 		              MakeSubSection(LOCTEXT("Recons", "Recons"), {
-			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_231),
+			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_Transport),
+			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_140),
+			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_221),
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_Mortar),
-			                             Slot::Tank(ETankSubtype::Tank_Puma),
-			                             Slot::Tank(ETankSubtype::Tank_FlamePuma),
-			                             Slot::Tank(ETankSubtype::Tank_Sdkfz9_37mm),
+			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_22),
 			                             Slot::Empty()
 		                             }),
 		              MakeSubSection(LOCTEXT("SupportWeapons", "Support Weapons"), {
-			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_22),
 			                             Slot::Empty(),
+			                             Slot::Squad(ESquadSubtype::Squad_Ger_PaK38),
 			                             Slot::Empty(),
 			                             Slot::Squad(ESquadSubtype::Squad_Ger_SFH18_150mm),
 			                             Slot::Squad(ESquadSubtype::Squad_Ger_88mmFlak),
@@ -339,11 +339,11 @@ void UTrainingLayoutDataAsset::InitDefaultStrikeDivisionLayout()
 	Buildings.Add(ENomadicSubtype::Nomadic_GerLightSteelForge, MakeBuilding({
 		              MakeSubSection(LOCTEXT("LightTanks", "Light Tanks"), {
 			                             Slot::Tank(ETankSubtype::Tank_PzII_F),
-			                             Slot::Tank(ETankSubtype::Tank_Pz38t),
+			                             Slot::Tank(ETankSubtype::Tank_Puma),
 			                             Slot::Tank(ETankSubtype::Tank_PzJagerLaser),
-			                             Slot::Tank(ETankSubtype::Tank_PzI_15cm),
+			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_232_3),
 			                             Slot::Tank(ETankSubtype::Tank_PzIII_J),
-			                             Slot::Empty(),
+			                             Slot::Tank(ETankSubtype::Tank_PzIII_AA),
 			                             Slot::Empty(),
 			                             Slot::Tank(ETankSubtype::Tank_Pz38t_R),
 			                             Slot::Empty()
@@ -355,7 +355,7 @@ void UTrainingLayoutDataAsset::InitDefaultStrikeDivisionLayout()
 			                             Slot::Tank(ETankSubtype::Tank_Stug),
 			                             Slot::Tank(ETankSubtype::Tank_Jaguar),
 			                             Slot::Tank(ETankSubtype::Tank_Hetzer),
-			                             Slot::Tank(ETankSubtype::Tank_Brumbar),
+			                             Slot::Tank(ETankSubtype::Tank_Wespe),
 			                             Slot::Tank(ETankSubtype::Tank_PzIII_M),
 			                             Slot::Tank(ETankSubtype::Tank_PzIII_FLamm)
 		                             })
@@ -437,44 +437,41 @@ void UTrainingLayoutDataAsset::InitDefaultBreakthroughLayout()
 	Buildings.Add(ENomadicSubtype::Nomadic_GerMechanizedDepot, MakeBuilding({
 		              MakeSubSection(LOCTEXT("Recons", "Recons"), {
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz250),
+			                             Slot::Tank(ETankSubtype::Tank_Pz38t),
+			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_221),
+			                             Slot::Empty(),
 			                             Slot::Tank(ETankSubtype::Tank_Sdkfz250_37mm),
-			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_232_3),
-			                             Slot::Tank(ETankSubtype::Tank_Panzerwerfer),
-			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_140),
 			                             Slot::Empty()
 		                             }),
 		              MakeSubSection(LOCTEXT("SupportWeapons", "Support Weapons"), {
-			                             Slot::Tank(ETankSubtype::Tank_Sdkfz251_PZIV),
 			                             Slot::Empty(),
+			                             Slot::Squad(ESquadSubtype::Squad_Ger_PaK38),
 			                             Slot::Empty(),
 			                             Slot::Squad(ESquadSubtype::Squad_Ger_LefH18),
-			                             Slot::Squad(ESquadSubtype::Squad_Ger_88mmFlak),
+			                             Slot::Squad(ESquadSubtype::Squad_Ger_PaK40),
 			                             Slot::Empty()
 		                             })
 	              }));
 
 	Buildings.Add(ENomadicSubtype::Nomadic_GerLightSteelForge, MakeBuilding({
 		              MakeSubSection(LOCTEXT("LightTanks", "Light Tanks"), {
-			                             Slot::Tank(ETankSubtype::Tank_PzII_F),
-			                             Slot::Tank(ETankSubtype::Tank_Pz38t),
+			                             Slot::Tank(ETankSubtype::Tank_PzII_Luchs),
+			                             Slot::Tank(ETankSubtype::Tank_Sdkfz_7_Flakvierling),
 			                             Slot::Tank(ETankSubtype::Tank_PzJager),
 			                             Slot::Tank(ETankSubtype::Tank_PzI_15cm),
 			                             Slot::Tank(ETankSubtype::Tank_PzIV_F1),
-			                             Slot::Empty(),
-			                             Slot::Tank(ETankSubtype::Tank_Marder),
-			                             Slot::Tank(ETankSubtype::Tank_Pz38t_RailGun),
-			                             Slot::Empty()
+			                             Slot::Tank(ETankSubtype::Tank_Pz38t_RailGun)
 		                             })
 	              }));
 
 	Buildings.Add(ENomadicSubtype::Nomadic_GerMedTankFactory, MakeBuilding({
 		              MakeSubSection(LOCTEXT("MediumTanks", "Medium Tanks"), {
-			                             Slot::Tank(ETankSubtype::Tank_Stug),
-			                             Slot::Tank(ETankSubtype::Tank_PzIV_70),
-			                             Slot::Tank(ETankSubtype::Tank_Hetzer),
-			                             Slot::Tank(ETankSubtype::Tank_Brumbar),
+			                             Slot::Tank(ETankSubtype::Tank_Marder),
 			                             Slot::Tank(ETankSubtype::Tank_PzIV_G),
+			                             Slot::Tank(ETankSubtype::Tank_PzIV_70),
+			                             Slot::Tank(ETankSubtype::Tank_Brumbar),
 			                             Slot::Tank(ETankSubtype::Tank_PzIV_H),
+			                             Slot::Empty(),
 			                             Slot::Empty(),
 			                             Slot::Tank(ETankSubtype::Tank_PZIV_Rockets),
 			                             Slot::Empty()

@@ -27,6 +27,8 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Kismet/KismetRenderingLibrary.h"
+#include "Components/MeshComponent.h"
+#include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -68,6 +70,19 @@ namespace UnitPortraitConstants
 	const TCHAR* const DebugPostProcessSwitch = TEXT("UnitPortraitDebugPostProcess");
 	// Also takes a high-res screenshot of the real game view at each idle picture, as a reference for the lighting.
 	const TCHAR* const DebugViewportShotSwitch = TEXT("UnitPortraitDebugViewportShot");
+	// Adds a steep camera like the in-game RTS view, which mostly sees the deck and turret roof.
+	const TCHAR* const RtsViewSwitch = TEXT("UnitPortraitRtsView");
+	// Manual exposure (the exposure bias still applies) so every picture of a comparison is lit the same.
+	const TCHAR* const FixedExposureSwitch = TEXT("UnitPortraitFixedExposure");
+	// Optional list entry fields after the class path, separated by '|'.
+	const TCHAR* const EntryOptionSeparator = TEXT("|");
+	const TCHAR* const SwapOption = TEXT("Swap=");
+	const TCHAR* const SwapTargetSeparator = TEXT(">");
+	const TCHAR* const TeamColorOption = TEXT("TeamColor=");
+	// Custom primitive data 0 holds the faction flag atlas index (FRTS_FactionFlags); team colour uses 4-7 (RGBA).
+	constexpr int32 TeamColorPrimitiveDataIndex = 4;
+	constexpr int32 MinTeamColorComponents = 3;
+	constexpr int32 AlphaComponentIndex = 3;
 	const TCHAR* const AnchorClassPrefix = TEXT("BP_UnitImage_LandscapeAnchor");
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 
@@ -114,6 +129,7 @@ namespace UnitPortraitConstants
 		{TEXT("Right"), 95.f, -48.f},
 		{TEXT("Front"), 20.f, -45.f}
 	};
+	const FUnitPortraitView RtsView = {TEXT("RtsCamera"), 70.f, -62.f};
 
 	/**
 	 * Scene captures turn Lumen off (SceneCaptureRendering.cpp); in this project Lumen also carries the sky light, so
@@ -266,6 +282,13 @@ void UUnitPortraitCaptureSubsystem::TickSpawningUnit()
 	}
 	M_ShotState = FUnitPortraitShotState();
 	M_UnitSpawnLocation = M_Unit->GetActorLocation();
+	const int32 SwappedSlots = ApplyLookOverride();
+	if (Entry.LookOverride.bHasTeamColor || not Entry.LookOverride.SwapToMaterialPath.IsEmpty())
+	{
+		UE_LOG(LogRTSUnitPortrait, Display, TEXT("RTS_PORTRAIT %s look: %d slots swapped to %s, team colour %s"),
+		       *Entry.Name, SwappedSlots, *Entry.LookOverride.SwapToMaterialPath,
+		       Entry.LookOverride.bHasTeamColor ? *Entry.LookOverride.TeamColor.ToString() : TEXT("none"));
+	}
 	if (GetIsValidPlayerController())
 	{
 		M_PlayerController->FocusCameraOnActor(M_Unit.Get());
@@ -277,6 +300,8 @@ void UUnitPortraitCaptureSubsystem::TickSpawningUnit()
 void UUnitPortraitCaptureSubsystem::TickSettling()
 {
 	using namespace UnitPortraitConstants;
+	// Turrets and other child actors may set up their meshes after the spawn frame.
+	ApplyLookOverride();
 	const bool bIsStillPreparing = GetIsStillCompilingOrLoading() && GetGameSecondsInPhase() < MaxSettleSeconds;
 	if (GetGameSecondsInPhase() < SettleSeconds || bIsStillPreparing)
 	{
@@ -292,6 +317,12 @@ void UUnitPortraitCaptureSubsystem::TickSettling()
 	if (FParse::Param(FCommandLine::Get(), DebugViewportShotSwitch) && GEngine)
 	{
 		GEngine->Exec(GetWorld(), TEXT("HighResShot 1"));
+	}
+	if (M_ShotsPerUnit <= 0)
+	{
+		// Look comparisons only need the idle picture.
+		EnterPhase(EUnitPortraitPhase::ClearingUnit);
+		return;
 	}
 	OrderAttackGroundOutOfFrame();
 	EnterPhase(EUnitPortraitPhase::WaitingForShot);
@@ -398,7 +429,8 @@ bool UUnitPortraitCaptureSubsystem::LoadEntries()
 		UE_LOG(LogRTSUnitPortrait, Error, TEXT("RTS_PORTRAIT cannot read the unit list %s"), *ListFile);
 		return false;
 	}
-	// One unit per line as Name=/Game/Path/BP_Unit.BP_Unit_C; # starts a comment.
+	// One unit per line as Name=/Game/Path/BP_Unit.BP_Unit_C; # starts a comment. Optional look fields follow the
+	// class path: Name=/Game/..._C|Swap=/Game/Old.Old>/Game/New.New|TeamColor=0.8,0.02,0.02
 	for (const FString& RawLine : Lines)
 	{
 		const FString Line = RawLine.TrimStartAndEnd();
@@ -406,6 +438,11 @@ bool UUnitPortraitCaptureSubsystem::LoadEntries()
 		if (Line.IsEmpty() || Line.StartsWith(TEXT("#")) || not Line.Split(TEXT("="), &Entry.Name, &Entry.ClassPath))
 		{
 			continue;
+		}
+		FString OptionsText;
+		if (Entry.ClassPath.Split(UnitPortraitConstants::EntryOptionSeparator, &Entry.ClassPath, &OptionsText))
+		{
+			ParseLookOverride(OptionsText, Entry.LookOverride);
 		}
 		Entry.Name.TrimStartAndEndInline();
 		Entry.ClassPath.TrimStartAndEndInline();
@@ -522,6 +559,10 @@ bool UUnitPortraitCaptureSubsystem::CreateCameras()
 		DebugView.Name += TEXT("WithPostProcess");
 		DebugView.bKeepPostProcessMaterials = true;
 	}
+	if (FParse::Param(FCommandLine::Get(), RtsViewSwitch))
+	{
+		ViewsToCreate.Add(RtsView);
+	}
 	for (const FUnitPortraitView& View : ViewsToCreate)
 	{
 		ASceneCapture2D* Capture = World->SpawnActor<ASceneCapture2D>(ASceneCapture2D::StaticClass(),
@@ -571,6 +612,14 @@ void UUnitPortraitCaptureSubsystem::ConfigureCaptureComponent(USceneCaptureCompo
 	{
 		Settings.bOverride_AutoExposureBias = true;
 		Settings.AutoExposureBias = ExposureBias;
+	}
+	if (FParse::Param(FCommandLine::Get(), FixedExposureSwitch))
+	{
+		// Auto exposure follows what is in frame, so side-by-side look comparisons came out lit differently.
+		Settings.bOverride_AutoExposureMethod = true;
+		Settings.AutoExposureMethod = AEM_Manual;
+		Settings.bOverride_AutoExposureApplyPhysicalCameraExposure = true;
+		Settings.AutoExposureApplyPhysicalCameraExposure = false;
 	}
 }
 
@@ -704,11 +753,100 @@ AActor* UUnitPortraitCaptureSubsystem::SpawnUnit(const FUnitPortraitEntry& Entry
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 	AActor* Unit = World->SpawnActor<AActor>(UnitClass, SpawnLocation, SpawnRotation, SpawnParameters);
 	APawn* UnitPawn = Cast<APawn>(Unit);
-	if (IsValid(UnitPawn) && not IsValid(UnitPawn->GetController()))
+	// Look comparisons take no shots; without a controller the unit does not engage the map's enemies mid-picture.
+	const bool bNeedsController = M_ShotsPerUnit > 0;
+	if (bNeedsController && IsValid(UnitPawn) && not IsValid(UnitPawn->GetController()))
 	{
 		UnitPawn->SpawnDefaultController();
 	}
 	return Unit;
+}
+
+void UUnitPortraitCaptureSubsystem::ParseLookOverride(const FString& OptionsText,
+                                                      FUnitPortraitLookOverride& OutLookOverride)
+{
+	using namespace UnitPortraitConstants;
+	TArray<FString> Options;
+	OptionsText.ParseIntoArray(Options, EntryOptionSeparator);
+	for (const FString& RawOption : Options)
+	{
+		const FString Option = RawOption.TrimStartAndEnd();
+		if (Option.StartsWith(SwapOption))
+		{
+			Option.RightChop(FCString::Strlen(SwapOption)).Split(SwapTargetSeparator,
+			                                                     &OutLookOverride.SwapFromMaterialPath,
+			                                                     &OutLookOverride.SwapToMaterialPath);
+			continue;
+		}
+		if (not Option.StartsWith(TeamColorOption))
+		{
+			continue;
+		}
+		TArray<FString> ComponentTexts;
+		Option.RightChop(FCString::Strlen(TeamColorOption)).ParseIntoArray(ComponentTexts, TEXT(","));
+		if (ComponentTexts.Num() < MinTeamColorComponents)
+		{
+			continue;
+		}
+		OutLookOverride.bHasTeamColor = true;
+		OutLookOverride.TeamColor = FLinearColor(FCString::Atof(*ComponentTexts[0]), FCString::Atof(*ComponentTexts[1]),
+		                                         FCString::Atof(*ComponentTexts[2]), 1.f);
+		if (ComponentTexts.IsValidIndex(AlphaComponentIndex))
+		{
+			OutLookOverride.TeamColor.A = FCString::Atof(*ComponentTexts[AlphaComponentIndex]);
+		}
+	}
+}
+
+int32 UUnitPortraitCaptureSubsystem::ApplyLookOverride() const
+{
+	if (not M_Unit.IsValid() || not M_Entries.IsValidIndex(M_EntryIndex))
+	{
+		return 0;
+	}
+	const FUnitPortraitLookOverride& LookOverride = M_Entries[M_EntryIndex].LookOverride;
+	UMaterialInterface* SwapToMaterial = LookOverride.SwapToMaterialPath.IsEmpty()
+		                                     ? nullptr
+		                                     : LoadObject<UMaterialInterface>(nullptr, *LookOverride.SwapToMaterialPath);
+	TArray<AActor*> UnitActors;
+	M_Unit->GetAttachedActors(UnitActors, true, true);
+	UnitActors.Add(M_Unit.Get());
+	int32 SwappedSlots = 0;
+	for (const AActor* UnitActor : UnitActors)
+	{
+		TInlineComponentArray<UMeshComponent*> Meshes(UnitActor);
+		for (UMeshComponent* Mesh : Meshes)
+		{
+			SwappedSlots += ApplyLookOverrideToMesh(*Mesh, LookOverride, SwapToMaterial);
+		}
+	}
+	return SwappedSlots;
+}
+
+int32 UUnitPortraitCaptureSubsystem::ApplyLookOverrideToMesh(UMeshComponent& Mesh,
+                                                             const FUnitPortraitLookOverride& LookOverride,
+                                                             UMaterialInterface* SwapToMaterial)
+{
+	if (LookOverride.bHasTeamColor)
+	{
+		Mesh.SetCustomPrimitiveDataVector4(UnitPortraitConstants::TeamColorPrimitiveDataIndex,
+		                                   FVector4(LookOverride.TeamColor));
+	}
+	if (not IsValid(SwapToMaterial))
+	{
+		return 0;
+	}
+	int32 SwappedSlots = 0;
+	for (int32 SlotIndex = 0; SlotIndex < Mesh.GetNumMaterials(); ++SlotIndex)
+	{
+		const UMaterialInterface* SlotMaterial = Mesh.GetMaterial(SlotIndex);
+		if (IsValid(SlotMaterial) && SlotMaterial->GetPathName() == LookOverride.SwapFromMaterialPath)
+		{
+			Mesh.SetMaterial(SlotIndex, SwapToMaterial);
+			++SwappedSlots;
+		}
+	}
+	return SwappedSlots;
 }
 
 void UUnitPortraitCaptureSubsystem::KeepUnitReady() const
