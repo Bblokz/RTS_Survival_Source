@@ -2,7 +2,9 @@
 
 
 #include "RTSComponent.h"
+#include "RTS_Survival/Interfaces/UnitVariantReceiver.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 
@@ -545,4 +547,41 @@ void URTSComponent::OnAircraftInitializedLookingForUpgrades(AAircraftMaster* Air
 	{
 		PlayerTechManager->CheckTechsToApplyToAircraft(Aircraft);
 	}
+}
+
+void URTSComponent::ApplyUnitVariant()
+{
+	if (bM_HasAppliedUnitVariant)
+	{
+		return;
+	}
+	const UPlayerUnitVariantManager* PlayerUnitVariantManager = FRTS_Statics::GetPlayerUnitVariantManager(this);
+	if (not PlayerUnitVariantManager)
+	{
+		// Enemy-only test maps, the portrait capture tool and editor utility worlds have no player controller.
+		ApplyUnitVariant_Internal(EUnitVariant::Base);
+		return;
+	}
+	ApplyUnitVariant_Internal(PlayerUnitVariantManager->ResolveVariantForUnit(this));
+}
+
+void URTSComponent::ApplyUnitVariantFromParent(const EUnitVariant Variant)
+{
+	if (bM_HasAppliedUnitVariant)
+	{
+		return;
+	}
+	ApplyUnitVariant_Internal(Variant);
+}
+
+void URTSComponent::ApplyUnitVariant_Internal(const EUnitVariant Variant)
+{
+	M_UnitVariant = Variant;
+	bM_HasAppliedUnitVariant = true;
+	AActor* OwnerActor = GetOwner();
+	if (IsValid(OwnerActor) && OwnerActor->Implements<UUnitVariantReceiver>())
+	{
+		IUnitVariantReceiver::Execute_BP_ApplyUnitVariant(OwnerActor, Variant);
+	}
+	OnUnitVariantApplied.Broadcast(Variant);
 }

@@ -11,6 +11,7 @@
 
 
 struct FCardSaveData;
+struct FUnitVariantSelection;
 /** Handles loading the player profile units, resources and technologies.
 * @note Units are loaded async, when done we call ACPPController::ONPlayerProfileLoadComplete()
 * @note OnPlayerProfileLoadComplete will then continue with setting up the HQ reference and notifying
@@ -39,6 +40,8 @@ private:
 	void UpdateNomadicUnit(const TArray<FTrainingOption>& NomadicTrainingOptions, const ENomadicSubtype NomadicType) const;
 	void ApplyTechnologies(const TArray<ETechnology>& Technologies) const;
 	void ApplyResourceCards(const TArray<FUnitCost>& ResourceBonuses) const;
+	void ApplyUnitVariantSelections(const TArray<FUnitVariantSelection>& UnitVariantSelections,
+	                                const ACPPController* PlayerController) const;
 	
 	TArray<FTrainingOption> ExtractUnitsToCreate(const TArray<FCardSaveData>& SelectedCards);
 	TArray<FTrainingOption> ExtractTrainingOptionsOfType(const TArray<FCardSaveData>& SelectedCards, const ECardType TypeToExtract);

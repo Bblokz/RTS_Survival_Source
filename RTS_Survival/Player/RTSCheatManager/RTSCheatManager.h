@@ -83,5 +83,13 @@ public:
 	UFUNCTION(Exec)
 	void RTSOptimizeUnits(const bool bEnable) const;
 
+	/** RTSCheatSetUnitVariant <UnitType> <Subtype> <Variant>: numeric enum values; affects units that spawn afterwards. */
+	UFUNCTION(Exec)
+	void RTSCheatSetUnitVariant(const int32 UnitType, const int32 Subtype, const int32 Variant);
+
+	/** Prints every stored selection and the implemented count per unit with a choice. */
+	UFUNCTION(Exec)
+	void RTSCheatPrintUnitVariants();
+
 	
 };

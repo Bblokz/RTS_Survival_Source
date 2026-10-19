@@ -11,6 +11,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
+#include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/UnitData/NomadicVehicleData.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -53,6 +54,8 @@ void UPlayerProfileLoader::LoadProfile(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner
 	//                   ENomadicSubtype::Nomadic_GerMechanizedDepot);
 	ApplyResourceCards(ExtractResources(PlayerProfile->M_SelectedCards));
 	ApplyTechnologies(ExtractTechnologies(PlayerProfile->M_SelectedCards));
+	// Before LoadInUnits: the starting units pull their variant from the manager when they begin play.
+	ApplyUnitVariantSelections(PlayerProfile->M_UnitVariantSelections, PlayerController);
 	if(bDoNotLoadPlayerUnits)
 	{
 		return;
@@ -200,6 +203,20 @@ void UPlayerProfileLoader::ApplyTechnologies(const TArray<ETechnology>& Technolo
 			TechManager->OnTechResearched(EachTech);
 		}
 	}
+}
+
+void UPlayerProfileLoader::ApplyUnitVariantSelections(const TArray<FUnitVariantSelection>& UnitVariantSelections,
+                                                      const ACPPController* PlayerController) const
+{
+	UPlayerUnitVariantManager* PlayerUnitVariantManager = PlayerController->GetPlayerUnitVariantManager();
+	if (not IsValid(PlayerUnitVariantManager))
+	{
+		RTSFunctionLibrary::ReportError("Could not apply unit variant selections as the player controller has no"
+			" valid PlayerUnitVariantManager."
+			"\nAt function: UPlayerProfileLoader::ApplyUnitVariantSelections");
+		return;
+	}
+	PlayerUnitVariantManager->InitFromProfile(UnitVariantSelections);
 }
 
 void UPlayerProfileLoader::ApplyResourceCards(const TArray<FUnitCost>& ResourceBonuses) const
