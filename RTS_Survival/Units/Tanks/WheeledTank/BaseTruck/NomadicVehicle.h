@@ -34,6 +34,8 @@ class RTS_SURVIVAL_API UTimeProgressBarWidget;
 
 DECLARE_MULTICAST_DELEGATE(FOnNomadConvertToBuilding);
 DECLARE_MULTICAST_DELEGATE(FOnNomadConvertToVehicle);
+DECLARE_MULTICAST_DELEGATE(FOnNomadFinishedConvertToBuilding);
+DECLARE_MULTICAST_DELEGATE(FOnNomadCancelledConvertToVehicle);
 
 
 UENUM()
@@ -109,6 +111,10 @@ public:
 	FOnNomadConvertToBuilding OnNomadConvertToBuilding;
 	// Delegate called when converting to vehicle.
 	FOnNomadConvertToVehicle OnNomadConvertToVehicle;
+	// Delegate called once the building is fully expanded (also when the vehicle starts as a building).
+	FOnNomadFinishedConvertToBuilding OnNomadFinishedConvertToBuilding;
+	// Delegate called when packing up into a vehicle is cancelled and the building stays.
+	FOnNomadCancelledConvertToVehicle OnNomadCancelledConvertToVehicle;
 
 	UEnergyComp* GetEnergyComp() const;
 	// Returns the building radius if available, otherwise 0.
@@ -131,6 +137,12 @@ public:
 	inline bool GetIsInTruckMode() const { return M_NomadStatus == ENomadStatus::Truck; }
 
 	inline ENomadStatus GetNomadicStatus() const { return M_NomadStatus; }
+
+	/**
+	 * @brief Adds or removes a turret that belongs to the expanded building (UNomadicBuildingTurretComponent), so it
+	 * only takes the vehicle's turret commands while the building stands.
+	 */
+	void SetBuildingTurretRegistered(ACPPTurretsMaster* BuildingTurret, const bool bRegister);
 
 	// While the truck drives to where it deploys, allied vehicles do not hold it up and idle ones are pushed aside.
 	virtual EAlliedVehiclePassage GetAlliedVehiclePassage() const override;

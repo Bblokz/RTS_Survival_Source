@@ -724,6 +724,7 @@ void ANomadicVehicle::OnFinishedConvertingToBuilding()
 	// Open command queue by calling cancel.
 	SetCommandQueueEnabled(true);
 	RemoveMoveAbilityAfterFinishedConvertingToBuilding();
+	OnNomadFinishedConvertToBuilding.Broadcast();
 	// Propagate to blueprints.
 	BP_OnFinishedConvertingToBuilding();
 }
@@ -987,6 +988,7 @@ void ANomadicVehicle::TerminateConvertToVehicleCommand()
 	CreateBuildingAttachments();
 
 	SetCommandQueueEnabled(true);
+	OnNomadCancelledConvertToVehicle.Broadcast();
 	// Propagate to Blueprints.
 	BP_OnCancelledConvertingToVehicle();
 }
@@ -1443,6 +1445,20 @@ void ANomadicVehicle::SetReinforcementPointActive(const bool bIsActive) const
 	{
 		M_ReinforcementPoint->SetReinforcementEnabled(bIsActive);
 	}
+}
+
+void ANomadicVehicle::SetBuildingTurretRegistered(ACPPTurretsMaster* BuildingTurret, const bool bRegister)
+{
+	if (not IsValid(BuildingTurret))
+	{
+		return;
+	}
+	if (bRegister)
+	{
+		SetupTurret(BuildingTurret);
+		return;
+	}
+	RemoveTurret(BuildingTurret);
 }
 
 void ANomadicVehicle::StartAsConvertedBuilding()
