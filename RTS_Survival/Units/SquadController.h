@@ -324,6 +324,14 @@ public:
 	virtual TArray<UWeaponState*> GetWeaponsOfSquad();
 	virtual float GetSquadRange();
 
+	/**
+	 * @brief Raises every soldier's max health (keeping their health percentage) and keeps the bonus through
+	 * reinforcements; technologies stack by multiplying.
+	 * @param HealthMultiplier Positive factor, e.g. 1.15 for +15%.
+	 */
+	void ApplyTechMaxHealthMultiplier(const float HealthMultiplier);
+	float GetTechMaxHealthMultiplier() const { return M_TechMaxHealthMultiplier; }
+
 	virtual bool GetIsUnitInCombat() const override;
 
 	UBehaviourComp* GetBehaviourComponentOfSquad() const;
@@ -1075,6 +1083,10 @@ protected:
 	float M_SquadVisionRange = 0.0f;
 
 	float M_StressTolerance = 0.0f;
+
+	// Product of every researched max-health technology on this squad. Health is re-initialised from the
+	// game-state squad data when the squad finishes reinforcing, so the bonus is applied there again.
+	float M_TechMaxHealthMultiplier = 1.0f;
 
 	UPROPERTY()
 	FSquadRangeClosingGuard M_RangeClosingGuard;

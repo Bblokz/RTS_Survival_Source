@@ -71,7 +71,10 @@ namespace AimCrosshairCaptureConstants
 	const TCHAR* const DefaultCases =
 		TEXT("Small=SmallCrosshair:200+Medium=MediumCrosshair:700+Large=LargeCrosshair:1400")
 		TEXT("+LargeComplex=LargeComplexCrosshair:1600")
-		TEXT("+GrenadeAntiInfantry=AntiInfantryGrenade:500+GrenadeAntiVehicle=AntiVehicleGrenade:350");
+		TEXT("+GrenadeAntiInfantry=AntiInfantryGrenade:500+GrenadeAntiVehicle=AntiVehicleGrenade:350")
+		// Not mapped to an aim type by default: shown through the Large path with its own material.
+		TEXT("+LargeClassic=LargeCrosshair:1400:")
+		TEXT("/Game/RTS_Survival/Materials/AimMaterials/Crosshairs/MI_AimCrosshair_LargeClassic.MI_AimCrosshair_LargeClassic");
 	const TCHAR* const AnchorClassPrefix = TEXT("BP_UnitImage_LandscapeAnchor");
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 	const FName RadiusParameterName(TEXT("Radius"));

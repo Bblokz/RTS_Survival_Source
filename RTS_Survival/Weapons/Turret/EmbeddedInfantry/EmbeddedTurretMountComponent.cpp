@@ -46,10 +46,10 @@ void UEmbeddedTurretMountComponent::BeginPlay_ScheduleMount()
 	{
 		return;
 	}
-	if (not IsValid(EmbeddedTurretClass))
+	if (EmbeddedTurretClasses.IsEmpty())
 	{
 		RTSFunctionLibrary::ReportError("UEmbeddedTurretMountComponent on " + GetNameSafe(GetOwner())
-			+ " has no EmbeddedTurretClass; no turret is mounted.");
+			+ " has no EmbeddedTurretClasses; no turret is mounted.");
 		return;
 	}
 
@@ -80,7 +80,15 @@ void UEmbeddedTurretMountComponent::MountTurret()
 		return;
 	}
 
-	M_MountChildActorComponent = CreateMountChildActorComponent(TargetMesh);
+	const TSubclassOf<ACPPTurretsMaster> ChosenTurretClass = GetRandomEmbeddedTurretClass();
+	if (not IsValid(ChosenTurretClass))
+	{
+		RTSFunctionLibrary::ReportError("UEmbeddedTurretMountComponent on " + GetNameSafe(Owner)
+			+ " has no valid entry in EmbeddedTurretClasses; no turret is mounted.");
+		return;
+	}
+
+	M_MountChildActorComponent = CreateMountChildActorComponent(TargetMesh, ChosenTurretClass);
 	if (not GetIsValidMountChildActorComponent())
 	{
 		return;
@@ -90,10 +98,28 @@ void UEmbeddedTurretMountComponent::MountTurret()
 	if (not IsValid(Turret))
 	{
 		RTSFunctionLibrary::ReportError("UEmbeddedTurretMountComponent on " + GetNameSafe(Owner)
-			+ " failed to spawn its turret " + GetNameSafe(EmbeddedTurretClass.Get()));
+			+ " failed to spawn its turret " + GetNameSafe(ChosenTurretClass.Get()));
 		return;
 	}
 	RegisterTurretWithOwner(Turret);
+}
+
+TSubclassOf<ACPPTurretsMaster> UEmbeddedTurretMountComponent::GetRandomEmbeddedTurretClass() const
+{
+	TArray<TSubclassOf<ACPPTurretsMaster>> ValidTurretClasses;
+	for (const TSubclassOf<ACPPTurretsMaster>& TurretClass : EmbeddedTurretClasses)
+	{
+		if (IsValid(TurretClass))
+		{
+			ValidTurretClasses.Add(TurretClass);
+		}
+	}
+
+	if (ValidTurretClasses.IsEmpty())
+	{
+		return nullptr;
+	}
+	return ValidTurretClasses[FMath::RandRange(0, ValidTurretClasses.Num() - 1)];
 }
 
 UMeshComponent* UEmbeddedTurretMountComponent::FindMountMesh() const
@@ -167,7 +193,9 @@ bool UEmbeddedTurretMountComponent::GetMeshHasMountSocket(
 	return IsValid(Mesh) && Mesh->IsA(MeshClass) && Mesh->DoesSocketExist(MountSocketName);
 }
 
-UChildActorComponent* UEmbeddedTurretMountComponent::CreateMountChildActorComponent(UMeshComponent* TargetMesh)
+UChildActorComponent* UEmbeddedTurretMountComponent::CreateMountChildActorComponent(
+	UMeshComponent* TargetMesh,
+	const TSubclassOf<ACPPTurretsMaster> TurretClass)
 {
 	AActor* Owner = GetOwner();
 	UChildActorComponent* ChildActorComponent = NewObject<UChildActorComponent>(
@@ -177,7 +205,7 @@ UChildActorComponent* UEmbeddedTurretMountComponent::CreateMountChildActorCompon
 		return nullptr;
 	}
 
-	ChildActorComponent->SetChildActorClass(EmbeddedTurretClass);
+	ChildActorComponent->SetChildActorClass(TurretClass);
 	ChildActorComponent->SetupAttachment(TargetMesh, MountSocketName);
 	ChildActorComponent->SetRelativeLocation(MountLocalOffset);
 	ChildActorComponent->SetCanEverAffectNavigation(false);

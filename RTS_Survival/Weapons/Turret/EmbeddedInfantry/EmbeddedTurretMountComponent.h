@@ -26,7 +26,7 @@ enum class EEmbeddedTurretMountMesh : uint8
  * @brief Add to a tank or building expansion Blueprint to give it an extra turret at a mesh socket at runtime,
  * e.g. an infantry gunner (AEmbeddedInfantryTurret) in a cupola. The spawned turret is registered with the host
  * like its own turrets, follows its attack orders and auto-engages.
- * @note Set EmbeddedTurretClass and MountSocketName in the Blueprint component details.
+ * @note Set EmbeddedTurretClasses and MountSocketName in the Blueprint component details.
  */
 UCLASS(ClassGroup = (RTS), meta = (BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API UEmbeddedTurretMountComponent : public UActorComponent
@@ -42,8 +42,9 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+	// One class is picked at random per mount, so vehicles of the same type can carry different gunners.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Embedded Turret Mount")
-	TSubclassOf<ACPPTurretsMaster> EmbeddedTurretClass;
+	TArray<TSubclassOf<ACPPTurretsMaster>> EmbeddedTurretClasses;
 
 	// True for a turret on a tank; picks the tank mesh with MountMesh. Otherwise any mesh of the owner with the socket.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Embedded Turret Mount")
@@ -65,12 +66,15 @@ private:
 	void BeginPlay_ScheduleMount();
 	void MountTurret();
 
+	TSubclassOf<ACPPTurretsMaster> GetRandomEmbeddedTurretClass() const;
 	UMeshComponent* FindMountMesh() const;
 	UMeshComponent* FindTankTurretMeshWithSocket(const TSubclassOf<UMeshComponent> MeshClass) const;
 	UMeshComponent* FindOwnerMeshWithSocket(const TSubclassOf<UMeshComponent> MeshClass) const;
 	bool GetMeshHasMountSocket(const UMeshComponent* Mesh, const TSubclassOf<UMeshComponent> MeshClass) const;
 
-	UChildActorComponent* CreateMountChildActorComponent(UMeshComponent* TargetMesh);
+	UChildActorComponent* CreateMountChildActorComponent(
+		UMeshComponent* TargetMesh,
+		const TSubclassOf<ACPPTurretsMaster> TurretClass);
 	void RegisterTurretWithOwner(ACPPTurretsMaster* Turret) const;
 	void ReportMountMeshNotFound() const;
 
