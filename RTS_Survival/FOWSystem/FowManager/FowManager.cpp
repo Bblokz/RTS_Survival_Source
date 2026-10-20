@@ -515,6 +515,11 @@ void AFowManager::Tick(float DeltaTime)
 	RefreshCustomMiniMapIconDrawDataCache();
 }
 
+bool AFowManager::GetIsFowParticipant(UFowComp* FowComp) const
+{
+	return M_ActiveFowComponents.Contains(FowComp) || M_PassiveFowComponents.Contains(FowComp);
+}
+
 bool AFowManager::GetIsActiveParticipantUnique(UFowComp* FowComp) const
 {
 	if (M_ActiveFowComponents.Contains(FowComp))

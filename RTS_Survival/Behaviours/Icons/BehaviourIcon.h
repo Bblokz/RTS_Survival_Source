@@ -83,5 +83,14 @@ enum class EBehaviourIcon : uint8
 	DestroyedAmmo,
 	DestroyedTurret,
 	DestroyedWeapon,
-	DestroyedWheels
+	DestroyedWheels,
+	// Append only: Blueprints and the icon style asset store these.
+	TechTungsten88,
+	TechStereoRangefinder,
+	TechShellHoist,
+	TechArmoredTroopBay,
+	TechFlak88GroundRole,
+	TechInfantryKit,
+	TechGhillieSuits,
+	TechEntrenchingTools
 };

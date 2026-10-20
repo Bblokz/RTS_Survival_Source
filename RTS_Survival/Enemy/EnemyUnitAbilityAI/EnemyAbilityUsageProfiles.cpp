@@ -24,6 +24,7 @@ EEnemyBehaviourUsage FEnemyAbilityUsageProfiles::GetBehaviourUsage(const EBehavi
 	case EBehaviourAbilityType::SuppressiveShockline:
 		return EEnemyBehaviourUsage::CombatVsInfantry;
 	case EBehaviourAbilityType::AdrenalineShot:
+	case EBehaviourAbilityType::RusCloseAssault:
 		return EEnemyBehaviourUsage::CombatCloseRange;
 	case EBehaviourAbilityType::OverwatchFireSupport:
 		return EEnemyBehaviourUsage::CombatStationary;
@@ -39,6 +40,7 @@ EEnemyGrenadeUsage FEnemyAbilityUsageProfiles::GetGrenadeUsage(const EGrenadeAbi
 	switch (GrenadeAbility)
 	{
 	case EGrenadeAbilityType::GerAtGrenade:
+	case EGrenadeAbilityType::RusRPG43:
 		return EEnemyGrenadeUsage::AntiArmor;
 	case EGrenadeAbilityType::DefaultGerBundleGrenade:
 	case EGrenadeAbilityType::BundleSturmKommando:

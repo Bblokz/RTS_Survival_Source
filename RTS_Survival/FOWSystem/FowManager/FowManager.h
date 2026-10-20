@@ -115,6 +115,12 @@ public:
 	void RemoveFowParticipant(UFowComp* FowComp);
 
 	/**
+	 * @param FowComp The Fog of War component to look for.
+	 * @return True when the component currently participates, as active (vision bubble) or passive participant.
+	 */
+	bool GetIsFowParticipant(UFowComp* FowComp) const;
+
+	/**
 	 * @brief Receives particle data from a Niagara system and processes it accordingly.
 	 *
 	 * @param Data The array of particle data received from the Niagara system.
