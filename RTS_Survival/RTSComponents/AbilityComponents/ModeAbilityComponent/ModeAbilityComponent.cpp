@@ -81,6 +81,18 @@ EModeAbilityType UModeAbilityComponent::GetModeAbilityType() const
 	return ModeAbilitySettings.ModeType;
 }
 
+void UModeAbilityComponent::InitModeAbilitySettings(const FModeAbilitySettings& NewSettings)
+{
+	if (HasBegunPlay())
+	{
+		RTSFunctionLibrary::ReportError(
+			"InitModeAbilitySettings called after BeginPlay; the ability is already on the command card: "
+			+ GetDebugName());
+		return;
+	}
+	ModeAbilitySettings = NewSettings;
+}
+
 void UModeAbilityComponent::PostInitProperties()
 {
 	Super::PostInitProperties();

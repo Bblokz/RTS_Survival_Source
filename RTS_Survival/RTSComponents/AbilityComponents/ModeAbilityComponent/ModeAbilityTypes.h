@@ -9,5 +9,7 @@ UENUM(BlueprintType)
 enum class EModeAbilityType : uint8
 {
 	DefaultSniperOverwatch,
-	ArtilleryMode
+	ArtilleryMode,
+	// Added at runtime by Tech_Flak88_GroundRole on the 8.8 cm Flak team weapon.
+	Flak88GroundRole
 };

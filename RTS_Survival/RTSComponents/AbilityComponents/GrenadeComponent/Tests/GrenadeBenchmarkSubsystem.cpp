@@ -46,6 +46,11 @@ namespace GrenadeBenchPrivate
 	const TCHAR* const LightBringerSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Ger/EliteInfantry/LightBringers/Squad_Ger_LightBringers.Squad_Ger_LightBringers_C");
 	const TCHAR* const MosinSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_Mosin.Rus_Squad_Mosin_C");
 	const TCHAR* const HazmatSniperSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Ger/ArmoryUnlocked/Squad_Ger_HazmatSniperTeam.Squad_Ger_HazmatSniperTeam_C");
+	// Soviet WW2 grenades (Docs/Abilities/SovietGrenades.md).
+	const TCHAR* const RedHammerSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/T2/Rus_T2Squad_RedHammer.Rus_T2Squad_RedHammer_C");
+	const TCHAR* const RedHammerPTRSSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/T2/Rus_T2Squad_RedHammerPTRS.Rus_T2Squad_RedHammerPTRS_C");
+	const TCHAR* const LargeMixSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_LargeMixBasic.Rus_Squad_LargeMixBasic_C");
+	const TCHAR* const SVTSquad = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_SVT.Rus_Squad_SVT_C");
 	// Five soldiers in the normal squad formation: shows how much of a squad one blast reaches. It is German because
 	// soldiers keep their Blueprint's collision side: Soviet soldiers collide as enemies and the enemy-owned thrower
 	// squad's grenades only hit player objects. Squads of more than eight soldiers stack the extra ones on the spawn
@@ -314,6 +319,14 @@ void UGrenadeBenchmarkSubsystem::BuildScenarios()
 	    NoSoldierCheck, false);
 	Add(TEXT("Molotov_vs_PzIV_Driving"), MosinSquad, EGrenade::RusMolotov, ETarget::TankMoving, GermanMediumTank,
 	    NotChecked, NoSoldierCheck, false);
+	Add(TEXT("RGD33_vs_Infantry"), RedHammerSquad, EGrenade::RusRGD33, ETarget::Infantry, InfantryTarget, NotChecked, 3,
+	    false);
+	Add(TEXT("F1_vs_Infantry"), LargeMixSquad, EGrenade::RusF1, ETarget::Infantry, InfantryTarget, NotChecked, 3, false);
+	Add(TEXT("RG42_vs_Infantry"), SVTSquad, EGrenade::RusRG42, ETarget::Infantry, InfantryTarget, NotChecked, 2, false);
+	Add(TEXT("RPG43_vs_PzIV"), RedHammerPTRSSquad, EGrenade::RusRPG43, ETarget::TankStill, GermanMediumTank, 40.f,
+	    NoSoldierCheck, true);
+	Add(TEXT("RPG43_vs_PzIV_Driving"), RedHammerPTRSSquad, EGrenade::RusRPG43, ETarget::TankMoving, GermanMediumTank,
+	    40.f, NoSoldierCheck, true);
 	// The player's own squads against enemy units: the other collision side of sticking, tracking and the AOE.
 	Add(TEXT("PlayerAT_vs_EnemyT34"), FaustSquad, EGrenade::GerAtGrenade, ETarget::TankStill, MediumTank, 40.f,
 	    NoSoldierCheck, true);

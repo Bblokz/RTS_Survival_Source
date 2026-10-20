@@ -53,6 +53,12 @@ public:
 	bool GetIsModeActive() const;
 	EModeAbilityType GetModeAbilityType() const;
 
+	/**
+	 * @brief For components created at runtime (e.g. by a technology) instead of authored on a Blueprint.
+	 * @param NewSettings Applied only before the component begins play, which adds the ability to the command card.
+	 */
+	void InitModeAbilitySettings(const FModeAbilitySettings& NewSettings);
+
 protected:
 	virtual void PostInitProperties() override;
 	virtual void BeginPlay() override;
