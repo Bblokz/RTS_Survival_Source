@@ -10,7 +10,7 @@ infantry fire montages on every shot. He never collides, never affects navigatio
 
 | Piece | What it does |
 |---|---|
-| `UEmbeddedTurretMountComponent` (`Weapons/Turret/EmbeddedInfantry`) | Add to a tank or BXP Blueprint. A tick after BeginPlay it spawns `EmbeddedTurretClass` in a runtime child actor component at `MountSocketName` + `MountLocalOffset`, calls the host's `SetupTurret` and starts auto-engage. |
+| `UEmbeddedTurretMountComponent` (`Weapons/Turret/EmbeddedInfantry`) | Add to a tank or BXP Blueprint. A tick after BeginPlay it spawns a random entry of `EmbeddedTurretClasses` in a runtime child actor component at `MountSocketName` + `MountLocalOffset`, calls the host's `SetupTurret` and starts auto-engage. |
 | `AEmbeddedInfantryTurret` | `ACPPTurretsMaster` child. `TurretRoot` (turned in yaw) → `SoldierMesh` (yaw -90, like every squad unit) → `WeaponMesh` on `GunSocket` with the squad `Weapon` child actor transform. Aims from `GunSocket`. Turret tuning (rotation speed, pitch limits, idle) lives in `InfantryTurretSettings`, not in a Blueprint `InitChildTurret`. |
 | `UEmbeddedInfantryTurretAnimInstance` | Eases `Pitch` to the turret's target pitch and plays `SingleFireMontage` / `BurstFireMontage`. |
 | `Tests/EmbInfantryTurretTestSubsystem` | `-EmbInfantryTurretValidate` map test (below). |

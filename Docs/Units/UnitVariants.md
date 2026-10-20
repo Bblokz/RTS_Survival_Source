@@ -1,783 +1,730 @@
 # Unit variants
 
-Design for the player's army customisation layer that sits below unit cards. A card swaps a whole unit; a
-variant is a small modification a unit applies to itself when it begins play (a different gun, extra armour
-plates, a different squad weapon mix, a different turret on a pit). Every German unit has at most three
-variants, of which the first is always the base unit. The player picks one variant per unit type for the
-whole army before a mission; every unit of that type the player receives during the mission then starts as
-that variant.
+The player's army customisation layer below unit cards. A card swaps a whole unit; a variant is a small
+modification of a unit (a different gun, extra armour plates, a different squad weapon mix, a different turret
+on a pit). Every German unit has at most three variants, of which the first is always the base unit. The player
+picks one variant per unit type for the whole army before a mission; every unit of that type the player
+receives during the mission then **is** that variant.
 
-This document is the implementation brief. The C++ side (sections 3 to 6 and the automation tests of 9.1) is
-implemented; where the code deviates from the brief, section 12 lists it and the affected sections say so.
-The data asset `DA_UnitVariants` and the Blueprint switches (section 8 step 10) are not made yet. The variant
-*selection UI* is out of scope; everything that lets the selection reach the units, and everything the UI will
-need to know which units have variants to choose from, is in scope.
+**A variant is a Blueprint child class of the base unit Blueprint.** The player's selection replaces the class
+the `ARTSAsyncSpawner` spawns for that unit type, using the same mapping-override mechanism the enemy director
+already uses to swap unit classes for the Director of Forge and the Director of Harvest. There is no runtime
+event, no interface, and no per-unit lookup: the unit that comes out of the spawner is the variant.
 
-Decisions taken (the questions that led to them are in the session history; the proposed defaults were accepted,
-with one deviation: nomadic trucks were proposed as in scope by inheritance and are excluded here because the
-request names tanks, squads and BXPs; section 10 shows the three-line extension):
+This document is the implementation brief, and it **replaces an earlier design** that was implemented and
+committed (units pulled their variant at BeginPlay and fired a Blueprint event). Section 8 lists, symbol by
+symbol, what of that implementation is kept, changed and removed. Read section 8 before touching code.
+
+The variant *selection UI* is out of scope. Everything that lets the selection reach the spawner, and
+everything the UI will need to know which units have variants to choose from, is in scope.
 
 | Topic | Decision |
 |---|---|
-| Choice model | One exclusive choice per unit type, from a shared enum `EUnitVariant { Base, VariantA, VariantB }`. Not stackable. |
-| Supported unit kinds | Tanks (`ATankMaster` with `UnitType == UNType_Tank`), squads (`ASquadController`, including team weapon controllers since they are squads), building expansions (`ABuildingExpansion`). Nomadic trucks, harvesters (`UNType_Harvester`) and aircraft get `Base` always; extension points are listed in section 10. |
-| Who gets variants | Units whose `URTSComponent::GetOwningPlayer()` equals `UPlayerTechManager::PlayerTechOwnerIndex` (1). Everyone else gets `Base`. |
-| Direction | Units **pull** their variant when their subtype is known, from a manager on `ACPPController`. The spawner pushes nothing. |
-| Persistence | The selection is saved next to the cards in the player profile. |
-| Scope of a selection change | Only units that begin play after the change see it. Pre-mission selection makes this moot. |
-| Variant definition store | A `UDataAsset` picked in Project Settings, holding per subtype how many variants exist and their names and icons for the later UI. |
-| Cost / training time | Variants never change cost or training time. They are stat, mesh and loadout tweaks done in the unit's Blueprint. |
-| Per doctrine | No. The implemented count is per subtype, not per `ERTSFaction`. |
-| Stale saves | A saved variant the asset no longer implements clamps to `Base` and reports an error once. |
-| Testing before the UI exists | Cheat manager commands plus a developer-settings forced-variant list. |
+| What a variant is | A Blueprint child class of the base unit Blueprint (`BP_PzIV_H_VariantA` is a child of `BP_PzIV_H`). It overrides defaults: meshes, weapons, modules, abilities, squad unit classes, team weapon class, building mesh. |
+| Choice model | One exclusive choice per unit type, from the shared enum `EUnitVariant { Base, VariantA, VariantB }`. Not stackable. |
+| How the choice reaches units | The spawner's class maps are overridden at mission start, exactly like `ARTSAsyncSpawner::ApplyEnemyDirectorUnitOverrides`. |
+| Supported unit kinds | Tanks (`M_TrainingOptionMap` keys with `UNType_Tank`), squads (`UNType_Squad`, which includes team weapon crews since they are squads), building expansions (`BuildingExpansionMap`). Nomadic trucks and aircraft are not supported yet; section 13 shows the extension. |
+| Scope | Only units that come out of `ARTSAsyncSpawner`. Anything spawned another way gets whatever class spawns it; see section 6. |
+| Who gets variants | The player, and only the player, without any owner check. A faction is always unique to one player, so the spawner never spawns a unit of one player's faction for another player: German subtypes (the only keys variants override) are only ever requested for the player. No spawn path checks the requester, the trainer component's owner or the spawned unit's owner; see section 6. |
+| Persistence | The selection is saved next to the cards in the player profile (already in place). |
+| Scope of a selection change | Units requested after the change. Already spawned units keep their class. |
+| Variant definition store | `UUnitVariantDataAsset` picked in Project Settings > Unit Variants (already in place), extended with the variant class per entry. |
+| Subtype | **All variants of a unit share that unit's one subtype.** Three Pz II F Blueprints are all `Tank_PzII_F`. No variant ever gets its own `ETankSubtype` / `ESquadSubtype` / `EBuildingExpansionType`; see "One subtype per unit" below. |
+| Cost / training time / requirements | Identical for every variant, because they are keyed by the shared subtype (`FTrainingOption`, `DT_Training` row). This is intended. |
+| Training UI presentation | While a variant is selected, the training menu can show that variant's **icon, title and description** instead of the base unit's. Each of the three is opt-in per variant with its own bool on the variant data asset entry; off means the base unit's table entry is shown. The values come from the variant data asset, never from `DT_Training` / `DT_TrainingOptions`. See 3.8. |
+| Per doctrine | No. The implemented variants are per subtype, not per `ERTSFaction`. |
+| Stale saves | A saved variant the asset no longer implements clamps to `Base` and reports an error once (already in place). |
+| Precedence vs director overrides | Director overrides apply first, variants second. A variant wins on the same key; the collision is reported. |
+| Testing before the UI exists | Cheat manager commands plus the developer-settings forced-variant list (already in place, adapted). |
 
----
+### One subtype per unit, shared by all its variants
 
-## 1. Existing code this builds on
+This is a hard rule. Read it before designing anything.
 
-Read these before implementing. They define the ordering constraints.
+- A unit type is identified by its `FTrainingOption` (unit type + subtype). **Variants do not change that
+  identity.** `BP_PzII_F`, `BP_PzII_F_VariantA` and `BP_PzII_F_VariantB` all call `SetUnitSubtype` with
+  `Tank_PzII_F` (the children inherit it from the base Blueprint and must not override it).
+- **Do not add enumerators** to `ETankSubtype`, `ESquadSubtype` or `EBuildingExpansionType` for variants (no
+  `Tank_PzII_F_VariantA`), and do not add `DT_Training` rows, training layout slots, cards, spawner setup rows or
+  `GameState` unit data per variant.
+- What tells variants apart is **only** `EUnitVariant`: the player's selection (keyed by the shared
+  `FTrainingOption`), the variant data asset entry for that subtype (class, name, description, icon), and the
+  `UnitVariant` class default on the variant Blueprint's `URTSComponent` (3.7).
+- Everything keyed by the subtype is therefore shared by all variants, and that is the intended behaviour:
+  - cost, training time and training requirements (`DT_Training` row named by `GetTrainingOptionName`,
+    `FTrainingOptionState::RTSRequirement` in `TrainingMenuManager.cpp` ~425);
+  - the training menu slot and its position in the layout (`UTrainingLayoutDataAsset`);
+  - unit data from the game state (`ACPPGameState::GetTankDataOfPlayer` / `GetSquadDataOfPlayer`: health,
+    speed, vision, resistances, abilities), which the variant Blueprint can still adjust on top like any
+    Blueprint;
+  - technologies that target the subtype, unit cards (`FCardSaveData::UnitToCreate`), the game unit manager's
+    per-subtype counts, enemy director keys and the saved selection itself.
+- The **only** per-variant exception the player sees in the training menu is presentation: icon, title and
+  description, each opt-in (3.8). They are read from the variant data asset by the training menu, keyed by the
+  shared `FTrainingOption` plus the selected `EUnitVariant`. Cost, training time and requirements in that same
+  menu stay the shared ones.
+- Consequence for the spawner: there is exactly **one key per unit** in `M_TrainingOptionMap` /
+  `BuildingExpansionMap`, and applying a variant **replaces the class under that key**. It never adds a key.
+- If a future variant genuinely needs a different cost or different requirements, that is a different unit (a
+  new subtype, a new training slot), not a variant.
 
-| Fact | Where | Why it matters |
-|---|---|---|
-| Player units are spawned with `World->SpawnActor` (not deferred) and then handed to a callback. | `Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.cpp` `AttemptSpawnAsset`, `SquadController.cpp` ~4016, `Squads/Reinforcement/SquadReinforcementComponent.cpp` ~651 | `BeginPlay` runs before any post-spawn callback. Nothing can be pushed into the unit before BeginPlay without converting every spawn site to deferred spawning, which is why the unit pulls. |
-| Several player-unit spawn paths never touch the async spawner. | `MissionBase::AsyncSpawnActor*`, `VTOLDropshipAircraft.cpp` ~479, `NomadicVehicle.cpp` ~2338 (conversion), `SquadController.cpp` ~1156 (team weapon controller), reinforcements | A push from the spawner would miss all of these. Pull covers all of them. |
-| `URTSComponent` holds `OwningPlayer` (BP default, 222 when unset), `UnitType` and the subtype. The subtype is set by BP via `SetUnitSubtype`, which broadcasts `OnSubTypeInitialized`. | `RTSComponents/RTSComponent.h/.cpp` | The component is the natural place to store the resolved variant and the single lookup key (owner + unit type + subtype). |
-| Each supported class already has a "my subtype is known, go look for upgrades" hook that calls into the player tech manager and early-outs for non-player owners. | `ATankMaster::BeginPlay` → `CheckForUpgrades()`; `ASquadController::InitSquadData` → `CheckForUpgrades()`; `ABuildingExpansion::InitBuildingExpansion` → `CheckForUpgrades()`; `URTSComponent::On*InitializedLookingForUpgrades` → `UPlayerTechManager::CheckTechsToApplyTo*` | The variant hook goes in the **same places, immediately before** `CheckForUpgrades()`, so techs apply on top of the variant. |
-| Squad units are loaded asynchronously after the controller's BeginPlay and register through `ASquadUnit::SetSquadController`, which queues work on `SquadDataCallbacks.CallbackOnSquadDataLoaded`. That callback runs immediately when the data is already loaded. Reinforcements use the same `SetSquadController`. | `SquadUnit.cpp` ~2795, `SquadControllerDataCallback.cpp` | Squad units receive their variant through this callback, which also covers reinforcements and the re-crewed team weapon squad without extra code. |
-| `UPlayerTechManager` is a `UActorComponent` created in the `ACPPController` constructor, exposed via `GetPlayerTechManager()` and `FRTS_Statics::GetPlayerTechManager(WorldContext)`. | `Player/PlayerTechManager/PlayerTechManager.h`, `Player/CPPController.cpp` ~267, `Utils/RTS_Statics/RTS_Statics.cpp` ~158 | The variant manager copies this shape exactly. |
-| The profile is loaded in `UPlayerProfileLoader::LoadProfile`, which applies resources and techs and then spawns the starting units (`LoadInUnits`). | `Player/StartGameProfileManager/PlayerProfileLoader.cpp` ~39 | The variant manager must be initialised from the profile **before** `LoadInUnits`, otherwise the starting units pull an empty selection. |
-| Project-settings-picked data assets follow `UTrainingLayoutSettings` (`UDeveloperSettings`, `TSoftObjectPtr<Asset>`, `LoadSynchronous`, class default fallback). | `GameUI/TrainingUI/TrainingLayout/TrainingLayoutSettings.h/.cpp` | Copy that pattern for the variant asset. |
-| Save data lives in `USavePlayerProfile` (legacy slot `PlayerProfile`, read by the in-game loader) and in `FPlayerCardSaveData` (world campaign, `FPlayerData::CardData`, written by `W_CardMenu`). | `CardSystem/PlayerProfile/...`, `WorldCampaign/PlayerProfile/PlayerCardData/PlayerCardData.h` | The selection array is added to both so the later UI can save wherever cards are saved. |
-| `Player/AGENTS.md` wants player state routed through `ACPPController`. | `RTS_Survival/Player/AGENTS.md` | The manager lives on the controller, not in the game instance or a subsystem. |
+## 1. The precedent: enemy director unit overrides
+
+Read this path end to end before implementing; the variant path is a copy of it.
+
+| Step | Where |
+|---|---|
+| The spawner's Blueprint holds `TArray<FTankTrainingOptionSetup> SetupLightGerVehicles` and friends (one row = subtype + `TSoftClassPtr<AActor> UnitClass`), plus `TMap<EBuildingExpansionType, TSoftClassPtr<ABuildingExpansion>> BuildingExpansionMap` and `TMap<EBuildingExpansionType, UStaticMesh*> BxpPreviewMeshMap`. | `Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h` ~160–210 |
+| `PostInitializeComponents` rebuilds the private `TMap<FTrainingOption, TSoftClassPtr<AActor>> M_TrainingOptionMap` from those arrays (`SetupTrainingOptionsFromConfig`, `AddTrainingOptionMapping`). Tanks are keyed `FTrainingOption(UNType_Tank, TankSubtype)`, squads `UNType_Squad`, nomadics `UNType_Nomadic`, aircraft `UNType_Aircraft`. | `RTSAsyncSpawner.cpp` 86–130, 195–214 |
+| Every spawn request looks the class up by `FTrainingOption` at request time: `AsyncSpawnOptionAtLocation` (~652) and `LoadNextTrainingOptionInQueue` (~737) read `M_TrainingOptionMap`; `AsyncSpawnBuildingExpansion` (~328), `AsyncBatchLoadInstantPlaceExpansions` (~928) and `AsyncSpawnFieldDefenseExpansion` (~1057) read `BuildingExpansionMap`. | `RTSAsyncSpawner.cpp` |
+| `ACPPController::InitPlayerController` stores the spawner, calls `ApplyEnemyDirectorUnitOverrides()`, then `InitPlayerStartLocation`, which leads to `LoadPlayerProfile` → `UPlayerProfileLoader::LoadProfile` → `LoadInUnits` (starting units). | `Player/CPPController.cpp` ~2145–2150 |
+| `ACPPController::ApplyEnemyDirectorUnitOverrides` asks the mission manager for the `EEnemyDirector` and calls `ARTSAsyncSpawner::ApplyEnemyDirectorUnitOverrides(Director)`. | `CPPController.cpp` ~2172 |
+| The spawner reads `UEnemyDirectorUnitOverrideSettings` (a `UDeveloperSettings` with a `TSoftObjectPtr` to the asset) → `UEnemyDirectorUnitOverridesDataAsset::FindOverrides(Director)` → `FEnemyDirectorUnitOverrides` (four typed arrays) → `ApplyTrainingOptionOverride(FTrainingOption, TSoftClassPtr<AActor>)`, which **replaces only an existing key** and returns silently when the key is absent. Guarded by `bM_HasAppliedEnemyDirectorUnitOverrides`. | `Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner_EnemyDirectorOverrides.cpp`, `Enemy/EnemyDirector/EnemyDirectorUnitOverrideSettings.h`, `EnemyDirectorUnitOverridesDataAsset.h/.cpp` |
+
+Three things the director path does **not** do, which variants need: it never overrides `BuildingExpansionMap`
+or `BxpPreviewMeshMap`; it never remembers the class a key had before the override, so nothing can be
+restored; and a missing base key is silently fine (the director asset is sparse by design). Section 3.4 adds
+these.
 
 ---
 
 ## 2. Runtime flow
 
 ```
-Pre-mission (later UI)      Mission start                              Unit spawn (any path)
-┌─────────────────┐   ┌───────────────────────────────────┐   ┌─────────────────────────────────────┐
-│ player picks     │   │ UPlayerProfileLoader::LoadProfile  │   │ BP sets owner + subtype             │
-│ variant per unit │──►│  1. ApplyResourceCards             │   │ C++ hook (section 5):               │
-│ → saved in       │   │  2. ApplyTechnologies              │   │   URTSComponent::ApplyUnitVariant() │
-│   profile        │   │  3. VariantManager->InitFromProfile│   │     owner != 1 → Base               │
-└─────────────────┘   │  4. LoadInUnits (starting units)   │   │     else manager->GetSelectedVariant│
-                      └───────────────────────────────────┘   │     store on RTSComponent           │
-                                                              │     Execute_BP_ApplyUnitVariant     │
-                                                              │   CheckForUpgrades() (techs)        │
-                                                              └─────────────────────────────────────┘
+Pre-mission (later UI)            Mission start (ACPPController::InitPlayerController)
+┌───────────────────────┐   ┌──────────────────────────────────────────────────────────────┐
+│ player picks a variant │   │ 1. ApplyEnemyDirectorUnitOverrides()  (existing)             │
+│ per unit type          │──►│ 2. InitPlayerStartLocation → LoadPlayerProfile →             │
+│ → FUnitVariantSelection│   │    UPlayerProfileLoader::LoadProfile:                        │
+│   saved in the profile │   │      ApplyResourceCards, ApplyTechnologies,                  │
+└───────────────────────┘   │      ApplyUnitVariantSelections  → manager clamps selection   │
+                            │        → ARTSAsyncSpawner::ApplyPlayerUnitVariants(...)       │
+                            │           replaces M_TrainingOptionMap / BuildingExpansionMap  │
+                            │           entries with the variant classes from the asset     │
+                            │      LoadInUnits (starting units now spawn as variants)       │
+                            └──────────────────────────────────────────────────────────────┘
+Any later spawn request through the spawner (trainer, mission, dropship, field defense, instant BXP batch)
+reads the overridden map and spawns the variant class. Nothing in the unit knows or cares.
 ```
-
-The unit's Blueprint implements one interface event, `BP_ApplyUnitVariant(EUnitVariant Variant)`, and switches
-on the enum. That is the only Blueprint work per unit.
 
 ---
 
-## 3. New types
+## 3. Types
 
-All new C++ lives in `RTS_Survival/Units/Variants/` unless stated otherwise. Follow `AGENTS.md` (early
-returns, `not`, `M_` prefix, validator functions, Doxygen on classes, braces on their own lines).
+Paths are under `RTS_Survival/`. Follow `AGENTS.md` (early returns, `not`, `M_` prefix, validator functions,
+Doxygen on classes, braces on their own lines).
 
-### 3.1 `EUnitVariant` — `Units/Variants/UnitVariantTypes.h`
+### 3.1 `EUnitVariant`, `FUnitVariantSelection` — `Units/Variants/UnitVariantTypes.h` (exists, one struct added)
 
-```cpp
-UENUM(BlueprintType)
-enum class EUnitVariant : uint8
-{
-	Base     UMETA(DisplayName = "Base"),
-	VariantA UMETA(DisplayName = "Variant A"),
-	VariantB UMETA(DisplayName = "Variant B"),
-};
-
-namespace UnitVariants
-{
-	// Base plus two alternatives; the enum, the data asset validation and the UI all rely on this cap.
-	constexpr int32 MaxVariantsPerUnit = 3;
-}
-
-static inline FString Global_GetUnitVariantAsString(const EUnitVariant Variant);  // define inline in the header, like Global_GetCardTypeAsString
-```
-
-The enum is shared by every unit on purpose: a Blueprint `Switch on EUnitVariant` node gives the designer
-exactly three pins, and the cap is enforced by the type. The *meaning* of VariantA for a Panzer IV and for a
-PaK 40 is unrelated; the display name per unit comes from the data asset (3.3).
-
-### 3.2 `FUnitVariantSelection` — same header
-
-The saved choice for one unit type.
+`EUnitVariant { Base, VariantA, VariantB }`, `UnitVariants::MaxVariantsPerUnit = 3`,
+`Global_GetUnitVariantAsString`, and `FUnitVariantSelection { FTrainingOption Unit; EUnitVariant Variant; }`.
+Keep as committed. Add the struct the training menu passes to its widgets (3.8); it lives here so
+`TrainingWidgetState.h` can include it without pulling in the data asset:
 
 ```cpp
+/** What the training UI shows instead of the base unit's table entries while a variant is selected. */
 USTRUCT(BlueprintType)
-struct FUnitVariantSelection
+struct FUnitVariantTrainingPresentation
 {
 	GENERATED_BODY()
 
-	// Which unit this choice is for. Only Tank, Squad and BuildingExpansion unit types are valid keys.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
-	FTrainingOption Unit;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	// The selected variant; Base when the player kept the base unit, and then every override below is off.
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
 	EUnitVariant Variant = EUnitVariant::Base;
-};
-```
 
-`FTrainingOption` (`GameUI/TrainingUI/TrainingOptions/TrainingOptions.h`) is `EAllUnitType` + `uint8`
-subtype and already hashes, so the runtime map is `TMap<FTrainingOption, EUnitVariant>`. Building expansions
-use `EAllUnitType::UNType_BuildingExpansion` 
-with `static_cast<uint8>(EBuildingExpansionType)` as the subtype, which is also what `URTSComponent` stores
-for them.
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
+	bool bOverrideIcon = false;
 
-### 3.3 `UUnitVariantDataAsset` — `Units/Variants/UnitVariantDataAsset.h/.cpp`
-
-The designer-edited list of which variants exist per German unit. Keyed by the typed subtype enums so the
-asset is readable in the editor; converted to `FTrainingOption` at runtime.
-
-```cpp
-/** One selectable variant as the later UI will show it. */
-USTRUCT(BlueprintType)
-struct FUnitVariantDefinition
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	FText DisplayName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (MultiLine = "true"))
-	FText Description;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
 	TSoftObjectPtr<UTexture2D> Icon;
-};
 
-/** The variants one unit type has. Index 0 is always the base unit; the array length is the implemented count. */
-USTRUCT(BlueprintType)
-struct FUnitVariantEntry
-{
-	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
+	bool bOverrideTitle = false;
 
-	// Element 0 describes the base unit, 1 is VariantA, 2 is VariantB. Length 1 means "no choice to offer".
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (TitleProperty = "DisplayName"))
-	TArray<FUnitVariantDefinition> Variants;
-};
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
+	FText Title;
 
-/**
- * @brief Make one asset of this class and pick it in Project Settings > Unit Variants. It lists, per German unit
- * subtype, which variants are implemented in that unit's Blueprint; the variant UI only offers a choice for
- * entries with more than one variant and the runtime clamps saved choices to what is listed here.
- */
-UCLASS(BlueprintType)
-class RTS_SURVIVAL_API UUnitVariantDataAsset : public UDataAsset
-{
-	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
+	bool bOverrideDescription = false;
 
-public:
-	/** @return 1 when the unit has no entry (base only), otherwise the entry's array length clamped to 1..3. */
-	int32 GetImplementedVariantCount(const FTrainingOption& Unit) const;
-
-	/** @return True when Variant's index is below the implemented count of Unit. Base is always implemented. */
-	bool GetIsVariantImplemented(const FTrainingOption& Unit, const EUnitVariant Variant) const;
-
-	/** @return Null when the unit has no entry or the variant is not implemented. */
-	const FUnitVariantDefinition* FindVariantDefinition(const FTrainingOption& Unit, const EUnitVariant Variant) const;
-
-	/** @return Every unit with more than one implemented variant, for the later UI. */
-	TArray<FTrainingOption> GetUnitsWithChoice() const;
-
-#if WITH_EDITOR
-	virtual EDataValidationResult IsDataValid(FDataValidationContext& Context) const override;
-#endif
-
-private:
-	const FUnitVariantEntry* FindEntry(const FTrainingOption& Unit) const;
-
-	UPROPERTY(EditAnywhere, Category = "Unit Variants|Tanks", meta = (AllowPrivateAccess = "true"))
-	TMap<ETankSubtype, FUnitVariantEntry> M_TankVariants;
-
-	UPROPERTY(EditAnywhere, Category = "Unit Variants|Squads", meta = (AllowPrivateAccess = "true"))
-	TMap<ESquadSubtype, FUnitVariantEntry> M_SquadVariants;
-
-	UPROPERTY(EditAnywhere, Category = "Unit Variants|Building Expansions", meta = (AllowPrivateAccess = "true"))
-	TMap<EBuildingExpansionType, FUnitVariantEntry> M_BuildingExpansionVariants;
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
+	FText Description;
 };
 ```
 
-The shipped header adds the private editor-only helpers `ValidateEntry` / `GetIsRussianKey` and a test
-`friend`; see section 12.
+Keys for the three supported kinds:
 
-Rules the implementation must follow:
+| Kind | `FTrainingOption` key |
+|---|---|
+| Tank | `(UNType_Tank, static_cast<uint8>(ETankSubtype))`. The spawner's setup arrays key **every** tank subtype under `UNType_Tank` (`AddTrainingOptionsForTankArray`), and the field defense test spawns the harvester as `(UNType_Tank, Tank_PzI_Harvester)` (`FieldDefenseTestSubsystem.cpp:98`). The training menu, however, lists the harvester under `UNType_Harvester` (`TrainingMenuManager.cpp` ~506); where that is translated before the spawn request was not traced. The manager therefore normalises `UNType_Harvester` to `UNType_Tank` when storing a selection (3.5), and the implementer confirms once in the map test that a harvester variant resolves (a wrong key shows up as the spawner's "not found in the map" error). |
+| Squad / team weapon crew | `(UNType_Squad, static_cast<uint8>(ESquadSubtype))` |
+| Building expansion | `(UNType_BuildingExpansion, static_cast<uint8>(EBuildingExpansionType))`. The spawner translates this to a `BuildingExpansionMap` key. |
 
-- A subtype with **no entry** has exactly one variant (Base). Designers only add entries for units that have
-  a real alternative, so the asset stays short.
-- `FindEntry` switches on `Unit.UnitType`: Tank → `M_TankVariants`, Squad → `M_SquadVariants`,
-  BuildingExpansion → `M_BuildingExpansionVariants`, anything else → null. Cast `Unit.SubtypeValue` to the
-  typed enum before the `Find`.
-- `GetImplementedVariantCount` clamps to `[1, UnitVariants::MaxVariantsPerUnit]`. An entry with an empty
-  array still counts as 1.
-- `IsDataValid` reports an error (not a warning) for: an entry with 0 or more than 3 elements; a non-base
-  element (index ≥ 1) with an empty `DisplayName`; a key that is the `_None` / `BXT_Invalid` enumerator; a
-  Russian subtype as key (enumerator name contains `Rus`, *or* display name starts with `Rus`: Russian tanks
-  such as `Tank_T34_85` only carry it in the display name "Rus Medium T-34/85"). Follow
-  `UTrainingLayoutDataAsset::IsDataValid` for the style.
-- Nothing in the asset is loaded at runtime except through the settings class below.
+### 3.2 `UUnitVariantDataAsset` — `Units/Variants/UnitVariantDataAsset.h/.cpp` (exists, extended)
 
-### 3.4 `UUnitVariantSettings` — `Units/Variants/UnitVariantSettings.h/.cpp`
-
-Copy of `UTrainingLayoutSettings`.
+Keep the committed shape (three typed maps `M_TankVariants`, `M_SquadVariants`, `M_BuildingExpansionVariants`
+of `FUnitVariantEntry { TArray<FUnitVariantDefinition> Variants; }`, index 0 = Base, `FindEntry`,
+`GetImplementedVariantCount`, `GetIsVariantImplemented`, `FindVariantDefinition`, `GetUnitsWithChoice`,
+`IsDataValid` with the shared `ValidateEntry` / `GetIsRussianKey`). Add to `FUnitVariantDefinition`:
 
 ```cpp
-UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Unit Variants"))
-class RTS_SURVIVAL_API UUnitVariantSettings : public UDeveloperSettings
-{
-	GENERATED_BODY()
+	// The Blueprint child class spawned for this variant. Must stay null on element 0 (Base): the base class is the
+	// one the spawner's own setup holds, so the asset never duplicates it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftClassPtr<AActor> UnitClass;
 
-public:
-	static const UUnitVariantSettings* Get() { return GetDefault<UUnitVariantSettings>(); }
+	// Building expansions only: the placement preview mesh of this variant. Null keeps the base preview mesh.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TSoftObjectPtr<UStaticMesh> BxpPreviewMesh;
 
-	/** @return The picked asset, or the class defaults when none is picked, so every unit resolves to Base. */
-	const UUnitVariantDataAsset* LoadVariantDataAsset() const;
+	// Training UI (3.8). Each override is opt-in; off shows the base unit's DT_TrainingOptions / DT_Training entry.
+	// DisplayName / Description / Icon above are for the later variant selection UI and are not used here, so the
+	// selection UI can say "Long 75 mm gun" while the training menu says "Pz IV H (L/48)".
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI")
+	bool bOverrideTrainingIcon = false;
 
-	UPROPERTY(Config, EditAnywhere, Category = "Unit Variants")
-	TSoftObjectPtr<UUnitVariantDataAsset> VariantDataAsset;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI", meta = (EditCondition = "bOverrideTrainingIcon"))
+	TSoftObjectPtr<UTexture2D> TrainingIcon;
 
-	// Development aid until the selection UI exists: applied over the saved selection when the manager initialises.
-	// Ignored in Shipping builds. Clear it before committing.
-	UPROPERTY(Config, EditAnywhere, Category = "Unit Variants|Debug", meta = (TitleProperty = "Unit"))
-	TArray<FUnitVariantSelection> DebugForcedVariants;
-};
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI")
+	bool bOverrideTrainingTitle = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI", meta = (EditCondition = "bOverrideTrainingTitle"))
+	FText TrainingTitle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI")
+	bool bOverrideTrainingDescription = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI",
+		meta = (EditCondition = "bOverrideTrainingDescription", MultiLine = "true"))
+	FText TrainingDescription;
 ```
 
-### 3.5 `IUnitVariantReceiver` — `Interfaces/UnitVariantReceiver.h`
+New accessors:
 
 ```cpp
-UINTERFACE(BlueprintType)
-class UUnitVariantReceiver : public UInterface
-{
-	GENERATED_BODY()
-};
+	/** @return The class of a non-base variant, or a null soft pointer for Base, a missing entry or a missing class. */
+	TSoftClassPtr<AActor> FindVariantClass(const FTrainingOption& Unit, const EUnitVariant Variant) const;
 
-/**
- * @brief Implemented in C++ by every unit base class that supports variants; the unit's Blueprint implements
- * the event and switches on the variant to apply its modifications. Fired once, after the subtype is known.
- */
-class RTS_SURVIVAL_API IUnitVariantReceiver
-{
-	GENERATED_BODY()
+	/** @return The preview mesh of a building expansion variant, null when the variant keeps the base preview. */
+	TSoftObjectPtr<UStaticMesh> FindBxpVariantPreviewMesh(const EBuildingExpansionType BxpType, const EUnitVariant Variant) const;
 
-public:
 	/**
-	 * @brief Apply the modifications of this variant. Base is also delivered so a Blueprint can run shared setup.
-	 * @param Variant The variant the player selected for this unit type; Base for non-player units.
+	 * @brief What the training menu shows for this unit while Variant is selected (3.8).
+	 * @return All overrides off for Base, a missing entry or an unimplemented variant.
 	 */
-	UFUNCTION(BlueprintImplementableEvent, Category = "Unit Variant")
-	void BP_ApplyUnitVariant(EUnitVariant Variant);
-};
+	FUnitVariantTrainingPresentation GetTrainingPresentation(const FTrainingOption& Unit, const EUnitVariant Variant) const;
 ```
 
-Because the C++ classes inherit `IUnitVariantReceiver`, their Blueprint children see
-`Event BP_ApplyUnitVariant` under *Interfaces* in the graph. C++ fires it with
-`IUnitVariantReceiver::Execute_BP_ApplyUnitVariant(OwnerActor, Variant)`, never by calling the function
-directly. The interface deliberately has no getter; the variant is read from `URTSComponent` (3.7).
+`GetTrainingPresentation` copies each override only when its bool is on (and, for the icon, the soft pointer is
+not null); `Variant` in the result is always the requested variant so a Blueprint can show a variant badge even
+when no override is on.
 
-### 3.6 `UPlayerUnitVariantManager` — `Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h/.cpp`
+`IsDataValid` additions (editor only, so `LoadSynchronous` is fine there), all reported as errors:
+
+- Element 0 has a non-null `UnitClass`.
+- Element 1 or 2 has a null `UnitClass` (an entry without a class is not implemented; shorten the array instead).
+- A class whose native parent is wrong for its map: tank map classes must `IsChildOf(ATankMaster::StaticClass())`,
+  squad map classes `ASquadController`, building expansion map classes `ABuildingExpansion`.
+- The same class used by two definitions anywhere in the asset.
+- `BxpPreviewMesh` set on a tank or squad definition (warning, it is ignored there).
+- Any `bOverrideTraining*` on element 0 (Base always shows the base unit's table entries).
+- `bOverrideTrainingIcon` on with a null `TrainingIcon`, `bOverrideTrainingTitle` on with an empty
+  `TrainingTitle`, `bOverrideTrainingDescription` on with an empty `TrainingDescription`.
+
+`GetImplementedVariantCount` stays "array length clamped to 1..3": an entry with elements that fail validation
+is a data error, not a runtime case.
+
+### 3.3 `UUnitVariantSettings` — `Units/Variants/UnitVariantSettings.h/.cpp` (exists, unchanged)
+
+`VariantDataAsset` (`TSoftObjectPtr<UUnitVariantDataAsset>`, falls back to class defaults) and
+`DebugForcedVariants` (`TArray<FUnitVariantSelection>`, ignored in Shipping). Keep, but its semantics change:
+the committed version bypasses the asset clamp "so unlisted Blueprint variants can be tested". Under class
+swap an unlisted variant has no class to swap to, so bypassing only produces a "no class" error every mission
+start. Forced entries are now clamped exactly like saved ones; rewrite the header comment accordingly.
+
+### 3.4 `ARTSAsyncSpawner` additions — `Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h` and a new `RTSAsyncSpawner_UnitVariants.cpp`
+
+Mirror the director override file. Public:
 
 ```cpp
-/**
- * @brief Owned by the player controller; holds the variant the player selected per unit type for this mission and
- * answers units that pull their variant when they begin play. Initialised from the profile before starting units spawn.
- */
-UCLASS()
-class RTS_SURVIVAL_API UPlayerUnitVariantManager : public UActorComponent
-{
-	GENERATED_BODY()
-
-public:
 	/**
-	 * @brief Replaces the selection with the saved one, drops entries for unsupported unit types and clamps every
-	 * variant the data asset does not implement to Base, reporting each clamp once.
-	 * @param SavedSelections The selections stored in the player profile.
+	 * @brief Replaces the spawn class of every selected unit type with its variant class from the variant data asset.
+	 * Runs after the director overrides so a variant wins on a shared key; the collision is reported.
+	 * @param Selections Clamped selections (Base entries are skipped).
 	 */
-	void InitFromProfile(const TArray<FUnitVariantSelection>& SavedSelections);
-
-	/** @return The selected variant for the unit type, Base when nothing was selected or the asset is missing. */
-	EUnitVariant GetSelectedVariant(const FTrainingOption& Unit) const;
+	void ApplyPlayerUnitVariants(const TArray<FUnitVariantSelection>& Selections);
 
 	/**
-	 * @brief The one entry point units use. Returns Base for every owner except the player and for unit types
-	 * without variant support, so callers need no owner check of their own.
-	 * @param RTSComponent The unit's RTS component with owner, unit type and subtype already set.
+	 * @brief Changes one unit type at runtime (cheat manager, future UI). Base restores the class the mapping held
+	 * before the first variant override, so a mission can go back and forth.
+	 * @return False when the unit type has no base mapping or the variant has no class in the asset.
 	 */
-	EUnitVariant ResolveVariantForUnit(const URTSComponent* RTSComponent) const;
+	bool SetPlayerUnitVariant(const FTrainingOption& Unit, const EUnitVariant Variant);
 
-	/**
-	 * @brief Changes one selection at runtime (cheat manager, future UI). Clamps like InitFromProfile.
-	 * @return False when the unit type is unsupported or the variant is not implemented.
-	 */
-	bool SetSelectedVariant(const FTrainingOption& Unit, const EUnitVariant Variant);
+	/** @return The class currently mapped for the training option (after overrides), or a null soft pointer. */
+	TSoftClassPtr<AActor> GetTrainingOptionClass(const FTrainingOption& TrainingOption) const;
+```
 
-	TArray<FUnitVariantSelection> GetSelectionsForSave() const;
+Private:
 
-	const UUnitVariantDataAsset* GetVariantDataAsset() const;
+```cpp
+	bool ApplyTrainingOptionVariant(const FTrainingOption& Unit, const EUnitVariant Variant);
+	bool ApplyBuildingExpansionVariant(const EBuildingExpansionType BxpType, const EUnitVariant Variant);
 
-	static bool GetIsUnitTypeSupported(const EAllUnitType UnitType);
-
-protected:
-	virtual void BeginPlay() override;
-
-private:
-	void BeginPlay_LoadVariantDataAsset();
-	void ApplyDebugForcedVariants();
-	bool GetIsValidVariantDataAsset() const;
-
-	// Same declaration shape as UTrainingLayoutSubsystem::M_TrainingLayout.
+	// The class (and BXP preview mesh) each key held before its first variant override; restored for Base.
+	TMap<FTrainingOption, TSoftClassPtr<AActor>> M_PreVariantTrainingOptionClasses;
+	TMap<EBuildingExpansionType, TSoftClassPtr<ABuildingExpansion>> M_PreVariantBuildingExpansionClasses;
 	UPROPERTY()
-	TObjectPtr<const UUnitVariantDataAsset> M_VariantDataAsset;
+	TMap<EBuildingExpansionType, TObjectPtr<UStaticMesh>> M_PreVariantBxpPreviewMeshes;
 
-	// Only units with a non-Base choice are stored; a missing key means Base.
-	TMap<FTrainingOption, EUnitVariant> M_SelectedVariants;
-};
+	// Keys the director overrides replaced; a variant on one of these is applied but reported as a collision.
+	TSet<FTrainingOption> M_DirectorOverriddenOptions;
 ```
 
-The shipped header adds a constructor, the private `StoreSelectionClamped` and `CacheVariantDataAsset`, and a
-test `friend`; see section 12.
+Rules:
 
-Behaviour details:
+- `ApplyPlayerUnitVariants` loops the selections, skips `Variant == Base`, and dispatches on `Unit.UnitType`:
+  `UNType_Tank` / `UNType_Squad` → `ApplyTrainingOptionVariant`, `UNType_BuildingExpansion` →
+  `ApplyBuildingExpansionVariant` with `static_cast<EBuildingExpansionType>(Unit.SubtypeValue)`, anything else →
+  `ReportError` and continue. It is not guarded by a once-flag: the cheat path calls `SetPlayerUnitVariant`,
+  which uses the same two functions, so repeated application must be safe (it is, because the pre-variant
+  maps are only written when the key is absent from them).
+- `ApplyTrainingOptionVariant`:
+  1. `TSoftClassPtr<AActor>* Existing = M_TrainingOptionMap.Find(Unit)`. Null → `ReportError` "no base
+     mapping for <GetTrainingName>" and return false. **Do not** reuse `ApplyTrainingOptionOverride`; it
+     returns silently on a missing key and its error strings say "Enemy director".
+  2. If `not M_PreVariantTrainingOptionClasses.Contains(Unit)`, add `*Existing` under that key. Never
+     overwrite a present entry.
+  3. `Variant == Base` → `*Existing = M_PreVariantTrainingOptionClasses.FindChecked(Unit)` (the key was added
+     in step 2), return true.
+  4. Otherwise `Class = Asset->FindVariantClass(Unit, Variant)`; null → `ReportError`, return false.
+  5. If `M_DirectorOverriddenOptions.Contains(Unit)` → `ReportError` "variant <X> replaces a director override
+     for <unit>" and continue anyway.
+  6. `*Existing = Class`, return true.
+  The pointer from `Find` is used in the same function and `M_TrainingOptionMap` is not mutated in between
+  (rule 22 of `AGENTS.md`); the pre-variant map is a different container.
+- `ApplyBuildingExpansionVariant`: same steps against `BuildingExpansionMap` with
+  `TSoftClassPtr<ABuildingExpansion>` (build it from the asset's `TSoftClassPtr<AActor>` through
+  `ToSoftObjectPath()`), plus the preview mesh: remember the `BxpPreviewMeshMap` value in
+  `M_PreVariantBxpPreviewMeshes` the same way, then if `FindBxpVariantPreviewMesh` is non-null,
+  `LoadSynchronous()` it and write it into `BxpPreviewMeshMap` (the map holds hard pointers and
+  `SyncGetBuildingExpansionPreviewMesh` reads it synchronously at placement time); Base restores the remembered
+  mesh.
+- `ApplyTrainingOptionOverride` (director path) gets one extra line: `M_DirectorOverriddenOptions.Add(TrainingOption)`
+  after a successful replacement.
+- The variant data asset is read through `UUnitVariantSettings::Get()->LoadVariantDataAsset()` at the top of
+  `ApplyPlayerUnitVariants` / `SetPlayerUnitVariant`; store nothing on the spawner.
+- No runtime class-hierarchy check. The asset's `IsDataValid` is the gate (3.2).
 
-- `BeginPlay` loads the asset via `UUnitVariantSettings::Get()->LoadVariantDataAsset()` and stores it. The
-  asset is `const` and owned by the asset registry; the `UPROPERTY` keeps it alive. `InitFromProfile` and
-  `SetSelectedVariant` cache it too (`CacheVariantDataAsset`) and the const `GetVariantDataAsset()` loads it
-  without caching when the pointer is still null, so `InitFromProfile`, the cheats and `ResolveVariantForUnit`
-  work whatever order they run in relative to the component's `BeginPlay`.
-- `InitFromProfile` is called from `UPlayerProfileLoader::LoadProfile` right after `ApplyTechnologies` and
-  before the `bDoNotLoadPlayerUnits` early return that precedes `LoadInUnits`, through the private
-  `UPlayerProfileLoader::ApplyUnitVariantSelections`. It clears the map, inserts valid entries, then calls
-  `ApplyDebugForcedVariants()` (guarded by `#if !UE_BUILD_SHIPPING`).
-- Clamping: for every selection, if `not M_VariantDataAsset->GetIsVariantImplemented(Unit, Variant)` then
-  `RTSFunctionLibrary::ReportError` with the unit's `GetTrainingName()` and the variant string, and store
-  nothing (Base). Do this once per selection, in `InitFromProfile`/`SetSelectedVariant` (both go through the
-  private `StoreSelectionClamped`), never in `GetSelectedVariant`, which is called per spawned unit. Selecting
-  `Base` removes the key.
-- `ApplyDebugForcedVariants` does **not** clamp: it only checks `GetIsUnitTypeSupported`, so a Blueprint variant
-  that has no asset entry yet can be tested (section 7 step 3).
-- `ResolveVariantForUnit`: `not IsValid(RTSComponent)` → Base; owner `!= UPlayerTechManager::PlayerTechOwnerIndex`
-  → Base; `not GetIsUnitTypeSupported(UnitType)` → Base; otherwise
-  `GetSelectedVariant(FTrainingOption(UnitType, RTSComponent->GetUnitSubType()))`.
-- `GetIsUnitTypeSupported`: `UNType_Tank`, `UNType_Squad`, `UNType_BuildingExpansion` → true. `UNType_Harvester`
-  (the Pz I harvester is an `ATankMaster` with this unit type), `UNType_Nomadic`, `UNType_Aircraft`,
-  `UNType_StandaloneTurret`, `UNType_GarrisonBuilding` → false.
+### 3.5 `UPlayerUnitVariantManager` — `Player/PlayerUnitVariantManager/` (exists, repurposed)
 
-Wiring on `ACPPController` (mirror `M_PlayerTechManager` exactly):
+It stays the **selection store** on `ACPPController` (created in the constructor next to the tech manager,
+`GetPlayerUnitVariantManager()`, `FRTS_Statics::GetPlayerUnitVariantManager`). Keep: `InitFromProfile` (clamps
+through `StoreSelectionClamped`, applies `DebugForcedVariants`), `GetSelectedVariant`, `SetSelectedVariant`,
+`GetSelectionsForSave`, `GetVariantDataAsset`, `GetIsUnitTypeSupported` (Tank, Squad, BuildingExpansion), the
+test friend access.
 
-- `UPROPERTY() UPlayerUnitVariantManager* M_PlayerUnitVariantManager;` created in the constructor with
-  `CreateDefaultSubobject<UPlayerUnitVariantManager>(TEXT("PlayerUnitVariantManager"))`.
-- `inline UPlayerUnitVariantManager* GetPlayerUnitVariantManager() const`.
-- `bool GetIsValidPlayerUnitVariantManager()` validator using `ReportErrorVariableNotInitialised`.
-- `FRTS_Statics::GetPlayerUnitVariantManager(const UObject* WorldContextObject)` next to
-  `GetPlayerTechManager`, same null-returning shape.
+Change: `StoreSelectionClamped` normalises `UNType_Harvester` to `UNType_Tank` before anything else (the
+spawner has no harvester keys, see 3.1), and `ApplyDebugForcedVariants` goes through the same clamp as saved
+selections (3.3).
 
-### 3.7 Changes to `URTSComponent`
+Remove: `ResolveVariantForUnit` and every mention of owners. Units no longer ask the manager anything.
 
-Add to `RTSComponents/RTSComponent.h/.cpp`:
+Add:
 
 ```cpp
-DECLARE_MULTICAST_DELEGATE_OneParam(FOnUnitVariantApplied, EUnitVariant);
-
-public:
-	// Fired once when the variant is resolved; components (e.g. UI, portraits) that care can bind here.
-	FOnUnitVariantApplied OnUnitVariantApplied;
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Unit Variant")
-	EUnitVariant GetUnitVariant() const { return M_UnitVariant; }
-
-	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Unit Variant")
-	bool GetHasAppliedUnitVariant() const { return bM_HasAppliedUnitVariant; }
-
 	/**
-	 * @brief Resolves the player's selection for this unit, stores it and fires BP_ApplyUnitVariant on the owner.
-	 * Call once, after owner and subtype are set and before techs are applied. Later calls are ignored.
+	 * @brief Pushes the stored selection into the spawner's class maps and remembers the spawner so later
+	 * SetSelectedVariant calls (cheats, future UI) reach it too.
+	 * @param AsyncSpawner The mission's spawner; must already hold its base mappings and the director overrides.
 	 */
-	void ApplyUnitVariant();
-
-	/**
-	 * @brief Used by squad units, which copy the variant of their squad controller instead of resolving one.
-	 * @param Variant The variant resolved by the squad controller.
-	 */
-	void ApplyUnitVariantFromParent(const EUnitVariant Variant);
+	void ApplySelectionsToSpawner(ARTSAsyncSpawner* AsyncSpawner);
 
 private:
-	void ApplyUnitVariant_Internal(const EUnitVariant Variant);
+	bool GetIsValidAsyncSpawner() const;
 
-	EUnitVariant M_UnitVariant = EUnitVariant::Base;
-	bool bM_HasAppliedUnitVariant = false;
+	UPROPERTY()
+	TWeakObjectPtr<ARTSAsyncSpawner> M_AsyncSpawner;
 ```
 
-`ApplyUnitVariant()`:
+`SetSelectedVariant` keeps its clamp, then, when `M_AsyncSpawner` is valid, calls
+`M_AsyncSpawner->SetPlayerUnitVariant(Unit, Variant)` (also for `Base`, which restores). `ApplySelectionsToSpawner`
+builds the array from `M_SelectedVariants` and calls `ApplyPlayerUnitVariants`.
 
-1. If `bM_HasAppliedUnitVariant` → return (idempotent; the hooks below are reached once but this guards
-   against future callers).
-2. `UPlayerUnitVariantManager* Manager = FRTS_Statics::GetPlayerUnitVariantManager(this)`. If null (enemy-only
-   test maps, editor utility worlds) → `ApplyUnitVariant_Internal(EUnitVariant::Base)` and return. Do **not**
-   report an error; units legitimately exist in worlds without a player controller.
-3. `ApplyUnitVariant_Internal(Manager->ResolveVariantForUnit(this))`.
+Also add `GetTrainingPresentation(const FTrainingOption& Unit) const` for the training menu (3.8).
 
-`ApplyUnitVariantFromParent(Variant)` has the same `bM_HasAppliedUnitVariant` guard, so a soldier fires the event
-once even if it is later handed to another squad controller.
+### 3.6 `UPlayerProfileLoader::ApplyUnitVariantSelections` (exists, extended)
 
-`ApplyUnitVariant_Internal(Variant)`: store, set the flag, then if the owner actor
-`Implements<UUnitVariantReceiver>()` call `IUnitVariantReceiver::Execute_BP_ApplyUnitVariant(Owner, Variant)`;
-finally `OnUnitVariantApplied.Broadcast(Variant)`. Fire the event for `Base` too; a Blueprint that does
-nothing for Base simply leaves that pin unconnected.
+Already called in `LoadProfile` after `ApplyTechnologies` and before the `bDoNotLoadPlayerUnits` early return
+(`PlayerProfileLoader.cpp` ~58). Its body calls `InitFromProfile`; add
+`PlayerUnitVariantManager->ApplySelectionsToSpawner(AsyncSpawner)` right after it (pass the spawner through from
+`LoadProfile`, which already has it as a parameter). Keep the call before the early return: a map without
+starting units still trains units later and needs the overrides.
 
-Owner changes: `ChangeOwningPlayer` / `SetOwningPlayerRuntime` do not re-resolve. A captured enemy unit keeps
-its Base variant and a player unit given to a mission keeps its variant. Document this in the function comment.
+### 3.7 `URTSComponent` (exists, simplified)
 
----
-
-## 4. Save data
-
-Add `TArray<FUnitVariantSelection>` with `SaveGame` to both places cards are saved. Default empty means "all
-Base", so old saves keep working with no migration.
-
-| Struct / class | Field | Plumbing |
-|---|---|---|
-| `USavePlayerProfile` (`CardSystem/PlayerProfile/SavePlayerProfile/USavePlayerProfile.h`) | `UPROPERTY(SaveGame) TArray<FUnitVariantSelection> M_UnitVariantSelections;` | Add a defaulted trailing parameter to `Initialize` and to `FRTS_Profile::SaveNewPlayerProfile`; `FRTS_Profile::ProfileValidator` removes duplicates per `Unit` (last one wins) and entries whose `UnitType` is unsupported. `FRTS_Profile::GetTestProfile` leaves it empty. `DebugPrintProfile` prints each entry as `TrainingName -> VariantString`. |
-| `FPlayerCardSaveData` (`WorldCampaign/PlayerProfile/PlayerCardData/PlayerCardData.h`) | `UPROPERTY(EditAnywhere, BlueprintReadOnly, SaveGame, meta=(TitleProperty="Unit")) TArray<FUnitVariantSelection> UnitVariantSelections;` | Add a defaulted trailing parameter to `FRTS_Profile::BuildPlayerCardSaveData`. `W_CardMenu` passes an empty array until the UI exists. |
-
-The in-game loader (`UPlayerProfileLoader::LoadProfile`) reads `USavePlayerProfile` today; it passes
-`PlayerProfile->M_UnitVariantSelections` to `InitFromProfile`. How the world-campaign `FPlayerCardSaveData`
-reaches `USavePlayerProfile` is the card system's existing concern and is not changed here; the later UI
-writes to whichever of the two it edits, and both carry the field.
-
----
-
-## 5. Hook points per unit kind
-
-Every hook is the line **immediately before** the existing `CheckForUpgrades()` call, so the variant is in
-place before techs are applied. Each class gets a small private helper named `ApplyUnitVariant()` that
-validates the RTS component and forwards to `URTSComponent::ApplyUnitVariant()`; `CheckForUpgrades()` is the
-template for that helper.
-
-### 5.1 Tanks — `ATankMaster`
-
-`Units/Tanks/TankMaster.h/.cpp`. Add `public IUnitVariantReceiver` to the class declaration.
-
-In `ATankMaster::BeginPlay()` (currently ~line 495):
+Replace the runtime-applied state with a class default the variant Blueprint sets:
 
 ```cpp
-	M_TankStartGameAction.OnBeginPlay();
-	if (GetIsValidRTSComponent() && RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank)
-	{
-		ApplyUnitVariant();   // new
-		CheckForUpgrades();
-	}
+protected:
+	// Set in the class defaults of a variant child Blueprint; the base Blueprint leaves it on Base. Read by UI and
+	// portraits; nothing in gameplay branches on it.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "RTSComponent")
+	EUnitVariant UnitVariant = EUnitVariant::Base;
+
+public:
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Unit Variant")
+	EUnitVariant GetUnitVariant() const { return UnitVariant; }
 ```
 
-By the time this runs, the Blueprint's BeginPlay (which calls `SetUnitSubtype`) has already executed inside
-`Super::BeginPlay()`; the comment "Wait for bp begin play to set the subtype" above `BeginPlay_SetupData()`
-documents that. The `UNType_Tank` check already excludes nomadic trucks, which keeps `ANomadicVehicle`
-(derived from `ATrackedTankMaster`) on Base without touching it.
+Remove `M_UnitVariant`, `bM_HasAppliedUnitVariant`, `GetHasAppliedUnitVariant`, `OnUnitVariantApplied`,
+`FOnUnitVariantApplied`, `ApplyUnitVariant`, `ApplyUnitVariantFromParent`, `ApplyUnitVariant_Internal`.
 
-### 5.2 Squads — `ASquadController` and `ASquadUnit`
+### 3.8 Training UI: variant icon, title and description (new)
 
-`Units/SquadController.h/.cpp`. Add `public IUnitVariantReceiver`. `ATeamWeaponController` inherits it; PaK,
-Flak, mortar and MG crews are squads with `ESquadSubtype` keys (`Squad_Ger_PaK38`, …) and need nothing extra.
+Goal: while the player has a variant selected for a unit, its training menu slot, its hover description and its
+requirement panel can show the variant's icon, title and description. Each is opt-in on the variant definition
+(3.2: `bOverrideTrainingIcon`, `bOverrideTrainingTitle`, `bOverrideTrainingDescription`). Cost, training time and
+requirements are **not** overridable; they stay the shared ones ("One subtype per unit").
 
-In `ASquadController::InitSquadData()` (~line 3714), after `InitSquadData_InitExperienceComponent()` and
-`InitSquadData_SetupSquadHealthAggregation()` and **before** `SquadDataCallbacks.SetDataLoaded(true)`:
+How the training UI gets its data today (traced):
 
-```cpp
-	DamageSquadGameStart.ApplyStartDamageToSquad(M_TSquadUnits);
-	ApplyUnitVariant();                 // new: before SetDataLoaded so units' callbacks see the variant
-	SquadDataCallbacks.SetDataLoaded(true);
-	SquadDataCallbacks.OnSquadDataReady.Broadcast();
-	M_SquadLoadingStatus.bM_HasInitializedData = true;
-	CheckForUpgrades();
-```
+- `UTrainingMenuManager::CreateWidgetStateForOption` (`TrainingMenuManager.cpp` ~3020) builds one
+  `FTrainingWidgetState` per shown slot, called from `UpdateWidgetsWithShownSubSection` (~3016) on every
+  refresh. It is the **only** place a `FTrainingWidgetState` is built from a training option.
+- That state reaches the three Blueprint events that draw a training option:
+  `UW_TrainingItem::OnUpdateTrainingItem` (the slot), `UW_TrainingDescription::OnShowTrainingDescription` (the
+  hover panel, via `OnTrainingItemHovered` → `UMainGameUI::SetBottomUIPanel`) and
+  `UW_TrainingRequirement::OnUpdateRequirement`.
+- `FTrainingWidgetState` (`GameUI/TrainingUI/TrainingUIWidget/TrainingItemState/TrainingWidgetState.h`) carries
+  no icon or text: the Blueprints look them up by `ItemID` (`DT_TrainingOptions` for the icon, keyed by
+  `GetTrainingOptionName`; the title and description lookup inside `W_TrainingItem` / `W_TrainingDescription`
+  was not traced, it is in their graphs). The cost panel (`UW_TrainingDescription::CostDisplay`) is filled from
+  C++ by `ItemID` and stays as is.
 
-`InitSquadData` runs once all initial squad units are loaded and the subtype is set (either from
-`OnAllSquadUnitsLoaded` or from `OnSquadSubtypeSet`, whichever is last), so at this point the controller's
-Blueprint event can safely touch `M_TSquadUnits` (change weapons, swap meshes, adjust squad size).
+C++ changes:
 
-The re-crew path reaches the same place: `TryRemanAbandonedTeamWeapon_SpawnReplacementController` spawns the
-replacement controller with `SetShouldSkipInitialSquadUnitLoad(true)` (so its BeginPlay loads nothing), the
-configure step copies the subtype onto its RTS component, then `SquadController.cpp` ~1231 sets
-`bM_HasFinishedLoading = true` and calls `OnAllSquadUnitsLoaded()` → `InitSquadData()`. No second hook is
-needed there.
+1. `FTrainingWidgetState` gets one field, filled for every slot:
+   ```cpp
+   	// Variant overrides for this slot; all off when the player keeps the base unit.
+   	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
+   	FUnitVariantTrainingPresentation VariantPresentation;
+   ```
+2. `UPlayerUnitVariantManager` gets
+   `FUnitVariantTrainingPresentation GetTrainingPresentation(const FTrainingOption& Unit) const`: normalise
+   `UNType_Harvester` to `UNType_Tank` (the training menu lists the harvester as `UNType_Harvester`, the
+   selection is stored as a tank, see 3.1), then `GetVariantDataAsset()->GetTrainingPresentation(Unit,
+   GetSelectedVariant(Unit))`. It reports nothing; it runs on every menu refresh.
+3. `CreateWidgetStateForOption` sets `WidgetState.VariantPresentation` through a private helper of
+   `UTrainingMenuManager` that gets the manager with `FRTS_Statics::GetPlayerUnitVariantManager(this)`; no
+   manager (menus outside a mission) leaves the default (Base, all off). The training menu is the player's
+   own UI, so no owner check (section 6).
+4. A runtime selection change (cheat, future UI) shows on the next menu refresh, since the state is rebuilt on
+   every `UpdateWidgetsWithShownSubSection`. `RTSCheatSetUnitVariant` may force a refresh of the shown sub
+   section; nothing else needs to.
 
-`Units/Squads/SquadUnit/SquadUnit.h/.cpp`. Add `public IUnitVariantReceiver` so soldier Blueprints can also
-react (e.g. a helmet mesh). In `ASquadUnit::SetSquadController` (~line 2795) extend the existing
-`CallOnDataLoaded` lambda:
+Blueprint changes (editor work, section 9 step 8):
 
-```cpp
-	auto CallOnDataLoaded = [WeakThis]()-> void
-	{
-		if (not WeakThis.IsValid())
-		{
-			return;
-		}
-		WeakThis->OnDataLoaded_InitExperienceWorth();
-		WeakThis->OnDataLoaded_ApplyUnitVariantFromSquad();   // new
-	};
-```
+- `W_TrainingItem` `OnUpdateTrainingItem`: if `VariantPresentation.bOverrideIcon`, set the item image from
+  `VariantPresentation.Icon` (soft texture; *Set Brush from Soft Texture*), else keep the `DT_TrainingOptions`
+  lookup. If the slot shows a name, use `Title` when `bOverrideTitle`.
+- `W_TrainingDescription` `OnShowTrainingDescription`: use `Title` / `Description` when their bools are on, the
+  existing lookup otherwise; the icon too if the panel shows one.
+- `W_TrainingRequirement` `OnUpdateRequirement`: if it shows the hovered unit's name or icon, apply the same
+  rule. The names of *required* units (`RequiredUnit`, `SecondaryRequiredUnit`) stay the base names.
 
-`OnDataLoaded_ApplyUnitVariantFromSquad()`: validate `M_SquadController` and both RTS components, then
-`GetRTSComponent()->ApplyUnitVariantFromParent(M_SquadController->GetRTSComponent()->GetUnitVariant())`.
-Because `CallbackOnSquadDataLoaded` invokes immediately when the data is already loaded, this one path covers:
-
-- the initial units (callback fires from `OnSquadDataReady.Broadcast()` in `InitSquadData`, after the
-  controller stored its variant);
-- reinforcements (`SquadReinforcementComponent` calls `SetSquadController` on an already-loaded squad →
-  immediate);
-- the squad that re-crews an abandoned team weapon (it goes through `InitSquadData` like any squad).
-
-Squad units never call `URTSComponent::ApplyUnitVariant()` themselves; their owner is set by the controller
-later (`SetOwningPlayerAndStartFow`) and would be unreliable at BeginPlay.
-
-#### 5.2.1 The gun actor of a team weapon — `ATeamWeaponController` and `ATeamWeapon`
-
-The gun is a separate `ATeamWeapon` actor (`Units/TeamWeapons/TeamWeapon.h`, an `AEmbeddedTurretsMaster`
-without an RTS component). `ATeamWeaponController::OnAllSquadUnitsLoaded` first runs
-`Super::OnAllSquadUnitsLoaded()` (which may run `InitSquadData` and so the controller's variant hook) and only
-then `SpawnTeamWeapon()`. So when the controller's Blueprint event fires, `M_TeamWeapon` is still null, and a
-gun-mesh variant cannot be done from the controller's event.
-
-Do this instead:
-
-- `ATeamWeapon` adds `public IUnitVariantReceiver`, so gun Blueprints get the same event.
-- `ATeamWeaponController` gets a private `ApplyUnitVariantToTeamWeapon()` called at the end of
-  `OnAllSquadUnitsLoaded`, after `SpawnTeamWeapon()`. It validates `M_TeamWeapon` (silently, with
-  `GetIsValidTeamWeaponNoReport`, because `SpawnTeamWeapon` already reported a failed spawn) and the controller's RTS
-  component, then (both branches go through the private `ForwardUnitVariantToTeamWeapon`; the delegate handle is
-  kept in `M_UnitVariantAppliedHandle` so it is bound once):
-  - if `GetHasAppliedUnitVariant()` is already true → `IUnitVariantReceiver::Execute_BP_ApplyUnitVariant(M_TeamWeapon, GetUnitVariant())` now;
-  - otherwise bind a lambda with a `TWeakObjectPtr<ATeamWeaponController>` capture to the RTS component's
-    `OnUnitVariantApplied` that does the same when the controller's variant resolves later (the case where
-    `InitSquadData` waits for `OnSquadSubtypeSet`).
-- `SpawnTeamWeapon` has three branches (map setup, adopting an abandoned gun, fresh spawn). The call sits after
-  the whole function, so all three are covered. An adopted gun that already received a variant from its
-  previous crew receives the event again with the new crew's variant; gun Blueprints must therefore make the
-  event idempotent (set state, do not accumulate).
-
-### 5.3 Building expansions — `ABuildingExpansion`
-
-`Buildings/BuildingExpansion/BuildingExpansion.h/.cpp`. Add `public IUnitVariantReceiver`.
-
-In `ABuildingExpansion::InitBuildingExpansion(...)` (~line 1000), before the existing `CheckForUpgrades()`:
-
-```cpp
-	M_BuildingExpansionType = NewBuildingExpansionType;
-	M_BuildingAttachments = NewBuildingAttachments;
-	bM_IsStandAlone = bIsStandAlone;
-	if (bM_IsStandAlone)
-	{
-		OnBxpStandAlone();
-	}
-	ApplyUnitVariant();   // new
-	CheckForUpgrades();
-```
-
-`InitBuildingExpansion` is the Blueprint-callable setup every BXP Blueprint calls with its type, after
-`BP_PostInit_SetupRTSSubtype` ran in `PostInitializeComponents`. The event therefore fires while the BXP is
-still a preview or under construction, so a variant that changes `BuildingMeshComponent`'s mesh is visible
-from placement onwards. If a variant needs the constructed state (turret swap on a pit), the Blueprint stores
-the variant from the event and acts in `BP_OnFinishedExpansionConstruction` (or binds `OnBxpConstructed`); `GetUnitVariant`
-on the RTS component is available at any later time for that.
-
-Enemy field constructions and instant-placement batches also reach `InitBuildingExpansion`; the owner check in
-`ResolveVariantForUnit` gives them Base.
-
-### 5.4 What is deliberately not hooked
-
-- `ANomadicVehicle` and `AAircraftMaster`: `GetIsUnitTypeSupported` returns false. See section 10 to add them.
-- `ACPPTurretsMaster` and embedded turrets: a tank's Blueprint changes its own turrets inside its event.
-- `URTSComponent::BeginPlay`: the subtype is not known yet there.
+Not covered (base presentation stays): quick navigation buttons (they show buildings, which have no variants),
+the control group image (`UW_ControlGroupImage::OnUpdateControlGroup`, keyed by `FTrainingOption`), the selected
+unit info panel, cards. A spawned unit's own UI can read `URTSComponent::GetUnitVariant()` (3.7) and the asset
+if that is wanted later.
 
 ---
 
-## 6. Development aids
+## 4. Save data (exists, unchanged)
 
-### 6.1 Cheat manager — `Player/RTSCheatManager/RTSCheatManager.h/.cpp`
-
-```cpp
-	/** RTSCheatSetUnitVariant <UnitType> <Subtype> <Variant>: numeric enum values; affects units that spawn afterwards. */
-	UFUNCTION(Exec)
-	void RTSCheatSetUnitVariant(const int32 UnitType, const int32 Subtype, const int32 Variant);
-
-	/** Prints every stored selection and the implemented count per unit with a choice. */
-	UFUNCTION(Exec)
-	void RTSCheatPrintUnitVariants();
-```
-
-Both resolve the manager via `FRTS_Statics::GetPlayerUnitVariantManager(this)` and print with
-`RTSFunctionLibrary::ReportError`-style on-screen messages or `UE_LOG`, matching the neighbouring cheats.
-`RTSCheatSetUnitVariant` returns the `SetSelectedVariant` result in the message so a wrong subtype number is
-visible.
-
-### 6.2 Forced variants in Project Settings
-
-`UUnitVariantSettings::DebugForcedVariants` (3.4) lets a designer test a Blueprint variant without typing enum
-numbers: pick the unit and variant in Project Settings > Unit Variants > Debug, start the map, train the
-unit. The manager applies the list in `InitFromProfile` and logs each forced entry with `UE_LOG(LogTemp,
-Warning, ...)` so a forgotten override is visible in every run.
+`USavePlayerProfile::M_UnitVariantSelections` and `FPlayerCardSaveData::UnitVariantSelections`
+(`TArray<FUnitVariantSelection>`, `SaveGame`), the defaulted trailing parameters on `USavePlayerProfile::Initialize`,
+`FRTS_Profile::BuildPlayerCardSaveData` and `FRTS_Profile::SaveNewPlayerProfile`, and
+`FRTS_Profile::ValidateUnitVariantSelections` (dedupe per unit, drop unsupported types; runs in
+`ProfileValidator` and both save paths). `W_CardMenu` passes an empty array until the UI exists. Empty means
+"all Base", so old saves need no migration.
 
 ---
 
-## 7. Blueprint work (per unit, by the designer)
+## 5. Ordering and precedence
 
-1. Open the unit Blueprint (tank, squad controller, squad unit or BXP). The parent C++ class now implements
-   `UnitVariantReceiver`, so *Event BP_ApplyUnitVariant* is available under *Add Event > Interfaces*.
-2. Add the event, a `Switch on EUnitVariant`, and the modification per pin. Leave `Base` unconnected unless
-   shared setup is wanted.
-3. Add the unit's entry to the variant data asset with one `FUnitVariantDefinition` per implemented variant,
-   index 0 being the base unit. Without this entry the runtime clamps every selection for that unit to Base,
-   so a Blueprint variant with no asset entry is unreachable except through the debug list.
-4. Do not change cost or training time in the event; those are read from the training data tables and the UI
-   would show the wrong values.
-5. Do not call `SetUnitSubtype` or `ChangeOwningPlayer` from the event.
+1. `ARTSAsyncSpawner::PostInitializeComponents` builds the base maps from the Blueprint arrays.
+2. `ACPPController::InitPlayerController` → `ApplyEnemyDirectorUnitOverrides()` (Forge / Harvest only).
+3. `InitPlayerStartLocation` → … → `UPlayerProfileLoader::LoadProfile` → `ApplyUnitVariantSelections` →
+   `InitFromProfile` (clamp, debug list) → `ApplySelectionsToSpawner` → `ApplyPlayerUnitVariants`.
+4. `LoadInUnits` spawns the starting units: the first requests that see the variant classes.
+5. Everything later (trainer queue, missions, dropships, field defenses, instant BXP batches, enemy waves)
+   reads the same maps.
 
-Typical modifications and where they are safe:
+A variant on a key the director also overrode replaces the director's class and reports the collision. The
+director asset is expected to hold only Russian keys; check it in the editor rather than relying on that, the
+collision report exists for exactly this case.
 
-| Modification | Tank | Squad controller | Squad unit | BXP |
-|---|---|---|---|---|
-| Swap a static/skeletal mesh or material | yes | – | yes | yes (building mesh; preview mesh is loaded separately, see `ABuildingExpansion` notes) |
-| Change health / armour via the existing BP init functions | yes; the event fires at the same point techs are applied, after `BeginPlay_SetupData`. Anything a derived class sets after `Super::BeginPlay()` (`ATrackedTankMaster`: experience component, target acquisition) runs later | yes, units are loaded | yes | yes |
-| Change weapon class of a turret | yes, through the turret's existing swap/init calls | team weapon gun: in the `ATeamWeapon` Blueprint's own event (5.2.1), not the controller's | – | yes |
-| Change squad weapon mix / squad size | – | yes, `M_TSquadUnits` is complete at this point | – | – |
-| Add an ability | through existing ability init functions only | same | – | same |
+`InitFromProfile` runs once per mission. Runtime changes go through `SetSelectedVariant`, which reaches the
+spawner through `SetPlayerUnitVariant`; spawn requests already queued or loading keep the class they resolved
+at request time (`AsyncSpawnOptionAtLocation` copies the soft class before loading).
 
 ---
 
-## 8. Implementation order
+## 6. What is covered, what is not
 
-Each step compiles on its own. Build with the editor target after every step
-(`Build.bat RTS_SurvivalEditor Win64 Development ...`, see the memory note "UE build command").
+Covered because it goes through the spawner's maps (verified call sites):
 
-1. `Units/Variants/UnitVariantTypes.h`: `EUnitVariant`, `UnitVariants::MaxVariantsPerUnit`,
-   `FUnitVariantSelection`, `Global_GetUnitVariantAsString`.
-2. `Units/Variants/UnitVariantDataAsset.h/.cpp` with `IsDataValid`.
-3. `Units/Variants/UnitVariantSettings.h/.cpp`. Confirm *Project Settings > Game > Unit Variants* appears.
-4. `Interfaces/UnitVariantReceiver.h`.
-5. `URTSComponent` additions (3.7). No callers yet; compile.
-6. `UPlayerUnitVariantManager` + `ACPPController` wiring + `FRTS_Statics` getter.
-7. Save data (section 4) and the `InitFromProfile` call in `UPlayerProfileLoader::LoadProfile` between
-   `ApplyTechnologies` and `LoadInUnits`.
-8. Hooks (section 5): tank, squad controller, squad unit, BXP. Add `IUnitVariantReceiver` to each class.
-9. Cheat commands and debug forced list (section 6).
-10. Tests (section 9). Create the data asset `DA_UnitVariants` next to the other settings assets, e.g.
-    `/Game/RTS_Survival/Blueprints/GameUI/TrainingUI/` holds `DA_TrainingLayout` and
-    `/Game/RTS_Survival/Blueprints/GroundVehicles/ModuleSystem/` holds `DA_VehicleModules`; a sensible home is
-    `/Game/RTS_Survival/Blueprints/Units/Variants/DA_UnitVariants`. Picking it writes a
-    `[/Script/RTS_Survival.UnitVariantSettings]` block into `Config/DefaultGame.ini` like the
-    `TrainingLayoutSettings` block at ~line 189. Both the asset and the Blueprint switch need the editor (or the
-    UECP `create_asset` / Blueprint tools); they cannot be made from the filesystem. Add one test entry
-    (e.g. `Tank_PzIV_H` with two variants) and a matching Blueprint switch that prints the variant.
-11. Add the `Docs/README.md` row and the `Units/TeamWeapons/AGENTS.md` / `Player/AGENTS.md` notes if those
-    files list owned components.
+- Trainer buildings: `UTrainerComponent` → `AsyncSpawnTrainingOption` (~1408) and
+  `AsyncSpawnFieldDefenseExpansion` (~422).
+- Starting units: `UPlayerProfileLoader::LoadInUnits` → `AsyncSpawnOptionAtLocation` (~142).
+- Missions: `UMissionBase::AsyncSpawnActor*`, `MissionManager`, the cargo-with-vehicle and tow-team-weapon
+  spawn states.
+- Global abilities: `GA_AircraftDrop` → `AsyncSpawnOptionAtLocation`.
+- Building expansions: `ACPPController::AsyncSpawnBuildingExpansion` calls (~1820, ~1910) and
+  `IBuildingExpansionOwner` instant placement (`BuildingExpansionOwner.cpp` ~188).
+- Squad soldiers and reinforcements: `ASquadController::LoadSquadUnitsAsync` and
+  `USquadReinforcementComponent` (~133, ~651) spawn the classes listed in the controller's `SquadUnitClasses`.
+  A variant squad controller Blueprint lists its own soldier classes, so soldier changes are "a different
+  soldier Blueprint in that list", not a runtime swap.
+- Team weapon guns: `ATeamWeaponController::SpawnTeamWeapon` spawns the controller's `TeamWeaponClass`
+  (`TeamWeaponController.h` ~559), so a variant crew Blueprint sets its own gun class.
+- Post-spawn casts still pass because a variant is a child class: `Cast<IRTSUnit>` in
+  `OnTrainingOptionSpawned`, `Cast<ABuildingExpansion>` in `OnBuildingExpansionSpawned` (~469) and
+  `BatchBxp_SpawnExpansionActor` (~1031).
 
----
+No owner check anywhere, by design:
 
-## 9. Tests
+- **The enemy shares the spawner but never shares a faction.** `EnemyController` (~467), `EnemyWaveController`
+  (~801), `EnemyStrategicAIComponent` (~954), enemy `UTrainerComponent`s (registered on the strategic AI
+  blackboard, `EnemyController.cpp` ~776) and enemy-owned `IBuildingExpansionOwner`s use the same spawner and
+  the same maps. That is safe because a faction is always unique to one player: the spawner never spawns units
+  of a different faction for another player, so the enemy never requests a German subtype and never meets a
+  variant class.
+- **Therefore do not check who owns the trainer component** in `AsyncSpawnTrainingOption` /
+  `LoadNextTrainingOptionInQueue`, do not add an owner or "is player request" parameter to
+  `AsyncSpawnOptionAtLocation`, and do not gate the BXP paths by owner. The override on the shared map is the
+  whole mechanism.
 
-### 9.1 Automation tests (no world needed) — `Units/Variants/Tests/UnitVariantTests.cpp`
+Out of scope, because it does not spawn through the spawner's maps:
 
-Use `IMPLEMENT_SIMPLE_AUTOMATION_TEST` with `EAutomationTestFlags::EditorContext | ProductFilter`; run with
-`-DisablePlugins=Fab` (memory note "Automation tests need -DisablePlugins=Fab").
-
-- Data asset: `NewObject<UUnitVariantDataAsset>` filled through a test-only `friend` or a `#if WITH_EDITOR`
-  setter; assert `GetImplementedVariantCount` is 1 for a missing key, 2 for a two-element entry, 3 for a
-  five-element entry (clamped), and `GetIsVariantImplemented(VariantB)` false for the two-element entry.
-- Manager clamp: `NewObject<UPlayerUnitVariantManager>`, inject the asset through a test-only setter, call
-  `InitFromProfile` with `{PzIV_H → VariantB}` where only two variants are implemented; assert
-  `GetSelectedVariant` returns Base and the error reporter was hit (see `UnitTests/UT_ErrorReporting` for how existing tests capture
-  `RTSFunctionLibrary::ReportError`).
-- Owner gate: `ResolveVariantForUnit` with an `URTSComponent` whose owner is 2 returns Base even when the
-  selection says VariantA.
-- Supported types: Nomadic and Aircraft resolve to Base.
-
-### 9.2 Map test (manual or `-UnitVariantValidate`)
-
-A headless validate subsystem in the style of `Units/TeamWeapons/Tests/TeamWeaponQualityTestSubsystem` is
-optional; the manual check is:
-
-1. Set `DebugForcedVariants` to `{Tank PzIV_H → VariantA}`, `{Squad Ger_JagerTruppKar98k → VariantB}`,
-   `{BXP <any Ger pit> → VariantA}`.
-2. Run `RTS_ToCopySmall` (flat map, see memory note "Team weapon quality test"), train one of each, and confirm
-   via the Blueprint's debug print that each unit received the forced variant exactly once.
-3. Reinforce the squad; the new soldier prints VariantB.
-4. Spawn the same tank for the enemy (enemy director / wave) and confirm it prints Base.
-5. `RTSCheatSetUnitVariant` to Base at runtime; already-spawned units keep their print, newly trained ones
-   print Base.
+- Units placed in the level by hand (they begin play before anything is overridden).
+- Nomadic vehicle conversion to and from buildings (`NomadicVehicle.cpp`, its own class properties).
+- The replacement controller when a squad re-crews an abandoned team weapon
+  (`ASquadController::TryRemanAbandonedTeamWeapon_*`, class resolved there, `SquadController.cpp` ~1038–1049).
+- The faction-selection preview spawn (`FactionPlayerController.cpp` ~63): it does go through the spawner,
+  but runs on the faction menu where no profile is loaded, so it shows the base unit. Acceptable.
 
 ---
 
-## 10. Extension points (not in this change)
+## 7. Blueprint work (per variant, by the designer)
 
-- **Nomadic trucks**: add `TMap<ENomadicSubtype, FUnitVariantEntry> M_NomadicVariants` to the asset, handle
-  `UNType_Nomadic` in `FindEntry` and `GetIsUnitTypeSupported`, and call `ApplyUnitVariant()` before
-  `CheckForUpgrades()` at the end of `ANomadicVehicle::BeginPlay` (~line 362). Converted buildings re-pull on
-  conversion automatically because the new actor begins play again.
-- **Harvesters**: the Pz I harvester is an `ATankMaster` whose unit type is `UNType_Harvester` and whose subtype is an
-  `ETankSubtype`. Add `UNType_Harvester` to `GetIsUnitTypeSupported` and to `FindEntry` (same tank map), and widen the
-  `UNType_Tank` check in `ATankMaster::BeginPlay` to include it.
-- **Aircraft**: same shape with `EAircraftSubtype`, hook before `CheckForUpgrades()` in
-  `AAircraftMaster::BeginPlay` (~line 91).
-- **Per-doctrine availability**: wrap the three maps in a struct keyed by `ERTSFaction` like
-  `UTrainingLayoutDataAsset::FactionLayouts`, with a fallback to a shared entry.
-- **Selection UI**: reads `UUnitVariantDataAsset::GetUnitsWithChoice()` for the list, `FindVariantDefinition`
-  for name/icon/description, writes `FUnitVariantSelection` arrays into the profile (section 4). Portraits
-  per variant can hook `URTSComponent::OnUnitVariantApplied`.
-- **Per-unit choice at training time**: would replace `ResolveVariantForUnit`'s map lookup with a value the
-  trainer passes; keep that in mind and do not spread direct `GetSelectedVariant` calls outside the manager.
+1. Right-click the base unit Blueprint (tank, squad controller, team weapon controller or BXP) → *Create Child
+   Blueprint Class*. Name it `<Base>_VariantA` / `<Base>_VariantB`.
+2. In the child's class defaults set the `RTSComponent` → `Unit Variant` to `VariantA` / `VariantB`. Leave the
+   subtype and owner as inherited: every variant uses the base unit's subtype (see "One subtype per unit").
+3. Override what differs: meshes and materials, turret/weapon child actor classes, vehicle modules, ability
+   lists, `SquadUnitClasses` (squads), `TeamWeaponClass` (team weapon crews), building mesh and attachments
+   (BXPs). Do **not** change the RTS subtype, the unit type or anything that `DT_Training` /
+   `DT_TrainingOptions` keys by name (cost, training time and requirements stay those of the base unit; the
+   training icon, title and description are changed in step 4, not in those tables).
+4. In `DA_UnitVariants` add or extend the entry for the subtype: element 0 is Base (no class), element 1/2 get
+   the child class, a display name, description and icon for the later selection UI, and for BXPs an optional
+   preview mesh. To change what the training menu shows while this variant is selected, tick
+   `bOverrideTrainingIcon` / `bOverrideTrainingTitle` / `bOverrideTrainingDescription` and fill `TrainingIcon` /
+   `TrainingTitle` / `TrainingDescription` (3.2, 3.8). Unticked means the base unit's icon or text.
+5. Run *Asset Actions → Validate* on the asset; the rules in 3.2 must pass.
+6. Soldier-level changes for squads: make a child of the soldier Blueprint too and list it in the variant
+   controller's `SquadUnitClasses`.
 
----
-
-## 11. Pitfalls for the implementer
-
-- **Do not fire the event from Blueprint BeginPlay or from `URTSComponent::BeginPlay`.** The subtype is set
-  by the Blueprint during BeginPlay; only the hook points in section 5 are after it.
-- **Squad controller before `SetDataLoaded(true)`.** If `ApplyUnitVariant()` is placed after the broadcast,
-  initial squad units read `Base` from the controller and only reinforcements get the variant.
-- **Profile order.** `InitFromProfile` must precede `LoadInUnits` in `UPlayerProfileLoader::LoadProfile`, or
-  the starting units get Base while trained units get the variant.
-- **Map-placed player units** (actors placed in the level with owner 1) begin play before the profile loads
-  and therefore resolve to Base. This matches how techs behave today; do not try to fix it here.
-- **No manager is not an error.** Enemy-only test maps, the portrait capture tool and editor utility worlds
-  have no `ACPPController`; `ApplyUnitVariant` falls back to Base silently.
-- **Keep `FTrainingOption` as the runtime key.** Do not introduce a second key struct; the training UI, cards
-  and spawner all speak `FTrainingOption`.
-- **`TMap::operator[]` inserts.** Use `Find` in `GetSelectedVariant`; it runs for every unit that spawns.
-- **Russian keys are an asset error**, not a runtime case. The owner check already prevents variants on enemy
-  units; the validation exists so nobody authors variants the player can never use.
-- **Idempotency.** `bM_HasAppliedUnitVariant` guards double application; never reset it on owner change.
-- **Shipping builds** compile out `ApplyDebugForcedVariants`. Guard with `#if !UE_BUILD_SHIPPING`, not a
-  runtime bool, so the config list cannot leak into a release.
+No event, no switch, no BeginPlay logic. A variant Blueprint can still use its own Event BeginPlay like any
+other Blueprint.
 
 ---
 
-## 12. Implementation notes and deviations from the brief
+## 8. Migration from the committed implementation
 
-Implemented on 2026-10-19. Where the code differs from sections 3 to 9, this list is authoritative.
+The tree already contains the earlier pull-based design (commits `c110e711` … `ae21d32f`). Apply this table
+before adding anything from section 3. "Keep" means leave as committed.
 
-| Area | What the code does | Why |
-|---|---|---|
-| Russian key check (3.3) | Enumerator name contains `Rus` **or** display name starts with `Rus`. | Russian tanks (`Tank_T34_85`, `Tank_KV_1`, …) only carry `Rus` in the display name. |
-| `IsDataValid` (3.3) | Shared rules live in the private static `ValidateEntry` / `GetIsRussianKey` (editor only). | One rule set for the three maps. |
-| Asset caching (3.6) | `GetVariantDataAsset() const` does not write the `UPROPERTY`; the non-const paths call `CacheVariantDataAsset`. | No `mutable` UPROPERTY. |
-| Clamp path (3.6) | `InitFromProfile` and `SetSelectedVariant` share the private `StoreSelectionClamped`; selecting `Base` removes the key. | The map only holds non-Base choices. |
-| Debug forced list (3.6, 6.2) | Not clamped against the asset; only `GetIsUnitTypeSupported` is checked. | Section 7 step 3: an unlisted Blueprint variant must be testable through this list. |
-| Profile order (4, 3.6) | `LoadProfile` calls the new private `UPlayerProfileLoader::ApplyUnitVariantSelections` after `ApplyTechnologies` and **before** the `bDoNotLoadPlayerUnits` early return. | Otherwise the no-units path never initialises the manager. |
-| Save validation (4) | `FRTS_Profile::ValidateUnitVariantSelections` (private static) runs in `ProfileValidator`, and also in `BuildPlayerCardSaveData` and `SaveNewPlayerProfile`. | Both save paths get the same dedupe / unsupported-type cleanup. |
-| `ApplyUnitVariantFromParent` (3.7) | Guarded by `bM_HasAppliedUnitVariant` like `ApplyUnitVariant`. | The interface promises the event fires once. |
-| Helper access (5) | `ATankMaster::ApplyUnitVariant` is private; `ASquadController::ApplyUnitVariant` and `ABuildingExpansion::ApplyUnitVariant` are protected, next to their `CheckForUpgrades`. | `SquadController.h` has no private section; the BXP helper sits with `CheckForUpgrades`. |
-| `ACPPController::GetIsValidPlayerUnitVariantManager` (3.6) | Declared and defined (const, reports via `ReportErrorVariableNotInitialised`), but nothing in the controller calls it yet. It does not recreate the component the way `GetIsValidPlayerTechManager` does. | Kept to the brief's wording; callers use `FRTS_Statics::GetPlayerUnitVariantManager`. |
-| Unity build | `Units/TeamWeapons/Tests/TeamWeaponDigInTestSubsystem.cpp` got an explicit `InfantryWeaponMaster.h` include. | The new .cpp files reshuffled the unity groups and exposed a missing include there. |
-| `Player/AGENTS.md` (8 step 11) | Not changed. | It lists orchestration rules, not owned components. `Units/TeamWeapons/AGENTS.md` got a short "Unit variants" section. |
-| Tests (9.1) | `Units/Variants/Tests/UnitVariantTests.cpp`, tests under `RTS.UnitVariants.*`. Private state is reached through `friend struct FUnitVariantTestAccess` (declared in the asset and the manager). The clamp test wraps `InitFromProfile` in `RTSFunctionLibrary::Push/PopModalDialogSuppression` and expects the `LogRTS` error. | No editor-only setters in shipping headers. |
+| Symbol / file | Action |
+|---|---|
+| `Interfaces/UnitVariantReceiver.h` | **Delete.** Remove `public IUnitVariantReceiver` and the include from `ATankMaster`, `ASquadController`, `ASquadUnit`, `ATeamWeapon`, `ABuildingExpansion` (`ATeamWeaponController` inherits from the squad controller; nothing to edit there for the interface). |
+| `ATankMaster::ApplyUnitVariant` (private, called in `BeginPlay` before `CheckForUpgrades`) | **Delete** declaration, definition and call. |
+| `ASquadController::ApplyUnitVariant` (protected, called in `InitSquadData` before `SetDataLoaded(true)`) | **Delete** declaration, definition and call. |
+| `ASquadUnit::OnDataLoaded_ApplyUnitVariantFromSquad` and its call in the `SetSquadController` lambda | **Delete.** |
+| `ATeamWeaponController::ApplyUnitVariantToTeamWeapon` (called at `OnAllSquadUnitsLoaded` ~149), `ForwardUnitVariantToTeamWeapon`, `M_UnitVariantAppliedHandle` and its unbind | **Delete.** |
+| `ABuildingExpansion::ApplyUnitVariant` (called in `InitBuildingExpansion` before `CheckForUpgrades`) | **Delete** declaration, definition and call. |
+| `URTSComponent`: `OnUnitVariantApplied`, `FOnUnitVariantApplied`, `GetHasAppliedUnitVariant`, `ApplyUnitVariant`, `ApplyUnitVariantFromParent`, `ApplyUnitVariant_Internal`, `M_UnitVariant`, `bM_HasAppliedUnitVariant` | **Replace** with the `UnitVariant` class default and `GetUnitVariant()` of 3.7. |
+| `UPlayerUnitVariantManager::ResolveVariantForUnit` | **Delete.** Everything else in the manager: keep; add 3.5. |
+| `FRTS_Statics::GetPlayerUnitVariantManager`, `ACPPController::M_PlayerUnitVariantManager` / getter / validator | Keep. |
+| `Units/Variants/UnitVariantTypes.h` | Keep. |
+| `Units/Variants/UnitVariantSettings.h/.cpp` | Keep the properties; rewrite the `DebugForcedVariants` comment (it no longer bypasses the clamp, 3.3). |
+| `UPlayerUnitVariantManager::ApplyDebugForcedVariants` | **Change**: route through `StoreSelectionClamped` instead of bypassing it. |
+| `Units/Variants/UnitVariantDataAsset.h/.cpp` | Keep; extend per 3.2. |
+| Save data, `FRTS_Profile::ValidateUnitVariantSelections`, `USavePlayerProfile`, `FPlayerCardSaveData` | Keep. |
+| `UPlayerProfileLoader::ApplyUnitVariantSelections` | Keep; extend per 3.6. |
+| `URTSCheatManager::RTSCheatSetUnitVariant` / `RTSCheatPrintUnitVariants` | Keep; adapt per section 11. |
+| `Units/Variants/Tests/UnitVariantTests.cpp` | Keep `RTS.UnitVariants.DataAssetCounts` and `RTS.UnitVariants.ManagerClampsSavedSelection`. **Delete** `OnlyPlayerUnitsGetVariants` and `ComponentAppliesOnce`. Rewrite `UnsupportedUnitTypesGetBase` against `GetIsUnitTypeSupported` / `StoreSelectionClamped` only. See section 10. |
+| `Units/TeamWeapons/AGENTS.md` "Unit variants" section (~line 149) | **Rewrite** to two lines: a team weapon variant is a child Blueprint of the crew controller with its own `TeamWeaponClass` and `SquadUnitClasses`; the spawner swaps the class, see this doc. |
+| The explicit `InfantryWeaponMaster.h` include added to `TeamWeaponDigInTestSubsystem.cpp` (unity build fix) | Keep. |
+| The Russian key check using enumerator name **or** display name prefix `Rus` | Keep. |
 
-Run the tests headless (does not touch an open editor):
+After the table, nothing outside `Units/Variants/`, the manager, the spawner, `URTSComponent`, the profile
+loader, the profile save code, the cheat manager and (after step 5 of section 9) `FTrainingWidgetState` /
+`UTrainingMenuManager::CreateWidgetStateForOption` should mention variants. `grep -rn "UnitVariant" RTS_Survival`
+is the check.
+
+---
+
+## 9. Implementation order
+
+Each step compiles on its own. Build with `Build.bat RTS_SurvivalEditor Win64 Development ...` (memory note
+"UE build command") after every step.
+
+1. Migration table of section 8 (deletions and the `URTSComponent` replacement). Build; fix the test compile
+   errors by deleting the listed tests.
+2. Data asset extension (3.2) with validation and the two accessors.
+3. Spawner additions (3.4) in `RTSAsyncSpawner_UnitVariants.cpp`; add `M_DirectorOverriddenOptions.Add` to
+   `ApplyTrainingOptionOverride`.
+4. Manager repurpose (3.5) and the profile loader call (3.6).
+5. Training UI presentation (3.8): `FUnitVariantTrainingPresentation` (3.1), the training fields and
+   `GetTrainingPresentation` on the asset (3.2), `GetTrainingPresentation` on the manager, the
+   `VariantPresentation` field on `FTrainingWidgetState` and the helper in `CreateWidgetStateForOption`.
+6. Cheat manager adaptation (section 11).
+7. Tests (section 10).
+8. Editor work (needs the editor or the UECP bridge; cannot be done from the filesystem): the three training
+   widget Blueprint changes of 3.8 (`W_TrainingItem`, `W_TrainingDescription`, `W_TrainingRequirement`), one
+   child Blueprint for one tank (e.g. `BP_PzIV_H_VariantA` with a visibly different mesh or turret), its asset
+   entry (with all three training overrides ticked, so 10.2 can check them) in
+   `DA_UnitVariants` (the asset lives where the other settings assets do, e.g. next to
+   `/Game/RTS_Survival/Blueprints/GameUI/TrainingUI/DA_TrainingLayout`; picking it writes a
+   `[/Script/RTS_Survival.UnitVariantSettings]` block into `Config/DefaultGame.ini` like the
+   `TrainingLayoutSettings` block at ~line 189), and the manual test of 10.2.
+9. Update the `Docs/README.md` hook text if it still describes the pull design.
+
+---
+
+## 10. Tests
+
+### 10.1 Automation tests — `Units/Variants/Tests/UnitVariantTests.cpp`
+
+Run headless (does not touch an open editor; needs `-DisablePlugins=Fab`):
 
 ```
 UnrealEditor-Cmd.exe D:\UE5Projects\RTS_Survival\RTS_Survival.uproject -ExecCmds="Automation RunTests RTS.UnitVariants; Quit" -unattended -nullrhi -nosplash -DisablePlugins=Fab -log
 ```
 
-The manager clamp test also runs `ApplyDebugForcedVariants`, so a non-empty `DebugForcedVariants` list in
-`Config/DefaultGame.ini` can make it fail; clear the list before running the tests.
+Keep:
+
+- `RTS.UnitVariants.DataAssetCounts`: counts of 1 / 2 / clamped 3 and `GetIsVariantImplemented`.
+- `RTS.UnitVariants.ManagerClampsSavedSelection`: an unimplemented VariantB clamps to Base with one reported
+  error (wrapped in `RTSFunctionLibrary::Push/PopModalDialogSuppression`, expects the `LogRTS` error). A
+  non-empty `DebugForcedVariants` in `Config/DefaultGame.ini` makes it fail; clear the list first.
+
+Add:
+
+- `RTS.UnitVariants.DataAssetClassRules`: fill an asset through `FUnitVariantTestAccess` with a Base element
+  that has a class, a VariantA without a class, a tank entry whose class is a squad controller subclass, and
+  the same class twice; `IsDataValid` must return `Invalid` and report at least one error per broken rule
+  (do not assert an exact count; the preview-mesh warning and future rules would make it brittle). Use
+  `ATankMaster::StaticClass()` etc. as the classes; no Blueprints needed.
+- `RTS.UnitVariants.FindVariantClass`: Base → null, VariantA → the class, missing entry → null.
+- `RTS.UnitVariants.TrainingPresentation`: a VariantA definition with only `bOverrideTrainingTitle` on gives a
+  presentation with `Variant == VariantA`, `bOverrideTitle` true and the title, `bOverrideIcon` and
+  `bOverrideDescription` false; Base and a missing entry give everything off. Through the manager: a selection
+  stored for `(UNType_Tank, Tank_PzI_Harvester)` is found when asked with `(UNType_Harvester, Tank_PzI_Harvester)`.
+  `IsDataValid` must fail for an override bool on element 0 and for a ticked override with an empty value.
+- `RTS.UnitVariants.UnsupportedUnitTypesRejected` (rewrite of the old supported-types test):
+  `StoreSelectionClamped` returns false for `UNType_Nomadic` / `UNType_Aircraft` and the selection is not stored.
+
+The spawner override itself needs a world with a spawner actor and loaded Blueprints; it is not an automation
+test. Cover it with 10.2.
+
+### 10.2 Map test (manual, or a `-UnitVariantValidate` subsystem later)
+
+1. Set `DebugForcedVariants` to `{Tank Tank_PzIV_H → VariantA}` (and the entries of any other variant
+   Blueprints that exist).
+2. Run `RTS_ToCopySmall` (flat test map, see memory note "Team weapon quality test"). Train a Pz IV H; the
+   spawned actor's class must be `BP_PzIV_H_VariantA_C` (`RTSCheatPrintUnitVariants` prints the mapped class
+   per selection; or check the actor name in the outliner).
+3. Spawn the same tank as a starting unit (profile card) and through a mission spawn if one is handy; same
+   class.
+4. `RTSCheatSetUnitVariant <UNType_Tank value> <Tank_PzIV_H value> 0` (Base) at runtime; the next trained
+   Pz IV H is the base class, the one already on the map is unchanged.
+5. With a BXP variant that sets a preview mesh: open the build menu and confirm the placement preview changed.
+6. Training menu, with the forced Pz IV H VariantA whose three training overrides are ticked: the slot shows the
+   variant icon, hovering shows the variant title and description, and the cost and training time are the base
+   unit's. Untick `bOverrideTrainingDescription` and restart: the base description returns while icon and title
+   stay. After step 4 (back to Base), the next menu refresh shows the base icon and texts.
+
+---
+
+## 11. Development aids
+
+### 11.1 Cheat manager — `Player/RTSCheatManager/RTSCheatManager.h/.cpp` (exists, adapted)
+
+- `RTSCheatSetUnitVariant <UnitType> <Subtype> <Variant>` (numeric enum values): unchanged entry point; it
+  now takes effect through the manager → spawner path, so the message should print the result of
+  `SetSelectedVariant` and the class name `GetTrainingOptionClass` returns afterwards.
+- `RTSCheatPrintUnitVariants`: for every stored selection print `TrainingName -> VariantString -> mapped class
+  asset name`; for every unit with a choice in the asset print the implemented count.
+
+### 11.2 Forced variants in Project Settings (exists, now clamped)
+
+`UUnitVariantSettings::DebugForcedVariants` is applied in `InitFromProfile` before `ApplySelectionsToSpawner`,
+so forced entries reach the spawner like saved ones, and they are clamped like saved ones: a forced variant
+without an asset entry (and therefore without a class) clamps to Base with one reported error. Each forced
+entry that survives the clamp is logged as a warning so a forgotten override is visible.
+
+---
+
+## 12. Pitfalls for the implementer
+
+- **Do not reuse `ApplyTrainingOptionOverride` for variants.** It is silent on a missing key and its errors say
+  "Enemy director". Variants need the loud version (3.4).
+- **Remember the pre-variant class only once per key.** Check `Contains` before writing the pre-variant map;
+  a second variant application must not overwrite the remembered base with the first variant.
+- **`BuildingExpansionMap` is typed `TSoftClassPtr<ABuildingExpansion>`**, the asset holds
+  `TSoftClassPtr<AActor>`. Convert through `ToSoftObjectPath()`; do not add a second typed field to the asset.
+- **`BxpPreviewMeshMap` holds hard `UStaticMesh*`** read synchronously at placement. Load the variant preview
+  mesh with `LoadSynchronous()` when applying, and keep the remembered base mesh in a `UPROPERTY` map so GC
+  sees it.
+- **Order in `LoadProfile`**: the variant application sits before the `bDoNotLoadPlayerUnits` early return and
+  before `LoadInUnits`; moving it after either breaks starting units or no-unit maps.
+- **`FTrainingOption` keys for tanks are always `UNType_Tank`**, including the harvester. A selection keyed
+  `UNType_Harvester` finds no base mapping; the manager normalises it (3.5), the later UI must not rely on
+  that and should key the harvester as a tank itself.
+- **No owner checks** (section 6). Do not check the trainer component's owner or add an owner parameter to any
+  spawner function: a faction is always unique to one player, so variant keys (German subtypes) are only ever
+  spawned for the player.
+- **Never give a variant its own subtype** ("One subtype per unit" at the top). No new enum values, no new
+  `DT_Training` rows, no new spawner keys; a variant replaces the class under the base unit's existing key, and
+  shares its cost, training time and requirements.
+- **Cards, `DT_Training` and `DT_TrainingOptions` are untouched.** All variants share the base
+  `FTrainingOption`. Anything keyed by class (there should be nothing) would break; grep for `UnitClass ==`
+  style comparisons before assuming.
+- **Variant training icon / title / description come only from the variant data asset** (3.8). Do not add
+  variant rows to `DT_TrainingOptions` or `DT_Training`, and do not override cost, training time or
+  requirements in the training UI. Each override is shown only when its bool is ticked; the Blueprints fall back
+  to their existing table lookup otherwise.
+- **`TMap::operator[]` inserts.** The spawner's existing code uses `Contains` then `[]`; new code uses `Find`.
+- **Shipping builds** compile out `DebugForcedVariants` application (`#if !UE_BUILD_SHIPPING`), as committed.
+- **Pointer rule 22**: the `TSoftClassPtr<AActor>*` from `M_TrainingOptionMap.Find` is used in the same
+  function with no mutation of that map in between. Writing the pre-variant map is a different container; fine.
+
+---
+
+## 13. Extension points (not in this change)
+
+- **Nomadic trucks and aircraft**: add `TMap<ENomadicSubtype, …>` / `TMap<EAircraftSubtype, …>` to the asset,
+  the two cases to `FindEntry`, `GetIsUnitTypeSupported` and `ApplyPlayerUnitVariants`'s dispatch. The spawner
+  already keys both kinds in `M_TrainingOptionMap`, so `ApplyTrainingOptionVariant` works unchanged.
+- **Per-doctrine availability**: wrap the three maps in a struct keyed by `ERTSFaction` like
+  `UTrainingLayoutDataAsset::FactionLayouts`, with a fallback to a shared entry.
+- **Selection UI**: reads `GetUnitsWithChoice()` and `FindVariantDefinition` for name / icon / description,
+  writes `FUnitVariantSelection` arrays into the profile (section 4), and calls
+  `UPlayerUnitVariantManager::SetSelectedVariant` if it ever runs inside a mission.
+- **Per-unit choice at training time**: would pass the class per request instead of overriding the map; keep
+  `GetTrainingOptionClass` as the single read point so that change stays local to the spawner.

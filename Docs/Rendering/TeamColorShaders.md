@@ -11,10 +11,12 @@ changed**: `MM_Ger_PostApoTank_NoBlend`, `MI_PZIII_Hull_DesertAPO` and `M_TigerI
 |---|---|
 | `MF_TeamColor_CamoSwap` | repaints one camo band (picked with `TC_KeyColor`, default red-brown) in the team colour |
 | `MF_TeamColor_PaintTint` | glazes all painted plates toward the team colour; bare metal untouched |
+| `MF_TeamColor_CamoTint` | both in one: a light tint over all paint (`TC_TintStrength`, 0.2) plus the keyed band repainted on top (`TC_SwapStrength`, 0.95); either strength at 0 gives the pure version |
 | `MF_TeamColor_TopologyAccent` | paints the steep/side plates (turret walls, superstructure sides); flat decks and the turret roof keep their camo |
 | `MM_Ger_PostApoTank_TC_<Type>` | duplicate of the tank master with the function spliced in |
 | `MI_PZIII_Hull_DesertAPO_TC_<Type>` | copy of the Panzer III hull instance on that test master |
 | `M_TigerII_Hull_TC_<Type>` | copy of the King Tiger hull/turret material (a standalone material, not on the master) with the function spliced in |
+| `MM_Ger_PostApoTank_TC_CamoTint`, `MI_PZIII_Hull_DesertAPO_TC_CamoTint`, `M_TigerII_Hull_TC_CamoTint`, `MI_TigerII_Hull_TC_CamoTint_GreenKey` | the combined function on both test tanks |
 | `MI_TigerII_Hull_TC_CamoSwap_GreenKey` | King Tiger CamoSwap with `TC_KeyColor` set to the camo's dark green |
 
 ## Where the function sits in the master
@@ -113,6 +115,28 @@ Material edits made while no editor bridge is free (editor closed or in PIE) can
   silver-white), so dark team colours lose saturation on bright camo.
 - **TopologyAccent** colours the steep turret and hull sides; better than on the Panzer III because the King Tiger's
   turret walls are larger, but still mostly camo from the RTS camera.
+
+## Combined CamoTint and performance
+
+CamoSwap and PaintTint share the same core, so `MF_TeamColor_CamoTint` runs both in one Custom node: tint all paint
+lightly, then repaint the keyed band on top (each stage with its own strength and lift). On the Panzer III the tint
+makes the sand plates lean toward the team hue, which helps the weakest case (yellow team on sand); on the King Tiger's
+bright dunkelgelb a 0.2 tint is barely visible, so raise `TC_TintStrength` per instance there.
+
+Pixel shader instructions from `MaterialEditingLibrary.get_statistics` (SM6, 2026-10-19):
+
+| | Panzer III master | King Tiger material |
+|---|---|---|
+| Original | 423 | 395 |
+| + PaintTint | 461 (+38) | 433 (+38) |
+| + TopologyAccent | 473 (+50) | 445 (+50) |
+| + CamoSwap | 481 (+58) | 453 (+58) |
+| + CamoTint | 496 (+73, +17%) | 468 (+73, +18%) |
+
+No extra samplers or texture samples (the function reuses the camo sample), vertex shader unchanged (554), no new
+shader permutations. The cost is base-pass pixel ALU on vehicle pixels only; not profiled in a running mission yet.
+Cheaper later if needed: replace the gamma `pow`s with `sqrt`/square (gamma 2.0). Adding the function to the master
+means a one-time recompile of every instance on it; vehicles with their own materials need it added per material.
 
 ## Not done yet
 

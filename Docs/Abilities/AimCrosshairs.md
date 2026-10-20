@@ -21,6 +21,15 @@ The reticle shown on the ground while the player aims an ability (attack ground,
 | `LargeComplexCrosshair` | heavy barrages | `MI_AimCrosshair_LargeComplex` | `T_AimCrosshair_LargeComplex` (1024) |
 | `AntiInfantryGrenade` | frag grenades, molotovs | `MI_AimCrosshair_GrenadeAntiInfantry` | `T_AimCrosshair_GrenadeAntiInfantry` |
 | `AntiVehicleGrenade` | AT grenades, bundle charges | `MI_AimCrosshair_GrenadeAntiVehicle` | `T_AimCrosshair_GrenadeAntiVehicle` |
+| (not wired) | alternative Large look the user picked | `MI_AimCrosshair_LargeClassic` | `T_AimCrosshair_LargeClassic` |
+
+`LargeClassic` is the first Large design with its warm look (pale orange, cream, soft brown contour, warm
+vignette), kept unchanged on purpose; its instance carries those colours (`material_overrides` in
+`crosshair_designs.py`). Put it on any aim type in the Blueprint map to use it.
+
+State on 2026-10-19: the open editors ran a build without `LargeComplexCrosshair`, so `wire` mapped the other five
+only, and the Blueprint save was blocked by a second editor holding the file. After a rebuild: close the other
+editors, run `wire` again, save, and confirm with `run_capture.sh` without `WIRE`.
 
 Assets live in `/Game/RTS_Survival/Materials/AimMaterials/Crosshairs/`. `LargeComplexCrosshair` was appended to
 the enum; keep the enum append-only, ability Blueprints store its values.
