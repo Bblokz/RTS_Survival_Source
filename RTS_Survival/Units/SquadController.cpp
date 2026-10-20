@@ -473,6 +473,25 @@ TArray<UWeaponState*> ASquadController::GetWeaponsOfSquad()
 	return Weapons;
 }
 
+void ASquadController::ApplyTechMaxHealthMultiplier(const float HealthMultiplier)
+{
+	if (HealthMultiplier <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError("ApplyTechMaxHealthMultiplier needs a positive multiplier on " + GetName());
+		return;
+	}
+	M_TechMaxHealthMultiplier *= HealthMultiplier;
+	for (ASquadUnit* EachSquadUnit : GetSquadUnitsChecked())
+	{
+		if (not IsValid(EachSquadUnit->HealthComponent))
+		{
+			continue;
+		}
+		// Keeps each soldier's health percentage; the squad health bar receives the change from the soldier.
+		EachSquadUnit->HealthComponent->SetMaxHealth(EachSquadUnit->HealthComponent->GetMaxHealth() * HealthMultiplier);
+	}
+}
+
 bool ASquadController::GetIsUnitInCombat() const
 {
 	if (not GetIsValidRTSComponent())
@@ -3761,6 +3780,8 @@ void ASquadController::InitSquadData_SetValues(const float MaxWalkSpeed, const f
                                                const FResistanceAndDamageReductionData& ResistanceData)
 {
 	EnsureSquadUnitsValid();
+	// Researched health technologies scale the data value; see M_TechMaxHealthMultiplier.
+	const float TechAdjustedMaxHealth = MaxHealth * M_TechMaxHealthMultiplier;
 	for (const auto EachSqUnit : M_TSquadUnits)
 	{
 		if (IsValid(EachSqUnit->GetCharacterMovement()))
@@ -3770,8 +3791,8 @@ void ASquadController::InitSquadData_SetValues(const float MaxWalkSpeed, const f
 		}
 		if (IsValid(EachSqUnit->HealthComponent))
 		{
-			EachSqUnit->HealthComponent->InitHealthAndResistance(ResistanceData, MaxHealth);
-			EachSqUnit->OnSquadInitsData_OverwriteArmorAndResistance(MaxHealth);
+			EachSqUnit->HealthComponent->InitHealthAndResistance(ResistanceData, TechAdjustedMaxHealth);
+			EachSqUnit->OnSquadInitsData_OverwriteArmorAndResistance(TechAdjustedMaxHealth);
 		}
 		if (IsValid(EachSqUnit->GetRTSComponent()))
 		{
@@ -3789,7 +3810,7 @@ void ASquadController::InitSquadData_SetValues(const float MaxWalkSpeed, const f
 	if (IsValid(SquadHealthComponent))
 	{
 		// Sets TargetTypeIcon (and stores resist data) so the squad bar matches its members.
-		SquadHealthComponent->InitHealthAndResistance(ResistanceData, MaxHealth);
+		SquadHealthComponent->InitHealthAndResistance(ResistanceData, TechAdjustedMaxHealth);
 	}
 
 	SetSquadVisionRange(VisionRadius);

@@ -29,7 +29,16 @@ enum class ETechnology: uint8
 	Tech_RepairUpgrade UMETA(DisplayName = "Repair Upgrade"),
 	Tech_AutoCannonDamage,
 	Tech_FlameRange,
-	Tech_FlameDamage
+	Tech_FlameDamage,
+	// Append only: researched techs are saved in player profiles by value.
+	Tech_Tungsten88 UMETA(DisplayName = "Tungsten-Core 8.8"),
+	Tech_StereoRangefinder UMETA(DisplayName = "Stereoscopic Rangefinder"),
+	Tech_Assault_ShellHoist UMETA(DisplayName = "Heavy Shell Hoist"),
+	Tech_HalfTrack_ArmoredBay UMETA(DisplayName = "Armoured Troop Bay"),
+	Tech_Flak88_GroundRole UMETA(DisplayName = "Flak 88 Ground Role"),
+	Tech_Infantry_Kit UMETA(DisplayName = "M42 Kit & Webbing"),
+	Tech_Sniper_Ghillie UMETA(DisplayName = "Ghillie Suits"),
+	Tech_Pioneer_Entrenching UMETA(DisplayName = "Entrenching Tools")
 };
 
 static FString Global_GetTechAsString(const ETechnology Tech)
@@ -68,6 +77,22 @@ static FString Global_GetTechAsString(const ETechnology Tech)
 		return "Tech_FlameRange";
 	case ETechnology::Tech_FlameDamage:
 		return "Tech_FlameDamage";
+	case ETechnology::Tech_Tungsten88:
+		return "Tech_Tungsten88";
+	case ETechnology::Tech_StereoRangefinder:
+		return "Tech_StereoRangefinder";
+	case ETechnology::Tech_Assault_ShellHoist:
+		return "Tech_Assault_ShellHoist";
+	case ETechnology::Tech_HalfTrack_ArmoredBay:
+		return "Tech_HalfTrack_ArmoredBay";
+	case ETechnology::Tech_Flak88_GroundRole:
+		return "Tech_Flak88_GroundRole";
+	case ETechnology::Tech_Infantry_Kit:
+		return "Tech_Infantry_Kit";
+	case ETechnology::Tech_Sniper_Ghillie:
+		return "Tech_Sniper_Ghillie";
+	case ETechnology::Tech_Pioneer_Entrenching:
+		return "Tech_Pioneer_Entrenching";
 	default: break;
 	}
 	return "Tech_NONE";
@@ -109,6 +134,22 @@ static FString Global_GetTechDisplayName(const ETechnology Tech)
 			return "Flame Range";
 		case ETechnology::Tech_FlameDamage:
 			return "Flame Damage";
+		case ETechnology::Tech_Tungsten88:
+			return "Tungsten-Core 8.8";
+		case ETechnology::Tech_StereoRangefinder:
+			return "Stereoscopic Rangefinder";
+		case ETechnology::Tech_Assault_ShellHoist:
+			return "Heavy Shell Hoist";
+		case ETechnology::Tech_HalfTrack_ArmoredBay:
+			return "Armoured Troop Bay";
+		case ETechnology::Tech_Flak88_GroundRole:
+			return "Flak 88 Ground Role";
+		case ETechnology::Tech_Infantry_Kit:
+			return "M42 Kit & Webbing";
+		case ETechnology::Tech_Sniper_Ghillie:
+			return "Ghillie Suits";
+		case ETechnology::Tech_Pioneer_Entrenching:
+			return "Entrenching Tools";
 		default:
 			return "None";
 	}

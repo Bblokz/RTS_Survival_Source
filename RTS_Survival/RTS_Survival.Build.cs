@@ -50,6 +50,14 @@ public class RTS_Survival : ModuleRules
 			"MovieSceneCapture",
 			"AudioMixer",
 			"EnhancedInput",
+			// Shorts creator (Source/RTS_Survival/Shorts): drives Movie Render Queue from a -game process and
+			// reads its Job.json with the JSON object converter.
+			"MovieRenderPipelineCore",
+			"MovieRenderPipelineRenderPasses",
+			"LevelSequence",
+			"MovieSceneTracks",
+			"CinematicCamera",
+			"JsonUtilities",
 			//// Saviour-added:
 			//"GameFeatures",
 			//"GameplayAbilities",

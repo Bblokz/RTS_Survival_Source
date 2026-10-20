@@ -179,6 +179,13 @@ public:
 
         void OnOwnerDies(const ERTSDeathType DeathType);
         void ApplyDamageToGarrisonedSquads(const int32 DamagePercent);
+
+	/**
+	 * @brief Passengers bail out when the carrier is destroyed instead of dying with it (Tech_HalfTrack_ArmoredBay).
+	 * @param HealthFractionKept Share (0..1] of its current health each passenger keeps when bailing out.
+	 */
+	void SetPassengersBailOutOnOwnerDeath(const float HealthFractionKept);
+	bool GetDoPassengersBailOutOnOwnerDeath() const { return M_BailOutHealthFractionKept > 0.f; }
         void AdjustSeatsForSquad(ASquadController* Squad, int32 SeatsDelta);
 
 	void SetIsEnabled(const bool bEnable);
@@ -367,6 +374,11 @@ private:
         void OnOwnerDies_DetachIfAttachedToOwner(ASquadUnit* Unit);
         void ApplyDamageToSquadUnits(ASquadController* SquadController, const int32 DamagePercent) const;
         float CalculateDamageAmountForUnit(UHealthComponent* HealthComponent, const int32 DamagePercent) const;
+	void OnOwnerDies_BailOutAllInsideSquads(const TArray<TObjectPtr<ASquadController>>& InsideSquads);
+	void OnOwnerDies_BailOutSquad(ASquadController* Squad) const;
+
+	// 0 = passengers die with the carrier (default); otherwise the share of health they keep when bailing out.
+	float M_BailOutHealthFractionKept = 0.f;
 
 	// Index where tank cargo owners should show ExitCargo while squads are inside.
 	UPROPERTY(EditDefaultsOnly, Category="Cargo|Abilities")

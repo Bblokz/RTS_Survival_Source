@@ -121,8 +121,71 @@ void UCargo::OnOwnerDies(const ERTSDeathType DeathType)
 	}
 
 	const TArray<TObjectPtr<ASquadController>> InsideSquads = OnOwnerDies_GetInsideSquadsSnapshot();
-	OnOwnerDies_KillAllInsideSquads(InsideSquads);
+	if (GetDoPassengersBailOutOnOwnerDeath())
+	{
+		OnOwnerDies_BailOutAllInsideSquads(InsideSquads);
+	}
+	else
+	{
+		OnOwnerDies_KillAllInsideSquads(InsideSquads);
+	}
 	OnOwnerDies_ResetState();
+}
+
+void UCargo::SetPassengersBailOutOnOwnerDeath(const float HealthFractionKept)
+{
+	if (HealthFractionKept <= 0.f || HealthFractionKept > 1.f)
+	{
+		RTSFunctionLibrary::ReportError("SetPassengersBailOutOnOwnerDeath needs a fraction in (0, 1].");
+		return;
+	}
+	M_BailOutHealthFractionKept = HealthFractionKept;
+}
+
+void UCargo::OnOwnerDies_BailOutAllInsideSquads(const TArray<TObjectPtr<ASquadController>>& InsideSquads)
+{
+	for (const TObjectPtr<ASquadController>& SquadPtr : InsideSquads)
+	{
+		ASquadController* Squad = SquadPtr.Get();
+		if (not IsValid(Squad))
+		{
+			continue;
+		}
+		OnOwnerDies_BailOutSquad(Squad);
+	}
+}
+
+void UCargo::OnOwnerDies_BailOutSquad(ASquadController* Squad) const
+{
+	UCargoSquad* const CargoSquad = Squad->FindComponentByClass<UCargoSquad>();
+	if (not IsValid(CargoSquad))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(Squad, "CargoSquad", "UCargo::OnOwnerDies_BailOutSquad");
+		return;
+	}
+	// Same immediate exit as a disabled garrison; also swaps Exit back to Enter on the command card.
+	CargoSquad->ExitCargoImmediate(/*bSwapAbilities=*/true);
+	// Copy: damage can kill a soldier and change the squad's unit list.
+	const TArray<ASquadUnit*> SquadUnits = Squad->GetSquadUnitsChecked();
+	for (ASquadUnit* const Unit : SquadUnits)
+	{
+		if (not IsValid(Unit))
+		{
+			continue;
+		}
+		const UHealthComponent* const UnitHealthComponent = Unit->FindComponentByClass<UHealthComponent>();
+		if (not IsValid(UnitHealthComponent))
+		{
+			continue;
+		}
+		const float DamageAmount = UnitHealthComponent->GetCurrentHealth() * (1.f - M_BailOutHealthFractionKept);
+		if (DamageAmount <= 0.f)
+		{
+			continue;
+		}
+		FDamageEvent DamageEvent;
+		Unit->TakeDamage(DamageAmount, DamageEvent, /*EventInstigator*/ nullptr, /*DamageCauser*/ GetOwner());
+	}
 }
 
 void UCargo::ApplyDamageToGarrisonedSquads(const int32 DamagePercent)
