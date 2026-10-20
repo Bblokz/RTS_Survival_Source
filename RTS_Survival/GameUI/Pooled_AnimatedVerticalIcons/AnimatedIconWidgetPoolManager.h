@@ -92,6 +92,15 @@ public:
 	bool ShowAnimatedIconAttachedToActorWithSettings(ERTSVerticalAnimatedIcon IconType, AActor* AttachActor,
 		const FVector& LocalOffset, const FRTSVerticalAnimIconSettings& AnimationSettings);
 
+	/**
+	 * @brief Lets persistent cursor widgets reuse the catalog artwork without consuming pooled world slots.
+	 * @param IconType Catalog entry to look up.
+	 * @param OutDefinition Copy of the entry; its texture stays resident while the pool is ready.
+	 * @return False without reporting when the entry has no artwork, so the catalog can opt icons out.
+	 */
+	bool TryGetCatalogIconDefinition(const ERTSVerticalAnimatedIcon IconType,
+		FRTSVerticalAnimatedIconDefinition& OutDefinition) const;
+
 	UFUNCTION(BlueprintPure, Category="Animated Icons")
 	int32 GetPoolSize() const;
 

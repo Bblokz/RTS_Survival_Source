@@ -43,6 +43,14 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/CardSystem/CardUI/CardMenu/LayoutProfileWidgets.h"
+#include "RTS_Survival/CardSystem/CardUI/CardMenu/W_CardMenu.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
+#include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/AsyncWorldGeneration/W_AsyncWorldGeneration.h"
+#include "RTS_Survival/WorldCampaign/WorldMapUI/W_WorldMenu.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerController.h"
+#include "RTS_Survival/WorldCampaign/WorldPlayer/Controller/WorldPlayerProfileAndUIManager/WorldProfileAndUIManager.h"
 
 namespace UISnapshotConstants
 {
@@ -96,6 +104,10 @@ namespace UISnapshotConstants
 	const FVector PreviewPingOffsets[] = {FVector(-0.32, -0.26, 0.0), FVector(0.3, -0.08, 0.0), FVector(0.06, 0.34, 0.0)};
 	constexpr float PreviewPingAgesAtCapture[] = {0.3f, 0.9f, 1.7f};
 	const TCHAR* const GallerySwitch = TEXT("UISnapshotGallery=");
+	// Campaign map: capture the card menu of the player profile UI instead of a mission HUD.
+	const TCHAR* const WorldCardMenuSwitch = TEXT("UISnapshotWorldCardMenu");
+	const TCHAR* const WorldLayoutSwitch = TEXT("UISnapshotWorldLayout=");
+	constexpr int32 WorldCampaignGenerationSeed = 1337;
 	const FVector2D GalleryOrigin(40.0, 140.0);
 	constexpr double GalleryRowHeight = 260.0;
 	constexpr int32 GalleryZOrder = 1000;
@@ -118,6 +130,11 @@ bool UUISnapshotSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 void UUISnapshotSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
+	RTSFunctionLibrary::PushModalDialogSuppression();
+	if (GetIsWorldCardMenuMode())
+	{
+		SeedGameInstanceForWorldCampaign();
+	}
 	BuildSteps();
 	FModuleManager::Get().LoadModule(TEXT("SlateReflector"));
 	EnterPhase(EUISnapshotPhase::WaitingForHud);
@@ -152,7 +169,12 @@ void UUISnapshotSubsystem::Tick(float DeltaTime)
 
 void UUISnapshotSubsystem::TickWaitingForHud()
 {
-	if (GetSecondsInPhase() >= UISnapshotConstants::HudBuildSeconds && TryStartGame())
+	if (GetSecondsInPhase() < UISnapshotConstants::HudBuildSeconds)
+	{
+		return;
+	}
+	const bool bIsReady = GetIsWorldCardMenuMode() ? TryOpenWorldCardMenu() : TryStartGame();
+	if (bIsReady)
 	{
 		EnterPhase(EUISnapshotPhase::WaitingAfterStart);
 	}
@@ -214,7 +236,12 @@ double UUISnapshotSubsystem::GetSecondsInPhase() const
 void UUISnapshotSubsystem::BuildSteps()
 {
 	M_Steps.Reset();
-	for (const EUISnapshotSelection Selection : {EUISnapshotSelection::PlayerUnits, EUISnapshotSelection::Trainer})
+	TArray<EUISnapshotSelection> Selections = {EUISnapshotSelection::PlayerUnits, EUISnapshotSelection::Trainer};
+	if (GetIsWorldCardMenuMode())
+	{
+		Selections = {EUISnapshotSelection::WorldCardMenu};
+	}
+	for (const EUISnapshotSelection Selection : Selections)
 	{
 		for (const FIntPoint& Resolution : UISnapshotConstants::Resolutions)
 		{
@@ -247,6 +274,87 @@ bool UUISnapshotSubsystem::TryStartGame()
 	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT game started"));
 	FocusCameraOnTrainer();
 	return true;
+}
+
+bool UUISnapshotSubsystem::GetIsWorldCardMenuMode() const
+{
+	return FParse::Param(FCommandLine::Get(), UISnapshotConstants::WorldCardMenuSwitch);
+}
+
+void UUISnapshotSubsystem::SeedGameInstanceForWorldCampaign() const
+{
+	URTSGameInstance* const GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (not IsValid(GameInstance))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UISNAPSHOT no RTS game instance to seed for the world campaign"));
+		return;
+	}
+	// The map is started directly, so the main menu never set these; a fixed seed keeps captures comparable.
+	FCampaignGenerationSettings GenerationSettings;
+	GenerationSettings.bNeedsToGenerateCampaign = true;
+	GenerationSettings.GenerationSeed = UISnapshotConstants::WorldCampaignGenerationSeed;
+	GenerationSettings.bAreSettingsLoaded = true;
+	GameInstance->SetCampaignGenerationSettings(GenerationSettings);
+	FRTSGameDifficulty Difficulty;
+	Difficulty.bIsInitialized = true;
+	GameInstance->SetSelectedGameDifficulty(Difficulty);
+	GameInstance->SetPlayerFaction(ERTSFaction::GerBreakthroughDoctrine);
+}
+
+bool UUISnapshotSubsystem::TryOpenWorldCardMenu() const
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	const AWorldPlayerController* const WorldController = Cast<AWorldPlayerController>(
+		World->GetFirstPlayerController());
+	if (not IsValid(WorldController))
+	{
+		return false;
+	}
+	// The card menu is filled once the campaign is generated, which also removes the loading screen.
+	TArray<UUserWidget*> LoadingScreens;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(World, LoadingScreens, UW_AsyncWorldGeneration::StaticClass(), false);
+	if (LoadingScreens.Num() > 0)
+	{
+		return false;
+	}
+	const UWorldProfileAndUIManager* const ProfileManager = WorldController->FindComponentByClass<
+		UWorldProfileAndUIManager>();
+	if (not IsValid(ProfileManager))
+	{
+		return false;
+	}
+	UW_WorldMenu* const WorldMenu = ProfileManager->GetWorldMenu();
+	if (not IsValid(WorldMenu))
+	{
+		return false;
+	}
+	WorldMenu->UpdateMenuForNewFocus(EWorldUIFocusState::CardMenu);
+	ShowWorldCardMenuLayout();
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT world card menu opened"));
+	return true;
+}
+
+void UUISnapshotSubsystem::ShowWorldCardMenuLayout() const
+{
+	int32 LayoutValue = INDEX_NONE;
+	if (not FParse::Value(FCommandLine::Get(), UISnapshotConstants::WorldLayoutSwitch, LayoutValue))
+	{
+		return;
+	}
+	TArray<UUserWidget*> CardMenus;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), CardMenus, UW_CardMenu::StaticClass(), false);
+	for (UUserWidget* const Widget : CardMenus)
+	{
+		UW_CardMenu* const CardMenu = Cast<UW_CardMenu>(Widget);
+		if (IsValid(CardMenu))
+		{
+			CardMenu->SwitchLayout(static_cast<ELayoutProfileWidgets>(LayoutValue));
+		}
+	}
 }
 
 void UUISnapshotSubsystem::HoldEnergyPreview() const
@@ -457,6 +565,11 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 	}
 	const FSnapshotStep& Step = M_Steps[M_StepIndex];
 	FSystemResolution::RequestResolutionChange(Step.Resolution.X, Step.Resolution.Y, EWindowMode::Windowed);
+	if (Step.Selection == EUISnapshotSelection::WorldCardMenu)
+	{
+		// Nothing to select on the campaign map; the menu was opened when the world became ready.
+		return;
+	}
 	if (Step.Selection == EUISnapshotSelection::PlayerUnits)
 	{
 		SelectPlayerUnits();
@@ -784,7 +897,15 @@ FString UUISnapshotSubsystem::GetCurrentStepName() const
 		return TEXT("invalid");
 	}
 	const FSnapshotStep& Step = M_Steps[M_StepIndex];
-	const TCHAR* const SelectionName = Step.Selection == EUISnapshotSelection::PlayerUnits ? TEXT("units") : TEXT("trainer");
+	const TCHAR* SelectionName = TEXT("trainer");
+	if (Step.Selection == EUISnapshotSelection::PlayerUnits)
+	{
+		SelectionName = TEXT("units");
+	}
+	else if (Step.Selection == EUISnapshotSelection::WorldCardMenu)
+	{
+		SelectionName = TEXT("worldcardmenu");
+	}
 	return FString::Printf(TEXT("%s_%dp"), SelectionName, Step.Resolution.Y);
 }
 

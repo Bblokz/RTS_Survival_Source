@@ -2422,6 +2422,15 @@ ECommandQueueError ICommands::CancelAimAbility(const bool bSetUnitToIdle, const 
 	if (bSetUnitToIdle)
 	{
 		SetUnitToIdle();
+		// Going idle terminated the aim ability: its move to range stopped and the card shows the aim ability again.
+		// A cancel queued now would find no cancel entry and be refused with an error; the cancel is already done.
+		// The refused command used to end the (now empty) queue, which is what tells the unit it is idle.
+		if (not FAbilityHelpers::GetHasAimAbility(UnitCommandData->GetAbilities(), EAbilityID::IdCancelAimAbility,
+		                                          AimAbilityType, AimAbilityEntry))
+		{
+			OnUnitIdleAndNoNewCommands();
+			return ECommandQueueError::NoError;
+		}
 	}
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdCancelAimAbility, FVector::ZeroVector, nullptr, FRotator::ZeroRotator,

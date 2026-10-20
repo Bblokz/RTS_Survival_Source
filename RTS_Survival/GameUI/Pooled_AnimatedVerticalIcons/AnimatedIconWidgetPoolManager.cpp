@@ -284,6 +284,28 @@ const FRTSVerticalAnimatedIconDefinition* UAnimatedIconWidgetPoolManager::FindDe
 	return Definition;
 }
 
+bool UAnimatedIconWidgetPoolManager::TryGetCatalogIconDefinition(const ERTSVerticalAnimatedIcon IconType,
+	FRTSVerticalAnimatedIconDefinition& OutDefinition) const
+{
+	if (IconType == ERTSVerticalAnimatedIcon::None || not bM_IsReady || not GetIsValidIconDataAsset())
+	{
+		return false;
+	}
+	const FRTSVerticalAnimatedIconDefinition* CatalogEntry = M_IconDataAsset->IconDefinitions.Find(IconType);
+	if (CatalogEntry == nullptr || CatalogEntry->Texture.IsNull())
+	{
+		// Unassigned artwork deliberately disables this icon.
+		return false;
+	}
+	const FRTSVerticalAnimatedIconDefinition* ValidatedDefinition = FindDefinition(IconType);
+	if (ValidatedDefinition == nullptr)
+	{
+		return false;
+	}
+	OutDefinition = *ValidatedDefinition;
+	return true;
+}
+
 int32 UAnimatedIconWidgetPoolManager::FindOldestActiveIndex() const
 {
 	int32 OldestIndex = INDEX_NONE;

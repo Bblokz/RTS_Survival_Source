@@ -23,7 +23,9 @@ enum class EUISnapshotPhase : uint8
 enum class EUISnapshotSelection : uint8
 {
 	PlayerUnits,
-	Trainer
+	Trainer,
+	// -UISnapshotWorldCardMenu: the campaign map's card menu (player profile UI) instead of a mission HUD.
+	WorldCardMenu
 };
 
 /**
@@ -74,6 +76,13 @@ private:
 
 	void BuildSteps();
 	bool TryStartGame();
+	// World campaign map (-UISnapshotWorldCardMenu): seeds the game instance so the campaign generates without the
+	// main menu, then opens the card menu once the generation loading screen is gone.
+	bool GetIsWorldCardMenuMode() const;
+	void SeedGameInstanceForWorldCampaign() const;
+	bool TryOpenWorldCardMenu() const;
+	// -UISnapshotWorldLayout=N switches the card menu to that ELayoutProfileWidgets value before the capture.
+	void ShowWorldCardMenuLayout() const;
 	// Writes the minimap terrain capture next to the screenshots so its framing and exposure can be reviewed.
 	void ExportMinimapTerrain() const;
 	// Maps that open on a difficulty picker (the game start tutorial) wait for it; picks Normal.
