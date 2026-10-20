@@ -83,6 +83,18 @@ struct FRTSShortsCameraParams
 	/** Centimetres the aim point is moved along the unit's forward axis (side profiles: puts the muzzle inside the frame). */
 	UPROPERTY()
 	float LookAtForward = 0.f;
+
+	/** Degrees the camera travels around the unit during the segment (0 = static; 180 = from the front round to the rear). */
+	UPROPERTY()
+	float OrbitDegrees = 0.f;
+
+	/** Segment-local second at which the orbit pan starts (after the shot, so the reload is seen from behind). */
+	UPROPERTY()
+	float OrbitStartSeconds = 0.f;
+
+	/** Duration of the orbit pan in seconds (eased in and out). */
+	UPROPERTY()
+	float OrbitSeconds = 3.f;
 };
 
 /**
@@ -217,6 +229,14 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	float TargetAimHeight = 400.f;
 
+	/** A destructible apartment target: its part health is scaled by this and its splash radius by
+	 *  TargetSplashScale before it is set up (a short slot only has room for a few rounds). */
+	UPROPERTY()
+	float TargetHealthScale = 1.f;
+
+	UPROPERTY()
+	float TargetSplashScale = 1.f;
+
 	/** Squads: issue a switch-weapons command right after placement (rifle squads otherwise fight with their Panzerfausts). */
 	UPROPERTY()
 	bool bSwitchWeapons = false;
@@ -224,6 +244,10 @@ struct FRTSShortsSegment
 	/** Squads with MaxSquadVisible: members whose weapon class name contains this are shown first (e.g. "Kar98_C"). */
 	UPROPERTY()
 	FString PreferredWeapon;
+
+	/** Squads: the soldiers' cooldown between shots in seconds (a bolt rifle otherwise fires once per 3.7 s slot); negative keeps the weapon's own. */
+	UPROPERTY()
+	float InfantryFireIntervalSeconds = -1.f;
 
 	/** Owning player of the dummy target (0 = the AI enemy). */
 	UPROPERTY()
@@ -247,6 +271,29 @@ struct FRTSShortsSegment
 	 *  the original size) while EffectUnitScale sizes the flash. */
 	UPROPERTY()
 	float EffectUnitSmokeScale = 0.f;
+
+	/** Smoke copy: seconds it keeps spawning, its fade time (-1 = the effect values) and how far (cm) in front of
+	 *  the muzzle socket it plays. */
+	UPROPERTY()
+	float EffectSmokeMaxSeconds = -1.f;
+
+	UPROPERTY()
+	float EffectSmokeFadeSeconds = -1.f;
+
+	UPROPERTY()
+	float EffectSmokeForwardOffset = 0.f;
+
+	/** Number of stacked smoke copies (1-4): more copies, denser smoke at the same size. */
+	UPROPERTY()
+	int32 EffectSmokeCopies = 1;
+
+	/** Extra smoke copies (after the first) are scaled by this relative to EffectUnitSmokeScale. */
+	UPROPERTY()
+	float EffectSmokeExtraCopyScale = 1.f;
+
+	/** Smoke copies are pushed this far (cm, horizontally) away from the camera, behind the barrel's plane. */
+	UPROPERTY()
+	float EffectSmokeAwayOffset = 0.f;
 
 	/** After EffectMaxSeconds the effect stops spawning; its live particles keep fading naturally and whatever is
 	 *  left is removed this many seconds later. */
@@ -328,6 +375,10 @@ struct FRTSShortsJob
 	/** StageName variable value of the BP_ShortsStage instance to use. */
 	UPROPERTY()
 	FString StageName = TEXT("Vehicle");
+
+	/** Stage actor label to place units on (default "Stage_" + StageName): a second mark inside an existing stage's dressing. */
+	UPROPERTY()
+	FString StageActorName;
 
 	UPROPERTY()
 	int32 Fps = 60;

@@ -23,6 +23,7 @@
 #include "Components/MeshComponent.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/ApartmentDestruction/ApartmentDestructibleActor.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Particles/ParticleSystem.h"
@@ -301,6 +302,13 @@ void ARTSShortsDirector::TickWaitingForTurrets()
 			ForceAnimationTicking(Unit);
 		}
 	}
+	// The first vehicle goes on its mark during the warm-up: placed on the cut frame, the BT-7 Soviet stayed in its
+	// pen for 12 frames and never fired. Squads keep waiting in the pen (their members follow the controller).
+	AActor* FirstUnit = M_Units.IsValidIndex(0) ? M_Units[0].Get() : nullptr;
+	if (IsValid(FirstUnit) && Cast<ASquadController>(FirstUnit) == nullptr && M_Job.Segments.IsValidIndex(0))
+	{
+		PlaceUnitOnStage(FirstUnit, M_Job.Segments[0]);
+	}
 	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_READY units=%d waited=%.1fs allReady=%s"),
 	       M_Units.Num(), Waited, bAllReady ? TEXT("true") : TEXT("false"));
 	M_RunStartWorldSeconds = GetWorld()->GetTimeSeconds();
@@ -391,13 +399,25 @@ void ARTSShortsDirector::TickRunning()
 	{
 		// Some units drive toward their attack-ground target (into the camera); a unit that left its mark by
 		// more than half a metre is put back where it was placed.
-		if (Cast<ASquadController>(Unit) == nullptr && FVector::Dist2D(Unit->GetActorLocation(), M_PlacedLocation) > 50.f)
+		constexpr float MaxDriftCm = 50.f;
+		constexpr float MaxLiftCm = 120.f;
+		const bool bDrifted = FVector::Dist2D(Unit->GetActorLocation(), M_PlacedLocation) > MaxDriftCm
+			|| Unit->GetActorLocation().Z - M_PlacedLocation.Z > MaxLiftCm;
+		if (Cast<ASquadController>(Unit) == nullptr && bDrifted)
 		{
 			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_DRIFT_RESET segment=%d frame=%d placed=%s now=%s dist=%.0f"),
 			       M_CurrentSegment, Frame, *M_PlacedLocation.ToCompactString(), *Unit->GetActorLocation().ToCompactString(),
 			       FVector::Dist2D(Unit->GetActorLocation(), M_PlacedLocation));
+			// A unit whose first placement did not take (the BT-7 Soviet stayed in its pen for 12 frames) was framed
+			// where it stood: re-frame the camera once it really arrives on the stage.
+			constexpr float ReframeAfterJumpCm = 1000.f;
+			const bool bArrivedFromAfar = FVector::Dist2D(Unit->GetActorLocation(), M_Stage->GetActorLocation()) > ReframeAfterJumpCm;
 			PlaceUnitOnStage(Unit, Segment);
 			M_PlacedLocation = Unit->GetActorLocation();
+			if (bArrivedFromAfar)
+			{
+				FrameCamera(Unit, Segment, GetTargetWorldLocation(Segment, Unit));
+			}
 		}
 	}
 	if (Local % 15 == 0 && Local <= 120)
@@ -421,6 +441,23 @@ void ARTSShortsDirector::TickRunning()
 	{
 		DisarmSegmentTarget();
 	}
+	if (Frame % 30 == 0)
+	{
+		// Waiting squads: how many members each still has and where the first one is (diagnoses squads that
+		// arrive at their slot empty).
+		for (int32 Index = M_CurrentSegment + 1; Index < M_Units.Num(); ++Index)
+		{
+			if (ASquadController* Waiting = Cast<ASquadController>(M_Units[Index].Get()))
+			{
+				const TArray<ASquadUnit*> Members = Waiting->GetSquadUnitsChecked();
+				const ASquadUnit* First = Members.Num() > 0 ? Members[0] : nullptr;
+				UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_WAITING_SQUAD frame=%d segment=%d members=%d first=%s"), Frame, Index,
+				       Members.Num(), IsValid(First) ? *First->GetActorLocation().ToCompactString() : TEXT("none"));
+			}
+		}
+	}
+	LogVisibleSoldierShots(Frame);
+	UpdateOrbitCamera(static_cast<float>(Local) / M_Job.Fps);
 	if (M_HiddenSoldiers.IsValidIndex(M_CurrentSegment))
 	{
 		// Hidden squad members stay silent: their shots would be heard but not seen.
@@ -500,6 +537,8 @@ void ARTSShortsDirector::FrameImpactCamera(const AActor* Unit, const FRTSShortsS
 	{
 		return;
 	}
+	// The impact cut replaces the segment's camera, orbit pan included.
+	M_Orbit.bIsActive = false;
 	const FRTSShortsImpactCameraParams& Params = Segment.ImpactCamera;
 	const FVector Target = GetTargetWorldLocation(Segment, Unit);
 	const FVector UnitLocation = Unit->GetActorLocation();
@@ -546,7 +585,7 @@ bool ARTSShortsDirector::FindStageActors()
 {
 	using namespace RTSShortsDirectorPrivate;
 	const FName WantedStage(*M_Job.StageName);
-	const FString WantedActorName = TEXT("Stage_") + M_Job.StageName;
+	const FString WantedActorName = TEXT("Stage_") + (M_Job.StageActorName.IsEmpty() ? M_Job.StageName : M_Job.StageActorName);
 	for (TActorIterator<ACineCameraActor> CameraIt(GetWorld()); CameraIt; ++CameraIt)
 	{
 		M_Camera = *CameraIt;
@@ -726,7 +765,14 @@ void ARTSShortsDirector::ParkStartingUnits() const
 {
 	// The player profile spawns starting units (HQ truck and friends) at the player start, 16 m behind the stage
 	// and inside the hero shot. Move every tank that is not one of ours to the far side of the pen.
+	// They go 40 m behind the pen grid (its rows grow forward): parked on the grid they landed on the segment 2-3
+	// slots and crushed the squads waiting there.
+	constexpr float StartingUnitsBehindPenCm = 4000.f;
+	constexpr float StartingUnitsSpacingCm = 1200.f;
+	constexpr float StartingUnitsLiftCm = 50.f;
 	const FTransform Pen = GetPenTransform(0);
+	const FVector PenForward = Pen.GetRotation().GetForwardVector();
+	const FVector PenRight = Pen.GetRotation().GetRightVector();
 	int32 Parked = 0;
 	for (TActorIterator<ATankMaster> It(GetWorld()); It; ++It)
 	{
@@ -735,7 +781,8 @@ void ARTSShortsDirector::ParkStartingUnits() const
 		{
 			continue;
 		}
-		const FVector Location = Pen.GetLocation() + FVector(0.f, 3000.f + 1200.f * Parked, 50.f);
+		const FVector Location = Pen.GetLocation() - PenForward * StartingUnitsBehindPenCm
+			+ PenRight * (StartingUnitsSpacingCm * Parked) + FVector(0.f, 0.f, StartingUnitsLiftCm);
 		Tank->SetActorLocationAndRotation(Location, Pen.Rotator(), false, nullptr, ETeleportType::TeleportPhysics);
 		++Parked;
 	}
@@ -787,7 +834,9 @@ FTransform ARTSShortsDirector::GetPenTransform(const int32 SegmentIndex) const
 	// and killed a parked mortar crew at 150 m.
 	// Job.PenLocalOffset moves them (stage-local X forward, Y right), e.g. behind a camera that looks downrange.
 	FVector Origin = M_Stage->GetActorLocation() + StageForward * M_Job.PenLocalOffset.X + StageRight * M_Job.PenLocalOffset.Y;
-	if (IsValid(M_Pen) && FVector::Dist2D(M_Pen->GetActorLocation(), M_Stage->GetActorLocation()) < 10000.f)
+	// A job that sets its own PenLocalOffset keeps it even when a placed pen actor happens to be near the stage.
+	const bool bJobPen = not M_Job.PenLocalOffset.Equals(FVector(15000.f, 8000.f, 0.f), 1.f);
+	if (not bJobPen && IsValid(M_Pen) && FVector::Dist2D(M_Pen->GetActorLocation(), M_Stage->GetActorLocation()) < 10000.f)
 	{
 		Origin = M_Pen->GetActorLocation();
 	}
@@ -872,6 +921,7 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 		M_PlayerController->ResetSelectionArrays();
 	}
 	bM_FireOrdered = false;
+	M_LastVisibleRounds = -1;
 	bM_StopOrdered = false;
 	bM_SecondFireOrdered = false;
 	M_StopAfterFireFrame = -1;
@@ -879,15 +929,66 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 	M_HoldFramesLeft = RTSShortsDirectorPrivate::HoldFramesAfterCut;
 	const FRTSShortsSegment& Segment = M_Job.Segments[SegmentIndex];
 	AActor* Unit = M_Units[SegmentIndex].Get();
+	ASquadController* WaitingSquad = Cast<ASquadController>(Unit);
+	const bool bSquadDied = Unit != nullptr && (not IsValid(Unit)
+		|| (IsValid(WaitingSquad) && WaitingSquad->GetSquadUnitsChecked().Num() == 0));
+	if (bSquadDied && not M_Manifest.Segments[SegmentIndex].bSkipped)
+	{
+		// Some squads lose every member while they wait in the pen (a PTRS crew was gone before the first segment
+		// wherever the pen was; its controller then destroys itself); a fresh squad spawns its members at once and is
+		// placed below like any other.
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SQUAD_RESPAWNED segment=%d old=%s"), SegmentIndex, *Unit->GetName());
+		if (IsValid(Unit))
+		{
+			Unit->Destroy();
+		}
+		M_Units[SegmentIndex] = SpawnSegmentUnit(SegmentIndex);
+		Unit = M_Units[SegmentIndex].Get();
+		if (IsValid(Unit))
+		{
+			DisableUnitOptimisation();
+			ForceAnimationTicking(Unit);
+		}
+	}
 	const FVector TargetWorld = GetTargetWorldLocation(Segment, Unit);
 	M_SegmentTarget = nullptr;
 	if (not Segment.TargetClassPath.IsEmpty())
 	{
 #if RTS_WITH_MAP_TESTS
 		const FRotator FaceBack(0.f, M_Stage->GetActorRotation().Yaw + Segment.UnitYawOffset + 180.f, 0.f);
-		M_SegmentTarget = FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), *Segment.TargetClassPath,
-		                                                           FTransform(FaceBack, TargetWorld + FVector(0.f, 0.f, 50.f)),
-		                                                           static_cast<uint8>(Segment.TargetOwningPlayer));
+		UClass* TargetClass = LoadClass<AActor>(nullptr, *Segment.TargetClassPath);
+		if (IsValid(TargetClass) && TargetClass->IsChildOf(AApartmentDestructibleActor::StaticClass()))
+		{
+			// A building: spawned deferred so its part health can be scaled before the parts are set up (a short
+			// slot has room for only a few rounds), with a wider splash so each hit takes out more of it.
+			const FTransform TargetTransform(FaceBack, TargetWorld);
+			AActor* Building = GetWorld()->SpawnActorDeferred<AActor>(TargetClass, TargetTransform, nullptr, nullptr,
+			                                                         ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+			if (IsValid(Building))
+			{
+				if (FStructProperty* SettingsProperty = FindFProperty<FStructProperty>(AApartmentDestructibleActor::StaticClass(), TEXT("DestructionSettings")))
+				{
+					FApartmentDestructionSettings* Settings = SettingsProperty->ContainerPtrToValuePtr<FApartmentDestructionSettings>(Building);
+					const float HealthScale = FMath::Max(0.01f, Segment.TargetHealthScale);
+					FApartmentPartHealth& Health = Settings->PartHealth;
+					Health.ExteriorWall *= HealthScale;
+					Health.InteriorWall *= HealthScale;
+					Health.Floor *= HealthScale;
+					Health.Roof *= HealthScale;
+					Health.Stairs *= HealthScale;
+					Health.Detail *= HealthScale;
+					Settings->SplashRadius *= Segment.TargetSplashScale;
+				}
+				Building->FinishSpawning(TargetTransform);
+			}
+			M_SegmentTarget = Building;
+		}
+		else
+		{
+			M_SegmentTarget = FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), *Segment.TargetClassPath,
+			                                                           FTransform(FaceBack, TargetWorld + FVector(0.f, 0.f, 50.f)),
+			                                                           static_cast<uint8>(Segment.TargetOwningPlayer));
+		}
 #endif
 		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_TARGET_SPAWNED segment=%d class=%s ok=%d"), SegmentIndex,
 		       *Segment.TargetClassPath, M_SegmentTarget.IsValid() ? 1 : 0);
@@ -904,6 +1005,7 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 			}
 		}
 		SuppressUnitDecals(Unit, SegmentIndex);
+		ApplyInfantryFireInterval(Unit, Segment);
 		M_Manifest.Segments[SegmentIndex].CaliberMm = ReadLargestCaliberMm(Unit);
 		FrameCamera(Unit, Segment, TargetWorld);
 	}
@@ -926,7 +1028,29 @@ void ARTSShortsDirector::EndSegment(const int32 SegmentIndex)
 	}
 	if (M_SegmentTarget.IsValid())
 	{
-		M_SegmentTarget->Destroy();
+		if (ASquadController* TargetSquad = Cast<ASquadController>(M_SegmentTarget.Get()))
+		{
+			// The soldiers are separate actors: destroying only the controller left armed orphans by the stage that
+			// fought the next segments' squads.
+			// A copy: each destroyed soldier removes itself from the squad's own array.
+			TArray<TWeakObjectPtr<ASquadUnit>> Soldiers;
+			for (ASquadUnit* Soldier : TargetSquad->GetSquadUnitsChecked())
+			{
+				Soldiers.Add(Soldier);
+			}
+			for (const TWeakObjectPtr<ASquadUnit>& Soldier : Soldiers)
+			{
+				if (Soldier.IsValid())
+				{
+					Soldier->Destroy();
+				}
+			}
+		}
+		// A squad controller destroys itself with its last soldier.
+		if (AActor* TargetActor = M_SegmentTarget.Get(); IsValid(TargetActor))
+		{
+			TargetActor->Destroy();
+		}
 		M_SegmentTarget = nullptr;
 	}
 }
@@ -940,6 +1064,19 @@ void ARTSShortsDirector::PlaceUnitOnStage(AActor* Unit, const FRTSShortsSegment&
 	const FVector Start = Location + FVector(0.f, 0.f, 2000.f);
 	const FVector End = Location - FVector(0.f, 0.f, 2000.f);
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(ShortsPlace), false, Unit);
+	// The previous unit was parked this same frame and its collision can still stand on the mark: the KV-2 after the
+	// Maus landed on the Maus's old roof, 3 m up, and fell into frame two seconds late.
+	for (const TObjectPtr<AActor>& OtherUnit : M_Units)
+	{
+		if (not IsValid(OtherUnit))
+		{
+			continue;
+		}
+		Params.AddIgnoredActor(OtherUnit.Get());
+		TArray<AActor*> AttachedActors;
+		OtherUnit->GetAttachedActors(AttachedActors, true, true);
+		Params.AddIgnoredActors(AttachedActors);
+	}
 	// Height above the ground the unit rests at where it stands now (settled in its pen, or already on the stage):
 	// placing it at that height means it lands resting instead of dropping 20-35 cm on camera.
 	float RestHeight = 30.f;
@@ -959,6 +1096,16 @@ void ARTSShortsDirector::PlaceUnitOnStage(AActor* Unit, const FRTSShortsSegment&
 	// TeleportPhysics: with ResetPhysics the Chaos vehicle body stayed in the pen and the actor snapped back to it
 	// every tick (drift reset on every frame, physics 150 m away from the rendered hull).
 	Unit->SetActorLocationAndRotation(Location, Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+	if (UPrimitiveComponent* RootBody = Cast<UPrimitiveComponent>(Unit->GetRootComponent()))
+	{
+		// No velocity carried over from the pen: a KV-2 dropped there kept its fall speed and bounced off the stage
+		// several metres up, out of the side-profile strip.
+		if (RootBody->IsSimulatingPhysics())
+		{
+			RootBody->SetPhysicsLinearVelocity(FVector::ZeroVector);
+			RootBody->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+		}
+	}
 	UE_LOG(LogRTSShorts, Verbose, TEXT("RTS_SHORTS_PLACED wanted=%s got=%s"), *Location.ToCompactString(), *Unit->GetActorLocation().ToCompactString());
 	if (Segment.TurretRotationSpeed > 0.f)
 	{
@@ -1121,6 +1268,15 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_FX_NEW frame=%d asset=%s owner=%s onUnit=%d dist=%.0f"), Frame, *AssetName,
 			       ComponentOwner ? *ComponentOwner->GetName() : TEXT("none"), bOnUnit ? 1 : 0,
 			       FVector::Dist(Component->GetComponentLocation(), Unit->GetActorLocation()));
+			if (not bExempt && Segment.EffectKillNames.ContainsByPredicate([&AssetName](const FString& Part) { return AssetName.Contains(Part); }))
+			{
+				// Named effects (e.g. the recoil ground dust that hides the hull) are removed outright, before any smoke
+				// split: a coax MG firing every 6 frames otherwise left two scaled smoke copies per shot (a grey veil).
+				Component->DeactivateImmediate();
+				M_EffectFirstSeen.Remove(Component);
+				M_EffectBaseScale.Remove(Component);
+				continue;
+			}
 			if (UNiagaraComponent* Niagara = Cast<UNiagaraComponent>(Component))
 			{
 				if (const UNiagaraSystem* System = Niagara->GetAsset())
@@ -1156,12 +1312,20 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 						// only the smoke at EffectUnitSmokeScale.
 						const float UnitScale = FMath::IsNearlyZero(Segment.EffectUnitScale) ? 1.f : Segment.EffectUnitScale;
 						const FVector OriginalScale = Niagara->GetComponentScale() / UnitScale;
-						UNiagaraComponent* SmokeCopy = UNiagaraFunctionLibrary::SpawnSystemAttached(
-							const_cast<UNiagaraSystem*>(System), Niagara->GetAttachParent(), Niagara->GetAttachSocketName(),
-							Niagara->GetRelativeLocation(), Niagara->GetRelativeRotation(), EAttachLocation::KeepRelativeOffset, true);
-						if (IsValid(SmokeCopy))
+						// No opacity parameter is exposed: density comes from stacking copies. The first plays out in front
+						// of the muzzle (EffectSmokeForwardOffset), the others right at it so there is no gap after the shot.
+						const int32 CopyCount = FMath::Clamp(Segment.EffectSmokeCopies, 1, 4);
+						for (int32 CopyIndex = 0; CopyIndex < CopyCount; ++CopyIndex)
 						{
-							SmokeCopy->SetWorldScale3D(OriginalScale * Segment.EffectUnitSmokeScale);
+							UNiagaraComponent* SmokeCopy = UNiagaraFunctionLibrary::SpawnSystemAttached(
+								const_cast<UNiagaraSystem*>(System), Niagara->GetAttachParent(), Niagara->GetAttachSocketName(),
+								Niagara->GetRelativeLocation(), Niagara->GetRelativeRotation(), EAttachLocation::KeepRelativeOffset, true);
+							if (not IsValid(SmokeCopy))
+							{
+								continue;
+							}
+							const float CopyScale = CopyIndex == 0 ? 1.f : FMath::Max(0.05f, Segment.EffectSmokeExtraCopyScale);
+							SmokeCopy->SetWorldScale3D(OriginalScale * Segment.EffectUnitSmokeScale * CopyScale);
 							for (const FNiagaraEmitterHandle& Handle : System->GetEmitterHandles())
 							{
 								if (not SmokeEmitters.Contains(Handle.GetName()))
@@ -1169,8 +1333,22 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 									SmokeCopy->SetEmitterEnable(Handle.GetName(), false);
 								}
 							}
+							if (CopyIndex == 0 && not FMath::IsNearlyZero(Segment.EffectSmokeForwardOffset))
+							{
+								// Out in front of the muzzle, so the cloud does not sit over the barrel.
+								SmokeCopy->AddWorldOffset(SmokeCopy->GetForwardVector() * Segment.EffectSmokeForwardOffset);
+							}
+							if (not FMath::IsNearlyZero(Segment.EffectSmokeAwayOffset) && IsValid(M_Camera))
+							{
+								// Behind the barrel's plane as seen from the camera: the barrel stays readable in front of
+								// the cloud instead of sinking into it (the hull plates are nearer the camera anyway).
+								FVector Away = SmokeCopy->GetComponentLocation() - M_Camera->GetActorLocation();
+								Away.Z = 0.f;
+								SmokeCopy->AddWorldOffset(Away.GetSafeNormal() * Segment.EffectSmokeAwayOffset);
+							}
 							M_EffectFirstSeen.Add(SmokeCopy, Frame);
 							M_EffectBaseScale.Add(SmokeCopy, SmokeCopy->GetComponentScale());
+							M_SmokeCopies.Add(SmokeCopy);
 						}
 						Disabled.Append(SmokeEmitters);
 					}
@@ -1187,13 +1365,6 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 					UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_FX_EMITTERS asset=%s emitters=%s disabled=%d"), *AssetName, *Emitters, Disabled.Num());
 				}
 			}
-			if (not bExempt && Segment.EffectKillNames.ContainsByPredicate([&AssetName](const FString& Part) { return AssetName.Contains(Part); }))
-			{
-				// Named effects (e.g. the recoil ground dust that hides the hull) are removed outright.
-				Component->DeactivateImmediate();
-				M_EffectFirstSeen.Remove(Component);
-				M_EffectBaseScale.Remove(Component);
-			}
 			continue;
 		}
 		if (not bCap || GetIsEffectExemptFromLimits(Segment, *FirstSeen))
@@ -1202,7 +1373,14 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 		}
 		// Stop spawning at EffectMaxSeconds, then shrink what is left to nothing over 0.6 s (a fade, not a pop).
 		const int32 Age = Frame - *FirstSeen;
-		if (Age <= MaxFrames)
+		// The smoke copy of a split effect has its own hold and fade, and fades at normal speed (smoke drifts out).
+		const bool bSmokeCopy = M_SmokeCopies.Contains(Component);
+		const int32 CompMaxFrames = bSmokeCopy && Segment.EffectSmokeMaxSeconds >= 0.f
+			? FMath::RoundToInt(Segment.EffectSmokeMaxSeconds * M_Job.Fps) : MaxFrames;
+		const int32 CompFadeFrames = bSmokeCopy && Segment.EffectSmokeFadeSeconds > 0.f
+			? FMath::Max(1, FMath::RoundToInt(Segment.EffectSmokeFadeSeconds * M_Job.Fps)) : FadeFrames;
+		const float CompFadeSpeed = bSmokeCopy ? 1.f : Segment.EffectFadeSpeed;
+		if (Age <= CompMaxFrames)
 		{
 			continue;
 		}
@@ -1226,12 +1404,12 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 		if (UNiagaraComponent* Niagara = Cast<UNiagaraComponent>(Component))
 		{
 			// Age the remaining particles faster so they fade out on their own curve instead of being cut.
-			if (Segment.EffectFadeSpeed > 1.f && not FMath::IsNearlyEqual(Niagara->GetCustomTimeDilation(), Segment.EffectFadeSpeed))
+			if (CompFadeSpeed > 1.f && not FMath::IsNearlyEqual(Niagara->GetCustomTimeDilation(), CompFadeSpeed))
 			{
-				Niagara->SetCustomTimeDilation(Segment.EffectFadeSpeed);
+				Niagara->SetCustomTimeDilation(CompFadeSpeed);
 			}
 		}
-		const float Alpha = FMath::Clamp(static_cast<float>(Age - MaxFrames) / FadeFrames, 0.f, 1.f);
+		const float Alpha = FMath::Clamp(static_cast<float>(Age - CompMaxFrames) / CompFadeFrames, 0.f, 1.f);
 		if (Alpha >= 1.f)
 		{
 			if (UNiagaraComponent* Niagara = Cast<UNiagaraComponent>(Component))
@@ -1247,6 +1425,7 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 			M_EffectFirstSeen.Remove(Component);
 			M_EffectBaseScale.Remove(Component);
 			M_EffectStopped.Remove(Component);
+			M_SmokeCopies.Remove(Component);
 		}
 	}
 }
@@ -1259,6 +1438,65 @@ bool ARTSShortsDirector::GetIsEffectExemptFromLimits(const FRTSShortsSegment& Se
 	}
 	const int32 LimitEndFrame = M_SegmentStartFrames[M_CurrentSegment] + FMath::RoundToInt(Segment.EffectLimitUntilSeconds * M_Job.Fps);
 	return FirstSeenFrame >= LimitEndFrame;
+}
+
+void ARTSShortsDirector::LogVisibleSoldierShots(const int32 Frame)
+{
+	// One line per round the framed soldier fires (its magazine count drops): cut leads are set from these frames.
+	const ASquadUnit* Soldier = M_Units.IsValidIndex(M_CurrentSegment)
+		? Cast<ASquadUnit>(GetFramingSubject(M_Units[M_CurrentSegment].Get())) : nullptr;
+	AInfantryWeaponMaster* Weapon = IsValid(Soldier) ? Soldier->GetInfantryWeapon() : nullptr;
+	if (not IsValid(Weapon))
+	{
+		return;
+	}
+	int32 Rounds = 0;
+	for (const UWeaponState* State : Weapon->GetWeapons())
+	{
+		Rounds += IsValid(State) ? State->GetCurrentMagCapacity() : 0;
+	}
+	if (M_LastVisibleRounds >= 0 && Rounds < M_LastVisibleRounds)
+	{
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SHOT segment=%d frame=%d local=%d rounds=%d"), M_CurrentSegment, Frame,
+		       Frame - M_SegmentStartFrames[M_CurrentSegment], Rounds);
+	}
+	M_LastVisibleRounds = Rounds;
+}
+
+void ARTSShortsDirector::ApplyInfantryFireInterval(AActor* Unit, const FRTSShortsSegment& Segment) const
+{
+	ASquadController* Squad = Cast<ASquadController>(Unit);
+	if (Segment.InfantryFireIntervalSeconds < 0.f || not IsValid(Squad))
+	{
+		return;
+	}
+	int32 Changed = 0;
+	for (ASquadUnit* Soldier : Squad->GetSquadUnitsChecked())
+	{
+		AInfantryWeaponMaster* Weapon = IsValid(Soldier) ? Soldier->GetInfantryWeapon() : nullptr;
+		if (not IsValid(Weapon))
+		{
+			continue;
+		}
+		for (UWeaponState* State : Weapon->GetWeapons())
+		{
+			FWeaponData* Data = IsValid(State) ? State->GetWeaponDataToUpgrade() : nullptr;
+			if (Data == nullptr)
+			{
+				continue;
+			}
+			Data->BaseCooldown = FMath::Min(Data->BaseCooldown, Segment.InfantryFireIntervalSeconds);
+			Data->CooldownFlux = 0;
+			// A faster bolt rifle emptied its 5-round clip before the cut and reloaded on camera: a deep magazine,
+			// filled now, keeps it firing through the slot.
+			constexpr int32 ShortsMagazine = 30;
+			Data->MagCapacity = FMath::Max(Data->MagCapacity, ShortsMagazine);
+			State->ForceInstantReload();
+			++Changed;
+		}
+	}
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_FIRE_INTERVAL squad=%s weapons=%d interval=%.2f"), *Squad->GetName(), Changed,
+	       Segment.InfantryFireIntervalSeconds);
 }
 
 void ARTSShortsDirector::DisarmSegmentTarget() const
@@ -1444,6 +1682,16 @@ void ARTSShortsDirector::FrameCamera(const AActor* Unit, const FRTSShortsSegment
 	Rotation.Pitch += Params.ExtraPitch;
 	Rotation.Roll = 0.f;
 	M_Camera->SetActorLocationAndRotation(CameraLocation, Rotation);
+	M_Orbit = FRTSShortsOrbitState();
+	if (not FMath::IsNearlyZero(Params.OrbitDegrees))
+	{
+		M_Orbit.bIsActive = true;
+		M_Orbit.Pivot = LookAt;
+		M_Orbit.StartOffset = CameraLocation - LookAt;
+		M_Orbit.Degrees = Params.OrbitDegrees;
+		M_Orbit.StartSeconds = Params.OrbitStartSeconds;
+		M_Orbit.DurationSeconds = FMath::Max(0.1f, Params.OrbitSeconds);
+	}
 	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CAMERA origin=%s camera=%s lookAt=%s rot=%s focal=%.0f"), *Origin.ToCompactString(),
 	       *CameraLocation.ToCompactString(), *LookAt.ToCompactString(), *Rotation.ToCompactString(), Params.FocalLength);
 	if (UCineCameraComponent* CineComponent = M_Camera->GetCineCameraComponent())
@@ -1463,6 +1711,22 @@ void ARTSShortsDirector::FrameCamera(const AActor* Unit, const FRTSShortsSegment
 		CineComponent->PostProcessBlendWeight = 1.f;
 	}
 	ApplyCameraCut(CameraLocation);
+}
+
+void ARTSShortsDirector::UpdateOrbitCamera(const float SegmentSeconds) const
+{
+	if (not M_Orbit.bIsActive || not GetIsValidCamera())
+	{
+		return;
+	}
+	const float Alpha = FMath::Clamp((SegmentSeconds - M_Orbit.StartSeconds) / M_Orbit.DurationSeconds, 0.f, 1.f);
+	// Smoothstep: the pan eases out of the front view and settles on the rear view instead of stopping hard.
+	const float Eased = Alpha * Alpha * (3.f - 2.f * Alpha);
+	const FVector Offset = M_Orbit.StartOffset.RotateAngleAxis(M_Orbit.Degrees * Eased, FVector::UpVector);
+	const FVector CameraLocation = M_Orbit.Pivot + Offset;
+	FRotator Rotation = (M_Orbit.Pivot - CameraLocation).Rotation();
+	Rotation.Roll = 0.f;
+	M_Camera->SetActorLocationAndRotation(CameraLocation, Rotation);
 }
 
 float ARTSShortsDirector::ReadLargestWeaponRange(const AActor* Unit) const

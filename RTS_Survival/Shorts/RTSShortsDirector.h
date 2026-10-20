@@ -13,6 +13,22 @@ class ACPPController;
 class UMoviePipeline;
 class USoundMix;
 
+/** Camera orbit pan of the running segment: the start pose rotated around the framed unit's vertical axis. */
+USTRUCT()
+struct FRTSShortsOrbitState
+{
+	GENERATED_BODY()
+
+	bool bIsActive = false;
+	// Look-at point the camera circles and looks at.
+	FVector Pivot = FVector::ZeroVector;
+	// Camera location minus Pivot at the segment's framing; rotated about Z by the eased orbit angle.
+	FVector StartOffset = FVector::ZeroVector;
+	float Degrees = 0.f;
+	float StartSeconds = 0.f;
+	float DurationSeconds = 1.f;
+};
+
 /** Phases of one shorts run; the director advances through them in order. */
 UENUM()
 enum class ERTSShortsDirectorPhase : uint8
@@ -101,14 +117,22 @@ private:
 	TMap<TWeakObjectPtr<class UFXSystemComponent>, FVector> M_EffectBaseScale;
 	/** Effects this director deactivated after EffectMaxSeconds; one that turns active again is a new shot. */
 	TSet<TWeakObjectPtr<class UFXSystemComponent>> M_EffectStopped;
+	/** Smoke-only copies spawned by EffectUnitSmokeScale (own hold and fade). */
+	TSet<TWeakObjectPtr<class UFXSystemComponent>> M_SmokeCopies;
 
 	/** Squads: stops projected decals from painting the soldiers' skeletal meshes. */
 	void SuppressUnitDecals(AActor* Unit, const int32 SegmentIndex) const;
+	/** Segment.InfantryFireIntervalSeconds: shortens the squad's weapon cooldown so a slot shows several shots. */
+	void ApplyInfantryFireInterval(AActor* Unit, const FRTSShortsSegment& Segment) const;
+	/** Logs RTS_SHORTS_SHOT when the framed soldier's magazine count drops (one line per round). */
+	void LogVisibleSoldierShots(const int32 Frame);
 	/** Segment.bDisarmTarget: the spawned dummy target can be shot but never fires back. */
 	void DisarmSegmentTarget() const;
 	void PlaceSquadMembers(AActor* Unit, const FVector& Location, const FRotator& Rotation) const;
 	void FrameCamera(const AActor* Unit, const FRTSShortsSegment& Segment, const FVector& TargetWorld) const;
 	void FrameImpactCamera(const AActor* Unit, const FRTSShortsSegment& Segment) const;
+	/** Moves the camera along the running segment's orbit pan (Camera.OrbitDegrees) for this segment-local time. */
+	void UpdateOrbitCamera(const float SegmentSeconds) const;
 	void ApplyCameraCut(const FVector& CameraLocation) const;
 	void ForceAnimationTicking(AActor* Unit) const;
 	void DisableUnitOptimisation() const;
@@ -146,6 +170,8 @@ private:
 	TArray<int32> M_SegmentStartFrames;
 	int32 M_CurrentSegment = -1;
 	bool bM_FireOrdered = false;
+	// Rounds left in the framed soldier's weapons last tick (-1 = not read yet this segment).
+	int32 M_LastVisibleRounds = -1;
 	bool bM_StopOrdered = false;
 	bool bM_SecondFireOrdered = false;
 	/** Per segment: squad members hidden by MaxSquadVisible (their attack orders are cancelled every tick). */
@@ -153,6 +179,8 @@ private:
 	int32 M_StopAfterFireFrame = -1;
 	int32 M_HoldFramesLeft = 0;
 	FVector M_PlacedLocation = FVector::ZeroVector;
+	// Set by FrameCamera (const) when the segment pans; read every tick by UpdateOrbitCamera.
+	mutable FRTSShortsOrbitState M_Orbit;
 	bool bM_ImpactCutDone = false;
 
 	/** Own capture of the main submix (see FRTSShortsAudioCapture); clock window of frames 0..TotalFrames. */
