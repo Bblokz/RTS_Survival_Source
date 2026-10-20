@@ -181,6 +181,15 @@ public:
 	 */
 	void TerminateFieldConstructionCommand(AActor* StaticPreviewActor);
 
+	/**
+	 * @brief Speeds up construction for research such as Tech_Pioneer_Entrenching; stacks by multiplying.
+	 * @param SpeedMultiplier Positive factor; 1.35 builds 35% faster (duration divided by it).
+	 */
+	void ApplyConstructionSpeedMultiplier(const float SpeedMultiplier);
+	float GetConstructionSpeedMultiplier() const { return M_ConstructionSpeedMultiplier; }
+	// The build time with the full squad alive, after technologies.
+	float GetFullSquadConstructionDurationSeconds() const;
+
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
@@ -225,6 +234,9 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<URTSTimedProgressBarManager> M_TimedProgressBarManager;
 	bool GetIsValidTimedProgressBarManager() const;
+
+	// Product of researched construction speed technologies.
+	float M_ConstructionSpeedMultiplier = 1.f;
 
 	void StartMovementToConstruction();
 	void OnUnitCloseEnoughForConstruction();

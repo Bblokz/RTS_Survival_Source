@@ -564,9 +564,24 @@ void UFieldConstructionAbilityComponent::StopConstructionProgressBar()
 	M_ActiveConstructionState.M_ProgressBarActivationID = 0;
 }
 
+void UFieldConstructionAbilityComponent::ApplyConstructionSpeedMultiplier(const float SpeedMultiplier)
+{
+	if (SpeedMultiplier <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError("ApplyConstructionSpeedMultiplier needs a positive multiplier.");
+		return;
+	}
+	M_ConstructionSpeedMultiplier *= SpeedMultiplier;
+}
+
+float UFieldConstructionAbilityComponent::GetFullSquadConstructionDurationSeconds() const
+{
+	return FieldConstructionAbilitySettings.ConstructionTime / M_ConstructionSpeedMultiplier;
+}
+
 float UFieldConstructionAbilityComponent::CalculateConstructionDurationSeconds() const
 {
-	const float BaseTime = FieldConstructionAbilitySettings.ConstructionTime;
+	const float BaseTime = GetFullSquadConstructionDurationSeconds();
 	const int32 AliveUnits = GetAliveSquadUnitCount();
 	if (AliveUnits <= 0)
 	{

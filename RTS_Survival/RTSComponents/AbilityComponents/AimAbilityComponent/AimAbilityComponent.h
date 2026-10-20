@@ -115,7 +115,7 @@ public:
 	EAimAbilityType GetAimAbilityType() const;
 	EPlayerAimAbilityTypes GetAimAssistType() const;
 	float GetAimAbilityRange() const;
-	float GetAimAbilityRadius() const;
+	virtual float GetAimAbilityRadius() const;
 
 protected:
 	virtual void PostInitProperties() override;
@@ -123,6 +123,36 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FAimAbilitySettings M_AimAbilitySettings;
+
+	/**
+	 * @brief Whether this ability works through the unit's weapons (weapon behaviour, weapon range, firing at the
+	 * target). Aim abilities that launch something of their own instead, like the flare, return false and override
+	 * GetAbilityMaxRange, ExecuteAbilityInRange and OnAbilityInRangeFinished.
+	 * @return True for weapon based aim abilities (default).
+	 */
+	virtual bool GetUsesWeaponBehaviour() const;
+
+	/**
+	 * @brief The range the unit has to be within before the ability executes.
+	 * @param OutMaxRange Maximum range for targeting.
+	 * @return True when the range is valid for use. Default: the range of the weapons from CollectWeaponStates.
+	 */
+	virtual bool GetAbilityMaxRange(float& OutMaxRange) const;
+
+	/**
+	 * @brief Executes the ability once the unit is in range; the ability state is InAbility at this point.
+	 * Default: applies the weapon behaviour, fires the weapons at the location and starts the duration timer.
+	 * Overrides must eventually end the ability with HandleBehaviourDurationFinished(true) or the queue stalls.
+	 * @param TargetLocation The location the player aimed at.
+	 */
+	virtual void ExecuteAbilityInRange(const FVector& TargetLocation);
+
+	/**
+	 * @brief Called when the in-range part of the ability ends (duration over or terminated), before the ability is
+	 * swapped back, put on cooldown and the queue is notified. Default: removes the weapon behaviour and sets the
+	 * weapons back to auto engage.
+	 */
+	virtual void OnAbilityInRangeFinished();
 
 	/**
 	 * @brief Collects the weapons used by this ability and their max range for targeting.
@@ -158,7 +188,9 @@ private:
 	bool GetIsInRange(const FVector& TargetLocation, const float MaxRange) const;
 	float GetDesiredRangeWithBuffer(const float MaxRange) const;
 	FVector GetMoveToRangeLocation(const FVector& TargetLocation, const float DesiredRange) const;
-	void HandleAbilityInRange(const FVector& TargetLocation, const TArray<UWeaponState*>& WeaponStates);
+	void HandleAbilityInRange(const FVector& TargetLocation);
+	// Whether the ability can start at all: a weapon based ability needs its behaviour instance.
+	bool GetCanExecuteAbility() const;
 	void StartMoveToRange(const FVector& TargetLocation, const float MaxRange);
 	void OnMoveCheckTimer();
 	void ClearAbilityTimers();

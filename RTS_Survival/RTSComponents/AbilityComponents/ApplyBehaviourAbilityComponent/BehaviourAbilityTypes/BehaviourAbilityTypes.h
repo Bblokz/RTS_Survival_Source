@@ -33,4 +33,9 @@ enum class EBehaviourAbilityType : uint8
 	EngineOverclocking,
 	ArmorPiercingBullets,
 	APCR_Rounds,
+	// Soviet PPSh assault squads: faster fire and reloads at close range. The values are card keys in
+	// Buttons_DataTableb (IdApplyBehaviour), so new types are only appended.
+	RusCloseAssault,
+	// Soviet mortar teams: rapid barrage, the mortar fires and reloads faster for a short time.
+	RusMortarBarrage,
 };
