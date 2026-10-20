@@ -4,6 +4,7 @@
 
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewComponent.h"
 #include "RTS_Survival/Player/Formation/FormationMovePreview/FormationMovePreviewComponent.h"
+#include "RTS_Survival/Player/HoverCommandIcon/HoverCommandIconComponent.h"
 #include "Misc/ScopeExit.h"
 
 #include "Abilities.h"
@@ -271,6 +272,7 @@ ACPPController::ACPPController()
 	M_FormationController = CreateDefaultSubobject<UFormationController>(TEXT("FormationController"));
 	M_SquadMovePreview = CreateDefaultSubobject<USquadMovePreviewComponent>(TEXT("SquadMovePreview"));
 	M_FormationMovePreview = CreateDefaultSubobject<UFormationMovePreviewComponent>(TEXT("FormationMovePreview"));
+	M_HoverCommandIcon = CreateDefaultSubobject<UHoverCommandIconComponent>(TEXT("HoverCommandIcon"));
 
 
 	M_PlayerProfileLoader = CreateDefaultSubobject<UPlayerProfileLoader>(TEXT("PlayerProfileLoader"));
@@ -1063,6 +1065,7 @@ void ACPPController::Tick(float DeltaTime)
 	Tick_UpdateSquadMovePreview(HitResultCursorProjection, bHit);
 	Tick_UpdateFormationMovePreview(HitResultCursorProjection, bHit);
 	UpdateHoveringActorInfo(DeltaTime, MouseScreenPosition, HitResultCursorProjection, bHit);
+	Tick_UpdateHoverCommandIcon(MouseScreenPosition, HitResultCursorProjection, bHit);
 	UpdateAimAbilityAtCursorProjection(DeltaTime, HitResultCursorProjection);
 
 
@@ -1097,6 +1100,58 @@ bool ACPPController::GetWouldSecondaryClickMove(AActor* ActorUnderCursor)
 	}
 	FTargetUnion UnusedTarget;
 	return M_CommandTypeDecoder->DecodeTargetedActor(ActorUnderCursor, UnusedTarget) == ECommandType::Movement;
+}
+
+bool ACPPController::GetIsValidHoverCommandIcon() const
+{
+	if (IsValid(M_HoverCommandIcon))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_HoverCommandIcon",
+		"GetIsValidHoverCommandIcon",
+		this);
+	return false;
+}
+
+bool ACPPController::GetIsSecondaryClickCommandContext() const
+{
+	if (bM_IsInTechTree || bM_IsInFullMapView || bM_IsCinematicTakeOverActive)
+	{
+		return false;
+	}
+	// Each of these makes the secondary click cancel a mode instead of commanding the selection.
+	if (GetIsPreviewBuildingActive() || bM_IsActionButtonActive || M_ActiveGlobalAbility.IsValid())
+	{
+		return false;
+	}
+	// A held secondary button or an open formation picker means the click is already being handled.
+	return M_PrimaryClickContext == ERTSPrimaryClickContext::RegularPrimaryClick && IsAnyUnitSelected();
+}
+
+void ACPPController::Tick_UpdateHoverCommandIcon(const FVector2D& MouseScreenPosition, const FHitResult& CursorHit,
+                                                 const bool bCursorHit)
+{
+	if (not GetIsValidHoverCommandIcon())
+	{
+		return;
+	}
+	AActor* HoveredActor = bCursorHit ? CursorHit.GetActor() : nullptr;
+	// Same redirect as SecondaryClick, so weapons and turrets preview their owner's command.
+	ChangeClickedActorIfIsChildActor(HoveredActor);
+	const bool bIsAddingOrRemovingFromSelection = bIsHoldingControl || bIsHoldingShift;
+	const bool bWouldChangeSelection = bIsAddingOrRemovingFromSelection && GetIsClickedUnitSelectable(HoveredActor);
+	AActor* PrimarySelectedUnit = GetPrimarySelectedUnit();
+	if (not IsValid(HoveredActor) || not IsValid(PrimarySelectedUnit) || bWouldChangeSelection
+		|| not GetIsSecondaryClickCommandContext() || not GetIsValidCommandTypeDecoder())
+	{
+		M_HoverCommandIcon->HideCommandIcon();
+		return;
+	}
+	M_HoverCommandIcon->UpdateCommandIcon(*M_CommandTypeDecoder, HoveredActor, PrimarySelectedUnit,
+	                                      MouseScreenPosition);
 }
 
 void ACPPController::Tick_UpdateSquadMovePreview(const FHitResult& CursorHit, const bool bCursorHit)

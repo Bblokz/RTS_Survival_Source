@@ -660,6 +660,12 @@ bool UPlayerCommandTypeDecoder::Decode_TowVehicle(AActor* ClickedActor, FTargetU
 		return false;
 	}
 
+	// Enemy tow vehicles must fall through to the HP decoders so they decode as attack targets.
+	if (not GetIsActorAlliedToPlayer(ClickedActor) && not GetIsActorNeutral(ClickedActor))
+	{
+		return false;
+	}
+
 	OutTarget.TargetActor = ClickedActor;
 	OutType = ECommandType::ClickedTowVehicle;
 	return true;
@@ -674,6 +680,12 @@ bool UPlayerCommandTypeDecoder::Decode_TowableActor(AActor* ClickedActor, FTarge
 
 	UTowedActorComponent* TowedActorComp = ClickedActor->FindComponentByClass<UTowedActorComponent>();
 	if (not IsValid(TowedActorComp))
+	{
+		return false;
+	}
+
+	// Enemy towable actors must fall through to the HP decoders so they decode as attack targets.
+	if (not GetIsActorAlliedToPlayer(ClickedActor) && not GetIsActorNeutral(ClickedActor))
 	{
 		return false;
 	}

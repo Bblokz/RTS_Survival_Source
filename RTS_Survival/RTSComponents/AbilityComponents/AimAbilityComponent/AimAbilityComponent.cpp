@@ -85,21 +85,70 @@ void UAimAbilityComponent::StopMovementForAbility()
 {
 }
 
+bool UAimAbilityComponent::GetUsesWeaponBehaviour() const
+{
+	return true;
+}
+
+bool UAimAbilityComponent::GetAbilityMaxRange(float& OutMaxRange) const
+{
+	TArray<UWeaponState*> WeaponStates;
+	return CollectWeaponStates(WeaponStates, OutMaxRange);
+}
+
+void UAimAbilityComponent::ExecuteAbilityInRange(const FVector& TargetLocation)
+{
+	TArray<UWeaponState*> WeaponStates;
+	float MaxRange = 0.0f;
+	if (not CollectWeaponStates(WeaponStates, MaxRange))
+	{
+		HandleBehaviourDurationFinished(true);
+		return;
+	}
+
+	CacheAbilityWeaponStates(WeaponStates);
+	SetWeaponsDisabled();
+	for (UWeaponState* WeaponState : WeaponStates)
+	{
+		if (not IsValid(WeaponState))
+		{
+			continue;
+		}
+		M_WeaponOverwriteBehaviour->ApplybehaviourToWeaponStandalone(WeaponState);
+	}
+	FireWeaponsAtLocation(TargetLocation);
+	BeginAbilityDurationTimer();
+}
+
+void UAimAbilityComponent::OnAbilityInRangeFinished()
+{
+	for (const TWeakObjectPtr<UWeaponState>& WeaponState : M_AbilityExecutionState.M_WeaponStates)
+	{
+		if (not WeaponState.IsValid())
+		{
+			continue;
+		}
+		M_WeaponOverwriteBehaviour->RemovebehaviourFromWeaponStandalone(WeaponState.Get());
+	}
+
+	ClearCachedAbilityWeaponStates();
+	SetWeaponsAutoEngage(false);
+}
+
 void UAimAbilityComponent::ExecuteAimAbility(const FVector& TargetLocation)
 {
 	if (not GetIsValidOwnerCommandsInterface())
 	{
 		return;
 	}
-	if (not GetIsValidBehaviourInstance())
+	if (not GetCanExecuteAbility())
 	{
 		NotifyDoneExecuting();
 		return;
 	}
 
-	TArray<UWeaponState*> WeaponStates;
 	float MaxRange = 0.0f;
-	if (not CollectWeaponStates(WeaponStates, MaxRange))
+	if (not GetAbilityMaxRange(MaxRange))
 	{
 		NotifyDoneExecuting();
 		return;
@@ -111,7 +160,7 @@ void UAimAbilityComponent::ExecuteAimAbility(const FVector& TargetLocation)
 		return;
 	}
 
-	HandleAbilityInRange(TargetLocation, WeaponStates);
+	HandleAbilityInRange(TargetLocation);
 }
 
 void UAimAbilityComponent::TerminateAimAbility()
@@ -156,9 +205,8 @@ EPlayerAimAbilityTypes UAimAbilityComponent::GetAimAssistType() const
 
 float UAimAbilityComponent::GetAimAbilityRange() const
 {
-	TArray<UWeaponState*> WeaponStates;
 	float MaxRange = 0.0f;
-	if (not CollectWeaponStates(WeaponStates, MaxRange))
+	if (not GetAbilityMaxRange(MaxRange))
 	{
 		return 0.0f;
 	}
@@ -238,22 +286,12 @@ void UAimAbilityComponent::StartBehaviourTimer(const float DurationSeconds)
 void UAimAbilityComponent::HandleBehaviourDurationFinished(const bool bNotifyCommand)
 {
 	ClearAbilityTimers();
-	if (not GetIsValidBehaviourInstance())
+	if (not GetCanExecuteAbility())
 	{
 		return;
 	}
 
-	for (const TWeakObjectPtr<UWeaponState>& WeaponState : M_AbilityExecutionState.M_WeaponStates)
-	{
-		if (not WeaponState.IsValid())
-		{
-			continue;
-		}
-		M_WeaponOverwriteBehaviour->RemovebehaviourFromWeaponStandalone(WeaponState.Get());
-	}
-
-	ClearCachedAbilityWeaponStates();
-	SetWeaponsAutoEngage(false);
+	OnAbilityInRangeFinished();
 	RestoreRemovedAbilitiesForAimAbility();
 	M_AbilityExecutionState.M_State = EAimAbilityState::None;
 	SwapAbilityToAim();
@@ -348,6 +386,10 @@ void UAimAbilityComponent::AddAbilityToSquad(ASquadController* SquadController)
 
 void UAimAbilityComponent::BeginPlay_CreateBehaviourInstance()
 {
+	if (not GetUsesWeaponBehaviour())
+	{
+		return;
+	}
 	if (not IsValid(M_AimAbilitySettings.BehaviourApplied))
 	{
 		RTSFunctionLibrary::ReportError("Aim ability behaviour class is not set.");
@@ -362,7 +404,7 @@ void UAimAbilityComponent::BeginPlay_ValidateSettings() const
 	{
 		RTSFunctionLibrary::ReportError("Aim ability cooldown is not valid.");
 	}
-	if (M_AimAbilitySettings.BehaviourDuration <= 0.0f)
+	if (GetUsesWeaponBehaviour() && M_AimAbilitySettings.BehaviourDuration <= 0.0f)
 	{
 		RTSFunctionLibrary::ReportError("Aim ability behaviour duration is not valid.");
 	}
@@ -411,10 +453,18 @@ FVector UAimAbilityComponent::GetMoveToRangeLocation(const FVector& TargetLocati
 	return TargetLocation - (DirectionToTarget * DesiredRange);
 }
 
-void UAimAbilityComponent::HandleAbilityInRange(const FVector& TargetLocation,
-                                                const TArray<UWeaponState*>& WeaponStates)
+bool UAimAbilityComponent::GetCanExecuteAbility() const
 {
-	if (not GetIsValidBehaviourInstance())
+	if (not GetUsesWeaponBehaviour())
+	{
+		return true;
+	}
+	return GetIsValidBehaviourInstance();
+}
+
+void UAimAbilityComponent::HandleAbilityInRange(const FVector& TargetLocation)
+{
+	if (not GetCanExecuteAbility())
 	{
 		NotifyDoneExecuting();
 		return;
@@ -428,18 +478,7 @@ void UAimAbilityComponent::HandleAbilityInRange(const FVector& TargetLocation,
 
 	M_AbilityExecutionState.M_State = EAimAbilityState::InAbility;
 	RemoveAbilitiesForAimAbility();
-	CacheAbilityWeaponStates(WeaponStates);
-	SetWeaponsDisabled();
-	for (UWeaponState* WeaponState : WeaponStates)
-	{
-		if (not IsValid(WeaponState))
-		{
-			continue;
-		}
-		M_WeaponOverwriteBehaviour->ApplybehaviourToWeaponStandalone(WeaponState);
-	}
-	FireWeaponsAtLocation(TargetLocation);
-	BeginAbilityDurationTimer();
+	ExecuteAbilityInRange(TargetLocation);
 }
 
 void UAimAbilityComponent::StartMoveToRange(const FVector& TargetLocation, const float MaxRange)
@@ -490,9 +529,8 @@ void UAimAbilityComponent::OnMoveCheckTimer()
 		return;
 	}
 
-	TArray<UWeaponState*> WeaponStates;
 	float MaxRange = 0.0f;
-	if (not CollectWeaponStates(WeaponStates, MaxRange))
+	if (not GetAbilityMaxRange(MaxRange))
 	{
 		return;
 	}
@@ -504,7 +542,7 @@ void UAimAbilityComponent::OnMoveCheckTimer()
 
 	StopMovementForAbility();
 	ClearAbilityTimers();
-	HandleAbilityInRange(M_AbilityExecutionState.M_TargetLocation, WeaponStates);
+	HandleAbilityInRange(M_AbilityExecutionState.M_TargetLocation);
 }
 
 void UAimAbilityComponent::ClearAbilityTimers()

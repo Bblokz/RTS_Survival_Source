@@ -87,6 +87,7 @@ class AScavengeableObject;
 enum class ERTSPrimaryClickContext;
 struct FPlayerRotationArrowSettings;
 class USquadMovePreviewComponent;
+class UHoverCommandIconComponent;
 class UFormationMovePreviewComponent;
 enum class ERTSPauseGameOptions : uint8;
 enum class ERTSVoiceLine : uint8;
@@ -1676,6 +1677,24 @@ private:
 	 * @param bCursorHit Whether CursorHit is a valid hit.
 	 */
 	void Tick_UpdateFormationMovePreview(const FHitResult& CursorHit, bool bCursorHit);
+
+	// Shows next to the cursor which targeted command a secondary click would give the primary selected unit.
+	UPROPERTY()
+	TObjectPtr<UHoverCommandIconComponent> M_HoverCommandIcon;
+
+	bool GetIsValidHoverCommandIcon() const;
+
+	/**
+	 * @brief Feeds this frame's cursor target to the hover command icon, or hides it when a click would not command.
+	 * @param MouseScreenPosition Cursor position in viewport pixels.
+	 * @param CursorHit What the cursor currently points at.
+	 * @param bCursorHit Whether CursorHit is a valid hit.
+	 */
+	void Tick_UpdateHoverCommandIcon(const FVector2D& MouseScreenPosition, const FHitResult& CursorHit,
+	                                 const bool bCursorHit);
+
+	/** @return False while another mode would consume the secondary click, so no command preview is honest. */
+	bool GetIsSecondaryClickCommandContext() const;
 
 	/**
 	 * @brief Starts recording a line drag when the held secondary button can spread the selection along it.
