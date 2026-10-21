@@ -45,6 +45,17 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup")
 	ERocketAbility RocketAbilityType = ERocketAbility::None;
 
+	// Opt-in for units whose unit data has no IdFireRockets entry (e.g. a variant that shares its base's abilities):
+	// adds the fire-rockets ability of RocketAbilityType on the next tick. Leave off when the unit data already has it,
+	// adding a duplicate ability reports an error.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Ability")
+	bool bAddAbilityOnBeginPlay = false;
+
+	// Card slot for the added ability; INDEX_NONE picks the first free generic slot.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Ability",
+		meta=(EditCondition="bAddAbilityOnBeginPlay"))
+	int32 PreferredAbilityIndex = INDEX_NONE;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup|Frame")
 	FName FrameSocketName = "AttachRockets";
 
@@ -131,6 +142,9 @@ private:
 	void BeginPlay_LoadDataFromGameState(const int32 PlayerOwningRockets);
 	bool SetupOnOwner_InitInterface();
 	void BeginPlay_SetupSystemOnOwner();
+	// Waits a tick so the owner's command data holds its unit-data abilities before the rocket ability is added.
+	void BeginPlay_AddAbility();
+	void AddAbilityToCommands() const;
 	void FindMeshComponentWithSocket();
 	void OnFoundMeshComponentForFrame(UMeshComponent* MeshComponent);
 

@@ -38,4 +38,10 @@ enum class EBehaviourAbilityType : uint8
 	RusCloseAssault,
 	// Soviet mortar teams: rapid barrage, the mortar fires and reloads faster for a short time.
 	RusMortarBarrage,
+	// Panzerjager I Ambush Shield: short burst of extra mag size, faster shots and faster reloads.
+	PzJagerAmbush,
+	// Panzerjager I Mobile Battery: faster rate of fire while the vehicle stays immobile.
+	PzJagerBarrage,
+	// Marder Dual Barrel: both barrels load HEAT rounds and reload faster for a short time.
+	HEATOverload,
 };

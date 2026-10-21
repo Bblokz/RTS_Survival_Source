@@ -245,6 +245,33 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	FString PreferredWeapon;
 
+	/**
+	 * Runtime effects whose asset name contains any of these (e.g. "Bounce", "MuzzleFlash", "LaunchEffect") are scaled
+	 * by EffectBoostScale every time they play, pooled ones included: small ricochets and MG flashes read from far away.
+	 */
+	UPROPERTY()
+	TArray<FString> EffectBoostNames;
+
+	UPROPERTY()
+	float EffectBoostScale = 1.f;
+
+	/** Battle: further player units spawned in line abreast beside the segment's unit (BattleSpacing apart). */
+	UPROPERTY()
+	TArray<FString> BattleAllyClassPaths;
+
+	/**
+	 * Battle: enemy units (TargetOwningPlayer) spawned in a facing line TargetOffset.X ahead. A segment with enemies
+	 * plays until one side is destroyed (or its SlotSeconds run out) and then ends BattleEndHoldSeconds later.
+	 */
+	UPROPERTY()
+	TArray<FString> BattleEnemyClassPaths;
+
+	UPROPERTY()
+	float BattleSpacing = 700.f;
+
+	UPROPERTY()
+	float BattleEndHoldSeconds = 3.f;
+
 	/** Squads: the soldiers' cooldown between shots in seconds (a bolt rifle otherwise fires once per 3.7 s slot); negative keeps the weapon's own. */
 	UPROPERTY()
 	float InfantryFireIntervalSeconds = -1.f;

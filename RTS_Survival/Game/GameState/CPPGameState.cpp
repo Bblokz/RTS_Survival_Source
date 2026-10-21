@@ -1540,6 +1540,48 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.ReloadSpeed = 14.f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_120MM_TW, WeaponData);
 
+	// Jagdpanzer IV/70 Siege: 100mm HE siege mortar, the Mortar 120mm formulas scaled to 100mm.
+	// HE is applied when firing, so TNT, damage, pen and shrapnel are divided by the HE multipliers here.
+	{
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
+		constexpr float SiegeMortarTntGrams = 90.f;
+		constexpr float SiegeMortarShrapnelDamageMlt = 1.45f;
+		constexpr float SiegeMortarReloadSpeed = 11.5f;
+		FWeaponData SiegeMortarData = {};
+		SiegeMortarData.WeaponName = EWeaponName::Mortar_100MM_JPzIVSiege;
+		SiegeMortarData.DamageType = ERTSDamageType::Kinetic;
+		SiegeMortarData.ShellType = EWeaponShellType::Shell_HE;
+		SiegeMortarData.ShellTypes = {EWeaponShellType::Shell_HE};
+		SiegeMortarData.WeaponCalibre = 100;
+		SiegeMortarData.TNTExplosiveGrams = SiegeMortarTntGrams / HE_TNTExplosiveGramsMlt;
+		SiegeMortarData.BaseDamage = (DamagePerMM * SiegeMortarData.WeaponCalibre
+			+ SiegeMortarData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) / HE_DamageMlt;
+		SiegeMortarData.DamageFlux = DamageFluxPercentage;
+		SiegeMortarData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange, 100);
+		SiegeMortarData.ArmorPen = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM
+			* SiegeMortarData.WeaponCalibre) / HE_ArmorPenMlt;
+		SiegeMortarData.ArmorPenMaxRange = SiegeMortarData.ArmorPen;
+		SiegeMortarData.MagCapacity = 1;
+		SiegeMortarData.ReloadSpeed = SiegeMortarReloadSpeed;
+		SiegeMortarData.BaseCooldown = 1.f;
+		SiegeMortarData.CooldownFlux = CooldownFluxPercentage;
+		SiegeMortarData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
+		SiegeMortarData.ShrapnelRange = (SiegeMortarData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt)
+			/ HE_ShrapnelRangeMlt;
+		SiegeMortarData.ShrapnelDamage = SiegeMortarShrapnelDamageMlt * SiegeMortarData.TNTExplosiveGrams
+			* ShrapnelDamagePerTNTGram / HE_ShrapnelDamageMlt;
+		SiegeMortarData.ShrapnelParticles = SiegeMortarData.WeaponCalibre * ShrapnelAmountPerMM / HE_ShrapnelParticlesMlt;
+		SiegeMortarData.ShrapnelPen = SiegeMortarData.WeaponCalibre * ShrapnelPenPerMM;
+		SiegeMortarData.ProjectileMovementSpeed = HEProjectileSpeed;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Mortar_100MM_JPzIVSiege, SiegeMortarData);
+	}
+
 	// Mortar 80mm (HE)
 	WeaponData.WeaponName = EWeaponName::Mortar_80MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -2544,6 +2586,37 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailgun20MM, WeaponData);
 
+	// Pz 38(t) Railgun Sniper: APCR-only rail rifle. Pen and damage are base values; APCR multiplies pen and
+	// projectile speed up and damage down when firing, landing near the railgun's damage with little pen falloff.
+	{
+		constexpr float SniperDamageMlt = 1.3f;
+		constexpr float SniperRangeMlt = 1.15f;
+		FWeaponData RailSniperData = {};
+		RailSniperData.WeaponName = EWeaponName::GerRailSniper20MM;
+		RailSniperData.DamageType = ERTSDamageType::Kinetic;
+		RailSniperData.ShellType = EWeaponShellType::Shell_APCR;
+		RailSniperData.ShellTypes = {EWeaponShellType::Shell_APCR};
+		// Stays at 20mm so the >= 20mm behaviour and tech rules keep applying.
+		RailSniperData.WeaponCalibre = 20;
+		RailSniperData.TNTExplosiveGrams = 0.f;
+		RailSniperData.BaseDamage = DamagePerMM * RailSniperData.WeaponCalibre * DamageBonusMlt * SniperDamageMlt;
+		RailSniperData.DamageFlux = DamageFluxPercentage;
+		RailSniperData.Range = LightCannonRange * RailGunRangeMultiplier * SniperRangeMlt;
+		RailSniperData.ArmorPen = 75.f;
+		RailSniperData.ArmorPenMaxRange = 70.f;
+		RailSniperData.MagCapacity = 1;
+		RailSniperData.ReloadSpeed = 9.f;
+		RailSniperData.BaseCooldown = 11.f;
+		RailSniperData.CooldownFlux = CooldownFluxPercentage;
+		RailSniperData.Accuracy = 95;
+		RailSniperData.ShrapnelRange = 0.f;
+		RailSniperData.ShrapnelDamage = 0.f;
+		RailSniperData.ShrapnelParticles = 0;
+		RailSniperData.ShrapnelPen = 0.f;
+		RailSniperData.ProjectileMovementSpeed = BaseProjectileSpeed;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailSniper20MM, RailSniperData);
+	}
+
 	// Handheld railgun with radixite rounds.
 	WeaponData = {};
 	WeaponData.WeaponName = EWeaponName::RailGunY;
@@ -2945,6 +3018,35 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Kwk34_Twin30MM, WeaponData);
 
+	// Marder Dual Barrel: twin 40mm fired through a multi projectile weapon on 2 sockets, so all stats are per
+	// projectile and one shot (one magazine round) fires both barrels. Trades the Pak 40's pen for volume.
+	{
+		FWeaponData TwinFortyData = {};
+		TwinFortyData.WeaponName = EWeaponName::Ger_Twin40MM_Marder;
+		TwinFortyData.DamageType = ERTSDamageType::Kinetic;
+		TwinFortyData.ShellType = EWeaponShellType::Shell_AP;
+		TwinFortyData.ShellTypes = {EWeaponShellType::Shell_AP};
+		TwinFortyData.WeaponCalibre = 40;
+		TwinFortyData.TNTExplosiveGrams = 0;
+		TwinFortyData.BaseDamage = DamagePerMM * TwinFortyData.WeaponCalibre;
+		TwinFortyData.DamageFlux = DamageFluxPercentage;
+		TwinFortyData.Range = DeveloperSettings::GameBalance::Ranges::MediumAssaultCannonRange;
+		TwinFortyData.ArmorPen = 75;
+		TwinFortyData.ArmorPenMaxRange = 62;
+		TwinFortyData.MagCapacity = 4;
+		// Keep >= 4.48 s: under the HEAT Overload (-33% reload) the Marder loader drill still needs >= 3.0 s.
+		TwinFortyData.ReloadSpeed = 4.5f;
+		TwinFortyData.BaseCooldown = 0.35f;
+		TwinFortyData.CooldownFlux = CooldownFluxPercentage;
+		TwinFortyData.Accuracy = 85;
+		TwinFortyData.ShrapnelRange = 0;
+		TwinFortyData.ShrapnelDamage = 0;
+		TwinFortyData.ShrapnelParticles = 0;
+		TwinFortyData.ShrapnelPen = 0;
+		TwinFortyData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_Twin40MM_Marder, TwinFortyData);
+	}
+
 	// https://wiki.warthunder.com/Pz.38(t)_F
 	WeaponData.WeaponName = EWeaponName::KwK38_T_37MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -2969,6 +3071,34 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.95f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK38_T_37MM, WeaponData);
+
+	// Pz 38(t) AT Ammo Stock: 25mm autocannon firing 3-round APCR clips. Pen is the base value; the APCR
+	// multipliers are applied when firing (high pen up close that falls off fast with range).
+	{
+		FWeaponData ApcrAutocannonData = {};
+		ApcrAutocannonData.WeaponName = EWeaponName::KwK_25MM_APCR_Pz38t;
+		ApcrAutocannonData.DamageType = ERTSDamageType::Kinetic;
+		ApcrAutocannonData.ShellType = EWeaponShellType::Shell_APCR;
+		ApcrAutocannonData.ShellTypes = {EWeaponShellType::Shell_APCR};
+		ApcrAutocannonData.WeaponCalibre = 25;
+		ApcrAutocannonData.TNTExplosiveGrams = 0;
+		ApcrAutocannonData.BaseDamage = DamagePerMM * ApcrAutocannonData.WeaponCalibre;
+		ApcrAutocannonData.DamageFlux = DamageFluxPercentage;
+		ApcrAutocannonData.Range = LightCannonRange;
+		ApcrAutocannonData.ArmorPen = 62;
+		ApcrAutocannonData.ArmorPenMaxRange = 30;
+		ApcrAutocannonData.MagCapacity = 3;
+		ApcrAutocannonData.ReloadSpeed = 4.5f;
+		ApcrAutocannonData.BaseCooldown = 0.35f;
+		ApcrAutocannonData.CooldownFlux = CooldownFluxPercentage;
+		ApcrAutocannonData.Accuracy = 80;
+		ApcrAutocannonData.ShrapnelRange = 0;
+		ApcrAutocannonData.ShrapnelDamage = 0;
+		ApcrAutocannonData.ShrapnelParticles = 0;
+		ApcrAutocannonData.ShrapnelPen = 0;
+		ApcrAutocannonData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK_25MM_APCR_Pz38t, ApcrAutocannonData);
+	}
 
 	// https://wiki.warthunder.com/Panzerjager_I
 	WeaponData.WeaponName = EWeaponName::Pak_t_L_43_47MM;
@@ -3068,6 +3198,37 @@ void ACPPGameState::InitAllGameLightWeapons()
 	// Flakvierling 38 20mm (Sd.Kfz. 7/1): same stats as the Flak 38, own name for its own weapon icon.
 	WeaponData.WeaponName = EWeaponName::Flakvierling38_20MM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flakvierling38_20MM, WeaponData);
+
+	// Flak Luchs: twin MG 151/15 fired through a multi projectile weapon on 2 sockets, so all stats are per
+	// projectile and one shot (one magazine round) fires both barrels. Damage formula as the Flak 38.
+	{
+		constexpr float TwinMg151ProjectileSpeedMlt = 0.95f;
+		FWeaponData TwinMg151Data = {};
+		TwinMg151Data.WeaponName = EWeaponName::MG151_15MM_Twin;
+		TwinMg151Data.DamageType = ERTSDamageType::Kinetic;
+		TwinMg151Data.ShellType = EWeaponShellType::Shell_AP;
+		TwinMg151Data.ShellTypes = {EWeaponShellType::Shell_AP};
+		TwinMg151Data.WeaponCalibre = 15;
+		TwinMg151Data.TNTExplosiveGrams = 3.f;
+		TwinMg151Data.BaseDamage = (DamagePerMM * TwinMg151Data.WeaponCalibre
+			+ TwinMg151Data.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * FlakCannonBonusDamageFactor;
+		TwinMg151Data.DamageFlux = DamageFluxPercentage;
+		TwinMg151Data.Range = LightCannonRange;
+		TwinMg151Data.ArmorPen = 30;
+		TwinMg151Data.ArmorPenMaxRange = 20;
+		TwinMg151Data.MagCapacity = 24;
+		// The crew drill and the drum swap are authored for 8 s; the pit crew skips its drill below 6 s.
+		TwinMg151Data.ReloadSpeed = 8.f;
+		TwinMg151Data.BaseCooldown = 0.35f;
+		TwinMg151Data.CooldownFlux = 0;
+		TwinMg151Data.Accuracy = 85;
+		TwinMg151Data.ShrapnelRange = 0;
+		TwinMg151Data.ShrapnelDamage = 0;
+		TwinMg151Data.ShrapnelParticles = 0;
+		TwinMg151Data.ShrapnelPen = 0;
+		TwinMg151Data.ProjectileMovementSpeed = BaseProjectileSpeed * TwinMg151ProjectileSpeedMlt;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::MG151_15MM_Twin, TwinMg151Data);
+	}
 
 	// Flak 36 37mm
 	WeaponData.WeaponName = EWeaponName::Flak36_37MM;
@@ -3198,6 +3359,37 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.9f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK42_L_50MM, WeaponData);
 
+	// Pz IV G Double Turret rear gun: a short 50mm lobbing HE as light artillery; APHE stays selectable.
+	// The pen values are the APHE ones; HE scales them down when firing, as on the KwK 37 75mm.
+	{
+		constexpr float ArtilleryProjectileSpeedMlt = 0.8f;
+		FWeaponData DoubleTurretArtilleryData = {};
+		DoubleTurretArtilleryData.WeaponName = EWeaponName::PzIVG_DT_50MM_Artillery;
+		DoubleTurretArtilleryData.DamageType = ERTSDamageType::Kinetic;
+		DoubleTurretArtilleryData.ShellType = EWeaponShellType::Shell_HE;
+		DoubleTurretArtilleryData.ShellTypes = {EWeaponShellType::Shell_HE, EWeaponShellType::Shell_APHE};
+		DoubleTurretArtilleryData.WeaponCalibre = 50;
+		DoubleTurretArtilleryData.TNTExplosiveGrams = 36;
+		DoubleTurretArtilleryData.BaseDamage = DamagePerMM * DoubleTurretArtilleryData.WeaponCalibre
+			+ DoubleTurretArtilleryData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		DoubleTurretArtilleryData.DamageFlux = DamageFluxPercentage;
+		DoubleTurretArtilleryData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			DeveloperSettings::GameBalance::Ranges::LightArtilleryRange, 100);
+		DoubleTurretArtilleryData.ArmorPen = 45;
+		DoubleTurretArtilleryData.ArmorPenMaxRange = 38;
+		DoubleTurretArtilleryData.MagCapacity = 1;
+		DoubleTurretArtilleryData.ReloadSpeed = 4.5f;
+		DoubleTurretArtilleryData.BaseCooldown = 0.5;
+		DoubleTurretArtilleryData.CooldownFlux = CooldownFluxPercentage;
+		DoubleTurretArtilleryData.Accuracy = 70;
+		DoubleTurretArtilleryData.ShrapnelRange = DoubleTurretArtilleryData.WeaponCalibre * ShrapnelRangePerMM;
+		DoubleTurretArtilleryData.ShrapnelDamage = DoubleTurretArtilleryData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		DoubleTurretArtilleryData.ShrapnelParticles = DoubleTurretArtilleryData.WeaponCalibre * ShrapnelAmountPerMM;
+		DoubleTurretArtilleryData.ShrapnelPen = DoubleTurretArtilleryData.WeaponCalibre * ShrapnelPenPerMM;
+		DoubleTurretArtilleryData.ProjectileMovementSpeed = BaseProjectileSpeed * ArtilleryProjectileSpeedMlt;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::PzIVG_DT_50MM_Artillery, DoubleTurretArtilleryData);
+	}
+
 	WeaponData.WeaponName = EWeaponName::KwK37_F_50MM;
 	WeaponData.DamageType = ERTSDamageType::Fire;
 	WeaponData.ShellType = EWeaponShellType::Shell_Fire;
@@ -3248,6 +3440,36 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK39_1_50MM, WeaponData);
+
+	// Pz I Bison Direct Fire: a long 50mm with a faster reload, more range and more pen than the Pz III M's KwK 39/1.
+	{
+		constexpr float BisonRangeMlt = 1.1f;
+		constexpr float BisonLongBarrelSpeedMlt = 1.1f;
+		FWeaponData BisonData = {};
+		BisonData.WeaponName = EWeaponName::PzI_Bison_L60_50MM;
+		BisonData.DamageType = ERTSDamageType::Kinetic;
+		BisonData.ShellType = EWeaponShellType::Shell_APHE;
+		BisonData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
+		BisonData.WeaponCalibre = 50.f;
+		BisonData.TNTExplosiveGrams = 38;
+		BisonData.BaseDamage = DamagePerMM * BisonData.WeaponCalibre
+			+ BisonData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		BisonData.DamageFlux = DamageFluxPercentage;
+		BisonData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumCannonRange * BisonRangeMlt, 10);
+		BisonData.ArmorPen = 110;
+		BisonData.ArmorPenMaxRange = 90;
+		BisonData.MagCapacity = 1;
+		BisonData.ReloadSpeed = 3.f;
+		BisonData.BaseCooldown = 0.5;
+		BisonData.CooldownFlux = CooldownFluxPercentage;
+		BisonData.Accuracy = 85;
+		BisonData.ShrapnelRange = BisonData.WeaponCalibre * ShrapnelRangePerMM;
+		BisonData.ShrapnelDamage = BisonData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		BisonData.ShrapnelParticles = BisonData.WeaponCalibre * ShrapnelAmountPerMM;
+		BisonData.ShrapnelPen = BisonData.WeaponCalibre * ShrapnelPenPerMM;
+		BisonData.ProjectileMovementSpeed = BaseProjectileSpeed * BisonLongBarrelSpeedMlt;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::PzI_Bison_L60_50MM, BisonData);
+	}
 
 	WeaponData.WeaponName = EWeaponName::KwK39_Rockets;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
@@ -3339,6 +3561,42 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK37_75MM, WeaponData);
+
+	// Sd.Kfz. 250 Howitzer: the KwK 37's short 75mm firing HE only; slower to load and weak against armour.
+	{
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+		constexpr float HowitzerRangeMlt = 1.1f;
+		constexpr float HowitzerProjectileSpeedMlt = 0.85f;
+		// Effective HE pen; HE is the only shell and the projectile multiplies pen with HE_ArmorPenMlt, so we
+		// neutralize it here (as the mortars do). Under HE the max range pen equals the base pen.
+		constexpr float HowitzerEffectiveArmorPen = 20.f;
+		constexpr float HowitzerEffectiveArmorPenMaxRange = 18.f;
+		FWeaponData HowitzerData = {};
+		HowitzerData.WeaponName = EWeaponName::KwK37_75MM_HE_Sdkfz250;
+		HowitzerData.DamageType = ERTSDamageType::Kinetic;
+		HowitzerData.ShellType = EWeaponShellType::Shell_HE;
+		HowitzerData.ShellTypes = {EWeaponShellType::Shell_HE};
+		HowitzerData.WeaponCalibre = 75;
+		HowitzerData.TNTExplosiveGrams = 73;
+		HowitzerData.BaseDamage = DamagePerMM * HowitzerData.WeaponCalibre
+			+ HowitzerData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		HowitzerData.DamageFlux = DamageFluxPercentage;
+		HowitzerData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			DeveloperSettings::GameBalance::Ranges::LightArtilleryRange * HowitzerRangeMlt, 100);
+		HowitzerData.ArmorPen = HowitzerEffectiveArmorPen / HE_ArmorPenMlt;
+		HowitzerData.ArmorPenMaxRange = HowitzerEffectiveArmorPenMaxRange / HE_ArmorPenMlt;
+		HowitzerData.MagCapacity = 1;
+		HowitzerData.ReloadSpeed = 5.5f;
+		HowitzerData.BaseCooldown = 1;
+		HowitzerData.CooldownFlux = CooldownFluxPercentage;
+		HowitzerData.Accuracy = 72;
+		HowitzerData.ShrapnelRange = HowitzerData.WeaponCalibre * ShrapnelRangePerMM;
+		HowitzerData.ShrapnelDamage = HowitzerData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		HowitzerData.ShrapnelParticles = HowitzerData.WeaponCalibre * ShrapnelAmountPerMM;
+		HowitzerData.ShrapnelPen = HowitzerData.WeaponCalibre * ShrapnelPenPerMM;
+		HowitzerData.ProjectileMovementSpeed = BaseProjectileSpeed * HowitzerProjectileSpeedMlt;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK37_75MM_HE_Sdkfz250, HowitzerData);
+	}
 
 	// https://wiki.warthunder.com/Pz.Bef.Wg.IV_J
 	// Also used on Hetzer.
@@ -3474,6 +3732,14 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		WeaponData.ReloadSpeed = Pak42ReloadSpeed;
 		WeaponData.Accuracy = Pak42Accuracy;
 		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Pak42_L70_75MM, WeaponData);
+
+		// Jagdpanzer IV/70 Ambush: the same Pak 42 with APCR as its only shell, so the ammo picker cannot switch it
+		// back. The APCR multipliers are applied when firing, so every stat stays the Pak 42's.
+		FWeaponData Pak42ApcrData = WeaponData;
+		Pak42ApcrData.WeaponName = EWeaponName::Pak42_L70_75MM_APCR;
+		Pak42ApcrData.ShellType = EWeaponShellType::Shell_APCR;
+		Pak42ApcrData.ShellTypes = {EWeaponShellType::Shell_APCR};
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Pak42_L70_75MM_APCR, Pak42ApcrData);
 	}
 
 	// F-34 76mm family
@@ -4545,6 +4811,23 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.ArmorPenFluxMlt = ArmorPenFluxPercentage / 100;
 	RocketData.WeaponCalibre = 50;
 	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::JagdPantherRockets, RocketData);
+
+	// Pz 38(t) Rocketeer: 11cm rockets with a small warhead; a long 120 s reload between salvos.
+	RocketData = {};
+	RocketData.DamageType = ERTSDamageType::Kinetic;
+	RocketData.Cooldown = 0.33f;
+	RocketData.Damage = 120.f;
+	RocketData.Range = 10000.f;
+	RocketData.ArmorPen = 80.f;
+	RocketData.ProjectileSpeed = 5000.f;
+	RocketData.ProjectileAccelerationFactor = 2.f;
+	RocketData.ReloadSpeed = 120.f;
+	RocketData.Accuracy = 60.f;
+	RocketData.DamageFluxMlt = DamageFluxPercentage / 100;
+	RocketData.CoolDownFluxMlt = CooldownFluxPercentage / 100;
+	RocketData.ArmorPenFluxMlt = ArmorPenFluxPercentage / 100;
+	RocketData.WeaponCalibre = 40;
+	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::Pz38tRockets, RocketData);
 
 	M_EnemyAttachedRocketDataHashMap = M_TPlayerAttachedRocketDataHashMap;
 }

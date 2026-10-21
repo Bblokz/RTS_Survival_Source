@@ -273,7 +273,26 @@ enum class
 	// The Sd.Kfz. 221's 20mm: the Sd.Kfz. 231's KwK 30 stats under its own name, so it can get its own icon.
 	Kwk30_20MM_sdkfz221 UMETA(DisplayName = "KwK30 20MM (Sdkfz 221)"),
 	// The Jagdpanzer IV/70's long 75mm: the Panther's gun in a medium tank destroyer casemate.
-	Pak42_L70_75MM UMETA(DisplayName = "Pak42 L/70 75MM (Jagdpanzer IV/70)")
+	Pak42_L70_75MM UMETA(DisplayName = "Pak42 L/70 75MM (Jagdpanzer IV/70)"),
+	// Unit variant batch: appended so serialized weapon names keep their values.
+	// Pz 38(t) AT Ammo Stock: 25mm autocannon firing 3-round APCR clips.
+	KwK_25MM_APCR_Pz38t UMETA(DisplayName = "2.5 cm APCR Autocannon"),
+	// Pz 38(t) Railgun Sniper: APCR-only rail rifle with little pen falloff at range.
+	GerRailSniper20MM UMETA(DisplayName = "2 cm Rail Sniper"),
+	// Sd.Kfz. 250 Howitzer: the short 75mm firing HE only.
+	KwK37_75MM_HE_Sdkfz250 UMETA(DisplayName = "7.5 cm KwK 37 L/24 (HE)"),
+	// Flak Luchs: twin 15mm; stats are per projectile, one shot fires both barrels.
+	MG151_15MM_Twin UMETA(DisplayName = "2x MG 151/15"),
+	// Pz I Bison Direct Fire: long 50mm with a faster reload, more range and pen than the KwK 39/1.
+	PzI_Bison_L60_50MM UMETA(DisplayName = "5 cm L/60 (Bison)"),
+	// Marder Dual Barrel: twin 40mm; stats are per projectile, one shot fires both barrels.
+	Ger_Twin40MM_Marder UMETA(DisplayName = "Twin 4 cm (Marder)"),
+	// Pz IV G Double Turret: the rear turret's arcing 50mm artillery gun.
+	PzIVG_DT_50MM_Artillery UMETA(DisplayName = "5 cm Artillery"),
+	// Jagdpanzer IV/70 Siege: 100mm HE siege mortar.
+	Mortar_100MM_JPzIVSiege UMETA(DisplayName = "10 cm Siege Mortar"),
+	// Jagdpanzer IV/70 Ambush: the Pak 42 locked to APCR (the only shell in its list, so the ammo picker can't switch).
+	Pak42_L70_75MM_APCR UMETA(DisplayName = "7.5 cm PaK 42 L/70 (APCR)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -372,6 +391,15 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Flakvierling38_20MM: return "Flakvierling 38";
 	case EWeaponName::Kwk30_20MM_sdkfz221: return "KwK 30";
 	case EWeaponName::Pak42_L70_75MM: return "Pak 42 L/70";
+	case EWeaponName::KwK_25MM_APCR_Pz38t: return "2.5 cm APCR";
+	case EWeaponName::GerRailSniper20MM: return "Rail Sniper";
+	case EWeaponName::KwK37_75MM_HE_Sdkfz250: return "KwK 37 HE";
+	case EWeaponName::MG151_15MM_Twin: return "2x MG 151/15";
+	case EWeaponName::PzI_Bison_L60_50MM: return "5 cm L/60";
+	case EWeaponName::Ger_Twin40MM_Marder: return "Twin 40mm";
+	case EWeaponName::PzIVG_DT_50MM_Artillery: return "5 cm Artillery";
+	case EWeaponName::Mortar_100MM_JPzIVSiege: return "10 cm Mortar";
+	case EWeaponName::Pak42_L70_75MM_APCR: return "Pak 42 APCR";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -865,6 +893,24 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Kwk30_20MM_sdkfz221";
 	case EWeaponName::Pak42_L70_75MM:
 		return "Pak42_L70_75MM";
+	case EWeaponName::KwK_25MM_APCR_Pz38t:
+		return "KwK_25MM_APCR_Pz38t";
+	case EWeaponName::GerRailSniper20MM:
+		return "GerRailSniper20MM";
+	case EWeaponName::KwK37_75MM_HE_Sdkfz250:
+		return "KwK37_75MM_HE_Sdkfz250";
+	case EWeaponName::MG151_15MM_Twin:
+		return "MG151_15MM_Twin";
+	case EWeaponName::PzI_Bison_L60_50MM:
+		return "PzI_Bison_L60_50MM";
+	case EWeaponName::Ger_Twin40MM_Marder:
+		return "Ger_Twin40MM_Marder";
+	case EWeaponName::PzIVG_DT_50MM_Artillery:
+		return "PzIVG_DT_50MM_Artillery";
+	case EWeaponName::Mortar_100MM_JPzIVSiege:
+		return "Mortar_100MM_JPzIVSiege";
+	case EWeaponName::Pak42_L70_75MM_APCR:
+		return "Pak42_L70_75MM_APCR";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:

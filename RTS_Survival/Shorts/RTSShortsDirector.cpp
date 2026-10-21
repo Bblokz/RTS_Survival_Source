@@ -39,6 +39,8 @@
 #include "RTSShortsRenderSubsystem.h"
 #include "RTS_Survival/Game/GameState/HideGameUI/RTSUIElement.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/RTSCheatManager/RTSCheatManager.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
@@ -359,6 +361,15 @@ void ARTSShortsDirector::TickRunning()
 		M_Phase = ERTSShortsDirectorPhase::Finished;
 		WriteManifest();
 		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_DIRECTOR_DONE frames=%d"), Frame);
+		if (bM_TimelineShortened)
+		{
+			// Battles ended early: nothing left to film, so the movie render stops here instead of at the planned end.
+			if (UMoviePipeline* Pipeline = GetActivePipeline())
+			{
+				Pipeline->RequestShutdown();
+				UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_RENDER_STOPPED_EARLY frame=%d"), Frame);
+			}
+		}
 		if (M_Job.bRecordAudio && not M_Job.bRender)
 		{
 			EndRealtimeAudioRecordingAndExit();
@@ -458,6 +469,7 @@ void ARTSShortsDirector::TickRunning()
 	}
 	LogVisibleSoldierShots(Frame);
 	UpdateOrbitCamera(static_cast<float>(Local) / M_Job.Fps);
+	TickBattle(Frame);
 	if (M_HiddenSoldiers.IsValidIndex(M_CurrentSegment))
 	{
 		// Hidden squad members stay silent: their shots would be heard but not seen.
@@ -1008,6 +1020,10 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 		ApplyInfantryFireInterval(Unit, Segment);
 		M_Manifest.Segments[SegmentIndex].CaliberMm = ReadLargestCaliberMm(Unit);
 		FrameCamera(Unit, Segment, TargetWorld);
+		if (Segment.BattleEnemyClassPaths.Num() > 0)
+		{
+			BeginBattle(SegmentIndex, Unit);
+		}
 	}
 	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SEGMENT_BEGIN index=%d subtype=%s frame=%d caliber=%d range=%.0f target=%s"),
 	       SegmentIndex, *Segment.Subtype, GetTimelineFrame(), M_Manifest.Segments[SegmentIndex].CaliberMm,
@@ -1017,6 +1033,7 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 
 void ARTSShortsDirector::EndSegment(const int32 SegmentIndex)
 {
+	EndBattle();
 	if (not bM_StopOrdered)
 	{
 		OrderStop(SegmentIndex);
@@ -1212,7 +1229,8 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 {
 	const bool bCap = Segment.EffectMaxSeconds >= 0.f;
 	const bool bScale = not FMath::IsNearlyEqual(Segment.EffectScale, 1.f);
-	if (not bCap && not bScale && not Segment.bSuppressExhaust)
+	const bool bBoost = Segment.EffectBoostNames.Num() > 0 && not FMath::IsNearlyEqual(Segment.EffectBoostScale, 1.f);
+	if (not bCap && not bScale && not bBoost && not Segment.bSuppressExhaust)
 	{
 		return;
 	}
@@ -1245,6 +1263,10 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 				Component->DeactivateImmediate();
 			}
 			continue;
+		}
+		if (bBoost && Component->IsActive())
+		{
+			BoostEffectScale(Component, Segment);
 		}
 		if (FirstSeen == nullptr)
 		{
@@ -1428,6 +1450,32 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 			M_SmokeCopies.Remove(Component);
 		}
 	}
+}
+
+void ARTSShortsDirector::BoostEffectScale(UFXSystemComponent* Component, const FRTSShortsSegment& Segment)
+{
+	const UFXSystemAsset* Asset = Component->GetFXSystemAsset();
+	if (Asset == nullptr)
+	{
+		return;
+	}
+	const FString AssetName = Asset->GetName();
+	if (not Segment.EffectBoostNames.ContainsByPredicate([&AssetName](const FString& Part) { return AssetName.Contains(Part); }))
+	{
+		return;
+	}
+	// A pooled effect gets its weapon's scale back on every play: boost whatever scale it has now unless it is still
+	// the one this director gave it.
+	const FVector Current = Component->GetComponentScale();
+	const FVector* LastBoosted = M_EffectBoostedScale.Find(Component);
+	constexpr float SameScaleTolerance = 0.01f;
+	if (LastBoosted != nullptr && Current.Equals(*LastBoosted, SameScaleTolerance))
+	{
+		return;
+	}
+	const FVector Boosted = Current * Segment.EffectBoostScale;
+	Component->SetWorldScale3D(Boosted);
+	M_EffectBoostedScale.Add(Component, Boosted);
 }
 
 bool ARTSShortsDirector::GetIsEffectExemptFromLimits(const FRTSShortsSegment& Segment, const int32 FirstSeenFrame) const
@@ -1768,6 +1816,13 @@ FVector ARTSShortsDirector::GetTargetWorldLocation(const FRTSShortsSegment& Segm
 void ARTSShortsDirector::OrderAttackGround(const int32 SegmentIndex)
 {
 	bM_FireOrdered = true;
+	if (M_Battle.bIsActive)
+	{
+		// A battle fights unit against unit: every tank gets the nearest opponent instead of a ground point.
+		IssueBattleOrders();
+		M_Manifest.Segments[SegmentIndex].FireOrderFrame = GetTimelineFrame();
+		return;
+	}
 	AActor* Unit = M_Units[SegmentIndex].Get();
 	ICommands* Commands = Cast<ICommands>(Unit);
 	if (Commands == nullptr)
@@ -1794,6 +1849,11 @@ void ARTSShortsDirector::OrderAttackGround(const int32 SegmentIndex)
 void ARTSShortsDirector::OrderStop(const int32 SegmentIndex)
 {
 	bM_StopOrdered = true;
+	if (M_Battle.bIsActive)
+	{
+		// A battle plays until one side is gone; the slot end (or the decision) ends it, not a stop order.
+		return;
+	}
 	ICommands* Commands = Cast<ICommands>(M_Units[SegmentIndex].Get());
 	if (Commands == nullptr)
 	{
@@ -2193,4 +2253,284 @@ bool ARTSShortsDirector::GetIsValidCamera() const
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_Camera", "GetIsValidCamera", this);
 	return false;
+}
+
+
+void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
+{
+	const FRTSShortsSegment& Segment = M_Job.Segments[SegmentIndex];
+	M_Battle = FRTSShortsBattleState();
+	M_Battle.bIsActive = true;
+	M_Battle.PlayerUnits.Add(MainUnit);
+	const FTransform StageTransform = M_Stage->GetActorTransform();
+	const FVector Forward = StageTransform.GetRotation().GetForwardVector();
+	const FVector Right = StageTransform.GetRotation().GetRightVector();
+	const float Yaw = StageTransform.Rotator().Yaw + Segment.UnitYawOffset;
+	// Line abreast: 0, +1, -1, +2, -2 spacings off the stage axis.
+	auto LateralSlot = [](const int32 Index)
+	{
+		return Index == 0 ? 0.f : (Index % 2 == 1 ? 1.f : -1.f) * static_cast<float>((Index + 1) / 2);
+	};
+#if RTS_WITH_MAP_TESTS
+	for (int32 Index = 0; Index < Segment.BattleAllyClassPaths.Num(); ++Index)
+	{
+		const FVector Location = GetBattleGroundPoint(StageTransform.GetLocation() + Right * LateralSlot(Index + 1) * Segment.BattleSpacing);
+		AActor* Ally = FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), *Segment.BattleAllyClassPaths[Index],
+		                                                       FTransform(FRotator(0.f, Yaw, 0.f), Location),
+		                                                       static_cast<uint8>(M_Job.UnitOwningPlayer));
+		if (IsValid(Ally))
+		{
+			M_Battle.PlayerUnits.Add(Ally);
+		}
+	}
+	for (int32 Index = 0; Index < Segment.BattleEnemyClassPaths.Num(); ++Index)
+	{
+		const FVector Location = GetBattleGroundPoint(StageTransform.GetLocation() + Forward * Segment.TargetOffset.X
+		                                              + Right * LateralSlot(Index) * Segment.BattleSpacing);
+		AActor* Enemy = FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), *Segment.BattleEnemyClassPaths[Index],
+		                                                        FTransform(FRotator(0.f, Yaw + 180.f, 0.f), Location),
+		                                                        static_cast<uint8>(Segment.TargetOwningPlayer));
+		if (IsValid(Enemy))
+		{
+			M_Battle.EnemyUnits.Add(Enemy);
+		}
+	}
+#endif
+	// The fog of war would hide the enemy line from the player and keep the player line out of the AI's vision
+	// (RTSIsVisibleTarget), so neither side would fire: battle units leave the fog system and are kept visible.
+	const TArray<TWeakObjectPtr<AActor>>* Sides[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits};
+	for (const TArray<TWeakObjectPtr<AActor>>* Side : Sides)
+	{
+		for (const TWeakObjectPtr<AActor>& BattleUnit : *Side)
+		{
+			UFowComp* Fow = BattleUnit.IsValid() ? BattleUnit->FindComponentByClass<UFowComp>() : nullptr;
+			if (Fow != nullptr)
+			{
+				Fow->StopFowParticipation();
+			}
+		}
+	}
+	KeepBattleUnitsVisible();
+	M_Battle.ActorSpawnedHandle = GetWorld()->AddOnActorSpawnedHandler(
+		FOnActorSpawned::FDelegate::CreateUObject(this, &ARTSShortsDirector::OnBattleActorSpawned));
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_BATTLE_BEGIN segment=%d players=%d enemies=%d"), SegmentIndex,
+	       M_Battle.PlayerUnits.Num(), M_Battle.EnemyUnits.Num());
+}
+
+void ARTSShortsDirector::OnBattleActorSpawned(AActor* SpawnedActor)
+{
+	if (IsValid(SpawnedActor) && SpawnedActor->GetClass()->GetName().StartsWith(TEXT("Env_Dest")))
+	{
+		M_Battle.SpawnedWrecks.Add(SpawnedActor);
+	}
+}
+
+FVector ARTSShortsDirector::GetBattleGroundPoint(const FVector& Location) const
+{
+	constexpr float TraceHalfHeightCm = 2000.f;
+	constexpr float SpawnLiftCm = 80.f;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(ShortsBattleGround), false);
+	for (const TObjectPtr<AActor>& Unit : M_Units)
+	{
+		if (IsValid(Unit))
+		{
+			Params.AddIgnoredActor(Unit.Get());
+		}
+	}
+	FHitResult Hit;
+	const FVector Start = Location + FVector(0.f, 0.f, TraceHalfHeightCm);
+	const FVector End = Location - FVector(0.f, 0.f, TraceHalfHeightCm);
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+	{
+		return Hit.ImpactPoint + FVector(0.f, 0.f, SpawnLiftCm);
+	}
+	return Location + FVector(0.f, 0.f, SpawnLiftCm);
+}
+
+namespace RTSShortsBattlePrivate
+{
+	bool GetIsAlive(const TWeakObjectPtr<AActor>& Unit)
+	{
+		return Unit.IsValid() && Unit->IsUnitAlive();
+	}
+
+	int32 CountAlive(const TArray<TWeakObjectPtr<AActor>>& Units)
+	{
+		int32 Alive = 0;
+		for (const TWeakObjectPtr<AActor>& Unit : Units)
+		{
+			Alive += GetIsAlive(Unit) ? 1 : 0;
+		}
+		return Alive;
+	}
+
+	AActor* FindNearestAlive(const AActor* From, const TArray<TWeakObjectPtr<AActor>>& Candidates)
+	{
+		AActor* Nearest = nullptr;
+		float NearestDistance = TNumericLimits<float>::Max();
+		for (const TWeakObjectPtr<AActor>& Candidate : Candidates)
+		{
+			if (not GetIsAlive(Candidate))
+			{
+				continue;
+			}
+			const float Distance = FVector::DistSquared(From->GetActorLocation(), Candidate->GetActorLocation());
+			if (Distance < NearestDistance)
+			{
+				NearestDistance = Distance;
+				Nearest = Candidate.Get();
+			}
+		}
+		return Nearest;
+	}
+}
+
+void ARTSShortsDirector::KeepBattleUnitsVisible() const
+{
+	using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+	for (const TWeakObjectPtr<AActor>& PlayerUnit : M_Battle.PlayerUnits)
+	{
+		if (PlayerUnit.IsValid() && not PlayerUnit->Tags.Contains(TagUnitInEnemyVision))
+		{
+			PlayerUnit->Tags.Add(TagUnitInEnemyVision);
+		}
+	}
+	for (const TWeakObjectPtr<AActor>& EnemyUnit : M_Battle.EnemyUnits)
+	{
+		if (not EnemyUnit.IsValid())
+		{
+			continue;
+		}
+		if (EnemyUnit->IsHidden())
+		{
+			EnemyUnit->SetActorHiddenInGame(false);
+		}
+		TArray<AActor*> Attached;
+		EnemyUnit->GetAttachedActors(Attached, true, true);
+		for (AActor* Child : Attached)
+		{
+			if (IsValid(Child) && Child->IsHidden())
+			{
+				Child->SetActorHiddenInGame(false);
+			}
+		}
+	}
+}
+
+void ARTSShortsDirector::IssueBattleOrders()
+{
+	using namespace RTSShortsBattlePrivate;
+	auto OrderSide = [this](const TArray<TWeakObjectPtr<AActor>>& Attackers, const TArray<TWeakObjectPtr<AActor>>& Defenders)
+	{
+		for (const TWeakObjectPtr<AActor>& Attacker : Attackers)
+		{
+			if (not GetIsAlive(Attacker))
+			{
+				continue;
+			}
+			const TWeakObjectPtr<AActor>* Ordered = M_Battle.OrderedTargets.Find(Attacker);
+			if (Ordered != nullptr && GetIsAlive(*Ordered))
+			{
+				continue;
+			}
+			AActor* Target = FindNearestAlive(Attacker.Get(), Defenders);
+			ICommands* Commands = Cast<ICommands>(Attacker.Get());
+			if (Target == nullptr || Commands == nullptr)
+			{
+				continue;
+			}
+			Commands->AttackActor(Target, true);
+			M_Battle.OrderedTargets.Add(Attacker, Target);
+		}
+	};
+	OrderSide(M_Battle.PlayerUnits, M_Battle.EnemyUnits);
+	OrderSide(M_Battle.EnemyUnits, M_Battle.PlayerUnits);
+}
+
+void ARTSShortsDirector::TickBattle(const int32 Frame)
+{
+	using namespace RTSShortsBattlePrivate;
+	if (not M_Battle.bIsActive || not M_Job.Segments.IsValidIndex(M_CurrentSegment))
+	{
+		return;
+	}
+	const FRTSShortsSegment& Segment = M_Job.Segments[M_CurrentSegment];
+	KeepBattleUnitsVisible();
+	constexpr int32 OrderEveryFrames = 20;
+	if (bM_FireOrdered && Frame % OrderEveryFrames == 0)
+	{
+		IssueBattleOrders();
+	}
+	const int32 PlayersAlive = CountAlive(M_Battle.PlayerUnits);
+	const int32 EnemiesAlive = CountAlive(M_Battle.EnemyUnits);
+	if (M_Battle.DecidedFrame < 0 && (PlayersAlive == 0 || EnemiesAlive == 0))
+	{
+		M_Battle.DecidedFrame = Frame;
+		M_Battle.bPlayerWon = PlayersAlive > 0;
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_BATTLE_DECIDED segment=%d frame=%d local=%d winner=%s survivors=%d"),
+		       M_CurrentSegment, Frame, Frame - M_SegmentStartFrames[M_CurrentSegment],
+		       M_Battle.bPlayerWon ? TEXT("player") : TEXT("enemy"), FMath::Max(PlayersAlive, EnemiesAlive));
+	}
+	const int32 HoldFrames = FMath::RoundToInt(Segment.BattleEndHoldSeconds * M_Job.Fps);
+	if (M_Battle.DecidedFrame >= 0 && not M_Battle.bSegmentShortened && Frame >= M_Battle.DecidedFrame + HoldFrames)
+	{
+		M_Battle.bSegmentShortened = true;
+		ShortenRunningSegment(Frame + 1);
+	}
+}
+
+void ARTSShortsDirector::ShortenRunningSegment(const int32 Frame)
+{
+	if (not M_SegmentStartFrames.IsValidIndex(M_CurrentSegment + 1))
+	{
+		return;
+	}
+	const int32 Saved = M_SegmentStartFrames[M_CurrentSegment + 1] - Frame;
+	if (Saved <= 0)
+	{
+		return;
+	}
+	for (int32 Index = M_CurrentSegment + 1; Index < M_SegmentStartFrames.Num(); ++Index)
+	{
+		M_SegmentStartFrames[Index] -= Saved;
+	}
+	for (int32 Index = M_CurrentSegment; Index < M_Manifest.Segments.Num(); ++Index)
+	{
+		M_Manifest.Segments[Index].StartFrame = M_SegmentStartFrames[Index];
+		M_Manifest.Segments[Index].EndFrame = M_SegmentStartFrames[Index + 1];
+	}
+	M_Manifest.TotalFrames -= Saved;
+	bM_TimelineShortened = true;
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SEGMENT_SHORTENED segment=%d end=%d saved=%d"), M_CurrentSegment, Frame, Saved);
+	WriteManifest();
+}
+
+void ARTSShortsDirector::EndBattle()
+{
+	if (not M_Battle.bIsActive)
+	{
+		return;
+	}
+	if (M_Battle.ActorSpawnedHandle.IsValid())
+	{
+		GetWorld()->RemoveOnActorSpawnedHandler(M_Battle.ActorSpawnedHandle);
+	}
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_BATTLE_END segment=%d decided=%d winner=%s wrecks=%d"), M_CurrentSegment,
+	       M_Battle.DecidedFrame,
+	       M_Battle.DecidedFrame < 0 ? TEXT("none") : (M_Battle.bPlayerWon ? TEXT("player") : TEXT("enemy")),
+	       M_Battle.SpawnedWrecks.Num());
+	// The segment's own unit is parked by EndSegment; everything else from this battle leaves the field.
+	const AActor* MainUnit = M_Battle.PlayerUnits.Num() > 0 ? M_Battle.PlayerUnits[0].Get() : nullptr;
+	const TArray<TWeakObjectPtr<AActor>>* Groups[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits, &M_Battle.SpawnedWrecks};
+	for (const TArray<TWeakObjectPtr<AActor>>* Group : Groups)
+	{
+		for (const TWeakObjectPtr<AActor>& Actor : *Group)
+		{
+			if (Actor.IsValid() && Actor.Get() != MainUnit)
+			{
+				Actor->Destroy();
+			}
+		}
+	}
+	M_Battle = FRTSShortsBattleState();
 }

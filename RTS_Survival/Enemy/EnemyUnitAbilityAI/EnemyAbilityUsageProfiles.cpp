@@ -18,6 +18,8 @@ EEnemyBehaviourUsage FEnemyAbilityUsageProfiles::GetBehaviourUsage(const EBehavi
 	case EBehaviourAbilityType::HighVoltage:
 	case EBehaviourAbilityType::ArmorPiercingBullets:
 	case EBehaviourAbilityType::APCR_Rounds:
+	case EBehaviourAbilityType::PzJagerAmbush:
+	case EBehaviourAbilityType::HEATOverload:
 		return EEnemyBehaviourUsage::CombatVsArmor;
 	case EBehaviourAbilityType::FlakShrapnelRounds:
 	case EBehaviourAbilityType::FlameNapalmAbility:
@@ -27,6 +29,7 @@ EEnemyBehaviourUsage FEnemyAbilityUsageProfiles::GetBehaviourUsage(const EBehavi
 	case EBehaviourAbilityType::RusCloseAssault:
 		return EEnemyBehaviourUsage::CombatCloseRange;
 	case EBehaviourAbilityType::OverwatchFireSupport:
+	case EBehaviourAbilityType::PzJagerBarrage:
 		return EEnemyBehaviourUsage::CombatStationary;
 	case EBehaviourAbilityType::PulseRepair:
 		return EEnemyBehaviourUsage::Repair;

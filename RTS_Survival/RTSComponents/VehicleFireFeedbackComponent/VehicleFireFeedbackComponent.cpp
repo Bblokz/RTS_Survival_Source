@@ -47,9 +47,16 @@ void UVehicleFireFeedbackComponent::NotifyWeaponFired(
 		return;
 	}
 
-	if (GetIsValidOptimizationComponent() && not M_OptimizationComponent->GetIsInFOV())
+	// Skip the kick only when the unit is known to be out of view: with optimisation switched off (or before the
+	// first optimisation pass) the distance is None, and the hull must still recoil.
+	if (GetIsValidOptimizationComponent())
 	{
-		return;
+		const ERTSOptimizationDistance OptimizationDistance = M_OptimizationComponent->GetCurrentOptimizationDistance();
+		if (OptimizationDistance == ERTSOptimizationDistance::OutFOVClose
+			|| OptimizationDistance == ERTSOptimizationDistance::OutFOVFar)
+		{
+			return;
+		}
 	}
 
 	if (M_TrackedWeaponCalibre != WeaponCalibre)

@@ -444,6 +444,7 @@ bool GetCanExecuteDetachTow(AActor* Actor);
 		case ERocketAbility::HetzerRockets:
 			return DefaultRocketAbility;
 		case ERocketAbility::JagdPantherRockets:
+		case ERocketAbility::Pz38tRockets:
 			return GetRocketAbilityEntry(EAttachedRocketAbilityType::SmallRockets);
 		};
 		RTSFunctionLibrary::ReportError(

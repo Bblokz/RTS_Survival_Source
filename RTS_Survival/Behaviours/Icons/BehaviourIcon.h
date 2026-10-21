@@ -92,5 +92,12 @@ enum class EBehaviourIcon : uint8
 	TechFlak88GroundRole,
 	TechInfantryKit,
 	TechGhillieSuits,
-	TechEntrenchingTools
+	TechEntrenchingTools,
+	// Unit variant batch.
+	Pz38RailOvercharge,
+	LongBarrel,
+	Unarmed,
+	PzJagerAmbush,
+	PzJagerBarrage,
+	HEAT_Rounds
 };

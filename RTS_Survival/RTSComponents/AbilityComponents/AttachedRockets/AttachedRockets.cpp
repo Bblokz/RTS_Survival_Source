@@ -114,6 +114,10 @@ void UAttachedRockets::BeginPlay()
 	BeginPlay_SetupCallbackToProjectileManager();
 	BeginPlay_LoadDataFromGameState(M_OwningPlayer);
 	BeginPlay_SetupSystemOnOwner();
+	if (bAddAbilityOnBeginPlay)
+	{
+		BeginPlay_AddAbility();
+	}
 }
 
 void UAttachedRockets::BeginDestroy()
@@ -229,6 +233,42 @@ void UAttachedRockets::BeginPlay_SetupSystemOnOwner()
 	{
 		// If the mesh was set manually, we use that instead of searching for it.
 		OnFrameSetupManually();
+	}
+}
+
+void UAttachedRockets::BeginPlay_AddAbility()
+{
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+
+	FTimerDelegate NextTickDelegate;
+	TWeakObjectPtr<UAttachedRockets> WeakThis(this);
+	NextTickDelegate.BindLambda([WeakThis]()
+	{
+		if (not WeakThis.IsValid())
+		{
+			return;
+		}
+
+		const UAttachedRockets* StrongThis = WeakThis.Get();
+		StrongThis->AddAbilityToCommands();
+	});
+	World->GetTimerManager().SetTimerForNextTick(NextTickDelegate);
+}
+
+void UAttachedRockets::AddAbilityToCommands() const
+{
+	if (not EnsureOwnerIsValid())
+	{
+		return;
+	}
+	const FUnitAbilityEntry RocketAbilityEntry = FAbilityHelpers::GetRocketAbilityForRocketType(RocketAbilityType);
+	if (not M_Owner->AddAbility(RocketAbilityEntry, PreferredAbilityIndex))
+	{
+		ReportError("Failed to add the fire rockets ability in AddAbilityToCommands.");
 	}
 }
 

@@ -29,6 +29,26 @@ struct FRTSShortsOrbitState
 	float DurationSeconds = 1.f;
 };
 
+/** 3v3 battle of the running segment: both lines, their current targets, the decision and the wrecks it left. */
+USTRUCT()
+struct FRTSShortsBattleState
+{
+	GENERATED_BODY()
+
+	bool bIsActive = false;
+	// The segment's own unit plus BattleAllyClassPaths.
+	TArray<TWeakObjectPtr<AActor>> PlayerUnits;
+	TArray<TWeakObjectPtr<AActor>> EnemyUnits;
+	// Attack target last ordered per unit; a new order only goes out once that target is dead.
+	TMap<TWeakObjectPtr<AActor>, TWeakObjectPtr<AActor>> OrderedTargets;
+	// Wrecks spawned while the battle ran; destroyed with the battle so the next one starts on a clean field.
+	TArray<TWeakObjectPtr<AActor>> SpawnedWrecks;
+	int32 DecidedFrame = -1;
+	bool bPlayerWon = false;
+	bool bSegmentShortened = false;
+	FDelegateHandle ActorSpawnedHandle;
+};
+
 /** Phases of one shorts run; the director advances through them in order. */
 UENUM()
 enum class ERTSShortsDirectorPhase : uint8
@@ -107,6 +127,9 @@ private:
 	/** Cuts runtime-spawned particle effects after Segment.EffectMaxSeconds and keeps exhaust emitters off. */
 	void LimitStageEffects(AActor* Unit, const struct FRTSShortsSegment& Segment, const int32 Frame);
 
+	/** Segment.EffectBoostNames: enlarges a matching effect, again each time its pool resets its scale. */
+	void BoostEffectScale(class UFXSystemComponent* Component, const struct FRTSShortsSegment& Segment);
+
 	/** True when an effect first seen at FirstSeenFrame appeared after Segment.EffectLimitUntilSeconds. */
 	bool GetIsEffectExemptFromLimits(const struct FRTSShortsSegment& Segment, const int32 FirstSeenFrame) const;
 
@@ -115,6 +138,8 @@ private:
 
 	/** Scale each tracked runtime effect had when it was first seen (the fade-out shrinks from it). */
 	TMap<TWeakObjectPtr<class UFXSystemComponent>, FVector> M_EffectBaseScale;
+	/** Scale this director last gave each boosted effect (EffectBoostNames); a different scale means its pool reset it. */
+	TMap<TWeakObjectPtr<class UFXSystemComponent>, FVector> M_EffectBoostedScale;
 	/** Effects this director deactivated after EffectMaxSeconds; one that turns active again is a new shot. */
 	TSet<TWeakObjectPtr<class UFXSystemComponent>> M_EffectStopped;
 	/** Smoke-only copies spawned by EffectUnitSmokeScale (own hold and fade). */
@@ -131,6 +156,17 @@ private:
 	void PlaceSquadMembers(AActor* Unit, const FVector& Location, const FRotator& Rotation) const;
 	void FrameCamera(const AActor* Unit, const FRTSShortsSegment& Segment, const FVector& TargetWorld) const;
 	void FrameImpactCamera(const AActor* Unit, const FRTSShortsSegment& Segment) const;
+	/** Segment.BattleEnemyClassPaths: spawns both lines (the segment's unit leads the player line) and makes them see each other. */
+	void BeginBattle(const int32 SegmentIndex, AActor* MainUnit);
+	/** Keeps the fog of war out, re-targets units whose target died, and ends the segment once one side is gone. */
+	void TickBattle(const int32 Frame);
+	void EndBattle();
+	void IssueBattleOrders();
+	void KeepBattleUnitsVisible() const;
+	void OnBattleActorSpawned(AActor* SpawnedActor);
+	/** Ends the running segment at Frame and pulls every later segment forward by the time saved. */
+	void ShortenRunningSegment(const int32 Frame);
+	FVector GetBattleGroundPoint(const FVector& Location) const;
 	/** Moves the camera along the running segment's orbit pan (Camera.OrbitDegrees) for this segment-local time. */
 	void UpdateOrbitCamera(const float SegmentSeconds) const;
 	void ApplyCameraCut(const FVector& CameraLocation) const;
@@ -181,6 +217,9 @@ private:
 	FVector M_PlacedLocation = FVector::ZeroVector;
 	// Set by FrameCamera (const) when the segment pans; read every tick by UpdateOrbitCamera.
 	mutable FRTSShortsOrbitState M_Orbit;
+	FRTSShortsBattleState M_Battle;
+	// A battle ended early: the movie render is stopped once the last segment is done instead of filming empty time.
+	bool bM_TimelineShortened = false;
 	bool bM_ImpactCutDone = false;
 
 	/** Own capture of the main submix (see FRTSShortsAudioCapture); clock window of frames 0..TotalFrames. */
