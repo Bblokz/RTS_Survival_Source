@@ -42,6 +42,10 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="PIE Startup")
 	ERTSCommander PlayerCommander = ERTSCommander::BalancedCommander;
 
+	// Shows the unit variant selection after the faction is chosen on the faction selection map.
+	UPROPERTY(Config, EditAnywhere, Category="PIE Startup")
+	bool bAllowUnitVariantSelection = false;
+
 	// Loaded into the game instance when directly testing an operation map in PIE.
 	UPROPERTY(Config, EditAnywhere, BlueprintReadWrite, Category = "PIE Startup|World Mission Context",
 		meta = (ShowOnlyInnerProperties))

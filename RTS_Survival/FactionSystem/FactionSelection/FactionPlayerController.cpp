@@ -12,6 +12,12 @@
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionPopup.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionSelectionMenu.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionWorldGenerationSettings.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/W_UnitVariantSelectionMenu.h"
+#include "RTS_Survival/CardSystem/PlayerProfile/PlayerProfileLoader/FRTS_Profile.h"
+#include "RTS_Survival/CardSystem/PlayerProfile/SavePlayerProfile/USavePlayerProfile.h"
+#include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
+#include "RTS_Survival/Units/Variants/UnitVariantDataAsset.h"
+#include "RTS_Survival/Units/Variants/UnitVariantSettings.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -141,14 +147,163 @@ void AFactionPlayerController::HandleLaunchCampaignRequested(const ERTSFaction S
 	M_SelectedFaction = SelectedFaction;
 	RTSGameInstance->SetPlayerFaction(M_SelectedFaction);
 
+	TArray<FTrainingOption> FactionUnits;
 	if (GetIsValidFactionSelectionMenu())
 	{
+		FactionUnits = M_FactionSelectionMenu->GetFactionTrainingOptions(M_SelectedFaction);
 		M_FactionSelectionMenu->RemoveFromParent();
 		M_FactionSelectionMenu.Reset();
 	}
 
+	if (TryShowUnitVariantSelection(RTSGameInstance, FactionUnits))
+	{
+		return;
+	}
+	ShowFactionDifficultyPicker();
+}
+
+void AFactionPlayerController::HandleUnitVariantPreviewRequested(const FTrainingOption& Unit,
+                                                                 const EUnitVariant Variant)
+{
+	if (not GetIsValidRTSAsyncSpawner() || not GetIsValidVariantDataAsset())
+	{
+		return;
+	}
+	(void)M_RTSAsyncSpawner->SetPlayerUnitVariant(*M_VariantDataAsset,
+	                                              UPlayerUnitVariantManager::GetSpawnerKey(Unit), Variant);
+	SpawnPreviewForTrainingOption(Unit);
+}
+
+void AFactionPlayerController::HandleUnitVariantSelectionConfirmed(
+	const TMap<FTrainingOption, EUnitVariant>& Selections)
+{
+	// Choices of units outside this faction's list stay as they were saved.
+	TMap<FTrainingOption, EUnitVariant> MergedSelections = LoadSavedVariantSelections();
+	for (const TPair<FTrainingOption, EUnitVariant>& Selection : Selections)
+	{
+		const FTrainingOption SpawnerKey = UPlayerUnitVariantManager::GetSpawnerKey(Selection.Key);
+		if (Selection.Value == EUnitVariant::Base)
+		{
+			MergedSelections.Remove(SpawnerKey);
+			continue;
+		}
+		MergedSelections.Add(SpawnerKey, Selection.Value);
+	}
+	TArray<FUnitVariantSelection> SelectionsToSave;
+	for (const TPair<FTrainingOption, EUnitVariant>& MergedSelection : MergedSelections)
+	{
+		FUnitVariantSelection SelectionToSave;
+		SelectionToSave.Unit = MergedSelection.Key;
+		SelectionToSave.Variant = MergedSelection.Value;
+		SelectionsToSave.Add(SelectionToSave);
+	}
+	(void)FRTS_Profile::SaveUnitVariantSelections(SelectionsToSave);
+
+	CloseUnitVariantSelection();
+	ShowFactionDifficultyPicker();
+}
+
+void AFactionPlayerController::HandleUnitVariantSelectionBack()
+{
+	RestoreBaseVariantsInSpawner();
+	CloseUnitVariantSelection();
+	ClearCurrentPreview();
+	InitFactionSelectionMenu();
+	if (GetIsValidFactionSelectionMenu())
+	{
+		M_FactionSelectionMenu->ShowFaction(M_SelectedFaction);
+	}
+	InitInputModeForWidget(M_FactionSelectionMenu.Get());
+}
+
+void AFactionPlayerController::ShowFactionDifficultyPicker()
+{
 	InitFactionDifficultyPicker();
 	InitInputModeForWidget(M_FactionDifficultyPicker.Get());
+}
+
+bool AFactionPlayerController::TryShowUnitVariantSelection(const URTSGameInstance* RTSGameInstance,
+                                                           const TArray<FTrainingOption>& FactionUnits)
+{
+	if (not IsValid(RTSGameInstance) || not RTSGameInstance->GetAllowUnitVariantSelection())
+	{
+		return false;
+	}
+	M_VariantDataAsset = UUnitVariantSettings::Get()->LoadVariantDataAsset();
+	if (not GetIsValidVariantDataAsset())
+	{
+		return false;
+	}
+	M_VariantSelectionUnits.Reset();
+	for (const FTrainingOption& Unit : FactionUnits)
+	{
+		if (M_VariantDataAsset->GetImplementedVariantCount(UPlayerUnitVariantManager::GetSpawnerKey(Unit)) > 1)
+		{
+			M_VariantSelectionUnits.Add(Unit);
+		}
+	}
+	if (M_VariantSelectionUnits.IsEmpty() || not GetIsValidUnitVariantSelectionMenuClass())
+	{
+		return false;
+	}
+	UW_UnitVariantSelectionMenu* const VariantSelectionMenu = CreateWidget<UW_UnitVariantSelectionMenu>(
+		this, M_UnitVariantSelectionMenuClass);
+	if (not IsValid(VariantSelectionMenu))
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::TryShowUnitVariantSelection - Failed to create the unit variant selection.");
+		return false;
+	}
+	VariantSelectionMenu->AddToViewport();
+	M_UnitVariantSelectionMenu = VariantSelectionMenu;
+	VariantSelectionMenu->InitVariantSelection(this, M_SelectedFaction, M_VariantSelectionUnits, M_VariantDataAsset,
+	                                           LoadSavedVariantSelections());
+	InitInputModeForWidget(VariantSelectionMenu);
+	return true;
+}
+
+TMap<FTrainingOption, EUnitVariant> AFactionPlayerController::LoadSavedVariantSelections() const
+{
+	TMap<FTrainingOption, EUnitVariant> SavedSelections;
+	const USavePlayerProfile* PlayerProfile = FRTS_Profile::LoadPlayerProfile();
+	if (not IsValid(PlayerProfile) || not GetIsValidVariantDataAsset())
+	{
+		return SavedSelections;
+	}
+	for (const FUnitVariantSelection& Selection : PlayerProfile->M_UnitVariantSelections)
+	{
+		// A saved variant the asset no longer implements is shown as Base, as a mission would spawn it.
+		const FTrainingOption SpawnerKey = UPlayerUnitVariantManager::GetSpawnerKey(Selection.Unit);
+		if (M_VariantDataAsset->GetIsVariantImplemented(SpawnerKey, Selection.Variant))
+		{
+			SavedSelections.Add(SpawnerKey, Selection.Variant);
+		}
+	}
+	return SavedSelections;
+}
+
+void AFactionPlayerController::RestoreBaseVariantsInSpawner()
+{
+	if (not GetIsValidRTSAsyncSpawner() || not GetIsValidVariantDataAsset())
+	{
+		return;
+	}
+	for (const FTrainingOption& Unit : M_VariantSelectionUnits)
+	{
+		(void)M_RTSAsyncSpawner->SetPlayerUnitVariant(*M_VariantDataAsset,
+		                                              UPlayerUnitVariantManager::GetSpawnerKey(Unit),
+		                                              EUnitVariant::Base);
+	}
+}
+
+void AFactionPlayerController::CloseUnitVariantSelection()
+{
+	if (not GetIsValidUnitVariantSelectionMenu())
+	{
+		return;
+	}
+	M_UnitVariantSelectionMenu->RemoveFromParent();
+	M_UnitVariantSelectionMenu.Reset();
 }
 
 void AFactionPlayerController::HandleFactionDifficultyChosen(
@@ -1217,6 +1372,39 @@ bool AFactionPlayerController::GetIsValidFactionWorldGenerationSettings() const
 	}
 
 	return true;
+}
+
+bool AFactionPlayerController::GetIsValidUnitVariantSelectionMenuClass() const
+{
+	if (IsValid(M_UnitVariantSelectionMenuClass))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_UnitVariantSelectionMenuClass",
+	                                                      "GetIsValidUnitVariantSelectionMenuClass", this);
+	return false;
+}
+
+bool AFactionPlayerController::GetIsValidUnitVariantSelectionMenu() const
+{
+	if (M_UnitVariantSelectionMenu.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_UnitVariantSelectionMenu",
+	                                                      "GetIsValidUnitVariantSelectionMenu", this);
+	return false;
+}
+
+bool AFactionPlayerController::GetIsValidVariantDataAsset() const
+{
+	if (IsValid(M_VariantDataAsset))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_VariantDataAsset", "GetIsValidVariantDataAsset",
+	                                                      this);
+	return false;
 }
 
 bool AFactionPlayerController::GetIsValidFactionUnitPreview() const

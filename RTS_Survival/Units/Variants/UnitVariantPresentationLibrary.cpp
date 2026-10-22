@@ -2,7 +2,31 @@
 
 #include "UnitVariantPresentationLibrary.h"
 
+#include "Engine/DataTable.h"
+#include "Internationalization/Regex.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSettings.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
 #include "Slate/SlateBrushAsset.h"
+
+namespace UnitVariantPresentationLibraryPrivate
+{
+	// DT_TrainingOptions rows are a Blueprint struct, whose members are stored as Title_13_<guid>; the authored name
+	// lookup is editor only, so the stored name prefix is matched.
+	const TCHAR* const TitleColumnName = TEXT("Title");
+	const TCHAR* const TitleColumnPrefix = TEXT("Title_");
+	const TCHAR* const RichTextTagPattern = TEXT("<[^>]*>");
+
+	const uint8* FindTrainingTableRow(const UDataTable* TrainingOptionsTable, const FTrainingOption& Unit)
+	{
+		if (not IsValid(TrainingOptionsTable) || not TrainingOptionsTable->GetRowStruct())
+		{
+			return nullptr;
+		}
+		const FName RowName(*UTrainingOptionLibrary::GetTrainingOptionName(Unit.UnitType, Unit.SubtypeValue));
+		return TrainingOptionsTable->FindRowUnchecked(RowName);
+	}
+}
 
 USlateBrushAsset* UUnitVariantPresentationLibrary::GetTrainingImageBrush(
 	const FUnitVariantTrainingPresentation& Presentation, USlateBrushAsset* TableImageBrush)
@@ -30,4 +54,71 @@ FText UUnitVariantPresentationLibrary::GetTrainingTooltip(const FUnitVariantTrai
                                                           const FText& TableTooltip)
 {
 	return Presentation.bOverrideTooltip ? Presentation.Tooltip : TableTooltip;
+}
+
+const UDataTable* UUnitVariantPresentationLibrary::LoadTrainingOptionsTable()
+{
+	const UTrainingLayoutDataAsset* TrainingLayout = UTrainingLayoutSettings::Get()->LoadTrainingLayout();
+	if (not IsValid(TrainingLayout))
+	{
+		return nullptr;
+	}
+	return TrainingLayout->TrainingOptionIconTable.LoadSynchronous();
+}
+
+USlateBrushAsset* UUnitVariantPresentationLibrary::FindTrainingTableImageBrush(const UDataTable* TrainingOptionsTable,
+                                                                              const FTrainingOption& Unit)
+{
+	const uint8* RowData = UnitVariantPresentationLibraryPrivate::FindTrainingTableRow(TrainingOptionsTable, Unit);
+	if (not RowData)
+	{
+		return nullptr;
+	}
+	for (TFieldIterator<FObjectPropertyBase> PropertyIt(TrainingOptionsTable->GetRowStruct()); PropertyIt; ++PropertyIt)
+	{
+		if (USlateBrushAsset* BrushAsset = Cast<USlateBrushAsset>(PropertyIt->GetObjectPropertyValue_InContainer(RowData)))
+		{
+			return BrushAsset;
+		}
+	}
+	return nullptr;
+}
+
+FText UUnitVariantPresentationLibrary::FindTrainingTableTitle(const UDataTable* TrainingOptionsTable,
+                                                              const FTrainingOption& Unit)
+{
+	const uint8* RowData = UnitVariantPresentationLibraryPrivate::FindTrainingTableRow(TrainingOptionsTable, Unit);
+	if (not RowData)
+	{
+		return FText::GetEmpty();
+	}
+	for (TFieldIterator<FTextProperty> PropertyIt(TrainingOptionsTable->GetRowStruct()); PropertyIt; ++PropertyIt)
+	{
+		const FString PropertyName = PropertyIt->GetName();
+		const bool bIsTitleColumn = PropertyName == UnitVariantPresentationLibraryPrivate::TitleColumnName
+			|| PropertyName.StartsWith(UnitVariantPresentationLibraryPrivate::TitleColumnPrefix);
+		if (not bIsTitleColumn)
+		{
+			continue;
+		}
+		return StripRichTextMarkup(PropertyIt->GetPropertyValue_InContainer(RowData));
+	}
+	return FText::GetEmpty();
+}
+
+FText UUnitVariantPresentationLibrary::StripRichTextMarkup(const FText& RichText)
+{
+	FString PlainText = RichText.ToString();
+	const FRegexPattern TagPattern(UnitVariantPresentationLibraryPrivate::RichTextTagPattern);
+	FRegexMatcher TagMatcher(TagPattern, PlainText);
+	TArray<FString> Tags;
+	while (TagMatcher.FindNext())
+	{
+		Tags.Add(TagMatcher.GetCaptureGroup(0));
+	}
+	for (const FString& Tag : Tags)
+	{
+		PlainText.ReplaceInline(*Tag, TEXT(""));
+	}
+	return FText::FromString(PlainText.TrimStartAndEnd());
 }

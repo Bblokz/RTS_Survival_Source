@@ -70,6 +70,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Mission Context")
 	void ResetWorldMissionContext();
 
+	// Set before opening the faction selection map; when on, the player picks unit variants after the faction.
+	UFUNCTION(BlueprintCallable, Category = "Pre-Game Setup")
+	void SetAllowUnitVariantSelection(const bool bAllow) { bM_AllowUnitVariantSelection = bAllow; }
+
+	UFUNCTION(BlueprintPure, Category = "Pre-Game Setup")
+	bool GetAllowUnitVariantSelection() const { return bM_AllowUnitVariantSelection; }
+
 protected:
     // Called on init when the music manager is setup and needs to be initialized.
     UFUNCTION(BlueprintImplementableEvent, Category="Music")
@@ -118,5 +125,7 @@ private:
 	// Keeps the selected setup flow and destination alive across pre-game map transitions.
 	UPROPERTY()
 	FRTSPreGameLaunchRequest M_PreGameLaunchRequest;
+
+	bool bM_AllowUnitVariantSelection = false;
 
 };

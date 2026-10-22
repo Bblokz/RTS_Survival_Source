@@ -338,6 +338,80 @@ void UW_FactionSelectionMenu::UpdateFactionSelectionBrush(FSlateBrush& Brush, co
 	ButtonMaterial->SetVectorParameterValue(EffectsParameter, Effects);
 }
 
+TArray<FTrainingOption> UW_FactionSelectionMenu::GetFactionTrainingOptions(const ERTSFaction Faction) const
+{
+	TArray<FTrainingOption> TrainingOptions;
+	const FFactionMenuSetting* FactionSetting = FindFactionSetting(Faction);
+	if (not FactionSetting)
+	{
+		return TrainingOptions;
+	}
+	for (const TArray<FFactionMenuTankOption>* TankOptions : {
+		     &FactionSetting->ArmoredCars, &FactionSetting->LightTanks, &FactionSetting->MediumTanks,
+		     &FactionSetting->HeavyTanks
+	     })
+	{
+		for (const FFactionMenuTankOption& TankOption : *TankOptions)
+		{
+			if (TankOption.TankSubtype != ETankSubtype::Tank_None)
+			{
+				TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Tank,
+				                                    static_cast<uint8>(TankOption.TankSubtype)));
+			}
+		}
+	}
+	for (const FFactionMenuSquadOption& SquadOption : FactionSetting->Infantry)
+	{
+		if (SquadOption.SquadSubtype != ESquadSubtype::Squad_None)
+		{
+			TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Squad,
+			                                    static_cast<uint8>(SquadOption.SquadSubtype)));
+		}
+	}
+	for (const FFactionMenuBuildingExpansionOption& BxpOption : FactionSetting->BuildingExpansions)
+	{
+		if (BxpOption.BuildingExpansionType != EBuildingExpansionType::BXT_Invalid)
+		{
+			TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_BuildingExpansion,
+			                                    static_cast<uint8>(BxpOption.BuildingExpansionType)));
+		}
+	}
+	return TrainingOptions;
+}
+
+void UW_FactionSelectionMenu::ShowFaction(const ERTSFaction Faction)
+{
+	switch (Faction)
+	{
+	case ERTSFaction::GerBreakthroughDoctrine:
+		SelectGermanBreakthrough(false);
+		return;
+	case ERTSFaction::GerStrikeDivision:
+		SelectGermanThermoKorps(false);
+		return;
+	case ERTSFaction::GerItalianFaction:
+		SelectGermanItalianGame(false);
+		return;
+	default:
+		return;
+	}
+}
+
+const FFactionMenuSetting* UW_FactionSelectionMenu::FindFactionSetting(const ERTSFaction Faction) const
+{
+	switch (Faction)
+	{
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return &M_GerBreakthroughSetting;
+	case ERTSFaction::GerStrikeDivision:
+		return &M_GerThermoKorpsSetting;
+	case ERTSFaction::GerItalianFaction:
+		return &M_GerItalianGameSetting;
+	default:
+		return nullptr;
+	}
+}
+
 void UW_FactionSelectionMenu::PopulateFactionUnits(const FFactionMenuSetting& FactionSetting)
 {
 	if (not GetIsValidScrollBox())

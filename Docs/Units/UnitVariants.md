@@ -898,3 +898,31 @@ entry that survives the clamp is logged as a warning so a forgotten override is 
   `UPlayerUnitVariantManager::SetSelectedVariant` if it ever runs inside a mission.
 - **Per-unit choice at training time**: would pass the class per request instead of overriding the map; keep
   `GetTrainingOptionClass` as the single read point so that change stays local to the spawner.
+
+## 14. Faction selection variant screen (done 2026-10-22)
+
+The first selection UI runs on the faction selection map (`RTS_FactionSelection`), until the world campaign has its
+own section for unlocked units.
+
+- **When:** after Launch Campaign on the faction menu, before the difficulty picker, only when
+  `URTSGameInstance::GetAllowUnitVariantSelection()` is on (Blueprint: `SetAllowUnitVariantSelection`, off by
+  default; in PIE: Project Settings > RTS PIE Startup > Allow Unit Variant Selection) and the faction's menu setting
+  (`FFactionMenuSetting` on `BP_W_FactionSelectionMenu`) lists at least one unit with more than one variant.
+- **Code:** `FactionSystem/FactionSelection/UnitVariantSelection/`. `UW_UnitVariantSelectionMenu` builds its own
+  widget tree (unit list left, variant cards right, Back / Confirm), `UW_UnitVariantUnitEntry` and
+  `UW_UnitVariantCard` are its rows. `AFactionPlayerController` opens it (`TryShowUnitVariantSelection`), previews
+  each choice by calling `ARTSAsyncSpawner::SetPlayerUnitVariant` and respawning the hangar unit, saves on Confirm
+  with `FRTS_Profile::SaveUnitVariantSelections` (only this faction's units change; the rest of the saved choices
+  stay) and on Back puts the spawner back on Base.
+- **Look:** `BP_W_UnitVariantSelectionMenu` (`/Game/RTS_Survival/FactionSelection/UI/`) only fills
+  `FUnitVariantSelectionStyle` with the Frontstahl `Custom_Variant*` slice instances. Art and layout spec:
+  `UISkins/_generator/variant_selection_parts.py`, `variant_selection_spec.md`, `mock_variant_selection.png`;
+  import, instances and style: `UISkins/_generator/ui_variant_selection.py` (commandlet, re-runnable). Fonts are
+  Roboto Bold / Regular (`RR_mainFont` is a display face); change them in the Blueprint's style.
+- **Texts:** unit names come from the `DT_TrainingOptions` Title (markup stripped), card names and descriptions from
+  the variant definition's `DisplayName` / `Description`, card pictures from its `Icon`, else its training image
+  brush override, else the unit's table brush.
+- **Check:** `-UnitVariantSelectionCapture` on `RTS_FactionSelection` (`-game -RenderOffscreen -windowed -ResX=1920
+  -ResY=1080`) launches Breakthrough (or `-UnitVariantSelectionFaction=<value>`), checks the hangar spawns the base
+  and then the Variant A class and writes `Saved/UnitVariantSelection/*.png`. It never confirms, so it does not write
+  the player profile.

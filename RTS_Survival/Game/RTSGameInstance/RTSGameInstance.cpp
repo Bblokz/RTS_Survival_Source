@@ -63,6 +63,7 @@ void URTSGameInstance::ApplyPIEStartupOverrides()
 	
 	SetPlayerFaction(PIEStartupSettings->PlayerFaction);
 	SetPlayerCommander(PIEStartupSettings->PlayerCommander);
+	SetAllowUnitVariantSelection(PIEStartupSettings->bAllowUnitVariantSelection);
 	SetWorldMissionContext(PIEStartupSettings->WorldMissionContext);
 	
 #endif

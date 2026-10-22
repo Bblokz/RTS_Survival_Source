@@ -23,7 +23,10 @@ class UW_FactionDifficultyPicker;
 class UW_FactionPopup;
 class UW_FactionSelectionMenu;
 class UW_FactionWorldGenerationSettings;
+class UW_UnitVariantSelectionMenu;
+class UUnitVariantDataAsset;
 enum class ERTSFaction : uint8;
+enum class EUnitVariant : uint8;
 
 UENUM()
 enum class EPreviewActionType : uint8
@@ -79,7 +82,10 @@ struct FUnitPreviewActions
  *
  * @details Widget flow handled by this controller:
  * - Start: show the faction selection menu and preview units while the player browses.
- * - Launch Campaign: store the selected faction, remove the menu, and show the faction difficulty picker.
+ * - Launch Campaign: store the selected faction, remove the menu, and show the unit variant selection when the game
+ *   instance allows it and the faction has units with variants; otherwise show the faction difficulty picker.
+ * - Unit Variant Selection: previews each choice in the hangar; Confirm saves the choices to the player profile and
+ *   shows the difficulty picker, Back returns to the faction selection menu.
  * - Difficulty Selected: store the chosen difficulty, then either load the requested map or show campaign settings.
  * - Campaign Generation Settings: when confirmed, store the settings and load the requested campaign map.
  *   Back returns to the difficulty picker and repeats the campaign flow.
@@ -103,6 +109,18 @@ public:
 	void HandleWorldGenerationBackRequested();
 	void HandleWorldGenerationSettingsGenerated(const FCampaignGenerationSettings& Settings);
 
+	/**
+	 * @brief Swaps the spawner's class for the unit to the variant and respawns the hangar preview with it.
+	 * @param Unit The unit as the faction menu lists it.
+	 * @param Variant The variant to show.
+	 */
+	void HandleUnitVariantPreviewRequested(const FTrainingOption& Unit, const EUnitVariant Variant);
+
+	/** Saves the choices (Base included) into the player profile and continues to the difficulty picker. */
+	void HandleUnitVariantSelectionConfirmed(const TMap<FTrainingOption, EUnitVariant>& Selections);
+
+	void HandleUnitVariantSelectionBack();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionPopup> M_FactionPopupClass;
@@ -115,6 +133,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionWorldGenerationSettings> M_FactionWorldGenerationSettingsClass;
+
+	// The Blueprint child of UW_UnitVariantSelectionMenu that holds the skin brushes.
+	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
+	TSubclassOf<UW_UnitVariantSelectionMenu> M_UnitVariantSelectionMenuClass;
 
 	// Used as the campaign request fallback when pre-game setup was opened without a launch request.
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
@@ -141,6 +163,16 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UW_FactionWorldGenerationSettings> M_FactionWorldGenerationSettings;
+
+	UPROPERTY()
+	TWeakObjectPtr<UW_UnitVariantSelectionMenu> M_UnitVariantSelectionMenu;
+
+	// Loaded when the variant selection opens; also keeps the variant training brushes alive for its cards.
+	UPROPERTY()
+	TObjectPtr<const UUnitVariantDataAsset> M_VariantDataAsset;
+
+	// The units the variant selection shows; Back puts the spawner back on Base for each of them.
+	TArray<FTrainingOption> M_VariantSelectionUnits;
 
 	UPROPERTY()
 	TWeakObjectPtr<AFactionUnitPreview> M_FactionUnitPreview;
@@ -177,6 +209,18 @@ private:
 	void InitFactionDifficultyPicker();
 	void InitFactionWorldGenerationSettings();
 	void ShowFactionWorldGenerationSettings();
+	void ShowFactionDifficultyPicker();
+
+	/**
+	 * @brief Opens the unit variant selection when the game instance allows it.
+	 * @param RTSGameInstance Holds the allow flag.
+	 * @param FactionUnits Every unit the faction menu lists for the chosen faction.
+	 * @return False when the selection is not allowed or no unit of the faction has variants.
+	 */
+	bool TryShowUnitVariantSelection(const URTSGameInstance* RTSGameInstance, const TArray<FTrainingOption>& FactionUnits);
+	TMap<FTrainingOption, EUnitVariant> LoadSavedVariantSelections() const;
+	void RestoreBaseVariantsInSpawner();
+	void CloseUnitVariantSelection();
 	void BeginPlay_InitFactionBanners();
 	void InitPreviewReferences();
 	void NotifyFactionBannersOfFactionChange();
@@ -232,6 +276,9 @@ private:
 	bool GetIsValidFactionDifficultyPicker() const;
 	bool GetIsValidFactionWorldGenerationSettingsClass() const;
 	bool GetIsValidFactionWorldGenerationSettings() const;
+	bool GetIsValidUnitVariantSelectionMenuClass() const;
+	bool GetIsValidUnitVariantSelectionMenu() const;
+	bool GetIsValidVariantDataAsset() const;
 	bool GetIsValidFactionUnitPreview() const;
 	bool GetIsValidRTSAsyncSpawner() const;
 };

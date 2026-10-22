@@ -70,6 +70,13 @@ public:
 
 	static void DebugPrintProfile(const USavePlayerProfile* InPlayerProfile, bool bUseErrorFunction = false);
 
+	/**
+	 * @brief Replaces only the unit variant choices of the saved profile, keeping its cards and layouts.
+	 * @param UnitVariantSelections Every non-Base choice; units missing from it are saved as Base.
+	 * @return False when the profile could not be saved.
+	 */
+	static bool SaveUnitVariantSelections(const TArray<FUnitVariantSelection>& UnitVariantSelections);
+
 private:
 	/**
  * @brief Attempts to load the player profile from the specified save slot.

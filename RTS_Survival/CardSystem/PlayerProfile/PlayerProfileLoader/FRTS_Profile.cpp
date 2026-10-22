@@ -205,6 +205,20 @@ void FRTS_Profile::ProfileValidator(USavePlayerProfile* Profile)
 	ValidateUnitVariantSelections(Profile->M_UnitVariantSelections);
 }
 
+bool FRTS_Profile::SaveUnitVariantSelections(const TArray<FUnitVariantSelection>& UnitVariantSelections)
+{
+	USavePlayerProfile* Profile = LoadPlayerProfile();
+	if (not IsValid(Profile))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("No player profile to save the unit variant selections into."
+			"\nAt function: FRTS_Profile::SaveUnitVariantSelections"));
+		return false;
+	}
+	Profile->M_UnitVariantSelections = UnitVariantSelections;
+	ValidateUnitVariantSelections(Profile->M_UnitVariantSelections);
+	return SavePlayerProfile(Profile);
+}
+
 void FRTS_Profile::ValidateUnitVariantSelections(TArray<FUnitVariantSelection>& InOutSelections)
 {
 	TSet<FTrainingOption> SeenUnits;

@@ -120,6 +120,12 @@ public:
 	void HandleUnitSelected(const FTrainingOption& TrainingOption);
 	void HandleAnnouncementFinished();
 
+	/** @return Every unit the faction's menu setting lists, in list order; the variant selection filters these. */
+	TArray<FTrainingOption> GetFactionTrainingOptions(const ERTSFaction Faction) const;
+
+	/** Selects a faction without forcing its announcement, e.g. when the player comes back from variant selection. */
+	void ShowFaction(const ERTSFaction Faction);
+
 protected:
 	virtual void NativeConstruct() override;
 
@@ -252,6 +258,7 @@ private:
 	 */
 	void UpdateFactionSelectionBrush(FSlateBrush& Brush, const bool bIsSelected);
 	void PopulateFactionUnits(const FFactionMenuSetting& FactionSetting);
+	const FFactionMenuSetting* FindFactionSetting(const ERTSFaction Faction) const;
 	void AddTankUnitWidgets(
 		const TArray<FFactionMenuTankOption>& TankOptions,
 		TArray<TObjectPtr<UW_FactionUnit>>& OutUnitWidgets);
