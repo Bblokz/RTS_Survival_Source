@@ -7,6 +7,8 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSettings.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptionLibrary/TrainingOptionLibrary.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "Slate/SlateBrushAsset.h"
 
 namespace UnitVariantPresentationLibraryPrivate
@@ -16,6 +18,10 @@ namespace UnitVariantPresentationLibraryPrivate
 	const TCHAR* const TitleColumnName = TEXT("Title");
 	const TCHAR* const TitleColumnPrefix = TEXT("Title_");
 	const TCHAR* const RichTextTagPattern = TEXT("<[^>]*>");
+	// Leading words of the subtype display names ("Ger Light Pz 38t Railgun") that the UI does not show.
+	const TCHAR* const DisplayNamePrefixes[] = {
+		TEXT("Ger "), TEXT("Rus "), TEXT("Light "), TEXT("Medium "), TEXT("Heavy "), TEXT("ArmCar ")
+	};
 
 	const uint8* FindTrainingTableRow(const UDataTable* TrainingOptionsTable, const FTrainingOption& Unit)
 	{
@@ -104,6 +110,32 @@ FText UUnitVariantPresentationLibrary::FindTrainingTableTitle(const UDataTable* 
 		return StripRichTextMarkup(PropertyIt->GetPropertyValue_InContainer(RowData));
 	}
 	return FText::GetEmpty();
+}
+
+FText UUnitVariantPresentationLibrary::GetUnitDisplayNameFallback(const FTrainingOption& Unit)
+{
+	FText SubtypeDisplayName;
+	switch (Unit.UnitType)
+	{
+	case EAllUnitType::UNType_Tank:
+	case EAllUnitType::UNType_Harvester:
+		SubtypeDisplayName = StaticEnum<ETankSubtype>()->GetDisplayNameTextByValue(Unit.SubtypeValue);
+		break;
+	case EAllUnitType::UNType_Squad:
+		SubtypeDisplayName = StaticEnum<ESquadSubtype>()->GetDisplayNameTextByValue(Unit.SubtypeValue);
+		break;
+	case EAllUnitType::UNType_BuildingExpansion:
+		SubtypeDisplayName = StaticEnum<EBuildingExpansionType>()->GetDisplayNameTextByValue(Unit.SubtypeValue);
+		break;
+	default:
+		return FText::FromString(Unit.GetDisplayName());
+	}
+	FString DisplayName = SubtypeDisplayName.ToString();
+	for (const TCHAR* const Prefix : UnitVariantPresentationLibraryPrivate::DisplayNamePrefixes)
+	{
+		DisplayName.RemoveFromStart(Prefix);
+	}
+	return FText::FromString(DisplayName);
 }
 
 FText UUnitVariantPresentationLibrary::StripRichTextMarkup(const FText& RichText)

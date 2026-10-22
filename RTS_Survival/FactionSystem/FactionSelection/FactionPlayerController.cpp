@@ -19,6 +19,8 @@
 #include "RTS_Survival/Units/Variants/UnitVariantDataAsset.h"
 #include "RTS_Survival/Units/Variants/UnitVariantSettings.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSettings.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
@@ -147,10 +149,14 @@ void AFactionPlayerController::HandleLaunchCampaignRequested(const ERTSFaction S
 	M_SelectedFaction = SelectedFaction;
 	RTSGameInstance->SetPlayerFaction(M_SelectedFaction);
 
-	TArray<FTrainingOption> FactionUnits;
+	// The training layout is what the faction trains; the menu's showcase list is only the fallback.
+	TArray<FTrainingOption> FactionUnits = GetFactionUnitsFromTrainingLayout(M_SelectedFaction);
 	if (GetIsValidFactionSelectionMenu())
 	{
-		FactionUnits = M_FactionSelectionMenu->GetFactionTrainingOptions(M_SelectedFaction);
+		if (FactionUnits.IsEmpty())
+		{
+			FactionUnits = M_FactionSelectionMenu->GetFactionTrainingOptions(M_SelectedFaction);
+		}
 		M_FactionSelectionMenu->RemoveFromParent();
 		M_FactionSelectionMenu.Reset();
 	}
@@ -280,6 +286,34 @@ TMap<FTrainingOption, EUnitVariant> AFactionPlayerController::LoadSavedVariantSe
 		}
 	}
 	return SavedSelections;
+}
+
+TArray<FTrainingOption> AFactionPlayerController::GetFactionUnitsFromTrainingLayout(const ERTSFaction Faction)
+{
+	TArray<FTrainingOption> FactionUnits;
+	const UTrainingLayoutDataAsset* TrainingLayout = UTrainingLayoutSettings::Get()->LoadTrainingLayout();
+	const FTrainingLayoutFaction* FactionLayout = IsValid(TrainingLayout)
+		                                              ? TrainingLayout->FactionLayouts.Find(Faction)
+		                                              : nullptr;
+	if (not FactionLayout)
+	{
+		return FactionUnits;
+	}
+	for (const TPair<ENomadicSubtype, FTrainingLayoutBuilding>& BuildingLayout : FactionLayout->Buildings)
+	{
+		for (const FTrainingLayoutSubSection& SubSection : BuildingLayout.Value.SubSections)
+		{
+			for (const FTrainingLayoutSlot& LayoutSlot : SubSection.Slots)
+			{
+				const FTrainingOption Unit = LayoutSlot.ToTrainingOption();
+				if (not Unit.IsNone())
+				{
+					FactionUnits.AddUnique(Unit);
+				}
+			}
+		}
+	}
+	return FactionUnits;
 }
 
 void AFactionPlayerController::RestoreBaseVariantsInSpawner()

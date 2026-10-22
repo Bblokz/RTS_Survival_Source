@@ -219,6 +219,9 @@ private:
 	 */
 	bool TryShowUnitVariantSelection(const URTSGameInstance* RTSGameInstance, const TArray<FTrainingOption>& FactionUnits);
 	TMap<FTrainingOption, EUnitVariant> LoadSavedVariantSelections() const;
+
+	/** @return Every unit the faction trains, from the training layout (all buildings, sub sections and slots). */
+	static TArray<FTrainingOption> GetFactionUnitsFromTrainingLayout(const ERTSFaction Faction);
 	void RestoreBaseVariantsInSpawner();
 	void CloseUnitVariantSelection();
 	void BeginPlay_InitFactionBanners();

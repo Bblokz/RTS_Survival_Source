@@ -1116,11 +1116,27 @@ void UUnitPortraitCaptureSubsystem::DestroyUnit()
 	M_Unit->GetAttachedActors(UnitActors, true, true);
 	const APawn* UnitPawn = Cast<APawn>(M_Unit.Get());
 	AController* Controller = IsValid(UnitPawn) ? UnitPawn->GetController() : nullptr;
+	// Destroying one attached actor can destroy others in the list (a child actor component's actor takes its own
+	// attached actors with it), so the list is held weakly and child actors are left to their component.
+	TArray<TWeakObjectPtr<AActor>> WeakUnitActors;
 	for (AActor* UnitActor : UnitActors)
 	{
+		WeakUnitActors.Add(UnitActor);
+	}
+	for (const TWeakObjectPtr<AActor>& WeakUnitActor : WeakUnitActors)
+	{
+		AActor* UnitActor = WeakUnitActor.Get();
+		if (not IsValid(UnitActor) || UnitActor->IsActorBeingDestroyed() || UnitActor->IsChildActor())
+		{
+			continue;
+		}
 		UnitActor->Destroy();
 	}
-	M_Unit->Destroy();
+	// The Pz 38(t) Rocketeer's rocket actors take the unit down with them, so it can be gone by now.
+	if (M_Unit.IsValid() && not M_Unit->IsActorBeingDestroyed())
+	{
+		M_Unit->Destroy();
+	}
 	if (IsValid(Controller))
 	{
 		Controller->Destroy();

@@ -155,8 +155,11 @@ void UW_UnitVariantCard::SetupCard(UW_UnitVariantSelectionMenu* Menu, const EUni
 	{
 		return;
 	}
+	// An empty brush would draw Slate's default white box, so the well stays empty instead.
+	const bool bHasIcon = IsValid(IconBrush.GetResourceObject());
 	M_Icon->SetBrush(IconBrush);
 	M_Icon->SetDesiredSizeOverride(FVector2D(IconSize, IconSize));
+	M_Icon->SetVisibility(bHasIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
 	M_SelectedMarker->SetBrush(Style.SelectedMarker);
 
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(

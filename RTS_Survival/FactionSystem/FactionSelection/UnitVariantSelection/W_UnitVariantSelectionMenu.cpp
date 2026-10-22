@@ -343,9 +343,8 @@ void UW_UnitVariantSelectionMenu::PopulateUnitEntries()
 		{
 			continue;
 		}
-		Entry->SetupEntry(this, UnitIndex, M_Style,
-		                  UUnitVariantPresentationLibrary::FindTrainingTableImageBrush(M_TrainingOptionsTable, Unit),
-		                  GetUnitName(Unit), M_VariantDataAsset->GetImplementedVariantCount(Unit));
+		Entry->SetupEntry(this, UnitIndex, M_Style, MakeUnitIconBrush(Unit), GetUnitName(Unit),
+		                  M_VariantDataAsset->GetImplementedVariantCount(Unit));
 		Entry->SetPadding(FMargin(0.f, 0.f, 0.f, EntrySpacing));
 		M_UnitList->AddChild(Entry);
 		M_UnitEntries.Add(Entry);
@@ -486,7 +485,19 @@ FText UW_UnitVariantSelectionMenu::GetUnitName(const FTrainingOption& Unit) cons
 	{
 		return TableTitle;
 	}
-	return FText::FromString(Unit.GetDisplayName());
+	return UUnitVariantPresentationLibrary::GetUnitDisplayNameFallback(Unit);
+}
+
+FSlateBrush UW_UnitVariantSelectionMenu::MakeUnitIconBrush(const FTrainingOption& Unit)
+{
+	// The training icon when the unit has one; units without a DT_TrainingOptions row show their Base picture.
+	const USlateBrushAsset* TableBrush = UUnitVariantPresentationLibrary::FindTrainingTableImageBrush(
+		M_TrainingOptionsTable, Unit);
+	if (IsValid(TableBrush))
+	{
+		return TableBrush->Brush;
+	}
+	return MakeVariantIconBrush(Unit, EUnitVariant::Base);
 }
 
 FText UW_UnitVariantSelectionMenu::GetVariantName(const FTrainingOption& Unit, const EUnitVariant Variant) const

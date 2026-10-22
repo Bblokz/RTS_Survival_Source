@@ -14,7 +14,6 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "Slate/SlateBrushAsset.h"
 #include "UnitVariantSelectionWidgetHelpers.h"
 #include "W_UnitVariantSelectionMenu.h"
 
@@ -107,7 +106,7 @@ void UW_UnitVariantUnitEntry::BuildTexts(UOverlay* EntryOverlay)
 }
 
 void UW_UnitVariantUnitEntry::SetupEntry(UW_UnitVariantSelectionMenu* Menu, const int32 EntryIndex,
-                                         const FUnitVariantSelectionStyle& Style, USlateBrushAsset* UnitIcon,
+                                         const FUnitVariantSelectionStyle& Style, const FSlateBrush& UnitIcon,
                                          const FText& UnitName, const int32 VariantCount)
 {
 	using namespace UnitVariantUnitEntryLayout;
@@ -119,12 +118,15 @@ void UW_UnitVariantUnitEntry::SetupEntry(UW_UnitVariantSelectionMenu* Menu, cons
 	{
 		return;
 	}
-	if (IsValid(UnitIcon))
+	// The image's brush is a UPROPERTY, so it keeps the icon texture loaded. An empty brush would draw Slate's
+	// default white box, so the well stays empty instead.
+	const bool bHasIcon = IsValid(UnitIcon.GetResourceObject());
+	if (bHasIcon)
 	{
-		// The image's brush is a UPROPERTY, so it keeps the icon texture loaded.
-		M_Icon->SetBrush(UnitIcon->Brush);
+		M_Icon->SetBrush(UnitIcon);
 		M_Icon->SetDesiredSizeOverride(FVector2D(IconSize, IconSize));
 	}
+	M_Icon->SetVisibility(bHasIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		M_NameText, UnitVariantSelectionWidgets::MakeFont(Style.HeadingFont, NameFontSize), Style.TextColor);
 	M_NameText->SetText(UnitName.ToUpper());

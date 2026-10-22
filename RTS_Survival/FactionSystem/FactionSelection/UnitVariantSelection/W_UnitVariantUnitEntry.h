@@ -14,7 +14,6 @@ class UImage;
 class UOverlay;
 class UTextBlock;
 class UW_UnitVariantSelectionMenu;
-class USlateBrushAsset;
 
 /**
  * @brief One unit in the left list of the unit variant selection screen; created by UW_UnitVariantSelectionMenu,
@@ -31,12 +30,12 @@ public:
 	 * @param Menu Receives the click.
 	 * @param EntryIndex Index of the unit in the menu's unit list.
 	 * @param Style Brushes, fonts and colours shared by the whole screen.
-	 * @param UnitIcon The unit's DT_TrainingOptions brush; null shows an empty well.
+	 * @param UnitIcon The unit's picture; a brush without a resource leaves the well empty.
 	 * @param UnitName Plain text name of the unit.
 	 * @param VariantCount How many variants the unit has, Base included.
 	 */
 	void SetupEntry(UW_UnitVariantSelectionMenu* Menu, const int32 EntryIndex, const FUnitVariantSelectionStyle& Style,
-	                USlateBrushAsset* UnitIcon, const FText& UnitName, const int32 VariantCount);
+	                const FSlateBrush& UnitIcon, const FText& UnitName, const int32 VariantCount);
 
 	void SetIsSelected(const bool bIsSelected);
 

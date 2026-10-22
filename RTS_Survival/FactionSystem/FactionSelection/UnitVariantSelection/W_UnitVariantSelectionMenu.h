@@ -185,6 +185,7 @@ private:
 	 * @return A brush with no resource when nothing has a picture.
 	 */
 	FSlateBrush MakeVariantIconBrush(const FTrainingOption& Unit, const EUnitVariant Variant);
+	FSlateBrush MakeUnitIconBrush(const FTrainingOption& Unit);
 
 	UFUNCTION()
 	void OnConfirmClicked();

@@ -55,6 +55,12 @@ public:
 	/** @return The Title column of the unit's row without rich text markup, empty when the unit has no row. */
 	static FText FindTrainingTableTitle(const UDataTable* TrainingOptionsTable, const FTrainingOption& Unit);
 
+	/**
+	 * @return The subtype's display name without the nation and class words ("Ger Light Pz 38t Railgun" gives
+	 * "Pz 38t Railgun"), for units without a DT_TrainingOptions row.
+	 */
+	static FText GetUnitDisplayNameFallback(const FTrainingOption& Unit);
+
 	/** @return The text with every <Style>...</> rich text tag removed, for plain text blocks. */
 	static FText StripRichTextMarkup(const FText& RichText);
 };

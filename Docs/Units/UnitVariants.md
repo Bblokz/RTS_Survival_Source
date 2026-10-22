@@ -907,7 +907,7 @@ own section for unlocked units.
 - **When:** after Launch Campaign on the faction menu, before the difficulty picker, only when
   `URTSGameInstance::GetAllowUnitVariantSelection()` is on (Blueprint: `SetAllowUnitVariantSelection`, off by
   default; in PIE: Project Settings > RTS PIE Startup > Allow Unit Variant Selection) and the faction's menu setting
-  (`FFactionMenuSetting` on `BP_W_FactionSelectionMenu`) lists at least one unit with more than one variant.
+  trains at least one unit with more than one variant (its `DA_TrainingLayout` entry, see section 15).
 - **Code:** `FactionSystem/FactionSelection/UnitVariantSelection/`. `UW_UnitVariantSelectionMenu` builds its own
   widget tree (unit list left, variant cards right, Back / Confirm), `UW_UnitVariantUnitEntry` and
   `UW_UnitVariantCard` are its rows. `AFactionPlayerController` opens it (`TryShowUnitVariantSelection`), previews
@@ -926,3 +926,35 @@ own section for unlocked units.
   -ResY=1080`) launches Breakthrough (or `-UnitVariantSelectionFaction=<value>`), checks the hangar spawns the base
   and then the Variant A class and writes `Saved/UnitVariantSelection/*.png`. It never confirms, so it does not write
   the player profile.
+
+## 15. Variants set up (2026-10-22)
+
+`Tools/UnitVariants/fill_unit_variants.py` (commandlet, re-runnable) writes the tank entries of `DA_UnitVariants`,
+sets the `UnitVariant` class default on each variant Blueprint and imports the selection pictures
+(`/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Variants/T_Variant_<Blueprint>`, 256x256 crops from
+`Tools/UnitPortraits`, front-right idle view). Entries are per subtype, so a unit both factions train has the same
+variants in both. The order in an entry is the saved index: append, never reorder. Ideas for further variants:
+`Docs/Units/UnitVariantCatalog.md`.
+
+| Unit (subtype) | Variant A | Variant B |
+|---|---|---|
+| Sd.Kfz. 250 (`Tank_Sdkfz250`) | Armoured Ambulance | Ammo Carrier |
+| Sd.Kfz. 250/37 (`Tank_Sdkfz250_37mm`) | Long Barrel | Howitzer 250 |
+| Pz 38(t) (`Tank_Pz38t`) | AT Ammo Stock | Rocketeer |
+| Pz 38(t) Railgun (`Tank_Pz38t_RailGun`) | Overcharge | Sniper |
+| Panzerjäger I (`Tank_PzJager`) | Mobile Battery | Ambush Shield |
+| Pz I 15 cm (`Tank_PzI_15cm`) | Indirect Fire | Direct Fire |
+| Pz IV F1 (`Tank_PzIV_F1`) | Spotter | Assault |
+| Pz IV G (`Tank_PzIV_G`) | Double Turret | |
+| Jagdpanzer IV/70 (`Tank_PzIV_70`) | Ambush | Siege |
+| Marder (`Tank_Marder`) | Dual Barrel | |
+
+All ten are Breakthrough Doctrine units. No Strike Division unit, and no unit both factions train, has a finished
+variant yet. Not set up: `Ger_Vehicle_PanzerII_F_Strike` (an older Strike Pz II F child from before variants),
+`Ger_ArmoredCar_Sdkfz_231_MG231` (the Sd.Kfz. 231 is in neither faction's training layout), and the Flak 88
+stand-alone expansion and the tutorial `MissionVehicle` (not variants).
+
+The faction selection variant screen (section 14) takes the faction's units from `DA_TrainingLayout` (every
+building, sub section and slot), falling back to the faction menu's showcase list only when the layout has no entry
+for the faction. Pz 38(t) Railgun and Pz IV H have no `DT_TrainingOptions` row: the screen then names them from the
+subtype and shows their Base picture.

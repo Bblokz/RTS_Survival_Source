@@ -205,14 +205,27 @@ void UUnitVariantTestSubsystem::TickWaitingForGarbageCollection()
 
 void UUnitVariantTestSubsystem::CheckTrainingPresentation(const FString& CheckName)
 {
-	const FUnitVariantTrainingPresentation Presentation = GetVariantManager()->GetTrainingPresentation(M_TestedTank);
+	// The presentation must carry exactly the overrides the asset ticks for this variant (none is a valid setup).
+	UPlayerUnitVariantManager* VariantManager = GetVariantManager();
+	const FUnitVariantTrainingPresentation Presentation = VariantManager->GetTrainingPresentation(M_TestedTank);
+	const FUnitVariantDefinition* Definition = VariantManager->GetVariantDataAsset()->FindVariantDefinition(
+		M_TestedTank, EUnitVariant::VariantA);
+	if (not Definition)
+	{
+		Check(false, CheckName, TEXT("no VariantA definition"));
+		return;
+	}
 	const USlateBrushAsset* ImageBrush = Presentation.ImageBrush.Get();
-	const bool bHasTextureBrush = Presentation.bOverrideImageBrush && IsValid(ImageBrush)
-		&& IsValid(Cast<UTexture2D>(ImageBrush->Brush.GetResourceObject()));
-	Check(Presentation.Variant == EUnitVariant::VariantA && bHasTextureBrush && Presentation.bOverrideTitle
-	      && Presentation.bOverrideDescription && Presentation.bOverrideTooltip, CheckName,
-	      FString::Printf(TEXT("brush=%s title=%s tooltip=%s"), IsValid(ImageBrush) ? *ImageBrush->GetName() : TEXT("none"),
-	                      *Presentation.Title.ToString(), *Presentation.Tooltip.ToString()));
+	const bool bBrushMatches = Presentation.bOverrideImageBrush == Definition->bOverrideTrainingImageBrush
+		&& (not Presentation.bOverrideImageBrush
+			|| (IsValid(ImageBrush) && IsValid(Cast<UTexture2D>(ImageBrush->Brush.GetResourceObject()))));
+	const bool bTextsMatch = Presentation.bOverrideTitle == Definition->bOverrideTrainingTitle
+		&& Presentation.bOverrideDescription == Definition->bOverrideTrainingDescription
+		&& Presentation.bOverrideTooltip == Definition->bOverrideTrainingTooltip;
+	Check(Presentation.Variant == EUnitVariant::VariantA && bBrushMatches && bTextsMatch, CheckName,
+	      FString::Printf(TEXT("brush=%s title=%d description=%d tooltip=%d"),
+	                      IsValid(ImageBrush) ? *ImageBrush->GetName() : TEXT("none"), Presentation.bOverrideTitle,
+	                      Presentation.bOverrideDescription, Presentation.bOverrideTooltip));
 }
 
 void UUnitVariantTestSubsystem::TickWaitingForVariantSpawn()
