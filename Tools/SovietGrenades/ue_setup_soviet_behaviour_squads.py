@@ -23,7 +23,7 @@ ASSIGNMENTS = {
     SQUADS + "Rus/T2/Rus_T2Squad_RedHammer": "CloseAssault",
     SQUADS + "Rus/T2/Rus_T2Squad_RedHammerPTRS": "CloseAssault",
     SQUADS + "Rus/Rus_Squad_LargeMixBasic": "CloseAssault",
-    TW + "80Mortar/Rus_SquadTW_80mmMortar": "MortarBarrage",
+    TW + "80MMMortar/Rus_SquadTW_80mmMortar": "MortarBarrage",
     TW + "120Mortar/Rus_SquadTW_120mmMortar": "MortarBarrage",
 }
 ONLY = globals().get("ONLY")

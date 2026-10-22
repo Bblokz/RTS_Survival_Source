@@ -39,8 +39,8 @@ calibre window decides which weapons a buff touches.
 | Type (`EBehaviourAbilityType`, card key) | Behaviour Blueprint | Effect | Calibre window | Squads (card slot, cooldown) |
 |---|---|---|---|---|
 | `ArmorPiercingBullets` (18, existed without users) | `BP_Beh_Squad_APBullets_Soviet` | 15 s: +50 % armor pen, +15 % damage, +20 % reload time | <= 20 mm (rifles, PTRS; not the bazooka) | `Rus_Squad_PTRS` (+ `_Soviet` child), `Rus_Squad_LargePTRSSquad`, `Rus_Squad_MosinPTRS` (6, 40 s) |
-| `RusCloseAssault` (21, new) | `BP_Beh_Squad_CloseAssault_Soviet` | 12 s: -33 % time between shots, -50 % reload time, +15 % damage, -15 % accuracy | <= 20 mm | `Rus_T2Squad_RedHammer`, `Rus_T2Squad_RedHammerPTRS`, `Rus_Squad_LargeMixBasic` (6, 35 s) |
-| `RusMortarBarrage` (22, new) | `BP_Beh_MortarBarrage_Soviet` | 15 s: -60 % reload time, -50 % time between shots, -20 % accuracy | >= 50 mm (the mortar only, not the crew's rifles) | `Rus_SquadTW_80mmMortar`, `Rus_SquadTW_120mmMortar` (+ `_Soviet` children) (7, 60 s) |
+| `RusCloseAssault` (20, new) | `BP_Beh_Squad_CloseAssault_Soviet` | 12 s: -33 % time between shots, -50 % reload time, +15 % damage, -15 % accuracy | <= 20 mm | `Rus_T2Squad_RedHammer`, `Rus_T2Squad_RedHammerPTRS`, `Rus_Squad_LargeMixBasic` (6, 35 s) |
+| `RusMortarBarrage` (21, new) | `BP_Beh_MortarBarrage_Soviet` | 15 s: -60 % reload time, -50 % time between shots, -20 % accuracy | >= 50 mm (the mortar only, not the crew's rifles) | `Rus_SquadTW_80mmMortar`, `Rus_SquadTW_120mmMortar` (+ `_Soviet` children) (7, 60 s) |
 
 Multipliers scale the weapon value (`UBehaviourWeapon::CalculateAttributes...`: value * (mult - 1) is added; 0 = unchanged).
 Enemy AI (`FEnemyAbilityUsageProfiles::GetBehaviourUsage`): AP bullets in combat vs armor, Close Assault at close
@@ -85,6 +85,6 @@ scale and montage time are copied from the German stick (frag) and HEAT (AT) com
   `ue_setup_soviet_grenade_squads.py` (components and tuning; needs the build with the new enum values),
   `ue_create_soviet_behaviours.py` (behaviour Blueprints), `ue_setup_soviet_behaviour_squads.py` (behaviour
   components). Both setup scripts take `ONLY = [...]` before `exec` to run a subset. Card entries for
-  `IdApplyBehaviour` keys 18/21/22 are added by `ue_add_soviet_grenade_cards.py` as well.
+  `IdApplyBehaviour` keys 18/20/21 are added by `ue_add_soviet_grenade_cards.py` as well.
 - Editor Python gotcha: a free-standing `unreal.GrenadeComponentSettings()` refuses `EditDefaultsOnly` fields
   ("cannot be edited on instances"); edit the component template's own `M_Settings` struct and set it back.
