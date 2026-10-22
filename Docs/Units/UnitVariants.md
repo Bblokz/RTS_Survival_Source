@@ -28,14 +28,14 @@ everything the UI will need to know which units have variants to choose from, is
 | Who gets variants | The player, and only the player, without any owner check. A faction is always unique to one player, so the spawner never spawns a unit of one player's faction for another player: German subtypes (the only keys variants override) are only ever requested for the player. No spawn path checks the requester, the trainer component's owner or the spawned unit's owner; see section 6. |
 | Persistence | The selection is saved next to the cards in the player profile (already in place). |
 | Scope of a selection change | Units requested after the change. Already spawned units keep their class. |
-| Variant definition store | `UUnitVariantDataAsset` picked in Project Settings > Unit Variants (already in place), extended with the variant class per entry. |
+| Variant definition store | `UUnitVariantDataAsset` (`DA_UnitVariants`) holds **all** variant data: classes, preview meshes, selection-UI texts, training UI overrides and the debug forced list. Project Settings > Unit Variants holds **only** the reference to that asset (3.3). |
 | Subtype | **All variants of a unit share that unit's one subtype.** Three Pz II F Blueprints are all `Tank_PzII_F`. No variant ever gets its own `ETankSubtype` / `ESquadSubtype` / `EBuildingExpansionType`; see "One subtype per unit" below. |
 | Cost / training time / requirements | Identical for every variant, because they are keyed by the shared subtype (`FTrainingOption`, `DT_Training` row). This is intended. |
-| Training UI presentation | While a variant is selected, the training menu can show that variant's **icon, title and description** instead of the base unit's. Each of the three is opt-in per variant with its own bool on the variant data asset entry; off means the base unit's table entry is shown. The values come from the variant data asset, never from `DT_Training` / `DT_TrainingOptions`. See 3.8. |
+| Training UI presentation | While a variant is selected, the training menu can show that variant's own value for any of the four `DT_TrainingOptions` columns (`BP_FTrainingUI_OptionSlate`): **`ImageBrush`, `Title`, `Description`, `Tooltip`**. Each of the four is opt-in per variant with its own bool on the variant data asset entry; off means the base unit's `DT_TrainingOptions` row value is shown. The values come from the variant data asset, never from extra `DT_Training` / `DT_TrainingOptions` rows. The image brush is a hard `USlateBrushAsset` reference held by `UPROPERTY`s end to end so GC cannot collect it (3.9). See 3.8. |
 | Per doctrine | No. The implemented variants are per subtype, not per `ERTSFaction`. |
 | Stale saves | A saved variant the asset no longer implements clamps to `Base` and reports an error once (already in place). |
 | Precedence vs director overrides | Director overrides apply first, variants second. A variant wins on the same key; the collision is reported. |
-| Testing before the UI exists | Cheat manager commands plus the developer-settings forced-variant list (already in place, adapted). |
+| Testing before the UI exists | Cheat manager commands plus the forced-variant list, moved from the developer settings onto the data asset (3.3). |
 
 ### One subtype per unit, shared by all its variants
 
@@ -59,10 +59,10 @@ This is a hard rule. Read it before designing anything.
     Blueprint;
   - technologies that target the subtype, unit cards (`FCardSaveData::UnitToCreate`), the game unit manager's
     per-subtype counts, enemy director keys and the saved selection itself.
-- The **only** per-variant exception the player sees in the training menu is presentation: icon, title and
-  description, each opt-in (3.8). They are read from the variant data asset by the training menu, keyed by the
-  shared `FTrainingOption` plus the selected `EUnitVariant`. Cost, training time and requirements in that same
-  menu stay the shared ones.
+- The **only** per-variant exception the player sees in the training menu is presentation: the four
+  `DT_TrainingOptions` columns image brush, title, description and tooltip, each opt-in (3.8). They are read from
+  the variant data asset by the training menu, keyed by the shared `FTrainingOption` plus the selected
+  `EUnitVariant`. Cost, training time and requirements in that same menu stay the shared ones.
 - Consequence for the spawner: there is exactly **one key per unit** in `M_TrainingOptionMap` /
   `BuildingExpansionMap`, and applying a variant **replaces the class under that key**. It never adds a key.
 - If a future variant genuinely needs a different cost or different requirements, that is a different unit (a
@@ -122,7 +122,12 @@ Keep as committed. Add the struct the training menu passes to its widgets (3.8);
 `TrainingWidgetState.h` can include it without pulling in the data asset:
 
 ```cpp
-/** What the training UI shows instead of the base unit's table entries while a variant is selected. */
+class USlateBrushAsset;
+
+/**
+ * What the training UI shows instead of the base unit's DT_TrainingOptions row while a variant is selected.
+ * Mirrors the row struct BP_FTrainingUI_OptionSlate (ImageBrush, Title, Description, Tooltip), one opt-in bool each.
+ */
 USTRUCT(BlueprintType)
 struct FUnitVariantTrainingPresentation
 {
@@ -133,10 +138,13 @@ struct FUnitVariantTrainingPresentation
 	EUnitVariant Variant = EUnitVariant::Base;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
-	bool bOverrideIcon = false;
+	bool bOverrideImageBrush = false;
 
+	// Hard reference on purpose, same type as the DT_TrainingOptions ImageBrush column. Being a UPROPERTY keeps the
+	// brush asset (and through it its texture) reachable for GC from every struct copy that is itself a UPROPERTY,
+	// such as UW_TrainingItem::M_TrainingItemState. Never turn this into a soft pointer or a by-value FSlateBrush (3.9).
 	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
-	TSoftObjectPtr<UTexture2D> Icon;
+	TObjectPtr<USlateBrushAsset> ImageBrush = nullptr;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
 	bool bOverrideTitle = false;
@@ -149,6 +157,12 @@ struct FUnitVariantTrainingPresentation
 
 	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
 	FText Description;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
+	bool bOverrideTooltip = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Unit Variant")
+	FText Tooltip;
 };
 ```
 
@@ -177,14 +191,18 @@ of `FUnitVariantEntry { TArray<FUnitVariantDefinition> Variants; }`, index 0 = B
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TSoftObjectPtr<UStaticMesh> BxpPreviewMesh;
 
-	// Training UI (3.8). Each override is opt-in; off shows the base unit's DT_TrainingOptions / DT_Training entry.
-	// DisplayName / Description / Icon above are for the later variant selection UI and are not used here, so the
-	// selection UI can say "Long 75 mm gun" while the training menu says "Pz IV H (L/48)".
+	// Training UI (3.8): one opt-in override per DT_TrainingOptions column (row struct BP_FTrainingUI_OptionSlate).
+	// Off shows the base unit's DT_TrainingOptions row value. DisplayName / Description / Icon above are for the
+	// later variant selection UI and are not used here, so the selection UI can say "Long 75 mm gun" while the
+	// training menu says "Pz IV H (L/48)".
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI")
-	bool bOverrideTrainingIcon = false;
+	bool bOverrideTrainingImageBrush = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI", meta = (EditCondition = "bOverrideTrainingIcon"))
-	TSoftObjectPtr<UTexture2D> TrainingIcon;
+	// Hard reference (not soft): it loads with the data asset and stays alive as long as the asset does, exactly
+	// like the brushes the DT_TrainingOptions rows hold. See 3.9 for why this must not be a soft pointer.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI",
+		meta = (EditCondition = "bOverrideTrainingImageBrush"))
+	TObjectPtr<USlateBrushAsset> TrainingImageBrush = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI")
 	bool bOverrideTrainingTitle = false;
@@ -198,6 +216,13 @@ of `FUnitVariantEntry { TArray<FUnitVariantDefinition> Variants; }`, index 0 = B
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI",
 		meta = (EditCondition = "bOverrideTrainingDescription", MultiLine = "true"))
 	FText TrainingDescription;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI")
+	bool bOverrideTrainingTooltip = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Training UI",
+		meta = (EditCondition = "bOverrideTrainingTooltip", MultiLine = "true"))
+	FText TrainingTooltip;
 ```
 
 New accessors:
@@ -216,9 +241,10 @@ New accessors:
 	FUnitVariantTrainingPresentation GetTrainingPresentation(const FTrainingOption& Unit, const EUnitVariant Variant) const;
 ```
 
-`GetTrainingPresentation` copies each override only when its bool is on (and, for the icon, the soft pointer is
-not null); `Variant` in the result is always the requested variant so a Blueprint can show a variant badge even
-when no override is on.
+`GetTrainingPresentation` copies each override only when its bool is on (and, for the image brush, the pointer is
+valid); `Variant` in the result is always the requested variant so a Blueprint can show a variant badge even
+when no override is on. Copying the `TObjectPtr<USlateBrushAsset>` into the returned struct is safe because both
+ends are `UPROPERTY` and the source object is the data asset the manager keeps alive (3.9).
 
 `IsDataValid` additions (editor only, so `LoadSynchronous` is fine there), all reported as errors:
 
@@ -229,19 +255,48 @@ when no override is on.
 - The same class used by two definitions anywhere in the asset.
 - `BxpPreviewMesh` set on a tank or squad definition (warning, it is ignored there).
 - Any `bOverrideTraining*` on element 0 (Base always shows the base unit's table entries).
-- `bOverrideTrainingIcon` on with a null `TrainingIcon`, `bOverrideTrainingTitle` on with an empty
-  `TrainingTitle`, `bOverrideTrainingDescription` on with an empty `TrainingDescription`.
+- `bOverrideTrainingImageBrush` on with a null `TrainingImageBrush`, or a brush whose
+  `Brush.GetResourceObject()` is not a `UTexture2D` (`UW_TrainingItem::GetIconTextureFromSlateBrushAsset` needs
+  a texture for the cooldown clock), `bOverrideTrainingTitle` on with an empty `TrainingTitle`,
+  `bOverrideTrainingDescription` on with an empty `TrainingDescription`, `bOverrideTrainingTooltip` on with an
+  empty `TrainingTooltip`.
 
 `GetImplementedVariantCount` stays "array length clamped to 1..3": an entry with elements that fail validation
 is a data error, not a runtime case.
 
-### 3.3 `UUnitVariantSettings` — `Units/Variants/UnitVariantSettings.h/.cpp` (exists, unchanged)
+### 3.3 `UUnitVariantSettings` — `Units/Variants/UnitVariantSettings.h/.cpp` (exists, reduced to the asset)
 
-`VariantDataAsset` (`TSoftObjectPtr<UUnitVariantDataAsset>`, falls back to class defaults) and
-`DebugForcedVariants` (`TArray<FUnitVariantSelection>`, ignored in Shipping). Keep, but its semantics change:
-the committed version bypasses the asset clamp "so unlisted Blueprint variants can be tested". Under class
-swap an unlisted variant has no class to swap to, so bypassing only produces a "no class" error every mission
-start. Forced entries are now clamped exactly like saved ones; rewrite the header comment accordingly.
+**Project Settings holds only the reference to the data asset.** Everything else about variants, including the
+debug forced-variant list, lives in `DA_UnitVariants`, so all variant data is edited, validated, diffed and
+cooked in one place.
+
+- Keep `VariantDataAsset` (`TSoftObjectPtr<UUnitVariantDataAsset>`) and `LoadVariantDataAsset()` (falls back to
+  the class defaults when none is picked).
+- **Move** `DebugForcedVariants` out of the settings into `UUnitVariantDataAsset` (below). Remove the property and
+  its `Debug` category from the settings class, and delete a stale `DebugForcedVariants=` line from the
+  `[/Script/RTS_Survival.UnitVariantSettings]` block in `Config/DefaultGame.ini` if one was ever saved.
+- Rewrite the class Doxygen: "Project Settings > Unit Variants: pick the `UUnitVariantDataAsset` the game uses.
+  All variant data, including the debug forced-variant list, is on that asset."
+
+On `UUnitVariantDataAsset` (3.2), add:
+
+```cpp
+	/** @return The forced selections; always empty in Shipping builds. */
+	const TArray<FUnitVariantSelection>& GetDebugForcedVariants() const;
+
+private:
+	// Development aid until the selection UI exists: applied over the saved selection when the manager
+	// initialises, clamped exactly like saved selections. Ignored in Shipping builds. Clear it before committing.
+	UPROPERTY(EditAnywhere, Category = "Debug", meta = (TitleProperty = "Unit"))
+	TArray<FUnitVariantSelection> M_DebugForcedVariants;
+```
+
+`GetDebugForcedVariants` returns a static empty array under `UE_BUILD_SHIPPING`. `IsDataValid` warns (not
+errors) while the list is non-empty, so a forgotten forced variant shows on every *Validate* run.
+
+Semantics change from the committed version: it bypassed the asset clamp "so unlisted Blueprint variants can be
+tested". Under class swap an unlisted variant has no class to swap to, so bypassing only produces a "no class"
+error every mission start. Forced entries are now clamped exactly like saved ones.
 
 ### 3.4 `ARTSAsyncSpawner` additions — `Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h` and a new `RTSAsyncSpawner_UnitVariants.cpp`
 
@@ -321,12 +376,13 @@ Rules:
 
 It stays the **selection store** on `ACPPController` (created in the constructor next to the tech manager,
 `GetPlayerUnitVariantManager()`, `FRTS_Statics::GetPlayerUnitVariantManager`). Keep: `InitFromProfile` (clamps
-through `StoreSelectionClamped`, applies `DebugForcedVariants`), `GetSelectedVariant`, `SetSelectedVariant`,
+through `StoreSelectionClamped`, applies the asset's forced list), `GetSelectedVariant`, `SetSelectedVariant`,
 `GetSelectionsForSave`, `GetVariantDataAsset`, `GetIsUnitTypeSupported` (Tank, Squad, BuildingExpansion), the
 test friend access.
 
 Change: `StoreSelectionClamped` normalises `UNType_Harvester` to `UNType_Tank` before anything else (the
-spawner has no harvester keys, see 3.1), and `ApplyDebugForcedVariants` goes through the same clamp as saved
+spawner has no harvester keys, see 3.1), and `ApplyDebugForcedVariants` reads
+`GetVariantDataAsset()->GetDebugForcedVariants()` instead of the settings and goes through the same clamp as saved
 selections (3.3).
 
 Remove: `ResolveVariantForUnit` and every mention of owners. Units no longer ask the manager anything.
@@ -381,12 +437,15 @@ public:
 Remove `M_UnitVariant`, `bM_HasAppliedUnitVariant`, `GetHasAppliedUnitVariant`, `OnUnitVariantApplied`,
 `FOnUnitVariantApplied`, `ApplyUnitVariant`, `ApplyUnitVariantFromParent`, `ApplyUnitVariant_Internal`.
 
-### 3.8 Training UI: variant icon, title and description (new)
+### 3.8 Training UI: variant image brush, title, description and tooltip (new)
 
 Goal: while the player has a variant selected for a unit, its training menu slot, its hover description and its
-requirement panel can show the variant's icon, title and description. Each is opt-in on the variant definition
-(3.2: `bOverrideTrainingIcon`, `bOverrideTrainingTitle`, `bOverrideTrainingDescription`). Cost, training time and
-requirements are **not** overridable; they stay the shared ones ("One subtype per unit").
+requirement panel can show the variant's own value for any of the four `DT_TrainingOptions` columns
+(`/Game/RTS_Survival/Blueprints/GameUI/TrainingUI/DT_TrainingOptions`, row struct `BP_FTrainingUI_OptionSlate`:
+`ImageBrush` (`USlateBrushAsset*`), `Title`, `Description`, `Tooltip`). Each is opt-in on the variant definition
+(3.2: `bOverrideTrainingImageBrush`, `bOverrideTrainingTitle`, `bOverrideTrainingDescription`,
+`bOverrideTrainingTooltip`). Cost, training time and requirements are **not** overridable; they stay the shared
+ones ("One subtype per unit").
 
 How the training UI gets its data today (traced):
 
@@ -398,10 +457,17 @@ How the training UI gets its data today (traced):
   hover panel, via `OnTrainingItemHovered` → `UMainGameUI::SetBottomUIPanel`) and
   `UW_TrainingRequirement::OnUpdateRequirement`.
 - `FTrainingWidgetState` (`GameUI/TrainingUI/TrainingUIWidget/TrainingItemState/TrainingWidgetState.h`) carries
-  no icon or text: the Blueprints look them up by `ItemID` (`DT_TrainingOptions` for the icon, keyed by
-  `GetTrainingOptionName`; the title and description lookup inside `W_TrainingItem` / `W_TrainingDescription`
-  was not traced, it is in their graphs). The cost panel (`UW_TrainingDescription::CostDisplay`) is filled from
-  C++ by `ItemID` and stays as is.
+  no brush or text: the Blueprints look up the `DT_TrainingOptions` row by `ItemID` (row name
+  `GetTrainingOptionName`; where exactly title, description and tooltip are read inside `W_TrainingItem` /
+  `W_TrainingDescription` was not traced, it is in their graphs). The cost panel
+  (`UW_TrainingDescription::CostDisplay`) is filled from C++ by `ItemID` and stays as is.
+- `W_TrainingItem`'s `OnUpdateTrainingItem` graph loads the row's `ImageBrush` asset, sets the item image, then
+  calls the C++ `UW_TrainingItem::OnObtainedSlateBrushFromTrainingTable(USlateBrushAsset*)`, which extracts the
+  brush's `UTexture2D` and caches it in the `Transient UPROPERTY M_CooldownIconTexture` for the cooldown clock
+  material. A variant brush must go through that same call, or the cooldown clock keeps the base unit's icon.
+- C++ reads the same table for the quick navigation buttons
+  (`UTrainingLayoutSubsystem::GetIconBrushFromTrainingOptionTable` finds the `USlateBrushAsset` member by type
+  because the row is a Blueprint struct). Those show buildings and are not overridden.
 
 C++ changes:
 
@@ -424,15 +490,59 @@ C++ changes:
    every `UpdateWidgetsWithShownSubSection`. `RTSCheatSetUnitVariant` may force a refresh of the shown sub
    section; nothing else needs to.
 
-Blueprint changes (editor work, section 9 step 8):
+Blueprint changes (editor work, section 9 step 8). The rule for every column is the same: read the
+`DT_TrainingOptions` row as today, then replace the value with the `VariantPresentation` one when its bool is on.
 
-- `W_TrainingItem` `OnUpdateTrainingItem`: if `VariantPresentation.bOverrideIcon`, set the item image from
-  `VariantPresentation.Icon` (soft texture; *Set Brush from Soft Texture*), else keep the `DT_TrainingOptions`
-  lookup. If the slot shows a name, use `Title` when `bOverrideTitle`.
-- `W_TrainingDescription` `OnShowTrainingDescription`: use `Title` / `Description` when their bools are on, the
-  existing lookup otherwise; the icon too if the panel shows one.
-- `W_TrainingRequirement` `OnUpdateRequirement`: if it shows the hovered unit's name or icon, apply the same
+- `W_TrainingItem` `OnUpdateTrainingItem`: pick the brush asset with a *Select* on
+  `VariantPresentation.bOverrideImageBrush` (`VariantPresentation.ImageBrush` vs the row's `ImageBrush`), then
+  run the **existing** path on the selected asset: set the item image from it (*Set Brush from Asset*) and call
+  `OnObtainedSlateBrushFromTrainingTable` with it. Title and tooltip (the item's tool tip text, if the graph sets
+  one from the row) use `Title` / `Tooltip` when their bools are on.
+- `W_TrainingDescription` `OnShowTrainingDescription`: same rule for `Title`, `Description`, `Tooltip` and, if
+  the panel shows one, the image brush.
+- `W_TrainingRequirement` `OnUpdateRequirement`: if it shows the hovered unit's name or image, apply the same
   rule. The names of *required* units (`RequiredUnit`, `SecondaryRequiredUnit`) stay the base names.
+- Do **not** use *Make Brush from Texture*, *Set Brush from Soft Texture* or an async load node for the variant
+  brush, and do not store the brush in a Blueprint variable of type Slate Brush. The brush asset is already
+  loaded and held (3.9); setting it the same way the table brush is set keeps both paths identical.
+
+### 3.9 Keeping variant brushes alive (GC)
+
+Slate brushes are a common source of "the icon turns white / blank after a while" bugs: `FSlateBrush` only holds
+its texture through `ResourceObject`, Slate's own copy of a brush (inside `SImage`) is invisible to GC, and a
+texture that only a Slate-side copy, a soft pointer or a non-`UPROPERTY` struct refers to is collected at the next
+GC. The variant path therefore keeps a strong, GC-visible chain from a rooted object down to the texture at all
+times, the same chain the `DT_TrainingOptions` rows already have:
+
+1. `DefaultGame.ini` / Project Settings → `UUnitVariantSettings::VariantDataAsset` (soft, and the only thing
+   the settings hold) is only the *path*.
+   The strong owner of the loaded asset is `UPlayerUnitVariantManager::M_VariantDataAsset`
+   (`UPROPERTY() TObjectPtr<const UUnitVariantDataAsset>`, cached in `BeginPlay_LoadVariantDataAsset`), and
+   the manager is a `UPROPERTY` of `ACPPController`. Keep that cache; `GetTrainingPresentation` on the manager
+   reads through `GetVariantDataAsset()`, whose uncached fallback is only for menus without a mission.
+2. `FUnitVariantDefinition::TrainingImageBrush` is a **hard** `TObjectPtr<USlateBrushAsset>` `UPROPERTY`, so the
+   brush asset loads with the data asset and is referenced by it.
+3. `USlateBrushAsset::Brush` is a `UPROPERTY FSlateBrush`, whose `ResourceObject` is a `UPROPERTY`, so the
+   texture is referenced by the brush asset.
+4. Every copy the training menu makes is a `UPROPERTY` struct holding the brush **asset** pointer, never an
+   `FSlateBrush` by value: `FUnitVariantTrainingPresentation::ImageBrush` inside
+   `FTrainingWidgetState::VariantPresentation` inside `UW_TrainingItem::M_TrainingItemState` (`UPROPERTY`).
+   The cooldown clock's texture is held by `UW_TrainingItem::M_CooldownIconTexture` (`UPROPERTY(Transient)`).
+
+Consequences for the implementer:
+
+- No `TSoftObjectPtr` for the training brush anywhere (definition, presentation, widget state). A soft pointer
+  resolved with `Get()` / `LoadSynchronous()` has no strong owner and is exactly the GC trap.
+- No raw `USlateBrushAsset*` / `UTexture2D*` members or containers without `UPROPERTY`, and no `FSlateBrush`
+  cached in a non-`UPROPERTY` member. Pass the brush asset pointer; let the widget set it.
+- The `TObjectPtr` in a `USTRUCT` is only seen by GC while the struct itself sits in a `UPROPERTY` of a live
+  `UObject`. A local `FUnitVariantTrainingPresentation` on the stack is fine for the duration of the call
+  (the data asset still holds the brush); do not stash one in a lambda capture or a timer.
+- Cooking: the brush and texture are cooked because the data asset references them hard. Verify that
+  `DA_UnitVariants` itself is cooked: a settings-only soft reference is not always followed by the cooker (memory
+  note "Packaged debug testing": C++-only asset paths are not cooked). Check how `DA_TrainingLayout`, which is
+  referenced the same way, ends up in the package, and do the same (or add it to *Additional Asset Directories
+  to Cook* / a primary asset rule).
 
 Not covered (base presentation stays): quick navigation buttons (they show buildings, which have no variants),
 the control group image (`UW_ControlGroupImage::OnUpdateControlGroup`, keyed by `FTrainingOption`), the selected
@@ -528,12 +638,14 @@ Out of scope, because it does not spawn through the spawner's maps:
    lists, `SquadUnitClasses` (squads), `TeamWeaponClass` (team weapon crews), building mesh and attachments
    (BXPs). Do **not** change the RTS subtype, the unit type or anything that `DT_Training` /
    `DT_TrainingOptions` keys by name (cost, training time and requirements stay those of the base unit; the
-   training icon, title and description are changed in step 4, not in those tables).
+   training image brush, title, description and tooltip are changed in step 4, not in those tables).
 4. In `DA_UnitVariants` add or extend the entry for the subtype: element 0 is Base (no class), element 1/2 get
    the child class, a display name, description and icon for the later selection UI, and for BXPs an optional
-   preview mesh. To change what the training menu shows while this variant is selected, tick
-   `bOverrideTrainingIcon` / `bOverrideTrainingTitle` / `bOverrideTrainingDescription` and fill `TrainingIcon` /
-   `TrainingTitle` / `TrainingDescription` (3.2, 3.8). Unticked means the base unit's icon or text.
+   preview mesh. To change what the training menu shows while this variant is selected, tick any of
+   `bOverrideTrainingImageBrush` / `bOverrideTrainingTitle` / `bOverrideTrainingDescription` /
+   `bOverrideTrainingTooltip` and fill `TrainingImageBrush` (a Slate Brush asset whose image is a texture, like
+   the ones the `DT_TrainingOptions` rows use) / `TrainingTitle` / `TrainingDescription` / `TrainingTooltip`
+   (3.2, 3.8). Unticked means the base unit's `DT_TrainingOptions` value.
 5. Run *Asset Actions → Validate* on the asset; the rules in 3.2 must pass.
 6. Soldier-level changes for squads: make a child of the soldier Blueprint too and list it in the variant
    controller's `SquadUnitClasses`.
@@ -560,8 +672,8 @@ before adding anything from section 3. "Keep" means leave as committed.
 | `UPlayerUnitVariantManager::ResolveVariantForUnit` | **Delete.** Everything else in the manager: keep; add 3.5. |
 | `FRTS_Statics::GetPlayerUnitVariantManager`, `ACPPController::M_PlayerUnitVariantManager` / getter / validator | Keep. |
 | `Units/Variants/UnitVariantTypes.h` | Keep. |
-| `Units/Variants/UnitVariantSettings.h/.cpp` | Keep the properties; rewrite the `DebugForcedVariants` comment (it no longer bypasses the clamp, 3.3). |
-| `UPlayerUnitVariantManager::ApplyDebugForcedVariants` | **Change**: route through `StoreSelectionClamped` instead of bypassing it. |
+| `Units/Variants/UnitVariantSettings.h/.cpp` | Keep `VariantDataAsset` / `LoadVariantDataAsset`. **Move** `DebugForcedVariants` to the data asset (3.3); the settings keep only the asset reference. Rewrite the class comment. |
+| `UPlayerUnitVariantManager::ApplyDebugForcedVariants` | **Change**: read the list from the data asset and route it through `StoreSelectionClamped` instead of bypassing it. |
 | `Units/Variants/UnitVariantDataAsset.h/.cpp` | Keep; extend per 3.2. |
 | Save data, `FRTS_Profile::ValidateUnitVariantSelections`, `USavePlayerProfile`, `FPlayerCardSaveData` | Keep. |
 | `UPlayerProfileLoader::ApplyUnitVariantSelections` | Keep; extend per 3.6. |
@@ -591,17 +703,19 @@ Each step compiles on its own. Build with `Build.bat RTS_SurvivalEditor Win64 De
 4. Manager repurpose (3.5) and the profile loader call (3.6).
 5. Training UI presentation (3.8): `FUnitVariantTrainingPresentation` (3.1), the training fields and
    `GetTrainingPresentation` on the asset (3.2), `GetTrainingPresentation` on the manager, the
-   `VariantPresentation` field on `FTrainingWidgetState` and the helper in `CreateWidgetStateForOption`.
+   `VariantPresentation` field on `FTrainingWidgetState` and the helper in `CreateWidgetStateForOption`. Brush
+   pointers follow 3.9 (hard `UPROPERTY` `USlateBrushAsset` everywhere).
 6. Cheat manager adaptation (section 11).
 7. Tests (section 10).
 8. Editor work (needs the editor or the UECP bridge; cannot be done from the filesystem): the three training
    widget Blueprint changes of 3.8 (`W_TrainingItem`, `W_TrainingDescription`, `W_TrainingRequirement`), one
    child Blueprint for one tank (e.g. `BP_PzIV_H_VariantA` with a visibly different mesh or turret), its asset
-   entry (with all three training overrides ticked, so 10.2 can check them) in
+   entry (with all four training overrides ticked, so 10.2 can check them) in
    `DA_UnitVariants` (the asset lives where the other settings assets do, e.g. next to
    `/Game/RTS_Survival/Blueprints/GameUI/TrainingUI/DA_TrainingLayout`; picking it writes a
    `[/Script/RTS_Survival.UnitVariantSettings]` block into `Config/DefaultGame.ini` like the
-   `TrainingLayoutSettings` block at ~line 189), and the manual test of 10.2.
+   `TrainingLayoutSettings` block at ~line 189; that block holds only `VariantDataAsset=`), and the manual test
+   of 10.2.
 9. Update the `Docs/README.md` hook text if it still describes the pull design.
 
 ---
@@ -620,8 +734,12 @@ Keep:
 
 - `RTS.UnitVariants.DataAssetCounts`: counts of 1 / 2 / clamped 3 and `GetIsVariantImplemented`.
 - `RTS.UnitVariants.ManagerClampsSavedSelection`: an unimplemented VariantB clamps to Base with one reported
-  error (wrapped in `RTSFunctionLibrary::Push/PopModalDialogSuppression`, expects the `LogRTS` error). A
-  non-empty `DebugForcedVariants` in `Config/DefaultGame.ini` makes it fail; clear the list first.
+  error (wrapped in `RTSFunctionLibrary::Push/PopModalDialogSuppression`, expects the `LogRTS` error). Give the
+  manager a test data asset through `FUnitVariantTestAccess` with an empty forced list, so a forced entry left
+  in `DA_UnitVariants` cannot make it fail.
+- Extend `RTS.UnitVariants.ManagerClampsSavedSelection` (or add `RTS.UnitVariants.ForcedVariantsFromAsset`): a
+  test asset whose forced list holds one implemented and one unimplemented variant gives the implemented one
+  and Base for the other, with one reported error.
 
 Add:
 
@@ -632,10 +750,18 @@ Add:
   `ATankMaster::StaticClass()` etc. as the classes; no Blueprints needed.
 - `RTS.UnitVariants.FindVariantClass`: Base → null, VariantA → the class, missing entry → null.
 - `RTS.UnitVariants.TrainingPresentation`: a VariantA definition with only `bOverrideTrainingTitle` on gives a
-  presentation with `Variant == VariantA`, `bOverrideTitle` true and the title, `bOverrideIcon` and
-  `bOverrideDescription` false; Base and a missing entry give everything off. Through the manager: a selection
-  stored for `(UNType_Tank, Tank_PzI_Harvester)` is found when asked with `(UNType_Harvester, Tank_PzI_Harvester)`.
+  presentation with `Variant == VariantA`, `bOverrideTitle` true and the title, `bOverrideImageBrush`,
+  `bOverrideDescription` and `bOverrideTooltip` false; a definition with `bOverrideTrainingImageBrush` on and a
+  transient `USlateBrushAsset` (`NewObject`, brush resource a transient `UTexture2D`) gives that same pointer in
+  `ImageBrush`; Base and a missing entry give everything off. Through the manager: a selection stored for
+  `(UNType_Tank, Tank_PzI_Harvester)` is found when asked with `(UNType_Harvester, Tank_PzI_Harvester)`.
   `IsDataValid` must fail for an override bool on element 0 and for a ticked override with an empty value.
+- `RTS.UnitVariants.TrainingBrushSurvivesGC`: put a transient brush asset (with a transient texture) only into a
+  test data asset's definition, keep the data asset in a `TStrongObjectPtr` (stand-in for the manager's
+  `UPROPERTY`), build a presentation, drop every other reference, run
+  `CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS)`, then check the presentation's `ImageBrush` and its resource
+  texture are still valid. Release the strong pointer, collect again and check through a `TWeakObjectPtr` that
+  both are gone (proves the test really depends on the data asset's reference, not on something else).
 - `RTS.UnitVariants.UnsupportedUnitTypesRejected` (rewrite of the old supported-types test):
   `StoreSelectionClamped` returns false for `UNType_Nomadic` / `UNType_Aircraft` and the selection is not stored.
 
@@ -644,8 +770,8 @@ test. Cover it with 10.2.
 
 ### 10.2 Map test (manual, or a `-UnitVariantValidate` subsystem later)
 
-1. Set `DebugForcedVariants` to `{Tank Tank_PzIV_H → VariantA}` (and the entries of any other variant
-   Blueprints that exist).
+1. In `DA_UnitVariants` (Debug category), set the forced-variant list to `{Tank Tank_PzIV_H → VariantA}` (and
+   the entries of any other variant Blueprints that exist). Save the asset.
 2. Run `RTS_ToCopySmall` (flat test map, see memory note "Team weapon quality test"). Train a Pz IV H; the
    spawned actor's class must be `BP_PzIV_H_VariantA_C` (`RTSCheatPrintUnitVariants` prints the mapped class
    per selection; or check the actor name in the outliner).
@@ -654,10 +780,13 @@ test. Cover it with 10.2.
 4. `RTSCheatSetUnitVariant <UNType_Tank value> <Tank_PzIV_H value> 0` (Base) at runtime; the next trained
    Pz IV H is the base class, the one already on the map is unchanged.
 5. With a BXP variant that sets a preview mesh: open the build menu and confirm the placement preview changed.
-6. Training menu, with the forced Pz IV H VariantA whose three training overrides are ticked: the slot shows the
-   variant icon, hovering shows the variant title and description, and the cost and training time are the base
-   unit's. Untick `bOverrideTrainingDescription` and restart: the base description returns while icon and title
-   stay. After step 4 (back to Base), the next menu refresh shows the base icon and texts.
+6. Training menu, with the forced Pz IV H VariantA whose four training overrides are ticked: the slot shows the
+   variant image (also on the cooldown clock while it trains), the tooltip is the variant's, hovering shows the
+   variant title and description, and the cost and training time are the base unit's. Untick
+   `bOverrideTrainingDescription` and restart: the base description returns while the others stay. After step 4
+   (back to Base), the next menu refresh shows the base image and texts.
+7. GC: with the variant image showing, run `obj gc` in the console a few times (and leave the menu open for a
+   few minutes while playing); the variant image must not go blank or white, on the slot or the cooldown clock.
 
 ---
 
@@ -671,9 +800,10 @@ test. Cover it with 10.2.
 - `RTSCheatPrintUnitVariants`: for every stored selection print `TrainingName -> VariantString -> mapped class
   asset name`; for every unit with a choice in the asset print the implemented count.
 
-### 11.2 Forced variants in Project Settings (exists, now clamped)
+### 11.2 Forced variants on the data asset (moved from Project Settings, now clamped)
 
-`UUnitVariantSettings::DebugForcedVariants` is applied in `InitFromProfile` before `ApplySelectionsToSpawner`,
+`UUnitVariantDataAsset::GetDebugForcedVariants()` (the Debug category of `DA_UnitVariants`, 3.3) is applied in
+`InitFromProfile` before `ApplySelectionsToSpawner`,
 so forced entries reach the spawner like saved ones, and they are clamped like saved ones: a forced variant
 without an asset entry (and therefore without a class) clamps to Base with one reported error. Each forced
 entry that survives the clamp is logged as a warning so a forgotten override is visible.
@@ -705,12 +835,18 @@ entry that survives the clamp is logged as a warning so a forgotten override is 
 - **Cards, `DT_Training` and `DT_TrainingOptions` are untouched.** All variants share the base
   `FTrainingOption`. Anything keyed by class (there should be nothing) would break; grep for `UnitClass ==`
   style comparisons before assuming.
-- **Variant training icon / title / description come only from the variant data asset** (3.8). Do not add
-  variant rows to `DT_TrainingOptions` or `DT_Training`, and do not override cost, training time or
+- **Variant training image brush / title / description / tooltip come only from the variant data asset** (3.8).
+  Do not add variant rows to `DT_TrainingOptions` or `DT_Training`, and do not override cost, training time or
   requirements in the training UI. Each override is shown only when its bool is ticked; the Blueprints fall back
   to their existing table lookup otherwise.
+- **Variant brushes are hard `UPROPERTY` `USlateBrushAsset` pointers end to end** (3.9). No soft pointers, no
+  by-value `FSlateBrush` caches, no *Make Brush from Texture*; route the variant brush through
+  `OnObtainedSlateBrushFromTrainingTable` so the cooldown clock texture is held too.
 - **`TMap::operator[]` inserts.** The spawner's existing code uses `Contains` then `[]`; new code uses `Find`.
-- **Shipping builds** compile out `DebugForcedVariants` application (`#if !UE_BUILD_SHIPPING`), as committed.
+- **Shipping builds** ignore the forced list: `GetDebugForcedVariants` returns an empty array under
+  `UE_BUILD_SHIPPING`, and the manager keeps its `#if !UE_BUILD_SHIPPING` around the application, as committed.
+- **Project Settings holds only the asset reference** (3.3). Do not add new variant properties to
+  `UUnitVariantSettings`; they go on `UUnitVariantDataAsset`.
 - **Pointer rule 22**: the `TSoftClassPtr<AActor>*` from `M_TrainingOptionMap.Find` is used in the same
   function with no mutation of that map in between. Writing the pre-variant map is a different container; fine.
 

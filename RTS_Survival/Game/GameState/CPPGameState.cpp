@@ -794,6 +794,324 @@ void ACPPGameState::SetupStrikeDivisionTrainingOptions()
 }
 
 
+namespace VariantBatchTwoWeapons
+{
+	/**
+	 * @brief Unit variant batch 2 weapons. Each entry is its own struct; clones copy their source entry from the map, so
+	 * none of them inherit carry-over values from the shared WeaponData struct of the category initializers.
+	 * All numbers are TUNABLE (user's balance call). Stored values are before the shell-type multipliers that
+	 * GLOBAL_GetWeaponDataForShellType applies when firing.
+	 * @param WeaponDataMap The player weapon map, already filled by the category initializers.
+	 */
+	void AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponDataMap)
+	{
+		using DeveloperSettings::GameBalance::Weapons::DamagePerMM;
+		using DeveloperSettings::GameBalance::Weapons::DamagePerMM_FireProjectileBonus;
+		using DeveloperSettings::GameBalance::Weapons::DamagePerTNTEquivalentGrams;
+		using DeveloperSettings::GameBalance::Weapons::DamageFluxPercentage;
+		using DeveloperSettings::GameBalance::Weapons::CooldownFluxPercentage;
+		using DeveloperSettings::GameBalance::Weapons::ShrapnelAmountPerMM;
+		using DeveloperSettings::GameBalance::Weapons::ShrapnelRangePerMM;
+		using DeveloperSettings::GameBalance::Weapons::ShrapnelPenPerMM;
+		using DeveloperSettings::GameBalance::Weapons::ShrapnelDamagePerTNTGram;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelPenMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
+		using DeveloperSettings::GamePlay::Projectile::BaseProjectileSpeed;
+		using DeveloperSettings::GamePlay::Projectile::HighVelocityProjectileSpeed;
+		using DeveloperSettings::GameBalance::Ranges::LightCannonRange;
+		using DeveloperSettings::GameBalance::Ranges::LightArtilleryRange;
+		using DeveloperSettings::GameBalance::Ranges::MediumCannonRange;
+		using DeveloperSettings::GameBalance::Ranges::MediumAssaultCannonRange;
+		using DeveloperSettings::GameBalance::Ranges::HeavyCannonRange;
+		using DeveloperSettings::GameBalance::Ranges::HeavyAssaultCannonRange;
+
+		// Brummbar Direct Siege: the StuH 43 scaled to 200mm and fired direct; HE stays the default (HEAT kept as on
+		// the StuH 43). The stored pen is divided by HE_ArmorPenMlt, so the fired HE pen is 80.
+		if (const FWeaponData* const StuH43Data = WeaponDataMap.Find(EWeaponName::Stu_H_43_L_12_150MM))
+		{
+			constexpr float SiegeGunTntGrams = 1100.f;
+			constexpr float SiegeGunEffectiveArmorPen = 80.f;
+			constexpr float SiegeGunReloadSpeed = 23.f;
+			FWeaponData SiegeGunData = *StuH43Data;
+			SiegeGunData.WeaponName = EWeaponName::StuH_200MM_DirectSiege;
+			SiegeGunData.WeaponCalibre = 200;
+			SiegeGunData.TNTExplosiveGrams = SiegeGunTntGrams;
+			SiegeGunData.BaseDamage = DamagePerMM * SiegeGunData.WeaponCalibre
+				+ SiegeGunData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+			// Direct fire now (the turret is no longer artillery), so a direct-fire range instead of the arch range.
+			SiegeGunData.Range = HeavyAssaultCannonRange;
+			SiegeGunData.ArmorPen = SiegeGunEffectiveArmorPen / HE_ArmorPenMlt;
+			SiegeGunData.ArmorPenMaxRange = SiegeGunEffectiveArmorPen / HE_ArmorPenMlt;
+			SiegeGunData.ReloadSpeed = SiegeGunReloadSpeed;
+			SiegeGunData.ShrapnelRange = SiegeGunData.WeaponCalibre * ShrapnelRangePerMM;
+			SiegeGunData.ShrapnelDamage = SiegeGunData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+			SiegeGunData.ShrapnelParticles = SiegeGunData.WeaponCalibre * ShrapnelAmountPerMM;
+			SiegeGunData.ShrapnelPen = SiegeGunData.WeaponCalibre * ShrapnelPenPerMM;
+			WeaponDataMap.Add(EWeaponName::StuH_200MM_DirectSiege, SiegeGunData);
+		}
+
+		// Pz IV H Ostwind: the Flak 36 with the Flak 43's 8-round clip and faster fire; the clip drill is authored
+		// for the 2 s reload.
+		if (const FWeaponData* const Flak36Data = WeaponDataMap.Find(EWeaponName::Flak36_37MM))
+		{
+			constexpr int32 OstwindClipSize = 8;
+			constexpr float OstwindReloadSpeed = 2.f;
+			constexpr float OstwindCooldown = 0.12f;
+			constexpr int32 OstwindAccuracy = 62;
+			constexpr float OstwindProjectileSpeedMlt = 0.95f;
+			FWeaponData OstwindData = *Flak36Data;
+			OstwindData.WeaponName = EWeaponName::Flak43_37MM_Ostwind;
+			OstwindData.MagCapacity = OstwindClipSize;
+			OstwindData.ReloadSpeed = OstwindReloadSpeed;
+			OstwindData.BaseCooldown = OstwindCooldown;
+			OstwindData.Accuracy = OstwindAccuracy;
+			OstwindData.ArmorPen = 46;
+			OstwindData.ArmorPenMaxRange = 32;
+			OstwindData.ProjectileMovementSpeed = BaseProjectileSpeed * OstwindProjectileSpeedMlt;
+			WeaponDataMap.Add(EWeaponName::Flak43_37MM_Ostwind, OstwindData);
+		}
+
+		// Pz IV Rockets Incendiary Salvo: three large incendiary rockets, 0.8 s apart, then a long reload. Fire damage
+		// as the Ampulomet (fire shells skip the shell multipliers when fired), almost no armour pen, wide splash.
+		{
+			constexpr float IncendiaryCalibreDamageMlt = 0.6f;
+			constexpr float IncendiaryShrapnelRangeMlt = 1.5f;
+			constexpr float IncendiaryShrapnelDamage = 40.f;
+			constexpr float IncendiaryProjectileSpeedMlt = 0.9f * 0.8f;
+			FWeaponData IncendiaryData = {};
+			IncendiaryData.WeaponName = EWeaponName::Rocket_320mm_Incendiary;
+			IncendiaryData.DamageType = ERTSDamageType::Fire;
+			IncendiaryData.ShellType = EWeaponShellType::Shell_Fire;
+			IncendiaryData.ShellTypes = {EWeaponShellType::Shell_Fire};
+			IncendiaryData.WeaponCalibre = 320;
+			IncendiaryData.TNTExplosiveGrams = 0;
+			IncendiaryData.BaseDamage = DamagePerMM * IncendiaryData.WeaponCalibre * IncendiaryCalibreDamageMlt
+				+ DamagePerMM_FireProjectileBonus * IncendiaryData.WeaponCalibre;
+			IncendiaryData.DamageFlux = DamageFluxPercentage;
+			IncendiaryData.Range = LightArtilleryRange;
+			IncendiaryData.ArmorPen = 20;
+			IncendiaryData.ArmorPenMaxRange = 20;
+			// The vertical rocket state overwrites the magazine with the launcher's socket count.
+			IncendiaryData.MagCapacity = 3;
+			IncendiaryData.ReloadSpeed = 45.f;
+			IncendiaryData.BaseCooldown = 0.8f;
+			IncendiaryData.CooldownFlux = CooldownFluxPercentage;
+			IncendiaryData.Accuracy = 25;
+			IncendiaryData.ShrapnelRange = IncendiaryData.WeaponCalibre * ShrapnelRangePerMM * IncendiaryShrapnelRangeMlt;
+			IncendiaryData.ShrapnelDamage = IncendiaryShrapnelDamage;
+			IncendiaryData.ShrapnelParticles = IncendiaryData.WeaponCalibre * ShrapnelAmountPerMM;
+			IncendiaryData.ShrapnelPen = 0;
+			IncendiaryData.ProjectileMovementSpeed = BaseProjectileSpeed * IncendiaryProjectileSpeedMlt;
+			// Lingering ground fire (fire subsystem, GroundFire pool). TUNABLE: a unit that stays in the fire for the
+			// whole 9 s takes 225 fire damage (vs 390 for a direct hit); the rocket's own splash is 960 cm wide, the
+			// burning patch 450 cm. Rear armor up to 20 burns fully, 40 not at all (molotov: 10 / 20).
+			IncendiaryData.GroundFire.RadiusCm = 450.f;
+			IncendiaryData.GroundFire.DurationSeconds = 9.f;
+			IncendiaryData.GroundFire.DamagePerSecond = 25.f;
+			IncendiaryData.GroundFire.DamageFalloffExponent = 0.f;
+			IncendiaryData.GroundFire.FullArmorPen = 20.f;
+			IncendiaryData.GroundFire.ArmorPenFallOff = 5.f;
+			IncendiaryData.GroundFire.MaxArmorPen = 40.f;
+			IncendiaryData.GroundFire.VfxScale = 2.f;
+			WeaponDataMap.Add(EWeaponName::Rocket_320mm_Incendiary, IncendiaryData);
+		}
+
+		// Pz IV Rockets Radixite Hail: a ripple of small HE rockets (one per socket, 0.15 s apart). Damage, TNT, pen and
+		// shrapnel are divided by the HE multipliers here, so the fired values are the plain calibre formulas and each
+		// rocket hits softer than one Rocket_50mm.
+		{
+			constexpr float HailFiredTntGrams = 15.f;
+			constexpr float HailEffectiveArmorPen = 20.f;
+			constexpr float HailProjectileSpeedMlt = 0.9f;
+			FWeaponData HailData = {};
+			HailData.WeaponName = EWeaponName::RadixiteHail_Rocket_76MM;
+			HailData.DamageType = ERTSDamageType::Kinetic;
+			HailData.ShellType = EWeaponShellType::Shell_HE;
+			HailData.ShellTypes = {EWeaponShellType::Shell_HE};
+			HailData.WeaponCalibre = 76;
+			HailData.TNTExplosiveGrams = HailFiredTntGrams / HE_TNTExplosiveGramsMlt;
+			HailData.BaseDamage = (DamagePerMM * HailData.WeaponCalibre
+				+ HailFiredTntGrams * DamagePerTNTEquivalentGrams) / HE_DamageMlt;
+			HailData.DamageFlux = DamageFluxPercentage;
+			HailData.Range = LightArtilleryRange;
+			HailData.ArmorPen = HailEffectiveArmorPen / HE_ArmorPenMlt;
+			HailData.ArmorPenMaxRange = HailEffectiveArmorPen / HE_ArmorPenMlt;
+			// Informational: the vertical rocket state overwrites it with the socket count (36).
+			HailData.MagCapacity = 36;
+			HailData.ReloadSpeed = 30.f;
+			HailData.BaseCooldown = 0.15f;
+			HailData.CooldownFlux = CooldownFluxPercentage;
+			HailData.Accuracy = 25;
+			HailData.ShrapnelRange = HailData.WeaponCalibre * ShrapnelRangePerMM / HE_ShrapnelRangeMlt;
+			HailData.ShrapnelDamage = HailFiredTntGrams * ShrapnelDamagePerTNTGram / HE_ShrapnelDamageMlt;
+			HailData.ShrapnelParticles = HailData.WeaponCalibre * ShrapnelAmountPerMM / HE_ShrapnelParticlesMlt;
+			HailData.ShrapnelPen = HailData.WeaponCalibre * ShrapnelPenPerMM / HE_ShrapnelPenMlt;
+			HailData.ProjectileMovementSpeed = BaseProjectileSpeed * HailProjectileSpeedMlt;
+			WeaponDataMap.Add(EWeaponName::RadixiteHail_Rocket_76MM, HailData);
+		}
+
+		// E25 Hunter: a precise, long 60mm firing APCR only. Pen is the base value (APCR multiplies it when firing);
+		// the x2.6 damage bonus follows the railgun damage bonus precedent (user-approved).
+		{
+			constexpr float HunterDamageBonusMlt = 2.6f;
+			constexpr float HunterRangeMlt = 1.15f;
+			constexpr float HunterProjectileSpeedMlt = 1.15f;
+			FWeaponData HunterData = {};
+			HunterData.WeaponName = EWeaponName::E25_Hunter_60MM_APCR;
+			HunterData.DamageType = ERTSDamageType::Kinetic;
+			HunterData.ShellType = EWeaponShellType::Shell_APCR;
+			HunterData.ShellTypes = {EWeaponShellType::Shell_APCR};
+			HunterData.WeaponCalibre = 60;
+			HunterData.TNTExplosiveGrams = 0;
+			HunterData.BaseDamage = DamagePerMM * HunterData.WeaponCalibre * HunterDamageBonusMlt;
+			HunterData.DamageFlux = DamageFluxPercentage;
+			HunterData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumAssaultCannonRange * HunterRangeMlt, 10);
+			HunterData.ArmorPen = 150;
+			HunterData.ArmorPenMaxRange = 140;
+			HunterData.MagCapacity = 1;
+			HunterData.ReloadSpeed = 4.2f;
+			HunterData.BaseCooldown = 1;
+			HunterData.CooldownFlux = CooldownFluxPercentage;
+			HunterData.Accuracy = 98;
+			HunterData.ShrapnelRange = 0;
+			HunterData.ShrapnelDamage = 0;
+			HunterData.ShrapnelParticles = 0;
+			HunterData.ShrapnelPen = 0;
+			HunterData.ProjectileMovementSpeed = HighVelocityProjectileSpeed * HunterProjectileSpeedMlt;
+			WeaponDataMap.Add(EWeaponName::E25_Hunter_60MM_APCR, HunterData);
+		}
+
+		// E25 Assault: a short 90mm firing HE only (Sd.Kfz. 250 Howitzer pattern): the stored pen is divided by
+		// HE_ArmorPenMlt so the fired pen is 25; big HE splash (shrapnel range and damage x1.25).
+		{
+			constexpr float AssaultEffectiveArmorPen = 25.f;
+			constexpr float AssaultEffectiveArmorPenMaxRange = 22.f;
+			constexpr float AssaultShrapnelMlt = 1.25f;
+			constexpr float AssaultProjectileSpeedMlt = 0.8f;
+			FWeaponData AssaultData = {};
+			AssaultData.WeaponName = EWeaponName::E25_Assault_90MM_HE;
+			AssaultData.DamageType = ERTSDamageType::Kinetic;
+			AssaultData.ShellType = EWeaponShellType::Shell_HE;
+			AssaultData.ShellTypes = {EWeaponShellType::Shell_HE};
+			AssaultData.WeaponCalibre = 90;
+			AssaultData.TNTExplosiveGrams = 120;
+			AssaultData.BaseDamage = DamagePerMM * AssaultData.WeaponCalibre
+				+ AssaultData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+			AssaultData.DamageFlux = DamageFluxPercentage;
+			AssaultData.Range = LightCannonRange;
+			AssaultData.ArmorPen = AssaultEffectiveArmorPen / HE_ArmorPenMlt;
+			AssaultData.ArmorPenMaxRange = AssaultEffectiveArmorPenMaxRange / HE_ArmorPenMlt;
+			AssaultData.MagCapacity = 1;
+			AssaultData.ReloadSpeed = 6.5f;
+			AssaultData.BaseCooldown = 1;
+			AssaultData.CooldownFlux = CooldownFluxPercentage;
+			AssaultData.Accuracy = 74;
+			AssaultData.ShrapnelRange = AssaultData.WeaponCalibre * ShrapnelRangePerMM * AssaultShrapnelMlt;
+			AssaultData.ShrapnelDamage = AssaultData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram * AssaultShrapnelMlt;
+			AssaultData.ShrapnelParticles = AssaultData.WeaponCalibre * ShrapnelAmountPerMM;
+			AssaultData.ShrapnelPen = AssaultData.WeaponCalibre * ShrapnelPenPerMM;
+			AssaultData.ProjectileMovementSpeed = BaseProjectileSpeed * AssaultProjectileSpeedMlt;
+			WeaponDataMap.Add(EWeaponName::E25_Assault_90MM_HE, AssaultData);
+		}
+
+		// Tiger H1 Twin Gun: each gun is its own weapon with the KwK 40's stats, HEAT by default and HE selectable;
+		// two guns, so each reloads slower than the KwK 40.
+		if (const FWeaponData* const KwK40Data = WeaponDataMap.Find(EWeaponName::KwK40_L48_75MM))
+		{
+			constexpr float TwinGunReloadSpeed = 8.f;
+			FWeaponData TwinGunData = *KwK40Data;
+			TwinGunData.WeaponName = EWeaponName::KwK40_L48_75MM_HEAT_TigerTwin;
+			TwinGunData.ShellType = EWeaponShellType::Shell_HEAT;
+			TwinGunData.ShellTypes = {EWeaponShellType::Shell_HEAT, EWeaponShellType::Shell_HE};
+			TwinGunData.ReloadSpeed = TwinGunReloadSpeed;
+			WeaponDataMap.Add(EWeaponName::KwK40_L48_75MM_HEAT_TigerTwin, TwinGunData);
+		}
+
+		// Tiger Rail Bunker: the 80mm rail cannon scaled to 100mm, longer barrel (+10% range), slower reload.
+		if (const FWeaponData* const RailGun80Data = WeaponDataMap.Find(EWeaponName::RailGun80MM))
+		{
+			using DeveloperSettings::GameBalance::Weapons::RailGun::DamageBonusMlt;
+			using DeveloperSettings::GameBalance::Weapons::RailGun::RangeBonusPercentage;
+			constexpr float BunkerRangeMlt = 1.1f;
+			const float RailGunRangeMultiplier = 1.f + RangeBonusPercentage / 100.f;
+			FWeaponData RailBunkerData = *RailGun80Data;
+			RailBunkerData.WeaponName = EWeaponName::TigerRail_100MM_Railgun;
+			RailBunkerData.WeaponCalibre = 100;
+			RailBunkerData.BaseDamage = DamagePerMM * RailBunkerData.WeaponCalibre * DamageBonusMlt;
+			RailBunkerData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+				MediumCannonRange * RailGunRangeMultiplier * BunkerRangeMlt, 10);
+			RailBunkerData.ArmorPen = 460;
+			RailBunkerData.ArmorPenMaxRange = 430;
+			RailBunkerData.ReloadSpeed = 14.f;
+			RailBunkerData.Accuracy = 92;
+			RailBunkerData.ShrapnelRange = RailBunkerData.WeaponCalibre * ShrapnelRangePerMM;
+			RailBunkerData.ShrapnelParticles = RailBunkerData.WeaponCalibre * ShrapnelAmountPerMM;
+			RailBunkerData.ShrapnelPen = RailBunkerData.WeaponCalibre * ShrapnelPenPerMM;
+			WeaponDataMap.Add(EWeaponName::TigerRail_100MM_Railgun, RailBunkerData);
+		}
+
+		// Tiger II Rocketeer: two twin 35mm mounts fired through one multi projectile weapon on 4 sockets, so all
+		// stats are per projectile and one shot (one magazine round) fires all four barrels. Damage as the
+		// T-34-AA twin 35mm (flak ammo bonus included).
+		{
+			constexpr float FlakCannonBonusDamageFactor = 1 +
+				DeveloperSettings::GameBalance::Weapons::DamageBonusFlakAmmoPercentage / 100.f;
+			FWeaponData QuadThirtyFiveData = {};
+			QuadThirtyFiveData.WeaponName = EWeaponName::Ger_2xTwin35MM_TigerII;
+			QuadThirtyFiveData.DamageType = ERTSDamageType::Kinetic;
+			QuadThirtyFiveData.ShellType = EWeaponShellType::Shell_AP;
+			QuadThirtyFiveData.ShellTypes = {EWeaponShellType::Shell_AP};
+			QuadThirtyFiveData.WeaponCalibre = 35;
+			QuadThirtyFiveData.TNTExplosiveGrams = 15.6f;
+			QuadThirtyFiveData.BaseDamage = (DamagePerMM * QuadThirtyFiveData.WeaponCalibre
+				+ QuadThirtyFiveData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * FlakCannonBonusDamageFactor;
+			QuadThirtyFiveData.DamageFlux = DamageFluxPercentage;
+			QuadThirtyFiveData.Range = MediumAssaultCannonRange;
+			QuadThirtyFiveData.ArmorPen = 70;
+			QuadThirtyFiveData.ArmorPenMaxRange = 58;
+			QuadThirtyFiveData.MagCapacity = 8;
+			QuadThirtyFiveData.ReloadSpeed = 6.f;
+			// Not below the 0.4 s recoil take of the four barrels.
+			QuadThirtyFiveData.BaseCooldown = 0.4f;
+			QuadThirtyFiveData.CooldownFlux = CooldownFluxPercentage;
+			QuadThirtyFiveData.Accuracy = 75;
+			QuadThirtyFiveData.ShrapnelRange = QuadThirtyFiveData.WeaponCalibre * ShrapnelRangePerMM;
+			QuadThirtyFiveData.ShrapnelDamage = QuadThirtyFiveData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+			QuadThirtyFiveData.ShrapnelParticles = QuadThirtyFiveData.WeaponCalibre * ShrapnelAmountPerMM;
+			QuadThirtyFiveData.ShrapnelPen = QuadThirtyFiveData.WeaponCalibre * ShrapnelPenPerMM;
+			QuadThirtyFiveData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
+			WeaponDataMap.Add(EWeaponName::Ger_2xTwin35MM_TigerII, QuadThirtyFiveData);
+		}
+
+		// Maus AA: the Flak 37 as a Flak 41 (longer L/74 barrel: more range, pen and speed) with a 3-round magazine;
+		// dual purpose, so APHE and HE.
+		if (const FWeaponData* const Flak37Data = WeaponDataMap.Find(EWeaponName::Flak37_88MM))
+		{
+			constexpr float Flak41RangeMlt = 1.1f;
+			constexpr float Flak41ProjectileSpeedMlt = 1.1f;
+			constexpr int32 Flak41MagazineSize = 3;
+			FWeaponData Flak41Data = *Flak37Data;
+			Flak41Data.WeaponName = EWeaponName::Maus_AA_88MM_Flak;
+			Flak41Data.ShellType = EWeaponShellType::Shell_APHE;
+			Flak41Data.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
+			Flak41Data.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(HeavyCannonRange * Flak41RangeMlt, 10);
+			Flak41Data.ArmorPen = 175;
+			Flak41Data.ArmorPenMaxRange = 160;
+			Flak41Data.MagCapacity = Flak41MagazineSize;
+			Flak41Data.BaseCooldown = 1.2f;
+			// The magazine change; the Reload_L / Reload_R anims are stretched to it.
+			Flak41Data.ReloadSpeed = 9.f;
+			Flak41Data.ProjectileMovementSpeed = HighVelocityProjectileSpeed * Flak41ProjectileSpeedMlt;
+			WeaponDataMap.Add(EWeaponName::Maus_AA_88MM_Flak, Flak41Data);
+		}
+	}
+}
+
 void ACPPGameState::InitAllGameWeaponData()
 {
 	// Pen values equal to 100m - 500m war thunder wiki: https://wiki.warthunder.com/Panther_G
@@ -812,6 +1130,8 @@ void ACPPGameState::InitAllGameWeaponData()
 	InitAllGameLightWeapons();
 	InitAllGameMediumWeapons();
 	InitAllGameHeavyWeapons();
+	// Clones of entries above, so it runs after every category initializer.
+	VariantBatchTwoWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
 
 	// Set the enemy weapons to the same base data.
 	M_TEnemyWeaponDataHashMap = M_TPlayerWeaponDataHashMap;
@@ -4829,6 +5149,24 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.WeaponCalibre = 40;
 	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::Pz38tRockets, RocketData);
 
+	// Tiger II Rocketeer: 7 big 20 cm rockets fired one by one (Cooldown = the gap inside the salvo), 75 s between
+	// salvos. TUNABLE.
+	RocketData = {};
+	RocketData.DamageType = ERTSDamageType::Kinetic;
+	RocketData.Cooldown = 0.45f;
+	RocketData.Damage = 260.f;
+	RocketData.Range = 10000.f;
+	RocketData.ArmorPen = 160.f;
+	RocketData.ProjectileSpeed = 4500.f;
+	RocketData.ProjectileAccelerationFactor = 2.f;
+	RocketData.ReloadSpeed = 75.f;
+	RocketData.Accuracy = 65.f;
+	RocketData.DamageFluxMlt = DamageFluxPercentage / 100;
+	RocketData.CoolDownFluxMlt = CooldownFluxPercentage / 100;
+	RocketData.ArmorPenFluxMlt = ArmorPenFluxPercentage / 100;
+	RocketData.WeaponCalibre = 150;
+	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::TigerIIRockets, RocketData);
+
 	M_EnemyAttachedRocketDataHashMap = M_TPlayerAttachedRocketDataHashMap;
 }
 
@@ -6066,15 +6404,28 @@ void ACPPGameState::InitAllGameMediumTankData()
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_70, TankData);
 	}
 	
-	// E-25 T3 tank destroyer
-	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, E25_Radixite},
-		{ERTSResourceType::Resource_VehicleParts, E25_VehicleParts}
-	});
-	TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
-	TankData.ExperienceWorth = BaseHeavyTankExp;
-	TankData.ExperienceMultiplier = 1.0f;
-	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_E25, TankData);
+	// E-25 T3 tank destroyer: a light, fast, low-profile casemate TD. It used to inherit health, armour, speeds,
+	// vision and abilities from the Jagdpanzer IV/70 block above; these are its own values now (TUNABLE): less health
+	// and lighter armour than the JP IV/70, much faster. Weak Spot Aim is a component on the base BP, not in Abilities.
+	{
+		constexpr float E25HealthMlt = 0.8f;
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * E25HealthMlt, 10);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = 55 * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = 38;
+		TankData.VehicleReverseSpeedKmh = 20;
+		TankData.VisionRadius = T2TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, E25_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, E25_VehicleParts}
+		});
+		TankData.Abilities = BasicTankDestroyerAbilities;
+		TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
+		TankData.ExperienceWorth = BaseHeavyTankExp;
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_E25, TankData);
+	}
 
 	// ------------------------------- RUS Medium Tanks -------------------------------
 
@@ -7635,7 +7986,10 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T1BxpHealth * 1.25, 10);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(BxpData.Health);
 	BxpData.VisionRadius = T1BxpVisionRadius;
+	BxpData.EnergySupply = 10;
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BXT_SolarLarge, BxpData);
+	// Reset so the expansions configured after the solar trailer do not inherit its supply.
+	BxpData.EnergySupply = 0;
 
 	BxpData.ConstructionTime = BxpT2BuildTime;
 	BxpData.Cost = FUnitCost({
@@ -8343,7 +8697,6 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.BuildRadius = 3300;
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
-		AsEconomic(EBuildingExpansionType::BXT_SolarSmall),
 		AsEconomic(EBuildingExpansionType::BXT_SolarLarge),
 	});
 

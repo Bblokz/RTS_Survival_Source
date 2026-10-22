@@ -442,6 +442,8 @@ bool GetCanExecuteDetachTow(AActor* Actor);
 				TEXT("FAbilityHelpers::GetRocketAbilityForRocketType: Rocket ability is None!"));
 			return DefaultRocketAbility;
 		case ERocketAbility::HetzerRockets:
+		// Big 20 cm rockets: the large default rocket card, as the Hetzer.
+		case ERocketAbility::TigerIIRockets:
 			return DefaultRocketAbility;
 		case ERocketAbility::JagdPantherRockets:
 		case ERocketAbility::Pz38tRockets:

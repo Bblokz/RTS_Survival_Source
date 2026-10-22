@@ -20,6 +20,7 @@ EEnemyBehaviourUsage FEnemyAbilityUsageProfiles::GetBehaviourUsage(const EBehavi
 	case EBehaviourAbilityType::APCR_Rounds:
 	case EBehaviourAbilityType::PzJagerAmbush:
 	case EBehaviourAbilityType::HEATOverload:
+	case EBehaviourAbilityType::E25HunterAmbush:
 		return EEnemyBehaviourUsage::CombatVsArmor;
 	case EBehaviourAbilityType::FlakShrapnelRounds:
 	case EBehaviourAbilityType::FlameNapalmAbility:
@@ -33,6 +34,10 @@ EEnemyBehaviourUsage FEnemyAbilityUsageProfiles::GetBehaviourUsage(const EBehavi
 		return EEnemyBehaviourUsage::CombatStationary;
 	case EBehaviourAbilityType::PulseRepair:
 		return EEnemyBehaviourUsage::Repair;
+	// Reload / rate-of-fire buffs that help against any target.
+	case EBehaviourAbilityType::HastyReload:
+	case EBehaviourAbilityType::TwinAutocannonOverload:
+		return EEnemyBehaviourUsage::CombatAnyTarget;
 	default:
 		return EEnemyBehaviourUsage::CombatAnyTarget;
 	}

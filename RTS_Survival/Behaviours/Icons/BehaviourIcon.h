@@ -99,5 +99,8 @@ enum class EBehaviourIcon : uint8
 	Unarmed,
 	PzJagerAmbush,
 	PzJagerBarrage,
-	HEAT_Rounds
+	HEAT_Rounds,
+	// Unit variant batch 2.
+	HastyReload,
+	TwinAutocannonOverload
 };

@@ -292,7 +292,28 @@ enum class
 	// Jagdpanzer IV/70 Siege: 100mm HE siege mortar.
 	Mortar_100MM_JPzIVSiege UMETA(DisplayName = "10 cm Siege Mortar"),
 	// Jagdpanzer IV/70 Ambush: the Pak 42 locked to APCR (the only shell in its list, so the ammo picker can't switch).
-	Pak42_L70_75MM_APCR UMETA(DisplayName = "7.5 cm PaK 42 L/70 (APCR)")
+	Pak42_L70_75MM_APCR UMETA(DisplayName = "7.5 cm PaK 42 L/70 (APCR)"),
+	// Unit variant batch 2: appended so serialized weapon names keep their values.
+	// Brummbar Direct Siege: a short 20 cm direct-fire siege gun; slower reload than the StuH 43.
+	StuH_200MM_DirectSiege UMETA(DisplayName = "20 cm StuH (Direct Siege)"),
+	// Pz IV H Ostwind: Flak 43 with 8-round clips and a quick clip change.
+	Flak43_37MM_Ostwind UMETA(DisplayName = "3.7 cm Flak 43 (Ostwind)"),
+	// Pz IV Rockets Incendiary Salvo: three large incendiary rockets per salvo, long reload.
+	Rocket_320mm_Incendiary UMETA(DisplayName = "32 cm Incendiary Rocket (Pz IV Rockets)"),
+	// Pz IV Rockets Radixite Hail: a ripple of many small radixite rockets.
+	RadixiteHail_Rocket_76MM UMETA(DisplayName = "7.6 cm Radixite Hail Rocket"),
+	// E25 Hunter: long 60mm firing APCR only.
+	E25_Hunter_60MM_APCR UMETA(DisplayName = "6 cm L/100 (E25 Hunter)"),
+	// E25 Assault: short 90mm firing HE only.
+	E25_Assault_90MM_HE UMETA(DisplayName = "9 cm Sturmkanone (HE)"),
+	// Tiger H1 Twin Gun: each of the two 75mm guns; HEAT by default, can switch to HE.
+	KwK40_L48_75MM_HEAT_TigerTwin UMETA(DisplayName = "7.5 cm KwK 40 L/48 (HEAT)"),
+	// Tiger Rail Bunker: 100mm rail cannon in the casemate.
+	TigerRail_100MM_Railgun UMETA(DisplayName = "10 cm Rail Cannon (Rail Bunker)"),
+	// Tiger II Rocketeer: two twin 35mm mounts; stats are per projectile, one shot fires all four barrels.
+	Ger_2xTwin35MM_TigerII UMETA(DisplayName = "2x Twin 3.5 cm (Tiger II)"),
+	// Maus AA: Flak 41 with a 3-round magazine.
+	Maus_AA_88MM_Flak UMETA(DisplayName = "8.8 cm Flak 41 (Maus AA)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -400,6 +421,16 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::PzIVG_DT_50MM_Artillery: return "5 cm Artillery";
 	case EWeaponName::Mortar_100MM_JPzIVSiege: return "10 cm Mortar";
 	case EWeaponName::Pak42_L70_75MM_APCR: return "Pak 42 APCR";
+	case EWeaponName::StuH_200MM_DirectSiege: return "20 cm Siege Gun";
+	case EWeaponName::Flak43_37MM_Ostwind: return "Flak 43";
+	case EWeaponName::Rocket_320mm_Incendiary: return "Incendiary Rockets";
+	case EWeaponName::RadixiteHail_Rocket_76MM: return "Radixite Hail";
+	case EWeaponName::E25_Hunter_60MM_APCR: return "6 cm Hunter APCR";
+	case EWeaponName::E25_Assault_90MM_HE: return "9 cm HE";
+	case EWeaponName::KwK40_L48_75MM_HEAT_TigerTwin: return "KwK 40 HEAT";
+	case EWeaponName::TigerRail_100MM_Railgun: return "100MM RailGun";
+	case EWeaponName::Ger_2xTwin35MM_TigerII: return "2x Twin 35mm";
+	case EWeaponName::Maus_AA_88MM_Flak: return "Flak 41";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -911,6 +942,26 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Mortar_100MM_JPzIVSiege";
 	case EWeaponName::Pak42_L70_75MM_APCR:
 		return "Pak42_L70_75MM_APCR";
+	case EWeaponName::StuH_200MM_DirectSiege:
+		return "StuH_200MM_DirectSiege";
+	case EWeaponName::Flak43_37MM_Ostwind:
+		return "Flak43_37MM_Ostwind";
+	case EWeaponName::Rocket_320mm_Incendiary:
+		return "Rocket_320mm_Incendiary";
+	case EWeaponName::RadixiteHail_Rocket_76MM:
+		return "RadixiteHail_Rocket_76MM";
+	case EWeaponName::E25_Hunter_60MM_APCR:
+		return "E25_Hunter_60MM_APCR";
+	case EWeaponName::E25_Assault_90MM_HE:
+		return "E25_Assault_90MM_HE";
+	case EWeaponName::KwK40_L48_75MM_HEAT_TigerTwin:
+		return "KwK40_L48_75MM_HEAT_TigerTwin";
+	case EWeaponName::TigerRail_100MM_Railgun:
+		return "TigerRail_100MM_Railgun";
+	case EWeaponName::Ger_2xTwin35MM_TigerII:
+		return "Ger_2xTwin35MM_TigerII";
+	case EWeaponName::Maus_AA_88MM_Flak:
+		return "Maus_AA_88MM_Flak";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:

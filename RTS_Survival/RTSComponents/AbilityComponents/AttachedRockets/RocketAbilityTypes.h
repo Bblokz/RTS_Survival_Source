@@ -13,6 +13,8 @@ enum class ERocketAbility : uint8
 	JagdPantherRockets UMETA(DisplayName = "JagdPanther Rockets"),
 	// Append only: Blueprints store these values.
 	Pz38tRockets UMETA(DisplayName = "Pz 38(t) Rockets"),
+	// Tiger II Rocketeer: 7 large rockets on the turret racks, fired one by one.
+	TigerIIRockets UMETA(DisplayName = "Tiger II Rockets"),
 
 };
 

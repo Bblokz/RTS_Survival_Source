@@ -44,4 +44,11 @@ enum class EBehaviourAbilityType : uint8
 	PzJagerBarrage,
 	// Marder Dual Barrel: both barrels load HEAT rounds and reload faster for a short time.
 	HEATOverload,
+	// Unit variant batch 2.
+	// Brummbar Direct Siege: the crew rams shells in faster for a short time (faster reload).
+	HastyReload,
+	// E25 Hunter: its own ambush volley (own card and duration; otherwise like PzJagerAmbush).
+	E25HunterAmbush,
+	// Tiger II Rocketeer: only the twin 35mm barrels; less accurate, but faster reload and shorter cooldown.
+	TwinAutocannonOverload,
 };
