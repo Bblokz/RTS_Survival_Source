@@ -186,6 +186,19 @@ public:
 	 */
 	bool GetActiveTrainingProgress(float& OutProgress) const;
 
+	/**
+	 * @brief Lets cosmetic followers (the training preview fill) check which option trains and glide between the
+	 * 1 s queue ticks.
+	 * @param OutActiveOption The option of the item in training.
+	 * @param OutProgress How far that item is, from 0 to 1.
+	 * @param OutTotalTrainingTime Its total training time in seconds.
+	 * @return Whether this trainer has an item in training; the out values are defaults otherwise.
+	 */
+	bool GetActiveTrainingProgressDetails(
+		FTrainingOption& OutActiveOption,
+		float& OutProgress,
+		int32& OutTotalTrainingTime) const;
+
 	/** @return How many queued items belong to the options of the given sub section. */
 	int32 GetQueuedCountInSubSection(const int32 SubSectionIndex) const;
 

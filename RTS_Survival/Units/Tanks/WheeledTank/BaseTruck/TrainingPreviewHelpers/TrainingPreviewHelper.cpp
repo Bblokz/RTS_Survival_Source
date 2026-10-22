@@ -3,12 +3,24 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "RTS_Survival/GameUI/TrainingUI/TrainerComponent/TrainerComponent.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "TimerManager.h"
 #include "TrainingPreviewSettings/TrainingPreviewSettings.h"
 
 namespace TrainingPreview
 {
 	static const FName TrainingPreviewSocketName = TEXT("TrainingPreview");
+
+	// Scalar on the progress material: 0 = nothing filled, 1 = the whole preview filled.
+	static const FName BuildProgressParameterName = TEXT("BuildProgress");
+
+	// 10 Hz keeps the fill line smooth without ticking the preview every frame.
+	constexpr float ProgressUpdateIntervalSeconds = 0.1f;
+
+	// UTrainerComponent pays for and advances its active item once per second.
+	constexpr float TrainerQueueTickSeconds = 1.f;
 }
 
 void FTrainingPreviewHelper::SetupTrainingPreviewIfNotExisting(ANomadicVehicle* NomadTraining)
@@ -17,6 +29,7 @@ void FTrainingPreviewHelper::SetupTrainingPreviewIfNotExisting(ANomadicVehicle* 
 	{
 		return;
 	}
+	M_Nomad = NomadTraining;
 
 	if (IsValid(M_TrainingPreview))
 	{
@@ -71,6 +84,8 @@ void FTrainingPreviewHelper::OnStartOrResumeTraining(const FTrainingOption& Star
 	if (StartedOption == M_ActivePreviewTrainingOption)
 	{
 		// Only Set visibility in case we resumed training after packing up.
+		// The progress fill picks up again from the trainer's current progress.
+		StartProgressUpdates();
 		return;
 	}
 
@@ -88,6 +103,7 @@ void FTrainingPreviewHelper::OnStartOrResumeTraining(const FTrainingOption& Star
 
 	M_CachedSoftMesh = SoftMesh;
 	BeginAsyncLoadPreview(SoftMesh, Nomad);
+	StartProgressUpdates();
 }
 
 void FTrainingPreviewHelper::HandleTrainingDisabledOrNomadTruck()
@@ -95,6 +111,7 @@ void FTrainingPreviewHelper::HandleTrainingDisabledOrNomadTruck()
 	// Do not clear the active option; just hide the preview while training is disabled.
 	SetPreviewVisibility(false);
 	bM_ShouldBeVisible = false;
+	StopProgressUpdates();
 }
 
 void FTrainingPreviewHelper::OnActiveTrainingCancelled(const FTrainingOption& CancelledOption)
@@ -123,6 +140,22 @@ void FTrainingPreviewHelper::ResetAsyncState()
 		// Some engine versions have CancelHandle; otherwise reset is enough.
 		M_StreamableHandle.Reset();
 	}
+}
+
+float FTrainingPreviewHelper::GetDisplayedBuildProgress(
+	const float TrainedFraction,
+	const int32 TotalTrainingTimeSeconds,
+	const float SecondsSinceFractionChanged)
+{
+	const float ClampedFraction = FMath::Clamp(TrainedFraction, 0.f, 1.f);
+	if (TotalTrainingTimeSeconds <= 0)
+	{
+		return ClampedFraction;
+	}
+	const float PartOfRunningTick = FMath::Clamp(
+		SecondsSinceFractionChanged / TrainingPreview::TrainerQueueTickSeconds, 0.f, 1.f);
+	return FMath::Clamp(
+		ClampedFraction + PartOfRunningTick / static_cast<float>(TotalTrainingTimeSeconds), 0.f, 1.f);
 }
 
 bool FTrainingPreviewHelper::GetIsValidTrainingPreview() const
@@ -193,12 +226,17 @@ void FTrainingPreviewHelper::BeginAsyncLoadPreview(const TSoftObjectPtr<UStaticM
 	TWeakObjectPtr<ANomadicVehicle> WeakNomad = Nomad;
 
 	FStreamableManager& Streamable = UAssetManager::GetStreamableManager();
-	const FSoftObjectPath Path = SoftMesh.ToSoftObjectPath();
+	// The progress materials load with the mesh so the swap can happen in the same callback.
+	TArray<FSoftObjectPath> PathsToLoad = {SoftMesh.ToSoftObjectPath()};
+	if (const UTrainingPreviewSettings* Settings = GetSettingsCached())
+	{
+		PathsToLoad.Append(Settings->GetProgressMaterialPaths());
+	}
 
 	ResetAsyncState();
 
 	M_StreamableHandle = Streamable.RequestAsyncLoad(
-		Path,
+		PathsToLoad,
 		FStreamableDelegate::CreateLambda([ this, WeakPreview, WeakNomad, SoftMesh, OptionBeingLoaded ]()
 		{
 			if (not WeakPreview.IsValid() || not WeakNomad.IsValid())
@@ -229,10 +267,135 @@ void FTrainingPreviewHelper::BeginAsyncLoadPreview(const TSoftObjectPtr<UStaticM
 			StrongPreviewMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			StrongPreviewMeshComponent->SetCanEverAffectNavigation(false);
 			StrongPreviewMeshComponent->SetGenerateOverlapEvents(false);
+			this->ApplyProgressMaterial(StrongPreviewMeshComponent, Loaded);
 
 			StrongPreviewMeshComponent->SetVisibility(bInBuilding && this->bM_ShouldBeVisible, true);
 		})
 	);
+}
+
+void FTrainingPreviewHelper::ApplyProgressMaterial(UStaticMeshComponent* PreviewComponent, const UStaticMesh* PreviewMesh)
+{
+	ClearProgressMaterial();
+	const UTrainingPreviewSettings* Settings = GetSettingsCached();
+	if (not IsValid(PreviewComponent) || not IsValid(PreviewMesh) || not IsValid(Settings))
+	{
+		return;
+	}
+	UMaterialInterface* PreviewMeshMaterial = PreviewMesh->GetMaterial(0);
+	const TSoftObjectPtr<UMaterialInterface> SoftProgressMaterial = Settings->ResolveProgressMaterial(PreviewMeshMaterial);
+	if (SoftProgressMaterial.IsNull())
+	{
+		// This preview keeps its own material (e.g. the Soviet previews).
+		return;
+	}
+	UMaterialInterface* ProgressMaterial = SoftProgressMaterial.Get();
+	if (not IsValid(ProgressMaterial))
+	{
+		RTSFunctionLibrary::ReportError("Training preview progress material failed to load: " +
+			SoftProgressMaterial.ToString() + "\nCheck Project Settings -> Game -> Training Previews -> Progress Materials.");
+		return;
+	}
+
+	M_ProgressState.ProgressMaterial = UMaterialInstanceDynamic::Create(ProgressMaterial, PreviewComponent);
+	if (not GetHasProgressMaterial())
+	{
+		return;
+	}
+	// Every slot that uses the replaced material gets the progress fill (the previews have one slot).
+	for (int32 SlotIndex = 0; SlotIndex < PreviewMesh->GetStaticMaterials().Num(); ++SlotIndex)
+	{
+		if (PreviewMesh->GetMaterial(SlotIndex) == PreviewMeshMaterial)
+		{
+			PreviewComponent->SetMaterial(SlotIndex, M_ProgressState.ProgressMaterial);
+		}
+	}
+	// Start from the trainer's progress: the factory may redeploy halfway through a unit.
+	M_ProgressState.LastTrainedFraction = -1.f;
+	UpdateProgressMaterial();
+}
+
+void FTrainingPreviewHelper::ClearProgressMaterial()
+{
+	M_ProgressState.ProgressMaterial = nullptr;
+	if (IsValid(M_TrainingPreview))
+	{
+		M_TrainingPreview->EmptyOverrideMaterials();
+	}
+}
+
+bool FTrainingPreviewHelper::GetHasProgressMaterial() const
+{
+	return IsValid(M_ProgressState.ProgressMaterial);
+}
+
+void FTrainingPreviewHelper::StartProgressUpdates()
+{
+	ANomadicVehicle* Nomad = M_Nomad.Get();
+	if (not IsValid(Nomad) || not Nomad->GetWorld())
+	{
+		return;
+	}
+	// A resume restarts the glide from the trainer's value instead of jumping ahead by the time spent packed up.
+	M_ProgressState.LastTrainedFraction = -1.f;
+	FTimerManager& TimerManager = Nomad->GetWorld()->GetTimerManager();
+	if (TimerManager.IsTimerActive(M_ProgressState.UpdateTimerHandle))
+	{
+		return;
+	}
+	// Weak lambda on the nomad: the helper lives inside the nomad, so `this` is valid whenever the nomad is.
+	TimerManager.SetTimer(
+		M_ProgressState.UpdateTimerHandle,
+		FTimerDelegate::CreateWeakLambda(Nomad, [this]()
+		{
+			UpdateProgressMaterial();
+		}),
+		TrainingPreview::ProgressUpdateIntervalSeconds,
+		true);
+}
+
+void FTrainingPreviewHelper::StopProgressUpdates()
+{
+	const ANomadicVehicle* Nomad = M_Nomad.Get();
+	if (not IsValid(Nomad) || not Nomad->GetWorld())
+	{
+		return;
+	}
+	Nomad->GetWorld()->GetTimerManager().ClearTimer(M_ProgressState.UpdateTimerHandle);
+}
+
+void FTrainingPreviewHelper::UpdateProgressMaterial()
+{
+	if (not GetHasProgressMaterial())
+	{
+		// Mesh still loading, or a preview without a progress material.
+		return;
+	}
+	const ANomadicVehicle* Nomad = M_Nomad.Get();
+	if (not IsValid(Nomad) || not IsValid(Nomad->M_TrainerComponent) || not Nomad->GetWorld())
+	{
+		return;
+	}
+	FTrainingOption ActiveOption;
+	float TrainedFraction = 0.f;
+	int32 TotalTrainingTime = 0;
+	const bool bHasActiveItem = Nomad->M_TrainerComponent->GetActiveTrainingProgressDetails(
+		ActiveOption, TrainedFraction, TotalTrainingTime);
+	if (not bHasActiveItem || not (ActiveOption == M_ActivePreviewTrainingOption))
+	{
+		return;
+	}
+
+	const float WorldTime = Nomad->GetWorld()->GetTimeSeconds();
+	if (not FMath::IsNearlyEqual(TrainedFraction, M_ProgressState.LastTrainedFraction))
+	{
+		M_ProgressState.LastTrainedFraction = TrainedFraction;
+		M_ProgressState.LastFractionChangeTime = WorldTime;
+	}
+	const float DisplayedProgress = GetDisplayedBuildProgress(
+		TrainedFraction, TotalTrainingTime, WorldTime - M_ProgressState.LastFractionChangeTime);
+	M_ProgressState.ProgressMaterial->SetScalarParameterValue(
+		TrainingPreview::BuildProgressParameterName, DisplayedProgress);
 }
 
 void FTrainingPreviewHelper::ResetPreviewState(const bool bHide)
@@ -244,6 +407,10 @@ void FTrainingPreviewHelper::ResetPreviewState(const bool bHide)
 
 	// Clear any pending async load.
 	ResetAsyncState();
+
+	// The next unit starts its fill from zero with a fresh material.
+	StopProgressUpdates();
+	ClearProgressMaterial();
 
 	// Drop references so we don’t accidentally reuse a stale mesh/option.
 	M_CachedSoftMesh.Reset();

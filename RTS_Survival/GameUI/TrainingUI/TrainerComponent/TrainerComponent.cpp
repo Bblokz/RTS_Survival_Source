@@ -211,6 +211,23 @@ bool UTrainerComponent::GetActiveTrainingProgress(float& OutProgress) const
 	return true;
 }
 
+bool UTrainerComponent::GetActiveTrainingProgressDetails(
+	FTrainingOption& OutActiveOption,
+	float& OutProgress,
+	int32& OutTotalTrainingTime) const
+{
+	OutActiveOption = FTrainingOption();
+	OutTotalTrainingTime = 0;
+	if (not GetActiveTrainingProgress(OutProgress))
+	{
+		return false;
+	}
+	const FTrainingQueueItem* ActiveItem = M_TTrainingQueue.Peek();
+	OutActiveOption = ActiveItem->ItemID;
+	OutTotalTrainingTime = ActiveItem->TotalTrainingTime;
+	return true;
+}
+
 int32 UTrainerComponent::GetQueuedCountInSubSection(const int32 SubSectionIndex) const
 {
 	if (not M_TrainingSubSections.IsValidIndex(SubSectionIndex))
