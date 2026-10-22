@@ -7,6 +7,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
+#include "RTS_Survival/Behaviours/Behaviour.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/GameUI/Healthbar/GarrisonHealthBar/W_GarrisonHealthBar.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -426,7 +428,60 @@ void UCargo::OnSquadEntered(ASquadController* SquadController)
 		UpdateGarrisonWidgetForSquad(SquadController, SlotIndex, /*bIsEntering=*/true);
 	}
 
+	ApplyGarrisonBehaviourToSquad(SquadController);
+
 	M_OnSquadEnteredCargo.Broadcast(this, SquadController);
+}
+
+bool UCargo::GetIsGarrisonBehaviourAppliedToSquad(const ASquadController* SquadController) const
+{
+	if (not IsValid(SquadController))
+	{
+		return false;
+	}
+	return M_SquadsWithGarrisonBehaviour.Contains(TWeakObjectPtr<ASquadController>(
+		const_cast<ASquadController*>(SquadController)));
+}
+
+void UCargo::ApplyGarrisonBehaviourToSquad(ASquadController* SquadController)
+{
+	if (GarrisonBehaviour.Get() == nullptr || not IsValid(SquadController))
+	{
+		return;
+	}
+	const TWeakObjectPtr<ASquadController> WeakSquad(SquadController);
+	if (M_SquadsWithGarrisonBehaviour.Contains(WeakSquad))
+	{
+		return;
+	}
+	UBehaviourComp* const SquadBehaviourComponent = SquadController->GetBehaviourComponentOfSquad();
+	if (not IsValid(SquadBehaviourComponent))
+	{
+		RTSFunctionLibrary::ReportNullErrorComponent(
+			SquadController, "BehaviourComponent", "UCargo::ApplyGarrisonBehaviourToSquad");
+		return;
+	}
+	SquadBehaviourComponent->AddBehaviour(GarrisonBehaviour);
+	M_SquadsWithGarrisonBehaviour.Add(WeakSquad);
+}
+
+void UCargo::RemoveGarrisonBehaviourFromSquad(ASquadController* SquadController)
+{
+	if (not IsValid(SquadController))
+	{
+		return;
+	}
+	const TWeakObjectPtr<ASquadController> WeakSquad(SquadController);
+	if (M_SquadsWithGarrisonBehaviour.Remove(WeakSquad) == 0 || GarrisonBehaviour.Get() == nullptr)
+	{
+		return;
+	}
+	UBehaviourComp* const SquadBehaviourComponent = SquadController->GetBehaviourComponentOfSquad();
+	if (not IsValid(SquadBehaviourComponent))
+	{
+		return;
+	}
+	SquadBehaviourComponent->RemoveBehaviour(GarrisonBehaviour);
 }
 
 void UCargo::OnSquadExited(ASquadController* SquadController, const TArray<ASquadUnit*>& Units)
@@ -805,6 +860,9 @@ void UCargo::RegisterSquadAtVacancy(ASquadController* Squad, const bool bRegiste
 		}
 		return;
 	}
+
+	// Every way out of the cargo (exit, bail-out, disabled cargo, wiped out inside, carrier destroyed) unregisters here.
+	RemoveGarrisonBehaviourFromSquad(Squad);
 
 	const int32 OldCount = M_VacancyState.M_CurrentSquads;
 
@@ -1350,6 +1408,7 @@ void UCargo::StopSeatShuffleTimer()
 void UCargo::OnOwnerDies_ResetState()
 {
 	M_SocketOccupancy.M_SocketToUnit.Reset();
+	M_SquadsWithGarrisonBehaviour.Empty();
 	M_VacancyState.M_InsideSquads.Empty();
 	M_VacancyState.M_CurrentSquads = 0;
 }

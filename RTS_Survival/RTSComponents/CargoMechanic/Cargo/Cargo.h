@@ -10,6 +10,7 @@
 #include "Cargo.generated.h"
 
 class UW_GarrisonHealthBar;
+class UBehaviour;
 class UHealthComponent;
 class UPrimitiveComponent;
 class UCargo;
@@ -269,14 +270,37 @@ public:
 	/** @return Owning actor (shortcut). */
 	AActor* GetCargoOwnerActor() const { return GetOwner(); }
 
+	/** @return The behaviour given to squads while they are inside this cargo; none by default. */
+	TSubclassOf<UBehaviour> GetGarrisonBehaviour() const { return GarrisonBehaviour; }
+
+	/** @return Whether this cargo applied its garrison behaviour to the squad and has not removed it yet. */
+	bool GetIsGarrisonBehaviourAppliedToSquad(const ASquadController* SquadController) const;
+
 protected:
 	virtual void BeginPlay() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
 	bool bUseCargoWidget = true;
 
+	/**
+	 * Optional (opt-in): a behaviour added to every squad once it has fully entered this cargo, and removed when it
+	 * leaves (exit, bail-out, disabled cargo, squad wiped out inside, carrier destroyed). It goes on the squad's
+	 * behaviour component, so a weapon behaviour applies to the weapons of all its soldiers.
+	 * E.g. a garrison reload bonus: a weapon behaviour with ReloadSpeedMlt 0.8 (+25 % reload speed).
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cargo|Garrison")
+	TSubclassOf<UBehaviour> GarrisonBehaviour;
+
 private:
-	
+	// Squads that got GarrisonBehaviour from this cargo, so only those get it removed again.
+	TSet<TWeakObjectPtr<ASquadController>> M_SquadsWithGarrisonBehaviour;
+
+	/** Adds GarrisonBehaviour (if set) to the squad's behaviour component once. */
+	void ApplyGarrisonBehaviourToSquad(ASquadController* SquadController);
+
+	/** Removes GarrisonBehaviour from the squad if this cargo applied it. */
+	void RemoveGarrisonBehaviourFromSquad(ASquadController* SquadController);
+
 	/** Clears seat occupancy for all units that belong to the given squad. */
 	void ClearSeatOccupancyForSquad(ASquadController* Squad);
 	/** Validated cached mesh. */
