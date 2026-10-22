@@ -95,7 +95,8 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
 
 		// --- solar  ---
-		{EBuildingExpansionType::BXT_SolarLarge, WithFootprint(FreeConstructionRules, 500.f, 500.f)},
+		// The radixite solar trailer snaps to the Gamma Facility's BXP_L / BXP_R side sockets (4.5 m out, 4 m along the wall).
+		{EBuildingExpansionType::BXT_SolarLarge, WithFootprint(SocketConstructionRules, 450.f, 500.f)},
 		{EBuildingExpansionType::BXT_SolarSmall, WithFootprint(FreeConstructionRules, 300.f, 300.f)},
 	};
 }

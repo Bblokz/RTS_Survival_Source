@@ -81,7 +81,7 @@ enum class EBuildingExpansionType : uint8
 	// ENERGY
 	//
 	BXT_SolarSmall UMETA(DisplayName = "Small Solar Panel Expansion"),
-	BXT_SolarLarge UMETA(DisplayName = "Large Solar Panel Expansion"),
+	BXT_SolarLarge UMETA(DisplayName = "Radixite Solar Trailer Expansion"),
 
 	BTX_RusIndustrialRefinery UMETA(DisplayName = "Rus Industrial Refinery"),
 
@@ -342,7 +342,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusAntenna: return TEXT("Antenna");
 
 	case EBuildingExpansionType::BXT_SolarSmall: return TEXT("Small Solar Panel");
-	case EBuildingExpansionType::BXT_SolarLarge: return TEXT("Large Solar Panel");
+	case EBuildingExpansionType::BXT_SolarLarge: return TEXT("Radixite Solar Trailer");
 
 	case EBuildingExpansionType::BTX_RefConverter: return TEXT("Refinery Converter");
 
