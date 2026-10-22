@@ -25,6 +25,7 @@ struct FRTSShortsOrbitState
 	// Camera location minus Pivot at the segment's framing; rotated about Z by the eased orbit angle.
 	FVector StartOffset = FVector::ZeroVector;
 	float Degrees = 0.f;
+	float EndHeightScale = 1.f;
 	float StartSeconds = 0.f;
 	float DurationSeconds = 1.f;
 };
@@ -43,10 +44,36 @@ struct FRTSShortsBattleState
 	TMap<TWeakObjectPtr<AActor>, TWeakObjectPtr<AActor>> OrderedTargets;
 	// Wrecks spawned while the battle ran; destroyed with the battle so the next one starts on a clean field.
 	TArray<TWeakObjectPtr<AActor>> SpawnedWrecks;
+	// Squad controllers of either line: they take the attack orders, their soldiers join the lines above as they spawn.
+	TArray<TWeakObjectPtr<AActor>> PlayerSquads;
+	TArray<TWeakObjectPtr<AActor>> EnemySquads;
+	int32 BeginFrame = 0;
 	int32 DecidedFrame = -1;
 	bool bPlayerWon = false;
 	bool bSegmentShortened = false;
 	FDelegateHandle ActorSpawnedHandle;
+};
+
+/** Convoy segment: the vehicles driving in a wedge, their pinned turrets and the follow camera's offsets. */
+USTRUCT()
+struct FRTSShortsConvoyState
+{
+	GENERATED_BODY()
+
+	bool bIsActive = false;
+	bool bDriving = false;
+	// The segment's own unit first, then the wedge's side vehicles.
+	TArray<TWeakObjectPtr<AActor>> Units;
+	// Every turret mesh of the convoy with the relative yaw it is held at (its yaw when the convoy formed plus the
+	// side's offset).
+	TArray<TWeakObjectPtr<USceneComponent>> TurretMeshes;
+	TArray<float> TurretYaws;
+	// Smoothed lead position the camera follows, and the camera's and its look-at point's offsets from it.
+	FVector Anchor = FVector::ZeroVector;
+	FVector CameraOffset = FVector::ZeroVector;
+	FVector LookOffset = FVector::ZeroVector;
+	int32 StartFrame = 0;
+	int32 SegmentFrames = 1;
 };
 
 /** Phases of one shorts run; the director advances through them in order. */
@@ -158,6 +185,19 @@ private:
 	void FrameImpactCamera(const AActor* Unit, const FRTSShortsSegment& Segment) const;
 	/** Segment.BattleEnemyClassPaths: spawns both lines (the segment's unit leads the player line) and makes them see each other. */
 	void BeginBattle(const int32 SegmentIndex, AActor* MainUnit);
+	/** Battle squads: their soldiers join the battle lines (targets, visibility, alive count) as they spawn. */
+	void AbsorbBattleSquadMembers();
+	/** Gives a battle squad's soldier the squad controller's owner (and its weapons and collision with it). */
+	static void MatchSoldierToSquadOwner(class ASquadUnit* Soldier, const uint8 SquadOwner);
+	/** Segment.bConvoy: spawns the wedge's side vehicles, pins the turrets and starts the follow camera. */
+	void BeginConvoy(const int32 SegmentIndex, AActor* MainUnit);
+	/** Orders every convoy vehicle Segment.ConvoyDriveDistance ahead (issued at the segment's fire time). */
+	void OrderConvoyDrive(const int32 SegmentIndex);
+	/** Holds the convoy's turrets and moves the follow camera. */
+	void TickConvoy(const int32 Frame);
+	void EndConvoy();
+	/** Segment.StageActorName: the segment plays on its own stage actor; otherwise on the job's stage. */
+	void ApplySegmentStage(const int32 SegmentIndex);
 	/** Keeps the fog of war out, re-targets units whose target died, and ends the segment once one side is gone. */
 	void TickBattle(const int32 Frame);
 	void EndBattle();
@@ -167,6 +207,16 @@ private:
 	/** Ends the running segment at Frame and pulls every later segment forward by the time saved. */
 	void ShortenRunningSegment(const int32 Frame);
 	FVector GetBattleGroundPoint(const FVector& Location) const;
+	/** Job.CombatTextWorldScale: floating combat texts become camera-facing world widgets the 3D pass can film. */
+	void KeepCombatTextsInWorld() const;
+	/**
+	 * A grey checker sphere (a mesh drawn with the engine's default material) shows in battle and convoy frames.
+	 * Hides any visible engine sphere or default-material mesh a gameplay actor owns (level dressing is skipped)
+	 * and logs each one once.
+	 */
+	void HideEngineSpheres();
+	/** Effects of these owners are activated once and never restarted: the shorts flush and caps must leave them alone. */
+	static bool GetIsPersistentEffectOwner(const AActor* ComponentOwner);
 	/** Moves the camera along the running segment's orbit pan (Camera.OrbitDegrees) for this segment-local time. */
 	void UpdateOrbitCamera(const float SegmentSeconds) const;
 	void ApplyCameraCut(const FVector& CameraLocation) const;
@@ -218,6 +268,19 @@ private:
 	// Set by FrameCamera (const) when the segment pans; read every tick by UpdateOrbitCamera.
 	mutable FRTSShortsOrbitState M_Orbit;
 	FRTSShortsBattleState M_Battle;
+	FRTSShortsConvoyState M_Convoy;
+	// The job's stage; segments with their own StageActorName switch M_Stage away from it for their duration.
+	UPROPERTY()
+	TObjectPtr<AActor> M_JobStage;
+	// Diagnostics for the world-space combat texts (converted widgets, ticks with a visible one).
+	struct FCombatTextStats
+	{
+		int32 Converted = 0;
+		int32 VisibleTicks = 0;
+	};
+	mutable FCombatTextStats M_CombatTextStats;
+	// Owners already logged by HideEngineSpheres.
+	TSet<FString> M_LoggedSphereOwners;
 	// A battle ended early: the movie render is stopped once the last segment is done instead of filming empty time.
 	bool bM_TimelineShortened = false;
 	bool bM_ImpactCutDone = false;

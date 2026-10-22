@@ -19,6 +19,7 @@
 #include "MoviePipelineQueue.h"
 #include "MoviePipelineQueueEngineSubsystem.h"
 #include "MoviePipelineWaveOutput.h"
+#include "MoviePipelineWidgetRenderSetting.h"
 #include "MovieScene.h"
 #include "TimerManager.h"
 #include "UObject/Package.h"
@@ -219,6 +220,16 @@ UMoviePipelinePrimaryConfig* URTSShortsRenderSubsystem::BuildConfig() const
 
 	Config->FindOrAddSettingByClass(UMoviePipelineDeferredPassBase::StaticClass());
 	Config->FindOrAddSettingByClass(UMoviePipelineImageSequenceOutput_JPG::StaticClass());
+	if (M_Job.bRenderGameWidgets)
+	{
+		// Screen-space game widgets (the floating "engine damaged" / "shell shattered" texts) are not part of the 3D
+		// pass: the UI renderer composites the viewport's widgets (everything else is hidden by the director).
+		UMoviePipelineWidgetRenderer* WidgetRenderer = Cast<UMoviePipelineWidgetRenderer>(
+			Config->FindOrAddSettingByClass(UMoviePipelineWidgetRenderer::StaticClass()));
+		WidgetRenderer->bCompositeOntoFinalImage = true;
+		// Every pass writes its own file (the UI pass would overwrite the scene under one name); post keeps FinalImage.
+		Output->FileNameFormat = TEXT("{sequence_name}.{render_pass}.{frame_number}");
+	}
 	// No MRQ wave output: its recording buffer is reset mid-render (audio lost) and its finalize asserts on long
 	// sequences; the director's own submix capture (<Job>_capture.wav) is the audio track.
 

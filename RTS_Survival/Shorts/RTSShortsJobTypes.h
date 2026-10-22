@@ -23,6 +23,13 @@ struct FRTSShortsCameraParams
 	UPROPERTY()
 	float SideOffset = -550.f;
 
+	/**
+	 * Moves the camera and its look-at point together along the unit's right axis (SideOffset moves only the
+	 * camera): centres a battle line whose slots are not symmetric about the unit, e.g. six abreast.
+	 */
+	UPROPERTY()
+	float LateralShift = 0.f;
+
 	/** Height above the unit's ground contact. */
 	UPROPERTY()
 	float Height = 420.f;
@@ -95,6 +102,13 @@ struct FRTSShortsCameraParams
 	/** Duration of the orbit pan in seconds (eased in and out). */
 	UPROPERTY()
 	float OrbitSeconds = 3.f;
+
+	/**
+	 * Opt-in descent during the orbit: the camera's height above the look-at point eases to this fraction of its
+	 * framing height (1 keeps the height; 0.4 ends at 40 %), so a high overview can swing down to a low side view.
+	 */
+	UPROPERTY()
+	float OrbitEndHeightScale = 1.f;
 };
 
 /**
@@ -255,7 +269,51 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	float EffectBoostScale = 1.f;
 
-	/** Battle: further player units spawned in line abreast beside the segment's unit (BattleSpacing apart). */
+	/** Non-empty: the segment plays on the stage actor "Stage_<StageActorName>" instead of the job's stage. */
+	UPROPERTY()
+	FString StageActorName;
+
+	/**
+	 * Convoy: the segment's unit and BattleAllyClassPaths drive forward in a wedge from the segment's fire time
+	 * (nobody fires). The side vehicles hold their turrets ConvoyTurretYawDegrees outward and the camera follows the
+	 * lead vehicle, pulling back to ConvoyZoomOut times its framing offset by the end of the segment (SlotSeconds).
+	 */
+	UPROPERTY()
+	bool bConvoy = false;
+
+	/** Convoy: sideways distance between the wedge's ranks (cm). */
+	UPROPERTY()
+	float ConvoySpacing = 650.f;
+
+	/** Convoy: how far each rank of side vehicles drives behind the one before (cm). */
+	UPROPERTY()
+	float ConvoySideLag = 350.f;
+
+	UPROPERTY()
+	float ConvoyTurretYawDegrees = 20.f;
+
+	/**
+	 * Convoy rows instead of the wedge: vehicles per row, front to back (e.g. [3, 4]: the segment's unit and two
+	 * allies in front, four allies behind). The front row fans out from the segment's unit (centre, right, left, ...),
+	 * the rows behind are centred; rows are ConvoyRowGap apart and ConvoySpacing sideways. Empty keeps the wedge.
+	 */
+	UPROPERTY()
+	TArray<int32> ConvoyRows;
+
+	UPROPERTY()
+	float ConvoyRowGap = 1100.f;
+
+	/** Convoy: each vehicle's move order goes this far ahead of it along the stage's forward axis (cm). */
+	UPROPERTY()
+	float ConvoyDriveDistance = 20000.f;
+
+	UPROPERTY()
+	float ConvoyZoomOut = 1.35f;
+
+	/**
+	 * Battle: further player units spawned in line abreast beside the segment's unit (BattleSpacing apart). Squads
+	 * may be mixed in here and in BattleEnemyClassPaths: the squad takes the orders, its soldiers are the targets.
+	 */
 	UPROPERTY()
 	TArray<FString> BattleAllyClassPaths;
 
@@ -271,6 +329,10 @@ struct FRTSShortsSegment
 
 	UPROPERTY()
 	float BattleEndHoldSeconds = 3.f;
+
+	/** Battle: every unit's max health (both lines) is scaled by this, so heavily armoured lines still reach a winner. */
+	UPROPERTY()
+	float BattleHealthScale = 1.f;
 
 	/** Squads: the soldiers' cooldown between shots in seconds (a bolt rifle otherwise fires once per 3.7 s slot); negative keeps the weapon's own. */
 	UPROPERTY()
@@ -402,6 +464,21 @@ struct FRTSShortsJob
 	/** StageName variable value of the BP_ShortsStage instance to use. */
 	UPROPERTY()
 	FString StageName = TEXT("Vehicle");
+
+	/**
+	 * > 0: the floating combat texts ("engine damaged", "shell shattered") are turned into world-space widgets facing the
+	 * camera at this scale, so the 3D pass films them (screen-space widgets never reach Movie Render Queue frames).
+	 */
+	UPROPERTY()
+	float CombatTextWorldScale = 0.f;
+
+	/** Render the game's screen-space widgets (floating combat texts) into the frames via the MRQ UI renderer. */
+	UPROPERTY()
+	bool bRenderGameWidgets = false;
+
+	/** Actors whose name or label starts with any of these are hidden for this job (e.g. a backdrop hill over a second mark). */
+	UPROPERTY()
+	TArray<FString> HiddenActorPrefixes;
 
 	/** Stage actor label to place units on (default "Stage_" + StageName): a second mark inside an existing stage's dressing. */
 	UPROPERTY()

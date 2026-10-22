@@ -5,6 +5,11 @@
 #include "CineCameraActor.h"
 #include "CineCameraComponent.h"
 #include "EngineUtils.h"
+#include "NavigationPath.h"
+#include "NavigationSystem.h"
+#include "Engine/StaticMeshActor.h"
+#include "Materials/Material.h"
+#include "Components/MeshComponent.h"
 #include "JsonObjectConverter.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/App.h"
@@ -22,6 +27,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/MeshComponent.h"
 #include "NiagaraComponent.h"
+#include "Components/WidgetComponent.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/ApartmentDestruction/ApartmentDestructibleActor.h"
 #include "NiagaraFunctionLibrary.h"
@@ -41,11 +47,15 @@
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/Weapons/Projectile/Projectile.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/RTSCheatManager/RTSCheatManager.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/Tests/GrenadeTestHelpers.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
@@ -53,6 +63,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSShorts, Log, All);
@@ -307,6 +318,7 @@ void ARTSShortsDirector::TickWaitingForTurrets()
 	// The first vehicle goes on its mark during the warm-up: placed on the cut frame, the BT-7 Soviet stayed in its
 	// pen for 12 frames and never fired. Squads keep waiting in the pen (their members follow the controller).
 	AActor* FirstUnit = M_Units.IsValidIndex(0) ? M_Units[0].Get() : nullptr;
+	ApplySegmentStage(0);
 	if (IsValid(FirstUnit) && Cast<ASquadController>(FirstUnit) == nullptr && M_Job.Segments.IsValidIndex(0))
 	{
 		PlaceUnitOnStage(FirstUnit, M_Job.Segments[0]);
@@ -395,7 +407,11 @@ void ARTSShortsDirector::TickRunning()
 	{
 		LogActiveSounds(Frame);
 	}
-	if (M_HoldFramesLeft > 0)
+	if (M_Convoy.bDriving)
+	{
+		M_HoldFramesLeft = 0;
+	}
+	else if (M_HoldFramesLeft > 0)
 	{
 		// Re-apply the placement for a few frames so vehicle physics cannot slide the unit into frame.
 		--M_HoldFramesLeft;
@@ -470,6 +486,9 @@ void ARTSShortsDirector::TickRunning()
 	LogVisibleSoldierShots(Frame);
 	UpdateOrbitCamera(static_cast<float>(Local) / M_Job.Fps);
 	TickBattle(Frame);
+	TickConvoy(Frame);
+	KeepCombatTextsInWorld();
+	HideEngineSpheres();
 	if (M_HiddenSoldiers.IsValidIndex(M_CurrentSegment))
 	{
 		// Hidden squad members stay silent: their shots would be heard but not seen.
@@ -883,6 +902,11 @@ UMoviePipeline* ARTSShortsDirector::GetActivePipeline() const
 	return IsValid(Subsystem) ? Subsystem->GetActivePipeline() : nullptr;
 }
 
+bool ARTSShortsDirector::GetIsPersistentEffectOwner(const AActor* ComponentOwner)
+{
+	return Cast<AProjectile>(ComponentOwner) != nullptr || Cast<ASmallArmsProjectileManager>(ComponentOwner) != nullptr;
+}
+
 void ARTSShortsDirector::FlushStageEffects(const int32 SegmentIndex) const
 {
 	// Smoke and dust of the previous unit must not linger behind the next one: stop every Niagara and Cascade
@@ -896,6 +920,13 @@ void ARTSShortsDirector::FlushStageEffects(const int32 SegmentIndex) const
 		const AActor* ComponentOwner = Component->GetOwner();
 		if (Component->GetWorld() != GetWorld() || (Keep != nullptr && ComponentOwner == Keep)
 			|| (ComponentOwner != nullptr && ComponentOwner->IsNetStartupActor()))
+		{
+			continue;
+		}
+		// Pooled projectiles keep their shell/tracer system active for life and only hide the actor while dormant, and
+		// the small arms manager draws every bullet and trace impact with systems it activates once: a deactivated one
+		// is never restarted, so every later shell would fly invisible and every bullet impact would be missing.
+		if (GetIsPersistentEffectOwner(ComponentOwner))
 		{
 			continue;
 		}
@@ -926,6 +957,7 @@ void ARTSShortsDirector::FlushStageEffects(const int32 SegmentIndex) const
 
 void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 {
+	ApplySegmentStage(SegmentIndex);
 	FlushStageEffects(SegmentIndex);
 	// Nothing on stage may carry the selection outline or decal.
 	if (GetIsValidPlayerController())
@@ -1024,6 +1056,10 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 		{
 			BeginBattle(SegmentIndex, Unit);
 		}
+		if (Segment.bConvoy)
+		{
+			BeginConvoy(SegmentIndex, Unit);
+		}
 	}
 	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SEGMENT_BEGIN index=%d subtype=%s frame=%d caliber=%d range=%.0f target=%s"),
 	       SegmentIndex, *Segment.Subtype, GetTimelineFrame(), M_Manifest.Segments[SegmentIndex].CaliberMm,
@@ -1034,6 +1070,7 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 void ARTSShortsDirector::EndSegment(const int32 SegmentIndex)
 {
 	EndBattle();
+	EndConvoy();
 	if (not bM_StopOrdered)
 	{
 		OrderStop(SegmentIndex);
@@ -1244,8 +1281,9 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 			continue;
 		}
 		const AActor* ComponentOwner = Component->GetOwner();
-		// Level-placed actors (burning wrecks, ambient effects) keep running.
-		if (ComponentOwner != nullptr && ComponentOwner->IsNetStartupActor())
+		// Level-placed actors (burning wrecks, ambient effects) keep running, and so do the pooled projectiles' and the
+		// small arms manager's systems (never restarted once stopped, see FlushStageEffects).
+		if (ComponentOwner != nullptr && (ComponentOwner->IsNetStartupActor() || GetIsPersistentEffectOwner(ComponentOwner)))
 		{
 			continue;
 		}
@@ -1711,7 +1749,7 @@ void ARTSShortsDirector::FrameCamera(const AActor* Unit, const FRTSShortsSegment
 		}
 		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_FIT width=%.0f distance=%.0f focal=%.0f height=%.0f lookAt=%.0f"), Width, Distance, Params.FocalLength, CameraHeight, LookAtHeight);
 	}
-	FVector CameraLocation = Origin - Forward * BackDistance + Right * Params.SideOffset;
+	FVector CameraLocation = Origin - Forward * BackDistance + Right * (Params.SideOffset + Params.LateralShift);
 	if (Params.FitWidthFraction > 0.f && Params.FitPitch > 0.f)
 	{
 		// Lay the fitted distance out along a pitched ray: horizontal = d cos(pitch), vertical = d sin(pitch),
@@ -1724,7 +1762,7 @@ void ARTSShortsDirector::FrameCamera(const AActor* Unit, const FRTSShortsSegment
 		CameraHeight = LookAtHeight + Distance * FMath::Sin(FMath::DegreesToRadians(Params.FitPitch));
 	}
 	CameraLocation.Z = GroundZ + CameraHeight;
-	FVector LookAt = FMath::Lerp(Origin, TargetWorld, Params.LookAtBlend) + Forward * Params.LookAtForward;
+	FVector LookAt = FMath::Lerp(Origin, TargetWorld, Params.LookAtBlend) + Forward * Params.LookAtForward + Right * Params.LateralShift;
 	LookAt.Z = GroundZ + LookAtHeight;
 	FRotator Rotation = (LookAt - CameraLocation).Rotation();
 	Rotation.Pitch += Params.ExtraPitch;
@@ -1737,6 +1775,7 @@ void ARTSShortsDirector::FrameCamera(const AActor* Unit, const FRTSShortsSegment
 		M_Orbit.Pivot = LookAt;
 		M_Orbit.StartOffset = CameraLocation - LookAt;
 		M_Orbit.Degrees = Params.OrbitDegrees;
+		M_Orbit.EndHeightScale = Params.OrbitEndHeightScale;
 		M_Orbit.StartSeconds = Params.OrbitStartSeconds;
 		M_Orbit.DurationSeconds = FMath::Max(0.1f, Params.OrbitSeconds);
 	}
@@ -1770,7 +1809,8 @@ void ARTSShortsDirector::UpdateOrbitCamera(const float SegmentSeconds) const
 	const float Alpha = FMath::Clamp((SegmentSeconds - M_Orbit.StartSeconds) / M_Orbit.DurationSeconds, 0.f, 1.f);
 	// Smoothstep: the pan eases out of the front view and settles on the rear view instead of stopping hard.
 	const float Eased = Alpha * Alpha * (3.f - 2.f * Alpha);
-	const FVector Offset = M_Orbit.StartOffset.RotateAngleAxis(M_Orbit.Degrees * Eased, FVector::UpVector);
+	FVector Offset = M_Orbit.StartOffset.RotateAngleAxis(M_Orbit.Degrees * Eased, FVector::UpVector);
+	Offset.Z *= FMath::Lerp(1.f, M_Orbit.EndHeightScale, Eased);
 	const FVector CameraLocation = M_Orbit.Pivot + Offset;
 	FRotator Rotation = (M_Orbit.Pivot - CameraLocation).Rotation();
 	Rotation.Roll = 0.f;
@@ -1816,6 +1856,12 @@ FVector ARTSShortsDirector::GetTargetWorldLocation(const FRTSShortsSegment& Segm
 void ARTSShortsDirector::OrderAttackGround(const int32 SegmentIndex)
 {
 	bM_FireOrdered = true;
+	if (M_Convoy.bIsActive)
+	{
+		OrderConvoyDrive(SegmentIndex);
+		M_Manifest.Segments[SegmentIndex].FireOrderFrame = GetTimelineFrame();
+		return;
+	}
 	if (M_Battle.bIsActive)
 	{
 		// A battle fights unit against unit: every tank gets the nearest opponent instead of a ground point.
@@ -1939,6 +1985,17 @@ void ARTSShortsDirector::ApplyStageVisibility() const
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
 		AActor* Actor = *It;
+		if (M_Job.HiddenActorPrefixes.Num() > 0)
+		{
+			const FString ActorName = Actor->GetActorNameOrLabel();
+			if (M_Job.HiddenActorPrefixes.ContainsByPredicate([&ActorName](const FString& Prefix) { return ActorName.StartsWith(Prefix); }))
+			{
+				Actor->SetActorHiddenInGame(true);
+				Actor->SetActorEnableCollision(false);
+				++Hidden;
+				continue;
+			}
+		}
 		bool bTagged = false;
 		bool bForThisStage = false;
 		for (const FName& Tag : Actor->Tags)
@@ -2280,7 +2337,7 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 		                                                       static_cast<uint8>(M_Job.UnitOwningPlayer));
 		if (IsValid(Ally))
 		{
-			M_Battle.PlayerUnits.Add(Ally);
+			(Cast<ASquadController>(Ally) != nullptr ? M_Battle.PlayerSquads : M_Battle.PlayerUnits).Add(Ally);
 		}
 	}
 	for (int32 Index = 0; Index < Segment.BattleEnemyClassPaths.Num(); ++Index)
@@ -2292,7 +2349,7 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 		                                                        static_cast<uint8>(Segment.TargetOwningPlayer));
 		if (IsValid(Enemy))
 		{
-			M_Battle.EnemyUnits.Add(Enemy);
+			(Cast<ASquadController>(Enemy) != nullptr ? M_Battle.EnemySquads : M_Battle.EnemyUnits).Add(Enemy);
 		}
 	}
 #endif
@@ -2308,13 +2365,308 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 			{
 				Fow->StopFowParticipation();
 			}
+			UHealthComponent* Health = BattleUnit.IsValid() ? BattleUnit->FindComponentByClass<UHealthComponent>() : nullptr;
+			if (Health != nullptr && not FMath::IsNearlyEqual(Segment.BattleHealthScale, 1.f))
+			{
+				Health->SetMaxHealth(Health->GetMaxHealth() * Segment.BattleHealthScale);
+			}
 		}
 	}
+	M_Battle.BeginFrame = GetTimelineFrame();
+	AbsorbBattleSquadMembers();
 	KeepBattleUnitsVisible();
 	M_Battle.ActorSpawnedHandle = GetWorld()->AddOnActorSpawnedHandler(
 		FOnActorSpawned::FDelegate::CreateUObject(this, &ARTSShortsDirector::OnBattleActorSpawned));
-	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_BATTLE_BEGIN segment=%d players=%d enemies=%d"), SegmentIndex,
-	       M_Battle.PlayerUnits.Num(), M_Battle.EnemyUnits.Num());
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_BATTLE_BEGIN segment=%d players=%d enemies=%d playerSquads=%d enemySquads=%d"),
+	       SegmentIndex, M_Battle.PlayerUnits.Num(), M_Battle.EnemyUnits.Num(), M_Battle.PlayerSquads.Num(),
+	       M_Battle.EnemySquads.Num());
+}
+
+void ARTSShortsDirector::MatchSoldierToSquadOwner(ASquadUnit* Soldier, const uint8 SquadOwner)
+{
+	// A squad spawns its soldiers itself, after FGrenadeTestHelpers::SpawnUnitForPlayer has restored the class
+	// defaults it overrode for the controller, so a soldier can come up as its class default's player (1) and fight
+	// its own squad: give it the controller's owner, and with it its weapons' owner and its capsule's collision.
+	URTSComponent* SoldierRTS = IsValid(Soldier) ? Soldier->FindComponentByClass<URTSComponent>() : nullptr;
+	if (SoldierRTS == nullptr || SoldierRTS->GetOwningPlayer() == SquadOwner)
+	{
+		return;
+	}
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SOLDIER_OWNER_FIXED soldier=%s from=%d to=%d"), *Soldier->GetName(),
+	       SoldierRTS->GetOwningPlayer(), SquadOwner);
+	SoldierRTS->SetOwningPlayerRuntime(SquadOwner);
+	FRTS_CollisionSetup::SetupInfantryCapsuleCollision(Soldier->GetCapsuleComponent(), SquadOwner);
+	TArray<AActor*> Attached;
+	Soldier->GetAttachedActors(Attached, true, true);
+	for (AActor* Child : Attached)
+	{
+		if (AInfantryWeaponMaster* Weapon = Cast<AInfantryWeaponMaster>(Child))
+		{
+			Weapon->SetOwningPlayer(SquadOwner);
+		}
+	}
+	if (AInfantryWeaponMaster* Weapon = Soldier->GetInfantryWeapon())
+	{
+		Weapon->SetOwningPlayer(SquadOwner);
+	}
+}
+
+void ARTSShortsDirector::AbsorbBattleSquadMembers()
+{
+	if (not M_Battle.bIsActive || not M_Job.Segments.IsValidIndex(M_CurrentSegment))
+	{
+		return;
+	}
+	const float HealthScale = M_Job.Segments[M_CurrentSegment].BattleHealthScale;
+	auto Absorb = [HealthScale](const TArray<TWeakObjectPtr<AActor>>& Squads, TArray<TWeakObjectPtr<AActor>>& Line)
+	{
+		for (const TWeakObjectPtr<AActor>& SquadActor : Squads)
+		{
+			ASquadController* Squad = Cast<ASquadController>(SquadActor.Get());
+			const URTSComponent* SquadRTS = IsValid(Squad) ? Squad->FindComponentByClass<URTSComponent>() : nullptr;
+			if (SquadRTS == nullptr)
+			{
+				continue;
+			}
+			for (ASquadUnit* Soldier : Squad->GetSquadUnitsChecked())
+			{
+				const TWeakObjectPtr<AActor> SoldierActor(Soldier);
+				if (not IsValid(Soldier) || Line.Contains(SoldierActor))
+				{
+					continue;
+				}
+				Line.Add(SoldierActor);
+				MatchSoldierToSquadOwner(Soldier, SquadRTS->GetOwningPlayer());
+				// Same treatment as the vehicles in BeginBattle: out of the fog system, scaled health.
+				if (UFowComp* Fow = Soldier->FindComponentByClass<UFowComp>())
+				{
+					Fow->StopFowParticipation();
+				}
+				UHealthComponent* Health = Soldier->FindComponentByClass<UHealthComponent>();
+				if (Health != nullptr && not FMath::IsNearlyEqual(HealthScale, 1.f))
+				{
+					Health->SetMaxHealth(Health->GetMaxHealth() * HealthScale);
+				}
+			}
+		}
+	};
+	Absorb(M_Battle.PlayerSquads, M_Battle.PlayerUnits);
+	Absorb(M_Battle.EnemySquads, M_Battle.EnemyUnits);
+}
+
+void ARTSShortsDirector::ApplySegmentStage(const int32 SegmentIndex)
+{
+	using namespace RTSShortsDirectorPrivate;
+	if (not IsValid(M_JobStage))
+	{
+		M_JobStage = M_Stage;
+	}
+	AActor* SegmentStage = M_JobStage;
+	const FString Wanted = M_Job.Segments.IsValidIndex(SegmentIndex) ? M_Job.Segments[SegmentIndex].StageActorName : FString();
+	if (not Wanted.IsEmpty())
+	{
+		const FString WantedActorName = TEXT("Stage_") + Wanted;
+		AActor* Found = nullptr;
+		for (TActorIterator<AActor> It(GetWorld()); It && Found == nullptr; ++It)
+		{
+			if (not GetClassNameStartsWith(*It, TEXT("BP_ShortsStage")))
+			{
+				continue;
+			}
+			bool bNameMatches = It->GetName() == WantedActorName;
+#if WITH_EDITOR
+			bNameMatches = bNameMatches || It->GetActorLabel() == WantedActorName;
+#endif
+			Found = bNameMatches ? *It : nullptr;
+		}
+		if (Found != nullptr)
+		{
+			SegmentStage = Found;
+		}
+		else
+		{
+			UE_LOG(LogRTSShorts, Warning, TEXT("RTS_SHORTS_SEGMENT_STAGE_MISSING segment=%d wanted=%s"), SegmentIndex, *WantedActorName);
+		}
+	}
+	if (SegmentStage != M_Stage)
+	{
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SEGMENT_STAGE segment=%d stage=%s"), SegmentIndex,
+		       IsValid(SegmentStage) ? *SegmentStage->GetName() : TEXT("none"));
+	}
+	M_Stage = SegmentStage;
+}
+
+void ARTSShortsDirector::BeginConvoy(const int32 SegmentIndex, AActor* MainUnit)
+{
+	const FRTSShortsSegment& Segment = M_Job.Segments[SegmentIndex];
+	M_Convoy = FRTSShortsConvoyState();
+	if (not IsValid(MainUnit) || not GetIsValidCamera() || not IsValid(M_Stage))
+	{
+		return;
+	}
+	M_Convoy.bIsActive = true;
+	M_Convoy.Units.Add(MainUnit);
+	TArray<float> YawOffsets = {0.f};
+	const FTransform StageTransform = M_Stage->GetActorTransform();
+	const FVector Forward = StageTransform.GetRotation().GetForwardVector();
+	const FVector Right = StageTransform.GetRotation().GetRightVector();
+	const float Yaw = StageTransform.Rotator().Yaw + Segment.UnitYawOffset;
+#if RTS_WITH_MAP_TESTS
+	// Ally slots as (sideways, behind) in spacings and rows: the wedge by default, or Segment.ConvoyRows.
+	TArray<FVector2D> AllySlots;
+	if (Segment.ConvoyRows.Num() > 0)
+	{
+		for (int32 Row = 0; Row < Segment.ConvoyRows.Num(); ++Row)
+		{
+			const int32 Count = FMath::Max(0, Segment.ConvoyRows[Row]);
+			for (int32 Place = 0; Place < Count; ++Place)
+			{
+				// Front row: the segment's unit holds the centre and the allies fan out right, left, ...;
+				// rows behind are centred.
+				const float Side = Row == 0
+					                   ? (Place % 2 == 1 ? 1.f : -1.f) * static_cast<float>((Place + 1) / 2)
+					                   : static_cast<float>(Place) - static_cast<float>(Count - 1) * 0.5f;
+				if (Row == 0 && Place == 0)
+				{
+					continue;
+				}
+				AllySlots.Add(FVector2D(Side * Segment.ConvoySpacing, Row * Segment.ConvoyRowGap));
+			}
+		}
+	}
+	for (int32 Index = AllySlots.Num(); Index < Segment.BattleAllyClassPaths.Num(); ++Index)
+	{
+		// Wedge: right, left, further right, ...; each rank drives ConvoySideLag behind the one before.
+		const float Side = Index % 2 == 0 ? 1.f : -1.f;
+		const float Rank = static_cast<float>(Index / 2 + 1);
+		AllySlots.Add(FVector2D(Side * Rank * Segment.ConvoySpacing, Rank * Segment.ConvoySideLag));
+	}
+	for (int32 Index = 0; Index < Segment.BattleAllyClassPaths.Num(); ++Index)
+	{
+		const float Side = FMath::Sign(AllySlots[Index].X);
+		const FVector Location = GetBattleGroundPoint(StageTransform.GetLocation() + Right * AllySlots[Index].X
+		                                              - Forward * AllySlots[Index].Y);
+		AActor* Vehicle = FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), *Segment.BattleAllyClassPaths[Index],
+		                                                          FTransform(FRotator(0.f, Yaw, 0.f), Location),
+		                                                          static_cast<uint8>(M_Job.UnitOwningPlayer));
+		if (IsValid(Vehicle))
+		{
+			M_Convoy.Units.Add(Vehicle);
+			YawOffsets.Add(Side * Segment.ConvoyTurretYawDegrees);
+		}
+	}
+#endif
+	// The turrets hold still (no idle sweeps) at their current yaw plus the side's offset, in tank space.
+	for (int32 Index = 0; Index < M_Convoy.Units.Num(); ++Index)
+	{
+		for (ACPPTurretsMaster* Turret : GetUnitTurrets(M_Convoy.Units[Index].Get()))
+		{
+			USkeletalMeshComponent* TurretMesh = IsValid(Turret) ? Turret->FindComponentByClass<USkeletalMeshComponent>() : nullptr;
+			if (TurretMesh == nullptr)
+			{
+				continue;
+			}
+			Turret->SetTurretRotationSpeed(0.f);
+			M_Convoy.TurretMeshes.Add(TurretMesh);
+			M_Convoy.TurretYaws.Add(TurretMesh->GetRelativeRotation().Yaw + YawOffsets[Index]);
+		}
+	}
+	// The follow camera keeps FrameCamera's framing relative to the lead vehicle; it looks at the ground point its
+	// view ray meets, so pulling back keeps the same subject centred.
+	const FVector UnitLocation = MainUnit->GetActorLocation();
+	const FVector CameraLocation = M_Camera->GetActorLocation();
+	const FVector View = M_Camera->GetActorForwardVector();
+	const float RayLength = View.Z < -0.05f ? (UnitLocation.Z - CameraLocation.Z) / View.Z : 3000.f;
+	M_Convoy.Anchor = UnitLocation;
+	M_Convoy.CameraOffset = CameraLocation - UnitLocation;
+	M_Convoy.LookOffset = CameraLocation + View * RayLength - UnitLocation;
+	M_Convoy.StartFrame = GetTimelineFrame();
+	M_Convoy.SegmentFrames = FMath::Max(1, FMath::RoundToInt(Segment.SlotSeconds * M_Job.Fps));
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_BEGIN segment=%d vehicles=%d turrets=%d"), SegmentIndex,
+	       M_Convoy.Units.Num(), M_Convoy.TurretMeshes.Num());
+}
+
+void ARTSShortsDirector::OrderConvoyDrive(const int32 SegmentIndex)
+{
+	const FRTSShortsSegment& Segment = M_Job.Segments[SegmentIndex];
+	const FVector Forward = M_Stage->GetActorForwardVector();
+	int32 Ordered = 0;
+	for (const TWeakObjectPtr<AActor>& Vehicle : M_Convoy.Units)
+	{
+		ICommands* Commands = Cast<ICommands>(Vehicle.Get());
+		if (Commands == nullptr)
+		{
+			continue;
+		}
+		// Parallel lanes: every vehicle drives straight ahead of where it stands, so the wedge keeps its shape.
+		const FVector Destination = GetBattleGroundPoint(Vehicle->GetActorLocation() + Forward * Segment.ConvoyDriveDistance);
+		const ECommandQueueError Result = Commands->MoveToLocation(Destination, false, Forward.Rotation(), false);
+		++Ordered;
+		// Vehicles path on the baked navmesh: a stage without navigation leaves the convoy standing.
+		const UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(), Vehicle->GetActorLocation(),
+		                                                                                   Destination, Vehicle.Get());
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_ORDER vehicle=%s result=%d pathValid=%d points=%d length=%.0f"),
+		       *Vehicle->GetName(), static_cast<int32>(Result), Path != nullptr && Path->IsValid() ? 1 : 0,
+		       Path != nullptr ? Path->PathPoints.Num() : 0, Path != nullptr ? Path->GetPathLength() : 0.f);
+	}
+	M_Convoy.bDriving = true;
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_DRIVE segment=%d ordered=%d"), SegmentIndex, Ordered);
+}
+
+void ARTSShortsDirector::TickConvoy(const int32 Frame)
+{
+	if (not M_Convoy.bIsActive || not M_Job.Segments.IsValidIndex(M_CurrentSegment))
+	{
+		return;
+	}
+	for (int32 Index = 0; Index < M_Convoy.TurretMeshes.Num(); ++Index)
+	{
+		if (USceneComponent* TurretMesh = M_Convoy.TurretMeshes[Index].Get())
+		{
+			FRotator Relative = TurretMesh->GetRelativeRotation();
+			Relative.Yaw = M_Convoy.TurretYaws[Index];
+			TurretMesh->SetRelativeRotation(Relative);
+		}
+	}
+	const AActor* Lead = M_Convoy.Units.Num() > 0 ? M_Convoy.Units[0].Get() : nullptr;
+	if (not IsValid(Lead) || not GetIsValidCamera())
+	{
+		return;
+	}
+	constexpr int32 SpeedLogEveryFrames = 60;
+	if (M_Convoy.bDriving && (Frame - M_Convoy.StartFrame) % SpeedLogEveryFrames == 0)
+	{
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_SPEED frame=%d lead=%.0f cm/s at %s"), Frame,
+		       Lead->GetVelocity().Size(), *Lead->GetActorLocation().ToCompactString());
+	}
+	// A camera bolted to the hull would shake with the suspension: follow a smoothed point instead.
+	constexpr float FollowAlpha = 0.2f;
+	M_Convoy.Anchor = FMath::Lerp(M_Convoy.Anchor, Lead->GetActorLocation(), FollowAlpha);
+	const float Alpha = FMath::Clamp(static_cast<float>(Frame - M_Convoy.StartFrame) / M_Convoy.SegmentFrames, 0.f, 1.f);
+	const float Eased = Alpha * Alpha * (3.f - 2.f * Alpha);
+	const float Zoom = FMath::Lerp(1.f, M_Job.Segments[M_CurrentSegment].ConvoyZoomOut, Eased);
+	const FVector CameraLocation = M_Convoy.Anchor + M_Convoy.CameraOffset * Zoom;
+	FRotator Rotation = (M_Convoy.Anchor + M_Convoy.LookOffset - CameraLocation).Rotation();
+	Rotation.Roll = 0.f;
+	M_Camera->SetActorLocationAndRotation(CameraLocation, Rotation);
+}
+
+void ARTSShortsDirector::EndConvoy()
+{
+	if (not M_Convoy.bIsActive)
+	{
+		return;
+	}
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_END segment=%d"), M_CurrentSegment);
+	// The segment's own unit is parked by EndSegment; the side vehicles leave the field.
+	for (int32 Index = 1; Index < M_Convoy.Units.Num(); ++Index)
+	{
+		if (AActor* Vehicle = M_Convoy.Units[Index].Get())
+		{
+			Vehicle->Destroy();
+		}
+	}
+	M_Convoy = FRTSShortsConvoyState();
 }
 
 void ARTSShortsDirector::OnBattleActorSpawned(AActor* SpawnedActor)
@@ -2349,6 +2701,35 @@ FVector ARTSShortsDirector::GetBattleGroundPoint(const FVector& Location) const
 
 namespace RTSShortsBattlePrivate
 {
+	bool GetHasLivingSoldier(const TWeakObjectPtr<AActor>& SquadActor)
+	{
+		ASquadController* Squad = Cast<ASquadController>(SquadActor.Get());
+		if (not IsValid(Squad))
+		{
+			return false;
+		}
+		for (ASquadUnit* Soldier : Squad->GetSquadUnitsChecked())
+		{
+			if (IsValid(Soldier) && Soldier->IsUnitAlive())
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Squads still waiting for their soldiers to spawn. */
+	int32 CountWaitingSquads(const TArray<TWeakObjectPtr<AActor>>& Squads)
+	{
+		int32 Waiting = 0;
+		for (const TWeakObjectPtr<AActor>& SquadActor : Squads)
+		{
+			ASquadController* Squad = Cast<ASquadController>(SquadActor.Get());
+			Waiting += IsValid(Squad) && Squad->GetSquadUnitsChecked().Num() == 0 ? 1 : 0;
+		}
+		return Waiting;
+	}
+
 	bool GetIsAlive(const TWeakObjectPtr<AActor>& Unit)
 	{
 		return Unit.IsValid() && Unit->IsUnitAlive();
@@ -2385,9 +2766,150 @@ namespace RTSShortsBattlePrivate
 	}
 }
 
+void ARTSShortsDirector::HideEngineSpheres()
+{
+	static const UStaticMesh* EngineSphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	// A mesh drawn with the engine's default material (the grey checker, WorldGridMaterial), or an engine sphere.
+	auto GetIsPlaceholder = [](const UMeshComponent* Mesh, const UStaticMesh* Sphere)
+	{
+		const UStaticMeshComponent* StaticMesh = Cast<UStaticMeshComponent>(Mesh);
+		if (StaticMesh != nullptr && Sphere != nullptr && StaticMesh->GetStaticMesh() == Sphere)
+		{
+			return true;
+		}
+		for (int32 Index = 0; Index < Mesh->GetNumMaterials(); ++Index)
+		{
+			const UMaterialInterface* Material = Mesh->GetMaterial(Index);
+			const UMaterial* BaseMaterial = Material ? Material->GetMaterial() : nullptr;
+			if (BaseMaterial != nullptr && BaseMaterial->GetName() == TEXT("WorldGridMaterial"))
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+	for (TObjectIterator<UMeshComponent> It; It; ++It)
+	{
+		UMeshComponent* Mesh = *It;
+		if (not IsValid(Mesh) || Mesh->GetWorld() != GetWorld() || not Mesh->IsVisible() || Mesh->bHiddenInGame)
+		{
+			continue;
+		}
+		const AActor* MeshOwner = Mesh->GetOwner();
+		if (not MeshOwner || MeshOwner->IsA<AStaticMeshActor>() || not GetIsPlaceholder(Mesh, EngineSphere))
+		{
+			// Level dressing (hills, haze) is built from engine spheres on purpose.
+			continue;
+		}
+		const FString Key = MeshOwner->GetName() + TEXT(".") + Mesh->GetName();
+		if (not M_LoggedSphereOwners.Contains(Key))
+		{
+			M_LoggedSphereOwners.Add(Key);
+			const UStaticMeshComponent* StaticMesh = Cast<UStaticMeshComponent>(Mesh);
+			UE_LOG(LogRTSShorts, Display,
+			       TEXT("RTS_SHORTS_PLACEHOLDER_MESH_HIDDEN frame=%d owner=%s class=%s attachedTo=%s component=%s mesh=%s at=%s scale=%s"),
+			       GetTimelineFrame(), *MeshOwner->GetName(), *MeshOwner->GetClass()->GetName(),
+			       MeshOwner->GetAttachParentActor() ? *MeshOwner->GetAttachParentActor()->GetName() : TEXT("none"), *Mesh->GetName(),
+			       StaticMesh && StaticMesh->GetStaticMesh() ? *StaticMesh->GetStaticMesh()->GetName() : *Mesh->GetClass()->GetName(),
+			       *Mesh->GetComponentLocation().ToCompactString(), *Mesh->GetComponentScale().ToString());
+		}
+		Mesh->SetHiddenInGame(true);
+	}
+}
+
+void ARTSShortsDirector::KeepCombatTextsInWorld() const
+{
+	if (M_Job.CombatTextWorldScale <= 0.f || not GetIsValidCamera())
+	{
+		return;
+	}
+	const FVector CameraLocation = M_Camera->GetActorLocation();
+	const FVector Scale(M_Job.CombatTextWorldScale);
+	constexpr int32 LogEveryFrames = 300;
+	if (GFrameCounter % LogEveryFrames == 0)
+	{
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_COMBAT_TEXT converted=%d visibleTicks=%d"), M_CombatTextStats.Converted,
+		       M_CombatTextStats.VisibleTicks);
+	}
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		// The text and icon pools own their widget components on pool actors (AnimatedTextPoolActor,
+		// AnimatedIconPoolActor); units' own widgets (health bars) are left alone.
+		const FString ClassName = It->GetClass()->GetName();
+		if (not ClassName.StartsWith(TEXT("AnimatedTextPoolActor")) && not ClassName.StartsWith(TEXT("AnimatedIconPoolActor")))
+		{
+			continue;
+		}
+		TArray<UWidgetComponent*> Widgets;
+		It->GetComponents<UWidgetComponent>(Widgets);
+		for (UWidgetComponent* Widget : Widgets)
+		{
+			if (not IsValid(Widget))
+			{
+				continue;
+			}
+			if (Widget->GetWidgetSpace() != EWidgetSpace::World)
+			{
+				const bool bWasHidden = Widget->bHiddenInGame;
+				Widget->SetWidgetSpace(EWidgetSpace::World);
+				Widget->SetTwoSided(true);
+				Widget->SetCastShadow(false);
+				Widget->SetTickWhenOffscreen(true);
+				// Fire and smoke stand between the camera and the hit tank: draw the text without a depth test, after the
+				// other translucency.
+				static UMaterialInterface* OnTopMaterial = LoadObject<UMaterialInterface>(
+					nullptr, TEXT("/Game/RTS_Survival/Shorts/M_ShortsWidgetOnTop.M_ShortsWidgetOnTop"));
+				Widget->SetBlendMode(EWidgetBlendMode::Transparent);
+				if (OnTopMaterial)
+				{
+					Widget->SetMaterial(0, OnTopMaterial);
+				}
+				Widget->SetTranslucentSortPriority(1000);
+				// A registered screen-space component stays in the screen layer: re-register it as a world widget.
+				Widget->UnregisterComponent();
+				Widget->RegisterComponent();
+				Widget->SetHiddenInGame(bWasHidden);
+				++M_CombatTextStats.Converted;
+			}
+			if (not Widget->bHiddenInGame && Widget->IsVisible())
+			{
+				++M_CombatTextStats.VisibleTicks;
+			}
+			if (not Widget->GetComponentScale().Equals(Scale, 0.01f))
+			{
+				Widget->SetWorldScale3D(Scale);
+			}
+			// A world widget is seen from its +X side: turn it to the camera every tick.
+			Widget->SetWorldRotation((CameraLocation - Widget->GetComponentLocation()).Rotation());
+		}
+	}
+}
+
 void ARTSShortsDirector::KeepBattleUnitsVisible() const
 {
 	using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+	// With the UI pass on, the units' health bars (screen-space widget components) would be filmed: keep them hidden.
+	// The floating combat texts belong to the text pool actor, not to the units, and stay visible.
+	const TArray<TWeakObjectPtr<AActor>>* Lines[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits};
+	for (const TArray<TWeakObjectPtr<AActor>>* Line : Lines)
+	{
+		for (const TWeakObjectPtr<AActor>& Unit : *Line)
+		{
+			if (not Unit.IsValid())
+			{
+				continue;
+			}
+			TArray<UWidgetComponent*> Widgets;
+			Unit->GetComponents<UWidgetComponent>(Widgets, true);
+			for (UWidgetComponent* Widget : Widgets)
+			{
+				if (IsValid(Widget) && not Widget->bHiddenInGame)
+				{
+					Widget->SetHiddenInGame(true);
+				}
+			}
+		}
+	}
 	for (const TWeakObjectPtr<AActor>& PlayerUnit : M_Battle.PlayerUnits)
 	{
 		if (PlayerUnit.IsValid() && not PlayerUnit->Tags.Contains(TagUnitInEnemyVision))
@@ -2420,11 +2942,23 @@ void ARTSShortsDirector::KeepBattleUnitsVisible() const
 void ARTSShortsDirector::IssueBattleOrders()
 {
 	using namespace RTSShortsBattlePrivate;
-	auto OrderSide = [this](const TArray<TWeakObjectPtr<AActor>>& Attackers, const TArray<TWeakObjectPtr<AActor>>& Defenders)
+	auto OrderSide = [this](const TArray<TWeakObjectPtr<AActor>>& Line, const TArray<TWeakObjectPtr<AActor>>& Squads,
+	                        const TArray<TWeakObjectPtr<AActor>>& Defenders)
 	{
+		// Soldiers are commanded through their squad: the line's vehicles and the squad controllers attack.
+		TArray<TWeakObjectPtr<AActor>> Attackers;
+		for (const TWeakObjectPtr<AActor>& Unit : Line)
+		{
+			if (Cast<ASquadUnit>(Unit.Get()) == nullptr)
+			{
+				Attackers.Add(Unit);
+			}
+		}
+		Attackers.Append(Squads);
 		for (const TWeakObjectPtr<AActor>& Attacker : Attackers)
 		{
-			if (not GetIsAlive(Attacker))
+			const bool bSquad = Cast<ASquadController>(Attacker.Get()) != nullptr;
+			if (bSquad ? not GetHasLivingSoldier(Attacker) : not GetIsAlive(Attacker))
 			{
 				continue;
 			}
@@ -2443,8 +2977,8 @@ void ARTSShortsDirector::IssueBattleOrders()
 			M_Battle.OrderedTargets.Add(Attacker, Target);
 		}
 	};
-	OrderSide(M_Battle.PlayerUnits, M_Battle.EnemyUnits);
-	OrderSide(M_Battle.EnemyUnits, M_Battle.PlayerUnits);
+	OrderSide(M_Battle.PlayerUnits, M_Battle.PlayerSquads, M_Battle.EnemyUnits);
+	OrderSide(M_Battle.EnemyUnits, M_Battle.EnemySquads, M_Battle.PlayerUnits);
 }
 
 void ARTSShortsDirector::TickBattle(const int32 Frame)
@@ -2455,14 +2989,18 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 		return;
 	}
 	const FRTSShortsSegment& Segment = M_Job.Segments[M_CurrentSegment];
+	AbsorbBattleSquadMembers();
 	KeepBattleUnitsVisible();
 	constexpr int32 OrderEveryFrames = 20;
 	if (bM_FireOrdered && Frame % OrderEveryFrames == 0)
 	{
 		IssueBattleOrders();
 	}
-	const int32 PlayersAlive = CountAlive(M_Battle.PlayerUnits);
-	const int32 EnemiesAlive = CountAlive(M_Battle.EnemyUnits);
+	// A squad whose soldiers have not spawned yet still counts, for the first seconds of the battle.
+	constexpr int32 SquadSpawnGraceFrames = 180;
+	const bool bSquadGrace = Frame - M_Battle.BeginFrame < SquadSpawnGraceFrames;
+	const int32 PlayersAlive = CountAlive(M_Battle.PlayerUnits) + (bSquadGrace ? CountWaitingSquads(M_Battle.PlayerSquads) : 0);
+	const int32 EnemiesAlive = CountAlive(M_Battle.EnemyUnits) + (bSquadGrace ? CountWaitingSquads(M_Battle.EnemySquads) : 0);
 	if (M_Battle.DecidedFrame < 0 && (PlayersAlive == 0 || EnemiesAlive == 0))
 	{
 		M_Battle.DecidedFrame = Frame;
@@ -2521,7 +3059,8 @@ void ARTSShortsDirector::EndBattle()
 	       M_Battle.SpawnedWrecks.Num());
 	// The segment's own unit is parked by EndSegment; everything else from this battle leaves the field.
 	const AActor* MainUnit = M_Battle.PlayerUnits.Num() > 0 ? M_Battle.PlayerUnits[0].Get() : nullptr;
-	const TArray<TWeakObjectPtr<AActor>>* Groups[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits, &M_Battle.SpawnedWrecks};
+	const TArray<TWeakObjectPtr<AActor>>* Groups[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits, &M_Battle.PlayerSquads,
+	                                                  &M_Battle.EnemySquads, &M_Battle.SpawnedWrecks};
 	for (const TArray<TWeakObjectPtr<AActor>>* Group : Groups)
 	{
 		for (const TWeakObjectPtr<AActor>& Actor : *Group)

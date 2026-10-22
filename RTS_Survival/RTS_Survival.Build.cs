@@ -54,6 +54,8 @@ public class RTS_Survival : ModuleRules
 			// reads its Job.json with the JSON object converter.
 			"MovieRenderPipelineCore",
 			"MovieRenderPipelineRenderPasses",
+			// UI renderer pass: floating combat texts are screen-space widgets.
+			"MovieRenderPipelineSettings",
 			"LevelSequence",
 			"MovieSceneTracks",
 			"CinematicCamera",
