@@ -1914,6 +1914,7 @@ void AProjectile::OnProjectileDormant()
 void AProjectile::OnRestartProjectile(const FVector& NewLocation, const FRotator& LaunchRotation,
                                       const float ProjectileSpeed)
 {
+	M_BouncedActorsToIgnore.Reset();
 	// Pooled projectiles get a fresh activation identity so reuse never repeats module rolls.
 	M_ModuleShotActivationId = ++GProjectileModuleShotSerial;
 	M_ModuleImpactOrdinal = 0;
@@ -1989,18 +1990,17 @@ void AProjectile::PerformAsyncLineTrace()
 	const FVector EndLocation = CurrentLocation + (Dir * ForwardTracePaddingUnits);
 	M_LastTraceLocation = CurrentLocation;
 
-	FCollisionQueryParams TraceParams(FName(TEXT("ProjectileTrace")), false, this);
-	TraceParams.bTraceComplex = false;
-	TraceParams.bReturnPhysicalMaterial = true;
-	TraceParams.AddIgnoredActors(M_ActorsToIgnore);
-	for (const TWeakObjectPtr<UPrimitiveComponent>& IgnoredComponent : M_ComponentsToIgnore)
+	DispatchAsyncProjectileTrace(World, StartLocation, EndLocation);
+}
+
+void AProjectile::DispatchAsyncProjectileTrace(UWorld* World, const FVector& StartLocation, const FVector& EndLocation)
+{
+	if (not IsValid(World))
 	{
-		UPrimitiveComponent* Component = IgnoredComponent.Get();
-		if (IsValid(Component))
-		{
-			TraceParams.AddIgnoredComponent(Component);
-		}
+		return;
 	}
+
+	const FCollisionQueryParams TraceParams = BuildProjectileTraceParams();
 
 	const int32 TraceRequestId = ++M_TraceRequestId;
 	bM_TraceInFlight = true;
@@ -2044,6 +2044,53 @@ void AProjectile::PerformAsyncLineTrace()
 	);
 }
 
+FCollisionQueryParams AProjectile::BuildProjectileTraceParams() const
+{
+	FCollisionQueryParams TraceParams(FName(TEXT("ProjectileTrace")), false, this);
+	TraceParams.bTraceComplex = false;
+	TraceParams.bReturnPhysicalMaterial = true;
+	TraceParams.AddIgnoredActors(M_ActorsToIgnore);
+	for (const TWeakObjectPtr<AActor>& IgnoredActor : M_BouncedActorsToIgnore)
+	{
+		const AActor* Actor = IgnoredActor.Get();
+		if (not IsValid(Actor))
+		{
+			continue;
+		}
+		TraceParams.AddIgnoredActor(Actor);
+	}
+	for (const TWeakObjectPtr<UPrimitiveComponent>& IgnoredComponent : M_ComponentsToIgnore)
+	{
+		const UPrimitiveComponent* Component = IgnoredComponent.Get();
+		if (not IsValid(Component))
+		{
+			continue;
+		}
+		TraceParams.AddIgnoredComponent(Component);
+	}
+	return TraceParams;
+}
+
+void AProjectile::IgnoreActorAfterBounce(AActor* HitActor)
+{
+	if (not IsValid(HitActor))
+	{
+		return;
+	}
+
+	M_BouncedActorsToIgnore.AddUnique(TWeakObjectPtr<AActor>(HitActor));
+	TArray<AActor*> ChildActors;
+	HitActor->GetAllChildActors(ChildActors, true);
+	for (AActor* ChildActor : ChildActors)
+	{
+		if (not IsValid(ChildActor))
+		{
+			continue;
+		}
+		M_BouncedActorsToIgnore.AddUnique(TWeakObjectPtr<AActor>(ChildActor));
+	}
+}
+
 void AProjectile::ResetAsyncTraceState()
 {
 	++M_TraceRequestId;
@@ -2077,6 +2124,10 @@ void AProjectile::OnAsyncTraceComplete(const FTraceHandle& TraceHandle, FTraceDa
 	AActor* HitActor = nullptr;
 	UArmorCalculation* ArmorCalculationComp = FRTSWeaponHelpers::GetArmorAndActorOrParentFromHit(
 		HitResult, HitActor);
+	if (M_BouncedActorsToIgnore.Contains(TWeakObjectPtr<AActor>(HitActor)))
+	{
+		return;
+	}
 	if (IsValid(ArmorCalculationComp))
 	{
 		if (HandleShieldHit(ArmorCalculationComp, HitResult))
@@ -2189,6 +2240,7 @@ void AProjectile::HandleProjectileBounce(const FHitResult& HitResult, const EArm
 		// The HE or HEAT bounce already spawned explosion, damaged actor and modules and set to dormant.
 		return;
 	}
+	IgnoreActorAfterBounce(HitActor);
 	// Non-penetrating hit without hull damage: external modules roll once.
 	if (ModuleDamageEvent != nullptr)
 	{

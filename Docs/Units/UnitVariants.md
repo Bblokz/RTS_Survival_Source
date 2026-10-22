@@ -300,22 +300,27 @@ error every mission start. Forced entries are now clamped exactly like saved one
 
 ### 3.4 `ARTSAsyncSpawner` additions — `Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h` and a new `RTSAsyncSpawner_UnitVariants.cpp`
 
-Mirror the director override file. Public:
+Mirror the director override file. The variant data asset is passed in by the manager (the one asset it clamped
+the selection against and keeps alive), so the spawner stores no asset and never reads the settings. Public:
 
 ```cpp
 	/**
-	 * @brief Replaces the spawn class of every selected unit type with its variant class from the variant data asset.
+	 * @brief Replaces the spawn class of every selected unit type with its variant class.
 	 * Runs after the director overrides so a variant wins on a shared key; the collision is reported.
+	 * @param VariantDataAsset The asset the selections were clamped against.
 	 * @param Selections Clamped selections (Base entries are skipped).
+	 * @return The units whose variant could not be applied (reported); the manager drops them from its selection.
 	 */
-	void ApplyPlayerUnitVariants(const TArray<FUnitVariantSelection>& Selections);
+	TArray<FTrainingOption> ApplyPlayerUnitVariants(const UUnitVariantDataAsset& VariantDataAsset,
+	                                                const TArray<FUnitVariantSelection>& Selections);
 
 	/**
 	 * @brief Changes one unit type at runtime (cheat manager, future UI). Base restores the class the mapping held
 	 * before the first variant override, so a mission can go back and forth.
 	 * @return False when the unit type has no base mapping or the variant has no class in the asset.
 	 */
-	bool SetPlayerUnitVariant(const FTrainingOption& Unit, const EUnitVariant Variant);
+	bool SetPlayerUnitVariant(const UUnitVariantDataAsset& VariantDataAsset, const FTrainingOption& Unit,
+	                          const EUnitVariant Variant);
 
 	/** @return The class currently mapped for the training option (after overrides), or a null soft pointer. */
 	TSoftClassPtr<AActor> GetTrainingOptionClass(const FTrainingOption& TrainingOption) const;
@@ -324,8 +329,12 @@ Mirror the director override file. Public:
 Private:
 
 ```cpp
+	// Each takes the variant data asset first, like the public functions.
+	bool ApplyUnitVariant(const FTrainingOption& Unit, const EUnitVariant Variant);  // dispatch on the unit kind
 	bool ApplyTrainingOptionVariant(const FTrainingOption& Unit, const EUnitVariant Variant);
 	bool ApplyBuildingExpansionVariant(const EBuildingExpansionType BxpType, const EUnitVariant Variant);
+	void ApplyBxpVariantPreviewMesh(const EBuildingExpansionType BxpType, const EUnitVariant Variant);
+	void RestoreBasePreviewMesh(const EBuildingExpansionType BxpType);
 
 	// The class (and BXP preview mesh) each key held before its first variant override; restored for Base.
 	TMap<FTrainingOption, TSoftClassPtr<AActor>> M_PreVariantTrainingOptionClasses;
@@ -361,15 +370,15 @@ Rules:
   (rule 22 of `AGENTS.md`); the pre-variant map is a different container.
 - `ApplyBuildingExpansionVariant`: same steps against `BuildingExpansionMap` with
   `TSoftClassPtr<ABuildingExpansion>` (build it from the asset's `TSoftClassPtr<AActor>` through
-  `ToSoftObjectPath()`), plus the preview mesh: remember the `BxpPreviewMeshMap` value in
-  `M_PreVariantBxpPreviewMeshes` the same way, then if `FindBxpVariantPreviewMesh` is non-null,
-  `LoadSynchronous()` it and write it into `BxpPreviewMeshMap` (the map holds hard pointers and
-  `SyncGetBuildingExpansionPreviewMesh` reads it synchronously at placement time); Base restores the remembered
-  mesh.
+  `ToSoftObjectPath()`), plus the preview mesh: remember the `BxpPreviewMeshMap` entry in
+  `M_PreVariantBxpPreviewMeshes` the same way (only when the base has an entry, so restoring also restores "no
+  entry"), then if `FindBxpVariantPreviewMesh` is non-null, `LoadSynchronous()` it and write it into
+  `BxpPreviewMeshMap` (the map holds hard pointers and `SyncGetBuildingExpansionPreviewMesh` reads it
+  synchronously at placement time). Base, a variant without a preview mesh and a mesh that fails to load restore
+  the remembered base entry.
 - `ApplyTrainingOptionOverride` (director path) gets one extra line: `M_DirectorOverriddenOptions.Add(TrainingOption)`
   after a successful replacement.
-- The variant data asset is read through `UUnitVariantSettings::Get()->LoadVariantDataAsset()` at the top of
-  `ApplyPlayerUnitVariants` / `SetPlayerUnitVariant`; store nothing on the spawner.
+- The variant data asset comes in as a parameter from `UPlayerUnitVariantManager`; store nothing on the spawner.
 - No runtime class-hierarchy check. The asset's `IsDataValid` is the gate (3.2).
 
 ### 3.5 `UPlayerUnitVariantManager` — `Player/PlayerUnitVariantManager/` (exists, repurposed)
@@ -397,16 +406,25 @@ Add:
 	 */
 	void ApplySelectionsToSpawner(ARTSAsyncSpawner* AsyncSpawner);
 
+	/** @return The key the spawner uses for the unit: the training menu lists harvesters as UNType_Harvester. */
+	static FTrainingOption GetSpawnerKey(const FTrainingOption& Unit);
+
 private:
-	bool GetIsValidAsyncSpawner() const;
+	// No report: outside a mission (menus, automation tests) selections are only stored.
+	bool GetIsValidAsyncSpawnerNoReport() const;
 
 	UPROPERTY()
 	TWeakObjectPtr<ARTSAsyncSpawner> M_AsyncSpawner;
 ```
 
+`GetSpawnerKey` is the one place the harvester normalisation lives; `StoreSelectionClamped`,
+`GetSelectedVariant`, `SetSelectedVariant` and `GetTrainingPresentation` all key through it.
+
 `SetSelectedVariant` keeps its clamp, then, when `M_AsyncSpawner` is valid, calls
-`M_AsyncSpawner->SetPlayerUnitVariant(Unit, Variant)` (also for `Base`, which restores). `ApplySelectionsToSpawner`
-builds the array from `M_SelectedVariants` and calls `ApplyPlayerUnitVariants`.
+`M_AsyncSpawner->SetPlayerUnitVariant(*M_VariantDataAsset, Unit, StoredVariant)` with the variant that survived
+the clamp (so a rejected VariantB after a VariantA also puts the spawner back on Base). When the spawner refuses,
+the selection is dropped so the stored choice always equals what spawns. `ApplySelectionsToSpawner` builds the
+array from `M_SelectedVariants`, calls `ApplyPlayerUnitVariants` and removes the units it returns.
 
 Also add `GetTrainingPresentation(const FTrainingOption& Unit) const` for the training menu (3.8).
 
@@ -490,21 +508,24 @@ C++ changes:
    every `UpdateWidgetsWithShownSubSection`. `RTSCheatSetUnitVariant` may force a refresh of the shown sub
    section; nothing else needs to.
 
-Blueprint changes (editor work, section 9 step 8). The rule for every column is the same: read the
-`DT_TrainingOptions` row as today, then replace the value with the `VariantPresentation` one when its bool is on.
+Blueprint changes (done 2026-10-22). Both widgets keep their `DT_TrainingOptions` lookup and pass each row value
+through `UUnitVariantPresentationLibrary` (`Units/Variants/UnitVariantPresentationLibrary.h`): `GetTrainingImageBrush`,
+`GetTrainingTitle`, `GetTrainingDescription`, `GetTrainingTooltip` take `VariantPresentation` and the table value and
+return the variant value when its bool is on, the table value otherwise.
 
-- `W_TrainingItem` `OnUpdateTrainingItem`: pick the brush asset with a *Select* on
-  `VariantPresentation.bOverrideImageBrush` (`VariantPresentation.ImageBrush` vs the row's `ImageBrush`), then
-  run the **existing** path on the selected asset: set the item image from it (*Set Brush from Asset*) and call
-  `OnObtainedSlateBrushFromTrainingTable` with it. Title and tooltip (the item's tool tip text, if the graph sets
-  one from the row) use `Title` / `Tooltip` when their bools are on.
-- `W_TrainingDescription` `OnShowTrainingDescription`: same rule for `Title`, `Description`, `Tooltip` and, if
-  the panel shows one, the image brush.
-- `W_TrainingRequirement` `OnUpdateRequirement`: if it shows the hovered unit's name or image, apply the same
-  rule. The names of *required* units (`RequiredUnit`, `SecondaryRequiredUnit`) stay the base names.
+- `BP_W_TrainingItem` `OnUpdateTrainingItem`: *Get Data Table Row DT_TrainingOptions* → *Break* → the four helpers →
+  *Make BP_FTrainingUI_OptionSlate* → *Set Slate* (the widget's row variable, which its image binding reads), and
+  `GetTrainingImageBrush` → `OnObtainedSlateBrushFromTrainingTable` (cooldown clock texture). `Slate` is a
+  `UPROPERTY` of the widget, so the brush stays GC-visible there too. The *Row Not Found* branch is unchanged: a
+  unit without a row (Pz IV H today) shows no image, variant or not.
+- `BP_W_TrainingDescription` `OnShowTrainingDescription`: *Break* row → `GetTrainingImageBrush` → *Set Brush from
+  Asset*, `GetTrainingTitle` → `RichTitle`, `GetTrainingDescription` → `RichContextBlock`. It shows no tooltip.
+- `BP_W_Requirement`: no change. It only shows the *required* units, which stay the base names and icons.
 - Do **not** use *Make Brush from Texture*, *Set Brush from Soft Texture* or an async load node for the variant
   brush, and do not store the brush in a Blueprint variable of type Slate Brush. The brush asset is already
   loaded and held (3.9); setting it the same way the table brush is set keeps both paths identical.
+- Editing these graphs through the UECP bridge: do not call `arrange_blueprint_nodes`; it reroutes every existing
+  wire through reroute-node chains and moves the user's nodes.
 
 ### 3.9 Keeping variant brushes alive (GC)
 
@@ -768,7 +789,20 @@ Add:
 The spawner override itself needs a world with a spawner actor and loaded Blueprints; it is not an automation
 test. Cover it with 10.2.
 
-### 10.2 Map test (manual, or a `-UnitVariantValidate` subsystem later)
+### 10.2 Map test
+
+Automated: `UUnitVariantTestSubsystem` (`Units/Variants/Tests/`), started with `-UnitVariantValidate`
+(optional `-UnitVariantTank=<ETankSubtype value>`, default Pz IV G, which has the test `VariantA` in
+`DA_UnitVariants`). It selects VariantA at runtime, checks the spawner's mapped class and the training
+presentation (also after a full GC), spawns one tank through the spawner and checks its class, `UnitVariant` and
+hull mesh, then selects Base, checks the mapping is restored and spawns a base tank next to it. Logs
+`RTS_UNIT_VARIANT_TEST`; the run exits by itself.
+
+```
+UnrealEditor-Cmd.exe <uproject> /Game/RTS_Survival/Maps/UnitTests/RTS_ToCopySmall -game -unattended -NullRHI -nosound -UnitVariantValidate -abslog=<file>
+```
+
+Manual (the menu itself, which the automated run does not draw):
 
 1. In `DA_UnitVariants` (Debug category), set the forced-variant list to `{Tank Tank_PzIV_H → VariantA}` (and
    the entries of any other variant Blueprints that exist). Save the asset.

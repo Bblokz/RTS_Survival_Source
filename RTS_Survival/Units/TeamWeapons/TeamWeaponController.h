@@ -346,11 +346,6 @@ private:
 	void SpawnTeamWeapon();
 	void StopOperatorWalksAfterSpawnSnap();
 
-	// The gun spawns after InitSquadData resolved (or before it resolves) the controller's variant, so the gun's
-	// Blueprint gets the event here or as soon as the controller's variant is applied.
-	void ApplyUnitVariantToTeamWeapon();
-	void ForwardUnitVariantToTeamWeapon(const EUnitVariant Variant);
-	FDelegateHandle M_UnitVariantAppliedHandle;
 	bool TrySetupSquadUnitsAndTeamWeaponFromMapSetup();
 	bool TrySetupSquadUnitsFromMapSetup();
 	bool TrySetupTeamWeaponFromMapSetup();

@@ -11,7 +11,6 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/Interfaces/RTSInterface/RTSUnit.h"
-#include "RTS_Survival/Interfaces/UnitVariantReceiver.h"
 #include "RTS_Survival/RTSComponents/ExperienceComponent/ExperienceInterface/ExperienceInterface.h"
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
 #include "RTS_Survival/UnitData/ArmorAndResistanceData.h"
@@ -293,7 +292,7 @@ struct FSquadPlannedMove
 UCLASS()
 class RTS_SURVIVAL_API ASquadController : public AActor, public ICommands,
                                           public IRTSUnit, public IExperienceInterface,
-                                          public IHealthBarOwner, public IUnitVariantReceiver
+                                          public IHealthBarOwner
 {
 	GENERATED_BODY()
 
@@ -550,10 +549,6 @@ protected:
 	bool EnsureValidExperienceComponent();
 
 	void InitSquadData_SetupSquadHealthAggregation();
-
-	// Pulls the player's variant for this squad type; must run before SetDataLoaded so squad units copy it.
-	void ApplyUnitVariant();
-
 
 	// ----------------- START EXPERIENCE INTERFACE -----------------
 	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)

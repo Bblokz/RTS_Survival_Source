@@ -7,6 +7,7 @@
 #include "RTS_Survival/Buildings/EnergyComponent/EnergyComp.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingMenuManager.h"
+#include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/Resources/ResourceComponent/ResourceComponent.h"
@@ -337,6 +338,23 @@ namespace RTSCheatUnitVariants
 		}
 		return true;
 	}
+
+	/** @return The asset name of the class the spawner currently spawns for the unit, for the cheat messages. */
+	FString GetMappedClassName(const UObject* WorldContextObject, const FTrainingOption& Unit)
+	{
+		const ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(WorldContextObject);
+		if (not AsyncSpawner)
+		{
+			return TEXT("<no async spawner>");
+		}
+		const TSoftClassPtr<AActor> MappedClass =
+			AsyncSpawner->GetTrainingOptionClass(UPlayerUnitVariantManager::GetSpawnerKey(Unit));
+		if (MappedClass.IsNull())
+		{
+			return TEXT("<not mapped>");
+		}
+		return MappedClass.GetAssetName();
+	}
 }
 
 void URTSCheatManager::RTSCheatSetUnitVariant(const int32 UnitType, const int32 Subtype, const int32 Variant)
@@ -356,10 +374,10 @@ void URTSCheatManager::RTSCheatSetUnitVariant(const int32 UnitType, const int32 
 	const EUnitVariant NewVariant = static_cast<EUnitVariant>(Variant);
 	const bool bWasSet = PlayerUnitVariantManager->SetSelectedVariant(Unit, NewVariant);
 	RTSCheatUnitVariants::PrintUnitVariantMessage(FString::Printf(
-		TEXT("RTSCheatSetUnitVariant: %s -> %s %s (applies to units that spawn from now on)."),
+		TEXT("RTSCheatSetUnitVariant: %s -> %s %s; spawner now spawns %s for units requested from now on."),
 		*Unit.GetTrainingName(), *Global_GetUnitVariantAsString(NewVariant),
-		bWasSet ? TEXT("SET") : TEXT("REJECTED, unit type unsupported or variant not implemented")),
-	                                              bWasSet ? FColor::Green : FColor::Red);
+		bWasSet ? TEXT("SET") : TEXT("REJECTED (unsupported unit type, unimplemented variant or no class)"),
+		*RTSCheatUnitVariants::GetMappedClassName(this, Unit)), bWasSet ? FColor::Green : FColor::Red);
 }
 
 void URTSCheatManager::RTSCheatPrintUnitVariants()
@@ -374,8 +392,9 @@ void URTSCheatManager::RTSCheatPrintUnitVariants()
 	FString Report = TEXT("Selected unit variants (missing units are Base):\n");
 	for (const FUnitVariantSelection& Selection : PlayerUnitVariantManager->GetSelectionsForSave())
 	{
-		Report += FString::Printf(TEXT(" - %s -> %s\n"), *Selection.Unit.GetTrainingName(),
-		                          *Global_GetUnitVariantAsString(Selection.Variant));
+		Report += FString::Printf(TEXT(" - %s -> %s -> %s\n"), *Selection.Unit.GetTrainingName(),
+		                          *Global_GetUnitVariantAsString(Selection.Variant),
+		                          *RTSCheatUnitVariants::GetMappedClassName(this, Selection.Unit));
 	}
 	Report += TEXT("Units with a variant choice in the data asset:\n");
 	const UUnitVariantDataAsset* VariantDataAsset = PlayerUnitVariantManager->GetVariantDataAsset();

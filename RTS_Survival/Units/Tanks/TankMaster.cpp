@@ -513,8 +513,6 @@ void ATankMaster::BeginPlay()
 	M_TankStartGameAction.OnBeginPlay();
 	if (GetIsValidRTSComponent() && RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank)
 	{
-		// Before techs so they apply on top of the variant.
-		ApplyUnitVariant();
 		CheckForUpgrades();
 	}
 }
@@ -527,16 +525,6 @@ void ATankMaster::CheckForUpgrades()
 	}
 
 	RTSComponent->OnTankInitializedLookingForUpgrades(this);
-}
-
-void ATankMaster::ApplyUnitVariant()
-{
-	if (not GetIsValidRTSComponent())
-	{
-		return;
-	}
-
-	RTSComponent->ApplyUnitVariant();
 }
 
 void ATankMaster::BeginDestroy()

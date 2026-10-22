@@ -26,7 +26,10 @@ enum class EBuildingExpansionType : uint8;
 class ABuildingExpansion;
 class AActor;
 enum class EEnemyDirector : uint8;
+enum class EUnitVariant : uint8;
 struct FEnemyDirectorUnitOverrides;
+struct FUnitVariantSelection;
+class UUnitVariantDataAsset;
 
 
 USTRUCT()
@@ -113,6 +116,30 @@ public:
 
 	/** Applies the selected director's sparse class replacements at most once for this spawner instance. */
 	void ApplyEnemyDirectorUnitOverrides(const EEnemyDirector EnemyDirector);
+
+	/**
+	 * @brief Replaces the spawn class of every selected unit type with its variant class, so every later request
+	 * spawns the variant. Runs after the director overrides so a variant wins on a shared key; that is reported.
+	 * @param VariantDataAsset The asset the selections were clamped against.
+	 * @param Selections Clamped selections; Base entries are skipped.
+	 * @return The units whose variant could not be applied (reported); they keep spawning their base class.
+	 */
+	TArray<FTrainingOption> ApplyPlayerUnitVariants(const UUnitVariantDataAsset& VariantDataAsset,
+	                                                const TArray<FUnitVariantSelection>& Selections);
+
+	/**
+	 * @brief Changes one unit type at runtime (cheat manager, future UI). Base restores the class the mapping held
+	 * before the first variant override, so a mission can go back and forth.
+	 * @param VariantDataAsset The asset that holds the variant class.
+	 * @param Unit The unit type to change, keyed as the spawner keys it (harvesters as tanks).
+	 * @param Variant The variant to spawn from now on.
+	 * @return False when the unit type has no base mapping or the variant has no class in the asset.
+	 */
+	bool SetPlayerUnitVariant(const UUnitVariantDataAsset& VariantDataAsset, const FTrainingOption& Unit,
+	                          const EUnitVariant Variant);
+
+	/** @return The class currently mapped for the training option (after overrides), or a null soft pointer. */
+	TSoftClassPtr<AActor> GetTrainingOptionClass(const FTrainingOption& TrainingOption) const;
 
 	/**
 	 * Syncronously gets the preview mesh of the building expansion type.
@@ -261,6 +288,27 @@ private:
 	void ApplyTrainingOptionOverride(
 		const FTrainingOption& TrainingOption,
 		const TSoftClassPtr<AActor>& UnitClass);
+
+	// Dispatches one selection to the map that holds its unit kind.
+	bool ApplyUnitVariant(const UUnitVariantDataAsset& VariantDataAsset, const FTrainingOption& Unit,
+	                      const EUnitVariant Variant);
+	bool ApplyTrainingOptionVariant(const UUnitVariantDataAsset& VariantDataAsset, const FTrainingOption& Unit,
+	                                const EUnitVariant Variant);
+	bool ApplyBuildingExpansionVariant(const UUnitVariantDataAsset& VariantDataAsset,
+	                                   const EBuildingExpansionType BxpType, const EUnitVariant Variant);
+	void ApplyBxpVariantPreviewMesh(const UUnitVariantDataAsset& VariantDataAsset,
+	                                const EBuildingExpansionType BxpType, const EUnitVariant Variant);
+	void RestoreBasePreviewMesh(const EBuildingExpansionType BxpType);
+
+	// The class (and BXP preview mesh) each key held before its first variant override; restored for Base.
+	// Written only when the key is absent, so applying a second variant never overwrites the remembered base.
+	TMap<FTrainingOption, TSoftClassPtr<AActor>> M_PreVariantTrainingOptionClasses;
+	TMap<EBuildingExpansionType, TSoftClassPtr<ABuildingExpansion>> M_PreVariantBuildingExpansionClasses;
+	UPROPERTY()
+	TMap<EBuildingExpansionType, TObjectPtr<UStaticMesh>> M_PreVariantBxpPreviewMeshes;
+
+	// Keys the director overrides replaced; a variant on one of these is applied but reported as a collision.
+	TSet<FTrainingOption> M_DirectorOverriddenOptions;
 
 
 	// StreamableHandle that is currently loading bxp assets.

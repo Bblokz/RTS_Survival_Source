@@ -4,7 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "NiagaraSystem.h"
+#include "Components/AudioComponent.h"
 #include "Components/BoxComponent.h"
+#include "GameFramework/DamageType.h"
+#include "Sound/SoundAttenuation.h"
+#include "TimerManager.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/Barrage/BarrageProjectileMover.h"
 #include "Engine/DamageEvents.h"
 #include "ProjectileVfxSettings/ProjectileVfxSettings.h"
@@ -361,6 +365,10 @@ private:
 	UPROPERTY()
 	TArray<AActor*> M_ActorsToIgnore;
 
+	// Ignore the entire struck vehicle for this launch, including child actors such as turrets.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<AActor>> M_BouncedActorsToIgnore;
+
 	UPROPERTY()
 	TArray<TWeakObjectPtr<UPrimitiveComponent>> M_ComponentsToIgnore;
 
@@ -430,7 +438,16 @@ private:
 	 * We make use of the delta time passed (calculated in tick)
 	 */
 	void PerformAsyncLineTrace();
+	/**
+	 * @brief Keeps both projectile trace shapes on the same collision filters and stale-callback protection.
+	 * @param World World receiving the collision query.
+	 * @param StartLocation Beginning of the sampled flight segment.
+	 * @param EndLocation End of the segment including forward padding.
+	 */
+	void DispatchAsyncProjectileTrace(UWorld* World, const FVector& StartLocation, const FVector& EndLocation);
+	FCollisionQueryParams BuildProjectileTraceParams() const;
 	void ResetAsyncTraceState();
+	void IgnoreActorAfterBounce(AActor* HitActor);
 
 	void StartFlightTimers(const float ExpectedFlightTime);
 

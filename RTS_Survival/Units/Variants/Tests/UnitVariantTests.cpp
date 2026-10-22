@@ -2,12 +2,20 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "Engine/Texture2D.h"
 #include "Misc/AutomationTest.h"
-#include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
-#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Units/Variants/UnitVariantDataAsset.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "Slate/SlateBrushAsset.h"
+#include "UObject/StrongObjectPtr.h"
+
+#if WITH_EDITOR
+#include "Misc/DataValidation.h"
+#endif
 
 /** Befriended by the data asset and the manager so tests fill private state without an editor-only setter. */
 struct FUnitVariantTestAccess
@@ -22,6 +30,11 @@ struct FUnitVariantTestAccess
 		return VariantDataAsset.M_SquadVariants;
 	}
 
+	static TArray<FUnitVariantSelection>& GetDebugForcedVariants(UUnitVariantDataAsset& VariantDataAsset)
+	{
+		return VariantDataAsset.M_DebugForcedVariants;
+	}
+
 	static void InjectVariantDataAsset(UPlayerUnitVariantManager& Manager,
 	                                   const UUnitVariantDataAsset* VariantDataAsset)
 	{
@@ -34,9 +47,10 @@ namespace UnitVariantTestsPrivate
 	constexpr EAutomationTestFlags TestFlags = EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter;
 	constexpr int32 TwoVariants = 2;
 	constexpr int32 FiveVariants = 5;
-	constexpr uint8 EnemyOwningPlayer = 2;
+	constexpr int32 VariantAIndex = 1;
 	const TCHAR* const ClampErrorFragment = TEXT("is not implemented for");
 	const TCHAR* const SuppressionResetMessage = TEXT("UnitVariantTests: resetting error dialog suppression.");
+	const TCHAR* const VariantTitle = TEXT("Pz IV H (L/48)");
 
 	FUnitVariantEntry MakeEntry(const int32 VariantCount)
 	{
@@ -50,6 +64,14 @@ namespace UnitVariantTestsPrivate
 		return Entry;
 	}
 
+	/** Base plus one VariantA that spawns VariantClass. */
+	FUnitVariantEntry MakeEntryWithVariantClass(const UClass* VariantClass)
+	{
+		FUnitVariantEntry Entry = MakeEntry(TwoVariants);
+		Entry.Variants[VariantAIndex].UnitClass = TSoftClassPtr<AActor>(FSoftObjectPath(VariantClass));
+		return Entry;
+	}
+
 	FTrainingOption MakeTank(const ETankSubtype TankSubtype)
 	{
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(TankSubtype));
@@ -58,6 +80,14 @@ namespace UnitVariantTestsPrivate
 	FTrainingOption MakeSquad(const ESquadSubtype SquadSubtype)
 	{
 		return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(SquadSubtype));
+	}
+
+	FUnitVariantSelection MakeSelection(const FTrainingOption& Unit, const EUnitVariant Variant)
+	{
+		FUnitVariantSelection Selection;
+		Selection.Unit = Unit;
+		Selection.Variant = Variant;
+		return Selection;
 	}
 
 	/** PzIV H implements Base + VariantA, the Pz38t lists five (clamped to three), the Kar98k squad lists two. */
@@ -79,12 +109,12 @@ namespace UnitVariantTestsPrivate
 		return Manager;
 	}
 
-	/** A component outside any world, so it never registers with a game state. */
-	URTSComponent* MakeRTSComponent(const EAllUnitType UnitType)
+	/** A transient brush whose image is a transient texture, like the brush assets DT_TrainingOptions uses. */
+	USlateBrushAsset* MakeTextureBrush()
 	{
-		URTSComponent* RTSComponent = NewObject<URTSComponent>(GetTransientPackage());
-		RTSComponent->SetUnitType(UnitType);
-		return RTSComponent;
+		USlateBrushAsset* BrushAsset = NewObject<USlateBrushAsset>(GetTransientPackage());
+		BrushAsset->Brush.SetResourceObject(NewObject<UTexture2D>(GetTransientPackage()));
+		return BrushAsset;
 	}
 
 	/** Pushes dialog suppression so ReportError logs to LogRTS instead of opening a modal dialog. */
@@ -100,6 +130,20 @@ namespace UnitVariantTestsPrivate
 			RTSFunctionLibrary::PopModalDialogSuppression();
 		}
 	};
+
+#if WITH_EDITOR
+	bool GetHasIssueContaining(const FDataValidationContext& Context, const TCHAR* Fragment)
+	{
+		for (const FDataValidationContext::FIssue& Issue : Context.GetIssues())
+		{
+			if (Issue.Message.ToString().Contains(Fragment))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+#endif
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantDataAssetCountTest, "RTS.UnitVariants.DataAssetCounts",
@@ -143,16 +187,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantManagerClampTest, "RTS.UnitVariants
 bool FUnitVariantManagerClampTest::RunTest(const FString& Parameters)
 {
 	using namespace UnitVariantTestsPrivate;
+	// A test asset with an empty debug list, so a forced entry left in DA_UnitVariants cannot change the result.
 	UPlayerUnitVariantManager* Manager = MakeManager(MakeTestDataAsset());
 	const FTrainingOption TwoVariantTank = MakeTank(ETankSubtype::Tank_PzIV_H);
 	const FTrainingOption TwoVariantSquad = MakeSquad(ESquadSubtype::Squad_Ger_JagerTruppKar98k);
-
-	FUnitVariantSelection UnimplementedSelection;
-	UnimplementedSelection.Unit = TwoVariantTank;
-	UnimplementedSelection.Variant = EUnitVariant::VariantB;
-	FUnitVariantSelection ImplementedSelection;
-	ImplementedSelection.Unit = TwoVariantSquad;
-	ImplementedSelection.Variant = EUnitVariant::VariantA;
 
 	{
 		const FScopedErrorDialogSuppression ErrorDialogSuppression;
@@ -161,7 +199,10 @@ bool FUnitVariantManagerClampTest::RunTest(const FString& Parameters)
 		RTSFunctionLibrary::ReportError(SuppressionResetMessage, true);
 
 		AddExpectedError(ClampErrorFragment, EAutomationExpectedErrorFlags::Contains, 1);
-		Manager->InitFromProfile({UnimplementedSelection, ImplementedSelection});
+		Manager->InitFromProfile({
+			MakeSelection(TwoVariantTank, EUnitVariant::VariantB),
+			MakeSelection(TwoVariantSquad, EUnitVariant::VariantA)
+		});
 	}
 
 	TestEqual(TEXT("An unimplemented saved variant clamps to Base"),
@@ -175,34 +216,150 @@ bool FUnitVariantManagerClampTest::RunTest(const FString& Parameters)
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantOwnerGateTest, "RTS.UnitVariants.OnlyPlayerUnitsGetVariants",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantForcedFromAssetTest, "RTS.UnitVariants.ForcedVariantsFromAsset",
                                  UnitVariantTestsPrivate::TestFlags)
 
-bool FUnitVariantOwnerGateTest::RunTest(const FString& Parameters)
+bool FUnitVariantForcedFromAssetTest::RunTest(const FString& Parameters)
 {
 	using namespace UnitVariantTestsPrivate;
-	UPlayerUnitVariantManager* Manager = MakeManager(MakeTestDataAsset());
-	TestTrue(TEXT("VariantA is selectable for the PzIV H"),
-	         Manager->SetSelectedVariant(MakeTank(ETankSubtype::Tank_PzIV_H), EUnitVariant::VariantA));
+	UUnitVariantDataAsset* VariantDataAsset = MakeTestDataAsset();
+	const FTrainingOption TwoVariantTank = MakeTank(ETankSubtype::Tank_PzIV_H);
+	const FTrainingOption TwoVariantSquad = MakeSquad(ESquadSubtype::Squad_Ger_JagerTruppKar98k);
+	TArray<FUnitVariantSelection>& ForcedVariants = FUnitVariantTestAccess::GetDebugForcedVariants(*VariantDataAsset);
+	ForcedVariants.Add(MakeSelection(TwoVariantTank, EUnitVariant::VariantA));
+	ForcedVariants.Add(MakeSelection(TwoVariantSquad, EUnitVariant::VariantB));
+	UPlayerUnitVariantManager* Manager = MakeManager(VariantDataAsset);
 
-	URTSComponent* TankRTSComponent = MakeRTSComponent(EAllUnitType::UNType_Tank);
-	TankRTSComponent->SetUnitSubtype(ENomadicSubtype::Nomadic_None, ETankSubtype::Tank_PzIV_H);
-	TestEqual(TEXT("The component starts owned by the player"), TankRTSComponent->GetOwningPlayer(),
-	          UPlayerTechManager::PlayerTechOwnerIndex);
-	TestEqual(TEXT("A player-owned PzIV H resolves to the selection"),
-	          Manager->ResolveVariantForUnit(TankRTSComponent), EUnitVariant::VariantA);
+	{
+		const FScopedErrorDialogSuppression ErrorDialogSuppression;
+		AddExpectedError(SuppressionResetMessage, EAutomationExpectedErrorFlags::Contains, 1);
+		RTSFunctionLibrary::ReportError(SuppressionResetMessage, true);
 
-	TankRTSComponent->SetOwningPlayerRuntime(EnemyOwningPlayer);
-	TestEqual(TEXT("An enemy-owned PzIV H resolves to Base"),
-	          Manager->ResolveVariantForUnit(TankRTSComponent), EUnitVariant::Base);
-	TestEqual(TEXT("A null component resolves to Base"), Manager->ResolveVariantForUnit(nullptr), EUnitVariant::Base);
+		AddExpectedError(ClampErrorFragment, EAutomationExpectedErrorFlags::Contains, 1);
+		Manager->InitFromProfile({});
+	}
+
+	TestEqual(TEXT("An implemented forced variant is applied"),
+	          Manager->GetSelectedVariant(TwoVariantTank), EUnitVariant::VariantA);
+	TestEqual(TEXT("An unimplemented forced variant clamps to Base"),
+	          Manager->GetSelectedVariant(TwoVariantSquad), EUnitVariant::Base);
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantSupportedTypesTest, "RTS.UnitVariants.UnsupportedUnitTypesGetBase",
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantFindClassTest, "RTS.UnitVariants.FindVariantClass",
                                  UnitVariantTestsPrivate::TestFlags)
 
-bool FUnitVariantSupportedTypesTest::RunTest(const FString& Parameters)
+bool FUnitVariantFindClassTest::RunTest(const FString& Parameters)
+{
+	using namespace UnitVariantTestsPrivate;
+	UUnitVariantDataAsset* VariantDataAsset = NewObject<UUnitVariantDataAsset>(GetTransientPackage());
+	FUnitVariantTestAccess::GetTankVariants(*VariantDataAsset).Add(
+		ETankSubtype::Tank_PzIV_H, MakeEntryWithVariantClass(ATankMaster::StaticClass()));
+	const FTrainingOption VariantTank = MakeTank(ETankSubtype::Tank_PzIV_H);
+
+	TestTrue(TEXT("Base has no variant class"),
+	         VariantDataAsset->FindVariantClass(VariantTank, EUnitVariant::Base).IsNull());
+	TestEqual(TEXT("VariantA resolves to its class"),
+	          VariantDataAsset->FindVariantClass(VariantTank, EUnitVariant::VariantA).ToSoftObjectPath(),
+	          FSoftObjectPath(ATankMaster::StaticClass()));
+	TestTrue(TEXT("An unimplemented VariantB has no class"),
+	         VariantDataAsset->FindVariantClass(VariantTank, EUnitVariant::VariantB).IsNull());
+	TestTrue(TEXT("A unit without an entry has no class"),
+	         VariantDataAsset->FindVariantClass(MakeTank(ETankSubtype::Tank_PzIII_M), EUnitVariant::VariantA).IsNull());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantTrainingPresentationTest, "RTS.UnitVariants.TrainingPresentation",
+                                 UnitVariantTestsPrivate::TestFlags)
+
+bool FUnitVariantTrainingPresentationTest::RunTest(const FString& Parameters)
+{
+	using namespace UnitVariantTestsPrivate;
+	UUnitVariantDataAsset* VariantDataAsset = NewObject<UUnitVariantDataAsset>(GetTransientPackage());
+	TMap<ETankSubtype, FUnitVariantEntry>& TankVariants = FUnitVariantTestAccess::GetTankVariants(*VariantDataAsset);
+
+	FUnitVariantEntry TitleOnlyEntry = MakeEntryWithVariantClass(ATankMaster::StaticClass());
+	TitleOnlyEntry.Variants[VariantAIndex].bOverrideTrainingTitle = true;
+	TitleOnlyEntry.Variants[VariantAIndex].TrainingTitle = FText::FromString(VariantTitle);
+	TankVariants.Add(ETankSubtype::Tank_PzIV_H, TitleOnlyEntry);
+
+	USlateBrushAsset* VariantBrush = MakeTextureBrush();
+	FUnitVariantEntry BrushEntry = MakeEntryWithVariantClass(ATankMaster::StaticClass());
+	BrushEntry.Variants[VariantAIndex].bOverrideTrainingImageBrush = true;
+	BrushEntry.Variants[VariantAIndex].TrainingImageBrush = VariantBrush;
+	TankVariants.Add(ETankSubtype::Tank_PzI_Harvester, BrushEntry);
+
+	const FTrainingOption TitleTank = MakeTank(ETankSubtype::Tank_PzIV_H);
+	const FUnitVariantTrainingPresentation TitlePresentation =
+		VariantDataAsset->GetTrainingPresentation(TitleTank, EUnitVariant::VariantA);
+	TestEqual(TEXT("The requested variant is echoed"), TitlePresentation.Variant, EUnitVariant::VariantA);
+	TestTrue(TEXT("The ticked title override is on"), TitlePresentation.bOverrideTitle);
+	TestEqual(TEXT("The title is the variant's"), TitlePresentation.Title.ToString(), FString(VariantTitle));
+	TestFalse(TEXT("The unticked image brush override is off"), TitlePresentation.bOverrideImageBrush);
+	TestFalse(TEXT("The unticked description override is off"), TitlePresentation.bOverrideDescription);
+	TestFalse(TEXT("The unticked tooltip override is off"), TitlePresentation.bOverrideTooltip);
+
+	const FUnitVariantTrainingPresentation BasePresentation =
+		VariantDataAsset->GetTrainingPresentation(TitleTank, EUnitVariant::Base);
+	TestFalse(TEXT("Base never overrides the title"), BasePresentation.bOverrideTitle);
+	const FUnitVariantTrainingPresentation MissingPresentation =
+		VariantDataAsset->GetTrainingPresentation(MakeTank(ETankSubtype::Tank_PzIII_M), EUnitVariant::VariantA);
+	TestFalse(TEXT("A unit without an entry overrides nothing"), MissingPresentation.bOverrideTitle);
+
+	// The training menu lists the harvester as UNType_Harvester; the manager stores and finds it as a tank.
+	UPlayerUnitVariantManager* Manager = MakeManager(VariantDataAsset);
+	const FTrainingOption MenuHarvester(EAllUnitType::UNType_Harvester,
+	                                    static_cast<uint8>(ETankSubtype::Tank_PzI_Harvester));
+	TestTrue(TEXT("A harvester variant can be selected through its menu key"),
+	         Manager->SetSelectedVariant(MenuHarvester, EUnitVariant::VariantA));
+	TestEqual(TEXT("The harvester selection is stored under the tank key"),
+	          Manager->GetSelectedVariant(MakeTank(ETankSubtype::Tank_PzI_Harvester)), EUnitVariant::VariantA);
+	const FUnitVariantTrainingPresentation HarvesterPresentation = Manager->GetTrainingPresentation(MenuHarvester);
+	TestTrue(TEXT("The harvester's ticked image brush override is on"), HarvesterPresentation.bOverrideImageBrush);
+	TestTrue(TEXT("The presentation holds the variant brush asset"),
+	         HarvesterPresentation.ImageBrush.Get() == VariantBrush);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantTrainingBrushGCTest, "RTS.UnitVariants.TrainingBrushSurvivesGC",
+                                 UnitVariantTestsPrivate::TestFlags)
+
+bool FUnitVariantTrainingBrushGCTest::RunTest(const FString& Parameters)
+{
+	using namespace UnitVariantTestsPrivate;
+	// Stand-in for UPlayerUnitVariantManager::M_VariantDataAsset, the only strong owner in a mission.
+	TStrongObjectPtr<UUnitVariantDataAsset> VariantDataAsset(NewObject<UUnitVariantDataAsset>(GetTransientPackage()));
+	FUnitVariantEntry BrushEntry = MakeEntryWithVariantClass(ATankMaster::StaticClass());
+	BrushEntry.Variants[VariantAIndex].bOverrideTrainingImageBrush = true;
+	BrushEntry.Variants[VariantAIndex].TrainingImageBrush = MakeTextureBrush();
+	FUnitVariantTestAccess::GetTankVariants(*VariantDataAsset).Add(ETankSubtype::Tank_PzIV_H, BrushEntry);
+
+	const FUnitVariantTrainingPresentation Presentation =
+		VariantDataAsset->GetTrainingPresentation(MakeTank(ETankSubtype::Tank_PzIV_H), EUnitVariant::VariantA);
+	const TWeakObjectPtr<USlateBrushAsset> WeakBrush(Presentation.ImageBrush.Get());
+	if (not TestTrue(TEXT("The presentation holds a brush"), WeakBrush.IsValid()))
+	{
+		return false;
+	}
+	const TWeakObjectPtr<UObject> WeakTexture(WeakBrush->Brush.GetResourceObject());
+	BrushEntry = FUnitVariantEntry();
+
+	CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+	TestTrue(TEXT("The brush survives GC while the data asset is referenced"), WeakBrush.IsValid());
+	TestTrue(TEXT("The brush texture survives GC while the data asset is referenced"), WeakTexture.IsValid());
+
+	// Proves the test depends on the data asset's reference and not on something else keeping the brush alive.
+	VariantDataAsset.Reset();
+	CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+	TestFalse(TEXT("The brush is collected once the data asset is released"), WeakBrush.IsValid());
+	TestFalse(TEXT("The texture is collected once the data asset is released"), WeakTexture.IsValid());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantUnsupportedTypesTest, "RTS.UnitVariants.UnsupportedUnitTypesRejected",
+                                 UnitVariantTestsPrivate::TestFlags)
+
+bool FUnitVariantUnsupportedTypesTest::RunTest(const FString& Parameters)
 {
 	using namespace UnitVariantTestsPrivate;
 	UPlayerUnitVariantManager* Manager = MakeManager(MakeTestDataAsset());
@@ -216,55 +373,61 @@ bool FUnitVariantSupportedTypesTest::RunTest(const FString& Parameters)
 	          UPlayerUnitVariantManager::GetIsUnitTypeSupported(EAllUnitType::UNType_Nomadic));
 	TestFalse(TEXT("Aircraft are not supported"),
 	          UPlayerUnitVariantManager::GetIsUnitTypeSupported(EAllUnitType::UNType_Aircraft));
-	TestFalse(TEXT("Harvesters are not supported"),
-	          UPlayerUnitVariantManager::GetIsUnitTypeSupported(EAllUnitType::UNType_Harvester));
 
-	const FTrainingOption NomadicUnit(EAllUnitType::UNType_Nomadic,
-	                                  static_cast<uint8>(ENomadicSubtype::Nomadic_GerHq));
+	const FTrainingOption NomadicUnit(EAllUnitType::UNType_Nomadic, static_cast<uint8>(ENomadicSubtype::Nomadic_GerHq));
+	const FTrainingOption AircraftUnit(EAllUnitType::UNType_Aircraft,
+	                                   static_cast<uint8>(EAircraftSubtype::Aircraft_Bf109));
 	TestFalse(TEXT("A nomadic selection is rejected"), Manager->SetSelectedVariant(NomadicUnit, EUnitVariant::VariantA));
-
-	URTSComponent* NomadicRTSComponent = MakeRTSComponent(EAllUnitType::UNType_Nomadic);
-	NomadicRTSComponent->SetUnitSubtype(ENomadicSubtype::Nomadic_GerHq);
-	TestEqual(TEXT("A player nomadic truck resolves to Base"),
-	          Manager->ResolveVariantForUnit(NomadicRTSComponent), EUnitVariant::Base);
-
-	URTSComponent* AircraftRTSComponent = MakeRTSComponent(EAllUnitType::UNType_Aircraft);
-	AircraftRTSComponent->SetUnitSubtype(ENomadicSubtype::Nomadic_None, ETankSubtype::Tank_None,
-	                                     ESquadSubtype::Squad_None, EBuildingExpansionType::BXT_Invalid,
-	                                     EAircraftSubtype::Aircraft_Bf109);
-	TestEqual(TEXT("A player aircraft resolves to Base"),
-	          Manager->ResolveVariantForUnit(AircraftRTSComponent), EUnitVariant::Base);
+	TestFalse(TEXT("An aircraft selection is rejected"),
+	          Manager->SetSelectedVariant(AircraftUnit, EUnitVariant::VariantA));
+	TestEqual(TEXT("Rejected selections are not stored"), Manager->GetSelectionsForSave().Num(), 0);
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantComponentApplyOnceTest, "RTS.UnitVariants.ComponentAppliesOnce",
+#if WITH_EDITOR
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FUnitVariantDataAssetClassRulesTest, "RTS.UnitVariants.DataAssetClassRules",
                                  UnitVariantTestsPrivate::TestFlags)
 
-bool FUnitVariantComponentApplyOnceTest::RunTest(const FString& Parameters)
+bool FUnitVariantDataAssetClassRulesTest::RunTest(const FString& Parameters)
 {
 	using namespace UnitVariantTestsPrivate;
-	URTSComponent* SquadUnitRTSComponent = MakeRTSComponent(EAllUnitType::UNType_Squad);
-	int32 BroadcastCount = 0;
-	SquadUnitRTSComponent->OnUnitVariantApplied.AddLambda([&BroadcastCount](const EUnitVariant)
-	{
-		++BroadcastCount;
-	});
+	UUnitVariantDataAsset* ValidAsset = NewObject<UUnitVariantDataAsset>(GetTransientPackage());
+	FUnitVariantEntry ValidEntry = MakeEntryWithVariantClass(ATankMaster::StaticClass());
+	ValidEntry.Variants[VariantAIndex].bOverrideTrainingImageBrush = true;
+	ValidEntry.Variants[VariantAIndex].TrainingImageBrush = MakeTextureBrush();
+	ValidEntry.Variants[VariantAIndex].bOverrideTrainingTooltip = true;
+	ValidEntry.Variants[VariantAIndex].TrainingTooltip = FText::FromString(VariantTitle);
+	FUnitVariantTestAccess::GetTankVariants(*ValidAsset).Add(ETankSubtype::Tank_PzIV_H, ValidEntry);
+	FDataValidationContext ValidContext;
+	TestNotEqual(TEXT("A correct asset validates"), ValidAsset->IsDataValid(ValidContext),
+	             EDataValidationResult::Invalid);
+	TestEqual(TEXT("A correct asset reports no errors"), ValidContext.GetNumErrors(), 0u);
 
-	SquadUnitRTSComponent->ApplyUnitVariantFromParent(EUnitVariant::VariantB);
-	SquadUnitRTSComponent->ApplyUnitVariantFromParent(EUnitVariant::VariantA);
-	SquadUnitRTSComponent->ApplyUnitVariant();
+	UUnitVariantDataAsset* BrokenAsset = NewObject<UUnitVariantDataAsset>(GetTransientPackage());
+	TMap<ETankSubtype, FUnitVariantEntry>& TankVariants = FUnitVariantTestAccess::GetTankVariants(*BrokenAsset);
+	FUnitVariantEntry BaseWithClassEntry = MakeEntry(TwoVariants);
+	BaseWithClassEntry.Variants[0].UnitClass = TSoftClassPtr<AActor>(FSoftObjectPath(ATankMaster::StaticClass()));
+	BaseWithClassEntry.Variants[0].bOverrideTrainingTitle = true;
+	BaseWithClassEntry.Variants[VariantAIndex].bOverrideTrainingDescription = true;
+	TankVariants.Add(ETankSubtype::Tank_PzIV_H, BaseWithClassEntry);
+	// Wrong parent for the tank map, and the same class again in the squad map.
+	TankVariants.Add(ETankSubtype::Tank_Pz38t, MakeEntryWithVariantClass(ASquadController::StaticClass()));
+	FUnitVariantTestAccess::GetSquadVariants(*BrokenAsset).Add(
+		ESquadSubtype::Squad_Ger_JagerTruppKar98k, MakeEntryWithVariantClass(ASquadController::StaticClass()));
 
-	TestTrue(TEXT("The variant is marked applied"), SquadUnitRTSComponent->GetHasAppliedUnitVariant());
-	TestEqual(TEXT("The first variant is kept"), SquadUnitRTSComponent->GetUnitVariant(), EUnitVariant::VariantB);
-	TestEqual(TEXT("The variant is broadcast once"), BroadcastCount, 1);
-
-	URTSComponent* WorldlessRTSComponent = MakeRTSComponent(EAllUnitType::UNType_Tank);
-	WorldlessRTSComponent->ApplyUnitVariant();
-	TestTrue(TEXT("Without a player controller the variant still applies"),
-	         WorldlessRTSComponent->GetHasAppliedUnitVariant());
-	TestEqual(TEXT("Without a player controller the variant is Base"), WorldlessRTSComponent->GetUnitVariant(),
-	          EUnitVariant::Base);
+	FDataValidationContext BrokenContext;
+	TestEqual(TEXT("A broken asset is invalid"), BrokenAsset->IsDataValid(BrokenContext),
+	          EDataValidationResult::Invalid);
+	TestTrue(TEXT("Base with a class is reported"), GetHasIssueContaining(BrokenContext, TEXT("Base must not have")));
+	TestTrue(TEXT("A variant without a class is reported"), GetHasIssueContaining(BrokenContext, TEXT("no unit class")));
+	TestTrue(TEXT("A wrong parent class is reported"), GetHasIssueContaining(BrokenContext, TEXT("is not a child of")));
+	TestTrue(TEXT("A class used twice is reported"), GetHasIssueContaining(BrokenContext, TEXT("variant definitions")));
+	TestTrue(TEXT("A training override on Base is reported"),
+	         GetHasIssueContaining(BrokenContext, TEXT("untick its training overrides")));
+	TestTrue(TEXT("A ticked override with an empty value is reported"),
+	         GetHasIssueContaining(BrokenContext, TEXT("empty TrainingDescription")));
 	return true;
 }
+#endif
 
 #endif

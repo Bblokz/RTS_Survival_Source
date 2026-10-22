@@ -145,45 +145,6 @@ void ATeamWeaponController::OnAllSquadUnitsLoaded()
 	SpawnTeamWeapon();
 	SnapOperatorsToCrewPositions();
 	StopOperatorWalksAfterSpawnSnap();
-	// After SpawnTeamWeapon so all three branches (map setup, adopted gun, fresh spawn) have their gun.
-	ApplyUnitVariantToTeamWeapon();
-}
-
-void ATeamWeaponController::ApplyUnitVariantToTeamWeapon()
-{
-	// Silent: SpawnTeamWeapon already reported a failed spawn or adoption.
-	if (not GetIsValidTeamWeaponNoReport() || not GetIsValidRTSComponent())
-	{
-		return;
-	}
-	if (RTSComponent->GetHasAppliedUnitVariant())
-	{
-		ForwardUnitVariantToTeamWeapon(RTSComponent->GetUnitVariant());
-		return;
-	}
-	if (M_UnitVariantAppliedHandle.IsValid())
-	{
-		return;
-	}
-	// InitSquadData still waits for the subtype; forward the variant once the controller resolves it.
-	TWeakObjectPtr<ATeamWeaponController> WeakThis(this);
-	M_UnitVariantAppliedHandle = RTSComponent->OnUnitVariantApplied.AddLambda([WeakThis](const EUnitVariant Variant)
-	{
-		if (not WeakThis.IsValid())
-		{
-			return;
-		}
-		WeakThis->ForwardUnitVariantToTeamWeapon(Variant);
-	});
-}
-
-void ATeamWeaponController::ForwardUnitVariantToTeamWeapon(const EUnitVariant Variant)
-{
-	if (not GetIsValidTeamWeaponNoReport())
-	{
-		return;
-	}
-	IUnitVariantReceiver::Execute_BP_ApplyUnitVariant(M_TeamWeapon, Variant);
 }
 
 void ATeamWeaponController::StopOperatorWalksAfterSpawnSnap()

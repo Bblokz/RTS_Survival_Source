@@ -148,9 +148,7 @@ Doc and test: `Source/Docs/Units/TeamWeaponDigIn.md`, `-TeamWeaponDigInValidate`
 
 ## Unit variants
 
-Doc: `Source/Docs/Units/UnitVariants.md` (section 5.2.1).
+Doc: `Source/Docs/Units/UnitVariants.md`.
 
-- The controller resolves its variant in `InitSquadData` (as a squad); the gun does not exist yet at that point.
-  `ApplyUnitVariantToTeamWeapon` runs at the end of `OnAllSquadUnitsLoaded`, after `SpawnTeamWeapon`, and fires
-  `BP_ApplyUnitVariant` on `ATeamWeapon` directly or once the controller's `URTSComponent::OnUnitVariantApplied` fires.
-- An adopted gun receives the event again with its new crew's variant: gun Blueprints must set state, not accumulate.
+- A team weapon variant is a child Blueprint of the crew controller with its own `TeamWeaponClass` and
+  `SquadUnitClasses`; the async spawner swaps the controller class, nothing in the controller or gun resolves it.

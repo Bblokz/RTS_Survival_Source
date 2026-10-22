@@ -6,7 +6,6 @@
 #include "NiagaraSystem.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
-#include "RTS_Survival/Interfaces/UnitVariantReceiver.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderTypes.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnitPlannedPosition.h"
@@ -402,8 +401,7 @@ struct FSquadUnitCoverMoveGuard
  */
 UCLASS()
 class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExperienceProvider,
-                                    public IRTSNavAgentInterface, public IAimOffsetProvider,
-                                    public IUnitVariantReceiver
+                                    public IRTSNavAgentInterface, public IAimOffsetProvider
 {
 	GENERATED_BODY()
 
@@ -1358,8 +1356,6 @@ private:
 	void Debug_Weapons(const FString& DebugMessage, const FColor Color);
 
 	void OnDataLoaded_InitExperienceWorth();
-	// Copies the squad controller's resolved variant; also reached by reinforcements through SetSquadController.
-	void OnDataLoaded_ApplyUnitVariantFromSquad();
 	// Set after the squad controller is set so value can be aligned with squad data value.
 	float M_ExperienceWorth;
 

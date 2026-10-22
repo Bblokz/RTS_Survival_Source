@@ -3760,8 +3760,6 @@ void ASquadController::InitSquadData()
 	// After units are fully valid and any BP HP tweaks have run
 	InitSquadData_SetupSquadHealthAggregation();
 	DamageSquadGameStart.ApplyStartDamageToSquad(M_TSquadUnits);
-	// Before SetDataLoaded so the squad units' data-loaded callbacks copy the resolved variant.
-	ApplyUnitVariant();
 	// Notify callbacks set and future ones that the blueprint data is loaded on the squad controller.
 	SquadDataCallbacks.SetDataLoaded(true);
 	SquadDataCallbacks.OnSquadDataReady.Broadcast();
@@ -4100,16 +4098,6 @@ void ASquadController::CheckForUpgrades()
 	}
 
 	RTSComponent->OnSquadInitializedLookingForUpgrades(this);
-}
-
-void ASquadController::ApplyUnitVariant()
-{
-	if (not GetIsValidRTSComponent())
-	{
-		return;
-	}
-
-	RTSComponent->ApplyUnitVariant();
 }
 
 void ASquadController::UnitInSquadDied_HandleGrenadeComp(ASquadUnit* UnitDied) const

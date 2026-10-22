@@ -7,6 +7,7 @@
 #include "RTS_Survival/GameUI/BottomRightUIPanelState/BottomRightUIPanelState.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/GameUI/TrainingUI/Interface/Trainer.h"
@@ -3040,7 +3041,22 @@ FTrainingWidgetState UTrainingMenuManager::CreateWidgetStateForOption(const FTra
 		WidgetState.TrainingStatusSecondRequirement,
 		WidgetState.bIsSecondRequirementMet,
 		WidgetState.bIsFirstRequirementMet);
+	WidgetState.VariantPresentation = GetVariantPresentationForOption(Option);
 	return WidgetState;
+}
+
+FUnitVariantTrainingPresentation UTrainingMenuManager::GetVariantPresentationForOption(
+	const FTrainingOption& Option) const
+{
+	// The training menu is the player's own UI, so the player's selection applies without an owner check.
+	// The menu widget is the world context, as for the game unit manager lookups in this class.
+	const UPlayerUnitVariantManager* PlayerUnitVariantManager =
+		FRTS_Statics::GetPlayerUnitVariantManager(M_TrainingMenu);
+	if (not PlayerUnitVariantManager)
+	{
+		return FUnitVariantTrainingPresentation();
+	}
+	return PlayerUnitVariantManager->GetTrainingPresentation(Option);
 }
 
 int32 UTrainingMenuManager::GetWidgetIndexOfFlatOptionIndex(const int32 FlatOptionIndex) const

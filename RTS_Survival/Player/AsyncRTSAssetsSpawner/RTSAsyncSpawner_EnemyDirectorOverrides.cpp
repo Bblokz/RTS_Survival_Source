@@ -131,4 +131,5 @@ void ARTSAsyncSpawner::ApplyTrainingOptionOverride(
 	}
 
 	*ExistingUnitClass = UnitClass;
+	M_DirectorOverriddenOptions.Add(TrainingOption);
 }

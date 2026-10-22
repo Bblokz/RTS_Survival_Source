@@ -1007,8 +1007,6 @@ void ABuildingExpansion::InitBuildingExpansion(
 	{
 		OnBxpStandAlone();
 	}
-	// Before techs so they apply on top of the variant.
-	ApplyUnitVariant();
 	CheckForUpgrades();
 }
 
@@ -1020,16 +1018,6 @@ void ABuildingExpansion::CheckForUpgrades()
 	}
 
 	GetRTSComponent()->OnBuildingExpansionInitializedLookingForUpgrades(this);
-}
-
-void ABuildingExpansion::ApplyUnitVariant()
-{
-	if (not GetIsValidRTSComponent())
-	{
-		return;
-	}
-
-	GetRTSComponent()->ApplyUnitVariant();
 }
 
 void ABuildingExpansion::OnFinishedExpansionConstruction()

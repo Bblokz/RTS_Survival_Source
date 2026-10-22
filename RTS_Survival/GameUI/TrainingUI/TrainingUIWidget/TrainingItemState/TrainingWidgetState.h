@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
+#include "RTS_Survival/Units/Variants/UnitVariantTypes.h"
 
 #include "TrainingWidgetState.generated.h"
 
@@ -62,4 +63,8 @@ struct FTrainingWidgetState
 	// Only used when a requirement has a second condition.
 	UPROPERTY(BlueprintReadOnly)
 	bool bIsSecondRequirementMet = false;
+	// Variant overrides of the DT_TrainingOptions row for this slot; all off when the player keeps the base unit.
+	// Holds the variant brush asset as a UPROPERTY so every widget copy of this state keeps it alive for GC.
+	UPROPERTY(BlueprintReadOnly, VisibleDefaultsOnly)
+	FUnitVariantTrainingPresentation VariantPresentation;
 };

@@ -54,8 +54,9 @@ void UPlayerProfileLoader::LoadProfile(TObjectPtr<ARTSAsyncSpawner> AsyncSpawner
 	//                   ENomadicSubtype::Nomadic_GerMechanizedDepot);
 	ApplyResourceCards(ExtractResources(PlayerProfile->M_SelectedCards));
 	ApplyTechnologies(ExtractTechnologies(PlayerProfile->M_SelectedCards));
-	// Before LoadInUnits: the starting units pull their variant from the manager when they begin play.
-	ApplyUnitVariantSelections(PlayerProfile->M_UnitVariantSelections, PlayerController);
+	// Before LoadInUnits so starting units spawn as variants, and before the early return because a map without
+	// starting units still trains units through the spawner.
+	ApplyUnitVariantSelections(PlayerProfile->M_UnitVariantSelections, PlayerController, AsyncSpawner);
 	if(bDoNotLoadPlayerUnits)
 	{
 		return;
@@ -206,7 +207,8 @@ void UPlayerProfileLoader::ApplyTechnologies(const TArray<ETechnology>& Technolo
 }
 
 void UPlayerProfileLoader::ApplyUnitVariantSelections(const TArray<FUnitVariantSelection>& UnitVariantSelections,
-                                                      const ACPPController* PlayerController) const
+                                                      const ACPPController* PlayerController,
+                                                      ARTSAsyncSpawner* AsyncSpawner) const
 {
 	UPlayerUnitVariantManager* PlayerUnitVariantManager = PlayerController->GetPlayerUnitVariantManager();
 	if (not IsValid(PlayerUnitVariantManager))
@@ -217,6 +219,7 @@ void UPlayerProfileLoader::ApplyUnitVariantSelections(const TArray<FUnitVariantS
 		return;
 	}
 	PlayerUnitVariantManager->InitFromProfile(UnitVariantSelections);
+	PlayerUnitVariantManager->ApplySelectionsToSpawner(AsyncSpawner);
 }
 
 void UPlayerProfileLoader::ApplyResourceCards(const TArray<FUnitCost>& ResourceBonuses) const

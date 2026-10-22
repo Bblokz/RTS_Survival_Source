@@ -2803,7 +2803,6 @@ void ASquadUnit::SetSquadController(ASquadController* SquadController)
 			return;
 		}
 		WeakThis->OnDataLoaded_InitExperienceWorth();
-		WeakThis->OnDataLoaded_ApplyUnitVariantFromSquad();
 	};
 	if (M_SquadController)
 	{
@@ -4532,24 +4531,6 @@ void ASquadUnit::OnDataLoaded_InitExperienceWorth()
 			"\n For Squad unit: " + GetName() +
 			"\n Experience value: " + FString::FromInt(M_ExperienceWorth));
 	}
-}
-
-void ASquadUnit::OnDataLoaded_ApplyUnitVariantFromSquad()
-{
-	if (not GetIsValidSquadController() || not GetIsValidRTSComponent())
-	{
-		return;
-	}
-	const URTSComponent* SquadRTSComponent = M_SquadController->GetRTSComponent();
-	if (not IsValid(SquadRTSComponent))
-	{
-		RTSFunctionLibrary::ReportError("Squad unit cannot copy the unit variant as its squad controller has no"
-			" valid RTS component."
-			"\n For Squad unit: " + GetName() +
-			"\nAt function: ASquadUnit::OnDataLoaded_ApplyUnitVariantFromSquad");
-		return;
-	}
-	RTSComponent->ApplyUnitVariantFromParent(SquadRTSComponent->GetUnitVariant());
 }
 
 void ASquadUnit::OnMoveToSelfPathFindingFailed(const EPathFollowingRequestResult::Type RequestResult,

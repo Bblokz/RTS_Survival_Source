@@ -132,6 +132,8 @@ private:
 	void UpdateSubSectionTabsWithPrimaryTrainer() const;
 	void UpdateWidgetsWithShownSubSection(const TMap<FTrainingOption, int32>& QueueState);
 	FTrainingWidgetState CreateWidgetStateForOption(const FTrainingOption& Option, const int32 QueuedCount) const;
+	// Base presentation (all overrides off) outside a mission, where no player variant manager exists.
+	FUnitVariantTrainingPresentation GetVariantPresentationForOption(const FTrainingOption& Option) const;
 
 	/**
 	 * @param FlatOptionIndex Index into the training options of the primary selected trainer.

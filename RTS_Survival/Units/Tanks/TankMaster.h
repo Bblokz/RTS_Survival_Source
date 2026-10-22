@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
-#include "RTS_Survival/Interfaces/UnitVariantReceiver.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/Resources/Harvester/HarvesterInterface/HarvesterInterface.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/CargoOwner/CargoOwner.h"
@@ -278,7 +277,7 @@ private:
 UCLASS()
 class RTS_SURVIVAL_API ATankMaster : public ASelectablePawnMaster, public ITurretOwner,
                                      public IHarvesterInterface, public IRTSNavAgentInterface, public ICargoOwner,
-                                     public IAimOffsetProvider, public IShieldOwner, public IUnitVariantReceiver
+                                     public IAimOffsetProvider, public IShieldOwner
 {
 	GENERATED_BODY()
 
@@ -947,9 +946,6 @@ private:
 
 	void BeginPlay_SetupCollisionVsBuildings();
 	void BeginPlay_SetFactionFlagPrimitiveDataIndex();
-
-	// Pulls the player's variant for this tank type before techs are applied; see Docs/Units/UnitVariants.md.
-	void ApplyUnitVariant();
 
 	// the derived bp has already set the correct tank subtype before c++ begin play.
 	void BeginPlay_SetupData();

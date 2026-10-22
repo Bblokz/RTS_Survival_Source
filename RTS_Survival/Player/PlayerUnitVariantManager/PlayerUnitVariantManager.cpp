@@ -2,8 +2,7 @@
 
 #include "PlayerUnitVariantManager.h"
 
-#include "RTS_Survival/Player/PlayerTechManager/PlayerTechManager.h"
-#include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Units/Variants/UnitVariantDataAsset.h"
 #include "RTS_Survival/Units/Variants/UnitVariantSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -27,41 +26,77 @@ void UPlayerUnitVariantManager::InitFromProfile(const TArray<FUnitVariantSelecti
 #endif
 }
 
+void UPlayerUnitVariantManager::ApplySelectionsToSpawner(ARTSAsyncSpawner* AsyncSpawner)
+{
+	if (not IsValid(AsyncSpawner))
+	{
+		RTSFunctionLibrary::ReportError("Cannot apply the unit variant selections as the async spawner is not valid."
+			"\nAt function: UPlayerUnitVariantManager::ApplySelectionsToSpawner");
+		return;
+	}
+	M_AsyncSpawner = AsyncSpawner;
+	if (not GetIsValidVariantDataAsset())
+	{
+		return;
+	}
+	// The spawner reports each failure; dropping it keeps the selection equal to what actually spawns.
+	const TArray<FTrainingOption> FailedUnits = AsyncSpawner->ApplyPlayerUnitVariants(
+		*M_VariantDataAsset, GetSelectionsForSave());
+	for (const FTrainingOption& FailedUnit : FailedUnits)
+	{
+		M_SelectedVariants.Remove(FailedUnit);
+	}
+}
+
 EUnitVariant UPlayerUnitVariantManager::GetSelectedVariant(const FTrainingOption& Unit) const
 {
-	// Runs for every spawned unit: Find, never operator[], and no reporting here.
-	if (const EUnitVariant* SelectedVariant = M_SelectedVariants.Find(Unit))
+	// Runs on every training menu refresh: Find, never operator[], and no reporting here.
+	if (const EUnitVariant* SelectedVariant = M_SelectedVariants.Find(GetSpawnerKey(Unit)))
 	{
 		return *SelectedVariant;
 	}
 	return EUnitVariant::Base;
 }
 
-EUnitVariant UPlayerUnitVariantManager::ResolveVariantForUnit(const URTSComponent* RTSComponent) const
-{
-	if (not IsValid(RTSComponent))
-	{
-		return EUnitVariant::Base;
-	}
-	if (RTSComponent->GetOwningPlayer() != UPlayerTechManager::PlayerTechOwnerIndex)
-	{
-		return EUnitVariant::Base;
-	}
-	const EAllUnitType UnitType = RTSComponent->GetUnitType();
-	if (not GetIsUnitTypeSupported(UnitType))
-	{
-		return EUnitVariant::Base;
-	}
-	return GetSelectedVariant(FTrainingOption(UnitType, RTSComponent->GetUnitSubType()));
-}
-
 bool UPlayerUnitVariantManager::SetSelectedVariant(const FTrainingOption& Unit, const EUnitVariant Variant)
 {
-	CacheVariantDataAsset();
 	FUnitVariantSelection Selection;
-	Selection.Unit = Unit;
+	Selection.Unit = GetSpawnerKey(Unit);
 	Selection.Variant = Variant;
-	return StoreSelectionClamped(Selection);
+	if (not GetIsUnitTypeSupported(Selection.Unit.UnitType))
+	{
+		return false;
+	}
+	CacheVariantDataAsset();
+	const bool bWasStored = StoreSelectionClamped(Selection);
+	if (not GetIsValidAsyncSpawnerNoReport() || not GetIsValidVariantDataAsset())
+	{
+		return bWasStored;
+	}
+	// A clamp falls back to Base; the spawner follows the stored choice so selection and spawned class agree.
+	const EUnitVariant StoredVariant = GetSelectedVariant(Selection.Unit);
+	if (M_AsyncSpawner->SetPlayerUnitVariant(*M_VariantDataAsset, Selection.Unit, StoredVariant))
+	{
+		return bWasStored;
+	}
+	M_SelectedVariants.Remove(Selection.Unit);
+	return false;
+}
+
+FUnitVariantTrainingPresentation UPlayerUnitVariantManager::GetTrainingPresentation(const FTrainingOption& Unit) const
+{
+	const FTrainingOption SpawnerKey = GetSpawnerKey(Unit);
+	const EUnitVariant SelectedVariant = GetSelectedVariant(SpawnerKey);
+	if (SelectedVariant == EUnitVariant::Base)
+	{
+		return FUnitVariantTrainingPresentation();
+	}
+	const UUnitVariantDataAsset* VariantDataAsset = GetVariantDataAsset();
+	if (not IsValid(VariantDataAsset))
+	{
+		return FUnitVariantTrainingPresentation();
+	}
+	return VariantDataAsset->GetTrainingPresentation(SpawnerKey, SelectedVariant);
 }
 
 TArray<FUnitVariantSelection> UPlayerUnitVariantManager::GetSelectionsForSave() const
@@ -96,10 +131,20 @@ bool UPlayerUnitVariantManager::GetIsUnitTypeSupported(const EAllUnitType UnitTy
 	case EAllUnitType::UNType_BuildingExpansion:
 		return true;
 	default:
-		// Harvesters (Pz I harvester is an ATankMaster), nomadic trucks, aircraft, standalone turrets and garrison
-		// buildings stay on Base; see Docs/Units/UnitVariants.md section 10 to extend.
+		// Nomadic trucks, aircraft, standalone turrets and garrison buildings stay on Base; harvesters are keyed as
+		// tanks through GetSpawnerKey. See Docs/Units/UnitVariants.md section 13 to extend.
 		return false;
 	}
+}
+
+FTrainingOption UPlayerUnitVariantManager::GetSpawnerKey(const FTrainingOption& Unit)
+{
+	// The spawner's setup arrays key every tank subtype, the Pz I harvester included, under UNType_Tank.
+	if (Unit.UnitType == EAllUnitType::UNType_Harvester)
+	{
+		return FTrainingOption(EAllUnitType::UNType_Tank, Unit.SubtypeValue);
+	}
+	return Unit;
 }
 
 void UPlayerUnitVariantManager::BeginPlay()
@@ -115,54 +160,51 @@ void UPlayerUnitVariantManager::BeginPlay_LoadVariantDataAsset()
 
 void UPlayerUnitVariantManager::ApplyDebugForcedVariants()
 {
-	for (const FUnitVariantSelection& ForcedSelection : UUnitVariantSettings::Get()->DebugForcedVariants)
+	if (not GetIsValidVariantDataAsset())
 	{
-		if (not GetIsUnitTypeSupported(ForcedSelection.Unit.UnitType))
+		return;
+	}
+	for (const FUnitVariantSelection& ForcedSelection : M_VariantDataAsset->GetDebugForcedVariants())
+	{
+		if (not StoreSelectionClamped(ForcedSelection))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Unit variants: ignored forced variant for unsupported unit %s."),
-			       *ForcedSelection.Unit.GetTrainingName());
+			UE_LOG(LogTemp, Warning, TEXT("Unit variants: ignored forced variant %s for %s."),
+			       *Global_GetUnitVariantAsString(ForcedSelection.Variant), *ForcedSelection.Unit.GetTrainingName());
 			continue;
 		}
-		if (ForcedSelection.Variant == EUnitVariant::Base)
-		{
-			M_SelectedVariants.Remove(ForcedSelection.Unit);
-		}
-		else
-		{
-			M_SelectedVariants.Add(ForcedSelection.Unit, ForcedSelection.Variant);
-		}
-		UE_LOG(LogTemp, Warning,
-		       TEXT("Unit variants: FORCED %s -> %s from Project Settings > Unit Variants > Debug."),
-		       *ForcedSelection.Unit.GetTrainingName(), *Global_GetUnitVariantAsString(ForcedSelection.Variant));
+		UE_LOG(LogTemp, Warning, TEXT("Unit variants: FORCED %s -> %s from the Debug list of the unit variant data "
+			       "asset."), *ForcedSelection.Unit.GetTrainingName(),
+		       *Global_GetUnitVariantAsString(ForcedSelection.Variant));
 	}
 }
 
 bool UPlayerUnitVariantManager::StoreSelectionClamped(const FUnitVariantSelection& Selection)
 {
-	if (not GetIsUnitTypeSupported(Selection.Unit.UnitType))
+	const FTrainingOption SpawnerKey = GetSpawnerKey(Selection.Unit);
+	if (not GetIsUnitTypeSupported(SpawnerKey.UnitType))
 	{
 		return false;
 	}
 	if (Selection.Variant == EUnitVariant::Base)
 	{
-		M_SelectedVariants.Remove(Selection.Unit);
+		M_SelectedVariants.Remove(SpawnerKey);
 		return true;
 	}
 	if (not GetIsValidVariantDataAsset())
 	{
-		M_SelectedVariants.Remove(Selection.Unit);
+		M_SelectedVariants.Remove(SpawnerKey);
 		return false;
 	}
-	if (not M_VariantDataAsset->GetIsVariantImplemented(Selection.Unit, Selection.Variant))
+	if (not M_VariantDataAsset->GetIsVariantImplemented(SpawnerKey, Selection.Variant))
 	{
 		RTSFunctionLibrary::ReportError(FString::Printf(
 			TEXT("Unit variant %s is not implemented for %s in the unit variant data asset; the unit uses Base."
 				"\nAt function: UPlayerUnitVariantManager::StoreSelectionClamped"),
-			*Global_GetUnitVariantAsString(Selection.Variant), *Selection.Unit.GetTrainingName()));
-		M_SelectedVariants.Remove(Selection.Unit);
+			*Global_GetUnitVariantAsString(Selection.Variant), *SpawnerKey.GetTrainingName()));
+		M_SelectedVariants.Remove(SpawnerKey);
 		return false;
 	}
-	M_SelectedVariants.Add(Selection.Unit, Selection.Variant);
+	M_SelectedVariants.Add(SpawnerKey, Selection.Variant);
 	return true;
 }
 
@@ -184,4 +226,9 @@ bool UPlayerUnitVariantManager::GetIsValidVariantDataAsset() const
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_VariantDataAsset",
 	                                                             "GetIsValidVariantDataAsset", this);
 	return false;
+}
+
+bool UPlayerUnitVariantManager::GetIsValidAsyncSpawnerNoReport() const
+{
+	return M_AsyncSpawner.IsValid();
 }

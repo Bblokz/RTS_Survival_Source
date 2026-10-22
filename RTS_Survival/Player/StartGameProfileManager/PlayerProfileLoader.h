@@ -40,8 +40,14 @@ private:
 	void UpdateNomadicUnit(const TArray<FTrainingOption>& NomadicTrainingOptions, const ENomadicSubtype NomadicType) const;
 	void ApplyTechnologies(const TArray<ETechnology>& Technologies) const;
 	void ApplyResourceCards(const TArray<FUnitCost>& ResourceBonuses) const;
+	/**
+	 * @brief Stores the saved variant choices on the player's variant manager and swaps the spawner's classes.
+	 * @param UnitVariantSelections The selections saved in the profile.
+	 * @param PlayerController Owns the variant manager.
+	 * @param AsyncSpawner Already holds its base mappings and the director overrides.
+	 */
 	void ApplyUnitVariantSelections(const TArray<FUnitVariantSelection>& UnitVariantSelections,
-	                                const ACPPController* PlayerController) const;
+	                                const ACPPController* PlayerController, ARTSAsyncSpawner* AsyncSpawner) const;
 	
 	TArray<FTrainingOption> ExtractUnitsToCreate(const TArray<FCardSaveData>& SelectedCards);
 	TArray<FTrainingOption> ExtractTrainingOptionsOfType(const TArray<FCardSaveData>& SelectedCards, const ECardType TypeToExtract);

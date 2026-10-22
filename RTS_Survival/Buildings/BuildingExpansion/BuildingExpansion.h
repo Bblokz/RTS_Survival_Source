@@ -12,7 +12,6 @@
 #include "RTS_Survival/Collapse/DestroySpawnActorsParameters.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/RTSVerticalCollapseSettings.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
-#include "RTS_Survival/Interfaces/UnitVariantReceiver.h"
 #include "RTS_Survival/Weapons/Turret/TurretOwner/TurretOwner.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
@@ -53,8 +52,7 @@ DECLARE_MULTICAST_DELEGATE(FOnBxpCancelledPackingUp);
  * @note The previewmesh is loaded sync with game thread.
  */
 UCLASS()
-class RTS_SURVIVAL_API ABuildingExpansion : public ASelectableActorObjectsMaster, public ITurretOwner, public IAimOffsetProvider,
-                                           public IUnitVariantReceiver
+class RTS_SURVIVAL_API ABuildingExpansion : public ASelectableActorObjectsMaster, public ITurretOwner, public IAimOffsetProvider
 {
 	GENERATED_BODY()
 
@@ -181,8 +179,6 @@ protected:
 	bool GetIsValidBehaviourComponent() const;
 	virtual void CheckForUpgrades();
 
-	// Pulls the player's variant for this BXP type before techs are applied; fires while still a preview.
-	void ApplyUnitVariant();
 	
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void VerticalDestruction(
