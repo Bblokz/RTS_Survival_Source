@@ -28,6 +28,10 @@ class RTS_SURVIVAL_API AInfantryWeaponMaster : public ACPPWeaponsMaster, public 
 {
 	GENERATED_BODY()
 
+#if WITH_DEV_AUTOMATION_TESTS && !UE_BUILD_SHIPPING
+	friend struct FSquadAdvanceDiagnosticAccess;
+#endif
+
 public:
 	// Sets default values for this component's properties
 	AInfantryWeaponMaster();

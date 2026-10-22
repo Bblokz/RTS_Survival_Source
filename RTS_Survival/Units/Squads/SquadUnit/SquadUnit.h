@@ -406,6 +406,9 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 	GENERATED_BODY()
 
 	friend class ASquadController;
+#if WITH_DEV_AUTOMATION_TESTS && !UE_BUILD_SHIPPING
+	friend struct FSquadAdvanceDiagnosticAccess;
+#endif
 	friend class ATeamWeaponController;
 	// To call the movement functions.
 	friend class URepairComponent;

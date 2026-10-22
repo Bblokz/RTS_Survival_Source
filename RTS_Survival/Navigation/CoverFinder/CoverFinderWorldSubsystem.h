@@ -186,6 +186,10 @@ class RTS_SURVIVAL_API URTSCoverFinderWorldSubsystem : public UTickableWorldSubs
 {
 	GENERATED_BODY()
 
+#if WITH_DEV_AUTOMATION_TESTS && !UE_BUILD_SHIPPING
+	friend struct FSquadAdvanceDiagnosticAccess;
+#endif
+
 public:
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;

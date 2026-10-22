@@ -13,10 +13,15 @@ class ICommands;
 class URTSComponent;
 class UGameUnitManager;
 
+/** @brief Attach to commandable units to issue autonomous attack orders according to their engagement stance. */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API URTSTargetAcquisition : public UActorComponent
 {
 	GENERATED_BODY()
+
+#if WITH_DEV_AUTOMATION_TESTS && !UE_BUILD_SHIPPING
+	friend struct FSquadAdvanceDiagnosticAccess;
+#endif
 
 public:
 	// Sets default values for this component's properties
