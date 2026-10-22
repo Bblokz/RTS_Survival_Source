@@ -45,4 +45,19 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category="Fire Effect User Param Names")
 	FName Smoke_RGB_MltUserParamName = FName("Smoke_RGB_Mlt");
+
+	/** Most ground fire areas burning at once; at the cap a new fire replaces the one closest to burning out.
+	 * Keep the GroundFire pool size at least this large. */
+	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="1", UIMin="1"))
+	int32 MaxActiveGroundFires = 8;
+
+	/** A new ground fire of the same player whose centre lies within this fraction of the larger radius of a burning
+	 * area refreshes that area instead of starting a second one. */
+	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.0", UIMin="0.0"))
+	float GroundFireMergeDistanceFraction = 0.75f;
+
+	/** Spawn radius (cm) of the GroundFire Niagara system at component scale 1; the component is scaled in X/Y by
+	 * RadiusCm / this so the flames cover the burning area. */
+	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="1.0", UIMin="1.0"))
+	float GroundFireVfxBaseRadiusCm = 100.f;
 };

@@ -5,6 +5,7 @@
 #include "TimerManager.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/ERTSFireType.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/FRTSFireEffectParams.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/GroundFire/RTSGroundFireSettings.h"
 #include "RTSFireManager.generated.h"
 
 class UNiagaraComponent;
@@ -53,9 +54,33 @@ struct FRTSFirePool
 	TArray<int32> M_FreeList;
 };
 
+/** One burning patch of ground: its damage is dealt by the fire manager's tick, its flames are a pooled GroundFire. */
+struct FRTSGroundFireArea
+{
+	FRTSGroundFireSettings Settings;
+	FVector Location = FVector::ZeroVector;
+	float EndTimeSeconds = 0.f;
+	float LastDamageTimeSeconds = 0.f;
+	int32 OwningPlayer = 0;
+	int32 AreaHandle = INDEX_NONE;
+	// Pooled GroundFire Niagara of this area, or INDEX_NONE when the pool is not configured (the area still burns).
+	int32 VfxFireHandle = INDEX_NONE;
+};
+
+/** Outcome of a ground fire request. */
+struct FRTSGroundFireRequestResult
+{
+	// Handle of the area that burns for this request (new or refreshed), INDEX_NONE when nothing burns.
+	int32 AreaHandle = INDEX_NONE;
+	// True when the request refreshed an overlapping area of the same player instead of starting a new one.
+	bool bMergedIntoExistingArea = false;
+	// True when the cap was reached and the area closest to burning out was put out for this one.
+	bool bReplacedOldestArea = false;
+};
+
 /**
  * @brief Spawned by the fire subsystem to pool, activate, and recycle fire Niagara components.
- * Ticks every second to reclaim expired pooled fire instances.
+ * Ticks every second to reclaim expired pooled fire instances and to burn the ground fire areas.
  */
 UCLASS()
 class RTS_SURVIVAL_API ARTSFireManager : public AActor
@@ -127,7 +152,58 @@ public:
 	UFUNCTION(BlueprintCallable, Category="RTS|Fire")
 	bool StopFireByHandle(int32 FireHandle);
 
+	/**
+	 * @brief Start (or refresh) a burning ground area that damages the other side every manager tick.
+	 * Overlapping requests of the same player merge into one area; at the cap the area closest to burning out is
+	 * replaced. The flames are one pooled GroundFire Niagara per area, stopped when the area burns out.
+	 * @param Settings Radius, duration, damage per second and armor pen of the burn; ignored when not enabled.
+	 * @param GroundLocation Centre of the burning area on the ground.
+	 * @param OwningPlayer Player that caused the fire; it damages the units of the other side.
+	 * @return Which area burns for this request and whether it merged or replaced one.
+	 */
+	FRTSGroundFireRequestResult RequestGroundFire(const FRTSGroundFireSettings& Settings,
+	                                              const FVector& GroundLocation,
+	                                              int32 OwningPlayer);
+
+	/** @return Number of ground fire areas currently burning. */
+	int32 GetActiveGroundFireCount() const { return M_GroundFireAreas.Num(); }
+
+	/** @return Number of pooled fire effects of this type that are currently active. */
+	int32 GetActiveFireCount(ERTSFireType FireType) const;
+
+	/** @return Number of pooled fire effects of this type that are free for reuse. */
+	int32 GetFreeFireCount(ERTSFireType FireType) const;
+
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend struct FRTSGroundFireTestAccess;
+#endif
+
+	// Burning ground areas; at most M_MaxActiveGroundFires, damaged from Tick (no timer or tick per fire).
+	TArray<FRTSGroundFireArea> M_GroundFireAreas;
+	int32 M_NextGroundFireAreaHandle = 1;
+	int32 M_MaxActiveGroundFires = 8;
+	float M_GroundFireMergeDistanceFraction = 0.75f;
+	float M_GroundFireVfxBaseRadiusCm = 100.f;
+	bool bM_HasReportedMissingGroundFirePool = false;
+
+	FRTSGroundFireRequestResult RequestGroundFireAtTime(const FRTSGroundFireSettings& Settings,
+	                                                    const FVector& GroundLocation,
+	                                                    int32 OwningPlayer,
+	                                                    float CurrentTimeSeconds);
+	/** @brief Deal the burn damage owed since the last tick and put out the areas that burnt out. */
+	void TickGroundFires(float CurrentTimeSeconds);
+	int32 FindMergeableGroundFireIndex(const FRTSGroundFireSettings& Settings,
+	                                   const FVector& GroundLocation,
+	                                   int32 OwningPlayer) const;
+	int32 FindGroundFireClosestToBurningOut() const;
+	void MergeIntoGroundFire(FRTSGroundFireArea& Area, const FRTSGroundFireSettings& Settings,
+	                         float CurrentTimeSeconds) const;
+	int32 StartGroundFireVfx(const FRTSGroundFireSettings& Settings, const FVector& GroundLocation);
+	void PutOutGroundFireAt(int32 AreaIndex);
+	void DealGroundFireDamage(const FRTSGroundFireArea& Area, float BurnSeconds);
+	void InitGroundFireSettings(const URTSFirePoolSettings* Settings);
+
 	UPROPERTY()
 	TObjectPtr<USceneComponent> M_RootComponent = nullptr;
 

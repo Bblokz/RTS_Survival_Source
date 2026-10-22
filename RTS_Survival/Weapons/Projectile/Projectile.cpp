@@ -30,6 +30,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 
 // --- local helpers (file-scope) ------------------------------------------------
@@ -305,6 +306,9 @@ void AProjectile::SetupProjectileForNewLaunch(
 {
 	M_ShellType = ShellType;
 	M_ProjectileOwner = NewProjectileOwner;
+	ResetGroundFireForLaunch(IsValid(NewProjectileOwner)
+		                         ? NewProjectileOwner->GetRawWeaponData().GroundFire
+		                         : FRTSGroundFireSettings());
 	OnNewDamageType(DamageType);
 	M_OwningPlayer = OwningPlayer;
 	// NOTE: this cannot be applied on the weapon itself as it would provide misleading info to the player
@@ -386,6 +390,7 @@ void AProjectile::ApplyBarrageProjectileLaunchData(
 {
 	M_ShellType = WeaponData.ShellType;
 	M_ProjectileOwner = nullptr;
+	ResetGroundFireForLaunch(WeaponData.GroundFire);
 	OnNewDamageType(WeaponData.DamageType);
 	M_OwningPlayer = OwningPlayer;
 	M_Range = WeaponData.Range * DeveloperSettings::GameBalance::Weapons::Projectiles::DefaultProjectileRangeMlt;
@@ -1811,6 +1816,52 @@ float AProjectile::GetRadixiteDamageDurationSeconds() const
 	                   InterpolationFactor);
 }
 
+void AProjectile::ResetGroundFireForLaunch(const FRTSGroundFireSettings& GroundFireSettings)
+{
+	M_GroundFireSettings = GroundFireSettings;
+	bM_HasRequestedGroundFire = false;
+}
+
+void AProjectile::TryRequestGroundFire(const FVector& ImpactLocation, const ERTSSurfaceType HitSurface)
+{
+	if (bM_HasRequestedGroundFire || not M_GroundFireSettings.GetIsEnabled())
+	{
+		return;
+	}
+	bM_HasRequestedGroundFire = true;
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	URTSFireSubsystem* FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
+	if (not IsValid(FireSubsystem))
+	{
+		return;
+	}
+
+	// One landscape trace per incendiary impact: hull hits and timed (Air) bursts burn on the ground below.
+	constexpr float GroundTraceUpCm = 100.f;
+	constexpr float GroundTraceDownCm = 1500.f;
+	FHitResult GroundHit;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ProjectileGroundFireTrace), false, this);
+	const bool bFoundGround = World->LineTraceSingleByChannel(
+		GroundHit,
+		ImpactLocation + FVector(0.f, 0.f, GroundTraceUpCm),
+		ImpactLocation - FVector(0.f, 0.f, GroundTraceDownCm),
+		COLLISION_TRACE_LANDSCAPE,
+		QueryParams);
+	if (not bFoundGround && HitSurface == ERTSSurfaceType::Air)
+	{
+		// A real air burst far above the ground leaves nothing burning.
+		return;
+	}
+
+	const FVector GroundLocation = bFoundGround ? GroundHit.ImpactPoint : ImpactLocation;
+	FireSubsystem->RequestGroundFire(M_GroundFireSettings, GroundLocation, M_OwningPlayer);
+}
+
 bool AProjectile::GetIsValidWidgetPoolManager() const
 {
 	if (not M_AnimatedTextWidgetPoolManager.IsValid())
@@ -2192,6 +2243,9 @@ void AProjectile::SpawnExplosionHandleAOE(const FVector& Location, const FRotato
 		ShakeRequest.M_WorldLocation = Location;
 		M_CameraShakeSubsystem->RequestExplosionShake(ShakeRequest);
 	}
+
+	// Before the impact-data check: a surface without impact VFX must still burn.
+	TryRequestGroundFire(Location, HitSurface);
 
 	// Resolve impact data once.
 	const FRTSSurfaceImpactData* const Data = FindImpactData(M_ImpactVfx, HitSurface);

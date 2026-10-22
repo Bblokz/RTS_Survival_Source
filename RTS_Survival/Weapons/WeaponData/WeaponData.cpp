@@ -170,6 +170,7 @@ void FWeaponData::CopyWeaponDataValues(const FWeaponData* const WeaponData)
 	ShrapnelPen = WeaponData->ShrapnelPen;
 	ProjectileMovementSpeed = WeaponData->ProjectileMovementSpeed; // ← add
 	BehaviourAttributes = WeaponData->BehaviourAttributes;
+	GroundFire = WeaponData->GroundFire;
 }
 
 bool FLaunchEffectSettings::HasLaunchSettings() const
@@ -3416,18 +3417,34 @@ void UWeaponStateSplitterArchProjectile::SpawnSplitEffects(const FVector& SplitL
 
 FWeaponData UWeaponStateSplitterArchProjectile::BuildSplitProjectileData(const FWeaponData& SourceWeaponData) const
 {
-	FWeaponData SplitData = SourceWeaponData;
-	SplitData.WeaponCalibre = FMath::CeilToInt(
-		SourceWeaponData.WeaponCalibre * M_SplitterSettings.SplitSettings.SplitCalibreMultiplier);
-	SplitData.BaseDamage *= M_SplitterSettings.SplitSettings.SplitDamageMultiplier;
-	SplitData.ArmorPen *= M_SplitterSettings.SplitSettings.SplitArmorPenMultiplier;
-	SplitData.ArmorPenMaxRange *= M_SplitterSettings.SplitSettings.SplitArmorPenMultiplier;
-	SplitData.ShrapnelRange *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
-	SplitData.ShrapnelDamage *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
-	SplitData.ShrapnelPen *= M_SplitterSettings.SplitSettings.SplitAoeMultiplier;
+	return BuildSplitProjectileDataFromSettings(SourceWeaponData, M_SplitterSettings.SplitSettings);
+}
 
-	const float MinSpeedMultiplier = M_SplitterSettings.SplitSettings.SplitProjectileSpeedMultiplierMin;
-	const float MaxSpeedMultiplier = M_SplitterSettings.SplitSettings.SplitProjectileSpeedMultiplierMax;
+FWeaponData UWeaponStateSplitterArchProjectile::BuildSplitProjectileDataFromSettings(
+	const FWeaponData& SourceWeaponData,
+	const FSplitterArcWeaponSplitSettings& SplitSettings)
+{
+	// Same rule as the main shell in FireProjectile: the split shells are the same shell type, so they get the same
+	// shell multipliers (an HE-only gun stores its pen divided by HE_ArmorPenMlt; without this each split fired that
+	// neutralised x10 pen). Fire shells have no shell adjustment.
+	const bool bIsAPShell = (SourceWeaponData.ShellType == EWeaponShellType::Shell_AP) ||
+		(SourceWeaponData.ShellType == EWeaponShellType::Shell_APHE) ||
+		(SourceWeaponData.ShellType == EWeaponShellType::Shell_Railgun);
+	const bool bIsFireShell = (SourceWeaponData.ShellType == EWeaponShellType::Shell_Fire);
+	FWeaponData SplitData = (not bIsAPShell && not bIsFireShell)
+		                        ? GLOBAL_GetWeaponDataForShellType(SourceWeaponData)
+		                        : SourceWeaponData;
+
+	SplitData.WeaponCalibre = FMath::CeilToInt(SplitData.WeaponCalibre * SplitSettings.SplitCalibreMultiplier);
+	SplitData.BaseDamage *= SplitSettings.SplitDamageMultiplier;
+	SplitData.ArmorPen *= SplitSettings.SplitArmorPenMultiplier;
+	SplitData.ArmorPenMaxRange *= SplitSettings.SplitArmorPenMultiplier;
+	SplitData.ShrapnelRange *= SplitSettings.SplitAoeMultiplier;
+	SplitData.ShrapnelDamage *= SplitSettings.SplitAoeMultiplier;
+	SplitData.ShrapnelPen *= SplitSettings.SplitAoeMultiplier;
+
+	const float MinSpeedMultiplier = SplitSettings.SplitProjectileSpeedMultiplierMin;
+	const float MaxSpeedMultiplier = SplitSettings.SplitProjectileSpeedMultiplierMax;
 	const float SpeedMultiplierLow = FMath::Min(MinSpeedMultiplier, MaxSpeedMultiplier);
 	const float SpeedMultiplierHigh = FMath::Max(MinSpeedMultiplier, MaxSpeedMultiplier);
 	const float ProjectileSpeedMultiplier = FMath::FRandRange(SpeedMultiplierLow, SpeedMultiplierHigh);

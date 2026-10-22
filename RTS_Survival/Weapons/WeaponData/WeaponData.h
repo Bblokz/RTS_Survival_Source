@@ -8,6 +8,7 @@
 #include "RTSDamageTypes/RTSDamageTypes.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/GroundFire/RTSGroundFireSettings.h"
 #include "RTS_Survival/Weapons/LaserWeapon/LaserWeaponData.h"
 #include "RTS_Survival/Weapons/Projectile/ProjectileVfxSettings/ProjectileVfxSettings.h"
 #include "Sound/SoundCue.h"
@@ -234,6 +235,10 @@ struct FWeaponData
 
 	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	FBehaviourWeaponAttributes BehaviourAttributes;
+
+	// Lingering burning ground left by each projectile impact (incendiary weapons); off by default.
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
+	FRTSGroundFireSettings GroundFire;
 
 	void CopyWeaponDataValues(const FWeaponData* WeaponData);
 };
@@ -1305,12 +1310,16 @@ struct FSplitterArcWeaponSplitSettings
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float SplitCalibreMultiplier = 1.0f;
 
+	// The split multipliers below apply on top of the shell-adjusted stats (the shell type's multipliers, as the main
+	// shell gets them), so 1.0 = the same value as the main shell when fired.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float SplitDamageMultiplier = 1.0f;
 
+	// Pen and pen at max range of each split shell, e.g. 0.5 = half the main shell's pen.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float SplitArmorPenMultiplier = 1.0f;
 
+	// Scales shrapnel range, damage and pen together; for a fraction F of the blast area use sqrt(F) (1/6 -> 0.408).
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="0.0", UIMin="0.0"))
 	float SplitAoeMultiplier = 1.0f;
 
@@ -1657,6 +1666,17 @@ public:
 		const int32 NewMinBurstAmount = 0,
 		const bool bNewCreateShellCasingOnEveryRandomBurst = false,
 		const FSplitterArcWeaponSettings& NewSplitterSettings = FSplitterArcWeaponSettings());
+
+	/**
+	 * @brief Stat package of one split child shell: the source data with the shell-type multipliers applied (the same
+	 * rule as the main shell: AP, APHE, railgun and fire shells are not adjusted), then the split multipliers.
+	 * The projectile speed is rolled between the split speed multipliers.
+	 * @param SourceWeaponData Raw weapon data of the splitter weapon (before shell-type multipliers).
+	 * @param SplitSettings Split multipliers to apply on top of the shell-adjusted data.
+	 * @return Stats for one split child projectile.
+	 */
+	static FWeaponData BuildSplitProjectileDataFromSettings(const FWeaponData& SourceWeaponData,
+	                                                        const FSplitterArcWeaponSplitSettings& SplitSettings);
 
 protected:
 	virtual void FireWeaponSystem() override;

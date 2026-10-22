@@ -5,12 +5,15 @@
 #include "NiagaraSystem.h"
 #include "Engine/World.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/FirePoolSettings/RTSFirePoolSettings.h"
+#include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace RTSFireManagerConstants
 {
 	constexpr float FireManagerTickIntervalSeconds = 1.0f;
 	constexpr int32 MinimumPoolSize = 1;
+	// Below this much damage a tick sends no overlap query (e.g. a tick right after the area started).
+	constexpr float MinimumGroundFireDamagePerTick = 0.5f;
 }
 
 ARTSFireManager::ARTSFireManager()
@@ -49,6 +52,8 @@ void ARTSFireManager::Tick(float DeltaSeconds)
 			}
 		}
 	}
+
+	TickGroundFires(CurrentTimeSeconds);
 }
 
 void ARTSFireManager::InitFireManager(const URTSFirePoolSettings* Settings)
@@ -63,6 +68,7 @@ void ARTSFireManager::InitFireManager(const URTSFirePoolSettings* Settings)
 		return;
 	}
 
+	InitGroundFireSettings(Settings);
 	InitPoolsFromSettings(Settings);
 }
 
@@ -220,6 +226,237 @@ bool ARTSFireManager::StopFireByHandle(const int32 FireHandle)
 	}
 
 	return false;
+}
+
+FRTSGroundFireRequestResult ARTSFireManager::RequestGroundFire(const FRTSGroundFireSettings& Settings,
+                                                               const FVector& GroundLocation,
+                                                               const int32 OwningPlayer)
+{
+	if (not GetIsValidWorld())
+	{
+		return FRTSGroundFireRequestResult();
+	}
+
+	return RequestGroundFireAtTime(Settings, GroundLocation, OwningPlayer, GetWorld()->GetTimeSeconds());
+}
+
+int32 ARTSFireManager::GetActiveFireCount(const ERTSFireType FireType) const
+{
+	const FRTSFirePool* Pool = M_FirePools.Find(FireType);
+	if (Pool == nullptr)
+	{
+		return 0;
+	}
+
+	int32 ActiveCount = 0;
+	for (const FRTSFirePoolEntry& Entry : Pool->M_Entries)
+	{
+		ActiveCount += Entry.bM_IsActive ? 1 : 0;
+	}
+	return ActiveCount;
+}
+
+int32 ARTSFireManager::GetFreeFireCount(const ERTSFireType FireType) const
+{
+	const FRTSFirePool* Pool = M_FirePools.Find(FireType);
+	return Pool == nullptr ? 0 : Pool->M_FreeList.Num();
+}
+
+FRTSGroundFireRequestResult ARTSFireManager::RequestGroundFireAtTime(const FRTSGroundFireSettings& Settings,
+                                                                     const FVector& GroundLocation,
+                                                                     const int32 OwningPlayer,
+                                                                     const float CurrentTimeSeconds)
+{
+	FRTSGroundFireRequestResult Result;
+	if (not Settings.GetIsEnabled())
+	{
+		return Result;
+	}
+
+	// Three rockets of one salvo landing together keep one area burning instead of three.
+	const int32 MergeIndex = FindMergeableGroundFireIndex(Settings, GroundLocation, OwningPlayer);
+	if (MergeIndex != INDEX_NONE)
+	{
+		FRTSGroundFireArea& Area = M_GroundFireAreas[MergeIndex];
+		MergeIntoGroundFire(Area, Settings, CurrentTimeSeconds);
+		Result.AreaHandle = Area.AreaHandle;
+		Result.bMergedIntoExistingArea = true;
+		return Result;
+	}
+
+	if (M_GroundFireAreas.Num() >= M_MaxActiveGroundFires)
+	{
+		const int32 ReplaceIndex = FindGroundFireClosestToBurningOut();
+		if (ReplaceIndex != INDEX_NONE)
+		{
+			PutOutGroundFireAt(ReplaceIndex);
+			Result.bReplacedOldestArea = true;
+		}
+	}
+
+	FRTSGroundFireArea NewArea;
+	NewArea.Settings = Settings;
+	NewArea.Location = GroundLocation;
+	NewArea.EndTimeSeconds = CurrentTimeSeconds + Settings.DurationSeconds;
+	NewArea.LastDamageTimeSeconds = CurrentTimeSeconds;
+	NewArea.OwningPlayer = OwningPlayer;
+	NewArea.AreaHandle = M_NextGroundFireAreaHandle;
+	M_NextGroundFireAreaHandle = M_NextGroundFireAreaHandle >= MAX_int32 - 1 ? 1 : M_NextGroundFireAreaHandle + 1;
+	// The area may burn without flames when the pool is missing; gameplay does not depend on the VFX asset.
+	NewArea.VfxFireHandle = StartGroundFireVfx(Settings, GroundLocation);
+	M_GroundFireAreas.Add(NewArea);
+
+	Result.AreaHandle = NewArea.AreaHandle;
+	return Result;
+}
+
+void ARTSFireManager::TickGroundFires(const float CurrentTimeSeconds)
+{
+	// Reverse order: PutOutGroundFireAt swaps the last (already processed) area into the removed slot.
+	for (int32 AreaIndex = M_GroundFireAreas.Num() - 1; AreaIndex >= 0; --AreaIndex)
+	{
+		FRTSGroundFireArea& Area = M_GroundFireAreas[AreaIndex];
+		const float BurnUntilSeconds = FMath::Min(CurrentTimeSeconds, Area.EndTimeSeconds);
+		const float BurnSeconds = BurnUntilSeconds - Area.LastDamageTimeSeconds;
+		if (BurnSeconds > 0.f && Area.Settings.DamagePerSecond * BurnSeconds >=
+			RTSFireManagerConstants::MinimumGroundFireDamagePerTick)
+		{
+			DealGroundFireDamage(Area, BurnSeconds);
+			Area.LastDamageTimeSeconds = BurnUntilSeconds;
+		}
+
+		if (CurrentTimeSeconds >= Area.EndTimeSeconds)
+		{
+			PutOutGroundFireAt(AreaIndex);
+		}
+	}
+}
+
+int32 ARTSFireManager::FindMergeableGroundFireIndex(const FRTSGroundFireSettings& Settings,
+                                                    const FVector& GroundLocation,
+                                                    const int32 OwningPlayer) const
+{
+	int32 BestIndex = INDEX_NONE;
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	const int32 AreaCount = M_GroundFireAreas.Num();
+	for (int32 AreaIndex = 0; AreaIndex < AreaCount; ++AreaIndex)
+	{
+		const FRTSGroundFireArea& Area = M_GroundFireAreas[AreaIndex];
+		if (Area.OwningPlayer != OwningPlayer)
+		{
+			continue;
+		}
+
+		const float MergeDistance = M_GroundFireMergeDistanceFraction
+			* FMath::Max(Area.Settings.RadiusCm, Settings.RadiusCm);
+		const float DistanceSquared = FVector::DistSquared2D(Area.Location, GroundLocation);
+		if (DistanceSquared <= FMath::Square(MergeDistance) && DistanceSquared < BestDistanceSquared)
+		{
+			BestDistanceSquared = DistanceSquared;
+			BestIndex = AreaIndex;
+		}
+	}
+	return BestIndex;
+}
+
+int32 ARTSFireManager::FindGroundFireClosestToBurningOut() const
+{
+	int32 BestIndex = INDEX_NONE;
+	float EarliestEndTime = TNumericLimits<float>::Max();
+	const int32 AreaCount = M_GroundFireAreas.Num();
+	for (int32 AreaIndex = 0; AreaIndex < AreaCount; ++AreaIndex)
+	{
+		if (M_GroundFireAreas[AreaIndex].EndTimeSeconds < EarliestEndTime)
+		{
+			EarliestEndTime = M_GroundFireAreas[AreaIndex].EndTimeSeconds;
+			BestIndex = AreaIndex;
+		}
+	}
+	return BestIndex;
+}
+
+void ARTSFireManager::MergeIntoGroundFire(FRTSGroundFireArea& Area,
+                                          const FRTSGroundFireSettings& Settings,
+                                          const float CurrentTimeSeconds) const
+{
+	// Refresh, never stack: the area burns as long and as hard as the strongest fire that fed it.
+	Area.EndTimeSeconds = FMath::Max(Area.EndTimeSeconds, CurrentTimeSeconds + Settings.DurationSeconds);
+	Area.Settings.DurationSeconds = FMath::Max(Area.Settings.DurationSeconds, Settings.DurationSeconds);
+	Area.Settings.RadiusCm = FMath::Max(Area.Settings.RadiusCm, Settings.RadiusCm);
+	Area.Settings.DamagePerSecond = FMath::Max(Area.Settings.DamagePerSecond, Settings.DamagePerSecond);
+	Area.Settings.FullArmorPen = FMath::Max(Area.Settings.FullArmorPen, Settings.FullArmorPen);
+	Area.Settings.MaxArmorPen = FMath::Max(Area.Settings.MaxArmorPen, Settings.MaxArmorPen);
+}
+
+int32 ARTSFireManager::StartGroundFireVfx(const FRTSGroundFireSettings& Settings, const FVector& GroundLocation)
+{
+	if (not M_FirePools.Contains(ERTSFireType::GroundFire))
+	{
+		if (not bM_HasReportedMissingGroundFirePool)
+		{
+			bM_HasReportedMissingGroundFirePool = true;
+			RTSFunctionLibrary::ReportWarning(TEXT("ARTSFireManager: no GroundFire pool in RTSFirePoolSettings; "
+				"ground fires burn without flames."));
+		}
+		return INDEX_NONE;
+	}
+
+	// Spread the flames over the radius in X/Y only; the Niagara Scale parameter sizes the flames themselves.
+	const float SpreadScale = Settings.RadiusCm / FMath::Max(M_GroundFireVfxBaseRadiusCm, 1.f);
+	const FVector ComponentScale(SpreadScale, SpreadScale, 1.f);
+	FRTSFireEffectParams EffectParams;
+	EffectParams.Scale = Settings.VfxScale;
+	// Lifetime 0: no dormant timer per fire; the area puts its flames out when it burns out.
+	constexpr float KeepActiveUntilStopped = 0.f;
+	return ActivateFireAtLocation(ERTSFireType::GroundFire, KeepActiveUntilStopped, GroundLocation, ComponentScale,
+	                              EffectParams);
+}
+
+void ARTSFireManager::PutOutGroundFireAt(const int32 AreaIndex)
+{
+	if (not M_GroundFireAreas.IsValidIndex(AreaIndex))
+	{
+		return;
+	}
+
+	const int32 VfxFireHandle = M_GroundFireAreas[AreaIndex].VfxFireHandle;
+	if (VfxFireHandle != INDEX_NONE)
+	{
+		StopFireByHandle(VfxFireHandle);
+	}
+	M_GroundFireAreas.RemoveAtSwap(AreaIndex, 1, EAllowShrinking::No);
+}
+
+void ARTSFireManager::DealGroundFireDamage(const FRTSGroundFireArea& Area, const float BurnSeconds)
+{
+	const ETriggerOverlapLogic OverlapLogic = Area.OwningPlayer == 1
+		                                          ? ETriggerOverlapLogic::OverlapEnemy
+		                                          : ETriggerOverlapLogic::OverlapPlayer;
+	const TArray<TWeakObjectPtr<AActor>> NoActorsToIgnore;
+	// One async overlap per area per tick; measured to each victim's hull like the molotov burn.
+	FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
+		this,
+		Area.Location,
+		Area.Settings.RadiusCm,
+		Area.Settings.DamagePerSecond * BurnSeconds,
+		Area.Settings.DamageFalloffExponent,
+		Area.Settings.FullArmorPen,
+		Area.Settings.ArmorPenFallOff,
+		Area.Settings.MaxArmorPen,
+		ERTSDamageType::Fire,
+		OverlapLogic,
+		EShieldDamageSource::Flamethrower,
+		NoActorsToIgnore,
+		EVehicleModuleSplashPolicy::Ignore,
+		static_cast<EWeaponShellType>(0),
+		EAoeFalloffDistance::ClosestCollision);
+}
+
+void ARTSFireManager::InitGroundFireSettings(const URTSFirePoolSettings* Settings)
+{
+	M_MaxActiveGroundFires = FMath::Max(Settings->MaxActiveGroundFires, 1);
+	M_GroundFireMergeDistanceFraction = FMath::Max(Settings->GroundFireMergeDistanceFraction, 0.f);
+	M_GroundFireVfxBaseRadiusCm = FMath::Max(Settings->GroundFireVfxBaseRadiusCm, 1.f);
 }
 
 void ARTSFireManager::InitPoolsFromSettings(const URTSFirePoolSettings* Settings)

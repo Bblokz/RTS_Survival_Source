@@ -117,6 +117,18 @@ bool URTSFireSubsystem::StopFireByHandle(const int32 FireHandle)
 	return M_FireManager->StopFireByHandle(FireHandle);
 }
 
+int32 URTSFireSubsystem::RequestGroundFire(const FRTSGroundFireSettings& Settings,
+                                           const FVector& GroundLocation,
+                                           const int32 OwningPlayer)
+{
+	if (not Settings.GetIsEnabled() || not GetIsValidFireManager())
+	{
+		return INDEX_NONE;
+	}
+
+	return M_FireManager->RequestGroundFire(Settings, GroundLocation, OwningPlayer).AreaHandle;
+}
+
 bool URTSFireSubsystem::GetIsValidFireManager() const
 {
 	if (not IsValid(M_FireManager))

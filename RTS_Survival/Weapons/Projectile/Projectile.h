@@ -313,6 +313,19 @@ private:
 	UPROPERTY()
 	int32 M_WeaponCalibre = 0;
 
+	// Ground fire of the weapon that fired this launch; reset on every launch because projectiles are pooled.
+	FRTSGroundFireSettings M_GroundFireSettings;
+	// One ground fire per launch, also when the projectile overpenetrates and explodes more than once.
+	bool bM_HasRequestedGroundFire = false;
+
+	/**
+	 * @brief Ask the fire subsystem to burn the ground under the impact when the weapon is incendiary.
+	 * @param ImpactLocation Where the projectile exploded.
+	 * @param HitSurface Surface hit; an Air burst that finds no ground below does not burn.
+	 */
+	void TryRequestGroundFire(const FVector& ImpactLocation, ERTSSurfaceType HitSurface);
+	void ResetGroundFireForLaunch(const FRTSGroundFireSettings& GroundFireSettings);
+
 	// Begin Projectile Pool Settings
 
 	// The manager and index of this projectile in the pool.

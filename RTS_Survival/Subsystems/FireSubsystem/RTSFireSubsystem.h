@@ -4,6 +4,7 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/ERTSFireType.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/FRTSFireEffectParams.h"
+#include "RTS_Survival/Subsystems/FireSubsystem/GroundFire/RTSGroundFireSettings.h"
 #include "RTSFireSubsystem.generated.h"
 
 class ARTSFireManager;
@@ -85,6 +86,16 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category="RTS|Fire")
 	bool StopFireByHandle(int32 FireHandle);
+
+	/**
+	 * @brief Burn the ground at a location: pooled GroundFire flames plus fire damage to the other side each second.
+	 * Overlapping fires of the same player merge and the number of fires is capped (see URTSFirePoolSettings).
+	 * @param Settings Radius, duration and damage per second of the burn; nothing happens when not enabled.
+	 * @param GroundLocation Centre of the burning area on the ground.
+	 * @param OwningPlayer Player that caused the fire.
+	 * @return Handle of the area that burns for this request, or INDEX_NONE.
+	 */
+	int32 RequestGroundFire(const FRTSGroundFireSettings& Settings, const FVector& GroundLocation, int32 OwningPlayer);
 
 private:
 	UPROPERTY()
