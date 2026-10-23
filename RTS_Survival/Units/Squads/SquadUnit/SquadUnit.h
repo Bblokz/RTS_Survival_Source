@@ -437,10 +437,11 @@ public:
 
 	/**
 	 * @brief Lets a squad that closes range for an attack order leave behind the units that do not need to move.
-	 * One unit out of range moves the whole squad, which used to pull every other unit out of its cover as well.
-	 * @return True when this unit sits in cover and its own weapon has the ordered target in range.
+	 * One unit out of range moves the whole squad, which used to pull every other unit out of its position too,
+	 * so a short-ranged unit kept walking the riflemen forward.
+	 * @return True when this unit's own weapon has the ordered target in range, in cover or in the open.
 	 */
-	bool GetCanHoldCoverWhileSquadClosesRange() const;
+	bool GetMayKeepFiringWhileSquadClosesRange() const;
 
 	/**
 	 * @brief The squad's order to enter cover: reserves the best free point nearby and starts the walk to it.
@@ -732,8 +733,10 @@ protected:
 	/**
 	 * @brief Commands the unit to attack a specified target.
 	 * @param TargetActor The target actor to attack.
+	 * @param bIsAutonomousOrder True when the squad's own target acquisition picked the target; the unit then
+	 * keeps the cover grace it has for any weapon target instead of the stronger intent of a given order.
 	 */
-	void ExecuteAttackCommand(AActor* TargetActor);
+	void ExecuteAttackCommand(AActor* TargetActor, bool bIsAutonomousOrder);
 
 	void ExecuteAttackGroundCommand(const FVector& TargetLocation);
 	void TerminateAttackGroundCommand();
@@ -979,6 +982,10 @@ private:
 	UPROPERTY()
 	AActor* M_TargetActor;
 
+	// Set when the attack on M_TargetActor came from the squad's aggressive stance instead of an order; such an
+	// attack does not count as an attack order for cover decisions.
+	bool bM_IsAttackOrderAutonomous = false;
+
 	// Reference to the child actor comp that holds the weapon that is active.
 	UPROPERTY()
 	UChildActorComponent* M_ChildWeaponComp;
@@ -1193,6 +1200,9 @@ private:
 
 	// Cover must stay clearly inside weapon range, or entering it would make the squad walk closer again.
 	float GetMaximumCoverDistanceToTarget() const;
+
+	// Combat cover is kept at the distances this range fights at; zero when the unit has no weapon.
+	float GetCombatCoverWeaponRange() const;
 	bool GetIsSquadMateWalkingToCover() const;
 	void ReturnToProtectedCover(const TCHAR* Reason);
 
@@ -1329,6 +1339,7 @@ private:
 	 * @brief Picks the enemy the unit's cover is judged against.
 	 * Normally the weapon's target. Under an attack order it is the ordered enemy whenever that enemy is in
 	 * weapon range, also when the weapon is on someone else: the order has priority over staying in cover.
+	 * An attack the squad's aggressive stance started is not an order and is judged like any weapon target.
 	 * @param OutTargetLocation Where that enemy is.
 	 * @param bOutIsAttackOrderTarget True when the result is the enemy named by an attack order.
 	 * @return The enemy, or nullptr when there is nobody to judge the cover against.

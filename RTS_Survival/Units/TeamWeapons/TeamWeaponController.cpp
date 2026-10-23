@@ -2031,7 +2031,9 @@ void ATeamWeaponController::IssueSpecificEngageForGuards(AActor* TargetActor) co
 			continue;
 		}
 
-		SquadUnit->ExecuteAttackCommand(TargetActor);
+		// Crews of a team weapon take no automatic cover, which is all the order's provenance decides.
+		constexpr bool bIsAutonomousOrder = false;
+		SquadUnit->ExecuteAttackCommand(TargetActor, bIsAutonomousOrder);
 	}
 }
 

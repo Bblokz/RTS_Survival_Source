@@ -1,6 +1,8 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
-// Characterization tests: passing means the current advance policy was reproduced, not that it is desirable.
+// Regression tests for the squad advance fixes in Docs/Investigations/SquadAdvanceInvestigation.md: cover keeps the
+// weapon's engagement distance, in-range soldiers keep firing while the squad closes range, and attacks started by
+// the aggressive stance keep the cover grace time.
 // Even the includes, friend access, settings overrides and test registration are absent from Shipping builds.
 #if WITH_DEV_AUTOMATION_TESTS && !UE_BUILD_SHIPPING
 
@@ -17,6 +19,7 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/AISquadUnit/AISquadUnit.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
+#include "RTS_Survival/Weapons/WeaponAIState/WeaponAIState.h"
 #include "UObject/StrongObjectPtr.h"
 
 /** @brief Supplies controlled inputs to production decisions without adding gameplay hooks or reflected types. */
@@ -64,6 +67,13 @@ struct FSquadAdvanceDiagnosticAccess
 		Weapon.M_WeaponRangeData.ForceSetRange(Range);
 		Weapon.SetOwningPlayer(Soldier.GetOwningPlayer());
 		Weapon.M_TargetingData.SetTargetActor(&Target);
+		// Already engaging this target: an attack command on it needs no weapon state or timers.
+		Weapon.M_WeaponAIState = EWeaponAIState::SpecificEngage;
+	}
+
+	static void SetWeaponGroundTarget(AInfantryWeaponMaster& Weapon, const FVector& GroundLocation)
+	{
+		Weapon.M_TargetingData.SetTargetGround(GroundLocation);
 	}
 
 	static void SetRangeClosingState(ASquadUnit& Soldier, AAISquadUnit& Controller, const EAbilityID CombatAbility)
@@ -77,6 +87,17 @@ struct FSquadAdvanceDiagnosticAccess
 	static bool GetHasCommandPath(const ASquadUnit& Soldier)
 	{
 		return Soldier.M_CurrentPath.IsValid();
+	}
+
+	static void ExecuteAttack(ASquadUnit& Soldier, AActor& Target, const bool bIsAutonomousOrder)
+	{
+		Soldier.ExecuteAttackCommand(&Target, bIsAutonomousOrder);
+	}
+
+	static AActor* GetCoverJudgementTarget(const ASquadUnit& Soldier, bool& bOutIsAttackOrderTarget)
+	{
+		FVector TargetLocation = FVector::ZeroVector;
+		return Soldier.GetCoverJudgementTarget(TargetLocation, bOutIsAttackOrderTarget);
 	}
 
 	static void SetStance(URTSTargetAcquisition& Acquisition, const ERTSAggroBehaviour Stance)
@@ -105,7 +126,10 @@ namespace SquadAdvanceDiagnosticTestsPrivate
 	constexpr float MinimumScoreGain = 0.3f;
 	constexpr float MaximumAimYaw = 90.0f;
 	constexpr float ProtectedHalfAngle = 60.0f;
+	constexpr float MinimumEngagementRangeRatio = 0.35f;
+	constexpr float MaximumAdvanceDistance = 600.0f;
 	constexpr float WeaponRange = 3000.0f;
+	constexpr float ShortWeaponRange = 800.0f;
 	constexpr float PointBlankDistance = 200.0f;
 
 	/** @brief Restores every overridden setting on all exits so tests cannot leave the editor's tuning changed. */
@@ -120,6 +144,8 @@ namespace SquadAdvanceDiagnosticTestsPrivate
 		TGuardValue<float> ScoreGain;
 		TGuardValue<float> AimYaw;
 		TGuardValue<float> ProtectedAngle;
+		TGuardValue<float> EngagementRangeRatio;
+		TGuardValue<float> AdvanceDistance;
 
 		explicit FScopedCoverSettings(URTSCoverFinderDeveloperSettings& Settings)
 			: PlayerRadius(Settings.M_AutomaticCoverSearchRadius, PlayerSearchRadius),
@@ -130,7 +156,9 @@ namespace SquadAdvanceDiagnosticTestsPrivate
 			  Travel(Settings.M_CombatCoverTravelWeight, TravelWeight),
 			  ScoreGain(Settings.M_CombatCoverMinimumScoreGain, MinimumScoreGain),
 			  AimYaw(Settings.M_CombatCoverMaximumAimYawDegrees, MaximumAimYaw),
-			  ProtectedAngle(Settings.M_CombatCoverProtectedHalfAngleDegrees, ProtectedHalfAngle)
+			  ProtectedAngle(Settings.M_CombatCoverProtectedHalfAngleDegrees, ProtectedHalfAngle),
+			  EngagementRangeRatio(Settings.M_CombatCoverMinimumEngagementRangeRatio, MinimumEngagementRangeRatio),
+			  AdvanceDistance(Settings.M_CombatCoverMaximumAdvanceDistance, MaximumAdvanceDistance)
 		{
 		}
 	};
@@ -214,10 +242,29 @@ namespace SquadAdvanceDiagnosticTestsPrivate
 		Threats.ThreatLocations.Add(TargetLocation);
 		return Threats;
 	}
+
+	FRTSCombatCoverSettings MakeLimitSettings()
+	{
+		FRTSCombatCoverSettings Settings;
+		Settings.MinimumEngagementRangeRatio = MinimumEngagementRangeRatio;
+		Settings.MaximumAdvanceTowardTarget = MaximumAdvanceDistance;
+		return Settings;
+	}
+
+	/** @return Whether a point PointDistance from a target at the origin passes for a soldier SoldierDistance away. */
+	bool GetIsAllowedOnLine(const float SoldierDistance, const float PointDistance, const float Range)
+	{
+		const FRTSCombatCoverDistanceLimits Limits = FRTSCombatCoverScoring::BuildDistanceLimits(Range, MakeLimitSettings());
+		return FRTSCombatCoverScoring::GetIsWithinDistanceLimits(
+			MakePoint(1, FVector(PointDistance, 0.0f, 0.0f)),
+			FVector(SoldierDistance, 0.0f, 0.0f),
+			FVector::ZeroVector,
+			Limits);
+	}
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSquadAdvanceInitialCoverTest,
-	"RTS.Squads.AdvanceDiagnostics.EnemyInitialCoverCanApproachWithinTwoMetres",
+	"RTS.Squads.AdvanceDiagnostics.EnemyInitialCoverKeepsEngagementDistance",
 	SquadAdvanceDiagnosticTestsPrivate::TestFlags)
 
 bool FSquadAdvanceInitialCoverTest::RunTest(const FString& Parameters)
@@ -229,6 +276,7 @@ bool FSquadAdvanceInitialCoverTest::RunTest(const FString& Parameters)
 	constexpr float TargetDistance = 2600.0f;
 	constexpr float LateralDistance = 400.0f;
 	constexpr float SidewaysYaw = 70.0f;
+	constexpr float NoWeaponLimits = 0.0f;
 	AActor* Target = Fixture.SpawnTarget(FVector(TargetDistance, 0.0f, 0.0f));
 	if (not TestNotNull(TEXT("Isolated soldier exists"), Soldier) || not TestNotNull(TEXT("Traceable target exists"), Target))
 	{
@@ -243,27 +291,32 @@ bool FSquadAdvanceInitialCoverTest::RunTest(const FString& Parameters)
 	FSquadAdvanceDiagnosticAccess::SetOwningPlayer(*Soldier, PlayerOwnedTeam);
 	TestTrue(TEXT("Player finds lateral cover with a real target collision trace"), Subsystem->TryReserveCombatCoverPoint(
 		*Soldier, *Target, Threats, WeaponRange, nullptr, ChosenPoint));
-	TestEqual(TEXT("The 24 m advance is outside the player's 12 m search"), ChosenPoint.PointId, NearbyPoint.PointId);
+	TestEqual(TEXT("The player takes the nearby cover"), ChosenPoint.PointId, NearbyPoint.PointId);
 	Subsystem->ReleaseCoverReservation(*Soldier, ChosenPoint.PointId);
+
 	FSquadAdvanceDiagnosticAccess::SetOwningPlayer(*Soldier, EnemyOwnedTeam);
+	TestTrue(TEXT("Control: without weapon limits the enemy still finds cover"), Subsystem->TryReserveCombatCoverPoint(
+		*Soldier, *Target, Threats, NoWeaponLimits, nullptr, ChosenPoint));
+	TestEqual(TEXT("Control: on score alone the 24 m forward walk still beats sideways cover"),
+		ChosenPoint.PointId, ForwardPoint.PointId);
+	Subsystem->ReleaseCoverReservation(*Soldier, ChosenPoint.PointId);
 	TestTrue(TEXT("Enemy finds cover with the identical geometry"), Subsystem->TryReserveCombatCoverPoint(
 		*Soldier, *Target, Threats, WeaponRange, nullptr, ChosenPoint));
-	TestEqual(TEXT("The enemy chooses the 24 m forward walk over nearby sideways cover"), ChosenPoint.PointId, ForwardPoint.PointId);
-	TestEqual(TEXT("The selected cover is only 2 m from the enemy"),
-		FVector::Dist2D(ChosenPoint.Location, Target->GetActorLocation()), static_cast<double>(PointBlankDistance));
+	TestEqual(TEXT("The rifle's engagement distance rules out the point 2 m from the target"),
+		ChosenPoint.PointId, NearbyPoint.PointId);
+	Subsystem->ReleaseCoverReservation(*Soldier, ChosenPoint.PointId);
+
 	FRTSCoverPoint GoodNearbyPoint = NearbyPoint;
 	GoodNearbyPoint.CoverNormal = (GoodNearbyPoint.Location - Target->GetActorLocation()).GetSafeNormal2D();
 	FSquadAdvanceDiagnosticAccess::PublishCover(*Subsystem, {ForwardPoint, GoodNearbyPoint});
 	TestTrue(TEXT("Control: well-facing nearby cover remains usable"), Subsystem->TryReserveCombatCoverPoint(
 		*Soldier, *Target, Threats, WeaponRange, nullptr, ChosenPoint));
-	TestEqual(TEXT("Control: equally protective nearby cover wins; there is no unconditional forward preference"),
-		ChosenPoint.PointId, GoodNearbyPoint.PointId);
-	AddInfo(TEXT("REPRODUCED: cover selection alone accepts a 2400 cm advance ending 200 cm from the target."));
+	TestEqual(TEXT("Control: equally protective nearby cover wins"), ChosenPoint.PointId, GoodNearbyPoint.PointId);
 	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSquadAdvanceCoverRepositionTest,
-	"RTS.Squads.AdvanceDiagnostics.BetterAngleCanRepositionWithinTwoMetres",
+	"RTS.Squads.AdvanceDiagnostics.BetterAngleRepositionKeepsEngagementDistance",
 	SquadAdvanceDiagnosticTestsPrivate::TestFlags)
 
 bool FSquadAdvanceCoverRepositionTest::RunTest(const FString& Parameters)
@@ -274,6 +327,7 @@ bool FSquadAdvanceCoverRepositionTest::RunTest(const FString& Parameters)
 	ASquadUnit* Soldier = Fixture.Spawn<ASquadUnit>();
 	constexpr float TargetDistance = 1000.0f;
 	constexpr float FlankedCoverYaw = 75.0f;
+	constexpr float SidestepDistance = 300.0f;
 	AActor* Target = Fixture.SpawnTarget(FVector(TargetDistance, 0.0f, 0.0f));
 	if (not TestNotNull(TEXT("Isolated soldier exists"), Soldier) || not TestNotNull(TEXT("Traceable target exists"), Target))
 	{
@@ -285,24 +339,56 @@ bool FSquadAdvanceCoverRepositionTest::RunTest(const FString& Parameters)
 	FSquadAdvanceDiagnosticAccess::PublishCover(*Subsystem, {OccupiedPoint, ForwardPoint});
 	const FRTSCombatCoverThreats Threats = MakeThreats(Target->GetActorLocation());
 	FSquadAdvanceDiagnosticAccess::SetOwningPlayer(*Soldier, EnemyOwnedTeam);
-	FRTSCoverPoint ChosenPoint;
-	TestTrue(TEXT("An existing occupant is offered the forward point"), Subsystem->TryReserveCombatCoverPoint(
-		*Soldier, *Target, Threats, WeaponRange, &OccupiedPoint, ChosenPoint));
-	TestEqual(TEXT("The score-gain threshold accepts the point 2 m from the target"), ChosenPoint.PointId, ForwardPoint.PointId);
 	const FRTSCombatCoverSettings CombatSettings = FSquadAdvanceDiagnosticAccess::GetCombatSettings(*Subsystem);
 	float CurrentScore = 0.0f;
 	float ForwardScore = 0.0f;
 	FRTSCombatCoverScoring::TryScoreCoverPoint(OccupiedPoint, Soldier->GetActorLocation(), Threats, CombatSettings, CurrentScore);
 	FRTSCombatCoverScoring::TryScoreCoverPoint(ForwardPoint, Soldier->GetActorLocation(), Threats, CombatSettings, ForwardScore);
-	TestTrue(TEXT("The real reposition score confirms the selection"),
+	TestTrue(TEXT("Control: on score alone the forward point would be worth the walk"),
 		FRTSCombatCoverScoring::GetIsWorthRepositioning(CurrentScore, ForwardScore, CombatSettings));
-	AddInfo(FString::Printf(TEXT("REPRODUCED: improving the angle accepts an 800 cm advance; scores %.3f -> %.3f."),
-		CurrentScore, ForwardScore));
+	FRTSCoverPoint ChosenPoint;
+	TestFalse(TEXT("The occupant does not walk to the point 2 m from the target"), Subsystem->TryReserveCombatCoverPoint(
+		*Soldier, *Target, Threats, WeaponRange, &OccupiedPoint, ChosenPoint));
+
+	// Squarely faces the target from beside the soldier: no closer to the enemy, so it is still a valid move.
+	const FVector SidestepLocation(0.0f, SidestepDistance, 0.0f);
+	FRTSCoverPoint SidestepPoint = MakePoint(3, SidestepLocation);
+	SidestepPoint.CoverNormal = (SidestepLocation - Target->GetActorLocation()).GetSafeNormal2D();
+	FSquadAdvanceDiagnosticAccess::PublishCover(*Subsystem, {OccupiedPoint, ForwardPoint, SidestepPoint});
+	TestTrue(TEXT("A flanked occupant still repositions to better cover beside it"), Subsystem->TryReserveCombatCoverPoint(
+		*Soldier, *Target, Threats, WeaponRange, &OccupiedPoint, ChosenPoint));
+	TestEqual(TEXT("It takes the sidestep, not the forward point"), ChosenPoint.PointId, SidestepPoint.PointId);
+	AddInfo(FString::Printf(TEXT("Forward point refused despite scores %.3f -> %.3f."), CurrentScore, ForwardScore));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSquadAdvanceDistanceLimitsTest,
+	"RTS.Squads.AdvanceDiagnostics.EngagementDistanceFollowsWeaponRange",
+	SquadAdvanceDiagnosticTestsPrivate::TestFlags)
+
+bool FSquadAdvanceDistanceLimitsTest::RunTest(const FString& Parameters)
+{
+	using namespace SquadAdvanceDiagnosticTestsPrivate;
+	const FRTSCombatCoverDistanceLimits RifleLimits = FRTSCombatCoverScoring::BuildDistanceLimits(
+		WeaponRange, MakeLimitSettings());
+	TestEqual(TEXT("A rifle keeps 35% of its range"), RifleLimits.MinimumDistanceToTarget, 1050.0f);
+	TestEqual(TEXT("Cover stays inside 90% of weapon range"), RifleLimits.MaximumDistanceToTarget, 2700.0f);
+	TestTrue(TEXT("A rifleman may step 3 m forward to cover 12 m from the target"), GetIsAllowedOnLine(1500.0f, 1200.0f, WeaponRange));
+	TestFalse(TEXT("A rifleman does not walk to 2 m from the target"), GetIsAllowedOnLine(1500.0f, PointBlankDistance, WeaponRange));
+	TestFalse(TEXT("Nor 9 m forward, even to a point at a good distance"), GetIsAllowedOnLine(2600.0f, 1700.0f, WeaponRange));
+	TestTrue(TEXT("A short-ranged weapon may close to 3 m"), GetIsAllowedOnLine(700.0f, 300.0f, ShortWeaponRange));
+	TestFalse(TEXT("The same 3 m point is refused for a rifle"), GetIsAllowedOnLine(700.0f, 300.0f, WeaponRange));
+	TestTrue(TEXT("An enemy that walked up still leaves cover no closer than the soldier"),
+		GetIsAllowedOnLine(400.0f, 450.0f, WeaponRange));
+	TestFalse(TEXT("But not cover closer to that enemy"), GetIsAllowedOnLine(400.0f, 300.0f, WeaponRange));
+	TestTrue(TEXT("A soldier beyond the maximum may close that gap as well"), GetIsAllowedOnLine(2900.0f, 2200.0f, WeaponRange));
+	TestFalse(TEXT("Only that gap on top of the advance limit"), GetIsAllowedOnLine(2900.0f, 2000.0f, WeaponRange));
+	TestTrue(TEXT("Without a weapon range nothing is limited"), GetIsAllowedOnLine(2600.0f, PointBlankDistance, 0.0f));
 	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSquadAdvanceCoverDistanceTest,
-	"RTS.Squads.AdvanceDiagnostics.CoverScoreHasNoEnemyDistancePenalty",
+	"RTS.Squads.AdvanceDiagnostics.CoverScoreChargesTheWholeWalk",
 	SquadAdvanceDiagnosticTestsPrivate::TestFlags)
 
 bool FSquadAdvanceCoverDistanceTest::RunTest(const FString& Parameters)
@@ -316,13 +402,23 @@ bool FSquadAdvanceCoverDistanceTest::RunTest(const FString& Parameters)
 		Point, Point.Location, MakeThreats(FVector(WeaponRange, 0.0f, 0.0f)), Settings, FarTargetScore));
 	TestTrue(TEXT("Cover can aim at an enemy 2 m away"), FRTSCombatCoverScoring::TryScoreCoverPoint(
 		Point, Point.Location, MakeThreats(FVector(PointBlankDistance, 0.0f, 0.0f)), Settings, CloseTargetScore));
-	TestEqual(TEXT("30 m and 2 m separation receive exactly the same cover score"), CloseTargetScore, FarTargetScore);
-	AddInfo(TEXT("REPRODUCED: scoring uses protection, facing and travel, with no preferred combat separation."));
+	TestEqual(TEXT("The score leaves the distance to the enemy to the weapon's distance limits"),
+		CloseTargetScore, FarTargetScore);
+
+	constexpr float ReferenceWalk = 900.0f;
+	constexpr float LongWalk = 2400.0f;
+	const FRTSCombatCoverThreats Threats = MakeThreats(FVector(WeaponRange, 0.0f, 0.0f));
+	float ReferenceWalkScore = 0.0f;
+	float LongWalkScore = 0.0f;
+	FRTSCombatCoverScoring::TryScoreCoverPoint(
+		Point, FVector(0.0f, ReferenceWalk, 0.0f), Threats, Settings, ReferenceWalkScore);
+	FRTSCombatCoverScoring::TryScoreCoverPoint(Point, FVector(0.0f, LongWalk, 0.0f), Threats, Settings, LongWalkScore);
+	TestTrue(TEXT("A 24 m walk costs more than a 9 m walk"), LongWalkScore < ReferenceWalkScore);
 	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSquadAdvanceRangeClosingExemptionTest,
-	"RTS.Squads.AdvanceDiagnostics.OnlyOccupiedCoverIsExemptFromSquadRangeClosing",
+	"RTS.Squads.AdvanceDiagnostics.InRangeSoldiersKeepFiringWhileSquadClosesRange",
 	SquadAdvanceDiagnosticTestsPrivate::TestFlags)
 
 bool FSquadAdvanceRangeClosingExemptionTest::RunTest(const FString& Parameters)
@@ -333,8 +429,9 @@ bool FSquadAdvanceRangeClosingExemptionTest::RunTest(const FString& Parameters)
 	AInfantryWeaponMaster* Weapon = Fixture.Spawn<AInfantryWeaponMaster>();
 	constexpr float TargetDistance = 2000.0f;
 	AActor* Target = Fixture.SpawnTarget(FVector(TargetDistance, 0.0f, 0.0f));
+	AActor* OtherTarget = Fixture.SpawnTarget(FVector(0.0f, TargetDistance, 0.0f));
 	if (not TestNotNull(TEXT("Soldier exists"), Soldier) || not TestNotNull(TEXT("Weapon exists"), Weapon) ||
-		not TestNotNull(TEXT("Target exists"), Target))
+		not TestNotNull(TEXT("Target exists"), Target) || not TestNotNull(TEXT("Other target exists"), OtherTarget))
 	{
 		return false;
 	}
@@ -342,15 +439,23 @@ bool FSquadAdvanceRangeClosingExemptionTest::RunTest(const FString& Parameters)
 	FSquadAdvanceDiagnosticAccess::SetupWeapon(*Soldier, *Weapon, *Target, WeaponRange);
 	FSquadAdvanceDiagnosticAccess::SetCombatState(*Soldier, EAbilityID::IdAttack, Target);
 	TestTrue(TEXT("The actual weapon reports this soldier already in range"), Weapon->GetIsCurrentTargetInRange());
-	TestFalse(TEXT("An in-range soldier in the open is NOT exempt from squad range closing"),
-		Soldier->GetCanHoldCoverWhileSquadClosesRange());
+	TestTrue(TEXT("An in-range soldier in the open keeps firing"), Soldier->GetMayKeepFiringWhileSquadClosesRange());
 	FSquadAdvanceDiagnosticAccess::SetCoverState(*Soldier, ESquadUnitCoverState::MovingToCover);
-	TestFalse(TEXT("An in-range soldier walking into cover is also NOT exempt"), Soldier->GetCanHoldCoverWhileSquadClosesRange());
+	TestTrue(TEXT("An in-range soldier walking into cover keeps going there"), Soldier->GetMayKeepFiringWhileSquadClosesRange());
 	FSquadAdvanceDiagnosticAccess::SetCoverState(*Soldier, ESquadUnitCoverState::Protected);
-	TestTrue(TEXT("An in-range soldier occupying cover IS exempt"), Soldier->GetCanHoldCoverWhileSquadClosesRange());
+	TestTrue(TEXT("An in-range soldier occupying cover keeps it"), Soldier->GetMayKeepFiringWhileSquadClosesRange());
+	FSquadAdvanceDiagnosticAccess::SetupWeapon(*Soldier, *Weapon, *OtherTarget, WeaponRange);
+	TestFalse(TEXT("A soldier whose weapon is on another enemy closes on the ordered one"),
+		Soldier->GetMayKeepFiringWhileSquadClosesRange());
 	FSquadAdvanceDiagnosticAccess::SetupWeapon(*Soldier, *Weapon, *Target, PointBlankDistance);
-	TestFalse(TEXT("A short-range weapon loses that exemption, even in occupied cover"), Soldier->GetCanHoldCoverWhileSquadClosesRange());
-	AddInfo(TEXT("REPRODUCED: the squad-wide range-closing filter protects occupied cover, not all in-range soldiers."));
+	TestFalse(TEXT("A short-range weapon out of range does close in"), Soldier->GetMayKeepFiringWhileSquadClosesRange());
+
+	FSquadAdvanceDiagnosticAccess::SetupWeapon(*Soldier, *Weapon, *Target, WeaponRange);
+	FSquadAdvanceDiagnosticAccess::SetWeaponGroundTarget(*Weapon, Target->GetActorLocation());
+	FSquadAdvanceDiagnosticAccess::SetCombatState(*Soldier, EAbilityID::IdAttackGround, nullptr);
+	TestTrue(TEXT("An attack-ground soldier in range keeps firing"), Soldier->GetMayKeepFiringWhileSquadClosesRange());
+	FSquadAdvanceDiagnosticAccess::SetCombatState(*Soldier, EAbilityID::IdMove, nullptr);
+	TestFalse(TEXT("A soldier without a combat command is not exempt"), Soldier->GetMayKeepFiringWhileSquadClosesRange());
 	return true;
 }
 
@@ -378,13 +483,13 @@ bool FSquadAdvanceRangeStopTest::RunTest(const FString& Parameters)
 	FSquadAdvanceDiagnosticAccess::SetCombatState(*Soldier, EAbilityID::IdAttack, nullptr);
 	FSquadAdvanceDiagnosticAccess::SetCoverState(*Soldier, ESquadUnitCoverState::MovingToCover);
 	Soldier->OnSpecificTargetInRange();
+	// Intended: cover walks are kept inside the engagement distance by the cover selection instead.
 	TestTrue(TEXT("The same range notification leaves a cover walk active"), Soldier->GetIsOnItsWayIntoCover());
-	AddInfo(TEXT("REPRODUCED: the in-range stop exists for range closing; cover movement bypasses that stop."));
 	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSquadAdvanceAttackOrderToleranceTest,
-	"RTS.Squads.AdvanceDiagnostics.AggressiveAttackOrdersBypassCoverTargetTolerance",
+	"RTS.Squads.AdvanceDiagnostics.AggressiveAttackKeepsCoverTargetTolerance",
 	SquadAdvanceDiagnosticTestsPrivate::TestFlags)
 
 bool FSquadAdvanceAttackOrderToleranceTest::RunTest(const FString& Parameters)
@@ -395,15 +500,39 @@ bool FSquadAdvanceAttackOrderToleranceTest::RunTest(const FString& Parameters)
 		FSquadAdvanceDiagnosticAccess::GetCanAggro(*Acquisition));
 	FSquadAdvanceDiagnosticAccess::SetStance(*Acquisition, ERTSAggroBehaviour::Stance_Aggressive);
 	TestTrue(TEXT("Aggressive stance allows autonomous attack orders"), FSquadAdvanceDiagnosticAccess::GetCanAggro(*Acquisition));
+
+	FDecisionWorld Fixture;
+	ASquadUnit* Soldier = Fixture.Spawn<ASquadUnit>();
+	AInfantryWeaponMaster* Weapon = Fixture.Spawn<AInfantryWeaponMaster>();
+	constexpr float TargetDistance = 2000.0f;
+	AActor* Target = Fixture.SpawnTarget(FVector(TargetDistance, 0.0f, 0.0f));
+	if (not TestNotNull(TEXT("Soldier exists"), Soldier) || not TestNotNull(TEXT("Weapon exists"), Weapon) ||
+		not TestNotNull(TEXT("Target exists"), Target))
+	{
+		return false;
+	}
+	FSquadAdvanceDiagnosticAccess::SetOwningPlayer(*Soldier, EnemyOwnedTeam);
+	FSquadAdvanceDiagnosticAccess::SetupWeapon(*Soldier, *Weapon, *Target, WeaponRange);
+	constexpr bool bAutonomousOrder = true;
+	constexpr bool bGivenOrder = false;
+	bool bIsAttackOrderTarget = false;
+	FSquadAdvanceDiagnosticAccess::ExecuteAttack(*Soldier, *Target, bGivenOrder);
+	TestEqual(TEXT("A given order judges cover against the ordered enemy"),
+		FSquadAdvanceDiagnosticAccess::GetCoverJudgementTarget(*Soldier, bIsAttackOrderTarget), Target);
+	TestTrue(TEXT("A given order keeps its stronger intent"), bIsAttackOrderTarget);
+	FSquadAdvanceDiagnosticAccess::ExecuteAttack(*Soldier, *Target, bAutonomousOrder);
+	TestEqual(TEXT("An autonomous attack judges cover against the weapon's target"),
+		FSquadAdvanceDiagnosticAccess::GetCoverJudgementTarget(*Soldier, bIsAttackOrderTarget), Target);
+	TestFalse(TEXT("An autonomous attack is not treated as an attack order"), bIsAttackOrderTarget);
+
 	constexpr float TargetChangeToleranceSeconds = 2.5f;
 	constexpr float JustLostTargetSeconds = 0.0f;
-	TestEqual(TEXT("An automatically engaged weapon target gets cover grace time"),
-		FRTSCombatCoverScoring::DecideOnInvalidTarget(false, JustLostTargetSeconds, TargetChangeToleranceSeconds),
+	TestEqual(TEXT("So an autonomous attack target gets the cover grace time"),
+		FRTSCombatCoverScoring::DecideOnInvalidTarget(bIsAttackOrderTarget, JustLostTargetSeconds, TargetChangeToleranceSeconds),
 		ERTSCoverInvalidTargetDecision::StayInCover);
-	TestEqual(TEXT("The same invalid target on an attack order causes immediate cover exit"),
+	TestEqual(TEXT("While a given attack order still leaves cover at once"),
 		FRTSCombatCoverScoring::DecideOnInvalidTarget(true, JustLostTargetSeconds, TargetChangeToleranceSeconds),
 		ERTSCoverInvalidTargetDecision::LeaveCover);
-	AddInfo(TEXT("REPRODUCED: attack-order cover policy has no distinction between an aggressive auto-order and a player order."));
 	return true;
 }
 

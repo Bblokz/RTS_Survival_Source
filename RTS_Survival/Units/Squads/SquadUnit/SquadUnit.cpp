@@ -678,17 +678,18 @@ bool ASquadUnit::GetIsOnItsWayIntoCover() const
 	return M_CoverRuntimeState.GetHasAssignment() && not M_CoverRuntimeState.GetIsOccupyingCover();
 }
 
-bool ASquadUnit::GetCanHoldCoverWhileSquadClosesRange() const
+bool ASquadUnit::GetMayKeepFiringWhileSquadClosesRange() const
 {
-	const bool bHoldsCoverOnAttackOrder = M_CoverRuntimeState.GetIsOccupyingCover() &&
-		M_ActiveCommand == EAbilityID::IdAttack && IsValid(M_TargetActor);
-	if (not bHoldsCoverOnAttackOrder || not GetIsValidWeapon())
+	const bool bIsAttackingActor = M_ActiveCommand == EAbilityID::IdAttack && IsValid(M_TargetActor);
+	const bool bIsAttackingGround = M_ActiveCommand == EAbilityID::IdAttackGround;
+	if (not (bIsAttackingActor || bIsAttackingGround) || not GetIsValidWeapon())
 	{
 		return false;
 	}
-	// A unit that cannot engage the ordered target from its point gives the point up through the cover update.
-	return M_InfantryWeapon->GetCurrentTargetActor() == M_TargetActor &&
-		M_InfantryWeapon->GetIsCurrentTargetInRange();
+	// A unit that cannot engage the ordered target from its cover point gives the point up through the cover
+	// update; a unit walking into cover goes to a point inside weapon range.
+	const bool bWeaponIsOnOrderedTarget = bIsAttackingGround || M_InfantryWeapon->GetCurrentTargetActor() == M_TargetActor;
+	return bWeaponIsOnOrderedTarget && M_InfantryWeapon->GetIsCurrentTargetInRange();
 }
 
 bool ASquadUnit::GetIsCoverPointRejectedForTarget(const int64 PointId) const
@@ -787,7 +788,7 @@ bool ASquadUnit::TryReserveAndWalkToCover(
 			*this,
 			*TargetActor,
 			BuildCombatCoverThreats(*TargetActor, TargetLocation),
-			GetMaximumCoverDistanceToTarget(),
+			GetCombatCoverWeaponRange(),
 			nullptr,
 			CoverPoint)
 		: CoverSubsystem.TryReserveBestCoverPoint(*this, nullptr, TargetLocation, CoverPoint);
@@ -814,9 +815,12 @@ bool ASquadUnit::TryReserveAndWalkToCover(
 
 float ASquadUnit::GetMaximumCoverDistanceToTarget() const
 {
-	// Stay clearly inside weapon range so entering cover can never trigger range-closing squad movement.
-	constexpr float CoverWeaponRangeRatio = 0.9f;
-	return GetIsValidWeapon() ? M_InfantryWeapon->GetMaxWeaponRange() * CoverWeaponRangeRatio : 0.0f;
+	return FRTSCombatCoverScoring::GetMaximumCoverDistanceToTarget(GetCombatCoverWeaponRange());
+}
+
+float ASquadUnit::GetCombatCoverWeaponRange() const
+{
+	return GetIsValidWeapon() ? M_InfantryWeapon->GetMaxWeaponRange() : 0.0f;
 }
 
 FRTSCombatCoverThreats ASquadUnit::BuildCombatCoverThreats(
@@ -913,7 +917,7 @@ bool ASquadUnit::TryRepositionToBetterCombatCover(
 		*this,
 		TargetActor,
 		BuildCombatCoverThreats(TargetActor, TargetLocation),
-		GetMaximumCoverDistanceToTarget(),
+		GetCombatCoverWeaponRange(),
 		&OccupiedPoint,
 		BetterPoint))
 	{
@@ -2629,7 +2633,9 @@ AActor* ASquadUnit::GetCoverJudgementTarget(FVector& OutTargetLocation, bool& bO
 {
 	bOutIsAttackOrderTarget = false;
 	AActor* WeaponTarget = GetCurrentCoverTarget(OutTargetLocation);
-	const bool bHasAttackOrder = M_ActiveCommand == EAbilityID::IdAttack && IsValid(M_TargetActor);
+	// An attack the aggressive stance started keeps the grace time a weapon target gets.
+	const bool bHasAttackOrder = M_ActiveCommand == EAbilityID::IdAttack && IsValid(M_TargetActor) &&
+		not bM_IsAttackOrderAutonomous;
 	if (not bHasAttackOrder)
 	{
 		return WeaponTarget;
@@ -3357,9 +3363,10 @@ void ASquadUnit::MoveToActorAndBindOnCompleted(
 }
 
 
-void ASquadUnit::ExecuteAttackCommand(AActor* TargetActor)
+void ASquadUnit::ExecuteAttackCommand(AActor* TargetActor, const bool bIsAutonomousOrder)
 {
 	M_TargetActor = TargetActor;
+	bM_IsAttackOrderAutonomous = bIsAutonomousOrder;
 	M_ActiveCommand = EAbilityID::IdAttack;
 	M_CombatAbilityBeforeRangeClosing = EAbilityID::IdAttack;
 	M_RangeClosingRequestID = FAIRequestID::InvalidRequest;
