@@ -1907,9 +1907,10 @@ void ASquadController::GeneralMoveToForAbility(const FVector& MoveToLocation, co
 		{
 			continue;
 		}
-		// Closing range is only needed by the units that are out of range; the others keep firing from cover.
+		// Closing range is only needed by the units that are out of range; the others keep firing from where they
+		// are, in cover or in the open.
 		if (AbilityID == EAbilityID::IdNoAbility_MoveCloserToTarget &&
-			SquadUnit->GetCanHoldCoverWhileSquadClosesRange())
+			SquadUnit->GetMayKeepFiringWhileSquadClosesRange())
 		{
 			continue;
 		}
@@ -2213,9 +2214,18 @@ void ASquadController::ExecuteAttackCommand(AActor* TargetActor)
 	{
 		if (GetIsValidSquadUnit(SquadUnit))
 		{
-			SquadUnit->ExecuteAttackCommand(TargetActor);
+			SquadUnit->ExecuteAttackCommand(TargetActor, bM_IsIssuingAutonomousAttack);
 		}
 	}
+}
+
+void ASquadController::IssueAutonomousAttack(AActor* TargetActor)
+{
+	// Replacing the queue starts the attack inside AttackActor, so ExecuteAttackCommand still sees the flag. An
+	// attack that only starts later counts as a given order, which is what every attack used to be.
+	constexpr bool bReplaceQueue = true;
+	TGuardValue<bool> IssuingAutonomousAttack(bM_IsIssuingAutonomousAttack, true);
+	AttackActor(TargetActor, bReplaceQueue);
 }
 
 void ASquadController::TerminateAttackCommand()

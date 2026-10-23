@@ -495,6 +495,13 @@ public:
 	virtual void OnSquadUnitOutOfRange(
 		const FVector& TargetLocation,
 		EAbilityID CombatAbility);
+
+	/**
+	 * @brief Called by the squad's target acquisition instead of AttackActor, so its soldiers know the attack is
+	 * their own choice: they keep the cover grace time of a weapon target instead of obeying it like an order.
+	 * @param TargetActor The enemy the aggressive stance picked.
+	 */
+	void IssueAutonomousAttack(AActor* TargetActor);
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	virtual bool GetSquadAlreadyHasTeamWeapon() const;
 
@@ -1085,6 +1092,9 @@ protected:
 
 	UPROPERTY()
 	FSquadRangeClosingGuard M_RangeClosingGuard;
+
+	// Only true inside IssueAutonomousAttack, so the attack it starts reaches the soldiers as autonomous.
+	bool bM_IsIssuingAutonomousAttack = false;
 
 	/**
 	 * @brief Decides whether the squad may try to walk closer to its attack target now.

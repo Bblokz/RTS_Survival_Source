@@ -24,6 +24,16 @@ void USquadTargetAcquisition::BeginPlay()
 	Super::BeginPlay();
 }
 
+void USquadTargetAcquisition::IssueAttackClosestVisibleTargetInAggroRange(AActor* TargetActor)
+{
+	if (not GetIsValidOwningSquad())
+	{
+		return;
+	}
+	// Marks the attack as the stance's own choice instead of an order.
+	M_OwningSquad->IssueAutonomousAttack(TargetActor);
+}
+
 ETargetPreference USquadTargetAcquisition::GetOwnerTargetPreference() const
 {
 	if (not GetIsValidOwningSquad())

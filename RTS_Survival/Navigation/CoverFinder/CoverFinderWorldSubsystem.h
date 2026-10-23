@@ -269,7 +269,8 @@ public:
 	 * @param SquadUnit Unit requesting a point.
 	 * @param TargetActor The enemy the unit shoots at; it must be reachable by a firing lane from the point.
 	 * @param Threats That target's location plus the other enemies the unit's squad is engaging.
-	 * @param MaximumDistanceToTarget Keeps the point inside weapon range of the target; zero disables the limit.
+	 * @param WeaponRange Range of the unit's weapon; keeps the point inside it and at the distance that weapon
+	 * fights at, never far forward toward the target. Zero disables these distance limits.
 	 * @param OccupiedCoverPoint The point the unit holds now, or nullptr; the result must be clearly better.
 	 * @param OutCoverPoint Reserved point when successful.
 	 * @return True when a point was reserved; false keeps the unit where it is.
@@ -278,7 +279,7 @@ public:
 		ASquadUnit& SquadUnit,
 		AActor& TargetActor,
 		const FRTSCombatCoverThreats& Threats,
-		float MaximumDistanceToTarget,
+		float WeaponRange,
 		const FRTSCoverPoint* OccupiedCoverPoint,
 		FRTSCoverPoint& OutCoverPoint);
 
@@ -1015,6 +1016,22 @@ private:
 
 	// Free, reachable, not just given up by this unit, and its cover object still exists.
 	bool GetIsCoverPointAvailableToUnit(const FRTSCoverPoint& CoverPoint, const ASquadUnit& SquadUnit) const;
+
+	/**
+	 * @brief The cheap checks a point must pass before it is scored as combat cover for this unit.
+	 * @param CoverPoint Candidate point.
+	 * @param SquadUnit Unit requesting a point.
+	 * @param OccupiedCoverPoint The point the unit holds now, or nullptr; it is never its own candidate.
+	 * @param TargetLocation Where the unit's target is.
+	 * @param DistanceLimits The engagement distances of the unit's weapon.
+	 * @return True when the point may be scored.
+	 */
+	bool GetIsCombatCoverCandidate(
+		const FRTSCoverPoint& CoverPoint,
+		const ASquadUnit& SquadUnit,
+		const FRTSCoverPoint* OccupiedCoverPoint,
+		const FVector& TargetLocation,
+		const FRTSCombatCoverDistanceLimits& DistanceLimits) const;
 	bool GetIsPointReservedByAnotherUnit(int64 PointId, const ASquadUnit& SquadUnit) const;
 	bool GetIsCoverPointTemporarilyUnreachable(int64 PointId) const;
 	void RebuildPublishedCoverPoints();
