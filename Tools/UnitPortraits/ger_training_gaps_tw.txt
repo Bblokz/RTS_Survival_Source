@@ -1,0 +1,6 @@
+# Team weapon guns (the gun actor, not the squad) for training images (2026-10-22); run with -UnitPortraitShots=0.
+T_Ger_TeamWeapon_Pak38=/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Pak38_50mm/Ger_TW_Pak38.Ger_TW_Pak38_C
+T_Ger_TeamWeapon_Pak40=/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Pak40_75MM/Ger_TW_Pak40.Ger_TW_Pak40_C
+T_Ger_TeamWeapon_Flak88=/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Flak88Wheels/Ger_TW_Flak88.Ger_TW_Flak88_C
+T_Ger_TeamWeapon_LeFH18=/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/LefhHowitzer/BP_TW_Lefh.BP_TW_Lefh_C
+T_Ger_TeamWeapon_Morser210=/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Morser210MM/BP_TW_Morser.BP_TW_Morser_C
