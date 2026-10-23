@@ -1,0 +1,4 @@
+# Units in the faction menu without a DT_TrainingOptions image (2026-10-22). Name = portrait file stem.
+T_Ger_LightTank_PanzerII_Luchs=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/PanzerII_Luchs/Ger_Vehicle_PanzerII_Luchs.Ger_Vehicle_PanzerII_Luchs_C
+T_Ger_ArmoredCar_Sdkfz7_Flakvierling=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz7_Flak/Ger_Vehicle_Sdkfz7Flak.Ger_Vehicle_Sdkfz7Flak_C
+T_Ger_HeavyTank_TigerH1=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/Tiger/Ger_Vehicle_TigerH1.Ger_Vehicle_TigerH1_C

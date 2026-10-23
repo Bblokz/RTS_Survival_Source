@@ -1,0 +1,17 @@
+# Training icons for the faction menu units that had no DT_TrainingOptions image (2026-10-22).
+# <icon stem>=<portrait>|<class glyph>|<role glyph>; glyphs from engrave_icons.py extract.
+T_Ger_MediumTank_PZIV_H=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIV_H.png|class_medium|-
+T_Ger_HeavyTank_Tiger1_Rail=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_Tiger1_Rail.png|class_heavy|role_rail
+T_Ger_ArmoredCar_Sdkfz251_Mortar=D:/UE_Assets/Icons/TrainingUI/GerTanks/ArmoredCars/NoIcon/T_Ger_ArmoredCar_Sdkfz251_Mortar.png|class_artillery|-
+T_Ger_LightTank_Panzer38t_R=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_Panzer38t_R.png|class_light|role_rockets
+T_Ger_ArmoredCar_Sdkfz7_Flakvierling=D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_crop/T_Ger_ArmoredCar_Sdkfz7_Flakvierling/T_Ger_ArmoredCar_Sdkfz7_Flakvierling_FrontRight_shot1_t1.png|class_light|role_anti_air
+T_Ger_HeavyTank_TigerH1=D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_crop/T_Ger_HeavyTank_TigerH1/T_Ger_HeavyTank_TigerH1_FrontRight_shot2_t0.png|class_heavy|-
+T_Ger_LightTank_PanzerII_Luchs=D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_crop/T_Ger_LightTank_PanzerII_Luchs/T_Ger_LightTank_PanzerII_Luchs_FrontRight_shot1_t3.png|class_light|role_autocannon
+T_Ger_TeamWeapon_Pak38=D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_tw_crop14/T_Ger_TeamWeapon_Pak38/T_Ger_TeamWeapon_Pak38_FrontRight_idle.png|class_tank_hunter|-
+T_Ger_TeamWeapon_Pak40=D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_tw_crop14/T_Ger_TeamWeapon_Pak40/T_Ger_TeamWeapon_Pak40_FrontRight_idle.png|class_tank_hunter|-
+T_Ger_TeamWeapon_Flak88=D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_tw_crop14/T_Ger_TeamWeapon_Flak88/T_Ger_TeamWeapon_Flak88_FrontRight_idle.png|class_tank_hunter|role_anti_air
+T_Ger_TeamWeapon_LeFH18=D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_tw_crop14/T_Ger_TeamWeapon_LeFH18/T_Ger_TeamWeapon_LeFH18_FrontRight_idle.png|class_artillery|-
+T_Ger_TeamWeapon_Morser210=D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_tw_crop14/T_Ger_TeamWeapon_Morser210/T_Ger_TeamWeapon_Morser210_FrontRight_idle.png|class_artillery|-
+T_Ger_LightTank_Pz38_Rail=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/T_Ger_LightTank_Pz38_Rail.png|-|-
+T_Ger_MediumTank_PZIV_Rockets=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/T_Ger_MediumTank_PZIV_Rockets.png|-|-
+T_Ger_LightTank_PzJager_Laser=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/T_Ger_LightTank_PzJager_Laser.png|-|-
