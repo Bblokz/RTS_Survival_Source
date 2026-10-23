@@ -1452,6 +1452,11 @@ FRTSCombatCoverSettings URTSCoverFinderWorldSubsystem::BuildCombatCoverSettings(
 	CombatSettings.TravelWeight = FMath::Max(0.0f, CoverSettings->M_CombatCoverTravelWeight);
 	CombatSettings.TravelReferenceDistance = FMath::Max(100.0f, CoverSettings->M_CombatCoverRepositionRadius);
 	CombatSettings.MinimumScoreGain = FMath::Max(0.0f, CoverSettings->M_CombatCoverMinimumScoreGain);
+	CombatSettings.MinimumEngagementRangeRatio = FMath::Clamp(
+		CoverSettings->M_CombatCoverMinimumEngagementRangeRatio,
+		0.0f,
+		0.9f);
+	CombatSettings.MaximumAdvanceTowardTarget = FMath::Max(0.0f, CoverSettings->M_CombatCoverMaximumAdvanceDistance);
 	return CombatSettings;
 }
 
@@ -1658,7 +1663,7 @@ bool URTSCoverFinderWorldSubsystem::TryReserveCombatCoverPoint(
 	ASquadUnit& SquadUnit,
 	AActor& TargetActor,
 	const FRTSCombatCoverThreats& Threats,
-	const float MaximumDistanceToTarget,
+	const float WeaponRange,
 	const FRTSCoverPoint* OccupiedCoverPoint,
 	FRTSCoverPoint& OutCoverPoint)
 {
@@ -1668,6 +1673,9 @@ bool URTSCoverFinderWorldSubsystem::TryReserveCombatCoverPoint(
 		return false;
 	}
 	const FRTSCombatCoverSettings CombatSettings = BuildCombatCoverSettings();
+	const FRTSCombatCoverDistanceLimits DistanceLimits = FRTSCombatCoverScoring::BuildDistanceLimits(
+		WeaponRange,
+		CombatSettings);
 	const FVector UnitLocation = SquadUnit.GetActorLocation();
 	const float SearchRadius = OccupiedCoverPoint != nullptr
 		? CombatSettings.TravelReferenceDistance
@@ -1681,18 +1689,15 @@ bool URTSCoverFinderWorldSubsystem::TryReserveCombatCoverPoint(
 		ScoreToBeat = OccupiedScore + CombatSettings.MinimumScoreGain;
 	}
 
-	const float MaximumDistanceToTargetSquared = FMath::Square(MaximumDistanceToTarget);
 	const TArray<FRTSCoverPoint> NearbyPoints = FindCoverPointsInRadius(UnitLocation, SearchRadius);
 	M_TacticalPerformanceSnapshot.CandidateChecksLastFrame += NearbyPoints.Num();
 	TArray<FRTSScoredCombatCoverPoint> ScoredCandidates;
 	ScoredCandidates.Reserve(NearbyPoints.Num());
 	for (const FRTSCoverPoint& CoverPoint : NearbyPoints)
 	{
-		const bool bIsOccupiedPoint = OccupiedCoverPoint != nullptr && CoverPoint.PointId == OccupiedCoverPoint->PointId;
-		const bool bOutOfWeaponRange = MaximumDistanceToTarget > 0.0f && FVector::DistSquared(
-			CoverPoint.Location, Threats.PrimaryTargetLocation) > MaximumDistanceToTargetSquared;
 		float CandidateScore = 0.0f;
-		if (bIsOccupiedPoint || bOutOfWeaponRange || not GetIsCoverPointAvailableToUnit(CoverPoint, SquadUnit) ||
+		if (not GetIsCombatCoverCandidate(
+				CoverPoint, SquadUnit, OccupiedCoverPoint, Threats.PrimaryTargetLocation, DistanceLimits) ||
 			not FRTSCombatCoverScoring::TryScoreCoverPoint(
 				CoverPoint, UnitLocation, Threats, CombatSettings, CandidateScore) ||
 			CandidateScore < ScoreToBeat)
@@ -1734,6 +1739,22 @@ bool URTSCoverFinderWorldSubsystem::TryReserveCombatCoverPoint(
 		return true;
 	}
 	return false;
+}
+
+bool URTSCoverFinderWorldSubsystem::GetIsCombatCoverCandidate(
+	const FRTSCoverPoint& CoverPoint,
+	const ASquadUnit& SquadUnit,
+	const FRTSCoverPoint* OccupiedCoverPoint,
+	const FVector& TargetLocation,
+	const FRTSCombatCoverDistanceLimits& DistanceLimits) const
+{
+	const bool bIsOccupiedPoint = OccupiedCoverPoint != nullptr && CoverPoint.PointId == OccupiedCoverPoint->PointId;
+	if (bIsOccupiedPoint || not FRTSCombatCoverScoring::GetIsWithinDistanceLimits(
+		CoverPoint, SquadUnit.GetActorLocation(), TargetLocation, DistanceLimits))
+	{
+		return false;
+	}
+	return GetIsCoverPointAvailableToUnit(CoverPoint, SquadUnit);
 }
 
 TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::GatherBestTacticalCoverCandidates(

@@ -11,10 +11,10 @@
 
 class AFactionPlayerController;
 class UButton;
-class UScrollBox;
 class USoundBase;
+struct FFactionUnitBrowserGroup;
 struct FSlateBrush;
-class UW_FactionUnit;
+class UW_FactionUnitBrowser;
 class UW_Portrait;
 
 USTRUCT(BlueprintType)
@@ -22,7 +22,7 @@ struct FFactionMenuTankOption
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ETankSubtype TankSubtype = ETankSubtype::Tank_None;
 };
 
@@ -31,7 +31,7 @@ struct FFactionMenuSquadOption
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ESquadSubtype SquadSubtype = ESquadSubtype::Squad_None;
 };
 
@@ -40,7 +40,7 @@ struct FFactionMenuAircraftOption
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EAircraftSubtype AircraftSubtype = EAircraftSubtype::Aircarft_None;
 };
 
@@ -49,7 +49,7 @@ struct FFactionMenuBuildingExpansionOption
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	EBuildingExpansionType BuildingExpansionType = EBuildingExpansionType::BXT_Invalid;
 };
 
@@ -58,57 +58,42 @@ struct FFactionMenuSetting
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Armored Cars")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Armored Cars")
 	TArray<FFactionMenuTankOption> ArmoredCars;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Light")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Light")
 	TArray<FFactionMenuTankOption> LightTanks;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Medium")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Medium")
 	TArray<FFactionMenuTankOption> MediumTanks;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Heavy")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction Selection|Training|Tanks|Heavy")
 	TArray<FFactionMenuTankOption> HeavyTanks;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Infantry")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction Selection|Training|Infantry")
 	TArray<FFactionMenuSquadOption> Infantry;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Aircraft")
+	// Team weapon crews (anti-tank guns, howitzers, flak, the Mörser); shown under their own filter.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction Selection|Training|Support Weapons")
+	TArray<FFactionMenuSquadOption> SupportWeapons;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction Selection|Training|Aircraft")
 	TArray<FFactionMenuAircraftOption> Aircraft;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Faction Selection|Training|Building Expansion")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Faction Selection|Training|Building Expansion")
 	TArray<FFactionMenuBuildingExpansionOption> BuildingExpansions;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bIsEnabled = true;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<USoundBase> FactionDescription = nullptr;
-};
-
-USTRUCT()
-struct FFactionSelectionUnitWidgets
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	TArray<TObjectPtr<UW_FactionUnit>> AllUnits;
-
-	UPROPERTY()
-	TArray<TObjectPtr<UW_FactionUnit>> ArmoredCars;
-
-	UPROPERTY()
-	TArray<TObjectPtr<UW_FactionUnit>> LightTanks;
-
-	UPROPERTY()
-	TArray<TObjectPtr<UW_FactionUnit>> MediumTanks;
-
-	UPROPERTY()
-	TArray<TObjectPtr<UW_FactionUnit>> HeavyTanks;
 };
 
 /**
  * @brief Widget used to select a faction and preview its units before launching the campaign.
+ * Creates the unit browser (M_UnitBrowserClass) on its canvas and fills it with the selected faction's units.
+ * @note M_UnitBrowserClass: set to BP_W_FactionUnitBrowser in the class defaults.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_FactionSelectionMenu : public UUserWidget
@@ -125,6 +110,9 @@ public:
 
 	/** Selects a faction without forcing its announcement, e.g. when the player comes back from variant selection. */
 	void ShowFaction(const ERTSFaction Faction);
+
+	/** Test access for the faction menu capture. */
+	UW_FactionUnitBrowser* GetUnitBrowser() const { return M_UnitBrowser; }
 
 protected:
 	virtual void NativeConstruct() override;
@@ -151,28 +139,11 @@ protected:
 	UButton* M_LaunchCampaign = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
-	UScrollBox* M_ScrollBox = nullptr;
-
-	UPROPERTY(meta = (BindWidget))
 	UW_Portrait* M_Portrait = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
-	UButton* SortArmoredCars = nullptr;
-
-	UPROPERTY(meta = (BindWidget))
-	UButton* SortLightTanks = nullptr;
-
-	UPROPERTY(meta = (BindWidget))
-	UButton* SortMediumTanks = nullptr;
-
-	UPROPERTY(meta = (BindWidget))
-	UButton* SortHeavyTanks = nullptr;
-
-	UPROPERTY(meta = (BindWidget))
-	UButton* ShowAllUnits = nullptr;
-
+	// Built in code and placed at the bottom centre of the root canvas.
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
-	TSubclassOf<UW_FactionUnit> M_FactionUnitWidgetClass;
+	TSubclassOf<UW_FactionUnitBrowser> M_UnitBrowserClass;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	FFactionMenuSetting M_GerBreakthroughSetting;
@@ -187,6 +158,10 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AFactionPlayerController> M_FactionPlayerController;
 	void SetupFactionPlayerController();
+
+	UPROPERTY()
+	TObjectPtr<UW_FactionUnitBrowser> M_UnitBrowser;
+	void SetupUnitBrowser();
 
 	ERTSFaction M_SelectedFaction = ERTSFaction::GerBreakthroughDoctrine;
 
@@ -214,21 +189,6 @@ private:
 
 	UFUNCTION()
 	void HandleLaunchCampaignClicked();
-
-	UFUNCTION()
-	void HandleSortArmoredCarsClicked();
-
-	UFUNCTION()
-	void HandleSortLightTanksClicked();
-
-	UFUNCTION()
-	void HandleSortMediumTanksClicked();
-
-	UFUNCTION()
-	void HandleSortHeavyTanksClicked();
-
-	UFUNCTION()
-	void HandleShowAllUnitsClicked();
 
 	void SetupButtonBindings();
 	void ApplyFactionAvailability();
@@ -259,27 +219,21 @@ private:
 	void UpdateFactionSelectionBrush(FSlateBrush& Brush, const bool bIsSelected);
 	void PopulateFactionUnits(const FFactionMenuSetting& FactionSetting);
 	const FFactionMenuSetting* FindFactionSetting(const ERTSFaction Faction) const;
-	void AddTankUnitWidgets(
-		const TArray<FFactionMenuTankOption>& TankOptions,
-		TArray<TObjectPtr<UW_FactionUnit>>& OutUnitWidgets);
-	void AddSquadUnitWidgets(const TArray<FFactionMenuSquadOption>& SquadOptions);
-	void AddAircraftUnitWidgets(const TArray<FFactionMenuAircraftOption>& AircraftOptions);
-	void AddBuildingExpansionUnitWidgets(const TArray<FFactionMenuBuildingExpansionOption>& BuildingExpansionOptions);
-	void AddUnitWidgetFromTrainingOption(
-		const FTrainingOption& TrainingOption,
-		TArray<TObjectPtr<UW_FactionUnit>>* OptionalBucket);
-	void ApplyUnitFilter(const TArray<TObjectPtr<UW_FactionUnit>>& VisibleUnits);
-	void ShowAllUnitWidgets();
-	void ResetUnitWidgets();
+	/** @return The browser tabs in order: ALL first, then each unit class; the browser hides empty ones. */
+	static TArray<FFactionUnitBrowserGroup> BuildUnitBrowserGroups(const FFactionMenuSetting& FactionSetting);
+	static TArray<FTrainingOption> ToTrainingOptions(const TArray<FFactionMenuTankOption>& TankOptions);
+	static TArray<FTrainingOption> ToTrainingOptions(const TArray<FFactionMenuSquadOption>& SquadOptions);
+	static TArray<FTrainingOption> ToTrainingOptions(const TArray<FFactionMenuAircraftOption>& AircraftOptions);
+	static TArray<FTrainingOption> ToTrainingOptions(
+		const TArray<FFactionMenuBuildingExpansionOption>& BuildingExpansionOptions);
 	void PlayFactionAudio(const FFactionMenuSetting& FactionSetting);
 	void UpdatePortraitForAnnouncement();
 	void HidePortrait();
 	void LaunchCampaign();
 
 	bool GetIsValidPlayerController() const;
-	bool GetIsValidScrollBox() const;
+	bool GetIsValidUnitBrowser() const;
 	bool GetIsValidPortrait() const;
-	bool GetIsValidFactionUnitWidgetClass() const;
 	bool GetIsValidGermanBreakthroughButton() const;
 	bool GetIsValidGermanBreakthroughAudioButton() const;
 	bool GetIsValidGermanThermoKorpsButton() const;
@@ -287,13 +241,4 @@ private:
 	bool GetIsValidGermanItalianGameButton() const;
 	bool GetIsValidGermanItalianGameAudioButton() const;
 	bool GetIsValidLaunchCampaignButton() const;
-	bool GetIsValidSortArmoredCarsButton() const;
-	bool GetIsValidSortLightTanksButton() const;
-	bool GetIsValidSortMediumTanksButton() const;
-	bool GetIsValidSortHeavyTanksButton() const;
-	bool GetIsValidShowAllUnitsButton() const;
-
-	// Tracks widget groups used to filter the scroll list without destroying widgets.
-	UPROPERTY()
-	FFactionSelectionUnitWidgets M_UnitWidgets;
 };

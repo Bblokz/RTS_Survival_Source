@@ -170,7 +170,8 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="3.0"))
 	float M_CombatCoverFacingWeight = 0.5f;
 
-	// How much a long walk under fire counts against a point; the full weight applies at the reposition radius.
+	// How much a long walk under fire counts against a point; the full weight applies at the reposition radius,
+	// and the longer walks of a soldier's first cover search cost proportionally more.
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="3.0"))
 	float M_CombatCoverTravelWeight = 0.4f;
 
@@ -182,6 +183,17 @@ public:
 	// keep soldiers in place; lower values make them hop between similar points.
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="2.0"))
 	float M_CombatCoverMinimumScoreGain = 0.3f;
+
+	// Combat cover stays at least this share of the soldier's weapon range away from its target, so riflemen
+	// keep a firing distance while short-ranged weapons such as SMGs and flamethrowers may close in further.
+	// A soldier the enemy walked up to may still take cover no closer than where it stands. Zero disables.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", ClampMax="0.9", UIMin="0.0", UIMax="0.9"))
+	float M_CombatCoverMinimumEngagementRangeRatio = 0.35f;
+
+	// How much closer to its target a soldier may get by walking to combat cover. Sideways and backward moves
+	// are not limited. Zero disables.
+	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="2500.0", Units="cm"))
+	float M_CombatCoverMaximumAdvanceDistance = 600.0f;
 
 	// A soldier stays at least this long on a point before it may move to a better one.
 	UPROPERTY(Config, EditAnywhere, Category="Combat Cover", meta=(ClampMin="0.0", UIMin="0.0", UIMax="30.0", Units="s"))

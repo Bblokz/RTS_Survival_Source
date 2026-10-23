@@ -62,10 +62,11 @@ bool FRTSCombatCoverScoring::TryScoreCoverPoint(
 	const float PrimaryYawRadians = FMath::DegreesToRadians(
 		GetYawToLocationDegrees(CoverPoint, Threats.PrimaryTargetLocation));
 	const float FacingQuality = FMath::Max(0.0f, FMath::Cos(PrimaryYawRadians));
-	const float TravelCost = FMath::Clamp(
-		FVector::Dist2D(UnitLocation, CoverPoint.Location) / FMath::Max(1.0f, Settings.TravelReferenceDistance),
+	// Not capped: the first search reaches further than the reference, and a long walk under fire must not cost
+	// the same as a short one.
+	const float TravelCost = FMath::Max(
 		0.0f,
-		1.0f);
+		FVector::Dist2D(UnitLocation, CoverPoint.Location) / FMath::Max(1.0f, Settings.TravelReferenceDistance));
 	OutScore = Settings.ProtectionWeight * GetProtectedThreatFraction(CoverPoint, Threats, Settings)
 		+ Settings.FacingWeight * FacingQuality
 		- Settings.TravelWeight * TravelCost;
@@ -88,4 +89,57 @@ bool FRTSCombatCoverScoring::GetIsWorthRepositioning(
 	const FRTSCombatCoverSettings& Settings)
 {
 	return CandidateScore >= CurrentPointScore + Settings.MinimumScoreGain;
+}
+
+float FRTSCombatCoverScoring::GetMaximumCoverDistanceToTarget(const float WeaponRange)
+{
+	// Stay clearly inside weapon range so entering cover can never trigger range-closing squad movement.
+	constexpr float CoverWeaponRangeRatio = 0.9f;
+	return FMath::Max(0.0f, WeaponRange) * CoverWeaponRangeRatio;
+}
+
+FRTSCombatCoverDistanceLimits FRTSCombatCoverScoring::BuildDistanceLimits(
+	const float WeaponRange,
+	const FRTSCombatCoverSettings& Settings)
+{
+	FRTSCombatCoverDistanceLimits Limits;
+	if (WeaponRange <= 0.0f)
+	{
+		return Limits;
+	}
+	Limits.MaximumDistanceToTarget = GetMaximumCoverDistanceToTarget(WeaponRange);
+	Limits.MinimumDistanceToTarget = FMath::Min(
+		WeaponRange * FMath::Max(0.0f, Settings.MinimumEngagementRangeRatio),
+		Limits.MaximumDistanceToTarget);
+	Limits.MaximumAdvanceTowardTarget = FMath::Max(0.0f, Settings.MaximumAdvanceTowardTarget);
+	return Limits;
+}
+
+bool FRTSCombatCoverScoring::GetIsWithinDistanceLimits(
+	const FRTSCoverPoint& CoverPoint,
+	const FVector& UnitLocation,
+	const FVector& TargetLocation,
+	const FRTSCombatCoverDistanceLimits& Limits)
+{
+	// Measured like the weapon measures its range, so a point inside the limit is inside weapon range.
+	const float CurrentDistance = FVector::Dist(UnitLocation, TargetLocation);
+	const float PointDistance = FVector::Dist(CoverPoint.Location, TargetLocation);
+	const bool bHasMaximum = Limits.MaximumDistanceToTarget > 0.0f;
+	if (bHasMaximum && PointDistance > Limits.MaximumDistanceToTarget)
+	{
+		return false;
+	}
+	// An enemy that walked up to the soldier leaves cover no closer than where the soldier already stands.
+	const float MinimumDistance = FMath::Min(Limits.MinimumDistanceToTarget, CurrentDistance);
+	if (Limits.MinimumDistanceToTarget > 0.0f && PointDistance < MinimumDistance)
+	{
+		return false;
+	}
+	if (Limits.MaximumAdvanceTowardTarget <= 0.0f)
+	{
+		return true;
+	}
+	// A soldier standing beyond the maximum distance may also close that gap.
+	const float RequiredAdvance = bHasMaximum ? FMath::Max(0.0f, CurrentDistance - Limits.MaximumDistanceToTarget) : 0.0f;
+	return CurrentDistance - PointDistance <= Limits.MaximumAdvanceTowardTarget + RequiredAdvance;
 }

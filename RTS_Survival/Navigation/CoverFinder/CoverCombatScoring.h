@@ -16,11 +16,30 @@ struct FRTSCombatCoverSettings
 	float FacingWeight = 0.5f;
 	float TravelWeight = 0.4f;
 
-	// Walking this far to a point costs the full travel weight.
+	// Walking this far to a point costs the full travel weight; longer walks cost proportionally more.
 	float TravelReferenceDistance = 900.0f;
 
 	// A soldier only gives up its point for one that scores at least this much higher.
 	float MinimumScoreGain = 0.3f;
+
+	// Share of the weapon range that combat cover keeps between the soldier and its target. A share of the
+	// range lets short-ranged weapons such as SMGs and flamethrowers close in further than rifles. Zero: no limit.
+	float MinimumEngagementRangeRatio = 0.35f;
+
+	// How much closer to its target a soldier may get by walking to combat cover. Zero: no limit.
+	float MaximumAdvanceTowardTarget = 600.0f;
+};
+
+/** How far from its target a soldier's combat cover may be. A zero field disables that limit. */
+struct FRTSCombatCoverDistanceLimits
+{
+	// Keeps the point inside weapon range of the target.
+	float MaximumDistanceToTarget = 0.0f;
+
+	// Keeps the soldier at a firing distance instead of walking up to point-blank range for a better wall.
+	float MinimumDistanceToTarget = 0.0f;
+
+	float MaximumAdvanceTowardTarget = 0.0f;
 };
 
 /** What a soldier in cover does when that cover turns out to be useless against its current target. */
@@ -96,4 +115,30 @@ struct FRTSCombatCoverScoring
 		float CurrentPointScore,
 		float CandidateScore,
 		const FRTSCombatCoverSettings& Settings);
+
+	// Cover must stay clearly inside weapon range, or entering it would make the squad walk closer again.
+	static float GetMaximumCoverDistanceToTarget(float WeaponRange);
+
+	/**
+	 * @brief Derives the distance limits from the weapon, so each soldier keeps the distance its weapon fights at.
+	 * @param WeaponRange Maximum range of the soldier's weapon; zero disables every limit.
+	 * @param Settings Designer ratio and advance limit.
+	 * @return The limits for that weapon.
+	 */
+	static FRTSCombatCoverDistanceLimits BuildDistanceLimits(float WeaponRange, const FRTSCombatCoverSettings& Settings);
+
+	/**
+	 * @brief Rejects points that would take the soldier to point-blank range or far forward toward its target,
+	 * however well they shield it. A target that walked up itself never forbids cover no closer than the soldier.
+	 * @param CoverPoint Candidate point.
+	 * @param UnitLocation Where the soldier is now.
+	 * @param TargetLocation Where the soldier's target is.
+	 * @param Limits Distance limits of the soldier's weapon.
+	 * @return True when the point respects every enabled limit.
+	 */
+	static bool GetIsWithinDistanceLimits(
+		const FRTSCoverPoint& CoverPoint,
+		const FVector& UnitLocation,
+		const FVector& TargetLocation,
+		const FRTSCombatCoverDistanceLimits& Limits);
 };
