@@ -2,14 +2,17 @@
 
 #include "W_FactionSelectionMenu.h"
 
+#include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/CanvasPanel.h"
+#include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
-#include "Components/ScrollBox.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitWidget/W_Portrait.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "W_FactionUnit.h"
+#include "UnitBrowser/FactionUnitBrowserLayout.h"
+#include "UnitBrowser/W_FactionUnitBrowser.h"
 
 void UW_FactionSelectionMenu::SetFactionPlayerController(AFactionPlayerController* FactionPlayerController)
 {
@@ -35,6 +38,7 @@ void UW_FactionSelectionMenu::NativeConstruct()
 {
 	Super::NativeConstruct();
 	SetupFactionPlayerController();
+	SetupUnitBrowser();
 	SetupButtonBindings();
 	ApplyFactionAvailability();
 	SelectGermanBreakthrough(true);
@@ -43,6 +47,34 @@ void UW_FactionSelectionMenu::NativeConstruct()
 void UW_FactionSelectionMenu::SetupFactionPlayerController()
 {
 	M_FactionPlayerController = Cast<AFactionPlayerController>(GetOwningPlayer());
+}
+
+void UW_FactionSelectionMenu::SetupUnitBrowser()
+{
+	using namespace FactionUnitBrowserLayout;
+	if (IsValid(M_UnitBrowser))
+	{
+		return;
+	}
+	UCanvasPanel* const RootCanvas = IsValid(WidgetTree) ? Cast<UCanvasPanel>(WidgetTree->RootWidget) : nullptr;
+	if (not IsValid(RootCanvas) || M_UnitBrowserClass == nullptr)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Faction selection menu needs a root canvas and M_UnitBrowserClass "
+			"(BP_W_FactionUnitBrowser) to show the faction units."));
+		return;
+	}
+	M_UnitBrowser = CreateWidget<UW_FactionUnitBrowser>(this, M_UnitBrowserClass);
+	if (not IsValid(M_UnitBrowser))
+	{
+		return;
+	}
+	M_UnitBrowser->SetupBrowser(this);
+	UCanvasPanelSlot* const BrowserSlot = RootCanvas->AddChildToCanvas(M_UnitBrowser);
+	const FVector2D BottomCentre(0.5f, 1.f);
+	BrowserSlot->SetAnchors(FAnchors(BottomCentre.X, BottomCentre.Y));
+	BrowserSlot->SetAlignment(BottomCentre);
+	BrowserSlot->SetPosition(FVector2D(0.f, -BottomMargin));
+	BrowserSlot->SetAutoSize(true);
 }
 
 void UW_FactionSelectionMenu::HandleGerBreakthroughClicked()
@@ -78,31 +110,6 @@ void UW_FactionSelectionMenu::HandleGerItalianGameAudioClicked()
 void UW_FactionSelectionMenu::HandleLaunchCampaignClicked()
 {
 	LaunchCampaign();
-}
-
-void UW_FactionSelectionMenu::HandleSortArmoredCarsClicked()
-{
-	ApplyUnitFilter(M_UnitWidgets.ArmoredCars);
-}
-
-void UW_FactionSelectionMenu::HandleSortLightTanksClicked()
-{
-	ApplyUnitFilter(M_UnitWidgets.LightTanks);
-}
-
-void UW_FactionSelectionMenu::HandleSortMediumTanksClicked()
-{
-	ApplyUnitFilter(M_UnitWidgets.MediumTanks);
-}
-
-void UW_FactionSelectionMenu::HandleSortHeavyTanksClicked()
-{
-	ApplyUnitFilter(M_UnitWidgets.HeavyTanks);
-}
-
-void UW_FactionSelectionMenu::HandleShowAllUnitsClicked()
-{
-	ShowAllUnitWidgets();
 }
 
 void UW_FactionSelectionMenu::SetupButtonBindings()
@@ -142,30 +149,6 @@ void UW_FactionSelectionMenu::SetupButtonBindings()
 		M_LaunchCampaign->OnClicked.AddDynamic(this, &UW_FactionSelectionMenu::HandleLaunchCampaignClicked);
 	}
 
-	if (GetIsValidSortArmoredCarsButton())
-	{
-		SortArmoredCars->OnClicked.AddDynamic(this, &UW_FactionSelectionMenu::HandleSortArmoredCarsClicked);
-	}
-
-	if (GetIsValidSortLightTanksButton())
-	{
-		SortLightTanks->OnClicked.AddDynamic(this, &UW_FactionSelectionMenu::HandleSortLightTanksClicked);
-	}
-
-	if (GetIsValidSortMediumTanksButton())
-	{
-		SortMediumTanks->OnClicked.AddDynamic(this, &UW_FactionSelectionMenu::HandleSortMediumTanksClicked);
-	}
-
-	if (GetIsValidSortHeavyTanksButton())
-	{
-		SortHeavyTanks->OnClicked.AddDynamic(this, &UW_FactionSelectionMenu::HandleSortHeavyTanksClicked);
-	}
-
-	if (GetIsValidShowAllUnitsButton())
-	{
-		ShowAllUnits->OnClicked.AddDynamic(this, &UW_FactionSelectionMenu::HandleShowAllUnitsClicked);
-	}
 }
 
 void UW_FactionSelectionMenu::ApplyFactionAvailability()
@@ -346,36 +329,13 @@ TArray<FTrainingOption> UW_FactionSelectionMenu::GetFactionTrainingOptions(const
 	{
 		return TrainingOptions;
 	}
-	for (const TArray<FFactionMenuTankOption>* TankOptions : {
-		     &FactionSetting->ArmoredCars, &FactionSetting->LightTanks, &FactionSetting->MediumTanks,
-		     &FactionSetting->HeavyTanks
-	     })
-	{
-		for (const FFactionMenuTankOption& TankOption : *TankOptions)
-		{
-			if (TankOption.TankSubtype != ETankSubtype::Tank_None)
-			{
-				TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Tank,
-				                                    static_cast<uint8>(TankOption.TankSubtype)));
-			}
-		}
-	}
-	for (const FFactionMenuSquadOption& SquadOption : FactionSetting->Infantry)
-	{
-		if (SquadOption.SquadSubtype != ESquadSubtype::Squad_None)
-		{
-			TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Squad,
-			                                    static_cast<uint8>(SquadOption.SquadSubtype)));
-		}
-	}
-	for (const FFactionMenuBuildingExpansionOption& BxpOption : FactionSetting->BuildingExpansions)
-	{
-		if (BxpOption.BuildingExpansionType != EBuildingExpansionType::BXT_Invalid)
-		{
-			TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_BuildingExpansion,
-			                                    static_cast<uint8>(BxpOption.BuildingExpansionType)));
-		}
-	}
+	TrainingOptions.Append(ToTrainingOptions(FactionSetting->ArmoredCars));
+	TrainingOptions.Append(ToTrainingOptions(FactionSetting->LightTanks));
+	TrainingOptions.Append(ToTrainingOptions(FactionSetting->MediumTanks));
+	TrainingOptions.Append(ToTrainingOptions(FactionSetting->HeavyTanks));
+	TrainingOptions.Append(ToTrainingOptions(FactionSetting->Infantry));
+	TrainingOptions.Append(ToTrainingOptions(FactionSetting->SupportWeapons));
+	TrainingOptions.Append(ToTrainingOptions(FactionSetting->BuildingExpansions));
 	return TrainingOptions;
 }
 
@@ -414,164 +374,104 @@ const FFactionMenuSetting* UW_FactionSelectionMenu::FindFactionSetting(const ERT
 
 void UW_FactionSelectionMenu::PopulateFactionUnits(const FFactionMenuSetting& FactionSetting)
 {
-	if (not GetIsValidScrollBox())
+	if (not GetIsValidUnitBrowser())
 	{
 		return;
 	}
-
-	if (not GetIsValidFactionUnitWidgetClass())
-	{
-		return;
-	}
-
-	ResetUnitWidgets();
-
-	AddTankUnitWidgets(FactionSetting.ArmoredCars, M_UnitWidgets.ArmoredCars);
-	AddTankUnitWidgets(FactionSetting.LightTanks, M_UnitWidgets.LightTanks);
-	AddTankUnitWidgets(FactionSetting.MediumTanks, M_UnitWidgets.MediumTanks);
-	AddTankUnitWidgets(FactionSetting.HeavyTanks, M_UnitWidgets.HeavyTanks);
-	AddSquadUnitWidgets(FactionSetting.Infantry);
-	AddAircraftUnitWidgets(FactionSetting.Aircraft);
-	AddBuildingExpansionUnitWidgets(FactionSetting.BuildingExpansions);
-
-	ShowAllUnitWidgets();
+	M_UnitBrowser->SetUnitGroups(BuildUnitBrowserGroups(FactionSetting));
 }
 
-void UW_FactionSelectionMenu::AddTankUnitWidgets(
-	const TArray<FFactionMenuTankOption>& TankOptions,
-	TArray<TObjectPtr<UW_FactionUnit>>& OutUnitWidgets)
+TArray<FFactionUnitBrowserGroup> UW_FactionSelectionMenu::BuildUnitBrowserGroups(
+	const FFactionMenuSetting& FactionSetting)
 {
+	auto MakeGroup = [](const FText& Label, TArray<FTrainingOption>&& Units)
+	{
+		FFactionUnitBrowserGroup Group;
+		Group.Label = Label;
+		Group.Units = MoveTemp(Units);
+		return Group;
+	};
+	TArray<FFactionUnitBrowserGroup> Groups;
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabAll", "All"), {}));
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabRecon", "Recon"),
+	                     ToTrainingOptions(FactionSetting.ArmoredCars)));
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabLight", "Light"),
+	                     ToTrainingOptions(FactionSetting.LightTanks)));
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabMedium", "Medium"),
+	                     ToTrainingOptions(FactionSetting.MediumTanks)));
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabHeavy", "Heavy"),
+	                     ToTrainingOptions(FactionSetting.HeavyTanks)));
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabInfantry", "Infantry"),
+	                     ToTrainingOptions(FactionSetting.Infantry)));
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabSupport", "Support"),
+	                     ToTrainingOptions(FactionSetting.SupportWeapons)));
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabAircraft", "Aircraft"),
+	                     ToTrainingOptions(FactionSetting.Aircraft)));
+	Groups.Add(MakeGroup(NSLOCTEXT("FactionSelectionMenu", "TabDefences", "Defences"),
+	                     ToTrainingOptions(FactionSetting.BuildingExpansions)));
+	// ALL lists every other group in tab order.
+	for (int32 GroupIndex = 1; GroupIndex < Groups.Num(); ++GroupIndex)
+	{
+		Groups[0].Units.Append(Groups[GroupIndex].Units);
+	}
+	return Groups;
+}
+
+TArray<FTrainingOption> UW_FactionSelectionMenu::ToTrainingOptions(const TArray<FFactionMenuTankOption>& TankOptions)
+{
+	TArray<FTrainingOption> TrainingOptions;
 	for (const FFactionMenuTankOption& TankOption : TankOptions)
 	{
-		if (TankOption.TankSubtype == ETankSubtype::Tank_None)
+		if (TankOption.TankSubtype != ETankSubtype::Tank_None)
 		{
-			continue;
+			TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(TankOption.TankSubtype)));
 		}
-
-		const FTrainingOption TrainingOption(
-			EAllUnitType::UNType_Tank,
-			static_cast<uint8>(TankOption.TankSubtype));
-		AddUnitWidgetFromTrainingOption(TrainingOption, &OutUnitWidgets);
 	}
+	return TrainingOptions;
 }
 
-void UW_FactionSelectionMenu::AddSquadUnitWidgets(const TArray<FFactionMenuSquadOption>& SquadOptions)
+TArray<FTrainingOption> UW_FactionSelectionMenu::ToTrainingOptions(const TArray<FFactionMenuSquadOption>& SquadOptions)
 {
+	TArray<FTrainingOption> TrainingOptions;
 	for (const FFactionMenuSquadOption& SquadOption : SquadOptions)
 	{
-		if (SquadOption.SquadSubtype == ESquadSubtype::Squad_None)
+		if (SquadOption.SquadSubtype != ESquadSubtype::Squad_None)
 		{
-			continue;
+			TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Squad,
+			                                    static_cast<uint8>(SquadOption.SquadSubtype)));
 		}
-
-		const FTrainingOption TrainingOption(
-			EAllUnitType::UNType_Squad,
-			static_cast<uint8>(SquadOption.SquadSubtype));
-		AddUnitWidgetFromTrainingOption(TrainingOption, nullptr);
 	}
+	return TrainingOptions;
 }
 
-void UW_FactionSelectionMenu::AddAircraftUnitWidgets(const TArray<FFactionMenuAircraftOption>& AircraftOptions)
+TArray<FTrainingOption> UW_FactionSelectionMenu::ToTrainingOptions(
+	const TArray<FFactionMenuAircraftOption>& AircraftOptions)
 {
+	TArray<FTrainingOption> TrainingOptions;
 	for (const FFactionMenuAircraftOption& AircraftOption : AircraftOptions)
 	{
-		if (AircraftOption.AircraftSubtype == EAircraftSubtype::Aircarft_None)
+		if (AircraftOption.AircraftSubtype != EAircraftSubtype::Aircarft_None)
 		{
-			continue;
+			TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_Aircraft,
+			                                    static_cast<uint8>(AircraftOption.AircraftSubtype)));
 		}
-
-		const FTrainingOption TrainingOption(
-			EAllUnitType::UNType_Aircraft,
-			static_cast<uint8>(AircraftOption.AircraftSubtype));
-		AddUnitWidgetFromTrainingOption(TrainingOption, nullptr);
 	}
+	return TrainingOptions;
 }
 
-void UW_FactionSelectionMenu::AddBuildingExpansionUnitWidgets(
+TArray<FTrainingOption> UW_FactionSelectionMenu::ToTrainingOptions(
 	const TArray<FFactionMenuBuildingExpansionOption>& BuildingExpansionOptions)
 {
-	for (const FFactionMenuBuildingExpansionOption& BuildingExpansionOption : BuildingExpansionOptions)
+	TArray<FTrainingOption> TrainingOptions;
+	for (const FFactionMenuBuildingExpansionOption& BxpOption : BuildingExpansionOptions)
 	{
-		if (BuildingExpansionOption.BuildingExpansionType == EBuildingExpansionType::BXT_Invalid)
+		if (BxpOption.BuildingExpansionType != EBuildingExpansionType::BXT_Invalid)
 		{
-			continue;
+			TrainingOptions.Add(FTrainingOption(EAllUnitType::UNType_BuildingExpansion,
+			                                    static_cast<uint8>(BxpOption.BuildingExpansionType)));
 		}
-
-		const FTrainingOption TrainingOption(
-			EAllUnitType::UNType_BuildingExpansion,
-			static_cast<uint8>(BuildingExpansionOption.BuildingExpansionType));
-		AddUnitWidgetFromTrainingOption(TrainingOption, nullptr);
 	}
-}
-
-void UW_FactionSelectionMenu::AddUnitWidgetFromTrainingOption(
-	const FTrainingOption& TrainingOption,
-	TArray<TObjectPtr<UW_FactionUnit>>* OptionalBucket)
-{
-	UW_FactionUnit* FactionUnitWidget = CreateWidget<UW_FactionUnit>(this, M_FactionUnitWidgetClass);
-	if (not IsValid(FactionUnitWidget))
-	{
-		return;
-	}
-
-	FactionUnitWidget->SetFactionSelectionMenu(this);
-	FactionUnitWidget->SetTrainingOption(TrainingOption);
-	M_ScrollBox->AddChild(FactionUnitWidget);
-	M_UnitWidgets.AllUnits.Add(FactionUnitWidget);
-
-	if (OptionalBucket != nullptr)
-	{
-		OptionalBucket->Add(FactionUnitWidget);
-	}
-}
-
-void UW_FactionSelectionMenu::ApplyUnitFilter(const TArray<TObjectPtr<UW_FactionUnit>>& VisibleUnits)
-{
-	for (const TObjectPtr<UW_FactionUnit>& FactionUnitWidget : M_UnitWidgets.AllUnits)
-	{
-		if (not IsValid(FactionUnitWidget))
-		{
-			continue;
-		}
-
-		FactionUnitWidget->SetVisibility(ESlateVisibility::Collapsed);
-	}
-
-	for (const TObjectPtr<UW_FactionUnit>& FactionUnitWidget : VisibleUnits)
-	{
-		if (not IsValid(FactionUnitWidget))
-		{
-			continue;
-		}
-
-		FactionUnitWidget->SetVisibility(ESlateVisibility::Visible);
-	}
-
-	for (const TObjectPtr<UW_FactionUnit>& FactionUnitWidget : VisibleUnits)
-	{
-		if (not IsValid(FactionUnitWidget))
-		{
-			continue;
-		}
-
-		FactionUnitWidget->SimulateUnitButtonClick();
-		break;
-	}
-}
-
-void UW_FactionSelectionMenu::ShowAllUnitWidgets()
-{
-	ApplyUnitFilter(M_UnitWidgets.AllUnits);
-}
-
-void UW_FactionSelectionMenu::ResetUnitWidgets()
-{
-	M_ScrollBox->ClearChildren();
-	M_UnitWidgets.AllUnits.Reset();
-	M_UnitWidgets.ArmoredCars.Reset();
-	M_UnitWidgets.LightTanks.Reset();
-	M_UnitWidgets.MediumTanks.Reset();
-	M_UnitWidgets.HeavyTanks.Reset();
+	return TrainingOptions;
 }
 
 void UW_FactionSelectionMenu::PlayFactionAudio(const FFactionMenuSetting& FactionSetting)
@@ -641,14 +541,14 @@ bool UW_FactionSelectionMenu::GetIsValidPlayerController() const
 	return true;
 }
 
-bool UW_FactionSelectionMenu::GetIsValidScrollBox() const
+bool UW_FactionSelectionMenu::GetIsValidUnitBrowser() const
 {
-	if (not IsValid(M_ScrollBox))
+	if (not IsValid(M_UnitBrowser))
 	{
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this,
-			"M_ScrollBox",
-			"GetIsValidScrollBox",
+			"M_UnitBrowser",
+			"GetIsValidUnitBrowser",
 			this
 		);
 		return false;
@@ -665,22 +565,6 @@ bool UW_FactionSelectionMenu::GetIsValidPortrait() const
 			this,
 			"M_Portrait",
 			"GetIsValidPortrait",
-			this
-		);
-		return false;
-	}
-
-	return true;
-}
-
-bool UW_FactionSelectionMenu::GetIsValidFactionUnitWidgetClass() const
-{
-	if (M_FactionUnitWidgetClass == nullptr)
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-			this,
-			"M_FactionUnitWidgetClass",
-			"GetIsValidFactionUnitWidgetClass",
 			this
 		);
 		return false;
@@ -793,86 +677,6 @@ bool UW_FactionSelectionMenu::GetIsValidLaunchCampaignButton() const
 			this,
 			"M_LaunchCampaign",
 			"GetIsValidLaunchCampaignButton",
-			this
-		);
-		return false;
-	}
-
-	return true;
-}
-
-bool UW_FactionSelectionMenu::GetIsValidSortArmoredCarsButton() const
-{
-	if (not IsValid(SortArmoredCars))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-			this,
-			"SortArmoredCars",
-			"GetIsValidSortArmoredCarsButton",
-			this
-		);
-		return false;
-	}
-
-	return true;
-}
-
-bool UW_FactionSelectionMenu::GetIsValidSortLightTanksButton() const
-{
-	if (not IsValid(SortLightTanks))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-			this,
-			"SortLightTanks",
-			"GetIsValidSortLightTanksButton",
-			this
-		);
-		return false;
-	}
-
-	return true;
-}
-
-bool UW_FactionSelectionMenu::GetIsValidSortMediumTanksButton() const
-{
-	if (not IsValid(SortMediumTanks))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-			this,
-			"SortMediumTanks",
-			"GetIsValidSortMediumTanksButton",
-			this
-		);
-		return false;
-	}
-
-	return true;
-}
-
-bool UW_FactionSelectionMenu::GetIsValidSortHeavyTanksButton() const
-{
-	if (not IsValid(SortHeavyTanks))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-			this,
-			"SortHeavyTanks",
-			"GetIsValidSortHeavyTanksButton",
-			this
-		);
-		return false;
-	}
-
-	return true;
-}
-
-bool UW_FactionSelectionMenu::GetIsValidShowAllUnitsButton() const
-{
-	if (not IsValid(ShowAllUnits))
-	{
-		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-			this,
-			"ShowAllUnits",
-			"GetIsValidShowAllUnitsButton",
 			this
 		);
 		return false;

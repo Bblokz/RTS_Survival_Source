@@ -128,3 +128,32 @@ as a level designer places them, gun found on the child turret actor. Published 
   run with every-frame shot delays and cropped at `--zoom 1.0`. The B-4 pit's 20 m footprint is why the mesh-size
   cutoff for framing is 25 m. From the Right view the Flak pit's interior is in shadow but the flash frame still
   reads best there.
+
+## Tactical glyphs and training rows (2026-10-22)
+
+`engrave_icons.py` adds the class symbol (bottom left) and role glyph (bottom right) that used to be painted by hand:
+
+```bash
+cd Source/Tools/UnitPortraits
+python engrave_icons.py extract                       # glyphs/*.png, lifted from the hand-made icons
+python engrave_icons.py engrave ger_training_gaps_icons.txt D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_icons --sheet sheet.png
+```
+
+- `extract` takes each glyph from a portrait that exists with and without glyphs (`GerTanks/<class>/` and its
+  `NoIcon/`). The difference gives every glyph pixel's colour and opacity (the least-opaque colour that explains the
+  picture), so glow edges recomposite correctly over other backgrounds. Re-engraved onto other units' portraits the
+  glyphs match the hand-made icons to about 1.5 levels on average. The rail arrow only exists on iconed pictures; its
+  background is inpainted first. Glyphs keep the spot they were painted at.
+- Glyphs: `class_light` (hollow triangle), `class_medium` (filled), `class_heavy` (double), `class_tank_hunter`
+  (crosshair), `class_artillery` (arc); `role_autocannon` (rounds), `role_anti_air` (radar), `role_rockets`,
+  `role_rail`.
+- Plan lines: `<icon stem>=<portrait png>|<class glyph or ->|<role glyph or ->`.
+- `import_training_icons.py` (commandlet, editor closed) imports the icons as UI textures with the settings of an
+  existing icon, makes a `_Brush` SlateBrushAsset for each and adds the `DT_TrainingOptions` rows through a JSON
+  round trip. It refuses to save if any existing row changed. The row texts it writes are drafts.
+
+First batch: the 15 faction-menu units without an image (`ger_training_gaps.txt`, `ger_training_gaps_tw.txt`,
+`ger_training_gaps_icons.txt`). Team weapons are pictured as the bare gun actor (`Ger_TW_*` / `BP_TW_*`) with
+`-UnitPortraitShots=0`, cropped at `--zoom 1.4`; the squad controller has no mesh to frame on. Their sources are in
+`D:/UE_Assets/Icons/TrainingUI/GerTeamWeapons`. The Pz II Luchs Blueprint renders almost black (its materials look
+unfinished). Not made, because they have no Blueprint: SdKfz 221, SdKfz 251 Transport, Wespe, sFH 18 squad.

@@ -93,6 +93,40 @@ Start with the cover destination constraints: they address the tested large adva
 without weakening the working range-stop callback. Then address per-member range closing and order provenance.
 No gameplay fix is included in this investigation.
 
+## Implemented fix
+
+Implemented on 2026-10-22, one change per suggestion:
+
+1. **Engagement distance.** `TryReserveCombatCoverPoint` now takes the weapon range instead of a maximum distance
+   and rejects candidates before scoring with `FRTSCombatCoverScoring::GetIsWithinDistanceLimits`: inside 90% of
+   weapon range, at least `M_CombatCoverMinimumEngagementRangeRatio` (0.35) of the range from the target, and no
+   more than `M_CombatCoverMaximumAdvanceDistance` (600 cm) closer to it than the soldier stands. A ratio of the
+   range lets short-ranged weapons close further than rifles without a weapon-role enum. When the enemy walked
+   up, cover no closer than the soldier's current distance stays allowed. Initial selection and repositioning
+   share the limits. Zero weapon range still disables them (`CoverCombatTestScenario` relies on that).
+2. **Travel cost.** The travel term is no longer capped at the reference distance, so a 2400 cm walk now costs
+   about 1.07 instead of 0.4. Walks inside the 900 cm reposition radius score as before, so the
+   `RTS.CoverFinder.Combat` tests are unaffected. On score alone the forward point in the initial-cover test
+   still wins (0.43 against 0.06); the distance limits are what reject it.
+3. **Per-member range closing.** `GetCanHoldCoverWhileSquadClosesRange` became
+   `GetMayKeepFiringWhileSquadClosesRange`: every soldier whose own weapon has the ordered actor (attack) or
+   ground location (attack ground) in range stays out of the squad's range-closing move, whether in cover, walking
+   into cover or in the open. The move destination and range stop are unchanged: movers still stop at weapon
+   range through `OnSpecificTargetInRange`. No separate squad-cohesion constraint was added.
+4. **Order provenance.** `USquadTargetAcquisition` now calls `ASquadController::IssueAutonomousAttack`, which
+   sets `bM_IsIssuingAutonomousAttack` around `AttackActor(Target, true)`. Replacing the queue starts the
+   attack synchronously, so `ExecuteAttackCommand` passes the flag to every soldier
+   (`ASquadUnit::bM_IsAttackOrderAutonomous`). `GetCoverJudgementTarget` treats an autonomous attack like a
+   weapon target. It gets the 2.5 s tolerance, no forced step-out and no judging against an out-of-lane ordered
+   enemy. If the attack only started later, it would count as a given order, matching the old behaviour. Team
+   weapon guards pass "given": crews take no automatic cover. Pursuit for autonomous orders is bounded only by fixes
+   1 and 3; no separate leash was added.
+
+Verified on 2026-10-22 in an isolated copy (only these changes on top of `ad5bde69`), `RTS_SurvivalEditor Win64
+Development`. `RTS.Squads.AdvanceDiagnostics` (7) and `RTS.CoverFinder.Combat` (5) all reported `Result={Success}`.
+`-CoverFinderValidateCombatCover` on TestCover logged `RESULT PASS failed_checks=0` (12 directions, 9 with cover, 9
+facing the enemy, 6 flank repositions). It was not checked in a live battle or with real Soviet squads.
+
 ## Tests and scope
 
 Validation completed on 2026-10-22:
@@ -108,8 +142,12 @@ File: `RTS_Survival/Units/Squads/Tests/SquadAdvanceDiagnosticTests.cpp`
 
 Automation prefix: `RTS.Squads.AdvanceDiagnostics`
 
-These are characterization tests: a pass confirms the existing, sometimes undesirable behavior. After agreeing
-on the desired policy, update those expectations into regression tests for the fix.
+These began as characterization tests (the list above records the pre-fix run). With the fix they are
+regression tests: seven tests that check the enemy takes nearby cover over the 2 m forward point, and a flanked
+occupant sidesteps instead of advancing. They also cover the distance limits for rifle and short-range ranges,
+including an enemy that walked up and a soldier just beyond the maximum. Other checks: a 24 m walk costs more than
+9 m, in-range soldiers in the open or walking to cover are exempt from range closing, and an autonomous attack is
+not an attack-order target.
 
 The fixture creates an isolated editor-preview world and native deferred actors. It supplies controlled cover
 snapshots, runs the production selection/reservation/scoring functions and target collision traces, and exercises
