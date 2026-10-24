@@ -2894,7 +2894,7 @@ void UMissionBase::SpawnPlayerSpecialArmoredCar(const FVector SpawnLocation, con
 void UMissionBase::SpawnPlayerGerArmoredCar250_251Mortar(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
 	const FTrainingOption PlayerArmoredCarTrainingOption =
-		URTSBlueprintFunctionLibrary::GetPlayerGerArmoredCar250_251Mortar(this);
+		URTSBlueprintFunctionLibrary::GetPlayerGerArmored_Transport_251_Or_250(this);
 	AsyncSpawnActorAtLocation(
 		PlayerArmoredCarTrainingOption,
 		GetNextAsyncSpawnId(),
@@ -2907,7 +2907,7 @@ void UMissionBase::SpawnPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(
 	const FRotator SpawnRotation)
 {
 	const FTrainingOption PlayerArmoredCarTankDestroyerTrainingOption =
-		URTSBlueprintFunctionLibrary::GetPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(this);
+		URTSBlueprintFunctionLibrary::GetPlayerArmoredCarTankDestroyer_251_75mm_250_37mm(this);
 	AsyncSpawnActorAtLocation(
 		PlayerArmoredCarTankDestroyerTrainingOption,
 		GetNextAsyncSpawnId(),
@@ -2930,7 +2930,7 @@ void UMissionBase::SpawnPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(const FVector S
 void UMissionBase::SpawnPlayerMediumTank_IIIM_Or_PZIVRockets(const FVector SpawnLocation, const FRotator SpawnRotation)
 {
 	const FTrainingOption PlayerMediumVehicleTrainingOption =
-		URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(this);
+		URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIV_Rail(this);
 	AsyncSpawnActorAtLocation(
 		PlayerMediumVehicleTrainingOption,
 		GetNextAsyncSpawnId(),

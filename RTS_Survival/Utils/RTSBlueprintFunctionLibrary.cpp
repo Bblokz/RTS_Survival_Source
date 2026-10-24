@@ -1500,7 +1500,7 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerSpecialArmoredCar(UObject
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_FlamePuma));
 }
 
-FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerArmoredCar250_251Mortar(UObject* WorldContext)
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerArmored_Transport_251_Or_250(UObject* WorldContext)
 {
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
@@ -1508,14 +1508,14 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerArmoredCar250_251Morta
 	case ERTSFaction::NotInitialised:
 	case ERTSFaction::GerStrikeDivision:
 	case ERTSFaction::GerItalianFaction:
-		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251_Mortar));
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz251));
 	case ERTSFaction::GerBreakthroughDoctrine:
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz250));
 	}
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz250));
 }
 
-FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(UObject* WorldContext)
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerArmoredCarTankDestroyer_251_75mm_250_37mm(UObject* WorldContext)
 {
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
@@ -1561,7 +1561,7 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerTankDestroyerOrRail_Pzjag
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_RailGun));
 }
 
-FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(UObject* WorldContext)
+FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIV_Rail(UObject* WorldContext)
 {
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
@@ -1571,12 +1571,12 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZI
 	case ERTSFaction::GerItalianFaction:
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_M));
 	case ERTSFaction::GerBreakthroughDoctrine:
-		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets));
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_H));
 	}
-	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets));
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_H));
 }
 
-FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZIVH(UObject* WorldContext)
+FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_38Rockets_PZIVRockets(UObject* WorldContext)
 {
 	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
 	switch (PlayerFaction)
@@ -1584,7 +1584,7 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetGerPlayerMediumTank_IIIM_Or_PZI
 	case ERTSFaction::NotInitialised:
 	case ERTSFaction::GerStrikeDivision:
 	case ERTSFaction::GerItalianFaction:
-		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIII_M));
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Pz38t_R));
 	case ERTSFaction::GerBreakthroughDoctrine:
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PZIV_Rockets));
 	}
@@ -1645,6 +1645,81 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerGerMediumTankDestroyer_St
 		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Marder));
 	}
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Marder));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerPuma_Or_Flakvierling(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Puma));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_7_Flakvierling));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_7_Flakvierling));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerPanzerII_F_Or_PanzerII_Luchs(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_F));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_Luchs));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzII_Luchs));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerHetzer_Or_JagdpanzerIV(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Hetzer));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_70));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzIV_70));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerSdkfz234_75mm_Or_PanzerI_Bison_150mm(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Sdkfz_232_3));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_15cm));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerWespe_Or_Brummbar(UObject* WorldContext)
+{
+	const ERTSFaction PlayerFaction = FRTS_Statics::GetPlayerFaction(WorldContext);
+	switch (PlayerFaction)
+	{
+	case ERTSFaction::NotInitialised:
+	case ERTSFaction::GerStrikeDivision:
+	case ERTSFaction::GerItalianFaction:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Wespe));
+	case ERTSFaction::GerBreakthroughDoctrine:
+		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Brumbar));
+	}
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Brumbar));
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetPlayerFlak88_Or_PanzerIV_Rail(UObject* WorldContext)

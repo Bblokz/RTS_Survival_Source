@@ -11,6 +11,7 @@
 class AFormationEffectActor;
 class AActor;
 struct FFormationDragPath;
+struct FFormationArrowDrag;
 class RTS_SURVIVAL_API ASelectablePawnMaster;
 class RTS_SURVIVAL_API ASquadController;
 class RTS_SURVIVAL_API ASelectableActorObjectsMaster;
@@ -91,23 +92,22 @@ public:
 	);
 
 	/**
-	 * @brief Spreads the units along a line the player dragged instead of using the current formation shape.
-	 * @param DragPath The dragged line; a line too short for all units gets extra rows behind it.
+	 * @brief Lines the units up in rectangle rows behind the front the held rotation arrow describes.
+	 * @param ArrowDrag The rotation arrow; it sets the facing, and pulling it further widens the front.
 	 * @param SelectedSquads Array of selected squads.
 	 * @param SelectedPawns Array of selected pawns.
 	 * @param SelectedActorMasters Array of other selectable actors.
 	 */
-	void InitiateMovementAlongDragPath(
-		const FFormationDragPath& DragPath,
+	void InitiateMovementWithArrowFormation(
+		const FFormationArrowDrag& ArrowDrag,
 		const TArray<ASquadController*>& SelectedSquads,
 		const TArray<ASelectablePawnMaster*>& SelectedPawns,
 		const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters
 	);
 
 	/**
-	 * @brief Computes where a move order would put the units, without showing effects or issuing anything.
-	 * @param MoveLocation World-space target location, used when there is no drag path.
-	 * @param DragPath Line to spread the units along, or null for the current formation shape.
+	 * @brief Computes where a regular move order would put the units, without showing effects or issuing anything.
+	 * @param MoveLocation World-space target location.
 	 * @param SelectedSquads Array of selected squads.
 	 * @param SelectedPawns Array of selected pawns.
 	 * @param SelectedActorMasters Array of other selectable actors.
@@ -116,7 +116,6 @@ public:
 	 */
 	void BuildFormationPreview(
 		const FVector& MoveLocation,
-		const FFormationDragPath* DragPath,
 		const TArray<ASquadController*>& SelectedSquads,
 		const TArray<ASelectablePawnMaster*>& SelectedPawns,
 		const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters,
@@ -124,11 +123,25 @@ public:
 		TArray<FRotator>& OutRotations
 	);
 
-	/** @return How many of the selected units would take a slot in a formation move. */
-	int32 GetMovableUnitCount(
+	/**
+	 * @brief Computes where a move with the held rotation arrow would put the units, without issuing anything.
+	 * @param ArrowDrag The held rotation arrow.
+	 * @param SelectedSquads Array of selected squads.
+	 * @param SelectedPawns Array of selected pawns.
+	 * @param SelectedActorMasters Array of other selectable actors.
+	 * @param OutPositions Receives one location per unit that can move.
+	 * @param OutRotations Receives the facing of each location, parallel to OutPositions.
+	 * @param OutFrontLine Receives the front the units line up behind, so the preview can draw it.
+	 */
+	void BuildArrowFormationPreview(
+		const FFormationArrowDrag& ArrowDrag,
 		const TArray<ASquadController*>& SelectedSquads,
 		const TArray<ASelectablePawnMaster*>& SelectedPawns,
-		const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters) const;
+		const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters,
+		TArray<FVector>& OutPositions,
+		TArray<FRotator>& OutRotations,
+		FFormationDragPath& OutFrontLine
+	);
 
 	/**
 	 * @brief Activates the formation-picker UI at the given screen position.
@@ -173,12 +186,13 @@ private:
 		const TArray<ASelectablePawnMaster*>& SelectedPawns,
 		const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters);
 
-	// Fills the slot containers for units spread along DragPath; shared by orders and previews.
-	void BuildFormationSlotsAlongDragPath(
-		const FFormationDragPath& DragPath,
+	// Fills the slot containers for units lined up behind the arrow's front; shared by orders and previews.
+	void BuildFormationSlotsForArrowDrag(
+		const FFormationArrowDrag& ArrowDrag,
 		const TArray<ASquadController*>& SelectedSquads,
 		const TArray<ASelectablePawnMaster*>& SelectedPawns,
-		const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters);
+		const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters,
+		FFormationDragPath& OutFrontLine);
 
 	/**
      * @brief Build “movable” views of the selection arrays without mutating the originals.
@@ -301,7 +315,7 @@ private:
 	 *
 	 * @param AllRows         Array of rows, each containing unit data for that row.
 	 * @param RightVector     Formation’s right-axis vector used for horizontal placement.
-	 * @param OutLocalPos     Receives relative positions along each row for every unit.
+	 * @param OutLocalPos     Receives every unit's offset from the centre of its row.
 	 * @param OutMaxRadius    Receives the largest formation radius found in each row.
 	 */
 	void ComputeLocalRowPositions(
@@ -590,28 +604,45 @@ private:
     ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// ++++++++++++++++++++++++ Drag Line Formation Helpers ++++++++++++++++++++++++++++++++
+	// ++++++++++++++++++++++++ Arrow Drag Formation Helpers ++++++++++++++++++++++++++++++++
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	/**
-	 * @brief Generates one row of units along the dragged line, or several rows when the line is too short.
-	 * @param DragPath The dragged line.
-	 * @param Squads   Selected squad controllers.
-	 * @param Pawns    Selected pawn masters.
-	 * @param Actors   Selected other actor masters.
+	 * @brief A short arrow keeps the regular rectangle and only turns it; a longer one widens the front so the
+	 * rows behind it empty into the front.
+	 * @param ArrowDrag    The held rotation arrow.
+	 * @param Squads       Selected squad controllers.
+	 * @param Pawns        Selected pawn masters.
+	 * @param Actors       Selected other actor masters.
+	 * @param OutFrontLine Receives the front the units line up behind.
 	 */
-	void CreateDragLineFormation(
-		const FFormationDragPath& DragPath,
+	void CreateArrowDragFormation(
+		const FFormationArrowDrag& ArrowDrag,
 		const TArray<ASquadController*>& Squads,
 		const TArray<ASelectablePawnMaster*>& Pawns,
-		const TArray<ASelectableActorObjectsMaster*>& Actors
+		const TArray<ASelectableActorObjectsMaster*>& Actors,
+		FFormationDragPath& OutFrontLine
 	);
+
+	/** @return Front row span of the regular rectangle formation for units with these radii. */
+	float ComputeRectangleFrontRowSpan(const TArray<float>& UnitRadii) const;
+
+	/**
+	 * @brief Fills rows as wide as the front line, front to back, and assigns every unit its slot.
+	 * @param Units     Sorted unit data (in priority order).
+	 * @param UnitRadii Formation radius of every unit, parallel to Units.
+	 * @param FrontLine The straight front the rows line up behind.
+	 */
+	void PlaceUnitsBehindFrontLine(
+		const TArray<FUnitData>& Units,
+		const TArray<float>& UnitRadii,
+		const FFormationDragPath& FrontLine);
 
 	// Units that already stand towards the start of the line get the slots there, which limits crossing.
 	void SortDragLineRowAlongLine(TArray<FUnitData>& Row, const FVector& LineDirection) const;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////
-	// ++++++++++++++++++++++++ END Drag Line Formation Helpers ++++++++++++++++++++++++++++++++
+	// ++++++++++++++++++++++++ END Arrow Drag Formation Helpers ++++++++++++++++++++++++++++++++
 	////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	////////////////////////////////////////////////////////////////////////////////////////////////////

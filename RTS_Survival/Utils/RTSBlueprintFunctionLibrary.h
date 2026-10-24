@@ -741,18 +741,18 @@ public:
 	static FTrainingOption GetPlayerSpecialArmoredCar(UObject* WorldContext);
 	// Sdkfz with rockets for break through; sdkfz 250 for strike division.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetPlayerGerArmoredCar250_251Mortar(UObject* WorldContext);
+	static FTrainingOption GetPlayerGerArmored_Transport_251_Or_250(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetPlayerArmoredCarTankDestroyer_250_37mm_251_75mm(UObject* WorldContext);
+	static FTrainingOption GetPlayerArmoredCarTankDestroyer_251_75mm_250_37mm(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerLightMediumTank_PZIII_J_Or_PZIV_F1(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerTankDestroyerOrRail_PzjagerL_Or_PZ38Rail(UObject* WorldContext);
 	// Returns panzer IV H rockets for break through; panzer III M otherwise.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIVRockets(UObject* WorldContext);
+	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIV_Rail(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
-	static FTrainingOption GetGerPlayerMediumTank_IIIM_Or_PZIVH(UObject* WorldContext);
+	static FTrainingOption GetGerPlayerMediumTank_38Rockets_PZIVRockets(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerPanzerIIIAAOrRail38T(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
@@ -763,6 +763,16 @@ public:
 	static FTrainingOption GetPlayerGerJaguarOrPanzerIVG(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerGerMediumTankDestroyer_StugIII_OrMarder(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerPuma_Or_Flakvierling(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerPanzerII_F_Or_PanzerII_Luchs(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerHetzer_Or_JagdpanzerIV(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerSdkfz234_75mm_Or_PanzerI_Bison_150mm(UObject* WorldContext);
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
+	static FTrainingOption GetPlayerWespe_Or_Brummbar(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")
 	static FTrainingOption GetPlayerFlak88_Or_PanzerIV_Rail(UObject* WorldContext);
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="German")

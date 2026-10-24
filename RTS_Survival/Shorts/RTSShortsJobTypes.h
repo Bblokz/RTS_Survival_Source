@@ -361,6 +361,11 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	float EffectUnitSmokeScale = 0.f;
 
+	/** The unit's own effects whose asset name contains one of these keep their original size (no EffectUnitScale,
+	 *  no smoke split), e.g. machine-gun flashes next to a scaled-up cannon blast. */
+	UPROPERTY()
+	TArray<FString> EffectUnitExemptNames;
+
 	/** Smoke copy: seconds it keeps spawning, its fade time (-1 = the effect values) and how far (cm) in front of
 	 *  the muzzle socket it plays. */
 	UPROPERTY()

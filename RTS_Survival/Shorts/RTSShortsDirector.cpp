@@ -1312,11 +1312,14 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 			// on the turret socket) keep theirs.
 			const bool bOnUnit = ComponentOwner != nullptr && (ComponentOwner == Unit || ComponentOwner->IsAttachedTo(Unit));
 			const bool bExempt = GetIsEffectExemptFromLimits(Segment, Frame);
+			const FString FirstSeenAssetName = Component->GetFXSystemAsset() ? Component->GetFXSystemAsset()->GetName() : FString();
+			const bool bUnitExempt = Segment.EffectUnitExemptNames.ContainsByPredicate(
+				[&FirstSeenAssetName](const FString& Part) { return FirstSeenAssetName.Contains(Part); });
 			if (bScale && not bOnUnit && not bExempt)
 			{
 				Component->SetWorldScale3D(Component->GetComponentScale() * Segment.EffectScale);
 			}
-			if (bOnUnit && not FMath::IsNearlyEqual(Segment.EffectUnitScale, 1.f))
+			if (bOnUnit && not bUnitExempt && not FMath::IsNearlyEqual(Segment.EffectUnitScale, 1.f))
 			{
 				// The unit's own effects (muzzle flash and smoke on the barrel socket), e.g. a bigger fireball
 				// for a far side-profile camera.
@@ -1352,7 +1355,7 @@ void ARTSShortsDirector::LimitStageEffects(AActor* Unit, const FRTSShortsSegment
 							Disabled.Add(Handle.GetName());
 						}
 					}
-					const bool bSplitSmoke = bOnUnit && not bExempt && Segment.EffectUnitSmokeScale > 0.f;
+					const bool bSplitSmoke = bOnUnit && not bUnitExempt && not bExempt && Segment.EffectUnitSmokeScale > 0.f;
 					TArray<FName> SmokeEmitters;
 					if (bSplitSmoke)
 					{

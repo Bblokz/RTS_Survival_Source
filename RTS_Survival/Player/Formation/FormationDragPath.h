@@ -19,6 +19,13 @@ struct RTS_SURVIVAL_API FFormationDragPath
 	 */
 	bool TryAddPoint(const FVector& Location);
 
+	/**
+	 * @brief Replaces the path with one straight segment; unlike TryAddPoint it also keeps a very short one.
+	 * @param StartLocation First end of the line.
+	 * @param EndLocation Last end of the line; units on it face to the left of the start-to-end direction.
+	 */
+	void SetStraightLine(const FVector& StartLocation, const FVector& EndLocation);
+
 	bool GetIsStarted() const { return not M_Points.IsEmpty(); }
 	float GetLength() const { return M_CumulativeLengths.IsEmpty() ? 0.0f : M_CumulativeLengths.Last(); }
 	const TArray<FVector>& GetPoints() const { return M_Points; }

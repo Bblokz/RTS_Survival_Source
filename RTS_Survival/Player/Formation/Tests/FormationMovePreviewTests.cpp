@@ -21,7 +21,7 @@ namespace FormationMovePreviewTestsPrivate
 		TStrongObjectPtr<UWorld> World;
 		TObjectPtr<UFormationMovePreviewComponent> Preview = nullptr;
 
-		// Empty selection; the drag history is drawn whether or not any unit takes a slot.
+		// Empty selection; the arrow's front is drawn whether or not any unit takes a slot.
 		TArray<ASquadController*> SelectedSquads;
 		TArray<ASelectablePawnMaster*> SelectedPawns;
 		TArray<ASelectableActorObjectsMaster*> SelectedActorMasters;
@@ -77,12 +77,13 @@ namespace FormationMovePreviewTestsPrivate
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FFormationMovePreviewRendersDragTest,
-	"RTS.Formation.MovePreview.DragHistoryIsDrawnForAHiddenOwner",
+	"RTS.Formation.MovePreview.ArrowFrontIsDrawnForAHiddenOwner",
 	FormationMovePreviewTestsPrivate::TestFlags)
 
 bool FFormationMovePreviewRendersDragTest::RunTest(const FString& Parameters)
 {
 	using namespace FormationMovePreviewTestsPrivate;
+	constexpr float LocationTolerance = 0.5f;
 	FPreviewFixture Fixture;
 	if (not TestTrue(TEXT("The preview fixture starts"), Fixture.Initialize()))
 	{
@@ -95,27 +96,45 @@ bool FFormationMovePreviewRendersDragTest::RunTest(const FString& Parameters)
 
 	Preview.BeginDrag(FVector::ZeroVector);
 	TestTrue(TEXT("Holding the secondary button starts the drag"), Preview.GetIsDragActive());
-	TestFalse(TEXT("A drag that has not moved is not a line yet"), Preview.GetIsLineDragReady());
+	TestFalse(TEXT("A drag without a rotation arrow is a quick click"), Preview.GetIsArrowFormationReady());
 
 	Preview.UpdatePreview(Fixture.MakeInput(FVector(0.0f, 100.0f, 0.0f)));
-	TestEqual(TEXT("The first stretch of the drag is drawn at once"), Preview.GetPreviewLineCount(), 1);
-	TestFalse(TEXT("A short drag still is a regular move"), Preview.GetIsLineDragReady());
+	TestFalse(TEXT("Until the arrow appears the click keeps the regular rectangle"),
+		Preview.GetIsArrowFormationReady());
+	TestEqual(TEXT("A quick click draws no front"), Preview.GetPreviewLineCount(), 0);
 
-	// Every update extends the history, also the ones that come faster than the slots are rebuilt.
-	Preview.UpdatePreview(Fixture.MakeInput(FVector(0.0f, 200.0f, 0.0f)));
-	Preview.UpdatePreview(Fixture.MakeInput(FVector(0.0f, 300.0f, 0.0f)));
-	TestEqual(TEXT("No part of the drag is lost between redraws"), Preview.GetDragPath().GetPoints().Num(), 4);
-	TestTrue(TEXT("A long enough drag becomes a line to spread the units along"), Preview.GetIsLineDragReady());
-	TestTrue(TEXT("The drag history stays on screen while dragging"), Preview.GetPreviewLineCount() >= 1);
+	FFormationMovePreviewInput ArrowInput = Fixture.MakeInput(FVector(300.0f, 0.0f, 0.0f));
+	ArrowInput.bArrowFacingChosen = true;
+	ArrowInput.ArrowRotation = FRotator::ZeroRotator;
+	Preview.UpdatePreview(ArrowInput);
+	TestTrue(TEXT("Once the arrow appears it shapes the formation"), Preview.GetIsArrowFormationReady());
+	TestEqual(TEXT("The arrow is as long as the cursor is far from where the button went down"),
+		Preview.GetArrowDrag().ArrowLength, 300.0f, LocationTolerance);
+	TestEqual(TEXT("The front of the arrow formation is drawn at once"), Preview.GetPreviewLineCount(), 1);
+	const TArray<FVector>& FrontPoints = Preview.GetFrontLine().GetPoints();
+	if (TestEqual(TEXT("The front is one straight line"), FrontPoints.Num(), 2))
+	{
+		TestTrue(TEXT("The front reaches as far to the left as the arrow is long"),
+			FrontPoints[0].Equals(FVector(0.0f, -300.0f, 0.0f), LocationTolerance));
+		TestTrue(TEXT("The front reaches as far to the right as the arrow is long"),
+			FrontPoints[1].Equals(FVector(0.0f, 300.0f, 0.0f), LocationTolerance));
+	}
+
+	// Updates faster than the rebuild interval still move the arrow the order is given with.
+	ArrowInput.CursorLocation = FVector(500.0f, 0.0f, 0.0f);
+	Preview.UpdatePreview(ArrowInput);
+	TestEqual(TEXT("The order uses the latest arrow, also between rebuilds"),
+		Preview.GetArrowDrag().ArrowLength, 500.0f, LocationTolerance);
 
 	Preview.EndDrag();
 	TestFalse(TEXT("Releasing the button ends the drag"), Preview.GetIsDragActive());
-	TestEqual(TEXT("The drag history disappears with the drag"), Preview.GetPreviewLineCount(), 0);
+	TestFalse(TEXT("Releasing the button drops the arrow formation"), Preview.GetIsArrowFormationReady());
+	TestEqual(TEXT("The front disappears with the drag"), Preview.GetPreviewLineCount(), 0);
 
-	// Losing the move context in the middle of a drag drops the line as well.
+	// Losing the move context in the middle of a drag drops the arrow formation as well.
 	Preview.BeginDrag(FVector::ZeroVector);
-	Preview.UpdatePreview(Fixture.MakeInput(FVector(0.0f, 100.0f, 0.0f)));
-	FFormationMovePreviewInput NoContextInput = Fixture.MakeInput(FVector(0.0f, 200.0f, 0.0f));
+	Preview.UpdatePreview(ArrowInput);
+	FFormationMovePreviewInput NoContextInput = ArrowInput;
 	NoContextInput.bFormationMoveContext = false;
 	Preview.UpdatePreview(NoContextInput);
 	TestFalse(TEXT("Without a formation selection there is no drag"), Preview.GetIsDragActive());

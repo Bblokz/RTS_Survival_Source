@@ -74,15 +74,16 @@ void UFormationController::InitiateMovement(
 	}
 }
 
-void UFormationController::InitiateMovementAlongDragPath(
-	const FFormationDragPath& DragPath,
+void UFormationController::InitiateMovementWithArrowFormation(
+	const FFormationArrowDrag& ArrowDrag,
 	const TArray<ASquadController*>& SelectedSquads,
 	const TArray<ASelectablePawnMaster*>& SelectedPawns,
 	const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters)
 {
-	BuildFormationSlotsAlongDragPath(DragPath, SelectedSquads, SelectedPawns, SelectedActorMasters);
+	FFormationDragPath FrontLine;
+	BuildFormationSlotsForArrowDrag(ArrowDrag, SelectedSquads, SelectedPawns, SelectedActorMasters, FrontLine);
 
-	// The line gives every unit a facing, so the slots are drawn as arrows like an arrow-rotated formation.
+	// The arrow gives every unit a facing, so the slots are drawn as arrows.
 	TArray<FRotator> Rotations;
 	const TArray<FVector> Positions = GatherAllFormationPositions(Rotations);
 	ShowEffectsAtPositions(Positions, EFormationEffect::Arrow, Rotations);
@@ -96,7 +97,6 @@ void UFormationController::InitiateMovementAlongDragPath(
 
 void UFormationController::BuildFormationPreview(
 	const FVector& MoveLocation,
-	const FFormationDragPath* DragPath,
 	const TArray<ASquadController*>& SelectedSquads,
 	const TArray<ASelectablePawnMaster*>& SelectedPawns,
 	const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters,
@@ -104,28 +104,22 @@ void UFormationController::BuildFormationPreview(
 	TArray<FRotator>& OutRotations)
 {
 	OutRotations.Reset();
-	if (DragPath != nullptr)
-	{
-		BuildFormationSlotsAlongDragPath(*DragPath, SelectedSquads, SelectedPawns, SelectedActorMasters);
-	}
-	else
-	{
-		BuildFormationSlotsAtLocation(MoveLocation, SelectedSquads, SelectedPawns, SelectedActorMasters);
-	}
+	BuildFormationSlotsAtLocation(MoveLocation, SelectedSquads, SelectedPawns, SelectedActorMasters);
 	OutPositions = GatherAllFormationPositions(OutRotations);
 }
 
-int32 UFormationController::GetMovableUnitCount(
+void UFormationController::BuildArrowFormationPreview(
+	const FFormationArrowDrag& ArrowDrag,
 	const TArray<ASquadController*>& SelectedSquads,
 	const TArray<ASelectablePawnMaster*>& SelectedPawns,
-	const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters) const
+	const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters,
+	TArray<FVector>& OutPositions,
+	TArray<FRotator>& OutRotations,
+	FFormationDragPath& OutFrontLine)
 {
-	TArray<ASquadController*> MovableSquads;
-	TArray<ASelectablePawnMaster*> MovablePawns;
-	TArray<ASelectableActorObjectsMaster*> MovableActors;
-	BuildMovableSelections(SelectedSquads, SelectedPawns, SelectedActorMasters,
-	                       MovableSquads, MovablePawns, MovableActors);
-	return MovableSquads.Num() + MovablePawns.Num() + MovableActors.Num();
+	OutRotations.Reset();
+	BuildFormationSlotsForArrowDrag(ArrowDrag, SelectedSquads, SelectedPawns, SelectedActorMasters, OutFrontLine);
+	OutPositions = GatherAllFormationPositions(OutRotations);
 }
 
 void UFormationController::BuildFormationSlotsAtLocation(
@@ -164,14 +158,15 @@ void UFormationController::BuildFormationSlotsAtLocation(
 	}
 }
 
-void UFormationController::BuildFormationSlotsAlongDragPath(
-	const FFormationDragPath& DragPath,
+void UFormationController::BuildFormationSlotsForArrowDrag(
+	const FFormationArrowDrag& ArrowDrag,
 	const TArray<ASquadController*>& SelectedSquads,
 	const TArray<ASelectablePawnMaster*>& SelectedPawns,
-	const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters)
+	const TArray<ASelectableActorObjectsMaster*>& SelectedActorMasters,
+	FFormationDragPath& OutFrontLine)
 {
-	// Assignments are made relative to the middle of the line, like a click there would have been.
-	M_OriginalLocation = DragPath.GetLocationAtDistance(DragPath.GetLength() * 0.5f);
+	// Assignments are made relative to the arrow's anchor, like a click there would have been.
+	M_OriginalLocation = ArrowDrag.AnchorLocation;
 	M_TPositionsPerUnitType.Empty();
 	M_AssignedFormationSlots.Empty();
 
@@ -181,7 +176,7 @@ void UFormationController::BuildFormationSlotsAlongDragPath(
 	BuildMovableSelections(SelectedSquads, SelectedPawns, SelectedActorMasters,
 	                       MovableSquads, MovablePawns, MovableActors);
 
-	CreateDragLineFormation(DragPath, MovableSquads, MovablePawns, MovableActors);
+	CreateArrowDragFormation(ArrowDrag, MovableSquads, MovablePawns, MovableActors, OutFrontLine);
 }
 
 bool UFormationController::ActivateFormationPicker(const FVector2D& MousePosition) const
@@ -697,6 +692,13 @@ void UFormationController::ComputeLocalRowPositions(
 			RowMax = FMath::Max(RowMax, RowData[c].FormationRadius);
 		}
 		OutMaxRadius[r] = RowMax;
+
+		// Centre the row on the click, like the arrow formation centres its rows on the arrow.
+		const FVector RowCentreOffset = OutLocalPos[r].Last() * 0.5f;
+		for (FVector& LocalPosition : OutLocalPos[r])
+		{
+			LocalPosition -= RowCentreOffset;
+		}
 	}
 }
 
@@ -1581,22 +1583,16 @@ FVector UFormationController::ApplyDepthSag(
 	return BasePosition - ForwardAxis * (DepthFactor * (InterUnitSpacing * 0.5f));
 }
 
-void UFormationController::CreateDragLineFormation(
-	const FFormationDragPath& DragPath,
+void UFormationController::CreateArrowDragFormation(
+	const FFormationArrowDrag& ArrowDrag,
 	const TArray<ASquadController*>& Squads,
 	const TArray<ASelectablePawnMaster*>& Pawns,
-	const TArray<ASelectableActorObjectsMaster*>& Actors)
+	const TArray<ASelectableActorObjectsMaster*>& Actors,
+	FFormationDragPath& OutFrontLine)
 {
 	TArray<FUnitData> Units;
 	FVector AverageUnitsLocation;
 	GatherAndSortUnits(Squads, Pawns, Actors, Units, AverageUnitsLocation);
-	if (Units.IsEmpty())
-	{
-		return;
-	}
-
-	M_FormationRotation = DragPath.GetOverallFacing().Rotation();
-	const FVector LineDirection = M_FormationRotation.RotateVector(FVector::RightVector);
 
 	TArray<float> UnitRadii;
 	UnitRadii.Reserve(Units.Num());
@@ -1604,8 +1600,33 @@ void UFormationController::CreateDragLineFormation(
 	{
 		UnitRadii.Add(Unit.FormationRadius);
 	}
+	const float FrontWidth = FFormationDragLineLayout::ComputeArrowFrontWidth(
+		ComputeRectangleFrontRowSpan(UnitRadii), ArrowDrag.ArrowLength);
+	FFormationDragLineLayout::MakeArrowFrontLine(ArrowDrag, FrontWidth, OutFrontLine);
+	M_FormationRotation = FRotator(0.0f, ArrowDrag.Facing.Yaw, 0.0f);
+	if (Units.IsEmpty())
+	{
+		return;
+	}
+	PlaceUnitsBehindFrontLine(Units, UnitRadii, OutFrontLine);
+}
+
+float UFormationController::ComputeRectangleFrontRowSpan(const TArray<float>& UnitRadii) const
+{
+	int32 Columns = 0;
+	int32 Rows = 0;
+	DetermineGridDimensions(UnitRadii.Num(), Columns, Rows);
+	return FFormationDragLineLayout::ComputeFrontRowSpan(UnitRadii, Columns);
+}
+
+void UFormationController::PlaceUnitsBehindFrontLine(
+	const TArray<FUnitData>& Units,
+	const TArray<float>& UnitRadii,
+	const FFormationDragPath& FrontLine)
+{
+	const FVector LineDirection = M_FormationRotation.RotateVector(FVector::RightVector);
 	const TArray<int32> RowUnitCounts = FFormationDragLineLayout::ComputeRowUnitCounts(
-		UnitRadii, DragPath.GetLength());
+		UnitRadii, FrontLine.GetLength());
 
 	TArray<FUnitData> OrderedUnits;
 	TArray<TArray<float>> RowUnitRadii;
@@ -1628,7 +1649,7 @@ void UFormationController::CreateDragLineFormation(
 
 	TArray<FVector> Positions;
 	TArray<FRotator> Rotations;
-	FFormationDragLineLayout::PlaceRows(RowUnitRadii, DragPath, Positions, Rotations);
+	FFormationDragLineLayout::PlaceRows(RowUnitRadii, FrontLine, Positions, Rotations);
 	BuildUnitAssignments(OrderedUnits, Positions, Rotations);
 }
 

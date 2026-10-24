@@ -4,10 +4,20 @@
 
 struct FFormationDragPath;
 
+/** The rotation arrow the player holds: where it stands, where it points and how far the cursor pulled it. */
+struct RTS_SURVIVAL_API FFormationArrowDrag
+{
+	FVector AnchorLocation = FVector::ZeroVector;
+	FRotator Facing = FRotator::ZeroRotator;
+
+	// Ground distance from the anchor to the cursor.
+	float ArrowLength = 0.0f;
+};
+
 /**
- * @brief Pure layout of units along a dragged line, working on formation radii only so it can be tested
- * without units. The formation controller asks for the row sizes, orders its units inside each row and
- * then asks for the slot of every unit.
+ * @brief Pure layout of units along a front line, working on formation radii only so it can be tested
+ * without units. The formation controller makes the line from the rotation arrow, asks for the row sizes,
+ * orders its units inside each row and then asks for the slot of every unit.
  */
 struct RTS_SURVIVAL_API FFormationDragLineLayout
 {
@@ -34,4 +44,29 @@ struct RTS_SURVIVAL_API FFormationDragLineLayout
 
 	/** Distance between the centres of two neighbouring units standing shoulder to shoulder. */
 	static float GetNeighbourSpacing(float FirstUnitRadius, float SecondUnitRadius);
+
+	/**
+	 * @brief Span of a front row holding the first units shoulder to shoulder, as the rectangle formation fills it.
+	 * @param UnitRadii         Formation radius of every unit, in the order the rows are filled.
+	 * @param FrontRowUnitCount How many of those units stand in the front row.
+	 * @return Distance between the centres of the first and last unit of that row.
+	 */
+	static float ComputeFrontRowSpan(const TArray<float>& UnitRadii, int32 FrontRowUnitCount);
+
+	/**
+	 * @brief A short arrow only turns the regular rectangle; pulling it further than that front reaches widens it.
+	 * @param RectangleFrontSpan Front row span of the regular rectangle formation for these units.
+	 * @param ArrowLength        Ground distance from the arrow's anchor to the cursor.
+	 * @return Length of the front line the units are spread along.
+	 */
+	static float ComputeArrowFrontWidth(float RectangleFrontSpan, float ArrowLength);
+
+	/**
+	 * @brief The front is centred on the arrow's anchor and square to it, so the units on it face the arrow's way.
+	 * @param ArrowDrag    The held rotation arrow.
+	 * @param FrontWidth   Length of the front line.
+	 * @param OutFrontLine Receives the straight front line.
+	 */
+	static void MakeArrowFrontLine(const FFormationArrowDrag& ArrowDrag, float FrontWidth,
+	                               FFormationDragPath& OutFrontLine);
 };

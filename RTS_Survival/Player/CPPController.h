@@ -1662,7 +1662,7 @@ private:
 	// Asks the command decoder what a secondary click on this actor would do, without issuing anything.
 	bool GetWouldSecondaryClickMove(AActor* ActorUnderCursor);
 
-	// Previews formation moves of selections with non-squad units and records the secondary-button line drag.
+	// Previews formation moves of selections with non-squad units and follows the held secondary button's arrow.
 	UPROPERTY()
 	TObjectPtr<UFormationMovePreviewComponent> M_FormationMovePreview;
 
@@ -1697,14 +1697,14 @@ private:
 	bool GetIsSecondaryClickCommandContext() const;
 
 	/**
-	 * @brief Starts recording a line drag when the held secondary button can spread the selection along it.
+	 * @brief Lets the formation preview follow the held secondary button when it would move a formation, so the
+	 * rotation arrow can turn and widen that formation.
 	 * @param CursorHit What the cursor pointed at when the secondary button went down.
-	 * @return False when this selection keeps the rotation arrow instead.
 	 */
-	bool TryBeginFormationLineDrag(const FHitResult& CursorHit);
+	void TryBeginFormationArrowDrag(const FHitResult& CursorHit);
 
-	/** @return True when releasing the secondary button now spreads the selection along the dragged line. */
-	bool GetIsFormationLineDragReady() const;
+	/** @return True when releasing the secondary button now lines the selection up behind the rotation arrow. */
+	bool GetIsFormationArrowDragReady() const;
 
 	// Whether there is currently an active building preview.
 	// This is only the case if we activated a building ability but have not yet propagated a valid building

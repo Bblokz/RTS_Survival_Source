@@ -10,24 +10,23 @@
 
 namespace FormationMovePreviewPrivate
 {
-	// A drag shorter than this is a plain click that slipped; it stays a regular formation move.
-	constexpr float MinimumLineDragLength = 200.0f;
-
-	// The slots are rebuilt when the cursor moved this far.
+	// The slots are rebuilt when the cursor moved this far, or the held arrow got this much longer or shorter.
 	constexpr float RebuildCursorDistance = 25.0f;
+	// The slots are rebuilt when the held arrow turned this far.
+	constexpr float RebuildArrowYawDegrees = 1.0f;
 	// Upper bound on rebuilds per second while the cursor keeps moving.
 	constexpr double MinimumRebuildIntervalSeconds = 0.04;
 	// A standing cursor still rebuilds at this pace, because the units walk and the formation turns with them.
 	constexpr double IdleRebuildIntervalSeconds = 0.25;
 
 	constexpr float PreviewHeight = 45.0f;
-	constexpr float DragPathThickness = 6.0f;
+	constexpr float FrontLineThickness = 6.0f;
 	constexpr float SlotArrowThickness = 4.0f;
 	constexpr float ArrowLength = 110.0f;
 	constexpr float ArrowHeadLength = 40.0f;
 	constexpr float ArrowHeadHalfWidth = 26.0f;
 
-	const FLinearColor DragPathColor(1.0f, 1.0f, 1.0f);
+	const FLinearColor FrontLineColor(1.0f, 1.0f, 1.0f);
 	const FLinearColor SlotArrowColor(0.1f, 0.72f, 0.1f);
 
 	FBatchedLine MakePreviewLine(
@@ -124,7 +123,10 @@ bool UFormationMovePreviewComponent::GetIsValidPreviewLineBatch() const
 
 void UFormationMovePreviewComponent::BeginDrag(const FVector& StartLocation)
 {
-	M_DragPath.Start(StartLocation);
+	M_DragState = FFormationMovePreviewDragState();
+	M_DragState.bIsActive = true;
+	// The rotation arrow stands where the button went down, so that is where the formation's front is anchored.
+	M_DragState.ArrowDrag.AnchorLocation = StartLocation;
 }
 
 void UFormationMovePreviewComponent::EndDrag()
@@ -133,14 +135,9 @@ void UFormationMovePreviewComponent::EndDrag()
 	{
 		return;
 	}
-	M_DragPath.Reset();
-	// The slots on screen were built for the line that is now gone.
+	M_DragState = FFormationMovePreviewDragState();
+	// The slots on screen were built for the drag that is now gone.
 	HidePreview();
-}
-
-bool UFormationMovePreviewComponent::GetIsLineDragReady() const
-{
-	return GetIsDragActive() && M_DragPath.GetLength() >= FormationMovePreviewPrivate::MinimumLineDragLength;
 }
 
 void UFormationMovePreviewComponent::UpdatePreview(const FFormationMovePreviewInput& Input)
@@ -155,11 +152,11 @@ void UFormationMovePreviewComponent::UpdatePreview(const FFormationMovePreviewIn
 		return;
 	}
 
-	if (GetIsDragActive() && Input.bCursorHit && M_DragPath.TryAddPoint(Input.CursorLocation))
+	if (GetIsDragActive())
 	{
-		M_RefreshState.bDragPathChanged = true;
+		UpdateArrowDrag(Input);
 	}
-	// While dragging, the line itself is the move target, whatever the cursor happens to be over.
+	// While dragging, the arrow's anchor is the move target, whatever the cursor happens to be over.
 	const bool bHasMoveTarget = GetIsDragActive() || Input.bCursorOnMoveGround;
 	if (not bHasMoveTarget)
 	{
@@ -178,8 +175,24 @@ void UFormationMovePreviewComponent::UpdatePreview(const FFormationMovePreviewIn
 	M_RefreshState.CursorLocation = Input.CursorLocation;
 	M_RefreshState.SelectionHash = SelectionHash;
 	M_RefreshState.BuiltAtWorldSeconds = WorldSeconds;
-	M_RefreshState.bDragPathChanged = false;
+	M_RefreshState.ArrowYaw = M_DragState.ArrowDrag.Facing.Yaw;
+	M_RefreshState.ArrowLength = M_DragState.ArrowDrag.ArrowLength;
 	DrawPreview();
+}
+
+void UFormationMovePreviewComponent::UpdateArrowDrag(const FFormationMovePreviewInput& Input)
+{
+	if (not Input.bArrowFacingChosen)
+	{
+		return;
+	}
+	M_DragState.bIsArrowStarted = true;
+	FFormationArrowDrag& ArrowDrag = M_DragState.ArrowDrag;
+	ArrowDrag.Facing = FRotator(0.0f, Input.ArrowRotation.Yaw, 0.0f);
+	if (Input.bCursorHit)
+	{
+		ArrowDrag.ArrowLength = FVector::Dist2D(ArrowDrag.AnchorLocation, Input.CursorLocation);
+	}
 }
 
 bool UFormationMovePreviewComponent::GetShouldRebuild(
@@ -197,11 +210,24 @@ bool UFormationMovePreviewComponent::GetShouldRebuild(
 	{
 		return false;
 	}
-	// A held drag only changes with its path; the cursor wandering near the last point changes nothing.
+	// A held drag only changes with its arrow; the cursor itself is not the move target then.
 	const bool bCursorMoved = not GetIsDragActive() &&
 		FVector::DistSquared2D(Input.CursorLocation, M_RefreshState.CursorLocation) >
 		FMath::Square(RebuildCursorDistance);
-	return M_RefreshState.bDragPathChanged || bCursorMoved || SecondsSinceBuild >= IdleRebuildIntervalSeconds;
+	return GetHasArrowChangedSinceBuild() || bCursorMoved || SecondsSinceBuild >= IdleRebuildIntervalSeconds;
+}
+
+bool UFormationMovePreviewComponent::GetHasArrowChangedSinceBuild() const
+{
+	using namespace FormationMovePreviewPrivate;
+	if (not GetIsArrowFormationReady())
+	{
+		return false;
+	}
+	const FFormationArrowDrag& ArrowDrag = M_DragState.ArrowDrag;
+	const float YawChange = FMath::Abs(FRotator::NormalizeAxis(ArrowDrag.Facing.Yaw - M_RefreshState.ArrowYaw));
+	const float LengthChange = FMath::Abs(ArrowDrag.ArrowLength - M_RefreshState.ArrowLength);
+	return YawChange > RebuildArrowYawDegrees || LengthChange > RebuildCursorDistance;
 }
 
 void UFormationMovePreviewComponent::RebuildSlots(const FFormationMovePreviewInput& Input)
@@ -212,12 +238,23 @@ void UFormationMovePreviewComponent::RebuildSlots(const FFormationMovePreviewInp
 	{
 		return;
 	}
-	// A drag that is still too short previews the regular move to where the button went down.
-	const FFormationDragPath* LinePath = GetIsLineDragReady() ? &M_DragPath : nullptr;
-	const FVector MoveLocation = GetIsDragActive() ? M_DragPath.GetStartLocation() : Input.CursorLocation;
+	if (GetIsArrowFormationReady())
+	{
+		M_FormationController->BuildArrowFormationPreview(
+			M_DragState.ArrowDrag,
+			*Input.SelectedSquads,
+			*Input.SelectedPawns,
+			*Input.SelectedActorMasters,
+			M_SlotLocations,
+			M_SlotRotations,
+			M_DragState.FrontLine);
+		return;
+	}
+	M_DragState.FrontLine.Reset();
+	// Until the rotation arrow appears, a held button previews the quick click on where it went down.
+	const FVector MoveLocation = GetIsDragActive() ? M_DragState.ArrowDrag.AnchorLocation : Input.CursorLocation;
 	M_FormationController->BuildFormationPreview(
 		MoveLocation,
-		LinePath,
 		*Input.SelectedSquads,
 		*Input.SelectedPawns,
 		*Input.SelectedActorMasters,
@@ -227,7 +264,7 @@ void UFormationMovePreviewComponent::RebuildSlots(const FFormationMovePreviewInp
 
 uint32 UFormationMovePreviewComponent::BuildSelectionHash(const FFormationMovePreviewInput& Input) const
 {
-	uint32 SelectionHash = GetTypeHash(GetIsLineDragReady());
+	uint32 SelectionHash = GetTypeHash(GetIsArrowFormationReady());
 	for (const ASquadController* SquadController : *Input.SelectedSquads)
 	{
 		SelectionHash = HashCombine(SelectionHash, GetTypeHash(SquadController));
@@ -265,7 +302,7 @@ void UFormationMovePreviewComponent::DrawPreview()
 		return;
 	}
 	TArray<FBatchedLine> PreviewLines;
-	AddDragPathLines(PreviewLines);
+	AddFrontLineLines(PreviewLines);
 	for (int32 SlotIndex = 0; SlotIndex < M_SlotLocations.Num(); ++SlotIndex)
 	{
 		const FRotator SlotRotation = M_SlotRotations.IsValidIndex(SlotIndex)
@@ -279,18 +316,18 @@ void UFormationMovePreviewComponent::DrawPreview()
 	M_RefreshState.bIsVisible = true;
 }
 
-void UFormationMovePreviewComponent::AddDragPathLines(TArray<FBatchedLine>& OutLines) const
+void UFormationMovePreviewComponent::AddFrontLineLines(TArray<FBatchedLine>& OutLines) const
 {
 	using namespace FormationMovePreviewPrivate;
-	const TArray<FVector>& PathPoints = M_DragPath.GetPoints();
+	const TArray<FVector>& PathPoints = M_DragState.FrontLine.GetPoints();
 	const FVector HeightOffset = FVector::UpVector * PreviewHeight;
 	for (int32 PointIndex = 1; PointIndex < PathPoints.Num(); ++PointIndex)
 	{
 		OutLines.Add(MakePreviewLine(
 			PathPoints[PointIndex - 1] + HeightOffset,
 			PathPoints[PointIndex] + HeightOffset,
-			DragPathColor,
-			DragPathThickness));
+			FrontLineColor,
+			FrontLineThickness));
 	}
 }
 

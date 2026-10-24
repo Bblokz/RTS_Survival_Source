@@ -350,4 +350,85 @@ bool FFormationDragLineBentLineTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFormationArrowFrontWidthTest,
+	"RTS.Formation.ArrowDrag.ShortArrowKeepsTheRectangleLongArrowWidensIt",
+	FormationDragLineTestsPrivate::TestFlags)
+
+bool FFormationArrowFrontWidthTest::RunTest(const FString& Parameters)
+{
+	using namespace FormationDragLineTestsPrivate;
+	// Nine units make a three by three rectangle; shoulder to shoulder they stand 100 apart.
+	const TArray<float> UnitRadii = MakeEqualRadii(9, 100.0f);
+	constexpr int32 RectangleColumns = 3;
+	const float RectangleFrontSpan = FFormationDragLineLayout::ComputeFrontRowSpan(UnitRadii, RectangleColumns);
+	TestEqual(TEXT("The rectangle's front spans its three columns"), RectangleFrontSpan, 200.0f, LocationTolerance);
+
+	FFormationArrowDrag ArrowDrag;
+	ArrowDrag.AnchorLocation = FVector(1000.0f, 0.0f, 0.0f);
+
+	// The arrow appears after a couple of pixels, so it starts out much shorter than the rectangle is wide.
+	ArrowDrag.ArrowLength = 20.0f;
+	FFormationDragPath FrontLine;
+	FFormationDragLineLayout::MakeArrowFrontLine(
+		ArrowDrag, FFormationDragLineLayout::ComputeArrowFrontWidth(RectangleFrontSpan, ArrowDrag.ArrowLength),
+		FrontLine);
+	TestEqual(TEXT("A short arrow keeps the rectangle's three rows of three"),
+		FFormationDragLineLayout::ComputeRowUnitCounts(UnitRadii, FrontLine.GetLength()), TArray<int32>{3, 3, 3});
+
+	ArrowDrag.ArrowLength = 260.0f;
+	FFormationDragLineLayout::MakeArrowFrontLine(
+		ArrowDrag, FFormationDragLineLayout::ComputeArrowFrontWidth(RectangleFrontSpan, ArrowDrag.ArrowLength),
+		FrontLine);
+	TestEqual(TEXT("A longer arrow widens the front, which pulls units out of the rows behind it"),
+		FFormationDragLineLayout::ComputeRowUnitCounts(UnitRadii, FrontLine.GetLength()), TArray<int32>{6, 3});
+
+	ArrowDrag.ArrowLength = 500.0f;
+	FFormationDragLineLayout::MakeArrowFrontLine(
+		ArrowDrag, FFormationDragLineLayout::ComputeArrowFrontWidth(RectangleFrontSpan, ArrowDrag.ArrowLength),
+		FrontLine);
+	TestEqual(TEXT("A long enough arrow puts every unit in the front"),
+		FFormationDragLineLayout::ComputeRowUnitCounts(UnitRadii, FrontLine.GetLength()), TArray<int32>{9});
+	TestTrue(TEXT("The front is centred on the arrow's anchor"),
+		GetIsNear(FrontLine.GetLocationAtDistance(FrontLine.GetLength() * 0.5f), ArrowDrag.AnchorLocation));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FFormationArrowFrontFacingTest,
+	"RTS.Formation.ArrowDrag.UnitsFaceAlongTheArrow",
+	FormationDragLineTestsPrivate::TestFlags)
+
+bool FFormationArrowFrontFacingTest::RunTest(const FString& Parameters)
+{
+	using namespace FormationDragLineTestsPrivate;
+	FFormationArrowDrag ArrowDrag;
+	ArrowDrag.AnchorLocation = FVector(100.0f, 0.0f, 0.0f);
+	ArrowDrag.Facing = FRotator(0.0f, 90.0f, 0.0f);
+
+	FFormationDragPath FrontLine;
+	FFormationDragLineLayout::MakeArrowFrontLine(ArrowDrag, 600.0f, FrontLine);
+	const FVector ArrowForward = ArrowDrag.Facing.Vector();
+	TestTrue(TEXT("The units on the front face where the arrow points"),
+		FrontLine.GetOverallFacing().Equals(ArrowForward, DirectionTolerance));
+	TestTrue(TEXT("The front runs square to the arrow"),
+		FMath::IsNearlyZero(FVector::DotProduct(FrontLine.GetPoints().Last() - FrontLine.GetPoints()[0], ArrowForward),
+		                    LocationTolerance));
+
+	// A single unit has no front width to speak of; it still stands on the anchor and faces the arrow's way.
+	const TArray<float> SingleUnitRadii = MakeEqualRadii(1, 100.0f);
+	FFormationDragLineLayout::MakeArrowFrontLine(
+		ArrowDrag, FFormationDragLineLayout::ComputeArrowFrontWidth(0.0f, 0.0f), FrontLine);
+	TArray<int32> RowUnitCounts;
+	TArray<FVector> Positions;
+	TArray<FRotator> Rotations;
+	LayOutUnits(SingleUnitRadii, FrontLine, RowUnitCounts, Positions, Rotations);
+	if (TestEqual(TEXT("The single unit gets a slot"), Positions.Num(), 1))
+	{
+		TestTrue(TEXT("The single unit stands on the anchor"), GetIsNear(Positions[0], ArrowDrag.AnchorLocation));
+		TestTrue(TEXT("The single unit faces the arrow's way"), GetFaces(Rotations[0], ArrowForward));
+	}
+	return true;
+}
+
 #endif

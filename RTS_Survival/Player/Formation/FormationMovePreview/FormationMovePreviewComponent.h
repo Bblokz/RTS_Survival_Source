@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "RTS_Survival/Player/Formation/FormationDragLineLayout.h"
 #include "RTS_Survival/Player/Formation/FormationDragPath.h"
 #include "FormationMovePreviewComponent.generated.h"
 
@@ -28,6 +29,23 @@ struct FFormationMovePreviewInput
 	// False when the cursor is over an actor that a click would target instead of move to.
 	bool bCursorOnMoveGround = false;
 	FVector CursorLocation = FVector::ZeroVector;
+
+	// True once the rotation arrow of the held secondary button appeared; from then on it shapes the formation.
+	bool bArrowFacingChosen = false;
+	FRotator ArrowRotation = FRotator::ZeroRotator;
+};
+
+/** The held secondary button that went down on move ground, from press to release. */
+struct FFormationMovePreviewDragState
+{
+	bool bIsActive = false;
+
+	// Set once the rotation arrow appeared; a release before that is a quick click with the regular rectangle.
+	bool bIsArrowStarted = false;
+	FFormationArrowDrag ArrowDrag;
+
+	// Front the slots on screen line up behind, drawn as a bar so the player sees how wide the arrow made it.
+	FFormationDragPath FrontLine;
 };
 
 /** Remembers what the slots on screen were built from, so they are only rebuilt when something relevant changed. */
@@ -38,13 +56,14 @@ struct FFormationMovePreviewRefreshState
 	uint32 SelectionHash = 0;
 	bool bIsVisible = false;
 
-	// Set when the dragged line grew since the slots were last built.
-	bool bDragPathChanged = false;
+	// The arrow the slots on screen were built for.
+	float ArrowYaw = 0.0f;
+	float ArrowLength = 0.0f;
 };
 
 /**
  * @brief Shows where a formation move would put every selected unit for the current cursor position, and
- * records the line the player drags with the secondary button so the units can be spread along it.
+ * follows the held secondary button: once its rotation arrow appears, the arrow turns and widens the formation.
  * The player controller calls UpdatePreview every tick and BeginDrag / EndDrag around the secondary click.
  * @note InitFormationMovePreview: call from the owning controller before the first UpdatePreview.
  */
@@ -59,23 +78,26 @@ public:
 	void InitFormationMovePreview(UFormationController* FormationController);
 
 	/**
-	 * @brief Extends an active drag, rebuilds the slots when needed and redraws them.
+	 * @brief Follows the rotation arrow of an active drag, rebuilds the slots when needed and redraws them.
 	 * @param Input This frame's selection and cursor state from the player controller.
 	 */
 	void UpdatePreview(const FFormationMovePreviewInput& Input);
 
-	/** Starts recording the dragged line at the ground location the secondary button went down on. */
+	/** Starts following the held secondary button that went down on this ground location. */
 	void BeginDrag(const FVector& StartLocation);
 
-	/** Forgets the dragged line; the next order is a regular formation move again. */
+	/** Forgets the held button; the next order is a regular formation move again. */
 	void EndDrag();
 
-	bool GetIsDragActive() const { return M_DragPath.GetIsStarted(); }
+	bool GetIsDragActive() const { return M_DragState.bIsActive; }
 
-	/** @return True once the drag is long enough that releasing it spreads the units along the line. */
-	bool GetIsLineDragReady() const;
+	/** @return True once the rotation arrow appeared, so releasing lines the units up behind its front. */
+	bool GetIsArrowFormationReady() const { return M_DragState.bIsActive && M_DragState.bIsArrowStarted; }
 
-	const FFormationDragPath& GetDragPath() const { return M_DragPath; }
+	const FFormationArrowDrag& GetArrowDrag() const { return M_DragState.ArrowDrag; }
+
+	/** @return Front line of the slots on screen; empty unless the arrow shapes the formation. */
+	const FFormationDragPath& GetFrontLine() const { return M_DragState.FrontLine; }
 
 	/** @return True when the renderer exists and the engine will actually draw it in the game view. */
 	bool GetCanPreviewRender() const;
@@ -101,7 +123,7 @@ private:
 
 	bool GetIsValidPreviewLineBatch() const;
 
-	FFormationDragPath M_DragPath;
+	FFormationMovePreviewDragState M_DragState;
 	FFormationMovePreviewRefreshState M_RefreshState;
 
 	// Slots of the preview on screen, parallel arrays.
@@ -112,12 +134,14 @@ private:
 		const FFormationMovePreviewInput& Input,
 		uint32 SelectionHash,
 		double WorldSeconds) const;
+	bool GetHasArrowChangedSinceBuild() const;
+	void UpdateArrowDrag(const FFormationMovePreviewInput& Input);
 	void RebuildSlots(const FFormationMovePreviewInput& Input);
 	uint32 BuildSelectionHash(const FFormationMovePreviewInput& Input) const;
 
 	void HidePreview();
 	void DrawPreview();
-	void AddDragPathLines(TArray<FBatchedLine>& OutLines) const;
+	void AddFrontLineLines(TArray<FBatchedLine>& OutLines) const;
 	void AddSlotArrowLines(const FVector& SlotLocation, const FRotator& SlotRotation,
 	                       TArray<FBatchedLine>& OutLines) const;
 };

@@ -7,6 +7,13 @@ namespace FormationDragLineLayoutPrivate
 	// Same row spacing as the rectangle formation, so a short line looks like a rectangle of that width.
 	constexpr float RowSpacingDivisor = 1.5f;
 
+	// The front reaches as far to either side of the anchor as the arrow is long.
+	constexpr float ArrowLengthToFrontWidth = 2.0f;
+	// Slack on the rectangle's front, so rounding cannot push its last unit into the next row.
+	constexpr float FrontWidthFitTolerance = 1.0f;
+	// A front of a single unit still needs two distinct ends to know which way it faces.
+	constexpr float MinimumFrontLineHalfWidth = 1.0f;
+
 	/** Distance between the centres of the first and last unit of a row standing shoulder to shoulder. */
 	float ComputeRowSpan(const TArray<float>& RowRadii)
 	{
@@ -55,6 +62,38 @@ namespace FormationDragLineLayoutPrivate
 float FFormationDragLineLayout::GetNeighbourSpacing(const float FirstUnitRadius, const float SecondUnitRadius)
 {
 	return (FirstUnitRadius + SecondUnitRadius) * 0.5f;
+}
+
+float FFormationDragLineLayout::ComputeFrontRowSpan(const TArray<float>& UnitRadii, const int32 FrontRowUnitCount)
+{
+	const int32 UnitsInFrontRow = FMath::Min(FrontRowUnitCount, UnitRadii.Num());
+	float FrontRowSpan = 0.0f;
+	for (int32 UnitIndex = 1; UnitIndex < UnitsInFrontRow; ++UnitIndex)
+	{
+		FrontRowSpan += GetNeighbourSpacing(UnitRadii[UnitIndex - 1], UnitRadii[UnitIndex]);
+	}
+	return FrontRowSpan;
+}
+
+float FFormationDragLineLayout::ComputeArrowFrontWidth(const float RectangleFrontSpan, const float ArrowLength)
+{
+	using namespace FormationDragLineLayoutPrivate;
+	return FMath::Max(RectangleFrontSpan + FrontWidthFitTolerance, ArrowLength * ArrowLengthToFrontWidth);
+}
+
+void FFormationDragLineLayout::MakeArrowFrontLine(
+	const FFormationArrowDrag& ArrowDrag,
+	const float FrontWidth,
+	FFormationDragPath& OutFrontLine)
+{
+	using namespace FormationDragLineLayoutPrivate;
+	const FRotator FlatFacing(0.0f, ArrowDrag.Facing.Yaw, 0.0f);
+	const FVector FrontDirection = FlatFacing.RotateVector(FVector::RightVector);
+	const float HalfWidth = FMath::Max(FrontWidth * 0.5f, MinimumFrontLineHalfWidth);
+	// Running from the left flank to the right flank makes the units on the line face along the arrow.
+	OutFrontLine.SetStraightLine(
+		ArrowDrag.AnchorLocation - FrontDirection * HalfWidth,
+		ArrowDrag.AnchorLocation + FrontDirection * HalfWidth);
 }
 
 TArray<int32> FFormationDragLineLayout::ComputeRowUnitCounts(const TArray<float>& UnitRadii, const float LineLength)

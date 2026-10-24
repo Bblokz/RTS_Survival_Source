@@ -49,6 +49,13 @@ bool FFormationDragPath::TryAddPoint(const FVector& Location)
 	return true;
 }
 
+void FFormationDragPath::SetStraightLine(const FVector& StartLocation, const FVector& EndLocation)
+{
+	Start(StartLocation);
+	M_CumulativeLengths.Add(FVector::Dist2D(StartLocation, EndLocation));
+	M_Points.Add(EndLocation);
+}
+
 FVector FFormationDragPath::GetLocationAtDistance(const float Distance) const
 {
 	if (M_Points.IsEmpty())
