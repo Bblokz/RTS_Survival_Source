@@ -5,6 +5,8 @@
 
 #include "Components/Border.h"
 #include "Components/Button.h"
+#include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficultySettings/RTSGameDifficultySettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -43,6 +45,11 @@ void UW_GameDifficultyPicker::NativeOnInitialized()
 	M_IronmanDifficultyButton->OnClicked.AddDynamic(this, &UW_GameDifficultyPicker::OnIronmanDifficultyClicked);
 
 	SetDifficultyInfoBorderVisible(false);
+}
+
+void UW_GameDifficultyPicker::ConfigureForRestartCurrentMap()
+{
+	M_SelectionAction = EDifficultySelectionAction::RestartCurrentMap;
 }
 
 void UW_GameDifficultyPicker::OnNewToRTSDifficultyHovered()
@@ -159,6 +166,23 @@ void UW_GameDifficultyPicker::HandleDifficultyClicked(const ERTSGameDifficulty S
 
 void UW_GameDifficultyPicker::OnDifficultyChosen(const int32 DifficultyPercentage, const ERTSGameDifficulty SelectedDifficulty)
 {
+	switch (M_SelectionAction)
+	{
+	case EDifficultySelectionAction::SetCurrentMission:
+		ApplyDifficultyToCurrentMission(DifficultyPercentage, SelectedDifficulty);
+		return;
+	case EDifficultySelectionAction::RestartCurrentMap:
+		RestartCurrentMapWithDifficulty(DifficultyPercentage, SelectedDifficulty);
+		return;
+	}
+
+	RTSFunctionLibrary::ReportError("Difficulty picker has an unsupported selection action.");
+}
+
+void UW_GameDifficultyPicker::ApplyDifficultyToCurrentMission(
+	const int32 DifficultyPercentage,
+	const ERTSGameDifficulty SelectedDifficulty)
+{
 	AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
 	if (not MissionManager)
 	{
@@ -168,6 +192,34 @@ void UW_GameDifficultyPicker::OnDifficultyChosen(const int32 DifficultyPercentag
 	MissionManager->SetMissionDifficulty(DifficultyPercentage, SelectedDifficulty);
 	RemoveFromParent();
 	ConditionalBeginDestroy();
+}
+
+void UW_GameDifficultyPicker::RestartCurrentMapWithDifficulty(
+	const int32 DifficultyPercentage,
+	const ERTSGameDifficulty SelectedDifficulty)
+{
+	const FString CurrentLevelName = UGameplayStatics::GetCurrentLevelName(this, true);
+	if (CurrentLevelName.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to restart with a new difficulty because the current level name was empty.");
+		return;
+	}
+
+	URTSGameInstance* const GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (not IsValid(GameInstance))
+	{
+		return;
+	}
+
+	FRTSGameDifficulty NewDifficulty;
+	NewDifficulty.DifficultyLevel = SelectedDifficulty;
+	NewDifficulty.DifficultyPercentage = DifficultyPercentage;
+	NewDifficulty.bIsInitialized = true;
+	GameInstance->SetSelectedGameDifficultyForRestart(NewDifficulty);
+
+	RemoveFromParent();
+	UGameplayStatics::OpenLevel(this, FName(*CurrentLevelName));
 }
 
 void UW_GameDifficultyPicker::SetDifficultyInfoBorderVisible(const bool bIsVisible)

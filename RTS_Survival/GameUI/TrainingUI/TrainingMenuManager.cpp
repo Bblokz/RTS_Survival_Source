@@ -2709,6 +2709,9 @@ void UTrainingMenuManager::InitAllGameTrainingLayoutOnlyOptions()
 	};
 
 	AddSquadOptionIfMissing(ESquadSubtype::Squad_Ger_IronStorm, EliteInfantryTrainingTime);
+	AddSquadOptionIfMissing(ESquadSubtype::Squad_Rus_Dyakonov, BasicInfantryTrainingTime);
+	AddSquadOptionIfMissing(ESquadSubtype::Squad_Rus_KorovinAssault, ArmoredInfantryTrainingTime);
+	AddSquadOptionIfMissing(ESquadSubtype::Squad_Rus_ROKS3_PPSH, ArmoredInfantryTrainingTime);
 
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz250, ArmoredCarTrainingTime);
 	AddTankOptionIfMissing(ETankSubtype::Tank_Sdkfz250_37mm, ArmoredCarTrainingTime);

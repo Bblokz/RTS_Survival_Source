@@ -27,6 +27,7 @@ public:
 	void SetPlayerController(ACPPController* NewPlayerController);
 
 protected:
+	virtual void NativePreConstruct() override;
 	virtual void NativeConstruct() override;
 
 private:
@@ -36,10 +37,14 @@ private:
 	void BindKeyBindingsButton();
 	void BindArchiveButton();
 	void BindRestartLevelButton();
+	void BindRestartWithNewDifficultyButton();
 	void BindExitToMainMenuButton();
+	void UpdateRestartWithNewDifficultyButtonText() const;
+	void UpdateExitToMainMenuButtonText() const;
 
 	bool GetIsValidPlayerController() const;
 	bool GetIsValidMainGameUI() const;
+	bool GetIsValidRestartWithNewDifficultyButton() const;
 
 	UFUNCTION()
 	void HandleResumeGameClicked();
@@ -55,6 +60,9 @@ private:
 
 	UFUNCTION()
 	void HandleRestartLevelClicked();
+
+	UFUNCTION()
+	void HandleRestartWithNewDifficultyClicked();
 
 	UFUNCTION()
 	void HandleExitToMainMenuClicked();
@@ -81,6 +89,9 @@ private:
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ButtonRestartLevel = nullptr;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UButton> M_ButtonRestartWithNewDifficulty = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> M_ButtonExitToMainMenu = nullptr;

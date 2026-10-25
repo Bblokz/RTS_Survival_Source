@@ -27,6 +27,7 @@
 #include "RTS_Survival/FOWSystem/FowManager/FowManager.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GameUI/ActionUI/WeaponUI/W_WeaponItem.h"
+#include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/GameUI/MiniMap/MinimapTerrainCaptureComponent.h"
 #include "RTS_Survival/GameUI/MiniMap/W_MiniMap.h"
 #include "RTS_Survival/TechTree/TechTreeBaseWidget/TechTree.h"
@@ -1593,6 +1594,41 @@ void UMainGameUI::OnEscapeMenuRestartLevel()
 	}
 
 	UGameplayStatics::OpenLevel(this, FName(*CurrentLevelName));
+}
+
+void UMainGameUI::OnEscapeMenuRestartWithNewDifficulty()
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+
+	AMissionManager* const MissionManager = FRTS_Statics::GetGameMissionManager(this);
+	if (not IsValid(MissionManager))
+	{
+		return;
+	}
+
+	UW_GameDifficultyPicker* const DifficultyPicker = MissionManager->CreateRestartDifficultyPicker();
+	if (not IsValid(DifficultyPicker))
+	{
+		return;
+	}
+
+	OnEscapeMenuResumeGame();
+
+	constexpr int32 RestartDifficultyPickerZOrder = 1930;
+	DifficultyPicker->AddToViewport(RestartDifficultyPickerZOrder);
+	M_PlayerController->PauseAndLockGame(true);
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetWidgetToFocus(DifficultyPicker->TakeWidget());
+	M_PlayerController->SetInputMode(InputMode);
+	M_PlayerController->bShowMouseCursor = true;
+	M_PlayerController->bEnableClickEvents = true;
+	M_PlayerController->bEnableMouseOverEvents = true;
 }
 
 void UMainGameUI::OnEscapeMenuExitToMainMenu()

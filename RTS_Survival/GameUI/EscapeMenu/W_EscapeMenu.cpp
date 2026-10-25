@@ -1,6 +1,7 @@
 #include "RTS_Survival/GameUI/EscapeMenu/W_EscapeMenu.h"
 
 #include "Components/Button.h"
+#include "Components/RichTextBlock.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -23,6 +24,13 @@ void UW_EscapeMenu::NativeConstruct()
 	BindButtonCallbacks();
 }
 
+void UW_EscapeMenu::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+	UpdateRestartWithNewDifficultyButtonText();
+	UpdateExitToMainMenuButtonText();
+}
+
 void UW_EscapeMenu::BindButtonCallbacks()
 {
 	BindResumeGameButton();
@@ -30,6 +38,7 @@ void UW_EscapeMenu::BindButtonCallbacks()
 	BindKeyBindingsButton();
 	BindArchiveButton();
 	BindRestartLevelButton();
+	BindRestartWithNewDifficultyButton();
 	BindExitToMainMenuButton();
 }
 
@@ -93,6 +102,61 @@ void UW_EscapeMenu::BindRestartLevelButton()
 	M_ButtonRestartLevel->OnClicked.AddDynamic(this, &UW_EscapeMenu::HandleRestartLevelClicked);
 }
 
+void UW_EscapeMenu::BindRestartWithNewDifficultyButton()
+{
+	if (not GetIsValidRestartWithNewDifficultyButton())
+	{
+		return;
+	}
+
+	M_ButtonRestartWithNewDifficulty->OnClicked.RemoveAll(this);
+	M_ButtonRestartWithNewDifficulty->OnClicked.AddDynamic(
+		this,
+		&UW_EscapeMenu::HandleRestartWithNewDifficultyClicked);
+}
+
+void UW_EscapeMenu::UpdateRestartWithNewDifficultyButtonText() const
+{
+	if (not GetIsValidRestartWithNewDifficultyButton())
+	{
+		return;
+	}
+
+	URichTextBlock* const ButtonText = Cast<URichTextBlock>(M_ButtonRestartWithNewDifficulty->GetContent());
+	if (not IsValid(ButtonText))
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("Restart with new difficulty button does not contain a rich text block."));
+		return;
+	}
+
+	ButtonText->SetText(NSLOCTEXT(
+		"RTSEscapeMenu",
+		"RestartWithNewDifficulty",
+		"<Text_Title>Restart with new difficulty</>"));
+}
+
+void UW_EscapeMenu::UpdateExitToMainMenuButtonText() const
+{
+	const FString FunctionName = TEXT("UW_EscapeMenu::UpdateExitToMainMenuButtonText");
+	if (not EnsureButtonIsValid(M_ButtonExitToMainMenu, TEXT("M_ButtonExitToMainMenu"), FunctionName))
+	{
+		return;
+	}
+
+	URichTextBlock* const ButtonText = Cast<URichTextBlock>(M_ButtonExitToMainMenu->GetContent());
+	if (not IsValid(ButtonText))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Exit to main menu button does not contain a rich text block."));
+		return;
+	}
+
+	ButtonText->SetText(NSLOCTEXT(
+		"RTSEscapeMenu",
+		"ExitToMainMenu",
+		"<Text_Title>Exit to main menu</>"));
+}
+
 void UW_EscapeMenu::BindExitToMainMenuButton()
 {
 	const FString FunctionName = TEXT("UW_EscapeMenu::BindExitToMainMenuButton");
@@ -132,6 +196,22 @@ bool UW_EscapeMenu::GetIsValidMainGameUI() const
 		this,
 		TEXT("M_MainGameUI"),
 		TEXT("UW_EscapeMenu::GetIsValidMainGameUI"),
+		this
+	);
+	return false;
+}
+
+bool UW_EscapeMenu::GetIsValidRestartWithNewDifficultyButton() const
+{
+	if (IsValid(M_ButtonRestartWithNewDifficulty))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		TEXT("M_ButtonRestartWithNewDifficulty"),
+		TEXT("UW_EscapeMenu::GetIsValidRestartWithNewDifficultyButton"),
 		this
 	);
 	return false;
@@ -185,6 +265,16 @@ void UW_EscapeMenu::HandleRestartLevelClicked()
 	}
 
 	M_MainGameUI->OnEscapeMenuRestartLevel();
+}
+
+void UW_EscapeMenu::HandleRestartWithNewDifficultyClicked()
+{
+	if (not GetIsValidMainGameUI())
+	{
+		return;
+	}
+
+	M_MainGameUI->OnEscapeMenuRestartWithNewDifficulty();
 }
 
 void UW_EscapeMenu::HandleExitToMainMenuClicked()

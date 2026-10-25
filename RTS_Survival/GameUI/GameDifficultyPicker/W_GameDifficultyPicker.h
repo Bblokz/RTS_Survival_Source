@@ -20,6 +20,7 @@ class RTS_SURVIVAL_API UW_GameDifficultyPicker : public UUserWidget
 
 public:
 	virtual void NativeOnInitialized() override;
+	void ConfigureForRestartCurrentMap();
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent)
@@ -51,6 +52,12 @@ protected:
 	virtual void OnDifficultyChosen(const int32 DifficultyPercentage, const ERTSGameDifficulty SelectedDifficulty);
 
 private:
+	enum class EDifficultySelectionAction : uint8
+	{
+		SetCurrentMission,
+		RestartCurrentMap
+	};
+
 	UFUNCTION()
 	void OnNewToRTSDifficultyHovered();
 
@@ -99,6 +106,12 @@ private:
 	void HandleDifficultyHovered(const ERTSGameDifficulty HoveredDifficulty);
 	void HandleDifficultyUnhovered();
 	void HandleDifficultyClicked(const ERTSGameDifficulty SelectedDifficulty);
+	void ApplyDifficultyToCurrentMission(
+		const int32 DifficultyPercentage,
+		const ERTSGameDifficulty SelectedDifficulty);
+	void RestartCurrentMapWithDifficulty(
+		const int32 DifficultyPercentage,
+		const ERTSGameDifficulty SelectedDifficulty);
 
 	void SetDifficultyInfoBorderVisible(const bool bIsVisible);
 	bool GetIsAnyDifficultyButtonHovered() const;
@@ -109,4 +122,6 @@ private:
 	bool GetIsValidBrutalDifficultyButton() const;
 	bool GetIsValidIronmanDifficultyButton() const;
 	bool GetIsValidDifficultyInfoBorder() const;
+
+	EDifficultySelectionAction M_SelectionAction = EDifficultySelectionAction::SetCurrentMission;
 };

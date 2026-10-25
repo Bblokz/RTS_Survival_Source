@@ -202,6 +202,7 @@ public:
 	void OnEscapeMenuCloseKeyBindings();
 	void OnEscapeMenuOpenArchive();
 	void OnEscapeMenuRestartLevel();
+	void OnEscapeMenuRestartWithNewDifficulty();
 	void OnEscapeMenuExitToMainMenu();
 
 	void OnHoverWeaponItem(const bool bIsHovering);
