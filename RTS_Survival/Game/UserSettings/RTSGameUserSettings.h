@@ -49,7 +49,7 @@ public:
 	static const URTSGameUserSettings* Get();
 	static URTSGameUserSettings* GetMutable();
 
-	/** @brief Restores project defaults with every scalability group set to Epic. */
+	/** @brief Restores the native display resolution, Epic graphics, and project gameplay defaults. */
 	virtual void SetToDefaults() override;
 
 	/**

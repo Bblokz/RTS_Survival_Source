@@ -8,6 +8,11 @@ namespace RTSGameUserSettingsPrivate
 	constexpr float MinFrameRateLimit = 0.0f;
 	constexpr int32 EpicScalabilityLevel = 3;
 
+	bool GetIsValidResolution(const FIntPoint& Resolution)
+	{
+		return Resolution.X > 0 && Resolution.Y > 0;
+	}
+
 	bool GetHasSavedScalabilitySettings()
 	{
 		if (GConfig == nullptr)
@@ -66,6 +71,14 @@ URTSGameUserSettings* URTSGameUserSettings::GetMutable()
 void URTSGameUserSettings::SetToDefaults()
 {
 	Super::SetToDefaults();
+
+	const FIntPoint NativeDesktopResolution = GetDesktopResolution();
+	if (RTSGameUserSettingsPrivate::GetIsValidResolution(NativeDesktopResolution))
+	{
+		SetScreenResolution(NativeDesktopResolution);
+		ConfirmVideoMode();
+	}
+
 	SetOverallScalabilityLevel(RTSGameUserSettingsPrivate::EpicScalabilityLevel);
 
 	M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;

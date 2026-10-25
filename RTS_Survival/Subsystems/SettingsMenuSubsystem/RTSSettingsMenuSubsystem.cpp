@@ -13,6 +13,7 @@
 #include "Scalability.h"
 #include "Sound/SoundClass.h"
 #include "Sound/SoundMix.h"
+#include "UnrealEngine.h"
 
 namespace RTSSettingsMenuSubsystemPrivate
 {
@@ -34,6 +35,45 @@ namespace RTSSettingsMenuSubsystemPrivate
 	FString BuildResolutionLabel(const FIntPoint& Resolution)
 	{
 		return FString::Printf(TEXT("%dx%d"), Resolution.X, Resolution.Y);
+	}
+
+	bool GetIsValidResolution(const FIntPoint& Resolution)
+	{
+		return Resolution.X >= MinResolutionDimension && Resolution.Y >= MinResolutionDimension;
+	}
+
+	FIntPoint GetEffectiveRuntimeResolution(const URTSGameUserSettings& GameUserSettings)
+	{
+		const FIntPoint RuntimeResolution(GSystemResolution.ResX, GSystemResolution.ResY);
+		if (GetIsValidResolution(RuntimeResolution))
+		{
+			return RuntimeResolution;
+		}
+
+		const FIntPoint SettingsResolution = GameUserSettings.GetScreenResolution();
+		if (GetIsValidResolution(SettingsResolution))
+		{
+			return SettingsResolution;
+		}
+
+		const FIntPoint DesktopResolution = GameUserSettings.GetDesktopResolution();
+		if (GetIsValidResolution(DesktopResolution))
+		{
+			return DesktopResolution;
+		}
+
+		return DefaultResolution;
+	}
+
+	EWindowMode::Type GetEffectiveRuntimeWindowMode(const URTSGameUserSettings& GameUserSettings)
+	{
+		const FIntPoint RuntimeResolution(GSystemResolution.ResX, GSystemResolution.ResY);
+		if (GetIsValidResolution(RuntimeResolution))
+		{
+			return GSystemResolution.WindowMode;
+		}
+
+		return GameUserSettings.GetFullscreenMode();
 	}
 
 	void ApplyScalabilityGroupsToQualityLevels(const FRTSScalabilityGroupSettings& ScalabilityGroups, Scalability::FQualityLevels& QualityLevels)
@@ -371,9 +411,18 @@ void URTSSettingsMenuSubsystem::ApplySettings()
 	}
 
 	const FRTSSettingsSnapshot PreviousCurrentSettings = M_CurrentSettings;
+	const FRTSDisplaySettings& PreviousDisplaySettings = PreviousCurrentSettings.M_GraphicsSettings.M_DisplaySettings;
+	const FRTSDisplaySettings& PendingDisplaySettings = M_PendingSettings.M_GraphicsSettings.M_DisplaySettings;
+	const bool bResolutionSettingsChanged =
+		PreviousDisplaySettings.M_Resolution != PendingDisplaySettings.M_Resolution ||
+		PreviousDisplaySettings.M_WindowMode != PendingDisplaySettings.M_WindowMode;
+
 	ApplyPendingSettingsToGameUserSettings();
 	ApplyNonResolutionSettings();
-	ApplyResolutionSettings();
+	if (bResolutionSettingsChanged)
+	{
+		ApplyResolutionSettings();
+	}
 
 	M_CurrentSettings = M_PendingSettings;
 	ApplyGameplaySettingsDiff(PreviousCurrentSettings.M_GameplaySettings, M_CurrentSettings.M_GameplaySettings);
@@ -547,7 +596,9 @@ void URTSSettingsMenuSubsystem::CacheSupportedResolutions()
 		return;
 	}
 
-	const FIntPoint CurrentResolution = GetGameUserSettingsChecked()->GetScreenResolution();
+	const FIntPoint CurrentResolution = RTSSettingsMenuSubsystemPrivate::GetEffectiveRuntimeResolution(
+		*GetGameUserSettingsChecked()
+	);
 	AddSupportedResolutionUnique(CurrentResolution);
 }
 
@@ -909,8 +960,11 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 {
 	FRTSSettingsSnapshot Snapshot;
 
-	Snapshot.M_GraphicsSettings.M_DisplaySettings.M_WindowMode = GetMenuWindowMode(GameUserSettings.GetFullscreenMode());
-	Snapshot.M_GraphicsSettings.M_DisplaySettings.M_Resolution = GameUserSettings.GetScreenResolution();
+	Snapshot.M_GraphicsSettings.M_DisplaySettings.M_WindowMode = GetMenuWindowMode(
+		RTSSettingsMenuSubsystemPrivate::GetEffectiveRuntimeWindowMode(GameUserSettings)
+	);
+	Snapshot.M_GraphicsSettings.M_DisplaySettings.M_Resolution =
+		RTSSettingsMenuSubsystemPrivate::GetEffectiveRuntimeResolution(GameUserSettings);
 	Snapshot.M_GraphicsSettings.M_DisplaySettings.bM_VSyncEnabled = GameUserSettings.IsVSyncEnabled();
 	Snapshot.M_GraphicsSettings.M_DisplaySettings.M_OverallQuality = GetScalabilityQualityFromLevel(GameUserSettings.GetOverallScalabilityLevel());
 	Snapshot.M_GraphicsSettings.M_DisplaySettings.M_FrameRateLimit = GameUserSettings.GetFrameRateLimit();

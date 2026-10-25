@@ -275,6 +275,18 @@ void AMissionManager::SetMissionDifficulty(const int32 NewDifficultyPercentage, 
 	PropagateGameDifficultyToEnemyStrategicAI(M_GameDifficulty);
 }
 
+UW_GameDifficultyPicker* AMissionManager::CreateRestartDifficultyPicker() const
+{
+	UW_GameDifficultyPicker* const DifficultyPickerWidget = CreateDifficultyPickerWidget();
+	if (not IsValid(DifficultyPickerWidget))
+	{
+		return nullptr;
+	}
+
+	DifficultyPickerWidget->ConfigureForRestartCurrentMap();
+	return DifficultyPickerWidget;
+}
+
 void AMissionManager::SetMissionWidgetManagerVisibility(const bool bVisible) const
 {
 	if (not EnsureMissionWidgetIsValid())
@@ -1665,35 +1677,65 @@ void AMissionManager::HidePlayerGlobalAbilityPanelIfNeeded() const
 
 void AMissionManager::BeginPlay_CheckForDifficultyOverrideWithWidget() const
 {
+	URTSGameInstance* const GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (IsValid(GameInstance) && GameInstance->ConsumeRestartWithNewDifficultyRequest())
+	{
+		return;
+	}
+
 	if (not bSetGameDifficultyWithWidget)
 	{
 		// The Game instance will have determined the difficulty set at post init.
 		return;
 	}
 
+	constexpr int32 DifficultyWidgetZOrder = 100;
+	UW_GameDifficultyPicker* const DifficultyPickerWidget = CreateDifficultyPickerWidget();
+	if (not IsValid(DifficultyPickerWidget))
+	{
+		return;
+	}
+
+	DifficultyPickerWidget->AddToViewport(DifficultyWidgetZOrder);
+}
+
+UW_GameDifficultyPicker* AMissionManager::CreateDifficultyPickerWidget() const
+{
 	if (not EnsureValidPlayerController())
 	{
-		return;
+		return nullptr;
 	}
 
-	if (not M_GameDifficultyPickerWidgetClass)
+	if (not GetIsValidGameDifficultyPickerWidgetClass())
 	{
-		RTSFunctionLibrary::ReportError(
-			"Game difficulty widget class is not set on the mission manager.");
-		return;
+		return nullptr;
 	}
 
-	constexpr int32 DifficultyWidgetZOrder = 100;
-	UW_GameDifficultyPicker* DifficultyPickerWidget = CreateWidget<UW_GameDifficultyPicker>(
+	UW_GameDifficultyPicker* const DifficultyPickerWidget = CreateWidget<UW_GameDifficultyPicker>(
 		M_PlayerController.Get(), M_GameDifficultyPickerWidgetClass);
 	if (not IsValid(DifficultyPickerWidget))
 	{
 		RTSFunctionLibrary::ReportError(
 			"Failed to create game difficulty picker widget on mission manager.");
-		return;
 	}
 
-	DifficultyPickerWidget->AddToViewport(DifficultyWidgetZOrder);
+	return DifficultyPickerWidget;
+}
+
+bool AMissionManager::GetIsValidGameDifficultyPickerWidgetClass() const
+{
+	if (IsValid(M_GameDifficultyPickerWidgetClass.Get()))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		TEXT("M_GameDifficultyPickerWidgetClass"),
+		TEXT("AMissionManager::GetIsValidGameDifficultyPickerWidgetClass"),
+		this
+	);
+	return false;
 }
 
 void AMissionManager::BeginPlay_InitMissionScheduler()

@@ -214,6 +214,8 @@ public:
 	void OnAnyMissionStarted(UMissionBase* LoadedMission);
 	void OnAnyMissionFailed(UMissionBase* FailedMission);
 	void SetMissionDifficulty(const int32 NewDifficultyPercentage, const ERTSGameDifficulty GameDifficulty);
+	/** @return A configured picker that restarts the current map after the player chooses a difficulty. */
+	UW_GameDifficultyPicker* CreateRestartDifficultyPicker() const;
 	void SetMissionWidgetManagerVisibility(const bool bVisible) const;
 	void StartEnemyStrategicAIThinkingFromMission() const;
 	
@@ -523,6 +525,8 @@ private:
 
 	void BeginPlay_InitPlayerController();
 	void BeginPlay_CheckForDifficultyOverrideWithWidget() const;
+	UW_GameDifficultyPicker* CreateDifficultyPickerWidget() const;
+	bool GetIsValidGameDifficultyPickerWidgetClass() const;
 	void BeginPlay_InitMissionScheduler();
 	void BeginPlay_InitMissionTriggerVolumesManager();
 	void HidePlayerGlobalAbilityPanelIfNeeded() const;
