@@ -8,7 +8,7 @@
 #include "SecondaryWeapon.generated.h"
 
 
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class RTS_SURVIVAL_API USecondaryWeapon : public UActorComponent
@@ -35,13 +35,13 @@ public:
 	 * @brief This function allows to define a secondary weapon on a squad unit without any pickups.
 	 * This means that this squad unit is not able to pick up any weapons.
 	 * @param OwnerSecondaryWeaponMesh The static mesh component that holds the secondary weapon on the back.
-	 * @param NewWeaponName The name of the secondary weapon.
+	 * @param NewWeaponName The name of the secondary weapon; an FName since Blueprints cannot use the uint32 EWeaponName.
 	 * @param NewWeaponClass The class of the secondary weapon.
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void ManuallySetSecondaryWeapon(
 		UStaticMeshComponent* OwnerSecondaryWeaponMesh,
-		const EWeaponName NewWeaponName,
+		const FName NewWeaponName,
 		TSoftClassPtr<AInfantryWeaponMaster>
 	                                NewWeaponClass);
 

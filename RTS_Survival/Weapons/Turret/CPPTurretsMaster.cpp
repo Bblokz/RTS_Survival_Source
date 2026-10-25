@@ -738,7 +738,7 @@ void ACPPTurretsMaster::SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHit
 	DirectHit->InitDirectHitWeapon(
 		DirectHitWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		DirectHitWeaponParameters.WeaponName,
+		DirectHitWeaponParameters.GetWeaponNameEnum(),
 		DirectHitWeaponParameters.WeaponBurstMode,
 		DirectHitWeaponParameters.WeaponOwner,
 		DirectHitWeaponParameters.MeshComponent,
@@ -770,7 +770,7 @@ void ACPPTurretsMaster::SetupTraceWeapon(FInitWeaponStatTrace TraceWeaponParamet
 	Trace->InitTraceWeapon(
 		TraceWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		TraceWeaponParameters.WeaponName,
+		TraceWeaponParameters.GetWeaponNameEnum(),
 		TraceWeaponParameters.WeaponBurstMode,
 		TraceWeaponParameters.WeaponOwner,
 		TraceWeaponParameters.MeshComponent,
@@ -808,7 +808,7 @@ void ACPPTurretsMaster::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTr
 	MultiTrace->InitMultiTraceWeapon(
 		MultiTraceWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		MultiTraceWeaponParameters.WeaponName,
+		MultiTraceWeaponParameters.GetWeaponNameEnum(),
 		MultiTraceWeaponParameters.WeaponBurstMode,
 		MultiTraceWeaponParameters.WeaponOwner,
 		MultiTraceWeaponParameters.MeshComponent,
@@ -847,7 +847,7 @@ void ACPPTurretsMaster::SetupLaserWeapon(const FInitWeaponStateLaser& LaserWeapo
 	LaserWeapon->InitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.GetWeaponNameEnum(),
 		LaserWeaponParameters.WeaponOwner,
 		LaserWeaponParameters.MeshComponent,
 		LaserWeaponParameters.FireSocketName,
@@ -872,7 +872,7 @@ void ACPPTurretsMaster::SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitL
 	LaserWeapon->InitMultiHitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.GetWeaponNameEnum(),
 		LaserWeaponParameters.WeaponOwner,
 		LaserWeaponParameters.MeshComponent,
 		LaserWeaponParameters.FireSocketName,
@@ -900,7 +900,7 @@ void ACPPTurretsMaster::SetupFlameThrowerWeapon(const FInitWeaponStateFlameThrow
 	FlameWeapon->InitFlameThrowerWeapon(
 		FlameWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		FlameWeaponParameters.WeaponName,
+		FlameWeaponParameters.GetWeaponNameEnum(),
 		FlameWeaponParameters.WeaponOwner,
 		FlameWeaponParameters.MeshComponent,
 		FlameWeaponParameters.FireSocketName,
@@ -925,7 +925,7 @@ void ACPPTurretsMaster::SetupProjectileWeapon(FInitWeaponStateProjectile Project
 	Projectile->InitProjectileWeapon(
 		ProjectileWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		ProjectileWeaponParameters.WeaponName,
+		ProjectileWeaponParameters.GetWeaponNameEnum(),
 		ProjectileWeaponParameters.WeaponBurstMode,
 		ProjectileWeaponParameters.WeaponOwner,
 		ProjectileWeaponParameters.MeshComponent,
@@ -1012,7 +1012,7 @@ void ACPPTurretsMaster::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjec
 	RocketProjectile->InitRocketProjectileWeapon(
 		RocketProjectileParameters.OwningPlayer,
 		WeaponIndex,
-		RocketProjectileParameters.WeaponName,
+		RocketProjectileParameters.GetWeaponNameEnum(),
 		RocketProjectileParameters.WeaponBurstMode,
 		RocketProjectileParameters.WeaponOwner,
 		RocketProjectileParameters.MeshComponent,
@@ -1049,7 +1049,7 @@ void ACPPTurretsMaster::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile H
 	HomingMissile->InitHomingMissileWeapon(
 		HomingMissileParameters.OwningPlayer,
 		WeaponIndex,
-		HomingMissileParameters.WeaponName,
+		HomingMissileParameters.GetWeaponNameEnum(),
 		HomingMissileParameters.WeaponBurstMode,
 		HomingMissileParameters.WeaponOwner,
 		HomingMissileParameters.MeshComponent,
@@ -1087,7 +1087,7 @@ void ACPPTurretsMaster::SetupVerticalRocketProjectileWeapon(
 	VerticalRocketProjectile->InitVerticalRocketWeapon(
 		VerticalRocketProjectileParameters.OwningPlayer,
 		WeaponIndex,
-		VerticalRocketProjectileParameters.WeaponName,
+		VerticalRocketProjectileParameters.GetWeaponNameEnum(),
 		VerticalRocketProjectileParameters.WeaponBurstMode,
 		VerticalRocketProjectileParameters.WeaponOwner,
 		VerticalRocketProjectileParameters.MeshComponent,
@@ -1123,7 +1123,7 @@ void ACPPTurretsMaster::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjecti
 	MultiProjectile->InitMultiProjectileWeapon(
 		M_OwningPlayer,
 		WeaponIndex,
-		MultiProjectileState.WeaponName,
+		MultiProjectileState.GetWeaponNameEnum(),
 		MultiProjectileState.WeaponBurstMode,
 		MultiProjectileState.WeaponOwner,
 		MultiProjectileState.MeshComponent,
@@ -1162,7 +1162,7 @@ void ACPPTurretsMaster::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile
 		ArchProjectile->InitArchProjectileWeapon(
 			ArchProjParameters.OwningPlayer,
 			WeaponIndex,
-			ArchProjParameters.WeaponName,
+			ArchProjParameters.GetWeaponNameEnum(),
 			ArchProjParameters.WeaponBurstMode,
 			ArchProjParameters.WeaponOwner,
 			ArchProjParameters.MeshComponent,
@@ -1213,7 +1213,7 @@ void ACPPTurretsMaster::SetupSplitterArchProjectileWeapon(
 	SplitterProjectile->InitSplitterArchProjectileWeapon(
 		SplitterArchProjParameters.OwningPlayer,
 		WeaponIndex,
-		SplitterArchProjParameters.WeaponName,
+		SplitterArchProjParameters.GetWeaponNameEnum(),
 		SplitterArchProjParameters.WeaponBurstMode,
 		SplitterArchProjParameters.WeaponOwner,
 		SplitterArchProjParameters.MeshComponent,

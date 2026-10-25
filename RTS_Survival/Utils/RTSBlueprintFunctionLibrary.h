@@ -46,7 +46,7 @@ struct FTankData;
 enum class ETechnology : uint8;
 enum class ERTSInfantryBalanceSetting : uint8;
 enum class EGameBalanceHealthTypes : uint8;
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 enum class EAbilityID : uint8;
 enum class EBuildingExpansionType : uint8;
 enum class ENomadicSubtype : uint8;
@@ -133,8 +133,13 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Subtypes")
 	static FString BP_GetNomadicSubtypeString(const ENomadicSubtype NomadicSubtype);
 
+	// FName because EWeaponName is uint32 and so cannot be used by Blueprints.
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Get weapon enum string")
-	static FString BP_GetWeaponEnumAsString(const EWeaponName WeaponName);
+	static FString BP_GetWeaponEnumAsString(const FName WeaponName);
+
+	// Options for meta=(GetOptions="RTSBlueprintFunctionLibrary.GetWeaponNameOptions") on FName weapon fields.
+	UFUNCTION()
+	static TArray<FName> GetWeaponNameOptions();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "BuildingExpansionType")
 	static FString BP_GetBxpTypeString(const EBuildingExpansionType BuildingExpansionType);
@@ -208,7 +213,7 @@ public:
 	static FString BP_GetAbilityIDString(const EAbilityID AbilityID);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "TrainingOptions")
-	static FString BP_GetWeaponDisplayNameString(const EWeaponName WeaponName);
+	static FString BP_GetWeaponDisplayNameString(const FName WeaponName);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable, Category="GameBalance")
 	static float BP_GetHealthGameBalanceValue(const EGameBalanceHealthTypes HealthType);

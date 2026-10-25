@@ -204,7 +204,7 @@ void UAircraftWeapon::SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHitWe
 	DirectHit->InitDirectHitWeapon(
 		DirectHitWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		DirectHitWeaponParameters.WeaponName,
+		DirectHitWeaponParameters.GetWeaponNameEnum(),
 		DirectHitWeaponParameters.WeaponBurstMode,
 		DirectHitWeaponParameters.WeaponOwner,
 		DirectHitWeaponParameters.MeshComponent,
@@ -235,7 +235,7 @@ void UAircraftWeapon::SetupTraceWeapon(FInitWeaponStatTrace TraceWeaponParameter
 	Trace->InitTraceWeapon(
 		TraceWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		TraceWeaponParameters.WeaponName,
+		TraceWeaponParameters.GetWeaponNameEnum(),
 		TraceWeaponParameters.WeaponBurstMode,
 		TraceWeaponParameters.WeaponOwner,
 		TraceWeaponParameters.MeshComponent,
@@ -273,7 +273,7 @@ void UAircraftWeapon::SetupProjectileWeapon(FInitWeaponStateProjectile Projectil
 	Projectile->InitProjectileWeapon(
 		ProjectileWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		ProjectileWeaponParameters.WeaponName,
+		ProjectileWeaponParameters.GetWeaponNameEnum(),
 		ProjectileWeaponParameters.WeaponBurstMode,
 		ProjectileWeaponParameters.WeaponOwner,
 		ProjectileWeaponParameters.MeshComponent,
@@ -333,7 +333,7 @@ void UAircraftWeapon::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjecti
 	RocketProjectile->InitRocketProjectileWeapon(
 		RocketProjectileParameters.OwningPlayer,
 		WeaponIndex,
-		RocketProjectileParameters.WeaponName,
+		RocketProjectileParameters.GetWeaponNameEnum(),
 		RocketProjectileParameters.WeaponBurstMode,
 		RocketProjectileParameters.WeaponOwner,
 		RocketProjectileParameters.MeshComponent,
@@ -372,7 +372,7 @@ void UAircraftWeapon::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile Hom
 	HomingMissile->InitHomingMissileWeapon(
 		HomingMissileParameters.OwningPlayer,
 		WeaponIndex,
-		HomingMissileParameters.WeaponName,
+		HomingMissileParameters.GetWeaponNameEnum(),
 		HomingMissileParameters.WeaponBurstMode,
 		HomingMissileParameters.WeaponOwner,
 		HomingMissileParameters.MeshComponent,
@@ -412,7 +412,7 @@ void UAircraftWeapon::SetupVerticalRocketProjectileWeapon(
 	VerticalRocketProjectile->InitVerticalRocketWeapon(
 		VerticalRocketProjectileParameters.OwningPlayer,
 		WeaponIndex,
-		VerticalRocketProjectileParameters.WeaponName,
+		VerticalRocketProjectileParameters.GetWeaponNameEnum(),
 		VerticalRocketProjectileParameters.WeaponBurstMode,
 		VerticalRocketProjectileParameters.WeaponOwner,
 		VerticalRocketProjectileParameters.MeshComponent,
@@ -469,7 +469,7 @@ void UAircraftWeapon::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTrac
 	MultiTrace->InitMultiTraceWeapon(
 		MultiTraceWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		MultiTraceWeaponParameters.WeaponName,
+		MultiTraceWeaponParameters.GetWeaponNameEnum(),
 		MultiTraceWeaponParameters.WeaponBurstMode,
 		MultiTraceWeaponParameters.WeaponOwner,
 		MultiTraceWeaponParameters.MeshComponent,
@@ -509,7 +509,7 @@ void UAircraftWeapon::SetupLaserWeapon(const FInitWeaponStateLaser& LaserWeaponP
 	LaserWeapon->InitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.GetWeaponNameEnum(),
 		LaserWeaponParameters.WeaponOwner,
 		LaserWeaponParameters.MeshComponent,
 		LaserWeaponParameters.FireSocketName,
@@ -536,7 +536,7 @@ void UAircraftWeapon::SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitLas
 	LaserWeapon->InitMultiHitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.GetWeaponNameEnum(),
 		LaserWeaponParameters.WeaponOwner,
 		LaserWeaponParameters.MeshComponent,
 		LaserWeaponParameters.FireSocketName,
@@ -564,7 +564,7 @@ void UAircraftWeapon::SetupFlameThrowerWeapon(const FInitWeaponStateFlameThrower
 	FlameWeapon->InitFlameThrowerWeapon(
 		FlameWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		FlameWeaponParameters.WeaponName,
+		FlameWeaponParameters.GetWeaponNameEnum(),
 		FlameWeaponParameters.WeaponOwner,
 		FlameWeaponParameters.MeshComponent,
 		FlameWeaponParameters.FireSocketName,
@@ -592,7 +592,7 @@ void UAircraftWeapon::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile
 	MultiProjectile->InitMultiProjectileWeapon(
 		M_OwningPlayer,
 		WeaponIndex,
-		MultiProjectileState.WeaponName,
+		MultiProjectileState.GetWeaponNameEnum(),
 		MultiProjectileState.WeaponBurstMode,
 		MultiProjectileState.WeaponOwner,
 		MultiProjectileState.MeshComponent,

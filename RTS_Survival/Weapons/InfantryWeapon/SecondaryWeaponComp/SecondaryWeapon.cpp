@@ -6,6 +6,7 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponSystems.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponNameConversion.h"
 
 
 // Sets default values for this component's properties
@@ -58,14 +59,14 @@ void USecondaryWeapon::SetupSecondaryWeaponMesh(UStaticMesh* WeaponMesh, const E
 }
 
 void USecondaryWeapon::ManuallySetSecondaryWeapon(UStaticMeshComponent* OwnerSecondaryWeaponMesh,
-                                                  const EWeaponName NewWeaponName, TSoftClassPtr<AInfantryWeaponMaster>
+                                                  const FName NewWeaponName, TSoftClassPtr<AInfantryWeaponMaster>
                                                   NewWeaponClass)
 {
 	if (IsValid(OwnerSecondaryWeaponMesh))
 	{
 		M_OwnerSecondaryWeaponMesh = OwnerSecondaryWeaponMesh;
 		SetCollisionSettings();
-		M_WeaponName = NewWeaponName;
+		M_WeaponName = Global_GetWeaponNameFromFName(NewWeaponName);
 		M_WeaponClass = NewWeaponClass;
 		return;
 	}

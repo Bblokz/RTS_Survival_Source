@@ -38,7 +38,7 @@ class UResourceComponent;
 class UResourceDropOff;
 class URTSGameSettingsHandler;
 class URTSGameInstance;
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 enum class ERTSFaction : uint8;
 // Forward Declaration
 class RTS_SURVIVAL_API ACPPResourceMaster;

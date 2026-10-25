@@ -78,7 +78,7 @@ class UAttachedWeaponAbilityComponent;
 class ATankMaster;
 class UHullWeaponComponent;
 class UWeaponState;
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 enum class EWeaponShellType : uint8;
 class UPlayerPortraitManager;
 class UW_Portrait;

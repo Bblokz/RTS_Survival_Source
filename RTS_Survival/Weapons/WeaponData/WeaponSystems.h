@@ -30,9 +30,11 @@ enum class EWeaponFireMode : uint8
 };
 
 // also fill in Global_GetWeaponDisplayName and Global_GetWeaponEnumAsString (see below)
-UENUM(BlueprintType)
+// uint32 so we can grow past 256 weapons; Blueprints therefore use FName weapon names, see Global_GetWeaponNameFromFName.
+// Append only: never reorder or remove an entry (hide it with UMETA(Hidden) instead).
+UENUM()
 enum class
-	EWeaponName : uint8
+	EWeaponName : uint32
 {
 	DEFAULT_WEAPON,
 	T26_Mg,
@@ -136,7 +138,7 @@ enum class
 	// German Heavy calibre
 	KwK36_88MM UMETA(DisplayName = "KwK36 88MM (Tiger)"),
 	Kwk36_88MM_TigerH1 UMETA(DisplayName = "KwK36 88MM TigerH1"),
-	Flak37_88MM UMETA(DisplaynName = "Flak37_88MM (Flak 88 BXP)"),
+	Flak37_88MM UMETA(DisplayName = "Flak37_88MM (Flak 88 BXP)"),
 	Flak37_88MM_TW UMETA(DisplayName = "Flak37 88MM TW"),
 	KwK43_88MM UMETA(DisplayName = "Kwk43 88MM (KingTiger)"),
 	Pak43_88MM UMETA(DisplayName = "Pak43 88MM (Jagdpanther)"),
@@ -230,7 +232,7 @@ enum class
 	M1938_122MM UMETA(DisplayName = "M-1938 122MM (Howitzer)"),
 	ZIS_6_107MM UMETA(DisplayName = "ZIS-6 107MM (KV-5)"),
 	QF_37In_94MM UMETA(DisplayName = "QF 37in 94MM"),
-	D_25T_122MM_IS3 UMETA(Displayname = "DT-25T 122MM (IS-3)"),
+	D_25T_122MM_IS3 UMETA(DisplayName = "DT-25T 122MM (IS-3)"),
 	M_10T_152MM UMETA(DisplayName = "M-10T 152MM (KV-2)"),
 	ML_20S_152MM_SU152 UMETA(DisplayName = "ML-20S 152MM (SU-152)"),
 	KS30_130MM_TW UMETA(DisplayName = "KS-30 130MM TW"),

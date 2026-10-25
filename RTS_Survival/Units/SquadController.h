@@ -28,7 +28,7 @@ class USpatialVoiceLinePlayer;
 class UBehaviourComp;
 class RTS_SURVIVAL_API UFieldConstructionAbilityComponent; 
 class UWeaponState;
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 class USquadHealthComponent;
 class UCargoSquad;
 class URTSExperienceComp;

@@ -16,7 +16,7 @@ class UBombComponent;
 class USizeBox;
 class UWidgetSwitcher;
 enum class EWeaponShellType : uint8;
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 struct FWeaponData;
 
 /**
@@ -36,7 +36,8 @@ struct FWeaponDescription
 	UPROPERTY(BlueprintReadOnly)
 	ERTSDamageType DamageType = ERTSDamageType::None;
 
-	UPROPERTY(BlueprintReadOnly)
+	// Not Blueprint-visible: EWeaponName is uint32.
+	UPROPERTY()
 	EWeaponName WeaponName = EWeaponName::DEFAULT_WEAPON;
 
 	UPROPERTY(BlueprintReadOnly)

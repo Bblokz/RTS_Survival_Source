@@ -6,6 +6,7 @@
 #include "OnHoverDescription/W_WeaponDescription.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponNameConversion.h"
 
 void UW_WeaponItem::InitWeaponItem(UW_AmmoPicker* AmmoPicker, UW_WeaponDescription* WeaponDescription,
                                    UActionUIManager* ActionUIManager)
@@ -31,7 +32,7 @@ void UW_WeaponItem::SetupWidgetForWeapon(UWeaponState* WeaponState)
 		EWeaponDescriptionType WeaponDescriptionType = M_W_WeaponDescription->OnHoverWeaponItem(WeaponState);
 		if (IsValid(WeaponState))
 		{
-			OnSetupWidgetForWeapon(WeaponState->GetRawWeaponData().WeaponName);
+			OnSetupWidgetForWeapon(Global_GetWeaponNameAsFName(WeaponState->GetRawWeaponData().WeaponName));
 		}
 		SetupAmmoIcon(WeaponDescriptionType, WeaponState->GetRawWeaponData().ShellType,
 		              WeaponState->GetRawWeaponData().ShellTypes.Num());
@@ -52,7 +53,7 @@ void UW_WeaponItem::SetupWidgetForBombComponent(UBombComponent* BombComp)
 	if (IsValid(M_W_WeaponDescription))
 	{
 		M_W_WeaponDescription->OnHoverBombItem(BombComp);
-		OnSetupWidgetForWeapon(BombComp->GetBombBayWeaponData().WeaponName);
+		OnSetupWidgetForWeapon(Global_GetWeaponNameAsFName(BombComp->GetBombBayWeaponData().WeaponName));
 	}
 }
 

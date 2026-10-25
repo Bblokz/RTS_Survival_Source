@@ -74,7 +74,8 @@ struct FBombBayData
 	float BombInterval = 0.5;
 	
 	// To identify the stats of this bomb weapon.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
+	// Not Blueprint-visible: EWeaponName is uint32. The details panel still edits it through reflection.
+	UPROPERTY(EditDefaultsOnly)
 	EWeaponName WeaponName = EWeaponName::DEFAULT_WEAPON;
 	
 	// Mesh used on bomb instances.

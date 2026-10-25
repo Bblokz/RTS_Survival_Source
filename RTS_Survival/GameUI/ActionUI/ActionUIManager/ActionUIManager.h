@@ -17,7 +17,7 @@ class UW_ActionUIDescription;
 class UW_OnHoverAmmoDescription;
 class UW_SelectedUnitDescription;
 enum class EWeaponShellType : uint8;
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 enum class EVeterancyIconSet : uint8;
 class ATankMaster;
 enum class ESquadSubtype : uint8;

@@ -7,7 +7,7 @@
 #include "RTS_Survival/PickupItems/Items/ItemsMaster.h"
 #include "WeaponPickup.generated.h"
 
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 class AInfantryWeaponMaster;
 
 UCLASS()
@@ -31,7 +31,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	TSoftClassPtr<AInfantryWeaponMaster> WeaponClass;	
 
-	UPROPERTY(EditDefaultsOnly,BlueprintReadOnly)
+	// Not Blueprint-visible: EWeaponName is uint32. The details panel still edits it through reflection.
+	UPROPERTY(EditDefaultsOnly)
 	EWeaponName WeaponName;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable)

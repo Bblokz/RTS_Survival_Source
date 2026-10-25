@@ -2720,7 +2720,7 @@ void UWeaponStateRailwayCannon::InitRailwayCannonWeapon(
 	InitProjectileWeapon(
 		RailwayCannonParameters.OwningPlayer,
 		NewWeaponIndex,
-		RailwayCannonParameters.WeaponName,
+		RailwayCannonParameters.GetWeaponNameEnum(),
 		RailwayCannonParameters.WeaponBurstMode,
 		RailwayCannonParameters.WeaponOwner,
 		RailwayCannonParameters.MeshComponent,
@@ -2807,7 +2807,7 @@ void URailgunWeaponState::InitRailgunWeapon(
 	InitProjectileWeapon(
 		ProjectileParameters.OwningPlayer,
 		NewWeaponIndex,
-		ProjectileParameters.WeaponName,
+		ProjectileParameters.GetWeaponNameEnum(),
 		ProjectileParameters.WeaponBurstMode,
 		ProjectileParameters.WeaponOwner,
 		ProjectileParameters.MeshComponent,

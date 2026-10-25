@@ -53,8 +53,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly)
 	UW_WeaponDescription* M_W_WeaponDescription;
 
+	// FName because EWeaponName is uint32 and so cannot be used by Blueprints.
 	UFUNCTION(BlueprintImplementableEvent)
-	void OnSetupWidgetForWeapon(const EWeaponName WeaponName);
+	void OnSetupWidgetForWeapon(const FName WeaponName);
 	
 	UFUNCTION(BlueprintImplementableEvent)
 	void OnUpdateAmmoIconForWeapon(const EWeaponShellType NewShellType);

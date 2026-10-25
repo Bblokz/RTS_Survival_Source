@@ -1504,7 +1504,7 @@ void AStandaloneTurret::SetupDirectHitWeapon(FInitWeaponStateDirectHit DirectHit
 	DirectHit->InitDirectHitWeapon(
 		DirectHitWeaponParameters.OwningPlayer,
 		M_Weapons.Num(),
-		DirectHitWeaponParameters.WeaponName,
+		DirectHitWeaponParameters.GetWeaponNameEnum(),
 		DirectHitWeaponParameters.WeaponBurstMode,
 		DirectHitWeaponParameters.WeaponOwner,
 		DirectHitWeaponParameters.MeshComponent,
@@ -1538,7 +1538,7 @@ void AStandaloneTurret::SetupTraceWeapon(FInitWeaponStatTrace TraceWeaponParamet
 	TraceWeapon->InitTraceWeapon(
 		TraceWeaponParameters.OwningPlayer,
 		M_Weapons.Num(),
-		TraceWeaponParameters.WeaponName,
+		TraceWeaponParameters.GetWeaponNameEnum(),
 		TraceWeaponParameters.WeaponBurstMode,
 		TraceWeaponParameters.WeaponOwner,
 		TraceWeaponParameters.MeshComponent,
@@ -1574,7 +1574,7 @@ void AStandaloneTurret::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace MultiTr
 	MultiTrace->InitMultiTraceWeapon(
 		MultiTraceWeaponParameters.OwningPlayer,
 		M_Weapons.Num(),
-		MultiTraceWeaponParameters.WeaponName,
+		MultiTraceWeaponParameters.GetWeaponNameEnum(),
 		MultiTraceWeaponParameters.WeaponBurstMode,
 		MultiTraceWeaponParameters.WeaponOwner,
 		MultiTraceWeaponParameters.MeshComponent,
@@ -1610,7 +1610,7 @@ void AStandaloneTurret::SetupLaserWeapon(const FInitWeaponStateLaser& LaserWeapo
 	LaserWeapon->InitLaserWeapon(
 		Parameters.OwningPlayer,
 		M_Weapons.Num(),
-		Parameters.WeaponName,
+		Parameters.GetWeaponNameEnum(),
 		Parameters.WeaponOwner,
 		Parameters.MeshComponent,
 		Parameters.FireSocketName,
@@ -1639,7 +1639,7 @@ void AStandaloneTurret::SetupMultiHitLaserWeapon(const FInitWeaponStateMultiHitL
 	LaserWeapon->InitMultiHitLaserWeapon(
 		Parameters.OwningPlayer,
 		M_Weapons.Num(),
-		Parameters.WeaponName,
+		Parameters.GetWeaponNameEnum(),
 		Parameters.WeaponOwner,
 		Parameters.MeshComponent,
 		Parameters.FireSocketName,
@@ -1668,7 +1668,7 @@ void AStandaloneTurret::SetupFlameThrowerWeapon(const FInitWeaponStateFlameThrow
 	FlameWeapon->InitFlameThrowerWeapon(
 		Parameters.OwningPlayer,
 		M_Weapons.Num(),
-		Parameters.WeaponName,
+		Parameters.GetWeaponNameEnum(),
 		Parameters.WeaponOwner,
 		Parameters.MeshComponent,
 		Parameters.FireSocketName,
@@ -1697,7 +1697,7 @@ void AStandaloneTurret::SetupProjectileWeapon(FInitWeaponStateProjectile Project
 	Projectile->InitProjectileWeapon(
 		ProjectileWeaponParameters.OwningPlayer,
 		M_Weapons.Num(),
-		ProjectileWeaponParameters.WeaponName,
+		ProjectileWeaponParameters.GetWeaponNameEnum(),
 		ProjectileWeaponParameters.WeaponBurstMode,
 		ProjectileWeaponParameters.WeaponOwner,
 		ProjectileWeaponParameters.MeshComponent,
@@ -1778,7 +1778,7 @@ void AStandaloneTurret::SetupRocketProjectileWeapon(FInitWeaponStateRocketProjec
 	RocketProjectile->InitRocketProjectileWeapon(
 		RocketProjectileParameters.OwningPlayer,
 		M_Weapons.Num(),
-		RocketProjectileParameters.WeaponName,
+		RocketProjectileParameters.GetWeaponNameEnum(),
 		RocketProjectileParameters.WeaponBurstMode,
 		RocketProjectileParameters.WeaponOwner,
 		RocketProjectileParameters.MeshComponent,
@@ -1816,7 +1816,7 @@ void AStandaloneTurret::SetupVerticalRocketProjectileWeapon(
 	VerticalRocket->InitVerticalRocketWeapon(
 		VerticalRocketProjectileParameters.OwningPlayer,
 		M_Weapons.Num(),
-		VerticalRocketProjectileParameters.WeaponName,
+		VerticalRocketProjectileParameters.GetWeaponNameEnum(),
 		VerticalRocketProjectileParameters.WeaponBurstMode,
 		VerticalRocketProjectileParameters.WeaponOwner,
 		VerticalRocketProjectileParameters.MeshComponent,
@@ -1853,7 +1853,7 @@ void AStandaloneTurret::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile H
 	HomingMissile->InitHomingMissileWeapon(
 		HomingMissileParameters.OwningPlayer,
 		M_Weapons.Num(),
-		HomingMissileParameters.WeaponName,
+		HomingMissileParameters.GetWeaponNameEnum(),
 		HomingMissileParameters.WeaponBurstMode,
 		HomingMissileParameters.WeaponOwner,
 		HomingMissileParameters.MeshComponent,
@@ -1890,7 +1890,7 @@ void AStandaloneTurret::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjecti
 	MultiProjectile->InitMultiProjectileWeapon(
 		MultiProjectileParameters.OwningPlayer,
 		M_Weapons.Num(),
-		MultiProjectileParameters.WeaponName,
+		MultiProjectileParameters.GetWeaponNameEnum(),
 		MultiProjectileParameters.WeaponBurstMode,
 		MultiProjectileParameters.WeaponOwner,
 		MultiProjectileParameters.MeshComponent,
@@ -1926,7 +1926,7 @@ void AStandaloneTurret::SetupArchProjectileWeapon(FInitWeaponStateArchProjectile
 	ArchProjectile->InitArchProjectileWeapon(
 		ArchProjectileParameters.OwningPlayer,
 		M_Weapons.Num(),
-		ArchProjectileParameters.WeaponName,
+		ArchProjectileParameters.GetWeaponNameEnum(),
 		ArchProjectileParameters.WeaponBurstMode,
 		ArchProjectileParameters.WeaponOwner,
 		ArchProjectileParameters.MeshComponent,
@@ -1969,7 +1969,7 @@ void AStandaloneTurret::SetupSplitterArchProjectileWeapon(
 	SplitterProjectile->InitSplitterArchProjectileWeapon(
 		SplitterArchProjectileParameters.OwningPlayer,
 		M_Weapons.Num(),
-		SplitterArchProjectileParameters.WeaponName,
+		SplitterArchProjectileParameters.GetWeaponNameEnum(),
 		SplitterArchProjectileParameters.WeaponBurstMode,
 		SplitterArchProjectileParameters.WeaponOwner,
 		SplitterArchProjectileParameters.MeshComponent,

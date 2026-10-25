@@ -35,6 +35,7 @@
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponNameConversion.h"
 
 
 void URTSBlueprintFunctionLibrary::ApplyRTSDamage(AActor* ActorToDamage, const ERTSDamageType DamageType,
@@ -70,9 +71,14 @@ FString URTSBlueprintFunctionLibrary::BP_GetNomadicSubtypeString(const ENomadicS
 	return UTrainingOptionLibrary::GetEnumValueName(EAllUnitType::UNType_Nomadic, static_cast<uint8>(NomadicSubtype));
 }
 
-FString URTSBlueprintFunctionLibrary::BP_GetWeaponEnumAsString(const EWeaponName WeaponName)
+FString URTSBlueprintFunctionLibrary::BP_GetWeaponEnumAsString(const FName WeaponName)
 {
-	return Global_GetWeaponEnumAsString(WeaponName);
+	return Global_GetWeaponEnumAsString(Global_GetWeaponNameFromFName(WeaponName));
+}
+
+TArray<FName> URTSBlueprintFunctionLibrary::GetWeaponNameOptions()
+{
+	return Global_GetWeaponNameOptions();
 }
 
 FString URTSBlueprintFunctionLibrary::BP_GetBxpTypeString(const EBuildingExpansionType BuildingExpansionType)
@@ -304,9 +310,9 @@ FString URTSBlueprintFunctionLibrary::BP_GetAbilityIDString(const EAbilityID Abi
 	return CleanName;
 }
 
-FString URTSBlueprintFunctionLibrary::BP_GetWeaponDisplayNameString(const EWeaponName WeaponName)
+FString URTSBlueprintFunctionLibrary::BP_GetWeaponDisplayNameString(const FName WeaponName)
 {
-	return Global_GetWeaponDisplayName(WeaponName);
+	return Global_GetWeaponDisplayName(Global_GetWeaponNameFromFName(WeaponName));
 }
 
 float URTSBlueprintFunctionLibrary::BP_GetHealthGameBalanceValue(const EGameBalanceHealthTypes HealthType)

@@ -30,7 +30,7 @@ class UMedicComponent;
 class UFowComp;
 class AScavengeableObject;
 class UScavengerComponent;
-enum class EWeaponName : uint8;
+enum class EWeaponName : uint32;
 enum class ESquadIdleAnimationPose : uint8;
 enum class ESquadCoverAnimAction : uint8;
 enum class ESquadCoverSprayStance : uint8;

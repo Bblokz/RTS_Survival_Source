@@ -249,7 +249,7 @@ void UHullWeaponComponent::SetupDirectHitWeapon(FInitWeaponStateDirectHit Direct
 	DirectHit->InitDirectHitWeapon(
 		DirectHitWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		DirectHitWeaponParameters.WeaponName,
+		DirectHitWeaponParameters.GetWeaponNameEnum(),
 		DirectHitWeaponParameters.WeaponBurstMode,
 		DirectHitWeaponParameters.WeaponOwner,
 		DirectHitWeaponParameters.MeshComponent,
@@ -279,7 +279,7 @@ void UHullWeaponComponent::SetupTraceWeapon(FInitWeaponStatTrace TraceWeaponPara
 	Trace->InitTraceWeapon(
 		TraceWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		TraceWeaponParameters.WeaponName,
+		TraceWeaponParameters.GetWeaponNameEnum(),
 		TraceWeaponParameters.WeaponBurstMode,
 		TraceWeaponParameters.WeaponOwner,
 		TraceWeaponParameters.MeshComponent,
@@ -316,7 +316,7 @@ void UHullWeaponComponent::SetupMultiTraceWeapon(FInitWeaponStateMultiTrace Mult
 	MultiTrace->InitMultiTraceWeapon(
 		MultiTraceWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		MultiTraceWeaponParameters.WeaponName,
+		MultiTraceWeaponParameters.GetWeaponNameEnum(),
 		MultiTraceWeaponParameters.WeaponBurstMode,
 		MultiTraceWeaponParameters.WeaponOwner,
 		MultiTraceWeaponParameters.MeshComponent,
@@ -352,7 +352,7 @@ void UHullWeaponComponent::SetupLaserWeapon(const FInitWeaponStateLaser& LaserWe
 	LaserWeapon->InitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.GetWeaponNameEnum(),
 		LaserWeaponParameters.WeaponOwner,
 		LaserWeaponParameters.MeshComponent,
 		LaserWeaponParameters.FireSocketName,
@@ -376,7 +376,7 @@ void UHullWeaponComponent::SetupMultiHitLaserWeapon(const FInitWeaponStateMultiH
 	LaserWeapon->InitMultiHitLaserWeapon(
 		LaserWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		LaserWeaponParameters.WeaponName,
+		LaserWeaponParameters.GetWeaponNameEnum(),
 		LaserWeaponParameters.WeaponOwner,
 		LaserWeaponParameters.MeshComponent,
 		LaserWeaponParameters.FireSocketName,
@@ -402,7 +402,7 @@ void UHullWeaponComponent::SetupFlameThrowerWeapon(const FInitWeaponStateFlameTh
 	FlameWeapon->InitFlameThrowerWeapon(
 		FlameWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		FlameWeaponParameters.WeaponName,
+		FlameWeaponParameters.GetWeaponNameEnum(),
 		FlameWeaponParameters.WeaponOwner,
 		FlameWeaponParameters.MeshComponent,
 		FlameWeaponParameters.FireSocketName,
@@ -426,7 +426,7 @@ void UHullWeaponComponent::SetupProjectileWeapon(FInitWeaponStateProjectile Proj
 	Projectile->InitProjectileWeapon(
 		ProjectileWeaponParameters.OwningPlayer,
 		WeaponIndex,
-		ProjectileWeaponParameters.WeaponName,
+		ProjectileWeaponParameters.GetWeaponNameEnum(),
 		ProjectileWeaponParameters.WeaponBurstMode,
 		ProjectileWeaponParameters.WeaponOwner,
 		ProjectileWeaponParameters.MeshComponent,
@@ -481,7 +481,7 @@ void UHullWeaponComponent::SetupRocketProjectileWeapon(FInitWeaponStateRocketPro
 	RocketProjectile->InitRocketProjectileWeapon(
 		RocketProjectileParameters.OwningPlayer,
 		WeaponIndex,
-		RocketProjectileParameters.WeaponName,
+		RocketProjectileParameters.GetWeaponNameEnum(),
 		RocketProjectileParameters.WeaponBurstMode,
 		RocketProjectileParameters.WeaponOwner,
 		RocketProjectileParameters.MeshComponent,
@@ -518,7 +518,7 @@ void UHullWeaponComponent::SetupMultiProjectileWeapon(FInitWeaponStateMultiProje
 	MultiProjectile->InitMultiProjectileWeapon(
 		M_OwningPlayer,
 		WeaponIndex,
-		MultiProjectileState.WeaponName,
+		MultiProjectileState.GetWeaponNameEnum(),
 		MultiProjectileState.WeaponBurstMode,
 		MultiProjectileState.WeaponOwner,
 		MultiProjectileState.MeshComponent,
@@ -553,7 +553,7 @@ void UHullWeaponComponent::SetupHomingMissileWeapon(FInitWeaponStateHomingMissil
 	HomingMissile->InitHomingMissileWeapon(
 		HomingMissileParameters.OwningPlayer,
 		WeaponIndex,
-		HomingMissileParameters.WeaponName,
+		HomingMissileParameters.GetWeaponNameEnum(),
 		HomingMissileParameters.WeaponBurstMode,
 		HomingMissileParameters.WeaponOwner,
 		HomingMissileParameters.MeshComponent,
@@ -591,7 +591,7 @@ void UHullWeaponComponent::SetupVerticalRocketProjectileWeapon(
 	VerticalRocketProjectile->InitVerticalRocketWeapon(
 		VerticalRocketProjectileParameters.OwningPlayer,
 		WeaponIndex,
-		VerticalRocketProjectileParameters.WeaponName,
+		VerticalRocketProjectileParameters.GetWeaponNameEnum(),
 		VerticalRocketProjectileParameters.WeaponBurstMode,
 		VerticalRocketProjectileParameters.WeaponOwner,
 		VerticalRocketProjectileParameters.MeshComponent,
