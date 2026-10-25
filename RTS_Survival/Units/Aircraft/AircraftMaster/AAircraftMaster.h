@@ -47,6 +47,8 @@ class UAircraftOwnerComp;
  * @note - All external triggers use validator helpers; errors are reported once at the source to avoid spam.
  * @note - Anim/weapon systems are kept in lock-step with landed state to avoid firing while docked or mid-transition.
  */
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnAircraftStraightRunPassedPoint, AAircraftMaster*);
+
 UCLASS()
 class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterface, public IRTSUnit
 {
@@ -152,6 +154,17 @@ public:
 	 * @param DropRequest Payload, landing, stay, spawn, and retreat data owned by this drop run.
 	 */
 	void OrderAircraftDrop(const FAircraftDropRequest& DropRequest);
+
+	/**
+	 * @brief One-shot global-ability flight: flies a straight line at max move speed and constant height from the
+	 * current location through PassOverLocation to EndLocation, then destroys itself. Bypasses the bezier paths.
+	 * @param PassOverLocation Point on the line (at flight height) that fires OnStraightRunPassedPoint once.
+	 * @param EndLocation Run end; the aircraft is destroyed when it gets there.
+	 */
+	void OrderStraightFlightRun(const FVector& PassOverLocation, const FVector& EndLocation);
+
+	// Fired once when a straight flight run reaches its pass-over point.
+	FOnAircraftStraightRunPassedPoint OnStraightRunPassedPoint;
 
 private:
 	/**
@@ -645,6 +658,22 @@ private:
 	};
 
 	FAircraftCarpetBombingState M_CarpetBombingState;
+
+	struct FAircraftStraightRunState
+	{
+		FVector StartLocation = FVector::ZeroVector;
+		FVector Direction = FVector::ForwardVector;
+		// Distances along Direction from StartLocation.
+		float PassOverDistance = 0.f;
+		float EndDistance = 0.f;
+		bool bM_IsActive = false;
+		bool bM_HasPassedPoint = false;
+	};
+
+	// Owns the aircraft's movement while active; Tick routes here before every other movement state.
+	FAircraftStraightRunState M_StraightRunState;
+	void Tick_StraightRun(float DeltaTime);
+	void StraightRun_ApplyFullSpeed() const;
 
 	FAircraftDropRequest M_AircraftDropRequest;
 	FTimerHandle M_AircraftDropStayLandedTimerHandle;

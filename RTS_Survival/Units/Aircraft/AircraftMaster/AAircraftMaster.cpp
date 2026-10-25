@@ -360,6 +360,11 @@ void AAircraftMaster::Tick(float DeltaTime)
 	}
 	M_AnimInstAircraft->UpdateAnim(GetActorRotation(), GetVelocity().Size());
 
+	if (M_StraightRunState.bM_IsActive)
+	{
+		Tick_StraightRun(DeltaTime);
+		return;
+	}
 	if (M_LandedState == EAircraftLandingState::VerticalTakeOff)
 	{
 		Tick_VerticalTakeOff(DeltaTime);
@@ -2916,6 +2921,67 @@ void AAircraftMaster::OrderAircraftDrop(const FAircraftDropRequest& DropRequest)
 	M_AircraftDropRequest.State = EAircraftDropRequestState::MovingToDropLocation;
 	AircraftDrop_AttachTank();
 	AircraftDrop_MoveToDropLocation();
+}
+
+void AAircraftMaster::OrderStraightFlightRun(const FVector& PassOverLocation, const FVector& EndLocation)
+{
+	FVector Direction = EndLocation - GetActorLocation();
+	Direction.Z = 0.0f;
+	if (not Direction.Normalize())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("AAircraftMaster::OrderStraightFlightRun has no horizontal direction."));
+		Destroy();
+		return;
+	}
+
+	StopBombThrowing();
+	Strafe_StopAndRestoreSettings();
+	M_StraightRunState.StartLocation = GetActorLocation();
+	M_StraightRunState.Direction = Direction;
+	M_StraightRunState.PassOverDistance = FVector::DotProduct(PassOverLocation - GetActorLocation(), Direction);
+	M_StraightRunState.EndDistance = FVector::DotProduct(EndLocation - GetActorLocation(), Direction);
+	M_StraightRunState.bM_HasPassedPoint = false;
+	M_StraightRunState.bM_IsActive = true;
+	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	SetActorRotation(Direction.Rotation());
+	StraightRun_ApplyFullSpeed();
+}
+
+void AAircraftMaster::StraightRun_ApplyFullSpeed() const
+{
+	if (not EnsureAircraftMovementIsValid())
+	{
+		return;
+	}
+
+	M_AircraftMovement->MaxSpeed = M_AircraftMovementSettings.MaxMoveSpeed;
+	M_AircraftMovement->Acceleration = M_AircraftMovementSettings.Acceleration;
+	M_AircraftMovement->Deceleration = M_AircraftMovementSettings.Deceleration;
+	M_AircraftMovement->Velocity = M_StraightRunState.Direction * M_AircraftMovementSettings.MaxMoveSpeed;
+	// Without input the floating pawn movement decelerates within the frame.
+	M_AircraftMovement->AddInputVector(M_StraightRunState.Direction);
+}
+
+void AAircraftMaster::Tick_StraightRun(const float DeltaTime)
+{
+	// Re-applied every frame so no other system can bend or slow the run; the height stays at the start height.
+	StraightRun_ApplyFullSpeed();
+	const FVector FromStart = GetActorLocation() - M_StraightRunState.StartLocation;
+	const float DistanceAlongRun = FVector::DotProduct(FromStart, M_StraightRunState.Direction);
+	FVector OnLineLocation = M_StraightRunState.StartLocation + M_StraightRunState.Direction * DistanceAlongRun;
+	OnLineLocation.Z = M_StraightRunState.StartLocation.Z;
+	SetActorLocationAndRotation(OnLineLocation, M_StraightRunState.Direction.Rotation());
+
+	if (not M_StraightRunState.bM_HasPassedPoint && DistanceAlongRun >= M_StraightRunState.PassOverDistance)
+	{
+		M_StraightRunState.bM_HasPassedPoint = true;
+		OnStraightRunPassedPoint.Broadcast(this);
+	}
+	if (DistanceAlongRun >= M_StraightRunState.EndDistance)
+	{
+		M_StraightRunState.bM_IsActive = false;
+		Destroy();
+	}
 }
 
 void AAircraftMaster::AircraftDrop_MoveToDropLocation()

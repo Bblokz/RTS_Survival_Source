@@ -808,6 +808,15 @@ public:
 
 	void PlayWeldingMontage();
 
+	/**
+	 * @brief Loops the hanging-in-the-harness montage while a paratrooper descends; the montage's first section
+	 * is linked onto itself here, so any single-section FullBody montage loops.
+	 * @param ParachuteMontage Montage on the infantry skeleton, provided by the paratrooper ability.
+	 */
+	void StartParachuteDescentAnimation(UAnimMontage* ParachuteMontage);
+	// Blends out of the parachute montage back to the regular idle.
+	void StopParachuteDescentAnimation();
+
 	// Stop playing all montages on the unit.
 	void StopAllMontages();
 
@@ -1140,6 +1149,9 @@ private:
 	FOnMontageEnded M_TeamWeaponCrewLoopMontageEndedDelegate;
 	FOnMontageEnded M_TeamWeaponCrewReactMontageEndedDelegate;
 	FOnMontageEnded M_DeathMontageEndedDelegate;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> M_ActiveParachuteMontage = nullptr;
 	FOnSquadUnitDeathMontageFinished M_DeathMontageCompletionDelegate;
 
 	UPROPERTY(Transient)

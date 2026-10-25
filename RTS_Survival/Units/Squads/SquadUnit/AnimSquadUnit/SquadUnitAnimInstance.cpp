@@ -839,8 +839,40 @@ void USquadUnitAnimInstance::PlayWeldingMontage()
 	StartMontage(SelectedMontage, false);
 }
 
+void USquadUnitAnimInstance::StartParachuteDescentAnimation(UAnimMontage* ParachuteMontage)
+{
+	if (not IsValid(ParachuteMontage))
+	{
+		RTSFunctionLibrary::ReportError(
+			"No valid parachute montage provided in USquadUnitAnimInstance::StartParachuteDescentAnimation");
+		return;
+	}
+	StopAllMontages();
+	if (Montage_Play(ParachuteMontage, 1.0f) <= 0.0f)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Failed to play parachute montage " + ParachuteMontage->GetName() + " on " + GetName());
+		return;
+	}
+	const FName LoopSectionName = ParachuteMontage->GetSectionName(0);
+	Montage_SetNextSection(LoopSectionName, LoopSectionName, ParachuteMontage);
+	M_ActiveParachuteMontage = ParachuteMontage;
+}
+
+void USquadUnitAnimInstance::StopParachuteDescentAnimation()
+{
+	if (not IsValid(M_ActiveParachuteMontage))
+	{
+		return;
+	}
+	constexpr float ParachuteBlendOutSeconds = 0.25f;
+	Montage_Stop(ParachuteBlendOutSeconds, M_ActiveParachuteMontage);
+	M_ActiveParachuteMontage = nullptr;
+}
+
 void USquadUnitAnimInstance::StopAllMontages()
 {
+	M_ActiveParachuteMontage = nullptr;
 	// Montage_Stop without a montage stops every montage; keep the full-body runtime owners in sync.
 	ClearTeamWeaponCrewAnimationRuntime(false);
 	ClearCoverAnimationRuntime();

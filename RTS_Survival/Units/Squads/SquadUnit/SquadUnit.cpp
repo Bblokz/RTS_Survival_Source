@@ -3078,6 +3078,14 @@ void ASquadUnit::OnSquadSpawned(const bool bSetDisabled, const float TimeNotSele
 }
 
 
+void ASquadUnit::CancelPendingSpawnPlacement()
+{
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_SpawnSelectionTimerHandle);
+	}
+}
+
 void ASquadUnit::StrafeToLocation(const FVector& StrafeLocation)
 {
 }

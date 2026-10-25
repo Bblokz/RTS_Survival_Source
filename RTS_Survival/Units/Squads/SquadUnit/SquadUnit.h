@@ -529,6 +529,10 @@ public:
 #endif
 
 	inline AInfantryWeaponMaster* GetInfantryWeapon() const { return M_InfantryWeapon; }
+
+	// Stops a pending OnSquadSpawned placement, so a unit placed by other means (a parachute drop) is not
+	// teleported back to its spawn grid point.
+	void CancelPendingSpawnPlacement();
 	inline  USquadUnitAnimInstance * GetAnimBP_SquadUnit() const { return AnimBp_SquadUnit; }
 
 	// Ovewrites if an enum was set to do so.

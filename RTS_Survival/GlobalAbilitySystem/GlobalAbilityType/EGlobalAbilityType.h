@@ -34,4 +34,6 @@ enum class EGlobalAbility : uint8
 	GA_SovietHeavyTankDrop,
 	GA_SovietHeavyTankDropVariation,
 	GA_ScavengersDrop,
+	GA_SovietParatroopers,
+	GA_GerParatroopers,
 };
