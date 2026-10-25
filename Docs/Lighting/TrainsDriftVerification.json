@@ -1,0 +1,11 @@
+{
+  "rays": 14,
+  "grounded_rays": 14,
+  "slow_speed_cm_per_second": 32.0,
+  "fast_speed_cm_per_second": 3200.0,
+  "speed_change_phase_jump": 0.0,
+  "max_ray_alignment_error_cm": 0.0017288042713294247,
+  "zero_speed_and_reverse": "passed",
+  "fixed_ground_mean_transmission_change": 0.06256495416164398,
+  "following_cloud_max_transmission_error": 0.0
+}
