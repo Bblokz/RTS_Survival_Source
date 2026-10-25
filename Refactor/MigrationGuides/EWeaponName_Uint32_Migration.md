@@ -19,6 +19,17 @@ Enum: `EWeaponName` in `Source/RTS_Survival/Weapons/WeaponData/WeaponSystems.h:3
 
 Do not skip or reorder phases 1 and 4.
 
+### Phase 1 status (2026-10-25)
+
+Done headless in a separate worktree (`D:/UE5Projects/RTS_WN`; superproject and Source branch `migration/weaponname-uint32`), so the live editors and the UECP bridge were not touched. Ignored marketplace folders under `Content/` are junctions to the main checkout; `Plugins/` is a plain copy of the plugin sources.
+
+* The committed `Utils/Migration/WeaponNameMigrationCommandlet.cpp` is authoritative; it differs from §4.2 in four ways. It only loads packages whose bytes contain `EWeaponName` (Verify loads the snapshot's packages instead). It collects garbage with `RF_NoFlags`, because `GARBAGE_COLLECTION_KEEPFLAGS` is `RF_Standalone` in an editor commandlet and would keep every asset alive. It records weapon values inside unsplit struct pins and struct variables (`Kind=StructPin`). It walks instanced subobjects (`Sub:` / `CDOSub:` containers).
+* Run it with `-DisablePlugins=BpGeneratorUltimate`; the run then does not register with the UECP bridge. The snapshot takes about 50 s.
+* Coverage: 289 of 289 inventory assets have rows; no unresolved or stale names. `check_weaponname_snapshot.py` in this folder reruns the §4.4 checks.
+* **Correction to §1.2 / §6:** most turrets do not type their gun into the Make-node pin. 261 pin literals (208 assets) are restorable by Apply as written. 72 assets wire the pin instead, mostly from an `EWeaponName` **Blueprint variable** whose value lives on the CDO (66 variables, plus 9 local variables). Before Phase 4, extend Apply to retype these variables to `Name` and write the CDO value from the snapshot's `Property|CDO` row; otherwise they become manual work. There are no Switch-on-`EWeaponName` nodes.
+* `Ger_Turret_Sdkfz231_MG231` gets its gun from `BPF_ImpactHelpers` (its local variables are recorded). `DA_GlobalAbilitySystem` stores `Bomb_250Gr` in `GA_Barrage::M_WeaponData` (bucket 1).
+* Not done yet: the `CompileAllBlueprints` baseline (§4.1 item 4) and the spot-check (§4.4 item 6).
+
 ---
 
 ## 1. What actually changes, and what does not
