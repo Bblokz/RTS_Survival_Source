@@ -236,6 +236,7 @@ private:
 	FVector GetTargetWorldLocation(const FRTSShortsSegment& Segment, const AActor* Unit) const;
 	float ReadLargestWeaponRange(const AActor* Unit) const;
 	void OrderAttackGround(const int32 SegmentIndex);
+	void ReleaseOutOfRangeHullWeapons(AActor* Unit, const FVector& Target) const;
 	void OrderStop(const int32 SegmentIndex);
 	int32 ReadLargestCaliberMm(const AActor* Unit) const;
 	void MarkSegmentSkipped(const int32 SegmentIndex, const FString& Reason);

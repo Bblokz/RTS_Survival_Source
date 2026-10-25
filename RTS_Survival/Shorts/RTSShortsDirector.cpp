@@ -60,6 +60,7 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
@@ -1893,6 +1894,43 @@ void ARTSShortsDirector::OrderAttackGround(const int32 SegmentIndex)
 	M_Manifest.Segments[SegmentIndex].FireOrderFrame = GetTimelineFrame();
 	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_ATTACK_GROUND index=%d frame=%d result=%d target=%s"),
 	       SegmentIndex, M_Manifest.Segments[SegmentIndex].FireOrderFrame, static_cast<int32>(Result), *Target.ToString());
+	ReleaseOutOfRangeHullWeapons(Unit, M_SegmentTarget.IsValid() && not bTargetAsGround ? M_SegmentTarget->GetActorLocation() : Target);
+}
+
+void ARTSShortsDirector::ReleaseOutOfRangeHullWeapons(AActor* Unit, const FVector& Target) const
+{
+	// A hull MG that cannot reach the target asks the tank to drive into range: the Jagdpanther crept 50 cm toward
+	// the target and the drift lock snapped it back every 20 frames (it rocked while firing). Such a weapon goes back
+	// to auto-engage, where out of range only means it holds fire, like a turret's coaxial MG.
+	const ATankMaster* Tank = Cast<ATankMaster>(Unit);
+	if (Tank == nullptr)
+	{
+		return;
+	}
+	for (UHullWeaponComponent* Hull : Tank->GetHullWeapons())
+	{
+		if (not IsValid(Hull))
+		{
+			continue;
+		}
+		float HullRange = 0.f;
+		for (const UWeaponState* Weapon : Hull->GetWeapons())
+		{
+			if (IsValid(Weapon))
+			{
+				HullRange = FMath::Max(HullRange, Weapon->GetRange());
+			}
+		}
+		const UMeshComponent* HullMesh = Hull->GetModuleBindingMesh();
+		const float Distance = FVector::Dist(IsValid(HullMesh) ? HullMesh->GetComponentLocation() : Unit->GetActorLocation(), Target);
+		if (Distance <= HullRange)
+		{
+			continue;
+		}
+		Hull->SetAutoEngageTargets(false);
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_HULL_WEAPON_RELEASED unit=%s hull=%s range=%.0f distance=%.0f"),
+		       *Unit->GetName(), *Hull->GetName(), HullRange, Distance);
+	}
 }
 
 void ARTSShortsDirector::OrderStop(const int32 SegmentIndex)
