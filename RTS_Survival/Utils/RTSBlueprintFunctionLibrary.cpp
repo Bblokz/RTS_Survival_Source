@@ -1344,6 +1344,21 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_Mosin()
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Mosin));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_Dyakonov()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Dyakonov));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_KorovinAssault()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_KorovinAssault));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_ROKS3_PPSH()
+{
+	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_ROKS3_PPSH));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_Okhotnik()
 {
 	return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Rus_Okhotnik));

@@ -370,6 +370,15 @@ public:
 	// Fired once when async-created squad units are available for commands that need squad members.
 	FOnSquadFullyLoaded OnSquadFullyLoaded;
 
+	/**
+	 * @brief Paratrooper drop: keeps the squad hidden, unselectable and unarmed (also units that finish loading
+	 * later) and blocks commands until EndParachuteDrop. Cancels the async spawner's spawn placement and move.
+	 */
+	void BeginParachuteDrop();
+	// Called once every soldier has landed: the squad accepts commands again.
+	void EndParachuteDrop();
+	bool GetIsInParachuteDrop() const { return bM_IsInParachuteDrop; }
+
 	void PlaySquadUnitLostVoiceLine();
 	void OnSquadUnitKilledActor(AActor* KilledActor) const;
 
@@ -1113,6 +1122,10 @@ protected:
 	// Set when a replacement controller receives already-existing squad units and should not spawn fresh units.
 	bool bM_ShouldSkipInitialSquadUnitLoad = false;
 	bool bM_HasBroadcastSquadFullyLoaded = false;
+
+	// Set between BeginParachuteDrop and EndParachuteDrop; units spawned meanwhile start hidden.
+	bool bM_IsInParachuteDrop = false;
+	void ParachuteDrop_HideUnit(ASquadUnit* SquadUnit) const;
 
 	void Debug_Scavenging(const FString& DebugMessage) const;
 	void Debug_ItemPickup(const FString& DebugMessage) const;

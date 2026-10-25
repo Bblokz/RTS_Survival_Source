@@ -926,6 +926,45 @@ void ASquadController::OnRTSUnitSpawned(const bool bSetDisabled, const float Tim
 	}
 }
 
+void ASquadController::BeginParachuteDrop()
+{
+	bM_IsInParachuteDrop = true;
+	if (UWorld* World = GetWorld())
+	{
+		// The async spawner's delayed move to the spawn location must not run while the squad is in the air.
+		World->GetTimerManager().ClearTimer(M_SpawningTimer);
+	}
+	SetCommandQueueEnabled(false);
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		ParachuteDrop_HideUnit(SquadUnit);
+	}
+}
+
+void ASquadController::EndParachuteDrop()
+{
+	if (not bM_IsInParachuteDrop)
+	{
+		return;
+	}
+	bM_IsInParachuteDrop = false;
+	SetCommandQueueEnabled(true);
+}
+
+void ASquadController::ParachuteDrop_HideUnit(ASquadUnit* SquadUnit) const
+{
+	if (not IsValid(SquadUnit))
+	{
+		return;
+	}
+	SquadUnit->CancelPendingSpawnPlacement();
+	SquadUnit->OnSquadSpawned(true, 0.f, SquadUnit->GetActorLocation());
+	if (AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon())
+	{
+		InfantryWeapon->DisableWeaponSearch(true, true);
+	}
+}
+
 void ASquadController::OnSquadUnitOutOfRange(
 	const FVector& TargetLocation,
 	const EAbilityID CombatAbility)
@@ -4055,6 +4094,10 @@ void ASquadController::OnSquadUnitClassLoaded(TSoftClassPtr<ASquadUnit> LoadedCl
 				// Set the squad controller reference on the unit
 				SpawnedUnit->SetSquadController(this);
 				M_TSquadUnits.Add(SpawnedUnit);
+				if (bM_IsInParachuteDrop)
+				{
+					ParachuteDrop_HideUnit(SpawnedUnit);
+				}
 			}
 			else
 			{

@@ -27,6 +27,7 @@ UTE_FlameDamage::UTE_FlameDamage()
 	};
 	SquadsToApplyTo = {
 		ESquadSubtype::Squad_Rus_ToxicGuard,
+		ESquadSubtype::Squad_Rus_ROKS3_PPSH,
 	};
 }
 

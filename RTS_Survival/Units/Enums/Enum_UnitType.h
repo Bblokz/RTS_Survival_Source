@@ -447,6 +447,10 @@ enum class ESquadSubtype: uint8
 	Squad_Rus_ML20_152mm UMETA(DisplayName = "Rus ML-20 152MM"),
 	// Team weapons: anti tank guns, appended for the same reason.
 	Squad_Rus_BS3_100MM UMETA(DisplayName = "Rus BS-3 100MM"),
+	// Soviet assault squads: appended to preserve the numeric subtype IDs stored in training options.
+	Squad_Rus_Dyakonov UMETA(DisplayName = "Rus Dyakonov Squad (grenade rifle)"),
+	Squad_Rus_KorovinAssault UMETA(DisplayName = "Korovin Assautl squad"),
+	Squad_Rus_ROKS3_PPSH UMETA(DisplayName = "Rus ROKS S3PPSH (flame close range)"),
 };
 
 
@@ -585,6 +589,12 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		break;
 	case ESquadSubtype::Squad_Rus_Mosin:
 		return "Mosin Squad";
+	case ESquadSubtype::Squad_Rus_Dyakonov:
+		return "Dyakonov Squad";
+	case ESquadSubtype::Squad_Rus_KorovinAssault:
+		return "Korovin Assault Squad";
+	case ESquadSubtype::Squad_Rus_ROKS3_PPSH:
+		return "ROKS-3 PPSh Squad";
 	case ESquadSubtype::Squad_Ger_IronStorm:
 		return "Iron Storm Squad";
 	case ESquadSubtype::Squad_Rus_RedHammer:
