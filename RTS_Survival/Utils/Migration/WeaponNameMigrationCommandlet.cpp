@@ -4,6 +4,7 @@
 
 #if WITH_EDITOR
 #include "AssetRegistry/AssetRegistryModule.h"
+#include "Blueprint/BlueprintSupport.h"
 #include "Components/ChildActorComponent.h"
 #include "EdGraphSchema_K2.h"
 #include "Engine/Blueprint.h"
@@ -25,23 +26,31 @@
 namespace WeaponNameMigration
 {
 	const TCHAR* const TsvHeader =
-		TEXT("AssetPackage\tKind\tContainer\tNodeClass\tNodeTitle\tNodeGuid\tPinOrPropertyPath\tDirection\tRawValue\tCanonicalValue\tNumericValue\tLinkSource");
-	constexpr int32 TsvColumnCount = 12;
+		TEXT("AssetPackage\tKind\tContainer\tNodeClass\tNodeTitle\tNodeGuid\tPinOrPropertyPath\tDirection\tRawValue\tCanonicalValue\tNumericValue\tLinkSource\tLinkSourceNodeGuid\tLinkSourcePin");
+	constexpr int32 TsvColumnCount = 14;
 	// Loading every Blueprint without collecting runs the commandlet out of memory on this project.
 	constexpr int32 AssetsPerGarbageCollect = 50;
 	constexpr int32 AssetsPerProgressLog = 500;
 	// Init structs nest at most one level (FInitWeaponStateRailgun); the margin covers user defined structs.
 	constexpr int32 MaxStructSearchDepth = 4;
+	// Guards the parent-class walk against a broken ParentClass tag that points back at a child.
+	constexpr int32 MaxBlueprintInheritanceDepth = 32;
 	// Before the migration every package that stores a weapon value imports the enum, so its name table holds this.
 	const ANSICHAR* const WeaponEnumNameInPackage = "EWeaponName";
 	const TCHAR* const WeaponNameFieldSuffix = TEXT("WeaponName");
+	const TCHAR* const OrphanedPinMarker = TEXT(" [ORPHANED]");
+
+	// After the migration a weapon field is an FName that may be called anything ("Weapon Name", "RailGunName").
+	// Apply and Verify fill this from the snapshot so those fields are still recognised; Snapshot leaves it empty.
+	TSet<FName> KnownWeaponFieldNames;
 
 	struct FRow
 	{
 		FString AssetPackage;
 		// Pin | StructPin | SwitchCase | Variable | LocalVariable | Property
 		FString Kind;
-		// Graph name for pins; CDO / SCS:<Var> / ICH:<Name> / ChildActor:<Var> / Row:<RowName> for properties.
+		// Graph name for pins; CDO / CDOSub:<Path> / SCS:<Var> / ICH:<Name> / ChildActor:<Var> / Asset / Sub:<Path> /
+		// Row:<RowName> / StructDefaults for properties.
 		FString Container;
 		FString NodeClass;
 		FString NodeTitle;
@@ -56,11 +65,22 @@ namespace WeaponNameMigration
 		int64 NumericValue = INDEX_NONE;
 		// Set when an input pin is wired: the value comes from another node, so there is no literal to restore.
 		FString LinkSource;
+		// Lets Apply reconnect a wire the migration broke; node GUIDs survive reconstruction.
+		FString LinkSourceNodeGuid;
+		FString LinkSourcePin;
 
 		FString GetKey() const
 		{
 			return AssetPackage + TEXT("|") + Kind + TEXT("|") + Container + TEXT("|") + NodeGuid + TEXT("|") + PinOrPropertyPath;
 		}
+	};
+
+	struct FApplyContext
+	{
+		const UEnum* WeaponEnum = nullptr;
+		// True: do everything but save, so a spike run shows the FAILED lines without touching Content.
+		bool bDryRun = false;
+		int32 FailureCount = 0;
 	};
 
 	FString Sanitize(const FString& Value)
@@ -83,14 +103,19 @@ namespace WeaponNameMigration
 		Row.CanonicalValue = WeaponEnum->GetNameStringByValue(Row.NumericValue);
 	}
 
+	bool IsWeaponFieldName(const FString& FieldName)
+	{
+		return FieldName.EndsWith(WeaponNameFieldSuffix) || KnownWeaponFieldNames.Contains(FName(*FieldName));
+	}
+
 	bool IsWeaponNameProperty(const FProperty* Property, const UEnum* WeaponEnum)
 	{
 		if (const FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property))
 		{
 			return EnumProperty->GetEnum() == WeaponEnum;
 		}
-		// After the migration the Blueprint-facing fields are FName properties that kept the WeaponName name.
-		return Property->IsA<FNameProperty>() && Property->GetName().EndsWith(WeaponNameFieldSuffix);
+		// After the migration the Blueprint-facing fields and retyped variables are FName properties.
+		return Property->IsA<FNameProperty>() && IsWeaponFieldName(Property->GetName());
 	}
 
 	bool StructHoldsWeaponName(const UStruct* Struct, const UEnum* WeaponEnum, const int32 Depth)
@@ -120,9 +145,8 @@ namespace WeaponNameMigration
 		{
 			return true;
 		}
-		// After the migration the struct and function pins are FName pins that kept the WeaponName name.
-		return Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Name
-			&& Pin->PinName.ToString().EndsWith(WeaponNameFieldSuffix);
+		// After the migration the struct, function and variable pins are FName pins that kept their names.
+		return Pin->PinType.PinCategory == UEdGraphSchema_K2::PC_Name && IsWeaponFieldName(Pin->PinName.ToString());
 	}
 
 	bool IsWeaponStructType(const FEdGraphPinType& PinType, const UEnum* WeaponEnum)
@@ -169,15 +193,18 @@ namespace WeaponNameMigration
 		}
 	}
 
-	FString GetLinkSource(const UEdGraphPin* Pin)
+	void FillLinkSource(const UEdGraphPin* Pin, FRow& Row)
 	{
 		if (Pin->Direction != EGPD_Input || Pin->LinkedTo.IsEmpty())
 		{
-			return FString();
+			return;
 		}
 		const UEdGraphPin* SourcePin = Pin->LinkedTo[0];
 		const UEdGraphNode* SourceNode = SourcePin->GetOwningNode();
-		return SourceNode->GetNodeTitle(ENodeTitleType::ListView).ToString() + TEXT(".") + SourcePin->PinName.ToString();
+		Row.LinkSource = Sanitize(SourceNode->GetNodeTitle(ENodeTitleType::ListView).ToString() + TEXT(".")
+			+ SourcePin->PinName.ToString());
+		Row.LinkSourceNodeGuid = SourceNode->NodeGuid.ToString(EGuidFormats::Digits);
+		Row.LinkSourcePin = SourcePin->PinName.ToString();
 	}
 
 	FRow MakeNodeRow(const UEdGraphNode* Node, const FString& Package, const FString& GraphName, const FString& Kind)
@@ -248,13 +275,23 @@ namespace WeaponNameMigration
 				continue;
 			}
 			FRow Row = MakeNodeRow(Node, Package, GraphName, TEXT("Pin"));
-			Row.PinOrPropertyPath = Pin->PinName.ToString() + (Pin->bOrphanedPin ? TEXT(" [ORPHANED]") : TEXT(""));
+			Row.PinOrPropertyPath = Pin->PinName.ToString() + (Pin->bOrphanedPin ? OrphanedPinMarker : TEXT(""));
 			Row.Direction = Pin->Direction == EGPD_Input ? TEXT("In") : TEXT("Out");
 			Row.RawValue = Pin->DefaultValue;
-			Row.LinkSource = Sanitize(GetLinkSource(Pin));
+			FillLinkSource(Pin, Row);
 			ResolveValue(WeaponEnum, Row);
 			OutRows.Add(Row);
 		}
+	}
+
+	bool IsWeaponVariable(const FBPVariableDescription& Variable, const UEnum* WeaponEnum)
+	{
+		if (Variable.VarType.PinSubCategoryObject == WeaponEnum)
+		{
+			return true;
+		}
+		return Variable.VarType.PinCategory == UEdGraphSchema_K2::PC_Name
+			&& KnownWeaponFieldNames.Contains(Variable.VarName);
 	}
 
 	void CollectVariableRows(const TArray<FBPVariableDescription>& Variables, const FString& Package,
@@ -267,7 +304,7 @@ namespace WeaponNameMigration
 			Row.AssetPackage = Package;
 			Row.Kind = Kind;
 			Row.Container = Container;
-			if (Variable.VarType.PinSubCategoryObject == WeaponEnum)
+			if (IsWeaponVariable(Variable, WeaponEnum))
 			{
 				Row.PinOrPropertyPath = Variable.VarName.ToString();
 				Row.RawValue = Variable.DefaultValue;
@@ -333,26 +370,29 @@ namespace WeaponNameMigration
 		}
 	}
 
+	// One UObject whose reflected properties can hold weapon values, with the label its rows use as Container.
+	struct FPropertyContainer
+	{
+		FString Label;
+		UObject* Object = nullptr;
+	};
+
 	// Instanced subobjects (e.g. the global abilities inside DA_GlobalAbilitySystem, C++ default subobject components
 	// on a CDO) are separate UObjects, so the property walk of their owner does not reach them.
-	void CollectSubobjectRows(UObject* Owner, const FString& Package, const FString& LabelPrefix, const UEnum* WeaponEnum,
-	                          TArray<FRow>& OutRows)
+	void AddSubobjectContainers(UObject* Owner, const FString& LabelPrefix, TArray<FPropertyContainer>& OutContainers)
 	{
 		TArray<UObject*> Subobjects;
 		GetObjectsWithOuter(Owner, Subobjects, true);
 		for (UObject* Subobject : Subobjects)
 		{
-			if (not Subobject)
+			if (Subobject)
 			{
-				continue;
+				OutContainers.Add({LabelPrefix + Subobject->GetPathName(Owner), Subobject});
 			}
-			CollectPropertyRows(Subobject->GetClass(), Subobject, Package, LabelPrefix + Subobject->GetPathName(Owner),
-			                    WeaponEnum, OutRows);
 		}
 	}
 
-	void CollectConstructionScriptTemplates(const UBlueprint* Blueprint, const FString& Package, const UEnum* WeaponEnum,
-	                                        TArray<FRow>& OutRows)
+	void AddConstructionScriptContainers(const UBlueprint* Blueprint, TArray<FPropertyContainer>& OutContainers)
 	{
 		if (not Blueprint->SimpleConstructionScript)
 		{
@@ -366,21 +406,25 @@ namespace WeaponNameMigration
 				continue;
 			}
 			const FString VariableName = ScsNode->GetVariableName().ToString();
-			CollectPropertyRows(Template->GetClass(), Template, Package, TEXT("SCS:") + VariableName, WeaponEnum, OutRows);
+			OutContainers.Add({TEXT("SCS:") + VariableName, Template});
 			const UChildActorComponent* ChildActorComponent = Cast<UChildActorComponent>(Template);
 			AActor* ChildTemplate = ChildActorComponent ? ChildActorComponent->GetChildActorTemplate() : nullptr;
 			if (ChildTemplate)
 			{
-				CollectPropertyRows(ChildTemplate->GetClass(), ChildTemplate, Package, TEXT("ChildActor:") + VariableName,
-				                    WeaponEnum, OutRows);
+				OutContainers.Add({TEXT("ChildActor:") + VariableName, ChildTemplate});
 			}
 		}
 	}
 
-	void CollectComponentTemplates(UBlueprint* Blueprint, const FString& Package, const UEnum* WeaponEnum,
-	                               TArray<FRow>& OutRows)
+	void AddBlueprintContainers(UBlueprint* Blueprint, TArray<FPropertyContainer>& OutContainers)
 	{
-		CollectConstructionScriptTemplates(Blueprint, Package, WeaponEnum, OutRows);
+		if (UClass* GeneratedClass = Blueprint->GeneratedClass)
+		{
+			UObject* DefaultObject = GeneratedClass->GetDefaultObject();
+			OutContainers.Add({TEXT("CDO"), DefaultObject});
+			AddSubobjectContainers(DefaultObject, TEXT("CDOSub:"), OutContainers);
+		}
+		AddConstructionScriptContainers(Blueprint, OutContainers);
 		const UInheritableComponentHandler* Handler = Blueprint->GetInheritableComponentHandler(false);
 		if (not Handler)
 		{
@@ -390,16 +434,33 @@ namespace WeaponNameMigration
 		Handler->GetAllTemplates(Templates);
 		for (UActorComponent* Template : Templates)
 		{
-			CollectPropertyRows(Template->GetClass(), Template, Package, TEXT("ICH:") + Template->GetName(),
-			                    WeaponEnum, OutRows);
+			OutContainers.Add({TEXT("ICH:") + Template->GetName(), Template});
 		}
+	}
+
+	// Data tables and user defined structs hold their values in raw memory, not UObjects, and are handled separately.
+	TArray<FPropertyContainer> GetPropertyContainers(UObject* Asset)
+	{
+		TArray<FPropertyContainer> Containers;
+		if (UBlueprint* Blueprint = Cast<UBlueprint>(Asset))
+		{
+			AddBlueprintContainers(Blueprint, Containers);
+			return Containers;
+		}
+		if (not Asset || Asset->IsA<UDataTable>() || Asset->IsA<UUserDefinedStruct>())
+		{
+			return Containers;
+		}
+		Containers.Add({TEXT("Asset"), Asset});
+		AddSubobjectContainers(Asset, TEXT("Sub:"), Containers);
+		return Containers;
 	}
 
 	/**
 	 * @param bRefreshNodes True after the migration: loading does not guarantee nodes were reconstructed against
 	 * the new FName types, and reading the stale enum pins would report a false "verified".
 	 */
-	void CollectBlueprint(UBlueprint* Blueprint, const UEnum* WeaponEnum, const bool bRefreshNodes, TArray<FRow>& OutRows)
+	void CollectBlueprintGraphs(UBlueprint* Blueprint, const UEnum* WeaponEnum, const bool bRefreshNodes, TArray<FRow>& OutRows)
 	{
 		if (bRefreshNodes)
 		{
@@ -429,13 +490,6 @@ namespace WeaponNameMigration
 			}
 		}
 		CollectVariableRows(Blueprint->NewVariables, Package, TEXT("Variable"), TEXT("Blueprint"), WeaponEnum, OutRows);
-		if (UClass* GeneratedClass = Blueprint->GeneratedClass)
-		{
-			UObject* DefaultObject = GeneratedClass->GetDefaultObject();
-			CollectPropertyRows(GeneratedClass, DefaultObject, Package, TEXT("CDO"), WeaponEnum, OutRows);
-			CollectSubobjectRows(DefaultObject, Package, TEXT("CDOSub:"), WeaponEnum, OutRows);
-		}
-		CollectComponentTemplates(Blueprint, Package, WeaponEnum, OutRows);
 	}
 
 	void CollectDataTable(const UDataTable* Table, const UEnum* WeaponEnum, TArray<FRow>& OutRows)
@@ -450,27 +504,27 @@ namespace WeaponNameMigration
 
 	void CollectAsset(UObject* Asset, const UEnum* WeaponEnum, const bool bRefreshNodes, TArray<FRow>& OutRows)
 	{
+		if (not Asset)
+		{
+			return;
+		}
 		if (UBlueprint* Blueprint = Cast<UBlueprint>(Asset))
 		{
-			CollectBlueprint(Blueprint, WeaponEnum, bRefreshNodes, OutRows);
-			return;
+			CollectBlueprintGraphs(Blueprint, WeaponEnum, bRefreshNodes, OutRows);
 		}
-		if (const UDataTable* Table = Cast<UDataTable>(Asset))
+		else if (const UDataTable* Table = Cast<UDataTable>(Asset))
 		{
 			CollectDataTable(Table, WeaponEnum, OutRows);
-			return;
 		}
-		if (const UUserDefinedStruct* UserStruct = Cast<UUserDefinedStruct>(Asset))
+		else if (const UUserDefinedStruct* UserStruct = Cast<UUserDefinedStruct>(Asset))
 		{
 			CollectPropertyRows(UserStruct, UserStruct->GetDefaultInstance(), UserStruct->GetOutermost()->GetName(),
 			                    TEXT("StructDefaults"), WeaponEnum, OutRows);
-			return;
 		}
-		if (Asset)
+		const FString Package = Asset->GetOutermost()->GetName();
+		for (const FPropertyContainer& Container : GetPropertyContainers(Asset))
 		{
-			const FString Package = Asset->GetOutermost()->GetName();
-			CollectPropertyRows(Asset->GetClass(), Asset, Package, TEXT("Asset"), WeaponEnum, OutRows);
-			CollectSubobjectRows(Asset, Package, TEXT("Sub:"), WeaponEnum, OutRows);
+			CollectPropertyRows(Container.Object->GetClass(), Container.Object, Package, Container.Label, WeaponEnum, OutRows);
 		}
 	}
 
@@ -500,10 +554,14 @@ namespace WeaponNameMigration
 		return false;
 	}
 
+	IAssetRegistry& GetAssetRegistry()
+	{
+		return FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+	}
+
 	TArray<FAssetData> GetCandidateAssets()
 	{
-		IAssetRegistry& AssetRegistry =
-			FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+		IAssetRegistry& AssetRegistry = GetAssetRegistry();
 		AssetRegistry.SearchAllAssets(true);
 
 		FARFilter Filter;
@@ -566,7 +624,7 @@ namespace WeaponNameMigration
 			Lines.Add(FString::Join(TArray<FString>{
 				Row.AssetPackage, Row.Kind, Row.Container, Row.NodeClass, Row.NodeTitle, Row.NodeGuid,
 				Row.PinOrPropertyPath, Row.Direction, Sanitize(Row.RawValue), Row.CanonicalValue,
-				LexToString(Row.NumericValue), Row.LinkSource}, TEXT("\t")));
+				LexToString(Row.NumericValue), Row.LinkSource, Row.LinkSourceNodeGuid, Row.LinkSourcePin}, TEXT("\t")));
 		}
 		return FFileHelper::SaveStringArrayToFile(Lines, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	}
@@ -590,9 +648,47 @@ namespace WeaponNameMigration
 			Row.NodeTitle = Cells[4]; Row.NodeGuid = Cells[5]; Row.PinOrPropertyPath = Cells[6];
 			Row.Direction = Cells[7]; Row.RawValue = Cells[8]; Row.CanonicalValue = Cells[9];
 			LexFromString(Row.NumericValue, *Cells[10]); Row.LinkSource = Cells[11];
+			Row.LinkSourceNodeGuid = Cells[12]; Row.LinkSourcePin = Cells[13];
 			Rows.Add(Row);
 		}
 		return Rows;
+	}
+
+	FString GetSnapshotPinName(const FRow& Row)
+	{
+		FString PinName = Row.PinOrPropertyPath;
+		PinName.RemoveFromEnd(OrphanedPinMarker);
+		return PinName;
+	}
+
+	// "Arr[2].WeaponName" -> "WeaponName", "Weapon Name" -> "Weapon Name".
+	FString GetLastFieldName(const FString& PropertyPath)
+	{
+		FString FieldName = PropertyPath;
+		int32 DotIndex = INDEX_NONE;
+		if (FieldName.FindLastChar(TEXT('.'), DotIndex))
+		{
+			FieldName.RightChopInline(DotIndex + 1);
+		}
+		int32 BracketIndex = INDEX_NONE;
+		if (FieldName.FindChar(TEXT('['), BracketIndex))
+		{
+			FieldName.LeftInline(BracketIndex);
+		}
+		return FieldName;
+	}
+
+	void RegisterKnownWeaponFields(const TArray<FRow>& Rows)
+	{
+		for (const FRow& Row : Rows)
+		{
+			const bool bIsPin = Row.Kind == TEXT("Pin");
+			const FString FieldName = bIsPin ? GetSnapshotPinName(Row) : GetLastFieldName(Row.PinOrPropertyPath);
+			if (bIsPin || Row.Kind == TEXT("Variable") || Row.Kind == TEXT("LocalVariable") || Row.Kind == TEXT("Property"))
+			{
+				KnownWeaponFieldNames.Add(FName(*FieldName));
+			}
+		}
 	}
 
 	UEdGraphNode* FindNodeByGuid(UBlueprint* Blueprint, const FString& GuidString)
@@ -617,34 +713,41 @@ namespace WeaponNameMigration
 		return nullptr;
 	}
 
-	FString GetSnapshotPinName(const FRow& Row)
-	{
-		FString PinName = Row.PinOrPropertyPath;
-		PinName.RemoveFromEnd(TEXT(" [ORPHANED]"));
-		return PinName;
-	}
-
-	// @return Whether an orphan was removed, so the caller knows the Blueprint must be saved.
+	/**
+	 * @brief Removes the orphan K2 leaves behind when a pin changes type, so it neither keeps the old enum value nor
+	 * holds on to a wire. Links on the orphan are broken; Apply reconnects the live pin from the snapshot.
+	 * @return Whether an orphan was removed, so the caller knows the Blueprint changed.
+	 */
 	bool RemoveOrphanedPin(UEdGraphNode* Node, const FName PinName)
 	{
 		UEdGraphPin* const* Orphan = Node->Pins.FindByPredicate([PinName](const UEdGraphPin* Pin)
 		{
-			return Pin->bOrphanedPin && Pin->PinName == PinName && Pin->LinkedTo.IsEmpty();
+			return Pin->bOrphanedPin && Pin->PinName == PinName;
 		});
 		if (not Orphan)
 		{
 			return false;
 		}
 		Node->Modify();
+		(*Orphan)->BreakAllPinLinks();
 		Node->RemovePin(*Orphan);
 		return true;
 	}
 
-	// Only literals on unwired input pins can be restored automatically; everything else is a manual fix.
 	bool IsRestorableRow(const FRow& Row)
 	{
 		return Row.Kind == TEXT("Pin") && Row.Direction == TEXT("In") && Row.LinkSource.IsEmpty()
 			&& not Row.CanonicalValue.IsEmpty();
+	}
+
+	bool IsWiredPinRow(const FRow& Row)
+	{
+		return Row.Kind == TEXT("Pin") && Row.Direction == TEXT("In") && not Row.LinkSourceNodeGuid.IsEmpty();
+	}
+
+	bool IsRestorablePropertyRow(const FRow& Row)
+	{
+		return Row.Kind == TEXT("Property") && not Row.CanonicalValue.IsEmpty();
 	}
 
 	UEdGraphPin* FindLivePin(UEdGraphNode* Node, const FName PinName)
@@ -674,16 +777,22 @@ namespace WeaponNameMigration
 		return nullptr;
 	}
 
-	// @return Whether the Blueprint was modified and must be saved.
-	bool ApplyRowToBlueprint(UBlueprint* Blueprint, const FRow& Row)
+	void ReportFailure(FApplyContext& Context, const FString& Message)
+	{
+		++Context.FailureCount;
+		UE_LOG(LogTemp, Error, TEXT("WeaponNameMigration FAILED: %s"), *Message);
+	}
+
+	// @return Whether the Blueprint was modified.
+	bool ApplyPinLiteral(UBlueprint* Blueprint, const FRow& Row, FApplyContext& Context)
 	{
 		UEdGraphNode* Node = FindNodeByGuid(Blueprint, Row.NodeGuid);
 		const FName PinName(*GetSnapshotPinName(Row));
 		UEdGraphPin* MigratedPin = Node ? FindMigratedPin(Node, PinName) : nullptr;
 		if (not MigratedPin)
 		{
-			UE_LOG(LogTemp, Error, TEXT("WeaponNameMigration FAILED: no migrated Name pin %s on node %s (%s) in %s"),
-			       *PinName.ToString(), *Row.NodeTitle, *Row.NodeGuid, *Row.AssetPackage);
+			ReportFailure(Context, FString::Printf(TEXT("no migrated Name pin %s on node %s (%s) in %s"),
+				*PinName.ToString(), *Row.NodeTitle, *Row.NodeGuid, *Row.AssetPackage));
 			return false;
 		}
 		const bool bRemovedOrphan = RemoveOrphanedPin(Node, PinName);
@@ -698,6 +807,265 @@ namespace WeaponNameMigration
 		return true;
 	}
 
+	/**
+	 * @brief Reconnects a weapon pin to the node that fed it before the migration (usually a weapon variable getter).
+	 * K2 may drop the wire while the two ends have different types during reconstruction.
+	 * @return Whether the Blueprint was modified.
+	 */
+	bool RelinkWiredPin(UBlueprint* Blueprint, const FRow& Row, FApplyContext& Context)
+	{
+		const FName TargetPinName(*GetSnapshotPinName(Row));
+		const FName SourcePinName(*Row.LinkSourcePin);
+		UEdGraphNode* TargetNode = FindNodeByGuid(Blueprint, Row.NodeGuid);
+		UEdGraphNode* SourceNode = FindNodeByGuid(Blueprint, Row.LinkSourceNodeGuid);
+		UEdGraphPin* TargetPin = TargetNode ? FindLivePin(TargetNode, TargetPinName) : nullptr;
+		UEdGraphPin* SourcePin = SourceNode ? FindLivePin(SourceNode, SourcePinName) : nullptr;
+		if (not TargetPin || not SourcePin)
+		{
+			ReportFailure(Context, FString::Printf(TEXT("cannot find wire %s -> %s.%s (%s) in %s"),
+				*Row.LinkSource, *Row.NodeTitle, *TargetPinName.ToString(), *Row.NodeGuid, *Row.AssetPackage));
+			return false;
+		}
+		const bool bRemovedOrphans = RemoveOrphanedPin(TargetNode, TargetPinName) | RemoveOrphanedPin(SourceNode, SourcePinName);
+		if (TargetPin->LinkedTo.Contains(SourcePin))
+		{
+			return bRemovedOrphans;
+		}
+		if (not GetDefault<UEdGraphSchema_K2>()->TryCreateConnection(SourcePin, TargetPin))
+		{
+			ReportFailure(Context, FString::Printf(TEXT("cannot reconnect %s -> %s.%s in %s (types %s -> %s)"),
+				*Row.LinkSource, *Row.NodeTitle, *TargetPinName.ToString(), *Row.AssetPackage,
+				*SourcePin->PinType.PinCategory.ToString(), *TargetPin->PinType.PinCategory.ToString()));
+			return bRemovedOrphans;
+		}
+		UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration relinked %s -> %s.%s in %s"),
+		       *Row.LinkSource, *Row.NodeTitle, *TargetPinName.ToString(), *Row.AssetPackage);
+		return true;
+	}
+
+	// Keeps the container type, so an array of weapons becomes an array of names.
+	FEdGraphPinType MakeNamePinType(const FEdGraphPinType& OldPinType)
+	{
+		FEdGraphPinType NamePinType = OldPinType;
+		NamePinType.PinCategory = UEdGraphSchema_K2::PC_Name;
+		NamePinType.PinSubCategory = NAME_None;
+		NamePinType.PinSubCategoryObject = nullptr;
+		return NamePinType;
+	}
+
+	/**
+	 * @brief Retypes an EWeaponName Blueprint member variable to Name. Done by hand instead of through
+	 * ChangeMemberVariableType, which asks for confirmation in a dialog; the CDO value is restored afterwards.
+	 * @return Whether the variable was retyped, which requires a structural recompile.
+	 */
+	bool RetypeMemberVariable(UBlueprint* Blueprint, const FRow& Row, FApplyContext& Context)
+	{
+		const int32 VariableIndex = FBlueprintEditorUtils::FindNewVariableIndex(Blueprint, FName(*Row.PinOrPropertyPath));
+		if (VariableIndex == INDEX_NONE)
+		{
+			ReportFailure(Context, FString::Printf(TEXT("variable %s not found in %s"), *Row.PinOrPropertyPath, *Row.AssetPackage));
+			return false;
+		}
+		FBPVariableDescription& Variable = Blueprint->NewVariables[VariableIndex];
+		if (Variable.VarType.PinSubCategoryObject != Context.WeaponEnum)
+		{
+			return false;
+		}
+		Blueprint->Modify();
+		Variable.VarType = MakeNamePinType(Variable.VarType);
+		UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration retyped variable %s to Name in %s"),
+		       *Row.PinOrPropertyPath, *Row.AssetPackage);
+		return true;
+	}
+
+	UK2Node_FunctionEntry* FindFunctionEntry(UBlueprint* Blueprint, const FString& GraphName)
+	{
+		TArray<UEdGraph*> Graphs;
+		Blueprint->GetAllGraphs(Graphs);
+		for (const UEdGraph* Graph : Graphs)
+		{
+			if (not Graph || Graph->GetName() != GraphName)
+			{
+				continue;
+			}
+			const TObjectPtr<UEdGraphNode>* Entry = Graph->Nodes.FindByPredicate([](const UEdGraphNode* Node)
+			{
+				return Node && Node->IsA<UK2Node_FunctionEntry>();
+			});
+			return Entry ? Cast<UK2Node_FunctionEntry>(*Entry) : nullptr;
+		}
+		return nullptr;
+	}
+
+	// Local variable defaults live on the description itself, so the snapshot value is written there directly.
+	bool RetypeLocalVariable(UBlueprint* Blueprint, const FRow& Row, FApplyContext& Context)
+	{
+		UK2Node_FunctionEntry* Entry = FindFunctionEntry(Blueprint, Row.Container);
+		const FName VariableName(*Row.PinOrPropertyPath);
+		FBPVariableDescription* Variable = Entry
+			? Entry->LocalVariables.FindByPredicate([VariableName](const FBPVariableDescription& Local) { return Local.VarName == VariableName; })
+			: nullptr;
+		if (not Variable)
+		{
+			ReportFailure(Context, FString::Printf(TEXT("local variable %s not found in %s.%s"),
+				*Row.PinOrPropertyPath, *Row.AssetPackage, *Row.Container));
+			return false;
+		}
+		if (Variable->VarType.PinSubCategoryObject != Context.WeaponEnum)
+		{
+			return false;
+		}
+		Entry->Modify();
+		Variable->VarType = MakeNamePinType(Variable->VarType);
+		Variable->DefaultValue = Row.CanonicalValue;
+		UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration retyped local variable %s.%s to Name = %s in %s"),
+		       *Row.Container, *Row.PinOrPropertyPath, *Row.CanonicalValue, *Row.AssetPackage);
+		return true;
+	}
+
+	// @return Whether the variables changed type, which requires a structural recompile before nodes are refreshed.
+	bool RetypeWeaponVariables(UBlueprint* Blueprint, const TArray<const FRow*>& Rows, FApplyContext& Context)
+	{
+		bool bAnyRetyped = false;
+		for (const FRow* Row : Rows)
+		{
+			if (Row->Kind == TEXT("Variable"))
+			{
+				bAnyRetyped |= RetypeMemberVariable(Blueprint, *Row, Context);
+			}
+			else if (Row->Kind == TEXT("LocalVariable"))
+			{
+				bAnyRetyped |= RetypeLocalVariable(Blueprint, *Row, Context);
+			}
+		}
+		return bAnyRetyped;
+	}
+
+	bool HasGraphRows(const TArray<const FRow*>& Rows)
+	{
+		return Rows.ContainsByPredicate([](const FRow* Row)
+		{
+			return Row->Kind == TEXT("Variable") || Row->Kind == TEXT("LocalVariable") || IsRestorableRow(*Row)
+				|| IsWiredPinRow(*Row);
+		});
+	}
+
+	/**
+	 * @brief Retypes weapon variables, rebuilds every node against the new types, then restores pin literals and wires.
+	 * Always compiles when the Blueprint has graph rows, so the saved asset holds the migrated pins (outcome A included).
+	 * @return Whether the Blueprint must be saved.
+	 */
+	bool ApplyBlueprintGraphRows(UBlueprint* Blueprint, const TArray<const FRow*>& Rows, FApplyContext& Context)
+	{
+		if (not HasGraphRows(Rows))
+		{
+			return false;
+		}
+		if (RetypeWeaponVariables(Blueprint, Rows, Context))
+		{
+			// Regenerates the skeleton class so the variable getters reconstruct with Name pins.
+			FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+		}
+		FBlueprintEditorUtils::RefreshAllNodes(Blueprint);
+		for (const FRow* Row : Rows)
+		{
+			if (IsRestorableRow(*Row))
+			{
+				ApplyPinLiteral(Blueprint, *Row, Context);
+			}
+			else if (IsWiredPinRow(*Row))
+			{
+				RelinkWiredPin(Blueprint, *Row, Context);
+			}
+		}
+		FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
+		FKismetEditorUtilities::CompileBlueprint(Blueprint);
+		return true;
+	}
+
+	// @return Whether the value differed and was written.
+	bool WriteWeaponPropertyValue(const FProperty* Property, void* Value, const FRow& Row, const UEnum* WeaponEnum)
+	{
+		if (const FNameProperty* NameProperty = CastField<FNameProperty>(Property))
+		{
+			const FName SnapshotName(*Row.CanonicalValue);
+			if (NameProperty->GetPropertyValue(Value) == SnapshotName)
+			{
+				return false;
+			}
+			NameProperty->SetPropertyValue(Value, SnapshotName);
+			return true;
+		}
+		const FEnumProperty* EnumProperty = CastField<FEnumProperty>(Property);
+		const int64 SnapshotValue = WeaponEnum->GetValueByNameString(Row.CanonicalValue);
+		if (not EnumProperty || SnapshotValue == INDEX_NONE
+			|| EnumProperty->GetUnderlyingProperty()->GetSignedIntPropertyValue(Value) == SnapshotValue)
+		{
+			return false;
+		}
+		EnumProperty->GetUnderlyingProperty()->SetIntPropertyValue(Value, SnapshotValue);
+		return true;
+	}
+
+	/**
+	 * @brief Writes the snapshot values back onto one container, matched by the same label and property path the
+	 * snapshot recorded. Retyped variables and C++ fields lose their value when the property type changes.
+	 * @return Whether any value was written.
+	 */
+	bool RestoreContainerProperties(const FPropertyContainer& Container, const TMap<FString, const FRow*>& RowsByPath,
+	                                const UEnum* WeaponEnum)
+	{
+		bool bAnyWritten = false;
+		for (TPropertyValueIterator<const FProperty> It(Container.Object->GetClass(), Container.Object); It; ++It)
+		{
+			if (not IsWeaponNameProperty(It.Key(), WeaponEnum))
+			{
+				continue;
+			}
+			const FRow* const* SnapshotRow = RowsByPath.Find(Container.Label + TEXT("|") + It.GetPropertyPathDebugString());
+			if (not SnapshotRow)
+			{
+				continue;
+			}
+			if (not bAnyWritten)
+			{
+				Container.Object->Modify();
+			}
+			// The iterator only hands out const pointers; the container itself is a mutable object we own here.
+			if (WriteWeaponPropertyValue(It.Key(), const_cast<void*>(It.Value()), **SnapshotRow, WeaponEnum))
+			{
+				bAnyWritten = true;
+				UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration restored property %s %s = %s in %s"),
+				       *Container.Label, *(*SnapshotRow)->PinOrPropertyPath, *(*SnapshotRow)->CanonicalValue,
+				       *(*SnapshotRow)->AssetPackage);
+			}
+		}
+		return bAnyWritten;
+	}
+
+	// @return Whether the asset must be saved.
+	bool RestorePropertyRows(UObject* Asset, const TArray<const FRow*>& Rows, FApplyContext& Context)
+	{
+		TMap<FString, const FRow*> RowsByPath;
+		for (const FRow* Row : Rows)
+		{
+			if (IsRestorablePropertyRow(*Row))
+			{
+				RowsByPath.Add(Row->Container + TEXT("|") + Row->PinOrPropertyPath, Row);
+			}
+		}
+		if (RowsByPath.IsEmpty())
+		{
+			return false;
+		}
+		bool bAnyWritten = false;
+		for (const FPropertyContainer& Container : GetPropertyContainers(Asset))
+		{
+			bAnyWritten |= RestoreContainerProperties(Container, RowsByPath, Context.WeaponEnum);
+		}
+		return bAnyWritten;
+	}
+
 	bool SavePackageToDisk(UPackage* Package)
 	{
 		const FString Filename = FPackageName::LongPackageNameToFilename(
@@ -707,57 +1075,131 @@ namespace WeaponNameMigration
 		return UPackage::SavePackage(Package, nullptr, *Filename, SaveArgs);
 	}
 
-	void ApplyBlueprintRows(const FString& Package, const TArray<const FRow*>& Rows)
+	void ApplyPackage(const FString& Package, const TArray<const FRow*>& Rows, FApplyContext& Context)
 	{
 		const FString ObjectPath = Package + TEXT(".") + FPackageName::GetShortName(Package);
-		UBlueprint* Blueprint = LoadObject<UBlueprint>(nullptr, *ObjectPath);
-		if (not Blueprint)
+		UObject* Asset = LoadObject<UObject>(nullptr, *ObjectPath);
+		if (not Asset)
 		{
-			UE_LOG(LogTemp, Error, TEXT("WeaponNameMigration FAILED: could not load %s"), *ObjectPath);
+			ReportFailure(Context, FString::Printf(TEXT("could not load %s"), *ObjectPath));
 			return;
 		}
-		// Make K2 rebuild every node against the new FName types before we look at any pin.
-		FBlueprintEditorUtils::RefreshAllNodes(Blueprint);
-		bool bAnyChanged = false;
-		for (const FRow* Row : Rows)
+		bool bMustSave = false;
+		if (UBlueprint* Blueprint = Cast<UBlueprint>(Asset))
 		{
-			bAnyChanged |= ApplyRowToBlueprint(Blueprint, *Row);
+			bMustSave = ApplyBlueprintGraphRows(Blueprint, Rows, Context);
 		}
-		if (not bAnyChanged)
+		// After the compile: compiling rebuilds the CDO, and the restored values must land on the new one.
+		bMustSave |= RestorePropertyRows(Asset, Rows, Context);
+		if (not bMustSave)
 		{
 			return;
 		}
-		FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
-		FKismetEditorUtilities::CompileBlueprint(Blueprint);
-		if (not SavePackageToDisk(Blueprint->GetOutermost()))
+		if (Context.bDryRun)
 		{
-			UE_LOG(LogTemp, Error, TEXT("WeaponNameMigration FAILED: could not save %s"), *Package);
+			UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration DRYRUN would save %s"), *Package);
+			return;
+		}
+		if (not SavePackageToDisk(Asset->GetOutermost()))
+		{
+			ReportFailure(Context, FString::Printf(TEXT("could not save %s"), *Package));
 		}
 	}
 
-	int32 RunApply(const FString& TsvPath)
+	/**
+	 * @brief Counts Blueprint parents inside /Game using the ParentClass asset registry tag, without loading anything.
+	 * Apply runs parents first so a child compiles against its parent's retyped variables.
+	 */
+	int32 GetBlueprintDepth(const FString& Package, IAssetRegistry& AssetRegistry, TMap<FString, int32>& DepthCache,
+	                        const int32 Guard)
+	{
+		if (const int32* CachedDepth = DepthCache.Find(Package))
+		{
+			return *CachedDepth;
+		}
+		TArray<FAssetData> PackageAssets;
+		AssetRegistry.GetAssetsByPackageName(FName(*Package), PackageAssets);
+		int32 Depth = 0;
+		for (const FAssetData& AssetData : PackageAssets)
+		{
+			FString ParentClassExportPath;
+			if (not AssetData.GetTagValue(FBlueprintTags::ParentClassPath, ParentClassExportPath))
+			{
+				continue;
+			}
+			const FString ParentPackage = FPackageName::ObjectPathToPackageName(
+				FPackageName::ExportTextPathToObjectPath(ParentClassExportPath));
+			if (ParentPackage.StartsWith(TEXT("/Game/")) && Guard < MaxBlueprintInheritanceDepth)
+			{
+				Depth = 1 + GetBlueprintDepth(ParentPackage, AssetRegistry, DepthCache, Guard + 1);
+			}
+		}
+		DepthCache.Add(Package, Depth);
+		return Depth;
+	}
+
+	TArray<FString> GetPackagesParentsFirst(const TMap<FString, TArray<const FRow*>>& RowsByPackage)
+	{
+		IAssetRegistry& AssetRegistry = GetAssetRegistry();
+		AssetRegistry.SearchAllAssets(true);
+		TMap<FString, int32> DepthCache;
+		TArray<FString> Packages;
+		RowsByPackage.GetKeys(Packages);
+		for (const FString& Package : Packages)
+		{
+			GetBlueprintDepth(Package, AssetRegistry, DepthCache, 0);
+		}
+		Packages.Sort([&DepthCache](const FString& Left, const FString& Right)
+		{
+			const int32 LeftDepth = DepthCache.FindRef(Left);
+			const int32 RightDepth = DepthCache.FindRef(Right);
+			return LeftDepth != RightDepth ? LeftDepth < RightDepth : Left < Right;
+		});
+		return Packages;
+	}
+
+	bool IsApplicableRow(const FRow& Row)
+	{
+		return IsRestorableRow(Row) || IsWiredPinRow(Row) || Row.Kind == TEXT("Variable")
+			|| Row.Kind == TEXT("LocalVariable") || IsRestorablePropertyRow(Row);
+	}
+
+	int32 RunApply(const UEnum* WeaponEnum, const FString& TsvPath, const bool bDryRun)
 	{
 		const TArray<FRow> Rows = ReadTsv(TsvPath);
+		RegisterKnownWeaponFields(Rows);
+		FApplyContext Context;
+		Context.WeaponEnum = WeaponEnum;
+		Context.bDryRun = bDryRun;
 		TMap<FString, TArray<const FRow*>> RowsByPackage;
 		for (const FRow& Row : Rows)
 		{
-			if (IsRestorableRow(Row))
+			if (Row.Container.StartsWith(TEXT("Row:")) || Row.Container == TEXT("StructDefaults"))
+			{
+				ReportFailure(Context, FString::Printf(TEXT("data table / struct default rows are not restored: %s %s"),
+					*Row.AssetPackage, *Row.Container));
+				continue;
+			}
+			if (IsApplicableRow(Row))
 			{
 				RowsByPackage.FindOrAdd(Row.AssetPackage).Add(&Row);
 			}
 		}
-		for (const TPair<FString, TArray<const FRow*>>& Pair : RowsByPackage)
+		for (const FString& Package : GetPackagesParentsFirst(RowsByPackage))
 		{
-			ApplyBlueprintRows(Pair.Key, Pair.Value);
+			ApplyPackage(Package, RowsByPackage[Package], Context);
 			// Save per package and collect garbage so a failure late in the run does not lose earlier work.
 			CollectGarbage(RF_NoFlags);
 		}
-		return 0;
+		UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration apply: %d packages, %d failures%s"),
+		       RowsByPackage.Num(), Context.FailureCount, bDryRun ? TEXT(" (dry run, nothing saved)") : TEXT(""));
+		return Context.FailureCount == 0 ? 0 : 1;
 	}
 
 	int32 RunVerify(const UEnum* WeaponEnum, const FString& TsvPath)
 	{
 		const TArray<FRow> SnapshotRows = ReadTsv(TsvPath);
+		RegisterKnownWeaponFields(SnapshotRows);
 		TSet<FString> SnapshotPackages;
 		for (const FRow& Row : SnapshotRows)
 		{
@@ -767,13 +1209,13 @@ namespace WeaponNameMigration
 		for (const FRow& Row : CollectAll(WeaponEnum, true, &SnapshotPackages))
 		{
 			FRow Normalised = Row;
-			Normalised.PinOrPropertyPath.RemoveFromEnd(TEXT(" [ORPHANED]"));
+			Normalised.PinOrPropertyPath.RemoveFromEnd(OrphanedPinMarker);
 			AfterByKey.Add(Normalised.GetKey(), Normalised);
 		}
 		int32 ProblemCount = 0;
 		for (FRow Before : SnapshotRows)
 		{
-			Before.PinOrPropertyPath.RemoveFromEnd(TEXT(" [ORPHANED]"));
+			Before.PinOrPropertyPath.RemoveFromEnd(OrphanedPinMarker);
 			const FRow* After = AfterByKey.Find(Before.GetKey());
 			if (not After)
 			{
@@ -782,10 +1224,16 @@ namespace WeaponNameMigration
 				++ProblemCount;
 				continue;
 			}
-			if (After->CanonicalValue != Before.CanonicalValue || After->LinkSource != Before.LinkSource)
+			// Only stored values count: a Variable row keeps its value on the CDO, an Out pin has none, and a wired
+			// In pin's literal is an unused leftover. Those rows only have to be found and keep their wire.
+			const bool bHoldsStoredValue = Before.Kind != TEXT("Variable") && Before.Direction != TEXT("Out")
+				&& Before.LinkSource.IsEmpty();
+			const bool bValueChanged = bHoldsStoredValue && After->CanonicalValue != Before.CanonicalValue;
+			if (bValueChanged || After->LinkSourceNodeGuid != Before.LinkSourceNodeGuid)
 			{
-				UE_LOG(LogTemp, Warning, TEXT("VERIFY CHANGED  %s  %s  %s : %s -> %s"), *Before.AssetPackage,
-				       *Before.NodeTitle, *Before.PinOrPropertyPath, *Before.CanonicalValue, *After->CanonicalValue);
+				UE_LOG(LogTemp, Warning, TEXT("VERIFY CHANGED  %s  %s  %s : %s <- %s  ->  %s <- %s"), *Before.AssetPackage,
+				       *Before.NodeTitle, *Before.PinOrPropertyPath, *Before.CanonicalValue, *Before.LinkSource,
+				       *After->CanonicalValue, *After->LinkSource);
 				++ProblemCount;
 			}
 		}
@@ -812,7 +1260,7 @@ int32 UWeaponNameMigrationCommandlet::Main(const FString& Params)
 	FString TsvPath;
 	if (not WeaponEnum || not FParse::Value(*Params, TEXT("Mode="), Mode) || not FParse::Value(*Params, TEXT("Tsv="), TsvPath))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Usage: -run=WeaponNameMigration -Mode=Snapshot|Apply|Verify -Tsv=<path>"));
+		UE_LOG(LogTemp, Error, TEXT("Usage: -run=WeaponNameMigration -Mode=Snapshot|Apply|Verify -Tsv=<path> [-DryRun]"));
 		return 1;
 	}
 	if (Mode == TEXT("Snapshot"))
@@ -824,7 +1272,7 @@ int32 UWeaponNameMigrationCommandlet::Main(const FString& Params)
 	}
 	if (Mode == TEXT("Apply"))
 	{
-		return RunApply(TsvPath);
+		return RunApply(WeaponEnum, TsvPath, FParse::Param(*Params, TEXT("DryRun")));
 	}
 	if (Mode == TEXT("Verify"))
 	{

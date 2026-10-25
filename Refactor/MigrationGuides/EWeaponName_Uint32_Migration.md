@@ -26,7 +26,7 @@ Done headless in a separate worktree (`D:/UE5Projects/RTS_WN`; superproject and 
 * The committed `Utils/Migration/WeaponNameMigrationCommandlet.cpp` is authoritative; it differs from §4.2 in four ways. It only loads packages whose bytes contain `EWeaponName` (Verify loads the snapshot's packages instead). It collects garbage with `RF_NoFlags`, because `GARBAGE_COLLECTION_KEEPFLAGS` is `RF_Standalone` in an editor commandlet and would keep every asset alive. It records weapon values inside unsplit struct pins and struct variables (`Kind=StructPin`). It walks instanced subobjects (`Sub:` / `CDOSub:` containers).
 * Run it with `-DisablePlugins=BpGeneratorUltimate`; the run then does not register with the UECP bridge. The snapshot takes about 50 s.
 * Coverage: 289 of 289 inventory assets have rows; no unresolved or stale names. `check_weaponname_snapshot.py` in this folder reruns the §4.4 checks.
-* **Correction to §1.2 / §6:** most turrets do not type their gun into the Make-node pin. 261 pin literals (208 assets) are restorable by Apply as written. 72 assets wire the pin instead, mostly from an `EWeaponName` **Blueprint variable** whose value lives on the CDO (66 variables, plus 9 local variables). Before Phase 4, extend Apply to retype these variables to `Name` and write the CDO value from the snapshot's `Property|CDO` row; otherwise they become manual work. There are no Switch-on-`EWeaponName` nodes.
+* **Correction to §1.2 / §6:** many turrets do not type their gun into the Make-node pin. 261 pin literals (208 assets) are plain literals. 72 assets wire the pin instead, mostly from an `EWeaponName` **Blueprint variable** whose value lives on the CDO (66 member variables, plus 9 local variables). Apply now handles these (see §6.1). There are no Switch-on-`EWeaponName` nodes.
 * `Ger_Turret_Sdkfz231_MG231` gets its gun from `BPF_ImpactHelpers` (its local variables are recorded). `DA_GlobalAbilitySystem` stores `Bomb_250Gr` in `GA_Barrage::M_WeaponData` (bucket 1).
 * Not done yet: the `CompileAllBlueprints` baseline (§4.1 item 4) and the spot-check (§4.4 item 6).
 
@@ -1056,6 +1056,18 @@ grep -E "FAILED|restored" /tmp/wn_apply.log | sort | uniq -c | sort -rn | head
 ```
 
 Apply writes each literal back by `NodeGuid` + pin name, compiles each changed Blueprint and **saves after each package**, so a crash late in the run keeps everything before it. Every `FAILED` line is a node that no longer exists or a pin whose name changed. Handle those by hand using §6.2.
+
+Packages run parents first (by the asset registry `ParentClass` tag). For each Blueprint, Apply:
+
+1. Retypes `EWeaponName` member and local variables to `Name`, keeping the container type. It edits the variable description directly, because `ChangeMemberVariableType` asks for confirmation in a dialog. Local variables get their snapshot default.
+2. Recompiles structurally and refreshes all nodes, so the getters and Make nodes rebuild as `Name` pins.
+3. Restores pin literals, then reconnects any wired pin whose wire broke. It uses `LinkSourceNodeGuid` / `LinkSourcePin` from the snapshot and removes orphaned pins on both ends.
+4. Compiles.
+5. Writes every snapshot `Property` value back onto the new CDO, CDO subobjects, SCS/ICH templates and child-actor templates, matched by container label and property path. This restores the retyped variables' values, and child Blueprints that override them.
+
+Non-Blueprint assets only get step 5. Data-table and struct-default rows are reported as `FAILED` (the snapshot has none).
+
+Add `-DryRun` to do everything except save. Use it in the Phase 2 spike to read the `FAILED` list first. A dry run on the unmigrated project (2026-10-25) retyped 66 + 9 variables, restored all 66 CDO values and failed only the 261 pin literals, which need the `uint32` change first. No wires had to be reconnected: reconstruction kept them even across the type mismatch.
 
 Commit right away: `git add Content && git commit -m "Restore EWeaponName pin literals after uint32 migration"`.
 
