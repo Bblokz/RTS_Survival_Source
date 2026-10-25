@@ -13,6 +13,9 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 		ESquadSubtype::Squad_Rus_HazmatEngineers,
 		ESquadSubtype::Squad_Rus_HazmatBazooka,
 		ESquadSubtype::Squad_Rus_Mosin,
+		ESquadSubtype::Squad_Rus_Dyakonov,
+		ESquadSubtype::Squad_Rus_KorovinAssault,
+		ESquadSubtype::Squad_Rus_ROKS3_PPSH,
 		ESquadSubtype::Squad_Rus_Okhotnik
 	};
 	BasicInfantryOptions.TrainableTankSubtypes = {};

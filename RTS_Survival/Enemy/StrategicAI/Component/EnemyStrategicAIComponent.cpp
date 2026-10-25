@@ -1997,6 +1997,7 @@ bool UEnemyStrategicAIComponent::IsEnemyReinforcementAbility(const EGlobalAbilit
 	return AbilityType == EGlobalAbility::GA_SovietT34Drop
 		|| AbilityType == EGlobalAbility::GA_SovietT34DropVariation
 		|| AbilityType == EGlobalAbility::GA_SovietInfantryDrop
+		|| AbilityType == EGlobalAbility::GA_SovietParatroopers
 		|| AbilityType == EGlobalAbility::GA_SovietHeavyTankDrop
 		|| AbilityType == EGlobalAbility::GA_SovietHeavyTankDropVariation;
 }
