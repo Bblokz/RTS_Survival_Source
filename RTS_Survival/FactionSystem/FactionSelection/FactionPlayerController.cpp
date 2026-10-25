@@ -26,7 +26,22 @@
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+namespace FactionPlayerControllerPreview
+{
+	void DestroyTeamWeapon(ATeamWeapon* TeamWeapon)
+	{
+		if (not IsValid(TeamWeapon))
+		{
+			return;
+		}
+
+		TeamWeapon->Destroy();
+	}
+}
 
 AFactionPlayerController::AFactionPlayerController()
 {
@@ -1238,6 +1253,12 @@ void AFactionPlayerController::ClearCurrentPreview()
 
 	AActor* CurrentPreviewActor = M_CurrentPreviewActor.Get();
 	ASquadController* PreviewSquadController = Cast<ASquadController>(CurrentPreviewActor);
+	ATeamWeapon* PreviewTeamWeapon = nullptr;
+	if (ATeamWeaponController* PreviewTeamWeaponController = Cast<ATeamWeaponController>(PreviewSquadController))
+	{
+		PreviewTeamWeapon = PreviewTeamWeaponController->GetControlledTeamWeaponNoReport();
+	}
+
 	if (IsValid(PreviewSquadController))
 	{
 		TArray<ASquadUnit*> SquadUnits = PreviewSquadController->GetSquadUnitsChecked();
@@ -1256,6 +1277,8 @@ void AFactionPlayerController::ClearCurrentPreview()
 	{
 		CurrentPreviewActor->Destroy();
 	}
+
+	FactionPlayerControllerPreview::DestroyTeamWeapon(PreviewTeamWeapon);
 
 	M_CurrentPreviewActor.Reset();
 	M_CurrentCommandsInterface.SetObject(nullptr);

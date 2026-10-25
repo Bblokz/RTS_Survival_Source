@@ -445,18 +445,18 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 
 	DefaultSettings.M_GameplaySettings.bM_HideActionButtonHotkeys = RTSSettingsMenuSubsystemPrivate::bDefaultHideActionButtonHotkeys;
 	DefaultSettings.M_GameplaySettings.bM_CheckUnitRangeOnHover = RTSSettingsMenuSubsystemPrivate::bDefaultCheckUnitRangeOnHover;
-	DefaultSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
-	DefaultSettings.M_GameplaySettings.M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::NotInitialized;
-	DefaultSettings.M_GameplaySettings.M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
-	DefaultSettings.M_GameplaySettings.M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	DefaultSettings.M_GameplaySettings.M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	DefaultSettings.M_GameplaySettings.M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	M_PendingSettings = DefaultSettings;
 }
@@ -1017,8 +1017,13 @@ void URTSSettingsMenuSubsystem::AddSupportedResolutionUnique(const FIntPoint& Re
 
 ERTSScalabilityQuality URTSSettingsMenuSubsystem::GetScalabilityQualityFromLevel(const int32 ScalabilityLevel) const
 {
-	const int32 ClampedLevel = FMath::Clamp(ScalabilityLevel, RTSSettingsMenuSubsystemPrivate::MinScalabilityLevel, RTSSettingsMenuSubsystemPrivate::MaxScalabilityLevel);
-	return static_cast<ERTSScalabilityQuality>(ClampedLevel);
+	if (ScalabilityLevel < RTSSettingsMenuSubsystemPrivate::MinScalabilityLevel ||
+		ScalabilityLevel > RTSSettingsMenuSubsystemPrivate::MaxScalabilityLevel)
+	{
+		return RTSSettingsMenuSubsystemPrivate::DefaultScalabilityQuality;
+	}
+
+	return static_cast<ERTSScalabilityQuality>(ScalabilityLevel);
 }
 
 int32 URTSSettingsMenuSubsystem::GetLevelFromScalabilityQuality(const ERTSScalabilityQuality ScalabilityQuality) const

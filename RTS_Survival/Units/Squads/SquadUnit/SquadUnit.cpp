@@ -640,6 +640,11 @@ bool ASquadUnit::GetMayKeepAutomaticCover() const
 		SquadCommand == EAbilityID::IdHeal || SquadCommand == EAbilityID::IdEnterCoverAndHold;
 }
 
+bool ASquadUnit::GetMayRelocateFromCoverForStress() const
+{
+	return true;
+}
+
 bool ASquadUnit::GetIsSquadOnHoldPosition() const
 {
 	// Silent: polled on tactical updates, and a unit without a squad has no stance to respect.
@@ -671,6 +676,27 @@ bool ASquadUnit::TryEnterNearbyCoverOnOrder()
 	bool bTargetIsAttackOrder = false;
 	AActor* TargetActor = GetCoverJudgementTarget(TargetLocation, bTargetIsAttackOrder);
 	return TryReserveAndWalkToCover(*CoverSubsystem, TargetActor, TargetLocation);
+}
+
+bool ASquadUnit::TryEnterNearestCover()
+{
+	if (not IsUnitAlive() || not GetIsSquadEligibleForAutomaticCover() ||
+		M_CoverRuntimeState.GetHasAssignment())
+	{
+		return false;
+	}
+
+	const UWorld* World = GetWorld();
+	URTSCoverFinderWorldSubsystem* CoverSubsystem = IsValid(World)
+		? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		: nullptr;
+	if (not IsValid(CoverSubsystem))
+	{
+		return false;
+	}
+
+	ClearPlayerPlannedPosition();
+	return TryReserveAndWalkToCover(*CoverSubsystem, nullptr, FVector::ZeroVector);
 }
 
 bool ASquadUnit::GetIsOnItsWayIntoCover() const

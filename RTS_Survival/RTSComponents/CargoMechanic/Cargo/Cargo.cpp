@@ -131,6 +131,7 @@ void UCargo::OnOwnerDies(const ERTSDeathType DeathType)
 	{
 		OnOwnerDies_KillAllInsideSquads(InsideSquads);
 	}
+	OnOwnerDies_KillAllSoloUnits();
 	OnOwnerDies_ResetState();
 }
 
@@ -410,6 +411,43 @@ bool UCargo::RequestCanEnterCargo(ASquadController* SquadController, TMap<ASquad
 
 	RegisterSquadAtVacancy(SquadController, true);
 	return true;
+}
+
+bool UCargo::TryAssignSoloUnitSeat(ASquadUnit* SoloUnit, FName& OutSocketName)
+{
+	OutSocketName = NAME_None;
+	if (not IsValid(SoloUnit) || not bM_IsEnabled || not GetIsValidCargoMesh())
+	{
+		return false;
+	}
+
+	const TArray<FName> EmptySockets = M_SocketOccupancy.GetEmptySockets();
+	if (EmptySockets.IsEmpty())
+	{
+		return false;
+	}
+
+	OutSocketName = EmptySockets[0];
+	M_SocketOccupancy.M_SocketToUnit.Add(OutSocketName, SoloUnit);
+	M_SoloUnitsInside.Add(TWeakObjectPtr<ASquadUnit>(SoloUnit));
+	return true;
+}
+
+void UCargo::ReleaseSoloUnitSeat(ASquadUnit* SoloUnit)
+{
+	if (SoloUnit == nullptr)
+	{
+		return;
+	}
+
+	for (auto SocketIterator = M_SocketOccupancy.M_SocketToUnit.CreateIterator(); SocketIterator; ++SocketIterator)
+	{
+		if (SocketIterator->Value.Get() == SoloUnit)
+		{
+			SocketIterator.RemoveCurrent();
+		}
+	}
+	M_SoloUnitsInside.Remove(TWeakObjectPtr<ASquadUnit>(SoloUnit));
 }
 
 
@@ -1076,6 +1114,10 @@ bool UCargo::TryFindNextUnitToMove(const int32 EmptySeatIndex, ASquadUnit*& OutU
 			M_SocketOccupancy.M_SocketToUnit.Remove(SocketName);
 			continue;
 		}
+		if (M_SoloUnitsInside.Contains(TWeakObjectPtr<ASquadUnit>(OccupantUnit)))
+		{
+			continue;
+		}
 
 		OutUnitToMove = OccupantUnit;
 		OutSourceIndex = SocketIndex;
@@ -1214,6 +1256,23 @@ void UCargo::OnOwnerDies_KillAllInsideSquads(const TArray<TObjectPtr<ASquadContr
 			continue;
 		}
 		OnOwnerDies_HandleSquad(Squad);
+	}
+}
+
+void UCargo::OnOwnerDies_KillAllSoloUnits()
+{
+	const TArray<TWeakObjectPtr<ASquadUnit>> SoloUnits = M_SoloUnitsInside.Array();
+	for (const TWeakObjectPtr<ASquadUnit>& SoloUnitPtr : SoloUnits)
+	{
+		ASquadUnit* SoloUnit = SoloUnitPtr.Get();
+		if (not IsValid(SoloUnit))
+		{
+			continue;
+		}
+
+		// A solo unit has no squad-level bailout workflow, so it dies with its destroyed cargo owner.
+		OnOwnerDies_DetachIfAttachedToOwner(SoloUnit);
+		OnOwnerDies_KillUnit(SoloUnit);
 	}
 }
 
@@ -1408,6 +1467,7 @@ void UCargo::StopSeatShuffleTimer()
 void UCargo::OnOwnerDies_ResetState()
 {
 	M_SocketOccupancy.M_SocketToUnit.Reset();
+	M_SoloUnitsInside.Reset();
 	M_SquadsWithGarrisonBehaviour.Empty();
 	M_VacancyState.M_InsideSquads.Empty();
 	M_VacancyState.M_CurrentSquads = 0;

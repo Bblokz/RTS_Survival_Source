@@ -256,7 +256,8 @@ bool ASquadUnit::TryReserveStressRelocationPoint(
 	const UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
 	// A soldier under orders, or one that left his cover in the meantime, is not sent anywhere by his stress.
 	if (not IsValid(World) || not IsValid(CoverSettings) || not IsValid(UnitMovement) ||
-		not GetIsHoldingCoverPoint() || not GetMayKeepAutomaticCover())
+		not GetIsHoldingCoverPoint() || not GetMayKeepAutomaticCover() ||
+		not GetMayRelocateFromCoverForStress())
 	{
 		return false;
 	}

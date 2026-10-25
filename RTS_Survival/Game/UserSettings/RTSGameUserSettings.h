@@ -49,6 +49,9 @@ public:
 	static const URTSGameUserSettings* Get();
 	static URTSGameUserSettings* GetMutable();
 
+	/** @brief Restores project defaults with every scalability group set to Epic. */
+	virtual void SetToDefaults() override;
+
 	/**
 	 * @brief Pulls settings from config and normalizes them before the UI reads them.
 	 * @param bForceReload Forces a fresh read from config instead of cached values.
@@ -322,38 +325,38 @@ private:
 	TArray<FRTSSavedChordedKeyBinding> M_SavedChordedKeyBindings;
 
 	UPROPERTY(config)
-	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
+	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSEnemyHealthBarVisibilityStrategy M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::NotInitialized;
+	ERTSEnemyHealthBarVisibilityStrategy M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(config)
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 };

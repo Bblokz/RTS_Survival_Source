@@ -140,6 +140,10 @@ class RTS_SURVIVAL_API UCargo : public UActorComponent
 {
 	GENERATED_BODY()
 
+#if WITH_DEV_AUTOMATION_TESTS && !UE_BUILD_SHIPPING
+	friend struct FSoloInfantryUnitTestAccess;
+#endif
+
 public:
 	UCargo();
 
@@ -239,6 +243,17 @@ public:
 	 */
 	bool RequestCanEnterCargo(ASquadController* SquadController, TMap<ASquadUnit*, FName>& OutAssignments);
 
+	/**
+	 * @brief Reserves one physical seat for a standalone infantry unit without creating squad vacancy state.
+	 * @param SoloUnit Unit that will occupy the seat.
+	 * @param OutSocketName Reserved cargo socket when successful.
+	 * @return True when an enabled cargo seat was reserved for the unit.
+	 */
+	bool TryAssignSoloUnitSeat(ASquadUnit* SoloUnit, FName& OutSocketName);
+
+	/** @brief Releases a standalone infantry unit's physical cargo seat. */
+	void ReleaseSoloUnitSeat(ASquadUnit* SoloUnit);
+
 	void OnSquadEntered(ASquadController* SquadController);
 
 	/** @return Delegate broadcast after a squad has fully entered this cargo. */
@@ -314,6 +329,10 @@ private:
 	// Tracks seat occupancy and exposes helpers (empty-socket listing, optional round-robin reuse order).
 	UPROPERTY()
 	FCargoSocketOccupancy M_SocketOccupancy;
+
+	// Solo occupants consume physical seats but do not participate in squad-slot or squad UI bookkeeping.
+	UPROPERTY()
+	TSet<TWeakObjectPtr<ASquadUnit>> M_SoloUnitsInside;
 
 	/** Vacancy state for squads (capacity, inside set, and derived count). */
 	UPROPERTY()
@@ -392,6 +411,7 @@ private:
         // ----------------------------------------
         TArray<TObjectPtr<ASquadController>> OnOwnerDies_GetInsideSquadsSnapshot() const;
         void OnOwnerDies_KillAllInsideSquads(const TArray<TObjectPtr<ASquadController>>& InsideSquads);
+		void OnOwnerDies_KillAllSoloUnits();
         void OnOwnerDies_HandleSquad(ASquadController* Squad);
         void OnOwnerDies_KillUnit(ASquadUnit* Unit);
         void OnOwnerDies_ResetState();

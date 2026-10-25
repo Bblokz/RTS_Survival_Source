@@ -1,10 +1,28 @@
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 
+#include "Misc/ConfigCacheIni.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace RTSGameUserSettingsPrivate
 {
 	constexpr float MinFrameRateLimit = 0.0f;
+	constexpr int32 EpicScalabilityLevel = 3;
+
+	bool GetHasSavedScalabilitySettings()
+	{
+		if (GConfig == nullptr)
+		{
+			return false;
+		}
+
+		int32 SavedViewDistanceQuality = EpicScalabilityLevel;
+		return GConfig->GetInt(
+			TEXT("ScalabilityGroups"),
+			TEXT("sg.ViewDistanceQuality"),
+			SavedViewDistanceQuality,
+			GGameUserSettingsIni
+		);
+	}
 }
 
 const URTSGameUserSettings* URTSGameUserSettings::Get()
@@ -45,9 +63,37 @@ URTSGameUserSettings* URTSGameUserSettings::GetMutable()
 	return RTSSettings;
 }
 
+void URTSGameUserSettings::SetToDefaults()
+{
+	Super::SetToDefaults();
+	SetOverallScalabilityLevel(RTSGameUserSettingsPrivate::EpicScalabilityLevel);
+
+	M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+	M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
+
+	M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+	M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
+}
+
 void URTSGameUserSettings::LoadSettings(const bool bForceReload)
 {
+	const bool bHasSavedScalabilitySettings = RTSGameUserSettingsPrivate::GetHasSavedScalabilitySettings();
 	Super::LoadSettings(bForceReload);
+
+	if (not bHasSavedScalabilitySettings)
+	{
+		SetOverallScalabilityLevel(RTSGameUserSettingsPrivate::EpicScalabilityLevel);
+		Scalability::SetQualityLevels(ScalabilityQuality);
+	}
+
 	ApplyCustomSettingClamps();
 }
 

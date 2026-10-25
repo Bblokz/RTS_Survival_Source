@@ -45,19 +45,19 @@ struct FRTSScalabilityGroupSettings
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
-	ERTSScalabilityQuality M_ViewDistance = ERTSScalabilityQuality::High;
+	ERTSScalabilityQuality M_ViewDistance = ERTSScalabilityQuality::Epic;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
-	ERTSScalabilityQuality M_Shadows = ERTSScalabilityQuality::High;
+	ERTSScalabilityQuality M_Shadows = ERTSScalabilityQuality::Epic;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
-	ERTSScalabilityQuality M_Textures = ERTSScalabilityQuality::High;
+	ERTSScalabilityQuality M_Textures = ERTSScalabilityQuality::Epic;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
-	ERTSScalabilityQuality M_Effects = ERTSScalabilityQuality::High;
+	ERTSScalabilityQuality M_Effects = ERTSScalabilityQuality::Epic;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
-	ERTSScalabilityQuality M_PostProcessing = ERTSScalabilityQuality::High;
+	ERTSScalabilityQuality M_PostProcessing = ERTSScalabilityQuality::Epic;
 };
 
 USTRUCT(BlueprintType)
@@ -75,7 +75,7 @@ struct FRTSDisplaySettings
 	bool bM_VSyncEnabled = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
-	ERTSScalabilityQuality M_OverallQuality = ERTSScalabilityQuality::High;
+	ERTSScalabilityQuality M_OverallQuality = ERTSScalabilityQuality::Epic;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
 	float M_FrameRateLimit = 0.0f;
@@ -156,40 +156,40 @@ struct FRTSGameplaySettings
 	bool bM_CheckUnitRangeOnHover = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::NotInitialized;
+	ERTSPlayerHealthBarVisibilityStrategy M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerNomadicHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerBxpHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSPlayerHealthBarVisibilityStrategy M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSPlayerHealthBarVisibilityStrategy M_PlayerAircraftHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSEnemyHealthBarVisibilityStrategy M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::NotInitialized;
+	ERTSEnemyHealthBarVisibilityStrategy M_OverwriteAllEnemyHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyTankHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemySquadHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyNomadicHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyBxpHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Gameplay")
-	ERTSEnemyHealthBarVisibilityStrategy M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::UnitDefaults;
+	ERTSEnemyHealthBarVisibilityStrategy M_EnemyAircraftHpBarStrat = ERTSEnemyHealthBarVisibilityStrategy::AwaysVisible;
 };
 
 USTRUCT(BlueprintType)

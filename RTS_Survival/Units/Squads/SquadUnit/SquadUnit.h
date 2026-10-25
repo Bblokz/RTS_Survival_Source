@@ -430,7 +430,7 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 public:
 	ASquadUnit(const FObjectInitializer& ObjectInitializer);
 
-	bool GetIsUnitIdle() const;
+	virtual bool GetIsUnitIdle() const;
 	bool GetIsUnitInCombat( )const;
 
 	const FSquadUnitCoverRuntimeState& GetCoverRuntimeState() const { return M_CoverRuntimeState; }
@@ -646,6 +646,24 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
+
+	/** @return True if the squad controller is valid; derived standalone units may make absence non-reporting. */
+	virtual bool GetIsValidSquadController() const;
+
+	/** @return Whether the tactical cover update may start a new automatic cover search. */
+	virtual bool GetCanUseAutomaticCover() const;
+
+	/** @return Whether an assigned automatic cover point may continue to be occupied. */
+	virtual bool GetMayKeepAutomaticCover() const;
+
+	/** @return Whether infantry stress may replace the currently assigned cover point. */
+	virtual bool GetMayRelocateFromCoverForStress() const;
+
+	/** @return Whether cover reevaluation must preserve the currently assigned point. */
+	virtual bool GetIsSquadOnHoldPosition() const;
+
+	/** @return True when the nearest free cover point was reserved and movement to it started. */
+	bool TryEnterNearestCover();
 
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category ="Resistance")
@@ -924,11 +942,6 @@ private:
 	/** The path the unit is following. */
 	FNavPathSharedPtr M_CurrentPath;
 
-	/** 
-	 * @return True if the squad controller is valid; otherwise, false.
-	 */
-	bool GetIsValidSquadController() const;
-
 	/** @return True when the mesh-owned squad animation instance is available. */
 	bool GetIsValidAnimBpSquadUnit() const;
 
@@ -1107,10 +1120,6 @@ private:
 
 	void StopMovementAndClearPath();
 	void UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);
-	bool GetCanUseAutomaticCover() const;
-
-	/** @return True while a unit that already holds a point may stay, which is more lenient than taking one. */
-	bool GetMayKeepAutomaticCover() const;
 	void LeaveCoverUnusableAgainstTarget(const TCHAR* Reason);
 	bool GetIsSquadEligibleForAutomaticCover() const;
 	bool GetIsCoverSearchOnCooldown() const;
@@ -1132,8 +1141,6 @@ private:
 		AActor* TargetActor,
 		const FVector& TargetLocation);
 
-	// A squad on hold position does not trade the cover it has for better cover.
-	bool GetIsSquadOnHoldPosition() const;
 	bool StartCoverMovement();
 	float GetCoverWalkDeadlineSeconds() const;
 	void FinishCoverMovement();

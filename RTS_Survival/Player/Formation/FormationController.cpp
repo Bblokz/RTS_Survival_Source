@@ -573,6 +573,11 @@ void UFormationController::BuildRectangleFormationPositions(
 	const TArray<FUnitData>& Units,
 	const FVector& AverageUnitsLocation)
 {
+	if (Units.IsEmpty())
+	{
+		return;
+	}
+
 	// Determine how many columns & rows we need based on total units and our ratio.
 	int32 Columns = 0, Rows = 0;
 	DetermineGridDimensions(Units.Num(), Columns, Rows);
@@ -621,6 +626,13 @@ TArray<FVector> UFormationController::GatherAllFormationPositions(TArray<FRotato
 void UFormationController::DetermineGridDimensions(
 	const int32 TotalUnits, int32& OutColumns, int32& OutRows) const
 {
+	OutColumns = 0;
+	OutRows = 0;
+	if (TotalUnits <= 0 || M_RowsToColumnsRatio <= 0)
+	{
+		return;
+	}
+
 	OutColumns = FMath::CeilToInt(FMath::Sqrt(TotalUnits / static_cast<float>(M_RowsToColumnsRatio)));
 	OutRows = M_RowsToColumnsRatio * OutColumns;
 }
@@ -629,7 +641,12 @@ TArray<TArray<FUnitData>> UFormationController::GroupUnitsIntoRows(
 	const TArray<FUnitData>& Units, const int32 Columns) const
 {
 	TArray<TArray<FUnitData>> Rows;
-	Rows.Reserve(FMath::CeilToInt(Units.Num() / static_cast<float>(Columns)));
+	if (Units.IsEmpty() || Columns <= 0)
+	{
+		return Rows;
+	}
+
+	Rows.Reserve(FMath::DivideAndRoundUp(Units.Num(), Columns));
 	for (int32 i = 0; i < Units.Num();)
 	{
 		TArray<FUnitData> Row;
