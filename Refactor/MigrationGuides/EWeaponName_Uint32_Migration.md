@@ -28,7 +28,29 @@ Done headless in a separate worktree (`D:/UE5Projects/RTS_WN`; superproject and 
 * Coverage: 289 of 289 inventory assets have rows; no unresolved or stale names. `check_weaponname_snapshot.py` in this folder reruns the §4.4 checks.
 * **Correction to §1.2 / §6:** many turrets do not type their gun into the Make-node pin. 261 pin literals (208 assets) are plain literals. 72 assets wire the pin instead, mostly from an `EWeaponName` **Blueprint variable** whose value lives on the CDO (66 member variables, plus 9 local variables). Apply now handles these (see §6.1). There are no Switch-on-`EWeaponName` nodes.
 * `Ger_Turret_Sdkfz231_MG231` gets its gun from `BPF_ImpactHelpers` (its local variables are recorded). `DA_GlobalAbilitySystem` stores `Bomb_250Gr` in `GA_Barrage::M_WeaponData` (bucket 1).
-* Not done yet: the `CompileAllBlueprints` baseline (§4.1 item 4) and the spot-check (§4.4 item 6).
+* Not done: the `CompileAllBlueprints` baseline (§4.1 item 4) and the spot-check (§4.4 item 6). The full compile after the migration was judged per error instead (see below).
+
+### Phases 2–5 status (2026-10-25, worktree branch `migration/weaponname-uint32`)
+
+The spike and the real change were the same work, because the worktree is already isolated.
+
+* **C++ (Source `89f042f8`).** Enum `UENUM()` / `uint32`, with the two `DisplayName` typos fixed. 10 forward declarations. `Weapons/WeaponData/WeaponNameConversion.h/.cpp` holds the FName↔enum helpers and the options list. The four init-struct `WeaponName` fields (which also cover the 11 derived structs) are `FName` with `GetWeaponNameEnum()`. 76 read sites call that accessor; the doc's two test files read `FWeaponData`, so they needed no change. The three bucket-1 fields and `FWeaponDescription::WeaponName` lost their Blueprint specifiers. `OnSetupWidgetForWeapon`, `BP_GetWeapon*String` and `ManuallySetSecondaryWeapon` take `FName`. UHT and the editor build are clean.
+* **Apply (Content `e87b72a06`).** 269 assets saved, 0 `FAILED`. 66 + 9 variables retyped, 72 property values restored (6 more than the dry run: child Blueprints and the Wespe's child-actor turret template lost their override once the parent was saved). 215 pin literals restored (the other 46 were at the `T26_Mg` default). 77 wires relinked. Three fixes were needed first, all in Source `d4dd7d2f`:
+  1. Regenerate the skeleton class after retyping. Otherwise the getters stay enum pins and the relink inserts "Enum to Name" nodes.
+  2. Delete the "Enum to Name" nodes K2 itself inserts when it rebuilds a mismatched wire on load.
+  3. Look nodes up by GUID **within the row's graph**: duplicated graphs keep their node GUIDs (`BPF_ImpactHelpers`, `Rus_BXP_MegaBunker_1`).
+* **Verify.** 0 `CHANGED`. 2 `MISSING`, both expected: the unused `WeaponName` outputs of `Break Weapon Description` in `BP_W_WeaponDescriptionHorizontal`. Verify now reads the saved graphs without refreshing nodes; refreshing crashed the `RF_NoFlags` collection.
+* **CompileAllBlueprints.** 84 errors in 32 assets, none caused by the migration. They are marketplace demo assets with missing parents, `BP_Mission_Trains_Start` calling a library function removed in `3f52506d`, `ArmoredCar_ToCopy`, `SquadOptim_Target` and `W_BP_ShieldBar`.
+* **Not done:** a PIE pass (§7.3).
+
+### Merging while other branches add weapon Blueprints
+
+`main` keeps adding vehicles while this branch exists. Their Blueprints use `EWeaponName` pins, which this branch's C++ no longer has. At merge time:
+
+1. Close the editors on `main`. On `main` (enum still `uint8`), build the commandlet and run `-Mode=Snapshot` to a new TSV.
+2. Keep only rows whose package is new or changed on `main` since `16891bc9` (Source) / `8948a4c66` (superproject).
+3. Merge: append-only enum entries merge as text. Content conflicts mean an asset changed on both sides. Take `main`'s version and re-apply it from the new TSV.
+4. Build, then run `-Mode=Apply` and `-Mode=Verify` with the new TSV. Its rows record which vehicle uses which weapon, so they don't depend on asking the other agent.
 
 ---
 
