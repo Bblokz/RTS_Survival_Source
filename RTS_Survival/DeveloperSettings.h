@@ -610,6 +610,14 @@ namespace DeveloperSettings
 					static_cast<int32>(200 * GameCostMlt * InfantryCostMlt));
 				inline constexpr int32 PTRS_SquadRadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 DyakonovSquadRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(300 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 KorovinAssaultSquadRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(325 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 KorovinAssaultSquadMetalCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(50 * GameCostMlt * InfantryCostMlt));
+				inline constexpr int32 ROKS3PPSHSquadRadixiteCost = RoundToNearestMultipleOfFive(
+					static_cast<int32>(350 * GameCostMlt * InfantryCostMlt));
 				// Ger -- Armory unlocked infantry
 				inline constexpr int32 VulturesFg42RadixiteCost = RoundToNearestMultipleOfFive(
 					static_cast<int32>(525 * GameCostMlt * InfantryCostMlt));

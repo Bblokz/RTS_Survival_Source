@@ -9483,6 +9483,7 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Untrained;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Mosin, SquadData);
+	InitAllGameSovietAssaultSquadData(SquadData);
 
 	SquadData.MaxHealth = BasicInfantryHealth;
 	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
@@ -9635,6 +9636,48 @@ void ACPPGameState::InitAllGameSquadData()
 	M_TEnemySquadDataHashMap = M_TPlayerSquadDataHashMap;
 }
 
+
+void ACPPGameState::InitAllGameSovietAssaultSquadData(const FSquadData& MosinSquadData)
+{
+	using namespace DeveloperSettings::GameBalance::UnitCosts::InfantryCosts;
+	using namespace DeveloperSettings::GameBalance::InfantrySettings;
+	constexpr float DyakonovHealthMultiplier = 1.25f;
+	constexpr float AssaultHealthMultiplier = 1.33f;
+
+	FSquadData DyakonovSquadData = MosinSquadData;
+	DyakonovSquadData.MaxHealth = MosinSquadData.MaxHealth * DyakonovHealthMultiplier;
+	DyakonovSquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(
+		DyakonovSquadData.MaxHealth);
+	DyakonovSquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, DyakonovSquadRadixiteCost}
+	});
+	DyakonovSquadData.StressTolerance = StressTolerance::Regular;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Dyakonov, DyakonovSquadData);
+
+	FSquadData KorovinSquadData = MosinSquadData;
+	KorovinSquadData.MaxHealth = MosinSquadData.MaxHealth * AssaultHealthMultiplier;
+	KorovinSquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		KorovinSquadData.MaxHealth);
+	KorovinSquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	KorovinSquadData.MaxAcceleration = SlowInfantryAcceleration;
+	KorovinSquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, KorovinAssaultSquadRadixiteCost},
+		{ERTSResourceType::Resource_Metal, KorovinAssaultSquadMetalCost}
+	});
+	KorovinSquadData.ExperienceWorth = DeveloperSettings::GameBalance::Experience::ArmoredInfantryExp;
+	KorovinSquadData.StressTolerance = StressTolerance::Hardened;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_KorovinAssault, KorovinSquadData);
+
+	FSquadData ROKS3PPSHSquadData = MosinSquadData;
+	ROKS3PPSHSquadData.MaxHealth = MosinSquadData.MaxHealth * AssaultHealthMultiplier;
+	ROKS3PPSHSquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(
+		ROKS3PPSHSquadData.MaxHealth);
+	ROKS3PPSHSquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, ROKS3PPSHSquadRadixiteCost}
+	});
+	ROKS3PPSHSquadData.StressTolerance = StressTolerance::Regular;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_ROKS3_PPSH, ROKS3PPSHSquadData);
+}
 
 void ACPPGameState::InitAllGameAntiTankGunTWSquadData()
 {

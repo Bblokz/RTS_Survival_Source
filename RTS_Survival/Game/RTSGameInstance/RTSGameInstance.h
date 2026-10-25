@@ -52,6 +52,8 @@ public:
 	void SetCampaignGenerationSettings(const FCampaignGenerationSettings& Settings);
 	FCampaignGenerationSettings GetCampaignGenerationSettings() const;
 	void SetSelectedGameDifficulty(const FRTSGameDifficulty& Difficulty) { M_SelectedGameDifficulty = Difficulty; }
+	void SetSelectedGameDifficultyForRestart(const FRTSGameDifficulty& Difficulty);
+	bool ConsumeRestartWithNewDifficultyRequest();
 	FRTSGameDifficulty GetSelectedGameDifficulty() const { return M_SelectedGameDifficulty; }
 	void SetPlayerFaction(const ERTSFaction Faction) { M_PlayerFaction = Faction; }
 	void SetPlayerCommander(const ERTSCommander Commander) { M_PlayerCommander = Commander; }
@@ -116,6 +118,7 @@ private:
 
 	FCampaignGenerationSettings M_CampaignGenerationSettings;
 	FRTSGameDifficulty M_SelectedGameDifficulty;
+	bool bM_RestartWithNewDifficultyRequested = false;
 	ERTSFaction M_PlayerFaction;
 	ERTSCommander M_PlayerCommander;
 

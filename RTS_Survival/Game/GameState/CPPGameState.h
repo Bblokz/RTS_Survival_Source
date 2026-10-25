@@ -61,6 +61,7 @@ enum EGameTimeUnit
 	Days
 };
 
+/** @brief Supplies shared unit and weapon balance data and coordinates match-wide gameplay managers. */
 UCLASS()
 class RTS_SURVIVAL_API ACPPGameState : public AGameStateBase
 {
@@ -399,6 +400,7 @@ FBxpOptionData InitBxpOptionEntry(const EBuildingExpansionType Type,
 	TMap<ESquadSubtype, FSquadData> M_TEnemySquadDataHashMap;
 
 	void InitAllGameSquadData();
+	void InitAllGameSovietAssaultSquadData(const FSquadData& MosinSquadData);
 	void InitAllGameAntiTankGunTWSquadData();
 	void InitAllGameMortarTWSquadData();
 	void InitAllGameFlakTWSquadData();

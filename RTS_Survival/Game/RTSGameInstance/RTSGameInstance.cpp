@@ -122,6 +122,19 @@ FCampaignGenerationSettings URTSGameInstance::GetCampaignGenerationSettings() co
 	return M_CampaignGenerationSettings;
 }
 
+void URTSGameInstance::SetSelectedGameDifficultyForRestart(const FRTSGameDifficulty& Difficulty)
+{
+	M_SelectedGameDifficulty = Difficulty;
+	bM_RestartWithNewDifficultyRequested = true;
+}
+
+bool URTSGameInstance::ConsumeRestartWithNewDifficultyRequest()
+{
+	const bool bRestartWithNewDifficultyRequested = bM_RestartWithNewDifficultyRequested;
+	bM_RestartWithNewDifficultyRequested = false;
+	return bRestartWithNewDifficultyRequested;
+}
+
 ERTSFaction URTSGameInstance::GetPlayerFaction() const
 {
 	if(M_PlayerFaction == ERTSFaction::NotInitialised)
