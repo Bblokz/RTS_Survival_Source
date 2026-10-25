@@ -14,6 +14,7 @@
 #include "Engine/SCS_Node.h"
 #include "Engine/SimpleConstructionScript.h"
 #include "K2Node_FunctionEntry.h"
+#include "K2Node_GetEnumeratorName.h"
 #include "K2Node_SwitchEnum.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -456,16 +457,10 @@ namespace WeaponNameMigration
 		return Containers;
 	}
 
-	/**
-	 * @param bRefreshNodes True after the migration: loading does not guarantee nodes were reconstructed against
-	 * the new FName types, and reading the stale enum pins would report a false "verified".
-	 */
-	void CollectBlueprintGraphs(UBlueprint* Blueprint, const UEnum* WeaponEnum, const bool bRefreshNodes, TArray<FRow>& OutRows)
+	// Reads the graphs exactly as saved. Verify relies on Apply having compiled and saved every Blueprint it touched;
+	// refreshing nodes here regenerates classes, and the RF_NoFlags collection below then crashes destroying them.
+	void CollectBlueprintGraphs(UBlueprint* Blueprint, const UEnum* WeaponEnum, TArray<FRow>& OutRows)
 	{
-		if (bRefreshNodes)
-		{
-			FBlueprintEditorUtils::RefreshAllNodes(Blueprint);
-		}
 		const FString Package = Blueprint->GetOutermost()->GetName();
 		TArray<UEdGraph*> Graphs;
 		Blueprint->GetAllGraphs(Graphs);
@@ -502,7 +497,7 @@ namespace WeaponNameMigration
 		}
 	}
 
-	void CollectAsset(UObject* Asset, const UEnum* WeaponEnum, const bool bRefreshNodes, TArray<FRow>& OutRows)
+	void CollectAsset(UObject* Asset, const UEnum* WeaponEnum, TArray<FRow>& OutRows)
 	{
 		if (not Asset)
 		{
@@ -510,7 +505,7 @@ namespace WeaponNameMigration
 		}
 		if (UBlueprint* Blueprint = Cast<UBlueprint>(Asset))
 		{
-			CollectBlueprintGraphs(Blueprint, WeaponEnum, bRefreshNodes, OutRows);
+			CollectBlueprintGraphs(Blueprint, WeaponEnum, OutRows);
 		}
 		else if (const UDataTable* Table = Cast<UDataTable>(Asset))
 		{
@@ -579,10 +574,10 @@ namespace WeaponNameMigration
 	}
 
 	/**
-	 * @brief Loads candidate assets and records their weapon values. Never saves: RefreshAllNodes only changes memory.
+	 * @brief Loads candidate assets and records their weapon values. Never saves.
 	 * @param OnlyPackages Packages to scan (Verify uses the snapshot's); null scans every package that names the enum.
 	 */
-	TArray<FRow> CollectAll(const UEnum* WeaponEnum, const bool bRefreshNodes, const TSet<FString>* OnlyPackages)
+	TArray<FRow> CollectAll(const UEnum* WeaponEnum, const TSet<FString>* OnlyPackages)
 	{
 		const TArray<FAssetData> Assets = GetCandidateAssets();
 		UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration: %d candidate assets"), Assets.Num());
@@ -609,7 +604,7 @@ namespace WeaponNameMigration
 				CollectGarbage(RF_NoFlags);
 			}
 			++LoadedCount;
-			CollectAsset(AssetData.GetAsset(), WeaponEnum, bRefreshNodes, Rows);
+			CollectAsset(AssetData.GetAsset(), WeaponEnum, Rows);
 		}
 		UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration: loaded %d packages"), LoadedCount);
 		return Rows;
@@ -691,7 +686,11 @@ namespace WeaponNameMigration
 		}
 	}
 
-	UEdGraphNode* FindNodeByGuid(UBlueprint* Blueprint, const FString& GuidString)
+	/**
+	 * @brief Finds a node by GUID inside one graph. Graphs duplicated in the editor keep their node GUIDs
+	 * (BPF_ImpactHelpers has three copies of one function), so a Blueprint-wide search can return another graph's node.
+	 */
+	UEdGraphNode* FindNodeByGuid(UBlueprint* Blueprint, const FString& GraphName, const FString& GuidString)
 	{
 		FGuid Guid;
 		if (not FGuid::Parse(GuidString, Guid))
@@ -702,7 +701,8 @@ namespace WeaponNameMigration
 		Blueprint->GetAllGraphs(Graphs);
 		for (const UEdGraph* Graph : Graphs)
 		{
-			const TObjectPtr<UEdGraphNode>* Found = Graph
+			const bool bIsRowGraph = Graph && Graph->GetName() == GraphName;
+			const TObjectPtr<UEdGraphNode>* Found = bIsRowGraph
 				? Graph->Nodes.FindByPredicate([&Guid](const UEdGraphNode* Node) { return Node && Node->NodeGuid == Guid; })
 				: nullptr;
 			if (Found)
@@ -786,7 +786,7 @@ namespace WeaponNameMigration
 	// @return Whether the Blueprint was modified.
 	bool ApplyPinLiteral(UBlueprint* Blueprint, const FRow& Row, FApplyContext& Context)
 	{
-		UEdGraphNode* Node = FindNodeByGuid(Blueprint, Row.NodeGuid);
+		UEdGraphNode* Node = FindNodeByGuid(Blueprint, Row.Container, Row.NodeGuid);
 		const FName PinName(*GetSnapshotPinName(Row));
 		UEdGraphPin* MigratedPin = Node ? FindMigratedPin(Node, PinName) : nullptr;
 		if (not MigratedPin)
@@ -816,8 +816,9 @@ namespace WeaponNameMigration
 	{
 		const FName TargetPinName(*GetSnapshotPinName(Row));
 		const FName SourcePinName(*Row.LinkSourcePin);
-		UEdGraphNode* TargetNode = FindNodeByGuid(Blueprint, Row.NodeGuid);
-		UEdGraphNode* SourceNode = FindNodeByGuid(Blueprint, Row.LinkSourceNodeGuid);
+		// A wire never crosses graphs, so the source lives in the target's graph too.
+		UEdGraphNode* TargetNode = FindNodeByGuid(Blueprint, Row.Container, Row.NodeGuid);
+		UEdGraphNode* SourceNode = FindNodeByGuid(Blueprint, Row.Container, Row.LinkSourceNodeGuid);
 		UEdGraphPin* TargetPin = TargetNode ? FindLivePin(TargetNode, TargetPinName) : nullptr;
 		UEdGraphPin* SourcePin = SourceNode ? FindLivePin(SourceNode, SourcePinName) : nullptr;
 		if (not TargetPin || not SourcePin)
@@ -831,7 +832,13 @@ namespace WeaponNameMigration
 		{
 			return bRemovedOrphans;
 		}
-		if (not GetDefault<UEdGraphSchema_K2>()->TryCreateConnection(SourcePin, TargetPin))
+		const UEdGraphSchema_K2* Schema = GetDefault<UEdGraphSchema_K2>();
+		// A conversion response means one end is still the enum; TryCreateConnection would silently insert an
+		// "Enum to Name" node that does not compile, so refuse and report instead.
+		const ECanCreateConnectionResponse Response = Schema->CanCreateConnection(SourcePin, TargetPin).Response;
+		const bool bIsDirectConnection = Response != CONNECT_RESPONSE_MAKE_WITH_CONVERSION_NODE
+			&& Response != CONNECT_RESPONSE_MAKE_WITH_PROMOTION && Response != CONNECT_RESPONSE_DISALLOW;
+		if (not bIsDirectConnection || not Schema->TryCreateConnection(SourcePin, TargetPin))
 		{
 			ReportFailure(Context, FString::Printf(TEXT("cannot reconnect %s -> %s.%s in %s (types %s -> %s)"),
 				*Row.LinkSource, *Row.NodeTitle, *TargetPinName.ToString(), *Row.AssetPackage,
@@ -841,6 +848,63 @@ namespace WeaponNameMigration
 		UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration relinked %s -> %s.%s in %s"),
 		       *Row.LinkSource, *Row.NodeTitle, *TargetPinName.ToString(), *Row.AssetPackage);
 		return true;
+	}
+
+	/**
+	 * @brief True for an "Enum to Name" node K2 inserted while it rebuilt a weapon wire whose ends had different types.
+	 * After the relink nothing reads its output, and its input is either unwired or now a Name (the retyped getter).
+	 * The snapshot holds no Enum to Name nodes on weapon pins, so a node in this state is migration debris.
+	 */
+	bool IsMigrationConversionNode(const UEdGraphNode* Node)
+	{
+		if (not Node->IsA<UK2Node_GetEnumeratorName>())
+		{
+			return false;
+		}
+		for (const UEdGraphPin* Pin : Node->Pins)
+		{
+			if (Pin->Direction == EGPD_Output && not Pin->LinkedTo.IsEmpty())
+			{
+				return false;
+			}
+			const bool bFedByNonName = Pin->Direction == EGPD_Input && Pin->LinkedTo.ContainsByPredicate(
+				[](const UEdGraphPin* Source) { return Source->PinType.PinCategory != UEdGraphSchema_K2::PC_Name; });
+			if (bFedByNonName)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// @return Whether any conversion node was removed.
+	bool RemoveMigrationConversionNodes(UBlueprint* Blueprint)
+	{
+		TArray<UEdGraphNode*> Debris;
+		TArray<UEdGraph*> Graphs;
+		Blueprint->GetAllGraphs(Graphs);
+		for (const UEdGraph* Graph : Graphs)
+		{
+			if (not Graph)
+			{
+				continue;
+			}
+			for (UEdGraphNode* Node : Graph->Nodes)
+			{
+				if (Node && IsMigrationConversionNode(Node))
+				{
+					Debris.Add(Node);
+				}
+			}
+		}
+		// Removed after the walk: removing a node while iterating Graph->Nodes would skip or invalidate entries.
+		for (UEdGraphNode* Node : Debris)
+		{
+			UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration removed conversion node %s in %s"),
+			       *Node->NodeGuid.ToString(EGuidFormats::Digits), *Blueprint->GetOutermost()->GetName());
+			FBlueprintEditorUtils::RemoveNode(Blueprint, Node, true);
+		}
+		return not Debris.IsEmpty();
 	}
 
 	// Keeps the container type, so an array of weapons becomes an array of names.
@@ -963,8 +1027,11 @@ namespace WeaponNameMigration
 		}
 		if (RetypeWeaponVariables(Blueprint, Rows, Context))
 		{
-			// Regenerates the skeleton class so the variable getters reconstruct with Name pins.
 			FBlueprintEditorUtils::MarkBlueprintAsStructurallyModified(Blueprint);
+			// The variable getters take their pin type from the skeleton class. In a commandlet the structural
+			// change does not regenerate it before the refresh below, so the getters stayed enum pins.
+			FKismetEditorUtilities::CompileBlueprint(Blueprint,
+				EBlueprintCompileOptions::RegenerateSkeletonOnly | EBlueprintCompileOptions::SkipGarbageCollection);
 		}
 		FBlueprintEditorUtils::RefreshAllNodes(Blueprint);
 		for (const FRow* Row : Rows)
@@ -978,6 +1045,7 @@ namespace WeaponNameMigration
 				RelinkWiredPin(Blueprint, *Row, Context);
 			}
 		}
+		RemoveMigrationConversionNodes(Blueprint);
 		FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint);
 		FKismetEditorUtilities::CompileBlueprint(Blueprint);
 		return true;
@@ -1206,7 +1274,7 @@ namespace WeaponNameMigration
 			SnapshotPackages.Add(Row.AssetPackage);
 		}
 		TMap<FString, FRow> AfterByKey;
-		for (const FRow& Row : CollectAll(WeaponEnum, true, &SnapshotPackages))
+		for (const FRow& Row : CollectAll(WeaponEnum, &SnapshotPackages))
 		{
 			FRow Normalised = Row;
 			Normalised.PinOrPropertyPath.RemoveFromEnd(OrphanedPinMarker);
@@ -1265,8 +1333,7 @@ int32 UWeaponNameMigrationCommandlet::Main(const FString& Params)
 	}
 	if (Mode == TEXT("Snapshot"))
 	{
-		// No refresh: before the migration the loaded graphs are exactly what is on disk.
-		const TArray<FRow> Rows = CollectAll(WeaponEnum, false, nullptr);
+		const TArray<FRow> Rows = CollectAll(WeaponEnum, nullptr);
 		UE_LOG(LogTemp, Display, TEXT("WeaponNameMigration snapshot: %d rows"), Rows.Num());
 		return WriteTsv(Rows, TsvPath) ? 0 : 1;
 	}
