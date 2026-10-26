@@ -68,17 +68,35 @@ first_camera=camera_samples[0]
 last_camera=camera_samples[-1]
 assert float(first_camera[1])==0,first_camera
 move=job["Segments"][0]["ParatrooperCameraMove"]
-assert move["DurationSeconds"]==90,move
-assert move["EndOffset"]["Y"]==-2200,move
+assert move["DurationSeconds"]==30,move
+assert move["EndOffset"]=={"X":0.0,"Y":-3800.0,"Z":1100.0},move
+assert job["Segments"][0]["Camera"]["Height"]==2200
 start_position=[float(value) for value in first_camera[2:5]]
-end_position=[230000+move["EndOffset"]["X"],10000+move["EndOffset"]["Y"],144+move["EndOffset"]["Z"]]
+route=[{"DurationSeconds":move["DurationSeconds"],"Offset":move["EndOffset"],"FocalLength":move["EndFocalLength"]}]+move["ContinuationPoints"]
+assert len(route)==3,route
+assert route[-1]["Offset"]=={"X":5200.0,"Y":1000.0,"Z":2200.0},route
+route_seconds=sum(point["DurationSeconds"] for point in route)
 for sample in camera_samples:
-    alpha=min(1,int(sample[0])/(job["Fps"]*move["DurationSeconds"]))
+    remaining=int(sample[0])/job["Fps"]
+    previous=start_position
+    previous_focal=job["Segments"][0]["Camera"]["FocalLength"]
+    for point in route:
+        end_position=[230000+point["Offset"]["X"],10000+point["Offset"]["Y"],144+point["Offset"]["Z"]]
+        if remaining<=point["DurationSeconds"] or point is route[-1]:
+            break
+        remaining-=point["DurationSeconds"]
+        previous=end_position
+        previous_focal=point["FocalLength"]
+    alpha=min(1,remaining/point["DurationSeconds"])
     eased=alpha*alpha*(3-2*alpha)
-    expected=[start+(end-start)*eased for start,end in zip(start_position,end_position)]
+    expected=[start+(end-start)*eased for start,end in zip(previous,end_position)]
     assert all(abs(float(actual)-wanted)<.1 for actual,wanted in zip(sample[2:5],expected)),sample
-assert float(last_camera[4])<float(first_camera[4])-300,(first_camera,last_camera)
-assert float(last_camera[3])<float(first_camera[3])-300,(first_camera,last_camera)
+    assert abs(float(sample[6])-(previous_focal+(point["FocalLength"]-previous_focal)*eased))<.02,sample
+assert abs(float(last_camera[4])-float(first_camera[4]))<20,(first_camera,last_camera)
+assert abs(float(last_camera[2])-235200)<1,last_camera
+assert abs(float(last_camera[3])-11000)<1,last_camera
+assert abs(float(last_camera[5])-float(first_camera[5]))<.1,(first_camera,last_camera)
+assert 'leg=1' in log and 'leg=2' in log
 assert len(job["Segments"][0]["Caption1"].split("|"))==8
 assert len(job["Segments"][0]["Caption2"].split("|"))==8
 assert '1× IS-1 (HEAT)' in job['Segments'][0]['Caption1']
@@ -89,7 +107,7 @@ assert "Cue_SmallRocketLaunch(v=" in log
 segment=manifest["segments"][0]
 expected_duration=(segment["endFrame"]-segment["startFrame"])/job["Fps"]
 assert abs(duration-expected_duration)<.05,(duration,expected_duration)
-final_camera_progress=min(1,max(0,(duration-2)/move["DurationSeconds"]))
+final_camera_progress=min(1,max(0,(duration-2)/route_seconds))
 report={"video":str(video),"duration_seconds":duration,"aircraft_intro_seconds":2,
         "range_behaviour_recipients":len(recipients),"soldier_owners_verified":len(owners),
         "rear_pits_verified":len(pit_positions),"all_four_pits_firing":True,"faction_header_columns":True,
@@ -98,6 +116,7 @@ report={"video":str(video),"duration_seconds":duration,"aircraft_intro_seconds":
         "forge_is1_count":1,"forge_is1_heat_blueprint_verified":True,
         "both_armies_firing":True,"has_audio":True,"job_complete":True,
         "camera_move_verified":True,"camera_move_reached_fraction":final_camera_progress,
+        "camera_route_seconds":route_seconds,"german_reverse_view_verified":True,
         "last_logged_camera_height_above_ground_cm":float(last_camera[4])-144,
         "audio_cache_assertion_after_export":"NumberOfLoadsInFlight.GetValue() == 0" in log,
         "battle_outcome":re.findall(r"RTS_SHORTS_BATTLE_DECIDED[^\r\n]+",log)[-1:]}

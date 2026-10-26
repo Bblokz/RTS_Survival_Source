@@ -165,7 +165,27 @@ struct FRTSShortsImpactCameraParams
 	float ColorSaturation = 1.f;
 };
 
-/** @brief Opt-in descent from the landing overview to a vehicle-side view, relative to the battle midpoint. */
+/** @brief Extends a paratrooper camera move around the battle without restarting the fight. */
+USTRUCT()
+struct FRTSShortsParatrooperCameraWaypoint
+{
+	GENERATED_BODY()
+
+	/** Travel time from the preceding viewpoint; nonpositive values skip this waypoint. */
+	UPROPERTY()
+	float DurationSeconds = 0.f;
+
+	UPROPERTY()
+	FVector Offset = FVector::ZeroVector;
+
+	UPROPERTY()
+	FVector LookOffset = FVector(0.f, 0.f, 150.f);
+
+	UPROPERTY()
+	float FocalLength = 14.f;
+};
+
+/** @brief Opt-in camera route from the landing overview, relative to the battle midpoint. */
 USTRUCT()
 struct FRTSShortsParatrooperCameraMove
 {
@@ -183,6 +203,10 @@ struct FRTSShortsParatrooperCameraMove
 
 	UPROPERTY()
 	float EndFocalLength = 14.f;
+
+	/** Additional viewpoints continue after the original endpoint; empty preserves existing presets. */
+	UPROPERTY()
+	TArray<FRTSShortsParatrooperCameraWaypoint> ContinuationPoints;
 };
 
 /**
