@@ -41,7 +41,8 @@ The spike and the real change were the same work, because the worktree is alread
   3. Look nodes up by GUID **within the row's graph**: duplicated graphs keep their node GUIDs (`BPF_ImpactHelpers`, `Rus_BXP_MegaBunker_1`).
 * **Verify.** 0 `CHANGED`. 2 `MISSING`, both expected: the unused `WeaponName` outputs of `Break Weapon Description` in `BP_W_WeaponDescriptionHorizontal`. Verify now reads the saved graphs without refreshing nodes; refreshing crashed the `RF_NoFlags` collection.
 * **CompileAllBlueprints.** 84 errors in 32 assets, none caused by the migration. They are marketplace demo assets with missing parents, `BP_Mission_Trains_Start` calling a library function removed in `3f52506d`, `ArmoredCar_ToCopy`, `SquadOptim_Target` and `W_BP_ShieldBar`.
-* **Not done:** a PIE pass (§7.3).
+* **Runtime smoke test (2026-10-26)** instead of PIE (§7.3). `UnrealEditor-Cmd <uproject> <map> -game -nullrhi -nosound -unattended -benchmark -benchmarkseconds=90 -fps=30 -DisablePlugins=BpGeneratorUltimate` ran 701 frames each on `Ger_DestroyT35`, `RTS_GameStartTutorial` and `Ger_FirstMission`. Each run had 0 `Unknown weapon name`, 0 `ReportError` dialogs (under `-unattended` they log as `Message dialog closed`), 0 `LogRTS` errors and no crash. The same `Ger_DestroyT35` run on the unmigrated main checkout gives the same warning and error set; the only difference is the worktree's missing `PlayerProfile.sav`. In Git Bash, set `MSYS_NO_PATHCONV=1`, otherwise `/Game/...` map arguments become `C:/Program Files/Git/Game/...`.
+* **Not done:** a hands-on PIE pass that checks weapon UI icons and fire, which a headless run cannot see.
 
 ### Merging while other branches add weapon Blueprints
 
