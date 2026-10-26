@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import tempfile
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 
 DEFAULT_STYLE = {
@@ -73,6 +73,7 @@ class Callout:
     typing: int
     hold: int
     exit: int
+    exit_effect: str = "slide_fade"
 
     @property
     def hold_start(self):
@@ -94,6 +95,8 @@ class Callout:
         if local_frame < self.typing + self.hold:
             return len(self.text), 1.0
         exit_frame = local_frame - self.typing - self.hold
+        if self.exit_effect == "wipe":
+            return len(self.text), 1.0
         return len(self.text), 1.0 - (exit_frame + 1) / self.exit
 
     def timing(self, fps):
@@ -104,6 +107,7 @@ class Callout:
             "hold_seconds": float(self.hold / fps),
             "exit_start_seconds": float(self.exit_start / fps),
             "end_seconds": float(self.end / fps),
+            "exit_effect": self.exit_effect,
         }
 
 
@@ -116,20 +120,33 @@ def resolve_recipe(recipe, fps, duration):
         text = entry.get("text", "")
         if not isinstance(text, str) or not text.strip() or "\n" in text:
             raise ValueError("Each callout needs nonempty, single-paragraph text; wrapping is automatic.")
-        if ("start_seconds" in entry) == ("after_previous_seconds" in entry):
-            raise ValueError("Use either start_seconds or after_previous_seconds.")
+        timing_fields = ("start_seconds", "after_previous_seconds", "start_fraction", "end_before_seconds")
+        if sum(field in entry for field in timing_fields) != 1:
+            raise ValueError("Use exactly one start_seconds, after_previous_seconds, start_fraction or end_before_seconds.")
+        typing = seconds_to_frames(entry.get("type_seconds", 0.4), fps)
+        hold = seconds_to_frames(entry["hold_seconds"], fps)
+        exit_frames = seconds_to_frames(entry.get("exit_seconds", 0.2), fps)
         if "after_previous_seconds" in entry:
             if index == 0:
                 raise ValueError("The first callout requires start_seconds.")
             start = previous_end + seconds_to_frames(entry["after_previous_seconds"], fps, True)
+        elif "start_fraction" in entry:
+            fraction = float(entry["start_fraction"])
+            if not math.isfinite(fraction) or not 0 <= fraction <= 1:
+                raise ValueError("start_fraction must be between zero and one.")
+            start = round(Fraction(str(duration)) * Fraction(str(entry["start_fraction"])) * fps)
+        elif "end_before_seconds" in entry:
+            gap = seconds_to_frames(entry["end_before_seconds"], fps, True)
+            start = round(Fraction(str(duration)) * fps) - gap - typing - hold - exit_frames
         else:
             start = seconds_to_frames(entry["start_seconds"], fps, True)
         callout = Callout(
             text, start,
-            seconds_to_frames(entry.get("type_seconds", 0.4), fps),
-            seconds_to_frames(entry["hold_seconds"], fps),
-            seconds_to_frames(entry.get("exit_seconds", 0.2), fps),
+            typing, hold, exit_frames,
+            entry.get("exit_effect", "slide_fade"),
         )
+        if callout.exit_effect not in ("slide_fade", "wipe"):
+            raise ValueError("exit_effect must be slide_fade or wipe.")
         if min(callout.typing, callout.hold, callout.exit) < 1:
             raise ValueError("Each animation phase must last at least one frame.")
         if start < previous_end or callout.end / fps > duration + 0.001:
@@ -208,7 +225,8 @@ class CalloutArtwork:
             cursor_y = baseline
         typing = frame_index < self.callout.typing
         blinking = int(float(frame_index / fps) / self.style["cursor_blink_seconds"]) % 2 == 0
-        if typing or blinking:
+        wiping = self.callout.exit_effect == "wipe" and frame_index >= self.callout.typing + self.callout.hold
+        if (typing or blinking) and not wiping:
             drawing.rectangle((round(cursor_x), cursor_y - round(self.font.size * 0.82),
                                round(cursor_x) + max(1, self.stroke), cursor_y), fill=(255, 255, 250, 255))
         shadow = Image.new("RGBA", self.size, (0, 0, 0, 0))
@@ -216,6 +234,12 @@ class CalloutArtwork:
         canvas = Image.alpha_composite(shadow, canvas)
         if opacity < 1:
             canvas.putalpha(canvas.getchannel("A").point(lambda value: round(value * opacity)))
+        if wiping:
+            exit_frame = frame_index - self.callout.typing - self.callout.hold
+            clear_width = round(self.size[0] * (exit_frame + 1) / self.callout.exit)
+            mask = Image.new("L", self.size, 255)
+            ImageDraw.Draw(mask).rectangle((0, 0, clear_width, self.size[1]), fill=0)
+            canvas.putalpha(ImageChops.multiply(canvas.getchannel("A"), mask))
         return canvas
 
 
@@ -267,6 +291,8 @@ def export(source, destination, recipe, report_path=None):
             filters.append(f"[{index}:v]setpts=PTS-STARTPTS+{start:.9f}/TB[o{index}]")
             previous = "0:v" if index == 1 else f"v{index - 1}"
             movement = f"{artwork.left}-if(gte(t,{exit_start:.9f}),{artwork.slide}*min(1,(t-{exit_start:.9f})/{exit_length:.9f}),0)"
+            if callout.exit_effect == "wipe":
+                movement = str(artwork.left)
             filters.append(f"[{previous}][o{index}]overlay=x='{movement}':y={artwork.top}:"
                            f"eof_action=pass:repeatlast=0:enable='gte(t,{start:.9f})*lt(t,{end:.9f})'[v{index}]")
         encoded = temporary / "edited.mp4"

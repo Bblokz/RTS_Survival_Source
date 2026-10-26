@@ -52,6 +52,40 @@ class ParatrooperPresetTests(unittest.TestCase):
         self.assertEqual(len(segment["Caption1"].split("|")),8)
         self.assertEqual(len(segment["Caption2"].split("|")),8)
 
+    def test_german_two_bomber_lineup_and_ownership(self):
+        result = model.compose(ROOT, {"jobId": "GermanTwinBomberParatrooperBattle", "setupId": "ParatrooperBattle"})
+        job = result["job"]
+        segment = job["Segments"][0]
+        self.assertEqual((job["ResolutionX"], job["ResolutionY"], job["Fps"]), (1080, 1920, 60))
+        self.assertEqual(job["UnitOwningPlayer"], 2)
+        self.assertEqual(segment["TargetOwningPlayer"], 1)
+        self.assertEqual(segment["ParatrooperAbility"], "GA_GerParatroopers")
+        formation = segment["ParatrooperFormation"]
+        self.assertEqual(formation["OwningPlayer"], 1)
+        self.assertEqual(len(formation["Passes"]), 2)
+        self.assertEqual(formation["LandingTrailLength"], 7200)
+        self.assertTrue(all(flight["DropOffset"]["X"] > segment["TargetOffset"]["X"] for flight in formation["Passes"]))
+        self.assertTrue(all(flight["AircraftStartOffset"]["X"] > 0 for flight in formation["Passes"]))
+        soviets = [segment["ClassPath"]] + segment["BattleAllyClassPaths"]
+        germans = segment["BattleEnemyClassPaths"]
+        for name, count in [("Rus_Vehicle_T34E.", 3), ("Rus_Vehicle_T-70.", 3), ("Rus_Vehicle_IS-1.", 1),
+                            ("Rus_Vehicle_IS-2.", 1), ("Rus_Squad_PTRS.", 3), ("Rus_BXP_BS3Pit.", 1)]:
+            self.assertEqual(sum(name in path for path in soviets), count)
+        for name, count in [("Ger_Vehicle_StugIII.", 3), ("Ger_Vehicle_PanzerIII_J.", 3),
+                            ("Ger_Vehicle_TigerII.", 1), ("Squad_Ger_Scavengers.", 4), ("Ger_BXP_GerPit_Flak88.", 2)]:
+            self.assertEqual(sum(name in path for path in germans), count)
+        self.assertTrue(all("_Soviet." not in path for path in soviets))
+        self.assertTrue(all(offset["X"] == 800 for offset in segment["BattleAllyOffsets"][7:10]))
+        self.assertTrue(all(offset["X"] == -850 for offset in segment["BattleEnemyOffsets"][7:11]))
+
+    def test_formation_rejects_wrong_side_and_invalid_flight(self):
+        for formation in [{"OwningPlayer": 3}, {"Passes": [{}] * 5},
+                          {"Passes": [{"DropOffset": {"X": 0, "Y": 0, "Z": 0},
+                                       "AircraftStartOffset": {"X": 10000, "Y": 0, "Z": 0}}]}]:
+            request = self.request(controls={"segment": {"ParatrooperFormation": formation}})
+            with self.subTest(formation=formation), self.assertRaises(ValueError):
+                model.compose(ROOT, request)
+
     def test_cap_survives_global_and_advanced_overrides(self):
         for request in [self.request(controls={"battleSeconds":121}),
                         self.request(controls={"segments":[{"index":0,"patch":{"SlotSeconds":150,"StopAtSeconds":150}}]}),

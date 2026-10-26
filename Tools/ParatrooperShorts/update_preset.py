@@ -61,8 +61,8 @@ setup["Segment"]["Camera"].update(camera)
 setup["Segment"]["ParatrooperCameraMove"]=move
 setup_path.write_text(json.dumps(setup,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
 job["JobName"]="SovietParatrooperBattle_Test"
-job["Fps"]=30
-job["ResolutionX"]=540
-job["ResolutionY"]=960
+job["Fps"]=60
+job["ResolutionX"]=1080
+job["ResolutionY"]=1920
 (Path(__file__).parent/"SovietTest.json").write_text(json.dumps(job,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
 print("Updated rear gun pits, slower left camera move and faction columns in the existing short.")

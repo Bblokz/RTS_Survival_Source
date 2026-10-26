@@ -21,6 +21,36 @@
       "type_seconds": 0.5,
       "hold_seconds": 2.0,
       "exit_seconds": 0.2
+    },
+    {
+      "text": "This IS-1 is owned by the director of forge and shoots HEAT rounds.",
+      "after_previous_seconds": 2.0,
+      "type_seconds": 1.0,
+      "hold_seconds": 2.0,
+      "exit_seconds": 0.2
+    },
+    {
+      "text": "nothing is scripted here; the units pick targets by themselves and infantry tries to find better cover to hit their targets",
+      "after_previous_seconds": 1.0,
+      "type_seconds": 1.8,
+      "hold_seconds": 3.0,
+      "exit_seconds": 0.2
+    },
+    {
+      "text": "The animals use Vertex Animation Texture (VAT) to only take minimal CPU budget",
+      "start_seconds": 26.0,
+      "type_seconds": 1.2,
+      "hold_seconds": 3.0,
+      "exit_seconds": 0.3,
+      "exit_effect": "wipe"
+    },
+    {
+      "text": "... But do look a bit funky",
+      "after_previous_seconds": 0.0,
+      "type_seconds": 0.5,
+      "hold_seconds": 1.5,
+      "exit_seconds": 0.3,
+      "exit_effect": "wipe"
     }
   ]
 }
