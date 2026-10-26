@@ -2941,6 +2941,7 @@ void AAircraftMaster::OrderStraightFlightRun(const FVector& PassOverLocation, co
 	M_StraightRunState.PassOverDistance = FVector::DotProduct(PassOverLocation - GetActorLocation(), Direction);
 	M_StraightRunState.EndDistance = FVector::DotProduct(EndLocation - GetActorLocation(), Direction);
 	M_StraightRunState.bM_HasPassedPoint = false;
+	M_StraightRunState.bM_HoldAtEnd = false;
 	M_StraightRunState.bM_IsActive = true;
 	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
 	SetActorRotation(Direction.Rotation());
@@ -2977,11 +2978,21 @@ void AAircraftMaster::Tick_StraightRun(const float DeltaTime)
 		M_StraightRunState.bM_HasPassedPoint = true;
 		OnStraightRunPassedPoint.Broadcast(this);
 	}
-	if (DistanceAlongRun >= M_StraightRunState.EndDistance)
+	// Safety cap for a held run: a payload that never reports back must not keep the aircraft flying forever.
+	constexpr float MaxHeldDistancePastEnd = 50000.0f;
+	const bool bIsPastEnd = DistanceAlongRun >= M_StraightRunState.EndDistance;
+	const bool bIsHeld = M_StraightRunState.bM_HoldAtEnd
+		&& DistanceAlongRun < M_StraightRunState.EndDistance + MaxHeldDistancePastEnd;
+	if (bIsPastEnd && not bIsHeld)
 	{
 		M_StraightRunState.bM_IsActive = false;
 		Destroy();
 	}
+}
+
+void AAircraftMaster::SetStraightRunHoldAtEnd(const bool bHoldAtEnd)
+{
+	M_StraightRunState.bM_HoldAtEnd = bHoldAtEnd;
 }
 
 void AAircraftMaster::AircraftDrop_MoveToDropLocation()

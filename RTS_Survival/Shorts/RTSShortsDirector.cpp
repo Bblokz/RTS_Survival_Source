@@ -1,6 +1,7 @@
 // Copyright (C) 2020-2026 Bas Blokzijl - All rights reserved.
 
 #include "RTSShortsDirector.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/Paratroopers/GA_Paratroopers.h"
 
 #include "CineCameraActor.h"
 #include "CineCameraComponent.h"
@@ -184,6 +185,7 @@ void ARTSShortsDirector::BeginPlay()
 
 void ARTSShortsDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	EndParatrooperBattle();
 	StopSubmixCapture();
 	Super::EndPlay(EndPlayReason);
 }
@@ -488,6 +490,7 @@ void ARTSShortsDirector::TickRunning()
 	UpdateOrbitCamera(static_cast<float>(Local) / M_Job.Fps);
 	TickBattle(Frame);
 	TickConvoy(Frame);
+	TickParatrooperBattle(Local);
 	KeepCombatTextsInWorld();
 	HideEngineSpheres();
 	if (M_HiddenSoldiers.IsValidIndex(M_CurrentSegment))
@@ -1070,6 +1073,7 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 
 void ARTSShortsDirector::EndSegment(const int32 SegmentIndex)
 {
+	EndParatrooperBattle();
 	EndBattle();
 	EndConvoy();
 	if (not bM_StopOrdered)
@@ -2354,26 +2358,61 @@ bool ARTSShortsDirector::GetIsValidCamera() const
 }
 
 
+FVector ARTSShortsDirector::GetBattleSpawnLocation(const FRTSShortsSegment& Segment, const int32 UnitIndex,
+                                                  const bool bEnemy) const
+{
+	if (not GetIsValidStage())
+	{
+		return FVector::ZeroVector;
+	}
+	const TArray<FVector>& Offsets = bEnemy ? Segment.BattleEnemyOffsets : Segment.BattleAllyOffsets;
+	const int32 LateralIndex = bEnemy ? UnitIndex : UnitIndex + 1;
+	// Line abreast: 0, +1, -1, +2, -2 spacings off the stage axis when no custom offset is present.
+	const float LateralSlot = LateralIndex == 0 ? 0.f
+		: (LateralIndex % 2 == 1 ? 1.f : -1.f) * static_cast<float>((LateralIndex + 1) / 2);
+	const FVector Offset = Offsets.IsValidIndex(UnitIndex) ? Offsets[UnitIndex]
+		: FVector(0.f, LateralSlot * Segment.BattleSpacing, 0.f);
+	const FVector LineOrigin = bEnemy ? FVector(Segment.TargetOffset.X, 0.f, 0.f) : FVector::ZeroVector;
+	return GetBattleGroundPoint(M_Stage->GetActorTransform().TransformPosition(LineOrigin + Offset));
+}
+
+AActor* ARTSShortsDirector::SpawnBattleParticipant(const FString& ClassPath, const FTransform& Transform,
+                                                   const uint8 OwningPlayer) const
+{
+#if RTS_WITH_MAP_TESTS
+	FVector GroundLocation = Transform.GetLocation();
+	// Trace before spawning, so the new pit's own shell cannot become its grounding surface.
+	FGrenadeTestHelpers::DropToGround(*GetWorld(), GroundLocation);
+	AActor* Unit = FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), *ClassPath, Transform, OwningPlayer);
+	if (not IsValid(Unit))
+	{
+		return nullptr;
+	}
+	if (Cast<ABuildingExpansion>(Unit) != nullptr)
+	{
+		Unit->SetActorLocation(GroundLocation, false, nullptr, ETeleportType::TeleportPhysics);
+	}
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_BATTLE_PARTICIPANT unit=%s owner=%d location=%s"),
+		*Unit->GetName(), OwningPlayer, *Unit->GetActorLocation().ToString());
+	return Unit;
+#else
+	return nullptr;
+#endif
+}
+
 void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 {
 	const FRTSShortsSegment& Segment = M_Job.Segments[SegmentIndex];
 	M_Battle = FRTSShortsBattleState();
 	M_Battle.bIsActive = true;
-	M_Battle.PlayerUnits.Add(MainUnit);
+	(Cast<ASquadController>(MainUnit) != nullptr ? M_Battle.PlayerSquads : M_Battle.PlayerUnits).Add(MainUnit);
 	const FTransform StageTransform = M_Stage->GetActorTransform();
-	const FVector Forward = StageTransform.GetRotation().GetForwardVector();
-	const FVector Right = StageTransform.GetRotation().GetRightVector();
 	const float Yaw = StageTransform.Rotator().Yaw + Segment.UnitYawOffset;
-	// Line abreast: 0, +1, -1, +2, -2 spacings off the stage axis.
-	auto LateralSlot = [](const int32 Index)
-	{
-		return Index == 0 ? 0.f : (Index % 2 == 1 ? 1.f : -1.f) * static_cast<float>((Index + 1) / 2);
-	};
 #if RTS_WITH_MAP_TESTS
 	for (int32 Index = 0; Index < Segment.BattleAllyClassPaths.Num(); ++Index)
 	{
-		const FVector Location = GetBattleGroundPoint(StageTransform.GetLocation() + Right * LateralSlot(Index + 1) * Segment.BattleSpacing);
-		AActor* Ally = FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), *Segment.BattleAllyClassPaths[Index],
+		const FVector Location = GetBattleSpawnLocation(Segment, Index, false);
+		AActor* Ally = SpawnBattleParticipant(Segment.BattleAllyClassPaths[Index],
 		                                                       FTransform(FRotator(0.f, Yaw, 0.f), Location),
 		                                                       static_cast<uint8>(M_Job.UnitOwningPlayer));
 		if (IsValid(Ally))
@@ -2383,9 +2422,8 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 	}
 	for (int32 Index = 0; Index < Segment.BattleEnemyClassPaths.Num(); ++Index)
 	{
-		const FVector Location = GetBattleGroundPoint(StageTransform.GetLocation() + Forward * Segment.TargetOffset.X
-		                                              + Right * LateralSlot(Index) * Segment.BattleSpacing);
-		AActor* Enemy = FGrenadeTestHelpers::SpawnUnitForPlayer(*GetWorld(), *Segment.BattleEnemyClassPaths[Index],
+		const FVector Location = GetBattleSpawnLocation(Segment, Index, true);
+		AActor* Enemy = SpawnBattleParticipant(Segment.BattleEnemyClassPaths[Index],
 		                                                        FTransform(FRotator(0.f, Yaw + 180.f, 0.f), Location),
 		                                                        static_cast<uint8>(Segment.TargetOwningPlayer));
 		if (IsValid(Enemy))
@@ -2421,6 +2459,8 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_BATTLE_BEGIN segment=%d players=%d enemies=%d playerSquads=%d enemySquads=%d"),
 	       SegmentIndex, M_Battle.PlayerUnits.Num(), M_Battle.EnemyUnits.Num(), M_Battle.PlayerSquads.Num(),
 	       M_Battle.EnemySquads.Num());
+	BeginParatrooperBattle();
+	UpdateParatrooperRangeBehaviour(false);
 }
 
 void ARTSShortsDirector::MatchSoldierToSquadOwner(ASquadUnit* Soldier, const uint8 SquadOwner)
@@ -2929,6 +2969,9 @@ void ARTSShortsDirector::KeepCombatTextsInWorld() const
 void ARTSShortsDirector::KeepBattleUnitsVisible() const
 {
 	using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
+	const bool bParatrooperMeadow = M_Job.StageName == TEXT("ParatrooperMeadow")
+		&& M_Job.Segments.IsValidIndex(M_CurrentSegment)
+		&& M_Job.Segments[M_CurrentSegment].ParatrooperAbility != EGlobalAbility::GA_None;
 	// With the UI pass on, the units' health bars (screen-space widget components) would be filmed: keep them hidden.
 	// The floating combat texts belong to the text pool actor, not to the units, and stay visible.
 	const TArray<TWeakObjectPtr<AActor>>* Lines[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits};
@@ -2964,6 +3007,11 @@ void ARTSShortsDirector::KeepBattleUnitsVisible() const
 		{
 			continue;
 		}
+		// This setup's Soviet first line is player 2: it needs enemy-vision tags on the German targets too.
+		if (bParatrooperMeadow)
+		{
+			EnemyUnit->Tags.AddUnique(TagUnitInEnemyVision);
+		}
 		if (EnemyUnit->IsHidden())
 		{
 			EnemyUnit->SetActorHiddenInGame(false);
@@ -2998,6 +3046,11 @@ void ARTSShortsDirector::IssueBattleOrders()
 		Attackers.Append(Squads);
 		for (const TWeakObjectPtr<AActor>& Attacker : Attackers)
 		{
+			const ASquadController* ParachutingSquad = Cast<ASquadController>(Attacker.Get());
+			if (ParachutingSquad != nullptr && ParachutingSquad->GetIsInParachuteDrop())
+			{
+				continue;
+			}
 			const bool bSquad = Cast<ASquadController>(Attacker.Get()) != nullptr;
 			if (bSquad ? not GetHasLivingSoldier(Attacker) : not GetIsAlive(Attacker))
 			{
@@ -3030,9 +3083,14 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 		return;
 	}
 	const FRTSShortsSegment& Segment = M_Job.Segments[M_CurrentSegment];
+	TrackParatrooperSquads();
 	AbsorbBattleSquadMembers();
 	KeepBattleUnitsVisible();
 	constexpr int32 OrderEveryFrames = 20;
+	if (Frame % OrderEveryFrames == 0)
+	{
+		UpdateParatrooperRangeBehaviour(false);
+	}
 	if (bM_FireOrdered && Frame % OrderEveryFrames == 0)
 	{
 		IssueBattleOrders();
@@ -3042,7 +3100,9 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 	const bool bSquadGrace = Frame - M_Battle.BeginFrame < SquadSpawnGraceFrames;
 	const int32 PlayersAlive = CountAlive(M_Battle.PlayerUnits) + (bSquadGrace ? CountWaitingSquads(M_Battle.PlayerSquads) : 0);
 	const int32 EnemiesAlive = CountAlive(M_Battle.EnemyUnits) + (bSquadGrace ? CountWaitingSquads(M_Battle.EnemySquads) : 0);
-	if (M_Battle.DecidedFrame < 0 && (PlayersAlive == 0 || EnemiesAlive == 0))
+	const bool bDropPending = Segment.ParatrooperAbility != EGlobalAbility::GA_None
+		&& GetIsValidParatrooperAbility() && M_ParatrooperAbility->GetHasActiveDrop();
+	if (M_Battle.DecidedFrame < 0 && not bDropPending && (PlayersAlive == 0 || EnemiesAlive == 0))
 	{
 		M_Battle.DecidedFrame = Frame;
 		M_Battle.bPlayerWon = PlayersAlive > 0;
@@ -3090,6 +3150,7 @@ void ARTSShortsDirector::EndBattle()
 	{
 		return;
 	}
+	UpdateParatrooperRangeBehaviour(true);
 	if (M_Battle.ActorSpawnedHandle.IsValid())
 	{
 		GetWorld()->RemoveOnActorSpawnedHandler(M_Battle.ActorSpawnedHandle);
@@ -3099,7 +3160,7 @@ void ARTSShortsDirector::EndBattle()
 	       M_Battle.DecidedFrame < 0 ? TEXT("none") : (M_Battle.bPlayerWon ? TEXT("player") : TEXT("enemy")),
 	       M_Battle.SpawnedWrecks.Num());
 	// The segment's own unit is parked by EndSegment; everything else from this battle leaves the field.
-	const AActor* MainUnit = M_Battle.PlayerUnits.Num() > 0 ? M_Battle.PlayerUnits[0].Get() : nullptr;
+	const AActor* MainUnit = M_Units.IsValidIndex(M_CurrentSegment) ? M_Units[M_CurrentSegment].Get() : nullptr;
 	const TArray<TWeakObjectPtr<AActor>>* Groups[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits, &M_Battle.PlayerSquads,
 	                                                  &M_Battle.EnemySquads, &M_Battle.SpawnedWrecks};
 	for (const TArray<TWeakObjectPtr<AActor>>* Group : Groups)

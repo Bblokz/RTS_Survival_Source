@@ -166,6 +166,13 @@ public:
 	// Fired once when a straight flight run reaches its pass-over point.
 	FOnAircraftStraightRunPassedPoint OnStraightRunPassedPoint;
 
+	/**
+	 * @brief While held, a straight run keeps flying past its end point instead of destroying itself, so payload that
+	 * still has to leave the aircraft (paratroopers) can do so; capped at a fixed distance past the end.
+	 * @param bHoldAtEnd True to keep flying at the end, false to destroy as soon as the end has been passed.
+	 */
+	void SetStraightRunHoldAtEnd(bool bHoldAtEnd);
+
 private:
 	/**
 	 * @brief Owner-agnostic VTO entry point (extracted) so owners can grant lift-off exactly when doors are open.
@@ -668,6 +675,7 @@ private:
 		float EndDistance = 0.f;
 		bool bM_IsActive = false;
 		bool bM_HasPassedPoint = false;
+		bool bM_HoldAtEnd = false;
 	};
 
 	// Owns the aircraft's movement while active; Tick routes here before every other movement state.

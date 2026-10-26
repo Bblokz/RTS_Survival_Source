@@ -68,6 +68,8 @@ public class RTS_Survival : ModuleRules
 
 		if (Target.bBuildEditor)
 		{
+			// Landscape height editing updates any foliage attached to the modified terrain.
+			PrivateDependencyModuleNames.Add("Foliage");
 			// NiagaraEditor: the authoring step of the trace impact Niagara system edits emitter graphs.
 			PrivateDependencyModuleNames.AddRange(new string[] { "UnrealEd", "BlueprintGraph", "NiagaraEditor" });
 			// Sequencer: NiagaraEditorUtilities.h (impact Niagara system authoring) includes Sequencer headers.

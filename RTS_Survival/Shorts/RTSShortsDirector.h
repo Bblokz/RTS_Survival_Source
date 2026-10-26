@@ -185,6 +185,22 @@ private:
 	void FrameImpactCamera(const AActor* Unit, const FRTSShortsSegment& Segment) const;
 	/** Segment.BattleEnemyClassPaths: spawns both lines (the segment's unit leads the player line) and makes them see each other. */
 	void BeginBattle(const int32 SegmentIndex, AActor* MainUnit);
+	/**
+	 * @brief Allows support weapons to stand behind a battle line while retaining the default line layout elsewhere.
+	 * @param Segment Layout and spacing for the current battle.
+	 * @param UnitIndex Index in the chosen faction's additional unit list.
+	 * @param bEnemy Uses the enemy origin and layout instead of the player origin and layout.
+	 * @return Grounded world position for this participant.
+	 */
+	FVector GetBattleSpawnLocation(const FRTSShortsSegment& Segment, const int32 UnitIndex, const bool bEnemy) const;
+	/**
+	 * @brief Grounds fixed emplacements without the vehicle spawner's suspension clearance.
+	 * @param ClassPath Participant Blueprint class.
+	 * @param Transform Facing and grounded placement for this battle.
+	 * @param OwningPlayer Faction owner propagated before participant initialization.
+	 * @return Spawned participant, or null when its class cannot spawn.
+	 */
+	AActor* SpawnBattleParticipant(const FString& ClassPath, const FTransform& Transform, const uint8 OwningPlayer) const;
 	/** Battle squads: their soldiers join the battle lines (targets, visibility, alive count) as they spawn. */
 	void AbsorbBattleSquadMembers();
 	/** Gives a battle squad's soldier the squad controller's owner (and its weapons and collision with it). */
@@ -201,6 +217,28 @@ private:
 	/** Keeps the fog of war out, re-targets units whose target died, and ends the segment once one side is gone. */
 	void TickBattle(const int32 Frame);
 	void EndBattle();
+	void BeginParatrooperBattle();
+	void TickParatrooperBattle(const int32 LocalFrame);
+	/** Preserves the landing view at the cut, then eases toward the configured low vehicle-side view. */
+	void UpdateParatrooperBattleCamera(const int32 BattleLocalFrame) const;
+	void TrackParatrooperSquads();
+	/** Adds the meadow's private range behaviour to vehicles and whole squads, including late arrivals. */
+	void UpdateParatrooperRangeBehaviour(const bool bRemove) const;
+	/**
+	 * @brief Keeps the meadow modifier on its owning component so squad weapon loading is handled by the behaviour.
+	 * @param Unit Vehicle or squad controller participating in this battle.
+	 * @param bRemove Removes the modifier before a survivor can be reused by another segment.
+	 */
+	void UpdateParatrooperUnitRangeBehaviour(AActor* Unit, const bool bRemove) const;
+	void LogParatrooperUnitRanges(AActor* Unit) const;
+	void EndParatrooperBattle();
+	bool GetIsValidParatrooperAbility() const;
+
+	// A private copy of the designer template owns the drop; no mission ability or cooldown is modified.
+	UPROPERTY()
+	TObjectPtr<class UGA_Paratroopers> M_ParatrooperAbility;
+	FTransform M_ParatrooperBattleCamera;
+	bool bM_ParatrooperCameraCut = false;
 	void IssueBattleOrders();
 	void KeepBattleUnitsVisible() const;
 	void OnBattleActorSpawned(AActor* SpawnedActor);

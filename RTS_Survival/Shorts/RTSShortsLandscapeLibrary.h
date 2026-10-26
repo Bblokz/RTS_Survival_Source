@@ -21,6 +21,15 @@ class RTS_SURVIVAL_API URTSShortsLandscapeLibrary : public UBlueprintFunctionLib
 
 public:
 	/**
+	 * @brief Lets stage dressing scripts reshape an existing isolated landscape without replacing its actor.
+	 * @param LandscapeActor Existing landscape with edit layers disabled.
+	 * @param HeightFile Raw uint16 heights matching the landscape's complete vertex grid.
+	 * @return True when the grid was validated and the editor height/collision update completed.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Shorts|Editor")
+	static bool ImportStageHeights(AActor* LandscapeActor, const FString& HeightFile);
+
+	/**
 	 * Spawns a landscape with one section per component and imports its heights and layer weights.
 	 * @param Location World location of the landscape's corner (vertex 0, 0).
 	 * @param Scale Actor scale: X/Y are centimetres per quad, Z 100 maps the uint16 range to +-256 m.
