@@ -31,12 +31,14 @@ EEnemyBehaviourUsage FEnemyAbilityUsageProfiles::GetBehaviourUsage(const EBehavi
 		return EEnemyBehaviourUsage::CombatCloseRange;
 	case EBehaviourAbilityType::OverwatchFireSupport:
 	case EBehaviourAbilityType::PzJagerBarrage:
+	case EBehaviourAbilityType::Sdkfz140BunkerOverwatch:
 		return EEnemyBehaviourUsage::CombatStationary;
 	case EBehaviourAbilityType::PulseRepair:
 		return EEnemyBehaviourUsage::Repair;
 	// Reload / rate-of-fire buffs that help against any target.
 	case EBehaviourAbilityType::HastyReload:
 	case EBehaviourAbilityType::TwinAutocannonOverload:
+	case EBehaviourAbilityType::PzIIIRadixiteOvercharge:
 		return EEnemyBehaviourUsage::CombatAnyTarget;
 	default:
 		return EEnemyBehaviourUsage::CombatAnyTarget;

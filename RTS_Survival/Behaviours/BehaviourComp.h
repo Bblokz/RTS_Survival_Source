@@ -39,6 +39,8 @@ struct FPendingBehaviourAdd
 	TSubclassOf<UBehaviour> BehaviourClass = nullptr;
 	bool bHasCustomLifetime = false;
 	float CustomLifetimeSeconds = 0.f;
+	// Optional setup of the new instance before stack rules run; kept so a queued add configures it too.
+	TFunction<void(UBehaviour&)> ConfigureNewBehaviour;
 };
 
 /** @brief The exact behaviour instance owned by one vehicle module slot plus its latest desired state. */
@@ -81,6 +83,16 @@ public:
 	 * @param CustomLifetimeSeconds Override duration in seconds for timed behaviours.
 	 */
 	void AddBehaviourWithDuration(TSubclassOf<UBehaviour> BehaviourClass, const float CustomLifetimeSeconds);
+
+	/**
+	 * @brief Add a behaviour with a custom lifetime whose instance is set up before the stack rules run, so a Refresh
+	 * copies the configured values (e.g. a per-weapon damage per second) onto the existing instance.
+	 * @param BehaviourClass Class to instantiate and add.
+	 * @param CustomLifetimeSeconds Override duration in seconds for timed behaviours.
+	 * @param ConfigureNewBehaviour Called on the new instance right after creation; must not capture raw UObjects.
+	 */
+	void AddBehaviourWithDurationConfigured(TSubclassOf<UBehaviour> BehaviourClass, const float CustomLifetimeSeconds,
+	                                        TFunction<void(UBehaviour&)> ConfigureNewBehaviour);
 
 	/**
 	 * @brief Remove a behaviour instance matching the provided class.
@@ -249,7 +261,8 @@ private:
 	 * @param CustomLifetimeSeconds Optional custom lifetime duration.
 	 */
 	void QueueAddBehaviour(const TSubclassOf<UBehaviour>& BehaviourClass,
-	                       const TOptional<float>& CustomLifetimeSeconds);
+	                       const TOptional<float>& CustomLifetimeSeconds,
+	                       const TFunction<void(UBehaviour&)>& ConfigureNewBehaviour = nullptr);
 	/**
 	 * @brief Queue a behaviour class for removal after ticking finishes.
 	 * @param BehaviourClass Behaviour class to remove.
@@ -274,7 +287,8 @@ private:
 	 * @param CustomLifetimeSeconds Optional custom lifetime duration.
 	 */
 	void AddBehaviourInternal(const TSubclassOf<UBehaviour>& BehaviourClass,
-	                          const TOptional<float>& CustomLifetimeSeconds);
+	                          const TOptional<float>& CustomLifetimeSeconds,
+	                          const TFunction<void(UBehaviour&)>& ConfigureNewBehaviour = nullptr);
 	/**
 	 * @brief Initialize and register a new behaviour instance.
 	 * @param NewBehaviour Behaviour to initialize.

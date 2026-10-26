@@ -17,6 +17,11 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/Projectile/Projectile.h"
+#include "Engine/OverlapResult.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 
 UAttachedRockets::UAttachedRockets()
 {
@@ -31,6 +36,7 @@ void UAttachedRockets::ExecuteFireAllRockets()
 		return;
 	}
 	M_RocketsRemainingToFire = M_RocketsInstances->GetNumVisibleInstances();
+	ExecuteFire_PickHomingTarget();
 	// Needs to be done first as if the salvo has only one rocket the first call will instantly start reloading where
 	// We need to be able to swap the cancel for the reload variant of this ability.
 	if (not M_Owner->SwapAbility(EAbilityID::IdFireRockets, EAbilityID::IdCancelRocketFire))
@@ -670,9 +676,25 @@ bool UAttachedRockets::FireRocket_LaunchPoolProjectile(const FVector& LaunchLoca
 		LaunchLocation,
 		LaunchRotation,
 		ImpactAttenuation,
-		ImpactConcurrency, M_ProjectileVfxSettings, EWeaponShellType::Shell_HEAT, {},
+		ImpactConcurrency, M_ProjectileVfxSettings, M_RocketData.ShellType, {},
 		M_RocketData.WeaponCalibre);
-	Projectile->OverwriteGravityScale(DeveloperSettings::GameBalance::Weapons::RocketProjectileGravityScale * FMath::RandRange(0.2, 1.5));
+	AActor* HomingTarget = M_RocketData.bHomingMissiles ? M_SalvoHomingTarget.Get() : nullptr;
+	if (GetIsValidHomingTargetCandidate(HomingTarget))
+	{
+		// Homing sets its own (zero) gravity, so no gravity overwrite here.
+		Projectile->SetupHomingMissileLaunch(LaunchLocation, HomingTarget, HomingTarget->GetActorLocation(),
+		                                     M_RocketData.ProjectileSpeed, M_RocketData.HomingSettings);
+	}
+	else
+	{
+		Projectile->OverwriteGravityScale(
+			DeveloperSettings::GameBalance::Weapons::RocketProjectileGravityScale * FMath::RandRange(0.2, 1.5));
+	}
+	// SetupProjectileForNewLaunch reset the ground fire (no weapon state owner), so set it after.
+	if (M_RocketData.GroundFire.GetIsEnabled())
+	{
+		Projectile->SetGroundFireForLaunch(M_RocketData.GroundFire);
+	}
 	if (RocketMesh.IsValid())
 	{
 		Projectile->SetupAttachedRocketMesh(RocketMesh.Get());
@@ -696,6 +718,120 @@ void UAttachedRockets::OnSalvoFinished()
 	}
 	StartReload();
 	M_Owner->DoneExecutingCommand(EAbilityID::IdFireRockets);
+}
+
+bool UAttachedRockets::GetIsWithinHomingCone(const FVector& Origin, const FVector& Heading,
+                                             const FVector& TargetLocation, const float HalfAngleDegrees,
+                                             const float Range)
+{
+	const FVector ToTarget = TargetLocation - Origin;
+	if (ToTarget.SizeSquared() > FMath::Square(Range))
+	{
+		return false;
+	}
+	const FVector HorizontalHeading = Heading.GetSafeNormal2D();
+	const FVector HorizontalToTarget = ToTarget.GetSafeNormal2D();
+	if (HorizontalHeading.IsNearlyZero() || HorizontalToTarget.IsNearlyZero())
+	{
+		// Straight above or below the vehicle: accept, the missile only needs a direction.
+		return true;
+	}
+	const float MinimumCosine = FMath::Cos(FMath::DegreesToRadians(FMath::Clamp(HalfAngleDegrees, 0.f, 180.f)));
+	return FVector::DotProduct(HorizontalHeading, HorizontalToTarget) >= MinimumCosine - KINDA_SMALL_NUMBER;
+}
+
+void UAttachedRockets::ExecuteFire_PickHomingTarget()
+{
+	M_SalvoHomingTarget.Reset();
+	if (not M_RocketData.bHomingMissiles)
+	{
+		return;
+	}
+	AActor* HomingTarget = FindHomingTarget_OwnerWeaponTarget();
+	if (not HomingTarget)
+	{
+		HomingTarget = FindHomingTarget_ClosestEnemyInCone();
+	}
+	M_SalvoHomingTarget = HomingTarget;
+}
+
+AActor* UAttachedRockets::FindHomingTarget_OwnerWeaponTarget() const
+{
+	const ATankMaster* OwnerTank = Cast<ATankMaster>(GetOwner());
+	if (not IsValid(OwnerTank))
+	{
+		return nullptr;
+	}
+	for (const ACPPTurretsMaster* Turret : OwnerTank->GetTurrets())
+	{
+		AActor* TurretTarget = IsValid(Turret) ? Turret->GetCurrentTargetActor() : nullptr;
+		if (GetIsValidHomingTargetCandidate(TurretTarget))
+		{
+			return TurretTarget;
+		}
+	}
+	for (const UHullWeaponComponent* HullWeapon : OwnerTank->GetHullWeapons())
+	{
+		AActor* HullWeaponTarget = IsValid(HullWeapon) ? HullWeapon->GetCurrentTargetActor() : nullptr;
+		if (GetIsValidHomingTargetCandidate(HullWeaponTarget))
+		{
+			return HullWeaponTarget;
+		}
+	}
+	return nullptr;
+}
+
+AActor* UAttachedRockets::FindHomingTarget_ClosestEnemyInCone() const
+{
+	const AActor* OwnerActor = GetOwner();
+	UWorld* World = GetWorld();
+	if (not IsValid(OwnerActor) || not World)
+	{
+		return nullptr;
+	}
+
+	// Player 1 targets the enemy object channel, every other player targets the player's units.
+	constexpr int32 PlayerOneIndex = 1;
+	const ECollisionChannel EnemyObjectChannel = M_OwningPlayer == PlayerOneIndex
+		                                             ? COLLISION_OBJ_ENEMY
+		                                             : COLLISION_OBJ_PLAYER;
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(EnemyObjectChannel);
+	FCollisionQueryParams QueryParams(TEXT("AttachedRocketsHomingTarget"), false, OwnerActor);
+	TArray<FOverlapResult> Overlaps;
+	const FVector OwnerLocation = OwnerActor->GetActorLocation();
+	World->OverlapMultiByObjectType(Overlaps, OwnerLocation, FQuat::Identity, ObjectQueryParams,
+	                                FCollisionShape::MakeSphere(M_RocketData.Range), QueryParams);
+
+	AActor* ClosestTarget = nullptr;
+	float ClosestDistanceSquared = TNumericLimits<float>::Max();
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Candidate = Overlap.GetActor();
+		if (not GetIsValidHomingTargetCandidate(Candidate))
+		{
+			continue;
+		}
+		const float DistanceSquared = FVector::DistSquared(OwnerLocation, Candidate->GetActorLocation());
+		if (DistanceSquared < ClosestDistanceSquared)
+		{
+			ClosestDistanceSquared = DistanceSquared;
+			ClosestTarget = Candidate;
+		}
+	}
+	return ClosestTarget;
+}
+
+bool UAttachedRockets::GetIsValidHomingTargetCandidate(AActor* Candidate) const
+{
+	const AActor* OwnerActor = GetOwner();
+	if (not RTSFunctionLibrary::RTSIsValid(Candidate) || not IsValid(OwnerActor) || Candidate == OwnerActor)
+	{
+		return false;
+	}
+	return GetIsWithinHomingCone(OwnerActor->GetActorLocation(), OwnerActor->GetActorForwardVector(),
+	                             Candidate->GetActorLocation(), M_RocketData.HomingConeHalfAngleDegrees,
+	                             M_RocketData.Range);
 }
 
 void UAttachedRockets::BeginPlay_SetupCallbackToProjectileManager()

@@ -9,20 +9,23 @@
 
 class USlateBrushAsset;
 
-// Shared by every unit on purpose: a Blueprint switch on this enum gives exactly three pins. What VariantA means
-// differs per unit; the per-unit display name comes from UUnitVariantDataAsset.
+// Shared by every unit on purpose: a Blueprint switch on this enum gives one pin per value. What VariantA means
+// differs per unit; the per-unit display name comes from UUnitVariantDataAsset. Append only: saved selections and
+// Blueprints store the values.
 UENUM(BlueprintType)
 enum class EUnitVariant : uint8
 {
 	Base UMETA(DisplayName = "Base"),
 	VariantA UMETA(DisplayName = "Variant A"),
 	VariantB UMETA(DisplayName = "Variant B"),
+	// Unit variant batch 3: a third alternative (the Puma has three variants).
+	VariantC UMETA(DisplayName = "Variant C"),
 };
 
 namespace UnitVariants
 {
-	// Base plus two alternatives; the enum, the data asset validation and the UI all rely on this cap.
-	constexpr int32 MaxVariantsPerUnit = 3;
+	// Base plus three alternatives; the enum, the data asset validation and the UI all rely on this cap.
+	constexpr int32 MaxVariantsPerUnit = 4;
 }
 
 static inline FString Global_GetUnitVariantAsString(const EUnitVariant Variant)
@@ -35,6 +38,8 @@ static inline FString Global_GetUnitVariantAsString(const EUnitVariant Variant)
 		return "VariantA";
 	case EUnitVariant::VariantB:
 		return "VariantB";
+	case EUnitVariant::VariantC:
+		return "VariantC";
 	}
 	return "Unknown";
 }

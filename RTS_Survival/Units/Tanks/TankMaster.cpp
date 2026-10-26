@@ -397,6 +397,17 @@ void ATankMaster::UpgradeTurnRate(const float NewTurnRate)
 	TurnRate = NewTurnRate;
 }
 
+void ATankMaster::SetVehicleTurnRate(const float NewTurnRate)
+{
+	if (NewTurnRate <= 0.f)
+	{
+		RTSFunctionLibrary::ReportError("SetVehicleTurnRate needs a turn rate above 0."
+			"\n For tank: " + GetName());
+		return;
+	}
+	UpgradeTurnRate(NewTurnRate);
+}
+
 void ATankMaster::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
 {
 	// Calls bp event.
@@ -1779,10 +1790,12 @@ void ATankMaster::SetMaxSpeedOnVehicleMovementComponent()
 					ETankSubtype TankSubtype = RTSComp->GetSubtypeAsTankSubtype();
 					const FTankData MyTankData = URTSBlueprintFunctionLibrary::BP_GetTankDataOfPlayer(
 						RTSComp->GetOwningPlayer(), RTSComp->GetSubtypeAsTankSubtype(), this);
-					VehiclePathFollowingComponent->SetDesiredSpeed(MyTankData.VehicleMaxSpeedKmh,
-					                                               ESpeedUnits::KilometersPerHour);
-					VehiclePathFollowingComponent->SetDesiredReverseSpeed(MyTankData.VehicleReverseSpeedKmh,
-					                                                      ESpeedUnits::KilometersPerHour);
+					VehiclePathFollowingComponent->SetDesiredSpeed(
+						MyTankData.VehicleMaxSpeedKmh * VariantMobilityMultipliers.MaxSpeedMultiplier,
+						ESpeedUnits::KilometersPerHour);
+					VehiclePathFollowingComponent->SetDesiredReverseSpeed(
+						MyTankData.VehicleReverseSpeedKmh * VariantMobilityMultipliers.ReverseSpeedMultiplier,
+						ESpeedUnits::KilometersPerHour);
 					return;
 				}
 				RTSFunctionLibrary::ReportFailedCastError("PathFollowingComponent",

@@ -4,6 +4,8 @@
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Behaviours/Derived/Damage/RadixiteDamageBehaviour.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponOwner/WeaponOwner.h"
@@ -409,6 +411,10 @@ void UWeaponStateLaser::OnLaserAsyncTraceComplete(
 		{
 			OnActorKilled(HitActor);
 		}
+		else
+		{
+			TryApplyWeaponRadixiteDot(HitActor);
+		}
 	}
 
 	PlayImpactSound(EndLocation);
@@ -453,6 +459,16 @@ float UWeaponStateLaser::GetDamageToDealAndVerifyHitActor(const FHitResult& Trac
 
 	FRTSWeaponHelpers::Debug_Resistances(TEXT("Laser hit had no armor component; using base damage."), FColor::Red);
 	return WeaponData.BaseDamage;
+}
+
+void UWeaponStateLaser::TryApplyWeaponRadixiteDot(AActor* HitActor) const
+{
+	if (not WeaponData.GetHasRadixiteDotOverride() || not RTSFunctionLibrary::RTSIsValid(HitActor))
+	{
+		return;
+	}
+	URadixiteDamageBehaviour::ApplyRadixiteDamageToActor(HitActor, WeaponData.RadixiteDotDurationSeconds,
+	                                                     WeaponData.GetRadixiteDotDamagePerSecond());
 }
 
 // ---------------- Niagara param helpers ----------------

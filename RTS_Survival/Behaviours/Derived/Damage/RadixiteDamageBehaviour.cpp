@@ -3,6 +3,7 @@
 #include "RadixiteDamageBehaviour.h"
 
 #include "GameFramework/Actor.h"
+#include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 URadixiteDamageBehaviour::URadixiteDamageBehaviour()
@@ -23,6 +24,32 @@ void URadixiteDamageBehaviour::SetDamagePerSecond(const float NewDamagePerSecond
 float URadixiteDamageBehaviour::GetDamagePerSecond() const
 {
 	return DamagePerSecond;
+}
+
+void URadixiteDamageBehaviour::ApplyRadixiteDamageToActor(AActor* HitActor, const float DurationSeconds,
+                                                          const float DamagePerSecond)
+{
+	if (not IsValid(HitActor) || DurationSeconds <= 0.f)
+	{
+		return;
+	}
+	UBehaviourComp* BehaviourComponent = HitActor->FindComponentByClass<UBehaviourComp>();
+	if (not IsValid(BehaviourComponent))
+	{
+		return;
+	}
+
+	// Configured before the Refresh stack rule runs: OnRefreshed copies the DPS of this new instance.
+	BehaviourComponent->AddBehaviourWithDurationConfigured(
+		URadixiteDamageBehaviour::StaticClass(),
+		DurationSeconds,
+		[DamagePerSecond](UBehaviour& NewBehaviour)
+		{
+			if (URadixiteDamageBehaviour* RadixiteBehaviour = Cast<URadixiteDamageBehaviour>(&NewBehaviour))
+			{
+				RadixiteBehaviour->SetDamagePerSecond(DamagePerSecond);
+			}
+		});
 }
 
 void URadixiteDamageBehaviour::OnAdded(AActor* BehaviourOwner)

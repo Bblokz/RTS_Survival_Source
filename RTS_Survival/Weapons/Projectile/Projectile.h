@@ -251,6 +251,13 @@ public:
 	// Called by abilities using attach rockets to change the mesh on the rocket VFX.
 	void SetupAttachedRocketMesh(UStaticMesh* RocketMesh);
 
+	/**
+	 * @brief Gives a launch without a weapon state (attached rockets) lingering ground fire on impact.
+	 * Call after SetupProjectileForNewLaunch, which resets the ground fire to the owner weapon's (off without owner).
+	 * @param GroundFireSettings Burning ground to leave; disabled settings turn it off.
+	 */
+	void SetGroundFireForLaunch(const FRTSGroundFireSettings& GroundFireSettings);
+
 	// can be called AFTER SetupProjectileForNewLaunch to accelerate the projetile.
 	void ApplyAccelerationFactor(const float Factor, const bool bUseGravityTArch, const float LowestZValue);
 	void SetupTraceChannel(int NewOwningPlayer);
@@ -329,6 +336,12 @@ private:
 	 */
 	void TryRequestGroundFire(const FVector& ImpactLocation, ERTSSurfaceType HitSurface);
 	void ResetGroundFireForLaunch(const FRTSGroundFireSettings& GroundFireSettings);
+
+	// Per-weapon radixite damage over time of the weapon that fired this launch (FWeaponData::RadixiteDot*);
+	// both 0 = the calibre-based default. Reset on every launch because projectiles are pooled.
+	float M_RadixiteDotTotalDamage = 0.f;
+	float M_RadixiteDotDurationSeconds = 0.f;
+	void ResetRadixiteDotForLaunch(const float RadixiteDotTotalDamage, const float RadixiteDotDurationSeconds);
 
 	// Begin Projectile Pool Settings
 

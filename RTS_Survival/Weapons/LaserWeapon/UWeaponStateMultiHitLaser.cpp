@@ -301,6 +301,10 @@ void UWeaponStateMultiHitLaser::OnMultiHitLaserAsyncTraceComplete(
 			{
 				OnActorKilled(HitActor);
 			}
+			else
+			{
+				TryApplyWeaponRadixiteDot(HitActor);
+			}
 
 			HitsProcessed++;
 			if (HitsProcessed >= MaxHitCount)

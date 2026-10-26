@@ -309,6 +309,15 @@ void AProjectile::SetupProjectileForNewLaunch(
 	ResetGroundFireForLaunch(IsValid(NewProjectileOwner)
 		                         ? NewProjectileOwner->GetRawWeaponData().GroundFire
 		                         : FRTSGroundFireSettings());
+	if (IsValid(NewProjectileOwner))
+	{
+		const FWeaponData& OwnerWeaponData = NewProjectileOwner->GetRawWeaponData();
+		ResetRadixiteDotForLaunch(OwnerWeaponData.RadixiteDotTotalDamage, OwnerWeaponData.RadixiteDotDurationSeconds);
+	}
+	else
+	{
+		ResetRadixiteDotForLaunch(0.f, 0.f);
+	}
 	OnNewDamageType(DamageType);
 	M_OwningPlayer = OwningPlayer;
 	// NOTE: this cannot be applied on the weapon itself as it would provide misleading info to the player
@@ -391,6 +400,7 @@ void AProjectile::ApplyBarrageProjectileLaunchData(
 	M_ShellType = WeaponData.ShellType;
 	M_ProjectileOwner = nullptr;
 	ResetGroundFireForLaunch(WeaponData.GroundFire);
+	ResetRadixiteDotForLaunch(WeaponData.RadixiteDotTotalDamage, WeaponData.RadixiteDotDurationSeconds);
 	OnNewDamageType(WeaponData.DamageType);
 	M_OwningPlayer = OwningPlayer;
 	M_Range = WeaponData.Range * DeveloperSettings::GameBalance::Weapons::Projectiles::DefaultProjectileRangeMlt;
@@ -1793,6 +1803,14 @@ void AProjectile::ApplyRadixiteDamageBehaviour(AActor* HitActor)
 		return;
 	}
 
+	const bool bHasWeaponDotOverride = M_RadixiteDotTotalDamage > 0.f && M_RadixiteDotDurationSeconds > 0.f;
+	if (bHasWeaponDotOverride)
+	{
+		URadixiteDamageBehaviour::ApplyRadixiteDamageToActor(
+			HitActor, M_RadixiteDotDurationSeconds, M_RadixiteDotTotalDamage / M_RadixiteDotDurationSeconds);
+		return;
+	}
+
 	UBehaviourComp* BehaviourComponent = HitActor->FindComponentByClass<UBehaviourComp>();
 	if (not IsValid(BehaviourComponent))
 	{
@@ -1820,6 +1838,17 @@ void AProjectile::ResetGroundFireForLaunch(const FRTSGroundFireSettings& GroundF
 {
 	M_GroundFireSettings = GroundFireSettings;
 	bM_HasRequestedGroundFire = false;
+}
+
+void AProjectile::SetGroundFireForLaunch(const FRTSGroundFireSettings& GroundFireSettings)
+{
+	ResetGroundFireForLaunch(GroundFireSettings);
+}
+
+void AProjectile::ResetRadixiteDotForLaunch(const float RadixiteDotTotalDamage, const float RadixiteDotDurationSeconds)
+{
+	M_RadixiteDotTotalDamage = RadixiteDotTotalDamage;
+	M_RadixiteDotDurationSeconds = RadixiteDotDurationSeconds;
 }
 
 void AProjectile::TryRequestGroundFire(const FVector& ImpactLocation, const ERTSSurfaceType HitSurface)

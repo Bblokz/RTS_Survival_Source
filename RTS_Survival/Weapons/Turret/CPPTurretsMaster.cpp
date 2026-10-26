@@ -707,8 +707,9 @@ void ACPPTurretsMaster::OnReloadStart(const int32 WeaponIndex, const float Reloa
 	}
 }
 
-void ACPPTurretsMaster::OnReloadFinished(const int32 /*WeaponIndex*/)
+void ACPPTurretsMaster::OnReloadFinished(const int32 WeaponIndex)
 {
+	BP_OnReloadFinished(WeaponIndex);
 }
 
 void ACPPTurretsMaster::ForceSetAllWeaponsFullyReloaded()

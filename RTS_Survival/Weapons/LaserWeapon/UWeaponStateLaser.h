@@ -76,6 +76,9 @@ protected:
 
 	float GetDamageToDealAndVerifyHitActor(const FHitResult& TraceHit, AActor*& OutHitActor) const;
 
+	// Lasers have no shell type: a weapon with FWeaponData::RadixiteDot* set applies that DoT on every hit.
+	void TryApplyWeaponRadixiteDot(AActor* HitActor) const;
+
 	// ------------ Niagara params ------------
 	inline static const FName NsLaserLocationParamName = TEXT("Location");
 	inline static const FName NsLaserColorParamName = TEXT("LaserColor");

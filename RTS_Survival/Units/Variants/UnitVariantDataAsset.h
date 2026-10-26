@@ -78,7 +78,8 @@ struct FUnitVariantEntry
 {
 	GENERATED_BODY()
 
-	// Element 0 describes the base unit, 1 is VariantA, 2 is VariantB. Length 1 means "no choice to offer".
+	// Element 0 describes the base unit, 1 is VariantA, 2 is VariantB, 3 is VariantC. Length 1 means "no choice to
+	// offer".
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (TitleProperty = "DisplayName"))
 	TArray<FUnitVariantDefinition> Variants;
 };
