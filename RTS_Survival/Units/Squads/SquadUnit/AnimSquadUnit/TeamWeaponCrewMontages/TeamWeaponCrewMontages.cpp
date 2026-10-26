@@ -2,6 +2,8 @@
 
 #include "TeamWeaponCrewMontages.h"
 
+#include "Animation/AnimMontage.h"
+
 const FTeamWeaponCrewMontageEntry& FTeamWeaponCrewMontage::ResolveEntry(
 	const ESquadSubtype TeamWeaponSquadSubtype) const
 {
@@ -52,4 +54,32 @@ const FTeamWeaponCrewMontage* FTeamWeaponCrewMontages::GetMontageForRole(const E
 		break;
 	}
 	return nullptr;
+}
+
+UAnimMontage* FTeamWeaponCrewTransitionSideMontages::GetMontageForSide(const bool bIsOnWeaponRightSide) const
+{
+	if (not bIsOnWeaponRightSide && LeftSideMontage != nullptr)
+	{
+		return LeftSideMontage;
+	}
+	return RightSideMontage;
+}
+
+const FTeamWeaponCrewTransitionSideMontages& FTeamWeaponCrewTransitionMontageSet::GetSideMontages(
+	const ETeamWeaponCrewTransition Transition) const
+{
+	return Transition == ETeamWeaponCrewTransition::Deploy ? Deploy : Pack;
+}
+
+const FTeamWeaponCrewTransitionMontageSet& FTeamWeaponCrewTransitionMontages::ResolveSet(
+	const ESquadSubtype TeamWeaponSquadSubtype) const
+{
+	for (const FTeamWeaponCrewTransitionMontageOverride& Override : Overrides)
+	{
+		if (Override.GetAppliesToSubtype(TeamWeaponSquadSubtype))
+		{
+			return Override.MontageSet;
+		}
+	}
+	return Base;
 }

@@ -209,6 +209,44 @@ struct FRTSShortsParatrooperCameraMove
 	TArray<FRTSShortsParatrooperCameraWaypoint> ContinuationPoints;
 };
 
+/** @brief Places one aircraft pass independently of the battle's camera and unit origins. */
+USTRUCT()
+struct FRTSShortsParatrooperPass
+{
+	GENERATED_BODY()
+
+	/** Ground target in stage-local centimetres. */
+	UPROPERTY()
+	FVector DropOffset = FVector::ZeroVector;
+
+	/** Approach relative to DropOffset, including flight altitude. */
+	UPROPERTY()
+	FVector AircraftStartOffset = FVector(-6000.f, 0.f, 3500.f);
+};
+
+/** @brief Overrides only this short's copied ability when the drop belongs to another side or spans several passes. */
+USTRUCT()
+struct FRTSShortsParatrooperFormation
+{
+	GENERATED_BODY()
+
+	/** Zero inherits the job's owning player. */
+	UPROPERTY()
+	int32 OwningPlayer = 0;
+
+	/** Zero retains the template's circular landing zone; positive values spread landings along the flight. */
+	UPROPERTY()
+	float LandingTrailLength = 0.f;
+
+	/** Zero inherits the ability template's timing between individual jumps. */
+	UPROPERTY()
+	float JumpIntervalSeconds = 0.f;
+
+	/** Empty retains the original single pass over the battle midpoint. */
+	UPROPERTY()
+	TArray<FRTSShortsParatrooperPass> Passes;
+};
+
 /**
  * @brief One unit of a short: which Blueprint to spawn, how long it is on stage and when it fires.
  */
@@ -398,6 +436,9 @@ struct FRTSShortsSegment
 	/** Approach in stage-local cm, relative to the midpoint between the two battle lines. */
 	UPROPERTY()
 	FVector ParatrooperAircraftStartOffset = FVector(-6000.f, 0.f, 3500.f);
+
+	UPROPERTY()
+	FRTSShortsParatrooperFormation ParatrooperFormation;
 
 	UPROPERTY()
 	FRTSShortsParatrooperCameraMove ParatrooperCameraMove;

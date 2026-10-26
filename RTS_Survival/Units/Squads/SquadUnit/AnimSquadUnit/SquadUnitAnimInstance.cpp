@@ -152,6 +152,10 @@ namespace SquadUnitTeamWeaponCrewAnimStatics
 	constexpr float CrewMontageBlendOutTime = 0.1f;
 	// Guards the division for the reload synced play rate.
 	constexpr float MinReloadTimeSeconds = 0.01f;
+	// A deploy or pack montage stretched further than this reads as slow motion or fast forward; it is clamped and
+	// the arming of the crew loop (deploy) or the crew walking off (pack) blends out whatever is left.
+	constexpr float MinTransitionPlayRate = 0.6f;
+	constexpr float MaxTransitionPlayRate = 1.75f;
 	// A crewing operator never walks; above this speed the crew montage is dropped no matter who moved the unit.
 	// Well above the controller's settled speed so a unit that is still braking after arming is never dropped.
 	constexpr float CrewAnimationMaxSpeedCmPerSec = 60.0f;
@@ -2478,7 +2482,9 @@ void FSquadUnitTeamWeaponCrewAnimRuntime::Reset()
 	bM_IsActive = false;
 	bM_IsLoopPlaying = false;
 	bM_IsReactPlaying = false;
+	bM_IsTransitionPlaying = false;
 	M_ActiveLoopMontage = nullptr;
+	M_ActiveTransitionMontage = nullptr;
 }
 
 void USquadUnitAnimInstance::StartTeamWeaponCrewAnimation(const ECrewPositionType CrewRole,
@@ -2666,13 +2672,98 @@ void USquadUnitAnimInstance::OnTeamWeaponCrewReactMontageEnded(UAnimMontage* Mon
 	PlayTeamWeaponCrewLoopMontage(ActiveEntry.IdleLoopMontage, ActiveEntry.IdleLoopPlayRate);
 }
 
+bool USquadUnitAnimInstance::PlayTeamWeaponCrewTransition(
+	const ETeamWeaponCrewTransition Transition,
+	const ESquadSubtype TeamWeaponSquadSubtype,
+	const bool bIsOnWeaponRightSide,
+	const float TransitionSeconds)
+{
+	const FTeamWeaponCrewTransitionMontageSet& MontageSet =
+		TeamWeaponCrewTransitionMontages.ResolveSet(TeamWeaponSquadSubtype);
+	UAnimMontage* TransitionMontage = MontageSet.GetSideMontages(Transition).GetMontageForSide(bIsOnWeaponRightSide);
+	if (not IsValid(TransitionMontage))
+	{
+		// No montage for this weapon family is a valid designer choice; the operator keeps its regular animation.
+		return false;
+	}
+
+	CancelCoverAnimation();
+	// Unbinds the delegates of a crew loop or an earlier transition before the new montage interrupts them.
+	ClearTeamWeaponCrewAnimationRuntime(true);
+
+	const float SafeTransitionSeconds = FMath::Max(
+		TransitionSeconds, SquadUnitTeamWeaponCrewAnimStatics::MinReloadTimeSeconds);
+	const float SafeRateScale = FMath::Max(TransitionMontage->RateScale, KINDA_SMALL_NUMBER);
+	const float StretchedPlayRate = TransitionMontage->GetPlayLength() / (SafeTransitionSeconds * SafeRateScale);
+	const float PlayRate = FMath::Clamp(
+		StretchedPlayRate * MontageSet.PlayRate,
+		SquadUnitTeamWeaponCrewAnimStatics::MinTransitionPlayRate,
+		SquadUnitTeamWeaponCrewAnimStatics::MaxTransitionPlayRate);
+
+	if (Montage_Play(TransitionMontage, PlayRate) <= 0.f)
+	{
+		return false;
+	}
+
+	// The role is not set: a transition is never the assignment the controller arms afterwards.
+	M_TeamWeaponCrewAnimRuntime.M_TeamWeaponSquadSubtype = TeamWeaponSquadSubtype;
+	M_TeamWeaponCrewAnimRuntime.bM_IsActive = true;
+	M_TeamWeaponCrewAnimRuntime.bM_IsTransitionPlaying = true;
+	M_TeamWeaponCrewAnimRuntime.M_ActiveTransitionMontage = TransitionMontage;
+
+	// The authored full body pose replaces any crouch; reset so no stray crouch-to-stand transition plays later.
+	AimPositionMontages.AimPosition = ESquadAimPosition::Standing;
+	AimOffsets.UpdateAOForNewAimPosition(ESquadAimPosition::Standing);
+
+	M_TeamWeaponCrewTransitionMontageEndedDelegate.BindUObject(
+		this, &USquadUnitAnimInstance::OnTeamWeaponCrewTransitionMontageEnded);
+	Montage_SetEndDelegate(M_TeamWeaponCrewTransitionMontageEndedDelegate, TransitionMontage);
+
+	if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
+	{
+		SquadUnitTeamWeaponCrewAnimStatics::PrintCrewAnimDebug(
+			GetOwningActor(),
+			"Crew transition: " + TransitionMontage->GetName() +
+			" seconds: " + FString::SanitizeFloat(TransitionSeconds) +
+			" rate: " + FString::SanitizeFloat(PlayRate));
+	}
+	return true;
+}
+
+void USquadUnitAnimInstance::StopTeamWeaponCrewTransition()
+{
+	if (not M_TeamWeaponCrewAnimRuntime.bM_IsTransitionPlaying)
+	{
+		return;
+	}
+	ClearTeamWeaponCrewAnimationRuntime(true);
+}
+
+void USquadUnitAnimInstance::OnTeamWeaponCrewTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (not M_TeamWeaponCrewAnimRuntime.bM_IsTransitionPlaying ||
+		Montage != M_TeamWeaponCrewAnimRuntime.M_ActiveTransitionMontage)
+	{
+		return;
+	}
+	// Natural end or something else took the FullBody slot: either way the operator is free again.
+	ClearTeamWeaponCrewAnimationRuntime(false);
+}
+
 void USquadUnitAnimInstance::ClearTeamWeaponCrewAnimationRuntime(const bool bStopPlayingMontages)
 {
 	M_TeamWeaponCrewLoopMontageEndedDelegate.Unbind();
 	M_TeamWeaponCrewReactMontageEndedDelegate.Unbind();
+	M_TeamWeaponCrewTransitionMontageEndedDelegate.Unbind();
 
 	if (bStopPlayingMontages)
 	{
+		UAnimMontage* TransitionMontage = M_TeamWeaponCrewAnimRuntime.M_ActiveTransitionMontage;
+		if (M_TeamWeaponCrewAnimRuntime.bM_IsTransitionPlaying && IsValid(TransitionMontage) &&
+			Montage_IsPlaying(TransitionMontage))
+		{
+			Montage_Stop(SquadUnitTeamWeaponCrewAnimStatics::CrewMontageBlendOutTime, TransitionMontage);
+		}
 		UAnimMontage* LoopMontage = M_TeamWeaponCrewAnimRuntime.M_ActiveLoopMontage;
 		if (IsValid(LoopMontage) && Montage_IsPlaying(LoopMontage))
 		{

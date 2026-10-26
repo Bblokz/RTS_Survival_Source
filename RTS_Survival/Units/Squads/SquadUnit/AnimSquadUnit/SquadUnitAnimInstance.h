@@ -593,9 +593,11 @@ struct FSquadUnitTeamWeaponCrewAnimRuntime
 
 	void Reset();
 
+	// A deploy or pack montage never counts as the assignment, so arming after a deploy always starts the role loop.
 	bool GetIsSameAssignment(const ECrewPositionType CrewRole, const ESquadSubtype TeamWeaponSquadSubtype) const
 	{
-		return bM_IsActive && M_CrewRole == CrewRole && M_TeamWeaponSquadSubtype == TeamWeaponSquadSubtype;
+		return bM_IsActive && not bM_IsTransitionPlaying && M_CrewRole == CrewRole &&
+			M_TeamWeaponSquadSubtype == TeamWeaponSquadSubtype;
 	}
 
 	// Copy of the resolved entry; montages are also referenced by the EditDefaultsOnly struct so GC is safe.
@@ -615,9 +617,15 @@ struct FSquadUnitTeamWeaponCrewAnimRuntime
 	// True while a reaction montage is in flight; suppresses the loop's interrupted-end handling.
 	bool bM_IsReactPlaying = false;
 
+	// True while a one-shot deploy or pack montage plays; the runtime clears itself when it ends.
+	bool bM_IsTransitionPlaying = false;
+
 	// The loop montage that was started last; needed to stop and to re-play it on its natural end.
 	UPROPERTY()
 	TObjectPtr<UAnimMontage> M_ActiveLoopMontage = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UAnimMontage> M_ActiveTransitionMontage = nullptr;
 };
 
 /**
@@ -880,6 +888,26 @@ public:
 	/** @return True while armed, even when the resolved entry has no montage (the controller must not re-arm). */
 	bool GetIsTeamWeaponCrewAnimationActive() const { return M_TeamWeaponCrewAnimRuntime.bM_IsActive; }
 
+	/**
+	 * @brief Plays the deploy or pack montage once, stretched so it ends when the team weapon finishes the transition.
+	 * Shares the crew runtime, so every guard that keeps other montages off a crewing operator also applies here.
+	 * @param Transition Whether the team weapon deploys or packs.
+	 * @param TeamWeaponSquadSubtype Subtype of the team weapon squad used as override key.
+	 * @param bIsOnWeaponRightSide True when the operator's crew position is on the weapon's right (local +Y).
+	 * @param TransitionSeconds Time left until the team weapon finishes deploying or packing.
+	 * @return True when a montage started; false when none is assigned (not an error).
+	 */
+	bool PlayTeamWeaponCrewTransition(
+		const ETeamWeaponCrewTransition Transition,
+		const ESquadSubtype TeamWeaponSquadSubtype,
+		const bool bIsOnWeaponRightSide,
+		const float TransitionSeconds);
+
+	/** @brief Blends out a deploy or pack montage that is still playing; leaves a crew loop alone. */
+	void StopTeamWeaponCrewTransition();
+
+	bool GetIsTeamWeaponCrewTransitionPlaying() const { return M_TeamWeaponCrewAnimRuntime.bM_IsTransitionPlaying; }
+
 protected:
 	// Set by unit selection.
 	UPROPERTY(BlueprintReadOnly)
@@ -953,6 +981,10 @@ protected:
 	// Full body montages played per crew position type while operating a deployed team weapon.
 	UPROPERTY(EditDefaultsOnly, Category = "Team Weapon Crew")
 	FTeamWeaponCrewMontages TeamWeaponCrewMontages;
+
+	// Full body montages operators play once while their team weapon deploys or packs, per weapon family.
+	UPROPERTY(EditDefaultsOnly, Category = "Team Weapon Crew")
+	FTeamWeaponCrewTransitionMontages TeamWeaponCrewTransitionMontages;
 
 	// Full body heal animations of a medic, per stance of its patient.
 	UPROPERTY(EditDefaultsOnly, Category = "Medic")
@@ -1129,6 +1161,7 @@ private:
 	void PlayTeamWeaponCrewLoopMontage(UAnimMontage* LoopMontage, const float PlayRate);
 	void OnTeamWeaponCrewLoopMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void OnTeamWeaponCrewReactMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	void OnTeamWeaponCrewTransitionMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 	void OnDeathMontageEnded(UAnimMontage* Montage, bool bInterrupted);
 
 	/** Stops whichever crew montage is playing and clears the crew runtime, without touching other montages. */
@@ -1148,6 +1181,7 @@ private:
 	// Dedicated delegates; M_MontageEndedDelegate is rebound by StartMontage and must not be shared.
 	FOnMontageEnded M_TeamWeaponCrewLoopMontageEndedDelegate;
 	FOnMontageEnded M_TeamWeaponCrewReactMontageEndedDelegate;
+	FOnMontageEnded M_TeamWeaponCrewTransitionMontageEndedDelegate;
 	FOnMontageEnded M_DeathMontageEndedDelegate;
 
 	UPROPERTY(Transient)

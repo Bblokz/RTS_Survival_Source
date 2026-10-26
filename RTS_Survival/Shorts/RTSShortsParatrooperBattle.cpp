@@ -4,11 +4,15 @@
 
 #include "CineCameraActor.h"
 #include "CineCameraComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialInterface.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/GlobalAbilitySetDataAsset.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/Paratroopers/GA_Paratroopers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -109,17 +113,51 @@ void ARTSShortsDirector::BeginParatrooperBattle()
 	{
 		return;
 	}
-	M_ParatrooperAbility->InitGlobalAbility(M_Job.UnitOwningPlayer, AbilityManager, M_PlayerController);
+	M_ParatrooperAbility->InitGlobalAbility(GetParatrooperOwningPlayer(), AbilityManager, M_PlayerController);
+	M_ParatrooperAbility->SetCinematicLandingTrailLength(Segment.ParatrooperFormation.LandingTrailLength);
+	M_ParatrooperAbility->SetCinematicJumpInterval(Segment.ParatrooperFormation.JumpIntervalSeconds);
 	M_ParatrooperBattleCamera = M_Camera->GetActorTransform();
 	bM_ParatrooperCameraCut = false;
 	M_Orbit.bIsActive = false;
-	constexpr float BattleMidpointFraction = 0.5f;
-	const FVector DropLocation = M_Stage->GetActorTransform().TransformPosition(Segment.TargetOffset * BattleMidpointFraction);
-	const FVector StartLocation = DropLocation + M_Stage->GetActorTransform().TransformVectorNoScale(Segment.ParatrooperAircraftStartOffset);
-	M_ParatrooperAbility->ExecuteCinematicDrop(DropLocation, StartLocation);
+	if (Segment.ParatrooperFormation.Passes.IsEmpty())
+	{
+		constexpr float BattleMidpointFraction = 0.5f;
+		FRTSShortsParatrooperPass DefaultPass;
+		DefaultPass.DropOffset = Segment.TargetOffset * BattleMidpointFraction;
+		DefaultPass.AircraftStartOffset = Segment.ParatrooperAircraftStartOffset;
+		StartParatrooperPass(DefaultPass, 0);
+	}
+	for (int32 PassIndex = 0; PassIndex < Segment.ParatrooperFormation.Passes.Num(); ++PassIndex)
+	{
+		StartParatrooperPass(Segment.ParatrooperFormation.Passes[PassIndex], PassIndex);
+	}
 	TickParatrooperBattle(0);
-	UE_LOG(LogTemp, Display, TEXT("RTS_SHORTS_PARATROOPER_BEGIN ability=%d drop=%s start=%s intro=%.2f"),
-		static_cast<int32>(Segment.ParatrooperAbility), *DropLocation.ToString(), *StartLocation.ToString(), Segment.ParatrooperIntroSeconds);
+}
+
+void ARTSShortsDirector::StartParatrooperPass(const FRTSShortsParatrooperPass& Pass, const int32 PassIndex) const
+{
+	if (not GetIsValidStage() || not GetIsValidParatrooperAbility())
+	{
+		return;
+	}
+	const FRTSShortsSegment& Segment = M_Job.Segments[M_CurrentSegment];
+	const FTransform StageTransform = M_Stage->GetActorTransform();
+	const FVector DropLocation = StageTransform.TransformPosition(Pass.DropOffset);
+	const FVector StartLocation = DropLocation + StageTransform.TransformVectorNoScale(Pass.AircraftStartOffset);
+	M_ParatrooperAbility->ExecuteCinematicDrop(DropLocation, StartLocation);
+	UE_LOG(LogTemp, Display, TEXT("RTS_SHORTS_PARATROOPER_BEGIN ability=%d drop=%s start=%s intro=%.2f pass=%d owner=%d"),
+		static_cast<int32>(Segment.ParatrooperAbility), *DropLocation.ToString(), *StartLocation.ToString(),
+		Segment.ParatrooperIntroSeconds, PassIndex, GetParatrooperOwningPlayer());
+}
+
+int32 ARTSShortsDirector::GetParatrooperOwningPlayer() const
+{
+	if (not M_Job.Segments.IsValidIndex(M_CurrentSegment))
+	{
+		return M_Job.UnitOwningPlayer;
+	}
+	const int32 OverridePlayer = M_Job.Segments[M_CurrentSegment].ParatrooperFormation.OwningPlayer;
+	return OverridePlayer > 0 ? OverridePlayer : M_Job.UnitOwningPlayer;
 }
 
 bool ARTSShortsDirector::GetIsValidParatrooperAbility() const
@@ -141,6 +179,7 @@ void ARTSShortsDirector::TickParatrooperBattle(const int32 LocalFrame)
 		return;
 	}
 	const int32 IntroFrames = FMath::RoundToInt(M_Job.Segments[M_CurrentSegment].ParatrooperIntroSeconds * M_Job.Fps);
+	KeepParatrooperAircraftVisible();
 	if (LocalFrame >= IntroFrames)
 	{
 		if (not bM_ParatrooperCameraCut)
@@ -154,17 +193,128 @@ void ARTSShortsDirector::TickParatrooperBattle(const int32 LocalFrame)
 		UpdateParatrooperBattleCamera(LocalFrame - IntroFrames);
 		return;
 	}
-	const AAircraftMaster* Aircraft = M_ParatrooperAbility->GetActiveDropAircraft();
+	UpdateParatrooperAircraftCamera(LocalFrame);
+}
+
+void ARTSShortsDirector::UpdateParatrooperAircraftCamera(const int32 LocalFrame) const
+{
+	if (not GetIsValidParatrooperAbility() || not GetIsValidCamera())
+	{
+		return;
+	}
+	const AAircraftMaster* LeadAircraft = M_ParatrooperAbility->GetActiveDropAircraft();
+	if (not IsValid(LeadAircraft))
+	{
+		return;
+	}
+	const TArray<TWeakObjectPtr<AAircraftMaster>> AircraftFormation = M_ParatrooperAbility->GetActiveDropAircrafts();
+	FBox FormationBounds(ForceInit);
+	for (const TWeakObjectPtr<AAircraftMaster>& FormationAircraft : AircraftFormation)
+	{
+		if (const AAircraftMaster* Aircraft = FormationAircraft.Get())
+		{
+			FormationBounds += Aircraft->GetActorLocation();
+		}
+	}
+	const FVector AircraftLocation = FormationBounds.IsValid ? FormationBounds.GetCenter() : LeadAircraft->GetActorLocation();
+	const bool bHasFormation = AircraftFormation.Num() > 1;
+	const FVector FormationCameraOffset(2200.f, -2400.f, 1100.f);
+	const FVector SingleAircraftCameraOffset(-2200.f, -2400.f, 850.f);
+	const FVector CameraOffset = bHasFormation ? FormationCameraOffset : SingleAircraftCameraOffset;
+	const FRotator FramingRotation = bHasFormation
+		? FRotator(0.f, LeadAircraft->GetActorRotation().Yaw, 0.f) : LeadAircraft->GetActorRotation();
+	const FVector CameraLocation = AircraftLocation + FramingRotation.RotateVector(CameraOffset);
+	M_Camera->SetActorLocationAndRotation(CameraLocation, (AircraftLocation - CameraLocation).Rotation());
+	constexpr float AircraftFocalLengthMm = 18.f;
+	constexpr float FormationFocalLengthMm = 9.5f;
+	M_Camera->GetCineCameraComponent()->SetCurrentFocalLength(bHasFormation ? FormationFocalLengthMm : AircraftFocalLengthMm);
+	const int32 LogIntervalFrames = FMath::Max(1, M_Job.Fps / 2);
+	if (LocalFrame % LogIntervalFrames == 0)
+	{
+		UE_LOG(LogTemp, Display, TEXT("RTS_SHORTS_PARATROOPER_AIRCRAFT count=%d focus=%s camera=%s aircraftRotation=%s hidden=%d"),
+			AircraftFormation.Num(), *AircraftLocation.ToString(), *CameraLocation.ToString(),
+			*LeadAircraft->GetActorRotation().ToString(), LeadAircraft->IsHidden() ? 1 : 0);
+	}
+}
+
+void ARTSShortsDirector::KeepParatrooperAircraftVisible() const
+{
+	if (not GetIsValidParatrooperAbility())
+	{
+		return;
+	}
+	const TArray<TWeakObjectPtr<AAircraftMaster>> AircraftFormation = M_ParatrooperAbility->GetActiveDropAircrafts();
+	for (const TWeakObjectPtr<AAircraftMaster>& Aircraft : AircraftFormation)
+	{
+		PrepareParatrooperAircraftForCapture(Aircraft.Get());
+	}
+}
+
+void ARTSShortsDirector::PrepareParatrooperAircraftForCapture(AAircraftMaster* Aircraft) const
+{
 	if (not IsValid(Aircraft))
 	{
 		return;
 	}
-	const FVector AircraftLocation = Aircraft->GetActorLocation();
-	const FVector CameraOffset(-2200.f, -2400.f, 850.f);
-	const FVector CameraLocation = AircraftLocation + Aircraft->GetActorRotation().RotateVector(CameraOffset);
-	M_Camera->SetActorLocationAndRotation(CameraLocation, (AircraftLocation - CameraLocation).Rotation());
-	constexpr float AircraftFocalLengthMm = 18.f;
-	M_Camera->GetCineCameraComponent()->SetCurrentFocalLength(AircraftFocalLengthMm);
+	if (UFowComp* AircraftFog = Aircraft->FindComponentByClass<UFowComp>())
+	{
+		AircraftFog->StopFowParticipation();
+	}
+	Aircraft->SetActorHiddenInGame(false);
+	const FName PreparedTag(TEXT("ShortsAircraftCapturePrepared"));
+	const bool bLogPreparation = not Aircraft->Tags.Contains(PreparedTag);
+	TInlineComponentArray<USkeletalMeshComponent*> Meshes(Aircraft);
+	for (USkeletalMeshComponent* Mesh : Meshes)
+	{
+		PrepareParatrooperAircraftMesh(Mesh, bLogPreparation);
+	}
+	Aircraft->Tags.AddUnique(PreparedTag);
+}
+
+void ARTSShortsDirector::PrepareParatrooperAircraftMesh(USkeletalMeshComponent* Mesh, const bool bFirstPreparation) const
+{
+	if (not IsValid(Mesh))
+	{
+		return;
+	}
+	Mesh->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	Mesh->bEnableUpdateRateOptimizations = false;
+	Mesh->SetComponentTickEnabled(true);
+	Mesh->SetVisibility(true);
+	Mesh->SetHiddenInGame(false);
+	if (not bFirstPreparation)
+	{
+		return;
+	}
+	RepairParatrooperAircraftPropellerMaterial(Mesh);
+}
+
+void ARTSShortsDirector::RepairParatrooperAircraftPropellerMaterial(USkeletalMeshComponent* Mesh) const
+{
+	if (not IsValid(Mesh))
+	{
+		return;
+	}
+	UMaterialInterface* PropellerMaterial = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Game/RTS_Survival/Blueprints/Aircraft/GerAircraft/FW_Recon/M_FWRecon_PropBlade.M_FWRecon_PropBlade"));
+	if (not IsValid(PropellerMaterial))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Cinematic aircraft need the German propeller blade material."));
+		return;
+	}
+	const FName PlaceholderMaterialName(TEXT("WorldGridMaterial"));
+	for (int32 MaterialIndex = 0; MaterialIndex < Mesh->GetNumMaterials(); ++MaterialIndex)
+	{
+		const UMaterialInterface* CurrentMaterial = Mesh->GetMaterial(MaterialIndex);
+		const UMaterial* BaseMaterial = IsValid(CurrentMaterial) ? CurrentMaterial->GetMaterial() : nullptr;
+		if (not IsValid(BaseMaterial) || BaseMaterial->GetFName() != PlaceholderMaterialName)
+		{
+			continue;
+		}
+		Mesh->SetMaterial(MaterialIndex, PropellerMaterial);
+		UE_LOG(LogTemp, Display, TEXT("RTS_SHORTS_PARATROOPER_AIRCRAFT_MATERIAL_REPAIRED aircraft=%s slot=%d material=%s"),
+			*GetNameSafe(Mesh->GetOwner()), MaterialIndex, *PropellerMaterial->GetName());
+	}
 }
 
 void ARTSShortsDirector::UpdateParatrooperBattleCamera(const int32 BattleLocalFrame) const
@@ -213,20 +363,23 @@ void ARTSShortsDirector::TrackParatrooperSquads()
 		return;
 	}
 	const TArray<TWeakObjectPtr<ASquadController>> DropSquads = M_ParatrooperAbility->GetActiveDropSquads();
+	const int32 DropOwner = GetParatrooperOwningPlayer();
+	TArray<TWeakObjectPtr<AActor>>& DropSideSquads = DropOwner == M_Job.UnitOwningPlayer
+		? M_Battle.PlayerSquads : M_Battle.EnemySquads;
 	for (const TWeakObjectPtr<ASquadController>& DropSquad : DropSquads)
 	{
 		ASquadController* Squad = DropSquad.Get();
-		if (not IsValid(Squad) || M_Battle.PlayerSquads.Contains(Squad))
+		if (not IsValid(Squad) || DropSideSquads.Contains(Squad))
 		{
 			continue;
 		}
-		M_Battle.PlayerSquads.Add(Squad);
+		DropSideSquads.Add(Squad);
 		if (URTSComponent* SquadRTS = Squad->FindComponentByClass<URTSComponent>())
 		{
-			SquadRTS->SetOwningPlayerRuntime(static_cast<uint8>(M_Job.UnitOwningPlayer));
+			SquadRTS->SetOwningPlayerRuntime(static_cast<uint8>(DropOwner));
 		}
 		UE_LOG(LogTemp, Display, TEXT("RTS_SHORTS_PARATROOPER_SQUAD squad=%s owner=%d"),
-			*Squad->GetName(), M_Job.UnitOwningPlayer);
+			*Squad->GetName(), DropOwner);
 	}
 }
 
