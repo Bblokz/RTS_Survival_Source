@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "style": {
+    "font": "C:/Windows/Fonts/seguisb.ttf",
+    "font_size_fraction": 0.0463,
+    "left_fraction": 0.05,
+    "bottom_fraction": 0.115,
+    "max_width_fraction": 0.78
+  },
+  "callouts": [
+    {
+      "text": "Do note that sometimes the IS-2 manages to get a shot through the frontal turret that causes ammo cook off and destroys the Tiger II (bit of RNG there)",
+      "start_fraction": 0.5,
+      "type_seconds": 2.1,
+      "hold_seconds": 4.0,
+      "exit_seconds": 0.25
+    },
+    {
+      "text": "Rerunning the fight does not always give the same result; but this one is very clear. Do you agree?",
+      "end_before_seconds": 0.8,
+      "type_seconds": 1.4,
+      "hold_seconds": 3.0,
+      "exit_seconds": 0.25
+    }
+  ]
+}
