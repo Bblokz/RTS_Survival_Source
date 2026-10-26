@@ -75,6 +75,10 @@ namespace TeamWeaponCrewAnimationStatics
 	// Crew moves allow partial paths, so operators may legally stop short of their spot and are snapped when armed.
 	// Beyond this distance the unit is considered stuck and is left alone rather than teleported across the map.
 	constexpr float MaxSnapToCrewPositionDistanceCm = 600.0f;
+	// Deploy and pack montages are cosmetic: an operator further than this from its post is not teleported for one.
+	constexpr float MaxTransitionSnapDistanceCm = 150.0f;
+	// Less time than this left in the deploy or pack is not worth starting a montage for.
+	constexpr float MinCrewTransitionSecondsLeft = 0.75f;
 
 	void PrintCrewAnimDebug(const AActor* Operator, const FString& Message)
 	{
@@ -206,6 +210,7 @@ void ATeamWeaponController::Tick(float DeltaSeconds)
 	TickPushedCrewFormation(DeltaSeconds);
 	TickTowedWeaponAnimation(DeltaSeconds);
 	TickCrewAnimationArming();
+	TickCrewTransitionMontages();
 	TickGuardPlacement(DeltaSeconds);
 }
 
@@ -1223,6 +1228,7 @@ void ATeamWeaponController::StartPacking()
 		&ATeamWeaponController::HandlePackingTimerFinished,
 		DeploymentTime,
 		false);
+	StartCrewTransitionMontages(ETeamWeaponCrewTransition::Pack);
 }
 
 void ATeamWeaponController::StartDeploying()
@@ -1605,6 +1611,8 @@ void ATeamWeaponController::StartDeployingTeamWeapon()
 		&ATeamWeaponController::HandleDeployingTimerFinished,
 		DeploymentTime,
 		false);
+	// Operators walking onto their posts are picked up by the tick as soon as they settle.
+	StartCrewTransitionMontages(ETeamWeaponCrewTransition::Deploy);
 }
 
 void ATeamWeaponController::HandlePackingTimerFinished()
@@ -2515,6 +2523,8 @@ void ATeamWeaponController::SetTeamWeaponState(const ETeamWeaponState NewState)
 		return;
 	}
 	M_TeamWeaponState = NewState;
+
+	EndCrewTransitionMontages(NewState);
 
 	if (M_TeamWeapon != nullptr)
 	{
@@ -3993,6 +4003,137 @@ bool ATeamWeaponController::GetIsValidCrewAnimationSlotOperator(const FTeamWeapo
 {
 	// Silent on purpose: an operator that just died leaves a dangling weak pointer until the crew is rebuilt.
 	return TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot) != nullptr;
+}
+
+void ATeamWeaponController::StartCrewTransitionMontages(const ETeamWeaponCrewTransition Transition)
+{
+	M_CrewTransitionState.Reset();
+	if (bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+	M_CrewTransitionState.M_Transition = Transition;
+	M_CrewTransitionState.bM_IsActive = true;
+	TryPlayCrewTransitionForSettledOperators();
+}
+
+void ATeamWeaponController::TickCrewTransitionMontages()
+{
+	if (not M_CrewTransitionState.bM_IsActive)
+	{
+		return;
+	}
+	TryPlayCrewTransitionForSettledOperators();
+}
+
+void ATeamWeaponController::TryPlayCrewTransitionForSettledOperators()
+{
+	const ETeamWeaponState TransitionState = M_CrewTransitionState.M_Transition == ETeamWeaponCrewTransition::Deploy
+		                                         ? ETeamWeaponState::Deploying
+		                                         : ETeamWeaponState::Packing;
+	if (M_TeamWeaponState != TransitionState || bM_IsTeamWeaponAbandoned)
+	{
+		return;
+	}
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	// The montage is stretched to end with the deploy or pack timer.
+	const float TransitionSecondsLeft = World->GetTimerManager().GetTimerRemaining(M_DeployTimer);
+	if (TransitionSecondsLeft < TeamWeaponCrewAnimationStatics::MinCrewTransitionSecondsLeft)
+	{
+		return;
+	}
+
+	for (const FTeamWeaponCrewAnimationSlot& Slot : M_CrewAnimationState.M_Slots)
+	{
+		if (not Slot.GetHasRole() || M_CrewTransitionState.M_HandledOperators.Contains(Slot.M_Operator))
+		{
+			continue;
+		}
+		if (not GetIsOperatorSettledAtCrewPosition(Slot))
+		{
+			continue;
+		}
+		PlayCrewTransitionForSlot(Slot, TransitionSecondsLeft);
+	}
+}
+
+void ATeamWeaponController::PlayCrewTransitionForSlot(const FTeamWeaponCrewAnimationSlot& Slot,
+                                                      const float TransitionSecondsLeft)
+{
+	USquadUnitAnimInstance* AnimInstance = TeamWeaponCrewAnimationStatics::GetOperatorAnimInstanceNoReport(Slot);
+	const UCrewPosition* CrewPosition = Slot.M_CrewPosition.Get();
+	if (AnimInstance == nullptr || not IsValid(CrewPosition))
+	{
+		return;
+	}
+	M_CrewTransitionState.M_HandledOperators.Add(Slot.M_Operator);
+
+	ASquadUnit* Operator = Slot.M_Operator.Get();
+	const float DistanceToCrewPositionCm = FVector::Dist2D(
+		Operator->GetActorLocation(),
+		CrewPosition->GetComponentLocation());
+	if (DistanceToCrewPositionCm > TeamWeaponCrewAnimationStatics::MaxTransitionSnapDistanceCm)
+	{
+		return;
+	}
+
+	// Authored on the crew position facing downrange, like the crew loops; snap so the hands find the trail.
+	if (not SnapOperatorToCrewPosition(Operator, CrewPosition))
+	{
+		FRotator OperatorRotation = Operator->GetActorRotation();
+		OperatorRotation.Yaw = CrewPosition->GetComponentRotation().Yaw;
+		Operator->SetActorRotation(OperatorRotation, ETeleportType::TeleportPhysics);
+	}
+
+	AnimInstance->PlayTeamWeaponCrewTransition(
+		M_CrewTransitionState.M_Transition,
+		M_CrewAnimationState.M_TeamWeaponSquadSubtype,
+		GetIsCrewPositionOnWeaponRightSide(CrewPosition),
+		TransitionSecondsLeft);
+}
+
+void ATeamWeaponController::EndCrewTransitionMontages(const ETeamWeaponState NewState)
+{
+	if (not M_CrewTransitionState.bM_IsActive)
+	{
+		return;
+	}
+	const bool bIsDeployFinished = M_CrewTransitionState.M_Transition == ETeamWeaponCrewTransition::Deploy &&
+		NewState == ETeamWeaponState::Ready_Deployed;
+	const bool bIsPackFinished = M_CrewTransitionState.M_Transition == ETeamWeaponCrewTransition::Pack &&
+		NewState == ETeamWeaponState::Ready_Packed;
+	// A finished transition lets the montage run out: arming the crew loop or walking off blends it out by itself.
+	if (not bIsDeployFinished && not bIsPackFinished)
+	{
+		for (const TWeakObjectPtr<ASquadUnit>& HandledOperator : M_CrewTransitionState.M_HandledOperators)
+		{
+			if (not HandledOperator.IsValid())
+			{
+				continue;
+			}
+			USquadUnitAnimInstance* AnimInstance = HandledOperator->GetAnimBP_SquadUnit();
+			if (IsValid(AnimInstance))
+			{
+				AnimInstance->StopTeamWeaponCrewTransition();
+			}
+		}
+	}
+	M_CrewTransitionState.Reset();
+}
+
+bool ATeamWeaponController::GetIsCrewPositionOnWeaponRightSide(const UCrewPosition* CrewPosition) const
+{
+	if (not GetIsValidTeamWeaponNoReport() || not IsValid(CrewPosition))
+	{
+		return true;
+	}
+	const FVector CrewPositionInWeaponSpace = M_TeamWeapon->GetActorTransform().InverseTransformPosition(
+		CrewPosition->GetComponentLocation());
+	return CrewPositionInWeaponSpace.Y >= 0.f;
 }
 
 // ---- End crew animations ----

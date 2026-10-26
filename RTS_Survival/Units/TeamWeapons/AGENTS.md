@@ -111,6 +111,23 @@ Design: `Source/DesignTexts/Teamweapons/AnimationsAndTWPositionIntegration.md`.
   `ITurretOwner::OnTurretWeaponReloadStart`, stretched to the flux-adjusted reload time. `OnFireWeapon` is not used.
 - Debug prints: `DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols`.
 
+### Deploy and pack montages (operators handling the trails)
+
+- Designer data: `USquadUnitAnimInstance::TeamWeaponCrewTransitionMontages` (`FTeamWeaponCrewTransitionMontages`): a
+  base set plus overrides keyed by lists of team weapon squad subtypes, so one set serves a whole family (all
+  howitzers, all anti-tank guns). Each set has a Deploy and a Pack montage per side of the weapon; the side is the sign
+  of the operator's crew position Y in the weapon's local space (left falls back to right). Null plays nothing.
+- The clips are in place, start and end standing facing downrange, and are stretched (`PlayRate` multiplies, clamped)
+  so they end with the deploy/pack timer. Sources and generators: Blender
+  `CustomMapItems/InfantryAnimations/TrailPak` and `TrailHowitzer`.
+- Purely cosmetic and additive: `StartCrewTransitionMontages` runs after the deploy/pack timer is set, plays on every
+  settled operator (snapped onto its post like arming), and the tick picks up operators that settle later while time
+  is left. `SetTeamWeaponState` ends the transition; only its own end state (Ready_Deployed / Ready_Packed) lets the
+  montages run out, every other state (tow hook, abandon, pack during deploy) blends them out.
+- The anim instance runs them through the crew runtime (`bM_IsTransitionPlaying`), so every guard that keeps cover,
+  aim-position transitions and the walking backstop off a crewing operator also covers a transition. A transition never
+  matches `GetIsSameAssignment`, so arming after a deploy always replaces it with the role loop.
+
 ## Ground contact, pushed crew and tow sway
 
 Doc and test: `Source/Docs/Units/TeamWeaponQuality.md`, `-TeamWeaponQualityValidate` (`Tests/TeamWeaponQualityTestSubsystem`).

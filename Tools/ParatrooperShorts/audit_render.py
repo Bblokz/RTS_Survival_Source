@@ -3,6 +3,7 @@ import json
 import re
 import subprocess
 import sys
+from fractions import Fraction
 from pathlib import Path
 
 take=Path(sys.argv[1]).resolve()
@@ -10,7 +11,11 @@ manifest=json.loads((take/"Manifest.json").read_text(encoding="utf-8-sig"))
 job=json.loads((take/"Job.json").read_text(encoding="utf-8-sig"))
 log=(take/"render.log").read_text(encoding="utf-8",errors="replace")
 video=take/(job["JobName"]+".mp4")
-probe=json.loads(subprocess.check_output(["ffprobe","-v","error","-show_entries","format=duration:stream=codec_type,width,height","-of","json",str(video)],text=True))
+probe=json.loads(subprocess.check_output(["ffprobe","-v","error","-show_entries","format=duration:stream=codec_type,width,height,avg_frame_rate","-of","json",str(video)],text=True))
+
+video_stream=next(stream for stream in probe["streams"] if stream["codec_type"]=="video")
+assert (video_stream["width"],video_stream["height"])==(job["ResolutionX"],job["ResolutionY"])
+assert Fraction(video_stream["avg_frame_rate"])==job["Fps"]
 duration=float(probe["format"]["duration"])
 assert 0<duration<=120.001,duration
 assert manifest["bComplete"]
@@ -109,6 +114,7 @@ expected_duration=(segment["endFrame"]-segment["startFrame"])/job["Fps"]
 assert abs(duration-expected_duration)<.05,(duration,expected_duration)
 final_camera_progress=min(1,max(0,(duration-2)/route_seconds))
 report={"video":str(video),"duration_seconds":duration,"aircraft_intro_seconds":2,
+        "resolution":[video_stream["width"],video_stream["height"]],"fps":job["Fps"],
         "range_behaviour_recipients":len(recipients),"soldier_owners_verified":len(owners),
         "rear_pits_verified":len(pit_positions),"all_four_pits_firing":True,"faction_header_columns":True,
         "added_infantry_squads_verified":len(infantry_positions),"regular_t34_85_count":4,

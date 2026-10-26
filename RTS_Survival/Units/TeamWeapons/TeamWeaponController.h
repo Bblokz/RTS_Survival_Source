@@ -10,6 +10,7 @@
 #include "CrewFormation/TeamWeaponCrewFormation.h"
 #include "TeamWeaponState/TeamWeaponState.h"
 #include "CrewPositions/CrewPositionType.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/TeamWeaponCrewMontages/TeamWeaponCrewMontages.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
 #include "TeamWeaponController.generated.h"
@@ -214,6 +215,30 @@ struct FTeamWeaponCrewAnimationState
 	TArray<FTeamWeaponCrewAnimationSlot> M_Slots;
 
 	ESquadSubtype M_TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+};
+
+/**
+ * @brief The deploy or pack the operators play their one-shot crew montage for.
+ * Operators still walking to their crew position when it starts get the montage late, over the time that is left.
+ */
+USTRUCT()
+struct FTeamWeaponCrewTransitionState
+{
+	GENERATED_BODY()
+
+	void Reset()
+	{
+		bM_IsActive = false;
+		M_HandledOperators.Reset();
+	}
+
+	ETeamWeaponCrewTransition M_Transition = ETeamWeaponCrewTransition::Deploy;
+
+	bool bM_IsActive = false;
+
+	// Operators that started their montage (or were skipped) for this transition; each plays it at most once.
+	UPROPERTY()
+	TArray<TWeakObjectPtr<ASquadUnit>> M_HandledOperators;
 };
 
 /** An ability taken off the command card while the gun is dug in, and the card slot it goes back to. */
@@ -525,6 +550,17 @@ private:
 	void TickArmedCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& Slot);
 	void ResnapArmedOperatorPushedOffPost(const FTeamWeaponCrewAnimationSlot& Slot) const;
 	bool GetIsValidCrewAnimationSlotOperator(const FTeamWeaponCrewAnimationSlot& Slot) const;
+
+	// Deploy and pack montages: one-shot, stretched over the deployment time, purely cosmetic.
+	/** Call after the deploy or pack timer is set; plays the montage on every operator already on its post. */
+	void StartCrewTransitionMontages(const ETeamWeaponCrewTransition Transition);
+	/** Starts the montage late for operators that only now settled on their crew position. */
+	void TickCrewTransitionMontages();
+	void TryPlayCrewTransitionForSettledOperators();
+	void PlayCrewTransitionForSlot(const FTeamWeaponCrewAnimationSlot& Slot, const float TransitionSecondsLeft);
+	/** Any state but the transition's own end (Ready_Deployed / Ready_Packed) cuts the montages short. */
+	void EndCrewTransitionMontages(const ETeamWeaponState NewState);
+	bool GetIsCrewPositionOnWeaponRightSide(const UCrewPosition* CrewPosition) const;
 	// ---- End crew animations ----
 
 	// ---- ITurretOwner ----
@@ -590,6 +626,10 @@ private:
 	// Per operator crew role and arming state for the full body crew montages.
 	UPROPERTY()
 	FTeamWeaponCrewAnimationState M_CrewAnimationState;
+
+	// Operators playing their deploy or pack montage; only active while Deploying or Packing.
+	UPROPERTY()
+	FTeamWeaponCrewTransitionState M_CrewTransitionState;
 
 	UPROPERTY()
 	ETeamWeaponState M_TeamWeaponState = ETeamWeaponState::Uninitialized;

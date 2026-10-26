@@ -130,3 +130,99 @@ struct FTeamWeaponCrewMontages
 private:
 	const FTeamWeaponCrewMontage* GetMontageForRole(const ECrewPositionType CrewRole) const;
 };
+
+/** The team weapon transitions a crew member plays a one-shot full body montage for. */
+UENUM(BlueprintType)
+enum class ETeamWeaponCrewTransition : uint8
+{
+	Deploy,
+	Pack
+};
+
+/**
+ * @brief Montage an operator plays once while the team weapon deploys or packs, per side of the weapon.
+ * Authored in place, starting and ending standing and facing downrange like the operator on its crew position.
+ */
+USTRUCT(BlueprintType)
+struct FTeamWeaponCrewTransitionSideMontages
+{
+	GENERATED_BODY()
+
+	/**
+	 * @param bIsOnWeaponRightSide True when the operator's crew position is on the weapon's right (local +Y).
+	 * @return The montage for that side; the left side falls back to the right side montage. Null plays nothing.
+	 */
+	UAnimMontage* GetMontageForSide(const bool bIsOnWeaponRightSide) const;
+
+	// Operator whose crew position is on the weapon's right (local +Y). Null means: play nothing.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	TObjectPtr<UAnimMontage> RightSideMontage = nullptr;
+
+	// Operator on the weapon's left (local -Y), usually the mirrored clip. Null reuses RightSideMontage.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	TObjectPtr<UAnimMontage> LeftSideMontage = nullptr;
+};
+
+/**
+ * @brief Deploy and pack montages shared by one family of team weapons (all howitzers, all anti-tank guns, ...).
+ * Each montage is stretched so it ends when the weapon finishes deploying or packing.
+ */
+USTRUCT(BlueprintType)
+struct FTeamWeaponCrewTransitionMontageSet
+{
+	GENERATED_BODY()
+
+	const FTeamWeaponCrewTransitionSideMontages& GetSideMontages(const ETeamWeaponCrewTransition Transition) const;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	FTeamWeaponCrewTransitionSideMontages Deploy;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	FTeamWeaponCrewTransitionSideMontages Pack;
+
+	// Multiplied with the play rate that stretches the montage over the deployment time.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew", meta = (ClampMin = "0.01"))
+	float PlayRate = 1.0f;
+};
+
+/** One override serves every team weapon squad subtype listed, e.g. one entry for all howitzers. */
+USTRUCT(BlueprintType)
+struct FTeamWeaponCrewTransitionMontageOverride
+{
+	GENERATED_BODY()
+
+	bool GetAppliesToSubtype(const ESquadSubtype TeamWeaponSquadSubtype) const
+	{
+		return SquadSubtypes.Contains(TeamWeaponSquadSubtype);
+	}
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	TArray<ESquadSubtype> SquadSubtypes;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	FTeamWeaponCrewTransitionMontageSet MontageSet;
+};
+
+/**
+ * @brief Designer container for the montages operators play while their team weapon deploys or packs.
+ * Purely additive: a weapon without montages deploys and packs exactly as before.
+ */
+USTRUCT(BlueprintType)
+struct FTeamWeaponCrewTransitionMontages
+{
+	GENERATED_BODY()
+
+	/**
+	 * @param TeamWeaponSquadSubtype Subtype of the team weapon squad used as override key.
+	 * @return The first override whose subtype list contains the subtype, otherwise the base set.
+	 */
+	const FTeamWeaponCrewTransitionMontageSet& ResolveSet(const ESquadSubtype TeamWeaponSquadSubtype) const;
+
+	// Used by every team weapon squad that has no matching override; empty means those crews play nothing.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	FTeamWeaponCrewTransitionMontageSet Base;
+
+	// First override whose SquadSubtypes contains the team weapon squad subtype wins.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	TArray<FTeamWeaponCrewTransitionMontageOverride> Overrides;
+};
