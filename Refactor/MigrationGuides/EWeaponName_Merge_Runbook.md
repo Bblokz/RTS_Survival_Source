@@ -24,6 +24,15 @@ How to bring the finished migration (worktree `D:/UE5Projects/RTS_WN`, branch `m
 * Tests: 138 of 139 `RTS.` tests pass. The one failure is not caused by the migration: `RTS.Weapons.GroundFire.OtherWeaponsHaveNone` fails on `main` too, because batch 3 gives `KwK37_75MM_Napalm` ground fire while the test still allows only `Rocket_320mm_Incendiary`.
 * Headless `-game` smoke runs on 3 maps: clean.
 * Not landed. The variants agent still has uncommitted weapon Blueprints on `main`: the Luchs and 234/3 turret edits, the new 234/3 IncendiarySupport and StummelAssault turrets, and the Puma, 234/3, Pz II F and Sd.Kfz. 140 vehicles. Once they are committed, run round 2 (steps 2–4 for `325e93160..main` only), then step 5.
+**Round 2 (2026-10-26): merged `main` superproject `a88486722` / Source `92f92162`** (variants `09eb60cad`, Luchs + Shorts `a88486722`, Shorts text `92f92162`).
+
+* Delta: 3 packages. The new `EmbTurret_Sdkfz_234_3_IncendiarySupport` and `_StummelAssault`, plus `Ger_Turret_PZ_II_Luchs`. The Luchs turret was changed on both sides: the merge took `main`'s version (identical blob) and Apply migrated it again.
+* Apply: 0 `FAILED`, 0 compile errors.
+* Verify (1,459 combined rows): 0 changed, the 2 known missing rows.
+* CompileAllBlueprints: identical to the baseline.
+* Tests: 138 of 139; the GroundFire test fails on `main` too.
+* Headless `-game` smoke runs on 3 maps: clean.
+
 * Note for the variants agent: some new variant Blueprints currently store the *base* weapon, not the batch-3 one. The Pz II F Radixite turret stores `KwK30_20MM`, the Puma DualBarrel `Kwk34_Twin30MM`, the 140 AA `MG151_15MM_Twin` and the 140 Bunker mortar `Mortar_40MM`. The migration keeps whatever is stored.
 
 ## 0. State on 2026-10-26 (re-check before starting)
