@@ -65,6 +65,11 @@ public:
 	 */
 	void ExecuteCinematicDrop(const FVector& TargetLocation, const FVector& AircraftStartLocation);
 	AAircraftMaster* GetActiveDropAircraft() const;
+	TArray<TWeakObjectPtr<AAircraftMaster>> GetActiveDropAircrafts() const;
+	/** Configure only a cinematic ability copy before starting its passes; zero preserves ordinary mission landings. */
+	void SetCinematicLandingTrailLength(float TrailLength);
+	/** Positive values override jump spacing on a cinematic copy; zero keeps the template's interval. */
+	void SetCinematicJumpInterval(float IntervalSeconds);
 	TArray<TWeakObjectPtr<ASquadController>> GetActiveDropSquads() const;
 	bool GetHasActiveDrop() const;
 	void CancelActiveDrops();
@@ -99,6 +104,7 @@ private:
 		bool bM_HasReachedTarget = false;
 		int32 PendingSquadSpawns = 0;
 		int32 JumpedUnitCount = 0;
+		int32 QueuedUnitCount = 0;
 		TArray<FParatrooperWaitingToJump> UnitsWaitingToJump;
 		TArray<FParatrooperSquadInDrop> SquadsInDrop;
 		FTimerHandle JumpTimerHandle;
@@ -108,6 +114,9 @@ private:
 
 	UPROPERTY(Transient)
 	int32 M_NextRunId = 0;
+
+	// Cinematic callers can distribute a squad along its pass without changing the shared designer template.
+	float M_CinematicLandingTrailLength = 0.f;
 
 	// Keeps async aircraft class loads alive until their callbacks can spawn the aircraft.
 	TArray<TSharedPtr<FStreamableHandle>> M_AircraftClassLoadHandles;
@@ -150,6 +159,7 @@ private:
 	 * @return Actor location (capsule centre) on the ground.
 	 */
 	FVector GetLandingLocation(const FParatrooperDropRun& Run, const ASquadUnit* SquadUnit, int32 JumpIndex) const;
+	FVector GetLandingTrailOrigin(const FParatrooperDropRun& Run, int32 JumpIndex) const;
 	void OnParatrooperDescentFinished(int32 RunId, TWeakObjectPtr<ASquadController> Squad);
 	void MarkUnitDone(FParatrooperDropRun& Run, const TWeakObjectPtr<ASquadController>& Squad);
 	void ReleaseFinishedSquads(FParatrooperDropRun& Run) const;

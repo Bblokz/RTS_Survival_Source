@@ -112,6 +112,34 @@ AAircraftMaster* UGA_Paratroopers::GetActiveDropAircraft() const
 	return nullptr;
 }
 
+TArray<TWeakObjectPtr<AAircraftMaster>> UGA_Paratroopers::GetActiveDropAircrafts() const
+{
+	TArray<TWeakObjectPtr<AAircraftMaster>> AircraftFormation;
+	for (const FParatrooperDropRun& Run : M_DropRuns)
+	{
+		if (Run.Aircraft.IsValid())
+		{
+			AircraftFormation.Add(Run.Aircraft);
+		}
+	}
+	return AircraftFormation;
+}
+
+void UGA_Paratroopers::SetCinematicLandingTrailLength(const float TrailLength)
+{
+	M_CinematicLandingTrailLength = FMath::Max(0.f, TrailLength);
+}
+
+void UGA_Paratroopers::SetCinematicJumpInterval(const float IntervalSeconds)
+{
+	if (IntervalSeconds <= 0.f)
+	{
+		return;
+	}
+	constexpr float MinimumJumpIntervalSeconds = 0.05f;
+	M_ParatroopersSettings.DropIntervalPerUnit = FMath::Max(MinimumJumpIntervalSeconds, IntervalSeconds);
+}
+
 TArray<TWeakObjectPtr<ASquadController>> UGA_Paratroopers::GetActiveDropSquads() const
 {
 	TArray<TWeakObjectPtr<ASquadController>> Squads;
@@ -392,6 +420,7 @@ void UGA_Paratroopers::OnSquadReadyToJump(const int32 RunId, ASquadController* S
 		WaitingUnit.SquadUnit = SquadUnit;
 		WaitingUnit.Squad = Squad;
 		Run->UnitsWaitingToJump.Add(WaitingUnit);
+		++Run->QueuedUnitCount;
 		++SquadInDrop->UnitsNotLanded;
 	}
 }
@@ -433,11 +462,11 @@ void UGA_Paratroopers::JumpNextUnit(FParatrooperDropRun& Run)
 	const FVector LandingLocation = GetLandingLocation(Run, SquadUnit, Run.JumpedUnitCount);
 	const FVector StartLocation = GetJumpStartLocation(Run);
 	const AAircraftMaster* Aircraft = Run.Aircraft.Get();
-	UE_LOG(LogTemp, Display, TEXT("RTS_PARATROOPER_JUMP run=%d index=%d unit=%s source=%s past_target_cm=%.0f"),
+	UE_LOG(LogTemp, Display, TEXT("RTS_PARATROOPER_JUMP run=%d index=%d unit=%s source=%s past_target_cm=%.0f start=%s landing=%s"),
 		Run.RunId, Run.JumpedUnitCount, *SquadUnit->GetName(), IsValid(Aircraft) ? TEXT("aircraft") : TEXT("fallback"),
 		IsValid(Aircraft)
 			? FVector::DotProduct(Aircraft->GetActorLocation() - Run.PassOverLocation, Run.RunDirection)
-			: 0.0f);
+			: 0.0f, *StartLocation.ToString(), *LandingLocation.ToString());
 	++Run.JumpedUnitCount;
 	// May finish synchronously (invalid owner) and re-enter through OnParatrooperDescentFinished: Run is not used after.
 	DescentComponent->StartDescent(
@@ -495,7 +524,7 @@ FVector UGA_Paratroopers::GetLandingLocation(
 		M_ParatroopersSettings.LandingSpreadRadius,
 		ParatroopersConstants::LandingSpiralSpacing * FMath::Sqrt(static_cast<float>(JumpIndex) + 0.5f));
 	const float SpiralAngle = static_cast<float>(JumpIndex) * ParatroopersConstants::GoldenAngleRadians;
-	const FVector DesiredLocation = Run.TargetLocation +
+	const FVector DesiredLocation = GetLandingTrailOrigin(Run, JumpIndex) +
 		FVector(FMath::Cos(SpiralAngle), FMath::Sin(SpiralAngle), 0.0f) * SpiralRadius;
 	bool bWasProjected = false;
 	FVector GroundLocation = URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
@@ -521,6 +550,16 @@ FVector UGA_Paratroopers::GetLandingLocation(
 	const UCapsuleComponent* Capsule = SquadUnit->GetCapsuleComponent();
 	const float HalfHeight = IsValid(Capsule) ? Capsule->GetScaledCapsuleHalfHeight() : 0.0f;
 	return GroundLocation + FVector(0.0f, 0.0f, HalfHeight);
+}
+
+FVector UGA_Paratroopers::GetLandingTrailOrigin(const FParatrooperDropRun& Run, const int32 JumpIndex) const
+{
+	if (M_CinematicLandingTrailLength <= 0.f)
+	{
+		return Run.TargetLocation;
+	}
+	const float TrailFraction = static_cast<float>(JumpIndex) / FMath::Max(1, Run.QueuedUnitCount - 1);
+	return Run.TargetLocation + Run.RunDirection * M_CinematicLandingTrailLength * TrailFraction;
 }
 
 void UGA_Paratroopers::OnParatrooperDescentFinished(const int32 RunId, TWeakObjectPtr<ASquadController> Squad)

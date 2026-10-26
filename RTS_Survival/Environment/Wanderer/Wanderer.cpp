@@ -6,6 +6,7 @@
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/OverlapResult.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -29,6 +30,11 @@ namespace WandererConstants
 	constexpr float MinWalkTimeout = 3.f;
 
 	constexpr int32 DestinationAttempts = 6;
+
+	// Flee directions are spread around "straight away" so a herd scatters instead of running in one line.
+	constexpr float FleeSpreadDegrees = 35.f;
+	constexpr int32 FleeAttempts = 6;
+	constexpr float FleeRetryAngleStepDegrees = 30.f;
 
 	// Aim points relative to the mesh bounds: centre of the body plus front and rear.
 	constexpr float AimHeightFraction = 0.6f;
@@ -61,6 +67,7 @@ void AWanderer::BeginPlay()
 	BeginPlay_SetupCollision();
 	BeginPlay_SetupAimOffsets();
 	BeginPlay_ApplyRandomMaterialVariant();
+	BeginPlay_RandomizeVariation();
 
 	FVector Location = GetActorLocation();
 	Location.Z = GetGroundHeight(Location);
@@ -120,10 +127,19 @@ void AWanderer::BeginPlay_ApplyRandomMaterialVariant() const
 	AnimalMesh->SetMaterial(0, Variant);
 }
 
+void AWanderer::BeginPlay_RandomizeVariation() const
+{
+	if (not GetIsValidAnimalMesh())
+	{
+		return;
+	}
+	AnimalMesh->SetCustomPrimitiveDataFloat(WandererVatPrimitiveData::Variation, FMath::FRand());
+}
+
 void AWanderer::Tick(const float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	if (M_State == EWandererState::Walking)
+	if (M_State == EWandererState::Walking || M_State == EWandererState::Fleeing)
 	{
 		TickWalking(DeltaSeconds);
 	}
@@ -134,7 +150,8 @@ void AWanderer::StartIdle(const bool bRandomizeDuration)
 	M_State = EWandererState::Idle;
 	SetActorTickEnabled(false);
 
-	const float ClipDuration = VatSettings.IdleClip.GetDuration(VatSettings.FramesPerSecond);
+	const FWandererVatClip& IdleClip = PickIdleClip();
+	const float ClipDuration = IdleClip.GetDuration(VatSettings.FramesPerSecond);
 	const int32 MinLoops = FMath::Max(1, MovementSettings.MinIdleLoops);
 	const int32 Loops = FMath::RandRange(MinLoops, FMath::Max(MinLoops, MovementSettings.MaxIdleLoops));
 	float IdleDuration = ClipDuration * Loops;
@@ -145,7 +162,7 @@ void AWanderer::StartIdle(const bool bRandomizeDuration)
 		PhaseSeconds = FMath::FRandRange(0.f, IdleDuration);
 		IdleDuration -= PhaseSeconds;
 	}
-	PlayVatClip(VatSettings.IdleClip, true, PhaseSeconds);
+	PlayVatClip(IdleClip, true, PhaseSeconds);
 
 	UWorld* World = GetWorld();
 	if (not World)
@@ -155,6 +172,16 @@ void AWanderer::StartIdle(const bool bRandomizeDuration)
 	constexpr float MinTimerDelay = 0.05f;
 	World->GetTimerManager().SetTimer(M_IdleTimerHandle, this, &AWanderer::OnIdleFinished,
 	                                  FMath::Max(IdleDuration, MinTimerDelay), false);
+}
+
+const FWandererVatClip& AWanderer::PickIdleClip() const
+{
+	const int32 Choice = FMath::RandRange(0, VatSettings.ExtraIdleClips.Num());
+	if (Choice == 0 || not VatSettings.ExtraIdleClips.IsValidIndex(Choice - 1))
+	{
+		return VatSettings.IdleClip;
+	}
+	return VatSettings.ExtraIdleClips[Choice - 1];
 }
 
 void AWanderer::OnIdleFinished()
@@ -184,9 +211,115 @@ bool AWanderer::TryStartWalking()
 	M_WalkTimeLeft = FMath::Max(WandererConstants::MinWalkTimeout,
 	                            StraightDistance / MovementSettings.WalkSpeed * WandererConstants::WalkTimeoutFactor);
 	M_State = EWandererState::Walking;
+	M_MoveSpeed = MovementSettings.WalkSpeed;
+	M_TurnSpeed = MovementSettings.TurnSpeedDegrees;
 	PlayVatClip(VatSettings.WalkClip, true, 0.f);
 	SetActorTickEnabled(true);
 	return true;
+}
+
+bool AWanderer::StartFleeing(const FVector& ThreatLocation, const bool bHasThreatLocation)
+{
+	if (not VatSettings.HasRunClip() || not IsUnitAlive() || M_State == EWandererState::Fleeing)
+	{
+		return false;
+	}
+	FVector Away = GetActorLocation() - ThreatLocation;
+	Away.Z = 0.f;
+	if (not bHasThreatLocation || Away.IsNearlyZero())
+	{
+		Away = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f).Vector();
+	}
+	Away = Away.GetSafeNormal().RotateAngleAxis(
+		FMath::FRandRange(-WandererConstants::FleeSpreadDegrees, WandererConstants::FleeSpreadDegrees), FVector::UpVector);
+	if (not TryBuildFleePath(Away))
+	{
+		return false;
+	}
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(M_IdleTimerHandle);
+	}
+	M_State = EWandererState::Fleeing;
+	M_MoveSpeed = FleeSettings.RunSpeed;
+	M_TurnSpeed = FleeSettings.RunTurnSpeedDegrees;
+	M_WalkTimeLeft = FMath::Max(WandererConstants::MinWalkTimeout,
+	                            FleeSettings.FleeDistance / FleeSettings.RunSpeed * WandererConstants::WalkTimeoutFactor);
+	PlayVatClip(VatSettings.RunClip, true, FMath::FRandRange(0.f, VatSettings.RunClip.GetDuration(VatSettings.FramesPerSecond)));
+	SetActorTickEnabled(true);
+	return true;
+}
+
+bool AWanderer::TryBuildFleePath(const FVector& Away)
+{
+	const UNavigationSystemV1* NavigationSystem = GetNavigationSystemIfOnNavMesh();
+	for (int32 Attempt = 0; Attempt < WandererConstants::FleeAttempts; ++Attempt)
+	{
+		// Straight away first, then alternate left/right further from the threat direction.
+		const float Sign = Attempt % 2 == 0 ? 1.f : -1.f;
+		const float Angle = Sign * WandererConstants::FleeRetryAngleStepDegrees * ((Attempt + 1) / 2);
+		FVector Destination = GetActorLocation() + Away.RotateAngleAxis(Angle, FVector::UpVector) * FleeSettings.FleeDistance;
+		if (NavigationSystem)
+		{
+			FNavLocation NavLocation;
+			if (not NavigationSystem->ProjectPointToNavigation(Destination, NavLocation))
+			{
+				continue;
+			}
+			Destination = NavLocation.Location;
+		}
+		if (BuildPathTo(Destination))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool AWanderer::GetThreatLocation(const AActor* DamageCauser, FVector& OutThreatLocation) const
+{
+	if (not IsValid(DamageCauser))
+	{
+		// Hit-scan weapons pass no causer.
+		return false;
+	}
+	// Projectiles hit us at our own location; the shooter is back along their flight path.
+	const FVector CauserVelocity = DamageCauser->GetVelocity();
+	if (not CauserVelocity.IsNearlyZero())
+	{
+		OutThreatLocation = GetActorLocation() - CauserVelocity.GetSafeNormal() * FleeSettings.FleeDistance;
+		return true;
+	}
+	if (const AActor* CauserOwner = DamageCauser->GetOwner())
+	{
+		OutThreatLocation = CauserOwner->GetActorLocation();
+		return true;
+	}
+	OutThreatLocation = DamageCauser->GetActorLocation();
+	return FVector::Dist2D(OutThreatLocation, GetActorLocation()) > WandererConstants::AcceptanceRadius;
+}
+
+void AWanderer::AlertHerd(const FVector& ThreatLocation, const bool bHasThreatLocation) const
+{
+	const UWorld* World = GetWorld();
+	if (not World || FleeSettings.HerdAlertRadius <= 0.f)
+	{
+		return;
+	}
+	TArray<FOverlapResult> Overlaps;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(WandererHerdAlert), false, this);
+	World->OverlapMultiByObjectType(Overlaps, GetActorLocation(), FQuat::Identity,
+	                                FCollisionObjectQueryParams(ECC_Destructible),
+	                                FCollisionShape::MakeSphere(FleeSettings.HerdAlertRadius), QueryParams);
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AWanderer* HerdMember = Cast<AWanderer>(Overlap.GetActor());
+		if (not IsValid(HerdMember) || HerdMember == this || HerdMember->GetClass() != GetClass())
+		{
+			continue;
+		}
+		HerdMember->StartFleeing(ThreatLocation, bHasThreatLocation);
+	}
 }
 
 UNavigationSystemV1* AWanderer::GetNavigationSystemIfOnNavMesh() const
@@ -278,14 +411,14 @@ void AWanderer::TickWalking(const float DeltaSeconds)
 	const float DesiredYaw = ToTarget.Rotation().Yaw;
 	const float CurrentYaw = GetActorRotation().Yaw;
 	const float YawError = FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw);
-	const float MaxYawStep = MovementSettings.TurnSpeedDegrees * DeltaSeconds;
+	const float MaxYawStep = M_TurnSpeed * DeltaSeconds;
 	const float NewYaw = CurrentYaw + FMath::Clamp(YawError, -MaxYawStep, MaxYawStep);
 
 	const float SpeedFactor = FMath::Abs(YawError) > WandererConstants::SharpTurnDegrees
 		                          ? WandererConstants::SharpTurnSpeedFactor
 		                          : 1.f;
 	const FRotator NewRotation(0.f, NewYaw, 0.f);
-	Location += NewRotation.Vector() * MovementSettings.WalkSpeed * SpeedFactor * DeltaSeconds;
+	Location += NewRotation.Vector() * M_MoveSpeed * SpeedFactor * DeltaSeconds;
 	Location.Z = GetGroundHeight(Location);
 	SetActorLocationAndRotation(Location, NewRotation);
 }
@@ -334,7 +467,19 @@ float AWanderer::TakeDamage(const float DamageAmount, FDamageEvent const& Damage
                             AActor* DamageCauser)
 {
 	const float DamageTaken = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
-	if (M_State == EWandererState::Idle && MovementSettings.bStartWalkingWhenDamaged && IsUnitAlive())
+	if (not IsUnitAlive())
+	{
+		return DamageTaken;
+	}
+	if (VatSettings.HasRunClip() && FleeSettings.bFleeWhenDamaged)
+	{
+		FVector Threat = GetActorLocation();
+		const bool bHasThreat = GetThreatLocation(DamageCauser, Threat);
+		StartFleeing(Threat, bHasThreat);
+		AlertHerd(Threat, bHasThreat);
+		return DamageTaken;
+	}
+	if (M_State == EWandererState::Idle && MovementSettings.bStartWalkingWhenDamaged)
 	{
 		(void)TryStartWalking();
 	}

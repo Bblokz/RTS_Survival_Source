@@ -17,6 +17,8 @@ namespace WandererVatPrimitiveData
 	constexpr int32 StartTime = 2;
 	constexpr int32 Loop = 3;
 	constexpr int32 FramesPerSecond = 4;
+	// Random 0..1 per animal; the material uses it for subtle coat variation (hue/value jitter).
+	constexpr int32 Variation = 5;
 }
 
 /** One clip inside the vertex animation textures, in texture rows as written by the Blender bake. */
@@ -55,6 +57,16 @@ struct FWandererVatSettings
 	// Played once on death; the last frame is held.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VAT")
 	FWandererVatClip DeathClip;
+
+	// Looping run cycle used while fleeing; leave NumFrames at 1 for animals that do not flee.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VAT")
+	FWandererVatClip RunClip;
+
+	// More idle clips (look around, rest, ...); each idle picks one of IdleClip and these at random.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="VAT")
+	TArray<FWandererVatClip> ExtraIdleClips;
+
+	bool HasRunClip() const { return RunClip.NumFrames > 1; }
 };
 
 USTRUCT(BlueprintType)
@@ -106,12 +118,38 @@ struct FWandererDeathSettings
 	bool bDieWhenCrushedByTanks = true;
 };
 
+/** Flight behaviour for animals with a run clip: bolt away from the threat, and the herd bolts with them. */
+USTRUCT(BlueprintType)
+struct FWandererFleeSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Flee")
+	bool bFleeWhenDamaged = true;
+
+	// Should match the run clip's stride, like WalkSpeed does for the walk clip.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Flee", meta=(ClampMin="1"))
+	float RunSpeed = 400.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Flee", meta=(ClampMin="1"))
+	float RunTurnSpeedDegrees = 240.f;
+
+	// How far the animal runs before it settles down again (it may leave its wander radius).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Flee", meta=(ClampMin="100"))
+	float FleeDistance = 2500.f;
+
+	// Wanderers of the same class within this radius flee from the same threat; 0 disables the alarm.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Flee", meta=(ClampMin="0"))
+	float HerdAlertRadius = 1500.f;
+};
+
 UENUM(BlueprintType)
 enum class EWandererState : uint8
 {
 	Idle,
 	Walking,
-	Dead
+	Dead,
+	Fleeing
 };
 
 /**
@@ -128,6 +166,15 @@ public:
 	AWanderer(const FObjectInitializer& ObjectInitializer);
 
 	virtual void Tick(float DeltaSeconds) override;
+
+	/**
+	 * @brief Run away from a threat with the run clip (no-op without a run clip, while dead or already fleeing).
+	 * @param ThreatLocation Where the danger came from.
+	 * @param bHasThreatLocation False picks a random direction (weapon traces carry no causer).
+	 * @return Whether the animal started fleeing.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Wander")
+	bool StartFleeing(const FVector& ThreatLocation, const bool bHasThreatLocation);
 
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category="Wander")
 	EWandererState GetWandererState() const { return M_State; }
@@ -154,6 +201,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wander")
 	FWandererDeathSettings DeathSettings;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wander")
+	FWandererFleeSettings FleeSettings;
+
 	// Optional colour variants (e.g. cow patterns); one is picked at random on BeginPlay. Empty keeps the mesh material.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wander")
 	TArray<TObjectPtr<UMaterialInterface>> MaterialVariants;
@@ -163,7 +213,14 @@ private:
 	void BeginPlay_SetupAimOffsets();
 	void BeginPlay_ApplyRandomMaterialVariant() const;
 
+	void BeginPlay_RandomizeVariation() const;
+
 	void StartIdle(const bool bRandomizeDuration);
+	const FWandererVatClip& PickIdleClip() const;
+	/** @return Whether a threat direction is known; projectiles point back along their flight, hit-scan has none. */
+	bool GetThreatLocation(const AActor* DamageCauser, FVector& OutThreatLocation) const;
+	void AlertHerd(const FVector& ThreatLocation, const bool bHasThreatLocation) const;
+	bool TryBuildFleePath(const FVector& Away);
 	void OnIdleFinished();
 	bool TryStartWalking();
 	bool BuildPathTo(const FVector& Destination);
@@ -199,6 +256,10 @@ private:
 
 	// Walks that take much longer than expected are aborted (blocked by an obstacle).
 	float M_WalkTimeLeft = 0.f;
+
+	// Speed and turn rate of the current move: walking or fleeing.
+	float M_MoveSpeed = 0.f;
+	float M_TurnSpeed = 0.f;
 
 	FTimerHandle M_IdleTimerHandle;
 };

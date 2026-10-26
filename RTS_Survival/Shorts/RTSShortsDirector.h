@@ -218,6 +218,23 @@ private:
 	void TickBattle(const int32 Frame);
 	void EndBattle();
 	void BeginParatrooperBattle();
+	/**
+	 * @brief Allows independent passes to share the real ability lifecycle without moving either battle line.
+	 * @param Pass Ground target and aircraft approach in stage-local coordinates.
+	 * @param PassIndex Stable pass index recorded in render verification logs.
+	 */
+	void StartParatrooperPass(const FRTSShortsParatrooperPass& Pass, int32 PassIndex) const;
+	int32 GetParatrooperOwningPlayer() const;
+	void UpdateParatrooperAircraftCamera(int32 LocalFrame) const;
+	void KeepParatrooperAircraftVisible() const;
+	void PrepareParatrooperAircraftForCapture(class AAircraftMaster* Aircraft) const;
+	/**
+	 * @brief Keeps the flight pose updating offscreen and prevents a missing propeller material hiding the airframe.
+	 * @param Mesh Airframe component on the spawned cinematic aircraft.
+	 * @param bFirstPreparation Repairs material slots once before the placeholder cleanup sees them.
+	 */
+	void PrepareParatrooperAircraftMesh(class USkeletalMeshComponent* Mesh, bool bFirstPreparation) const;
+	void RepairParatrooperAircraftPropellerMaterial(USkeletalMeshComponent* Mesh) const;
 	void TickParatrooperBattle(const int32 LocalFrame);
 	/** Preserves the landing cut, then follows the configured route across both faction viewpoints. */
 	void UpdateParatrooperBattleCamera(const int32 BattleLocalFrame) const;
