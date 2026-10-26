@@ -11,6 +11,21 @@ How to bring the finished migration (worktree `D:/UE5Projects/RTS_WN`, branch `m
 
 `main` itself then only needs a fast-forward and a rebuild, so the editors are closed for about 30 minutes.
 
+## Progress log
+
+**Round 1 (2026-10-26): merged `main` superproject `325e93160` / Source `7cb7a9d5`.**
+
+* Snapshot of `main`: 1,501 rows. 52 of them are `RTS_BP_GameState` CDO rows for the 13 new weapons, which the C++ fills into `SkipSerialization` maps; they are harmless.
+* Delta: 7 packages, all new batch-3 weapon Blueprints, none of them already migrated: Sd.Kfz. 140 AA / Bunker turret / Bunker vehicle, Pz II F Radixite turret, and the Puma DualBarrel / OverchargedBeam / RadixiteSniper turrets.
+* Merge: Source merged cleanly. The only superproject conflict was the `Source` gitlink.
+* Apply: 0 `FAILED`, 6 variables retyped, 9 wires relinked, 0 compile errors.
+* Verify (1,449 combined rows): 0 changed, only the 2 known `Break Weapon Description` rows missing.
+* CompileAllBlueprints: identical to the baseline.
+* Tests: 138 of 139 `RTS.` tests pass. The one failure is not caused by the migration: `RTS.Weapons.GroundFire.OtherWeaponsHaveNone` fails on `main` too, because batch 3 gives `KwK37_75MM_Napalm` ground fire while the test still allows only `Rocket_320mm_Incendiary`.
+* Headless `-game` smoke runs on 3 maps: clean.
+* Not landed. The variants agent still has uncommitted weapon Blueprints on `main`: the Luchs and 234/3 turret edits, the new 234/3 IncendiarySupport and StummelAssault turrets, and the Puma, 234/3, Pz II F and Sd.Kfz. 140 vehicles. Once they are committed, run round 2 (steps 2–4 for `325e93160..main` only), then step 5.
+* Note for the variants agent: some new variant Blueprints currently store the *base* weapon, not the batch-3 one. The Pz II F Radixite turret stores `KwK30_20MM`, the Puma DualBarrel `Kwk34_Twin30MM`, the 140 AA `MG151_15MM_Twin` and the 140 Bunker mortar `Mortar_40MM`. The migration keeps whatever is stored.
+
 ## 0. State on 2026-10-26 (re-check before starting)
 
 | | Superproject | Source |
