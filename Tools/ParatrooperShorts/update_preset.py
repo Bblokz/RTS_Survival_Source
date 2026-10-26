@@ -4,10 +4,18 @@ root=Path(__file__).resolve().parents[3]/"ShortsCreator"
 job_path=root/"Jobs/SovietParatrooperBattle.json"
 job=json.loads(job_path.read_text(encoding="utf-8-sig"))
 job["UnitOwningPlayer"]=2
+job["EditorialOverlayRecipe"]="Source/Tools/ShortsEditing/paratrooper_callouts.json"
 job["Segments"][0]["TargetOwningPlayer"]=1
-camera={"BackDistance":4000.0,"Height":3600.0,"LookAtHeight":600.0,"FocalLength":12.0,"OrbitDegrees":0.0}
-move={"DurationSeconds":90.0,"EndOffset":{"X":-3400.0,"Y":-2200.0,"Z":400.0},
-      "EndLookOffset":{"X":0.0,"Y":0.0,"Z":0.0},"EndFocalLength":12.0}
+camera={"BackDistance":3200.0,"SideOffset":-1000.0,"LateralShift":0.0,
+        "Height":2200.0,"LookAtHeight":300.0,"FocalLength":11.5,"OrbitDegrees":0.0}
+# Reach the low flank view sooner, then continue behind the German line for the reverse POV.
+move={"DurationSeconds":30.0,"EndOffset":{"X":0.0,"Y":-3800.0,"Z":1100.0},
+      "EndLookOffset":{"X":0.0,"Y":0.0,"Z":150.0},"EndFocalLength":8.0,
+      "ContinuationPoints":[
+          {"DurationSeconds":24.0,"Offset":{"X":4000.0,"Y":-3000.0,"Z":1600.0},
+           "LookOffset":{"X":300.0,"Y":0.0,"Z":200.0},"FocalLength":8.5},
+          {"DurationSeconds":24.0,"Offset":{"X":5200.0,"Y":1000.0,"Z":2200.0},
+           "LookOffset":{"X":620.0,"Y":0.0,"Z":300.0},"FocalLength":11.5}]}
 flak="/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_Flak37.Ger_BXP_GerPit_Flak37_C"
 ml20="/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Soviet/ML20_152MM/Pit/Rus_BXP_ML20Pit.Rus_BXP_ML20Pit_C"
 lefh="/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/Ger_BXP_GerPit_LeFH18.Ger_BXP_GerPit_LeFH18_C"

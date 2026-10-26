@@ -219,7 +219,7 @@ private:
 	void EndBattle();
 	void BeginParatrooperBattle();
 	void TickParatrooperBattle(const int32 LocalFrame);
-	/** Preserves the landing view at the cut, then eases toward the configured low vehicle-side view. */
+	/** Preserves the landing cut, then follows the configured route across both faction viewpoints. */
 	void UpdateParatrooperBattleCamera(const int32 BattleLocalFrame) const;
 	void TrackParatrooperSquads();
 	/** Adds the meadow's private range behaviour to vehicles and whole squads, including late arrivals. */

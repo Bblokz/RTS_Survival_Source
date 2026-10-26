@@ -21,10 +21,14 @@ class ParatrooperPresetTests(unittest.TestCase):
         # Whole Soviet lineup and the drop share player 2, opposed by player 1.
         self.assertEqual(result["job"]["UnitOwningPlayer"],2)
         self.assertEqual(segment["TargetOwningPlayer"],1)
-        self.assertEqual(segment["ParatrooperCameraMove"]["DurationSeconds"],90)
-        self.assertEqual(segment["ParatrooperCameraMove"]["EndOffset"]["Z"],400)
+        self.assertEqual(segment["ParatrooperCameraMove"]["DurationSeconds"],30)
+        self.assertEqual(segment["ParatrooperCameraMove"]["EndOffset"]["Z"],1100)
         self.assertLess(segment["ParatrooperCameraMove"]["EndOffset"]["Y"],-1100)
-        self.assertLess(segment["Camera"]["Height"],5000)
+        self.assertEqual(segment["Camera"]["Height"],2200)
+        continuation=segment["ParatrooperCameraMove"]["ContinuationPoints"]
+        self.assertEqual(sum(point["DurationSeconds"] for point in continuation),48)
+        self.assertEqual(continuation[-1]["Offset"],{"X":5200,"Y":1000,"Z":2200})
+        self.assertEqual(continuation[-1]["FocalLength"],segment["Camera"]["FocalLength"])
         self.assertEqual(len(segment["BattleEnemyClassPaths"]),16)
         self.assertEqual(len(segment["BattleAllyClassPaths"]),10)
         self.assertNotIn('_Soviet',segment['ClassPath'])

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "style": {
+    "font": "C:/Windows/Fonts/seguisb.ttf",
+    "font_size_fraction": 0.0463,
+    "left_fraction": 0.05,
+    "bottom_fraction": 0.115,
+    "max_width_fraction": 0.78
+  },
+  "callouts": [
+    {
+      "text": "paratroopers test...",
+      "start_seconds": 0.2,
+      "type_seconds": 0.4,
+      "hold_seconds": 1.5,
+      "exit_seconds": 0.2
+    },
+    {
+      "text": "infantry automatically takes cover",
+      "after_previous_seconds": 2.0,
+      "type_seconds": 0.5,
+      "hold_seconds": 2.0,
+      "exit_seconds": 0.2
+    }
+  ]
+}

@@ -19,6 +19,75 @@
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
+namespace RTSShortsParatrooperCameraPrivate
+{
+	/** @brief Keeps the position, aim and lens together while evaluating a camera route. */
+	struct FCameraView
+	{
+		FVector Location = FVector::ZeroVector;
+		FVector LookAt = FVector::ZeroVector;
+		float FocalLength = 0.f;
+	};
+
+	/** @brief Retains one active route leg after elapsed time has passed earlier viewpoints. */
+	struct FCameraLeg
+	{
+		FCameraView Start;
+		FCameraView End;
+		float ElapsedSeconds = 0.f;
+		float DurationSeconds = 0.f;
+		int32 Index = 0;
+	};
+
+	FCameraView MakeStageView(const FTransform& StageTransform, const FVector& LocalMidpoint,
+		const FVector& Offset, const FVector& LookOffset, const float FocalLength)
+	{
+		FCameraView View;
+		View.Location = StageTransform.TransformPosition(LocalMidpoint + Offset);
+		View.LookAt = StageTransform.TransformPosition(LocalMidpoint + LookOffset);
+		View.FocalLength = FocalLength;
+		return View;
+	}
+
+	FCameraLeg FindActiveLeg(const FRTSShortsParatrooperCameraMove& Move, const FTransform& StageTransform,
+		const FVector& LocalMidpoint, const FCameraView& InitialView, const float ElapsedSeconds)
+	{
+		FCameraLeg Leg;
+		Leg.Start = InitialView;
+		Leg.End = MakeStageView(StageTransform, LocalMidpoint, Move.EndOffset, Move.EndLookOffset, Move.EndFocalLength);
+		Leg.ElapsedSeconds = FMath::Max(0.f, ElapsedSeconds);
+		Leg.DurationSeconds = Move.DurationSeconds;
+		for (const FRTSShortsParatrooperCameraWaypoint& Waypoint : Move.ContinuationPoints)
+		{
+			if (Waypoint.DurationSeconds <= 0.f)
+			{
+				continue;
+			}
+			if (Leg.ElapsedSeconds <= Leg.DurationSeconds)
+			{
+				return Leg;
+			}
+			Leg.ElapsedSeconds -= Leg.DurationSeconds;
+			Leg.Start = Leg.End;
+			Leg.End = MakeStageView(StageTransform, LocalMidpoint, Waypoint.Offset, Waypoint.LookOffset, Waypoint.FocalLength);
+			Leg.DurationSeconds = Waypoint.DurationSeconds;
+			++Leg.Index;
+		}
+		return Leg;
+	}
+
+	FCameraView InterpolateLeg(const FCameraLeg& Leg)
+	{
+		const float Alpha = FMath::Clamp(Leg.ElapsedSeconds / Leg.DurationSeconds, 0.f, 1.f);
+		const float Eased = FMath::SmoothStep(0.f, 1.f, Alpha);
+		FCameraView View;
+		View.Location = FMath::Lerp(Leg.Start.Location, Leg.End.Location, Eased);
+		View.LookAt = FMath::Lerp(Leg.Start.LookAt, Leg.End.LookAt, Eased);
+		View.FocalLength = FMath::Lerp(Leg.Start.FocalLength, Leg.End.FocalLength, Eased);
+		return View;
+	}
+}
+
 void ARTSShortsDirector::BeginParatrooperBattle()
 {
 	const FRTSShortsSegment& Segment = M_Job.Segments[M_CurrentSegment];
@@ -100,6 +169,7 @@ void ARTSShortsDirector::TickParatrooperBattle(const int32 LocalFrame)
 
 void ARTSShortsDirector::UpdateParatrooperBattleCamera(const int32 BattleLocalFrame) const
 {
+	using namespace RTSShortsParatrooperCameraPrivate;
 	if (not M_Job.Segments.IsValidIndex(M_CurrentSegment) || not GetIsValidStage() || not GetIsValidCamera())
 	{
 		return;
@@ -110,28 +180,27 @@ void ARTSShortsDirector::UpdateParatrooperBattleCamera(const int32 BattleLocalFr
 	{
 		return;
 	}
-	const float Alpha = FMath::Clamp(static_cast<float>(BattleLocalFrame) / (M_Job.Fps * Move.DurationSeconds), 0.f, 1.f);
-	const float Eased = FMath::SmoothStep(0.f, 1.f, Alpha);
 	constexpr float MidpointFraction = 0.5f;
 	const FVector LocalMidpoint = Segment.TargetOffset * MidpointFraction;
 	const FTransform StageTransform = M_Stage->GetActorTransform();
 	const FVector InitialFocus = StageTransform.TransformPosition(LocalMidpoint + FVector(0.f, 0.f, Segment.Camera.LookAtHeight));
-	const FVector StartLocation = M_ParatrooperBattleCamera.GetLocation();
-	const float InitialFocusDistance = FVector::Distance(StartLocation, InitialFocus);
-	const FVector StartLookAt = StartLocation + M_ParatrooperBattleCamera.GetRotation().GetForwardVector() * InitialFocusDistance;
-	const FVector EndLocation = StageTransform.TransformPosition(LocalMidpoint + Move.EndOffset);
-	const FVector EndLookAt = StageTransform.TransformPosition(LocalMidpoint + Move.EndLookOffset);
-	const FVector Location = FMath::Lerp(StartLocation, EndLocation, Eased);
-	const FVector LookAt = FMath::Lerp(StartLookAt, EndLookAt, Eased);
-	const FRotator Rotation = (LookAt - Location).Rotation();
-	const float FocalLength = FMath::Lerp(Segment.Camera.FocalLength, Move.EndFocalLength, Eased);
-	M_Camera->SetActorLocationAndRotation(Location, Rotation);
-	M_Camera->GetCineCameraComponent()->SetCurrentFocalLength(FocalLength);
+	FCameraView InitialView;
+	InitialView.Location = M_ParatrooperBattleCamera.GetLocation();
+	const float InitialFocusDistance = FVector::Distance(InitialView.Location, InitialFocus);
+	InitialView.LookAt = InitialView.Location + M_ParatrooperBattleCamera.GetRotation().GetForwardVector() * InitialFocusDistance;
+	InitialView.FocalLength = Segment.Camera.FocalLength;
+	const float ElapsedSeconds = static_cast<float>(BattleLocalFrame) / M_Job.Fps;
+	const FCameraLeg Leg = FindActiveLeg(Move, StageTransform, LocalMidpoint, InitialView, ElapsedSeconds);
+	const FCameraView View = InterpolateLeg(Leg);
+	const FRotator Rotation = (View.LookAt - View.Location).Rotation();
+	M_Camera->SetActorLocationAndRotation(View.Location, Rotation);
+	M_Camera->GetCineCameraComponent()->SetCurrentFocalLength(View.FocalLength);
 	constexpr int32 LogIntervalSeconds = 10;
 	if (BattleLocalFrame % FMath::Max(1, M_Job.Fps * LogIntervalSeconds) == 0)
 	{
-		UE_LOG(LogTemp, Display, TEXT("RTS_SHORTS_PARATROOPER_CAMERA_MOVE local=%d alpha=%.3f location=%s pitch=%.2f focal=%.2f"),
-			BattleLocalFrame, Alpha, *Location.ToString(), Rotation.Pitch, FocalLength);
+		const float Alpha = FMath::Clamp(Leg.ElapsedSeconds / Leg.DurationSeconds, 0.f, 1.f);
+		UE_LOG(LogTemp, Display, TEXT("RTS_SHORTS_PARATROOPER_CAMERA_MOVE local=%d alpha=%.3f location=%s pitch=%.2f focal=%.2f leg=%d"),
+			BattleLocalFrame, Alpha, *View.Location.ToString(), Rotation.Pitch, View.FocalLength, Leg.Index);
 	}
 }
 
