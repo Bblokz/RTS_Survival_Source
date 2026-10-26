@@ -58,6 +58,17 @@ public:
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation) override;
 	virtual void BeginDestroy() override;
 
+	/**
+	 * @brief Gives cinematic callers a repeatable approach without changing the mission's aircraft spawn settings.
+	 * @param TargetLocation Ground centre of the drop.
+	 * @param AircraftStartLocation Start of the straight flight, including its altitude.
+	 */
+	void ExecuteCinematicDrop(const FVector& TargetLocation, const FVector& AircraftStartLocation);
+	AAircraftMaster* GetActiveDropAircraft() const;
+	TArray<TWeakObjectPtr<ASquadController>> GetActiveDropSquads() const;
+	bool GetHasActiveDrop() const;
+	void CancelActiveDrops();
+
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FParatroopersGlobalAbilitySettings M_ParatroopersSettings;
@@ -83,6 +94,7 @@ private:
 		FVector TargetLocation = FVector::ZeroVector;
 		FVector PassOverLocation = FVector::ZeroVector;
 		FVector RunDirection = FVector::ForwardVector;
+		TOptional<FVector> AircraftStartOverride;
 		TWeakObjectPtr<AAircraftMaster> Aircraft;
 		bool bM_HasReachedTarget = false;
 		int32 PendingSquadSpawns = 0;
@@ -101,6 +113,12 @@ private:
 	TArray<TSharedPtr<FStreamableHandle>> M_AircraftClassLoadHandles;
 
 	FParatrooperDropRun* FindRun(int32 RunId);
+	/**
+	 * @brief Keeps ordinary mission spawns and explicitly positioned cinematic passes on the same drop lifecycle.
+	 * @param TargetLocation Ground centre shared by the squad landing spirals.
+	 * @param AircraftStartOverride Optional cinematic approach; unset uses the owning manager's mission edge.
+	 */
+	void StartDrop(const FVector& TargetLocation, const TOptional<FVector>& AircraftStartOverride);
 
 	void OnAircraftClassLoaded(int32 RunId);
 	void QueueStraightRunForNextFrame(AAircraftMaster* SpawnedAircraft, int32 RunId, const FVector& EndLocation);
@@ -114,6 +132,12 @@ private:
 
 	void OnJumpTimer(int32 RunId);
 	void JumpNextUnit(FParatrooperDropRun& Run);
+	/**
+	 * @brief The aircraft is held at the end of its run until every soldier of the run has jumped from it; a short
+	 * approach (cinematics) would otherwise remove it while squads are still loading or queued.
+	 */
+	void ReleaseAircraftHoldIfAllJumped(const FParatrooperDropRun& Run) const;
+	bool GetHasEverySoldierJumped(const FParatrooperDropRun& Run) const;
 	/**
 	 * @brief The soldier always exits the aircraft (just behind and below it) and then drifts to his landing point.
 	 * Only when the aircraft is already gone does he start above the target instead.

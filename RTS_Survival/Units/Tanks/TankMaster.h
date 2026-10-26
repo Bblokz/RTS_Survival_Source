@@ -149,6 +149,28 @@ struct FTankMobilityRestriction
 	float AccelerationMultiplier = 1.f;
 };
 
+/**
+ * @brief Permanent mobility of a unit variant relative to its TankData, so a variant child BP only sets class
+ * defaults instead of overwriting speeds after a delay.
+ */
+USTRUCT(BlueprintType)
+struct FTankVariantMobilityMultipliers
+{
+	GENERATED_BODY()
+
+	// Scales TankData.VehicleMaxSpeedKmh when the tank applies its speeds (about 1 s after BeginPlay).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0.05", UIMin = "0.05"))
+	float MaxSpeedMultiplier = 1.f;
+
+	// Scales TankData.VehicleReverseSpeedKmh at the same moment.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0.05", UIMin = "0.05"))
+	float ReverseSpeedMultiplier = 1.f;
+
+	// Scales the turn rate given to InitTrackedTank (tracked tanks), so later turn-rate upgrades build on it.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, meta = (ClampMin = "0.05", UIMin = "0.05"))
+	float TurnRateMultiplier = 1.f;
+};
+
 /** @brief Cached module counts plus the ordinary-healing finishing progress of a module tank. */
 USTRUCT()
 struct FVehicleModuleRepairState
@@ -405,6 +427,22 @@ public:
 
 	/** @param NewTurnRate The new turn rate used on this vehicle and the track physics movement. */
 	virtual void UpgradeTurnRate(const float NewTurnRate);
+
+	/**
+	 * @brief Blueprint access to the turn rate (degrees per second) for variants; call after the tank's init
+	 * (InitTrackedTank) or it is overwritten. Prefer VariantMobilityMultipliers.TurnRateMultiplier.
+	 * @param NewTurnRate The new turn rate, above 0.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "TankMaster|Mobility")
+	void SetVehicleTurnRate(const float NewTurnRate);
+
+	UFUNCTION(BlueprintPure, Category = "TankMaster|Mobility")
+	float GetVehicleTurnRate() const { return TurnRate; }
+
+	// Variant child BPs set these in their class defaults (e.g. the Sd.Kfz. 234/3 Stummel Assault: speed and
+	// reverse 0.7, turn rate 0.75).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "TankMaster|Mobility")
+	FTankVariantMobilityMultipliers VariantMobilityMultipliers;
 
 
 	inline float GetTankCornerOffset() const { return M_CornerOffset; }

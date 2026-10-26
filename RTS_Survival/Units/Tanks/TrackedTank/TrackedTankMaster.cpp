@@ -469,14 +469,16 @@ void ATrackedTankMaster::InitTrackedTank(
 	}
 
 	// The turn rate is also used by TankMaster to rotate towards a specific location.
-	TurnRate = NewTurnRate;
+	// A unit variant can turn slower or faster than its TankData (class default multiplier).
+	const float VariantTurnRate = NewTurnRate * VariantMobilityMultipliers.TurnRateMultiplier;
+	TurnRate = VariantTurnRate;
 	SetTankCornerOffset(TankCornerOffset);
 	if (GetIsValidTrackPhysicsMovement())
 	{
 		TrackPhysicsMovement->InitTrackPhysicsMovement(
 			Mesh,
 			NewTrackForceMultiplier,
-			NewTurnRate,
+			VariantTurnRate,
 			TrackedAnimBP,
 			TankMeshZOffset);
 	}

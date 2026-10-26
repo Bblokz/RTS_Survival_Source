@@ -14,6 +14,53 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSShortsLandscape, Log, All);
 
+bool URTSShortsLandscapeLibrary::ImportStageHeights(AActor* LandscapeActor, const FString& HeightFile)
+{
+#if WITH_EDITOR
+	ALandscape* Landscape = Cast<ALandscape>(LandscapeActor);
+	if (not IsValid(Landscape) || Landscape->CanHaveLayersContent())
+	{
+		UE_LOG(LogRTSShortsLandscape, Error, TEXT("ImportStageHeights: requires a landscape without edit layers."));
+		return false;
+	}
+	ULandscapeInfo* LandscapeInfo = Landscape->GetLandscapeInfo();
+	if (not IsValid(LandscapeInfo))
+	{
+		return false;
+	}
+	int32 MinimumX = 0;
+	int32 MinimumY = 0;
+	int32 MaximumX = 0;
+	int32 MaximumY = 0;
+	if (not LandscapeInfo->GetLandscapeExtent(MinimumX, MinimumY, MaximumX, MaximumY))
+	{
+		return false;
+	}
+	const int64 VertexCount = (static_cast<int64>(MaximumX) - MinimumX + 1) * (static_cast<int64>(MaximumY) - MinimumY + 1);
+	TArray<uint8> HeightBytes;
+	if (VertexCount <= 0 || VertexCount > MAX_int32 / sizeof(uint16)
+		|| not FFileHelper::LoadFileToArray(HeightBytes, *HeightFile) || HeightBytes.Num() != VertexCount * sizeof(uint16))
+	{
+		UE_LOG(LogRTSShortsLandscape, Error, TEXT("ImportStageHeights: height file does not match the landscape grid."));
+		return false;
+	}
+	TArray<uint16> Heights;
+	Heights.SetNumUninitialized(static_cast<int32>(VertexCount));
+	FMemory::Memcpy(Heights.GetData(), HeightBytes.GetData(), HeightBytes.Num());
+	Landscape->Modify();
+	{
+		FHeightmapAccessor<false> HeightAccessor(LandscapeInfo);
+		HeightAccessor.SetData(MinimumX, MinimumY, MaximumX, MaximumY, Heights.GetData());
+		HeightAccessor.Flush();
+	}
+	Landscape->PostEditChange();
+	Landscape->MarkPackageDirty();
+	return true;
+#else
+	return false;
+#endif
+}
+
 AActor* URTSShortsLandscapeLibrary::CreatePaintedLandscape(UObject* WorldContextObject, const FVector Location,
                                                            const FVector Scale, const int32 ComponentsX,
                                                            const int32 ComponentsY, const int32 QuadsPerSection,

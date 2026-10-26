@@ -38,6 +38,18 @@ public:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Constructor")
 	void SetupMeshManually(UStaticMeshComponent* MeshComp);
 
+	/**
+	 * @brief Homing salvos only take targets ahead of the vehicle so the missiles do not turn around after launch.
+	 * @param Origin Where the cone starts (the vehicle).
+	 * @param Heading Forward direction of the cone; only its horizontal part is used.
+	 * @param TargetLocation Location to test.
+	 * @param HalfAngleDegrees Allowed angle between the heading and the direction to the target.
+	 * @param Range Maximum distance to the target.
+	 * @return True when the target is within range and inside the cone (horizontal angle).
+	 */
+	static bool GetIsWithinHomingCone(const FVector& Origin, const FVector& Heading, const FVector& TargetLocation,
+	                                  const float HalfAngleDegrees, const float Range);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void BeginDestroy() override;
@@ -170,6 +182,15 @@ private:
 	void CreateLaunchFX(const FVector& LaunchLocation, const FRotator& LaunchRotation, const int32 RocketInstanceIndex) const;
 	bool FireRocket_LaunchPoolProjectile(const FVector& LaunchLocation, const FRotator& LaunchRotation) const;
 	void OnSalvoFinished();
+
+	// Homing salvos: the target picked when the salvo starts; every rocket of the salvo homes onto it.
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_SalvoHomingTarget;
+
+	void ExecuteFire_PickHomingTarget();
+	AActor* FindHomingTarget_OwnerWeaponTarget() const;
+	AActor* FindHomingTarget_ClosestEnemyInCone() const;
+	bool GetIsValidHomingTargetCandidate(AActor* Candidate) const;
 
 	
 	/** @brief Registers the OnProjectileManagerLoaded callback to the ProjectileManager.

@@ -28,6 +28,7 @@
 #include "RTS_Survival/GameUI/MiniMap/MinimapTerrainCaptureComponent.h"
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
+#include "RTS_Survival/Weapons/WeaponData/VariantBatchThree/VariantBatchThreeWeaponData.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInType/DigInType.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
@@ -1132,6 +1133,8 @@ void ACPPGameState::InitAllGameWeaponData()
 	InitAllGameHeavyWeapons();
 	// Clones of entries above, so it runs after every category initializer.
 	VariantBatchTwoWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
+	// Batch 3 clones entries of the category initializers too (VariantBatchThreeWeaponData.cpp).
+	VariantBatchThreeWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
 
 	// Set the enemy weapons to the same base data.
 	M_TEnemyWeaponDataHashMap = M_TPlayerWeaponDataHashMap;
@@ -5166,6 +5169,9 @@ void ACPPGameState::InitAllGameRocketData()
 	RocketData.ArmorPenFluxMlt = ArmorPenFluxPercentage / 100;
 	RocketData.WeaponCalibre = 150;
 	M_TPlayerAttachedRocketDataHashMap.Add(ERocketAbility::TigerIIRockets, RocketData);
+
+	// Unit variant batch 3: the Sd.Kfz. 251 Mortar rockets (Incendiary, Guided Missile). TUNABLE.
+	VariantBatchThreeWeapons::AddRocketData(M_TPlayerAttachedRocketDataHashMap);
 
 	M_EnemyAttachedRocketDataHashMap = M_TPlayerAttachedRocketDataHashMap;
 }

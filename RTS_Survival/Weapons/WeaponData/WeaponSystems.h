@@ -315,7 +315,34 @@ enum class
 	// Tiger II Rocketeer: two twin 35mm mounts; stats are per projectile, one shot fires all four barrels.
 	Ger_2xTwin35MM_TigerII UMETA(DisplayName = "2x Twin 3.5 cm (Tiger II)"),
 	// Maus AA: Flak 41 with a 3-round magazine.
-	Maus_AA_88MM_Flak UMETA(DisplayName = "8.8 cm Flak 41 (Maus AA)")
+	Maus_AA_88MM_Flak UMETA(DisplayName = "8.8 cm Flak 41 (Maus AA)"),
+	// Unit variant batch 3: appended so serialized weapon names keep their values.
+	// Sd.Kfz. 140 AA: one MG 151/15 of the triple Drilling mount (three separate weapons of this type).
+	MG151_15MM_Drilling UMETA(DisplayName = "MG 151/15 (Drilling)"),
+	// Sd.Kfz. 140 Bunker: the casemate's paired 5 cm mortar (HE only, autocannon range).
+	Mortar_50MM_140Bunker UMETA(DisplayName = "5 cm Casemate Mortar"),
+	// Puma Dual Barrel: each of the two MK 103 30mm guns (3-round magazine).
+	MK103_30MM_PumaDual UMETA(DisplayName = "MK 103 30MM (Puma Dual)"),
+	// Puma Radixite Sniper: one huge 50mm laser shot per reload (damage assumes BeamIterations 1).
+	RadixiteSniper_50MM_Laser UMETA(DisplayName = "Radixite Sniper 50MM Laser (Puma)"),
+	// Pz II F Radixite Autocannon: 20mm radixite rounds with their own damage over time.
+	KwK30_Radixite_20MM UMETA(DisplayName = "Radixite Auto-Blaster 20mm (Pz II F)"),
+	// Pz III J Radixite Cannon: radixite rounds by default (own damage over time), HE selectable.
+	KwK42_Radixite_50MM UMETA(DisplayName = "Radixite Cannon 50mm (Pz III J)"),
+	// Pz III J Rocket Launcher: the 8-rocket rack beside the gun (HEAT only).
+	Rocket_80mm_PzIIIRack UMETA(DisplayName = "8 cm Rocket Rack (Pz III J)"),
+	// Sd.Kfz. 234/3 Incendiary Support: the Stummel firing napalm HE that leaves burning ground.
+	KwK37_75MM_Napalm UMETA(DisplayName = "7.5 cm KwK 37 Napalm"),
+	// Sd.Kfz. 234/3 Incendiary Support: each of the two rear flame projectors (burning ground on impact).
+	FlameCharge_50MM_234 UMETA(DisplayName = "5 cm Flame Charge"),
+	// Pz III AA Drilling: three Flak 38 barrels; stats are per projectile, one shot fires all three.
+	Flak38_20MM_Drilling UMETA(DisplayName = "3x 2 cm Flak 38 (Drilling)"),
+	// Pz III AA FlaK 41: 5 cm flak with 5-round clips.
+	Flak41_50MM UMETA(DisplayName = "5 cm FlaK 41"),
+	// Pz 38(t) Rockets Incendiary Salvo: six 15 cm incendiary rockets on a fixed rack.
+	Rocket_150mm_Incendiary UMETA(DisplayName = "15 cm Incendiary Rocket (Pz 38(t))"),
+	// Pz 38(t) Rockets Precision Missile: two 20 cm vertical missiles.
+	Rocket_200mm_PrecisionMissile UMETA(DisplayName = "20 cm Precision Missile (Pz 38(t))")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -433,6 +460,19 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::TigerRail_100MM_Railgun: return "100MM RailGun";
 	case EWeaponName::Ger_2xTwin35MM_TigerII: return "2x Twin 35mm";
 	case EWeaponName::Maus_AA_88MM_Flak: return "Flak 41";
+	case EWeaponName::MG151_15MM_Drilling: return "MG 151/15";
+	case EWeaponName::Mortar_50MM_140Bunker: return "5 cm Mortar";
+	case EWeaponName::MK103_30MM_PumaDual: return "MK 103";
+	case EWeaponName::RadixiteSniper_50MM_Laser: return "Radixite Sniper";
+	case EWeaponName::KwK30_Radixite_20MM: return "Radixite 20mm";
+	case EWeaponName::KwK42_Radixite_50MM: return "Radixite 50mm";
+	case EWeaponName::Rocket_80mm_PzIIIRack: return "8 cm Rockets";
+	case EWeaponName::KwK37_75MM_Napalm: return "KwK 37 Napalm";
+	case EWeaponName::FlameCharge_50MM_234: return "Flame Charge";
+	case EWeaponName::Flak38_20MM_Drilling: return "3x Flak 38";
+	case EWeaponName::Flak41_50MM: return "5 cm Flak 41";
+	case EWeaponName::Rocket_150mm_Incendiary: return "Incendiary Rockets";
+	case EWeaponName::Rocket_200mm_PrecisionMissile: return "Precision Missile";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -964,6 +1004,32 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Ger_2xTwin35MM_TigerII";
 	case EWeaponName::Maus_AA_88MM_Flak:
 		return "Maus_AA_88MM_Flak";
+	case EWeaponName::MG151_15MM_Drilling:
+		return "MG151_15MM_Drilling";
+	case EWeaponName::Mortar_50MM_140Bunker:
+		return "Mortar_50MM_140Bunker";
+	case EWeaponName::MK103_30MM_PumaDual:
+		return "MK103_30MM_PumaDual";
+	case EWeaponName::RadixiteSniper_50MM_Laser:
+		return "RadixiteSniper_50MM_Laser";
+	case EWeaponName::KwK30_Radixite_20MM:
+		return "KwK30_Radixite_20MM";
+	case EWeaponName::KwK42_Radixite_50MM:
+		return "KwK42_Radixite_50MM";
+	case EWeaponName::Rocket_80mm_PzIIIRack:
+		return "Rocket_80mm_PzIIIRack";
+	case EWeaponName::KwK37_75MM_Napalm:
+		return "KwK37_75MM_Napalm";
+	case EWeaponName::FlameCharge_50MM_234:
+		return "FlameCharge_50MM_234";
+	case EWeaponName::Flak38_20MM_Drilling:
+		return "Flak38_20MM_Drilling";
+	case EWeaponName::Flak41_50MM:
+		return "Flak41_50MM";
+	case EWeaponName::Rocket_150mm_Incendiary:
+		return "Rocket_150mm_Incendiary";
+	case EWeaponName::Rocket_200mm_PrecisionMissile:
+		return "Rocket_200mm_PrecisionMissile";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:

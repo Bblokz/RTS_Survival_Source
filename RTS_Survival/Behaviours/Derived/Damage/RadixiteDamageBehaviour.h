@@ -22,6 +22,15 @@ public:
 	void SetDamagePerSecond(const float NewDamagePerSecond);
 	float GetDamagePerSecond() const;
 
+	/**
+	 * @brief One entry for every weapon type with a per-weapon radixite damage over time (projectiles and lasers),
+	 * so a new hit restarts the effect with this weapon's damage per second instead of the class default.
+	 * @param HitActor Actor that was hit; ignored when it has no behaviour component.
+	 * @param DurationSeconds Lifetime of the effect.
+	 * @param DamagePerSecond Radiation damage per second while the effect lasts.
+	 */
+	static void ApplyRadixiteDamageToActor(AActor* HitActor, const float DurationSeconds, const float DamagePerSecond);
+
 protected:
 	virtual void OnAdded(AActor* BehaviourOwner) override;
 	virtual void OnTick(const float DeltaTime) override;

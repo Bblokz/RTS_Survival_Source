@@ -2,7 +2,8 @@
 
 The player's army customisation layer below unit cards. A card swaps a whole unit; a variant is a small
 modification of a unit (a different gun, extra armour plates, a different squad weapon mix, a different turret
-on a pit). Every German unit has at most three variants, of which the first is always the base unit. The player
+on a pit). Every German unit has at most four variants (three until batch 3 added `VariantC` for the Puma), of
+which the first is always the base unit. The player
 picks one variant per unit type for the whole army before a mission; every unit of that type the player
 receives during the mission then **is** that variant.
 
@@ -21,7 +22,7 @@ everything the UI will need to know which units have variants to choose from, is
 | Topic | Decision |
 |---|---|
 | What a variant is | A Blueprint child class of the base unit Blueprint (`BP_PzIV_H_VariantA` is a child of `BP_PzIV_H`). It overrides defaults: meshes, weapons, modules, abilities, squad unit classes, team weapon class, building mesh. |
-| Choice model | One exclusive choice per unit type, from the shared enum `EUnitVariant { Base, VariantA, VariantB }`. Not stackable. |
+| Choice model | One exclusive choice per unit type, from the shared enum `EUnitVariant { Base, VariantA, VariantB, VariantC }` (append only; `VariantC` = 3 was added in variant batch 3). Not stackable. |
 | How the choice reaches units | The spawner's class maps are overridden at mission start, exactly like `ARTSAsyncSpawner::ApplyEnemyDirectorUnitOverrides`. |
 | Supported unit kinds | Tanks (`M_TrainingOptionMap` keys with `UNType_Tank`), squads (`UNType_Squad`, which includes team weapon crews since they are squads), building expansions (`BuildingExpansionMap`). Nomadic trucks and aircraft are not supported yet; section 13 shows the extension. |
 | Scope | Only units that come out of `ARTSAsyncSpawner`. Anything spawned another way gets whatever class spawns it; see section 6. |
@@ -116,7 +117,7 @@ Doxygen on classes, braces on their own lines).
 
 ### 3.1 `EUnitVariant`, `FUnitVariantSelection` — `Units/Variants/UnitVariantTypes.h` (exists, one struct added)
 
-`EUnitVariant { Base, VariantA, VariantB }`, `UnitVariants::MaxVariantsPerUnit = 3`,
+`EUnitVariant { Base, VariantA, VariantB, VariantC }`, `UnitVariants::MaxVariantsPerUnit = 4` (was 3 before batch 3),
 `Global_GetUnitVariantAsString`, and `FUnitVariantSelection { FTrainingOption Unit; EUnitVariant Variant; }`.
 Keep as committed. Add the struct the training menu passes to its widgets (3.8); it lives here so
 `TrainingWidgetState.h` can include it without pulling in the data asset:

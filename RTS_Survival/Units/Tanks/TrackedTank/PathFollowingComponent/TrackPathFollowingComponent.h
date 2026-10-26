@@ -269,6 +269,15 @@ public:
 	APawn* GetValidControlledPawn();
 
 
+	/**
+	 * Updates this agent's desired reverse speed.
+	 * @param NewSpeed The new reverse speed in SpeedUnit.
+	 * @param SpeedUnit The unit of NewSpeed; converted to cm/s internally.
+	 * @note The tank sets both speeds from its TankData about 1 s after BeginPlay
+	 * (ATankMaster::SetMaxSpeedOnVehicleMovementComponent); prefer ATankMaster::VariantMobilityMultipliers for a
+	 * variant's permanent speeds.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Vehicle AI|Speed Control")
 	void SetDesiredReverseSpeed(const float NewSpeed, ESpeedUnits SpeedUnit);
 
 	/**

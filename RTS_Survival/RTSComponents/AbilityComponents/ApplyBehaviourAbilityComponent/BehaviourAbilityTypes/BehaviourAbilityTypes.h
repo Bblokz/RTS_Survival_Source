@@ -51,4 +51,9 @@ enum class EBehaviourAbilityType : uint8
 	E25HunterAmbush,
 	// Tiger II Rocketeer: only the twin 35mm barrels; less accurate, but faster reload and shorter cooldown.
 	TwinAutocannonOverload,
+	// Unit variant batch 3.
+	// Sd.Kfz. 140 Bunker: overwatch with the driver helping to load (faster reload, more range, immobile).
+	Sdkfz140BunkerOverwatch,
+	// Pz III J Radixite Cannon: overcharged radixite coils, much faster reload but far less accurate.
+	PzIIIRadixiteOvercharge,
 };

@@ -27,6 +27,7 @@
 #include "WeaponOwner/WeaponOwner.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
+#include "Components/SkinnedMeshComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/HideableInstancedStaticMeshComponent/RTSHidableInstancedStaticMeshComponent.h"
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
@@ -171,6 +172,8 @@ void FWeaponData::CopyWeaponDataValues(const FWeaponData* const WeaponData)
 	ProjectileMovementSpeed = WeaponData->ProjectileMovementSpeed; // ← add
 	BehaviourAttributes = WeaponData->BehaviourAttributes;
 	GroundFire = WeaponData->GroundFire;
+	RadixiteDotTotalDamage = WeaponData->RadixiteDotTotalDamage;
+	RadixiteDotDurationSeconds = WeaponData->RadixiteDotDurationSeconds;
 }
 
 bool FLaunchEffectSettings::HasLaunchSettings() const
@@ -3595,6 +3598,203 @@ void UWeaponStateRocketProjectile::InitRocketProjectileWeapon(
 		NewSingleBurstAmountMaxBurstAmount,
 		NewMinBurstAmount,
 		bNewCreateShellCasingOnEveryRandomBurst);
+
+	if (M_RocketSettings.bSetupWithAttachedRocketsMesh)
+	{
+		InitRocket_SetupAttachedRocketInstances();
+	}
+}
+
+void UWeaponStateRocketProjectile::SortLaunchSocketNamesByNumericSuffix(TArray<FName>& InOutSocketNames)
+{
+	struct FSocketNameSortKey
+	{
+		FString Prefix;
+		int32 NumericSuffix = INDEX_NONE;
+	};
+
+	auto MakeSortKey = [](const FName& SocketName) -> FSocketNameSortKey
+	{
+		const FString SocketString = SocketName.ToString();
+		int32 DigitStartIndex = SocketString.Len();
+		while (DigitStartIndex > 0 && FChar::IsDigit(SocketString[DigitStartIndex - 1]))
+		{
+			--DigitStartIndex;
+		}
+		FSocketNameSortKey SortKey;
+		SortKey.Prefix = SocketString.Left(DigitStartIndex);
+		const FString DigitString = SocketString.Mid(DigitStartIndex);
+		SortKey.NumericSuffix = DigitString.IsEmpty() ? INDEX_NONE : FCString::Atoi(*DigitString);
+		return SortKey;
+	};
+
+	InOutSocketNames.StableSort([&MakeSortKey](const FName& LeftName, const FName& RightName)
+	{
+		const FSocketNameSortKey LeftKey = MakeSortKey(LeftName);
+		const FSocketNameSortKey RightKey = MakeSortKey(RightName);
+		const int32 PrefixComparison = LeftKey.Prefix.Compare(RightKey.Prefix, ESearchCase::IgnoreCase);
+		if (PrefixComparison != 0)
+		{
+			return PrefixComparison < 0;
+		}
+		return LeftKey.NumericSuffix < RightKey.NumericSuffix;
+	});
+}
+
+void UWeaponStateRocketProjectile::InitRocket_SetupAttachedRocketInstances()
+{
+	if (M_RocketSettings.FireSocketNames.IsEmpty())
+	{
+		CollectFilteredLaunchSocketNames();
+	}
+	if (not IsValid(MeshComponent) || not IsValid(MeshComponent->GetOwner()))
+	{
+		ReportErrorForWeapon("ROCKET PROJECTILE weapon needs a mesh component with an owner for attached rockets.");
+		return;
+	}
+	if (not M_RocketSettings.RocketMesh)
+	{
+		ReportErrorForWeapon("ROCKET PROJECTILE weapon needs RocketSettings.RocketMesh for attached rockets.");
+		return;
+	}
+	if (M_RocketSettings.FireSocketNames.IsEmpty())
+	{
+		ReportErrorForWeapon("ROCKET PROJECTILE weapon has no launch sockets for attached rockets: set "
+			"RocketSettings.FireSocketNames or AttachedRocketsSocketNameFilter.");
+		return;
+	}
+
+	const FName ParentBoneName = GetAttachedRocketsParentBoneName();
+	if (not CreateAttachedRocketInstanceComponent(ParentBoneName))
+	{
+		return;
+	}
+	AddAttachedRocketInstances(ParentBoneName);
+	if (M_SocketToAttachedRocketIndex.IsEmpty())
+	{
+		ReportErrorForWeapon("ROCKET PROJECTILE weapon found none of its launch sockets on the mesh for attached rockets.");
+		return;
+	}
+
+	// One rocket per socket; a full magazine shows every rocket.
+	WeaponData.MagCapacity = M_SocketToAttachedRocketIndex.Num();
+	ForceInstantReload();
+}
+
+void UWeaponStateRocketProjectile::CollectFilteredLaunchSocketNames()
+{
+	if (M_RocketSettings.AttachedRocketsSocketNameFilter.IsNone() || not IsValid(MeshComponent))
+	{
+		return;
+	}
+
+	const FString SocketNameFilter = M_RocketSettings.AttachedRocketsSocketNameFilter.ToString();
+	TArray<FName> FilteredSocketNames;
+	for (const FName& SocketName : MeshComponent->GetAllSocketNames())
+	{
+		if (SocketName.ToString().Contains(SocketNameFilter))
+		{
+			FilteredSocketNames.Add(SocketName);
+		}
+	}
+	SortLaunchSocketNamesByNumericSuffix(FilteredSocketNames);
+	M_RocketSettings.FireSocketNames = FilteredSocketNames;
+}
+
+FName UWeaponStateRocketProjectile::GetAttachedRocketsParentBoneName() const
+{
+	const USkinnedMeshComponent* SkinnedMeshComponent = Cast<USkinnedMeshComponent>(MeshComponent);
+	if (not IsValid(SkinnedMeshComponent) || M_RocketSettings.FireSocketNames.IsEmpty())
+	{
+		// Static meshes have no bones: the rockets follow the mesh component itself.
+		return NAME_None;
+	}
+	return SkinnedMeshComponent->GetSocketBoneName(M_RocketSettings.FireSocketNames[0]);
+}
+
+bool UWeaponStateRocketProjectile::CreateAttachedRocketInstanceComponent(const FName ParentBoneName)
+{
+	AActor* MeshOwner = MeshComponent->GetOwner();
+	const FName ComponentName = MakeUniqueObjectName(MeshOwner, URTSHidableInstancedStaticMeshComponent::StaticClass(),
+	                                                 TEXT("RocketWeaponAttachedInstances"));
+	M_AttachedRocketInstances = NewObject<URTSHidableInstancedStaticMeshComponent>(MeshOwner, ComponentName);
+	if (not IsValid(M_AttachedRocketInstances))
+	{
+		ReportErrorForWeapon("ROCKET PROJECTILE weapon failed to create the attached rocket instance component.");
+		return false;
+	}
+
+	// Attached to the launch sockets' bone so the rockets pitch with the rack.
+	M_AttachedRocketInstances->AttachToComponent(MeshComponent, FAttachmentTransformRules::KeepRelativeTransform,
+	                                             ParentBoneName);
+	M_AttachedRocketInstances->SetRelativeTransform(FTransform::Identity);
+	M_AttachedRocketInstances->RegisterComponent();
+	M_AttachedRocketInstances->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_AttachedRocketInstances->SetGenerateOverlapEvents(false);
+	M_AttachedRocketInstances->SetCanEverAffectNavigation(false);
+	M_AttachedRocketInstances->SetStaticMesh(M_RocketSettings.RocketMesh);
+	return true;
+}
+
+void UWeaponStateRocketProjectile::AddAttachedRocketInstances(const FName ParentBoneName)
+{
+	M_SocketToAttachedRocketIndex.Reset();
+	// NAME_None resolves to the component transform.
+	const FTransform ParentWorldTransform = MeshComponent->GetSocketTransform(ParentBoneName, RTS_World);
+	for (const FName& SocketName : M_RocketSettings.FireSocketNames)
+	{
+		if (not MeshComponent->DoesSocketExist(SocketName) || M_SocketToAttachedRocketIndex.Contains(SocketName))
+		{
+			continue;
+		}
+
+		const FTransform SocketWorldTransform = MeshComponent->GetSocketTransform(SocketName, RTS_World);
+		FTransform InstanceTransform = SocketWorldTransform.GetRelativeTransform(ParentWorldTransform);
+		InstanceTransform.SetLocation(InstanceTransform.TransformPosition(M_RocketSettings.LocalSocketAttachOffset));
+		InstanceTransform.SetScale3D(M_RocketSettings.RocketScale);
+
+		const int32 InstanceIndex = M_AttachedRocketInstances->AddInstance(InstanceTransform, false);
+		if (InstanceIndex != INDEX_NONE)
+		{
+			M_SocketToAttachedRocketIndex.Add(SocketName, InstanceIndex);
+		}
+	}
+}
+
+void UWeaponStateRocketProjectile::HideAttachedRocketInstanceForSocket(const FName SocketName) const
+{
+	if (not IsValid(M_AttachedRocketInstances))
+	{
+		return;
+	}
+	if (const int32* InstanceIndex = M_SocketToAttachedRocketIndex.Find(SocketName))
+	{
+		M_AttachedRocketInstances->SetInstanceHidden(*InstanceIndex, true);
+	}
+}
+
+void UWeaponStateRocketProjectile::UnhideAllAttachedRocketInstances() const
+{
+	if (not IsValid(M_AttachedRocketInstances))
+	{
+		return;
+	}
+	for (const TPair<FName, int32>& EachSocketToInstance : M_SocketToAttachedRocketIndex)
+	{
+		M_AttachedRocketInstances->SetInstanceHidden(EachSocketToInstance.Value, false);
+	}
+}
+
+void UWeaponStateRocketProjectile::OnReloadFinished_PostReload()
+{
+	Super::OnReloadFinished_PostReload();
+	if (M_SocketToAttachedRocketIndex.IsEmpty())
+	{
+		return;
+	}
+	UnhideAllAttachedRocketInstances();
+	// A full rack fires in socket order again.
+	M_NextRocketSocketIndex = 0;
 }
 
 void UWeaponStateRocketProjectile::FireWeaponSystem()
@@ -3722,6 +3922,7 @@ void UWeaponStateRocketProjectile::FireProjectile(const FVector& TargetLocationR
 		ReportErrorForWeapon("ROCKET PROJECTILE weapon failed to get dormant projectile from pool manager.");
 		return;
 	}
+	HideAttachedRocketInstanceForSocket(LaunchData.SocketName);
 
 	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP) || (WeaponData.ShellType ==
 		EWeaponShellType::Shell_APHE) || (WeaponData.ShellType == EWeaponShellType::Shell_Railgun);
@@ -3855,6 +4056,7 @@ void UWeaponStateHomingMissile::FireProjectile(const FVector& TargetLocationRaw)
 		ReportErrorForWeapon("HOMING MISSILE weapon failed to get dormant projectile from pool manager.");
 		return;
 	}
+	HideAttachedRocketInstanceForSocket(LaunchData.SocketName);
 
 	AActor* TargetActor = WeaponOwner ? WeaponOwner->GetTargetActor(WeaponIndex) : nullptr;
 	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP)

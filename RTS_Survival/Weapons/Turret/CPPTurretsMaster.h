@@ -375,6 +375,15 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void ReloadWeapon(const int WeaponIndexOnTurret, const float ReloadTime);
 
+	/**
+	 * @brief Called on Bp when a weapon's magazine is full again: the end of the ReloadWeapon timer, a
+	 * ForceInstantReload (also the one rocket racks with attached rockets do when they are set up) and a forced full
+	 * reload of all weapons. Use it to end reload effects such as a charging glow.
+	 * @param WeaponIndex Index of the weapon on this turret that finished reloading.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Weapon|Reload")
+	void BP_OnReloadFinished(const int32 WeaponIndex);
+
 	/** @brief Determines how the turret weapon target pitch is updated, by default calls the UpdateTargetPitch on
 	 * the blueprint instance. Is overwritten in embedded turrets to use the interface.
 	 */

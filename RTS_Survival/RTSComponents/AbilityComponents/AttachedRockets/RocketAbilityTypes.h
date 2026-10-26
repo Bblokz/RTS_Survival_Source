@@ -15,6 +15,10 @@ enum class ERocketAbility : uint8
 	Pz38tRockets UMETA(DisplayName = "Pz 38(t) Rockets"),
 	// Tiger II Rocketeer: 7 large rockets on the turret racks, fired one by one.
 	TigerIIRockets UMETA(DisplayName = "Tiger II Rockets"),
+	// Sd.Kfz. 251 Mortar Incendiary: six 32 cm incendiary rockets that leave burning ground.
+	Sdkfz251IncendiaryRockets UMETA(DisplayName = "Sd.Kfz. 251 Incendiary Rockets"),
+	// Sd.Kfz. 251 Mortar Guided Missile: four missiles that home onto one target per salvo.
+	Sdkfz251GuidedMissiles UMETA(DisplayName = "Sd.Kfz. 251 Guided Missiles"),
 
 };
 

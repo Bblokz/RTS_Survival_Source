@@ -92,6 +92,19 @@ bool URTSShortsRenderSubsystem::LoadJobFile(const FString& Path)
 	{
 		return false;
 	}
+	constexpr float MaxParatrooperShortSeconds = 120.f;
+	float TotalSlotSeconds = 0.f;
+	bool bHasParatrooperBattle = false;
+	for (const FRTSShortsSegment& Segment : M_Job.Segments)
+	{
+		TotalSlotSeconds += Segment.SlotSeconds;
+		bHasParatrooperBattle |= Segment.ParatrooperAbility != EGlobalAbility::GA_None;
+	}
+	if (bHasParatrooperBattle && TotalSlotSeconds > MaxParatrooperShortSeconds)
+	{
+		UE_LOG(LogRTSShortsRender, Error, TEXT("Paratrooper shorts cannot exceed 120 seconds, including the aircraft intro."));
+		return false;
+	}
 	if (M_Job.OutputDir.IsEmpty())
 	{
 		M_Job.OutputDir = FPaths::GetPath(Path);

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 
 #include "RTSShortsJobTypes.generated.h"
 
@@ -162,6 +163,26 @@ struct FRTSShortsImpactCameraParams
 	/** Post-process colour saturation multiplier (1 = untouched). */
 	UPROPERTY()
 	float ColorSaturation = 1.f;
+};
+
+/** @brief Opt-in descent from the landing overview to a vehicle-side view, relative to the battle midpoint. */
+USTRUCT()
+struct FRTSShortsParatrooperCameraMove
+{
+	GENERATED_BODY()
+
+	// Zero keeps the existing fixed battle camera for presets that have not requested a move.
+	UPROPERTY()
+	float DurationSeconds = 0.f;
+
+	UPROPERTY()
+	FVector EndOffset = FVector(-2400.f, -1100.f, 300.f);
+
+	UPROPERTY()
+	FVector EndLookOffset = FVector(500.f, -700.f, 240.f);
+
+	UPROPERTY()
+	float EndFocalLength = 14.f;
 };
 
 /**
@@ -324,6 +345,14 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	TArray<FString> BattleEnemyClassPaths;
 
+	/** Optional stage-axis offsets from the player line origin, indexed like BattleAllyClassPaths (main unit excluded). */
+	UPROPERTY()
+	TArray<FVector> BattleAllyOffsets;
+
+	/** Optional stage-axis offsets from the enemy line origin, indexed like BattleEnemyClassPaths. */
+	UPROPERTY()
+	TArray<FVector> BattleEnemyOffsets;
+
 	UPROPERTY()
 	float BattleSpacing = 700.f;
 
@@ -333,6 +362,21 @@ struct FRTSShortsSegment
 	/** Battle: every unit's max health (both lines) is scaled by this, so heavily armoured lines still reach a winner. */
 	UPROPERTY()
 	float BattleHealthScale = 1.f;
+
+	/** Opt-in real paratrooper ability; GA_None preserves the ordinary battle/showcase camera. */
+	UPROPERTY()
+	EGlobalAbility ParatrooperAbility = EGlobalAbility::GA_None;
+
+	/** Aircraft is framed for exactly this many seconds before cutting to the drop zone. */
+	UPROPERTY()
+	float ParatrooperIntroSeconds = 2.f;
+
+	/** Approach in stage-local cm, relative to the midpoint between the two battle lines. */
+	UPROPERTY()
+	FVector ParatrooperAircraftStartOffset = FVector(-6000.f, 0.f, 3500.f);
+
+	UPROPERTY()
+	FRTSShortsParatrooperCameraMove ParatrooperCameraMove;
 
 	/** Squads: the soldiers' cooldown between shots in seconds (a bolt rifle otherwise fires once per 3.7 s slot); negative keeps the weapon's own. */
 	UPROPERTY()

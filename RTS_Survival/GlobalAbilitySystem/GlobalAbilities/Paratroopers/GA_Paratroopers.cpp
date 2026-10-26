@@ -34,6 +34,16 @@ namespace ParatroopersConstants
 
 void UGA_Paratroopers::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
+	StartDrop(TargetLocation, TOptional<FVector>());
+}
+
+void UGA_Paratroopers::ExecuteCinematicDrop(const FVector& TargetLocation, const FVector& AircraftStartLocation)
+{
+	StartDrop(TargetLocation, AircraftStartLocation);
+}
+
+void UGA_Paratroopers::StartDrop(const FVector& TargetLocation, const TOptional<FVector>& AircraftStartOverride)
+{
 	ResetAbilityEndedBroadcast();
 	if (not GetIsValidGlobalAbilityManager())
 	{
@@ -51,8 +61,16 @@ void UGA_Paratroopers::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 	FParatrooperDropRun NewRun;
 	NewRun.RunId = M_NextRunId++;
 	NewRun.TargetLocation = TargetLocation;
+	NewRun.AircraftStartOverride = AircraftStartOverride;
 	const int32 RunId = NewRun.RunId;
 	M_DropRuns.Add(MoveTemp(NewRun));
+	if (AircraftStartOverride.IsSet())
+	{
+		// A cinematic must have its aircraft ready on the first visible frame.
+		M_ParatroopersSettings.AircraftClass.LoadSynchronous();
+		OnAircraftClassLoaded(RunId);
+		return;
+	}
 
 	TWeakObjectPtr<UGA_Paratroopers> WeakThis(this);
 	M_AircraftClassLoadHandles.Add(UAssetManager::GetStreamableManager().RequestAsyncLoad(
@@ -82,6 +100,56 @@ void UGA_Paratroopers::BeginDestroy()
 	Super::BeginDestroy();
 }
 
+AAircraftMaster* UGA_Paratroopers::GetActiveDropAircraft() const
+{
+	for (const FParatrooperDropRun& Run : M_DropRuns)
+	{
+		if (AAircraftMaster* Aircraft = Run.Aircraft.Get())
+		{
+			return Aircraft;
+		}
+	}
+	return nullptr;
+}
+
+TArray<TWeakObjectPtr<ASquadController>> UGA_Paratroopers::GetActiveDropSquads() const
+{
+	TArray<TWeakObjectPtr<ASquadController>> Squads;
+	for (const FParatrooperDropRun& Run : M_DropRuns)
+	{
+		for (const FParatrooperSquadInDrop& SquadInDrop : Run.SquadsInDrop)
+		{
+			Squads.AddUnique(SquadInDrop.Squad);
+		}
+	}
+	return Squads;
+}
+
+bool UGA_Paratroopers::GetHasActiveDrop() const
+{
+	return not M_DropRuns.IsEmpty();
+}
+
+void UGA_Paratroopers::CancelActiveDrops()
+{
+	// Remove the runs before destroying aircraft: their destruction delegates can re-enter this ability.
+	TArray<FParatrooperDropRun> CancelledRuns = MoveTemp(M_DropRuns);
+	M_DropRuns.Reset();
+	for (const FParatrooperDropRun& Run : CancelledRuns)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			FTimerHandle JumpTimerHandle = Run.JumpTimerHandle;
+			World->GetTimerManager().ClearTimer(JumpTimerHandle);
+		}
+		if (AAircraftMaster* Aircraft = Run.Aircraft.Get())
+		{
+			Aircraft->Destroy();
+		}
+	}
+	M_AircraftClassLoadHandles.Reset();
+}
+
 UGA_Paratroopers::FParatrooperDropRun* UGA_Paratroopers::FindRun(const int32 RunId)
 {
 	return M_DropRuns.FindByPredicate([RunId](const FParatrooperDropRun& Run)
@@ -101,7 +169,9 @@ void UGA_Paratroopers::OnAircraftClassLoaded(const int32 RunId)
 		return;
 	}
 
-	const FVector StartLocation = GetGlobalAbilityManager()->GetAircraftBombingSpawnLocation(this, Run->TargetLocation);
+	const FVector StartLocation = Run->AircraftStartOverride.IsSet()
+		? Run->AircraftStartOverride.GetValue()
+		: GetGlobalAbilityManager()->GetAircraftBombingSpawnLocation(this, Run->TargetLocation);
 	Run->PassOverLocation = FVector(Run->TargetLocation.X, Run->TargetLocation.Y, StartLocation.Z);
 	const FVector EndLocation = BuildRunEndLocation(StartLocation, Run->PassOverLocation);
 	Run->RunDirection = (EndLocation - StartLocation).GetSafeNormal2D();
@@ -151,6 +221,7 @@ void UGA_Paratroopers::QueueStraightRunForNextFrame(
 				return;
 			}
 			WeakAircraft->OrderStraightFlightRun(Run->PassOverLocation, EndLocation);
+			WeakAircraft->SetStraightRunHoldAtEnd(true);
 		}));
 }
 
@@ -336,6 +407,7 @@ void UGA_Paratroopers::OnJumpTimer(const int32 RunId)
 	{
 		JumpNextUnit(*Run);
 	}
+	ReleaseAircraftHoldIfAllJumped(*Run);
 	FinishRunIfDone(RunId);
 }
 
@@ -360,6 +432,12 @@ void UGA_Paratroopers::JumpNextUnit(FParatrooperDropRun& Run)
 	});
 	const FVector LandingLocation = GetLandingLocation(Run, SquadUnit, Run.JumpedUnitCount);
 	const FVector StartLocation = GetJumpStartLocation(Run);
+	const AAircraftMaster* Aircraft = Run.Aircraft.Get();
+	UE_LOG(LogTemp, Display, TEXT("RTS_PARATROOPER_JUMP run=%d index=%d unit=%s source=%s past_target_cm=%.0f"),
+		Run.RunId, Run.JumpedUnitCount, *SquadUnit->GetName(), IsValid(Aircraft) ? TEXT("aircraft") : TEXT("fallback"),
+		IsValid(Aircraft)
+			? FVector::DotProduct(Aircraft->GetActorLocation() - Run.PassOverLocation, Run.RunDirection)
+			: 0.0f);
 	++Run.JumpedUnitCount;
 	// May finish synchronously (invalid owner) and re-enter through OnParatrooperDescentFinished: Run is not used after.
 	DescentComponent->StartDescent(
@@ -367,6 +445,33 @@ void UGA_Paratroopers::JumpNextUnit(FParatrooperDropRun& Run)
 		StartLocation,
 		LandingLocation,
 		Run.RunDirection.Rotation().Yaw);
+}
+
+void UGA_Paratroopers::ReleaseAircraftHoldIfAllJumped(const FParatrooperDropRun& Run) const
+{
+	AAircraftMaster* Aircraft = Run.Aircraft.Get();
+	if (not IsValid(Aircraft) || not GetHasEverySoldierJumped(Run))
+	{
+		return;
+	}
+	Aircraft->SetStraightRunHoldAtEnd(false);
+}
+
+bool UGA_Paratroopers::GetHasEverySoldierJumped(const FParatrooperDropRun& Run) const
+{
+	if (not Run.bM_HasReachedTarget || Run.PendingSquadSpawns > 0 || not Run.UnitsWaitingToJump.IsEmpty())
+	{
+		return false;
+	}
+	for (const FParatrooperSquadInDrop& SquadInDrop : Run.SquadsInDrop)
+	{
+		// A squad that is still loading its soldiers has not queued them yet.
+		if (SquadInDrop.Squad.IsValid() && not SquadInDrop.bM_HasQueuedUnits)
+		{
+			return false;
+		}
+	}
+	return true;
 }
 
 FVector UGA_Paratroopers::GetJumpStartLocation(const FParatrooperDropRun& Run) const

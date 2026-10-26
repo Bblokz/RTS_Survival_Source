@@ -444,6 +444,9 @@ bool GetCanExecuteDetachTow(AActor* Actor);
 		case ERocketAbility::HetzerRockets:
 		// Big 20 cm rockets: the large default rocket card, as the Hetzer.
 		case ERocketAbility::TigerIIRockets:
+		// Sd.Kfz. 251 Mortar variants: big rockets / missiles, the large card too.
+		case ERocketAbility::Sdkfz251IncendiaryRockets:
+		case ERocketAbility::Sdkfz251GuidedMissiles:
 			return DefaultRocketAbility;
 		case ERocketAbility::JagdPantherRockets:
 		case ERocketAbility::Pz38tRockets:

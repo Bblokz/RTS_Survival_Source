@@ -242,7 +242,28 @@ struct FWeaponData
 	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	FRTSGroundFireSettings GroundFire;
 
+	// Per-weapon radixite damage over time: total damage of one hit's effect. Used with RadixiteDotDurationSeconds;
+	// when either is 0 the calibre-based default applies. Projectiles apply it for Shell_Radixite only, lasers on
+	// every hit. Each hit restarts the effect (refresh), it does not stack.
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
+	float RadixiteDotTotalDamage = 0.f;
+
+	// Duration in seconds of the per-weapon radixite damage over time (see RadixiteDotTotalDamage).
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
+	float RadixiteDotDurationSeconds = 0.f;
+
 	void CopyWeaponDataValues(const FWeaponData* WeaponData);
+
+	bool GetHasRadixiteDotOverride() const
+	{
+		return RadixiteDotTotalDamage > 0.f && RadixiteDotDurationSeconds > 0.f;
+	}
+
+	// Only meaningful when GetHasRadixiteDotOverride() is true.
+	float GetRadixiteDotDamagePerSecond() const
+	{
+		return GetHasRadixiteDotOverride() ? RadixiteDotTotalDamage / RadixiteDotDurationSeconds : 0.f;
+	}
 };
 
 USTRUCT(BlueprintType)
@@ -1749,6 +1770,33 @@ struct FRocketWeaponSettings
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, meta=(ClampMin="1.0", ClampMax="100.0", UIMin="1.0", UIMax="100.0"))
 	float RandomSwingStrength = 50.0f;
+
+	/**
+	 * @brief Shows one RocketMesh instance on every launch socket and hides it when that socket fires; all come back
+	 * on reload. The instances follow the bone of the first launch socket (pitching racks), so keep every launch
+	 * socket on that one bone. The magazine becomes the number of instances.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Attached Rockets")
+	bool bSetupWithAttachedRocketsMesh = false;
+
+	/**
+	 * Only used when FireSocketNames is empty: every socket of the weapon mesh whose name contains this text becomes a
+	 * launch socket, sorted by name with numeric suffixes in order (RKT_0, RKT_1 ... RKT_10). Prefer FireSocketNames:
+	 * its order is the firing order.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Attached Rockets",
+		meta=(EditCondition="bSetupWithAttachedRocketsMesh"))
+	FName AttachedRocketsSocketNameFilter = NAME_None;
+
+	// Offset in each launch socket's local space at which its rocket instance is placed.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Attached Rockets",
+		meta=(EditCondition="bSetupWithAttachedRocketsMesh"))
+	FVector LocalSocketAttachOffset = FVector::ZeroVector;
+
+	// Scale of each rocket instance.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Attached Rockets",
+		meta=(EditCondition="bSetupWithAttachedRocketsMesh"))
+	FVector RocketScale = FVector(1.0f);
 };
 
 USTRUCT(Blueprintable, BlueprintType)
@@ -2036,12 +2084,23 @@ public:
 		const int32 NewMinBurstAmount = 0,
 		const bool bNewCreateShellCasingOnEveryRandomBurst = false);
 
+	/**
+	 * @brief Orders filter-discovered launch sockets so the firing order follows the authored numbering
+	 * (RKT_2 before RKT_10) instead of the mesh's socket array order.
+	 * @param InOutSocketNames Socket names to sort in place.
+	 */
+	static void SortLaunchSocketNamesByNumericSuffix(TArray<FName>& InOutSocketNames);
+
+	int32 GetAttachedRocketInstanceCount() const { return M_SocketToAttachedRocketIndex.Num(); }
+
 protected:
 	virtual void FireWeaponSystem() override;
 	virtual void CreateLaunchVfx(
 		const FVector& LaunchLocation,
 		const FVector& ForwardVector,
 		const bool bCreateShellCase = true) override;
+	// Shows every attached rocket again; also runs on ForceInstantReload.
+	virtual void OnReloadFinished_PostReload() override;
 
 	struct FRocketLaunchSocketData
 	{
@@ -2056,6 +2115,9 @@ protected:
 	int32 M_NextRocketSocketIndex = 0;
 
 	virtual void FireProjectile(const FVector& TargetLocation);
+
+	// Hides the attached rocket of the socket that just fired; no-op without attached rockets.
+	void HideAttachedRocketInstanceForSocket(const FName SocketName) const;
 
 	FRocketLaunchSocketData GetRocketLaunchSocketData(const bool bAdvanceSocketIndex);
 
@@ -2072,6 +2134,21 @@ protected:
 	                                                      const FVector& LaunchLocation,
 	                                                      const FRotator& LaunchRotation,
 	                                                      const FVector& TargetLocation);
+
+private:
+	// One hidable rocket per launch socket, attached to the launch sockets' bone so a pitching rack carries them.
+	UPROPERTY()
+	TObjectPtr<URTSHidableInstancedStaticMeshComponent> M_AttachedRocketInstances;
+
+	UPROPERTY()
+	TMap<FName, int32> M_SocketToAttachedRocketIndex;
+
+	void InitRocket_SetupAttachedRocketInstances();
+	void CollectFilteredLaunchSocketNames();
+	FName GetAttachedRocketsParentBoneName() const;
+	bool CreateAttachedRocketInstanceComponent(const FName ParentBoneName);
+	void AddAttachedRocketInstances(const FName ParentBoneName);
+	void UnhideAllAttachedRocketInstances() const;
 };
 
 /**
