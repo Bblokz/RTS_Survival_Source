@@ -1,0 +1,35 @@
+# CompileAllBlueprints errors on the migrated branch, 2026-10-25 (none caused by the migration).
+# After the merge, regroup with group_bp_errors.py and diff: only new lines need attention.
+32 distinct asset/error pairs, 84 errors
+  2 W LowPolyForest/ThirdpersonCharacter/ThirdPersonBP/Blueprints/ThirdPersonCharacter :: In use pin <Unnamed> no longer exists on node Reset Orientation and Position . Please refresh node or break links to remove pin.
+  2 W LowPolyForest/ThirdpersonCharacter/ThirdPersonBP/Blueprints/ThirdPersonCharacter :: Could not find a function named "ResetOrientationAndPosition" in 'ThirdPersonCharacter'.
+  4 W RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/ArmoredCar_ToCopy :: In use pin <Unnamed> generated from expanding Child Bp Setup Armor no longer exists on node Child Bp Setup Armor generated from expanding Child Bp Setup Armor . Please re
+  2 W RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/ArmoredCar_ToCopy :: Could not find a function named "ChildBpSetupArmor" in 'ArmoredCar_ToCopy_C'.
+  4 W RTS_Survival/Blueprints/Missions/GerCampaign/Trains/BP_Mission_Trains_Start :: Could not find a function named "GetGerPlayerMediumTank_IIIM_Or_PZIVRockets" in 'RTSBlueprintFunctionLibrary'.
+  4   FOWTest/Blueprints/BP_Pawn :: W_MiniMap.MiniMapImg is not blueprint visible (BlueprintReadOnly or BlueprintReadWrite). Please fix mark up or cease accessing as this will be made an error in a future r
+  1   HazmatCharacter02/Demo/ThirdPersonBP/ThirdPersonOverview :: Blueprint ThirdPersonOverview has missing or NULL parent class.
+  1   LowPolyForest/Blueprints/Truck/BP_Truck_01 :: Blueprint BP_Truck_01 has missing or NULL parent class.
+  1   LowPolyForest/Models/Vehicles/Truck/Blueprint/Sedan :: Blueprint Sedan has missing or NULL parent class.
+  1   LowPolyForest/Models/Vehicles/Truck/Blueprint/Sedan_BackWheel :: Blueprint Sedan_BackWheel has missing or NULL parent class.
+  1   LowPolyForest/Models/Vehicles/Truck/Blueprint/Sedan_FrontWheel :: Blueprint Sedan_FrontWheel has missing or NULL parent class.
+  1   LowPolyForest/Models/Vehicles/Truck/Blueprint/Truck_BackWheel :: Blueprint Truck_BackWheel has missing or NULL parent class.
+  1   LowPolyForest/Models/Vehicles/Truck/Blueprint/Truck_FrontWheel :: Blueprint Truck_FrontWheel has missing or NULL parent class.
+  6   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: Can't connect pins Object and Return Value : This cast has an invalid target type (was the class deleted without a redirect?).
+  6   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: In use pin As Sedan no longer exists on node Bad cast node . Please refresh node or break links to remove pin.
+  6   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: Can't connect pins Return Value and Object : This cast has an invalid target type (was the class deleted without a redirect?).
+  2   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: The property associated with Is in Car could not be found in '/Game/LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD.VehicleHUD_C'
+  2   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: The property associated with Speed Display String could not be found in '/Game/LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD.VehicleHUD_C'
+  2   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: The property associated with In Reverse Gear could not be found in '/Game/LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD.VehicleHUD_C'
+  2   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: The property associated with Gear Display Color could not be found in '/Game/LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD.VehicleHUD_C'
+  2   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: The property associated with Gear Display Reverse Color could not be found in '/Game/LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD.VehicleHUD_C'
+  2   LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD :: The property associated with Gear Display String could not be found in '/Game/LowPolyForest/Models/Vehicles/Truck/Blueprint/VehicleHUD.VehicleHUD_C'
+  1   LowPolyForest/Models/Vehicles/Truck/Sedan_AnimBP :: Blueprint Sedan_AnimBP has missing or NULL parent class.
+  6   LowPolyForest/ThirdpersonCharacter/Mannequin/Animations/ThirdPerson_AnimBP :: In use pin Player Ref Snow Mobile no longer exists on node Get . Please refresh node or break links to remove pin.
+  3   LowPolyForest/ThirdpersonCharacter/Mannequin/Animations/ThirdPerson_AnimBP :: The property associated with Handle Bar Rotation could not be found in '/Game/LowPolyForest/ThirdpersonCharacter/Mannequin/Animations/ThirdPerson_AnimBP.ThirdPerson_AnimB
+  2   RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/ArmoredCar_ToCopy :: In use pin My Armor Setup generated from expanding Child Bp Setup Armor no longer exists on node Child Bp Setup Armor generated from expanding Child Bp Setup Armor . Plea
+  4   RTS_Survival/Blueprints/Missions/GerCampaign/Trains/BP_Mission_Trains_Start :: In use pin World Context no longer exists on node Get Ger Player Medium Tank IIIM or PZIVRockets . Please refresh node or break links to remove pin.
+  4   RTS_Survival/Blueprints/Missions/GerCampaign/Trains/BP_Mission_Trains_Start :: In use pin Return Value no longer exists on node Get Ger Player Medium Tank IIIM or PZIVRockets . Please refresh node or break links to remove pin.
+  1   RTS_Survival/Blueprints/ProjectilesAndShells/Projectiles/ArchProjectile/BP_ArchProjectile :: Blueprint BP_ArchProjectile has missing or NULL parent class.
+  1   RTS_Survival/Blueprints/ProjectilesAndShells/RTS_BP_ShellCaseMaster :: Blueprint RTS_BP_ShellCaseMaster has missing or NULL parent class.
+  3   RTS_Survival/Maps/Optimize/OptimSquads/SquadOptim_Target :: In use pin New Building Time no longer exists on node BP_InitBuildingExp . Please refresh node or break links to remove pin.
+  4   RTS_Survival/Materials/Shields/W_BP_ShieldBar :: A required widget binding "ShieldProgressBar" of type Progress Bar was not found.
