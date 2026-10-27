@@ -14,6 +14,7 @@
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTrenchTestScenario.h"
 #include "RTS_Survival/Units/Squads/Tests/SquadPerfScenario.h"
 #include "RTS_Survival/RTSComponents/MedicComponent/Tests/MedicHealTestScenario.h"
+#include "RTS_Survival/Units/Squads/Tests/SquadMarchTestScenario.h"
 #include "RTS_Survival/Units/Tanks/Tests/VehicleAvoidanceScenario.h"
 #include "RTS_Survival/Units/Tanks/Tests/AlliedVehiclePassageScenario.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/Tests/TraceImpactVfxPerfScenario.h"
@@ -489,6 +490,7 @@ private:
 	FCoverStressPerfScenario M_StressPerfScenario;
 	FSquadPerfScenario M_SquadPerfScenario;
 	FMedicHealTestScenario M_MedicHealScenario;
+	FSquadMarchTestScenario M_SquadMarchScenario;
 	FVehicleAvoidanceScenario M_VehicleAvoidanceScenario;
 	FAlliedVehiclePassageScenario M_AlliedVehiclePassageScenario;
 	FTraceImpactVfxPerfScenario M_TraceImpactVfxPerfScenario;

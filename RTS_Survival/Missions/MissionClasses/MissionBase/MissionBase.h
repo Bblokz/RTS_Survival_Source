@@ -566,6 +566,14 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
 	bool RemoveCustomMiniMapIcon(const FName IconId);
 
+	/**
+	 * @brief Shows a circle with "Reinforcements" written in it on the minimap and tactical map.
+	 * @param WorldLocation World location the circle is placed at on the map.
+	 * @param DurationSeconds Real seconds the circle stays on the map (RTSReinforcementsPingConstants default).
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
+	void ShowReinforcementsOnMiniMap(const FVector WorldLocation, const float DurationSeconds = 5.f);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|MiniMap")
 	bool SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType);
 

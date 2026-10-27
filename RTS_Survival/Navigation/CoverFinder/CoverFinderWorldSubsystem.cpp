@@ -681,6 +681,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_MedicHealScenario.Start();
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("SquadMarchValidate")))
+	{
+		M_SquadMarchScenario.Start();
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("VehicleAvoidanceMeasure")))
 	{
 		M_VehicleAvoidanceScenario.Start();
@@ -733,6 +737,7 @@ void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
 	M_StressPerfScenario.Tick(*this);
 	M_SquadPerfScenario.Tick(*this);
 	M_MedicHealScenario.Tick(*this);
+	M_SquadMarchScenario.Tick(*this);
 	M_VehicleAvoidanceScenario.Tick(*this, DeltaTime);
 	M_AlliedVehiclePassageScenario.Tick(*this, DeltaTime);
 	M_TraceImpactVfxPerfScenario.Tick(*this);
