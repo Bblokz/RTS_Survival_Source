@@ -454,6 +454,7 @@ public:
 	bool GetHasCoverAssignment() const { return M_CoverRuntimeState.GetHasAssignment(); }
 	bool GetIsOccupyingCover() const { return M_CoverRuntimeState.GetIsOccupyingCover(); }
 	EAbilityID GetActiveCommand() const { return M_ActiveCommand; }
+	float GetMarchSpeedMultiplier() const { return MarchSpeedMultiplier; }
 
 	/**
 	 * @brief Lets cover selection test the firing lane from where this unit's expose animation really ends.
@@ -780,6 +781,18 @@ protected:
 	 */
 	void TerminatePatrol();
 
+	/**
+	 * @brief Patrols between two locations while marching: slower, with the march montage looping.
+	 * @param StartLocation The starting location of the march.
+	 * @param MarchToLocation The far end of the march.
+	 */
+	void ExecuteMarch(const FVector& StartLocation, const FVector& MarchToLocation);
+
+	/**
+	 * @brief Stops marching: restores the walk speed and the regular locomotion, active ability ID to Idle.
+	 */
+	void TerminateMarch();
+
 	void ExecuteSwitchWeapon();
 	void TerminateSwitchWeapon();
 
@@ -818,6 +831,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly)
 	FName SecondaryWeaponSocketName;
+
+	// Walk speed and acceleration while marching, as a fraction of the normal values.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "March", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float MarchSpeedMultiplier = 0.6f;
 
 	/**
 	 * @brief This unit was chosen by the sq controller to pick up the provided weapon,
@@ -992,8 +1009,17 @@ private:
 	UPROPERTY()
 	TObjectPtr<AInfantryWeaponMaster> M_InfantryWeapon;
 
-	/** The current patrol state of the unit. */
+	/** The current patrol state of the unit; a march uses it too. */
 	FSquadUnitPatrol M_PatrolState;
+
+	// What the march made of the movement; undone only while it is still exactly this, so a movement
+	// behaviour that changed the speed in the meantime is left alone.
+	float M_MarchedMaxWalkSpeed = 0.0f;
+	float M_MarchedMaxAcceleration = 0.0f;
+	float M_AppliedMarchSpeedMultiplier = 1.0f;
+
+	void ApplyMarchSpeed();
+	void RemoveMarchSpeed();
 
 	/** The target actor for the unit to engage. */
 	UPROPERTY()

@@ -3474,6 +3474,70 @@ void ASquadUnit::TerminatePatrol()
 	M_ActiveCommand = EAbilityID::IdIdle;
 }
 
+void ASquadUnit::ExecuteMarch(const FVector& StartLocation, const FVector& MarchToLocation)
+{
+	M_ActiveCommand = EAbilityID::IdMarch;
+	M_LastPatrolMoveTimeOut = 0.f;
+	M_PatrolState.PatrolStartLocation = StartLocation;
+	M_PatrolState.PatrolEndLocation = MarchToLocation;
+	M_PatrolState.bIsToEndPatrolActive = true;
+	ApplyMarchSpeed();
+	if (GetIsValidAnimBpSquadUnit())
+	{
+		AnimBp_SquadUnit->StartMarchAnimation();
+	}
+	MoveToAndBindOnCompleted(MarchToLocation, true, EAbilityID::IdMarch);
+}
+
+void ASquadUnit::TerminateMarch()
+{
+	// Also unbinds the OnMoveCompleted function.
+	StopMovementAndClearPath();
+	RemoveMarchSpeed();
+	if (GetIsValidAnimBpSquadUnit())
+	{
+		AnimBp_SquadUnit->StopMarchAnimation();
+	}
+	M_ActiveCommand = EAbilityID::IdIdle;
+}
+
+void ASquadUnit::ApplyMarchSpeed()
+{
+	UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+	const bool bAlreadyApplied = M_AppliedMarchSpeedMultiplier != 1.0f;
+	if (not IsValid(UnitMovement) || bAlreadyApplied)
+	{
+		return;
+	}
+	constexpr float MinimumMarchSpeedMultiplier = 0.05f;
+	M_AppliedMarchSpeedMultiplier = FMath::Clamp(MarchSpeedMultiplier, MinimumMarchSpeedMultiplier, 1.0f);
+	UnitMovement->MaxWalkSpeed *= M_AppliedMarchSpeedMultiplier;
+	UnitMovement->MaxAcceleration *= M_AppliedMarchSpeedMultiplier;
+	M_MarchedMaxWalkSpeed = UnitMovement->MaxWalkSpeed;
+	M_MarchedMaxAcceleration = UnitMovement->MaxAcceleration;
+}
+
+void ASquadUnit::RemoveMarchSpeed()
+{
+	constexpr float SpeedComparisonTolerance = 0.5f;
+	UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
+	const float AppliedSpeedMultiplier = M_AppliedMarchSpeedMultiplier;
+	M_AppliedMarchSpeedMultiplier = 1.0f;
+	if (not IsValid(UnitMovement) || AppliedSpeedMultiplier == 1.0f)
+	{
+		return;
+	}
+	// Something else set his speed in the meantime; that value already left the march out.
+	if (FMath::IsNearlyEqual(UnitMovement->MaxWalkSpeed, M_MarchedMaxWalkSpeed, SpeedComparisonTolerance))
+	{
+		UnitMovement->MaxWalkSpeed /= AppliedSpeedMultiplier;
+	}
+	if (FMath::IsNearlyEqual(UnitMovement->MaxAcceleration, M_MarchedMaxAcceleration, SpeedComparisonTolerance))
+	{
+		UnitMovement->MaxAcceleration /= AppliedSpeedMultiplier;
+	}
+}
+
 void ASquadUnit::ExecuteSwitchWeapon()
 {
 	bool bValidSecondaryWeapon = false;
@@ -3933,6 +3997,7 @@ void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::T
 	switch (M_ActiveCommand)
 	{
 	case EAbilityID::IdPatrol:
+	case EAbilityID::IdMarch:
 		OnMoveCompleted_Patrol();
 		break;
 	case EAbilityID::IdScavenge:
@@ -3994,18 +4059,29 @@ void ASquadUnit::OnMoveCompleted_Patrol()
 		RTSFunctionLibrary::PrintString(
 			"Last patrol move timeout is very close to now, aborting patrol.");
 		// Notify the squad controller that the patrol command is completed.
+		if (M_ActiveCommand == EAbilityID::IdMarch)
+		{
+			// Completing is not terminating: undo the march here or the soldier keeps its slow step.
+			RemoveMarchSpeed();
+			if (GetIsValidAnimBpSquadUnit())
+			{
+				AnimBp_SquadUnit->StopMarchAnimation();
+			}
+		}
 		StopMovementAndClearPath();
 		OnCommandComplete();
 		return;
 	}
 	M_LastPatrolMoveTimeOut = TimeNow;
+	// Patrol and march share the back-and-forth; the active command tells which one is walking it.
+	const EAbilityID PatrolAbility = M_ActiveCommand;
 	if (M_PatrolState.bIsToEndPatrolActive)
 	{
-		MoveToAndBindOnCompleted(M_PatrolState.PatrolStartLocation, true, EAbilityID::IdPatrol);
+		MoveToAndBindOnCompleted(M_PatrolState.PatrolStartLocation, true, PatrolAbility);
 	}
 	else
 	{
-		MoveToAndBindOnCompleted(M_PatrolState.PatrolEndLocation, true, EAbilityID::IdPatrol);
+		MoveToAndBindOnCompleted(M_PatrolState.PatrolEndLocation, true, PatrolAbility);
 	}
 	M_PatrolState.bIsToEndPatrolActive = !M_PatrolState.bIsToEndPatrolActive;
 }

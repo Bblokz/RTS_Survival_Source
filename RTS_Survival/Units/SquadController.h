@@ -384,6 +384,10 @@ public:
 
 	// Updates the decal and selection logic for the squad units their selection components.
 	void SetSquadSelected(const bool bIsSelected);
+	/**
+	 * @brief Called when a squad unit fires or takes damage.
+	 * @note A patrolling or marching squad drops the order and goes idle so the whole squad fights.
+	 */
 	void OnSquadUnitInCombat();
 
 	int32 GetSquadUnitIndex(const ASquadUnit* SquadUnit);
@@ -655,6 +659,14 @@ protected:
 	virtual void ExecutePatrolCommand(const FVector PatrolToLocation) override;
 
 	virtual void TerminatePatrolCommand() override;
+
+	/**
+	 * @brief Patrol between each unit's position and the location while marching at reduced speed.
+	 * @param MarchToLocation The far end of the march.
+	 */
+	virtual void ExecuteMarchCommand(const FVector MarchToLocation) override;
+
+	virtual void TerminateMarchCommand() override;
 
 	virtual void ExecutePickupItemCommand(AItemsMaster* TargetItem) override;
 

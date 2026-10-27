@@ -685,6 +685,7 @@ void USquadUnitAnimInstance::UpdateAnimState(const FVector& VectorSpeed)
 	RunningPlayRate = FMath::GetMappedRangeValueClamped(FVector2D(600.0f, 1200.0f), FVector2D(1.0f, 2.0f), Speed);
 
 	SetMovementStateWithSpeed(Speed);
+	UpdateMarchPlayRate();
 }
 
 void USquadUnitAnimInstance::BindSelectionFunctions(USelectionComponent* SelectionComponent)
@@ -874,9 +875,60 @@ void USquadUnitAnimInstance::StopParachuteDescentAnimation()
 	M_ActiveParachuteMontage = nullptr;
 }
 
+bool USquadUnitAnimInstance::StartMarchAnimation()
+{
+	if (not IsValid(MarchMontage))
+	{
+		RTSFunctionLibrary::ReportError("No march montage set on anim blueprint " + GetName() +
+			"\n At function: USquadUnitAnimInstance::StartMarchAnimation");
+		return false;
+	}
+	if (Montage_IsPlaying(MarchMontage))
+	{
+		M_ActiveMarchMontage = MarchMontage;
+		return true;
+	}
+	CancelCoverAnimation();
+	if (Montage_Play(MarchMontage, 1.0f) <= 0.0f)
+	{
+		RTSFunctionLibrary::ReportError("Failed to play march montage " + MarchMontage->GetName() + " on " + GetName());
+		return false;
+	}
+	const FName LoopSectionName = MarchMontage->GetSectionName(0);
+	Montage_SetNextSection(LoopSectionName, LoopSectionName, MarchMontage);
+	M_ActiveMarchMontage = MarchMontage;
+	UpdateMarchPlayRate();
+	return true;
+}
+
+void USquadUnitAnimInstance::StopMarchAnimation()
+{
+	if (not IsValid(M_ActiveMarchMontage))
+	{
+		return;
+	}
+	constexpr float MarchBlendOutSeconds = 0.25f;
+	Montage_Stop(MarchBlendOutSeconds, M_ActiveMarchMontage);
+	M_ActiveMarchMontage = nullptr;
+}
+
+void USquadUnitAnimInstance::UpdateMarchPlayRate()
+{
+	if (not IsValid(M_ActiveMarchMontage))
+	{
+		return;
+	}
+	// A soldier waiting at a patrol end or for a squad mate marks time slowly instead of freezing mid-step.
+	constexpr float MinMarchPlayRate = 0.35f;
+	constexpr float MaxMarchPlayRate = 2.0f;
+	const float PlayRate = FMath::Clamp(Speed / MarchMontageNaturalSpeed, MinMarchPlayRate, MaxMarchPlayRate);
+	Montage_SetPlayRate(M_ActiveMarchMontage, PlayRate);
+}
+
 void USquadUnitAnimInstance::StopAllMontages()
 {
 	M_ActiveParachuteMontage = nullptr;
+	M_ActiveMarchMontage = nullptr;
 	// Montage_Stop without a montage stops every montage; keep the full-body runtime owners in sync.
 	ClearTeamWeaponCrewAnimationRuntime(false);
 	ClearCoverAnimationRuntime();
