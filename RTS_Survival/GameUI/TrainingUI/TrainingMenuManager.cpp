@@ -1546,6 +1546,39 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 
 	// RUS MEDIUM TANKS
 
+	// Rus T-34 Harvester
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_T34_Harvester)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			HarvesterTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_T34_Harvester,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+
+		FTrainingOption HarvesterItemID = FTrainingOption(
+			EAllUnitType::UNType_Harvester,
+			static_cast<uint8>(ETankSubtype::Tank_T34_Harvester)
+		);
+
+		FTrainingOptionState HarvesterTrainingOptionState = CreateTrainingOptionState(
+			HarvesterItemID,
+			MediumTankTrainingTime,
+			EAllUnitType::UNType_Harvester,
+			ETankSubtype::Tank_T34_Harvester,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(HarvesterItemID, HarvesterTrainingOptionState);
+	}
+
 	// Rus T-34/76
 	{
 		const int32 T34AaExtraTrainingSeconds = 12;

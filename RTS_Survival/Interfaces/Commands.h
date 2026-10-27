@@ -769,6 +769,18 @@ public:
 		const FVector& Location,
 		const bool bSetUnitToIdle);
 
+	/**
+	 * @brief Patrols between the current position and the location while marching (squads only).
+	 * @param Location The far end of the march.
+	 * @param bSetUnitToIdle Whether the unit should clear all previous commands making this ability the first
+	 * to be executed.
+	 * @note Scripted order: the ability does not need to be on the command card.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError MarchToLocation(
+		const FVector& Location,
+		const bool bSetUnitToIdle);
+
 
 	/**
 	 * @brief Moves the unit in reverse to the provided location, adds the move command to the command queue.
@@ -1135,6 +1147,11 @@ protected:
 	virtual void ExecutePatrolCommand(const FVector PatrolToLocation);
 
 	virtual void TerminatePatrolCommand();
+
+	/** @brief March-patrol between the current position and the location; finishes at once on non-squads. */
+	virtual void ExecuteMarchCommand(const FVector MarchToLocation);
+
+	virtual void TerminateMarchCommand();
 
 	/**
 	 * @brief Force-reverse moves the unit to the specified location.
