@@ -37,6 +37,21 @@ Wheat and pumpkins leave the area empty and are crushed by any tank.
 - Plants never get removed from their ISM (indices stay valid): a crushed standing instance is shrunk and dropped
   500 uu; render state is marked dirty once per crush batch. Crushed remains get a random 0..1.5 uu lift so the flat
   cards of neighbouring plants never z-fight.
+- Wheat (v3 realism pass, 2026-10-27): muted tan-gold, nearly neutral per-plant tint (`InstanceTintLow/High`
+  0.84 / 0.95). Canopy cards are flat, about 1.7x the plant spacing, and thin out through a noisy rim, so the stand
+  reads as one carpet instead of puffs. `MissingPlantChance` is 0.004.
+- Burned-out wheat (`BP_CropField_WheatBurned`, `SM_WheatBurnt_A/B/_Crushed`, `NS_FarmCrush_Ash`):
+  - Each plant is a slightly domed scorched-ground card plus charred stubble cards. Crushed plants become lighter
+    trampled ash, so trails show. Any tank crushes it, and its shadows are off.
+  - It uses `MI_FarmCrops_Burnt`, a child of `M_FarmCrops` on the same atlas. That instance has no per-plant tint,
+    grey field patches and no transmission. Overlapping ground cards show up as cells as soon as neighbours differ
+    in tone, so the ash texture keeps only fine-scale contrast.
+- Hay props (plain static meshes, same `MI_FarmCrops` / atlas, with collision):
+  - Meshes: `SM_HayStack_A` (beehive with pole), `SM_HayStack_B` (rick), `SM_HayBale_Round_A/B` and
+    `SM_HayBale_Round_Stack`.
+  - Atlas regions: `hay_strip` (tiles along V), `hay_weathered` (stack caps), `bale_end` and `hay_fringe` (wisp
+    cards, LOD0 only).
+  - Stacks get 4 convex hulls, bales get boxes. `ue_place_farms.py` `place_hay()` puts them around the wheat.
 - ISM, not HISM: with HISM only the first component created during the construction script rendered in the editor
   (2026-10-27); ISM is GPU-scene culled per instance and cheaper to update while tanks crush.
 
@@ -52,6 +67,8 @@ several fenced patches, some with distance between them. So the map has three fa
 | Pumpkins | `Farm_Pumpkin_P1-3` (rotated 90 / 5 deg) | 100-118 m |
 | Vineyard | `Farm_Vineyard_V1-3`, east of the rail line | 109-146 m |
 
+- `Farm_WheatBurned_W4` is an extra burned-out wheat patch west of W2. It is placed last in `PATCHES`, so the other
+  patches keep their seeds.
 - Each patch has its own `Farm_Fence_*` with a 4 m gate.
 - Every patch lies on the +Y side of the Soviet wall line (`Rus_Building_Wall*` / `GateWired*`, y -11k..-22k). That
   is the open approach from the player start (y about +19k). The city is behind the walls at y < -11k. Overview:
