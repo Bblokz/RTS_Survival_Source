@@ -81,6 +81,10 @@ void URTSGameUserSettings::SetToDefaults()
 
 	SetOverallScalabilityLevel(RTSGameUserSettingsPrivate::EpicScalabilityLevel);
 
+	M_EnvironmentDetailDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+	M_FoliageDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+	M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+
 	M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 	M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 	M_PlayerSquadHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
@@ -281,6 +285,39 @@ void URTSGameUserSettings::SetHideActionButtonHotkeys(const bool bNewHideActionB
 void URTSGameUserSettings::SetCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover)
 {
 	bM_CheckUnitRangeOnHover = bNewCheckUnitRangeOnHover;
+}
+
+float URTSGameUserSettings::GetEnvironmentDetailDensity() const
+{
+	return M_EnvironmentDetailDensity;
+}
+
+float URTSGameUserSettings::GetFoliageDensity() const
+{
+	return M_FoliageDensity;
+}
+
+float URTSGameUserSettings::GetStoneDensity() const
+{
+	return M_StoneDensity;
+}
+
+void URTSGameUserSettings::SetEnvironmentDetailDensity(const float NewEnvironmentDetailDensity)
+{
+	M_EnvironmentDetailDensity = NewEnvironmentDetailDensity;
+	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SetFoliageDensity(const float NewFoliageDensity)
+{
+	M_FoliageDensity = NewFoliageDensity;
+	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SetStoneDensity(const float NewStoneDensity)
+{
+	M_StoneDensity = NewStoneDensity;
+	ApplyCustomSettingClamps();
 }
 
 
@@ -568,4 +605,29 @@ void URTSGameUserSettings::ApplyCustomSettingClamps()
 		RTSFunctionLibrary::ReportError(TEXT("Frame rate limit was negative and has been reset to unlimited."));
 		SetFrameRateLimit(RTSGameUserSettingsPrivate::MinFrameRateLimit);
 	}
+
+	ApplyEnvironmentDensityClamps();
+}
+
+void URTSGameUserSettings::ApplyEnvironmentDensityClamps()
+{
+	ClampEnvironmentDensity(M_EnvironmentDetailDensity, TEXT("Environment detail density"));
+	ClampEnvironmentDensity(M_FoliageDensity, TEXT("Foliage density"));
+	ClampEnvironmentDensity(M_StoneDensity, TEXT("Stone density"));
+}
+
+void URTSGameUserSettings::ClampEnvironmentDensity(float& DensityToClamp, const TCHAR* DensityName)
+{
+	const float ClampedDensity = FMath::Clamp(
+		DensityToClamp,
+		RTSGameUserSettingsRanges::MinEnvironmentDensity,
+		RTSGameUserSettingsRanges::MaxEnvironmentDensity
+	);
+	if (FMath::IsNearlyEqual(ClampedDensity, DensityToClamp))
+	{
+		return;
+	}
+
+	RTSFunctionLibrary::ReportError(FString::Printf(TEXT("%s was out of range and has been clamped."), DensityName));
+	DensityToClamp = ClampedDensity;
 }

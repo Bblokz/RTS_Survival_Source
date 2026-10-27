@@ -82,6 +82,24 @@ struct FRTSDisplaySettings
 };
 
 USTRUCT(BlueprintType)
+struct FRTSEnvironmentDetailSettings
+{
+	GENERATED_BODY()
+
+	// Main slider; changing it overwrites the foliage and stone densities below.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	float M_EnvironmentDetailDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+
+	// Drives grass.DensityScale (landscape grass types).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	float M_FoliageDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+
+	// Drives foliage.DensityScale, which only the ground stone HISMs opt into.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	float M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+};
+
+USTRUCT(BlueprintType)
 struct FRTSGraphicsSettings
 {
 	GENERATED_BODY()
@@ -91,6 +109,9 @@ struct FRTSGraphicsSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
 	FRTSScalabilityGroupSettings M_ScalabilityGroups;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	FRTSEnvironmentDetailSettings M_EnvironmentDetailSettings;
 };
 
 USTRUCT(BlueprintType)
@@ -257,6 +278,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingFrameRateLimit(float NewFrameRateLimit);
 
+	/** @brief Main environment detail slider: also overwrites the pending foliage and stone densities. */
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingEnvironmentDetailDensity(float NewDensity);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingFoliageDensity(float NewDensity);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingStoneDensity(float NewDensity);
+
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingMasterVolume(float NewVolume);
 
@@ -350,6 +381,12 @@ private:
 	void ApplyNonResolutionSettings();
 	void ApplyAudioSettings();
 	void ApplyControlSettings();
+
+	/**
+	 * @brief Pushes the saved foliage / stone densities into grass.DensityScale and foliage.DensityScale.
+	 * Set at game-setting priority so a later scalability change cannot override the user's choice.
+	 */
+	void ApplyEnvironmentDetailSettings() const;
 	void ApplyGameplaySettingsDiff(const FRTSGameplaySettings& PreviousSettings, const FRTSGameplaySettings& CurrentSettings);
 
 	void ApplyAudioChannelVolume(ERTSAudioType AudioType, float VolumeToApply);

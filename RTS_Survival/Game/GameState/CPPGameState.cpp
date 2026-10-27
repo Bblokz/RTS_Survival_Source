@@ -710,7 +710,7 @@ void ACPPGameState::SetupBreakThroughTrainingOptions()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SturmTiger)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KingTiger)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Tiger105)),
-		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_E75)),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_210MM_Morser)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Maus)),
 		FTrainingOption(),
@@ -6995,6 +6995,24 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Tiger105, TankData);
 
+	// E-75 (King Tiger hull with heavier armor and the 128mm: one more shot of health, slower hull and turret)
+	TankData.MaxHealth = T3HeavyTankBase + 2 * OneHeavyTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 14 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 14;
+	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, E75_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, E75_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 2.f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_E75, TankData);
+
 	// ------------------------------- RUS Heavy Tanks -------------------------------
 
 	// T-28 (uses Medium exp levels per original)
@@ -8116,6 +8134,17 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 7, 10);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusPlatformFactory, BxpData);
+
+	// -----------------------------------------------------------------------
+	// ------------------------- RUS ASSEMBLY YARD --------------------------
+	// -----------------------------------------------------------------------
+	// The same role as the platform factory (large vehicles, armed with a 53-K in its casemate), so the same data.
+	FBxpData AssemblyYardData = BxpData;
+	AssemblyYardData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusAssemblyYard_Radixite},
+		{ERTSResourceType::Resource_Metal, RusAssemblyYard_Metal},
+	});
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusAssemblyYard, AssemblyYardData);
 
 	// -----------------------------------------------------------------------
 	// ------------------------- RUS RESEARCH CENTER ------------------------

@@ -22,7 +22,7 @@ FACTIONS = {
         "medium_tanks": ["Tank_Marder", "Tank_PzIV_G", "Tank_PzIV_70", "Tank_Brumbar", "Tank_PzIV_H",
                          "Tank_PZIV_Rockets"],
         "heavy_tanks": ["Tank_E25", "Tank_TigerH1", "Tank_TigerRail", "Tank_SturmTiger", "Tank_KingTiger",
-                        "Tank_Tiger105", "Tank_Maus"],
+                        "Tank_Tiger105", "Tank_E75", "Tank_Maus"],
         "support_weapons": ["Squad_Ger_PaK38", "Squad_Ger_LefH18", "Squad_Ger_PaK40", "Squad_Ger_210MM_Morser"],
     },
     "m_ger_thermo_korps_setting": {

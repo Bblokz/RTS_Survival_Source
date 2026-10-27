@@ -141,6 +141,7 @@ void UW_EscapeMenuSettings::NativeConstruct()
 	CacheSettingsSectionButtonPadding();
 	ApplySettingsSectionSelection(EscapeMenuSettingsOptionDefaults::SettingsSectionGameplayIndex);
 	RefreshControlsFromSubsystem();
+	SetEnvironmentAdvancedExpanded(false);
 }
 
 void UW_EscapeMenuSettings::CacheSettingsSubsystem()
@@ -234,6 +235,13 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 	SetSliderRange(M_SliderMusicVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 	SetSliderRange(M_SliderSfxVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
 	SetSliderRange(M_SliderTransmissionsAndCinematicsVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
+	SetSliderRange(
+		M_SliderEnvironmentDetail,
+		RTSGameUserSettingsRanges::MinEnvironmentDensity,
+		RTSGameUserSettingsRanges::MaxEnvironmentDensity
+	);
+	SetSliderRange(M_SliderFoliageDensity, RTSGameUserSettingsRanges::MinEnvironmentDensity, RTSGameUserSettingsRanges::MaxEnvironmentDensity);
+	SetSliderRange(M_SliderStoneDensity, RTSGameUserSettingsRanges::MinEnvironmentDensity, RTSGameUserSettingsRanges::MaxEnvironmentDensity);
 }
 
 void UW_EscapeMenuSettings::PopulateWindowModeOptions()
@@ -544,6 +552,23 @@ void UW_EscapeMenuSettings::UpdateAllRichTextBlocks()
 	M_TextApplyButton->SetText(M_ButtonText.M_ApplyButtonText);
 	M_TextSetDefaultsButton->SetText(M_ButtonText.M_SetDefaultsButtonText);
 	M_TextBackOrCancelButton->SetText(M_ButtonText.M_BackOrCancelButtonText);
+
+	UpdateEnvironmentDetailTexts();
+}
+
+void UW_EscapeMenuSettings::UpdateEnvironmentDetailTexts()
+{
+	if (not GetAreEnvironmentDetailWidgetsValid())
+	{
+		return;
+	}
+
+	M_TextEnvironmentDetailLabel->SetText(M_GraphicsText.M_EnvironmentDetailLabelText);
+	M_TextFoliageDensityLabel->SetText(M_GraphicsText.M_FoliageDensityLabelText);
+	M_TextStoneDensityLabel->SetText(M_GraphicsText.M_StoneDensityLabelText);
+	M_TextEnvironmentAdvancedLabel->SetText(bM_IsEnvironmentAdvancedExpanded
+		                                        ? M_GraphicsText.M_EnvironmentAdvancedHideText
+		                                        : M_GraphicsText.M_EnvironmentAdvancedShowText);
 }
 
 void UW_EscapeMenuSettings::InitialiseControlsFromSnapshot(const FRTSSettingsSnapshot& SettingsSnapshot)
@@ -559,6 +584,32 @@ void UW_EscapeMenuSettings::InitialiseGraphicsControls(const FRTSGraphicsSetting
 	InitialiseGraphicsDisplayControls(GraphicsSettings.M_DisplaySettings);
 	InitialiseGraphicsScalabilityControls(GraphicsSettings.M_ScalabilityGroups);
 	InitialiseGraphicsFrameRateControl(GraphicsSettings.M_DisplaySettings);
+	InitialiseGraphicsEnvironmentDetailControls(GraphicsSettings.M_EnvironmentDetailSettings);
+}
+
+void UW_EscapeMenuSettings::InitialiseGraphicsEnvironmentDetailControls(
+	const FRTSEnvironmentDetailSettings& EnvironmentDetailSettings)
+{
+	if (not GetAreEnvironmentDetailWidgetsValid())
+	{
+		return;
+	}
+
+	M_SliderEnvironmentDetail->SetValue(EnvironmentDetailSettings.M_EnvironmentDetailDensity);
+	M_SliderFoliageDensity->SetValue(EnvironmentDetailSettings.M_FoliageDensity);
+	M_SliderStoneDensity->SetValue(EnvironmentDetailSettings.M_StoneDensity);
+}
+
+void UW_EscapeMenuSettings::SetEnvironmentAdvancedExpanded(const bool bExpanded)
+{
+	if (not GetIsValidVerticalBoxEnvironmentAdvanced())
+	{
+		return;
+	}
+
+	bM_IsEnvironmentAdvancedExpanded = bExpanded;
+	M_VerticalBoxEnvironmentAdvanced->SetVisibility(bExpanded ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	UpdateEnvironmentDetailTexts();
 }
 
 void UW_EscapeMenuSettings::InitialiseGraphicsDisplayControls(const FRTSDisplaySettings& DisplaySettings)
@@ -1044,6 +1095,28 @@ void UW_EscapeMenuSettings::BindGraphicsSettingCallbacks()
 
 	M_SliderFrameRateLimit->OnValueChanged.RemoveAll(this);
 	M_SliderFrameRateLimit->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleFrameRateLimitChanged);
+
+	BindEnvironmentDetailCallbacks();
+}
+
+void UW_EscapeMenuSettings::BindEnvironmentDetailCallbacks()
+{
+	if (not GetAreEnvironmentDetailWidgetsValid())
+	{
+		return;
+	}
+
+	M_SliderEnvironmentDetail->OnValueChanged.RemoveAll(this);
+	M_SliderEnvironmentDetail->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnvironmentDetailDensityChanged);
+
+	M_SliderFoliageDensity->OnValueChanged.RemoveAll(this);
+	M_SliderFoliageDensity->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleFoliageDensityChanged);
+
+	M_SliderStoneDensity->OnValueChanged.RemoveAll(this);
+	M_SliderStoneDensity->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleStoneDensityChanged);
+
+	M_ButtonEnvironmentAdvanced->OnClicked.RemoveAll(this);
+	M_ButtonEnvironmentAdvanced->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnvironmentAdvancedClicked);
 }
 
 void UW_EscapeMenuSettings::BindAudioSettingCallbacks()
@@ -1736,6 +1809,150 @@ bool UW_EscapeMenuSettings::GetIsValidComboPostProcessingQuality() const
 			this,
 			TEXT("M_ComboPostProcessingQuality"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidComboPostProcessingQuality"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextEnvironmentDetailLabel() const
+{
+	if (not IsValid(M_TextEnvironmentDetailLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextEnvironmentDetailLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextEnvironmentDetailLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderEnvironmentDetail() const
+{
+	if (not IsValid(M_SliderEnvironmentDetail))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderEnvironmentDetail"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderEnvironmentDetail"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidButtonEnvironmentAdvanced() const
+{
+	if (not IsValid(M_ButtonEnvironmentAdvanced))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ButtonEnvironmentAdvanced"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidButtonEnvironmentAdvanced"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextEnvironmentAdvancedLabel() const
+{
+	if (not IsValid(M_TextEnvironmentAdvancedLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextEnvironmentAdvancedLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextEnvironmentAdvancedLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidVerticalBoxEnvironmentAdvanced() const
+{
+	if (not IsValid(M_VerticalBoxEnvironmentAdvanced))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_VerticalBoxEnvironmentAdvanced"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidVerticalBoxEnvironmentAdvanced"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextFoliageDensityLabel() const
+{
+	if (not IsValid(M_TextFoliageDensityLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextFoliageDensityLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextFoliageDensityLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderFoliageDensity() const
+{
+	if (not IsValid(M_SliderFoliageDensity))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderFoliageDensity"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderFoliageDensity"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextStoneDensityLabel() const
+{
+	if (not IsValid(M_TextStoneDensityLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextStoneDensityLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextStoneDensityLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidSliderStoneDensity() const
+{
+	if (not IsValid(M_SliderStoneDensity))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_SliderStoneDensity"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidSliderStoneDensity"),
 			this
 		);
 		return false;
@@ -2835,6 +3052,11 @@ bool UW_EscapeMenuSettings::GetAreGraphicsWidgetsValid() const
 		return false;
 	}
 
+	if (not GetAreEnvironmentDetailWidgetsValid())
+	{
+		return false;
+	}
+
 	return GetAreGraphicsControlWidgetsValid();
 }
 
@@ -3281,6 +3503,31 @@ bool UW_EscapeMenuSettings::GetAreGraphicsScalabilityWidgetsValid() const
 bool UW_EscapeMenuSettings::GetAreGraphicsFrameRateWidgetsValid() const
 {
 	return GetIsValidSliderFrameRateLimit();
+}
+
+bool UW_EscapeMenuSettings::GetAreEnvironmentDetailWidgetsValid() const
+{
+	if (not GetIsValidTextEnvironmentDetailLabel() || not GetIsValidSliderEnvironmentDetail())
+	{
+		return false;
+	}
+
+	if (not GetIsValidButtonEnvironmentAdvanced() || not GetIsValidTextEnvironmentAdvancedLabel())
+	{
+		return false;
+	}
+
+	if (not GetIsValidVerticalBoxEnvironmentAdvanced())
+	{
+		return false;
+	}
+
+	if (not GetIsValidTextFoliageDensityLabel() || not GetIsValidSliderFoliageDensity())
+	{
+		return false;
+	}
+
+	return GetIsValidTextStoneDensityLabel() && GetIsValidSliderStoneDensity();
 }
 
 bool UW_EscapeMenuSettings::GetAreAudioSliderWidgetsValid() const
@@ -3744,6 +3991,66 @@ void UW_EscapeMenuSettings::HandleFrameRateLimitChanged(const float NewValue)
 	}
 
 	M_SettingsSubsystem->SetPendingFrameRateLimit(NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleEnvironmentDetailDensityChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetAreEnvironmentDetailWidgetsValid())
+	{
+		return;
+	}
+
+	// The main slider overwrites both categories, like the health bar "overwrite all" combos.
+	M_SettingsSubsystem->SetPendingEnvironmentDetailDensity(NewValue);
+	bM_IsInitialisingControls = true;
+	M_SliderFoliageDensity->SetValue(NewValue);
+	M_SliderStoneDensity->SetValue(NewValue);
+	bM_IsInitialisingControls = false;
+}
+
+void UW_EscapeMenuSettings::HandleFoliageDensityChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingFoliageDensity(NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleStoneDensityChanged(const float NewValue)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingStoneDensity(NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleEnvironmentAdvancedClicked()
+{
+	SetEnvironmentAdvancedExpanded(not bM_IsEnvironmentAdvancedExpanded);
 }
 
 void UW_EscapeMenuSettings::HandleMasterVolumeChanged(const float NewValue)

@@ -93,6 +93,9 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerMortarPit, WithFootprint(FreeConstructionRules, 1000.f, 1000.f)},
 		{EBuildingExpansionType::BTX_Rus120MortarPit, WithFootprint(FreeConstructionRules, 1000.f, 1000.f)},
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
+		// The assembly yard platform with its exit ramp and the casemate's glacis: 43.9 x 32.4 m, its origin 1.65 m
+		// behind the middle, so the footprint is sized to twice the far half (23.6 m forward).
+		{EBuildingExpansionType::BTX_RusAssemblyYard, WithFootprint(FreeConstructionRules, 4800.f, 3300.f)},
 
 		// --- solar  ---
 		// The radixite solar trailer snaps to the Gamma Facility's BXP_L / BXP_R side sockets (4.5 m out, 4 m along the wall).

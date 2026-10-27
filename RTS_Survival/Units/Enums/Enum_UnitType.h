@@ -194,6 +194,8 @@ enum class ETankSubtype : uint8
 	Tank_Wespe UMETA(DisplayName = "Ger Light Wespe 105mm"),
 	// Soviet harvester on the T-34 hull: breaks crystal with a pile-driver hammer instead of the Pz I saw.
 	Tank_T34_Harvester UMETA(DisplayName = "Rus Medium T-34 Harvester"),
+	// E-75 heavy tank on the King Tiger hull with the 128mm KwK 44 in an enlarged turret.
+	Tank_E75 UMETA(DisplayName = "Ger Heavy E75"),
 };
 
 
@@ -218,6 +220,7 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_JagdTiger:
 	case ETankSubtype::Tank_Maus:
 	case ETankSubtype::Tank_E100:
+	case ETankSubtype::Tank_E75:
 	case ETankSubtype::Tank_T35:
 	case ETankSubtype::Tank_KV_1:
 	case ETankSubtype::Tank_KV_2:

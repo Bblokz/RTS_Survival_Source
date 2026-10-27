@@ -132,6 +132,9 @@ enum class EBuildingExpansionType : uint8
 	BTX_Rus120MortarPit UMETA(DisplayName = "Rus 120mm Mortar Pit"),
 	// Twin German MG 42 positions joined by an ammunition corridor and worked by two scavenger crews.
 	BTX_GerTwinMG42Pit UMETA(DisplayName = "Ger Twin MG42 Pit"),
+	// Soviet vehicle assembly yard: a large platform where four cranes relay parts onto the vehicle being trained,
+	// with a 53-K in a concrete-roofed casemate on its front corner.
+	BTX_RusAssemblyYard UMETA(DisplayName = "Rus Assembly Yard"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -166,6 +169,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_Rus_SuppliesStorage");
 	case EBuildingExpansionType::BTX_RusPlatformFactory:
 		return FString("BTX_RusPlatformFactory");
+	case EBuildingExpansionType::BTX_RusAssemblyYard:
+		return FString("BTX_RusAssemblyYard");
 	case EBuildingExpansionType::BTX_RusFactory:
 		return FString("BTX_RusFactory");
 	case EBuildingExpansionType::BTX_GerMarderStugFactory:
@@ -331,6 +336,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusResearchCenter: return TEXT("Research Center");
 	case EBuildingExpansionType::BTX_RusIndustrialRefinery: return TEXT("Industrial Refinery");
 	case EBuildingExpansionType::BTX_RusPlatformFactory: return TEXT("Platform Factory");
+	case EBuildingExpansionType::BTX_RusAssemblyYard: return TEXT("Assembly Yard");
 	case EBuildingExpansionType::BTX_RusCoolingTowers: return TEXT("Cooling Towers");
 	case EBuildingExpansionType::BTX_RusFuelStorage1: return TEXT("Fuel Storage 1");
 	case EBuildingExpansionType::BTX_RusFuelStorage2: return TEXT("Fuel Storage 2");

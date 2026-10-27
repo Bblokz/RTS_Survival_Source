@@ -485,7 +485,7 @@ void UTrainingLayoutDataAsset::InitDefaultBreakthroughLayout()
 			                             Slot::Empty(),
 			                             Slot::Empty(),
 			                             Slot::Tank(ETankSubtype::Tank_KingTiger),
-			                             Slot::Empty()
+			                             Slot::Tank(ETankSubtype::Tank_E75)
 		                             }),
 		              MakeSubSection(LOCTEXT("Experimental", "Experimental"), {
 			                             Slot::Tank(ETankSubtype::Tank_TigerRail),

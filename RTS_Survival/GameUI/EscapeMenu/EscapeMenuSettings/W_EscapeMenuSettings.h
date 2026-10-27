@@ -63,6 +63,21 @@ struct FEscapeMenuSettingsGraphicsText
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_FrameRateLimitLabelText = FText::FromString(TEXT("SETTINGS_FRAME_RATE_LIMIT_LABEL"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_EnvironmentDetailLabelText = FText::FromString(TEXT("<Text_Armor>Environment Detail</>"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_EnvironmentAdvancedShowText = FText::FromString(TEXT("<Text_Armor>Advanced +</>"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_EnvironmentAdvancedHideText = FText::FromString(TEXT("<Text_Armor>Advanced -</>"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_FoliageDensityLabelText = FText::FromString(TEXT("<Text_Armor>Foliage</>"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_StoneDensityLabelText = FText::FromString(TEXT("<Text_Armor>Stones</>"));
 };
 
 /**
@@ -313,6 +328,11 @@ private:
 	void InitialiseGraphicsDisplayControls(const FRTSDisplaySettings& DisplaySettings);
 	void InitialiseGraphicsScalabilityControls(const FRTSScalabilityGroupSettings& ScalabilityGroups);
 	void InitialiseGraphicsFrameRateControl(const FRTSDisplaySettings& DisplaySettings);
+	void InitialiseGraphicsEnvironmentDetailControls(const FRTSEnvironmentDetailSettings& EnvironmentDetailSettings);
+	void UpdateEnvironmentDetailTexts();
+
+	/** @brief Shows or hides the per-category density sliders under the main environment detail slider. */
+	void SetEnvironmentAdvancedExpanded(bool bExpanded);
 	void InitialiseAudioControls(const FRTSAudioSettings& AudioSettings);
 	void InitialiseControlSettingsControls(const FRTSControlSettings& ControlSettings);
 	void InitialiseGameplayControls(const FRTSGameplaySettings& GameplaySettings);
@@ -360,6 +380,7 @@ private:
 	void BindBackOrCancelButton();
 	void BindSettingCallbacks();
 	void BindGraphicsSettingCallbacks();
+	void BindEnvironmentDetailCallbacks();
 	void BindAudioSettingCallbacks();
 	void BindControlSettingCallbacks();
 	void BindGameplaySettingCallbacks();
@@ -415,6 +436,16 @@ private:
 	bool GetIsValidComboEffectsQuality() const;
 	bool GetIsValidComboPostProcessingQuality() const;
 	bool GetIsValidSliderFrameRateLimit() const;
+
+	bool GetIsValidTextEnvironmentDetailLabel() const;
+	bool GetIsValidSliderEnvironmentDetail() const;
+	bool GetIsValidButtonEnvironmentAdvanced() const;
+	bool GetIsValidTextEnvironmentAdvancedLabel() const;
+	bool GetIsValidVerticalBoxEnvironmentAdvanced() const;
+	bool GetIsValidTextFoliageDensityLabel() const;
+	bool GetIsValidSliderFoliageDensity() const;
+	bool GetIsValidTextStoneDensityLabel() const;
+	bool GetIsValidSliderStoneDensity() const;
 
 	bool GetIsValidTextAudioHeader() const;
 	bool GetIsValidTextMasterVolumeLabel() const;
@@ -502,6 +533,7 @@ private:
 	bool GetAreGraphicsDisplayWidgetsValid() const;
 	bool GetAreGraphicsScalabilityWidgetsValid() const;
 	bool GetAreGraphicsFrameRateWidgetsValid() const;
+	bool GetAreEnvironmentDetailWidgetsValid() const;
 	bool GetAreAudioSliderWidgetsValid() const;
 	bool GetAreControlSettingsWidgetsValid() const;
 	bool GetAreGameplayWidgetsValid() const;
@@ -545,6 +577,18 @@ private:
 
 	UFUNCTION()
 	void HandleFrameRateLimitChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleEnvironmentDetailDensityChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleFoliageDensityChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleStoneDensityChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleEnvironmentAdvancedClicked();
 
 	UFUNCTION()
 	void HandleMasterVolumeChanged(float NewValue);
@@ -974,6 +1018,48 @@ private:
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderFrameRateLimit = nullptr;
 
+	/** @brief BindWidget variable must reference a RichTextBlock named M_TextEnvironmentDetailLabel in the Widget Blueprint. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextEnvironmentDetailLabel = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a Slider named M_SliderEnvironmentDetail in the Widget Blueprint.
+	 * @note Main environment detail slider: moving it overwrites the foliage and stone sliders.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderEnvironmentDetail = nullptr;
+
+	/** @brief BindWidget variable must reference a Button named M_ButtonEnvironmentAdvanced in the Widget Blueprint. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UButton> M_ButtonEnvironmentAdvanced = nullptr;
+
+	/** @brief BindWidget variable must reference a RichTextBlock named M_TextEnvironmentAdvancedLabel in the Widget Blueprint. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextEnvironmentAdvancedLabel = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a VerticalBox named M_VerticalBoxEnvironmentAdvanced in the Widget Blueprint.
+	 * @note Holds the per-category density rows; collapsed until the Advanced button expands it.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UVerticalBox> M_VerticalBoxEnvironmentAdvanced = nullptr;
+
+	/** @brief BindWidget variable must reference a RichTextBlock named M_TextFoliageDensityLabel in the Widget Blueprint. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextFoliageDensityLabel = nullptr;
+
+	/** @brief BindWidget variable must reference a Slider named M_SliderFoliageDensity in the Widget Blueprint. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderFoliageDensity = nullptr;
+
+	/** @brief BindWidget variable must reference a RichTextBlock named M_TextStoneDensityLabel in the Widget Blueprint. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextStoneDensityLabel = nullptr;
+
+	/** @brief BindWidget variable must reference a Slider named M_SliderStoneDensity in the Widget Blueprint. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<USlider> M_SliderStoneDensity = nullptr;
+
 	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextAudioHeader in the Widget Blueprint.
 	 * @note Designers may style the text, but C++ owns the runtime text value for localization.
@@ -1358,6 +1444,10 @@ private:
 
 	UPROPERTY(Transient)
 	bool bM_IsInitialisingControls = false;
+
+	// Not persisted: the advanced environment detail rows start collapsed every time the menu is built.
+	UPROPERTY(Transient)
+	bool bM_IsEnvironmentAdvancedExpanded = false;
 
 	UPROPERTY(Transient)
 	bool bM_HasCachedSettingsSectionPadding = false;

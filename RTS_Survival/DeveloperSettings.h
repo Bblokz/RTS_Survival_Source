@@ -510,6 +510,9 @@ namespace DeveloperSettings
 				inline constexpr int32 JagdTiger_VehicleParts = 850;
 				inline constexpr int32 Tiger105_Radixite = 1500;
 				inline constexpr int32 Tiger105_VehicleParts = 750;
+				// 128mm E-75: above the King Tiger and Tiger 105, below the Maus / E100.
+				inline constexpr int32 E75_Radixite = 1450;
+				inline constexpr int32 E75_VehicleParts = 850;
 			}
 
 			namespace Infantry
@@ -875,6 +878,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerMarderStugFactory_Metal = 1000;
 				inline constexpr int32 RusPlatformFactory_Radixite = 3500;
 				inline constexpr int32 RusPlatformFactory_Metal = 1750;
+				inline constexpr int32 RusAssemblyYard_Radixite = 3500;
+				inline constexpr int32 RusAssemblyYard_Metal = 1750;
 				inline constexpr int32 RusResearchCenter_Radixite = 750;
 				inline constexpr int32 RusResearchCenter_Metal = 370;
 				inline constexpr int32 RusCoolingTowers_Radixite = 750;

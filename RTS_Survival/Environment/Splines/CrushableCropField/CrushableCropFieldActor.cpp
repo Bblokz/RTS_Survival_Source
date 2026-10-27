@@ -9,6 +9,7 @@
 #include "Engine/OverlapResult.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "GameFramework/Volume.h"
 #include "TimerManager.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/ApartmentDestruction/ApartmentFootprintNavModifier.h"
@@ -472,13 +473,19 @@ float ACrushableCropFieldActor::TraceLocalGroundZ(const FVector2D& LocalPoint) c
 	const FVector TraceEnd = ActorTransform.TransformPosition(
 		FVector(LocalPoint, -CrushableCropField::GroundTraceHalfHeight));
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(CropFieldGround), false, this);
-	FHitResult Hit;
-	if (not World->LineTraceSingleByObjectType(Hit, TraceStart, TraceEnd,
-	                                           FCollisionObjectQueryParams(ECC_WorldStatic), Params))
+	TArray<FHitResult> Hits;
+	World->LineTraceMultiByObjectType(Hits, TraceStart, TraceEnd, FCollisionObjectQueryParams(ECC_WorldStatic), Params);
+	for (const FHitResult& Hit : Hits)
 	{
-		return 0.f;
+		// Volumes (PCG, triggers, post process) are not ground; their lids would lift the whole field.
+		const AActor* HitActor = Hit.GetActor();
+		if (HitActor && HitActor->IsA<AVolume>())
+		{
+			continue;
+		}
+		return ActorTransform.InverseTransformPosition(Hit.ImpactPoint).Z;
 	}
-	return ActorTransform.InverseTransformPosition(Hit.ImpactPoint).Z;
+	return 0.f;
 }
 
 UInstancedStaticMeshComponent* ACrushableCropFieldActor::CreatePlantComponent(
