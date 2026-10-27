@@ -482,7 +482,7 @@ void UTrainingLayoutDataAsset::InitDefaultBreakthroughLayout()
 		              MakeSubSection(LOCTEXT("HeavyTanks", "Heavy Tanks"), {
 			                             Slot::Tank(ETankSubtype::Tank_TigerH1),
 			                             Slot::Tank(ETankSubtype::Tank_JagdTiger),
-			                             Slot::Empty(),
+			                             Slot::Tank(ETankSubtype::Tank_E50),
 			                             Slot::Empty(),
 			                             Slot::Tank(ETankSubtype::Tank_KingTiger),
 			                             Slot::Tank(ETankSubtype::Tank_E75)

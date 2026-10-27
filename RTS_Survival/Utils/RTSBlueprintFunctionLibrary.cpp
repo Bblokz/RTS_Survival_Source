@@ -1276,6 +1276,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T44_100L()
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T44_100L));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T44_155()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T44_155));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_T35()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T35));

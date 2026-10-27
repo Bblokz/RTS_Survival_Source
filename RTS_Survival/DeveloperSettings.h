@@ -513,6 +513,9 @@ namespace DeveloperSettings
 				// 128mm E-75: above the King Tiger and Tiger 105, below the Maus / E100.
 				inline constexpr int32 E75_Radixite = 1450;
 				inline constexpr int32 E75_VehicleParts = 850;
+				// 88mm L/100 E-50: between the Panther II and the King Tiger.
+				inline constexpr int32 E50_Radixite = 1150;
+				inline constexpr int32 E50_VehicleParts = 600;
 			}
 
 			namespace Infantry

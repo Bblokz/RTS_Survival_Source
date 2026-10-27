@@ -1190,6 +1190,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Ger E-50 (same as the King Tiger)
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_E50)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_E50,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 
 	// Ger Panther D
 	{
@@ -1752,6 +1770,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			MediumTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_T44_100L,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus T-44/155
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_T44_155)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			MediumTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_T44_155,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);

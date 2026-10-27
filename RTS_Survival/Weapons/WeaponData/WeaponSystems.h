@@ -357,7 +357,14 @@ enum class
 	// JagdPanther Pfeil: the PaK 43 firing APCR only (no splash, more pen).
 	Pak43_88MM_APCR_Pfeil UMETA(DisplayName = "8.8 cm PaK 43 Pfeil (APCR)"),
 	// JagdPanther Bollwerk: the casemate sFH 18 as arcing HE artillery.
-	sFH18_150MM_Bollwerk UMETA(DisplayName = "15 cm sFH 18 Bollwerk")
+	sFH18_150MM_Bollwerk UMETA(DisplayName = "15 cm sFH 18 Bollwerk"),
+	// E-50 Ausf. F: the long 8.8 cm KwK 44 L/100 (more pen, range and accuracy than the King Tiger's KwK 43).
+	KwK44_88MM_E50 UMETA(DisplayName = "8.8 cm KwK 44 L/100 (E-50)"),
+	// T-44/155: a 155mm howitzer in the T-44 turret, firing arcing HE like the towed ML-20.
+	T44_155MM_Howitzer UMETA(DisplayName = "155MM Howitzer (T-44/155)"),
+	// The MG 42 on the pit field mounts (twin MG42 pit, comm centre MG42 nests): 10-round bursts timed to the tank
+	// MG42 burst sound; it used to borrow the DShK's 12.7mm entry.
+	Ger_PitMG42_7_92MM UMETA(DisplayName = "MG 42 7.92MM (Pit)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -495,6 +502,9 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Mortar_120MM_Hetzer: return "12 cm Mortar";
 	case EWeaponName::Pak43_88MM_APCR_Pfeil: return "Pak 43 Pfeil";
 	case EWeaponName::sFH18_150MM_Bollwerk: return "sFH 18";
+	case EWeaponName::KwK44_88MM_E50: return "KwK 44/2";
+	case EWeaponName::T44_155MM_Howitzer: return "155mm How";
+	case EWeaponName::Ger_PitMG42_7_92MM: return "MG 42";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -1066,6 +1076,12 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Pak43_88MM_APCR_Pfeil";
 	case EWeaponName::sFH18_150MM_Bollwerk:
 		return "sFH18_150MM_Bollwerk";
+	case EWeaponName::KwK44_88MM_E50:
+		return "KwK44_88MM_E50";
+	case EWeaponName::T44_155MM_Howitzer:
+		return "T44_155MM_Howitzer";
+	case EWeaponName::Ger_PitMG42_7_92MM:
+		return "Ger_PitMG42_7_92MM";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:
