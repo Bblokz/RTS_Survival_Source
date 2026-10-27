@@ -22,32 +22,43 @@ namespace COllapseVFXNiagaraParams
 
 void FCollapseFX::CreateFX(const AActor* WorldContext) const
 {
-	const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
-	if(not World)
+	if(not WorldContext)
 	{
 		return;
 	}
-	if(CollapseVfx)
+	const FVector SpawnLocation = WorldContext->GetActorLocation() + FxLocationOffset;
+	SpawnVfxAtLocation(WorldContext, SpawnLocation);
+	PlaySfxAtLocation(WorldContext, SpawnLocation);
+}
+
+void FCollapseFX::SpawnVfxAtLocation(const UObject* WorldContext, const FVector& SpawnLocation) const
+{
+	UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
+	if(not World || not CollapseVfx)
 	{
-		const FVector SpawnLocation = WorldContext->GetActorLocation() + FxLocationOffset;
-		UNiagaraComponent* Niagara =  UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, CollapseVfx, SpawnLocation, VfxRotation, VfxScale);
-		AdjustFX(Niagara);
+		return;
 	}
-	if(CollapseSfx)
+	UNiagaraComponent* Niagara =  UNiagaraFunctionLibrary::SpawnSystemAtLocation(World, CollapseVfx, SpawnLocation, VfxRotation, VfxScale);
+	AdjustFX(Niagara);
+}
+
+void FCollapseFX::PlaySfxAtLocation(const UObject* WorldContext, const FVector& SpawnLocation) const
+{
+	if(not WorldContext || not WorldContext->GetWorld() || not CollapseSfx)
 	{
-		const FVector SpawnLocation = WorldContext->GetActorLocation() + FxLocationOffset;
-		UGameplayStatics::PlaySoundAtLocation(
-			WorldContext,
-			CollapseSfx,
-			SpawnLocation,
-			FRotator::ZeroRotator,
-			1.f,
-			1.f,
-			0.f,
-			SfxAttenuation,
-			SfxConcurrency
-		);
+		return;
 	}
+	UGameplayStatics::PlaySoundAtLocation(
+		WorldContext,
+		CollapseSfx,
+		SpawnLocation,
+		FRotator::ZeroRotator,
+		1.f,
+		1.f,
+		0.f,
+		SfxAttenuation,
+		SfxConcurrency
+	);
 }
 
 void FCollapseFX::AdjustFX(UNiagaraComponent* NiagaraComp) const

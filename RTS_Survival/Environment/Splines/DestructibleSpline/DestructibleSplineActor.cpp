@@ -1,4 +1,4 @@
-// Copyright (C) Bas Blokzijl - All rights reserved.
+﻿// Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "DestructibleSplineActor.h"
 
@@ -9,6 +9,7 @@
 #include "SplinePieceCollapseProxy.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/CrushDestructionTypes/FRTSCrushGate.h"
 #include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -248,24 +249,7 @@ void ADestructibleSplineActor::HandlePieceBeginOverlap(UPrimitiveComponent* Over
 
 bool ADestructibleSplineActor::GetPassesCrushGate(AActor* OtherActor) const
 {
-	const IRTSNavAgentInterface* NavAgent = Cast<IRTSNavAgentInterface>(OtherActor);
-	if (not NavAgent)
-	{
-		return false;
-	}
-	const ERTSNavAgents AgentType = NavAgent->GetRTSNavAgentType();
-	switch (CrushDestructionType)
-	{
-	case ECrushDestructionType::HeavyTank:
-		return AgentType == ERTSNavAgents::HeavyTank;
-
-	case ECrushDestructionType::MediumOrHeavyTank:
-		return AgentType == ERTSNavAgents::MediumTank || AgentType == ERTSNavAgents::HeavyTank;
-
-	case ECrushDestructionType::AnyTank:
-	default:
-		return AgentType != ERTSNavAgents::Character;
-	}
+	return FRTSCrushGate::GetPassesCrushGate(OtherActor, CrushDestructionType);
 }
 
 // ------------------------- HEALTH / DAMAGE ------------------------

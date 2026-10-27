@@ -76,6 +76,10 @@ struct FCollapseFX
 	FCollapseParameters CollapseNiagaraParameters;
 
 	void CreateFX(const AActor* WorldContext) const;
+	// Spawns CollapseVfx at the exact location (no FxLocationOffset applied), adjusted like CreateFX.
+	void SpawnVfxAtLocation(const UObject* WorldContext, const FVector& SpawnLocation) const;
+	// Plays CollapseSfx at the exact location (no FxLocationOffset applied).
+	void PlaySfxAtLocation(const UObject* WorldContext, const FVector& SpawnLocation) const;
 	void AdjustFX(UNiagaraComponent* NiagaraComp) const;
 	void AdjustFxForSetScaleColorLifetime(UNiagaraComponent* NiagaraComp) const;
 	void AdjustFxForSandbagSizeAndCount(UNiagaraComponent* NiagaraComp) const;
