@@ -8,6 +8,9 @@
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Behaviours/Derived/Damage/AmmoCookOff/AmmoCookOffBehaviour.h"
 #include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireBehaviour.h"
+#include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
+#include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossComponent.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -216,6 +219,95 @@ TSubclassOf<UAmmoCookOffBehaviour> ATankMaster::GetAmmoCookOffBehaviourClass() c
 		return nullptr;
 	}
 	return M_VehicleModuleSubsystem->GetAmmoCookOffBehaviourClass(M_ModuleArmor->GetVehicleModuleProfile());
+}
+
+// ----------------------------------------------------------------------------------------------------
+// Ammo cook-off death
+// ----------------------------------------------------------------------------------------------------
+
+namespace TankWreckTurretToss
+{
+	bool GetHasComponentNamed(const AActor* Wreck, const FName ComponentName)
+	{
+		TArray<UStaticMeshComponent*> MeshComponents;
+		Wreck->GetComponents<UStaticMeshComponent>(MeshComponents);
+		return MeshComponents.ContainsByPredicate([ComponentName](const UStaticMeshComponent* MeshComponent)
+		{
+			return IsValid(MeshComponent) && MeshComponent->GetFName() == ComponentName;
+		});
+	}
+
+	void StartOnWreck(AActor* Wreck, const FWreckTurretTossSettings& Settings, const float LiveTurretYawOffset)
+	{
+		// Other spawned debris has no hull to burn or turret to throw.
+		if (not IsValid(Wreck) || not GetHasComponentNamed(Wreck, Settings.HullComponentName))
+		{
+			return;
+		}
+
+		UWreckTurretTossComponent* TossComponent = NewObject<UWreckTurretTossComponent>(Wreck);
+		Wreck->AddInstanceComponent(TossComponent);
+		TossComponent->RegisterComponent();
+		if (not TossComponent->StartToss(Settings, LiveTurretYawOffset))
+		{
+			TossComponent->DestroyComponent();
+		}
+	}
+}
+
+void ATankMaster::DestroyAndSpawnActorsWithTurretToss(const FDestroySpawnActorsParameters& SpawnParams,
+                                                      const FCollapseFX CollapseFX)
+{
+	// Read now: the tank may be destroyed before the wreck class finished loading.
+	const FWreckTurretTossSettings TossSettings = M_TurretTossSettings;
+	const float LiveTurretYawOffset = GetLiveTurretYawOffset();
+	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX,
+	                                    [TossSettings, LiveTurretYawOffset](AActor* SpawnedActor)
+	                                    {
+		                                    TankWreckTurretToss::StartOnWreck(
+			                                    SpawnedActor, TossSettings, LiveTurretYawOffset);
+	                                    });
+}
+
+void ATankMaster::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, const FCollapseFX CollapseFX)
+{
+	if (bM_DiedWhileAmmoCookingOff && M_TurretTossSettings.bTossTurretOnCookOffDeath)
+	{
+		DestroyAndSpawnActorsWithTurretToss(SpawnParams, CollapseFX);
+		return;
+	}
+	Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
+}
+
+void ATankMaster::Debug_DieDuringAmmoCookOff()
+{
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+
+	const TSubclassOf<UAmmoCookOffBehaviour> CookOffBehaviourClass = GetAmmoCookOffBehaviourClass();
+	if (CookOffBehaviourClass != nullptr && GetIsValidBehaviourComponent()
+		&& BehaviourComponent->GetBehaviourByClass(CookOffBehaviourClass) == nullptr)
+	{
+		BehaviourComponent->AddBehaviour(CookOffBehaviourClass);
+	}
+	// Tanks without a cook-off profile still show the cook-off death.
+	bM_IsAmmoCookingOff = true;
+	UnitDies(ERTSDeathType::Kinetic);
+}
+
+float ATankMaster::GetLiveTurretYawOffset() const
+{
+	const TArray<ACPPTurretsMaster*> MountedTurrets = GetTurrets();
+	for (const ACPPTurretsMaster* MountedTurret : MountedTurrets)
+	{
+		if (IsValid(MountedTurret))
+		{
+			return FRotator::NormalizeAxis(MountedTurret->GetActorRotation().Yaw - GetActorRotation().Yaw);
+		}
+	}
+	return 0.f;
 }
 
 void ATankMaster::ShowModuleFirePopup(const FString& PopupText) const

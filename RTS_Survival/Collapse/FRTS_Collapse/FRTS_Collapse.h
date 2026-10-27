@@ -49,11 +49,13 @@ public:
 	 * @param Owner The owner to destroy.
 	 * @param SpawnParams Defines what actors to spawn.
 	 * @param CollapseFX
+	 * @param OnActorSpawned Optional; called for every spawned actor before the owner is destroyed.
 	 */
 	static void OnDestroySpawnActors(
 		AActor* Owner,
 		const FDestroySpawnActorsParameters& SpawnParams,
-		FCollapseFX CollapseFX
+		FCollapseFX CollapseFX,
+		TFunction<void(AActor*)> OnActorSpawned = nullptr
 	);
 
 private:
@@ -147,4 +149,7 @@ struct FOnDestroySpawnActorsContext
 
 	// Optional collapse FX that might be played.
 	FCollapseFX CollapseFX;
+
+	// Optional hook so the caller can set up each spawned actor (e.g. a wreck) while the owner still exists.
+	TFunction<void(AActor*)> OnActorSpawned;
 };
