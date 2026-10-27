@@ -3,3 +3,4 @@ Before/
 *.log
 *.png
 *.json
+__pycache__/

@@ -286,6 +286,7 @@ FString URTSBlueprintFunctionLibrary::BP_GetAbilityIDString(const EAbilityID Abi
 	case EAbilityID::IdIdle: return "IdIdle";
 	case EAbilityID::IdMove: return "IdMove";
 	case EAbilityID::IdPatrol: return "IdPatrol";
+	case EAbilityID::IdMarch: return "IdMarch";
 	case EAbilityID::IdProne: return "IdProne";
 	case EAbilityID::IdReverseMove: return "IdReverseMove";
 	case EAbilityID::IdStand: return "IdStand";
