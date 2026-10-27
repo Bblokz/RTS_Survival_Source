@@ -47,8 +47,30 @@ That means the ability must be present in `UCommandData::M_Abilities` (unit comm
 - `IdEnterCargo`
 - `IdManAbandonedTeamWeapon`
 - `IdCapture`
+- `IdTowActor`
+- `IdRegisterUnitAsBlackboardIdle`
+- `IdMarch`
 
 These are allowed even when no direct command-card entry exists.
+
+### March (`IdMarch`)
+
+- Squads only. Mostly scripted: `ICommands::MarchToLocation` is BlueprintCallable and mission spawn orders accept it.
+  A card entry is optional; with one, the second click goes through `ACPPController::ActionButtonPatrol`.
+- A patrol with a different gait: `ASquadUnit::ExecuteMarch` reuses the patrol back-and-forth, multiplies the walk
+  speed by `MarchSpeedMultiplier` (default 0.6) and loops the anim BP's `MarchMontage`, its play rate following
+  the ground speed. `TerminateMarch` restores both.
+- Like patrol it never completes by itself and blocks the queue (`IsQueueActiveAndNoPatrol`).
+- Patrol and march end when the squad enters combat: `ASquadController::OnSquadUnitInCombat` (a soldier fires or
+  is hit) calls `StopCommand`, so the whole squad goes idle and engages.
+- Guard squads stop their own guarding on a march order, as on a patrol order.
+- The anim BP's `MarchMontageNaturalSpeed` (190 cm/s) is the clip's own stride speed; at the default 0.6 × 500 cm/s
+  the montage plays at about 1.6× (quicker steps, no sliding). A `MarchSpeedMultiplier` near 0.38 keeps the
+  authored cadence.
+- Map test: `-SquadMarchValidate` on TestCover (`Units/Squads/Tests/SquadMarchTestScenario`) logs
+  `RTS_MARCH_TEST RESULT PASS|FAIL` after checking march speed, montage and its rate, that a hurt soldier drops
+  march and patrol to idle with speed and locomotion restored, and saves pictures to `Saved/SquadMarchTest`.
+  `-SquadMarchSquad=<name part>` picks the squad; riflemen are preferred otherwise.
 
 ---
 

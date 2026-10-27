@@ -453,6 +453,8 @@ namespace DeveloperSettings
 				inline constexpr int32 PzIIIJCommander_VehicleParts = 100;
 				inline constexpr int32 PzIIIM_Radixite = 400;
 				inline constexpr int32 PzIIIM_VehicleParts = 200;
+				// Medium hull and armour, so it costs more than the Pz I harvester.
+				inline constexpr int32 T34Harvester_Radixite = 400;
 				inline constexpr int32 PzIIIFlamm_Radixite = 400;
 				inline constexpr int32 PzIIIFlamm_VehicleParts = 300;
 				inline constexpr int32 PzIVG_Radixite = 400;

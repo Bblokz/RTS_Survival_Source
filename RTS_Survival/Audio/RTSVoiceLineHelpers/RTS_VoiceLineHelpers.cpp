@@ -24,6 +24,7 @@ ERTSVoiceLine FRTS_VoiceLineHelpers::GetVoiceLineFromAbility(const EAbilityID Ab
 	case EAbilityID::IdMove:
 		return ERTSVoiceLine::Move;
 	case EAbilityID::IdPatrol:
+	case EAbilityID::IdMarch:
 		return ERTSVoiceLine::Move;
 	case EAbilityID::IdStop:
 		return ERTSVoiceLine::Stop;
@@ -238,7 +239,7 @@ void FRTS_VoiceLineHelpers::PlayUnitDeathVoiceLineOnRadio(AActor* UnitThatDied, 
 EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetDeathVoiceLineForTank(const ETankSubtype Type)
 {
 	// Handle the harvester as an exception
-	if (Type == ETankSubtype::Tank_PzI_Harvester)
+	if (Type == ETankSubtype::Tank_PzI_Harvester || Type == ETankSubtype::Tank_T34_Harvester)
 	{
 		return EAnnouncerVoiceLineType::LostHarvester;
 	}

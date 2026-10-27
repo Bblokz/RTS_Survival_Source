@@ -6162,6 +6162,14 @@ void ACPPGameState::InitAllGameMediumTankData()
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
+	const TArray<FUnitAbilityEntry> BasicHarvesterTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdNoAbility,
+		EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility,
+	});
 
 	FTankData TankData;
 
@@ -6554,6 +6562,23 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * 2.2f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_100, TankData);
+
+	// T-34 Harvester (pile-driver breaker): medium armour, slower than a T-34 with the mast and hopper.
+	TankData.MaxHealth = MediumTankHealthBase;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 22;
+	TankData.VehicleReverseSpeedKmh = 12;
+	TankData.VisionRadius = T1TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, T34Harvester_Radixite}
+	});
+	TankData.Abilities = BasicHarvesterTankAbilities;
+	TankData.ExperienceLevels = GetMediumTankExpLevels();
+	TankData.ExperienceWorth = BaseMediumTankExp;
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_Harvester, TankData);
 
 	// SU-85
 	{

@@ -8,7 +8,8 @@
 
 /**
  * @brief Project settings (Game > Combat Pings) for the ripple drawn on the minimap and tactical map where enemies
- * hit player units. URTSCombatPingSubsystem reads the detection values, UW_MiniMap the look.
+ * hit player units, plus the "Reinforcements" circle. URTSCombatPingSubsystem reads the detection values, UW_MiniMap
+ * the look.
  */
 UCLASS(Config = Game, DefaultConfig, meta = (DisplayName = "Combat Pings"))
 class RTS_SURVIVAL_API URTSCombatPingSettings : public UDeveloperSettings
@@ -85,4 +86,25 @@ public:
 	/** Brightness of the soft disc behind the rings (0 hides it). */
 	UPROPERTY(Config, EditAnywhere, Category = "Look", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float GlowOpacity = 0.22f;
+
+	/** Circle with "Reinforcements" written in it, shown where player reinforcements arrive. */
+	UPROPERTY(Config, EditAnywhere, Category = "Reinforcements")
+	FLinearColor ReinforcementsColor = FLinearColor(0.25f, 0.85f, 1.f, 1.f);
+
+	/** Smallest circle radius on the small minimap, in UI units; grows when the text needs more room. */
+	UPROPERTY(Config, EditAnywhere, Category = "Reinforcements", meta = (ClampMin = "4.0", ClampMax = "128.0"))
+	float ReinforcementsMiniMapRadius = 22.f;
+
+	/** Smallest circle radius on the tactical (full screen) map, in UI units. */
+	UPROPERTY(Config, EditAnywhere, Category = "Reinforcements", meta = (ClampMin = "4.0", ClampMax = "256.0"))
+	float ReinforcementsTacticalMapRadius = 40.f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Reinforcements", meta = (ClampMin = "4", ClampMax = "32"))
+	int32 ReinforcementsMiniMapTextSize = 7;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Reinforcements", meta = (ClampMin = "4", ClampMax = "48"))
+	int32 ReinforcementsTacticalMapTextSize = 11;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Reinforcements", meta = (ClampMin = "0.5", ClampMax = "8.0"))
+	float ReinforcementsRingThickness = 2.f;
 };
