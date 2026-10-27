@@ -12,6 +12,7 @@
 FApplyBehaviourAbilitySettings::FApplyBehaviourAbilitySettings()
 	: BehaviourAbility(EBehaviourAbilityType::DefaultSprint),
 	  PreferredAbilityIndex(INDEX_NONE),
+	  bReplaceAbilityInPreferredSlot(false),
 	  Cooldown(5),
 	  BehaviourApplied(nullptr)
 
@@ -186,7 +187,33 @@ void UApplyBehaviourAbilityComponent::AddAbilityToCommands()
 	NewAbility.AbilityId = EAbilityID::IdApplyBehaviour;
 	NewAbility.CooldownDuration = BehaviourAbilitySettings.Cooldown;
 	NewAbility.CustomType = static_cast<int32>(BehaviourAbilitySettings.BehaviourAbility);
+	if (BehaviourAbilitySettings.bReplaceAbilityInPreferredSlot)
+	{
+		AddAbilityToCommands_FreePreferredSlot();
+	}
 	M_OwnerCommandsInterface->AddAbility(NewAbility, BehaviourAbilitySettings.PreferredAbilityIndex);
+}
+
+void UApplyBehaviourAbilityComponent::AddAbilityToCommands_FreePreferredSlot() const
+{
+	const int32 PreferredIndex = BehaviourAbilitySettings.PreferredAbilityIndex;
+	const TArray<FUnitAbilityEntry> OwnerAbilities = M_OwnerCommandsInterface->GetUnitAbilityEntries();
+	if (not OwnerAbilities.IsValidIndex(PreferredIndex))
+	{
+		RTSFunctionLibrary::ReportError("bReplaceAbilityInPreferredSlot needs a valid PreferredAbilityIndex; got "
+			+ FString::FromInt(PreferredIndex) + " on " + GetDebugName());
+		return;
+	}
+	const FUnitAbilityEntry& OccupyingAbility = OwnerAbilities[PreferredIndex];
+	if (OccupyingAbility.AbilityId == EAbilityID::IdNoAbility)
+	{
+		return;
+	}
+	if (not M_OwnerCommandsInterface->RemoveAbility(OccupyingAbility.AbilityId, OccupyingAbility.CustomType))
+	{
+		RTSFunctionLibrary::ReportError("Could not replace the ability in slot " + FString::FromInt(PreferredIndex)
+			+ " on " + GetDebugName());
+	}
 }
 
 void UApplyBehaviourAbilityComponent::AddAbility()

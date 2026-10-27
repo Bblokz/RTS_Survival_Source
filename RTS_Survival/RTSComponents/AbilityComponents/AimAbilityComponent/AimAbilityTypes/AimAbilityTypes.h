@@ -13,4 +13,6 @@ enum class EAimAbilityType : uint8
 	// Fires a parachute flare that lights up an area in the fog of war (UFlareAimAbilityComponent).
 	// The values are card keys in Buttons_DataTableb (IdAimAbility / IdCancelAimAbility), so only append.
 	FlareLaunch,
+	// Unit variant batch 4: JagdPanther Bollwerk's sFH 18 HE barrage; its own card row and icon.
+	JagdPantherBollwerkBarrage,
 };

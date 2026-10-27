@@ -29,6 +29,7 @@
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
 #include "RTS_Survival/Weapons/WeaponData/VariantBatchThree/VariantBatchThreeWeaponData.h"
+#include "RTS_Survival/Weapons/WeaponData/VariantBatchFour/VariantBatchFourWeaponData.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInType/DigInType.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
@@ -1135,6 +1136,8 @@ void ACPPGameState::InitAllGameWeaponData()
 	VariantBatchTwoWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
 	// Batch 3 clones entries of the category initializers too (VariantBatchThreeWeaponData.cpp).
 	VariantBatchThreeWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
+	// Batch 4 (Wespe, Pz III M, Hetzer, JagdPanther) clones entries above (VariantBatchFourWeaponData.cpp).
+	VariantBatchFourWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
 
 	// Set the enemy weapons to the same base data.
 	M_TEnemyWeaponDataHashMap = M_TPlayerWeaponDataHashMap;
@@ -1454,7 +1457,7 @@ void ACPPGameState::InitAllGameFlameWeapons()
 	WeaponData.ShrapnelParticles = 0;
 	WeaponData.ShrapnelPen = 0;
 	WeaponData.ProjectileMovementSpeed = 0;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flamm15, WeaponData);
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ashmaker11, WeaponData);
 
 	WeaponData.WeaponName = EWeaponName::Flamm15;
 	WeaponData.DamageType = ERTSDamageType::Fire;

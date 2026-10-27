@@ -29,6 +29,12 @@ struct FApplyBehaviourAbilitySettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 PreferredAbilityIndex = INDEX_NONE;
 
+	// When the PreferredAbilityIndex slot already holds another ability (e.g. an inherited IdFireRockets card on a
+	// variant), remove that ability and take its slot instead of moving to the first free slot.
+	// The replaced ability is gone for good: do not also list it in a URemoveRestoreAbilitiesComponent.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "PreferredAbilityIndex >= 0"))
+	bool bReplaceAbilityInPreferredSlot = false;
+
 	// How long the ability is on cooldown after use. (does not affect behaviour duration)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 Cooldown = 5;
@@ -84,6 +90,7 @@ protected:
 	void AddAbility();
 	void AddAbilityToSquad(ASquadController* Squad);
 	void AddAbilityToCommands();
+	void AddAbilityToCommands_FreePreferredSlot() const;
 	
 
 };

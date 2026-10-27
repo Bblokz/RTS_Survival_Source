@@ -10,6 +10,7 @@
 #include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponNameConversion.h"
 
 namespace BehaviourWeaponConstants
 {
@@ -100,9 +101,28 @@ bool UBehaviourWeapon::GetIsWeaponCalibreWithinMaximum(const UWeaponState* Valid
 	return true;
 }
 
+bool UBehaviourWeapon::GetIsWeaponNameInFilter(const TArray<FName>& WeaponNameFilter, const EWeaponName WeaponName)
+{
+	if (WeaponNameFilter.IsEmpty())
+	{
+		return true;
+	}
+	// Compared as names: the filter is authored in Blueprints, where EWeaponName (uint32) is not available.
+	return WeaponNameFilter.Contains(Global_GetWeaponNameAsFName(WeaponName));
+}
+
+bool UBehaviourWeapon::GetIsWeaponNameAllowed(const UWeaponState* ValidWeapon) const
+{
+	return GetIsWeaponNameInFilter(WeaponNamesToApplyTo, ValidWeapon->GetRawWeaponData().WeaponName);
+}
+
 bool UBehaviourWeapon::CheckRequirement(UWeaponState* WeaponState) const
 {
 	if (not GetIsWeaponCalibreLargeEnough(WeaponState))
+	{
+		return false;
+	}
+	if (not GetIsWeaponNameAllowed(WeaponState))
 	{
 		return false;
 	}

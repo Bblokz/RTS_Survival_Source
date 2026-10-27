@@ -50,11 +50,24 @@ public:
 	static bool GetIsWithinHomingCone(const FVector& Origin, const FVector& Heading, const FVector& TargetLocation,
 	                                  const float HalfAngleDegrees, const float Range);
 
+	/** @return True when this rocket system is switched off (bDisabled) and builds nothing. */
+	bool GetIsDisabled() const { return bDisabled; }
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
 
+	/**
+	 * Set in a child (variant) Blueprint to drop the inherited rocket system: BeginPlay then does nothing (no socket
+	 * search, no frame or rocket meshes, no game-state data, no ability, no error reports).
+	 * The IdFireRockets card that comes from the unit data is NOT removed here: remove it with a
+	 * URemoveRestoreAbilitiesComponent (IdFireRockets) or replace it with bReplaceAbilityInPreferredSlot.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup")
+	bool bDisabled = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Setup", meta=(EditCondition="!bDisabled"))
 	ERocketAbility RocketAbilityType = ERocketAbility::None;
 
 	// Opt-in for units whose unit data has no IdFireRockets entry (e.g. a variant that shares its base's abilities):
@@ -175,6 +188,7 @@ private:
 	FRotator ApplyAccuracyDeviation(const FRotator& BaseRotation, const int32 Accuracy) const;
 
 	bool ExecuteFire_EnsureFireReady() const;
+	void ExecuteFire_FinishCommandWhileDisabled() const;
 
 	FRotator FireRocket_GetLaunchRotation(const FRotator& SocketRotationInWorld)const;
 	void OnFireRocketInSalvo();
@@ -214,6 +228,7 @@ private:
 	FTimerHandle M_ReloadTimerHandle;
 	void StartReload();
 	void OnReloadFinished() const;
+	void ClearAllTimers();
 	void SetAllRocketsVisible() const;
 
 	UPROPERTY()
