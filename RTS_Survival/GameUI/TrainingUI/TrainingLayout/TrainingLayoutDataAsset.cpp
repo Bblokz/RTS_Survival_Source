@@ -252,6 +252,10 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 			                                   Slot::Empty(),
 			                                   Slot::Nomadic(ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory),
 			                                   Slot::Empty()
+		                                   }),
+		                    // Procedural defenses the player drags out, see UFieldTrenchPlacementComponent.
+		                    MakeSubSection(LOCTEXT("Barriers", "Barriers"), {
+			                                   Slot::FieldDefense(EBuildingExpansionType::BTX_GerFieldTrench)
 		                                   })
 	                    }, bRequiresUnitCards);
 }

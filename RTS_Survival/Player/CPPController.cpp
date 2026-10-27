@@ -1,6 +1,7 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "CPPController.h"
+#include "RTS_Survival/Player/ConstructionPreview/FieldTrenchPlacement/FieldTrenchPlacementComponent.h"
 
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewComponent.h"
 #include "RTS_Survival/Player/Formation/FormationMovePreview/FormationMovePreviewComponent.h"
@@ -272,6 +273,7 @@ ACPPController::ACPPController()
 	M_PlayerUnitVariantManager = CreateDefaultSubobject<UPlayerUnitVariantManager>(TEXT("PlayerUnitVariantManager"));
 	M_FormationController = CreateDefaultSubobject<UFormationController>(TEXT("FormationController"));
 	M_SquadMovePreview = CreateDefaultSubobject<USquadMovePreviewComponent>(TEXT("SquadMovePreview"));
+	M_FieldTrenchPlacement = CreateDefaultSubobject<UFieldTrenchPlacementComponent>(TEXT("FieldTrenchPlacement"));
 	M_FormationMovePreview = CreateDefaultSubobject<UFormationMovePreviewComponent>(TEXT("FormationMovePreview"));
 	M_HoverCommandIcon = CreateDefaultSubobject<UHoverCommandIconComponent>(TEXT("HoverCommandIcon"));
 
@@ -1935,6 +1937,21 @@ bool ACPPController::MapTest_PlaceLoadedBxpAtLocation(FVector& InClickedLocation
 bool ACPPController::MapTest_GetIsFieldDefensePreviewActive() const
 {
 	return M_IsBuildingPreviewModeActive == EPlayerBuildingPreviewMode::FieldDefensePreviewMode;
+}
+
+bool ACPPController::MapTest_ClickFieldTrenchAt(const FVector& Location)
+{
+	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::FieldTrenchPreviewMode)
+	{
+		return true;
+	}
+	FVector ClickedLocation = Location;
+	if (TryPlaceBuilding(ClickedLocation))
+	{
+		StopPreviewAndBuildingMode(true);
+		return true;
+	}
+	return false;
 }
 
 bool ACPPController::MapTest_PlaceFieldDefenseAt(const FVector& Location, float& OutInclineDegrees)
@@ -6625,6 +6642,11 @@ void ACPPController::DirectActionButtonCreateBuilding()
 
 bool ACPPController::TryPlaceBuilding(FVector& ClickedLocation)
 {
+	// A trench is laid out by two clicks and has no preview mesh that could be blocked.
+	if (M_IsBuildingPreviewModeActive == EPlayerBuildingPreviewMode::FieldTrenchPreviewMode)
+	{
+		return not IsValid(M_FieldTrenchPlacement) || M_FieldTrenchPlacement->OnPrimaryClick(ClickedLocation);
+	}
 	if (CPPConstructionPreviewRef->GetIsBuildingPreviewBlocked())
 	{
 		// Need a click somewhere else.
@@ -6957,6 +6979,9 @@ void ACPPController::StopBuildingPreviewMode()
 	case EPlayerBuildingPreviewMode::FieldDefensePreviewMode:
 		StopFieldDefensePlacement();
 		break;
+	case EPlayerBuildingPreviewMode::FieldTrenchPreviewMode:
+		StopFieldTrenchPlacement();
+		break;
 	case EPlayerBuildingPreviewMode::BuildingPreviewModeOFF:
 		break;
 	default:
@@ -7023,6 +7048,30 @@ void ACPPController::StartFieldDefensePlacement(
 		                                   ? Get_NOMADIC_BuildRadiiAndMakeThemVisible()
 		                                   : TArray<URadiusComp*>();
 	CPPConstructionPreviewRef->StartFieldDefensePreview(FieldDefensePreviewMesh, ConstructionRules->Footprint, Radii);
+}
+
+void ACPPController::StartFieldTrenchPlacement(
+	UTrainerComponent* Trainer,
+	const TMap<ERTSResourceType, int32>& CostPerMetre)
+{
+	if (not IsValid(Trainer) || not IsValid(M_FieldTrenchPlacement))
+	{
+		return;
+	}
+	// Ends whatever placement was active, including another trench that was not confirmed.
+	StopBuildingPreviewMode();
+	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::FieldTrenchPreviewMode;
+	// Trenches are laid inside the player's building radii, like the field defenses.
+	const TArray<URadiusComp*> Radii = GetIsValidPlayerBuildRadiusManager()
+		                                   ? Get_NOMADIC_BuildRadiiAndMakeThemVisible()
+		                                   : TArray<URadiusComp*>();
+	M_FieldTrenchPlacement->StartPlacement(Trainer, CostPerMetre, Radii);
+}
+
+void ACPPController::StopFieldTrenchPlacement()
+{
+	// The trench itself is removed by StopPreviewAndBuildingMode.
+	StopPreviewAndBuildingMode(false);
 }
 
 void ACPPController::StopFieldDefensePlacementForTrainer(const UTrainerComponent* Trainer)
@@ -7232,6 +7281,11 @@ void ACPPController::StopPreviewAndBuildingMode(const bool bIsPlacedSuccessfully
 	CPPConstructionPreviewRef->StopBuildingPreview(bIsPlacedSuccessfully);
 	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::BuildingPreviewModeOFF;
 	M_FieldDefensePlacementRequest.Reset();
+	// Keeps a trench that was just confirmed; removes one that was still being laid out.
+	if (IsValid(M_FieldTrenchPlacement))
+	{
+		M_FieldTrenchPlacement->CancelPlacement();
+	}
 	ShowPlayerBuildRadius(false);
 	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{

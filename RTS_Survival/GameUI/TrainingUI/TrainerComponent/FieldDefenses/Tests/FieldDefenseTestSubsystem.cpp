@@ -15,6 +15,8 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Buildings/FieldTrench/RTSFieldTrench.h"
+#include "RTS_Survival/Player/ConstructionPreview/FieldTrenchPlacement/FieldTrenchPlacementComponent.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
 #include "RTS_Survival/Game/GameState/BxpDataHelpers/BxpConstructionRulesHelpers.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
@@ -95,6 +97,20 @@ namespace FieldDefenseTestPrivate
 	                                    static_cast<uint8>(EBuildingExpansionType::BTX_GerLeFH18Pit));
 	const FTrainingOption SFHPitOption(EAllUnitType::UNType_BuildingExpansion,
 	                                   static_cast<uint8>(EBuildingExpansionType::BTX_GerSFH18Pit));
+	const FTrainingOption FieldTrenchOption(EAllUnitType::UNType_BuildingExpansion,
+	                                        static_cast<uint8>(EBuildingExpansionType::BTX_GerFieldTrench));
+	// The HQ layout's fourth tab.
+	constexpr int32 BarriersTabIndex = 3;
+	constexpr float TrenchTimeoutSeconds = 150.f;
+	// The cursor moves this far along the trench path every frame while the trench follows it.
+	constexpr float TrenchCursorStep = 100.f;
+	// The trench path: a straight run away from the HQ, then a turn of 45 degrees.
+	constexpr float TrenchStartDistanceFromHQ = 1500.f;
+	constexpr float TrenchFirstLegLength = 1000.f;
+	constexpr float TrenchSecondLegLength = 600.f;
+	// Low enough that the first piece cannot be paid for.
+	constexpr int32 TrenchShortfallRadixite = 5;
+	constexpr float TrenchWaitForResourcesSeconds = 3.f;
 	const FTrainingOption HarvesterOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_Harvester));
 	const FTrainingOption Pak40PitOption(EAllUnitType::UNType_BuildingExpansion,
 	                                     static_cast<uint8>(EBuildingExpansionType::BTX_GerPak40Pit));
@@ -110,7 +126,8 @@ bool UFieldDefenseTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
 	const UWorld* OuterWorld = Cast<UWorld>(Outer);
 	return IsValid(OuterWorld) && OuterWorld->IsGameWorld()
-		&& FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidate"));
+		&& (FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidate"))
+			|| FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrench")));
 }
 
 TStatId UFieldDefenseTestSubsystem::GetStatId() const
@@ -191,6 +208,9 @@ void UFieldDefenseTestSubsystem::Tick(const float DeltaTime)
 		return;
 	case EFieldDefenseTestPhase::CheckingOwnerDeath:
 		TickCheckingOwnerDeath();
+		return;
+	case EFieldDefenseTestPhase::LayingTrench:
+		TickLayingTrench();
 		return;
 	}
 }
@@ -355,6 +375,11 @@ void UFieldDefenseTestSubsystem::TickExpandingHQ()
 	UE_LOG(LogRTSFieldDefenseTest, Display, TEXT("RTS_FIELD_DEFENSE_TEST hq_expanded after=%.1fs"),
 	       GetPhaseSeconds());
 	CheckLayoutAndRequirements();
+	if (FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrench")))
+	{
+		EnterPhase(EFieldDefenseTestPhase::LayingTrench, FieldDefenseTestPrivate::TrenchTimeoutSeconds);
+		return;
+	}
 	EnterPhase(EFieldDefenseTestPhase::PlanningFirstPit, FieldDefenseTestPrivate::UnitTrainingTimeoutSeconds);
 }
 
@@ -1506,6 +1531,242 @@ AStaticPreviewMesh* UFieldDefenseTestSubsystem::FindPreviewNear(const FVector& S
 		}
 	}
 	return nullptr;
+}
+
+void UFieldDefenseTestSubsystem::TickLayingTrench()
+{
+	using namespace FieldDefenseTestPrivate;
+	ACPPController* Controller = GetController();
+	UTrainerComponent* Trainer = M_Trainer.Get();
+	const ANomadicVehicle* HQ = M_HQ.Get();
+	UFieldTrenchPlacementComponent* Placement = IsValid(Controller) ? Controller->MapTest_GetFieldTrenchPlacement() : nullptr;
+	UPlayerResourceManager* ResourceManager = IsValid(Controller) ? Controller->GetPlayerResourceManager() : nullptr;
+	if (not IsValid(Trainer) || not IsValid(HQ) || not IsValid(Placement) || not IsValid(ResourceManager))
+	{
+		Check(false, TEXT("trench_setup"), TEXT("the HQ, its trainer, the trench placement or the resources are missing"));
+		Finish();
+		return;
+	}
+	const TMap<ERTSResourceType, int32> CostPerMetre = {
+		{ERTSResourceType::Resource_Radixite, DeveloperSettings::GameBalance::UnitCosts::Bxps::GerFieldTrench_RadixitePerMetre}
+	};
+	// A straight run away from the HQ in the given direction, then a turn of 45 degrees; on the ground.
+	auto MakePath = [HQ, this](const float DirectionYaw) -> TArray<FVector>
+	{
+		const FVector2D Forward(FMath::Cos(FMath::DegreesToRadians(DirectionYaw)),
+		                        FMath::Sin(FMath::DegreesToRadians(DirectionYaw)));
+		const FVector2D Turned(FMath::Cos(FMath::DegreesToRadians(DirectionYaw + 45.f)),
+		                       FMath::Sin(FMath::DegreesToRadians(DirectionYaw + 45.f)));
+		const FVector2D Start = FVector2D(HQ->GetActorLocation()) + Forward * TrenchStartDistanceFromHQ;
+		const FVector2D Corner = Start + Forward * TrenchFirstLegLength;
+		TArray<FVector> Path;
+		for (const FVector2D& Point : {Start, Corner, Corner + Turned * TrenchSecondLegLength})
+		{
+			FVector Ground;
+			Path.Add(GetGroundAt(Point, Ground) ? Ground : FVector(Point, HQ->GetActorLocation().Z));
+		}
+		return Path;
+	};
+	switch (M_PhaseStep)
+	{
+	case 0:
+		{
+			const FTrainingSubSectionState* BarriersSection = Trainer->GetTrainingSubSections().FindByPredicate(
+				[](const FTrainingSubSectionState& SubSection) { return SubSection.Options.Contains(FieldTrenchOption); });
+			Check(BarriersSection != nullptr, TEXT("trench_in_hq_layout"),
+			      BarriersSection != nullptr
+				      ? BarriersSection->DisplayName.ToString()
+				      : FString(TEXT("no sub section has the trench")));
+			Controller->SelectSingleUnitFromUI(M_HQ.Get());
+			const UMainGameUI* MainGameUI = Controller->GetMainMenuUI();
+			UTrainingMenuManager* MenuManager = IsValid(MainGameUI) ? MainGameUI->GetTrainingMenuManager() : nullptr;
+			if (IsValid(MenuManager))
+			{
+				MenuManager->OnSubSectionTabClicked(BarriersTabIndex);
+			}
+			++M_PhaseStep;
+			return;
+		}
+	case 1:
+		{
+			const bool bClicked = ClickTrainingItemWidget(FieldTrenchOption, true);
+			Check(bClicked && Placement->GetIsPlacing(), TEXT("trench_menu_click_starts_placement"),
+			      FString::Printf(TEXT("item_widget_found=%d placing=%d"), bClicked ? 1 : 0,
+			                      Placement->GetIsPlacing() ? 1 : 0));
+			if (not Placement->GetIsPlacing())
+			{
+				// Without the widget the rest of the trench is still tested through the controller.
+				Controller->StartFieldTrenchPlacement(Trainer, CostPerMetre);
+			}
+			M_TrenchPath = MakePath(HQ->GetActorRotation().Yaw);
+			M_TrenchCursorDistance = 0.f;
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
+			Check(not Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath[0]) && Placement->GetIsDrawing(),
+			      TEXT("trench_first_click_starts_drawing"), M_TrenchPath[0].ToCompactString());
+			++M_PhaseStep;
+			return;
+		}
+	case 2:
+		{
+			// The trench follows the cursor along the path, a step every frame.
+			M_TrenchCursorDistance = FMath::Min(M_TrenchCursorDistance + TrenchCursorStep, GetPathLength(M_TrenchPath));
+			Placement->MapTest_SetCursorOverride(GetPointAlongPath(M_TrenchPath, M_TrenchCursorDistance));
+			if (M_TrenchCursorDistance >= GetPathLength(M_TrenchPath))
+			{
+				++M_PhaseStep;
+			}
+			return;
+		}
+	case 3:
+		{
+			const TArray<FFieldTrenchPiecePlacement> Plan = Placement->MapTest_GetPlannedPieces();
+			const bool bHasBend = Plan.ContainsByPredicate([](const FFieldTrenchPiecePlacement& Piece)
+			{
+				return Piece.Piece == EFieldTrenchPiece::Bend_15 || Piece.Piece == EFieldTrenchPiece::Bend_30 ||
+					Piece.Piece == EFieldTrenchPiece::Bend_45 || Piece.Piece == EFieldTrenchPiece::Corner_90;
+			});
+			const bool bCapped = Plan.Num() >= 4 && Plan[0].Piece == EFieldTrenchPiece::End &&
+				Plan.Last().Piece == EFieldTrenchPiece::End;
+			Check(bCapped && bHasBend, TEXT("trench_follows_the_cursor_with_caps_and_a_bend"),
+			      FString::Printf(TEXT("pieces=%d length_cm=%.0f bend=%d"), Plan.Num(),
+			                      FieldTrenchLayout::GetTotalLengthCm(Plan), bHasBend ? 1 : 0));
+			M_ExpectedTrenchRadixite = 0;
+			for (const FFieldTrenchPiecePlacement& Piece : Plan)
+			{
+				M_ExpectedTrenchRadixite += ARTSFieldTrench::GetCostOfLength(CostPerMetre, Piece.LengthCm)
+					.FindRef(ERTSResourceType::Resource_Radixite);
+			}
+			M_RadixiteBeforeTrench = GetResourceAmount(ERTSResourceType::Resource_Radixite);
+			const bool bConfirmed = Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath.Last());
+			M_TestTrench = Placement->MapTest_GetLastConfirmedTrench();
+			Check(bConfirmed && M_TestTrench.IsValid() && not Placement->GetIsPlacing(),
+			      TEXT("trench_second_click_confirms"));
+			Placement->MapTest_SetCursorOverride(TOptional<FVector>());
+			if (not M_TestTrench.IsValid())
+			{
+				Finish();
+				return;
+			}
+			ScheduleCapture(TEXT("FieldTrench_Digging"), M_TrenchPath[1], 2.f);
+			++M_PhaseStep;
+			return;
+		}
+	case 4:
+		{
+			const ARTSFieldTrench* Trench = M_TestTrench.Get();
+			if (not IsValid(Trench) || Trench->GetBuiltPieceCount() < Trench->GetPieceCount())
+			{
+				return;
+			}
+			const int32 Spent = M_RadixiteBeforeTrench - GetResourceAmount(ERTSResourceType::Resource_Radixite);
+			Check(Spent == M_ExpectedTrenchRadixite, TEXT("trench_dug_and_paid_per_metre"),
+			      FString::Printf(TEXT("pieces=%d spent=%d expected=%d after=%.1fs"), Trench->GetPieceCount(), Spent,
+			                      M_ExpectedTrenchRadixite, GetPhaseSeconds()));
+			ScheduleCapture(TEXT("FieldTrench_Built"), M_TrenchPath[1], 1.f);
+			// Almost nothing left: the next trench has to wait for resources.
+			const int32 Radixite = GetResourceAmount(ERTSResourceType::Resource_Radixite);
+			ResourceManager->PayForCostsNoCheck({{ERTSResourceType::Resource_Radixite, Radixite - TrenchShortfallRadixite}});
+			Controller->StartFieldTrenchPlacement(Trainer, CostPerMetre);
+			M_TrenchPath = MakePath(HQ->GetActorRotation().Yaw + 180.f);
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
+			(void)Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath[0]);
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[1]);
+			++M_PhaseStep;
+			return;
+		}
+	case 5:
+		{
+			// One frame later the trench has followed the cursor to the end of the first leg.
+			Check(Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath[1]), TEXT("trench_without_resources_confirmed"));
+			M_TestTrench = Placement->MapTest_GetLastConfirmedTrench();
+			Placement->MapTest_SetCursorOverride(TOptional<FVector>());
+			M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds();
+			++M_PhaseStep;
+			return;
+		}
+	case 6:
+		{
+			if (GetWorld()->GetTimeSeconds() - M_PhaseMarkSeconds < TrenchWaitForResourcesSeconds)
+			{
+				return;
+			}
+			const ARTSFieldTrench* Trench = M_TestTrench.Get();
+			Check(IsValid(Trench) && Trench->GetIsWaitingForResources() && Trench->GetBuiltPieceCount() == 0,
+			      TEXT("trench_waits_while_the_player_cannot_pay"),
+			      FString::Printf(TEXT("built=%d radixite=%d"), IsValid(Trench) ? Trench->GetBuiltPieceCount() : -1,
+			                      GetResourceAmount(ERTSResourceType::Resource_Radixite)));
+			GivePlayerResources();
+			++M_PhaseStep;
+			return;
+		}
+	case 7:
+		{
+			const ARTSFieldTrench* Trench = M_TestTrench.Get();
+			if (IsValid(Trench) && Trench->GetBuiltPieceCount() == 0)
+			{
+				return;
+			}
+			Check(IsValid(Trench) && not Trench->GetIsWaitingForResources(), TEXT("trench_digs_on_once_resources_come_in"));
+			// A trench that is never confirmed goes with the placement.
+			M_TrenchCountBeforeCancel = CountFieldTrenches();
+			Controller->StartFieldTrenchPlacement(Trainer, CostPerMetre);
+			M_TrenchPath = MakePath(HQ->GetActorRotation().Yaw + 90.f);
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
+			(void)Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath[0]);
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[1]);
+			++M_PhaseStep;
+			return;
+		}
+	case 8:
+		{
+			Check(CountFieldTrenches() == M_TrenchCountBeforeCancel + 1, TEXT("trench_preview_while_drawing"));
+			Controller->StopFieldTrenchPlacement();
+			Placement->MapTest_SetCursorOverride(TOptional<FVector>());
+			++M_PhaseStep;
+			return;
+		}
+	default:
+		Check(CountFieldTrenches() == M_TrenchCountBeforeCancel && not Placement->GetIsPlacing(),
+		      TEXT("trench_cancel_removes_only_the_unconfirmed_trench"),
+		      FString::Printf(TEXT("trenches=%d expected=%d"), CountFieldTrenches(), M_TrenchCountBeforeCancel));
+		Finish();
+		return;
+	}
+}
+
+FVector UFieldDefenseTestSubsystem::GetPointAlongPath(const TArray<FVector>& Path, const float Distance)
+{
+	float Remaining = Distance;
+	for (int32 PointIndex = 1; PointIndex < Path.Num(); ++PointIndex)
+	{
+		const float SegmentLength = FVector::Dist2D(Path[PointIndex - 1], Path[PointIndex]);
+		if (Remaining <= SegmentLength)
+		{
+			return FMath::Lerp(Path[PointIndex - 1], Path[PointIndex], SegmentLength > 0.f ? Remaining / SegmentLength : 1.f);
+		}
+		Remaining -= SegmentLength;
+	}
+	return Path.IsEmpty() ? FVector::ZeroVector : Path.Last();
+}
+
+float UFieldDefenseTestSubsystem::GetPathLength(const TArray<FVector>& Path)
+{
+	float Length = 0.f;
+	for (int32 PointIndex = 1; PointIndex < Path.Num(); ++PointIndex)
+	{
+		Length += FVector::Dist2D(Path[PointIndex - 1], Path[PointIndex]);
+	}
+	return Length;
+}
+
+int32 UFieldDefenseTestSubsystem::CountFieldTrenches() const
+{
+	int32 TrenchCount = 0;
+	for (TActorIterator<ARTSFieldTrench> TrenchIterator(GetWorld()); TrenchIterator; ++TrenchIterator)
+	{
+		TrenchCount += IsValid(*TrenchIterator) && not TrenchIterator->IsActorBeingDestroyed() ? 1 : 0;
+	}
+	return TrenchCount;
 }
 
 #else

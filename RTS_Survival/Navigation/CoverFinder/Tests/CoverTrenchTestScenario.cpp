@@ -61,10 +61,16 @@ namespace CoverTrenchTestScenarioPrivate
 	}
 }
 
-void FCoverTrenchTestScenario::Start()
+void FCoverTrenchTestScenario::Start(AActor* RequiredTrenchActor)
 {
 	M_Phase = ECoverTrenchTestPhase::WaitingForCoverScan;
-	UE_LOG(LogRTSCoverTrenchTest, Display, TEXT("RTS_COVER_TRENCH_TEST scheduled"));
+	M_RequiredTrenchActor = RequiredTrenchActor;
+	bM_RequiresTrenchActor = RequiredTrenchActor != nullptr;
+	UE_LOG(
+		LogRTSCoverTrenchTest,
+		Display,
+		TEXT("RTS_COVER_TRENCH_TEST scheduled trench_actor=%s"),
+		*GetNameSafe(RequiredTrenchActor));
 }
 
 void FCoverTrenchTestScenario::Check(const bool bCondition, const TCHAR* Description, const FString& Details)
@@ -165,7 +171,10 @@ bool FCoverTrenchTestScenario::SendSquadIntoTrench(UWorld& World, URTSCoverFinde
 	TArray<FRTSCoverPoint> TrenchPoints;
 	for (const FRTSCoverPoint& CoverPoint : CoverSubsystem.GetCoverPointsView())
 	{
-		if (CoverPoint.CoverType == ERTSCoverType::TrenchStandUp)
+		const bool bIsOfRequiredTrench = not bM_RequiresTrenchActor ||
+			(M_RequiredTrenchActor.IsValid() &&
+				CoverSubsystem.ResolveBlockingProvider(CoverPoint) == M_RequiredTrenchActor.Get());
+		if (CoverPoint.CoverType == ERTSCoverType::TrenchStandUp && bIsOfRequiredTrench)
 		{
 			TrenchPoints.Add(CoverPoint);
 		}
@@ -272,6 +281,15 @@ void FCoverTrenchTestScenario::TickWalkingToTrench(UWorld& World)
 	}
 	M_TrenchSoldier = TrenchSoldier;
 	M_TrenchPoint = TrenchSoldier->GetCoverRuntimeState().AssignedCoverPoint;
+	if (bM_RequiresTrenchActor)
+	{
+		const URTSCoverFinderWorldSubsystem* CoverSubsystem = World.GetSubsystem<URTSCoverFinderWorldSubsystem>();
+		const AActor* HeldTrench = IsValid(CoverSubsystem) ? CoverSubsystem->ResolveBlockingProvider(M_TrenchPoint) : nullptr;
+		Check(
+			HeldTrench != nullptr && HeldTrench == M_RequiredTrenchActor.Get(),
+			TEXT("the soldier holds a socket of the tested trench"),
+			FString::Printf(TEXT("held_trench=%s"), *GetNameSafe(HeldTrench)));
+	}
 	Check(
 		GetIdlePose(*TrenchSoldier) == ESquadIdleAnimationPose::TrenchCover,
 		TEXT("with nothing in sight the soldier crouches below the edge"),

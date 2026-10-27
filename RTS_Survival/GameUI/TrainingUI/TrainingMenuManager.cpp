@@ -2857,6 +2857,8 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 		EBuildingExpansionType::BTX_GerRailPakBunker,
 		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding),
 		GerRailPakBunkerBuildTime);
+	// Never queued: the trench digs itself, so its training time is unused.
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerFieldTrench, nullptr);
 }
 
 URTSRequirement* UTrainingMenuManager::CreateTierTwoUnlockRequirement()
@@ -2984,6 +2986,12 @@ void UTrainingMenuManager::OnLeftClickFieldDefenseItem(const FTrainingWidgetStat
 	ACPPController* PlayerController = M_MainGameUI->GetPlayerController();
 	if (not IsValid(PlayerController))
 	{
+		return;
+	}
+	// A trench is dragged out and pays per metre while it is dug, so it does not go through the trainer's queue.
+	if (static_cast<EBuildingExpansionType>(TrainingItem.ItemID.SubtypeValue) == EBuildingExpansionType::BTX_GerFieldTrench)
+	{
+		PlayerController->StartFieldTrenchPlacement(M_PrimarySelectedTrainer, GetTrainingCosts(TrainingItem.ItemID));
 		return;
 	}
 	// The controller owns building placement; it checks the limit of planned field defenses and shows its error.

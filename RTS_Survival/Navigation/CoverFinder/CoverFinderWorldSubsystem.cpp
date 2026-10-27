@@ -665,6 +665,10 @@ void URTSCoverFinderWorldSubsystem::StartCommandLineMapTests()
 	{
 		M_TrenchCoverScenario.Start();
 	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateRuntimeTrench")))
+	{
+		M_RuntimeTrenchScenario.Start();
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("CoverFinderValidateStress")))
 	{
 		M_StressScenario.Start();
@@ -733,6 +737,7 @@ void URTSCoverFinderWorldSubsystem::TickMapTests(const float DeltaTime)
 	M_CombatCoverScenario.Tick(*this);
 	M_CoverCountScenario.Tick(*this);
 	M_TrenchCoverScenario.Tick(*this);
+	M_RuntimeTrenchScenario.Tick(*this, M_TrenchCoverScenario);
 	M_StressScenario.Tick(*this);
 	M_StressPerfScenario.Tick(*this);
 	M_SquadPerfScenario.Tick(*this);
@@ -1065,6 +1070,18 @@ void URTSCoverFinderWorldSubsystem::RegisterActorSocketCover(TSet<const AActor*>
 			RefreshCoverSocketsOfActor(CoverActor);
 		}
 	}
+	TArray<TWeakObjectPtr<AActor>> AwaitingActors = MoveTemp(M_ActorSocketSourcesAwaitingRegistration);
+	M_ActorSocketSourcesAwaitingRegistration.Reset();
+	for (const TWeakObjectPtr<AActor>& AwaitingActor : AwaitingActors)
+	{
+		AActor* CoverActor = AwaitingActor.Get();
+		if (not IsValid(CoverActor) || InOutRegisteredActors.Contains(CoverActor))
+		{
+			continue;
+		}
+		InOutRegisteredActors.Add(CoverActor);
+		RefreshCoverSocketsOfActor(CoverActor);
+	}
 }
 
 TArray<FRTSCoverPoint> URTSCoverFinderWorldSubsystem::BuildActorSocketCoverPoints(
@@ -1196,10 +1213,15 @@ void URTSCoverFinderWorldSubsystem::RefreshCoverSocketsOfActor(AActor* CoverActo
 {
 	const IRTSCoverSocketSource* CoverSocketSource = Cast<IRTSCoverSocketSource>(CoverActor);
 	const UWorld* World = GetWorld();
-	// Before the map start registration there is no navigation data to place the sockets with; that
-	// registration reads every listed actor itself.
-	if (CoverSocketSource == nullptr || not IsValid(World) || not bM_HasRegisteredSocketCover)
+	if (CoverSocketSource == nullptr || not IsValid(World))
 	{
+		return;
+	}
+	// Before the map start registration there is no navigation data to place the sockets with; that
+	// registration reads every listed actor itself, and the ones that asked before it.
+	if (not bM_HasRegisteredSocketCover)
+	{
+		M_ActorSocketSourcesAwaitingRegistration.AddUnique(CoverActor);
 		return;
 	}
 	uint64 PreviousRegistrationId = 0;

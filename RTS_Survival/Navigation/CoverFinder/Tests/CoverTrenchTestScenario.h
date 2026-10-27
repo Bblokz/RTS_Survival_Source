@@ -27,10 +27,15 @@ enum class ECoverTrenchTestPhase : uint8
  */
 struct FCoverTrenchTestScenario
 {
-	void Start();
+	/** @param RequiredTrenchActor When set, only the trench cover of this actor is used, such as a trench built at runtime. */
+	void Start(AActor* RequiredTrenchActor = nullptr);
 	void Tick(URTSCoverFinderWorldSubsystem& CoverSubsystem);
+	bool GetIsRunning() const { return M_Phase != ECoverTrenchTestPhase::Inactive; }
+	int32 GetFailedCheckCount() const { return M_FailedCheckCount; }
 
 private:
+	TWeakObjectPtr<AActor> M_RequiredTrenchActor;
+	bool bM_RequiresTrenchActor = false;
 	// The squad the test ordered into the trench; other squads on the map take cover by themselves too.
 	TWeakObjectPtr<ASquadController> M_OrderedSquad;
 	TWeakObjectPtr<ASquadUnit> M_TrenchSoldier;

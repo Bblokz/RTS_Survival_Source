@@ -1,0 +1,1221 @@
+{
+ "units": "cm",
+ "forward": "+X along the trench",
+ "up": "+Z",
+ "ground": 0.0,
+ "materials": [
+  "GerPit_Atlas",
+  "GerPit_Sandbag"
+ ],
+ "conventions": {
+  "half_width_inner": 55.0,
+  "half_width_outer": 170.0,
+  "rim_height": 53.9,
+  "floor_z": 3.0,
+  "socket_z": -60.0,
+  "socket_inset": 22.0,
+  "socket_pitch_per_wall": 125.0,
+  "bag_pitch": 62.5,
+  "bend_radius": 250.0,
+  "socket_name_part": "cargo",
+  "port_rule": "join two pieces where a port of each coincides with opposite yaws; ports point out of the piece; straights and bends may be entered from either port"
+ },
+ "pieces": [
+  {
+   "name": "SM_FieldTrench_Straight_125",
+   "kind": "straight",
+   "fbx": "SM_FieldTrench_Straight_125.fbx",
+   "triangles": 863,
+   "triangles_by_material": {
+    "GerPit_Atlas": 168,
+    "GerPit_Sandbag": 695
+   },
+   "bounds_min": [
+    -1.12,
+    -169.5,
+    -10.05
+   ],
+   "bounds_max": [
+    126.54,
+    171.29,
+    70.99
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      125.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      31.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      93.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    }
+   ],
+   "length": 125.0,
+   "triangles_before_cull": 980
+  },
+  {
+   "name": "SM_FieldTrench_Straight_250_A",
+   "kind": "straight",
+   "fbx": "SM_FieldTrench_Straight_250_A.fbx",
+   "triangles": 1674,
+   "triangles_by_material": {
+    "GerPit_Atlas": 334,
+    "GerPit_Sandbag": 1340
+   },
+   "bounds_min": [
+    -1.94,
+    -168.45,
+    -10.65
+   ],
+   "bounds_max": [
+    251.06,
+    171.18,
+    71.98
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      250.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      31.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      93.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      156.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      218.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    }
+   ],
+   "length": 250.0,
+   "triangles_before_cull": 1918
+  },
+  {
+   "name": "SM_FieldTrench_Straight_250_B",
+   "kind": "straight",
+   "fbx": "SM_FieldTrench_Straight_250_B.fbx",
+   "triangles": 1823,
+   "triangles_by_material": {
+    "GerPit_Atlas": 334,
+    "GerPit_Sandbag": 1489
+   },
+   "bounds_min": [
+    -2.02,
+    -171.8,
+    -10.79
+   ],
+   "bounds_max": [
+    251.14,
+    172.85,
+    74.12
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      250.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      31.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      93.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      156.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      218.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    }
+   ],
+   "length": 250.0,
+   "triangles_before_cull": 2082
+  },
+  {
+   "name": "SM_FieldTrench_Straight_250_C",
+   "kind": "straight",
+   "fbx": "SM_FieldTrench_Straight_250_C.fbx",
+   "triangles": 1695,
+   "triangles_by_material": {
+    "GerPit_Atlas": 334,
+    "GerPit_Sandbag": 1361
+   },
+   "bounds_min": [
+    -1.91,
+    -170.45,
+    -9.93
+   ],
+   "bounds_max": [
+    250.91,
+    171.43,
+    70.67
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      250.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      31.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      93.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      156.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      218.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    }
+   ],
+   "length": 250.0,
+   "triangles_before_cull": 1958
+  },
+  {
+   "name": "SM_FieldTrench_Straight_500_A",
+   "kind": "straight",
+   "fbx": "SM_FieldTrench_Straight_500_A.fbx",
+   "triangles": 3299,
+   "triangles_by_material": {
+    "GerPit_Atlas": 666,
+    "GerPit_Sandbag": 2633
+   },
+   "bounds_min": [
+    -1.58,
+    -172.28,
+    -11.47
+   ],
+   "bounds_max": [
+    501.23,
+    173.04,
+    55.41
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      500.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      31.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      93.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      156.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      218.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_5",
+     "location": [
+      281.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_6",
+     "location": [
+      343.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_7",
+     "location": [
+      406.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_8",
+     "location": [
+      468.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    }
+   ],
+   "length": 500.0,
+   "triangles_before_cull": 3844
+  },
+  {
+   "name": "SM_FieldTrench_Straight_500_B",
+   "kind": "straight",
+   "fbx": "SM_FieldTrench_Straight_500_B.fbx",
+   "triangles": 3409,
+   "triangles_by_material": {
+    "GerPit_Atlas": 666,
+    "GerPit_Sandbag": 2743
+   },
+   "bounds_min": [
+    -1.4,
+    -172.02,
+    -11.5
+   ],
+   "bounds_max": [
+    501.2,
+    173.88,
+    72.74
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      500.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      31.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      93.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      156.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      218.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_5",
+     "location": [
+      281.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_6",
+     "location": [
+      343.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_7",
+     "location": [
+      406.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_8",
+     "location": [
+      468.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    }
+   ],
+   "length": 500.0,
+   "triangles_before_cull": 3956
+  },
+  {
+   "name": "SM_FieldTrench_Bend_15",
+   "kind": "bend",
+   "fbx": "SM_FieldTrench_Bend_15.fbx",
+   "triangles": 525,
+   "triangles_by_material": {
+    "GerPit_Atlas": 147,
+    "GerPit_Sandbag": 378
+   },
+   "bounds_min": [
+    -8.93,
+    -169.79,
+    -9.93
+   ],
+   "bounds_max": [
+    103.57,
+    171.59,
+    54.09
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      64.705,
+      8.519,
+      0.0
+     ],
+     "yaw": 15.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      15.382,
+      22.693,
+      -60.0
+     ],
+     "yaw": 92.5
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      53.497,
+      -16.5,
+      -60.0
+     ],
+     "yaw": -77.5
+    }
+   ],
+   "turn_degrees": 15.0,
+   "radius": 250.0,
+   "arc_length": 65.45,
+   "tangent_length": 32.913,
+   "triangles_before_cull": 582
+  },
+  {
+   "name": "SM_FieldTrench_Bend_30",
+   "kind": "bend",
+   "fbx": "SM_FieldTrench_Bend_30.fbx",
+   "triangles": 867,
+   "triangles_by_material": {
+    "GerPit_Atlas": 232,
+    "GerPit_Sandbag": 635
+   },
+   "bounds_min": [
+    -6.09,
+    -169.57,
+    -11.77
+   ],
+   "bounds_max": [
+    197.47,
+    177.18,
+    54.71
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      125.0,
+      33.494,
+      0.0
+     ],
+     "yaw": 30.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      29.729,
+      24.186,
+      -60.0
+     ],
+     "yaw": 97.5
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      103.999,
+      -1.075,
+      -60.0
+     ],
+     "yaw": -67.5
+    }
+   ],
+   "turn_degrees": 30.0,
+   "radius": 250.0,
+   "arc_length": 130.9,
+   "tangent_length": 66.987,
+   "triangles_before_cull": 988
+  },
+  {
+   "name": "SM_FieldTrench_Bend_45",
+   "kind": "bend",
+   "fbx": "SM_FieldTrench_Bend_45.fbx",
+   "triangles": 1514,
+   "triangles_by_material": {
+    "GerPit_Atlas": 324,
+    "GerPit_Sandbag": 1190
+   },
+   "bounds_min": [
+    -5.16,
+    -167.13,
+    -9.34
+   ],
+   "bounds_max": [
+    291.49,
+    185.05,
+    73.93
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      176.777,
+      73.223,
+      0.0
+     ],
+     "yaw": 45.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      21.62,
+      23.119,
+      -60.0
+     ],
+     "yaw": 97.5
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      79.12,
+      -10.004,
+      -60.0
+     ],
+     "yaw": -72.5
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      107.587,
+      49.231,
+      -60.0
+     ],
+     "yaw": 117.5
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      171.927,
+      39.376,
+      -60.0
+     ],
+     "yaw": -52.5
+    }
+   ],
+   "turn_degrees": 45.0,
+   "radius": 250.0,
+   "arc_length": 196.35,
+   "tangent_length": 103.553,
+   "triangles_before_cull": 1728
+  },
+  {
+   "name": "SM_FieldTrench_Corner_90",
+   "kind": "corner",
+   "fbx": "SM_FieldTrench_Corner_90.fbx",
+   "triangles": 2702,
+   "triangles_by_material": {
+    "GerPit_Atlas": 614,
+    "GerPit_Sandbag": 2088
+   },
+   "bounds_min": [
+    -2.8,
+    -171.24,
+    -9.81
+   ],
+   "bounds_max": [
+    360.36,
+    189.72,
+    56.0
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      187.5,
+      187.5,
+      0.0
+     ],
+     "yaw": 90.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      23.438,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      70.312,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      117.188,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      164.062,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_5",
+     "location": [
+      165.5,
+      88.125,
+      -60.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "cargo_6",
+     "location": [
+      209.5,
+      154.375,
+      -60.0
+     ],
+     "yaw": -0.0
+    }
+   ],
+   "turn_degrees": 90.0,
+   "tangent_length": 187.5,
+   "triangles_before_cull": 3176
+  },
+  {
+   "name": "SM_FieldTrench_Tee",
+   "kind": "tee",
+   "fbx": "SM_FieldTrench_Tee.fbx",
+   "triangles": 2968,
+   "triangles_by_material": {
+    "GerPit_Atlas": 878,
+    "GerPit_Sandbag": 2090
+   },
+   "bounds_min": [
+    -1.98,
+    -172.08,
+    -11.97
+   ],
+   "bounds_max": [
+    377.72,
+    251.42,
+    72.91
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      375.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    },
+    {
+     "name": "C",
+     "location": [
+      187.5,
+      250.0,
+      0.0
+     ],
+     "yaw": 90.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      31.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      93.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      218.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      281.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_5",
+     "location": [
+      343.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_6",
+     "location": [
+      165.5,
+      79.375,
+      -60.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "cargo_7",
+     "location": [
+      209.5,
+      128.125,
+      -60.0
+     ],
+     "yaw": -0.0
+    },
+    {
+     "name": "cargo_8",
+     "location": [
+      165.5,
+      176.875,
+      -60.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "cargo_9",
+     "location": [
+      209.5,
+      225.625,
+      -60.0
+     ],
+     "yaw": -0.0
+    }
+   ],
+   "length": 375.0,
+   "branch_length": 250.0,
+   "triangles_before_cull": 3404
+  },
+  {
+   "name": "SM_FieldTrench_Cross",
+   "kind": "cross",
+   "fbx": "SM_FieldTrench_Cross.fbx",
+   "triangles": 3494,
+   "triangles_by_material": {
+    "GerPit_Atlas": 1256,
+    "GerPit_Sandbag": 2238
+   },
+   "bounds_min": [
+    -2.54,
+    -251.7,
+    -12.44
+   ],
+   "bounds_max": [
+    378.28,
+    251.19,
+    71.58
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "B",
+     "location": [
+      375.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    },
+    {
+     "name": "C",
+     "location": [
+      187.5,
+      250.0,
+      0.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "D",
+     "location": [
+      187.5,
+      -250.0,
+      0.0
+     ],
+     "yaw": -90.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      31.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_2",
+     "location": [
+      93.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_3",
+     "location": [
+      281.25,
+      22.0,
+      -60.0
+     ],
+     "yaw": 90.0
+    },
+    {
+     "name": "cargo_4",
+     "location": [
+      343.75,
+      -22.0,
+      -60.0
+     ],
+     "yaw": -90.0
+    },
+    {
+     "name": "cargo_5",
+     "location": [
+      165.5,
+      79.375,
+      -60.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "cargo_6",
+     "location": [
+      209.5,
+      128.125,
+      -60.0
+     ],
+     "yaw": -0.0
+    },
+    {
+     "name": "cargo_7",
+     "location": [
+      165.5,
+      176.875,
+      -60.0
+     ],
+     "yaw": 180.0
+    },
+    {
+     "name": "cargo_8",
+     "location": [
+      209.5,
+      225.625,
+      -60.0
+     ],
+     "yaw": -0.0
+    },
+    {
+     "name": "cargo_9",
+     "location": [
+      209.5,
+      -79.375,
+      -60.0
+     ],
+     "yaw": 0.0
+    },
+    {
+     "name": "cargo_10",
+     "location": [
+      165.5,
+      -128.125,
+      -60.0
+     ],
+     "yaw": -180.0
+    },
+    {
+     "name": "cargo_11",
+     "location": [
+      209.5,
+      -176.875,
+      -60.0
+     ],
+     "yaw": 0.0
+    },
+    {
+     "name": "cargo_12",
+     "location": [
+      165.5,
+      -225.625,
+      -60.0
+     ],
+     "yaw": -180.0
+    }
+   ],
+   "length": 375.0,
+   "branch_length": 250.0,
+   "triangles_before_cull": 3972
+  },
+  {
+   "name": "SM_FieldTrench_End",
+   "kind": "end",
+   "fbx": "SM_FieldTrench_End.fbx",
+   "triangles": 1175,
+   "triangles_by_material": {
+    "GerPit_Atlas": 182,
+    "GerPit_Sandbag": 993
+   },
+   "bounds_min": [
+    -167.09,
+    -165.79,
+    -11.41
+   ],
+   "bounds_max": [
+    1.79,
+    167.65,
+    72.03
+   ],
+   "ports": [
+    {
+     "name": "A",
+     "location": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "yaw": 0.0
+    }
+   ],
+   "sockets": [
+    {
+     "name": "cargo_1",
+     "location": [
+      -22.0,
+      0.0,
+      -60.0
+     ],
+     "yaw": 180.0
+    }
+   ],
+   "depth": 170.0,
+   "triangles_before_cull": 1395
+  }
+ ]
+}

@@ -949,6 +949,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerFlak88Pit_Metal = 360;
 				inline constexpr int32 GerMortarPit_Radixite = 340;
 				inline constexpr int32 GerMortarPit_Metal = 160;
+				// Per metre of trench: the field trench pays for each piece as it is dug.
+				inline constexpr int32 GerFieldTrench_RadixitePerMetre = 10;
 				inline constexpr int32 Rus120MortarPit_Radixite = 480;
 				inline constexpr int32 Rus120MortarPit_Metal = 240;
 			}

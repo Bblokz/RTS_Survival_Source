@@ -135,6 +135,8 @@ enum class EBuildingExpansionType : uint8
 	// Soviet vehicle assembly yard: a large platform where four cranes relay parts onto the vehicle being trained,
 	// with a 53-K in a concrete-roofed casemate on its front corner.
 	BTX_RusAssemblyYard UMETA(DisplayName = "Rus Assembly Yard"),
+	// German field trench the player drags out from the HQ; priced per metre and dug piece by piece (ARTSFieldTrench).
+	BTX_GerFieldTrench UMETA(DisplayName = "Ger Field Trench"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -171,6 +173,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_RusPlatformFactory");
 	case EBuildingExpansionType::BTX_RusAssemblyYard:
 		return FString("BTX_RusAssemblyYard");
+	case EBuildingExpansionType::BTX_GerFieldTrench:
+		return FString("BTX_GerFieldTrench");
 	case EBuildingExpansionType::BTX_RusFactory:
 		return FString("BTX_RusFactory");
 	case EBuildingExpansionType::BTX_GerMarderStugFactory:
@@ -337,6 +341,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusIndustrialRefinery: return TEXT("Industrial Refinery");
 	case EBuildingExpansionType::BTX_RusPlatformFactory: return TEXT("Platform Factory");
 	case EBuildingExpansionType::BTX_RusAssemblyYard: return TEXT("Assembly Yard");
+	case EBuildingExpansionType::BTX_GerFieldTrench: return TEXT("Field Trench");
 	case EBuildingExpansionType::BTX_RusCoolingTowers: return TEXT("Cooling Towers");
 	case EBuildingExpansionType::BTX_RusFuelStorage1: return TEXT("Fuel Storage 1");
 	case EBuildingExpansionType::BTX_RusFuelStorage2: return TEXT("Fuel Storage 2");

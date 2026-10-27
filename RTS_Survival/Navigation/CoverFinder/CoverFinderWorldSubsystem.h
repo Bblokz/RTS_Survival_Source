@@ -11,6 +11,7 @@
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverStressPerfScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverStressTestScenario.h"
+#include "RTS_Survival/Navigation/CoverFinder/Tests/CoverRuntimeTrenchTestScenario.h"
 #include "RTS_Survival/Navigation/CoverFinder/Tests/CoverTrenchTestScenario.h"
 #include "RTS_Survival/Units/Squads/Tests/SquadPerfScenario.h"
 #include "RTS_Survival/RTSComponents/MedicComponent/Tests/MedicHealTestScenario.h"
@@ -486,6 +487,7 @@ private:
 	FCoverCombatTestScenario M_CombatCoverScenario;
 	FCoverCountTestScenario M_CoverCountScenario;
 	FCoverTrenchTestScenario M_TrenchCoverScenario;
+	FCoverRuntimeTrenchTestScenario M_RuntimeTrenchScenario;
 	FCoverStressTestScenario M_StressScenario;
 	FCoverStressPerfScenario M_StressPerfScenario;
 	FSquadPerfScenario M_SquadPerfScenario;
@@ -549,6 +551,10 @@ private:
 	// Right after a map starts the navigation mesh around a building is still taking in the building's own
 	// navigation areas, and approach locations there are not found yet.
 	TMap<TWeakObjectPtr<AActor>, FActorSocketCoverRetry> M_ActorSocketCoverRetries;
+
+	// Socket sources that asked to be read before the map start registration, such as a trench spawned in the
+	// first frame; their class need not be listed in the cover settings.
+	TArray<TWeakObjectPtr<AActor>> M_ActorSocketSourcesAwaitingRegistration;
 
 	// Rings around the thin obstacles found while gathering the bounds of the next environment scan.
 	TArray<FCoverFocusedSample> M_PendingThinObstacleSamples;

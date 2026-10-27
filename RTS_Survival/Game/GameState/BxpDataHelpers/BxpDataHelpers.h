@@ -148,6 +148,11 @@ namespace BxpHelpers
 				BxpData.Abilities = ArmedBxpAbilities;
 				InPlayerDataMap.Add(Pit.Type, BxpData);
 			}
+			// The field trench is not an expansion: the menu shows its price per metre, the trench actor charges it
+			// for each piece it digs and digs at its own pace.
+			FBxpData FieldTrenchData;
+			FieldTrenchData.Cost = FUnitCost({{ERTSResourceType::Resource_Radixite, GerFieldTrench_RadixitePerMetre}});
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerFieldTrench, FieldTrenchData);
 		}
 
 
