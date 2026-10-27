@@ -30,6 +30,18 @@ struct FRTSShortsOrbitState
 	float DurationSeconds = 1.f;
 };
 
+/** One Segment.FlyBys aircraft of the running segment: its spawned airframe and whether its sound has started. */
+USTRUCT()
+struct FRTSShortsFlyByState
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TObjectPtr<AActor> Airframe;
+
+	bool bSoundStarted = false;
+};
+
 /** 3v3 battle of the running segment: both lines, their current targets, the decision and the wrecks it left. */
 USTRUCT()
 struct FRTSShortsBattleState
@@ -47,6 +59,11 @@ struct FRTSShortsBattleState
 	// Squad controllers of either line: they take the attack orders, their soldiers join the lines above as they spawn.
 	TArray<TWeakObjectPtr<AActor>> PlayerSquads;
 	TArray<TWeakObjectPtr<AActor>> EnemySquads;
+	// Segment.BattleReinforcements, same indices: spawned when the battle begins, ordered in at their OrderAtSeconds
+	// and moved into PlayerUnits / EnemyUnits once they arrive.
+	TArray<TWeakObjectPtr<AActor>> Reinforcements;
+	TArray<bool> ReinforcementOrdered;
+	TArray<bool> ReinforcementJoined;
 	int32 BeginFrame = 0;
 	int32 DecidedFrame = -1;
 	bool bPlayerWon = false;
@@ -203,6 +220,9 @@ private:
 	AActor* SpawnBattleParticipant(const FString& ClassPath, const FTransform& Transform, const uint8 OwningPlayer) const;
 	/** Battle squads: their soldiers join the battle lines (targets, visibility, alive count) as they spawn. */
 	void AbsorbBattleSquadMembers();
+	void SpawnBattleReinforcements(const FRTSShortsSegment& Segment);
+	/** Orders the waiting reinforcements in at their time and adds the arrived ones to their line. */
+	void TickBattleReinforcements(int32 Frame);
 	/** Gives a battle squad's soldier the squad controller's owner (and its weapons and collision with it). */
 	static void MatchSoldierToSquadOwner(class ASquadUnit* Soldier, const uint8 SquadOwner);
 	/** Segment.bConvoy: spawns the wedge's side vehicles, pins the turrets and starts the follow camera. */
@@ -274,6 +294,17 @@ private:
 	static bool GetIsPersistentEffectOwner(const AActor* ComponentOwner);
 	/** Moves the camera along the running segment's orbit pan (Camera.OrbitDegrees) for this segment-local time. */
 	void UpdateOrbitCamera(const float SegmentSeconds) const;
+	/** Spawns the running segment's Segment.FlyBys airframes, flies them for this segment-local time and removes
+	 *  the previous segment's. */
+	void UpdateFlyBys(const float SegmentSeconds);
+	AActor* SpawnFlyByAirframe(const FRTSShortsFlyBy& FlyBy) const;
+	/**
+	 * The batched small-arms tracers and trace impacts are two Niagara systems on the projectile manager, which the
+	 * game spawns at the world origin; their fixed bounds sit there too, so on a stage far from the origin both were
+	 * culled and no tracer or impact rendered. Widens their bounds over the whole level and turns off their
+	 * scalability culling.
+	 */
+	void KeepSmallArmsEffectsVisible();
 	void ApplyCameraCut(const FVector& CameraLocation) const;
 	void ForceAnimationTicking(AActor* Unit) const;
 	void DisableUnitOptimisation() const;
@@ -323,6 +354,12 @@ private:
 	FVector M_PlacedLocation = FVector::ZeroVector;
 	// Set by FrameCamera (const) when the segment pans; read every tick by UpdateOrbitCamera.
 	mutable FRTSShortsOrbitState M_Orbit;
+	UPROPERTY()
+	TArray<FRTSShortsFlyByState> M_FlyBys;
+	// Segment whose Segment.FlyBys M_FlyBys holds (INDEX_NONE before the first update).
+	int32 M_FlyBySegment = INDEX_NONE;
+	// Niagara components of the projectile manager whose bounds were already widened.
+	TSet<TWeakObjectPtr<class UNiagaraComponent>> M_WidenedSmallArmsSystems;
 	FRTSShortsBattleState M_Battle;
 	FRTSShortsConvoyState M_Convoy;
 	// The job's stage; segments with their own StageActorName switch M_Stage away from it for their duration.

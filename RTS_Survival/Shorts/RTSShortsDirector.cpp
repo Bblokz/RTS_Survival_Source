@@ -26,6 +26,10 @@
 #include "Sound/SoundSubmix.h"
 #include "AudioThread.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimationAsset.h"
+#include "Animation/SkeletalMeshActor.h"
+#include "Engine/SkeletalMesh.h"
+#include "Sound/SoundBase.h"
 #include "Components/MeshComponent.h"
 #include "NiagaraComponent.h"
 #include "Components/WidgetComponent.h"
@@ -488,6 +492,8 @@ void ARTSShortsDirector::TickRunning()
 	}
 	LogVisibleSoldierShots(Frame);
 	UpdateOrbitCamera(static_cast<float>(Local) / M_Job.Fps);
+	UpdateFlyBys(static_cast<float>(Local) / M_Job.Fps);
+	KeepSmallArmsEffectsVisible();
 	TickBattle(Frame);
 	TickConvoy(Frame);
 	TickParatrooperBattle(Local);
@@ -1825,6 +1831,136 @@ void ARTSShortsDirector::UpdateOrbitCamera(const float SegmentSeconds) const
 	M_Camera->SetActorLocationAndRotation(CameraLocation, Rotation);
 }
 
+void ARTSShortsDirector::UpdateFlyBys(const float SegmentSeconds)
+{
+	if (M_FlyBySegment != M_CurrentSegment)
+	{
+		for (const FRTSShortsFlyByState& State : M_FlyBys)
+		{
+			if (IsValid(State.Airframe))
+			{
+				State.Airframe->Destroy();
+			}
+		}
+		M_FlyBys.Reset();
+		M_FlyBySegment = M_CurrentSegment;
+		if (M_Job.Segments.IsValidIndex(M_CurrentSegment))
+		{
+			for (const FRTSShortsFlyBy& FlyBy : M_Job.Segments[M_CurrentSegment].FlyBys)
+			{
+				M_FlyBys.AddDefaulted_GetRef().Airframe = SpawnFlyByAirframe(FlyBy);
+			}
+		}
+	}
+	if (not M_Job.Segments.IsValidIndex(M_CurrentSegment) || not GetIsValidStage())
+	{
+		return;
+	}
+	const TArray<FRTSShortsFlyBy>& FlyBys = M_Job.Segments[M_CurrentSegment].FlyBys;
+	const FTransform StageTransform = M_Stage->GetActorTransform();
+	for (int32 Index = 0; Index < FlyBys.Num() && Index < M_FlyBys.Num(); ++Index)
+	{
+		const FRTSShortsFlyBy& FlyBy = FlyBys[Index];
+		FRTSShortsFlyByState& State = M_FlyBys[Index];
+		if (not State.bSoundStarted && not FlyBy.SoundPath.IsEmpty() && SegmentSeconds >= FlyBy.SoundAtSeconds)
+		{
+			State.bSoundStarted = true;
+			USoundBase* Sound = LoadObject<USoundBase>(nullptr, *FlyBy.SoundPath);
+			if (IsValid(Sound))
+			{
+				UGameplayStatics::PlaySound2D(this, Sound, FlyBy.SoundVolume);
+			}
+			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_FLYBY_SOUND frame=%d index=%d sound=%s loaded=%d"), GetTimelineFrame(), Index,
+			       *FlyBy.SoundPath, IsValid(Sound) ? 1 : 0);
+		}
+		AActor* Airframe = State.Airframe;
+		if (not IsValid(Airframe))
+		{
+			continue;
+		}
+		const float Alpha = (SegmentSeconds - FlyBy.StartSeconds) / FMath::Max(0.1f, FlyBy.DurationSeconds);
+		const bool bFlying = Alpha >= 0.f && Alpha <= 1.f;
+		Airframe->SetActorHiddenInGame(not bFlying);
+		if (not bFlying)
+		{
+			continue;
+		}
+		const FVector Start = StageTransform.TransformPositionNoScale(FlyBy.StartOffset);
+		const FVector End = StageTransform.TransformPositionNoScale(FlyBy.EndOffset);
+		FRotator Rotation = (End - Start).Rotation();
+		Rotation.Yaw += FlyBy.MeshYawOffset;
+		Rotation.Roll = FlyBy.BankDegrees;
+		Airframe->SetActorLocationAndRotation(FMath::Lerp(Start, End, Alpha), Rotation);
+	}
+}
+
+AActor* ARTSShortsDirector::SpawnFlyByAirframe(const FRTSShortsFlyBy& FlyBy) const
+{
+	USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *FlyBy.MeshPath);
+	if (not IsValid(Mesh))
+	{
+		UE_LOG(LogRTSShorts, Warning, TEXT("RTS_SHORTS_FLYBY_MESH_MISSING mesh=%s"), *FlyBy.MeshPath);
+		return nullptr;
+	}
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	ASkeletalMeshActor* Airframe = GetWorld()->SpawnActor<ASkeletalMeshActor>(ASkeletalMeshActor::StaticClass(), FTransform::Identity, SpawnParams);
+	if (not IsValid(Airframe))
+	{
+		return nullptr;
+	}
+	USkeletalMeshComponent* Component = Airframe->GetSkeletalMeshComponent();
+	Component->SetMobility(EComponentMobility::Movable);
+	Component->SetSkeletalMesh(Mesh);
+	Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Component->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::AlwaysTickPoseAndRefreshBones;
+	Component->bEnableUpdateRateOptimizations = false;
+	// Same airframes as the paratrooper pass: an unassigned propeller slot would be hidden by HideEngineSpheres.
+	RepairParatrooperAircraftPropellerMaterial(Component);
+	Airframe->SetActorScale3D(FVector(FlyBy.Scale));
+	UAnimationAsset* Animation = FlyBy.AnimPath.IsEmpty() ? nullptr : LoadObject<UAnimationAsset>(nullptr, *FlyBy.AnimPath);
+	if (IsValid(Animation))
+	{
+		Component->PlayAnimation(Animation, true);
+	}
+	for (const FName& Bone : FlyBy.HiddenBones)
+	{
+		if (Component->GetBoneIndex(Bone) == INDEX_NONE)
+		{
+			UE_LOG(LogRTSShorts, Warning, TEXT("RTS_SHORTS_FLYBY_BONE_MISSING bone=%s"), *Bone.ToString());
+			continue;
+		}
+		Component->HideBoneByName(Bone, EPhysBodyOp::PBO_None);
+	}
+	Airframe->SetActorHiddenInGame(true);
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_FLYBY_SPAWNED airframe=%s mesh=%s animation=%s bounds=%s"), *Airframe->GetName(),
+	       *Mesh->GetName(), IsValid(Animation) ? *Animation->GetName() : TEXT("none"), *Mesh->GetBounds().BoxExtent.ToCompactString());
+	return Airframe;
+}
+
+void ARTSShortsDirector::KeepSmallArmsEffectsVisible()
+{
+	constexpr double LevelHalfExtentCm = 2000000.0;
+	const FBox LevelBounds(FVector(-LevelHalfExtentCm), FVector(LevelHalfExtentCm));
+	for (TActorIterator<ASmallArmsProjectileManager> It(GetWorld()); It; ++It)
+	{
+		TInlineComponentArray<UNiagaraComponent*> Systems(*It);
+		for (UNiagaraComponent* System : Systems)
+		{
+			if (not IsValid(System) || M_WidenedSmallArmsSystems.Contains(System))
+			{
+				continue;
+			}
+			M_WidenedSmallArmsSystems.Add(System);
+			System->SetSystemFixedBounds(LevelBounds);
+			System->SetAllowScalability(false);
+			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SMALL_ARMS_SYSTEM_WIDENED owner=%s component=%s asset=%s at=%s"), *It->GetName(),
+			       *System->GetName(), System->GetAsset() ? *System->GetAsset()->GetName() : TEXT("none"),
+			       *System->GetComponentLocation().ToCompactString());
+		}
+	}
+}
+
 float ARTSShortsDirector::ReadLargestWeaponRange(const AActor* Unit) const
 {
 	float Largest = 0.f;
@@ -2431,6 +2567,7 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 			(Cast<ASquadController>(Enemy) != nullptr ? M_Battle.EnemySquads : M_Battle.EnemyUnits).Add(Enemy);
 		}
 	}
+	SpawnBattleReinforcements(Segment);
 #endif
 	// The fog of war would hide the enemy line from the player and keep the player line out of the AI's vision
 	// (RTSIsVisibleTarget), so neither side would fire: battle units leave the fog system and are kept visible.
@@ -3086,6 +3223,7 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 	TrackParatrooperSquads();
 	AbsorbBattleSquadMembers();
 	KeepBattleUnitsVisible();
+	TickBattleReinforcements(Frame);
 	constexpr int32 OrderEveryFrames = 20;
 	if (Frame % OrderEveryFrames == 0)
 	{
@@ -3115,6 +3253,85 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 	{
 		M_Battle.bSegmentShortened = true;
 		ShortenRunningSegment(Frame + 1);
+	}
+}
+
+void ARTSShortsDirector::SpawnBattleReinforcements(const FRTSShortsSegment& Segment)
+{
+#if RTS_WITH_MAP_TESTS
+	const FTransform StageTransform = M_Stage->GetActorTransform();
+	for (const FRTSShortsBattleReinforcement& Reinforcement : Segment.BattleReinforcements)
+	{
+		const FVector Start = GetBattleGroundPoint(StageTransform.TransformPosition(Reinforcement.StartOffset));
+		const FVector Drive = StageTransform.TransformPosition(Reinforcement.DriveOffset);
+		const uint8 OwningPlayer = static_cast<uint8>(Reinforcement.bEnemy ? Segment.TargetOwningPlayer : M_Job.UnitOwningPlayer);
+		AActor* Unit = SpawnBattleParticipant(Reinforcement.ClassPath,
+		                                      FTransform(FRotator(0.f, (Drive - Start).Rotation().Yaw, 0.f), Start), OwningPlayer);
+		M_Battle.Reinforcements.Add(Unit);
+		M_Battle.ReinforcementOrdered.Add(false);
+		M_Battle.ReinforcementJoined.Add(false);
+		if (not IsValid(Unit))
+		{
+			continue;
+		}
+		// Same treatment as the lines get in BeginBattle: out of the fog system and the battle's health scale.
+		if (UFowComp* Fow = Unit->FindComponentByClass<UFowComp>())
+		{
+			Fow->StopFowParticipation();
+		}
+		UHealthComponent* Health = Unit->FindComponentByClass<UHealthComponent>();
+		if (Health != nullptr && not FMath::IsNearlyEqual(Segment.BattleHealthScale, 1.f))
+		{
+			Health->SetMaxHealth(Health->GetMaxHealth() * Segment.BattleHealthScale);
+		}
+	}
+#endif
+}
+
+void ARTSShortsDirector::TickBattleReinforcements(const int32 Frame)
+{
+	const FRTSShortsSegment& Segment = M_Job.Segments[M_CurrentSegment];
+	const float SegmentSeconds = static_cast<float>(Frame - M_SegmentStartFrames[M_CurrentSegment]) / M_Job.Fps;
+	const FTransform StageTransform = M_Stage->GetActorTransform();
+	// Arrived within this distance of its drive point, or this long after its order: it joins the fight.
+	constexpr float ArrivedCm = 1200.f;
+	constexpr float JoinAfterOrderSeconds = 25.f;
+	for (int32 Index = 0; Index < M_Battle.Reinforcements.Num() && Index < Segment.BattleReinforcements.Num(); ++Index)
+	{
+		AActor* Unit = M_Battle.Reinforcements[Index].Get();
+		if (Unit == nullptr || M_Battle.ReinforcementJoined[Index])
+		{
+			continue;
+		}
+		const FRTSShortsBattleReinforcement& Reinforcement = Segment.BattleReinforcements[Index];
+		const FVector Destination = GetBattleGroundPoint(StageTransform.TransformPosition(Reinforcement.DriveOffset));
+		if (not M_Battle.ReinforcementOrdered[Index])
+		{
+			if (SegmentSeconds < Reinforcement.OrderAtSeconds)
+			{
+				continue;
+			}
+			M_Battle.ReinforcementOrdered[Index] = true;
+			ICommands* Commands = Cast<ICommands>(Unit);
+			const FVector Direction = (Destination - Unit->GetActorLocation()).GetSafeNormal2D();
+			const ECommandQueueError Result = Commands != nullptr
+				? Commands->MoveToLocation(Destination, false, Direction.Rotation(), false) : ECommandQueueError::NoError;
+			const UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(), Unit->GetActorLocation(),
+			                                                                                   Destination, Unit);
+			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_REINFORCEMENT_ORDER frame=%d unit=%s commands=%d result=%d pathValid=%d length=%.0f"),
+			       Frame, *Unit->GetName(), Commands != nullptr ? 1 : 0, static_cast<int32>(Result),
+			       Path != nullptr && Path->IsValid() ? 1 : 0, Path != nullptr ? Path->GetPathLength() : 0.f);
+			continue;
+		}
+		const bool bArrived = FVector::Dist2D(Unit->GetActorLocation(), Destination) < ArrivedCm;
+		if (not bArrived && SegmentSeconds < Reinforcement.OrderAtSeconds + JoinAfterOrderSeconds)
+		{
+			continue;
+		}
+		M_Battle.ReinforcementJoined[Index] = true;
+		(Reinforcement.bEnemy ? M_Battle.EnemyUnits : M_Battle.PlayerUnits).Add(Unit);
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_REINFORCEMENT_JOINED frame=%d unit=%s arrived=%d at=%s"), Frame, *Unit->GetName(),
+		       bArrived ? 1 : 0, *Unit->GetActorLocation().ToCompactString());
 	}
 }
 
@@ -3162,7 +3379,7 @@ void ARTSShortsDirector::EndBattle()
 	// The segment's own unit is parked by EndSegment; everything else from this battle leaves the field.
 	const AActor* MainUnit = M_Units.IsValidIndex(M_CurrentSegment) ? M_Units[M_CurrentSegment].Get() : nullptr;
 	const TArray<TWeakObjectPtr<AActor>>* Groups[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits, &M_Battle.PlayerSquads,
-	                                                  &M_Battle.EnemySquads, &M_Battle.SpawnedWrecks};
+	                                                  &M_Battle.EnemySquads, &M_Battle.SpawnedWrecks, &M_Battle.Reinforcements};
 	for (const TArray<TWeakObjectPtr<AActor>>* Group : Groups)
 	{
 		for (const TWeakObjectPtr<AActor>& Actor : *Group)

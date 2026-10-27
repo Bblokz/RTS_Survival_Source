@@ -247,6 +247,85 @@ struct FRTSShortsParatrooperFormation
 	TArray<FRTSShortsParatrooperPass> Passes;
 };
 
+/** @brief A cinematic aircraft (an animated airframe, no unit or AI) that flies one straight line over the stage. */
+USTRUCT()
+struct FRTSShortsFlyBy
+{
+	GENERATED_BODY()
+
+	/** Skeletal mesh of the airframe. */
+	UPROPERTY()
+	FString MeshPath;
+
+	/** Looping animation on the airframe (the propeller spin); empty plays none. */
+	UPROPERTY()
+	FString AnimPath;
+
+	/** Path start and end in stage-local centimetres (X forward, Y right, Z above the stage origin). */
+	UPROPERTY()
+	FVector StartOffset = FVector(-25000.f, 2500.f, 3000.f);
+
+	UPROPERTY()
+	FVector EndOffset = FVector(25000.f, 2500.f, 3000.f);
+
+	/** Segment-local seconds at which the aircraft is at StartOffset; it is hidden outside the flight. */
+	UPROPERTY()
+	float StartSeconds = 0.f;
+
+	UPROPERTY()
+	float DurationSeconds = 8.f;
+
+	/** Yaw added to the flight direction so the nose leads (a mesh modelled along +Y needs -90). */
+	UPROPERTY()
+	float MeshYawOffset = 0.f;
+
+	/** Roll in degrees for a banking pass. */
+	UPROPERTY()
+	float BankDegrees = 0.f;
+
+	UPROPERTY()
+	float Scale = 1.f;
+
+	/** Bones hidden with their children (the landing gear, which the propeller animations leave lowered). */
+	UPROPERTY()
+	TArray<FName> HiddenBones;
+
+	/** One-shot 2D sound started SoundAtSeconds into the segment (a recorded fly-by peaks mid-file); empty = silent. */
+	UPROPERTY()
+	FString SoundPath;
+
+	UPROPERTY()
+	float SoundAtSeconds = 0.f;
+
+	UPROPERTY()
+	float SoundVolume = 1.f;
+};
+
+/** @brief A battle unit that waits far from the lines and drives in later, joining its side when it arrives. */
+USTRUCT()
+struct FRTSShortsBattleReinforcement
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FString ClassPath;
+
+	/** True joins the enemy line (Segment.TargetOwningPlayer), false the player line (Job.UnitOwningPlayer). */
+	UPROPERTY()
+	bool bEnemy = false;
+
+	/** Where it waits and where it drives to, in stage-local centimetres. */
+	UPROPERTY()
+	FVector StartOffset = FVector::ZeroVector;
+
+	UPROPERTY()
+	FVector DriveOffset = FVector::ZeroVector;
+
+	/** Segment-local second of the move order. */
+	UPROPERTY()
+	float OrderAtSeconds = 0.f;
+};
+
 /**
  * @brief One unit of a short: which Blueprint to spawn, how long it is on stage and when it fires.
  */
@@ -538,6 +617,14 @@ struct FRTSShortsSegment
 
 	UPROPERTY()
 	FRTSShortsImpactCameraParams ImpactCamera;
+
+	/** Battle: units that drive in from far off during the battle (they take no attack orders until they arrive). */
+	UPROPERTY()
+	TArray<FRTSShortsBattleReinforcement> BattleReinforcements;
+
+	/** Aircraft passes flown during this segment. */
+	UPROPERTY()
+	TArray<FRTSShortsFlyBy> FlyBys;
 };
 
 /**
