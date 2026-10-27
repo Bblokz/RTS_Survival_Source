@@ -29,6 +29,10 @@ UAmmoCookOffBehaviour::UAmmoCookOffBehaviour()
 void UAmmoCookOffBehaviour::OnAdded(AActor* BehaviourOwner)
 {
 	M_TankMaster = Cast<ATankMaster>(BehaviourOwner);
+	if (GetIsValidTankMaster())
+	{
+		M_TankMaster->SetIsAmmoCookingOff(true);
+	}
 	StartCookOffEffect();
 	StartCookOffSound();
 	Super::OnAdded(BehaviourOwner);
@@ -38,6 +42,11 @@ void UAmmoCookOffBehaviour::OnRemoved(AActor* BehaviourOwner)
 {
 	StopCookOffSound();
 	StopCookOffEffect();
+	// No validator: during tank destruction the tank may already be gone, which is not an error here.
+	if (M_TankMaster.IsValid())
+	{
+		M_TankMaster->SetIsAmmoCookingOff(false);
+	}
 	Super::OnRemoved(BehaviourOwner);
 	M_TankMaster.Reset();
 	M_FireSubsystem.Reset();

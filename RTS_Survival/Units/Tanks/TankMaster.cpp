@@ -567,6 +567,8 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 		return;
 	}
 
+	// Snapshot first: the teardown below can remove behaviours before BP_OnUnitDies reads it.
+	bM_DiedWhileAmmoCookingOff = bM_IsAmmoCookingOff;
 	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
 	FinishCrewRepair(ECrewRepairStopReason::OwnerDestroyed);
 	CleanupTowRelationshipsOnDeath();

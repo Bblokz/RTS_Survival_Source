@@ -318,7 +318,7 @@ void FRTS_Collapse::HandleDestroyGeometry(TSharedPtr<FCollapseTaskContext> Conte
 }
 
 void FRTS_Collapse::OnDestroySpawnActors(AActor* Owner, const FDestroySpawnActorsParameters& SpawnParams,
-                                         FCollapseFX CollapseFX)
+                                         FCollapseFX CollapseFX, TFunction<void(AActor*)> OnActorSpawned)
 {
 	// Safety: ensure the owner is valid.
 	if (!IsValid(Owner))
@@ -331,6 +331,7 @@ void FRTS_Collapse::OnDestroySpawnActors(AActor* Owner, const FDestroySpawnActor
 	Context->SpawnParams = SpawnParams;
 	Context->WeakOwner = Owner;
 	Context->CollapseFX = CollapseFX;
+	Context->OnActorSpawned = MoveTemp(OnActorSpawned);
 
 	// Build an array of asset paths for all actors that need to be loaded.
 	TArray<FSoftObjectPath> AssetsToLoad;
@@ -436,6 +437,11 @@ void FRTS_Collapse::SpawnActorsFromContext(TSharedPtr<FOnDestroySpawnActorsConte
 		if (!SpawnedActor)
 		{
 			RTSFunctionLibrary::ReportError(TEXT("OnDestroySpawnActors: Failed to spawn actor."));
+			continue;
+		}
+		if (Context->OnActorSpawned)
+		{
+			Context->OnActorSpawned(SpawnedActor);
 		}
 	}
 	// create vfx and sfx

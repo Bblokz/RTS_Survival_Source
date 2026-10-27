@@ -18,6 +18,7 @@
 #include "RTS_Survival/RTSComponents/TowMechanic/TowAbilityTypes/TowAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBatches.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/CrewRepairAbilityTypes.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossSettings.h"
 #include "TankMaster.generated.h"
 
 enum class ERTSAggroBehaviour : uint8;
@@ -323,6 +324,13 @@ public:
 	/** @return True when the blueprint carries a harvester component; known from post init components on. */
 	bool GetHasHarvesterComponent() const;
 
+	/** @brief Kept up to date by UAmmoCookOffBehaviour so the death event knows whether ammunition was burning. */
+	void SetIsAmmoCookingOff(const bool bIsCookingOff) { bM_IsAmmoCookingOff = bIsCookingOff; }
+
+	/** @brief Testing aid: starts this tank's ammo cook-off and kills it at once, so the cook-off death can be watched. */
+	UFUNCTION(BlueprintCallable, Category="Death|Debug")
+	void Debug_DieDuringAmmoCookOff();
+
 	// ---- Vehicle modules ----
 
 	/**
@@ -487,6 +495,22 @@ public:
 	void SetTurretsDisabled();
 
 protected:
+
+	/** @return True when an ammo cook-off was burning as this tank died; branch on it in BP_OnUnitDies. */
+	UFUNCTION(BlueprintPure, Category="Death")
+	bool GetDiedWhileAmmoCookingOff() const { return bM_DiedWhileAmmoCookingOff; }
+
+	/**
+	 * @brief Ammo cook-off death: spawns the wreck like DestroyAndSpawnActors, then blows the wreck turret off with
+	 * physics and leaves an ammo fire in the open hull. Tuned per tank in TurretTossSettings.
+	 * @param SpawnParams Same wreck list as DestroyAndSpawnActors.
+	 * @param CollapseFX Same FX as DestroyAndSpawnActors.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Death")
+	void DestroyAndSpawnActorsWithTurretToss(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX);
+
+	/** @brief Every tank Blueprint spawns its wreck here; a cook-off death takes the turret toss path automatically. */
+	virtual void DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX) override;
 
 	/**
 	 * @brief Allows module state reactions to distinguish damage from repair.
@@ -868,6 +892,18 @@ private:
 	TSubclassOf<UTankEngineFireBehaviour> GetEngineFireBehaviourClass() const;
 	bool StartAmmoCookOffChance(EVehicleModuleState AmmoState);
 	TSubclassOf<UAmmoCookOffBehaviour> GetAmmoCookOffBehaviourClass() const;
+
+	// ---- Ammo cook-off death ----
+	bool bM_IsAmmoCookingOff = false;
+	// Snapshot of bM_IsAmmoCookingOff taken as UnitDies starts, before teardown can remove the cook-off behaviour.
+	bool bM_DiedWhileAmmoCookingOff = false;
+
+	// How the wreck turret is thrown when this tank dies during an ammo cook-off.
+	UPROPERTY(EditDefaultsOnly, Category="Death|Turret Toss", meta=(AllowPrivateAccess="true"))
+	FWreckTurretTossSettings M_TurretTossSettings;
+
+	/** @return Yaw of the first mounted turret relative to the hull; 0 without turrets. */
+	float GetLiveTurretYawOffset() const;
 	void ShowModuleFirePopup(const FString& PopupText) const;
 	void OnModuleAddOnArmorDamaged(
 		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
