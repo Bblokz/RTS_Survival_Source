@@ -35,6 +35,12 @@ void AGuardController::ExecutePatrolCommand(const FVector PatrolToLocation)
 	Super::ExecutePatrolCommand(PatrolToLocation);
 }
 
+void AGuardController::ExecuteMarchCommand(const FVector MarchToLocation)
+{
+	StopAutoGuardingPermanently();
+	Super::ExecuteMarchCommand(MarchToLocation);
+}
+
 void AGuardController::GeneralMoveToForAbility(const FVector& MoveToLocation, const EAbilityID AbilityID)
 {
 	StopAutoGuardingPermanently();

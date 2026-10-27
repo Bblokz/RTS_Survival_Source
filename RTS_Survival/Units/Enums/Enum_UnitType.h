@@ -192,6 +192,8 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz_221 UMETA(DisplayName = "Ger ArmCar SdKfz 221 20mm"),
 	// 105mm self-propelled howitzer on the Pz II chassis.
 	Tank_Wespe UMETA(DisplayName = "Ger Light Wespe 105mm"),
+	// Soviet harvester on the T-34 hull: breaks crystal with a pile-driver hammer instead of the Pz I saw.
+	Tank_T34_Harvester UMETA(DisplayName = "Rus Medium T-34 Harvester"),
 };
 
 

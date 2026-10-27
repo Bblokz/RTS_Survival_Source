@@ -60,6 +60,7 @@ protected:
 	virtual void ExecuteAttackCommand(AActor* TargetActor) override;
 	virtual void ExecuteAttackGroundCommand(const FVector GroundLocation) override;
 	virtual void ExecutePatrolCommand(const FVector PatrolToLocation) override;
+	virtual void ExecuteMarchCommand(const FVector MarchToLocation) override;
 	virtual void GeneralMoveToForAbility(const FVector& MoveToLocation, EAbilityID AbilityID) override;
 	virtual void LoadSquadUnitsAsync() override;
 	virtual void OnAllSquadUnitsLoaded() override;
