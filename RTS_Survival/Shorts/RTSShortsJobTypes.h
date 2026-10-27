@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
+#include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 
 #include "RTSShortsJobTypes.generated.h"
 
@@ -241,6 +242,10 @@ struct FRTSShortsParatrooperFormation
 	/** Zero inherits the ability template's timing between individual jumps. */
 	UPROPERTY()
 	float JumpIntervalSeconds = 0.f;
+
+	/** Empty inherits the template's squads; each pass drops one copy of this list. */
+	UPROPERTY()
+	TArray<ESquadSubtype> SquadSubtypes;
 
 	/** Empty retains the original single pass over the battle midpoint. */
 	UPROPERTY()

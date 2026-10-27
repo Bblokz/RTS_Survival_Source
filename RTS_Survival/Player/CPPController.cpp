@@ -50,6 +50,7 @@
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/GameUI/BottomCenterUI/BuildingUI_ItemPanel/W_BuildingUI_ItemPanel.h"
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
@@ -1390,6 +1391,11 @@ void ACPPController::SpawnReinforcementAttackWave(
 		return;
 	}
 	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ReinforcementsHaveArrived, true, true);
+	if (URTSCombatPingSubsystem* const CombatPingSubsystem = GetWorld()->GetSubsystem<URTSCombatPingSubsystem>())
+	{
+		CombatPingSubsystem->AddReinforcementsPing(CenterFormationLocation,
+		                                           RTSReinforcementsPingConstants::DefaultDurationSeconds);
+	}
 
 	int32 SpawnId = 0;
 	TWeakObjectPtr<ACPPController> WeakThis(this);
@@ -3158,13 +3164,7 @@ bool ACPPController::GetIsHarvesterTankPawn(ASelectablePawnMaster* SelectedPawn)
 	{
 		return false;
 	}
-	const URTSComponent* RTSComponent = SelectedPawn->GetRTSComponent();
-	if (not IsValid(RTSComponent))
-	{
-		return false;
-	}
-	return RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank
-		&& RTSComponent->GetSubtypeAsTankSubtype() == ETankSubtype::Tank_PzI_Harvester;
+	return SelectedPawn->GetIsHarvester() != nullptr;
 }
 
 bool ACPPController::GetIsMarqueePawnsOnlyHarvester(const TArray<ASelectablePawnMaster*>& MarqueeSelectedPawns) const
@@ -5269,6 +5269,7 @@ void ACPPController::UpdateCursor()
 			CursorType = EMouseCursor::Type::ResizeSouthEast;
 			break;
 		case EAbilityID::IdPatrol:
+		case EAbilityID::IdMarch:
 			CursorType = EMouseCursor::Type::ResizeSouthWest;
 			break;
 		case EAbilityID::IdPickupItem:
@@ -5316,7 +5317,8 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		this->ActionButtonAttackGround(ClickedLocation);
 		break;
 	case EAbilityID::IdPatrol:
-		this->ActionButtonPatrol(ClickedLocation);
+	case EAbilityID::IdMarch:
+		this->ActionButtonPatrol(ClickedLocation, M_ActiveAbility);
 		break;
 	case EAbilityID::IdThrowGrenade:
 		this->ActionButtonThrowGrenade(ClickedLocation, M_ActiveGrenadeAbilityType);
@@ -5725,7 +5727,7 @@ void ACPPController::ActionButtonHarvestResource(AActor* ClickedActor, const FVe
 		bResetAllPlacementEffects, CommandsExe, ClickedLocation, CommandType, AbilityActivated, bForcePlayVoiceLine);
 }
 
-void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation)
+void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation, const EAbilityID PatrolAbility)
 {
 	FRotator AfterMovementRotation = FRotator::ZeroRotator;
 	if (not GetIsValidFormationController())
@@ -5743,9 +5745,12 @@ void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation)
 			                                                      EachSquad);
 			continue;
 		}
-		CommandsExe += EachSquad->PatrolToLocation(
-			M_FormationController->UseFormationPosition(EachSquad->GetRTSComponent(), AfterMovementRotation, EachSquad),
-			!bIsHoldingShift) == ECommandQueueError::NoError;
+		const FVector FormationLocation = M_FormationController->UseFormationPosition(
+			EachSquad->GetRTSComponent(), AfterMovementRotation, EachSquad);
+		const ECommandQueueError Error = PatrolAbility == EAbilityID::IdMarch
+			                                 ? EachSquad->MarchToLocation(FormationLocation, !bIsHoldingShift)
+			                                 : EachSquad->PatrolToLocation(FormationLocation, !bIsHoldingShift);
+		CommandsExe += Error == ECommandQueueError::NoError;
 	}
 	const bool bResetAllPlacementEffects = !bIsHoldingShift;
 	constexpr bool bForcePlayVoiceLine = false;

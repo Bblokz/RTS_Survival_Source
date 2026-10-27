@@ -1530,9 +1530,10 @@ private:
 	 * Places a placementEffect on the clicked location, if shift is held a new effect is added
 	 * if shift is not held all previous effects are destroyed and only this effect is shown
 	 * @param ClickedLocation: The location on the map that was right-clicked
+	 * @param PatrolAbility IdPatrol, or IdMarch to patrol while marching.
 	 * @pre All references to all selected units are valid.
 	 */
-	void ActionButtonPatrol(const FVector& ClickedLocation);
+	void ActionButtonPatrol(const FVector& ClickedLocation, const EAbilityID PatrolAbility = EAbilityID::IdPatrol);
 
 	void ActionButtonThrowGrenade(const FVector& ClickedLocation, const EGrenadeAbilityType GrenadeAbilityType);
 	void ActionButtonAimAbility(const FVector& ClickedLocation, const EAimAbilityType AimAbilityType);

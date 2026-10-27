@@ -76,6 +76,9 @@ enum class EAbilityID : uint8
 	IdHeal,
 	// Squads: every soldier takes the nearest free cover, after which the squad goes on hold position.
 	IdEnterCoverAndHold,
+	// Squads: patrol between the start position and a point while marching with the weapon over the shoulder.
+	// Any combat drops the whole squad out of the march to idle so it fights.
+	IdMarch,
 };
 
 inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
@@ -137,6 +140,7 @@ inline static FString Global_GetAbilityIDAsString(const EAbilityID Ability)
 	case EAbilityID::IdCrewRepair: return TEXT("Crew Repair");
 	case EAbilityID::IdHeal: return TEXT("Heal");
 	case EAbilityID::IdEnterCoverAndHold: return TEXT("Enter Cover And Hold");
+	case EAbilityID::IdMarch: return TEXT("March");
 	case EAbilityID::IdRegisterUnitAsBlackboardIdle: return TEXT("Register Unit As Blackboard Idle");
 	case EAbilityID::IdResearchTechnology: return TEXT("Research Technology");
 	default: return TEXT("Unknown Ability");
