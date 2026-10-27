@@ -261,6 +261,11 @@ struct FRTSShortsFlyBy
 	UPROPERTY()
 	FString AnimPath;
 
+	/** Optional static mesh attached at the airframe's origin: the Soviet aircraft are a static frame plus a
+	 *  skeletal rotor mesh (MeshPath) authored in the same space. */
+	UPROPERTY()
+	FString FrameMeshPath;
+
 	/** Path start and end in stage-local centimetres (X forward, Y right, Z above the stage origin). */
 	UPROPERTY()
 	FVector StartOffset = FVector(-25000.f, 2500.f, 3000.f);
@@ -617,6 +622,11 @@ struct FRTSShortsSegment
 
 	UPROPERTY()
 	FRTSShortsImpactCameraParams ImpactCamera;
+
+	/** Battle: > 0 orders a unit to attack only enemies within this distance (cm) and puts the battle squads on hold
+	 *  position, so they keep their cover (a trench) and fire at what is in range instead of walking at far targets. */
+	UPROPERTY()
+	float BattleOrderMaxDistance = 0.f;
 
 	/** Battle: units that drive in from far off during the battle (they take no attack orders until they arrive). */
 	UPROPERTY()

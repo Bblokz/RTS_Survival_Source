@@ -59,9 +59,11 @@ struct FRTSShortsBattleState
 	// Squad controllers of either line: they take the attack orders, their soldiers join the lines above as they spawn.
 	TArray<TWeakObjectPtr<AActor>> PlayerSquads;
 	TArray<TWeakObjectPtr<AActor>> EnemySquads;
-	// Segment.BattleReinforcements, same indices: spawned when the battle begins, ordered in at their OrderAtSeconds
-	// and moved into PlayerUnits / EnemyUnits once they arrive.
+	// Segment.BattleReinforcements, same indices: spawned into their line when the battle begins (so they count as
+	// alive and their soldiers get absorbed) but held, ordered in at their OrderAtSeconds and released on arrival.
 	TArray<TWeakObjectPtr<AActor>> Reinforcements;
+	// Held reinforcements: they take no attack orders and nobody is ordered to attack them.
+	TSet<TWeakObjectPtr<AActor>> HeldUnits;
 	TArray<bool> ReinforcementOrdered;
 	TArray<bool> ReinforcementJoined;
 	int32 BeginFrame = 0;
@@ -221,8 +223,12 @@ private:
 	/** Battle squads: their soldiers join the battle lines (targets, visibility, alive count) as they spawn. */
 	void AbsorbBattleSquadMembers();
 	void SpawnBattleReinforcements(const FRTSShortsSegment& Segment);
+	/** True when Segment.BattleOrderMaxDistance is set and the target lies farther than it from the attacker. */
+	bool GetIsBattleTargetTooFar(const AActor* Attacker, const AActor* Target) const;
 	/** Orders the waiting reinforcements in at their time and adds the arrived ones to their line. */
 	void TickBattleReinforcements(int32 Frame);
+	/** Held-position battles: logs every squad's soldiers' stage-local X span now and then (who left their cover line). */
+	void LogBattleSquadPositions(int32 Frame) const;
 	/** Gives a battle squad's soldier the squad controller's owner (and its weapons and collision with it). */
 	static void MatchSoldierToSquadOwner(class ASquadUnit* Soldier, const uint8 SquadOwner);
 	/** Segment.bConvoy: spawns the wedge's side vehicles, pins the turrets and starts the follow camera. */

@@ -62,6 +62,8 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
+#include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -1923,6 +1925,23 @@ AActor* ARTSShortsDirector::SpawnFlyByAirframe(const FRTSShortsFlyBy& FlyBy) con
 	{
 		Component->PlayAnimation(Animation, true);
 	}
+	if (not FlyBy.FrameMeshPath.IsEmpty())
+	{
+		UStaticMesh* FrameMesh = LoadObject<UStaticMesh>(nullptr, *FlyBy.FrameMeshPath);
+		if (IsValid(FrameMesh))
+		{
+			UStaticMeshComponent* Frame = NewObject<UStaticMeshComponent>(Airframe, TEXT("FlyByFrame"));
+			Frame->SetMobility(EComponentMobility::Movable);
+			Frame->SetStaticMesh(FrameMesh);
+			Frame->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Frame->SetupAttachment(Component);
+			Frame->RegisterComponent();
+		}
+		else
+		{
+			UE_LOG(LogRTSShorts, Warning, TEXT("RTS_SHORTS_FLYBY_FRAME_MISSING mesh=%s"), *FlyBy.FrameMeshPath);
+		}
+	}
 	for (const FName& Bone : FlyBy.HiddenBones)
 	{
 		if (Component->GetBoneIndex(Bone) == INDEX_NONE)
@@ -2588,6 +2607,28 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 			}
 		}
 	}
+	if (Segment.BattleOrderMaxDistance > 0.f)
+	{
+		// The enemy side searches cover 25 m out (the player side 12 m): across a 26 m gap Soviet soldiers took firing
+		// spots in no man's land and in the German trench. Both sides search the player radius here and a stressed
+		// soldier relocates at most 10 m (this render process only; the config is untouched).
+		if (URTSCoverFinderDeveloperSettings* CoverSettings = GetMutableDefault<URTSCoverFinderDeveloperSettings>())
+		{
+			CoverSettings->M_EnemyAutomaticCoverSearchRadius = CoverSettings->M_AutomaticCoverSearchRadius;
+			CoverSettings->M_InfantryStressedCoverMaxDisplacement = FMath::Min(CoverSettings->M_InfantryStressedCoverMaxDisplacement, 1000.f);
+		}
+		// Hold position: the squads fire at what is in range from their cover and never walk out at a far target.
+		for (const TArray<TWeakObjectPtr<AActor>>* Squads : {&M_Battle.PlayerSquads, &M_Battle.EnemySquads})
+		{
+			for (const TWeakObjectPtr<AActor>& SquadActor : *Squads)
+			{
+				if (const ASquadController* Squad = Cast<ASquadController>(SquadActor.Get()))
+				{
+					Squad->SetAggroStance(ERTSAggroBehaviour::Stance_HoldPosition);
+				}
+			}
+		}
+	}
 	M_Battle.BeginFrame = GetTimelineFrame();
 	AbsorbBattleSquadMembers();
 	KeepBattleUnitsVisible();
@@ -3168,9 +3209,34 @@ void ARTSShortsDirector::KeepBattleUnitsVisible() const
 void ARTSShortsDirector::IssueBattleOrders()
 {
 	using namespace RTSShortsBattlePrivate;
-	auto OrderSide = [this](const TArray<TWeakObjectPtr<AActor>>& Line, const TArray<TWeakObjectPtr<AActor>>& Squads,
-	                        const TArray<TWeakObjectPtr<AActor>>& Defenders)
+	// Held reinforcements (and the soldiers of held squads) neither attack nor get attacked until they arrive: an
+	// order on a far-off unit would send the whole line walking across the field.
+	TSet<const AActor*> Held;
+	for (const TWeakObjectPtr<AActor>& HeldUnit : M_Battle.HeldUnits)
 	{
+		if (AActor* HeldActor = HeldUnit.Get())
+		{
+			Held.Add(HeldActor);
+			if (ASquadController* HeldSquad = Cast<ASquadController>(HeldActor))
+			{
+				for (const ASquadUnit* Soldier : HeldSquad->GetSquadUnitsChecked())
+				{
+					Held.Add(Soldier);
+				}
+			}
+		}
+	}
+	auto OrderSide = [this, &Held](const TArray<TWeakObjectPtr<AActor>>& Line, const TArray<TWeakObjectPtr<AActor>>& Squads,
+	                               const TArray<TWeakObjectPtr<AActor>>& AllDefenders)
+	{
+		TArray<TWeakObjectPtr<AActor>> Defenders;
+		for (const TWeakObjectPtr<AActor>& Defender : AllDefenders)
+		{
+			if (not Held.Contains(Defender.Get()))
+			{
+				Defenders.Add(Defender);
+			}
+		}
 		// Soldiers are commanded through their squad: the line's vehicles and the squad controllers attack.
 		TArray<TWeakObjectPtr<AActor>> Attackers;
 		for (const TWeakObjectPtr<AActor>& Unit : Line)
@@ -3183,6 +3249,10 @@ void ARTSShortsDirector::IssueBattleOrders()
 		Attackers.Append(Squads);
 		for (const TWeakObjectPtr<AActor>& Attacker : Attackers)
 		{
+			if (Held.Contains(Attacker.Get()))
+			{
+				continue;
+			}
 			const ASquadController* ParachutingSquad = Cast<ASquadController>(Attacker.Get());
 			if (ParachutingSquad != nullptr && ParachutingSquad->GetIsInParachuteDrop())
 			{
@@ -3200,7 +3270,7 @@ void ARTSShortsDirector::IssueBattleOrders()
 			}
 			AActor* Target = FindNearestAlive(Attacker.Get(), Defenders);
 			ICommands* Commands = Cast<ICommands>(Attacker.Get());
-			if (Target == nullptr || Commands == nullptr)
+			if (Target == nullptr || Commands == nullptr || GetIsBattleTargetTooFar(Attacker.Get(), Target))
 			{
 				continue;
 			}
@@ -3210,6 +3280,16 @@ void ARTSShortsDirector::IssueBattleOrders()
 	};
 	OrderSide(M_Battle.PlayerUnits, M_Battle.PlayerSquads, M_Battle.EnemyUnits);
 	OrderSide(M_Battle.EnemyUnits, M_Battle.EnemySquads, M_Battle.PlayerUnits);
+}
+
+bool ARTSShortsDirector::GetIsBattleTargetTooFar(const AActor* Attacker, const AActor* Target) const
+{
+	if (not M_Job.Segments.IsValidIndex(M_CurrentSegment) || not IsValid(Attacker) || not IsValid(Target))
+	{
+		return false;
+	}
+	const float MaxDistance = M_Job.Segments[M_CurrentSegment].BattleOrderMaxDistance;
+	return MaxDistance > 0.f && FVector::Dist2D(Attacker->GetActorLocation(), Target->GetActorLocation()) > MaxDistance;
 }
 
 void ARTSShortsDirector::TickBattle(const int32 Frame)
@@ -3224,6 +3304,7 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 	AbsorbBattleSquadMembers();
 	KeepBattleUnitsVisible();
 	TickBattleReinforcements(Frame);
+	LogBattleSquadPositions(Frame);
 	constexpr int32 OrderEveryFrames = 20;
 	if (Frame % OrderEveryFrames == 0)
 	{
@@ -3274,6 +3355,17 @@ void ARTSShortsDirector::SpawnBattleReinforcements(const FRTSShortsSegment& Segm
 		{
 			continue;
 		}
+		const bool bSquad = Cast<ASquadController>(Unit) != nullptr;
+		TArray<TWeakObjectPtr<AActor>>& Line = Reinforcement.bEnemy
+			? (bSquad ? M_Battle.EnemySquads : M_Battle.EnemyUnits)
+			: (bSquad ? M_Battle.PlayerSquads : M_Battle.PlayerUnits);
+		Line.Add(Unit);
+		M_Battle.HeldUnits.Add(Unit);
+		if (Segment.BattleOrderMaxDistance > 0.f && bSquad)
+		{
+			// The lines hold position (BeginBattle); a reinforcement squad without it walked out of its trench at the enemy.
+			Cast<ASquadController>(Unit)->SetAggroStance(ERTSAggroBehaviour::Stance_HoldPosition);
+		}
 		// Same treatment as the lines get in BeginBattle: out of the fog system and the battle's health scale.
 		if (UFowComp* Fow = Unit->FindComponentByClass<UFowComp>())
 		{
@@ -3293,9 +3385,11 @@ void ARTSShortsDirector::TickBattleReinforcements(const int32 Frame)
 	const FRTSShortsSegment& Segment = M_Job.Segments[M_CurrentSegment];
 	const float SegmentSeconds = static_cast<float>(Frame - M_SegmentStartFrames[M_CurrentSegment]) / M_Job.Fps;
 	const FTransform StageTransform = M_Stage->GetActorTransform();
-	// Arrived within this distance of its drive point, or this long after its order: it joins the fight.
-	constexpr float ArrivedCm = 1200.f;
-	constexpr float JoinAfterOrderSeconds = 25.f;
+	// Arrived within this distance of its drive point, or this long after its order: it joins the fight. A held-position
+	// battle (trenches) needs the squad on its spot: released 12 m short, it fought from the open where it stood.
+	const bool bHoldPosition = Segment.BattleOrderMaxDistance > 0.f;
+	const float ArrivedCm = bHoldPosition ? 350.f : 1200.f;
+	const float JoinAfterOrderSeconds = bHoldPosition ? 45.f : 25.f;
 	for (int32 Index = 0; Index < M_Battle.Reinforcements.Num() && Index < Segment.BattleReinforcements.Num(); ++Index)
 	{
 		AActor* Unit = M_Battle.Reinforcements[Index].Get();
@@ -3329,9 +3423,49 @@ void ARTSShortsDirector::TickBattleReinforcements(const int32 Frame)
 			continue;
 		}
 		M_Battle.ReinforcementJoined[Index] = true;
-		(Reinforcement.bEnemy ? M_Battle.EnemyUnits : M_Battle.PlayerUnits).Add(Unit);
+		M_Battle.HeldUnits.Remove(Unit);
 		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_REINFORCEMENT_JOINED frame=%d unit=%s arrived=%d at=%s"), Frame, *Unit->GetName(),
 		       bArrived ? 1 : 0, *Unit->GetActorLocation().ToCompactString());
+	}
+}
+
+void ARTSShortsDirector::LogBattleSquadPositions(const int32 Frame) const
+{
+	constexpr int32 LogEveryFrames = 300;
+	if (M_Job.Segments[M_CurrentSegment].BattleOrderMaxDistance <= 0.f || (Frame - M_Battle.BeginFrame) % LogEveryFrames != 0)
+	{
+		return;
+	}
+	const FTransform StageTransform = M_Stage->GetActorTransform();
+	for (const TArray<TWeakObjectPtr<AActor>>* Squads : {&M_Battle.PlayerSquads, &M_Battle.EnemySquads})
+	{
+		for (const TWeakObjectPtr<AActor>& SquadActor : *Squads)
+		{
+			ASquadController* Squad = Cast<ASquadController>(SquadActor.Get());
+			if (not IsValid(Squad))
+			{
+				continue;
+			}
+			float MinX = TNumericLimits<float>::Max();
+			float MaxX = TNumericLimits<float>::Lowest();
+			int32 Alive = 0;
+			for (ASquadUnit* Soldier : Squad->GetSquadUnitsChecked())
+			{
+				if (not RTSShortsBattlePrivate::GetIsAlive(TWeakObjectPtr<AActor>(Soldier)))
+				{
+					continue;
+				}
+				const float LocalX = StageTransform.InverseTransformPosition(Soldier->GetActorLocation()).X / 100.f;
+				MinX = FMath::Min(MinX, LocalX);
+				MaxX = FMath::Max(MaxX, LocalX);
+				++Alive;
+			}
+			if (Alive > 0)
+			{
+				UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_BATTLE_POSITIONS frame=%d squad=%s alive=%d x=%.1f..%.1f held=%d"), Frame,
+				       *Squad->GetName(), Alive, MinX, MaxX, M_Battle.HeldUnits.Contains(SquadActor) ? 1 : 0);
+			}
+		}
 	}
 }
 
