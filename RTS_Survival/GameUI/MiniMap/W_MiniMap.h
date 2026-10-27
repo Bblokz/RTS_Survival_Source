@@ -314,6 +314,29 @@ private:
 	                            FSlateWindowElementList& OutDrawElements,
 	                            const int32 LayerId) const;
 
+	// "Reinforcements" circles (URTSCombatPingSubsystem::AddReinforcementsPing); drawn over the combat pings.
+	int32 DrawReinforcementsPings(const FGeometry& AllottedGeometry,
+	                              FSlateWindowElementList& OutDrawElements,
+	                              const int32 LayerId) const;
+
+	/**
+	 * @brief Draws one circle with the label in its middle; the circle grows to fit the label.
+	 * @param CenterInWidget Circle centre in this widget's local space.
+	 * @param AgeSeconds Real seconds since the ping was created.
+	 * @param DurationSeconds Real seconds the ping stays on the map.
+	 * @param Settings Look of the circle.
+	 * @param AllottedGeometry This widget's paint geometry.
+	 * @param OutDrawElements Paint output.
+	 * @param LayerId Lowest layer; the circle uses this layer and the two above it.
+	 */
+	void DrawReinforcementsPing(const FVector2D& CenterInWidget,
+	                            const float AgeSeconds,
+	                            const float DurationSeconds,
+	                            const URTSCombatPingSettings& Settings,
+	                            const FGeometry& AllottedGeometry,
+	                            FSlateWindowElementList& OutDrawElements,
+	                            const int32 LayerId) const;
+
 	void DrawMiniMapDisc(const FVector2D& CenterInWidget,
 	                        const float Diameter,
 	                        const FLinearColor& Color,

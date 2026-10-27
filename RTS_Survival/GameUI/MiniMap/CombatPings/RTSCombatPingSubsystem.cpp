@@ -70,6 +70,23 @@ void URTSCombatPingSubsystem::AddPreviewPing(const FVector& WorldLocation, const
 	NewPing.M_SpawnRealTimeSeconds = GetRealTimeSeconds() - AgeNowSeconds;
 }
 
+void URTSCombatPingSubsystem::AddReinforcementsPing(const FVector& WorldLocation, const float DurationSeconds)
+{
+	if (DurationSeconds <= 0.f)
+	{
+		return;
+	}
+	const double NowSeconds = GetRealTimeSeconds();
+	M_ReinforcementsPings.RemoveAll([NowSeconds](const FRTSReinforcementsPing& Ping)
+	{
+		return NowSeconds - Ping.M_SpawnRealTimeSeconds > Ping.M_DurationSeconds;
+	});
+	FRTSReinforcementsPing& NewPing = M_ReinforcementsPings.AddDefaulted_GetRef();
+	NewPing.M_WorldLocation = WorldLocation;
+	NewPing.M_SpawnRealTimeSeconds = NowSeconds;
+	NewPing.M_DurationSeconds = DurationSeconds;
+}
+
 double URTSCombatPingSubsystem::GetRealTimeSeconds() const
 {
 	const UWorld* const World = GetWorld();

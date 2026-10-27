@@ -964,6 +964,8 @@ void UUISnapshotSubsystem::ShowCombatPingsForStep() const
 		CombatPingSubsystem->AddPreviewPing(
 			MapCenter + UISnapshotConstants::PreviewPingOffsets[PreviewIndex] * MapExtent, AgeNowSeconds);
 	}
+	// Outlasts the settle time, so the capture shows it at full opacity.
+	CombatPingSubsystem->AddReinforcementsPing(MapCenter, RTSReinforcementsPingConstants::DefaultDurationSeconds);
 }
 
 void UUISnapshotSubsystem::ShowMapObjectFiltersForStep() const

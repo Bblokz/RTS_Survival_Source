@@ -79,6 +79,24 @@ namespace MiniMapCombatPingConstants
 	}
 }
 
+namespace MiniMapReinforcementsPingConstants
+{
+	constexpr float FillOpacity = 0.28f;
+	// Space between the label and the ring, as a share of the label height.
+	constexpr float TextPaddingShare = 0.6f;
+	constexpr int32 TextOutlineSizePixels = 1;
+
+	// One ring keeps leaving the circle so the spot catches the eye without hiding the label.
+	constexpr float RipplePeriodSeconds = 1.5f;
+	constexpr float RippleEndRadiusShare = 1.45f;
+	constexpr float RippleEaseExponent = 2.f;
+	constexpr float RippleOpacityShare = 0.7f;
+
+	// The ring breathes slightly over the same period.
+	constexpr float RingPulseAmount = 0.04f;
+	constexpr float TextWhiteBlend = 0.75f;
+}
+
 UImage* UW_MiniMap::GetIsValidMiniMapImg() const
 {
 	if (not IsValid(MiniMapImg))
@@ -204,7 +222,8 @@ int32 UW_MiniMap::NativePaint(const FPaintArgs& Args,
 	const int32 CustomIconLayerId = DrawCustomMiniMapTextureIcons(AllottedGeometry, OutDrawElements, IconLayerId);
 	const int32 TextLayerId = DrawCustomMiniMapText(AllottedGeometry, OutDrawElements, CustomIconLayerId);
 	const int32 CombatPingLayerId = DrawCombatPings(AllottedGeometry, OutDrawElements, TextLayerId);
-	return DrawGlassOverlay(AllottedGeometry, OutDrawElements, CombatPingLayerId);
+	const int32 ReinforcementsLayerId = DrawReinforcementsPings(AllottedGeometry, OutDrawElements, CombatPingLayerId);
+	return DrawGlassOverlay(AllottedGeometry, OutDrawElements, ReinforcementsLayerId);
 }
 
 void UW_MiniMap::EnsureGlassOverlayMaterial()
@@ -761,6 +780,109 @@ void UW_MiniMap::DrawCombatPingBrackets(const FVector2D& CenterInWidget,
 		DrawArc(CenterInWidget, Radius, StartDegrees, BracketArcDegrees, Thickness, BracketColor,
 		        AllottedGeometry, OutDrawElements, LayerId);
 	}
+}
+
+int32 UW_MiniMap::DrawReinforcementsPings(const FGeometry& AllottedGeometry,
+                                          FSlateWindowElementList& OutDrawElements,
+                                          const int32 LayerId) const
+{
+	// Same early out as the combat pings: no subsystem in the designer, validators only run while pings exist.
+	const UWorld* const World = GetWorld();
+	const URTSCombatPingSubsystem* const CombatPingSubsystem = IsValid(World)
+		                                                           ? World->GetSubsystem<URTSCombatPingSubsystem>()
+		                                                           : nullptr;
+	if (not IsValid(CombatPingSubsystem) || CombatPingSubsystem->GetReinforcementsPings().IsEmpty()
+		|| not FSlateApplication::IsInitialized())
+	{
+		return LayerId;
+	}
+	const AFowManager* const FowManager = GetIsValidFowManager();
+	const UImage* const MiniMapImage = GetIsValidMiniMapImg();
+	if (not IsValid(FowManager) || not IsValid(MiniMapImage))
+	{
+		return LayerId;
+	}
+	const FGeometry MiniMapGeometry = MiniMapImage->GetCachedGeometry();
+	const FVector2D MiniMapSize = MiniMapGeometry.GetLocalSize();
+	if (MiniMapSize.X <= 0.0f || MiniMapSize.Y <= 0.0f)
+	{
+		return LayerId;
+	}
+
+	const URTSCombatPingSettings* const Settings = GetDefault<URTSCombatPingSettings>();
+	const double NowSeconds = CombatPingSubsystem->GetRealTimeSeconds();
+	for (const FRTSReinforcementsPing& Ping : CombatPingSubsystem->GetReinforcementsPings())
+	{
+		const float AgeSeconds = static_cast<float>(NowSeconds - Ping.M_SpawnRealTimeSeconds);
+		FVector2D PingUV;
+		if (AgeSeconds < 0.f || AgeSeconds > Ping.M_DurationSeconds
+			|| not FowManager->GetMiniMapUVFromWorldLocation(Ping.M_WorldLocation, PingUV))
+		{
+			continue;
+		}
+		const FVector2D CenterAbsolute = MiniMapGeometry.LocalToAbsolute(PingUV * MiniMapSize);
+		DrawReinforcementsPing(AllottedGeometry.AbsoluteToLocal(CenterAbsolute), AgeSeconds, Ping.M_DurationSeconds,
+		                       *Settings, AllottedGeometry, OutDrawElements, LayerId + 1);
+	}
+	// Fill, rings and label each take a layer.
+	constexpr int32 ReinforcementsLayerCount = 3;
+	return LayerId + ReinforcementsLayerCount;
+}
+
+void UW_MiniMap::DrawReinforcementsPing(const FVector2D& CenterInWidget,
+                                        const float AgeSeconds,
+                                        const float DurationSeconds,
+                                        const URTSCombatPingSettings& Settings,
+                                        const FGeometry& AllottedGeometry,
+                                        FSlateWindowElementList& OutDrawElements,
+                                        const int32 LayerId) const
+{
+	using namespace MiniMapReinforcementsPingConstants;
+	using MiniMapCombatPingConstants::DrawArc;
+	using MiniMapCombatPingConstants::FullCircleDegrees;
+	const float Envelope = MiniMapCombatPingConstants::GetPingEnvelope(AgeSeconds, DurationSeconds);
+	FSlateRenderer* const SlateRenderer = FSlateApplication::Get().GetRenderer();
+	if (Envelope <= 0.f || SlateRenderer == nullptr)
+	{
+		return;
+	}
+
+	static const FText ReinforcementsLabel = NSLOCTEXT("MiniMap", "ReinforcementsPingLabel", "Reinforcements");
+	const int32 TextSize = bM_IsTacticalMapView
+		                       ? Settings.ReinforcementsTacticalMapTextSize
+		                       : Settings.ReinforcementsMiniMapTextSize;
+	const FSlateFontInfo FontInfo = FCoreStyle::GetDefaultFontStyle(
+		FName(TEXT("Bold")), TextSize, FFontOutlineSettings(TextOutlineSizePixels));
+	const FVector2D LabelSize = SlateRenderer->GetFontMeasureService()->Measure(ReinforcementsLabel, FontInfo);
+	const float MinRadius = bM_IsTacticalMapView
+		                        ? Settings.ReinforcementsTacticalMapRadius
+		                        : Settings.ReinforcementsMiniMapRadius;
+	const float Radius = FMath::Max(MinRadius, LabelSize.X * 0.5f + LabelSize.Y * TextPaddingShare);
+
+	const FLinearColor& Color = Settings.ReinforcementsColor;
+	DrawMiniMapDisc(CenterInWidget, Radius * 2.f, Color.CopyWithNewOpacity(Color.A * FillOpacity * Envelope),
+	                AllottedGeometry, OutDrawElements, LayerId);
+
+	const int32 RingLayerId = LayerId + 1;
+	const float Phase = FMath::Frac(AgeSeconds / RipplePeriodSeconds);
+	const float RingRadius = Radius * (1.f + RingPulseAmount * FMath::Sin(Phase * UE_TWO_PI));
+	DrawArc(CenterInWidget, RingRadius, 0.f, FullCircleDegrees, Settings.ReinforcementsRingThickness,
+	        Color.CopyWithNewOpacity(Color.A * Envelope), AllottedGeometry, OutDrawElements, RingLayerId);
+	const float Expansion = FMath::InterpEaseOut(0.f, 1.f, Phase, RippleEaseExponent);
+	const float RippleOpacity = Color.A * RippleOpacityShare * FMath::Square(1.f - Phase) * Envelope;
+	DrawArc(CenterInWidget, Radius * FMath::Lerp(1.f, RippleEndRadiusShare, Expansion), 0.f, FullCircleDegrees,
+	        Settings.ReinforcementsRingThickness, Color.CopyWithNewOpacity(RippleOpacity), AllottedGeometry,
+	        OutDrawElements, RingLayerId);
+
+	// The map may be rotated; the label is turned back so it always reads upright.
+	const float CounterRotationRadians = FMath::DegreesToRadians(-GetRenderTransformAngle());
+	const FPaintGeometry LabelGeometry = AllottedGeometry.ToPaintGeometry(
+		LabelSize,
+		FSlateLayoutTransform(CenterInWidget - LabelSize * 0.5f),
+		FSlateRenderTransform(FQuat2D(CounterRotationRadians)));
+	const FLinearColor LabelColor = FMath::Lerp(Color, FLinearColor::White, TextWhiteBlend);
+	FSlateDrawElement::MakeText(OutDrawElements, RingLayerId + 1, LabelGeometry, ReinforcementsLabel, FontInfo,
+	                            ESlateDrawEffect::None, LabelColor.CopyWithNewOpacity(Envelope));
 }
 
 int32 UW_MiniMap::DrawMapObjectFilters(const FGeometry& AllottedGeometry,
