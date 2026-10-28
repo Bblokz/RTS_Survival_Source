@@ -25,7 +25,9 @@ enum class EPlayerBuildingPreviewMode : uint8
 	// Preview mode is active for field construction placement.
 	FieldConstructionPreviewMode,
 	// Preview mode is active for planning a field defense from a trainer's training menu.
-	FieldDefensePreviewMode
+	FieldDefensePreviewMode,
+	// Preview mode is active for laying out a field trench from the HQ's training menu.
+	FieldTrenchPreviewMode
 };
 
 static FString Global_GetPlayerBuildingPreviewModeEnumAsString(const EPlayerBuildingPreviewMode Mode)
@@ -42,6 +44,8 @@ static FString Global_GetPlayerBuildingPreviewModeEnumAsString(const EPlayerBuil
 		return "FieldConstructionPreviewMode";
 	case EPlayerBuildingPreviewMode::FieldDefensePreviewMode:
 		return "FieldDefensePreviewMode";
+	case EPlayerBuildingPreviewMode::FieldTrenchPreviewMode:
+		return "FieldTrenchPreviewMode";
 	}
 	return "Unknown";
 }

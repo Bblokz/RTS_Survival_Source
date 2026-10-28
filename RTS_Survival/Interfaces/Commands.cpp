@@ -925,6 +925,11 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 			M_Owner->ExecutePatrolCommand(Cmd.TargetLocation);
 		}
 		break;
+	case EAbilityID::IdMarch:
+		{
+			M_Owner->ExecuteMarchCommand(Cmd.TargetLocation);
+		}
+		break;
 	case EAbilityID::IdReverseMove:
 		{
 			M_Owner->ExecuteReverseCommand(Cmd.TargetLocation);
@@ -1291,7 +1296,8 @@ ECommandQueueError UCommandData::IsQueueActiveAndNoPatrol() const
 		return ECommandQueueError::QueueInactive;
 	}
 
-	return GetHasCommandInQueue(EAbilityID::IdPatrol)
+	// A march is a patrol too: it never ends by itself, so nothing may queue behind it.
+	return GetHasCommandInQueue(EAbilityID::IdPatrol) || GetHasCommandInQueue(EAbilityID::IdMarch)
 		       ? ECommandQueueError::QueueHasPatrol
 		       : ECommandQueueError::NoError;
 }
@@ -1394,6 +1400,8 @@ bool UCommandData::IsAbilityRequiredOnCommandCard(const EAbilityID CommandType) 
 	case EAbilityID::IdCapture:
 	case EAbilityID::IdTowActor:
 	case EAbilityID::IdRegisterUnitAsBlackboardIdle:
+	// Scripted from missions and blueprints; squads do not carry a march button.
+	case EAbilityID::IdMarch:
 		return false;
 
 	default:
@@ -2071,6 +2079,23 @@ ECommandQueueError ICommands::PatrolToLocation(const FVector& Location, const bo
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(
 		EAbilityID::IdPatrol, Location, nullptr, FRotator::ZeroRotator);
 	return Error;
+}
+
+ECommandQueueError ICommands::MarchToLocation(const FVector& Location, const bool bSetUnitToIdle)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	// Scripted order (missions, blueprints): squads do not carry a march button, so the card is not checked.
+	if (bSetUnitToIdle)
+	{
+		SetUnitToIdle();
+	}
+	return UnitCommandData->AddAbilityToTCommands(
+		EAbilityID::IdMarch, Location, nullptr, FRotator::ZeroRotator);
 }
 
 
@@ -2860,6 +2885,17 @@ void ICommands::TerminatePatrolCommand()
 	// non-pure so no overwrite needed in base-classes that don't use this.
 }
 
+void ICommands::ExecuteMarchCommand(const FVector MarchToLocation)
+{
+	// Only squads march; anything else rejects the order without stalling its queue.
+	DoneExecutingCommand(EAbilityID::IdMarch);
+}
+
+void ICommands::TerminateMarchCommand()
+{
+	// non-pure so no overwrite needed in base-classes that don't use this.
+}
+
 void ICommands::ExecuteReverseCommand(const FVector ReverseToLocation)
 {
 	// non-pure so no overwrite needed in base-classes that don't use this.
@@ -3553,6 +3589,9 @@ void ICommands::TerminateCommand(const EAbilityID AbilityToKill)
 		break;
 	case EAbilityID::IdPatrol:
 		TerminatePatrolCommand();
+		break;
+	case EAbilityID::IdMarch:
+		TerminateMarchCommand();
 		break;
 	case EAbilityID::IdAttack:
 		TerminateAttackCommand();

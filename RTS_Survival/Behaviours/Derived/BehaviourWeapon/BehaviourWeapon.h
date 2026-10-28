@@ -88,6 +88,14 @@ public:
         UBehaviourWeapon();
         const FBehaviourWeaponMultipliers& GetBehaviourWeaponMultipliers() const;
 
+        /**
+         * @brief The weapon-name filter rule of WeaponNamesToApplyTo.
+         * @param WeaponNameFilter Exact EWeaponName entry names; empty means every weapon passes.
+         * @param WeaponName The weapon to test.
+         * @return True when the filter is empty or holds the weapon's name.
+         */
+        static bool GetIsWeaponNameInFilter(const TArray<FName>& WeaponNameFilter, const EWeaponName WeaponName);
+
 protected:
         virtual void OnAdded(AActor* BehaviourOwner) override;
         virtual void OnRemoved(AActor* BehaviourOwner) override;
@@ -95,6 +103,7 @@ protected:
 
 	bool GetIsWeaponCalibreLargeEnough(const UWeaponState* ValidWeapon) const;
 	bool GetIsWeaponCalibreWithinMaximum(const UWeaponState* ValidWeapon) const;
+	bool GetIsWeaponNameAllowed(const UWeaponState* ValidWeapon) const;
         
 
         /** @brief Determine whether this behaviour should be applied to the provided weapon. */
@@ -121,6 +130,13 @@ protected:
         // Otherwise; only weapons with a calibre equal to or smaller than this value will receive the behaviour.
         UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Rules")
         float MaximumWeaponCalibreToApplyTo = 0.f;
+
+        // If empty the behaviour is applied to all weapons (that pass the calibre rules).
+        // Otherwise; only weapons whose EWeaponName entry name is in this list receive the behaviour,
+        // e.g. Laser_60MM_PzIIIM so an overcharge buffs only the laser and not the coax.
+        UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Rules",
+                meta = (GetOptions = "RTSBlueprintFunctionLibrary.GetWeaponNameOptions"))
+        TArray<FName> WeaponNamesToApplyTo;
 
         UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Behaviour Attributes")
         FBehaviourWeaponAttributes BehaviourWeaponAttributes;

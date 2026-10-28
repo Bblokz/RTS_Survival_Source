@@ -4,6 +4,7 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
 #include "Components/SizeBox.h"
@@ -12,6 +13,7 @@
 #include "EngineUtils.h"
 #include "Styling/CoreStyle.h"
 #include "UObject/UObjectIterator.h"
+#include "RTS_Survival/GameUI/IndicatorLamps/IndicatorLampSettings.h"
 #include "RTS_Survival/Interfaces/Commands.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
@@ -59,6 +61,12 @@ void UW_IdleUnitButton::NativeDestruct()
 	Super::NativeDestruct();
 }
 
+void UW_IdleUnitButton::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	M_IdleLamp.Tick(InDeltaTime);
+}
+
 void UW_IdleUnitButton::BuildWidgetTree()
 {
 	if (not IsValid(WidgetTree) || IsValid(WidgetTree->RootWidget))
@@ -89,6 +97,27 @@ void UW_IdleUnitButton::BuildWidgetTree()
 	CountSlot->SetHorizontalAlignment(HAlign_Right);
 	CountSlot->SetVerticalAlignment(VAlign_Bottom);
 	CountSlot->SetPadding(IdleUnitButtonConstants::CountPadding);
+
+	BuildIdleLamp(*Overlay);
+}
+
+void UW_IdleUnitButton::BuildIdleLamp(UOverlay& Overlay)
+{
+	const UIndicatorLampSettings* const Settings = GetDefault<UIndicatorLampSettings>();
+	const TSoftObjectPtr<UMaterialInterface>& LampMaterial = M_IdleUnitType == EIdleUnitButtonType::Harvester
+		                                                         ? Settings->IdleHarvesterLamp
+		                                                         : Settings->IdleNomadTruckLamp;
+	UImage* const LampImage = M_IdleLamp.Build(*WidgetTree, LampMaterial.LoadSynchronous(), Settings->IdleLampSize,
+	                                           false);
+	if (not IsValid(LampImage))
+	{
+		return;
+	}
+	// The round dome leaves the square's corners free; the lamp sits in the top-right one, against the bezel.
+	UOverlaySlot* const LampSlot = Overlay.AddChildToOverlay(LampImage);
+	LampSlot->SetHorizontalAlignment(HAlign_Right);
+	LampSlot->SetVerticalAlignment(VAlign_Top);
+	LampSlot->SetPadding(FMargin(0.0f, -Settings->IdleLampOverhang, -Settings->IdleLampOverhang, 0.0f));
 }
 
 FButtonStyle UW_IdleUnitButton::MakeGlassButtonStyle() const
@@ -129,6 +158,7 @@ void UW_IdleUnitButton::RefreshIdleCount()
 	M_Button->SetToolTipText(GetTooltipText(IdleCount));
 	M_CountText->SetText(FText::AsNumber(IdleCount));
 	M_CountText->SetVisibility(IdleCount > 0 ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	M_IdleLamp.SetIsLit(IdleCount > 0);
 }
 
 void UW_IdleUnitButton::OnIdleButtonClicked()

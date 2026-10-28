@@ -29,6 +29,11 @@ namespace RTSGameUserSettingsRanges
 	constexpr float MinCameraShakeMultiplier = 0.1f;
 	constexpr float MaxCameraShakeMultiplier = 5.0f;
 	constexpr float DefaultCameraShakeMultiplier = 1.0f;
+
+	// Fraction of environment detail instances (landscape grass, ground stones) that are kept.
+	constexpr float MinEnvironmentDensity = 0.0f;
+	constexpr float MaxEnvironmentDensity = 1.0f;
+	constexpr float DefaultEnvironmentDensity = 1.0f;
 }
 
 /**
@@ -159,6 +164,24 @@ public:
 	/** @brief Writes the unit hover range indicator setting. */
 	void SetCheckUnitRangeOnHover(const bool bNewCheckUnitRangeOnHover);
 
+	/** @brief Returns the overall environment detail density the menu shows as the main slider. */
+	float GetEnvironmentDetailDensity() const;
+
+	/** @brief Returns the fraction of landscape grass foliage that is kept. */
+	float GetFoliageDensity() const;
+
+	/** @brief Returns the fraction of scattered ground stones that is kept. */
+	float GetStoneDensity() const;
+
+	/** @brief Writes the overall environment detail density before clamping and saving. */
+	void SetEnvironmentDetailDensity(const float NewEnvironmentDetailDensity);
+
+	/** @brief Writes the landscape grass foliage density before clamping and saving. */
+	void SetFoliageDensity(const float NewFoliageDensity);
+
+	/** @brief Writes the ground stone density before clamping and saving. */
+	void SetStoneDensity(const float NewStoneDensity);
+
 
 	/** @brief Returns saved single-key overrides so controllers can restore remaps during startup. */
 	const TArray<FRTSSavedKeyBinding>& GetSavedKeyBindings() const;
@@ -272,6 +295,8 @@ public:
 
 private:
 	void ApplyCustomSettingClamps();
+	void ApplyEnvironmentDensityClamps();
+	static void ClampEnvironmentDensity(float& DensityToClamp, const TCHAR* DensityName);
 
 	UPROPERTY(config)
 	float M_MasterVolume = RTSGameUserSettingsRanges::DefaultVolume;
@@ -317,6 +342,15 @@ private:
 
 	UPROPERTY(config)
 	bool bM_CheckUnitRangeOnHover = true;
+
+	UPROPERTY(config)
+	float M_EnvironmentDetailDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+
+	UPROPERTY(config)
+	float M_FoliageDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+
+	UPROPERTY(config)
+	float M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 
 	UPROPERTY(config)
 	TArray<FRTSSavedKeyBinding> M_SavedKeyBindings;

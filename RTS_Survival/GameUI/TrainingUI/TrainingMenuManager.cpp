@@ -1172,6 +1172,42 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Ger E-75 (a quarter longer than the King Tiger)
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_E75)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime + T3HeavyTankTrainingTime / 4,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_E75,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Ger E-50 (same as the King Tiger)
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_E50)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_E50,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 
 	// Ger Panther D
 	{
@@ -1546,6 +1582,39 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 
 	// RUS MEDIUM TANKS
 
+	// Rus T-34 Harvester
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_T34_Harvester)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			HarvesterTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_T34_Harvester,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+
+		FTrainingOption HarvesterItemID = FTrainingOption(
+			EAllUnitType::UNType_Harvester,
+			static_cast<uint8>(ETankSubtype::Tank_T34_Harvester)
+		);
+
+		FTrainingOptionState HarvesterTrainingOptionState = CreateTrainingOptionState(
+			HarvesterItemID,
+			MediumTankTrainingTime,
+			EAllUnitType::UNType_Harvester,
+			ETankSubtype::Tank_T34_Harvester,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(HarvesterItemID, HarvesterTrainingOptionState);
+	}
+
 	// Rus T-34/76
 	{
 		const int32 T34AaExtraTrainingSeconds = 12;
@@ -1701,6 +1770,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			MediumTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_T44_100L,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus T-44/155
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_T44_155)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			MediumTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_T44_155,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);
@@ -1901,6 +1988,42 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			2 * T3HeavyTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_KV_5,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus IS-6
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_IS6)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_IS6,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus SMK
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_SMK)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_SMK,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);
@@ -2770,6 +2893,8 @@ void UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions()
 		EBuildingExpansionType::BTX_GerRailPakBunker,
 		FRTS_RequirementHelpers::CreateUnitRequirement(GetTransientPackage(), RequiredTierTwoBuilding),
 		GerRailPakBunkerBuildTime);
+	// Never queued: the trench digs itself, so its training time is unused.
+	AddFieldDefenseTrainingOption(EBuildingExpansionType::BTX_GerFieldTrench, nullptr);
 }
 
 URTSRequirement* UTrainingMenuManager::CreateTierTwoUnlockRequirement()
@@ -2897,6 +3022,12 @@ void UTrainingMenuManager::OnLeftClickFieldDefenseItem(const FTrainingWidgetStat
 	ACPPController* PlayerController = M_MainGameUI->GetPlayerController();
 	if (not IsValid(PlayerController))
 	{
+		return;
+	}
+	// A trench is dragged out and pays per metre while it is dug, so it does not go through the trainer's queue.
+	if (static_cast<EBuildingExpansionType>(TrainingItem.ItemID.SubtypeValue) == EBuildingExpansionType::BTX_GerFieldTrench)
+	{
+		PlayerController->StartFieldTrenchPlacement(M_PrimarySelectedTrainer, GetTrainingCosts(TrainingItem.ItemID));
 		return;
 	}
 	// The controller owns building placement; it checks the limit of planned field defenses and shows its error.

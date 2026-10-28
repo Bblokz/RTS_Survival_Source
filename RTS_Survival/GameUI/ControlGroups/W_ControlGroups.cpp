@@ -8,7 +8,8 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
-void UW_ControlGroups::UpdateMostFrequentUnitInGroup(const int32 GroupIndex, const FTrainingOption TrainingOption)
+void UW_ControlGroups::UpdateMostFrequentUnitInGroup(const int32 GroupIndex, const FTrainingOption TrainingOption,
+                                                     const int32 UnitCount)
 {
 	if (not M_ControlGroupWidgets.IsValidIndex(GroupIndex))
 	{
@@ -17,7 +18,16 @@ void UW_ControlGroups::UpdateMostFrequentUnitInGroup(const int32 GroupIndex, con
 			FString::FromInt(GroupIndex) + " in function: UW_ControlGroups::UpdateMostFrequentUnitInGroup");
 		return;
 	}
-	M_ControlGroupWidgets[GroupIndex]->OnUpdateControlGroup(TrainingOption);
+	M_ControlGroupWidgets[GroupIndex]->UpdateControlGroup(TrainingOption, UnitCount);
+}
+
+void UW_ControlGroups::OnControlGroupRecalled(const int32 GroupIndex)
+{
+	if (not M_ControlGroupWidgets.IsValidIndex(GroupIndex) || not IsValid(M_ControlGroupWidgets[GroupIndex]))
+	{
+		return;
+	}
+	M_ControlGroupWidgets[GroupIndex]->PlayRecallFlash();
 }
 
 void UW_ControlGroups::InitControlGroups(const TArray<UW_ControlGroupImage*> ControlGroupWidgets)

@@ -286,6 +286,7 @@ FString URTSBlueprintFunctionLibrary::BP_GetAbilityIDString(const EAbilityID Abi
 	case EAbilityID::IdIdle: return "IdIdle";
 	case EAbilityID::IdMove: return "IdMove";
 	case EAbilityID::IdPatrol: return "IdPatrol";
+	case EAbilityID::IdMarch: return "IdMarch";
 	case EAbilityID::IdProne: return "IdProne";
 	case EAbilityID::IdReverseMove: return "IdReverseMove";
 	case EAbilityID::IdStand: return "IdStand";
@@ -1275,6 +1276,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T44_100L()
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T44_100L));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetMediumTank_T44_155()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T44_155));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_T35()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_T35));
@@ -1328,6 +1334,16 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_IS_3()
 FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV_5()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV_5));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_IS6()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_IS6));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SMK()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SMK));
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SU_152()

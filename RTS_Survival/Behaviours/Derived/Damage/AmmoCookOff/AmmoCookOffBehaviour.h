@@ -17,6 +17,7 @@ class USceneComponent;
 class USoundAttenuation;
 class USoundBase;
 class USoundConcurrency;
+class USoundCue;
 
 /**
  * @brief Add this permanent behaviour to a tank to burn its health and show a pooled ammunition fire.
@@ -29,6 +30,9 @@ class RTS_SURVIVAL_API UAmmoCookOffBehaviour : public UBehaviour
 
 public:
 	UAmmoCookOffBehaviour();
+
+	/** @return Sound for the turret blown off when a tank dies during this cook-off; null keeps the explosion's own sound. */
+	USoundCue* GetTurretLaunchSound() const { return M_TurretLaunchSound; }
 
 protected:
 	virtual void OnAdded(AActor* BehaviourOwner) override;
@@ -85,6 +89,10 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Ammo Cook Off|Sound", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<USoundAttenuation> M_SoundAttenuation = nullptr;
+
+	// Set per weight class (one cook-off Blueprint per vehicle profile); a tank's own TurretTossSettings.LaunchSound wins.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Ammo Cook Off|Turret Toss", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<USoundCue> M_TurretLaunchSound = nullptr;
 
 	UPROPERTY()
 	TWeakObjectPtr<ATankMaster> M_TankMaster;

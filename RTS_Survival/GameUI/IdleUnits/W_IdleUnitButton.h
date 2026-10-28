@@ -5,10 +5,12 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Styling/SlateTypes.h"
+#include "RTS_Survival/GameUI/IndicatorLamps/IndicatorLamp.h"
 
 #include "W_IdleUnitButton.generated.h"
 
 class UButton;
+class UOverlay;
 class UTextBlock;
 class UTexture2D;
 
@@ -22,7 +24,8 @@ enum class EIdleUnitButtonType : uint8
 /**
  * @brief Glass button in the minimap panel that counts the player's idle harvesters or idle nomadic trucks;
  * each click selects the next idle one and focuses the camera on it. Builds its own widget tree, so it is
- * placed in the HUD as is; the button is disabled while nothing of its type is idle.
+ * placed in the HUD as is; the button is disabled while nothing of its type is idle. An indicator lamp in the
+ * button's top-right corner blinks while something is idle (Project Settings > Game > Indicator Lamps).
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_IdleUnitButton : public UUserWidget
@@ -33,6 +36,7 @@ protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	UPROPERTY(EditAnywhere, Category = "IdleUnits")
 	EIdleUnitButtonType M_IdleUnitType = EIdleUnitButtonType::Harvester;
@@ -58,12 +62,16 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_CountText;
 
+	UPROPERTY()
+	FIndicatorLamp M_IdleLamp;
+
 	FTimerHandle M_RefreshTimerHandle;
 
 	// Position in the idle list for the next click, so repeated clicks walk through every idle unit.
 	int32 M_CycleIndex = 0;
 
 	void BuildWidgetTree();
+	void BuildIdleLamp(UOverlay& Overlay);
 	FButtonStyle MakeGlassButtonStyle() const;
 	FSlateBrush MakeGlassBrush(UTexture2D* Texture, const FLinearColor& Tint) const;
 

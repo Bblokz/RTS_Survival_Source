@@ -192,6 +192,18 @@ enum class ETankSubtype : uint8
 	Tank_Sdkfz_221 UMETA(DisplayName = "Ger ArmCar SdKfz 221 20mm"),
 	// 105mm self-propelled howitzer on the Pz II chassis.
 	Tank_Wespe UMETA(DisplayName = "Ger Light Wespe 105mm"),
+	// Soviet harvester on the T-34 hull: breaks crystal with a pile-driver hammer instead of the Pz I saw.
+	Tank_T34_Harvester UMETA(DisplayName = "Rus Medium T-34 Harvester"),
+	// E-75 heavy tank on the King Tiger hull with the 128mm KwK 44 in an enlarged turret.
+	Tank_E75 UMETA(DisplayName = "Ger Heavy E75"),
+	// E-50 Ausf. F on the King Tiger hull: cast turret with the long 88mm KwK 44 L/100, faster and lighter than the King Tiger.
+	Tank_E50 UMETA(DisplayName = "Ger Heavy E50"),
+	// T-44 hull with a 155mm arcing howitzer in the turret and a DShK on the commander's cupola.
+	Tank_T44_155 UMETA(DisplayName = "Rus Medium T-44/155"),
+	// IS-6 heavy tank: IS-3 122mm gun in a wide cast turret on a long hull with angled side plates; faster than the IS-3.
+	Tank_IS6 UMETA(DisplayName = "Rus Heavy IS-6"),
+	// SMK twin-turret heavy tank: L-11 76mm main turret on a raised barbette over a forward 45mm turret; long and slow.
+	Tank_SMK UMETA(DisplayName = "Rus Heavy SMK"),
 };
 
 
@@ -216,6 +228,8 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_JagdTiger:
 	case ETankSubtype::Tank_Maus:
 	case ETankSubtype::Tank_E100:
+	case ETankSubtype::Tank_E75:
+	case ETankSubtype::Tank_E50:
 	case ETankSubtype::Tank_T35:
 	case ETankSubtype::Tank_KV_1:
 	case ETankSubtype::Tank_KV_2:
@@ -231,6 +245,8 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_KV_5:
 	case ETankSubtype::Tank_SU_152:
 	case ETankSubtype::Tank_ISU_152:
+	case ETankSubtype::Tank_IS6:
+	case ETankSubtype::Tank_SMK:
 		return true;
 	default:
 		return false;
@@ -269,6 +285,7 @@ static bool Global_GetIsMediumTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_SU_100:
 	case ETankSubtype::Tank_SU_122:
 	case ETankSubtype::Tank_T44_100L:
+	case ETankSubtype::Tank_T44_155:
 		return true;
 	default:
 		return false;

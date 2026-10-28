@@ -132,6 +132,17 @@ enum class EBuildingExpansionType : uint8
 	BTX_Rus120MortarPit UMETA(DisplayName = "Rus 120mm Mortar Pit"),
 	// Twin German MG 42 positions joined by an ammunition corridor and worked by two scavenger crews.
 	BTX_GerTwinMG42Pit UMETA(DisplayName = "Ger Twin MG42 Pit"),
+	// Soviet vehicle assembly yard: a large platform where four cranes relay parts onto the vehicle being trained,
+	// with a 53-K in a concrete-roofed casemate on its front corner.
+	BTX_RusAssemblyYard UMETA(DisplayName = "Rus Assembly Yard"),
+	// German field trench the player drags out from the HQ; priced per metre and dug piece by piece (ARTSFieldTrench).
+	BTX_GerFieldTrench UMETA(DisplayName = "Ger Field Trench"),
+	// Communication Center: an artillery observation bunker with a stereo rangefinder that clicks onto either
+	// sandbag-wing end (BXP_WingEndA / BXP_WingEndB sockets).
+	BTX_GerCommObservationPost UMETA(DisplayName = "Ger Comm Observation Post"),
+	// Communication Center: a raised MG42 nest on top of each sandbag-wing end, each with a scavenger gunner and a
+	// loader who walks the deck to his ammo crate (the twin MG42 pit's turrets and crew).
+	BTX_GerCommMG42Nests UMETA(DisplayName = "Ger Comm MG42 Nests"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -166,6 +177,10 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_Rus_SuppliesStorage");
 	case EBuildingExpansionType::BTX_RusPlatformFactory:
 		return FString("BTX_RusPlatformFactory");
+	case EBuildingExpansionType::BTX_RusAssemblyYard:
+		return FString("BTX_RusAssemblyYard");
+	case EBuildingExpansionType::BTX_GerFieldTrench:
+		return FString("BTX_GerFieldTrench");
 	case EBuildingExpansionType::BTX_RusFactory:
 		return FString("BTX_RusFactory");
 	case EBuildingExpansionType::BTX_GerMarderStugFactory:
@@ -248,6 +263,10 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_Rus120MortarPit");
 	case EBuildingExpansionType::BTX_GerTwinMG42Pit:
 		return FString("BTX_GerTwinMG42Pit");
+	case EBuildingExpansionType::BTX_GerCommObservationPost:
+		return FString("BTX_GerCommObservationPost");
+	case EBuildingExpansionType::BTX_GerCommMG42Nests:
+		return FString("BTX_GerCommMG42Nests");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -323,6 +342,8 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerMortarPit: return TEXT("Mortar Pit");
 	case EBuildingExpansionType::BTX_Rus120MortarPit: return TEXT("120mm Mortar Pit");
 	case EBuildingExpansionType::BTX_GerTwinMG42Pit: return TEXT("Twin MG42 Pit");
+	case EBuildingExpansionType::BTX_GerCommObservationPost: return TEXT("Observation Post");
+	case EBuildingExpansionType::BTX_GerCommMG42Nests: return TEXT("MG42 Nests");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");
@@ -331,6 +352,8 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_RusResearchCenter: return TEXT("Research Center");
 	case EBuildingExpansionType::BTX_RusIndustrialRefinery: return TEXT("Industrial Refinery");
 	case EBuildingExpansionType::BTX_RusPlatformFactory: return TEXT("Platform Factory");
+	case EBuildingExpansionType::BTX_RusAssemblyYard: return TEXT("Assembly Yard");
+	case EBuildingExpansionType::BTX_GerFieldTrench: return TEXT("Field Trench");
 	case EBuildingExpansionType::BTX_RusCoolingTowers: return TEXT("Cooling Towers");
 	case EBuildingExpansionType::BTX_RusFuelStorage1: return TEXT("Fuel Storage 1");
 	case EBuildingExpansionType::BTX_RusFuelStorage2: return TEXT("Fuel Storage 2");

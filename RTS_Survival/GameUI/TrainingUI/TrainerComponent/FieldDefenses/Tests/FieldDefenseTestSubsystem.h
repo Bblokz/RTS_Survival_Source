@@ -8,6 +8,7 @@
 #include "FieldDefenseTestSubsystem.generated.h"
 
 class ABuildingExpansion;
+class ARTSFieldTrench;
 class ACPPController;
 class ANomadicVehicle;
 class AStaticPreviewMesh;
@@ -41,7 +42,11 @@ enum class EFieldDefenseTestPhase : uint8
 	// Eight pits planned behind another unit; the ninth is refused.
 	PlanningAhead,
 	WaitingForNextConstruction,
-	CheckingOwnerDeath
+	CheckingOwnerDeath,
+	// -FieldDefenseValidateTrench: the field trench of the Barriers tab is laid out with two clicks along a bent
+	// path, dug piece by piece and paid per metre; it waits while the player cannot pay, and a trench that was not
+	// confirmed goes when the placement is cancelled.
+	LayingTrench
 };
 
 /**
@@ -167,6 +172,19 @@ private:
 	void TickPlanningAhead();
 	void TickWaitingForNextConstruction();
 	void TickCheckingOwnerDeath();
+	void TickLayingTrench();
+	/** @return Where along the path the given distance from its start lies. */
+	static FVector GetPointAlongPath(const TArray<FVector>& Path, const float Distance);
+	static float GetPathLength(const TArray<FVector>& Path);
+	int32 CountFieldTrenches() const;
+
+	TArray<FVector> M_TrenchPath;
+	float M_TrenchCursorDistance = 0.f;
+	int32 M_RadixiteBeforeTrench = 0;
+	int32 M_ExpectedTrenchRadixite = 0;
+	int32 M_TrenchCountBeforeCancel = 0;
+	UPROPERTY()
+	TWeakObjectPtr<ARTSFieldTrench> M_TestTrench;
 
 	bool FindHQ();
 	void LogHQStatus(const ANomadicVehicle& HQ, const UTrainerComponent* Trainer);

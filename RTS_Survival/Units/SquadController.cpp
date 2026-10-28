@@ -167,6 +167,8 @@ bool FSquadStartGameAction::ExecuteStartAbility() const
 			ECommandQueueError::NoError;
 	case EAbilityID::IdPatrol:
 		return M_MySquad->PatrolToLocation(TargetLocation, true) == ECommandQueueError::NoError;
+	case EAbilityID::IdMarch:
+		return M_MySquad->MarchToLocation(TargetLocation, true) == ECommandQueueError::NoError;
 	case EAbilityID::IdStop:
 		break;
 	case EAbilityID::IdSwitchWeapon:
@@ -599,6 +601,12 @@ void ASquadController::OnSquadUnitInCombat()
 		return;
 	}
 	RTSComponent->SetUnitInCombat(true);
+	// One soldier in a fight stops the whole patrol or march; idle squads engage on their own.
+	const EAbilityID ActiveCommand = GetActiveCommandID();
+	if (ActiveCommand == EAbilityID::IdPatrol || ActiveCommand == EAbilityID::IdMarch)
+	{
+		StopCommand();
+	}
 }
 
 int32 ASquadController::GetSquadUnitIndex(const ASquadUnit* SquadUnit)
@@ -2331,6 +2339,35 @@ void ASquadController::TerminatePatrolCommand()
 		if (GetIsValidSquadUnit(SquadUnit))
 		{
 			SquadUnit->TerminatePatrol();
+		}
+	}
+}
+
+void ASquadController::ExecuteMarchCommand(const FVector MarchToLocation)
+{
+	if (IsValid(CargoSquad))
+	{
+		CargoSquad->CheckCargoState(EAbilityID::IdMarch);
+	}
+
+	M_UnitsCompletedCommand = 0;
+
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (GetIsValidSquadUnit(SquadUnit))
+		{
+			SquadUnit->ExecuteMarch(SquadUnit->GetActorLocation(), MarchToLocation);
+		}
+	}
+}
+
+void ASquadController::TerminateMarchCommand()
+{
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (GetIsValidSquadUnit(SquadUnit))
+		{
+			SquadUnit->TerminateMarch();
 		}
 	}
 }

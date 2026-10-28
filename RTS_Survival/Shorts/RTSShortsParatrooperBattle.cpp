@@ -116,6 +116,7 @@ void ARTSShortsDirector::BeginParatrooperBattle()
 	M_ParatrooperAbility->InitGlobalAbility(GetParatrooperOwningPlayer(), AbilityManager, M_PlayerController);
 	M_ParatrooperAbility->SetCinematicLandingTrailLength(Segment.ParatrooperFormation.LandingTrailLength);
 	M_ParatrooperAbility->SetCinematicJumpInterval(Segment.ParatrooperFormation.JumpIntervalSeconds);
+	M_ParatrooperAbility->SetCinematicSquadSubtypes(Segment.ParatrooperFormation.SquadSubtypes);
 	M_ParatrooperBattleCamera = M_Camera->GetActorTransform();
 	bM_ParatrooperCameraCut = false;
 	M_Orbit.bIsActive = false;

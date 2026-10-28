@@ -317,6 +317,8 @@ ECommandQueueError FMissionSpawnCommandQueueState::ExecuteSingleOrder(
 		return CommandsInterface->MoveToLocation(Order.TargetLocation, bSetUnitToIdle, Order.TargetRotation, false);
 	case EAbilityID::IdPatrol:
 		return CommandsInterface->PatrolToLocation(Order.TargetLocation, bSetUnitToIdle);
+	case EAbilityID::IdMarch:
+		return CommandsInterface->MarchToLocation(Order.TargetLocation, bSetUnitToIdle);
 	case EAbilityID::IdReverseMove:
 		return CommandsInterface->ReverseUnitToLocation(Order.TargetLocation, bSetUnitToIdle);
 	case EAbilityID::IdRotateTowards:

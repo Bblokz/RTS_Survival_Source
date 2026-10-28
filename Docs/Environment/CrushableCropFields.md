@@ -19,6 +19,8 @@ field keeps everything the pipes share and drops the per-piece bodies:
 
 Fences around the fields ARE plain `ADestructibleSplineActor`s (`BP_DestSpline_FarmFence`).
 
+Each plant gets its height from a world-static line trace (30 m above and below the actor). The trace uses the first hit that is not an `AVolume`, so the lids of PCG, trigger and post-process volumes are never treated as ground. Before this rule, the 2026-10-27 `PCG_GroundStones` volume lifted every field to its top face.
+
 ## Navigation (vineyards block light tanks)
 
 `StandingPlantsNavArea` marks one nav cell per standing plant (plant spacing x row spacing) through an

@@ -140,6 +140,15 @@ void UGA_Paratroopers::SetCinematicJumpInterval(const float IntervalSeconds)
 	M_ParatroopersSettings.DropIntervalPerUnit = FMath::Max(MinimumJumpIntervalSeconds, IntervalSeconds);
 }
 
+void UGA_Paratroopers::SetCinematicSquadSubtypes(const TArray<ESquadSubtype>& SquadSubtypes)
+{
+	if (SquadSubtypes.IsEmpty())
+	{
+		return;
+	}
+	M_ParatroopersSettings.SquadSubtypes = SquadSubtypes;
+}
+
 TArray<TWeakObjectPtr<ASquadController>> UGA_Paratroopers::GetActiveDropSquads() const
 {
 	TArray<TWeakObjectPtr<ASquadController>> Squads;

@@ -1,6 +1,7 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "CPPController.h"
+#include "RTS_Survival/Player/ConstructionPreview/FieldTrenchPlacement/FieldTrenchPlacementComponent.h"
 
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewComponent.h"
 #include "RTS_Survival/Player/Formation/FormationMovePreview/FormationMovePreviewComponent.h"
@@ -50,9 +51,14 @@
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/GameUI/BottomCenterUI/BuildingUI_ItemPanel/W_BuildingUI_ItemPanel.h"
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
+#include "Engine/GameViewportClient.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Application/SlateUser.h"
+#include "Widgets/SViewport.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/CommanderSettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityCostState.h"
@@ -271,6 +277,7 @@ ACPPController::ACPPController()
 	M_PlayerUnitVariantManager = CreateDefaultSubobject<UPlayerUnitVariantManager>(TEXT("PlayerUnitVariantManager"));
 	M_FormationController = CreateDefaultSubobject<UFormationController>(TEXT("FormationController"));
 	M_SquadMovePreview = CreateDefaultSubobject<USquadMovePreviewComponent>(TEXT("SquadMovePreview"));
+	M_FieldTrenchPlacement = CreateDefaultSubobject<UFieldTrenchPlacementComponent>(TEXT("FieldTrenchPlacement"));
 	M_FormationMovePreview = CreateDefaultSubobject<UFormationMovePreviewComponent>(TEXT("FormationMovePreview"));
 	M_HoverCommandIcon = CreateDefaultSubobject<UHoverCommandIconComponent>(TEXT("HoverCommandIcon"));
 
@@ -1390,6 +1397,11 @@ void ACPPController::SpawnReinforcementAttackWave(
 		return;
 	}
 	PlayAnnouncerVoiceLine(EAnnouncerVoiceLineType::ReinforcementsHaveArrived, true, true);
+	if (URTSCombatPingSubsystem* const CombatPingSubsystem = GetWorld()->GetSubsystem<URTSCombatPingSubsystem>())
+	{
+		CombatPingSubsystem->AddReinforcementsPing(CenterFormationLocation,
+		                                           RTSReinforcementsPingConstants::DefaultDurationSeconds);
+	}
 
 	int32 SpawnId = 0;
 	TWeakObjectPtr<ACPPController> WeakThis(this);
@@ -1931,6 +1943,21 @@ bool ACPPController::MapTest_GetIsFieldDefensePreviewActive() const
 	return M_IsBuildingPreviewModeActive == EPlayerBuildingPreviewMode::FieldDefensePreviewMode;
 }
 
+bool ACPPController::MapTest_ClickFieldTrenchAt(const FVector& Location)
+{
+	if (M_IsBuildingPreviewModeActive != EPlayerBuildingPreviewMode::FieldTrenchPreviewMode)
+	{
+		return true;
+	}
+	FVector ClickedLocation = Location;
+	if (TryPlaceBuilding(ClickedLocation))
+	{
+		StopPreviewAndBuildingMode(true);
+		return true;
+	}
+	return false;
+}
+
 bool ACPPController::MapTest_PlaceFieldDefenseAt(const FVector& Location, float& OutInclineDegrees)
 {
 	OutInclineDegrees = 0.f;
@@ -2269,6 +2296,11 @@ void ACPPController::UseControlGroup(const int32 GroupIndex)
 	const ESelectionChangeAction Action = M_PlayerControlGroupManager->UseControlGroup(
 		GroupIndex, bIsHoldingShift, bIsHoldingControl, NewActorTypeAddedByGroup);
 	UpdateUIForSelectionAction(Action, NewActorTypeAddedByGroup);
+}
+
+void ACPPController::UseControlGroupFromUI(const int32 GroupIndex)
+{
+	UseControlGroup(GroupIndex);
 }
 
 void ACPPController::MoveCameraToControlGroup(const int32 GroupIndex)
@@ -3158,13 +3190,7 @@ bool ACPPController::GetIsHarvesterTankPawn(ASelectablePawnMaster* SelectedPawn)
 	{
 		return false;
 	}
-	const URTSComponent* RTSComponent = SelectedPawn->GetRTSComponent();
-	if (not IsValid(RTSComponent))
-	{
-		return false;
-	}
-	return RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank
-		&& RTSComponent->GetSubtypeAsTankSubtype() == ETankSubtype::Tank_PzI_Harvester;
+	return SelectedPawn->GetIsHarvester() != nullptr;
 }
 
 bool ACPPController::GetIsMarqueePawnsOnlyHarvester(const TArray<ASelectablePawnMaster*>& MarqueeSelectedPawns) const
@@ -5269,6 +5295,7 @@ void ACPPController::UpdateCursor()
 			CursorType = EMouseCursor::Type::ResizeSouthEast;
 			break;
 		case EAbilityID::IdPatrol:
+		case EAbilityID::IdMarch:
 			CursorType = EMouseCursor::Type::ResizeSouthWest;
 			break;
 		case EAbilityID::IdPickupItem:
@@ -5316,7 +5343,8 @@ bool ACPPController::ExecuteActionButtonSecondClick(
 		this->ActionButtonAttackGround(ClickedLocation);
 		break;
 	case EAbilityID::IdPatrol:
-		this->ActionButtonPatrol(ClickedLocation);
+	case EAbilityID::IdMarch:
+		this->ActionButtonPatrol(ClickedLocation, M_ActiveAbility);
 		break;
 	case EAbilityID::IdThrowGrenade:
 		this->ActionButtonThrowGrenade(ClickedLocation, M_ActiveGrenadeAbilityType);
@@ -5725,7 +5753,7 @@ void ACPPController::ActionButtonHarvestResource(AActor* ClickedActor, const FVe
 		bResetAllPlacementEffects, CommandsExe, ClickedLocation, CommandType, AbilityActivated, bForcePlayVoiceLine);
 }
 
-void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation)
+void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation, const EAbilityID PatrolAbility)
 {
 	FRotator AfterMovementRotation = FRotator::ZeroRotator;
 	if (not GetIsValidFormationController())
@@ -5743,9 +5771,12 @@ void ACPPController::ActionButtonPatrol(const FVector& ClickedLocation)
 			                                                      EachSquad);
 			continue;
 		}
-		CommandsExe += EachSquad->PatrolToLocation(
-			M_FormationController->UseFormationPosition(EachSquad->GetRTSComponent(), AfterMovementRotation, EachSquad),
-			!bIsHoldingShift) == ECommandQueueError::NoError;
+		const FVector FormationLocation = M_FormationController->UseFormationPosition(
+			EachSquad->GetRTSComponent(), AfterMovementRotation, EachSquad);
+		const ECommandQueueError Error = PatrolAbility == EAbilityID::IdMarch
+			                                 ? EachSquad->MarchToLocation(FormationLocation, !bIsHoldingShift)
+			                                 : EachSquad->PatrolToLocation(FormationLocation, !bIsHoldingShift);
+		CommandsExe += Error == ECommandQueueError::NoError;
 	}
 	const bool bResetAllPlacementEffects = !bIsHoldingShift;
 	constexpr bool bForcePlayVoiceLine = false;
@@ -6620,6 +6651,11 @@ void ACPPController::DirectActionButtonCreateBuilding()
 
 bool ACPPController::TryPlaceBuilding(FVector& ClickedLocation)
 {
+	// A trench is laid out by two clicks and has no preview mesh that could be blocked.
+	if (M_IsBuildingPreviewModeActive == EPlayerBuildingPreviewMode::FieldTrenchPreviewMode)
+	{
+		return not IsValid(M_FieldTrenchPlacement) || M_FieldTrenchPlacement->OnPrimaryClick(ClickedLocation);
+	}
 	if (CPPConstructionPreviewRef->GetIsBuildingPreviewBlocked())
 	{
 		// Need a click somewhere else.
@@ -6952,6 +6988,9 @@ void ACPPController::StopBuildingPreviewMode()
 	case EPlayerBuildingPreviewMode::FieldDefensePreviewMode:
 		StopFieldDefensePlacement();
 		break;
+	case EPlayerBuildingPreviewMode::FieldTrenchPreviewMode:
+		StopFieldTrenchPlacement();
+		break;
 	case EPlayerBuildingPreviewMode::BuildingPreviewModeOFF:
 		break;
 	default:
@@ -7018,6 +7057,30 @@ void ACPPController::StartFieldDefensePlacement(
 		                                   ? Get_NOMADIC_BuildRadiiAndMakeThemVisible()
 		                                   : TArray<URadiusComp*>();
 	CPPConstructionPreviewRef->StartFieldDefensePreview(FieldDefensePreviewMesh, ConstructionRules->Footprint, Radii);
+}
+
+void ACPPController::StartFieldTrenchPlacement(
+	UTrainerComponent* Trainer,
+	const TMap<ERTSResourceType, int32>& CostPerMetre)
+{
+	if (not IsValid(Trainer) || not IsValid(M_FieldTrenchPlacement))
+	{
+		return;
+	}
+	// Ends whatever placement was active, including another trench that was not confirmed.
+	StopBuildingPreviewMode();
+	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::FieldTrenchPreviewMode;
+	// Trenches are laid inside the player's building radii, like the field defenses.
+	const TArray<URadiusComp*> Radii = GetIsValidPlayerBuildRadiusManager()
+		                                   ? Get_NOMADIC_BuildRadiiAndMakeThemVisible()
+		                                   : TArray<URadiusComp*>();
+	M_FieldTrenchPlacement->StartPlacement(Trainer, CostPerMetre, Radii);
+}
+
+void ACPPController::StopFieldTrenchPlacement()
+{
+	// The trench itself is removed by StopPreviewAndBuildingMode.
+	StopPreviewAndBuildingMode(false);
 }
 
 void ACPPController::StopFieldDefensePlacementForTrainer(const UTrainerComponent* Trainer)
@@ -7227,6 +7290,11 @@ void ACPPController::StopPreviewAndBuildingMode(const bool bIsPlacedSuccessfully
 	CPPConstructionPreviewRef->StopBuildingPreview(bIsPlacedSuccessfully);
 	M_IsBuildingPreviewModeActive = EPlayerBuildingPreviewMode::BuildingPreviewModeOFF;
 	M_FieldDefensePlacementRequest.Reset();
+	// Keeps a trench that was just confirmed; removes one that was still being laid out.
+	if (IsValid(M_FieldTrenchPlacement))
+	{
+		M_FieldTrenchPlacement->CancelPlacement();
+	}
 	ShowPlayerBuildRadius(false);
 	if constexpr (DeveloperSettings::Debugging::GBuilding_Mode_Compile_DebugSymbols)
 	{
@@ -8223,9 +8291,9 @@ void ACPPController::ApplyHoverRangeIndicatorSettingChanged(const bool bNewCheck
 void ACPPController::UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
                                              const FHitResult& MouseHitResult, const bool bHit)
 {
-	if (bM_IsInTechTree || bM_IsInFullMapView || bM_IsCinematicTakeOverActive)
+	if (bM_IsInTechTree || bM_IsInFullMapView || bM_IsCinematicTakeOverActive || GetIsCursorOverHitTestableHUD())
 	{
-		// Do not use hovering widgets while blocked by top-level UI overlays or cinematic takeover.
+		// Do not use hovering widgets while blocked by top-level UI overlays, HUD panels or cinematic takeover.
 		HandleHoveringBlockedState();
 		return;
 	}
@@ -8315,6 +8383,49 @@ void ACPPController::HandleHoveringBlockedState()
 	HideHoveringWidget();
 }
 
+bool ACPPController::GetIsCursorOverHitTestableHUD() const
+{
+	if (not FSlateApplication::IsInitialized())
+	{
+		return false;
+	}
+	const ULocalPlayer* LocalPlayer = GetLocalPlayer();
+	if (not IsValid(LocalPlayer) || not IsValid(LocalPlayer->ViewportClient))
+	{
+		return false;
+	}
+	const TSharedPtr<SViewport> GameViewportWidget = LocalPlayer->ViewportClient->GetGameViewportWidget();
+	const TSharedPtr<const FSlateUser> CursorUser = FSlateApplication::Get().GetCursorUser();
+	if (not GameViewportWidget.IsValid() || not CursorUser.IsValid())
+	{
+		return false;
+	}
+	// Slate caches this path on every pointer event (and synthesized move), so no extra hit test is needed.
+	const FWeakWidgetPath WidgetsUnderCursor = CursorUser->GetLastWidgetsUnderCursor();
+	// Empty until the first pointer event; GetLastWidget asserts on an empty path.
+	if (not WidgetsUnderCursor.IsValid())
+	{
+		return false;
+	}
+	const TSharedPtr<SWidget> TopWidgetUnderCursor = WidgetsUnderCursor.GetLastWidget().Pin();
+	if (not TopWidgetUnderCursor.IsValid())
+	{
+		return false;
+	}
+	return GetIsWidgetBlockingWorldHover(*TopWidgetUnderCursor, *GameViewportWidget);
+}
+
+bool ACPPController::GetIsWidgetBlockingWorldHover(const SWidget& TopWidgetUnderCursor, const SViewport& GameViewportWidget)
+{
+	if (&TopWidgetUnderCursor == &GameViewportWidget)
+	{
+		return false;
+	}
+	// A user widget's own container is hit-testable when the widget is Visible (MainGameUI_HUD covers the whole
+	// screen this way) but passes the mouse on to the viewport; only a widget inside it takes the cursor.
+	static const FName UserWidgetContainerType(TEXT("SObjectWidget"));
+	return TopWidgetUnderCursor.GetType() != UserWidgetContainerType;
+}
 
 void ACPPController::HideHoveringWidget()
 {

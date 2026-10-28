@@ -252,6 +252,10 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultHeadquartersLayout(
 			                                   Slot::Empty(),
 			                                   Slot::Nomadic(ENomadicSubtype::Nomadic_GerExperimentalUnitsFactory),
 			                                   Slot::Empty()
+		                                   }),
+		                    // Procedural defenses the player drags out, see UFieldTrenchPlacementComponent.
+		                    MakeSubSection(LOCTEXT("Barriers", "Barriers"), {
+			                                   Slot::FieldDefense(EBuildingExpansionType::BTX_GerFieldTrench)
 		                                   })
 	                    }, bRequiresUnitCards);
 }
@@ -482,10 +486,10 @@ void UTrainingLayoutDataAsset::InitDefaultBreakthroughLayout()
 		              MakeSubSection(LOCTEXT("HeavyTanks", "Heavy Tanks"), {
 			                             Slot::Tank(ETankSubtype::Tank_TigerH1),
 			                             Slot::Tank(ETankSubtype::Tank_JagdTiger),
-			                             Slot::Empty(),
+			                             Slot::Tank(ETankSubtype::Tank_E50),
 			                             Slot::Empty(),
 			                             Slot::Tank(ETankSubtype::Tank_KingTiger),
-			                             Slot::Empty()
+			                             Slot::Tank(ETankSubtype::Tank_E75)
 		                             }),
 		              MakeSubSection(LOCTEXT("Experimental", "Experimental"), {
 			                             Slot::Tank(ETankSubtype::Tank_TigerRail),

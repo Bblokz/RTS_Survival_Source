@@ -629,16 +629,49 @@ bool UArmorCalculation::GetIsRearHullArmor(const EArmorPlate Plate) const
 
 void UArmorCalculation::SortArmorArray(TArray<FArmorSettings>& OutSortedArmorSettings) const
 {
-	OutSortedArmorSettings.Sort([](const FArmorSettings& A, const FArmorSettings& B)
+	SortArmorSettings(OutSortedArmorSettings, true);
+}
+
+bool UArmorCalculation::GetIsUnitScaleArmorBox(const FArmorSettings& ArmorSettings)
+{
+	constexpr float UnitScaleTolerance = 1.e-3f;
+	return ArmorSettings.ArmorBoxTransform.GetScale3D().Equals(FVector::OneVector, UnitScaleTolerance);
+}
+
+bool UArmorCalculation::GetIsPromotedArmorBox(const FArmorSettings& ArmorSettings)
+{
+	// Zero-armor plates are module-routing markers (and untouched default plates); they keep their legacy position.
+	return ArmorSettings.ArmorValue > 0.f && GetIsUnitScaleArmorBox(ArmorSettings);
+}
+
+bool UArmorCalculation::GetIsLegacyPlateOrderBefore(const FArmorSettings& A, const FArmorSettings& B)
+{
+	const float ValueA = StaticArmorHierarchy.Contains(A.ArmorType) ? StaticArmorHierarchy[A.ArmorType] : 0.f;
+	const float ValueB = StaticArmorHierarchy.Contains(B.ArmorType) ? StaticArmorHierarchy[B.ArmorType] : 0.f;
+	if (FMath::IsNearlyEqual(ValueA, ValueB))
 	{
-		const float ValueA = StaticArmorHierarchy.Contains(A.ArmorType) ? StaticArmorHierarchy[A.ArmorType] : 0.f;
-		const float ValueB = StaticArmorHierarchy.Contains(B.ArmorType) ? StaticArmorHierarchy[B.ArmorType] : 0.f;
-		if (FMath::IsNearlyEqual(ValueA, ValueB))
-		{
-			// If same hierarchy priority, sort by higher ArmorValue first.
-			return A.ArmorValue > B.ArmorValue;
-		}
-		return ValueA > ValueB;
+		// If same hierarchy priority, sort by higher ArmorValue first.
+		return A.ArmorValue > B.ArmorValue;
+	}
+	return ValueA > ValueB;
+}
+
+void UArmorCalculation::SortArmorSettings(TArray<FArmorSettings>& InOutArmorSettings, const bool bUnitScaleBoxesFirst)
+{
+	// The exact pre-fix sort, so meshes without promoted boxes keep their old order (ties included).
+	InOutArmorSettings.Sort([](const FArmorSettings& A, const FArmorSettings& B)
+	{
+		return GetIsLegacyPlateOrderBefore(A, B);
+	});
+	if (not bUnitScaleBoxesFirst)
+	{
+		return;
+	}
+	// Unit-scale boxes have their real size; scaled boxes cover 32 * s^2 and would shadow them. The stable pass keeps
+	// the legacy order inside both groups.
+	InOutArmorSettings.StableSort([](const FArmorSettings& A, const FArmorSettings& B)
+	{
+		return GetIsPromotedArmorBox(A) && not GetIsPromotedArmorBox(B);
 	});
 }
 

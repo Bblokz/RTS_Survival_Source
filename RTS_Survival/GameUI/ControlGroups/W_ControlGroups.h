@@ -18,7 +18,16 @@ class RTS_SURVIVAL_API UW_ControlGroups : public UUserWidget
 
 
 public:
-	void UpdateMostFrequentUnitInGroup(const int32 GroupIndex, const FTrainingOption TrainingOption);
+	/**
+	 * @brief Shows the group's most frequent unit and size on its slot; an empty group clears the slot.
+	 * @param GroupIndex Control group index (0 = key 1).
+	 * @param TrainingOption Most frequent unit of the group, None when the group is empty.
+	 * @param UnitCount Number of units in the group.
+	 */
+	void UpdateMostFrequentUnitInGroup(const int32 GroupIndex, const FTrainingOption TrainingOption, const int32 UnitCount);
+
+	// The group's hotkey just selected it: its slot flashes.
+	void OnControlGroupRecalled(const int32 GroupIndex);
 
 
 protected:

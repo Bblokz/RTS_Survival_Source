@@ -36,6 +36,11 @@ float ASquadUnit::TakeDamage(
 	{
 		RecordHealthLossForStress(HealthBeforeDamage - HealthComponent->GetCurrentHealth());
 	}
+	// Being hit puts the squad in combat as much as firing does: a patrol or march ends so the squad fights back.
+	if (DamageAmount > 0.0f && IsValid(M_SquadController))
+	{
+		M_SquadController->OnSquadUnitInCombat();
+	}
 	return DamageResult;
 }
 

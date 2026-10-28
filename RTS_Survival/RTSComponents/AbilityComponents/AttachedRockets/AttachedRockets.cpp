@@ -31,6 +31,11 @@ UAttachedRockets::UAttachedRockets()
 
 void UAttachedRockets::ExecuteFireAllRockets()
 {
+	if (bDisabled)
+	{
+		ExecuteFire_FinishCommandWhileDisabled();
+		return;
+	}
 	if (not ExecuteFire_EnsureFireReady())
 	{
 		return;
@@ -68,7 +73,7 @@ void UAttachedRockets::ExecuteFireAllRockets()
 
 void UAttachedRockets::TerminateFireAllRockets()
 {
-	if (not EnsureOwnerIsValid() || M_RocketsRemainingToFire <= 0)
+	if (bDisabled || not EnsureOwnerIsValid() || M_RocketsRemainingToFire <= 0)
 	{
 		return;
 	}
@@ -87,6 +92,10 @@ void UAttachedRockets::TerminateFireAllRockets()
 
 void UAttachedRockets::CancelFireRockets()
 {
+	if (bDisabled)
+	{
+		return;
+	}
 	if (not EnsureOwnerIsValid())
 	{
 		return;
@@ -113,6 +122,11 @@ void UAttachedRockets::SetupMeshManually(UStaticMeshComponent* MeshComp)
 void UAttachedRockets::BeginPlay()
 {
 	Super::BeginPlay();
+	if (bDisabled)
+	{
+		// A variant dropped the inherited rocket system: build nothing, so there is nothing to tear down.
+		return;
+	}
 	if (not EnsureRocketEnumIsValid() || not SetupOwningPlayer())
 	{
 		return;
@@ -126,13 +140,47 @@ void UAttachedRockets::BeginPlay()
 	}
 }
 
+void UAttachedRockets::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	ClearAllTimers();
+	// Stop pending async loads so their callbacks do not build meshes on a component that has left play.
+	if (FrameMeshHandle.IsValid())
+	{
+		FrameMeshHandle->CancelHandle();
+		FrameMeshHandle.Reset();
+	}
+	if (RocketMeshHandle.IsValid())
+	{
+		RocketMeshHandle->CancelHandle();
+		RocketMeshHandle.Reset();
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
 void UAttachedRockets::BeginDestroy()
 {
 	Super::BeginDestroy();
 
+	ClearAllTimers();
+}
+
+void UAttachedRockets::ExecuteFire_FinishCommandWhileDisabled() const
+{
+	// Only reachable when the IdFireRockets card was left on a variant that disabled its rockets.
+	ReportError("ExecuteFireAllRockets on a disabled rocket system: remove the IdFireRockets card from this variant "
+		"(URemoveRestoreAbilitiesComponent) or replace it (bReplaceAbilityInPreferredSlot).");
+	if (ICommands* OwnerCommands = Cast<ICommands>(GetOwner()))
+	{
+		OwnerCommands->DoneExecutingCommand(EAbilityID::IdFireRockets);
+	}
+}
+
+void UAttachedRockets::ClearAllTimers()
+{
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(M_CooldownTimerHandle);
+		World->GetTimerManager().ClearTimer(M_ReloadTimerHandle);
 	}
 }
 

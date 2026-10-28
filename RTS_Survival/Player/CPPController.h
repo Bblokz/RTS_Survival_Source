@@ -62,6 +62,8 @@
 #endif
 
 enum class ERTSAggroBehaviour : uint8;
+class SViewport;
+class SWidget;
 class UGlobalAbility;
 enum class EGlobalAbility : uint8;
 struct FGlobalAbilitySoundSettings;
@@ -87,6 +89,8 @@ class AScavengeableObject;
 enum class ERTSPrimaryClickContext;
 struct FPlayerRotationArrowSettings;
 class USquadMovePreviewComponent;
+class UFieldTrenchPlacementComponent;
+enum class ERTSResourceType : uint8;
 class UHoverCommandIconComponent;
 class UFormationMovePreviewComponent;
 enum class ERTSPauseGameOptions : uint8;
@@ -724,6 +728,18 @@ public:
 	/** @brief Ends the field defense preview when it plans for this trainer, e.g. because the trainer died. */
 	void StopFieldDefensePlacementForTrainer(const UTrainerComponent* Trainer);
 
+	/**
+	 * @brief Starts laying out a field trench picked in the HQ's training menu: a click sets its start, the trench
+	 * follows the mouse and a second click ends it. The trench is dug piece by piece afterwards and pays for each
+	 * piece when its digging starts, so the trainer's queue is not used.
+	 * @param Trainer The HQ the trench was picked from.
+	 * @param CostPerMetre What one metre of trench costs.
+	 */
+	void StartFieldTrenchPlacement(UTrainerComponent* Trainer, const TMap<ERTSResourceType, int32>& CostPerMetre);
+
+	/** @brief Ends laying out a field trench; a trench that was not confirmed yet is removed. */
+	void StopFieldTrenchPlacement();
+
 #if RTS_WITH_MAP_TESTS
 	/** @brief Map tests: whether the BXP of a clicked build option has loaded and waits for its placement click. */
 	bool MapTest_GetIsBxpWaitingForPlacement() const;
@@ -745,6 +761,14 @@ public:
 	 * @return Whether the spot was accepted; the trainer's queue tells whether the defense was queued.
 	 */
 	bool MapTest_PlaceFieldDefenseAt(const FVector& Location, float& OutInclineDegrees);
+
+	UFieldTrenchPlacementComponent* MapTest_GetFieldTrenchPlacement() const { return M_FieldTrenchPlacement; }
+
+	/**
+	 * @brief Map tests: a primary click while a field trench is laid out, as the player's click would be handled.
+	 * @return Whether laying out the trench is over.
+	 */
+	bool MapTest_ClickFieldTrenchAt(const FVector& Location);
 #endif
 
 #if RTS_WITH_SHIPPING_MAP_TESTS
@@ -866,6 +890,13 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Selection")
 	void SelectSingleUnitFromUI(AActor* UnitToSelect);
+
+	/**
+	 * @brief Lets the control group bar act like the group's hotkey: a click selects the group, shift adds it to the
+	 * selection and control assigns the current selection to it (the held modifier keys decide).
+	 * @param GroupIndex Control group index (0 = key 1).
+	 */
+	void UseControlGroupFromUI(const int32 GroupIndex);
 
 	/** Keep only units of UnitID.UnitType across all selection arrays. If the selection already contains only that type, UI remains unchanged. */
 	void OnlySelectUnitsOfType(const FTrainingOption& UnitID);
@@ -1530,9 +1561,10 @@ private:
 	 * Places a placementEffect on the clicked location, if shift is held a new effect is added
 	 * if shift is not held all previous effects are destroyed and only this effect is shown
 	 * @param ClickedLocation: The location on the map that was right-clicked
+	 * @param PatrolAbility IdPatrol, or IdMarch to patrol while marching.
 	 * @pre All references to all selected units are valid.
 	 */
-	void ActionButtonPatrol(const FVector& ClickedLocation);
+	void ActionButtonPatrol(const FVector& ClickedLocation, const EAbilityID PatrolAbility = EAbilityID::IdPatrol);
 
 	void ActionButtonThrowGrenade(const FVector& ClickedLocation, const EGrenadeAbilityType GrenadeAbilityType);
 	void ActionButtonAimAbility(const FVector& ClickedLocation, const EAimAbilityType AimAbilityType);
@@ -1646,6 +1678,10 @@ private:
 	// Previews and issues per-soldier positions while squads are the whole selection.
 	UPROPERTY()
 	TObjectPtr<USquadMovePreviewComponent> M_SquadMovePreview;
+
+	// Lays out field trenches picked in the HQ's training menu while the field trench preview mode is active.
+	UPROPERTY()
+	TObjectPtr<UFieldTrenchPlacementComponent> M_FieldTrenchPlacement;
 
 	bool GetIsValidSquadMovePreview() const;
 
@@ -2016,6 +2052,9 @@ private:
 
 	// Helper methods
 	void HandleHoveringBlockedState();
+	// True when a hit-testable HUD widget takes the cursor, so world hover must not show under the HUD.
+	bool GetIsCursorOverHitTestableHUD() const;
+	static bool GetIsWidgetBlockingWorldHover(const SWidget& TopWidgetUnderCursor, const SViewport& GameViewportWidget);
 	void UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
 	                             const FHitResult& MouseHitResult, const bool bHit);
 	void HideHoveringWidget();

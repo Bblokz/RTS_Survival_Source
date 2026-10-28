@@ -342,7 +342,31 @@ enum class
 	// Pz 38(t) Rockets Incendiary Salvo: six 15 cm incendiary rockets on a fixed rack.
 	Rocket_150mm_Incendiary UMETA(DisplayName = "15 cm Incendiary Rocket (Pz 38(t))"),
 	// Pz 38(t) Rockets Precision Missile: two 20 cm vertical missiles.
-	Rocket_200mm_PrecisionMissile UMETA(DisplayName = "20 cm Precision Missile (Pz 38(t))")
+	Rocket_200mm_PrecisionMissile UMETA(DisplayName = "20 cm Precision Missile (Pz 38(t))"),
+	// Unit variant batch 4: appended so serialized weapon names keep their values.
+	// Wespe Radixite Howitzer: 20 cm radixite shells with their own damage over time; HE can be loaded too.
+	LeFH_Radixite_200MM UMETA(DisplayName = "20 cm Radixite Howitzer"),
+	// Pz III M Overcharged: one charged 60mm laser shot per (long) reload.
+	Laser_60MM_PzIIIM UMETA(DisplayName = "Overcharged Laser 60mm (Pz III M)"),
+	// Pz III M Spaced Armor: the Panzerschreck foxhole rocket with medium tank cannon range.
+	PanzerSchreck_PzIIIM UMETA(DisplayName = "PanzerSchreck 88MM (Pz III M)"),
+	// Hetzer Flame: the Pz III Flamm's Flamm 15 in the hull, with less damage.
+	Flamm15_HetzerHull UMETA(DisplayName = "Flamm 15 (Hetzer hull)"),
+	// Hetzer Mortar: HE-only 12 cm mortar with stronger shells and a faster reload.
+	Mortar_120MM_Hetzer UMETA(DisplayName = "12 cm Hetzer Mortar"),
+	// JagdPanther Pfeil: the PaK 43 firing APCR only (no splash, more pen).
+	Pak43_88MM_APCR_Pfeil UMETA(DisplayName = "8.8 cm PaK 43 Pfeil (APCR)"),
+	// JagdPanther Bollwerk: the casemate sFH 18 as arcing HE artillery.
+	sFH18_150MM_Bollwerk UMETA(DisplayName = "15 cm sFH 18 Bollwerk"),
+	// E-50 Ausf. F: the long 8.8 cm KwK 44 L/100 (more pen, range and accuracy than the King Tiger's KwK 43).
+	KwK44_88MM_E50 UMETA(DisplayName = "8.8 cm KwK 44 L/100 (E-50)"),
+	// T-44/155: a 155mm howitzer in the T-44 turret, firing arcing HE like the towed ML-20.
+	T44_155MM_Howitzer UMETA(DisplayName = "155MM Howitzer (T-44/155)"),
+	// The MG 42 on the pit field mounts (twin MG42 pit, comm centre MG42 nests): 10-round bursts timed to the tank
+	// MG42 burst sound; it used to borrow the DShK's 12.7mm entry.
+	Ger_PitMG42_7_92MM UMETA(DisplayName = "MG 42 7.92MM (Pit)"),
+	// SMK main turret: the L-11 76mm with a faster reload and a little more range than the KV-1's.
+	L_11_76MM_SMK UMETA(DisplayName = "L-11 76MM (SMK)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -473,6 +497,17 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Flak41_50MM: return "5 cm Flak 41";
 	case EWeaponName::Rocket_150mm_Incendiary: return "Incendiary Rockets";
 	case EWeaponName::Rocket_200mm_PrecisionMissile: return "Precision Missile";
+	case EWeaponName::LeFH_Radixite_200MM: return "Radixite 200mm";
+	case EWeaponName::Laser_60MM_PzIIIM: return "Laser 60mm";
+	case EWeaponName::PanzerSchreck_PzIIIM: return "Pzr Schreck";
+	case EWeaponName::Flamm15_HetzerHull: return "Hull Flamm";
+	case EWeaponName::Mortar_120MM_Hetzer: return "12 cm Mortar";
+	case EWeaponName::Pak43_88MM_APCR_Pfeil: return "Pak 43 Pfeil";
+	case EWeaponName::sFH18_150MM_Bollwerk: return "sFH 18";
+	case EWeaponName::KwK44_88MM_E50: return "KwK 44/2";
+	case EWeaponName::T44_155MM_Howitzer: return "155mm How";
+	case EWeaponName::Ger_PitMG42_7_92MM: return "MG 42";
+	case EWeaponName::L_11_76MM_SMK: return "L/11";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -1030,6 +1065,28 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Rocket_150mm_Incendiary";
 	case EWeaponName::Rocket_200mm_PrecisionMissile:
 		return "Rocket_200mm_PrecisionMissile";
+	case EWeaponName::LeFH_Radixite_200MM:
+		return "LeFH_Radixite_200MM";
+	case EWeaponName::Laser_60MM_PzIIIM:
+		return "Laser_60MM_PzIIIM";
+	case EWeaponName::PanzerSchreck_PzIIIM:
+		return "PanzerSchreck_PzIIIM";
+	case EWeaponName::Flamm15_HetzerHull:
+		return "Flamm15_HetzerHull";
+	case EWeaponName::Mortar_120MM_Hetzer:
+		return "Mortar_120MM_Hetzer";
+	case EWeaponName::Pak43_88MM_APCR_Pfeil:
+		return "Pak43_88MM_APCR_Pfeil";
+	case EWeaponName::sFH18_150MM_Bollwerk:
+		return "sFH18_150MM_Bollwerk";
+	case EWeaponName::KwK44_88MM_E50:
+		return "KwK44_88MM_E50";
+	case EWeaponName::T44_155MM_Howitzer:
+		return "T44_155MM_Howitzer";
+	case EWeaponName::Ger_PitMG42_7_92MM:
+		return "Ger_PitMG42_7_92MM";
+	case EWeaponName::L_11_76MM_SMK:
+		return "L_11_76MM_SMK";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:

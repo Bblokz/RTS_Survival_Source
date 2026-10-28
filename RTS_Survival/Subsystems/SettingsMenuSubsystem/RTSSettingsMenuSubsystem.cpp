@@ -3,6 +3,7 @@
 #include "AudioDevice.h"
 #include "Engine/Engine.h"
 #include "GameFramework/PlayerController.h"
+#include "HAL/IConsoleManager.h"
 #include "Kismet/GameplayStatics.h"
 #include "RHI.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
@@ -27,6 +28,23 @@ namespace RTSSettingsMenuSubsystemPrivate
 	constexpr bool bDefaultInvertYAxis = false;
 	constexpr bool bDefaultHideActionButtonHotkeys = false;
 	constexpr bool bDefaultCheckUnitRangeOnHover = true;
+
+	// Landscape grass types follow grass.DensityScale; HISMs that opt into density scaling (the ground stones
+	// spawned by PCG_GroundStones) follow foliage.DensityScale.
+	const TCHAR* const FoliageDensityCVarName = TEXT("grass.DensityScale");
+	const TCHAR* const StoneDensityCVarName = TEXT("foliage.DensityScale");
+
+	void SetDensityCVar(const TCHAR* CVarName, const float Density)
+	{
+		IConsoleVariable* const CVar = IConsoleManager::Get().FindConsoleVariable(CVarName);
+		if (CVar == nullptr)
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(TEXT("Console variable %s was not found."), CVarName));
+			return;
+		}
+
+		CVar->Set(Density, ECVF_SetByGameSetting);
+	}
 
 	const ERTSWindowMode DefaultWindowMode = ERTSWindowMode::Fullscreen;
 	const ERTSScalabilityQuality DefaultScalabilityQuality = ERTSScalabilityQuality::Epic;
@@ -137,6 +155,7 @@ void URTSSettingsMenuSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	CacheSettingsSnapshots();
 	CacheAudioSettingsFromDeveloperSettings();
 	ApplyAudioSettings();
+	ApplyEnvironmentDetailSettings();
 }
 
 void URTSSettingsMenuSubsystem::Deinitialize()
@@ -246,6 +265,37 @@ void URTSSettingsMenuSubsystem::SetPendingFrameRateLimit(const float NewFrameRat
 {
 	const float ClampedFrameRateLimit = FMath::Max(NewFrameRateLimit, RTSSettingsMenuSubsystemPrivate::UnlimitedFrameRateLimit);
 	M_PendingSettings.M_GraphicsSettings.M_DisplaySettings.M_FrameRateLimit = ClampedFrameRateLimit;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingEnvironmentDetailDensity(const float NewDensity)
+{
+	const float ClampedDensity = FMath::Clamp(
+		NewDensity,
+		RTSGameUserSettingsRanges::MinEnvironmentDensity,
+		RTSGameUserSettingsRanges::MaxEnvironmentDensity
+	);
+	FRTSEnvironmentDetailSettings& EnvironmentDetailSettings = M_PendingSettings.M_GraphicsSettings.M_EnvironmentDetailSettings;
+	EnvironmentDetailSettings.M_EnvironmentDetailDensity = ClampedDensity;
+	EnvironmentDetailSettings.M_FoliageDensity = ClampedDensity;
+	EnvironmentDetailSettings.M_StoneDensity = ClampedDensity;
+}
+
+void URTSSettingsMenuSubsystem::SetPendingFoliageDensity(const float NewDensity)
+{
+	M_PendingSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_FoliageDensity = FMath::Clamp(
+		NewDensity,
+		RTSGameUserSettingsRanges::MinEnvironmentDensity,
+		RTSGameUserSettingsRanges::MaxEnvironmentDensity
+	);
+}
+
+void URTSSettingsMenuSubsystem::SetPendingStoneDensity(const float NewDensity)
+{
+	M_PendingSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_StoneDensity = FMath::Clamp(
+		NewDensity,
+		RTSGameUserSettingsRanges::MinEnvironmentDensity,
+		RTSGameUserSettingsRanges::MaxEnvironmentDensity
+	);
 }
 
 void URTSSettingsMenuSubsystem::SetPendingMasterVolume(const float NewVolume)
@@ -477,6 +527,10 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 		RTSSettingsMenuSubsystemPrivate::DefaultScalabilityQuality
 	);
 
+	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_EnvironmentDetailDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_FoliageDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+
 	DefaultSettings.M_AudioSettings.M_MasterVolume = RTSGameUserSettingsRanges::DefaultVolume;
 	DefaultSettings.M_AudioSettings.M_MusicVolume = RTSGameUserSettingsRanges::DefaultVolume;
 	DefaultSettings.M_AudioSettings.M_SfxAndWeaponsVolume = RTSGameUserSettingsRanges::DefaultVolume;
@@ -677,6 +731,26 @@ void URTSSettingsMenuSubsystem::ApplyNonResolutionSettings()
 	GameUserSettings->ApplyNonResolutionSettings();
 	ApplyAudioSettings();
 	ApplyControlSettings();
+	// After the scalability groups so their foliage defaults do not win over the user's densities.
+	ApplyEnvironmentDetailSettings();
+}
+
+void URTSSettingsMenuSubsystem::ApplyEnvironmentDetailSettings() const
+{
+	const URTSGameUserSettings* const GameUserSettings = GetGameUserSettingsChecked();
+	if (GameUserSettings == nullptr)
+	{
+		return;
+	}
+
+	RTSSettingsMenuSubsystemPrivate::SetDensityCVar(
+		RTSSettingsMenuSubsystemPrivate::FoliageDensityCVarName,
+		GameUserSettings->GetFoliageDensity()
+	);
+	RTSSettingsMenuSubsystemPrivate::SetDensityCVar(
+		RTSSettingsMenuSubsystemPrivate::StoneDensityCVarName,
+		GameUserSettings->GetStoneDensity()
+	);
 }
 
 void URTSSettingsMenuSubsystem::ApplyAudioSettings()
@@ -976,6 +1050,10 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 	Snapshot.M_GraphicsSettings.M_ScalabilityGroups.M_Effects = GetScalabilityQualityFromLevel(QualityLevels.EffectsQuality);
 	Snapshot.M_GraphicsSettings.M_ScalabilityGroups.M_PostProcessing = GetScalabilityQualityFromLevel(QualityLevels.PostProcessQuality);
 
+	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_EnvironmentDetailDensity = GameUserSettings.GetEnvironmentDetailDensity();
+	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_FoliageDensity = GameUserSettings.GetFoliageDensity();
+	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_StoneDensity = GameUserSettings.GetStoneDensity();
+
 	Snapshot.M_AudioSettings.M_MasterVolume = GameUserSettings.GetMasterVolume();
 	Snapshot.M_AudioSettings.M_MusicVolume = GameUserSettings.GetMusicVolume();
 	Snapshot.M_AudioSettings.M_SfxAndWeaponsVolume = GameUserSettings.GetSfxAndWeaponsVolume();
@@ -1021,6 +1099,11 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	Scalability::FQualityLevels QualityLevels = GameUserSettingsToApply.GetQualityLevels();
 	RTSSettingsMenuSubsystemPrivate::ApplyScalabilityGroupsToQualityLevels(SnapshotToApply.M_GraphicsSettings.M_ScalabilityGroups, QualityLevels);
 	GameUserSettingsToApply.SetQualityLevels(QualityLevels);
+
+	const FRTSEnvironmentDetailSettings& EnvironmentDetailSettings = SnapshotToApply.M_GraphicsSettings.M_EnvironmentDetailSettings;
+	GameUserSettingsToApply.SetEnvironmentDetailDensity(EnvironmentDetailSettings.M_EnvironmentDetailDensity);
+	GameUserSettingsToApply.SetFoliageDensity(EnvironmentDetailSettings.M_FoliageDensity);
+	GameUserSettingsToApply.SetStoneDensity(EnvironmentDetailSettings.M_StoneDensity);
 
 	GameUserSettingsToApply.SetMasterVolume(SnapshotToApply.M_AudioSettings.M_MasterVolume);
 	GameUserSettingsToApply.SetMusicVolume(SnapshotToApply.M_AudioSettings.M_MusicVolume);

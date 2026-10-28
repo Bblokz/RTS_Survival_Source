@@ -289,6 +289,9 @@ namespace DeveloperSettings
 			inline constexpr int32 GerPuppchenPitBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
 			inline constexpr int32 GerPanzerschreckPitBuildTime = RoundToNearestMultipleOf(12.f * GameTimeMlt, 2);
 			inline constexpr int32 GerTwinMG42PitBuildTime = RoundToNearestMultipleOf(18.f * GameTimeMlt, 2);
+			// Communication Center expansions: the concrete observation post and the two raised MG42 nests.
+			inline constexpr int32 GerCommObservationPostBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
+			inline constexpr int32 GerCommMG42NestsBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
 		}
@@ -453,6 +456,8 @@ namespace DeveloperSettings
 				inline constexpr int32 PzIIIJCommander_VehicleParts = 100;
 				inline constexpr int32 PzIIIM_Radixite = 400;
 				inline constexpr int32 PzIIIM_VehicleParts = 200;
+				// Medium hull and armour, so it costs more than the Pz I harvester.
+				inline constexpr int32 T34Harvester_Radixite = 400;
 				inline constexpr int32 PzIIIFlamm_Radixite = 400;
 				inline constexpr int32 PzIIIFlamm_VehicleParts = 300;
 				inline constexpr int32 PzIVG_Radixite = 400;
@@ -508,6 +513,18 @@ namespace DeveloperSettings
 				inline constexpr int32 JagdTiger_VehicleParts = 850;
 				inline constexpr int32 Tiger105_Radixite = 1500;
 				inline constexpr int32 Tiger105_VehicleParts = 750;
+				// 128mm E-75: above the King Tiger and Tiger 105, below the Maus / E100.
+				inline constexpr int32 E75_Radixite = 1450;
+				inline constexpr int32 E75_VehicleParts = 850;
+				// 88mm L/100 E-50: between the Panther II and the King Tiger.
+				inline constexpr int32 E50_Radixite = 1150;
+				inline constexpr int32 E50_VehicleParts = 600;
+				// IS-6: between the IS-2 and the IS-3, at King Tiger level.
+				inline constexpr int32 IS6_Radixite = 1300;
+				inline constexpr int32 IS6_VehicleParts = 700;
+				// SMK: two turrets (76mm + 45mm) on a long slow hull; between the KV-1 and the IS-6.
+				inline constexpr int32 SMK_Radixite = 1150;
+				inline constexpr int32 SMK_VehicleParts = 650;
 			}
 
 			namespace Infantry
@@ -873,6 +890,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerMarderStugFactory_Metal = 1000;
 				inline constexpr int32 RusPlatformFactory_Radixite = 3500;
 				inline constexpr int32 RusPlatformFactory_Metal = 1750;
+				inline constexpr int32 RusAssemblyYard_Radixite = 3500;
+				inline constexpr int32 RusAssemblyYard_Metal = 1750;
 				inline constexpr int32 RusResearchCenter_Radixite = 750;
 				inline constexpr int32 RusResearchCenter_Metal = 370;
 				inline constexpr int32 RusCoolingTowers_Radixite = 750;
@@ -933,12 +952,18 @@ namespace DeveloperSettings
 				inline constexpr int32 GerPanzerschreckPit_Metal = 60;
 				inline constexpr int32 GerTwinMG42Pit_Radixite = 320;
 				inline constexpr int32 GerTwinMG42Pit_Metal = 140;
+				inline constexpr int32 GerCommObservationPost_Radixite = 250;
+				inline constexpr int32 GerCommObservationPost_Metal = 150;
+				inline constexpr int32 GerCommMG42Nests_Radixite = 360;
+				inline constexpr int32 GerCommMG42Nests_Metal = 160;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;
 				inline constexpr int32 GerFlak88Pit_Metal = 360;
 				inline constexpr int32 GerMortarPit_Radixite = 340;
 				inline constexpr int32 GerMortarPit_Metal = 160;
+				// Per metre of trench: the field trench pays for each piece as it is dug.
+				inline constexpr int32 GerFieldTrench_RadixitePerMetre = 10;
 				inline constexpr int32 Rus120MortarPit_Radixite = 480;
 				inline constexpr int32 Rus120MortarPit_Metal = 240;
 			}

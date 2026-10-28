@@ -207,7 +207,8 @@ void FMoveUnitsFromConstruction::IssueMoveOrderIfPossible(
 	}
 	const bool bIsMoving = Commands->GetActiveCommandID() == EAbilityID::IdMove || Commands->GetActiveCommandID() ==
 		EAbilityID::IdReverseMove;
-	const bool bIsPatrolling = Commands->GetActiveCommandID() == EAbilityID::IdPatrol;
+	const bool bIsPatrolling = Commands->GetActiveCommandID() == EAbilityID::IdPatrol || Commands->GetActiveCommandID()
+		== EAbilityID::IdMarch;
 	const bool bIsConstructing = Commands->GetActiveCommandID() == EAbilityID::IdCreateBuilding || Commands->
 		GetActiveCommandID() == EAbilityID::IdFieldConstruction;
 	if (bIsConstructing || bIsMoving || bIsPatrolling)

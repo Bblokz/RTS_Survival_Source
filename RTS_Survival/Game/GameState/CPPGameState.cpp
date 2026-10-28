@@ -29,6 +29,7 @@
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/AttachedRocketsData/AttachedRocketsData.h"
 #include "RTS_Survival/Weapons/WeaponData/VariantBatchThree/VariantBatchThreeWeaponData.h"
+#include "RTS_Survival/Weapons/WeaponData/VariantBatchFour/VariantBatchFourWeaponData.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/DigInComponent/DigInType/DigInType.h"
 #include "RTS_Survival/UnitData/AircraftData.h"
 #include "RTS_Survival/UnitData/UnitAbilityEntry.h"
@@ -709,10 +710,10 @@ void ACPPGameState::SetupBreakThroughTrainingOptions()
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SturmTiger)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KingTiger)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Tiger105)),
-		FTrainingOption(),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_E75)),
+		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_E50)),
 		FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_210MM_Morser)),
 		FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Maus)),
-		FTrainingOption(),
 		FTrainingOption()
 	};
 }
@@ -1135,6 +1136,8 @@ void ACPPGameState::InitAllGameWeaponData()
 	VariantBatchTwoWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
 	// Batch 3 clones entries of the category initializers too (VariantBatchThreeWeaponData.cpp).
 	VariantBatchThreeWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
+	// Batch 4 (Wespe, Pz III M, Hetzer, JagdPanther) clones entries above (VariantBatchFourWeaponData.cpp).
+	VariantBatchFourWeapons::AddWeapons(M_TPlayerWeaponDataHashMap);
 
 	// Set the enemy weapons to the same base data.
 	M_TEnemyWeaponDataHashMap = M_TPlayerWeaponDataHashMap;
@@ -1454,7 +1457,7 @@ void ACPPGameState::InitAllGameFlameWeapons()
 	WeaponData.ShrapnelParticles = 0;
 	WeaponData.ShrapnelPen = 0;
 	WeaponData.ProjectileMovementSpeed = 0;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flamm15, WeaponData);
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ashmaker11, WeaponData);
 
 	WeaponData.WeaponName = EWeaponName::Flamm15;
 	WeaponData.DamageType = ERTSDamageType::Fire;
@@ -1965,8 +1968,8 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RW61_Mortar_380MM, WeaponData);
 
-	// Mortar 120mm (HE)
-	WeaponData.WeaponName = EWeaponName::Mortar_120MM;
+	// Panzerwerfer small (40mm rocket, HEAT)
+	WeaponData.WeaponName = EWeaponName::Panzerwerfer_Small;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_HEAT;
 	WeaponData.ShellTypes = { EWeaponShellType::Shell_HEAT };
@@ -2790,6 +2793,22 @@ void ACPPGameState::InitAllGameSmallArmsWeapons()
 	WeaponData.WeaponName = EWeaponName::Ger_TankMG_13;
 	WeaponData.MagCapacity = 100;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_TankMG_13, WeaponData);
+
+	// MG 42 on the pit field mounts. The turret BPs fire it in SingleBurst mode: 10 rounds 0.055 s apart (about 1100 rpm,
+	// the rhythm of Cue_MG42_GerTank_11Burst, which plays once per burst and rings out after ~0.85 s). The 1.5 s
+	// cooldown starts after the last round, so bursts never overlap and land about 2 s apart. 10 bursts per belt;
+	// the 6 s reload matches the pit loader's ammo-box drill.
+	WeaponData.WeaponName = EWeaponName::Ger_PitMG42_7_92MM;
+	WeaponData.WeaponCalibre = 7.92f;
+	WeaponData.BaseDamage = WeaponData.WeaponCalibre * DamagePerMM;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(BasicSmallArmsRange * 1.1, 10);
+	WeaponData.ArmorPen = 13.f;
+	WeaponData.ArmorPenMaxRange = 10.f;
+	WeaponData.MagCapacity = 100;
+	WeaponData.ReloadSpeed = 6.f;
+	WeaponData.BaseCooldown = 1.5f;
+	WeaponData.Accuracy = HMGAccuracy;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ger_PitMG42_7_92MM, WeaponData);
 
 	// Korovin M1941: 7.62 Tokarev SMG with a 35-round box magazine; slower cyclic rate than the PPSh, steadier.
 	WeaponData = {};
@@ -4157,6 +4176,16 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ReloadSpeed = 7.1f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::L_11_76MM, WeaponData);
 
+	// SMK main gun: the same L-11 shell in the big barbette turret (roomier, two loaders): faster reload, a
+	// little more range from the raised gun.
+	{
+		FWeaponData SmkWeaponData = WeaponData;
+		SmkWeaponData.WeaponName = EWeaponName::L_11_76MM_SMK;
+		SmkWeaponData.ReloadSpeed = 6.0f;
+		SmkWeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(WeaponData.Range * 1.05f, 10);
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::L_11_76MM_SMK, SmkWeaponData);
+	}
+
 	{
 		const float Kv1ArcDamageMlt = 1.2f;
 		const float Kv1ArcArmorPen = 76.f;
@@ -4570,6 +4599,31 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK43_88MM, WeaponData);
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK43_88MM_PantherII, WeaponData);
 
+	// E-50 Ausf. F: the long 8.8 cm KwK 44 L/100 (King Tiger shell, longer barrel).
+	// More pen, range and accuracy than the KwK 43, and a faster reload in the roomier turret.
+	WeaponData.WeaponName = EWeaponName::KwK44_88MM_E50;
+	WeaponData.DamageType = ERTSDamageType::Kinetic;
+	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
+	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_APCR, EWeaponShellType::Shell_HE};
+	WeaponData.WeaponCalibre = 88;
+	WeaponData.TNTExplosiveGrams = 109;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(HeavyCannonRange * 1.1, 10);
+	WeaponData.ArmorPen = 256;
+	WeaponData.ArmorPenMaxRange = 245;
+	WeaponData.MagCapacity = 1;
+	WeaponData.ReloadSpeed = 7;
+	WeaponData.BaseCooldown = 1;
+	WeaponData.CooldownFlux = CooldownFluxPercentage;
+	WeaponData.Accuracy = 97;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+	WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK44_88MM_E50, WeaponData);
+
 	// https://wiki.warthunder.com/Tiger_II_(10.5_cm_Kw.K)
 	// Cramped turret; stock reload.
 	WeaponData.WeaponName = EWeaponName::KwKL_68_105MM;
@@ -4692,6 +4746,23 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	ML20WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange * 1.2f, 100);
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML20_152MM_Pit, ML20WeaponData);
+
+	// T-44/155: a 155mm howitzer in the T-44 turret. Heavier shell than the ML-20, but the cramped turret and
+	// separate loading make it slower to reload and the short barrel less accurate.
+	FWeaponData T44HowitzerData = ML20WeaponData;
+	T44HowitzerData.WeaponName = EWeaponName::T44_155MM_Howitzer;
+	T44HowitzerData.WeaponCalibre = 155;
+	T44HowitzerData.TNTExplosiveGrams = 6600;
+	T44HowitzerData.BaseDamage = DamagePerMM * T44HowitzerData.WeaponCalibre
+		+ T44HowitzerData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	T44HowitzerData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
+	T44HowitzerData.ReloadSpeed = 14;
+	T44HowitzerData.Accuracy = 24;
+	T44HowitzerData.ShrapnelRange = T44HowitzerData.WeaponCalibre * ShrapnelRangePerMM;
+	T44HowitzerData.ShrapnelDamage = T44HowitzerData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	T44HowitzerData.ShrapnelParticles = T44HowitzerData.WeaponCalibre * ShrapnelAmountPerMM;
+	T44HowitzerData.ShrapnelPen = T44HowitzerData.WeaponCalibre * ShrapnelPenPerMM;
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::T44_155MM_Howitzer, T44HowitzerData);
 
 	// Cramped turret; stock reload.
 	WeaponData.WeaponName = EWeaponName::sIG_33_150MM;
@@ -6162,6 +6233,14 @@ void ACPPGameState::InitAllGameMediumTankData()
 		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
 		EAbilityID::IdNoAbility,
 	});
+	const TArray<FUnitAbilityEntry> BasicHarvesterTankAbilities = FAbilityHelpers::ConvertAbilityIdsToEntries({
+		EAbilityID::IdAttack, EAbilityID::IdMove, EAbilityID::IdStop, EAbilityID::IdReverseMove,
+		EAbilityID::IdNoAbility,
+		EAbilityID::IdHarvestResource, EAbilityID::IdRotateTowards, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdAttackGround,
+		EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility, EAbilityID::IdNoAbility,
+		EAbilityID::IdNoAbility,
+	});
 
 	FTankData TankData;
 
@@ -6555,6 +6634,23 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_100, TankData);
 
+	// T-34 Harvester (pile-driver breaker): medium armour, slower than a T-34 with the mast and hopper.
+	TankData.MaxHealth = MediumTankHealthBase;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 22;
+	TankData.VehicleReverseSpeedKmh = 12;
+	TankData.VisionRadius = T1TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, T34Harvester_Radixite}
+	});
+	TankData.Abilities = BasicHarvesterTankAbilities;
+	TankData.ExperienceLevels = GetMediumTankExpLevels();
+	TankData.ExperienceWorth = BaseMediumTankExp;
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_Harvester, TankData);
+
 	// SU-85
 	{
 		const float SuMediumTankDestroyerBaseHealth = MediumTankHealthBase + OneLightTankShotHp;
@@ -6687,6 +6783,38 @@ void ACPPGameState::InitAllGameMediumTankData()
 			BaseMediumTankExp * T44LaserExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T44_100L, TankData);
+	}
+
+	// T-44/155: the T-44/100L hull carrying a 155mm howitzer; the heavier turret turns slower.
+	{
+		const float T44HowitzerRotationSpeed = 55.f;
+		const float T44HowitzerTurretRotationSpeed = 16.f;
+		const float T44HowitzerMaxSpeedKmh = 28.f;
+		const float T44HowitzerReverseSpeedKmh = 18.f;
+		const float T44HowitzerCostMlt = 1.8f;
+		const float T44HowitzerExpWorthMlt = 3.0f;
+		const int32 T44HowitzerCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			HeavyTanks::PantherG_Radixite * T44HowitzerCostMlt, 10);
+		const int32 T44HowitzerVehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			HeavyTanks::PantherG_VehicleParts * T44HowitzerCostMlt, 10);
+
+		TankData.MaxHealth = T3MediumTankBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = T44HowitzerRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = T44HowitzerTurretRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = T44HowitzerMaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = T44HowitzerReverseSpeedKmh;
+		TankData.VisionRadius = T3TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, T44HowitzerCost},
+			{ERTSResourceType::Resource_VehicleParts, T44HowitzerVehiclePartsCost}
+		});
+		TankData.Abilities = BasicTankAbilities;
+		TankData.ExperienceLevels = GetHeavyArtillerySpecialVehicleExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			BaseMediumTankExp * T44HowitzerExpWorthMlt, 5);
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T44_155, TankData);
 	}
 }
 
@@ -6967,6 +7095,42 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Tiger105, TankData);
 
+	// E-75 (King Tiger hull with heavier armor and the 128mm: one more shot of health, slower hull and turret)
+	TankData.MaxHealth = T3HeavyTankBase + 2 * OneHeavyTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 14 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 14;
+	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, E75_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, E75_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 2.f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_E75, TankData);
+
+	// E-50 Ausf. F (King Tiger hull, 50 t class: one shot less health than the King Tiger, faster hull and turret)
+	TankData.MaxHealth = T3HeavyTankBase;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 19 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 22 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 20;
+	TankData.VehicleReverseSpeedKmh = 9;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, E50_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, E50_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.5f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_E50, TankData);
+
 	// ------------------------------- RUS Heavy Tanks -------------------------------
 
 	// T-28 (uses Medium exp levels per original)
@@ -7186,6 +7350,42 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseSuperHeavyTankExp* 1.67f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_5, TankData);
+
+	// IS-6 (heavy): tougher than the IS-2, below the IS-3, and the fastest of the IS line.
+	TankData.MaxHealth = T3HeavyTankBase + 2 * OneHeavyTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 28 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 24;
+	TankData.VehicleReverseSpeedKmh = 11;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, IS6_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, IS6_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.5f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_IS6, TankData);
+
+	// SMK (heavy): two turrets on a very long hull; KV-class armour, more hit points, slow and wide-turning.
+	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 16 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 13 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 15;
+	TankData.VehicleReverseSpeedKmh = 7;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, SMK_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, SMK_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.4f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SMK, TankData);
 
 	// SU-152 (heavy tank destroyer)
 	{
@@ -7948,6 +8148,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpHelpers::GerBxpData::InitRefineryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCaptureBunkersBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerBarracksBxpData(M_TPlayerBxpDataHashMap);
+	BxpHelpers::GerBxpData::InitGerCommCenterBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::RusBxpData::InitRusIndustrialBxpData(M_TPlayerBxpDataHashMap);
 
 	BxpData.ConstructionTime = T1BxpBuildTime;
@@ -8088,6 +8289,17 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpData.Health = RTSFunctionLibrary::RoundToNearestMultipleOf(T3NomadicBuildingHealth * 7, 10);
 	BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(BxpData.Health);
 	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusPlatformFactory, BxpData);
+
+	// -----------------------------------------------------------------------
+	// ------------------------- RUS ASSEMBLY YARD --------------------------
+	// -----------------------------------------------------------------------
+	// The same role as the platform factory (large vehicles, armed with a 53-K in its casemate), so the same data.
+	FBxpData AssemblyYardData = BxpData;
+	AssemblyYardData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RusAssemblyYard_Radixite},
+		{ERTSResourceType::Resource_Metal, RusAssemblyYard_Metal},
+	});
+	M_TPlayerBxpDataHashMap.Add(EBuildingExpansionType::BTX_RusAssemblyYard, AssemblyYardData);
 
 	// -----------------------------------------------------------------------
 	// ------------------------- RUS RESEARCH CENTER ------------------------
@@ -8951,11 +9163,15 @@ void ACPPGameState::InitAllGameNomadicData()
 	// Expansion radius is for BXPs that are freely placed, building radius is for other buildings.
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
 	NomadicData.BuildRadius = 0;
+	// The observation post goes on either sandbag-wing end socket; the MG42 nests sit on both wing ends at once.
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
+		AsTech(EBuildingExpansionType::BTX_GerCommObservationPost),
+		AsDefense(EBuildingExpansionType::BTX_GerCommMG42Nests),
 	});
 
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Two observation posts and the nests.
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = T2NomadicExp;

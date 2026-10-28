@@ -14,7 +14,7 @@ namespace TrainingLayoutConstants
 	inline constexpr int32 ColumnsPerSubSection = 3;
 	inline constexpr int32 RowsPerSubSection = 3;
 	inline constexpr int32 SlotsPerSubSection = ColumnsPerSubSection * RowsPerSubSection;
-	inline constexpr int32 MaxSubSectionsPerBuilding = 3;
+	inline constexpr int32 MaxSubSectionsPerBuilding = 4;
 }
 
 /**

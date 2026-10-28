@@ -102,5 +102,7 @@ enum class EBehaviourIcon : uint8
 	HEAT_Rounds,
 	// Unit variant batch 2.
 	HastyReload,
-	TwinAutocannonOverload
+	TwinAutocannonOverload,
+	// Unit variant batch 4: the JagdPanther Bollwerk barrage behaviour.
+	JagdPantherBollwerkBarrage
 };

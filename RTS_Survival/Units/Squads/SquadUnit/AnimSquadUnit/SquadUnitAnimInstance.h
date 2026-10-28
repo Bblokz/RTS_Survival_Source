@@ -825,6 +825,26 @@ public:
 	// Blends out of the parachute montage back to the regular idle.
 	void StopParachuteDescentAnimation();
 
+	/**
+	 * @brief Loops the march montage (weapon carried over the shoulder); its play rate follows the walking speed.
+	 * @return False when the anim blueprint has no march montage set or it failed to play.
+	 */
+	bool StartMarchAnimation();
+	// Blends out of the march montage back to the regular locomotion.
+	void StopMarchAnimation();
+
+	bool GetIsMarchAnimationPlaying() const
+	{
+		return IsValid(M_ActiveMarchMontage) && Montage_IsPlaying(M_ActiveMarchMontage);
+	}
+
+	float GetMarchAnimationPlayRate() const
+	{
+		return IsValid(M_ActiveMarchMontage) ? Montage_GetPlayRate(M_ActiveMarchMontage) : 0.0f;
+	}
+
+	float GetMarchMontageNaturalSpeed() const { return MarchMontageNaturalSpeed; }
+
 	// Stop playing all montages on the unit.
 	void StopAllMontages();
 
@@ -993,6 +1013,14 @@ protected:
 	// Full body death montages and the team-weapon subtypes that override the current unit stance.
 	UPROPERTY(EditDefaultsOnly, Category = "Death")
 	FSquadUnitDeathMontages DeathMontages;
+
+	// Full-body walk cycle looped while the squad marches; its first section is linked onto itself.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "March")
+	TObjectPtr<UAnimMontage> MarchMontage = nullptr;
+
+	// Ground speed in cm/s at which the march montage plays at rate 1 without the feet sliding.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "March", meta = (ClampMin = "1.0"))
+	float MarchMontageNaturalSpeed = 190.0f;
 
 	UPROPERTY(BlueprintReadOnly)
 	float Speed;
@@ -1186,6 +1214,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> M_ActiveParachuteMontage = nullptr;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimMontage> M_ActiveMarchMontage = nullptr;
+
+	// Keeps the marching feet planted: the montage rate follows the current ground speed.
+	void UpdateMarchPlayRate();
 	FOnSquadUnitDeathMontageFinished M_DeathMontageCompletionDelegate;
 
 	UPROPERTY(Transient)

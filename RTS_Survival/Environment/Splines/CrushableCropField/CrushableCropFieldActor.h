@@ -283,7 +283,7 @@ private:
 	/** Picks a variant by weight; INDEX_NONE when no variant is usable. */
 	int32 PickVariant(const FRandomStream& Stream, const float TotalWeight) const;
 
-	/** Local ground height under a local XY point (traces against world static), or 0 when nothing is hit. */
+	/** Local ground height under a local XY point (first world-static hit that is not a volume), or 0 when nothing is hit. */
 	float TraceLocalGroundZ(const FVector2D& LocalPoint) const;
 
 	UInstancedStaticMeshComponent* CreatePlantComponent(UStaticMesh* Mesh, const bool bCastShadow,

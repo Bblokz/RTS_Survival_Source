@@ -70,6 +70,8 @@ public:
 	void SetCinematicLandingTrailLength(float TrailLength);
 	/** Positive values override jump spacing on a cinematic copy; zero keeps the template's interval. */
 	void SetCinematicJumpInterval(float IntervalSeconds);
+	/** Override squads only on a cinematic ability copy before its passes; empty retains the template. */
+	void SetCinematicSquadSubtypes(const TArray<ESquadSubtype>& SquadSubtypes);
 	TArray<TWeakObjectPtr<ASquadController>> GetActiveDropSquads() const;
 	bool GetHasActiveDrop() const;
 	void CancelActiveDrops();

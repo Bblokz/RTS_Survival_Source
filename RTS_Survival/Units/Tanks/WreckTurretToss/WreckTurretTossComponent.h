@@ -8,6 +8,7 @@
 
 class UStaticMeshComponent;
 class URTSFireSubsystem;
+class USoundCue;
 
 /**
  * @brief Added at runtime to a freshly spawned tank wreck when the tank died during an ammo cook-off.
@@ -42,8 +43,15 @@ private:
 	void StoreTurretCollision();
 	void PrepareTurretForFlight();
 	void LaunchTurret() const;
-	void SpawnExplosion(ERTS_ExplosionType ExplosionType, const FVector& Location) const;
+	/**
+	 * @brief Explosion VFX of the given type with either its own sound or the tank's override from the toss settings.
+	 * @param ExplosionType Explosion pool to pick the VFX (and default sound) from.
+	 * @param Location World location of the explosion.
+	 * @param OverrideSound Plays instead of the type's sound when set.
+	 */
+	void SpawnExplosion(ERTS_ExplosionType ExplosionType, const FVector& Location, USoundCue* OverrideSound) const;
 	void StartHullAmmoFire();
+	void StartDebrisBurst() const;
 	void StartTurretFire();
 	void StartLandingChecks();
 	void CheckIfTurretLanded();

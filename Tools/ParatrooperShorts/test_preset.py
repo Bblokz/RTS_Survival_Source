@@ -86,6 +86,29 @@ class ParatrooperPresetTests(unittest.TestCase):
             with self.subTest(formation=formation), self.assertRaises(ValueError):
                 model.compose(ROOT, request)
 
+    def test_panzergrenadier_artillery_lineup_and_private_drop_override(self):
+        original = model.read_json(ROOT / "Jobs/GermanPanzergrenadierArtilleryBattle.json")
+        result = model.compose(ROOT, {"jobId": original["JobName"], "setupId": "ParatrooperBattle", "advanced": original})
+        segment = result["job"]["Segments"][0]
+        self.assertEqual(result["category"], "paratrooper")
+        self.assertEqual(segment["ParatrooperFormation"]["SquadSubtypes"], ["Squad_Ger_PanzerGrenadiere"])
+        self.assertEqual(segment["ParatrooperFormation"]["OwningPlayer"], 1)
+        self.assertEqual(len(segment["ParatrooperFormation"]["Passes"]), 2)
+        soviets = [segment["ClassPath"]] + segment["BattleAllyClassPaths"]
+        for name, count in [("Rus_Vehicle_T3476.", 5), ("Rus_Vehicle_IS-1_Soviet.", 2),
+                            ("Rus_Squad_MosinPTRS.", 2), ("Rus_Squad_HazmatBazooka.", 2),
+                            ("Rus_Squad_Mosin.", 2), ("Rus_BXP_B4HowitzerPit.", 1)]:
+            self.assertEqual(sum(name in path for path in soviets), count, name)
+        for name, count in [("Ger_Vehicle_TigerH1.", 2), ("Ger_Vehicle_PantherD.", 3),
+                            ("Squad_Ger_Scavengers.", 4), ("Ger_BXP_GerPit_SFH18.", 2)]:
+            self.assertEqual(sum(name in path for path in segment["BattleEnemyClassPaths"]), count, name)
+        self.assertTrue(all(offset["X"] == 800 for offset in segment["BattleAllyOffsets"][6:12]))
+        self.assertTrue(all(offset["X"] == -850 for offset in segment["BattleEnemyOffsets"][5:9]))
+        self.assertEqual(segment["BattleAllyOffsets"][-1]["X"], -3200)
+        self.assertIn("2× IS-1 (HEAT)", segment["Caption1"])
+        previous = model.read_json(ROOT / "Jobs/GermanTwinBomberParatrooperBattle.json")
+        self.assertNotIn("SquadSubtypes", previous["Segments"][0]["ParatrooperFormation"])
+
     def test_cap_survives_global_and_advanced_overrides(self):
         for request in [self.request(controls={"battleSeconds":121}),
                         self.request(controls={"segments":[{"index":0,"patch":{"SlotSeconds":150,"StopAtSeconds":150}}]}),

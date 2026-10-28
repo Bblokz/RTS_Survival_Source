@@ -44,6 +44,12 @@ namespace BxpConstructionRules
 		// Refinery Expansions.
 		{EBuildingExpansionType::BTX_RefConverter, WithFootprint(SocketConstructionRules, 800.f, 400.f)},
 
+		// Communication Center Expansions.
+		// The observation post in socket space: 3.75 m out of the sandbag-wing end wall, 5.17 m along it.
+		{EBuildingExpansionType::BTX_GerCommObservationPost, WithFootprint(SocketConstructionRules, 375.f, 517.f)},
+		// Both nests sit on the wing ends of the building itself; each deck is a 4.3 m square.
+		{EBuildingExpansionType::BTX_GerCommMG42Nests, WithFootprint(OriginConstructionRules, 430.f, 430.f)},
+
 		// Ger Light Factory Expansions.
 		{EBuildingExpansionType::BTX_GerLFactoryRadixiteReactor, WithFootprint(OriginConstructionRules, 200.f, 200.f)},
 		{EBuildingExpansionType::BTX_GerLFactoryFuelStorage, WithFootprint(OriginConstructionRules, 200.f, 200.f)},
@@ -93,6 +99,9 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerMortarPit, WithFootprint(FreeConstructionRules, 1000.f, 1000.f)},
 		{EBuildingExpansionType::BTX_Rus120MortarPit, WithFootprint(FreeConstructionRules, 1000.f, 1000.f)},
 		{EBuildingExpansionType::BTX_GerMarderStugFactory, WithFootprint(FreeConstructionRules, 800.f, 800.f)},
+		// The assembly yard platform with its exit ramp and the casemate's glacis: 43.9 x 32.4 m, its origin 1.65 m
+		// behind the middle, so the footprint is sized to twice the far half (23.6 m forward).
+		{EBuildingExpansionType::BTX_RusAssemblyYard, WithFootprint(FreeConstructionRules, 4800.f, 3300.f)},
 
 		// --- solar  ---
 		// The radixite solar trailer snaps to the Gamma Facility's BXP_L / BXP_R side sockets (4.5 m out, 4 m along the wall).

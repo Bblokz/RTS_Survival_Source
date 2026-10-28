@@ -17,6 +17,7 @@
 #include "RTS_Survival/Audio/Settings/RTSAudioDeveloperSettings.h"
 #include "RTS_Survival/Audio/Settings/RTSAudioType.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
+#include "RTS_Survival/GameUI/MiniMap/CombatPings/RTSCombatPingSubsystem.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionCinematicTakeOverSession.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
@@ -299,6 +300,25 @@ FName UMissionBase::AddCustomMiniMapIconAttachedToActor(const FName IconId,
 		StaticWorldRotation,
 		bUseStaticRotation,
 		TextPayload);
+}
+
+void UMissionBase::ShowReinforcementsOnMiniMap(const FVector WorldLocation, const float DurationSeconds)
+{
+	const AMissionManager* const MissionManager = GetMissionManagerChecked();
+	if (MissionManager == nullptr)
+	{
+		return;
+	}
+	const UWorld* const World = MissionManager->GetWorld();
+	URTSCombatPingSubsystem* const CombatPingSubsystem = IsValid(World)
+		                                                     ? World->GetSubsystem<URTSCombatPingSubsystem>()
+		                                                     : nullptr;
+	if (not IsValid(CombatPingSubsystem))
+	{
+		RTSFunctionLibrary::ReportError("No combat ping subsystem in ShowReinforcementsOnMiniMap.");
+		return;
+	}
+	CombatPingSubsystem->AddReinforcementsPing(WorldLocation, DurationSeconds);
 }
 
 bool UMissionBase::RemoveCustomMiniMapIcon(const FName IconId)

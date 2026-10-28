@@ -105,3 +105,25 @@ To see the tab itself, run the offscreen UI capture with `-UISnapshot -UISnapsho
 2. Add its option in `InitAllGameFieldDefenseTrainingOptions`, with a requirement if it needs one.
 3. Add a `Slot::FieldDefense(...)` to the trainer's layout.
 4. Add a `Train_<type>` row to `DT_TrainingOptions` for its icon.
+
+## Field trench (Barriers tab)
+
+The HQ's fourth tab, Barriers, holds procedural defenses that the player drags out. The first one is the field trench, `BTX_GerFieldTrench`. It does not go through the trainer's queue.
+
+- **Picking it:** `UTrainingMenuManager::OnLeftClickFieldDefenseItem` catches the trench and calls `ACPPController::StartFieldTrenchPlacement`, which turns on `EPlayerBuildingPreviewMode::FieldTrenchPreviewMode`.
+- **Laying it out:** `UFieldTrenchPlacementComponent`, which lives on the controller, handles the clicks (`Player/ConstructionPreview/FieldTrenchPlacement`).
+  - The first click sets the start.
+  - The trench then follows the mouse. The path is recorded every 50 cm and planned again whenever it changes.
+  - The second click confirms the trench. Both ends always get an End cap.
+  - Right click, Escape, or the HQ dying removes a trench that is not confirmed yet.
+  - The trench is cut short before the first piece that would lie outside the build radii or lean more than 15°. If no piece fits, the whole plan shows in red.
+- **Planning:** `FieldTrenchLayout::PlanAlongPath` (`Buildings/FieldTrench`) chains kit pieces along the path, using straights of 125, 250 and 500 cm and bends of 15, 30 and 45° (Corner_90 above 75°). It works in the kit's port contract (`GerDefenses/FieldTrenches/Exports/field_trench_kit.json`, flipped to Unreal space).
+- **Uneven ground:** `ARTSFieldTrench::PlanOnGround` swaps 5 m straights for shorter ones when the ground strays more than 20 cm from a piece.
+- **Paying and digging:** `ARTSFieldTrench` holds one static mesh component per piece and lays each piece onto the ground, tilted with the slope. Pieces are dug in order, at 1 s per metre.
+  - Each piece is paid for when its digging starts: `GerFieldTrench_RadixitePerMetre` (10 Radixite per metre) times its length. The tooltip cost is that per-metre price.
+  - While the player cannot pay, digging waits and checks again twice a second.
+- **Cover:** built pieces give their `cargo_N` sockets to the cover finder through `IRTSCoverSocketSource`. Soldiers are snapped onto the sockets 60 cm under the ground, as in `BP_TrenchMaster` trenches.
+
+Map tests:
+- `-FieldDefenseValidateTrench` on `UT_Nomadics`: the menu click, the two clicks along a bent path, digging with per-metre payment, waiting while the player cannot pay, and cancelling.
+- `-CoverFinderValidateRuntimeTrench` on `TestCover/TestFieldTrench`: runtime cover publishing, a piece removed and added again, a dug trench on uneven ground, and the full stand-up cycle in a runtime trench.

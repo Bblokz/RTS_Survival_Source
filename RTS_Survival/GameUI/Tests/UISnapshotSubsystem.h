@@ -7,6 +7,8 @@
 
 #include "UISnapshotSubsystem.generated.h"
 
+class ASquadUnit;
+class ASelectablePawnMaster;
 class ACPPController;
 
 enum class EUISnapshotPhase : uint8
@@ -64,6 +66,9 @@ private:
 	bool bM_HasFinishedTruckAnims = false;
 	bool bM_HasCollapsedMission = false;
 	bool bM_HasOpenedFullMap = false;
+	bool bM_HasAssignedControlGroups = false;
+	// -UISnapshotPressControlGroup holds the mouse button down on the hovered slot once per capture step.
+	mutable bool bM_HasPressedControlGroupThisStep = false;
 	int32 M_BehaviourSampleIndex = 0;
 
 	void TickWaitingForHud();
@@ -118,6 +123,19 @@ private:
 	void StartWeaponReloads() const;
 	// -UISnapshotCollapseMission: collapses the mission dialog to its title once (captures the collapsed state).
 	void CollapseMissionOnce();
+	// -UISnapshotControlGroups: fills control groups 1-4 once (all units, one pawn, a few pawns, the squads), so the
+	// bar shows occupied slots next to empty ones.
+	void AssignControlGroupsOnce();
+	void AssignControlGroupFromUnits(const int32 GroupIndex, const TArray<ASquadUnit*>& SquadUnits,
+	                                 const TArray<ASelectablePawnMaster*>& Pawns) const;
+	void GatherPlayerUnits(TArray<ASquadUnit*>& OutSquadUnits, TArray<ASelectablePawnMaster*>& OutPawns) const;
+	// -UISnapshotHoverControlGroup=N hovers the control group slot with index N (0 = key 1).
+	bool HoverControlGroupSlot() const;
+	bool GetControlGroupSlotCentre(const int32 SlotIndex, FVector2D& OutAbsolutePosition) const;
+	// -UISnapshotClickControlGroup=N clicks slot N once per step after the selection and logs what it selected.
+	void ClickControlGroupSlotOncePerStep() const;
+	mutable bool bM_HasClickedControlGroupThisStep = false;
+	void PressAtCursorOncePerStep() const;
 	// -UISnapshotOpenFullMap: presses the minimap's map button once; -UISnapshotCloseFullMapAtStep=N presses the
 	// full map's close button when step N starts (both through the real buttons' OnClicked).
 	void ToggleFullMapForStep();
