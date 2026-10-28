@@ -20,6 +20,8 @@
 #include "RTS_Survival/GameUI/ActionUI/SelectedUnitInfo/W_SelectedUnitInfo.h"
 #include "RTS_Survival/GameUI/ActionUI/ItemActionUI/W_ItemActionUI.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingUIWidget/W_TrainingItem.h"
+#include "RTS_Survival/GameUI/ControlGroups/ControlGroupImage/W_ControlGroupImage.h"
+#include "RTS_Survival/Player/PlayerControlGroupManager/PlayerControlGroupManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
@@ -73,6 +75,20 @@ namespace UISnapshotConstants
 	const FName ActionButtonName(TEXT("M_ActionItemButton"));
 	const TCHAR* const HoverTrainingSwitch = TEXT("UISnapshotHoverTraining");
 	const FName TrainingButtonName(TEXT("M_TrainingItemButton"));
+	const TCHAR* const ControlGroupsSwitch = TEXT("UISnapshotControlGroups");
+	const TCHAR* const HoverControlGroupSwitch = TEXT("UISnapshotHoverControlGroup=");
+	const FName ControlGroupButtonName(TEXT("M_ControlGroupButton"));
+	// Holds the light band of the hovered control group slot at this progress (0..1) so a capture shows it mid-way.
+	const TCHAR* const ControlGroupSweepSwitch = TEXT("UISnapshotControlGroupSweep=");
+	const TCHAR* const PressControlGroupSwitch = TEXT("UISnapshotPressControlGroup");
+	const TCHAR* const ClickControlGroupSwitch = TEXT("UISnapshotClickControlGroup=");
+	constexpr double PressAfterSettleSeconds = 1.0;
+	// Groups filled by -UISnapshotControlGroups: key 1 = everything, 2 = one pawn, 3 = a few pawns, 4 = the squads.
+	constexpr int32 AllUnitsGroupIndex = 0;
+	constexpr int32 SinglePawnGroupIndex = 1;
+	constexpr int32 FewPawnsGroupIndex = 2;
+	constexpr int32 SquadsGroupIndex = 3;
+	constexpr int32 FewPawnsCount = 3;
 	// Extra real seconds after the start before capturing, e.g. so nomadic trucks finish converting into buildings.
 	const TCHAR* const DelaySwitch = TEXT("UISnapshotDelay=");
 	const TCHAR* const FocusTrainerSwitch = TEXT("UISnapshotFocusTrainer");
@@ -136,6 +152,13 @@ void UUISnapshotSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		SeedGameInstanceForWorldCampaign();
 	}
 	BuildSteps();
+#if !UE_BUILD_SHIPPING
+	float ControlGroupSweepProgress = -1.0f;
+	if (FParse::Value(FCommandLine::Get(), UISnapshotConstants::ControlGroupSweepSwitch, ControlGroupSweepProgress))
+	{
+		UW_ControlGroupImage::Debug_FrozenSweepProgress = FMath::Clamp(ControlGroupSweepProgress, 0.0f, 1.0f);
+	}
+#endif
 	FModuleManager::Get().LoadModule(TEXT("SlateReflector"));
 	EnterPhase(EUISnapshotPhase::WaitingForHud);
 	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT started with %d captures"), M_Steps.Num());
@@ -202,6 +225,7 @@ void UUISnapshotSubsystem::TickSettling()
 	HideGlassPanes();
 	HoldEnergyPreview();
 	HoverPortrait();
+	ClickControlGroupSlotOncePerStep();
 	if (GetSecondsInPhase() >= UISnapshotConstants::SettleSeconds)
 	{
 		CaptureCurrentStep();
@@ -382,6 +406,10 @@ void UUISnapshotSubsystem::HoldEnergyPreview() const
 
 void UUISnapshotSubsystem::HoverPortrait() const
 {
+	if (HoverControlGroupSlot())
+	{
+		return;
+	}
 	if (FParse::Param(FCommandLine::Get(), UISnapshotConstants::HoverPortraitSwitch))
 	{
 		HoverFirstVisibleWidget(UW_SelectedUnitInfo::StaticClass(), UISnapshotConstants::UnitInfoBorderName);
@@ -420,6 +448,104 @@ void UUISnapshotSubsystem::HoverFirstVisibleWidget(UClass* const UserWidgetClass
 		MoveSlateCursorTo(Target->GetCachedGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5, 0.5)));
 		return;
 	}
+}
+
+bool UUISnapshotSubsystem::HoverControlGroupSlot() const
+{
+	int32 SlotIndex = INDEX_NONE;
+	if (not FSlateApplication::IsInitialized()
+		|| not FParse::Value(FCommandLine::Get(), UISnapshotConstants::HoverControlGroupSwitch, SlotIndex))
+	{
+		return false;
+	}
+	FVector2D SlotCentre;
+	if (GetControlGroupSlotCentre(SlotIndex, SlotCentre))
+	{
+		MoveSlateCursorTo(SlotCentre);
+		PressAtCursorOncePerStep();
+	}
+	return true;
+}
+
+bool UUISnapshotSubsystem::GetControlGroupSlotCentre(const int32 SlotIndex, FVector2D& OutAbsolutePosition) const
+{
+	TArray<UUserWidget*> Candidates;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Candidates, UW_ControlGroupImage::StaticClass(), false);
+	for (UUserWidget* const Candidate : Candidates)
+	{
+		const UW_ControlGroupImage* const ControlGroupSlot = Cast<UW_ControlGroupImage>(Candidate);
+		if (not IsValid(ControlGroupSlot) || ControlGroupSlot->GetGroupIndex() != SlotIndex
+			|| not IsValid(ControlGroupSlot->WidgetTree))
+		{
+			continue;
+		}
+		const UWidget* const Button = ControlGroupSlot->WidgetTree->FindWidget(UISnapshotConstants::ControlGroupButtonName);
+		if (not IsValid(Button) || Button->GetCachedGeometry().GetLocalSize().IsNearlyZero())
+		{
+			continue;
+		}
+		OutAbsolutePosition = Button->GetCachedGeometry().GetAbsolutePositionAtCoordinates(FVector2D(0.5, 0.5));
+		return true;
+	}
+	return false;
+}
+
+void UUISnapshotSubsystem::ClickControlGroupSlotOncePerStep() const
+{
+	int32 SlotIndex = INDEX_NONE;
+	if (bM_HasClickedControlGroupThisStep || not FSlateApplication::IsInitialized()
+		|| not FParse::Value(FCommandLine::Get(), UISnapshotConstants::ClickControlGroupSwitch, SlotIndex)
+		|| GetSecondsInPhase() < UISnapshotConstants::PressAfterSettleSeconds || not GetIsValidPlayerController())
+	{
+		return;
+	}
+	FVector2D SlotCentre;
+	if (not GetControlGroupSlotCentre(SlotIndex, SlotCentre))
+	{
+		return;
+	}
+	bM_HasClickedControlGroupThisStep = true;
+	MoveSlateCursorTo(SlotCentre);
+	FSlateApplication& SlateApplication = FSlateApplication::Get();
+	TSet<FKey> PressedButtons;
+	PressedButtons.Add(EKeys::LeftMouseButton);
+	const FPointerEvent MouseDown(
+		SlateApplication.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, SlotCentre, SlotCentre,
+		PressedButtons, EKeys::LeftMouseButton, 0, SlateApplication.GetModifierKeys());
+	SlateApplication.ProcessMouseButtonDownEvent(nullptr, MouseDown);
+	const FPointerEvent MouseUp(
+		SlateApplication.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, SlotCentre, SlotCentre,
+		TSet<FKey>(), EKeys::LeftMouseButton, 0, SlateApplication.GetModifierKeys());
+	SlateApplication.ProcessMouseButtonUpEvent(MouseUp);
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT clicked control group slot %d -> %d pawns selected"),
+	       SlotIndex, M_PlayerController->TSelectedPawnMasters.Num());
+}
+
+void UUISnapshotSubsystem::PressAtCursorOncePerStep() const
+{
+	if (bM_HasPressedControlGroupThisStep || not FParse::Param(FCommandLine::Get(), UISnapshotConstants::PressControlGroupSwitch))
+	{
+		return;
+	}
+	// Right after a resolution change the slot's cached geometry is still the old one; press where it is now.
+	if (GetSecondsInPhase() < UISnapshotConstants::PressAfterSettleSeconds)
+	{
+		return;
+	}
+	bM_HasPressedControlGroupThisStep = true;
+	FSlateApplication& SlateApplication = FSlateApplication::Get();
+	const FVector2D CursorPosition = SlateApplication.GetCursorPos();
+	// Slate still holds the button from the previous step's press (no up event was ever sent); release it first.
+	const FPointerEvent MouseUp(
+		SlateApplication.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, CursorPosition, CursorPosition,
+		TSet<FKey>(), EKeys::LeftMouseButton, 0, SlateApplication.GetModifierKeys());
+	SlateApplication.ProcessMouseButtonUpEvent(MouseUp);
+	TSet<FKey> PressedButtons;
+	PressedButtons.Add(EKeys::LeftMouseButton);
+	const FPointerEvent MouseDown(
+		SlateApplication.GetUserIndexForMouse(), FSlateApplication::CursorPointerIndex, CursorPosition, CursorPosition,
+		PressedButtons, EKeys::LeftMouseButton, 0, SlateApplication.GetModifierKeys());
+	SlateApplication.ProcessMouseButtonDownEvent(nullptr, MouseDown);
 }
 
 void UUISnapshotSubsystem::MoveSlateCursorTo(const FVector2D& AbsolutePosition)
@@ -564,6 +690,8 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 		return;
 	}
 	const FSnapshotStep& Step = M_Steps[M_StepIndex];
+	bM_HasPressedControlGroupThisStep = false;
+	bM_HasClickedControlGroupThisStep = false;
 	FSystemResolution::RequestResolutionChange(Step.Resolution.X, Step.Resolution.Y, EWindowMode::Windowed);
 	if (Step.Selection == EUISnapshotSelection::WorldCardMenu)
 	{
@@ -572,6 +700,7 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 	}
 	if (Step.Selection == EUISnapshotSelection::PlayerUnits)
 	{
+		AssignControlGroupsOnce();
 		SelectPlayerUnits();
 	}
 	else
@@ -617,19 +746,31 @@ void UUISnapshotSubsystem::Finish()
 
 void UUISnapshotSubsystem::SelectPlayerUnits() const
 {
-	UWorld* World = GetWorld();
-	if (not IsValid(World) || not GetIsValidPlayerController())
+	if (not GetIsValidPlayerController())
 	{
 		return;
 	}
 	TArray<ASquadUnit*> SquadUnits;
 	TArray<ASelectablePawnMaster*> Pawns;
+	GatherPlayerUnits(SquadUnits, Pawns);
+	M_PlayerController->SelectUnitsFromMarquee(SquadUnits, {}, Pawns);
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT selected %d pawns and %d soldiers"), Pawns.Num(), SquadUnits.Num());
+}
+
+void UUISnapshotSubsystem::GatherPlayerUnits(TArray<ASquadUnit*>& OutSquadUnits,
+                                             TArray<ASelectablePawnMaster*>& OutPawns) const
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
 	for (TActorIterator<ASelectablePawnMaster> It(World); It; ++It)
 	{
 		const URTSComponent* RTSComponent = It->FindComponentByClass<URTSComponent>();
 		if (IsValid(RTSComponent) && RTSComponent->GetOwningPlayer() == UISnapshotConstants::PlayerOwnerIndex)
 		{
-			Pawns.Add(*It);
+			OutPawns.Add(*It);
 		}
 	}
 	for (TActorIterator<ASquadUnit> It(World); It; ++It)
@@ -637,11 +778,54 @@ void UUISnapshotSubsystem::SelectPlayerUnits() const
 		const URTSComponent* RTSComponent = It->FindComponentByClass<URTSComponent>();
 		if (IsValid(RTSComponent) && RTSComponent->GetOwningPlayer() == UISnapshotConstants::PlayerOwnerIndex)
 		{
-			SquadUnits.Add(*It);
+			OutSquadUnits.Add(*It);
 		}
 	}
+}
+
+void UUISnapshotSubsystem::AssignControlGroupsOnce()
+{
+	if (bM_HasAssignedControlGroups || not FParse::Param(FCommandLine::Get(), UISnapshotConstants::ControlGroupsSwitch))
+	{
+		return;
+	}
+	bM_HasAssignedControlGroups = true;
+	TArray<ASquadUnit*> SquadUnits;
+	TArray<ASelectablePawnMaster*> Pawns;
+	GatherPlayerUnits(SquadUnits, Pawns);
+	AssignControlGroupFromUnits(UISnapshotConstants::AllUnitsGroupIndex, SquadUnits, Pawns);
+	if (not Pawns.IsEmpty())
+	{
+		AssignControlGroupFromUnits(UISnapshotConstants::SinglePawnGroupIndex, {}, {Pawns[0]});
+		const TArray<ASelectablePawnMaster*> FewPawns(
+			Pawns.GetData(), FMath::Min(UISnapshotConstants::FewPawnsCount, Pawns.Num()));
+		AssignControlGroupFromUnits(UISnapshotConstants::FewPawnsGroupIndex, {}, FewPawns);
+	}
+	if (not SquadUnits.IsEmpty())
+	{
+		AssignControlGroupFromUnits(UISnapshotConstants::SquadsGroupIndex, SquadUnits, {});
+	}
+}
+
+void UUISnapshotSubsystem::AssignControlGroupFromUnits(const int32 GroupIndex, const TArray<ASquadUnit*>& SquadUnits,
+                                                       const TArray<ASelectablePawnMaster*>& Pawns) const
+{
+	if (not GetIsValidPlayerController())
+	{
+		return;
+	}
+	UPlayerControlGroupManager* const ControlGroupManager =
+		FRTS_Statics::GetPlayerControlGroupManager(M_PlayerController.Get());
+	if (not IsValid(ControlGroupManager))
+	{
+		return;
+	}
 	M_PlayerController->SelectUnitsFromMarquee(SquadUnits, {}, Pawns);
-	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT selected %d pawns and %d soldiers"), Pawns.Num(), SquadUnits.Num());
+	AActor* AddedActorByControlGroup = nullptr;
+	// Holding control assigns the current selection to the group.
+	ControlGroupManager->UseControlGroup(GroupIndex, false, true, AddedActorByControlGroup);
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT control group %d <- %d pawns, %d soldiers"),
+	       GroupIndex, Pawns.Num(), SquadUnits.Num());
 }
 
 void UUISnapshotSubsystem::SelectTrainer() const

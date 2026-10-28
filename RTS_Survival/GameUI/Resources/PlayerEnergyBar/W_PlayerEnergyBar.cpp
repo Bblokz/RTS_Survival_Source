@@ -31,6 +31,11 @@ void UW_PlayerEnergyBar::InitPlayerEnergyBar(UPlayerResourceManager* NewPlayerRe
 	SetEnergyInfoBarVisibility(false);
 }
 
+void UW_PlayerEnergyBar::SetPowerDeficitLamp(const FIndicatorLamp& PowerDeficitLamp)
+{
+	M_PowerDeficitLamp = PowerDeficitLamp;
+}
+
 void UW_PlayerEnergyBar::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -101,6 +106,7 @@ void UW_PlayerEnergyBar::UpdateEnergyBar()
 
 	UpdateProgressBarUI(SupplyFill01, bDeficit);
 	UpdateEnergyLevelUI(DemandLevel01);
+	M_PowerDeficitLamp.SetIsLit(bDeficit);
 
 	// Forward numbers to the info widget (if present).
 	if (GetIsValidEnergyInfoWidget())
@@ -112,6 +118,7 @@ void UW_PlayerEnergyBar::UpdateEnergyBar()
 void UW_PlayerEnergyBar::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
+	M_PowerDeficitLamp.Tick(InDeltaTime);
 
 	if (!GetIsValidEnergyProgressBar())
 	{

@@ -1994,6 +1994,42 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Rus IS-6
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_IS6)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_IS6,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus SMK
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_SMK)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_SMK,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 	// Rus SU-152
 	{
 		FTrainingOption ItemID = FTrainingOption(

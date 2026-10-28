@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "RTS_Survival/GameUI/IndicatorLamps/IndicatorLamp.h"
 #include "W_PlayerEnergyBar.generated.h"
 
 class UImage;
@@ -37,6 +38,9 @@ public:
 	 * @param NewEnergyInfoWidget Info widget to show on hover.
 	 */
 	void InitPlayerEnergyBar(UPlayerResourceManager* NewPlayerResourceManager, UW_EnergyBarInfo* NewEnergyInfoWidget);
+
+	/** @param PowerDeficitLamp Lamp placed next to the bar (by UMainGameUI); it blinks while demand exceeds supply. */
+	void SetPowerDeficitLamp(const FIndicatorLamp& PowerDeficitLamp);
 
 protected:
 	/** Sets up update timer and caches base position for the level overlay. */
@@ -94,6 +98,9 @@ protected:
 	FLinearColor DeficitColor = FLinearColor::Red;
 
 private:
+	UPROPERTY()
+	FIndicatorLamp M_PowerDeficitLamp;
+
 	/** Timer handle for updating the energy bar */
 	FTimerHandle EnergyBarUpdateTimerHandle;
 
