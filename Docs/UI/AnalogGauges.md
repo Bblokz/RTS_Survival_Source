@@ -78,6 +78,10 @@ RadioDial) are kept as materials. Faces: `energy_meters.py`; materials, capture 
 - **Look:** a glowing radixite column in a clamped glass tube. The tube refracts the scale behind it (flipped inside
   the fluid, with colour fringes at the walls), the meniscus rocks, the fluid swirls and lights the plate beside it.
   No bubbles (by request). A brass collar with a red tip marks the demand.
+- **Numerals as text:** the scale numbers (0, 2, ... 10) are TextBlocks `EnergyMeterLabel_<n>` in
+  `BP_W_PlayerEnergyBar` (engine Roboto Bold 8, cream, 1 px shadow), not part of the face, so they stay crisp at every
+  DPI. They sit right-aligned in the free column left of the ticks; `energy_meters.py` writes their positions to
+  `meters.json` and `apply_to_hud()` places them. The top and bottom plates carry no engraving.
 - **Deficit:** the fluid turns `DeficitColor` and flickers, and a dashed red band on the scale shows the shortfall.
 - **Runtime:** `BP_W_PlayerEnergyBar` has an `EnergyMeterImage` (BindWidgetOptional). When it is there,
   `UW_PlayerEnergyBar` collapses the old progress bar and level marker, eases `Fill`, `Demand` and `Deficit` towards
