@@ -7,6 +7,8 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Misc/CommandLine.h"
 #include "RTS_Survival/GameUI/Resources/PlayerEnergyBar/EnergyBarInfo/W_EnergyBarInfo.h"
 #include "RTS_Survival/Player/PlayerResourceManager/PlayerResourceManager.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -31,14 +33,11 @@ void UW_PlayerEnergyBar::InitPlayerEnergyBar(UPlayerResourceManager* NewPlayerRe
 	SetEnergyInfoBarVisibility(false);
 }
 
-void UW_PlayerEnergyBar::SetPowerDeficitLamp(const FIndicatorLamp& PowerDeficitLamp)
-{
-	M_PowerDeficitLamp = PowerDeficitLamp;
-}
-
 void UW_PlayerEnergyBar::NativeConstruct()
 {
 	Super::NativeConstruct();
+
+	SetupEnergyMeter();
 
 	// Cache base Y from the level's canvas slot so we can add offsets around center.
 	if (GetIsValidEnergyBarLevel())
@@ -106,7 +105,7 @@ void UW_PlayerEnergyBar::UpdateEnergyBar()
 
 	UpdateProgressBarUI(SupplyFill01, bDeficit);
 	UpdateEnergyLevelUI(DemandLevel01);
-	M_PowerDeficitLamp.SetIsLit(bDeficit);
+	SetEnergyMeterTargets(SupplyFill01, DemandLevel01, bDeficit);
 
 	// Forward numbers to the info widget (if present).
 	if (GetIsValidEnergyInfoWidget())
@@ -118,14 +117,15 @@ void UW_PlayerEnergyBar::UpdateEnergyBar()
 void UW_PlayerEnergyBar::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
-	M_PowerDeficitLamp.Tick(InDeltaTime);
+	TickEnergyMeter(InDeltaTime);
 
-	if (!GetIsValidEnergyProgressBar())
+	const UWidget* const HoverWidget = GetHoverWidget();
+	if (not IsValid(HoverWidget))
 	{
 		return;
 	}
 
-	const bool bIsHoveredNow = EnergyProgressBar->IsHovered();
+	const bool bIsHoveredNow = HoverWidget->IsHovered();
 	if (bIsHoveredNow == bM_WasProgressBarHovered)
 	{
 		return;
@@ -133,6 +133,124 @@ void UW_PlayerEnergyBar::NativeTick(const FGeometry& MyGeometry, const float InD
 
 	bM_WasProgressBarHovered = bIsHoveredNow;
 	OnHoverEnergyBar(bIsHoveredNow);
+}
+
+// ----------------- Analog meter -----------------
+
+namespace EnergyMeterParameters
+{
+	const FName Fill(TEXT("Fill"));
+	const FName Demand(TEXT("Demand"));
+	const FName Deficit(TEXT("Deficit"));
+	const FName OkColor(TEXT("OkColor"));
+	const FName DeficitColor(TEXT("DeficitColor"));
+	// A jump larger than this is a new energy window (the bar restarts at 0%), so the meter snaps instead of draining.
+	constexpr float SnapDistance = 0.5f;
+}
+
+namespace
+{
+	// Offscreen UI captures (-UISnapshotEnergyPreview / -UISnapshotEnergyDeficit) show a fixed, readable level.
+	bool GetCapturePreviewTargets(float& OutFill, float& OutDemand, bool& bOutDeficit)
+	{
+#if !UE_BUILD_SHIPPING
+		if (FParse::Param(FCommandLine::Get(), TEXT("UISnapshotEnergyDeficit")))
+		{
+			OutFill = 0.34f;
+			OutDemand = 0.58f;
+			bOutDeficit = true;
+			return true;
+		}
+		if (FParse::Param(FCommandLine::Get(), TEXT("UISnapshotEnergyPreview")))
+		{
+			OutFill = 0.62f;
+			OutDemand = 0.45f;
+			bOutDeficit = false;
+			return true;
+		}
+#endif
+		return false;
+	}
+}
+
+void UW_PlayerEnergyBar::SetupEnergyMeter()
+{
+	if (not GetHasEnergyMeter())
+	{
+		return;
+	}
+	M_EnergyMeterMaterial = EnergyMeterImage->GetDynamicMaterial();
+	if (not IsValid(M_EnergyMeterMaterial))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UW_PlayerEnergyBar: EnergyMeterImage has no material brush; the meter stays still."));
+		return;
+	}
+	M_EnergyMeterMaterial->SetVectorParameterValue(EnergyMeterParameters::OkColor, OkColor);
+	M_EnergyMeterMaterial->SetVectorParameterValue(EnergyMeterParameters::DeficitColor, DeficitColor);
+	EnergyMeterImage->SetVisibility(ESlateVisibility::Visible);
+	if (GetIsValidEnergyProgressBar())
+	{
+		EnergyProgressBar->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (GetIsValidEnergyBarLevel())
+	{
+		EnergyBarLevel->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void UW_PlayerEnergyBar::SetEnergyMeterTargets(const float Fill01, const float DemandLevel01, const bool bInDeficit)
+{
+	FEnergyMeterDisplayState& State = M_EnergyMeterState;
+	State.TargetFill = Fill01;
+	State.TargetDemand = DemandLevel01;
+	State.TargetDeficit = bInDeficit ? 1.f : 0.f;
+	float PreviewFill = 0.f;
+	float PreviewDemand = 0.f;
+	bool bPreviewDeficit = false;
+	if (GetCapturePreviewTargets(PreviewFill, PreviewDemand, bPreviewDeficit))
+	{
+		State.TargetFill = PreviewFill;
+		State.TargetDemand = PreviewDemand;
+		State.TargetDeficit = bPreviewDeficit ? 1.f : 0.f;
+	}
+	const bool bIsNewWindow = FMath::Abs(State.TargetFill - State.Fill) > EnergyMeterParameters::SnapDistance;
+	if (State.bHasTargets && not bIsNewWindow)
+	{
+		return;
+	}
+	State.Fill = State.TargetFill;
+	State.Demand = State.TargetDemand;
+	State.Deficit = State.TargetDeficit;
+	State.bHasTargets = true;
+}
+
+void UW_PlayerEnergyBar::TickEnergyMeter(const float DeltaTime)
+{
+	if (not IsValid(M_EnergyMeterMaterial) || not M_EnergyMeterState.bHasTargets)
+	{
+		return;
+	}
+	FEnergyMeterDisplayState& State = M_EnergyMeterState;
+	State.Fill = FMath::FInterpTo(State.Fill, State.TargetFill, DeltaTime, EnergyMeterFollowSpeed);
+	State.Demand = FMath::FInterpTo(State.Demand, State.TargetDemand, DeltaTime, EnergyMeterFollowSpeed);
+	State.Deficit = FMath::FInterpTo(State.Deficit, State.TargetDeficit, DeltaTime, EnergyMeterFollowSpeed);
+	M_EnergyMeterMaterial->SetScalarParameterValue(EnergyMeterParameters::Fill, State.Fill);
+	M_EnergyMeterMaterial->SetScalarParameterValue(EnergyMeterParameters::Demand, State.Demand);
+	M_EnergyMeterMaterial->SetScalarParameterValue(EnergyMeterParameters::Deficit, State.Deficit);
+}
+
+bool UW_PlayerEnergyBar::GetHasEnergyMeter() const
+{
+	return IsValid(EnergyMeterImage);
+}
+
+UWidget* UW_PlayerEnergyBar::GetHoverWidget() const
+{
+	if (GetHasEnergyMeter())
+	{
+		return EnergyMeterImage;
+	}
+	return GetIsValidEnergyProgressBar() ? EnergyProgressBar : nullptr;
 }
 
 // ----------------- Validators -----------------

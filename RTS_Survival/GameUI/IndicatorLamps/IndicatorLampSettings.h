@@ -10,8 +10,7 @@ class UMaterialInterface;
 
 /**
  * @brief Project settings for the analog indicator lamps on the HUD (M_UI_IndicatorLamp instances, see
- * Source/Docs/UI/AnalogGauges.md): one on each idle unit button and the power deficit lamp in the minimap's
- * top-left corner, next to the energy bar. No HUD Blueprint needs its own setup.
+ * Source/Docs/UI/AnalogGauges.md): one on each idle unit button. No HUD Blueprint needs its own setup.
  */
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Indicator Lamps"))
 class RTS_SURVIVAL_API UIndicatorLampSettings : public UDeveloperSettings
@@ -36,22 +35,6 @@ public:
 	/** How far the idle lamp reaches past the button's top and right edge, in UI units. */
 	UPROPERTY(Config, EditAnywhere, Category="Idle Unit Buttons", meta=(ClampMin="0.0"))
 	float IdleLampOverhang = 4.f;
-
-	/** Blinks while the energy demand is higher than the supply. */
-	UPROPERTY(Config, EditAnywhere, Category="Power Deficit")
-	TSoftObjectPtr<UMaterialInterface> PowerDeficitLamp;
-
-	/** Edge length of the power deficit lamp in UI units. */
-	UPROPERTY(Config, EditAnywhere, Category="Power Deficit", meta=(ClampMin="4.0"))
-	float PowerDeficitLampSize = 22.f;
-
-	/** Distance from the minimap's top-left corner, in UI units (the full map button uses the same inset). */
-	UPROPERTY(Config, EditAnywhere, Category="Power Deficit")
-	float PowerDeficitLampInset = 6.f;
-
-	/** When false the deficit lamp is hidden while the power is fine instead of showing as a dark jewel. */
-	UPROPERTY(Config, EditAnywhere, Category="Power Deficit")
-	bool bShowPowerDeficitLampWhenOk = true;
 
 	/** Seconds a lamp takes to light up or go dark, like a warming filament. */
 	UPROPERTY(Config, EditAnywhere, Category="Lamps", meta=(ClampMin="0.0"))

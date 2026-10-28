@@ -61,15 +61,32 @@ instruments keep moving on a paused game.
 - **Idle lamps:** each idle unit button (`UW_IdleUnitButton`) builds a lamp into its free top-right corner, against
   the bezel and reaching `IdleLampOverhang` units past the edge. It blinks while something of its type is idle
   (`MI_Lamp_IdleHarvester` red, `MI_Lamp_IdleNomadTruck` green, 0.8 Hz, out of phase) and is a dark jewel otherwise.
-- **Power deficit lamp:** `UMainGameUI::SetupPowerDeficitLamp` puts a red lamp (`MI_Lamp_PowerDeficit`, 1.6 Hz) in
-  the minimap's top-left corner, next to the top of the energy bar, mirroring the full map button. The energy bar
-  lights it while demand exceeds supply. `bShowPowerDeficitLampWhenOk` false hides it while the power is fine.
-- **Settings:** Project Settings > Game > Indicator Lamps (`UIndicatorLampSettings`): lamp materials, sizes,
-  overhang, inset and the fade time. No HUD Blueprint was changed; everything is built at runtime.
+- **Settings:** Project Settings > Game > Indicator Lamps (`UIndicatorLampSettings`): lamp materials, size,
+  overhang and the fade time. (A power deficit lamp in the minimap corner was tried on 2026-10-27 and removed.) No HUD Blueprint was changed; everything is built at runtime.
 - **Code:** `FIndicatorLamp` (`GameUI/IndicatorLamps/`) is the shared helper: an Image with its own dynamic
   instance, `SetIsLit` and a `Tick` that fades `Power` in and out.
 - **Capture:** `-UISnapshotLampsOn` (non-shipping) forces every lamp lit and steady (no blink) for offscreen UI
   captures.
+
+## Energy meter (in the HUD: the glass tube)
+
+The energy bar left of the minimap is now an analog glass tube (`MI_EnergyMeter_Tube`, 32 x 256 units at x -298..-266,
+y 8..264 in the HUD: level with the minimap). Picked on 2026-10-28 from three designs; the other two (Edgewise,
+RadioDial) are kept as materials. Faces: `energy_meters.py`; materials, capture and HUD setup:
+`ui_energy_meters.py` (`build()`, `capture()`, `apply_to_hud()`), assets in `/Game/.../Skins/_Shared/EnergyMeters/`.
+
+- **Look:** a glowing radixite column in a clamped glass tube. The tube refracts the scale behind it (flipped inside
+  the fluid, with colour fringes at the walls), the meniscus rocks, the fluid swirls and lights the plate beside it.
+  No bubbles (by request). A brass collar with a red tip marks the demand.
+- **Deficit:** the fluid turns `DeficitColor` and flickers, and a dashed red band on the scale shows the shortfall.
+- **Runtime:** `BP_W_PlayerEnergyBar` has an `EnergyMeterImage` (BindWidgetOptional). When it is there,
+  `UW_PlayerEnergyBar` collapses the old progress bar and level marker, eases `Fill`, `Demand` and `Deficit` towards
+  the 0.5 s energy update (`EnergyMeterFollowSpeed`, snapping when supply jumps to a new window) and uses the meter
+  for the hover info. OK / deficit colours come from the Blueprint's `OkColor` / `DeficitColor`.
+- **Captures:** `-UISnapshotEnergyPreview` holds the meter at 62% supply / 45% demand, `-UISnapshotEnergyDeficit` at
+  34% / 58% (non-shipping).
+- **Undo:** the original `BP_W_PlayerEnergyBar.uasset` is in `Saved/UISkinSwitcher/backup_energymeter/`; deleting
+  `EnergyMeterImage` from it alone brings the progress bar back.
 
 ## Driving them at runtime
 

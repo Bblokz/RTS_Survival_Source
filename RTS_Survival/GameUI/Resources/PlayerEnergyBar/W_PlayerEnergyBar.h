@@ -4,10 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "RTS_Survival/GameUI/IndicatorLamps/IndicatorLamp.h"
 #include "W_PlayerEnergyBar.generated.h"
 
 class UImage;
+class UMaterialInstanceDynamic;
 class UW_EnergyBarInfo;
 class UPlayerResourceManager;
 class UProgressBar;
@@ -26,6 +26,27 @@ class UProgressBar;
  * Configure the non-linear scale via EnergyWindowSizes. When supply exceeds the sum of defined windows,
  * the last window size repeats indefinitely (to support any amount of energy).
  */
+/**
+ * @brief What the analog energy meter shows and where its needle-like parts currently are: the shader gets the eased
+ * values every tick, the targets come from the 0.5 s energy update.
+ */
+USTRUCT()
+struct FEnergyMeterDisplayState
+{
+	GENERATED_BODY()
+
+	float TargetFill = 0.f;
+	float TargetDemand = 0.f;
+	float TargetDeficit = 0.f;
+
+	float Fill = 0.f;
+	float Demand = 0.f;
+	float Deficit = 0.f;
+
+	// False until the first energy update, so the meter starts at the real level instead of rising from empty.
+	bool bHasTargets = false;
+};
+
 UCLASS()
 class RTS_SURVIVAL_API UW_PlayerEnergyBar : public UUserWidget
 {
@@ -38,9 +59,6 @@ public:
 	 * @param NewEnergyInfoWidget Info widget to show on hover.
 	 */
 	void InitPlayerEnergyBar(UPlayerResourceManager* NewPlayerResourceManager, UW_EnergyBarInfo* NewEnergyInfoWidget);
-
-	/** @param PowerDeficitLamp Lamp placed next to the bar (by UMainGameUI); it blinks while demand exceeds supply. */
-	void SetPowerDeficitLamp(const FIndicatorLamp& PowerDeficitLamp);
 
 protected:
 	/** Sets up update timer and caches base position for the level overlay. */
@@ -71,6 +89,17 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	UImage* EnergyBarLevel;
 
+	/**
+	 * Optional analog meter (an M_UI_EnergyMeter_* material, e.g. the glass tube). When present it replaces the
+	 * progress bar and level marker, which are collapsed, and it is what the player hovers for the info widget.
+	 */
+	UPROPERTY(meta = (BindWidgetOptional))
+	UImage* EnergyMeterImage;
+
+	/** How fast the meter's fluid and collar follow a change, per second (FInterpTo speed). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "EnergyMeter", meta = (ClampMin = "0.1"))
+	float EnergyMeterFollowSpeed = 3.f;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Description")
 	TObjectPtr<UW_EnergyBarInfo> EnergyBarInfoWidget;
 
@@ -99,7 +128,9 @@ protected:
 
 private:
 	UPROPERTY()
-	FIndicatorLamp M_PowerDeficitLamp;
+	TObjectPtr<UMaterialInstanceDynamic> M_EnergyMeterMaterial;
+
+	FEnergyMeterDisplayState M_EnergyMeterState;
 
 	/** Timer handle for updating the energy bar */
 	FTimerHandle EnergyBarUpdateTimerHandle;
@@ -134,5 +165,16 @@ private:
 	void SetEnergyInfoBarVisibility(const bool bVisible) const;
 	void UpdateProgressBarUI(const float Fill01, const bool bInDeficit) const;
 	void UpdateEnergyLevelUI(const float Level01) const;
+
+	// ----------------- Analog meter -----------------
+	void SetupEnergyMeter();
+	void SetEnergyMeterTargets(const float Fill01, const float DemandLevel01, const bool bInDeficit);
+	void TickEnergyMeter(const float DeltaTime);
+
+	// Silent on purpose: the meter is optional, a Blueprint without one keeps the progress bar.
+	bool GetHasEnergyMeter() const;
+
+	/** @return The widget the player hovers to see the energy info: the meter if there is one, else the bar. */
+	UWidget* GetHoverWidget() const;
 	float MapPercentToYOffset(const float Percent01) const;
 };

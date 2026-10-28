@@ -605,10 +605,6 @@ private:
 		const ACPPController* NewPlayerController, UW_PlayerEnergyBar* NewPlayerEnergyBar, UW_EnergyBarInfo*
 		NewPlayerEnergyBarInfo) const;
 
-	// Places the power deficit indicator lamp in the minimap's top-left corner, next to the top of the energy bar,
-	// and hands it to the energy bar, which lights it while demand exceeds supply.
-	void SetupPowerDeficitLamp(UW_PlayerEnergyBar* PlayerEnergyBar);
-
 	// The Bxp description widget that is shown when hovering over a building expansion option.
 	UPROPERTY()
 	TObjectPtr<UW_BxpDescription> M_BxpDescription;
