@@ -7,6 +7,8 @@
 
 #include "WreckTurretTossSettings.generated.h"
 
+class USoundCue;
+
 /**
  * @brief Tuning for the ammo cook-off death where the wreck's turret is blown off the hull.
  * Set per tank on ATankMaster; the values are handed to the UWreckTurretTossComponent on the spawned wreck.
@@ -47,6 +49,10 @@ struct RTS_SURVIVAL_API FWreckTurretTossSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Launch")
 	ERTS_ExplosionType LaunchExplosionType = ERTS_ExplosionType::TankTurret;
 
+	// Plays instead of the launch explosion type's own sound; empty keeps that sound.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Launch")
+	TObjectPtr<USoundCue> LaunchSound = nullptr;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Hull Fire")
 	ERTSFireType HullFireType = ERTSFireType::AmmoCookOffInf;
 
@@ -77,11 +83,23 @@ struct RTS_SURVIVAL_API FWreckTurretTossSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Turret Fire", meta=(EditCondition="bBurnTurretWhileFlying"))
 	FVector TurretFireScale = FVector(0.6);
 
+	// Metal chunks, shells, ammo boxes and cans thrown out of the hull (pieces set in Project Settings > Wreck Debris).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Debris")
+	bool bThrowDebris = true;
+
+	// Multiplies the piece count, which already grows with the hull's size.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Debris", meta=(EditCondition="bThrowDebris", ClampMin="0"))
+	float DebrisCountScale = 1.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing")
 	bool bPlayLandingImpact = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(EditCondition="bPlayLandingImpact"))
 	ERTS_ExplosionType LandingExplosionType = ERTS_ExplosionType::Small;
+
+	// Plays instead of the landing explosion type's own sound; empty keeps that sound.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(EditCondition="bPlayLandingImpact"))
+	TObjectPtr<USoundCue> LandingSound = nullptr;
 
 	// Below this linear speed (cm/s) for the settle duration the turret counts as landed.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(ClampMin="0"))

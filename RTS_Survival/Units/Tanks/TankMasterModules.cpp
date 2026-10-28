@@ -259,7 +259,11 @@ void ATankMaster::DestroyAndSpawnActorsWithTurretToss(const FDestroySpawnActorsP
                                                       const FCollapseFX CollapseFX)
 {
 	// Read now: the tank may be destroyed before the wreck class finished loading.
-	const FWreckTurretTossSettings TossSettings = M_TurretTossSettings;
+	FWreckTurretTossSettings TossSettings = M_TurretTossSettings;
+	if (not IsValid(TossSettings.LaunchSound))
+	{
+		TossSettings.LaunchSound = GetCookOffTurretLaunchSound();
+	}
 	const float LiveTurretYawOffset = GetLiveTurretYawOffset();
 	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX,
 	                                    [TossSettings, LiveTurretYawOffset](AActor* SpawnedActor)
@@ -295,6 +299,16 @@ void ATankMaster::Debug_DieDuringAmmoCookOff()
 	// Tanks without a cook-off profile still show the cook-off death.
 	bM_IsAmmoCookingOff = true;
 	UnitDies(ERTSDeathType::Kinetic);
+}
+
+USoundCue* ATankMaster::GetCookOffTurretLaunchSound() const
+{
+	const TSubclassOf<UAmmoCookOffBehaviour> CookOffBehaviourClass = GetAmmoCookOffBehaviourClass();
+	if (CookOffBehaviourClass == nullptr)
+	{
+		return nullptr;
+	}
+	return CookOffBehaviourClass->GetDefaultObject<UAmmoCookOffBehaviour>()->GetTurretLaunchSound();
 }
 
 float ATankMaster::GetLiveTurretYawOffset() const

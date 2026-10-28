@@ -3,12 +3,16 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "PhysicsEngine/BodySetup.h"
+#include "Sound/SoundCue.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDebrisBurstComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogWreckTurretToss, Log, All);
 
 namespace WreckTurretTossConstants
 {
@@ -32,6 +36,8 @@ UWreckTurretTossComponent::UWreckTurretTossComponent()
 bool UWreckTurretTossComponent::StartToss(const FWreckTurretTossSettings& Settings, const float LiveTurretYawOffset)
 {
 	M_Settings = Settings;
+	UE_LOG(LogWreckTurretToss, Verbose, TEXT("Turret toss on %s, launch sound %s"), *GetNameSafe(GetOwner()),
+	       *GetNameSafe(M_Settings.LaunchSound));
 	if (not TryFindWreckMeshes())
 	{
 		return false;
@@ -45,8 +51,9 @@ bool UWreckTurretTossComponent::StartToss(const FWreckTurretTossSettings& Settin
 	M_FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
 
 	M_TurretRingLocation = GetTurretRingLocation();
-	SpawnExplosion(M_Settings.LaunchExplosionType, M_TurretRingLocation);
+	SpawnExplosion(M_Settings.LaunchExplosionType, M_TurretRingLocation, M_Settings.LaunchSound);
 	StartHullAmmoFire();
+	StartDebrisBurst();
 	// Casemate wrecks have no separate turret: they only get the explosion and the hull ammo fire.
 	if (not M_TurretMesh.IsValid())
 	{
@@ -222,11 +229,17 @@ void UWreckTurretTossComponent::LaunchTurret() const
 	M_TurretMesh->SetPhysicsAngularVelocityInDegrees(TumbleAxis * SpinSpeed);
 }
 
-void UWreckTurretTossComponent::SpawnExplosion(const ERTS_ExplosionType ExplosionType, const FVector& Location) const
+void UWreckTurretTossComponent::SpawnExplosion(const ERTS_ExplosionType ExplosionType, const FVector& Location,
+                                               USoundCue* OverrideSound) const
 {
 	UGameExplosionsManager* ExplosionsManager = FRTS_Statics::GetGameExplosionsManager(this);
 	if (not IsValid(ExplosionsManager))
 	{
+		return;
+	}
+	if (IsValid(OverrideSound))
+	{
+		ExplosionsManager->SpawnExplosionAtLocationCustomSound(ExplosionType, Location, OverrideSound);
 		return;
 	}
 	ExplosionsManager->SpawnRTSExplosionAtLocation(ExplosionType, Location, true);
@@ -249,6 +262,19 @@ void UWreckTurretTossComponent::StartHullAmmoFire()
 		M_Settings.HullFireLifeTime,
 		M_Settings.HullFireScale,
 		M_Settings.HullFireEffectParams);
+}
+
+void UWreckTurretTossComponent::StartDebrisBurst() const
+{
+	AActor* Wreck = GetOwner();
+	if (not M_Settings.bThrowDebris || not IsValid(Wreck) || not GetIsValidHullMesh())
+	{
+		return;
+	}
+	UWreckDebrisBurstComponent* DebrisBurst = NewObject<UWreckDebrisBurstComponent>(Wreck);
+	Wreck->AddInstanceComponent(DebrisBurst);
+	DebrisBurst->RegisterComponent();
+	DebrisBurst->StartBurst(M_TurretRingLocation, M_HullMesh.Get(), M_Settings.DebrisCountScale);
 }
 
 void UWreckTurretTossComponent::StartTurretFire()
@@ -386,7 +412,7 @@ void UWreckTurretTossComponent::OnTurretHit(UPrimitiveComponent* HitComponent, A
 	}
 
 	bM_HasPlayedLandingImpact = true;
-	SpawnExplosion(M_Settings.LandingExplosionType, Hit.ImpactPoint);
+	SpawnExplosion(M_Settings.LandingExplosionType, Hit.ImpactPoint, M_Settings.LandingSound);
 }
 
 bool UWreckTurretTossComponent::GetIsValidTurretMesh() const

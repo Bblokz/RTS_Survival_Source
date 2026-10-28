@@ -904,6 +904,9 @@ private:
 
 	/** @return Yaw of the first mounted turret relative to the hull; 0 without turrets. */
 	float GetLiveTurretYawOffset() const;
+
+	/** @return The weight-class turret launch sound of this tank's cook-off behaviour; null when it has none. */
+	USoundCue* GetCookOffTurretLaunchSound() const;
 	void ShowModuleFirePopup(const FString& PopupText) const;
 	void OnModuleAddOnArmorDamaged(
 		const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState);
