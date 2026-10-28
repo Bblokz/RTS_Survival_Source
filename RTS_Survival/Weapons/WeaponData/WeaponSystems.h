@@ -374,7 +374,9 @@ enum class
 	// BM-13 Katyusha: sixteen M-13 132mm HE rockets rippled off launch rails; area fire with a long reload.
 	Katyusha_M13_132MM UMETA(DisplayName = "13.2 cm M-13 Rocket (BM-13)"),
 	// MS-1: the short low-velocity 37mm Hotchkiss (PS-1) tank gun; quick to reload, weak against armour.
-	Hotchkiss_37MM_MS1 UMETA(DisplayName = "37MM Hotchkiss (MS-1)")
+	Hotchkiss_37MM_MS1 UMETA(DisplayName = "37MM Hotchkiss (MS-1)"),
+	// Horten Ho 229: one of its two wing-root MK 108 30mm cannons (both weapons share this entry).
+	MK108_30MM_Horten UMETA(DisplayName = "MK 108 30MM (Horten Ho 229)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -520,6 +522,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::S_26_130MM_ISU130: return "S-26";
 	case EWeaponName::Katyusha_M13_132MM: return "M-13 Rockets";
 	case EWeaponName::Hotchkiss_37MM_MS1: return "Hotchkiss 37";
+	case EWeaponName::MK108_30MM_Horten: return "MK 108";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -1107,6 +1110,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Katyusha_M13_132MM";
 	case EWeaponName::Hotchkiss_37MM_MS1:
 		return "Hotchkiss_37MM_MS1";
+	case EWeaponName::MK108_30MM_Horten:
+		return "MK108_30MM_Horten";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:

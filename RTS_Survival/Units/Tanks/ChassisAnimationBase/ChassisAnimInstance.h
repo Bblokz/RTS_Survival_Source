@@ -19,7 +19,7 @@ struct FChassisSmokeSurfaceState
 
 	FLinearColor M_CurrentTint = FLinearColor::White;
 
-	float M_CurrentDensity = 1.f;
+	float M_CurrentOpacity = 1.f;
 
 	// False while the smoke is off: the next activation takes the ground's look at once instead of easing to it.
 	bool bM_HasAppliedLook = false;
