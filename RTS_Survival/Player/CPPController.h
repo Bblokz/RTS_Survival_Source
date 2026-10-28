@@ -62,6 +62,8 @@
 #endif
 
 enum class ERTSAggroBehaviour : uint8;
+class SViewport;
+class SWidget;
 class UGlobalAbility;
 enum class EGlobalAbility : uint8;
 struct FGlobalAbilitySoundSettings;
@@ -888,6 +890,13 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Selection")
 	void SelectSingleUnitFromUI(AActor* UnitToSelect);
+
+	/**
+	 * @brief Lets the control group bar act like the group's hotkey: a click selects the group, shift adds it to the
+	 * selection and control assigns the current selection to it (the held modifier keys decide).
+	 * @param GroupIndex Control group index (0 = key 1).
+	 */
+	void UseControlGroupFromUI(const int32 GroupIndex);
 
 	/** Keep only units of UnitID.UnitType across all selection arrays. If the selection already contains only that type, UI remains unchanged. */
 	void OnlySelectUnitsOfType(const FTrainingOption& UnitID);
@@ -2043,6 +2052,9 @@ private:
 
 	// Helper methods
 	void HandleHoveringBlockedState();
+	// True when a hit-testable HUD widget takes the cursor, so world hover must not show under the HUD.
+	bool GetIsCursorOverHitTestableHUD() const;
+	static bool GetIsWidgetBlockingWorldHover(const SWidget& TopWidgetUnderCursor, const SViewport& GameViewportWidget);
 	void UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
 	                             const FHitResult& MouseHitResult, const bool bHit);
 	void HideHoveringWidget();

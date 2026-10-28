@@ -92,6 +92,7 @@ ESelectionChangeAction UPlayerControlGroupManager::UseControlGroup(
 		SetControlGroupFromSelection(GroupIndex);
 		return ESelectionChangeAction::SelectionInvariant;
 	}
+	NotifyControlGroupRecalled(GroupIndex);
 	if (bIsHoldingShift)
 	{
 		return AddControlGroupToSelection_UpdateDecals(GroupIndex, AddedActorByControlGroup);
@@ -99,6 +100,16 @@ ESelectionChangeAction UPlayerControlGroupManager::UseControlGroup(
 	// Deselect current selection and select control group
 	SelectOnlyControlGroup(GroupIndex, AddedActorByControlGroup);
 	return ESelectionChangeAction::UnitAdded_RebuildUIHierarchy;
+}
+
+void UPlayerControlGroupManager::NotifyControlGroupRecalled(const int32 GroupIndex) const
+{
+	if (not M_ControlGroupsWidget || not M_ControlGroups.IsValidIndex(GroupIndex)
+		|| M_ControlGroups[GroupIndex].IsEmpty())
+	{
+		return;
+	}
+	M_ControlGroupsWidget->OnControlGroupRecalled(GroupIndex);
 }
 
 
@@ -184,7 +195,9 @@ void UPlayerControlGroupManager::SetControlGroupFromSelection(const int32 GroupI
 	{
 		AActor* OutMostFrequentUnit = nullptr;
 		const FTrainingOption MostFrequentUnit = GetMostFrequentUnitOfGroup(GroupIndex, OutMostFrequentUnit);
-		M_ControlGroupsWidget->UpdateMostFrequentUnitInGroup(GroupIndex, MostFrequentUnit);
+		// GetMostFrequentUnitOfGroup pruned the destroyed units, so the count is current.
+		M_ControlGroupsWidget->UpdateMostFrequentUnitInGroup(
+			GroupIndex, MostFrequentUnit, M_ControlGroups[GroupIndex].GetNumUnits());
 	}
 }
 

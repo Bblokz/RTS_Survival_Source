@@ -23,6 +23,9 @@ struct FControlGroup
 
 	bool IsEmpty()const;
 
+	// A squad counts as one unit.
+	int32 GetNumUnits() const { return CGSquads.Num() + CGPawns.Num() + GCActors.Num(); }
+
 	UPROPERTY()
 	TArray<TWeakObjectPtr<ASquadController>> CGSquads;
 
@@ -114,6 +117,9 @@ private:
 	FTrainingOption GetMostFrequentUnitOfGroup(int32 GroupIndex, AActor*& OutMostFrequentUnit);
 
 	bool EnsureValidUseControlGroupRequest(const int32 GroupIndex) const;
+
+	// Flashes the group's slot in the control group bar when its hotkey selects it.
+	void NotifyControlGroupRecalled(const int32 GroupIndex) const;
 
 	/** @return Whether we added a new type of unit to the selection that the hierarchy needs to be updated for.*/
 	ESelectionChangeAction AddSquadsFromControlGroupToSelection(FControlGroup& ControlGroup, const int32 GroupIndex,

@@ -12,6 +12,7 @@
 #include "RTS_Survival/Buildings/FieldTrench/RTSFieldTrench.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorldSubsystem.h"
 #include "RTS_Survival/Player/CPPController.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -26,7 +27,16 @@ namespace CoverRuntimeTrenchTestScenarioPrivate
 	// The dug trench is about 9 m long at one second of digging per metre.
 	constexpr float DigTimeoutSeconds = 60.0f;
 	// Beside the squad, so the squad's walk into the trench is short; the dug trench well away from it.
-	const FVector BuiltTrenchOffsetFromSquad(600.0f, -300.0f, 0.0f);
+	// Where the built trench may go, beside the squad so its walk is short. The test of leaving the socket compares
+	// the soldier's feet with the navigation mesh point, so the spot must have navmesh that lies on the ground.
+	const FVector BuiltTrenchOffsetsFromSquad[] = {
+		FVector(600.0f, -300.0f, 0.0f), FVector(-600.0f, -300.0f, 0.0f), FVector(600.0f, -1500.0f, 0.0f),
+		FVector(-600.0f, -1500.0f, 0.0f), FVector(1500.0f, -300.0f, 0.0f), FVector(-1500.0f, -300.0f, 0.0f)
+	};
+	// The built trench runs along +Y from its start; its centreline is sampled this often and this far.
+	constexpr float BuiltTrenchLength = 1000.0f;
+	constexpr float BuiltTrenchSampleStep = 125.0f;
+	constexpr float MaximumNavmeshAboveGround = 8.0f;
 	// Where the dug trench may go; the first spot flat enough for the HQ's trench placement is taken.
 	const FVector DugTrenchOffsetsFromSquad[] = {
 		FVector(600.0f, 2500.0f, 0.0f), FVector(600.0f, -2500.0f, 0.0f), FVector(-1500.0f, 0.0f, 0.0f),
@@ -87,6 +97,9 @@ namespace CoverRuntimeTrenchTestScenarioPrivate
 		return Pieces;
 	}
 
+	/** @return How far the navigation mesh lies from the landscape along the line, at worst; a large value off navmesh. */
+	float GetWorstNavmeshToGroundGap(UWorld& World, const FVector& Start, const FVector& Direction, const float Length);
+
 	bool TryProjectToNavigation(UWorld& World, const FVector& Location, FVector& OutLocation)
 	{
 		UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(&World);
@@ -98,6 +111,26 @@ namespace CoverRuntimeTrenchTestScenarioPrivate
 		}
 		OutLocation = Projected.Location;
 		return true;
+	}
+
+	float GetWorstNavmeshToGroundGap(UWorld& World, const FVector& Start, const FVector& Direction, const float Length)
+	{
+		float WorstGap = 0.0f;
+		for (float Distance = 0.0f; Distance <= Length; Distance += BuiltTrenchSampleStep)
+		{
+			const FVector Sample = Start + Direction * Distance;
+			FVector OnNavigation;
+			FHitResult GroundHit;
+			const bool bHasGround = World.LineTraceSingleByChannel(
+				GroundHit, Sample + FVector::UpVector * 1000.0f, Sample - FVector::UpVector * 1000.0f, COLLISION_TRACE_LANDSCAPE);
+			if (not bHasGround || not TryProjectToNavigation(World, GroundHit.ImpactPoint, OnNavigation))
+			{
+				return TNumericLimits<float>::Max();
+			}
+			WorstGap = FMath::Max(WorstGap, FMath::Abs(OnNavigation.Z - GroundHit.ImpactPoint.Z) +
+				FVector::Dist2D(OnNavigation, GroundHit.ImpactPoint));
+		}
+		return WorstGap;
 	}
 }
 
@@ -259,9 +292,25 @@ bool FCoverRuntimeTrenchTestScenario::SpawnTrenches(UWorld& World)
 		}
 	}
 	FVector BuiltTrenchStart = FVector::ZeroVector;
-	const bool bFoundGround = IsValid(PlayerSquad) &&
-		TryProjectToNavigation(World, PlayerSquad->GetActorLocation() + BuiltTrenchOffsetFromSquad, BuiltTrenchStart);
-	Check(bFoundGround, TEXT("a player squad with navigation mesh beside it exists"));
+	float BuiltTrenchNavmeshGap = TNumericLimits<float>::Max();
+	for (const FVector& Offset : BuiltTrenchOffsetsFromSquad)
+	{
+		if (not IsValid(PlayerSquad) ||
+			not TryProjectToNavigation(World, PlayerSquad->GetActorLocation() + Offset, BuiltTrenchStart))
+		{
+			continue;
+		}
+		BuiltTrenchNavmeshGap = GetWorstNavmeshToGroundGap(World, BuiltTrenchStart, FVector::RightVector, BuiltTrenchLength);
+		if (BuiltTrenchNavmeshGap <= MaximumNavmeshAboveGround)
+		{
+			break;
+		}
+	}
+	const bool bFoundGround = BuiltTrenchNavmeshGap <= MaximumNavmeshAboveGround;
+	Check(
+		bFoundGround,
+		TEXT("a player squad with navigation mesh on the ground beside it exists"),
+		FString::Printf(TEXT("worst_navmesh_gap_cm=%.1f"), BuiltTrenchNavmeshGap));
 	if (not bFoundGround)
 	{
 		return false;
