@@ -7,13 +7,13 @@
 namespace GroundSurfaceSettingsDefaults
 {
 	FGroundSurfaceDefinition MakeDefinition(const EGroundSurfaceType SurfaceType, TArray<FName> LayerNames,
-	                                        const FLinearColor& SmokeTint, const float SmokeDensity)
+	                                        const FLinearColor& SmokeTint, const float SmokeOpacity)
 	{
 		FGroundSurfaceDefinition Definition;
 		Definition.SurfaceType = SurfaceType;
 		Definition.LayerNames = MoveTemp(LayerNames);
 		Definition.SmokeLook.SmokeTint = SmokeTint;
-		Definition.SmokeLook.SmokeDensity = SmokeDensity;
+		Definition.SmokeLook.SmokeOpacity = SmokeOpacity;
 		return Definition;
 	}
 
@@ -51,19 +51,19 @@ URTSGroundSurfaceSettings::URTSGroundSurfaceSettings()
 		               {TEXT("Grass"), TEXT("Grass_a"), TEXT("Grass_b"), TEXT("GrassCastle"), TEXT("GrassDry"), TEXT("DryGrass"),
 		                TEXT("Weedy"), TEXT("Forest"), TEXT("ForestDry"), TEXT("ForestGround"), TEXT("ForrestGround"),
 		                TEXT("GreenForrest")},
-		               FLinearColor(0.6f, 0.5f, 0.38f), 0.8f),
+		               FLinearColor(0.6f, 0.5f, 0.38f), 0.75f),
 		MakeDefinition(EGroundSurfaceType::Sand,
 		               {TEXT("Sand"), TEXT("AridSoil"), TEXT("Desert"), TEXT("DesertGravel"), TEXT("GraySand"), TEXT("StandardSand"),
 		                TEXT("Standard Sand"), TEXT("WhiteSand"), TEXT("White Sand"), TEXT("RTSSand"), TEXT("Dunes"), TEXT("Beach")},
-		               FLinearColor(1.f, 0.66f, 0.38f), 1.3f),
+		               FLinearColor(1.f, 0.66f, 0.38f), 1.25f),
 		MakeDefinition(EGroundSurfaceType::Rock,
 		               {TEXT("Rock"), TEXT("RockDesert"), TEXT("RockSlope"), TEXT("RockyForrest"), TEXT("RockyPath"),
 		                TEXT("DesertRockDark"), TEXT("Mountain"), TEXT("MountainTop"), TEXT("Slope"), TEXT("RiverStone"),
 		                TEXT("StoneGround"), TEXT("Layer_StoneGround"), TEXT("ScorchSandyStone")},
-		               FLinearColor(0.7f, 0.64f, 0.58f), 0.65f),
+		               FLinearColor(0.7f, 0.64f, 0.58f), 0.6f),
 		MakeDefinition(EGroundSurfaceType::Concrete,
 		               {TEXT("IndustrialConcrete"), TEXT("IndustrialConcrete2"), TEXT("Asphalt"), TEXT("ScorchConcrete")},
-		               FLinearColor(0.66f, 0.66f, 0.66f), 0.4f),
+		               FLinearColor(0.66f, 0.66f, 0.66f), 0.35f),
 	};
 
 	// Specific meshes and the specific ground path kinds first: BP_RoadSpline draws rails and train wires too, and the

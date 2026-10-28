@@ -32,7 +32,7 @@ struct FGroundSurfaceSmokeLook
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Smoke")
 	FLinearColor SmokeTint = FLinearColor(0.88f, 0.682f, 0.55f, 1.f);
 
-	// Scales how many smoke particles spawn; 1 is the look tuned on dirt.
+	// Scales the opacity of the smoke, so thin ground (concrete) gives faint smoke; 1 is the look tuned on dirt.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Smoke", meta=(ClampMin="0", ClampMax="3"))
-	float SmokeDensity = 1.f;
+	float SmokeOpacity = 1.f;
 };

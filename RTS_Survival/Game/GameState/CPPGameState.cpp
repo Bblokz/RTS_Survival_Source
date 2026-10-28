@@ -3228,6 +3228,32 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::shVAK_20MM, WeaponData);
 
+	// MK 108 30mm (Horten Ho 229; both wing-root cannons share this entry). A short, low-velocity cannon firing heavy
+	// mine shells: hits harder and fires slower than the MG 151, with a small magazine and a short reach.
+	{
+		FWeaponData Mk108WeaponData = WeaponData;
+		Mk108WeaponData.WeaponName = EWeaponName::MK108_30MM_Horten;
+		Mk108WeaponData.ShellType = EWeaponShellType::Shell_AP;
+		Mk108WeaponData.ShellTypes = {EWeaponShellType::Shell_AP, EWeaponShellType::Shell_HE};
+		Mk108WeaponData.WeaponCalibre = 30;
+		Mk108WeaponData.TNTExplosiveGrams = 25;
+		Mk108WeaponData.BaseDamage = DamagePerMM * Mk108WeaponData.WeaponCalibre
+			+ Mk108WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		Mk108WeaponData.Range = DeveloperSettings::GameBalance::Ranges::AircraftSmallArmsRange;
+		Mk108WeaponData.ArmorPen = 32;
+		Mk108WeaponData.ArmorPenMaxRange = 20;
+		Mk108WeaponData.MagCapacity = 60;
+		Mk108WeaponData.ReloadSpeed = 6;
+		Mk108WeaponData.BaseCooldown = 0.45f;
+		Mk108WeaponData.Accuracy = 55;
+		Mk108WeaponData.ShrapnelRange = Mk108WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+		Mk108WeaponData.ShrapnelDamage = Mk108WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		Mk108WeaponData.ShrapnelParticles = Mk108WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+		Mk108WeaponData.ShrapnelPen = Mk108WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+		Mk108WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.75f;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::MK108_30MM_Horten, Mk108WeaponData);
+	}
+
 
 	// Ba 12 23mm
 	WeaponData.WeaponName = EWeaponName::Ba12_23MM;

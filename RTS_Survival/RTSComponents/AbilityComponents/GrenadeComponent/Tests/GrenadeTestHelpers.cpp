@@ -9,11 +9,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
 #include "Components/SceneCaptureComponent2D.h"
-#include "Engine/BlueprintGeneratedClass.h"
-#include "Engine/InheritableComponentHandler.h"
-#include "Engine/SCS_Node.h"
 #include "Engine/SceneCapture2D.h"
-#include "Engine/SimpleConstructionScript.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -29,6 +25,7 @@
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
 namespace GrenadeTestHelpersPrivate
 {
@@ -41,67 +38,6 @@ namespace GrenadeTestHelpersPrivate
 	constexpr int32 PictureHeight = 720;
 	const FRotator GameCameraRotation(-70.f, 0.f, 0.f);
 	constexpr float GameCameraDistance = 3000.f;
-
-	void CollectComponentTemplates(UClass* UnitClass, TArray<UActorComponent*>& OutTemplates)
-	{
-		for (UClass* Class = UnitClass; Class != nullptr; Class = Class->GetSuperClass())
-		{
-			UBlueprintGeneratedClass* BlueprintClass = Cast<UBlueprintGeneratedClass>(Class);
-			if (BlueprintClass == nullptr)
-			{
-				continue;
-			}
-			if (BlueprintClass->SimpleConstructionScript != nullptr)
-			{
-				for (const USCS_Node* Node : BlueprintClass->SimpleConstructionScript->GetAllNodes())
-				{
-					OutTemplates.Add(Node != nullptr ? Node->ComponentTemplate : nullptr);
-				}
-			}
-			if (UInheritableComponentHandler* Handler = BlueprintClass->GetInheritableComponentHandler(false))
-			{
-				for (auto RecordIterator = Handler->CreateRecordIterator(); RecordIterator; ++RecordIterator)
-				{
-					OutTemplates.Add(RecordIterator->ComponentTemplate);
-				}
-			}
-		}
-	}
-
-	// Blueprint-added RTS components copy their template at spawn; the template carries the owner until restored.
-	void OverrideRTSComponentTemplateOwners(UClass* UnitClass, const uint8 OwningPlayer,
-	                                        TArray<TPair<TWeakObjectPtr<UObject>, uint8>>& OutRestore)
-	{
-		const FByteProperty* OwnerProperty = FindFProperty<FByteProperty>(URTSComponent::StaticClass(), TEXT("OwningPlayer"));
-		if (OwnerProperty == nullptr)
-		{
-			return;
-		}
-		TArray<UActorComponent*> Templates;
-		CollectComponentTemplates(UnitClass, Templates);
-		for (UActorComponent* Template : Templates)
-		{
-			if (not IsValid(Template) || not Template->IsA<URTSComponent>())
-			{
-				continue;
-			}
-			uint8* OwnerValue = OwnerProperty->ContainerPtrToValuePtr<uint8>(Template);
-			OutRestore.Emplace(Template, *OwnerValue);
-			*OwnerValue = OwningPlayer;
-		}
-	}
-
-	void RestoreRTSComponentTemplateOwners(const TArray<TPair<TWeakObjectPtr<UObject>, uint8>>& Restore)
-	{
-		const FByteProperty* OwnerProperty = FindFProperty<FByteProperty>(URTSComponent::StaticClass(), TEXT("OwningPlayer"));
-		for (const TPair<TWeakObjectPtr<UObject>, uint8>& Entry : Restore)
-		{
-			if (OwnerProperty != nullptr && Entry.Key.IsValid())
-			{
-				*OwnerProperty->ContainerPtrToValuePtr<uint8>(Entry.Key.Get()) = Entry.Value;
-			}
-		}
-	}
 }
 
 bool FGrenadeTestHelpers::TryStartGame(UWorld& World, TWeakObjectPtr<ACPPController>& OutPlayerController)
@@ -217,26 +153,8 @@ AActor* FGrenadeTestHelpers::SpawnUnitForPlayer(UWorld& World, const TCHAR* Clas
 	SpawnLocation.Z += SpawnHeightOffset;
 	const FTransform SpawnTransform(Transform.GetRotation(), SpawnLocation);
 
-	TArray<TPair<TWeakObjectPtr<UObject>, uint8>> TemplateOwnersToRestore;
-	OverrideRTSComponentTemplateOwners(UnitClass, OwningPlayer, TemplateOwnersToRestore);
-	AActor* Unit = World.SpawnActorDeferred<AActor>(UnitClass, SpawnTransform, nullptr, nullptr,
-	                                                ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-	if (IsValid(Unit))
-	{
-		// Components the C++ class creates exist already; Blueprint-added ones took the template value above.
-		if (URTSComponent* RTSComponent = Unit->FindComponentByClass<URTSComponent>())
-		{
-			RTSComponent->SetOwningPlayerRuntime(OwningPlayer);
-		}
-		Unit->FinishSpawning(SpawnTransform);
-	}
-	RestoreRTSComponentTemplateOwners(TemplateOwnersToRestore);
-	APawn* Pawn = Cast<APawn>(Unit);
-	if (IsValid(Pawn) && not IsValid(Pawn->GetController()))
-	{
-		Pawn->SpawnDefaultController();
-	}
-	return Unit;
+	return FRTSUnitOwnerSpawning::SpawnUnitForPlayer(World, UnitClass, FTransform(Transform.GetRotation(), SpawnLocation),
+	                                                 OwningPlayer);
 }
 
 bool FGrenadeTestHelpers::GetIsLivingSoldier(ASquadUnit* Soldier)

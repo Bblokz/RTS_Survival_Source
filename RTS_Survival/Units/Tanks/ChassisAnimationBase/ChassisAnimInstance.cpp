@@ -10,10 +10,9 @@
 
 namespace ChassisTrackSmoke
 {
-	// User parameters of NS_Track_Smokes: SmokeTint feeds the material through a dynamic parameter at particle spawn,
-	// SmokeDensity scales the spawn count.
-	const FName SmokeTintParameter = TEXT("SmokeTint");
-	const FName SmokeDensityParameter = TEXT("SmokeDensity");
+	// User parameter of NS_Track_Smokes: RGB tint and opacity scale in A. Each particle copies it into its dynamic
+	// material parameter at spawn, so particles already in the air keep the look of the ground they rose from.
+	const FName SmokeSurfaceLookParameter = TEXT("SmokeSurfaceLook");
 	// Below this difference the eased look snaps to the ground's look and stops updating the Niagara component.
 	constexpr float LookSnapTolerance = 0.01f;
 }
@@ -148,22 +147,22 @@ void UChassisAnimInstance::UpdateTrackSmokeSurfaceLook()
 	const float BlendAlpha = State.bM_HasAppliedLook && Settings != nullptr ? Settings->SmokeLookBlendPerUpdate : 1.f;
 
 	FLinearColor NewTint = FMath::Lerp(State.M_CurrentTint, TargetLook.SmokeTint, BlendAlpha);
-	float NewDensity = FMath::Lerp(State.M_CurrentDensity, TargetLook.SmokeDensity, BlendAlpha);
+	float NewOpacity = FMath::Lerp(State.M_CurrentOpacity, TargetLook.SmokeOpacity, BlendAlpha);
 	if (NewTint.Equals(TargetLook.SmokeTint, ChassisTrackSmoke::LookSnapTolerance)
-		&& FMath::IsNearlyEqual(NewDensity, TargetLook.SmokeDensity, ChassisTrackSmoke::LookSnapTolerance))
+		&& FMath::IsNearlyEqual(NewOpacity, TargetLook.SmokeOpacity, ChassisTrackSmoke::LookSnapTolerance))
 	{
 		NewTint = TargetLook.SmokeTint;
-		NewDensity = TargetLook.SmokeDensity;
+		NewOpacity = TargetLook.SmokeOpacity;
 	}
 	// Most updates land here: the vehicle stays on the same ground and the component keeps its values.
-	if (State.bM_HasAppliedLook && NewTint == State.M_CurrentTint && NewDensity == State.M_CurrentDensity)
+	if (State.bM_HasAppliedLook && NewTint == State.M_CurrentTint && NewOpacity == State.M_CurrentOpacity)
 	{
 		return;
 	}
-	M_TrackParticleComponent->SetVariableLinearColor(ChassisTrackSmoke::SmokeTintParameter, NewTint);
-	M_TrackParticleComponent->SetVariableFloat(ChassisTrackSmoke::SmokeDensityParameter, NewDensity);
+	M_TrackParticleComponent->SetVariableVec4(ChassisTrackSmoke::SmokeSurfaceLookParameter,
+	                                          FVector4(NewTint.R, NewTint.G, NewTint.B, NewOpacity));
 	State.M_CurrentTint = NewTint;
-	State.M_CurrentDensity = NewDensity;
+	State.M_CurrentOpacity = NewOpacity;
 	State.bM_HasAppliedLook = true;
 }
 
