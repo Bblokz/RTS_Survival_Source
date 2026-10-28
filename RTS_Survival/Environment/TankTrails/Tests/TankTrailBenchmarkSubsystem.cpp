@@ -27,6 +27,7 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/Tests/GrenadeTestHelpers.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "ShaderCompiler.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSTankTrailBench, Log, All);
 
@@ -39,7 +40,10 @@ namespace TankTrailBenchPrivate
 	const TCHAR* const RepeatsSwitch = TEXT("TankTrailBenchRepeats=");
 	const TCHAR* const LocationSwitch = TEXT("TankTrailBenchAt=");
 	const TCHAR* const ProfileGpuSwitch = TEXT("TankTrailBenchProfileGPU");
-	const TCHAR* const TrailConsoleVariable = TEXT("rts.TankTrails");
+	// The console variable the off/on phases switch; other features can be measured the same way
+	// (-TankTrailBenchCVar=grass.Enable).
+	const TCHAR* const ToggleSwitch = TEXT("TankTrailBenchCVar=");
+	const TCHAR* const DefaultToggledVariable = TEXT("rts.TankTrails");
 
 	const TCHAR* const TankClassPath =
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Ger_Vehicle_PanzerIV_H.Ger_Vehicle_PanzerIV_H_C");
@@ -62,6 +66,7 @@ namespace TankTrailBenchPrivate
 	// built tiles path fine, so after this long the tanks are spawned anyway.
 	constexpr double MaxNavigationSeconds = 60.0;
 	constexpr int32 NavigationQuietFrames = 60;
+	constexpr double MaxShaderCompileSeconds = 1200.0;
 	constexpr double MaxTankLoadSeconds = 90.0;
 	constexpr int32 WarmUpFrames = 450;
 	// Long enough for the capture's auto exposure to settle.
@@ -149,6 +154,8 @@ void UTankTrailBenchmarkSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	M_FramesPerPhase = DefaultFramesPerPhase;
 	FParse::Value(FCommandLine::Get(), FramesSwitch, M_FramesPerPhase);
 	M_PhaseRepeats = DefaultPhaseRepeats;
+	M_ToggledConsoleVariable = DefaultToggledVariable;
+	FParse::Value(FCommandLine::Get(), ToggleSwitch, M_ToggledConsoleVariable);
 	FParse::Value(FCommandLine::Get(), RepeatsSwitch, M_PhaseRepeats);
 	M_DriveCentre = DefaultDriveCentre;
 	FString LocationText;
@@ -173,8 +180,9 @@ void UTankTrailBenchmarkSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	bM_IsSuppressingErrorDialogs = true;
 	EnterPhase(ETankTrailBenchPhase::WaitingForGameStart);
 	UE_LOG(LogRTSTankTrailBench, Display,
-	       TEXT("RTS_TANK_TRAIL_BENCH started: tanks=%d frames_per_phase=%d repeats=%d centre=%s output=%s"),
-	       M_TankCount, M_FramesPerPhase, M_PhaseRepeats, *M_DriveCentre.ToCompactString(), *M_OutputDirectory);
+	       TEXT("RTS_TANK_TRAIL_BENCH started: toggles=%s tanks=%d frames_per_phase=%d repeats=%d centre=%s output=%s"),
+	       *M_ToggledConsoleVariable, M_TankCount, M_FramesPerPhase, M_PhaseRepeats, *M_DriveCentre.ToCompactString(),
+	       *M_OutputDirectory);
 }
 
 void UTankTrailBenchmarkSubsystem::Deinitialize()
@@ -273,6 +281,16 @@ void UTankTrailBenchmarkSubsystem::TickWaitingForNavigation()
 {
 	using namespace TankTrailBenchPrivate;
 	UNavigationSystemV1* NavigationSystem = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	// Shaders a changed material needs compile on demand in an uncooked run; until they are done the landscape draws
+	// a stand-in material and every frame time is the compiler's, not the game's.
+	const int32 RemainingShaderJobs = GShaderCompilingManager != nullptr
+		                                  ? GShaderCompilingManager->GetNumRemainingJobs()
+		                                  : 0;
+	if (RemainingShaderJobs > 0 && GetRealSecondsInPhase() < MaxShaderCompileSeconds)
+	{
+		M_FramesInPhase = 0;
+		return;
+	}
 	const bool bIsBuilding = IsValid(NavigationSystem) && NavigationSystem->IsNavigationBuildInProgress();
 	const bool bHasWaitedLongEnough = GetRealSecondsInPhase() > MaxNavigationSeconds;
 	if (bIsBuilding && not bHasWaitedLongEnough)
@@ -542,13 +560,16 @@ int32 UTankTrailBenchmarkSubsystem::CountLivingTanks() const
 	return LivingTanks;
 }
 
-void UTankTrailBenchmarkSubsystem::SetTrailsOn(const bool bTrailsOn)
+void UTankTrailBenchmarkSubsystem::SetTrailsOn(const bool bTrailsOn) const
 {
-	if (IConsoleVariable* TrailVariable = IConsoleManager::Get().FindConsoleVariable(
-		TankTrailBenchPrivate::TrailConsoleVariable))
+	IConsoleVariable* ToggledVariable = IConsoleManager::Get().FindConsoleVariable(*M_ToggledConsoleVariable);
+	if (ToggledVariable == nullptr)
 	{
-		TrailVariable->Set(bTrailsOn ? 1 : 0, ECVF_SetByConsole);
+		UE_LOG(LogRTSTankTrailBench, Warning, TEXT("RTS_TANK_TRAIL_BENCH console variable %s does not exist"),
+		       *M_ToggledConsoleVariable);
+		return;
 	}
+	ToggledVariable->Set(bTrailsOn ? 1 : 0, ECVF_SetByConsole);
 }
 
 void UTankTrailBenchmarkSubsystem::StartMeasuredPhase(const int32 PhaseIndex)

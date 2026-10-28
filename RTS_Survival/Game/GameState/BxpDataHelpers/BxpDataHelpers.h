@@ -123,6 +123,11 @@ namespace BxpHelpers
 					EBuildingExpansionType::BTX_GerTwinMG42Pit, GerTwinMG42Pit_Radixite, GerTwinMG42Pit_Metal,
 					0.75f, GerTwinMG42PitBuildTime
 				},
+				// The Communication Center's two raised MG42 nests: the twin pit's turrets and crew on timber decks.
+				{
+					EBuildingExpansionType::BTX_GerCommMG42Nests, GerCommMG42Nests_Radixite, GerCommMG42Nests_Metal,
+					0.75f, GerCommMG42NestsBuildTime
+				},
 				// A concrete pillbox with the rail Pak in its roof pit: much tougher than any sandbag pit.
 				{
 					EBuildingExpansionType::BTX_GerRailPakBunker, GerRailPakBunker_Radixite, GerRailPakBunker_Metal,
@@ -342,6 +347,37 @@ namespace BxpHelpers
 			BxpData.EnergySupply = -5;
 			BxpData.Abilities = NotArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerHQRepairBay, BxpData);
+		}
+
+		static void InitGerCommCenterBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
+		{
+			using namespace BxpHelpers;
+			using namespace DeveloperSettings::GameBalance::TrainingTime;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
+			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
+			using namespace DeveloperSettings::GameBalance::UnitHealth;
+			FBxpData BxpData;
+
+			// ----------------------- GER Communication Center Observation Post Socket Expansion -----------------------
+			// A small concrete bunker; its gameplay role (artillery spotting) is still open.
+			BxpData.ConstructionTime = GerCommObservationPostBuildTime;
+			BxpData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			BxpData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(
+				BxpData.Health);
+			BxpData.VisionRadius = T2BxpVisionRadius;
+			BxpData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerCommObservationPost_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerCommObservationPost_Metal
+				},
+			});
+			BxpData.EnergySupply = -5;
+			BxpData.Abilities = NotArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerCommObservationPost, BxpData);
 		}
 
 		static void InitGerLFactoryBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)

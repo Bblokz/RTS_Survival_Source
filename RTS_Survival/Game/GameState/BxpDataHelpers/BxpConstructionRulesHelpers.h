@@ -44,6 +44,12 @@ namespace BxpConstructionRules
 		// Refinery Expansions.
 		{EBuildingExpansionType::BTX_RefConverter, WithFootprint(SocketConstructionRules, 800.f, 400.f)},
 
+		// Communication Center Expansions.
+		// The observation post in socket space: 3.75 m out of the sandbag-wing end wall, 5.17 m along it.
+		{EBuildingExpansionType::BTX_GerCommObservationPost, WithFootprint(SocketConstructionRules, 375.f, 517.f)},
+		// Both nests sit on the wing ends of the building itself; each deck is a 4.3 m square.
+		{EBuildingExpansionType::BTX_GerCommMG42Nests, WithFootprint(OriginConstructionRules, 430.f, 430.f)},
+
 		// Ger Light Factory Expansions.
 		{EBuildingExpansionType::BTX_GerLFactoryRadixiteReactor, WithFootprint(OriginConstructionRules, 200.f, 200.f)},
 		{EBuildingExpansionType::BTX_GerLFactoryFuelStorage, WithFootprint(OriginConstructionRules, 200.f, 200.f)},

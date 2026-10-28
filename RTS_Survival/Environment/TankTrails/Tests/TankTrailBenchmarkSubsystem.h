@@ -56,7 +56,8 @@ struct FTankTrailBenchTank
  * saves a picture of the trails plus the trail render target.
  * Started with -TankTrailBench; -TankTrailBenchDir=<folder>, -TankTrailBenchCount=<tanks>,
  * -TankTrailBenchFrames=<frames per phase>, -TankTrailBenchRepeats=<off/on pairs>, -TankTrailBenchAt=X,Y,
- * -TankTrailBenchProfileGPU (one ProfileGPU dump per phase).
+ * -TankTrailBenchProfileGPU (one ProfileGPU dump per phase), -TankTrailBenchCVar=<console variable to toggle instead of
+ * rts.TankTrails, e.g. grass.Enable>.
  * Not in a shipping build.
  */
 UCLASS()
@@ -87,6 +88,7 @@ private:
 	int32 M_TankCount = 0;
 	int32 M_FramesPerPhase = 0;
 	int32 M_PhaseRepeats = 0;
+	FString M_ToggledConsoleVariable;
 
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
@@ -130,7 +132,8 @@ private:
 	void OrderTankAlongLane(FTankTrailBenchTank& BenchTank) const;
 	int32 CountLivingTanks() const;
 
-	static void SetTrailsOn(bool bTrailsOn);
+	// Sets the measured console variable (rts.TankTrails unless -TankTrailBenchCVar names another) to 1 or 0.
+	void SetTrailsOn(bool bTrailsOn) const;
 	void StartMeasuredPhase(int32 PhaseIndex);
 	void RecordFrame(FTankTrailBenchPhase& Phase, double FrameMs) const;
 	void FinishMeasuredPhase(FTankTrailBenchPhase& Phase) const;
