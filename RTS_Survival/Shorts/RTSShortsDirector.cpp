@@ -499,6 +499,7 @@ void ARTSShortsDirector::TickRunning()
 	TickBattle(Frame);
 	TickConvoy(Frame);
 	TickParatrooperBattle(Local);
+	TickAircraftCrash(Local);
 	KeepCombatTextsInWorld();
 	HideEngineSpheres();
 	if (M_HiddenSoldiers.IsValidIndex(M_CurrentSegment))
@@ -742,6 +743,11 @@ AActor* ARTSShortsDirector::SpawnSegmentUnit(const int32 SegmentIndex)
 	if (Segment.ClassPath.IsEmpty())
 	{
 		MarkSegmentSkipped(SegmentIndex, TEXT("no ClassPath"));
+		return nullptr;
+	}
+	if (GetIsAircraftCrashSegment(SegmentIndex))
+	{
+		// Spawned in flight by BeginAircraftCrash: parked in a pen it would circle there for the whole job.
 		return nullptr;
 	}
 	TSet<AActor*> TeamWeaponsBefore;
@@ -1073,6 +1079,7 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 			BeginConvoy(SegmentIndex, Unit);
 		}
 	}
+	BeginAircraftCrash(SegmentIndex);
 	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SEGMENT_BEGIN index=%d subtype=%s frame=%d caliber=%d range=%.0f target=%s"),
 	       SegmentIndex, *Segment.Subtype, GetTimelineFrame(), M_Manifest.Segments[SegmentIndex].CaliberMm,
 	       ReadLargestWeaponRange(Unit), *TargetWorld.ToString());
@@ -1082,6 +1089,7 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 void ARTSShortsDirector::EndSegment(const int32 SegmentIndex)
 {
 	EndParatrooperBattle();
+	EndAircraftCrash();
 	EndBattle();
 	EndConvoy();
 	if (not bM_StopOrdered)
@@ -2019,6 +2027,11 @@ FVector ARTSShortsDirector::GetTargetWorldLocation(const FRTSShortsSegment& Segm
 void ARTSShortsDirector::OrderAttackGround(const int32 SegmentIndex)
 {
 	bM_FireOrdered = true;
+	if (GetIsAircraftCrashSegment(SegmentIndex))
+	{
+		// The crash aircraft flies its straight run; KillAtSeconds, not a fire order, drives the segment.
+		return;
+	}
 	if (M_Convoy.bIsActive)
 	{
 		OrderConvoyDrive(SegmentIndex);
@@ -2593,6 +2606,8 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 	const TArray<TWeakObjectPtr<AActor>>* Sides[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits};
 	for (const TArray<TWeakObjectPtr<AActor>>* Side : Sides)
 	{
+		const float SideHealthScale = Segment.BattleHealthScale
+			* (Side == &M_Battle.PlayerUnits ? Segment.BattlePlayerHealthScale : 1.f);
 		for (const TWeakObjectPtr<AActor>& BattleUnit : *Side)
 		{
 			UFowComp* Fow = BattleUnit.IsValid() ? BattleUnit->FindComponentByClass<UFowComp>() : nullptr;
@@ -2601,9 +2616,9 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 				Fow->StopFowParticipation();
 			}
 			UHealthComponent* Health = BattleUnit.IsValid() ? BattleUnit->FindComponentByClass<UHealthComponent>() : nullptr;
-			if (Health != nullptr && not FMath::IsNearlyEqual(Segment.BattleHealthScale, 1.f))
+			if (Health != nullptr && not FMath::IsNearlyEqual(SideHealthScale, 1.f))
 			{
-				Health->SetMaxHealth(Health->GetMaxHealth() * Segment.BattleHealthScale);
+				Health->SetMaxHealth(Health->GetMaxHealth() * SideHealthScale);
 			}
 		}
 	}
@@ -2677,7 +2692,8 @@ void ARTSShortsDirector::AbsorbBattleSquadMembers()
 		return;
 	}
 	const float HealthScale = M_Job.Segments[M_CurrentSegment].BattleHealthScale;
-	auto Absorb = [HealthScale](const TArray<TWeakObjectPtr<AActor>>& Squads, TArray<TWeakObjectPtr<AActor>>& Line)
+	auto Absorb = [](const TArray<TWeakObjectPtr<AActor>>& Squads, TArray<TWeakObjectPtr<AActor>>& Line,
+	                 const float LineHealthScale)
 	{
 		for (const TWeakObjectPtr<AActor>& SquadActor : Squads)
 		{
@@ -2702,15 +2718,16 @@ void ARTSShortsDirector::AbsorbBattleSquadMembers()
 					Fow->StopFowParticipation();
 				}
 				UHealthComponent* Health = Soldier->FindComponentByClass<UHealthComponent>();
-				if (Health != nullptr && not FMath::IsNearlyEqual(HealthScale, 1.f))
+				if (Health != nullptr && not FMath::IsNearlyEqual(LineHealthScale, 1.f))
 				{
-					Health->SetMaxHealth(Health->GetMaxHealth() * HealthScale);
+					Health->SetMaxHealth(Health->GetMaxHealth() * LineHealthScale);
 				}
 			}
 		}
 	};
-	Absorb(M_Battle.PlayerSquads, M_Battle.PlayerUnits);
-	Absorb(M_Battle.EnemySquads, M_Battle.EnemyUnits);
+	Absorb(M_Battle.PlayerSquads, M_Battle.PlayerUnits,
+	       HealthScale * M_Job.Segments[M_CurrentSegment].BattlePlayerHealthScale);
+	Absorb(M_Battle.EnemySquads, M_Battle.EnemyUnits, HealthScale);
 }
 
 void ARTSShortsDirector::ApplySegmentStage(const int32 SegmentIndex)

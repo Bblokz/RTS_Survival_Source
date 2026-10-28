@@ -306,6 +306,60 @@ struct FRTSShortsFlyBy
 	float SoundVolume = 1.f;
 };
 
+/**
+ * @brief Segment Kind "AircraftCrash": the segment's aircraft (ClassPath, an *_Airborne blueprint) spawns in flight,
+ * flies a straight run, is shot down at KillAtSeconds and is filmed by a chase camera, then from a high side camera
+ * that follows the dive and holds on the wreck. Offsets are in centimetres.
+ */
+USTRUCT()
+struct FRTSShortsAircraftCrash
+{
+	GENERATED_BODY()
+
+	/** Spawn point in stage-local space (X forward, Y right, Z above the stage origin). */
+	UPROPERTY()
+	FVector StartOffset = FVector(-9000.f, 0.f, 2600.f);
+
+	/** Direction of the run in degrees from the stage forward. */
+	UPROPERTY()
+	float RunYaw = 0.f;
+
+	/** Segment-local seconds at which the aircraft takes fatal damage. */
+	UPROPERTY()
+	float KillAtSeconds = 3.f;
+
+	/** Seconds after the kill when the chase camera cuts to the crash view (the fire and the nose drop read first). */
+	UPROPERTY()
+	float CrashViewAfterKillSeconds = 1.2f;
+
+	/** Chase camera offset from the aircraft in the run's frame (X along the run, Y right, Z up). */
+	UPROPERTY()
+	FVector FollowOffset = FVector(-2400.f, -1300.f, 450.f);
+
+	/** The chase camera aims this far ahead of the aircraft along the run. */
+	UPROPERTY()
+	float FollowLookAhead = 900.f;
+
+	UPROPERTY()
+	float FollowFocalLength = 14.f;
+
+	/** Crash camera offset in the run's frame from the ground point below the aircraft at the cut; Z is the height
+	 *  above that ground. Positive X stands it ahead, where the dive comes down. */
+	UPROPERTY()
+	FVector CrashViewOffset = FVector(2600.f, -5200.f, 2600.f);
+
+	UPROPERTY()
+	float CrashViewFocalLength = 12.f;
+
+	/** How fast (1/s) the crash camera's aim catches up with the falling aircraft; lower lags more. */
+	UPROPERTY()
+	float CrashViewTrackSpeed = 5.f;
+
+	/** Seconds the crash camera holds on the burning wreck before the next segment starts. */
+	UPROPERTY()
+	float HoldAfterImpactSeconds = 3.f;
+};
+
 /** @brief A battle unit that waits far from the lines and drives in later, joining its side when it arrives. */
 USTRUCT()
 struct FRTSShortsBattleReinforcement
@@ -509,6 +563,11 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	float BattleHealthScale = 1.f;
 
+	/** Battle: the player line's max health is scaled by this on top of BattleHealthScale, so a showcased unit
+	 *  survives the match-up that shows its strength (a variant short's one unit against a group). */
+	UPROPERTY()
+	float BattlePlayerHealthScale = 1.f;
+
 	/** Opt-in real paratrooper ability; GA_None preserves the ordinary battle/showcase camera. */
 	UPROPERTY()
 	EGlobalAbility ParatrooperAbility = EGlobalAbility::GA_None;
@@ -635,6 +694,10 @@ struct FRTSShortsSegment
 	/** Aircraft passes flown during this segment. */
 	UPROPERTY()
 	TArray<FRTSShortsFlyBy> FlyBys;
+
+	/** Kind "AircraftCrash": the flight, kill and cameras of the shot-down aircraft. */
+	UPROPERTY()
+	FRTSShortsAircraftCrash AircraftCrash;
 };
 
 /**

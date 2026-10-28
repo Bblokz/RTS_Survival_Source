@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "RTSShortsJobTypes.h"
+#include "RTSShortsAircraftCrashState.h"
 
 #include "RTSShortsDirector.generated.h"
 
@@ -277,6 +278,25 @@ private:
 	void EndParatrooperBattle();
 	bool GetIsValidParatrooperAbility() const;
 
+	// Aircraft crash segments (RTSShortsAircraftCrash.cpp): the aircraft spawns when its segment begins, not in a pen.
+	bool GetIsAircraftCrashSegment(int32 SegmentIndex) const;
+	void BeginAircraftCrash(int32 SegmentIndex);
+	class AAircraftMaster* SpawnCrashAircraft(const FRTSShortsSegment& Segment, const FTransform& SpawnTransform) const;
+	void ApplyCrashCameraGrade(const FRTSShortsCameraParams& Params) const;
+	void TickAircraftCrash(int32 LocalFrame);
+	void KillCrashAircraft(AAircraftMaster& Aircraft, int32 LocalFrame);
+	void UpdateCrashFollowCamera(const AAircraftMaster& Aircraft, const FRTSShortsAircraftCrash& Crash) const;
+	/**
+	 * @brief Stands the crash camera high beside the dive's path, so the fall and the impact are both in frame.
+	 * @param Aircraft The falling aircraft; the camera is placed relative to the ground below it.
+	 * @param Crash The segment's crash settings (offset in the run's frame, lens).
+	 */
+	void CutToCrashView(const AAircraftMaster& Aircraft, const FRTSShortsAircraftCrash& Crash);
+	void UpdateCrashViewCamera(const FRTSShortsAircraftCrash& Crash);
+	/** Records the impact and ends the segment once the crash camera has held on the wreck long enough. */
+	void TrackCrashImpact(int32 LocalFrame, const FRTSShortsAircraftCrash& Crash);
+	void EndAircraftCrash();
+
 	// A private copy of the designer template owns the drop; no mission ability or cooldown is modified.
 	UPROPERTY()
 	TObjectPtr<class UGA_Paratroopers> M_ParatrooperAbility;
@@ -368,6 +388,8 @@ private:
 	TSet<TWeakObjectPtr<class UNiagaraComponent>> M_WidenedSmallArmsSystems;
 	FRTSShortsBattleState M_Battle;
 	FRTSShortsConvoyState M_Convoy;
+	UPROPERTY()
+	FRTSShortsAircraftCrashState M_AircraftCrash;
 	// The job's stage; segments with their own StageActorName switch M_Stage away from it for their duration.
 	UPROPERTY()
 	TObjectPtr<AActor> M_JobStage;
