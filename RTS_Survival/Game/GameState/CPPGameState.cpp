@@ -1968,8 +1968,8 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::RW61_Mortar_380MM, WeaponData);
 
-	// Mortar 120mm (HE)
-	WeaponData.WeaponName = EWeaponName::Mortar_120MM;
+	// Panzerwerfer small (40mm rocket, HEAT)
+	WeaponData.WeaponName = EWeaponName::Panzerwerfer_Small;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_HEAT;
 	WeaponData.ShellTypes = { EWeaponShellType::Shell_HEAT };
@@ -4175,6 +4175,16 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ArmorPenMaxRange = 70;
 	WeaponData.ReloadSpeed = 7.1f;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::L_11_76MM, WeaponData);
+
+	// SMK main gun: the same L-11 shell in the big barbette turret (roomier, two loaders): faster reload, a
+	// little more range from the raised gun.
+	{
+		FWeaponData SmkWeaponData = WeaponData;
+		SmkWeaponData.WeaponName = EWeaponName::L_11_76MM_SMK;
+		SmkWeaponData.ReloadSpeed = 6.0f;
+		SmkWeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(WeaponData.Range * 1.05f, 10);
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::L_11_76MM_SMK, SmkWeaponData);
+	}
 
 	{
 		const float Kv1ArcDamageMlt = 1.2f;
@@ -7341,6 +7351,42 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV_5, TankData);
 
+	// IS-6 (heavy): tougher than the IS-2, below the IS-3, and the fastest of the IS line.
+	TankData.MaxHealth = T3HeavyTankBase + 2 * OneHeavyTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 28 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 24;
+	TankData.VehicleReverseSpeedKmh = 11;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, IS6_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, IS6_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.5f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_IS6, TankData);
+
+	// SMK (heavy): two turrets on a very long hull; KV-class armour, more hit points, slow and wide-turning.
+	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 16 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 13 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 15;
+	TankData.VehicleReverseSpeedKmh = 7;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, SMK_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, SMK_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.4f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SMK, TankData);
+
 	// SU-152 (heavy tank destroyer)
 	{
 		const int32 Su152RadixiteCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
@@ -8102,6 +8148,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpHelpers::GerBxpData::InitRefineryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCaptureBunkersBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerBarracksBxpData(M_TPlayerBxpDataHashMap);
+	BxpHelpers::GerBxpData::InitGerCommCenterBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::RusBxpData::InitRusIndustrialBxpData(M_TPlayerBxpDataHashMap);
 
 	BxpData.ConstructionTime = T1BxpBuildTime;
@@ -9116,11 +9163,15 @@ void ACPPGameState::InitAllGameNomadicData()
 	// Expansion radius is for BXPs that are freely placed, building radius is for other buildings.
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
 	NomadicData.BuildRadius = 0;
+	// The observation post goes on either sandbag-wing end socket; the MG42 nests sit on both wing ends at once.
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
+		AsTech(EBuildingExpansionType::BTX_GerCommObservationPost),
+		AsDefense(EBuildingExpansionType::BTX_GerCommMG42Nests),
 	});
 
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Two observation posts and the nests.
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = T2NomadicExp;
