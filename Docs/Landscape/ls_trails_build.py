@@ -36,6 +36,13 @@ mel = unreal.MaterialEditingLibrary
 mat = None
 failures = []
 
+def tagged_expressions(material, desc):
+    """Every expression of the material carrying desc. Walks the material's real expressions: looking them up by
+    name index misses nodes once repeated rebuilds push the numbering past any fixed range."""
+    return [e for e in unreal.ObjectIterator(unreal.MaterialExpression)
+            if e.get_outer() == material and e.get_editor_property("desc") == desc]
+
+
 USED = ["WorldPosition", "ComponentMask", "Multiply", "Add", "LinearInterpolate", "LandscapeLayerSample", "Saturate",
         "BreakMaterialAttributes", "MakeMaterialAttributes", "StaticSwitchParameter", "ScalarParameter",
         "VectorParameter", "Constant", "AppendVector", "Comment", "Custom", "TextureObject",
@@ -60,12 +67,9 @@ return Result;"""
 
 def remove_previous():
     removed = 0
-    for cls in USED:
-        for i in range(0, 400):
-            e = unreal.find_object(mat, "MaterialExpression%s_%d" % (cls, i))
-            if e and e.get_editor_property("desc") == DESC:
-                mel.delete_material_expression(mat, e)
-                removed += 1
+    for e in tagged_expressions(mat, DESC):
+        mel.delete_material_expression(mat, e)
+        removed += 1
     return removed
 
 

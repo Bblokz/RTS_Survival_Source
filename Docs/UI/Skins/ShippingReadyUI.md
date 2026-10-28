@@ -395,3 +395,68 @@ sizing in `MainGameUI_HUD`.
   portrait on 2026-10-15, then removed from the HUD again (`ui_tactical_icons.restore()`). The feature is kept for
   use elsewhere later.
 - Full write-up: [../TacticalUnitIcons.md](../TacticalUnitIcons.md).
+
+## Control group bar under glass (`ui_control_groups.py`)
+
+- **Layout:** `BP_W_ControlGroups` puts the ten slots on a `Custom_ThinPanel` plate (6 units padding, 4 units
+  between slots), key 1 first. The slots are drawn at their real size; the old 0.66 ScaleBoxes are gone. In
+  `MainGameUI_HUD` the bar is anchored bottom left, 12 units from the edge, with the plate's bottom on the training
+  panel's bottom rim.
+- **Slot:** `BP_W_ControlGroupImage` is a 44-unit SceneItem well like the action buttons:
+  - the unit icon sits 9 units in, 2 inside the pane, with a cool grade (0.86, 0.90, 0.96);
+  - an `MI_GlassPane_ControlGroup` pane lies over it (`M_UI_GlassPane`, smaller scratch cells);
+  - the hotkey (top left) and the unit count (bottom right, 8 pt) sit above the glass.
+
+  The hotkey is top left because the unit renders carry their own type badge bottom left. It sits on a small
+  35% black tab (`M_HotkeyTab`, only on occupied slots). The shared `BP_W_HotKey` style is unchanged: the slot
+  lays it out at 0.72 in a ScaleBox, so the digit is ~11-12 px at 1080p. Counts above 99 show "99+".
+
+  The frame keeps its normal face on hover, so the hover is in the glass alone. Pressed uses the action buttons'
+  pressed slice (red ring). Hover and press make no sound.
+- **Click:** clicking a slot works like the group's hotkey (`ACPPController::UseControlGroupFromUI`):
+  - a plain click selects the group;
+  - shift-click adds it to the selection;
+  - control-click assigns the current selection to it.
+- **Per-slot wear:** `UW_ControlGroupImage::ApplySlotWear` gives every slot its own dynamic instance. Each slot has
+  its own `ScratchSeed` and its own scratch coverage, scratch length, dust and reflection position (`StreakOffset`),
+  from a fixed random stream per group index. Rim, inset, tint and edge bias stay the same, so the ten read as one
+  set.
+- **States:**
+  - Empty: icon hidden, glass at 0.8 opacity, hotkey at 45%, a weaker hover.
+  - Occupied: icon, count, hotkey at 85% on its tab. The shader's `Occupied` layer rounds the icon's corners with
+    the well colour (`IconMaskInsetFrac`, `IconMaskRadiusPx`, `WellColor`) and darkens it towards the rim
+    (`OccupiedVignette` 0.45). It also adds `OccupiedEdgeTint` and `OccupiedRimBoost`.
+  - Recalled: when a group's hotkey selects it, its slot glows at Hover 0.35 and fades over 1.2 s, with no light
+    band (`RecallFlashHover`, `RecallFlashSeconds`). A hovered slot uses the larger of the two.
+
+  The bar sends the group's unit count with every update (`UpdateMostFrequentUnitInGroup`). A group that is None
+  or has no units shows as empty.
+- **Hover in the shader:** `M_UI_GlassPane` has new scalars. At 0 (the default) every other pane is unchanged.
+  - `Hover` (0..1): the whole rim lights up and turns towards `HoverTint`. The edge tint deepens
+    (`HoverEdgeTint`) and the scratches catch the light (`HoverScratchBoost`).
+  - `HoverSweep` (0..1): one band of light crosses the pane from top left to bottom right. It is weaker over the
+    icon (`HoverSweepIntensity`, `HoverSweepWidth`).
+  - `Pressed`: a darker lip and a little shade (`PressedDim`, `PressedEdgeShadow`).
+  - `StreakOffset`: moves the diagonal reflection.
+
+  `UW_ControlGroupImage::NativeTick` ramps them. Hover takes 0.12 s in and 0.22 s out, the sweep plays once per
+  mouse enter over 0.26 s, and press takes 0.05 s. The timings are under Control Group | Glass in the blueprint's
+  Class Defaults (`FControlGroupGlassSettings`).
+- **Captures:**
+  - `-UISnapshotControlGroups` fills groups 1-4: all units, one pawn, three pawns, the squads.
+  - `-UISnapshotHoverControlGroup=N` hovers slot N (0 = key 1).
+  - `-UISnapshotControlGroupSweep=P` holds the hovered slot's light band at progress P (non-shipping).
+  - `-UISnapshotPressControlGroup` holds the mouse button down on the hovered slot in every step.
+  - `-UISnapshotClickControlGroup=N` clicks slot N once per step, after the selection, and logs how many
+    vehicles that selected.
+  - Run them with `UnrealEditor-Win64-DebugGame-Cmd.exe` after a DebugGame build. Plain `UnrealEditor-Cmd -DebugGame`
+    still loads the Development game module.
+- **Undo:** the original uassets (both control group blueprints and `M_UI_GlassPane`) are in
+  `Saved/UISkinSwitcher/backup_controlgroups/`. `MainGameUI_HUD` only had the bar's canvas slot changed: anchors
+  (1,1), offsets -1922 / -61 / 319 / 31, no auto size.
+
+## Analog tank instruments (experimental, `ui_analog_gauges.py`)
+
+- Gauges, lamps and an inclinometer in the skin's gunmetal and glass, with needles, counters, compass card and
+  lamps that move in the shader. Not placed in the HUD yet.
+- Full write-up: [../AnalogGauges.md](../AnalogGauges.md).

@@ -289,6 +289,9 @@ namespace DeveloperSettings
 			inline constexpr int32 GerPuppchenPitBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
 			inline constexpr int32 GerPanzerschreckPitBuildTime = RoundToNearestMultipleOf(12.f * GameTimeMlt, 2);
 			inline constexpr int32 GerTwinMG42PitBuildTime = RoundToNearestMultipleOf(18.f * GameTimeMlt, 2);
+			// Communication Center expansions: the concrete observation post and the two raised MG42 nests.
+			inline constexpr int32 GerCommObservationPostBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
+			inline constexpr int32 GerCommMG42NestsBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
 		}
@@ -516,6 +519,12 @@ namespace DeveloperSettings
 				// 88mm L/100 E-50: between the Panther II and the King Tiger.
 				inline constexpr int32 E50_Radixite = 1150;
 				inline constexpr int32 E50_VehicleParts = 600;
+				// IS-6: between the IS-2 and the IS-3, at King Tiger level.
+				inline constexpr int32 IS6_Radixite = 1300;
+				inline constexpr int32 IS6_VehicleParts = 700;
+				// SMK: two turrets (76mm + 45mm) on a long slow hull; between the KV-1 and the IS-6.
+				inline constexpr int32 SMK_Radixite = 1150;
+				inline constexpr int32 SMK_VehicleParts = 650;
 			}
 
 			namespace Infantry
@@ -943,6 +952,10 @@ namespace DeveloperSettings
 				inline constexpr int32 GerPanzerschreckPit_Metal = 60;
 				inline constexpr int32 GerTwinMG42Pit_Radixite = 320;
 				inline constexpr int32 GerTwinMG42Pit_Metal = 140;
+				inline constexpr int32 GerCommObservationPost_Radixite = 250;
+				inline constexpr int32 GerCommObservationPost_Metal = 150;
+				inline constexpr int32 GerCommMG42Nests_Radixite = 360;
+				inline constexpr int32 GerCommMG42Nests_Metal = 160;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;
