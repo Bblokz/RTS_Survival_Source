@@ -1469,6 +1469,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Rus BM-13 Katyusha: rocket artillery truck, trained like the Panzerwerfer.
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_BM13)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			ArmoredCarMediumCalibreTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_BM13,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 
 	// RUS LIGHT TANKS
 
@@ -1484,6 +1502,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			LightTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_BT7,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus MS-1
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_MS1)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_MS1,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);
@@ -2060,6 +2096,24 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			T3HeavyTankTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_ISU_152,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus ISU-130
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_ISU_130)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			T3HeavyTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_ISU_130,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);

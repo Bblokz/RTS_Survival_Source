@@ -4,11 +4,11 @@ Top-down grass clumps grow on the Ger_Trains landscape as landscape grass. They 
 
 | Part | Where |
 |---|---|
-| Builder | `Source/Docs/Landscape/ls_grass_build.py`: `run()` builds the grass types and the switched output, `tune_look()` changes only the types and the card tint |
+| Builder | `Source/Docs/Landscape/ls_grass_build.py`: `build_function()` builds `MF_RTS_LS_GrassWeights`, `create_grass_types()` the types, and `tune_look()` changes only the types and the card tint. The master is wired by `ls_master_build.run()` (`Landscape/LandscapeMaster.md`) |
 | Grass types | `GroundFoliage/Grass/LGT_Trains_Green` (4 varieties), `LGT_Trains_Flowers` (3), `LGT_Trains_Dry` (4); density scaling on, so the Foliage slider (`grass.DensityScale`) thins them |
 | Cards | `GroundFoliage/MeshesTop/SM_GFT_*` (11 meshes, 8–24 tris) on `T_GroundFoliageTop_D/N` through `MI_GroundFoliageTop` (child of `M_GroundFoliage`, normal atlas on) |
 | Card pipeline | `D:/Blender/BlenderProjects/BlenderTanks/GroundFoliage/`: `build_topdown_atlas.py` (Blender, renders 16 clumps top-down), `compose_topdown_atlas.py` (atlas + preview), `build_topdown_meshes.py` (Blender, octagon dome cards), `ue_import_topdown.py` (UE import + material) |
-| Material | `LandscapeGrassOutput` in `M_RTS_Landscape_DryCastle`, each input behind `LS_GroundGrass` (off by default, on only in `MI_RTS_Landscape_DryCastle_Trains`) |
+| Material | `MF_RTS_LS_GrassWeights` feeds the `LandscapeGrassOutput` in `M_RTS_Landscape_DryCastle`; each input sits behind `LS_GroundGrass` (off by default, on only in `MI_RTS_Landscape_DryCastle_Trains`) |
 
 ## Weights
 

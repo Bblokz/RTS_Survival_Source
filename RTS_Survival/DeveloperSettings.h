@@ -411,6 +411,10 @@ namespace DeveloperSettings
 				// Rapid fire quad 20mm flak half-track, priced just above the Sd.Kfz. 9 37mm.
 				inline constexpr int32 Sdkfz7Flakvierling_Radixite = 120;
 				inline constexpr int32 Sdkfz7Flakvierling_VehicleParts = 45;
+				// BM-13 Katyusha: an unarmoured truck, but sixteen 132mm rockets per salvo at long artillery range.
+				// Above the Panzerwerfer (ten 150mm rockets, medium range), below the Nebelwerfer TW team weapon.
+				inline constexpr int32 BM13_Radixite = 450;
+				inline constexpr int32 BM13_VehicleParts = 200;
 			}
 
 			namespace LightTanks
@@ -444,6 +448,9 @@ namespace DeveloperSettings
 				// 105mm howitzer on a Pz II chassis: a step up from the Pz I 15cm, trained at the medium factory.
 				inline constexpr int32 Wespe_Radixite = 275;
 				inline constexpr int32 Wespe_VehicleParts = 120;
+				// MS-1: the cheapest Soviet tank, below the BT-7 (Pz II F - 50 / - 10) and the T-26 (Pz II F).
+				inline constexpr int32 MS1_Radixite = 125;
+				inline constexpr int32 MS1_VehicleParts = 30;
 			}
 
 			namespace MediumTanks

@@ -21,6 +21,7 @@
 #include "TrainingUI/TrainingMenuManager.h"
 #include "MainGameUI.generated.h"
 
+class FWeakWidgetPath;
 class UW_GA_Description;
 class UW_GlobalAbilityPanel;
 struct FSelectedUnitsWidgetState;
@@ -336,6 +337,14 @@ public:
 	 */
 	void InitMiniMap(const TObjectPtr<AFowManager>& FowManager, const EMiniMapStartDirection StartDirection);
 
+	/**
+	 * @brief The controller hides world hover (tooltip, outline, weapon range) only under these panels, so the
+	 * HUD's full-screen root and other overlays never block it.
+	 * @param WidgetsUnderCursor Slate's path from the window down to the widget under the cursor.
+	 * @return True if the path runs through the building, action, training, minimap or resource panel.
+	 */
+	bool GetIsPathOverWorldHoverBlockingPanel(const FWeakWidgetPath& WidgetsUnderCursor) const;
+
 protected:
 	virtual void NativeOnInitialized() override;
 
@@ -625,6 +634,19 @@ private:
 	TObjectPtr<UW_MiniMap> M_MiniMap;
 
 	bool EnsureMiniMapIsValid() const;
+
+	// The building, action, training, minimap and resource panels; see GetIsPathOverWorldHoverBlockingPanel.
+	UPROPERTY()
+	TArray<TObjectPtr<UWidget>> M_WorldHoverBlockingPanels;
+
+	void InitMainGameUI_InitWorldHoverBlockingPanels(
+		const FActionUIContainer& ActionUIContainerWidgets,
+		UBorder* TrainingUIBorder,
+		UW_BottomCenterUI* BottomCenterUI,
+		const TArray<UW_PlayerResource*>& ResourceWidgets,
+		UW_PlayerEnergyBar* EnergyBar,
+		UW_EnergyBarInfo* EnergyBarInfo);
+	void AddWorldHoverBlockingPanel(UWidget* Panel);
 
 	// Created on first open and added to the viewport; collapsed while closed.
 	UPROPERTY()

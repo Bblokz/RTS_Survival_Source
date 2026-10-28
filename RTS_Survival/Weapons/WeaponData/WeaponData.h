@@ -1808,6 +1808,91 @@ struct FInitWeaponStateRocketProjectile : public FInitWeaponStateProjectile
 	FRocketWeaponSettings RocketSettings;
 };
 
+/**
+ * Rail-launched rocket artillery (BM-13 Katyusha): each rocket runs straight along its launch socket's forward axis
+ * for RailLength, then flies a ballistic arc that leaves in the rail's direction and lands on the target.
+ * Defaults suit a 13.2 cm rocket off 5 m rails.
+ */
+USTRUCT(Blueprintable, BlueprintType)
+struct FRailRocketWeaponSettings
+{
+	GENERATED_BODY()
+
+	// Rocket mesh, launch sockets (firing order) and the attached hidable rockets; the swing settings are unused.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FRocketWeaponSettings RocketSettings;
+
+	/**
+	 * Distance in cm the rocket travels straight along the launch socket's forward (X) axis, without gravity, before
+	 * the free-flight arc starts. Measure it from the socket to the front end of the rail.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Rail", meta=(ClampMin="0.0", UIMin="0.0", Units="cm"))
+	float RailLength = 450.0f;
+
+	/**
+	 * Speed on the rail as a fraction of the shell-adjusted projectile speed. Lower reads as a heavy rocket sliding
+	 * off the rail; the arc never flies slower than this (short shots fall faster instead).
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Rail", meta=(ClampMin="0.05", UIMin="0.05"))
+	float RailExitSpeedMultiplier = 0.4f;
+
+	/**
+	 * Lowest elevation of the arc. If the rail is pitched flatter, the arc uses this elevation and the rocket visibly
+	 * kinks up at the rail exit by the difference, so keep the rack pitched at or above this (20-35 degrees reads best).
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Arc",
+		meta=(ClampMin="1.0", ClampMax="80.0", UIMin="1.0", UIMax="80.0", Units="Degrees"))
+	float MinArcElevationDegrees = 15.0f;
+
+	// Highest elevation of the arc; a steeper rail is flattened to this at the rail exit.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Arc",
+		meta=(ClampMin="1.0", ClampMax="85.0", UIMin="1.0", UIMax="85.0", Units="Degrees"))
+	float MaxArcElevationDegrees = 60.0f;
+
+	/**
+	 * Gravity multiplier during the arc. Higher makes long shots land sooner (faster, flatter-looking flight); the
+	 * arc is solved with it, so it does not change where the rocket lands.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Arc", meta=(ClampMin="0.1", UIMin="0.1"))
+	float ArcGravityScale = 1.25f;
+
+	/**
+	 * Cap on the solved arc speed as a multiple of the projectile speed. Above it (target almost on the line along the
+	 * rail) the rocket falls back to the generic arced launch from the rail exit.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Arc", meta=(ClampMin="0.1", UIMin="0.1"))
+	float MaxArcSpeedMultiplier = 3.0f;
+
+	/**
+	 * Random +/- elevation per rocket. The arc is re-solved for it, so the rocket still lands on its target; it only
+	 * varies apex height and flight time so a salvo does not fly in lockstep.
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Salvo",
+		meta=(ClampMin="0.0", ClampMax="10.0", UIMin="0.0", UIMax="10.0", Units="Degrees"))
+	float ElevationJitterDegrees = 1.5f;
+
+	// Radius in cm of a random offset added to every rocket's (accuracy-deviated) target, so a ripple salvo spreads.
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Salvo", meta=(ClampMin="0.0", UIMin="0.0", Units="cm"))
+	float TargetScatterRadius = 200.0f;
+
+	/**
+	 * Random +/- yaw and pitch kick when the rocket leaves the rail. Not aimed out, so the spread grows with range
+	 * like real fin-stabilised rockets (about 1.5 m per degree at full range).
+	 */
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Salvo",
+		meta=(ClampMin="0.0", ClampMax="10.0", UIMin="0.0", UIMax="10.0", Units="Degrees"))
+	float RailExitWobbleDegrees = 0.75f;
+};
+
+USTRUCT(Blueprintable, BlueprintType)
+struct FInitWeaponStateRailRocket : public FInitWeaponStateProjectile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere)
+	FRailRocketWeaponSettings RailRocketSettings;
+};
+
 UENUM(BlueprintType)
 enum class EHomingMissileMotionType : uint8
 {
@@ -2218,6 +2303,89 @@ private:
 	                                                      const FRotator& LaunchRotation,
 	                                                      const FVector& TargetLocation,
 	                                                      AActor* TargetActor);
+};
+
+/**
+ * @brief Rail-launched rocket artillery (BM-13): each shot leaves the next launch socket, runs along its rail and arcs
+ * onto the target. Reuses the rocket state's socket cycling and attached hidable rockets (one per socket).
+ * @note SetupRailRocketWeapon: call on the weapon owner (turret) in blueprint with FInitWeaponStateRailRocket.
+ */
+UCLASS()
+class RTS_SURVIVAL_API URailRocketWeaponState : public UWeaponStateRocketProjectile
+{
+	GENERATED_BODY()
+
+public:
+	/**
+	 * @brief Keeps rail rocket setup data-driven while reusing the rocket launch-socket and attached-rocket pipeline.
+	 * @param NewOwningPlayer Player index owning the weapon.
+	 * @param NewWeaponIndex Weapon array index on the owner.
+	 * @param NewWeaponName Identifier for this weapon.
+	 * @param NewWeaponBurstMode Burst mode configuration; single fire with the weapon cooldown gives a ripple salvo.
+	 * @param NewWeaponOwner Interface used to read target data and dispatch weapon callbacks.
+	 * @param NewMeshComponent Mesh carrying the launch sockets.
+	 * @param NewFireSocketName Fallback socket used when the rocket settings provide no launch sockets.
+	 * @param NewWorld World context used by projectile pooling and VFX.
+	 * @param ProjectileNiagaraSystem Niagara system used for the projectile VFX.
+	 * @param NewWeaponVFX VFX configuration for impact, bounce, and launch feedback.
+	 * @param NewWeaponShellCase Shell casing configuration shared with other projectile weapons.
+	 * @param NewRailRocketSettings Rocket mesh, launch sockets and the rail and arc tuning.
+	 * @param NewBurstCooldown Cooldown between burst shots.
+	 * @param NewSingleBurstAmountMaxBurstAmount Maximum burst count for burst fire modes.
+	 * @param NewMinBurstAmount Minimum burst count for random burst fire.
+	 * @param bNewCreateShellCasingOnEveryRandomBurst Should spawn shell casing each random burst shot.
+	 */
+	void InitRailRocketWeapon(
+		const int32 NewOwningPlayer,
+		const int32 NewWeaponIndex,
+		const EWeaponName NewWeaponName,
+		const EWeaponFireMode NewWeaponBurstMode,
+		TScriptInterface<IWeaponOwner> NewWeaponOwner,
+		UMeshComponent* NewMeshComponent,
+		const FName NewFireSocketName,
+		UWorld* NewWorld,
+		const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+		FWeaponVFX NewWeaponVFX,
+		FWeaponShellCase NewWeaponShellCase,
+		const FRailRocketWeaponSettings& NewRailRocketSettings,
+		const float NewBurstCooldown = 0.0f,
+		const int32 NewSingleBurstAmountMaxBurstAmount = 0,
+		const int32 NewMinBurstAmount = 0,
+		const bool bNewCreateShellCasingOnEveryRandomBurst = false);
+
+protected:
+	// Marks that the socket about to fire already got its launch effect from the fire mode.
+	virtual void CreateLaunchVfx(
+		const FVector& LaunchLocation,
+		const FVector& ForwardVector,
+		const bool bCreateShellCase = true) override;
+
+private:
+	UPROPERTY()
+	FRailRocketWeaponSettings M_RailRocketSettings;
+
+	// Single-burst fire only creates a launch effect for its first shot; the other rockets create their own.
+	bool bM_HasLaunchVfxForNextRocket = false;
+
+	virtual void FireProjectile(const FVector& TargetLocation) override;
+
+	// Accuracy deviation plus the per-rocket salvo scatter.
+	FVector GetScatteredTargetLocation(const FVector& RawTargetLocation) const;
+
+	// HE/HEAT/APCR/radixite get their shell multipliers; AP, APHE, railgun and fire shells are used as stored.
+	FWeaponData GetShellAdjustedWeaponData() const;
+
+	/**
+	 * @brief Applies shell-adjusted combat data before handing the rail and arc flight to the projectile.
+	 * @param ShellAdjustedData Damage, AOE, range and speed after shell conversion.
+	 * @param Projectile Pooled projectile that receives the launch.
+	 * @param LaunchData Socket the rocket leaves from; its forward axis is the rail.
+	 * @param TargetLocation Scattered target the arc lands on.
+	 */
+	void FireRailRocketWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+	                                          AProjectile* Projectile,
+	                                          const FRocketLaunchSocketData& LaunchData,
+	                                          const FVector& TargetLocation);
 };
 
 /**

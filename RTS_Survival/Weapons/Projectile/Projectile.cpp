@@ -48,6 +48,8 @@ namespace
 	constexpr float RocketSwingMinStraightPercent = 0.15f;
 	constexpr float RocketSwingMinSpeedMultiplier = 0.1f;
 	constexpr float RocketSwingMinCurveDistance = 50.0f;
+	// Floor for the rail rocket's rail-speed and arc-speed-cap multipliers, so a zero setting cannot stall the rocket.
+	constexpr float RailRocketMinSpeedMultiplier = 0.05f;
 
 	namespace RadixiteDamageConstants
 	{
@@ -541,6 +543,7 @@ void AProjectile::StartFlightTimers(const float ExpectedFlightTime)
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RailwayCannonTransitionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RailRocketTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 		World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 		World->GetTimerManager().ClearTimer(M_ExplosionTimerHandle);
@@ -970,6 +973,176 @@ void AProjectile::ScheduleRailwayCannonTransition(
 		},
 		LaunchStageTime,
 		false);
+}
+
+void AProjectile::SetupRailRocketLaunch(
+	const FVector& LaunchLocation,
+	const FVector& RailForward,
+	const FVector& TargetLocation,
+	const float ProjectileSpeed,
+	const FRailRocketWeaponSettings& RailRocketSettings)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	StopDescentSound();
+	const float SafeProjectileSpeed = FMath::Max(ProjectileSpeed, KINDA_SMALL_NUMBER);
+	const FVector RailDirection = RailForward.GetSafeNormal();
+	if (RailDirection.IsNearlyZero())
+	{
+		SetupArcedLaunch(LaunchLocation, TargetLocation, SafeProjectileSpeed, M_Range, FArchProjectileSettings(),
+		                 nullptr, nullptr);
+		return;
+	}
+
+	const float RailSpeed = SafeProjectileSpeed * FMath::Max(RailRocketSettings.RailExitSpeedMultiplier,
+	                                                         RailRocketMinSpeedMultiplier);
+	const float RailLength = FMath::Max(RailRocketSettings.RailLength, 0.0f);
+	const float RailTime = RailLength / RailSpeed;
+	const FRailRocketArcRequest ArcRequest = BuildRailRocketArcRequest(
+		LaunchLocation + RailDirection * RailLength,
+		RailDirection,
+		TargetLocation,
+		SafeProjectileSpeed,
+		RailSpeed,
+		RailRocketSettings);
+
+	// Stage 1: straight along the rail without gravity.
+	SetActorLocation(LaunchLocation);
+	SetActorRotation(RailDirection.Rotation());
+	M_ProjectileMovement->Activate();
+	M_ProjectileMovement->ProjectileGravityScale = 0.0f;
+	M_ProjectileMovement->Velocity = RailDirection * RailSpeed;
+
+	// Provisional; the rail-exit transition re-times the explosion (or the fallback restarts every flight timer).
+	FRailRocketFreeFlightSolution PredictedFreeFlight;
+	const float PredictedFreeFlightTime = FRailRocketArcSolver::SolveFreeFlight(ArcRequest, PredictedFreeFlight)
+		                                      ? PredictedFreeFlight.FlightTime
+		                                      : M_Range / SafeProjectileSpeed;
+	// Clears every stage timer, including the rail transition, so it must run before that is scheduled.
+	StartFlightTimers(RailTime + PredictedFreeFlightTime);
+	ScheduleRailRocketFreeFlight(ArcRequest, SafeProjectileSpeed, RailTime);
+}
+
+FRailRocketArcRequest AProjectile::BuildRailRocketArcRequest(
+	const FVector& RailExitLocation,
+	const FVector& RailDirection,
+	const FVector& TargetLocation,
+	const float ProjectileSpeed,
+	const float RailSpeed,
+	const FRailRocketWeaponSettings& RailRocketSettings) const
+{
+	const float ElevationJitter = FMath::Max(RailRocketSettings.ElevationJitterDegrees, 0.0f);
+	const float ExitWobble = FMath::Max(RailRocketSettings.RailExitWobbleDegrees, 0.0f);
+	const UWorld* World = GetWorld();
+
+	FRailRocketArcRequest ArcRequest;
+	ArcRequest.RailExitLocation = RailExitLocation;
+	ArcRequest.RailDirection = RailDirection;
+	ArcRequest.TargetLocation = TargetLocation;
+	ArcRequest.WorldGravity = World ? FMath::Abs(World->GetGravityZ()) : 0.0f;
+	ArcRequest.ArcGravityScale = RailRocketSettings.ArcGravityScale;
+	ArcRequest.MinElevationDegrees = RailRocketSettings.MinArcElevationDegrees;
+	ArcRequest.MaxElevationDegrees = RailRocketSettings.MaxArcElevationDegrees;
+	ArcRequest.ElevationOffsetDegrees = FMath::FRandRange(-ElevationJitter, ElevationJitter);
+	ArcRequest.MinLaunchSpeed = RailSpeed;
+	ArcRequest.MaxLaunchSpeed = ProjectileSpeed * FMath::Max(RailRocketSettings.MaxArcSpeedMultiplier,
+	                                                         RailRocketMinSpeedMultiplier);
+	ArcRequest.ExitYawWobbleDegrees = FMath::FRandRange(-ExitWobble, ExitWobble);
+	ArcRequest.ExitPitchWobbleDegrees = FMath::FRandRange(-ExitWobble, ExitWobble);
+	return ArcRequest;
+}
+
+void AProjectile::ScheduleRailRocketFreeFlight(const FRailRocketArcRequest& ArcRequest, const float ProjectileSpeed,
+                                               const float RailTime)
+{
+	if (RailTime <= KINDA_SMALL_NUMBER)
+	{
+		TransitionRailRocketToFreeFlight(ArcRequest, ProjectileSpeed);
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	const TWeakObjectPtr<AProjectile> WeakThis(this);
+	World->GetTimerManager().SetTimer(
+		M_RailRocketTransitionTimerHandle,
+		[WeakThis, ArcRequest, ProjectileSpeed]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			WeakThis->TransitionRailRocketToFreeFlight(ArcRequest, ProjectileSpeed);
+		},
+		RailTime,
+		false);
+}
+
+void AProjectile::TransitionRailRocketToFreeFlight(FRailRocketArcRequest ArcRequest, const float ProjectileSpeed)
+{
+	if (not GetIsValidProjectileMovement())
+	{
+		return;
+	}
+
+	// Solve from where the rocket really left the rail; the timer fires on a frame boundary.
+	ArcRequest.RailExitLocation = GetActorLocation();
+	FRailRocketFreeFlightSolution FreeFlight;
+	if (not FRailRocketArcSolver::SolveFreeFlight(ArcRequest, FreeFlight))
+	{
+		// No arc at the rail's elevation: target above it, too close, or the speed cap was exceeded.
+		SetupArcedLaunch(ArcRequest.RailExitLocation, ArcRequest.TargetLocation, ProjectileSpeed, M_Range,
+		                 FArchProjectileSettings(), nullptr, nullptr);
+		return;
+	}
+
+	// Stage 2: the motor boost only changes the speed; the direction stays the rail's unless it was clamped.
+	M_ProjectileMovement->ProjectileGravityScale = FreeFlight.GravityScale;
+	M_ProjectileMovement->Velocity = FreeFlight.LaunchVelocity;
+	// The rocket noses over along the arc (the pooled Blueprint keeps a fixed rotation for straight shells).
+	M_ProjectileMovement->bRotationFollowsVelocity = true;
+	SetActorRotation(FreeFlight.LaunchVelocity.Rotation());
+
+	// Re-time the explosion from the real arc start so a rocket that hits nothing bursts on the target.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(M_ExplosionTimerHandle, this, &AProjectile::HandleTimedExplosion,
+		                                  FreeFlight.FlightTime, false);
+	}
+
+	if constexpr (DeveloperSettings::Debugging::GArchProjectile_Compile_DebugSymbols)
+	{
+		DebugDrawRailRocketFreeFlight(ArcRequest, FreeFlight);
+	}
+}
+
+void AProjectile::DebugDrawRailRocketFreeFlight(const FRailRocketArcRequest& ArcRequest,
+                                                const FRailRocketFreeFlightSolution& FreeFlight) const
+{
+	const FVector HorizontalVelocity(FreeFlight.LaunchVelocity.X, FreeFlight.LaunchVelocity.Y, 0.0f);
+	const FVector ApexLocation = FreeFlight.LaunchVelocity.Z > KINDA_SMALL_NUMBER
+		                             ? CalculateApexLocation(ArcRequest.RailExitLocation,
+		                                                     HorizontalVelocity.GetSafeNormal(),
+		                                                     HorizontalVelocity.Size(),
+		                                                     FreeFlight.LaunchVelocity.Z,
+		                                                     FreeFlight.EffectiveGravity)
+		                             : ArcRequest.RailExitLocation;
+	DebugDrawArcedLaunch(
+		this,
+		FArcedLaunchSolution{
+			ArcRequest.RailExitLocation,
+			ArcRequest.TargetLocation,
+			ApexLocation,
+			FreeFlight.LaunchVelocity,
+			FreeFlight.FlightTime
+		});
 }
 
 void AProjectile::TransitionVerticalRocketToArcOrStraight(const FVector& TargetLocation,
@@ -1732,6 +1905,7 @@ void AProjectile::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RailwayCannonTransitionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RailRocketTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
@@ -1751,6 +1925,7 @@ void AProjectile::BeginDestroy()
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RailwayCannonTransitionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RailRocketTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
@@ -1934,6 +2109,7 @@ void AProjectile::OnProjectileDormant()
 		World->GetTimerManager().ClearTimer(M_RocketSwingTimerHandle);
 		World->GetTimerManager().ClearTimer(M_VerticalRocketStraightTimerHandle);
 		World->GetTimerManager().ClearTimer(M_RailwayCannonTransitionTimerHandle);
+		World->GetTimerManager().ClearTimer(M_RailRocketTransitionTimerHandle);
 		World->GetTimerManager().ClearTimer(M_HomingMissileTimerHandle);
 	World->GetTimerManager().ClearTimer(M_BarrageProjectileTimerHandle);
 	}
@@ -1956,6 +2132,7 @@ void AProjectile::OnRestartProjectile(const FVector& NewLocation, const FRotator
 	{
 		M_ProjectileMovement->Activate();
 		M_ProjectileMovement->ProjectileGravityScale = M_DefaultGravityScale;
+		M_ProjectileMovement->bRotationFollowsVelocity = bM_DefaultRotationFollowsVelocity;
 		const FVector Direction = LaunchRotation.Vector();
 		M_ProjectileMovement->Velocity = Direction * ProjectileSpeed;
 		DebugProjectile("Projectile speed: " + FString::SanitizeFloat(ProjectileSpeed));
@@ -3019,6 +3196,10 @@ void AProjectile::PostInitializeComponents()
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "ProjectileMovement", "PostInitComponents");
 	}
 	M_DefaultGravityScale = DeveloperSettings::GameBalance::Weapons::ProjectileGravityScale;
+	if (IsValid(M_ProjectileMovement))
+	{
+		bM_DefaultRotationFollowsVelocity = M_ProjectileMovement->bRotationFollowsVelocity;
+	}
 	M_NiagaraComponent = FindComponentByClass<UNiagaraComponent>();
 	if (not IsValid(M_NiagaraComponent))
 	{

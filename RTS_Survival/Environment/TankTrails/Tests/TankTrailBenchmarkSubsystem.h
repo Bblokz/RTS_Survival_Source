@@ -89,6 +89,7 @@ private:
 	int32 M_FramesPerPhase = 0;
 	int32 M_PhaseRepeats = 0;
 	FString M_ToggledConsoleVariable;
+	int32 M_ToggledOnValue = 1;
 
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;

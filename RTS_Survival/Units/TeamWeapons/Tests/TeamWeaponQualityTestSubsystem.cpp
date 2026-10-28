@@ -45,6 +45,7 @@
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponMover.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -60,6 +61,8 @@ namespace TeamWeaponQualityPrivate
 	const TCHAR* const ExitCargoSwitch = TEXT("TWQualityExitCargo");
 	const TCHAR* const LegLengthSwitch = TEXT("TWQualityLegCm=");
 	const TCHAR* const SearchRadiusSwitch = TEXT("TWQualitySearchCm=");
+	const TCHAR* const CrewAnimsSwitch = TEXT("TWQualityCrewAnims");
+	const TCHAR* const CrewAnimDirectorySwitch = TEXT("TWQualityCrewAnimDir=");
 	const TCHAR* const AnchorClassPrefix = TEXT("BP_UnitImage_LandscapeAnchor");
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 
@@ -89,6 +92,14 @@ namespace TeamWeaponQualityPrivate
 	constexpr float TowedSettleSeconds = 1.5f;
 	constexpr float StoppedSettleSeconds = 3.f;
 	constexpr float DefaultLegLengthCm = 3600.f;
+	// Firing step of the crew animation audit: enough reloads to see the loader react and return to its loop.
+	constexpr int32 FiringReloadsWanted = 3;
+	constexpr float MaxFiringSeconds = 75.f;
+	// Without a reload by then the gun cannot hit the ground target; reloads are then started by the test hook.
+	constexpr float ForcedReloadAfterSeconds = 20.f;
+	constexpr float ForcedReloadPauseSeconds = 3.f;
+	constexpr float FireTargetRangeFraction = 0.55f;
+	constexpr float MinFireTargetDistanceCm = 1500.f;
 	constexpr float TowFirstSegmentCm = 3000.f;
 	constexpr float TowTurnSegmentCm = 2200.f;
 	constexpr float TowTurnDegrees = 70.f;
@@ -290,6 +301,13 @@ void UTeamWeaponQualityTestSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	bM_TakePictures = FParse::Value(FCommandLine::Get(), DirectorySwitch, M_OutputDirectory);
 	M_LegLengthCm = DefaultLegLengthCm;
 	FParse::Value(FCommandLine::Get(), LegLengthSwitch, M_LegLengthCm);
+	bM_AuditCrewAnims = FParse::Param(FCommandLine::Get(), CrewAnimsSwitch);
+	if (bM_AuditCrewAnims)
+	{
+		FString CrewAnimDirectory;
+		FParse::Value(FCommandLine::Get(), CrewAnimDirectorySwitch, CrewAnimDirectory);
+		M_CrewAnimAudit.Initialise(CrewAnimDirectory);
+	}
 	// Error dialogs stall unattended runs; they still reach the log.
 	RTSFunctionLibrary::PushModalDialogSuppression();
 	bM_IsSuppressingErrorDialogs = true;
@@ -334,6 +352,10 @@ void UTeamWeaponQualityTestSubsystem::Finish(const TCHAR* Reason)
 		return;
 	}
 	bM_IsFinished = true;
+	if (bM_AuditCrewAnims)
+	{
+		M_CrewAnimAudit.Finish(GetGameSeconds());
+	}
 	UE_LOG(LogRTSTeamWeaponQuality, Display, TEXT("RTS_TWQC RESULT %s passed=%d failed=%d reason=%s game_t=%.1f real_s=%.0f"),
 	       M_FailedCheckCount == 0 ? TEXT("PASS") : TEXT("FAIL"), M_PassedCheckCount, M_FailedCheckCount, Reason,
 	       GetGameSeconds(), FPlatformTime::Seconds() - M_StartRealSeconds);
@@ -402,6 +424,10 @@ void UTeamWeaponQualityTestSubsystem::Tick(float DeltaTime)
 	{
 		TickTowSubject(Subject);
 		bAllDone &= Subject.Step == ETWQualityTowStep::Done;
+	}
+	if (bM_AuditCrewAnims)
+	{
+		M_CrewAnimAudit.Tick(GetGameSeconds());
 	}
 	TickPictures();
 	if (bAllDone && M_Pictures.Num() == 0)
@@ -986,7 +1012,8 @@ void UTeamWeaponQualityTestSubsystem::KeepUnitsUnthrottled(AActor* Unit) const
 	}
 }
 
-void UTeamWeaponQualityTestSubsystem::KeepSquadUnthrottled(ATeamWeaponController& Controller) const
+void UTeamWeaponQualityTestSubsystem::KeepSquadUnthrottled(ATeamWeaponController& Controller,
+                                                            const bool bKeepTurretEnabled) const
 {
 	for (ASquadUnit* SquadUnit : Controller.GetSquadUnitsChecked())
 	{
@@ -996,7 +1023,7 @@ void UTeamWeaponQualityTestSubsystem::KeepSquadUnthrottled(ATeamWeaponController
 	KeepUnitsUnthrottled(Weapon);
 	// Soviet subjects are enemies of the German ones by their Blueprint owner; engaging each other makes the guns
 	// pack and turn on their own, which hides what the test measures.
-	if (IsValid(Weapon))
+	if (IsValid(Weapon) && not bKeepTurretEnabled)
 	{
 		Weapon->DisableTurret();
 	}
@@ -1184,7 +1211,12 @@ void UTeamWeaponQualityTestSubsystem::TickSquadSubject(FTWQualitySquadSubject& S
 		EnterSquadStep(Subject, ETWQualitySquadStep::Done);
 		return;
 	}
-	KeepSquadUnthrottled(*Controller);
+	KeepSquadUnthrottled(*Controller, Subject.Step == ETWQualitySquadStep::Firing);
+	if (bM_AuditCrewAnims && not Subject.bIsRegisteredForCrewAnimAudit)
+	{
+		M_CrewAnimAudit.RegisterSubject(Subject.Name, Subject.SquadSubtype, Controller);
+		Subject.bIsRegisteredForCrewAnimAudit = true;
+	}
 	if (not Subject.bLoggedConfig)
 	{
 		LogTeamWeaponConfig(Subject.Name, *Weapon);
@@ -1200,6 +1232,9 @@ void UTeamWeaponQualityTestSubsystem::TickSquadSubject(FTWQualitySquadSubject& S
 		break;
 	case ETWQualitySquadStep::MeasuringDeployed:
 		TickSquadMeasuringDeployed(Subject, *Controller, *Weapon, StepSeconds);
+		break;
+	case ETWQualitySquadStep::Firing:
+		TickSquadFiring(Subject, *Controller, *Weapon, StepSeconds);
 		break;
 	case ETWQualitySquadStep::Moving:
 		TickSquadMoving(Subject, *Controller, *Weapon, StepSeconds);
@@ -1283,7 +1318,73 @@ void UTeamWeaponQualityTestSubsystem::TickSquadMeasuringDeployed(FTWQualitySquad
 	Check(Subject.UnorderedStateChanges == 0, Subject.Name, *(Label + TEXT("_stays_deployed_without_orders")),
 	      FString::Printf(TEXT("frames_not_deployed=%d"), Subject.UnorderedStateChanges));
 	Subject.UnorderedStateChanges = 0;
+	if (bM_AuditCrewAnims && not Subject.bHasFired)
+	{
+		StartSquadFiring(Subject, Controller, Weapon);
+		return;
+	}
 	OrderNextLeg(Subject);
+}
+
+void UTeamWeaponQualityTestSubsystem::StartSquadFiring(FTWQualitySquadSubject& Subject,
+                                                       ATeamWeaponController& Controller, ATeamWeapon& Weapon)
+{
+	using namespace TeamWeaponQualityPrivate;
+	Subject.bHasFired = true;
+	Subject.ForcedReloads = 0;
+	const float TargetDistanceCm = FMath::Max(Controller.GetTeamWeaponRange() * FireTargetRangeFraction,
+	                                          MinFireTargetDistanceCm);
+	FVector Target = Weapon.GetActorLocation() + Weapon.GetActorForwardVector().GetSafeNormal2D() * TargetDistanceCm;
+	float GroundZ = 0.f;
+	if (TryGetGroundZ(Target, GroundZ))
+	{
+		Target.Z = GroundZ;
+	}
+	Subject.FireTarget = Target;
+	// The turret was switched off every frame until now; the attack ground order restarts its targeting.
+	const ECommandQueueError Error = Controller.AttackGround(Target, true);
+	UE_LOG(LogRTSTeamWeaponQuality, Display, TEXT("RTS_TWQC fire subject=%s target=%s distance=%.0f error=%d"),
+	       *Subject.Name, *Target.ToCompactString(), TargetDistanceCm, static_cast<int32>(Error));
+	EnterSquadStep(Subject, ETWQualitySquadStep::Firing);
+	Subject.NextForcedReloadSeconds = GetGameSeconds() + ForcedReloadAfterSeconds;
+}
+
+void UTeamWeaponQualityTestSubsystem::TickSquadFiring(FTWQualitySquadSubject& Subject,
+                                                      ATeamWeaponController& Controller, ATeamWeapon& Weapon,
+                                                      const float StepSeconds)
+{
+	using namespace TeamWeaponQualityPrivate;
+	const int32 Reloads = M_CrewAnimAudit.GetReloadCount(Subject.Name);
+	const bool bIsReloading = M_CrewAnimAudit.GetIsReloading(Subject.Name);
+	if ((Reloads >= FiringReloadsWanted && not bIsReloading) || StepSeconds > MaxFiringSeconds)
+	{
+		UE_LOG(LogRTSTeamWeaponQuality, Display, TEXT("RTS_TWQC fire_done subject=%s reloads=%d forced=%d seconds=%.1f"),
+		       *Subject.Name, Reloads, Subject.ForcedReloads, StepSeconds);
+		Controller.StopCommand();
+		OrderNextLeg(Subject);
+		return;
+	}
+	// Any reload pushes the forced reload back: only a gun that cannot shoot the ground (minimum range, no line)
+	// gets its reloads from the test hook.
+	if (bIsReloading)
+	{
+		Subject.NextForcedReloadSeconds = GetGameSeconds() + ForcedReloadAfterSeconds;
+		return;
+	}
+	if (GetGameSeconds() < Subject.NextForcedReloadSeconds)
+	{
+		return;
+	}
+	TArray<UWeaponState*> Weapons = Weapon.GetWeapons();
+	if (Weapons.Num() == 0 || not IsValid(Weapons[0]))
+	{
+		return;
+	}
+	Weapons[0]->Debug_StartReload();
+	Subject.ForcedReloads++;
+	Subject.NextForcedReloadSeconds = GetGameSeconds() + ForcedReloadPauseSeconds;
+	UE_LOG(LogRTSTeamWeaponQuality, Display, TEXT("RTS_TWQC fire_forced_reload subject=%s count=%d"),
+	       *Subject.Name, Subject.ForcedReloads);
 }
 
 void UTeamWeaponQualityTestSubsystem::TickSquadMoving(FTWQualitySquadSubject& Subject, ATeamWeaponController& Controller,
@@ -1703,7 +1804,7 @@ void UTeamWeaponQualityTestSubsystem::TickTowSubject(FTWQualityTowSubject& Subje
 		return;
 	}
 	KeepUnitsUnthrottled(Frame.Truck);
-	KeepSquadUnthrottled(*Frame.Controller);
+	KeepSquadUnthrottled(*Frame.Controller, false);
 	LogTowStatusChanges(Subject);
 	Frame.State = Frame.Controller->GetTeamWeaponState();
 	switch (Subject.Step)

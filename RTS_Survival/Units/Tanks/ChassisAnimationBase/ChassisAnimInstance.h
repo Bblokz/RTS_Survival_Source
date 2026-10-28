@@ -9,8 +9,24 @@
 #include "ChassisAnimInstance.generated.h"
 
 class UNiagaraComponent;
+class UGroundSurfaceSubsystem;
+
+// The ground look the track smoke shows now; it eases towards the look of the ground under the vehicle.
+USTRUCT()
+struct FChassisSmokeSurfaceState
+{
+	GENERATED_BODY()
+
+	FLinearColor M_CurrentTint = FLinearColor::White;
+
+	float M_CurrentDensity = 1.f;
+
+	// False while the smoke is off: the next activation takes the ground's look at once instead of easing to it.
+	bool bM_HasAppliedLook = false;
+};
+
 /**
- * 
+ *
  */
 UCLASS()
 class RTS_SURVIVAL_API UChassisAnimInstance : public UAnimInstance
@@ -79,6 +95,19 @@ private:
 
 	UFUNCTION()
 	void UpdateTrackVFX();
+
+	void DisableTrackSmoke();
+
+	// Tints the track smoke and scales its amount by the ground under the vehicle (baked surface map).
+	void UpdateTrackSmokeSurfaceLook();
+
+	bool GetIsValidGroundSurfaceSubsystem() const;
+
+	UPROPERTY()
+	TWeakObjectPtr<UGroundSurfaceSubsystem> M_GroundSurfaceSubsystem;
+
+	UPROPERTY()
+	FChassisSmokeSurfaceState M_SmokeSurfaceState;
 	
 	
 };

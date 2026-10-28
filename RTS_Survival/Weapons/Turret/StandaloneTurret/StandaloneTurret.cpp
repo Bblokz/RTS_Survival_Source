@@ -1870,6 +1870,43 @@ void AStandaloneTurret::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile H
 	AddInitializedWeapon(HomingMissile);
 }
 
+void AStandaloneTurret::SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters)
+{
+	UWorld* World = GetWeaponSetupWorld(TEXT("SetupRailRocketWeapon"));
+	if (not IsValid(World))
+	{
+		return;
+	}
+
+	PrepareStandaloneWeaponParameters(
+		RailRocketParameters, this, M_TurretMesh, GetOwningPlayerForWeaponInit());
+	URailRocketWeaponState* RailRocket =
+		CreateStandaloneWeaponState<URailRocketWeaponState>(this, TEXT("rail rocket"));
+	if (not IsValid(RailRocket))
+	{
+		return;
+	}
+
+	RailRocket->InitRailRocketWeapon(
+		RailRocketParameters.OwningPlayer,
+		M_Weapons.Num(),
+		RailRocketParameters.GetWeaponNameEnum(),
+		RailRocketParameters.WeaponBurstMode,
+		RailRocketParameters.WeaponOwner,
+		RailRocketParameters.MeshComponent,
+		RailRocketParameters.FireSocketName,
+		World,
+		RailRocketParameters.ProjectileSystem,
+		RailRocketParameters.WeaponVFX,
+		RailRocketParameters.WeaponShellCase,
+		RailRocketParameters.RailRocketSettings,
+		RailRocketParameters.BurstCooldown,
+		RailRocketParameters.SingleBurstAmountMaxBurstAmount,
+		RailRocketParameters.MinBurstAmount,
+		RailRocketParameters.CreateShellCasingOnEveryRandomBurst);
+	AddInitializedWeapon(RailRocket);
+}
+
 void AStandaloneTurret::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileParameters)
 {
 	UWorld* World = GetWeaponSetupWorld(TEXT("SetupMultiProjectileWeapon"));

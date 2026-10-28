@@ -366,7 +366,15 @@ enum class
 	// MG42 burst sound; it used to borrow the DShK's 12.7mm entry.
 	Ger_PitMG42_7_92MM UMETA(DisplayName = "MG 42 7.92MM (Pit)"),
 	// SMK main turret: the L-11 76mm with a faster reload and a little more range than the KV-1's.
-	L_11_76MM_SMK UMETA(DisplayName = "L-11 76MM (SMK)")
+	L_11_76MM_SMK UMETA(DisplayName = "L-11 76MM (SMK)"),
+	// Jaguar Flanker: one of two independent long 60mm guns (two weapons share this entry), APCR only.
+	KwK_Long60MM_APCR_Flanker UMETA(DisplayName = "6 cm Long APCR (Jaguar Flanker)"),
+	// The ISU-130's casemate gun: the S-26, a B-13 naval 130mm with a muzzle brake; flat, long-ranged and penetrating.
+	S_26_130MM_ISU130 UMETA(DisplayName = "S-26 130MM (ISU-130)"),
+	// BM-13 Katyusha: sixteen M-13 132mm HE rockets rippled off launch rails; area fire with a long reload.
+	Katyusha_M13_132MM UMETA(DisplayName = "13.2 cm M-13 Rocket (BM-13)"),
+	// MS-1: the short low-velocity 37mm Hotchkiss (PS-1) tank gun; quick to reload, weak against armour.
+	Hotchkiss_37MM_MS1 UMETA(DisplayName = "37MM Hotchkiss (MS-1)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -508,6 +516,10 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::T44_155MM_Howitzer: return "155mm How";
 	case EWeaponName::Ger_PitMG42_7_92MM: return "MG 42";
 	case EWeaponName::L_11_76MM_SMK: return "L/11";
+	case EWeaponName::KwK_Long60MM_APCR_Flanker: return "6 cm APCR";
+	case EWeaponName::S_26_130MM_ISU130: return "S-26";
+	case EWeaponName::Katyusha_M13_132MM: return "M-13 Rockets";
+	case EWeaponName::Hotchkiss_37MM_MS1: return "Hotchkiss 37";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -1087,6 +1099,14 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "Ger_PitMG42_7_92MM";
 	case EWeaponName::L_11_76MM_SMK:
 		return "L_11_76MM_SMK";
+	case EWeaponName::KwK_Long60MM_APCR_Flanker:
+		return "KwK_Long60MM_APCR_Flanker";
+	case EWeaponName::S_26_130MM_ISU130:
+		return "S_26_130MM_ISU130";
+	case EWeaponName::Katyusha_M13_132MM:
+		return "Katyusha_M13_132MM";
+	case EWeaponName::Hotchkiss_37MM_MS1:
+		return "Hotchkiss_37MM_MS1";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:

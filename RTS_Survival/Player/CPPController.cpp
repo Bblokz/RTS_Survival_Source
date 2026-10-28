@@ -55,10 +55,8 @@
 #include "RTS_Survival/GameUI/BottomCenterUI/BuildingUI_ItemPanel/W_BuildingUI_ItemPanel.h"
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/GameUI/MouseHovering/UW_HoveringActor.h"
-#include "Engine/GameViewportClient.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Application/SlateUser.h"
-#include "Widgets/SViewport.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/CommanderSettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityCostState.h"
@@ -8291,9 +8289,9 @@ void ACPPController::ApplyHoverRangeIndicatorSettingChanged(const bool bNewCheck
 void ACPPController::UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
                                              const FHitResult& MouseHitResult, const bool bHit)
 {
-	if (bM_IsInTechTree || bM_IsInFullMapView || bM_IsCinematicTakeOverActive || GetIsCursorOverHitTestableHUD())
+	if (bM_IsInTechTree || bM_IsInFullMapView || bM_IsCinematicTakeOverActive || GetIsCursorOverWorldHoverBlockingHUD())
 	{
-		// Do not use hovering widgets while blocked by top-level UI overlays, HUD panels or cinematic takeover.
+		// Do not use hovering widgets under top-level UI overlays, the main HUD panels or during cinematic takeover.
 		HandleHoveringBlockedState();
 		return;
 	}
@@ -8383,48 +8381,20 @@ void ACPPController::HandleHoveringBlockedState()
 	HideHoveringWidget();
 }
 
-bool ACPPController::GetIsCursorOverHitTestableHUD() const
+bool ACPPController::GetIsCursorOverWorldHoverBlockingHUD() const
 {
-	if (not FSlateApplication::IsInitialized())
+	// Checked every tick, also before the HUD exists, so a missing HUD is not an error here.
+	if (not IsValid(M_MainGameUI) || not FSlateApplication::IsInitialized())
 	{
 		return false;
 	}
-	const ULocalPlayer* LocalPlayer = GetLocalPlayer();
-	if (not IsValid(LocalPlayer) || not IsValid(LocalPlayer->ViewportClient))
-	{
-		return false;
-	}
-	const TSharedPtr<SViewport> GameViewportWidget = LocalPlayer->ViewportClient->GetGameViewportWidget();
 	const TSharedPtr<const FSlateUser> CursorUser = FSlateApplication::Get().GetCursorUser();
-	if (not GameViewportWidget.IsValid() || not CursorUser.IsValid())
+	if (not CursorUser.IsValid())
 	{
 		return false;
 	}
 	// Slate caches this path on every pointer event (and synthesized move), so no extra hit test is needed.
-	const FWeakWidgetPath WidgetsUnderCursor = CursorUser->GetLastWidgetsUnderCursor();
-	// Empty until the first pointer event; GetLastWidget asserts on an empty path.
-	if (not WidgetsUnderCursor.IsValid())
-	{
-		return false;
-	}
-	const TSharedPtr<SWidget> TopWidgetUnderCursor = WidgetsUnderCursor.GetLastWidget().Pin();
-	if (not TopWidgetUnderCursor.IsValid())
-	{
-		return false;
-	}
-	return GetIsWidgetBlockingWorldHover(*TopWidgetUnderCursor, *GameViewportWidget);
-}
-
-bool ACPPController::GetIsWidgetBlockingWorldHover(const SWidget& TopWidgetUnderCursor, const SViewport& GameViewportWidget)
-{
-	if (&TopWidgetUnderCursor == &GameViewportWidget)
-	{
-		return false;
-	}
-	// A user widget's own container is hit-testable when the widget is Visible (MainGameUI_HUD covers the whole
-	// screen this way) but passes the mouse on to the viewport; only a widget inside it takes the cursor.
-	static const FName UserWidgetContainerType(TEXT("SObjectWidget"));
-	return TopWidgetUnderCursor.GetType() != UserWidgetContainerType;
+	return M_MainGameUI->GetIsPathOverWorldHoverBlockingPanel(CursorUser->GetLastWidgetsUnderCursor());
 }
 
 void ACPPController::HideHoveringWidget()

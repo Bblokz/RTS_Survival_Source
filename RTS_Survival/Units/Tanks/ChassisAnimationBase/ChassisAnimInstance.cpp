@@ -4,7 +4,19 @@
 #include "ChassisAnimInstance.h"
 
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Environment/GroundSurface/GroundSurfaceSubsystem.h"
+#include "RTS_Survival/Environment/GroundSurface/RTSGroundSurfaceSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+namespace ChassisTrackSmoke
+{
+	// User parameters of NS_Track_Smokes: SmokeTint feeds the material through a dynamic parameter at particle spawn,
+	// SmokeDensity scales the spawn count.
+	const FName SmokeTintParameter = TEXT("SmokeTint");
+	const FName SmokeDensityParameter = TEXT("SmokeDensity");
+	// Below this difference the eased look snaps to the ground's look and stops updating the Niagara component.
+	constexpr float LookSnapTolerance = 0.01f;
+}
 
 void UChassisAnimInstance::SetMovementParameters(const float NewSpeed, const float NewRotationYaw,
                                                  const bool bIsMovingForward)
@@ -24,21 +36,16 @@ void UChassisAnimInstance::SetChassisAnimToStationaryRotation(const bool bRotate
 void UChassisAnimInstance::SetChassisAnimToIdle()
 {
 	// Derived Wheeled Or Track anim instances set the correct animation enum.
-	if (IsValid(M_TrackParticleComponent))
-	{
-		M_TrackParticleComponent->Deactivate();
-		M_TrackParticleComponent->SetVisibility(false);
-		M_TrackParticleComponent->
-			SetVariableFloat(FName("XSmokeSpeedMultiplier"), 0);
-	}
+	DisableTrackSmoke();
 }
 
 void UChassisAnimInstance::NativeBeginPlay()
 {
 	Super::NativeBeginPlay();
 	SetChassisAnimToIdle();
-	if (const UWorld* World = GetWorld())
+	if (UWorld* World = GetWorld())
 	{
+		M_GroundSurfaceSubsystem = World->GetSubsystem<UGroundSurfaceSubsystem>();
 		M_VfxDel.BindUObject(this, &UChassisAnimInstance::UpdateTrackVFX);
 		World->GetTimerManager().SetTimer(M_VfxHandle, M_VfxDel,
 		                                  DeveloperSettings::Optimization::UpdateChassisVFXInterval, true);
@@ -85,14 +92,16 @@ void UChassisAnimInstance::UpdateTrackVFX()
 	{
 		if (Speed <= AnimationSpeedDivider)
 		{
-			// stop the niagara system from rendering (speed too low)
-			M_TrackParticleComponent->Deactivate();
-			M_TrackParticleComponent->SetVisibility(false);
-			M_TrackParticleComponent->
-				SetVariableFloat(FName("XSmokeSpeedMultiplier"), 0);
+			// stop the niagara system from rendering (speed too low); idle vehicles skip this once it is off.
+			if (M_TrackParticleComponent->IsActive())
+			{
+				DisableTrackSmoke();
+			}
 		}
 		else
 		{
+			// Before activating, so the first particles already have the ground's look.
+			UpdateTrackSmokeSurfaceLook();
 			// enable the niagara system to render (speed high enough)
 			if (!M_TrackParticleComponent->IsActive())
 			{
@@ -111,4 +120,63 @@ void UChassisAnimInstance::UpdateTrackVFX()
 			SetVariableFloat(FName("PlayRate"),
 			                 LocalPlayrate);
 	}
+}
+
+void UChassisAnimInstance::DisableTrackSmoke()
+{
+	if (not IsValid(M_TrackParticleComponent))
+	{
+		return;
+	}
+	M_TrackParticleComponent->Deactivate();
+	M_TrackParticleComponent->SetVisibility(false);
+	M_TrackParticleComponent->
+		SetVariableFloat(FName("XSmokeSpeedMultiplier"), 0);
+	M_SmokeSurfaceState.bM_HasAppliedLook = false;
+}
+
+void UChassisAnimInstance::UpdateTrackSmokeSurfaceLook()
+{
+	const AActor* OwningActor = GetOwningActor();
+	if (not IsValid(OwningActor) || not IsValid(M_TrackParticleComponent) || not GetIsValidGroundSurfaceSubsystem())
+	{
+		return;
+	}
+	const FGroundSurfaceSmokeLook& TargetLook = M_GroundSurfaceSubsystem->GetSmokeLookAt(OwningActor->GetActorLocation());
+	FChassisSmokeSurfaceState& State = M_SmokeSurfaceState;
+	const URTSGroundSurfaceSettings* Settings = URTSGroundSurfaceSettings::Get();
+	const float BlendAlpha = State.bM_HasAppliedLook && Settings != nullptr ? Settings->SmokeLookBlendPerUpdate : 1.f;
+
+	FLinearColor NewTint = FMath::Lerp(State.M_CurrentTint, TargetLook.SmokeTint, BlendAlpha);
+	float NewDensity = FMath::Lerp(State.M_CurrentDensity, TargetLook.SmokeDensity, BlendAlpha);
+	if (NewTint.Equals(TargetLook.SmokeTint, ChassisTrackSmoke::LookSnapTolerance)
+		&& FMath::IsNearlyEqual(NewDensity, TargetLook.SmokeDensity, ChassisTrackSmoke::LookSnapTolerance))
+	{
+		NewTint = TargetLook.SmokeTint;
+		NewDensity = TargetLook.SmokeDensity;
+	}
+	// Most updates land here: the vehicle stays on the same ground and the component keeps its values.
+	if (State.bM_HasAppliedLook && NewTint == State.M_CurrentTint && NewDensity == State.M_CurrentDensity)
+	{
+		return;
+	}
+	M_TrackParticleComponent->SetVariableLinearColor(ChassisTrackSmoke::SmokeTintParameter, NewTint);
+	M_TrackParticleComponent->SetVariableFloat(ChassisTrackSmoke::SmokeDensityParameter, NewDensity);
+	State.M_CurrentTint = NewTint;
+	State.M_CurrentDensity = NewDensity;
+	State.bM_HasAppliedLook = true;
+}
+
+bool UChassisAnimInstance::GetIsValidGroundSurfaceSubsystem() const
+{
+	if (M_GroundSurfaceSubsystem.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_GroundSurfaceSubsystem",
+		"GetIsValidGroundSurfaceSubsystem",
+		GetOwningActor());
+	return false;
 }

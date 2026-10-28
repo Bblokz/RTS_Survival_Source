@@ -2110,6 +2110,62 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	constexpr float AmpulometProjectileSpeedMlt = 0.9f;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * AmpulometProjectileSpeedMlt;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Ampulomet_125MM, WeaponData);
+
+	// BM-13 Katyusha: sixteen M-13 132mm HE rockets rippled off the rails (the Nebelwerfer / Panzerwerfer rocket
+	// family, but HE instead of HEAT). Each rocket is a heavy mortar bomb: more blast and splash than the 120mm mortar,
+	// with the mortar AOE multiplier for a wide shrapnel ring. Area fire: low accuracy, long reload of the whole rack.
+	// HE is applied when firing, so TNT, damage, pen and shrapnel are divided by the HE multipliers here
+	// (Jagdpanzer IV/70 Siege pattern) and the fired rocket carries the plain formulas.
+	{
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
+		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
+		constexpr int32 KatyushaCalibre = 132;
+		// Game-scale warhead of the rocket/mortar family (the 120mm mortar fires 100 g), not the real 4.9 kg.
+		constexpr float KatyushaFiredTntGrams = 300.f;
+		constexpr float KatyushaShrapnelDamageMlt = 1.45f;
+		// The real BM-13 carried 16 rockets; one per launch socket.
+		constexpr int32 KatyushaMagCapacity = 16;
+		// Ripple fire: a full salvo leaves the rails in about seven seconds.
+		constexpr float KatyushaRippleCooldown = 0.45f;
+		// Reloading sixteen rails by hand takes the crew a long time.
+		constexpr float KatyushaReloadSpeed = 35.f;
+		// Area fire: about the howitzers' spread (they use 24-26).
+		constexpr int32 KatyushaAccuracy = 22;
+		FWeaponData KatyushaData = {};
+		KatyushaData.WeaponName = EWeaponName::Katyusha_M13_132MM;
+		KatyushaData.DamageType = ERTSDamageType::Kinetic;
+		KatyushaData.ShellType = EWeaponShellType::Shell_HE;
+		KatyushaData.ShellTypes = {EWeaponShellType::Shell_HE};
+		KatyushaData.WeaponCalibre = KatyushaCalibre;
+		KatyushaData.TNTExplosiveGrams = KatyushaFiredTntGrams / HE_TNTExplosiveGramsMlt;
+		KatyushaData.BaseDamage = (DamagePerMM * KatyushaData.WeaponCalibre
+			+ KatyushaData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) / HE_DamageMlt;
+		KatyushaData.DamageFlux = DamageFluxPercentage;
+		// Between the Nebelwerfer (medium artillery) and the T-44/155 howitzer (howitzer artillery).
+		KatyushaData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange, 100);
+		KatyushaData.ArmorPen = (DeveloperSettings::GameBalance::Weapons::Mortars::MortarArmorPenPerMM
+			* KatyushaData.WeaponCalibre) / HE_ArmorPenMlt;
+		KatyushaData.ArmorPenMaxRange = KatyushaData.ArmorPen;
+		KatyushaData.MagCapacity = KatyushaMagCapacity;
+		KatyushaData.ReloadSpeed = KatyushaReloadSpeed;
+		KatyushaData.BaseCooldown = KatyushaRippleCooldown;
+		KatyushaData.CooldownFlux = CooldownFluxPercentage;
+		KatyushaData.Accuracy = KatyushaAccuracy;
+		KatyushaData.ShrapnelRange = (KatyushaData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt)
+			/ HE_ShrapnelRangeMlt;
+		KatyushaData.ShrapnelDamage = KatyushaShrapnelDamageMlt * KatyushaData.TNTExplosiveGrams
+			* ShrapnelDamagePerTNTGram / HE_ShrapnelDamageMlt;
+		KatyushaData.ShrapnelParticles = KatyushaData.WeaponCalibre * ShrapnelAmountPerMM / HE_ShrapnelParticlesMlt;
+		KatyushaData.ShrapnelPen = KatyushaData.WeaponCalibre * ShrapnelPenPerMM;
+		// The rocket family speed (Panzerwerfer); the rail rocket state solves its own arc speed from this.
+		KatyushaData.ProjectileMovementSpeed = BaseProjectileSpeed * PanzerwerferProjectileSpeedMultiplier;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Katyusha_M13_132MM, KatyushaData);
+	}
 }
 
 
@@ -3503,6 +3559,28 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.WeaponName = EWeaponName::BT_7_20K_45MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::BT_7_20K_45MM, WeaponData);
+
+	// MS-1: the short 37mm Hotchkiss (PS-1) of 1928. A low-velocity infantry-support gun: a smaller, slower shell than
+	// the 20-K's that penetrates far less (below the Pz 38(t)'s 37mm), with a quicker reload and a shorter reach.
+	{
+		FWeaponData Ms1WeaponData = WeaponData;
+		Ms1WeaponData.WeaponName = EWeaponName::Hotchkiss_37MM_MS1;
+		Ms1WeaponData.WeaponCalibre = 37;
+		Ms1WeaponData.TNTExplosiveGrams = 20;
+		Ms1WeaponData.BaseDamage = DamagePerMM * Ms1WeaponData.WeaponCalibre
+			+ Ms1WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		Ms1WeaponData.ArmorPen = 38;
+		Ms1WeaponData.ArmorPenMaxRange = 26;
+		Ms1WeaponData.ReloadSpeed = 3.0f;
+		Ms1WeaponData.Accuracy = 75;
+		Ms1WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(WeaponData.Range * 0.85f, 10);
+		Ms1WeaponData.ShrapnelRange = Ms1WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+		Ms1WeaponData.ShrapnelDamage = Ms1WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		Ms1WeaponData.ShrapnelParticles = Ms1WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+		Ms1WeaponData.ShrapnelPen = Ms1WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+		Ms1WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 0.7f;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Hotchkiss_37MM_MS1, Ms1WeaponData);
+	}
 
 	// T-70 20K (faster reload & more accurate)
 	WeaponData.WeaponName = EWeaponName::T_70_20k_45MM;
@@ -5071,6 +5149,42 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML_20S_152MM_ISU152, Isu152WeaponData);
 	}
 
+	// ISU-130 gun: the S-26, a B-13 naval 130mm with a muzzle brake. Flatter and longer ranged than the ISU-152's ML-20S
+	// with more penetration than the IS-2's D-25T and a faster reload, but a smaller shell.
+	{
+		const float Isu130Calibre = 130.f;
+		// Bore-area step between the 122mm (562 g) and 152mm (1062 g) shells.
+		const float Isu130TNTGrams = 640.f;
+		const float Isu130RangeMlt = 1.25f;
+		const float Isu130ArmorPen = 215.f;
+		const float Isu130ArmorPenMaxRange = 200.f;
+		const float Isu130ReloadSpeed = 25.0f;
+		const int32 Isu130Accuracy = 92;
+
+		FWeaponData Isu130WeaponData = WeaponData;
+		Isu130WeaponData.WeaponName = EWeaponName::S_26_130MM_ISU130;
+		Isu130WeaponData.DamageType = ERTSDamageType::Kinetic;
+		Isu130WeaponData.ShellType = EWeaponShellType::Shell_APHE;
+		Isu130WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
+		Isu130WeaponData.WeaponCalibre = Isu130Calibre;
+		Isu130WeaponData.TNTExplosiveGrams = Isu130TNTGrams;
+		Isu130WeaponData.BaseDamage = DamagePerMM * Isu130WeaponData.WeaponCalibre
+			+ Isu130WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		Isu130WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			DeveloperSettings::GameBalance::Ranges::HeavyCannonRange * Isu130RangeMlt, 100);
+		Isu130WeaponData.ArmorPen = Isu130ArmorPen;
+		Isu130WeaponData.ArmorPenMaxRange = Isu130ArmorPenMaxRange;
+		Isu130WeaponData.MagCapacity = 1;
+		Isu130WeaponData.ReloadSpeed = Isu130ReloadSpeed;
+		Isu130WeaponData.Accuracy = Isu130Accuracy;
+		Isu130WeaponData.ShrapnelRange = Isu130WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+		Isu130WeaponData.ShrapnelDamage = Isu130WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		Isu130WeaponData.ShrapnelParticles = Isu130WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+		Isu130WeaponData.ShrapnelPen = Isu130WeaponData.WeaponCalibre * ShrapnelPenPerMM;
+		Isu130WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::S_26_130MM_ISU130, Isu130WeaponData);
+	}
+
 	{
 		constexpr float TM312CalibreMM = 305.f;
 		// Produces roughly 8.5k base damage, following the bore-area progression of the 128mm and 152mm cannons.
@@ -5776,6 +5890,36 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SovietTanker, TankData);
+
+	// BM-13 Katyusha: the Zil truck with a 16-rail rocket rack on the bed. Unarmoured like the supply trucks but a
+	// little sturdier (cab and rack bracing); the rack traverses slowly and the loaded truck is a bit slower.
+	// The rockets are its main weapon, so it keeps the basic abilities (attack ground included) and the artillery
+	// experience levels of the Panzerwerfer.
+	{
+		constexpr float BM13HealthMlt = 1.0f;
+		constexpr float BM13RotationSpeed = 35.f;
+		constexpr float BM13RackRotationSpeed = 20.f;
+		constexpr float BM13MaxSpeedKmh = 50.f;
+		constexpr float BM13ReverseSpeedKmh = 20.f;
+		constexpr float BM13ExpWorthMlt = 1.8f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * BM13HealthMlt, 5);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = BM13RotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = BM13RackRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = BM13MaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = BM13ReverseSpeedKmh;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * BM13ExpWorthMlt, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, BM13_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, BM13_VehicleParts}
+		});
+		TankData.ExperienceLevels = GetLightArtillerySpecialVehicleExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_BM13, TankData);
+	}
 }
 
 void ACPPGameState::InitAllGameLightTankData()
@@ -6131,6 +6275,25 @@ void ACPPGameState::InitAllGameLightTankData()
 	TankData.ExperienceWorth = BaseLightTankExp;
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T26, TankData);
+
+	// MS-1 (T-18): the weakest Soviet tank. Thin riveted plates (fewer hit points than the BT-7), as slow as the T-26
+	// with a slower hand-cranked turret, and cheap.
+	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp - 75;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 35 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 16;
+	TankData.VehicleReverseSpeedKmh = 6;
+	TankData.VisionRadius = T1TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, MS1_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, MS1_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetLightTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseLightTankExp * 0.7f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_MS1, TankData);
 
 	// T-70
 	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp + 25;
@@ -7440,6 +7603,37 @@ void ACPPGameState::InitAllGameHeavyTankData()
 		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * Isu152ExpWorthMlt, 5);
 		TankData.ExperienceMultiplier = 1.0f;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_ISU_152, TankData);
+	}
+
+	// ISU-130 (heavy tank destroyer): the ISU-152's hull and armour; the long S-26 is slower to lay and costs more.
+	{
+		const float Isu130CostMlt = 1.1f;
+		const int32 Isu130RadixiteCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			(JagdPanther_Radixite + Tiger_Radixite) * 0.5f * Isu130CostMlt, 10);
+		const int32 Isu130VehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
+			(JagdPanther_VehicleParts + Tiger_VehicleParts) * 0.5f * Isu130CostMlt, 10);
+		const float Isu130VehicleRotationSpeed = 21.f;
+		const float Isu130TurretRotationSpeed = 7.f;
+		const float Isu130MaxSpeedKmh = 18.f;
+		const float Isu130ReverseSpeedKmh = 8.f;
+		const float Isu130ExpWorthMlt = 1.6f;
+
+		TankData.MaxHealth = T3HeavyTankBase;
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = Isu130VehicleRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = Isu130TurretRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = Isu130MaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = Isu130ReverseSpeedKmh;
+		TankData.VisionRadius = T3TankVisionRadius;
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Isu130RadixiteCost},
+			{ERTSResourceType::Resource_VehicleParts, Isu130VehiclePartsCost}
+		});
+		TankData.Abilities = BasicTankDestroyerAbilities;
+		TankData.ExperienceLevels = GetHeavyTankDestroyerExpLevels();
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * Isu130ExpWorthMlt, 5);
+		TankData.ExperienceMultiplier = 1.0f;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_ISU_130, TankData);
 	}
 }
 

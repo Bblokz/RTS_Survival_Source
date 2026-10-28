@@ -3,6 +3,12 @@
 
 #include "MainGameUI.h"
 
+#include "Blueprint/WidgetTree.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBox.h"
+#include "Layout/WidgetPath.h"
+#include "Resources/PlayerEnergyBar/EnergyBarInfo/W_EnergyBarInfo.h"
+
 #include "BottomRightUIPanelState/BottomRightUIPanelState.h"
 #include "BuildingExpansion/W_ItemBuildingExpansion.h"
 #include "BuildingExpansion/W_OptionBuildingExpansion.h"
@@ -1749,7 +1755,84 @@ void UMainGameUI::InitMainGameUI(
 	InitMainGameUI_HideWidgets();
 
 	SetupResources(NewPlayerResourceWidgets, NewPlayerController, NewPlayerEnergyBar, NewPlayerEnergyBarInfo);
+	InitMainGameUI_InitWorldHoverBlockingPanels(ActionUIContainerWidgets, NewTrainingUIBorder, NewBottomCenterUI,
+	                                            NewPlayerResourceWidgets, NewPlayerEnergyBar, NewPlayerEnergyBarInfo);
 	PropagateControlGroupsToPlayer(NewControlGroups);
 	// Start async loading archive.
 	LoadArchiveMenu();
+}
+
+namespace MainGameUIWorldHover
+{
+	// Designer-only parts of the minimap/resource and bottom-right panels that have no C++ reference.
+	const TCHAR* const BlockingPanelNames[] = {
+		TEXT("HudTopPanel"),
+		TEXT("M_OpenFullMapButton"),
+		TEXT("BottomPanelCanvas")
+	};
+}
+
+void UMainGameUI::InitMainGameUI_InitWorldHoverBlockingPanels(
+	const FActionUIContainer& ActionUIContainerWidgets,
+	UBorder* TrainingUIBorder,
+	UW_BottomCenterUI* BottomCenterUI,
+	const TArray<UW_PlayerResource*>& ResourceWidgets,
+	UW_PlayerEnergyBar* EnergyBar,
+	UW_EnergyBarInfo* EnergyBarInfo)
+{
+	M_WorldHoverBlockingPanels.Reset();
+	AddWorldHoverBlockingPanel(BottomCenterUI);
+	AddWorldHoverBlockingPanel(ActionUIContainerWidgets.M_ActionUIBorder);
+	AddWorldHoverBlockingPanel(ActionUIContainerWidgets.M_ActionUIHorizontalBox);
+	AddWorldHoverBlockingPanel(TrainingUIBorder);
+	AddWorldHoverBlockingPanel(M_TrainingBuildingColumn);
+	AddWorldHoverBlockingPanel(M_MiniMap);
+	AddWorldHoverBlockingPanel(EnergyBar);
+	AddWorldHoverBlockingPanel(EnergyBarInfo);
+	for (UW_PlayerResource* const ResourceWidget : ResourceWidgets)
+	{
+		AddWorldHoverBlockingPanel(ResourceWidget);
+	}
+	if (not IsValid(WidgetTree))
+	{
+		return;
+	}
+	for (const TCHAR* const PanelName : MainGameUIWorldHover::BlockingPanelNames)
+	{
+		UWidget* const Panel = WidgetTree->FindWidget(FName(PanelName));
+		if (not IsValid(Panel))
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("MainGameUI has no widget named %s; world hover will show under it."), PanelName));
+			continue;
+		}
+		AddWorldHoverBlockingPanel(Panel);
+	}
+}
+
+void UMainGameUI::AddWorldHoverBlockingPanel(UWidget* Panel)
+{
+	if (not IsValid(Panel))
+	{
+		return;
+	}
+	M_WorldHoverBlockingPanels.AddUnique(Panel);
+}
+
+bool UMainGameUI::GetIsPathOverWorldHoverBlockingPanel(const FWeakWidgetPath& WidgetsUnderCursor) const
+{
+	for (const TObjectPtr<UWidget>& Panel : M_WorldHoverBlockingPanels)
+	{
+		if (not IsValid(Panel))
+		{
+			continue;
+		}
+		// The path only holds a panel when a hit-testable widget inside it is under the cursor.
+		const TSharedPtr<SWidget> PanelSlateWidget = Panel->GetCachedWidget();
+		if (PanelSlateWidget.IsValid() && WidgetsUnderCursor.ContainsWidget(PanelSlateWidget.Get()))
+		{
+			return true;
+		}
+	}
+	return false;
 }

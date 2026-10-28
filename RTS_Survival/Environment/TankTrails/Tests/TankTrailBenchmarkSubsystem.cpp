@@ -44,6 +44,9 @@ namespace TankTrailBenchPrivate
 	// (-TankTrailBenchCVar=grass.Enable).
 	const TCHAR* const ToggleSwitch = TEXT("TankTrailBenchCVar=");
 	const TCHAR* const DefaultToggledVariable = TEXT("rts.TankTrails");
+	// Value of the toggled variable in the "on" phases, for variables with more than one level
+	// (-TankTrailBenchCVar=rts.AmbientFx -TankTrailBenchOnValue=2).
+	const TCHAR* const OnValueSwitch = TEXT("TankTrailBenchOnValue=");
 
 	const TCHAR* const TankClassPath =
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Ger_Vehicle_PanzerIV_H.Ger_Vehicle_PanzerIV_H_C");
@@ -156,6 +159,8 @@ void UTankTrailBenchmarkSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	M_PhaseRepeats = DefaultPhaseRepeats;
 	M_ToggledConsoleVariable = DefaultToggledVariable;
 	FParse::Value(FCommandLine::Get(), ToggleSwitch, M_ToggledConsoleVariable);
+	M_ToggledOnValue = 1;
+	FParse::Value(FCommandLine::Get(), OnValueSwitch, M_ToggledOnValue);
 	FParse::Value(FCommandLine::Get(), RepeatsSwitch, M_PhaseRepeats);
 	M_DriveCentre = DefaultDriveCentre;
 	FString LocationText;
@@ -569,7 +574,7 @@ void UTankTrailBenchmarkSubsystem::SetTrailsOn(const bool bTrailsOn) const
 		       *M_ToggledConsoleVariable);
 		return;
 	}
-	ToggledVariable->Set(bTrailsOn ? 1 : 0, ECVF_SetByConsole);
+	ToggledVariable->Set(bTrailsOn ? M_ToggledOnValue : 0, ECVF_SetByConsole);
 }
 
 void UTankTrailBenchmarkSubsystem::StartMeasuredPhase(const int32 PhaseIndex)

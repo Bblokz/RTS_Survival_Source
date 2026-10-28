@@ -4,10 +4,10 @@ Wet tank ruts and ridge-and-furrow field soil are drawn by the Ger_Trains landsc
 
 | Part | Where |
 |---|---|
-| Builder | `Source/Docs/Landscape/ls_detail_build.py`: `run()` builds the chain, `write_fields()` writes the crop fields into the instance |
+| Builder | `Source/Docs/Landscape/ls_detail_build.py`: `build_furrows_function()` and `build_wet_ruts_function()` build `MF_RTS_LS_FieldFurrows` and `MF_RTS_LS_WetRuts`, and `write_fields()` writes the crop fields into the instance. The master is wired by `ls_master_build.run()` (`Landscape/LandscapeMaster.md`) |
 | Switch | `LS_GroundDetail` in `M_RTS_Landscape_DryCastle` (off by default, on only in `MI_RTS_Landscape_DryCastle_Trains`); it sits after `LS_TankTrails` and before the main BreakMaterialAttributes, so the RVT output never sees it |
-| Fields | `Field<i>_A–D`, `FieldBounds`, `FieldCount` instance parameters, from the level's `ACrushableCropFieldActor`s (4-point splines), up to 10 fields |
-| Grass | `ls_grass_build.py` keeps grass out of the fields (`FieldFurrows` R channel) |
+| Fields | `Field<i>_A–E`, `FieldBounds`, `FieldCount` instance parameters, from the level's `ACrushableCropFieldActor`s (4-point splines), up to 10 fields |
+| Grass | `MF_RTS_LS_GrassWeights` keeps grass out of the fields (FieldMask) |
 
 ## What it draws
 
@@ -20,7 +20,7 @@ Wet tank ruts and ridge-and-furrow field soil are drawn by the Ger_Trains landsc
 - **Furrows.** One custom HLSL node tests each field's real outline, an oriented quad that follows the fence.
   - The edge is roughened by noise.
   - Furrow bottoms are desaturated and darkened (`Furrow_Darken` 0.75) and ridge tops are lit; the normal tilts with the furrow slope (`Furrow_Depth` 9).
-  - Pixels outside `FieldBounds` exit at once. Inside, the unrolled loop rejects fields by a radius check (`Field<i>_B.z` = radius²) before running the four edge tests.
+  - Pixels outside `FieldBounds` exit at once. Inside, the unrolled loop tests each field's four fence edges at once: `write_fields()` stores them as inward unit normals (`Field<i>_C`, `_D`) and offsets (`_E`), so a field costs two vector multiply-adds and three mins. Move or add a crop field, then rerun `write_fields()`.
 
 ## Puddles were removed (2026-10-28)
 
@@ -30,20 +30,14 @@ Puddles in damp hollows and water in ruts were built, reviewed and then removed 
 - **Thresholds:** noise percentiles from the exported texture didn't match the game. Calibrate with instance overrides and headless captures.
 - **Emissive:** emissive on this landscape never reached the `-game` capture (final LDR colour), not even at 10, so a reflection fake has to go through albedo. The master's emissive input stays wired to the main break; with nothing upstream it folds to 0.
 
-## Rebuild order
+## Rebuild
 
-Run the builders in this order, every time (the scratchpad helper `r2.py` does this):
-
-1. `ls_detail_build.run()`
-2. `write_fields()`
-3. `ls_grass_build.run()`
-
-Then, once shaders have compiled, run Build → Build Grass Maps Only and save `Ger_Trains`.
+1. Run `ls_master_build.run()`; it rebuilds every landscape function and the master (`Landscape/LandscapeMaster.md`).
+2. With Ger_Trains loaded, run `ls_detail_build.write_fields()` after you move or add a crop field.
+3. Once shaders have compiled, run Build → Build Grass Maps Only and save `Ger_Trains`.
 
 ## Gotchas (2026-10-28)
 
-- **Never run the detail builder alone.** It recreates the field node, which leaves the grass chain's ComponentMask and OneMinus unfed. The instance then fails to compile and `-game` draws the default checkerboard; the log says `Missing ComponentMask input`.
-- **A failed detail run leaves the break unfed.** `find_insertion()` falls back to the tank-trail switch on the next run.
 - **The setter's return value lies.** `set_material_instance_scalar_parameter_value` returns False on this instance even when the value is set; read `scalar_parameter_values` back instead.
 - **The editor bridge's Python sandbox can't open files outside the project.** Inline values into the script.
 

@@ -6,7 +6,7 @@ Tracked tanks leave twin ruts in soft ground (grass, desert, sand and gravel lay
 |---|---|
 | Trail writer | `Source/RTS_Survival/Environment/TankTrails/TankTrailSubsystem.h/.cpp` (`UTankTrailSubsystem`) |
 | Benchmark | `Environment/TankTrails/Tests/TankTrailBenchmarkSubsystem.h/.cpp`, runner `Source/Tools/TankTrails/run_bench.sh` |
-| Material chain | `Source/Docs/Landscape/ls_trails_build.py`: `run("DryCastle")` / `run("DesertPaintable")`, re-runnable, nodes tagged `LSTankTrails`; `TARGETS` lists each master's soft layers |
+| Material chain | `MF_RTS_LS_TankTrails` (Attributes, SoftGround -> Attributes, RutCentre), built by `Source/Docs/Landscape/ls_trails_build.py`. `M_RTS_Landscape_DryCastle` calls it through `ls_master_build.run()` (`Landscape/LandscapeMaster.md`). `M_RTS_Landscape_DesertPaintable` calls it through `run_desert_paintable()` in the same file |
 | Assets | `/Game/RTS_Survival/Blueprints/Environment/TankTrails/RT_TankTrails` (R8 render target, saved at 4x4), `MPC_TankTrails` |
 
 ## How it works

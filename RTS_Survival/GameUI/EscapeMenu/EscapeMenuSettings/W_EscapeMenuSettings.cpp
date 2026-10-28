@@ -212,6 +212,7 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 	PopulateWindowModeOptions();
 	PopulateResolutionOptions();
 	PopulateQualityOptions();
+	PopulateAmbientEffectsOptions();
 	PopulateGameplayOptions();
 
 	SetSliderRange(M_SliderFrameRateLimit, M_SliderRanges.M_FrameRateLimitMin, M_SliderRanges.M_FrameRateLimitMax);
@@ -315,6 +316,25 @@ void UW_EscapeMenuSettings::PopulateQualityOptionsForComboBox(UComboBoxString* C
 	for (const FText& QualityOptionText : M_QualityOptionTexts)
 	{
 		ComboBoxToPopulate->AddOption(QualityOptionText.ToString());
+	}
+}
+
+void UW_EscapeMenuSettings::PopulateAmbientEffectsOptions()
+{
+	if (not GetIsValidComboAmbientEffects())
+	{
+		return;
+	}
+
+	M_ComboAmbientEffects->ClearOptions();
+	for (const ERTSAmbientEffectsLevel Level : {
+		     ERTSAmbientEffectsLevel::Disabled,
+		     ERTSAmbientEffectsLevel::Low,
+		     ERTSAmbientEffectsLevel::Medium,
+		     ERTSAmbientEffectsLevel::Maximum
+	     })
+	{
+		M_ComboAmbientEffects->AddOption(global_GetAmbientEffectsLevelText(Level).ToString());
 	}
 }
 
@@ -566,6 +586,7 @@ void UW_EscapeMenuSettings::UpdateEnvironmentDetailTexts()
 	M_TextEnvironmentDetailLabel->SetText(M_GraphicsText.M_EnvironmentDetailLabelText);
 	M_TextFoliageDensityLabel->SetText(M_GraphicsText.M_FoliageDensityLabelText);
 	M_TextStoneDensityLabel->SetText(M_GraphicsText.M_StoneDensityLabelText);
+	M_TextAmbientEffectsLabel->SetText(M_GraphicsText.M_AmbientEffectsLabelText);
 	M_TextEnvironmentAdvancedLabel->SetText(bM_IsEnvironmentAdvancedExpanded
 		                                        ? M_GraphicsText.M_EnvironmentAdvancedHideText
 		                                        : M_GraphicsText.M_EnvironmentAdvancedShowText);
@@ -598,6 +619,8 @@ void UW_EscapeMenuSettings::InitialiseGraphicsEnvironmentDetailControls(
 	M_SliderEnvironmentDetail->SetValue(EnvironmentDetailSettings.M_EnvironmentDetailDensity);
 	M_SliderFoliageDensity->SetValue(EnvironmentDetailSettings.M_FoliageDensity);
 	M_SliderStoneDensity->SetValue(EnvironmentDetailSettings.M_StoneDensity);
+	M_ComboAmbientEffects->SetSelectedOption(
+		global_GetAmbientEffectsLevelText(EnvironmentDetailSettings.M_AmbientEffectsLevel).ToString());
 }
 
 void UW_EscapeMenuSettings::SetEnvironmentAdvancedExpanded(const bool bExpanded)
@@ -1114,6 +1137,9 @@ void UW_EscapeMenuSettings::BindEnvironmentDetailCallbacks()
 
 	M_SliderStoneDensity->OnValueChanged.RemoveAll(this);
 	M_SliderStoneDensity->OnValueChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleStoneDensityChanged);
+
+	M_ComboAmbientEffects->OnSelectionChanged.RemoveAll(this);
+	M_ComboAmbientEffects->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleAmbientEffectsSelectionChanged);
 
 	M_ButtonEnvironmentAdvanced->OnClicked.RemoveAll(this);
 	M_ButtonEnvironmentAdvanced->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnvironmentAdvancedClicked);
@@ -1953,6 +1979,38 @@ bool UW_EscapeMenuSettings::GetIsValidSliderStoneDensity() const
 			this,
 			TEXT("M_SliderStoneDensity"),
 			TEXT("UW_EscapeMenuSettings::GetIsValidSliderStoneDensity"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidTextAmbientEffectsLabel() const
+{
+	if (not IsValid(M_TextAmbientEffectsLabel))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_TextAmbientEffectsLabel"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidTextAmbientEffectsLabel"),
+			this
+		);
+		return false;
+	}
+
+	return true;
+}
+
+bool UW_EscapeMenuSettings::GetIsValidComboAmbientEffects() const
+{
+	if (not IsValid(M_ComboAmbientEffects))
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_ComboAmbientEffects"),
+			TEXT("UW_EscapeMenuSettings::GetIsValidComboAmbientEffects"),
 			this
 		);
 		return false;
@@ -3527,7 +3585,12 @@ bool UW_EscapeMenuSettings::GetAreEnvironmentDetailWidgetsValid() const
 		return false;
 	}
 
-	return GetIsValidTextStoneDensityLabel() && GetIsValidSliderStoneDensity();
+	if (not GetIsValidTextStoneDensityLabel() || not GetIsValidSliderStoneDensity())
+	{
+		return false;
+	}
+
+	return GetIsValidTextAmbientEffectsLabel() && GetIsValidComboAmbientEffects();
 }
 
 bool UW_EscapeMenuSettings::GetAreAudioSliderWidgetsValid() const
@@ -4046,6 +4109,33 @@ void UW_EscapeMenuSettings::HandleStoneDensityChanged(const float NewValue)
 	}
 
 	M_SettingsSubsystem->SetPendingStoneDensity(NewValue);
+}
+
+void UW_EscapeMenuSettings::HandleAmbientEffectsSelectionChanged(FString SelectedItem, const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem())
+	{
+		return;
+	}
+
+	if (not GetIsValidComboAmbientEffects())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboAmbientEffects->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Ambient effects selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingAmbientEffectsLevel(static_cast<ERTSAmbientEffectsLevel>(SelectedIndex));
 }
 
 void UW_EscapeMenuSettings::HandleEnvironmentAdvancedClicked()

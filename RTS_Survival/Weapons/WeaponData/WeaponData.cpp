@@ -4118,6 +4118,162 @@ void UWeaponStateHomingMissile::FireProjectileWithShellAdjustedStats(const FWeap
 	}
 }
 
+void URailRocketWeaponState::InitRailRocketWeapon(
+	const int32 NewOwningPlayer,
+	const int32 NewWeaponIndex,
+	const EWeaponName NewWeaponName,
+	const EWeaponFireMode NewWeaponBurstMode,
+	TScriptInterface<IWeaponOwner> NewWeaponOwner,
+	UMeshComponent* NewMeshComponent,
+	const FName NewFireSocketName,
+	UWorld* NewWorld,
+	const EProjectileNiagaraSystem ProjectileNiagaraSystem,
+	FWeaponVFX NewWeaponVFX,
+	FWeaponShellCase NewWeaponShellCase,
+	const FRailRocketWeaponSettings& NewRailRocketSettings,
+	const float NewBurstCooldown,
+	const int32 NewSingleBurstAmountMaxBurstAmount,
+	const int32 NewMinBurstAmount,
+	const bool bNewCreateShellCasingOnEveryRandomBurst)
+{
+	M_RailRocketSettings = NewRailRocketSettings;
+	bM_HasLaunchVfxForNextRocket = false;
+	InitRocketProjectileWeapon(
+		NewOwningPlayer,
+		NewWeaponIndex,
+		NewWeaponName,
+		NewWeaponBurstMode,
+		NewWeaponOwner,
+		NewMeshComponent,
+		NewFireSocketName,
+		NewWorld,
+		ProjectileNiagaraSystem,
+		NewWeaponVFX,
+		NewWeaponShellCase,
+		NewRailRocketSettings.RocketSettings,
+		NewBurstCooldown,
+		NewSingleBurstAmountMaxBurstAmount,
+		NewMinBurstAmount,
+		bNewCreateShellCasingOnEveryRandomBurst);
+}
+
+void URailRocketWeaponState::CreateLaunchVfx(
+	const FVector& LaunchLocation,
+	const FVector& ForwardVector,
+	const bool bCreateShellCase)
+{
+	// The base effect reads the socket that fires next (not yet advanced), so it plays at the rail about to fire.
+	Super::CreateLaunchVfx(LaunchLocation, ForwardVector, bCreateShellCase);
+	bM_HasLaunchVfxForNextRocket = true;
+}
+
+void URailRocketWeaponState::FireProjectile(const FVector& TargetLocationRaw)
+{
+	// Consumed up front so an aborted shot never hands its launch effect to the next rocket.
+	const bool bLaunchVfxAlreadyCreated = bM_HasLaunchVfxForNextRocket;
+	bM_HasLaunchVfxForNextRocket = false;
+
+	ASmallArmsProjectileManager* ProjectileManager = GetProjectileManager();
+	if (not ProjectileManager)
+	{
+		return;
+	}
+
+	AProjectile* SpawnedProjectile = ProjectileManager->GetDormantTankProjectile();
+	if (not IsValid(SpawnedProjectile))
+	{
+		ReportErrorForWeapon("RAIL ROCKET weapon failed to get dormant projectile from pool manager.");
+		return;
+	}
+
+	if (not bLaunchVfxAlreadyCreated)
+	{
+		// Must run before the socket index advances so the flash plays at the rail that fires.
+		Super::CreateLaunchVfx(FVector::ZeroVector, FVector::ZeroVector, false);
+	}
+
+	const FRocketLaunchSocketData LaunchData = GetRocketLaunchSocketData(true);
+	HideAttachedRocketInstanceForSocket(LaunchData.SocketName);
+	FireRailRocketWithShellAdjustedStats(
+		GetShellAdjustedWeaponData(),
+		SpawnedProjectile,
+		LaunchData,
+		GetScatteredTargetLocation(TargetLocationRaw));
+}
+
+FVector URailRocketWeaponState::GetScatteredTargetLocation(const FVector& RawTargetLocation) const
+{
+	FVector TargetLocation = FRTSWeaponHelpers::ApplyAccuracyDeviationForArchWeapon(
+		RawTargetLocation, WeaponData.Accuracy);
+	const float ScatterRadius = FMath::Max(M_RailRocketSettings.TargetScatterRadius, 0.0f);
+	if (ScatterRadius <= KINDA_SMALL_NUMBER)
+	{
+		return TargetLocation;
+	}
+
+	// Uniform over the disc: the square root keeps the rockets from bunching in the middle.
+	const float ScatterAngle = FMath::FRandRange(0.0f, UE_TWO_PI);
+	const float ScatterDistance = ScatterRadius * FMath::Sqrt(FMath::FRand());
+	TargetLocation.X += ScatterDistance * FMath::Cos(ScatterAngle);
+	TargetLocation.Y += ScatterDistance * FMath::Sin(ScatterAngle);
+	return TargetLocation;
+}
+
+FWeaponData URailRocketWeaponState::GetShellAdjustedWeaponData() const
+{
+	const bool bIsAPShell = (WeaponData.ShellType == EWeaponShellType::Shell_AP)
+		|| (WeaponData.ShellType == EWeaponShellType::Shell_APHE)
+		|| (WeaponData.ShellType == EWeaponShellType::Shell_Railgun);
+	const bool bIsFireShell = WeaponData.ShellType == EWeaponShellType::Shell_Fire;
+	return (not bIsAPShell && not bIsFireShell) ? GLOBAL_GetWeaponDataForShellType(WeaponData) : WeaponData;
+}
+
+void URailRocketWeaponState::FireRailRocketWithShellAdjustedStats(const FWeaponData& ShellAdjustedData,
+                                                                  AProjectile* Projectile,
+                                                                  const FRocketLaunchSocketData& LaunchData,
+                                                                  const FVector& TargetLocation)
+{
+	constexpr float PenFluxFactorHigh = 1 + DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	constexpr float PenFluxFactorLow = 1 - DeveloperSettings::GameBalance::Weapons::ArmorPenFluxPercentage / 100;
+	const float PenAdjustedWithGameFlux = FMath::RandRange(ShellAdjustedData.ArmorPen * PenFluxFactorLow,
+	                                                       ShellAdjustedData.ArmorPen * PenFluxFactorHigh);
+	const float PenMaxRangeAdjustedWithGameFlux = FMath::RandRange(
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorLow,
+		ShellAdjustedData.ArmorPenMaxRange * PenFluxFactorHigh);
+
+	FProjectileVfxSettings ProjectileVfxSettings;
+	ProjectileVfxSettings.ShellType = ShellAdjustedData.ShellType;
+	ProjectileVfxSettings.WeaponCaliber = ShellAdjustedData.WeaponCalibre;
+	ProjectileVfxSettings.ProjectileNiagaraSystem = GetProjectileNiagaraSystem();
+
+	// The rocket starts pointing along its rail; the projectile solves the arc from the rail exit.
+	const FVector RailForward = LaunchData.ForwardVector.IsNearlyZero()
+		                            ? (TargetLocation - LaunchData.LaunchLocation).GetSafeNormal()
+		                            : LaunchData.ForwardVector.GetSafeNormal();
+	Projectile->SetupProjectileForNewLaunch(this, WeaponData.DamageType, ShellAdjustedData.Range,
+	                                        ShellAdjustedData.BaseDamage, PenAdjustedWithGameFlux,
+	                                        PenMaxRangeAdjustedWithGameFlux,
+	                                        ShellAdjustedData.ShrapnelParticles, ShellAdjustedData.ShrapnelRange,
+	                                        ShellAdjustedData.ShrapnelDamage, ShellAdjustedData.ShrapnelPen,
+	                                        OwningPlayer, M_WeaponVfx.SurfaceImpactEffects, M_WeaponVfx.BounceEffect,
+	                                        M_WeaponVfx.BounceSound, M_WeaponVfx.ImpactScale, M_WeaponVfx.BounceScale,
+	                                        ShellAdjustedData.ProjectileMovementSpeed, LaunchData.LaunchLocation,
+	                                        RailForward.Rotation(), M_WeaponVfx.ImpactAttenuation,
+	                                        M_WeaponVfx.ImpactConcurrency, ProjectileVfxSettings, WeaponData.ShellType,
+	                                        BuildValidIgnoredActorArray(), ShellAdjustedData.WeaponCalibre);
+	Projectile->SetupRailRocketLaunch(
+		LaunchData.LaunchLocation,
+		RailForward,
+		TargetLocation,
+		ShellAdjustedData.ProjectileMovementSpeed,
+		M_RailRocketSettings);
+
+	if (M_RocketSettings.RocketMesh)
+	{
+		Projectile->SetupAttachedRocketMesh(M_RocketSettings.RocketMesh);
+	}
+}
+
 void UVerticalRocketWeaponState::InitVerticalRocketWeapon(
 	const int32 NewOwningPlayer,
 	const int32 NewWeaponIndex,

@@ -397,6 +397,43 @@ void UAircraftWeapon::SetupHomingMissileWeapon(FInitWeaponStateHomingMissile Hom
 	}
 }
 
+void UAircraftWeapon::SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters)
+{
+	SetOwningPlayer(RailRocketParameters.OwningPlayer);
+
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+	const int32 WeaponIndex = M_TWeapons.Num();
+	URailRocketWeaponState* RailRocket = NewObject<URailRocketWeaponState>(this);
+	RailRocket->InitRailRocketWeapon(
+		RailRocketParameters.OwningPlayer,
+		WeaponIndex,
+		RailRocketParameters.GetWeaponNameEnum(),
+		RailRocketParameters.WeaponBurstMode,
+		RailRocketParameters.WeaponOwner,
+		RailRocketParameters.MeshComponent,
+		RailRocketParameters.FireSocketName,
+		M_WorldSpawnedIn,
+		RailRocketParameters.ProjectileSystem,
+		RailRocketParameters.WeaponVFX,
+		RailRocketParameters.WeaponShellCase,
+		RailRocketParameters.RailRocketSettings,
+		RailRocketParameters.BurstCooldown,
+		RailRocketParameters.SingleBurstAmountMaxBurstAmount,
+		RailRocketParameters.MinBurstAmount,
+		RailRocketParameters.CreateShellCasingOnEveryRandomBurst);
+	M_TWeapons.Add(RailRocket);
+	RailRocket->SetIsAircraftWeapon(true);
+	UpdateRangeBasedOnWeapons();
+	M_WeaponIndexToSocket.Add(WeaponIndex, RailRocketParameters.FireSocketName);
+	if (GetIsProjectileManagerLoaded())
+	{
+		RailRocket->SetupProjectileManager(M_ProjectileManager.Get());
+	}
+}
+
 void UAircraftWeapon::SetupVerticalRocketProjectileWeapon(
 	FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters)
 {

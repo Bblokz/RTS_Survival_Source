@@ -1,6 +1,7 @@
 # Farm tractors (natural cover, Ger_Trains)
 
-Two 1930s Soviet tractors that infantry use as cover. When one dies it turns into a burnt wreck that is still cover.
+Two 1930s Soviet tractors that infantry use as cover. Medium and heavy tanks crush them. When one dies (crushed or shot)
+it turns into a burnt wreck, explodes, sinks into the ground and is removed.
 
 | Blueprint | Tractor | Size | Health | Cover sockets |
 |---|---|---|---|---|
@@ -30,26 +31,41 @@ yard next to the farm buildings.
     tank. Everything else is crouch, because wheels and tracks are 90-140 cm tall.
 - **Master graph.**
   - BeginPlay runs in this order: parent BeginPlay (`SetupComponentCollisions`), then
-    `HealthComp.SetMaxHealth(MaxHealth)`, then `SetupCrushDestructionOverlap(MainMesh, HeavyTank, RegularDeath)`.
-  - `BP_OnUnitDies` calls `CollapseMeshWithSwapping`. It swaps `MainMesh` to `WreckMesh`, plays `WreckExplosionFX`
-    (`NS_TankExplosion_1_Large`) and `WreckSound`, and attaches `WreckFireFX` (`NS_Fire_Tank_1`) at `FireOffset`.
-  - The actor is not destroyed, so its cover points stay. The wreck has the same footprint and sockets.
+    `HealthComp.SetMaxHealth(MaxHealth)`, then
+    `SetupCrushDestructionOverlap(MainMesh, MediumOrHeavyTank, RegularDeath)`. A crush therefore goes through the
+    normal death (`OnUnitDies` -> `BP_OnUnitDies`), the same as being shot.
+  - `BP_OnUnitDies` runs two steps:
+    1. `CollapseMeshWithSwapping` swaps `MainMesh` to `WreckMesh` (burnt material) and attaches `WreckFireFX`
+       (`NS_Fire_Tank_1`) at `FireOffset`.
+    2. `VerticalDestruction` plays `WreckExplosionFX` (`NS_TankExplosion_1_Large`) and `Cue_Explosion_GeneralMedium`
+       at `FireOffset`. It then sinks the actor `CollapseDeltaZ` (STZ-1 240, S-65 290, master default 260) over
+       `CollapseTime` (5 s), with up to 6 deg of yaw and 3 deg of pitch/roll, and destroys it.
+  - Once the actor is destroyed, the cover subsystem drops its socket points (`RemoveSocketCoverOfDestroyedActors`).
 - **Navigation.**
-  - `NavModifier` uses `RTS_NavArea_BlockCharLightMedium`, with `failsafe_extent` set to the mesh half extents. The
+  - `NavModifier` uses `RTS_NavArea_BlockCharLight`, with `failsafe_extent` set to the mesh half extents. The
     failsafe box rotates with the actor.
-  - `Overlap Tanks` is on, so tanks never collide with the tractor. Infantry, light tanks and medium tanks path
-    around it through their RTS nav filters. A heavy tank drives through it and crushes it, which is the death above.
-    This is the same setup as the dead-tree logs.
+  - `Overlap Tanks` is on, so tanks never collide with the tractor. Infantry and light tanks path around it through
+    their RTS nav filters. Medium and heavy tanks drive through it and crush it, which triggers the death above.
+    This matches the area and crush pairing of `BP_Cover_Log1`.
 - **Verification (2026-10-27, Simulate on Ger_Trains).**
   - With `LogRTSCoverFinder Verbose`, all 17 sockets logged `RTS_COVER_SOCKET ... on_navigation=1` with 0 cm offset,
     and none were skipped.
-  - `TriggerDestroyActor` swapped the S-65 to `SM_Tractor_S65_Wreck` with the fire attached.
-  - Path tests across each tractor used the per-agent filter (`RTS_NavFilter_*`):
-    - The character path ran 1119 cm against 1000 cm straight; light and medium tanks also went around.
-    - The heavy-tank path ran straight through.
+  - Crush test on 2026-10-28, with tanks spawned and teleported onto the tractors:
+    - A T-34/76 (medium) killed the STZ-1, and a Tiger II (heavy) killed the S-65.
+    - A Panzer II F (light) left the S-65 alive.
+    - Both crushed tractors exploded, sank (the S-65 went from z 144 to 125 within 0.4 s) and were destroyed within
+      about 10 s.
+  - Path tests across each tractor used the per-agent filter (`RTS_NavFilter_*`), against 1000 cm straight:
+    - Character 1119 cm and light tank 1278 cm: both go around.
+    - Medium tank 1001 cm and heavy tank 1010 cm: both go straight through.
   - Without a filter, the paths run straight through, because the area's cost is 1.
+  - Do not run that filtered path query from editor Python during Simulate. On 2026-10-28 it hit an engine ensure
+    (`NavFilter_AIControllerDefault`: no AI controller) and the editor then crashed when Simulate stopped.
 
 ## Rebuilding
+Blueprint defaults (health, collapse depth and time, nav area and extents, meshes) can be re-applied with
+`ue_tractor_bp_defaults.apply()` from the pipeline folder. The master graph is described under How it works.
+
 The pipeline is in `D:/Blender/BlenderProjects/BlenderTanks/FarmTractors/` (see its README):
 1. `blender -b -P build_tractors.py -- STZ1|S65` (Blender 4.0, Cycles on CPU).
    - It builds the parts (`tractors.py`, `tr_lib.py`), unwraps them, and builds the wreck from the same UVs.

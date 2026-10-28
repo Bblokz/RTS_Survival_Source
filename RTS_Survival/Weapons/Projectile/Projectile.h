@@ -18,6 +18,7 @@
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Weapons/Projectile/RailRocketArc/RailRocketArcSolver.h"
 #include "Sound/SoundCue.h"
 #include "Sound/SoundBase.h"
 
@@ -233,6 +234,22 @@ public:
 		const FVector& TargetLocation,
 		float ProjectileSpeed,
 		const FRailwayCannonWeaponSettings& RailwayCannonSettings);
+
+	/**
+	 * @brief Runs the rocket straight along its rail without gravity, then flies a ballistic arc that leaves in the
+	 * rail's direction and lands on the target; uses SetupArcedLaunch from the rail exit when no such arc exists.
+	 * @param LaunchLocation World-space launch socket location.
+	 * @param RailForward World-space forward axis of the launch socket (the rail).
+	 * @param TargetLocation Accuracy-deviated and scattered impact point.
+	 * @param ProjectileSpeed Shell-adjusted projectile speed that the rail and arc multipliers scale.
+	 * @param RailRocketSettings Rail length and speed, arc elevation limits, gravity scale and salvo jitter.
+	 */
+	void SetupRailRocketLaunch(
+		const FVector& LaunchLocation,
+		const FVector& RailForward,
+		const FVector& TargetLocation,
+		const float ProjectileSpeed,
+		const FRailRocketWeaponSettings& RailRocketSettings);
 
 	/**
 	 * @brief Starts actor-target homing after the pooled projectile was initialized with normal damage data.
@@ -562,6 +579,37 @@ private:
 		const FVector& TargetLocation,
 		float DirectStageSpeed,
 		float LaunchStageTime);
+
+	/**
+	 * @brief Rolls this rocket's salvo jitter and wobble once, so the predicted and the rail-exit solve agree.
+	 * @param RailExitLocation Predicted end of the rail stage.
+	 * @param RailDirection Normalized rail (launch socket forward) direction.
+	 * @param TargetLocation Impact point the arc must land on.
+	 * @param ProjectileSpeed Shell-adjusted projectile speed used for the arc speed cap.
+	 * @param RailSpeed Rail stage speed; the arc never flies slower.
+	 * @param RailRocketSettings Designer limits and jitter ranges.
+	 * @return The solve request for FRailRocketArcSolver::SolveFreeFlight.
+	 */
+	FRailRocketArcRequest BuildRailRocketArcRequest(
+		const FVector& RailExitLocation,
+		const FVector& RailDirection,
+		const FVector& TargetLocation,
+		const float ProjectileSpeed,
+		const float RailSpeed,
+		const FRailRocketWeaponSettings& RailRocketSettings) const;
+
+	void ScheduleRailRocketFreeFlight(const FRailRocketArcRequest& ArcRequest, const float ProjectileSpeed,
+	                                  const float RailTime);
+
+	/**
+	 * @brief Re-solves the arc from where the rocket actually left the rail and re-times the explosion to land on
+	 * the target; falls back to SetupArcedLaunch when no arc at the rail's elevation exists.
+	 * @param ArcRequest Solve request with the rolled jitter; its rail exit is replaced by the current location.
+	 * @param ProjectileSpeed Shell-adjusted projectile speed for the fallback launch.
+	 */
+	void TransitionRailRocketToFreeFlight(FRailRocketArcRequest ArcRequest, const float ProjectileSpeed);
+	void DebugDrawRailRocketFreeFlight(const FRailRocketArcRequest& ArcRequest,
+	                                   const FRailRocketFreeFlightSolution& FreeFlight) const;
 	/**
 	 * @brief Applies the second-stage arc, or immediately uses the final approach if no safe arc exists.
 	 * @param TargetLocation Final target after accuracy deviation.
@@ -798,6 +846,10 @@ private:
 	UPROPERTY()
 	float M_DefaultGravityScale = 0.0f;
 
+	// The Blueprint's own setting; a rail rocket turns rotation-follows-velocity on for its arc, every restart resets it.
+	UPROPERTY()
+	bool bM_DefaultRotationFollowsVelocity = false;
+
 	UPROPERTY()
 	UNiagaraComponent* M_NiagaraComponent;
 
@@ -833,6 +885,10 @@ private:
 
 	UPROPERTY()
 	FTimerHandle M_RailwayCannonTransitionTimerHandle;
+
+	// Rail rocket: end of the straight rail stage, start of the ballistic arc.
+	UPROPERTY()
+	FTimerHandle M_RailRocketTransitionTimerHandle;
 
 	UPROPERTY()
 	FTimerHandle M_HomingMissileTimerHandle;

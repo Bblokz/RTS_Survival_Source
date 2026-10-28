@@ -62,8 +62,6 @@
 #endif
 
 enum class ERTSAggroBehaviour : uint8;
-class SViewport;
-class SWidget;
 class UGlobalAbility;
 enum class EGlobalAbility : uint8;
 struct FGlobalAbilitySoundSettings;
@@ -2052,9 +2050,8 @@ private:
 
 	// Helper methods
 	void HandleHoveringBlockedState();
-	// True when a hit-testable HUD widget takes the cursor, so world hover must not show under the HUD.
-	bool GetIsCursorOverHitTestableHUD() const;
-	static bool GetIsWidgetBlockingWorldHover(const SWidget& TopWidgetUnderCursor, const SViewport& GameViewportWidget);
+	// True when the cursor is on the building, action, training, minimap or resource panel of the HUD.
+	bool GetIsCursorOverWorldHoverBlockingHUD() const;
 	void UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
 	                             const FHitResult& MouseHitResult, const bool bHit);
 	void HideHoveringWidget();

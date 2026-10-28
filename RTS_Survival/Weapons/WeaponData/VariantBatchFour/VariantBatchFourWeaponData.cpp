@@ -201,6 +201,36 @@ namespace VariantBatchFourWeaponsPrivate
 		BollwerkData.BaseCooldown = 1.f;
 		WeaponDataMap.Add(EWeaponName::sFH18_150MM_Bollwerk, BollwerkData);
 	}
+
+	// Jaguar Flanker: the Bison's long 50mm scaled up to 60mm, firing APCR only (no filler, no shrapnel).
+	void AddFlankerLong60(TMap<EWeaponName, FWeaponData>& WeaponDataMap)
+	{
+		const FWeaponData* const BisonData = WeaponDataMap.Find(EWeaponName::PzI_Bison_L60_50MM);
+		if (not BisonData)
+		{
+			RTSFunctionLibrary::ReportError(
+				"VariantBatchFour: PzI_Bison_L60_50MM missing, KwK_Long60MM_APCR_Flanker not added.");
+			return;
+		}
+		using namespace VariantBatchFourWeapons;
+		FWeaponData FlankerData = *BisonData;
+		FlankerData.WeaponName = EWeaponName::KwK_Long60MM_APCR_Flanker;
+		FlankerData.ShellType = EWeaponShellType::Shell_APCR;
+		FlankerData.ShellTypes = {EWeaponShellType::Shell_APCR};
+		FlankerData.WeaponCalibre = FlankerCalibre;
+		FlankerData.TNTExplosiveGrams = 0.f;
+		// Stored before the APCR damage multiplier, so a fired shot deals the Bison's fired APHE damage x 60/50.
+		FlankerData.BaseDamage = BisonData->BaseDamage * FlankerScaleFromBison / APCR_DamageMlt;
+		FlankerData.ArmorPen = BisonData->ArmorPen * FlankerScaleFromBison;
+		FlankerData.ArmorPenMaxRange = BisonData->ArmorPenMaxRange * FlankerScaleFromBison;
+		FlankerData.MagCapacity = 1;
+		FlankerData.ReloadSpeed = FlankerReloadSpeed;
+		FlankerData.ShrapnelRange = 0.f;
+		FlankerData.ShrapnelDamage = 0.f;
+		FlankerData.ShrapnelParticles = 0;
+		FlankerData.ShrapnelPen = 0.f;
+		WeaponDataMap.Add(EWeaponName::KwK_Long60MM_APCR_Flanker, FlankerData);
+	}
 }
 
 void VariantBatchFourWeapons::AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponDataMap)
@@ -213,4 +243,5 @@ void VariantBatchFourWeapons::AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponD
 	AddHetzerMortar(WeaponDataMap);
 	AddPfeilPak43(WeaponDataMap);
 	AddBollwerkSfh18(WeaponDataMap);
+	AddFlankerLong60(WeaponDataMap);
 }

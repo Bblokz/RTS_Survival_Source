@@ -173,6 +173,8 @@ protected:
         virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
         UFUNCTION(BlueprintCallable)
 	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;

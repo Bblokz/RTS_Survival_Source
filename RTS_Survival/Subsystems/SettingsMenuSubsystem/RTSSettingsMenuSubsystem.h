@@ -97,6 +97,10 @@ struct FRTSEnvironmentDetailSettings
 	// Drives foliage.DensityScale, which only the ground stone HISMs opt into.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
 	float M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+
+	// Drives rts.AmbientFx: how many dust devils may be alive around the camera. Not touched by the main slider.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSAmbientEffectsLevel M_AmbientEffectsLevel = ERTSAmbientEffectsLevel::Maximum;
 };
 
 USTRUCT(BlueprintType)
@@ -289,6 +293,9 @@ public:
 	void SetPendingStoneDensity(float NewDensity);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingAmbientEffectsLevel(ERTSAmbientEffectsLevel NewLevel);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingMasterVolume(float NewVolume);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
@@ -383,7 +390,8 @@ private:
 	void ApplyControlSettings();
 
 	/**
-	 * @brief Pushes the saved foliage / stone densities into grass.DensityScale and foliage.DensityScale.
+	 * @brief Pushes the saved foliage / stone densities into grass.DensityScale and foliage.DensityScale, and the
+	 * ambient effects level into rts.AmbientFx.
 	 * Set at game-setting priority so a later scalability change cannot override the user's choice.
 	 */
 	void ApplyEnvironmentDetailSettings() const;

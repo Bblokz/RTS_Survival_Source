@@ -7,7 +7,7 @@
 #include "RTS_Survival/Weapons/WeaponData/WeaponSystems.h"
 
 /**
- * Unit variant batch 4 weapon data (Wespe, Pz III M, Hetzer, JagdPanther), registered by ACPPGameState after batch 3
+ * Unit variant batch 4 weapon data (Wespe, Pz III M, Hetzer, JagdPanther, Jaguar Flanker), registered by ACPPGameState after batch 3
  * so the clones can copy their source entries. All numbers are TUNABLE (the user's balance call); stored values are
  * before the shell multipliers that GLOBAL_GetWeaponDataForShellType applies when firing.
  */
@@ -44,6 +44,12 @@ namespace VariantBatchFourWeapons
 	// JagdPanther Bollwerk (J-B2 defaults).
 	constexpr float BollwerkReloadSpeed = 16.f;
 	constexpr int32 BollwerkAccuracy = 82;
+
+	// Jaguar Flanker: two independent long 60mm guns, each its own weapon on this entry. Scaled from the Bison's long
+	// 50mm by calibre (60 / 50); APCR only, one round per gun, the user's 9 s reload per gun.
+	constexpr float FlankerCalibre = 60.f;
+	constexpr float FlankerScaleFromBison = FlankerCalibre / 50.f;
+	constexpr float FlankerReloadSpeed = 9.f;
 
 	/** @param WeaponDataMap The player weapon map, already filled by the category initializers and batches 2-3. */
 	void AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponDataMap);

@@ -4,6 +4,7 @@
 #include "GameFramework/GameUserSettings.h"
 #include "Scalability.h"
 #include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
+#include "RTS_Survival/Game/UserSettings/GraphicsSettings/AmbientEffectsLevel.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 
 #include "RTSGameUserSettings.generated.h"
@@ -182,6 +183,12 @@ public:
 	/** @brief Writes the ground stone density before clamping and saving. */
 	void SetStoneDensity(const float NewStoneDensity);
 
+	/** @brief Returns how many ambient landscape effects (dust devils) may be alive around the camera. */
+	ERTSAmbientEffectsLevel GetAmbientEffectsLevel() const;
+
+	/** @brief Writes the ambient landscape effects level before saving. */
+	void SetAmbientEffectsLevel(const ERTSAmbientEffectsLevel NewAmbientEffectsLevel);
+
 
 	/** @brief Returns saved single-key overrides so controllers can restore remaps during startup. */
 	const TArray<FRTSSavedKeyBinding>& GetSavedKeyBindings() const;
@@ -351,6 +358,9 @@ private:
 
 	UPROPERTY(config)
 	float M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+
+	UPROPERTY(config)
+	ERTSAmbientEffectsLevel M_AmbientEffectsLevel = ERTSAmbientEffectsLevel::Maximum;
 
 	UPROPERTY(config)
 	TArray<FRTSSavedKeyBinding> M_SavedKeyBindings;

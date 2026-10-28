@@ -37,7 +37,8 @@ namespace VariantBatchFourWeaponTestsPrivate
 			EWeaponName::Flamm15_HetzerHull,
 			EWeaponName::Mortar_120MM_Hetzer,
 			EWeaponName::Pak43_88MM_APCR_Pfeil,
-			EWeaponName::sFH18_150MM_Bollwerk
+			EWeaponName::sFH18_150MM_Bollwerk,
+			EWeaponName::KwK_Long60MM_APCR_Flanker
 		};
 		return NewWeapons;
 	}
@@ -53,11 +54,54 @@ namespace VariantBatchFourWeaponTestsPrivate
 		return GameState ? GameState->GetWeaponDataOfPlayer(PlayerOne, WeaponName) : nullptr;
 	}
 
+	/**
+	 * The values a weapon fires with for a shell type. GLOBAL_GetWeaponDataForShellType is a header-static defined only
+	 * in WeaponData.cpp, so a test in another unity unit cannot call it; its shell multipliers are mirrored here.
+	 */
 	FWeaponData GetFiredData(const FWeaponData& StoredData, const EWeaponShellType ShellType)
 	{
-		FWeaponData ShellData = StoredData;
-		ShellData.ShellType = ShellType;
-		return GLOBAL_GetWeaponDataForShellType(ShellData);
+		using namespace DeveloperSettings::GameBalance::Weapons::Projectiles;
+		FWeaponData FiredData = StoredData;
+		FiredData.ShellType = ShellType;
+		switch (ShellType)
+		{
+		case EWeaponShellType::Shell_APHEBC:
+			FiredData.ArmorPenMaxRange = FMath::Lerp(FiredData.ArmorPen, FiredData.ArmorPenMaxRange,
+			                                         APHEBC_ArmorPenLerpFactor);
+			break;
+		case EWeaponShellType::Shell_HE:
+			FiredData.ArmorPen *= HE_ArmorPenMlt;
+			FiredData.ArmorPenMaxRange = FiredData.ArmorPen;
+			FiredData.TNTExplosiveGrams *= HE_TNTExplosiveGramsMlt;
+			FiredData.BaseDamage *= HE_DamageMlt;
+			FiredData.ShrapnelDamage *= HE_ShrapnelDamageMlt;
+			FiredData.ShrapnelRange *= HE_ShrapnelRangeMlt;
+			FiredData.ShrapnelPen *= HE_ShrapnelPenMlt;
+			FiredData.ShrapnelParticles *= HE_ShrapnelParticlesMlt;
+			FiredData.ProjectileMovementSpeed *= HE_ProjectileSpeedMlt;
+			break;
+		case EWeaponShellType::Shell_HEAT:
+			FiredData.ArmorPen *= HEAT_ArmorPenMlt;
+			FiredData.ArmorPenMaxRange = FiredData.ArmorPen;
+			FiredData.ProjectileMovementSpeed *= HEAT_ProjectileSpeedMlt;
+			break;
+		case EWeaponShellType::Shell_Radixite:
+			FiredData.BaseDamage *= Radixite_DamageMlt;
+			FiredData.ArmorPenMaxRange *= Radixite_ArmorPenMaxRangeMlt;
+			FiredData.Accuracy += Radixite_AccuracyDelta;
+			break;
+		case EWeaponShellType::Shell_APCR:
+			FiredData.ArmorPen *= APCR_ArmorPenMlt;
+			FiredData.ArmorPenMaxRange *= APCR_ArmorPenMlt;
+			FiredData.BaseDamage *= APCR_DamageMlt;
+			FiredData.ShrapnelParticles = 0;
+			FiredData.ProjectileMovementSpeed *= APCR_ProjectileSpeedMlt;
+			break;
+		default:
+			// AP, APHE and railgun shells fire their stored values.
+			break;
+		}
+		return FiredData;
 	}
 }
 
@@ -135,9 +179,11 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	const FWeaponData* Pak43 = FindWeapon(GameState, EWeaponName::Pak43_88MM);
 	const FWeaponData* Bollwerk = FindWeapon(GameState, EWeaponName::sFH18_150MM_Bollwerk);
 	const FWeaponData* TowedSfh = FindWeapon(GameState, EWeaponName::sFH18_150MM_TW);
+	const FWeaponData* Flanker = FindWeapon(GameState, EWeaponName::KwK_Long60MM_APCR_Flanker);
+	const FWeaponData* Bison = FindWeapon(GameState, EWeaponName::PzI_Bison_L60_50MM);
 	if (not RadixiteHowitzer || not LeFH || not PzIIIMLaser || not KwK39 || not PzIIIMSchreck || not PitSchreck
 		|| not HullFlamm || not Flamm15 || not HetzerMortar || not Mortar120 || not Pfeil || not Pak43
-		|| not Bollwerk || not TowedSfh)
+		|| not Bollwerk || not TowedSfh || not Flanker || not Bison)
 	{
 		AddError(TEXT("A weapon entry is missing."));
 		return false;
@@ -234,6 +280,21 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Bollwerk damage as the towed sFH 18"), Bollwerk->BaseDamage, TowedSfh->BaseDamage, Tolerance);
 	TestEqual(TEXT("Bollwerk fired pen 61"), GetFiredData(*Bollwerk, EWeaponShellType::Shell_HE).ArmorPen, 61.f,
 	          0.05f);
+
+	// Jaguar Flanker: the Bison's long 50mm scaled to 60mm, APCR only, one round, 9 s reload per gun.
+	TestTrue(TEXT("Flanker is APCR only"), Flanker->ShellTypes.Num() == 1
+	         && Flanker->ShellType == EWeaponShellType::Shell_APCR);
+	TestEqual(TEXT("Flanker calibre"), Flanker->WeaponCalibre, 60.f, Tolerance);
+	TestEqual(TEXT("Flanker has no TNT"), Flanker->TNTExplosiveGrams, 0.f, Tolerance);
+	TestTrue(TEXT("Flanker has no shrapnel"), Flanker->ShrapnelRange == 0.f && Flanker->ShrapnelDamage == 0.f
+	         && Flanker->ShrapnelParticles == 0 && Flanker->ShrapnelPen == 0.f);
+	TestEqual(TEXT("Flanker magazine"), Flanker->MagCapacity, 1);
+	TestEqual(TEXT("Flanker reload 9 s"), Flanker->ReloadSpeed, 9.f, Tolerance);
+	TestEqual(TEXT("Flanker range as the Bison"), Flanker->Range, Bison->Range, Tolerance);
+	TestEqual(TEXT("Flanker pen = Bison x 60/50"), Flanker->ArmorPen, Bison->ArmorPen * 1.2f, Tolerance);
+	TestEqual(TEXT("Flanker fired damage = Bison fired APHE x 60/50"),
+	          GetFiredData(*Flanker, EWeaponShellType::Shell_APCR).BaseDamage,
+	          GetFiredData(*Bison, EWeaponShellType::Shell_APHE).BaseDamage * 1.2f, Tolerance);
 	return true;
 }
 
@@ -333,6 +394,8 @@ bool FVariantBatchFourEnumKeysTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Mortar_120MM_Hetzer"), static_cast<int32>(EWeaponName::Mortar_120MM_Hetzer), 217);
 	TestEqual(TEXT("Pak43_88MM_APCR_Pfeil"), static_cast<int32>(EWeaponName::Pak43_88MM_APCR_Pfeil), 218);
 	TestEqual(TEXT("sFH18_150MM_Bollwerk"), static_cast<int32>(EWeaponName::sFH18_150MM_Bollwerk), 219);
+	TestEqual(TEXT("L_11_76MM_SMK (previous last)"), static_cast<int32>(EWeaponName::L_11_76MM_SMK), 223);
+	TestEqual(TEXT("KwK_Long60MM_APCR_Flanker"), static_cast<int32>(EWeaponName::KwK_Long60MM_APCR_Flanker), 224);
 
 	TestEqual(TEXT("Flak88GroundRole (previous last mode)"), static_cast<int32>(EModeAbilityType::Flak88GroundRole), 2);
 	TestEqual(TEXT("WespeCamouflagedNest mode key"), static_cast<int32>(EModeAbilityType::WespeCamouflagedNest), 3);
