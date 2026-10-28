@@ -1336,6 +1336,16 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV_5()
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV_5));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_IS6()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_IS6));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SMK()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SMK));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SU_152()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SU_152));

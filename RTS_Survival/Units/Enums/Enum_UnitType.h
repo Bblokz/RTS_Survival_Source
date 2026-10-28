@@ -200,6 +200,10 @@ enum class ETankSubtype : uint8
 	Tank_E50 UMETA(DisplayName = "Ger Heavy E50"),
 	// T-44 hull with a 155mm arcing howitzer in the turret and a DShK on the commander's cupola.
 	Tank_T44_155 UMETA(DisplayName = "Rus Medium T-44/155"),
+	// IS-6 heavy tank: IS-3 122mm gun in a wide cast turret on a long hull with angled side plates; faster than the IS-3.
+	Tank_IS6 UMETA(DisplayName = "Rus Heavy IS-6"),
+	// SMK twin-turret heavy tank: L-11 76mm main turret on a raised barbette over a forward 45mm turret; long and slow.
+	Tank_SMK UMETA(DisplayName = "Rus Heavy SMK"),
 };
 
 
@@ -241,6 +245,8 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_KV_5:
 	case ETankSubtype::Tank_SU_152:
 	case ETankSubtype::Tank_ISU_152:
+	case ETankSubtype::Tank_IS6:
+	case ETankSubtype::Tank_SMK:
 		return true;
 	default:
 		return false;

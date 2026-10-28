@@ -654,6 +654,12 @@ public:
 	static FTrainingOption GetHeavyTank_KV_5();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_IS6();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_SMK();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetHeavyTank_SU_152();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")

@@ -498,6 +498,7 @@ protected:
 private:
 #if WITH_DEV_AUTOMATION_TESTS
 	friend struct FVehicleModuleTestAccess;
+	friend struct FArmorCalculationTestAccess;
 #endif
 
 	// Optional non-owning shield link supplied by the tank during component initialization.
@@ -598,6 +599,26 @@ private:
      * @param OutSortedArmorSettings The array to sort.
      */
 	void SortArmorArray(TArray<FArmorSettings>& OutSortedArmorSettings) const;
+
+	/**
+	 * @brief Box scale fix (B4b): the hit test covers ArmorBox * scale^2 per axis (InitArmorCalculation multiplies the
+	 * box by the transform scale and InverseTransformPosition divides the hit by it again). Scaled legacy boxes keep
+	 * that live coverage; unit-scale boxes (authored with their true half extents) are evaluated first so a smaller
+	 * box inside an inflated inherited box can be hit. Within each group the legacy order (hierarchy, then thicker
+	 * armor first) is kept; unit-scale plates with zero armor stay in the scaled group.
+	 * @param InOutArmorSettings Plates to sort in place.
+	 * @param bUnitScaleBoxesFirst False gives the pre-fix order (kept for the audit test).
+	 */
+	static void SortArmorSettings(TArray<FArmorSettings>& InOutArmorSettings, bool bUnitScaleBoxesFirst);
+
+	/** @return True when the plate's box transform has scale 1 on every axis (box extents are the real size). */
+	static bool GetIsUnitScaleArmorBox(const FArmorSettings& ArmorSettings);
+
+	/** @return True for a unit-scale plate with armor above zero; these go before the scaled plates. */
+	static bool GetIsPromotedArmorBox(const FArmorSettings& ArmorSettings);
+
+	/** @return The pre-fix order: higher StaticArmorHierarchy first, then thicker armor first. */
+	static bool GetIsLegacyPlateOrderBefore(const FArmorSettings& A, const FArmorSettings& B);
 	void Debug_PostSort(TArray<FArmorSettings>& ArmorSettingsSorted) const;
 
 	// ------------------------------------------------------------------------------------------------
