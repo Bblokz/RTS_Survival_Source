@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "RTSShortsJobTypes.h"
 #include "RTSShortsAircraftCrashState.h"
+#include "RTSShortsCookOffState.h"
 
 #include "RTSShortsDirector.generated.h"
 
@@ -296,6 +297,23 @@ private:
 	/** Records the impact and ends the segment once the crash camera has held on the wreck long enough. */
 	void TrackCrashImpact(int32 LocalFrame, const FRTSShortsAircraftCrash& Crash);
 	void EndAircraftCrash();
+	/** Unique ids of the Niagara components active now; StopEffectsStartedSince stops every other active one later. */
+	TSet<uint32> CollectActiveEffectIds() const;
+	/**
+	 * @brief Effects spawned at a location are owned by the world settings, a level actor FlushStageEffects keeps
+	 * (crash smoke, cook-off explosions): stops every active one that was not active when the segment began.
+	 * @param EffectIdsAtBegin What CollectActiveEffectIds returned at the segment's start.
+	 * @return How many components were stopped.
+	 */
+	int32 StopEffectsStartedSince(const TSet<uint32>& EffectIdsAtBegin) const;
+
+	// Ammo cook-off segments (RTSShortsCookOff.cpp): cook-off, death a second later, turret toss, cut once it landed.
+	void BeginCookOff(int32 SegmentIndex);
+	void TickCookOff(int32 LocalFrame);
+	void TrackTossedTurret(int32 LocalFrame);
+	void AimCookOffCamera(const FRTSShortsCookOff& CookOff);
+	void OnCookOffActorSpawned(AActor* SpawnedActor);
+	void EndCookOff();
 
 	// A private copy of the designer template owns the drop; no mission ability or cooldown is modified.
 	UPROPERTY()
@@ -390,6 +408,8 @@ private:
 	FRTSShortsConvoyState M_Convoy;
 	UPROPERTY()
 	FRTSShortsAircraftCrashState M_AircraftCrash;
+	UPROPERTY()
+	FRTSShortsCookOffState M_CookOff;
 	// The job's stage; segments with their own StageActorName switch M_Stage away from it for their duration.
 	UPROPERTY()
 	TObjectPtr<AActor> M_JobStage;

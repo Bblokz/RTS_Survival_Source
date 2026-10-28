@@ -360,6 +360,42 @@ struct FRTSShortsAircraftCrash
 	float HoldAfterImpactSeconds = 3.f;
 };
 
+/**
+ * @brief Ammo cook-off death of the segment's tank: its ammunition starts cooking off at StartAtSeconds, it dies
+ * DieAfterSeconds later (the cook-off death throws the wreck turret), and the segment ends HoldAfterLandSeconds after
+ * the turret has come down and settled. StartAtSeconds < 0 leaves the segment a normal one.
+ */
+USTRUCT()
+struct FRTSShortsCookOff
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	float StartAtSeconds = -1.f;
+
+	UPROPERTY()
+	float DieAfterSeconds = 1.f;
+
+	UPROPERTY()
+	float HoldAfterLandSeconds = 1.f;
+
+	/** Seconds after the death when the segment ends even if no thrown turret was seen landing (hull-only wrecks). */
+	UPROPERTY()
+	float MaxAfterDeathSeconds = 7.f;
+
+	/** Seconds after the death without a tossed turret before the segment treats the wreck as hull-only. */
+	UPROPERTY()
+	float HullOnlyHoldSeconds = 3.f;
+
+	/** How far the camera's aim moves from the tank toward the thrown turret (0 = never, 1 = onto the turret). */
+	UPROPERTY()
+	float TurretAimBlend = 0.55f;
+
+	/** How fast (1/s) the aim follows; lower lags more and keeps the motion calm. */
+	UPROPERTY()
+	float AimTrackSpeed = 2.5f;
+};
+
 /** @brief A battle unit that waits far from the lines and drives in later, joining its side when it arrives. */
 USTRUCT()
 struct FRTSShortsBattleReinforcement
@@ -698,6 +734,10 @@ struct FRTSShortsSegment
 	/** Kind "AircraftCrash": the flight, kill and cameras of the shot-down aircraft. */
 	UPROPERTY()
 	FRTSShortsAircraftCrash AircraftCrash;
+
+	/** Ammo cook-off death of the segment's tank (turret toss); off unless CookOff.StartAtSeconds >= 0. */
+	UPROPERTY()
+	FRTSShortsCookOff CookOff;
 };
 
 /**

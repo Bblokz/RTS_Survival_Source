@@ -69,15 +69,7 @@ void ARTSShortsDirector::BeginAircraftCrash(const int32 SegmentIndex)
 	PrepareParatrooperAircraftForCapture(Aircraft);
 
 	M_AircraftCrash = FRTSShortsAircraftCrashState();
-	for (TObjectIterator<UNiagaraComponent> It; It; ++It)
-	{
-		// Only active ones: the smoke puffs come from a component pool, and a pooled component released by an earlier
-		// crash already exists, inactive, when this one begins.
-		if (It->GetWorld() == GetWorld() && It->IsActive())
-		{
-			M_AircraftCrash.EffectIdsAtBegin.Add(It->GetUniqueID());
-		}
-	}
+	M_AircraftCrash.EffectIdsAtBegin = CollectActiveEffectIds();
 	M_AircraftCrash.Aircraft = Aircraft;
 	M_AircraftCrash.RunRotation = RunRotation;
 	M_AircraftCrash.bIsActive = true;
@@ -291,14 +283,35 @@ void ARTSShortsDirector::EndAircraftCrash()
 	{
 		It->Destroy();
 	}
-	// The smoke trail puffs and the explosion are spawned at a location, owned by the world settings: a level actor,
-	// so FlushStageEffects keeps them and the trail would hang in the next aircraft's shot.
+	// The smoke trail puffs and the explosion would otherwise hang in the next aircraft's shot.
+	const int32 Stopped = StopEffectsStartedSince(M_AircraftCrash.EffectIdsAtBegin);
+	UE_LOG(LogRTSShortsAircraftCrash, Display, TEXT("RTS_SHORTS_AIRCRAFT_CRASH_EFFECTS_STOPPED count=%d"), Stopped);
+	M_AircraftCrash = FRTSShortsAircraftCrashState();
+}
+
+TSet<uint32> ARTSShortsDirector::CollectActiveEffectIds() const
+{
+	TSet<uint32> ActiveIds;
+	for (TObjectIterator<UNiagaraComponent> It; It; ++It)
+	{
+		// Only active ones: crash smoke and explosions come from a component pool, and a pooled component released by
+		// an earlier segment already exists, inactive, when the next one begins.
+		if (It->GetWorld() == GetWorld() && It->IsActive())
+		{
+			ActiveIds.Add(It->GetUniqueID());
+		}
+	}
+	return ActiveIds;
+}
+
+int32 ARTSShortsDirector::StopEffectsStartedSince(const TSet<uint32>& EffectIdsAtBegin) const
+{
 	int32 Stopped = 0;
 	for (TObjectIterator<UNiagaraComponent> It; It; ++It)
 	{
 		UNiagaraComponent* Component = *It;
 		if (Component->GetWorld() != GetWorld() || not Component->IsActive()
-			|| M_AircraftCrash.EffectIdsAtBegin.Contains(Component->GetUniqueID())
+			|| EffectIdsAtBegin.Contains(Component->GetUniqueID())
 			|| GetIsPersistentEffectOwner(Component->GetOwner()))
 		{
 			continue;
@@ -306,6 +319,5 @@ void ARTSShortsDirector::EndAircraftCrash()
 		Component->DeactivateImmediate();
 		++Stopped;
 	}
-	UE_LOG(LogRTSShortsAircraftCrash, Display, TEXT("RTS_SHORTS_AIRCRAFT_CRASH_EFFECTS_STOPPED count=%d"), Stopped);
-	M_AircraftCrash = FRTSShortsAircraftCrashState();
+	return Stopped;
 }

@@ -286,6 +286,17 @@ void ATankMaster::Debug_DieDuringAmmoCookOff()
 		return;
 	}
 
+	Debug_StartAmmoCookOff();
+	UnitDies(ERTSDeathType::Kinetic);
+}
+
+void ATankMaster::Debug_StartAmmoCookOff()
+{
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+
 	const TSubclassOf<UAmmoCookOffBehaviour> CookOffBehaviourClass = GetAmmoCookOffBehaviourClass();
 	if (CookOffBehaviourClass != nullptr && GetIsValidBehaviourComponent()
 		&& BehaviourComponent->GetBehaviourByClass(CookOffBehaviourClass) == nullptr)
@@ -294,7 +305,6 @@ void ATankMaster::Debug_DieDuringAmmoCookOff()
 	}
 	// Tanks without a cook-off profile still show the cook-off death.
 	bM_IsAmmoCookingOff = true;
-	UnitDies(ERTSDeathType::Kinetic);
 }
 
 float ATankMaster::GetLiveTurretYawOffset() const

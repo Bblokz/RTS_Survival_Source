@@ -500,6 +500,7 @@ void ARTSShortsDirector::TickRunning()
 	TickConvoy(Frame);
 	TickParatrooperBattle(Local);
 	TickAircraftCrash(Local);
+	TickCookOff(Local);
 	KeepCombatTextsInWorld();
 	HideEngineSpheres();
 	if (M_HiddenSoldiers.IsValidIndex(M_CurrentSegment))
@@ -994,12 +995,15 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 	ASquadController* WaitingSquad = Cast<ASquadController>(Unit);
 	const bool bSquadDied = Unit != nullptr && (not IsValid(Unit)
 		|| (IsValid(WaitingSquad) && WaitingSquad->GetSquadUnitsChecked().Num() == 0));
-	if (bSquadDied && not M_Manifest.Segments[SegmentIndex].bSkipped)
+	// The last tank of a cook-off job was gone from its pen when its turn came (cause unknown, nothing logged its
+	// death); a fresh one is spawned like a lost squad.
+	const bool bCookOffTankLost = M_Job.Segments[SegmentIndex].CookOff.StartAtSeconds >= 0.f && not IsValid(Unit);
+	if ((bSquadDied || bCookOffTankLost) && not M_Manifest.Segments[SegmentIndex].bSkipped)
 	{
 		// Some squads lose every member while they wait in the pen (a PTRS crew was gone before the first segment
 		// wherever the pen was; its controller then destroys itself); a fresh squad spawns its members at once and is
 		// placed below like any other.
-		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SQUAD_RESPAWNED segment=%d old=%s"), SegmentIndex, *Unit->GetName());
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SQUAD_RESPAWNED segment=%d old=%s"), SegmentIndex, *GetNameSafe(Unit));
 		if (IsValid(Unit))
 		{
 			Unit->Destroy();
@@ -1080,6 +1084,7 @@ void ARTSShortsDirector::BeginSegment(const int32 SegmentIndex)
 		}
 	}
 	BeginAircraftCrash(SegmentIndex);
+	BeginCookOff(SegmentIndex);
 	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_SEGMENT_BEGIN index=%d subtype=%s frame=%d caliber=%d range=%.0f target=%s"),
 	       SegmentIndex, *Segment.Subtype, GetTimelineFrame(), M_Manifest.Segments[SegmentIndex].CaliberMm,
 	       ReadLargestWeaponRange(Unit), *TargetWorld.ToString());
@@ -1090,6 +1095,7 @@ void ARTSShortsDirector::EndSegment(const int32 SegmentIndex)
 {
 	EndParatrooperBattle();
 	EndAircraftCrash();
+	EndCookOff();
 	EndBattle();
 	EndConvoy();
 	if (not bM_StopOrdered)

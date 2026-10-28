@@ -331,6 +331,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_DieDuringAmmoCookOff();
 
+	/** @brief Testing and Shorts aid: starts this tank's ammo cook-off without killing it, so the burning ammo shows first. */
+	UFUNCTION(BlueprintCallable, Category="Death|Debug")
+	void Debug_StartAmmoCookOff();
+
 	// ---- Vehicle modules ----
 
 	/**
