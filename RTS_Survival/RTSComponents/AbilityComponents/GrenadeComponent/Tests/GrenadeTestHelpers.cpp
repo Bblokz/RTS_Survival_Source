@@ -152,9 +152,7 @@ AActor* FGrenadeTestHelpers::SpawnUnitForPlayer(UWorld& World, const TCHAR* Clas
 	ProjectOntoNavMesh(World, SpawnLocation, FVector(SpawnNavExtent));
 	SpawnLocation.Z += SpawnHeightOffset;
 	const FTransform SpawnTransform(Transform.GetRotation(), SpawnLocation);
-
-	return FRTSUnitOwnerSpawning::SpawnUnitForPlayer(World, UnitClass, FTransform(Transform.GetRotation(), SpawnLocation),
-	                                                 OwningPlayer);
+	return FRTSUnitOwnerSpawning::SpawnUnitForPlayer(World, UnitClass, SpawnTransform, OwningPlayer);
 }
 
 bool FGrenadeTestHelpers::GetIsLivingSoldier(ASquadUnit* Soldier)
