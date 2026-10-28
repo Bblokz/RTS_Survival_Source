@@ -594,19 +594,23 @@ struct FSquadUnitTeamWeaponCrewAnimRuntime
 	void Reset();
 
 	// A deploy or pack montage never counts as the assignment, so arming after a deploy always starts the role loop.
-	bool GetIsSameAssignment(const ECrewPositionType CrewRole, const ESquadSubtype TeamWeaponSquadSubtype) const
+	bool GetIsSameAssignment(const ECrewPositionType CrewRole, const ESquadSubtype TeamWeaponSquadSubtype,
+	                         const bool bIsOnWeaponRightSide) const
 	{
 		return bM_IsActive && not bM_IsTransitionPlaying && M_CrewRole == CrewRole &&
-			M_TeamWeaponSquadSubtype == TeamWeaponSquadSubtype;
+			M_TeamWeaponSquadSubtype == TeamWeaponSquadSubtype && bM_IsOnWeaponRightSide == bIsOnWeaponRightSide;
 	}
 
-	// Copy of the resolved entry; montages are also referenced by the EditDefaultsOnly struct so GC is safe.
+	// Copy of the resolved entry for the operator's side; montages are also referenced by the EditDefaultsOnly
+	// struct so GC is safe.
 	UPROPERTY()
 	FTeamWeaponCrewMontageEntry M_ActiveEntry;
 
 	ECrewPositionType M_CrewRole = ECrewPositionType::None;
 
 	ESquadSubtype M_TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+
+	bool bM_IsOnWeaponRightSide = true;
 
 	// Armed by the controller; cleared by Stop, StopAllMontages and UnitDies.
 	bool bM_IsActive = false;
@@ -893,8 +897,10 @@ public:
 	 * Idempotent for the same role and subtype; a re-arm with a different role restarts the resolution.
 	 * @param CrewRole Crew position type assigned to this operator.
 	 * @param TeamWeaponSquadSubtype Subtype of the team weapon squad used as override key.
+	 * @param bIsOnWeaponRightSide True when the operator's crew position is on the weapon's right (local +Y).
 	 */
-	void StartTeamWeaponCrewAnimation(const ECrewPositionType CrewRole, const ESquadSubtype TeamWeaponSquadSubtype);
+	void StartTeamWeaponCrewAnimation(const ECrewPositionType CrewRole, const ESquadSubtype TeamWeaponSquadSubtype,
+	                                  const bool bIsOnWeaponRightSide);
 
 	/** @brief Stops loop and reaction montages and returns the unit to its regular animations. */
 	void StopTeamWeaponCrewAnimation();

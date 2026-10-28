@@ -4,6 +4,16 @@
 
 #include "Animation/AnimMontage.h"
 
+FTeamWeaponCrewMontageEntry FTeamWeaponCrewMontageEntry::GetEntryForSide(const bool bIsOnWeaponRightSide) const
+{
+	FTeamWeaponCrewMontageEntry SideEntry = *this;
+	if (not bIsOnWeaponRightSide && LeftSideMontage != nullptr)
+	{
+		SideEntry.Montage = LeftSideMontage;
+	}
+	return SideEntry;
+}
+
 const FTeamWeaponCrewMontageEntry& FTeamWeaponCrewMontage::ResolveEntry(
 	const ESquadSubtype TeamWeaponSquadSubtype) const
 {

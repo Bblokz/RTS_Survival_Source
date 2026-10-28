@@ -761,6 +761,11 @@ void FTeamWeaponCrewAnimAudit::LogSubjectSetup(FTWCrewAnimSubjectTrack& Subject,
 			Subject.MontageKinds.Add(Entry->Montage->GetName(),
 			                         (Entry->bReactToWeaponFire ? TEXT("React_") : TEXT("Loop_")) + RoleName);
 		}
+		if (IsValid(Entry->LeftSideMontage))
+		{
+			Subject.MontageKinds.Add(Entry->LeftSideMontage->GetName(),
+			                         (Entry->bReactToWeaponFire ? TEXT("React_") : TEXT("Loop_")) + RoleName);
+		}
 		if (IsValid(Entry->IdleLoopMontage))
 		{
 			Subject.MontageKinds.Add(Entry->IdleLoopMontage->GetName(), TEXT("IdleLoop_") + RoleName);
@@ -769,10 +774,11 @@ void FTeamWeaponCrewAnimAudit::LogSubjectSetup(FTWCrewAnimSubjectTrack& Subject,
 			                        ? GetStretchedRate(Entry->Montage, ReloadSeconds, Entry->PlayRate)
 			                        : Entry->PlayRate;
 		UE_LOG(LogRTSTeamWeaponCrewAnimAudit, Display,
-		       TEXT("RTS_TWQC crew_setup subject=%s role=%s react=%d montage=%s play_rate=%.2f effective_rate=%.2f "
-			       "idle_loop=%s idle_rate=%.2f"),
+		       TEXT("RTS_TWQC crew_setup subject=%s role=%s react=%d montage=%s left_montage=%s play_rate=%.2f "
+			       "effective_rate=%.2f idle_loop=%s idle_rate=%.2f"),
 		       *Subject.Name, *RoleName, Entry->bReactToWeaponFire ? 1 : 0, *DescribeMontage(Entry->Montage),
-		       Entry->PlayRate, ReactRate, *DescribeMontage(Entry->IdleLoopMontage), Entry->IdleLoopPlayRate);
+		       *GetMontageName(Entry->LeftSideMontage), Entry->PlayRate, ReactRate,
+		       *DescribeMontage(Entry->IdleLoopMontage), Entry->IdleLoopPlayRate);
 	}
 
 	const FTeamWeaponCrewTransitionMontageSet& Set = TransitionMontages->ResolveSet(Subject.SquadSubtype);
@@ -831,8 +837,10 @@ void FTeamWeaponCrewAnimAudit::LogAnimClassTable(const USquadUnitAnimInstance& A
 			{
 				continue;
 			}
-			Roles += FString::Printf(TEXT(" %s=%s%s/%s"), *GetRoleName(Role), Entry->bReactToWeaponFire ? TEXT("react:") : TEXT(""),
-			                         *GetMontageName(Entry->Montage), *GetMontageName(Entry->IdleLoopMontage));
+			Roles += FString::Printf(TEXT(" %s=%s%s|L:%s/%s"), *GetRoleName(Role),
+			                         Entry->bReactToWeaponFire ? TEXT("react:") : TEXT(""),
+			                         *GetMontageName(Entry->Montage), *GetMontageName(Entry->LeftSideMontage),
+			                         *GetMontageName(Entry->IdleLoopMontage));
 		}
 		const FTeamWeaponCrewTransitionMontageSet& Set = TransitionMontages->ResolveSet(Subtype);
 		UE_LOG(LogRTSTeamWeaponCrewAnimAudit, Display,

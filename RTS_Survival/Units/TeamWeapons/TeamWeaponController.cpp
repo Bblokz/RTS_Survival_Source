@@ -3895,7 +3895,10 @@ void ATeamWeaponController::ArmCrewAnimationSlot(FTeamWeaponCrewAnimationSlot& S
 		Operator->SetActorRotation(OperatorRotation, ETeleportType::TeleportPhysics);
 	}
 
-	AnimInstance->StartTeamWeaponCrewAnimation(Slot.M_CrewRole, M_CrewAnimationState.M_TeamWeaponSquadSubtype);
+	AnimInstance->StartTeamWeaponCrewAnimation(
+		Slot.M_CrewRole,
+		M_CrewAnimationState.M_TeamWeaponSquadSubtype,
+		GetIsCrewPositionOnWeaponRightSide(CrewPosition));
 	Slot.bM_IsArmed = true;
 
 	if constexpr (DeveloperSettings::Debugging::GTeamWeapon_CrewAnimations_Compile_DebugSymbols)
