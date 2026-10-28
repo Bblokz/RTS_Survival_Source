@@ -18,6 +18,7 @@ namespace VariantBatchFourWeaponsPrivate
 	using DeveloperSettings::GameBalance::Weapons::Projectiles::Radixite_DamageMlt;
 	using DeveloperSettings::GameBalance::Weapons::Projectiles::Radixite_ArmorPenMaxRangeMlt;
 	using DeveloperSettings::GameBalance::Weapons::Projectiles::Radixite_AccuracyDelta;
+	using DeveloperSettings::GameBalance::Weapons::Projectiles::APCR_DamageMlt;
 	using DeveloperSettings::GameBalance::Ranges::MediumCannonRange;
 	using DeveloperSettings::GameBalance::Ranges::MediumLaserWeaponRange;
 	using DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange;
@@ -164,8 +165,8 @@ namespace VariantBatchFourWeaponsPrivate
 		PfeilData.ShellType = EWeaponShellType::Shell_APCR;
 		PfeilData.ShellTypes = {EWeaponShellType::Shell_APCR};
 		PfeilData.TNTExplosiveGrams = 0.f;
-		// The PaK 43's damage comes mostly from its TNT; without it the calibre term is the damage (APCR x0.7 at fire).
-		PfeilData.BaseDamage = DamagePerMM * PfeilData.WeaponCalibre * PfeilDamagePerCalibreMlt;
+		// Stored before the APCR damage multiplier, so a fired shot deals PfeilFiredDamagePerShot (250).
+		PfeilData.BaseDamage = PfeilFiredDamagePerShot / APCR_DamageMlt;
 		PfeilData.ArmorPen = PfeilArmorPen;
 		PfeilData.ArmorPenMaxRange = PfeilArmorPenMaxRange;
 		PfeilData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(

@@ -210,7 +210,8 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Pfeil has no TNT"), Pfeil->TNTExplosiveGrams, 0.f, Tolerance);
 	TestTrue(TEXT("Pfeil has no shrapnel"), Pfeil->ShrapnelRange == 0.f && Pfeil->ShrapnelDamage == 0.f
 	         && Pfeil->ShrapnelParticles == 0 && Pfeil->ShrapnelPen == 0.f);
-	TestEqual(TEXT("Pfeil damage = calibre formula x1.15"), Pfeil->BaseDamage, DamagePerMM * 88.f * 1.15f, Tolerance);
+	TestEqual(TEXT("Pfeil stored damage = 250 / APCR mlt"), Pfeil->BaseDamage,
+	          250.f / DeveloperSettings::GameBalance::Weapons::Projectiles::APCR_DamageMlt, Tolerance);
 	TestEqual(TEXT("Pfeil pen"), Pfeil->ArmorPen, 255.f, Tolerance);
 	TestEqual(TEXT("Pfeil max-range pen"), Pfeil->ArmorPenMaxRange, 250.f, Tolerance);
 	TestEqual(TEXT("Pfeil accuracy"), Pfeil->Accuracy, 97);
@@ -220,6 +221,7 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	          Pak43->ProjectileMovementSpeed, Tolerance);
 	const FWeaponData PfeilFired = GetFiredData(*Pfeil, EWeaponShellType::Shell_APCR);
 	TestTrue(TEXT("Pfeil fired pen beats the PaK 43 APHE"), PfeilFired.ArmorPen > Pak43->ArmorPen);
+	TestEqual(TEXT("Pfeil fired damage per shot = 250"), PfeilFired.BaseDamage, 250.f, Tolerance);
 
 	// JagdPanther Bollwerk.
 	TestTrue(TEXT("Bollwerk sFH is HE only"), Bollwerk->ShellTypes.Num() == 1

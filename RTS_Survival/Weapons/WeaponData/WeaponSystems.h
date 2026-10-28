@@ -364,7 +364,9 @@ enum class
 	T44_155MM_Howitzer UMETA(DisplayName = "155MM Howitzer (T-44/155)"),
 	// The MG 42 on the pit field mounts (twin MG42 pit, comm centre MG42 nests): 10-round bursts timed to the tank
 	// MG42 burst sound; it used to borrow the DShK's 12.7mm entry.
-	Ger_PitMG42_7_92MM UMETA(DisplayName = "MG 42 7.92MM (Pit)")
+	Ger_PitMG42_7_92MM UMETA(DisplayName = "MG 42 7.92MM (Pit)"),
+	// SMK main turret: the L-11 76mm with a faster reload and a little more range than the KV-1's.
+	L_11_76MM_SMK UMETA(DisplayName = "L-11 76MM (SMK)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -505,6 +507,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::KwK44_88MM_E50: return "KwK 44/2";
 	case EWeaponName::T44_155MM_Howitzer: return "155mm How";
 	case EWeaponName::Ger_PitMG42_7_92MM: return "MG 42";
+	case EWeaponName::L_11_76MM_SMK: return "L/11";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -1082,6 +1085,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "T44_155MM_Howitzer";
 	case EWeaponName::Ger_PitMG42_7_92MM:
 		return "Ger_PitMG42_7_92MM";
+	case EWeaponName::L_11_76MM_SMK:
+		return "L_11_76MM_SMK";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:

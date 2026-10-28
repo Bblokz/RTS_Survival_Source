@@ -34,7 +34,8 @@ namespace VariantBatchFourWeapons
 	constexpr float HetzerMortarReloadSpeed = 7.f;
 
 	// JagdPanther Pfeil (J-P3 defaults).
-	constexpr float PfeilDamagePerCalibreMlt = 1.15f;
+	// Fired (after APCR x0.7) damage per shot; user 2026-10-27 (was 85 from calibre x1.15).
+	constexpr float PfeilFiredDamagePerShot = 250.f;
 	constexpr float PfeilArmorPen = 255.f;
 	constexpr float PfeilArmorPenMaxRange = 250.f;
 	constexpr float PfeilRangeMlt = 1.1f;

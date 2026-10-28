@@ -7,11 +7,14 @@
 #   run_bench.sh many -TankTrailBenchCount=80          more tanks
 #   BIN=Development run_bench.sh ...                   default DebugGame (the user's editor holds Development)
 #   RES=2560x1440 run_bench.sh ...                     render resolution, default 1920x1080
+#   EXEC="grass.Enable 0" run_bench.sh nograss ...     extra console commands at start (comma separated)
 # Output: Saved/TankTrailBench/<run name>/ (frame CSV + pictures), log Saved/Logs/TankTrailBench_<run name>.log.
 set -u
 NAME="$1"; shift
 MAP="${MAP:-/Game/RTS_Survival/Maps/GerMissions/Ger_Trains}"
 RES="${RES:-1920x1080}"
+EXEC_CMDS="r.VSync 0, t.MaxFPS 0, r.ProfileGPU.ShowUI 0"
+if [ -n "${EXEC:-}" ]; then EXEC_CMDS="$EXEC_CMDS, $EXEC"; fi
 if [ "${BIN:-DebugGame}" = "Development" ]; then
   ENGINE="D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
 else
@@ -24,6 +27,6 @@ mkdir -p "$OUT"
 # -benchmark -fps=30: fixed game step, so every phase simulates the same driving; wall time per frame is measured.
 MSYS_NO_PATHCONV=1 "$ENGINE" "D:/UE5Projects/RTS_Survival/RTS_Survival.uproject" "$MAP" \
   -game -unattended -nosound -RenderOffscreen -windowed -ResX="${RES%x*}" -ResY="${RES#*x}" -DisablePlugins=Fab \
-  -benchmark -fps=30 -ExecCmds="r.VSync 0, t.MaxFPS 0, r.ProfileGPU.ShowUI 0" -TankTrailBench -TankTrailBenchDir="$OUT" -abslog="$LOG" "$@"
+  -benchmark -fps=30 -ExecCmds="$EXEC_CMDS" -TankTrailBench -TankTrailBenchDir="$OUT" -abslog="$LOG" "$@"
 echo "exit=$? log=$LOG"
 grep -E "RTS_TANK_TRAIL_BENCH (started|navigation|spawned|phase|pairdelta|summary|pictures|RESULT)" "$LOG" | sed 's/.*RTS_TANK_TRAIL_BENCH //'
