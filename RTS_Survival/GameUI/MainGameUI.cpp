@@ -1185,6 +1185,45 @@ void UMainGameUI::PropagateControlGroupsToPlayer(UW_ControlGroups* ControlGroups
 	}
 }
 
+void UMainGameUI::SetupPowerDeficitLamp(UW_PlayerEnergyBar* PlayerEnergyBar)
+{
+	const UIndicatorLampSettings* const Settings = GetDefault<UIndicatorLampSettings>();
+	UMaterialInterface* const LampMaterial = Settings->PowerDeficitLamp.LoadSynchronous();
+	if (not IsValid(PlayerEnergyBar) || not IsValid(LampMaterial) || not EnsureMiniMapIsValid())
+	{
+		return;
+	}
+	UCanvasPanel* const Canvas = Cast<UCanvasPanel>(M_MiniMap->GetParent());
+	const UCanvasPanelSlot* const MiniMapSlot = Cast<UCanvasPanelSlot>(M_MiniMap->Slot);
+	if (not IsValid(Canvas) || not IsValid(MiniMapSlot))
+	{
+		RTSFunctionLibrary::ReportError("The minimap is not in a canvas panel, so the power deficit lamp has no place."
+			"\n See function SetupPowerDeficitLamp in MainGameUI.cpp");
+		return;
+	}
+	FIndicatorLamp Lamp;
+	UImage* const LampImage = Lamp.Build(*WidgetTree, LampMaterial, Settings->PowerDeficitLampSize,
+	                                     not Settings->bShowPowerDeficitLampWhenOk);
+	if (not IsValid(LampImage))
+	{
+		return;
+	}
+	// Same anchors as the minimap; its offsets are (left, top, width, height) around its alignment point.
+	FAnchorData Layout = MiniMapSlot->GetLayout();
+	const float MiniMapLeft = Layout.Offsets.Left - Layout.Alignment.X * Layout.Offsets.Right;
+	const float MiniMapTop = Layout.Offsets.Top - Layout.Alignment.Y * Layout.Offsets.Bottom;
+	Layout.Offsets = FMargin(MiniMapLeft + Settings->PowerDeficitLampInset, MiniMapTop + Settings->PowerDeficitLampInset,
+	                         Settings->PowerDeficitLampSize, Settings->PowerDeficitLampSize);
+	Layout.Alignment = FVector2D::ZeroVector;
+	UCanvasPanelSlot* const LampSlot = Canvas->AddChildToCanvas(LampImage);
+	LampSlot->SetLayout(Layout);
+	LampSlot->SetAutoSize(false);
+	// Above the minimap, like the full map button in the opposite corner.
+	constexpr int32 LampZOrderAboveMiniMap = 9;
+	LampSlot->SetZOrder(MiniMapSlot->GetZOrder() + LampZOrderAboveMiniMap);
+	PlayerEnergyBar->SetPowerDeficitLamp(Lamp);
+}
+
 bool UMainGameUI::EnsureMiniMapIsValid() const
 {
 	if (not IsValid(M_MiniMap))
@@ -1749,6 +1788,7 @@ void UMainGameUI::InitMainGameUI(
 	InitMainGameUI_HideWidgets();
 
 	SetupResources(NewPlayerResourceWidgets, NewPlayerController, NewPlayerEnergyBar, NewPlayerEnergyBarInfo);
+	SetupPowerDeficitLamp(NewPlayerEnergyBar);
 	PropagateControlGroupsToPlayer(NewControlGroups);
 	// Start async loading archive.
 	LoadArchiveMenu();

@@ -427,7 +427,8 @@ void UW_HoveringActor::SetHoveredActor(AActor* HoveredActor)
 		M_ActorInfoText->SetText(FText::FromString(ActorInfo));
 		SetPaddingForText(PaddingText);
 	}
-	SetVisibility(ESlateVisibility::Visible);
+	// The tooltip must never take the cursor; the controller hides world hover while a hit-testable widget does.
+	SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
 void UW_HoveringActor::HideWidget()
