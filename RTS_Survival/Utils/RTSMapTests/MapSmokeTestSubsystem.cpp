@@ -275,6 +275,10 @@ void UMapSmokeTestSubsystem::Tick(const float DeltaTime)
 	{
 		LogHeartbeat(SecondsRun, RealSecondsRun);
 	}
+	if (TickStuckPause(RealSecondsRun))
+	{
+		return;
+	}
 	if (SecondsRun >= M_RunSeconds)
 	{
 		Finish();
@@ -429,6 +433,40 @@ void UMapSmokeTestSubsystem::KeepGameUnpaused() const
 	{
 		Controller->PauseGame(ERTSPauseGameOptions::ForceUnpause);
 	}
+}
+
+bool UMapSmokeTestSubsystem::TickStuckPause(const float RealSecondsRun)
+{
+	constexpr float StuckPauseRealSeconds = 90.f;
+	const ACPPController* Controller = GetController();
+	if (not IsValid(Controller) || not Controller->GetIsGameOnPause())
+	{
+		M_PausedSinceRealSeconds = -1.f;
+		return false;
+	}
+	if (M_PausedSinceRealSeconds < 0.f)
+	{
+		M_PausedSinceRealSeconds = RealSecondsRun;
+	}
+	if (RealSecondsRun - M_PausedSinceRealSeconds < StuckPauseRealSeconds)
+	{
+		return false;
+	}
+	TArray<UUserWidget*> TopLevelWidgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), TopLevelWidgets, UUserWidget::StaticClass(), true);
+	FString WidgetNames;
+	for (const UUserWidget* Widget : TopLevelWidgets)
+	{
+		if (IsValid(Widget) && Widget->IsInViewport() && Widget->IsVisible())
+		{
+			WidgetNames += Widget->GetClass()->GetName() + TEXT(",");
+		}
+	}
+	LogResult(TEXT("smoke"), false, FString::Printf(
+		          TEXT("stuck_paused for %.0fs real at %.0fs game, world_paused=%d, widgets=%s"),
+		          RealSecondsRun - M_PausedSinceRealSeconds, GetWorld()->GetTimeSeconds() - M_GameSecondsAtStart,
+		          GetWorld()->IsPaused() ? 1 : 0, *WidgetNames));
+	return true;
 }
 
 void UMapSmokeTestSubsystem::LogHeartbeat(const float SecondsRun, const float RealSecondsRun)
@@ -687,6 +725,11 @@ void UMapSmokeTestSubsystem::ContinueTutorialOvertakes() const
 
 void UMapSmokeTestSubsystem::KeepGameUnpaused() const
 {
+}
+
+bool UMapSmokeTestSubsystem::TickStuckPause(const float RealSecondsRun)
+{
+	return false;
 }
 
 void UMapSmokeTestSubsystem::LogHeartbeat(const float SecondsRun, const float RealSecondsRun)

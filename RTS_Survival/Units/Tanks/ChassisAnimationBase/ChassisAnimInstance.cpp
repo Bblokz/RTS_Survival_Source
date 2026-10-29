@@ -3,6 +3,7 @@
 
 #include "ChassisAnimInstance.h"
 
+#include "HAL/IConsoleManager.h"
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Environment/GroundSurface/GroundSurfaceSubsystem.h"
 #include "RTS_Survival/Environment/GroundSurface/RTSGroundSurfaceSettings.h"
@@ -15,6 +16,13 @@ namespace ChassisTrackSmoke
 	const FName SmokeSurfaceLookParameter = TEXT("SmokeSurfaceLook");
 	// Below this difference the eased look snaps to the ground's look and stops updating the Niagara component.
 	constexpr float LookSnapTolerance = 0.01f;
+
+	// For tuning the looks and checking a map's surface map: logs every look a vehicle's smoke takes.
+	TAutoConsoleVariable<int32> CVarLogSmokeSurfaceLook(
+		TEXT("rts.GroundSurface.LogSmoke"),
+		0,
+		TEXT("1: log the ground surface and smoke look whenever a vehicle's track smoke changes its look."),
+		ECVF_Default);
 }
 
 void UChassisAnimInstance::SetMovementParameters(const float NewSpeed, const float NewRotationYaw,
@@ -164,6 +172,13 @@ void UChassisAnimInstance::UpdateTrackSmokeSurfaceLook()
 	State.M_CurrentTint = NewTint;
 	State.M_CurrentOpacity = NewOpacity;
 	State.bM_HasAppliedLook = true;
+	if (ChassisTrackSmoke::CVarLogSmokeSurfaceLook.GetValueOnGameThread() != 0)
+	{
+		const EGroundSurfaceType SurfaceType = M_GroundSurfaceSubsystem->GetSurfaceTypeAt(OwningActor->GetActorLocation());
+		UE_LOG(LogTemp, Display, TEXT("RTS_SMOKE_LOOK %s at %s surface=%s look=(%.2f %.2f %.2f a%.2f)"),
+		       *OwningActor->GetName(), *OwningActor->GetActorLocation().ToCompactString(),
+		       *UEnum::GetValueAsString(SurfaceType), NewTint.R, NewTint.G, NewTint.B, NewOpacity);
+	}
 }
 
 bool UChassisAnimInstance::GetIsValidGroundSurfaceSubsystem() const
