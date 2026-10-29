@@ -7,8 +7,10 @@
 #include "RTS_Survival/FactionSystem/Factions/Factions.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "RTS_Survival/Units/Variants/UnitVariantTypes.h"
+#include "UnitVariantAbilityCards.h"
 #include "UnitVariantSelectionStyle.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "W_UnitVariantSelectionMenu.generated.h"
 
 class AFactionPlayerController;
@@ -19,6 +21,7 @@ class UCanvasPanelSlot;
 class UDataTable;
 class UImage;
 class UOverlay;
+class URichTextBlock;
 class UScrollBox;
 class UVerticalBox;
 class UWidget;
@@ -26,7 +29,12 @@ class UTextBlock;
 class UTexture2D;
 class UUnitVariantDataAsset;
 class UW_UnitVariantCard;
+class UW_UnitVariantDetailPanel;
+class UW_UnitVariantDiscardDialog;
+class UUnitVariantProbes;
+struct FUnitVariantProbeResult;
 class UW_UnitVariantUnitEntry;
+struct FStreamableHandle;
 
 /**
  * @brief Shown by AFactionPlayerController after the faction is chosen when the game instance allows variant
@@ -55,8 +63,29 @@ public:
 	void HandleUnitEntryClicked(const int32 EntryIndex);
 	void HandleVariantCardClicked(const EUnitVariant Variant);
 
+	/** The ability panel shows the hovered card's abilities, and the equipped variant's when no card is hovered. */
+	void HandleVariantCardHovered(const EUnitVariant Variant, const bool bIsHovered);
+
+	/** @param bDiscard True leaves the screen without saving; false closes the dialog and keeps the choices. */
+	void HandleDiscardDialogChoice(const bool bDiscard);
+
+	int32 GetUnitCount() const { return M_Units.Num(); }
+
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
+	// Test hooks (offscreen captures): drive the keyboard navigation and read its effects without a real key press.
+	bool Debug_PressNavigationKey(const FKey& Key) { return HandleNavigationKey(Key); }
+	int32 Debug_GetUnconfirmedChangeCount() const { return GetUnconfirmedChangeCount(); }
+	bool Debug_GetIsDiscardDialogOpen() const;
+	EUnitVariant Debug_GetChosenVariantOfSelectedUnit() const;
+#endif
+	void ScrollCardsToEnd() const;
+
 protected:
 	virtual void NativeOnInitialized() override;
+	virtual void NativeDestruct() override;
+	// Up/Down pick the unit, Left/Right move over the cards, Enter equips, Space confirms, Escape goes back; the
+	// gamepad d-pad, A, Start and B do the same.
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Unit Variant Selection")
 	FUnitVariantSelectionStyle M_Style;
@@ -106,9 +135,6 @@ private:
 	TObjectPtr<UBorder> M_UnitPanel;
 
 	UPROPERTY()
-	TObjectPtr<UTextBlock> M_UnitCountText;
-
-	UPROPERTY()
 	TObjectPtr<UScrollBox> M_UnitList;
 
 	UPROPERTY()
@@ -121,10 +147,54 @@ private:
 	TObjectPtr<UTextBlock> M_VariantCountText;
 
 	UPROPERTY()
+	TObjectPtr<UScrollBox> M_CardScrollBox;
+
+	UPROPERTY()
 	TObjectPtr<UVerticalBox> M_CardColumn;
 
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_FootnoteText;
+
+	// Left of the variant panel: the special abilities of the hovered or equipped variant.
+	UPROPERTY()
+	TObjectPtr<UW_UnitVariantDetailPanel> M_DetailPanel;
+
+	UPROPERTY()
+	TObjectPtr<UW_UnitVariantDiscardDialog> M_DiscardDialog;
+
+	UPROPERTY()
+	TObjectPtr<UButton> M_ResetButton;
+
+	// The choices as saved when the screen opened (Base for units without one); Back without Confirm returns to them.
+	TMap<FTrainingOption, EUnitVariant> M_ConfirmedSelections;
+
+	// Spawns each variant once out of sight to read the weapons and health its Blueprint sets up at BeginPlay.
+	UPROPERTY()
+	TObjectPtr<UUnitVariantProbes> M_Probes;
+
+	// Index into M_Cards of the card the arrow keys are on; INDEX_NONE until a Left/Right press.
+	int32 M_KeyboardCardIndex = INDEX_NONE;
+
+	// M_Style.AbilityCardTable, loaded once; it also holds the ability icons the cards and the panel show.
+	UPROPERTY()
+	TObjectPtr<const UDataTable> M_AbilityCardTable;
+
+	UPROPERTY()
+	TObjectPtr<UDataTable> M_AbilityRichTextStyle;
+
+	// M_Style.WeaponCardTable, loaded once; it holds the weapon icon brushes the detail panel shows.
+	UPROPERTY()
+	TObjectPtr<const UDataTable> M_WeaponCardTable;
+
+	// Keeps the selected unit's variant classes loaded while their ability components are read; replaced per unit.
+	TSharedPtr<FStreamableHandle> M_AbilityClassLoadHandle;
+
+	// The selected unit's abilities per variant; empty until its variant classes have loaded.
+	UPROPERTY()
+	TMap<EUnitVariant, FUnitVariantAbilityCardList> M_VariantAbilityCards;
+
+	EUnitVariant M_HoveredVariant = EUnitVariant::Base;
+	bool bM_HasHoveredVariant = false;
 
 	UPROPERTY()
 	TObjectPtr<UButton> M_ConfirmButton;
@@ -138,6 +208,9 @@ private:
 	void BuildUnitPanel(UCanvasPanel* RootCanvas);
 	void BuildCardPanel(UCanvasPanel* RootCanvas);
 	void BuildButtons(UCanvasPanel* RootCanvas);
+	void BuildDetailPanel(UCanvasPanel* RootCanvas);
+	void BuildResetButton(UCanvasPanel* RootCanvas);
+	void BuildDiscardDialog(UCanvasPanel* RootCanvas);
 
 	/**
 	 * @brief A side column: fixed size panel plate with a title and count in its header strip.
@@ -153,15 +226,6 @@ private:
 	                         TObjectPtr<UTextBlock>& OutTitleText, TObjectPtr<UTextBlock>& OutCountText,
 	                         TObjectPtr<UBorder>& OutPanelPlate);
 
-	/**
-	 * @param Label The button text.
-	 * @param ButtonStyle The Confirm or Back style from M_Style.
-	 * @param ButtonSize Drawn size its instances were made for.
-	 * @param OutButton Receives the button, to bind its click.
-	 * @return The size box to place on the canvas.
-	 */
-	UWidget* BuildTextButton(const FText& Label, const FButtonStyle& ButtonStyle, const FVector2D& ButtonSize,
-	                         TObjectPtr<UButton>& OutButton);
 	void ApplyStyle();
 
 	void PopulateUnitEntries();
@@ -170,6 +234,28 @@ private:
 	void RefreshCardSelection();
 	void RefreshEntryChosenVariant(const int32 EntryIndex);
 	void RequestPreviewOfSelectedUnit() const;
+
+	void LoadAbilityTables();
+	// Loads the variant classes of the unit async; their component templates say which abilities each variant has.
+	void LoadVariantAbilities(const FTrainingOption& Unit);
+	void ResolveVariantAbilities();
+	void ProbeVariantsOfSelectedUnit();
+	void HandleVariantProbesRead(const int32 ProbedUnitIndex);
+	// Null until the variant's probe was read.
+	const FUnitVariantProbeResult* FindVariantProbe(const FTrainingOption& Unit, const EUnitVariant Variant) const;
+	void RefreshAbilityPanel();
+	EUnitVariant GetAbilityPanelVariant() const;
+
+	bool GetHasUnconfirmedChange(const FTrainingOption& Unit) const;
+	int32 GetUnconfirmedChangeCount() const;
+
+	/** @return True when the key was one of the screen's navigation keys. */
+	bool HandleNavigationKey(const FKey& Key);
+	bool HandleDiscardDialogKey(const FKey& Key);
+	void SelectAdjacentUnit(const int32 Step);
+	void FocusAdjacentCard(const int32 Step);
+	void SetKeyboardFocusedCard(const int32 CardIndex);
+	void EquipKeyboardFocusedCard();
 
 	EUnitVariant GetChosenVariant(const FTrainingOption& Unit) const;
 	static FText GetFactionDisplayName(const ERTSFaction Faction);
@@ -193,8 +279,15 @@ private:
 	UFUNCTION()
 	void OnBackClicked();
 
+	UFUNCTION()
+	void OnResetClicked();
+
 	bool GetIsValidFactionPlayerController() const;
 	bool GetIsValidVariantDataAsset() const;
 	bool GetIsValidUnitList() const;
 	bool GetIsValidCardColumn() const;
+	bool GetIsValidCardScrollBox() const;
+	bool GetIsValidDetailPanel() const;
+	bool GetIsValidDiscardDialog() const;
+	bool GetIsValidAbilityCardTable() const;
 };

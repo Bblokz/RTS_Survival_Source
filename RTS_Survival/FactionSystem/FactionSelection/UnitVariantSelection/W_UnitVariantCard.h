@@ -15,6 +15,8 @@ class UImage;
 class UOverlay;
 class UTextBlock;
 class UW_UnitVariantSelectionMenu;
+class UWrapBox;
+struct FUnitVariantAbilityCard;
 
 /**
  * @brief One variant (Base, Variant A or Variant B) of the unit selected in the unit variant selection screen;
@@ -39,6 +41,12 @@ public:
 	               const FSlateBrush& IconBrush, const FText& VariantName, const FText& Description);
 
 	void SetIsSelected(const bool bIsSelected);
+
+	/** Arrow key / d-pad focus: the card shows its hovered look until the focus moves on. */
+	void SetIsKeyboardFocused(const bool bIsKeyboardFocused);
+
+	/** Fills the row of small ability icons under the description; called once the variant's class has loaded. */
+	void SetAbilityIcons(const TArray<FUnitVariantAbilityCard>& AbilityCards);
 
 	EUnitVariant GetVariant() const { return M_Variant; }
 
@@ -73,12 +81,17 @@ private:
 	UPROPERTY()
 	TObjectPtr<UImage> M_SelectedMarker;
 
+	// Wraps when a variant has more abilities than fit next to each other in the text column.
+	UPROPERTY()
+	TObjectPtr<UWrapBox> M_AbilityIconRow;
+
 	// Copied from the menu so selection can swap the button style, the icon well and the text colours.
 	UPROPERTY()
 	FUnitVariantSelectionStyle M_Style;
 
 	EUnitVariant M_Variant = EUnitVariant::Base;
 	bool bM_IsSelected = false;
+	bool bM_IsKeyboardFocused = false;
 
 	void BuildWidgetTree();
 	void BuildIconWell(UOverlay* CardOverlay);
@@ -89,6 +102,13 @@ private:
 	UFUNCTION()
 	void OnCardClicked();
 
+	UFUNCTION()
+	void OnCardHovered();
+
+	UFUNCTION()
+	void OnCardUnhovered();
+
 	bool GetIsValidMenu() const;
 	bool GetIsValidButton() const;
+	bool GetIsValidAbilityIconRow() const;
 };

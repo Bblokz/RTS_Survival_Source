@@ -42,6 +42,9 @@ public:
 	/** Shows which variant is currently chosen for the unit next to its variant count. */
 	void SetChosenVariantName(const FText& ChosenVariantName);
 
+	/** Marks the entry while its chosen variant differs from the one last confirmed. */
+	void SetHasUnconfirmedChange(const bool bHasUnconfirmedChange);
+
 protected:
 	virtual void NativeOnInitialized() override;
 
@@ -64,6 +67,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_DetailText;
 
+	// Small accent square on the icon well's corner.
+	UPROPERTY()
+	TObjectPtr<UImage> M_ChangedMarker;
+
 	// Copied from the menu so selection can swap the button style, the icon well and the text colours.
 	UPROPERTY()
 	FUnitVariantSelectionStyle M_Style;
@@ -75,6 +82,7 @@ private:
 	void BuildWidgetTree();
 	void BuildIconWell(UOverlay* EntryOverlay);
 	void BuildTexts(UOverlay* EntryOverlay);
+	void BuildChangedMarker(UOverlay* EntryOverlay);
 	void ApplySelectionLook();
 
 	UFUNCTION()

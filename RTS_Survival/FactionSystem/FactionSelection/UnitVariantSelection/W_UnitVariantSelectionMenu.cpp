@@ -13,13 +13,15 @@
 #include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/RichTextBlock.h"
 #include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
-#include "Components/Spacer.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Engine/AssetManager.h"
 #include "Engine/DataTable.h"
+#include "Engine/StreamableManager.h"
 #include "Engine/Texture2D.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Units/Variants/UnitVariantDataAsset.h"
@@ -27,8 +29,14 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "Slate/SlateBrushAsset.h"
 #include "UnitVariantSelectionWidgetHelpers.h"
+#include "UnitVariantProbes.h"
 #include "W_UnitVariantCard.h"
+#include "W_UnitVariantDetailPanel.h"
+#include "W_UnitVariantDiscardDialog.h"
 #include "W_UnitVariantUnitEntry.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogRTSUnitVariantSelection, Log, All);
 
 // Screen layout of UISkins/_generator/variant_selection_spec.md, section 4 (1920x1080 reference, whole units).
 namespace UnitVariantSelectionLayout
@@ -52,7 +60,6 @@ namespace UnitVariantSelectionLayout
 	constexpr float CardSpacing = 12.f;
 	const FVector2D BackButtonSize(240.f, 48.f);
 	const FVector2D ConfirmButtonSize(280.f, 48.f);
-	const FMargin ButtonTextPadding(36.f, 4.f, 36.f, 10.f);
 	constexpr int32 TitleFontSize = 28;
 	constexpr int32 TitleLetterSpacing = 150;
 	constexpr int32 FactionFontSize = 15;
@@ -61,15 +68,20 @@ namespace UnitVariantSelectionLayout
 	constexpr int32 PanelTitleLetterSpacing = 100;
 	constexpr int32 PanelCountFontSize = 13;
 	constexpr int32 FootnoteFontSize = 13;
-	constexpr int32 ButtonFontSize = 18;
-	constexpr int32 ButtonLetterSpacing = 100;
 	// Size of a selection icon texture on a card; the card's well draws it at 128x128.
 	const FVector2D CardIconSize(128.f, 128.f);
+	// Detail panel: left of the variant panel, top aligned with it.
+	constexpr float DetailPanelGap = 16.f;
+	// Reset button bottom centre between Back and Confirm.
+	const FVector2D ResetButtonSize(280.f, 48.f);
 }
 
 void UW_UnitVariantSelectionMenu::NativeOnInitialized()
 {
+	// Keyboard focus stays on the screen itself (its buttons never take it), for the arrow key navigation.
+	SetIsFocusable(true);
 	Super::NativeOnInitialized();
+	M_Probes = NewObject<UUnitVariantProbes>(this);
 	BuildWidgetTree();
 	ApplyStyle();
 }
@@ -86,7 +98,10 @@ void UW_UnitVariantSelectionMenu::BuildWidgetTree()
 	BuildHeader(RootCanvas);
 	BuildUnitPanel(RootCanvas);
 	BuildCardPanel(RootCanvas);
+	BuildDetailPanel(RootCanvas);
 	BuildButtons(RootCanvas);
+	BuildResetButton(RootCanvas);
+	BuildDiscardDialog(RootCanvas);
 }
 
 void UW_UnitVariantSelectionMenu::BuildEdgeShades(UCanvasPanel* RootCanvas)
@@ -173,9 +188,17 @@ void UW_UnitVariantSelectionMenu::BuildUnitPanel(UCanvasPanel* RootCanvas)
 	using namespace UnitVariantSelectionLayout;
 	UCanvasPanelSlot* PanelSlot = nullptr;
 	TObjectPtr<UTextBlock> PanelTitle;
-	UOverlay* const PanelOverlay = BuildSidePanel(RootCanvas, UnitPanelSize, PanelSlot, PanelTitle, M_UnitCountText, M_UnitPanel);
+	TObjectPtr<UTextBlock> PanelCount;
+	UOverlay* const PanelOverlay = BuildSidePanel(RootCanvas, UnitPanelSize, PanelSlot, PanelTitle, PanelCount, M_UnitPanel);
 	PanelSlot->SetAnchors(FAnchors(0.f, 0.f));
 	PanelSlot->SetPosition(FVector2D(ScreenMargin, PanelTop));
+	// The unit list needs no count; its title sits centred in the header strip.
+	PanelCount->SetVisibility(ESlateVisibility::Collapsed);
+	if (UHorizontalBoxSlot* const TitleSlot = Cast<UHorizontalBoxSlot>(PanelTitle->Slot))
+	{
+		TitleSlot->SetHorizontalAlignment(HAlign_Center);
+		TitleSlot->SetPadding(FMargin(0.f));
+	}
 	PanelTitle->SetText(NSLOCTEXT("UnitVariantSelection", "UnitsTitle", "UNITS"));
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		PanelTitle, UnitVariantSelectionWidgets::MakeFont(M_Style.HeadingFont, PanelTitleFontSize,
@@ -203,10 +226,11 @@ void UW_UnitVariantSelectionMenu::BuildCardPanel(UCanvasPanel* RootCanvas)
 	BodySlot->SetHorizontalAlignment(HAlign_Fill);
 	BodySlot->SetVerticalAlignment(VAlign_Fill);
 	BodySlot->SetPadding(CardColumnPadding);
+	// Takes the height the footnote leaves; its scroll bar only shows once the cards need more than that.
+	M_CardScrollBox = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
+	Body->AddChildToVerticalBox(M_CardScrollBox)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	M_CardColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	Body->AddChildToVerticalBox(M_CardColumn);
-	USpacer* const Filler = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
-	Body->AddChildToVerticalBox(Filler)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	M_CardScrollBox->AddChild(M_CardColumn);
 	M_FootnoteText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	M_FootnoteText->SetText(NSLOCTEXT("UnitVariantSelection", "Footnote",
 	                                  "The equipped variant is trained from every barracks and factory of this faction."));
@@ -218,8 +242,9 @@ void UW_UnitVariantSelectionMenu::BuildCardPanel(UCanvasPanel* RootCanvas)
 void UW_UnitVariantSelectionMenu::BuildButtons(UCanvasPanel* RootCanvas)
 {
 	using namespace UnitVariantSelectionLayout;
-	UWidget* const BackBox = BuildTextButton(NSLOCTEXT("UnitVariantSelection", "Back", "BACK"), M_Style.BackButton,
-	                                         BackButtonSize, M_BackButton);
+	UWidget* const BackBox = UnitVariantSelectionWidgets::BuildTextButton(
+		*WidgetTree, M_Style, NSLOCTEXT("UnitVariantSelection", "Back", "BACK"), M_Style.BackButton, BackButtonSize,
+		M_BackButton);
 	M_BackButton->OnClicked.AddDynamic(this, &UW_UnitVariantSelectionMenu::OnBackClicked);
 	UCanvasPanelSlot* const BackSlot = RootCanvas->AddChildToCanvas(BackBox);
 	BackSlot->SetAnchors(FAnchors(0.f, 1.f));
@@ -227,8 +252,9 @@ void UW_UnitVariantSelectionMenu::BuildButtons(UCanvasPanel* RootCanvas)
 	BackSlot->SetPosition(FVector2D(ScreenMargin, -ScreenMargin));
 	BackSlot->SetAutoSize(true);
 
-	UWidget* const ConfirmBox = BuildTextButton(NSLOCTEXT("UnitVariantSelection", "Confirm", "CONFIRM"),
-	                                            M_Style.ConfirmButton, ConfirmButtonSize, M_ConfirmButton);
+	UWidget* const ConfirmBox = UnitVariantSelectionWidgets::BuildTextButton(
+		*WidgetTree, M_Style, NSLOCTEXT("UnitVariantSelection", "Confirm", "CONFIRM"), M_Style.ConfirmButton,
+		ConfirmButtonSize, M_ConfirmButton);
 	M_ConfirmButton->OnClicked.AddDynamic(this, &UW_UnitVariantSelectionMenu::OnConfirmClicked);
 	UCanvasPanelSlot* const ConfirmSlot = RootCanvas->AddChildToCanvas(ConfirmBox);
 	ConfirmSlot->SetAnchors(FAnchors(1.f, 1.f));
@@ -237,29 +263,15 @@ void UW_UnitVariantSelectionMenu::BuildButtons(UCanvasPanel* RootCanvas)
 	ConfirmSlot->SetAutoSize(true);
 }
 
-UWidget* UW_UnitVariantSelectionMenu::BuildTextButton(const FText& Label, const FButtonStyle& ButtonStyle,
-                                                      const FVector2D& ButtonSize, TObjectPtr<UButton>& OutButton)
+void UW_UnitVariantSelectionMenu::BuildDetailPanel(UCanvasPanel* RootCanvas)
 {
 	using namespace UnitVariantSelectionLayout;
-	USizeBox* const ButtonBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	ButtonBox->SetWidthOverride(ButtonSize.X);
-	ButtonBox->SetHeightOverride(ButtonSize.Y);
-	OutButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-	OutButton->SetStyle(ButtonStyle);
-	ButtonBox->SetContent(OutButton);
-	UTextBlock* const LabelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	LabelText->SetText(Label);
-	LabelText->SetVisibility(ESlateVisibility::HitTestInvisible);
-	UnitVariantSelectionWidgets::ApplyTextOnMetal(
-		LabelText, UnitVariantSelectionWidgets::MakeFont(M_Style.HeadingFont, ButtonFontSize, ButtonLetterSpacing),
-		M_Style.TextColor);
-	if (UButtonSlot* const LabelSlot = Cast<UButtonSlot>(OutButton->SetContent(LabelText)))
-	{
-		LabelSlot->SetPadding(ButtonTextPadding);
-		LabelSlot->SetHorizontalAlignment(HAlign_Center);
-		LabelSlot->SetVerticalAlignment(VAlign_Center);
-	}
-	return ButtonBox;
+	M_DetailPanel = WidgetTree->ConstructWidget<UW_UnitVariantDetailPanel>(UW_UnitVariantDetailPanel::StaticClass());
+	UCanvasPanelSlot* const PanelSlot = RootCanvas->AddChildToCanvas(M_DetailPanel);
+	PanelSlot->SetAnchors(FAnchors(1.f, 0.f));
+	PanelSlot->SetAlignment(FVector2D(1.f, 0.f));
+	PanelSlot->SetPosition(FVector2D(-(ScreenMargin + VariantPanelSize.X + DetailPanelGap), PanelTop));
+	PanelSlot->SetAutoSize(true);
 }
 
 void UW_UnitVariantSelectionMenu::ApplyStyle()
@@ -286,12 +298,9 @@ void UW_UnitVariantSelectionMenu::ApplyStyle()
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		M_SelectedUnitText, UnitVariantSelectionWidgets::MakeFont(M_Style.HeadingFont, PanelTitleFontSize,
 		                                                          PanelTitleLetterSpacing), M_Style.TextColor);
-	for (UTextBlock* const CountText : {M_UnitCountText.Get(), M_VariantCountText.Get()})
-	{
-		UnitVariantSelectionWidgets::ApplyTextOnMetal(
-			CountText, UnitVariantSelectionWidgets::MakeFont(M_Style.BodyFont, PanelCountFontSize, PanelTitleLetterSpacing),
-			M_Style.MutedTextColor);
-	}
+	UnitVariantSelectionWidgets::ApplyTextOnMetal(
+		M_VariantCountText, UnitVariantSelectionWidgets::MakeFont(M_Style.BodyFont, PanelCountFontSize,
+		                                                          PanelTitleLetterSpacing), M_Style.MutedTextColor);
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		M_FootnoteText, UnitVariantSelectionWidgets::MakeFont(M_Style.BodyFont, FootnoteFontSize), M_Style.MutedTextColor);
 }
@@ -312,15 +321,16 @@ void UW_UnitVariantSelectionMenu::InitVariantSelection(AFactionPlayerController*
 		const EUnitVariant* SavedVariant = CurrentSelections.Find(Unit);
 		M_Selections.Add(Unit, SavedVariant ? *SavedVariant : EUnitVariant::Base);
 	}
+	M_ConfirmedSelections = M_Selections;
+	if (GetIsValidDiscardDialog())
+	{
+		M_DiscardDialog->SetupDialog(this, M_Style);
+	}
 	if (IsValid(M_SubtitleText))
 	{
 		M_SubtitleText->SetText(GetFactionDisplayName(Faction).ToUpper());
 	}
-	if (IsValid(M_UnitCountText))
-	{
-		M_UnitCountText->SetText(FText::Format(NSLOCTEXT("UnitVariantSelection", "UnitCount", "{0} WITH VARIANTS"),
-		                                       FText::AsNumber(M_Units.Num())));
-	}
+	LoadAbilityTables();
 	PopulateUnitEntries();
 	SelectUnit(0);
 }
@@ -365,6 +375,7 @@ void UW_UnitVariantSelectionMenu::HandleVariantCardClicked(const EUnitVariant Va
 	}
 	M_Selections.Add(M_Units[M_SelectedUnitIndex], Variant);
 	RefreshCardSelection();
+	RefreshAbilityPanel();
 	RefreshEntryChosenVariant(M_SelectedUnitIndex);
 	RequestPreviewOfSelectedUnit();
 }
@@ -394,6 +405,7 @@ void UW_UnitVariantSelectionMenu::SelectUnit(const int32 EntryIndex)
 		                                          FText::AsNumber(M_VariantDataAsset->GetImplementedVariantCount(Unit))));
 	}
 	RebuildCards(Unit);
+	LoadVariantAbilities(Unit);
 	RequestPreviewOfSelectedUnit();
 }
 
@@ -406,6 +418,8 @@ void UW_UnitVariantSelectionMenu::RebuildCards(const FTrainingOption& Unit)
 	}
 	M_CardColumn->ClearChildren();
 	M_Cards.Reset();
+	bM_HasHoveredVariant = false;
+	M_KeyboardCardIndex = INDEX_NONE;
 	const int32 VariantCount = M_VariantDataAsset->GetImplementedVariantCount(Unit);
 	for (int32 VariantIndex = 0; VariantIndex < VariantCount; ++VariantIndex)
 	{
@@ -420,7 +434,448 @@ void UW_UnitVariantSelectionMenu::RebuildCards(const FTrainingOption& Unit)
 		M_CardColumn->AddChildToVerticalBox(Card)->SetPadding(FMargin(0.f, 0.f, 0.f, CardSpacing));
 		M_Cards.Add(Card);
 	}
+	if (GetIsValidCardScrollBox())
+	{
+		M_CardScrollBox->ScrollToStart();
+	}
 	RefreshCardSelection();
+}
+
+void UW_UnitVariantSelectionMenu::ScrollCardsToEnd() const
+{
+	if (not GetIsValidCardScrollBox())
+	{
+		return;
+	}
+	M_CardScrollBox->ScrollToEnd();
+}
+
+void UW_UnitVariantSelectionMenu::BuildResetButton(UCanvasPanel* RootCanvas)
+{
+	using namespace UnitVariantSelectionLayout;
+	UWidget* const ResetBox = UnitVariantSelectionWidgets::BuildTextButton(
+		*WidgetTree, M_Style, NSLOCTEXT("UnitVariantSelection", "ResetAll", "RESET TO BASE"), M_Style.BackButton,
+		ResetButtonSize, M_ResetButton);
+	M_ResetButton->OnClicked.AddDynamic(this, &UW_UnitVariantSelectionMenu::OnResetClicked);
+	UCanvasPanelSlot* const ResetSlot = RootCanvas->AddChildToCanvas(ResetBox);
+	ResetSlot->SetAnchors(FAnchors(0.5f, 1.f));
+	ResetSlot->SetAlignment(FVector2D(0.5f, 1.f));
+	ResetSlot->SetPosition(FVector2D(0.f, -ScreenMargin));
+	ResetSlot->SetAutoSize(true);
+}
+
+void UW_UnitVariantSelectionMenu::BuildDiscardDialog(UCanvasPanel* RootCanvas)
+{
+	M_DiscardDialog = WidgetTree->ConstructWidget<UW_UnitVariantDiscardDialog>(
+		UW_UnitVariantDiscardDialog::StaticClass());
+	// Last on the canvas, so it draws over everything and takes every click while open.
+	UCanvasPanelSlot* const DialogSlot = RootCanvas->AddChildToCanvas(M_DiscardDialog);
+	DialogSlot->SetAnchors(FAnchors(0.f, 0.f, 1.f, 1.f));
+	DialogSlot->SetOffsets(FMargin(0.f));
+}
+
+FReply UW_UnitVariantSelectionMenu::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
+{
+	if (HandleNavigationKey(InKeyEvent.GetKey()))
+	{
+		return FReply::Handled();
+	}
+	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+}
+
+bool UW_UnitVariantSelectionMenu::HandleNavigationKey(const FKey& Key)
+{
+	if (GetIsValidDiscardDialog() && M_DiscardDialog->GetIsOpen())
+	{
+		return HandleDiscardDialogKey(Key);
+	}
+	const auto IsAnyOf = [&Key](const std::initializer_list<FKey> Keys)
+	{
+		for (const FKey& Candidate : Keys)
+		{
+			if (Candidate == Key)
+			{
+				return true;
+			}
+		}
+		return false;
+	};
+	if (IsAnyOf({EKeys::Up, EKeys::W, EKeys::Gamepad_DPad_Up, EKeys::Gamepad_LeftStick_Up}))
+	{
+		SelectAdjacentUnit(-1);
+		return true;
+	}
+	if (IsAnyOf({EKeys::Down, EKeys::S, EKeys::Gamepad_DPad_Down, EKeys::Gamepad_LeftStick_Down}))
+	{
+		SelectAdjacentUnit(1);
+		return true;
+	}
+	if (IsAnyOf({EKeys::Left, EKeys::A, EKeys::Gamepad_DPad_Left, EKeys::Gamepad_LeftShoulder}))
+	{
+		FocusAdjacentCard(-1);
+		return true;
+	}
+	if (IsAnyOf({EKeys::Right, EKeys::D, EKeys::Gamepad_DPad_Right, EKeys::Gamepad_RightShoulder}))
+	{
+		FocusAdjacentCard(1);
+		return true;
+	}
+	if (IsAnyOf({EKeys::Enter, EKeys::Gamepad_FaceButton_Bottom}))
+	{
+		EquipKeyboardFocusedCard();
+		return true;
+	}
+	if (IsAnyOf({EKeys::SpaceBar, EKeys::Gamepad_Special_Right}))
+	{
+		OnConfirmClicked();
+		return true;
+	}
+	if (IsAnyOf({EKeys::Escape, EKeys::Gamepad_FaceButton_Right}))
+	{
+		OnBackClicked();
+		return true;
+	}
+	return false;
+}
+
+bool UW_UnitVariantSelectionMenu::HandleDiscardDialogKey(const FKey& Key)
+{
+	if (Key == EKeys::Enter || Key == EKeys::Gamepad_FaceButton_Bottom)
+	{
+		HandleDiscardDialogChoice(true);
+	}
+	else if (Key == EKeys::Escape || Key == EKeys::Gamepad_FaceButton_Right)
+	{
+		HandleDiscardDialogChoice(false);
+	}
+	// Every other key is swallowed so nothing changes behind the open dialog.
+	return true;
+}
+
+void UW_UnitVariantSelectionMenu::SelectAdjacentUnit(const int32 Step)
+{
+	const int32 NewIndex = FMath::Clamp(M_SelectedUnitIndex + Step, 0, M_Units.Num() - 1);
+	if (NewIndex == M_SelectedUnitIndex || not M_Units.IsValidIndex(NewIndex))
+	{
+		return;
+	}
+	SelectUnit(NewIndex);
+	if (GetIsValidUnitList() && M_UnitEntries.IsValidIndex(NewIndex))
+	{
+		M_UnitList->ScrollWidgetIntoView(M_UnitEntries[NewIndex]);
+	}
+}
+
+void UW_UnitVariantSelectionMenu::FocusAdjacentCard(const int32 Step)
+{
+	if (M_Cards.IsEmpty() || not M_Units.IsValidIndex(M_SelectedUnitIndex))
+	{
+		return;
+	}
+	int32 StartIndex = M_KeyboardCardIndex;
+	if (not M_Cards.IsValidIndex(StartIndex))
+	{
+		// The first press lands on the equipped card's neighbour, as if the focus started on the equipped card.
+		const EUnitVariant ChosenVariant = GetChosenVariant(M_Units[M_SelectedUnitIndex]);
+		StartIndex = M_Cards.IndexOfByPredicate([ChosenVariant](const UW_UnitVariantCard* Card)
+		{
+			return IsValid(Card) && Card->GetVariant() == ChosenVariant;
+		});
+	}
+	const int32 CardCount = M_Cards.Num();
+	SetKeyboardFocusedCard(((FMath::Max(StartIndex, 0) + Step) % CardCount + CardCount) % CardCount);
+}
+
+void UW_UnitVariantSelectionMenu::SetKeyboardFocusedCard(const int32 CardIndex)
+{
+	if (M_Cards.IsValidIndex(M_KeyboardCardIndex) && IsValid(M_Cards[M_KeyboardCardIndex]))
+	{
+		M_Cards[M_KeyboardCardIndex]->SetIsKeyboardFocused(false);
+		HandleVariantCardHovered(M_Cards[M_KeyboardCardIndex]->GetVariant(), false);
+	}
+	M_KeyboardCardIndex = CardIndex;
+	if (not M_Cards.IsValidIndex(CardIndex) || not IsValid(M_Cards[CardIndex]))
+	{
+		return;
+	}
+	M_Cards[CardIndex]->SetIsKeyboardFocused(true);
+	// The detail panel follows the keyboard like it follows the mouse.
+	HandleVariantCardHovered(M_Cards[CardIndex]->GetVariant(), true);
+	if (GetIsValidCardScrollBox())
+	{
+		M_CardScrollBox->ScrollWidgetIntoView(M_Cards[CardIndex]);
+	}
+}
+
+void UW_UnitVariantSelectionMenu::EquipKeyboardFocusedCard()
+{
+	if (not M_Cards.IsValidIndex(M_KeyboardCardIndex) || not IsValid(M_Cards[M_KeyboardCardIndex]))
+	{
+		return;
+	}
+	HandleVariantCardClicked(M_Cards[M_KeyboardCardIndex]->GetVariant());
+}
+
+bool UW_UnitVariantSelectionMenu::GetHasUnconfirmedChange(const FTrainingOption& Unit) const
+{
+	// FindRef gives Base for a unit without a confirmed choice, matching how the screen treats it.
+	return GetChosenVariant(Unit) != M_ConfirmedSelections.FindRef(Unit);
+}
+
+int32 UW_UnitVariantSelectionMenu::GetUnconfirmedChangeCount() const
+{
+	int32 ChangeCount = 0;
+	for (const FTrainingOption& Unit : M_Units)
+	{
+		ChangeCount += GetHasUnconfirmedChange(Unit) ? 1 : 0;
+	}
+	return ChangeCount;
+}
+
+void UW_UnitVariantSelectionMenu::OnResetClicked()
+{
+	for (const FTrainingOption& Unit : M_Units)
+	{
+		M_Selections.Add(Unit, EUnitVariant::Base);
+	}
+	for (int32 UnitIndex = 0; UnitIndex < M_Units.Num(); ++UnitIndex)
+	{
+		RefreshEntryChosenVariant(UnitIndex);
+	}
+	RefreshCardSelection();
+	RefreshAbilityPanel();
+	RequestPreviewOfSelectedUnit();
+}
+
+void UW_UnitVariantSelectionMenu::HandleDiscardDialogChoice(const bool bDiscard)
+{
+	if (GetIsValidDiscardDialog())
+	{
+		M_DiscardDialog->HideDialog();
+	}
+	if (not bDiscard || not GetIsValidFactionPlayerController())
+	{
+		return;
+	}
+	M_FactionPlayerController->HandleUnitVariantSelectionBack();
+}
+
+void UW_UnitVariantSelectionMenu::HandleVariantCardHovered(const EUnitVariant Variant, const bool bIsHovered)
+{
+	if (bIsHovered)
+	{
+		M_HoveredVariant = Variant;
+		bM_HasHoveredVariant = true;
+	}
+	else if (bM_HasHoveredVariant && M_HoveredVariant == Variant)
+	{
+		bM_HasHoveredVariant = false;
+	}
+	RefreshAbilityPanel();
+}
+
+void UW_UnitVariantSelectionMenu::LoadAbilityTables()
+{
+	M_AbilityCardTable = M_Style.AbilityCardTable.LoadSynchronous();
+	M_AbilityRichTextStyle = M_Style.AbilityRichTextStyle.LoadSynchronous();
+	M_WeaponCardTable = M_Style.WeaponCardTable.LoadSynchronous();
+	(void)GetIsValidAbilityCardTable();
+	if (not IsValid(M_AbilityRichTextStyle))
+	{
+		RTSFunctionLibrary::ReportError("The unit variant screen has no AbilityRichTextStyle in M_Style; ability "
+			"descriptions show their style tags as plain text.\nAt function: UW_UnitVariantSelectionMenu::LoadAbilityTables");
+	}
+	if (GetIsValidDetailPanel())
+	{
+		M_DetailPanel->SetupPanel(M_Style, M_AbilityRichTextStyle, M_WeaponCardTable);
+	}
+}
+
+void UW_UnitVariantSelectionMenu::LoadVariantAbilities(const FTrainingOption& Unit)
+{
+	M_VariantAbilityCards.Reset();
+	if (M_AbilityClassLoadHandle.IsValid())
+	{
+		M_AbilityClassLoadHandle->CancelHandle();
+		M_AbilityClassLoadHandle.Reset();
+	}
+	RefreshAbilityPanel();
+	if (not GetIsValidFactionPlayerController() || not GetIsValidVariantDataAsset())
+	{
+		return;
+	}
+	TArray<FSoftObjectPath> ClassPaths;
+	const int32 VariantCount = M_VariantDataAsset->GetImplementedVariantCount(Unit);
+	for (int32 VariantIndex = 0; VariantIndex < VariantCount; ++VariantIndex)
+	{
+		const TSoftClassPtr<AActor> VariantClass = M_FactionPlayerController->GetUnitVariantClass(
+			Unit, static_cast<EUnitVariant>(VariantIndex));
+		if (not VariantClass.IsNull())
+		{
+			ClassPaths.AddUnique(VariantClass.ToSoftObjectPath());
+		}
+	}
+	if (ClassPaths.IsEmpty())
+	{
+		ResolveVariantAbilities();
+		return;
+	}
+	const int32 RequestedUnitIndex = M_SelectedUnitIndex;
+	M_AbilityClassLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+		ClassPaths, FStreamableDelegate::CreateWeakLambda(this, [this, RequestedUnitIndex]()
+		{
+			if (M_SelectedUnitIndex == RequestedUnitIndex)
+			{
+				ResolveVariantAbilities();
+			}
+		}));
+}
+
+void UW_UnitVariantSelectionMenu::ResolveVariantAbilities()
+{
+	if (not M_Units.IsValidIndex(M_SelectedUnitIndex) || not GetIsValidFactionPlayerController()
+		|| not GetIsValidAbilityCardTable())
+	{
+		return;
+	}
+	const FTrainingOption& Unit = M_Units[M_SelectedUnitIndex];
+	for (UW_UnitVariantCard* const Card : M_Cards)
+	{
+		if (not IsValid(Card))
+		{
+			continue;
+		}
+		const EUnitVariant Variant = Card->GetVariant();
+		const UClass* const VariantClass = M_FactionPlayerController->GetUnitVariantClass(Unit, Variant).Get();
+		const FUnitVariantAbilityCardList& AbilityCards = M_VariantAbilityCards.Add(
+			Variant, UnitVariantAbilityCards::MakeAbilityCards(VariantClass, M_AbilityCardTable));
+		Card->SetAbilityIcons(AbilityCards.Cards);
+		UE_LOG(LogRTSUnitVariantSelection, Display, TEXT("RTS_VARIANT_ABILITIES unit=%s variant=%s class=%s abilities=%d"),
+		       *GetUnitName(Unit).ToString(), *UEnum::GetValueAsString(Variant), *GetNameSafe(VariantClass),
+		       AbilityCards.Cards.Num());
+	}
+	RefreshAbilityPanel();
+	ProbeVariantsOfSelectedUnit();
+}
+
+void UW_UnitVariantSelectionMenu::NativeDestruct()
+{
+	if (IsValid(M_Probes))
+	{
+		M_Probes->CancelProbes();
+	}
+	Super::NativeDestruct();
+}
+
+void UW_UnitVariantSelectionMenu::ProbeVariantsOfSelectedUnit()
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(M_Probes) || not IsValid(World) || not M_Units.IsValidIndex(M_SelectedUnitIndex)
+		|| not GetIsValidFactionPlayerController())
+	{
+		return;
+	}
+	TArray<UClass*> VariantClasses;
+	for (const UW_UnitVariantCard* const Card : M_Cards)
+	{
+		if (IsValid(Card))
+		{
+			VariantClasses.Add(M_FactionPlayerController->GetUnitVariantClass(
+				M_Units[M_SelectedUnitIndex], Card->GetVariant()).Get());
+		}
+	}
+	const int32 ProbedUnitIndex = M_SelectedUnitIndex;
+	TWeakObjectPtr<UW_UnitVariantSelectionMenu> WeakThis(this);
+	M_Probes->ProbeClasses(*World, VariantClasses, [WeakThis, ProbedUnitIndex]()
+	{
+		if (WeakThis.IsValid())
+		{
+			WeakThis->HandleVariantProbesRead(ProbedUnitIndex);
+		}
+	});
+}
+
+void UW_UnitVariantSelectionMenu::HandleVariantProbesRead(const int32 ProbedUnitIndex)
+{
+	if (ProbedUnitIndex != M_SelectedUnitIndex || not M_Units.IsValidIndex(ProbedUnitIndex)
+		|| not GetIsValidFactionPlayerController())
+	{
+		return;
+	}
+	const FTrainingOption& Unit = M_Units[ProbedUnitIndex];
+	for (const UW_UnitVariantCard* const Card : M_Cards)
+	{
+		const UClass* const VariantClass = IsValid(Card)
+			                                   ? M_FactionPlayerController->GetUnitVariantClass(Unit, Card->GetVariant()).Get()
+			                                   : nullptr;
+		const FUnitVariantProbeResult* const Result = M_Probes->FindResult(VariantClass);
+		if (Result == nullptr)
+		{
+			continue;
+		}
+		FString WeaponList;
+		for (const FUnitVariantWeaponStats& Weapon : Result->Weapons)
+		{
+			WeaponList += FString::Printf(TEXT("%s x%d (dmg %.0f pen %.0f reload %.1f range %.0f mag %d); "),
+			                              *Weapon.WeaponRowName.ToString(), Weapon.Count, Weapon.Damage, Weapon.ArmorPen,
+			                              Weapon.ReloadSeconds, Weapon.RangeMeters, Weapon.MagCapacity);
+		}
+		UE_LOG(LogRTSUnitVariantSelection, Display, TEXT("RTS_VARIANT_PROBE unit=%s variant=%s health=%.0f speed=%.2f weapons=%s"),
+		       *GetUnitName(Unit).ToString(), *UEnum::GetValueAsString(Card->GetVariant()), Result->MaxHealth,
+		       Result->MaxSpeedMultiplier, *WeaponList);
+	}
+	RefreshAbilityPanel();
+}
+
+const FUnitVariantProbeResult* UW_UnitVariantSelectionMenu::FindVariantProbe(const FTrainingOption& Unit,
+                                                                            const EUnitVariant Variant) const
+{
+	if (not IsValid(M_Probes) || not GetIsValidFactionPlayerController())
+	{
+		return nullptr;
+	}
+	return M_Probes->FindResult(M_FactionPlayerController->GetUnitVariantClass(Unit, Variant).Get());
+}
+
+EUnitVariant UW_UnitVariantSelectionMenu::GetAbilityPanelVariant() const
+{
+	if (bM_HasHoveredVariant)
+	{
+		return M_HoveredVariant;
+	}
+	if (not M_Units.IsValidIndex(M_SelectedUnitIndex))
+	{
+		return EUnitVariant::Base;
+	}
+	return GetChosenVariant(M_Units[M_SelectedUnitIndex]);
+}
+
+void UW_UnitVariantSelectionMenu::RefreshAbilityPanel()
+{
+	if (not GetIsValidDetailPanel())
+	{
+		return;
+	}
+	const EUnitVariant ShownVariant = GetAbilityPanelVariant();
+	const FUnitVariantAbilityCardList* const AbilityCards = M_VariantAbilityCards.Find(ShownVariant);
+	if (AbilityCards == nullptr || not M_Units.IsValidIndex(M_SelectedUnitIndex))
+	{
+		M_DetailPanel->HidePanel();
+		return;
+	}
+	const FTrainingOption& Unit = M_Units[M_SelectedUnitIndex];
+	FUnitVariantDetailContent Content;
+	Content.VariantName = GetVariantName(Unit, ShownVariant);
+	Content.AbilityCards = &AbilityCards->Cards;
+	Content.Probe = FindVariantProbe(Unit, ShownVariant);
+	// Base is the reference the variants are compared with; showing Base itself tags nothing.
+	if (ShownVariant != EUnitVariant::Base)
+	{
+		const FUnitVariantAbilityCardList* const BaseAbilityCards = M_VariantAbilityCards.Find(EUnitVariant::Base);
+		Content.BaseAbilityCards = BaseAbilityCards != nullptr ? &BaseAbilityCards->Cards : nullptr;
+		Content.BaseProbe = FindVariantProbe(Unit, EUnitVariant::Base);
+	}
+	M_DetailPanel->ShowVariant(Content);
 }
 
 void UW_UnitVariantSelectionMenu::RefreshCardSelection()
@@ -452,6 +907,7 @@ void UW_UnitVariantSelectionMenu::RefreshEntryChosenVariant(const int32 EntryInd
 	M_UnitEntries[EntryIndex]->SetChosenVariantName(ChosenVariant == EUnitVariant::Base
 		                                                ? FText::GetEmpty()
 		                                                : UEnum::GetDisplayValueAsText(ChosenVariant));
+	M_UnitEntries[EntryIndex]->SetHasUnconfirmedChange(GetHasUnconfirmedChange(Unit));
 }
 
 void UW_UnitVariantSelectionMenu::RequestPreviewOfSelectedUnit() const
@@ -562,11 +1018,13 @@ void UW_UnitVariantSelectionMenu::OnConfirmClicked()
 
 void UW_UnitVariantSelectionMenu::OnBackClicked()
 {
-	if (not GetIsValidFactionPlayerController())
+	const int32 ChangeCount = GetUnconfirmedChangeCount();
+	if (ChangeCount > 0 && GetIsValidDiscardDialog())
 	{
+		M_DiscardDialog->ShowDialog(ChangeCount);
 		return;
 	}
-	M_FactionPlayerController->HandleUnitVariantSelectionBack();
+	HandleDiscardDialogChoice(true);
 }
 
 bool UW_UnitVariantSelectionMenu::GetIsValidFactionPlayerController() const
@@ -608,5 +1066,60 @@ bool UW_UnitVariantSelectionMenu::GetIsValidCardColumn() const
 		return true;
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_CardColumn", "GetIsValidCardColumn", this);
+	return false;
+}
+
+bool UW_UnitVariantSelectionMenu::GetIsValidCardScrollBox() const
+{
+	if (IsValid(M_CardScrollBox))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_CardScrollBox", "GetIsValidCardScrollBox",
+	                                                             this);
+	return false;
+}
+
+bool UW_UnitVariantSelectionMenu::GetIsValidDetailPanel() const
+{
+	if (IsValid(M_DetailPanel))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_DetailPanel", "GetIsValidDetailPanel", this);
+	return false;
+}
+
+bool UW_UnitVariantSelectionMenu::GetIsValidAbilityCardTable() const
+{
+	if (IsValid(M_AbilityCardTable))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_AbilityCardTable",
+	                                                             "GetIsValidAbilityCardTable", this);
+	return false;
+}
+
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
+bool UW_UnitVariantSelectionMenu::Debug_GetIsDiscardDialogOpen() const
+{
+	return IsValid(M_DiscardDialog) && M_DiscardDialog->GetIsOpen();
+}
+
+EUnitVariant UW_UnitVariantSelectionMenu::Debug_GetChosenVariantOfSelectedUnit() const
+{
+	return M_Units.IsValidIndex(M_SelectedUnitIndex) ? GetChosenVariant(M_Units[M_SelectedUnitIndex]) : EUnitVariant::Base;
+}
+#endif
+
+bool UW_UnitVariantSelectionMenu::GetIsValidDiscardDialog() const
+{
+	if (IsValid(M_DiscardDialog))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_DiscardDialog", "GetIsValidDiscardDialog",
+	                                                             this);
 	return false;
 }
