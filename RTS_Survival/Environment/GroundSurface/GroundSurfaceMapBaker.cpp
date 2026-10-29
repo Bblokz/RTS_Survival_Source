@@ -23,6 +23,8 @@
 #include "LandscapeLayerInfoObject.h"
 #include "Engine/StaticMesh.h"
 #include "Misc/FileHelper.h"
+#include "NiagaraSystem.h"
+#include "NiagaraTypes.h"
 #include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
@@ -535,6 +537,35 @@ namespace GroundSurfaceMapBaker
 		const bool bIsSaved = UEditorLoadingAndSavingUtils::SavePackages({SurfaceMap->GetOutermost()}, false);
 		LogBakeResult(Context, *SurfaceMap, MapName, bIsSaved, MapPath);
 	}
+
+	// The track smoke system's default look must be the old tan: vehicles whose code never writes it (or an editor on
+	// an older DLL) would otherwise draw black or invisible smoke.
+	void LogTrackSmokeDefaultLook()
+	{
+		const TCHAR* const SystemPath =
+			TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/TrackSmoke/NS_Track_Smokes.NS_Track_Smokes");
+		const UNiagaraSystem* System = LoadObject<UNiagaraSystem>(nullptr, SystemPath);
+		if (System == nullptr)
+		{
+			UE_LOG(LogRTSSurfaceMapBake, Error, TEXT("RTS_SMOKE_DEFAULT RESULT FAIL cannot load %s"), SystemPath);
+			return;
+		}
+		const FNiagaraVariable LookVariable(FNiagaraTypeDefinition::GetVec4Def(), TEXT("User.SmokeSurfaceLook"));
+		const int32 Offset = System->GetExposedParameters().IndexOf(LookVariable);
+		if (Offset == INDEX_NONE)
+		{
+			UE_LOG(LogRTSSurfaceMapBake, Error, TEXT("RTS_SMOKE_DEFAULT RESULT FAIL no Vector4 User.SmokeSurfaceLook"));
+			return;
+		}
+		const FVector4f DefaultLook = System->GetExposedParameters().GetParameterValue<FVector4f>(LookVariable);
+		UE_LOG(LogRTSSurfaceMapBake, Display, TEXT("RTS_SMOKE_DEFAULT RESULT DONE User.SmokeSurfaceLook=(%.3f %.3f %.3f %.3f)"),
+		       DefaultLook.X, DefaultLook.Y, DefaultLook.Z, DefaultLook.W);
+	}
+
+	FAutoConsoleCommand LogTrackSmokeDefaultCommand(
+		TEXT("RTS.GroundSurface.LogSmokeDefault"),
+		TEXT("Logs the default User.SmokeSurfaceLook of NS_Track_Smokes (should be the old tan, alpha 1)."),
+		FConsoleCommandDelegate::CreateStatic(&LogTrackSmokeDefaultLook));
 
 	FAutoConsoleCommand BakeSurfaceMapCommand(
 		TEXT("RTS.GroundSurface.BakeSurfaceMap"),

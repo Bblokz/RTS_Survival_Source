@@ -62,6 +62,7 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 		ETankSubtype::Tank_SU_85,
 		ETankSubtype::Tank_SU_85_L,
 		ETankSubtype::Tank_SU_122,
+		ETankSubtype::Tank_BM13,
 		ETankSubtype::Tank_T28,
 		ETankSubtype::Tank_T28F,
 		ETankSubtype::Tank_KV_1,

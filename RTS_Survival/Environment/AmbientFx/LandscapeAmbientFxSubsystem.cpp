@@ -118,7 +118,8 @@ void ULandscapeAmbientFxSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 	M_Random.Initialize(static_cast<int32>(FPlatformTime::Cycles()));
-	M_SecondsUntilSpawn = M_Random.FRandRange(0.f, Settings->SpawnInterval.Max);
+	UpdateMaxDustDevils(*Settings);
+	M_SecondsUntilSpawn = M_Random.FRandRange(0.f, M_SpawnInterval.Max);
 	M_PublishedPositionAndScale.SetNumZeroed(MaxDustDevilSlots);
 	M_PublishedMotion.SetNumZeroed(MaxDustDevilSlots);
 	M_PublishedAliveSlots.Reserve(MaxDustDevilSlots);
@@ -410,12 +411,15 @@ void ULandscapeAmbientFxSubsystem::UpdateMaxDustDevils(const URTSAmbientFxSettin
 	{
 	case AmbientFxPrivate::LevelLow:
 		M_MaxDustDevils = Settings.MaxDustDevilsLow;
+		M_SpawnInterval = Settings.SpawnIntervalLow;
 		break;
 	case AmbientFxPrivate::LevelMedium:
 		M_MaxDustDevils = Settings.MaxDustDevilsMedium;
+		M_SpawnInterval = Settings.SpawnIntervalMedium;
 		break;
 	case AmbientFxPrivate::LevelMaximum:
 		M_MaxDustDevils = Settings.MaxDustDevilsMaximum;
+		M_SpawnInterval = Settings.SpawnIntervalMaximum;
 		break;
 	default:
 		M_MaxDustDevils = 0;
@@ -536,7 +540,7 @@ void ULandscapeAmbientFxSubsystem::TrySpawnDustDevil(const float DeltaTime, cons
 		return;
 	}
 	const bool bIsInstant = AmbientFxPrivate::CVarAmbientFxInstant.GetValueOnGameThread() != 0;
-	M_SecondsUntilSpawn = bIsInstant ? 0.f : M_Random.FRandRange(Settings.SpawnInterval.Min, Settings.SpawnInterval.Max);
+	M_SecondsUntilSpawn = bIsInstant ? 0.f : M_Random.FRandRange(M_SpawnInterval.Min, M_SpawnInterval.Max);
 	int32 FreeSlot = INDEX_NONE;
 	int32 AliveCount = 0;
 	for (int32 SlotIndex = 0; SlotIndex < MaxDustDevilSlots; ++SlotIndex)

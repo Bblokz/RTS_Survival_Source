@@ -92,6 +92,8 @@ private:
 	float M_SecondsUntilStatusLog = 0.f;
 	int32 M_NextGroundTraceSlot = 0;
 	int32 M_MaxDustDevils = 0;
+	// Seconds between new devils at the current graphics setting; read with the count from rts.AmbientFx.
+	FFloatInterval M_SpawnInterval = FFloatInterval(20.f, 35.f);
 	bool bM_HasCameraFocus = false;
 	bool bM_IsReady = false;
 	bool bM_WasPublishingLastTick = false;
@@ -115,7 +117,7 @@ private:
 	void BeginPlay_ReadEmitterSpawnRates(const UNiagaraSystem& System);
 	static bool GetIsMapExcluded(const UWorld& InWorld, const URTSAmbientFxSettings& Settings);
 
-	// Reads rts.AmbientFx and turns it into the number of devils that may be alive.
+	// Reads rts.AmbientFx and turns it into the number of devils that may be alive and how often a new one starts.
 	void UpdateMaxDustDevils(const URTSAmbientFxSettings& Settings);
 	void UpdateCameraFocus(float DeltaTime);
 	void UpdateDustDevils(float DeltaTime, const URTSAmbientFxSettings& Settings);

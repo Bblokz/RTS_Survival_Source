@@ -34,7 +34,7 @@ public:
 	UPROPERTY(EditAnywhere, Config, Category="Dust Devils")
 	TSoftObjectPtr<UNiagaraSystem> DustDevilNiagaraSystem;
 
-	// Dust devils alive at the same time around the camera, per graphics setting (Low, Medium, Maximum).
+	// Most dust devils alive at the same time around the camera, per graphics setting (Low, Medium, Maximum).
 	UPROPERTY(EditAnywhere, Config, Category="Dust Devils", meta=(ClampMin="0", ClampMax="16"))
 	int32 MaxDustDevilsLow = 1;
 
@@ -53,9 +53,19 @@ public:
 	UPROPERTY(EditAnywhere, Config, Category="Dust Devils", meta=(ClampMin="1000"))
 	float DespawnRadius = 10000.f;
 
-	// Seconds between two new dust devils while fewer than the maximum are alive.
+	/**
+	 * Seconds between two new dust devils, per graphics setting (Low, Medium, Maximum); this sets how often devils
+	 * appear. With a devil living about 37 s, on average Low has 0.2, Medium 0.7 and Maximum 1.4 devils alive; the
+	 * counts above only cap a lucky streak.
+	 */
 	UPROPERTY(EditAnywhere, Config, Category="Dust Devils", meta=(ClampMin="0.1"))
-	FFloatInterval SpawnInterval = FFloatInterval(2.f, 6.f);
+	FFloatInterval SpawnIntervalLow = FFloatInterval(120.f, 210.f);
+
+	UPROPERTY(EditAnywhere, Config, Category="Dust Devils", meta=(ClampMin="0.1"))
+	FFloatInterval SpawnIntervalMedium = FFloatInterval(40.f, 70.f);
+
+	UPROPERTY(EditAnywhere, Config, Category="Dust Devils", meta=(ClampMin="0.1"))
+	FFloatInterval SpawnIntervalMaximum = FFloatInterval(20.f, 35.f);
 
 	// How long one dust devil lives, in seconds.
 	UPROPERTY(EditAnywhere, Config, Category="Dust Devils", meta=(ClampMin="5"))
