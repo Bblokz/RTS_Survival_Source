@@ -136,13 +136,13 @@ collections. Rebuild after an aircraft mesh changes. Lessons:
   - `-AntiAirValidate`: the Bofors bunker, 37 mm and 88 mm flak, Flak 37 pit, flak bunker, Panzer III AA, T-34 AA
     and the towed Flak 37 and Flak 88 squads must target, fire at and damage an enemy aircraft circling over them,
     then turn on an enemy tank. Optional `-AntiAirUnit=<label>`.
-  - `-AircraftDeathValidate`: shoots down a Bf 109, Ju 87, Sturmovik, Me 410, Pe-2, Pe-8, Ju 390, both drop ships and
+  - `-AircraftDeathValidate`: shoots down a Bf 109, Ju 87, Sturmovik, Me 410, Pe-2, Pe-8, Ju 390, Ho 229, both drop ships and
     the VTOL shuttle in flight, a Bf 109 parked on a field and a Bf 109 parked in a bay of an unpacked German airbase
     (`Ger_Airbase_Truck`, placed the way a trained aircraft is); checks dead-not-destroyed, out of the target lists,
     fire on the right engine, the fall starting with the speed it had and carrying it on, impact on the ground, the
     breakup, the fire ending, the actor being cleared, a parked aircraft's pieces staying within its own size, and in
     the airbase every piece staying inside the building and above the ground under it (203 checks; the aircraft are
-    spread over rows of six so all twelve land on the test map). `-AircraftDeathOnly=<label>`,
+    spread over rows of six so all fourteen land on the test map; a Ho 229 parked on a field is the fourteenth). `-AircraftDeathOnly=<label>`,
     `-AircraftDeathCapture=<folder>` for pictures, and `-AircraftDeath<Fire|Smoke|Explosion|GroundFire>Vfx=<path|none>`
     / `...Params="Name:Value|Name:X,Y,Z|@Scale:S"` / `-AircraftDeathDumpVfxParams` to try other effects.
 

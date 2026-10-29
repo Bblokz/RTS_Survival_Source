@@ -18,6 +18,7 @@
 #include "RTS_Survival/Units/Tanks/TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "RTS_Survival/Units/Tanks/VehicleAvoidance/RTSVehicleAvoidanceSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 namespace EnemyFormationVehicles
 {
@@ -1949,7 +1950,7 @@ void UEnemyFormationController::OnUnitReachedFWaypoint(TWeakInterfacePtr<IComman
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
 	ShippingTest_RecordUnitWaypointArrival(FormationID);
 #endif
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 	OnFormationUnitReachedWaypointForTest.Broadcast(Unit->GetOwnerActor(), UnitInFormation->M_WaypointDestination,
 	                                                FormationID);
 #endif
