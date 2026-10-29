@@ -603,11 +603,16 @@ void UAttachedWeaponAbilityComponent::AddAbilityToCommands()
 		return;
 	}
 
+	M_OwnerCommandsInterface->AddAbility(MakeAbilityEntry(), M_AttachedWeaponAbilitySettings.PreferredAbilityIndex);
+}
+
+FUnitAbilityEntry UAttachedWeaponAbilityComponent::MakeAbilityEntry() const
+{
 	FUnitAbilityEntry AbilityEntry;
 	AbilityEntry.AbilityId = EAbilityID::IdAttachedWeapon;
 	AbilityEntry.CustomType = static_cast<int32>(M_AttachedWeaponAbilitySettings.WeaponAbilityType);
 	AbilityEntry.CooldownDuration = M_AttachedWeaponAbilitySettings.Cooldown;
-	M_OwnerCommandsInterface->AddAbility(AbilityEntry, M_AttachedWeaponAbilitySettings.PreferredAbilityIndex);
+	return AbilityEntry;
 }
 
 bool UAttachedWeaponAbilityComponent::GetIsValidOwnerCommandsInterface() const

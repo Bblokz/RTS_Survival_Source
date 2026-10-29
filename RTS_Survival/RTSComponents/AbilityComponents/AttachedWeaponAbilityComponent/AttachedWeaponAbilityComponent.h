@@ -126,6 +126,8 @@ public:
 	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
 
 	EAttachWeaponAbilitySubType GetAttachedWeaponAbilityType() const;
+	// The entry this component adds to the command card; the unit variant screen reads it from Blueprint templates.
+	FUnitAbilityEntry MakeAbilityEntry() const;
 	EPlayerAimAbilityTypes GetAimAssistType() const;
 	float GetAttachedWeaponAbilityRange() const;
 	float GetAttachedWeaponAbilityRadius() const;

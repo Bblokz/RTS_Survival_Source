@@ -21,6 +21,7 @@ class UStaticMeshComponent;
 class UInstancedStaticMeshComponent;
 class UMeshComponent;
 struct FStreamableHandle;
+struct FUnitAbilityEntry;
 
 // Find the mesh to attach to based on the socket name or use SetupMeshManually.
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -34,6 +35,9 @@ public:
 	// Triggered if unit goes to other command before finishing fire.
 	void TerminateFireAllRockets();
 	void CancelFireRockets();
+	// The fire-rockets entry of RocketAbilityType (IdNoAbility while it is None); the unit variant screen reads it
+	// from Blueprint templates.
+	FUnitAbilityEntry MakeAbilityEntry() const;
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Constructor")
 	void SetupMeshManually(UStaticMeshComponent* MeshComp);

@@ -313,6 +313,15 @@ void UAttachedRockets::BeginPlay_AddAbility()
 	World->GetTimerManager().SetTimerForNextTick(NextTickDelegate);
 }
 
+FUnitAbilityEntry UAttachedRockets::MakeAbilityEntry() const
+{
+	if (RocketAbilityType == ERocketAbility::None)
+	{
+		return FUnitAbilityEntry();
+	}
+	return FAbilityHelpers::GetRocketAbilityForRocketType(RocketAbilityType);
+}
+
 void UAttachedRockets::AddAbilityToCommands() const
 {
 	if (not EnsureOwnerIsValid())

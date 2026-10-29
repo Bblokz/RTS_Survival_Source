@@ -206,10 +206,15 @@ void UModeAbilityComponent::AddAbilityToCommands()
 		return;
 	}
 
+	M_OwnerCommandsInterface->AddAbility(MakeAbilityEntry(), ModeAbilitySettings.PreferredAbilityIndex);
+}
+
+FUnitAbilityEntry UModeAbilityComponent::MakeAbilityEntry() const
+{
 	FUnitAbilityEntry NewAbility;
 	NewAbility.AbilityId = EAbilityID::IdActivateMode;
 	NewAbility.CustomType = static_cast<int32>(ModeAbilitySettings.ModeType);
-	M_OwnerCommandsInterface->AddAbility(NewAbility, ModeAbilitySettings.PreferredAbilityIndex);
+	return NewAbility;
 }
 
 void UModeAbilityComponent::ClearAutoDeactivateTimer()
