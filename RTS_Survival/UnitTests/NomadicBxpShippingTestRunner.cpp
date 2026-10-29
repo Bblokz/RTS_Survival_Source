@@ -32,6 +32,9 @@
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
+#include "RTS_Survival/Units/Variants/UnitVariantDataAsset.h"
+#include "RTS_Survival/Units/Variants/UnitVariantSettings.h"
+#include "RTS_Survival/Units/Variants/UnitVariantTypes.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Stats/Stats.h"
 #include "Tickable.h"
@@ -781,6 +784,8 @@ private:
 	UWorld* GetWorld() const;
 	void FinishRun();
 	void GatherScenarios();
+	// -RTSNomadicBxpVariant=A|B|C: selects that variant for every expansion that has it; only those are tested.
+	bool ApplyBxpVariantRun();
 	void StartUnitAbilityStress();
 	void ResumeStartGameFlowIfPaused() const;
 	void GivePlayerTestResources() const;
@@ -855,6 +860,9 @@ private:
 	FString M_RunReason;
 	FString M_NameFilter;
 	TArray<FString> M_ExcludeNameFilters;
+	// Expansion types whose variant this run selected; empty outside a variant run.
+	TSet<EBuildingExpansionType> M_VariantBxpTypes;
+	bool bM_IsVariantRun = false;
 	int32 M_CurrentScenarioIndex = INDEX_NONE;
 	int32 M_PassedScenarioCount = 0;
 	int32 M_FailedScenarioCount = 0;
@@ -1217,6 +1225,7 @@ void FRTSNomadicBxpShippingTestRunner::GatherScenarios()
 {
 	ResumeStartGameFlowIfPaused();
 	GivePlayerTestResources();
+	bM_IsVariantRun = ApplyBxpVariantRun();
 
 	for (TActorIterator<ANomadicVehicle> NomadicIterator(GetWorld()); NomadicIterator; ++NomadicIterator)
 	{
@@ -1239,6 +1248,15 @@ void FRTSNomadicBxpShippingTestRunner::GatherScenarios()
 			{
 				continue;
 			}
+			if (bM_IsVariantRun)
+			{
+				if (M_VariantBxpTypes.Contains(Option.ExpansionType))
+				{
+					AddScenario(*Nomadic, Option, ENomadicBxpShippingScenarioType::BuildPackAndRebuild);
+					AddScenario(*Nomadic, Option, ENomadicBxpShippingScenarioType::BuildAndDestroyCleanly);
+				}
+				continue;
+			}
 
 			AddScenario(*Nomadic, Option, ENomadicBxpShippingScenarioType::CancelDuringAsyncLoad);
 			AddScenario(*Nomadic, Option, ENomadicBxpShippingScenarioType::CancelAsyncThenBuildAgain);
@@ -1255,6 +1273,43 @@ void FRTSNomadicBxpShippingTestRunner::GatherScenarios()
 	UE_LOG(LogRTSNomadicBxpShippingTests, Display,
 	       TEXT("RTS_NOMADIC_BXP_TEST_SCENARIOS gathered=%d"),
 	       M_Scenarios.Num());
+}
+
+bool FRTSNomadicBxpShippingTestRunner::ApplyBxpVariantRun()
+{
+	FString VariantText;
+	if (not FParse::Value(FCommandLine::Get(), TEXT("RTSNomadicBxpVariant="), VariantText))
+	{
+		return false;
+	}
+	const EUnitVariant Variant = VariantText == TEXT("C") ? EUnitVariant::VariantC
+		                             : VariantText == TEXT("B") ? EUnitVariant::VariantB
+		                             : EUnitVariant::VariantA;
+	const UUnitVariantDataAsset* VariantDataAsset = UUnitVariantSettings::Get()->LoadVariantDataAsset();
+	ARTSAsyncSpawner* Spawner = FRTS_Statics::GetAsyncSpawner(GetWorld());
+	if (not IsValid(VariantDataAsset) || not IsValid(Spawner))
+	{
+		UE_LOG(LogRTSNomadicBxpShippingTests, Error, TEXT("RTS_NOMADIC_BXP_VARIANT no variant asset or spawner"));
+		return true;
+	}
+	for (const FTrainingOption& Unit : VariantDataAsset->GetUnitsWithChoice())
+	{
+		if (Unit.UnitType != EAllUnitType::UNType_BuildingExpansion
+			|| not VariantDataAsset->GetIsVariantImplemented(Unit, Variant))
+		{
+			continue;
+		}
+		const bool bApplied = Spawner->SetPlayerUnitVariant(*VariantDataAsset, Unit, Variant);
+		const EBuildingExpansionType BxpType = static_cast<EBuildingExpansionType>(Unit.SubtypeValue);
+		UE_LOG(LogRTSNomadicBxpShippingTests, Display, TEXT("RTS_NOMADIC_BXP_VARIANT type=%s variant=%s applied=%d class=%s"),
+		       *UEnum::GetValueAsString(BxpType), *VariantText, bApplied ? 1 : 0,
+		       *VariantDataAsset->FindVariantClass(Unit, Variant).ToString());
+		if (bApplied)
+		{
+			M_VariantBxpTypes.Add(BxpType);
+		}
+	}
+	return true;
 }
 
 void FRTSNomadicBxpShippingTestRunner::ResumeStartGameFlowIfPaused() const
@@ -1473,6 +1528,8 @@ void FRTSNomadicBxpShippingTestRunner::AdvanceWaitForBxpSpawn(FNomadicBxpShippin
 	if (IsValid(SpawnedBxp))
 	{
 		Scenario.Bxp = SpawnedBxp;
+		UE_LOG(LogRTSNomadicBxpShippingTests, Display, TEXT("RTS_NOMADIC_BXP_SPAWNED name=%s bxp_class=%s"),
+		       *Scenario.Name, *SpawnedBxp->GetClass()->GetName());
 		if (Scenario.Type == ENomadicBxpShippingScenarioType::CancelBeforePlacement)
 		{
 			TScriptInterface<IBuildingExpansionOwner> Owner;
@@ -2231,9 +2288,10 @@ void FRTSNomadicBxpShippingTestRunner::LogScenarioSuccess(FNomadicBxpShippingSce
 {
 	M_PassedScenarioCount++;
 	UE_LOG(LogRTSNomadicBxpShippingTests, Display,
-	       TEXT("RTS_NOMADIC_BXP_SCENARIO_PASS index=%d name=%s"),
+	       TEXT("RTS_NOMADIC_BXP_SCENARIO_PASS index=%d name=%s bxp_class=%s"),
 	       M_CurrentScenarioIndex,
-	       *Scenario.Name);
+	       *Scenario.Name,
+	       Scenario.Bxp.IsValid() ? *Scenario.Bxp->GetClass()->GetName() : TEXT("-"));
 
 	CleanupScenario(Scenario);
 	Scenario.Stage = ENomadicBxpShippingScenarioStage::Done;

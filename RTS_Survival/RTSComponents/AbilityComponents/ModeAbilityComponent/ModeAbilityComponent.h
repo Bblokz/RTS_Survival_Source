@@ -12,6 +12,7 @@ class ASquadController;
 class ICommands;
 class UBehaviour;
 class UBehaviourComp;
+struct FUnitAbilityEntry;
 
 USTRUCT(BlueprintType)
 struct FModeAbilitySettings
@@ -52,6 +53,8 @@ public:
 	void DeactivateMode();
 	bool GetIsModeActive() const;
 	EModeAbilityType GetModeAbilityType() const;
+	// The entry this component adds to the command card; the unit variant screen reads it from Blueprint templates.
+	FUnitAbilityEntry MakeAbilityEntry() const;
 
 	/**
 	 * @brief For components created at runtime (e.g. by a technology) instead of authored on a Blueprint.
