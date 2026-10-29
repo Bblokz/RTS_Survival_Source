@@ -183,15 +183,21 @@ void UApplyBehaviourAbilityComponent::AddAbilityToCommands()
 	{
 		return;
 	}
-	FUnitAbilityEntry NewAbility;
-	NewAbility.AbilityId = EAbilityID::IdApplyBehaviour;
-	NewAbility.CooldownDuration = BehaviourAbilitySettings.Cooldown;
-	NewAbility.CustomType = static_cast<int32>(BehaviourAbilitySettings.BehaviourAbility);
+	const FUnitAbilityEntry NewAbility = MakeAbilityEntry();
 	if (BehaviourAbilitySettings.bReplaceAbilityInPreferredSlot)
 	{
 		AddAbilityToCommands_FreePreferredSlot();
 	}
 	M_OwnerCommandsInterface->AddAbility(NewAbility, BehaviourAbilitySettings.PreferredAbilityIndex);
+}
+
+FUnitAbilityEntry UApplyBehaviourAbilityComponent::MakeAbilityEntry() const
+{
+	FUnitAbilityEntry NewAbility;
+	NewAbility.AbilityId = EAbilityID::IdApplyBehaviour;
+	NewAbility.CooldownDuration = BehaviourAbilitySettings.Cooldown;
+	NewAbility.CustomType = static_cast<int32>(BehaviourAbilitySettings.BehaviourAbility);
+	return NewAbility;
 }
 
 void UApplyBehaviourAbilityComponent::AddAbilityToCommands_FreePreferredSlot() const

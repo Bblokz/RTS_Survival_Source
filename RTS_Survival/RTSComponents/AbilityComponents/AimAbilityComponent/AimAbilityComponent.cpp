@@ -361,11 +361,16 @@ void UAimAbilityComponent::AddAbilityToCommands()
 	{
 		return;
 	}
+	M_OwnerCommandsInterface->AddAbility(MakeAbilityEntry(), M_AimAbilitySettings.PreferredAbilityIndex);
+}
+
+FUnitAbilityEntry UAimAbilityComponent::MakeAbilityEntry() const
+{
 	FUnitAbilityEntry AimAbilityEntry;
 	AimAbilityEntry.AbilityId = EAbilityID::IdAimAbility;
 	AimAbilityEntry.CustomType = static_cast<int32>(M_AimAbilitySettings.AimAbilityType);
 	AimAbilityEntry.CooldownDuration = M_AimAbilitySettings.Cooldown;
-	M_OwnerCommandsInterface->AddAbility(AimAbilityEntry, M_AimAbilitySettings.PreferredAbilityIndex);
+	return AimAbilityEntry;
 }
 
 void UAimAbilityComponent::AddAbilityToSquad(ASquadController* SquadController)

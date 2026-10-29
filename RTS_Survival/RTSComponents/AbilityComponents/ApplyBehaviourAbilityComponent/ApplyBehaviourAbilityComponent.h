@@ -12,6 +12,7 @@ class UBehaviour;
 class ICommands;
 class UBehaviourComp;
 enum class EBehaviourAbilityType : uint8;
+struct FUnitAbilityEntry;
 
 USTRUCT(BlueprintType)
 struct FApplyBehaviourAbilitySettings
@@ -63,6 +64,8 @@ public:
 	void TerminateBehaviourAbility() const;
 
 	EBehaviourAbilityType GetBehaviourAbilityType() const;
+	// The entry this component adds to the command card; the unit variant screen reads it from Blueprint templates.
+	FUnitAbilityEntry MakeAbilityEntry() const;
 
 protected:
 	virtual void PostInitProperties() override;

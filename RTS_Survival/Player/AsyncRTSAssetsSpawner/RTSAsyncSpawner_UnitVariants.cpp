@@ -50,6 +50,23 @@ TSoftClassPtr<AActor> ARTSAsyncSpawner::GetTrainingOptionClass(const FTrainingOp
 	return TSoftClassPtr<AActor>(MappedBxpClass->ToSoftObjectPath());
 }
 
+TSoftClassPtr<AActor> ARTSAsyncSpawner::GetBaseTrainingOptionClass(const FTrainingOption& TrainingOption) const
+{
+	if (const TSoftClassPtr<AActor>* const BaseClass = M_PreVariantTrainingOptionClasses.Find(TrainingOption))
+	{
+		return *BaseClass;
+	}
+	if (TrainingOption.UnitType == EAllUnitType::UNType_BuildingExpansion)
+	{
+		const EBuildingExpansionType BxpType = static_cast<EBuildingExpansionType>(TrainingOption.SubtypeValue);
+		if (const TSoftClassPtr<ABuildingExpansion>* const BaseBxpClass = M_PreVariantBuildingExpansionClasses.Find(BxpType))
+		{
+			return TSoftClassPtr<AActor>(BaseBxpClass->ToSoftObjectPath());
+		}
+	}
+	return GetTrainingOptionClass(TrainingOption);
+}
+
 bool ARTSAsyncSpawner::ApplyUnitVariant(const UUnitVariantDataAsset& VariantDataAsset, const FTrainingOption& Unit,
                                         const EUnitVariant Variant)
 {
