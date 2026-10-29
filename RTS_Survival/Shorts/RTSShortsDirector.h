@@ -95,6 +95,9 @@ struct FRTSShortsConvoyState
 	FVector LookOffset = FVector::ZeroVector;
 	int32 StartFrame = 0;
 	int32 SegmentFrames = 1;
+	// Crushable props laid in the vehicles' lanes; the ones still standing are removed when the convoy ends.
+	TArray<TWeakObjectPtr<AActor>> CrushProps;
+	int32 CrushedProps = 0;
 };
 
 /** Phases of one shorts run; the director advances through them in order. */
@@ -240,6 +243,8 @@ private:
 	/** Holds the convoy's turrets and moves the follow camera. */
 	void TickConvoy(const int32 Frame);
 	void EndConvoy();
+	// Lays Segment.CrushableDistances props in front of every convoy vehicle, sized to what its weight can crush.
+	void SpawnConvoyCrushProps(const FRTSShortsSegment& Segment);
 	/** Segment.StageActorName: the segment plays on its own stage actor; otherwise on the job's stage. */
 	void ApplySegmentStage(const int32 SegmentIndex);
 	/** Keeps the fog of war out, re-targets units whose target died, and ends the segment once one side is gone. */

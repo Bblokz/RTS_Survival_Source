@@ -573,6 +573,29 @@ struct FRTSShortsSegment
 	float ConvoyZoomOut = 1.35f;
 
 	/**
+	 * Convoy: crushable props laid in every vehicle's lane before it drives, this far ahead of its hull front (cm).
+	 * Empty lays none. Each vehicle gets props it can crush, picked by its nav agent weight from the lists below.
+	 */
+	UPROPERTY()
+	TArray<float> CrushableDistances;
+
+	/** Convoy: props for heavy tanks (crush rule HeavyTank or lighter). */
+	UPROPERTY()
+	TArray<FString> CrushableHeavyClassPaths;
+
+	/** Convoy: props for medium tanks (crush rule MediumOrHeavyTank or AnyTank). */
+	UPROPERTY()
+	TArray<FString> CrushableMediumClassPaths;
+
+	/** Convoy: props for light tanks and other vehicles (crush rule AnyTank). */
+	UPROPERTY()
+	TArray<FString> CrushableLightClassPaths;
+
+	/** Convoy: the props stand up to this far left or right of the lane's centre line (cm). */
+	UPROPERTY()
+	float CrushableLaneJitter = 60.f;
+
+	/**
 	 * Battle: further player units spawned in line abreast beside the segment's unit (BattleSpacing apart). Squads
 	 * may be mixed in here and in BattleEnemyClassPaths: the squad takes the orders, its soldiers are the targets.
 	 */

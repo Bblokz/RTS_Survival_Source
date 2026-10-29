@@ -35,6 +35,8 @@
 #include "Components/WidgetComponent.h"
 #include "NiagaraSystem.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/ApartmentDestruction/ApartmentDestructibleActor.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
+#include "RTS_Survival/Navigation/RTSNavAgents/IRTSNavAgent/IRTSNavAgent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Particles/ParticleSystem.h"
@@ -2864,8 +2866,92 @@ void ARTSShortsDirector::BeginConvoy(const int32 SegmentIndex, AActor* MainUnit)
 	M_Convoy.LookOffset = CameraLocation + View * RayLength - UnitLocation;
 	M_Convoy.StartFrame = GetTimelineFrame();
 	M_Convoy.SegmentFrames = FMath::Max(1, FMath::RoundToInt(Segment.SlotSeconds * M_Job.Fps));
-	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_BEGIN segment=%d vehicles=%d turrets=%d"), SegmentIndex,
-	       M_Convoy.Units.Num(), M_Convoy.TurretMeshes.Num());
+	SpawnConvoyCrushProps(Segment);
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_BEGIN segment=%d vehicles=%d turrets=%d props=%d"), SegmentIndex,
+	       M_Convoy.Units.Num(), M_Convoy.TurretMeshes.Num(), M_Convoy.CrushProps.Num());
+}
+
+void ARTSShortsDirector::SpawnConvoyCrushProps(const FRTSShortsSegment& Segment)
+{
+	if (Segment.CrushableDistances.Num() == 0 || not IsValid(M_Stage))
+	{
+		return;
+	}
+	const FVector Forward = M_Stage->GetActorForwardVector().GetSafeNormal2D();
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward);
+	// The same props in the same places every take.
+	FRandomStream Random(7919 + M_CurrentSegment);
+	for (int32 VehicleIndex = 0; VehicleIndex < M_Convoy.Units.Num(); ++VehicleIndex)
+	{
+		const AActor* Vehicle = M_Convoy.Units[VehicleIndex].Get();
+		if (not IsValid(Vehicle))
+		{
+			continue;
+		}
+		// The crush gate compares the vehicle's nav agent with the prop's rule, so pick by the same weight.
+		const IRTSNavAgentInterface* NavAgent = Cast<IRTSNavAgentInterface>(Vehicle);
+		const ERTSNavAgents Weight = NavAgent != nullptr ? NavAgent->GetRTSNavAgentType() : ERTSNavAgents::NONE;
+		const TArray<FString>& ClassPaths = Weight == ERTSNavAgents::HeavyTank
+			                                    ? Segment.CrushableHeavyClassPaths
+			                                    : Weight == ERTSNavAgents::MediumTank
+			                                    ? Segment.CrushableMediumClassPaths
+			                                    : Segment.CrushableLightClassPaths;
+		// A vehicle driving behind another one (convoy rows) would find its props already flattened.
+		const bool bLaneTaken = M_Convoy.Units.ContainsByPredicate([Vehicle, &Forward, &Right](const TWeakObjectPtr<AActor>& Other)
+		{
+			if (not Other.IsValid() || Other.Get() == Vehicle)
+			{
+				return false;
+			}
+			const FVector Offset = Other->GetActorLocation() - Vehicle->GetActorLocation();
+			return FVector::DotProduct(Offset, Forward) > 0.f && FMath::Abs(FVector::DotProduct(Offset, Right)) < 450.f;
+		});
+		if (ClassPaths.Num() == 0 || bLaneTaken)
+		{
+			continue;
+		}
+		FVector Origin;
+		FVector Extent;
+		Vehicle->GetActorBounds(true, Origin, Extent);
+		const float HalfLength = FMath::Abs(Extent.X * Forward.X) + FMath::Abs(Extent.Y * Forward.Y);
+		const FVector Front = FVector(Origin.X, Origin.Y, Vehicle->GetActorLocation().Z) + Forward * HalfLength;
+		for (int32 PropIndex = 0; PropIndex < Segment.CrushableDistances.Num(); ++PropIndex)
+		{
+			const FString& ClassPath = ClassPaths[(VehicleIndex + PropIndex) % ClassPaths.Num()];
+			UClass* PropClass = LoadClass<AActor>(nullptr, *ClassPath);
+			if (PropClass == nullptr)
+			{
+				UE_LOG(LogRTSShorts, Warning, TEXT("RTS_SHORTS_CRUSH_PROP missing class %s"), *ClassPath);
+				continue;
+			}
+			const float Side = Random.FRandRange(-Segment.CrushableLaneJitter, Segment.CrushableLaneJitter);
+			constexpr float SpawnLiftCm = 80.f;
+			const FVector Location = GetBattleGroundPoint(Front + Forward * Segment.CrushableDistances[PropIndex] + Right * Side)
+				- FVector(0.f, 0.f, SpawnLiftCm);
+			FActorSpawnParameters Params;
+			Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			// Across the lane, so the tracks roll over the prop instead of along it and the contact time holds.
+			const float Yaw = Forward.Rotation().Yaw + 90.f + Random.FRandRange(-25.f, 25.f);
+			AActor* Prop = GetWorld()->SpawnActor<AActor>(PropClass, FTransform(FRotator(0.f, Yaw, 0.f), Location), Params);
+			if (not IsValid(Prop))
+			{
+				continue;
+			}
+			M_Convoy.CrushProps.Add(Prop);
+			if (ADestructableEnvActor* Destructible = Cast<ADestructableEnvActor>(Prop))
+			{
+				const FString PropName = Prop->GetName();
+				Destructible->OnDestructableEnvActorDied.AddWeakLambda(this, [this, PropName]()
+				{
+					++M_Convoy.CrushedProps;
+					UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CRUSHED prop=%s frame=%d"), *PropName, GetTimelineFrame());
+				});
+			}
+			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CRUSH_PROP vehicle=%s weight=%s prop=%s ahead=%.0f at %s"),
+			       *Vehicle->GetName(), *Global_GetRTSNavAgentName(Weight), *Prop->GetName(),
+			       Segment.CrushableDistances[PropIndex], *Location.ToCompactString());
+		}
+	}
 }
 
 void ARTSShortsDirector::OrderConvoyDrive(const int32 SegmentIndex)
@@ -2939,7 +3025,16 @@ void ARTSShortsDirector::EndConvoy()
 	{
 		return;
 	}
-	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_END segment=%d"), M_CurrentSegment);
+	UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_CONVOY_END segment=%d props=%d crushed=%d"), M_CurrentSegment,
+	       M_Convoy.CrushProps.Num(), M_Convoy.CrushedProps);
+	// Props the convoy missed (and the crushed ones still collapsing) would stand in the next shot.
+	for (const TWeakObjectPtr<AActor>& Prop : M_Convoy.CrushProps)
+	{
+		if (AActor* Standing = Prop.Get())
+		{
+			Standing->Destroy();
+		}
+	}
 	// The segment's own unit is parked by EndSegment; the side vehicles leave the field.
 	for (int32 Index = 1; Index < M_Convoy.Units.Num(); ++Index)
 	{
