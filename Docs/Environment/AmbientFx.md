@@ -30,7 +30,7 @@ devils are alive, the cost is one Niagara component, one GPU simulation per emit
    - Rebake after repainting a map's landscape: `bash Source/Tools/AmbientFx/bake_sand_masks.sh [map...]`.
 2. **Only near the camera.** Every 0.5 s the camera's view ray is traced onto the landscape. New devils start on a
    random sand point within `SpawnRadius` (60 m; the RTS view is about 65 x 36 m) of that point, at least 25 m from the others, one every
-   `SpawnInterval` seconds while fewer than the allowed count are alive. A devil fades out at the end of its
+   `SpawnInterval<Level>` seconds while fewer than the allowed count are alive. A devil fades out at the end of its
    `Lifetime`, when it drifts off the sand, or when it is further than `DespawnRadius` from the camera focus.
 3. **The CPU side is tiny.** Each devil is a slot (max 16) with a ground point, scale, strength, seed, spin and drift
    heading. The subsystem moves them (drift plus a slow wander), traces the ground under one devil per tick, and
@@ -51,8 +51,16 @@ devils are alive, the cost is one Niagara component, one GPU simulation per emit
 ## The player setting
 
 `rts.AmbientFx` (0 to 3) carries the setting from the settings menu to the subsystem; the subsystem reads it every
-tick, so a change applies at once (extra devils fade out). Counts per level: Low 1, Medium 3, Maximum 6 (project
-settings, at most 16). Particles per devil are the same at every level, so a devil looks the same everywhere.
+tick, so a change applies at once (extra devils fade out). Per level (project settings):
+
+| Level | New devil every | Most alive | Alive on average (devil lives ~37 s) |
+|---|---|---|---|
+| Low | 120-210 s | 1 | 0.2 |
+| Medium | 40-70 s | 3 | 0.7 |
+| Maximum | 20-35 s | 6 | 1.4 |
+
+The intervals were set on 2026-10-28 to a quarter of the first rate (a devil every 2-6 s up to the cap, which kept
+every level at its cap). The caps (at most 16) now only limit a lucky streak. Particles per devil are the same at every level, so a devil looks the same everywhere.
 
 `rts.AmbientFx.Instant 1` makes devils appear at full strength up to the maximum at once and vanish at once, for
 benchmarks.

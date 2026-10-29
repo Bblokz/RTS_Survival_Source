@@ -18,8 +18,13 @@ It's drawn by the landscape material, not by decals or meshes, so the crystals' 
 ## How the circles are made
 
 1. **Find the crystals.** Every actor with a `UResourceComponent` of type `Resource_Radixite` counts, whether hand-placed or spawned by `PCGCreateRadixiteField`.
-2. **Size each crystal's circle.** The radius is 2.5× the crystal's colliding footprint, clamped to 5–16 m. Colliding components only, because a crystal's destruction geometry spans tens of metres.
-3. **Merge down to 8.** While there are more than 8 circles, the pair whose enclosing circle is smallest is merged. The log (`LogRTSRadixiteBlight`) reports how many crystals went into how many circles.
+2. **Size each crystal's circle.** The radius is 3× the bounding-sphere radius of the crystal's largest designed static mesh, times the actor's scale, clamped to 5–16 m. The measure ignores rotation, and it only counts meshes the class defines:
+   - `URadixiteGrowthComponent` spawns extra meshes at random;
+   - the editor reruns construction scripts on every load, and they randomise the meshes' rotation;
+   - the destruction geometry collection spans tens of metres.
+
+   World bounds made the circles, and so the grass fingerprint, differ on every load.
+3. **Merge down to 8.** The circles are sorted by position, because actor order differs between editor, commandlet and game worlds. Then, while there are more than 8 circles, the pair whose enclosing circle is smallest is merged. The log (`LogRTSRadixiteBlight`) reports how many crystals went into how many circles.
 4. **Write the collection.** The subsystem writes `RadixiteBlight0–7` (centre x, y, radius, 1 / radius²), `RadixiteBlightBounds` (all circles plus a 50% margin for the edge noise) and `RadixiteBlightCount`.
 
 **When it runs:** when a game or PIE world begins play. In the editor it also runs when a map opens, and again whenever a radixite actor is added, moved or deleted, one frame later. So the editor view and the landscape grass bake both see the current blight.
@@ -28,7 +33,7 @@ It's drawn by the landscape material, not by decals or meshes, so the crystals' 
 
 Landscape grass is baked into the level, so the dead ground loses its grass only after a grass rebuild. The subsystem tracks this the way the editor tracks lighting:
 
-1. **Fingerprint.** It fingerprints the current circles, rounded to whole centimetres.
+1. **Fingerprint.** It fingerprints the current circles, rounded to 10 cm. The log line `LogRTSRadixiteBlight: <map>: N radixite crystals in M blight circles (fingerprint xxxxxxxx)` shows it; with `LogRTSRadixiteBlight Verbose` it also lists the circles. Verified identical in editor loads, headless loads and game runs (`f2c91c3f` on Ger_Trains, 2026-10-28).
 2. **Warning.** If the landscape's material shows both `LS_RadixiteBlight` and `LS_GroundGrass`, and the fingerprint differs from the one stored on the landscape actor, every viewport shows in red: *"RADIXITE GRASS NEEDS TO BE REBUILT (radixite crystals changed): run RTS.Radixite.RebuildGrass, then save the map"*. The stored fingerprint is an actor tag, `RadixiteBlightGrass_<hex>`.
    - A map with crystals that was never baked warns.
    - A map without crystals never warns.
