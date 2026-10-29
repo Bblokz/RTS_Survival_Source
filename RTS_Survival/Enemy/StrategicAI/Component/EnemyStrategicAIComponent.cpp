@@ -30,10 +30,23 @@ namespace EnemyStrategicAIMineLocationConstants
 	constexpr float RoadSplineSampleSpacing = 750.f;
 }
 
+namespace EnemyStrategicAIBasesInCombatConstants
+{
+	// A base counts as in combat with less pressure than a designer attack location: one tank nearby is enough.
+	constexpr float DefaultMaxInfluenceRadius = 6000.f;
+	constexpr float DefaultMinimumThreatScoreToFlagBase = 1.5f;
+	constexpr float DefaultMinimumEffectiveAttackerCount = 0.5f;
+}
+
 UEnemyStrategicAIComponent::UEnemyStrategicAIComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	CacheGenerationSeedFromGameInstance();
+
+	using namespace EnemyStrategicAIBasesInCombatConstants;
+	FindBasesInCombat_TimerRequest.MaxInfluenceRadius = DefaultMaxInfluenceRadius;
+	FindBasesInCombat_TimerRequest.MinimumThreatScoreToFlagLocation = DefaultMinimumThreatScoreToFlagBase;
+	FindBasesInCombat_TimerRequest.MinimumEffectiveAttackerCount = DefaultMinimumEffectiveAttackerCount;
 }
 
 void UEnemyStrategicAIComponent::InitStrategicAIComponent(AEnemyController* EnemyController,
@@ -268,6 +281,13 @@ void UEnemyStrategicAIComponent::PreThinKStep_InitThinkingTimers(const float Now
 		this, &UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep);
 	M_AIThinkTimers.Add(&M_LocationsUnderAttackThinkTimer);
 
+	M_BasesInCombatThinkTimer.LastTimeThought = Now;
+	M_BasesInCombatThinkTimer.ThinkingInterval =
+		EnemyAISettings::DamagedVehicleRetreat::UpdateBasesInCombat_Interval;
+	M_BasesInCombatThinkTimer.ThinkStepDelegate.BindUObject(
+		this, &UEnemyStrategicAIComponent::BasesInCombat_ThinkStep);
+	M_AIThinkTimers.Add(&M_BasesInCombatThinkTimer);
+
 	M_PlayerUnitBulkLocationsThinkTimer.LastTimeThought = Now;
 	M_PlayerUnitBulkLocationsThinkTimer.ThinkingInterval =
 		EnemyAISettings::ThinkingTimers::UpdatePlayerUnitBulkLocations_Interval;
@@ -374,6 +394,29 @@ void UEnemyStrategicAIComponent::PlayerUnitCountsBuildingCounts_ThinkStep()
 void UEnemyStrategicAIComponent::LocationsUnderAttack_ThinkStep()
 {
 	QueueFindLocationsUnderPlayerAttackRequest(FindLocationsUnderAttack_TimerRequest);
+}
+
+void UEnemyStrategicAIComponent::BasesInCombat_ThinkStep()
+{
+	FFindLocationsUnderPlayerAttack RequestToQueue = FindBasesInCombat_TimerRequest;
+	RequestToQueue.RequestID = EnemyAISettings::DamagedVehicleRetreat::BasesInCombatRequestID;
+	RequestToQueue.LocationsToEvaluate.Reset();
+	RequestToQueue.LocationsToEvaluate.Reserve(M_Blackboard.EnemyBasePoints.Num());
+	for (const FEnemyBasePointCoreBuildings& BasePoint : M_Blackboard.EnemyBasePoints)
+	{
+		if (not BasePoint.BaseLocation.IsNearlyZero())
+		{
+			RequestToQueue.LocationsToEvaluate.Add(BasePoint.BaseLocation);
+		}
+	}
+
+	if (RequestToQueue.LocationsToEvaluate.IsEmpty())
+	{
+		M_Blackboard.CurrentEnemyBasesInCombat.LocationsUnderAttack.Reset();
+		return;
+	}
+
+	QueueFindLocationsUnderPlayerAttackRequest(RequestToQueue);
 }
 
 void UEnemyStrategicAIComponent::PlayerUnitBulkLocations_ThinkStep()
@@ -1630,16 +1673,40 @@ void UEnemyStrategicAIComponent::ProcessPlayerUnitCountsAndBaseResults(
 void UEnemyStrategicAIComponent::ProcessLocationsUnderPlayerAttackResults(
 	const TArray<FResultLocationsUnderPlayerAttack>& LocationsUnderPlayerAttackResults)
 {
-	if (LocationsUnderPlayerAttackResults.IsEmpty())
+	// Walk back to front so the most recent result of each kind wins, like taking Last() before base-combat routing.
+	const FResultLocationsUnderPlayerAttack* LatestDesignerResult = nullptr;
+	const FResultLocationsUnderPlayerAttack* LatestBasesInCombatResult = nullptr;
+	for (int32 ResultIndex = LocationsUnderPlayerAttackResults.Num() - 1; ResultIndex >= 0; --ResultIndex)
+	{
+		const FResultLocationsUnderPlayerAttack& Result = LocationsUnderPlayerAttackResults[ResultIndex];
+		const FResultLocationsUnderPlayerAttack*& LatestOfKind = GetIsBasesInCombatResult(Result)
+			                                                         ? LatestBasesInCombatResult
+			                                                         : LatestDesignerResult;
+		if (LatestOfKind == nullptr)
+		{
+			LatestOfKind = &Result;
+		}
+	}
+
+	if (LatestBasesInCombatResult != nullptr)
+	{
+		M_Blackboard.CurrentEnemyBasesInCombat = *LatestBasesInCombatResult;
+	}
+	if (LatestDesignerResult == nullptr)
 	{
 		return;
 	}
-	M_Blackboard.CurrentLocationsUnderPlayerAttack = LocationsUnderPlayerAttackResults.Last();
+	M_Blackboard.CurrentLocationsUnderPlayerAttack = *LatestDesignerResult;
 	if constexpr (DeveloperSettings::Debugging::GEnemyController_StrategicAI_Compile_DebugSymbols &&
 		EnemyAISettings::Debugging::LocationsUnderPlayerAttackDebugging)
 	{
 		DebugBlackboardLocationsUnderAttack();
 	}
+}
+
+bool UEnemyStrategicAIComponent::GetIsBasesInCombatResult(const FResultLocationsUnderPlayerAttack& Result) const
+{
+	return Result.RequestID == EnemyAISettings::DamagedVehicleRetreat::BasesInCombatRequestID;
 }
 
 void UEnemyStrategicAIComponent::ProcessPlayerUnitBulkLocationsResults(

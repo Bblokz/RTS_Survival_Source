@@ -1028,6 +1028,43 @@ void AInfantryWeaponMaster::SetupHomingMissileWeapon(FInitWeaponStateHomingMissi
 	}
 }
 
+void AInfantryWeaponMaster::SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters)
+{
+	SetOwningPlayer(RailRocketParameters.OwningPlayer);
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		RTSFunctionLibrary::ReportError("World is null for rail rocket weapon: " + GetName());
+		return;
+	}
+	constexpr int32 WeaponIndex = 0;
+	URailRocketWeaponState* RailRocket = NewObject<URailRocketWeaponState>(this);
+	RailRocket->InitRailRocketWeapon(
+		RailRocketParameters.OwningPlayer,
+		WeaponIndex,
+		RailRocketParameters.GetWeaponNameEnum(),
+		RailRocketParameters.WeaponBurstMode,
+		RailRocketParameters.WeaponOwner,
+		RailRocketParameters.MeshComponent,
+		RailRocketParameters.FireSocketName,
+		World,
+		RailRocketParameters.ProjectileSystem,
+		RailRocketParameters.WeaponVFX,
+		RailRocketParameters.WeaponShellCase,
+		RailRocketParameters.RailRocketSettings,
+		RailRocketParameters.BurstCooldown,
+		RailRocketParameters.SingleBurstAmountMaxBurstAmount,
+		RailRocketParameters.MinBurstAmount,
+		RailRocketParameters.CreateShellCasingOnEveryRandomBurst);
+	WeaponState = RailRocket;
+	SetupRange();
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(WeaponState, M_ProjectileManager.Get());
+	}
+}
+
 void AInfantryWeaponMaster::SetupVerticalRocketProjectileWeapon(
 	FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters)
 {

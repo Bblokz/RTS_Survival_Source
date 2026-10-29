@@ -158,14 +158,20 @@ void UGunPitCrewComponent::InitPitCrew_GatherRounds()
 
 void UGunPitCrewComponent::OnGunFired()
 {
-	// A gun reload montage starts with its own recoil; a second recoil on top would restart the slot.
-	if (bM_IsLoading && IsValid(ReloadSettings.GunReloadMontage))
+	// A gun reload montage starts with its own recoil; a second fire montage on top would restart the slot. The
+	// procedural carriage kick and the crew flinch are not montages, so they still play: on a single-shot gun every
+	// shot starts the reload before this runs, and skipping them left the gun and crew still on every shot.
+	const bool bReloadMontageOwnsSlot = bM_IsLoading && IsValid(ReloadSettings.GunReloadMontage);
+	if (not bReloadMontageOwnsSlot)
+	{
+		PlayGunMontage(ReloadSettings.GunFireMontage, 1.f, 0.f);
+	}
+	PlayGunFireKick();
+	PlayCrewFireFlinch();
+	if (bReloadMontageOwnsSlot)
 	{
 		return;
 	}
-	PlayGunMontage(ReloadSettings.GunFireMontage, 1.f, 0.f);
-	PlayGunFireKick();
-	PlayCrewFireFlinch();
 	if (not bM_IsLoading)
 	{
 		PlayCrewFireMontages();

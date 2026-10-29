@@ -475,7 +475,9 @@ bool URTSCameraShakeSubsystem::GetActiveShakeCameraData(const APlayerController*
 	float& OutCameraFovDegrees) const
 {
 	const ACPPController* RTSPlayerController = nullptr;
-	if (GetIsValidPlayerCameraController(PlayerController, RTSPlayerController))
+	// The main menu films through its own camera, not an RTS camera pawn: it uses the view point below.
+	if (GetIsValidPlayerCameraController(PlayerController, RTSPlayerController)
+		&& not RTSPlayerController->GetIsMainMenuController())
 	{
 		const ACameraPawn* CameraPawn = RTSPlayerController->GetCameraPawn();
 		if (not IsValid(CameraPawn) || not IsValid(CameraPawn->GetCameraComponent()))

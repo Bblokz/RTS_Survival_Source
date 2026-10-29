@@ -104,4 +104,23 @@ namespace EnemyAISettings
 	}
 
 	inline float EnemyRetreatControllerCheckInterval = 8.4f;
+
+	namespace DamagedVehicleRetreat
+	{
+		// Direct control vehicles at or below this health ratio reverse to a base and request a hazmat repair.
+		inline float HealthRatioThresholdToRetreat = 0.2f;
+		// How often direct control checks vehicle health and advances active retreats.
+		inline float CheckInterval = 1.5f;
+		// How often the strategic AI evaluates which of its base clusters are in combat.
+		inline float UpdateBasesInCombat_Interval = 25.f;
+		// Reserved request id so base-combat results never overwrite the designer's locations-under-attack results.
+		inline constexpr int32 BasesInCombatRequestID = -25;
+		// A base point counts as the evaluated one when within this distance (base points shift between updates).
+		inline constexpr float BaseCombatMatchTolerance = 2000.f;
+		// Retreat to this distance in front of the base center, on the vehicle's side, so it does not reverse into buildings.
+		inline constexpr float RetreatStandOffDistanceFromBase = 900.f;
+		inline constexpr float RetreatLocationReachedTolerance = 400.f;
+		// Caps re-issued repair orders to the same hazmat before another hazmat is picked.
+		inline constexpr int32 MaxRepairOrdersPerHazmat = 3;
+	}
 }

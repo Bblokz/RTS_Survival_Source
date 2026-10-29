@@ -113,6 +113,8 @@ public:
 	void ExecuteCancelAimAbility();
 
 	EAimAbilityType GetAimAbilityType() const;
+	// The entry this component adds to the command card; the unit variant screen reads it from Blueprint templates.
+	FUnitAbilityEntry MakeAbilityEntry() const;
 	EPlayerAimAbilityTypes GetAimAssistType() const;
 	float GetAimAbilityRange() const;
 	virtual float GetAimAbilityRadius() const;

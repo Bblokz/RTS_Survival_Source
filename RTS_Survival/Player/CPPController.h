@@ -62,8 +62,6 @@
 #endif
 
 enum class ERTSAggroBehaviour : uint8;
-class SViewport;
-class SWidget;
 class UGlobalAbility;
 enum class EGlobalAbility : uint8;
 struct FGlobalAbilitySoundSettings;
@@ -453,6 +451,9 @@ public:
 	bool OnCinematicTakeOver(const bool bStartCinematic);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	inline bool GetIsGameOnPause() const { return M_PauseGameState.bM_IsGamePaused; };
+	inline bool GetIsMainMenuController() const { return bM_IsMainMenuController; }
+	// Only takes effect before PostInitializeComponents; the main menu game mode calls it on its deferred spawn.
+	inline void SetIsMainMenuController(const bool bIsMainMenuController) { bM_IsMainMenuController = bIsMainMenuController; }
 
 	// Tick
 	virtual void Tick(float DeltaTime) override;
@@ -1049,6 +1050,11 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> M_ChordedActionInputMappingContext = nullptr;
+
+	// The main menu controller only drives the menu UI: it skips the gameplay helpers (start-game pause, formations,
+	// rotation arrow, aim ability, key bindings) whose data only the in-game controller Blueprint sets.
+	// Set by ARTSMainMenuGameMode before the controller initializes.
+	bool bM_IsMainMenuController = false;
 
 	// Start Location of secondary click.
 	FVector M_SecondaryStartMouseProjectedLocation;
@@ -2052,9 +2058,8 @@ private:
 
 	// Helper methods
 	void HandleHoveringBlockedState();
-	// True when a hit-testable HUD widget takes the cursor, so world hover must not show under the HUD.
-	bool GetIsCursorOverHitTestableHUD() const;
-	static bool GetIsWidgetBlockingWorldHover(const SWidget& TopWidgetUnderCursor, const SViewport& GameViewportWidget);
+	// True when the cursor is on the building, action, training, minimap or resource panel of the HUD.
+	bool GetIsCursorOverWorldHoverBlockingHUD() const;
 	void UpdateHoveringActorInfo(float DeltaTime, const FVector2D CurrentMouseScreenPosition,
 	                             const FHitResult& MouseHitResult, const bool bHit);
 	void HideHoveringWidget();

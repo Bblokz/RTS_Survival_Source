@@ -5,12 +5,13 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "EnemyRetreatData.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "EnemyRetreatController.generated.h"
 
 class AEnemyController;
 class ICommands;
 
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 // Test hook: every unit of a retreat reached its retreat location, after this many seconds.
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnRetreatAllUnitsReachedForTest, int32 /*RetreatID*/, float /*SecondsTaken*/);
 #endif
@@ -49,7 +50,7 @@ public:
 	// True while the unit belongs to a retreat that has not turned into its counterattack yet.
 	bool GetIsUnitRetreating(const AActor* UnitActor) const;
 
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 	FOnRetreatAllUnitsReachedForTest OnRetreatAllUnitsReachedForTest;
 #endif
 

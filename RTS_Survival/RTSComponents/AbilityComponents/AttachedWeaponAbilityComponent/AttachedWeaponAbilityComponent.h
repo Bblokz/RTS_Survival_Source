@@ -126,6 +126,8 @@ public:
 	virtual void SetTargetPreference(const ETargetPreference NewTargetPreference) override;
 
 	EAttachWeaponAbilitySubType GetAttachedWeaponAbilityType() const;
+	// The entry this component adds to the command card; the unit variant screen reads it from Blueprint templates.
+	FUnitAbilityEntry MakeAbilityEntry() const;
 	EPlayerAimAbilityTypes GetAimAssistType() const;
 	float GetAttachedWeaponAbilityRange() const;
 	float GetAttachedWeaponAbilityRadius() const;
@@ -200,6 +202,8 @@ protected:
 	virtual void SetupRocketProjectileWeapon(FInitWeaponStateRocketProjectile RocketProjectileParameters) override;
 	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) override;
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters) override;
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState) override;
@@ -242,6 +246,7 @@ private:
 	void ProcessPendingRocketWeapons();
 	void ProcessPendingVerticalRocketWeapons();
 	void ProcessPendingHomingMissileWeapons();
+	void ProcessPendingRailRocketWeapons();
 	void ProcessPendingMultiProjectileWeapons();
 	void ProcessPendingArchProjectileWeapons();
 	void ProcessPendingSplitterArchProjectileWeapons();
@@ -263,6 +268,7 @@ private:
 	bool TryPrepareWeaponParameters(FInitWeaponStateArchProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateSplitterArchProjectile& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateHomingMissile& WeaponParameters, const FString& FunctionName);
+	bool TryPrepareWeaponParameters(FInitWeaponStateRailRocket& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateLaser& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateMultiHitLaser& WeaponParameters, const FString& FunctionName);
 	bool TryPrepareWeaponParameters(FInitWeaponStateFlameThrower& WeaponParameters, const FString& FunctionName);
@@ -286,6 +292,7 @@ private:
 	void SetupMultiProjectileWeaponInternal(const FInitWeaponStateMultiProjectile& MultiProjectileState);
 	void SetupArchProjectileWeaponInternal(const FInitWeaponStateArchProjectile& ArchProjParameters);
 	void SetupHomingMissileWeaponInternal(const FInitWeaponStateHomingMissile& HomingMissileParameters);
+	void SetupRailRocketWeaponInternal(const FInitWeaponStateRailRocket& RailRocketParameters);
 	void SetupSplitterArchProjectileWeaponInternal(
 		const FInitWeaponStateSplitterArchProjectile& SplitterArchProjParameters);
 
@@ -323,6 +330,7 @@ private:
 	TArray<FInitWeaponStateArchProjectile> M_PendingArchProjectileWeapons;
 	TArray<FInitWeaponStateSplitterArchProjectile> M_PendingSplitterArchProjectileWeapons;
 	TArray<FInitWeaponStateHomingMissile> M_PendingHomingMissileWeapons;
+	TArray<FInitWeaponStateRailRocket> M_PendingRailRocketWeapons;
 
 	EAttachedWeaponAbilityMeshSetup M_WeaponMeshSetupState = EAttachedWeaponAbilityMeshSetup::Uninitialized;
 

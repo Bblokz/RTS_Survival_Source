@@ -573,10 +573,16 @@ public:
 	static FTrainingOption GetLightTank_Ba14();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetArmoredCar_BM13();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetLightTank_BT7();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetLightTank_BT7_4();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetLightTank_MS1();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetLightTank_T70();
@@ -664,6 +670,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetHeavyTank_ISU_152();
+
+	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
+	static FTrainingOption GetHeavyTank_ISU_130();
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, BlueprintPure, Category="Soviet")
 	static FTrainingOption GetSquad_HazmatEngineers();

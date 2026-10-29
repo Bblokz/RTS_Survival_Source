@@ -1,14 +1,18 @@
-"""Landscape grass for Ger_Trains: grass types from the GroundFoliage atlas meshes plus a switched Landscape Grass
-Output in M_RTS_Landscape_DryCastle (Docs/Environment/GroundGrass.md).
+"""Landscape grass for Ger_Trains: grass types from the GroundFoliage atlas meshes, and their weights as a material
+function, MF_RTS_LS_GrassWeights (Docs/Environment/GroundGrass.md).
 
-Re-runnable: grass type assets are updated in place; master nodes carry DESC and are removed first.
-Weights follow what the player sees, not the painted layers: green grass and flower patches use the breakup chain's
-final grassiness (LS_NoiseBreakup target, "g_t"), dry grass uses the soft sand layers where the ground is not green.
-StaticSwitchParameter LS_GroundGrass defaults to False (every weight is constant 0, no instances); only
-MI_RTS_Landscape_DryCastle_Trains turns it on.
-Usage (UECP execute_python): sys.path + import ls_grass_build; ls_grass_build.run()
+MF_RTS_LS_GrassWeights(Grassiness, SandWeight, FieldMask, BlightMask optional) -> Green, Flowers, Dry
+  Weights follow what the player sees, not the painted layers: green grass and flower patches use the breakup's final
+  grassiness, dry grass uses the soft sand layers where the ground is not green. Nothing grows under water
+  (Grass_MinHeight), inside farm fields or on radixite-blighted ground; dead straw rings the blight.
+M_RTS_Landscape_DryCastle feeds the weights to its LandscapeGrassOutput through StaticSwitchParameter LS_GroundGrass
+(off: every weight is constant 0, no instances); only MI_RTS_Landscape_DryCastle_Trains turns it on
+(ls_master_build.run()). Grass type assets are updated in place.
 """
 import unreal
+
+import ls_graph as G
+from ls_graph import N, C, S, mask
 
 MAT_PATH = "/Game/RTS_Survival/Materials/ground/Landscape/CastleGrassDesertDry/M_RTS_Landscape_DryCastle"
 MI_PATH = "/Game/RTS_Survival/Materials/ground/Landscape/CastleGrassDesertDry/MI_RTS_Landscape_DryCastle_Trains"
@@ -16,13 +20,9 @@ MI_PATH = "/Game/RTS_Survival/Materials/ground/Landscape/CastleGrassDesertDry/MI
 MESH_DIR = "/Game/RTS_Survival/Blueprints/Environment/GroundFoliage/MeshesTop/"
 GRASS_DIR = "/Game/RTS_Survival/Blueprints/Environment/GroundFoliage/Grass"
 NOISE = "/Game/RTS_Survival/Textures/Noise/T_RTS_PackedNoise"
-DESC = "LSGroundGrass"
+FUNCTION_NAME = "MF_RTS_LS_GrassWeights"
 GROUP = "Ground Grass"
 SWITCH = "LS_GroundGrass"
-BREAKUP_DESC = "LSBreakup"
-# Editor positions of the breakup chain's nodes (ls_breakup_build.py X0=-3200, Y0=-3400).
-GRASSINESS_POS = (-1200, -3000)
-SOFT_GROUND_POS = (-1820, -2440)
 
 # Density is instances per 100 m2 at full weight. Cull distances are from the camera; the RTS camera sits 30-60 m
 # from the ground, so grass ends just past the far edge of the view and never casts dynamic shadows.
@@ -55,18 +55,11 @@ FLOWER_PATCH_MIN = 0.58
 FLOWER_PATCH_MAX = 0.72
 # Lake beds are painted grass too; nothing grows below the water surface (Ger_Trains lake top is about -310).
 GRASS_MIN_HEIGHT = -300.0
+# Dry-grass weight of the dead straw ring at the radixite blight's rim.
+DEAD_TUFT_WEIGHT = 0.8
 GRASS_HEIGHT_FADE = 80.0
 
 mel = unreal.MaterialEditingLibrary
-failures = []
-
-def tagged_expressions(material, desc):
-    """Every expression of the material carrying desc. Walks the material's real expressions: looking them up by
-    name index misses nodes once repeated rebuilds push the numbering past any fixed range."""
-    return [e for e in unreal.ObjectIterator(unreal.MaterialExpression)
-            if e.get_outer() == material and e.get_editor_property("desc") == desc]
-
-mat = None
 
 
 def make_variety(mesh_name, density, scale, cull):
@@ -109,60 +102,6 @@ def create_grass_types():
     return grass_types
 
 
-def N(cls, x, y, **props):
-    e = mel.create_material_expression(mat, getattr(unreal, "MaterialExpression" + cls), x, y)
-    e.set_editor_property("desc", DESC)
-    for k, v in props.items():
-        e.set_editor_property(k, v)
-    return e
-
-
-def C(a, a_out, b, b_in):
-    if not mel.connect_material_expressions(a, a_out, b, b_in):
-        failures.append("%s.%s -> %s.%s" % (a.get_name(), a_out, b.get_name(), b_in))
-
-
-def remove_previous():
-    removed = 0
-    for e in tagged_expressions(mat, DESC):
-        mel.delete_material_expression(mat, e)
-        removed += 1
-    return removed
-
-
-def find_breakup_node(position):
-    for e in tagged_expressions(mat, BREAKUP_DESC):
-        if e.get_class().get_name() != "MaterialExpressionSaturate":
-            continue
-        if (e.get_editor_property("material_expression_editor_x"),
-                e.get_editor_property("material_expression_editor_y")) == position:
-            return e
-    raise RuntimeError("breakup node at %s not found (run ls_breakup_build.py first)" % (position,))
-
-
-def field_free_mask(x, y):
-    """1 - field mask from the ground-detail furrow node; 1 everywhere when that chain is not built."""
-    furrow = None
-    for e in tagged_expressions(mat, "LSGroundDetail"):
-        if e.get_class().get_name() == "MaterialExpressionCustom" and                 e.get_editor_property("description") == "FieldFurrows":
-            furrow = e
-    if furrow is None:
-        return N("Constant", x, y, r=1.0)
-    field = N("ComponentMask", x, y, r=True, g=False, b=False, a=False)
-    C(furrow, "", field, "")
-    free = N("OneMinus", x + 160, y)
-    C(field, "", free, "")
-    return free
-
-
-def gated(weight, weight_out, x, y):
-    """LS_GroundGrass on: the weight; off: constant 0, so other maps on this master spawn no grass."""
-    switch = N("StaticSwitchParameter", x, y, parameter_name=SWITCH, default_value=False, group=GROUP)
-    C(weight, weight_out, switch, "True")
-    C(N("Constant", x - 160, y + 80, r=0.0), "", switch, "False")
-    return switch
-
-
 def set_grass_inputs(output, grass_types):
     inputs = []
     for asset_name in VARIETIES:
@@ -173,48 +112,47 @@ def set_grass_inputs(output, grass_types):
     output.set_editor_property("grass_types", inputs)
 
 
-def build(grass_types):
-    X0, Y0 = -3200, -1300
-    N("Comment", X0 - 60, Y0 - 120, text="Ground grass (LS_GroundGrass): GroundFoliage atlas cards as landscape grass. "
-      "Green and flowers follow the breakup's final grassiness, dry grass the soft sand layers.")
-    grassiness = find_breakup_node(GRASSINESS_POS)
-    soft_ground = find_breakup_node(SOFT_GROUND_POS)
-    # Farm fields (ls_detail_build.py FieldFurrows, R = field mask) are tilled soil: no meadow grass inside them.
-    not_field = field_free_mask(X0 - 400, Y0 + 900)
+def build_function():
+    function = G.function_asset(FUNCTION_NAME, "Landscape grass weights: green clumps and flower patches where the "
+                                "ground looks green, dry tufts on soft sand elsewhere; none under water or in fields.")
+    G.begin(function, group=GROUP)
+    X0, Y0 = 0, 0
+    grassiness = G.function_input("Grassiness", G.SCALAR, 0, X0 - 300, Y0 - 100, "Visible grass amount, 0..1.")
+    soft_ground = G.function_input("SandWeight", G.SCALAR, 1, X0 - 300, Y0 + 200, "Soft sand layers, 0..1.")
+    field = G.function_input("FieldMask", G.SCALAR, 2, X0 - 300, Y0 + 900, "1 inside a farm field (tilled soil).")
+    not_field = N("OneMinus", X0 - 100, Y0 + 900)
+    C(field, "", not_field, "")
+    blight = G.function_input("BlightMask", G.SCALAR, 3, X0 - 300, Y0 + 1100,
+                              "Optional: 1 on dead ground around radixite (MF_RTS_LS_RadixiteBlight).",
+                              G.const(0.0, X0 - 460, Y0 + 1100), "")
+    alive = N("OneMinus", X0 - 100, Y0 + 1100)
+    C(blight, "", alive, "")
 
+    G.comment("Above the water: 0 below Grass_MinHeight, 1 from Grass_MinHeight + %d cm. Lake beds are painted "
+              "grass too." % GRASS_HEIGHT_FADE, X0 - 60, Y0 + 520, 700, 300, G.INPUT_COLOR)
     wp = N("WorldPosition", X0, Y0 + 400)
-    # Above the water: 0 below Grass_MinHeight, 1 from Grass_MinHeight + fade.
-    wp_z = N("ComponentMask", X0 + 160, Y0 + 600, r=False, g=False, b=True, a=False)
-    C(wp, "", wp_z, "")
-    min_height = N("ScalarParameter", X0 + 160, Y0 + 700, parameter_name="Grass_MinHeight",
-                   default_value=GRASS_MIN_HEIGHT, group=GROUP)
+    wp_z = mask(wp, "", "B", X0 + 160, Y0 + 600)
+    min_height = S("Grass_MinHeight", GRASS_MIN_HEIGHT, X0 + 160, Y0 + 700)
     max_height = N("Add", X0 + 320, Y0 + 700, const_b=GRASS_HEIGHT_FADE)
     C(min_height, "", max_height, "A")
-    dry_land = N("SmoothStep", X0 + 480, Y0 + 620)
-    C(min_height, "", dry_land, "Min")
-    C(max_height, "", dry_land, "Max")
-    C(wp_z, "", dry_land, "Value")
-    green_land = N("Multiply", X0 + 640, Y0 - 100)
-    C(grassiness, "", green_land, "A")
-    C(dry_land, "", green_land, "B")
-    green = N("Multiply", X0 + 800, Y0 - 100)
-    C(green_land, "", green, "A")
-    C(not_field, "", green, "B")
+    dry_land = G.smooth(min_height, max_height, wp_z, "", X0 + 480, Y0 + 620)
 
+    G.comment("Green: the visible grassiness on dry land outside the fields and the radixite blight. Dry: soft sand "
+              "where the ground is not green, plus dead straw at the blight's rim.", X0 + 580, Y0 - 160, 560, 500)
+    green = G.mul(G.mul(G.mul(grassiness, "", dry_land, "", X0 + 640, Y0 - 100), "", not_field, "", X0 + 800, Y0 - 100),
+                  "", alive, "", X0 + 940, Y0 - 100)
     not_green = N("OneMinus", X0, Y0 + 200)
     C(grassiness, "", not_green, "")
-    dry_soft = N("Multiply", X0 + 160, Y0 + 200)
-    C(soft_ground, "", dry_soft, "A")
-    C(not_green, "", dry_soft, "B")
-    dry_on_land = N("Multiply", X0 + 640, Y0 + 200)
-    C(dry_soft, "", dry_on_land, "A")
-    C(dry_land, "", dry_on_land, "B")
-    dry = N("Multiply", X0 + 800, Y0 + 200)
-    C(dry_on_land, "", dry, "A")
-    C(not_field, "", dry, "B")
+    dry_soft = G.mul(soft_ground, "", not_green, "", X0 + 160, Y0 + 200)
+    dry_alive = G.mul(G.mul(dry_soft, "", dry_land, "", X0 + 640, Y0 + 200), "", not_field, "", X0 + 800, Y0 + 200)
+    # Dead straw at the blight's rim (4 b (1 - b) peaks at the edge), none on the dead ground itself.
+    rim = G.mulc(G.mul(blight, "", alive, "", X0 + 640, Y0 + 1180), "", 4.0 * DEAD_TUFT_WEIGHT, X0 + 800, Y0 + 1180)
+    dead_tufts = G.mul(G.mul(rim, "", dry_land, "", X0 + 940, Y0 + 1180), "", not_field, "", X0 + 1080, Y0 + 1180)
+    dry = G.op("Add", G.mul(dry_alive, "", alive, "", X0 + 940, Y0 + 200), "", dead_tufts, "", X0 + 1080, Y0 + 200)
 
-    wpxy = N("ComponentMask", X0 + 160, Y0 + 400, r=True, g=True, b=False, a=False)
-    C(wp, "", wpxy, "")
+    G.comment("Flowers: about %d m noise patches (G channel) inside the green." % (FLOWER_PATCH_SCALE / 100),
+              X0 + 100, Y0 + 340, 1000, 180, G.LAYER_COLOR)
+    wpxy = mask(wp, "", "RG", X0 + 160, Y0 + 400)
     patch_uv = N("Divide", X0 + 320, Y0 + 400, const_b=FLOWER_PATCH_SCALE)
     C(wpxy, "", patch_uv, "A")
     noise = N("TextureSample", X0 + 480, Y0 + 400, texture=unreal.load_asset(NOISE),
@@ -222,15 +160,12 @@ def build(grass_types):
     C(patch_uv, "", noise, "UVs")
     patches = N("SmoothStep", X0 + 720, Y0 + 400, const_min=FLOWER_PATCH_MIN, const_max=FLOWER_PATCH_MAX)
     C(noise, "G", patches, "Value")
-    flowers = N("Multiply", X0 + 900, Y0 + 300)
-    C(green, "", flowers, "A")
-    C(patches, "", flowers, "B")
+    flowers = G.mul(green, "", patches, "", X0 + 900, Y0 + 300)
 
-    output = N("LandscapeGrassOutput", X0 + 1400, Y0 + 200)
-    set_grass_inputs(output, grass_types)
-    C(gated(green, "", X0 + 1100, Y0), "", output, "LGT_Trains_Green")
-    C(gated(flowers, "", X0 + 1100, Y0 + 300), "", output, "LGT_Trains_Flowers")
-    C(gated(dry, "", X0 + 1100, Y0 + 150), "", output, "LGT_Trains_Dry")
+    G.function_output("Green", green, "", 0, X0 + 1100, Y0 - 100, "Weight for LGT_Trains_Green.")
+    G.function_output("Flowers", flowers, "", 1, X0 + 1100, Y0 + 300, "Weight for LGT_Trains_Flowers.")
+    G.function_output("Dry", dry, "", 2, X0 + 1100, Y0 + 150, "Weight for LGT_Trains_Dry.")
+    return G.finish_function(function)
 
 
 def enable_on_trains():
@@ -248,17 +183,3 @@ def enable_on_trains():
 def tune_look():
     """Grass types only (meshes, densities, scales): no landscape recompile, grass maps stay valid."""
     create_grass_types()
-
-
-def run(enable=True):
-    global mat
-    mat = unreal.load_asset(MAT_PATH)
-    failures.clear()
-    grass_types = create_grass_types()
-    removed = remove_previous()
-    build(grass_types)
-    mel.recompile_material(mat)
-    print("removed", removed, "failures", failures)
-    if enable:
-        enable_on_trains()
-    return failures

@@ -61,7 +61,7 @@ namespace TankTrailPrivate
 
 	// Old trails fade away; zero half life keeps every trail for the whole match.
 	constexpr float FadeIntervalSeconds = 4.f;
-	constexpr float FadeHalfLifeSeconds = 300.f;
+	constexpr float FadeHalfLifeSeconds = 120.f;
 
 	TAutoConsoleVariable<int32> CVarTankTrails(
 		TEXT("rts.TankTrails"),
@@ -317,7 +317,9 @@ void UTankTrailSubsystem::UpdateTrails()
 			M_Vehicles.RemoveAtSwap(VehicleIndex);
 			continue;
 		}
-		if (Tank->IsHidden())
+		// Hidden, or carried by something (an aircraft flying it in for a drop): no ruts, and the trail starts afresh
+		// where the tank is set down instead of joining up with the flight path.
+		if (Tank->IsHidden() || Tank->GetAttachParentActor() != nullptr)
 		{
 			Vehicle.bHasLastTracks = false;
 			continue;

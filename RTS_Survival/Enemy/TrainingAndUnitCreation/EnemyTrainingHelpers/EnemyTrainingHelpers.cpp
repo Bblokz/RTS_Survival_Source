@@ -79,6 +79,9 @@ int32 EnemyTrainingHelpers::GetTankTrainingPointsCost(const ETankSubtype TankTyp
 	case ETankSubtype::Tank_T26:
 	case ETankSubtype::Tank_BT7_4:
 		return 10;
+	// The cheapest, weakest Soviet tank.
+	case ETankSubtype::Tank_MS1:
+		return 8;
 	case ETankSubtype::Tank_T70:
 	case ETankSubtype::Tank_T70F:
 	case ETankSubtype::Tank_SU_76:
@@ -93,6 +96,8 @@ int32 EnemyTrainingHelpers::GetTankTrainingPointsCost(const ETankSubtype TankTyp
 
 	case ETankSubtype::Tank_T34E:
 	case ETankSubtype::Tank_SU_122:
+	// Fragile truck, but a full rocket salvo is worth a mid-tier artillery piece.
+	case ETankSubtype::Tank_BM13:
 		return 25;
 
 	case ETankSubtype::Tank_T34_85:
@@ -122,6 +127,8 @@ int32 EnemyTrainingHelpers::GetTankTrainingPointsCost(const ETankSubtype TankTyp
 	case ETankSubtype::Tank_SU_152:
 	case ETankSubtype::Tank_ISU_152:
 		return 55;
+	case ETankSubtype::Tank_ISU_130:
+		return 60;
 	case ETankSubtype::Tank_IS6:
 		return 75;
 	case ETankSubtype::Tank_SMK:

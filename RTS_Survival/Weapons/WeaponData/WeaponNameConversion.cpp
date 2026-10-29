@@ -40,7 +40,12 @@ TArray<FName> Global_GetWeaponNameOptions()
 	for (int32 EnumIndex = 0; EnumIndex < LastWeaponIndex; ++EnumIndex)
 	{
 		const int64 Value = WeaponEnum->GetValueByIndex(EnumIndex);
+		// Enum metadata only exists in builds with metadata; the options only feed editor dropdowns.
+#if WITH_METADATA
 		const bool bIsHidden = WeaponEnum->HasMetaData(TEXT("Hidden"), EnumIndex);
+#else
+		const bool bIsHidden = false;
+#endif
 		if (bIsHidden || Value == static_cast<int64>(EWeaponName::DEFAULT_WEAPON))
 		{
 			continue;

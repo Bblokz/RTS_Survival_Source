@@ -302,6 +302,9 @@ protected:
 	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) override;
 
 	UFUNCTION(BlueprintCallable, Category="Standalone Turret|Weapon")
+	virtual void SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters) override;
+
+	UFUNCTION(BlueprintCallable, Category="Standalone Turret|Weapon")
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileParameters) override;
 
 	UFUNCTION(BlueprintCallable, Category="Standalone Turret|Weapon")

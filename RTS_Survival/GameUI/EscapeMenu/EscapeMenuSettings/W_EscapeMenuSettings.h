@@ -78,6 +78,9 @@ struct FEscapeMenuSettingsGraphicsText
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_StoneDensityLabelText = FText::FromString(TEXT("<Text_Armor>Stones</>"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_AmbientEffectsLabelText = FText::FromString(TEXT("<Text_Armor>Ambient Effects</>"));
 };
 
 /**
@@ -312,6 +315,8 @@ private:
 	void PopulateResolutionOptions();
 	void PopulateQualityOptions();
 	void PopulateQualityOptionsForComboBox(UComboBoxString* ComboBoxToPopulate) const;
+	// Disabled, Low, Medium, Maximum in ERTSAmbientEffectsLevel order.
+	void PopulateAmbientEffectsOptions();
 	void PopulateGameplayOptions();
 	void PopulateVisibilityOptionsForComboBox(UComboBoxString* ComboBoxToPopulate, const TArray<FText>& OptionTexts) const;
 	void SetPlayerHealthBarStrategySelection(UComboBoxString* ComboBoxToSelect, ERTSPlayerHealthBarVisibilityStrategy Strategy) const;
@@ -446,6 +451,8 @@ private:
 	bool GetIsValidSliderFoliageDensity() const;
 	bool GetIsValidTextStoneDensityLabel() const;
 	bool GetIsValidSliderStoneDensity() const;
+	bool GetIsValidTextAmbientEffectsLabel() const;
+	bool GetIsValidComboAmbientEffects() const;
 
 	bool GetIsValidTextAudioHeader() const;
 	bool GetIsValidTextMasterVolumeLabel() const;
@@ -586,6 +593,9 @@ private:
 
 	UFUNCTION()
 	void HandleStoneDensityChanged(float NewValue);
+
+	UFUNCTION()
+	void HandleAmbientEffectsSelectionChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
 
 	UFUNCTION()
 	void HandleEnvironmentAdvancedClicked();
@@ -1059,6 +1069,17 @@ private:
 	/** @brief BindWidget variable must reference a Slider named M_SliderStoneDensity in the Widget Blueprint. */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<USlider> M_SliderStoneDensity = nullptr;
+
+	/** @brief BindWidget variable must reference a RichTextBlock named M_TextAmbientEffectsLabel in the Widget Blueprint. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextAmbientEffectsLabel = nullptr;
+
+	/**
+	 * @brief BindWidget variable must reference a ComboBoxString named M_ComboAmbientEffects in the Widget Blueprint.
+	 * @note Sets how many dust devils may be alive around the camera; the main environment slider leaves it alone.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboAmbientEffects = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextAudioHeader in the Widget Blueprint.

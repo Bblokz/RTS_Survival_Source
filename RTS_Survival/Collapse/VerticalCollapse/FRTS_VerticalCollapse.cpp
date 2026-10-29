@@ -93,6 +93,7 @@ void FRTS_VerticalCollapse::StartVerticalCollapse(
 		return;
 	}
 
+	Context->WeakWorld = World;
 	FTimerDelegate TickDelegate;
 	TickDelegate.BindStatic(&FRTS_VerticalCollapse::TickVerticalCollapse, Context);
 
@@ -176,6 +177,15 @@ void FRTS_VerticalCollapse::HandleStart(FVerticalCollapseTaskContext& MutableCon
 
 void FRTS_VerticalCollapse::TickVerticalCollapse(TSharedPtr<FVerticalCollapseTaskContext> Context)
 {
+	if (Context.IsValid() && not Context->WeakOwner.IsValid())
+	{
+		// The owner was destroyed mid-collapse (wreck cleared, killed again): stop the looping timer for good.
+		if (UWorld* const OwnerlessWorld = Context->WeakWorld.Get())
+		{
+			OwnerlessWorld->GetTimerManager().ClearTimer(Context->TimerHandle);
+		}
+		return;
+	}
 	if (!EnsureValidContext(Context, TEXT("TickVerticalCollapse")))
 	{
 		return;

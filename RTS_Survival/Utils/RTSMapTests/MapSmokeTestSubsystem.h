@@ -48,6 +48,8 @@ private:
 	bool bM_HasStartedGame = false;
 	bool bM_HasFinished = false;
 	bool bM_HasPressedLoadCampaign = false;
+	// Real time the game has been paused since (-1 while running); a locked pause the test cannot lift ends the run.
+	float M_PausedSinceRealSeconds = -1.f;
 	float M_NextMissionLaunchSeconds = 0.f;
 	// Victory round trip: which step runs and when it started.
 	uint8 M_VictoryStep = 0;
@@ -63,6 +65,8 @@ private:
 	// Tutorial popups pause and lock the game until the player presses Continue; the smoke test presses it.
 	void ContinueTutorialOvertakes() const;
 	void KeepGameUnpaused() const;
+	// Ends the run with a FAIL naming the on-screen widgets when the game stays paused (defeat, a locked dialog).
+	bool TickStuckPause(const float RealSecondsRun);
 	void LogHeartbeat(const float SecondsRun, const float RealSecondsRun);
 	void Finish();
 	// Victory round trip: triggers the mission victory, presses Continue and waits for the travel.

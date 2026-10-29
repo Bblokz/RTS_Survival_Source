@@ -14,6 +14,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "UnitVariantSelectionButton.h"
 #include "UnitVariantSelectionWidgetHelpers.h"
 #include "W_UnitVariantSelectionMenu.h"
 
@@ -32,6 +33,9 @@ namespace UnitVariantUnitEntryLayout
 	constexpr int32 NameFontSize = 18;
 	constexpr int32 DetailFontSize = 13;
 	constexpr int32 DetailLetterSpacing = 50;
+	// On the top right corner of the icon well (16..88, 4..76).
+	constexpr float ChangedMarkerSize = 10.f;
+	const FMargin ChangedMarkerOffset(82.f, 2.f, 0.f, 0.f);
 }
 
 void UW_UnitVariantUnitEntry::NativeOnInitialized()
@@ -52,7 +56,8 @@ void UW_UnitVariantUnitEntry::BuildWidgetTree()
 	SizeBox->SetHeightOverride(EntryHeight);
 	WidgetTree->RootWidget = SizeBox;
 
-	M_Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	// Never takes keyboard focus, so the menu keeps the arrow keys for its navigation.
+	M_Button = WidgetTree->ConstructWidget<UUnitVariantSelectionButton>(UUnitVariantSelectionButton::StaticClass());
 	M_Button->OnClicked.AddDynamic(this, &UW_UnitVariantUnitEntry::OnEntryClicked);
 	SizeBox->SetContent(M_Button);
 
@@ -66,6 +71,23 @@ void UW_UnitVariantUnitEntry::BuildWidgetTree()
 	}
 	BuildIconWell(EntryOverlay);
 	BuildTexts(EntryOverlay);
+	BuildChangedMarker(EntryOverlay);
+}
+
+void UW_UnitVariantUnitEntry::BuildChangedMarker(UOverlay* EntryOverlay)
+{
+	using namespace UnitVariantUnitEntryLayout;
+	USizeBox* const MarkerBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+	MarkerBox->SetWidthOverride(ChangedMarkerSize);
+	MarkerBox->SetHeightOverride(ChangedMarkerSize);
+	UOverlaySlot* const MarkerSlot = EntryOverlay->AddChildToOverlay(MarkerBox);
+	MarkerSlot->SetHorizontalAlignment(HAlign_Left);
+	MarkerSlot->SetVerticalAlignment(VAlign_Top);
+	MarkerSlot->SetPadding(ChangedMarkerOffset);
+	// The default brush is a plain white quad; the tint makes it the accent colour.
+	M_ChangedMarker = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+	M_ChangedMarker->SetVisibility(ESlateVisibility::Collapsed);
+	MarkerBox->SetContent(M_ChangedMarker);
 }
 
 void UW_UnitVariantUnitEntry::BuildIconWell(UOverlay* EntryOverlay)
@@ -158,6 +180,16 @@ void UW_UnitVariantUnitEntry::SetChosenVariantName(const FText& ChosenVariantNam
 	}
 	M_DetailText->SetText(FText::Format(NSLOCTEXT("UnitVariantSelection", "ChosenVariant", "{0}  |  {1}"),
 	                                    VariantCountText, ChosenVariantName.ToUpper()));
+}
+
+void UW_UnitVariantUnitEntry::SetHasUnconfirmedChange(const bool bHasUnconfirmedChange)
+{
+	if (not GetIsValidButton())
+	{
+		return;
+	}
+	M_ChangedMarker->SetColorAndOpacity(M_Style.AccentColor.GetSpecifiedColor());
+	M_ChangedMarker->SetVisibility(bHasUnconfirmedChange ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 }
 
 void UW_UnitVariantUnitEntry::ApplySelectionLook()

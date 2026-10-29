@@ -22,7 +22,42 @@ enum class EAircraftTestPhase : uint8
 	AntiAirGroundEngaging,
 	// -AircraftDeathValidate: every aircraft is shot down in the air and must burn, crash with its speed and break up.
 	AircraftDeathRunning,
+	// -AircraftVtoValidate: a parked aircraft must take off vertically on its montages and fire its guns.
+	AircraftVtoRunning,
+	// -AircraftStrafeValidate: the player's Ho 229 strafing global ability must bring two Ho 229s that fire.
+	AircraftStrafeRunning,
 	Finished
+};
+
+UENUM()
+enum class EAircraftVtoTestStep : uint8
+{
+	// Parked; BeginPlay, the anim instance and the weapons settle before the checks.
+	Settling,
+	TakingOff,
+	Firing,
+	Done
+};
+
+/** The aircraft of -AircraftVtoValidate and what was seen of its take-off. */
+USTRUCT()
+struct FAircraftVtoUnderTest
+{
+	GENERATED_BODY()
+
+	FString ClassPath;
+	// Landing gear bone the wing-rotor animations fold away in flight; NAME_None skips the gear checks.
+	FName GearBone = NAME_None;
+
+	UPROPERTY()
+	TWeakObjectPtr<AAircraftMaster> Aircraft;
+
+	EAircraftVtoTestStep Step = EAircraftVtoTestStep::Settling;
+	float StepStartSeconds = 0.f;
+	float StartZ = 0.f;
+	bool bSawVerticalTakeOff = false;
+	bool bSawTakeOffMontage = false;
+	int32 MagazineBeforeAttack = 0;
 };
 
 /** One anti-air unit under test and what its turrets did against the aircraft. */
@@ -106,7 +141,10 @@ struct FAircraftDeathUnderTest
  * @brief Map tests for aircraft, started from the command line on a map with open ground (UT_Nomadics):
  * -AntiAirValidate spawns the player's anti-air units around the camera and an enemy aircraft circling over them;
  * every unit must target the aircraft and fire at it. -AircraftDeathValidate shoots every aircraft down in flight
- * and checks the burning crash and the breakup. Logs RTS_AIRCRAFT_TEST; not in shipping.
+ * and checks the burning crash and the breakup. -AircraftVtoValidate parks one aircraft (the Ho 229 unless
+ * -AircraftVtoClass=<path under Blueprints/Aircraft/> names another), takes off and fires at the ground.
+ * -AircraftStrafeValidate runs the player's Ho 229 strafing global ability on the anchor.
+ * Logs RTS_AIRCRAFT_TEST; not in shipping.
  */
 UCLASS()
 class RTS_SURVIVAL_API UAircraftTestSubsystem : public UTickableWorldSubsystem
@@ -142,6 +180,14 @@ private:
 	TArray<FAircraftDeathUnderTest> M_DeathAircraft;
 
 	int32 M_DeathAircraftIndex = 0;
+
+	UPROPERTY()
+	FAircraftVtoUnderTest M_VtoAircraft;
+
+	// -AircraftStrafeValidate: magazine of every strafing aircraft when first seen; a drop is a shot.
+	TMap<TWeakObjectPtr<AAircraftMaster>, int32> M_StrafeAircraftFirstMagazines;
+	int32 M_StrafeMostAircraftSeen = 0;
+	bool bM_StrafeAnyFired = false;
 
 	// -AircraftDeathCapture=<folder>: offscreen pictures of every crash.
 	FB4HowitzerCaptureRig M_CaptureRig;
@@ -203,4 +249,20 @@ private:
 	void ApplyDeathEffectOverrides(AAircraftMaster& Aircraft) const;
 	void LogWreck(const FAircraftDeathUnderTest& Entry) const;
 	void LogNiagaraUserParameters(const class UNiagaraSystem* System) const;
+
+	// ---------------- Vertical take-off (AircraftVtoTest.cpp) ----------------
+	void StartAircraftVto();
+	void TickAircraftVto();
+	void TickVtoSettling(FAircraftVtoUnderTest& Entry);
+	void TickVtoTakingOff(FAircraftVtoUnderTest& Entry);
+	void TickVtoFiring(FAircraftVtoUnderTest& Entry);
+	/** Rig, anim instance and weapon of the parked aircraft, before it takes off. */
+	void CheckVtoLoadout(const FAircraftVtoUnderTest& Entry);
+	void EnterVtoStep(FAircraftVtoUnderTest& Entry, EAircraftVtoTestStep NewStep);
+
+	// ---------------- Strafing global ability (AircraftStrafeTest.cpp) ----------------
+	void StartAircraftStrafe();
+	void TickAircraftStrafe();
+	/** @return Whether any strafing aircraft has fired since it was first seen. */
+	bool TrackStrafeAircraft();
 };

@@ -34,6 +34,11 @@ struct FStrategicAIBlackboard
 	UPROPERTY()
 	FResultLocationsUnderPlayerAttack CurrentLocationsUnderPlayerAttack;
 
+	// Base points (from EnemyBasePoints) that were under player pressure at the last base-combat evaluation.
+	// Damaged direct control vehicles prefer retreating to bases not listed here.
+	UPROPERTY()
+	FResultLocationsUnderPlayerAttack CurrentEnemyBasesInCombat;
+
 	UPROPERTY()
 	FResultPlayerUnitBulkLocations CurrentPlayerUnitBulkLocations;
 

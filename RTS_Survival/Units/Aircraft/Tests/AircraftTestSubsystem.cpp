@@ -186,7 +186,9 @@ bool UAircraftTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 		return false;
 	}
 	return FParse::Param(FCommandLine::Get(), TEXT("AntiAirValidate"))
-		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftDeathValidate"));
+		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftDeathValidate"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftVtoValidate"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("AircraftStrafeValidate"));
 }
 
 TStatId UAircraftTestSubsystem::GetStatId() const
@@ -214,6 +216,12 @@ void UAircraftTestSubsystem::Tick(const float DeltaTime)
 		return;
 	case EAircraftTestPhase::AircraftDeathRunning:
 		TickAircraftDeath();
+		return;
+	case EAircraftTestPhase::AircraftVtoRunning:
+		TickAircraftVto();
+		return;
+	case EAircraftTestPhase::AircraftStrafeRunning:
+		TickAircraftStrafe();
 		return;
 	case EAircraftTestPhase::Inactive:
 	case EAircraftTestPhase::Finished:
@@ -289,6 +297,16 @@ void UAircraftTestSubsystem::TickWaitingForStart()
 	if (FParse::Param(FCommandLine::Get(), TEXT("AntiAirValidate")))
 	{
 		StartAntiAir();
+		return;
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("AircraftVtoValidate")))
+	{
+		StartAircraftVto();
+		return;
+	}
+	if (FParse::Param(FCommandLine::Get(), TEXT("AircraftStrafeValidate")))
+	{
+		StartAircraftStrafe();
 		return;
 	}
 	StartAircraftDeath();
@@ -789,8 +807,11 @@ namespace AircraftDeathTestPrivate
 			{TEXT("Sturmovik"), TEXT("RusAircraft/Sturmovic/Rus_Aircraft_Sturmovic.Rus_Aircraft_Sturmovic_C"), false, false},
 			{TEXT("Me410"), TEXT("GerAircraft/ME410/Ger_Aircraft_ME5_Airbrone.Ger_Aircraft_ME5_Airbrone_C"), true, false},
 			{TEXT("Pe2"), TEXT("RusAircraft/PE2/Rus_PE2_Aircraft_3x250.Rus_PE2_Aircraft_3x250_C"), true, false},
-			{TEXT("Pe8"), TEXT("RusAircraft/PE8Bomber/Rus_PE8_Aircraft_Airborne.Rus_PE8_Aircraft_Airborne_C"), true, false},
+			{TEXT("Pe8"), TEXT("RusAircraft/PE8Bomber/Rus_PE8_Aircraft_8x500.Rus_PE8_Aircraft_8x500_C"), true, false},
 			{TEXT("Ju390"), TEXT("GerAircraft/JU390B/Ger_Aircraft_JU390B_Airbrone.Ger_Aircraft_JU390B_Airbrone_C"), true, false},
+			// Two jets (B_Rotor1/2 are the intake compressors): burns at a wing engine.
+			{TEXT("Ho229"), TEXT("GerAircraft/HO229/Ger_Aircraft_Horten229_Airborne.Ger_Aircraft_Horten229_Airborne_C"), true, false},
+			{TEXT("Ho229Parked"), TEXT("GerAircraft/HO229/Ger_Aircraft_Horten229.Ger_Aircraft_Horten229_C"), true, true},
 			{TEXT("Bf109Parked"), TEXT("GerAircraft/BF109/Ger_Aircraft_BF109.Ger_Aircraft_BF109_C"), false, true},
 			{TEXT("Bf109InAirbase"), TEXT("GerAircraft/BF109/Ger_Aircraft_BF109.Ger_Aircraft_BF109_C"), false, true, true},
 			{TEXT("Ju87DropShip"), TEXT("DropShips/BP_DropShip_Ger_Ju87.BP_DropShip_Ger_Ju87_C"), false, false},

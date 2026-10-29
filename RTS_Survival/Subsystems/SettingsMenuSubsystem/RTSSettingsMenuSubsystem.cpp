@@ -33,6 +33,8 @@ namespace RTSSettingsMenuSubsystemPrivate
 	// spawned by PCG_GroundStones) follow foliage.DensityScale.
 	const TCHAR* const FoliageDensityCVarName = TEXT("grass.DensityScale");
 	const TCHAR* const StoneDensityCVarName = TEXT("foliage.DensityScale");
+	// Read by ULandscapeAmbientFxSubsystem: 0 disabled, 1 low, 2 medium, 3 maximum.
+	const TCHAR* const AmbientEffectsCVarName = TEXT("rts.AmbientFx");
 
 	void SetDensityCVar(const TCHAR* CVarName, const float Density)
 	{
@@ -44,6 +46,18 @@ namespace RTSSettingsMenuSubsystemPrivate
 		}
 
 		CVar->Set(Density, ECVF_SetByGameSetting);
+	}
+
+	void SetAmbientEffectsCVar(const ERTSAmbientEffectsLevel Level)
+	{
+		IConsoleVariable* const CVar = IConsoleManager::Get().FindConsoleVariable(AmbientEffectsCVarName);
+		if (CVar == nullptr)
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(TEXT("Console variable %s was not found."), AmbientEffectsCVarName));
+			return;
+		}
+
+		CVar->Set(static_cast<int32>(Level), ECVF_SetByGameSetting);
 	}
 
 	const ERTSWindowMode DefaultWindowMode = ERTSWindowMode::Fullscreen;
@@ -298,6 +312,11 @@ void URTSSettingsMenuSubsystem::SetPendingStoneDensity(const float NewDensity)
 	);
 }
 
+void URTSSettingsMenuSubsystem::SetPendingAmbientEffectsLevel(const ERTSAmbientEffectsLevel NewLevel)
+{
+	M_PendingSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_AmbientEffectsLevel = NewLevel;
+}
+
 void URTSSettingsMenuSubsystem::SetPendingMasterVolume(const float NewVolume)
 {
 	const float ClampedVolume = FMath::Clamp(NewVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
@@ -530,6 +549,7 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_EnvironmentDetailDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_FoliageDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_AmbientEffectsLevel = ERTSAmbientEffectsLevel::Maximum;
 
 	DefaultSettings.M_AudioSettings.M_MasterVolume = RTSGameUserSettingsRanges::DefaultVolume;
 	DefaultSettings.M_AudioSettings.M_MusicVolume = RTSGameUserSettingsRanges::DefaultVolume;
@@ -751,6 +771,7 @@ void URTSSettingsMenuSubsystem::ApplyEnvironmentDetailSettings() const
 		RTSSettingsMenuSubsystemPrivate::StoneDensityCVarName,
 		GameUserSettings->GetStoneDensity()
 	);
+	RTSSettingsMenuSubsystemPrivate::SetAmbientEffectsCVar(GameUserSettings->GetAmbientEffectsLevel());
 }
 
 void URTSSettingsMenuSubsystem::ApplyAudioSettings()
@@ -1053,6 +1074,7 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_EnvironmentDetailDensity = GameUserSettings.GetEnvironmentDetailDensity();
 	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_FoliageDensity = GameUserSettings.GetFoliageDensity();
 	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_StoneDensity = GameUserSettings.GetStoneDensity();
+	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_AmbientEffectsLevel = GameUserSettings.GetAmbientEffectsLevel();
 
 	Snapshot.M_AudioSettings.M_MasterVolume = GameUserSettings.GetMasterVolume();
 	Snapshot.M_AudioSettings.M_MusicVolume = GameUserSettings.GetMusicVolume();
@@ -1104,6 +1126,7 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetEnvironmentDetailDensity(EnvironmentDetailSettings.M_EnvironmentDetailDensity);
 	GameUserSettingsToApply.SetFoliageDensity(EnvironmentDetailSettings.M_FoliageDensity);
 	GameUserSettingsToApply.SetStoneDensity(EnvironmentDetailSettings.M_StoneDensity);
+	GameUserSettingsToApply.SetAmbientEffectsLevel(EnvironmentDetailSettings.M_AmbientEffectsLevel);
 
 	GameUserSettingsToApply.SetMasterVolume(SnapshotToApply.M_AudioSettings.M_MasterVolume);
 	GameUserSettingsToApply.SetMusicVolume(SnapshotToApply.M_AudioSettings.M_MusicVolume);

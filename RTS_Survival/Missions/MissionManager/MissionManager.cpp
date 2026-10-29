@@ -1120,6 +1120,11 @@ void AMissionManager::PostInit_CheckOverrideFaction() const
 	{
 		return;
 	}
+	// The backup is for launching the map directly; never replace the faction the player picked.
+	if (GameInstance->GetIsPlayerFactionChosenByPlayer())
+	{
+		return;
+	}
 	GameInstance->SetPlayerFaction(PlayerFactionBackupData.PlayerFaction);
 }
 

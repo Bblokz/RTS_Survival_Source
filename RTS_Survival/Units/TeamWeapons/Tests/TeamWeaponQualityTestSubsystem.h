@@ -6,6 +6,7 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeaponState/TeamWeaponState.h"
+#include "TeamWeaponCrewAnimAudit.h"
 #include "TeamWeaponQualityTestSubsystem.generated.h"
 
 class ACPPController;
@@ -93,6 +94,8 @@ enum class ETWQualitySquadStep : uint8
 	WaitingForDeploy,
 	SettlingDeployed,
 	MeasuringDeployed,
+	// Only with -TWQualityCrewAnims: attack ground until weapon 0 reloaded a few times, for the loader montages.
+	Firing,
 	Moving,
 	Done
 };
@@ -118,6 +121,11 @@ struct FTWQualitySquadSubject
 	FVector LastWeaponLocation = FVector::ZeroVector;
 	bool bHasLastWeaponLocation = false;
 	bool bLoggedConfig = false;
+	bool bHasFired = false;
+	bool bIsRegisteredForCrewAnimAudit = false;
+	FVector FireTarget = FVector::ZeroVector;
+	float NextForcedReloadSeconds = 0.f;
+	int32 ForcedReloads = 0;
 };
 
 enum class ETWQualityTowStep : uint8
@@ -232,6 +240,9 @@ private:
 	bool bM_TakePictures = false;
 	FVector M_TestCentre = FVector::ZeroVector;
 	float M_LegLengthCm = 0.f;
+	// -TWQualityCrewAnims: crew montage audit plus a firing step so reload montages play.
+	bool bM_AuditCrewAnims = false;
+	FTeamWeaponCrewAnimAudit M_CrewAnimAudit;
 
 	TArray<FTWQualitySquadSubject> M_Squads;
 	TArray<FTWQualityTowSubject> M_Tows;
@@ -295,6 +306,9 @@ private:
 	                                ATeamWeapon& Weapon, const float StepSeconds);
 	void TickSquadMoving(FTWQualitySquadSubject& Subject, ATeamWeaponController& Controller, ATeamWeapon& Weapon,
 	                     const float StepSeconds);
+	void StartSquadFiring(FTWQualitySquadSubject& Subject, ATeamWeaponController& Controller, ATeamWeapon& Weapon);
+	void TickSquadFiring(FTWQualitySquadSubject& Subject, ATeamWeaponController& Controller, ATeamWeapon& Weapon,
+	                     const float StepSeconds);
 	void EnterSquadStep(FTWQualitySquadSubject& Subject, const ETWQualitySquadStep NewStep);
 	void OrderNextLeg(FTWQualitySquadSubject& Subject);
 	void SampleSquadMove(FTWQualitySquadSubject& Subject, ATeamWeaponController& Controller, ATeamWeapon& Weapon,
@@ -310,7 +324,12 @@ private:
 	void ReportGround(const FString& SubjectName, const FString& Label, const FTWQualityGroundMetrics& Metrics,
 	                  const bool bIsMoving);
 	void KeepUnitsUnthrottled(AActor* Unit) const;
-	void KeepSquadUnthrottled(ATeamWeaponController& Controller) const;
+	/**
+	 * @brief Keeps a squad and its gun ticking at full rate and alive.
+	 * @param Controller Squad to keep running.
+	 * @param bKeepTurretEnabled False switches the turret off so subjects never engage each other.
+	 */
+	void KeepSquadUnthrottled(ATeamWeaponController& Controller, const bool bKeepTurretEnabled) const;
 
 	// ---- Towing ----
 	void TickTowSubject(FTWQualityTowSubject& Subject);

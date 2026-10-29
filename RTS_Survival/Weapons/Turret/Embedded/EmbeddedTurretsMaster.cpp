@@ -122,6 +122,11 @@ FTransform AEmbeddedTurretsMaster::GetTurretTransform() const
 
 FRotator AEmbeddedTurretsMaster::GetTargetRotation(const FVector& TargetLocation, const FVector& TurretLocation) const
 {
+	// The owner's mesh is gone while a dying vehicle tears down; an engage order then must not dereference it.
+	if (not IsValid(EmbeddedTurretMesh))
+	{
+		return FRotator::ZeroRotator;
+	}
 	// Transform the target location into the turret's local space
 	const FVector LocalTargetLocation = EmbeddedTurretMesh->GetComponentTransform().InverseTransformPosition(
 		TargetLocation);

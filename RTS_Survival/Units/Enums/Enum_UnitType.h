@@ -204,6 +204,14 @@ enum class ETankSubtype : uint8
 	Tank_IS6 UMETA(DisplayName = "Rus Heavy IS-6"),
 	// SMK twin-turret heavy tank: L-11 76mm main turret on a raised barbette over a forward 45mm turret; long and slow.
 	Tank_SMK UMETA(DisplayName = "Rus Heavy SMK"),
+	// ISU-130 heavy tank destroyer: the ISU-152 hull with the long S-26 130mm naval-derived gun; longer reach and
+	// more penetration than the ISU-152, a smaller shell.
+	Tank_ISU_130 UMETA(DisplayName = "Rus Heavy ISU-130"),
+	// BM-13 "Katyusha": unarmoured ZiS truck carrying a 16-rail M-13 132mm rocket launcher; area-fire artillery.
+	Tank_BM13 UMETA(DisplayName = "Rus BM-13 Katyusha"),
+	// MS-1 (T-18), the first Soviet tank (1928): a small, slow, thinly riveted light tank with a short 37mm Hotchkiss
+	// and a coaxial machine gun; cheaper and weaker than the T-26.
+	Tank_MS1 UMETA(DisplayName = "Rus Light MS-1"),
 };
 
 
@@ -247,6 +255,7 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_ISU_152:
 	case ETankSubtype::Tank_IS6:
 	case ETankSubtype::Tank_SMK:
+	case ETankSubtype::Tank_ISU_130:
 		return true;
 	default:
 		return false;
@@ -311,6 +320,7 @@ static bool Global_GetIsTankDestroyer(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_SU_100:
 	case ETankSubtype::Tank_SU_152:
 	case ETankSubtype::Tank_ISU_152:
+	case ETankSubtype::Tank_ISU_130:
 		return true;
 	default:
 		return false;
@@ -339,6 +349,7 @@ static bool Global_GetIsLightTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_T70:
 	case ETankSubtype::Tank_T70F:
 	case ETankSubtype::Tank_SU_76:
+	case ETankSubtype::Tank_MS1:
 		return true;
 	default:
 		return false;
@@ -371,6 +382,7 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_ZilAmmo:
 	case ETankSubtype::Tank_ZilFuel:
 	case ETankSubtype::Tank_SovietTanker:
+	case ETankSubtype::Tank_BM13:
 		return true;
 	default:
 		return false;

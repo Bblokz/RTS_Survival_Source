@@ -85,6 +85,9 @@ struct FVerticalCollapseTaskContext
 	// Timer handle so we can clear it cleanly on finish.
 	FTimerHandle TimerHandle;
 
+	// The owner can be destroyed mid-collapse; the world is kept to clear the looping timer then.
+	TWeakObjectPtr<UWorld> WeakWorld;
+
 	FVerticalCollapseTaskContext() = default;
 
 	FVerticalCollapseTaskContext(

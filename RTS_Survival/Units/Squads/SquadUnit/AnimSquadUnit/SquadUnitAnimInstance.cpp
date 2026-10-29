@@ -2531,6 +2531,7 @@ void FSquadUnitTeamWeaponCrewAnimRuntime::Reset()
 	M_ActiveEntry = FTeamWeaponCrewMontageEntry();
 	M_CrewRole = ECrewPositionType::None;
 	M_TeamWeaponSquadSubtype = ESquadSubtype::Squad_None;
+	bM_IsOnWeaponRightSide = true;
 	bM_IsActive = false;
 	bM_IsLoopPlaying = false;
 	bM_IsReactPlaying = false;
@@ -2540,11 +2541,12 @@ void FSquadUnitTeamWeaponCrewAnimRuntime::Reset()
 }
 
 void USquadUnitAnimInstance::StartTeamWeaponCrewAnimation(const ECrewPositionType CrewRole,
-                                                          const ESquadSubtype TeamWeaponSquadSubtype)
+                                                          const ESquadSubtype TeamWeaponSquadSubtype,
+                                                          const bool bIsOnWeaponRightSide)
 {
 	CancelCoverAnimation();
 
-	if (M_TeamWeaponCrewAnimRuntime.GetIsSameAssignment(CrewRole, TeamWeaponSquadSubtype))
+	if (M_TeamWeaponCrewAnimRuntime.GetIsSameAssignment(CrewRole, TeamWeaponSquadSubtype, bIsOnWeaponRightSide))
 	{
 		return;
 	}
@@ -2562,9 +2564,10 @@ void USquadUnitAnimInstance::StartTeamWeaponCrewAnimation(const ECrewPositionTyp
 	}
 
 	// Armed even when the entry has no montage: a missing montage is a valid designer choice (no error).
-	M_TeamWeaponCrewAnimRuntime.M_ActiveEntry = *ResolvedEntry;
+	M_TeamWeaponCrewAnimRuntime.M_ActiveEntry = ResolvedEntry->GetEntryForSide(bIsOnWeaponRightSide);
 	M_TeamWeaponCrewAnimRuntime.M_CrewRole = CrewRole;
 	M_TeamWeaponCrewAnimRuntime.M_TeamWeaponSquadSubtype = TeamWeaponSquadSubtype;
+	M_TeamWeaponCrewAnimRuntime.bM_IsOnWeaponRightSide = bIsOnWeaponRightSide;
 	M_TeamWeaponCrewAnimRuntime.bM_IsActive = true;
 
 	// The authored full body pose replaces any crouch; reset so no stray crouch-to-stand transition plays later.

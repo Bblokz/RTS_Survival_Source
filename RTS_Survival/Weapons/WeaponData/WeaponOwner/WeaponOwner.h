@@ -16,6 +16,7 @@ struct FInitWeaponStateSplitterArchProjectile;
 struct FInitWeaponStateRocketProjectile;
 struct FInitWeaponStateVerticalRocketProjectile;
 struct FInitWeaponStateHomingMissile;
+struct FInitWeaponStateRailRocket;
 struct FWeaponData;
 class ASquadController;
 class UWeaponState;
@@ -50,6 +51,7 @@ public:
 	friend class RTS_SURVIVAL_API UWeaponStateSplitterArchProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateRocketProjectile;
 	friend class RTS_SURVIVAL_API UWeaponStateHomingMissile;
+	friend class RTS_SURVIVAL_API URailRocketWeaponState;
 	friend class RTS_SURVIVAL_API UVerticalRocketWeaponState;
 	friend class RTS_SURVIVAL_API UWeaponStateLaser;
 	friend class RTS_SURVIVAL_API UWeaponStateMultiHitLaser;
@@ -141,6 +143,10 @@ protected:
 
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) = 0;
+
+	// Rail-launched rocket artillery (BM-13): rockets run along their launch socket's rail, then arc onto the target.
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters) = 0;
 	
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)=0;

@@ -166,33 +166,34 @@ TArray<AActor*> UEnemyFieldConstructionComponent::GetHazmatUnitsAlreadyAssignedT
 			continue;
 		}
 
-		for (const FEnemyFieldConstructionOrder& FieldConstructionOrder : M_FieldConstructionOrders)
+		if (GetIsSquadAssignedToFieldConstruction(HazmatActor))
 		{
-			bool bHazmatFoundInFieldConstructionOrder = false;
-			for (const FEnemyFieldConstructionSquadEntry& SquadConstructionEntry : FieldConstructionOrder.SquadConstructionData)
-			{
-				ASquadController* SquadController = SquadConstructionEntry.SquadController.Get();
-				if (not IsValid(SquadController))
-				{
-					continue;
-				}
-
-				if (SquadController == HazmatActor)
-				{
-					HazmatUnitsToIgnoreForRetreat.AddUnique(HazmatActor);
-					bHazmatFoundInFieldConstructionOrder = true;
-					break;
-				}
-			}
-
-			if (bHazmatFoundInFieldConstructionOrder)
-			{
-				break;
-			}
+			HazmatUnitsToIgnoreForRetreat.AddUnique(HazmatActor);
 		}
 	}
 
 	return HazmatUnitsToIgnoreForRetreat;
+}
+
+bool UEnemyFieldConstructionComponent::GetIsSquadAssignedToFieldConstruction(const AActor* SquadActor) const
+{
+	if (not IsValid(SquadActor))
+	{
+		return false;
+	}
+
+	for (const FEnemyFieldConstructionOrder& FieldConstructionOrder : M_FieldConstructionOrders)
+	{
+		for (const FEnemyFieldConstructionSquadEntry& SquadConstructionEntry : FieldConstructionOrder.SquadConstructionData)
+		{
+			if (SquadConstructionEntry.SquadController.Get() == SquadActor)
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 void UEnemyFieldConstructionComponent::BeginPlay()

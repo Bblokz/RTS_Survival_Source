@@ -507,6 +507,19 @@ void UAttachedWeaponAbilityComponent::SetupHomingMissileWeapon(FInitWeaponStateH
 	SetupHomingMissileWeaponInternal(HomingMissileParameters);
 }
 
+void UAttachedWeaponAbilityComponent::SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters)
+{
+	if (not TryPrepareWeaponParameters(RailRocketParameters, "SetupRailRocketWeapon"))
+	{
+		if (M_WeaponMeshSetupState == EAttachedWeaponAbilityMeshSetup::Uninitialized)
+		{
+			M_PendingRailRocketWeapons.Add(RailRocketParameters);
+		}
+		return;
+	}
+	SetupRailRocketWeaponInternal(RailRocketParameters);
+}
+
 void UAttachedWeaponAbilityComponent::SetupMultiProjectileWeapon(FInitWeaponStateMultiProjectile MultiProjectileState)
 {
 	if (not TryPrepareWeaponParameters(MultiProjectileState, "SetupMultiProjectileWeapon"))
@@ -590,11 +603,16 @@ void UAttachedWeaponAbilityComponent::AddAbilityToCommands()
 		return;
 	}
 
+	M_OwnerCommandsInterface->AddAbility(MakeAbilityEntry(), M_AttachedWeaponAbilitySettings.PreferredAbilityIndex);
+}
+
+FUnitAbilityEntry UAttachedWeaponAbilityComponent::MakeAbilityEntry() const
+{
 	FUnitAbilityEntry AbilityEntry;
 	AbilityEntry.AbilityId = EAbilityID::IdAttachedWeapon;
 	AbilityEntry.CustomType = static_cast<int32>(M_AttachedWeaponAbilitySettings.WeaponAbilityType);
 	AbilityEntry.CooldownDuration = M_AttachedWeaponAbilitySettings.Cooldown;
-	M_OwnerCommandsInterface->AddAbility(AbilityEntry, M_AttachedWeaponAbilitySettings.PreferredAbilityIndex);
+	return AbilityEntry;
 }
 
 bool UAttachedWeaponAbilityComponent::GetIsValidOwnerCommandsInterface() const
@@ -770,6 +788,7 @@ void UAttachedWeaponAbilityComponent::ProcessPendingWeaponSetups()
 	ProcessPendingArchProjectileWeapons();
 	ProcessPendingSplitterArchProjectileWeapons();
 	ProcessPendingHomingMissileWeapons();
+	ProcessPendingRailRocketWeapons();
 }
 
 void UAttachedWeaponAbilityComponent::ProcessPendingDirectHitWeapons()
@@ -954,6 +973,19 @@ void UAttachedWeaponAbilityComponent::ProcessPendingHomingMissileWeapons()
 	M_PendingHomingMissileWeapons.Reset();
 }
 
+void UAttachedWeaponAbilityComponent::ProcessPendingRailRocketWeapons()
+{
+	for (const FInitWeaponStateRailRocket& PendingRailRocket : M_PendingRailRocketWeapons)
+	{
+		FInitWeaponStateRailRocket Parameters = PendingRailRocket;
+		if (TryPrepareWeaponParameters(Parameters, "ProcessPendingRailRocketWeapons"))
+		{
+			SetupRailRocketWeaponInternal(Parameters);
+		}
+	}
+	M_PendingRailRocketWeapons.Reset();
+}
+
 void UAttachedWeaponAbilityComponent::ReportMissingInit(const FString& SetupFunctionName) const
 {
 	RTSFunctionLibrary::ReportError(
@@ -1058,6 +1090,12 @@ bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStat
 bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(
 	FInitWeaponStateVerticalRocketProjectile& WeaponParameters,
 	const FString& FunctionName)
+{
+	return TryPrepareWeaponParameters(static_cast<FInitWeaponStateProjectile&>(WeaponParameters), FunctionName);
+}
+
+bool UAttachedWeaponAbilityComponent::TryPrepareWeaponParameters(FInitWeaponStateRailRocket& WeaponParameters,
+                                                                 const FString& FunctionName)
 {
 	return TryPrepareWeaponParameters(static_cast<FInitWeaponStateProjectile&>(WeaponParameters), FunctionName);
 }
@@ -1656,6 +1694,38 @@ void UAttachedWeaponAbilityComponent::SetupHomingMissileWeaponInternal(
 	OverwriteData(HomingMissile);
 	UpdateAbilityRangeFromWeapons();
 	SetupProjectileManagerIfReady(HomingMissile);
+}
+
+void UAttachedWeaponAbilityComponent::SetupRailRocketWeaponInternal(
+	const FInitWeaponStateRailRocket& RailRocketParameters)
+{
+	const int32 WeaponIndex = M_AttachedWeapons.Num();
+	M_OwningPlayer = RailRocketParameters.OwningPlayer;
+	M_TargetingData.InitTargetStruct(M_OwningPlayer);
+
+	URailRocketWeaponState* RailRocket = NewObject<URailRocketWeaponState>(this);
+	RailRocket->InitRailRocketWeapon(
+		RailRocketParameters.OwningPlayer,
+		WeaponIndex,
+		RailRocketParameters.GetWeaponNameEnum(),
+		RailRocketParameters.WeaponBurstMode,
+		RailRocketParameters.WeaponOwner,
+		RailRocketParameters.MeshComponent,
+		RailRocketParameters.FireSocketName,
+		GetWorld(),
+		RailRocketParameters.ProjectileSystem,
+		RailRocketParameters.WeaponVFX,
+		RailRocketParameters.WeaponShellCase,
+		RailRocketParameters.RailRocketSettings,
+		RailRocketParameters.BurstCooldown,
+		RailRocketParameters.SingleBurstAmountMaxBurstAmount,
+		RailRocketParameters.MinBurstAmount,
+		RailRocketParameters.CreateShellCasingOnEveryRandomBurst);
+
+	M_AttachedWeapons.Add(RailRocket);
+	OverwriteData(RailRocket);
+	UpdateAbilityRangeFromWeapons();
+	SetupProjectileManagerIfReady(RailRocket);
 }
 
 void UAttachedWeaponAbilityComponent::CacheWeaponOwnerInParameters(FInitWeaponStateDirectHit& WeaponParameters)

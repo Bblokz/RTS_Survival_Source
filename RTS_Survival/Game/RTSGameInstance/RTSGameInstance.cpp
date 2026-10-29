@@ -135,6 +135,18 @@ bool URTSGameInstance::ConsumeRestartWithNewDifficultyRequest()
 	return bRestartWithNewDifficultyRequested;
 }
 
+void URTSGameInstance::SetPlayerFaction(const ERTSFaction Faction)
+{
+	M_PlayerFaction = Faction;
+	bM_IsPlayerFactionChosenByPlayer = false;
+}
+
+void URTSGameInstance::SetPlayerChosenFaction(const ERTSFaction Faction)
+{
+	M_PlayerFaction = Faction;
+	bM_IsPlayerFactionChosenByPlayer = true;
+}
+
 ERTSFaction URTSGameInstance::GetPlayerFaction() const
 {
 	if(M_PlayerFaction == ERTSFaction::NotInitialised)
@@ -143,6 +155,11 @@ ERTSFaction URTSGameInstance::GetPlayerFaction() const
 		return ERTSFaction::GerStrikeDivision;
 	}
 	return M_PlayerFaction;
+}
+
+bool URTSGameInstance::GetHasPlayerFaction() const
+{
+	return M_PlayerFaction != ERTSFaction::NotInitialised;
 }
 
 ERTSCommander URTSGameInstance::GetPlayerCommander() const

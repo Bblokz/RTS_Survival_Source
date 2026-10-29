@@ -333,6 +333,10 @@ protected:
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupHomingMissileWeapon(FInitWeaponStateHomingMissile HomingMissileParameters) override;
 
+	// BM-13 style rail rockets: one rocket per launch socket, straight along the rail, then an arc onto the target.
+	UFUNCTION(BlueprintCallable)
+	virtual void SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters) override;
+
 	UFUNCTION(BlueprintCallable)
 	virtual void SetupVerticalRocketProjectileWeapon(FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters) override;
 

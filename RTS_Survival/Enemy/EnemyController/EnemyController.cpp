@@ -591,7 +591,14 @@ void AEnemyController::RetreatAllFormations(
 	for (const FFormationData& Formation : ActiveFormations)
 	{
 		bool bHasIssuedRetreatOrderForFormation = false;
-		const FVector RetreatLocation = Formation.AverageSpawnLocation;
+		// The average of spawn points spread over uneven ground can float off the navmesh; every retreat path to it
+		// then fails. Retreat to the nearest navigable spot instead (the raw average is kept if nothing is found).
+		bool bWasRetreatLocationProjected = false;
+		const FVector ProjectedRetreatLocation = RTSFunctionLibrary::GetLocationProjected(
+			this, Formation.AverageSpawnLocation, true, bWasRetreatLocationProjected);
+		const FVector RetreatLocation = bWasRetreatLocationProjected
+			                                ? ProjectedRetreatLocation
+			                                : Formation.AverageSpawnLocation;
 		for (const FFormationUnitData& FormationUnit : Formation.FormationUnits)
 		{
 			if (not FormationUnit.Unit.IsValid())

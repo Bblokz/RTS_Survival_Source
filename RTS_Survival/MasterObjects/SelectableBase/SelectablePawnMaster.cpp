@@ -87,6 +87,8 @@ float ASelectablePawnMaster::GetUnitRepairRadius()
 void ASelectablePawnMaster::BeginPlay()
 {
 	Super::BeginPlay();
+	// Right after the components began play, where variant Blueprints used to destroy them in their own BeginPlay.
+	BeginPlay_DestroyRemovedInheritedComponents();
 	if (const UWorld* World = GetWorld())
 	{
 		APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
@@ -108,6 +110,32 @@ void ASelectablePawnMaster::BeginPlay()
 			RTSFunctionLibrary::ReportNullErrorInitialisation(this, "PlayerController",
 			                                                  "ASelectablePawnMaster::BeginPlay");
 		}
+	}
+}
+
+void ASelectablePawnMaster::BeginPlay_DestroyRemovedInheritedComponents()
+{
+	if (M_RemovedInheritedComponents.IsEmpty())
+	{
+		return;
+	}
+	TInlineComponentArray<UActorComponent*> Components;
+	GetComponents(Components);
+	for (const FName ComponentName : M_RemovedInheritedComponents)
+	{
+		UActorComponent* const* const ComponentToRemove = Components.FindByPredicate(
+			[ComponentName](const UActorComponent* Component)
+			{
+				return IsValid(Component) && Component->GetFName() == ComponentName;
+			});
+		if (ComponentToRemove == nullptr)
+		{
+			RTSFunctionLibrary::ReportError("M_RemovedInheritedComponents of " + GetName() + " lists " +
+				ComponentName.ToString() + ", which the unit has no component of."
+				"\nAt function: ASelectablePawnMaster::BeginPlay_DestroyRemovedInheritedComponents");
+			continue;
+		}
+		(*ComponentToRemove)->DestroyComponent();
 	}
 }
 

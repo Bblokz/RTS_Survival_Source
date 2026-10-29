@@ -16,6 +16,8 @@ GlobalDefinitions.Add("RTS_WITH_SHIPPING_MAP_TESTS=1");
 
 Do not define `RTS_WITH_SHIPPING_MAP_TESTS` in `DeveloperSettings.h`. It needs to be a compile-time target definition so the normal `RTS_Survival` Shipping target does not include the shipping-map-test code.
 
+The target also sets `RTS_WITH_MAP_TESTS=1`. `RTSMapTests.h` defaults that macro to `!UE_BUILD_SHIPPING`, so without it the map smoke test (`-RTSMapSmokeTest`, `-RTSMenuFlowTest`) and the command-line validators (`-UnitVariantValidate`, `-AircraftDeathValidate`, the pit validators, ...) are compiled out of every Shipping executable. With it, this target's Shipping executable runs them too, while the regular `RTS_Survival` Shipping target still compiles them out. It also sets `UE_ALLOW_MAP_OVERRIDE_IN_SHIPPING=1`: a Shipping build otherwise ignores the map URL on the command line (`GameInstance.cpp`) and always boots to the main menu, so `<map> -RTSMapSmokeTest` lines would never reach their map. A guard of the form `#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS` in game code needs `RTSMapTests.h` included, or targets without the define fail with C4668. A test `.cpp` added for those scenarios must be wrapped in `#if RTS_WITH_MAP_TESTS` (include `RTS_Survival/Utils/RTSMapTests/RTSMapTests.h` first), otherwise the regular Shipping target fails to link.
+
 ## Executables
 
 In a staged Windows package, the launcher executable is named after the target:
@@ -63,6 +65,23 @@ E:\RR_test\Windows\RTS_SurvivalShippingMapTests.exe -RTSRunMapTest=NomadicBxp -R
 ```
 
 `-RTSRunMapTest=All` also starts this runner. At the time of writing, `NomadicBxp` is the available shipping map test.
+
+## Unit Roster (every unit and variant)
+
+`-RTSRunMapTest=UnitRoster` (or `-RTSRunUnitRosterTests`) starts `Source/RTS_Survival/UnitTests/UnitRosterShippingTestRunner.cpp`, compiled only into this target. It travels to `UT_Nomadics` (override with `-RTSUnitRosterMap=<package>`) and runs one scenario per entry, one at a time:
+
+- every training option the player's async spawner holds (German and Soviet tanks, harvesters, squads, nomadics, aircraft), then
+- every non-base variant of `DA_UnitVariants` (tanks and squads; building expansion variants are left to the Nomadic/BXP runner).
+
+Each scenario: spawn through the real spawner path (`AsyncSpawnOptionAtLocation`, variants through `SetPlayerUnitVariant`; aircraft through `FRTSUnitOwnerSpawning`, airborne when the class does not start landed), check the owner and the spawned class, move 15 m, duel a copy owned by player 2 for 20 s (tanks and squads), deploy and pack up again (nomadics), kill both with lethal damage and wait for the death. Error lines logged meanwhile are counted per scenario.
+
+```powershell
+E:\RR_test\Tests\Windows\RTS_SurvivalShippingMapTests.exe -RTSRunMapTest=UnitRoster -RTSTestExitOnComplete -unattended -windowed -ResX=1280 -ResY=720 -log
+```
+
+Options: `-RTSUnitRosterFilter=<text>` (only entries whose name contains it), `-RTSUnitRosterShard=<i> -RTSUnitRosterShardCount=<n>` (split the roster over parallel processes), `-RTSUnitRosterOrigin=X,Y` (spawn point, default the camera pawn), `-RTSUnitRosterNoDuels`.
+
+Output: one `RTS_UNIT_ROSTER_SCENARIO PASS|WARN|FAIL <name> class=... moved=... dealt=... taken=... deployed=... packed=... died=... errors=N fails=[...] warns=[...]` line per entry, then `RTS_UNIT_ROSTER_RESULT`. The same lines go to `%LOCALAPPDATA%\RTS_Survival\Saved\UnitRosterTests\Run_<stamp>_shard<i>.txt`. FAIL means the unit did not spawn, had the wrong class or owner, could not deploy/pack, or survived lethal damage; WARN means it did not move, dealt and took no damage in the duel, or errors were logged while it ran.
 
 ## Useful Options
 

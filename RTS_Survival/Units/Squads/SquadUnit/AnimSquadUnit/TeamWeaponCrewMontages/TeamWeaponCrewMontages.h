@@ -21,9 +21,20 @@ struct FTeamWeaponCrewMontageEntry
 	bool GetHasMontage() const { return Montage != nullptr; }
 	bool GetHasIdleLoopMontage() const { return IdleLoopMontage != nullptr; }
 
+	/**
+	 * @param bIsOnWeaponRightSide True when the operator's crew position is on the weapon's right (local +Y).
+	 * @return Copy of this entry; for a left side operator Montage is LeftSideMontage when one is assigned.
+	 */
+	FTeamWeaponCrewMontageEntry GetEntryForSide(const bool bIsOnWeaponRightSide) const;
+
 	// Full body montage. Null means: play nothing for this role (no error is reported).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
 	TObjectPtr<UAnimMontage> Montage = nullptr;
+
+	// Operator whose crew position is on the weapon's left (local -Y), usually the mirrored clip.
+	// Null reuses Montage. Lets two loaders of the same role work on opposite sides of the breech.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Team Weapon Crew")
+	TObjectPtr<UAnimMontage> LeftSideMontage = nullptr;
 
 	// Looping roles: straight play-rate multiplier.
 	// Reacting roles: multiplied with the reload-synced play rate.

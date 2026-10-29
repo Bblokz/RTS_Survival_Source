@@ -3,6 +3,7 @@
 #include "FormationDragPath.h"
 #include "RTS_Survival/GameUI/FormationUI/W_FormationPicker.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
+#include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -271,6 +272,12 @@ void UFormationController::ConsoleDebugFormations() const
 void UFormationController::BeginPlay()
 {
 	Super::BeginPlay();
+	const ACPPController* OwningController = Cast<ACPPController>(GetOwner());
+	if (IsValid(OwningController) && OwningController->GetIsMainMenuController())
+	{
+		// The main menu has no formation picker or formation effects.
+		return;
+	}
 
 	BeginPlay_CreateFormationWidget();
 

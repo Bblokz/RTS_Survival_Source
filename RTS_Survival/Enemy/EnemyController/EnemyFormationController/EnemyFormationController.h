@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Enemy/Formation/FormationData.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "EnemyFormationController.generated.h"
 
 
@@ -16,7 +17,7 @@ class UEnemyDirectControlComponent;
 class UNavigationSystemV1;
 class URTSGameInstance;
 
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnFormationUnitReachedWaypointForTest, AActor* /*UnitActor*/,
                                        const FVector& /*WaypointDestination*/, int32 /*FormationID*/);
 #endif
@@ -155,7 +156,7 @@ public:
 	// Formation units must stay free to follow the formation, e.g. never lock themselves in place.
 	bool GetIsUnitInActiveFormation(const AActor* UnitActor) const;
 
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 	// Test hook: a formation unit counted as having reached its waypoint, with the spot it was sent to.
 	FOnFormationUnitReachedWaypointForTest OnFormationUnitReachedWaypointForTest;
 #endif

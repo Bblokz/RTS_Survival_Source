@@ -38,6 +38,7 @@
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "Stats/Stats.h"
 #include "Tickable.h"

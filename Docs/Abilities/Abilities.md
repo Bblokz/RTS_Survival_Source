@@ -198,6 +198,14 @@ If you forget to call `DoneExecutingCommand` for a queued asynchronous ability, 
 - Cooldown starts when command begins execution (`StartCooldownForCommand`), not when queued.
 - `ActivateBehaviourAbility(..., bSetUnitToIdle=true)` is intentionally immediate and bypasses queue, but still tries to start cooldown.
 - Capture is intentionally allowed without command-card ability gate (`CaptureActor` path).
+- Ability components (`UApplyBehaviourAbilityComponent`, `UAimAbilityComponent`, `UAttachedRockets`,
+  `UAttachedWeaponAbilityComponent`, `UModeAbilityComponent`, `UTurretSwapComp`) build their command-card entry in
+  `MakeAbilityEntry()`. The unit variant screen calls it on Blueprint templates to list a variant's abilities without
+  spawning it (`UnitVariantAbilityCards`), so a new ability component needs the same getter and a case in
+  `TryMakeAbilityEntry`.
+- A variant Blueprint that drops an ability component of its base lists the component's variable name in
+  `M_RemovedInheritedComponents` (Class Defaults, Unit Variant), never `DestroyComponent` in BeginPlay: the unit
+  destroys them right after BeginPlay and the variant screen leaves their abilities out.
 
 ---
 

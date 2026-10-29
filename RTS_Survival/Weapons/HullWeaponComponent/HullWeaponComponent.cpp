@@ -576,6 +576,41 @@ void UHullWeaponComponent::SetupHomingMissileWeapon(FInitWeaponStateHomingMissil
 	}
 }
 
+void UHullWeaponComponent::SetupRailRocketWeapon(FInitWeaponStateRailRocket RailRocketParameters)
+{
+	SetOwningPlayer(RailRocketParameters.OwningPlayer);
+	if (not EnsureWorldIsValid())
+	{
+		return;
+	}
+	const int32 WeaponIndex = M_TWeapons.Num();
+	URailRocketWeaponState* RailRocket = NewObject<URailRocketWeaponState>(this);
+	RailRocket->InitRailRocketWeapon(
+		RailRocketParameters.OwningPlayer,
+		WeaponIndex,
+		RailRocketParameters.GetWeaponNameEnum(),
+		RailRocketParameters.WeaponBurstMode,
+		RailRocketParameters.WeaponOwner,
+		RailRocketParameters.MeshComponent,
+		RailRocketParameters.FireSocketName,
+		M_WorldSpawnedIn,
+		RailRocketParameters.ProjectileSystem,
+		RailRocketParameters.WeaponVFX,
+		RailRocketParameters.WeaponShellCase,
+		RailRocketParameters.RailRocketSettings,
+		RailRocketParameters.BurstCooldown,
+		RailRocketParameters.SingleBurstAmountMaxBurstAmount,
+		RailRocketParameters.MinBurstAmount,
+		RailRocketParameters.CreateShellCasingOnEveryRandomBurst);
+	M_TWeapons.Add(RailRocket);
+	UpdateHullWeaponRangeBasedOnWeapons();
+
+	if (M_ProjectileManager.IsValid())
+	{
+		FRTSWeaponHelpers::SetupProjectileManagerForWeapon(RailRocket, M_ProjectileManager.Get());
+	}
+}
+
 void UHullWeaponComponent::SetupVerticalRocketProjectileWeapon(
 	FInitWeaponStateVerticalRocketProjectile VerticalRocketProjectileParameters)
 {

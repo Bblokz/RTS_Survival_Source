@@ -84,6 +84,7 @@ void URTSGameUserSettings::SetToDefaults()
 	M_EnvironmentDetailDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 	M_FoliageDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 	M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
+	M_AmbientEffectsLevel = ERTSAmbientEffectsLevel::Maximum;
 
 	M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 	M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
@@ -318,6 +319,16 @@ void URTSGameUserSettings::SetStoneDensity(const float NewStoneDensity)
 {
 	M_StoneDensity = NewStoneDensity;
 	ApplyCustomSettingClamps();
+}
+
+ERTSAmbientEffectsLevel URTSGameUserSettings::GetAmbientEffectsLevel() const
+{
+	return M_AmbientEffectsLevel;
+}
+
+void URTSGameUserSettings::SetAmbientEffectsLevel(const ERTSAmbientEffectsLevel NewAmbientEffectsLevel)
+{
+	M_AmbientEffectsLevel = NewAmbientEffectsLevel;
 }
 
 

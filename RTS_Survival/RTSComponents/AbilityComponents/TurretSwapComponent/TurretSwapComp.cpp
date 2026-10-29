@@ -147,11 +147,16 @@ void UTurretSwapComp::AddAbilityToCommands()
 		return;
 	}
 
+	M_OwnerCommandsInterface->AddAbility(MakeAbilityEntry(), M_TurretSwapAbilitySettings.PreferredAbilityIndex);
+}
+
+FUnitAbilityEntry UTurretSwapComp::MakeAbilityEntry() const
+{
 	FUnitAbilityEntry AbilityEntry;
 	AbilityEntry.AbilityId = EAbilityID::IdSwapTurret;
 	AbilityEntry.CustomType = static_cast<int32>(M_TurretSwapAbilitySettings.ActiveSwapAbilityType);
 	AbilityEntry.CooldownDuration = M_TurretSwapAbilitySettings.Cooldown;
-	M_OwnerCommandsInterface->AddAbility(AbilityEntry, M_TurretSwapAbilitySettings.PreferredAbilityIndex);
+	return AbilityEntry;
 }
 
 void UTurretSwapComp::StartSwapProgressAndTimer()

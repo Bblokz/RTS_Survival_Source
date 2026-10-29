@@ -128,6 +128,8 @@ public:
 	TArray<AActor*> GetHazmatUnitsAlreadyAssignedToFieldConstruction(
 		const TArray<FWeakActorLocations>& HazmatUnits) const;
 
+	bool GetIsSquadAssignedToFieldConstruction(const AActor* SquadActor) const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

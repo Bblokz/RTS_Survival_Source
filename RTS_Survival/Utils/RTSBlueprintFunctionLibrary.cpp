@@ -1201,6 +1201,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_Ba14()
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Ba14));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetArmoredCar_BM13()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BM13));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_BT7()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BT7));
@@ -1209,6 +1214,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_BT7()
 FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_BT7_4()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BT7_4));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_MS1()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_MS1));
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_T70()
@@ -1354,6 +1364,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SU_152()
 FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_ISU_152()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_ISU_152));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_ISU_130()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_ISU_130));
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetSquad_HazmatEngineers()
