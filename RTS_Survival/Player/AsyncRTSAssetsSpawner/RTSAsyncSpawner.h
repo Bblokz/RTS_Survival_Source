@@ -141,6 +141,9 @@ public:
 	/** @return The class currently mapped for the training option (after overrides), or a null soft pointer. */
 	TSoftClassPtr<AActor> GetTrainingOptionClass(const FTrainingOption& TrainingOption) const;
 
+	/** @return The class the training option had before any variant override, or a null soft pointer. */
+	TSoftClassPtr<AActor> GetBaseTrainingOptionClass(const FTrainingOption& TrainingOption) const;
+
 	/**
 	 * Syncronously gets the preview mesh of the building expansion type.
 	 * @param BuildingExpansionType The type of building expansion to get the preview mesh of.
@@ -152,6 +155,8 @@ public:
 #if RTS_WITH_SHIPPING_MAP_TESTS
 	bool ShippingTest_GetHasBxpPreviewMeshMapping(EBuildingExpansionType BuildingExpansionType) const;
 	bool ShippingTest_GetHasBxpSpawnClassMapping(EBuildingExpansionType BuildingExpansionType) const;
+	// Every unit type the spawner can train, for the unit roster test.
+	TArray<FTrainingOption> ShippingTest_GetAllTrainingOptions() const;
 #endif
 
 	void CancelLoadRequestForTrainer(const TWeakObjectPtr<UTrainerComponent> TrainerComponent);

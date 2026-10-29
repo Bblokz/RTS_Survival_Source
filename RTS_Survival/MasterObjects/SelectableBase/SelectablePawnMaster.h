@@ -61,6 +61,9 @@ public:
 	
 	/** @copydoc ICommands::GetCommandData()*/
 	virtual UCommandData* GetIsValidCommandData() override final ;
+
+	/** The unit variant screen leaves the abilities of these components out. */
+	const TArray<FName>& GetRemovedInheritedComponents() const { return M_RemovedInheritedComponents; }
 	
 
 protected:
@@ -77,6 +80,12 @@ protected:
 
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Components")
 	UFowComp* FowComponent;
+
+	// A variant Blueprint inherits every component of its base and cannot delete one; list the component variable
+	// names this variant does not have (e.g. AttachedMortar). They are destroyed at BeginPlay before their abilities
+	// reach the command card, and the unit variant screen reads this list to leave those abilities out.
+	UPROPERTY(EditDefaultsOnly, Category = "Unit Variant")
+	TArray<FName> M_RemovedInheritedComponents;
 	
 	virtual void PostInitializeComponents() override;
 	
@@ -125,6 +134,8 @@ private:
 
 	// Setup the behaviour of the fow component depending on the owner as registered in the RTS Component.
 	void PostInitComp_InitFowBehaviour(URTSComponent* MyRTSComponent);
+
+	void BeginPlay_DestroyRemovedInheritedComponents();
 
 
 };

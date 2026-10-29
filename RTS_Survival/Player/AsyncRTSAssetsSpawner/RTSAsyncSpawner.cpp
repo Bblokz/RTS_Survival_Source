@@ -249,6 +249,13 @@ bool ARTSAsyncSpawner::ShippingTest_GetHasBxpSpawnClassMapping(
 		BuildingExpansionType);
 	return BuildingExpansionClass != nullptr && not BuildingExpansionClass->IsNull();
 }
+
+TArray<FTrainingOption> ARTSAsyncSpawner::ShippingTest_GetAllTrainingOptions() const
+{
+	TArray<FTrainingOption> TrainingOptions;
+	M_TrainingOptionMap.GetKeys(TrainingOptions);
+	return TrainingOptions;
+}
 #endif
 
 void ARTSAsyncSpawner::CancelLoadRequestForTrainer(const TWeakObjectPtr<UTrainerComponent> TrainerComponent)

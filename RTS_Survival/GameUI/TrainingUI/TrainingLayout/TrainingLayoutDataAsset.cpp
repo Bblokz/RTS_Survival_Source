@@ -269,7 +269,8 @@ FTrainingLayoutBuilding UTrainingLayoutDataAsset::MakeDefaultAirbaseLayout()
 		MakeSubSection(LOCTEXT("Aircraft", "Aircraft"), {
 			               Slot::Aircraft(EAircraftSubtype::Aircraft_Bf109),
 			               Slot::Aircraft(EAircraftSubtype::Aircraft_Ju87),
-			               Slot::Aircraft(EAircraftSubtype::Aircraft_Me410)
+			               Slot::Aircraft(EAircraftSubtype::Aircraft_Me410),
+			               Slot::Aircraft(EAircraftSubtype::Aircraft_Horten229)
 		               })
 	});
 }
