@@ -402,6 +402,7 @@ void UEnemyDirectControlComponent::BeginPlay()
 	Super::BeginPlay();
 	BeginPlay_CacheEnemyControllerFromOwner();
 	StartDirectControlTickTimer();
+	StartDamagedVehicleCheckTimer();
 }
 
 void UEnemyDirectControlComponent::BeginPlay_CacheEnemyControllerFromOwner()
@@ -423,6 +424,7 @@ void UEnemyDirectControlComponent::BeginPlay_CacheEnemyControllerFromOwner()
 void UEnemyDirectControlComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	StopDirectControlTickTimer();
+	StopDamagedVehicleCheckTimer();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -545,6 +547,15 @@ bool UEnemyDirectControlComponent::RegisterDirectControlUnit(AActor* UnitActor)
 		return false;
 	}
 
+	AddUnitToDamagedVehicleRoster(UnitActor);
+	if (GetIsUnitInDamagedVehicleRetreat(UnitActor))
+	{
+		// Queued register-idle commands or finished formations must not hand a retreating unit back to the AI.
+		DebugReportRegisterDeregister("RegisterDirectControlUnit ignored unit in damaged vehicle retreat: "
+			+ UnitActor->GetName());
+		return false;
+	}
+
 	Blackboard.IdleDirectControlUnits.Add(IdleUnitEntry);
 
 #if defined(RTS_WITH_ENEMY_AI_SHIPPING_TESTS) && RTS_WITH_ENEMY_AI_SHIPPING_TESTS
@@ -578,6 +589,7 @@ bool UEnemyDirectControlComponent::DeregisterDirectControlUnit(AActor* UnitActor
 
 	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
 
+	RemoveUnitFromDamagedVehicleRoster(UnitActor);
 	const int32 RemovedCount = FBlackboardIdleUnitEntry::RemoveByUnitActor(
 		Blackboard.IdleDirectControlUnits,
 		UnitActor);
@@ -601,6 +613,9 @@ void UEnemyDirectControlComponent::ClearDirectControlUnits()
 
 	FStrategicAIBlackboard& Blackboard = StrategicAIComponent->GetEditableStrategicAIBlackboard();
 	Blackboard.IdleDirectControlUnits.Empty();
+	// Active retreats still finish; only stop watching the cleared units for new retreats and repairs.
+	M_DamagedVehicleState.DirectControlVehicles.Empty();
+	M_DamagedVehicleState.DirectControlHazmats.Empty();
 	DebugReportRegisterDeregister("ClearDirectControlUnits removed all direct control units.");
 }
 
@@ -1061,6 +1076,7 @@ TArray<TWeakObjectPtr<AActor>> UEnemyDirectControlComponent::GetRetreatGroupUnit
 		AppendRetreatGroupUnitsToExclude(RetreatGroup, UnitsToExclude);
 	}
 
+	AppendDamagedVehicleRetreatUnitsToExclude(UnitsToExclude);
 	return UnitsToExclude;
 }
 

@@ -23,6 +23,8 @@ namespace EnemyDirectControlConstants
 
 		inline constexpr bool DebugRemoveDirectControlUnitFromFormations = true;
 		inline constexpr bool DebugIgnoredFieldconstructionHazmats = true;
+		inline constexpr bool DebugDamagedVehicleRetreat = true;
+		const FColor DamagedVehicleRetreatColor = FColor::Orange;
 
 		const FColor RemoveFromFormationColor = FColor::Red;
 		const float RemoveFromFormationZOffset = 500.f;

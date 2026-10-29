@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "DirectControl_Retreat/DamagedVehicleRetreat.h"
 #include "DirectControl_Retreat/EnemyRetreatCache.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardIdleUnitsResult/FBlackboardIdleUnitsResult.h"
 #include "RTS_Survival/Enemy/StrategicAI/IdleUnitSelectionPolicy.h"
@@ -12,12 +13,17 @@ class AEnemyController;
 class AActor;
 class ICommands;
 class UEnemyFormationController;
+class ATankMaster;
+class ASquadController;
 struct FResultAlliedTanksToRetreat;
 struct FDamagedTanksRetreatGroup;
+struct FStrategicAIBlackboard;
 
 
 /**
  * @brief Tracks units under direct enemy AI control and offers safe registration APIs for blueprints.
+ * Badly damaged direct control vehicles are pulled from their orders, reversed once to the nearest base not in combat
+ * and repaired by a hazmat squad; both return to the idle blackboard once the vehicle is repaired or dead.
  * @note RegisterDirectControlUnit: call in blueprint when a unit should be controlled by direct control logic.
  * @note DeregisterDirectControlUnit: call in blueprint to return a unit to normal controller ownership.
  */
@@ -177,4 +183,54 @@ private:
 
 	void Debug_RetreatUnitsRemovedFromFormations(const TArray<AActor*>& RemovedUnits) const;
 	void Debug_IgnoredFieldconstructionHazmats(const TArray<AActor*>& IgnoredHazmatUnits) const;
+
+	// ---------------- Damaged vehicle retreat (EnemyDirectControlComponent_DamagedVehicleRetreat.cpp) ----------------
+
+	UPROPERTY()
+	FDirectControlDamagedVehicleState M_DamagedVehicleState;
+
+	void StartDamagedVehicleCheckTimer();
+	void StopDamagedVehicleCheckTimer();
+	void TickDamagedVehicleRetreats();
+
+	void AddUnitToDamagedVehicleRoster(AActor* UnitActor);
+	void RemoveUnitFromDamagedVehicleRoster(const AActor* UnitActor);
+	void PruneDamagedVehicleRoster();
+	// Units in an active retreat must not re-enter the idle blackboard, or the strategic AI re-orders them mid-retreat.
+	bool GetIsUnitInDamagedVehicleRetreat(const AActor* UnitActor) const;
+	void AppendDamagedVehicleRetreatUnitsToExclude(TArray<TWeakObjectPtr<AActor>>& OutUnitsToExclude) const;
+
+	void StartRetreatsForDamagedVehicles();
+	bool GetShouldVehicleStartRetreat(const ATankMaster* Vehicle) const;
+	bool GetIsUnitInOtherRetreatSystem(const AActor* UnitActor) const;
+	bool TryStartDamagedVehicleRetreat(ATankMaster* Vehicle);
+	/**
+	 * @brief Picks the closest base not in combat (else the closest base) and stops short of its center on the
+	 * vehicle's side so the vehicle does not reverse into buildings.
+	 * @param VehicleLocation Where the damaged vehicle is now.
+	 * @param OutRetreatLocation Navigable retreat location.
+	 * @return False when no base point is known or none projects onto the navmesh.
+	 */
+	bool TryGetDamagedVehicleRetreatLocation(const FVector& VehicleLocation, FVector& OutRetreatLocation) const;
+	bool GetIsBaseInCombat(const FVector& BaseLocation, const FStrategicAIBlackboard& Blackboard) const;
+	bool IssueRetreatOrderToVehicle(ATankMaster* Vehicle, const FVector& RetreatLocation) const;
+	void RemoveUnitFromStrategicAIOrders(AActor* UnitActor);
+	void SetVehicleRetreatBehaviourActive(ATankMaster* Vehicle, const bool bActive) const;
+
+	// @return True when the retreat is over (vehicle repaired or dead) and the entry should be removed.
+	bool UpdateDamagedVehicleRetreat(FDamagedVehicleRetreatEntry& Entry);
+	void UpdateRetreatPhase(FDamagedVehicleRetreatEntry& Entry) const;
+	void UpdateRepairHazmat(FDamagedVehicleRetreatEntry& Entry);
+	void TryAssignRepairHazmat(FDamagedVehicleRetreatEntry& Entry);
+	void DropRepairHazmat(FDamagedVehicleRetreatEntry& Entry);
+	ASquadController* FindClosestAvailableRepairHazmat(
+		const FVector& VehicleLocation,
+		const ASquadController* ExcludedHazmat) const;
+	// Hazmats on their way to (or building) field constructions are never pulled off for repairs.
+	bool GetIsHazmatAvailableForRepair(ASquadController* Hazmat, const ASquadController* ExcludedHazmat) const;
+	bool GetIsHazmatRepairing(ASquadController* Hazmat) const;
+	void FinishDamagedVehicleRetreat(const FDamagedVehicleRetreatEntry& Entry, const bool bVehicleRepaired);
+	void ReleaseUnitToDirectControl(AActor* UnitActor);
+
+	void Debug_DamagedVehicleRetreat(const AActor* UnitActor, const FString& Message) const;
 };

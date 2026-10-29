@@ -233,6 +233,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindLocationsUnderPlayerAttack FindLocationsUnderAttack_TimerRequest;
 
+	// Periodically evaluates the AI's own base points for player pressure so damaged vehicles avoid bases in combat.
+	// LocationsToEvaluate and RequestID are overwritten with the current base points on each think step.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FFindLocationsUnderPlayerAttack FindBasesInCombat_TimerRequest;
+
 	// This request is periodically used to find player squad and tank force concentrations.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FFindPlayerUnitBulkLocations FindPlayerUnitBulkLocations_TimerRequest;
@@ -303,6 +308,9 @@ private:
 
 	FAIThinkingTimerData M_LocationsUnderAttackThinkTimer;
 	void LocationsUnderAttack_ThinkStep();
+
+	FAIThinkingTimerData M_BasesInCombatThinkTimer;
+	void BasesInCombat_ThinkStep();
 
 	FAIThinkingTimerData M_PlayerUnitBulkLocationsThinkTimer;
 	void PlayerUnitBulkLocations_ThinkStep();
@@ -509,6 +517,8 @@ private:
 	void ProcessPlayerUnitCountsAndBaseResults(const TArray<FResultPlayerUnitCounts>& PlayerUnitCountsAndBaseResults);
 	void ProcessLocationsUnderPlayerAttackResults(
 		const TArray<FResultLocationsUnderPlayerAttack>& LocationsUnderPlayerAttackResults);
+	// Both the designer under-attack request and the base-combat request share one result array; split by RequestID.
+	bool GetIsBasesInCombatResult(const FResultLocationsUnderPlayerAttack& Result) const;
 	void ProcessPlayerUnitBulkLocationsResults(
 		const TArray<FResultPlayerUnitBulkLocations>& PlayerUnitBulkLocationsResults);
 	void ProcessConstructionLocationsResults(
