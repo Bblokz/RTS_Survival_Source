@@ -116,6 +116,14 @@ public:
 	 */
 	void HandleUnitVariantPreviewRequested(const FTrainingOption& Unit, const EUnitVariant Variant);
 
+	/**
+	 * @brief Lets the variant screen read what a variant is built from (its ability components) without spawning it.
+	 * @param Unit The unit as the faction menu lists it.
+	 * @param Variant Base gives the class the spawner held before any variant override.
+	 * @return A null soft pointer when the spawner or the data asset has no class for it.
+	 */
+	TSoftClassPtr<AActor> GetUnitVariantClass(const FTrainingOption& Unit, const EUnitVariant Variant) const;
+
 	/** Saves the choices (Base included) into the player profile and continues to the difficulty picker. */
 	void HandleUnitVariantSelectionConfirmed(const TMap<FTrainingOption, EUnitVariant>& Selections);
 
@@ -185,6 +193,10 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_CurrentPreviewActor;
+
+	// Spawn id of the only preview request still wanted; ClearCurrentPreview bumps it so a request that is
+	// still loading is destroyed on arrival instead of standing next to the newer preview.
+	int32 M_LatestPreviewSpawnId = 0;
 
 	UPROPERTY()
 	TScriptInterface<ICommands> M_CurrentCommandsInterface;

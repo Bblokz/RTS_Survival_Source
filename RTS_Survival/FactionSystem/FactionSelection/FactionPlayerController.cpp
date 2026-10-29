@@ -41,6 +41,38 @@ namespace FactionPlayerControllerPreview
 
 		TeamWeapon->Destroy();
 	}
+
+	// A squad preview owns its squad units and possibly a team weapon; those are separate actors.
+	void DestroyPreviewActor(AActor* PreviewActor)
+	{
+		ASquadController* PreviewSquadController = Cast<ASquadController>(PreviewActor);
+		ATeamWeapon* PreviewTeamWeapon = nullptr;
+		if (ATeamWeaponController* PreviewTeamWeaponController = Cast<ATeamWeaponController>(PreviewSquadController))
+		{
+			PreviewTeamWeapon = PreviewTeamWeaponController->GetControlledTeamWeaponNoReport();
+		}
+
+		if (IsValid(PreviewSquadController))
+		{
+			TArray<ASquadUnit*> SquadUnits = PreviewSquadController->GetSquadUnitsChecked();
+			for (ASquadUnit* SquadUnit : SquadUnits)
+			{
+				if (not IsValid(SquadUnit))
+				{
+					continue;
+				}
+
+				SquadUnit->Destroy();
+			}
+		}
+
+		if (IsValid(PreviewActor))
+		{
+			PreviewActor->Destroy();
+		}
+
+		DestroyTeamWeapon(PreviewTeamWeapon);
+	}
 }
 
 AFactionPlayerController::AFactionPlayerController()
@@ -81,7 +113,8 @@ void AFactionPlayerController::SpawnPreviewForTrainingOption(const FTrainingOpti
 	ClearCurrentPreview();
 
 	const FVector FactionUnitSpawnLocation = M_FactionUnitPreview->GetActorLocation();
-	const int32 PreviewSpawnRequestId = 1;
+	// Set before the request: a loaded class spawns and calls back inside AsyncSpawnOptionAtLocation.
+	const int32 PreviewSpawnRequestId = M_LatestPreviewSpawnId;
 	TWeakObjectPtr<AFactionPlayerController> WeakThis(this);
 	const bool bRequestStarted = M_RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
 		TrainingOption,
@@ -193,6 +226,26 @@ void AFactionPlayerController::HandleUnitVariantPreviewRequested(const FTraining
 	(void)M_RTSAsyncSpawner->SetPlayerUnitVariant(*M_VariantDataAsset,
 	                                              UPlayerUnitVariantManager::GetSpawnerKey(Unit), Variant);
 	SpawnPreviewForTrainingOption(Unit);
+}
+
+TSoftClassPtr<AActor> AFactionPlayerController::GetUnitVariantClass(const FTrainingOption& Unit,
+                                                                   const EUnitVariant Variant) const
+{
+	// Keyed as the spawner keys it, like HandleUnitVariantPreviewRequested (harvesters as tanks).
+	const FTrainingOption SpawnerKey = UPlayerUnitVariantManager::GetSpawnerKey(Unit);
+	if (Variant != EUnitVariant::Base)
+	{
+		if (not GetIsValidVariantDataAsset())
+		{
+			return TSoftClassPtr<AActor>();
+		}
+		return M_VariantDataAsset->FindVariantClass(SpawnerKey, Variant);
+	}
+	if (not GetIsValidRTSAsyncSpawner())
+	{
+		return TSoftClassPtr<AActor>();
+	}
+	return M_RTSAsyncSpawner->GetBaseTrainingOptionClass(SpawnerKey);
 }
 
 void AFactionPlayerController::HandleUnitVariantSelectionConfirmed(
@@ -771,10 +824,16 @@ void AFactionPlayerController::HandlePreviewSpawned(
 	const int32 SpawnRequestId)
 {
 	(void)TrainingOption;
-	(void)SpawnRequestId;
 
 	if (not IsValid(SpawnedActor))
 	{
+		return;
+	}
+
+	if (SpawnRequestId != M_LatestPreviewSpawnId)
+	{
+		// A newer preview was requested (or the preview cleared) while this one was loading.
+		FactionPlayerControllerPreview::DestroyPreviewActor(SpawnedActor);
 		return;
 	}
 
@@ -1251,34 +1310,9 @@ void AFactionPlayerController::ClearCurrentPreview()
 		World->GetTimerManager().ClearTimer(M_PreviewAircraftComeDownTimerHandle);
 	}
 
-	AActor* CurrentPreviewActor = M_CurrentPreviewActor.Get();
-	ASquadController* PreviewSquadController = Cast<ASquadController>(CurrentPreviewActor);
-	ATeamWeapon* PreviewTeamWeapon = nullptr;
-	if (ATeamWeaponController* PreviewTeamWeaponController = Cast<ATeamWeaponController>(PreviewSquadController))
-	{
-		PreviewTeamWeapon = PreviewTeamWeaponController->GetControlledTeamWeaponNoReport();
-	}
-
-	if (IsValid(PreviewSquadController))
-	{
-		TArray<ASquadUnit*> SquadUnits = PreviewSquadController->GetSquadUnitsChecked();
-		for (ASquadUnit* SquadUnit : SquadUnits)
-		{
-			if (not IsValid(SquadUnit))
-			{
-				continue;
-			}
-
-			SquadUnit->Destroy();
-		}
-	}
-
-	if (IsValid(CurrentPreviewActor))
-	{
-		CurrentPreviewActor->Destroy();
-	}
-
-	FactionPlayerControllerPreview::DestroyTeamWeapon(PreviewTeamWeapon);
+	// Spawns still loading would otherwise land next to the next preview.
+	++M_LatestPreviewSpawnId;
+	FactionPlayerControllerPreview::DestroyPreviewActor(M_CurrentPreviewActor.Get());
 
 	M_CurrentPreviewActor.Reset();
 	M_CurrentCommandsInterface.SetObject(nullptr);

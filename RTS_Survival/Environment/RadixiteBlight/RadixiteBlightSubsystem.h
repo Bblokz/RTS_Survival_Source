@@ -97,11 +97,14 @@ private:
 	 */
 	static void MergeToShaderLimit(TArray<FRadixiteBlightBlob>& Blobs);
 
+	// Actor iteration order differs between editor, commandlet and game worlds; position order does not.
+	static void SortByPosition(TArray<FRadixiteBlightBlob>& Blobs);
+
 	static FRadixiteBlightBlob EnclosingBlob(const FRadixiteBlightBlob& First, const FRadixiteBlightBlob& Second);
 
 	void WriteBlobs(const TArray<FRadixiteBlightBlob>& Blobs) const;
 
-	// Rounded to whole centimetres, so re-saving an unchanged map gives the same value; 0 when there are no circles.
+	// Rounded to 10 cm, so an unchanged map always gives the same value; 0 when there are no circles.
 	static uint32 ComputeFingerprint(const TArray<FRadixiteBlightBlob>& Blobs);
 
 #if WITH_EDITOR

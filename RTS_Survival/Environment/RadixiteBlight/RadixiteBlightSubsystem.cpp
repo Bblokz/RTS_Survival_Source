@@ -4,6 +4,8 @@
 
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Engine/World.h"
@@ -29,9 +31,10 @@ namespace RadixiteBlightPrivate
 	// Must match MAX_BLOBS in Source/Docs/Landscape/ls_blight_build.py: the circles the shader tests per pixel.
 	constexpr int32 MaxBlobs = 8;
 
-	// Dead ground around a crystal, from its colliding footprint (other components, such as the destruction
-	// geometry collection, span tens of metres): a few crystal widths, within sensible limits (cm).
-	constexpr float RadiusPerFootprint = 2.5f;
+	// Dead ground around a crystal, from its static meshes' footprint: a few crystal widths, within sensible limits
+	// (cm). Only the static meshes: the destruction geometry collection's bounds span tens of metres and differ
+	// between editor sessions, commandlets and game runs, which would change the grass fingerprint at random.
+	constexpr float RadiusPerFootprint = 3.0f;
 	constexpr float MinCrystalRadius = 500.f;
 	constexpr float MaxCrystalRadius = 1600.f;
 
@@ -40,6 +43,34 @@ namespace RadixiteBlightPrivate
 
 	// Below this a crystal sits on its neighbour's centre and the merged circle just takes the larger one.
 	constexpr float CoincidentDistance = 1.f;
+
+	// The grass fingerprint rounds circles to this many cm, so float noise never reads as a changed blight.
+	constexpr float FingerprintStep = 10.f;
+
+	// Only meshes the class itself defines: URadixiteGrowthComponent spawns extra meshes at random on every load, and a
+	// construction script may randomise too, which would make the circles (and the grass fingerprint) differ each time.
+	bool IsDesignedComponent(const UActorComponent& Component)
+	{
+		return Component.CreationMethod == EComponentCreationMethod::Native
+			|| Component.CreationMethod == EComponentCreationMethod::SimpleConstructionScript;
+	}
+
+	// Footprint of the actor's designed static meshes: the largest mesh asset's bounding sphere times the actor's own
+	// (saved) scale. The editor reruns construction scripts on every load, and the crystals' randomise their meshes'
+	// rotation and scale there, so world-space component bounds would change the circles from load to load.
+	float GetStaticMeshFootprint(const AActor& Actor)
+	{
+		float SphereRadius = 0.f;
+		TInlineComponentArray<UStaticMeshComponent*> Meshes(&Actor);
+		for (const UStaticMeshComponent* Mesh : Meshes)
+		{
+			if (IsValid(Mesh) && Mesh->GetStaticMesh() && IsDesignedComponent(*Mesh))
+			{
+				SphereRadius = FMath::Max(SphereRadius, Mesh->GetStaticMesh()->GetBounds().SphereRadius);
+			}
+		}
+		return SphereRadius * Actor.GetActorScale3D().GetAbsMax();
+	}
 
 	const FName CountParameter = TEXT("RadixiteBlightCount");
 	const FName BoundsParameter = TEXT("RadixiteBlightBounds");
@@ -173,14 +204,21 @@ int32 URadixiteBlightSubsystem::Refresh()
 	}
 	TArray<FRadixiteBlightBlob> Blobs = GatherCrystalBlobs();
 	const int32 CrystalCount = Blobs.Num();
+	SortByPosition(Blobs);
 	MergeToShaderLimit(Blobs);
+	// Merging swaps circles around: sort again so the collection and the fingerprint never depend on actor order.
+	SortByPosition(Blobs);
 	WriteBlobs(Blobs);
 #if WITH_EDITOR
 	M_EditorState.CurrentFingerprint = ComputeFingerprint(Blobs);
 	M_EditorState.Landscape = FindLandscape();
 #endif
-	UE_LOG(LogRTSRadixiteBlight, Log, TEXT("%s: %d radixite crystals in %d blight circles"),
-	       *GetWorld()->GetMapName(), CrystalCount, Blobs.Num());
+	UE_LOG(LogRTSRadixiteBlight, Log, TEXT("%s: %d radixite crystals in %d blight circles (fingerprint %08x)"),
+	       *GetWorld()->GetMapName(), CrystalCount, Blobs.Num(), ComputeFingerprint(Blobs));
+	for (const FRadixiteBlightBlob& Blob : Blobs)
+	{
+		UE_LOG(LogRTSRadixiteBlight, Verbose, TEXT("  circle %s radius %.1f"), *Blob.Centre.ToString(), Blob.Radius);
+	}
 	return Blobs.Num();
 }
 
@@ -208,14 +246,20 @@ TArray<FRadixiteBlightBlob> URadixiteBlightSubsystem::GatherCrystalBlobs() const
 		{
 			continue;
 		}
-		const FBox Bounds = Actor->GetComponentsBoundingBox(false);
-		const FVector Extent = Bounds.IsValid ? Bounds.GetExtent() : FVector::ZeroVector;
-		const float Footprint = FMath::Max(Extent.X, Extent.Y);
+		const float Footprint = GetStaticMeshFootprint(*Actor);
 		FRadixiteBlightBlob& Blob = Blobs.AddDefaulted_GetRef();
 		Blob.Centre = FVector2D(Actor->GetActorLocation());
 		Blob.Radius = FMath::Clamp(Footprint * RadiusPerFootprint, MinCrystalRadius, MaxCrystalRadius);
 	}
 	return Blobs;
+}
+
+void URadixiteBlightSubsystem::SortByPosition(TArray<FRadixiteBlightBlob>& Blobs)
+{
+	Blobs.Sort([](const FRadixiteBlightBlob& First, const FRadixiteBlightBlob& Second)
+	{
+		return First.Centre.X != Second.Centre.X ? First.Centre.X < Second.Centre.X : First.Centre.Y < Second.Centre.Y;
+	});
 }
 
 void URadixiteBlightSubsystem::MergeToShaderLimit(TArray<FRadixiteBlightBlob>& Blobs)
@@ -290,12 +334,13 @@ void URadixiteBlightSubsystem::WriteBlobs(const TArray<FRadixiteBlightBlob>& Blo
 
 uint32 URadixiteBlightSubsystem::ComputeFingerprint(const TArray<FRadixiteBlightBlob>& Blobs)
 {
+	using RadixiteBlightPrivate::FingerprintStep;
 	uint32 Fingerprint = 0;
 	for (const FRadixiteBlightBlob& Blob : Blobs)
 	{
-		Fingerprint = HashCombine(Fingerprint, GetTypeHash(FMath::RoundToInt(Blob.Centre.X)));
-		Fingerprint = HashCombine(Fingerprint, GetTypeHash(FMath::RoundToInt(Blob.Centre.Y)));
-		Fingerprint = HashCombine(Fingerprint, GetTypeHash(FMath::RoundToInt(Blob.Radius)));
+		Fingerprint = HashCombine(Fingerprint, GetTypeHash(FMath::RoundToInt(Blob.Centre.X / FingerprintStep)));
+		Fingerprint = HashCombine(Fingerprint, GetTypeHash(FMath::RoundToInt(Blob.Centre.Y / FingerprintStep)));
+		Fingerprint = HashCombine(Fingerprint, GetTypeHash(FMath::RoundToInt(Blob.Radius / FingerprintStep)));
 	}
 	return Fingerprint;
 }
