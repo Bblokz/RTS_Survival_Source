@@ -10,6 +10,9 @@
 
 #include "UnitVariantSelectionStyle.generated.h"
 
+class UDataTable;
+class UTexture2D;
+
 /**
  * @brief The look of the unit variant selection screen, filled in the class defaults of its Blueprint child with the
  * Frontstahl Custom_Variant* slice instances (UISkins/_generator/variant_selection_spec.md). The menu hands it to its
@@ -66,6 +69,34 @@ struct FUnitVariantSelectionStyle
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Variant Card")
 	FSlateBrush SelectedMarker;
 
+	// Buttons_DataTableb: the title, description and icon the action bar shows for each ability.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Abilities")
+	TSoftObjectPtr<UDataTable> AbilityCardTable = TSoftObjectPtr<UDataTable>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/GameUI/ActionUI/Data/Buttons_DataTableb.Buttons_DataTableb")));
+
+	// The <Style> tags of the ability descriptions, the set the action bar's description widget uses.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Abilities")
+	TSoftObjectPtr<UDataTable> AbilityRichTextStyle = TSoftObjectPtr<UDataTable>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/GameUI/WeaponUI/AmmoButtonWidgets/DT_RichText.DT_RichText")));
+
+	// WeaponUI_Data: the icon brush ("Slate") the weapon bar shows per weapon, rows named after EWeaponName.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapons")
+	TSoftObjectPtr<UDataTable> WeaponCardTable = TSoftObjectPtr<UDataTable>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Blueprints/GameUI/WeaponUI/WeaponUI_Data.WeaponUI_Data")));
+
+	// White pictograms in front of the 1-10 pip bars of each weapon; tinted by the screen.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapons")
+	TSoftObjectPtr<UTexture2D> DamageStatIcon = TSoftObjectPtr<UTexture2D>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Textures/GameUI/VariantSelection/T_VariantStat_Damage.T_VariantStat_Damage")));
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapons")
+	TSoftObjectPtr<UTexture2D> PenetrationStatIcon = TSoftObjectPtr<UTexture2D>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Textures/GameUI/VariantSelection/T_VariantStat_Penetration.T_VariantStat_Penetration")));
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapons")
+	TSoftObjectPtr<UTexture2D> ReloadStatIcon = TSoftObjectPtr<UTexture2D>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Textures/GameUI/VariantSelection/T_VariantStat_Reload.T_VariantStat_Reload")));
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Buttons")
 	FButtonStyle ConfirmButton;
 
@@ -101,6 +132,14 @@ struct FUnitVariantSelectionStyle
 	// "BASE" / "VARIANT A" labels on the cards.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Text")
 	FSlateColor LabelColor = FSlateColor(FColor::FromHex(TEXT("38C8FF")));
+
+	// The REMOVED tag of an ability a variant lost against Base.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Text")
+	FSlateColor RemovedColor = FSlateColor(FColor::FromHex(TEXT("E07A5F")));
+
+	// A stat that is better than Base's.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Text")
+	FSlateColor BetterColor = FSlateColor(FColor::FromHex(TEXT("8FD46B")));
 
 	// The faction name in the header and the EQUIPPED label.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Text")

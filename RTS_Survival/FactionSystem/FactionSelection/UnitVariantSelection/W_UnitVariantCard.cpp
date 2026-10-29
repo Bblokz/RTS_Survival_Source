@@ -13,25 +13,30 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Components/WrapBox.h"
+#include "Engine/Texture2D.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "UnitVariantAbilityCards.h"
+#include "UnitVariantSelectionButton.h"
 #include "UnitVariantSelectionWidgetHelpers.h"
 #include "W_UnitVariantSelectionMenu.h"
 
-// Measured on Custom_VariantCard (variant_selection_spec.md, section 2).
+// Measured on Custom_VariantCard (variant_selection_spec.md, section 2). The 9-slice card art stretches, so the
+// card takes the width of the column and grows taller than its 216 minimum when the description needs more lines.
 namespace UnitVariantCardLayout
 {
-	constexpr float CardWidth = 440.f;
-	constexpr float CardHeight = 216.f;
+	constexpr float CardMinHeight = 216.f;
 	constexpr float IconWellSize = 136.f;
 	constexpr float IconSize = 128.f;
 	const FMargin IconWellOffset(16.f, 40.f, 0.f, 0.f);
 	const FMargin IconWellPadding(4.f);
-	// Text column x 168..424; the label centres on y 48, the name on y 74, the description starts at y 88.
-	constexpr float TextColumnWidth = 256.f;
-	const FMargin TextColumnOffset(168.f, 40.f, 0.f, 0.f);
+	// Text column from x 168 to 16 short of the right rim; the label centres on y 48, the name on y 74, the
+	// description starts at y 88. The bottom keeps the description off the rim when it makes the card grow.
+	const FMargin TextColumnOffset(168.f, 40.f, 16.f, 24.f);
 	const FMargin NamePadding(0.f, 6.f, 0.f, 2.f);
 	constexpr float MarkerSize = 28.f;
-	const FMargin MarkerOffset(388.f, 34.f, 0.f, 0.f);
+	// Spec (388,34) on a 440 wide card, kept from the right so it follows the rim when a scroll bar narrows the card.
+	const FMargin MarkerOffset(0.f, 34.f, 24.f, 0.f);
 	// EQUIPPED ends at x 380 on the label's line.
 	const FMargin EquippedOffset(0.f, 40.f, 60.f, 0.f);
 	constexpr int32 LabelFontSize = 12;
@@ -39,6 +44,11 @@ namespace UnitVariantCardLayout
 	constexpr int32 NameFontSize = 20;
 	constexpr int32 DescriptionFontSize = 14;
 	constexpr float DescriptionLineHeight = 1.15f;
+	// Ability icons under the description, in a smaller copy of the unit list's icon well.
+	const FMargin AbilityIconRowPadding(0.f, 10.f, 0.f, 0.f);
+	constexpr float AbilityIconWellSize = 40.f;
+	const FMargin AbilityIconWellPadding(3.f);
+	constexpr float AbilityIconSpacing = 6.f;
 }
 
 void UW_UnitVariantCard::NativeOnInitialized()
@@ -55,12 +65,14 @@ void UW_UnitVariantCard::BuildWidgetTree()
 		return;
 	}
 	USizeBox* const SizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	SizeBox->SetWidthOverride(CardWidth);
-	SizeBox->SetHeightOverride(CardHeight);
+	SizeBox->SetMinDesiredHeight(CardMinHeight);
 	WidgetTree->RootWidget = SizeBox;
 
-	M_Button = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	// Never takes keyboard focus, so the menu keeps the arrow keys for its navigation.
+	M_Button = WidgetTree->ConstructWidget<UUnitVariantSelectionButton>(UUnitVariantSelectionButton::StaticClass());
 	M_Button->OnClicked.AddDynamic(this, &UW_UnitVariantCard::OnCardClicked);
+	M_Button->OnHovered.AddDynamic(this, &UW_UnitVariantCard::OnCardHovered);
+	M_Button->OnUnhovered.AddDynamic(this, &UW_UnitVariantCard::OnCardUnhovered);
 	SizeBox->SetContent(M_Button);
 
 	UOverlay* const CardOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass());
@@ -98,16 +110,14 @@ void UW_UnitVariantCard::BuildIconWell(UOverlay* CardOverlay)
 void UW_UnitVariantCard::BuildTextColumn(UOverlay* CardOverlay)
 {
 	using namespace UnitVariantCardLayout;
-	USizeBox* const ColumnBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	ColumnBox->SetWidthOverride(TextColumnWidth);
-	ColumnBox->SetVisibility(ESlateVisibility::HitTestInvisible);
-	UOverlaySlot* const ColumnSlot = CardOverlay->AddChildToOverlay(ColumnBox);
-	ColumnSlot->SetHorizontalAlignment(HAlign_Left);
+	UVerticalBox* const Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	Column->SetVisibility(ESlateVisibility::HitTestInvisible);
+	UOverlaySlot* const ColumnSlot = CardOverlay->AddChildToOverlay(Column);
+	// Fill, so the wrapping texts take the column width the card is given and their height sizes the card.
+	ColumnSlot->SetHorizontalAlignment(HAlign_Fill);
 	ColumnSlot->SetVerticalAlignment(VAlign_Top);
 	ColumnSlot->SetPadding(TextColumnOffset);
 
-	UVerticalBox* const Column = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	ColumnBox->SetContent(Column);
 	M_LabelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	Column->AddChildToVerticalBox(M_LabelText);
 	M_NameText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
@@ -118,6 +128,10 @@ void UW_UnitVariantCard::BuildTextColumn(UOverlay* CardOverlay)
 	M_DescriptionText->SetAutoWrapText(true);
 	M_DescriptionText->SetLineHeightPercentage(DescriptionLineHeight);
 	Column->AddChildToVerticalBox(M_DescriptionText);
+	M_AbilityIconRow = WidgetTree->ConstructWidget<UWrapBox>(UWrapBox::StaticClass());
+	M_AbilityIconRow->SetInnerSlotPadding(FVector2D(AbilityIconSpacing, AbilityIconSpacing));
+	M_AbilityIconRow->SetVisibility(ESlateVisibility::Collapsed);
+	Column->AddChildToVerticalBox(M_AbilityIconRow)->SetPadding(AbilityIconRowPadding);
 }
 
 void UW_UnitVariantCard::BuildEquippedBadge(UOverlay* CardOverlay)
@@ -135,7 +149,7 @@ void UW_UnitVariantCard::BuildEquippedBadge(UOverlay* CardOverlay)
 	MarkerBox->SetWidthOverride(MarkerSize);
 	MarkerBox->SetHeightOverride(MarkerSize);
 	UOverlaySlot* const MarkerSlot = CardOverlay->AddChildToOverlay(MarkerBox);
-	MarkerSlot->SetHorizontalAlignment(HAlign_Left);
+	MarkerSlot->SetHorizontalAlignment(HAlign_Right);
 	MarkerSlot->SetVerticalAlignment(VAlign_Top);
 	MarkerSlot->SetPadding(MarkerOffset);
 	M_SelectedMarker = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
@@ -185,13 +199,55 @@ void UW_UnitVariantCard::SetIsSelected(const bool bIsSelected)
 	ApplySelectionLook();
 }
 
+void UW_UnitVariantCard::SetAbilityIcons(const TArray<FUnitVariantAbilityCard>& AbilityCards)
+{
+	using namespace UnitVariantCardLayout;
+	if (not GetIsValidAbilityIconRow())
+	{
+		return;
+	}
+	M_AbilityIconRow->ClearChildren();
+	for (const FUnitVariantAbilityCard& AbilityCard : AbilityCards)
+	{
+		if (not IsValid(AbilityCard.Icon))
+		{
+			continue;
+		}
+		USizeBox* const IconBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+		IconBox->SetWidthOverride(AbilityIconWellSize);
+		IconBox->SetHeightOverride(AbilityIconWellSize);
+		UBorder* const IconWell = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+		IconWell->SetBrush(M_Style.UnitIconWell);
+		IconWell->SetPadding(AbilityIconWellPadding);
+		IconBox->SetContent(IconWell);
+		UImage* const Icon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+		Icon->SetBrushFromTexture(AbilityCard.Icon);
+		IconWell->SetContent(Icon);
+		M_AbilityIconRow->AddChildToWrapBox(IconBox);
+	}
+	M_AbilityIconRow->SetVisibility(M_AbilityIconRow->HasAnyChildren()
+		                                ? ESlateVisibility::HitTestInvisible
+		                                : ESlateVisibility::Collapsed);
+}
+
+void UW_UnitVariantCard::SetIsKeyboardFocused(const bool bIsKeyboardFocused)
+{
+	bM_IsKeyboardFocused = bIsKeyboardFocused;
+	ApplySelectionLook();
+}
+
 void UW_UnitVariantCard::ApplySelectionLook()
 {
 	if (not GetIsValidButton())
 	{
 		return;
 	}
-	M_Button->SetStyle(bM_IsSelected ? M_Style.CardSelected : M_Style.Card);
+	FButtonStyle ButtonStyle = bM_IsSelected ? M_Style.CardSelected : M_Style.Card;
+	if (bM_IsKeyboardFocused)
+	{
+		ButtonStyle.Normal = ButtonStyle.Hovered;
+	}
+	M_Button->SetStyle(ButtonStyle);
 	M_IconWell->SetBrush(bM_IsSelected ? M_Style.CardIconWellSelected : M_Style.CardIconWell);
 	M_NameText->SetColorAndOpacity(bM_IsSelected ? M_Style.SelectedTextColor : M_Style.TextColor);
 	const ESlateVisibility BadgeVisibility = bM_IsSelected
@@ -208,6 +264,24 @@ void UW_UnitVariantCard::OnCardClicked()
 		return;
 	}
 	M_Menu->HandleVariantCardClicked(M_Variant);
+}
+
+void UW_UnitVariantCard::OnCardHovered()
+{
+	if (not GetIsValidMenu())
+	{
+		return;
+	}
+	M_Menu->HandleVariantCardHovered(M_Variant, true);
+}
+
+void UW_UnitVariantCard::OnCardUnhovered()
+{
+	if (not GetIsValidMenu())
+	{
+		return;
+	}
+	M_Menu->HandleVariantCardHovered(M_Variant, false);
 }
 
 bool UW_UnitVariantCard::GetIsValidMenu() const
@@ -227,5 +301,16 @@ bool UW_UnitVariantCard::GetIsValidButton() const
 		return true;
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_Button", "GetIsValidButton", this);
+	return false;
+}
+
+bool UW_UnitVariantCard::GetIsValidAbilityIconRow() const
+{
+	if (IsValid(M_AbilityIconRow))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(this, "M_AbilityIconRow", "GetIsValidAbilityIconRow",
+	                                                             this);
 	return false;
 }
