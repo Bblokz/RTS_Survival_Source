@@ -94,6 +94,10 @@ struct FUnitVariantSelectionStyle
 		TEXT("/Game/RTS_Survival/Textures/GameUI/VariantSelection/T_VariantStat_Penetration.T_VariantStat_Penetration")));
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapons")
+	TSoftObjectPtr<UTexture2D> MagazineStatIcon = TSoftObjectPtr<UTexture2D>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/Textures/GameUI/VariantSelection/T_VariantStat_Magazine.T_VariantStat_Magazine")));
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapons")
 	TSoftObjectPtr<UTexture2D> ReloadStatIcon = TSoftObjectPtr<UTexture2D>(FSoftObjectPath(
 		TEXT("/Game/RTS_Survival/Textures/GameUI/VariantSelection/T_VariantStat_Reload.T_VariantStat_Reload")));
 

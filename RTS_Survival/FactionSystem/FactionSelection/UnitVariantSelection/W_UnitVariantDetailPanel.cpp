@@ -101,6 +101,7 @@ void UW_UnitVariantDetailPanel::SetupPanel(const FUnitVariantSelectionStyle& Sty
 	M_DamageStatIcon = Style.DamageStatIcon.LoadSynchronous();
 	M_PenetrationStatIcon = Style.PenetrationStatIcon.LoadSynchronous();
 	M_ReloadStatIcon = Style.ReloadStatIcon.LoadSynchronous();
+	M_MagazineStatIcon = Style.MagazineStatIcon.LoadSynchronous();
 	if (not GetIsValidPlate())
 	{
 		return;
@@ -296,6 +297,10 @@ void UW_UnitVariantDetailPanel::AddWeaponRow(const FUnitVariantWeaponStats& Weap
 		M_ReloadStatIcon, UnitVariantStatComparison::GetReloadLevel(Weapon.ReloadSeconds),
 		TrendAgainstBase(Weapon.ReloadSeconds, BaseWeapon != nullptr ? BaseWeapon->ReloadSeconds : NoBaseValue,
 		                 false)))->SetPadding(FMargin(0.f, StatBarSpacing, 0.f, 0.f));
+	StatBars->AddChildToVerticalBox(BuildStatBar(
+		M_MagazineStatIcon, UnitVariantStatComparison::GetMagazineLevel(Weapon.MagCapacity),
+		TrendAgainstBase(Weapon.MagCapacity, BaseWeapon != nullptr ? BaseWeapon->MagCapacity : NoBaseValue, true)))->
+		SetPadding(FMargin(0.f, StatBarSpacing, 0.f, 0.f));
 	AddIconRow(Icon, WeaponIconSize, Title, Change, StatBars);
 }
 

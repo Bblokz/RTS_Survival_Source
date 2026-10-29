@@ -98,6 +98,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTexture2D> M_ReloadStatIcon;
 
+	UPROPERTY()
+	TObjectPtr<UTexture2D> M_MagazineStatIcon;
+
 	bool bM_NextRowFollowsLabel = false;
 
 	void BuildWidgetTree();

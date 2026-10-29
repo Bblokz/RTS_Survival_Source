@@ -195,7 +195,7 @@ void AFactionPlayerController::HandleLaunchCampaignRequested(const ERTSFaction S
 	}
 
 	M_SelectedFaction = SelectedFaction;
-	RTSGameInstance->SetPlayerFaction(M_SelectedFaction);
+	RTSGameInstance->SetPlayerChosenFaction(M_SelectedFaction);
 
 	// The training layout is what the faction trains; the menu's showcase list is only the fallback.
 	TArray<FTrainingOption> FactionUnits = GetFactionUnitsFromTrainingLayout(M_SelectedFaction);
@@ -488,7 +488,7 @@ void AFactionPlayerController::HandleWorldGenerationSettingsGenerated(const FCam
 	}
 
 	RTSGameInstance->SetCampaignGenerationSettings(Settings);
-	RTSGameInstance->SetPlayerFaction(M_SelectedFaction);
+	RTSGameInstance->SetPlayerChosenFaction(M_SelectedFaction);
 	RTSGameInstance->SetSelectedGameDifficulty(M_SelectedGameDifficulty);
 
 	if (GetIsValidFactionWorldGenerationSettings())

@@ -14,6 +14,8 @@ namespace UnitVariantStatComparisonPrivate
 	constexpr float MaxArmorPen = 800.f;
 	constexpr float FastestReloadSeconds = 1.f;
 	constexpr float SlowestReloadSeconds = 45.f;
+	constexpr float SmallestMagazine = 1.f;
+	constexpr float LargestMagazine = 150.f;
 	// Health and speed changes smaller than this are noise, not a trade-off worth a row.
 	constexpr float MinimumChangePercent = 3.f;
 	constexpr float ChangeStepPercent = 15.f;
@@ -142,6 +144,12 @@ EUnitVariantStatTrend UnitVariantStatComparison::GetTrend(const float VariantVal
 		return EUnitVariantStatTrend::Same;
 	}
 	return (ChangePercent > 0.f) == bHigherIsBetter ? EUnitVariantStatTrend::Better : EUnitVariantStatTrend::Worse;
+}
+
+int32 UnitVariantStatComparison::GetMagazineLevel(const int32 MagCapacity)
+{
+	using namespace UnitVariantStatComparisonPrivate;
+	return GetLogLevel(MagCapacity, SmallestMagazine, LargestMagazine);
 }
 
 TArray<FUnitVariantStatRow> UnitVariantStatComparison::CompareWithBase(const FUnitVariantProbeResult& Variant,

@@ -63,7 +63,7 @@ public:
 	void HandleUnitEntryClicked(const int32 EntryIndex);
 	void HandleVariantCardClicked(const EUnitVariant Variant);
 
-	/** The ability panel shows the hovered card's abilities, and the equipped variant's when no card is hovered. */
+	/** The detail panel shows the hovered (or keyboard-focused) card and hides when no card is hovered. */
 	void HandleVariantCardHovered(const EUnitVariant Variant, const bool bIsHovered);
 
 	/** @param bDiscard True leaves the screen without saving; false closes the dialog and keeps the choices. */
@@ -244,7 +244,6 @@ private:
 	// Null until the variant's probe was read.
 	const FUnitVariantProbeResult* FindVariantProbe(const FTrainingOption& Unit, const EUnitVariant Variant) const;
 	void RefreshAbilityPanel();
-	EUnitVariant GetAbilityPanelVariant() const;
 
 	bool GetHasUnconfirmedChange(const FTrainingOption& Unit) const;
 	int32 GetUnconfirmedChangeCount() const;

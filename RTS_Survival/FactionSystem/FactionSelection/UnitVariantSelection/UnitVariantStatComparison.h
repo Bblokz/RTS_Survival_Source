@@ -45,6 +45,9 @@ namespace UnitVariantStatComparison
 	/** @return 1-10 where a shorter reload fills more pips. */
 	int32 GetReloadLevel(const float ReloadSeconds);
 
+	/** @return 1-10 for the rounds per magazine: single-shot cannons at 1, belt-fed machine guns near 10. */
+	int32 GetMagazineLevel(const int32 MagCapacity);
+
 	/**
 	 * @brief The Base weapon a variant's weapon is judged against: the same weapon; for the variant's main gun Base's
 	 * main gun (the Maus AA's 88 mm Flak against the 128 mm it replaces); else Base's weapon of the closest calibre

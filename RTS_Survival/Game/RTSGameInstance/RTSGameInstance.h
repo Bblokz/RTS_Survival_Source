@@ -55,11 +55,14 @@ public:
 	void SetSelectedGameDifficultyForRestart(const FRTSGameDifficulty& Difficulty);
 	bool ConsumeRestartWithNewDifficultyRequest();
 	FRTSGameDifficulty GetSelectedGameDifficulty() const { return M_SelectedGameDifficulty; }
-	void SetPlayerFaction(const ERTSFaction Faction) { M_PlayerFaction = Faction; }
+	void SetPlayerFaction(const ERTSFaction Faction);
+	// Faction picked in the faction selection menu; mission manager faction backups never override it.
+	void SetPlayerChosenFaction(const ERTSFaction Faction);
 	void SetPlayerCommander(const ERTSCommander Commander) { M_PlayerCommander = Commander; }
 	ERTSFaction GetPlayerFaction() const ;
 	// False until faction selection (or the PIE startup settings) chose one; GetPlayerFaction reports an error then.
 	bool GetHasPlayerFaction() const;
+	bool GetIsPlayerFactionChosenByPlayer() const { return bM_IsPlayerFactionChosenByPlayer; }
 	ERTSCommander GetPlayerCommander() const ;
 
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Mission Context")
@@ -122,6 +125,8 @@ private:
 	FRTSGameDifficulty M_SelectedGameDifficulty;
 	bool bM_RestartWithNewDifficultyRequested = false;
 	ERTSFaction M_PlayerFaction;
+	// True when M_PlayerFaction came from the player's selection rather than dev settings, menus or tests.
+	bool bM_IsPlayerFactionChosenByPlayer = false;
 	ERTSCommander M_PlayerCommander;
 
 	UPROPERTY()

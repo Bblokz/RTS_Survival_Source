@@ -135,6 +135,18 @@ bool URTSGameInstance::ConsumeRestartWithNewDifficultyRequest()
 	return bRestartWithNewDifficultyRequested;
 }
 
+void URTSGameInstance::SetPlayerFaction(const ERTSFaction Faction)
+{
+	M_PlayerFaction = Faction;
+	bM_IsPlayerFactionChosenByPlayer = false;
+}
+
+void URTSGameInstance::SetPlayerChosenFaction(const ERTSFaction Faction)
+{
+	M_PlayerFaction = Faction;
+	bM_IsPlayerFactionChosenByPlayer = true;
+}
+
 ERTSFaction URTSGameInstance::GetPlayerFaction() const
 {
 	if(M_PlayerFaction == ERTSFaction::NotInitialised)

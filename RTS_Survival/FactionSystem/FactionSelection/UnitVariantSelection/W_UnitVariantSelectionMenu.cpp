@@ -837,26 +837,19 @@ const FUnitVariantProbeResult* UW_UnitVariantSelectionMenu::FindVariantProbe(con
 	return M_Probes->FindResult(M_FactionPlayerController->GetUnitVariantClass(Unit, Variant).Get());
 }
 
-EUnitVariant UW_UnitVariantSelectionMenu::GetAbilityPanelVariant() const
-{
-	if (bM_HasHoveredVariant)
-	{
-		return M_HoveredVariant;
-	}
-	if (not M_Units.IsValidIndex(M_SelectedUnitIndex))
-	{
-		return EUnitVariant::Base;
-	}
-	return GetChosenVariant(M_Units[M_SelectedUnitIndex]);
-}
-
 void UW_UnitVariantSelectionMenu::RefreshAbilityPanel()
 {
 	if (not GetIsValidDetailPanel())
 	{
 		return;
 	}
-	const EUnitVariant ShownVariant = GetAbilityPanelVariant();
+	// Only while a card is hovered (or focused with the keys): the rest of the time the hangar unit stays in view.
+	if (not bM_HasHoveredVariant)
+	{
+		M_DetailPanel->HidePanel();
+		return;
+	}
+	const EUnitVariant ShownVariant = M_HoveredVariant;
 	const FUnitVariantAbilityCardList* const AbilityCards = M_VariantAbilityCards.Find(ShownVariant);
 	if (AbilityCards == nullptr || not M_Units.IsValidIndex(M_SelectedUnitIndex))
 	{
