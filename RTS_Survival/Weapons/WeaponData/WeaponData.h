@@ -15,6 +15,7 @@
 #include "Sound/SoundCue.h"
 #include "WeaponShellType/WeaponShellType.h"
 
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "WeaponData.generated.h"
 
 
@@ -676,7 +677,7 @@ public:
 	/** @return Progress of the running magazine reload in [0, 1]; 0 while not reloading. */
 	float GetReloadProgress() const;
 
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 	/** Test hook (offscreen UI captures): starts a magazine reload as if the magazine had run empty. */
 	void Debug_StartReload() { Reload(); }
 #endif
