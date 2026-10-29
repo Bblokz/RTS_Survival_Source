@@ -6,6 +6,7 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Player/Abilities.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "EnemyUnitAbilityAIComponent.generated.h"
 
 class AEnemyController;
@@ -17,7 +18,7 @@ struct FUnitAbilityEntry;
 enum class EBehaviourAbilityType : uint8;
 enum class EEnemyGrenadeUsage : uint8;
 
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 // Test hook: an enemy unit used an ability; the location is the aim point for grenades and zero for behaviours.
 DECLARE_MULTICAST_DELEGATE_ThreeParams(FOnEnemyUnitAbilityUsedForTest, AActor* /*UnitActor*/, EAbilityID /*Ability*/,
                                        const FVector& /*AimLocation*/);
@@ -120,7 +121,7 @@ public:
 	const FEnemyUnitAbilityAIStats& GetStats() const { return M_Stats; }
 	int32 GetRosterCount() const { return M_Roster.Num(); }
 
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 	FOnEnemyUnitAbilityUsedForTest OnEnemyUnitAbilityUsedForTest;
 #endif
 

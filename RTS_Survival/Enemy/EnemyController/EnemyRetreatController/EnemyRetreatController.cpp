@@ -11,6 +11,7 @@
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 namespace EnemyRetreatControllerConstants
 {
@@ -273,7 +274,7 @@ void UEnemyRetreatController::CheckRetreatingUnits()
 		{
 			RetreatData.bM_HasAllUnitsReached = true;
 			RetreatData.AllUnitsReachedTimeSeconds = CurrentTimeSeconds;
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 			OnRetreatAllUnitsReachedForTest.Broadcast(RetreatData.RetreatID,
 			                                          CurrentTimeSeconds - RetreatData.RetreatStartTimeSeconds);
 #endif

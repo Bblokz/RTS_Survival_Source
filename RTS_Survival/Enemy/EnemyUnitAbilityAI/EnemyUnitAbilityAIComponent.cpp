@@ -30,6 +30,7 @@
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 namespace EnemyUnitAbilityAIConstants
 {
@@ -570,7 +571,7 @@ void UEnemyUnitAbilityAIComponent::RegisterGrenadeThrow(const FEnemyAbilityUnitC
 	Claim.ExpireSeconds = NowSeconds + Settings.TargetClaimSeconds;
 	M_GrenadeClaims.Add(Claim);
 	++M_Stats.GrenadesThrown;
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 	OnEnemyUnitAbilityUsedForTest.Broadcast(Context.UnitActor, EAbilityID::IdThrowGrenade, AimLocation);
 #endif
 }
@@ -816,7 +817,7 @@ void UEnemyUnitAbilityAIComponent::OnBehaviourUsed(FEnemyAbilityAIUnit& Unit, co
 	Unit.M_LastAbilityUseSeconds = NowSeconds;
 	Unit.bM_HasUsedAbility = true;
 	++M_Stats.BehavioursUsed;
-#if !UE_BUILD_SHIPPING
+#if !UE_BUILD_SHIPPING || RTS_WITH_MAP_TESTS
 	OnEnemyUnitAbilityUsedForTest.Broadcast(Context.UnitActor, EAbilityID::IdApplyBehaviour, FVector::ZeroVector);
 #endif
 }
