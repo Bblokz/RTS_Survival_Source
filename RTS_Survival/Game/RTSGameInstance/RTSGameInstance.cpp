@@ -145,6 +145,11 @@ ERTSFaction URTSGameInstance::GetPlayerFaction() const
 	return M_PlayerFaction;
 }
 
+bool URTSGameInstance::GetHasPlayerFaction() const
+{
+	return M_PlayerFaction != ERTSFaction::NotInitialised;
+}
+
 ERTSCommander URTSGameInstance::GetPlayerCommander() const
 {
 	if (M_PlayerCommander == ERTSCommander::NoCommander )

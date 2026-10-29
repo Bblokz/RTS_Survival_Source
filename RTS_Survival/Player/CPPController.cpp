@@ -1054,6 +1054,11 @@ void ACPPController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	DeltaSeconds = DeltaTime;
+	if (bM_IsMainMenuController)
+	{
+		// The menu UI takes all input; no hover info, previews or aim cursors over the battles behind it.
+		return;
+	}
 
 	// Get current mouse position in screen space.
 	FVector2D MouseScreenPosition;
@@ -2206,6 +2211,10 @@ void ACPPController::ApplyEnemyDirectorUnitOverrides() const
 void ACPPController::BeginPlay()
 {
 	Super::BeginPlay();
+	if (bM_IsMainMenuController)
+	{
+		return;
+	}
 	BeginPlay_SetupRotationArrow();
 	BeginPlay_SetupOutlineRules();
 	BeginPlay_SetupPlayerAimAbility();
@@ -2223,7 +2232,7 @@ void ACPPController::PostInitializeComponents()
 	Super::PostInitializeComponents();
 	M_PlayerCameraController = FindComponentByClass<UPlayerCameraController>();
 
-	if (M_FormationController)
+	if (M_FormationController && not bM_IsMainMenuController)
 	{
 		const TSharedPtr<FPlayerFormationPositionEffects> FormationEffects = MakeShared<
 			FPlayerFormationPositionEffects>(PlayerFormationEffects);
@@ -2250,7 +2259,7 @@ void ACPPController::PostInitializeComponents()
 	}
 
 	PlayerStartGameControlComponent = FindComponentByClass<UPlayerStartGameControl>();
-	if (GetIsValidPlayerStartGameControlComponent())
+	if (not bM_IsMainMenuController && GetIsValidPlayerStartGameControlComponent())
 	{
 		PlayerStartGameControlComponent->InitPlayerStartGameControl(this);
 	}

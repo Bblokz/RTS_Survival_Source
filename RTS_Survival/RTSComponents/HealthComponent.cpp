@@ -30,10 +30,9 @@ UHealthComponent::UHealthComponent()
 
 void UHealthComponent::UpdateRankIcon(const int32 NewRankLevel, const EVeterancyIconSet VeterancyIconSet) const
 {
-	
-	if (not Widget_GetIsValidHealthBarWidget())
+	if (bM_IsHealthBarPermanentlyInvisible || not Widget_GetIsValidHealthBarWidget())
 	{
-		return;	
+		return;
 	}
 	M_HealthBarWidget->UpdateRankIcon(NewRankLevel, VeterancyIconSet);
 }
@@ -1020,7 +1019,8 @@ void UHealthComponent::ClearSelectionComponentBindings()
 
 void UHealthComponent::UpdateVisibilityAfterSettingsChange()
 {
-	if (not HealthBarWidgetClass)
+	// A permanently invisible bar has dropped its widget; no setting can show it again.
+	if (not HealthBarWidgetClass || bM_IsHealthBarPermanentlyInvisible)
 	{
 		return;
 	}

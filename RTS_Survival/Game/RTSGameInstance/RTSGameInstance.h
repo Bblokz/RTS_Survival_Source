@@ -58,6 +58,8 @@ public:
 	void SetPlayerFaction(const ERTSFaction Faction) { M_PlayerFaction = Faction; }
 	void SetPlayerCommander(const ERTSCommander Commander) { M_PlayerCommander = Commander; }
 	ERTSFaction GetPlayerFaction() const ;
+	// False until faction selection (or the PIE startup settings) chose one; GetPlayerFaction reports an error then.
+	bool GetHasPlayerFaction() const;
 	ERTSCommander GetPlayerCommander() const ;
 
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Mission Context")

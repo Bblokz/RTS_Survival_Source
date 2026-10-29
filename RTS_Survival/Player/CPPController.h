@@ -451,6 +451,9 @@ public:
 	bool OnCinematicTakeOver(const bool bStartCinematic);
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	inline bool GetIsGameOnPause() const { return M_PauseGameState.bM_IsGamePaused; };
+	inline bool GetIsMainMenuController() const { return bM_IsMainMenuController; }
+	// Only takes effect before PostInitializeComponents; the main menu game mode calls it on its deferred spawn.
+	inline void SetIsMainMenuController(const bool bIsMainMenuController) { bM_IsMainMenuController = bIsMainMenuController; }
 
 	// Tick
 	virtual void Tick(float DeltaTime) override;
@@ -1047,6 +1050,11 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> M_ChordedActionInputMappingContext = nullptr;
+
+	// The main menu controller only drives the menu UI: it skips the gameplay helpers (start-game pause, formations,
+	// rotation arrow, aim ability, key bindings) whose data only the in-game controller Blueprint sets.
+	// Set by ARTSMainMenuGameMode before the controller initializes.
+	bool bM_IsMainMenuController = false;
 
 	// Start Location of secondary click.
 	FVector M_SecondaryStartMouseProjectedLocation;

@@ -61,7 +61,11 @@ void UPlayerPortraitManager::BeginPlay()
 
 void UPlayerPortraitManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	StopCurrentPortraitPlayback();
+	// Without a portrait widget (the main menu controller never gets one) no portrait can be playing.
+	if (M_PortraitWidget.IsValid())
+	{
+		StopCurrentPortraitPlayback();
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
