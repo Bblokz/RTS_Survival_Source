@@ -135,7 +135,8 @@ TArray<UWeaponState*> UUnitVariantProbes::GetProbeWeapons(const AActor& Probe)
 void UUnitVariantProbes::AddWeapon(TArray<FUnitVariantWeaponStats>& Weapons, const UWeaponState& WeaponState)
 {
 	using namespace UnitVariantProbesPrivate;
-	const FWeaponData& Data = WeaponState.GetRawWeaponData();
+	// The values the loaded shell fires with: stored APCR and HE values are not what the player gets.
+	const FWeaponData Data = WeaponState.GetWeaponDataAdjustedForShellType();
 	const FName RowName(Global_GetWeaponEnumAsString(Data.WeaponName));
 	if (FUnitVariantWeaponStats* const SameWeapon = Weapons.FindByPredicate(
 		[RowName](const FUnitVariantWeaponStats& Existing) { return Existing.WeaponRowName == RowName; }))
