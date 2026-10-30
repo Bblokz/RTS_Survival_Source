@@ -54,6 +54,61 @@ struct FRTSShortsBattleState
 	// The segment's own unit plus BattleAllyClassPaths.
 	TArray<TWeakObjectPtr<AActor>> PlayerUnits;
 	TArray<TWeakObjectPtr<AActor>> EnemyUnits;
+/** A Segment.BattleFlankRoutes drive under way: the enemy on it, and whether it was ordered off and has finished. */
+USTRUCT()
+struct FRTSShortsBattleFlankState
+{
+	GENERATED_BODY()
+
+	TWeakObjectPtr<AActor> Unit;
+	int32 RouteIndex = 0;
+	bool bOrdered = false;
+	bool bFinished = false;
+	float OrderedAtSeconds = 0.f;
+};
+
+/** An attacker working round the evading unit (Segment.BattleSoloEvasion) after its flank route is done. */
+USTRUCT()
+struct FRTSShortsReflankState
+{
+	GENERATED_BODY()
+
+	bool bDriving = false;
+	float NextAllowedSeconds = 0.f;
+	float OrderedAtSeconds = 0.f;
+	FVector Destination = FVector::ZeroVector;
+};
+
+/** Where Segment.BattleSoloEvasion's unit is in its stop, shoot, reverse cycle. */
+UENUM()
+enum class ERTSShortsSoloEvasionPhase : uint8
+{
+	WaitingForFireOrder,
+	Holding,
+	Reversing
+};
+
+/** Segment.BattleSoloEvasion running: the cycle, the attacker it faces and the follow camera's offsets. */
+USTRUCT()
+struct FRTSShortsSoloEvasionState
+{
+	GENERATED_BODY()
+
+	bool bIsActive = false;
+	ERTSShortsSoloEvasionPhase Phase = ERTSShortsSoloEvasionPhase::WaitingForFireOrder;
+	float PhaseStartSeconds = 0.f;
+	float LastTurnOrderSeconds = 0.f;
+	TWeakObjectPtr<AActor> Unit;
+	// Kept until it is dead: spreading shots over the attackers leaves all of them alive and firing.
+	TWeakObjectPtr<AActor> Threat;
+	FVector StartLocation = FVector::ZeroVector;
+	FVector CameraStartLocation = FVector::ZeroVector;
+	// Smoothed unit location the camera follows; its offset from StartLocation moves the camera.
+	FVector CameraAnchor = FVector::ZeroVector;
+	// Effects already running when the battle began: everything else stops with it, so the next round opens on a clean field.
+	TSet<uint32> EffectIdsAtBegin;
+};
+
 	// Attack target last ordered per unit; a new order only goes out once that target is dead.
 	TMap<TWeakObjectPtr<AActor>, TWeakObjectPtr<AActor>> OrderedTargets;
 	// Wrecks spawned while the battle ran; destroyed with the battle so the next one starts on a clean field.
@@ -78,6 +133,12 @@ struct FRTSShortsBattleState
 /** Convoy segment: the vehicles driving in a wedge, their pinned turrets and the follow camera's offsets. */
 USTRUCT()
 struct FRTSShortsConvoyState
+	// Segment.BattleFlankRoutes under way: these vehicles fire on the move but take no attack order until they finish.
+	TArray<FRTSShortsBattleFlankState> Flanks;
+	FRTSShortsSoloEvasionState Evasion;
+	TMap<TWeakObjectPtr<AActor>, FRTSShortsReflankState> Reflanks;
+	// Health fraction each battle unit had last tick; 0 once its Kill event went out.
+	TMap<TWeakObjectPtr<AActor>, float> LastHealth;
 {
 	GENERATED_BODY()
 
@@ -165,6 +226,7 @@ private:
 	/** @return The current timeline frame: rendered output frame when rendering, else world time * fps. */
 	int32 GetTimelineFrame() const;
 	UMoviePipeline* GetActivePipeline() const;
+	void ApplyTrackTrailArea() const;
 
 	void FlushStageEffects(const int32 SegmentIndex) const;
 	void BeginSegment(const int32 SegmentIndex);
@@ -238,6 +300,38 @@ private:
 	static void MatchSoldierToSquadOwner(class ASquadUnit* Soldier, const uint8 SquadOwner);
 	/** Segment.bConvoy: spawns the wedge's side vehicles, pins the turrets and starts the follow camera. */
 	void BeginConvoy(const int32 SegmentIndex, AActor* MainUnit);
+	/** Pairs each Segment.BattleFlankRoutes entry with the enemy vehicle that drives it. */
+	void BeginBattleFlanks(const FRTSShortsSegment& Segment);
+	/** Sends flanking vehicles off at their time and releases them to the normal attack orders on arrival. */
+	void TickBattleFlanks(int32 Frame);
+	void OrderBattleFlankRoute(FRTSShortsBattleFlankState& Flank, const FRTSShortsBattleFlankRoute& Route, int32 Frame,
+	                           float SegmentSeconds);
+	/** True for a unit that moves and picks its targets itself for now: the director's attack orders would cancel that. */
+	bool GetIsBattleUnitSelfDirected(const AActor* Unit) const;
+	void BeginSoloEvasion(const FRTSShortsSegment& Segment, AActor* MainUnit);
+	void TickSoloEvasion(int32 Frame);
+	void TickSoloEvasionCycle(const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
+	/**
+	 * @brief Starts the short reverse that gives ground during a reload; reversing away from the threat also turns the
+	 * front onto it, so one order does both.
+	 * @param Settings The segment's evasion settings.
+	 * @param SegmentSeconds Segment-local time, the start of the new phase.
+	 */
+	void EnterSoloReverse(const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
+	void EnterSoloHold(float SegmentSeconds);
+	void TurnSoloTowardsThreat(float SegmentSeconds);
+	void PickSoloThreat();
+	void AimSoloAtThreat() const;
+	void UpdateSoloFollowCamera(const FRTSShortsSoloEvasion& Settings);
+	/** Sends attackers the evading unit has turned to face round its side again, and back to attacking once there. */
+	void TickBattleReflanks(const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
+	/** Job.bStopWhenUnitDestroyed: later rounds are not rendered once the segment's unit lost; they stay skipped in the manifest. */
+	void SkipSegmentsAfterRunning(int32 Frame);
+	void OrderBattleReflank(AActor& Attacker, FRTSShortsReflankState& Reflank, const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
+	/** Writes hits and kills of both lines into the manifest, so post can cut a fight down to its moments. */
+	void TrackBattleEvents(int32 Frame);
+	void TrackBattleLineEvents(const TArray<TWeakObjectPtr<AActor>>& Line, bool bPlayerSide, int32 Frame);
+	void AddBattleEvent(const TCHAR* Kind, bool bPlayerSide, float HealthFraction, int32 Frame);
 	/** Orders every convoy vehicle Segment.ConvoyDriveDistance ahead (issued at the segment's fire time). */
 	void OrderConvoyDrive(const int32 SegmentIndex);
 	/** Holds the convoy's turrets and moves the follow camera. */
@@ -464,3 +558,5 @@ private:
 
 	bool bM_HasSuppressedDialogs = false;
 };
+	// The running segment's unit lost and the job ends with this segment: the later segments never begin.
+	bool bM_LaterSegmentsSkipped = false;

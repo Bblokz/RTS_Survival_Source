@@ -483,6 +483,73 @@ struct FRTSShortsSegment
 	/** Squads: how many soldiers stay at the mark (0 = all); the rest are parked 30 m behind the mark, out of frame. */
 	UPROPERTY()
 	int32 MaxSquadVisible = 0;
+/**
+ * @brief The drive one battle vehicle makes before it takes attack orders: it fires on the move with the game's own
+ * auto-engage and can be shot the whole way, which is what a flank looks like to the unit being flanked.
+ */
+USTRUCT()
+struct FRTSShortsBattleFlankRoute
+{
+	GENERATED_BODY()
+
+	/** Index among the enemy line's vehicles (Segment.BattleEnemyClassPaths without its squads). */
+	UPROPERTY()
+	int32 EnemyIndex = 0;
+
+	/** Stage-local centimetres, driven in order; the last one is where it stops and takes attack orders. */
+	UPROPERTY()
+	TArray<FVector> Waypoints;
+
+	/** Segment-local second of the move order. */
+	UPROPERTY()
+	float OrderAtSeconds = 0.f;
+
+	/** Seconds after the order when it takes attack orders even if it has not arrived. */
+	UPROPERTY()
+	float TimeoutSeconds = 30.f;
+};
+
+/**
+ * @brief How the segment's unit fights a swarm: it keeps its front on the attacker flanking it most and shoots that one,
+ * reverses a short way while reloading and stops to fire, and the attackers keep working round it. Commands only, no stats.
+ */
+USTRUCT()
+struct FRTSShortsSoloEvasion
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	/** Seconds it stands still for a shot, once the gun is loaded. */
+	UPROPERTY()
+	float HoldSeconds = 1.f;
+
+	/** It reverses again after this long even if the gun found no shot. */
+	UPROPERTY()
+	float MaxHoldSeconds = 2.5f;
+
+	/** Length of one reverse leg (cm): one per reload, so it can never simply outrun the attackers. */
+	UPROPERTY()
+	float ReverseLegCm = 650.f;
+
+	/** It stops giving ground this far (cm) from where it started and only turns from then on. */
+	UPROPERTY()
+	float RetreatRadiusCm = 3500.f;
+
+	/** Attackers drive to a point this far (cm) off the unit's side when it has turned to face them. */
+	UPROPERTY()
+	float ReflankRadiusCm = 1500.f;
+
+	/** Seconds an attacker fights from a spot before it may work round again. */
+	UPROPERTY()
+	float ReflankIntervalSeconds = 5.f;
+
+	/** How quickly the camera catches up with the unit (1/s); 0 leaves the camera where it was framed. */
+	UPROPERTY()
+	float CameraFollowSpeed = 2.5f;
+};
+
 
 	/** Team weapons: distance in cm of the crew arc behind the gun. */
 	UPROPERTY()
@@ -815,6 +882,14 @@ struct FRTSShortsJob
 	float CombatTextWorldScale = 0.f;
 
 	/** Render the game's screen-space widgets (floating combat texts) into the frames via the MRQ UI renderer. */
+	/** Battle: enemy vehicles that work round the segment's unit instead of attacking from where they spawned. */
+	UPROPERTY()
+	TArray<FRTSShortsBattleFlankRoute> BattleFlankRoutes;
+
+	/** Battle: the segment's unit fights the enemy line by itself instead of taking the director's attack orders. */
+	UPROPERTY()
+	FRTSShortsSoloEvasion BattleSoloEvasion;
+
 	UPROPERTY()
 	bool bRenderGameWidgets = false;
 
@@ -878,6 +953,14 @@ struct FRTSShortsManifestSegment
 {
 	GENERATED_BODY()
 
+	/** > 0: track trails only cover this far (cm) round the stage, which keeps them sharp on a map of far-apart landscapes. */
+	UPROPERTY()
+	float TrackTrailAreaHalfSizeCm = 0.f;
+
+	/** A battle the segment's unit lost is the last one rendered: the rounds of an escalating job stop there. */
+	UPROPERTY()
+	bool bStopWhenUnitDestroyed = false;
+
 	UPROPERTY()
 	int32 Index = 0;
 
@@ -937,7 +1020,51 @@ struct FRTSShortsManifest
 
 	UPROPERTY()
 	bool bComplete = false;
+/**
+ * @brief One moment of a battle for the post step, which cuts a long fight down to what mattered.
+ */
+USTRUCT()
+struct FRTSShortsBattleEvent
+{
+	GENERATED_BODY()
+
+	/** Output frame of the single rendered shot. */
+	UPROPERTY()
+	int32 Frame = 0;
+
+	/** "Hit", "Kill" or "FlankArrived". */
+	UPROPERTY()
+	FString Kind;
+
+	UPROPERTY()
+	bool bPlayerSide = false;
+
+	/** Health left on the unit, 0..1. */
+	UPROPERTY()
+	float HealthFraction = 1.f;
+
+	UPROPERTY()
+	int32 PlayersAlive = 0;
+
+	UPROPERTY()
+	int32 EnemiesAlive = 0;
+};
+
 
 	UPROPERTY()
 	TArray<FRTSShortsManifestSegment> Segments;
 };
+
+	/** Battles: output frame one side was gone; -1 when the slot ran out first. */
+	UPROPERTY()
+	int32 BattleDecidedFrame = -1;
+
+	/** Battles: "player", "enemy", or empty when undecided. */
+	UPROPERTY()
+	FString BattleWinner;
+
+	UPROPERTY()
+	int32 BattleSurvivors = 0;
+
+	UPROPERTY()
+	TArray<FRTSShortsBattleEvent> BattleEvents;

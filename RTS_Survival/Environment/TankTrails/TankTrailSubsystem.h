@@ -57,6 +57,14 @@ public:
 	const FTankTrailStats& GetStats() const { return M_Stats; }
 	UTextureRenderTarget2D* GetTrailRenderTarget() const { return M_RenderTarget; }
 
+	/**
+	 * @brief Limits the trails to one area: on a map of many far-apart landscapes the capped target is stretched over all
+	 * of them and ruts turn into wide smears, so a shorts stage narrows it to where the tanks fight.
+	 * @param AreaMin World XY corner of the area.
+	 * @param AreaSize World size of the area in cm.
+	 */
+	void SetTrailArea(const FVector2D& AreaMin, const FVector2D& AreaSize);
+
 private:
 	UPROPERTY()
 	TObjectPtr<UTextureRenderTarget2D> M_RenderTarget = nullptr;

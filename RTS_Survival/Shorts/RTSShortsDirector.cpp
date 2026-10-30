@@ -281,6 +281,7 @@ void ARTSShortsDirector::TickWaitingForStartDialog()
 	M_Phase = ERTSShortsDirectorPhase::SpawningUnits;
 	M_PhaseStartRealSeconds = FPlatformTime::Seconds();
 }
+	ApplyTrackTrailArea();
 
 void ARTSShortsDirector::TickSpawningUnits()
 {
@@ -373,7 +374,7 @@ void ARTSShortsDirector::TickRunning()
 			EndSegment(M_CurrentSegment);
 		}
 		++M_CurrentSegment;
-		if (M_CurrentSegment < M_Job.Segments.Num())
+		if (M_CurrentSegment < M_Job.Segments.Num() && not bM_LaterSegmentsSkipped)
 		{
 			BeginSegment(M_CurrentSegment);
 		}
@@ -433,7 +434,7 @@ void ARTSShortsDirector::TickRunning()
 			M_PlacedLocation = Unit->GetActorLocation();
 		}
 	}
-	else if (AActor* Unit = M_Units[M_CurrentSegment].Get())
+	else if (AActor* Unit = Segment.BattleSoloEvasion.bEnabled ? nullptr : M_Units[M_CurrentSegment].Get())
 	{
 		// Some units drive toward their attack-ground target (into the camera); a unit that left its mark by
 		// more than half a metre is put back where it was placed.
@@ -2685,6 +2686,8 @@ void ARTSShortsDirector::MatchSoldierToSquadOwner(ASquadUnit* Soldier, const uin
 		if (AInfantryWeaponMaster* Weapon = Cast<AInfantryWeaponMaster>(Child))
 		{
 			Weapon->SetOwningPlayer(SquadOwner);
+	BeginBattleFlanks(Segment);
+	BeginSoloEvasion(Segment, MainUnit);
 		}
 	}
 	if (AInfantryWeaponMaster* Weapon = Soldier->GetInfantryWeapon())
@@ -3367,7 +3370,7 @@ void ARTSShortsDirector::IssueBattleOrders()
 		Attackers.Append(Squads);
 		for (const TWeakObjectPtr<AActor>& Attacker : Attackers)
 		{
-			if (Held.Contains(Attacker.Get()))
+			if (Held.Contains(Attacker.Get()) || GetIsBattleUnitSelfDirected(Attacker.Get()))
 			{
 				continue;
 			}
@@ -3499,6 +3502,9 @@ void ARTSShortsDirector::SpawnBattleReinforcements(const FRTSShortsSegment& Segm
 }
 
 void ARTSShortsDirector::TickBattleReinforcements(const int32 Frame)
+	TickBattleFlanks(Frame);
+	TickSoloEvasion(Frame);
+	TrackBattleEvents(Frame);
 {
 	const FRTSShortsSegment& Segment = M_Job.Segments[M_CurrentSegment];
 	const float SegmentSeconds = static_cast<float>(Frame - M_SegmentStartFrames[M_CurrentSegment]) / M_Job.Fps;
@@ -3520,6 +3526,10 @@ void ARTSShortsDirector::TickBattleReinforcements(const int32 Frame)
 		if (not M_Battle.ReinforcementOrdered[Index])
 		{
 			if (SegmentSeconds < Reinforcement.OrderAtSeconds)
+		FRTSShortsManifestSegment& ManifestSegment = M_Manifest.Segments[M_CurrentSegment];
+		ManifestSegment.BattleDecidedFrame = Frame;
+		ManifestSegment.BattleWinner = M_Battle.bPlayerWon ? TEXT("player") : TEXT("enemy");
+		ManifestSegment.BattleSurvivors = FMath::Max(PlayersAlive, EnemiesAlive);
 			{
 				continue;
 			}
@@ -3529,6 +3539,10 @@ void ARTSShortsDirector::TickBattleReinforcements(const int32 Frame)
 			const ECommandQueueError Result = Commands != nullptr
 				? Commands->MoveToLocation(Destination, false, Direction.Rotation(), false) : ECommandQueueError::NoError;
 			const UNavigationPath* Path = UNavigationSystemV1::FindPathToLocationSynchronously(GetWorld(), Unit->GetActorLocation(),
+		if (M_Job.bStopWhenUnitDestroyed && not M_Battle.bPlayerWon)
+		{
+			SkipSegmentsAfterRunning(Frame + 1);
+		}
 			                                                                                   Destination, Unit);
 			UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_REINFORCEMENT_ORDER frame=%d unit=%s commands=%d result=%d pathValid=%d length=%.0f"),
 			       Frame, *Unit->GetName(), Commands != nullptr ? 1 : 0, static_cast<int32>(Result),
@@ -3644,3 +3658,11 @@ void ARTSShortsDirector::EndBattle()
 	}
 	M_Battle = FRTSShortsBattleState();
 }
+	const bool bClearEffects = M_Battle.Evasion.bIsActive;
+	const TSet<uint32> EffectIdsAtBegin = M_Battle.Evasion.EffectIdsAtBegin;
+	if (bClearEffects)
+	{
+		// A destroyed wreck goes off: that blast and the battle's fires would open the next round.
+		const int32 Stopped = StopEffectsStartedSince(EffectIdsAtBegin);
+		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_ROUND_EFFECTS_CLEARED stopped=%d"), Stopped);
+	}

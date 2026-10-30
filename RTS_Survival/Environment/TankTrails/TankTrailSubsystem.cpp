@@ -186,6 +186,23 @@ bool UTankTrailSubsystem::GetIsValidParameterCollection() const
 	return false;
 }
 
+void UTankTrailSubsystem::SetTrailArea(const FVector2D& AreaMin, const FVector2D& AreaSize)
+{
+	if (not bM_IsActive || not GetIsValidRenderTarget())
+	{
+		return;
+	}
+	M_BoundsMin = AreaMin;
+	M_BoundsSize = AreaSize;
+	if (not BeginPlay_SetupRenderTarget())
+	{
+		UE_LOG(LogRTSTankTrails, Warning, TEXT("Tank trails: the render target could not be resized."));
+		return;
+	}
+	ApplyMaterialParameters(GetIsTrailRenderingActive());
+	UE_LOG(LogRTSTankTrails, Display, TEXT("Tank trails limited to an area: render target %dx%d"), M_TargetSize.X, M_TargetSize.Y);
+}
+
 bool UTankTrailSubsystem::BeginPlay_ReadLandscape(UWorld& InWorld)
 {
 	FBox LandscapeBounds(ForceInit);
