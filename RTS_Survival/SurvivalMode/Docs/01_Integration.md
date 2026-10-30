@@ -40,6 +40,8 @@ Shared files touched outside `SurvivalMode/`:
   for a director; `bM_IsHQDeliveredAfterStart` silences the "no HQ at profile load" error for air-dropped HQs.
 - `Enemy/EnemyController/EnemyController.h/.cpp`: `OverrideStrategicDecisionTree` (survival decision tree template).
 - `Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h/.cpp`: `SetStochasticDecisionTree`.
+- `Units/Aircraft/AircraftMaster/AAircraftMaster.cpp`: a drop aircraft goes movement-idle when it lands (it ran the
+  finished path every frame while parked, one error per frame).
 - Content: `Blueprints/GameUI/StartGame/StartGameUI` has a SURVIVAL button (below Quit) calling
   `USurvivalModeLauncher::LaunchSurvivalMode`.
 - `Config/DefaultGame.ini`: `DirectoriesToAlwaysCook` for `/Game/RTS_Survival/SurvivalMode` and for the folders whose
@@ -48,8 +50,9 @@ Shared files touched outside `SurvivalMode/`:
   survival data assets hold those classes as C++ defaults, which are not serialized, so the cooker cannot follow them;
   a new preset or start-content entry from another folder needs its folder added here.
 
-Testing: place the map in PIE with the director's `bDebugAutoStart` (or `-SurvivalAutoStart -SurvivalGrace=20` on a
-non-Shipping command line): it deploys a debug army at the first start location and logs RTS errors instead of
+Testing: place the map in PIE with the director's `bDebugAutoStart`, or pass `-SurvivalAutoStart -SurvivalGrace=20` to
+a build with `RTS_WITH_MAP_TESTS` (the Shipping test exe: add `-RTSMapSmokeTest -RTSMapSmokeTestSeconds=900` and the map
+path; the plain game has no such switch): it deploys a debug army at the first start location and logs RTS errors instead of
 showing a modal dialog per error. Progress is logged under `LogTemp: Survival ...`.
 
 ## Making a new survival map
