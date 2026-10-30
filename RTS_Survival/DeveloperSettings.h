@@ -441,10 +441,10 @@ namespace DeveloperSettings
 				inline constexpr int32 PzJagerLaser_VehicleParts = 45;
 				inline constexpr int32 Marder_Radixite = 180;
 				inline constexpr int32 Marder_VehicleParts = 80;
-				inline constexpr int32 PzI15cm_Radixite = 125;
-				inline constexpr int32 PzI15cm_VehicleParts = 70;
-				inline constexpr int32 Hetzer_Radixite = 200;
-				inline constexpr int32 Hetzer_VehicleParts = 100;
+				inline constexpr int32 PzI15cm_Radixite = 220;
+				inline constexpr int32 PzI15cm_VehicleParts = 120;
+				inline constexpr int32 Hetzer_Radixite = 250;
+				inline constexpr int32 Hetzer_VehicleParts = 125;
 				// 105mm howitzer on a Pz II chassis: a step up from the Pz I 15cm, trained at the medium factory.
 				inline constexpr int32 Wespe_Radixite = 275;
 				inline constexpr int32 Wespe_VehicleParts = 120;
@@ -477,17 +477,17 @@ namespace DeveloperSettings
 				inline constexpr int32 PzIVF1_VehicleParts = 150;
 				inline constexpr int32 PzIVF1Commander_Radixite = 275;
 				inline constexpr int32 PzIVF1Commander_VehicleParts = 150;
-				inline constexpr int32 Jaguar_Radixite = 550;
-				inline constexpr int32 Jaguar_VehicleParts = 300;
+				inline constexpr int32 Jaguar_Radixite = 400;
+				inline constexpr int32 Jaguar_VehicleParts = 250;
 				inline constexpr int32 Brumbar_Radixite = 550;
 				inline constexpr int32 Brumbar_VehicleParts = 400;
 				inline constexpr int32 Stug_Radixite = 300;
 				inline constexpr int32 Stug_VehicleParts = 125;
-				// Long 75mm tank destroyer: above the StuG, below the Jaguar.
+				// Long 75mm tank destroyer: above the StuG and the Jaguar.
 				inline constexpr int32 PzIV70_Radixite = 475;
 				inline constexpr int32 PzIV70_VehicleParts = 250;
-				inline constexpr int32 E25_Radixite = 450;
-				inline constexpr int32 E25_VehicleParts = 200;
+				inline constexpr int32 E25_Radixite = 375;
+				inline constexpr int32 E25_VehicleParts = 150;
 			}
 
 			namespace HeavyTanks
@@ -504,8 +504,8 @@ namespace DeveloperSettings
 				inline constexpr int32 PanzerV_IV_VehicleParts = 400;
 				inline constexpr int32 PanzerV_III_Radixite = 900;
 				inline constexpr int32 PanzerV_III_VehicleParts = 400;
-				inline constexpr int32 PantherD_Radixite = 900;
-				inline constexpr int32 PantherD_VehicleParts = 400;
+				inline constexpr int32 PantherD_Radixite = 600;
+				inline constexpr int32 PantherD_VehicleParts = 350;
 				inline constexpr int32 PantherII_Radixite = 900;
 				inline constexpr int32 PantherII_VehicleParts = 600;
 				inline constexpr int32 Tiger_Radixite = 900;
@@ -518,17 +518,20 @@ namespace DeveloperSettings
 				inline constexpr int32 KingTiger_VehicleParts = 650;
 				inline constexpr int32 JagdTiger_Radixite = 1300;
 				inline constexpr int32 JagdTiger_VehicleParts = 850;
-				inline constexpr int32 Tiger105_Radixite = 1500;
-				inline constexpr int32 Tiger105_VehicleParts = 750;
+				inline constexpr int32 Tiger105_Radixite = 1350;
+				inline constexpr int32 Tiger105_VehicleParts = 700;
 				// 128mm E-75: above the King Tiger and Tiger 105, below the Maus / E100.
 				inline constexpr int32 E75_Radixite = 1450;
 				inline constexpr int32 E75_VehicleParts = 850;
 				// 88mm L/100 E-50: between the Panther II and the King Tiger.
 				inline constexpr int32 E50_Radixite = 1150;
 				inline constexpr int32 E50_VehicleParts = 600;
-				// IS-6: between the IS-2 and the IS-3, at King Tiger level.
+				// IS-6: above the IS-2, at the IS-3's price: faster, with slightly fewer hit points.
 				inline constexpr int32 IS6_Radixite = 1300;
 				inline constexpr int32 IS6_VehicleParts = 700;
+				// IS-3: same gun and armour as the IS-6, so the same price.
+				inline constexpr int32 IS3_Radixite = 1300;
+				inline constexpr int32 IS3_VehicleParts = 700;
 				// SMK: two turrets (76mm + 45mm) on a long slow hull; between the KV-1 and the IS-6.
 				inline constexpr int32 SMK_Radixite = 1150;
 				inline constexpr int32 SMK_VehicleParts = 650;
@@ -1172,6 +1175,27 @@ namespace DeveloperSettings
 			}
 
 			inline constexpr float DamagePerTNTEquivalentGrams = 1.8f;
+			// Filler up to this amount counts fully towards cannon damage.
+			inline constexpr float CannonFullDamageTNTGrams = 150.f;
+			// Part of the filler above CannonFullDamageTNTGrams that still counts towards cannon damage.
+			inline constexpr float CannonExcessTNTDamageFraction = 0.25f;
+			// Long high-velocity guns (2.5+ mm pen per mm calibre): the formula has no velocity term, so they get it here.
+			inline constexpr float HighVelocityDamageMlt = 1.25f;
+			// Short low-velocity guns (under 1 mm pen per mm calibre): calibre and filler alone overrate them.
+			inline constexpr float LowVelocityDamageMlt = 0.8f;
+
+			/**
+			 * @brief Keeps big shells from dominating cannon damage; blast and shrapnel still use the real filler.
+			 * @param TNTGrams The shell's real filler.
+			 * @return The filler to feed into the direct damage formula.
+			 */
+			constexpr float GetCannonDamageTNTGrams(const float TNTGrams)
+			{
+				return TNTGrams <= CannonFullDamageTNTGrams
+					       ? TNTGrams
+					       : CannonFullDamageTNTGrams
+					       + (TNTGrams - CannonFullDamageTNTGrams) * CannonExcessTNTDamageFraction;
+			}
 			inline constexpr float DamageFluxPercentage = 10.f;
 			inline constexpr float CooldownFluxPercentage = 10.f;
 			inline constexpr float BaseTankMGReloadTime = 8.f;
@@ -1185,6 +1209,19 @@ namespace DeveloperSettings
 			inline constexpr float ShrapnelPenPerMM = 0.5;
 			// Shrapnel damage per gram of TNT equivalent.
 			inline constexpr float ShrapnelDamagePerTNTGram = 0.5;
+			// Stored ceiling for cannon splash; HE multiplies it to the Sturmtiger's 1200 fired splash.
+			inline constexpr float MaxCannonShrapnelDamage = 800.f;
+
+			/**
+			 * @brief Splash follows the same filler cap as direct damage, so big shells cannot wipe an area on their own.
+			 * @param TNTGrams The shell's real filler.
+			 * @return The stored shrapnel damage, before any shell multiplier.
+			 */
+			constexpr float GetCannonShrapnelDamage(const float TNTGrams)
+			{
+				const float ShrapnelDamage = GetCannonDamageTNTGrams(TNTGrams) * ShrapnelDamagePerTNTGram;
+				return ShrapnelDamage < MaxCannonShrapnelDamage ? ShrapnelDamage : MaxCannonShrapnelDamage;
+			}
 			// Bonus multiplier for mortar AOE ranges compared to standard shrapnel range.
 			inline constexpr float MortarAOEMlt = 3.f;
 			// How much a projectile's penetration can differ from the base value in percentages

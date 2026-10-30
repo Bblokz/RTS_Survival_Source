@@ -169,7 +169,7 @@ bool FJagdPanzerIV70MainGunTest::RunTest(const FString& Parameters)
 
 	TestEqual(TEXT("Reload seconds"), Pak42->ReloadSpeed, ExpectedPak42ReloadSeconds, Tolerance);
 	TestEqual(TEXT("Accuracy"), Pak42->Accuracy, ExpectedPak42Accuracy);
-	TestTrue(TEXT("Loads slower than the Panther's KwK 42"), Pak42->ReloadSpeed > KwK42->ReloadSpeed);
+	TestEqual(TEXT("Reloads as the Panther's KwK 42"), Pak42->ReloadSpeed, KwK42->ReloadSpeed, Tolerance);
 
 	TestEqual(TEXT("Calibre as the KwK 42"), Pak42->WeaponCalibre, KwK42->WeaponCalibre, Tolerance);
 	TestEqual(TEXT("Armor pen as the KwK 42"), Pak42->ArmorPen, KwK42->ArmorPen, Tolerance);

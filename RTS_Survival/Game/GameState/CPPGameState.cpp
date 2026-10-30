@@ -810,6 +810,8 @@ namespace VariantBatchTwoWeapons
 		using DeveloperSettings::GameBalance::Weapons::DamagePerMM;
 		using DeveloperSettings::GameBalance::Weapons::DamagePerMM_FireProjectileBonus;
 		using DeveloperSettings::GameBalance::Weapons::DamagePerTNTEquivalentGrams;
+		using DeveloperSettings::GameBalance::Weapons::GetCannonDamageTNTGrams;
+		using DeveloperSettings::GameBalance::Weapons::GetCannonShrapnelDamage;
 		using DeveloperSettings::GameBalance::Weapons::DamageFluxPercentage;
 		using DeveloperSettings::GameBalance::Weapons::CooldownFluxPercentage;
 		using DeveloperSettings::GameBalance::Weapons::ShrapnelAmountPerMM;
@@ -844,25 +846,25 @@ namespace VariantBatchTwoWeapons
 			SiegeGunData.WeaponCalibre = 200;
 			SiegeGunData.TNTExplosiveGrams = SiegeGunTntGrams;
 			SiegeGunData.BaseDamage = DamagePerMM * SiegeGunData.WeaponCalibre
-				+ SiegeGunData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+				+ GetCannonDamageTNTGrams(SiegeGunData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 			// Direct fire now (the turret is no longer artillery), so a direct-fire range instead of the arch range.
 			SiegeGunData.Range = HeavyAssaultCannonRange;
 			SiegeGunData.ArmorPen = SiegeGunEffectiveArmorPen / HE_ArmorPenMlt;
 			SiegeGunData.ArmorPenMaxRange = SiegeGunEffectiveArmorPen / HE_ArmorPenMlt;
 			SiegeGunData.ReloadSpeed = SiegeGunReloadSpeed;
 			SiegeGunData.ShrapnelRange = SiegeGunData.WeaponCalibre * ShrapnelRangePerMM;
-			SiegeGunData.ShrapnelDamage = SiegeGunData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+			SiegeGunData.ShrapnelDamage = GetCannonShrapnelDamage(SiegeGunData.TNTExplosiveGrams);
 			SiegeGunData.ShrapnelParticles = SiegeGunData.WeaponCalibre * ShrapnelAmountPerMM;
 			SiegeGunData.ShrapnelPen = SiegeGunData.WeaponCalibre * ShrapnelPenPerMM;
 			WeaponDataMap.Add(EWeaponName::StuH_200MM_DirectSiege, SiegeGunData);
 		}
 
-		// Pz IV H Ostwind: the Flak 36 with the Flak 43's 8-round clip and faster fire; the clip drill is authored
-		// for the 2 s reload.
+		// Pz IV H Ostwind: the Flak 36 with the Flak 43's 8-round clip and faster fire; the clip drill was authored
+		// for a 2 s reload.
 		if (const FWeaponData* const Flak36Data = WeaponDataMap.Find(EWeaponName::Flak36_37MM))
 		{
 			constexpr int32 OstwindClipSize = 8;
-			constexpr float OstwindReloadSpeed = 2.f;
+			constexpr float OstwindReloadSpeed = 5.f;
 			constexpr float OstwindCooldown = 0.12f;
 			constexpr int32 OstwindAccuracy = 62;
 			constexpr float OstwindProjectileSpeedMlt = 0.95f;
@@ -976,7 +978,7 @@ namespace VariantBatchTwoWeapons
 			HunterData.ArmorPen = 150;
 			HunterData.ArmorPenMaxRange = 140;
 			HunterData.MagCapacity = 1;
-			HunterData.ReloadSpeed = 4.2f;
+			HunterData.ReloadSpeed = 6.f;
 			HunterData.BaseCooldown = 1;
 			HunterData.CooldownFlux = CooldownFluxPercentage;
 			HunterData.Accuracy = 98;
@@ -1025,7 +1027,7 @@ namespace VariantBatchTwoWeapons
 		// two guns, so each reloads slower than the KwK 40.
 		if (const FWeaponData* const KwK40Data = WeaponDataMap.Find(EWeaponName::KwK40_L48_75MM))
 		{
-			constexpr float TwinGunReloadSpeed = 8.f;
+			constexpr float TwinGunReloadSpeed = 11.f;
 			FWeaponData TwinGunData = *KwK40Data;
 			TwinGunData.WeaponName = EWeaponName::KwK40_L48_75MM_HEAT_TigerTwin;
 			TwinGunData.ShellType = EWeaponShellType::Shell_HEAT;
@@ -1037,14 +1039,13 @@ namespace VariantBatchTwoWeapons
 		// Tiger Rail Bunker: the 80mm rail cannon scaled to 100mm, longer barrel (+10% range), slower reload.
 		if (const FWeaponData* const RailGun80Data = WeaponDataMap.Find(EWeaponName::RailGun80MM))
 		{
-			using DeveloperSettings::GameBalance::Weapons::RailGun::DamageBonusMlt;
 			using DeveloperSettings::GameBalance::Weapons::RailGun::RangeBonusPercentage;
 			constexpr float BunkerRangeMlt = 1.1f;
 			const float RailGunRangeMultiplier = 1.f + RangeBonusPercentage / 100.f;
 			FWeaponData RailBunkerData = *RailGun80Data;
 			RailBunkerData.WeaponName = EWeaponName::TigerRail_100MM_Railgun;
 			RailBunkerData.WeaponCalibre = 100;
-			RailBunkerData.BaseDamage = DamagePerMM * RailBunkerData.WeaponCalibre * DamageBonusMlt;
+			RailBunkerData.BaseDamage = 440.f;
 			RailBunkerData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 				MediumCannonRange * RailGunRangeMultiplier * BunkerRangeMlt, 10);
 			RailBunkerData.ArmorPen = 460;
@@ -1107,7 +1108,7 @@ namespace VariantBatchTwoWeapons
 			Flak41Data.MagCapacity = Flak41MagazineSize;
 			Flak41Data.BaseCooldown = 1.2f;
 			// The magazine change; the Reload_L / Reload_R anims are stretched to it.
-			Flak41Data.ReloadSpeed = 9.f;
+			Flak41Data.ReloadSpeed = 15.f;
 			Flak41Data.ProjectileMovementSpeed = HighVelocityProjectileSpeed * Flak41ProjectileSpeedMlt;
 			WeaponDataMap.Add(EWeaponName::Maus_AA_88MM_Flak, Flak41Data);
 		}
@@ -1781,6 +1782,7 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	FWeaponData WeaponData;
 	using DeveloperSettings::GameBalance::Weapons::DamagePerMM;
 	using DeveloperSettings::GameBalance::Weapons::DamagePerTNTEquivalentGrams;
+	using DeveloperSettings::GameBalance::Weapons::GetCannonDamageTNTGrams;
 	using DeveloperSettings::GameBalance::Weapons::DamageFluxPercentage;
 	using DeveloperSettings::GameBalance::Weapons::CooldownFluxPercentage;
 
@@ -1807,9 +1809,9 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.ShellType = EWeaponShellType::Shell_HE;
 	WeaponData.ShellTypes = { EWeaponShellType::Shell_HE };
 	WeaponData.WeaponCalibre = 40;
-	WeaponData.TNTExplosiveGrams = 60;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.TNTExplosiveGrams = 60 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) /  DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange, 100);
@@ -1823,7 +1825,7 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = DeveloperSettings::GameBalance::Weapons::MortarAccuracy;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM * MortarAOEMlt;
-	WeaponData.ShrapnelDamage = 5 + 1.45*WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram
+	WeaponData.ShrapnelDamage = 1.45*WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelRangeMlt;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
@@ -1876,6 +1878,7 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelDamageMlt;
 		using DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ShrapnelParticlesMlt;
 		constexpr float SiegeMortarTntGrams = 90.f;
+		constexpr float SiegeMortarFiredDamage = 300.f;
 		constexpr float SiegeMortarShrapnelDamageMlt = 1.45f;
 		constexpr float SiegeMortarReloadSpeed = 11.5f;
 		FWeaponData SiegeMortarData = {};
@@ -1885,8 +1888,7 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 		SiegeMortarData.ShellTypes = {EWeaponShellType::Shell_HE};
 		SiegeMortarData.WeaponCalibre = 100;
 		SiegeMortarData.TNTExplosiveGrams = SiegeMortarTntGrams / HE_TNTExplosiveGramsMlt;
-		SiegeMortarData.BaseDamage = (DamagePerMM * SiegeMortarData.WeaponCalibre
-			+ SiegeMortarData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) / HE_DamageMlt;
+		SiegeMortarData.BaseDamage = SiegeMortarFiredDamage / HE_DamageMlt;
 		SiegeMortarData.DamageFlux = DamageFluxPercentage;
 		SiegeMortarData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange, 100);
@@ -1917,8 +1919,6 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.TNTExplosiveGrams = 80 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_TNTExplosiveGramsMlt;
 	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) /  DeveloperSettings::GameBalance::Weapons::Projectiles::HE_DamageMlt;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange, 100);
@@ -1949,7 +1949,7 @@ void ACPPGameState::InitAllGameMortarRocketWeapons()
 	WeaponData.WeaponCalibre = 380;
 	WeaponData.TNTExplosiveGrams = 3400;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange * 1.33, 100);
@@ -2942,11 +2942,11 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 30;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
+	WeaponData.BaseDamage = 140.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
-	WeaponData.ArmorPen = 170.f;
-	WeaponData.ArmorPenMaxRange = 150.f;
+	WeaponData.ArmorPen = 240.f;
+	WeaponData.ArmorPenMaxRange = 212.f;
 	WeaponData.MagCapacity = 3;
 	WeaponData.ReloadSpeed = 10.f;
 	WeaponData.BaseCooldown = 2.f;
@@ -2967,13 +2967,13 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 20;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
+	WeaponData.BaseDamage = 120.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = LightCannonRange * RailGunRangeMultiplier;
-	WeaponData.ArmorPen = 110.f;
-	WeaponData.ArmorPenMaxRange = 98.f;
+	WeaponData.ArmorPen = 150.f;
+	WeaponData.ArmorPenMaxRange = 134.f;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 7.f;
+	WeaponData.ReloadSpeed = 6.5f;
 	WeaponData.BaseCooldown = 11.f;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 85;
@@ -2985,10 +2985,10 @@ void ACPPGameState::InitAllGameRailGunData()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::GerRailgun20MM, WeaponData);
 
 	// Pz 38(t) Railgun Sniper: APCR-only rail rifle. Pen and damage are base values; APCR multiplies pen and
-	// projectile speed up and damage down when firing, landing near the railgun's damage with little pen falloff.
+	// projectile speed up and damage down when firing: the best pen of its class, with little falloff, for a slow reload.
 	{
-		constexpr float SniperDamageMlt = 1.3f;
-		constexpr float SniperRangeMlt = 1.15f;
+		constexpr float SniperFiredDamage = 100.f;
+		constexpr float SniperRange = 5600.f;
 		FWeaponData RailSniperData = {};
 		RailSniperData.WeaponName = EWeaponName::GerRailSniper20MM;
 		RailSniperData.DamageType = ERTSDamageType::Kinetic;
@@ -2997,13 +2997,13 @@ void ACPPGameState::InitAllGameRailGunData()
 		// Stays at 20mm so the >= 20mm behaviour and tech rules keep applying.
 		RailSniperData.WeaponCalibre = 20;
 		RailSniperData.TNTExplosiveGrams = 0.f;
-		RailSniperData.BaseDamage = DamagePerMM * RailSniperData.WeaponCalibre * DamageBonusMlt * SniperDamageMlt;
+		RailSniperData.BaseDamage = SniperFiredDamage / DeveloperSettings::GameBalance::Weapons::Projectiles::APCR_DamageMlt;
 		RailSniperData.DamageFlux = DamageFluxPercentage;
-		RailSniperData.Range = LightCannonRange * RailGunRangeMultiplier * SniperRangeMlt;
-		RailSniperData.ArmorPen = 75.f;
-		RailSniperData.ArmorPenMaxRange = 70.f;
+		RailSniperData.Range = SniperRange;
+		RailSniperData.ArmorPen = 150.f;
+		RailSniperData.ArmorPenMaxRange = 140.f;
 		RailSniperData.MagCapacity = 1;
-		RailSniperData.ReloadSpeed = 9.f;
+		RailSniperData.ReloadSpeed = 12.f;
 		RailSniperData.BaseCooldown = 11.f;
 		RailSniperData.CooldownFlux = CooldownFluxPercentage;
 		RailSniperData.Accuracy = 95;
@@ -3073,7 +3073,7 @@ void ACPPGameState::InitAllGameRailGunData()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_Railgun};
 	WeaponData.WeaponCalibre = 80;
 	WeaponData.TNTExplosiveGrams = 0.f;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre * DamageBonusMlt;
+	WeaponData.BaseDamage = 360.f;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumCannonRange * RailGunRangeMultiplier;
 	WeaponData.ArmorPen = 380.f;
@@ -3686,7 +3686,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ArmorPen = 45;
 	WeaponData.ArmorPenMaxRange = 31;
 	WeaponData.MagCapacity = 6;
-	WeaponData.ReloadSpeed = 2;
+	WeaponData.ReloadSpeed = 5;
 	WeaponData.BaseCooldown = 0.15f;
 	WeaponData.CooldownFlux = 10;
 	WeaponData.Accuracy = 60;
@@ -3714,7 +3714,7 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.ArmorPen = 50;
 	WeaponData.ArmorPenMaxRange = 40;
 	WeaponData.MagCapacity = 4;
-	WeaponData.ReloadSpeed = 0.8f;
+	WeaponData.ReloadSpeed = 3.f;
 	WeaponData.BaseCooldown = 0.25f;
 	WeaponData.CooldownFlux = 10;
 	WeaponData.Accuracy = 60;
@@ -3733,6 +3733,9 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	using DeveloperSettings::GameBalance::Weapons::DamagePerMM;
 	using DeveloperSettings::GameBalance::Weapons::DamagePerMM_FireProjectileBonus;
 	using DeveloperSettings::GameBalance::Weapons::DamagePerTNTEquivalentGrams;
+	using DeveloperSettings::GameBalance::Weapons::GetCannonDamageTNTGrams;
+	using DeveloperSettings::GameBalance::Weapons::LowVelocityDamageMlt;
+	using DeveloperSettings::GameBalance::Weapons::HighVelocityDamageMlt;
 	using DeveloperSettings::GameBalance::Weapons::DamageFluxPercentage;
 	using DeveloperSettings::GameBalance::Weapons::CooldownFluxPercentage;
 
@@ -3989,8 +3992,8 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	};
 	WeaponData.WeaponCalibre = 75;
 	WeaponData.TNTExplosiveGrams = 73;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * LowVelocityDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::LightArtilleryRange * 1.1, 100);
@@ -4024,8 +4027,8 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		HowitzerData.ShellTypes = {EWeaponShellType::Shell_HE};
 		HowitzerData.WeaponCalibre = 75;
 		HowitzerData.TNTExplosiveGrams = 73;
-		HowitzerData.BaseDamage = DamagePerMM * HowitzerData.WeaponCalibre
-			+ HowitzerData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		HowitzerData.BaseDamage = (DamagePerMM * HowitzerData.WeaponCalibre
+			+ HowitzerData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * LowVelocityDamageMlt;
 		HowitzerData.DamageFlux = DamageFluxPercentage;
 		HowitzerData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			DeveloperSettings::GameBalance::Ranges::LightArtilleryRange * HowitzerRangeMlt, 100);
@@ -4150,15 +4153,15 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	};
 	WeaponData.WeaponCalibre = 75;
 	WeaponData.TNTExplosiveGrams = 86;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * HighVelocityDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	// Range left as HeavyCannonRange in original; calibre puts it in Medium category by your spec
 	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HeavyCannonRange;
 	WeaponData.ArmorPen = 192;
 	WeaponData.ArmorPenMaxRange = 188;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 7.4f;
+	WeaponData.ReloadSpeed = 7.8f;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 98;
@@ -4170,12 +4173,15 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KwK42_75MM, WeaponData);
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KWK42_75MM_PantherD, WeaponData);
 
-	// Pak42 L/70 (Jagdpanzer IV/70): the Panther's gun, loaded slower in the cramped medium casemate.
+	// Pak42 L/70 (Jagdpanzer IV/70): the Panther's gun, less accurate in the cramped medium casemate.
 	{
-		const float Pak42ReloadSpeed = 7.8f;
 		const int32 Pak42Accuracy = 95;
 		WeaponData.WeaponName = EWeaponName::Pak42_L70_75MM;
-		WeaponData.ReloadSpeed = Pak42ReloadSpeed;
+		// No APCR: that shell is what the Ambush variant is for.
+		WeaponData.ShellTypes = {
+			EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE, EWeaponShellType::Shell_HEAT,
+			EWeaponShellType::Shell_APHEBC
+		};
 		WeaponData.Accuracy = Pak42Accuracy;
 		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Pak42_L70_75MM, WeaponData);
 
@@ -4291,7 +4297,6 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	}
 
 	{
-		const float Kv1ArcDamageMlt = 1.2f;
 		const float Kv1ArcArmorPen = 76.f;
 
 		FWeaponData Kv1ArcWeaponData = WeaponData;
@@ -4301,10 +4306,10 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		Kv1ArcWeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
 		Kv1ArcWeaponData.WeaponCalibre = 122;
 		Kv1ArcWeaponData.TNTExplosiveGrams = 140;
-		Kv1ArcWeaponData.BaseDamage = (DamagePerMM * Kv1ArcWeaponData.WeaponCalibre
-			+ Kv1ArcWeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * Kv1ArcDamageMlt;
+		Kv1ArcWeaponData.BaseDamage = DamagePerMM * Kv1ArcWeaponData.WeaponCalibre
+			+ Kv1ArcWeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 		Kv1ArcWeaponData.DamageFlux = DamageFluxPercentage;
-		WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		Kv1ArcWeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 0.92, 100);
 		// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
 		Kv1ArcWeaponData.ArmorPen = Kv1ArcArmorPen /
@@ -4312,7 +4317,7 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		Kv1ArcWeaponData.ArmorPenMaxRange = Kv1ArcArmorPen /
 			DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 		Kv1ArcWeaponData.MagCapacity = 1;
-		Kv1ArcWeaponData.ReloadSpeed = 7.1f;
+		Kv1ArcWeaponData.ReloadSpeed = 10.5f;
 		Kv1ArcWeaponData.BaseCooldown = 1;
 		Kv1ArcWeaponData.CooldownFlux = CooldownFluxPercentage;
 		Kv1ArcWeaponData.Accuracy = 50;
@@ -4346,8 +4351,8 @@ void ACPPGameState::InitAllGameMediumWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
 	WeaponData.WeaponCalibre = 76;
 	WeaponData.TNTExplosiveGrams = 75;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * LowVelocityDamageMlt;
 	WeaponData.Range = MediumCannonRange;
 	WeaponData.ArmorPen = 37;
 	WeaponData.ArmorPenMaxRange = 34;
@@ -4376,6 +4381,9 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	FWeaponData WeaponData;
 	using DeveloperSettings::GameBalance::Weapons::DamagePerMM;
 	using DeveloperSettings::GameBalance::Weapons::DamagePerTNTEquivalentGrams;
+	using DeveloperSettings::GameBalance::Weapons::GetCannonDamageTNTGrams;
+	using DeveloperSettings::GameBalance::Weapons::GetCannonShrapnelDamage;
+	using DeveloperSettings::GameBalance::Weapons::HighVelocityDamageMlt;
 	using DeveloperSettings::GameBalance::Weapons::DamageFluxPercentage;
 	using DeveloperSettings::GameBalance::Weapons::CooldownFluxPercentage;
 
@@ -4398,11 +4406,10 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	using DeveloperSettings::GameBalance::Weapons::MortarAOEMlt;
 
 	const float PanzerSchreckTNTPerMM = 55.f / 88.f;
-	const float PanzerSchreckArmorPenPerMM = 150.f / 88.f;
-	const float PanzerSchreckArmorPenMaxRangePerMM = 100.f / 88.f;
 	const int32 PanzerwerferMagCapacity = 10;
-	const float PanzerwerferReloadSpeed = 10.f;
+	const float PanzerwerferReloadSpeed = 30.f;
 	const float PanzerwerferBaseCooldown = 0.5f;
+	const float PanzerwerferFiredArmorPen = 120.f;
 
 
 	// PanzerSchreck (88mm; HEAT)
@@ -4460,15 +4467,15 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumArtilleryRange;
-	WeaponData.ArmorPen = (PanzerSchreckArmorPenPerMM * WeaponData.WeaponCalibre)
+	WeaponData.ArmorPen = PanzerwerferFiredArmorPen
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
-	WeaponData.ArmorPenMaxRange = (PanzerSchreckArmorPenMaxRangePerMM * WeaponData.WeaponCalibre)
+	WeaponData.ArmorPenMaxRange = PanzerwerferFiredArmorPen
 		/ DeveloperSettings::GameBalance::Weapons::Projectiles::HEAT_ArmorPenMlt;
 	WeaponData.MagCapacity = PanzerwerferMagCapacity;
 	WeaponData.ReloadSpeed = PanzerwerferReloadSpeed;
 	WeaponData.BaseCooldown = PanzerwerferBaseCooldown;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
-	WeaponData.Accuracy = 70;
+	WeaponData.Accuracy = 30;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
 	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
@@ -4570,7 +4577,19 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::QF_37In_94MM, WeaponData);
 
+	// KS-30 130mm: fires the ISU-130's S-26 shell, so it shares that gun's filler, pen and reload.
 	WeaponData.WeaponName = EWeaponName::KS30_130MM_TW;
+	WeaponData.WeaponCalibre = 130;
+	WeaponData.TNTExplosiveGrams = 640;
+	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
+	WeaponData.ArmorPen = 215;
+	WeaponData.ArmorPenMaxRange = 200;
+	WeaponData.ReloadSpeed = 13;
+	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
+	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
+	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::KS30_130MM_TW, WeaponData);
 
 	// https://wiki.warthunder.com/IS-1#:~:text=...
@@ -4660,8 +4679,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
 	WeaponData.WeaponCalibre = 88;
 	WeaponData.TNTExplosiveGrams = 109;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * HighVelocityDamageMlt;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::HeavyAssaultCannonRange * 1.2, 10);
 	WeaponData.ArmorPen = 232;
@@ -4685,8 +4704,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_APCR, EWeaponShellType::Shell_HE};
 	WeaponData.WeaponCalibre = 88;
 	WeaponData.TNTExplosiveGrams = 109;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * HighVelocityDamageMlt;
 	WeaponData.Range = HeavyCannonRange;
 	WeaponData.ArmorPen = 232;
 	WeaponData.ArmorPenMaxRange = 222;
@@ -4711,8 +4730,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_APCR, EWeaponShellType::Shell_HE};
 	WeaponData.WeaponCalibre = 88;
 	WeaponData.TNTExplosiveGrams = 109;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * HighVelocityDamageMlt;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(HeavyCannonRange * 1.1, 10);
 	WeaponData.ArmorPen = 256;
 	WeaponData.ArmorPenMaxRange = 245;
@@ -4737,17 +4756,17 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 105;
 	WeaponData.TNTExplosiveGrams = 343;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.Range = HeavyCannonRange;
 	WeaponData.ArmorPen = 248;
 	WeaponData.ArmorPenMaxRange = 234;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 16.2f;
+	WeaponData.ReloadSpeed = 10.5f;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 95;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
@@ -4761,19 +4780,19 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 105;
 	WeaponData.TNTExplosiveGrams = 343;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
 	WeaponData.ArmorPen = 46 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 46 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.MagCapacity = 1;
 	// WeaponData.ReloadSpeed = 16.2;
-	WeaponData.ReloadSpeed = 5;
+	WeaponData.ReloadSpeed = 8;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 25;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = 0.5f * HEProjectileSpeed;
@@ -4786,14 +4805,14 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 210;
 	WeaponData.TNTExplosiveGrams = 17200;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
 	WeaponData.ArmorPen = 35 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 35 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	WeaponData.ReloadSpeed = 9;
+	WeaponData.ReloadSpeed = 15;
 	WeaponData.Accuracy = 22;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Morser_18_210MM_TW, WeaponData);
@@ -4804,14 +4823,14 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	B4WeaponData.WeaponCalibre = 203;
 	B4WeaponData.TNTExplosiveGrams = 15300;
 	B4WeaponData.BaseDamage = DamagePerMM * B4WeaponData.WeaponCalibre
-		+ B4WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(B4WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	B4WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
 	B4WeaponData.ArmorPen = 40 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	B4WeaponData.ArmorPenMaxRange = 40 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	B4WeaponData.ReloadSpeed = 14;
+	B4WeaponData.ReloadSpeed = 15;
 	B4WeaponData.Accuracy = 24;
 	B4WeaponData.ShrapnelRange = B4WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	B4WeaponData.ShrapnelDamage = B4WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	B4WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(B4WeaponData.TNTExplosiveGrams);
 	B4WeaponData.ShrapnelParticles = B4WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	B4WeaponData.ShrapnelPen = B4WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::B4_203MM_TW, B4WeaponData);
@@ -4819,7 +4838,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	// The gun pit loads every shell with its crane and shell tray (the reload is the crew animation), but
 	// the fixed, surveyed position reaches further and lands closer.
 	B4WeaponData.WeaponName = EWeaponName::B4_203MM_Pit;
-	B4WeaponData.ReloadSpeed = 24;
+	B4WeaponData.ReloadSpeed = 12;
 	B4WeaponData.Accuracy = 34;
 	B4WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange * 1.25f, 100);
@@ -4831,39 +4850,39 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	ML20WeaponData.WeaponCalibre = 152;
 	ML20WeaponData.TNTExplosiveGrams = 5860;
 	ML20WeaponData.BaseDamage = DamagePerMM * ML20WeaponData.WeaponCalibre
-		+ ML20WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(ML20WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	ML20WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
 	ML20WeaponData.ArmorPen = 30 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	ML20WeaponData.ArmorPenMaxRange = 30 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
-	ML20WeaponData.ReloadSpeed = 10;
+	ML20WeaponData.ReloadSpeed = 14.4f;
 	ML20WeaponData.Accuracy = 26;
 	ML20WeaponData.ShrapnelRange = ML20WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	ML20WeaponData.ShrapnelDamage = ML20WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	ML20WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(ML20WeaponData.TNTExplosiveGrams);
 	ML20WeaponData.ShrapnelParticles = ML20WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	ML20WeaponData.ShrapnelPen = ML20WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML20_152MM_TW, ML20WeaponData);
 
-	// The ML-20 pit loads with the B-4 pit's crane drill: slower than the crew's hand loading, but surveyed in.
+	// The ML-20 pit loads with the B-4 pit's crane drill: faster than the crew's hand loading, and surveyed in.
 	ML20WeaponData.WeaponName = EWeaponName::ML20_152MM_Pit;
-	ML20WeaponData.ReloadSpeed = 18;
+	ML20WeaponData.ReloadSpeed = 12;
 	ML20WeaponData.Accuracy = 34;
 	ML20WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange * 1.2f, 100);
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ML20_152MM_Pit, ML20WeaponData);
 
-	// T-44/155: a 155mm howitzer in the T-44 turret. Heavier shell than the ML-20, but the cramped turret and
-	// separate loading make it slower to reload and the short barrel less accurate.
+	// T-44/155: a 155mm howitzer in the T-44 turret, with the KV-2 M-10T's filler. The cramped turret and
+	// separate loading make it slow to reload and the short barrel less accurate.
 	FWeaponData T44HowitzerData = ML20WeaponData;
 	T44HowitzerData.WeaponName = EWeaponName::T44_155MM_Howitzer;
 	T44HowitzerData.WeaponCalibre = 155;
-	T44HowitzerData.TNTExplosiveGrams = 6600;
+	T44HowitzerData.TNTExplosiveGrams = 1062;
 	T44HowitzerData.BaseDamage = DamagePerMM * T44HowitzerData.WeaponCalibre
-		+ T44HowitzerData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(T44HowitzerData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	T44HowitzerData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
-	T44HowitzerData.ReloadSpeed = 14;
+	T44HowitzerData.ReloadSpeed = 20;
 	T44HowitzerData.Accuracy = 24;
 	T44HowitzerData.ShrapnelRange = T44HowitzerData.WeaponCalibre * ShrapnelRangePerMM;
-	T44HowitzerData.ShrapnelDamage = T44HowitzerData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	T44HowitzerData.ShrapnelDamage = GetCannonShrapnelDamage(T44HowitzerData.TNTExplosiveGrams);
 	T44HowitzerData.ShrapnelParticles = T44HowitzerData.WeaponCalibre * ShrapnelAmountPerMM;
 	T44HowitzerData.ShrapnelPen = T44HowitzerData.WeaponCalibre * ShrapnelPenPerMM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::T44_155MM_Howitzer, T44HowitzerData);
@@ -4876,7 +4895,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 150;
 	WeaponData.TNTExplosiveGrams = 630;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange * 0.92, 100);
@@ -4889,7 +4908,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 80;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
@@ -4906,7 +4925,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 150;
 	WeaponData.TNTExplosiveGrams = 630;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.1, 100);
@@ -4919,7 +4938,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 94;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
@@ -4935,20 +4954,20 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 128;
 	WeaponData.TNTExplosiveGrams = 786;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = HeavyCannonRange;
 	WeaponData.ArmorPen = 269;
 	WeaponData.ArmorPenMaxRange = 257;
 	WeaponData.MagCapacity = 1;
 	// WeaponData.ReloadSpeed = 18.2;
-	WeaponData.ReloadSpeed = 10;
+	WeaponData.ReloadSpeed = 14;
 	WeaponData.BaseCooldown = 1;
 	// WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.CooldownFlux = CooldownFluxPercentage * 2;
 	WeaponData.Accuracy = 95;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
@@ -5006,8 +5025,8 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ShellTypes = {EWeaponShellType::Shell_APHE, EWeaponShellType::Shell_HE};
 	WeaponData.WeaponCalibre = 107;
 	WeaponData.TNTExplosiveGrams = 144;
-	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+	WeaponData.BaseDamage = (DamagePerMM * WeaponData.WeaponCalibre
+		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams) * HighVelocityDamageMlt;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = HeavyCannonRange;
 	WeaponData.ArmorPen = 302;
@@ -5031,17 +5050,17 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 122;
 	WeaponData.TNTExplosiveGrams = 562;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.Range = HeavyCannonRange;
 	WeaponData.ArmorPen = 201;
 	WeaponData.ArmorPenMaxRange = 182;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 26;
+	WeaponData.ReloadSpeed = 14;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 90;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 1;
@@ -5057,7 +5076,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		WeaponData.WeaponCalibre = 122;
 		WeaponData.TNTExplosiveGrams = 562;
 		WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-			+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+			+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 		WeaponData.DamageFlux = DamageFluxPercentage;
 		WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			DeveloperSettings::GameBalance::Ranges::MediumArtilleryRange * 1, 100);
@@ -5066,12 +5085,12 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		WeaponData.ArmorPenMaxRange = Su122HeArmorPen /
 			DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 		WeaponData.MagCapacity = 1;
-		WeaponData.ReloadSpeed = 26;
+		WeaponData.ReloadSpeed = 16;
 		WeaponData.BaseCooldown = 1;
 		WeaponData.CooldownFlux = CooldownFluxPercentage;
 		WeaponData.Accuracy = 60;
 		WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-		WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 		WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 		WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 		WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
@@ -5080,7 +5099,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		WeaponData.WeaponName = EWeaponName::M1938_122MM;
 		WeaponData.ShellTypes = {EWeaponShellType::Shell_HE};
 		WeaponData.Range = DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange;
-		WeaponData.ReloadSpeed = 5.0f;
+		WeaponData.ReloadSpeed = 8.0f;
 		M_TPlayerWeaponDataHashMap.Add(EWeaponName::M1938_122MM, WeaponData);
 	}
 
@@ -5091,17 +5110,17 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 122;
 	WeaponData.TNTExplosiveGrams = 562;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.Range = HeavyCannonRange;
 	WeaponData.ArmorPen = 227;
 	WeaponData.ArmorPenMaxRange = 215;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 26;
+	WeaponData.ReloadSpeed = 14;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 90;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 1;
@@ -5114,19 +5133,19 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 152;
 	WeaponData.TNTExplosiveGrams = 1062;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.33, 100);
 	// He is the only shell used for this gun but the projectile multiplies with this factor so we neutralize it.
 	WeaponData.ArmorPen = 66 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.ArmorPenMaxRange = 66 / DeveloperSettings::GameBalance::Weapons::Projectiles::HE_ArmorPenMlt;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 33.0f;
+	WeaponData.ReloadSpeed = 22.0f;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 80;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed * 1;
@@ -5139,18 +5158,18 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.WeaponCalibre = 152;
 	WeaponData.TNTExplosiveGrams = 1062;
 	WeaponData.BaseDamage = DamagePerMM * WeaponData.WeaponCalibre
-		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+		+ GetCannonDamageTNTGrams(WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 	WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 		DeveloperSettings::GameBalance::Ranges::HeavyArtilleryRange * 1.2, 100);
 	WeaponData.ArmorPen = 161;
 	WeaponData.ArmorPenMaxRange = 152;
 	WeaponData.MagCapacity = 1;
-	WeaponData.ReloadSpeed = 31.0f;
+	WeaponData.ReloadSpeed = 19.0f;
 	WeaponData.BaseCooldown = 1;
 	WeaponData.CooldownFlux = CooldownFluxPercentage;
 	WeaponData.Accuracy = 82;
 	WeaponData.ShrapnelRange = WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-	WeaponData.ShrapnelDamage = WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+	WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(WeaponData.TNTExplosiveGrams);
 	WeaponData.ShrapnelParticles = WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 	WeaponData.ShrapnelPen = WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
@@ -5161,7 +5180,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		const float Isu152RangeMlt = 1.1f;
 		const float Isu152ArmorPen = 165.f;
 		const float Isu152ArmorPenMaxRange = 155.f;
-		const float Isu152ReloadSpeed = 29.0f;
+		const float Isu152ReloadSpeed = 18.0f;
 		const int32 Isu152Accuracy = 85;
 
 		FWeaponData Isu152WeaponData = WeaponData;
@@ -5184,7 +5203,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		const float Isu130RangeMlt = 1.25f;
 		const float Isu130ArmorPen = 215.f;
 		const float Isu130ArmorPenMaxRange = 200.f;
-		const float Isu130ReloadSpeed = 25.0f;
+		const float Isu130ReloadSpeed = 13.0f;
 		const int32 Isu130Accuracy = 92;
 
 		FWeaponData Isu130WeaponData = WeaponData;
@@ -5195,7 +5214,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		Isu130WeaponData.WeaponCalibre = Isu130Calibre;
 		Isu130WeaponData.TNTExplosiveGrams = Isu130TNTGrams;
 		Isu130WeaponData.BaseDamage = DamagePerMM * Isu130WeaponData.WeaponCalibre
-			+ Isu130WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
+			+ GetCannonDamageTNTGrams(Isu130WeaponData.TNTExplosiveGrams) * DamagePerTNTEquivalentGrams;
 		Isu130WeaponData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
 			DeveloperSettings::GameBalance::Ranges::HeavyCannonRange * Isu130RangeMlt, 100);
 		Isu130WeaponData.ArmorPen = Isu130ArmorPen;
@@ -5204,7 +5223,7 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 		Isu130WeaponData.ReloadSpeed = Isu130ReloadSpeed;
 		Isu130WeaponData.Accuracy = Isu130Accuracy;
 		Isu130WeaponData.ShrapnelRange = Isu130WeaponData.WeaponCalibre * ShrapnelRangePerMM;
-		Isu130WeaponData.ShrapnelDamage = Isu130WeaponData.TNTExplosiveGrams * ShrapnelDamagePerTNTGram;
+		Isu130WeaponData.ShrapnelDamage = GetCannonShrapnelDamage(Isu130WeaponData.TNTExplosiveGrams);
 		Isu130WeaponData.ShrapnelParticles = Isu130WeaponData.WeaponCalibre * ShrapnelAmountPerMM;
 		Isu130WeaponData.ShrapnelPen = Isu130WeaponData.WeaponCalibre * ShrapnelPenPerMM;
 		Isu130WeaponData.ProjectileMovementSpeed = HighVelocityProjectileSpeed;
@@ -6362,8 +6381,8 @@ void ACPPGameState::InitAllGameLightTankData()
 		const float Su76TurretRotationSpeed = 12.f;
 		const float Su76MaxSpeedKmh = 25.f;
 		const float Su76ReverseSpeedKmh = 10.f;
-		const int32 Su76RadixiteCostOffset = 50;
-		const int32 Su76VehiclePartsCostOffset = 40;
+		const int32 Su76RadixiteCostOffset = 100;
+		const int32 Su76VehiclePartsCostOffset = 90;
 		const float Su76ExpWorthMlt = 1.5f;
 
 		TankData.MaxHealth = Su76Health;
@@ -6612,7 +6631,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
 		{ERTSResourceType::Resource_Radixite, Jaguar_Radixite},
-		{ERTSResourceType::Resource_VehicleParts, PzIVH_VehicleParts}
+		{ERTSResourceType::Resource_VehicleParts, Jaguar_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetLightMediumTankExpLevels();
@@ -6629,7 +6648,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 15;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, Jaguar_Radixite},
+		{ERTSResourceType::Resource_Radixite, Brumbar_Radixite},
 		{ERTSResourceType::Resource_VehicleParts, Brumbar_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
@@ -6796,7 +6815,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 18;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, Jaguar_Radixite},
+		{ERTSResourceType::Resource_Radixite, PzIIIM_Radixite + 75},
 		{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts + 75}
 	});
 	TankData.Abilities = BasicTankAbilities;
@@ -6814,8 +6833,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.VehicleReverseSpeedKmh = 8;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, PzIIIM_Radixite + 250},
-		{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts + 125}
+		{ERTSResourceType::Resource_Radixite, PzIIIM_Radixite + 175},
+		{ERTSResourceType::Resource_VehicleParts, PzIIIM_VehicleParts + 75}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -6850,9 +6869,11 @@ void ACPPGameState::InitAllGameMediumTankData()
 		const float SuMediumTankDestroyerTurretRotationSpeed = 15.f;
 		const float SuMediumTankDestroyerMaxSpeedKmh = 22.f;
 		const float SuMediumTankDestroyerReverseSpeedKmh = 12.f;
+		const int32 Su85RadixiteCostOffset = 100;
+		const int32 Su85VehiclePartsCostOffset = 50;
 		const float Su85LaserHealthMlt = 1.1f;
-		const int32 Su85LaserRadixiteCostOffset = 150;
-		const int32 Su85LaserVehiclePartsCostOffset = 100;
+		const int32 Su85LaserRadixiteCostOffset = 250;
+		const int32 Su85LaserVehiclePartsCostOffset = 150;
 		const float Su85LaserExpWorthMlt = 2.25f;
 		const int32 Su100RadixiteCostOffset = 100;
 		const int32 Su100VehiclePartsCostOffset = 75;
@@ -6871,8 +6892,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 		TankData.VehicleReverseSpeedKmh = SuMediumTankDestroyerReverseSpeedKmh;
 		TankData.VisionRadius = T2TankVisionRadius;
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, Stug_Radixite},
-			{ERTSResourceType::Resource_VehicleParts, Stug_VehicleParts}
+			{ERTSResourceType::Resource_Radixite, Stug_Radixite + Su85RadixiteCostOffset},
+			{ERTSResourceType::Resource_VehicleParts, Stug_VehicleParts + Su85VehiclePartsCostOffset}
 		});
 		TankData.Abilities = BasicTankDestroyerAbilities;
 		TankData.ExperienceLevels = GetMediumTankDestroyerExpLevels();
@@ -6980,12 +7001,9 @@ void ACPPGameState::InitAllGameMediumTankData()
 		const float T44HowitzerTurretRotationSpeed = 16.f;
 		const float T44HowitzerMaxSpeedKmh = 28.f;
 		const float T44HowitzerReverseSpeedKmh = 18.f;
-		const float T44HowitzerCostMlt = 1.8f;
 		const float T44HowitzerExpWorthMlt = 3.0f;
-		const int32 T44HowitzerCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			HeavyTanks::PantherG_Radixite * T44HowitzerCostMlt, 10);
-		const int32 T44HowitzerVehiclePartsCost = RTSFunctionLibrary::RoundToNearestMultipleOf(
-			HeavyTanks::PantherG_VehicleParts * T44HowitzerCostMlt, 10);
+		const int32 T44HowitzerCost = 700;
+		const int32 T44HowitzerVehiclePartsCost = 400;
 
 		TankData.MaxHealth = T3MediumTankBase;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
@@ -7331,8 +7349,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 10;
 	TankData.VisionRadius = T2TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, T2HeavyTankRadixiteCost - 250},
-		{ERTSResourceType::Resource_VehicleParts, T2HeavyTankVehiclePartsCost - 100}
+		{ERTSResourceType::Resource_Radixite, T2HeavyTankRadixiteCost - 175},
+		{ERTSResourceType::Resource_VehicleParts, T2HeavyTankVehiclePartsCost - 50}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
@@ -7344,10 +7362,10 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	{
 		const float T28FMetalCostMultiplier = 1.3f;
 		const int32 T28FVehiclePartsCost = FMath::RoundToInt(
-			(T2HeavyTankVehiclePartsCost - 100) * T28FMetalCostMultiplier);
+			(T2HeavyTankVehiclePartsCost - 50) * T28FMetalCostMultiplier);
 
 		TankData.Cost = FUnitCost({
-			{ERTSResourceType::Resource_Radixite, T2HeavyTankRadixiteCost - 250},
+			{ERTSResourceType::Resource_Radixite, T2HeavyTankRadixiteCost - 175},
 			{ERTSResourceType::Resource_VehicleParts, T28FVehiclePartsCost}
 		});
 	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
@@ -7364,8 +7382,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 6;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, 800},
-		{ERTSResourceType::Resource_VehicleParts, 200}
+		{ERTSResourceType::Resource_Radixite, 1100},
+		{ERTSResourceType::Resource_VehicleParts, 400}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetT2HeavyTankExpLevels();
@@ -7493,8 +7511,8 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.VehicleReverseSpeedKmh = 9;
 	TankData.VisionRadius = T3TankVisionRadius;
 	TankData.Cost = FUnitCost({
-		{ERTSResourceType::Resource_Radixite, Maus_Radixite},
-		{ERTSResourceType::Resource_VehicleParts, Maus_VehicleParts}
+		{ERTSResourceType::Resource_Radixite, IS3_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, IS3_VehicleParts}
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetSuperHeavyTankExpLevels();

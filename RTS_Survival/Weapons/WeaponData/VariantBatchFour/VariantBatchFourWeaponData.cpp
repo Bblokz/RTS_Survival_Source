@@ -59,7 +59,7 @@ namespace VariantBatchFourWeaponsPrivate
 		// Radixite does not slow the shell: store the base HE's fired speed so the arc stays the same.
 		RadixiteData.ProjectileMovementSpeed = BaseFiredProjectileSpeed;
 		RadixiteData.ShrapnelRange = RadixiteHowitzerCalibre * ShrapnelRangePerMM;
-		RadixiteData.ShrapnelDamage = TntGrams * ShrapnelDamagePerTNTGram;
+		RadixiteData.ShrapnelDamage = DeveloperSettings::GameBalance::Weapons::GetCannonShrapnelDamage(TntGrams);
 		RadixiteData.ShrapnelParticles = FMath::RoundToInt(RadixiteHowitzerCalibre * ShrapnelAmountPerMM);
 		RadixiteData.ShrapnelPen = RadixiteHowitzerCalibre * ShrapnelPenPerMM;
 		// Direct hits only (user W4: no splash damage over time).
@@ -81,13 +81,12 @@ namespace VariantBatchFourWeaponsPrivate
 		}
 		using namespace VariantBatchFourWeapons;
 		const float KwK39ShotDamage = KwK39Data->BaseDamage;
-		const float KwK39ReloadSpeed = KwK39Data->ReloadSpeed;
 		FWeaponData PzIIIMLaserData = *LaserData;
 		PzIIIMLaserData.WeaponName = EWeaponName::Laser_60MM_PzIIIM;
 		PzIIIMLaserData.WeaponCalibre = 60.f;
 		// Laser damage is dealt per beam iteration.
 		PzIIIMLaserData.BaseDamage = PzIIIMLaserDamageInKwK39Shots * KwK39ShotDamage / PzIIIMLaserBeamIterations;
-		PzIIIMLaserData.ReloadSpeed = PzIIIMLaserReloadInKwK39Reloads * KwK39ReloadSpeed;
+		PzIIIMLaserData.ReloadSpeed = PzIIIMLaserReloadSpeed;
 		PzIIIMLaserData.MagCapacity = 1;
 		PzIIIMLaserData.BaseCooldown = 0.25f;
 		PzIIIMLaserData.Accuracy = 100;
@@ -167,6 +166,7 @@ namespace VariantBatchFourWeaponsPrivate
 		PfeilData.TNTExplosiveGrams = 0.f;
 		// Stored before the APCR damage multiplier, so a fired shot deals PfeilFiredDamagePerShot (250).
 		PfeilData.BaseDamage = PfeilFiredDamagePerShot / APCR_DamageMlt;
+		PfeilData.ReloadSpeed = PfeilReloadSpeed;
 		PfeilData.ArmorPen = PfeilArmorPen;
 		PfeilData.ArmorPenMaxRange = PfeilArmorPenMaxRange;
 		PfeilData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(

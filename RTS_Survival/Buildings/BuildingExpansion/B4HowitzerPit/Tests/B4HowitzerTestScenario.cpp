@@ -85,8 +85,8 @@ namespace B4HowitzerTestPrivate
 	constexpr float GroundTargetRangeFraction = 0.75f;
 	// Off the gun's forward so the attack-ground order also has to turn the carriage past its yaw arc.
 	constexpr float GroundTargetYawOffsetDegrees = 25.f;
-	constexpr float DefaultSquadReloadSeconds = 14.f;
-	constexpr float PitReloadSeconds = 24.f;
+	constexpr float DefaultSquadReloadSeconds = 15.f;
+	constexpr float PitReloadSeconds = 12.f;
 	constexpr float MinimumReloadFraction = 0.8f;
 	constexpr float MaximumReloadFraction = 1.6f;
 	constexpr float MaximumAttachOffset = 1.f;
@@ -148,7 +148,7 @@ namespace B4HowitzerTestPrivate
 	const TCHAR* const MLTwentyReloadMontageMarker = TEXT("ML20Pit_Reload");
 	const TCHAR* const PitReloadMontageMarker = TEXT("B4Pit_Reload");
 	// ML20_152MM_Pit's reload in ACPPGameState.
-	constexpr float MLTwentyPitReloadSeconds = 18.f;
+	constexpr float MLTwentyPitReloadSeconds = 12.f;
 
 	FB4HowitzerPitVariant MakePitVariant(const FString& PitName, const bool bConcretePit)
 	{

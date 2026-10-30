@@ -195,10 +195,10 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Radixite howitzer default shell"), RadixiteHowitzer->ShellType, EWeaponShellType::Shell_Radixite);
 	TestTrue(TEXT("Radixite howitzer can load HE (W3)"),
 	         RadixiteHowitzer->ShellTypes.Num() == 2 && RadixiteHowitzer->ShellTypes.Contains(EWeaponShellType::Shell_HE));
-	TestEqual(TEXT("Radixite howitzer stored damage"), RadixiteHowitzer->BaseDamage, 1486.8f, 0.1f);
+	TestEqual(TEXT("Radixite howitzer stored damage"), RadixiteHowitzer->BaseDamage, 965.7f, 0.1f);
 	TestEqual(TEXT("Radixite howitzer fired damage = 1.5x base fired"), RadixiteFired.BaseDamage,
 	          LeFHFired.BaseDamage * VariantBatchFourWeapons::RadixiteHowitzerDamageInBaseShells, 0.1f);
-	TestEqual(TEXT("Radixite howitzer fired damage value"), RadixiteFired.BaseDamage, 1784.16f, 0.1f);
+	TestEqual(TEXT("Radixite howitzer fired damage value"), RadixiteFired.BaseDamage, 1158.84f, 0.1f);
 	TestEqual(TEXT("Radixite howitzer fired pen as base HE"), RadixiteFired.ArmorPen, LeFHFired.ArmorPen, Tolerance);
 	TestEqual(TEXT("Radixite howitzer fired max-range pen as base HE"), RadixiteFired.ArmorPenMaxRange,
 	          LeFHFired.ArmorPenMaxRange, 0.05f);
@@ -207,7 +207,7 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	          LeFHFired.ProjectileMovementSpeed, 0.1f);
 	TestEqual(TEXT("Radixite howitzer reload 2x base"), RadixiteHowitzer->ReloadSpeed, LeFH->ReloadSpeed * 2.f,
 	          Tolerance);
-	TestEqual(TEXT("Radixite howitzer reload value"), RadixiteHowitzer->ReloadSpeed, 10.f, Tolerance);
+	TestEqual(TEXT("Radixite howitzer reload value"), RadixiteHowitzer->ReloadSpeed, 16.f, Tolerance);
 	TestEqual(TEXT("Radixite howitzer calibre"), RadixiteHowitzer->WeaponCalibre, 200.f, Tolerance);
 	TestEqual(TEXT("Radixite howitzer range as base"), RadixiteHowitzer->Range, LeFH->Range, Tolerance);
 	TestEqual(TEXT("Radixite howitzer DoT 10 per second"), RadixiteHowitzer->GetRadixiteDotDamagePerSecond(), 10.f,
@@ -221,7 +221,7 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	// Pz III M Overcharged laser.
 	TestEqual(TEXT("Pz III M laser = 3 KwK 39/1 shots"), PzIIIMLaser->BaseDamage, 3.f * KwK39->BaseDamage, Tolerance);
 	TestEqual(TEXT("Pz III M laser damage value"), PzIIIMLaser->BaseDamage, 385.2f, Tolerance);
-	TestEqual(TEXT("Pz III M laser reload = 4 KwK 39/1 reloads"), PzIIIMLaser->ReloadSpeed, 14.8f, Tolerance);
+	TestEqual(TEXT("Pz III M laser reload"), PzIIIMLaser->ReloadSpeed, 10.f, Tolerance);
 	TestEqual(TEXT("Pz III M laser magazine"), PzIIIMLaser->MagCapacity, 1);
 	TestEqual(TEXT("Pz III M laser calibre"), PzIIIMLaser->WeaponCalibre, 60.f, Tolerance);
 	TestEqual(TEXT("Pz III M laser is a laser"), PzIIIMLaser->DamageType, ERTSDamageType::Laser);
@@ -247,7 +247,7 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	          Tolerance);
 	TestEqual(TEXT("Hetzer mortar shrapnel damage follows TNT"), HetzerMortar->ShrapnelDamage,
 	          Mortar120->ShrapnelDamage * 1.4f, Tolerance);
-	TestEqual(TEXT("Hetzer mortar reload"), HetzerMortar->ReloadSpeed, 7.f, Tolerance);
+	TestEqual(TEXT("Hetzer mortar reload"), HetzerMortar->ReloadSpeed, 10.f, Tolerance);
 	TestEqual(TEXT("Hetzer mortar range as base mortar"), HetzerMortar->Range, Mortar120->Range, Tolerance);
 	TestEqual(TEXT("Hetzer mortar magazine"), HetzerMortar->MagCapacity, 1);
 
@@ -261,7 +261,7 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Pfeil pen"), Pfeil->ArmorPen, 255.f, Tolerance);
 	TestEqual(TEXT("Pfeil max-range pen"), Pfeil->ArmorPenMaxRange, 250.f, Tolerance);
 	TestEqual(TEXT("Pfeil accuracy"), Pfeil->Accuracy, 97);
-	TestEqual(TEXT("Pfeil reload as PaK 43"), Pfeil->ReloadSpeed, Pak43->ReloadSpeed, Tolerance);
+	TestEqual(TEXT("Pfeil reloads slower than the PaK 43"), Pfeil->ReloadSpeed, 9.f, Tolerance);
 	TestEqual(TEXT("Pfeil range = PaK 43 x1.1"), Pfeil->Range, Pak43->Range * 1.1f, 10.f);
 	TestEqual(TEXT("Pfeil shell speed as PaK 43 (APCR x1.4 at fire)"), Pfeil->ProjectileMovementSpeed,
 	          Pak43->ProjectileMovementSpeed, Tolerance);
@@ -281,7 +281,7 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Bollwerk fired pen 61"), GetFiredData(*Bollwerk, EWeaponShellType::Shell_HE).ArmorPen, 61.f,
 	          0.05f);
 
-	// Jaguar Flanker: the Bison's long 50mm scaled to 60mm, APCR only, one round, 9 s reload per gun.
+	// Jaguar Flanker: the Bison's long 50mm scaled to 60mm, APCR only, one round, 11 s reload per gun.
 	TestTrue(TEXT("Flanker is APCR only"), Flanker->ShellTypes.Num() == 1
 	         && Flanker->ShellType == EWeaponShellType::Shell_APCR);
 	TestEqual(TEXT("Flanker calibre"), Flanker->WeaponCalibre, 60.f, Tolerance);
@@ -289,7 +289,7 @@ bool FVariantBatchFourWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Flanker has no shrapnel"), Flanker->ShrapnelRange == 0.f && Flanker->ShrapnelDamage == 0.f
 	         && Flanker->ShrapnelParticles == 0 && Flanker->ShrapnelPen == 0.f);
 	TestEqual(TEXT("Flanker magazine"), Flanker->MagCapacity, 1);
-	TestEqual(TEXT("Flanker reload 9 s"), Flanker->ReloadSpeed, 9.f, Tolerance);
+	TestEqual(TEXT("Flanker reload 11 s"), Flanker->ReloadSpeed, 11.f, Tolerance);
 	TestEqual(TEXT("Flanker range as the Bison"), Flanker->Range, Bison->Range, Tolerance);
 	TestEqual(TEXT("Flanker pen = Bison x 60/50"), Flanker->ArmorPen, Bison->ArmorPen * 1.2f, Tolerance);
 	TestEqual(TEXT("Flanker fired damage = Bison fired APHE x 60/50"),

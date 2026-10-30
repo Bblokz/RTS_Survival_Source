@@ -158,10 +158,10 @@ bool FVariantBatchThreeWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	// Puma.
 	TestEqual(TEXT("Puma Dual magazine"), PumaDual->MagCapacity, 3);
 	TestEqual(TEXT("Puma Dual damage as KwK 31"), PumaDual->BaseDamage, Kwk31->BaseDamage, Tolerance);
-	TestEqual(TEXT("Sniper damage = 7 Puma shots"), Sniper->BaseDamage, 7.f * PumaGun->BaseDamage, Tolerance);
-	TestEqual(TEXT("Sniper damage value"), Sniper->BaseDamage, 898.8f, Tolerance);
+	TestEqual(TEXT("Sniper damage = 3 Puma shots"), Sniper->BaseDamage, 3.f * PumaGun->BaseDamage, Tolerance);
+	TestEqual(TEXT("Sniper damage value"), Sniper->BaseDamage, 385.2f, Tolerance);
 	TestEqual(TEXT("Sniper magazine"), Sniper->MagCapacity, 1);
-	TestEqual(TEXT("Sniper reload"), Sniper->ReloadSpeed, 3.3f * 1.67f, Tolerance);
+	TestEqual(TEXT("Sniper reload"), Sniper->ReloadSpeed, 3.3f * 2.5f, Tolerance);
 	TestEqual(TEXT("Sniper is a laser"), Sniper->DamageType, ERTSDamageType::Laser);
 	TestFalse(TEXT("No radixite DoT on the sniper (none requested)"), Sniper->GetHasRadixiteDotOverride());
 
@@ -212,7 +212,7 @@ bool FVariantBatchThreeWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Drilling Flak calibre"), DrillingFlak->WeaponCalibre, 20.f, Tolerance);
 	TestEqual(TEXT("FlaK 41 calibre"), Flak41->WeaponCalibre, 50.f, Tolerance);
 	TestEqual(TEXT("FlaK 41 clip"), Flak41->MagCapacity, 5);
-	TestEqual(TEXT("FlaK 41 reload"), Flak41->ReloadSpeed, 3.25f, Tolerance);
+	TestEqual(TEXT("FlaK 41 reload"), Flak41->ReloadSpeed, 5.25f, Tolerance);
 	TestEqual(TEXT("FlaK 41 range"), Flak41->Range, MediumCannonRange, Tolerance);
 	TestTrue(TEXT("FlaK 41 hits softer than the 88 mm Maus AA Flak"), Flak41->BaseDamage < MausAa->BaseDamage);
 

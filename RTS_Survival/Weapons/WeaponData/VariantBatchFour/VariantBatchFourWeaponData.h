@@ -23,7 +23,7 @@ namespace VariantBatchFourWeapons
 	// The damage is per beam iteration; the turret BP must use this many BeamIterations.
 	constexpr int32 PzIIIMLaserBeamIterations = 1;
 	constexpr float PzIIIMLaserDamageInKwK39Shots = 3.f;
-	constexpr float PzIIIMLaserReloadInKwK39Reloads = 4.f;
+	constexpr float PzIIIMLaserReloadSpeed = 10.f;
 
 	// Hetzer Flame: the Flamm 15 with 33% less damage.
 	constexpr float HetzerHullFlameDamage = 16.75f;
@@ -31,11 +31,12 @@ namespace VariantBatchFourWeapons
 	// Hetzer Mortar (user H1 defaults) relative to the base 12 cm mortar.
 	constexpr float HetzerMortarDamageMlt = 1.5f;
 	constexpr float HetzerMortarTntMlt = 1.4f;
-	constexpr float HetzerMortarReloadSpeed = 7.f;
+	constexpr float HetzerMortarReloadSpeed = 10.f;
 
 	// JagdPanther Pfeil (J-P3 defaults).
 	// Fired (after APCR x0.7) damage per shot; user 2026-10-27 (was 85 from calibre x1.15).
 	constexpr float PfeilFiredDamagePerShot = 250.f;
+	constexpr float PfeilReloadSpeed = 9.f;
 	constexpr float PfeilArmorPen = 255.f;
 	constexpr float PfeilArmorPenMaxRange = 250.f;
 	constexpr float PfeilRangeMlt = 1.1f;
@@ -49,7 +50,7 @@ namespace VariantBatchFourWeapons
 	// 50mm by calibre (60 / 50); APCR only, one round per gun, the user's 9 s reload per gun.
 	constexpr float FlankerCalibre = 60.f;
 	constexpr float FlankerScaleFromBison = FlankerCalibre / 50.f;
-	constexpr float FlankerReloadSpeed = 9.f;
+	constexpr float FlankerReloadSpeed = 11.f;
 
 	/** @param WeaponDataMap The player weapon map, already filled by the category initializers and batches 2-3. */
 	void AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponDataMap);
