@@ -14,8 +14,9 @@
 #include "RTS_Survival/SurvivalMode/Waves/SurvivalEdgeSpawnZone.h"
 #include "RTS_Survival/SurvivalMode/Waves/SurvivalStrategicAICoordinator.h"
 #include "RTS_Survival/SurvivalMode/Waves/SurvivalWaveSettings.h"
+#include "EngineUtils.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
-#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -1353,6 +1354,7 @@ void USurvivalWaveDirectorComponent::UpdateRound()
 	{
 		return;
 	}
+	AttributeNewSquads();
 	PruneRoundUnits();
 	const double Now = GetWorldTime();
 	switch (M_RoundState)
@@ -1362,8 +1364,8 @@ void USurvivalWaveDirectorComponent::UpdateRound()
 		{
 			M_RoundState = ESurvivalRoundState::Clearing;
 			M_RoundClearStartTime = Now;
-			UE_LOG(LogTemp, Log, TEXT("Survival round %d clearing: %d enemies remaining."), M_RoundNumber,
-			       GetEnemiesRemaining());
+			UE_LOG(LogTemp, Log, TEXT("Survival round %d clearing: %d enemies remaining (%d vehicles, %d squads)."),
+			       M_RoundNumber, GetEnemiesRemaining(), M_RoundTanks.Num(), M_RoundSquads.Num());
 			return;
 		}
 		if (Now >= M_Schedule.NextWaveWorldTime)
@@ -1418,8 +1420,6 @@ void USurvivalWaveDirectorComponent::RegisterUnitListeners()
 	using SurvivalWaveDirectorConstants::EnemyPlayerIndex;
 	GameUnitManager->GameUnitDelegates.RegisterListener(this, EnemyPlayerIndex,
 	                                                    &USurvivalWaveDirectorComponent::OnEnemyTankChanged);
-	GameUnitManager->GameUnitDelegates.RegisterListener(this, EnemyPlayerIndex,
-	                                                    &USurvivalWaveDirectorComponent::OnEnemySquadUnitChanged);
 	bM_HasRegisteredUnitListeners = true;
 }
 
@@ -1437,27 +1437,31 @@ void USurvivalWaveDirectorComponent::OnEnemyTankChanged(ATankMaster* Tank, const
 	}
 }
 
-void USurvivalWaveDirectorComponent::OnEnemySquadUnitChanged(ASquadUnit* SquadUnit, const bool bWasAdded)
+void USurvivalWaveDirectorComponent::AttributeNewSquads()
 {
-	if (not bWasAdded or not IsValid(SquadUnit) or M_RoundState == ESurvivalRoundState::Idle
-		or M_RoundState == ESurvivalRoundState::Intermission)
+	if (M_RoundState != ESurvivalRoundState::Active and M_RoundState != ESurvivalRoundState::Clearing)
 	{
 		return;
 	}
-	ASquadController* Squad = SquadUnit->GetSquadControllerChecked();
-	if (not IsValid(Squad))
+	if (GetPendingRoundSpawns() <= 0)
 	{
 		return;
 	}
-	const bool bAlreadyCounted = M_RoundSquads.ContainsByPredicate([Squad](const TWeakObjectPtr<AActor>& Counted)
+	using SurvivalWaveDirectorConstants::EnemyPlayerIndex;
+	for (TActorIterator<ASquadController> It(GetWorld()); It; ++It)
 	{
-		return Counted.Get() == Squad;
-	});
-	// Every soldier reports; the squad is one planned unit.
-	if (not bAlreadyCounted and TryAttributeToRound(SquadUnit->GetActorLocation()))
-	{
-		M_RoundSquads.Add(Squad);
-		M_AllWaveSquads.Add(Squad);
+		ASquadController* Squad = *It;
+		const URTSComponent* RTSComponent = IsValid(Squad) ? Squad->FindComponentByClass<URTSComponent>() : nullptr;
+		if (not RTSComponent or RTSComponent->GetOwningPlayer() != EnemyPlayerIndex
+			or M_AllWaveSquads.Contains(Squad) or Squad->GetSquadUnitsChecked().IsEmpty())
+		{
+			continue;
+		}
+		if (TryAttributeToRound(Squad->GetActorLocation()))
+		{
+			M_RoundSquads.Add(Squad);
+			M_AllWaveSquads.Add(Squad);
+		}
 	}
 }
 

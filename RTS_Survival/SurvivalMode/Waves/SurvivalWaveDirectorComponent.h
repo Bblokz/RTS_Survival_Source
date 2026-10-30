@@ -209,7 +209,8 @@ private:
 	float GetRoundActiveSeconds(int32 RoundNumber) const;
 	void RegisterUnitListeners();
 	void OnEnemyTankChanged(ATankMaster* Tank, bool bWasAdded);
-	void OnEnemySquadUnitChanged(ASquadUnit* SquadUnit, bool bWasAdded);
+	// Soldiers register before their squad is assigned, so squads are found by scanning near the spawn markers.
+	void AttributeNewSquads();
 	bool TryAttributeToRound(const FVector& Location);
 	void PruneRoundUnits();
 	int32 GetPendingRoundSpawns() const;
