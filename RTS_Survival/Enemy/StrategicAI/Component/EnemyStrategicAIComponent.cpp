@@ -2185,3 +2185,8 @@ TArray<FVector> UEnemyStrategicAIComponent::GetHeavyCarpetBombingTargetLocations
 {
 	return GetLightMediumAirStrikeTargetLocations();
 }
+
+void UEnemyStrategicAIComponent::SetStochasticDecisionTree(UStochasticDecisionTree* NewTree)
+{
+	M_StochasticDecisionTree = NewTree;
+}

@@ -46,6 +46,12 @@ public:
 	AEnemyController(const FObjectInitializer& ObjectInitializer);
 
 	UStochasticDecisionTree* GetStrategicDecisionTree();
+
+	/**
+	 * @brief Replaces the map-authored decision tree with a copy of Template, for game modes that share one tree
+	 * across maps (survival). Call after BeginPlay; think timers keep running.
+	 */
+	void OverrideStrategicDecisionTree(const UStochasticDecisionTree* Template);
 	UGlobalAbilitiesManager* GetGlobalAbilitiesManager();
 
 	// This is used to evaluate whether the AI can use its decision tree to manually control units that are 'idle' on the blackboard

@@ -1,0 +1,507 @@
+{
+ "widget_path": "/Game/RTS_Survival/SurvivalMode/UI/WBP_SurvivalArmySelection",
+ "asset": {
+  "call": "create_asset",
+  "asset_type": "WidgetBlueprint",
+  "name": "WBP_SurvivalArmySelection",
+  "save_path": "/Game/RTS_Survival/SurvivalMode/UI",
+  "parent_class": "/Script/RTS_Survival.W_SurvivalArmySelection"
+ },
+ "class_defaults": {
+  "m_style_asset": "/Game/RTS_Survival/SurvivalMode/UI/DA_SurvivalUiStyle.DA_SurvivalUiStyle"
+ },
+ "bound_widgets": {
+  "required": [
+   "M_RosterScroll",
+   "M_SlotScroll",
+   "M_SlotGrid",
+   "M_SupplyBar",
+   "M_SupplyText",
+   "M_ConfirmButton"
+  ],
+  "optional": [
+   "M_ScreenShade",
+   "M_HeaderPlate",
+   "M_RosterPanel",
+   "M_ArmyPanel",
+   "M_TabRow",
+   "M_TitleText",
+   "M_FactionText",
+   "M_RosterTitleText",
+   "M_ArmyTitleText",
+   "M_SlotCountText",
+   "M_SupplyLabelText",
+   "M_FeedbackText",
+   "M_HintText",
+   "M_ConfirmText",
+   "M_ClearText",
+   "M_ClearButton"
+  ]
+ },
+ "notes": [
+  "Static chrome only. Roster entries, tabs and slots are created in C++ (UW_SurvivalRosterEntry, UW_SurvivalArmyTab, UW_SurvivalArmySlot).",
+  "Brushes and fonts come from DA_SurvivalUiStyle at runtime and in the designer (NativePreConstruct); the spec leaves them default.",
+  "m_design_preview_slot_count / m_design_preview_roster_count drive the designer preview; reset to 12 / 8 after the layout check.",
+  "Slot area of this layout: about 1056 x 640 units (SurvivalUiLayout::DefaultSlotArea*)."
+ ],
+ "steps": [
+  {
+   "call": "create_widget_from_layout",
+   "replace": true,
+   "canvas_size": "1920,1080",
+   "layout": [
+    {
+     "name": "Root",
+     "type": "Overlay",
+     "children": [
+      {
+       "name": "M_ScreenShade",
+       "type": "Border",
+       "properties": {
+        "BrushColor": "(R=0,G=0,B=0,A=0.55)"
+       }
+      },
+      {
+       "name": "ContentBox",
+       "type": "SizeBox",
+       "properties": {
+        "WidthOverride": 1600,
+        "HeightOverride": 920
+       },
+       "slot": {
+        "HorizontalAlignment": "Center",
+        "VerticalAlignment": "Center",
+        "Padding": "16"
+       },
+       "children": [
+        {
+         "name": "ContentColumn",
+         "type": "VerticalBox",
+         "children": [
+          {
+           "name": "HeaderBox",
+           "type": "SizeBox",
+           "properties": {
+            "WidthOverride": 560,
+            "HeightOverride": 80
+           },
+           "slot": {
+            "HorizontalAlignment": "Center"
+           },
+           "children": [
+            {
+             "name": "M_HeaderPlate",
+             "type": "Border",
+             "properties": {
+              "Padding": "0",
+              "HorizontalAlignment": "Center",
+              "VerticalAlignment": "Center"
+             },
+             "children": [
+              {
+               "name": "HeaderTexts",
+               "type": "VerticalBox",
+               "children": [
+                {
+                 "name": "M_TitleText",
+                 "type": "TextBlock",
+                 "properties": {
+                  "Text": "STARTING ARMY",
+                  "Justification": "Center",
+                  "FontSize": 22
+                 },
+                 "slot": {
+                  "HorizontalAlignment": "Center"
+                 }
+                },
+                {
+                 "name": "M_FactionText",
+                 "type": "TextBlock",
+                 "properties": {
+                  "Text": "BREAKTHROUGH DOCTRINE",
+                  "Justification": "Center",
+                  "FontSize": 13
+                 },
+                 "slot": {
+                  "HorizontalAlignment": "Center"
+                 }
+                }
+               ]
+              }
+             ]
+            }
+           ]
+          },
+          {
+           "name": "Body",
+           "type": "HorizontalBox",
+           "slot": {
+            "size": "fill",
+            "Padding": "0,12,0,0"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "layout_bytes_minified": 1148
+  },
+  {
+   "call": "create_widget_from_layout",
+   "parent_name": "Body",
+   "layout": [
+    {
+     "name": "RosterBox",
+     "type": "SizeBox",
+     "properties": {
+      "WidthOverride": 480
+     },
+     "slot": {
+      "VerticalAlignment": "Fill"
+     },
+     "children": [
+      {
+       "name": "M_RosterPanel",
+       "type": "Border",
+       "properties": {
+        "Padding": "20,16,20,20"
+       },
+       "children": [
+        {
+         "name": "RosterColumn",
+         "type": "VerticalBox",
+         "children": [
+          {
+           "name": "M_RosterTitleText",
+           "type": "TextBlock",
+           "properties": {
+            "Text": "AVAILABLE UNITS",
+            "FontSize": 14
+           },
+           "slot": {
+            "Padding": "0,0,0,8"
+           }
+          },
+          {
+           "name": "M_TabRow",
+           "type": "HorizontalBox",
+           "slot": {
+            "Padding": "0,0,0,10"
+           }
+          },
+          {
+           "name": "M_RosterScroll",
+           "type": "ScrollBox",
+           "properties": {
+            "Orientation": "Vertical",
+            "ScrollBarVisibility": "Visible"
+           },
+           "slot": {
+            "size": "fill"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "BodySpacer",
+     "type": "Spacer",
+     "properties": {
+      "Size": "(X=24,Y=1)"
+     }
+    },
+    {
+     "name": "M_ArmyPanel",
+     "type": "Border",
+     "properties": {
+      "Padding": "20,16,20,16"
+     },
+     "slot": {
+      "size": "fill"
+     },
+     "children": [
+      {
+       "name": "ArmyColumn",
+       "type": "VerticalBox"
+      }
+     ]
+    }
+   ],
+   "layout_bytes_minified": 848
+  },
+  {
+   "call": "create_widget_from_layout",
+   "parent_name": "ArmyColumn",
+   "layout": [
+    {
+     "name": "ArmyHeader",
+     "type": "HorizontalBox",
+     "slot": {
+      "Padding": "0,0,0,8"
+     },
+     "children": [
+      {
+       "name": "M_ArmyTitleText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "YOUR ARMY",
+        "FontSize": 14
+       },
+       "slot": {
+        "size": "fill",
+        "VerticalAlignment": "Center"
+       }
+      },
+      {
+       "name": "M_SlotCountText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "1 / 12 SLOTS",
+        "FontSize": 13
+       },
+       "slot": {
+        "VerticalAlignment": "Center"
+       }
+      }
+     ]
+    },
+    {
+     "name": "M_SlotScroll",
+     "type": "ScrollBox",
+     "properties": {
+      "Orientation": "Vertical",
+      "ScrollBarVisibility": "Visible"
+     },
+     "slot": {
+      "size": "fill"
+     },
+     "children": [
+      {
+       "name": "M_SlotGrid",
+       "type": "UniformGridPanel",
+       "properties": {
+        "SlotPadding": "(Left=4,Top=4,Right=4,Bottom=4)"
+       },
+       "slot": {
+        "HorizontalAlignment": "Center"
+       }
+      }
+     ]
+    }
+   ],
+   "layout_bytes_minified": 671
+  },
+  {
+   "call": "create_widget_from_layout",
+   "parent_name": "ArmyColumn",
+   "layout": [
+    {
+     "name": "SupplyRow",
+     "type": "HorizontalBox",
+     "slot": {
+      "Padding": "0,12,0,0"
+     },
+     "children": [
+      {
+       "name": "M_SupplyLabelText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "SUPPLY",
+        "FontSize": 14
+       },
+       "slot": {
+        "VerticalAlignment": "Center",
+        "Padding": "0,0,12,0"
+       }
+      },
+      {
+       "name": "SupplyBarBox",
+       "type": "SizeBox",
+       "properties": {
+        "HeightOverride": 24
+       },
+       "slot": {
+        "size": "fill",
+        "VerticalAlignment": "Center"
+       },
+       "children": [
+        {
+         "name": "M_SupplyBar",
+         "type": "ProgressBar",
+         "properties": {
+          "Percent": 0.4
+         }
+        }
+       ]
+      },
+      {
+       "name": "M_SupplyText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "40 / 100",
+        "FontSize": 14
+       },
+       "slot": {
+        "VerticalAlignment": "Center",
+        "Padding": "12,0,0,0"
+       }
+      }
+     ]
+    },
+    {
+     "name": "FeedbackBox",
+     "type": "SizeBox",
+     "properties": {
+      "HeightOverride": 22
+     },
+     "slot": {
+      "Padding": "0,8,0,0"
+     },
+     "children": [
+      {
+       "name": "M_FeedbackText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "Not enough supply: Tiger H1 costs 30, 12 left.",
+        "Visibility": "HitTestInvisible",
+        "FontSize": 13
+       }
+      }
+     ]
+    },
+    {
+     "name": "ButtonRow",
+     "type": "HorizontalBox",
+     "slot": {
+      "Padding": "0,10,0,0"
+     },
+     "children": [
+      {
+       "name": "M_HintText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "Drag units into slots.",
+        "AutoWrapText": true,
+        "FontSize": 13
+       },
+       "slot": {
+        "size": "fill",
+        "VerticalAlignment": "Center"
+       }
+      },
+      {
+       "name": "ClearBox",
+       "type": "SizeBox",
+       "properties": {
+        "WidthOverride": 240,
+        "HeightOverride": 48
+       },
+       "slot": {
+        "Padding": "16,0,16,0"
+       },
+       "children": [
+        {
+         "name": "M_ClearButton",
+         "type": "Button",
+         "properties": {
+          "IsFocusable": false
+         },
+         "children": [
+          {
+           "name": "M_ClearText",
+           "type": "TextBlock",
+           "properties": {
+            "Text": "CLEAR",
+            "Justification": "Center",
+            "FontSize": 18
+           },
+           "slot": {
+            "HorizontalAlignment": "Center",
+            "VerticalAlignment": "Center"
+           }
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "name": "ConfirmBox",
+       "type": "SizeBox",
+       "properties": {
+        "WidthOverride": 280,
+        "HeightOverride": 48
+       },
+       "children": [
+        {
+         "name": "M_ConfirmButton",
+         "type": "Button",
+         "properties": {
+          "IsFocusable": false
+         },
+         "children": [
+          {
+           "name": "M_ConfirmText",
+           "type": "TextBlock",
+           "properties": {
+            "Text": "CONFIRM",
+            "Justification": "Center",
+            "FontSize": 18
+           },
+           "slot": {
+            "HorizontalAlignment": "Center",
+            "VerticalAlignment": "Center"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "layout_bytes_minified": 1930
+  }
+ ],
+ "post_steps": [],
+ "verify": [
+  {
+   "set_cdo": {
+    "m_design_preview_slot_count": 8
+   },
+   "call": "analyze_widget_layout",
+   "resolutions": [
+    "1920x1080",
+    "1280x720"
+   ],
+   "expect": "no clipped/overlap/offscreen among M_SlotGrid children; grid fits M_SlotScroll without scrolling"
+  },
+  {
+   "set_cdo": {
+    "m_design_preview_slot_count": 16
+   },
+   "call": "analyze_widget_layout",
+   "resolutions": [
+    "1920x1080",
+    "1280x720"
+   ],
+   "expect": "no clipped/overlap/offscreen among M_SlotGrid children; grid fits M_SlotScroll without scrolling"
+  },
+  {
+   "set_cdo": {
+    "m_design_preview_slot_count": 40
+   },
+   "call": "analyze_widget_layout",
+   "resolutions": [
+    "1920x1080",
+    "1280x720"
+   ],
+   "expect": "no clipped/overlap/offscreen among M_SlotGrid children; grid fits M_SlotScroll without scrolling"
+  }
+ ]
+}

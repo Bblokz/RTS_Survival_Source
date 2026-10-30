@@ -1,0 +1,481 @@
+{
+ "widget_path": "/Game/RTS_Survival/SurvivalMode/UI/WBP_SurvivalHud",
+ "asset": {
+  "call": "create_asset",
+  "asset_type": "WidgetBlueprint",
+  "name": "WBP_SurvivalHud",
+  "save_path": "/Game/RTS_Survival/SurvivalMode/UI",
+  "parent_class": "/Script/RTS_Survival.W_SurvivalHud"
+ },
+ "class_defaults": {
+  "m_style_asset": "/Game/RTS_Survival/SurvivalMode/UI/DA_SurvivalUiStyle.DA_SurvivalUiStyle"
+ },
+ "bound_widgets": {
+  "required": [
+   "M_TimerText",
+   "M_DefeatPanel",
+   "M_RetryButton",
+   "M_MainMenuButton"
+  ],
+  "optional": [
+   "M_StatusPanel",
+   "M_StatusPlate",
+   "M_PhaseText",
+   "M_WaveText",
+   "M_BannerPanel",
+   "M_BannerPlate",
+   "M_BannerTitleText",
+   "M_BannerText",
+   "M_ResultPanel",
+   "M_DefeatTitleText",
+   "M_TimeSurvivedLabel",
+   "M_TimeSurvivedText",
+   "M_WavesLabel",
+   "M_WavesText",
+   "M_BestTimeLabel",
+   "M_BestTimeText",
+   "M_NewRecordText",
+   "M_RetryText",
+   "M_MainMenuText"
+  ]
+ },
+ "notes": [
+  "Root SelfHitTestInvisible: the HUD never blocks RTS input; only M_DefeatPanel (Visible when shown) takes the mouse.",
+  "Status plate sits 90 units from the top to clear the main game UI's top bar; adjust Slot.Position if it overlaps.",
+  "M_BannerPanel and M_DefeatPanel start hidden; code shows them. M_DefeatPanel is the first canvas child (lowest z) so the design-time linter does not report the hidden shade covering the status texts; ShowDefeat hides the status plate and banner."
+ ],
+ "steps": [
+  {
+   "call": "create_widget_from_layout",
+   "replace": true,
+   "canvas_size": "1920,1080",
+   "layout": [
+    {
+     "name": "Root",
+     "type": "CanvasPanel",
+     "properties": {
+      "Visibility": "SelfHitTestInvisible"
+     },
+     "children": [
+      {
+       "name": "M_DefeatPanel",
+       "type": "Overlay",
+       "properties": {
+        "Visibility": "Collapsed"
+       },
+       "slot": {
+        "Slot.Anchors": "0,0,1,1",
+        "Slot.Offsets": "0,0,0,0"
+       },
+       "children": [
+        {
+         "name": "DefeatShade",
+         "type": "Border",
+         "properties": {
+          "BrushColor": "(R=0,G=0,B=0,A=0.6)"
+         }
+        },
+        {
+         "name": "ResultBox",
+         "type": "SizeBox",
+         "properties": {
+          "WidthOverride": 750,
+          "HeightOverride": 450
+         },
+         "slot": {
+          "HorizontalAlignment": "Center",
+          "VerticalAlignment": "Center"
+         },
+         "children": [
+          {
+           "name": "M_ResultPanel",
+           "type": "Border",
+           "properties": {
+            "Padding": "48,40,48,36"
+           },
+           "children": [
+            {
+             "name": "ResultColumn",
+             "type": "VerticalBox"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "name": "M_StatusPanel",
+       "type": "SizeBox",
+       "properties": {
+        "WidthOverride": 510,
+        "HeightOverride": 130,
+        "Visibility": "HitTestInvisible"
+       },
+       "slot": {
+        "Slot.Anchors": "0.5,0,0.5,0",
+        "Slot.Alignment": "0.5,0",
+        "Slot.Position": "0,90",
+        "Slot.Size": "510,130"
+       },
+       "children": [
+        {
+         "name": "M_StatusPlate",
+         "type": "Border",
+         "properties": {
+          "Padding": "24,12,24,12",
+          "HorizontalAlignment": "Center",
+          "VerticalAlignment": "Center"
+         },
+         "children": [
+          {
+           "name": "StatusColumn",
+           "type": "VerticalBox",
+           "children": [
+            {
+             "name": "M_PhaseText",
+             "type": "TextBlock",
+             "properties": {
+              "Text": "FIRST WAVE IN",
+              "Justification": "Center",
+              "FontSize": 12
+             },
+             "slot": {
+              "HorizontalAlignment": "Center"
+             }
+            },
+            {
+             "name": "M_TimerText",
+             "type": "TextBlock",
+             "properties": {
+              "Text": "2:45",
+              "Justification": "Center",
+              "FontSize": 34
+             },
+             "slot": {
+              "HorizontalAlignment": "Center"
+             }
+            },
+            {
+             "name": "M_WaveText",
+             "type": "TextBlock",
+             "properties": {
+              "Text": "WAVE 3",
+              "Justification": "Center",
+              "FontSize": 12
+             },
+             "slot": {
+              "HorizontalAlignment": "Center"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "name": "M_BannerPanel",
+       "type": "SizeBox",
+       "properties": {
+        "WidthOverride": 511,
+        "HeightOverride": 150,
+        "Visibility": "HitTestInvisible"
+       },
+       "slot": {
+        "Slot.Anchors": "0.5,0,0.5,0",
+        "Slot.Alignment": "0.5,0",
+        "Slot.Position": "0,236",
+        "Slot.Size": "511,150"
+       },
+       "children": [
+        {
+         "name": "M_BannerPlate",
+         "type": "Border",
+         "properties": {
+          "Padding": "28,24,28,24",
+          "HorizontalAlignment": "Center",
+          "VerticalAlignment": "Center"
+         },
+         "children": [
+          {
+           "name": "BannerColumn",
+           "type": "VerticalBox",
+           "children": [
+            {
+             "name": "M_BannerTitleText",
+             "type": "TextBlock",
+             "properties": {
+              "Text": "WAVE 4 INCOMING",
+              "Justification": "Center",
+              "FontSize": 20
+             },
+             "slot": {
+              "HorizontalAlignment": "Center"
+             }
+            },
+            {
+             "name": "M_BannerText",
+             "type": "TextBlock",
+             "properties": {
+              "Text": "from the North-East",
+              "Justification": "Center",
+              "FontSize": 14
+             },
+             "slot": {
+              "HorizontalAlignment": "Center"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "layout_bytes_minified": 2377
+  },
+  {
+   "call": "create_widget_from_layout",
+   "parent_name": "ResultColumn",
+   "layout": [
+    {
+     "name": "M_DefeatTitleText",
+     "type": "TextBlock",
+     "properties": {
+      "Text": "YOUR LINES HAVE FALLEN",
+      "Justification": "Center",
+      "FontSize": 30
+     },
+     "slot": {
+      "HorizontalAlignment": "Center",
+      "Padding": "0,0,0,24"
+     }
+    },
+    {
+     "name": "TimeRow",
+     "type": "HorizontalBox",
+     "slot": {
+      "Padding": "0,6,0,6"
+     },
+     "children": [
+      {
+       "name": "M_TimeSurvivedLabel",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "TIME SURVIVED",
+        "FontSize": 14
+       },
+       "slot": {
+        "size": "fill",
+        "VerticalAlignment": "Center"
+       }
+      },
+      {
+       "name": "M_TimeSurvivedText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "24:13",
+        "FontSize": 20
+       },
+       "slot": {
+        "VerticalAlignment": "Center"
+       }
+      }
+     ]
+    },
+    {
+     "name": "WavesRow",
+     "type": "HorizontalBox",
+     "slot": {
+      "Padding": "0,6,0,6"
+     },
+     "children": [
+      {
+       "name": "M_WavesLabel",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "WAVES FACED",
+        "FontSize": 14
+       },
+       "slot": {
+        "size": "fill",
+        "VerticalAlignment": "Center"
+       }
+      },
+      {
+       "name": "M_WavesText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "11",
+        "FontSize": 20
+       },
+       "slot": {
+        "VerticalAlignment": "Center"
+       }
+      }
+     ]
+    },
+    {
+     "name": "BestRow",
+     "type": "HorizontalBox",
+     "slot": {
+      "Padding": "0,6,0,6"
+     },
+     "children": [
+      {
+       "name": "M_BestTimeLabel",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "BEST ON THIS MAP",
+        "FontSize": 14
+       },
+       "slot": {
+        "size": "fill",
+        "VerticalAlignment": "Center"
+       }
+      },
+      {
+       "name": "M_BestTimeText",
+       "type": "TextBlock",
+       "properties": {
+        "Text": "24:13",
+        "FontSize": 20
+       },
+       "slot": {
+        "VerticalAlignment": "Center"
+       }
+      }
+     ]
+    },
+    {
+     "name": "M_NewRecordText",
+     "type": "TextBlock",
+     "properties": {
+      "Text": "NEW RECORD",
+      "Justification": "Center",
+      "FontSize": 14
+     },
+     "slot": {
+      "HorizontalAlignment": "Center",
+      "Padding": "0,8,0,0"
+     }
+    },
+    {
+     "name": "ResultSpacer",
+     "type": "Spacer",
+     "slot": {
+      "size": "fill"
+     }
+    },
+    {
+     "name": "ResultButtons",
+     "type": "HorizontalBox",
+     "slot": {
+      "HorizontalAlignment": "Center"
+     },
+     "children": [
+      {
+       "name": "RetryBox",
+       "type": "SizeBox",
+       "properties": {
+        "WidthOverride": 280,
+        "HeightOverride": 48
+       },
+       "slot": {
+        "Padding": "0,0,24,0"
+       },
+       "children": [
+        {
+         "name": "M_RetryButton",
+         "type": "Button",
+         "properties": {
+          "IsFocusable": false
+         },
+         "children": [
+          {
+           "name": "M_RetryText",
+           "type": "TextBlock",
+           "properties": {
+            "Text": "RETRY",
+            "Justification": "Center",
+            "FontSize": 18
+           },
+           "slot": {
+            "HorizontalAlignment": "Center",
+            "VerticalAlignment": "Center"
+           }
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "name": "MenuBox",
+       "type": "SizeBox",
+       "properties": {
+        "WidthOverride": 240,
+        "HeightOverride": 48
+       },
+       "children": [
+        {
+         "name": "M_MainMenuButton",
+         "type": "Button",
+         "properties": {
+          "IsFocusable": false
+         },
+         "children": [
+          {
+           "name": "M_MainMenuText",
+           "type": "TextBlock",
+           "properties": {
+            "Text": "MAIN MENU",
+            "Justification": "Center",
+            "FontSize": 18
+           },
+           "slot": {
+            "HorizontalAlignment": "Center",
+            "VerticalAlignment": "Center"
+           }
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "layout_bytes_minified": 2411
+  }
+ ],
+ "post_steps": [
+  {
+   "call": "set_widget_slot",
+   "widget_name": "M_DefeatPanel",
+   "anchors": [
+    0,
+    0,
+    1,
+    1
+   ],
+   "offsets": [
+    0,
+    0,
+    0,
+    0
+   ]
+  }
+ ],
+ "verify": [
+  {
+   "call": "analyze_widget_layout",
+   "resolutions": [
+    "1920x1080",
+    "1280x720"
+   ],
+   "expect": "status plate and banner top-centre without overlap; temporarily set M_DefeatPanel Visible to check the result panel"
+  }
+ ]
+}

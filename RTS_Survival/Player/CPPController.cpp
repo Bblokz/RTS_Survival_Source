@@ -72,6 +72,7 @@
 #include "RTS_Survival/Procedural/LandscapeDivider/RTSLandscapeDivider.h"
 #include "RTS_Survival/Resources/Resource.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/RTSComponents/SelectionComponent.h"
@@ -7781,7 +7782,7 @@ bool ACPPController::SetupPlayerHQReference()
 	}
 	// Do not error report as when this function is used to check whether our HQ truck already spawned at loading profile,
 	// and this is not the case then we use a timer to try again and the first try should not error report.
-	return GetIsValidPlayerHQ(true);
+	return GetIsValidPlayerHQ(not bM_IsHQDeliveredAfterStart);
 }
 
 void ACPPController::ShowPlayerBuildRadius(const bool bShowRadius) const
@@ -8846,7 +8847,8 @@ bool ACPPController::GetIsGameWithChoosingStartingLocation()
 {
 	const ARTSLandscapeDivider* LandscapeDivider = FRTS_Statics::GetRTSLandscapeDivider(this);
 	bool bStartByPickingLocation = false;
-	if (IsValid(LandscapeDivider))
+	// Survival maps pick the start location (and fly the army in) through their director.
+	if (IsValid(LandscapeDivider) || IsValid(ASurvivalModeDirector::Get(this)))
 	{
 		bStartByPickingLocation = true;
 	}

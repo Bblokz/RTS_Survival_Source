@@ -318,6 +318,8 @@ class RTS_SURVIVAL_API ACPPController : public APlayerController
 	friend class UApartmentDestructionTestSubsystem;
 	// For calling StartGameAtLocation with the picked location by the Start Location UI / Mngr.
 	friend class RTS_SURVIVAL_API UPlayerStartLocationManager;
+	// Survival mode starts the game at the picked start location and registers the air-dropped HQ.
+	friend class RTS_SURVIVAL_API ASurvivalModeDirector;
 
 public:
 	// Constructor
@@ -1995,6 +1997,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<ANomadicVehicle> M_PlayerHQ;
+	// Survival flies the HQ in after the game started; its absence at profile load is expected, not an error.
+	bool bM_IsHQDeliveredAfterStart = false;
 
 	void ShowPlayerBuildRadius(const bool bShowRadius) const;
 

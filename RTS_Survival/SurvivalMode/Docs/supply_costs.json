@@ -1,0 +1,1414 @@
+{
+ "formula": "P = (Radixite + 2*Metal + 3*VehicleParts) / 100, weights from the DeveloperSettings::GameBalance::UnitCosts note that metal is twice and vehicle parts three times as rare as radixite. raw = (Base + K*P) * (clamp(TrainingTime, 12, 45) / 20)^0.15 (the time factor is only a mild modifier, 0.93x at 12 s to 1.13x at 45 s, so supply is resource-dominated), with Base/K per category: infantry 2/0.9, team weapons 2/0.65, vehicles 6/1.0, aircraft 6/1.0; economy units (harvester, nomadic trucks) use 2 + 0.6*P with no time factor. The per-category Base is a fixed per-unit overhead that lifts cheap vehicles (an Sd.Kfz. 250 costs about as much as a rifle squad in resources but is a durable vehicle), and the lower team-weapon K reflects that crew-served guns cost more resources than their mobility is worth in a defensive start army. Rounding: raw <= 10 rounds to an integer (minimum 1), 10-30 to an integer, above 30 to a multiple of 5. Overrides: every faction HQ = 0, harvester floor 5, Metal Vault priced from its intended 250 Radixite + 125 Metal. Variants get their own value only when clearly stronger or weaker than base (x0.80-x1.20 of base, re-rounded); unlisted variants cost the base value.",
+ "suggested_defaults": {
+  "SupplyBudget": 100,
+  "SlotCount": 12,
+  "reasoning": "Slots count every unit including the HQ (HQ costs 0 supply). Breakthrough example, 89 supply in 11 slots: HQ Truck (0), Panzer IV H (21), Panzer IV G (16), Panzer Grenadiers (12), 2x JagerTrupp 98K (4), Scavengers (4), Sdkfz. 250 (8), Sdkfz. 250/37 (8), Pak 38 (7), PanzerI Harvester (5). Heavy-tank opener, 89 supply in 9 slots: HQ Truck (0), Tiger H1 (30), Panzer IV H (21), Panzer Grenadiers (12), 2x JagerTrupp 98K (4), Scavengers (4), Sdkfz. 250 (8), GrW 42 80mm Mortar (6). Strike Division example, 92 supply in 10 slots: HQ Truck (0), Panther D (29), Stug III (13), Panzer Grenadiers (12), 2x JagerTrupp 98K (4), Puma (10), Sdkfz. 251 Transport (8), Pak 38 (7), PanzerI Harvester (5). A King Tiger (40) or Maus/E100 (60) is affordable but takes 40-60% of the budget, so a super-heavy start is a real trade against breadth. The 12-slot cap binds first for armies of 4-supply squads (it stops a 25-squad Jager swarm), the 100 budget binds first for armour-heavy armies."
+ },
+ "fallback_per_unit_type": {
+  "UNType_Squad": 5,
+  "UNType_Tank": 15,
+  "UNType_Harvester": 5,
+  "UNType_Nomadic": 10,
+  "UNType_Aircraft": 20
+ },
+ "units": [
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_Scavengers",
+   "subtype_value": 1,
+   "display": "Scavengers",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 250
+   },
+   "training_time": 12,
+   "base_supply": 4
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_JagerTruppKar98k",
+   "subtype_value": 2,
+   "display": "JagerTrupp 98K",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 200
+   },
+   "training_time": 12,
+   "base_supply": 4
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_LMGSquad",
+   "subtype_value": 4,
+   "display": "LMG Squad",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 300
+   },
+   "training_time": 12,
+   "base_supply": 4,
+   "note": "No DT_TrainingOptions row Train_Squad_Ger_LMGSquad; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_Gebirgsjagerin",
+   "subtype_value": 5,
+   "display": "GebirgsJäger",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 200
+   },
+   "training_time": 14,
+   "base_supply": 4
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_SteelFistAssaultSquad",
+   "subtype_value": 3,
+   "display": "Steel Fist Assault Squad",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 200,
+    "Metal": 100
+   },
+   "training_time": 14,
+   "base_supply": 5
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_GrW42_80mm",
+   "subtype_value": 22,
+   "display": "GrW 42 80mm Mortar",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 425,
+    "Metal": 140
+   },
+   "training_time": 12,
+   "base_supply": 6,
+   "note": "No DT_TrainingOptions row Train_Squad_Ger_GrW42_80mm; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_PaK38",
+   "subtype_value": 14,
+   "display": "Pak 38",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 450,
+    "Metal": 180
+   },
+   "training_time": 14,
+   "base_supply": 7
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_PaK40",
+   "subtype_value": 15,
+   "display": "Pak 40",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 450,
+    "Metal": 180
+   },
+   "training_time": 14,
+   "base_supply": 7
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_Vultures",
+   "subtype_value": 6,
+   "display": "Hazmat Vultures",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 525,
+    "Metal": 100
+   },
+   "training_time": 14,
+   "base_supply": 8
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_37mmFlak",
+   "subtype_value": 18,
+   "display": "37mm Flak",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 500,
+    "Metal": 220
+   },
+   "training_time": 20,
+   "base_supply": 8,
+   "note": "No DT_TrainingOptions row Train_Squad_Ger_37mmFlak; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_88mmFlak",
+   "subtype_value": 19,
+   "display": "88mm Flak",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 500,
+    "Metal": 220
+   },
+   "training_time": 20,
+   "base_supply": 8
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_SturmPionieren",
+   "subtype_value": 9,
+   "display": "Sturm Pioneers",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 400,
+    "Metal": 200
+   },
+   "training_time": 14,
+   "base_supply": 9
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_SniperTeam",
+   "subtype_value": 7,
+   "display": "Sniper Team",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 650,
+    "Metal": 150
+   },
+   "training_time": 14,
+   "base_supply": 10
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_FeuerSturm",
+   "subtype_value": 8,
+   "display": "FeuerSturm Squad",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 500,
+    "Metal": 200
+   },
+   "training_time": 20,
+   "base_supply": 10
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_LefH18",
+   "subtype_value": 25,
+   "display": "leFH 18",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "Metal": 260
+   },
+   "training_time": 24,
+   "base_supply": 10
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_SFH18_150mm",
+   "subtype_value": 27,
+   "display": "sFH 18 150mm",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "Metal": 260
+   },
+   "training_time": 24,
+   "base_supply": 10,
+   "note": "No DT_TrainingOptions row Train_Squad_Ger_SFH18_150mm; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_Nebelwerfer",
+   "subtype_value": 28,
+   "display": "Nebelwerfer",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "Metal": 260
+   },
+   "training_time": 24,
+   "base_supply": 10,
+   "note": "No DT_TrainingOptions row Train_Squad_Ger_Nebelwerfer; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_PanzerGrenadiere",
+   "subtype_value": 10,
+   "display": "Panzer Grenadiers",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 675,
+    "Metal": 200
+   },
+   "training_time": 20,
+   "base_supply": 12
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_SturmKommandos",
+   "subtype_value": 12,
+   "display": "SturmKommando",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 800,
+    "Metal": 200
+   },
+   "training_time": 25,
+   "base_supply": 13
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_LightBringers",
+   "subtype_value": 13,
+   "display": "Light Bringers",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 800,
+    "Metal": 200
+   },
+   "training_time": 20,
+   "base_supply": 13
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_210MM_Morser",
+   "subtype_value": 26,
+   "display": "21cm Mörser",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 800,
+    "Metal": 410
+   },
+   "training_time": 24,
+   "base_supply": 13
+  },
+  {
+   "unit_type": "UNType_Squad",
+   "subtype": "Squad_Ger_IronStorm",
+   "subtype_value": 11,
+   "display": "Iron Storm",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 700,
+    "Metal": 300
+   },
+   "training_time": 30,
+   "base_supply": 15,
+   "note": "No DT_TrainingOptions row Train_Squad_Ger_IronStorm; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzJager",
+   "subtype_value": 16,
+   "display": "Panzerjager I",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 100,
+    "VehicleParts": 30
+   },
+   "training_time": 14,
+   "base_supply": 7
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz_221",
+   "subtype_value": 104,
+   "display": "Sdkfz. 221",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 90,
+    "VehicleParts": 35
+   },
+   "training_time": 12,
+   "base_supply": 7,
+   "note": "No DT_TrainingOptions row Train_Tank_Sdkfz_221; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz250",
+   "subtype_value": 2,
+   "display": "Sdkfz. 250",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 100,
+    "VehicleParts": 40
+   },
+   "training_time": 12,
+   "base_supply": 8
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz250_37mm",
+   "subtype_value": 3,
+   "display": "Sdkfz. 250/37",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 140,
+    "VehicleParts": 55
+   },
+   "training_time": 12,
+   "base_supply": 8
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz251_Transport",
+   "subtype_value": 7,
+   "display": "Sdkfz. 251 Transport",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 130,
+    "VehicleParts": 40
+   },
+   "training_time": 14,
+   "base_supply": 8,
+   "variants": {
+    "VariantA": 9,
+    "VariantB": 9
+   },
+   "variant_names": {
+    "VariantA": "Incendiary",
+    "VariantB": "Guided Missile"
+   },
+   "note": "No DT_TrainingOptions row Train_Tank_Sdkfz251_Transport; display name from the enum name. Variant pricing: Incendiary: adds a 6-rocket incendiary rack (description names no loss; assumes troop capacity is kept). Guided Missile: adds 4 homing HEAT missiles (description names no loss; assumes troop capacity is kept)."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzJagerLaser",
+   "subtype_value": 17,
+   "display": "Panzerjager Laser",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 100,
+    "VehicleParts": 45
+   },
+   "training_time": 14,
+   "base_supply": 8
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz_7_Flakvierling",
+   "subtype_value": 102,
+   "display": "Sdkfz 7 Flakvierling",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 120,
+    "VehicleParts": 45
+   },
+   "training_time": 12,
+   "base_supply": 8,
+   "variants": {
+    "VariantA": 9
+   },
+   "variant_names": {
+    "VariantA": "Searchlight Truck"
+   },
+   "note": "Variant pricing: Searchlight Truck: keeps the quad 2 cm mount and gains range."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz251_Mortar",
+   "subtype_value": 6,
+   "display": "Sdkfz. 251 Mortar",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 150,
+    "VehicleParts": 53
+   },
+   "training_time": 14,
+   "base_supply": 9
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzI_15cm",
+   "subtype_value": 20,
+   "display": "PanzerI 150mm",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 125,
+    "VehicleParts": 70
+   },
+   "training_time": 14,
+   "base_supply": 9
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Pz38t",
+   "subtype_value": 21,
+   "display": "Panzer 38(t)",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 250,
+    "VehicleParts": 50
+   },
+   "training_time": 14,
+   "base_supply": 9
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzII_F",
+   "subtype_value": 24,
+   "display": "Panzer II F",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 200,
+    "VehicleParts": 50
+   },
+   "training_time": 14,
+   "base_supply": 9
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz251_22",
+   "subtype_value": 5,
+   "display": "Sdkfz. 251/22",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 225,
+    "VehicleParts": 90
+   },
+   "training_time": 14,
+   "base_supply": 10
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Puma",
+   "subtype_value": 8,
+   "display": "Puma",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 180,
+    "VehicleParts": 80
+   },
+   "training_time": 14,
+   "base_supply": 10,
+   "variants": {
+    "VariantC": 12
+   },
+   "variant_names": {
+    "VariantC": "Radixite Sniper"
+   },
+   "note": "Variant pricing: Radixite Sniper: one shot = 7 base rounds for only 67% longer reload, a large DPS/alpha gain."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Pz38t_RailGun",
+   "subtype_value": 23,
+   "display": "Pz 38(t) Railgun",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 200,
+    "VehicleParts": 100
+   },
+   "training_time": 14,
+   "base_supply": 10
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz_140",
+   "subtype_value": 26,
+   "display": "Sdkfz 140",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 225,
+    "VehicleParts": 70
+   },
+   "training_time": 14,
+   "base_supply": 10
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Marder",
+   "subtype_value": 39,
+   "display": "Marder",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 180,
+    "VehicleParts": 80
+   },
+   "training_time": 24,
+   "base_supply": 10
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzII_Luchs",
+   "subtype_value": 103,
+   "display": "Pz II Luchs",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 240,
+    "VehicleParts": 65
+   },
+   "training_time": 14,
+   "base_supply": 10
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Sdkfz_232_3",
+   "subtype_value": 12,
+   "display": "Sdkfz. 234/3",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 230,
+    "VehicleParts": 105
+   },
+   "training_time": 14,
+   "base_supply": 11,
+   "variants": {
+    "VariantA": 13,
+    "VariantB": 13
+   },
+   "variant_names": {
+    "VariantA": "Stummel Assault",
+    "VariantB": "Incendiary Support"
+   },
+   "note": "Variant pricing: Stummel Assault: +33% armour, +20% health, direct fire and a 30 s APCR ability for -30% speed. Incendiary Support: napalm HE plus two extra arcing flame-charge projectors."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Hetzer",
+   "subtype_value": 42,
+   "display": "Hetzer",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 200,
+    "VehicleParts": 100
+   },
+   "training_time": 24,
+   "base_supply": 11
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Pz38t_R",
+   "subtype_value": 22,
+   "display": "Pz 38(t) Rockets",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 375,
+    "VehicleParts": 90
+   },
+   "training_time": 14,
+   "base_supply": 12
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzIII_J",
+   "subtype_value": 28,
+   "display": "Panzer III J",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 250,
+    "VehicleParts": 100
+   },
+   "training_time": 24,
+   "base_supply": 12
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzIV_F1",
+   "subtype_value": 33,
+   "display": "Panzer IV F1",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 275,
+    "VehicleParts": 150
+   },
+   "training_time": 4,
+   "base_supply": 12,
+   "note": "Training time is MediumTankTrainingTime - 20 = 4 s in TrainingMenuManager.cpp (looks like a slip); the time factor clamps it to 12 s."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzIII_AA",
+   "subtype_value": 29,
+   "display": "Panzer III AA",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 325,
+    "VehicleParts": 125
+   },
+   "training_time": 24,
+   "base_supply": 13
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Stug",
+   "subtype_value": 38,
+   "display": "Stug III",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 300,
+    "VehicleParts": 125
+   },
+   "training_time": 24,
+   "base_supply": 13
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Wespe",
+   "subtype_value": 105,
+   "display": "Wespe",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 275,
+    "VehicleParts": 120
+   },
+   "training_time": 24,
+   "base_supply": 13,
+   "note": "No DT_TrainingOptions row Train_Tank_Wespe; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzIV_G",
+   "subtype_value": 35,
+   "display": "Panzer IV G",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 400,
+    "VehicleParts": 200
+   },
+   "training_time": 24,
+   "base_supply": 16
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzIII_M",
+   "subtype_value": 32,
+   "display": "Panzer III M",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 400,
+    "VehicleParts": 200
+   },
+   "training_time": 34,
+   "base_supply": 17,
+   "variants": {
+    "VariantA": 14
+   },
+   "variant_names": {
+    "VariantA": "Overcharged"
+   },
+   "note": "Variant pricing: Overcharged: 3x damage for 4x reload (75% DPS) and drops the homing missiles and Panzerschreck."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_E25",
+   "subtype_value": 57,
+   "display": "E25",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 450,
+    "VehicleParts": 200
+   },
+   "training_time": 34,
+   "base_supply": 18
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzIV_70",
+   "subtype_value": 40,
+   "display": "Jagdpanzer IV/70",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 475,
+    "VehicleParts": 250
+   },
+   "training_time": 24,
+   "base_supply": 19
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzIII_FLamm",
+   "subtype_value": 30,
+   "display": "Panzer III Flamm",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 400,
+    "VehicleParts": 300
+   },
+   "training_time": 24,
+   "base_supply": 20
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PzIV_H",
+   "subtype_value": 36,
+   "display": "Panzer IV H",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 500,
+    "VehicleParts": 300
+   },
+   "training_time": 24,
+   "base_supply": 21,
+   "variants": {
+    "VariantA": 23,
+    "VariantB": 18
+   },
+   "variant_names": {
+    "VariantA": "Standard Plus",
+    "VariantB": "Ostwind"
+   },
+   "note": "Variant pricing: Standard Plus: thicker skirts (50 mm sides) and an extra cupola MG gunner. Ostwind: 3.7 cm flak turret replaces the 75 mm gun; anti-air, far weaker against armour."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Jaguar",
+   "subtype_value": 43,
+   "display": "Jaguar",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 550,
+    "VehicleParts": 300
+   },
+   "training_time": 34,
+   "base_supply": 22,
+   "variants": {
+    "VariantA": 25
+   },
+   "variant_names": {
+    "VariantA": "Flanker"
+   },
+   "note": "Variant pricing: Flanker: two independent long 60 mm guns and a radixite-boosted engine instead of one 35 mm autocannon."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PZIV_Rockets",
+   "subtype_value": 37,
+   "display": "Panzer IV Rockets",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "VehicleParts": 350
+   },
+   "training_time": 24,
+   "base_supply": 23
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_JagdPanther",
+   "subtype_value": 50,
+   "display": "JagdPanther",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "VehicleParts": 300
+   },
+   "training_time": 34,
+   "base_supply": 23
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Brumbar",
+   "subtype_value": 41,
+   "display": "Brummbar",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 550,
+    "VehicleParts": 400
+   },
+   "training_time": 30,
+   "base_supply": 25
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PantherD",
+   "subtype_value": 44,
+   "display": "Panther D",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 900,
+    "VehicleParts": 400
+   },
+   "training_time": 30,
+   "base_supply": 29
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_TigerH1",
+   "subtype_value": 53,
+   "display": "Tiger H1",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 900,
+    "VehicleParts": 450
+   },
+   "training_time": 30,
+   "base_supply": 30,
+   "variants": {
+    "VariantB": 24
+   },
+   "variant_names": {
+    "VariantB": "ASPS"
+   },
+   "note": "Variant pricing: ASPS: no main gun; its firepower is the 3 garrisoned squads, which cost their own supply."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_PantherII",
+   "subtype_value": 48,
+   "display": "Panther II",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 900,
+    "VehicleParts": 600
+   },
+   "training_time": 30,
+   "base_supply": 35
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_SturmTiger",
+   "subtype_value": 51,
+   "display": "SturmTiger",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 1350,
+    "VehicleParts": 600
+   },
+   "training_time": 34,
+   "base_supply": 40
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_TigerRail",
+   "subtype_value": 54,
+   "display": "Tiger Rail",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 900,
+    "VehicleParts": 700
+   },
+   "training_time": 30,
+   "base_supply": 40
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_KingTiger",
+   "subtype_value": 55,
+   "display": "King Tiger",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 1300,
+    "VehicleParts": 650
+   },
+   "training_time": 34,
+   "base_supply": 40
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_E50",
+   "subtype_value": 108,
+   "display": "E-50",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 1150,
+    "VehicleParts": 600
+   },
+   "training_time": 34,
+   "base_supply": 40
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Tiger105",
+   "subtype_value": 56,
+   "display": "King Tiger 105mm",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 1500,
+    "VehicleParts": 750
+   },
+   "training_time": 34,
+   "base_supply": 45
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_JagdTiger",
+   "subtype_value": 58,
+   "display": "JagdTiger",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 1300,
+    "VehicleParts": 850
+   },
+   "training_time": 34,
+   "base_supply": 50
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_E75",
+   "subtype_value": 107,
+   "display": "E-75",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 1450,
+    "VehicleParts": 850
+   },
+   "training_time": 42,
+   "base_supply": 50
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_Maus",
+   "subtype_value": 59,
+   "display": "Maus",
+   "factions": [
+    "GerBreakthroughDoctrine"
+   ],
+   "resources": {
+    "Radixite": 1500,
+    "VehicleParts": 1000
+   },
+   "training_time": 68,
+   "base_supply": 60,
+   "note": "Training time 68 s is clamped to 45 s in the time factor."
+  },
+  {
+   "unit_type": "UNType_Tank",
+   "subtype": "Tank_E100",
+   "subtype_value": 60,
+   "display": "E100",
+   "factions": [
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 1500,
+    "VehicleParts": 1000
+   },
+   "training_time": 68,
+   "base_supply": 60,
+   "note": "Training time 68 s is clamped to 45 s in the time factor."
+  },
+  {
+   "unit_type": "UNType_Harvester",
+   "subtype": "Tank_PzI_Harvester",
+   "subtype_value": 18,
+   "display": "PanzerI Harvester",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 300
+   },
+   "training_time": 10,
+   "base_supply": 5,
+   "note": "Economy unit: the layout slot is UNType_Tank (value 18); the training menu has a UNType_Tank entry (HarvesterTrainingTime 10 s, used here) and a UNType_Harvester entry (LightTankTrainingTime 14 s). Match either unit type."
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerHq",
+   "subtype_value": 2,
+   "display": "HQ Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 100,
+    "VehicleParts": 100
+   },
+   "training_time": null,
+   "base_supply": 0,
+   "note": "Faction HQ: free by design. Not a slot of the training layout (it is the HQ trainer building itself), added so the HQ has an explicit 0."
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerGammaFacility",
+   "subtype_value": 5,
+   "display": "Gamma Facility Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 200,
+    "Metal": 100
+   },
+   "training_time": 10,
+   "base_supply": 4
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerRefinery",
+   "subtype_value": 3,
+   "display": "Refinery Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 250,
+    "Metal": 125
+   },
+   "training_time": 14,
+   "base_supply": 5
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerMetalVault",
+   "subtype_value": 4,
+   "display": "Vault Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Metal": 125
+   },
+   "training_time": 14,
+   "base_supply": 5,
+   "note": "CPPGameState registers its cost as {Metal: GerMetalVault_Radixite, Metal: GerMetalVault_Metal} (duplicate Metal key, so only Metal 125 survives); priced as the intended 250 Radixite + 125 Metal."
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerBarracks",
+   "subtype_value": 7,
+   "display": "Barracks Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 300,
+    "Metal": 150
+   },
+   "training_time": 14,
+   "base_supply": 6
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerMechanizedDepot",
+   "subtype_value": 8,
+   "display": "Mechanized Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 350,
+    "Metal": 200
+   },
+   "training_time": 18,
+   "base_supply": 6
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerArmory",
+   "subtype_value": 9,
+   "display": "Armory Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 350,
+    "Metal": 250
+   },
+   "training_time": 22,
+   "base_supply": 7,
+   "note": "No DT_TrainingOptions row Train_Nomadic_GerArmory; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerLightSteelForge",
+   "subtype_value": 6,
+   "display": "Light Tank Factory Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 500,
+    "Metal": 250
+   },
+   "training_time": 18,
+   "base_supply": 8
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerCommunicationCenter",
+   "subtype_value": 12,
+   "display": "Communication Center Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "Metal": 300
+   },
+   "training_time": 22,
+   "base_supply": 9
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerMedTankFactory",
+   "subtype_value": 11,
+   "display": "Medium Factory Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "Metal": 600
+   },
+   "training_time": 22,
+   "base_supply": 13
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerAirbase",
+   "subtype_value": 13,
+   "display": "Airbase Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 800,
+    "Metal": 500
+   },
+   "training_time": 22,
+   "base_supply": 13
+  },
+  {
+   "unit_type": "UNType_Nomadic",
+   "subtype": "Nomadic_GerExperimentalUnitsFactory",
+   "subtype_value": 14,
+   "display": "Experimental Units Factory Truck",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 1000,
+    "Metal": 500
+   },
+   "training_time": 30,
+   "base_supply": 14,
+   "note": "No DT_TrainingOptions row Train_Nomadic_GerExperimentalUnitsFactory; display name from the enum name."
+  },
+  {
+   "unit_type": "UNType_Aircraft",
+   "subtype": "Aircraft_Bf109",
+   "subtype_value": 1,
+   "display": "Bf 109",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "VehicleParts": 225
+   },
+   "training_time": 30,
+   "base_supply": 20,
+   "note": "DT_TrainingOptions Title for Train_Aircraft_Bf109 is the raw enum name; display name written by hand."
+  },
+  {
+   "unit_type": "UNType_Aircraft",
+   "subtype": "Aircraft_Ju87",
+   "subtype_value": 2,
+   "display": "JU87",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 600,
+    "VehicleParts": 250
+   },
+   "training_time": 30,
+   "base_supply": 21
+  },
+  {
+   "unit_type": "UNType_Aircraft",
+   "subtype": "Aircraft_Horten229",
+   "subtype_value": 10,
+   "display": "Ho 229",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 700,
+    "VehicleParts": 275
+   },
+   "training_time": 30,
+   "base_supply": 23
+  },
+  {
+   "unit_type": "UNType_Aircraft",
+   "subtype": "Aircraft_Me410",
+   "subtype_value": 3,
+   "display": "Me 410",
+   "factions": [
+    "GerBreakthroughDoctrine",
+    "GerStrikeDivision"
+   ],
+   "resources": {
+    "Radixite": 800,
+    "VehicleParts": 300
+   },
+   "training_time": 30,
+   "base_supply": 24,
+   "note": "DT_TrainingOptions Title for Train_Aircraft_Me410 says \"JU87\" (copy-paste); display name written by hand."
+  }
+ ]
+}
