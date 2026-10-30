@@ -55,6 +55,10 @@ a build with `RTS_WITH_MAP_TESTS` (the Shipping test exe: add `-RTSMapSmokeTest 
 path; the plain game has no such switch): it deploys a debug army at the first start location and logs RTS errors instead of
 showing a modal dialog per error. Progress is logged under `LogTemp: Survival ...`.
 
+Full menu route without a mouse, in the same builds: start on the `StartGame` map with `-RTSSurvivalMenuFlow
+-RTSMapSmokeTestSeconds=420 -SurvivalDriveSetup -SurvivalPickReward=1 -SurvivalGrace=20` (presses the SURVIVAL button,
+goes through faction, variants and difficulty, confirms an army and a start location, picks reward 2).
+
 ## Making a new survival map
 
 1. Duplicate `/Game/RTS_Survival/SurvivalMode/Maps/SM_Desert_01` (or start from `Maps/ToCopy/RTS_ToCopyMap`)

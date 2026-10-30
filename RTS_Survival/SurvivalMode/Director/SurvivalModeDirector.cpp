@@ -83,6 +83,10 @@ void ASurvivalModeDirector::BeginPlay()
 		bDebugAutoStart = true;
 	}
 	FParse::Value(FCommandLine::Get(), TEXT("SurvivalGrace="), DebugGraceSecondsOverride);
+	if (FParse::Param(FCommandLine::Get(), TEXT("SurvivalDriveSetup")) and DebugGraceSecondsOverride >= 0.f)
+	{
+		M_GraceSeconds = DebugGraceSecondsOverride;
+	}
 	// Unattended test runs log RTS errors instead of stopping the game on a modal dialog per error.
 	if (bDebugAutoStart)
 	{
@@ -362,6 +366,32 @@ void ASurvivalModeDirector::ShowArmySelection()
 	ArmySelection->InitArmySelection(this);
 	M_ActiveSetupWidget = ArmySelection;
 	SetSetupInputMode(ArmySelection, true);
+#if RTS_WITH_MAP_TESTS
+	// Test runs without a mouse: confirm a valid army, then the last start location, through the same entry points.
+	if (FParse::Param(FCommandLine::Get(), TEXT("SurvivalDriveSetup")))
+	{
+		TWeakObjectPtr<ASurvivalModeDirector> WeakThis(this);
+		FTimerHandle ConfirmArmyHandle;
+		GetWorld()->GetTimerManager().SetTimer(ConfirmArmyHandle, FTimerDelegate::CreateLambda([WeakThis]()
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			FText Reason;
+			const bool bConfirmed = WeakThis->ConfirmArmy(WeakThis->BuildDebugArmy(), Reason);
+			UE_LOG(LogTemp, Log, TEXT("Survival test: army confirmed %d %s"), bConfirmed ? 1 : 0, *Reason.ToString());
+		}), 3.f, false);
+		FTimerHandle ConfirmLocationHandle;
+		GetWorld()->GetTimerManager().SetTimer(ConfirmLocationHandle, FTimerDelegate::CreateLambda([WeakThis]()
+		{
+			if (WeakThis.IsValid() and not WeakThis->M_StartLocations.IsEmpty())
+			{
+				WeakThis->ConfirmStartLocation(WeakThis->M_StartLocations.Last().Get());
+			}
+		}), 6.f, false);
+	}
+#endif
 }
 
 void ASurvivalModeDirector::ShowStartLocationPicker()
@@ -807,6 +837,13 @@ void ASurvivalModeDirector::OnRoundSurvived(const int32 RoundNumber)
 	ShowRewardPicker();
 	GetWorld()->GetTimerManager().SetTimer(M_IntermissionTimerHandle, this,
 	                                       &ASurvivalModeDirector::OnIntermissionFinished, Seconds, false);
+#if RTS_WITH_MAP_TESTS
+	int32 TestRewardIndex = INDEX_NONE;
+	if (FParse::Value(FCommandLine::Get(), TEXT("SurvivalPickReward="), TestRewardIndex))
+	{
+		ChooseReward(TestRewardIndex);
+	}
+#endif
 }
 
 void ASurvivalModeDirector::ShowRewardPicker()

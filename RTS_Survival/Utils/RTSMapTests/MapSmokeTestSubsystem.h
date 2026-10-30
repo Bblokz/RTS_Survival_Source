@@ -48,6 +48,10 @@ private:
 	bool bM_HasStartedGame = false;
 	bool bM_HasFinished = false;
 	bool bM_HasPressedLoadCampaign = false;
+	bool bM_HasPressedSurvival = false;
+	// Steps of the survival route through the faction map: 0 faction, 1 variants, 2 difficulty, 3 done.
+	int32 M_SurvivalFactionStep = 0;
+	float M_NextSurvivalStepSeconds = 0.f;
 	// Real time the game has been paused since (-1 while running); a locked pause the test cannot lift ends the run.
 	float M_PausedSinceRealSeconds = -1.f;
 	float M_NextMissionLaunchSeconds = 0.f;
@@ -58,6 +62,9 @@ private:
 	// Menu flow: returns true while this world is the main menu or the campaign map, which the flow drives itself.
 	bool TickMenuFlow();
 	void PressLoadCampaignButton();
+	bool TickSurvivalMenuFlow();
+	void PressSurvivalButton();
+	void TickSurvivalFactionFlow(class AFactionPlayerController* FactionController);
 	void LaunchFirstCampaignMission();
 	void ApplyPIEStartupSettingsOnce() const;
 	bool TryStartGame();
