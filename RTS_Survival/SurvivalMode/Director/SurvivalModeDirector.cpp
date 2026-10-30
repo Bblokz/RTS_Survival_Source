@@ -8,6 +8,7 @@
 #include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
+#include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/SurvivalMode/Army/SurvivalArmyLibrary.h"
@@ -28,6 +29,7 @@
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 namespace SurvivalModeDirectorConstants
@@ -74,7 +76,7 @@ void ASurvivalModeDirector::BeginPlay()
 		return;
 	}
 	M_GraceSeconds = Settings->GracePeriodSeconds;
-#if not UE_BUILD_SHIPPING
+#if RTS_WITH_MAP_TESTS
 	// Headless test runs: -SurvivalAutoStart deploys the debug army at the first start location, -SurvivalGrace=N.
 	if (FParse::Param(FCommandLine::Get(), TEXT("SurvivalAutoStart")))
 	{
@@ -250,6 +252,22 @@ FVector ASurvivalModeDirector::GetCurrentPlayerBaseLocation() const
 		return M_ChosenStartLocation->GetDeployCenter();
 	}
 	return GetActorLocation();
+}
+
+ARTSAsyncSpawner* ASurvivalModeDirector::FindAsyncSpawner() const
+{
+	if (ARTSAsyncSpawner* AsyncSpawner = FRTS_Statics::GetAsyncSpawner(this))
+	{
+		return AsyncSpawner;
+	}
+	for (TActorIterator<ARTSAsyncSpawner> It(GetWorld()); It; ++It)
+	{
+		if (IsValid(*It))
+		{
+			return *It;
+		}
+	}
+	return nullptr;
 }
 
 FRTSGameDifficulty ASurvivalModeDirector::GetDifficulty() const
@@ -692,7 +710,8 @@ void ASurvivalModeDirector::DebugAutoStart()
 TArray<FSurvivalArmyPick> ASurvivalModeDirector::BuildDebugArmy() const
 {
 	TArray<FSurvivalArmyPick> Army;
-	const TArray<FSurvivalArmyEntry> Roster = USurvivalArmyLibrary::BuildArmyRoster(Settings, GetPlayerFaction());
+	const TArray<FSurvivalArmyEntry> Roster = USurvivalArmyLibrary::BuildArmyRoster(
+		Settings, GetPlayerFaction(), FindAsyncSpawner());
 	int32 SupplyLeft = Settings->Army.SupplyBudget;
 	for (const FSurvivalArmyEntry& Entry : Roster)
 	{
@@ -771,7 +790,8 @@ void ASurvivalModeDirector::OnRoundSurvived(const int32 RoundNumber)
 	M_IntermissionEndTime = GetWorld()->GetTimeSeconds() + Seconds;
 	bM_HasChosenReward = false;
 	M_RewardOptions = FSurvivalRewardLibrary::BuildRewardOptions(Settings, GetPlayerFaction(), RoundNumber,
-	                                                             M_RewardRandom);
+	                                                             M_RewardRandom,
+	                                                             FindAsyncSpawner());
 	UE_LOG(LogTemp, Log, TEXT("Survival intermission after wave %d: %.0f s, %d reward options."), RoundNumber,
 	       Seconds, M_RewardOptions.Num());
 	for (int32 Index = 0; Index < M_RewardOptions.Num(); ++Index)

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "TeamWeaponRecoilProbe.h"
 
 class ASquadUnit;
 class ATeamWeapon;
@@ -109,6 +110,8 @@ struct FTWCrewAnimSubjectTrack
 	TMap<FString, FString> MontageKinds;
 	bool bWroteWeaponCsvHeader = false;
 	TArray<FName> WeaponBoneNames;
+	// Per-shot fire feedback of the gun mesh, measured against the barrel direction.
+	FTeamWeaponRecoilProbe RecoilProbe;
 };
 
 /**

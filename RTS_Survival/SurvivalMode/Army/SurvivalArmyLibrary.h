@@ -8,6 +8,7 @@
 
 #include "SurvivalArmyLibrary.generated.h"
 
+class ARTSAsyncSpawner;
 class USurvivalModeSettings;
 
 /**
@@ -24,8 +25,11 @@ public:
 	 * variant saved in the player profile and with its supply cost. The HQ entry is first and flagged bIsHQ.
 	 * @param Settings Survival settings with the supply table.
 	 * @param Faction The faction the player picked; NotInitialised falls back to GerBreakthroughDoctrine.
+	 * @param AsyncSpawner When given, units the spawner has no class for are left out (the training layout lists a
+	 * few that cannot be spawned).
 	 */
-	static TArray<FSurvivalArmyEntry> BuildArmyRoster(const USurvivalModeSettings* Settings, ERTSFaction Faction);
+	static TArray<FSurvivalArmyEntry> BuildArmyRoster(const USurvivalModeSettings* Settings, ERTSFaction Faction,
+	                                                  const ARTSAsyncSpawner* AsyncSpawner = nullptr);
 
 	/** @return The HQ entry for the faction (slot 0). */
 	static FSurvivalArmyEntry BuildHQEntry(const USurvivalModeSettings* Settings, ERTSFaction Faction);

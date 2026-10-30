@@ -63,6 +63,8 @@ namespace TeamWeaponQualityPrivate
 	const TCHAR* const SearchRadiusSwitch = TEXT("TWQualitySearchCm=");
 	const TCHAR* const CrewAnimsSwitch = TEXT("TWQualityCrewAnims");
 	const TCHAR* const CrewAnimDirectorySwitch = TEXT("TWQualityCrewAnimDir=");
+	// Degrees the attack ground target is turned away from the gun's spawn facing (fire feedback checks).
+	const TCHAR* const FireYawSwitch = TEXT("TWQualityFireYaw=");
 	const TCHAR* const AnchorClassPrefix = TEXT("BP_UnitImage_LandscapeAnchor");
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 
@@ -301,6 +303,7 @@ void UTeamWeaponQualityTestSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	bM_TakePictures = FParse::Value(FCommandLine::Get(), DirectorySwitch, M_OutputDirectory);
 	M_LegLengthCm = DefaultLegLengthCm;
 	FParse::Value(FCommandLine::Get(), LegLengthSwitch, M_LegLengthCm);
+	FParse::Value(FCommandLine::Get(), FireYawSwitch, M_FireYawOffsetDegrees);
 	bM_AuditCrewAnims = FParse::Param(FCommandLine::Get(), CrewAnimsSwitch);
 	if (bM_AuditCrewAnims)
 	{
@@ -1334,7 +1337,9 @@ void UTeamWeaponQualityTestSubsystem::StartSquadFiring(FTWQualitySquadSubject& S
 	Subject.ForcedReloads = 0;
 	const float TargetDistanceCm = FMath::Max(Controller.GetTeamWeaponRange() * FireTargetRangeFraction,
 	                                          MinFireTargetDistanceCm);
-	FVector Target = Weapon.GetActorLocation() + Weapon.GetActorForwardVector().GetSafeNormal2D() * TargetDistanceCm;
+	const FVector FireDirection = Weapon.GetActorForwardVector().GetSafeNormal2D().RotateAngleAxis(
+		M_FireYawOffsetDegrees, FVector::UpVector);
+	FVector Target = Weapon.GetActorLocation() + FireDirection * TargetDistanceCm;
 	float GroundZ = 0.f;
 	if (TryGetGroundZ(Target, GroundZ))
 	{

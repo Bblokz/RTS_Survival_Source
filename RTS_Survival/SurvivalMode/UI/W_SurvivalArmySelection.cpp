@@ -251,7 +251,8 @@ void UW_SurvivalArmySelection::BuildRoster(const ASurvivalModeDirector& Director
 {
 	const USurvivalModeSettings* Settings = Director.GetSettings();
 	const ERTSFaction Faction = Director.GetPlayerFaction();
-	const TArray<FSurvivalArmyEntry> Entries = USurvivalArmyLibrary::BuildArmyRoster(Settings, Faction);
+	const TArray<FSurvivalArmyEntry> Entries = USurvivalArmyLibrary::BuildArmyRoster(
+		Settings, Faction, Director.FindAsyncSpawner());
 	M_Roster.Reset();
 	bool bFoundHQ = false;
 	for (const FSurvivalArmyEntry& Entry : Entries)

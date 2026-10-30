@@ -284,6 +284,7 @@ void FTeamWeaponCrewAnimAudit::TickSubject(FTWCrewAnimSubjectTrack& Subject, con
 	{
 		LogDeployedGeometry(Subject, *Weapon);
 	}
+	Subject.RecoilProbe.Tick(Subject.Name, *Weapon, GameSeconds);
 	RefreshOperators(Subject);
 	if (not Subject.bLoggedSetup && Subject.Operators.Num() > 0)
 	{

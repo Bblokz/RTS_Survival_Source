@@ -24,20 +24,20 @@ PLACED_TEST_UNIT_CLASSES = ("Ger_Vehicle_PanzerIV_G_C", "Rus_Vehicle_T-70_C", "G
 # label, location, yaw (German line -> Soviet line), settings overrides, region. The battles travel: the next one is
 # always in another region. The desert's four arenas share its region weight. The fog manager's capture is widened
 # to cover every landscape (FOG_MAP_EXTENT), so every battle plays in the fog of war.
-REMOTE = {}
+REMOTE = {"slot_spacing": 4500.0}
 FOG_MAP_EXTENT = 220000.0
 # The desert landscape ends at +-25200 cm: its arenas use shorter approach and reinforcement depths and sit so their
 # deepest slots stay on it (past the edge the camera sees the bare sky atmosphere ground).
-DESERT = {"pick_weight": 0.5, "approach_distance": 2500.0, "reinforcement_depth": 2000.0}
+DESERT = {"pick_weight": 0.5, "approach_distance": 2500.0, "reinforcement_depth": 2000.0, "slot_spacing": 4500.0}
 # The start camera (x -7650, looking west) looks down this arena's axis from behind the German line; it hosts the first
 # battle so the menu opens on a fight where it starts looking.
 START_VIEW_ARENA = ("MenuArena_StartView", (-11500, 0), 180.0, dict(DESERT, line_separation=7500.0), "Desert")
 ARENAS = [
     START_VIEW_ARENA,
     ("MenuArena_EastPlain", (7000, 2500), 0.0, DESERT, "Desert"),
-    ("MenuArena_NorthWestField", (-17000, -14000), 90.0, DESERT, "Desert"),
-    ("MenuArena_SouthWestFlats", (-14500, 16000), 0.0, DESERT, "Desert"),
-    ("MenuArena_SouthEastRolling", (16000, 6000), 90.0, dict(DESERT, camera_distance=5000.0), "Desert"),
+    ("MenuArena_NorthWestField", (-13000, -14000), 90.0, DESERT, "Desert"),
+    ("MenuArena_SouthWestFlats", (-14500, 13000), 0.0, DESERT, "Desert"),
+    ("MenuArena_SouthEastRolling", (14000, 6000), 90.0, dict(DESERT, camera_distance=5000.0), "Desert"),
     ("MenuArena_SteppeFarm", (0, 80000), 0.0, dict(REMOTE, pick_weight=2.0), "Steppe"),
     ("MenuArena_MeadowForest", (80000, 0), 90.0, dict(REMOTE, pick_weight=2.0), "Meadow"),
     ("MenuArena_WinterRidge", (0, -80000), 0.0, dict(REMOTE, pick_weight=2.0, camera_height=2600.0), "Winter"),

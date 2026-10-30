@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "SurvivalRewardTypes.h"
 
+class ARTSAsyncSpawner;
 class USurvivalModeSettings;
 
 /**
@@ -20,9 +21,11 @@ struct RTS_SURVIVAL_API FSurvivalRewardLibrary
 	 * @param Faction The player's faction.
 	 * @param RoundNumber The round just survived (1-based).
 	 * @param Random Match stream so rolls differ per match.
+	 * @param AsyncSpawner Units it has no class for are never offered.
 	 */
 	static TArray<FSurvivalRewardOption> BuildRewardOptions(const USurvivalModeSettings* Settings, ERTSFaction Faction,
-	                                                        int32 RoundNumber, FRandomStream& Random);
+	                                                        int32 RoundNumber, FRandomStream& Random,
+	                                                        const ARTSAsyncSpawner* AsyncSpawner);
 
 	/** @return Supply worth of each set offered after this round. */
 	static int32 GetRewardSupply(const USurvivalModeSettings* Settings, int32 RoundNumber);

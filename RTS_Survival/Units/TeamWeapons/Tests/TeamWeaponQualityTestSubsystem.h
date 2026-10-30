@@ -240,6 +240,8 @@ private:
 	bool bM_TakePictures = false;
 	FVector M_TestCentre = FVector::ZeroVector;
 	float M_LegLengthCm = 0.f;
+	// -TWQualityFireYaw=: turns the attack ground target away from the spawn facing so the gun fires off-axis.
+	float M_FireYawOffsetDegrees = 0.f;
 	// -TWQualityCrewAnims: crew montage audit plus a firing step so reload montages play.
 	bool bM_AuditCrewAnims = false;
 	FTeamWeaponCrewAnimAudit M_CrewAnimAudit;

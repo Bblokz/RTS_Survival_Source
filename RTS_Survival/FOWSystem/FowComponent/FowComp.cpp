@@ -115,6 +115,11 @@ void UFowComp::StartFowParticipationInSeconds(const float Seconds)
 
 void UFowComp::StopFowParticipation()
 {
+	// A pending delayed start would otherwise join the fog after this stop, and the fog would hide the owner again.
+	if (GetWorld())
+	{
+		GetWorld()->GetTimerManager().ClearTimer(M_FowParticpationHandle);
+	}
 	if (GetIsValidFowManager())
 	{
 		M_FowManager->RemoveFowParticipant(this);
@@ -145,11 +150,6 @@ void UFowComp::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
 	StopFowParticipation();
-	if (not GetWorld() || not M_FowParticpationHandle.IsValid())
-	{
-		return;
-	}
-	GetWorld()->GetTimerManager().ClearTimer(M_FowParticpationHandle);
 }
 
 

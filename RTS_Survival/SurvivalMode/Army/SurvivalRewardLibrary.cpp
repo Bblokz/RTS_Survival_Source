@@ -186,14 +186,16 @@ bool FSurvivalRewardLibrary::TryBuildAuthoredOption(const USurvivalModeSettings*
 TArray<FSurvivalRewardOption> FSurvivalRewardLibrary::BuildRewardOptions(const USurvivalModeSettings* Settings,
                                                                          const ERTSFaction Faction,
                                                                          const int32 RoundNumber,
-                                                                         FRandomStream& Random)
+                                                                         FRandomStream& Random,
+                                                                         const ARTSAsyncSpawner* AsyncSpawner)
 {
 	TArray<FSurvivalRewardOption> Options;
 	if (not IsValid(Settings))
 	{
 		return Options;
 	}
-	const TArray<FSurvivalArmyEntry> Roster = USurvivalArmyLibrary::BuildArmyRoster(Settings, Faction);
+	const TArray<FSurvivalArmyEntry> Roster = USurvivalArmyLibrary::BuildArmyRoster(
+		Settings, Faction, AsyncSpawner);
 	const int32 SupplyWorth = GetRewardSupply(Settings, RoundNumber);
 	const int32 OptionCount = FMath::Max(1, Settings->Rewards.OptionsPerReward);
 

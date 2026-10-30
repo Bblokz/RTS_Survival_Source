@@ -1311,14 +1311,14 @@ namespace DeveloperSettings
 			inline constexpr float CommandVehicleHp = RoundToNearestMultipleOfFive(1375.f * OverallHealthMlt);
 			// T2 medium calibre 75mm~85mm deals 220~260 damage. Base medium tank gets killed in 4 shots.
 			inline constexpr float MediumTankHealthBase = RoundToNearestMultipleOfFive(900.f * OverallHealthMlt);
-			// T2 heavy tank. A mid game heavy, not as durable as a T3 heavy tank, gets killed in 6 medium tank shots.
-			inline constexpr float T2HeavyTankBase = RoundToNearestMultipleOfFive(1300.f * OverallHealthMlt);
-			// T3 medium tank, a late game medium tank, gets killed in 6 medium tank shots.
-			inline constexpr float T3MediumTankBase = RoundToNearestMultipleOfFive(1300.f * OverallHealthMlt);
-			// T3 Heavy tank, very durable vehicle, gets killed in 6 heavy tank shots or 9-10 medium tank shots. 6*350=2100
-			inline constexpr float T3HeavyTankBase = RoundToNearestMultipleOfFive(2000.f * OverallHealthMlt);
-			// Super heavy tank, the most durable vehicle in the game, gets killed in 8 heavy tank shots.
-			inline constexpr float SuperHeavyTankBase = RoundToNearestMultipleOfFive(2800.f * OverallHealthMlt);
+			// T2 heavy tank. A mid game heavy, not as durable as a T3 heavy tank, gets killed in 5 medium tank shots.
+			inline constexpr float T2HeavyTankBase = RoundToNearestMultipleOfFive(1125.f * OverallHealthMlt);
+			// T3 medium tank, a late game medium tank, gets killed in 5 medium tank shots.
+			inline constexpr float T3MediumTankBase = RoundToNearestMultipleOfFive(1125.f * OverallHealthMlt);
+			// T3 Heavy tank, very durable vehicle, gets killed in 4 heavy tank shots or 6 medium tank shots.
+			inline constexpr float T3HeavyTankBase = RoundToNearestMultipleOfFive(1500.f * OverallHealthMlt);
+			// Super heavy tank, the most durable vehicle in the game, gets killed in 7 heavy tank shots.
+			inline constexpr float SuperHeavyTankBase = RoundToNearestMultipleOfFive(2300.f * OverallHealthMlt);
 			inline constexpr float LightTrainHealth = RoundToNearestMultipleOfFive(4000.f * OverallHealthMlt);
 			inline constexpr float MediumTrainHealth = RoundToNearestMultipleOfFive(7000.f * OverallHealthMlt);
 			inline constexpr float HeavyTrainHealth = RoundToNearestMultipleOfFive(10000.f * OverallHealthMlt);

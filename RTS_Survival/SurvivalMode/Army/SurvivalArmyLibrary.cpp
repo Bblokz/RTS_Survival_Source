@@ -6,6 +6,7 @@
 #include "RTS_Survival/CardSystem/PlayerProfile/SavePlayerProfile/USavePlayerProfile.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSettings.h"
+#include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/SurvivalMode/Data/SurvivalModeSettings.h"
 #include "RTS_Survival/Units/Variants/UnitVariantDataAsset.h"
@@ -122,7 +123,8 @@ namespace
 }
 
 TArray<FSurvivalArmyEntry> USurvivalArmyLibrary::BuildArmyRoster(const USurvivalModeSettings* Settings,
-                                                                 const ERTSFaction Faction)
+                                                                 const ERTSFaction Faction,
+                                                                 const ARTSAsyncSpawner* AsyncSpawner)
 {
 	TArray<FSurvivalArmyEntry> Roster;
 	const ERTSFaction RosterFaction = Faction == ERTSFaction::NotInitialised
@@ -142,6 +144,13 @@ TArray<FSurvivalArmyEntry> USurvivalArmyLibrary::BuildArmyRoster(const USurvival
 			or not Settings->Army.AllowedUnitTypes.Contains(Unit.UnitType)
 			or Settings->Army.ExcludedUnits.Contains(Unit))
 		{
+			continue;
+		}
+		if (AsyncSpawner and AsyncSpawner->GetBaseTrainingOptionClass(
+			UPlayerUnitVariantManager::GetSpawnerKey(Unit)).IsNull())
+		{
+			UE_LOG(LogTemp, Log, TEXT("Survival roster: %s left out, the spawner has no class for it."),
+			       *Unit.GetTrainingName());
 			continue;
 		}
 		FSurvivalArmyEntry Entry;

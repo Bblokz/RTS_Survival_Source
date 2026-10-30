@@ -3033,6 +3033,8 @@ void AAircraftMaster::AircraftDrop_OnLanded()
 	}
 
 	M_AircraftDropRequest.State = EAircraftDropRequestState::LandedWaiting;
+	// The flight path is finished; without this the tick keeps running the move past its last point while parked.
+	M_MovementState = EAircraftMovementState::Idle;
 	AircraftDrop_DetachTank();
 	AircraftDrop_SpawnSquads();
 	AircraftDrop_PlayDropOffSound();

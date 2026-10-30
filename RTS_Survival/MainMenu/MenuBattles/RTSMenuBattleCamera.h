@@ -108,6 +108,7 @@ private:
 	FVector GetFocusTarget() const;
 
 	void UpdateShot(const float DeltaSeconds);
+	void MarkCameraCutForRenderer() const;
 
 	/**
 	 * @brief The camera location and look-at point of the current shot at its local time.

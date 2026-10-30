@@ -13,6 +13,7 @@
 
 class ACPPController;
 class ANomadicVehicle;
+class ARTSAsyncSpawner;
 class ASurvivalEdgeSpawnZone;
 class ASurvivalStartLocation;
 class USurvivalDeploymentComponent;
@@ -65,6 +66,12 @@ public:
 	 */
 	UFUNCTION(BlueprintPure, Category = "Survival")
 	FVector GetCurrentPlayerBaseLocation() const;
+
+	/**
+	 * @return The level's async spawner, also before the player controller holds its reference (the army screen opens
+	 * that early); nullptr only when the level has none.
+	 */
+	ARTSAsyncSpawner* FindAsyncSpawner() const;
 
 	FRTSGameDifficulty GetDifficulty() const;
 	ERTSFaction GetPlayerFaction() const;

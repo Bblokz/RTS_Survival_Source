@@ -204,7 +204,7 @@ private:
 	void TickFadingOut();
 	void AbsorbSquadSoldiers(FRTSMenuBattleSideUnits& Side) const;
 	void PrepareBattleUnit(AActor* Unit) const;
-	void KeepBattleUnitsPresentable(const FRTSMenuBattleSideUnits& Side) const;
+	void KeepBattleUnitsPresentable(const FRTSMenuBattleSideUnits& Side);
 	/**
 	 * @brief Sends every attacker without a living target at the nearest living defender: an attack order when its
 	 * side can see that defender, else a move toward it until the fog of war reveals it.
