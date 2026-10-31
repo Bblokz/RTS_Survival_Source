@@ -298,6 +298,12 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 	SetPostDeployActionForAttack(TargetActor);
 	ApplyCrewRoleWeaponRestrictions();
 
+	// Stopping a crew-led move does not end the Moving state, and nothing deploys a gun that is still in it.
+	if (bM_IsStoppingMoveForAttackMoveEngagement && M_TeamWeaponState == ETeamWeaponState::Moving)
+	{
+		SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+	}
+
 	if (M_TeamWeaponState == ETeamWeaponState::Ready_Packed)
 	{
 		StartDeploying();
@@ -307,6 +313,20 @@ void ATeamWeaponController::ExecuteAttackCommand(AActor* TargetActor)
 	TryIssuePostDeployAction();
 
 	M_UnitsCompletedCommand = 0;
+}
+
+ECommandQueueError ATeamWeaponController::AttackActorBeforeActiveCommand(AActor* Target)
+{
+	TGuardValue<bool> StoppingMoveGuard(bM_IsStoppingMoveForAttackMoveEngagement, true);
+	return Super::AttackActorBeforeActiveCommand(Target);
+}
+
+bool ATeamWeaponController::GetCanStartAttackMoveEngagement() const
+{
+	const bool bIsMidTransition = M_TeamWeaponState == ETeamWeaponState::Packing ||
+		M_TeamWeaponState == ETeamWeaponState::Deploying;
+	return not bIsMidTransition && M_TeamWeaponState != ETeamWeaponState::Towed &&
+		Super::GetCanStartAttackMoveEngagement();
 }
 
 void ATeamWeaponController::TerminateAttackCommand()
@@ -2482,6 +2502,12 @@ void ATeamWeaponController::HandlePushedMoverFailed(const FString& FailureReason
 {
 	RestorePushedMoveSpeedOverride();
 	SetTeamWeaponState(ETeamWeaponState::Ready_Packed);
+
+	if (bM_IsStoppingMoveForAttackMoveEngagement)
+	{
+		// The inserted attack owns the queue now; finishing the move here would skip it.
+		return;
+	}
 
 	if (bM_HasInternalOutOfRangeReposition)
 	{
