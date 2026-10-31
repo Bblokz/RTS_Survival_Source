@@ -51,24 +51,51 @@ void UGlobalAbility::CancelAbilityActivation()
 
 void UGlobalAbility::OnClickedAbilityLocation(const FVector& TargetLocation)
 {
-	if (not EnsureIsValidGlobalAbilityManager())
+	if (not TryStartClickedExecution())
 	{
 		return;
+	}
+	ExecuteAbilityAtLocation(TargetLocation);
+	FinishClickedExecution();
+}
+
+void UGlobalAbility::OnClickedAbilityLine(const FVector& LineStart, const FVector& LineEnd)
+{
+	if (not TryStartClickedExecution())
+	{
+		return;
+	}
+	ExecuteAbilityAlongLine(LineStart, LineEnd);
+	FinishClickedExecution();
+}
+
+bool UGlobalAbility::TryStartClickedExecution()
+{
+	if (not EnsureIsValidGlobalAbilityManager())
+	{
+		return false;
 	}
 	if (IsBlocked())
 	{
 		CancelAbilityActivation();
-		return;
+		return false;
 	}
 	if (IsOwnedByPlayer() && not M_GlobalAbilitiesManager.Get()->TryPayForAbility(this))
 	{
 		CancelAbilityActivation();
-		return;
+		return false;
 	}
 	ResetAbilityEndedBroadcast();
-	ExecuteAbilityAtLocation(TargetLocation);
+	return true;
+}
+
+void UGlobalAbility::FinishClickedExecution()
+{
 	M_AbilityState = EGlobalAbilityState::NotActivated;
-	M_GlobalAbilitiesManager.Get()->OnAbilityFinishedExecuting(this);
+	if (EnsureIsValidGlobalAbilityManager())
+	{
+		M_GlobalAbilitiesManager.Get()->OnAbilityFinishedExecuting(this);
+	}
 }
 
 void UGlobalAbility::ActivateAbility()
@@ -100,6 +127,16 @@ void UGlobalAbility::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 			PlayerAudioController->PlayCustomOneShot2DSound(M_AbilitySoundSettings.Sound2DOnExecute);
 		}
 	}
+}
+
+void UGlobalAbility::ExecuteAbilityAlongLine(const FVector& LineStart, const FVector& LineEnd)
+{
+	ExecuteAbilityAtLocation((LineStart + LineEnd) * 0.5f);
+}
+
+void UGlobalAbility::GetStripDropPoints(const FVector& LineStart, const FVector& LineEnd,
+                                        TArray<FVector>& OutDropPoints) const
+{
 }
 
 EGlobalAbility UGlobalAbility::GetAbilityType() const
