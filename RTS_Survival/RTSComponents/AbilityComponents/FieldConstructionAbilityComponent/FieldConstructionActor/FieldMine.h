@@ -81,6 +81,9 @@ class RTS_SURVIVAL_API AFieldMine : public AFieldConstruction
 public:
 	AFieldMine(const FObjectInitializer& ObjectInitializer);
 
+	// Mines the AI drops are not seen until they go off; the trigger keeps working.
+	void ConcealMine();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void PostInitializeComponents() override;

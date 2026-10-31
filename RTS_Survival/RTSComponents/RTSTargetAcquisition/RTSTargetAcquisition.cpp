@@ -126,30 +126,63 @@ void URTSTargetAcquisition::OnTargetsFound(const TArray<AActor*>& Targets)
 	{
 		return;
 	}
-	if (M_OwnerRTSComponent->GetOwningPlayer() == 1)
-	{
-		
-		for (AActor* Target : Targets)
-		{
-			if (RTSFunctionLibrary::RTSIsVisibleTarget(Target, GetOwningPlayer()))
-			{
-				// preserves turret state changes; stores target in struct internally 	
-				IssueAttackClosestVisibleTargetInAggroRange(Target);
-				return;
-			}
-		}
-		return;
-	}
 	for (AActor* Target : Targets)
 	{
-		if (RTSFunctionLibrary::RTSIsValid(Target))
+		if (GetIsEngageableTarget(Target))
 		{
-			// preserves turret state changes; stores target in struct internally 	
+			// preserves turret state changes; stores target in struct internally
 			IssueAttackClosestVisibleTargetInAggroRange(Target);
 			return;
 		}
 	}
-	
+}
+
+void URTSTargetAcquisition::RequestAttackMoveTarget(const bool bIsInCombat, TFunction<void(AActor*)> OnTargetFound)
+{
+	constexpr int32 AttackMoveTargetCount = 8;
+	bool bValidOwner = false;
+	const FVector OwnerLocation = GetOwnerLocation(bValidOwner);
+	const float WeaponRange = GetOwnerRange();
+	if (not bValidOwner || WeaponRange <= 0.f || not EnsureIsValidGameUnitManager())
+	{
+		return;
+	}
+	const float SearchRange = bIsInCombat ? WeaponRange + GetAddedAggroRangeForOwningPlayer() : WeaponRange;
+	TWeakObjectPtr<URTSTargetAcquisition> WeakThis(this);
+	M_GameUnitManager->RequestClosestTargets(
+		OwnerLocation,
+		SearchRange,
+		AttackMoveTargetCount,
+		GetOwningPlayer(),
+		GetOwnerTargetPreference(),
+		[WeakThis, OnTargetFound = MoveTemp(OnTargetFound)](const TArray<AActor*>& Targets)
+		{
+			if (not WeakThis.IsValid())
+			{
+				return;
+			}
+			for (AActor* Target : Targets)
+			{
+				if (WeakThis->GetIsEngageableTarget(Target))
+				{
+					OnTargetFound(Target);
+					return;
+				}
+			}
+		});
+}
+
+bool URTSTargetAcquisition::GetIsEngageableTarget(AActor* Target) const
+{
+	if (not EnsureIsValidRTSComponent())
+	{
+		return false;
+	}
+	if (M_OwnerRTSComponent->GetOwningPlayer() == 1)
+	{
+		return RTSFunctionLibrary::RTSIsVisibleTarget(Target, GetOwningPlayer());
+	}
+	return RTSFunctionLibrary::RTSIsValid(Target);
 }
 
 int32 URTSTargetAcquisition::GetOwningPlayer() const

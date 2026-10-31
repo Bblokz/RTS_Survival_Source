@@ -29,6 +29,16 @@ AFieldMine::AFieldMine(const FObjectInitializer& ObjectInitializer)
 {
 }
 
+void AFieldMine::ConcealMine()
+{
+	if (not GetIsValidFieldConstructionMesh())
+	{
+		return;
+	}
+	FieldConstructionMesh->SetHiddenInGame(true);
+	FieldConstructionMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+}
+
 void AFieldMine::BeginPlay()
 {
 	Super::BeginPlay();
