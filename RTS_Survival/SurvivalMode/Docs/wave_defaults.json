@@ -1356,6 +1356,17 @@
     },
     {
       "Kind": "Tank",
+      "TankSubtype": "Tank_KV3",
+      "TechLevel": "Tier3",
+      "Role": "HeavyTank",
+      "Weight": 1,
+      "CostOverride": 0,
+      "FadeStartMinute": 0,
+      "FadeWeightMultiplier": 0.35,
+      "_cost": 60
+    },
+    {
+      "Kind": "Tank",
       "TankSubtype": "Tank_IS_3",
       "TechLevel": "Experimental",
       "Role": "SuperHeavy",

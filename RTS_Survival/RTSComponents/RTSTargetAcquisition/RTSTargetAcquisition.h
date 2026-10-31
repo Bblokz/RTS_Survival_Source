@@ -33,6 +33,17 @@ public:
 	void SetEngagementStance(const ERTSAggroBehaviour NewStance);
 	// Called by the owner when the owner is fully Initialized and ready to make use of TargetAcquisition
 	void ActivateAcquisition();
+
+	/**
+	 * @brief Target search of an attack move: ignores the stance and the idle check, and looks at weapon range only
+	 * unless the unit is under fire, so a unit does not leave its route for enemies it cannot hit yet.
+	 * @param bIsInCombat Adds the aggro range, so a unit shot at from further away goes after the shooter.
+	 * @param OnTargetFound Called with the closest engageable target; not called when there is none.
+	 */
+	void RequestAttackMoveTarget(const bool bIsInCombat, TFunction<void(AActor*)> OnTargetFound);
+
+	/** @return Whether this owner may attack the target: visible for the player, alive for the AI. */
+	bool GetIsEngageableTarget(AActor* Target) const;
 	
 
 protected:

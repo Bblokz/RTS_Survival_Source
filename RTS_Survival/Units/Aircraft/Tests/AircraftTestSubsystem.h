@@ -10,6 +10,7 @@
 class AAircraftMaster;
 class ACPPTurretsMaster;
 class ANomadicVehicle;
+class UGlobalAbility;
 
 UENUM()
 enum class EAircraftTestPhase : uint8
@@ -26,6 +27,8 @@ enum class EAircraftTestPhase : uint8
 	AircraftVtoRunning,
 	// -AircraftStrafeValidate: the player's Ho 229 strafing global ability must bring two Ho 229s that fire.
 	AircraftStrafeRunning,
+	// -AircraftDropValidate: the German vehicle drop abilities must land every vehicle they promise, in its exact variant.
+	AircraftDropRunning,
 	Finished
 };
 
@@ -144,6 +147,7 @@ struct FAircraftDeathUnderTest
  * and checks the burning crash and the breakup. -AircraftVtoValidate parks one aircraft (the Ho 229 unless
  * -AircraftVtoClass=<path under Blueprints/Aircraft/> names another), takes off and fires at the ground.
  * -AircraftStrafeValidate runs the player's Ho 229 strafing global ability on the anchor.
+ * -AircraftDropValidate runs the German vehicle drop abilities around the anchor.
  * Logs RTS_AIRCRAFT_TEST; not in shipping.
  */
 UCLASS()
@@ -188,6 +192,11 @@ private:
 	TMap<TWeakObjectPtr<AAircraftMaster>, int32> M_StrafeAircraftFirstMagazines;
 	int32 M_StrafeMostAircraftSeen = 0;
 	bool bM_StrafeAnyFired = false;
+
+	// -AircraftDropValidate: nothing else holds the running abilities, and their load callbacks outlive StartAircraftDrop.
+	UPROPERTY()
+	TArray<TObjectPtr<UGlobalAbility>> M_DropAbilities;
+	int32 M_DropMostAircraftSeen = 0;
 
 	// -AircraftDeathCapture=<folder>: offscreen pictures of every crash.
 	FB4HowitzerCaptureRig M_CaptureRig;
@@ -265,4 +274,8 @@ private:
 	void TickAircraftStrafe();
 	/** @return Whether any strafing aircraft has fired since it was first seen. */
 	bool TrackStrafeAircraft();
+
+	// ---------------- Vehicle drop global abilities (AircraftDropTest.cpp) ----------------
+	void StartAircraftDrop();
+	void TickAircraftDrop();
 };

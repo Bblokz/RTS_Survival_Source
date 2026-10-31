@@ -301,6 +301,7 @@ void USurvivalWaveSettings::InitDefaultUnitPool()
 		MakeTank(ETankSubtype::Tank_IS_1, ETL::Tier3, ER::HeavyTank, 1.5f),
 		MakeTank(ETankSubtype::Tank_IS_2, ETL::Tier3, ER::HeavyTank, 1.5f),
 		MakeTank(ETankSubtype::Tank_T35, ETL::Tier3, ER::HeavyTank, 0.4f),
+		MakeTank(ETankSubtype::Tank_KV3, ETL::Tier3, ER::HeavyTank, 1.f),
 		// Experimental.
 		MakeTank(ETankSubtype::Tank_IS_3, ETL::Experimental, ER::SuperHeavy, 1.f),
 		MakeTank(ETankSubtype::Tank_IS_3_Flame, ETL::Experimental, ER::SuperHeavy, 0.7f),
