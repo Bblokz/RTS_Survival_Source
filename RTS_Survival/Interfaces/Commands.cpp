@@ -24,6 +24,7 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/ResearchTechnologyAbilityComponent/ResearchTechnologyAbilityComp.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapComp.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
+#include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSTargetAcquisition.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBalance.h"
@@ -49,6 +50,7 @@ UCommandData::UCommandData(const FObjectInitializer& ObjectInitializer)
 void UCommandData::BeginDestroy()
 {
 	StopAbilityCooldownTimer();
+	StopAttackMoveScan();
 	ClearCommands(ECommandQueueClearReason::OwnerDestroyed);
 	UObject::BeginDestroy();
 }
@@ -396,6 +398,11 @@ EAbilityID UCommandData::GetCurrentActiveCommand() const
 
 bool UCommandData::GetHasQueuedMovementCommandAfterActive() const
 {
+	if (bM_IsStoppingActiveForInsertedCommand)
+	{
+		return false;
+	}
+
 	const int32 NextCommandIndex = CurrentIndex + 1;
 	if (NextCommandIndex < 0 || NextCommandIndex >= NumCommands)
 	{
@@ -437,6 +444,12 @@ EAbilityID UCommandData::GetCurrentlyActiveCommandType() const
 		return M_TCommands[CurrentIndex].CommandType;
 	}
 	return EAbilityID::IdIdle;
+}
+
+bool UCommandData::GetIsActiveCommandAttackMove() const
+{
+	const FQueueCommand* const ActiveCommand = GetCurrentQueuedCommand();
+	return ActiveCommand != nullptr && ActiveCommand->bIsAttackMove;
 }
 
 bool UCommandData::GetIsQueueFull() const
@@ -815,6 +828,7 @@ ECommandQueueError UCommandData::AddAbilityToTCommands(
 	NewCmd.TargetActor = TargetActor;
 	NewCmd.TargetRotator = Rotation;
 	NewCmd.CustomType = CustomType;
+	NewCmd.bIsAttackMove = bM_QueueNextMoveAsAttackMove && Ability == EAbilityID::IdMove;
 
 	if (bInsertBeforeActive)
 	{
@@ -917,6 +931,10 @@ void UCommandData::ExecuteCommand(const bool bExecuteCurrentCommand)
 	{
 	case EAbilityID::IdMove:
 		{
+			if (Cmd.bIsAttackMove)
+			{
+				StartAttackMoveScan();
+			}
 			M_Owner->ExecuteMoveCommand(Cmd.TargetLocation);
 		}
 		break;
@@ -1185,7 +1203,10 @@ void UCommandData::ClearCommands(const ECommandQueueClearReason Reason)
 void UCommandData::InsertCommandBeforeActive(const FQueueCommand& NewCommand)
 {
 	// Stop the running command first; it stays in the queue and runs again once the new command is done.
-	M_Owner->TerminateCommand(M_TCommands[CurrentIndex].CommandType);
+	{
+		TGuardValue<bool> StoppingGuard(bM_IsStoppingActiveForInsertedCommand, true);
+		M_Owner->TerminateCommand(M_TCommands[CurrentIndex].CommandType);
+	}
 	for (int32 QueueIndex = NumCommands; QueueIndex > CurrentIndex; --QueueIndex)
 	{
 		M_TCommands[QueueIndex] = M_TCommands[QueueIndex - 1];
@@ -1193,6 +1214,133 @@ void UCommandData::InsertCommandBeforeActive(const FQueueCommand& NewCommand)
 	M_TCommands[CurrentIndex] = NewCommand;
 	NumCommands++;
 	ExecuteCommand(true);
+}
+
+void UCommandData::DropExecutedCommandsBeforeActive()
+{
+	if (CurrentIndex <= 0 || CurrentIndex >= NumCommands)
+	{
+		return;
+	}
+	const int32 RemainingCommands = NumCommands - CurrentIndex;
+	for (int32 QueueIndex = 0; QueueIndex < RemainingCommands; ++QueueIndex)
+	{
+		M_TCommands[QueueIndex] = M_TCommands[QueueIndex + CurrentIndex];
+	}
+	for (int32 QueueIndex = RemainingCommands; QueueIndex < NumCommands; ++QueueIndex)
+	{
+		M_TCommands[QueueIndex] = FQueueCommand();
+	}
+	NumCommands = RemainingCommands;
+	CurrentIndex = 0;
+}
+
+void UCommandData::StartAttackMoveScan()
+{
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+	// The first scan runs on the next frame: after a fight the next enemy must be picked up before the unit is off.
+	constexpr float FirstScanDelaySeconds = 0.f;
+	constexpr float ScanIntervalSeconds = 0.8f;
+	World->GetTimerManager().SetTimer(
+		M_AttackMoveScanTimerHandle,
+		this,
+		&UCommandData::AttackMoveScanTick,
+		ScanIntervalSeconds,
+		true,
+		FirstScanDelaySeconds);
+}
+
+void UCommandData::StopAttackMoveScan()
+{
+	UWorld* World = GetWorld();
+	if (not World)
+	{
+		return;
+	}
+	World->GetTimerManager().ClearTimer(M_AttackMoveScanTimerHandle);
+}
+
+void UCommandData::AttackMoveScanTick()
+{
+	const FQueueCommand* const ActiveCommand = GetCurrentQueuedCommand();
+	if (ActiveCommand == nullptr || M_Owner == nullptr)
+	{
+		StopAttackMoveScan();
+		return;
+	}
+	if (ActiveCommand->bIsAttackMove)
+	{
+		RequestAttackMoveTarget();
+		return;
+	}
+	const bool bIsEngaging = ActiveCommand->CommandType == EAbilityID::IdAttack &&
+		M_AttackMoveEngagementSerial == M_CurrentCommandExecutionSerial;
+	if (bIsEngaging)
+	{
+		EndAttackMoveEngagementIfTargetIsGone(*ActiveCommand);
+		return;
+	}
+	// Executing the attack move again starts a new scan, so a command that was put in front of it needs no watching.
+	StopAttackMoveScan();
+}
+
+void UCommandData::RequestAttackMoveTarget()
+{
+	if (not M_Owner->GetCanStartAttackMoveEngagement())
+	{
+		return;
+	}
+	const AActor* OwnerActor = M_Owner->GetOwnerActor();
+	URTSTargetAcquisition* TargetAcquisition = IsValid(OwnerActor)
+		                                           ? OwnerActor->FindComponentByClass<URTSTargetAcquisition>()
+		                                           : nullptr;
+	if (not IsValid(TargetAcquisition))
+	{
+		return;
+	}
+	TWeakObjectPtr<UCommandData> WeakThis(this);
+	const uint64 ScanExecutionSerial = M_CurrentCommandExecutionSerial;
+	TargetAcquisition->RequestAttackMoveTarget(
+		M_Owner->GetIsUnitInCombat(),
+		[WeakThis, ScanExecutionSerial](AActor* Target)
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->OnAttackMoveTargetFound(ScanExecutionSerial, Target);
+			}
+		});
+}
+
+void UCommandData::OnAttackMoveTargetFound(const uint64 ScanExecutionSerial, AActor* Target)
+{
+	// The search is asynchronous: the attack move may have been replaced or restarted since it was requested.
+	const bool bIsSameExecution = GetIsActiveCommandAttackMove() && ScanExecutionSerial == M_CurrentCommandExecutionSerial;
+	if (not bIsSameExecution || M_Owner == nullptr || not IsValid(Target))
+	{
+		return;
+	}
+	if (M_Owner->AttackActorBeforeActiveCommand(Target) == ECommandQueueError::NoError)
+	{
+		M_AttackMoveEngagementSerial = M_CurrentCommandExecutionSerial;
+	}
+}
+
+void UCommandData::EndAttackMoveEngagementIfTargetIsGone(const FQueueCommand& EngagementCommand)
+{
+	const AActor* OwnerActor = M_Owner->GetOwnerActor();
+	const URTSTargetAcquisition* TargetAcquisition = IsValid(OwnerActor)
+		                                                 ? OwnerActor->FindComponentByClass<URTSTargetAcquisition>()
+		                                                 : nullptr;
+	if (not IsValid(TargetAcquisition) || TargetAcquisition->GetIsEngageableTarget(EngagementCommand.TargetActor.Get()))
+	{
+		return;
+	}
+	// Vehicles only finish an attack when the target dies; one that slips out of sight would hold up the march forever.
+	M_Owner->TryDoneExecutingCommand(EAbilityID::IdAttack, M_AttackMoveEngagementSerial);
 }
 
 void UCommandData::ClearQueuedCommandsAfterActive()
@@ -1721,6 +1869,22 @@ ECommandQueueError ICommands::MoveToLocation(
 	const ECommandQueueError Error = UnitCommandData->AddAbilityToTCommands(EAbilityID::IdMove, Location, nullptr,
 	                                                                        FinishedMovementRotation);
 	return Error;
+}
+
+ECommandQueueError ICommands::AttackMoveToLocation(
+	const FVector& Location,
+	const bool bSetUnitToIdle,
+	const FRotator& FinishedMovementRotation,
+	const bool bForceFinalRotationRegardlessOfReverse)
+{
+	UCommandData* UnitCommandData = GetIsValidCommandData();
+	if (not IsValid(UnitCommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	// Selections are often mixed: a unit that cannot fight simply walks along with the others.
+	TGuardValue<bool> AttackMoveGuard(UnitCommandData->bM_QueueNextMoveAsAttackMove, HasAbility(EAbilityID::IdAttack));
+	return MoveToLocation(Location, bSetUnitToIdle, FinishedMovementRotation, bForceFinalRotationRegardlessOfReverse);
 }
 
 ECommandQueueError ICommands::Reinforce(const bool bSetUnitToIdle)
@@ -2814,6 +2978,18 @@ ECommandQueueError ICommands::AimAbilityBeforeActiveCommand(const FVector& Locat
 	}
 	TGuardValue<bool> InsertGuard(CommandData->bM_InsertNewCommandBeforeActive, true);
 	return AimAbility(Location, false, AimAbilityType);
+}
+
+ECommandQueueError ICommands::AttackActorBeforeActiveCommand(AActor* Target)
+{
+	UCommandData* CommandData = GetIsValidCommandData();
+	if (not IsValid(CommandData))
+	{
+		return ECommandQueueError::CommandDataInvalid;
+	}
+	CommandData->DropExecutedCommandsBeforeActive();
+	TGuardValue<bool> InsertGuard(CommandData->bM_InsertNewCommandBeforeActive, true);
+	return AttackActor(Target, false);
 }
 
 

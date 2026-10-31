@@ -74,6 +74,11 @@ public:
 	UPROPERTY()
 	int32 CustomType;
 
+	// Only on IdMove: the unit stops to fight the enemies it meets on the way and carries on afterwards.
+	// Stays a move for everything else, so arrival, chaining and final rotation need no attack move cases.
+	UPROPERTY()
+	bool bIsAttackMove = false;
+
 	static constexpr int32 DefaultCustomType = 0;
 
 	EBehaviourAbilityType GetBehaviourAbilitySubtype() const
@@ -315,6 +320,9 @@ public:
 
 	EAbilityID GetCurrentlyActiveCommandType() const;
 
+	/** @return Whether the running command is an attack move; the active command then reads as IdMove. */
+	bool GetIsActiveCommandAttackMove() const;
+
 	/** @return The monotonically increasing token assigned to the current command execution. */
 	uint64 GetCurrentCommandExecutionSerial() const { return M_CurrentCommandExecutionSerial; }
 
@@ -451,6 +459,30 @@ private:
 	// While set, AddAbilityToTCommands inserts in front of the running command instead of appending.
 	// Only set through a scoped guard in ICommands::...BeforeActiveCommand.
 	bool bM_InsertNewCommandBeforeActive = false;
+
+	// While set, the running command is stopped for an inserted one: a move queued behind it is no hand-off, so
+	// the unit has to brake instead of rolling on into the inserted command.
+	bool bM_IsStoppingActiveForInsertedCommand = false;
+
+	// Only set through a scoped guard in ICommands::AttackMoveToLocation: the next move is queued as an attack move.
+	bool bM_QueueNextMoveAsAttackMove = false;
+
+	// ---- Attack move ----
+	// Runs for as long as an attack move or the attack it inserted is active and stops itself after that.
+	FTimerHandle M_AttackMoveScanTimerHandle;
+
+	// Execution serial of the attack an attack move inserted, so a player's own attack is left alone.
+	uint64 M_AttackMoveEngagementSerial = 0;
+
+	void StartAttackMoveScan();
+	void StopAttackMoveScan();
+	void AttackMoveScanTick();
+	void RequestAttackMoveTarget();
+	void OnAttackMoveTargetFound(uint64 ScanExecutionSerial, AActor* Target);
+	void EndAttackMoveEngagementIfTargetIsGone(const FQueueCommand& EngagementCommand);
+
+	// Every fight on an attack move adds a queue entry; this keeps a long march from running the queue full.
+	void DropExecutedCommandsBeforeActive();
 
 	ECommandQueueError PayForAbilityCosts(const EAbilityID AbilityId,
 	                                      const int32 Subtype) const;
@@ -688,6 +720,22 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
 	virtual ECommandQueueError MoveToLocation(
+		const FVector& Location,
+		const bool bSetUnitToIdle, const FRotator& FinishedMovementRotation,
+		const bool bForceFinalRotationRegardlessOfReverse = false);
+
+	/**
+	 * @brief Moves like MoveToLocation, but the unit stops to fight every enemy it meets on the way and then carries on.
+	 * @param Location Where the unit ends up.
+	 * @param bSetUnitToIdle Whether the unit should clear all previous commands making this ability the first
+	 * in the list to be executed.
+	 * @param FinishedMovementRotation The rotation to take after arriving.
+	 * @param bForceFinalRotationRegardlessOfReverse Keep the final rotation when the unit arrives in reverse.
+	 * @return Same errors as MoveToLocation.
+	 * @note Not on the command card; a unit without IdAttack on its card makes a regular move.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Commands")
+	virtual ECommandQueueError AttackMoveToLocation(
 		const FVector& Location,
 		const bool bSetUnitToIdle, const FRotator& FinishedMovementRotation,
 		const bool bForceFinalRotationRegardlessOfReverse = false);
@@ -981,6 +1029,20 @@ public:
 	 * @return Same errors as AimAbility; an idle unit simply starts the ability.
 	 */
 	ECommandQueueError AimAbilityBeforeActiveCommand(const FVector& Location, const EAimAbilityType AimAbilityType);
+
+	/**
+	 * @brief Attacks before the running command; that command and the rest of the queue resume once the attack is done.
+	 * This is how an attack move fights: the move runs again from where the fight ended.
+	 * @param Target The enemy to attack.
+	 * @return Same errors as AttackActor.
+	 */
+	virtual ECommandQueueError AttackActorBeforeActiveCommand(AActor* Target);
+
+	/**
+	 * @brief Polled while an attack move runs; a unit that returns false keeps walking.
+	 * @return Whether this unit can stop for a fight right now. False on units without attack move logic.
+	 */
+	virtual bool GetCanStartAttackMoveEngagement() const { return false; }
 
 	/**
 	 * @brief Terminates the current command and clears the command queue which sets the unit to idle.
