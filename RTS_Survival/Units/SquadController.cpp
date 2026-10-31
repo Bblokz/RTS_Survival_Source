@@ -2275,6 +2275,18 @@ void ASquadController::IssueAutonomousAttack(AActor* TargetActor)
 	AttackActor(TargetActor, bReplaceQueue);
 }
 
+ECommandQueueError ASquadController::AttackActorBeforeActiveCommand(AActor* Target)
+{
+	// The attack starts inside this call, so ExecuteAttackCommand still sees the flag.
+	TGuardValue<bool> IssuingAutonomousAttack(bM_IsIssuingAutonomousAttack, true);
+	return ICommands::AttackActorBeforeActiveCommand(Target);
+}
+
+bool ASquadController::GetCanStartAttackMoveEngagement() const
+{
+	return not IsValid(CargoSquad) || not CargoSquad->GetIsInsideCargo();
+}
+
 void ASquadController::TerminateAttackCommand()
 {
 	for (ASquadUnit* SquadUnit : M_TSquadUnits)

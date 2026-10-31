@@ -515,6 +515,12 @@ public:
 	 * @param TargetActor The enemy the aggressive stance picked.
 	 */
 	void IssueAutonomousAttack(AActor* TargetActor);
+
+	/** @brief The soldiers treat an attack move's fight like the aggressive stance's own attack, not like an order. */
+	virtual ECommandQueueError AttackActorBeforeActiveCommand(AActor* Target) override;
+
+	/** @return False while the squad sits inside cargo. */
+	virtual bool GetCanStartAttackMoveEngagement() const override;
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	virtual bool GetSquadAlreadyHasTeamWeapon() const;
 

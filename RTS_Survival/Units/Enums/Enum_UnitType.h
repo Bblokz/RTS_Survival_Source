@@ -212,6 +212,9 @@ enum class ETankSubtype : uint8
 	// MS-1 (T-18), the first Soviet tank (1928): a small, slow, thinly riveted light tank with a short 37mm Hotchkiss
 	// and a coaxial machine gun; cheaper and weaker than the T-26.
 	Tank_MS1 UMETA(DisplayName = "Rus Light MS-1"),
+	// KV-3 (Object 223): the KV line's 68 t step past the KV-1, with 120mm frontal armour and the 107mm ZiS-6 in a large
+	// cast turret; better protected than the IS-1, slower than the IS-2.
+	Tank_KV3 UMETA(DisplayName = "Rus Heavy KV-3"),
 };
 
 
@@ -256,6 +259,7 @@ static bool Global_GetIsHeavyTank(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_IS6:
 	case ETankSubtype::Tank_SMK:
 	case ETankSubtype::Tank_ISU_130:
+	case ETankSubtype::Tank_KV3:
 		return true;
 	default:
 		return false;
