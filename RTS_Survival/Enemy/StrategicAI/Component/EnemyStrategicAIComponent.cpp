@@ -2066,7 +2066,9 @@ bool UEnemyStrategicAIComponent::IsEnemyReinforcementAbility(const EGlobalAbilit
 		|| AbilityType == EGlobalAbility::GA_SovietInfantryDrop
 		|| AbilityType == EGlobalAbility::GA_SovietParatroopers
 		|| AbilityType == EGlobalAbility::GA_SovietHeavyTankDrop
-		|| AbilityType == EGlobalAbility::GA_SovietHeavyTankDropVariation;
+		|| AbilityType == EGlobalAbility::GA_SovietHeavyTankDropVariation
+		// Reinforcement targets are its defended positions, which is where a minefield belongs.
+		|| AbilityType == EGlobalAbility::GA_SovietAirMinefield;
 }
 
 bool UEnemyStrategicAIComponent::IsEnemyBarrageAbility(const EGlobalAbility AbilityType) const
@@ -2079,14 +2081,16 @@ bool UEnemyStrategicAIComponent::IsEnemyBarrageAbility(const EGlobalAbility Abil
 bool UEnemyStrategicAIComponent::IsEnemyLightMediumAirStrikeAbility(const EGlobalAbility AbilityType) const
 {
 	return AbilityType == EGlobalAbility::GA_2xPE2Strafing
-		|| AbilityType == EGlobalAbility::GA_4xPE2Strafing;
+		|| AbilityType == EGlobalAbility::GA_4xPE2Strafing
+		|| AbilityType == EGlobalAbility::GA_SovietReconFlight;
 }
 
 bool UEnemyStrategicAIComponent::IsEnemyHeavyCarpetBombingAbility(const EGlobalAbility AbilityType) const
 {
 	return AbilityType == EGlobalAbility::GA_HeavyCarpet_PE8_500Gr
 		|| AbilityType == EGlobalAbility::GA_HeavyCarpet_PE8_1000Gr
-		|| AbilityType == EGlobalAbility::GA_HeavyCarpet_PE8_3000Gr;
+		|| AbilityType == EGlobalAbility::GA_HeavyCarpet_PE8_3000Gr
+		|| AbilityType == EGlobalAbility::GA_SovietRadixiteNuke;
 }
 
 bool UEnemyStrategicAIComponent::GetCanUseReinforcementAbilities() const

@@ -535,6 +535,9 @@ namespace DeveloperSettings
 				// SMK: two turrets (76mm + 45mm) on a long slow hull; between the KV-1 and the IS-6.
 				inline constexpr int32 SMK_Radixite = 1150;
 				inline constexpr int32 SMK_VehicleParts = 650;
+				// KV-3: 120mm armour and the ZiS-6; above the IS-2, below the faster IS-6.
+				inline constexpr int32 KV3_Radixite = 1200;
+				inline constexpr int32 KV3_VehicleParts = 650;
 			}
 
 			namespace Infantry

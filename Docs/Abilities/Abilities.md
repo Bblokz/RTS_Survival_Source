@@ -72,6 +72,43 @@ These are allowed even when no direct command-card entry exists.
   march and patrol to idle with speed and locomotion restored, and saves pictures to `Saved/SquadMarchTest`.
   `-SquadMarchSquad=<name part>` picks the squad; riflemen are preferred otherwise.
 
+### Attack move
+
+- Not an `EAbilityID` and not on any card. It is an `IdMove` queue entry with `FQueueCommand::bIsAttackMove` set, so
+  `GetActiveCommandID()` reads `IdMove` and arrival, move chaining and the final rotation need no cases of their own.
+  Use `UCommandData::GetIsActiveCommandAttackMove` to tell it from a plain move.
+- Player: arm the attack button and click the ground. `ACPPController::CheckAttackCommandForAttackMove` turns that
+  click (`ECommandType::Movement`) into `ECommandType::AttackMove`; clicks on allies keep their repair or move
+  behaviour. `IssueAttackMoveToSelectedUnits` reports `IdAttack`, which is where the voice line comes from.
+- Script: `ICommands::AttackMoveToLocation`. A unit without `IdAttack` on its card makes a regular move, so mixed
+  selections stay together.
+- `UCommandData::StartAttackMoveScan` runs a 0.8 s timer that stops itself once neither the attack move nor the
+  attack it inserted is running. Each tick asks `URTSTargetAcquisition::RequestAttackMoveTarget`, which ignores
+  stance and idle state and searches at weapon range; a unit in combat adds the aggro range to reach whoever is
+  shooting it.
+- A found target goes through `AttackActorBeforeActiveCommand`, the same insertion as a grenade before an attack.
+  The move is terminated and stays in the queue; when the attack is done the move executes again from where the
+  fight ended, and the next scan picks up the next enemy. `DropExecutedCommandsBeforeActive` keeps those insertions
+  from filling the 16 queue entries.
+- While the inserted attack runs, the scan ends it if the target stops being engageable: vehicles otherwise only finish
+  an attack when the target dies.
+- Only units that override `GetCanStartAttackMoveEngagement` fight: squads (not inside cargo), team weapons (not
+  while packing or deploying) and armed tracked vehicles. Aircraft and trains make a regular move.
+- Team weapons: the inserted attack stops the gun mid-move, so `bM_IsStoppingMoveForAttackMoveEngagement` keeps
+  `HandlePushedMoverFailed` from finishing the move and takes a crew-led gun out of `Moving` so it can deploy.
+- The attack does not leash: a unit chases a visible target that runs. A patrol or march queued behind an attack move
+  blocks the insertion (`QueueHasPatrol`), so the unit walks without fighting until the queue reaches the patrol.
+- Tests: `RTS.Commands.AttackMove` (`Interfaces/Tests/AttackMoveQueueTests.cpp`) covers the queue, including more
+  fights than the queue has entries. `-AttackMoveValidate -AttackMoveAt=16796,-15808` on `RTS_ToCopySmall`
+  (`Interfaces/Tests/AttackMoveMapTest.cpp`) walks a tank, a squad and seven German guns past two disarmed T-34s and
+  logs `RTS_ATTACKMOVE_TEST RESULT PASS|FAIL`. It lives in one file behind `RTS_WITH_MAP_TESTS` with no hook in game
+  code. It needs a real RHI for the fog of war; `-RenderOffscreen -ResX=320 -ResY=180` with `r.Streaming.PoolSize 256`
+  and the `sg.*` settings at 0 keeps its VRAM use low.
+- The map test starts units directly, so the attack button click is not covered, and all seven guns are pushed
+  (`PushedWeaponLeads`): a crew-led gun has not run this path yet.
+- Team weapons do not enter the in-combat state by firing (`ATeamWeaponController::OnFireWeapon`), only by being hit,
+  so test their shots through the magazine in `UWeaponState`.
+
 ---
 
 ## 3) Ability subtypes: where and why they are used

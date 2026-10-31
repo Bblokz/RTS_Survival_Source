@@ -5043,6 +5043,22 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = BaseProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::ZIS_6_107MM, WeaponData);
 
+	// KV-3 gun: the same ZiS-6 and shell at a penetration that fits its ballistics. De Marre puts its 18.8 kg shell at
+	// 800 m/s at 97% of the D-25T's 25 kg at 781 m/s, so it takes that share of the D-25T's 201 / 182.
+	// One-piece rounds and two loaders set the reload.
+	{
+		constexpr float Kv3ArmorPen = 195.f;
+		constexpr float Kv3ArmorPenMaxRange = 175.f;
+		constexpr float Kv3ReloadSpeed = 12.0f;
+
+		FWeaponData Kv3WeaponData = WeaponData;
+		Kv3WeaponData.WeaponName = EWeaponName::ZIS_6_107MM_KV3;
+		Kv3WeaponData.ArmorPen = Kv3ArmorPen;
+		Kv3WeaponData.ArmorPenMaxRange = Kv3ArmorPenMaxRange;
+		Kv3WeaponData.ReloadSpeed = Kv3ReloadSpeed;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::ZIS_6_107MM_KV3, Kv3WeaponData);
+	}
+
 	WeaponData.WeaponName = EWeaponName::D_25T_122MM;
 	WeaponData.DamageType = ERTSDamageType::Kinetic;
 	WeaponData.ShellType = EWeaponShellType::Shell_APHE;
@@ -7593,6 +7609,25 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.4f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_SMK, TankData);
+
+	// KV-3 (heavy): IS-2 hit points and protection class from 120mm frontal plates, but 68 t on a 30 km/h design: slower
+	// than the IS line and wider turning, with a heavier turret traverse than the IS-2.
+	TankData.MaxHealth = T3HeavyTankBase + OneHeavyTankShotHp;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetISuperHeavyArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 20 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 13 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 16;
+	TankData.VehicleReverseSpeedKmh = 8;
+	TankData.VisionRadius = T3TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, KV3_Radixite},
+		{ERTSResourceType::Resource_VehicleParts, KV3_VehicleParts}
+	});
+	TankData.Abilities = BasicTankAbilities;
+	TankData.ExperienceLevels = GetHeavyTankExpLevels();
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseHeavyTankExp * 1.33f, 5);
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_KV3, TankData);
 
 	// SU-152 (heavy tank destroyer)
 	{
