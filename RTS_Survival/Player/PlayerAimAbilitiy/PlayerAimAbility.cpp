@@ -3,13 +3,35 @@
 
 #include "PlayerAimAbility.h"
 
+#include "Components/InstancedStaticMeshComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityCostState.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachedWeaponAbilityComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/AimAbilityTypes/AimAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeComponent.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/GrenadeComponent/GrenadeAbilityTypes/GrenadeAbilityTypes.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "UObject/ConstructorHelpers.h"
 
+namespace PlayerAimAbilityAreaConstants
+{
+	// /Engine/BasicShapes/Plane is 100 x 100 cm.
+	constexpr float PlaneSizeCm = 100.f;
+	// Room around the area inside the plane, for the outlines and the glow of the shaders.
+	constexpr float PlanePaddingCm = 300.f;
+	constexpr float HeightAboveGroundCm = 30.f;
+	const FName PlaneLengthParameter(TEXT("PlaneLength"));
+	const FName PlaneWidthParameter(TEXT("PlaneWidth"));
+	const FName StripLengthParameter(TEXT("StripLength"));
+	const FName AreaRadiusParameter(TEXT("AreaRadius"));
+	const FName InnerRadiusParameter(TEXT("InnerRadius"));
+	const FName MarkerCountParameter(TEXT("MarkerCount"));
+	const FName IsDrawingParameter(TEXT("IsDrawing"));
+}
 
 APlayerAimAbility::APlayerAimAbility(const FObjectInitializer& ObjectInitializer)
 	: AActorObjectsMaster(ObjectInitializer)
@@ -30,6 +52,26 @@ APlayerAimAbility::APlayerAimAbility(const FObjectInitializer& ObjectInitializer
 		AimMeshComponent->SetCanEverAffectNavigation(false);
 	}
 	SetCanBeDamaged(false);
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
+	M_AreaMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AreaMeshComponent"));
+	M_AreaMeshComponent->SetupAttachment(AimMeshComponent);
+	M_AreaMeshComponent->SetStaticMesh(PlaneMesh.Object);
+	M_AreaMeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_AreaMeshComponent->SetGenerateOverlapEvents(false);
+	M_AreaMeshComponent->SetReceivesDecals(false);
+	M_AreaMeshComponent->SetCanEverAffectNavigation(false);
+	M_AreaMeshComponent->SetCastShadow(false);
+	M_AreaMeshComponent->SetVisibility(false);
+
+	M_DropPointMarkers = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("DropPointMarkers"));
+	M_DropPointMarkers->SetupAttachment(AimMeshComponent);
+	M_DropPointMarkers->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	M_DropPointMarkers->SetGenerateOverlapEvents(false);
+	M_DropPointMarkers->SetReceivesDecals(false);
+	M_DropPointMarkers->SetCanEverAffectNavigation(false);
+	M_DropPointMarkers->SetCastShadow(false);
+	M_DropPointMarkers->SetVisibility(false);
 }
 
 void APlayerAimAbility::InitPlayerAimAbility(ACPPController* PlayerController)
@@ -105,7 +147,206 @@ void APlayerAimAbility::ShowGlobalAbilityRadius(const float Radius, const EPlaye
 void APlayerAimAbility::HideRadius()
 {
 	bM_IsPlayerAimActive = false;
+	HideArea();
 	SetActorHiddenInGame(true);
+}
+
+void APlayerAimAbility::ShowGlobalAbilityArea(const FGlobalAbilityAimSettings& AimSettings,
+                                              const UGlobalAbility* Ability)
+{
+	const FGlobalAbilityAreaAimSettings& AreaAim = AimSettings.AreaAim;
+	if (not GetIsValidAimMeshComponent() || not IsValid(M_AreaMeshComponent) || not IsValid(AreaAim.AreaMaterial))
+	{
+		RTSFunctionLibrary::ReportError("APlayerAimAbility::ShowGlobalAbilityArea has no area material or plane.");
+		HideRadius();
+		return;
+	}
+
+	M_AreaAimShown.Shape = AreaAim.Shape;
+	M_AreaAimShown.AreaRadius = AreaAim.AreaRadius;
+	M_AreaAimShown.InnerRadius = AreaAim.InnerRadius;
+	M_AreaAimShown.MinStripLength = AreaAim.MinStripLength;
+	M_AreaAimShown.MaxStripLength = FMath::Max(AreaAim.MinStripLength, AreaAim.MaxStripLength);
+	M_AreaAimShown.LengthBeforeAnchor = AreaAim.LengthBeforeAnchor;
+	M_AreaAimShown.ShaderMarkerCount = AreaAim.ShaderMarkerCount;
+	M_AreaAimShown.DropPointScale = AreaAim.DropPointScale;
+	M_AreaAimAbility = Ability;
+	M_AreaAimState = EGlobalAbilityAreaAimState::FollowingCursor;
+
+	bM_IsPlayerAimActive = true;
+	SetActorHiddenInGame(false);
+	// The plane carries the size: a scaled actor would also scale the world-space drop point instances.
+	SetActorScale3D(FVector::OneVector);
+	AimMeshComponent->SetVisibility(false);
+	M_AreaMaterialInstance = UMaterialInstanceDynamic::Create(AreaAim.AreaMaterial, this);
+	M_AreaMeshComponent->SetMaterial(0, M_AreaMaterialInstance);
+	M_AreaMeshComponent->SetVisibility(true);
+
+	const bool bHasDropPoints = AreaAim.Shape == EGlobalAbilityAimShape::Strip && IsValid(AreaAim.DropPointMesh);
+	M_DropPointMarkers->ClearInstances();
+	M_DropPointMarkers->SetVisibility(bHasDropPoints);
+	if (bHasDropPoints)
+	{
+		M_DropPointMarkers->SetStaticMesh(AreaAim.DropPointMesh);
+		M_DropPointMarkers->SetMaterial(0, AreaAim.DropPointMaterial);
+	}
+}
+
+void APlayerAimAbility::UpdateGlobalAbilityArea(const FVector& CursorLocation)
+{
+	const float CameraYaw = GetCameraYaw();
+	if (M_AreaAimShown.Shape == EGlobalAbilityAimShape::Circle)
+	{
+		PlaceArea(CursorLocation, CursorLocation, CameraYaw);
+		return;
+	}
+	if (M_AreaAimState == EGlobalAbilityAreaAimState::DrawingStrip)
+	{
+		const FVector StripEnd = GetClampedStripEnd(CursorLocation);
+		PlaceArea(M_StripStart, StripEnd, CameraYaw);
+		UpdateDropPointMarkers(M_StripStart, StripEnd);
+		return;
+	}
+	// Before the first click the strip leaves the cursor up the screen, so its size can be judged.
+	const FVector PreviewEnd = CursorLocation
+		+ FRotator(0.f, CameraYaw, 0.f).Vector() * M_AreaAimShown.LengthBeforeAnchor;
+	PlaceArea(CursorLocation, PreviewEnd, CameraYaw);
+	UpdateDropPointMarkers(CursorLocation, PreviewEnd);
+}
+
+bool APlayerAimAbility::TryAnchorStrip(const FVector& ClickedLocation)
+{
+	if (M_AreaAimState != EGlobalAbilityAreaAimState::FollowingCursor
+		|| M_AreaAimShown.Shape != EGlobalAbilityAimShape::Strip)
+	{
+		return false;
+	}
+	M_StripStart = ClickedLocation;
+	M_AreaAimState = EGlobalAbilityAreaAimState::DrawingStrip;
+	return true;
+}
+
+bool APlayerAimAbility::GetStripLine(const FVector& ClickedLocation, FVector& OutLineStart, FVector& OutLineEnd) const
+{
+	if (M_AreaAimState != EGlobalAbilityAreaAimState::DrawingStrip)
+	{
+		return false;
+	}
+	OutLineStart = M_StripStart;
+	OutLineEnd = GetClampedStripEnd(ClickedLocation);
+	return true;
+}
+
+void APlayerAimAbility::HideArea()
+{
+	M_AreaAimState = EGlobalAbilityAreaAimState::Inactive;
+	M_AreaAimAbility.Reset();
+	if (IsValid(AimMeshComponent))
+	{
+		AimMeshComponent->SetVisibility(true);
+	}
+	if (IsValid(M_AreaMeshComponent))
+	{
+		M_AreaMeshComponent->SetVisibility(false);
+	}
+	if (IsValid(M_DropPointMarkers))
+	{
+		M_DropPointMarkers->ClearInstances();
+		M_DropPointMarkers->SetVisibility(false);
+	}
+}
+
+FVector APlayerAimAbility::GetClampedStripEnd(const FVector& CursorLocation) const
+{
+	FVector ToCursor = CursorLocation - M_StripStart;
+	ToCursor.Z = 0.f;
+	const float CursorDistance = ToCursor.Size();
+	const FVector Direction = CursorDistance > KINDA_SMALL_NUMBER
+		                          ? ToCursor / CursorDistance
+		                          : FRotator(0.f, GetCameraYaw(), 0.f).Vector();
+	const float StripLength = FMath::Clamp(CursorDistance, M_AreaAimShown.MinStripLength,
+	                                       M_AreaAimShown.MaxStripLength);
+	FVector StripEnd = M_StripStart + Direction * StripLength;
+	FVector GroundLocation;
+	if (GlobalAbilityHelpers::TryFindGroundLocation(this, StripEnd, GroundLocation))
+	{
+		StripEnd = GroundLocation;
+	}
+	return StripEnd;
+}
+
+float APlayerAimAbility::GetCameraYaw() const
+{
+	const APlayerController* PlayerController = Cast<APlayerController>(M_PlayerController.Get());
+	if (not IsValid(PlayerController) || not IsValid(PlayerController->PlayerCameraManager))
+	{
+		return GetActorRotation().Yaw;
+	}
+	return PlayerController->PlayerCameraManager->GetCameraRotation().Yaw;
+}
+
+void APlayerAimAbility::PlaceArea(const FVector& LineStart, const FVector& LineEnd, const float Yaw)
+{
+	using namespace PlayerAimAbilityAreaConstants;
+	const FVector Line = LineEnd - LineStart;
+	const float StripLength = Line.Size2D();
+	const float EnclosingSize = 2.f * (M_AreaAimShown.AreaRadius + PlanePaddingCm);
+	const float PlaneLength = StripLength + EnclosingSize;
+	const float PlaneWidth = EnclosingSize;
+
+	const FVector Centre = (LineStart + LineEnd) * 0.5f + FVector(0.f, 0.f, HeightAboveGroundCm);
+	const FRotator Rotation = StripLength > KINDA_SMALL_NUMBER ? Line.Rotation() : FRotator(0.f, Yaw, 0.f);
+	SetActorLocationAndRotation(Centre, Rotation);
+	M_AreaMeshComponent->SetRelativeScale3D(FVector(PlaneLength / PlaneSizeCm, PlaneWidth / PlaneSizeCm, 1.f));
+	ApplyAreaParameters(StripLength, PlaneLength, PlaneWidth);
+}
+
+void APlayerAimAbility::ApplyAreaParameters(const float StripLength, const float PlaneLength,
+                                            const float PlaneWidth) const
+{
+	using namespace PlayerAimAbilityAreaConstants;
+	if (not IsValid(M_AreaMaterialInstance))
+	{
+		return;
+	}
+	const bool bIsDrawing = M_AreaAimState == EGlobalAbilityAreaAimState::DrawingStrip;
+	M_AreaMaterialInstance->SetScalarParameterValue(PlaneLengthParameter, PlaneLength);
+	M_AreaMaterialInstance->SetScalarParameterValue(PlaneWidthParameter, PlaneWidth);
+	M_AreaMaterialInstance->SetScalarParameterValue(StripLengthParameter, StripLength);
+	M_AreaMaterialInstance->SetScalarParameterValue(AreaRadiusParameter, M_AreaAimShown.AreaRadius);
+	M_AreaMaterialInstance->SetScalarParameterValue(InnerRadiusParameter, M_AreaAimShown.InnerRadius);
+	M_AreaMaterialInstance->SetScalarParameterValue(MarkerCountParameter,
+	                                                static_cast<float>(M_AreaAimShown.ShaderMarkerCount));
+	M_AreaMaterialInstance->SetScalarParameterValue(IsDrawingParameter, bIsDrawing ? 1.f : 0.f);
+}
+
+void APlayerAimAbility::UpdateDropPointMarkers(const FVector& LineStart, const FVector& LineEnd)
+{
+	using namespace PlayerAimAbilityAreaConstants;
+	if (not IsValid(M_DropPointMarkers) || not M_DropPointMarkers->IsVisible() || not M_AreaAimAbility.IsValid())
+	{
+		return;
+	}
+
+	TArray<FVector> DropPoints;
+	M_AreaAimAbility->GetStripDropPoints(LineStart, LineEnd, DropPoints);
+	const FVector Scale(M_AreaAimShown.DropPointScale);
+	const FRotator Rotation = (LineEnd - LineStart).GetSafeNormal2D().Rotation();
+	if (M_DropPointMarkers->GetInstanceCount() != DropPoints.Num())
+	{
+		M_DropPointMarkers->ClearInstances();
+		for (const FVector& DropPoint : DropPoints)
+		{
+			M_DropPointMarkers->AddInstance(FTransform(Rotation, DropPoint, Scale), true);
+		}
+		return;
+	}
+	for (int32 PointIndex = 0; PointIndex < DropPoints.Num(); ++PointIndex)
+	{
+		const bool bIsLastPoint = PointIndex == DropPoints.Num() - 1;
+		M_DropPointMarkers->UpdateInstanceTransform(PointIndex, FTransform(Rotation, DropPoints[PointIndex], Scale),
+		                                            true, bIsLastPoint);
+	}
 }
 
 // Called when the game starts or when spawned

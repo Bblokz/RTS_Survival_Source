@@ -389,7 +389,8 @@ bool USquadMovePreviewComponent::TryIssuePlannedMove(
 	const bool bFacingChosenByPlayer,
 	const FRotator& ChosenRotation,
 	const bool bQueueCommand,
-	uint32& OutIssuedCommandCount)
+	uint32& OutIssuedCommandCount,
+	const bool bAttackMove)
 {
 	OutIssuedCommandCount = 0;
 	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
@@ -427,11 +428,17 @@ bool USquadMovePreviewComponent::TryIssuePlannedMove(
 		const FRotator FacingRotation = Plan.SquadFacings[SquadIndex].Rotation();
 		const FVector SquadMoveLocation = ProjectToNavigation(Plan.SquadAnchors[SquadIndex]);
 		SquadController->SetPlannedMoveDestinations(SquadMoveLocation, MoveTemp(DestinationsPerSquad[SquadIndex]));
-		const ECommandQueueError MoveResult = SquadController->MoveToLocation(
-			SquadMoveLocation,
-			not bQueueCommand,
-			FacingRotation,
-			bFacingChosenByPlayer);
+		const ECommandQueueError MoveResult = bAttackMove
+			                                      ? SquadController->AttackMoveToLocation(
+				                                      SquadMoveLocation,
+				                                      not bQueueCommand,
+				                                      FacingRotation,
+				                                      bFacingChosenByPlayer)
+			                                      : SquadController->MoveToLocation(
+				                                      SquadMoveLocation,
+				                                      not bQueueCommand,
+				                                      FacingRotation,
+				                                      bFacingChosenByPlayer);
 		OutIssuedCommandCount += MoveResult == ECommandQueueError::NoError ? 1 : 0;
 	}
 	return true;
