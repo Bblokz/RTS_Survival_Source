@@ -115,6 +115,7 @@ EPlacementEffect UPlayerCommandTypeDecoder::DecodeCommandTypeIntoEffect(const EC
 	case ECommandType::EnemyCharacter:
 	case ECommandType::Attack:
 	case ECommandType::AttackGround:
+	case ECommandType::AttackMove:
 		return EPlacementEffect::Effect_Attack;
 	case ECommandType::HarvestResource:
 		return EPlacementEffect::Effect_HarvestResource;

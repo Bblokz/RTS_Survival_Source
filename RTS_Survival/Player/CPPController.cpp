@@ -386,10 +386,16 @@ void ACPPController::OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& Ai
 		}
 	}
 	M_ActiveGlobalAbility = AbilityActivated;
-	if (GetIsValidPlayerAimAbilityActor())
+	if (not GetIsValidPlayerAimAbilityActor())
+	{
+		return;
+	}
+	if (AimSettings.AreaAim.Shape == EGlobalAbilityAimShape::Reticle)
 	{
 		M_PlayerAimAbility->ShowGlobalAbilityRadius(AimSettings.AimRadius, AimSettings.AimType);
+		return;
 	}
+	M_PlayerAimAbility->ShowGlobalAbilityArea(AimSettings, AbilityActivated);
 }
 
 bool ACPPController::TryHandleActiveGlobalAbilityPrimaryClick(const FVector& ClickedLocation)
@@ -398,11 +404,25 @@ bool ACPPController::TryHandleActiveGlobalAbilityPrimaryClick(const FVector& Cli
 	{
 		return false;
 	}
+	const bool bHasAimActor = GetIsValidPlayerAimAbilityActor();
+	if (bHasAimActor && M_PlayerAimAbility->TryAnchorStrip(ClickedLocation))
+	{
+		return true;
+	}
+	FVector StripStart = FVector::ZeroVector;
+	FVector StripEnd = FVector::ZeroVector;
+	const bool bIsStrip = bHasAimActor && M_PlayerAimAbility->GetStripLine(ClickedLocation, StripStart, StripEnd);
+
 	UGlobalAbility* ActiveGlobalAbility = M_ActiveGlobalAbility.Get();
 	M_ActiveGlobalAbility.Reset();
-	if (GetIsValidPlayerAimAbilityActor())
+	if (bHasAimActor)
 	{
 		M_PlayerAimAbility->HideRadius();
+	}
+	if (bIsStrip)
+	{
+		ActiveGlobalAbility->OnClickedAbilityLine(StripStart, StripEnd);
+		return true;
 	}
 	ActiveGlobalAbility->OnClickedAbilityLocation(ClickedLocation);
 	return true;
@@ -2637,6 +2657,12 @@ void ACPPController::UpdateAimAbilityAtCursorProjection(const float DeltaTime, c
 		// No ability with aim cursor.
 		return;
 	}
+	if (M_PlayerAimAbility->IsAreaAimActive())
+	{
+		// Global abilities need no selection, and a strip is placed by its own two ends.
+		M_PlayerAimAbility->UpdateGlobalAbilityArea(CursorProjection.Location);
+		return;
+	}
 	M_PlayerAimAbility->SetActorLocation(CursorProjection.Location);
 	const AActor* PrimarySelectedUnit = nullptr;
 	if (GetIsValidGameUIController())
@@ -4455,6 +4481,9 @@ uint32 ACPPController::IssueCommandToSelectedUnits(
 		OutAbilityActivated = EAbilityID::IdMove;
 		AmountCommandsExe = MoveUnitsToLocation(ClickedLocation);
 		break;
+	case ECommandType::AttackMove:
+		AmountCommandsExe = IssueAttackMoveToSelectedUnits(OutAbilityActivated, ClickedLocation);
+		break;
 	case ECommandType::HarvestResource:
 		OutAbilityActivated = EAbilityID::IdHarvestResource;
 		AmountCommandsExe += IssueOrderHarvestResource(
@@ -4788,7 +4817,19 @@ void ACPPController::CreateVfxAndVoiceLineForIssuedCommand(const bool bResetAllP
 }
 
 
-uint32 ACPPController::MoveUnitsToLocation(const FVector& MoveLocation)
+uint32 ACPPController::IssueAttackMoveToSelectedUnits(EAbilityID& OutAbilityActivated, FVector& ClickedLocation)
+{
+	constexpr int32 ProjectionRetries = 5;
+	bool bProjectionSuccess = false;
+	ClickedLocation = RTSFunctionLibrary::GetLocationProjected(this, ClickedLocation, true,
+	                                                           bProjectionSuccess, ProjectionRetries);
+	// Attack moves have no voice lines of their own.
+	OutAbilityActivated = EAbilityID::IdAttack;
+	constexpr bool bAttackMove = true;
+	return MoveUnitsToLocation(ClickedLocation, bAttackMove);
+}
+
+uint32 ACPPController::MoveUnitsToLocation(const FVector& MoveLocation, const bool bAttackMove)
 {
 	if (not GetIsValidFormationController())
 	{
@@ -4806,7 +4847,8 @@ uint32 ACPPController::MoveUnitsToLocation(const FVector& MoveLocation)
 		M_FormationController->IsPlayerRotationOverrideActive(),
 		M_FormationController->GetPlayerRotationOverride(),
 		bIsHoldingShift,
-		AmountCommandsExe))
+		AmountCommandsExe,
+		bAttackMove))
 	{
 		M_FormationController->OnMovementFinished();
 		return AmountCommandsExe;
@@ -4833,6 +4875,24 @@ uint32 ACPPController::MoveUnitsToLocation(const FVector& MoveLocation)
 	// If the arrow was used then force final rotation even if the vehicle got there by reversing.
 	const bool bForceFinalRotationRegardlessOfReverse = bArrowUsed;
 
+	const auto IssueMoveToSlot = [&](ICommands& Unit, const FVector& SlotLoc)
+	{
+		const ECommandQueueError MoveError = bAttackMove
+			                                     ? Unit.AttackMoveToLocation(
+				                                     SlotLoc,
+				                                     /*bSetUnitToIdle*/ !bIsHoldingShift,
+				                                     /*FinishedMovementRotation*/ AfterMovementRotation,
+				                                     /*bForceFinalRotationRegardlessOfReverse*/
+				                                     bForceFinalRotationRegardlessOfReverse)
+			                                     : Unit.MoveToLocation(
+				                                     SlotLoc,
+				                                     /*bSetUnitToIdle*/ !bIsHoldingShift,
+				                                     /*FinishedMovementRotation*/ AfterMovementRotation,
+				                                     /*bForceFinalRotationRegardlessOfReverse*/
+				                                     bForceFinalRotationRegardlessOfReverse);
+		return MoveError == ECommandQueueError::NoError ? 1u : 0u;
+	};
+
 	for (const auto EachSquad : TSelectedSquadControllers)
 	{
 		if (not IsValid(EachSquad->GetRTSComponent()))
@@ -4846,13 +4906,7 @@ uint32 ACPPController::MoveUnitsToLocation(const FVector& MoveLocation)
 			M_FormationController->UseFormationPosition(
 				EachSquad->GetRTSComponent(), AfterMovementRotation, EachSquad);
 
-		AmountCommandsExe +=
-		(EachSquad->MoveToLocation(
-			SlotLoc,
-			/*bSetUnitToIdle*/ !bIsHoldingShift,
-			/*FinishedMovementRotation*/ AfterMovementRotation,
-			/*bForceFinalRotationRegardlessOfReverse*/
-			bForceFinalRotationRegardlessOfReverse) == ECommandQueueError::NoError);
+		AmountCommandsExe += IssueMoveToSlot(*EachSquad, SlotLoc);
 	}
 
 	for (const auto EachPawn : TSelectedPawnMasters)
@@ -4868,13 +4922,7 @@ uint32 ACPPController::MoveUnitsToLocation(const FVector& MoveLocation)
 			M_FormationController->UseFormationPosition(
 				EachPawn->GetRTSComponent(), AfterMovementRotation, EachPawn);
 
-		AmountCommandsExe +=
-		(EachPawn->MoveToLocation(
-			SlotLoc,
-			/*bSetUnitToIdle*/ !bIsHoldingShift,
-			/*FinishedMovementRotation*/ AfterMovementRotation,
-			/*bForceFinalRotationRegardlessOfReverse*/
-			bForceFinalRotationRegardlessOfReverse) == ECommandQueueError::NoError);
+		AmountCommandsExe += IssueMoveToSlot(*EachPawn, SlotLoc);
 	}
 	M_FormationController->OnMovementFinished();
 
@@ -5559,6 +5607,7 @@ void ACPPController::ActionButtonAttack(AActor* ClickedActor, FVector& ClickedLo
 		Command = ECommandType::DestroyDestructableEnvActor;
 	}
 	CheckAttackCommandForAttackGround(Command);
+	CheckAttackCommandForAttackMove(Command);
 	EAbilityID AbilityActivated;
 	const uint32 CommandsExe = IssueCommandToSelectedUnits(Command, AbilityActivated, TargetUnion, ClickedLocation,
 	                                                       ClickedActor);
@@ -5566,6 +5615,7 @@ void ACPPController::ActionButtonAttack(AActor* ClickedActor, FVector& ClickedLo
 	// Note that we display the attack placement effect but that the targeted actor may very well be an allied
 	// unit, in this case IssueCommandToSelectedUnits issues a movement command but the attack effect is displayed
 	// as part of the attack button. The voice line will then still be movement as that is the activated ability!
+	// A click on the ground is an attack move, which plays the attack voice line.
 	const bool bResetAllPlacementEffects = !bIsHoldingShift;
 	constexpr bool bForcePlayVoiceLine = false;
 	CreateVfxAndVoiceLineForIssuedCommand(
@@ -5609,6 +5659,14 @@ void ACPPController::CheckAttackCommandForAttackGround(ECommandType& OutCommandT
 	}
 }
 
+
+void ACPPController::CheckAttackCommandForAttackMove(ECommandType& OutCommandType) const
+{
+	if (OutCommandType == ECommandType::Movement)
+	{
+		OutCommandType = ECommandType::AttackMove;
+	}
+}
 
 void ACPPController::ActionButtonMove(FVector& MoveLocation)
 {

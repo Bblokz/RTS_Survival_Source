@@ -666,7 +666,26 @@ bool ARTSAsyncSpawner::AsyncSpawnOptionAtLocation(const FTrainingOption Training
 	}
 
 
-	const TSoftClassPtr<AActor> AssetClass = M_TrainingOptionMap[TrainingOption];
+	return AsyncSpawnClassAtLocation(M_TrainingOptionMap[TrainingOption], TrainingOption, Location, CallbackOwner,
+	                                 SpawnID, OnSpawnedCallback, OptionalRotation);
+}
+
+bool ARTSAsyncSpawner::AsyncSpawnClassAtLocation(const TSoftClassPtr<AActor>& AssetClass,
+                                                 const FTrainingOption TrainingOption,
+                                                 const FVector& Location,
+                                                 TWeakObjectPtr<UObject> CallbackOwner,
+                                                 const int32 SpawnID, TFunction<void(
+	                                                 const FTrainingOption&, AActor* SpawnedActor,
+	                                                 const int32 ID)> OnSpawnedCallback,
+                                                 const FRotator& OptionalRotation)
+{
+	if (AssetClass.IsNull())
+	{
+		RTSFunctionLibrary::ReportError(
+			"Attempted to spawn an empty class for TrainingOption: " + TrainingOption.GetTrainingName() +
+			"\nAt function AsyncSpawnClassAtLocation in ARTSAsyncSpawner.cpp");
+		return false;
+	}
 
 	const int32 SpawnRequestId = M_NextSpawnOptionRequestId++;
 

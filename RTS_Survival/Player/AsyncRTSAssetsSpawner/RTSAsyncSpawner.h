@@ -110,6 +110,27 @@ public:
 		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback, const FRotator
 		& OptionalRotation);
 
+	/**
+	 * @brief Spawns one exact class the way AsyncSpawnOptionAtLocation does, for callers that promise a specific unit
+	 * variant whatever the option maps to for this player.
+	 * @param AssetClass The class to load and spawn.
+	 * @param TrainingOption Handed back to the callback and named in errors; does not choose the class.
+	 * @param Location Where the unit is spawned.
+	 * @param CallbackOwner The callback is skipped when this object is gone.
+	 * @param SpawnID Handed back to the callback.
+	 * @param OnSpawnedCallback Called with the spawned actor, or nullptr when spawning failed.
+	 * @param OptionalRotation The spawn rotation.
+	 * @return False when the load could not be started; the callback may have run with nullptr.
+	 */
+	bool AsyncSpawnClassAtLocation(
+		const TSoftClassPtr<AActor>& AssetClass,
+		const FTrainingOption TrainingOption,
+		const FVector& Location,
+		TWeakObjectPtr<UObject> CallbackOwner,
+		const int32 SpawnID,
+		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback, const FRotator
+		& OptionalRotation);
+
 
 	UFUNCTION(BlueprintCallable, Category = "ReferenceCasts")
 	void InitRTSAsyncSpawner(ACPPController* PlayerController);
