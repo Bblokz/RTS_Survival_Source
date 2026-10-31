@@ -2,7 +2,32 @@
 
 #include "GlobalAbilityHelpers.h"
 
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
+
+bool GlobalAbilityHelpers::TryFindGroundLocation(
+	const UObject* WorldContextObject,
+	const FVector& Location,
+	FVector& OutGroundLocation)
+{
+	constexpr float TraceHalfHeight = 200000.0f;
+	OutGroundLocation = Location;
+	const UWorld* World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
+	const FVector TraceStart(Location.X, Location.Y, Location.Z + TraceHalfHeight);
+	const FVector TraceEnd(Location.X, Location.Y, Location.Z - TraceHalfHeight);
+	FHitResult LandscapeHit;
+	if (not World->LineTraceSingleByChannel(LandscapeHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE))
+	{
+		return false;
+	}
+	OutGroundLocation = LandscapeHit.ImpactPoint;
+	return true;
+}
 
 AAircraftMaster* GlobalAbilityHelpers::SpawnAircraftAtLocation(
 	const UObject* WorldContextObject,

@@ -95,6 +95,17 @@ public:
 	FVector GetAircraftBombingSpawnLocation(const UObject* Requester, const FVector& TargetLocation) const;
 	FVector GetAircraftBombingRetreatLocation(const UObject* Requester, const FVector& TargetLocation) const;
 
+	/**
+	 * @brief A straight flight has to start on its own line, so it cannot use the random edge spawn of the other
+	 * aircraft: walks back along the line to the map edge.
+	 * @param LineStart Ground location where the run starts.
+	 * @param FlightDirection Horizontal direction of the run.
+	 * @param MaxApproachDistance Longest approach; keeps a run from taking too long on large maps.
+	 * @return Spawn location on the line at the aircraft height.
+	 */
+	FVector GetStraightFlightSpawnLocation(const FVector& LineStart, const FVector& FlightDirection,
+	                                       float MaxApproachDistance) const;
+
 private:
 	FGlobalAbility_SpawnSettings M_SpawnSetings;
 	UPROPERTY()

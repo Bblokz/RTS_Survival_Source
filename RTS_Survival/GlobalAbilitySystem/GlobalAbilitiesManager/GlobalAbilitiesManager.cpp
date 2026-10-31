@@ -309,6 +309,34 @@ FVector UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation(const UObject
 	return M_SpawnSetings.AircraftStartLocation;
 }
 
+FVector UGlobalAbilitiesManager::GetStraightFlightSpawnLocation(const FVector& LineStart,
+                                                                const FVector& FlightDirection,
+                                                                const float MaxApproachDistance) const
+{
+	constexpr float MarginOutsideMap = 2000.0f;
+	float DistanceToEdge = MaxApproachDistance;
+	if (M_SpawnSetings.MapExtent > 0.0f)
+	{
+		const FVector FromMapCentre = LineStart - M_SpawnSetings.Fow_ManagerPosition;
+		const auto GetDistanceOnAxis = [this](const float Position, const float BackwardDirection)
+		{
+			if (FMath::IsNearlyZero(BackwardDirection))
+			{
+				return TNumericLimits<float>::Max();
+			}
+			const float Edge = BackwardDirection > 0.0f ? M_SpawnSetings.MapExtent : -M_SpawnSetings.MapExtent;
+			return FMath::Max(0.0f, (Edge - Position) / BackwardDirection);
+		};
+		DistanceToEdge = FMath::Min(
+			GetDistanceOnAxis(FromMapCentre.X, -FlightDirection.X),
+			GetDistanceOnAxis(FromMapCentre.Y, -FlightDirection.Y)) + MarginOutsideMap;
+	}
+
+	FVector SpawnLocation = LineStart - FlightDirection * FMath::Min(DistanceToEdge, MaxApproachDistance);
+	SpawnLocation.Z = M_SpawnSetings.AircratHeightStart;
+	return SpawnLocation;
+}
+
 bool UGlobalAbilitiesManager::IsPlayerAbilityManager() const
 {
 	return M_OwningPlayer == 1;
