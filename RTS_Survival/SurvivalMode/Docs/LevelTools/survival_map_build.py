@@ -10,6 +10,7 @@ editor before). Typical use from execute_python:
     smb.step_cleanup_template()      # remove test units / test FOW actors from the ToCopy template
     smb.step_replace_landscape()     # new painted landscape from the generator's raw files
     smb.step_fit_level_actors()      # FOW extent, boundaries, nav bounds, player starts
+    smb.step_place_start_locations() # survival start actors onto their terraces, defense points from the layout
     smb.save_level()                 # then check the .umap mtime on disk
 
 Requires the open level to be the survival map (checked by `require_map`).
@@ -123,9 +124,17 @@ def step_fit_level_actors(fow_margin=600.0):
     """FOW extent + centre, boundary volumes, nav bounds, player starts."""
     require_map()
     lay = LAYOUT["landscape"]
-    half = lay["size_cm"] / 2.0
-    centre_x = lay["corner"][0] + half
-    centre_y = lay["corner"][1] + half
+    play = LAYOUT.get("playable")
+    if play:
+        # Round 5 crop: the playable square is smaller than the landscape; the landscape past it is the dune skirt.
+        half = (play["x1"] - play["x0"]) / 2.0
+        centre_x = (play["x0"] + play["x1"]) / 2.0
+        centre_y = (play["y0"] + play["y1"]) / 2.0
+        fow_margin = 0.0
+    else:
+        half = lay["size_cm"] / 2.0
+        centre_x = lay["corner"][0] + half
+        centre_y = lay["corner"][1] + half
     actors = by_label()
     fow = actors.get("BP_FogOfWar_Manager")
     if fow is not None:
@@ -184,6 +193,27 @@ def step_fit_level_actors(fow_margin=600.0):
     return report
 
 
+def step_place_start_locations(max_designer_points=6):
+    """Moves the SurvivalStart_N actors to their terrace height and rewrites their designer defense points."""
+    require_map()
+    actors = by_label()
+    report = []
+    for start in LAYOUT["starts"]:
+        actor = actors.get("SurvivalStart_%d" % start["index"])
+        if actor is None:
+            log("missing SurvivalStart_%d" % start["index"])
+            continue
+        z = ground_z(start["x"], start["y"]) or start["z"]
+        actor.set_actor_location(unreal.Vector(start["x"], start["y"], z), False, False)
+        # Gate guards come first: the first 3 become pits. Soviet bases skip anything past 1.6 R themselves.
+        points = start["defense_points"][:max_designer_points]
+        actor.set_editor_property("designer_defense_points",
+                                  [unreal.Vector(p["x"] - start["x"], p["y"] - start["y"], p["z"] - z) for p in points])
+        report.append("%s z %.1f points %d" % (start["name"], z, len(points)))
+    log("start locations: %s" % report)
+    return report
+
+
 def save_level():
     require_map()
     pkg = world().get_outermost()
@@ -213,8 +243,20 @@ def clear_dressing():
         if label.startswith(DRESS_PREFIX) or label.startswith("RTS_BP_NavBlocker_CharOnly"):
             actors_sub().destroy_actor(actor)
             n += 1
+        elif isinstance(actor, unreal.InstancedFoliageActor):
+            # The shrubs were painted on the old ground; a replaced landscape leaves them floating.
+            actors_sub().destroy_actor(actor)
     log("cleared %d dressing actors" % n)
     return n
+
+
+def load_mesh(path):
+    """Megascans keep some lod meshes in a Preview subfolder."""
+    if unreal.EditorAssetLibrary.does_asset_exist(path):
+        return unreal.load_asset(path)
+    folder, name = path.rsplit("/", 1)
+    alternative = folder + "/Preview/" + name
+    return unreal.load_asset(alternative) if unreal.EditorAssetLibrary.does_asset_exist(alternative) else None
 
 
 def spawn_blueprint(path, label, folder, x, y, yaw=0.0, scale=1.0, sink=0.0):
@@ -237,7 +279,7 @@ def spawn_blueprint(path, label, folder, x, y, yaw=0.0, scale=1.0, sink=0.0):
 
 def spawn_mesh(path, label, folder, x, y, yaw=0.0, scale=1.0, sink=20.0, material=None, pitch=0.0, roll=0.0,
                collision=True):
-    mesh = unreal.load_asset(path)
+    mesh = load_mesh(path)
     if mesh is None:
         log("MISSING mesh " + path)
         return None
@@ -259,6 +301,28 @@ def spawn_mesh(path, label, folder, x, y, yaw=0.0, scale=1.0, sink=20.0, materia
         comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
         comp.set_editor_property("can_ever_affect_navigation", False)
     actor.set_actor_scale3d(unreal.Vector(scale, scale, scale))
+    actor.set_actor_label(DRESS_PREFIX + label)
+    actor.set_folder_path(DRESS_FOLDER + "/" + folder)
+    return actor
+
+
+def spawn_mesh_at(path, label, folder, x, y, bottom_z, yaw=0.0, scale=1.0, pitch=0.0, roll=0.0, collision=False,
+                  stretch=1.0, depth=1.0):
+    """Places a mesh with its lowest point at bottom_z (rock faces start below the talus, not on the ground)."""
+    mesh = load_mesh(path)
+    if mesh is None:
+        log("MISSING mesh " + path)
+        return None
+    bounds = mesh.get_bounds()
+    bottom = (bounds.origin.z - bounds.box_extent.z) * scale
+    actor = actors_sub().spawn_actor_from_class(unreal.StaticMeshActor, unreal.Vector(x, y, bottom_z - bottom),
+                                                unreal.Rotator(roll=roll, pitch=pitch, yaw=yaw))
+    comp = actor.static_mesh_component
+    comp.set_static_mesh(mesh)
+    if not collision:
+        comp.set_collision_enabled(unreal.CollisionEnabled.NO_COLLISION)
+        comp.set_editor_property("can_ever_affect_navigation", False)
+    actor.set_actor_scale3d(unreal.Vector(scale * stretch, scale * depth, scale))
     actor.set_actor_label(DRESS_PREFIX + label)
     actor.set_folder_path(DRESS_FOLDER + "/" + folder)
     return actor

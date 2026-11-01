@@ -196,6 +196,29 @@ component, e.g. in `Source/RTS_Survival/Resources/ResourceComponent/ResourceComp
 
 It would be called from `SpawnPlannedActor` via a deferred spawn. Not referenced by the current code.
 
+## Planner rules and data on SM_Desert_01 (review rounds 4-6)
+
+Planner rules added to `SurvivalStartContentPlanner.cpp` (they apply to every map):
+- **Metal before radixite** in each field pair: metal needs the larger disc on gentler ground.
+- **Field objects must fit**: a field actor is only picked if it can stand between the field's centre actor and the field
+  edge (`FieldRadius - r >= CentreFootprint + r + ActorClearance`), and only the ring outside the centre actor is sampled.
+- **No fields up a rim**: a field centre may not lie more than 150 cm above the deploy centre.
+- **Wrecks stay on the bench**: at most 2 of 7 wrecks (rounded share) may land more than 150 cm below the deploy centre;
+  the last quarter of a wreck's attempts accepts any ground so a start whose bench ends early still gets its wrecks.
+- `ASurvivalStartLocation.ReservedContentSpots` (actor-relative XY, Z = radius) are added to the planner's occupied
+  circles (ramps, salt flat).
+
+`DA_SurvivalStartContent` on this project (changed from the constructor defaults above):
+- Metal `FieldRadius` 2200 (was 2600), `PlacementAttemptsPerItem` 120 (was 48).
+- `Resource_Metal_BrokenWaterTank` is a metal **centre** actor (weight 0.5, footprint 970) instead of a field actor: beside
+  the tower or ruin it never fitted, so it never spawned.
+
+Map tests (only with `RTS_WITH_MAP_TESTS`, not in Shipping):
+- `LogPlansForMapTest()` logs `SURVIVALPLAN` lines (every field with its object count, plus `wrecks=off/total`) for 60 seeds ×
+  5 difficulties, and a `SURVIVALPLANCLASS` line per difficulty with per-class spawn counts.
+- `PressStartForMapTest()` presses the start-game button for the local player, so `-game` test runs leave the paused
+  start screen (Soviet bases only build once the world runs).
+
 ## Files
 
 | File | Purpose |
@@ -208,7 +231,6 @@ It would be called from `SpawnPlannedActor` via a deferred spawn. Not referenced
 
 ## Risks / not verified
 
-- Not compiled yet (integrator builds). Not run in PIE.
 - Wreck and pit footprints are estimates (geometry collections / child actors have no measurable static mesh);
   adjust in the data asset if they overlap.
 - Pit forward axis is assumed +X; if pits face the base, set `YawOffsetDegrees = 180` on the entries.

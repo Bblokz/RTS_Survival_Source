@@ -1,259 +1,253 @@
 # 50 — Soviet bases
 
 Owner: Soviet-base agent. Code: `Source/RTS_Survival/SurvivalMode/SovietBases/`. Data:
-`Content/RTS_Survival/SurvivalMode/Data/SovietBases/` (asset to create after compile, see Integration requests).
+`Content/RTS_Survival/SurvivalMode/Data/SovietBases/DA_SurvivalSovietBases` (`USurvivalSovietBaseSettings`).
 
-Every start location the player did **not** pick gets a procedurally generated Soviet base right after
+Every start location the player did **not** pick gets a Soviet base, generated at runtime by a PCG graph, right after
 `ConfirmStartLocation` (`ASurvivalModeDirector::GenerateStartLocationContent` → `GenerateSovietBaseAt`).
-Bases are real enemy (player 2) buildings and units: they shoot, they unlock enemy tech, the strategic AI trains at
-them and uses their reserve units, and destroying one pays out resources and lowers wave pressure.
+Bases are real enemy (player 2) buildings and units: they shoot, they unlock enemy tech, and the strategic AI uses their
+reserve units. Every base has at least two production buildings, the least the AI's cluster search accepts. Breaking a base's defences and production pays out resources.
+
+**Bases are a separate system.** By decision of the project owner they are not wired into the waves or into any other tech:
+nothing outside `SovietBases/` calls `GetWavePressureMultiplier`, `OnSovietBaseDestroyed`, `GetAliveBaseLaunchPoints` or
+`GetAliveSovietBaseCount`, so destroying a base does **not** lower wave pressure, and waves do not leave from bases. The API
+stays for whoever wants it later. `DifficultyPercentage` and `bUseMutations` do not reach bases. Difficulty shows through what is
+generated: layout, building selection, defences and garrison. The system depends on the director for start locations, the
+chosen location and the difficulty, and on the enemy controller for the AI hookup; nothing depends on it except the director.
 
 ## Files
 
 | File | What |
 |---|---|
-| `SurvivalSovietBaseTypes.h` | Designer structs: structure slot, perimeter, garrison group, reward, preset, difficulty row; role/behaviour/seed enums. |
-| `SurvivalSovietBaseSettings.h/.cpp` | `USurvivalSovietBaseSettings` data asset. Constructor fills working defaults (3 presets, 5 difficulty rows, AI building types) with verified asset paths; `ResetToDefaults` (CallInEditor) restores them. |
-| `SurvivalSovietBaseLayout.h/.cpp` | `FSurvivalSovietBaseLayout::BuildPlan` — pure layout step (preset + strength + seed → plan). Drives the shared `FEnemyBaseSetupBuilder`. |
-| `SurvivalSovietBaseComponent.h/.cpp` | `USurvivalSovietBaseComponent` — strength, preset pick, async load, footprint measuring, batched spawning, garrison, AI hookup, destruction tracking, rewards, query API for waves/HUD. |
+| `SurvivalSovietBaseTypes.h` | Designer structs: structure slot, threat step, site kit, reward, preset, difficulty row; role, zone, archetype, seed enums. |
+| `SurvivalSovietBaseSettings.h/.cpp` | `USurvivalSovietBaseSettings` data asset and the code defaults `ResetToDefaults` writes into it. |
+| `SurvivalSovietBaseSite.h/.cpp` | `FSurvivalSovietSiteMap`: terrain from real traces. Flat ground, slopes, drivable flood fill, open approaches, overlooks, drivable paths. |
+| `SurvivalSovietBaseMasterPlan.h` | The plan an archetype draws in a local frame: streets, plots, fence runs, gates, emplacements, park rows. |
+| `SurvivalSovietBaseArchetypes.cpp` | Where each archetype wants its gate, and the switch to its drawing. |
+| `Archetypes/SovietBaseArchetype_<Type>.cpp` | One file per base type: its master plan and its preset. |
+| `Archetypes/SovietBasePlanPen.h`, `SovietBasePresetLibrary.h/.cpp` | The pen the plans draw with; the price list, unit groups and slots the presets are built from. |
+| `SurvivalSovietBasePad.h/.cpp` | Ground decals: the pad under a building, and the pieces of roads, junctions and gate aprons (`InitShape`). |
+| `Tools/` | `regenerate_asset.py` writes the code tables into the data asset; `make_ground_decals.py` builds `M_SovietGroundDecal` and its pad, road and apron instances (`make_pad_materials.py` is the older pad material, only `MI_SovietPit_Earth` still comes from it). |
+| `SurvivalSovietBaseLayout.h/.cpp` | `FSurvivalSovietBaseLayoutRun`: the layout as stages, sharing one occupancy; buys the threat path and executes the master plan through `FEnemyBaseSetupBuilder`. No UObjects except the resolver callback. `BuildPlan` runs all stages in one go (match table). |
+| `PCG/SurvivalSovietBasePCGNodes.h/.cpp` | The custom PCG nodes (`Soviet Base Site`, `Soviet Base Stage`, `Soviet Base Spawn`) and `ASurvivalSovietBasePCGVolume`, the actor whose `UPCGComponent` runs the graph. |
+| `SurvivalSovietBaseComponent.h/.cpp` | `USurvivalSovietBaseComponent`: strength, preset pick, async load, starts one PCG volume per base, serves the graph's nodes, batched spawning, garrison, AI hookup, destruction tracking, rewards, query API. |
+| `SurvivalSovietBasePreview.h/.cpp` | Test builds only (`RTS_WITH_MAP_TESTS`): headless captures, spawn manifests, path tests, match table, match watch. |
 
-Public contract kept unchanged: `InitSovietBases(ASurvivalModeDirector*)`, `GenerateSovietBaseAt(ASurvivalStartLocation*, int32)`.
+Public contract unchanged: `InitSovietBases(ASurvivalModeDirector*)`, `GenerateSovietBaseAt(ASurvivalStartLocation*, int32)`.
 
-## Runtime vs editor: why direct C++ (with the PCG placement engine) and no runtime PCG graph
+## Generation is a PCG graph, run at runtime
 
-Decision: bases are generated by C++ at runtime that reuses the **same placement engine the PCG enemy-base nodes
-use** (`Procedural/CustomNodes/EnemyBaseSetup/EnemyBaseSetupPlacement.h`: `FEnemyBaseSetupBuilder`,
-`FEnemyOccupancyGrid`, `FEnemyResolvedEntry`, and the designer structs `FEnemyBlueprintEntry`,
-`FEnemyObstacleBeltSettings`, `FEnemyBarbedWireSettings`, `FEnemySandbagSettings`, `FEnemyDecoratorProfile`).
-So the bases are PCG-generated in the sense of the project's procedural toolset (SAT occupancy, bunker rows,
-belts, wire, sandbag walls, decorator rings), but no `UPCGComponent`/graph runs.
+`Content/RTS_Survival/SurvivalMode/PCG/SovietBases/PCG_SovietBase` is a real `UPCGGraph`. `GenerateSovietBaseAt` spawns one
+`ASurvivalSovietBasePCGVolume` per base with a `UPCGComponent` (`GenerateOnDemand`, seed = base seed, graph =
+`USurvivalSovietBaseSettings::BaseGraph`) and calls `GenerateLocal`. The PCG scheduler then runs:
 
-Reasons:
-- The PCG nodes are thin wrappers around that UObject-free builder; their element code needs an `FPCGContext`
-  (`PCGE_LOG_C`, `Context->SourceComponent`, managed resources). Running them would need a spawned actor with a
-  PCG component, an Area volume/spline, graph parameter overrides and an async generation callback, and we would
-  only get actor handles back through managed resources. We need handles immediately: ownership check, death
-  binding for rewards, garrison handover to the AI.
-- Deterministic and synchronous given the seed; no dependence on runtime PCG scheduling, graph cooking or
-  partitioning in a Shipping build. Spawns are plain `SpawnActor` of cooked Blueprint classes (soft refs from the
-  data asset, followed by the cooker).
-- The layout step is a pure function (`FSurvivalSovietBaseLayout::BuildPlan` with a resolver callback), so a
-  thin PCG node can wrap it later for editor previews without duplicating logic (see "Optional PCG preview node").
+```
+Soviet Base Site ─ Stage MasterPlan ─ Stage Streets ─ Stage Buildings ─ Stage VehiclePark ─ Stage Guns ─ Stage Perimeter ─ Stage Dressing ─ Stage Garrison
+                                          └───────────────┴─── every Stage's Placed points ───────────┴──────────────┘
+                                                                                  └─► Soviet Base Spawn
+```
 
-The one thing borrowed from the PCG element that needs a world is footprint measuring: each Blueprint class is
-spawned once, deferred, at Z = -100000 with `URTSComponent::SetAddToGameState(false)` (so it never registers as an
-enemy unit or flickers the tech level), measured with `GetComponentsBoundingBox`, destroyed; results are cached per
-class for the match. `FEnemyBlueprintEntry::bUseFootprintOverride` skips the measurement.
+- **Site** measures footprints and traces terrain over frames (the node sleeps with `bIsPaused`, the component wakes it) and
+  outputs the terrain as points (`Density`, `Steepness`).
+- **Stage** runs one step of the layout. Stages are chained through their `After` pins. Each outputs what it placed as points:
+  transform plus attributes `ClassIndex`, `Role`; streets as point chains with `Road`, `RoadKind`, `RoadWidth`.
+- **Spawn** reads the points it receives and builds exactly those, in the usual batches over frames, then sleeps until the base
+  stands. What is built is what reaches this node: a stock PCG filter between a `Placed` pin and `Spawn` takes effect, and
+  removing an edge removes that content.
 
-No PCG graph asset is needed in `Content/RTS_Survival/SurvivalMode/PCG/SovietBases/` for gameplay.
+Stages place through the **placement engine the PCG enemy-base nodes use**
+(`Procedural/CustomNodes/EnemyBaseSetup/EnemyBaseSetupPlacement.h`: `FEnemyBaseSetupBuilder`, `FEnemyOccupancyGrid`), which gained, all
+inert for the campaign nodes: a `Reserved` occupancy category (`ReserveCorridor`; streets cut gaps into walls, belts and wire
+because those runs avoid it), a whole-footprint block test (`SetBlockedFootprintPredicate`), `PlaceCentered` (by footprint
+centre, so off-centre Blueprint pivots line up) and `PlaceSegmentRun` (walls, fences, wire and sandbags laid end to end by real
+length).
 
-## What a base contains
+Limits of the graph today: stage order and the occupancy are shared state in `FSurvivalSovietBaseLayoutRun`, so stages cannot run
+without each other's predecessors, and building selection stays in the data asset rather than in graph nodes. Node positions in
+the graph asset were not set, so press Auto Arrange when opening it.
 
-Layout around the start location's deploy centre, build-area radius R (6000–8000), everything oriented toward the
-player's start location ("threat yaw"). Placement order = space priority:
+## How a base is built
 
-1. **Production compound** — the preset's production slots (gated by strength and the difficulty's
-   `MaxProductionTier`). First building at the centre, the rest on a ring of `CoreCompoundRadius` (1500–2000)
-   starting behind it; sandbag walls around them from strength 1. These are the base's heart: they unlock enemy
-   tech, form the strategic AI base cluster, and the base is destroyed when all of them are dead.
-2. **Perimeter lines** — bunker rows on a square of half size `HalfSizeFraction`·R (0.55) rotated to face the
-   player. Layout per strength: `Corners` (4 strongpoints), `FrontLine` (side facing the player),
-   `FullPerimeter` (4 sides with corner gaps of `LineMargin`). Each line gets a sandbag parapet, a hedgehog belt
-   (`StraightLine`/`DoubleRow`) and from `WireMinStrength` barbed wire. Bunker spacing is divided by the
-   difficulty's `DefenseDensity`.
-3. **Gun pits** — AT/AA/mortar pits on the start location's `GetDefensePoints()` (hill tops, ramp heads) within
-   1.6·R, player side first; then a ring at 0.8·R fanning out from the player direction. Each pit faces the
-   player's start location. Count scaled by `GunPitMultiplier`.
-4. **Support ring** — storage, fuel, megaphone, guard towers at ~0.33·R (strategic AI satellites).
-5. **Props** — crate/barrel stacks and camo nets around production, support and line clusters.
-6. **Garrison** — after all structures spawned, units spawn through `ARTSAsyncSpawner::AsyncSpawnOptionAtLocation`
-   (enemy training options), count scaled by `GarrisonMultiplier`:
-   - `HoldPosition`: ring at 0.45·R on the player side (±80°), facing the player; auto-engage in range.
-   - `Patrol`: spawned near the centre, then `AEnemyController::MoveRandomPatrolWithAttackMoveFormation` over
-     `PatrolPointCount` points at `PatrolRadiusFraction`·R (no wave supply used).
-   - `StrategicAIReserve`: `ICommands::RegisterAsBlackboardIdle(true)` → the strategic AI may use them for
-     counter attacks / flanks / retreats (same path the AI uses for its own trained units).
+1. **Distance rank**: 0 for the base nearest the player. The difficulty row reads everything by rank; its tables are stretched over
+   the number of bases: `StrengthByDistanceRank` (which plans and content a base may use), `ThreatBudgetByDistanceRank` (how much
+   defence it buys, so what the player meets rises in the order he meets it) and `ReservePointsByDistanceRank`.
+2. **Preset**: seeded, weighted pick among presets whose strength range contains the base's strength and whose
+   `MinProductionTier` the difficulty's tech cap reaches. `FarthestBasePresetWeights` shapes the farthest base (0 rules a preset out).
+   While another archetype is free for that strength, no two bases share one.
+3. **Site node**: footprints measured (`ClassesMeasuredPerStep`), terrain traced (`SiteTracesPerStep`, 400 cm grid to 5000 cm
+   past the build area), spread over frames. Only colliding components count towards a footprint: most Rus Blueprints carry a
+   large non-colliding sphere, and some leave a hidden component at the world origin.
+4. **Threat budget**: first every step marked `bSignature` for exactly this difficulty is bought once (from its
+   `SignatureMinStrength`), so a tier shows on every base. Then the budget is spent down the preset's `ThreatPath` in passes.
+   A step is skipped when its gates say so (`MinStrength`, `MinDifficulty`, `RequiredProductionTier`, `FirstPass`, `MaxCopies`). A unit
+   must cost at most the row's `MaxUnitPoints`; reserves also stay under the rank's reserve points. Structures that find no spot
+   hand their points back; at the end the garrison buys with them, up to 2x `MaxCopies` and only units of at least the row's
+   `MinTopUpUnitPoints`. What is left stays unspent and is reported (`unspent`).
+5. **Stage order = priority for space**: streets and gates, production in zoned plots (a building that does not fit its plot
+   moves to any plot, then to any free ground inside the base), support, revetments, guns, bunkers and fence runs, dressing,
+   garrison posts. Guns that find no listed spot search rings inside the perimeter, artillery from the rear, others from the
+   threatened side, so gun capacity grows with the plan. Plans grow with the budget (`SizeFill`). A slot that still fails goes to
+   `DroppedSlots` in the plan and the manifest.
+6. **Spawn node**: roads, then structures in batches (`StructuresPerSpawnStep` every `SpawnStepSeconds`), then garrison.
+   All stages of a base together take 1 to 3 ms in DebugGame.
 
-Structures spawn in batches (`StructuresPerSpawnStep` = 6 every `SpawnStepSeconds` = 0.05 s) so ~100–150
-spawns per base never hitch; base classes are async-loaded first (`UAssetManager::GetStreamableManager`).
+Everything is checked against real heights: `GetIsFootprintBuildable` rejects any corner on a slope or step, the gate goes
+on the open approach nearest to what the archetype wants, and ridge guns go to `GetDefensePoints()` and detected overlooks.
 
-## Strength, seeds, variety
+## Rules no base type can break
 
-- **Strength 0..MaxStrength (2)** = distance rank from the player's start (nearest base = 0, farthest = 2, spread
-  evenly: `rank·(MaxStrength+1)/baseCount`) + difficulty `StrengthBonus`, clamped. Nearby bases are soft
-  first targets; the farthest is a fortress.
-- **Preset pick**: weighted among presets whose `[MinStrength, MaxStrength]` contains the strength; presets already
-  used by another base keep `RepeatedPresetWeightFactor` (0.25) of their weight.
-- **Seed**: `SeedMode = RandomPerMatch` (default, new layout each run) or `Fixed` (`FixedSeed`). Base seed =
-  hash(match seed, rounded deploy centre, BaseIndex), so one match seed reproduces the whole map.
+The shared layout enforces these; an archetype only says which family and where.
 
-## Default presets
+- **One wall family per base.** `FenceLoop(Corners, Family)` sets it for the whole plan. Each span between corners and gates is fitted
+  exactly: as many pieces as fit, stretched by what is left (`wall.max_stretch` in the manifest). Corners: rounded end pieces at any
+  angle, or the family's corner piece at right angles. Thin families simply meet on the corner point. Gates are the family's gate
+  piece, or an opening with its swing gate or barrier blocks. A slot on bad ground or a road stays open and both sides get a
+  finished end. Walls go down before buildings: they are the outline, buildings fit inside.
+- **Wall pieces are measured, not guessed.** Piece lengths and pivots in `SurvivalSovietBaseSettings.cpp` are the visible meshes,
+  read from spawned actors (manifest `wall.piece_list[].vis`, `Saved/AgentNotes/base_types/wall_joints.py`). The concrete colliders run
+  30 to 60 cm past the meshes, which once left sand at every joint. Environment Blueprints (sandbags, precast fence, wire) drop the spawn
+  scale, so `EnforceSpawnScale` sets a wall piece's stretch again after it spawns.
+- **Flags.** A family's `FlagRate` (Soviet concrete 0.07) swaps a piece for its flag variant, seeded, with at least `FlagMinGap` (4)
+  plain pieces between two flags along the whole loop, corners and gates included (the count runs over spans and runs). Only
+  straights carry flags. A single piece left between two open slots is dropped; a thin family (no end pieces) that stops at an open
+  slot gets a concrete block (`Kit.GateBlocks`) as its finished end. Every open slot is in the manifest (`open_wall_slots`) and pictured.
+- **Bunkers stand only outside.** `PerimeterLine` is the closed line of a plan; `FenceLoop` sets it, and a plan without a closed wall
+  sets its own (the Hill Stronghold's is the circle of its trench arcs). Every bunker footprint is tested on placement and
+  checked again in `ValidateBunkerRule`; a violation goes to `rule_violations` in the manifest and to the log as `SOVIET_RULE`.
+  Light bunkers go forward as outposts, the row's bunkers stand against the wall, the heaviest form a second row further out.
+  Watchtowers and gun pits may stand inside. The Admin Bunker is a production building, not a bunker. Wall bunkers stand flush:
+  their back 12 cm off the wall's outer face, and never within one gate width of a gate (`GetIsClearOfGates`).
+- **Every building stands on a pad.** Production, support, defences, huts and hangars get an `ASurvivalSovietBasePad` of their real
+  footprint and yaw, plus a margin of 45% of the smaller half extent, between 70 cm and `Kit.PadMargin`. The surface comes from
+  `FSovietMasterPlan::PadKinds` by zone (default gravel); defences get packed earth. Footprints under `Kit.PadMinHalfExtent` get none.
+  Pads are opaque inside with a noise-broken soft edge, so neighbouring pads of one surface merge into one yard.
 
-| Preset | Strength | Production (tier) | Perimeter (per strength) / bunkers | Gun pits | Garrison | Destroy reward |
-|---|---|---|---|---|---|---|
-| Rifle Outpost | 0–1 | Barracks (0), Large Tent (0, +0.5/str), Cooling Towers (1, str≥1) | Corners → FrontLine; MG bunker, AutoCn bunker; wire from str 1 | DShK, 53-K, 120mm mortar (str≥1) | Mosin/Dyakonov/Okhotnik hold (3 +1/str); BA-12/BT-7 patrol (2 +0.5); Bazooka/Korovin reserve (str≥1) | 250 Radixite, 200 Metal |
-| Tank Depot | 1–2 | Factory (1), Barracks (0), Large Tent (0), Cooling Towers (1), Research Center (2, str 2) | FrontLine, FrontLine, Full; ZiS bunker, Dome, Long Camo; double hedgehog row | BS-3, 53-K sector, DShK, Bofors (str 2) | T-34/76, T-34/85, SU-85 hold; T-70/BT-7/T-26 patrol; Mosin/PTRS hold; T-34 AA (str 2); T-34/SU-76 reserve | 400 Metal, 250 Vehicle parts, 200 Fuel |
-| Command Fortress | 2+ | Admin Bunker (research, 2), Factory (1), Barracks (0), Large Tent (0) | Full; Bunker03, MG bunker, ZiS bunker, Mega bunker; double belt, 2 wire rows | 2× BS-3, mortar, Ampulomet, DShK, Bofors | KV-1/T-34-85 hold; T-34 patrol; Red Hammer/PTRS/Toxic Guard hold; T-34 AA; T-34-85/SU-85 reserve | 500 Radixite, 500 Metal, 300 Vehicle parts |
+## Roads, junctions and gate aprons
 
-Rewards scale ×(1 + 0.5·strength) × difficulty `RewardMultiplier`; paid with `UPlayerResourceManager::AddResource`
-(clamped to storage) and announced with `RTSFunctionLibrary::DisplayNotification` (`BaseDestroyedNotification`).
+Streets are painted as decals of `M_SovietGroundDecal` (kit `MainRoadSurface`, `LaneRoadSurface`, `TrackRoadSurface`, `StripRoadSurface`),
+in pieces of at most 16 m that each sit on their own ground. Three widths: main (planned 1050, painted 1.05x), lane (850, painted 0.78x)
+and track (700, painted 0.55x; Hill Stronghold crest tracks). Each road has soft verges, two wheel ruts along it, and ends that either run
+into the street they meet or fade out. Where a street meets another, a rounded patch of the wider street fills the mouth; every gate gets a
+concrete apron through it that fades out on both sides (`GateApronSurface`). A kind without a surface falls back to its ground path Blueprint.
+Every surface is one of the landscape's own layer textures (rippled sand, western gravel, weedy cracked mud, scorched concrete)
+times the landscape's brightness and a shade, so roads, pads and aprons share the desert palette: main road darkest, lane lighter,
+tracks and yard paths worn cracked earth, aprons and concrete pads scorched concrete slabs with joints.
+The decal material reads its frame from a dynamic instance (`ShapeCenter`, `ShapeAxis`, `ShapeHalf`, `ShapeEdge`, `ShapeFade`), so edges,
+ruts and fades are in cm whatever the decal's size.
 
-## Difficulty scaling (defaults)
+## Storage yards and lanterns
 
-| Difficulty | StrengthBonus | MaxProductionTier (AI tech cap) | DefenseDensity | GunPit× | Garrison× | Reward× |
-|---|---|---|---|---|---|---|
-| NewToRTS | −1 | 0 (barracks only → infantry) | 0.6 | 0.5 | 0.5 | 1.5 |
-| Normal | 0 | 1 (+ light tanks) | 1.0 | 1.0 | 1.0 | 1.0 |
-| Hard | 0 | 2 (+ tier 2: T-34, KV-1) | 1.2 | 1.25 | 1.35 | 1.0 |
-| Brutal | +1 | 2 | 1.4 | 1.5 | 1.7 | 0.9 |
-| Ironman | +1 | 2 | 1.5 | 1.75 | 2.0 | 0.8 |
+A plot dressed `Crates` or `Munitions` becomes an ammunition yard, one dressed `Barrels` a fuel yard. Yards are planned with the
+master plan (`PlanYards`, `FitYard`): the plot plus 180 cm, pulled off the wall (450 cm), the streets and other plots, then grown into
+free ground towards 42 x 34 m. From then on no other building, gun or prop may take yard ground (the builder's blocked-footprint
+predicate). Up to three of the preset's ammunition stores or fuel tanks stand in the back row of a yard whose shorter half side is at
+least 13 m; the rest stand elsewhere. A deep yard turns its rows towards the street. It is closed by one destructible
+fence family (`Kit.AmmoYardFence`, precast concrete; `Kit.FuelYardFence`, chain link `BP_Industrial_Dest_FenceWire`) laid by the wall
+code, with a 760 cm entrance in the street side. Stacks stand in straight rows with 340 cm aisles either side of a middle path;
+worn-earth paths (`Track` streets, 480 planned) run from outside the entrance down the middle and along every aisle. Ammunition rows get
+the large camouflage nets of `Kit.YardNets` over pairs of rows. Fuel and ammunition never share a yard; their distance comes from the
+archetype's zoning. `ASurvivalSovietBaseLantern` (mesh `Kit.LanternMesh`, `SM_LampPost`) stands beside every gate, every street end
+that meets another street and every yard entrance, never on a painted road. The manifest lists `yards` and `lanterns`.
 
-Example, Normal with 4 unpicked locations: strengths 0, 0, 1, 2 (nearest → farthest).
+## Archetypes
 
-## Verified asset paths (on disk 2026-10-29; all `/Game/RTS_Survival/...`)
+Each is a different street plan, perimeter and zoning, and each scales its own way, because its `ThreatPath` is its own.
 
-Building types read from the `.uasset` (`EBuildingExpansionType::…`); all Rus buildings derive from
-`ABuildingExpansion` (`RTS_BP_BuildingExpansion`). Prefix `B/BX/` = `Blueprints/Buildings/BuildingExpansions/`.
+| Preset | Archetype | Strength | Min tech | Plan | Scales by |
+|---|---|---|---|---|---|
+| Forward Firebase | Firebase | 0–1 | 0 | Hexagon or octagon wheel: sandbag rim, ring road, guns between ring and rim, hub with production, one rear gate | Guns, then heavier guns |
+| Rifle Cantonment | Cantonment | 0–1 | 0 | Parade axis, parallel lanes, rows of barracks gable-on, service yards, wire fence | Infantry and barracks |
+| Field Airstrip | Airstrip | 0–2 | 0 | Strip along a chord, apron with hangars, camp behind, fuel and bombs across the strip | Air defence |
+| Tank Park | TankPark | 1–2 | 1 | Boulevard, cross lanes lined with U revetments, workshops at the end, fuel on a flank behind a berm | Armour |
+| Supply Depot | FortifiedDepot | 1–2 | 1 | Walled square, fire-break cross, ammunition and fuel on opposite corners, refinery plant from Hard strength 2 | Wall bunkers and stores |
+| Hill Stronghold | HillStronghold | 1+ | 0 | No wall: tight core, tracks to the crests, zig-zag trench arcs across open approaches, guns on ridges and ramp heads | Dug-in guns on crests |
+| Command Fortress | CommandFortress | 2+ | 2 | Chamfered brick walls, two gates, avenues to a keep, one function per quadrant | Heavy bunkers and artillery |
 
-Production: `B/BX/RusBuildings/Rus_Building_Barracks` (BTX_RusBarracks), `…/Rus_Building_LargeTent`
-(BTX_RusBarracks), `…/Rus_Building_Factory` (BTX_RusFactory), `…/Rus_Building_CoolingTowers`
-(BTX_RusCoolingTowers), `…/Rus_Building_ResearchCenter` (BTX_RusResearchCenter), `…/Rus_Building_AdminBunker`
-(BTX_RusResearchCenter).
+A preset below its `MinProductionTier` is never rolled: no tank park without a factory, no fortress without its Admin Bunker.
 
-Support: `…/RusBuildings/Rus_Building_Supplies` (BTX_Rus_SuppliesStorage), `…/Rus_Building_AmmoStorage`
-(BTX_RusAmmoStorage), `…/Rus_Building_FuelStorage`, `…/Rus_Building_FuelStorageTank`, `…/Rus_Bxp_Megaphone`,
-`…/Rus_Bxp_ContainerHut` (all four BTX_RusFuelStorage1), `B/BX/RusBunkers/Rus_BXP_GuardTowerMG` (BTX_RusGuardTower),
-`…/RusBunkers/Rus_BXP_WeaponPlatform` (BTX_Bunker05).
+## Difficulty: one row per difficulty
 
-Perimeter bunkers: `B/BX/RusBunkers/Rus_BXP_MGBunker`, `Rus_BXP_AutoCnBunker` (BTX_RusBunkerMG),
-`Rus_BXP_Bunker02_ZIS` (BTX_Bunker02_ZIS), `Rus_BXP_DomeBunker` (BTX_RusDomeBunker), `Rus_BXP_LongCamoBunker`
-(BTX_RusLongCamoBunker), `Rus_BXP_RusBunker03` (BTX_Bunker05_WithTurrets), `Rus_BXP_MegaBunker_1`
-(BTX_RusMegaBunker).
+Every row is a set of tables in the data asset. Character is what the row can field; which of it stands on a given base depends on
+that base's rank and archetype. Each archetype carries one signature step per tier from Hard up.
 
-Gun pits (each with an embedded turret BP): `B/BX/RusDShKPit/Rus_BXP_DShKPit` (BTX_RusDShKPit),
-`B/BX/Rus53KPit/Rus_BXP_53KPit` (BTX_Rus53KPit), `B/BX/Rus53KPit/Rus_BXP_53KSectorPit` (BTX_Rus53KSectorPit),
-`B/BX/RusBS3Pit/Rus_BXP_BS3Pit` (BTX_RusBS3Pit), `B/BX/RusMortarPit/Rus_BXP_120MortarPit` (BTX_Rus120MortarPit),
-`B/BX/RusAmpulometPit/Rus_BXP_AmpulometPit` (BTX_RusAmpulometPit), `B/BX/RusBunkers/Rus_BXP_Bofors`
-(BTX_RusBoforsPosition, AA).
+| Difficulty | Character | Strength by rank | Budget by rank | Reserve by rank | Max unit | Top-up floor | Tech cap | Wire s0/s1/s2 | Belts from | Forward posts s0/s1/s2 | Inner line s0/s1/s2 | Reward/threat |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| NewToRTS | Rear guard: infantry, MG towers, 45 mm guns | 0,0,1,1 | 50,70,125,190 | 0,0,4,5 | 10 | 3 | 0 | 0/0/0 | never | 0/0/0 | 0/0/0 | 3.5 |
+| Normal | Line regiment: wire, mortars, light tanks, first tank factories | 0,0,1,2 | 65,110,170,310 | 0,0,7,20 | 15 | 3 | 1 | 0/1/1 | s2 | 0/0/0 | 0/0/0 | 3 |
+| Hard | Guards division: T-34, BS-3, ZiS bunkers, Bofors, belts, research | 0,1,1,2 | 85,165,250,450 | 0,5,10,20 | 20 | 10 | 2 | 1/1/2 | s1 | 0/2/2 | 0/0/0 | 3 |
+| Brutal | Shock army: T-34/85, KV-1, ML-20, turret bunkers | 0,1,2,2 | 120,250,400,640 | 0,7,12,20 | 28 | 12 | 2 | 1/2/2 | s1 | 0/2/3 | 0/3/4 | 2.75 |
+| Ironman | Stavka reserve: KV-2, IS-1, B-4, mega bunkers, second belt | 1,1,2,2 | 170,370,640,940 | 0,10,20,26 | 50 | 20 | 2 | 2/2/3 | s0 | 1/3/4 | 0/3/4 | 2.5 |
 
-Line works (`Blueprints/Environment/DestructableEnvActor/`): `Military/Barricades/BP_Military_Dest_Hedgehog`,
-`…_Hedgehog4`, `…_LargeHedgehog`, `…_BarbedWire`, `…_BarbedWireLong`;
-`NaturalCover/SandBagWalls/BP_Cover_RusSandbags_SingleStraight`, `…_DoubleStraight`.
+Support buildings scale through the slot's `CountPerStrength` and `CountPerDifficulty`. These tables are the balance
+surface: a row edit changes every base with no rebuild and no rounding step in between, since a budget is spent point
+by point.
 
-Props: `Blueprints/Environment/DestructableEnvActor/Airport/BP_Airport_Dest_CrateStack01/02/03`,
-`…/BP_Airport_Dest_BarrelStack`, `…/BP_Airport_Dest_BarrelStack2`, `…/Military/BP_Military_Dest_Camonet`.
+Threat points: units pay `EnemyTrainingHelpers` training prices. Structures pay `ThreatPoints` on the step: guard tower 6;
+MG bunker, DShK and 53-K pits 8; AutoCn bunker, Ampulomet 10; Dome, Long Camo, mortar 12; ZiS, Bofors, weapon platform 15;
+Bunker03 20; BS-3 22; Bunker05 28; Mega bunker 30; ML-20 38; B-4 45. Production, support and props cost nothing.
 
-Units (enemy training options through the async spawner): tanks `Tank_Ba12, Tank_BT7, Tank_T26, Tank_T70,
-Tank_SU_76, Tank_T34_76, Tank_T34_85, Tank_SU_85, Tank_T34_AA, Tank_KV_1`; squads `Squad_Rus_Mosin, _Dyakonov,
-_Okhotnik, _HazmatBazooka, _KorovinAssault, _LargePTRS, _RedHammer, _RedHamerPTRS, _ToxicGuard` — all are in the
-enemy AI tech lists (`FEnemyLevelTraining`), so the spawner has mappings for them.
+**Rewards**: a base's payout is its real threat × `RewardPerThreatPoint`, split by the preset's `DestroyRewards` shares and paid as it
+is earned. `ProductionPayoutShare` (0.3) is paid when the last production building falls. The rest is paid in step with the base's
+defences: every destroyed gun, tower and bunker earns its part, and `MinDefenseBrokenFraction` (0.6) of the defence points earns all of
+it. Killing only production pays 30%. Payments go through `UPlayerResourceManager::AddResource`, clamped to storage. Storage is what the
+player built: HQ 800 radixite, 350 metal, 250 parts; each refinery +1500 radixite; each metal vault +800 metal, +400 parts.
 
-`_Soviet` variants (`Rus_BXP_GuardTowerMG_Soviet`, `Rus_BXP_RusBunker03_Soviet`, `Rus_Building_CoolingTowers_Soviet`,
-…) are material-swap children of the base BPs and can be added as alternative entries.
+## Where the numbers live
 
-## How bases work with the enemy AI (no registration code needed)
+All tables and the graph reference are serialized in `DA_SurvivalSovietBases` (about 190 KB), so soft references are followed by the
+cooker and an edit in the asset is what the game uses. The constructor leaves them empty. `FillAllDefaults` (C++) is used by the `ResetToDefaults` button
+and, as a safety net, by `PostLoad` when an asset has no presets (`GetIsUsingCodeDefaults`, reported in the manifests).
+After changing the code defaults, press Reset To Defaults and save; the asset otherwise keeps its own values.
+Saving this asset from an editor running an older DLL drops fields that DLL does not know.
+
+## Seeds
+
+`SeedMode = RandomPerMatch` (default) or `Fixed` (`FixedSeed`). Base seed = hash(match seed, rounded deploy centre, BaseIndex).
+One seed reproduces axis, mirror, plan variant, unit picks and placements exactly.
+
+## How bases work with the enemy AI
 
 - **Registration**: a spawned Rus building expansion registers itself in `URTSComponent::BeginPlay` →
-  `UGameUnitManager::AddBxpForPlayer(OwningPlayer)`; units from the async spawner do the same. Ownership comes
-  from the Blueprint defaults (OwningPlayer = 2 on Rus BPs). `ChangeOwningPlayer` does **not** re-register
-  building expansions, so ownership is never patched afterwards; the component reports any non-enemy structure
-  once per class.
-- **Tech level** (`UEnemyStrategicAIComponent::TrainingRequirements_ThinkStep` →
-  `GetPlayerBxpCountsByType(2, …)`): BTX_RusBarracks → BasicInfantry, BTX_RusFactory / BTX_RusCoolingTowers →
-  LightTanks, BTX_RusResearchCenter → Tier2. So the bases *are* the enemy tech tree: difficulty caps it through
-  `MaxProductionTier`; destroying the production buildings removes the unlock.
-- **Base clusters**: the strategic AI finds bases asynchronously from enemy building states
-  (`FFindEnemyBaseClusters` = `FindEnemyBase_TimerRequest` on the strategic AI component; C++ defaults: cluster
-  distance 1500, min 2 core neighbours (self included), min 4 buildings, max 2 bases, min score 100). Acceptance
-  (`StrategicAIHelpers.cpp` `TryFinalizeBaseCluster`): core buildings within `CoreClusterDistanceXY` of each other
-  form a cluster; satellites attach (chaining) when within that distance of any cluster point; **score = number
-  of buildings in the cluster** and must be ≥ `MinBaseScoreToReturn` — the default 100 would reject every base.
-  With `bConfigureStrategicAIBaseDetection` (default on) the component, after each base plan, merges
-  `StrategicAICoreBuildingTypes`/`StrategicAISatelliteBuildingTypes` into the request (AddUnique), raises
-  `MaxBasesToReturn` to the base count and `CoreClusterDistanceXY` to max(4000, the layout's largest
-  production-neighbour distance + 250), and caps `MinBaseScoreToReturn` at 3 / `MinTotalBuildingsPerBase` at 3
-  (never raises them). Counted buildings: production (core) + support ring + perimeter bunkers / Bofors that are in
-  the satellite list and within 4000 of the cluster (support ring at ~0.33·R always is).
-- Production buildings per difficulty × strength × preset (every cell ≥ 2, so `MinCoreNeighbors = 2` holds):
+  `UGameUnitManager::AddBxpForPlayer(OwningPlayer)`; units from the async spawner do the same. Ownership comes from the
+  Blueprint defaults. Walls, fences and props are environment actors on purpose, so they never count as buildings.
+- **Production floor**: every preset guarantees two production buildings at every difficulty; the matrix fails a base below that.
+- **Tech** (`TrainingRequirements_ThinkStep`): BTX_RusBarracks → BasicInfantry, BTX_RusFactory / BTX_RusCoolingTowers →
+  LightTanks, BTX_RusResearchCenter (Research Center, Admin Bunker) → Tier2. Difficulty caps it through `MaxProductionTier`;
+  destroying the last building of a type removes the unlock. Strategic AI building tech tops out at Tier2.
+- **Base clusters**: `ConfigureStrategicAIBaseDetection` merges core and satellite types into `FindEnemyBase_TimerRequest`,
+  raises `MaxBasesToReturn` and `CoreClusterDistanceXY` (at least the plan's `RequiredCoreClusterDistance`, the smallest link
+  that chains all production buildings) and caps the score thresholds.
+- **Training location**: bases have no enemy trainer component. `GetValidTrainingSpawnTransform` falls back to
+  `GetRandomEnemyBaseClusterSpawnTransform`, so by the code trained units appear at a random base cluster. A watched match has not shown this yet: in 380 s of the menu flow nothing spawned within 15 m of a cluster centre. The note
+  in `40_WavesAndAI.md` that the AI trains nothing without a trainer component does not match this code. Until the first cluster
+  search finishes the AI reports once that it has no spawn transform.
+- **Reserves**: `RegisterAsBlackboardIdle(true)`, same path as freshly trained units.
+- **Patrols** are infantry only: vehicles of a patrol group hold the post they spawned on, so they leave no tyre-trail loops.
 
-  | Cap | Strength | Rifle Outpost | Tank Depot | Command Fortress |
-  |---|---|---|---|---|
-  | NewToRTS (tier 0) | 0 / 1 / 2 | 2 / 3 / – | – / 2 / 2 | – / – / 2 |
-  | Normal (tier 1) | 0 / 1 / 2 | 2 / 4 / – | – / 4 / 4 | – / – / 3 |
-  | Hard, Brutal, Ironman (tier 2) | 0 / 1 / 2 | 2 / 4 / – | – / 4 / 5 | – / – / 4 |
-- **Training location**: no Rus building calls `UTrainerComponent::InitTrainerAsEnemyTrainerComponent`, so the
-  strategic AI falls back to `GetRandomEnemyBaseClusterSpawnTransform` → units it trains appear at a random alive
-  Soviet base. Destroying bases moves the AI's production to the remaining ones; with none left it reports
-  "could not get a valid training spawn transform" and stops training.
-- **Defense positions**: the cluster request also builds defense-arc candidates around bases facing player
-  units; reserve units the AI picks up use them.
-- The strategic AI must be thinking for any of this to matter; that is started by the waves agent's
-  `USurvivalStrategicAICoordinator` (see `40_WavesAndAI.md`).
+## Testing
 
-## Interaction with waves (for the waves/AI agent)
+`-SovietBasePreview=<spec>` generates the listed bases through the graph (`label preset seed strength difficulty`), captures each, writes
+`<label>_manifest.json` from the actors that really stand, counts spawned against planned, and paths from outside the base to
+every post for all four nav agents. `-SovietBasePreviewDir=<dir>`, `-SovietBasePreviewTopOnly`, `-CaptureExposureBias=<stops>`.
+`-SovietBaseMatchTable=<file>` rolls whole matches per difficulty, player start and match seed through the real strength and preset
+code, planning without spawning. `-SovietBaseSurvey=<class list>` logs bounds and pictures Blueprints.
+`-SovietBaseWatch=<seconds>` with `-SurvivalAutoStart` watches a real match and logs where enemy units appear and how many base
+structures stand. It unpauses the world, like the player's start button; `-SovietBaseWatchKeepPause` does not.
 
-API on `USurvivalSovietBaseComponent` (`ASurvivalModeDirector::GetSovietBases()`):
-
-| Call | Use |
-|---|---|
-| `OnSovietBaseDestroyed` (native multicast `int32 BaseIndex, const FVector& Center`) | react: reduce wave budget, HUD message, skip that base's launch point |
-| `GetAliveSovietBaseCount()`, `GetSovietBaseCount()` | pressure / UI |
-| `GetWavePressureMultiplier()` = 1 + alive · `WavePressurePerAliveBase` (0.1) | optional multiplier on wave budgets — more bases alive, stronger waves |
-| `GetAliveBaseLaunchPoints()` | ground points on each alive base's perimeter facing the player; extra wave sources ("attacks come out of the base") |
-| `GetAliveBaseCenters()`, `GetBaseStrength(i)`, `GetIsBaseDestroyed(i)` | targeting / weighting |
-
-Suggested contract: edge waves stay the main source; from a minute threshold the wave director may launch a share
-of waves from `GetAliveBaseLaunchPoints()` (they are close to the player, so keep them smaller) and multiply the
-budget by `GetWavePressureMultiplier()`. Strategic-AI production happens at the bases automatically (above), so
-killing bases both cuts tech/production and lowers wave pressure — the reason to attack them. The base garrison
-does not use enemy wave supply (patrols call `MoveRandomPatrolWithAttackMoveFormation` on already spawned units).
-
-## Integration requests
-
-No code outside `SovietBases/` is required. Steps for the integrator / level designer:
-
-1. **After compiling**, create the data asset (class did not exist before the build):
-   `/Game/RTS_Survival/SurvivalMode/Data/SovietBases/DA_SurvivalSovietBases` (`USurvivalSovietBaseSettings`; the
-   defaults are already filled) and set it as `SovietBaseSettings` on `DA_SurvivalMode_Default` (and any per-map
-   copy). Or hand this back to me.
-2. The survival map must contain `RTS_BP_EnemyController` (`/Game/RTS_Survival/Blueprints/Player/RTS_BP_EnemyController`)
-   and the level's `ARTSAsyncSpawner` (same as other maps). Without the controller bases still spawn and fight but
-   the strategic AI ignores them (one error is reported).
-3. `ASurvivalModeDirector::GenerateStartLocationContent` already sets `M_ChosenStartLocation` before calling
-   `GenerateSovietBaseAt`; keep that order (strength ranking and facing use the chosen location).
-4. Start locations: fill `M_DefensePoints` (hill tops / ramp heads) — gun pits prefer them; empty is fine (ring
-   fallback).
-5. Waves agent: if it also edits `FindEnemyBase_TimerRequest`, it should merge (AddUnique / Max) like this
-   component does, or set `bConfigureStrategicAIBaseDetection = false` and own it.
-
-## Optional PCG preview node (not built)
-
-`UPCGSurvivalSovietBaseSettings` in `SovietBases/PCG/`: inputs Area (spatial, centre + radius from bounds),
-optional AimTarget (point) and DefensePoints (points); settings = preset index + strength + seed + a
-`USurvivalSovietBaseSettings` reference; element (game thread, not cacheable) builds `FSurvivalSovietLayoutInput`
-with a resolver that mirrors `EnemyBaseSetupShared::ResolveBlueprintList`, calls `BuildPlan`, spawns structures as
-managed actors and outputs one point per structure (attribute `Role`). Graph: `Get Actor Data (self bounds)` →
-node. Purely for designers to preview presets in an editor level; gameplay never uses it.
+**Bases only build while the world runs.** Preparation, the PCG graph and spawning tick with the world, so in a paused world (the setup
+screen until the player presses start, or a bare `-SurvivalAutoStart` run that nobody starts) every start gets its PCG volume and nothing
+else. Measured 2026-10-31: unpaused, four bases stood (663 structures) 16 s after start; kept paused, 0 after 90 s.
+Run with `-ExecCmds="r.TextureStreaming 0"`.
 
 ## Risks / not verified
 
-- **Not PIE-tested**: the shared editor was in a PIE session during this work; nothing was compiled or run.
-  Please PIE one base (e.g. debug auto start) and check: buildings fire, pits are manned, units patrol.
-- **Standalone spawned Rus buildings**: assumed operational when spawned raw (the PCG enemy-base node and
-  `EnemyBaseLvlInstances.umap` place them the same way). Gun pits (embedded turrets) are the least certain — if
-  one turns out neutral/unmanned, the ownership check logs it; drop it from the presets.
-- **Footprints**: measured by a deferred inspection spawn; BP components added in the construction script are
-  included, but an `URTSComponent` added only in the BP (not native) cannot be kept out of the game state during
-  the brief measure spawn. Sandbag front axes (`SandbagFrontAxis`, default −Y) and wire `SegmentLength` (400)
-  are unverified for the chosen BPs — may need tuning in the asset.
-- **Navigation** is `DynamicModifiersOnly`: runtime buildings must carry nav modifiers like player-built ones do;
-  otherwise units path through them.
-- Rewards are clamped to the player's storage by `AddResource`.
-- **Shared spawner class map vs. player-faction variants** (not resolved here, shared with the waves agent): the
-  async spawner has one class per training option and `SetPlayerUnitVariant` replaces entries. If a Soviet-faction
-  player's variant selection ever replaces e.g. `Tank_T34_76`, garrison units could come back player-owned. The
-  component checks every spawned garrison unit and structure (`URTSComponent` owner == 2) and reports once per class.
-- The strategic-AI request thresholds (`MinBaseScoreToReturn`, `MinTotalBuildingsPerBase`, `CoreClusterDistanceXY`,
-  `MaxBasesToReturn`, building types) are changed at runtime on the enemy controller; if the survival map's
-  `RTS_BP_EnemyController` instance already sets stricter values, ours only loosen them.
-- `CoreClusterDistanceXY` is raised globally on the enemy controller (fine in survival: bases are ≥ 12000 apart).
+- **Packaged game**: not cooked or run, so runtime PCG in a cooked Shipping build is unproven. The graph sits in the cooked
+  `SurvivalMode` folder and the data asset references everything it spawns. `Config/DefaultGame.ini` also gained the road, pit
+  and heavy gun folders.
+- **Navigation** is `DynamicModifiersOnly`: buildings block through nav modifiers. Path tests pass on the current terrain; rerun
+  them when the map changes.
+- The wall arch `BP_Military_Dest_WalkableGate`: the path test has to prove units pass under it on every plan that uses one.
+- Road tiles are rebuilt by C++ from the tiles a `BP_GroundPathSpline_*` lays at spawn; each tile is one translucent draw.
+- `CoreClusterDistanceXY` is raised globally on the enemy controller (bases are at least 12000 apart).
+- The shared spawner has one class per training option; a player-faction variant could replace an entry. The component checks
+  owner 2 on everything it spawns and reports once per class. `Squad_Rus_HazmatBazooka` is not in the spawner map; do not use it.
