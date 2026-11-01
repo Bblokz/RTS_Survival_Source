@@ -390,6 +390,19 @@ public:
 	 */
 	void OnSquadUnitInCombat();
 
+	/**
+	 * @brief Convoy hook: every soldier marches at this walk speed (cm/s) instead of his march multiplier, also
+	 * during a running march. 0 or less restores the normal march speed.
+	 */
+	void SetMarchSpeedOverride(const float MarchWalkSpeedCms);
+
+	/**
+	 * @brief Convoy hook: moves the far end of the running march without stopping or turning the soldiers; each
+	 * soldier keeps his offset from the squad centre.
+	 * @return False when the squad is not marching (issue MarchToLocation instead).
+	 */
+	bool RedirectMarch(const FVector& NewMarchToLocation);
+
 	int32 GetSquadUnitIndex(const ASquadUnit* SquadUnit);
 
 	// Delegate called when the squad picks up any weapon.

@@ -883,6 +883,7 @@ bool USquadUnitAnimInstance::StartMarchAnimation()
 			"\n At function: USquadUnitAnimInstance::StartMarchAnimation");
 		return false;
 	}
+	bM_MarchAnimationRequested = true;
 	if (Montage_IsPlaying(MarchMontage))
 	{
 		M_ActiveMarchMontage = MarchMontage;
@@ -903,6 +904,7 @@ bool USquadUnitAnimInstance::StartMarchAnimation()
 
 void USquadUnitAnimInstance::StopMarchAnimation()
 {
+	bM_MarchAnimationRequested = false;
 	if (not IsValid(M_ActiveMarchMontage))
 	{
 		return;
@@ -914,15 +916,36 @@ void USquadUnitAnimInstance::StopMarchAnimation()
 
 void USquadUnitAnimInstance::UpdateMarchPlayRate()
 {
-	if (not IsValid(M_ActiveMarchMontage))
+	// A soldier waiting at a patrol end or for a squad mate marks time slowly instead of freezing mid-step.
+	constexpr float MinMarchPlayRate = 0.35f;
+	// Above this the march cycle would slide its feet: the soldier jogs instead (still in the march state).
+	constexpr float MaxMarchPlayRate = 1.4f;
+	// Back into the march cycle a little below the jog threshold, so the switch does not flicker.
+	constexpr float ResumeMarchPlayRate = 1.3f;
+	constexpr float JogBlendSeconds = 0.3f;
+	const float WantedRate = MarchMontageNaturalSpeed > 0.f ? Speed / MarchMontageNaturalSpeed : 0.f;
+	if (not bM_MarchAnimationRequested or not IsValid(MarchMontage))
 	{
 		return;
 	}
-	// A soldier waiting at a patrol end or for a squad mate marks time slowly instead of freezing mid-step.
-	constexpr float MinMarchPlayRate = 0.35f;
-	constexpr float MaxMarchPlayRate = 2.0f;
-	const float PlayRate = FMath::Clamp(Speed / MarchMontageNaturalSpeed, MinMarchPlayRate, MaxMarchPlayRate);
-	Montage_SetPlayRate(M_ActiveMarchMontage, PlayRate);
+	const bool bMontagePlaying = IsValid(M_ActiveMarchMontage) && Montage_IsPlaying(M_ActiveMarchMontage);
+	if (bMontagePlaying and WantedRate > MaxMarchPlayRate)
+	{
+		Montage_Stop(JogBlendSeconds, M_ActiveMarchMontage);
+		M_ActiveMarchMontage = nullptr;
+		return;
+	}
+	if (not bMontagePlaying)
+	{
+		if (WantedRate > ResumeMarchPlayRate or Montage_Play(MarchMontage, 1.0f) <= 0.0f)
+		{
+			return;
+		}
+		const FName LoopSectionName = MarchMontage->GetSectionName(0);
+		Montage_SetNextSection(LoopSectionName, LoopSectionName, MarchMontage);
+		M_ActiveMarchMontage = MarchMontage;
+	}
+	Montage_SetPlayRate(M_ActiveMarchMontage, FMath::Clamp(WantedRate, MinMarchPlayRate, MaxMarchPlayRate));
 }
 
 void USquadUnitAnimInstance::StopAllMontages()

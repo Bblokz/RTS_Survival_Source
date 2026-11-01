@@ -2373,6 +2373,39 @@ void ASquadController::ExecuteMarchCommand(const FVector MarchToLocation)
 	}
 }
 
+void ASquadController::SetMarchSpeedOverride(const float MarchWalkSpeedCms)
+{
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (GetIsValidSquadUnit(SquadUnit))
+		{
+			SquadUnit->SetMarchSpeedOverride(MarchWalkSpeedCms);
+		}
+	}
+}
+
+bool ASquadController::RedirectMarch(const FVector& NewMarchToLocation)
+{
+	if (GetActiveCommandID() != EAbilityID::IdMarch)
+	{
+		return false;
+	}
+	// Keep the soldiers spread as they walk instead of funnelling them onto one point.
+	constexpr float MaxKeptSoldierOffset = 350.f;
+	const FVector SquadCentre = GetSquadLocation();
+	bool bAnyRedirected = false;
+	for (ASquadUnit* SquadUnit : M_TSquadUnits)
+	{
+		if (not GetIsValidSquadUnit(SquadUnit))
+		{
+			continue;
+		}
+		const FVector Offset = (SquadUnit->GetActorLocation() - SquadCentre).GetClampedToMaxSize2D(MaxKeptSoldierOffset);
+		bAnyRedirected |= SquadUnit->RedirectMarch(NewMarchToLocation + FVector(Offset.X, Offset.Y, 0.f));
+	}
+	return bAnyRedirected;
+}
+
 void ASquadController::TerminateMarchCommand()
 {
 	for (ASquadUnit* SquadUnit : M_TSquadUnits)

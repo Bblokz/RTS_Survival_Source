@@ -93,6 +93,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Survival|Start Location")
 	FText DisplayName;
 
+	// Ground the start content must leave free, such as the ramps up to gun platforms. Actor-relative XY; Z is the radius.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Survival|Start Location", meta = (MakeEditWidget = "true"))
+	TArray<FVector> ReservedContentSpots;
+
 	UPROPERTY(VisibleInstanceOnly, Transient, Category = "Survival|Defense Points")
 	TArray<FVector> M_DefensePoints;
 
@@ -132,11 +136,21 @@ protected:
 	UFUNCTION(CallInEditor, Category = "Survival|Debug")
 	void ClearStartContentPreview();
 
+	/** @brief Map test: logs the real planner's fields for every difficulty over many seeds. Does nothing in Shipping. */
+	UFUNCTION(BlueprintCallable, Category = "Survival|Debug")
+	void LogPlansForMapTest();
+
+	/** @brief Map test: presses the start-game button for the local player, so a -game test run leaves the paused start screen.
+	 * Does nothing in Shipping. */
+	UFUNCTION(BlueprintCallable, Category = "Survival|Debug")
+	void PressStartForMapTest();
+
 	/** @brief Copies the resolved defense points (hill tops included) into DesignerDefensePoints for hand edits. */
 	UFUNCTION(CallInEditor, Category = "Survival|Defense Points")
 	void BakeDefensePointsIntoDesignerPoints();
 
 private:
+
 #if WITH_EDITORONLY_DATA
 	UPROPERTY()
 	TObjectPtr<UBillboardComponent> M_EditorSprite = nullptr;

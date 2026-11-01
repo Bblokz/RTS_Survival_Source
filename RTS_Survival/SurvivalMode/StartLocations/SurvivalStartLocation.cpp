@@ -17,6 +17,9 @@
 #include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
 #include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartContentSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+#include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
+#include "GameFramework/PlayerController.h"
 
 namespace SurvivalStartLocationConstants
 {
@@ -80,6 +83,102 @@ void ASurvivalStartLocation::BeginPlay()
 	}
 	SetActorTickEnabled(bDrawDebugInGame);
 	SetRevealFogOfWar(true);
+}
+
+void ASurvivalStartLocation::LogPlansForMapTest()
+{
+#if RTS_WITH_MAP_TESTS
+	const USurvivalStartContentSettings* ContentSettings = LoadObject<USurvivalStartContentSettings>(
+		nullptr, TEXT("/Game/RTS_Survival/SurvivalMode/Data/DA_SurvivalStartContent.DA_SurvivalStartContent"));
+	UWorld* World = GetWorld();
+	if (not IsValid(ContentSettings) or not IsValid(World))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SURVIVALPLAN missing settings or world"));
+		return;
+	}
+	constexpr int32 SeedCount = 60;
+	const ERTSGameDifficulty Difficulties[] = {
+		ERTSGameDifficulty::NewToRTS, ERTSGameDifficulty::Normal, ERTSGameDifficulty::Hard,
+		ERTSGameDifficulty::Brutal, ERTSGameDifficulty::Ironman
+	};
+	for (const ERTSGameDifficulty Difficulty : Difficulties)
+	{
+		TMap<FString, int32> ClassCounts;
+		for (int32 Seed = 1; Seed <= SeedCount; ++Seed)
+		{
+			FSurvivalStartContentPlanInput PlanInput;
+			BuildPlanInput(*ContentSettings, Difficulty, Seed, PlanInput);
+			FSurvivalStartContentPlanner Planner(*World, *ContentSettings, PlanInput);
+			const FSurvivalStartContentPlan Plan = Planner.BuildPlan();
+			FString Fields;
+			for (const FSurvivalPlannedField& Field : Plan.Fields)
+			{
+				// Objects in the field besides its centre actor.
+				int32 FieldObjects = -1;
+				for (const FSurvivalPlannedActor& Actor : Plan.Actors)
+				{
+					const bool bInField = Actor.Category == Field.Category
+						and FVector::Dist2D(Actor.Transform.GetLocation(), Field.Center) <= Field.Radius + 50.f;
+					FieldObjects += bInField ? 1 : 0;
+				}
+				Fields += FString::Printf(TEXT(" %d:%.0f,%.0f,%.0f,%.0f,%d"), static_cast<int32>(Field.Category),
+				                          Field.Center.X, Field.Center.Y, Field.Center.Z, Field.Radius,
+				                          FMath::Max(0, FieldObjects));
+			}
+			int32 Wrecks = 0;
+			int32 WrecksOffBench = 0;
+			for (const FSurvivalPlannedActor& Actor : Plan.Actors)
+			{
+				if (Actor.Category != ESurvivalStartContentCategory::Wreck)
+				{
+					continue;
+				}
+				++Wrecks;
+				WrecksOffBench += Actor.Transform.GetLocation().Z < PlanInput.DeployCenter.Z - 150.f ? 1 : 0;
+			}
+			Fields += FString::Printf(TEXT(" wrecks=%d/%d"), WrecksOffBench, Wrecks);
+			for (const FSurvivalPlannedActor& Actor : Plan.Actors)
+			{
+				ClassCounts.FindOrAdd(Actor.ActorClass.GetAssetName())++;
+			}
+			UE_LOG(LogTemp, Warning, TEXT("SURVIVALPLAN %s diff=%d seed=%d requested=%d planned=%d%s"), *GetName(),
+			       static_cast<int32>(Difficulty), Seed, Plan.RequestedRadixiteFields + Plan.RequestedMetalFields,
+			       Plan.Fields.Num(), *Fields);
+		}
+		FString Classes;
+		for (const TPair<FString, int32>& Pair : ClassCounts)
+		{
+			Classes += FString::Printf(TEXT(" %s=%d"), *Pair.Key, Pair.Value);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("SURVIVALPLANCLASS %s diff=%d seeds=%d%s"), *GetName(),
+		       static_cast<int32>(Difficulty), SeedCount, *Classes);
+	}
+#endif
+}
+
+void ASurvivalStartLocation::PressStartForMapTest()
+{
+#if RTS_WITH_MAP_TESTS
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	APlayerController* PlayerController = World->GetFirstPlayerController();
+	if (not IsValid(PlayerController))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SURVIVALPRESSSTART no player controller"));
+		return;
+	}
+	UPlayerStartGameControl* StartGameControl = PlayerController->FindComponentByClass<UPlayerStartGameControl>();
+	if (not IsValid(StartGameControl) or not StartGameControl->GetIsWaitingForPlayerToStart())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("SURVIVALPRESSSTART nothing to start"));
+		return;
+	}
+	StartGameControl->PlayerStartedGame();
+	UE_LOG(LogTemp, Warning, TEXT("SURVIVALPRESSSTART started"));
+#endif
 }
 
 void ASurvivalStartLocation::SetRevealFogOfWar(const bool bReveal)
@@ -310,6 +409,13 @@ void ASurvivalStartLocation::BuildPlanInput(
 	OutInput.Seed = Seed;
 	OutInput.OtherStartAreas.Reset();
 	GatherOtherStartAreas(ContentSettings, OutInput.OtherStartAreas);
+	const FVector2D DeployCenter2D(GetDeployCenter());
+	for (const FVector& ReservedSpot : ReservedContentSpots)
+	{
+		FSurvivalReservedCircle& Reserved = OutInput.OtherStartAreas.AddDefaulted_GetRef();
+		Reserved.Center = DeployCenter2D + FVector2D(ReservedSpot);
+		Reserved.Radius = static_cast<float>(ReservedSpot.Z);
+	}
 }
 
 void ASurvivalStartLocation::RequestStartContentLoad()
