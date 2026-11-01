@@ -2,145 +2,145 @@
 
 #include "SurvivalSovietBaseSettings.h"
 
+#include "RTS_Survival/SurvivalMode/SovietBases/Archetypes/SovietBasePresetLibrary.h"
+#include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseLantern.h"
+#include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBasePad.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 
 #define LOCTEXT_NAMESPACE "SurvivalSovietBaseSettings"
 
-namespace SurvivalSovietBaseDefaults
+namespace
 {
-	// Verified on disk 2026-10-29 (see Docs/50_SovietBases.md for the full list and building types).
-	const TCHAR* const RusBuildings = TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBuildings/");
-	const TCHAR* const RusBunkers = TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBunkers/");
-	const TCHAR* const Bxps = TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/");
-	const TCHAR* const Barricades =
-		TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Military/Barricades/");
-	const TCHAR* const Sandbags =
-		TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/NaturalCover/SandBagWalls/");
-	const TCHAR* const Airport = TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Airport/");
-	const TCHAR* const Military = TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Military/");
-
-	/** @return A soft class path "<Folder><SubPath>/<Name>.<Name>_C"; AssetPath may contain sub folders. */
-	FSoftObjectPath MakeClassPath(const TCHAR* Folder, const TCHAR* AssetPath)
+	FSurvivalSovietWallPiece SovietWall_Piece(const FEnemyBlueprintEntry& Entry, const float Length, const float PivotAlong,
+	                                          const float PivotAcross)
 	{
-		const FString RelativePath(AssetPath);
-		FString AssetName = RelativePath;
-		int32 LastSlash = INDEX_NONE;
-		if (RelativePath.FindLastChar(TEXT('/'), LastSlash))
+		FSurvivalSovietWallPiece Piece;
+		Piece.Entry = Entry;
+		Piece.Length = Length;
+		Piece.PivotAlong = PivotAlong;
+		Piece.PivotAcross = PivotAcross;
+		return Piece;
+	}
+
+	/**
+	 * @return The heavy concrete family. Lengths and pivots are the visible meshes, measured from the spawned actors
+	 * (manifest piece_list, wall_joints.py), not the colliders: the colliders run 30 to 60 cm past the meshes, which left
+	 * a slot of sand at every joint. All pieces share the outer face at local X 260 (the star on the flag pieces looks along +X).
+	 */
+	FSurvivalSovietWallFamily SovietWall_MakeSovietConcrete()
+	{
+		using namespace SurvivalSovietBaseDefaults;
+		using EFront = EEnemySandbagFrontAxis;
+		constexpr float CentreLine = -130.f;
+		// The arch's outer face stands 6.6 cm behind the wall's.
+		constexpr float GateCentreLine = -123.4f;
+		const auto Wall = [](const TCHAR* const Name)
 		{
-			AssetName = RelativePath.RightChop(LastSlash + 1);
-		}
-		return FSoftObjectPath(FString::Printf(TEXT("%s%s.%s_C"), Folder, *RelativePath, *AssetName));
-	}
-
-	FEnemyBlueprintEntry MakeEntry(const TCHAR* Folder, const TCHAR* AssetName, const float Weight = 1.f)
-	{
-		FEnemyBlueprintEntry Entry;
-		Entry.BlueprintClass = TSoftClassPtr<AActor>(MakeClassPath(Folder, AssetName));
-		Entry.Weight = Weight;
-		return Entry;
-	}
-
-	FSurvivalSovietStructureSlot MakeSlot(
-		const TCHAR* Folder,
-		const TCHAR* AssetName,
-		const int32 MinStrength,
-		const int32 ProductionTier,
-		const int32 Count,
-		const float CountPerStrength)
-	{
-		FSurvivalSovietStructureSlot Slot;
-		Slot.Building = MakeEntry(Folder, AssetName);
-		Slot.MinStrength = MinStrength;
-		Slot.ProductionTier = ProductionTier;
-		Slot.Count = Count;
-		Slot.CountPerStrength = CountPerStrength;
-		return Slot;
-	}
-
-	FTrainingOption Tank(const ETankSubtype Subtype)
-	{
-		return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(Subtype));
-	}
-
-	FTrainingOption Squad(const ESquadSubtype Subtype)
-	{
-		return FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(Subtype));
-	}
-
-	FSurvivalSovietGarrisonGroup MakeGarrison(
-		const TArray<FTrainingOption>& Options,
-		const int32 Count,
-		const float CountPerStrength,
-		const int32 MinStrength,
-		const ESurvivalSovietGarrisonBehaviour Behaviour)
-	{
-		FSurvivalSovietGarrisonGroup Group;
-		Group.UnitOptions = Options;
-		Group.Count = Count;
-		Group.CountPerStrength = CountPerStrength;
-		Group.MinStrength = MinStrength;
-		Group.Behaviour = Behaviour;
-		return Group;
-	}
-
-	FSurvivalSovietBaseReward MakeReward(const ERTSResourceType Resource, const int32 Amount)
-	{
-		FSurvivalSovietBaseReward Reward;
-		Reward.Resource = Resource;
-		Reward.Amount = Amount;
-		return Reward;
-	}
-
-	/** @brief Hedgehog belt, sandbag parapet and wire shared by every default preset. */
-	void FillDefaultLineWorks(FSurvivalSovietPerimeterSettings& Perimeter)
-	{
-		Perimeter.ObstacleBelt.bEnabled = true;
-		Perimeter.ObstacleBelt.Obstacles = {
-			MakeEntry(Barricades, TEXT("BP_Military_Dest_Hedgehog"), 2.f),
-			MakeEntry(Barricades, TEXT("BP_Military_Dest_Hedgehog4"), 1.f),
-			MakeEntry(Barricades, TEXT("BP_Military_Dest_LargeHedgehog"), 0.5f)
+			return MakeSegment(RusWallBuildings, Name, EFront::PositiveX);
 		};
-		Perimeter.ObstacleBelt.DistanceFromLine = 900.f;
-		Perimeter.ObstacleBelt.SpacingBetweenObstacles = 450.f;
-
-		Perimeter.BarbedWire.bEnabled = true;
-		Perimeter.BarbedWire.WireSegments = {
-			MakeEntry(Barricades, TEXT("BP_Military_Dest_BarbedWire"), 1.f),
-			MakeEntry(Barricades, TEXT("BP_Military_Dest_BarbedWireLong"), 1.f)
-		};
-		Perimeter.BarbedWire.DistanceFromLine = 500.f;
-
-		Perimeter.Sandbags.bEnabled = true;
-		Perimeter.Sandbags.SandbagUnits = {
-			MakeEntry(Sandbags, TEXT("BP_Cover_RusSandbags_SingleStraight"), 2.f),
-			MakeEntry(Sandbags, TEXT("BP_Cover_RusSandbags_DoubleStraight"), 1.f)
-		};
-		Perimeter.Sandbags.Coverage = EEnemySandbagCoverage::FrontAndFlanks;
+		FSurvivalSovietWallFamily Family;
+		Family.Family = ESurvivalSovietWallFamily::SovietConcrete;
+		Family.Straight = SovietWall_Piece(Wall(TEXT("Rus_Building_Wall_Soviet")), 1220.4f, 1181.2f, CentreLine);
+		Family.FlagStraight = SovietWall_Piece(Wall(TEXT("Rus_Building_WallFlag_Soviet")), 1220.4f, 1181.2f, CentreLine);
+		// The piece named after the right hand has its rounded end at the start of the walk.
+		Family.StartCap = SovietWall_Piece(Wall(TEXT("Rus_Building_WallRightConnection_Soviet")), 1256.2f, 1248.3f, CentreLine);
+		Family.FlagStartCap = SovietWall_Piece(Wall(TEXT("Rus_Building_WallRightConnection_Flag_Soviet")), 1256.2f, 1248.3f, CentreLine);
+		Family.EndCap = SovietWall_Piece(Wall(TEXT("Rus_Building_WallLeftConnection_Soviet")), 1249.9f, 4.3f, CentreLine);
+		Family.FlagEndCap = SovietWall_Piece(Wall(TEXT("Rus_Building_WallLeftConnection_Flag_Soviet")), 1249.9f, 4.3f, CentreLine);
+		Family.Gate = SovietWall_Piece(Wall(TEXT("Rus_Building_GateWired_Soviet")), 1564.7f, 820.1f, GateCentreLine);
+		// About one piece in fifteen, never closer than four pieces apart: a flag is a mark, not a pattern.
+		Family.FlagRate = 0.07f;
+		Family.FlagMinGap = 4;
+		Family.Thickness = 260.f;
+		return Family;
 	}
 
-	FEnemyDecoratorProfile MakeSupplyDecorators()
+	FSurvivalSovietWallFamily SovietWall_MakePostApoConcrete()
 	{
-		FEnemyDecoratorProfile Profile;
-		Profile.Decorators = {
-			MakeEntry(Airport, TEXT("BP_Airport_Dest_CrateStack01")),
-			MakeEntry(Airport, TEXT("BP_Airport_Dest_CrateStack02")),
-			MakeEntry(Airport, TEXT("BP_Airport_Dest_CrateStack03")),
-			MakeEntry(Airport, TEXT("BP_Airport_Dest_BarrelStack")),
-			MakeEntry(Airport, TEXT("BP_Airport_Dest_BarrelStack2")),
-			MakeEntry(Military, TEXT("BP_Military_Dest_Camonet"), 0.5f)
+		using namespace SurvivalSovietBaseDefaults;
+		using EFront = EEnemySandbagFrontAxis;
+		FSurvivalSovietWallFamily Family;
+		Family.Family = ESurvivalSovietWallFamily::PostApoConcrete;
+		Family.Straight = SovietWall_Piece(MakeSegment(ConcreteWalls, TEXT("BP_Dest_PostApo_ConcreteFenceLong"), EFront::PositiveX),
+		                                   1020.f, 510.f, 0.f);
+		Family.Corner = SovietWall_Piece(MakeSegment(ConcreteWalls, TEXT("BP_Dest_PostApo_ConcreteFenceCorner"), EFront::PositiveX),
+		                                 176.f, 0.f, 0.f);
+		Family.GateLeaf = SovietWall_Piece(MakeSegment(ConcreteWalls, TEXT("BP_Dest_PostApo_ConcreteFenceGate"), EFront::PositiveX),
+		                                   334.f, 0.f, 0.f);
+		Family.Thickness = 20.f;
+		return Family;
+	}
+
+	FSurvivalSovietWallFamily SovietWall_MakeSandbag()
+	{
+		using namespace SurvivalSovietBaseDefaults;
+		FSurvivalSovietWallFamily Family;
+		Family.Family = ESurvivalSovietWallFamily::Sandbag;
+		Family.Straight = SovietWall_Piece(
+			MakeSegment(Sandbags, TEXT("BP_Cover_RusSandbags_DoubleStraight"), EEnemySandbagFrontAxis::PositiveX), 858.f, 429.f, 0.f);
+		Family.Thickness = 114.f;
+		return Family;
+	}
+
+	FSurvivalSovietWallFamily SovietWall_MakeWireFence()
+	{
+		using namespace SurvivalSovietBaseDefaults;
+		FSurvivalSovietWallFamily Family;
+		Family.Family = ESurvivalSovietWallFamily::WireFence;
+		Family.Straight = SovietWall_Piece(
+			MakeSegment(Airport, TEXT("BP_Airport_Dest_FenceWire"), EEnemySandbagFrontAxis::PositiveY), 376.f, 188.f, 0.f);
+		Family.Thickness = 74.f;
+		return Family;
+	}
+
+	/** @return Chain-link panels on posts, 364 cm, for fuel yards; the panel stands 43 cm behind its pivot. */
+	FSurvivalSovietWallFamily SovietWall_MakeChainLink()
+	{
+		using namespace SurvivalSovietBaseDefaults;
+		FSurvivalSovietWallFamily Family;
+		Family.Family = ESurvivalSovietWallFamily::ChainLink;
+		Family.Straight = SovietWall_Piece(
+			MakeSegment(Environment, TEXT("Industrial/BP_Industrial_Dest_FenceWire"), EEnemySandbagFrontAxis::PositiveX), 364.f, 182.f, 43.f);
+		Family.Thickness = 30.f;
+		return Family;
+	}
+
+	TArray<FSurvivalSovietWallFamily> MakeWallFamilies()
+	{
+		return {
+			SovietWall_MakeSovietConcrete(), SovietWall_MakePostApoConcrete(), SovietWall_MakeSandbag(), SovietWall_MakeWireFence(),
+			SovietWall_MakeChainLink()
 		};
-		Profile.CountPerSetup = 2.f;
-		Profile.MinDistanceFromBounds = 150.f;
-		Profile.MaxDistanceFromBounds = 700.f;
-		Profile.ChancePerSetup = 0.75f;
-		return Profile;
 	}
 }
 
 USurvivalSovietBaseSettings::USurvivalSovietBaseSettings()
 {
 	BaseDestroyedNotification = LOCTEXT("BaseDestroyed", "Soviet base destroyed: {0}");
+}
+
+void USurvivalSovietBaseSettings::PostLoad()
+{
+	Super::PostLoad();
+	// The tables live in the asset. An asset saved before they were filled gets the code defaults so a match still
+	// works; ResetToDefaults plus a save moves them into the asset for good.
+	bool bUseCodeDefaults = Presets.IsEmpty();
+#if RTS_WITH_MAP_TESTS
+	// One base type's work needs no asset save: -SovietBaseCodeDefaults runs the code tables as they are now.
+	bUseCodeDefaults = bUseCodeDefaults or FParse::Param(FCommandLine::Get(), TEXT("SovietBaseCodeDefaults"));
+#endif
+	if (bUseCodeDefaults)
+	{
+		FillAllDefaults();
+		bM_UsingCodeDefaults = true;
+	}
+}
+
+void USurvivalSovietBaseSettings::FillAllDefaults()
+{
 	FillDefaultPresets();
+	FillDefaultKit();
 	FillDefaultDifficultyScaling();
 	FillDefaultStrategicAITypes();
 }
@@ -167,211 +167,169 @@ FSurvivalSovietBaseDifficultyScaling USurvivalSovietBaseSettings::GetScalingForD
 void USurvivalSovietBaseSettings::ResetToDefaults()
 {
 	Modify();
-	FillDefaultPresets();
-	FillDefaultDifficultyScaling();
-	FillDefaultStrategicAITypes();
+	FillAllDefaults();
+	bM_UsingCodeDefaults = false;
 }
 #endif
 
-void USurvivalSovietBaseSettings::FillDefaultPresets()
+void USurvivalSovietBaseSettings::FillDefaultKit()
 {
 	using namespace SurvivalSovietBaseDefaults;
+	using EFront = EEnemySandbagFrontAxis;
+	Kit.MainRoadClass = TSoftClassPtr<AActor>(MakeClassPath(GroundPaths, TEXT("BP_GroundPathSpline_Gravel")));
+	// Gravel for lanes too: the two-track surface fades in and out and reads as dashes on this ground.
+	Kit.LaneRoadClass = TSoftClassPtr<AActor>(MakeClassPath(GroundPaths, TEXT("BP_GroundPathSpline_Gravel")));
+	Kit.StripRoadClass = TSoftClassPtr<AActor>(MakeClassPath(GroundPaths, TEXT("BP_GroundPathSpline_Gravel")));
+
+	const TCHAR* const DecalFolder = TEXT("/Game/RTS_Survival/SurvivalMode/Data/SovietBases/Pads/");
+	const auto DecalMaterial = [DecalFolder](const TCHAR* const Name)
+	{
+		return TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(FString::Printf(TEXT("%s%s.%s"), DecalFolder, Name, Name)));
+	};
+	Kit.MainRoadSurface = DecalMaterial(TEXT("MI_SovietRoad_Main"));
+	Kit.LaneRoadSurface = DecalMaterial(TEXT("MI_SovietRoad_Lane"));
+	Kit.TrackRoadSurface = DecalMaterial(TEXT("MI_SovietRoad_Track"));
+	Kit.StripRoadSurface = DecalMaterial(TEXT("MI_SovietRoad_Main"));
+	Kit.GateApronSurface = DecalMaterial(TEXT("MI_SovietRoad_Apron"));
+	Kit.MainRoadPaintShare = 1.05f;
+	Kit.LaneRoadPaintShare = 0.78f;
+	Kit.TrackRoadPaintShare = 0.55f;
+	Kit.YardNets = {
+		MakeEntry(RusBuildings, TEXT("CamoNets/BP_Dest_RusCamoNetRegular"), 2.f),
+		MakeEntry(RusBuildings, TEXT("CamoNets/BP_Dest_RusCamoNetUpright"), 1.f),
+		MakeEntry(Military, TEXT("BP_Military_Dest_Camonet_2"), 1.f)
+	};
+	Kit.AmmoYardFence = ESurvivalSovietWallFamily::PostApoConcrete;
+	Kit.FuelYardFence = ESurvivalSovietWallFamily::ChainLink;
+	Kit.Lantern.BlueprintClass = ASurvivalSovietBaseLantern::StaticClass();
+	Kit.Lantern.bUseFootprintOverride = true;
+	Kit.Lantern.FootprintOverride = FVector2D(60.0, 60.0);
+	Kit.LanternMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/MilitaryBaseCamp/Meshes/SM_LampPost.SM_LampPost")));
+
+	Kit.WallFamilies = MakeWallFamilies();
+	Kit.SandbagRuns = {
+		MakeSegment(Sandbags, TEXT("BP_Cover_RusSandbags_SingleStraight"), EFront::PositiveX, 2.f),
+		MakeSegment(Sandbags, TEXT("BP_Cover_RusSandbags_DoubleStraight"), EFront::PositiveX, 1.f)
+	};
+	Kit.BarbedWire = {MakeSegment(Barricades, TEXT("BP_Military_Dest_BarbedWire"), EFront::PositiveY)};
+	Kit.GateBlocks = {MakeEntry(Barricades, TEXT("BP_Military_Dest_ConcreteBarrier"))};
+	Kit.Revetments = {MakeEntry(Sandbags, TEXT("BP_Cover_RusSandbags_Cornered"))};
+	Kit.CamoNets = {MakeEntry(Military, TEXT("BP_Military_Dest_Camonet"))};
+	Kit.Wrecks = {MakeEntry(DestroyedTanks, TEXT("BP_Env_DestroyedT34"))};
+	Kit.Huts = {MakeEntry(Airport, TEXT("BP_Airport_Dest_Building01"))};
+	Kit.Hangars = {MakeEntry(Airport, TEXT("BP_Airport_Dest_Hangar"))};
+	Kit.Flags = {MakeEntry(Environment, TEXT("Dest_SovietFlag"))};
+	Kit.Crates = {
+		MakeEntry(Airport, TEXT("BP_Airport_Dest_CrateStack01")),
+		MakeEntry(Airport, TEXT("BP_Airport_Dest_CrateStack02")),
+		MakeEntry(Airport, TEXT("BP_Airport_Dest_CrateStack03"))
+	};
+	Kit.Barrels = {
+		MakeEntry(Airport, TEXT("BP_Airport_Dest_BarrelStack")),
+		MakeEntry(Airport, TEXT("BP_Airport_Dest_BarrelStack2")),
+		MakeEntry(Airport, TEXT("BP_Airport_Dest_BarrelStack3"))
+	};
+	Kit.Munitions = {
+		MakeEntry(Missiles, TEXT("BP_Military_Dest_MissileStack_1")),
+		MakeEntry(Missiles, TEXT("BP_Military_Dest_MissileStack_2")),
+		MakeEntry(Missiles, TEXT("BP_Military_Dest_MissileStack_3")),
+		MakeEntry(Missiles, TEXT("BP_Military_Dest_MissileStack_4")),
+		MakeEntry(Missiles, TEXT("BP_Military_Dest_MissileStack_5"))
+	};
+	Kit.Materials = {
+		MakeEntry(Airport, TEXT("BP_Airport_Dest_CrateStack01")),
+		MakeEntry(Airport, TEXT("BP_Airport_Dest_BarrelStack2"))
+	};
+
+	Kit.PadClass = ASurvivalSovietBasePad::StaticClass();
+	const TCHAR* const PadFolder = TEXT("/Game/RTS_Survival/SurvivalMode/Data/SovietBases/Pads/");
+	const auto PadMaterial = [PadFolder](const TCHAR* const Name)
+	{
+		return TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(FString::Printf(TEXT("%s%s.%s"), PadFolder, Name, Name)));
+	};
+	Kit.ConcretePad = PadMaterial(TEXT("MI_SovietPad_Concrete"));
+	Kit.GravelPad = PadMaterial(TEXT("MI_SovietPad_Gravel"));
+	Kit.PackedEarthPad = PadMaterial(TEXT("MI_SovietPad_PackedEarth"));
+	Kit.VirtualTextureEarth = TSoftObjectPtr<UMaterialInterface>(
+		FSoftObjectPath(TEXT("/Game/RTS_Survival/Materials/RVT/M_RTS_RVT_GlobalColor.M_RTS_RVT_GlobalColor")));
+	Kit.EarthStandIn = PadMaterial(TEXT("MI_SovietPit_Earth"));
+}
+
+void USurvivalSovietBaseSettings::FillDefaultPresets()
+{
+	// Every type writes its own preset in Archetypes/SovietBaseArchetype_<Type>.cpp.
 	Presets.Reset();
-
-	// --- Rifle Outpost: barracks camp, corner strongpoints, light AT/AA pits, infantry garrison. ---
-	{
-		FSurvivalSovietBasePreset& Preset = Presets.AddDefaulted_GetRef();
-		Preset.PresetName = TEXT("RifleOutpost");
-		Preset.DisplayName = LOCTEXT("RifleOutpost", "Rifle Outpost");
-		Preset.Weight = 1.f;
-		Preset.MinStrength = 0;
-		Preset.MaxStrength = 1;
-		Preset.CoreCompoundRadius = 1500.f;
-		Preset.ProductionBuildings = {
-			MakeSlot(RusBuildings, TEXT("Rus_Building_Barracks"), 0, 0, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_LargeTent"), 0, 0, 1, 0.5f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_CoolingTowers"), 1, 1, 1, 0.f)
-		};
-		Preset.SupportBuildings = {
-			MakeSlot(RusBuildings, TEXT("Rus_Building_Supplies"), 0, -1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_AmmoStorage"), 0, -1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Bxp_Megaphone"), 0, -1, 1, 0.f),
-			MakeSlot(RusBunkers, TEXT("Rus_BXP_GuardTowerMG"), 0, -1, 2, 1.f)
-		};
-		Preset.Perimeter.LayoutPerStrength = {EEnemyPerimeterLayout::Corners, EEnemyPerimeterLayout::FrontLine};
-		Preset.Perimeter.Bunkers = {
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_MGBunker"), 2.f),
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_AutoCnBunker"), 1.f)
-		};
-		FillDefaultLineWorks(Preset.Perimeter);
-		Preset.Perimeter.WireMinStrength = 1;
-		Preset.GunPits = {
-			MakeSlot(Bxps, TEXT("RusDShKPit/Rus_BXP_DShKPit"), 0, -1, 1, 0.5f),
-			MakeSlot(Bxps, TEXT("Rus53KPit/Rus_BXP_53KPit"), 0, -1, 1, 1.f),
-			MakeSlot(Bxps, TEXT("RusMortarPit/Rus_BXP_120MortarPit"), 1, -1, 1, 0.f)
-		};
-		Preset.DecoratorProfiles = {MakeSupplyDecorators()};
-		Preset.Garrison = {
-			MakeGarrison({
-				             Squad(ESquadSubtype::Squad_Rus_Mosin), Squad(ESquadSubtype::Squad_Rus_Dyakonov),
-				             Squad(ESquadSubtype::Squad_Rus_Okhotnik)
-			             }, 3, 1.f, 0, ESurvivalSovietGarrisonBehaviour::HoldPosition),
-			MakeGarrison({Tank(ETankSubtype::Tank_Ba12), Tank(ETankSubtype::Tank_BT7)}, 2, 0.5f, 0,
-			             ESurvivalSovietGarrisonBehaviour::Patrol),
-			MakeGarrison({Squad(ESquadSubtype::Squad_Rus_HazmatBazooka), Squad(ESquadSubtype::Squad_Rus_KorovinAssault)},
-			             1, 1.f, 1, ESurvivalSovietGarrisonBehaviour::StrategicAIReserve)
-		};
-		Preset.DestroyRewards = {
-			MakeReward(ERTSResourceType::Resource_Radixite, 250),
-			MakeReward(ERTSResourceType::Resource_Metal, 200)
-		};
-	}
-
-	// --- Tank Depot: factory + barracks, front line facing the player, heavy AT pits, armour garrison. ---
-	{
-		FSurvivalSovietBasePreset& Preset = Presets.AddDefaulted_GetRef();
-		Preset.PresetName = TEXT("TankDepot");
-		Preset.DisplayName = LOCTEXT("TankDepot", "Tank Depot");
-		Preset.Weight = 1.f;
-		Preset.MinStrength = 1;
-		Preset.MaxStrength = 2;
-		Preset.CoreCompoundRadius = 1900.f;
-		Preset.ProductionBuildings = {
-			MakeSlot(RusBuildings, TEXT("Rus_Building_Factory"), 0, 1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_Barracks"), 0, 0, 1, 0.f),
-			// Second tier-0 building keeps >= 2 production buildings when the difficulty caps the tier at 0.
-			MakeSlot(RusBuildings, TEXT("Rus_Building_LargeTent"), 0, 0, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_CoolingTowers"), 0, 1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_ResearchCenter"), 2, 2, 1, 0.f)
-		};
-		Preset.SupportBuildings = {
-			MakeSlot(RusBuildings, TEXT("Rus_Building_FuelStorage"), 0, -1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_FuelStorageTank"), 0, -1, 1, 0.5f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_AmmoStorage"), 0, -1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Bxp_ContainerHut"), 0, -1, 1, 0.f),
-			MakeSlot(RusBunkers, TEXT("Rus_BXP_GuardTowerMG"), 0, -1, 2, 0.5f)
-		};
-		Preset.Perimeter.LayoutPerStrength = {
-			EEnemyPerimeterLayout::FrontLine, EEnemyPerimeterLayout::FrontLine, EEnemyPerimeterLayout::FullPerimeter
-		};
-		Preset.Perimeter.Bunkers = {
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_Bunker02_ZIS"), 2.f),
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_DomeBunker"), 1.f),
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_LongCamoBunker"), 1.f)
-		};
-		FillDefaultLineWorks(Preset.Perimeter);
-		Preset.Perimeter.ObstacleBelt.Formation = EEnemyObstacleFormation::DoubleRow;
-		Preset.Perimeter.WireMinStrength = 1;
-		Preset.GunPits = {
-			MakeSlot(Bxps, TEXT("RusBS3Pit/Rus_BXP_BS3Pit"), 0, -1, 1, 1.f),
-			MakeSlot(Bxps, TEXT("Rus53KPit/Rus_BXP_53KSectorPit"), 0, -1, 1, 0.5f),
-			MakeSlot(Bxps, TEXT("RusDShKPit/Rus_BXP_DShKPit"), 0, -1, 1, 0.f),
-			MakeSlot(RusBunkers, TEXT("Rus_BXP_Bofors"), 2, -1, 1, 0.f)
-		};
-		Preset.DecoratorProfiles = {MakeSupplyDecorators()};
-		Preset.Garrison = {
-			MakeGarrison({
-				             Tank(ETankSubtype::Tank_T34_76), Tank(ETankSubtype::Tank_T34_85),
-				             Tank(ETankSubtype::Tank_SU_85)
-			             }, 2, 1.f, 0, ESurvivalSovietGarrisonBehaviour::HoldPosition),
-			MakeGarrison({Tank(ETankSubtype::Tank_T70), Tank(ETankSubtype::Tank_BT7), Tank(ETankSubtype::Tank_T26)},
-			             3, 0.5f, 0, ESurvivalSovietGarrisonBehaviour::Patrol),
-			MakeGarrison({Squad(ESquadSubtype::Squad_Rus_Mosin), Squad(ESquadSubtype::Squad_Rus_LargePTRS)},
-			             2, 0.5f, 0, ESurvivalSovietGarrisonBehaviour::HoldPosition),
-			MakeGarrison({Tank(ETankSubtype::Tank_T34_AA)}, 1, 0.f, 2, ESurvivalSovietGarrisonBehaviour::HoldPosition),
-			MakeGarrison({Tank(ETankSubtype::Tank_T34_76), Tank(ETankSubtype::Tank_SU_76)}, 1, 1.f, 1,
-			             ESurvivalSovietGarrisonBehaviour::StrategicAIReserve)
-		};
-		Preset.DestroyRewards = {
-			MakeReward(ERTSResourceType::Resource_Metal, 400),
-			MakeReward(ERTSResourceType::Resource_VehicleParts, 250),
-			MakeReward(ERTSResourceType::Resource_Fuel, 200)
-		};
-	}
-
-	// --- Command Fortress: research centre + factory + barracks, full ring of heavy bunkers, artillery and AA. ---
-	{
-		FSurvivalSovietBasePreset& Preset = Presets.AddDefaulted_GetRef();
-		Preset.PresetName = TEXT("CommandFortress");
-		Preset.DisplayName = LOCTEXT("CommandFortress", "Command Fortress");
-		Preset.Weight = 1.f;
-		Preset.MinStrength = 2;
-		Preset.MaxStrength = 5;
-		Preset.CoreCompoundRadius = 2000.f;
-		Preset.ProductionBuildings = {
-			MakeSlot(RusBuildings, TEXT("Rus_Building_AdminBunker"), 0, 2, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_Factory"), 0, 1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_Barracks"), 0, 0, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_LargeTent"), 0, 0, 1, 0.f)
-		};
-		Preset.SupportBuildings = {
-			MakeSlot(RusBuildings, TEXT("Rus_Building_Supplies"), 0, -1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_AmmoStorage"), 0, -1, 1, 0.5f),
-			MakeSlot(RusBuildings, TEXT("Rus_Building_FuelStorageTank"), 0, -1, 1, 0.f),
-			MakeSlot(RusBuildings, TEXT("Rus_Bxp_Megaphone"), 0, -1, 1, 0.f),
-			MakeSlot(RusBunkers, TEXT("Rus_BXP_WeaponPlatform"), 0, -1, 2, 0.5f)
-		};
-		Preset.Perimeter.LayoutPerStrength = {EEnemyPerimeterLayout::FullPerimeter};
-		Preset.Perimeter.Bunkers = {
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_RusBunker03"), 2.f),
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_MGBunker"), 2.f),
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_Bunker02_ZIS"), 1.f),
-			MakeEntry(RusBunkers, TEXT("Rus_BXP_MegaBunker_1"), 0.5f)
-		};
-		FillDefaultLineWorks(Preset.Perimeter);
-		Preset.Perimeter.ObstacleBelt.Formation = EEnemyObstacleFormation::DoubleRow;
-		Preset.Perimeter.BarbedWire.Rows = 2;
-		Preset.Perimeter.WireMinStrength = 0;
-		Preset.GunPits = {
-			MakeSlot(Bxps, TEXT("RusBS3Pit/Rus_BXP_BS3Pit"), 0, -1, 2, 0.5f),
-			MakeSlot(Bxps, TEXT("RusMortarPit/Rus_BXP_120MortarPit"), 0, -1, 1, 0.5f),
-			MakeSlot(Bxps, TEXT("RusAmpulometPit/Rus_BXP_AmpulometPit"), 0, -1, 1, 0.f),
-			MakeSlot(Bxps, TEXT("RusDShKPit/Rus_BXP_DShKPit"), 0, -1, 1, 0.f),
-			MakeSlot(RusBunkers, TEXT("Rus_BXP_Bofors"), 0, -1, 1, 0.5f)
-		};
-		Preset.DecoratorProfiles = {MakeSupplyDecorators()};
-		Preset.Garrison = {
-			MakeGarrison({Tank(ETankSubtype::Tank_KV_1), Tank(ETankSubtype::Tank_T34_85)}, 2, 1.f, 0,
-			             ESurvivalSovietGarrisonBehaviour::HoldPosition),
-			MakeGarrison({Tank(ETankSubtype::Tank_T34_76), Tank(ETankSubtype::Tank_T34_85)}, 3, 0.5f, 0,
-			             ESurvivalSovietGarrisonBehaviour::Patrol),
-			MakeGarrison({
-				             Squad(ESquadSubtype::Squad_Rus_RedHammer), Squad(ESquadSubtype::Squad_Rus_RedHamerPTRS),
-				             Squad(ESquadSubtype::Squad_Rus_ToxicGuard)
-			             }, 3, 0.5f, 0, ESurvivalSovietGarrisonBehaviour::HoldPosition),
-			MakeGarrison({Tank(ETankSubtype::Tank_T34_AA)}, 1, 0.5f, 0, ESurvivalSovietGarrisonBehaviour::HoldPosition),
-			MakeGarrison({Tank(ETankSubtype::Tank_T34_85), Tank(ETankSubtype::Tank_SU_85)}, 2, 1.f, 0,
-			             ESurvivalSovietGarrisonBehaviour::StrategicAIReserve)
-		};
-		Preset.DestroyRewards = {
-			MakeReward(ERTSResourceType::Resource_Radixite, 500),
-			MakeReward(ERTSResourceType::Resource_Metal, 500),
-			MakeReward(ERTSResourceType::Resource_VehicleParts, 300)
-		};
-	}
+	const FSovietPresetLibrary Library;
+	Library.AddForwardFirebase(Presets);
+	Library.AddRifleCantonment(Presets);
+	Library.AddFieldAirstrip(Presets);
+	Library.AddTankPark(Presets);
+	Library.AddSupplyDepot(Presets);
+	Library.AddHillStronghold(Presets);
+	Library.AddCommandFortress(Presets);
 }
 
 void USurvivalSovietBaseSettings::FillDefaultDifficultyScaling()
 {
+	using EDiff = ERTSGameDifficulty;
 	DifficultyScaling.Reset();
-	auto AddRow = [this](const ERTSGameDifficulty Difficulty, const int32 StrengthBonus, const int32 MaxProductionTier,
-	                     const float DefenseDensity, const float GunPitMultiplier, const float GarrisonMultiplier,
-	                     const float RewardMultiplier)
+	auto AddRow = [this](const EDiff Difficulty, const FString& Character, const TArray<int32>& Spread,
+	                     const TArray<int32>& Budget, const TArray<int32>& Reserve, const int32 MaxUnitPoints,
+	                     const int32 MinTopUp, const int32 MaxProductionTier) -> FSurvivalSovietBaseDifficultyScaling&
 	{
 		FSurvivalSovietBaseDifficultyScaling& Row = DifficultyScaling.AddDefaulted_GetRef();
 		Row.Difficulty = Difficulty;
-		Row.StrengthBonus = StrengthBonus;
+		Row.Character = Character;
+		Row.StrengthByDistanceRank = Spread;
+		Row.ThreatBudgetByDistanceRank = Budget;
+		Row.ReservePointsByDistanceRank = Reserve;
+		Row.MaxUnitPoints = MaxUnitPoints;
+		Row.MinTopUpUnitPoints = MinTopUp;
 		Row.MaxProductionTier = MaxProductionTier;
-		Row.DefenseDensity = DefenseDensity;
-		Row.GunPitMultiplier = GunPitMultiplier;
-		Row.GarrisonMultiplier = GarrisonMultiplier;
-		Row.RewardMultiplier = RewardMultiplier;
+		return Row;
 	};
-	AddRow(ERTSGameDifficulty::NewToRTS, -1, 0, 0.6f, 0.5f, 0.5f, 1.5f);
-	AddRow(ERTSGameDifficulty::Normal, 0, 1, 1.f, 1.f, 1.f, 1.f);
-	AddRow(ERTSGameDifficulty::Hard, 0, 2, 1.2f, 1.25f, 1.35f, 1.f);
-	AddRow(ERTSGameDifficulty::Brutal, 1, 2, 1.4f, 1.5f, 1.7f, 0.9f);
-	AddRow(ERTSGameDifficulty::Ironman, 1, 2, 1.5f, 1.75f, 2.f, 0.8f);
+	FSurvivalSovietBaseDifficultyScaling& NewRow = AddRow(
+		EDiff::NewToRTS, TEXT("Rear guard: infantry, MG towers and 45 mm guns, no wire, no tanks"),
+		{0, 0, 1, 1}, {50, 70, 125, 190}, {0, 0, 4, 5}, 10, 3, 0);
+	NewRow.WireRowsByStrength = {0, 0, 0};
+	NewRow.BeltMinStrength = 3;
+	NewRow.RewardPerThreatPoint = 3.5f;
+
+	FSurvivalSovietBaseDifficultyScaling& NormalRow = AddRow(
+		EDiff::Normal, TEXT("Line regiment: wire, mortars, light tanks, the first tank factories"),
+		{0, 0, 1, 2}, {65, 110, 170, 310}, {0, 0, 7, 20}, 15, 3, 1);
+	NormalRow.WireRowsByStrength = {0, 1, 1};
+	NormalRow.BeltMinStrength = 2;
+	NormalRow.RewardPerThreatPoint = 3.f;
+
+	FSurvivalSovietBaseDifficultyScaling& HardRow = AddRow(
+		EDiff::Hard, TEXT("Guards division: T-34, BS-3 guns, ZiS bunkers, Bofors, hedgehog belts, research; forward posts"),
+		{0, 1, 1, 2}, {85, 165, 250, 450}, {0, 5, 10, 20}, 20, 10, 2);
+	HardRow.WireRowsByStrength = {1, 1, 2};
+	HardRow.BeltMinStrength = 1;
+	HardRow.ForwardPostsByStrength = {0, 2, 2};
+	HardRow.RewardPerThreatPoint = 3.f;
+
+	FSurvivalSovietBaseDifficultyScaling& BrutalRow = AddRow(
+		EDiff::Brutal, TEXT("Shock army: T-34/85, KV-1, ML-20 batteries, turret bunkers; forward posts and an inner line"),
+		{0, 1, 2, 2}, {120, 250, 400, 640}, {0, 7, 12, 20}, 28, 12, 2);
+	BrutalRow.WireRowsByStrength = {1, 2, 2};
+	BrutalRow.BeltMinStrength = 1;
+	BrutalRow.ForwardPostsByStrength = {0, 2, 3};
+	BrutalRow.SecondRowBunkersByStrength = {0, 3, 4};
+	BrutalRow.RewardPerThreatPoint = 2.75f;
+	BrutalRow.FarthestBasePresetWeights = {{TEXT("CommandFortress"), 2.f}, {TEXT("FieldAirstrip"), 0.f}};
+
+	FSurvivalSovietBaseDifficultyScaling& IronmanRow = AddRow(
+		EDiff::Ironman, TEXT("Stavka reserve: KV-2, IS-1, B-4 siege guns, mega bunkers; a second belt and crest outposts"),
+		{1, 1, 2, 2}, {170, 370, 640, 940}, {0, 10, 20, 26}, 50, 20, 2);
+	IronmanRow.WireRowsByStrength = {2, 2, 3};
+	IronmanRow.BeltMinStrength = 0;
+	IronmanRow.ForwardPostsByStrength = {1, 3, 4};
+	IronmanRow.SecondRowBunkersByStrength = {0, 3, 4};
+	IronmanRow.bSecondBelt = true;
+	IronmanRow.RewardPerThreatPoint = 2.5f;
+	IronmanRow.FarthestBasePresetWeights = {{TEXT("CommandFortress"), 3.f}, {TEXT("FieldAirstrip"), 0.f}};
 }
 
 void USurvivalSovietBaseSettings::FillDefaultStrategicAITypes()

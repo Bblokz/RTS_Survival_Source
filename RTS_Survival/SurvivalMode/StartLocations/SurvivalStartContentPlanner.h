@@ -102,6 +102,10 @@ private:
 	FSurvivalStartContentDifficultyScale M_Scale;
 	FSurvivalStartContentPlan M_Plan;
 
+	// Wrecks that may land below the bench (more than WreckOffBenchDrop under the deploy centre); set by PlanWrecks.
+	int32 M_MaxWrecksOffBench = 0;
+	int32 M_WrecksOffBench = 0;
+
 	void PlanPits();
 	void ReserveProtectedAreas();
 	void PlanResourceFields();
@@ -134,11 +138,16 @@ private:
 		const ESurvivalStartContentCategory Category,
 		const FSurvivalGroundHit& CenterHit);
 
-	/** @return True when one field actor found room inside the field and was planned. */
+	/**
+	 * @return True when one field actor found room inside the field and was planned.
+	 * @param CentreFootprint Footprint of the field's centre actor (0 without one): entries that cannot fit beside it
+	 * are skipped, so a large centre actor does not silently starve the field.
+	 */
 	bool TryPlaceFieldActor(
 		const FSurvivalResourceFieldSettings& FieldSettings,
 		const ESurvivalStartContentCategory Category,
 		const FVector2D& FieldCenter,
+		const float CentreFootprint,
 		FSurvivalOccupancy& FieldOccupancy);
 
 	/** @return True when Position projects onto the landscape with a slope of at most MaxSlopeDegrees. */

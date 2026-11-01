@@ -9,14 +9,16 @@
 
 #include "SurvivalSovietBaseSettings.generated.h"
 
+class UPCGGraphInterface;
+
 /**
  * @brief How Soviet bases are generated on the start locations the player did not pick.
  *
- * Every unpicked start location gets one base. Its strength (0..MaxStrength) grows with its distance rank from
- * the player's start location (nearest = weakest) plus the difficulty's StrengthBonus. A preset allowed for that
- * strength is picked (seeded, weighted, avoiding repeats); the strength then gates the preset's slots.
- * @note The constructor fills working defaults (three presets, five difficulty rows) with verified asset paths,
- * so a freshly created asset is usable; ResetToDefaults restores them in the editor.
+ * Every unpicked start location gets one base. Its strength comes from the difficulty's StrengthByDistanceRank table
+ * (nearest first). A preset allowed for that strength and tech cap is picked (seeded, weighted, avoiding repeats), and
+ * the base then buys down the preset's ThreatPath until the difficulty's threat budget for that strength is spent.
+ * @note All tables live in this asset. An asset that has none yet gets the code defaults at load; ResetToDefaults
+ * writes them into the asset, and from then on the asset alone decides.
  */
 UCLASS(BlueprintType)
 class RTS_SURVIVAL_API USurvivalSovietBaseSettings : public UPrimaryDataAsset
@@ -26,11 +28,26 @@ class RTS_SURVIVAL_API USurvivalSovietBaseSettings : public UPrimaryDataAsset
 public:
 	USurvivalSovietBaseSettings();
 
+	virtual void PostLoad() override;
+
+	/** @return True when this asset holds no tables of its own and the code defaults were filled in at load. */
+	bool GetIsUsingCodeDefaults() const { return bM_UsingCodeDefaults; }
+
 	/** @return The scaling row for the difficulty; the Normal row (or a default row) when it is missing. */
 	FSurvivalSovietBaseDifficultyScaling GetScalingForDifficulty(ERTSGameDifficulty Difficulty) const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Presets")
 	TArray<FSurvivalSovietBasePreset> Presets;
+
+	// The PCG graph that generates a base (Site, then the Stage nodes, then Spawn). One graph, run once per base by a
+	// PCG component at runtime; add nodes between a stage's Placed output and Spawn to filter what gets built.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Presets")
+	TSoftObjectPtr<UPCGGraphInterface> BaseGraph = TSoftObjectPtr<UPCGGraphInterface>(FSoftObjectPath(
+		TEXT("/Game/RTS_Survival/SurvivalMode/PCG/SovietBases/PCG_SovietBase.PCG_SovietBase")));
+
+	// Fences, gates, revetments, props and road surfaces every master plan builds with.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Presets")
+	FSurvivalSovietSiteKit Kit;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Difficulty")
 	TArray<FSurvivalSovietBaseDifficultyScaling> DifficultyScaling;
@@ -46,7 +63,7 @@ public:
 		meta = (EditCondition = "SeedMode == ESurvivalSovietSeedMode::Fixed"))
 	int32 FixedSeed = 1941;
 
-	// A preset already used by another base keeps this fraction of its weight (variety between bases).
+	// Once every plan allowed for a strength is in use, a plan already used keeps this fraction of its weight.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Seed", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float RepeatedPresetWeightFactor = 0.25f;
 
@@ -88,11 +105,19 @@ public:
 		meta = (ClampMin = "1", EditCondition = "bConfigureStrategicAIBaseDetection"))
 	int32 StrategicAIMaxMinBuildingsPerBase = 3;
 
-	// --- Waves interaction (read by the waves director) ---
+	// --- Bases are a separate system: nothing outside it reads this ---
 
 	// GetWavePressureMultiplier() = 1 + alive bases * this.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Waves", meta = (ClampMin = "0.0"))
 	float WavePressurePerAliveBase = 0.1f;
+
+	// Share of a base's payout that its production buildings carry; the rest is earned by breaking its defences.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Reward", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float ProductionPayoutShare = 0.3f;
+
+	// Fraction of a base's defence points that must be destroyed to earn the whole defence share of the payout.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Reward", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float MinDefenseBrokenFraction = 0.6f;
 
 	// Notification shown when a base is destroyed; {0} = preset display name.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Reward")
@@ -105,7 +130,11 @@ public:
 #endif
 
 private:
+	bool bM_UsingCodeDefaults = false;
+
+	void FillAllDefaults();
 	void FillDefaultPresets();
+	void FillDefaultKit();
 	void FillDefaultDifficultyScaling();
 	void FillDefaultStrategicAITypes();
 };

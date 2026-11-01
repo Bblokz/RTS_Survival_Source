@@ -20,6 +20,13 @@ namespace SurvivalStartContentPlannerConstants
 	constexpr int32 FoliageAttemptsPerInstance = 6;
 	constexpr float FoliageFootprintRadius = 60.f;
 	constexpr float FullCircleDegrees = 360.f;
+	// Fields may not sit higher than this above the deploy centre: up a rim flank harvesters would have to climb.
+	constexpr float MaxFieldRiseAboveDeploy = 150.f;
+	// A wreck this far below the deploy centre lies off the bench; at most this share of a start's wrecks may.
+	constexpr float WreckOffBenchDrop = 150.f;
+	constexpr float MaxWreckOffBenchShare = 2.f / 7.f;
+	// The last quarter of a wreck's attempts accepts any ground, so a start whose bench ends early still gets its wrecks.
+	constexpr float WreckAnyGroundAttemptShare = 0.75f;
 }
 
 int32 FSurvivalStartContentPlan::GetPlannedFieldCount(const ESurvivalStartContentCategory Category) const
@@ -154,16 +161,17 @@ void FSurvivalStartContentPlanner::PlanResourceFields()
 	M_Plan.RequestedMetalFields = MetalLeft;
 
 	// Interleave the types so the harvesters of both resources have a field on every side of the base.
+	// Metal goes first in each pair: it needs the larger disc on gentler ground, so it must not get the leftovers.
 	TArray<ESurvivalStartContentCategory> FieldOrder;
 	while (RadixiteLeft > 0 or MetalLeft > 0)
 	{
-		if (RadixiteLeft-- > 0)
-		{
-			FieldOrder.Add(ESurvivalStartContentCategory::Radixite);
-		}
 		if (MetalLeft-- > 0)
 		{
 			FieldOrder.Add(ESurvivalStartContentCategory::Metal);
+		}
+		if (RadixiteLeft-- > 0)
+		{
+			FieldOrder.Add(ESurvivalStartContentCategory::Radixite);
 		}
 	}
 	if (FieldOrder.IsEmpty())
@@ -231,6 +239,10 @@ bool FSurvivalStartContentPlanner::GetIsFieldGroundValid(
 	{
 		return false;
 	}
+	if (OutCenterHit.Location.Z - M_Input.DeployCenter.Z > MaxFieldRiseAboveDeploy)
+	{
+		return false;
+	}
 	const float RingRadius = FieldSettings.FieldRadius * FieldGroundRingFraction;
 	// A field straddling a cliff edge would leave crystals unreachable for harvesters.
 	const float MaxHeightDifference =
@@ -259,12 +271,14 @@ void FSurvivalStartContentPlanner::PopulateField(
 {
 	const FVector2D FieldCenter(CenterHit.Location);
 	FSurvivalOccupancy FieldOccupancy;
+	float CentreFootprint = 0.f;
 	const int32 CentreIndex = SurvivalStartPlacement::PickWeightedActorIndex(FieldSettings.CentreActors, M_Random);
 	if (FieldSettings.CentreActors.IsValidIndex(CentreIndex))
 	{
 		const FSurvivalWeightedActorClass& CentreEntry = FieldSettings.CentreActors[CentreIndex];
 		AddPlannedActor(CentreEntry, CenterHit, GetRandomYaw(), Category);
 		FieldOccupancy.Add(FieldCenter, CentreEntry.FootprintRadius);
+		CentreFootprint = CentreEntry.FootprintRadius;
 	}
 
 	const int32 MinActors = FMath::Min(FieldSettings.MinFieldActors, FieldSettings.MaxFieldActors);
@@ -273,7 +287,7 @@ void FSurvivalStartContentPlanner::PopulateField(
 	                                    M_Scale.ResourceFieldActorMultiplier, MinActors > 0 ? 1 : 0);
 	for (int32 ActorIndex = 0; ActorIndex < ActorCount; ++ActorIndex)
 	{
-		TryPlaceFieldActor(FieldSettings, Category, FieldCenter, FieldOccupancy);
+		TryPlaceFieldActor(FieldSettings, Category, FieldCenter, CentreFootprint, FieldOccupancy);
 	}
 }
 
@@ -281,19 +295,35 @@ bool FSurvivalStartContentPlanner::TryPlaceFieldActor(
 	const FSurvivalResourceFieldSettings& FieldSettings,
 	const ESurvivalStartContentCategory Category,
 	const FVector2D& FieldCenter,
+	const float CentreFootprint,
 	FSurvivalOccupancy& FieldOccupancy)
 {
-	const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(FieldSettings.FieldActors, M_Random);
-	if (not FieldSettings.FieldActors.IsValidIndex(EntryIndex))
+	// Only entries that fit between the centre actor and the field edge can ever be placed.
+	TArray<FSurvivalWeightedActorClass> FittingEntries;
+	for (const FSurvivalWeightedActorClass& Candidate : FieldSettings.FieldActors)
+	{
+		const float Room = FieldSettings.FieldRadius - Candidate.FootprintRadius;
+		if (Room >= CentreFootprint + Candidate.FootprintRadius + FieldSettings.ActorClearance)
+		{
+			FittingEntries.Add(Candidate);
+		}
+	}
+	const TArray<FSurvivalWeightedActorClass>& Entries = FittingEntries.IsEmpty() ? FieldSettings.FieldActors : FittingEntries;
+	const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Entries, M_Random);
+	if (not Entries.IsValidIndex(EntryIndex))
 	{
 		return false;
 	}
-	const FSurvivalWeightedActorClass& Entry = FieldSettings.FieldActors[EntryIndex];
+	const FSurvivalWeightedActorClass& Entry = Entries[EntryIndex];
 	const float MaxOffset = FMath::Max(0.f, FieldSettings.FieldRadius - Entry.FootprintRadius);
+	// Sample only the ring that is not covered by the centre actor.
+	const float MinOffset = FMath::Min(MaxOffset, CentreFootprint > 0.f
+		                                              ? CentreFootprint + Entry.FootprintRadius + FieldSettings.ActorClearance
+		                                              : 0.f);
 	for (int32 Attempt = 0; Attempt < M_Settings.PlacementAttemptsPerItem; ++Attempt)
 	{
 		const FVector2D Position = SurvivalStartPlacement::RandomPointInAnnulus(
-			FieldCenter, 0.f, MaxOffset, M_Random);
+			FieldCenter, MinOffset, MaxOffset, M_Random);
 		FSurvivalGroundHit Ground;
 		if (not FieldOccupancy.IsFree(Position, Entry.FootprintRadius, FieldSettings.ActorClearance)
 			or not TryFindGround(Position, FieldSettings.MaxGroundSlopeDegrees, Ground))
@@ -309,6 +339,15 @@ bool FSurvivalStartContentPlanner::TryPlaceFieldActor(
 
 void FSurvivalStartContentPlanner::PlanWrecks()
 {
+	using namespace SurvivalStartContentPlannerConstants;
+	int32 TotalWrecks = 0;
+	for (const FSurvivalWreckGroup& Group : M_Settings.WreckGroups)
+	{
+		TotalWrecks += ScaleCount(Group.Count, M_Scale.WreckCountMultiplier, 0);
+	}
+	// Salvage should be comparable between starts: most wrecks stay on the bench, a few lie below it.
+	M_MaxWrecksOffBench = FMath::Max(1, FMath::RoundToInt(TotalWrecks * MaxWreckOffBenchShare));
+	M_WrecksOffBench = 0;
 	for (const FSurvivalWreckGroup& Group : M_Settings.WreckGroups)
 	{
 		PlanWreckGroup(Group);
@@ -341,6 +380,14 @@ void FSurvivalStartContentPlanner::PlanWreckGroup(const FSurvivalWreckGroup& Gro
 			{
 				continue;
 			}
+			const bool bOffBench = Ground.Location.Z < M_Input.DeployCenter.Z - SurvivalStartContentPlannerConstants::WreckOffBenchDrop;
+			const bool bAnyGround = Attempt >= M_Settings.PlacementAttemptsPerItem
+				* SurvivalStartContentPlannerConstants::WreckAnyGroundAttemptShare;
+			if (bOffBench and M_WrecksOffBench >= M_MaxWrecksOffBench and not bAnyGround)
+			{
+				continue;
+			}
+			M_WrecksOffBench += bOffBench ? 1 : 0;
 			AddPlannedActor(Entry, Ground, GetRandomYaw(), ESurvivalStartContentCategory::Wreck);
 			M_Occupancy.Add(Position, SpacingRadius);
 			break;
