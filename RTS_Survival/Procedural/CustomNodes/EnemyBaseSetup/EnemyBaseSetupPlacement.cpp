@@ -8,19 +8,22 @@ namespace EnemyBaseSetupPlacementConstants
 	constexpr int32 DecoratorRetryAttempts = 6;
 	constexpr double MinArcSpanRadians = 0.05;
 	constexpr double SandbagBoundsClearance = 1.0;
+	constexpr double SegmentRunRetryStep = 60.0;
 
 	// Include other sandbags so different resolved bounds cannot intersect at runs or corners.
 	constexpr uint8 SandbagAvoidMask =
 		EnemyOccupancyMask(EEnemyPlacementCategory::Bunker)
 		| EnemyOccupancyMask(EEnemyPlacementCategory::Sandbag)
 		| EnemyOccupancyMask(EEnemyPlacementCategory::Hedgehog)
-		| EnemyOccupancyMask(EEnemyPlacementCategory::BarbedWire);
+		| EnemyOccupancyMask(EEnemyPlacementCategory::BarbedWire)
+		| EnemyOccupancyMask(EEnemyPlacementCategory::Reserved);
 
 	// Barbed wire chains end to end: it avoids solids but not other wire.
 	constexpr uint8 BarbedWireAvoidMask =
 		EnemyOccupancyMask(EEnemyPlacementCategory::Bunker)
 		| EnemyOccupancyMask(EEnemyPlacementCategory::Sandbag)
-		| EnemyOccupancyMask(EEnemyPlacementCategory::Hedgehog);
+		| EnemyOccupancyMask(EEnemyPlacementCategory::Hedgehog)
+		| EnemyOccupancyMask(EEnemyPlacementCategory::Reserved);
 
 	constexpr uint8 DecoratorAvoidMask =
 		EnemySolidCategoryMask() | EnemyOccupancyMask(EEnemyPlacementCategory::Decorator);
@@ -103,9 +106,144 @@ void FEnemyBaseSetupBuilder::SetBlockedPredicate(TFunction<bool(const FVector2D&
 	M_IsBlocked = MoveTemp(InBlocked);
 }
 
+void FEnemyBaseSetupBuilder::SetBlockedFootprintPredicate(TFunction<bool(const FEnemyFootprint&)> InBlocked)
+{
+	M_IsFootprintBlocked = MoveTemp(InBlocked);
+}
+
 int32 FEnemyBaseSetupBuilder::BeginCluster()
 {
 	return M_Result.NumClusters++;
+}
+
+void FEnemyBaseSetupBuilder::ReserveCorridor(const FVector2D& Start, const FVector2D& End, const double HalfWidth)
+{
+	const FVector2D Delta = End - Start;
+	FEnemyFootprint Corridor;
+	Corridor.Center = (Start + End) * 0.5;
+	Corridor.HalfExtents = FVector2D(Delta.Size() * 0.5, HalfWidth);
+	Corridor.YawRadians = FMath::Atan2(Delta.Y, Delta.X);
+	M_Occupancy.Add(Corridor, EEnemyPlacementCategory::Reserved);
+}
+
+bool FEnemyBaseSetupBuilder::PlaceCentered(
+	const EEnemyPlacementCategory Category,
+	const TArray<FEnemyResolvedEntry>& Entries,
+	const int32 EntryIndex,
+	const FVector2D& FootprintCenter,
+	const double YawRadians,
+	const double ExtraSpacing,
+	const uint8 AvoidMask,
+	const int32 Cluster,
+	FEnemyFootprint& OutFootprint)
+{
+	const int32 ChosenIndex = EntryIndex == INDEX_NONE ? PickWeightedEntry(Entries) : EntryIndex;
+	if (not Entries.IsValidIndex(ChosenIndex))
+	{
+		return false;
+	}
+	const FEnemyResolvedEntry& Entry = Entries[ChosenIndex];
+	const double UniformScale = PickUniformScale(Entry);
+	const FVector2D Pivot = FootprintCenter - EBS_RotateVector2D(Entry.PivotToFootprintCenter * UniformScale, YawRadians);
+	const bool bReserved = TryReserveItemAtScale(
+		Category, Entries, ChosenIndex, Pivot, YawRadians, UniformScale, ExtraSpacing, AvoidMask, Cluster);
+	if (not bReserved)
+	{
+		return false;
+	}
+	OutFootprint = M_Result.Actors.Last().Footprint;
+	return true;
+}
+
+double EnemyFrontAxisYawRadians(const EEnemySandbagFrontAxis FrontAxis)
+{
+	return EBS_GetSandbagFrontAxisYaw(FrontAxis);
+}
+
+bool FEnemyBaseSetupBuilder::GetIsFootprintFree(const FEnemyFootprint& Footprint, const uint8 AvoidMask) const
+{
+	if (M_IsBlocked && M_IsBlocked(Footprint.Center))
+	{
+		return false;
+	}
+	if (M_IsFootprintBlocked && M_IsFootprintBlocked(Footprint))
+	{
+		return false;
+	}
+	return AvoidMask == 0 or not M_Occupancy.OverlapsAny(Footprint, AvoidMask);
+}
+
+void FEnemyBaseSetupBuilder::PlaceAtPivot(
+	const EEnemyPlacementCategory Category,
+	const FEnemyResolvedEntry& Entry,
+	const FVector2D& Pivot,
+	const double YawRadians,
+	const FEnemyFootprint& Footprint,
+	const int32 Cluster)
+{
+	M_Occupancy.Add(Footprint, Category);
+	FEnemyPlacedActor& Placed = M_Result.Actors.Emplace_GetRef();
+	Placed.Category = Category;
+	Placed.AssetIndex = Entry.OutputAssetIndex;
+	Placed.ClusterIndex = Cluster;
+	Placed.Position = Pivot;
+	Placed.YawRadians = YawRadians;
+	Placed.Footprint = Footprint;
+}
+
+void FEnemyBaseSetupBuilder::PlaceSegmentRun(
+	const EEnemyPlacementCategory Category,
+	const TArray<FEnemyResolvedEntry>& Segments,
+	const FVector2D& Start,
+	const FVector2D& End,
+	const FVector2D& OutwardDir,
+	const uint8 AvoidMask,
+	const bool bCloseRunEnd,
+	const int32 Cluster)
+{
+	using namespace EnemyBaseSetupPlacementConstants;
+	const double RunLength = FVector2D::Distance(Start, End);
+	if (Segments.IsEmpty() or RunLength < KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+	const FVector2D AlongDir = (End - Start) / RunLength;
+	const double FrontYaw = FMath::Atan2(OutwardDir.Y, OutwardDir.X);
+
+	double Cursor = 0.0;
+	int32 Placed = 0;
+	while (Cursor < RunLength and Placed < MaxChainItems)
+	{
+		const int32 EntryIndex = PickWeightedEntry(Segments);
+		const FEnemyResolvedEntry& Entry = Segments[EntryIndex];
+		const double YawRadians = FrontYaw - EBS_GetSandbagFrontAxisYaw(Entry.SandbagFrontAxis);
+		const double HalfLength = MakeFootprint(Entry, FVector2D::ZeroVector, YawRadians, 1.0).SupportRadius(AlongDir);
+		if (Cursor + 2.0 * HalfLength > RunLength)
+		{
+			break;
+		}
+		FEnemyFootprint Footprint;
+		const FVector2D Center = Start + AlongDir * (Cursor + HalfLength);
+		if (PlaceCentered(Category, Segments, EntryIndex, Center, YawRadians, 0.0, AvoidMask, Cluster, Footprint))
+		{
+			Cursor += 2.0 * HalfLength;
+			++Placed;
+			continue;
+		}
+		Cursor += SegmentRunRetryStep;
+	}
+
+	if (not bCloseRunEnd or Placed == 0)
+	{
+		return;
+	}
+	// The closing piece may overlap its neighbour: same material, and it hides the leftover slit at the corner.
+	const uint8 ClosingMask = AvoidMask & ~EnemyOccupancyMask(Category);
+	const FEnemyResolvedEntry& Entry = Segments[0];
+	const double YawRadians = FrontYaw - EBS_GetSandbagFrontAxisYaw(Entry.SandbagFrontAxis);
+	const double HalfLength = MakeFootprint(Entry, FVector2D::ZeroVector, YawRadians, 1.0).SupportRadius(AlongDir);
+	FEnemyFootprint Footprint;
+	PlaceCentered(Category, Segments, 0, End - AlongDir * HalfLength, YawRadians, 0.0, ClosingMask, Cluster, Footprint);
 }
 
 int32 FEnemyBaseSetupBuilder::PickWeightedEntry(const TArray<FEnemyResolvedEntry>& Entries) const
@@ -208,6 +346,10 @@ bool FEnemyBaseSetupBuilder::TryReserveItemAtScale(
 	const FEnemyFootprint Footprint = MakeFootprint(Entry, Position, YawRadians, UniformScale);
 
 	if (M_IsBlocked && M_IsBlocked(Footprint.Center))
+	{
+		return false;
+	}
+	if (M_IsFootprintBlocked && M_IsFootprintBlocked(Footprint))
 	{
 		return false;
 	}
