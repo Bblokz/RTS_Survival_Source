@@ -793,6 +793,18 @@ protected:
 	 */
 	void TerminateMarch();
 
+	/**
+	 * @brief Convoy hook: march walk speed in cm/s instead of MarchSpeedMultiplier × walk speed; applies at once
+	 * to a running march. 0 or less restores the multiplier.
+	 */
+	void SetMarchSpeedOverride(const float MarchWalkSpeedCms);
+
+	/**
+	 * @brief Convoy hook: moves the far end of a running march without stopping the soldier or turning him back.
+	 * @return False (nothing changes) when the soldier is not marching.
+	 */
+	bool RedirectMarch(const FVector& NewMarchToLocation);
+
 	void ExecuteSwitchWeapon();
 	void TerminateSwitchWeapon();
 
@@ -1017,6 +1029,10 @@ private:
 	float M_MarchedMaxWalkSpeed = 0.0f;
 	float M_MarchedMaxAcceleration = 0.0f;
 	float M_AppliedMarchSpeedMultiplier = 1.0f;
+	// Convoy hook: absolute march walk speed (cm/s); 0 uses MarchSpeedMultiplier.
+	float M_MarchSpeedOverrideCms = 0.0f;
+	// Set while RedirectMarch replaces the move: the aborted old move must not turn the march back.
+	bool bM_IsRedirectingMarch = false;
 
 	void ApplyMarchSpeed();
 	void RemoveMarchSpeed();
