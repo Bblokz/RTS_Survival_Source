@@ -123,6 +123,16 @@ public:
 	/** @return True between two waves (the reward can be picked). */
 	bool GetIsInIntermission() const { return M_IntermissionEndTime >= 0.0; }
 
+	/**
+	 * @brief Random events (SurvivalMode/Events): moves the end of the running intermission to its original end +
+	 * ExtraSeconds; the HUD countdown follows. Repeated calls replace, never stack.
+	 * @return False outside an intermission.
+	 */
+	bool ExtendIntermission(float ExtraSeconds);
+
+	/** @brief Random events: drops the extension; the intermission still lasts its original length. */
+	void EndIntermissionExtension();
+
 	/** @return True once the reward of the current intermission was picked. */
 	bool GetHasChosenReward() const { return bM_HasChosenReward; }
 
@@ -226,6 +236,9 @@ private:
 	// World time the current intermission ends; negative outside one.
 	bool bM_HasPushedDialogSuppression = false;
 	double M_IntermissionEndTime = -1.0;
+	// Random events: the end before ExtendIntermission moved it; negative while not extended.
+	double M_IntermissionBaseEndTime = -1.0;
+	void RestartIntermissionTimer();
 	int32 M_IntermissionRound = 0;
 	bool bM_HasChosenReward = false;
 	FTimerHandle M_IntermissionTimerHandle;

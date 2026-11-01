@@ -893,3 +893,36 @@ void AScavengeableObject::GenerateAdditionalPositions(TArray<FVector>& Positions
 		}
 	}
 }
+
+void AScavengeableObject::SetFixedScavengeRewards(const TMap<ERTSResourceType, int32>& Rewards,
+                                                  const float NewScavengeTime)
+{
+	constexpr int32 AlwaysChance = 100;
+	ScavengeResources.Empty();
+	for (const TPair<ERTSResourceType, int32>& Reward : Rewards)
+	{
+		if (Reward.Value <= 0)
+		{
+			continue;
+		}
+		ScavengeResources.Add(Reward.Key, FScavengeAmount(true, Reward.Value, 0, 0, AlwaysChance));
+	}
+	if (NewScavengeTime > 0.f)
+	{
+		ScavengeTime = NewScavengeTime;
+	}
+}
+
+TMap<ERTSResourceType, float> AScavengeableObject::GetExpectedScavengeRewards() const
+{
+	constexpr float PercentToFraction = 0.01f;
+	TMap<ERTSResourceType, float> Expected;
+	for (const TPair<ERTSResourceType, FScavengeAmount>& Reward : ScavengeResources)
+	{
+		const FScavengeAmount& Amount = Reward.Value;
+		const float Base = Amount.bIsSetAmount ? Amount.SetAmount : 0.5f * (Amount.Min + Amount.Max);
+		const float Chance = FMath::Clamp(Amount.Chance, 0, 100) * PercentToFraction;
+		Expected.FindOrAdd(Reward.Key) += Base * Chance;
+	}
+	return Expected;
+}

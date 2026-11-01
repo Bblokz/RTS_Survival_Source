@@ -17,6 +17,8 @@
 #include "RTS_Survival/SurvivalMode/Data/SurvivalModeSettings.h"
 #include "RTS_Survival/SurvivalMode/Deployment/SurvivalDeploymentComponent.h"
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseComponent.h"
+#include "RTS_Survival/SurvivalMode/PointsOfInterest/SurvivalPointsOfInterestSubsystem.h"
+#include "RTS_Survival/SurvivalMode/Events/SurvivalEventSubsystem.h"
 #include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartLocation.h"
 #include "RTS_Survival/SurvivalMode/UI/W_SurvivalArmySelection.h"
 #include "RTS_Survival/SurvivalMode/UI/W_SurvivalHud.h"
@@ -387,7 +389,11 @@ void ASurvivalModeDirector::ShowArmySelection()
 		{
 			if (WeakThis.IsValid() and not WeakThis->M_StartLocations.IsEmpty())
 			{
-				WeakThis->ConfirmStartLocation(WeakThis->M_StartLocations.Last().Get());
+				// Test runs pick the start with -SurvivalStartIndex=N; the last one when not given.
+				int32 StartIndex = WeakThis->M_StartLocations.Num() - 1;
+				FParse::Value(FCommandLine::Get(), TEXT("SurvivalStartIndex="), StartIndex);
+				StartIndex = FMath::Clamp(StartIndex, 0, WeakThis->M_StartLocations.Num() - 1);
+				WeakThis->ConfirmStartLocation(WeakThis->M_StartLocations[StartIndex].Get());
 			}
 		}), 6.f, false);
 	}
@@ -531,6 +537,10 @@ void ASurvivalModeDirector::GenerateStartLocationContent()
 		}
 		M_SovietBases->GenerateSovietBaseAt(StartLocation.Get(), BaseIndex++);
 	}
+	// Points of interest and wildlife (runtime PCG), after the base volumes exist so they keep clear of them.
+	USurvivalPointsOfInterestSubsystem::StartForMatch(this);
+	// Random events between waves (escorted supply convoys); binds to the phases and the wave director's rounds.
+	USurvivalEventSubsystem::StartForMatch(this);
 }
 
 void ASurvivalModeDirector::OnHQLanded(ANomadicVehicle* HQ)
@@ -668,6 +678,7 @@ void ASurvivalModeDirector::OnDefeat()
 	M_WaveDirector->StopWaves();
 	GetWorld()->GetTimerManager().ClearTimer(M_IntermissionTimerHandle);
 	M_IntermissionEndTime = -1.0;
+	M_IntermissionBaseEndTime = -1.0;
 	CloseRewardPicker();
 	const float PreviousBest = GetBestSurvivalSeconds();
 	const float Survived = GetElapsedSurvivalSeconds();
@@ -734,7 +745,11 @@ void ASurvivalModeDirector::DebugAutoStart()
 		RTSFunctionLibrary::ReportError(TEXT("ASurvivalModeDirector debug start: no start location."));
 		return;
 	}
-	ConfirmStartLocation(M_StartLocations[0].Get());
+	// Test runs pick the start with -SurvivalStartIndex=N.
+	int32 StartIndex = 0;
+	FParse::Value(FCommandLine::Get(), TEXT("SurvivalStartIndex="), StartIndex);
+	StartIndex = FMath::Clamp(StartIndex, 0, M_StartLocations.Num() - 1);
+	ConfirmStartLocation(M_StartLocations[StartIndex].Get());
 }
 
 TArray<FSurvivalArmyPick> ASurvivalModeDirector::BuildDebugArmy() const
@@ -818,6 +833,7 @@ void ASurvivalModeDirector::OnRoundSurvived(const int32 RoundNumber)
 		Rewards.MaxIntermissionSeconds);
 	M_IntermissionRound = RoundNumber;
 	M_IntermissionEndTime = GetWorld()->GetTimeSeconds() + Seconds;
+	M_IntermissionBaseEndTime = -1.0;
 	bM_HasChosenReward = false;
 	M_RewardOptions = FSurvivalRewardLibrary::BuildRewardOptions(Settings, GetPlayerFaction(), RoundNumber,
 	                                                             M_RewardRandom,
@@ -931,9 +947,49 @@ void ASurvivalModeDirector::OnIntermissionFinished()
 		ChooseReward(0);
 	}
 	M_IntermissionEndTime = -1.0;
+	M_IntermissionBaseEndTime = -1.0;
 	CloseRewardPicker();
 	if (M_Phase == ESurvivalPhase::Waves)
 	{
 		M_WaveDirector->StartNextRound();
 	}
+}
+
+bool ASurvivalModeDirector::ExtendIntermission(const float ExtraSeconds)
+{
+	if (not GetIsInIntermission() or ExtraSeconds <= 0.f)
+	{
+		return false;
+	}
+	if (M_IntermissionBaseEndTime < 0.0)
+	{
+		M_IntermissionBaseEndTime = M_IntermissionEndTime;
+	}
+	M_IntermissionEndTime = M_IntermissionBaseEndTime + ExtraSeconds;
+	RestartIntermissionTimer();
+	UE_LOG(LogTemp, Log, TEXT("Survival intermission extended by %.0f s for a random event."), ExtraSeconds);
+	return true;
+}
+
+void ASurvivalModeDirector::EndIntermissionExtension()
+{
+	if (not GetIsInIntermission() or M_IntermissionBaseEndTime < 0.0)
+	{
+		return;
+	}
+	// Never shorter than the intermission the player was promised, and a few seconds to read the outcome.
+	constexpr double MinSecondsLeftAfterExtension = 3.0;
+	M_IntermissionEndTime = FMath::Max(M_IntermissionBaseEndTime,
+	                                   GetWorld()->GetTimeSeconds() + MinSecondsLeftAfterExtension);
+	M_IntermissionBaseEndTime = -1.0;
+	RestartIntermissionTimer();
+	UE_LOG(LogTemp, Log, TEXT("Survival intermission extension ended, %.0f s left."), GetIntermissionSecondsRemaining());
+}
+
+void ASurvivalModeDirector::RestartIntermissionTimer()
+{
+	constexpr float MinTimerSeconds = 0.01f;
+	const float SecondsLeft = FMath::Max(MinTimerSeconds, GetIntermissionSecondsRemaining());
+	GetWorld()->GetTimerManager().SetTimer(M_IntermissionTimerHandle, this,
+	                                       &ASurvivalModeDirector::OnIntermissionFinished, SecondsLeft, false);
 }

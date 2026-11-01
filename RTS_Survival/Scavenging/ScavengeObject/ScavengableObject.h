@@ -92,6 +92,16 @@ public:
 
 	void SetIsScavengeEnabled(bool bEnabled);
 
+	/**
+	 * @brief Additive hook for cargo caches: replaces the rewards with fixed amounts and sets the scavenge time.
+	 * @param Rewards Fixed amount per resource; resources with 0 or less are left out.
+	 * @param NewScavengeTime Seconds to scavenge; 0 or less keeps the Blueprint's time.
+	 */
+	void SetFixedScavengeRewards(const TMap<ERTSResourceType, int32>& Rewards, const float NewScavengeTime);
+
+	/** @return The fixed reward of each resource (expected value for random amounts). */
+	TMap<ERTSResourceType, float> GetExpectedScavengeRewards() const;
+
 	inline bool GetShowOutline() const { return bShowScavengableObjectOutline; }
 
 	/** Provides scavenge positions for units */
