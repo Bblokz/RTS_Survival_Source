@@ -16,6 +16,7 @@
 #include "RTS_Survival/SurvivalMode/Core/SurvivalModeSave.h"
 #include "RTS_Survival/SurvivalMode/Data/SurvivalModeSettings.h"
 #include "RTS_Survival/SurvivalMode/Deployment/SurvivalDeploymentComponent.h"
+#include "RTS_Survival/SurvivalMode/Director/Tests/SurvivalLoadoutTest.h"
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseComponent.h"
 #include "RTS_Survival/SurvivalMode/PointsOfInterest/SurvivalPointsOfInterestSubsystem.h"
 #include "RTS_Survival/SurvivalMode/Events/SurvivalEventSubsystem.h"
@@ -85,10 +86,12 @@ void ASurvivalModeDirector::BeginPlay()
 		bDebugAutoStart = true;
 	}
 	FParse::Value(FCommandLine::Get(), TEXT("SurvivalGrace="), DebugGraceSecondsOverride);
-	if (FParse::Param(FCommandLine::Get(), TEXT("SurvivalDriveSetup")) and DebugGraceSecondsOverride >= 0.f)
+	if ((FParse::Param(FCommandLine::Get(), TEXT("SurvivalDriveSetup"))
+			or FParse::Param(FCommandLine::Get(), TEXT("SurvivalLoadoutTest"))) and DebugGraceSecondsOverride >= 0.f)
 	{
 		M_GraceSeconds = DebugGraceSecondsOverride;
 	}
+	FSurvivalLoadoutTest::StartIfRequested(this);
 	// Unattended test runs log RTS errors instead of stopping the game on a modal dialog per error.
 	if (bDebugAutoStart)
 	{
@@ -311,7 +314,7 @@ bool ASurvivalModeDirector::ConfirmArmy(const TArray<FSurvivalArmyPick>& Picks, 
 		OutReason = NSLOCTEXT("Survival", "NotInArmySelection", "The army can only be changed before deployment.");
 		return false;
 	}
-	if (not USurvivalArmyLibrary::GetIsArmyValid(Settings, Picks, OutReason))
+	if (not USurvivalArmyLibrary::GetIsArmyValid(Settings, GetPlayerFaction(), Picks, OutReason))
 	{
 		return false;
 	}
@@ -754,17 +757,20 @@ void ASurvivalModeDirector::DebugAutoStart()
 
 TArray<FSurvivalArmyPick> ASurvivalModeDirector::BuildDebugArmy() const
 {
-	TArray<FSurvivalArmyPick> Army;
+	// The HQ and the locked start units first, as the army selection builds them.
+	TArray<FSurvivalArmyPick> Army = USurvivalArmyLibrary::BuildLockedPicks(Settings, GetPlayerFaction());
 	const TArray<FSurvivalArmyEntry> Roster = USurvivalArmyLibrary::BuildArmyRoster(
 		Settings, GetPlayerFaction(), FindAsyncSpawner());
+	const int32 TotalSlotCount = USurvivalArmyLibrary::GetTotalSlotCount(Settings, GetPlayerFaction());
 	int32 SupplyLeft = Settings->Army.SupplyBudget;
 	for (const FSurvivalArmyEntry& Entry : Roster)
 	{
-		if (Army.Num() >= Settings->Army.SlotCount)
+		if (Army.Num() >= TotalSlotCount)
 		{
 			break;
 		}
-		if (not Entry.bIsHQ and (Entry.SupplyCost > SupplyLeft or Entry.Unit.UnitType == EAllUnitType::UNType_Nomadic))
+		if (Entry.bIsHQ or Entry.bIsLocked or Entry.SupplyCost > SupplyLeft
+			or Entry.Unit.UnitType == EAllUnitType::UNType_Nomadic)
 		{
 			continue;
 		}
@@ -772,10 +778,7 @@ TArray<FSurvivalArmyPick> ASurvivalModeDirector::BuildDebugArmy() const
 		Pick.SlotIndex = Army.Num();
 		Pick.Entry = Entry;
 		Army.Add(Pick);
-		if (not Entry.bIsHQ)
-		{
-			SupplyLeft -= Entry.SupplyCost;
-		}
+		SupplyLeft -= Entry.SupplyCost;
 	}
 	return Army;
 }
@@ -890,16 +893,23 @@ void ASurvivalModeDirector::CloseRewardPicker()
 
 void ASurvivalModeDirector::ChooseReward(const int32 OptionIndex)
 {
-	if (bM_HasChosenReward or not GetIsInIntermission() or not M_RewardOptions.IsValidIndex(OptionIndex))
+	// A pick not made in the intermission stays open into the wave (only without auto pick), so the open picker
+	// also counts.
+	const bool bCanPick = GetIsInIntermission() or IsValid(M_RewardPicker);
+	if (bM_HasChosenReward or not bCanPick or not M_RewardOptions.IsValidIndex(OptionIndex))
 	{
 		return;
 	}
 	bM_HasChosenReward = true;
-	if (IsValid(M_RewardPicker))
-	{
-		M_RewardPicker->ShowChosen(OptionIndex);
-	}
+	UE_LOG(LogTemp, Log, TEXT("Survival reward option %d chosen."), OptionIndex);
 	DeliverReward(M_RewardOptions[OptionIndex]);
+	// The choice is made: the picker goes away now, and the clicked card must not keep the keyboard focus.
+	const bool bHadPicker = IsValid(M_RewardPicker);
+	CloseRewardPicker();
+	if (bHadPicker and M_Phase == ESurvivalPhase::Waves)
+	{
+		SetSetupInputMode(nullptr, false);
+	}
 }
 
 void ASurvivalModeDirector::DeliverReward(const FSurvivalRewardOption& Option)
@@ -911,6 +921,7 @@ void ASurvivalModeDirector::DeliverReward(const FSurvivalRewardOption& Option)
 		Pick.SlotIndex = Picks.Num();
 		Pick.Entry = Entry;
 		Pick.Entry.bIsHQ = false;
+		Pick.Entry.bIsLocked = false;
 		Picks.Add(Pick);
 	}
 	if (Picks.IsEmpty())
@@ -942,13 +953,15 @@ void ASurvivalModeDirector::DeliverReward(const FSurvivalRewardOption& Option)
 
 void ASurvivalModeDirector::OnIntermissionFinished()
 {
+	// An unclaimed pick is auto-claimed (option 0) when the settings say so; ChooseReward then closes the picker.
+	// Without auto pick the picker stays open into the wave until the player chooses.
 	if (not bM_HasChosenReward and Settings->Rewards.bAutoPickWhenTimeRunsOut and not M_RewardOptions.IsEmpty())
 	{
+		UE_LOG(LogTemp, Log, TEXT("Survival intermission ended without a pick: auto-picking option 0."));
 		ChooseReward(0);
 	}
 	M_IntermissionEndTime = -1.0;
 	M_IntermissionBaseEndTime = -1.0;
-	CloseRewardPicker();
 	if (M_Phase == ESurvivalPhase::Waves)
 	{
 		M_WaveDirector->StartNextRound();

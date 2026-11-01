@@ -13,6 +13,8 @@ namespace SurvivalPOIComposerConstants
 	constexpr float CraterOverlapFactor = 0.7f;
 	constexpr float InsideSiteTolerance = 1.05f;
 	constexpr float FenceBreachChance = 0.08f;
+	// Largest footprint radius of a standing object, for picking the route segments a composition must test.
+	constexpr float MaxRouteFootprint = 1500.f;
 }
 
 /**
@@ -35,9 +37,12 @@ public:
 		M_Right = FVector2D(-M_Forward.Y, M_Forward.X);
 		// Odd sub layouts are mirrored across the story axis.
 		M_Mirror = Site.SubLayout % 2 == 1 ? -1.f : 1.f;
+		GatherNearRouteSegments();
 	}
 
 	void SetAnchorOnly(const bool bInAnchorOnly) { bM_AnchorOnly = bInAnchorOnly; }
+
+	void SetKeyObjectCount(FSurvivalPOIKeyObjectCount* InKeyObjects) { M_KeyObjects = InKeyObjects; }
 
 	void Compose()
 	{
@@ -77,6 +82,10 @@ private:
 	FRandomStream M_Random;
 	// A planning trial: only the objects that can block an anchor are placed.
 	bool bM_AnchorOnly = false;
+	// Counts scavengeables and capture targets tried and placed (planning tests), when set.
+	FSurvivalPOIKeyObjectCount* M_KeyObjects = nullptr;
+	// Route segments that pass near the site: standing objects keep the route's free width plus their footprint off them.
+	TArray<TPair<FVector2D, FVector2D>> M_NearRouteSegments;
 	FVector2D M_Forward = FVector2D(1.0, 0.0);
 	FVector2D M_Right = FVector2D(0.0, 1.0);
 	float M_Mirror = 1.f;
@@ -87,7 +96,60 @@ private:
 
 	FVector2D ToWorld(const FVector2D& Local) const
 	{
-		return FVector2D(M_Site.Center) + M_Forward * Local.X + M_Right * (Local.Y * M_Mirror);
+		return ToWorldAtScale(Local, M_Settings.Placement.CompositionScale);
+	}
+
+	FVector2D ToWorldAtScale(const FVector2D& Local, const float Scale) const
+	{
+		const FVector2D Scaled = Local * Scale;
+		return FVector2D(M_Site.Center) + M_Forward * Scaled.X + M_Right * (Scaled.Y * M_Mirror);
+	}
+
+	void GatherNearRouteSegments()
+	{
+		using namespace SurvivalPOIComposerConstants;
+		const FSurvivalPOILayoutExclusions& Layout = M_Settings.Placement.Layout;
+		const FVector2D Center(M_Site.Center);
+		const double Reach = M_Site.Radius * InsideSiteTolerance + Layout.RouteHalfWidth + MaxRouteFootprint;
+		for (const FSurvivalPOILayoutLine& Route : Layout.Routes)
+		{
+			for (int32 Index = 1; Index < Route.Points.Num(); ++Index)
+			{
+				const FVector2D Closest = FMath::ClosestPointOnSegment2D(Center, Route.Points[Index - 1], Route.Points[Index]);
+				if (FVector2D::Distance(Closest, Center) <= Reach)
+				{
+					M_NearRouteSegments.Emplace(Route.Points[Index - 1], Route.Points[Index]);
+				}
+			}
+		}
+	}
+
+	/** @return Whether a standing object of this radius at World keeps the free width of every route. */
+	bool GetIsClearOfRoutes(const FVector2D& World, const float Radius) const
+	{
+		const float Keep = M_Settings.Placement.Layout.RouteHalfWidth + Radius;
+		for (const TPair<FVector2D, FVector2D>& Segment : M_NearRouteSegments)
+		{
+			if (FVector2D::Distance(FMath::ClosestPointOnSegment2D(World, Segment.Key, Segment.Value), World) < Keep)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** @return +1 or -1: the local Y side on which the nearest route passes inside the site, or 0 when none does. */
+	float GetRouteSideLocal() const
+	{
+		FVector2D RoutePoint = FVector2D::ZeroVector;
+		FVector2D Tangent = FVector2D::ZeroVector;
+		double Distance = 0.0;
+		if (not M_Planner.GetNearestRoutePoint(FVector2D(M_Site.Center), RoutePoint, Tangent, Distance) or Distance > M_Site.Radius)
+		{
+			return 0.f;
+		}
+		const double Side = FVector2D::DotProduct(RoutePoint - FVector2D(M_Site.Center), M_Right) * M_Mirror;
+		return Side >= 0.0 ? 1.f : -1.f;
 	}
 
 	float ToWorldYaw(const float LocalYaw) const
@@ -154,16 +216,17 @@ private:
 		if (Asset.HalfExtent.X > 0.f and Asset.HalfExtent.Y > 0.f)
 		{
 			// Long objects test the same row of circles they will occupy.
+			const float CircleRadius = FMath::Min(Asset.HalfExtent.X, Asset.HalfExtent.Y);
 			for (const FVector2D& Centre : GetRowCircles(World, WorldYaw, Asset.HalfExtent))
 			{
-				if (not M_Solid.IsFree(Centre, FMath::Min(Asset.HalfExtent.X, Asset.HalfExtent.Y), SolidClearance))
+				if (not M_Solid.IsFree(Centre, CircleRadius, SolidClearance) or not GetIsClearOfRoutes(Centre, CircleRadius))
 				{
 					return false;
 				}
 			}
 			return true;
 		}
-		return M_Solid.IsFree(World, Asset.FootprintRadius, SolidClearance);
+		return M_Solid.IsFree(World, Asset.FootprintRadius, SolidClearance) and GetIsClearOfRoutes(World, Asset.FootprintRadius);
 	}
 
 	bool GetIsGroundFit(const FVector2D& World, const FSurvivalPOIAsset& Asset, float& OutHeight) const
@@ -194,11 +257,22 @@ private:
 		{
 			return {};
 		}
-		for (int32 Attempt = 0; Attempt < PlaceAttempts; ++Attempt)
+		// Unit-sized objects keep their size while the layout shrinks: a hero, capture target or scavengeable that finds no
+		// spot at the shrunk layout tries its original spacing before it is given up; filler is simply dropped.
+		const bool bKeyObject = Role == ESurvivalPOIRole::Hero or Role == ESurvivalPOIRole::Capture or Role == ESurvivalPOIRole::Scavenge;
+		const bool bCounted = M_KeyObjects != nullptr and (Role == ESurvivalPOIRole::Capture or Role == ESurvivalPOIRole::Scavenge);
+		if (bCounted)
 		{
+			++M_KeyObjects->Attempted;
+		}
+		const int32 TotalAttempts = bKeyObject and M_Settings.Placement.CompositionScale < 1.f ? 2 * PlaceAttempts : PlaceAttempts;
+		for (int32 TryIndex = 0; TryIndex < TotalAttempts; ++TryIndex)
+		{
+			const int32 Attempt = TryIndex % PlaceAttempts;
+			const float Scale = TryIndex < PlaceAttempts ? M_Settings.Placement.CompositionScale : 1.f;
 			const float Spread = Jitter * Attempt / static_cast<float>(PlaceAttempts - 1);
 			const FVector2D TryLocal = Local + FVector2D(Range(-Spread, Spread), Range(-Spread, Spread));
-			const FVector2D World = ToWorld(TryLocal);
+			const FVector2D World = ToWorldAtScale(TryLocal, Scale);
 			float Height = 0.f;
 			const float WorldYaw = FRotator::NormalizeAxis(ToWorldYaw(LocalYaw) + Asset->YawOffsetDegrees);
 			if (not GetIsSpotFree(World, *Asset, Role, WorldYaw) or not GetIsGroundFit(World, *Asset, Height))
@@ -214,6 +288,10 @@ private:
 			Object.Scale = ScaleOverride > 0.f ? ScaleOverride : Range(Asset->ScaleRange.X, Asset->ScaleRange.Y);
 			Object.SinkCm = SinkCm;
 			M_LastFootprint = Asset->FootprintRadius;
+			if (bCounted)
+			{
+				++M_KeyObjects->Placed;
+			}
 			const bool bIsFlat = Role == ESurvivalPOIRole::Decal or Role == ESurvivalPOIRole::Crater;
 			if (not bIsFlat and Asset->HalfExtent.X > 0.f and Asset->HalfExtent.Y > 0.f)
 			{
@@ -255,7 +333,8 @@ private:
 	FVector2D ToLocal(const FVector2D& World) const
 	{
 		const FVector2D Offset = World - FVector2D(M_Site.Center);
-		return FVector2D(FVector2D::DotProduct(Offset, M_Forward), FVector2D::DotProduct(Offset, M_Right) * M_Mirror);
+		const double Scale = FMath::Max(UE_KINDA_SMALL_NUMBER, static_cast<double>(M_Settings.Placement.CompositionScale));
+		return FVector2D(FVector2D::DotProduct(Offset, M_Forward), FVector2D::DotProduct(Offset, M_Right) * M_Mirror) / Scale;
 	}
 
 	void ScatterCraters(const int32 Count, const FVector2D& LocalMin, const FVector2D& LocalMax, const float SmallShare)
@@ -431,7 +510,13 @@ private:
 	void ComposeConvoy()
 	{
 		const int32 VehicleCount = M_Site.SubLayout == 2 ? 6 : 5;
-		const float AmbushSide = M_Random.FRand() < 0.5f ? 1.f : -1.f;
+		float AmbushSide = M_Random.FRand() < 0.5f ? 1.f : -1.f;
+		// Along a route the column was hit from the road: craters pock the verge, pushed wrecks and cargo lie off the road.
+		const float RouteSide = GetRouteSideLocal();
+		if (RouteSide != 0.f)
+		{
+			AmbushSide = RouteSide;
+		}
 		float X = -3500.f;
 		TArray<int32> Pushed = {M_Random.RandRange(1, VehicleCount - 2)};
 		if (M_Random.FRand() < 0.5f)
@@ -578,9 +663,11 @@ private:
 	}
 };
 
-void FSurvivalPOIPlanner::ComposeSite(const FSurvivalPOISite& Site, TArray<FSurvivalPOIPlacedObject>& OutObjects, const bool bAnchorOnly) const
+void FSurvivalPOIPlanner::ComposeSite(const FSurvivalPOISite& Site, TArray<FSurvivalPOIPlacedObject>& OutObjects, const bool bAnchorOnly,
+                                      FSurvivalPOIKeyObjectCount* OutKeyObjects) const
 {
 	FSurvivalPOIComposer Composer(*this, Site, OutObjects);
 	Composer.SetAnchorOnly(bAnchorOnly);
+	Composer.SetKeyObjectCount(OutKeyObjects);
 	Composer.Compose();
 }

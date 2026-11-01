@@ -129,12 +129,34 @@ namespace SovietBasePreviewConstants
 	constexpr double NavProjectExtent = 900.0;
 	constexpr double NavProjectExtentZ = 1200.0;
 	constexpr double PathStartMargin = 7000.0;
+	// Path tests start this far outside the main gate, on its approach road.
+	constexpr double PathStartBeyondGate = 2500.0;
 	constexpr int32 NavAgentCount = 4;
 	constexpr float NavAgentRadii[NavAgentCount] = {35.f, 120.f, 160.f, 200.f};
 	constexpr float NavAgentHeights[NavAgentCount] = {144.f, 180.f, 250.f, 300.f};
 	const TCHAR* const NavAgentNames[NavAgentCount] = {
 		TEXT("Character"), TEXT("LightTank"), TEXT("MediumTank"), TEXT("HeavyTank")
 	};
+}
+
+/** @return Every planned structure's class, role and position plus the base's radius and fallbacks (footprint measurements, round 3). */
+static FString SovietPreview_BuildExtentJson(const USurvivalSovietBaseComponent& SovietBases, const FSurvivalSovietBaseState& Base,
+                                             const FString& Label)
+{
+	TArray<FString> Rows;
+	for (const FSurvivalSovietPlannedStructure& Structure : Base.Plan.Structures)
+	{
+		Rows.Add(FString::Printf(TEXT("[\"%s\",%d,%.0f,%.0f,%.3f,%.3f]"), *SovietBases.GetClassNameForPreview(Structure.ClassIndex),
+		                         static_cast<int32>(Structure.Role), Structure.Position.X, Structure.Position.Y, Structure.StretchXY.X,
+		                         Structure.StretchXY.Y));
+	}
+	const float Radius = Base.StartLocation.IsValid() ? SovietBases.GetBaseBuildRadius(*Base.StartLocation) : 0.f;
+	const float StartRadius = Base.StartLocation.IsValid() ? Base.StartLocation->GetBuildAreaRadius() : 0.f;
+	return FString::Printf(
+		TEXT("{\"label\":\"%s\",\"center\":[%.0f,%.0f],\"build_radius\":%.0f,\"start_location_radius\":%.0f,\"dropped_slots\":%d,")
+		TEXT("\"open_wall_slots\":%d,\"rule_violations\":%d,\"structures\":[%s]}"),
+		*Label, Base.Center.X, Base.Center.Y, Radius, StartRadius, Base.Plan.DroppedSlots.Num(), Base.Plan.OpenWallSlots.Num(),
+		Base.Plan.RuleViolations.Num(), *FString::Join(Rows, TEXT(",")));
 }
 
 /** @brief The tool's state machine; kept alive by its own timer lambda until it asks the process to exit. */
@@ -191,7 +213,12 @@ private:
 		int32 Seed = 0;
 		int32 Strength = 0;
 		ERTSGameDifficulty Difficulty = ERTSGameDifficulty::Normal;
+		// Test only: the build radius this base is generated with (0 keeps the start location's own). Measures how small a
+		// build area each archetype tolerates without touching the map or the settings.
+		float BuildRadius = 0.f;
 	};
+	// The start locations' own build radii, restored after every batch that overrode them.
+	TMap<TWeakObjectPtr<ASurvivalStartLocation>, float> M_OriginalBuildRadii;
 
 	TWeakObjectPtr<ASurvivalModeDirector> M_Director;
 	TWeakObjectPtr<USurvivalSovietBaseComponent> M_SovietBases;
@@ -243,6 +270,8 @@ private:
 	bool CreateCaptureRig();
 
 	void StartBatch();
+	void SetPreviewBuildRadius(ASurvivalStartLocation& Location, float Radius);
+	void WriteExtentJson(const FSurvivalSovietBaseState& Base, const FPreviewEntry& Entry) const;
 	bool GetAreActiveBasesReady() const;
 	bool GetIsNavigationIdle() const;
 	void QueueBaseShots();
@@ -365,6 +394,8 @@ bool FSovietBasePreviewRunner::LoadPreviewEntries(const FString& SpecPath)
 		Entry.Strength = FCString::Atoi(*Words[3]);
 		Entry.Difficulty = static_cast<ERTSGameDifficulty>(FCString::Atoi(*Words[4]));
 		Entry.DistanceRank = Words.Num() > RequiredWords ? FCString::Atoi(*Words[RequiredWords]) : 0;
+		constexpr int32 RadiusWord = RequiredWords + 1;
+		Entry.BuildRadius = Words.Num() > RadiusWord ? FCString::Atof(*Words[RadiusWord]) : 0.f;
 	}
 	return not M_Entries.IsEmpty();
 }
@@ -551,6 +582,23 @@ void FSovietBasePreviewRunner::Finish()
 // Bases
 // ---------------------------------------------------------------------------
 
+void FSovietBasePreviewRunner::SetPreviewBuildRadius(ASurvivalStartLocation& Location, const float Radius)
+{
+	// BuildAreaRadius is a protected map property; the test sets it through reflection and restores it per batch.
+	FFloatProperty* const Property = FindFProperty<FFloatProperty>(ASurvivalStartLocation::StaticClass(), TEXT("BuildAreaRadius"));
+	if (Property == nullptr)
+	{
+		return;
+	}
+	float* const Value = Property->ContainerPtrToValuePtr<float>(&Location);
+	if (not M_OriginalBuildRadii.Contains(&Location))
+	{
+		M_OriginalBuildRadii.Add(&Location, *Value);
+	}
+	*Value = Radius > 0.f ? Radius : M_OriginalBuildRadii.FindRef(&Location);
+	UE_LOG(LogSovietBasePreview, Display, TEXT("SOVIET_PREVIEW build radius %.0f at %s"), *Value, *Location.GetName());
+}
+
 void FSovietBasePreviewRunner::StartBatch()
 {
 	const TArray<TWeakObjectPtr<ASurvivalStartLocation>>& Locations = M_Director->GetStartLocations();
@@ -579,6 +627,7 @@ void FSovietBasePreviewRunner::StartBatch()
 		Request.Difficulty = Entry.Difficulty;
 		Request.ThreatLocation = ThreatLocation;
 		Request.DistanceRank = Entry.DistanceRank;
+		SetPreviewBuildRadius(*Location, Entry.BuildRadius);
 		M_SovietBases->GenerateBaseForPreview(Location, M_ActiveEntries.Num(), Request);
 		M_ActiveEntries.Add(Entry);
 	}
@@ -697,7 +746,7 @@ void FSovietBasePreviewRunner::ReportClusters()
 		for (const FEnemyBasePointCoreBuildings& Point : Result.BasePoints)
 		{
 			const bool bThisBase = FVector::Dist2D(Point.BaseLocation, Bases[BaseIndex].Center)
-				<= Bases[BaseIndex].StartLocation->GetBuildAreaRadius();
+				<= M_SovietBases->GetBaseBuildRadius(*Bases[BaseIndex].StartLocation);
 			Core += bThisBase ? Point.CoreBuildingLocations.Num() : 0;
 		}
 		UE_LOG(LogSovietBasePreview, Display,
@@ -880,7 +929,7 @@ bool FSovietBasePreviewRunner::RunShots()
 void FSovietBasePreviewRunner::QueueTopShot(const FSurvivalSovietBaseState& Base, const FString& Label)
 {
 	using namespace SovietBasePreviewConstants;
-	const double ViewWidth = 2.0 * (Base.StartLocation->GetBuildAreaRadius() + TopViewMargin);
+	const double ViewWidth = 2.0 * (M_SovietBases->GetBaseBuildRadius(*Base.StartLocation) + TopViewMargin);
 	const double Height = ViewWidth * 0.5 / FMath::Tan(FMath::DegreesToRadians(TopFieldOfView * 0.5));
 	FCaptureShot& Shot = M_Shots.AddDefaulted_GetRef();
 	Shot.Location = Base.Center + FVector(0.0, 0.0, Height);
@@ -896,7 +945,7 @@ void FSovietBasePreviewRunner::QueueObliqueShot(
 	const FVector& ThreatLocation)
 {
 	using namespace SovietBasePreviewConstants;
-	const double Distance = Base.StartLocation->GetBuildAreaRadius() * ObliqueDistanceFactor;
+	const double Distance = M_SovietBases->GetBaseBuildRadius(*Base.StartLocation) * ObliqueDistanceFactor;
 	const double PitchRadians = FMath::DegreesToRadians(ObliquePitchDegrees);
 	// Seen from the player's side, like an attacker looks at it.
 	const FVector Toward = (ThreatLocation - Base.Center).GetSafeNormal2D();
@@ -1357,6 +1406,13 @@ void FSovietBasePreviewRunner::WritePlanJson(const FSurvivalSovietBaseState& Bas
 {
 	const FString Json = M_SovietBases->BuildSpawnManifestJson(Base, Entry.Label);
 	FFileHelper::SaveStringToFile(Json, *(M_Directory / (Entry.Label + TEXT("_manifest.json"))));
+	WriteExtentJson(Base, Entry);
+}
+
+void FSovietBasePreviewRunner::WriteExtentJson(const FSurvivalSovietBaseState& Base, const FPreviewEntry& Entry) const
+{
+	FFileHelper::SaveStringToFile(SovietPreview_BuildExtentJson(*M_SovietBases, Base, Entry.Label),
+	                              *(M_Directory / (Entry.Label + TEXT("_extent.json"))));
 }
 
 void FSovietBasePreviewRunner::ReportCounts(const FSurvivalSovietBaseState& Base, const FPreviewEntry& Entry)
@@ -1380,9 +1436,10 @@ void FSovietBasePreviewRunner::ReportCounts(const FSurvivalSovietBaseState& Base
 		and Base.TrackedStructuresTotal > 0;
 	M_TotalProblems += bMatches ? 0 : 1;
 	UE_LOG(LogSovietBasePreview, Display,
-	       TEXT("SOVIET_PREVIEW counts %s: structures %d/%d, units %d/%d, production %d, tracked %d, %s"),
+	       TEXT("SOVIET_PREVIEW counts %s: structures %d/%d, units %d/%d, production %d, tracked %d, dressed pads %d, dressing instances %d, %s"),
 	       *Entry.Label, AliveStructures, Base.Plan.Structures.Num(), AliveUnits, PlannedUnits,
-	       Base.Plan.ProductionCount, Base.TrackedStructuresTotal, bMatches ? TEXT("OK") : TEXT("MISMATCH"));
+	       Base.Plan.ProductionCount, Base.TrackedStructuresTotal, Base.DressedPads, Base.DressingInstances,
+	       bMatches ? TEXT("OK") : TEXT("MISMATCH"));
 }
 
 bool FSovietBasePreviewRunner::TestPath(const int32 AgentIndex, const FVector& From, const FVector& To) const
@@ -1433,8 +1490,16 @@ void FSovietBasePreviewRunner::ReportPaths(
 {
 	using namespace SovietBasePreviewConstants;
 	TArray<FVector> Targets = M_SovietBases->GetPathTestPointsForPreview(Base);
-	const double OutsideDistance = Base.StartLocation->GetBuildAreaRadius() + PathStartMargin;
-	const FVector Outside = Base.Center + (ThreatLocation - Base.Center).GetSafeNormal2D() * OutsideDistance;
+	// From outside the main gate, on its own approach: a fixed distance toward the threat landed in the oasis on the shrunk
+	// map (Red Mesa, round 3), where nothing projects to the navmesh.
+	FVector Outside = Base.Center + (ThreatLocation - Base.Center).GetSafeNormal2D()
+		* (M_SovietBases->GetBaseBuildRadius(*Base.StartLocation) + PathStartMargin);
+	if (not Base.Plan.Gates.IsEmpty())
+	{
+		const FSurvivalSovietPlannedGate& Gate = Base.Plan.Gates[0];
+		Outside = FVector(Gate.Center + Gate.Outward * PathStartBeyondGate, Base.Center.Z);
+	}
+	UE_LOG(LogSovietBasePreview, Display, TEXT("SOVIET_PREVIEW path start for %s: %s"), *Entry.Label, *Outside.ToCompactString());
 	for (int32 AgentIndex = 0; AgentIndex < NavAgentCount; ++AgentIndex)
 	{
 		int32 Reached = 0;
@@ -1769,6 +1834,9 @@ private:
 				Standing += Structure.IsValid() ? 1 : 0;
 			}
 			const FString Label = FString::Printf(TEXT("real_base%d"), Base.BaseIndex);
+			UE_LOG(LogSovietBasePreview, Display, TEXT("SOVIET_WATCH base %d build radius %.0f (start location actor says %.0f), foundation dressing on %d pads, %d mesh instances"),
+			       Base.BaseIndex, Base.StartLocation.IsValid() ? M_SovietBases->GetBaseBuildRadius(*Base.StartLocation) : 0.f,
+			       Base.StartLocation.IsValid() ? Base.StartLocation->GetBuildAreaRadius() : 0.f, Base.DressedPads, Base.DressingInstances);
 			UE_LOG(LogSovietBasePreview, Display,
 			       TEXT("SOVIET_WATCH base %d at %s: preset index %d, seed %d, strength %d, rank %d, structures %d planned / %d standing, rule violations %d, stood %.1f s after the start press, manifest %s"),
 			       Base.BaseIndex, *GetNameSafe(Base.StartLocation.Get()), Base.PresetIndex, Base.Seed, Base.Strength,
@@ -1778,6 +1846,8 @@ private:
 			{
 				FFileHelper::SaveStringToFile(M_SovietBases->BuildSpawnManifestJson(Base, Label),
 				                              *(Directory / (Label + TEXT("_manifest.json"))));
+				FFileHelper::SaveStringToFile(SovietPreview_BuildExtentJson(*M_SovietBases, Base, Label),
+				                              *(Directory / (Label + TEXT("_extent.json"))));
 			}
 		}
 		if (bWriteManifests)

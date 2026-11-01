@@ -8,7 +8,7 @@
 namespace SurvivalConvoyRoutePlannerConstants
 {
 	constexpr float EvaluationSpacing = 400.f;
-	constexpr float StraightLineSpacing = 4000.f;
+	constexpr float StraightLineSpacing = 2300.f;  // round 8: x0.577 with the map scale-down
 	// Via points are tried at these bearings around the direction from the base to the entry-exit line.
 	const float ViaBearingsDegrees[] = {0.f, -20.f, 20.f, -40.f, 40.f};
 	const float ViaDistanceFactors[] = {1.f, 0.9f, 1.15f};
@@ -16,7 +16,7 @@ namespace SurvivalConvoyRoutePlannerConstants
 	constexpr float ScoreLengthOverBudgetWeightPerCm = 1.f / 3000.f;
 	constexpr float ScoreRandomJitter = 1.5f;
 	// The first and last stretch of the route are at the entry and exit; the spawn-zone rule skips them.
-	constexpr float EndpointStretchSkipped = 6000.f;
+	constexpr float EndpointStretchSkipped = 3460.f;  // round 8: x0.577
 }
 
 TArray<FVector> FSurvivalConvoyRoutePlanner::Densify(const TArray<FVector>& ControlPoints, const float Spacing)

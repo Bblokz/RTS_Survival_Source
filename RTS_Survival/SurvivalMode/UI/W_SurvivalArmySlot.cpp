@@ -223,6 +223,12 @@ void UW_SurvivalArmySlot::SetSlotContent(const FSurvivalRosterItem* Item, const 
 	M_VariantBadge->SetVisibility(bHasVariant ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	M_EmptyText->SetVisibility(bM_IsFilled ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 	M_HqText->SetVisibility(bM_IsLocked ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+	if (bM_IsLocked)
+	{
+		M_HqText->SetText(Item->Entry.bIsHQ
+			                  ? NSLOCTEXT("SurvivalArmySelection", "HqLocked", "HQ")
+			                  : NSLOCTEXT("SurvivalArmySelection", "StartUnitLocked", "FIXED"));
+	}
 	SetToolTipText(bM_IsFilled ? Item->Tooltip : FText::GetEmpty());
 	if (bM_IsFilled)
 	{

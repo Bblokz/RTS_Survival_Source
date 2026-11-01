@@ -17,7 +17,10 @@ actors along the map edges. Nothing level-specific lives in C++.
    (training layout of `URTSGameInstance::GetPlayerFaction()`), each shown as its selected variant (profile
    `M_UnitVariantSelections` + `UUnitVariantDataAsset`), with a supply cost. The player drags units into a fixed
    number of slots (`USurvivalModeSettings::Army.SlotCount`, any count, grid wraps). Slot 0 is always the HQ
-   (locked). Total supply ≤ `Army.SupplyBudget`.
+   (locked), followed by the locked start units (default 6 harvesters + 2 scavenger squads, extra slots, no
+   supply). Total supply ≤ `Army.SupplyBudget`. The reward picker between waves closes as soon as a set is
+   chosen; an unclaimed pick is auto-claimed (option 0) when the intermission ends (`Rewards.bAutoPickWhenTimeRunsOut`),
+   otherwise it stays open into the wave.
 3. `StartLocationSelection` — the player cycles/clicks the `ASurvivalStartLocation`s and confirms one.
 4. `Deploying` — the director calls `ACPPController::StartGameAtLocation(loc, /*bDoNotLoadPlayerProfileUnits*/true)`
    (applies techs/resource cards/variants, spawns nothing), then `USurvivalDeploymentComponent` flies the army in:

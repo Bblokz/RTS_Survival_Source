@@ -333,27 +333,14 @@ void UW_SurvivalRewardPicker::RefreshTimer()
 	{
 		return;
 	}
-	const FText Clock = SurvivalArmyUi::FormatClock(M_Director->GetIntermissionSecondsRemaining());
-	M_TimerText->SetText(bM_HasChosen
-		                     ? FText::Format(NSLOCTEXT("SurvivalReward", "Inbound", "REINFORCEMENTS INBOUND  -  NEXT WAVE IN {0}"),
-		                                     Clock)
-		                     : FText::Format(NSLOCTEXT("SurvivalReward", "Timer", "NEXT WAVE IN {0}"), Clock));
-}
-
-void UW_SurvivalRewardPicker::ShowChosen(const int32 OptionIndex)
-{
-	bM_HasChosen = true;
-	for (int32 Index = 0; Index < M_CardButtons.Num(); ++Index)
+	// Without auto pick an unclaimed choice stays open into the wave.
+	if (not M_Director->GetIsInIntermission())
 	{
-		if (not IsValid(M_CardButtons[Index]))
-		{
-			continue;
-		}
-		// The chosen card stays bright (OnCardClicked ignores further clicks); the others fade and lock.
-		M_CardButtons[Index]->SetIsEnabled(Index == OptionIndex);
-		M_CardButtons[Index]->SetRenderOpacity(Index == OptionIndex ? 1.f : 0.35f);
+		M_TimerText->SetText(NSLOCTEXT("SurvivalReward", "WaveRunning", "WAVE IN PROGRESS  -  PICK ANY TIME"));
+		return;
 	}
-	RefreshTimer();
+	const FText Clock = SurvivalArmyUi::FormatClock(M_Director->GetIntermissionSecondsRemaining());
+	M_TimerText->SetText(FText::Format(NSLOCTEXT("SurvivalReward", "Timer", "NEXT WAVE IN {0}"), Clock));
 }
 
 void UW_SurvivalRewardPicker::OnCardClicked(const int32 OptionIndex)
@@ -362,7 +349,29 @@ void UW_SurvivalRewardPicker::OnCardClicked(const int32 OptionIndex)
 	{
 		return;
 	}
+	bM_HasChosen = true;
+	for (UButton* const CardButton : M_CardButtons)
+	{
+		if (IsValid(CardButton))
+		{
+			CardButton->SetIsEnabled(false);
+		}
+	}
+	// Delivers the set and removes this widget.
 	M_Director->ChooseReward(OptionIndex);
+	if (M_Director->GetHasChosenReward())
+	{
+		return;
+	}
+	// Refused (should not happen while this picker is shown): keep the choice open.
+	bM_HasChosen = false;
+	for (UButton* const CardButton : M_CardButtons)
+	{
+		if (IsValid(CardButton))
+		{
+			CardButton->SetIsEnabled(true);
+		}
+	}
 }
 
 void UW_SurvivalRewardPicker::OnCard0Clicked() { OnCardClicked(0); }

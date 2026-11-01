@@ -16,14 +16,11 @@ LAYOUT_RELATIVE = 'Source/RTS_Survival/SurvivalMode/Docs/LevelTools/SM_Desert_01
 ASSET_PATH = '/Game/RTS_Survival/SurvivalMode/PointsOfInterest/DA_SurvivalPointsOfInterest'
 # Pads a POI may stand on: the salt pan is the crash site's natural ground.
 PAD_NAMES_ALLOWED = ('salt',)
-BASIN_CLEARANCE = 3000.0
+BASIN_CLEARANCE = 1750.0
 # Power line pylons: points of interest keep this far (plus their own radius) from every pole.
 POLE_CLEARANCE = 1500.0
-# Routes: POI actors keep this far off a route's line (2 500 cm of the route stay free); circles every ROUTE_STEP along it.
-# The planner adds the whole site radius to an obstacle's clearance; objects stand inside about 0.75 of it, so the route
-# circles carry a negative clearance: the site keeps (radius - 900) off the line.
-ROUTE_CLEARANCE = -900.0
-ROUTE_STEP = 600.0
+# Routes are copied as lines (Layout.Routes): sites keep (radius + RouteSiteClearance, -900) off them, standing objects keep
+# RouteHalfWidth (1 250, rubric B.3: 2 500 free) plus their footprint off them, and the dead convoy may lie along one.
 
 
 def vec2(point):
@@ -69,18 +66,11 @@ def sync(asset=None, layout_relative=LAYOUT_RELATIVE):
                 continue
             areas.append(make_area(f"{world['name']}/{pad['name']}", pad['outline'], 0.0))
         for basin in world.get('basins', []):
-            areas.append(make_area(f"{world['name']}/{basin['name']}", basin['outline'], BASIN_CLEARANCE))
+            # Round 9 resized the oasis to 75%: its own top-level block holds the current outline.
+            outline = layout['oasis']['outline'] if basin['name'] == 'oasis' and 'oasis' in layout else basin['outline']
+            areas.append(make_area(f"{world['name']}/{basin['name']}", outline, BASIN_CLEARANCE))
     obstacles = []
-    # Routes (the layout's `routes` polylines): a chain of circles along each, so a site keeps its radius + ROUTE_CLEARANCE off the
-    # line and its objects stay about 1 300 or more off it (rubric B.3: 2 500 free); poi_post.py checks the actors.
-    for name, line in (layout.get('routes') or {}).items():
-        for (ax, ay), (bx, by) in zip(line, line[1:]):
-            steps = max(1, int(math.ceil(math.hypot(bx - ax, by - ay) / ROUTE_STEP)))
-            for step in range(steps):
-                t = step / steps
-                obstacles.append(unreal.Vector(float(ax + (bx - ax) * t), float(ay + (by - ay) * t), ROUTE_CLEARANCE))
-        if line:
-            obstacles.append(unreal.Vector(float(line[-1][0]), float(line[-1][1]), ROUTE_CLEARANCE))
+    routes = [make_line(name, line, line[-1]) for name, line in (layout.get('routes') or {}).items() if len(line) >= 2]
     for line in layout.get('power_lines', []):
         for pole in line.get('poles', []):
             obstacles.append(unreal.Vector(float(pole['x']), float(pole['y']), POLE_CLEARANCE))
@@ -93,9 +83,10 @@ def sync(asset=None, layout_relative=LAYOUT_RELATIVE):
     exclusions.set_editor_property('ramps', ramps)
     exclusions.set_editor_property('areas', areas)
     exclusions.set_editor_property('obstacles', obstacles)
+    exclusions.set_editor_property('routes', routes)
     placement.set_editor_property('layout', exclusions)
     asset.set_editor_property('placement', placement)
-    print(f'POI_LAYOUT synced {len(ramps)} ramps, {len(areas)} areas, {len(obstacles)} obstacles, md5 {md5}')
+    print(f'POI_LAYOUT synced {len(ramps)} ramps, {len(areas)} areas, {len(obstacles)} obstacles, {len(routes)} routes, md5 {md5}')
     return asset
 
 

@@ -37,7 +37,10 @@ FSovietMasterPlan BuildSovietMasterPlan(
 	const TArray<FVector2D>& DefensePointsLocal)
 {
 	FSovietMasterPlan Plan;
-	const FSovietPlanPen Pen{Plan, Random, FMath::Clamp(Strength, 0, SovietBaseArchetypeConstants::MaxPlanStrength), SizeFill};
+	// World cm per plan unit, read from the plan-to-world transform (it carries the build radius).
+	constexpr double UnitProbe = 1000.0;
+	const double Unit = ToWorld ? FVector2D::Distance(ToWorld(FVector2D(UnitProbe, 0.0)), ToWorld(FVector2D::ZeroVector)) / UnitProbe : 1.0;
+	const FSovietPlanPen Pen{Plan, Random, FMath::Clamp(Strength, 0, SovietBaseArchetypeConstants::MaxPlanStrength), SizeFill, Unit};
 	switch (Archetype)
 	{
 	case ESurvivalSovietBaseArchetype::Cantonment:

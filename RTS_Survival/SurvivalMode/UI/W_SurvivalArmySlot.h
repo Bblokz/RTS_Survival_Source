@@ -43,7 +43,7 @@ public:
 	/**
 	 * @brief Call once right after creating the slot.
 	 * @param Owner Receives drops, drags and remove requests; null for a drag visual.
-	 * @param SlotIndex Index in the army; 0 is the locked HQ slot.
+	 * @param SlotIndex Index in the army; 0 is the locked HQ slot, the locked start units follow.
 	 * @param StyleAsset Brushes, fonts and colours; kept alive by the owner.
 	 */
 	void SetupSlot(UW_SurvivalArmySelection* Owner, const int32 SlotIndex, const USurvivalUiStyleAsset* StyleAsset);
@@ -51,7 +51,7 @@ public:
 	/**
 	 * @brief Shows a unit or the empty look.
 	 * @param Item The unit in the slot; null for an empty slot.
-	 * @param bIsLocked True for the HQ slot: no drag, no remove, locked look.
+	 * @param bIsLocked True for the HQ and locked start unit slots: no drag, no remove, locked look and tag.
 	 */
 	void SetSlotContent(const FSurvivalRosterItem* Item, const bool bIsLocked);
 

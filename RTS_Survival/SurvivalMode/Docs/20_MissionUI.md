@@ -6,7 +6,10 @@ this doc, `Docs/ui_specs/`, `Docs/supply_costs.json`.
 Three screens, all in the Frontstahl look of the unit variant menu and the faction unit browser:
 
 1. **Army selection** (`UW_SurvivalArmySelection`, phase `ArmySelection`): drag faction units, each shown as the
-   variant the player picked, into a fixed number of slots within a supply budget. Slot 0 is the locked HQ.
+   variant the player picked, into a fixed number of slots within a supply budget. Slot 0 is the locked HQ; the
+   locked start units follow it (`Army.LockedStartUnitsPerFaction`, else `Army.DefaultLockedStartUnits`: 6 Pz I
+   harvesters and 2 scavenger squads). Locked slots are tagged HQ / FIXED, cost no supply, cannot be removed,
+   dragged, replaced or cleared, and come on top of `Army.SlotCount` (the player keeps `SlotCount - 1` free slots).
 2. **Start location picker** (`UW_SurvivalStartLocationPicker`, phase `StartLocationSelection`): cycle the start
    locations (the camera follows) and confirm one.
 3. **Survival HUD** (`UW_SurvivalHud`, from `Deploying` on): grace countdown, survival clock, wave counter,
@@ -61,16 +64,16 @@ Interaction:
   writes the reason in the feedback line in the warning colour, and it clears after 3 s:
   - "Not enough supply: {unit} costs {n}, {m} left."
   - "Your army can hold at most {n} x {unit}."
-  - "The first slot always holds your HQ."
+  - "The first slots always hold your HQ and start units."
   - "All {n} slots are full."
 - **Roster state**: entries that cannot be added right now (over budget, at max copies, no free slot) are dimmed to
   45% but stay draggable, so a drop still explains why. Each entry shows "IN ARMY n" or "IN ARMY n / max".
 - **Supply bar**: shows used / budget. The text and bar fill switch to the warning colour at 100%.
-- **Confirm** (button, Enter or gamepad Start) builds `TArray<FSurvivalArmyPick>` (HQ at slot 0 plus one pick per
-  filled slot, keeping slot indices) and calls `Director->ConfirmArmy(Picks, OutReason)`. When it returns false,
+- **Confirm** (button, Enter or gamepad Start) builds `TArray<FSurvivalArmyPick>` (the locked entries in slots
+  0..N-1, HQ first, plus one pick per filled slot, keeping slot indices) and calls `Director->ConfirmArmy(Picks, OutReason)`. When it returns false,
   OutReason goes in the feedback line. When it returns true, the button disables until the director removes the
   widget.
-- **Clear** (button, Delete or Backspace) empties every slot except the HQ.
+- **Clear** (button, Delete or Backspace) empties every slot except the locked ones.
 - **Tabs**: ALL / INFANTRY (Squad) / VEHICLES (Tank, Harvester) / TRUCKS (Nomadic) / AIRCRAFT. A tab whose category
   has no units is not created. The roster is sorted by category, then by supply, cheapest first.
 - **Tooltip** on entries and slots: name, [variant], variant description, a stat line and "Supply n (max m)". The

@@ -30,7 +30,8 @@ struct FSurvivalUiStyle;
 
 /**
  * @brief Start army selection: drag faction units (as their selected variants) into the army slots within the
- * supply budget; slot 0 holds the locked HQ. Confirm calls ASurvivalModeDirector::ConfirmArmy.
+ * supply budget; the first slots hold the locked HQ (slot 0) and the locked start units (harvesters, scavengers),
+ * which cannot be removed or moved. Confirm calls ASurvivalModeDirector::ConfirmArmy.
  * The Blueprint child (WBP_SurvivalArmySelection, Docs/ui_specs/W_SurvivalArmySelection.json) holds the static
  * layout; roster entries, tabs and slots are created here. The slot grid resizes its cells to the slot count and
  * the area it gets (8, 16 and 40 slots all fill it; past ~100 it scrolls).
@@ -59,7 +60,7 @@ public:
 	/** @brief Double-click on a roster entry: put it in the first free slot, or explain why not. */
 	void HandleRosterEntryActivated(const int32 RosterIndex);
 
-	/** @brief Right-click on a slot or its unit dragged outside every slot. The HQ slot ignores it. */
+	/** @brief Right-click on a slot or its unit dragged outside every slot. Locked slots ignore it. */
 	void HandleSlotRemoveRequested(const int32 SlotIndex);
 
 	/** @brief A drag was dropped on a slot: adds, replaces or swaps when allowed, otherwise shows why not. */
@@ -81,10 +82,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Survival|Army Selection")
 	int32 GetSlotCount() const { return M_SlotRosterIndices.Num(); }
 
-	/** @return The army as the director expects it: one pick per filled slot, HQ in slot 0. */
+	/** @return The army as the director expects it: one pick per filled slot, the locked entries first. */
 	TArray<FSurvivalArmyPick> BuildPicks() const;
 
-	/** @brief Empties every slot except the HQ slot. */
+	/** @brief Empties every slot except the locked slots. */
 	UFUNCTION(BlueprintCallable, Category = "Survival|Army Selection")
 	void ClearArmy();
 
@@ -185,12 +186,12 @@ private:
 	UPROPERTY()
 	TArray<FSurvivalRosterItem> M_Roster;
 
-	// The HQ shown in slot 0; never in M_Roster.
+	// Locked slot i shows element i: the HQ first, then the locked start units; never in M_Roster.
 	UPROPERTY()
-	FSurvivalRosterItem M_HQItem;
+	TArray<FSurvivalRosterItem> M_LockedItems;
 
-	// One element per slot: index into M_Roster, INDEX_NONE when empty. Element 0 is the HQ slot and stays
-	// INDEX_NONE; it always holds M_HQItem.
+	// One element per slot: index into M_Roster, INDEX_NONE when empty. The first M_LockedItems.Num() elements are
+	// the locked slots and stay INDEX_NONE; they always hold M_LockedItems.
 	TArray<int32> M_SlotRosterIndices;
 
 	int32 M_SupplyBudget = 0;
@@ -247,6 +248,8 @@ private:
 	int32 GetCopiesInArmy(const int32 RosterIndex) const;
 	int32 GetSupplyOfSlot(const int32 SlotIndex) const;
 	int32 FindFirstEmptySlot() const;
+	bool GetIsLockedSlot(const int32 SlotIndex) const;
+	int32 GetLockedSlotCount() const { return FMath::Max(1, M_LockedItems.Num()); }
 
 	// ---- Views
 	void RefreshArmyViews();

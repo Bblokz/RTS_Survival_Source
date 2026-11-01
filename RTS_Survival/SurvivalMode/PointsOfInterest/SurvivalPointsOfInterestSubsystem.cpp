@@ -304,8 +304,8 @@ void USurvivalPointsOfInterestSubsystem::WarnIfLayoutStale() const
 		       *Layout.LayoutFile);
 		return;
 	}
-	UE_LOG(LogSurvivalPOI, Log, TEXT("SURVIVAL_POI layout exclusions current: %d ramps, %d areas, %d obstacles"),
-	       Layout.Ramps.Num(), Layout.Areas.Num(), Layout.Obstacles.Num());
+	UE_LOG(LogSurvivalPOI, Log, TEXT("SURVIVAL_POI layout exclusions current: %d ramps, %d areas, %d obstacles, %d routes"),
+	       Layout.Ramps.Num(), Layout.Areas.Num(), Layout.Obstacles.Num(), Layout.Routes.Num());
 #endif
 }
 
@@ -616,8 +616,9 @@ bool USurvivalPointsOfInterestSubsystem::StepSiteSearch()
 		return false;
 	}
 	M_Stats.SitesChosenSeconds = FPlatformTime::Seconds();
-	UE_LOG(LogSurvivalPOI, Log, TEXT("SURVIVAL_POI sites chosen: %d (%d candidates not drivable from their start, %d outside the nav band, %d without room for their main object)"),
-	       M_Planner->GetSites().Num(), M_Planner->GetUnreachableCandidates(), M_Planner->GetNavBandRejects(), M_Planner->GetAnchorRejects());
+	UE_LOG(LogSurvivalPOI, Log, TEXT("SURVIVAL_POI sites chosen: %d (%d candidates not drivable from their start, %d outside the nav band, %d without room for their main object, %d losing a scavengeable or capture target)"),
+	       M_Planner->GetSites().Num(), M_Planner->GetUnreachableCandidates(), M_Planner->GetNavBandRejects(), M_Planner->GetAnchorRejects(),
+	       M_Planner->GetKeyObjectRejects());
 	for (const FString& Note : M_Planner->GetPlanNotes())
 	{
 		UE_LOG(LogSurvivalPOI, Log, TEXT("SURVIVAL_POI plan note: %s"), *Note);

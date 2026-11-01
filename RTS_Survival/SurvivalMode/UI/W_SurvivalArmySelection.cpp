@@ -35,7 +35,6 @@
 
 namespace SurvivalArmySelectionPrivate
 {
-	constexpr int32 HQSlotIndex = 0;
 	// The game state keeps per-player unit data; the human player is player 1 everywhere in the project.
 	constexpr int32 HumanPlayerIndex = 1;
 	// Unit type and subtype give every unit its own stable wear seed (same scheme as the faction unit browser).
@@ -162,7 +161,7 @@ void UW_SurvivalArmySelection::InitArmySelection(ASurvivalModeDirector* Director
 	BuildRoster(*Director);
 	RebuildTabs();
 	RebuildRosterEntries();
-	RebuildSlots(Settings->Army.SlotCount);
+	RebuildSlots(USurvivalArmyLibrary::GetTotalSlotCount(Settings, Director->GetPlayerFaction()));
 	SurvivalArmySelectionPrivate::SetTextIfBound(
 		M_FactionText, UEnum::GetDisplayValueAsText(Director->GetPlayerFaction()).ToUpper());
 	HandleTabClicked(ESurvivalRosterCategory::All);
@@ -254,23 +253,18 @@ void UW_SurvivalArmySelection::BuildRoster(const ASurvivalModeDirector& Director
 	const TArray<FSurvivalArmyEntry> Entries = USurvivalArmyLibrary::BuildArmyRoster(
 		Settings, Faction, Director.FindAsyncSpawner());
 	M_Roster.Reset();
-	bool bFoundHQ = false;
 	for (const FSurvivalArmyEntry& Entry : Entries)
 	{
-		if (Entry.bIsHQ)
+		// The HQ lives in the locked slots; harvesters and scavengers stay in the roster so more can be added.
+		if (not Entry.bIsHQ and not Entry.bIsLocked)
 		{
-			if (not bFoundHQ)
-			{
-				M_HQItem = MakeRosterItem(Entry);
-				bFoundHQ = true;
-			}
-			continue;
+			M_Roster.Add(MakeRosterItem(Entry));
 		}
-		M_Roster.Add(MakeRosterItem(Entry));
 	}
-	if (not bFoundHQ)
+	M_LockedItems.Reset();
+	for (const FSurvivalArmyEntry& LockedEntry : USurvivalArmyLibrary::BuildLockedEntries(Settings, Faction))
 	{
-		M_HQItem = MakeRosterItem(USurvivalArmyLibrary::BuildHQEntry(Settings, Faction));
+		M_LockedItems.Add(MakeRosterItem(LockedEntry));
 	}
 	// Grouped like the tabs, cheapest first inside a group, so the ALL list reads the same as the filtered ones.
 	M_Roster.StableSort([](const FSurvivalRosterItem& Left, const FSurvivalRosterItem& Right)
@@ -517,9 +511,11 @@ void UW_SurvivalArmySelection::BuildDesignPreview()
 		Item.VariantName = Index % 3 == 0 ? FText::FromString(TEXT("Variant A")) : FText::GetEmpty();
 		M_Roster.Add(Item);
 	}
-	M_HQItem = FSurvivalRosterItem();
-	M_HQItem.Entry.DisplayName = FText::FromString(TEXT("Command Vehicle"));
-	M_HQItem.Entry.bIsHQ = true;
+	M_LockedItems.Reset();
+	FSurvivalRosterItem& PreviewHQ = M_LockedItems.AddDefaulted_GetRef();
+	PreviewHQ.Entry.DisplayName = FText::FromString(TEXT("Command Vehicle"));
+	PreviewHQ.Entry.bIsHQ = true;
+	PreviewHQ.Entry.bIsLocked = true;
 	M_SupplyBudget = 100;
 	M_Tabs.Reset();
 	if (IsValid(M_TabRow))
@@ -542,7 +538,8 @@ void UW_SurvivalArmySelection::BuildDesignPreview()
 	RebuildRosterEntries();
 	RebuildSlots(M_DesignPreviewSlotCount);
 	// Fill a third of the slots so filled and empty looks are both visible.
-	for (int32 SlotIndex = 1; SlotIndex < M_SlotRosterIndices.Num() and not M_Roster.IsEmpty(); SlotIndex += 3)
+	for (int32 SlotIndex = GetLockedSlotCount(); SlotIndex < M_SlotRosterIndices.Num() and not M_Roster.IsEmpty();
+	     SlotIndex += 3)
 	{
 		M_SlotRosterIndices[SlotIndex] = SlotIndex % M_Roster.Num();
 	}
@@ -606,9 +603,10 @@ bool UW_SurvivalArmySelection::GetCanPlaceRosterItem(const int32 RosterIndex, co
 	{
 		return false;
 	}
-	if (SlotIndex == HQSlotIndex)
+	if (GetIsLockedSlot(SlotIndex))
 	{
-		OutReason = NSLOCTEXT("SurvivalArmySelection", "HqLockedReason", "The first slot always holds your HQ.");
+		OutReason = NSLOCTEXT("SurvivalArmySelection", "HqLockedReason",
+		                      "The first slots always hold your HQ and start units.");
 		return false;
 	}
 	const FSurvivalRosterItem& Item = M_Roster[RosterIndex];
@@ -642,9 +640,10 @@ bool UW_SurvivalArmySelection::GetCanMoveSlot(const int32 SourceSlotIndex, const
 	{
 		return false;
 	}
-	if (SourceSlotIndex == HQSlotIndex || TargetSlotIndex == HQSlotIndex)
+	if (GetIsLockedSlot(SourceSlotIndex) || GetIsLockedSlot(TargetSlotIndex))
 	{
-		OutReason = NSLOCTEXT("SurvivalArmySelection", "HqLockedReason", "The first slot always holds your HQ.");
+		OutReason = NSLOCTEXT("SurvivalArmySelection", "HqLockedReason",
+		                      "The first slots always hold your HQ and start units.");
 		return false;
 	}
 	// A move or swap keeps the same units, so supply and copies cannot change.
@@ -683,8 +682,7 @@ int32 UW_SurvivalArmySelection::GetUsedSupply() const
 
 int32 UW_SurvivalArmySelection::FindFirstEmptySlot() const
 {
-	for (int32 SlotIndex = SurvivalArmySelectionPrivate::HQSlotIndex + 1; SlotIndex < M_SlotRosterIndices.Num();
-	     ++SlotIndex)
+	for (int32 SlotIndex = GetLockedSlotCount(); SlotIndex < M_SlotRosterIndices.Num(); ++SlotIndex)
 	{
 		if (M_SlotRosterIndices[SlotIndex] == INDEX_NONE)
 		{
@@ -694,15 +692,22 @@ int32 UW_SurvivalArmySelection::FindFirstEmptySlot() const
 	return INDEX_NONE;
 }
 
+bool UW_SurvivalArmySelection::GetIsLockedSlot(const int32 SlotIndex) const
+{
+	return SlotIndex >= 0 and SlotIndex < GetLockedSlotCount();
+}
+
 TArray<FSurvivalArmyPick> UW_SurvivalArmySelection::BuildPicks() const
 {
-	using namespace SurvivalArmySelectionPrivate;
 	TArray<FSurvivalArmyPick> Picks;
-	FSurvivalArmyPick HQPick;
-	HQPick.SlotIndex = HQSlotIndex;
-	HQPick.Entry = M_HQItem.Entry;
-	Picks.Add(HQPick);
-	for (int32 SlotIndex = HQSlotIndex + 1; SlotIndex < M_SlotRosterIndices.Num(); ++SlotIndex)
+	for (int32 LockedIndex = 0; LockedIndex < M_LockedItems.Num(); ++LockedIndex)
+	{
+		FSurvivalArmyPick LockedPick;
+		LockedPick.SlotIndex = LockedIndex;
+		LockedPick.Entry = M_LockedItems[LockedIndex].Entry;
+		Picks.Add(LockedPick);
+	}
+	for (int32 SlotIndex = GetLockedSlotCount(); SlotIndex < M_SlotRosterIndices.Num(); ++SlotIndex)
 	{
 		const int32 RosterIndex = M_SlotRosterIndices[SlotIndex];
 		if (not M_Roster.IsValidIndex(RosterIndex))
@@ -759,7 +764,7 @@ void UW_SurvivalArmySelection::HandleRosterEntryActivated(const int32 RosterInde
 
 void UW_SurvivalArmySelection::HandleSlotRemoveRequested(const int32 SlotIndex)
 {
-	if (SlotIndex == SurvivalArmySelectionPrivate::HQSlotIndex || not M_SlotRosterIndices.IsValidIndex(SlotIndex))
+	if (GetIsLockedSlot(SlotIndex) || not M_SlotRosterIndices.IsValidIndex(SlotIndex))
 	{
 		return;
 	}
@@ -839,7 +844,7 @@ UDragDropOperation* UW_SurvivalArmySelection::CreateDragOperationFromRoster(cons
 
 UDragDropOperation* UW_SurvivalArmySelection::CreateDragOperationFromSlot(const int32 SlotIndex)
 {
-	if (SlotIndex == SurvivalArmySelectionPrivate::HQSlotIndex || not M_SlotRosterIndices.IsValidIndex(SlotIndex))
+	if (GetIsLockedSlot(SlotIndex) || not M_SlotRosterIndices.IsValidIndex(SlotIndex))
 	{
 		return nullptr;
 	}
@@ -855,8 +860,7 @@ UDragDropOperation* UW_SurvivalArmySelection::CreateDragOperationFromSlot(const 
 
 void UW_SurvivalArmySelection::ClearArmy()
 {
-	for (int32 SlotIndex = SurvivalArmySelectionPrivate::HQSlotIndex + 1; SlotIndex < M_SlotRosterIndices.Num();
-	     ++SlotIndex)
+	for (int32 SlotIndex = GetLockedSlotCount(); SlotIndex < M_SlotRosterIndices.Num(); ++SlotIndex)
 	{
 		M_SlotRosterIndices[SlotIndex] = INDEX_NONE;
 	}
@@ -915,14 +919,14 @@ void UW_SurvivalArmySelection::RefreshSlots()
 		{
 			continue;
 		}
-		const bool bIsHQSlot = SlotIndex == SurvivalArmySelectionPrivate::HQSlotIndex;
+		const bool bIsLockedSlot = GetIsLockedSlot(SlotIndex);
 		const int32 RosterIndex = M_SlotRosterIndices[SlotIndex];
-		const FSurvivalRosterItem* const Item = bIsHQSlot
-			                                        ? &M_HQItem
-			                                        : (M_Roster.IsValidIndex(RosterIndex)
-				                                           ? &M_Roster[RosterIndex]
-				                                           : nullptr);
-		ArmySlot->SetSlotContent(Item, bIsHQSlot);
+		const FSurvivalRosterItem* Item = M_Roster.IsValidIndex(RosterIndex) ? &M_Roster[RosterIndex] : nullptr;
+		if (bIsLockedSlot)
+		{
+			Item = M_LockedItems.IsValidIndex(SlotIndex) ? &M_LockedItems[SlotIndex] : nullptr;
+		}
+		ArmySlot->SetSlotContent(Item, bIsLockedSlot);
 		FilledSlots += Item ? 1 : 0;
 	}
 	SurvivalArmySelectionPrivate::SetTextIfBound(

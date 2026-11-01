@@ -22,6 +22,11 @@ namespace SovietBasePCGConstants
 	const FName RoleAttribute = TEXT("Role");
 	const FName ThreatPointsAttribute = TEXT("ThreatPoints");
 	const FName PadKindAttribute = TEXT("PadKind");
+	// Round 4 foundation dressing of a building pad: style, footprint half size, door direction (XY) and apron length.
+	const FName FoundationStyleAttribute = TEXT("FoundationStyle");
+	const FName FootprintHalfAttribute = TEXT("FootprintHalf");
+	const FName DoorDirectionAttribute = TEXT("DoorDirection");
+	const FName ApronLengthAttribute = TEXT("ApronLength");
 	const FName RoadAttribute = TEXT("Road");
 	const FName RoadKindAttribute = TEXT("RoadKind");
 	const FName RoadWidthAttribute = TEXT("RoadWidth");
@@ -84,6 +89,12 @@ namespace
 		FPCGMetadataAttribute<int32>* RoleData = PointData.Metadata->CreateAttribute<int32>(RoleAttribute, 0, false, false);
 		FPCGMetadataAttribute<int32>* ThreatData = PointData.Metadata->CreateAttribute<int32>(ThreatPointsAttribute, 0, false, false);
 		FPCGMetadataAttribute<int32>* PadData = PointData.Metadata->CreateAttribute<int32>(PadKindAttribute, 0, false, false);
+		FPCGMetadataAttribute<int32>* StyleData = PointData.Metadata->CreateAttribute<int32>(FoundationStyleAttribute, 0, false, false);
+		FPCGMetadataAttribute<FVector2D>* HalfData =
+			PointData.Metadata->CreateAttribute<FVector2D>(FootprintHalfAttribute, FVector2D::ZeroVector, false, false);
+		FPCGMetadataAttribute<FVector2D>* DoorData =
+			PointData.Metadata->CreateAttribute<FVector2D>(DoorDirectionAttribute, FVector2D::ZeroVector, false, false);
+		FPCGMetadataAttribute<double>* ApronData = PointData.Metadata->CreateAttribute<double>(ApronLengthAttribute, 0.0, false, false);
 		TArray<FPCGPoint>& Points = PointData.GetMutablePoints();
 		for (int32 Index = FirstStructure; Index < Plan.Structures.Num(); ++Index)
 		{
@@ -97,6 +108,10 @@ namespace
 			RoleData->SetValue(Point.MetadataEntry, static_cast<int32>(Structure.Role));
 			ThreatData->SetValue(Point.MetadataEntry, Structure.ThreatPoints);
 			PadData->SetValue(Point.MetadataEntry, static_cast<int32>(Structure.PadKind));
+			StyleData->SetValue(Point.MetadataEntry, static_cast<int32>(Structure.FoundationStyle));
+			HalfData->SetValue(Point.MetadataEntry, Structure.FootprintHalf);
+			DoorData->SetValue(Point.MetadataEntry, Structure.DoorDirection);
+			ApronData->SetValue(Point.MetadataEntry, Structure.ApronLength);
 		}
 	}
 
@@ -128,6 +143,10 @@ namespace
 		const FPCGMetadataAttribute<int32>* RoleData = PointData.Metadata->GetConstTypedAttribute<int32>(RoleAttribute);
 		const FPCGMetadataAttribute<int32>* ThreatData = PointData.Metadata->GetConstTypedAttribute<int32>(ThreatPointsAttribute);
 		const FPCGMetadataAttribute<int32>* PadData = PointData.Metadata->GetConstTypedAttribute<int32>(PadKindAttribute);
+		const FPCGMetadataAttribute<int32>* StyleData = PointData.Metadata->GetConstTypedAttribute<int32>(FoundationStyleAttribute);
+		const FPCGMetadataAttribute<FVector2D>* HalfData = PointData.Metadata->GetConstTypedAttribute<FVector2D>(FootprintHalfAttribute);
+		const FPCGMetadataAttribute<FVector2D>* DoorData = PointData.Metadata->GetConstTypedAttribute<FVector2D>(DoorDirectionAttribute);
+		const FPCGMetadataAttribute<double>* ApronData = PointData.Metadata->GetConstTypedAttribute<double>(ApronLengthAttribute);
 		if (ClassAttribute == nullptr or RoleData == nullptr or ThreatData == nullptr or PadData == nullptr)
 		{
 			return;
@@ -144,6 +163,14 @@ namespace
 			Structure.UniformScale = Scale.Z;
 			Structure.StretchXY = FVector2D(Scale.X, Scale.Y) / Scale.Z;
 			Structure.PadKind = static_cast<ESurvivalSovietPadKind>(PadData->GetValueFromItemKey(Point.MetadataEntry));
+			// Optional: points written before round 4, or by a filter that dropped them, simply get no dressing.
+			if (StyleData != nullptr and HalfData != nullptr and DoorData != nullptr and ApronData != nullptr)
+			{
+				Structure.FoundationStyle = static_cast<ESurvivalSovietFoundationStyle>(StyleData->GetValueFromItemKey(Point.MetadataEntry));
+				Structure.FootprintHalf = HalfData->GetValueFromItemKey(Point.MetadataEntry);
+				Structure.DoorDirection = DoorData->GetValueFromItemKey(Point.MetadataEntry);
+				Structure.ApronLength = ApronData->GetValueFromItemKey(Point.MetadataEntry);
+			}
 		}
 	}
 

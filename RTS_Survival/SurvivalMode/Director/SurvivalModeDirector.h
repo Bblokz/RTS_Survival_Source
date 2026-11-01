@@ -8,6 +8,7 @@
 #include "RTS_Survival/SurvivalMode/Army/SurvivalArmyTypes.h"
 #include "RTS_Survival/SurvivalMode/Army/SurvivalRewardTypes.h"
 #include "RTS_Survival/SurvivalMode/Core/SurvivalModeTypes.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 #include "SurvivalModeDirector.generated.h"
 
@@ -137,8 +138,8 @@ public:
 	bool GetHasChosenReward() const { return bM_HasChosenReward; }
 
 	/**
-	 * @brief Called by the reward picker: flies the chosen reinforcement set in. Only the first pick of an
-	 * intermission counts.
+	 * @brief Called by the reward picker: flies the chosen reinforcement set in and closes the picker. Only the
+	 * first pick of an intermission counts.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Survival")
 	void ChooseReward(int32 OptionIndex);
@@ -146,6 +147,11 @@ public:
 	/** @return Best survival time stored for this map, 0 when none. */
 	UFUNCTION(BlueprintPure, Category = "Survival")
 	float GetBestSurvivalSeconds() const;
+
+#if RTS_WITH_MAP_TESTS
+	/** @brief Test runs only (Tests/SurvivalLoadoutTest): opens an intermission as if RoundNumber was survived. */
+	void DebugOpenTestIntermission(const int32 RoundNumber) { OnRoundSurvived(RoundNumber); }
+#endif
 
 protected:
 	virtual void BeginPlay() override;

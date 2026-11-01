@@ -8,6 +8,8 @@
 
 namespace SurvivalPOIDefaults
 {
+	// The owner's "everything scales down" (2026-11-01): compositions at 0.65 of their round 2 layout.
+	constexpr float ShrunkCompositionScale = 0.65f;
 	const FString Environment = TEXT("/Game/RTS_Survival/Blueprints/Environment/");
 	const FString DestTanks = Environment + TEXT("DestructableEnvActor/Military/DestTanks/");
 	const FString ScavTanks = Environment + TEXT("ScavengeObjects/DestroyedTanks/German/");
@@ -96,10 +98,13 @@ namespace SurvivalPOIDefaults
 		FSurvivalPOITypeRules Rules;
 		Rules.Type = Type;
 		Rules.DisplayName = FText::FromString(DisplayName);
-		Rules.SiteRadius = Radius;
+		// Compositions are laid out at CompositionScale on the shrunk map; the site circle shrinks with them.
+		Rules.SiteRadius = Radius * SurvivalPOIDefaults::ShrunkCompositionScale;
 		Rules.MaxHeightRange = HeightRange;
 		Rules.MaxSlopeDegrees = Slope;
 		Rules.OwnerStartDistance = OwnerDistance;
+		// Drive distance band, scaled with the map like the straight bands (was 20 000-34 000 on the r 40 000 map).
+		Rules.OwnerNavDistance = FVector2D(11500.0, 19600.0);
 		return Rules;
 	}
 }
@@ -136,31 +141,40 @@ void USurvivalPointsOfInterestSettings::FillDefaults()
 void USurvivalPointsOfInterestSettings::FillDefaults_Placement()
 {
 	Placement = FSurvivalPOIPlacementRules();
-	// SM_Desert_01: the oasis basin outline (layout JSON features.world.basins "oasis") has its centroid at (16000, -3525)
-	// and its farthest point 6109 cm from it.
+	// SM_Desert_01 shrunk to a third of its area (owner, 2026-11-01; round 9 save 19:16): lengths x0.577, starts at r 24 541,
+	// oasis at 75%. The layout JSON's "oasis" block has its outline centroid at (15 875, -3 544), farthest point 4 572 from it.
 	FSurvivalPOIExclusionZone Oasis;
 	Oasis.Name = TEXT("Oasis");
-	Oasis.Center = FVector2D(16000.0, -3525.0);
-	Oasis.Radius = 6150.f;
-	Oasis.PropRim = 3000.f;
+	Oasis.Center = FVector2D(15875.0, -3544.0);
+	Oasis.Radius = 4620.f;
+	Oasis.PropRim = 1750.f;
 	Oasis.bIsWater = true;
 	Placement.ExclusionZones = {Oasis};
-	// SM_Desert_01 cropped to its playable square (coordinator, 2026-10-31 19:32); the landscape still reaches +-75 600.
-	Placement.PlayableAreaMin = FVector2D(-69400.0, -64400.0);
-	Placement.PlayableAreaMax = FVector2D(66200.0, 71200.0);
+	// The playable square of the shrunk map (layout JSON "playable").
+	Placement.PlayableAreaMin = FVector2D(-40068.0, -37181.0);
+	Placement.PlayableAreaMax = FVector2D(38221.0, 41107.0);
+	// Every distance scales with the map (x0.577); site and object sizes do not.
+	Placement.MinDistanceFromStart = 10400.f;
+	Placement.MinDistanceFromLandscapeEdge = 5200.f;
+	Placement.MinDistanceFromEdgeSpawnZone = 3500.f;
+	Placement.MinGapBetweenSites = 3500.f;
+	Placement.Layout.GateFootClearance = 1750.f;
+	Placement.ReservedSpotClearance = 1750.f;
+	Placement.RimCheckDistance = 2000.f;
+	Placement.CompositionScale = SurvivalPOIDefaults::ShrunkCompositionScale;
 }
 
 void USurvivalPointsOfInterestSettings::FillDefaults_TypesAndSectors()
 {
 	using namespace SurvivalPOIDefaults;
 	TypeRules = {
-		MakeRules(ESurvivalPOIType::SmallBattlefield, TEXT("Small battlefield"), 3400.f, 260.f, 8.f, FVector2D(19000.0, 27000.0)),
-		MakeRules(ESurvivalPOIType::RuinedHangar, TEXT("Ruined hangar"), 2800.f, 120.f, 4.f, FVector2D(19000.0, 27000.0)),
-		MakeRules(ESurvivalPOIType::CrashSite, TEXT("Crash site"), 4200.f, 300.f, 8.f, FVector2D(19000.0, 34000.0)),
-		MakeRules(ESurvivalPOIType::DeadConvoy, TEXT("Dead convoy"), 4600.f, 300.f, 8.f, FVector2D(19000.0, 34000.0)),
-		MakeRules(ESurvivalPOIType::TankGraveyard, TEXT("Tank graveyard"), 4000.f, 320.f, 9.f, FVector2D(19000.0, 34000.0)),
-		MakeRules(ESurvivalPOIType::PumpStation, TEXT("Pump station"), 3000.f, 150.f, 5.f, FVector2D(19000.0, 34000.0)),
-		MakeRules(ESurvivalPOIType::RelayStation, TEXT("Relay station"), 3800.f, 200.f, 6.f, FVector2D(19000.0, 34000.0)),
+		MakeRules(ESurvivalPOIType::SmallBattlefield, TEXT("Small battlefield"), 3400.f, 260.f, 8.f, FVector2D(11000.0, 15600.0)),
+		MakeRules(ESurvivalPOIType::RuinedHangar, TEXT("Ruined hangar"), 2800.f, 120.f, 4.f, FVector2D(11000.0, 15600.0)),
+		MakeRules(ESurvivalPOIType::CrashSite, TEXT("Crash site"), 4200.f, 300.f, 8.f, FVector2D(11000.0, 19600.0)),
+		MakeRules(ESurvivalPOIType::DeadConvoy, TEXT("Dead convoy"), 4600.f, 300.f, 8.f, FVector2D(11000.0, 19600.0)),
+		MakeRules(ESurvivalPOIType::TankGraveyard, TEXT("Tank graveyard"), 4000.f, 320.f, 9.f, FVector2D(11000.0, 19600.0)),
+		MakeRules(ESurvivalPOIType::PumpStation, TEXT("Pump station"), 3000.f, 150.f, 5.f, FVector2D(11000.0, 19600.0)),
+		MakeRules(ESurvivalPOIType::RelayStation, TEXT("Relay station"), 3800.f, 200.f, 6.f, FVector2D(11000.0, 19600.0)),
 	};
 	// 05_MapVision.md section 4, sectors named by the start display names of SM_Desert_01.
 	auto MakeSector = [](const TCHAR* A, const TCHAR* B, const ESurvivalPOIType Type)
@@ -181,6 +195,8 @@ void USurvivalPointsOfInterestSettings::FillDefaults_TypesAndSectors()
 	BuiltLandmarkTypes = {ESurvivalPOIType::CrashSite, ESurvivalPOIType::DeadConvoy, ESurvivalPOIType::TankGraveyard,
 	                      ESurvivalPOIType::PumpStation, ESurvivalPOIType::RelayStation};
 	GenericPerSector = {ESurvivalPOIType::SmallBattlefield, ESurvivalPOIType::RuinedHangar};
+	// Ten sites on the shrunk map: the five landmarks and one generic site per start.
+	GenericSitesPerSector = 1;
 }
 
 void USurvivalPointsOfInterestSettings::FillDefaults_BattlefieldPools()

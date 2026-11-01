@@ -8,6 +8,8 @@
 #include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartContentSettings.h"
 #include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartPlacementHelpers.h"
 
+class ANavigationData;
+
 class AActor;
 class UStaticMesh;
 class UWorld;
@@ -102,6 +104,12 @@ private:
 	FSurvivalStartContentDifficultyScale M_Scale;
 	FSurvivalStartContentPlan M_Plan;
 
+	TWeakObjectPtr<UWorld> M_World;
+	// Navigation data used for the reachability test (heavy tank agent) and the deploy centre projected onto it;
+	// null when the world has no navigation data yet (then only the ground tests apply).
+	TWeakObjectPtr<const ANavigationData> M_ReachNavData;
+	FVector M_ReachDeploy = FVector::ZeroVector;
+
 	// Wrecks that may land below the bench (more than WreckOffBenchDrop under the deploy centre); set by PlanWrecks.
 	int32 M_MaxWrecksOffBench = 0;
 	int32 M_WrecksOffBench = 0;
@@ -149,6 +157,19 @@ private:
 		const FVector2D& FieldCenter,
 		const float CentreFootprint,
 		FSurvivalOccupancy& FieldOccupancy);
+
+	/** @brief Finds the heavy-tank navigation data and projects the deploy centre onto it (once per plan). */
+	void InitReachability();
+
+	/** @return True when Location lies on the navmesh with a full path from the deploy centre (true without navmesh). */
+	bool GetIsReachable(const FVector& Location) const;
+
+	/**
+	 * @return True when the ground round a field actor or wreck (its footprint plus an access margin) keeps the slope
+	 * limit and the spot is reachable, so no resource can end up on a ledge, a cliff edge or off the navmesh.
+	 */
+	bool GetIsActorSpotValid(const FVector2D& Position, const FSurvivalGroundHit& Ground, const float FootprintRadius,
+	                         const float MaxSlopeDegrees) const;
 
 	/** @return True when Position projects onto the landscape with a slope of at most MaxSlopeDegrees. */
 	bool TryFindGround(const FVector2D& Position, const float MaxSlopeDegrees, FSurvivalGroundHit& OutHit) const;

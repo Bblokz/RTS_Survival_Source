@@ -122,14 +122,80 @@ namespace
 	}
 }
 
+namespace
+{
+	ERTSFaction GetRosterFaction(const ERTSFaction Faction)
+	{
+		return Faction == ERTSFaction::NotInitialised ? ERTSFaction::GerBreakthroughDoctrine : Faction;
+	}
+
+	const TArray<FSurvivalLockedStartUnit>& GetLockedStartUnits(const USurvivalModeSettings& Settings,
+	                                                            const ERTSFaction Faction)
+	{
+		if (const FSurvivalLockedStartUnits* FactionUnits = Settings.Army.LockedStartUnitsPerFaction.Find(Faction))
+		{
+			return FactionUnits->Units;
+		}
+		return Settings.Army.DefaultLockedStartUnits;
+	}
+
+	FSurvivalArmyEntry MakeLockedStartEntry(const USurvivalModeSettings& Settings, const FTrainingOption& Unit,
+	                                        const TMap<FTrainingOption, EUnitVariant>& ProfileVariants)
+	{
+		FSurvivalArmyEntry Entry;
+		// Keyed as the async spawner keys units; a harvester entered as UNType_Harvester would not spawn.
+		Entry.Unit = UPlayerUnitVariantManager::GetSpawnerKey(Unit);
+		Entry.Variant = FindProfileVariant(ProfileVariants, Entry.Unit);
+		Entry.SupplyCost = 0;
+		Entry.MaxCopies = 0;
+		Entry.bIsLocked = true;
+		Entry.DisplayName = GetEntryDisplayName(Entry.Unit, EUnitVariant::Base);
+		const FSurvivalUnitSupplyCost* SupplyEntry = FindSupplyEntry(&Settings, Entry.Unit);
+		if (SupplyEntry and not SupplyEntry->DisplayName.IsEmpty())
+		{
+			Entry.DisplayName = SupplyEntry->DisplayName;
+		}
+		return Entry;
+	}
+
+	/** @return False with a reason when a locked pick is in the wrong slot or a locked slot is missing. */
+	bool GetAreLockedPicksValid(const TArray<FSurvivalArmyEntry>& LockedEntries,
+	                            const TArray<FSurvivalArmyPick>& Picks, FText& OutReason)
+	{
+		TArray<bool> LockedSlotFilled;
+		LockedSlotFilled.Init(false, LockedEntries.Num());
+		for (const FSurvivalArmyPick& Pick : Picks)
+		{
+			const bool bIsLockedPick = Pick.Entry.bIsLocked or Pick.Entry.bIsHQ;
+			const bool bIsLockedSlot = LockedEntries.IsValidIndex(Pick.SlotIndex);
+			if (not bIsLockedPick and not bIsLockedSlot)
+			{
+				continue;
+			}
+			if (bIsLockedPick != bIsLockedSlot or LockedEntries[Pick.SlotIndex].Unit != Pick.Entry.Unit
+				or LockedEntries[Pick.SlotIndex].bIsHQ != Pick.Entry.bIsHQ)
+			{
+				OutReason = NSLOCTEXT("Survival", "LockedSlot",
+				                      "The HQ and the start units must stay in their locked slots.");
+				return false;
+			}
+			LockedSlotFilled[Pick.SlotIndex] = true;
+		}
+		if (LockedSlotFilled.Contains(false))
+		{
+			OutReason = NSLOCTEXT("Survival", "NoHQ", "The army needs its HQ and its start units.");
+			return false;
+		}
+		return true;
+	}
+}
+
 TArray<FSurvivalArmyEntry> USurvivalArmyLibrary::BuildArmyRoster(const USurvivalModeSettings* Settings,
                                                                  const ERTSFaction Faction,
                                                                  const ARTSAsyncSpawner* AsyncSpawner)
 {
 	TArray<FSurvivalArmyEntry> Roster;
-	const ERTSFaction RosterFaction = Faction == ERTSFaction::NotInitialised
-		                                  ? ERTSFaction::GerBreakthroughDoctrine
-		                                  : Faction;
+	const ERTSFaction RosterFaction = GetRosterFaction(Faction);
 	const FSurvivalArmyEntry HQEntry = BuildHQEntry(Settings, RosterFaction);
 	Roster.Add(HQEntry);
 	if (not IsValid(Settings))
@@ -188,8 +254,60 @@ FSurvivalArmyEntry USurvivalArmyLibrary::BuildHQEntry(const USurvivalModeSetting
 	HQEntry.SupplyCost = 0;
 	HQEntry.MaxCopies = 1;
 	HQEntry.bIsHQ = true;
+	HQEntry.bIsLocked = true;
 	HQEntry.DisplayName = GetEntryDisplayName(HQEntry.Unit, HQEntry.Variant);
 	return HQEntry;
+}
+
+TArray<FSurvivalArmyEntry> USurvivalArmyLibrary::BuildLockedEntries(const USurvivalModeSettings* Settings,
+                                                                    const ERTSFaction Faction)
+{
+	const ERTSFaction RosterFaction = GetRosterFaction(Faction);
+	TArray<FSurvivalArmyEntry> LockedEntries;
+	LockedEntries.Add(BuildHQEntry(Settings, RosterFaction));
+	if (not IsValid(Settings))
+	{
+		return LockedEntries;
+	}
+	const TMap<FTrainingOption, EUnitVariant> ProfileVariants = LoadProfileVariants();
+	for (const FSurvivalLockedStartUnit& LockedUnit : GetLockedStartUnits(*Settings, RosterFaction))
+	{
+		if (LockedUnit.Unit.IsNone() or LockedUnit.Count <= 0)
+		{
+			continue;
+		}
+		const FSurvivalArmyEntry Entry = MakeLockedStartEntry(*Settings, LockedUnit.Unit, ProfileVariants);
+		for (int32 Copy = 0; Copy < LockedUnit.Count; ++Copy)
+		{
+			LockedEntries.Add(Entry);
+		}
+	}
+	return LockedEntries;
+}
+
+TArray<FSurvivalArmyPick> USurvivalArmyLibrary::BuildLockedPicks(const USurvivalModeSettings* Settings,
+                                                                 const ERTSFaction Faction)
+{
+	TArray<FSurvivalArmyPick> Picks;
+	for (const FSurvivalArmyEntry& Entry : BuildLockedEntries(Settings, Faction))
+	{
+		FSurvivalArmyPick Pick;
+		Pick.SlotIndex = Picks.Num();
+		Pick.Entry = Entry;
+		Picks.Add(Pick);
+	}
+	return Picks;
+}
+
+int32 USurvivalArmyLibrary::GetTotalSlotCount(const USurvivalModeSettings* Settings, const ERTSFaction Faction)
+{
+	if (not IsValid(Settings))
+	{
+		return 1;
+	}
+	// The HQ slot is part of SlotCount; every other locked entry adds a slot.
+	const int32 ExtraLockedSlots = BuildLockedEntries(Settings, Faction).Num() - 1;
+	return Settings->Army.SlotCount + FMath::Max(0, ExtraLockedSlots);
 }
 
 int32 USurvivalArmyLibrary::GetSupplyCost(const USurvivalModeSettings* Settings, const FTrainingOption& Unit,
@@ -219,7 +337,7 @@ int32 USurvivalArmyLibrary::GetTotalSupply(const TArray<FSurvivalArmyPick>& Pick
 	int32 TotalSupply = 0;
 	for (const FSurvivalArmyPick& Pick : Picks)
 	{
-		if (not Pick.Entry.bIsHQ)
+		if (not Pick.Entry.bIsHQ and not Pick.Entry.bIsLocked)
 		{
 			TotalSupply += Pick.Entry.SupplyCost;
 		}
@@ -227,20 +345,20 @@ int32 USurvivalArmyLibrary::GetTotalSupply(const TArray<FSurvivalArmyPick>& Pick
 	return TotalSupply;
 }
 
-bool USurvivalArmyLibrary::GetIsArmyValid(const USurvivalModeSettings* Settings, const TArray<FSurvivalArmyPick>& Picks,
-                                          FText& OutReason)
+bool USurvivalArmyLibrary::GetIsArmyValid(const USurvivalModeSettings* Settings, const ERTSFaction Faction,
+                                          const TArray<FSurvivalArmyPick>& Picks, FText& OutReason)
 {
 	if (not IsValid(Settings))
 	{
 		OutReason = NSLOCTEXT("Survival", "NoSettings", "The survival settings are missing.");
 		return false;
 	}
-	int32 HQCount = 0;
+	const int32 TotalSlotCount = GetTotalSlotCount(Settings, Faction);
 	TSet<int32> UsedSlots;
 	TMap<FTrainingOption, int32> CopiesPerUnit;
 	for (const FSurvivalArmyPick& Pick : Picks)
 	{
-		if (Pick.SlotIndex < 0 or Pick.SlotIndex >= Settings->Army.SlotCount)
+		if (Pick.SlotIndex < 0 or Pick.SlotIndex >= TotalSlotCount)
 		{
 			OutReason = NSLOCTEXT("Survival", "BadSlot", "A unit is in a slot that does not exist.");
 			return false;
@@ -251,14 +369,9 @@ bool USurvivalArmyLibrary::GetIsArmyValid(const USurvivalModeSettings* Settings,
 			return false;
 		}
 		UsedSlots.Add(Pick.SlotIndex);
-		if (Pick.Entry.bIsHQ)
+		// Locked entries do not count towards the copies the player may add on top.
+		if (Pick.Entry.bIsHQ or Pick.Entry.bIsLocked)
 		{
-			++HQCount;
-			if (Pick.SlotIndex != 0)
-			{
-				OutReason = NSLOCTEXT("Survival", "HQSlot", "The HQ must be in the first slot.");
-				return false;
-			}
 			continue;
 		}
 		int32& Copies = CopiesPerUnit.FindOrAdd(Pick.Entry.Unit);
@@ -270,9 +383,8 @@ bool USurvivalArmyLibrary::GetIsArmyValid(const USurvivalModeSettings* Settings,
 			return false;
 		}
 	}
-	if (HQCount != 1)
+	if (not GetAreLockedPicksValid(BuildLockedEntries(Settings, Faction), Picks, OutReason))
 	{
-		OutReason = NSLOCTEXT("Survival", "NoHQ", "The army needs its HQ.");
 		return false;
 	}
 	const int32 TotalSupply = GetTotalSupply(Picks);

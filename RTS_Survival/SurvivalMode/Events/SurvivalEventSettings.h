@@ -56,7 +56,8 @@ struct FSurvivalEventExclusionZone
 	float Radius = 0.f;
 };
 
-/** Where convoy routes may run relative to the player and the Soviet bases. */
+/** Where convoy routes may run relative to the player and the Soviet bases.
+ * Round 8: all distances x0.577 with the SM_Desert_01 scale-down (one third of the area). */
 USTRUCT(BlueprintType)
 struct FSurvivalConvoyRouteSettings
 {
@@ -64,36 +65,36 @@ struct FSurvivalConvoyRouteSettings
 
 	// Closest approach of the route to the player's deploy centre must lie in this band.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float MinClosestApproach = 15000.f;
+	float MinClosestApproach = 8650.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float MaxClosestApproach = 26000.f;
+	float MaxClosestApproach = 15000.f;
 
 	// The planner aims the route's middle at this distance from the base.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float TargetClosestApproach = 19000.f;
+	float TargetClosestApproach = 11000.f;
 
 	// Unpicked starts carry Soviet bases: the route keeps this far from their deploy centres.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float SovietBaseClearance = 16000.f;
+	float SovietBaseClearance = 9250.f;
 
 	// Entry and exit lie at least this far from the base (spawned out of sight, leaves out of sight).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float MinEndpointDistanceFromBase = 30000.f;
+	float MinEndpointDistanceFromBase = 17300.f;
 
 	// No player unit may stand this close to the entry when the convoy spawns.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float MinSpawnDistanceFromPlayerUnits = 9000.f;
+	float MinSpawnDistanceFromPlayerUnits = 5200.f;
 
 	// Edge zones the last wave used are avoided by this much.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float ActiveSpawnZoneClearance = 6000.f;
+	float ActiveSpawnZoneClearance = 3460.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float MinRouteLength = 50000.f;
+	float MinRouteLength = 28900.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
-	float MaxRouteLength = 150000.f;
+	float MaxRouteLength = 86600.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Events")
 	TArray<FSurvivalEventExclusionZone> ExclusionZones;

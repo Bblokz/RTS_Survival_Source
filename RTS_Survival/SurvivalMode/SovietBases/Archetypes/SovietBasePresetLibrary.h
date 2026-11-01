@@ -7,6 +7,8 @@
 
 namespace SurvivalSovietBaseDefaults
 {
+	// The build radius the plans are drawn in since the map shrink (start discs flat to 5 700).
+	constexpr float BaseBuildAreaRadius = 5300.f;
 	extern const TCHAR* const RusBuildings;
 	extern const TCHAR* const RusBunkers;
 	extern const TCHAR* const Bxps;

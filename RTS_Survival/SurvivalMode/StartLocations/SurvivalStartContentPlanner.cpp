@@ -5,6 +5,9 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "NavigationData.h"
+#include "NavigationSystem.h"
+#include "NavFilters/NavigationQueryFilter.h"
 
 namespace SurvivalStartContentPlannerConstants
 {
@@ -27,6 +30,16 @@ namespace SurvivalStartContentPlannerConstants
 	constexpr float MaxWreckOffBenchShare = 2.f / 7.f;
 	// The last quarter of a wreck's attempts accepts any ground, so a start whose bench ends early still gets its wrecks.
 	constexpr float WreckAnyGroundAttemptShare = 0.75f;
+	// Every field actor and wreck needs gentle ground over its footprint plus room for a harvester to reach it: ground
+	// samples on this ring (footprint + margin) must keep the field's slope limit, and the spot must be on the navmesh
+	// with a full path from the deploy centre (heavy tank agent; skipped when the world has no navigation data).
+	constexpr int32 ActorFootprintSamples = 8;
+	constexpr float ActorAccessMargin = 250.f;
+	constexpr float ReachAgentRadius = 200.f;
+	constexpr float ReachAgentHeight = 300.f;
+	constexpr float ReachProjectExtentXY = 60.f;  // the spot itself must be on the navmesh, not just near it
+	constexpr float ReachProjectExtentZ = 400.f;
+	constexpr float ReachArriveTolerance = 300.f;
 }
 
 int32 FSurvivalStartContentPlan::GetPlannedFieldCount(const ESurvivalStartContentCategory Category) const
@@ -80,6 +93,7 @@ FSurvivalStartContentPlanner::FSurvivalStartContentPlanner(
 	: M_Settings(Settings)
 	, M_Input(Input)
 	, M_Projector(World, Settings.GroundTraceUp, Settings.GroundTraceDown)
+	, M_World(&World)
 	, M_Random(Input.Seed)
 	, M_Scale(Settings.GetDifficultyScale(Input.Difficulty))
 {
@@ -92,6 +106,7 @@ FSurvivalStartContentPlan FSurvivalStartContentPlanner::BuildPlan()
 	{
 		return M_Plan;
 	}
+	InitReachability();
 	PlanPits();
 	ReserveProtectedAreas();
 	PlanResourceFields();
@@ -261,7 +276,7 @@ bool FSurvivalStartContentPlanner::GetIsFieldGroundValid(
 			return false;
 		}
 	}
-	return true;
+	return GetIsReachable(OutCenterHit.Location);
 }
 
 void FSurvivalStartContentPlanner::PopulateField(
@@ -326,7 +341,8 @@ bool FSurvivalStartContentPlanner::TryPlaceFieldActor(
 			FieldCenter, MinOffset, MaxOffset, M_Random);
 		FSurvivalGroundHit Ground;
 		if (not FieldOccupancy.IsFree(Position, Entry.FootprintRadius, FieldSettings.ActorClearance)
-			or not TryFindGround(Position, FieldSettings.MaxGroundSlopeDegrees, Ground))
+			or not TryFindGround(Position, FieldSettings.MaxGroundSlopeDegrees, Ground)
+			or not GetIsActorSpotValid(Position, Ground, Entry.FootprintRadius, FieldSettings.MaxGroundSlopeDegrees))
 		{
 			continue;
 		}
@@ -376,7 +392,8 @@ void FSurvivalStartContentPlanner::PlanWreckGroup(const FSurvivalWreckGroup& Gro
 				GetDeployCenter2D(), InnerRadius, OuterRadius, M_Random);
 			FSurvivalGroundHit Ground;
 			if (not M_Occupancy.IsFree(Position, SpacingRadius)
-				or not TryFindGround(Position, Group.MaxGroundSlopeDegrees, Ground))
+				or not TryFindGround(Position, Group.MaxGroundSlopeDegrees, Ground)
+				or not GetIsActorSpotValid(Position, Ground, Entry.FootprintRadius, Group.MaxGroundSlopeDegrees))
 			{
 				continue;
 			}
@@ -461,6 +478,78 @@ void FSurvivalStartContentPlanner::PlanFoliage()
 			break;
 		}
 	}
+}
+
+void FSurvivalStartContentPlanner::InitReachability()
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	M_ReachNavData = nullptr;
+	UWorld* World = M_World.Get();
+	UNavigationSystemV1* NavigationSystem = World != nullptr ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World) : nullptr;
+	if (NavigationSystem == nullptr)
+	{
+		return;
+	}
+	FNavAgentProperties Agent;
+	Agent.AgentRadius = ReachAgentRadius;
+	Agent.AgentHeight = ReachAgentHeight;
+	const ANavigationData* NavData = NavigationSystem->GetNavDataForProps(Agent);
+	FNavLocation Deploy;
+	const FVector Extent(ReachProjectExtentXY, ReachProjectExtentXY, ReachProjectExtentZ);
+	if (NavData == nullptr or not NavigationSystem->ProjectPointToNavigation(M_Input.DeployCenter, Deploy, Extent, NavData))
+	{
+		return;
+	}
+	M_ReachNavData = NavData;
+	M_ReachDeploy = Deploy.Location;
+}
+
+bool FSurvivalStartContentPlanner::GetIsReachable(const FVector& Location) const
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	const ANavigationData* NavData = M_ReachNavData.Get();
+	UWorld* World = M_World.Get();
+	UNavigationSystemV1* NavigationSystem = World != nullptr ? FNavigationSystem::GetCurrent<UNavigationSystemV1>(World) : nullptr;
+	if (NavData == nullptr or NavigationSystem == nullptr)
+	{
+		// No navigation data (editor preview before a build): only the ground tests apply.
+		return true;
+	}
+	FNavLocation Projected;
+	const FVector Extent(ReachProjectExtentXY, ReachProjectExtentXY, ReachProjectExtentZ);
+	if (not NavigationSystem->ProjectPointToNavigation(Location, Projected, Extent, NavData)
+		or FVector::Dist2D(Projected.Location, Location) > ReachProjectExtentXY)
+	{
+		return false;
+	}
+	const FPathFindingQuery Query(nullptr, *NavData, M_ReachDeploy, Projected.Location,
+	                              UNavigationQueryFilter::GetQueryFilter(*NavData, nullptr, nullptr));
+	const FPathFindingResult Path = NavigationSystem->FindPathSync(Query);
+	return Path.IsSuccessful() and Path.Path.IsValid() and not Path.IsPartial()
+		and FVector::Dist2D(Path.Path->GetPathPoints().Last().Location, Projected.Location) <= ReachArriveTolerance;
+}
+
+bool FSurvivalStartContentPlanner::GetIsActorSpotValid(
+	const FVector2D& Position,
+	const FSurvivalGroundHit& Ground,
+	const float FootprintRadius,
+	const float MaxSlopeDegrees) const
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	// Gentle ground over the whole footprint plus an access ring: nothing straddles a cliff edge or sits on a ledge.
+	const float RingRadius = FootprintRadius + ActorAccessMargin;
+	const float MaxHeightDifference = FMath::Tan(FMath::DegreesToRadians(MaxSlopeDegrees)) * RingRadius;
+	for (int32 SampleIndex = 0; SampleIndex < ActorFootprintSamples; ++SampleIndex)
+	{
+		const float Angle = 2.f * PI * SampleIndex / ActorFootprintSamples;
+		FSurvivalGroundHit RingHit;
+		if (not TryFindGround(Position + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * RingRadius, MaxSlopeDegrees, RingHit)
+			or FMath::Abs(RingHit.Location.Z - Ground.Location.Z) > MaxHeightDifference)
+		{
+			return false;
+		}
+	}
+	return GetIsReachable(Ground.Location);
 }
 
 bool FSurvivalStartContentPlanner::TryFindGround(

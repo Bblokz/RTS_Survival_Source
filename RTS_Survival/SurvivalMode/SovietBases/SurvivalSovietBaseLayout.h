@@ -8,6 +8,16 @@
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseSite.h"
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseTypes.h"
 
+/** @brief How a building's ground is dressed beyond its pad decal (round 4: foundations). */
+enum class ESurvivalSovietFoundationStyle : uint8
+{
+	None,
+	// Permanent buildings: a sunk concrete slab, a worn apron to the road, a few crates and barrels along the walls.
+	Concrete,
+	// Tents: boards at the door and the apron.
+	Timber
+};
+
 /**
  * @brief One structure of a planned base. ClassIndex indexes the resolver's class table (see
  * FSurvivalSovietLayoutInput::ResolveEntry); Position is the actor pivot in world XY.
@@ -24,6 +34,11 @@ struct FSurvivalSovietPlannedStructure
 	// Threat points paid for this structure; destroying it counts towards the base's defences.
 	int32 ThreatPoints = 0;
 	ESurvivalSovietPadKind PadKind = ESurvivalSovietPadKind::None;
+	// Pads only: how the building's ground is dressed, its footprint, and the way to the nearest road (door side).
+	ESurvivalSovietFoundationStyle FoundationStyle = ESurvivalSovietFoundationStyle::None;
+	FVector2D FootprintHalf = FVector2D::ZeroVector;
+	FVector2D DoorDirection = FVector2D::ZeroVector;
+	double ApronLength = 0.0;
 };
 
 /** @brief What the wall layout really built; the manifest prints it and the matrix checks it. */

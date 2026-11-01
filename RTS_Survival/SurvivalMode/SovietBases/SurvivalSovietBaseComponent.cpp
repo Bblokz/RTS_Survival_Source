@@ -10,6 +10,7 @@
 #include "PCGGraph.h"
 #include "EngineUtils.h"
 #include "Engine/HitResult.h"
+#include "Misc/CommandLine.h"
 #include "Engine/StreamableManager.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
@@ -530,6 +531,13 @@ TArray<FSoftObjectPath> USurvivalSovietBaseComponent::CollectPresetClassPaths(
 	{
 		Paths.AddUnique(Kit.LanternMesh.ToSoftObjectPath());
 	}
+	for (const TArray<TSoftObjectPtr<UStaticMesh>>* Meshes : {&Kit.FoundationTileMeshes, &Kit.FoundationClutterMeshes, &Kit.TentBoardMeshes})
+	{
+		for (const TSoftObjectPtr<UStaticMesh>& Mesh : *Meshes)
+		{
+			Paths.AddUnique(Mesh.ToSoftObjectPath());
+		}
+	}
 	for (const TSoftClassPtr<AActor>* RoadClass : {&Kit.MainRoadClass, &Kit.LaneRoadClass, &Kit.StripRoadClass})
 	{
 		if (not RoadClass->IsNull())
@@ -584,7 +592,7 @@ void USurvivalSovietBaseComponent::StartBaseGraph(const int32 BaseArrayIndex, co
 		return;
 	}
 	Base.Volume = Volume;
-	Volume->StartGeneration(this, BaseArrayIndex, Graph, Base.Seed, Base.StartLocation->GetBuildAreaRadius());
+	Volume->StartGeneration(this, BaseArrayIndex, Graph, Base.Seed, GetBaseBuildRadius(*Base.StartLocation));
 }
 
 bool USurvivalSovietBaseComponent::GetIsBasePrepared(const int32 BaseArrayIndex) const
@@ -622,10 +630,17 @@ void USurvivalSovietBaseComponent::BeginBasePreparation(const int32 BaseArrayInd
 	FSurvivalSovietBaseState& Base = M_Bases[BaseArrayIndex];
 	Base.OnGraphStepDone = MoveTemp(OnPrepared);
 	const ASurvivalStartLocation* StartLocation = Base.StartLocation.Get();
-	Base.Site.Init(FVector2D(Base.Center), Base.Center.Z, StartLocation->GetBuildAreaRadius(), SiteReachPastBuildArea);
+	Base.Site.Init(FVector2D(Base.Center), Base.Center.Z, GetBaseBuildRadius(*StartLocation), SiteReachPastBuildArea);
 	// The load list also holds the kit's decal materials and the lantern mesh; only Blueprint classes are measured.
 	const FSurvivalSovietSiteKit& Kit = Settings->Kit;
 	TSet<FSoftObjectPath> NotClasses = {Kit.LanternMesh.ToSoftObjectPath()};
+	for (const TArray<TSoftObjectPtr<UStaticMesh>>* Meshes : {&Kit.FoundationTileMeshes, &Kit.FoundationClutterMeshes, &Kit.TentBoardMeshes})
+	{
+		for (const TSoftObjectPtr<UStaticMesh>& Mesh : *Meshes)
+		{
+			NotClasses.Add(Mesh.ToSoftObjectPath());
+		}
+	}
 	for (const TSoftObjectPtr<UMaterialInterface>* Material : {
 		     &Kit.ConcretePad, &Kit.GravelPad, &Kit.PackedEarthPad, &Kit.EarthStandIn, &Kit.MainRoadSurface, &Kit.LaneRoadSurface,
 		     &Kit.TrackRoadSurface, &Kit.StripRoadSurface, &Kit.GateApronSurface
@@ -802,7 +817,7 @@ FSurvivalSovietLayoutInput USurvivalSovietBaseComponent::BuildLayoutInput(const 
 	Input.ThreatBudget = Base.ThreatBudget;
 	Input.ReserveBudget = Base.ReserveBudget;
 	Input.Center = FVector2D(Base.Center);
-	Input.BuildAreaRadius = StartLocation->GetBuildAreaRadius();
+	Input.BuildAreaRadius = GetBaseBuildRadius(*StartLocation);
 	// Without a chosen location (debug), face the map origin.
 	Input.ThreatLocation = Base.ThreatOverride.IsSet()
 		                       ? Base.ThreatOverride.GetValue()
@@ -1476,6 +1491,7 @@ AActor* USurvivalSovietBaseComponent::SpawnStructure(FSurvivalSovietBaseState& B
 	if (ASurvivalSovietBasePad* Pad = Cast<ASurvivalSovietBasePad>(Actor))
 	{
 		Pad->InitPad(Structure.StretchXY, GetPadMaterial(Structure.PadKind));
+		DressPad(Base, Structure, *Pad);
 	}
 	else if (ASurvivalSovietBaseLantern* Lantern = Cast<ASurvivalSovietBaseLantern>(Actor))
 	{
@@ -2524,6 +2540,57 @@ FString USurvivalSovietBaseComponent::BuildSpawnManifestJson(
 		ActorsAboveGround, MaxGroundGap, *MaxGapClass, *Rules, *SovietPreview_JoinStrings(Base.Plan.DroppedSlots), *Structures, *Units, *Missing);
 }
 
+float USurvivalSovietBaseComponent::GetBaseBuildRadius(const ASurvivalStartLocation& StartLocation) const
+{
+	const USurvivalSovietBaseSettings* Settings = GetSovietBaseSettings();
+	return Settings != nullptr and Settings->BuildAreaRadius > 0.f ? Settings->BuildAreaRadius : StartLocation.GetBuildAreaRadius();
+}
+
+void USurvivalSovietBaseComponent::DressPad(FSurvivalSovietBaseState& Base, const FSurvivalSovietPlannedStructure& Structure,
+                                            ASurvivalSovietBasePad& Pad) const
+{
+	const USurvivalSovietBaseSettings* Settings = GetSovietBaseSettings();
+	if (Settings == nullptr or Structure.FoundationStyle == ESurvivalSovietFoundationStyle::None)
+	{
+		return;
+	}
+#if RTS_WITH_MAP_TESTS
+	// Before/after views of the round 4 dressing on one DLL.
+	if (FParse::Param(FCommandLine::Get(), TEXT("SovietBaseNoDressing")))
+	{
+		return;
+	}
+#endif
+	const FSurvivalSovietSiteKit& Kit = Settings->Kit;
+	const auto Load = [](const TArray<TSoftObjectPtr<UStaticMesh>>& Soft)
+	{
+		TArray<UStaticMesh*> Meshes;
+		for (const TSoftObjectPtr<UStaticMesh>& Mesh : Soft)
+		{
+			if (UStaticMesh* Loaded = Mesh.LoadSynchronous())
+			{
+				Meshes.Add(Loaded);
+			}
+		}
+		return Meshes;
+	};
+	FSurvivalSovietPadDressing Dressing;
+	Dressing.Style = Structure.FoundationStyle == ESurvivalSovietFoundationStyle::Concrete ? 1 : 2;
+	Dressing.FootprintHalf = Structure.FootprintHalf;
+	Dressing.DoorDirection = Structure.DoorDirection;
+	Dressing.ApronLength = Structure.ApronLength;
+	// Seeded by the base and the pad's place, so one seed always dresses a building the same way and neighbours differ.
+	Dressing.Seed = HashCombine(GetTypeHash(Base.Seed), GetTypeHash(FIntPoint(FMath::RoundToInt(Structure.Position.X), FMath::RoundToInt(Structure.Position.Y))));
+	Dressing.SlabMargin = Kit.FoundationMargin;
+	Dressing.SlabRise = Kit.FoundationRise;
+	Dressing.TileMeshes = Load(Kit.FoundationTileMeshes);
+	Dressing.ClutterMeshes = Load(Kit.FoundationClutterMeshes);
+	Dressing.BoardMeshes = Load(Kit.TentBoardMeshes);
+	Dressing.ApronMaterial = Kit.TrackRoadSurface.LoadSynchronous();
+	Base.DressingInstances += Pad.InitDressing(Dressing);
+	Base.DressedPads += 1;
+}
+
 void USurvivalSovietBaseComponent::LimitPipeConnections(AActor& Actor)
 {
 	// Fuel tanks lay pipes to any socket within 50 m; in a base that arcs a pipe over yard fences. The spline manager
@@ -2702,7 +2769,7 @@ FString USurvivalSovietBaseComponent::BuildMatchTableJson(const TArray<int32>& M
 		FSurvivalSovietBaseState Scan;
 		Scan.Center = Location->GetDeployCenter();
 		Scan.GroundTraceParams = FCollisionQueryParams(TEXT("SurvivalSovietBaseGround"), false);
-		Scan.Site.Init(FVector2D(Scan.Center), Scan.Center.Z, Location->GetBuildAreaRadius(),
+		Scan.Site.Init(FVector2D(Scan.Center), Scan.Center.Z, GetBaseBuildRadius(*Location),
 		               SurvivalSovietBaseConstants::SiteReachPastBuildArea);
 		TraceSiteSamples(Scan, Scan.Site.GetSampleCount());
 		Sites.Add(Location, Scan.Site);

@@ -139,6 +139,7 @@ void USurvivalSovietBaseSettings::PostLoad()
 
 void USurvivalSovietBaseSettings::FillAllDefaults()
 {
+	BuildAreaRadius = SurvivalSovietBaseDefaults::BaseBuildAreaRadius;
 	FillDefaultPresets();
 	FillDefaultKit();
 	FillDefaultDifficultyScaling();
@@ -242,6 +243,26 @@ void USurvivalSovietBaseSettings::FillDefaultKit()
 	};
 
 	Kit.PadClass = ASurvivalSovietBasePad::StaticClass();
+	const auto Mesh = [](const TCHAR* Path)
+	{
+		return TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(Path));
+	};
+	Kit.FoundationTileMeshes = {
+		Mesh(TEXT("/Game/DBK/Models/Concrete/DBK_Concrete_Floor_Tile_A.DBK_Concrete_Floor_Tile_A")),
+		Mesh(TEXT("/Game/DBK/Models/Concrete/DBK_Concrete_Floor_Tile_B.DBK_Concrete_Floor_Tile_B")),
+		Mesh(TEXT("/Game/DBK/Models/Concrete/DBK_Concrete_Floor_Tile_C.DBK_Concrete_Floor_Tile_C"))
+	};
+	Kit.FoundationClutterMeshes = {
+		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Barrel_1_Gasoline.SM_Barrel_1_Gasoline")),
+		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Barrel_2.SM_Barrel_2")),
+		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Crate_2.SM_Crate_2")),
+		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Pallet_4_Stack.SM_Pallet_4_Stack")),
+		Mesh(TEXT("/Game/MilitaryBaseCamp/Meshes/SM_CrateBig.SM_CrateBig"))
+	};
+	Kit.TentBoardMeshes = {
+		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Pallet_1.SM_Pallet_1")),
+		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Pallet_2.SM_Pallet_2"))
+	};
 	const TCHAR* const PadFolder = TEXT("/Game/RTS_Survival/SurvivalMode/Data/SovietBases/Pads/");
 	const auto PadMaterial = [PadFolder](const TCHAR* const Name)
 	{

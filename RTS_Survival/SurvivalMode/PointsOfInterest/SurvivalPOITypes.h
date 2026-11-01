@@ -304,6 +304,19 @@ struct FSurvivalPOILayoutExclusions
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "POI")
 	float GateFootClearance = 3000.f;
+
+	// The map's routes (layout JSON `routes`). Sites keep their radius plus RouteSiteClearance off a route's line (a dead
+	// convoy may lie along one instead); objects that stand up keep RouteHalfWidth plus their footprint off the line.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "POI")
+	TArray<FSurvivalPOILayoutLine> Routes;
+
+	// Half the drivable width a route keeps free of standing objects (rubric B.3: 2 500 cm).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "POI")
+	float RouteHalfWidth = 1250.f;
+
+	// Added to a site's radius when a site is kept off a route: negative because objects stand inside about 0.75 of it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "POI")
+	float RouteSiteClearance = -900.f;
 };
 
 /** @brief Where points of interest may go; all distances in cm. */
@@ -363,6 +376,11 @@ struct FSurvivalPOIPlacementRules
 	// Free ground around every start's ReservedContentSpots (its ramps and gate aprons), on top of their radius.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "POI")
 	float ReservedSpotClearance = 3000.f;
+
+	// Spacing and ring layouts of every composition are multiplied by this; objects keep their size (the shrunk map uses 0.65,
+	// and filler that no longer fits is dropped by the composer's own spot test).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "POI", meta = (ClampMin = "0.3", ClampMax = "1.0"))
+	float CompositionScale = 1.f;
 
 	// The play area when it is smaller than the landscape (a cropped map); unused while Max is not above Min.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "POI")

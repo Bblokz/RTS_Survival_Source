@@ -347,7 +347,7 @@ def step_horizon_skirt(edge_z=EDGE_Z, reach=150000.0, overlap=20.0):
             smb.actors_sub().destroy_actor(a)
     plane = unreal.load_asset("/Engine/BasicShapes/Plane")
     material = unreal.load_asset(SKIRT_MATERIAL)
-    inner = LANDSCAPE_HALF - overlap
+    inner = half() - overlap  # round 8: from the layout (the landscape is 88 200 cm now)
     depth = reach - inner
     strips = {"PX": (inner + depth / 2.0, 0.0, depth, 2.0 * reach), "NX": (-(inner + depth / 2.0), 0.0, depth, 2.0 * reach),
               "PY": (0.0, inner + depth / 2.0, 2.0 * inner, depth), "NY": (0.0, -(inner + depth / 2.0), 2.0 * inner, depth)}

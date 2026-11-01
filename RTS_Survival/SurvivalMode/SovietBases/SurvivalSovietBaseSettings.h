@@ -52,6 +52,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Difficulty")
 	TArray<FSurvivalSovietBaseDifficultyScaling> DifficultyScaling;
 
+	// The build radius every base is planned in (cm); the plans scale with it. 0 uses each start location's own
+	// BuildAreaRadius. 5 300 since the owner shrank the map (start discs flat to 5 700).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Presets", meta = (ClampMin = "0.0"))
+	float BuildAreaRadius = 5300.f;
+
 	// Strength levels are 0..MaxStrength.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Soviet Bases|Difficulty", meta = (ClampMin = "0", ClampMax = "5"))
 	int32 MaxStrength = 2;

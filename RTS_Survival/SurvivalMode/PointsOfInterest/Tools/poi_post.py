@@ -15,7 +15,7 @@ TYPE_COLOURS = {
     'convoy': (255, 120, 220), 'graveyard': (190, 90, 255), 'pumpstation': (60, 230, 200), 'relaystation': (240, 240, 240),
 }
 RAMP_HALF_WIDTH = 1100.0
-GATE_FOOT_CLEARANCE = 3000.0
+GATE_FOOT_CLEARANCE = 1750.0  # scaled with the map (x0.577) in the round 9 re-sync
 # Rubric B.3: at least 2 500 cm of free drivable width where a POI meets a route.
 ROUTE_FREE_WIDTH = 2500.0
 
@@ -229,7 +229,8 @@ def check_layout(run_dir, seed, manifest, layout_path):
                     if point_in_polygon(x, y, pad['outline']):
                         violations.append(f"#{poi['id']} {poi['type']} {actor['asset']}: on pad {world['name']}/{pad['name']}")
                 for basin in world.get('basins', []):
-                    if point_in_polygon(x, y, basin['outline']):
+                    outline = layout['oasis']['outline'] if basin['name'] == 'oasis' and 'oasis' in layout else basin['outline']
+                    if point_in_polygon(x, y, outline):
                         violations.append(f"#{poi['id']} {poi['type']} {actor['asset']}: inside basin {basin['name']}")
     # Routes (layout `routes`): where a POI touches one, the drivable width left beside the route line. A route is taken as a
     # corridor of ROUTE_FREE_WIDTH centred on its line; any actor box reaching into it narrows the route.
@@ -238,7 +239,8 @@ def check_layout(run_dir, seed, manifest, layout_path):
         nearest = None
         for poi in manifest['pois']:
             for actor in poi['actors']:
-                if not actor.get('alive'):
+                # Decals and craters lie flat: they do not narrow the drivable width.
+                if not actor.get('alive') or actor.get('role') in ('decal', 'crater'):
                     continue
                 x, y, _ = actor['xyz']
                 box_min = actor.get('lod0_box_local_min', [0, 0, 0])

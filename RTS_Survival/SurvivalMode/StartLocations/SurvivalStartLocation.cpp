@@ -14,6 +14,7 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Misc/DateTime.h"
+#include "RTS_Survival/Enemy/Convoy/ConvoyRoute.h"
 #include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
 #include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartContentSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -137,6 +138,35 @@ void ASurvivalStartLocation::LogPlansForMapTest()
 				WrecksOffBench += Actor.Transform.GetLocation().Z < PlanInput.DeployCenter.Z - 150.f ? 1 : 0;
 			}
 			Fields += FString::Printf(TEXT(" wrecks=%d/%d"), WrecksOffBench, Wrecks);
+			// Independent reachability check (chained vehicle paths, not the planner's own test) on the first seeds.
+			constexpr int32 ReachCheckSeeds = 12;
+			if (Seed <= ReachCheckSeeds)
+			{
+				int32 Checked = 0;
+				int32 Unreachable = 0;
+				FVector Deploy = PlanInput.DeployCenter;
+				UConvoyRouteLibrary::ProjectToVehicleNavmesh(World, PlanInput.DeployCenter, Deploy);
+				for (const FSurvivalPlannedActor& Actor : Plan.Actors)
+				{
+					if (Actor.Category != ESurvivalStartContentCategory::Metal and Actor.Category != ESurvivalStartContentCategory::Radixite
+						and Actor.Category != ESurvivalStartContentCategory::Wreck)
+					{
+						continue;
+					}
+					++Checked;
+					FVector Goal;
+					TArray<FVector> Points;
+					const bool bOnMesh = UConvoyRouteLibrary::ProjectToVehicleNavmesh(World, Actor.Transform.GetLocation(), Goal);
+					if (not bOnMesh or not UConvoyRouteLibrary::FindChainedVehiclePath(World, Deploy, Goal, Points))
+					{
+						++Unreachable;
+						UE_LOG(LogTemp, Warning, TEXT("SURVIVALPLANUNREACHABLE %s diff=%d seed=%d %s at %s onmesh=%d"), *GetName(),
+						       static_cast<int32>(Difficulty), Seed, *Actor.ActorClass.GetAssetName(),
+						       *Actor.Transform.GetLocation().ToCompactString(), bOnMesh ? 1 : 0);
+					}
+				}
+				Fields += FString::Printf(TEXT(" reach=%d/%d"), Checked - Unreachable, Checked);
+			}
 			for (const FSurvivalPlannedActor& Actor : Plan.Actors)
 			{
 				ClassCounts.FindOrAdd(Actor.ActorClass.GetAssetName())++;

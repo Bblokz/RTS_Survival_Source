@@ -62,9 +62,14 @@ struct FSurvivalArmyEntry
 	UPROPERTY(BlueprintReadOnly, Category = "Army")
 	FText DisplayName;
 
-	// True for the faction HQ: always in slot 0, cannot be removed and costs no supply.
+	// True for the faction HQ: always in slot 0, cannot be removed and costs no supply. Also bIsLocked.
 	UPROPERTY(BlueprintReadOnly, Category = "Army")
 	bool bIsHQ = false;
+
+	// True for the HQ and the fixed start units after it (harvesters, scavengers): they fill the first slots,
+	// cannot be removed or moved and cost no supply.
+	UPROPERTY(BlueprintReadOnly, Category = "Army")
+	bool bIsLocked = false;
 };
 
 /**
@@ -83,6 +88,41 @@ struct FSurvivalArmyPick
 };
 
 /**
+ * @brief A unit every army starts with in locked slots right after the HQ, Count times.
+ */
+USTRUCT(BlueprintType)
+struct FSurvivalLockedStartUnit
+{
+	GENERATED_BODY()
+
+	FSurvivalLockedStartUnit() = default;
+
+	FSurvivalLockedStartUnit(const FTrainingOption& InUnit, const int32 InCount)
+		: Unit(InUnit)
+		, Count(InCount)
+	{
+	}
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Army")
+	FTrainingOption Unit;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Army", meta = (ClampMin = "0", ClampMax = "64"))
+	int32 Count = 1;
+};
+
+/**
+ * @brief The locked start units of one faction (map value wrapper for FSurvivalArmySettings).
+ */
+USTRUCT(BlueprintType)
+struct FSurvivalLockedStartUnits
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Army", meta = (TitleProperty = "Unit"))
+	TArray<FSurvivalLockedStartUnit> Units;
+};
+
+/**
  * @brief Army selection rules; lives on the survival settings asset.
  */
 USTRUCT(BlueprintType)
@@ -90,7 +130,8 @@ struct FSurvivalArmySettings
 {
 	GENERATED_BODY()
 
-	// Total slots including the locked HQ slot; the selection UI wraps them into as many rows as needed.
+	// Slots including the locked HQ slot; the locked start units get extra slots on top, so the player always has
+	// SlotCount - 1 free slots. The selection UI wraps them into as many rows as needed.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Army", meta = (ClampMin = "2", ClampMax = "256"))
 	int32 SlotCount = 12;
 
@@ -100,6 +141,21 @@ struct FSurvivalArmySettings
 	// The HQ every army starts with; factions without an entry use Nomadic_GerHq.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Army")
 	TMap<ERTSFaction, FTrainingOption> HQPerFaction;
+
+	// Units every army starts with after the HQ, locked and free of supply, like the HQ.
+	// Factions without an entry use DefaultLockedStartUnits.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Army")
+	TMap<ERTSFaction, FSurvivalLockedStartUnits> LockedStartUnitsPerFaction;
+
+	// 6 Pz I harvesters and 2 scavenger squads (the German economy units); harvesters keyed as the training layout
+	// and the spawner key them (UNType_Tank).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Army", meta = (TitleProperty = "Unit"))
+	TArray<FSurvivalLockedStartUnit> DefaultLockedStartUnits = {
+		FSurvivalLockedStartUnit(
+			FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_Harvester)), 6),
+		FSurvivalLockedStartUnit(
+			FTrainingOption(EAllUnitType::UNType_Squad, static_cast<uint8>(ESquadSubtype::Squad_Ger_Scavengers)), 2)
+	};
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Army", meta = (TitleProperty = "Unit"))
 	TArray<FSurvivalUnitSupplyCost> UnitSupplyCosts;

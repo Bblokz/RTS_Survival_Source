@@ -85,6 +85,14 @@ struct FSurvivalDeploymentSettings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Deployment", meta = (ClampMin = "0.0"))
 	float InfantryLandingOffset = 900.f;
 
+	// The infantry ring stays inside this radius around the HQ: a large army packs its vehicle rings tighter
+	// (never below MinVehicleLandingSpacing) instead of landing beyond the flat start area.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Deployment", meta = (ClampMin = "1000.0"))
+	float MaxLandingRadius = 4200.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Deployment", meta = (ClampMin = "200.0"))
+	float MinVehicleLandingSpacing = 750.f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Deployment")
 	TObjectPtr<USoundBase> DeploymentStartedSound = nullptr;
 };

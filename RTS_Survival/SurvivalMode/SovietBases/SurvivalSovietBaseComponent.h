@@ -16,6 +16,7 @@ class ASurvivalModeDirector;
 struct FAsyncDetailedUnitState;
 struct FFindEnemyBaseClusters;
 class ASurvivalStartLocation;
+class ASurvivalSovietBasePad;
 class USurvivalSovietBaseSettings;
 class USplineComponent;
 struct FSurvivalSovietGroundDecalShape;
@@ -91,6 +92,9 @@ struct FSurvivalSovietBaseState
 	float PayoutFractionPaid = 0.f;
 	int32 PendingStructureSpawns = 0;
 	int32 PendingGarrisonGroups = 0;
+	// Round 4 cost note: building pads that got a foundation dressing and the mesh instances it laid.
+	int32 DressedPads = 0;
+	int32 DressingInstances = 0;
 
 	TSharedPtr<FStreamableHandle> LoadHandle;
 	// The PCG volume running this base's graph, the layout its stage nodes advance, and what wakes the sleeping node.
@@ -193,6 +197,9 @@ public:
 	void ClearBasesForPreview();
 
 	const TArray<FSurvivalSovietBaseState>& GetBaseStatesForPreview() const { return M_Bases; }
+
+	/** @return The radius a base at this start is planned in: the settings' BuildAreaRadius, else the start location's own. */
+	float GetBaseBuildRadius(const ASurvivalStartLocation& StartLocation) const;
 
 	/** @return What really stands in the world for this base, against what was planned, as JSON. */
 	FString BuildSpawnManifestJson(const FSurvivalSovietBaseState& Base, const FString& Label) const;
@@ -352,6 +359,8 @@ private:
 	/** @brief Applies a wall piece's stretch to an actor whose Blueprint dropped the spawn scale. */
 	void EnforceSpawnScale(AActor& Actor, const FVector& Scale) const;
 	static void LimitPipeConnections(AActor& Actor);
+	/** @brief Lays a building pad's foundation dressing (slab or boards, apron, clutter) from the kit; counts instances. */
+	void DressPad(FSurvivalSovietBaseState& Base, const FSurvivalSovietPlannedStructure& Structure, ASurvivalSovietBasePad& Pad) const;
 	/** @brief Pit meshes paint earth with a virtual texture material; on a map without that texture it reads black. */
 	void ReplaceVirtualTextureEarth(AActor& Actor) const;
 	void SpawnRoad(FSurvivalSovietBaseState& Base, int32 RoadIndex, const USurvivalSovietBaseSettings& Settings);

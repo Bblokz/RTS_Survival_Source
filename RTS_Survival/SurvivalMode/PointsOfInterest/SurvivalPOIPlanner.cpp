@@ -37,10 +37,14 @@ namespace SurvivalPOIPlannerConstants
 	constexpr int32 LandmarkLastRelaxLevel = 3;
 	// Site yaw offsets tried before a site is rejected because its main object does not fit.
 	constexpr float HeroYawOffsets[] = {0.f, 20.f, -20.f};
+	// A site along a route keeps the route's direction: only its two ways round are tried.
+	constexpr float RouteYawOffsets[] = {0.f, 180.f};
+	// A convoy beside a route: its column runs this far outside the route's free width (wrecks keep their footprint clear).
+	constexpr float ConvoyColumnVergeOffset = 500.f;
 	// Anchor trials (each a light composition) per request and relax level; keeps one request's frame short.
 	constexpr int32 MaxAnchorTriesPerRequest = 16;
-	// The fairness reach (30 000) less a margin.
-	constexpr double LandmarkBothStartsReach = 29000.0;
+	// The fairness reach (17 300 on the shrunk map) less a margin.
+	constexpr double LandmarkBothStartsReach = 16700.0;
 	constexpr int32 WaterTracePoints = 4;
 	// A trace that hits anything but the landscape this far above the landscape height is water, a rock or a building.
 	constexpr float OpenGroundTolerance = 60.f;
@@ -546,9 +550,19 @@ bool FSurvivalPOIPlanner::GetIsClearOfExclusions(const FVector2D& Position, cons
 	return not bIncludeLayout or GetIsClearOfLayout(Position, Radius);
 }
 
-bool FSurvivalPOIPlanner::GetIsClearOfLayout(const FVector2D& Position, const float Radius) const
+bool FSurvivalPOIPlanner::GetIsClearOfLayout(const FVector2D& Position, const float Radius, const bool bAllowRoutes) const
 {
 	const FSurvivalPOILayoutExclusions& Layout = M_Settings->Placement.Layout;
+	if (not bAllowRoutes)
+	{
+		for (const FSurvivalPOILayoutLine& Route : Layout.Routes)
+		{
+			if (SurvivalPOIGeometry::DistanceToPolyline(Position, Route.Points) < Radius + Layout.RouteSiteClearance)
+			{
+				return false;
+			}
+		}
+	}
 	for (const FSurvivalPOILayoutLine& Ramp : Layout.Ramps)
 	{
 		if (SurvivalPOIGeometry::DistanceToPolyline(Position, Ramp.Points) < Layout.RampHalfWidth + Radius
@@ -713,7 +727,17 @@ TArray<FSurvivalPOIPlanner::FSiteRequest> FSurvivalPOIPlanner::GetSiteRequests(c
 		Landmark.bIsLandmark = true;
 		Landmark.FractionWindow = LandmarkWindow;
 	}
-	for (int32 Index = 0; Index < M_Settings->GenericPerSector.Num(); ++Index)
+	if (M_Settings->GenericSitesPerSector == 1 and not M_Settings->GenericPerSector.IsEmpty())
+	{
+		// One per sector, owned by its first start: every start owns exactly one; the type alternates by sector and seed.
+		FSiteRequest& Generic = Requests.AddDefaulted_GetRef();
+		const int32 TypeIndex = FMath::Abs(Sector.SectorIndex + M_MatchSeed) % M_Settings->GenericPerSector.Num();
+		Generic.Type = M_Settings->GenericPerSector[TypeIndex];
+		Generic.bOwnedByStartA = true;
+		Generic.FractionWindow = StartASideWindow;
+		return Requests;
+	}
+	for (int32 Index = 0; Index < M_Settings->GenericPerSector.Num() and Index < M_Settings->GenericSitesPerSector; ++Index)
 	{
 		FSiteRequest& Generic = Requests.AddDefaulted_GetRef();
 		Generic.Type = M_Settings->GenericPerSector[Index];
@@ -737,31 +761,46 @@ void FSurvivalPOIPlanner::RunSiteRequest(const FSurvivalPOISector& Sector, const
 	{
 		return;
 	}
-	if (Request.bIsLandmark and TryAddSite(Sector, Request, SurvivalPOIPlannerConstants::LandmarkLastRelaxLevel, Random))
+	using namespace SurvivalPOIPlannerConstants;
+	if (Request.bIsLandmark)
 	{
+		if (TryAddSite(Sector, Request, LandmarkLastRelaxLevel, Random))
+		{
+			return;
+		}
+		M_PlanNotes.Add(FString::Printf(TEXT("sector %d: no ground for %s"), Sector.SectorIndex,
+		                                *SurvivalPOINames::GetTypeName(Request.Type)));
 		return;
 	}
-	// A generic site keeps its owner: try the owning start's other sector, on the owner's side of it.
-	if (not Request.bIsLandmark and M_Sectors.Num() > 1)
-	{
-		const int32 OwnerStart = Request.bOwnedByStartA ? Sector.StartA : Sector.StartB;
-		const FSurvivalPOISector* Other = M_Sectors.FindByPredicate([&Sector, OwnerStart](const FSurvivalPOISector& Candidate)
+	// A generic site keeps its owner (every start owns one): the neighbouring sector on the owner's side, strict first, then
+	// the last resort in the home sector and in that neighbour.
+	const int32 OwnerStart = Request.bOwnedByStartA ? Sector.StartA : Sector.StartB;
+	const FSurvivalPOISector* Other = M_Sectors.Num() < 2 ? nullptr : M_Sectors.FindByPredicate(
+		[&Sector, OwnerStart](const FSurvivalPOISector& Candidate)
 		{
 			return Candidate.SectorIndex != Sector.SectorIndex and (Candidate.StartA == OwnerStart or Candidate.StartB == OwnerStart);
 		});
-		if (Other != nullptr)
+	FSiteRequest Moved = Request;
+	if (Other != nullptr)
+	{
+		Moved.bOwnedByStartA = Other->StartA == OwnerStart;
+		Moved.FractionWindow = Moved.bOwnedByStartA ? StartASideWindow : StartBSideWindow;
+		if (TryAddSite(*Other, Moved, 0, Random) or TryAddSite(*Other, Moved, 1, Random) or TryAddSite(*Other, Moved, 2, Random))
 		{
-			FSiteRequest Moved = Request;
-			Moved.bOwnedByStartA = Other->StartA == OwnerStart;
-			Moved.FractionWindow = Moved.bOwnedByStartA ? SurvivalPOIPlannerConstants::StartASideWindow
-				                       : SurvivalPOIPlannerConstants::StartBSideWindow;
-			if (TryAddSite(*Other, Moved, 1, Random) or TryAddSite(*Other, Moved, 2, Random))
-			{
-				M_PlanNotes.Add(FString::Printf(TEXT("sector %d: %s moved to sector %d (same owner start)"), Sector.SectorIndex,
-				                                *SurvivalPOINames::GetTypeName(Request.Type), Other->SectorIndex));
-				return;
-			}
+			M_PlanNotes.Add(FString::Printf(TEXT("sector %d: %s moved to sector %d (same owner start)"), Sector.SectorIndex,
+			                                *SurvivalPOINames::GetTypeName(Request.Type), Other->SectorIndex));
+			return;
 		}
+	}
+	if (TryAddSite(Sector, Request, LandmarkLastRelaxLevel, Random))
+	{
+		return;
+	}
+	if (Other != nullptr and TryAddSite(*Other, Moved, LandmarkLastRelaxLevel, Random))
+	{
+		M_PlanNotes.Add(FString::Printf(TEXT("sector %d: %s moved to sector %d (same owner start, last resort)"), Sector.SectorIndex,
+		                                *SurvivalPOINames::GetTypeName(Request.Type), Other->SectorIndex));
+		return;
 	}
 	M_PlanNotes.Add(FString::Printf(TEXT("sector %d: no ground for %s"), Sector.SectorIndex,
 	                                *SurvivalPOINames::GetTypeName(Request.Type)));
@@ -801,7 +840,7 @@ float FSurvivalPOIPlanner::ScoreSite(const FCandidate& Candidate, const FSurviva
 		++OutRejectCounts[3];
 		return -1.f;
 	}
-	if (not GetIsClearOfLayout(Candidate.Position, Rules.SiteRadius))
+	if (not GetIsClearOfLayout(Candidate.Position, Rules.SiteRadius, GetMayLieAlongRoute(Rules.Type)))
 	{
 		++OutRejectCounts[4];
 		return -1.f;
@@ -840,11 +879,9 @@ bool FSurvivalPOIPlanner::TryAddSite(const FSurvivalPOISector& Sector, const FSi
 		const float TerrainFactor = bLastResort ? LandmarkLastTerrainFactor : SecondRelaxedTerrainFactor;
 		RelaxedRules.MaxHeightRange *= TerrainFactor;
 		RelaxedRules.MaxSlopeDegrees *= TerrainFactor;
-		// A landmark cannot move to another sector: it shrinks a little instead.
-		if (Request.bIsLandmark)
-		{
-			RelaxedRules.SiteRadius *= bLastResort ? LandmarkLastShrinkFactor : LandmarkShrinkFactor;
-		}
+		// A landmark cannot move to another sector, and a generic site that found no room in either of its owner's sectors
+		// would cost that start its site: both shrink a little instead (the composition keeps its key objects or is rejected).
+		RelaxedRules.SiteRadius *= bLastResort ? LandmarkLastShrinkFactor : LandmarkShrinkFactor;
 		Rules = &RelaxedRules;
 	}
 	const FSurvivalPOIStart& StartA = M_Context.Starts[Sector.StartA];
@@ -904,6 +941,9 @@ bool FSurvivalPOIPlanner::TryAddSite(const FSurvivalPOISector& Sector, const FSi
 	}
 	int32 NavChecks = 0;
 	int32 AnchorTries = 0;
+	// Landmarks and hangars are composed in full and must keep every scavengeable and capture target they try, except at
+	// the last resort, where the main object alone decides (round 2: stricter rules there cost a landmark).
+	const bool bNeedsComposition = GetHasHero(Request.Type) or Request.bIsLandmark;
 	for (const int32 CandidateIndex : Order)
 	{
 		const FCandidate& Candidate = M_Candidates[CandidateIndex];
@@ -919,7 +959,7 @@ bool FSurvivalPOIPlanner::TryAddSite(const FSurvivalPOISector& Sector, const FSi
 		const FSurvivalPOIStart& CandidateOwner = bCandidateOwnedByA ? StartA : StartB;
 		// Anchor or reject, before the (dearer) drive test: the site stands only if its main object fits (the hangar, the
 		// plane, the tower, the mast, enough convoy vehicles, hulls or pits); otherwise the next candidate is tried.
-		if (GetHasHero(Request.Type) and AnchorTries++ >= (bLastResort ? LandmarkLastNavChecks : MaxAnchorTriesPerRequest))
+		if (bNeedsComposition and AnchorTries++ >= (bLastResort ? LandmarkLastNavChecks : MaxAnchorTriesPerRequest))
 		{
 			break;
 		}
@@ -935,9 +975,9 @@ bool FSurvivalPOIPlanner::TryAddSite(const FSurvivalPOISector& Sector, const FSi
 		FRandomStream SiteRandom(Trial.Seed);
 		Trial.SubLayout = SiteRandom.RandRange(0, 2);
 		Trial.YawDegrees = FRotator::NormalizeAxis(GetSiteYaw(Trial, SiteRandom));
-		if (GetHasHero(Request.Type) and not TryFitSiteAnchor(Trial))
+		const bool bAlongRoute = GetMayLieAlongRoute(Request.Type) and TryAlignToRoute(Trial, *Rules, Sector);
+		if (bNeedsComposition and not TryFitSiteAnchor(Trial, GetNeedsKeyObjects(Trial) and not bLastResort, bAlongRoute))
 		{
-			++M_AnchorRejects;
 			continue;
 		}
 		if (NavChecks++ >= (bLastResort ? LandmarkLastNavChecks : MaxNavChecksPerSite))
@@ -964,8 +1004,7 @@ bool FSurvivalPOIPlanner::TryAddSite(const FSurvivalPOISector& Sector, const FSi
 			}
 		}
 		SurvivalPOINav::FChainedPathResult Path = SurvivalPOINav::FindChainedPath(
-			M_World.Get(), Origin, FVector(Candidate.Position, Candidate.Height),
-			SurvivalPOINav::HeavyTankRadius, SurvivalPOINav::HeavyTankHeight);
+			M_World.Get(), Origin, Trial.Center, SurvivalPOINav::HeavyTankRadius, SurvivalPOINav::HeavyTankHeight);
 		Path.Length += OriginOffset;
 		if (not Path.bReached)
 		{
@@ -1018,22 +1057,125 @@ bool FSurvivalPOIPlanner::GetHasHero(const ESurvivalPOIType Type)
 		or Type == ESurvivalPOIType::RelayStation;
 }
 
-bool FSurvivalPOIPlanner::TryFitSiteAnchor(FSurvivalPOISite& Site) const
+bool FSurvivalPOIPlanner::GetMayLieAlongRoute(const ESurvivalPOIType Type)
+{
+	return Type == ESurvivalPOIType::DeadConvoy;
+}
+
+bool FSurvivalPOIPlanner::GetNeedsKeyObjects(const FSurvivalPOISite& Site)
+{
+	return Site.bIsLandmark or Site.Type == ESurvivalPOIType::RuinedHangar;
+}
+
+bool FSurvivalPOIPlanner::GetNearestRoutePoint(const FVector2D& Position, FVector2D& OutPoint, FVector2D& OutTangent,
+                                               double& OutDistance) const
+{
+	OutDistance = TNumericLimits<double>::Max();
+	for (const FSurvivalPOILayoutLine& Route : M_Settings->Placement.Layout.Routes)
+	{
+		for (int32 Index = 1; Index < Route.Points.Num(); ++Index)
+		{
+			const FVector2D& From = Route.Points[Index - 1];
+			const FVector2D& To = Route.Points[Index];
+			const FVector2D Closest = FMath::ClosestPointOnSegment2D(Position, From, To);
+			const double Distance = FVector2D::Distance(Closest, Position);
+			if (Distance < OutDistance and not (To - From).IsNearlyZero())
+			{
+				OutDistance = Distance;
+				OutPoint = Closest;
+				OutTangent = (To - From).GetSafeNormal();
+			}
+		}
+	}
+	return OutDistance < TNumericLimits<double>::Max();
+}
+
+bool FSurvivalPOIPlanner::TryAlignToRoute(FSurvivalPOISite& Site, const FSurvivalPOITypeRules& Rules,
+                                          const FSurvivalPOISector& Sector) const
+{
+	using namespace SurvivalPOIPlannerConstants;
+	const FVector2D Center(Site.Center);
+	FVector2D RoutePoint = FVector2D::ZeroVector;
+	FVector2D Tangent = FVector2D::ZeroVector;
+	double Distance = 0.0;
+	if (not GetNearestRoutePoint(Center, RoutePoint, Tangent, Distance) or Distance > Site.Radius)
+	{
+		return false;
+	}
+	// The column stays on the candidate's side of the route, parallel to it, outside the route's free width.
+	FVector2D Normal(-Tangent.Y, Tangent.X);
+	if (FVector2D::DotProduct(Center - RoutePoint, Normal) < 0.0)
+	{
+		Normal = -Normal;
+	}
+	const FSurvivalPOILayoutExclusions& Layout = M_Settings->Placement.Layout;
+	const FVector2D Aligned = RoutePoint + Normal * (Layout.RouteHalfWidth + ConvoyColumnVergeOffset);
+	float Height = 0.f;
+	float HeightRange = 0.f;
+	if (not M_HeightField.GetHeight(Aligned, Height) or not GetIsClearOfExclusions(Aligned, Site.Radius, false)
+		or not GetIsClearOfLayout(Aligned, Site.Radius, true) or not GetIsTerrainFit(Aligned, Rules, Sector, HeightRange)
+		or not GetIsOpenGroundByTrace(Aligned, Site.Radius))
+	{
+		return false;
+	}
+	const float MinGap = M_Settings->Placement.MinGapBetweenSites;
+	for (const FSurvivalPOISite& Other : M_Sites)
+	{
+		if (FVector2D::Distance(FVector2D(Other.Center), Aligned) < Other.Radius + Site.Radius + MinGap)
+		{
+			return false;
+		}
+	}
+	// Of the route's two directions, the one nearer the planned yaw.
+	const float RouteYaw = FMath::RadiansToDegrees(FMath::Atan2(Tangent.Y, Tangent.X));
+	const bool bForward = FMath::Abs(FRotator::NormalizeAxis(Site.YawDegrees - RouteYaw)) <= 90.f;
+	Site.YawDegrees = FRotator::NormalizeAxis(bForward ? RouteYaw : RouteYaw + 180.f);
+	Site.Center = FVector(Aligned, Height);
+	return true;
+}
+
+bool FSurvivalPOIPlanner::TryFitSiteAnchor(FSurvivalPOISite& Site, const bool bRequireKeyObjects, const bool bAlongRoute)
 {
 	using namespace SurvivalPOIPlannerConstants;
 	const float PlannedYaw = Site.YawDegrees;
 	TArray<FSurvivalPOIPlacedObject> Trial;
-	for (const float Offset : HeroYawOffsets)
+	bool bHeldAnchor = false;
+	const TArrayView<const float> Offsets = bAlongRoute ? MakeArrayView(RouteYawOffsets) : MakeArrayView(HeroYawOffsets);
+	for (const float Offset : Offsets)
 	{
 		Site.YawDegrees = FRotator::NormalizeAxis(PlannedYaw + Offset);
+		if (GetHasHero(Site.Type))
+		{
+			Trial.Reset();
+			ComposeSite(Site, Trial, true);
+			if (not GetHoldsAnchor(Site, Trial))
+			{
+				continue;
+			}
+		}
+		bHeldAnchor = true;
+		if (not bRequireKeyObjects)
+		{
+			return true;
+		}
+		// The whole composition, exactly as the match lays it out (same seed, same order of draws and occupancy).
 		Trial.Reset();
-		ComposeSite(Site, Trial, true);
-		if (GetHoldsAnchor(Site, Trial))
+		FSurvivalPOIKeyObjectCount KeyObjects;
+		ComposeSite(Site, Trial, false, &KeyObjects);
+		if (KeyObjects.GetAllPlaced())
 		{
 			return true;
 		}
 	}
 	Site.YawDegrees = PlannedYaw;
+	if (bHeldAnchor)
+	{
+		++M_KeyObjectRejects;
+	}
+	else
+	{
+		++M_AnchorRejects;
+	}
 	return false;
 }
 

@@ -40,6 +40,8 @@ namespace SovietBaseLayoutConstants
 	constexpr double SizeFillFullBudget = 800.0;
 	constexpr double PlotScanStep = 320.0;
 	constexpr double InteriorScanStep = 480.0;
+	// The AI's base cluster search needs this many production buildings; compact plans place them first, anywhere in the build area.
+	constexpr int32 MinProductionBuildings = 2;
 	constexpr int32 TopUpCopiesFactor = 2;
 	constexpr double GunScanRingStep = 1250.0;
 	constexpr double GunScanSpotSpacing = 1400.0;
@@ -151,6 +153,9 @@ namespace SovietBaseLayoutConstants
 	constexpr double JunctionLanternTolerance = 80.0;
 
 	constexpr double PadMarginShare = 0.45;
+	// Foundation aprons run into the road verge by this much and never longer than the max (a far road gets a short worn patch).
+	constexpr double FoundationApronOverlap = 120.0;
+	constexpr double FoundationApronMaxLength = 1600.0;
 	constexpr double PadMinMargin = 70.0;
 
 	constexpr double LaunchPointStandOff = 2200.0;
@@ -417,7 +422,9 @@ namespace
 		void PlaceZone(ESurvivalSovietZone Zone, TArray<FSovietBuildingItem>& Items);
 		void FillPlot(const FSovietPlot& Plot, TArray<FSovietBuildingItem>& Items);
 		bool PlaceAnywhereInPlot(const FSovietPlot& Plot, FSovietBuildingItem& Item);
-		bool PlaceAnywhereInside(FSovietBuildingItem& Item);
+		bool PlaceAnywhereInside(FSovietBuildingItem& Item, double YawOffset = 0.0);
+		/** @brief Scans rings between two plan radii (plan units) for a spot, the building along the base axis plus YawOffset. */
+		bool PlaceInRings(FSovietBuildingItem& Item, double MinRadius, double MaxRadius, double YawOffset);
 		void NoteDropped(const FSovietBuildingItem& Item, const TCHAR* Reason);
 		bool PlaceBuildingItem(FSovietBuildingItem& Item, const FVector2D& Center, double Yaw);
 		double GetBuildingYaw(const FEnemyResolvedEntry& Entry, const FVector2D& Front, const FVector2D& Along,
@@ -477,10 +484,22 @@ namespace
 		const FSurvivalSovietWallFamily* FindWallFamily(ESurvivalSovietWallFamily FamilyKind) const;
 		void PlanYards();
 		bool GetIsInForeignYard(const FEnemyFootprint& Footprint) const;
+		// Set while a production building that found no free ground tries again on yard ground (compact plans).
+		bool bM_YardsYieldToProduction = false;
+		// Production buildings that had to stand between the interior and the build radius (logged in the dropped list).
+		TArray<FString> ProductionOutsideInterior;
+		/** @brief A production building's last resort: any free ground at either yaw, then yard ground (the yard is cut around it). */
+		bool PlaceProductionAnywhere(FSovietBuildingItem& Item);
+		/** @brief Shrinks every planned yard that overlaps this footprint to its largest part beside it. */
+		void CarveYardsAround(const FEnemyFootprint& Footprint);
+		/** @return Why a production building found no interior spot (terrain, yards, occupancy per category), for the dropped list. */
+		FString DescribeProductionBlock(const FSovietBuildingItem& Item) const;
 		/** @return The yard kind a building belongs to when it is an ammunition store, supplies or a fuel tank. */
 		static TOptional<ESurvivalSovietYardKind> GetStoreKind(const FSovietBuildingItem& Item);
 		/** @return Whether a store being placed would stand within the fire break of a yard of the other kind. */
 		bool GetIsInStoreFireBreak(const FEnemyFootprint& Footprint) const;
+		// The class of each building cluster (pads read it to dress tents differently).
+		TMap<int32, FString> ClusterClassNames;
 		// Set while PlaceBuildingItem places a store, so the footprint predicate can keep the fire break.
 		TOptional<ESurvivalSovietYardKind> PlacingStoreKind;
 		void TakeYardStores(TArray<FSovietBuildingItem>& Items);
@@ -562,6 +581,9 @@ namespace
 		void FinishPlan(FSurvivalSovietBasePlan& OutPlan);
 		void PlacePads(FSurvivalSovietBasePlan& OutPlan);
 		void ValidateBunkerRule(FSurvivalSovietBasePlan& OutPlan) const;
+		/** @brief Foundation style, footprint, door side and apron length of a building's pad (round 4). */
+		void DressPadFoundation(FSurvivalSovietPlannedStructure& Pad, const FEnemyPlacedActor& Placed, ESurvivalSovietStructureRole Role,
+		                        const TArray<FSurvivalSovietPlannedRoad>& Roads) const;
 	};
 
 	// ------------------------------------------------------------------
@@ -1319,12 +1341,169 @@ namespace
 				FillPlot(Plot, ZoneItems);
 			}
 		}
+		// Production keeps the base valid (the AI needs two production buildings): the factory first, then the rest, each
+		// may use either yaw and, as a last resort, yard ground.
+		ZoneItems.StableSort([](const FSovietBuildingItem& Left, const FSovietBuildingItem& Right)
+		{
+			return Left.ClassName.Contains(TEXT("Factory")) and not Right.ClassName.Contains(TEXT("Factory"));
+		});
 		for (FSovietBuildingItem& Item : ZoneItems)
 		{
-			if (not Item.bPlaced and not PlaceAnywhereInside(Item))
+			const bool bPlaced = Item.bPlaced or (Item.Role == ESurvivalSovietStructureRole::Production
+				                                      ? PlaceProductionAnywhere(Item)
+				                                      : PlaceAnywhereInside(Item));
+			if (not bPlaced)
 			{
-				NoteDropped(Item, TEXT("no free ground"));
+				NoteDropped(Item, Item.Role == ESurvivalSovietStructureRole::Production ? *DescribeProductionBlock(Item) : TEXT("no free ground"));
 			}
+		}
+	}
+
+	FString FSovietLayoutContext::DescribeProductionBlock(const FSovietBuildingItem& Item) const
+	{
+		using namespace SovietBaseLayoutConstants;
+		// Why every interior spot failed, counted over the same rings PlaceAnywhereInside scans (both yaws).
+		static const TCHAR* const CategoryNames[] = {
+			TEXT("buildings"), TEXT("sandbags"), TEXT("walls"), TEXT("wire"), TEXT("props"), TEXT("streets")
+		};
+		int32 Terrain = 0;
+		int32 Yard = 0;
+		int32 Categories[UE_ARRAY_COUNT(CategoryNames)] = {};
+		int32 Spots = 0;
+		const int32 Steps = FMath::FloorToInt32(Master.InteriorRadius / InteriorScanStep);
+		for (int32 Ring = 0; Ring <= Steps; ++Ring)
+		{
+			const double RingRadius = Ring * InteriorScanStep;
+			const int32 Angles = FMath::Max(1, FMath::CeilToInt32(2.0 * PI * RingRadius / InteriorScanStep));
+			for (int32 Angle = 0; Angle < Angles; ++Angle)
+			{
+				const double Yaw = 2.0 * PI * Angle / Angles;
+				for (const double Turn : {0.0, UE_DOUBLE_HALF_PI})
+				{
+					FEnemyFootprint Footprint;
+					Footprint.Center = ToWorld(FVector2D(FMath::Cos(Yaw), FMath::Sin(Yaw)) * RingRadius);
+					Footprint.HalfExtents = Item.Entry.FootprintHalfExtents + FVector2D(BuildingClearance, BuildingClearance);
+					Footprint.YawRadians = SovietLayout_Yaw(AxisForward) + Turn;
+					++Spots;
+					if (Input.Site != nullptr and not Input.Site->GetIsFootprintBuildable(Footprint))
+					{
+						++Terrain;
+						continue;
+					}
+					if (GetIsInForeignYard(Footprint))
+					{
+						++Yard;
+					}
+					for (int32 Category = 0; Category < UE_ARRAY_COUNT(CategoryNames); ++Category)
+					{
+						const uint8 Bit = EnemyOccupancyMask(static_cast<EEnemyPlacementCategory>(Category));
+						if ((EnemySolidCategoryMask() & Bit) != 0 and not Builder.GetIsFootprintFree(Footprint, Bit))
+						{
+							++Categories[Category];
+						}
+					}
+				}
+			}
+		}
+		FString Text = FString::Printf(TEXT("no free ground: %d spots, terrain %d, yard %d"), Spots, Terrain, Yard);
+		for (int32 Category = 0; Category < UE_ARRAY_COUNT(CategoryNames); ++Category)
+		{
+			Text += Categories[Category] > 0 ? FString::Printf(TEXT(", %s %d"), CategoryNames[Category], Categories[Category]) : FString();
+		}
+		return Text + FString::Printf(TEXT(", half %.0fx%.0f, interior r %.0f"), Item.Entry.FootprintHalfExtents.X,
+		                              Item.Entry.FootprintHalfExtents.Y, Master.InteriorRadius * Unit);
+	}
+
+	bool FSovietLayoutContext::PlaceProductionAnywhere(FSovietBuildingItem& Item)
+	{
+		if (PlaceAnywhereInside(Item) or PlaceAnywhereInside(Item, UE_DOUBLE_HALF_PI))
+		{
+			return true;
+		}
+		const int32 ActorsBefore = Result.Actors.Num();
+		bM_YardsYieldToProduction = true;
+		bool bPlaced = PlaceAnywhereInside(Item) or PlaceAnywhereInside(Item, UE_DOUBLE_HALF_PI);
+		bM_YardsYieldToProduction = false;
+		if (bPlaced and Result.Actors.IsValidIndex(ActorsBefore))
+		{
+			CarveYardsAround(Result.Actors[ActorsBefore].Footprint);
+			return true;
+		}
+		// Compact plans: streets and walls can leave no interior ground at all. The base must still hold the AI's two
+		// production buildings (and its factory), so those may stand in the free band between the interior and the build
+		// radius (the outer belt and outside bunkers are laid later and avoid them).
+		const bool bNeeded = ProductionPositions.Num() < SovietBaseLayoutConstants::MinProductionBuildings or Item.ClassName.Contains(TEXT("Factory"));
+		if (not bNeeded or Unit <= 0.0)
+		{
+			return false;
+		}
+		const double OuterRadius = Input.BuildAreaRadius / Unit;
+		bPlaced = PlaceInRings(Item, Master.InteriorRadius, OuterRadius, 0.0) or PlaceInRings(Item, Master.InteriorRadius, OuterRadius, UE_DOUBLE_HALF_PI);
+		if (bPlaced)
+		{
+			ProductionOutsideInterior.Add(Item.ClassName);
+		}
+		return bPlaced;
+	}
+
+	void FSovietLayoutContext::CarveYardsAround(const FEnemyFootprint& Footprint)
+	{
+		using namespace SovietBaseLayoutConstants;
+		FVector2D Corners[4];
+		Footprint.GetCorners(Corners);
+		for (FSovietYardPlan& Plan : YardPlans)
+		{
+			FSovietYardFrame& Frame = Plan.Frame;
+			// The footprint in the yard's frame, with the keep-out other buildings hold from a fence.
+			double MinAlong = TNumericLimits<double>::Max();
+			double MaxAlong = TNumericLimits<double>::Lowest();
+			double MinFront = TNumericLimits<double>::Max();
+			double MaxFront = TNumericLimits<double>::Lowest();
+			for (const FVector2D& Corner : Corners)
+			{
+				const FVector2D Offset = Corner - Frame.Center;
+				MinAlong = FMath::Min(MinAlong, FVector2D::DotProduct(Offset, Frame.Along) - YardKeepOut);
+				MaxAlong = FMath::Max(MaxAlong, FVector2D::DotProduct(Offset, Frame.Along) + YardKeepOut);
+				MinFront = FMath::Min(MinFront, FVector2D::DotProduct(Offset, Frame.Front) - YardKeepOut);
+				MaxFront = FMath::Max(MaxFront, FVector2D::DotProduct(Offset, Frame.Front) + YardKeepOut);
+			}
+			const bool bOverlaps = MaxAlong > -Frame.HalfLength and MinAlong < Frame.HalfLength and MaxFront > -Frame.HalfDepth
+				and MinFront < Frame.HalfDepth;
+			if (not bOverlaps)
+			{
+				continue;
+			}
+			// The four parts of the yard beside the footprint (low/high along, low/high front); keep the largest.
+			struct FPart
+			{
+				double AlongLow, AlongHigh, FrontLow, FrontHigh;
+			};
+			const FPart Parts[4] = {
+				{-Frame.HalfLength, MinAlong, -Frame.HalfDepth, Frame.HalfDepth},
+				{MaxAlong, Frame.HalfLength, -Frame.HalfDepth, Frame.HalfDepth},
+				{-Frame.HalfLength, Frame.HalfLength, -Frame.HalfDepth, MinFront},
+				{-Frame.HalfLength, Frame.HalfLength, MaxFront, Frame.HalfDepth}
+			};
+			const FPart* Best = nullptr;
+			double BestArea = 0.0;
+			for (const FPart& Part : Parts)
+			{
+				const double Length = Part.AlongHigh - Part.AlongLow;
+				const double Depth = Part.FrontHigh - Part.FrontLow;
+				if (Length >= 2.0 * YardMinExtent and Depth >= 2.0 * YardMinExtent and Length * Depth > BestArea)
+				{
+					BestArea = Length * Depth;
+					Best = &Part;
+				}
+			}
+			if (Best == nullptr)
+			{
+				// No part big enough: the yard keeps its frame and its stacks simply avoid the building.
+				continue;
+			}
+			Frame.Center += Frame.Along * ((Best->AlongLow + Best->AlongHigh) * 0.5) + Frame.Front * ((Best->FrontLow + Best->FrontHigh) * 0.5);
+			Frame.HalfLength = (Best->AlongHigh - Best->AlongLow) * 0.5;
+			Frame.HalfDepth = (Best->FrontHigh - Best->FrontLow) * 0.5;
 		}
 	}
 
@@ -1349,6 +1528,7 @@ namespace
 		const int32 Cluster = BeginCluster(Item.Role);
 		ClusterThreatPoints.Add(Cluster, Item.ThreatPoints);
 		ClusterZones.Add(Cluster, Item.Zone);
+		ClusterClassNames.Add(Cluster, Item.ClassName);
 		FEnemyFootprint Footprint;
 		const TArray<FEnemyResolvedEntry> Single = {Item.Entry};
 		// A store keeps the fire break from the yards of the other kind wherever it stands (the predicate reads this).
@@ -1467,13 +1647,18 @@ namespace
 		return false;
 	}
 
-	bool FSovietLayoutContext::PlaceAnywhereInside(FSovietBuildingItem& Item)
+	bool FSovietLayoutContext::PlaceAnywhereInside(FSovietBuildingItem& Item, const double YawOffset)
+	{
+		return PlaceInRings(Item, 0.0, Master.InteriorRadius, YawOffset);
+	}
+
+	bool FSovietLayoutContext::PlaceInRings(FSovietBuildingItem& Item, const double MinRadius, const double MaxRadius, const double YawOffset)
 	{
 		using namespace SovietBaseLayoutConstants;
-		const double Radius = Master.InteriorRadius;
-		const int32 Steps = FMath::FloorToInt32(Radius / InteriorScanStep);
+		const int32 FirstRing = FMath::CeilToInt32(MinRadius / InteriorScanStep);
+		const int32 Steps = FMath::FloorToInt32(MaxRadius / InteriorScanStep);
 		// Rings from the middle outward; the building lies along the base's own axis.
-		for (int32 Ring = 0; Ring <= Steps; ++Ring)
+		for (int32 Ring = FirstRing; Ring <= Steps; ++Ring)
 		{
 			const double RingRadius = Ring * InteriorScanStep;
 			const int32 Angles = FMath::Max(1, FMath::CeilToInt32(2.0 * PI * RingRadius / InteriorScanStep));
@@ -1481,7 +1666,7 @@ namespace
 			{
 				const double Yaw = 2.0 * PI * Angle / Angles;
 				const FVector2D Local = FVector2D(FMath::Cos(Yaw), FMath::Sin(Yaw)) * RingRadius;
-				if (PlaceBuildingItem(Item, ToWorld(Local), SovietLayout_Yaw(AxisForward)))
+				if (PlaceBuildingItem(Item, ToWorld(Local), SovietLayout_Yaw(AxisForward) + YawOffset))
 				{
 					return true;
 				}
@@ -2320,6 +2505,11 @@ namespace
 	bool FSovietLayoutContext::GetIsInForeignYard(const FEnemyFootprint& Footprint) const
 	{
 		using namespace SovietBaseLayoutConstants;
+		// A production building that found no other ground may take yard ground; the yard is then cut around it.
+		if (bM_YardsYieldToProduction)
+		{
+			return false;
+		}
 		FVector2D Corners[4];
 		Footprint.GetCorners(Corners);
 		for (int32 PlanIndex = 0; PlanIndex < YardPlans.Num(); ++PlanIndex)
@@ -3728,6 +3918,7 @@ namespace
 			                                   SovietBaseLayoutConstants::PadMinMargin, static_cast<double>(Kit.PadMargin));
 			Pad.StretchXY = Half + FVector2D(Margin, Margin);
 			Pad.PadKind = Kind;
+			DressPadFoundation(Pad, Placed, Role, OutPlan.Roads);
 			OutPlan.BuildingsOnPad += 1;
 			FSurvivalSovietPlannedPad& Record = OutPlan.Pads.AddDefaulted_GetRef();
 			Record.BuildingClassIndex = Placed.AssetIndex;
@@ -3737,6 +3928,51 @@ namespace
 			Record.YawRadians = Pad.YawRadians;
 			Record.Kind = Kind;
 		}
+	}
+
+	void FSovietLayoutContext::DressPadFoundation(FSurvivalSovietPlannedStructure& Pad, const FEnemyPlacedActor& Placed,
+	                                              const ESurvivalSovietStructureRole Role,
+	                                              const TArray<FSurvivalSovietPlannedRoad>& Roads) const
+	{
+		using namespace SovietBaseLayoutConstants;
+		const bool bBuilding = Role == ESurvivalSovietStructureRole::Production or Role == ESurvivalSovietStructureRole::Support;
+		if (not bBuilding)
+		{
+			return;
+		}
+		const FString ClassName = ClusterClassNames.FindRef(Placed.ClusterIndex);
+		Pad.FoundationStyle = ClassName.Contains(TEXT("Tent")) ? ESurvivalSovietFoundationStyle::Timber : ESurvivalSovietFoundationStyle::Concrete;
+		Pad.FootprintHalf = Placed.Footprint.HalfExtents;
+		// The door faces the nearest road; the apron runs from the footprint edge to that road's verge.
+		double Nearest = TNumericLimits<double>::Max();
+		FVector2D NearestPoint = Placed.Footprint.Center;
+		double NearestHalfWidth = 0.0;
+		for (const FSurvivalSovietPlannedRoad& Road : Roads)
+		{
+			for (int32 Index = 0; Index + 1 < Road.Points.Num(); ++Index)
+			{
+				const FVector2D& A = Road.Points[Index];
+				const FVector2D Along = (Road.Points[Index + 1] - A).GetSafeNormal();
+				const FVector2D Point = A + Along * FMath::Clamp(FVector2D::DotProduct(Placed.Footprint.Center - A, Along), 0.0,
+				                                                 FVector2D::Distance(A, Road.Points[Index + 1]));
+				const double Distance = FVector2D::Distance(Point, Placed.Footprint.Center);
+				if (Distance < Nearest)
+				{
+					Nearest = Distance;
+					NearestPoint = Point;
+					NearestHalfWidth = GetPaintHalfWidth(Road.Kind, Road.Width);
+				}
+			}
+		}
+		const FVector2D Toward = (NearestPoint - Placed.Footprint.Center).GetSafeNormal();
+		if (Toward.IsNearlyZero())
+		{
+			return;
+		}
+		Pad.DoorDirection = Toward;
+		FEnemyFootprint Footprint = Placed.Footprint;
+		const double EdgeDistance = Footprint.SupportRadius(Toward);
+		Pad.ApronLength = FMath::Clamp(Nearest - EdgeDistance - NearestHalfWidth + FoundationApronOverlap, 0.0, FoundationApronMaxLength);
 	}
 
 	void FSovietLayoutContext::ValidateBunkerRule(FSurvivalSovietBasePlan& OutPlan) const
@@ -3804,6 +4040,11 @@ namespace
 		OutPlan.ThreatBudget = ThreatBudget;
 		OutPlan.UnspentPoints = ThreatBudget - ThreatSpent;
 		OutPlan.DroppedSlots = DroppedSlots;
+		for (const FString& ClassName : ProductionOutsideInterior)
+		{
+			// Not dropped: listed so the manifest shows which production buildings stand outside the planned interior.
+			OutPlan.DroppedSlots.Add(ClassName + TEXT(" (placed outside the interior, compact plan)"));
+		}
 		OutPlan.EmplacementSpotsUsed = EmplacementSpotsUsed;
 		OutPlan.EmplacementSpotsAvailable = Master.Emplacements.Num() + GunScanSpots.Num();
 		OutPlan.PointsOutsideMainLine = PointsOutsideMainLine;

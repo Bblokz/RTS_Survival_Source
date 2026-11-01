@@ -4,6 +4,20 @@ Map: `/Game/RTS_Survival/SurvivalMode/Maps/SM_Desert_01`. Owner: the level worke
 (2026-11-01). Everything below is produced by the scripts in `LevelTools/` and is reproducible from them; the review
 history with images is in `Saved/AgentNotes/level_review/round_N/`.
 
+## 0. Round 8: scaled to one third of the area (current map)
+
+The owner found the map too large, so the round 7 design was scaled down with `LevelTools/survival_scale.py` (run on the
+generator output): XY x0.577 (sqrt 1/3), heights x0.75 around Z 600, landscape 14 x 63 quads (88 200 cm), playable
+78 288 cm, start ring r 24 541, build discs flat to r 5 700 (islands grow only by what the bigger disc needs and blend
+back to the plain scale 110-140 m out), every ramp re-stamped at >= 620 cm half width with gates regraded (p95 5.9-14.8
+deg). The oasis stays full size at its centre; the landforms give way round it (S3 and S4 lost their oasis-side gates and
+got new ones, north_road and east_road). Positions in the sections below are the round 7 full-size values; the current
+ones are in `LevelTools/SM_Desert_01_layout.json` and `Saved/AgentNotes/level_review/round_8/README.md`.
+
+Round 9: the oasis is 75 % of its size about its centre (heights x0.75 about the water, Z 372; palms and plants moved in
+and thinned, 93 palms remain), with drivable banks (<= 16 deg) graded into the non-pad ground round it. Red Mesa has its
+bench_road back (north_road removed); Dry Wells keeps east_road in place of wash_ford, whose head is still inside the oasis.
+
 ## 1. The map in one paragraph
 
 Five start islands (raised benches) stand on a pentagon of radius 40 000 around a central eroded table. Between them

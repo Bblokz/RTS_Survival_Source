@@ -30,6 +30,9 @@ struct FSovietPlanPen
 	int32 Strength = 0;
 	// 0..1: where the plan sits in its size range.
 	double Fill = 0.0;
+	// World cm per plan unit (build radius / 8 000). Buildings keep their size when it drops, so a plan may draw a compact
+	// variant below 1.
+	double Unit = 1.0;
 
 	double Size(const double Smallest, const double Largest) const
 	{

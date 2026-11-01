@@ -110,6 +110,8 @@ private:
 
 	void BuildDropPlan(const TArray<FSurvivalArmyPick>& Army);
 	TArray<FVector> BuildVehicleLandingLocations(int32 Amount, float& OutOuterRadius) const;
+	/** @return Ring spacing for Amount vehicles: the setting, packed tighter when the infantry would land too far out. */
+	float GetVehicleLandingSpacing(int32 Amount) const;
 	FVector ProjectToGround(const FVector& Location) const;
 
 	void OnVehicleAircraftClassLoaded();

@@ -23,6 +23,7 @@
 namespace SurvivalDeploymentConstants
 {
 	constexpr int32 PlayerOwner = 1;
+	constexpr int32 MinSlotsPerRing = 6;
 	// Sideways spacing of consecutive aircraft so they do not fly through each other.
 	constexpr float AircraftLateralSpacing = 700.f;
 	constexpr int32 AircraftLateralColumns = 5;
@@ -133,7 +134,8 @@ void USurvivalDeploymentComponent::BuildDropPlan(const TArray<FSurvivalArmyPick>
 		OtherVehicles.Add(VehicleDrop);
 	}
 
-	// The HQ lands in the centre; the other vehicles on rings around it.
+	// The HQ lands in the centre; the other vehicles on rings around it in slot order, so the locked start
+	// harvesters take the inner ring next to the HQ.
 	float OuterVehicleRadius = 0.f;
 	const TArray<FVector> VehicleLandings = BuildVehicleLandingLocations(OtherVehicles.Num(), OuterVehicleRadius);
 	if (not HQDrop.Unit.IsNone())
@@ -191,14 +193,14 @@ TArray<FVector> USurvivalDeploymentComponent::BuildVehicleLandingLocations(const
                                                                            float& OutOuterRadius) const
 {
 	TArray<FVector> Locations;
-	const FSurvivalDeploymentSettings* DeploymentSettings = GetDeploymentSettings();
-	const float Spacing = DeploymentSettings ? DeploymentSettings->VehicleLandingSpacing : 1100.f;
+	const float Spacing = GetVehicleLandingSpacing(Amount);
 	OutOuterRadius = Spacing;
 	int32 Ring = 1;
 	while (Locations.Num() < Amount)
 	{
 		const float Radius = Spacing * Ring;
-		const int32 SlotsOnRing = FMath::Max(6, FMath::FloorToInt(2.f * PI * Radius / Spacing));
+		const int32 SlotsOnRing = FMath::Max(SurvivalDeploymentConstants::MinSlotsPerRing,
+		                                     FMath::FloorToInt(2.f * PI * Ring));
 		// Offset every other ring so the vehicles of neighbouring rings do not line up.
 		const float AngleOffset = (Ring % 2 == 0) ? PI / SlotsOnRing : 0.f;
 		for (int32 Slot = 0; Slot < SlotsOnRing and Locations.Num() < Amount; ++Slot)
@@ -210,6 +212,29 @@ TArray<FVector> USurvivalDeploymentComponent::BuildVehicleLandingLocations(const
 		++Ring;
 	}
 	return Locations;
+}
+
+float USurvivalDeploymentComponent::GetVehicleLandingSpacing(const int32 Amount) const
+{
+	const FSurvivalDeploymentSettings* DeploymentSettings = GetDeploymentSettings();
+	if (not DeploymentSettings)
+	{
+		return 1100.f;
+	}
+	// Ring k holds max(6, floor(2 pi k)) vehicles whatever the spacing, so the ring count only depends on Amount.
+	int32 RingCount = 1;
+	int32 SlotsUpToRing = SurvivalDeploymentConstants::MinSlotsPerRing;
+	while (SlotsUpToRing < Amount)
+	{
+		++RingCount;
+		SlotsUpToRing += FMath::Max(SurvivalDeploymentConstants::MinSlotsPerRing,
+		                            FMath::FloorToInt(2.f * PI * RingCount));
+	}
+	const float FittingSpacing = (DeploymentSettings->MaxLandingRadius - DeploymentSettings->InfantryLandingOffset)
+		/ RingCount;
+	const float MinSpacing = FMath::Min(DeploymentSettings->MinVehicleLandingSpacing,
+	                                    DeploymentSettings->VehicleLandingSpacing);
+	return FMath::Clamp(FittingSpacing, MinSpacing, DeploymentSettings->VehicleLandingSpacing);
 }
 
 FVector USurvivalDeploymentComponent::ProjectToGround(const FVector& Location) const

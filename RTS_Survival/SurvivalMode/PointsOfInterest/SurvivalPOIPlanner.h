@@ -55,6 +55,15 @@ struct FSurvivalPOISector
 	float BasinFloorHeight = 0.f;
 };
 
+/** @brief The scavengeables and capture targets a composition tried to place, and how many found ground. */
+struct FSurvivalPOIKeyObjectCount
+{
+	int32 Attempted = 0;
+	int32 Placed = 0;
+
+	bool GetAllPlaced() const { return Placed >= Attempted; }
+};
+
 /** @brief The level actors the placement must keep away from, gathered once per match. */
 struct FSurvivalPOIWorldContext
 {
@@ -138,16 +147,31 @@ public:
 	// Reachable candidates dropped because their drive from the start was outside the type's nav band.
 	int32 GetNavBandRejects() const { return M_NavBandRejects; }
 	int32 GetAnchorRejects() const { return M_AnchorRejects; }
+	// Candidates whose main object fit but whose composition lost a scavengeable or capture target.
+	int32 GetKeyObjectRejects() const { return M_KeyObjectRejects; }
 
 	/** @return Whether a composed site holds its main object (hero, enough vehicles, hulls or pits). */
 	static bool GetHoldsAnchor(const FSurvivalPOISite& Site, const TArray<FSurvivalPOIPlacedObject>& Objects);
 	/** @return Whether the type has one main object (hangar, plane, water tower, mast) that the site must hold. */
 	static bool GetHasHero(ESurvivalPOIType Type);
+	/** @return Whether a site of this type may lie along a route (the dead convoy) instead of keeping off routes. */
+	static bool GetMayLieAlongRoute(ESurvivalPOIType Type);
+	/** @return Whether a site must keep every scavengeable and capture target its composition tries (landmarks and hangars). */
+	static bool GetNeedsKeyObjects(const FSurvivalPOISite& Site);
+
+	/**
+	 * @brief The point on the layout's routes nearest to Position.
+	 * @param OutTangent Unit direction of the route there.
+	 * @return False when the layout has no routes.
+	 */
+	bool GetNearestRoutePoint(const FVector2D& Position, FVector2D& OutPoint, FVector2D& OutTangent, double& OutDistance) const;
 	bool GetIsHeightFieldFilled() const { return M_HeightField.GetIsFilled(); }
 
 	/** @brief Lays out one site's composition in world space. */
 	/** @param bAnchorOnly Place only the hero (a planning trial): the hero is each hero type's first object, so the trial is exact and cheap. */
-	void ComposeSite(const FSurvivalPOISite& Site, TArray<FSurvivalPOIPlacedObject>& OutObjects, bool bAnchorOnly = false) const;
+	/** @param OutKeyObjects When set, counts the scavengeables and capture targets tried and placed. */
+	void ComposeSite(const FSurvivalPOISite& Site, TArray<FSurvivalPOIPlacedObject>& OutObjects, bool bAnchorOnly = false,
+	                 FSurvivalPOIKeyObjectCount* OutKeyObjects = nullptr) const;
 
 	/** @brief Places the herds and flocks; flocks over POIs read the sites given. */
 	void PlanWildlife(const TArray<FSurvivalPOISite>& Sites, TArray<FSurvivalWildlifeGroup>& OutGroups) const;
@@ -193,9 +217,21 @@ private:
 	int32 M_NavBandRejects = 0;
 	// Candidates that passed every test but could not hold their main object at any tried yaw.
 	int32 M_AnchorRejects = 0;
+	int32 M_KeyObjectRejects = 0;
 
-	/** @brief Composes the site at its planned yaw and a few offsets; keeps the first yaw whose composition holds its anchor. */
-	bool TryFitSiteAnchor(FSurvivalPOISite& Site) const;
+	/**
+	 * @brief Composes the site at its planned yaw and a few offsets; keeps the first yaw whose composition holds its anchor
+	 * and, when asked, places every scavengeable and capture target it tries (the full composition, as the match lays it out).
+	 * @param bAlongRoute The site lies along a route: only the route's two directions are tried.
+	 */
+	bool TryFitSiteAnchor(FSurvivalPOISite& Site, bool bRequireKeyObjects, bool bAlongRoute);
+
+	/**
+	 * @brief Moves a convoy site beside the route nearest to it (its column parallel to the route, the drivable width free)
+	 * when that route passes inside the site and the moved site still keeps every site rule.
+	 * @return Whether the site was moved.
+	 */
+	bool TryAlignToRoute(FSurvivalPOISite& Site, const FSurvivalPOITypeRules& Rules, const FSurvivalPOISector& Sector) const;
 
 	TArray<FSurvivalPOISector> M_Sectors;
 	TArray<FCandidate> M_Candidates;
@@ -211,7 +247,8 @@ private:
 
 	/**
 	 * @brief Picks the site for one request among the candidates of its sector.
-	 * @param RelaxLevel 0 strict; 1 ignores the fraction window and widens the distance band; 2 also accepts rougher ground.
+	 * @param RelaxLevel 0 strict; 1 ignores the fraction window and widens the distance band; 2 also accepts rougher ground and
+	 * shrinks the site; 3 (last resort) widens the band and the ground rule further and asks only for the main object.
 	 * @return Whether a site was added.
 	 */
 	bool TryAddSite(const FSurvivalPOISector& Sector, const FSiteRequest& Request, const int32 RelaxLevel, FRandomStream& Random);
@@ -221,7 +258,8 @@ private:
 	                const FVector2D& OwnerPosition, const FVector2D& DistanceBand, int32* OutRejectCounts) const;
 	/** @param bIncludeLayout Also test the layout's ramps, pads and basins (the expensive part). */
 	bool GetIsClearOfExclusions(const FVector2D& Position, const float Radius, const bool bIncludeLayout = true) const;
-	bool GetIsClearOfLayout(const FVector2D& Position, const float Radius) const;
+	/** @param bAllowRoutes Skip the routes (a site that may lie along one). */
+	bool GetIsClearOfLayout(const FVector2D& Position, const float Radius, const bool bAllowRoutes = false) const;
 	bool GetIsTerrainFit(const FVector2D& Position, const FSurvivalPOITypeRules& Rules, const FSurvivalPOISector& Sector,
 	                     float& OutHeightRange) const;
 	bool GetIsOpenGroundByTrace(const FVector2D& Position, const float Radius) const;

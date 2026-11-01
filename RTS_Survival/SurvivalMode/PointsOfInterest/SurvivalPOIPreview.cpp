@@ -83,7 +83,8 @@ namespace SurvivalPOIPreviewConstants
 	constexpr float CloseFieldOfView = 40.f;
 	constexpr double ScreenAspect = 16.0 / 9.0;
 	constexpr double MapViewMargin = 1.04;
-	constexpr double FairnessReach = 30000.0;
+	// POIs "within reach" of a start; 30 000 on the r 40 000 map, scaled x0.577 with the map.
+	constexpr double FairnessReach = 17300.0;
 	constexpr double ReferenceSpawnHeight = 60000.0;
 	constexpr double AnimalMinStartDistance = 9000.0;
 	constexpr float AnimalMaxSlope = 25.f;
@@ -2060,7 +2061,7 @@ void FSurvivalPOIPreviewRunner::RunSweep()
 		return;
 	}
 	const double Start = FPlatformTime::Seconds();
-	FString Csv = TEXT("seed,sites,battlefield,hangar,crashsite,convoy,graveyard,pumpstation,relaystation,objects,wildlife_groups,violations,anchors_missing");
+	FString Csv = TEXT("seed,sites,battlefield,hangar,crashsite,convoy,graveyard,pumpstation,relaystation,objects,wildlife_groups,violations,anchors_missing,key_missing,route_blocks,plan_ms,no_ground");
 	const FSurvivalPOIWorldContext& Context = Planner->GetContext();
 	for (const FSurvivalPOIStart& StartEntry : Context.Starts)
 	{
@@ -2070,12 +2071,41 @@ void FSurvivalPOIPreviewRunner::RunSweep()
 	Csv += TEXT(",signatures\n");
 	for (int32 Seed = 1; Seed <= M_SweepCount; ++Seed)
 	{
+		const double PlanStart = FPlatformTime::Seconds();
 		Planner->ReplanSites(Seed);
+		const double PlanMs = (FPlatformTime::Seconds() - PlanStart) * 1000.0;
 		const TArray<FSurvivalPOISite> Sites = Planner->GetSites();
 		TArray<FSurvivalPOIPlacedObject> Objects;
+		int32 KeyMissing = 0;
 		for (const FSurvivalPOISite& Site : Sites)
 		{
-			Planner->ComposeSite(Site, Objects);
+			FSurvivalPOIKeyObjectCount KeyObjects;
+			Planner->ComposeSite(Site, Objects, false, &KeyObjects);
+			KeyMissing += FSurvivalPOIPlanner::GetNeedsKeyObjects(Site) and not KeyObjects.GetAllPlaced() ? 1 : 0;
+		}
+		// Standing objects whose centre lies inside a route's free width.
+		int32 RouteBlocks = 0;
+		const float RouteHalfWidth = M_Subsystem->GetSettings() != nullptr ? M_Subsystem->GetSettings()->Placement.Layout.RouteHalfWidth : 0.f;
+		for (const FSurvivalPOIPlacedObject& Object : Objects)
+		{
+			FVector2D RoutePoint = FVector2D::ZeroVector;
+			FVector2D Tangent = FVector2D::ZeroVector;
+			double RouteDistance = 0.0;
+			const bool bFlat = Object.Role == ESurvivalPOIRole::Decal or Object.Role == ESurvivalPOIRole::Crater;
+			if (not bFlat and Planner->GetNearestRoutePoint(FVector2D(Object.Location), RoutePoint, Tangent, RouteDistance)
+				and RouteDistance < RouteHalfWidth)
+			{
+				++RouteBlocks;
+			}
+		}
+		FString NoGround;
+		for (const FString& Note : Planner->GetPlanNotes())
+		{
+			FString Type;
+			if (Note.Split(TEXT("no ground for "), nullptr, &Type))
+			{
+				NoGround += (NoGround.IsEmpty() ? TEXT("") : TEXT("|")) + Note.Left(Note.Find(TEXT(":"))).Replace(TEXT(" "), TEXT("")) + TEXT("=") + Type;
+			}
 		}
 		TArray<FSurvivalWildlifeGroup> Groups;
 		Planner->PlanWildlife(Sites, Groups);
@@ -2103,6 +2133,7 @@ void FSurvivalPOIPreviewRunner::RunSweep()
 		                       TypeCount.FindRef(ESurvivalPOIType::CrashSite), TypeCount.FindRef(ESurvivalPOIType::DeadConvoy),
 		                       TypeCount.FindRef(ESurvivalPOIType::TankGraveyard), TypeCount.FindRef(ESurvivalPOIType::PumpStation),
 		                       TypeCount.FindRef(ESurvivalPOIType::RelayStation), Objects.Num(), Groups.Num(), Violations.Num(), AnchorsMissing);
+		Csv += FString::Printf(TEXT(",%d,%d,%.1f,%s"), KeyMissing, RouteBlocks, PlanMs, NoGround.IsEmpty() ? TEXT("-") : *NoGround);
 		for (const FSurvivalPOIStart& StartEntry : Context.Starts)
 		{
 			double Nearest[2] = {-1.0, -1.0};

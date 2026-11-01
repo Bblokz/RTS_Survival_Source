@@ -110,6 +110,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Points Of Interest")
 	TArray<ESurvivalPOIType> GenericPerSector;
 
+	// 1: one generic site per sector, owned by the sector's first start (so every start owns one), its type drawn from
+	// GenericPerSector by sector and seed. 2 or more: the list above in order, both sides of the sector.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Points Of Interest", meta = (ClampMin = "0"))
+	int32 GenericSitesPerSector = 2;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Points Of Interest")
 	TArray<FSurvivalPOIAssetPool> Pools;
 

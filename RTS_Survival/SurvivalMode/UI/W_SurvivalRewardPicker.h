@@ -21,8 +21,8 @@ class UVerticalBox;
 /**
  * @brief Between waves: the reinforcement sets the player can pick, one card per option (theme, units with icon
  * and variant, supply worth) plus the intermission countdown. Clicking a card calls
- * ASurvivalModeDirector::ChooseReward. Builds its own widget tree, so it works without a Blueprint child; the
- * game keeps running and only the cards take the mouse.
+ * ASurvivalModeDirector::ChooseReward, which removes the picker; it never closes without a choice. Builds its own
+ * widget tree, so it works without a Blueprint child; the game keeps running and only the cards take the mouse.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_SurvivalRewardPicker : public UUserWidget
@@ -38,9 +38,6 @@ public:
 	 */
 	void InitRewardPicker(ASurvivalModeDirector* Director, int32 RoundNumber,
 	                      const TArray<FSurvivalRewardOption>& Options);
-
-	/** @brief Disables the cards and highlights the chosen one once a pick was made (by click or timeout). */
-	void ShowChosen(int32 OptionIndex);
 
 protected:
 	virtual void NativeOnInitialized() override;
@@ -75,6 +72,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<const UUnitVariantDataAsset> M_VariantDataAsset = nullptr;
 
+	// Set on the first card click, so a second click before the director removes the picker is ignored.
 	bool bM_HasChosen = false;
 	FTimerHandle M_TimerRefreshHandle;
 

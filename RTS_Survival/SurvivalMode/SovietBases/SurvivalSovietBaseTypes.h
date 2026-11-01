@@ -465,6 +465,26 @@ struct FSurvivalSovietSiteKit
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
 	float PadMargin = 170.f;
 
+	// Foundation slabs under permanent buildings: tiles laid over the footprint plus FoundationMargin, sunk to show an edge.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> FoundationTileMeshes;
+
+	// Sparse use-clutter along a permanent building's walls (crates, barrels, pallets); visual only, no collision.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> FoundationClutterMeshes;
+
+	// Boards laid in front of a tent's door.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> TentBoardMeshes;
+
+	// How far a slab reaches past the building footprint, cm.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
+	float FoundationMargin = 45.f;
+
+	// How far the slab's top stands above the ground (its visible edge), cm.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
+	float FoundationRise = 16.f;
+
 	// Footprints smaller than this half extent get no pad, cm.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
 	float PadMinHalfExtent = 200.f;
