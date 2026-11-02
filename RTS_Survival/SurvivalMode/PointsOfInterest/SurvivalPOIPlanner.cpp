@@ -37,6 +37,9 @@ namespace SurvivalPOIPlannerConstants
 	constexpr int32 LandmarkLastRelaxLevel = 3;
 	// Site yaw offsets tried before a site is rejected because its main object does not fit.
 	constexpr float HeroYawOffsets[] = {0.f, 20.f, -20.f};
+	// Sites whose story allows either way round (crash, pump, relay, graveyard, convoy) also try the flipped layout, which
+	// moves a large main object to the other side of the centre (away from a route or a rim).
+	constexpr float FlippableYawOffsets[] = {0.f, 20.f, -20.f, 180.f, 160.f, -160.f};
 	// A site along a route keeps the route's direction: only its two ways round are tried.
 	constexpr float RouteYawOffsets[] = {0.f, 180.f};
 	// A convoy beside a route: its column runs this far outside the route's free width (wrecks keep their footprint clear).
@@ -415,23 +418,12 @@ bool FSurvivalPOIPlanner::StepSiteSearch(const int32 MaxSamples, const double Bu
 		BuildCandidates();
 		bM_CandidatesBuilt = true;
 		M_Sites.Reset();
-		M_SectorsDone = 0;
+		BuildRequestQueue();
 		return false;
 	}
 	// One site request per step: each may run several path queries.
-	if (M_SectorRequests.IsValidIndex(M_NextRequest) and M_Sectors.IsValidIndex(M_CurrentSector))
+	if (RunNextQueuedRequest())
 	{
-		const FSiteRequest Request = M_SectorRequests[M_NextRequest++];
-		RunSiteRequest(M_Sectors[M_CurrentSector], Request, M_SectorRandom);
-		return false;
-	}
-	if (M_Sectors.IsValidIndex(M_SectorsDone))
-	{
-		const FSurvivalPOISector& Sector = M_Sectors[M_SectorsDone++];
-		M_CurrentSector = Sector.SectorIndex;
-		M_SectorRandom = FRandomStream(HashCombine(GetTypeHash(M_MatchSeed), GetTypeHash(Sector.SectorIndex)));
-		M_SectorRequests = GetSiteRequests(Sector);
-		M_NextRequest = 0;
 		return false;
 	}
 	for (int32 Index = 0; Index < M_Sites.Num(); ++Index)
@@ -705,10 +697,9 @@ bool FSurvivalPOIPlanner::GetIsOpenGroundByTrace(const FVector2D& Position, cons
 void FSurvivalPOIPlanner::ChooseSites()
 {
 	M_Sites.Reset();
-	for (const FSurvivalPOISector& Sector : M_Sectors)
+	BuildRequestQueue();
+	while (RunNextQueuedRequest())
 	{
-		FRandomStream Random(HashCombine(GetTypeHash(M_MatchSeed), GetTypeHash(Sector.SectorIndex)));
-		ChooseSitesForSector(Sector, Random);
 	}
 	for (int32 Index = 0; Index < M_Sites.Num(); ++Index)
 	{
@@ -747,12 +738,35 @@ TArray<FSurvivalPOIPlanner::FSiteRequest> FSurvivalPOIPlanner::GetSiteRequests(c
 	return Requests;
 }
 
-void FSurvivalPOIPlanner::ChooseSitesForSector(const FSurvivalPOISector& Sector, FRandomStream& Random)
+void FSurvivalPOIPlanner::BuildRequestQueue()
 {
-	for (const FSiteRequest& Request : GetSiteRequests(Sector))
+	M_RequestQueue.Reset();
+	M_SectorRandoms.Reset();
+	M_NextRequest = 0;
+	TArray<FQueuedRequest> Generics;
+	for (const FSurvivalPOISector& Sector : M_Sectors)
 	{
-		RunSiteRequest(Sector, Request, Random);
+		M_SectorRandoms.Emplace(HashCombine(GetTypeHash(M_MatchSeed), GetTypeHash(Sector.SectorIndex)));
+		for (const FSiteRequest& Request : GetSiteRequests(Sector))
+		{
+			(Request.bIsLandmark ? M_RequestQueue : Generics).Add({Sector.SectorIndex, Request});
+		}
 	}
+	M_RequestQueue.Append(Generics);
+}
+
+bool FSurvivalPOIPlanner::RunNextQueuedRequest()
+{
+	if (not M_RequestQueue.IsValidIndex(M_NextRequest))
+	{
+		return false;
+	}
+	const FQueuedRequest Queued = M_RequestQueue[M_NextRequest++];
+	if (M_Sectors.IsValidIndex(Queued.SectorIndex) and M_SectorRandoms.IsValidIndex(Queued.SectorIndex))
+	{
+		RunSiteRequest(M_Sectors[Queued.SectorIndex], Queued.Request, M_SectorRandoms[Queued.SectorIndex]);
+	}
+	return true;
 }
 
 void FSurvivalPOIPlanner::RunSiteRequest(const FSurvivalPOISector& Sector, const FSiteRequest& Request, FRandomStream& Random)
@@ -800,6 +814,16 @@ void FSurvivalPOIPlanner::RunSiteRequest(const FSurvivalPOISector& Sector, const
 	{
 		M_PlanNotes.Add(FString::Printf(TEXT("sector %d: %s moved to sector %d (same owner start, last resort)"), Sector.SectorIndex,
 		                                *SurvivalPOINames::GetTypeName(Request.Type), Other->SectorIndex));
+		return;
+	}
+	// A hangar needs a large flat footprint; rather than leave its start without a site, the start gets a battlefield
+	// (its own capture targets, the gun pits) through the same chain.
+	if (Request.Type == ESurvivalPOIType::RuinedHangar)
+	{
+		M_PlanNotes.Add(FString::Printf(TEXT("sector %d: no ground for hangar, trying a battlefield"), Sector.SectorIndex));
+		FSiteRequest Swapped = Request;
+		Swapped.Type = ESurvivalPOIType::SmallBattlefield;
+		RunSiteRequest(Sector, Swapped, Random);
 		return;
 	}
 	M_PlanNotes.Add(FString::Printf(TEXT("sector %d: no ground for %s"), Sector.SectorIndex,
@@ -879,9 +903,12 @@ bool FSurvivalPOIPlanner::TryAddSite(const FSurvivalPOISector& Sector, const FSi
 		const float TerrainFactor = bLastResort ? LandmarkLastTerrainFactor : SecondRelaxedTerrainFactor;
 		RelaxedRules.MaxHeightRange *= TerrainFactor;
 		RelaxedRules.MaxSlopeDegrees *= TerrainFactor;
-		// A landmark cannot move to another sector, and a generic site that found no room in either of its owner's sectors
-		// would cost that start its site: both shrink a little instead (the composition keeps its key objects or is rejected).
-		RelaxedRules.SiteRadius *= bLastResort ? LandmarkLastShrinkFactor : LandmarkShrinkFactor;
+		// A landmark cannot move to another sector: it shrinks a little instead; so does a battlefield (its pits and wrecks
+		// are spread loosely). Hangars keep their size: shrunk, they lost their capture vehicles and scavengeables.
+		if (Request.bIsLandmark or Request.Type == ESurvivalPOIType::SmallBattlefield)
+		{
+			RelaxedRules.SiteRadius *= bLastResort ? LandmarkLastShrinkFactor : LandmarkShrinkFactor;
+		}
 		Rules = &RelaxedRules;
 	}
 	const FSurvivalPOIStart& StartA = M_Context.Starts[Sector.StartA];
@@ -941,9 +968,9 @@ bool FSurvivalPOIPlanner::TryAddSite(const FSurvivalPOISector& Sector, const FSi
 	}
 	int32 NavChecks = 0;
 	int32 AnchorTries = 0;
-	// Landmarks and hangars are composed in full and must keep every scavengeable and capture target they try, except at
-	// the last resort, where the main object alone decides (round 2: stricter rules there cost a landmark).
-	const bool bNeedsComposition = GetHasHero(Request.Type) or Request.bIsLandmark;
+	// Landmarks and hangars are composed in full and must keep half of the scavengeables and capture targets they try; the
+	// last resort asks for one (round 2: stricter rules there cost a landmark).
+	const bool bNeedsComposition = GetHasHero(Request.Type) or Request.bIsLandmark or Request.Type == ESurvivalPOIType::SmallBattlefield;
 	for (const int32 CandidateIndex : Order)
 	{
 		const FCandidate& Candidate = M_Candidates[CandidateIndex];
@@ -976,7 +1003,7 @@ bool FSurvivalPOIPlanner::TryAddSite(const FSurvivalPOISector& Sector, const FSi
 		Trial.SubLayout = SiteRandom.RandRange(0, 2);
 		Trial.YawDegrees = FRotator::NormalizeAxis(GetSiteYaw(Trial, SiteRandom));
 		const bool bAlongRoute = GetMayLieAlongRoute(Request.Type) and TryAlignToRoute(Trial, *Rules, Sector);
-		if (bNeedsComposition and not TryFitSiteAnchor(Trial, GetNeedsKeyObjects(Trial) and not bLastResort, bAlongRoute))
+		if (bNeedsComposition and not TryFitSiteAnchor(Trial, GetNeedsKeyObjects(Trial), bLastResort, bAlongRoute))
 		{
 			continue;
 		}
@@ -1064,7 +1091,17 @@ bool FSurvivalPOIPlanner::GetMayLieAlongRoute(const ESurvivalPOIType Type)
 
 bool FSurvivalPOIPlanner::GetNeedsKeyObjects(const FSurvivalPOISite& Site)
 {
-	return Site.bIsLandmark or Site.Type == ESurvivalPOIType::RuinedHangar;
+	return Site.bIsLandmark or Site.Type == ESurvivalPOIType::RuinedHangar or Site.Type == ESurvivalPOIType::SmallBattlefield;
+}
+
+bool FSurvivalPOIPlanner::GetKeepsRewards(const FSurvivalPOISite& Site, const FSurvivalPOIKeyObjectCount& KeyObjects, const bool bLastResort)
+{
+	if (Site.Type == ESurvivalPOIType::SmallBattlefield)
+	{
+		// The battlefield is its start's capture target when the hangar found no ground: it must keep a gun pit.
+		return KeyObjects.CapturePlaced > 0;
+	}
+	return bLastResort ? KeyObjects.GetAnyPlaced() : KeyObjects.GetEnoughPlaced();
 }
 
 bool FSurvivalPOIPlanner::GetNearestRoutePoint(const FVector2D& Position, FVector2D& OutPoint, FVector2D& OutTangent,
@@ -1134,13 +1171,17 @@ bool FSurvivalPOIPlanner::TryAlignToRoute(FSurvivalPOISite& Site, const FSurviva
 	return true;
 }
 
-bool FSurvivalPOIPlanner::TryFitSiteAnchor(FSurvivalPOISite& Site, const bool bRequireKeyObjects, const bool bAlongRoute)
+bool FSurvivalPOIPlanner::TryFitSiteAnchor(FSurvivalPOISite& Site, const bool bRequireKeyObjects, const bool bLastResort,
+                                           const bool bAlongRoute)
 {
 	using namespace SurvivalPOIPlannerConstants;
 	const float PlannedYaw = Site.YawDegrees;
 	TArray<FSurvivalPOIPlacedObject> Trial;
 	bool bHeldAnchor = false;
-	const TArrayView<const float> Offsets = bAlongRoute ? MakeArrayView(RouteYawOffsets) : MakeArrayView(HeroYawOffsets);
+	// The hangar's door faces its owner: it never turns round.
+	const bool bFlippable = Site.Type != ESurvivalPOIType::RuinedHangar;
+	const TArrayView<const float> Offsets = bAlongRoute ? MakeArrayView(RouteYawOffsets)
+		                                        : (bFlippable ? MakeArrayView(FlippableYawOffsets) : MakeArrayView(HeroYawOffsets));
 	for (const float Offset : Offsets)
 	{
 		Site.YawDegrees = FRotator::NormalizeAxis(PlannedYaw + Offset);
@@ -1162,7 +1203,7 @@ bool FSurvivalPOIPlanner::TryFitSiteAnchor(FSurvivalPOISite& Site, const bool bR
 		Trial.Reset();
 		FSurvivalPOIKeyObjectCount KeyObjects;
 		ComposeSite(Site, Trial, false, &KeyObjects);
-		if (KeyObjects.GetAllPlaced())
+		if (GetKeepsRewards(Site, KeyObjects, bLastResort))
 		{
 			return true;
 		}

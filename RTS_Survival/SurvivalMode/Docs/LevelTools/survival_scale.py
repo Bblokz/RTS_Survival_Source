@@ -444,6 +444,74 @@ class Scaler:
                 s["index"], s["name"], x, y, z, s["z"], inside.max() - inside.min(), FLAT_RADIUS,
                 self.oasis_blend[r <= FLAT_RADIUS].max()))
 
+    # 5b -----------------------------------------------------------------------------------------------------------------
+    # Round 10 (owner: "mix other layers into the start pads so it is not all one sand; every start a bit different") and
+    # round 11 (coordinator: "still the same orange sand with dark blotches from the RTS camera"). Every disc was about
+    # half Weedy (the dark cracked clay) and half Sand, so all five read alike. Now each start replaces that mix with its
+    # own dominant layer in large shaped patches (up to START_DOMINANT_MAX of the cell) plus a second layer in smaller
+    # beds (up to START_SECOND_MAX). The landing ring keeps START_RING_KEEP of the strength and the gate ramps keep
+    # START_RAMP_KEEP, so the drop lanes and the drive lines stay readable.
+    # Layer looks in game (round 11 swatches): Sand = rippled orange sand, Weedy = dark cracked clay, DesertRockDark =
+    # red pebble beds, ScorchSandyStone = pale rough crust, DesertGravel = smooth pale packed ground.
+    START_VARIETY = [
+        # (dominant, second, dominant pattern): "ridges" = long wind-blown bands, "beds" = rounded patches
+        ("Sand", "ScorchSandyStone", "ridges"),         # S0 Dune Ridge: rippled sand with pale crests
+        ("ScorchSandyStone", "DesertGravel", "beds"),   # S1 Salt Flats: pale crusted flats, packed ground
+        ("DesertGravel", "DesertRockDark", "beds"),     # S2 Scorpion Basin: packed basin floor, pebble beds
+        ("DesertRockDark", "DesertGravel", "beds"),     # S3 Red Mesa: red pebble and rock beds, worn slabs
+        ("Weedy", "ScorchSandyStone", "beds"),          # S4 Dry Wells: cracked clay, pale crust rims
+    ]
+    START_DOMINANT_MAX = 0.85
+    START_SECOND_MAX = 0.6
+    START_RING_KEEP = 0.45
+    START_RAMP_KEEP = 0.25
+    START_VARIETY_FULL = 7000.0
+    START_VARIETY_RADIUS = 9500.0
+
+    def start_variety_masks(self, k, X, Y, pattern):
+        if pattern == "ridges":
+            # bands across the prevailing wind (along X here), broken up so they do not read as stripes
+            band = 0.5 + 0.5 * np.sin(Y / 520.0 + 1.8 * lf.fbm(X, Y, 2400.0, 760 + k, 2))
+            breakup = 0.5 + 0.5 * lf.fbm(X * 0.35, Y * 1.0, 3200.0, 770 + k, 3)
+            dom = lf.smoothstep(0.4, 0.62, 0.4 * band + 0.6 * breakup)
+        else:
+            n1 = 0.5 + 0.5 * lf.fbm(X, Y, 2800.0, 700 + k, 3)
+            dom = lf.smoothstep(0.42, 0.56, n1)
+        n2 = 0.5 + 0.5 * lf.fbm(X, Y, 1300.0, 720 + k, 3)
+        second = lf.smoothstep(0.54, 0.66, n2) * (1.0 - 0.5 * dom)
+        return dom, second
+
+    def start_variety(self):
+        ramp_lines = [np.asarray(r["line"])[:, :2] for r in self.ramp_rows if r.get("gate")]
+        for k, (sx, sy) in enumerate(self.new_centres):
+            r = np.hypot(self.X - sx, self.Y - sy)
+            near = r < self.START_VARIETY_RADIUS + 200.0
+            if not near.any():
+                continue
+            js, is_ = np.where(near)
+            win = (slice(js.min(), js.max() + 1), slice(is_.min(), is_.max() + 1))
+            X, Y, R = self.X[win], self.Y[win], r[win]
+            keep = 1.0 - lf.smoothstep(self.START_VARIETY_FULL, self.START_VARIETY_RADIUS, R)
+            keep *= self.START_RING_KEEP + (1.0 - self.START_RING_KEEP) * lf.smoothstep(1800.0, 2800.0, R)
+            for line in ramp_lines:
+                if np.hypot(line[:, 0] - sx, line[:, 1] - sy).min() > self.START_VARIETY_RADIUS + 1500.0:
+                    continue
+                arc, side, dist, length = lf.polyline_frame(X, Y, line)
+                keep *= self.START_RAMP_KEEP + (1.0 - self.START_RAMP_KEEP) * lf.smoothstep(500.0, 1100.0, dist)
+            dominant, second, pattern = self.START_VARIETY[k]
+            dom, sec = self.start_variety_masks(k, X, Y, pattern)
+            a1 = self.START_DOMINANT_MAX * dom * keep
+            a2 = np.minimum(self.START_SECOND_MAX * sec * keep, 0.95 - a1)
+            total = sum(self.W[n][win] for n in self.layers)
+            safe = np.maximum(total, 1e-6)
+            for name in self.layers:
+                frac = self.W[name][win] / safe
+                frac = frac * (1.0 - a1 - a2) + a1 * (name == dominant) + a2 * (name == second)
+                self.W[name][win] = frac * total
+            self.log("start %d ground: %s dominant on %.0f %% of r<70 m (mean strength %.2f), %s on %.0f %%" % (
+                k, dominant, 100.0 * float((a1[R < 7000] > 0.3).mean()), float(a1[R < 7000].mean()), second,
+                100.0 * float((a2[R < 7000] > 0.25).mean())))
+
     # 6 ------------------------------------------------------------------------------------------------------------------
     def edge(self):
         d = np.minimum(np.minimum(self.X + self.half, self.half - self.X), np.minimum(self.Y + self.half, self.half - self.Y))
@@ -689,6 +757,7 @@ def main():
     s.banks()
     s.ramps()
     s.discs()
+    s.start_variety()
     s.edge()
     rows = s.gate_audit()
     for r, rr in zip(rows, s.ramp_rows):

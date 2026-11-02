@@ -40,6 +40,7 @@
   ]
  },
  "notes": [
+  "Runtime override (2026-11-01): UW_SurvivalHud::ApplyCompactStatusLayout puts M_PhaseText, M_TimerText, M_WaveText and M_EnemiesText in one row, pins M_StatusPanel flush to the top centre (auto size) and M_BannerPanel at y 56; font sizes come from SurvivalUiLayout.h. The column and positions below are what the Blueprint holds, not what the game shows.",
   "Root SelfHitTestInvisible: the HUD never blocks RTS input; only M_DefeatPanel (Visible when shown) takes the mouse.",
   "Status plate sits 90 units from the top to clear the main game UI's top bar; adjust Slot.Position if it overlaps.",
   "M_BannerPanel and M_DefeatPanel start hidden; code shows them. M_DefeatPanel is the first canvas child (lowest z) so the design-time linter does not report the hidden shade covering the status texts; ShowDefeat hides the status plate and banner."

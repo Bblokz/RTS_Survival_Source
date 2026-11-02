@@ -60,8 +60,15 @@ struct FSurvivalPOIKeyObjectCount
 {
 	int32 Attempted = 0;
 	int32 Placed = 0;
+	// Capture targets alone (they are also in Attempted and Placed).
+	int32 CaptureAttempted = 0;
+	int32 CapturePlaced = 0;
 
 	bool GetAllPlaced() const { return Placed >= Attempted; }
+	// At least half of them, and at least one when any was tried: what a site must keep to stand.
+	bool GetEnoughPlaced() const { return 2 * Placed >= Attempted and (Attempted == 0 or Placed > 0); }
+	// At least one when any was tried: the last resort's floor.
+	bool GetAnyPlaced() const { return Attempted == 0 or Placed > 0; }
 };
 
 /** @brief The level actors the placement must keep away from, gathered once per match. */
@@ -156,8 +163,13 @@ public:
 	static bool GetHasHero(ESurvivalPOIType Type);
 	/** @return Whether a site of this type may lie along a route (the dead convoy) instead of keeping off routes. */
 	static bool GetMayLieAlongRoute(ESurvivalPOIType Type);
-	/** @return Whether a site must keep every scavengeable and capture target its composition tries (landmarks and hangars). */
+	/** @return Whether a site's composition is tested for its rewards (landmarks, hangars, and battlefields for a capture target). */
 	static bool GetNeedsKeyObjects(const FSurvivalPOISite& Site);
+	/**
+	 * @return Whether a composition keeps enough rewards to stand: half of the scavengeables and capture targets tried (one at
+	 * the last resort) for landmarks and hangars; at least one capture target for a battlefield, at every level.
+	 */
+	static bool GetKeepsRewards(const FSurvivalPOISite& Site, const FSurvivalPOIKeyObjectCount& KeyObjects, bool bLastResort);
 
 	/**
 	 * @brief The point on the layout's routes nearest to Position.
@@ -206,12 +218,16 @@ private:
 	int32 M_MatchSeed = 0;
 	bool bM_SitesChosen = false;
 	bool bM_CandidatesBuilt = false;
-	// Sectors whose sites are chosen; the search does one sector per step.
-	int32 M_SectorsDone = 0;
-	// The sector being searched one request per step, with its own seeded stream (as ChooseSites uses).
-	int32 M_CurrentSector = INDEX_NONE;
-	FRandomStream M_SectorRandom;
-	TArray<FSiteRequest> M_SectorRequests;
+	struct FQueuedRequest
+	{
+		int32 SectorIndex = INDEX_NONE;
+		FSiteRequest Request;
+	};
+	// Every sector's landmark first, then the generic sites (a generic falling back into a neighbouring sector must not
+	// take the ground that sector's landmark needs); the search runs one request per step.
+	TArray<FQueuedRequest> M_RequestQueue;
+	// One seeded stream per sector, shared by that sector's requests.
+	TArray<FRandomStream> M_SectorRandoms;
 	int32 M_NextRequest = 0;
 	int32 M_UnreachableCandidates = 0;
 	int32 M_NavBandRejects = 0;
@@ -221,10 +237,11 @@ private:
 
 	/**
 	 * @brief Composes the site at its planned yaw and a few offsets; keeps the first yaw whose composition holds its anchor
-	 * and, when asked, places every scavengeable and capture target it tries (the full composition, as the match lays it out).
+	 * and, when asked, keeps enough of the scavengeables and capture targets it tries (the full composition, as the match lays
+	 * it out): half of them, or at the last resort at least one.
 	 * @param bAlongRoute The site lies along a route: only the route's two directions are tried.
 	 */
-	bool TryFitSiteAnchor(FSurvivalPOISite& Site, bool bRequireKeyObjects, bool bAlongRoute);
+	bool TryFitSiteAnchor(FSurvivalPOISite& Site, bool bRequireKeyObjects, bool bLastResort, bool bAlongRoute);
 
 	/**
 	 * @brief Moves a convoy site beside the route nearest to it (its column parallel to the route, the drivable width free)
@@ -241,7 +258,10 @@ private:
 	void BuildSectors();
 	void BuildCandidates();
 	void ChooseSites();
-	void ChooseSitesForSector(const FSurvivalPOISector& Sector, FRandomStream& Random);
+	/** @brief Fills the request queue (landmarks of all sectors, then generic sites) and the per-sector streams. */
+	void BuildRequestQueue();
+	/** @brief Runs the next queued request. @return False when the queue is done. */
+	bool RunNextQueuedRequest();
 	void RunSiteRequest(const FSurvivalPOISector& Sector, const FSiteRequest& Request, FRandomStream& Random);
 	TArray<FSiteRequest> GetSiteRequests(const FSurvivalPOISector& Sector) const;
 

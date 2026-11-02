@@ -15,6 +15,9 @@ namespace SurvivalPOIComposerConstants
 	constexpr float FenceBreachChance = 0.08f;
 	// Largest footprint radius of a standing object, for picking the route segments a composition must test.
 	constexpr float MaxRouteFootprint = 1500.f;
+	// Extra distance a standing object keeps beyond the route's free width and a gate foot's clearance: a Blueprint's box
+	// reaches a little past its footprint radius (the post check measures the box).
+	constexpr float LayoutKeepMargin = 100.f;
 }
 
 /**
@@ -86,6 +89,8 @@ private:
 	FSurvivalPOIKeyObjectCount* M_KeyObjects = nullptr;
 	// Route segments that pass near the site: standing objects keep the route's free width plus their footprint off them.
 	TArray<TPair<FVector2D, FVector2D>> M_NearRouteSegments;
+	// Gate feet near the site: standing objects keep the gate foot clearance plus their footprint from them.
+	TArray<FVector2D> M_NearGateFeet;
 	FVector2D M_Forward = FVector2D(1.0, 0.0);
 	FVector2D M_Right = FVector2D(0.0, 1.0);
 	float M_Mirror = 1.f;
@@ -122,15 +127,31 @@ private:
 				}
 			}
 		}
+		for (const FSurvivalPOILayoutLine& Ramp : Layout.Ramps)
+		{
+			if (FVector2D::Distance(Ramp.FootPoint, Center) <= M_Site.Radius * InsideSiteTolerance + Layout.GateFootClearance + MaxRouteFootprint)
+			{
+				M_NearGateFeet.Add(Ramp.FootPoint);
+			}
+		}
 	}
 
-	/** @return Whether a standing object of this radius at World keeps the free width of every route. */
+	/** @return Whether a standing object of this radius at World keeps the free width of every route and clear of every gate foot. */
 	bool GetIsClearOfRoutes(const FVector2D& World, const float Radius) const
 	{
-		const float Keep = M_Settings.Placement.Layout.RouteHalfWidth + Radius;
+		using namespace SurvivalPOIComposerConstants;
+		const FSurvivalPOILayoutExclusions& Layout = M_Settings.Placement.Layout;
+		const float Keep = Layout.RouteHalfWidth + Radius + LayoutKeepMargin;
 		for (const TPair<FVector2D, FVector2D>& Segment : M_NearRouteSegments)
 		{
 			if (FVector2D::Distance(FMath::ClosestPointOnSegment2D(World, Segment.Key, Segment.Value), World) < Keep)
+			{
+				return false;
+			}
+		}
+		for (const FVector2D& Foot : M_NearGateFeet)
+		{
+			if (FVector2D::Distance(Foot, World) < Layout.GateFootClearance + Radius + LayoutKeepMargin)
 			{
 				return false;
 			}
@@ -264,7 +285,47 @@ private:
 		if (bCounted)
 		{
 			++M_KeyObjects->Attempted;
+			M_KeyObjects->CaptureAttempted += Role == ESurvivalPOIRole::Capture ? 1 : 0;
 		}
+		const TOptional<FVector2D> Placed = TryPlaceAsset(AssetKey, *Asset, Role, Local, LocalYaw, Jitter, SinkCm, ScaleOverride, bKeyObject,
+		                                                  bCounted);
+		if (Placed.IsSet() or Role != ESurvivalPOIRole::Hero)
+		{
+			return Placed;
+		}
+		// A main object that does not fit tries the other models of its pool, smallest first (the Avenger where the DC-3's
+		// wings would reach a route or the rim).
+		const int32 PoolIndex = M_Settings.FindPoolIndex(PoolName);
+		const TArray<FSurvivalPOIAsset>& Assets = M_Settings.Pools[PoolIndex].Assets;
+		TArray<int32> Others;
+		for (int32 Index = 0; Index < Assets.Num(); ++Index)
+		{
+			const int32 OtherKey = PoolIndex * FSurvivalPOIPlacedObject::AssetKeyStride + Index;
+			if (OtherKey != AssetKey and Assets[Index].GetIsSet())
+			{
+				Others.Add(Index);
+			}
+		}
+		Others.Sort([&Assets](const int32 A, const int32 B) { return Assets[A].FootprintRadius < Assets[B].FootprintRadius; });
+		for (const int32 Index : Others)
+		{
+			const TOptional<FVector2D> Fallback = TryPlaceAsset(PoolIndex * FSurvivalPOIPlacedObject::AssetKeyStride + Index, Assets[Index], Role,
+			                                                    Local, LocalYaw, Jitter, SinkCm, ScaleOverride, bKeyObject, bCounted);
+			if (Fallback.IsSet())
+			{
+				return Fallback;
+			}
+		}
+		return {};
+	}
+
+	/** @brief Tries one asset at the spot and around it; adds it to the output and the occupancy when it fits. */
+	TOptional<FVector2D> TryPlaceAsset(const int32 AssetKey, const FSurvivalPOIAsset& AssetRef, const ESurvivalPOIRole Role,
+	                                   const FVector2D& Local, const float LocalYaw, const float Jitter, const float SinkCm,
+	                                   const float ScaleOverride, const bool bKeyObject, const bool bCounted)
+	{
+		using namespace SurvivalPOIComposerConstants;
+		const FSurvivalPOIAsset* Asset = &AssetRef;
 		const int32 TotalAttempts = bKeyObject and M_Settings.Placement.CompositionScale < 1.f ? 2 * PlaceAttempts : PlaceAttempts;
 		for (int32 TryIndex = 0; TryIndex < TotalAttempts; ++TryIndex)
 		{
@@ -291,6 +352,7 @@ private:
 			if (bCounted)
 			{
 				++M_KeyObjects->Placed;
+				M_KeyObjects->CapturePlaced += Role == ESurvivalPOIRole::Capture ? 1 : 0;
 			}
 			const bool bIsFlat = Role == ESurvivalPOIRole::Decal or Role == ESurvivalPOIRole::Crater;
 			if (not bIsFlat and Asset->HalfExtent.X > 0.f and Asset->HalfExtent.Y > 0.f)
