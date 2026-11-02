@@ -187,7 +187,7 @@ bool UHarvester::AddHarvestedResourcesToCargo(const int32 Amount, const ERTSReso
 			return true;
 		}
 		M_CargoSpace[ResourceType].AddResource(Amount);
-		if (M_IOwnerHarvesterInterface.IsValid())
+		if (GetIsValidOwnerHarvesterInterface())
 		{
 			M_IOwnerHarvesterInterface->OnResourceStorageChanged(GetPercentageCapacityFilled(ResourceType), ResourceType);
 		}
@@ -500,7 +500,7 @@ void UHarvester::TerminateHarvestCommand()
 		}
 		break;
 	case EHarvesterAIAction::PlayHarvestAnimation:
-		if (M_IOwnerHarvesterInterface.IsValid())
+		if (GetIsValidOwnerHarvesterInterface())
 		{
 			M_IOwnerHarvesterInterface->Execute_StopHarvesterAnimation(GetOwner());
 		}
@@ -887,19 +887,17 @@ void UHarvester::OnMoveToTargetResourceFinished(FAIRequestID RequestID, const FP
 
 void UHarvester::HarvestAIAction_PlayHarvesterAnimation()
 {
-	if (M_IOwnerHarvesterInterface.IsValid())
-	{
-		if (TargetResource.IsValid())
-		{
-			RotateTowardsTargetLocation(TargetResource->GetResourceLocationNotThreadSafe());
-		}
-		M_IOwnerHarvesterInterface->Execute_PlayHarvesterAnimation(GetOwner());
-	}
-	else
+	if (not GetIsValidOwnerHarvesterInterface())
 	{
 		HarvestDebug("Harvester interface not valid, cannot play harvesting animation", FColor::Red);
 		HarvestAIExecuteAction(EHarvesterAIAction::FinishHarvestCommand);
+		return;
 	}
+	if (TargetResource.IsValid())
+	{
+		RotateTowardsTargetLocation(TargetResource->GetResourceLocationNotThreadSafe());
+	}
+	M_IOwnerHarvesterInterface->Execute_PlayHarvesterAnimation(GetOwner());
 }
 
 void UHarvester::HarvestAIAction_AsyncGetResource()
@@ -1011,7 +1009,8 @@ void UHarvester::AsyncOnReceivedDropOffs(const TArray<TWeakObjectPtr<UResourceDr
 	}
 	for (auto EachDropOff : DropOffs)
 	{
-		if (not EachDropOff.IsValid() || not EachDropOff->GetIsDropOffActive())
+		if (not EachDropOff.IsValid() || not EachDropOff->GetIsDropOffActive()
+			|| EachDropOff->GetDropOffCapacity(M_TargetResourceType) <= 0)
 		{
 			continue;
 		}
@@ -1027,6 +1026,11 @@ void UHarvester::AsyncOnReceivedDropOffs(const TArray<TWeakObjectPtr<UResourceDr
 	if (TryClearIgnoredDropOffsForImmediateRetry())
 	{
 		HarvestAIExecuteAction(EHarvesterAIAction::AsyncFindDropOff);
+		return;
+	}
+
+	if (TryDiscardCargoForPendingResourceSwitch())
+	{
 		return;
 	}
 
@@ -1264,7 +1268,7 @@ void UHarvester::HarvestAIAction_DropOffResources()
 	if (M_CargoSpace.Contains(M_TargetResourceType))
 	{
 		M_CargoSpace[M_TargetResourceType].CurrentAmount = AmountLeft;
-		if (M_IOwnerHarvesterInterface.IsValid())
+		if (GetIsValidOwnerHarvesterInterface())
 		{
 			M_IOwnerHarvesterInterface->OnResourceStorageChanged(GetPercentageCapacityFilled(M_TargetResourceType),
 			                                                     M_TargetResourceType);
@@ -1280,6 +1284,47 @@ void UHarvester::HarvestAIAction_DropOffResources()
 	{
 		OnDroppedOffAllTargetResources();
 	}
+}
+
+bool UHarvester::TryDiscardCargoForPendingResourceSwitch()
+{
+	if (M_TargetResourceTypeAfterDropOff == ERTSResourceType::Resource_None
+		|| M_TargetResourceTypeAfterDropOff == M_TargetResourceType
+		|| not M_CargoSpace.Contains(M_TargetResourceTypeAfterDropOff))
+	{
+		return false;
+	}
+
+	FHarvesterCargoSlot* CargoSlot = M_CargoSpace.Find(M_TargetResourceType);
+	if (CargoSlot == nullptr || CargoSlot->CurrentAmount <= 0)
+	{
+		return false;
+	}
+
+	// No drop-off can accept the old cargo, so discard it to honor the player's resource switch.
+	CargoSlot->CurrentAmount = 0;
+	M_TargetDropOff.Reset();
+	if (GetIsValidOwnerHarvesterInterface())
+	{
+		M_IOwnerHarvesterInterface->OnResourceStorageChanged(0, M_TargetResourceType);
+	}
+	OnDroppedOffAllTargetResources();
+	return true;
+}
+
+bool UHarvester::GetIsValidOwnerHarvesterInterface() const
+{
+	if (M_IOwnerHarvesterInterface.IsValid())
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+		this,
+		"M_IOwnerHarvesterInterface",
+		"GetIsValidOwnerHarvesterInterface",
+		this);
+	return false;
 }
 
 void UHarvester::OnDroppedOffAllTargetResources()

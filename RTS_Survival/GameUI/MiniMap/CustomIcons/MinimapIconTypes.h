@@ -18,6 +18,9 @@ enum class EMinimapIconType : uint8
 	Warning UMETA(DisplayName = "Warning"),
 	Scavenge,
 	Train UMETA(DisplayName = "Train"),
+	// Survival waves: a chevron drawn pointing along +X that rotates with the wave's heading, and an upright badge.
+	IncomingWave UMETA(DisplayName = "Incoming Wave"),
+	IncomingWaveBadge UMETA(DisplayName = "Incoming Wave Badge"),
 };
 
 USTRUCT(BlueprintType)

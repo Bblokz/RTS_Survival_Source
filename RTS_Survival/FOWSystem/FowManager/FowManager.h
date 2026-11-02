@@ -209,6 +209,16 @@ public:
 
 	bool RemoveCustomMiniMapIcon(const FName IconId);
 
+	/**
+	 * @brief Moves a fixed-location custom icon, for markers that follow something that is not one actor
+	 * (e.g. the centroid of a group of units).
+	 * @param IconId ID returned by AddCustomMiniMapIcon.
+	 * @param WorldLocation New world location of the icon.
+	 * @param WorldRotation New world rotation; its yaw turns the icon on the minimap.
+	 * @return False when no icon has this ID.
+	 */
+	bool SetCustomMiniMapIconTransform(const FName IconId, const FVector& WorldLocation, const FRotator& WorldRotation);
+
 	bool SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType);
 
 	/**
