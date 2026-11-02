@@ -220,7 +220,7 @@ def check_layout(run_dir, seed, manifest, layout_path):
                         violations.append(f"#{poi['id']} {poi['type']} {actor['asset']}: in ramp corridor {landform['name']}/{ramp['name']} ({corridor:.0f})")
                     foot = max(ramp['line'], key=lambda p: math.hypot(p[0] - start['x'], p[1] - start['y']))
                     if math.hypot(x - foot[0], y - foot[1]) < GATE_FOOT_CLEARANCE + reach:
-                        violations.append(f"#{poi['id']} {poi['type']} {actor['asset']}: within 3000 of gate foot {landform['name']}/{ramp['name']}")
+                        violations.append(f"#{poi['id']} {poi['type']} {actor['asset']}: within {GATE_FOOT_CLEARANCE:.0f} of gate foot {landform['name']}/{ramp['name']}")
                 for pad in landform['pads']:
                     if point_in_polygon(x, y, pad['outline']):
                         violations.append(f"#{poi['id']} {poi['type']} {actor['asset']}: on pad {landform['name']}/{pad['name']}")

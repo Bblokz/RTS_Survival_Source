@@ -156,6 +156,19 @@ namespace SovietBaseLayoutConstants
 	// Foundation aprons run into the road verge by this much and never longer than the max (a far road gets a short worn patch).
 	constexpr double FoundationApronOverlap = 120.0;
 	constexpr double FoundationApronMaxLength = 1600.0;
+	// Building class name tokens and the footprint each class gets (round 5: one design per class, not one tray).
+	const TPair<const TCHAR*, ESurvivalSovietFoundationStyle> FoundationStyleTokens[] = {
+		{TEXT("Factory"), ESurvivalSovietFoundationStyle::Concrete},
+		{TEXT("CoolingTowers"), ESurvivalSovietFoundationStyle::Concrete},
+		{TEXT("ResearchCenter"), ESurvivalSovietFoundationStyle::Concrete},
+		{TEXT("Tent"), ESurvivalSovietFoundationStyle::Timber},
+		{TEXT("Barracks"), ESurvivalSovietFoundationStyle::Gravel},
+		{TEXT("AmmoStorage"), ESurvivalSovietFoundationStyle::Hardstanding},
+		{TEXT("FuelStorage"), ESurvivalSovietFoundationStyle::Hardstanding},
+		{TEXT("Supplies"), ESurvivalSovietFoundationStyle::Hardstanding},
+		{TEXT("ContainerHut"), ESurvivalSovietFoundationStyle::Hardstanding},
+		{TEXT("AdminBunker"), ESurvivalSovietFoundationStyle::Forecourt},
+	};
 	constexpr double PadMinMargin = 70.0;
 
 	constexpr double LaunchPointStandOff = 2200.0;
@@ -581,6 +594,8 @@ namespace
 		void FinishPlan(FSurvivalSovietBasePlan& OutPlan);
 		void PlacePads(FSurvivalSovietBasePlan& OutPlan);
 		void ValidateBunkerRule(FSurvivalSovietBasePlan& OutPlan) const;
+		/** @return The footprint design of a building class (by name token), None for classes that keep the plain pad. */
+		static ESurvivalSovietFoundationStyle GetFoundationStyle(const FString& ClassName);
 		/** @brief Foundation style, footprint, door side and apron length of a building's pad (round 4). */
 		void DressPadFoundation(FSurvivalSovietPlannedStructure& Pad, const FEnemyPlacedActor& Placed, ESurvivalSovietStructureRole Role,
 		                        const TArray<FSurvivalSovietPlannedRoad>& Roads) const;
@@ -3904,7 +3919,15 @@ namespace
 			const ESurvivalSovietPadKind* ZoneKind = Zone != nullptr ? Master.PadKinds.Find(*Zone) : nullptr;
 			const ESurvivalSovietPadKind Kind = bDefence ? ESurvivalSovietPadKind::PackedEarth : ZoneKind != nullptr ? *ZoneKind : Master.DefaultPad;
 			const FVector2D Half = Placed.Footprint.HalfExtents;
-			if (Resolved.IsEmpty() or Kind == ESurvivalSovietPadKind::None or FMath::Max(Half.X, Half.Y) < Kit.PadMinHalfExtent)
+			// A class with a footprint design (the container hut) gets its pad however small; a pole without one is exempt.
+			const FString ClassName = ClusterClassNames.FindRef(Placed.ClusterIndex);
+			const bool bHasDesign = GetFoundationStyle(ClassName) != ESurvivalSovietFoundationStyle::None;
+			const bool bTooSmall = not bHasDesign and FMath::Max(Half.X, Half.Y) < Kit.PadMinHalfExtent;
+			if (bTooSmall)
+			{
+				OutPlan.PadExemptClasses.Add(ClassName.IsEmpty() ? TEXT("unnamed") : ClassName);
+			}
+			if (Resolved.IsEmpty() or Kind == ESurvivalSovietPadKind::None or bTooSmall)
 			{
 				continue;
 			}
@@ -3930,6 +3953,19 @@ namespace
 		}
 	}
 
+	ESurvivalSovietFoundationStyle FSovietLayoutContext::GetFoundationStyle(const FString& ClassName)
+	{
+		using namespace SovietBaseLayoutConstants;
+		for (const TPair<const TCHAR*, ESurvivalSovietFoundationStyle>& Entry : FoundationStyleTokens)
+		{
+			if (ClassName.Contains(Entry.Key))
+			{
+				return Entry.Value;
+			}
+		}
+		return ESurvivalSovietFoundationStyle::None;
+	}
+
 	void FSovietLayoutContext::DressPadFoundation(FSurvivalSovietPlannedStructure& Pad, const FEnemyPlacedActor& Placed,
 	                                              const ESurvivalSovietStructureRole Role,
 	                                              const TArray<FSurvivalSovietPlannedRoad>& Roads) const
@@ -3940,8 +3976,11 @@ namespace
 		{
 			return;
 		}
-		const FString ClassName = ClusterClassNames.FindRef(Placed.ClusterIndex);
-		Pad.FoundationStyle = ClassName.Contains(TEXT("Tent")) ? ESurvivalSovietFoundationStyle::Timber : ESurvivalSovietFoundationStyle::Concrete;
+		Pad.FoundationStyle = GetFoundationStyle(ClusterClassNames.FindRef(Placed.ClusterIndex));
+		if (Pad.FoundationStyle == ESurvivalSovietFoundationStyle::None)
+		{
+			return;
+		}
 		Pad.FootprintHalf = Placed.Footprint.HalfExtents;
 		// The door faces the nearest road; the apron runs from the footprint edge to that road's verge.
 		double Nearest = TNumericLimits<double>::Max();

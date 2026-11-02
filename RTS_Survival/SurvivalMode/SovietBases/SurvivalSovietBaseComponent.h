@@ -7,6 +7,7 @@
 #include "CollisionQueryParams.h"
 #include "Engine/TimerHandle.h"
 #include "UObject/ObjectKey.h"
+#include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseDressing.h"
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseLayout.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
@@ -20,6 +21,7 @@ class ASurvivalSovietBasePad;
 class USurvivalSovietBaseSettings;
 class USplineComponent;
 struct FSurvivalSovietGroundDecalShape;
+struct FSurvivalSovietSiteKit;
 struct FStreamableHandle;
 
 /** @brief Broadcast once when all production buildings of a base are dead (BaseIndex, base centre). */
@@ -92,9 +94,12 @@ struct FSurvivalSovietBaseState
 	float PayoutFractionPaid = 0.f;
 	int32 PendingStructureSpawns = 0;
 	int32 PendingGarrisonGroups = 0;
-	// Round 4 cost note: building pads that got a foundation dressing and the mesh instances it laid.
+	// Footprint dressing (round 5): the base's one dressing actor, what each pad laid, and the cost counts.
+	TWeakObjectPtr<ASurvivalSovietBaseDressing> Dressing;
+	TArray<FSurvivalSovietFootprintRecord> FootprintRecords;
 	int32 DressedPads = 0;
 	int32 DressingInstances = 0;
+	int32 DressingComponents = 0;
 
 	TSharedPtr<FStreamableHandle> LoadHandle;
 	// The PCG volume running this base's graph, the layout its stage nodes advance, and what wakes the sleeping node.
@@ -262,6 +267,12 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UClass>> M_ResolvedClasses;
 
+	// Footprint dressing assets, loaded on the first dressed pad and shared by every base.
+	FSurvivalSovietFootprintAssets M_FootprintAssets;
+	bool bM_FootprintAssetsLoaded = false;
+	UPROPERTY()
+	TArray<TObjectPtr<UObject>> M_FootprintAssetRefs;
+
 	TArray<FBox> M_MeasuredLocalBounds;
 	TMap<FSoftObjectPath, int32> M_ClassIndexByPath;
 	// Classes already reported for not being enemy owned (one error per class).
@@ -359,8 +370,16 @@ private:
 	/** @brief Applies a wall piece's stretch to an actor whose Blueprint dropped the spawn scale. */
 	void EnforceSpawnScale(AActor& Actor, const FVector& Scale) const;
 	static void LimitPipeConnections(AActor& Actor);
-	/** @brief Lays a building pad's foundation dressing (slab or boards, apron, clutter) from the kit; counts instances. */
-	void DressPad(FSurvivalSovietBaseState& Base, const FSurvivalSovietPlannedStructure& Structure, ASurvivalSovietBasePad& Pad) const;
+	/** @brief Dresses a building pad's footprint for its class through the base's dressing actor; records seating and counts. */
+	void DressPad(FSurvivalSovietBaseState& Base, const FSurvivalSovietPlannedStructure& Structure, ASurvivalSovietBasePad& Pad);
+	static TArray<const TArray<TSoftObjectPtr<UStaticMesh>>*> GetFootprintMeshLists(const FSurvivalSovietSiteKit& Kit);
+	static void LoadFootprintAssets(const FSurvivalSovietSiteKit& Kit, FSurvivalSovietFootprintAssets& OutAssets);
+	/** @brief Keeps the loaded footprint assets referenced (the dressing holds raw pointers). */
+	void KeepFootprintAssets();
+#if RTS_WITH_MAP_TESTS
+	/** @brief -SovietBaseDesertNets: the desert camouflage variant on the base kit's net meshes (an owner choice, not the default). */
+	void ApplyDesertNetsForPreview(AActor& Actor);
+#endif
 	/** @brief Pit meshes paint earth with a virtual texture material; on a map without that texture it reads black. */
 	void ReplaceVirtualTextureEarth(AActor& Actor) const;
 	void SpawnRoad(FSurvivalSovietBaseState& Base, int32 RoadIndex, const USurvivalSovietBaseSettings& Settings);

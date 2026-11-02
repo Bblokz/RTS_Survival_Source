@@ -26,6 +26,7 @@
 #include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
 #include "RTS_Survival/SurvivalMode/Data/SurvivalModeSettings.h"
 #include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
+#include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseDressing.h"
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseLantern.h"
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBasePad.h"
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBasePreview.h"
@@ -41,6 +42,9 @@
 namespace SurvivalSovietBaseConstants
 {
 	constexpr uint8 EnemyPlayer = 2;
+	// The desert camouflage net variants (round 5, map tests only).
+	const TCHAR* const DesertNetMaterialPath = TEXT("/Game/RTS_Survival/SurvivalMode/Data/SovietBases/Foundations/MI_Rus_CamoNet_Desert.MI_Rus_CamoNet_Desert");
+	const TCHAR* const DesertNetOpaqueMaterialPath = TEXT("/Game/RTS_Survival/SurvivalMode/Data/SovietBases/Foundations/MI_Rus_CamoNet_Desert_Opaque.MI_Rus_CamoNet_Desert_Opaque");
 	// Pipes between fuel tanks only to a neighbour standing beside it.
 	constexpr float MaxBasePipeRange = 1200.f;
 	constexpr double MeasureSpawnDepth = -100000.0;
@@ -517,7 +521,8 @@ TArray<FSoftObjectPath> USurvivalSovietBaseComponent::CollectPresetClassPaths(
 	}
 	for (const TSoftObjectPtr<UMaterialInterface>* PadMaterial : {
 		     &Kit.ConcretePad, &Kit.GravelPad, &Kit.PackedEarthPad, &Kit.EarthStandIn, &Kit.MainRoadSurface, &Kit.LaneRoadSurface,
-		     &Kit.TrackRoadSurface, &Kit.StripRoadSurface, &Kit.GateApronSurface
+		     &Kit.TrackRoadSurface, &Kit.StripRoadSurface, &Kit.GateApronSurface, &Kit.FoundationSlabMaterial, &Kit.FoundationSurface,
+		     &Kit.TrampledSurface, &Kit.GravelWalkSurface, &Kit.GravelOilySurface, &Kit.RutTrackSurface, &Kit.FoundationSpillSurface
 	     })
 	{
 		if (not PadMaterial->IsNull())
@@ -531,11 +536,18 @@ TArray<FSoftObjectPath> USurvivalSovietBaseComponent::CollectPresetClassPaths(
 	{
 		Paths.AddUnique(Kit.LanternMesh.ToSoftObjectPath());
 	}
-	for (const TArray<TSoftObjectPtr<UStaticMesh>>* Meshes : {&Kit.FoundationTileMeshes, &Kit.FoundationClutterMeshes, &Kit.TentBoardMeshes})
+	for (const TArray<TSoftObjectPtr<UStaticMesh>>* Meshes : GetFootprintMeshLists(Kit))
 	{
 		for (const TSoftObjectPtr<UStaticMesh>& Mesh : *Meshes)
 		{
 			Paths.AddUnique(Mesh.ToSoftObjectPath());
+		}
+	}
+	for (const TSoftObjectPtr<UStaticMesh>* SlabPart : {&Kit.FoundationSlabMesh, &Kit.FoundationSlabEdgeMesh})
+	{
+		if (not SlabPart->IsNull())
+		{
+			Paths.AddUnique(SlabPart->ToSoftObjectPath());
 		}
 	}
 	for (const TSoftClassPtr<AActor>* RoadClass : {&Kit.MainRoadClass, &Kit.LaneRoadClass, &Kit.StripRoadClass})
@@ -633,8 +645,9 @@ void USurvivalSovietBaseComponent::BeginBasePreparation(const int32 BaseArrayInd
 	Base.Site.Init(FVector2D(Base.Center), Base.Center.Z, GetBaseBuildRadius(*StartLocation), SiteReachPastBuildArea);
 	// The load list also holds the kit's decal materials and the lantern mesh; only Blueprint classes are measured.
 	const FSurvivalSovietSiteKit& Kit = Settings->Kit;
-	TSet<FSoftObjectPath> NotClasses = {Kit.LanternMesh.ToSoftObjectPath()};
-	for (const TArray<TSoftObjectPtr<UStaticMesh>>* Meshes : {&Kit.FoundationTileMeshes, &Kit.FoundationClutterMeshes, &Kit.TentBoardMeshes})
+	TSet<FSoftObjectPath> NotClasses = {Kit.LanternMesh.ToSoftObjectPath(), Kit.FoundationSlabMesh.ToSoftObjectPath(),
+	                                    Kit.FoundationSlabEdgeMesh.ToSoftObjectPath()};
+	for (const TArray<TSoftObjectPtr<UStaticMesh>>* Meshes : GetFootprintMeshLists(Kit))
 	{
 		for (const TSoftObjectPtr<UStaticMesh>& Mesh : *Meshes)
 		{
@@ -643,7 +656,8 @@ void USurvivalSovietBaseComponent::BeginBasePreparation(const int32 BaseArrayInd
 	}
 	for (const TSoftObjectPtr<UMaterialInterface>* Material : {
 		     &Kit.ConcretePad, &Kit.GravelPad, &Kit.PackedEarthPad, &Kit.EarthStandIn, &Kit.MainRoadSurface, &Kit.LaneRoadSurface,
-		     &Kit.TrackRoadSurface, &Kit.StripRoadSurface, &Kit.GateApronSurface
+		     &Kit.TrackRoadSurface, &Kit.StripRoadSurface, &Kit.GateApronSurface, &Kit.FoundationSlabMaterial, &Kit.FoundationSurface,
+		     &Kit.TrampledSurface, &Kit.GravelWalkSurface, &Kit.GravelOilySurface, &Kit.RutTrackSurface, &Kit.FoundationSpillSurface
 	     })
 	{
 		NotClasses.Add(Material->ToSoftObjectPath());
@@ -1493,6 +1507,17 @@ AActor* USurvivalSovietBaseComponent::SpawnStructure(FSurvivalSovietBaseState& B
 		Pad->InitPad(Structure.StretchXY, GetPadMaterial(Structure.PadKind));
 		DressPad(Base, Structure, *Pad);
 	}
+	else if (Base.Dressing.IsValid())
+	{
+		// A building spawned after its slab stands on it.
+		Base.Dressing->LiftIfOnSlab(*Actor);
+	}
+#if RTS_WITH_MAP_TESTS
+	if (FParse::Param(FCommandLine::Get(), TEXT("SovietBaseDesertNets")))
+	{
+		ApplyDesertNetsForPreview(*Actor);
+	}
+#endif
 	else if (ASurvivalSovietBaseLantern* Lantern = Cast<ASurvivalSovietBaseLantern>(Actor))
 	{
 		const USurvivalSovietBaseSettings* Settings = GetSovietBaseSettings();
@@ -2116,6 +2141,10 @@ void USurvivalSovietBaseComponent::ClearBasesForPreview()
 		{
 			Base.Volume->Destroy();
 		}
+		if (Base.Dressing.IsValid())
+		{
+			Base.Dressing->Destroy();
+		}
 	}
 	M_Bases.Reset();
 	M_SpawnQueue.Reset();
@@ -2491,10 +2520,10 @@ FString USurvivalSovietBaseComponent::BuildSpawnManifestJson(
 	const FSurvivalSovietWallReport& Wall = Base.Plan.Wall;
 	const FString Rules = FString::Printf(
 		TEXT("\"wall\":{\"family\":\"%s\",\"pieces\":%d,\"flags\":%d,\"gates\":%d,\"corners\":%d,\"blocked_slots\":%d,\"max_stretch\":%.3f,\"piece_list\":[%s]},")
-		TEXT("\"buildings\":%d,\"buildings_on_pad\":%d,\"perimeter\":[%s],\"bunkers\":[%s],\"rule_violations\":[%s],")
+		TEXT("\"buildings\":%d,\"buildings_on_pad\":%d,\"pad_exempt\":[%s],\"perimeter\":[%s],\"bunkers\":[%s],\"rule_violations\":[%s],")
 		TEXT("\"gates\":[%s],\"roads\":[%s],\"pads\":[%s],\"yards\":[%s],\"lanterns\":[%s],\"ground_gaps\":%s,\"open_wall_slots\":[%s],"),
 		*UEnum::GetValueAsString(Wall.Family), Wall.Pieces, Wall.FlagPieces, Wall.Gates, Wall.Corners, Wall.BlockedSlots, Wall.MaxStretch,
-		*SovietPreview_PieceListJson(Base), Base.Plan.BuildingsTotal, Base.Plan.BuildingsOnPad, *Perimeter, *Bunkers, *SovietPreview_JoinStrings(Base.Plan.RuleViolations),
+		*SovietPreview_PieceListJson(Base), Base.Plan.BuildingsTotal, Base.Plan.BuildingsOnPad, *SovietPreview_JoinStrings(Base.Plan.PadExemptClasses), *Perimeter, *Bunkers, *SovietPreview_JoinStrings(Base.Plan.RuleViolations),
 		*SovietPreview_GatesJson(Base.Plan), *SovietPreview_RoadsJson(Base.Plan.Roads, Settings != nullptr ? &Settings->Kit : nullptr),
 		*BuildPadsJson(Base), *BuildYardsJson(Base), *BuildLanternsJson(Base), *BuildGroundGapsJson(Base), *SovietPreview_OpenSlotsJson(Base.Plan));
 	FString Structures;
@@ -2524,12 +2553,29 @@ FString USurvivalSovietBaseComponent::BuildSpawnManifestJson(
 	{
 		PlannedUnits += Group.Units.Num();
 	}
+	// Footprints (round 5): per dressed pad its class, slab and seating numbers, clutter and apron.
+	FString Footprints;
+	for (const FSurvivalSovietFootprintRecord& Record : Base.FootprintRecords)
+	{
+		Footprints += FString::Printf(
+			TEXT("%s{\"class\":\"%s\",\"center\":[%.0f,%.0f],\"yaw\":%.1f,\"footprint_half\":[%.0f,%.0f],\"door\":[%.2f,%.2f],")
+			TEXT("\"slab\":%s,\"slab_index\":%d,\"slab_half\":[%.0f,%.0f],\"slab_top_over_ground\":[%.1f,%.1f],\"lifted_actors\":%d,")
+			TEXT("\"building_lift\":%.1f,\"clutter\":%d,\"clutter_min_edge_clearance\":%.0f,\"clutter_max_ground_gap\":%.1f,\"planks\":%d,")
+			TEXT("\"apron_length\":%.0f,\"apron_end\":[%.0f,%.0f],\"instances\":%d}"),
+			Footprints.IsEmpty() ? TEXT("") : TEXT(","), *Record.Style, Record.Center.X, Record.Center.Y, Record.YawDegrees,
+			Record.FootprintHalf.X, Record.FootprintHalf.Y, Record.DoorNormal.X, Record.DoorNormal.Y, Record.bSlab ? TEXT("true") : TEXT("false"),
+			Record.SlabIndex, Record.SlabHalf.X, Record.SlabHalf.Y, Record.SlabTopOverGroundMin, Record.SlabTopOverGroundMax, Record.LiftedActors,
+			Record.BuildingLift, Record.Clutter, Record.ClutterMinEdgeClearance, Record.ClutterMaxGroundGap, Record.Planks, Record.ApronLength,
+			Record.ApronEnd.X, Record.ApronEnd.Y, Record.Instances);
+	}
+	const FString Dressing = FString::Printf(TEXT("\"dressing\":{\"pads\":%d,\"instances\":%d,\"components\":%d},\"footprints\":[%s],"),
+	                                         Base.DressedPads, Base.DressingInstances, Base.DressingComponents, *Footprints);
 	return FString::Printf(
 		TEXT("{\"label\":\"%s\",\"preset\":\"%s\",\"archetype\":\"%s\",\"difficulty\":\"%s\",\"strength\":%d,\"seed\":%d,")
 		TEXT("\"tuning_source\":\"%s\",\"rank\":%d,\"budget\":%d,\"unspent\":%d,\"spots_used\":%d,\"spots_available\":%d,\"points_off_main_line\":%d,\"planned_threat\":%d,\"planned_reserve\":%d,\"production\":%d,")
 		TEXT("\"core_chain\":%.0f,\"road_count\":%d,\"footprint\":[%.0f,%.0f,%.0f,%.0f],\"planned_units\":%d,\"spawned_units\":%d,")
 		TEXT("\"start_location\":\"%s\",\"center_z\":%.1f,\"on_ground\":%d,\"max_ground_gap\":%.1f,\"max_gap_class\":\"%s\",")
-		TEXT("%s\"dropped_slots\":[%s],\"structures\":[%s],\"units\":[%s],\"missing\":[%s]}"),
+		TEXT("%s%s\"dropped_slots\":[%s],\"structures\":[%s],\"units\":[%s],\"missing\":[%s]}"),
 		*Label, Preset != nullptr ? *Preset->PresetName.ToString() : TEXT("?"),
 		Preset != nullptr ? *UEnum::GetValueAsString(Preset->Archetype) : TEXT("?"),
 		*UEnum::GetValueAsString(Base.Scaling.Difficulty), Base.Strength, Base.Seed, *GetTuningSourceForPreview(),
@@ -2537,7 +2583,8 @@ FString USurvivalSovietBaseComponent::BuildSpawnManifestJson(
 		Base.Plan.EmplacementSpotsAvailable, Base.Plan.PointsOutsideMainLine, Base.Plan.ThreatPoints, Base.Plan.ReservePoints,
 		Base.Plan.ProductionCount, Base.Plan.RequiredCoreClusterDistance, Base.Plan.Roads.Num(), LocalBounds.Min.X, LocalBounds.Min.Y, LocalBounds.Max.X,
 		LocalBounds.Max.Y, PlannedUnits, Base.SpawnedUnitRecords.Num(), *GetNameSafe(Base.StartLocation.Get()), Base.Center.Z,
-		ActorsAboveGround, MaxGroundGap, *MaxGapClass, *Rules, *SovietPreview_JoinStrings(Base.Plan.DroppedSlots), *Structures, *Units, *Missing);
+		ActorsAboveGround, MaxGroundGap, *MaxGapClass, *Rules, *Dressing, *SovietPreview_JoinStrings(Base.Plan.DroppedSlots), *Structures, *Units,
+		*Missing);
 }
 
 float USurvivalSovietBaseComponent::GetBaseBuildRadius(const ASurvivalStartLocation& StartLocation) const
@@ -2546,22 +2593,47 @@ float USurvivalSovietBaseComponent::GetBaseBuildRadius(const ASurvivalStartLocat
 	return Settings != nullptr and Settings->BuildAreaRadius > 0.f ? Settings->BuildAreaRadius : StartLocation.GetBuildAreaRadius();
 }
 
-void USurvivalSovietBaseComponent::DressPad(FSurvivalSovietBaseState& Base, const FSurvivalSovietPlannedStructure& Structure,
-                                            ASurvivalSovietBasePad& Pad) const
-{
-	const USurvivalSovietBaseSettings* Settings = GetSovietBaseSettings();
-	if (Settings == nullptr or Structure.FoundationStyle == ESurvivalSovietFoundationStyle::None)
-	{
-		return;
-	}
 #if RTS_WITH_MAP_TESTS
-	// Before/after views of the round 4 dressing on one DLL.
-	if (FParse::Param(FCommandLine::Get(), TEXT("SovietBaseNoDressing")))
+void USurvivalSovietBaseComponent::ApplyDesertNetsForPreview(AActor& Actor)
+{
+	using namespace SurvivalSovietBaseConstants;
+	UMaterialInterface* Desert = LoadObject<UMaterialInterface>(nullptr, DesertNetMaterialPath);
+	UMaterialInterface* DesertOpaque = LoadObject<UMaterialInterface>(nullptr, DesertNetOpaqueMaterialPath);
+	if (Desert == nullptr or DesertOpaque == nullptr)
 	{
 		return;
 	}
+	M_FootprintAssetRefs.AddUnique(Desert);
+	M_FootprintAssetRefs.AddUnique(DesertOpaque);
+	// Only the nets: the tents share the camo material and keep it.
+	TInlineComponentArray<UStaticMeshComponent*> Meshes(&Actor);
+	for (UStaticMeshComponent* Mesh : Meshes)
+	{
+		if (Mesh == nullptr or Mesh->GetStaticMesh() == nullptr or not Mesh->GetStaticMesh()->GetName().Contains(TEXT("CamoNet")))
+		{
+			continue;
+		}
+		for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
+		{
+			const UMaterialInterface* Current = Mesh->GetMaterial(Slot);
+			if (Current == nullptr or not Current->GetName().Contains(TEXT("Camo")))
+			{
+				continue;
+			}
+			Mesh->SetMaterial(Slot, Current->GetName().Contains(TEXT("Opaque")) ? DesertOpaque : Desert);
+		}
+	}
+}
 #endif
-	const FSurvivalSovietSiteKit& Kit = Settings->Kit;
+
+TArray<const TArray<TSoftObjectPtr<UStaticMesh>>*> USurvivalSovietBaseComponent::GetFootprintMeshLists(const FSurvivalSovietSiteKit& Kit)
+{
+	return {&Kit.PlankMeshes, &Kit.SandbagMeshes, &Kit.FactoryClutterMeshes, &Kit.BarracksClutterMeshes, &Kit.TentClutterMeshes,
+	        &Kit.ShelterClutterMeshes, &Kit.ForecourtClutterMeshes};
+}
+
+void USurvivalSovietBaseComponent::LoadFootprintAssets(const FSurvivalSovietSiteKit& Kit, FSurvivalSovietFootprintAssets& OutAssets)
+{
 	const auto Load = [](const TArray<TSoftObjectPtr<UStaticMesh>>& Soft)
 	{
 		TArray<UStaticMesh*> Meshes;
@@ -2574,20 +2646,100 @@ void USurvivalSovietBaseComponent::DressPad(FSurvivalSovietBaseState& Base, cons
 		}
 		return Meshes;
 	};
-	FSurvivalSovietPadDressing Dressing;
-	Dressing.Style = Structure.FoundationStyle == ESurvivalSovietFoundationStyle::Concrete ? 1 : 2;
-	Dressing.FootprintHalf = Structure.FootprintHalf;
-	Dressing.DoorDirection = Structure.DoorDirection;
-	Dressing.ApronLength = Structure.ApronLength;
+	OutAssets.SlabMesh = Kit.FoundationSlabMesh.LoadSynchronous();
+	OutAssets.SlabEdgeMesh = Kit.FoundationSlabEdgeMesh.LoadSynchronous();
+	OutAssets.SpillSurface = Kit.FoundationSpillSurface.LoadSynchronous();
+	OutAssets.SlabMaterial = Kit.FoundationSlabMaterial.LoadSynchronous();
+	OutAssets.FoundationSurface = Kit.FoundationSurface.LoadSynchronous();
+	OutAssets.TrampledSurface = Kit.TrampledSurface.LoadSynchronous();
+	OutAssets.GravelWalkSurface = Kit.GravelWalkSurface.LoadSynchronous();
+	OutAssets.GravelOilySurface = Kit.GravelOilySurface.LoadSynchronous();
+	OutAssets.RutTrackSurface = Kit.RutTrackSurface.LoadSynchronous();
+	OutAssets.PlankMeshes = Load(Kit.PlankMeshes);
+	OutAssets.SandbagMeshes = Load(Kit.SandbagMeshes);
+	OutAssets.FactoryClutter = Load(Kit.FactoryClutterMeshes);
+	OutAssets.BarracksClutter = Load(Kit.BarracksClutterMeshes);
+	OutAssets.TentClutter = Load(Kit.TentClutterMeshes);
+	OutAssets.ShelterClutter = Load(Kit.ShelterClutterMeshes);
+	OutAssets.ForecourtClutter = Load(Kit.ForecourtClutterMeshes);
+	OutAssets.SlabMargin = Kit.FoundationMargin;
+	OutAssets.SlabRise = Kit.FoundationRise;
+	OutAssets.SlabSink = Kit.FoundationSink;
+	OutAssets.ClutterCullDistance = Kit.FoundationClutterCullDistance;
+}
+
+void USurvivalSovietBaseComponent::KeepFootprintAssets()
+{
+	// The dressing holds raw pointers: keep every loaded asset referenced for the component's life.
+	M_FootprintAssetRefs.Reset();
+	for (UObject* Asset : TArray<UObject*>{M_FootprintAssets.SlabMesh, M_FootprintAssets.SlabEdgeMesh, M_FootprintAssets.SpillSurface,
+	                                       M_FootprintAssets.SlabMaterial, M_FootprintAssets.FoundationSurface,
+	                                       M_FootprintAssets.TrampledSurface, M_FootprintAssets.GravelWalkSurface,
+	                                       M_FootprintAssets.GravelOilySurface, M_FootprintAssets.RutTrackSurface})
+	{
+		if (Asset != nullptr)
+		{
+			M_FootprintAssetRefs.Add(Asset);
+		}
+	}
+	for (const TArray<UStaticMesh*>* Meshes : {&M_FootprintAssets.PlankMeshes, &M_FootprintAssets.SandbagMeshes, &M_FootprintAssets.FactoryClutter,
+	                                         &M_FootprintAssets.BarracksClutter, &M_FootprintAssets.TentClutter, &M_FootprintAssets.ShelterClutter,
+	                                         &M_FootprintAssets.ForecourtClutter})
+	{
+		for (UStaticMesh* Mesh : *Meshes)
+		{
+			M_FootprintAssetRefs.Add(Mesh);
+		}
+	}
+}
+
+void USurvivalSovietBaseComponent::DressPad(FSurvivalSovietBaseState& Base, const FSurvivalSovietPlannedStructure& Structure,
+                                            ASurvivalSovietBasePad& Pad)
+{
+	const USurvivalSovietBaseSettings* Settings = GetSovietBaseSettings();
+	UWorld* World = GetWorld();
+	if (Settings == nullptr or not IsValid(World) or Structure.FoundationStyle == ESurvivalSovietFoundationStyle::None)
+	{
+		return;
+	}
+	FSurvivalSovietFootprintRequest Request;
+	Request.Style = Structure.FoundationStyle;
+	Request.Center = FVector2D(Pad.GetActorLocation());
+	Request.YawDegrees = Pad.GetActorRotation().Yaw;
+	Request.FootprintHalf = Structure.FootprintHalf;
+	Request.DoorDirection = Structure.DoorDirection;
+	Request.ApronLength = Structure.ApronLength;
 	// Seeded by the base and the pad's place, so one seed always dresses a building the same way and neighbours differ.
-	Dressing.Seed = HashCombine(GetTypeHash(Base.Seed), GetTypeHash(FIntPoint(FMath::RoundToInt(Structure.Position.X), FMath::RoundToInt(Structure.Position.Y))));
-	Dressing.SlabMargin = Kit.FoundationMargin;
-	Dressing.SlabRise = Kit.FoundationRise;
-	Dressing.TileMeshes = Load(Kit.FoundationTileMeshes);
-	Dressing.ClutterMeshes = Load(Kit.FoundationClutterMeshes);
-	Dressing.BoardMeshes = Load(Kit.TentBoardMeshes);
-	Dressing.ApronMaterial = Kit.TrackRoadSurface.LoadSynchronous();
-	Base.DressingInstances += Pad.InitDressing(Dressing);
+	Request.Seed = HashCombine(GetTypeHash(Base.Seed), GetTypeHash(FIntPoint(FMath::RoundToInt(Structure.Position.X), FMath::RoundToInt(Structure.Position.Y))));
+#if RTS_WITH_MAP_TESTS
+	// Before/after views on one DLL: the pad keeps its round-3 decal and nothing is laid; the record still frames the views.
+	if (FParse::Param(FCommandLine::Get(), TEXT("SovietBaseNoDressing")))
+	{
+		Base.FootprintRecords.Add(ASurvivalSovietBaseDressing::MakeRecordOnly(Request));
+		return;
+	}
+#endif
+	if (not bM_FootprintAssetsLoaded)
+	{
+		LoadFootprintAssets(Settings->Kit, M_FootprintAssets);
+		KeepFootprintAssets();
+		bM_FootprintAssetsLoaded = true;
+	}
+	if (not Base.Dressing.IsValid())
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Base.Dressing = World->SpawnActor<ASurvivalSovietBaseDressing>(ASurvivalSovietBaseDressing::StaticClass(),
+		                                                             FTransform(FVector(Base.Center)), SpawnParams);
+		if (not Base.Dressing.IsValid())
+		{
+			return;
+		}
+		Base.Dressing->Tags.Add(SurvivalSovietBaseConstants::SovietBaseActorTag);
+	}
+	Base.FootprintRecords.Add(Base.Dressing->AddFootprint(Request, M_FootprintAssets, Pad, Base.SpawnedStructures));
+	Base.DressingInstances = Base.Dressing->GetInstanceCount();
+	Base.DressingComponents = Base.Dressing->GetComponentCount();
 	Base.DressedPads += 1;
 }
 

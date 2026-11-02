@@ -2061,7 +2061,7 @@ void FSurvivalPOIPreviewRunner::RunSweep()
 		return;
 	}
 	const double Start = FPlatformTime::Seconds();
-	FString Csv = TEXT("seed,sites,battlefield,hangar,crashsite,convoy,graveyard,pumpstation,relaystation,objects,wildlife_groups,violations,anchors_missing,key_missing,route_blocks,plan_ms,no_ground");
+	FString Csv = TEXT("seed,sites,battlefield,hangar,crashsite,convoy,graveyard,pumpstation,relaystation,objects,wildlife_groups,violations,anchors_missing,key_missing,route_blocks,plan_ms,no_ground,keys");
 	const FSurvivalPOIWorldContext& Context = Planner->GetContext();
 	for (const FSurvivalPOIStart& StartEntry : Context.Starts)
 	{
@@ -2077,11 +2077,14 @@ void FSurvivalPOIPreviewRunner::RunSweep()
 		const TArray<FSurvivalPOISite> Sites = Planner->GetSites();
 		TArray<FSurvivalPOIPlacedObject> Objects;
 		int32 KeyMissing = 0;
+		FString KeyCounts;
 		for (const FSurvivalPOISite& Site : Sites)
 		{
 			FSurvivalPOIKeyObjectCount KeyObjects;
 			Planner->ComposeSite(Site, Objects, false, &KeyObjects);
-			KeyMissing += FSurvivalPOIPlanner::GetNeedsKeyObjects(Site) and not KeyObjects.GetAllPlaced() ? 1 : 0;
+			KeyMissing += FSurvivalPOIPlanner::GetNeedsKeyObjects(Site) and not FSurvivalPOIPlanner::GetKeepsRewards(Site, KeyObjects, false) ? 1 : 0;
+			KeyCounts += FString::Printf(TEXT("%s%s:%d/%d"), KeyCounts.IsEmpty() ? TEXT("") : TEXT(" "), *SurvivalPOINames::GetTypeName(Site.Type),
+			                             KeyObjects.Placed, KeyObjects.Attempted);
 		}
 		// Standing objects whose centre lies inside a route's free width.
 		int32 RouteBlocks = 0;
@@ -2104,6 +2107,7 @@ void FSurvivalPOIPreviewRunner::RunSweep()
 			FString Type;
 			if (Note.Split(TEXT("no ground for "), nullptr, &Type))
 			{
+				Type = Type.Replace(TEXT(","), TEXT(";"));
 				NoGround += (NoGround.IsEmpty() ? TEXT("") : TEXT("|")) + Note.Left(Note.Find(TEXT(":"))).Replace(TEXT(" "), TEXT("")) + TEXT("=") + Type;
 			}
 		}
@@ -2133,7 +2137,7 @@ void FSurvivalPOIPreviewRunner::RunSweep()
 		                       TypeCount.FindRef(ESurvivalPOIType::CrashSite), TypeCount.FindRef(ESurvivalPOIType::DeadConvoy),
 		                       TypeCount.FindRef(ESurvivalPOIType::TankGraveyard), TypeCount.FindRef(ESurvivalPOIType::PumpStation),
 		                       TypeCount.FindRef(ESurvivalPOIType::RelayStation), Objects.Num(), Groups.Num(), Violations.Num(), AnchorsMissing);
-		Csv += FString::Printf(TEXT(",%d,%d,%.1f,%s"), KeyMissing, RouteBlocks, PlanMs, NoGround.IsEmpty() ? TEXT("-") : *NoGround);
+		Csv += FString::Printf(TEXT(",%d,%d,%.1f,%s,%s"), KeyMissing, RouteBlocks, PlanMs, NoGround.IsEmpty() ? TEXT("-") : *NoGround, *KeyCounts);
 		for (const FSurvivalPOIStart& StartEntry : Context.Starts)
 		{
 			double Nearest[2] = {-1.0, -1.0};
