@@ -25,6 +25,8 @@ class UTextBlock;
  * Bound widgets (names in the Blueprint must match):
  *   required: M_LocationNameText (TextBlock), M_PreviousButton, M_NextButton, M_ConfirmButton (Button)
  *   optional: M_PanelBorder (Border); M_TitleText, M_LocationIndexText, M_HintText, M_ConfirmText (TextBlock)
+ *   optional: M_ResourcesText, M_SpecialText (TextBlock): close radixite/metal nodes and the location's special;
+ *   created under M_LocationIndexText's panel when the Blueprint does not have them.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_SurvivalStartLocationPicker : public UUserWidget
@@ -65,7 +67,7 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Style")
 	TObjectPtr<USurvivalUiStyleAsset> M_StyleAsset = nullptr;
 
-	UPROPERTY(meta = (BindWidget))
+	UPROPERTY(BlueprintReadOnly, Category = "Survival|Start Location", meta = (BindWidget))
 	TObjectPtr<UTextBlock> M_LocationNameText = nullptr;
 
 	UPROPERTY(meta = (BindWidget))
@@ -92,6 +94,14 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> M_ConfirmText = nullptr;
 
+	// Close radixite and metal nodes by the drop-off ("Near the drop-off: 6 radixite, 2 metal").
+	UPROPERTY(BlueprintReadOnly, Category = "Survival|Start Location", meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> M_ResourcesText = nullptr;
+
+	// The location's special: label and one line ("Hangar: 3 capturable Panzer II Luchs").
+	UPROPERTY(BlueprintReadOnly, Category = "Survival|Start Location", meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> M_SpecialText = nullptr;
+
 private:
 	TWeakObjectPtr<ASurvivalModeDirector> M_Director;
 
@@ -104,6 +114,10 @@ private:
 	void ApplyStyleToBoundWidgets();
 	void BindButtons();
 	void RefreshTexts();
+	void RefreshSummaryTexts();
+	/** @brief Adds the summary text blocks under the location index text when the Blueprint has none. */
+	void EnsureSummaryTexts();
+	UTextBlock* CreateSummaryText(int32 InsertIndexOffset);
 	FText GetLocationName(const int32 LocationIndex) const;
 
 	UFUNCTION()

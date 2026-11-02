@@ -4,7 +4,12 @@
 
 #include "Components/Border.h"
 #include "Components/Button.h"
+#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
+#include "Components/VerticalBoxSlot.h"
+#include "Blueprint/WidgetTree.h"
+#include "RTS_Survival/SurvivalMode/Data/SurvivalModeSettings.h"
+#include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartContentSettings.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/UnitVariantSelectionWidgetHelpers.h"
 #include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
 #include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartLocation.h"
@@ -16,6 +21,8 @@ namespace SurvivalStartLocationPickerPrivate
 {
 	// The arrow art points right; the previous button draws it mirrored.
 	const FVector2D MirroredScale(-1.f, 1.f);
+	// Summary lines under the location name.
+	const FMargin SummaryPadding(0.f, 4.f, 0.f, 0.f);
 
 	void ApplyText(UTextBlock* Text, const FSlateFontInfo& Font, const FSlateColor& Color)
 	{
@@ -61,6 +68,7 @@ void UW_SurvivalStartLocationPicker::InitStartLocationPicker(ASurvivalModeDirect
 			M_Locations.Add(Location);
 		}
 	}
+	EnsureSummaryTexts();
 	if (M_Locations.IsEmpty())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("Survival start location picker: the map has no start locations."));
@@ -232,6 +240,7 @@ void UW_SurvivalStartLocationPicker::RefreshTexts()
 		                                           FText::AsNumber(M_SelectedIndex + 1),
 		                                           FText::AsNumber(M_Locations.Num())));
 	}
+	RefreshSummaryTexts();
 	const bool bCanCycle = M_Locations.Num() > 1;
 	for (UButton* const Arrow : {M_PreviousButton.Get(), M_NextButton.Get()})
 	{
@@ -239,6 +248,78 @@ void UW_SurvivalStartLocationPicker::RefreshTexts()
 		{
 			Arrow->SetIsEnabled(bCanCycle);
 		}
+	}
+}
+
+void UW_SurvivalStartLocationPicker::EnsureSummaryTexts()
+{
+	if (not IsValid(M_ResourcesText))
+	{
+		M_ResourcesText = CreateSummaryText(1);
+	}
+	if (not IsValid(M_SpecialText))
+	{
+		M_SpecialText = CreateSummaryText(2);
+	}
+	using namespace SurvivalUiLayout;
+	using namespace SurvivalStartLocationPickerPrivate;
+	using namespace UnitVariantSelectionWidgets;
+	if (not IsValid(M_StyleAsset))
+	{
+		return;
+	}
+	const FSurvivalUiStyle& Style = M_StyleAsset->Style;
+	ApplyText(M_ResourcesText, MakeFont(Style.BodyFont, BodyFontSize), Style.TextColor);
+	ApplyText(M_SpecialText, MakeFont(Style.BodyFont, BodyFontSize), Style.AccentColor);
+}
+
+UTextBlock* UW_SurvivalStartLocationPicker::CreateSummaryText(const int32 InsertIndexOffset)
+{
+	using namespace SurvivalStartLocationPickerPrivate;
+	UWidget* Anchor = IsValid(M_LocationIndexText) ? static_cast<UWidget*>(M_LocationIndexText) : static_cast<UWidget*>(M_LocationNameText);
+	UPanelWidget* Panel = IsValid(Anchor) ? Anchor->GetParent() : nullptr;
+	if (not IsValid(Panel) or not IsValid(WidgetTree))
+	{
+		return nullptr;
+	}
+	UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	Text->SetJustification(ETextJustify::Center);
+	Text->SetAutoWrapText(true);
+	UPanelSlot* InsertedSlot = Panel->InsertChildAt(Panel->GetChildIndex(Anchor) + InsertIndexOffset, Text);
+	if (UVerticalBoxSlot* BoxSlot = Cast<UVerticalBoxSlot>(InsertedSlot))
+	{
+		BoxSlot->SetHorizontalAlignment(HAlign_Center);
+		BoxSlot->SetPadding(SummaryPadding);
+	}
+	return Text;
+}
+
+void UW_SurvivalStartLocationPicker::RefreshSummaryTexts()
+{
+	const ASurvivalStartLocation* const Location = M_Locations.IsValidIndex(M_SelectedIndex) ? M_Locations[M_SelectedIndex].Get() : nullptr;
+	const ASurvivalModeDirector* const Director = M_Director.Get();
+	const USurvivalModeSettings* const ModeSettings = IsValid(Director) ? Director->GetSettings() : nullptr;
+	const USurvivalStartContentSettings* const ContentSettings = IsValid(ModeSettings) ? ModeSettings->StartContent.Get() : nullptr;
+	if (not IsValid(Location) or not IsValid(ContentSettings))
+	{
+		return;
+	}
+	int32 Radixite = 0;
+	int32 Metal = 0;
+	FText SpecialTitle;
+	FText SpecialLine;
+	Location->GetPickerSummary(*ContentSettings, Radixite, Metal, SpecialTitle, SpecialLine);
+	if (IsValid(M_ResourcesText))
+	{
+		M_ResourcesText->SetText(FText::Format(
+			NSLOCTEXT("SurvivalStartLocation", "CloseNodes", "Near the drop-off: {0} radixite, {1} metal"),
+			FText::AsNumber(Radixite), FText::AsNumber(Metal)));
+	}
+	if (IsValid(M_SpecialText))
+	{
+		M_SpecialText->SetText(SpecialTitle.IsEmpty()
+			                       ? FText::GetEmpty()
+			                       : FText::Format(NSLOCTEXT("SurvivalStartLocation", "Special", "{0}: {1}"), SpecialTitle, SpecialLine));
 	}
 }
 

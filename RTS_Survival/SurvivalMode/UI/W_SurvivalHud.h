@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "RTS_Survival/SurvivalMode/Core/SurvivalModeTypes.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 #include "W_SurvivalHud.generated.h"
 
@@ -74,6 +75,11 @@ public:
 	/** @brief Opens the project's default map, which leads to the main menu (as the escape menu's exit does). */
 	UFUNCTION(BlueprintCallable, Category = "Survival|HUD")
 	void ReturnToMainMenu();
+
+#if RTS_WITH_MAP_TESTS
+	// Test runs only: HUDs created while set keep the Blueprint's stacked layout (before/after screenshots).
+	static bool bDebugUseLegacyLayout;
+#endif
 
 protected:
 	virtual void NativeOnInitialized() override;
@@ -162,9 +168,13 @@ private:
 	FTimerHandle M_RefreshTimerHandle;
 	FTimerHandle M_BannerTimerHandle;
 	bool bM_IsDefeatShown = false;
+	bool bM_IsCompactLayout = true;
 
 	void ApplyStyleToBoundWidgets();
 	void EnsureEnemiesText();
+	// One slim status line flush with the top edge instead of the Blueprint's stacked plate.
+	void ApplyCompactStatusLayout();
+	static void PinToTopCentre(UWidget* Widget, float Top);
 	void ApplyStaticTexts();
 	void BindButtons();
 	void StartRefreshTimer();

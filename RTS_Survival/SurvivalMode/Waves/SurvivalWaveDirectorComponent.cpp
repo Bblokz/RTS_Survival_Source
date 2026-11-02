@@ -13,6 +13,7 @@
 #include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
 #include "RTS_Survival/SurvivalMode/Waves/SurvivalEdgeSpawnZone.h"
 #include "RTS_Survival/SurvivalMode/Waves/SurvivalStrategicAICoordinator.h"
+#include "RTS_Survival/SurvivalMode/Waves/SurvivalWaveMarkerTracker.h"
 #include "RTS_Survival/SurvivalMode/Waves/SurvivalWaveSettings.h"
 #include "EngineUtils.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -185,6 +186,10 @@ void USurvivalWaveDirectorComponent::EndPlay(const EEndPlayReason::Type EndPlayR
 	if (IsValid(M_StrategicAICoordinator))
 	{
 		M_StrategicAICoordinator->Shutdown();
+	}
+	if (IsValid(M_WaveMarkerTracker))
+	{
+		M_WaveMarkerTracker->StopTracking();
 	}
 	OnWaveIncoming.Clear();
 	OnTechStageReached.Clear();
@@ -886,6 +891,7 @@ bool USurvivalWaveDirectorComponent::LaunchFormationChunk(const ASurvivalEdgeSpa
 	Group.PlannedUnitCount = Units.Num();
 	Group.PlannedLoad = GetPlannedLoad(Units);
 	M_TrackedGroups.Add(Group);
+	MarkLaunchedFormation(Zone, FinalWaypoint, SpawnPoints, BaseLocation);
 
 	FRoundSpawnMarker Marker;
 	Marker.SpawnPoints = SpawnPoints;
@@ -893,6 +899,23 @@ bool USurvivalWaveDirectorComponent::LaunchFormationChunk(const ASurvivalEdgeSpa
 	Marker.LaunchTime = GetWorldTime();
 	M_RoundSpawnMarkers.Add(Marker);
 	return true;
+}
+
+void USurvivalWaveDirectorComponent::MarkLaunchedFormation(const ASurvivalEdgeSpawnZone& Zone,
+                                                           const FVector& FinalWaypoint,
+                                                           const TArray<FVector>& SpawnPoints,
+                                                           const FVector& BaseLocation)
+{
+	if (not IsValid(M_WaveMarkerTracker))
+	{
+		const USurvivalWaveSettings* WaveSettings = GetWaveSettings();
+		M_WaveMarkerTracker = NewObject<USurvivalWaveMarkerTracker>(this);
+		M_WaveMarkerTracker->InitTracker(GetEnemyController(),
+		                                 WaveSettings ? WaveSettings->FormationBindTimeoutSeconds : 120.f);
+	}
+	// M_WavesLaunched counts up once the whole wave launched, so this wave is the next number.
+	const FName GroupKey(*FString::Printf(TEXT("%d_%s"), M_WavesLaunched + 1, *Zone.GetName()));
+	M_WaveMarkerTracker->OnGroupLaunched(GroupKey, FinalWaypoint, SpawnPoints, BaseLocation);
 }
 
 void USurvivalWaveDirectorComponent::EnsureWaveSupplyFor(const int32 UnitCount)

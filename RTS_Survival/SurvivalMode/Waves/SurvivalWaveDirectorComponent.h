@@ -18,6 +18,7 @@ class ASquadUnit;
 class ATankMaster;
 class ATankMaster;
 class USurvivalStrategicAICoordinator;
+class USurvivalWaveMarkerTracker;
 class USurvivalWaveSettings;
 struct FFormationData;
 
@@ -169,6 +170,9 @@ public:
 	/** @return The load cap of the current difficulty. */
 	float GetAliveEnemyLoadCap() const;
 
+	/** @return The minimap markers of the launched waves; null before the first wave. */
+	USurvivalWaveMarkerTracker* GetWaveMarkerTracker() const { return M_WaveMarkerTracker; }
+
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -223,6 +227,13 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<USurvivalStrategicAICoordinator> M_StrategicAICoordinator;
+
+	// Minimap marker per wave and edge; created with the first launched wave.
+	UPROPERTY()
+	TObjectPtr<USurvivalWaveMarkerTracker> M_WaveMarkerTracker;
+
+	void MarkLaunchedFormation(const ASurvivalEdgeSpawnZone& Zone, const FVector& FinalWaypoint,
+	                           const TArray<FVector>& SpawnPoints, const FVector& BaseLocation);
 
 	UPROPERTY()
 	FSurvivalWaveScheduleState M_Schedule;
