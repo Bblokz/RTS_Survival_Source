@@ -361,6 +361,19 @@ On `USurvivalWaveDirectorComponent` (`Director->GetWaveDirector()`):
 - Polling: `GetSecondsUntilNextWave()`, `GetNextWaveNumber()`, `GetWavesLaunched()`, `GetCurrentTechStage()`,
   `GetIsWaitingForUnitCap()`, `GetAliveEnemyLoad()` / `GetAliveEnemyLoadCap()`, `GetLastAnnouncement()`.
 
+## 12b. Minimap wave markers
+
+`USurvivalWaveMarkerTracker` (`Waves/SurvivalWaveMarkerTracker.h/.cpp`, owned by the wave director) puts one marker per
+wave and edge on the minimap through the FOW manager's custom icons: an upright skull badge
+(`EMinimapIconType::IncomingWaveBadge`) and a red chevron (`IncomingWave`, drawn pointing +X) that turns with the
+group's heading. Custom icons ignore fog, so the marker shows from the announcement (at the spawn points' centre)
+through unexplored ground. Once the group's formation exists (found by its last waypoint) the marker follows the
+centroid of its units, also after the formation reached the base, and is removed when the last unit is dead (or after
+`FormationBindTimeoutSeconds` if the formation never appears). Icons are kept slightly inside the minimap edge.
+Textures: `Content/RTS_Survival/SurvivalMode/UI/MinimapIcons/T_MinimapIcon_IncomingWave(Badge)`, size 32 in
+`DA_MinimapIcon`. `AFowManager::SetCustomMiniMapIconTransform` moves a fixed-location custom icon.
+Test: `-SurvivalLoadoutTest -SurvivalWaveMarkerTest` (see `Director/Tests/SurvivalLoadoutTest.h`).
+
 ## 13. Risks
 
 - Not compiled or PIE-tested yet (no build allowed for this agent).

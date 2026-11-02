@@ -24,7 +24,10 @@
 #include "RTS_Survival/SurvivalMode/Director/SurvivalModeDirector.h"
 #include "RTS_Survival/SurvivalMode/StartLocations/SurvivalStartLocation.h"
 #include "RTS_Survival/SurvivalMode/UI/W_SurvivalArmySelection.h"
+#include "RTS_Survival/SurvivalMode/UI/W_SurvivalHud.h"
 #include "RTS_Survival/SurvivalMode/UI/W_SurvivalRewardPicker.h"
+#include "RTS_Survival/SurvivalMode/Waves/SurvivalWaveDirectorComponent.h"
+#include "RTS_Survival/SurvivalMode/Waves/SurvivalWaveMarkerTracker.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -46,6 +49,9 @@ namespace SurvivalLoadoutTestConstants
 	constexpr double AfterIntermissionEndSeconds = 2.0;
 	constexpr double MaxRunSeconds = 900.0;
 	constexpr int32 RosterUnitsToAdd = 3;
+	constexpr double MarkerMoveShotSeconds = 25.0;
+	constexpr double HudSwapSettleSeconds = 1.0;
+	constexpr double MarkerGoneTimeoutSeconds = 15.0;
 }
 
 class FSurvivalLoadoutTestRunner : public TSharedFromThis<FSurvivalLoadoutTestRunner>
@@ -69,6 +75,15 @@ private:
 		WaitFirstIntermissionEnd,
 		UnclaimedBeforeEnd,
 		UnclaimedAfterEnd,
+		// -SurvivalWaveMarkerTest: the minimap marker of the first wave instead of the reward steps.
+		MarkerWait,
+		MarkerBound,
+		MarkerMove1,
+		MarkerMove2,
+		HudBefore,
+		HudAfter,
+		MarkerKill,
+		MarkerGone,
 		Finished
 	};
 
@@ -81,6 +96,10 @@ private:
 	FString M_PendingShotPath;
 	double M_PendingShotStartReal = 0.0;
 	bool bM_PressedStart = false;
+	bool bM_IsMarkerTest = false;
+	bool bM_HasGraceHudShot = false;
+	FName M_MarkerId = NAME_None;
+	TWeakObjectPtr<UW_SurvivalHud> M_LegacyHud;
 
 	bool Tick(float DeltaTime);
 	bool TickStep(double StepSeconds);
@@ -97,6 +116,12 @@ private:
 	void LogArmyValidity(const TArray<FSurvivalArmyPick>& Picks) const;
 	void ConfirmArmyAndStart();
 	void LogSpawnedUnits() const;
+	bool TickMarkerStep(double StepSeconds);
+	void ShowLegacyHud();
+	void RemoveLegacyHud();
+	USurvivalWaveMarkerTracker* GetMarkerTracker() const;
+	const FSurvivalWaveMarker* FindTestMarker() const;
+	void LogMarkers(const TCHAR* Label) const;
 	void ClickRewardCard();
 	void LogRewardState(const TCHAR* Label) const;
 	void Finish();
@@ -107,6 +132,7 @@ void FSurvivalLoadoutTestRunner::Start(ASurvivalModeDirector* Director)
 	M_Director = Director;
 	M_Directory = FPaths::ProjectSavedDir() / TEXT("AgentNotes/start_loadout_review");
 	FParse::Value(FCommandLine::Get(), TEXT("SurvivalLoadoutTestDir="), M_Directory);
+	bM_IsMarkerTest = FParse::Param(FCommandLine::Get(), TEXT("SurvivalWaveMarkerTest"));
 	IFileManager::Get().MakeDirectory(*M_Directory, true);
 	// An RTS error is a modal dialog that would freeze the unattended run.
 	RTSFunctionLibrary::PushModalDialogSuppression();
@@ -190,6 +216,21 @@ bool FSurvivalLoadoutTestRunner::Tick(float)
 		Finish();
 		return false;
 	}
+	if (bM_IsMarkerTest and not bM_HasGraceHudShot and M_Director->GetPhase() == ESurvivalPhase::GracePeriod)
+	{
+		bM_HasGraceHudShot = true;
+		RequestShot(TEXT("hud_after_grace.png"));
+		return true;
+	}
+	// The marker test starts with the first wave, whatever setup step the run is in.
+	if (bM_IsMarkerTest and M_Step < EStep::MarkerWait and M_Director->GetPhase() == ESurvivalPhase::Waves)
+	{
+		AdvanceTo(EStep::MarkerWait);
+	}
+	if (M_Step >= EStep::MarkerWait and M_Step < EStep::Finished)
+	{
+		return TickMarkerStep(GetRealSeconds() - M_StepStartReal);
+	}
 	return TickStep(GetRealSeconds() - M_StepStartReal);
 }
 
@@ -232,6 +273,11 @@ bool FSurvivalLoadoutTestRunner::TickStep(const double StepSeconds)
 		}
 		return true;
 	case EStep::WaitWaves:
+		if (Director->GetPhase() == ESurvivalPhase::Waves and bM_IsMarkerTest)
+		{
+			AdvanceTo(EStep::MarkerWait);
+			return true;
+		}
 		if (Director->GetPhase() == ESurvivalPhase::Waves and StepSeconds >= AfterWavesStartSeconds)
 		{
 			Director->DebugOpenTestIntermission(1);
@@ -298,6 +344,159 @@ bool FSurvivalLoadoutTestRunner::TickStep(const double StepSeconds)
 	default:
 		Finish();
 		return false;
+	}
+}
+
+bool FSurvivalLoadoutTestRunner::TickMarkerStep(const double StepSeconds)
+{
+	using namespace SurvivalLoadoutTestConstants;
+	USurvivalWaveMarkerTracker* Tracker = GetMarkerTracker();
+	const FSurvivalWaveMarker* Marker = FindTestMarker();
+	switch (M_Step)
+	{
+	case EStep::MarkerWait:
+		if (IsValid(Tracker) and not Tracker->GetMarkers().IsEmpty())
+		{
+			M_MarkerId = Tracker->GetMarkers()[0].IconId;
+			LogMarkers(TEXT("announced"));
+			RequestShot(TEXT("marker_01_announced.png"));
+			AdvanceTo(EStep::MarkerBound);
+		}
+		return true;
+	case EStep::MarkerBound:
+		if (Marker and Marker->bHasBoundUnits)
+		{
+			LogMarkers(TEXT("units_spawned"));
+			RequestShot(TEXT("marker_02_units_spawned.png"));
+			AdvanceTo(EStep::MarkerMove1);
+		}
+		return true;
+	case EStep::MarkerMove1:
+	case EStep::MarkerMove2:
+		if (StepSeconds >= MarkerMoveShotSeconds)
+		{
+			const bool bFirst = M_Step == EStep::MarkerMove1;
+			LogMarkers(bFirst ? TEXT("moving_1") : TEXT("moving_2"));
+			RequestShot(bFirst ? TEXT("marker_03_moving.png") : TEXT("marker_04_moving.png"));
+			AdvanceTo(bFirst ? EStep::MarkerMove2 : EStep::HudBefore);
+		}
+		return true;
+	case EStep::HudBefore:
+		if (not M_LegacyHud.IsValid())
+		{
+			ShowLegacyHud();
+			return true;
+		}
+		if (StepSeconds >= HudSwapSettleSeconds)
+		{
+			RequestShot(TEXT("hud_before_legacy_layout.png"));
+			AdvanceTo(EStep::HudAfter);
+		}
+		return true;
+	case EStep::HudAfter:
+		if (M_LegacyHud.IsValid())
+		{
+			RemoveLegacyHud();
+			return true;
+		}
+		if (StepSeconds >= HudSwapSettleSeconds)
+		{
+			RequestShot(TEXT("hud_after_compact_layout.png"));
+			AdvanceTo(EStep::MarkerKill);
+		}
+		return true;
+	case EStep::MarkerKill:
+		UE_LOG(LogSurvivalLoadoutTest, Display, TEXT("LOADOUT_TEST marker %s: killed %d units"),
+		       *M_MarkerId.ToString(), IsValid(Tracker) ? Tracker->DebugKillMarkerUnits(M_MarkerId) : 0);
+		AdvanceTo(EStep::MarkerGone);
+		return true;
+	case EStep::MarkerGone:
+		if (not Marker or StepSeconds >= MarkerGoneTimeoutSeconds)
+		{
+			UE_LOG(LogSurvivalLoadoutTest, Display, TEXT("LOADOUT_TEST marker %s after kill: %s (%.1f s)"),
+			       *M_MarkerId.ToString(), Marker ? TEXT("STILL SHOWN") : TEXT("removed"), StepSeconds);
+			LogMarkers(TEXT("after_kill"));
+			RequestShot(TEXT("marker_05_after_kill.png"));
+			AdvanceTo(EStep::Finished);
+		}
+		return true;
+	default:
+		AdvanceTo(EStep::Finished);
+		return true;
+	}
+}
+
+void FSurvivalLoadoutTestRunner::ShowLegacyHud()
+{
+	UW_SurvivalHud* Hud = M_Director->GetHudWidget();
+	APlayerController* Controller = UGameplayStatics::GetPlayerController(M_Director.Get(), 0);
+	if (not IsValid(Hud) or not IsValid(Controller))
+	{
+		UE_LOG(LogSurvivalLoadoutTest, Error, TEXT("LOADOUT_TEST no HUD to compare"));
+		AdvanceTo(EStep::MarkerKill);
+		return;
+	}
+	// Same Blueprint class, created with the old stacked layout, shown in place of the compact HUD.
+	UW_SurvivalHud::bDebugUseLegacyLayout = true;
+	UW_SurvivalHud* LegacyHud = CreateWidget<UW_SurvivalHud>(Controller, Hud->GetClass());
+	UW_SurvivalHud::bDebugUseLegacyLayout = false;
+	if (not IsValid(LegacyHud))
+	{
+		AdvanceTo(EStep::MarkerKill);
+		return;
+	}
+	LegacyHud->AddToViewport();
+	LegacyHud->InitHud(M_Director.Get());
+	Hud->SetVisibility(ESlateVisibility::Collapsed);
+	M_LegacyHud = LegacyHud;
+	AdvanceTo(EStep::HudBefore);
+}
+
+void FSurvivalLoadoutTestRunner::RemoveLegacyHud()
+{
+	if (M_LegacyHud.IsValid())
+	{
+		M_LegacyHud->RemoveFromParent();
+	}
+	M_LegacyHud.Reset();
+	if (UW_SurvivalHud* Hud = M_Director->GetHudWidget())
+	{
+		Hud->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+	AdvanceTo(EStep::HudAfter);
+}
+
+USurvivalWaveMarkerTracker* FSurvivalLoadoutTestRunner::GetMarkerTracker() const
+{
+	const USurvivalWaveDirectorComponent* WaveDirector = M_Director->GetWaveDirector();
+	return IsValid(WaveDirector) ? WaveDirector->GetWaveMarkerTracker() : nullptr;
+}
+
+const FSurvivalWaveMarker* FSurvivalLoadoutTestRunner::FindTestMarker() const
+{
+	const USurvivalWaveMarkerTracker* Tracker = GetMarkerTracker();
+	if (not IsValid(Tracker))
+	{
+		return nullptr;
+	}
+	const FName MarkerId = M_MarkerId;
+	return Tracker->GetMarkers().FindByPredicate([MarkerId](const FSurvivalWaveMarker& Each)
+	{
+		return Each.IconId == MarkerId;
+	});
+}
+
+void FSurvivalLoadoutTestRunner::LogMarkers(const TCHAR* Label) const
+{
+	const USurvivalWaveMarkerTracker* Tracker = GetMarkerTracker();
+	const int32 Count = IsValid(Tracker) ? Tracker->GetMarkers().Num() : 0;
+	UE_LOG(LogSurvivalLoadoutTest, Display, TEXT("LOADOUT_TEST markers %s: %d"), Label, Count);
+	for (int32 Index = 0; Index < Count; ++Index)
+	{
+		const FSurvivalWaveMarker& Marker = Tracker->GetMarkers()[Index];
+		UE_LOG(LogSurvivalLoadoutTest, Display, TEXT("LOADOUT_TEST   %s at %s heading %.0f units %d bound %d"),
+		       *Marker.IconId.ToString(), *Marker.Location.ToString(), Marker.HeadingYaw, Marker.Units.Num(),
+		       Marker.bHasBoundUnits ? 1 : 0);
 	}
 }
 

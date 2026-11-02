@@ -93,7 +93,7 @@ void ASurvivalModeDirector::BeginPlay()
 	}
 	FSurvivalLoadoutTest::StartIfRequested(this);
 	// Unattended test runs log RTS errors instead of stopping the game on a modal dialog per error.
-	if (bDebugAutoStart)
+	if (bDebugAutoStart or FParse::Param(FCommandLine::Get(), TEXT("SurvivalDriveSetup")))
 	{
 		RTSFunctionLibrary::PushModalDialogSuppression();
 		bM_HasPushedDialogSuppression = true;
@@ -390,6 +390,11 @@ void ASurvivalModeDirector::ShowArmySelection()
 		FTimerHandle ConfirmLocationHandle;
 		GetWorld()->GetTimerManager().SetTimer(ConfirmLocationHandle, FTimerDelegate::CreateLambda([WeakThis]()
 		{
+			// -SurvivalPickerHold leaves the start location picker open for the test script (picker screenshots).
+			if (FParse::Param(FCommandLine::Get(), TEXT("SurvivalPickerHold")))
+			{
+				return;
+			}
 			if (WeakThis.IsValid() and not WeakThis->M_StartLocations.IsEmpty())
 			{
 				// Test runs pick the start with -SurvivalStartIndex=N; the last one when not given.

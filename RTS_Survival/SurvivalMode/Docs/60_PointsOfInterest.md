@@ -42,10 +42,10 @@ run nobody unpauses) shows only the volume. The preview tools unpause, as the pl
 - Starts are read from the director at generation time and sorted counter-clockwise around their centroid; each
   neighbouring pair is a **sector**. Nothing about the starts is hard-coded, so the planned move of the starts inward
   and the crop of the map change the sectors automatically.
-- Each sector gets, in order: its **landmark** (by the two starts' display names, `SectorLandmarks`; a landmark type not in
-  `BuiltLandmarkTypes` is skipped and logged), then `GenericPerSector` (battlefield, hangar). The first generic site
-  stands in the third of the sector next to its first start, the second next to the other start. So every start has one
-  landmark on each side, one battlefield and one hangar next to it: the same mix, by construction.
+- Each sector gets its **landmark** (by the two starts' display names, `SectorLandmarks`; a landmark type not in
+  `BuiltLandmarkTypes` is skipped and logged) and one generic site (`GenericSitesPerSector` = 1) owned by the sector's
+  first start, on that start's side; its type (battlefield or hangar) is drawn by sector and seed. So every start owns one
+  generic site and has a landmark on each side.
 - A site must keep: 18 000 from every start centre (start content reaches 17 500); 9 000 from the play-area edge (the landscape
   bounds, clipped to `PlayableAreaMin/Max` when the map is cropped: SM_Desert_01 x -69 400..66 200, y -64 400..71 200);
   every start's `ReservedContentSpots` (ramps, gate aprons; read through reflection) + 3 000;
@@ -63,11 +63,33 @@ run nobody unpauses) shows only the volume. The preview tools unpause, as the pl
   the type's `OwnerNavDistance` band (20 000-34 000 for generic sites), so every start's nearest POIs are a comparable drive away.
   Up to 8 candidates per request are path-tested.
 - Map layout exclusions: `Tools/poi_sync_layout.py` copies the layout JSON's ramps and tracks (corridor +-1 100), their gate feet
-  (3 000), the landform and world pads (no site overlaps a pad; the salt pan is allowed), the oasis basin (+3 000) and the power-line
-  pylons (1 500) into `Placement.Layout`, with the JSON's MD5. Rerun it (headless editor Python) whenever the terrain worker says the
-  map changed; the subsystem logs a warning when the stored MD5 no longer matches the file.
-- The seed chooses among all valid candidates, weighted by score (not best-first), so two seeds rarely share a site. A generic
-  site that finds no ground in its sector is tried in its owning start's other sector before it is dropped.
+  (`GateFootClearance`, 1 750 since the round 9 re-sync), the landform and world pads (no site overlaps a pad; the salt pan is
+  allowed), the oasis basin (+1 750), the power-line pylons (1 500) and the routes (as lines, see below) into `Placement.Layout`,
+  with the JSON's MD5. Rerun it (headless editor Python) whenever the terrain worker says the map changed; the subsystem logs a
+  warning when the stored MD5 no longer matches the file.
+- The seed chooses among all valid candidates, weighted by score (not best-first), so two seeds rarely share a site.
+- **Order and fallback (2026-11-02):** every sector's landmark is planned first, then the generic sites. A generic site that
+  falls back must not take a later landmark's ground. A generic site keeps its owner. It tries its home sector (relax 0-2),
+  then the owner's other sector (the neighbouring sector on the owner's side, relax 0-2), then the last resort (relax 3) in
+  both. A hangar that still finds nothing becomes a battlefield through the same chain, so its start keeps a site with
+  capture targets. Landmarks and battlefields shrink at relax 2-3 (x0.8 / x0.65); hangars keep their size, because
+  shrunk hangars lost their vehicles.
+- **Anchor test with rewards:** landmarks and hangars are composed in full while planning (same seed, same draws, same
+  occupancy as the match). A candidate stands only if its main object fits and the composition keeps at least half of the
+  scavengeables and capture targets it tries. At the last resort, one is enough. A main object that does not fit tries the
+  other models of its pool, smallest first. Battlefields are composed too (since 2026-11-02, round 5): one stands only if it
+  keeps at least one capture target (gun pit) at every relax level, because it is its start's capture site when the hangar
+  found no ground (capture spread median 1.56 over 200 seeds). Crash, pump, relay, graveyard and convoy sites also try the flipped layout
+  (yaw +180); hangars do not, because their door faces the owner.
+- **Routes:** `Layout.Routes` (the layout JSON's `routes`, copied by `poi_sync_layout.py`) replaces the old circle chain
+  in `Obstacles`.
+  - A site keeps its radius - 900 off a route's line.
+  - Every standing object keeps `RouteHalfWidth` (1 250) + its footprint + 100 off the line, so 2 500 cm stay drivable.
+    Decals and craters may lie on the route.
+  - Standing objects also keep the gate foot clearance + their footprint + 100 from every gate foot.
+  - The **dead convoy may lie along a route.** When a route passes inside a convoy candidate, the site moves beside it:
+    the column runs parallel, 500 outside the free width. The ambush side faces the road, so craters pock the verge
+    while pushed wrecks and cargo lie off the road. Only the route's two directions are tried.
 - One site request runs per frame (the search is time sliced: height field slices of 4 ms, then candidates, then requests).
 
 ## Compositions (local +X = the story direction)
@@ -148,8 +170,10 @@ vehicle folders of the `Env_Dest_*` wrecks.
 
 ## Not done / known limits
 
-- Routes, chokes, the long ramp tracks and low pads of the layout are not visible to the runtime (only each start's reserved
-  spots are); `Tools/poi_post.py` checks them against the layout JSON. Routes and chokes are not on the map yet.
+- The runtime sees the layout's ramps, gate feet, pads, basins, pylons and routes only through `Placement.Layout` (rerun
+  `Tools/poi_sync_layout.py` after map changes); `Tools/poi_post.py` checks the spawned actors against the layout JSON.
+- Sweep 2026-11-02 (200 seeds): 10 of 10 sites on 81% of seeds (else 9); convoy 100%, crash site 95%, relay 98.5%;
+  straight-line scavenge spread median 1.53, capture spread median 1.62 (target 1.5 not met).
 - Only one capturable vehicle type exists; hangar vehicles stand on the apron, because the hangar Blueprint's nav
   obstacle covers its whole footprint (a vehicle inside would be boxed in).
 - POIs do not show on the minimap as their own marks yet.

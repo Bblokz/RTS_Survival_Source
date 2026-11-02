@@ -122,6 +122,23 @@ The shared layout enforces these; an archetype only says which family and where.
   `FSovietMasterPlan::PadKinds` by zone (default gravel); defences get packed earth. Footprints under `Kit.PadMinHalfExtent` get none.
   Pads are opaque inside with a noise-broken soft edge, so neighbouring pads of one surface merge into one yard.
 
+## Building footprints (round 5)
+
+Each production or support building's pad is dressed for its class by the base's one `ASurvivalSovietBaseDressing` (one
+instanced group per mesh per base, no collision or navigation effect, no shadows on slabs and planks, clutter and planks
+culled as a group beyond `FoundationClutterCullDistance`). The layout picks the class by name token and carries it through
+the PCG points (`FoundationStyle`, `FootprintHalf`, `DoorDirection`, `ApronLength`):
+- factory / cooling towers / research: a chamfered slab (`SM_SovietSlab`, `M_SovietFoundationMesh`) 10 cm over the highest
+  ground, the building lifted onto it, the pad decal in `MI_SovietPad_Foundation` (joints, oil stains, sand rim), a concrete
+  apron to the road; slabs of one yaw within 150 cm merge;
+- barracks: a gravel walk decal, duckboards to the road; tents: a trampled-earth oval and planks; shelters and storage:
+  oily gravel and a rutted track decal; the command bunker: a concrete forecourt on the door side with sandbag corners;
+- clutter in one or two work corners outside any slab, on the ground.
+The manifest's `footprints[]` records slab heights, lifts, clutter clearances and aprons. `-SovietBaseNoDressing` (map tests)
+keeps the plain pads; `-SovietBasePerf` with the watch measures the frame cost (README round 5: GPU +0.03 ms, +37 draws at the
+RTS view, +18 at the map view). Materials: `Tools/make_ground_decals.py`; desert nets (owner choice): `Tools/make_desert_net.py`
+and `-SovietBaseDesertNets`.
+
 ## Roads, junctions and gate aprons
 
 Streets are painted as decals of `M_SovietGroundDecal` (kit `MainRoadSurface`, `LaneRoadSurface`, `TrackRoadSurface`, `StripRoadSurface`),
