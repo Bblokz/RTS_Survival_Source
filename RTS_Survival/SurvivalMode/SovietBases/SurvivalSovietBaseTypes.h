@@ -465,25 +465,78 @@ struct FSurvivalSovietSiteKit
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
 	float PadMargin = 170.f;
 
-	// Foundation slabs under permanent buildings: tiles laid over the footprint plus FoundationMargin, sunk to show an edge.
+	// Round 5 footprints, one design per building class (SurvivalSovietBaseDressing). The slab: one chamfered box (100 x 100,
+	// top at z = 0, 35 deep) scaled per slab, apron and forecourt, in a world-aligned concrete.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
-	TArray<TSoftObjectPtr<UStaticMesh>> FoundationTileMeshes;
+	TSoftObjectPtr<UStaticMesh> FoundationSlabMesh;
 
-	// Sparse use-clutter along a permanent building's walls (crates, barrels, pallets); visual only, no collision.
+	// The slab's edge strips (fixed 5 cm chamfer, round 6).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
-	TArray<TSoftObjectPtr<UStaticMesh>> FoundationClutterMeshes;
+	TSoftObjectPtr<UStaticMesh> FoundationSlabEdgeMesh;
 
-	// Boards laid in front of a tent's door.
+	// Spill lobes off one or two sides of a slab.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
-	TArray<TSoftObjectPtr<UStaticMesh>> TentBoardMeshes;
+	TSoftObjectPtr<UMaterialInterface> FoundationSpillSurface;
 
-	// How far a slab reaches past the building footprint, cm.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TSoftObjectPtr<UMaterialInterface> FoundationSlabMaterial;
+
+	// Ground decal surfaces per class: factory concrete (joints, stains, sand on the rim), tent trampled earth, barracks gravel
+	// walk, shelter oily gravel, and the rutted track from a shelter to its road.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TSoftObjectPtr<UMaterialInterface> FoundationSurface;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TSoftObjectPtr<UMaterialInterface> TrampledSurface;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TSoftObjectPtr<UMaterialInterface> GravelWalkSurface;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TSoftObjectPtr<UMaterialInterface> GravelOilySurface;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TSoftObjectPtr<UMaterialInterface> RutTrackSurface;
+
+	// Planks (duckboards to barracks doors, large planks to tents), stretched to size.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> PlankMeshes;
+
+	// The sandbag arc at a command bunker's forecourt.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> SandbagMeshes;
+
+	// Use clutter per class, laid in one or two tight work corners outside the slab.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> FactoryClutterMeshes;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> BarracksClutterMeshes;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> TentClutterMeshes;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> ShelterClutterMeshes;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations")
+	TArray<TSoftObjectPtr<UStaticMesh>> ForecourtClutterMeshes;
+
+	// How far a factory slab reaches past the building footprint, cm.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
-	float FoundationMargin = 45.f;
+	float FoundationMargin = 90.f;
 
-	// How far the slab's top stands above the ground (its visible edge), cm.
+	// How far the slab's top stands above the highest ground under it, cm.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
-	float FoundationRise = 16.f;
+	float FoundationRise = 10.f;
+
+	// How far the slab reaches below the lowest ground under it, so it never floats on a slope, cm.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
+	float FoundationSink = 25.f;
+
+	// Clutter and planks are not drawn beyond this camera distance, cm.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))
+	float FoundationClutterCullDistance = 12000.f;
 
 	// Footprints smaller than this half extent get no pad, cm.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Foundations", meta = (ClampMin = "0.0"))

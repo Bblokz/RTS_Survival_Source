@@ -47,7 +47,13 @@ namespace SurvivalStartContentDefaults
 	const FString GerPitFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/CaptureObjects/GerPits/");
 	const FString CaptureBunkerFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/CaptureObjects/Bunkers/");
 	const FString CraterFolder = TEXT("/Game/RTS_Survival/Materials/Decals/CraterDirt/");
-	const FString GroundFoliageFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/GroundFoliage/Meshes/");
+	// The map's own dead shrubs (FT_SM_DeadShrub_* paint these variants, so they cook with the map).
+	const FString DeadShrubFolder = TEXT("/Game/Megascans/3D_Plants/Deadshrub-01_vdknafgha/");
+	const FString AirportFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Airport/");
+	const FString SpecialsFolder = TEXT("/Game/RTS_Survival/SurvivalMode/Maps/Specials/");
+	const FString GroundStoneFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/GroundStones/Meshes/");
+	const FString IndustrialPropFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Industrial/");
+	const FString DestroyedTankPropFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Military/DestTanks/");
 
 	// Footprints measured from the Blueprints' mesh bounds (2026-10-29), rounded up.
 	constexpr float GrowthCrystalFootprint = 600.f;
@@ -65,6 +71,16 @@ namespace SurvivalStartContentDefaults
 	constexpr float CaptureBunkerFootprint = 750.f;
 	constexpr float CraterFootprint = 350.f;
 	constexpr float SmallCraterFootprint = 180.f;
+	// Round 10 specials (measured visible meshes: hangar +-860 cm, Luchs and Marder hulls ~ 3 m long).
+	constexpr float HangarFootprint = 1250.f;
+	constexpr float LightTankFootprint = 330.f;
+	constexpr float HangarStoreFootprint = 270.f;
+	constexpr float LargeCrystalFootprint = 350.f;
+	constexpr float DetailDecalFootprint = 400.f;
+	// Round 11 scrap yard props (measured actor bounds, rounded up).
+	constexpr float YardContainerFootprint = 650.f;
+	constexpr float YardOilTankFootprint = 400.f;
+	constexpr float YardTankHulkFootprint = 350.f;
 }
 
 USurvivalStartContentSettings::USurvivalStartContentSettings()
@@ -75,6 +91,30 @@ USurvivalStartContentSettings::USurvivalStartContentSettings()
 	InitDefaultPits();
 	InitDefaultClutter();
 	InitDefaultDifficultyScaling();
+	InitDefaultCloseResources();
+	InitDefaultSpecials();
+	InitDefaultGroundDetail();
+}
+
+const FSurvivalStartSpecialSettings* USurvivalStartContentSettings::FindSpecial(const ESurvivalStartSpecial Special) const
+{
+	if (Special == ESurvivalStartSpecial::None)
+	{
+		return nullptr;
+	}
+	return Specials.FindByPredicate([Special](const FSurvivalStartSpecialSettings& Entry) { return Entry.Special == Special; });
+}
+
+void USurvivalStartContentSettings::GetCloseNodeCounts(const ESurvivalStartSpecial Special, int32& OutRadixite,
+                                                       int32& OutMetal) const
+{
+	OutRadixite = CloseResources.RadixiteNodes;
+	OutMetal = CloseResources.MetalNodes;
+	if (const FSurvivalStartSpecialSettings* SpecialSettings = FindSpecial(Special))
+	{
+		OutRadixite += SpecialSettings->ExtraRadixiteNodes;
+		OutMetal += SpecialSettings->ExtraMetalNodes;
+	}
 }
 
 FSurvivalStartContentDifficultyScale USurvivalStartContentSettings::GetDifficultyScale(
@@ -215,10 +255,15 @@ void USurvivalStartContentSettings::InitDefaultClutter()
 		MakeEntry(CraterFolder + TEXT("BP_RTS_RandomDirtCraterDecal_Sandy"), 1.f, CraterFootprint),
 		MakeEntry(CraterFolder + TEXT("BP_RTS_RandomDirtCraterDecal_Small_Sandy"), 1.5f, SmallCraterFootprint)
 	};
+	// Round 11: the grey-green SM_GF dry tufts read as placeholder spots from the RTS camera on the desert discs; the
+	// map's brown dead shrubs read as dry growth.
 	Clutter.FoliageMeshes = {
-		MakeMesh(GroundFoliageFolder + TEXT("SM_GF_DryTuft_A"), 1.f),
-		MakeMesh(GroundFoliageFolder + TEXT("SM_GF_DryTuft_B"), 1.f),
-		MakeMesh(GroundFoliageFolder + TEXT("SM_GF_DryLitter"), 0.5f)
+		MakeMesh(DeadShrubFolder + TEXT("S_Deadshrub-01_vdknafgha_Var1_lod0"), 1.f),
+		MakeMesh(DeadShrubFolder + TEXT("S_Deadshrub-01_vdknafgha_Var3_lod0"), 1.f),
+		MakeMesh(DeadShrubFolder + TEXT("S_Deadshrub-01_vdknafgha_Var5_lod0"), 1.f),
+		MakeMesh(DeadShrubFolder + TEXT("S_Deadshrub-01_vdknafgha_Var7_lod0"), 1.f),
+		MakeMesh(DeadShrubFolder + TEXT("S_Deadshrub-01_vdknafgha_Var9_lod0"), 0.7f),
+		MakeMesh(DeadShrubFolder + TEXT("S_Deadshrub-01_vdknafgha_Var11_lod0"), 0.7f)
 	};
 }
 
@@ -238,4 +283,122 @@ void USurvivalStartContentSettings::InitDefaultDifficultyScaling()
 	DifficultyScaling.Add(ERTSGameDifficulty::Hard, MakeScale(1.f, 0.85f, 0.75f, 0.75f));
 	DifficultyScaling.Add(ERTSGameDifficulty::Brutal, MakeScale(0.75f, 0.75f, 0.6f, 0.5f));
 	DifficultyScaling.Add(ERTSGameDifficulty::Ironman, MakeScale(0.75f, 0.7f, 0.5f, 0.35f));
+}
+
+void USurvivalStartContentSettings::InitDefaultCloseResources()
+{
+	using namespace SurvivalStartContentDefaults;
+	CloseResources.RadixiteActors = {
+		MakeEntry(RadixiteFolder + TEXT("Resource_Radixite_Crystal_Large"), 1.f, LargeCrystalFootprint),
+		MakeEntry(RadixiteFolder + TEXT("Resource_Radixite_Crystal"), 1.f, CrystalFootprint)
+	};
+	// Round 11: the flat rails (22 cm high) do not read as metal from the RTS camera; barrels and the water tank do.
+	CloseResources.MetalActors = {
+		MakeEntry(MetalFolder + TEXT("Resource_Metal_Barrels"), 1.f, MetalBarrelsFootprint),
+		MakeEntry(MetalFolder + TEXT("Resource_Metal_BrokenWaterTank"), 0.8f, MetalWaterTankFootprint)
+	};
+}
+
+void USurvivalStartContentSettings::InitDefaultSpecials()
+{
+	using namespace SurvivalStartContentDefaults;
+	constexpr bool bUpright = false;
+	constexpr bool bFixedYaw = false;
+	FSurvivalStartSpecialSettings Radixite;
+	Radixite.Special = ESurvivalStartSpecial::MostRadixite;
+	Radixite.Title = NSLOCTEXT("SurvivalStartSpecial", "RadixiteTitle", "Radixite seam");
+	Radixite.Description = NSLOCTEXT("SurvivalStartSpecial", "RadixiteLine", "The most radixite next to the drop-off");
+	Radixite.ExtraRadixiteNodes = 4;
+	Specials.Add(Radixite);
+
+	FSurvivalStartSpecialSettings Metal;
+	Metal.Special = ESurvivalStartSpecial::MostMetal;
+	Metal.Title = NSLOCTEXT("SurvivalStartSpecial", "MetalTitle", "Scrap yard");
+	Metal.Description = NSLOCTEXT("SurvivalStartSpecial", "MetalLine", "The most metal next to the drop-off");
+	Metal.ExtraMetalNodes = 4;
+	// Round 11: the extra nodes stand together in a scrap yard with containers, oil tanks and burnt-out hulks round it.
+	Metal.MinDistance = 3300.f;
+	Metal.MaxDistance = 5000.f;
+	Metal.MaxGroundSlopeDegrees = 14.f;
+	Metal.YardRadius = 1500.f;
+	Metal.YardMetalActors = {
+		MakeEntry(MetalFolder + TEXT("Resource_Metal_BrokenWaterTank"), 1.f, MetalWaterTankFootprint),
+		MakeEntry(MetalFolder + TEXT("Resource_Metal_Barrels"), 1.f, MetalBarrelsFootprint)
+	};
+	Metal.YardPropCount = 5;
+	Metal.YardProps = {
+		MakeEntry(IndustrialPropFolder + TEXT("BP_Industrial_Dest_Container"), 1.f, YardContainerFootprint, bUpright),
+		MakeEntry(IndustrialPropFolder + TEXT("BP_Industrial_Dest_OilTankBarrels1"), 1.f, YardOilTankFootprint, bUpright),
+		MakeEntry(IndustrialPropFolder + TEXT("BP_Industrial_Dest_OilTankBarrels2"), 1.f, YardOilTankFootprint, bUpright),
+		MakeEntry(DestroyedTankPropFolder + TEXT("BP_Env_DestroyedPz38T"), 0.7f, YardTankHulkFootprint),
+		MakeEntry(DestroyedTankPropFolder + TEXT("BP_Env_DestroyedPzII"), 0.7f, YardTankHulkFootprint)
+	};
+	Metal.YardDecalCount = 5;
+	Metal.YardDecals = {
+		MakeEntry(SpecialsFolder + TEXT("BP_SMD_TrackDecal_Churn"), 1.f, DetailDecalFootprint),
+		MakeEntry(SpecialsFolder + TEXT("BP_SMD_TrackDecal_Ruts"), 1.f, DetailDecalFootprint),
+		MakeEntry(CraterFolder + TEXT("BP_RTS_RandomDirtCraterDecal_Small_Sandy"), 0.8f, DetailDecalFootprint)
+	};
+	Specials.Add(Metal);
+
+	FSurvivalStartSpecialSettings Wrecks;
+	Wrecks.Special = ESurvivalStartSpecial::Wrecks;
+	Wrecks.Title = NSLOCTEXT("SurvivalStartSpecial", "WrecksTitle", "Wreck field");
+	Wrecks.Description = NSLOCTEXT("SurvivalStartSpecial", "WrecksLine", "4 scavengeable tank wrecks by the drop-off");
+	Wrecks.WreckCount = 4;
+	Wrecks.MinDistance = 2600.f;
+	Wrecks.MaxDistance = 5200.f;
+	Wrecks.MaxGroundSlopeDegrees = 25.f;
+	Wrecks.Wrecks = {
+		MakeEntry(TankWreckFolder + TEXT("Light/PZ38T/ScavObj_Ger_Pz38T"), 1.f, TankWreckFootprint, true),
+		MakeEntry(TankWreckFolder + TEXT("Medium/Stug/ScavObj_Ger_Stug"), 1.f, TankWreckFootprint, true),
+		MakeEntry(TankWreckFolder + TEXT("Medium/PZIV/ScavObj_Ger_PZIV"), 1.f, TankWreckFootprint, true),
+		MakeEntry(TankWreckFolder + TEXT("Heavy/Tiger1/ScavObj_Ger_Tiger1"), 0.3f, HeavyTankWreckFootprint, true)
+	};
+	Specials.Add(Wrecks);
+
+	const auto MakeHangar = [&](const ESurvivalStartSpecial Special, const FText& Description, const FString& CaptureBlueprint)
+	{
+		FSurvivalStartSpecialSettings Hangar;
+		Hangar.Special = Special;
+		Hangar.Title = NSLOCTEXT("SurvivalStartSpecial", "HangarTitle", "Hangar");
+		Hangar.Description = Description;
+		// BP_SMD_Hangar is the Airport hangar with matte shell MIs (the Airport MIs' Specular_Int 3.0 reads as chrome).
+		Hangar.Hangar = MakeEntry(SpecialsFolder + TEXT("BP_SMD_Hangar"), 1.f, HangarFootprint, bUpright, bFixedYaw);
+		Hangar.CaptureVehicleCount = 3;
+		Hangar.CaptureVehicle = MakeEntry(SpecialsFolder + CaptureBlueprint, 1.f, LightTankFootprint, bUpright, bFixedYaw);
+		Hangar.HangarStores = {
+			MakeEntry(AirportFolder + TEXT("BP_Airport_Dest_BarrelStack"), 1.f, HangarStoreFootprint, bUpright),
+			MakeEntry(AirportFolder + TEXT("BP_Airport_Dest_CrateStack01"), 1.f, HangarStoreFootprint, bUpright)
+		};
+		return Hangar;
+	};
+	Specials.Add(MakeHangar(ESurvivalStartSpecial::LuchsHangar,
+	                        NSLOCTEXT("SurvivalStartSpecial", "LuchsLine", "3 capturable Panzer II Luchs"),
+	                        TEXT("BP_SMD_CaptureLuchs")));
+	Specials.Add(MakeHangar(ESurvivalStartSpecial::MarderHangar,
+	                        NSLOCTEXT("SurvivalStartSpecial", "MarderLine", "3 capturable twin-barrel Marders"),
+	                        TEXT("BP_SMD_CaptureMarderDual")));
+}
+
+void USurvivalStartContentSettings::InitDefaultGroundDetail()
+{
+	using namespace SurvivalStartContentDefaults;
+	GroundDetail.DecalActors = {
+		MakeEntry(SpecialsFolder + TEXT("BP_SMD_TrackDecal_Ruts"), 1.2f, DetailDecalFootprint),
+		MakeEntry(SpecialsFolder + TEXT("BP_SMD_TrackDecal_Churn"), 0.8f, DetailDecalFootprint),
+		// Round 11: the Crater_Decals dirt clusters carry green radixite debris and read as grey-green placeholder
+		// spots on the sand; sandy scorch craters replace them (the sandy track and tyre-print decals read as red claw
+		// marks at this size, and the concrete crack decals read as grey squares on sand, so neither is used).
+		MakeEntry(CraterFolder + TEXT("BP_RTS_RandomDirtCraterDecal_Small_Sandy"), 1.f, DetailDecalFootprint),
+		MakeEntry(CraterFolder + TEXT("BP_RTS_RandomDirtCraterDecal_Sandy"), 0.5f, DetailDecalFootprint)
+	};
+	GroundDetail.StoneMeshes = {
+		MakeMesh(GroundStoneFolder + TEXT("SM_GS_Chunk_A"), 1.f),
+		MakeMesh(GroundStoneFolder + TEXT("SM_GS_Chunk_B"), 1.f),
+		MakeMesh(GroundStoneFolder + TEXT("SM_GS_Chunk_C"), 1.f),
+		MakeMesh(GroundStoneFolder + TEXT("SM_GS_Cluster_A"), 0.6f),
+		MakeMesh(GroundStoneFolder + TEXT("SM_GS_Cluster_B"), 0.6f),
+		MakeMesh(GroundStoneFolder + TEXT("SM_GS_Slab_A"), 0.4f)
+	};
 }

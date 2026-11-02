@@ -40,6 +40,21 @@ namespace SurvivalStartContentPlannerConstants
 	constexpr float ReachProjectExtentXY = 60.f;  // the spot itself must be on the navmesh, not just near it
 	constexpr float ReachProjectExtentZ = 400.f;
 	constexpr float ReachArriveTolerance = 300.f;
+	// Specials and close nodes: hangar door search directions and attempts per item.
+	constexpr int32 HangarDirections = 24;
+	constexpr int32 HangarRadialSteps = 6;
+	constexpr int32 CloseNodeAttempts = 64;
+	constexpr float HangarApronGap = 500.f;
+	constexpr float HangarStoreSideGap = 250.f;
+	constexpr float DetailDecalYawDegrees = 360.f;
+	// Scrap yard: the centre must be clear over this share of the yard radius; nodes may stand closer than other nodes.
+	constexpr float YardFreeCoreFraction = 0.5f;
+	constexpr float YardNodeClearanceFraction = 0.4f;
+	// Props stand on the yard's far side: within this arc round the outward direction, at this share of the radius.
+	constexpr float YardPropHalfArcRadians = 1.2f;
+	constexpr float YardPropMinRadiusFraction = 0.8f;
+	constexpr float YardPropMaxRadiusFraction = 1.35f;
+	constexpr float YardPropSlopeFactor = 1.6f;
 }
 
 int32 FSurvivalStartContentPlan::GetPlannedFieldCount(const ESurvivalStartContentCategory Category) const
@@ -93,21 +108,27 @@ FSurvivalStartContentPlanner::FSurvivalStartContentPlanner(
 	: M_Settings(Settings)
 	, M_Input(Input)
 	, M_Projector(World, Settings.GroundTraceUp, Settings.GroundTraceDown)
-	, M_World(&World)
 	, M_Random(Input.Seed)
 	, M_Scale(Settings.GetDifficultyScale(Input.Difficulty))
+	, M_World(&World)
 {
 }
 
 FSurvivalStartContentPlan FSurvivalStartContentPlanner::BuildPlan()
 {
 	M_Plan.Reset();
+	M_YardMetalNodes = 0;
 	if (not M_Projector.HasLandscape())
 	{
 		return M_Plan;
 	}
 	InitReachability();
+	PlanSpecial();
+	PlanCloseResources();
 	PlanPits();
+	// Ground detail lies inside the build area (decals draw on the ground only; stones have no collision), so it is planned
+	// before the build area is reserved; it still avoids the specials, close nodes and pits planned above.
+	PlanGroundDetail();
 	ReserveProtectedAreas();
 	PlanResourceFields();
 	PlanWrecks();
@@ -475,6 +496,382 @@ void FSurvivalStartContentPlanner::PlanFoliage()
 			Instance.Transform = FTransform(
 				SurvivalStartPlacement::MakeGroundRotation(Ground.Normal, GetRandomYaw(), true),
 				Ground.Location, FVector(Scale));
+			break;
+		}
+	}
+}
+
+bool FSurvivalStartContentPlanner::GetIsOutsideLandingRing(const FVector2D& Position, const float Radius) const
+{
+	return FVector2D::Distance(Position, GetDeployCenter2D()) - Radius >= M_Settings.CloseResources.LandingClearRadius;
+}
+
+void FSurvivalStartContentPlanner::PlanSpecial()
+{
+	const FSurvivalStartSpecialSettings* Special = M_Settings.FindSpecial(M_Input.Special);
+	if (Special == nullptr)
+	{
+		return;
+	}
+	if (not Special->Hangar.ActorClass.IsNull())
+	{
+		M_Plan.RequestedSpecialPieces += 1 + Special->CaptureVehicleCount;
+		TryPlanHangar(*Special);
+	}
+	if (Special->WreckCount > 0)
+	{
+		PlanSpecialWrecks(*Special);
+	}
+	if (Special->ExtraMetalNodes > 0 and not Special->YardMetalActors.IsEmpty())
+	{
+		TryPlanScrapYard(*Special);
+	}
+}
+
+void FSurvivalStartContentPlanner::TryPlanScrapYard(const FSurvivalStartSpecialSettings& Special)
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	const FVector2D Deploy = GetDeployCenter2D();
+	const float StartAngle = M_Random.FRandRange(0.f, 2.f * PI);
+	for (int32 Step = 0; Step < HangarRadialSteps; ++Step)
+	{
+		const float Distance = FMath::Lerp(Special.MinDistance, Special.MaxDistance,
+		                                   static_cast<float>(Step) / FMath::Max(1, HangarRadialSteps - 1));
+		for (int32 Direction = 0; Direction < HangarDirections; ++Direction)
+		{
+			const float Angle = StartAngle + 2.f * PI * Direction / HangarDirections;
+			const FVector2D Outward(FMath::Cos(Angle), FMath::Sin(Angle));
+			const FVector2D YardCenter = Deploy + Outward * Distance;
+			FSurvivalGroundHit Ground;
+			if (not M_Occupancy.IsFree(YardCenter, Special.YardRadius * YardFreeCoreFraction)
+				or not GetIsOutsideLandingRing(YardCenter, Special.YardRadius * YardFreeCoreFraction)
+				or not TryFindGround(YardCenter, Special.MaxGroundSlopeDegrees, Ground))
+			{
+				continue;
+			}
+			M_YardMetalNodes = PlanYardNodes(Special, YardCenter);
+			M_Plan.PlannedCloseMetal += M_YardMetalNodes;
+			PlanYardDressing(Special, YardCenter, Outward);
+			return;
+		}
+	}
+}
+
+int32 FSurvivalStartContentPlanner::PlanYardNodes(const FSurvivalStartSpecialSettings& Special, const FVector2D& YardCenter)
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	const FSurvivalCloseResourceSettings& Close = M_Settings.CloseResources;
+	int32 Planned = 0;
+	for (int32 Node = 0; Node < Special.ExtraMetalNodes; ++Node)
+	{
+		const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Special.YardMetalActors, M_Random);
+		if (not Special.YardMetalActors.IsValidIndex(EntryIndex))
+		{
+			break;
+		}
+		const FSurvivalWeightedActorClass& Entry = Special.YardMetalActors[EntryIndex];
+		for (int32 Attempt = 0; Attempt < CloseNodeAttempts; ++Attempt)
+		{
+			const FVector2D Position = SurvivalStartPlacement::RandomPointInAnnulus(YardCenter, 0.f, Special.YardRadius, M_Random);
+			FSurvivalGroundHit Ground;
+			if (not M_Occupancy.IsFree(Position, Entry.FootprintRadius, Close.NodeClearance * YardNodeClearanceFraction)
+				or not GetIsOutsideLandingRing(Position, Entry.FootprintRadius)
+				or not TryFindGround(Position, Close.MaxGroundSlopeDegrees, Ground)
+				or not GetIsActorSpotValid(Position, Ground, Entry.FootprintRadius, Close.MaxGroundSlopeDegrees))
+			{
+				continue;
+			}
+			AddPlannedActor(Entry, Ground, GetRandomYaw(), ESurvivalStartContentCategory::Metal);
+			M_Occupancy.Add(Position, Entry.FootprintRadius);
+			++Planned;
+			break;
+		}
+	}
+	return Planned;
+}
+
+void FSurvivalStartContentPlanner::PlanYardDressing(const FSurvivalStartSpecialSettings& Special, const FVector2D& YardCenter,
+                                                    const FVector2D& Outward)
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	const float OutwardAngle = FMath::Atan2(Outward.Y, Outward.X);
+	for (int32 Prop = 0; Prop < Special.YardPropCount; ++Prop)
+	{
+		const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Special.YardProps, M_Random);
+		if (not Special.YardProps.IsValidIndex(EntryIndex))
+		{
+			break;
+		}
+		const FSurvivalWeightedActorClass& Entry = Special.YardProps[EntryIndex];
+		for (int32 Attempt = 0; Attempt < CloseNodeAttempts; ++Attempt)
+		{
+			const float Angle = OutwardAngle + M_Random.FRandRange(-YardPropHalfArcRadians, YardPropHalfArcRadians);
+			const float Distance = Special.YardRadius * M_Random.FRandRange(YardPropMinRadiusFraction, YardPropMaxRadiusFraction);
+			const FVector2D Position = YardCenter + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Distance;
+			FSurvivalGroundHit Ground;
+			if (not M_Occupancy.IsFree(Position, Entry.FootprintRadius)
+				or not GetIsOutsideLandingRing(Position, Entry.FootprintRadius)
+				or not TryFindGround(Position, Special.MaxGroundSlopeDegrees * YardPropSlopeFactor, Ground))
+			{
+				continue;
+			}
+			AddPlannedActor(Entry, Ground, GetRandomYaw(), ESurvivalStartContentCategory::Detail);
+			M_Occupancy.Add(Position, Entry.FootprintRadius);
+			break;
+		}
+	}
+	// Tracks and stains on the yard floor; decals draw on the ground only, so they need no room of their own.
+	for (int32 Decal = 0; Decal < Special.YardDecalCount; ++Decal)
+	{
+		const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Special.YardDecals, M_Random);
+		if (not Special.YardDecals.IsValidIndex(EntryIndex))
+		{
+			break;
+		}
+		const FVector2D Position = SurvivalStartPlacement::RandomPointInAnnulus(YardCenter, 0.f, Special.YardRadius, M_Random);
+		FSurvivalGroundHit Ground;
+		if (TryFindGround(Position, CraterMaxSlopeDegrees, Ground))
+		{
+			AddPlannedActor(Special.YardDecals[EntryIndex], Ground, GetRandomYaw(), ESurvivalStartContentCategory::Detail);
+		}
+	}
+}
+
+bool FSurvivalStartContentPlanner::TryPlanHangar(const FSurvivalStartSpecialSettings& Special)
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	const FVector2D Deploy = GetDeployCenter2D();
+	const float StartAngle = M_Random.FRandRange(0.f, 2.f * PI);
+	for (int32 Step = 0; Step < HangarRadialSteps; ++Step)
+	{
+		const float Distance = FMath::Lerp(Special.MinDistance, Special.MaxDistance, static_cast<float>(Step) / FMath::Max(1, HangarRadialSteps - 1));
+		for (int32 Direction = 0; Direction < HangarDirections; ++Direction)
+		{
+			const float Angle = StartAngle + 2.f * PI * Direction / HangarDirections;
+			const FVector2D Outward(FMath::Cos(Angle), FMath::Sin(Angle));
+			const FVector2D HangarCenter = Deploy + Outward * Distance;
+			const FVector2D Door = -Outward;  // the door (+X) faces the deploy centre
+			const FVector2D Side(-Door.Y, Door.X);
+			const float HangarYaw = FMath::RadiansToDegrees(FMath::Atan2(Door.Y, Door.X));
+			FSurvivalGroundHit HangarGround;
+			if (not M_Occupancy.IsFree(HangarCenter, Special.Hangar.FootprintRadius)
+				or not GetIsOutsideLandingRing(HangarCenter, Special.Hangar.FootprintRadius)
+				or not TryFindGround(HangarCenter, Special.MaxGroundSlopeDegrees, HangarGround)
+				or not GetIsActorSpotValid(HangarCenter, HangarGround, Special.Hangar.FootprintRadius, Special.MaxGroundSlopeDegrees))
+			{
+				continue;
+			}
+			// Vehicles in a row on the apron, nose to the deploy centre; all must fit.
+			TArray<FVector2D> VehicleSpots;
+			TArray<FSurvivalGroundHit> VehicleGrounds;
+			const FVector2D Apron = HangarCenter + Door * (Special.HangarHalfExtent.X + HangarApronGap + Special.CaptureVehicle.FootprintRadius);
+			bool bApronFits = true;
+			for (int32 Vehicle = 0; Vehicle < Special.CaptureVehicleCount and bApronFits; ++Vehicle)
+			{
+				const float Offset = (Vehicle - 0.5f * (Special.CaptureVehicleCount - 1)) * Special.CaptureVehicleSpacing;
+				const FVector2D Spot = Apron + Side * Offset;
+				FSurvivalGroundHit Ground;
+				bApronFits = M_Occupancy.IsFree(Spot, Special.CaptureVehicle.FootprintRadius)
+					and GetIsOutsideLandingRing(Spot, Special.CaptureVehicle.FootprintRadius)
+					and TryFindGround(Spot, Special.MaxGroundSlopeDegrees, Ground)
+					and GetIsActorSpotValid(Spot, Ground, Special.CaptureVehicle.FootprintRadius, Special.MaxGroundSlopeDegrees);
+				VehicleSpots.Add(Spot);
+				VehicleGrounds.Add(Ground);
+			}
+			if (not bApronFits)
+			{
+				continue;
+			}
+			AddPlannedActor(Special.Hangar, HangarGround, HangarYaw, ESurvivalStartContentCategory::Special);
+			M_Occupancy.Add(HangarCenter, Special.Hangar.FootprintRadius);
+			for (int32 Vehicle = 0; Vehicle < VehicleSpots.Num(); ++Vehicle)
+			{
+				AddPlannedActor(Special.CaptureVehicle, VehicleGrounds[Vehicle], HangarYaw, ESurvivalStartContentCategory::Special);
+				M_Occupancy.Add(VehicleSpots[Vehicle], Special.CaptureVehicle.FootprintRadius);
+			}
+			M_Plan.PlannedSpecialPieces += 1 + VehicleSpots.Num();
+			// Stores on both sides of the hangar mouth (decoration; skipped where they do not fit).
+			for (int32 Store = 0; Store < Special.HangarStoreCount; ++Store)
+			{
+				const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Special.HangarStores, M_Random);
+				if (not Special.HangarStores.IsValidIndex(EntryIndex))
+				{
+					break;
+				}
+				const FSurvivalWeightedActorClass& Entry = Special.HangarStores[EntryIndex];
+				const float SideSign = Store % 2 == 0 ? 1.f : -1.f;
+				// Beside the hangar's reserved circle, not just its walls, or the occupancy check always refuses the store.
+				const float SideDistance = FMath::Max(Special.HangarHalfExtent.Y, Special.Hangar.FootprintRadius);
+				const FVector2D Spot = HangarCenter + Side * SideSign * (SideDistance + HangarStoreSideGap + Entry.FootprintRadius)
+					+ Door * (Special.HangarHalfExtent.X * 0.5f);
+				FSurvivalGroundHit Ground;
+				if (M_Occupancy.IsFree(Spot, Entry.FootprintRadius) and TryFindGround(Spot, Special.MaxGroundSlopeDegrees, Ground))
+				{
+					AddPlannedActor(Entry, Ground, HangarYaw, ESurvivalStartContentCategory::Special);
+					M_Occupancy.Add(Spot, Entry.FootprintRadius);
+				}
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+void FSurvivalStartContentPlanner::PlanSpecialWrecks(const FSurvivalStartSpecialSettings& Special)
+{
+	M_Plan.RequestedSpecialPieces += Special.WreckCount;
+	for (int32 WreckIndex = 0; WreckIndex < Special.WreckCount; ++WreckIndex)
+	{
+		const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Special.Wrecks, M_Random);
+		if (not Special.Wrecks.IsValidIndex(EntryIndex))
+		{
+			return;
+		}
+		const FSurvivalWeightedActorClass& Entry = Special.Wrecks[EntryIndex];
+		const float SpacingRadius = FMath::Max(Entry.FootprintRadius, Special.WreckSpacing * 0.5f);
+		for (int32 Attempt = 0; Attempt < M_Settings.PlacementAttemptsPerItem; ++Attempt)
+		{
+			const FVector2D Position = SurvivalStartPlacement::RandomPointInAnnulus(
+				GetDeployCenter2D(), Special.MinDistance, Special.MaxDistance, M_Random);
+			FSurvivalGroundHit Ground;
+			if (not M_Occupancy.IsFree(Position, SpacingRadius) or not GetIsOutsideLandingRing(Position, Entry.FootprintRadius)
+				or not TryFindGround(Position, Special.MaxGroundSlopeDegrees, Ground)
+				or not GetIsActorSpotValid(Position, Ground, Entry.FootprintRadius, Special.MaxGroundSlopeDegrees))
+			{
+				continue;
+			}
+			AddPlannedActor(Entry, Ground, GetRandomYaw(), ESurvivalStartContentCategory::Wreck);
+			M_Occupancy.Add(Position, SpacingRadius);
+			++M_Plan.PlannedSpecialPieces;
+			break;
+		}
+	}
+}
+
+void FSurvivalStartContentPlanner::PlanCloseResources()
+{
+	int32 Radixite = 0;
+	int32 Metal = 0;
+	M_Settings.GetCloseNodeCounts(M_Input.Special, Radixite, Metal);
+	M_Plan.RequestedCloseRadixite = Radixite;
+	M_Plan.RequestedCloseMetal = Metal;
+	// The scrap yard already holds some of the metal special's extra nodes.
+	Metal = FMath::Max(0, Metal - M_YardMetalNodes);
+	// Alternate the two kinds round the drop-off so both are close to every side of the HQ.
+	TArray<ESurvivalStartContentCategory> Order;
+	while (Radixite > 0 or Metal > 0)
+	{
+		if (Radixite-- > 0)
+		{
+			Order.Add(ESurvivalStartContentCategory::Radixite);
+		}
+		if (Metal-- > 0)
+		{
+			Order.Add(ESurvivalStartContentCategory::Metal);
+		}
+	}
+	const float StartAngle = M_Random.FRandRange(0.f, 2.f * PI);
+	for (int32 Index = 0; Index < Order.Num(); ++Index)
+	{
+		const bool bRadixite = Order[Index] == ESurvivalStartContentCategory::Radixite;
+		const float Angle = StartAngle + 2.f * PI * Index / FMath::Max(1, Order.Num());
+		if (TryPlanCloseNode(bRadixite ? M_Settings.CloseResources.RadixiteActors : M_Settings.CloseResources.MetalActors,
+		                     Order[Index], Angle))
+		{
+			(bRadixite ? M_Plan.PlannedCloseRadixite : M_Plan.PlannedCloseMetal)++;
+		}
+	}
+}
+
+bool FSurvivalStartContentPlanner::TryPlanCloseNode(const TArray<FSurvivalWeightedActorClass>& Actors,
+                                                    const ESurvivalStartContentCategory Category,
+                                                    const float PreferredAngle)
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	const FSurvivalCloseResourceSettings& Close = M_Settings.CloseResources;
+	const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Actors, M_Random);
+	if (not Actors.IsValidIndex(EntryIndex))
+	{
+		return false;
+	}
+	const FSurvivalWeightedActorClass& Entry = Actors[EntryIndex];
+	for (int32 Attempt = 0; Attempt < CloseNodeAttempts; ++Attempt)
+	{
+		// Around the preferred angle first, widening with every attempt.
+		const float Spread = PI * FMath::Min(1.f, Attempt / static_cast<float>(CloseNodeAttempts / 2));
+		const float Angle = PreferredAngle + M_Random.FRandRange(-Spread, Spread) * 0.5f;
+		const float Distance = M_Random.FRandRange(Close.MinDistance, Close.MaxDistance);
+		const FVector2D Position = GetDeployCenter2D() + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Distance;
+		FSurvivalGroundHit Ground;
+		if (not M_Occupancy.IsFree(Position, Entry.FootprintRadius, Close.NodeClearance)
+			or not GetIsOutsideLandingRing(Position, Entry.FootprintRadius)
+			or not TryFindGround(Position, Close.MaxGroundSlopeDegrees, Ground)
+			or not GetIsActorSpotValid(Position, Ground, Entry.FootprintRadius, Close.MaxGroundSlopeDegrees))
+		{
+			continue;
+		}
+		AddPlannedActor(Entry, Ground, GetRandomYaw(), Category);
+		M_Occupancy.Add(Position, Entry.FootprintRadius);
+		return true;
+	}
+	return false;
+}
+
+void FSurvivalStartContentPlanner::PlanGroundDetail()
+{
+	using namespace SurvivalStartContentPlannerConstants;
+	const FSurvivalGroundDetailSettings& Detail = M_Settings.GroundDetail;
+	// Decals may lie under the drop lanes (they draw on the ground only); they avoid content and keep apart. Their own
+	// spacing is kept apart from M_Occupancy so they never block the resource fields and wrecks planned after them.
+	FSurvivalOccupancy DecalSpacing;
+	for (int32 DecalIndex = 0; DecalIndex < Detail.DecalCount; ++DecalIndex)
+	{
+		const int32 EntryIndex = SurvivalStartPlacement::PickWeightedActorIndex(Detail.DecalActors, M_Random);
+		if (not Detail.DecalActors.IsValidIndex(EntryIndex))
+		{
+			break;
+		}
+		const FSurvivalWeightedActorClass& Entry = Detail.DecalActors[EntryIndex];
+		for (int32 Attempt = 0; Attempt < M_Settings.PlacementAttemptsPerItem; ++Attempt)
+		{
+			const FVector2D Position = SurvivalStartPlacement::RandomPointInAnnulus(
+				GetDeployCenter2D(), Detail.MinDistance, Detail.MaxDistance, M_Random);
+			FSurvivalGroundHit Ground;
+			if (not M_Occupancy.IsFree(Position, Entry.FootprintRadius)
+				or not DecalSpacing.IsFree(Position, Entry.FootprintRadius)
+				or not TryFindGround(Position, CraterMaxSlopeDegrees, Ground))
+			{
+				continue;
+			}
+			AddPlannedActor(Entry, Ground, M_Random.FRandRange(0.f, DetailDecalYawDegrees), ESurvivalStartContentCategory::Detail);
+			DecalSpacing.Add(Position, Entry.FootprintRadius * 0.5f);
+			break;
+		}
+	}
+	// Scattered stones (instanced, no collision) beyond the close resource ring.
+	for (int32 StoneIndex = 0; StoneIndex < Detail.StoneCount; ++StoneIndex)
+	{
+		const int32 MeshIndex = SurvivalStartPlacement::PickWeightedMeshIndex(Detail.StoneMeshes, M_Random);
+		if (not Detail.StoneMeshes.IsValidIndex(MeshIndex))
+		{
+			break;
+		}
+		const FSurvivalWeightedMesh& Entry = Detail.StoneMeshes[MeshIndex];
+		for (int32 Attempt = 0; Attempt < FoliageAttemptsPerInstance; ++Attempt)
+		{
+			const FVector2D Position = SurvivalStartPlacement::RandomPointInAnnulus(
+				GetDeployCenter2D(), FMath::Max(Detail.StoneMinDistance, Detail.MinDistance), Detail.MaxDistance, M_Random);
+			FSurvivalGroundHit Ground;
+			if (not M_Occupancy.IsFree(Position, FoliageFootprintRadius)
+				or not TryFindGround(Position, Detail.StoneMaxGroundSlopeDegrees, Ground))
+			{
+				continue;
+			}
+			const float Scale = M_Random.FRandRange(FMath::Min(Entry.MinScale, Entry.MaxScale), FMath::Max(Entry.MinScale, Entry.MaxScale));
+			FSurvivalPlannedMeshInstance& Instance = M_Plan.MeshInstances.AddDefaulted_GetRef();
+			Instance.Mesh = Entry.Mesh;
+			Instance.Transform = FTransform(SurvivalStartPlacement::MakeGroundRotation(Ground.Normal, GetRandomYaw(), true),
+			                                Ground.Location, FVector(Scale));
 			break;
 		}
 	}

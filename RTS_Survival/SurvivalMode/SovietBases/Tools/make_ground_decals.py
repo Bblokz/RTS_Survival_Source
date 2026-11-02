@@ -10,7 +10,10 @@ roads, pads and aprons share the desert's palette and differ in how dark and how
 - pads: a rounded rectangle whose edge is broken by world-space noise, fully opaque inside, so overlapping pads of one
   surface merge into one yard instead of doubling their tint;
 - roads: soft verges with gravel spill along both sides, two wheel ruts that follow the road, ends that fade out;
-- concrete: expansion joints on a grid in the shape's own frame."""
+- concrete: expansion joints on a grid in the shape's own frame;
+- round 5 (footprints): optional oil/soot stains (Stain) and a world-space sand dust layer that thickens towards the shape's
+  edge (Dust, DustSurface), both off by default so roads and older pads keep their look.
+It also builds M_SovietFoundationMesh, the opaque world-aligned concrete of the foundation slabs and aprons (meshes)."""
 import unreal
 
 FOLDER = '/Game/RTS_Survival/SurvivalMode/Data/SovietBases/Pads'
@@ -94,13 +97,66 @@ else
 float JointLine = 0.0;
 if (Joint.x > 1.0)
 {
+	// Round 6: irregular pour panels. Each joint segment between two crossings is kept or dropped by a hash, so panels run
+	// one or two grid steps (Joint.x to 2 Joint.x) in each direction and no line crosses a whole slab; joints only darken.
 	float2 G = abs(frac(L / Joint.x + 0.5) - 0.5) * Joint.x;
-	JointLine = (1.0 - smoothstep(1.5, 5.0, min(G.x, G.y))) * Joint.y;
+	float2 Cell = floor(L / Joint.x + 0.5);
+	float2 Segment = floor(L / Joint.x);
+	float KeepX = step(0.45, N.Hash(float2(Cell.x * 1.7, Segment.y * 3.1) + Center.xy * 0.001));
+	float KeepY = step(0.45, N.Hash(float2(Segment.x * 2.3, Cell.y * 1.3) + Center.yx * 0.001));
+	float LineX = (1.0 - smoothstep(1.0, 3.0, G.x)) * KeepX;
+	float LineY = (1.0 - smoothstep(1.0, 3.0, G.y)) * KeepY;
+	JointLine = max(LineX, LineY) * Joint.y;
 }
 float Broad = 0.88 + 0.24 * N.Fbm(Pos.xy / 1400.0);
 float Grain = 0.93 + 0.14 * N.Value(Pos.xy / 55.0);
 float3 Shade = lerp(float3(1, 1, 1), VergeTint.rgb, saturate(Verge) * VergeStrength) * Broad * Grain;
 return Shade * (1.0 - saturate(Rut)) * (1.0 - JointLine);"""
+
+# Dust: x amount of the large-scale sand layer, y extra sand towards the edge, z noise scale cm. Stain: x amount, y blotch
+# scale cm, z darkness. The dust colour is the landscape's own sand at the landscape's brightness.
+FINISH_HLSL = NOISE + """float2 Q = abs(L) - Half.xy + Half.z;
+float Dist = Edge.z < 0.5 ? length(max(Q, 0.0)) + min(max(Q.x, Q.y), 0.0) - Half.z : abs(L.y) - Half.y;
+float3 Result = Color;
+if (Stain.x > 0.0)
+{
+	float Blot = smoothstep(0.58, 0.74, N.Fbm(Pos.xy / max(Stain.y, 1.0) + float2(13.7, 4.1)));
+	float Fine = 0.7 + 0.3 * N.Value(Pos.xy / 25.0);
+	Result *= 1.0 - saturate(Blot * Fine * Stain.x) * Stain.z;
+}
+if (Dust.x > 0.0 || Dust.y > 0.0)
+{
+	float Cover = smoothstep(0.38, 0.78, N.Fbm(Pos.xy / max(Dust.z, 1.0) + float2(3.3, 9.1))) * Dust.x;
+	float Rim = smoothstep(-Edge.x * 2.2, Edge.x * 0.2, Dist + (N.Fbm(Pos.xy / 120.0) - 0.5) * Edge.x) * Dust.y;
+	Result = lerp(Result, DustColor, saturate(Cover + Rim));
+}
+return Result;"""
+
+# The foundation meshes: world-aligned scorched concrete with a sand cast, faint joints every 350 cm on top, sand dust in
+# large patches, darker side faces.
+MESH_NOISE = """struct FSovietNoise
+{
+	float Hash(float2 P) { return frac(sin(dot(P, float2(127.1, 311.7))) * 43758.5453); }
+	float Value(float2 P)
+	{
+		float2 I = floor(P);
+		float2 F = frac(P);
+		F = F * F * (3.0 - 2.0 * F);
+		return lerp(lerp(Hash(I), Hash(I + float2(1, 0)), F.x), lerp(Hash(I + float2(0, 1)), Hash(I + float2(1, 1)), F.x), F.y);
+	}
+	float Fbm(float2 P) { return Value(P) * 0.6 + Value(P * 2.3 + 5.2) * 0.28 + Value(P * 5.1 + 1.7) * 0.12; }
+};
+FSovietNoise N;
+"""
+# Round 6: the texture's own tile lines read as a bright grid; its contrast is flattened to 30% around its mean (the tint
+# carries the colour), large dust blotches cover 40-60%, no regular joints on the mesh.
+MESH_HLSL = MESH_NOISE + """float Up = saturate(Normal.z);
+float Cover = smoothstep(0.32, 0.72, N.Fbm(Pos.xy / 640.0 + float2(7.7, 1.3))) * DustAmount;
+float Grain = 0.94 + 0.12 * N.Value(Pos.xy / 45.0);
+float Luma = dot(Tex, float3(0.3, 0.59, 0.11));
+float3 Flat = lerp(float3(0.45, 0.45, 0.45), Tex * (0.45 / max(Luma, 0.02)) * 0.5 + Tex * 0.5, 0.3);
+float3 Concrete = lerp(SideTint.rgb, TopTint.rgb, Up) * Flat * Grain * (0.11 / 0.45);
+return lerp(Concrete, Sand, saturate(Cover * Up + (1.0 - Up) * 0.2));"""
 
 lib = unreal.MaterialEditingLibrary
 tools = unreal.AssetToolsHelpers.get_asset_tools()
@@ -154,6 +210,8 @@ def make_material():
         'Ruts': vector(mat, 'Ruts', (0.42, 28, 0.0, 22), -1600, 1200),
         'Joint': vector(mat, 'Joint', (0, 0.35, 0, 0), -1600, 1400),
         'VergeTint': vector(mat, 'VergeTint', (1.05, 0.95, 0.85, 1), -1600, 1600),
+        'Dust': vector(mat, 'Dust', (0, 0, 600, 0), -1600, 2000),
+        'Stain': vector(mat, 'Stain', (0, 150, 0.5, 0), -1600, 2200),
     }
     opacity_value = scalar(mat, 'Opacity', 1.0, -1600, 1800)
     # World-aligned surface texture times a tint.
@@ -186,7 +244,25 @@ def make_material():
     color = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -450, -200)
     lib.connect_material_expressions(tinted, '', color, 'A')
     lib.connect_material_expressions(shade, '', color, 'B')
-    lib.connect_material_property(color, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    # Dust: the landscape sand, world aligned, at the landscape brightness.
+    dust_div = lib.create_material_expression(mat, unreal.MaterialExpressionDivide, -1150, 1900)
+    lib.connect_material_expressions(mask, '', dust_div, 'A')
+    lib.connect_material_expressions(scalar(mat, 'DustTilingCm', 400.0, -1300, 1950), '', dust_div, 'B')
+    dust_tex = lib.create_material_expression(mat, unreal.MaterialExpressionTextureSampleParameter2D, -950, 1900)
+    dust_tex.set_editor_property('parameter_name', 'DustSurface')
+    dust_tex.set_editor_property('texture', unreal.load_asset(LS_SAND))
+    lib.connect_material_expressions(dust_div, '', dust_tex, 'UVs')
+    dust_color = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -750, 1900)
+    lib.connect_material_expressions(dust_tex, 'RGB', dust_color, 'A')
+    lib.connect_material_expressions(scalar(mat, 'DustBrightness', LS_BRIGHTNESS, -950, 2100), '', dust_color, 'B')
+    finish = custom(mat, FINISH_HLSL, unreal.CustomMaterialOutputType.CMOT_FLOAT3,
+                    ['Color', 'Pos', 'Center', 'Axis', 'Half', 'Edge', 'Dust', 'DustColor', 'Stain'], -300, -200)
+    lib.connect_material_expressions(color, '', finish, 'Color')
+    lib.connect_material_expressions(pos, '', finish, 'Pos')
+    for name in ['Center', 'Axis', 'Half', 'Edge', 'Dust', 'Stain']:
+        lib.connect_material_expressions(params[name], '', finish, name)
+    lib.connect_material_expressions(dust_color, '', finish, 'DustColor')
+    lib.connect_material_property(finish, '', unreal.MaterialProperty.MP_BASE_COLOR)
     rough = lib.create_material_expression(mat, unreal.MaterialExpressionConstant, -450, 100)
     rough.set_editor_property('r', 0.93)
     lib.connect_material_property(rough, '', unreal.MaterialProperty.MP_ROUGHNESS)
@@ -203,7 +279,8 @@ def make_material():
     return mat
 
 
-def make_instance(name, parent, texture, tint, tiling, verge, ruts=None, joint=None, opacity=1.0, grain=0.5):
+def make_instance(name, parent, texture, tint, tiling, verge, ruts=None, joint=None, opacity=1.0, grain=0.5, dust=None, stain=None,
+                  grain_mean=None):
     inst = fresh(name, unreal.MaterialInstanceConstant, unreal.MaterialInstanceConstantFactoryNew())
     inst.set_editor_property('parent', parent)
     lib.set_material_instance_texture_parameter_value(inst, 'Surface', unreal.load_asset(texture))
@@ -216,6 +293,12 @@ def make_instance(name, parent, texture, tint, tiling, verge, ruts=None, joint=N
         lib.set_material_instance_vector_parameter_value(inst, 'Ruts', unreal.LinearColor(*ruts))
     if joint is not None:
         lib.set_material_instance_vector_parameter_value(inst, 'Joint', unreal.LinearColor(*joint))
+    if grain_mean is not None:
+        lib.set_material_instance_scalar_parameter_value(inst, 'GrainMean', grain_mean)
+    if dust is not None:
+        lib.set_material_instance_vector_parameter_value(inst, 'Dust', unreal.LinearColor(*dust))
+    if stain is not None:
+        lib.set_material_instance_vector_parameter_value(inst, 'Stain', unreal.LinearColor(*stain))
     lib.update_material_instance(inst)
     unreal.EditorAssetLibrary.save_loaded_asset(inst, only_if_is_dirty=False)
 
@@ -246,7 +329,90 @@ make_instance('MI_SovietPad_Concrete', material, LS_GRAVEL, shade(0.86), 600.0, 
 # Pads stay close to the ground: gravel a shade darker than the sand, packed earth under the defences darker still.
 make_instance('MI_SovietPad_Gravel', material, LS_GRAVEL, shade(0.95), 600.0, VERGE, grain=0.8)
 make_instance('MI_SovietPad_PackedEarth', material, LS_MUD, shade(0.85), 700.0, VERGE, opacity=0.9, grain=0.8)
-names = ['M_SovietGroundDecal', 'MI_SovietPad_Concrete', 'MI_SovietPad_Gravel', 'MI_SovietPad_PackedEarth', 'MI_SovietRoad_Main',
+# Round 5 footprints. Foundation: the landscape's scorched concrete, sand cast, faint joints every 350, oil stains, sand dust
+# in patches and drifted onto the rim. Oily gravel under vehicle and fuel shelters. Trampled earth around tents.
+# Round 5b: measured on the first renders the slab was olive and about a third darker than the sand; a warmer, brighter cast.
+def warm_cast(value):
+    v = LS_BRIGHTNESS * value
+    return (v * 1.32, v * 1.0, v * 0.70, 1)
+
+
+# Round 6 (critic: olive, 22% darker, bright tile grid): the sand's own hue at about 8% below its value. Measured on the
+# round 5 renders, slab RGB (90, 69, 27) against sand (115, 65, 16): red raised against green, blue lowered, the texture's
+# tile contrast flattened (grain 0.3), irregular panels 450-900 with dark joints, dust in 40-60% blotches.
+def sand_tone(value):
+    v = LS_BRIGHTNESS * value
+    return (v * 1.89, v * 1.08, v * 0.55, 1)
+
+
+# Round 6b: flattening around the default mean (0.45) brightened the slab to a cream tray; the scorched-concrete texture's
+# own mean luminance is about 0.11 (measured from the round 5 renders), so the flattened grain keeps the slab's value. The
+# dust colour (the bare sand albedo) is paler than the lit landscape, so it stays light.
+make_instance('MI_SovietPad_Foundation', material, LS_CONCRETE, sand_tone(1.1), 500.0, VERGE, joint=(450.0, 0.4, 0, 0), grain=0.3,
+              grain_mean=0.11, dust=(0.12, 0.2, 700.0, 0), stain=(0.7, 190.0, 0.45, 0))
+# Spill lobes off the slab sides: concrete dust over gravel, lighter than the slab, broken edges.
+make_instance('MI_SovietPad_Spill', material, LS_GRAVEL, shade(0.95), 600.0, VERGE, opacity=0.8, grain=0.7, dust=(0.08, 0.15, 400.0, 0))
+make_instance('MI_SovietPad_GravelOily', material, LS_GRAVEL, shade(0.9), 600.0, VERGE, grain=0.85, dust=(0.15, 0.5, 600.0, 0),
+              stain=(0.7, 140.0, 0.45, 0))
+# Round 5b: the first trampled earth and gravel walk sat too close to the sand to read at RTS height; darker, more grain.
+# Round 6 (critic: the oval read as dark grey cracked mud): trampled sand, the landscape's own sand about 10% darker, scuffed.
+make_instance('MI_SovietPad_Trampled', material, LS_SAND, shade(0.9), 400.0, VERGE, opacity=0.95, grain=1.0, dust=(0.0, 0.3, 500.0, 0))
+make_instance('MI_SovietPad_GravelWalk', material, LS_GRAVEL, shade(0.74), 600.0, VERGE, grain=0.95, dust=(0.08, 0.45, 500.0, 0))
+
+
+def make_mesh_material():
+    mat = fresh('M_SovietFoundationMesh', unreal.Material, unreal.MaterialFactoryNew())
+    pos = lib.create_material_expression(mat, unreal.MaterialExpressionWorldPosition, -1400, 0)
+    normal = lib.create_material_expression(mat, unreal.MaterialExpressionVertexNormalWS, -1400, 150)
+    mask = lib.create_material_expression(mat, unreal.MaterialExpressionComponentMask, -1200, -200)
+    mask.set_editor_property('r', True)
+    mask.set_editor_property('g', True)
+    lib.connect_material_expressions(pos, '', mask, '')
+
+    def world_tex(path, name, tiling, x, y):
+        div = lib.create_material_expression(mat, unreal.MaterialExpressionDivide, x - 200, y)
+        lib.connect_material_expressions(mask, '', div, 'A')
+        lib.connect_material_expressions(scalar(mat, name, tiling, x - 400, y + 80), '', div, 'B')
+        tex = lib.create_material_expression(mat, unreal.MaterialExpressionTextureSample, x, y)
+        tex.set_editor_property('texture', unreal.load_asset(path))
+        lib.connect_material_expressions(div, '', tex, 'UVs')
+        return tex
+    concrete = world_tex(LS_CONCRETE, 'ConcreteTilingCm', 500.0, -900, -300)
+    sand = world_tex(LS_SAND, 'SandTilingCm', 400.0, -900, 100)
+    top_tint = vector(mat, 'TopTint', sand_tone(1.1), -900, -500)
+    side_tint = vector(mat, 'SideTint', sand_tone(0.72), -900, -650)
+    top = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -650, -400)
+    lib.connect_material_expressions(concrete, 'RGB', top, 'A')
+    lib.connect_material_expressions(top_tint, '', top, 'B')
+    side = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -650, -550)
+    lib.connect_material_expressions(concrete, 'RGB', side, 'A')
+    lib.connect_material_expressions(side_tint, '', side, 'B')
+    sand_lit = lib.create_material_expression(mat, unreal.MaterialExpressionMultiply, -650, 100)
+    lib.connect_material_expressions(sand, 'RGB', sand_lit, 'A')
+    lib.connect_material_expressions(scalar(mat, 'SandBrightness', LS_BRIGHTNESS, -900, 300), '', sand_lit, 'B')
+    node = custom(mat, MESH_HLSL, unreal.CustomMaterialOutputType.CMOT_FLOAT3,
+                  ['Pos', 'Normal', 'Tex', 'TopTint', 'SideTint', 'Sand', 'DustAmount'], -350, -200)
+    lib.connect_material_expressions(pos, '', node, 'Pos')
+    lib.connect_material_expressions(normal, '', node, 'Normal')
+    lib.connect_material_expressions(concrete, 'RGB', node, 'Tex')
+    lib.connect_material_expressions(top_tint, '', node, 'TopTint')
+    lib.connect_material_expressions(side_tint, '', node, 'SideTint')
+    lib.connect_material_expressions(sand_lit, '', node, 'Sand')
+    lib.connect_material_expressions(scalar(mat, 'DustAmount', 0.15, -650, 250), '', node, 'DustAmount')
+    lib.connect_material_property(node, '', unreal.MaterialProperty.MP_BASE_COLOR)
+    rough = lib.create_material_expression(mat, unreal.MaterialExpressionConstant, -350, 100)
+    rough.set_editor_property('r', 0.95)
+    lib.connect_material_property(rough, '', unreal.MaterialProperty.MP_ROUGHNESS)
+    mat.set_editor_property('used_with_instanced_static_meshes', True)
+    # The edge strips were authored in another handedness: two-sided keeps every face drawn.
+    mat.set_editor_property('two_sided', True)
+    lib.recompile_material(mat)
+    unreal.EditorAssetLibrary.save_loaded_asset(mat, only_if_is_dirty=False)
+
+
+make_mesh_material()
+names = ['M_SovietGroundDecal', 'M_SovietFoundationMesh', 'MI_SovietPad_Foundation', 'MI_SovietPad_Spill', 'MI_SovietPad_GravelOily', 'MI_SovietPad_Trampled',
+         'MI_SovietPad_GravelWalk', 'MI_SovietPad_Concrete', 'MI_SovietPad_Gravel', 'MI_SovietPad_PackedEarth', 'MI_SovietRoad_Main',
          'MI_SovietRoad_Lane', 'MI_SovietRoad_Track', 'MI_SovietRoad_Apron']
 for name in names:
     print('SOVIET_DECAL', name, unreal.EditorAssetLibrary.does_asset_exist(FOLDER + '/' + name))

@@ -55,6 +55,13 @@ struct FSurvivalStartContentPlan
 	int32 RequestedMetalFields = 0;
 	int32 RequestedWrecks = 0;
 	int32 RequestedPits = 0;
+	// Close nodes by the drop-off (requested and planned) and the special's pieces.
+	int32 RequestedCloseRadixite = 0;
+	int32 RequestedCloseMetal = 0;
+	int32 PlannedCloseRadixite = 0;
+	int32 PlannedCloseMetal = 0;
+	int32 RequestedSpecialPieces = 0;
+	int32 PlannedSpecialPieces = 0;
 
 	int32 GetPlannedFieldCount(const ESurvivalStartContentCategory Category) const;
 	int32 GetPlannedActorCount(const ESurvivalStartContentCategory Category) const;
@@ -76,6 +83,8 @@ struct FSurvivalStartContentPlanInput
 	TArray<FSurvivalReservedCircle> OtherStartAreas;
 	ERTSGameDifficulty Difficulty = ERTSGameDifficulty::Normal;
 	int32 Seed = 0;
+	// This start's fixed special (hangar, wrecks, extra radixite or metal by the drop-off).
+	ESurvivalStartSpecial Special = ESurvivalStartSpecial::None;
 };
 
 /**
@@ -114,8 +123,25 @@ private:
 	int32 M_MaxWrecksOffBench = 0;
 	int32 M_WrecksOffBench = 0;
 
+	// Extra metal nodes already planned in the scrap yard; PlanCloseResources plans only the rest.
+	int32 M_YardMetalNodes = 0;
+
 	void PlanPits();
 	void ReserveProtectedAreas();
+	// Round 10: the special and the close nodes go first, inside the build area but outside the landing ring.
+	void PlanSpecial();
+	bool TryPlanHangar(const FSurvivalStartSpecialSettings& Special);
+	void PlanSpecialWrecks(const FSurvivalStartSpecialSettings& Special);
+	// Round 11: the metal special's extra nodes in one scrap yard; nodes that do not fit fall back to PlanCloseResources.
+	void TryPlanScrapYard(const FSurvivalStartSpecialSettings& Special);
+	int32 PlanYardNodes(const FSurvivalStartSpecialSettings& Special, const FVector2D& YardCenter);
+	void PlanYardDressing(const FSurvivalStartSpecialSettings& Special, const FVector2D& YardCenter, const FVector2D& Outward);
+	void PlanCloseResources();
+	bool TryPlanCloseNode(const TArray<FSurvivalWeightedActorClass>& Actors, ESurvivalStartContentCategory Category,
+	                      float PreferredAngle);
+	void PlanGroundDetail();
+	/** @return True when Position keeps out of the landing ring of the HQ and the drop pods. */
+	bool GetIsOutsideLandingRing(const FVector2D& Position, float Radius) const;
 	void PlanResourceFields();
 	void PlanWrecks();
 	void PlanWreckGroup(const FSurvivalWreckGroup& Group);
