@@ -7,9 +7,6 @@
 #include "SurvivalSovietBasePad.generated.h"
 
 class UDecalComponent;
-class UInstancedStaticMeshComponent;
-class UStaticMesh;
-class FSurvivalGroundProjector;
 
 /** @brief Whether a ground decal is drawn as a yard (rounded rectangle) or as a road piece (soft sides, ruts, end fades). */
 enum class ESurvivalSovietGroundDecalMode : uint8
@@ -47,23 +44,6 @@ struct FSurvivalSovietGroundDecalShape
 	double BoxHalfAlong = 0.0;
 };
 
-/** @brief What a building's pad lays beyond its decal (round 4): a sunk slab, an apron to the road, sparse clutter. */
-struct FSurvivalSovietPadDressing
-{
-	// 0 none, 1 concrete slab (permanent buildings), 2 timber boards (tents).
-	uint8 Style = 0;
-	FVector2D FootprintHalf = FVector2D::ZeroVector;
-	// World XY unit vector from the building toward its nearest road.
-	FVector2D DoorDirection = FVector2D::ZeroVector;
-	double ApronLength = 0.0;
-	int32 Seed = 0;
-	float SlabMargin = 45.f;
-	float SlabRise = 16.f;
-	TArray<UStaticMesh*> TileMeshes;
-	TArray<UStaticMesh*> ClutterMeshes;
-	TArray<UStaticMesh*> BoardMeshes;
-	UMaterialInterface* ApronMaterial = nullptr;
-};
 
 /**
  * @brief The ground under a building of a Soviet base and the base's roads: a decal of concrete, gravel or packed earth that
@@ -93,26 +73,15 @@ public:
 	void InitShape(const FSurvivalSovietGroundDecalShape& Shape, UMaterialInterface* Material);
 
 	/**
-	 * @brief Lays the building's foundation dressing in world space (instanced meshes without collision, one apron decal).
-	 * Call after InitPad: the actor's yaw is the footprint's.
-	 * @return How many mesh instances were added (cost note).
+	 * @brief Paints a second decal in road mode from the building's door edge to the road: a rutted track (vehicle and
+	 * fuel shelters). Call after the pad's own shape is set.
+	 * @param Door World unit vector out of the door wall.
+	 * @param DoorReach Distance from the pad centre to the door wall, cm.
+	 * @param Length From the door wall to the road's verge, cm.
 	 */
-	int32 InitDressing(const FSurvivalSovietPadDressing& Dressing);
+	void PaintApron(const FVector2D& Door, double DoorReach, double Length, double Width, UMaterialInterface* Material);
 
 private:
-	UInstancedStaticMeshComponent* GetOrAddInstancer(UStaticMesh* Mesh);
-	int32 LayFoundationTiles(const FSurvivalSovietPadDressing& Dressing, FRandomStream& Random, const FSurvivalGroundProjector& Ground);
-	int32 LayClutter(const FSurvivalSovietPadDressing& Dressing, FRandomStream& Random, const FSurvivalGroundProjector& Ground);
-	int32 LayTentBoards(const FSurvivalSovietPadDressing& Dressing, FRandomStream& Random, const FSurvivalGroundProjector& Ground);
-	void LayApron(const FSurvivalSovietPadDressing& Dressing);
-	/** @return The footprint's reach along a world direction (support radius of the rotated rectangle). */
-	double GetFootprintReach(const FVector2D& FootprintHalf, const FVector2D& Direction) const;
-	bool PlaceOnGround(UStaticMesh* Mesh, const FVector2D& WorldXY, double YawDegrees, const FVector& Scale, double Rise,
-	                   const FSurvivalGroundProjector& Ground);
-
-	UPROPERTY()
-	TMap<TObjectPtr<UStaticMesh>, TObjectPtr<UInstancedStaticMeshComponent>> M_Instancers;
-
 	UPROPERTY()
 	TObjectPtr<UDecalComponent> M_ApronDecal = nullptr;
 

@@ -12,10 +12,17 @@
 enum class ESurvivalSovietFoundationStyle : uint8
 {
 	None,
-	// Permanent buildings: a sunk concrete slab, a worn apron to the road, a few crates and barrels along the walls.
+	// Factories, forges, cooling towers, research: a weathered concrete slab the building stands on, a wide concrete apron
+	// to the road, scrap and drums in a work corner.
 	Concrete,
-	// Tents: boards at the door and the apron.
-	Timber
+	// Tents: a trampled-earth oval, large planks to the road, a crate and water can at the door.
+	Timber,
+	// Barracks (Quonset): a gravel walk round the berm (the berm stays on sand), a duckboard walk to the road, firewood.
+	Gravel,
+	// Vehicle, ammunition and fuel shelters: oily gravel hardstanding and a rutted track to the road, jerrycans and wheels.
+	Hardstanding,
+	// The command bunker: a sandbagged concrete forecourt on the door side only (the mesh has its own plinth).
+	Forecourt
 };
 
 /**
@@ -233,6 +240,8 @@ struct FSurvivalSovietBasePlan
 	TArray<FString> RuleViolations;
 	int32 BuildingsTotal = 0;
 	int32 BuildingsOnPad = 0;
+	// Buildings too small for a pad that have no footprint design (poles, megaphones): not counted against the pad ratio.
+	TArray<FString> PadExemptClasses;
 };
 
 /**

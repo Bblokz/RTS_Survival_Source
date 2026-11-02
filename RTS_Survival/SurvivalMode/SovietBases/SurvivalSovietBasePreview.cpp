@@ -4,7 +4,14 @@
 
 #if RTS_WITH_MAP_TESTS
 
+#include "Camera/CameraActor.h"
+#include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "DynamicRHI.h"
+#include "RenderTimer.h"
+#include "RHIStats.h"
+#include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseDressing.h"
 #include "Engine/SceneCapture2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
@@ -62,6 +69,14 @@ namespace SovietBasePreviewConstants
 	constexpr double WallCornerHeight = 1800.0;
 	constexpr double PadShotDistance = 2000.0;
 	constexpr double PadShotHeight = 1400.0;
+	// Footprint close views (critic round 4): eye 1 200 cm out on the door side, 500 up, FOV 45, a little off-axis.
+	// Round 6: higher and looking back at the door edge so the building, its ground and the apron share the frame (round 5's
+	// eye at 500 up saw a wall or only sand), lit from the camera's side with the capture's exposure bias.
+	constexpr double FootprintCloseDistance = 1400.0;
+	constexpr double FootprintCloseSideOffset = 500.0;
+	constexpr double FootprintCloseHeight = 1100.0;
+	constexpr double FootprintCloseLookAhead = -150.0;
+	constexpr float FootprintCloseFieldOfView = 50.f;
 	constexpr double JunctionTopHeight = 3000.0;
 	constexpr float JunctionTopFieldOfView = 60.f;
 	constexpr double JunctionTolerance = 50.0;
@@ -294,6 +309,8 @@ private:
 	void QueueWallLongShot(const FSurvivalSovietBaseState& Base, const FString& Label);
 	void QueueWallCornerShot(const FSurvivalSovietBaseState& Base, const FString& Label);
 	void QueuePadShot(const FSurvivalSovietBaseState& Base, const FString& Label, const FVector& ThreatLocation);
+	/** @brief One close view per footprint class in the base, from the door side (eye 1 200 cm out, 500 up, FOV 45). */
+	void QueueFootprintCloseShots(const FSurvivalSovietBaseState& Base, const FString& Label);
 	void QueueJunctionShots(const FSurvivalSovietBaseState& Base, const FString& Label, const FVector2D& Threat);
 	void QueueBunkerShot(const FSurvivalSovietBaseState& Base, const FString& Label);
 	void QueueTowerShot(const FSurvivalSovietBaseState& Base, const FString& Label);
@@ -1034,6 +1051,7 @@ void FSovietBasePreviewRunner::QueueDetailShots(const FSurvivalSovietBaseState& 
 	QueueWallLongShot(Base, Label);
 	QueueWallCornerShot(Base, Label);
 	QueuePadShot(Base, Label, ThreatLocation);
+	QueueFootprintCloseShots(Base, Label);
 	QueueJunctionShots(Base, Label, Threat);
 	QueueBunkerShot(Base, Label);
 	QueueTowerShot(Base, Label);
@@ -1102,6 +1120,32 @@ void FSovietBasePreviewRunner::QueueWallCornerShot(const FSurvivalSovietBaseStat
 	Bisector = Bisector.IsNearlyZero() ? (Corner - Center).GetSafeNormal() : Bisector.GetSafeNormal();
 	AddLookShot(FVector(Corner + Bisector * WallCornerBack, Base.Center.Z + WallCornerHeight), FVector(Corner, Base.Center.Z),
 	            CloseFieldOfView, Label + TEXT("_wall_corner.png"));
+}
+
+void FSovietBasePreviewRunner::QueueFootprintCloseShots(const FSurvivalSovietBaseState& Base, const FString& Label)
+{
+	using namespace SovietBasePreviewConstants;
+	TSet<FString> Done;
+	for (const FSurvivalSovietFootprintRecord& Record : Base.FootprintRecords)
+	{
+		if (Done.Contains(Record.Style) or Record.DoorNormal.IsNearlyZero())
+		{
+			continue;
+		}
+		Done.Add(Record.Style);
+		// The door side: texture, edge transition, apron start and seating in one view; the eye stands 1 200 cm out from the
+		// door wall (not the centre, which put it inside large buildings).
+		const double Yaw = FMath::DegreesToRadians(Record.YawDegrees);
+		const FVector2D Axis(FMath::Cos(Yaw), FMath::Sin(Yaw));
+		const FVector2D AxisSide(-Axis.Y, Axis.X);
+		const double Reach = FMath::Abs(FVector2D::DotProduct(Record.DoorNormal, Axis)) * Record.FootprintHalf.X
+			+ FMath::Abs(FVector2D::DotProduct(Record.DoorNormal, AxisSide)) * Record.FootprintHalf.Y;
+		const FVector2D Side(-Record.DoorNormal.Y, Record.DoorNormal.X);
+		const FVector2D DoorEdge = Record.Center + Record.DoorNormal * Reach;
+		const FVector2D EyeXY = DoorEdge + Record.DoorNormal * FootprintCloseDistance + Side * FootprintCloseSideOffset;
+		AddLookShot(FVector(EyeXY, Base.Center.Z + FootprintCloseHeight), FVector(DoorEdge + Record.DoorNormal * FootprintCloseLookAhead, Base.Center.Z),
+		            FootprintCloseFieldOfView, FString::Printf(TEXT("%s_close_%s.png"), *Label, *Record.Style));
+	}
 }
 
 void FSovietBasePreviewRunner::QueuePadShot(const FSurvivalSovietBaseState& Base, const FString& Label,
@@ -1436,9 +1480,9 @@ void FSovietBasePreviewRunner::ReportCounts(const FSurvivalSovietBaseState& Base
 		and Base.TrackedStructuresTotal > 0;
 	M_TotalProblems += bMatches ? 0 : 1;
 	UE_LOG(LogSovietBasePreview, Display,
-	       TEXT("SOVIET_PREVIEW counts %s: structures %d/%d, units %d/%d, production %d, tracked %d, dressed pads %d, dressing instances %d, %s"),
+	       TEXT("SOVIET_PREVIEW counts %s: structures %d/%d, units %d/%d, production %d, tracked %d, dressed pads %d, dressing instances %d in %d groups, %s"),
 	       *Entry.Label, AliveStructures, Base.Plan.Structures.Num(), AliveUnits, PlannedUnits,
-	       Base.Plan.ProductionCount, Base.TrackedStructuresTotal, Base.DressedPads, Base.DressingInstances,
+	       Base.Plan.ProductionCount, Base.TrackedStructuresTotal, Base.DressedPads, Base.DressingInstances, Base.DressingComponents,
 	       bMatches ? TEXT("OK") : TEXT("MISMATCH"));
 }
 
@@ -1628,6 +1672,276 @@ void FSovietBasePreviewRunner::FinishSurveyClass()
 	AdvanceTo(EStep::StartSurveyClass);
 }
 
+
+/**
+ * @brief Frame cost of the footprint dressing in a real match (-SovietBasePerf with the watch): the main viewport is posed
+ * over the densest base at the RTS camera and over the whole map, and the dressing is hidden and shown in alternating
+ * blocks (5 pairs x 600 frames per pose, after a settle). Medians of game, render and GPU time and draw calls per block,
+ * the per-pair deltas and their mean and spread go to perf_dressing.txt. Hiding in-process keeps the scene, units and
+ * light the same for both halves of a pair.
+ */
+class FSovietDressingPerf : public TSharedFromThis<FSovietDressingPerf>
+{
+public:
+	FSovietDressingPerf(UWorld* InWorld, USurvivalSovietBaseComponent* InSovietBases, const FString& InDirectory, const FVector& InPlayerStart)
+		: M_World(InWorld)
+		  , M_SovietBases(InSovietBases)
+		  , M_Directory(InDirectory)
+		  , M_PlayerStart(InPlayerStart)
+	{
+	}
+
+	void Start()
+	{
+		TSharedRef<FSovietDressingPerf> SharedThis = AsShared();
+		FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([SharedThis](const float Delta)
+		{
+			return SharedThis->Step();
+		}));
+	}
+
+	bool GetIsDone() const { return bM_Done; }
+
+private:
+	static constexpr int32 SettleFrames = 60;
+	static constexpr int32 SampleFrames = 600;
+	static constexpr int32 Pairs = 5;
+	static constexpr int32 Poses = 2;
+	static constexpr double MapViewMargin = 8000.0;
+	static constexpr float MapFieldOfView = 60.f;
+	static constexpr double ViewTargetTolerance = 50.0;
+
+	struct FSample
+	{
+		double Game = 0.0;
+		double Render = 0.0;
+		double Gpu = 0.0;
+		double Draws = 0.0;
+		double Primitives = 0.0;
+	};
+
+	TWeakObjectPtr<UWorld> M_World;
+	TWeakObjectPtr<USurvivalSovietBaseComponent> M_SovietBases;
+	FString M_Directory;
+	FVector M_PlayerStart;
+	TWeakObjectPtr<ACameraActor> M_Camera;
+	int32 M_Pose = 0;
+	int32 M_Block = 0;
+	int32 M_Frame = 0;
+	int32 M_ViewMisses = 0;
+	bool bM_Done = false;
+	TArray<FSample> M_Samples;
+	FString M_Report;
+	// Medians per pose, block: shown (true) or hidden.
+	TArray<TPair<bool, FSample>> M_BlockMedians[Poses];
+
+	static double Median(TArray<double> Values)
+	{
+		if (Values.IsEmpty())
+		{
+			return 0.0;
+		}
+		Values.Sort();
+		return Values[Values.Num() / 2];
+	}
+
+	/** Block order inside a pair alternates (shown first, then hidden first) so drift does not favour one side. */
+	static bool GetIsShownBlock(const int32 Block)
+	{
+		const int32 Pair = Block / 2;
+		const bool bFirst = Block % 2 == 0;
+		return Pair % 2 == 0 ? bFirst : not bFirst;
+	}
+
+	void PoseCamera()
+	{
+		UWorld* World = M_World.Get();
+		const TArray<FSurvivalSovietBaseState>& Bases = M_SovietBases->GetBaseStatesForPreview();
+		if (not M_Camera.IsValid())
+		{
+			FActorSpawnParameters SpawnParameters;
+			SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			M_Camera = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), FTransform::Identity, SpawnParameters);
+		}
+		FVector Eye = FVector::ZeroVector;
+		FVector LookAt = FVector::ZeroVector;
+		float FieldOfView = SovietBasePreviewConstants::RtsFieldOfView;
+		if (M_Pose == 0)
+		{
+			// The RTS camera over the base with the most dressing, from the player's side.
+			const FSurvivalSovietBaseState* Densest = nullptr;
+			for (const FSurvivalSovietBaseState& Base : Bases)
+			{
+				Densest = Densest == nullptr or Base.DressingInstances > Densest->DressingInstances ? &Base : Densest;
+			}
+			LookAt = Densest != nullptr ? Densest->Center : FVector::ZeroVector;
+			const FVector2D Toward = FVector2D(M_PlayerStart - LookAt).GetSafeNormal();
+			const double Pitch = FMath::DegreesToRadians(SovietBasePreviewConstants::RtsPitchDegrees);
+			Eye = LookAt + FVector(Toward * (SovietBasePreviewConstants::RtsDistance * FMath::Cos(Pitch)),
+			                       SovietBasePreviewConstants::RtsDistance * FMath::Sin(Pitch));
+			M_Report += FString::Printf(TEXT("pose rts: base %d at %s, eye %s\n"), Densest != nullptr ? Densest->BaseIndex : -1,
+			                            *LookAt.ToCompactString(), *Eye.ToCompactString());
+		}
+		else
+		{
+			// Straight down over the middle of all bases, high enough to hold every one.
+			FVector Sum = FVector::ZeroVector;
+			for (const FSurvivalSovietBaseState& Base : Bases)
+			{
+				Sum += Base.Center;
+			}
+			LookAt = Bases.IsEmpty() ? FVector::ZeroVector : Sum / Bases.Num();
+			double Reach = 0.0;
+			for (const FSurvivalSovietBaseState& Base : Bases)
+			{
+				Reach = FMath::Max(Reach, FVector::Dist2D(Base.Center, LookAt));
+			}
+			FieldOfView = MapFieldOfView;
+			const double Height = (Reach + MapViewMargin) / FMath::Tan(FMath::DegreesToRadians(FieldOfView * 0.5));
+			Eye = LookAt + FVector(0.0, -1.0, Height);
+			M_Report += FString::Printf(TEXT("pose map: centre %s, height %.0f\n"), *LookAt.ToCompactString(), Height);
+		}
+		M_Camera->SetActorLocationAndRotation(Eye, (LookAt - Eye).Rotation());
+		M_Camera->GetCameraComponent()->SetFieldOfView(FieldOfView);
+		M_Camera->GetCameraComponent()->bConstrainAspectRatio = false;
+		if (APlayerController* Controller = UGameplayStatics::GetPlayerController(World, 0))
+		{
+			Controller->SetViewTargetWithBlend(M_Camera.Get(), 0.f);
+		}
+	}
+
+	bool Step()
+	{
+		UWorld* World = M_World.Get();
+		if (not IsValid(World) or not M_SovietBases.IsValid())
+		{
+			bM_Done = true;
+			return false;
+		}
+		if (M_Frame == 0)
+		{
+			if (M_Block == 0)
+			{
+				PoseCamera();
+			}
+			ASurvivalSovietBaseDressing::SetAllHidden(World, not GetIsShownBlock(M_Block));
+			M_Samples.Reset();
+		}
+		++M_Frame;
+		// Still posed? The RTS camera pawn could take the view back.
+		if (APlayerController* Controller = UGameplayStatics::GetPlayerController(World, 0))
+		{
+			if (Controller->PlayerCameraManager != nullptr and M_Camera.IsValid()
+				and FVector::Dist(Controller->PlayerCameraManager->GetCameraLocation(), M_Camera->GetActorLocation()) > ViewTargetTolerance)
+			{
+				++M_ViewMisses;
+				Controller->SetViewTargetWithBlend(M_Camera.Get(), 0.f);
+			}
+		}
+		if (M_Frame <= SettleFrames)
+		{
+			return true;
+		}
+		FSample Sample;
+		Sample.Game = FPlatformTime::ToMilliseconds(GGameThreadTime);
+		Sample.Render = FPlatformTime::ToMilliseconds(GRenderThreadTime);
+		Sample.Gpu = FPlatformTime::ToMilliseconds(RHIGetGPUFrameCycles(0));
+		Sample.Draws = GNumDrawCallsRHI[0];
+		Sample.Primitives = GNumPrimitivesDrawnRHI[0];
+		M_Samples.Add(Sample);
+		if (M_Frame < SettleFrames + SampleFrames)
+		{
+			return true;
+		}
+		// Block done: its medians.
+		TArray<double> Game, Render, Gpu, Draws, Primitives;
+		for (const FSample& Each : M_Samples)
+		{
+			Game.Add(Each.Game);
+			Render.Add(Each.Render);
+			Gpu.Add(Each.Gpu);
+			Draws.Add(Each.Draws);
+			Primitives.Add(Each.Primitives);
+		}
+		FSample BlockMedian;
+		BlockMedian.Game = Median(Game);
+		BlockMedian.Render = Median(Render);
+		BlockMedian.Gpu = Median(Gpu);
+		BlockMedian.Draws = Median(Draws);
+		BlockMedian.Primitives = Median(Primitives);
+		const bool bShown = GetIsShownBlock(M_Block);
+		M_BlockMedians[M_Pose].Emplace(bShown, BlockMedian);
+		M_Report += FString::Printf(TEXT("pose %d block %d dressing %s: game %.3f ms, render %.3f ms, gpu %.3f ms, draws %.0f, primitives %.0f\n"),
+		                            M_Pose, M_Block, bShown ? TEXT("on ") : TEXT("off"), BlockMedian.Game, BlockMedian.Render, BlockMedian.Gpu,
+		                            BlockMedian.Draws, BlockMedian.Primitives);
+		M_Frame = 0;
+		++M_Block;
+		if (M_Block < 2 * Pairs)
+		{
+			return true;
+		}
+		WritePoseSummary(M_Pose);
+		M_Block = 0;
+		++M_Pose;
+		if (M_Pose < Poses)
+		{
+			return true;
+		}
+		ASurvivalSovietBaseDressing::SetAllHidden(World, false);
+		FinishReport();
+		bM_Done = true;
+		return false;
+	}
+
+	void WritePoseSummary(const int32 Pose)
+	{
+		// Per pair: shown minus hidden.
+		TArray<double> Deltas[4];
+		const TArray<TPair<bool, FSample>>& Blocks = M_BlockMedians[Pose];
+		for (int32 Pair = 0; 2 * Pair + 1 < Blocks.Num(); ++Pair)
+		{
+			const TPair<bool, FSample>& A = Blocks[2 * Pair];
+			const TPair<bool, FSample>& B = Blocks[2 * Pair + 1];
+			const FSample& On = A.Key ? A.Value : B.Value;
+			const FSample& Off = A.Key ? B.Value : A.Value;
+			Deltas[0].Add(On.Game - Off.Game);
+			Deltas[1].Add(On.Render - Off.Render);
+			Deltas[2].Add(On.Gpu - Off.Gpu);
+			Deltas[3].Add(On.Draws - Off.Draws);
+		}
+		const TCHAR* Names[4] = {TEXT("game ms"), TEXT("render ms"), TEXT("gpu ms"), TEXT("draws")};
+		M_Report += FString::Printf(TEXT("pose %d deltas (dressing on minus off, %d pairs):\n"), Pose, Deltas[0].Num());
+		for (int32 Metric = 0; Metric < 4; ++Metric)
+		{
+			double Sum = 0.0;
+			for (const double Value : Deltas[Metric])
+			{
+				Sum += Value;
+			}
+			const double Mean = Deltas[Metric].IsEmpty() ? 0.0 : Sum / Deltas[Metric].Num();
+			double Variance = 0.0;
+			for (const double Value : Deltas[Metric])
+			{
+				Variance += FMath::Square(Value - Mean);
+			}
+			const double Spread = Deltas[Metric].Num() > 1 ? FMath::Sqrt(Variance / (Deltas[Metric].Num() - 1)) : 0.0;
+			M_Report += FString::Printf(TEXT("  %s: mean %+.3f, sd %.3f, median %+.3f\n"), Names[Metric], Mean, Spread, Median(Deltas[Metric]));
+		}
+	}
+
+	void FinishReport()
+	{
+		M_Report += FString::Printf(TEXT("view target taken back %d times (re-posed each time)\n"), M_ViewMisses);
+		for (const FSurvivalSovietBaseState& Base : M_SovietBases->GetBaseStatesForPreview())
+		{
+			M_Report += FString::Printf(TEXT("base %d: %d dressed pads, %d instances in %d instanced groups\n"), Base.BaseIndex, Base.DressedPads,
+			                            Base.DressingInstances, Base.DressingComponents);
+		}
+		FFileHelper::SaveStringToFile(M_Report, *(M_Directory / TEXT("perf_dressing.txt")));
+		UE_LOG(LogSovietBasePreview, Display, TEXT("SOVIET_PERF written: %s"), *(M_Directory / TEXT("perf_dressing.txt")));
+	}
+};
+
 /**
  * @brief Watches a real match for the review: every enemy unit that appears outside the garrison spawn step, with its
  * distance to the nearest base, proves where the strategic AI trains. Logs storage too; ends the process when done.
@@ -1672,6 +1986,8 @@ private:
 	TStrongObjectPtr<UTextureRenderTarget2D> M_ShotTarget;
 	TWeakObjectPtr<USurvivalSovietBaseComponent> M_SovietBases;
 	float M_SecondsLeft = 0.f;
+	// -SovietBasePerf: the dressing frame cost, started once the base views are taken; the watch waits for it.
+	TSharedPtr<FSovietDressingPerf> M_Perf;
 
 	void OnActorSpawned(AActor* Actor) const
 	{
@@ -1784,8 +2100,9 @@ private:
 		{
 			NoteBasesStanding();
 			StepBaseShots();
+			StartPerfWhenReady();
 		}
-		if (M_SecondsLeft > 0.f)
+		if (M_SecondsLeft > 0.f or (M_Perf.IsValid() and not M_Perf->GetIsDone()))
 		{
 			return true;
 		}
@@ -1855,6 +2172,20 @@ private:
 			M_ShotDirectory = Directory;
 			M_NextShotBase = 0;
 		}
+	}
+
+	void StartPerfWhenReady()
+	{
+		if (M_Perf.IsValid() or not bM_ManifestsWritten or M_NextShotBase != INDEX_NONE or M_ShotDirectory.IsEmpty()
+			or not FParse::Param(FCommandLine::Get(), TEXT("SovietBasePerf")))
+		{
+			return;
+		}
+		const ASurvivalStartLocation* const Picked = M_Director->GetChosenStartLocation();
+		M_Perf = MakeShared<FSovietDressingPerf>(M_Director->GetWorld(), M_SovietBases.Get(), M_ShotDirectory,
+		                                         IsValid(Picked) ? Picked->GetActorLocation() : FVector::ZeroVector);
+		M_Perf->Start();
+		UE_LOG(LogSovietBasePreview, Display, TEXT("SOVIET_PERF started"));
 	}
 
 	bool EnsureShotCamera()

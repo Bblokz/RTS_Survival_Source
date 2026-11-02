@@ -247,22 +247,26 @@ void USurvivalSovietBaseSettings::FillDefaultKit()
 	{
 		return TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(Path));
 	};
-	Kit.FoundationTileMeshes = {
-		Mesh(TEXT("/Game/DBK/Models/Concrete/DBK_Concrete_Floor_Tile_A.DBK_Concrete_Floor_Tile_A")),
-		Mesh(TEXT("/Game/DBK/Models/Concrete/DBK_Concrete_Floor_Tile_B.DBK_Concrete_Floor_Tile_B")),
-		Mesh(TEXT("/Game/DBK/Models/Concrete/DBK_Concrete_Floor_Tile_C.DBK_Concrete_Floor_Tile_C"))
-	};
-	Kit.FoundationClutterMeshes = {
-		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Barrel_1_Gasoline.SM_Barrel_1_Gasoline")),
-		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Barrel_2.SM_Barrel_2")),
-		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Crate_2.SM_Crate_2")),
-		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Pallet_4_Stack.SM_Pallet_4_Stack")),
-		Mesh(TEXT("/Game/MilitaryBaseCamp/Meshes/SM_CrateBig.SM_CrateBig"))
-	};
-	Kit.TentBoardMeshes = {
-		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Pallet_1.SM_Pallet_1")),
-		Mesh(TEXT("/Game/MilitaryAirport/Meshes/Props/SM_Pallet_2.SM_Pallet_2"))
-	};
+	const TCHAR* const FoundationFolder = TEXT("/Game/RTS_Survival/SurvivalMode/Data/SovietBases/Foundations/");
+	Kit.FoundationSlabMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(TEXT("%sSM_SovietSlabCentre.SM_SovietSlabCentre"), FoundationFolder)));
+	Kit.FoundationSlabEdgeMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(FString::Printf(TEXT("%sSM_SovietSlabEdge.SM_SovietSlabEdge"), FoundationFolder)));
+	// Single warm-wood boards (the trench planks), laid as separate boards with gaps (round 5's scaffold boards read as grey metal).
+	Kit.PlankMeshes = {Mesh(TEXT("/Game/RBP_WW1_Trench/Meshes/SM_Broken_Wood_Plank_01.SM_Broken_Wood_Plank_01")),
+	                   Mesh(TEXT("/Game/RBP_WW1_Trench/Meshes/SM_Broken_Wood_Plank_03.SM_Broken_Wood_Plank_03"))};
+	Kit.SandbagMeshes = {Mesh(TEXT("/Game/RTS_Survival/Blueprints/Buildings/Walls/RusWalls/Meshes/SM_Rus_SandBagCornerWall.SM_Rus_SandBagCornerWall"))};
+	const TSoftObjectPtr<UStaticMesh> Drum = Mesh(TEXT("/Game/Hangar/Models/SM_Drum_03.SM_Drum_03"));
+	const TSoftObjectPtr<UStaticMesh> AmmoCrates = Mesh(TEXT("/Game/MillitaryBase/Meshes/SM_TankAmmoCrates_A.SM_TankAmmoCrates_A"));
+	const TSoftObjectPtr<UStaticMesh> Crate = Mesh(TEXT("/Game/MilitaryBaseCamp/Meshes/SM_CrateSmall.SM_CrateSmall"));
+	const TSoftObjectPtr<UStaticMesh> JerryCan = Mesh(TEXT("/Game/Hangar/Models/SM_JerryCan_01.SM_JerryCan_01"));
+	const TSoftObjectPtr<UStaticMesh> Tyre = Mesh(TEXT("/Game/MilitaryBaseCamp/Meshes/SM_Tire.SM_Tire"));
+	const TSoftObjectPtr<UStaticMesh> Logs = Mesh(TEXT("/Game/LowPolyForest/Models/Hut_Misc/SM_Cut_Logs_01.SM_Cut_Logs_01"));
+	// Few kinds per base on purpose: each kind is one instanced draw group (frame budget: 40 draws for all bases).
+	// At most six clutter meshes per base (round 6 draw trim): drum, ammo crates, crate, jerrycan, tyre, firewood.
+	Kit.FactoryClutterMeshes = {Drum, Drum, AmmoCrates, Crate};
+	Kit.BarracksClutterMeshes = {Logs, Crate, Drum};
+	Kit.TentClutterMeshes = {Crate, JerryCan, Logs};
+	Kit.ShelterClutterMeshes = {JerryCan, JerryCan, Tyre, Drum};
+	Kit.ForecourtClutterMeshes = {AmmoCrates, Crate};
 	const TCHAR* const PadFolder = TEXT("/Game/RTS_Survival/SurvivalMode/Data/SovietBases/Pads/");
 	const auto PadMaterial = [PadFolder](const TCHAR* const Name)
 	{
@@ -271,6 +275,13 @@ void USurvivalSovietBaseSettings::FillDefaultKit()
 	Kit.ConcretePad = PadMaterial(TEXT("MI_SovietPad_Concrete"));
 	Kit.GravelPad = PadMaterial(TEXT("MI_SovietPad_Gravel"));
 	Kit.PackedEarthPad = PadMaterial(TEXT("MI_SovietPad_PackedEarth"));
+	Kit.FoundationSurface = PadMaterial(TEXT("MI_SovietPad_Foundation"));
+	Kit.TrampledSurface = PadMaterial(TEXT("MI_SovietPad_Trampled"));
+	Kit.GravelWalkSurface = PadMaterial(TEXT("MI_SovietPad_GravelWalk"));
+	Kit.GravelOilySurface = PadMaterial(TEXT("MI_SovietPad_GravelOily"));
+	Kit.RutTrackSurface = PadMaterial(TEXT("MI_SovietRoad_Lane"));
+	Kit.FoundationSlabMaterial = PadMaterial(TEXT("M_SovietFoundationMesh"));
+	Kit.FoundationSpillSurface = PadMaterial(TEXT("MI_SovietPad_Spill"));
 	Kit.VirtualTextureEarth = TSoftObjectPtr<UMaterialInterface>(
 		FSoftObjectPath(TEXT("/Game/RTS_Survival/Materials/RVT/M_RTS_RVT_GlobalColor.M_RTS_RVT_GlobalColor")));
 	Kit.EarthStandIn = PadMaterial(TEXT("MI_SovietPit_Earth"));
