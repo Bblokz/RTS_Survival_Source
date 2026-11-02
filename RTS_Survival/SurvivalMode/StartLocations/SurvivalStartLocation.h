@@ -62,6 +62,15 @@ public:
 
 	bool GetHasGeneratedPlayerContent() const { return bM_HasGeneratedPlayerContent; }
 
+	ESurvivalStartSpecial GetStartSpecial() const { return StartSpecial; }
+
+	/**
+	 * @brief What the start location picker shows for this location: close radixite and metal nodes by the drop-off
+	 * and the special's label and one line (both empty without a special).
+	 */
+	void GetPickerSummary(const USurvivalStartContentSettings& ContentSettings, int32& OutCloseRadixite,
+	                      int32& OutCloseMetal, FText& OutSpecialTitle, FText& OutSpecialLine) const;
+
 	/** @return Actors spawned by GeneratePlayerStartContent that still exist or were destroyed (weak). */
 	const TArray<TWeakObjectPtr<AActor>>& GetSpawnedStartContent() const { return M_SpawnedStartContent; }
 
@@ -92,6 +101,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Survival|Start Location")
 	FText DisplayName;
+
+	// This location's fixed special (round 10): spawned with the start content only when the player picks it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Survival|Start Location")
+	ESurvivalStartSpecial StartSpecial = ESurvivalStartSpecial::None;
 
 	// Ground the start content must leave free, such as the ramps up to gun platforms. Actor-relative XY; Z is the radius.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Survival|Start Location", meta = (MakeEditWidget = "true"))

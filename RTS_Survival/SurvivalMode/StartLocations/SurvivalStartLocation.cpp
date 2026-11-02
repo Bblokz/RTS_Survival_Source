@@ -28,6 +28,9 @@ namespace SurvivalStartLocationConstants
 	constexpr float DefensePointTraceUp = 20000.f;
 	constexpr float DefensePointTraceDown = 50000.f;
 
+	// SetForcedLodModel is 1-based: 1 = always LOD0.
+	constexpr int32 ClutterForcedLodModel = 1;
+
 	constexpr double DebugRefreshIntervalSeconds = 0.3;
 	constexpr int32 DebugRingSegments = 96;
 	constexpr float DebugHeightOffset = 60.f;
@@ -137,7 +140,9 @@ void ASurvivalStartLocation::LogPlansForMapTest()
 				++Wrecks;
 				WrecksOffBench += Actor.Transform.GetLocation().Z < PlanInput.DeployCenter.Z - 150.f ? 1 : 0;
 			}
-			Fields += FString::Printf(TEXT(" wrecks=%d/%d"), WrecksOffBench, Wrecks);
+			Fields += FString::Printf(TEXT(" wrecks=%d/%d close=%d/%d,%d/%d special=%d/%d"), WrecksOffBench, Wrecks,
+			                          Plan.PlannedCloseRadixite, Plan.RequestedCloseRadixite, Plan.PlannedCloseMetal,
+			                          Plan.RequestedCloseMetal, Plan.PlannedSpecialPieces, Plan.RequestedSpecialPieces);
 			// Independent reachability check (chained vehicle paths, not the planner's own test) on the first seeds.
 			constexpr int32 ReachCheckSeeds = 12;
 			if (Seed <= ReachCheckSeeds)
@@ -149,7 +154,13 @@ void ASurvivalStartLocation::LogPlansForMapTest()
 				for (const FSurvivalPlannedActor& Actor : Plan.Actors)
 				{
 					if (Actor.Category != ESurvivalStartContentCategory::Metal and Actor.Category != ESurvivalStartContentCategory::Radixite
-						and Actor.Category != ESurvivalStartContentCategory::Wreck)
+						and Actor.Category != ESurvivalStartContentCategory::Wreck and Actor.Category != ESurvivalStartContentCategory::Special)
+					{
+						continue;
+					}
+					// Hangars and their stores are buildings and decoration; the capture vehicles in front are what counts.
+					if (Actor.Category == ESurvivalStartContentCategory::Special
+						and (Actor.ActorClass.GetAssetName().Contains(TEXT("Airport")) or Actor.ActorClass.GetAssetName().Contains(TEXT("Hangar"))))
 					{
 						continue;
 					}
@@ -437,6 +448,7 @@ void ASurvivalStartLocation::BuildPlanInput(
 	OutInput.DefensePoints = M_DefensePointDetails;
 	OutInput.Difficulty = Difficulty;
 	OutInput.Seed = Seed;
+	OutInput.Special = StartSpecial;
 	OutInput.OtherStartAreas.Reset();
 	GatherOtherStartAreas(ContentSettings, OutInput.OtherStartAreas);
 	const FVector2D DeployCenter2D(GetDeployCenter());
@@ -446,6 +458,16 @@ void ASurvivalStartLocation::BuildPlanInput(
 		Reserved.Center = DeployCenter2D + FVector2D(ReservedSpot);
 		Reserved.Radius = static_cast<float>(ReservedSpot.Z);
 	}
+}
+
+void ASurvivalStartLocation::GetPickerSummary(const USurvivalStartContentSettings& ContentSettings,
+                                              int32& OutCloseRadixite, int32& OutCloseMetal, FText& OutSpecialTitle,
+                                              FText& OutSpecialLine) const
+{
+	ContentSettings.GetCloseNodeCounts(StartSpecial, OutCloseRadixite, OutCloseMetal);
+	const FSurvivalStartSpecialSettings* Special = ContentSettings.FindSpecial(StartSpecial);
+	OutSpecialTitle = Special != nullptr ? Special->Title : FText::GetEmpty();
+	OutSpecialLine = Special != nullptr ? Special->Description : FText::GetEmpty();
 }
 
 void ASurvivalStartLocation::RequestStartContentLoad()
@@ -566,6 +588,9 @@ UInstancedStaticMeshComponent* ASurvivalStartLocation::CreateFoliageComponent(
 	FoliageComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	FoliageComponent->SetCanEverAffectNavigation(false);
 	FoliageComponent->SetCastShadow(false);
+	// Round 11: the Megascans shrubs' last LODs are flat impostor cards that read as grey-green placeholder spots from
+	// the RTS camera; the start clutter is a few dozen instances, so it always draws its real LOD0 geometry.
+	FoliageComponent->SetForcedLodModel(SurvivalStartLocationConstants::ClutterForcedLodModel);
 	if (CullDistance > 0.f)
 	{
 		FoliageComponent->SetCullDistances(0, FMath::RoundToInt(CullDistance));
@@ -790,7 +815,10 @@ void ASurvivalStartLocation::DrawDebugPlan() const
 		case ESurvivalStartContentCategory::Pit:
 			return PitColor;
 		case ESurvivalStartContentCategory::Crater:
+		case ESurvivalStartContentCategory::Detail:
 			return CraterColor;
+		case ESurvivalStartContentCategory::Special:
+			return PitColor;
 		}
 		return FColor::White;
 	};

@@ -4,6 +4,9 @@
 
 #include "Components/Border.h"
 #include "Components/Button.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
 #include "Components/PanelWidget.h"
 #include "Components/SizeBox.h"
 #include "Components/VerticalBoxSlot.h"
@@ -63,12 +66,25 @@ namespace SurvivalHudPrivate
 	}
 }
 
+#if RTS_WITH_MAP_TESTS
+bool UW_SurvivalHud::bDebugUseLegacyLayout = false;
+#endif
+
 void UW_SurvivalHud::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 	// The overlay never blocks the RTS camera and selection; only the defeat panel takes the mouse.
 	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	EnsureEnemiesText();
+	bool bUseCompactLayout = true;
+#if RTS_WITH_MAP_TESTS
+	bUseCompactLayout = not bDebugUseLegacyLayout;
+#endif
+	bM_IsCompactLayout = bUseCompactLayout;
+	if (bUseCompactLayout)
+	{
+		ApplyCompactStatusLayout();
+	}
 	ApplyStyleToBoundWidgets();
 	ApplyStaticTexts();
 	BindButtons();
@@ -213,7 +229,8 @@ void UW_SurvivalHud::ApplyStyleToBoundWidgets()
 	ApplyBrushIfSet(M_ResultPanel, Style.ResultPanel);
 	ApplyButtonStyleIfSet(M_RetryButton, Style.ConfirmButton);
 	ApplyButtonStyleIfSet(M_MainMenuButton, Style.BackButton);
-	ApplyText(M_TimerText, MakeFont(Style.HeadingFont, HudTimerFontSize, LabelLetterSpacing), Style.TextColor);
+	const int32 TimerFontSize = bM_IsCompactLayout ? HudTimerFontSize : HudStackedTimerFontSize;
+	ApplyText(M_TimerText, MakeFont(Style.HeadingFont, TimerFontSize, LabelLetterSpacing), Style.TextColor);
 	ApplyText(M_PhaseText, MakeFont(Style.HeadingFont, HudLabelFontSize, TitleLetterSpacing), Style.MutedTextColor);
 	ApplyText(M_WaveText, MakeFont(Style.HeadingFont, HudLabelFontSize, LabelLetterSpacing), Style.AccentColor);
 	ApplyText(M_EnemiesText, MakeFont(Style.HeadingFont, HudLabelFontSize, LabelLetterSpacing), Style.WarningColor);
@@ -261,6 +278,53 @@ void UW_SurvivalHud::EnsureEnemiesText()
 	{
 		StatusBox->ClearHeightOverride();
 	}
+}
+
+void UW_SurvivalHud::ApplyCompactStatusLayout()
+{
+	using namespace SurvivalUiLayout;
+	if (not IsValid(M_StatusPlate) or not WidgetTree)
+	{
+		return;
+	}
+	// The Blueprint stacks the texts in a column 90 units down; the owner wants one slim line at the top edge.
+	UHorizontalBox* const StatusRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(),
+	                                                                              TEXT("StatusRow"));
+	M_StatusPlate->SetContent(StatusRow);
+	M_StatusPlate->SetPadding(HudStatusPlatePadding);
+	bool bIsFirstItem = true;
+	for (UTextBlock* const Item : {M_PhaseText.Get(), M_TimerText.Get(), M_WaveText.Get(), M_EnemiesText.Get()})
+	{
+		if (not IsValid(Item))
+		{
+			continue;
+		}
+		Item->RemoveFromParent();
+		UHorizontalBoxSlot* const ItemSlot = StatusRow->AddChildToHorizontalBox(Item);
+		ItemSlot->SetVerticalAlignment(VAlign_Center);
+		ItemSlot->SetPadding(FMargin(bIsFirstItem ? 0.f : HudStatusItemGap, 0.f, 0.f, 0.f));
+		bIsFirstItem = false;
+	}
+	if (USizeBox* const StatusBox = Cast<USizeBox>(M_StatusPanel))
+	{
+		StatusBox->ClearWidthOverride();
+		StatusBox->ClearHeightOverride();
+	}
+	PinToTopCentre(M_StatusPanel, 0.f);
+	PinToTopCentre(M_BannerPanel, HudBannerTop);
+}
+
+void UW_SurvivalHud::PinToTopCentre(UWidget* Widget, const float Top)
+{
+	UCanvasPanelSlot* const CanvasSlot = IsValid(Widget) ? Cast<UCanvasPanelSlot>(Widget->Slot) : nullptr;
+	if (not CanvasSlot)
+	{
+		return;
+	}
+	CanvasSlot->SetAnchors(FAnchors(0.5f, 0.f));
+	CanvasSlot->SetAlignment(FVector2D(0.5f, 0.f));
+	CanvasSlot->SetPosition(FVector2D(0.f, Top));
+	CanvasSlot->SetAutoSize(true);
 }
 
 void UW_SurvivalHud::ApplyStaticTexts()
@@ -343,14 +407,14 @@ void UW_SurvivalHud::RefreshStatusForPhase(const ASurvivalModeDirector& Director
 			                                  FText::AsNumber(Director.GetRoundsSurvived())));
 			SetText(M_EnemiesText, Director.GetHasChosenReward()
 				                       ? NSLOCTEXT("SurvivalHud", "RewardInbound", "REINFORCEMENTS INBOUND")
-				                       : NSLOCTEXT("SurvivalHud", "PickReward", "CHOOSE YOUR REINFORCEMENTS"));
+				                       : NSLOCTEXT("SurvivalHud", "PickReward", "PICK REINFORCEMENTS"));
 			break;
 		}
 		SetText(M_PhaseText, NSLOCTEXT("SurvivalHud", "PhaseWaves", "SURVIVED"));
 		SetText(M_TimerText, SurvivalArmyUi::FormatClock(Director.GetElapsedSurvivalSeconds()));
 		SetText(M_WaveText, FText::Format(NSLOCTEXT("SurvivalHud", "WaveCounter", "WAVE {0}"),
 		                                  FText::AsNumber(Director.GetWavesLaunched())));
-		SetText(M_EnemiesText, FText::Format(NSLOCTEXT("SurvivalHud", "EnemiesRemaining", "{0} ENEMIES REMAINING"),
+		SetText(M_EnemiesText, FText::Format(NSLOCTEXT("SurvivalHud", "EnemiesRemaining", "{0} ENEMIES"),
 		                                     FText::AsNumber(Director.GetEnemiesRemaining())));
 		break;
 	default:

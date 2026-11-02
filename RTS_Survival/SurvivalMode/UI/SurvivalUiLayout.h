@@ -86,8 +86,15 @@ namespace SurvivalUiLayout
 	constexpr int32 ActionButtonFontSize = 18;
 	constexpr int32 ActionButtonLetterSpacing = 100;
 	constexpr int32 LocationNameFontSize = 26;
-	constexpr int32 HudTimerFontSize = 34;
+	// The status plate is one compact line flush with the top edge: label, clock, wave, enemies.
+	constexpr int32 HudTimerFontSize = 20;
+	// The Blueprint's stacked plate (test comparison only) keeps its big clock.
+	constexpr int32 HudStackedTimerFontSize = 34;
 	constexpr int32 HudLabelFontSize = 12;
+	constexpr float HudStatusItemGap = 14.f;
+	const FMargin HudStatusPlatePadding(18.f, 3.f, 18.f, 4.f);
+	// The incoming-wave banner sits right under the status plate.
+	constexpr float HudBannerTop = 56.f;
 	constexpr int32 BannerTitleFontSize = 20;
 	constexpr int32 ResultTitleFontSize = 34;
 	constexpr int32 ResultValueFontSize = 20;

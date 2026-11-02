@@ -21,7 +21,26 @@ enum class ESurvivalStartContentCategory : uint8
 	Metal,
 	Wreck,
 	Pit,
-	Crater
+	Crater,
+	// The start's special: hangar, capture vehicles and stores, or its wreck cluster.
+	Special,
+	// Ground detail decals (tracks, stains, cracks) and scrap-yard props: decoration, not part of the reach checks.
+	Detail
+};
+
+/**
+ * @brief The one fixed special a start location has, which gives each start its own strategic purpose.
+ * Set per start location actor (ASurvivalStartLocation::StartSpecial); spawned only at the start the player picks.
+ */
+UENUM(BlueprintType)
+enum class ESurvivalStartSpecial : uint8
+{
+	None,
+	MostRadixite,
+	MostMetal,
+	Wrecks,
+	LuchsHangar,
+	MarderHangar
 };
 
 /**
@@ -223,6 +242,171 @@ struct FSurvivalClutterSettings
 };
 
 /**
+ * @brief Single resource nodes very close to the drop-off, in a ring just outside the landing ring of the HQ,
+ * harvesters and scavengers. Counts are fixed (no difficulty scaling) so the start location picker can show them.
+ */
+USTRUCT(BlueprintType)
+struct FSurvivalCloseResourceSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Count", meta = (ClampMin = "0"))
+	int32 RadixiteNodes = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Count", meta = (ClampMin = "0"))
+	int32 MetalNodes = 2;
+
+	// Nothing of the start content comes inside this radius: the HQ and the drop pods land within ~11-18 m.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float LandingClearRadius = 2100.f;
+
+	// Node centres lie this far from the deploy centre.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MinDistance = 2500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MaxDistance = 4200.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float NodeClearance = 250.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Terrain", meta = (ClampMin = "0.0", ClampMax = "89.0", Units = "deg"))
+	float MaxGroundSlopeDegrees = 20.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actors")
+	TArray<FSurvivalWeightedActorClass> RadixiteActors;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Actors")
+	TArray<FSurvivalWeightedActorClass> MetalActors;
+};
+
+/**
+ * @brief What one start special adds near the drop-off, and how the start location picker names it.
+ */
+USTRUCT(BlueprintType)
+struct FSurvivalStartSpecialSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Special")
+	ESurvivalStartSpecial Special = ESurvivalStartSpecial::None;
+
+	// Short label for the picker ("Hangar").
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Picker")
+	FText Title;
+
+	// One line for the picker ("3 capturable Panzer II Luchs").
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Picker")
+	FText Description;
+
+	// Extra close resource nodes on top of FSurvivalCloseResourceSettings.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Resources", meta = (ClampMin = "0"))
+	int32 ExtraRadixiteNodes = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Resources", meta = (ClampMin = "0"))
+	int32 ExtraMetalNodes = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Wrecks", meta = (ClampMin = "0"))
+	int32 WreckCount = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Wrecks")
+	TArray<FSurvivalWeightedActorClass> Wrecks;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Wrecks", meta = (ClampMin = "0.0", Units = "cm"))
+	float WreckSpacing = 1300.f;
+
+	// Optional hangar; its door is on the asset's +X and faces the deploy centre.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hangar")
+	FSurvivalWeightedActorClass Hangar;
+
+	// Half size of the hangar along its X (door axis) and Y.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hangar")
+	FVector2D HangarHalfExtent = FVector2D(900.0, 900.0);
+
+	// Capturable vehicles parked in a row on the apron in front of the hangar door.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hangar", meta = (ClampMin = "0"))
+	int32 CaptureVehicleCount = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hangar")
+	FSurvivalWeightedActorClass CaptureVehicle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hangar", meta = (ClampMin = "0.0", Units = "cm"))
+	float CaptureVehicleSpacing = 650.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hangar")
+	TArray<FSurvivalWeightedActorClass> HangarStores;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hangar", meta = (ClampMin = "0"))
+	int32 HangarStoreCount = 2;
+
+	// Scrap yard: the extra metal nodes stand together in one yard of YardRadius (metal special) with scrap props and
+	// decals round it, so the start reads as the metal start from the RTS camera. Empty: the extra nodes spread out.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Yard")
+	TArray<FSurvivalWeightedActorClass> YardMetalActors;
+
+	// Decoration on the yard's far side from the deploy centre, so it never stands between the harvesters and the nodes.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Yard")
+	TArray<FSurvivalWeightedActorClass> YardProps;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Yard", meta = (ClampMin = "0"))
+	int32 YardPropCount = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Yard")
+	TArray<FSurvivalWeightedActorClass> YardDecals;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Yard", meta = (ClampMin = "0"))
+	int32 YardDecalCount = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Yard", meta = (ClampMin = "0.0", Units = "cm"))
+	float YardRadius = 1500.f;
+
+	// The hangar (or the wreck cluster, or the scrap yard) lies this far from the deploy centre.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MinDistance = 3600.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MaxDistance = 6500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Terrain", meta = (ClampMin = "0.0", ClampMax = "89.0", Units = "deg"))
+	float MaxGroundSlopeDegrees = 12.f;
+};
+
+/**
+ * @brief Ground detail round the drop-off of the picked start: track, stain and crack decals and scattered stones
+ * (instanced, no collision), so the start ground is not one sand. Spawned at runtime like the rest of the content.
+ */
+USTRUCT(BlueprintType)
+struct FSurvivalGroundDetailSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MinDistance = 1500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Distance", meta = (ClampMin = "0.0", Units = "cm"))
+	float MaxDistance = 8000.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Decals", meta = (ClampMin = "0"))
+	int32 DecalCount = 18;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Decals")
+	TArray<FSurvivalWeightedActorClass> DecalActors;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stones", meta = (ClampMin = "0"))
+	int32 StoneCount = 40;
+
+	// Stones keep out of the landing ring and the close resource ring so drop lanes and nodes read clearly.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stones", meta = (ClampMin = "0.0", Units = "cm"))
+	float StoneMinDistance = 4200.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stones")
+	TArray<FSurvivalWeightedMesh> StoneMeshes;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Stones", meta = (ClampMin = "0.0", ClampMax = "89.0", Units = "deg"))
+	float StoneMaxGroundSlopeDegrees = 35.f;
+};
+
+/**
  * @brief Multipliers applied to the Normal-difficulty counts; counts are rounded and never drop below 1
  * when the base count is at least 1 (resource fields only; wrecks and pits may reach 0).
  */
@@ -264,6 +448,12 @@ public:
 	/** @return The furthest distance beyond the build edge any start content can be placed at. */
 	float GetOuterContentDistanceFromBuildEdge() const;
 
+	/** @return The settings of this special, or nullptr for None or a missing entry. */
+	const FSurvivalStartSpecialSettings* FindSpecial(const ESurvivalStartSpecial Special) const;
+
+	/** @return Close radixite and metal nodes the planner asks for at a start with this special. */
+	void GetCloseNodeCounts(const ESurvivalStartSpecial Special, int32& OutRadixite, int32& OutMetal) const;
+
 	// 0 = a new layout every match; any other value always produces the same layout (testing).
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Generation")
 	int32 Seed = 0;
@@ -282,6 +472,17 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Clutter")
 	FSurvivalClutterSettings Clutter;
+
+	// Single resource nodes right by the drop-off (every start).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Close Resources")
+	FSurvivalCloseResourceSettings CloseResources;
+
+	// One entry per special; the start location actor names the special it has.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Specials")
+	TArray<FSurvivalStartSpecialSettings> Specials;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Ground Detail")
+	FSurvivalGroundDetailSettings GroundDetail;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Difficulty")
 	TMap<ERTSGameDifficulty, FSurvivalStartContentDifficultyScale> DifficultyScaling;
@@ -314,4 +515,7 @@ private:
 	void InitDefaultPits();
 	void InitDefaultClutter();
 	void InitDefaultDifficultyScaling();
+	void InitDefaultCloseResources();
+	void InitDefaultSpecials();
+	void InitDefaultGroundDetail();
 };
