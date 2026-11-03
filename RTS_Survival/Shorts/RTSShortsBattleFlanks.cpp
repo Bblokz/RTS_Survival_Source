@@ -126,6 +126,11 @@ bool ARTSShortsDirector::GetIsBattleUnitSelfDirected(const AActor* Unit) const
 	{
 		return true;
 	}
+	// Segment.BattleSquadTactics squads choose their own spots and attacks for the whole battle.
+	if (M_Battle.SquadTactics.ContainsByPredicate([Unit](const FRTSShortsSquadTacticState& Tactic) { return Tactic.Squad.Get() == Unit; }))
+	{
+		return true;
+	}
 	for (const TPair<TWeakObjectPtr<AActor>, FRTSShortsReflankState>& Reflank : M_Battle.Reflanks)
 	{
 		if (Reflank.Value.bDriving && Reflank.Key.Get() == Unit)

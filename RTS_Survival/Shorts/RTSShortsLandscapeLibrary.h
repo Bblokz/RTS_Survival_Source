@@ -21,6 +21,22 @@ class RTS_SURVIVAL_API URTSShortsLandscapeLibrary : public UBlueprintFunctionLib
 
 public:
 	/**
+	 * @brief New cinematic terrain must answer the custom ground traces used by tracked vehicle physics.
+	 * @param LandscapeActor Isolated stage landscape whose collision may be rebuilt.
+	 * @return True when its collision was configured and rebuilt in the editor.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Shorts|Editor")
+	static bool ConfigureVehicleGroundLandscape(AActor* LandscapeActor);
+
+	/**
+	 * @brief Lets isolated stage builders bake vehicle and crew paths after terrain and dressing are placed.
+	 * @param WorldContextObject Editor world containing the new stage's navigation bounds.
+	 * @return True when a valid editor navigation system accepted the rebuild.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Shorts|Editor", meta = (WorldContext = "WorldContextObject"))
+	static bool RebuildStageNavigation(UObject* WorldContextObject);
+
+	/**
 	 * @brief Lets stage dressing scripts reshape an existing isolated landscape without replacing its actor.
 	 * @param LandscapeActor Existing landscape with edit layers disabled.
 	 * @param HeightFile Raw uint16 heights matching the landscape's complete vertex grid.

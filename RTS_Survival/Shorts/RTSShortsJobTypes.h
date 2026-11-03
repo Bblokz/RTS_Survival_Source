@@ -111,6 +111,36 @@ struct FRTSShortsCameraParams
 	 */
 	UPROPERTY()
 	float OrbitEndHeightScale = 1.f;
+
+	/** Seconds the camera rests at the end of the orbit before the return sweep. */
+	UPROPERTY()
+	float OrbitHoldSeconds = 0.f;
+
+	/**
+	 * Opt-in second sweep after the hold, added to the orbit's angle: -2 x OrbitDegrees passes back over the starting view
+	 * to the same distance on the other side. The height eases back to the framing height by the starting view.
+	 */
+	UPROPERTY()
+	float OrbitReturnDegrees = 0.f;
+
+	/** Duration of the return sweep in seconds (eased in and out). */
+	UPROPERTY()
+	float OrbitReturnSeconds = 3.f;
+
+	/**
+	 * Team weapon battles: segment-local second at which the camera pushes in on the guns still standing, to show their
+	 * crews at work (0 = no push-in). The focus is fixed when the push-in starts.
+	 */
+	UPROPERTY()
+	float OrbitPushInStartSeconds = 0.f;
+
+	/** Duration of the push-in in seconds (eased in and out). */
+	UPROPERTY()
+	float OrbitPushInSeconds = 6.f;
+
+	/** The camera's distance from its focus at the end of the push-in, as a fraction of the orbit's distance. */
+	UPROPERTY()
+	float OrbitPushInDistanceScale = 0.4f;
 };
 
 /**
@@ -250,6 +280,33 @@ struct FRTSShortsParatrooperFormation
 	/** Empty retains the original single pass over the battle midpoint. */
 	UPROPERTY()
 	TArray<FRTSShortsParatrooperPass> Passes;
+};
+
+/** @brief Selects the two reusable shots without changing other short categories. */
+UENUM()
+enum class ERTSShortsTeamWeaponShot : uint8
+{
+	None,
+	TowConvoy,
+	DeployBattle
+};
+
+/** @brief Pairs the shot's transports with real crew controllers for transport or deployment. */
+USTRUCT()
+struct FRTSShortsTeamWeaponSettings
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	ERTSShortsTeamWeaponShot Shot = ERTSShortsTeamWeaponShot::None;
+
+	/** One crew-controller class per transport, in the same order as its convoy or battle line. */
+	UPROPERTY()
+	TArray<FString> SquadClassPaths;
+
+	/** Ground offset beside each half-track after the cut to the deployment yard. */
+	UPROPERTY()
+	FVector DeploymentOffset = FVector(-250.f, 650.f, 0.f);
 };
 
 /** @brief A cinematic aircraft (an animated airframe, no unit or AI) that flies one straight line over the stage. */
@@ -427,63 +484,6 @@ struct FRTSShortsBattleReinforcement
 };
 
 /**
- * @brief One unit of a short: which Blueprint to spawn, how long it is on stage and when it fires.
- */
-USTRUCT()
-struct FRTSShortsSegment
-{
-	GENERATED_BODY()
-
-	/** Subtype enum name, informational (e.g. Tank_PzII_F). */
-	UPROPERTY()
-	FString Subtype;
-
-	/** Blueprint class path of the unit, e.g. /Game/.../Ger_Vehicle_PanzerII_F.Ger_Vehicle_PanzerII_F_C. */
-	UPROPERTY()
-	FString ClassPath;
-
-	/** "Unit" (tank or squad, spawned for the player) or "Pit" (a building expansion spawned as a level designer places it). */
-	UPROPERTY()
-	FString Kind = TEXT("Unit");
-
-	UPROPERTY()
-	FString Caption1;
-
-	UPROPERTY()
-	FString Caption2;
-
-	/** Seconds this unit stays on stage. */
-	UPROPERTY()
-	float SlotSeconds = 7.f;
-
-	/** Seconds after the cut when the attack-ground order is given. */
-	UPROPERTY()
-	float FireAtSeconds = 0.5f;
-
-	/** Seconds after the cut when the stop order is given; negative means half a second before the slot ends. */
-	UPROPERTY()
-	float StopAtSeconds = -1.f;
-
-	/** Impact point relative to the stage spawn point, in stage space (X forward). */
-	UPROPERTY()
-	FVector TargetOffset = FVector(5000.f, 300.f, 0.f);
-
-	/** Yaw added to the stage forward when the unit is placed. */
-	UPROPERTY()
-	float UnitYawOffset = 0.f;
-
-	/** Seconds after the cut of a second attack-ground order; negative means none. */
-	UPROPERTY()
-	float FireAgainAtSeconds = -1.f;
-
-	/** Seconds after each fire order when a stop order follows (single shots); negative keeps StopAtSeconds only. */
-	UPROPERTY()
-	float StopAfterFireSeconds = -1.f;
-
-	/** Squads: how many soldiers stay at the mark (0 = all); the rest are parked 30 m behind the mark, out of frame. */
-	UPROPERTY()
-	int32 MaxSquadVisible = 0;
-/**
  * @brief The drive one battle vehicle makes before it takes attack orders: it fires on the move with the game's own
  * auto-engage and can be shot the whole way, which is what a flank looks like to the unit being flanked.
  */
@@ -550,6 +550,146 @@ struct FRTSShortsSoloEvasion
 	float CameraFollowSpeed = 2.5f;
 };
 
+/**
+ * @brief How enemy squads fight the segment's unit: each one works round its side to a cover tree (Job.BattleCoverTrees)
+ * from which it can still shoot, its soldiers sent onto the trunk's cover points, or to an open flank spot when no tree
+ * will do. A squad stays while it can engage from where it is and moves again when it cannot. Commands only, no stats.
+ */
+USTRUCT()
+struct FRTSShortsSquadTactics
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	/** Segment-local second of the first squad's order; the rest follow OrderStaggerSeconds apart. */
+	UPROPERTY()
+	float OrderAtSeconds = 1.f;
+
+	UPROPERTY()
+	float OrderStaggerSeconds = 0.5f;
+
+	/** Without a usable tree a squad goes to a spot this far (degrees) off the unit's nose, on the side it is on. */
+	UPROPERTY()
+	float FlankBearingDegrees = 110.f;
+
+	/** ...and this far (cm) from the unit, or less when its weapon does not reach that far. */
+	UPROPERTY()
+	float FlankRadiusCm = 1800.f;
+
+	/** Cover is only taken this far inside the squad's weapon range, so the unit backing off does not put it out of range at once. */
+	UPROPERTY()
+	float RangeFraction = 0.85f;
+
+	/** A cover tree closer to the unit than this (cm) is not used: the squad would be under its tracks. */
+	UPROPERTY()
+	float MinimumCoverDistanceCm = 700.f;
+
+	/** Seconds a squad fights from a spot before it may move to a better one (out of range moves it at once). */
+	UPROPERTY()
+	float HoldSeconds = 8.f;
+
+	/** Seconds after a move order when the squad attacks from wherever it got to. */
+	UPROPERTY()
+	float MoveTimeoutSeconds = 25.f;
+
+	/** A squad in the open that the unit has turned to within this many degrees moves to a flank again. */
+	UPROPERTY()
+	float FacedDegrees = 40.f;
+
+	/** Holding squads move to another spot when nobody has damaged the unit for this long: from here they are not hurting it. */
+	UPROPERTY()
+	float NoEffectSeconds = 12.f;
+
+	/** Living enemy soldiers get an outline (the game's outliner post-process), so viewers can find them in cover. */
+	UPROPERTY()
+	bool bOutlineSoldiers = false;
+
+	UPROPERTY()
+	FLinearColor OutlineColor = FLinearColor(1.f, 0.08f, 0.05f, 1.f);
+
+	UPROPERTY()
+	float OutlineWidth = 3.f;
+};
+
+/** @brief A tree the director plants for squad battles, with cover points round its trunk. */
+USTRUCT()
+struct FRTSShortsCoverTree
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	FString ClassPath;
+
+	/** Stage-local centimetres; the tree stands on the ground below. */
+	UPROPERTY()
+	FVector Offset = FVector::ZeroVector;
+
+	UPROPERTY()
+	float Scale = 1.f;
+
+	UPROPERTY()
+	float Yaw = 0.f;
+};
+
+/**
+ * @brief One unit of a short: which Blueprint to spawn, how long it is on stage and when it fires.
+ */
+USTRUCT()
+struct FRTSShortsSegment
+{
+	GENERATED_BODY()
+
+	/** Subtype enum name, informational (e.g. Tank_PzII_F). */
+	UPROPERTY()
+	FString Subtype;
+
+	/** Blueprint class path of the unit, e.g. /Game/.../Ger_Vehicle_PanzerII_F.Ger_Vehicle_PanzerII_F_C. */
+	UPROPERTY()
+	FString ClassPath;
+
+	/** "Unit" (tank or squad, spawned for the player) or "Pit" (a building expansion spawned as a level designer places it). */
+	UPROPERTY()
+	FString Kind = TEXT("Unit");
+
+	UPROPERTY()
+	FString Caption1;
+
+	UPROPERTY()
+	FString Caption2;
+
+	/** Seconds this unit stays on stage. */
+	UPROPERTY()
+	float SlotSeconds = 7.f;
+
+	/** Seconds after the cut when the attack-ground order is given. */
+	UPROPERTY()
+	float FireAtSeconds = 0.5f;
+
+	/** Seconds after the cut when the stop order is given; negative means half a second before the slot ends. */
+	UPROPERTY()
+	float StopAtSeconds = -1.f;
+
+	/** Impact point relative to the stage spawn point, in stage space (X forward). */
+	UPROPERTY()
+	FVector TargetOffset = FVector(5000.f, 300.f, 0.f);
+
+	/** Yaw added to the stage forward when the unit is placed. */
+	UPROPERTY()
+	float UnitYawOffset = 0.f;
+
+	/** Seconds after the cut of a second attack-ground order; negative means none. */
+	UPROPERTY()
+	float FireAgainAtSeconds = -1.f;
+
+	/** Seconds after each fire order when a stop order follows (single shots); negative keeps StopAtSeconds only. */
+	UPROPERTY()
+	float StopAfterFireSeconds = -1.f;
+
+	/** Squads: how many soldiers stay at the mark (0 = all); the rest are parked 30 m behind the mark, out of frame. */
+	UPROPERTY()
+	int32 MaxSquadVisible = 0;
 
 	/** Team weapons: distance in cm of the crew arc behind the gun. */
 	UPROPERTY()
@@ -609,6 +749,9 @@ struct FRTSShortsSoloEvasion
 	 */
 	UPROPERTY()
 	bool bConvoy = false;
+
+	UPROPERTY()
+	FRTSShortsTeamWeaponSettings TeamWeapons;
 
 	/** Convoy: sideways distance between the wedge's ranks (cm). */
 	UPROPERTY()
@@ -822,6 +965,18 @@ struct FRTSShortsSoloEvasion
 	UPROPERTY()
 	TArray<FRTSShortsBattleReinforcement> BattleReinforcements;
 
+	/** Battle: enemy vehicles that work round the segment's unit instead of attacking from where they spawned. */
+	UPROPERTY()
+	TArray<FRTSShortsBattleFlankRoute> BattleFlankRoutes;
+
+	/** Battle: the segment's unit fights the enemy line by itself instead of taking the director's attack orders. */
+	UPROPERTY()
+	FRTSShortsSoloEvasion BattleSoloEvasion;
+
+	/** Battle: the enemy squads flank and take cover behind Job.BattleCoverTrees instead of walking straight in. */
+	UPROPERTY()
+	FRTSShortsSquadTactics BattleSquadTactics;
+
 	/** Aircraft passes flown during this segment. */
 	UPROPERTY()
 	TArray<FRTSShortsFlyBy> FlyBys;
@@ -882,20 +1037,31 @@ struct FRTSShortsJob
 	float CombatTextWorldScale = 0.f;
 
 	/** Render the game's screen-space widgets (floating combat texts) into the frames via the MRQ UI renderer. */
-	/** Battle: enemy vehicles that work round the segment's unit instead of attacking from where they spawned. */
-	UPROPERTY()
-	TArray<FRTSShortsBattleFlankRoute> BattleFlankRoutes;
-
-	/** Battle: the segment's unit fights the enemy line by itself instead of taking the director's attack orders. */
-	UPROPERTY()
-	FRTSShortsSoloEvasion BattleSoloEvasion;
-
 	UPROPERTY()
 	bool bRenderGameWidgets = false;
+
+	/** > 0: track trails only cover this far (cm) round the stage, which keeps them sharp on a map of far-apart landscapes. */
+	UPROPERTY()
+	float TrackTrailAreaHalfSizeCm = 0.f;
+
+	/** A battle the segment's unit lost is the last one rendered: the rounds of an escalating job stop there. */
+	UPROPERTY()
+	bool bStopWhenUnitDestroyed = false;
+
+	/** Planted when the first battle with Segment.BattleSquadTactics begins and kept for the rest of the job. */
+	UPROPERTY()
+	TArray<FRTSShortsCoverTree> BattleCoverTrees;
 
 	/** Actors whose name or label starts with any of these are hidden for this job (e.g. a backdrop hill over a second mark). */
 	UPROPERTY()
 	TArray<FString> HiddenActorPrefixes;
+
+	/**
+	 * Keeps the crews' spoken lines in the capture. The shorts mute RTS_SClass_VoiceLine by default, which silences most
+	 * of them; the medium tanks' fire lines have no sound class and always played.
+	 */
+	UPROPERTY()
+	bool bKeepVoiceLines = false;
 
 	/** Stage actor label to place units on (default "Stage_" + StageName): a second mark inside an existing stage's dressing. */
 	UPROPERTY()
@@ -946,20 +1112,42 @@ struct FRTSShortsJob
 };
 
 /**
+ * @brief One moment of a battle for the post step, which cuts a long fight down to what mattered.
+ */
+USTRUCT()
+struct FRTSShortsBattleEvent
+{
+	GENERATED_BODY()
+
+	/** Output frame of the single rendered shot. */
+	UPROPERTY()
+	int32 Frame = 0;
+
+	/** "Hit", "Kill" or "FlankArrived". */
+	UPROPERTY()
+	FString Kind;
+
+	UPROPERTY()
+	bool bPlayerSide = false;
+
+	/** Health left on the unit, 0..1. */
+	UPROPERTY()
+	float HealthFraction = 1.f;
+
+	UPROPERTY()
+	int32 PlayersAlive = 0;
+
+	UPROPERTY()
+	int32 EnemiesAlive = 0;
+};
+
+/**
  * @brief What the director recorded about one segment, in output frames of the single rendered shot.
  */
 USTRUCT()
 struct FRTSShortsManifestSegment
 {
 	GENERATED_BODY()
-
-	/** > 0: track trails only cover this far (cm) round the stage, which keeps them sharp on a map of far-apart landscapes. */
-	UPROPERTY()
-	float TrackTrailAreaHalfSizeCm = 0.f;
-
-	/** A battle the segment's unit lost is the last one rendered: the rounds of an escalating job stop there. */
-	UPROPERTY()
-	bool bStopWhenUnitDestroyed = false;
 
 	UPROPERTY()
 	int32 Index = 0;
@@ -993,6 +1181,20 @@ struct FRTSShortsManifestSegment
 
 	UPROPERTY()
 	FString SkipReason;
+
+	/** Battles: output frame one side was gone; -1 when the slot ran out first. */
+	UPROPERTY()
+	int32 BattleDecidedFrame = -1;
+
+	/** Battles: "player", "enemy", or empty when undecided. */
+	UPROPERTY()
+	FString BattleWinner;
+
+	UPROPERTY()
+	int32 BattleSurvivors = 0;
+
+	UPROPERTY()
+	TArray<FRTSShortsBattleEvent> BattleEvents;
 };
 
 /**
@@ -1020,51 +1222,7 @@ struct FRTSShortsManifest
 
 	UPROPERTY()
 	bool bComplete = false;
-/**
- * @brief One moment of a battle for the post step, which cuts a long fight down to what mattered.
- */
-USTRUCT()
-struct FRTSShortsBattleEvent
-{
-	GENERATED_BODY()
-
-	/** Output frame of the single rendered shot. */
-	UPROPERTY()
-	int32 Frame = 0;
-
-	/** "Hit", "Kill" or "FlankArrived". */
-	UPROPERTY()
-	FString Kind;
-
-	UPROPERTY()
-	bool bPlayerSide = false;
-
-	/** Health left on the unit, 0..1. */
-	UPROPERTY()
-	float HealthFraction = 1.f;
-
-	UPROPERTY()
-	int32 PlayersAlive = 0;
-
-	UPROPERTY()
-	int32 EnemiesAlive = 0;
-};
-
 
 	UPROPERTY()
 	TArray<FRTSShortsManifestSegment> Segments;
 };
-
-	/** Battles: output frame one side was gone; -1 when the slot ran out first. */
-	UPROPERTY()
-	int32 BattleDecidedFrame = -1;
-
-	/** Battles: "player", "enemy", or empty when undecided. */
-	UPROPERTY()
-	FString BattleWinner;
-
-	UPROPERTY()
-	int32 BattleSurvivors = 0;
-
-	UPROPERTY()
-	TArray<FRTSShortsBattleEvent> BattleEvents;

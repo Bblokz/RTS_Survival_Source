@@ -111,3 +111,38 @@ preserved, and the map is not saved. The first recovery copy remains under
 Inspect the actual captured JPGs for visual review. On this workstation the UECP
 `render_anim_sequence_thumbnail` action crashed `UECPAnimationExt`; avoid that
 preview action and preserve any existing editor recovery files.
+
+## Large six-type batch
+
+`create_large_batch.py --queue` creates and queues three independent RTS_Shorts
+presets, using the existing ParatrooperMeadow stage. Re-running the tool does
+not duplicate queue entries or overwrite a changed preset. `--port` selects the
+Studio instance; its project root is checked before submission.
+
+Each battle contains six combat classes total, three per faction. The delivery
+aircraft are shown in the two-second intro and are omitted from the roster.
+The header includes all squads, including reinforcements delivered by the two
+planes. Counts are squads, not individual soldiers.
+
+- Large01: 8 tanks on each side. Germany has 5 Panther Ds, 3 Panzer IV Hs and
+  6 Vulture squads (4 deployed, 2 dropped). The Soviets have 6 T-34-85s (HEAT),
+  2 IS-2s and 8 Mosin squads.
+- Large02: 8 tanks on each side. Germany has 4 Tiger H1s, 4 Panther Gs and
+  12 Panzergrenadier squads. The Soviets have 8 IS-1s (HEAT), 8 Mosin squads
+  and 6 ROKS squads (2 of each squad type arrive by air).
+- Large03: 10 tanks on each side. Germany has 6 Panzer IV Gs, 4 StuG IIIs and
+  8 Vulture squads (6 deployed, 2 dropped). The Soviets have 6 T-34Es,
+  4 SU-85s (APCR) and 10 Mosin PTRS squads.
+
+These are approximate matchups using ordinary health and damage, with the
+stage's existing temporary double-range behaviour. Tanks occupy spaced rows;
+infantry starts in two rows toward the faction's sandbags. Each uses the approved
+camera route and ends with the battle or at 120 seconds. No shared abilities,
+unit Blueprints, landscape or earlier presets are modified.
+
+`forge_rounds.annotate_job` is called both when creating these presets and by
+the production render launcher, so HEAT/APCR labels remain automatic.
+`audit_large_batch.py` validates completed outputs against actual native spawns,
+drop owners and classes, jumps from both aircraft, the two-second cut, range
+behaviours, header limits and 1080 x 1920 / 60 fps stereo media. Audit results
+are saved with each take as Verification.json.

@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "RTS_Survival/Environment/TankTrails/TankTrailSubsystem.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
@@ -326,7 +327,9 @@ void ARTSShortsDirector::TickBattleReflanks(const FRTSShortsSoloEvasion& Setting
 		{
 			return not Flank.bFinished && Flank.Unit == Attacker;
 		});
-		if (bOnFlankRoute || not GetIsAlive(Attacker))
+		// Soldiers of Segment.BattleSquadTactics squads move with their squad, which picks its own flank.
+		const bool bTacticSoldier = not M_Battle.SquadTactics.IsEmpty() && Cast<ASquadUnit>(Attacker.Get()) != nullptr;
+		if (bOnFlankRoute || bTacticSoldier || not GetIsAlive(Attacker))
 		{
 			continue;
 		}

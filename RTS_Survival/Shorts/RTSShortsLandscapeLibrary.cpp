@@ -11,6 +11,8 @@
 #include "LandscapeLayerInfoObject.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/FileHelper.h"
+#include "NavigationSystem.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSShortsLandscape, Log, All);
 
@@ -203,5 +205,51 @@ AActor* URTSShortsLandscapeLibrary::CreatePaintedLandscape(UObject* WorldContext
 	return Landscape;
 #else
 	return nullptr;
+#endif
+}
+
+bool URTSShortsLandscapeLibrary::RebuildStageNavigation(UObject* WorldContextObject)
+{
+#if WITH_EDITOR
+	if (not IsValid(GEngine))
+	{
+		return false;
+	}
+	UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	if (not IsValid(Navigation))
+	{
+		return false;
+	}
+	Navigation->Build();
+	return true;
+#else
+	return false;
+#endif
+}
+
+bool URTSShortsLandscapeLibrary::ConfigureVehicleGroundLandscape(AActor* LandscapeActor)
+{
+#if WITH_EDITOR
+	ALandscape* Landscape = Cast<ALandscape>(LandscapeActor);
+	if (not IsValid(Landscape))
+	{
+		return false;
+	}
+	Landscape->Modify();
+	Landscape->BodyInstance.SetCollisionProfileName(TEXT("GroundNoBuilding"));
+	Landscape->BodyInstance.SetResponseToChannel(COLLISION_TRACE_LANDSCAPE, ECR_Block);
+	Landscape->RecreateCollisionComponents();
+	Landscape->PostEditChange();
+	Landscape->MarkPackageDirty();
+	UE_LOG(LogRTSShortsLandscape, Display, TEXT("RTS_SHORTS_VEHICLE_GROUND_CONFIGURED landscape=%s response=%d"),
+		*Landscape->GetName(), static_cast<int32>(Landscape->BodyInstance.GetResponseToChannel(COLLISION_TRACE_LANDSCAPE)));
+	return true;
+#else
+	return false;
 #endif
 }

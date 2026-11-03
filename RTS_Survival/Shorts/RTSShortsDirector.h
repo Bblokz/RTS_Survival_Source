@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "RTSShortsJobTypes.h"
+#include "RTSShortsTeamWeaponState.h"
 #include "RTSShortsAircraftCrashState.h"
 #include "RTSShortsCookOffState.h"
 
@@ -30,6 +31,15 @@ struct FRTSShortsOrbitState
 	float EndHeightScale = 1.f;
 	float StartSeconds = 0.f;
 	float DurationSeconds = 1.f;
+	float HoldSeconds = 0.f;
+	float ReturnDegrees = 0.f;
+	float ReturnSeconds = 1.f;
+	float PushInStartSeconds = 0.f;
+	float PushInSeconds = 1.f;
+	float PushInDistanceScale = 1.f;
+	bool bHasPushInFocus = false;
+	// The surviving guns' centre, taken when the push-in starts so a later loss does not jerk the camera.
+	FVector PushInFocus = FVector::ZeroVector;
 };
 
 /** One Segment.FlyBys aircraft of the running segment: its spawned airframe and whether its sound has started. */
@@ -44,16 +54,6 @@ struct FRTSShortsFlyByState
 	bool bSoundStarted = false;
 };
 
-/** 3v3 battle of the running segment: both lines, their current targets, the decision and the wrecks it left. */
-USTRUCT()
-struct FRTSShortsBattleState
-{
-	GENERATED_BODY()
-
-	bool bIsActive = false;
-	// The segment's own unit plus BattleAllyClassPaths.
-	TArray<TWeakObjectPtr<AActor>> PlayerUnits;
-	TArray<TWeakObjectPtr<AActor>> EnemyUnits;
 /** A Segment.BattleFlankRoutes drive under way: the enemy on it, and whether it was ordered off and has finished. */
 USTRUCT()
 struct FRTSShortsBattleFlankState
@@ -77,6 +77,36 @@ struct FRTSShortsReflankState
 	float NextAllowedSeconds = 0.f;
 	float OrderedAtSeconds = 0.f;
 	FVector Destination = FVector::ZeroVector;
+};
+
+/** One enemy squad under Segment.BattleSquadTactics: where it was sent and when it may think again. */
+USTRUCT()
+struct FRTSShortsSquadTacticState
+{
+	GENERATED_BODY()
+
+	TWeakObjectPtr<AActor> Squad;
+	float OrderAtSeconds = 0.f;
+	bool bOrdered = false;
+	// Walking to Destination: it takes no attack order from the director until it arrives or times out.
+	bool bMoving = false;
+	float MovedAtSeconds = 0.f;
+	float NextCheckSeconds = 0.f;
+	float ArrivedSeconds = 0.f;
+	// Index into M_CoverTrees, or INDEX_NONE for an open flank spot.
+	int32 TreeIndex = INDEX_NONE;
+	FVector Destination = FVector::ZeroVector;
+};
+
+/** A Job.BattleCoverTrees tree standing on the stage and its cover points' registration with the cover finder. */
+USTRUCT()
+struct FRTSShortsCoverTreeState
+{
+	GENERATED_BODY()
+
+	TWeakObjectPtr<AActor> Tree;
+	uint64 RegistrationId = 0;
+	FVector TrunkLocation = FVector::ZeroVector;
 };
 
 /** Where Segment.BattleSoloEvasion's unit is in its stop, shoot, reverse cycle. */
@@ -109,6 +139,16 @@ struct FRTSShortsSoloEvasionState
 	TSet<uint32> EffectIdsAtBegin;
 };
 
+/** 3v3 battle of the running segment: both lines, their current targets, the decision and the wrecks it left. */
+USTRUCT()
+struct FRTSShortsBattleState
+{
+	GENERATED_BODY()
+
+	bool bIsActive = false;
+	// The segment's own unit plus BattleAllyClassPaths.
+	TArray<TWeakObjectPtr<AActor>> PlayerUnits;
+	TArray<TWeakObjectPtr<AActor>> EnemyUnits;
 	// Attack target last ordered per unit; a new order only goes out once that target is dead.
 	TMap<TWeakObjectPtr<AActor>, TWeakObjectPtr<AActor>> OrderedTargets;
 	// Wrecks spawned while the battle ran; destroyed with the battle so the next one starts on a clean field.
@@ -123,6 +163,17 @@ struct FRTSShortsSoloEvasionState
 	TSet<TWeakObjectPtr<AActor>> HeldUnits;
 	TArray<bool> ReinforcementOrdered;
 	TArray<bool> ReinforcementJoined;
+	// Segment.BattleFlankRoutes under way: these vehicles fire on the move but take no attack order until they finish.
+	TArray<FRTSShortsBattleFlankState> Flanks;
+	FRTSShortsSoloEvasionState Evasion;
+	TMap<TWeakObjectPtr<AActor>, FRTSShortsReflankState> Reflanks;
+	// Segment.BattleSquadTactics: one entry per enemy squad.
+	TArray<FRTSShortsSquadTacticState> SquadTactics;
+	// The squads' target's health at the last tactics tick and when it last went down.
+	float SquadTargetHealth = -1.f;
+	float SquadTargetDamagedSeconds = 0.f;
+	// Health fraction each battle unit had last tick; 0 once its Kill event went out.
+	TMap<TWeakObjectPtr<AActor>, float> LastHealth;
 	int32 BeginFrame = 0;
 	int32 DecidedFrame = -1;
 	bool bPlayerWon = false;
@@ -133,12 +184,6 @@ struct FRTSShortsSoloEvasionState
 /** Convoy segment: the vehicles driving in a wedge, their pinned turrets and the follow camera's offsets. */
 USTRUCT()
 struct FRTSShortsConvoyState
-	// Segment.BattleFlankRoutes under way: these vehicles fire on the move but take no attack order until they finish.
-	TArray<FRTSShortsBattleFlankState> Flanks;
-	FRTSShortsSoloEvasionState Evasion;
-	TMap<TWeakObjectPtr<AActor>, FRTSShortsReflankState> Reflanks;
-	// Health fraction each battle unit had last tick; 0 once its Kill event went out.
-	TMap<TWeakObjectPtr<AActor>, float> LastHealth;
 {
 	GENERATED_BODY()
 
@@ -216,6 +261,7 @@ private:
 	void PushShortsSoundMix();
 	void LockViewOnCamera() const;
 	void ApplyStageVisibility() const;
+	void ApplyTrackTrailArea() const;
 
 	AActor* SpawnSegmentUnit(const int32 SegmentIndex);
 	AActor* SpawnPitAsPlaced(const FString& ClassPath, const FTransform& Transform) const;
@@ -226,7 +272,6 @@ private:
 	/** @return The current timeline frame: rendered output frame when rendering, else world time * fps. */
 	int32 GetTimelineFrame() const;
 	UMoviePipeline* GetActivePipeline() const;
-	void ApplyTrackTrailArea() const;
 
 	void FlushStageEffects(const int32 SegmentIndex) const;
 	void BeginSegment(const int32 SegmentIndex);
@@ -290,16 +335,6 @@ private:
 	/** Battle squads: their soldiers join the battle lines (targets, visibility, alive count) as they spawn. */
 	void AbsorbBattleSquadMembers();
 	void SpawnBattleReinforcements(const FRTSShortsSegment& Segment);
-	/** True when Segment.BattleOrderMaxDistance is set and the target lies farther than it from the attacker. */
-	bool GetIsBattleTargetTooFar(const AActor* Attacker, const AActor* Target) const;
-	/** Orders the waiting reinforcements in at their time and adds the arrived ones to their line. */
-	void TickBattleReinforcements(int32 Frame);
-	/** Held-position battles: logs every squad's soldiers' stage-local X span now and then (who left their cover line). */
-	void LogBattleSquadPositions(int32 Frame) const;
-	/** Gives a battle squad's soldier the squad controller's owner (and its weapons and collision with it). */
-	static void MatchSoldierToSquadOwner(class ASquadUnit* Soldier, const uint8 SquadOwner);
-	/** Segment.bConvoy: spawns the wedge's side vehicles, pins the turrets and starts the follow camera. */
-	void BeginConvoy(const int32 SegmentIndex, AActor* MainUnit);
 	/** Pairs each Segment.BattleFlankRoutes entry with the enemy vehicle that drives it. */
 	void BeginBattleFlanks(const FRTSShortsSegment& Segment);
 	/** Sends flanking vehicles off at their time and releases them to the normal attack orders on arrival. */
@@ -328,10 +363,49 @@ private:
 	/** Job.bStopWhenUnitDestroyed: later rounds are not rendered once the segment's unit lost; they stay skipped in the manifest. */
 	void SkipSegmentsAfterRunning(int32 Frame);
 	void OrderBattleReflank(AActor& Attacker, FRTSShortsReflankState& Reflank, const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
+	/** Plants Job.BattleCoverTrees once per job and publishes cover points round each trunk. */
+	void SpawnBattleCoverTrees();
+	/** Takes the cover of trees that were crushed or destroyed off the cover finder. */
+	void DropFallenCoverTrees();
+	void BeginSquadTactics(const FRTSShortsSegment& Segment);
+	/** Sends each enemy squad to a flank tree or spot at its time, and moves it again when it can no longer engage. */
+	void TickSquadTactics(int32 Frame);
+	/**
+	 * @brief Picks where a squad fights the unit from next and orders it there: the best flank tree it can shoot from,
+	 * with its soldiers on the trunk's cover points, or an open flank spot when no tree will do.
+	 * @param Tactic The squad's state; Destination, TreeIndex and the timers are updated.
+	 * @param Settings The segment's squad tactics.
+	 * @param Target The unit the squad fights.
+	 * @param SegmentSeconds Segment-local time of the order.
+	 */
+	void OrderSquadTactic(FRTSShortsSquadTacticState& Tactic, const FRTSShortsSquadTactics& Settings, AActor& Target,
+	                      float SegmentSeconds, int32 AvoidTreeIndex = INDEX_NONE);
+	/** @return False when no tree on the stage gives this squad cover it can shoot the unit from. */
+	bool TryPlanSquadTreeCover(const FRTSShortsSquadTacticState& Tactic, const FRTSShortsSquadTactics& Settings,
+	                           const AActor& Target, const TArray<class ASquadUnit*>& Soldiers, float WeaponRange,
+	                           int32 AvoidTreeIndex, int32& OutTreeIndex, FVector& OutDestination,
+	                           TArray<struct FSquadUnitPlannedDestination>& OutPlan) const;
+	/** The open flank spot a squad without a usable tree goes to: the first candidate its soldiers can walk to. */
+	FVector FindSquadFlankSpot(const FRTSShortsSquadTactics& Settings, const AActor& Target, const TArray<class ASquadUnit*>& Soldiers,
+	                           float WeaponRange) const;
+	/** Outlines the battle's living enemy soldiers and takes it off the dead, so only the remaining enemies stand out. */
+	void TickSoldierOutlines(const FRTSShortsSquadTactics& Settings);
+	/** The enemy squads' target under Segment.BattleSquadTactics: the evading unit, else the segment's own unit. */
+	AActor* GetSquadTacticsTarget() const;
 	/** Writes hits and kills of both lines into the manifest, so post can cut a fight down to its moments. */
 	void TrackBattleEvents(int32 Frame);
 	void TrackBattleLineEvents(const TArray<TWeakObjectPtr<AActor>>& Line, bool bPlayerSide, int32 Frame);
 	void AddBattleEvent(const TCHAR* Kind, bool bPlayerSide, float HealthFraction, int32 Frame);
+	/** True when Segment.BattleOrderMaxDistance is set and the target lies farther than it from the attacker. */
+	bool GetIsBattleTargetTooFar(const AActor* Attacker, const AActor* Target) const;
+	/** Orders the waiting reinforcements in at their time and adds the arrived ones to their line. */
+	void TickBattleReinforcements(int32 Frame);
+	/** Held-position battles: logs every squad's soldiers' stage-local X span now and then (who left their cover line). */
+	void LogBattleSquadPositions(int32 Frame) const;
+	/** Gives a battle squad's soldier the squad controller's owner (and its weapons and collision with it). */
+	static void MatchSoldierToSquadOwner(class ASquadUnit* Soldier, const uint8 SquadOwner);
+	/** Segment.bConvoy: spawns the wedge's side vehicles, pins the turrets and starts the follow camera. */
+	void BeginConvoy(const int32 SegmentIndex, AActor* MainUnit);
 	/** Orders every convoy vehicle Segment.ConvoyDriveDistance ahead (issued at the segment's fire time). */
 	void OrderConvoyDrive(const int32 SegmentIndex);
 	/** Holds the convoy's turrets and moves the follow camera. */
@@ -344,6 +418,39 @@ private:
 	/** Keeps the fog of war out, re-targets units whose target died, and ends the segment once one side is gone. */
 	void TickBattle(const int32 Frame);
 	void EndBattle();
+	bool GetShouldPreRollTeamWeaponIntro() const;
+	void BeginTeamWeaponShot(int32 SegmentIndex);
+	/**
+	 * @brief Gives each independently loaded crew a stable place beside its cinematic transport.
+	 * @param VehicleActor Existing convoy or battle vehicle.
+	 * @param SquadClassPath Crew controller Blueprint, which owns spawning the gun.
+	 * @param Settings Shot mode and relative deployment position.
+	 */
+	void SpawnTeamWeaponPair(AActor* VehicleActor, const FString& SquadClassPath,
+		const FRTSShortsTeamWeaponSettings& Settings);
+	void TickTeamWeaponShot(int32 Frame);
+	/**
+	 * @brief Waits for native loading and state transitions before permitting movement or combat.
+	 * @param Pair Transport, crew and gun whose state is being advanced.
+	 * @param Frame Output timeline frame used for capture verification.
+	 */
+	void TickTeamWeaponPair(FRTSShortsTowPair& Pair, int32 Frame);
+	/**
+	 * @brief Uses the game's tow/deploy actions once the crew and its gun have finished loading.
+	 * @param Pair Ready pair to hook or deploy.
+	 * @param Shot Determines whether transport or deployment is required.
+	 * @param Frame Output timeline frame recorded in the verification log.
+	 */
+	void PrepareTeamWeaponPair(FRTSShortsTowPair& Pair, ERTSShortsTeamWeaponShot Shot, int32 Frame);
+	void StartPreparedTeamWeaponConvoy(int32 Frame);
+	void LogTeamWeaponConvoyMotion(int32 Frame) const;
+	bool GetShouldHoldTeamWeaponOrder(const AActor* Unit) const;
+	void EndTeamWeaponShot();
+	static void DestroyTeamWeaponPair(const FRTSShortsTowPair& Pair);
+
+	UPROPERTY()
+	TArray<FRTSShortsTowPair> M_TeamWeaponPairs;
+
 	void BeginParatrooperBattle();
 	/**
 	 * @brief Allows independent passes to share the real ability lifecycle without moving either battle line.
@@ -437,6 +544,12 @@ private:
 	static bool GetIsPersistentEffectOwner(const AActor* ComponentOwner);
 	/** Moves the camera along the running segment's orbit pan (Camera.OrbitDegrees) for this segment-local time. */
 	void UpdateOrbitCamera(const float SegmentSeconds) const;
+	/**
+	 * @brief Lets a team weapon battle end close on the crews, once the pan has shown the whole field.
+	 * @param OutFocus Centre of the guns whose crews are still alive.
+	 * @return False when no gun is left to look at.
+	 */
+	bool GetSurvivingTeamWeaponsCentre(FVector& OutFocus) const;
 	/** Spawns the running segment's Segment.FlyBys airframes, flies them for this segment-local time and removes
 	 *  the previous segment's. */
 	void UpdateFlyBys(const float SegmentSeconds);
@@ -504,6 +617,12 @@ private:
 	// Niagara components of the projectile manager whose bounds were already widened.
 	TSet<TWeakObjectPtr<class UNiagaraComponent>> M_WidenedSmallArmsSystems;
 	FRTSShortsBattleState M_Battle;
+	// Segment.BattleSquadTactics.bOutlineSoldiers: the post-process volume that draws the outlines, made once per job.
+	UPROPERTY()
+	TObjectPtr<class APostProcessVolume> M_SoldierOutlineVolume;
+	// Job.BattleCoverTrees once planted: they stay for every later round.
+	TArray<FRTSShortsCoverTreeState> M_CoverTrees;
+	bool bM_CoverTreesSpawned = false;
 	FRTSShortsConvoyState M_Convoy;
 	UPROPERTY()
 	FRTSShortsAircraftCrashState M_AircraftCrash;
@@ -523,6 +642,8 @@ private:
 	TSet<FString> M_LoggedSphereOwners;
 	// A battle ended early: the movie render is stopped once the last segment is done instead of filming empty time.
 	bool bM_TimelineShortened = false;
+	// The running segment's unit lost and the job ends with this segment: the later segments never begin.
+	bool bM_LaterSegmentsSkipped = false;
 	bool bM_ImpactCutDone = false;
 
 	/** Own capture of the main submix (see FRTSShortsAudioCapture); clock window of frames 0..TotalFrames. */
@@ -558,5 +679,3 @@ private:
 
 	bool bM_HasSuppressedDialogs = false;
 };
-	// The running segment's unit lost and the job ends with this segment: the later segments never begin.
-	bool bM_LaterSegmentsSkipped = false;
