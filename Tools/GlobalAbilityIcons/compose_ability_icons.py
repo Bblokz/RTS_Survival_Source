@@ -2,6 +2,10 @@
 
 The aircraft, bombs, tanks and soldiers are the game's own meshes (render_ability_parts.py renders them to cut-outs);
 sky, ground, tracers, muzzle flashes and impacts are drawn here so the icon stays free of the game's smoke effects.
+The look (picked in the 2026-11-03 study, study_pbr_looks.py strategies 3 + 4): every cut-out gets a soft relight
+from its world-normal pass (hemisphere fill, warm sun, broad sheen, sky on glancing edges; nothing that draws outlines,
+so the models never look cel-shaded), and the finished card gets a photographic finish (tone curve, bloom on the hot
+parts, vignette, grain).
 
 Usage: python compose_ability_icons.py [icon names]      writes Saved/GlobalAbilityIcons/out/T_GA_<Name>.png + preview.png
 """
@@ -10,6 +14,7 @@ import math
 import os
 import sys
 
+import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -36,7 +41,73 @@ ERASE = {"Ho229_Dive": [(1086, 1198), (1104, 1183), (1172, 1275), (1152, 1296)]}
 # The barrage round render is a complete cartridge: a flying shell has left its brass case behind.
 CROP_BELOW = {"Shell_AP": 412}
 
+# Relight of the cut-outs, in screen space (x right, y up, z towards the viewer): a warm sun low behind on the
+# left like the glow of the icon skies, a neutral sky from above and a warm bounce from below.
+RELIGHT_SUN = np.array([-0.55, 0.33, -0.45], np.float32) / np.linalg.norm([-0.55, 0.33, -0.45])
+RELIGHT_SUN_RGB = np.array([1.0, 0.78, 0.55], np.float32)
+RELIGHT_SKY_RGB = np.array([0.60, 0.63, 0.68], np.float32)
+RELIGHT_GROUND_RGB = np.array([0.52, 0.42, 0.30], np.float32)
+RELIGHT_SPECULAR_POWER = 10.0         # broad sheen, not a tight toon highlight
+RELIGHT_MIX = 0.7                     # how much of the relight replaces the render's own shading
+
 ys, xs = np.mgrid[0:CANVAS, 0:CANVAS].astype(np.float32)
+
+
+def blur_float(values, radius):
+    """Gaussian blur of a float array (2D or with channels), radius in pixels."""
+    return cv2.GaussianBlur(np.ascontiguousarray(values, np.float32), (0, 0), sigmaX=max(radius, 0.1),
+                            borderType=cv2.BORDER_REFLECT)
+
+
+def screen_normals(name, points):
+    """The world-normal pass of a render in the camera's screen space, or None for renders made without it."""
+    path = RENDERS + name + "_normal.png"
+    if "camera" not in points or not os.path.exists(path):
+        return None
+    world = np.asarray(Image.open(path).convert("RGB")).astype(np.float32) / 255 * 2 - 1
+    right, up, forward = (np.array(points["camera"][k], np.float32) for k in ("right", "up", "forward"))
+    normals = np.dstack([world @ right, world @ up, -(world @ forward)])
+    return normals / (np.linalg.norm(normals, axis=2, keepdims=True) + 1e-6)
+
+
+def relight(color, alpha, normals):
+    """A soft relight on top of the studio render: hemisphere fill, a warm sun, a broad sheen and sky on the glancing
+    edges. Kept natural on purpose: no crease or edge darkening (those draw ink outlines and read as cel shading), no
+    hard clipping (it flattens light paint into bands), and only part of the relight is mixed in."""
+    up = normals[..., 1:2]
+    facing = np.clip(normals[..., 2:3], 0, 1)
+    hemisphere = RELIGHT_SKY_RGB * np.clip(up, 0, 1) + RELIGHT_GROUND_RGB * np.clip(-up, 0, 1) * 0.7 + 0.45
+    sun = np.clip(normals @ RELIGHT_SUN, 0, 1)[..., None]
+    lit = color * (0.72 + 0.3 * hemisphere) + color * RELIGHT_SUN_RGB * sun * 0.35
+    half = RELIGHT_SUN + np.array([0, 0, 1], np.float32)
+    sheen = np.clip(normals @ (half / np.linalg.norm(half)), 0, 1) ** RELIGHT_SPECULAR_POWER
+    lit += RELIGHT_SUN_RGB * sheen[..., None] * 0.18
+    lit += RELIGHT_SKY_RGB * (1 - facing) ** 3 * 0.12 * np.clip(up + 0.6, 0, 1)
+    # roll the highlights off instead of clipping them
+    lit = lit / (1 + np.clip(lit - 0.75, 0, None))
+    inside = alpha > 0.5
+    if inside.any():
+        lit *= min(1.0, color[inside].mean() / max(lit[inside].mean(), 1e-3))
+    lit = color * (1 - RELIGHT_MIX) + lit * RELIGHT_MIX
+    return np.where(alpha[..., None] > 0.01, np.clip(lit, 0, 1), color)
+
+
+def photographic_finish(img):
+    """Tone curve, bloom on the hot saturated parts (flashes, tracers) but not on white paint, vignette, grain."""
+    rgb = img[..., :3]
+    luma = rgb.mean(axis=2, keepdims=True)
+    curved = rgb * rgb * (3 - 2 * rgb) * 0.35 + rgb * 0.65
+    curved = curved + np.array([0.025, 0.008, -0.015]) * luma + np.array([0.0, 0.0, 0.012]) * (1 - luma)
+    saturation = rgb.max(axis=2, keepdims=True) - rgb.min(axis=2, keepdims=True)
+    # only the hottest pixels glow, so sky glow and big drawn blasts do not flood the card
+    hot = np.clip(rgb.max(axis=2, keepdims=True) - 0.9, 0, 1) / 0.1 * np.clip(saturation * 2.5, 0, 1) * rgb
+    out = np.clip(curved + blur_float(hot, 16) * 0.35 + blur_float(hot, 5) * 0.2, 0, 1)
+    distance = ((xs - CANVAS / 2) ** 2 + (ys - CANVAS / 2) ** 2) / (CANVAS / 2) ** 2
+    out *= (1 - 0.16 * np.clip(distance - 0.35, 0, 1))[..., None]
+    out += np.random.default_rng(3).normal(0, 0.01, out.shape[:2])[..., None]
+    img = img.copy()
+    img[..., :3] = np.clip(out, 0, 1)
+    return img
 
 
 def smooth(edge0, edge1, x):
@@ -114,10 +185,26 @@ def background(faction, seed, ground=True):
     return img
 
 
+CUTOUT_CACHE = {}
+
+
 def load_cutout(name):
-    """-> premultiplied RGBA float array, points dict. The HDR pass alpha is 1 - coverage."""
+    """-> premultiplied RGBA float array, points dict. The HDR pass alpha is 1 - coverage. Relit once per run."""
+    key = RENDERS + name
+    if key not in CUTOUT_CACHE:
+        CUTOUT_CACHE[key] = load_cutout_uncached(name)
+    pre, points = CUTOUT_CACHE[key]
+    return pre.copy(), points
+
+
+def load_cutout_uncached(name):
     color = np.asarray(Image.open(RENDERS + name + "_color.png").convert("RGB")).astype(np.float32) / 255
     alpha = 1 - np.asarray(Image.open(RENDERS + name + "_mask.png").convert("RGBA"))[..., 3].astype(np.float32) / 255
+    with open(RENDERS + name + "_points.json") as fh:
+        points = json.load(fh)
+    normals = screen_normals(name, points)
+    if normals is not None:
+        color = relight(color, alpha, normals)
     pre = np.dstack([color * alpha[..., None], alpha])
     if name in ERASE:
         mask = Image.new("L", (alpha.shape[1], alpha.shape[0]), 255)
@@ -125,8 +212,7 @@ def load_cutout(name):
         pre = pre * (np.asarray(mask).astype(np.float32) / 255)[..., None]
     if name in CROP_BELOW:
         pre[CROP_BELOW[name]:] = 0
-    with open(RENDERS + name + "_points.json") as fh:
-        return pre, json.load(fh)
+    return pre, points
 
 
 def bbox(pre):
@@ -309,7 +395,7 @@ def apply_frame(img):
 
 
 def finish(img):
-    img = apply_frame(img)
+    img = apply_frame(photographic_finish(img))
     rgba = (np.clip(img, 0, 1) * 255).astype(np.uint8)
     return Image.fromarray(rgba, "RGBA").resize((SIZE, SIZE), Image.LANCZOS)
 
