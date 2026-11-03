@@ -25,6 +25,7 @@
 #include "Rendering/SkeletalMeshModel.h"
 #endif
 #include "PhysicsEngine/SkeletalBodySetup.h"
+#include "RTS_Survival/Units/Ragdoll/RTSCorpsePoseLibrary.h"
 #include "RTS_Survival/Units/Ragdoll/RTSPooledRagdoll.h"
 #include "RTS_Survival/Units/Ragdoll/RTSRagdollSettings.h"
 #include "RTS_Survival/Units/Ragdoll/Tests/CorpsePoseBaker.h"
@@ -55,7 +56,11 @@ namespace RagdollPoseBakePrivate
 	constexpr float FullCircleDegrees = 360.f;
 	constexpr float MinSettleSeconds = 1.f;
 	constexpr float MaxSettleSeconds = 8.f;
-	const TCHAR* const PackageFolder = TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/CorpsePoses/Candidates/");
+	const TCHAR* const CorpsePosesFolder = TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/CorpsePoses/");
+	// Meshes go to a subfolder; the libraries the game reads (URTSRagdollSettings) sit next to it.
+	const TCHAR* const MeshFolderSwitch = TEXT("RagdollPoseFolder=");
+	const TCHAR* const DefaultMeshFolder = TEXT("Candidates");
+	const TCHAR* const LibraryNames[SideCount] = {TEXT("DA_CorpsePoses_Scav"), TEXT("DA_CorpsePoses_Mosin")};
 	const TCHAR* const SidePrefixes[SideCount] = {TEXT("Scav"), TEXT("Mosin")};
 	const FName PelvisBone(TEXT("pelvis"));
 
@@ -282,6 +287,7 @@ void URagdollDemoSubsystem::TickPoseSettle()
 	UE_LOG(LogRTSRagdollPoseBake, Display, TEXT("RTS_RGP settled asleep=%d of %d after %.1f s"), Asleep,
 	       M_PoseBake.Bodies.Num(), SettleSeconds);
 	BakePoses();
+	WritePoseLibraries();
 	if (not CreateCaptureRig())
 	{
 		Finish(TEXT("no_capture_rig"));
@@ -318,6 +324,7 @@ void URagdollDemoSubsystem::BakePoses()
 		{
 			M_PoseBake.BakedMeshes.Add(nullptr);
 			M_PoseBake.Pivots.Add(FVector::ZeroVector);
+			M_PoseBake.Pelvises.Add(FTransform::Identity);
 			continue;
 		}
 		const bool bAsleep = Body->GetIsAsleep();
@@ -339,7 +346,10 @@ void URagdollDemoSubsystem::BakePoses()
 		const bool bHasPelvis = CrewMesh->GetBoneIndex(PelvisBone) != INDEX_NONE;
 		const FTransform Pelvis = bHasPelvis ? CrewMesh->GetBoneTransform(PelvisBone) : CrewMesh->GetComponentTransform();
 		const FVector Pivot(Pelvis.GetLocation().X, Pelvis.GetLocation().Y, M_PoseBake.PlatformTop.Z);
-		const FString PackagePath = FString(PackageFolder) + TEXT("SM_CorpsePose_") + M_PoseBake.PoseNames[PoseIndex];
+		FString MeshFolder = DefaultMeshFolder;
+		FParse::Value(FCommandLine::Get(), MeshFolderSwitch, MeshFolder);
+		const FString PackagePath = FString(CorpsePosesFolder) + MeshFolder + TEXT("/SM_CorpsePose_")
+			+ M_PoseBake.PoseNames[PoseIndex];
 #if WITH_EDITOR
 		const FCorpsePoseBakeResult Result = CorpsePoseBaker::BakeAndSave(CrewMesh, Pivot, PackagePath);
 #else
@@ -347,6 +357,7 @@ void URagdollDemoSubsystem::BakePoses()
 #endif
 		M_PoseBake.BakedMeshes.Add(Result.Mesh);
 		M_PoseBake.Pivots.Add(Pivot);
+		M_PoseBake.Pelvises.Add(Pelvis);
 		// Pelvis axes tell face up, face down or on the side apart; the library will match poses on them later.
 		UE_LOG(LogRTSRagdollPoseBake, Display,
 		       TEXT("RTS_RGP pose=%s asleep=%d saved=%d tris=%d lowest_z=%.1f lowest_bone=%s pelvis_h=%.1f pelvis_x=%s pelvis_y=%s pelvis_z=%s"),
@@ -355,6 +366,38 @@ void URagdollDemoSubsystem::BakePoses()
 		       *Pelvis.GetUnitAxis(EAxis::X).ToCompactString(), *Pelvis.GetUnitAxis(EAxis::Y).ToCompactString(),
 		       *Pelvis.GetUnitAxis(EAxis::Z).ToCompactString());
 	}
+}
+
+void URagdollDemoSubsystem::WritePoseLibraries() const
+{
+	using namespace RagdollPoseBakePrivate;
+#if WITH_EDITOR
+	for (int32 Side = 0; Side < SideCount; ++Side)
+	{
+		const FString PackagePath = FString(CorpsePosesFolder) + LibraryNames[Side];
+		UPackage* Package = CorpsePoseBaker::CreateAssetPackage(PackagePath);
+		URTSCorpsePoseLibrary* Library = NewObject<URTSCorpsePoseLibrary>(Package, LibraryNames[Side],
+		                                                                 RF_Public | RF_Standalone);
+		for (int32 PoseIndex = 0; PoseIndex < M_PoseBake.BakedMeshes.Num(); ++PoseIndex)
+		{
+			if (not M_PoseBake.PoseNames[PoseIndex].StartsWith(SidePrefixes[Side])
+				|| not IsValid(M_PoseBake.BakedMeshes[PoseIndex]))
+			{
+				continue;
+			}
+			const FTransform& Pelvis = M_PoseBake.Pelvises[PoseIndex];
+			FRTSCorpsePose Pose;
+			Pose.Mesh = M_PoseBake.BakedMeshes[PoseIndex];
+			Pose.PelvisAxisX = Pelvis.GetUnitAxis(EAxis::X);
+			Pose.PelvisAxisY = Pelvis.GetUnitAxis(EAxis::Y);
+			Pose.PelvisAxisZ = Pelvis.GetUnitAxis(EAxis::Z);
+			Library->Poses.Add(Pose);
+		}
+		const bool bSaved = CorpsePoseBaker::SaveAsset(Package, Library);
+		UE_LOG(LogRTSRagdollPoseBake, Display, TEXT("RTS_RGP library=%s poses=%d saved=%d"), LibraryNames[Side],
+		       Library->Poses.Num(), bSaved ? 1 : 0);
+	}
+#endif
 }
 
 void URagdollDemoSubsystem::TickPoseShoot()

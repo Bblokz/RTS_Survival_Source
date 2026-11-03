@@ -5,6 +5,7 @@
 #include "Scalability.h"
 #include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
 #include "RTS_Survival/Game/UserSettings/GraphicsSettings/AmbientEffectsLevel.h"
+#include "RTS_Survival/Game/UserSettings/GraphicsSettings/BattlefieldCorpsesLevel.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 
 #include "RTSGameUserSettings.generated.h"
@@ -189,6 +190,12 @@ public:
 	/** @brief Writes the ambient landscape effects level before saving. */
 	void SetAmbientEffectsLevel(const ERTSAmbientEffectsLevel NewAmbientEffectsLevel);
 
+	/** @brief Returns how many crew corpses may stay on the battlefield at once. */
+	ERTSBattlefieldCorpsesLevel GetBattlefieldCorpsesLevel() const;
+
+	/** @brief Writes the battlefield corpses level before saving. */
+	void SetBattlefieldCorpsesLevel(const ERTSBattlefieldCorpsesLevel NewBattlefieldCorpsesLevel);
+
 
 	/** @brief Returns saved single-key overrides so controllers can restore remaps during startup. */
 	const TArray<FRTSSavedKeyBinding>& GetSavedKeyBindings() const;
@@ -361,6 +368,9 @@ private:
 
 	UPROPERTY(config)
 	ERTSAmbientEffectsLevel M_AmbientEffectsLevel = ERTSAmbientEffectsLevel::Maximum;
+
+	UPROPERTY(config)
+	ERTSBattlefieldCorpsesLevel M_BattlefieldCorpsesLevel = ERTSBattlefieldCorpsesLevel::Some;
 
 	UPROPERTY(config)
 	TArray<FRTSSavedKeyBinding> M_SavedKeyBindings;

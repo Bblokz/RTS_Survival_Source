@@ -29,7 +29,16 @@ enum class ERagdollDemoStep : uint8
 	CrewLook,
 	PoseSettle,
 	PoseShoot,
+	CorpseBench,
 	Done
+};
+
+/** Progress of the battlefield corpse benchmark. */
+struct FRagdollCorpseBenchState
+{
+	int32 Step = 0;
+	int32 CloseUpFrame = 0;
+	FRandomStream Random;
 };
 
 /** Bodies thrown for the battlefield corpse pose library, their baked meshes and the pictures taken of them. */
@@ -50,6 +59,8 @@ struct FRagdollPoseBakeState
 
 	TArray<FString> PoseNames;
 	TArray<FVector> Pivots;
+	// The pelvis of each pose as it was baked; the corpse library matches settled bodies against it.
+	TArray<FTransform> Pelvises;
 	FVector PlatformTop = FVector::ZeroVector;
 	int32 ShotIndex = 0;
 	int32 ShotFrame = 0;
@@ -74,6 +85,8 @@ struct FRagdollDemoSubject
  * With -RagdollBench it times spawning against two kinds of pool instead and logs simulation cost (RTS_RGB lines).
  * With -RagdollPoseBake it throws crew bodies onto a platform, bakes each settled pose into a static mesh for the
  * corpse library and photographs ragdoll and baked mesh side by side (RTS_RGP lines).
+ * With -RagdollCorpseBench it fills the field with 0 to 400 battlefield corpses, timing frames and taking a picture
+ * at each step (RTS_RGB and RTS_RGK lines).
  */
 UCLASS()
 class RTS_SURVIVAL_API URagdollDemoSubsystem : public UTickableWorldSubsystem
@@ -130,11 +143,21 @@ private:
 	static void LogPosePhysicsBodies(const USkeletalMesh* CrewMesh);
 	void TickPoseSettle();
 	void BakePoses();
+	void WritePoseLibraries() const;
 	void TickPoseShoot();
 	void SetUpPoseShot(int32 PoseIndex, int32 ShotKind) const;
 
 	UPROPERTY()
 	FRagdollPoseBakeState M_PoseBake;
+
+	// ---- Battlefield corpse benchmark (RagdollDemoCorpses.cpp) ----
+	bool TryStartCorpseBench();
+	void AimCorpseCapture(const FVector& Offset) const;
+	void TickCorpseBench();
+	void TickCorpseCloseUp();
+	void AddBenchCorpses(int32 TargetCount);
+
+	FRagdollCorpseBenchState M_CorpseBench;
 
 	UPROPERTY()
 	TWeakObjectPtr<ACPPController> M_PlayerController;
@@ -177,6 +200,7 @@ private:
 	bool bM_IsBench = false;
 	bool bM_IsCrew = false;
 	bool bM_IsPoseBake = false;
+	bool bM_IsCorpseBench = false;
 	int32 M_CrewKills = 0;
 	int32 M_CrewLookRequests = 0;
 	float M_FilmDistanceScale = 1.f;

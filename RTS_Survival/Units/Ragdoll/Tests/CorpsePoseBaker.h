@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 
+class UPackage;
 class USkeletalMeshComponent;
 class UStaticMesh;
 
@@ -35,5 +36,11 @@ namespace CorpsePoseBaker
 	 */
 	FCorpsePoseBakeResult BakeAndSave(const USkeletalMeshComponent* CrewMesh, const FVector& Pivot,
 	                                  const FString& PackagePath);
+
+	/** @return A package for a new asset that replaces whatever an earlier bake saved there. */
+	UPackage* CreateAssetPackage(const FString& PackagePath);
+
+	/** @return Whether the asset reached disk; works outside the editor too, as the bake runs with -game. */
+	bool SaveAsset(UPackage* Package, UObject* Asset);
 #endif
 }

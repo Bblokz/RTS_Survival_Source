@@ -4,6 +4,7 @@
 
 #include "Engine/SkeletalMesh.h"
 #include "Materials/MaterialInterface.h"
+#include "RTSCorpsePoseLibrary.h"
 
 namespace RTSRagdollDefaults
 {
@@ -17,6 +18,11 @@ namespace RTSRagdollDefaults
 		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/ScavengerVariations/MI_Inf_Ger_ScavengerVar1.MI_Inf_Ger_ScavengerVar1"),
 		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic/ScavengerVariations/MI_Inf_Ger_ScavengerVeteran.MI_Inf_Ger_ScavengerVeteran"),
 	};
+	// Written by the -RagdollPoseBake harness.
+	const TCHAR* const GermanCorpsePosesPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/CorpsePoses/DA_CorpsePoses_Scav.DA_CorpsePoses_Scav");
+	const TCHAR* const SovietCorpsePosesPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/SquadUnits/CorpsePoses/DA_CorpsePoses_Mosin.DA_CorpsePoses_Mosin");
 }
 
 URTSRagdollSettings::URTSRagdollSettings()
@@ -29,6 +35,8 @@ URTSRagdollSettings::URTSRagdollSettings()
 		GermanCrew.Materials.Add(TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(MaterialPath)));
 	}
 	SovietCrew.Mesh = TSoftObjectPtr<USkeletalMesh>(FSoftObjectPath(SovietCrewMeshPath));
+	GermanCorpsePoses = TSoftObjectPtr<URTSCorpsePoseLibrary>(FSoftObjectPath(GermanCorpsePosesPath));
+	SovietCorpsePoses = TSoftObjectPtr<URTSCorpsePoseLibrary>(FSoftObjectPath(SovietCorpsePosesPath));
 
 	CookOffDeath.MinBodies = 2;
 	CookOffDeath.MaxBodies = 3;

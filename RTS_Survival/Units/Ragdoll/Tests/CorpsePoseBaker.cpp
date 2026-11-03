@@ -228,16 +228,32 @@ namespace CorpsePoseBakerPrivate
 		StaticMesh->SetStaticMaterials(StaticMaterials);
 	}
 
-	bool SavePackage(UPackage* Package, UStaticMesh* StaticMesh, const FString& PackagePath)
+}
+
+UPackage* CorpsePoseBaker::CreateAssetPackage(const FString& PackagePath)
+{
+	UPackage* Package = CreatePackage(*PackagePath);
+	// The game may have loaded the previous bake (the corpse library references its meshes); move it aside so the
+	// new asset can take its name.
+	const FString AssetName = FPackageName::GetLongPackageAssetName(PackagePath);
+	if (UObject* Previous = StaticFindObjectFast(UObject::StaticClass(), Package, FName(*AssetName)))
 	{
-		const FString Filename = FPackageName::LongPackageNameToFilename(
-			PackagePath, FPackageName::GetAssetPackageExtension());
-		// Outside the editor the package metadata is otherwise created mid-save, which asserts.
-		Package->GetMetaData();
-		FSavePackageArgs SaveArgs;
-		SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-		return UPackage::SavePackage(Package, StaticMesh, *Filename, SaveArgs);
+		Previous->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional);
 	}
+	// A rebake replaces the previous asset; a new package over an existing file would count as partly loaded.
+	Package->MarkAsFullyLoaded();
+	return Package;
+}
+
+bool CorpsePoseBaker::SaveAsset(UPackage* Package, UObject* Asset)
+{
+	const FString Filename = FPackageName::LongPackageNameToFilename(
+		Package->GetName(), FPackageName::GetAssetPackageExtension());
+	// Outside the editor the package metadata is otherwise created mid-save, which asserts.
+	Package->GetMetaData();
+	FSavePackageArgs SaveArgs;
+	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+	return UPackage::SavePackage(Package, Asset, *Filename, SaveArgs);
 }
 
 FCorpsePoseBakeResult CorpsePoseBaker::BakeAndSave(const USkeletalMeshComponent* CrewMesh, const FVector& Pivot,
@@ -269,9 +285,7 @@ FCorpsePoseBakeResult CorpsePoseBaker::BakeAndSave(const USkeletalMeshComponent*
 	FMeshDescription MeshDescription;
 	const TArray<int32> UsedMaterials = BuildMeshDescription(SkeletalMesh, Lod, Vertices, MeshDescription,
 	                                                         Result.Triangles);
-	UPackage* Package = CreatePackage(*PackagePath);
-	// A rebake replaces the previous candidate; a new package over an existing file would count as partly loaded.
-	Package->MarkAsFullyLoaded();
+	UPackage* Package = CreateAssetPackage(PackagePath);
 	const FName AssetName(*FPackageName::GetLongPackageAssetName(PackagePath));
 	UStaticMesh* StaticMesh = NewObject<UStaticMesh>(Package, AssetName, RF_Public | RF_Standalone);
 	FStaticMeshSourceModel& SourceModel = StaticMesh->AddSourceModel();
@@ -285,7 +299,7 @@ FCorpsePoseBakeResult CorpsePoseBaker::BakeAndSave(const USkeletalMeshComponent*
 	FStaticMeshCompilingManager::Get().FinishCompilation({StaticMesh});
 	StaticMesh->MarkPackageDirty();
 	Result.Mesh = StaticMesh;
-	Result.bSaved = SavePackage(Package, StaticMesh, PackagePath);
+	Result.bSaved = SaveAsset(Package, StaticMesh);
 	return Result;
 }
 

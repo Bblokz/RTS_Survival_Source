@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "Materials/MaterialInterface.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "RTSCorpseSubsystem.h"
 #include "RTSPooledRagdoll.h"
 #include "RTSRagdollSettings.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnitRagdoll.h"
@@ -23,6 +24,8 @@ namespace RTSRagdollSubsystemStatics
 	constexpr float UpdateIntervalSeconds = 0.05f;
 	// Bodies fresh out of the launch can read as asleep for a moment.
 	constexpr float MinSecondsBeforeSleepCounts = 0.5f;
+	// A pelvis this close above static ground means the body lies down, whatever its pose.
+	constexpr float LandedPelvisHeightCm = 50.f;
 	constexpr float FullCircleDegrees = 360.f;
 }
 
@@ -193,6 +196,7 @@ void URTSRagdollSubsystem::WakeBody(const int32 PoolIndex, const FRTSCrewBodyReq
 
 	FRTSActiveCrewBody ActiveBody;
 	ActiveBody.Body = Body;
+	ActiveBody.Look = Material;
 	ActiveBody.PoolIndex = PoolIndex;
 	M_ActiveBodies.Add(ActiveBody);
 	++M_SimulatingCrew;
@@ -213,6 +217,11 @@ void URTSRagdollSubsystem::UpdateActiveBodies()
 		{
 			UpdateFlyingBody(ActiveBody);
 			M_SimulatingCrew -= ActiveBody.bIsSinking ? 1 : 0;
+			if (ActiveBody.bIsSinking && TryLeaveCorpse(ActiveBody))
+			{
+				ReturnToPool(ActiveBody.Body, ActiveBody.PoolIndex);
+				M_ActiveBodies.RemoveAtSwap(BodyIndex);
+			}
 			continue;
 		}
 		if (UpdateSinkingBody(ActiveBody))
@@ -229,13 +238,31 @@ void URTSRagdollSubsystem::UpdateActiveBodies()
 void URTSRagdollSubsystem::UpdateFlyingBody(FRTSActiveCrewBody& ActiveBody) const
 {
 	using namespace RTSRagdollSubsystemStatics;
+	const URTSRagdollSettings* Settings = GetDefault<URTSRagdollSettings>();
 	const bool bHasLanded = ActiveBody.SecondsAlive >= MinSecondsBeforeSleepCounts && ActiveBody.Body->GetIsAsleep();
-	if (not bHasLanded && ActiveBody.SecondsAlive < GetDefault<URTSRagdollSettings>()->MaxSimulationSeconds)
+	if (not bHasLanded && ActiveBody.SecondsAlive < Settings->MaxSimulationSeconds)
+	{
+		return;
+	}
+	// A high cook-off throw can still be in the air at the time limit; freezing it there would leave a corpse
+	// that jumps to the ground, so it gets a little longer to come down.
+	const bool bIsInGracePeriod = ActiveBody.SecondsAlive < Settings->MaxSimulationSeconds + Settings->LandingGraceSeconds;
+	if (not bHasLanded && bIsInGracePeriod && not GetIsNearGround(*ActiveBody.Body))
 	{
 		return;
 	}
 	ActiveBody.Body->Freeze();
 	ActiveBody.bIsSinking = true;
+}
+
+bool URTSRagdollSubsystem::GetIsNearGround(const ARTSPooledRagdoll& Body) const
+{
+	using namespace RTSRagdollSubsystemStatics;
+	const FVector Pelvis = Body.GetPelvisTransform().GetLocation();
+	FHitResult GroundHit;
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(RagdollLanding), false);
+	return GetWorld()->LineTraceSingleByObjectType(GroundHit, Pelvis, Pelvis - FVector(0.0, 0.0, LandedPelvisHeightCm),
+	                                               FCollisionObjectQueryParams(ECC_WorldStatic), QueryParams);
 }
 
 bool URTSRagdollSubsystem::UpdateSinkingBody(FRTSActiveCrewBody& ActiveBody)
@@ -248,7 +275,26 @@ bool URTSRagdollSubsystem::UpdateSinkingBody(FRTSActiveCrewBody& ActiveBody)
 		ActiveBody.Body->Sink(Settings->SinkDepthCm * Interval / Settings->SinkSeconds);
 		return false;
 	}
-	ActiveBody.Body->Park();
-	M_Pools[ActiveBody.PoolIndex].ParkedBodies.Add(ActiveBody.Body);
+	ReturnToPool(ActiveBody.Body, ActiveBody.PoolIndex);
 	return true;
+}
+
+bool URTSRagdollSubsystem::TryLeaveCorpse(const FRTSActiveCrewBody& ActiveBody) const
+{
+	URTSCorpseSubsystem* CorpseSubsystem = GetWorld()->GetSubsystem<URTSCorpseSubsystem>();
+	if (not IsValid(CorpseSubsystem))
+	{
+		return false;
+	}
+	FRTSCorpseRequest Request;
+	Request.Side = static_cast<ERTSCrewSide>(ActiveBody.PoolIndex);
+	Request.Look = ActiveBody.Look;
+	Request.Pelvis = ActiveBody.Body->GetPelvisTransform();
+	return CorpseSubsystem->TryAddCorpse(Request);
+}
+
+void URTSRagdollSubsystem::ReturnToPool(ARTSPooledRagdoll* Body, const int32 PoolIndex)
+{
+	Body->Park();
+	M_Pools[PoolIndex].ParkedBodies.Add(Body);
 }

@@ -101,6 +101,10 @@ struct FRTSEnvironmentDetailSettings
 	// Drives rts.AmbientFx: how many dust devils may be alive around the camera. Not touched by the main slider.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
 	ERTSAmbientEffectsLevel M_AmbientEffectsLevel = ERTSAmbientEffectsLevel::Maximum;
+
+	// Drives rts.Corpses: how many crew corpses stay on the battlefield. Not touched by the main slider.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSBattlefieldCorpsesLevel M_BattlefieldCorpsesLevel = ERTSBattlefieldCorpsesLevel::Some;
 };
 
 USTRUCT(BlueprintType)
@@ -294,6 +298,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingAmbientEffectsLevel(ERTSAmbientEffectsLevel NewLevel);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingBattlefieldCorpsesLevel(ERTSBattlefieldCorpsesLevel NewLevel);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingMasterVolume(float NewVolume);

@@ -51,6 +51,9 @@ public:
 
 	bool GetIsAsleep() const;
 
+	/** @return The pelvis in world space, which the battlefield corpse is matched and placed by. */
+	FTransform GetPelvisTransform() const;
+
 private:
 	bool GetIsValidCrewMesh() const;
 

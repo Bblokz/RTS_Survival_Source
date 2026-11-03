@@ -81,6 +81,9 @@ struct FEscapeMenuSettingsGraphicsText
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_AmbientEffectsLabelText = FText::FromString(TEXT("<Text_Armor>Ambient Effects</>"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_BattlefieldCorpsesLabelText = FText::FromString(TEXT("<Text_Armor>Battlefield Corpses</>"));
 };
 
 /**
@@ -598,6 +601,15 @@ private:
 	void HandleAmbientEffectsSelectionChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
 
 	UFUNCTION()
+	void HandleBattlefieldCorpsesSelectionChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	// Off, 50, 100, 200, 400 in ERTSBattlefieldCorpsesLevel order.
+	void PopulateBattlefieldCorpsesOptions();
+
+	/** @return Whether the Blueprint holds the optional Battlefield Corpses row; without it the setting keeps its value. */
+	bool GetHasBattlefieldCorpsesWidgets() const;
+
+	UFUNCTION()
 	void HandleEnvironmentAdvancedClicked();
 
 	UFUNCTION()
@@ -1080,6 +1092,17 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidget, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboAmbientEffects = nullptr;
+
+	/** @brief Optional RichTextBlock named M_TextBattlefieldCorpsesLabel, the label of the Battlefield Corpses row. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidgetOptional, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextBattlefieldCorpsesLabel = nullptr;
+
+	/**
+	 * @brief Optional ComboBoxString named M_ComboBattlefieldCorpses.
+	 * @note Sets how many crew corpses stay on the battlefield; the main environment slider leaves it alone.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidgetOptional, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboBattlefieldCorpses = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextAudioHeader in the Widget Blueprint.

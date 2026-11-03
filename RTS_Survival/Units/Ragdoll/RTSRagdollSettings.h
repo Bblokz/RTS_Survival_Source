@@ -7,6 +7,7 @@
 #include "RTSRagdollSettings.generated.h"
 
 class UMaterialInterface;
+class URTSCorpsePoseLibrary;
 class USkeletalMesh;
 
 /** One side's crew: a mesh per pool, as a swap would rebuild the bodies, and looks that are free to swap. */
@@ -92,9 +93,32 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Lifetime", meta=(ClampMin="0"))
 	float MaxSimulationSeconds = 2.f;
 
+	// Extra time a body still in the air at MaxSimulationSeconds gets to come down before it freezes anyway.
+	UPROPERTY(Config, EditAnywhere, Category="Lifetime", meta=(ClampMin="0"))
+	float LandingGraceSeconds = 2.f;
+
 	UPROPERTY(Config, EditAnywhere, Category="Lifetime", meta=(ClampMin="0"))
 	float SinkSeconds = 0.5f;
 
 	UPROPERTY(Config, EditAnywhere, Category="Lifetime", meta=(ClampMin="0"))
 	float SinkDepthCm = 40.f;
+
+	// Baked poses the settled German crew is left on the battlefield as; how many stay is the player's
+	// Battlefield Corpses setting (rts.Corpses). Without a library bodies sink away as before.
+	UPROPERTY(Config, EditAnywhere, Category="Corpses")
+	TSoftObjectPtr<URTSCorpsePoseLibrary> GermanCorpsePoses;
+
+	UPROPERTY(Config, EditAnywhere, Category="Corpses")
+	TSoftObjectPtr<URTSCorpsePoseLibrary> SovietCorpsePoses;
+
+	// A corpse follows the ground's slope up to this angle; steeper ground would stand it up unnaturally.
+	UPROPERTY(Config, EditAnywhere, Category="Corpses", meta=(ClampMin="0", ClampMax="90"))
+	float MaxCorpseTiltDegrees = 30.f;
+
+	// Poses scoring within this much of the best match are picked at random, so one fall does not always repeat.
+	UPROPERTY(Config, EditAnywhere, Category="Corpses", meta=(ClampMin="0"))
+	float PoseMatchSlack = 0.15f;
+
+	UPROPERTY(Config, EditAnywhere, Category="Corpses")
+	bool bCorpsesCastShadows = true;
 };

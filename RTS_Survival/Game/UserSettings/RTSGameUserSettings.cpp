@@ -85,6 +85,7 @@ void URTSGameUserSettings::SetToDefaults()
 	M_FoliageDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 	M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 	M_AmbientEffectsLevel = ERTSAmbientEffectsLevel::Maximum;
+	M_BattlefieldCorpsesLevel = ERTSBattlefieldCorpsesLevel::Some;
 
 	M_OverwriteAllPlayerHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
 	M_PlayerTankHpBarStrat = ERTSPlayerHealthBarVisibilityStrategy::AwaysVisible;
@@ -329,6 +330,16 @@ ERTSAmbientEffectsLevel URTSGameUserSettings::GetAmbientEffectsLevel() const
 void URTSGameUserSettings::SetAmbientEffectsLevel(const ERTSAmbientEffectsLevel NewAmbientEffectsLevel)
 {
 	M_AmbientEffectsLevel = NewAmbientEffectsLevel;
+}
+
+ERTSBattlefieldCorpsesLevel URTSGameUserSettings::GetBattlefieldCorpsesLevel() const
+{
+	return M_BattlefieldCorpsesLevel;
+}
+
+void URTSGameUserSettings::SetBattlefieldCorpsesLevel(const ERTSBattlefieldCorpsesLevel NewBattlefieldCorpsesLevel)
+{
+	M_BattlefieldCorpsesLevel = NewBattlefieldCorpsesLevel;
 }
 
 

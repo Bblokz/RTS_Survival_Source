@@ -57,6 +57,10 @@ struct FRTSActiveCrewBody
 	UPROPERTY()
 	TObjectPtr<ARTSPooledRagdoll> Body;
 
+	// The look this body wears, so its battlefield corpse wears it too.
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> Look;
+
 	int32 PoolIndex = 0;
 	float SecondsAlive = 0.f;
 	float SecondsSinking = 0.f;
@@ -102,7 +106,13 @@ private:
 	void WakeBody(int32 PoolIndex, const FRTSCrewBodyRequest& Request, const FRTSCrewThrow& Throw);
 	void UpdateActiveBodies();
 	void UpdateFlyingBody(FRTSActiveCrewBody& ActiveBody) const;
+	bool GetIsNearGround(const ARTSPooledRagdoll& Body) const;
 	bool UpdateSinkingBody(FRTSActiveCrewBody& ActiveBody);
+
+	/** @return Whether a battlefield corpse took the frozen body's place, so it can return to the pool at once. */
+	bool TryLeaveCorpse(const FRTSActiveCrewBody& ActiveBody) const;
+
+	void ReturnToPool(ARTSPooledRagdoll* Body, int32 PoolIndex);
 
 	// One pool per ERTSCrewSide, in enum order.
 	UPROPERTY()

@@ -137,6 +137,7 @@ void URagdollDemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	bM_IsBench = FParse::Param(FCommandLine::Get(), BenchSwitch);
 	bM_IsCrew = FParse::Param(FCommandLine::Get(), CrewSwitch);
 	bM_IsPoseBake = FParse::Param(FCommandLine::Get(), TEXT("RagdollPoseBake"));
+	bM_IsCorpseBench = FParse::Param(FCommandLine::Get(), TEXT("RagdollCorpseBench"));
 	M_StartRealSeconds = FPlatformTime::Seconds();
 	bM_IsActive = true;
 	UE_LOG(LogRTSRagdollDemo, Display, TEXT("RTS_RGD started dir=%s at=%s"), *M_OutputDirectory,
@@ -187,8 +188,13 @@ void URagdollDemoSubsystem::Tick(float DeltaTime)
 			M_StepStartGameSeconds = GetGameSeconds();
 			break;
 		}
-		if (not bM_IsBench && not bM_IsCrew && not bM_IsPoseBake && RealSeconds >= HudBuildSeconds && TryStartGame()
-			&& TrySpawnSquad())
+		if (bM_IsCorpseBench && RealSeconds >= HudBuildSeconds && TryStartGame() && TryStartCorpseBench())
+		{
+			M_Step = ERagdollDemoStep::CorpseBench;
+			break;
+		}
+		if (not bM_IsBench && not bM_IsCrew && not bM_IsPoseBake && not bM_IsCorpseBench && RealSeconds >= HudBuildSeconds
+			&& TryStartGame() && TrySpawnSquad())
 		{
 			M_Step = ERagdollDemoStep::WaitForSquad;
 			M_StepStartGameSeconds = GetGameSeconds();
@@ -229,6 +235,9 @@ void URagdollDemoSubsystem::Tick(float DeltaTime)
 		break;
 	case ERagdollDemoStep::PoseShoot:
 		TickPoseShoot();
+		break;
+	case ERagdollDemoStep::CorpseBench:
+		TickCorpseBench();
 		break;
 	case ERagdollDemoStep::CrewStress:
 	{
