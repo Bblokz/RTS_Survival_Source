@@ -66,7 +66,7 @@ The turret is a copy of `RTS_BP_EmbTurret_4x20mmFlak` with a `UGunPitCrewCompone
 
 - **Loader height:** the loader's animation stands him 58 cm up, on the Flak 37's platform. His spot is 58 cm lower, so his feet land on the dais and his hands reach the upper breeches.
 - **Who was left out:** the Flak 37 pit's handler, spotter and commander work 2.4–3.2 m from the gun. The chamber walls here are 1.6 m from the axis, so anything turning with the mount must stay on the 1.25 m dais. No rounds change hands.
-- **Wiring:** BeginPlay calls `InitPitCrew`, `PlaySingleFireAnimation` calls `OnGunFired` (the crew brace, at half strength) before each gun's own fire montage, and `ReloadWeapon` calls `OnReloadStarted`. Each 20 mm gun reloads its 20-round magazine in 10 s on its own, so the loader is busy most of the fight. `MinReloadTimeForLoadingSequence` is 2 s.
+- **Wiring:** BeginPlay calls `InitPitCrew`, `PlaySingleFireAnimation` calls `OnGunFired` (the crew brace, at half strength) before the fire montages, and `ReloadWeapon` calls `OnReloadStarted`. The magazine (20 volleys) reloads in 10 s, see [Fire and sound](#fire-and-sound-2026-11-03). `MinReloadTimeForLoadingSequence` is 2 s.
 - **Sockets:** on the shared skeleton `Flak4_20mm/Skeleton/SK_Flak4_20mm_Skeleton`:
   - `PitOrigin` on `B_Root`, the bone the aim offset turns;
   - `PitStatic` on the static `Flak4` root;
@@ -87,6 +87,30 @@ The four guns' fire montages play on slots `FireGun1`-`FireGun4`, and all four s
 - the loader's `Montage_GerPit_LoadFlak` plays while a magazine is changed.
 
 No rounds change hands, so the harness's montage drill (`LoaderReloadMontage`) replaces the round drill.
+
+## Fire and sound (2026-11-03)
+
+The mount used to be four separate Flak 38 weapons, each firing about 2 rounds a second out of step with the others, with the single-barrel cue on small-arms sound settings. It sounded like a light MG. Now all four barrels are one weapon that fires in short, loud bursts. The same change is in the original `RTS_BP_EmbTurret_4x20mmFlak` (both HQ trucks).
+
+| | |
+|---|---|
+| Weapon | one `SetupMultiProjectileWeapon` on sockets `B1`-`B4` (Blueprint variable `FireSockets`): a magazine round is a volley of four |
+| Weapon name | `Flakvierling38_20MM_Emplaced`: the Flak 38's stats per projectile (same gun, same damage), `BaseCooldown` 2.6 s between bursts |
+| Burst | `RandomBurst`, 4-6 volleys 0.14 s apart (a real Flak 38's ~7 rounds a second) |
+| Output | 20 volleys in about 10 s, then 10 s reload: about 4 projectiles a second, as the four separate guns gave |
+| Sound | `Cue_Flakvierling_Volley_Recorded` (a recorded quad burst with its echo) once per burst, on `Att_MediumCaliber_Launch` / `SC_MediumCaliber_Launch` |
+| Shell cases | from `O1` on every volley (`CreateShellCasingOnEveryRandomBurst`) |
+| Recoil | `PlaySingleFireAnimation` gets weapon index 0 once per burst and plays all four `Montage_Flak4_Fire1-4` (`bShouldStopAllMontages` off, so they don't cancel each other) |
+
+C++ behind it:
+- `FWeaponData::bPlayLaunchSoundOncePerBurst`: in `RandomBurst` mode the launch sound plays on the first round of a burst only (`UWeaponState::ConsumeLaunchSoundForShot`, used by every `CreateLaunchVfx` and the multi projectile's `PlayLaunchSoundOnce`). Off for every other weapon.
+- Fixed in `UWeaponState::InitRandomBurst`: a burst of one round (the magazine's last round, or any weapon with a minimum burst of 1) fired a second round, because the burst timer was started after the burst had already stopped. The magazine then went to -1.
+
+`-FlakvierlingBunkerValidate` passes with it, 6 runs in a row. They show bursts of 4-6 volleys 0.13-0.17 s apart (30 fps), 2.6-2.9 s between bursts, and the loader's 9.8 s drill. One run ended its magazine on a single-volley burst (mag 1 -> 0) with no extra round. Before the fix the same case went to -1.
+
+The recording's dense part is about 0.55 s, and a 6-volley burst lasts 0.7 s, so the last volley or two of a long burst only has the echo under it. If that sounds thin, lower `SingleBurstAmountMaxBurstAmount` to 5.
+
+**Not verified:** how it sounds in game (the test runs with `-nosound`), and the HQ trucks firing (they use the same weapon and Blueprint pattern, but no test covers them). The fire montage is one slow 1 s push, so the barrels recoil once per burst, not once per volley; a kick per volley needs `PlayWeaponAnimation` per round, which is C++ shared by every weapon. The Sd.Kfz. 7/1's multi projectile `Flakvierling38_20MM` still plays its volley cue on every shot.
 
 ## The MG gunner
 

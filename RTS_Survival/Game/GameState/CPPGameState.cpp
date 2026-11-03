@@ -3645,6 +3645,21 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.WeaponName = EWeaponName::Flakvierling38_20MM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flakvierling38_20MM, WeaponData);
 
+	// Emplaced Flakvierling: one multi projectile weapon on all four barrels, so a magazine round is a volley of four
+	// and the stats stay per projectile (same gun, same damage). Its turret fires random bursts of 4-6 volleys
+	// 0.14 s apart (a real Flak 38's ~7 rounds a second); the cooldown between bursts keeps the old output of four
+	// independent Flak 38s (about 4 projectiles a second over a 20 s magazine cycle): 16 x 0.14 s inside 4 bursts,
+	// 3 x 2.6 s between them, 10 s reload.
+	{
+		constexpr float EmplacedFlakvierlingBurstPause = 2.6f;
+		FWeaponData EmplacedFlakvierlingData = WeaponData;
+		EmplacedFlakvierlingData.WeaponName = EWeaponName::Flakvierling38_20MM_Emplaced;
+		EmplacedFlakvierlingData.BaseCooldown = EmplacedFlakvierlingBurstPause;
+		// Its launch sound is a recorded quad burst with its echo, played once per burst.
+		EmplacedFlakvierlingData.bPlayLaunchSoundOncePerBurst = true;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flakvierling38_20MM_Emplaced, EmplacedFlakvierlingData);
+	}
+
 	// Flak Luchs: twin MG 151/15 fired through a multi projectile weapon on 2 sockets, so all stats are per
 	// projectile and one shot (one magazine round) fires both barrels. Damage formula as the Flak 38.
 	{

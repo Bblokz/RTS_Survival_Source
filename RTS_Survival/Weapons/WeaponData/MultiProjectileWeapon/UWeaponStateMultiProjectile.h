@@ -88,7 +88,7 @@ private:
 	// ---- VFX helpers --------------------------------------------------------
 
 	/** Play launch sound once at the component location (if configured). */
-	void PlayLaunchSoundOnce() const;
+	void PlayLaunchSoundOnce();
 
 	/** Spawn launch VFX/smoke at all sockets. */
 	void SpawnMuzzleVfxForAllSockets();

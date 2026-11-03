@@ -378,7 +378,10 @@ enum class
 	// Horten Ho 229: one of its two wing-root MK 108 30mm cannons (both weapons share this entry).
 	MK108_30MM_Horten UMETA(DisplayName = "MK 108 30MM (Horten Ho 229)"),
 	// KV-3: the 107mm ZiS-6 with penetration matching its ballistics; ZIS_6_107MM stays the KV-5's experimental-tier entry.
-	ZIS_6_107MM_KV3 UMETA(DisplayName = "ZIS-6 107MM (KV-3)")
+	ZIS_6_107MM_KV3 UMETA(DisplayName = "ZIS-6 107MM (KV-3)"),
+	// The emplaced Flakvierling (Breakthrough Flakvierling bunker): all four barrels as one multi projectile weapon
+	// firing fast bursts; stats per projectile as the Flak 38, cooldown and reload set for the four guns' old output.
+	Flakvierling38_20MM_Emplaced UMETA(DisplayName = "Flakvierling 38 20MM (emplaced)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -526,6 +529,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Hotchkiss_37MM_MS1: return "Hotchkiss 37";
 	case EWeaponName::MK108_30MM_Horten: return "MK 108";
 	case EWeaponName::ZIS_6_107MM_KV3: return "ZIS-6";
+	case EWeaponName::Flakvierling38_20MM_Emplaced: return "Flakvierling 38";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -1117,6 +1121,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "MK108_30MM_Horten";
 	case EWeaponName::ZIS_6_107MM_KV3:
 		return "ZIS_6_107MM_KV3";
+	case EWeaponName::Flakvierling38_20MM_Emplaced:
+		return "Flakvierling38_20MM_Emplaced";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:
