@@ -26,9 +26,29 @@ UTankEngineFireBehaviour::UTankEngineFireBehaviour()
 	M_DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(ERTSDamageType::Fire);
 }
 
+bool UTankEngineFireBehaviour::GetFireWorldLocation(const ATankMaster& Tank, FVector& OutWorldLocation) const
+{
+	if (M_AttachmentRules.Mode == ETankEngineFireAttachmentMode::HullSocket)
+	{
+		const UMeshComponent* SocketMesh = FindMeshWithSocket(Tank, M_AttachmentRules.HullSocketName);
+		if (not IsValid(SocketMesh))
+		{
+			return false;
+		}
+		OutWorldLocation = SocketMesh->GetSocketLocation(M_AttachmentRules.HullSocketName);
+		return true;
+	}
+	OutWorldLocation = Tank.GetActorTransform().TransformPositionNoScale(M_AttachmentRules.TankPivotOffset);
+	return true;
+}
+
 void UTankEngineFireBehaviour::OnAdded(AActor* BehaviourOwner)
 {
 	M_TankMaster = Cast<ATankMaster>(BehaviourOwner);
+	if (GetIsValidTankMaster())
+	{
+		M_TankMaster->SetIsEngineBurning(true);
+	}
 	SampleDuration();
 	StartFireEffect();
 	StartFireSound();
@@ -39,6 +59,11 @@ void UTankEngineFireBehaviour::OnRemoved(AActor* BehaviourOwner)
 {
 	StopFireSound();
 	StopFireEffect();
+	// No validator: during tank destruction the tank may already be gone, which is not an error here.
+	if (M_TankMaster.IsValid())
+	{
+		M_TankMaster->SetIsEngineBurning(false);
+	}
 	Super::OnRemoved(BehaviourOwner);
 	M_TankMaster.Reset();
 	M_FireSubsystem.Reset();
@@ -215,12 +240,21 @@ void UTankEngineFireBehaviour::StopFireSound()
 
 UMeshComponent* UTankEngineFireBehaviour::FindTankMeshWithSocket(const FName SocketName) const
 {
-	if (not GetIsValidTankMaster() || SocketName == NAME_None)
+	if (not GetIsValidTankMaster())
+	{
+		return nullptr;
+	}
+	return FindMeshWithSocket(*M_TankMaster, SocketName);
+}
+
+UMeshComponent* UTankEngineFireBehaviour::FindMeshWithSocket(const AActor& Tank, const FName SocketName)
+{
+	if (SocketName == NAME_None)
 	{
 		return nullptr;
 	}
 
-	TInlineComponentArray<UMeshComponent*> TankMeshes(M_TankMaster.Get());
+	TInlineComponentArray<UMeshComponent*> TankMeshes(&Tank);
 	for (UMeshComponent* TankMesh : TankMeshes)
 	{
 		if (IsValid(TankMesh) && TankMesh->DoesSocketExist(SocketName))

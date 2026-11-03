@@ -9,6 +9,7 @@
 #include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDebrisBurstComponent.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDebrisSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -274,7 +275,8 @@ void UWreckTurretTossComponent::StartDebrisBurst() const
 	UWreckDebrisBurstComponent* DebrisBurst = NewObject<UWreckDebrisBurstComponent>(Wreck);
 	Wreck->AddInstanceComponent(DebrisBurst);
 	DebrisBurst->RegisterComponent();
-	DebrisBurst->StartBurst(M_TurretRingLocation, M_HullMesh.Get(), M_Settings.DebrisCountScale);
+	DebrisBurst->StartBurst(M_TurretRingLocation, M_HullMesh.Get(), M_Settings.DebrisCountScale,
+	                        GetDefault<UWreckDebrisSettings>()->AmmoCookOffBurst);
 }
 
 void UWreckTurretTossComponent::StartTurretFire()

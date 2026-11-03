@@ -19,6 +19,7 @@
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBatches.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/CrewRepairAbilityTypes.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossSettings.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckEngineFireDeathSettings.h"
 #include "TankMaster.generated.h"
 
 enum class ERTSAggroBehaviour : uint8;
@@ -338,6 +339,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_DieDuringAmmoCookOff();
 
+	/** @brief Kept up to date by UTankEngineFireBehaviour so the death event knows whether the engine was burning. */
+	void SetIsEngineBurning(const bool bIsBurning) { bM_IsEngineBurning = bIsBurning; }
+
+	/** @brief Testing aid: sets this tank's engine on fire and kills it at once, so the fuel explosion can be watched. */
+	UFUNCTION(BlueprintCallable, Category="Death|Debug")
+	void Debug_DieDuringEngineFire();
+
 	// ---- Vehicle modules ----
 
 	/**
@@ -510,6 +518,10 @@ protected:
 	UFUNCTION(BlueprintPure, Category="Death")
 	bool GetDiedWhileAmmoCookingOff() const { return bM_DiedWhileAmmoCookingOff; }
 
+	/** @return True when an engine fire was burning as this tank died. */
+	UFUNCTION(BlueprintPure, Category="Death")
+	bool GetDiedWhileEngineBurning() const { return bM_DiedWhileEngineBurning; }
+
 	/**
 	 * @brief Ammo cook-off death: spawns the wreck like DestroyAndSpawnActors, then blows the wreck turret off with
 	 * physics and leaves an ammo fire in the open hull. Tuned per tank in TurretTossSettings.
@@ -519,7 +531,10 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Death")
 	void DestroyAndSpawnActorsWithTurretToss(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX);
 
-	/** @brief Every tank Blueprint spawns its wreck here; a cook-off death takes the turret toss path automatically. */
+	/**
+	 * @brief Every tank Blueprint spawns its wreck here; a cook-off death tosses the turret and an engine fire death
+	 * explodes the fuel automatically.
+	 */
 	virtual void DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX) override;
 
 	/**
@@ -908,6 +923,22 @@ private:
 	// Snapshot of bM_IsAmmoCookingOff taken as UnitDies starts, before teardown can remove the cook-off behaviour.
 	bool bM_DiedWhileAmmoCookingOff = false;
 
+	// ---- Engine fire death ----
+	bool bM_IsEngineBurning = false;
+	// Snapshot of bM_IsEngineBurning taken as UnitDies starts, before teardown can remove the engine fire behaviour.
+	bool bM_DiedWhileEngineBurning = false;
+
+	/**
+	 * @brief Spawns the wreck and starts the turret toss and/or the fuel explosion on it.
+	 * @param bTossTurret The ammunition cooked off: throw the turret.
+	 * @param bExplodeFuel The engine burned: blow the engine deck (or, with the toss, only add the fuel fire).
+	 */
+	void DestroyAndSpawnActorsWithDeathEffects(const FDestroySpawnActorsParameters& SpawnParams,
+	                                          const FCollapseFX& CollapseFX, bool bTossTurret, bool bExplodeFuel);
+
+	/** @return Where the engine fire burns (or would burn) on this tank; the rear top of the hull as a fallback. */
+	FVector GetEngineWorldLocation() const;
+
 	/** @brief Throws crew ragdolls out of the top of the vehicle; runs before the Blueprint can destroy it. */
 	void OnUnitDies_ThrowCrewBodies(ERTSDeathType DeathType) const;
 
@@ -919,6 +950,10 @@ private:
 	// How the wreck turret is thrown when this tank dies during an ammo cook-off.
 	UPROPERTY(EditDefaultsOnly, Category="Death|Turret Toss", meta=(AllowPrivateAccess="true"))
 	FWreckTurretTossSettings M_TurretTossSettings;
+
+	// How the fuel explodes and the wreck burns when this tank dies during an engine fire.
+	UPROPERTY(EditDefaultsOnly, Category="Death|Engine Fire", meta=(AllowPrivateAccess="true"))
+	FWreckEngineFireDeathSettings M_EngineFireDeathSettings;
 
 	/** @return Yaw of the first mounted turret relative to the hull; 0 without turrets. */
 	float GetLiveTurretYawOffset() const;

@@ -25,6 +25,14 @@ enum class ETurretTossDemoStep : uint8
 	Done
 };
 
+/** How the demo kills its tanks (-TurretTossDemoDeath=CookOff|EngineFire|Both). */
+enum class ETurretTossDemoDeath : uint8
+{
+	CookOff,
+	EngineFire,
+	Both
+};
+
 /** One vehicle of the -TurretTossAudit run: spawned, killed during a cook-off and judged by what its wreck did. */
 struct FTurretTossAuditEntry
 {
@@ -69,6 +77,10 @@ private:
 	void AimCapture(float OrbitYawDegrees, float DistanceCm, float HeightCm, const FVector& LookAt) const;
 	void ExportFrame(const FString& FileName) const;
 	void LogTossedTurrets() const;
+	void LogEngineFireWrecks() const;
+	void KillTank(ATankMaster& Tank) const;
+	void ReportEngineFireAuditEntry(const FTurretTossAuditEntry& Entry, AActor* Wreck);
+	static int32 CountThrownDebris(const AActor* Wreck);
 
 	// ---- Audit of every tank subtype ----
 	void BuildAuditEntries();
@@ -98,6 +110,7 @@ private:
 	TObjectPtr<UTextureRenderTarget2D> M_RenderTarget;
 
 	ETurretTossDemoStep M_Step = ETurretTossDemoStep::StartGame;
+	ETurretTossDemoDeath M_DeathKind = ETurretTossDemoDeath::CookOff;
 	FString M_OutputDirectory;
 	FVector M_DemoLocation = FVector::ZeroVector;
 	// Where the tank stood when it died; the camera keeps looking here after the tank is replaced by its wreck.

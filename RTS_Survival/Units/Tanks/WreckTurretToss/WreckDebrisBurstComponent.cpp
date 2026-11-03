@@ -29,14 +29,17 @@ UWreckDebrisBurstComponent::UWreckDebrisBurstComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 }
 
-void UWreckDebrisBurstComponent::StartBurst(const FVector& Origin, UStaticMeshComponent* HullMesh, const float CountScale)
+void UWreckDebrisBurstComponent::StartBurst(const FVector& Origin, UStaticMeshComponent* HullMesh, const float CountScale,
+                                            const FWreckDebrisBurstProfile& Profile, const FVector& BurstDirection)
 {
 	UWorld* World = GetWorld();
-	if (not IsValid(HullMesh) || not IsValid(World) || GetSettings().PieceTypes.IsEmpty())
+	if (not IsValid(HullMesh) || not IsValid(World) || Profile.PieceTypes.IsEmpty())
 	{
 		return;
 	}
+	M_Profile = Profile;
 	M_Origin = Origin;
+	M_BurstDirection = FVector(BurstDirection.X, BurstDirection.Y, 0.f).GetSafeNormal();
 	M_FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
 
 	UMaterialInterface* HullMaterial = HullMesh->GetMaterial(0);
@@ -76,8 +79,8 @@ void UWreckDebrisBurstComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 int32 UWreckDebrisBurstComponent::GetPieceCount(const UStaticMeshComponent& HullMesh, const float CountScale) const
 {
 	const float CountForHull = FMath::GetMappedRangeValueClamped(
-		GetSettings().HullRadiusRange,
-		FVector2D(GetSettings().PieceCountRange.X, GetSettings().PieceCountRange.Y),
+		M_Profile.HullRadiusRange,
+		FVector2D(M_Profile.PieceCountRange.X, M_Profile.PieceCountRange.Y),
 		HullMesh.Bounds.SphereRadius);
 	return FMath::Max(0, FMath::RoundToInt(CountForHull * CountScale));
 }
@@ -85,12 +88,12 @@ int32 UWreckDebrisBurstComponent::GetPieceCount(const UStaticMeshComponent& Hull
 const FWreckDebrisPieceType* UWreckDebrisBurstComponent::PickPieceType() const
 {
 	float TotalWeight = 0.f;
-	for (const FWreckDebrisPieceType& PieceType : GetSettings().PieceTypes)
+	for (const FWreckDebrisPieceType& PieceType : M_Profile.PieceTypes)
 	{
 		TotalWeight += FMath::Max(PieceType.Weight, 0.f);
 	}
 	float Pick = FMath::FRandRange(0.f, TotalWeight);
-	for (const FWreckDebrisPieceType& PieceType : GetSettings().PieceTypes)
+	for (const FWreckDebrisPieceType& PieceType : M_Profile.PieceTypes)
 	{
 		Pick -= FMath::Max(PieceType.Weight, 0.f);
 		if (Pick <= 0.f)
@@ -98,7 +101,7 @@ const FWreckDebrisPieceType* UWreckDebrisBurstComponent::PickPieceType() const
 			return &PieceType;
 		}
 	}
-	return GetSettings().PieceTypes.IsEmpty() ? nullptr : &GetSettings().PieceTypes.Last();
+	return M_Profile.PieceTypes.IsEmpty() ? nullptr : &M_Profile.PieceTypes.Last();
 }
 
 UStaticMeshComponent* UWreckDebrisBurstComponent::SpawnPiece(const FWreckDebrisPieceType& PieceType,
@@ -117,7 +120,7 @@ UStaticMeshComponent* UWreckDebrisBurstComponent::SpawnPiece(const FWreckDebrisP
 	UStaticMeshComponent* Piece = NewObject<UStaticMeshComponent>(Wreck);
 	Piece->SetMobility(EComponentMobility::Movable);
 	Piece->SetStaticMesh(Mesh);
-	const FVector Scatter = FVector(FMath::RandPointInCircle(GetSettings().SpawnScatterRadius), SpawnHeightAboveRing);
+	const FVector Scatter = FVector(FMath::RandPointInCircle(M_Profile.SpawnScatterRadius), SpawnHeightAboveRing);
 	const FRotator RandomRotation(FMath::FRandRange(0.f, FullCircleDegrees), FMath::FRandRange(0.f, FullCircleDegrees),
 	                              FMath::FRandRange(0.f, FullCircleDegrees));
 	Piece->SetWorldTransform(FTransform(RandomRotation, M_Origin + Scatter,
@@ -147,7 +150,6 @@ UStaticMeshComponent* UWreckDebrisBurstComponent::SpawnPiece(const FWreckDebrisP
 
 void UWreckDebrisBurstComponent::LaunchPieces() const
 {
-	const UWreckDebrisSettings& Settings = GetSettings();
 	for (const FWreckDebrisFlyingPiece& FlyingPiece : M_Pieces)
 	{
 		UStaticMeshComponent* Piece = FlyingPiece.Mesh.Get();
@@ -155,25 +157,35 @@ void UWreckDebrisBurstComponent::LaunchPieces() const
 		{
 			continue;
 		}
-		const FVector SideDirection = FRotator(
-			0.f, FMath::FRandRange(0.f, WreckDebrisConstants::FullCircleDegrees), 0.f).Vector();
-		const float SideSpeed = FMath::FRandRange(Settings.SideSpeedRange.X, Settings.SideSpeedRange.Y);
-		const float UpSpeed = FMath::FRandRange(Settings.UpSpeedRange.X, Settings.UpSpeedRange.Y);
+		const FVector SideDirection = GetLaunchSideDirection();
+		const float SideSpeed = FMath::FRandRange(M_Profile.SideSpeedRange.X, M_Profile.SideSpeedRange.Y);
+		const float UpSpeed = FMath::FRandRange(M_Profile.UpSpeedRange.X, M_Profile.UpSpeedRange.Y);
 		const FVector LaunchVelocity = SideDirection * SideSpeed + FVector::UpVector * UpSpeed;
 		Piece->WakeRigidBody();
 		Piece->SetPhysicsLinearVelocity(LaunchVelocity);
 		Piece->SetPhysicsAngularVelocityInDegrees(
-			FMath::VRand() * FMath::FRandRange(Settings.SpinDegreesRange.X, Settings.SpinDegreesRange.Y));
+			FMath::VRand() * FMath::FRandRange(M_Profile.SpinDegreesRange.X, M_Profile.SpinDegreesRange.Y));
 	}
+}
+
+FVector UWreckDebrisBurstComponent::GetLaunchSideDirection() const
+{
+	const bool bIsBiased = not M_BurstDirection.IsNearlyZero() && FMath::FRand() < M_Profile.DirectionBias;
+	if (not bIsBiased)
+	{
+		return FRotator(0.f, FMath::FRandRange(0.f, WreckDebrisConstants::FullCircleDegrees), 0.f).Vector();
+	}
+	const float YawOffset = FMath::FRandRange(-M_Profile.DirectionSpreadDegrees, M_Profile.DirectionSpreadDegrees);
+	return M_BurstDirection.RotateAngleAxis(YawOffset, FVector::UpVector);
 }
 
 void UWreckDebrisBurstComponent::IgniteSomePieces()
 {
-	if (not M_FireSubsystem.IsValid() || GetSettings().BurningPieceFireType == ERTSFireType::None)
+	if (not M_FireSubsystem.IsValid() || M_Profile.BurningPieceFireType == ERTSFireType::None)
 	{
 		return;
 	}
-	const int32 BurningCount = FMath::Min(GetSettings().BurningPieceCount, M_Pieces.Num());
+	const int32 BurningCount = FMath::Min(M_Profile.BurningPieceCount, M_Pieces.Num());
 	for (int32 PieceIndex = 0; PieceIndex < BurningCount; ++PieceIndex)
 	{
 		UStaticMeshComponent* Piece = M_Pieces[PieceIndex].Mesh.Get();
@@ -182,8 +194,8 @@ void UWreckDebrisBurstComponent::IgniteSomePieces()
 			continue;
 		}
 		M_FireHandles.Add(M_FireSubsystem->SpawnFireAttachedToComponent(
-			GetOwner(), Piece, NAME_None, FVector::ZeroVector, GetSettings().BurningPieceFireType,
-			GetSettings().BurningPieceFireLifeTime, GetSettings().BurningPieceFireScale, FRTSFireEffectParams()));
+			GetOwner(), Piece, NAME_None, FVector::ZeroVector, M_Profile.BurningPieceFireType,
+			M_Profile.BurningPieceFireLifeTime, M_Profile.BurningPieceFireScale, FRTSFireEffectParams()));
 	}
 }
 

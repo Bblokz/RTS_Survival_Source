@@ -29,6 +29,7 @@
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckEngineFireDeathComponent.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossComponent.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
@@ -40,6 +41,8 @@ namespace TurretTossDemoPrivate
 	const TCHAR* const DirectorySwitch = TEXT("TurretTossDemoDir=");
 	const TCHAR* const LocationSwitch = TEXT("TurretTossDemoAt=");
 	const TCHAR* const TankSwitch = TEXT("TurretTossDemoTank=");
+	// CookOff (default), EngineFire or Both.
+	const TCHAR* const DeathSwitch = TEXT("TurretTossDemoDeath=");
 	const TCHAR* const DefaultTankSubtype = TEXT("Tank_PzIV_H");
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 
@@ -110,6 +113,15 @@ void UTurretTossDemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		M_DemoLocation = FVector(FCString::Atof(*XText), FCString::Atof(*YText), 0.f);
 	}
 	bM_IsAudit = FParse::Param(FCommandLine::Get(), AuditSwitch);
+	FString DeathText;
+	if (FParse::Value(FCommandLine::Get(), DeathSwitch, DeathText))
+	{
+		M_DeathKind = DeathText.Equals(TEXT("EngineFire"), ESearchCase::IgnoreCase)
+			              ? ETurretTossDemoDeath::EngineFire
+			              : DeathText.Equals(TEXT("Both"), ESearchCase::IgnoreCase)
+			              ? ETurretTossDemoDeath::Both
+			              : ETurretTossDemoDeath::CookOff;
+	}
 	M_StartRealSeconds = FPlatformTime::Seconds();
 	bM_IsActive = true;
 	UE_LOG(LogRTSTurretTossDemo, Display, TEXT("RTS_TTD started dir=%s at=%s"), *M_OutputDirectory,
@@ -307,7 +319,7 @@ void UTurretTossDemoSubsystem::TickRecord()
 			return;
 		}
 		UE_LOG(LogRTSTurretTossDemo, Display, TEXT("RTS_TTD kill t=%.2f frame=%d"), GetGameSeconds(), M_FrameIndex);
-		M_Tank->Debug_DieDuringAmmoCookOff();
+		KillTank(*M_Tank);
 		M_StepStartGameSeconds = GetGameSeconds();
 		M_NextTurretLogGameSeconds = GetGameSeconds();
 		return;
@@ -320,6 +332,7 @@ void UTurretTossDemoSubsystem::TickRecord()
 	{
 		M_NextTurretLogGameSeconds += TurretLogIntervalSeconds;
 		LogTossedTurrets();
+		LogEngineFireWrecks();
 	}
 	if (GetGameSeconds() - M_StepStartGameSeconds >= RecordAfterDeathGameSeconds)
 	{
@@ -335,6 +348,7 @@ void UTurretTossDemoSubsystem::TickStills()
 	if (M_StillIndex >= UE_ARRAY_COUNT(StillCameras))
 	{
 		LogTossedTurrets();
+		LogEngineFireWrecks();
 		Finish(TEXT("done"));
 		return;
 	}
@@ -431,6 +445,85 @@ void UTurretTossDemoSubsystem::LogTossedTurrets() const
 			       static_cast<int32>(MeshComponent->Mobility.GetValue()));
 		}
 	}
+}
+
+void UTurretTossDemoSubsystem::LogEngineFireWrecks() const
+{
+	for (TObjectIterator<UWreckEngineFireDeathComponent> It; It; ++It)
+	{
+		const UWreckEngineFireDeathComponent* EngineFireComponent = *It;
+		const AActor* Wreck = IsValid(EngineFireComponent) ? EngineFireComponent->GetOwner() : nullptr;
+		if (not IsValid(Wreck) || EngineFireComponent->GetWorld() != GetWorld())
+		{
+			continue;
+		}
+		const UStaticMeshComponent* Hull = Wreck->FindComponentByClass<UStaticMeshComponent>();
+		float MaxPieceHeight = 0.f;
+		float MaxPieceDistance = 0.f;
+		for (const UActorComponent* Component : Wreck->GetInstanceComponents())
+		{
+			const UStaticMeshComponent* Piece = Cast<UStaticMeshComponent>(Component);
+			if (IsValid(Piece))
+			{
+				MaxPieceHeight = FMath::Max(MaxPieceHeight, Piece->GetComponentLocation().Z - M_DeathLocation.Z);
+				MaxPieceDistance = FMath::Max(MaxPieceDistance,
+				                              FVector::Dist2D(Piece->GetComponentLocation(), M_DeathLocation));
+			}
+		}
+		UE_LOG(LogRTSTurretTossDemo, Display,
+		       TEXT("RTS_TTD engine t=%.2f wreck=%s pieces=%d max_piece_height_cm=%.0f max_piece_dist_cm=%.0f overlay=%s"),
+		       GetGameSeconds() - M_StepStartGameSeconds, *Wreck->GetName(), CountThrownDebris(Wreck), MaxPieceHeight,
+		       MaxPieceDistance,
+		       IsValid(Hull) && IsValid(Hull->GetOverlayMaterial()) ? *Hull->GetOverlayMaterial()->GetName() : TEXT("none"));
+	}
+}
+
+void UTurretTossDemoSubsystem::KillTank(ATankMaster& Tank) const
+{
+	switch (M_DeathKind)
+	{
+	case ETurretTossDemoDeath::EngineFire:
+		Tank.Debug_DieDuringEngineFire();
+		return;
+	case ETurretTossDemoDeath::Both:
+		Tank.SetIsEngineBurning(true);
+		Tank.Debug_DieDuringAmmoCookOff();
+		return;
+	default:
+		Tank.Debug_DieDuringAmmoCookOff();
+	}
+}
+
+void UTurretTossDemoSubsystem::ReportEngineFireAuditEntry(const FTurretTossAuditEntry& Entry, AActor* Wreck)
+{
+	const UWreckEngineFireDeathComponent* EngineFireComponent =
+		IsValid(Wreck) ? Wreck->FindComponentByClass<UWreckEngineFireDeathComponent>() : nullptr;
+	const FString WreckName = IsValid(Wreck) ? Wreck->GetClass()->GetName() : TEXT("none");
+	if (EngineFireComponent == nullptr)
+	{
+		++M_AuditCountsFailed;
+		UE_LOG(LogRTSTurretTossDemo, Display, TEXT("RTS_TTA vehicle=%s result=no_fuel_death wreck=%s"),
+		       *Entry.SubtypeName, *WreckName);
+		return;
+	}
+	const int32 PieceCount = CountThrownDebris(Wreck);
+	PieceCount > 0 ? ++M_AuditCountsTossed : ++M_AuditCountsFailed;
+	UE_LOG(LogRTSTurretTossDemo, Display, TEXT("RTS_TTA vehicle=%s result=%s wreck=%s pieces=%d"),
+	       *Entry.SubtypeName, PieceCount > 0 ? TEXT("fuel_death") : TEXT("no_debris"), *WreckName, PieceCount);
+}
+
+int32 UTurretTossDemoSubsystem::CountThrownDebris(const AActor* Wreck)
+{
+	if (not IsValid(Wreck))
+	{
+		return 0;
+	}
+	int32 PieceCount = 0;
+	for (const UActorComponent* Component : Wreck->GetInstanceComponents())
+	{
+		PieceCount += Cast<UStaticMeshComponent>(Component) != nullptr ? 1 : 0;
+	}
+	return PieceCount;
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -540,7 +633,7 @@ void UTurretTossDemoSubsystem::TickAuditSettle()
 		}
 		// The tank may have rolled a little while settling; judge the wreck where it actually died.
 		Entry.Location = Entry.Tank->GetActorLocation();
-		Entry.Tank->Debug_DieDuringAmmoCookOff();
+		KillTank(*Entry.Tank);
 		Entry.bKilled = true;
 	}
 	M_Step = ETurretTossDemoStep::AuditObserve;
@@ -603,6 +696,11 @@ void UTurretTossDemoSubsystem::ReportAuditEntry(const FTurretTossAuditEntry& Ent
 		return;
 	}
 	AActor* Wreck = Entry.Wreck.IsValid() ? Entry.Wreck.Get() : FindWreckNear(Entry.Location);
+	if (M_DeathKind == ETurretTossDemoDeath::EngineFire)
+	{
+		ReportEngineFireAuditEntry(Entry, Wreck);
+		return;
+	}
 	const UWreckTurretTossComponent* TossComponent = IsValid(Wreck)
 		                                                 ? Wreck->FindComponentByClass<UWreckTurretTossComponent>()
 		                                                 : nullptr;

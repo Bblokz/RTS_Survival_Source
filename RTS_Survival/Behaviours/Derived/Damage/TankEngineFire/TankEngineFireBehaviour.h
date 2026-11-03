@@ -28,6 +28,15 @@ class RTS_SURVIVAL_API UTankEngineFireBehaviour : public UBehaviour
 public:
 	UTankEngineFireBehaviour();
 
+	/**
+	 * @brief Where this behaviour's fire burns on the given tank; works on the class default object, so the engine
+	 * can be found as the tank dies even when the behaviour is already gone.
+	 * @param Tank Tank whose meshes carry the engine socket.
+	 * @param OutWorldLocation Engine fire location in world space.
+	 * @return False when the attachment socket or the hull mesh is missing.
+	 */
+	bool GetFireWorldLocation(const ATankMaster& Tank, FVector& OutWorldLocation) const;
+
 protected:
 	virtual void OnAdded(AActor* BehaviourOwner) override;
 	virtual void OnRemoved(AActor* BehaviourOwner) override;
@@ -45,6 +54,7 @@ private:
 	void StartFireSound();
 	void StopFireSound();
 	UMeshComponent* FindTankMeshWithSocket(FName SocketName) const;
+	static UMeshComponent* FindMeshWithSocket(const AActor& Tank, FName SocketName);
 	bool GetIsValidTankMaster() const;
 	bool GetIsValidFireSubsystem() const;
 
