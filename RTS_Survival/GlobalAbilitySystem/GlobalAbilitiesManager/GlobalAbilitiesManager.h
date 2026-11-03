@@ -6,6 +6,7 @@
 #include "GlobalAbility_SpawnSettings.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
 #include "GlobalAbilitiesManager.generated.h"
 
 USTRUCT(BlueprintType)
@@ -74,7 +75,14 @@ public:
 	
 	bool IsPlayerAbilityManager() const;
 	bool IsEnemyAbilityManager() const;
+	/**
+	 * @brief The mission caps which tiers of the commander's kit the player may use; set before the abilities are
+	 * initialised. Enemy managers ignore the cap.
+	 * @param MaxAllowedTier Highest ability tier the player may use in this mission.
+	 */
+	void SetMaxAllowedAbilityTier(const EGlobalAbilityTier MaxAllowedTier);
 	bool QueryRequirementForAbility(const UGlobalAbility* Ability) const;
+	bool QueryTierAllowedForAbility(const UGlobalAbility* Ability) const;
 	bool QueryUnitRequirementForAbility(const UGlobalAbility* Ability) const;
 	bool QueryPlayerUnitRequirementForAbility(const FTrainingOption& RequiredUnit) const;
 	bool QueryEnemyUnitRequirementForAbility(const FTrainingOption& RequiredUnit) const;
@@ -108,6 +116,10 @@ public:
 
 private:
 	FGlobalAbility_SpawnSettings M_SpawnSetings;
+
+	// Tier-capped abilities stay in the panel greyed out, so the player still sees the whole commander kit.
+	UPROPERTY()
+	EGlobalAbilityTier M_MaxAllowedAbilityTier = EGlobalAbilityTier::TierIV;
 	UPROPERTY()
 	int32 M_OwningPlayer;
 	

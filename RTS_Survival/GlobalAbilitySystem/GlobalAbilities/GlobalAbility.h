@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GlobalAbilityCostState.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "UObject/Object.h"
 #include "GlobalAbility.generated.h"
@@ -76,6 +77,7 @@ public:
 	                                TArray<FVector>& OutDropPoints) const;
 
 	EGlobalAbility GetAbilityType() const;
+	EGlobalAbilityTier GetAbilityTier() const { return M_AbilityTier; }
 	const FGlobalAbilityAimSettings& GetAimSettings() const { return M_AimSettings; }
 	const FGLobalAbilityCostState& GetAbilityCosts() const;
 	const FGlobalAbilityUISettings& GetUISettings() const;
@@ -94,6 +96,10 @@ protected:
 	EGlobalAbility M_AbilityType;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGLobalAbilityCostState M_AbilityCosts;
+
+	// Missions cap the tier the player may use; see AMissionManager::MaxPlayerGlobalAbilityTier.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EGlobalAbilityTier M_AbilityTier = EGlobalAbilityTier::TierI;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGlobalAbilityRequirements M_AbilityRequirements;
