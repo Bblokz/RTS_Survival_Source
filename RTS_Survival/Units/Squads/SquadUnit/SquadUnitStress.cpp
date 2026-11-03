@@ -6,6 +6,7 @@
 #include "SquadUnit.h"
 
 #include "AnimSquadUnit/SquadUnitAnimInstance.h"
+#include "Engine/DamageEvents.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SquadUnitSpacialVoiceLinePlayer/SquadUnitSpatialVoiceLinePlayer.h"
@@ -16,6 +17,7 @@
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
+#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitStress, Log, All);
 
@@ -31,6 +33,7 @@ float ASquadUnit::TakeDamage(
 	AActor* DamageCauser)
 {
 	const float HealthBeforeDamage = IsValid(HealthComponent) ? HealthComponent->GetCurrentHealth() : 0.0f;
+	RecordDeathHit(DamageAmount, DamageEvent, DamageCauser);
 	const float DamageResult = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	if (IsUnitAlive() && IsValid(HealthComponent))
 	{
@@ -42,6 +45,33 @@ float ASquadUnit::TakeDamage(
 		M_SquadController->OnSquadUnitInCombat();
 	}
 	return DamageResult;
+}
+
+void ASquadUnit::RecordDeathHit(const float DamageAmount, FDamageEvent const& DamageEvent,
+                                const AActor* DamageCauser)
+{
+	if (not M_RagdollSettings.bEnableRagdoll || not IsUnitAlive() || not GetIsValidHealthComponent())
+	{
+		return;
+	}
+	M_DeathHit = FSquadUnitDeathHit();
+	const float MaxHealth = HealthComponent->GetMaxHealth();
+	M_DeathHit.DamageFraction = MaxHealth > 0.0f ? FMath::Clamp(DamageAmount / MaxHealth, 0.0f, 1.0f) : 0.0f;
+	if (DamageEvent.IsOfType(FRTSBlastDamageEvent::ClassID))
+	{
+		const FVector Epicenter = static_cast<const FRTSBlastDamageEvent&>(DamageEvent).Epicenter;
+		M_DeathHit.bIsBlast = true;
+		M_DeathHit.PushDirection = (GetActorLocation() - Epicenter).GetSafeNormal2D();
+	}
+	else if (IsValid(DamageCauser))
+	{
+		M_DeathHit.PushDirection = DamageCauser->GetActorForwardVector().GetSafeNormal2D();
+	}
+	if (M_DeathHit.PushDirection.IsNearlyZero())
+	{
+		// Instant-hit weapons name no causer, and a soldier usually faces what shoots him.
+		M_DeathHit.PushDirection = -GetActorForwardVector();
+	}
 }
 
 bool ASquadUnit::GetIsHoldingCoverPoint() const

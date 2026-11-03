@@ -34,6 +34,7 @@
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "Components/CapsuleComponent.h"
+#include "RTS_Survival/Units/Ragdoll/RTSRagdollSubsystem.h"
 #include "NavigationSystem.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderDeveloperSettings.h"
@@ -135,184 +136,10 @@ void FSquadUnitCoverRuntimeState::Reset()
 }
 
 
-FSquadUnitRagdoll::FSquadUnitRagdoll()
-	: bEnableRagdoll(true)
-	  , RagdollCollisionProfileName(TEXT("Ragdoll"))
-	  , bApplyImpulseOnDeath(true)
-	  , ImpulseStrength(30000.0f)
-	  , ImpulseDirection(FVector(-1.0f, 0.0f, 0.0f))
-	  , ImpulseBoneName(TEXT("pelvis"))
-	  , TimeTillDeath(3.0f)
-	  , LinearDamping(0.5f)
-	  , AngularDamping(0.5f)
-	  , MassScale(1.0f)
-	  , bClampInitialVelocities(true)
-	  , MaxInitialSpeed(1200.0f)
-	  , bIsRagdollActive(false)
+namespace SquadUnitDeathStatics
 {
+	constexpr float CorpseSinkInterval = 1.f / 30.f;
 }
-
-void FSquadUnitRagdoll::StartRagdoll(
-	AActor* OwningActor,
-	USkeletalMeshComponent* MeshComponent,
-	USquadUnitAnimInstance* AnimInstance)
-{
-	if (not bEnableRagdoll)
-	{
-		return;
-	}
-
-	if (not IsValid(MeshComponent))
-	{
-		RTSFunctionLibrary::ReportNullErrorComponent(
-			OwningActor,
-			"MeshComponent",
-			"FSquadUnitRagdoll::StartRagdoll");
-		return;
-	}
-
-	StopAnimations(AnimInstance, MeshComponent);
-	SetupPhysicsAndCollision(MeshComponent);
-	ApplyImpulse(MeshComponent);
-	ClampInitialVelocities(MeshComponent);
-	StartRagdoll_CreateEffect(OwningActor);
-
-	bIsRagdollActive = true;
-}
-
-
-void FSquadUnitRagdoll::StopAnimations(
-	USquadUnitAnimInstance* AnimInstance,
-	USkeletalMeshComponent* MeshComponent) const
-{
-	if (IsValid(AnimInstance))
-	{
-		AnimInstance->StopAllMontages();
-	}
-
-	if (not IsValid(MeshComponent))
-	{
-		return;
-	}
-
-	MeshComponent->bPauseAnims = true;
-	MeshComponent->bNoSkeletonUpdate = true;
-}
-
-void FSquadUnitRagdoll::SetupPhysicsAndCollision(USkeletalMeshComponent* MeshComponent) const
-{
-	if (not IsValid(MeshComponent))
-	{
-		return;
-	}
-
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-
-	if (RagdollCollisionProfileName != NAME_None)
-	{
-		MeshComponent->SetCollisionProfileName(RagdollCollisionProfileName);
-	}
-	else
-	{
-		MeshComponent->SetCollisionProfileName(TEXT("Ragdoll"));
-	}
-
-	MeshComponent->SetSimulatePhysics(true);
-	MeshComponent->SetAllBodiesSimulatePhysics(true);
-	MeshComponent->WakeAllRigidBodies();
-	MeshComponent->bBlendPhysics = true;
-
-	const float ClampedLinearDamping = FMath::Max(0.0f, LinearDamping);
-	const float ClampedAngularDamping = FMath::Max(0.0f, AngularDamping);
-	const float ClampedMassScale = FMath::Max(0.01f, MassScale);
-
-	MeshComponent->SetLinearDamping(ClampedLinearDamping);
-	MeshComponent->SetAngularDamping(ClampedAngularDamping);
-	MeshComponent->SetAllMassScale(ClampedMassScale);
-}
-
-void FSquadUnitRagdoll::ApplyImpulse(USkeletalMeshComponent* MeshComponent) const
-{
-	if (not bApplyImpulseOnDeath || FMath::IsNearlyZero(ImpulseStrength) || not IsValid(MeshComponent))
-	{
-		return;
-	}
-
-	const FVector NormalizedDirection = ImpulseDirection.GetSafeNormal();
-	if (NormalizedDirection.IsNearlyZero())
-	{
-		return;
-	}
-
-	FVector WorldImpulse = MeshComponent->GetComponentTransform().TransformVector(
-		NormalizedDirection * ImpulseStrength);
-
-	// Do not allow the ragdoll to be launched upwards.
-	if (WorldImpulse.Z > 0.0f)
-	{
-		WorldImpulse.Z = 0.0f;
-	}
-
-	if (ImpulseBoneName != NAME_None)
-	{
-		MeshComponent->AddImpulseToAllBodiesBelow(WorldImpulse, ImpulseBoneName, true, true);
-		return;
-	}
-
-	MeshComponent->AddImpulse(WorldImpulse, NAME_None, true);
-}
-
-void FSquadUnitRagdoll::ClampInitialVelocities(USkeletalMeshComponent* MeshComponent) const
-{
-	if (not bClampInitialVelocities)
-	{
-		return;
-	}
-
-	if (not IsValid(MeshComponent))
-	{
-		return;
-	}
-
-	const float MaxInitialSpeedSquared = FMath::Square(MaxInitialSpeed);
-	if (MaxInitialSpeedSquared <= 0.0f)
-	{
-		return;
-	}
-
-	const int32 NumBones = MeshComponent->GetNumBones();
-	for (int32 BoneIndex = 0; BoneIndex < NumBones; ++BoneIndex)
-	{
-		const FName BoneName = MeshComponent->GetBoneName(BoneIndex);
-
-		FVector BoneVelocity = MeshComponent->GetPhysicsLinearVelocity(BoneName);
-
-		// Never let the ragdoll gain an upward initial velocity.
-		if (BoneVelocity.Z > 0.0f)
-		{
-			BoneVelocity.Z = 0.0f;
-		}
-
-		const float SpeedSquared = BoneVelocity.SizeSquared();
-		if (SpeedSquared <= MaxInitialSpeedSquared)
-		{
-			continue;
-		}
-
-		const FVector ClampedVelocity = BoneVelocity.GetSafeNormal() * MaxInitialSpeed;
-		MeshComponent->SetPhysicsLinearVelocity(ClampedVelocity, false, BoneName);
-	}
-}
-
-void FSquadUnitRagdoll::StartRagdoll_CreateEffect(AActor* OwningActor)
-{
-	if (not IsValid(OwningActor))
-	{
-		return;
-	}
-	DeathEffects.CreateFX(OwningActor);
-}
-
 
 ASquadUnit::ASquadUnit(const FObjectInitializer& ObjectInitializer):
 	Super(ObjectInitializer), AnimBp_SquadUnit(nullptr), M_ActiveCommand(EAbilityID::IdIdle),
@@ -3012,6 +2839,8 @@ void ASquadUnit::BeginPlay()
 void ASquadUnit::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Super::EndPlay(EndPlayReason);
+	// Anything can destroy a corpse mid-fall; a count that never comes down would end up refusing every ragdoll.
+	UnitDies_SetCountsAsSimulatingRagdoll(false);
 	EndStress();
 	ClearCoverStateInternal(false);
 	if (UWorld* World = GetWorld())
@@ -3667,6 +3496,18 @@ bool ASquadUnit::GetIsValidSquadController() const
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_SquadController",
 	                                                      "ASquadUnit::GetIsValidSquadController");
+	return false;
+}
+
+bool ASquadUnit::GetIsValidOptimizationComp() const
+{
+	if (IsValid(M_OptimizationComp))
+	{
+		return true;
+	}
+
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_OptimizationComp",
+	                                                      "ASquadUnit::GetIsValidOptimizationComp");
 	return false;
 }
 
@@ -4402,6 +4243,16 @@ void ASquadUnit::UnitDies(const ERTSDeathType DeathType)
 		return;
 	}
 
+	if (DeathType != ERTSDeathType::Kinetic)
+	{
+		// Fire and radiation have no impact to throw the body with; it drops as the montage ends.
+		M_DeathHit = FSquadUnitDeathHit();
+	}
+	if (M_RagdollSettings.GetShouldSkipDeathMontage(DeathType, GetMesh()) && UnitDies_GetFitsRagdollBudget())
+	{
+		UnitDies_OnDeathMontageFinished();
+		return;
+	}
 	UnitDies_StartDeathSequence(bUseCrouchedDeathMontage);
 }
 
@@ -4508,14 +4359,106 @@ void ASquadUnit::UnitDies_OnDeathMontageFinished()
 		World->GetTimerManager().ClearTimer(M_DeathTimerHandle);
 	}
 
-	if (not M_RagdollSettings.bEnableRagdoll)
+	if (not M_RagdollSettings.GetCanRagdoll(GetMesh()) || not UnitDies_GetFitsRagdollBudget())
 	{
 		Destroy();
 		return;
 	}
 
-	M_RagdollSettings.StartRagdoll(this, GetMesh(), AnimBp_SquadUnit);
-	UnitDies_ScheduleDestruction();
+	const FVector InheritedVelocity = GetVelocity();
+	UnitDies_ReleaseBodyForRagdoll();
+	UnitDies_SetCountsAsSimulatingRagdoll(true);
+	M_RagdollSettings.StartRagdoll(this, GetMesh(), AnimBp_SquadUnit, M_DeathHit, InheritedVelocity);
+	UnitDies_ScheduleCorpseSink();
+}
+
+bool ASquadUnit::UnitDies_GetFitsRagdollBudget() const
+{
+	const UWorld* World = GetWorld();
+	const URTSRagdollSubsystem* RagdollSubsystem = IsValid(World) ? World->GetSubsystem<URTSRagdollSubsystem>() : nullptr;
+	return not IsValid(RagdollSubsystem) || RagdollSubsystem->GetCanStartRagdoll();
+}
+
+void ASquadUnit::UnitDies_SetCountsAsSimulatingRagdoll(const bool bCounts)
+{
+	if (bM_CountsAsSimulatingRagdoll == bCounts)
+	{
+		return;
+	}
+	bM_CountsAsSimulatingRagdoll = bCounts;
+	const UWorld* World = GetWorld();
+	URTSRagdollSubsystem* RagdollSubsystem = IsValid(World) ? World->GetSubsystem<URTSRagdollSubsystem>() : nullptr;
+	if (not IsValid(RagdollSubsystem))
+	{
+		return;
+	}
+	bCounts ? RagdollSubsystem->NotifySoldierRagdollStarted() : RagdollSubsystem->NotifySoldierRagdollEnded();
+}
+
+void ASquadUnit::UnitDies_ReleaseBodyForRagdoll()
+{
+	if (GetIsValidOptimizationComp())
+	{
+		// Its timer would otherwise un-pause the animation or stop the mesh from ticking mid-fall.
+		M_OptimizationComp->SetOptimizationEnabled(false);
+	}
+	if (UCharacterMovementComponent* UnitMovement = GetCharacterMovement())
+	{
+		UnitMovement->StopMovementImmediately();
+		UnitMovement->DisableMovement();
+	}
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+}
+
+void ASquadUnit::UnitDies_ScheduleCorpseSink()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	World->GetTimerManager().SetTimer(
+		M_DeathTimerHandle,
+		this,
+		&ASquadUnit::UnitDies_StartCorpseSink,
+		FMath::Max(M_RagdollSettings.TimeTillDeath, KINDA_SMALL_NUMBER),
+		false);
+}
+
+void ASquadUnit::UnitDies_StartCorpseSink()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World) || M_RagdollSettings.CorpseSinkSeconds <= KINDA_SMALL_NUMBER)
+	{
+		Destroy();
+		return;
+	}
+	M_RagdollSettings.FreezeCorpse(GetMesh());
+	UnitDies_SetCountsAsSimulatingRagdoll(false);
+	M_CorpseSinkSecondsLeft = M_RagdollSettings.CorpseSinkSeconds;
+	World->GetTimerManager().SetTimer(
+		M_DeathTimerHandle,
+		this,
+		&ASquadUnit::UnitDies_TickCorpseSink,
+		SquadUnitDeathStatics::CorpseSinkInterval,
+		true);
+}
+
+void ASquadUnit::UnitDies_TickCorpseSink()
+{
+	M_CorpseSinkSecondsLeft -= SquadUnitDeathStatics::CorpseSinkInterval;
+	USkeletalMeshComponent* MeshComponent = GetMesh();
+	if (M_CorpseSinkSecondsLeft <= 0.f || not IsValid(MeshComponent))
+	{
+		Destroy();
+		return;
+	}
+	const float SinkPerTick = M_RagdollSettings.CorpseSinkDepthCm * SquadUnitDeathStatics::CorpseSinkInterval
+		/ M_RagdollSettings.CorpseSinkSeconds;
+	MeshComponent->AddWorldOffset(FVector(0.f, 0.f, -SinkPerTick));
 }
 
 void ASquadUnit::UnitDies_ScheduleDeathMontageTransition(const float MontageDuration)

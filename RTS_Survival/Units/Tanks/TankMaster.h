@@ -496,6 +496,9 @@ public:
 
 protected:
 
+	/** @return False for vehicles with no crew to throw out, such as a nomadic vehicle deployed as a building. */
+	virtual bool GetCanThrowCrewOnDeath() const;
+
 	/** @return True when an ammo cook-off was burning as this tank died; branch on it in BP_OnUnitDies. */
 	UFUNCTION(BlueprintPure, Category="Death")
 	bool GetDiedWhileAmmoCookingOff() const { return bM_DiedWhileAmmoCookingOff; }
@@ -897,6 +900,14 @@ private:
 	bool bM_IsAmmoCookingOff = false;
 	// Snapshot of bM_IsAmmoCookingOff taken as UnitDies starts, before teardown can remove the cook-off behaviour.
 	bool bM_DiedWhileAmmoCookingOff = false;
+
+	/** @brief Throws crew ragdolls out of the top of the vehicle; runs before the Blueprint can destroy it. */
+	void OnUnitDies_ThrowCrewBodies(ERTSDeathType DeathType) const;
+
+	/** @return Whether the player can see this death; bodies nobody sees would only cost frames. */
+	bool OnUnitDies_GetIsSeen() const;
+
+	bool GetIsValidOptimizationComponent() const;
 
 	// How the wreck turret is thrown when this tank dies during an ammo cook-off.
 	UPROPERTY(EditDefaultsOnly, Category="Death|Turret Toss", meta=(AllowPrivateAccess="true"))

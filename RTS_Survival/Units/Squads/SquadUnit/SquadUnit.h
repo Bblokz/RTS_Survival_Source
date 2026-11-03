@@ -14,7 +14,7 @@
 #include "RTS_Survival/RTSComponents/NavCollision/RTSNavCollision.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
-#include "RTS_Survival/Collapse/CollapseFXParameters.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnitRagdoll.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "SquadUnit.generated.h"
 
@@ -45,97 +45,6 @@ class AAISquadUnit;
 class ASquadController;
 enum class EAbilityID : uint8;
 
-
-/**
- * @brief Configures and applies ragdoll behaviour for a squad unit when it dies.
- */
-USTRUCT(BlueprintType)
-struct FSquadUnitRagdoll
-{
-	GENERATED_BODY()
-
-	FSquadUnitRagdoll();
-
-	/**
-	 * @brief Starts ragdoll simulation after the death montage has completed.
-	 * @param OwningActor Actor owning this ragdoll configuration, used for error reporting and timers.
-	 * @param MeshComponent Skeletal mesh that ragdoll physics will be applied to.
-	 * @param AnimInstance Current animation instance driving the mesh; may be nullptr.
-	 */
-	void StartRagdoll(
-		AActor* OwningActor,
-		USkeletalMeshComponent* MeshComponent,
-		USquadUnitAnimInstance* AnimInstance);
-
-
-	/** Whether this unit should use ragdoll on death. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll")
-	bool bEnableRagdoll;
-
-	/** Collision profile name to use while ragdolled (defaults to "Ragdoll" when empty). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll")
-	FName RagdollCollisionProfileName;
-
-	/** Whether to apply an impulse when the ragdoll starts. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll")
-	bool bApplyImpulseOnDeath;
-	
-
-	/** Strength of the impulse applied in the specified direction. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll",
-		meta = (EditCondition = "bApplyImpulseOnDeath"))
-	float ImpulseStrength;
-
-	/** Direction of the impulse (local space) applied when the unit dies. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll",
-		meta = (EditCondition = "bApplyImpulseOnDeath"))
-	FVector ImpulseDirection;
-
-	/** Bone from which the impulse should be applied (for example, "pelvis"). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll",
-		meta = (EditCondition = "bApplyImpulseOnDeath"))
-	FName ImpulseBoneName;
-
-	/** Time in seconds that ragdoll physics runs after the death montage before the unit is destroyed. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll")
-	float TimeTillDeath;
-
-	/** Linear damping applied to all ragdoll bodies (acts like friction in translation). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll|Physics")
-	float LinearDamping;
-
-	/** Angular damping applied to all ragdoll bodies (acts like friction in rotation). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll|Physics")
-	float AngularDamping;
-
-	/** Mass scale applied to all ragdoll bodies (higher = heavier / less movement). */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll|Physics")
-	float MassScale;
-
-	/** Whether to clamp initial ragdoll velocities to avoid the body flying too far. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll|Physics")
-	bool bClampInitialVelocities;
-
-	/** Maximum allowed initial speed for ragdoll bodies when clamping is enabled. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll|Physics",
-		meta = (EditCondition = "bClampInitialVelocities"))
-	float MaxInitialSpeed;
-
-	/** True after ragdoll has been activated for this unit. */
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Ragdoll")
-	bool bIsRagdollActive;
-	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Ragdoll|Effects")
-	FCollapseFX DeathEffects;
-
-
-private:
-	void StopAnimations(USquadUnitAnimInstance* AnimInstance, USkeletalMeshComponent* MeshComponent) const;
-	void SetupPhysicsAndCollision(USkeletalMeshComponent* MeshComponent) const;
-	void ApplyImpulse(USkeletalMeshComponent* MeshComponent) const;
-	void ClampInitialVelocities(USkeletalMeshComponent* MeshComponent) const;
-	void StartRagdoll_CreateEffect(AActor* OwningActor);
-};
 
 USTRUCT(BlueprintType)
 struct FSquadUnitHealthResistanceOverwrite
@@ -635,6 +544,7 @@ public:
 	                         AController* EventInstigator, AActor* DamageCauser) override;
 	bool GetIsStressed() const { return M_Stress.Phase != ESquadUnitStressPhase::None; }
 	const FSquadUnitStressState& GetStressState() const { return M_Stress; }
+	const FSquadUnitRagdoll& GetRagdollSettings() const { return M_RagdollSettings; }
 	void OnProjectileHit(const bool bBounced);
 
 	/** 
@@ -977,6 +887,7 @@ private:
 
 	/** @return True when the mesh-owned squad animation instance is available. */
 	bool GetIsValidAnimBpSquadUnit() const;
+	bool GetIsValidOptimizationComp() const;
 
 	/** 
 	 * @return True if the AI controller is valid; otherwise, false.
@@ -1162,7 +1073,38 @@ private:
 	/** @brief Schedules the destruction of the unit after a delay. */
 	void UnitDies_ScheduleDestruction();
 
+	/** @brief Stops everything that still moves or tends the living soldier, so physics owns the body alone. */
+	void UnitDies_ReleaseBodyForRagdoll();
+
+	/** @return Whether one more ragdoll fits the cap shared with thrown crew; if not the soldier keeps his montage. */
+	bool UnitDies_GetFitsRagdollBudget() const;
+
+	/** @brief Keeps the shared ragdoll count honest; safe to call again with the same value. */
+	void UnitDies_SetCountsAsSimulatingRagdoll(bool bCounts);
+
+	/** @brief Schedules the end of the simulation, after which the corpse sinks away. */
+	void UnitDies_ScheduleCorpseSink();
+
+	/** @brief Freezes the corpse and starts lowering it; a body that just vanishes pops on screen. */
+	void UnitDies_StartCorpseSink();
+
+	void UnitDies_TickCorpseSink();
+
+	/**
+	 * @brief Remembers how this hit would throw the body. It must run before the damage: the same call can kill.
+	 * @param DamageAmount Damage of this hit, sets how far the body flies.
+	 * @param DamageEvent Blast events carry their epicentre; the others are hits along the causer's heading.
+	 * @param DamageCauser The projectile; nullptr for instant-hit weapons.
+	 */
+	void RecordDeathHit(float DamageAmount, FDamageEvent const& DamageEvent, const AActor* DamageCauser);
+
 	bool bM_HasCompletedDeathMontage = false;
+
+	FSquadUnitDeathHit M_DeathHit;
+
+	bool bM_CountsAsSimulatingRagdoll = false;
+
+	float M_CorpseSinkSecondsLeft = 0.f;
 
 	void StopMovementAndClearPath();
 	void UpdateAutomaticCover(URTSCoverFinderWorldSubsystem& CoverSubsystem);

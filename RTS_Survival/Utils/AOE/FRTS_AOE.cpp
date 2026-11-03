@@ -204,7 +204,7 @@ void FRTS_AOE::DealDamageInRadiusAsync(
 		[WeakDamageCauser, Epicenter, BaseDamage, SafeRadius, SafeFalloffExponent, DamageType, ShieldDamageSource](
 		TArray<FHitResult>&& HitResults)
 		{
-			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
+			FRTSBlastDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBlastDamageEvent(DamageType, Epicenter);
 			for (const FHitResult& Hit : HitResults)
 			{
 				AActor* HitActor = Hit.GetActor();
@@ -448,7 +448,7 @@ void FRTS_AOE::DealDamageVsRearArmorInRadiusAsync(
 		ActorsToIgnore,
 		[Params, FalloffDistance](TArray<FHitResult>&& HitResults)
 		{
-			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(Params.DamageType);
+			FRTSBlastDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBlastDamageEvent(Params.DamageType, Params.Epicenter);
 			if (FalloffDistance == EAoeFalloffDistance::ClosestCollision)
 			{
 				for (const TPair<TWeakObjectPtr<AActor>, float>& ActorDistance :
@@ -522,7 +522,7 @@ void FRTS_AOE::DealDamageAndCustomArmorHandlingInRadiusAsync(
 				return;
 			}
 
-			FDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBasicDamageEvent(DamageType);
+			FRTSBlastDamageEvent DamageEvent = FRTSWeaponHelpers::MakeBlastDamageEvent(DamageType, Epicenter);
 			for (const FHitResult& Hit : HitResults)
 			{
 				AActor* HitActor = Hit.GetActor();

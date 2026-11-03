@@ -136,6 +136,8 @@ public:
 	/** @return Whether this truck is movable and not a stationary base. */
 	inline bool GetIsInTruckMode() const { return M_NomadStatus == ENomadStatus::Truck; }
 
+	virtual bool GetCanThrowCrewOnDeath() const override { return GetIsInTruckMode(); }
+
 	inline ENomadStatus GetNomadicStatus() const { return M_NomadStatus; }
 
 	/**
