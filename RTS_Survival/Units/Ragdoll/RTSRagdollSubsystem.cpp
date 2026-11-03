@@ -287,8 +287,12 @@ bool URTSRagdollSubsystem::TryLeaveCorpse(const FRTSActiveCrewBody& ActiveBody) 
 		return false;
 	}
 	FRTSCorpseRequest Request;
-	Request.Side = static_cast<ERTSCrewSide>(ActiveBody.PoolIndex);
-	Request.Look = ActiveBody.Look;
+	Request.SourceMesh = M_Pools.IsValidIndex(ActiveBody.PoolIndex) ? M_Pools[ActiveBody.PoolIndex].Mesh.Get() : nullptr;
+	// The crew look replaces the first slot, as it does on the body.
+	if (IsValid(ActiveBody.Look))
+	{
+		Request.Materials.Add(ActiveBody.Look);
+	}
 	Request.Pelvis = ActiveBody.Body->GetPelvisTransform();
 	return CorpseSubsystem->TryAddCorpse(Request);
 }

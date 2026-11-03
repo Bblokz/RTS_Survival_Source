@@ -2,8 +2,11 @@
 
 #include "RTSCorpseSubsystem.h"
 
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -22,11 +25,11 @@ namespace RTSCorpseSubsystemStatics
 	TAutoConsoleVariable<int32> CVarCorpses(
 		TEXT("rts.Corpses"),
 		DefaultCorpseCap,
-		TEXT("How many crew corpses stay on the battlefield at once; 0 lets every body sink away."),
+		TEXT("How many corpses stay on the battlefield at once; 0 lets every body sink away."),
 		ECVF_Default);
 
-	constexpr int32 SideCount = 2;
 	constexpr float TrimCheckSeconds = 1.f;
+	const FName PelvisBone(TEXT("pelvis"));
 	// Hidden instances wait in per-batch slots; once all batches together hold twice the cap they are compacted.
 	constexpr int32 MaxInstancesPerCorpse = 2;
 	constexpr float GroundTraceUpCm = 100.f;
@@ -44,12 +47,35 @@ bool URTSCorpseSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 void URTSCorpseSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
-	const URTSRagdollSettings* Settings = GetDefault<URTSRagdollSettings>();
-	M_Libraries.SetNum(RTSCorpseSubsystemStatics::SideCount);
-	M_Libraries[static_cast<int32>(ERTSCrewSide::German)] = Settings->GermanCorpsePoses.LoadSynchronous();
-	M_Libraries[static_cast<int32>(ERTSCrewSide::Soviet)] = Settings->SovietCorpsePoses.LoadSynchronous();
+	LoadLibraries();
 	InWorld.GetTimerManager().SetTimer(M_TrimTimer, this, &URTSCorpseSubsystem::TrimToCap,
 	                                   RTSCorpseSubsystemStatics::TrimCheckSeconds, true);
+}
+
+void URTSCorpseSubsystem::LoadLibraries()
+{
+	const FString Folder = GetDefault<URTSRagdollSettings>()->CorpsePoseFolder.Path;
+	IAssetRegistry& AssetRegistry = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry").Get();
+#if WITH_EDITOR
+	// Editor builds scan content in the background at startup; a packaged game reads its registry ready made.
+	AssetRegistry.ScanPathsSynchronous({Folder}, false);
+#endif
+	TArray<FAssetData> LibraryAssets;
+	AssetRegistry.GetAssetsByPath(FName(*Folder), LibraryAssets, true);
+	for (const FAssetData& LibraryAsset : LibraryAssets)
+	{
+		if (not LibraryAsset.IsInstanceOf(URTSCorpsePoseLibrary::StaticClass()))
+		{
+			continue;
+		}
+		URTSCorpsePoseLibrary* Library = Cast<URTSCorpsePoseLibrary>(LibraryAsset.GetAsset());
+		if (not IsValid(Library) || Library->Poses.IsEmpty() || Library->SourceMesh.IsNull())
+		{
+			continue;
+		}
+		M_LibraryByMesh.Add(Library->SourceMesh.ToSoftObjectPath(), M_Libraries.Add(Library));
+	}
+	UE_LOG(LogRTSCorpses, Display, TEXT("RTS_CORPSE libraries=%d in %s"), M_Libraries.Num(), *Folder);
 }
 
 void URTSCorpseSubsystem::Deinitialize()
@@ -66,6 +92,31 @@ int32 URTSCorpseSubsystem::GetCorpseCap()
 	return FMath::Max(0, RTSCorpseSubsystemStatics::CVarCorpses.GetValueOnGameThread());
 }
 
+FTransform URTSCorpseSubsystem::GetPelvisTransform(const USkeletalMeshComponent* Mesh)
+{
+	if (not IsValid(Mesh))
+	{
+		return FTransform::Identity;
+	}
+	if (GetHasPelvisBody(Mesh))
+	{
+		return Mesh->GetBodyInstance(RTSCorpseSubsystemStatics::PelvisBone)->GetUnrealWorldTransform();
+	}
+	return Mesh->GetBoneIndex(RTSCorpseSubsystemStatics::PelvisBone) != INDEX_NONE
+		       ? Mesh->GetBoneTransform(RTSCorpseSubsystemStatics::PelvisBone)
+		       : Mesh->GetComponentTransform();
+}
+
+bool URTSCorpseSubsystem::GetHasPelvisBody(const USkeletalMeshComponent* Mesh)
+{
+	if (not IsValid(Mesh))
+	{
+		return false;
+	}
+	const FBodyInstance* PelvisBody = Mesh->GetBodyInstance(RTSCorpseSubsystemStatics::PelvisBone);
+	return PelvisBody != nullptr && PelvisBody->IsValidBodyInstance();
+}
+
 int32 URTSCorpseSubsystem::GetInstanceCount() const
 {
 	int32 Instances = 0;
@@ -79,9 +130,8 @@ int32 URTSCorpseSubsystem::GetInstanceCount() const
 bool URTSCorpseSubsystem::TryAddCorpse(const FRTSCorpseRequest& Request)
 {
 	const int32 Cap = GetCorpseCap();
-	const int32 SideIndex = static_cast<int32>(Request.Side);
-	const URTSCorpsePoseLibrary* Library = GetLibrary(SideIndex);
-	if (Cap == 0 || Library == nullptr || Library->Poses.IsEmpty() || not EnsureHolder())
+	const int32 LibraryIndex = GetLibraryIndex(Request.SourceMesh);
+	if (Cap == 0 || LibraryIndex == INDEX_NONE || not EnsureHolder())
 	{
 		return false;
 	}
@@ -89,14 +139,14 @@ bool URTSCorpseSubsystem::TryAddCorpse(const FRTSCorpseRequest& Request)
 	{
 		RemoveOldestCorpse();
 	}
-	const int32 PoseIndex = PickPose(*Library, Request.Pelvis, SideIndex, Request.Look);
-	const int32 BatchIndex = FindOrCreateBatch(SideIndex, PoseIndex, Request.Look);
+	const int32 PoseIndex = PickPose(LibraryIndex, Request);
+	const int32 BatchIndex = FindOrCreateBatch(LibraryIndex, PoseIndex, Request.Materials);
 	if (BatchIndex == INDEX_NONE)
 	{
 		return false;
 	}
 	FRTSCorpseBatch& Batch = M_Batches[BatchIndex];
-	const FTransform CorpseTransform = GetCorpseTransform(Library->Poses[PoseIndex], Request.Pelvis);
+	const FTransform CorpseTransform = GetCorpseTransform(M_Libraries[LibraryIndex]->Poses[PoseIndex], Request.Pelvis);
 	int32 InstanceIndex = INDEX_NONE;
 	if (Batch.FreeInstances.IsEmpty())
 	{
@@ -112,32 +162,46 @@ bool URTSCorpseSubsystem::TryAddCorpse(const FRTSCorpseRequest& Request)
 	{
 		CompactBatches();
 	}
-	UE_LOG(LogRTSCorpses, Verbose, TEXT("RTS_CORPSE add side=%d pose=%d corpses=%d instances=%d"), SideIndex,
-	       PoseIndex, M_Corpses.Num(), GetInstanceCount());
+	UE_LOG(LogRTSCorpses, Verbose, TEXT("RTS_CORPSE add mesh=%s pose=%d corpses=%d instances=%d"),
+	       *GetNameSafe(Request.SourceMesh), PoseIndex, M_Corpses.Num(), GetInstanceCount());
 	return true;
 }
 
-const URTSCorpsePoseLibrary* URTSCorpseSubsystem::GetLibrary(const int32 SideIndex) const
+int32 URTSCorpseSubsystem::GetLibraryIndex(const USkeletalMesh* SourceMesh) const
 {
-	return M_Libraries.IsValidIndex(SideIndex) ? M_Libraries[SideIndex].Get() : nullptr;
+	if (not IsValid(SourceMesh))
+	{
+		return INDEX_NONE;
+	}
+	const int32* LibraryIndex = M_LibraryByMesh.Find(FSoftObjectPath(SourceMesh));
+	return LibraryIndex != nullptr ? *LibraryIndex : INDEX_NONE;
 }
 
-int32 URTSCorpseSubsystem::PickPose(const URTSCorpsePoseLibrary& Library, const FTransform& Pelvis,
-                                    const int32 SideIndex, const UMaterialInterface* Look) const
+const URTSCorpsePoseLibrary* URTSCorpseSubsystem::GetLibraryFor(const USkeletalMesh* SourceMesh) const
 {
+	const int32 LibraryIndex = GetLibraryIndex(SourceMesh);
+	return LibraryIndex == INDEX_NONE ? nullptr : M_Libraries[LibraryIndex].Get();
+}
+
+int32 URTSCorpseSubsystem::PickPose(const int32 LibraryIndex, const FRTSCorpseRequest& Request) const
+{
+	const URTSCorpsePoseLibrary& Library = *M_Libraries[LibraryIndex];
 	// How the pelvis lies (face up, face down, on a side) shows in how high each of its axes points; a turn about
 	// the vertical does not change that, and the corpse is turned to the body's heading afterwards.
 	const FVector BodyAxes[] = {
-		Pelvis.GetUnitAxis(EAxis::X), Pelvis.GetUnitAxis(EAxis::Y), Pelvis.GetUnitAxis(EAxis::Z)
+		Request.Pelvis.GetUnitAxis(EAxis::X), Request.Pelvis.GetUnitAxis(EAxis::Y), Request.Pelvis.GetUnitAxis(EAxis::Z)
 	};
 	TArray<float> Scores;
 	Scores.Reserve(Library.Poses.Num());
 	float BestScore = TNumericLimits<float>::Max();
 	for (const FRTSCorpsePose& Pose : Library.Poses)
 	{
-		const float Score = FMath::Square(Pose.PelvisAxisX.Z - BodyAxes[0].Z)
-			+ FMath::Square(Pose.PelvisAxisY.Z - BodyAxes[1].Z)
-			+ FMath::Square(Pose.PelvisAxisZ.Z - BodyAxes[2].Z);
+		// Without a body to match every pose scores the same, so the pick below is random.
+		const float Score = not Request.bMatchPelvis
+			                    ? 0.f
+			                    : FMath::Square(Pose.PelvisAxisX.Z - BodyAxes[0].Z)
+			                    + FMath::Square(Pose.PelvisAxisY.Z - BodyAxes[1].Z)
+			                    + FMath::Square(Pose.PelvisAxisZ.Z - BodyAxes[2].Z);
 		Scores.Add(Score);
 		BestScore = FMath::Min(BestScore, Score);
 	}
@@ -154,7 +218,8 @@ int32 URTSCorpseSubsystem::PickPose(const URTSCorpsePoseLibrary& Library, const 
 	TArray<int32, TInlineAllocator<16>> MatchesWithFreeSlot;
 	for (const int32 PoseIndex : CloseMatches)
 	{
-		if (GetHasFreeInstance(SideIndex, PoseIndex, Look))
+		const int32 BatchIndex = FindBatch(LibraryIndex, PoseIndex, Request.Materials);
+		if (BatchIndex != INDEX_NONE && not M_Batches[BatchIndex].FreeInstances.IsEmpty())
 		{
 			MatchesWithFreeSlot.Add(PoseIndex);
 		}
@@ -163,17 +228,28 @@ int32 URTSCorpseSubsystem::PickPose(const URTSCorpsePoseLibrary& Library, const 
 	return Choices[FMath::RandRange(0, Choices.Num() - 1)];
 }
 
-bool URTSCorpseSubsystem::GetHasFreeInstance(const int32 SideIndex, const int32 PoseIndex,
-                                             const UMaterialInterface* Look) const
+int32 URTSCorpseSubsystem::FindBatch(const int32 LibraryIndex, const int32 PoseIndex,
+                                     const TArray<UMaterialInterface*>& Materials) const
 {
-	for (const FRTSCorpseBatch& Batch : M_Batches)
+	for (int32 BatchIndex = 0; BatchIndex < M_Batches.Num(); ++BatchIndex)
 	{
-		if (Batch.SideIndex == SideIndex && Batch.PoseIndex == PoseIndex && Batch.Look == Look)
+		const FRTSCorpseBatch& Batch = M_Batches[BatchIndex];
+		if (Batch.LibraryIndex != LibraryIndex || Batch.PoseIndex != PoseIndex
+			|| Batch.Materials.Num() != Materials.Num())
 		{
-			return not Batch.FreeInstances.IsEmpty();
+			continue;
+		}
+		bool bSameLook = true;
+		for (int32 Slot = 0; Slot < Materials.Num() && bSameLook; ++Slot)
+		{
+			bSameLook = Batch.Materials[Slot] == Materials[Slot];
+		}
+		if (bSameLook)
+		{
+			return BatchIndex;
 		}
 	}
-	return false;
+	return INDEX_NONE;
 }
 
 void URTSCorpseSubsystem::CompactBatches()
@@ -211,15 +287,15 @@ void URTSCorpseSubsystem::CompactBatch(const int32 BatchIndex)
 	}
 }
 
-bool URTSCorpseSubsystem::GetCorpse(const int32 CorpseIndex, int32& OutSideIndex, int32& OutPoseIndex,
-                                    FTransform& OutTransform) const
+bool URTSCorpseSubsystem::GetCorpse(const int32 CorpseIndex, const URTSCorpsePoseLibrary*& OutLibrary,
+                                    int32& OutPoseIndex, FTransform& OutTransform) const
 {
 	if (not M_Corpses.IsValidIndex(CorpseIndex) || not M_Batches.IsValidIndex(M_Corpses[CorpseIndex].BatchIndex))
 	{
 		return false;
 	}
 	const FRTSCorpseBatch& Batch = M_Batches[M_Corpses[CorpseIndex].BatchIndex];
-	OutSideIndex = Batch.SideIndex;
+	OutLibrary = M_Libraries.IsValidIndex(Batch.LibraryIndex) ? M_Libraries[Batch.LibraryIndex].Get() : nullptr;
 	OutPoseIndex = Batch.PoseIndex;
 	return IsValid(Batch.Component)
 		&& Batch.Component->GetInstanceTransform(M_Corpses[CorpseIndex].InstanceIndex, OutTransform, true);
@@ -270,17 +346,15 @@ FQuat URTSCorpseSubsystem::GetGroundTilt(const FVector& GroundNormal) const
 	return FQuat(TiltAxis.GetSafeNormal(), TiltRadians);
 }
 
-int32 URTSCorpseSubsystem::FindOrCreateBatch(const int32 SideIndex, const int32 PoseIndex, UMaterialInterface* Look)
+int32 URTSCorpseSubsystem::FindOrCreateBatch(const int32 LibraryIndex, const int32 PoseIndex,
+                                             const TArray<UMaterialInterface*>& Materials)
 {
-	for (int32 BatchIndex = 0; BatchIndex < M_Batches.Num(); ++BatchIndex)
+	const int32 ExistingBatch = FindBatch(LibraryIndex, PoseIndex, Materials);
+	if (ExistingBatch != INDEX_NONE)
 	{
-		const FRTSCorpseBatch& Batch = M_Batches[BatchIndex];
-		if (Batch.SideIndex == SideIndex && Batch.PoseIndex == PoseIndex && Batch.Look == Look)
-		{
-			return BatchIndex;
-		}
+		return ExistingBatch;
 	}
-	const FRTSCorpsePose& Pose = GetLibrary(SideIndex)->Poses[PoseIndex];
+	const FRTSCorpsePose& Pose = M_Libraries[LibraryIndex]->Poses[PoseIndex];
 	if (not IsValid(Pose.Mesh))
 	{
 		return INDEX_NONE;
@@ -294,9 +368,13 @@ int32 URTSCorpseSubsystem::FindOrCreateBatch(const int32 SideIndex, const int32 
 	Component->SetCanEverAffectNavigation(false);
 	Component->SetGenerateOverlapEvents(false);
 	Component->SetCastShadow(GetDefault<URTSRagdollSettings>()->bCorpsesCastShadows);
-	if (IsValid(Look))
+	// Pose mesh slots match the soldier mesh's slots, so the soldier's materials apply as they are.
+	for (int32 Slot = 0; Slot < Materials.Num(); ++Slot)
 	{
-		Component->SetMaterial(0, Look);
+		if (IsValid(Materials[Slot]))
+		{
+			Component->SetMaterial(Slot, Materials[Slot]);
+		}
 	}
 	Component->SetupAttachment(M_Holder->GetRootComponent());
 	Component->RegisterComponent();
@@ -304,8 +382,8 @@ int32 URTSCorpseSubsystem::FindOrCreateBatch(const int32 SideIndex, const int32 
 
 	FRTSCorpseBatch Batch;
 	Batch.Component = Component;
-	Batch.Look = Look;
-	Batch.SideIndex = SideIndex;
+	Batch.Materials.Append(Materials);
+	Batch.LibraryIndex = LibraryIndex;
 	Batch.PoseIndex = PoseIndex;
 	return M_Batches.Add(Batch);
 }

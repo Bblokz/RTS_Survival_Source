@@ -15,7 +15,6 @@ COLUMNS = 4
 CROP = (240, 60, 1040, 660)
 TILE = (400, 300)
 LABEL_FONT = "C:/Windows/Fonts/arialbd.ttf"
-SIDES = ("Scav", "Mosin")
 # The speckled floor shimmers between frames, so the mean difference is noise. A wrong pose moves a whole limb:
 # thousands of pixels change by more than BIG_CHANGE. Matching shots stay near 0.01 %.
 BIG_CHANGE = 60
@@ -57,8 +56,10 @@ def make_sheet(directory, names, shot, info, out_path):
 def main():
     directory = Path(sys.argv[1])
     info = read_log(sys.argv[2])
-    for side in SIDES:
-        names = sorted(name for name in info if name.startswith(side + "_"))
+    # Pose names are <Prefix>_<NN>, one prefix per soldier mesh.
+    prefixes = sorted({name.rsplit("_", 1)[0] for name in info})
+    for side in prefixes:
+        names = sorted(name for name in info if name.rsplit("_", 1)[0] == side)
         for shot, suffix in (("baked", "top"), ("side", "side")):
             make_sheet(directory, names, shot, info, directory / f"sheet_{side}_{suffix}.png")
         for name in names:

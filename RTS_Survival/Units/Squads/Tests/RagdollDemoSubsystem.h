@@ -8,6 +8,7 @@
 
 class ACPPController;
 class ARTSPooledRagdoll;
+class UMaterialInterface;
 class ASceneCapture2D;
 class AStaticMeshActor;
 class UStaticMesh;
@@ -57,10 +58,24 @@ struct FRagdollPoseBakeState
 	UPROPERTY()
 	TWeakObjectPtr<AStaticMeshActor> PreviewActor;
 
+	// What to bake: one entry per soldier mesh, each with its own library.
+	UPROPERTY()
+	TArray<TObjectPtr<USkeletalMesh>> EntryMeshes;
+
+	// Material of the first slot while baking; null keeps the mesh's own.
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInterface>> EntryLooks;
+
+	TArray<FString> EntryPrefixes;
+	TArray<int32> EntryCounts;
+	// The entry each thrown body belongs to.
+	TArray<int32> PoseEntries;
 	TArray<FString> PoseNames;
 	TArray<FVector> Pivots;
 	// The pelvis of each pose as it was baked; the corpse library matches settled bodies against it.
 	TArray<FTransform> Pelvises;
+	// How far each baked pose reaches below the ground; deep ones stay out of the library.
+	TArray<float> LowestZ;
 	FVector PlatformTop = FVector::ZeroVector;
 	int32 ShotIndex = 0;
 	int32 ShotFrame = 0;
@@ -83,8 +98,9 @@ struct FRagdollDemoSubject
  * attacker-less hit, writes one PNG per frame and logs how each body moved (RTS_RGD lines), then quits.
  * With -RagdollCrew it films one player and one enemy tank dying, then stresses the pool (RTS_RGC lines).
  * With -RagdollBench it times spawning against two kinds of pool instead and logs simulation cost (RTS_RGB lines).
- * With -RagdollPoseBake it throws crew bodies onto a platform, bakes each settled pose into a static mesh for the
- * corpse library and photographs ragdoll and baked mesh side by side (RTS_RGP lines).
+ * With -RagdollPoseBake it throws soldier bodies onto a platform, bakes each settled pose into a static mesh for the
+ * corpse libraries and photographs ragdoll and baked mesh side by side (RTS_RGP lines); -RagdollPoseMeshes=<file>
+ * lists the meshes as Prefix|MeshPath|Count lines, else the two crew meshes are baked.
  * With -RagdollCorpseBench it fills the field with 0 to 400 battlefield corpses, timing frames and taking a picture
  * at each step (RTS_RGB and RTS_RGK lines).
  */
@@ -138,12 +154,14 @@ private:
 
 	// ---- Corpse pose library bake (RagdollDemoPoseBake.cpp) ----
 	bool TryStartPoseBake();
+	bool ReadPoseBakeEntries();
 	bool SpawnPosePlatform();
 	void ThrowPoseBodies();
 	static void LogPosePhysicsBodies(const USkeletalMesh* CrewMesh);
 	void TickPoseSettle();
 	void BakePoses();
 	void WritePoseLibraries() const;
+	TArray<int32> GetLibraryPoses(int32 Entry) const;
 	void TickPoseShoot();
 	void SetUpPoseShot(int32 PoseIndex, int32 ShotKind) const;
 

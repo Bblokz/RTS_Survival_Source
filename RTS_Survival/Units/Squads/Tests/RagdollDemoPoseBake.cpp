@@ -19,6 +19,7 @@
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/CommandLine.h"
+#include "Misc/FileHelper.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 #if WITH_EDITOR
 #include "Rendering/SkeletalMeshLODModel.h"
@@ -60,8 +61,18 @@ namespace RagdollPoseBakePrivate
 	// Meshes go to a subfolder; the libraries the game reads (URTSRagdollSettings) sit next to it.
 	const TCHAR* const MeshFolderSwitch = TEXT("RagdollPoseFolder=");
 	const TCHAR* const DefaultMeshFolder = TEXT("Candidates");
-	const TCHAR* const LibraryNames[SideCount] = {TEXT("DA_CorpsePoses_Scav"), TEXT("DA_CorpsePoses_Mosin")};
+	const TCHAR* const LibraryPrefix = TEXT("DA_CorpsePoses_");
 	const TCHAR* const SidePrefixes[SideCount] = {TEXT("Scav"), TEXT("Mosin")};
+	// A text file of Prefix|SkeletalMeshPath|Count lines; without it the two crew meshes are baked.
+	const TCHAR* const MeshListSwitch = TEXT("RagdollPoseMeshes=");
+	const TCHAR* const MeshListSeparator = TEXT("|");
+	const TCHAR* const MeshListComment = TEXT("#");
+	constexpr int32 MeshListFields = 3;
+	constexpr int32 MaxPosesPerMesh = 32;
+	// A corpse sinking deeper than this into flat ground shows a buried head or leg; such poses are left out of the
+	// library while enough others remain.
+	constexpr float MaxPoseSinkCm = 5.f;
+	constexpr int32 MinPosesPerLibrary = 6;
 	const FName PelvisBone(TEXT("pelvis"));
 
 	enum class EPoseShot : uint8
@@ -89,6 +100,11 @@ namespace RagdollPoseBakePrivate
 bool URagdollDemoSubsystem::TryStartPoseBake()
 {
 	using namespace RagdollPoseBakePrivate;
+	if (not ReadPoseBakeEntries())
+	{
+		Finish(TEXT("no_pose_meshes"));
+		return false;
+	}
 	if (not SpawnPosePlatform())
 	{
 		Finish(TEXT("no_pose_platform"));
@@ -96,6 +112,53 @@ bool URagdollDemoSubsystem::TryStartPoseBake()
 	}
 	ThrowPoseBodies();
 	return true;
+}
+
+bool URagdollDemoSubsystem::ReadPoseBakeEntries()
+{
+	using namespace RagdollPoseBakePrivate;
+	FString ListPath;
+	if (not FParse::Value(FCommandLine::Get(), MeshListSwitch, ListPath, /*bShouldStopOnSeparator=*/false))
+	{
+		// The two crew meshes in the order of the first bake, so the approved poses come out the same.
+		const URTSRagdollSettings* Settings = GetDefault<URTSRagdollSettings>();
+		int32 Count = DefaultPosesPerSide;
+		FParse::Value(FCommandLine::Get(), CountSwitch, Count);
+		const FRTSCrewBodyType* CrewTypes[SideCount] = {&Settings->GermanCrew, &Settings->SovietCrew};
+		for (int32 Side = 0; Side < SideCount; ++Side)
+		{
+			M_PoseBake.EntryPrefixes.Add(SidePrefixes[Side]);
+			M_PoseBake.EntryMeshes.Add(CrewTypes[Side]->Mesh.LoadSynchronous());
+			// German bodies wear the plain Scavenger look so the pictures compare poses, not uniforms.
+			M_PoseBake.EntryLooks.Add(CrewTypes[Side]->Materials.IsEmpty() ? nullptr
+				                          : CrewTypes[Side]->Materials[0].LoadSynchronous());
+			M_PoseBake.EntryCounts.Add(FMath::Clamp(Count, 1, DefaultPosesPerSide));
+		}
+		return true;
+	}
+	TArray<FString> Lines;
+	FFileHelper::LoadFileToStringArray(Lines, *ListPath);
+	for (const FString& RawLine : Lines)
+	{
+		const FString Line = RawLine.TrimStartAndEnd();
+		TArray<FString> Fields;
+		if (Line.IsEmpty() || Line.StartsWith(MeshListComment)
+			|| Line.ParseIntoArray(Fields, MeshListSeparator) != MeshListFields)
+		{
+			continue;
+		}
+		USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr, *Fields[1].TrimStartAndEnd());
+		if (not IsValid(Mesh))
+		{
+			UE_LOG(LogRTSRagdollPoseBake, Error, TEXT("RTS_RGP mesh not found: %s"), *Fields[1]);
+			continue;
+		}
+		M_PoseBake.EntryPrefixes.Add(Fields[0].TrimStartAndEnd());
+		M_PoseBake.EntryMeshes.Add(Mesh);
+		M_PoseBake.EntryLooks.Add(nullptr);
+		M_PoseBake.EntryCounts.Add(FMath::Clamp(FCString::Atoi(*Fields[2]), 1, MaxPosesPerMesh));
+	}
+	return not M_PoseBake.EntryMeshes.IsEmpty();
 }
 
 bool URagdollDemoSubsystem::SpawnPosePlatform()
@@ -116,7 +179,11 @@ bool URagdollDemoSubsystem::SpawnPosePlatform()
 	{
 		return false;
 	}
-	const int32 Rows = SideCount * FMath::DivideAndRoundUp(DefaultPosesPerSide, Columns);
+	int32 Rows = 0;
+	for (const int32 Count : M_PoseBake.EntryCounts)
+	{
+		Rows += FMath::DivideAndRoundUp(Count, Columns);
+	}
 	const FVector PlatformSize((Columns - 1) * SlotSpacingCm + 2.f * PlatformMarginCm,
 	                           (Rows - 1) * SlotSpacingCm + 2.f * PlatformMarginCm, PlatformThicknessCm);
 	UStaticMeshComponent* PlatformComponent = Platform->GetStaticMeshComponent();
@@ -210,40 +277,37 @@ void URagdollDemoSubsystem::ThrowPoseBodies()
 {
 	using namespace RagdollPoseBakePrivate;
 	const URTSRagdollSettings* Settings = GetDefault<URTSRagdollSettings>();
-	int32 PosesPerSide = DefaultPosesPerSide;
 	int32 Seed = DefaultSeed;
-	FParse::Value(FCommandLine::Get(), CountSwitch, PosesPerSide);
 	FParse::Value(FCommandLine::Get(), SeedSwitch, Seed);
-	PosesPerSide = FMath::Clamp(PosesPerSide, 1, DefaultPosesPerSide);
 	FRandomStream Random(Seed);
 	UPhysicalMaterial* CorpseMaterial = FSquadUnitRagdoll::CreateCorpseMaterial(this);
-	const FRTSCrewBodyType* CrewTypes[SideCount] = {&Settings->GermanCrew, &Settings->SovietCrew};
-	const int32 RowsPerSide = FMath::DivideAndRoundUp(DefaultPosesPerSide, Columns);
+	int32 TotalRows = 0;
+	for (const int32 Count : M_PoseBake.EntryCounts)
+	{
+		TotalRows += FMath::DivideAndRoundUp(Count, Columns);
+	}
 	const float HalfWidth = (Columns - 1) * SlotSpacingCm * 0.5f;
-	const float HalfDepth = (SideCount * RowsPerSide - 1) * SlotSpacingCm * 0.5f;
+	const float HalfDepth = (TotalRows - 1) * SlotSpacingCm * 0.5f;
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	for (int32 Side = 0; Side < SideCount; ++Side)
+	int32 FirstRow = 0;
+	for (int32 Entry = 0; Entry < M_PoseBake.EntryMeshes.Num(); ++Entry)
 	{
-		USkeletalMesh* CrewMesh = CrewTypes[Side]->Mesh.LoadSynchronous();
-		LogPosePhysicsBodies(CrewMesh);
-		// German bodies wear the plain Scavenger look so the pictures compare poses, not uniforms.
-		UMaterialInterface* Look = CrewTypes[Side]->Materials.IsEmpty()
-			                           ? nullptr
-			                           : CrewTypes[Side]->Materials[0].LoadSynchronous();
-		for (int32 PoseIndex = 0; PoseIndex < PosesPerSide; ++PoseIndex)
+		USkeletalMesh* SoldierMesh = M_PoseBake.EntryMeshes[Entry];
+		LogPosePhysicsBodies(SoldierMesh);
+		for (int32 PoseIndex = 0; PoseIndex < M_PoseBake.EntryCounts[Entry]; ++PoseIndex)
 		{
 			ARTSPooledRagdoll* Body = GetWorld()->SpawnActor<ARTSPooledRagdoll>(
 				ARTSPooledRagdoll::StaticClass(), FTransform::Identity, SpawnParameters);
-			if (not IsValid(Body) || not IsValid(CrewMesh))
+			if (not IsValid(Body) || not IsValid(SoldierMesh))
 			{
 				continue;
 			}
-			const int32 Row = Side * RowsPerSide + PoseIndex / Columns;
+			const int32 Row = FirstRow + PoseIndex / Columns;
 			const FVector Slot = M_PoseBake.PlatformTop + FVector((PoseIndex % Columns) * SlotSpacingCm - HalfWidth,
 			                                                      Row * SlotSpacingCm - HalfDepth, StartHeightCm);
-			Body->InitializeForPool(CrewMesh, CorpseMaterial);
-			Body->Wake(Slot, FRotator(0.f, Random.FRandRange(0.f, FullCircleDegrees), 0.f), Look);
+			Body->InitializeForPool(SoldierMesh, CorpseMaterial);
+			Body->Wake(Slot, FRotator(0.f, Random.FRandRange(0.f, FullCircleDegrees), 0.f), M_PoseBake.EntryLooks[Entry]);
 			// Half thrown like an ordinary death, half like a cook-off, as in play.
 			const FRTSCrewThrow& Throw = PoseIndex % 2 == 0 ? Settings->OrdinaryDeath : Settings->CookOffDeath;
 			const FVector Outward = FRotator(0.f, Random.FRandRange(0.f, FullCircleDegrees), 0.f).Vector();
@@ -259,11 +323,13 @@ void URagdollDemoSubsystem::ThrowPoseBodies()
 				}
 			}));
 			M_PoseBake.Bodies.Add(Body);
-			M_PoseBake.PoseNames.Add(FString::Printf(TEXT("%s_%02d"), SidePrefixes[Side], PoseIndex + 1));
+			M_PoseBake.PoseEntries.Add(Entry);
+			M_PoseBake.PoseNames.Add(FString::Printf(TEXT("%s_%02d"), *M_PoseBake.EntryPrefixes[Entry], PoseIndex + 1));
 		}
+		FirstRow += FMath::DivideAndRoundUp(M_PoseBake.EntryCounts[Entry], Columns);
 	}
-	UE_LOG(LogRTSRagdollPoseBake, Display, TEXT("RTS_RGP thrown=%d seed=%d platform=%s"), M_PoseBake.Bodies.Num(),
-	       Seed, *M_PoseBake.PlatformTop.ToCompactString());
+	UE_LOG(LogRTSRagdollPoseBake, Display, TEXT("RTS_RGP thrown=%d meshes=%d seed=%d platform=%s"),
+	       M_PoseBake.Bodies.Num(), M_PoseBake.EntryMeshes.Num(), Seed, *M_PoseBake.PlatformTop.ToCompactString());
 }
 
 void URagdollDemoSubsystem::TickPoseSettle()
@@ -325,6 +391,7 @@ void URagdollDemoSubsystem::BakePoses()
 			M_PoseBake.BakedMeshes.Add(nullptr);
 			M_PoseBake.Pivots.Add(FVector::ZeroVector);
 			M_PoseBake.Pelvises.Add(FTransform::Identity);
+			M_PoseBake.LowestZ.Add(0.f);
 			continue;
 		}
 		const bool bAsleep = Body->GetIsAsleep();
@@ -358,6 +425,7 @@ void URagdollDemoSubsystem::BakePoses()
 		M_PoseBake.BakedMeshes.Add(Result.Mesh);
 		M_PoseBake.Pivots.Add(Pivot);
 		M_PoseBake.Pelvises.Add(Pelvis);
+		M_PoseBake.LowestZ.Add(Result.LowestZ);
 		// Pelvis axes tell face up, face down or on the side apart; the library will match poses on them later.
 		UE_LOG(LogRTSRagdollPoseBake, Display,
 		       TEXT("RTS_RGP pose=%s asleep=%d saved=%d tris=%d lowest_z=%.1f lowest_bone=%s pelvis_h=%.1f pelvis_x=%s pelvis_y=%s pelvis_z=%s"),
@@ -368,23 +436,47 @@ void URagdollDemoSubsystem::BakePoses()
 	}
 }
 
+TArray<int32> URagdollDemoSubsystem::GetLibraryPoses(const int32 Entry) const
+{
+	using namespace RagdollPoseBakePrivate;
+	TArray<int32> Poses;
+	for (int32 PoseIndex = 0; PoseIndex < M_PoseBake.BakedMeshes.Num(); ++PoseIndex)
+	{
+		if (M_PoseBake.PoseEntries[PoseIndex] == Entry && IsValid(M_PoseBake.BakedMeshes[PoseIndex]))
+		{
+			Poses.Add(PoseIndex);
+		}
+	}
+	// Least sinking first, so the deep ones are the ones left out.
+	Poses.StableSort([this](const int32 First, const int32 Second)
+	{
+		return M_PoseBake.LowestZ[First] > M_PoseBake.LowestZ[Second];
+	});
+	int32 Kept = Poses.Num();
+	while (Kept > MinPosesPerLibrary && M_PoseBake.LowestZ[Poses[Kept - 1]] < -MaxPoseSinkCm)
+	{
+		UE_LOG(LogRTSRagdollPoseBake, Display, TEXT("RTS_RGP left out pose=%s lowest_z=%.1f"),
+		       *M_PoseBake.PoseNames[Poses[Kept - 1]], M_PoseBake.LowestZ[Poses[Kept - 1]]);
+		--Kept;
+	}
+	Poses.SetNum(Kept);
+	Poses.Sort();
+	return Poses;
+}
+
 void URagdollDemoSubsystem::WritePoseLibraries() const
 {
 	using namespace RagdollPoseBakePrivate;
 #if WITH_EDITOR
-	for (int32 Side = 0; Side < SideCount; ++Side)
+	for (int32 Entry = 0; Entry < M_PoseBake.EntryMeshes.Num(); ++Entry)
 	{
-		const FString PackagePath = FString(CorpsePosesFolder) + LibraryNames[Side];
-		UPackage* Package = CorpsePoseBaker::CreateAssetPackage(PackagePath);
-		URTSCorpsePoseLibrary* Library = NewObject<URTSCorpsePoseLibrary>(Package, LibraryNames[Side],
+		const FString LibraryName = FString(LibraryPrefix) + M_PoseBake.EntryPrefixes[Entry];
+		UPackage* Package = CorpsePoseBaker::CreateAssetPackage(FString(CorpsePosesFolder) + LibraryName);
+		URTSCorpsePoseLibrary* Library = NewObject<URTSCorpsePoseLibrary>(Package, *LibraryName,
 		                                                                 RF_Public | RF_Standalone);
-		for (int32 PoseIndex = 0; PoseIndex < M_PoseBake.BakedMeshes.Num(); ++PoseIndex)
+		Library->SourceMesh = M_PoseBake.EntryMeshes[Entry].Get();
+		for (const int32 PoseIndex : GetLibraryPoses(Entry))
 		{
-			if (not M_PoseBake.PoseNames[PoseIndex].StartsWith(SidePrefixes[Side])
-				|| not IsValid(M_PoseBake.BakedMeshes[PoseIndex]))
-			{
-				continue;
-			}
 			const FTransform& Pelvis = M_PoseBake.Pelvises[PoseIndex];
 			FRTSCorpsePose Pose;
 			Pose.Mesh = M_PoseBake.BakedMeshes[PoseIndex];
@@ -394,7 +486,7 @@ void URagdollDemoSubsystem::WritePoseLibraries() const
 			Library->Poses.Add(Pose);
 		}
 		const bool bSaved = CorpsePoseBaker::SaveAsset(Package, Library);
-		UE_LOG(LogRTSRagdollPoseBake, Display, TEXT("RTS_RGP library=%s poses=%d saved=%d"), LibraryNames[Side],
+		UE_LOG(LogRTSRagdollPoseBake, Display, TEXT("RTS_RGP library=%s poses=%d saved=%d"), *LibraryName,
 		       Library->Poses.Num(), bSaved ? 1 : 0);
 	}
 #endif

@@ -3,6 +3,7 @@
 #include "RTSPooledRagdoll.h"
 
 #include "Components/SkeletalMeshComponent.h"
+#include "RTSCorpseSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace RTSPooledRagdollStatics
@@ -12,7 +13,6 @@ namespace RTSPooledRagdollStatics
 	// The launch moves the whole body; the kick on the upper spine makes the limbs trail behind it.
 	const FName KickBone(TEXT("spine_02"));
 	constexpr float BoneKickShare = 0.3f;
-	const FName PelvisBone(TEXT("pelvis"));
 }
 
 ARTSPooledRagdoll::ARTSPooledRagdoll()
@@ -118,18 +118,7 @@ FTransform ARTSPooledRagdoll::GetPelvisTransform() const
 	{
 		return GetActorTransform();
 	}
-	// Bones only refresh while the mesh is rendered, so a body that fell out of view would report where it woke;
-	// the physics body always knows where it lies.
-	if (const FBodyInstance* PelvisBody = M_CrewMesh->GetBodyInstance(RTSPooledRagdollStatics::PelvisBone))
-	{
-		if (PelvisBody->IsValidBodyInstance())
-		{
-			return PelvisBody->GetUnrealWorldTransform();
-		}
-	}
-	return M_CrewMesh->GetBoneIndex(RTSPooledRagdollStatics::PelvisBone) != INDEX_NONE
-		       ? M_CrewMesh->GetBoneTransform(RTSPooledRagdollStatics::PelvisBone)
-		       : M_CrewMesh->GetComponentTransform();
+	return URTSCorpseSubsystem::GetPelvisTransform(M_CrewMesh);
 }
 
 bool ARTSPooledRagdoll::GetIsValidCrewMesh() const

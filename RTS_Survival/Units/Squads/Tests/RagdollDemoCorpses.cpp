@@ -123,13 +123,16 @@ void URagdollDemoSubsystem::AddBenchCorpses(const int32 TargetCount)
 	using namespace RagdollCorpseBenchPrivate;
 	URTSCorpseSubsystem* Corpses = GetWorld()->GetSubsystem<URTSCorpseSubsystem>();
 	const URTSRagdollSettings* Settings = GetDefault<URTSRagdollSettings>();
-	const URTSCorpsePoseLibrary* Libraries[] = {
-		Settings->GermanCorpsePoses.LoadSynchronous(), Settings->SovietCorpsePoses.LoadSynchronous()
-	};
 	if (not IsValid(Corpses))
 	{
 		return;
 	}
+	const USkeletalMesh* CrewMeshes[] = {
+		Settings->GermanCrew.Mesh.LoadSynchronous(), Settings->SovietCrew.Mesh.LoadSynchronous()
+	};
+	const URTSCorpsePoseLibrary* Libraries[] = {
+		Corpses->GetLibraryFor(CrewMeshes[0]), Corpses->GetLibraryFor(CrewMeshes[1])
+	};
 	FRandomStream& Random = M_CorpseBench.Random;
 	while (Corpses->GetCorpseCount() < TargetCount)
 	{
@@ -145,13 +148,16 @@ void URagdollDemoSubsystem::AddBenchCorpses(const int32 TargetCount)
 		const float Distance = FMath::Sqrt(Random.FRand()) * FieldRadiusCm;
 		const FVector Offset = FRotator(0.f, Random.FRandRange(0.f, FullCircleDegrees), 0.f).Vector() * Distance;
 		FRTSCorpseRequest Request;
-		Request.Side = static_cast<ERTSCrewSide>(Side);
+		Request.SourceMesh = CrewMeshes[Side];
 		Request.Pelvis = FTransform(
 			FQuat(FVector::UpVector, FMath::DegreesToRadians(Random.FRandRange(0.f, FullCircleDegrees))) * PoseRotation,
 			M_DemoLocation + Offset + FVector(0.f, 0.f, PelvisHeightCm));
 		const TArray<TSoftObjectPtr<UMaterialInterface>>& Looks = Side == 0 ? Settings->GermanCrew.Materials
 			                                                                : Settings->SovietCrew.Materials;
-		Request.Look = Looks.IsEmpty() ? nullptr : Looks[Random.RandRange(0, Looks.Num() - 1)].LoadSynchronous();
+		if (not Looks.IsEmpty())
+		{
+			Request.Materials.Add(Looks[Random.RandRange(0, Looks.Num() - 1)].LoadSynchronous());
+		}
 		if (not Corpses->TryAddCorpse(Request))
 		{
 			return;

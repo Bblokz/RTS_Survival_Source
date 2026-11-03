@@ -7,7 +7,6 @@
 #include "RTSRagdollSettings.generated.h"
 
 class UMaterialInterface;
-class URTSCorpsePoseLibrary;
 class USkeletalMesh;
 
 /** One side's crew: a mesh per pool, as a swap would rebuild the bodies, and looks that are free to swap. */
@@ -103,13 +102,11 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Lifetime", meta=(ClampMin="0"))
 	float SinkDepthCm = 40.f;
 
-	// Baked poses the settled German crew is left on the battlefield as; how many stay is the player's
-	// Battlefield Corpses setting (rts.Corpses). Without a library bodies sink away as before.
-	UPROPERTY(Config, EditAnywhere, Category="Corpses")
-	TSoftObjectPtr<URTSCorpsePoseLibrary> GermanCorpsePoses;
-
-	UPROPERTY(Config, EditAnywhere, Category="Corpses")
-	TSoftObjectPtr<URTSCorpsePoseLibrary> SovietCorpsePoses;
+	// Folder of the baked corpse pose libraries, one per soldier mesh; it must be in DirectoriesToAlwaysCook. Soldiers
+	// and crew whose mesh has no library sink away as before. How many corpses stay is the player's Battlefield Corpses
+	// setting (rts.Corpses).
+	UPROPERTY(Config, EditAnywhere, Category="Corpses", meta=(ContentDir))
+	FDirectoryPath CorpsePoseFolder;
 
 	// A corpse follows the ground's slope up to this angle; steeper ground would stand it up unnaturally.
 	UPROPERTY(Config, EditAnywhere, Category="Corpses", meta=(ClampMin="0", ClampMax="90"))

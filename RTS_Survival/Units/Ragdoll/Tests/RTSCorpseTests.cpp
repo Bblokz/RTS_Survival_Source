@@ -67,10 +67,15 @@ namespace RTSCorpseTestsPrivate
 		return Request;
 	}
 
+	const USkeletalMesh* GetGermanCrewMesh()
+	{
+		return GetDefault<URTSRagdollSettings>()->GermanCrew.Mesh.LoadSynchronous();
+	}
+
 	FRTSCorpseRequest MakeCorpse(const FVector& PelvisLocation, const FQuat& PelvisRotation)
 	{
 		FRTSCorpseRequest Request;
-		Request.Side = ERTSCrewSide::German;
+		Request.SourceMesh = GetGermanCrewMesh();
 		Request.Pelvis = FTransform(PelvisRotation, PelvisLocation);
 		return Request;
 	}
@@ -119,14 +124,15 @@ bool FRTSCorpseFrozenCrewTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Nothing simulates any more"), Ragdolls->GetSimulatingRagdollCount(), 0);
 	for (int32 CorpseIndex = 0; CorpseIndex < Corpses->GetCorpseCount(); ++CorpseIndex)
 	{
-		int32 Side = INDEX_NONE;
+		const URTSCorpsePoseLibrary* Library = nullptr;
 		int32 Pose = INDEX_NONE;
 		FTransform Corpse;
-		if (not TestTrue(TEXT("Corpse can be read"), Corpses->GetCorpse(CorpseIndex, Side, Pose, Corpse)))
+		if (not TestTrue(TEXT("Corpse can be read"), Corpses->GetCorpse(CorpseIndex, Library, Pose, Corpse)))
 		{
 			continue;
 		}
-		TestEqual(TEXT("A German crew body leaves a German corpse"), Side, static_cast<int32>(ERTSCrewSide::German));
+		TestTrue(TEXT("A Scavenger crew body leaves a Scavenger corpse"),
+		         Library != nullptr && Library == Corpses->GetLibraryFor(GetGermanCrewMesh()));
 		TestTrue(TEXT("Corpse lies on the ground"), FMath::Abs(Corpse.GetLocation().Z) < GroundToleranceCm);
 		// Bodies wake within the spread and a cook-off throws them metres out; a corpse inside the spread was placed
 		// where its body woke, not where it landed.
@@ -195,10 +201,10 @@ bool FRTSCorpseHighThrowTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Once down every body left a corpse"), Corpses->GetCorpseCount(), Thrown);
 	for (int32 CorpseIndex = 0; CorpseIndex < Corpses->GetCorpseCount(); ++CorpseIndex)
 	{
-		int32 Side = INDEX_NONE;
+		const URTSCorpsePoseLibrary* Library = nullptr;
 		int32 Pose = INDEX_NONE;
 		FTransform Corpse;
-		Corpses->GetCorpse(CorpseIndex, Side, Pose, Corpse);
+		Corpses->GetCorpse(CorpseIndex, Library, Pose, Corpse);
 		TestTrue(FString::Printf(TEXT("The corpse lies on the ground (at %s)"), *Corpse.GetLocation().ToCompactString()),
 		         FMath::Abs(Corpse.GetLocation().Z) < GroundToleranceCm);
 	}
@@ -230,10 +236,10 @@ bool FRTSCorpseCapTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Only the cap stays"), Corpses->GetCorpseCount(), SmallCap);
 	for (int32 CorpseIndex = 0; CorpseIndex < SmallCap; ++CorpseIndex)
 	{
-		int32 Side = INDEX_NONE;
+		const URTSCorpsePoseLibrary* Library = nullptr;
 		int32 Pose = INDEX_NONE;
 		FTransform Corpse;
-		Corpses->GetCorpse(CorpseIndex, Side, Pose, Corpse);
+		Corpses->GetCorpse(CorpseIndex, Library, Pose, Corpse);
 		const float ExpectedX = (CorpsesBeyondCap - SmallCap + CorpseIndex) * CorpseSpacingCm;
 		TestTrue(TEXT("The newest corpses stay, oldest first"),
 		         FMath::IsNearlyEqual(Corpse.GetLocation().X, ExpectedX, GroundToleranceCm));
@@ -267,10 +273,10 @@ bool FRTSCorpseTrimTest::RunTest(const FString& Parameters)
 	TestWorld.TickFor(TrimWaitSeconds);
 	TestEqual(TEXT("A lowered setting removes the oldest corpses"), Corpses->GetCorpseCount(), TrimCapAfter);
 	TestEqual(TEXT("Their instances are given back"), Corpses->GetInstanceCount(), TrimCapAfter);
-	int32 Side = INDEX_NONE;
+	const URTSCorpsePoseLibrary* Library = nullptr;
 	int32 Pose = INDEX_NONE;
 	FTransform Newest;
-	Corpses->GetCorpse(TrimCapAfter - 1, Side, Pose, Newest);
+	Corpses->GetCorpse(TrimCapAfter - 1, Library, Pose, Newest);
 	TestTrue(TEXT("The newest corpse is kept"), FMath::IsNearlyEqual(
 		         Newest.GetLocation().X, (TrimCapBefore - 1) * CorpseSpacingCm, GroundToleranceCm));
 	Cap.Set(0);
@@ -290,8 +296,9 @@ bool FRTSCorpsePoseMatchTest::RunTest(const FString& Parameters)
 	const FRagdollTestWorld TestWorld;
 	URTSCorpseSubsystem* Corpses = GetCorpses(TestWorld);
 	URTSRagdollSettings* Settings = GetMutableDefault<URTSRagdollSettings>();
-	const URTSCorpsePoseLibrary* Library = Settings->GermanCorpsePoses.LoadSynchronous();
-	const URTSCorpsePoseLibrary* SovietLibrary = Settings->SovietCorpsePoses.LoadSynchronous();
+	const URTSCorpsePoseLibrary* Library = Corpses ? Corpses->GetLibraryFor(GetGermanCrewMesh()) : nullptr;
+	const URTSCorpsePoseLibrary* SovietLibrary =
+		Corpses ? Corpses->GetLibraryFor(Settings->SovietCrew.Mesh.LoadSynchronous()) : nullptr;
 	if (not TestNotNull(TEXT("Corpse subsystem exists"), Corpses) || not TestNotNull(TEXT("German poses exist"), Library)
 		|| not TestNotNull(TEXT("Soviet poses exist"), SovietLibrary))
 	{
@@ -310,10 +317,10 @@ bool FRTSCorpsePoseMatchTest::RunTest(const FString& Parameters)
 		{
 			const FQuat BodyRotation = FQuat(FVector::UpVector, FMath::DegreesToRadians(YawDegrees)) * PoseRotation;
 			Corpses->TryAddCorpse(MakeCorpse(FVector(0.f, 0.f, PelvisHeightCm), BodyRotation));
-			int32 Side = INDEX_NONE;
+			const URTSCorpsePoseLibrary* ChosenLibrary = nullptr;
 			int32 ChosenPose = INDEX_NONE;
 			FTransform Corpse;
-			Corpses->GetCorpse(Corpses->GetCorpseCount() - 1, Side, ChosenPose, Corpse);
+			Corpses->GetCorpse(Corpses->GetCorpseCount() - 1, ChosenLibrary, ChosenPose, Corpse);
 			TestEqual(TEXT("A body lying exactly like a pose gets that pose"), ChosenPose, PoseIndex);
 			const FVector PlacedAxes[] = {
 				Corpse.GetRotation().RotateVector(Pose.PelvisAxisX), Corpse.GetRotation().RotateVector(Pose.PelvisAxisY),

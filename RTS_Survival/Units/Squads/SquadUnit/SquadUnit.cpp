@@ -34,6 +34,7 @@
 #include "RTS_Survival/RTSComponents/RTSOptimizer/RTSSquadUnitOptimizer/RTSSquadUnitOptimizer.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "Components/CapsuleComponent.h"
+#include "RTS_Survival/Units/Ragdoll/RTSCorpseSubsystem.h"
 #include "RTS_Survival/Units/Ragdoll/RTSRagdollSubsystem.h"
 #include "NavigationSystem.h"
 #include "RTS_Survival/Navigation/RTSNavigationHelpers/FRTSNavigationHelpers.h"
@@ -4361,6 +4362,8 @@ void ASquadUnit::UnitDies_OnDeathMontageFinished()
 
 	if (not M_RagdollSettings.GetCanRagdoll(GetMesh()) || not UnitDies_GetFitsRagdollBudget())
 	{
+		// The montage ends lying down, so a battlefield corpse in a random pose can take the soldier's place.
+		UnitDies_TryLeaveCorpse();
 		Destroy();
 		return;
 	}
@@ -4431,13 +4434,14 @@ void ASquadUnit::UnitDies_ScheduleCorpseSink()
 void ASquadUnit::UnitDies_StartCorpseSink()
 {
 	UWorld* World = GetWorld();
-	if (not IsValid(World) || M_RagdollSettings.CorpseSinkSeconds <= KINDA_SMALL_NUMBER)
+	M_RagdollSettings.FreezeCorpse(GetMesh());
+	UnitDies_SetCountsAsSimulatingRagdoll(false);
+	// A battlefield corpse takes the body's place, so the soldier can go at once.
+	if (not IsValid(World) || M_RagdollSettings.CorpseSinkSeconds <= KINDA_SMALL_NUMBER || UnitDies_TryLeaveCorpse())
 	{
 		Destroy();
 		return;
 	}
-	M_RagdollSettings.FreezeCorpse(GetMesh());
-	UnitDies_SetCountsAsSimulatingRagdoll(false);
 	M_CorpseSinkSecondsLeft = M_RagdollSettings.CorpseSinkSeconds;
 	World->GetTimerManager().SetTimer(
 		M_DeathTimerHandle,
@@ -4445,6 +4449,23 @@ void ASquadUnit::UnitDies_StartCorpseSink()
 		&ASquadUnit::UnitDies_TickCorpseSink,
 		SquadUnitDeathStatics::CorpseSinkInterval,
 		true);
+}
+
+bool ASquadUnit::UnitDies_TryLeaveCorpse() const
+{
+	const UWorld* World = GetWorld();
+	URTSCorpseSubsystem* Corpses = IsValid(World) ? World->GetSubsystem<URTSCorpseSubsystem>() : nullptr;
+	const USkeletalMeshComponent* MeshComponent = GetMesh();
+	if (not IsValid(Corpses) || not IsValid(MeshComponent))
+	{
+		return false;
+	}
+	FRTSCorpseRequest Request;
+	Request.SourceMesh = MeshComponent->GetSkeletalMeshAsset();
+	Request.Materials = MeshComponent->GetMaterials();
+	Request.Pelvis = URTSCorpseSubsystem::GetPelvisTransform(MeshComponent);
+	Request.bMatchPelvis = URTSCorpseSubsystem::GetHasPelvisBody(MeshComponent);
+	return Corpses->TryAddCorpse(Request);
 }
 
 void ASquadUnit::UnitDies_TickCorpseSink()

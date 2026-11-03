@@ -1085,8 +1085,14 @@ private:
 	/** @brief Schedules the end of the simulation, after which the corpse sinks away. */
 	void UnitDies_ScheduleCorpseSink();
 
-	/** @brief Freezes the corpse and starts lowering it; a body that just vanishes pops on screen. */
+	/**
+	 * @brief Freezes the corpse and leaves a battlefield corpse in its place, or starts lowering it when corpses are
+	 * off or this mesh has none; a body that just vanishes pops on screen.
+	 */
 	void UnitDies_StartCorpseSink();
+
+	/** @return Whether a battlefield corpse took this soldier's place; it lies like the body lies now. */
+	bool UnitDies_TryLeaveCorpse() const;
 
 	void UnitDies_TickCorpseSink();
 

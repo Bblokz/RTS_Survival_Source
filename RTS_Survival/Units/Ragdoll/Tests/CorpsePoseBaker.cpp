@@ -8,17 +8,22 @@
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "MeshDescription.h"
+#include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/SkeletalBodySetup.h"
 #include "Misc/PackageName.h"
 #include "Rendering/SkeletalMeshLODModel.h"
 #include "Rendering/SkeletalMeshModel.h"
 #include "StaticMeshAttributes.h"
 #include "StaticMeshCompiler.h"
+#include "StaticMeshResources.h"
 #include "UObject/Package.h"
 #include "UObject/SavePackage.h"
 
 namespace CorpsePoseBakerPrivate
 {
 	constexpr int32 BakedLodIndex = 0;
+	// Corpses are instanced in hundreds; denser soldier meshes are reduced to about this many triangles.
+	constexpr int32 MaxCorpseTriangles = 8000;
 
 	/** Per vertex of the imported LOD, in pivot space. */
 	struct FSkinnedVertex
@@ -29,7 +34,38 @@ namespace CorpsePoseBakerPrivate
 		FVector2f UV = FVector2f::ZeroVector;
 		float BinormalSign = 1.f;
 		int32 MainBone = INDEX_NONE;
+		// Whether a physics body moves this vertex; others (root, IK helper chains) stay where the body woke.
+		bool bIsCarried = true;
 	};
+
+	/** @return Per bone, whether it has a physics body or hangs below one; root and IK chains do not. */
+	TArray<bool> GetCarriedBones(const USkeletalMesh* SkeletalMesh)
+	{
+		const FReferenceSkeleton& RefSkeleton = SkeletalMesh->GetRefSkeleton();
+		TArray<bool> CarriedBones;
+		CarriedBones.Init(false, RefSkeleton.GetNum());
+		const UPhysicsAsset* PhysicsAsset = SkeletalMesh->GetPhysicsAsset();
+		if (PhysicsAsset == nullptr)
+		{
+			CarriedBones.Init(true, RefSkeleton.GetNum());
+			return CarriedBones;
+		}
+		for (const USkeletalBodySetup* BodySetup : PhysicsAsset->SkeletalBodySetups)
+		{
+			const int32 BoneIndex = BodySetup ? RefSkeleton.FindBoneIndex(BodySetup->BoneName) : INDEX_NONE;
+			if (CarriedBones.IsValidIndex(BoneIndex))
+			{
+				CarriedBones[BoneIndex] = true;
+			}
+		}
+		// Parents come before children in the reference skeleton.
+		for (int32 BoneIndex = 0; BoneIndex < RefSkeleton.GetNum(); ++BoneIndex)
+		{
+			const int32 ParentIndex = RefSkeleton.GetParentIndex(BoneIndex);
+			CarriedBones[BoneIndex] |= CarriedBones.IsValidIndex(ParentIndex) && CarriedBones[ParentIndex];
+		}
+		return CarriedBones;
+	}
 
 	/** Reference pose to pivot space per bone: undo the bind pose, then apply the bone's current world pose. */
 	TArray<FMatrix44f> GetRefToPivot(const USkeletalMeshComponent* CrewMesh, const FVector& Pivot)
@@ -113,16 +149,15 @@ namespace CorpsePoseBakerPrivate
 	}
 
 	/**
-	 * No physics body carries the root, so a triangle with a corner on it stretches between the body and where the
-	 * root stayed when the body fell (a thin line on the Mosin soldier); a corpse leaves those triangles out.
+	 * A triangle with a corner on a bone no physics body carries (the root, IK helper chains) stretches between the
+	 * body and where that bone stayed when the body fell (a thin line on the Mosin soldier); a corpse leaves it out.
 	 */
-	bool GetIsCarriedByRoot(const FSkeletalMeshLODModel& Lod, const TArray<FSkinnedVertex>& Vertices,
-	                        const uint32 FirstIndex)
+	bool GetHasDanglingCorner(const FSkeletalMeshLODModel& Lod, const TArray<FSkinnedVertex>& Vertices,
+	                          const uint32 FirstIndex)
 	{
-		constexpr int32 RootBoneIndex = 0;
 		for (uint32 Corner = 0; Corner < 3; ++Corner)
 		{
-			if (Vertices[Lod.IndexBuffer[FirstIndex + Corner]].MainBone == RootBoneIndex)
+			if (not Vertices[Lod.IndexBuffer[FirstIndex + Corner]].bIsCarried)
 			{
 				return true;
 			}
@@ -189,7 +224,7 @@ namespace CorpsePoseBakerPrivate
 				}
 				for (uint32 Triangle = 0; Triangle < Section.NumTriangles; ++Triangle)
 				{
-					if (GetIsCarriedByRoot(Lod, Vertices, Section.BaseIndex + Triangle * 3))
+					if (GetHasDanglingCorner(Lod, Vertices, Section.BaseIndex + Triangle * 3))
 					{
 						continue;
 					}
@@ -216,14 +251,17 @@ namespace CorpsePoseBakerPrivate
 	void SetMaterials(UStaticMesh* StaticMesh, const USkeletalMeshComponent* CrewMesh,
 	                  const TArray<int32>& UsedMaterials)
 	{
+		// Every slot of the soldier mesh, in its order, so a soldier's materials apply to the corpse slot for slot.
 		const USkeletalMesh* SkeletalMesh = CrewMesh->GetSkeletalMeshAsset();
 		TArray<FStaticMaterial> StaticMaterials;
-		for (int32 SectionIndex = 0; SectionIndex < UsedMaterials.Num(); ++SectionIndex)
+		for (int32 MaterialIndex = 0; MaterialIndex < SkeletalMesh->GetMaterials().Num(); ++MaterialIndex)
 		{
-			const int32 MaterialIndex = UsedMaterials[SectionIndex];
 			const FName SlotName = GetSlotName(SkeletalMesh, MaterialIndex);
 			StaticMaterials.Add(FStaticMaterial(CrewMesh->GetMaterial(MaterialIndex), SlotName, SlotName));
-			StaticMesh->GetSectionInfoMap().Set(BakedLodIndex, SectionIndex, FMeshSectionInfo(SectionIndex));
+		}
+		for (int32 SectionIndex = 0; SectionIndex < UsedMaterials.Num(); ++SectionIndex)
+		{
+			StaticMesh->GetSectionInfoMap().Set(BakedLodIndex, SectionIndex, FMeshSectionInfo(UsedMaterials[SectionIndex]));
 		}
 		StaticMesh->SetStaticMaterials(StaticMaterials);
 	}
@@ -253,7 +291,19 @@ bool CorpsePoseBaker::SaveAsset(UPackage* Package, UObject* Asset)
 	Package->GetMetaData();
 	FSavePackageArgs SaveArgs;
 	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
-	return UPackage::SavePackage(Package, Asset, *Filename, SaveArgs);
+	// An open editor rereads a changed asset file for a moment; a save that lands then is refused, so retry.
+	SaveArgs.SaveFlags = SAVE_NoError;
+	constexpr int32 SaveAttempts = 10;
+	constexpr float SecondsBetweenAttempts = 1.f;
+	for (int32 Attempt = 0; Attempt < SaveAttempts; ++Attempt)
+	{
+		if (UPackage::SavePackage(Package, Asset, *Filename, SaveArgs))
+		{
+			return true;
+		}
+		FPlatformProcess::Sleep(SecondsBetweenAttempts);
+	}
+	return false;
 }
 
 FCorpsePoseBakeResult CorpsePoseBaker::BakeAndSave(const USkeletalMeshComponent* CrewMesh, const FVector& Pivot,
@@ -268,12 +318,17 @@ FCorpsePoseBakeResult CorpsePoseBaker::BakeAndSave(const USkeletalMeshComponent*
 		return Result;
 	}
 	const FSkeletalMeshLODModel& Lod = ImportedModel->LODModels[BakedLodIndex];
-	const TArray<FSkinnedVertex> Vertices = SkinLod(Lod, GetRefToPivot(CrewMesh, Pivot));
+	TArray<FSkinnedVertex> Vertices = SkinLod(Lod, GetRefToPivot(CrewMesh, Pivot));
+	const TArray<bool> CarriedBones = GetCarriedBones(SkeletalMesh);
+	for (FSkinnedVertex& Vertex : Vertices)
+	{
+		Vertex.bIsCarried = CarriedBones.IsValidIndex(Vertex.MainBone) && CarriedBones[Vertex.MainBone];
+	}
 	Result.LowestZ = TNumericLimits<float>::Max();
 	for (const FSkinnedVertex& Vertex : Vertices)
 	{
-		// Root-only triangles are left out of the corpse, so their vertices do not count either.
-		if (Vertex.MainBone != 0 && Vertex.Position.Z < Result.LowestZ)
+		// Dangling triangles are left out of the corpse, so their vertices do not count either.
+		if (Vertex.bIsCarried && Vertex.Position.Z < Result.LowestZ)
 		{
 			Result.LowestZ = Vertex.Position.Z;
 			Result.LowestBone = SkeletalMesh->GetRefSkeleton().IsValidIndex(Vertex.MainBone)
@@ -292,12 +347,20 @@ FCorpsePoseBakeResult CorpsePoseBaker::BakeAndSave(const USkeletalMeshComponent*
 	SourceModel.BuildSettings.bRecomputeNormals = false;
 	SourceModel.BuildSettings.bRecomputeTangents = false;
 	SourceModel.BuildSettings.bGenerateLightmapUVs = false;
+	if (Result.Triangles > MaxCorpseTriangles)
+	{
+		SourceModel.ReductionSettings.PercentTriangles = static_cast<float>(MaxCorpseTriangles) / Result.Triangles;
+	}
 	SetMaterials(StaticMesh, CrewMesh, UsedMaterials);
 	StaticMesh->CreateMeshDescription(BakedLodIndex, MoveTemp(MeshDescription));
 	StaticMesh->CommitMeshDescription(BakedLodIndex);
 	StaticMesh->Build(true);
 	FStaticMeshCompilingManager::Get().FinishCompilation({StaticMesh});
 	StaticMesh->MarkPackageDirty();
+	if (StaticMesh->GetRenderData() != nullptr && StaticMesh->GetRenderData()->LODResources.IsValidIndex(BakedLodIndex))
+	{
+		Result.Triangles = StaticMesh->GetRenderData()->LODResources[BakedLodIndex].GetNumTriangles();
+	}
 	Result.Mesh = StaticMesh;
 	Result.bSaved = SaveAsset(Package, StaticMesh);
 	return Result;

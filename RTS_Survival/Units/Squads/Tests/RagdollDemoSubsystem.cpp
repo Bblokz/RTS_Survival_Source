@@ -49,6 +49,9 @@ namespace RagdollDemoPrivate
 	const TCHAR* const DirectorySwitch = TEXT("RagdollDemoDir=");
 	const TCHAR* const LocationSwitch = TEXT("RagdollDemoAt=");
 	const TCHAR* const SquadSwitch = TEXT("RagdollDemoSquad=");
+	// Soldiers further than this from the spawn point belong to the test map, not to the filmed squad.
+	constexpr float SubjectRadiusCm = 1500.f;
+	constexpr float SmallSquadWaitGameSeconds = 8.f;
 	const TCHAR* const BenchSwitch = TEXT("RagdollBench");
 	const TCHAR* const CrewSwitch = TEXT("RagdollCrew");
 	constexpr int32 CrewTankCount = 2;
@@ -333,18 +336,21 @@ bool URagdollDemoSubsystem::TryCollectSubjects()
 	TArray<ASquadUnit*> Units;
 	for (TActorIterator<ASquadUnit> It(GetWorld()); It; ++It)
 	{
-		// Test maps hold other soldiers; only the ones with ragdoll switched on are the subject of this film.
-		if (IsValid(*It) && It->GetRagdollSettings().GetCanRagdoll(It->GetMesh()))
+		// Test maps hold other soldiers, all able to ragdoll; only the squad spawned here is the subject of this film.
+		if (IsValid(*It) && It->GetRagdollSettings().GetCanRagdoll(It->GetMesh())
+			&& FVector::Dist2D(It->GetActorLocation(), M_DemoLocation) < SubjectRadiusCm)
 		{
 			Units.Add(*It);
 		}
 	}
-	if (Units.Num() < KillCount)
+	// Small squads never reach the kill count; once the spawn has had time to finish, film the soldiers there are.
+	const bool bHasWaitedForWholeSquad = GetGameSeconds() - M_StepStartGameSeconds > SmallSquadWaitGameSeconds;
+	if (Units.Num() < KillCount && (Units.IsEmpty() || not bHasWaitedForWholeSquad))
 	{
 		return false;
 	}
 	M_Subjects.Reset();
-	for (int32 KillIndex = 0; KillIndex < KillCount; ++KillIndex)
+	for (int32 KillIndex = 0; KillIndex < FMath::Min(KillCount, Units.Num()); ++KillIndex)
 	{
 		FRagdollDemoSubject Subject;
 		Subject.Unit = Units[KillIndex];
