@@ -25,12 +25,16 @@ enum class ETurretTossDemoStep : uint8
 	Done
 };
 
-/** How the demo kills its tanks (-TurretTossDemoDeath=CookOff|EngineFire|Both). */
+/**
+ * How the demo kills its tanks (-TurretTossDemoDeath=CookOff|EngineFire|Both). LeakDrive does not kill: it sets the
+ * engine on fire and drives the tank away with the camera following, to film the burning fuel leak.
+ */
 enum class ETurretTossDemoDeath : uint8
 {
 	CookOff,
 	EngineFire,
-	Both
+	Both,
+	LeakDrive
 };
 
 /** One vehicle of the -TurretTossAudit run: spawned, killed during a cook-off and judged by what its wreck did. */
@@ -79,6 +83,7 @@ private:
 	void LogTossedTurrets() const;
 	void LogEngineFireWrecks() const;
 	void KillTank(ATankMaster& Tank) const;
+	void StartLeakDrive(ATankMaster& Tank) const;
 	void ReportEngineFireAuditEntry(const FTurretTossAuditEntry& Entry, AActor* Wreck);
 	static int32 CountThrownDebris(const AActor* Wreck);
 

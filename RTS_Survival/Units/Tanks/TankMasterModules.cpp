@@ -420,15 +420,21 @@ void ATankMaster::Debug_DieDuringEngineFire()
 		return;
 	}
 
-	const TSubclassOf<UTankEngineFireBehaviour> EngineFireClass = GetEngineFireBehaviourClass();
-	if (EngineFireClass != nullptr && GetIsValidBehaviourComponent()
-		&& BehaviourComponent->GetBehaviourByClass(EngineFireClass) == nullptr)
-	{
-		BehaviourComponent->AddBehaviour(EngineFireClass);
-	}
+	Debug_StartEngineFire();
 	// Tanks without an engine fire profile still show the engine fire death.
 	bM_IsEngineBurning = true;
 	UnitDies(ERTSDeathType::Kinetic);
+}
+
+void ATankMaster::Debug_StartEngineFire()
+{
+	const TSubclassOf<UTankEngineFireBehaviour> EngineFireClass = GetEngineFireBehaviourClass();
+	if (not IsUnitAlive() || EngineFireClass == nullptr || not GetIsValidBehaviourComponent()
+		|| BehaviourComponent->GetBehaviourByClass(EngineFireClass) != nullptr)
+	{
+		return;
+	}
+	BehaviourComponent->AddBehaviour(EngineFireClass);
 }
 
 USoundCue* ATankMaster::GetCookOffTurretLaunchSound() const

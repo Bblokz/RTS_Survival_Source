@@ -120,6 +120,8 @@ void UTurretTossDemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			              ? ETurretTossDemoDeath::EngineFire
 			              : DeathText.Equals(TEXT("Both"), ESearchCase::IgnoreCase)
 			              ? ETurretTossDemoDeath::Both
+			              : DeathText.Equals(TEXT("LeakDrive"), ESearchCase::IgnoreCase)
+			              ? ETurretTossDemoDeath::LeakDrive
 			              : ETurretTossDemoDeath::CookOff;
 	}
 	M_StartRealSeconds = FPlatformTime::Seconds();
@@ -328,6 +330,11 @@ void UTurretTossDemoSubsystem::TickRecord()
 	{
 		return;
 	}
+	// The burning tank drives on; keep it in frame and leave the stills looking at where it ended up.
+	if (M_DeathKind == ETurretTossDemoDeath::LeakDrive && M_Tank.IsValid())
+	{
+		M_DeathLocation = M_Tank->GetActorLocation();
+	}
 	if (GetGameSeconds() >= M_NextTurretLogGameSeconds)
 	{
 		M_NextTurretLogGameSeconds += TurretLogIntervalSeconds;
@@ -485,6 +492,9 @@ void UTurretTossDemoSubsystem::KillTank(ATankMaster& Tank) const
 	case ETurretTossDemoDeath::EngineFire:
 		Tank.Debug_DieDuringEngineFire();
 		return;
+	case ETurretTossDemoDeath::LeakDrive:
+		StartLeakDrive(Tank);
+		return;
 	case ETurretTossDemoDeath::Both:
 		Tank.SetIsEngineBurning(true);
 		Tank.Debug_DieDuringAmmoCookOff();
@@ -492,6 +502,15 @@ void UTurretTossDemoSubsystem::KillTank(ATankMaster& Tank) const
 	default:
 		Tank.Debug_DieDuringAmmoCookOff();
 	}
+}
+
+void UTurretTossDemoSubsystem::StartLeakDrive(ATankMaster& Tank) const
+{
+	constexpr float LeakDriveDistanceCm = 3000.f;
+	Tank.Debug_StartEngineFire();
+	const FVector Goal = Tank.GetActorLocation() + Tank.GetActorForwardVector() * LeakDriveDistanceCm;
+	const ECommandQueueError MoveError = Tank.MoveToLocation(Goal, true, Tank.GetActorRotation());
+	UE_LOG(LogRTSTurretTossDemo, Display, TEXT("RTS_TTD leak_drive move_error=%d"), static_cast<int32>(MoveError));
 }
 
 void UTurretTossDemoSubsystem::ReportEngineFireAuditEntry(const FTurretTossAuditEntry& Entry, AActor* Wreck)

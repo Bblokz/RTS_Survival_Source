@@ -346,6 +346,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_DieDuringEngineFire();
 
+	/** @brief Testing aid: sets this tank's engine on fire without killing it, so the fuel leak can be watched. */
+	UFUNCTION(BlueprintCallable, Category="Death|Debug")
+	void Debug_StartEngineFire();
+
 	// ---- Vehicle modules ----
 
 	/**

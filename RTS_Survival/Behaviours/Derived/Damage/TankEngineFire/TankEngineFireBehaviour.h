@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Behaviours/Behaviour.h"
 #include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireAttachmentRules.h"
+#include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireFuelLeakSettings.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/ERTSFireType.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/FRTSFireEffectParams.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
@@ -15,6 +16,17 @@ class URTSFireSubsystem;
 class USoundAttenuation;
 class USoundBase;
 class USoundConcurrency;
+
+/** Runtime state of the burning fuel leak; reset whenever the leak (re)starts. */
+struct FTankEngineFireFuelLeakState
+{
+	int32 LeakFireHandle = INDEX_NONE;
+	// Ground patches still burning, oldest first; the oldest goes out when the per-tank cap is reached.
+	TArray<int32> PatchFireHandles;
+	FVector LastPatchLocation = FVector::ZeroVector;
+	float SecondsSinceLastPatch = 0.0f;
+	bool bHasDroppedPatch = false;
+};
 
 /**
  * @brief Add this behaviour to a tank to burn its health and show a pooled hull fire.
@@ -53,6 +65,13 @@ private:
 	void StopFireEffect();
 	void StartFireSound();
 	void StopFireSound();
+	void StartFuelLeak();
+	void StopFuelLeak();
+	void TickFuelLeak(float DeltaTime);
+	/** @return Where the fuel drips out: below the engine fire, just above the ground. */
+	FVector GetFuelLeakWorldLocation() const;
+	void DropBurningFuelPatch(const FVector& LeakWorldLocation);
+	bool TryGetGroundBelow(const FVector& WorldLocation, FVector& OutGroundLocation) const;
 	UMeshComponent* FindTankMeshWithSocket(FName SocketName) const;
 	static UMeshComponent* FindMeshWithSocket(const AActor& Tank, FName SocketName);
 	bool GetIsValidTankMaster() const;
@@ -83,6 +102,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Tank Engine Fire|Effect", meta=(AllowPrivateAccess="true"))
 	FTankEngineFireAttachmentRules M_AttachmentRules;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Tank Engine Fire|Fuel Leak", meta=(AllowPrivateAccess="true"))
+	FTankEngineFireFuelLeakSettings M_FuelLeakSettings;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="Tank Engine Fire|Sound", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<USoundBase> M_FireSound = nullptr;
 
@@ -105,4 +127,5 @@ private:
 	// Caps damage at the sampled lifetime even when the behaviour component ticks after expiry.
 	float M_RemainingDamageSeconds = 0.0f;
 	int32 M_FireHandle = INDEX_NONE;
+	FTankEngineFireFuelLeakState M_FuelLeak;
 };
