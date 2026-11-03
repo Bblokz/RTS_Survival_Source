@@ -13,6 +13,8 @@
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionSelectionMenu.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionWorldGenerationSettings.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/W_UnitVariantSelectionMenu.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/CommanderSelection/W_CommanderSelectionMenu.h"
+#include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/CardSystem/PlayerProfile/PlayerProfileLoader/FRTS_Profile.h"
 #include "RTS_Survival/CardSystem/PlayerProfile/SavePlayerProfile/USavePlayerProfile.h"
 #include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
@@ -79,6 +81,8 @@ AFactionPlayerController::AFactionPlayerController()
 {
 	M_AnnouncementAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("AnnouncementAudioComponent"));
 	M_AnnouncementAudioComponent->bAutoActivate = false;
+	M_CommanderSelectionMenuClass = UW_CommanderSelectionMenu::StaticClass();
+	M_ConfirmedCommander = ERTSCommander::NoCommander;
 }
 
 void AFactionPlayerController::BeginPlay()
@@ -209,11 +213,12 @@ void AFactionPlayerController::HandleLaunchCampaignRequested(const ERTSFaction S
 		M_FactionSelectionMenu.Reset();
 	}
 
+	M_FactionUnitsForVariantSelection = FactionUnits;
 	if (TryShowUnitVariantSelection(RTSGameInstance, FactionUnits))
 	{
 		return;
 	}
-	ShowFactionDifficultyPicker();
+	ShowCommanderSelection();
 }
 
 void AFactionPlayerController::HandleUnitVariantPreviewRequested(const FTrainingOption& Unit,
@@ -274,7 +279,7 @@ void AFactionPlayerController::HandleUnitVariantSelectionConfirmed(
 	(void)FRTS_Profile::SaveUnitVariantSelections(SelectionsToSave);
 
 	CloseUnitVariantSelection();
-	ShowFactionDifficultyPicker();
+	ShowCommanderSelection();
 }
 
 void AFactionPlayerController::HandleUnitVariantSelectionBack()
@@ -288,6 +293,68 @@ void AFactionPlayerController::HandleUnitVariantSelectionBack()
 		M_FactionSelectionMenu->ShowFaction(M_SelectedFaction);
 	}
 	InitInputModeForWidget(M_FactionSelectionMenu.Get());
+}
+
+void AFactionPlayerController::HandleCommanderSelectionConfirmed(const ERTSCommander Commander)
+{
+	URTSGameInstance* RTSGameInstance = GetRTSGameInstance();
+	if (RTSGameInstance == nullptr)
+	{
+		return;
+	}
+	M_ConfirmedCommander = Commander;
+	RTSGameInstance->SetPlayerCommander(Commander);
+	CloseCommanderSelection();
+	ShowFactionDifficultyPicker();
+}
+
+void AFactionPlayerController::HandleCommanderSelectionBack()
+{
+	CloseCommanderSelection();
+	// The variant screen saved its choices on Confirm, so it reopens on them.
+	const TArray<FTrainingOption> FactionUnits = M_FactionUnitsForVariantSelection;
+	if (TryShowUnitVariantSelection(GetRTSGameInstance(), FactionUnits))
+	{
+		return;
+	}
+	InitFactionSelectionMenu();
+	if (GetIsValidFactionSelectionMenu())
+	{
+		M_FactionSelectionMenu->ShowFaction(M_SelectedFaction);
+	}
+	InitInputModeForWidget(M_FactionSelectionMenu.Get());
+}
+
+void AFactionPlayerController::ShowCommanderSelection()
+{
+	// The commander portrait takes the centre of the screen, where the hangar preview would stand.
+	ClearCurrentPreview();
+	UW_CommanderSelectionMenu* const CommanderSelectionMenu = GetIsValidCommanderSelectionMenuClass()
+		                                                          ? CreateWidget<UW_CommanderSelectionMenu>(
+			                                                          this, M_CommanderSelectionMenuClass)
+		                                                          : nullptr;
+	if (not IsValid(CommanderSelectionMenu))
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::ShowCommanderSelection - Failed to create the commander selection; "
+			"continuing with the game instance's current commander.");
+		ShowFactionDifficultyPicker();
+		return;
+	}
+	CommanderSelectionMenu->AddToViewport();
+	M_CommanderSelectionMenu = CommanderSelectionMenu;
+	CommanderSelectionMenu->InitCommanderSelection(this, M_ConfirmedCommander);
+	InitInputModeForWidget(CommanderSelectionMenu);
+}
+
+void AFactionPlayerController::CloseCommanderSelection()
+{
+	if (not GetIsValidCommanderSelectionMenu())
+	{
+		return;
+	}
+	M_CommanderSelectionMenu->RemoveFromParent();
+	M_CommanderSelectionMenu.Reset();
 }
 
 void AFactionPlayerController::ShowFactionDifficultyPicker()
@@ -1484,6 +1551,28 @@ bool AFactionPlayerController::GetIsValidUnitVariantSelectionMenu() const
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_UnitVariantSelectionMenu",
 	                                                      "GetIsValidUnitVariantSelectionMenu", this);
+	return false;
+}
+
+bool AFactionPlayerController::GetIsValidCommanderSelectionMenuClass() const
+{
+	if (IsValid(M_CommanderSelectionMenuClass))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_CommanderSelectionMenuClass",
+	                                                      "GetIsValidCommanderSelectionMenuClass", this);
+	return false;
+}
+
+bool AFactionPlayerController::GetIsValidCommanderSelectionMenu() const
+{
+	if (M_CommanderSelectionMenu.IsValid())
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_CommanderSelectionMenu",
+	                                                      "GetIsValidCommanderSelectionMenu", this);
 	return false;
 }
 

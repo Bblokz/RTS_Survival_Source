@@ -24,7 +24,9 @@ class UW_FactionPopup;
 class UW_FactionSelectionMenu;
 class UW_FactionWorldGenerationSettings;
 class UW_UnitVariantSelectionMenu;
+class UW_CommanderSelectionMenu;
 class UUnitVariantDataAsset;
+enum class ERTSCommander : uint8;
 enum class ERTSFaction : uint8;
 enum class EUnitVariant : uint8;
 
@@ -83,9 +85,11 @@ struct FUnitPreviewActions
  * @details Widget flow handled by this controller:
  * - Start: show the faction selection menu and preview units while the player browses.
  * - Launch Campaign: store the selected faction, remove the menu, and show the unit variant selection when the game
- *   instance allows it and the faction has units with variants; otherwise show the faction difficulty picker.
+ *   instance allows it and the faction has units with variants; otherwise show the commander selection.
  * - Unit Variant Selection: previews each choice in the hangar; Confirm saves the choices to the player profile and
- *   shows the difficulty picker, Back returns to the faction selection menu.
+ *   shows the commander selection, Back returns to the faction selection menu.
+ * - Commander Selection: shown after the faction (and variant) choice; Confirm sets the commander on the game instance
+ *   and shows the difficulty picker, Back returns to the variant selection when it was shown, else the faction menu.
  * - Difficulty Selected: store the chosen difficulty, then either load the requested map or show campaign settings.
  * - Campaign Generation Settings: when confirmed, store the settings and load the requested campaign map.
  *   Back returns to the difficulty picker and repeats the campaign flow.
@@ -129,6 +133,11 @@ public:
 
 	void HandleUnitVariantSelectionBack();
 
+	/** Sets the commander on the game instance and continues to the difficulty picker. */
+	void HandleCommanderSelectionConfirmed(const ERTSCommander Commander);
+
+	void HandleCommanderSelectionBack();
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionPopup> M_FactionPopupClass;
@@ -145,6 +154,10 @@ protected:
 	// The Blueprint child of UW_UnitVariantSelectionMenu that holds the skin brushes.
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_UnitVariantSelectionMenu> M_UnitVariantSelectionMenuClass;
+
+	// The Blueprint child of UW_CommanderSelectionMenu that holds the skin brushes; the bare class works unskinned.
+	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
+	TSubclassOf<UW_CommanderSelectionMenu> M_CommanderSelectionMenuClass;
 
 	// Used as the campaign request fallback when pre-game setup was opened without a launch request.
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
@@ -174,6 +187,15 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UW_UnitVariantSelectionMenu> M_UnitVariantSelectionMenu;
+
+	UPROPERTY()
+	TWeakObjectPtr<UW_CommanderSelectionMenu> M_CommanderSelectionMenu;
+
+	// The faction's units the variant selection was opened with; Back on the commander screen reopens it with them.
+	TArray<FTrainingOption> M_FactionUnitsForVariantSelection;
+
+	// Preselected when the commander screen opens again; the game instance reports an error while it has none.
+	ERTSCommander M_ConfirmedCommander;
 
 	// Loaded when the variant selection opens; also keeps the variant training brushes alive for its cards.
 	UPROPERTY()
@@ -236,6 +258,9 @@ private:
 	static TArray<FTrainingOption> GetFactionUnitsFromTrainingLayout(const ERTSFaction Faction);
 	void RestoreBaseVariantsInSpawner();
 	void CloseUnitVariantSelection();
+	// Falls through to the difficulty picker when the screen cannot be created, so the setup flow never stalls.
+	void ShowCommanderSelection();
+	void CloseCommanderSelection();
 	void BeginPlay_InitFactionBanners();
 	void InitPreviewReferences();
 	void NotifyFactionBannersOfFactionChange();
@@ -293,6 +318,8 @@ private:
 	bool GetIsValidFactionWorldGenerationSettings() const;
 	bool GetIsValidUnitVariantSelectionMenuClass() const;
 	bool GetIsValidUnitVariantSelectionMenu() const;
+	bool GetIsValidCommanderSelectionMenuClass() const;
+	bool GetIsValidCommanderSelectionMenu() const;
 	bool GetIsValidVariantDataAsset() const;
 	bool GetIsValidFactionUnitPreview() const;
 	bool GetIsValidRTSAsyncSpawner() const;
