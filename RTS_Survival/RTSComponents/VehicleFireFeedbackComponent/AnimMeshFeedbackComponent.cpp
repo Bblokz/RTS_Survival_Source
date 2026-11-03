@@ -2,7 +2,9 @@
 #include "Math/UnrealMathUtility.h" // For FMath::IsFinite
 
 
+#include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 
 bool IsFiniteVector(const FVector& Vector)
 {
@@ -48,23 +50,30 @@ void UAnimMeshFeedbackComponent::ApplyFeedbackKick(
 	const float TurretWorldYawDegrees)
 {
 	(void)TurretWorldYawDegrees;
+	if (not GetIsValidAnimatedMesh())
+	{
+		return;
+	}
 
 	const float ClampedEnergy = FMath::Clamp(NormalisedMuzzleEnergy, 0.0f, 1.0f);
-	const FVector BackwardAxis = GetSignedAxisVector(M_AnimMeshRecoilAxesSettings.M_BackwardRecoilAxis);
+	const FRotator RecoilFrameYawInParentSpace = GetRecoilFrameYawInParentSpace();
+	const FVector BackwardAxis = RecoilFrameYawInParentSpace.RotateVector(
+		GetSignedAxisVector(M_AnimMeshRecoilAxesSettings.M_BackwardRecoilAxis));
 	const FVector BackwardRecoilOffset =
 		BackwardAxis * (M_FeedbackSettings.M_MaxBackCm * ClampedEnergy);
 	M_RecoilOffsetCm += BackwardRecoilOffset;
 
 	if (M_AnimMeshRecoilAxesSettings.bM_EnableSideSway)
 	{
-		const FVector SideSwayAxis = GetSignedAxisVector(M_AnimMeshRecoilAxesSettings.M_SideSwayAxis);
+		const FVector SideSwayAxis = RecoilFrameYawInParentSpace.RotateVector(
+			GetSignedAxisVector(M_AnimMeshRecoilAxesSettings.M_SideSwayAxis));
 		const float SideSwayJitterCm = FMath::FRandRange(
 			-M_AnimMeshRecoilAxesSettings.M_MaxSideSwayCm,
 			M_AnimMeshRecoilAxesSettings.M_MaxSideSwayCm) * ClampedEnergy;
 		M_RecoilOffsetCm += SideSwayAxis * SideSwayJitterCm;
 	}
 
-	M_RecoilRotDeg.X += M_FeedbackSettings.M_MaxPitchDeg * ClampedEnergy;
+	AddNoseUpKickAlongBarrel(M_FeedbackSettings.M_MaxPitchDeg * ClampedEnergy, RecoilFrameYawInParentSpace);
 
 	if (not M_AnimMeshRecoilAxesSettings.bM_EnableOptionalRoll)
 	{
@@ -128,6 +137,51 @@ FVector UAnimMeshFeedbackComponent::GetSignedAxisVector(const EAnimMeshRecoilSig
 		default:
 			return -FVector::ForwardVector;
 	}
+}
+
+FRotator UAnimMeshFeedbackComponent::GetMeshYawInParentSpace() const
+{
+	// Recoil never writes yaw, so the relative yaw is the mesh's own facing (its world yaw when it is the root).
+	return FRotator(0.0f, M_AnimatedMesh->GetRelativeRotation().Yaw, 0.0f);
+}
+
+FRotator UAnimMeshFeedbackComponent::GetRecoilFrameYawInParentSpace() const
+{
+	const FRotator MeshYawInParentSpace = GetMeshYawInParentSpace();
+	if (not GetHasValidTrackedWeapon())
+	{
+		return MeshYawInParentSpace;
+	}
+	const FName FireSocketName = M_TrackedWeapon->GetWeaponSocket();
+	if (not M_AnimatedMesh->DoesSocketExist(FireSocketName))
+	{
+		return MeshYawInParentSpace;
+	}
+
+	FVector BarrelForward = M_AnimatedMesh->GetSocketTransform(FireSocketName).GetUnitAxis(EAxis::X);
+	if (const USceneComponent* MeshParent = M_AnimatedMesh->GetAttachParent())
+	{
+		BarrelForward = MeshParent->GetComponentTransform().InverseTransformVectorNoScale(BarrelForward);
+	}
+	BarrelForward.Z = 0.0f;
+	if (BarrelForward.IsNearlyZero())
+	{
+		return MeshYawInParentSpace;
+	}
+	return FRotator(0.0f, BarrelForward.Rotation().Yaw, 0.0f);
+}
+
+void UAnimMeshFeedbackComponent::AddNoseUpKickAlongBarrel(const float NoseUpDeg,
+                                                          const FRotator& RecoilFrameYawInParentSpace)
+{
+	const float BarrelYawFromMeshDeg = FRotator::NormalizeAxis(
+		RecoilFrameYawInParentSpace.Yaw - GetMeshYawInParentSpace().Yaw);
+	float SinBarrelYaw = 0.0f;
+	float CosBarrelYaw = 1.0f;
+	FMath::SinCos(&SinBarrelYaw, &CosBarrelYaw, FMath::DegreesToRadians(BarrelYawFromMeshDeg));
+	M_RecoilRotDeg.X += NoseUpDeg * CosBarrelYaw;
+	// Positive roll lowers the mesh's +Y side, so lifting a barrel that points to +Y is a negative roll.
+	M_RecoilRotDeg.Z -= NoseUpDeg * SinBarrelYaw;
 }
 
 void UAnimMeshFeedbackComponent::ApplyPreservedRecoilLocation() const
@@ -210,12 +264,6 @@ void UAnimMeshFeedbackComponent::GetCurrentRecoilPitchAndRoll(
 	float& OutRecoilRollDeg) const
 {
 	OutRecoilPitchDeg = M_RecoilRotDeg.X;
-
-	if (M_AnimMeshRecoilAxesSettings.M_OptionalRollChannel == EAnimMeshOptionalRollChannel::Roll)
-	{
-		OutRecoilRollDeg = M_RecoilRotDeg.Z;
-		return;
-	}
-
-	OutRecoilRollDeg = 0.0f;
+	// Z holds the roll jitter (roll channel only) and the share of the nose-up kick of a traversed barrel.
+	OutRecoilRollDeg = M_RecoilRotDeg.Z;
 }

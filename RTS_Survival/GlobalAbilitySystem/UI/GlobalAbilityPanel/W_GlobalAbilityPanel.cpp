@@ -41,10 +41,19 @@ void UW_GlobalAbilityPanel::InitWithLoadedAbilities(TArray<TObjectPtr<UGlobalAbi
 
 TArray<UW_GA_Item*> UW_GlobalAbilityPanel::GetAbilityItems() const
 {
-	return {
+	TArray<UW_GA_Item*> AbilityItems = {
 		GlobalAbility_1.Get(), GlobalAbility_2.Get(), GlobalAbility_3.Get(), GlobalAbility_4.Get(),
 		GlobalAbility_5.Get()
 	};
+	// Optional slots: a panel without them must report too many abilities instead of dropping them silently.
+	for (UW_GA_Item* OptionalItem : {GlobalAbility_6.Get(), GlobalAbility_7.Get(), GlobalAbility_8.Get()})
+	{
+		if (IsValid(OptionalItem))
+		{
+			AbilityItems.Add(OptionalItem);
+		}
+	}
+	return AbilityItems;
 }
 
 void UW_GlobalAbilityPanel::NativeOnInitialized()

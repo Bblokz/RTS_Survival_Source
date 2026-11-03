@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GlobalAbilityCostState.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
+#include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 #include "UObject/Object.h"
 #include "GlobalAbility.generated.h"
 
@@ -35,6 +36,9 @@ class RTS_SURVIVAL_API UGlobalAbility : public UObject
 	GENERATED_BODY()
 
 	friend class UGlobalAbilitiesManager;
+#if RTS_WITH_MAP_TESTS
+	friend struct FGlobalAbilityTestAccess;
+#endif
 
 public:
 	UGlobalAbility();
@@ -48,11 +52,31 @@ public:
 	void OnClickedAbilityButton();
 	void CancelAbilityActivation();
 	void OnClickedAbilityLocation(const FVector& TargetLocation);
+	void OnClickedAbilityLine(const FVector& LineStart, const FVector& LineEnd);
 
 	virtual void ActivateAbility();
 
 	virtual void ExecuteAbilityAtLocation(const FVector& TargetLocation);
+
+	/**
+	 * @brief Player execution of an ability aimed as a strip. Enemy AI and missions only give a point, so strip
+	 * abilities also have to handle ExecuteAbilityAtLocation.
+	 * @param LineStart Ground location the flight starts at.
+	 * @param LineEnd Ground location the flight ends at.
+	 */
+	virtual void ExecuteAbilityAlongLine(const FVector& LineStart, const FVector& LineEnd);
+
+	/**
+	 * @brief Lets the aim preview show what the execution will really do for the strip the player is drawing.
+	 * @param LineStart Ground location the flight would start at.
+	 * @param LineEnd Ground location the flight would end at.
+	 * @param OutDropPoints Ground locations where something will land; left empty when the ability has none.
+	 */
+	virtual void GetStripDropPoints(const FVector& LineStart, const FVector& LineEnd,
+	                                TArray<FVector>& OutDropPoints) const;
+
 	EGlobalAbility GetAbilityType() const;
+	const FGlobalAbilityAimSettings& GetAimSettings() const { return M_AimSettings; }
 	const FGLobalAbilityCostState& GetAbilityCosts() const;
 	const FGlobalAbilityUISettings& GetUISettings() const;
 
@@ -103,6 +127,10 @@ private:
 	TArray<TObjectPtr<UNiagaraComponent>> M_SpawnedMarkerEffects;
 
 	bool IsOwnedByPlayer() const;
+
+	// Checks and pays for a clicked execution; false cancels the activation.
+	bool TryStartClickedExecution();
+	void FinishClickedExecution();
 
 	UPROPERTY(Transient)
 	EGlobalAbilityState M_AbilityState = EGlobalAbilityState::NotActivated;

@@ -31,6 +31,7 @@ class UAsyncFindClosestDropOff;
 
 /**
  * @brief Component used by harvester units to run harvesting commands and manage their resource cargo.
+ * @note SetupHarvester: call in Blueprint to configure supported resources, cargo capacity, and the owner's mesh.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), Blueprintable, BlueprintType)
 class RTS_SURVIVAL_API UHarvester : public UActorComponent
@@ -247,6 +248,11 @@ private:
 	void HarvestAIAction_DropOffResources();
 
 	void OnDroppedOffAllTargetResources();
+
+	/** @return Whether blocked cargo was discarded so a pending order for another resource could continue. */
+	bool TryDiscardCargoForPendingResourceSwitch();
+
+	bool GetIsValidOwnerHarvesterInterface() const;
 
 
 	void UnstuckHarvesterTowardsLocation(

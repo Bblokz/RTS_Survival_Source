@@ -39,6 +39,11 @@ void ACaptureActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void ACaptureActor::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
+{
+	BP_OnCaptureActorHealthChanged(PercentageLeft, bIsHealing);
+}
+
 void ACaptureActor::BeginPlay_ResolveHealthComponent()
 {
 	M_HealthComponent = FindComponentByClass<UHealthComponent>();

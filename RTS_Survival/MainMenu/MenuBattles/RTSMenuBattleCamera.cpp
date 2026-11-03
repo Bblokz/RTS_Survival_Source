@@ -3,7 +3,9 @@
 #include "RTSMenuBattleCamera.h"
 
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Engine/World.h"
+#include "GameFramework/PlayerController.h"
 #include "RTSMenuBattleArena.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -21,6 +23,8 @@ namespace RTSMenuBattleCameraPrivate
 
 	// Framing distance grows with the spread of the fighting so a battle that has grown still fits the frame.
 	constexpr float MinDistanceScale = 0.75f;
+	// The lines are wide: past this the camera frames part of the fight instead of shrinking every unit to a dot.
+	constexpr float MaxFramingDistanceCm = 13000.f;
 	constexpr float SpreadToDistance = 1.35f;
 	constexpr float SpreadEaseSpeed = 0.6f;
 
@@ -315,7 +319,23 @@ void ARTSMenuBattleCamera::UpdateShot(const float DeltaSeconds)
 	{
 		Camera->SetFieldOfView(FieldOfView);
 	}
+	if (M_ShotState.bIsCut)
+	{
+		MarkCameraCutForRenderer();
+	}
 	M_ShotState.bIsCut = false;
+}
+
+void ARTSMenuBattleCamera::MarkCameraCutForRenderer() const
+{
+	// Occlusion results of the previous shot would hide the landscape behind what stood in front of that camera,
+	// a one-frame flash of bare sky on the new shot.
+	const APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+	if (not IsValid(PlayerController) || not IsValid(PlayerController->PlayerCameraManager))
+	{
+		return;
+	}
+	PlayerController->PlayerCameraManager->SetGameCameraCutThisFrame();
 }
 
 float ARTSMenuBattleCamera::ComputeShot(const float ShotSeconds, const float DeltaSeconds, FVector& OutLocation,
@@ -465,7 +485,7 @@ float ARTSMenuBattleCamera::GetFramingDistance() const
 {
 	using namespace RTSMenuBattleCameraPrivate;
 	const float BaseDistance = M_Arena->GetSettings().CameraDistance;
-	return FMath::Max(BaseDistance * MinDistanceScale, M_SmoothedSpread * SpreadToDistance);
+	return FMath::Max(BaseDistance * MinDistanceScale, FMath::Min(M_SmoothedSpread * SpreadToDistance, MaxFramingDistanceCm));
 }
 
 float ARTSMenuBattleCamera::GetFramingHeight() const

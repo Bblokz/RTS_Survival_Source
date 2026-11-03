@@ -128,6 +128,7 @@ int32 EnemyTrainingHelpers::GetTankTrainingPointsCost(const ETankSubtype TankTyp
 	case ETankSubtype::Tank_ISU_152:
 		return 55;
 	case ETankSubtype::Tank_ISU_130:
+	case ETankSubtype::Tank_KV3:
 		return 60;
 	case ETankSubtype::Tank_IS6:
 		return 75;

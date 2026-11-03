@@ -1127,3 +1127,24 @@ bool AEnemyController::GetIsValidEnemyGlobalAbilitiesManager() const
 		this);
 	return false;
 }
+
+void AEnemyController::OverrideStrategicDecisionTree(const UStochasticDecisionTree* Template)
+{
+	if (not IsValid(Template))
+	{
+		RTSFunctionLibrary::ReportError("OverrideStrategicDecisionTree called without a template tree.");
+		return;
+	}
+	UStochasticDecisionTree* NewTree = DuplicateObject<UStochasticDecisionTree>(Template, this);
+	if (not IsValid(NewTree))
+	{
+		RTSFunctionLibrary::ReportError("Failed to duplicate the strategic decision tree template.");
+		return;
+	}
+	M_StochasticDecisionTree = NewTree;
+	BeginPlay_InitStochasticDecisionTree();
+	if (GetIsValidEnemyStrategicAIComponent())
+	{
+		M_EnemyStrategicAIComponent->SetStochasticDecisionTree(M_StochasticDecisionTree);
+	}
+}

@@ -178,6 +178,9 @@ public:
 	void InitStrategicAIComponent(AEnemyController* EnemyController, UStochasticDecisionTree* StochasticDecisionTree);
 	void StartStrategicAIThinkingTimer();
 
+	// Swaps the tree after init (AEnemyController::OverrideStrategicDecisionTree); think timers are untouched.
+	void SetStochasticDecisionTree(UStochasticDecisionTree* NewTree);
+
 	void QueueFindClosestFlankableEnemyHeavyRequest(const FFindClosestFlankableEnemyHeavy& Request);
 	void QueueGetPlayerUnitCountsAndBaseRequest(const FGetPlayerUnitCountsAndBase& Request);
 	void QueueFindAlliedTanksToRetreatRequest(const FFindAlliedTanksToRetreat& Request);

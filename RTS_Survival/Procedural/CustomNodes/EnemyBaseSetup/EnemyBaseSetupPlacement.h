@@ -48,13 +48,17 @@ struct FEnemyDefenseFrame
 	FVector2D Right() const;
 };
 
+/** @return Local yaw (radians) of the axis a Blueprint's front lies on. */
+double EnemyFrontAxisYawRadians(EEnemySandbagFrontAxis FrontAxis);
+
 /** @return Mask of the solid categories every structural placement must stay clear of. */
 constexpr uint8 EnemySolidCategoryMask()
 {
 	return EnemyOccupancyMask(EEnemyPlacementCategory::Bunker)
 		| EnemyOccupancyMask(EEnemyPlacementCategory::Sandbag)
 		| EnemyOccupancyMask(EEnemyPlacementCategory::Hedgehog)
-		| EnemyOccupancyMask(EEnemyPlacementCategory::BarbedWire);
+		| EnemyOccupancyMask(EEnemyPlacementCategory::BarbedWire)
+		| EnemyOccupancyMask(EEnemyPlacementCategory::Reserved);
 }
 
 /**
@@ -74,8 +78,72 @@ public:
 	/** @brief Sets an optional world-XY test that rejects blocked positions (exclusion / outside area). */
 	void SetBlockedPredicate(TFunction<bool(const FVector2D&)> InBlocked);
 
+	/**
+	 * @brief Sets an optional test on the whole reserved footprint, for callers that must reject bad ground
+	 * under any corner of an item and not only under its centre.
+	 */
+	void SetBlockedFootprintPredicate(TFunction<bool(const FEnemyFootprint&)> InBlocked);
+
 	/** @return A fresh cluster index; all props of one setup instance share it for per-cluster bounds. */
 	int32 BeginCluster();
+
+	/**
+	 * @brief Keeps a straight strip of ground clear; every later placement that avoids solids skips it, which is
+	 * how streets cut gaps into walls, belts and wire without those runs knowing about streets.
+	 * @param HalfWidth Half the strip width (cm).
+	 */
+	void ReserveCorridor(const FVector2D& Start, const FVector2D& End, double HalfWidth);
+
+	/**
+	 * @brief Places one entry so the centre of its footprint (not its pivot) lands on FootprintCenter; Blueprints
+	 * with an off-centre pivot then line up with their neighbours.
+	 * @param EntryIndex Entry to place; INDEX_NONE picks a weighted one.
+	 * @param ExtraSpacing Footprint inflation for the overlap test only.
+	 * @param AvoidMask Categories that reject this placement.
+	 * @param OutFootprint Receives the reserved footprint on success.
+	 * @return True when the item fit and was reserved.
+	 */
+	bool PlaceCentered(
+		EEnemyPlacementCategory Category,
+		const TArray<FEnemyResolvedEntry>& Entries,
+		int32 EntryIndex,
+		const FVector2D& FootprintCenter,
+		double YawRadians,
+		double ExtraSpacing,
+		uint8 AvoidMask,
+		int32 Cluster,
+		FEnemyFootprint& OutFootprint);
+
+	/** @return True when the footprint stands on good ground and overlaps none of the categories in AvoidMask. */
+	bool GetIsFootprintFree(const FEnemyFootprint& Footprint, uint8 AvoidMask) const;
+
+	/**
+	 * @brief Reserves an explicit footprint and places an entry at an exact pivot, without any test. For pieces fitted to
+	 * each other, whose footprint is not the entry's measured one; test first with GetIsFootprintFree.
+	 */
+	void PlaceAtPivot(
+		EEnemyPlacementCategory Category,
+		const FEnemyResolvedEntry& Entry,
+		const FVector2D& Pivot,
+		double YawRadians,
+		const FEnemyFootprint& Footprint,
+		int32 Cluster);
+
+	/**
+	 * @brief Lays long segments end to end from Start to End (walls, fences, wire, sandbag runs). Each segment's
+	 * SandbagFrontAxis points along OutwardDir, its real length drives the step, and where something blocks the
+	 * run it steps past the obstacle, so reserved corridors become clean gaps.
+	 * @param bCloseRunEnd Places a last segment flush with End so a wall meets its corner without a slit.
+	 */
+	void PlaceSegmentRun(
+		EEnemyPlacementCategory Category,
+		const TArray<FEnemyResolvedEntry>& Segments,
+		const FVector2D& Start,
+		const FVector2D& End,
+		const FVector2D& OutwardDir,
+		uint8 AvoidMask,
+		bool bCloseRunEnd,
+		int32 Cluster);
 
 	/**
 	 * @brief Lays a row of bunkers centered on the frame origin, spread along the frame's right
@@ -156,6 +224,7 @@ private:
 	FEnemyOccupancyGrid& M_Occupancy;
 	FEnemyBaseSetupResult& M_Result;
 	TFunction<bool(const FVector2D&)> M_IsBlocked;
+	TFunction<bool(const FEnemyFootprint&)> M_IsFootprintBlocked;
 
 	/** @brief One bounds-derived segment prepared for placement along a sandbag wall side. */
 	struct FSandbagPlacementCandidate

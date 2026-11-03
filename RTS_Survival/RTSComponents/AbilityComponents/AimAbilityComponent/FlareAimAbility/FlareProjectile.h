@@ -134,6 +134,18 @@ struct RTS_SURVIVAL_API FFlareFlightPath
 	                             const FVector& GroundTarget, const float ApexHeight, const float AscentSpeed,
 	                             const float HangSeconds);
 
+	/**
+	 * @brief The path of a flare dropped from an aircraft: it falls unlit to its apex instead of climbing to it, also
+	 * when the aircraft flies far above the height a launched flare could reach.
+	 * @param ReleaseLocation World location of the aircraft.
+	 * @param GroundTarget Ground location under the flare.
+	 * @param ApexHeight Height above GroundTarget at which the flare ignites.
+	 * @param FallSpeed Average fall speed in cm/s.
+	 * @param HangSeconds Seconds from ignition until the flare reaches the ground.
+	 */
+	static FFlareFlightPath MakeDropped(const FVector& ReleaseLocation, const FVector& GroundTarget,
+	                                    const float ApexHeight, const float FallSpeed, const float HangSeconds);
+
 	/** @return Location at this time since launch; the climb slows down towards the apex. */
 	FVector GetLocationAtTime(const float SecondsSinceLaunch) const;
 
@@ -166,6 +178,17 @@ public:
 	 */
 	void LaunchFlare(const FVector& LaunchLocation, const FVector& LaunchDirection, const FVector& GroundTarget,
 	                 const FFlareProjectileSettings& Settings, const uint8 OwningPlayer);
+
+	/**
+	 * @brief Starts the flight of a flare dropped from an aircraft; call once right after spawning. AscentSpeed of the
+	 * settings is the fall speed here.
+	 * @param ReleaseLocation World location of the aircraft.
+	 * @param GroundTarget Ground location under the flare.
+	 * @param Settings Height, hang time, vision and looks.
+	 * @param OwningPlayer Player of the ability; player 1 gets the vision bubble, the AI gets enemy vision.
+	 */
+	void DropFlare(const FVector& ReleaseLocation, const FVector& GroundTarget,
+	               const FFlareProjectileSettings& Settings, const uint8 OwningPlayer);
 
 	EFlareProjectilePhase GetPhase() const { return M_Phase; }
 	const FFlareFlightPath& GetFlightPath() const { return M_FlightPath; }
@@ -214,6 +237,7 @@ private:
 	float M_SecondsSinceBurnOut = 0.f;
 	uint8 M_OwningPlayer = 0;
 
+	bool GetCanStartFlight() const;
 	void SetupMeshes();
 	void StartAscent();
 	void Ignite();

@@ -3511,6 +3511,19 @@ void ASquadUnit::ApplyMarchSpeed()
 	}
 	constexpr float MinimumMarchSpeedMultiplier = 0.05f;
 	M_AppliedMarchSpeedMultiplier = FMath::Clamp(MarchSpeedMultiplier, MinimumMarchSpeedMultiplier, 1.0f);
+	if (M_MarchSpeedOverrideCms > 0.0f && UnitMovement->MaxWalkSpeed > KINDA_SMALL_NUMBER)
+	{
+		// A convoy sets the pace: the march may be faster than the soldier's own walk.
+		constexpr float MaximumMarchOverrideMultiplier = 3.0f;
+		M_AppliedMarchSpeedMultiplier = FMath::Clamp(M_MarchSpeedOverrideCms / UnitMovement->MaxWalkSpeed,
+		                                             MinimumMarchSpeedMultiplier, MaximumMarchOverrideMultiplier);
+		if (M_AppliedMarchSpeedMultiplier == 1.0f)
+		{
+			// Exactly the walk speed: nudge it so the march still counts as applied and is undone later.
+			constexpr float UnityMultiplierNudge = 0.999f;
+			M_AppliedMarchSpeedMultiplier = UnityMultiplierNudge;
+		}
+	}
 	UnitMovement->MaxWalkSpeed *= M_AppliedMarchSpeedMultiplier;
 	UnitMovement->MaxAcceleration *= M_AppliedMarchSpeedMultiplier;
 	M_MarchedMaxWalkSpeed = UnitMovement->MaxWalkSpeed;
@@ -3536,6 +3549,41 @@ void ASquadUnit::RemoveMarchSpeed()
 	{
 		UnitMovement->MaxAcceleration /= AppliedSpeedMultiplier;
 	}
+}
+
+void ASquadUnit::SetMarchSpeedOverride(const float MarchWalkSpeedCms)
+{
+	const float NewOverride = FMath::Max(0.0f, MarchWalkSpeedCms);
+	if (FMath::IsNearlyEqual(NewOverride, M_MarchSpeedOverrideCms))
+	{
+		return;
+	}
+	const bool bIsMarching = M_ActiveCommand == EAbilityID::IdMarch;
+	if (bIsMarching)
+	{
+		RemoveMarchSpeed();
+	}
+	M_MarchSpeedOverrideCms = NewOverride;
+	if (bIsMarching)
+	{
+		ApplyMarchSpeed();
+	}
+}
+
+bool ASquadUnit::RedirectMarch(const FVector& NewMarchToLocation)
+{
+	if (M_ActiveCommand != EAbilityID::IdMarch)
+	{
+		return false;
+	}
+	M_PatrolState.PatrolStartLocation = GetActorLocation();
+	M_PatrolState.PatrolEndLocation = NewMarchToLocation;
+	M_PatrolState.bIsToEndPatrolActive = true;
+	M_LastPatrolMoveTimeOut = 0.f;
+	bM_IsRedirectingMarch = true;
+	MoveToAndBindOnCompleted(NewMarchToLocation, true, EAbilityID::IdMarch);
+	bM_IsRedirectingMarch = false;
+	return true;
 }
 
 void ASquadUnit::ExecuteSwitchWeapon()
@@ -3979,6 +4027,11 @@ void ASquadUnit::AttachEffectAtEquipmentMesh(UNiagaraSystem* Effect, const FName
 
 void ASquadUnit::OnMoveCompleted(FAIRequestID RequestID, EPathFollowingResult::Type Result)
 {
+	if (bM_IsRedirectingMarch)
+	{
+		// RedirectMarch replaced this move; the march goes on towards the new end.
+		return;
+	}
 	if (M_CoverMoveRequestID.IsValid() && RequestID.GetID() == M_CoverMoveRequestID.GetID())
 	{
 		OnMoveCompleted_Cover(Result);

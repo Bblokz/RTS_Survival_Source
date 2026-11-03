@@ -82,6 +82,7 @@ public:
 	 * @param ChosenRotation The arrow's rotation when it was used.
 	 * @param bQueueCommand True to append to the squads' command queues instead of replacing them.
 	 * @param OutIssuedCommandCount Number of squads that accepted the move.
+	 * @param bAttackMove True to order an attack move instead of a regular move.
 	 * @return False when these squads cannot be planned, so the caller must use the regular formation move.
 	 */
 	bool TryIssuePlannedMove(
@@ -90,7 +91,8 @@ public:
 		bool bFacingChosenByPlayer,
 		const FRotator& ChosenRotation,
 		bool bQueueCommand,
-		uint32& OutIssuedCommandCount);
+		uint32& OutIssuedCommandCount,
+		bool bAttackMove = false);
 
 	/**
 	 * @brief Plans positions for squads without touching the plan that is on screen.

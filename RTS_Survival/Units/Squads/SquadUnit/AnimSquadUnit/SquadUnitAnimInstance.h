@@ -1224,7 +1224,11 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UAnimMontage> M_ActiveMarchMontage = nullptr;
 
-	// Keeps the marching feet planted: the montage rate follows the current ground speed.
+	// True while the unit is in the march state, also while it jogs because it is driven faster than the march cycle.
+	bool bM_MarchAnimationRequested = false;
+
+	// Keeps the marching feet planted: the montage rate follows the current ground speed up to MaxMarchPlayRate; above
+	// that the montage blends out into the regular jog locomotion and comes back when the unit slows down.
 	void UpdateMarchPlayRate();
 	FOnSquadUnitDeathMontageFinished M_DeathMontageCompletionDelegate;
 

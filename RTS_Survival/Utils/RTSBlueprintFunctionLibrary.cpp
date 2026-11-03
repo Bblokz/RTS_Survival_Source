@@ -115,6 +115,15 @@ EVehicleModuleProfile URTSBlueprintFunctionLibrary::BP_GetVehicleModuleProfileFo
 	{
 		return EVehicleModuleProfile::HeavyTank;
 	}
+	// Harvesters are in no combat weight class; their modules follow the chassis they are built on.
+	if (TankSubtype == ETankSubtype::Tank_PzI_Harvester)
+	{
+		return EVehicleModuleProfile::LightTank;
+	}
+	if (TankSubtype == ETankSubtype::Tank_T34_Harvester)
+	{
+		return EVehicleModuleProfile::MediumTank;
+	}
 
 	RTSFunctionLibrary::ReportError(FString::Printf(
 		TEXT("BP_GetVehicleModuleProfileForTankSubtype: no module profile for tank subtype %d."),
@@ -1354,6 +1363,11 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_IS6()
 FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SMK()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_SMK));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_KV3()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_KV3));
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetHeavyTank_SU_152()

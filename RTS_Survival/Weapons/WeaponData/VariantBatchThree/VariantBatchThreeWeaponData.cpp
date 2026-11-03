@@ -143,7 +143,7 @@ namespace VariantBatchThreeWeaponsPrivate
 		WeaponDataMap.Add(EWeaponName::MK103_30MM_PumaDual, DualData);
 	}
 
-	// Puma Radixite Sniper: the 50 mm laser as one shot of seven Puma shots, 1.67x the Puma's reload.
+	// Puma Radixite Sniper: the 50 mm laser as one shot of three Puma shots, 2.5x the Puma's reload.
 	void AddRadixiteSniper(TMap<EWeaponName, FWeaponData>& WeaponDataMap)
 	{
 		const FWeaponData* const LaserData = WeaponDataMap.Find(EWeaponName::Strahlkanone39);
@@ -152,7 +152,7 @@ namespace VariantBatchThreeWeaponsPrivate
 		{
 			return;
 		}
-		constexpr float SniperReloadMlt = 1.67f;
+		constexpr float SniperReloadMlt = 2.5f;
 		const float PumaShotDamage = PumaGunData->BaseDamage;
 		const float PumaReloadSpeed = PumaGunData->ReloadSpeed;
 		FWeaponData SniperData = *LaserData;
@@ -341,7 +341,7 @@ namespace VariantBatchThreeWeaponsPrivate
 		Flak41Data.ArmorPenMaxRange = 55.f;
 		Flak41Data.MagCapacity = 5;
 		// The 3.0 s clip drill is stretched to the reload time minus 0.25 s.
-		Flak41Data.ReloadSpeed = 3.25f;
+		Flak41Data.ReloadSpeed = 5.25f;
 		Flak41Data.BaseCooldown = 0.35f;
 		Flak41Data.Accuracy = 70;
 		Flak41Data.ProjectileMovementSpeed = HighVelocityProjectileSpeed;

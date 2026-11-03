@@ -23,6 +23,12 @@ camera owned by the director films the battles and fades from one landscape to t
 Vehicles and squads are drawn from the base pools, or at `VariantChance` (35%) from the variant pools, which the
 setup script harvests from `DA_UnitVariants` (combat variants only). The camera pulls back as the fighting spreads.
 
+Units of one rank stand `SlotSpacing` (45 m) apart, so they do not block each other on the way in; the camera stops
+pulling back at 130 m and frames part of the line instead. The generated landscapes are bowls with hills of 30 to 70 m
+around them and the desert has a ring of height-stretched mountains past its edges: a low camera must never see the
+next landscape over the horizon. Check crest heights with the terrain class before changing `rim`, and keep a flat or
+yard from cutting a gap in the crest (`flats` has its own size for that).
+
 The desert landscape ends at ±25200 cm, so its arenas use shorter approach and reinforcement depths and sit far
 enough in for their deepest slots; past any edge the camera would see the sky atmosphere's bare ground. As a safety
 net the director moves a slot without ground under it towards the middle of the battle until it has
@@ -42,6 +48,8 @@ net the director moves a slot without ground under it towards the middle of the 
 Battle units leave the fog of war and are kept visible (`bKeepBattleUnitsOutOfFog`, the Shorts approach): in the
 fog, unexplored ground around each battle turned black on camera and units could not find hidden targets. The fog
 manager's capture is widened to all five landscapes so none of them falls outside it (outside it renders black).
+`RTS_MENU_BATTLE_END` logs `hiddenShownAgain`, how often a unit had to be shown again: above zero means something
+still hides units that left the fog, which shows as units flickering between visible and invisible.
 `-MenuBattleGameplayFog` plays the battles in the fog like a mission instead. Health bars are made invisible and unit voice lines are suppressed. The placed `RTS_BP_EnemyController` is quieted (thinking starts only
 on a mission trigger, no training, building or direct control) so it never takes the Soviet units over.
 

@@ -935,6 +935,11 @@ void ATrackedTankMaster::StopMovement()
 	Super::StopMovement();
 }
 
+bool ATrackedTankMaster::GetCanStartAttackMoveEngagement() const
+{
+	return DoesVehicleHaveAnyWeapons();
+}
+
 void ATrackedTankMaster::ExecuteAttackCommand(AActor* Target)
 {
 	// Set turrets to engage target.

@@ -38,7 +38,13 @@ class RTS_SURVIVAL_API UW_GlobalAbilityPanel : public UUserWidget
 	TObjectPtr<UW_GA_Item> GlobalAbility_4;
 	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UW_GA_Item> GlobalAbility_5;
-	
+	UPROPERTY( blueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UW_GA_Item> GlobalAbility_6;
+	UPROPERTY( blueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UW_GA_Item> GlobalAbility_7;
+	UPROPERTY( blueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UW_GA_Item> GlobalAbility_8;
+
 	UPROPERTY( blueprintReadOnly, meta=(BindWidget))
 	TObjectPtr<UW_GA_Description> Description;
 	

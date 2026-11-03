@@ -25,6 +25,7 @@
 #include "RTS_Survival/Missions/Victory/W_Victory.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
@@ -38,6 +39,10 @@ namespace MapSmokeTestPrivate
 {
 	const TCHAR* const SmokeTestSwitch = TEXT("RTSMapSmokeTest");
 	const TCHAR* const MenuFlowSwitch = TEXT("RTSMenuFlowTest");
+	// Survival through the real menus: SURVIVAL button, faction, variants, difficulty, then the survival map.
+	const TCHAR* const SurvivalMenuFlowSwitch = TEXT("RTSSurvivalMenuFlow");
+	const FName SurvivalButtonName(TEXT("ButtonSurvival"));
+	constexpr float SurvivalFactionStepSeconds = 4.f;
 	// The main menu widget class and its Load Campaign button, as the start game map shows them.
 	const TCHAR* const StartGameWidgetClassName = TEXT("StartGameUI_C");
 	// The main menu map; its controller derives from the RTS controller, so the map name tells the menu apart.
@@ -179,7 +184,8 @@ bool UMapSmokeTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 	const UWorld* OuterWorld = Cast<UWorld>(Outer);
 	return IsValid(OuterWorld) && OuterWorld->IsGameWorld()
 		&& (FParse::Param(FCommandLine::Get(), MapSmokeTestPrivate::SmokeTestSwitch)
-			|| FParse::Param(FCommandLine::Get(), MapSmokeTestPrivate::MenuFlowSwitch));
+			|| FParse::Param(FCommandLine::Get(), MapSmokeTestPrivate::MenuFlowSwitch)
+			|| FParse::Param(FCommandLine::Get(), MapSmokeTestPrivate::SurvivalMenuFlowSwitch));
 }
 
 void UMapSmokeTestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -249,7 +255,7 @@ void UMapSmokeTestSubsystem::Tick(const float DeltaTime)
 	{
 		return;
 	}
-	if (TickReturnedFromVictory() || TickMenuFlow())
+	if (TickReturnedFromVictory() || TickMenuFlow() || TickSurvivalMenuFlow())
 	{
 		return;
 	}
@@ -315,6 +321,82 @@ bool UMapSmokeTestSubsystem::TickMenuFlow()
 	}
 	PressLoadCampaignButton();
 	return true;
+}
+
+bool UMapSmokeTestSubsystem::TickSurvivalMenuFlow()
+{
+	if (not FParse::Param(FCommandLine::Get(), MapSmokeTestPrivate::SurvivalMenuFlowSwitch))
+	{
+		return false;
+	}
+	UWorld* World = GetWorld();
+	if (AFactionPlayerController* FactionController = Cast<AFactionPlayerController>(World->GetFirstPlayerController()))
+	{
+		TickSurvivalFactionFlow(FactionController);
+		return true;
+	}
+	if (World->GetMapName() != MapSmokeTestPrivate::MainMenuMapName)
+	{
+		return false;
+	}
+	PressSurvivalButton();
+	return true;
+}
+
+void UMapSmokeTestSubsystem::PressSurvivalButton()
+{
+	if (bM_HasPressedSurvival)
+	{
+		return;
+	}
+	TArray<UUserWidget*> Widgets;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Widgets, UUserWidget::StaticClass(), false);
+	for (UUserWidget* const Widget : Widgets)
+	{
+		if (not IsValid(Widget) || not IsValid(Widget->WidgetTree)
+			|| Widget->GetClass()->GetName() != MapSmokeTestPrivate::StartGameWidgetClassName)
+		{
+			continue;
+		}
+		UButton* const SurvivalButton = Cast<UButton>(
+			Widget->WidgetTree->FindWidget(MapSmokeTestPrivate::SurvivalButtonName));
+		if (not IsValid(SurvivalButton))
+		{
+			continue;
+		}
+		bM_HasPressedSurvival = true;
+		UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST menu_survival_pressed"));
+		SurvivalButton->OnClicked.Broadcast();
+		return;
+	}
+}
+
+void UMapSmokeTestSubsystem::TickSurvivalFactionFlow(AFactionPlayerController* FactionController)
+{
+	const float RealSeconds = GetWorld()->GetRealTimeSeconds();
+	if (RealSeconds < M_NextSurvivalStepSeconds)
+	{
+		return;
+	}
+	M_NextSurvivalStepSeconds = RealSeconds + MapSmokeTestPrivate::SurvivalFactionStepSeconds;
+	switch (M_SurvivalFactionStep)
+	{
+	case 0:
+		UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST survival_faction_chosen"));
+		FactionController->HandleLaunchCampaignRequested(ERTSFaction::GerBreakthroughDoctrine);
+		break;
+	case 1:
+		UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST survival_variants_confirmed"));
+		FactionController->HandleUnitVariantSelectionConfirmed({});
+		break;
+	case 2:
+		UE_LOG(LogRTSMapSmokeTest, Display, TEXT("RTS_MAP_SMOKE_TEST survival_difficulty_chosen"));
+		FactionController->HandleFactionDifficultyChosen(100, ERTSGameDifficulty::Normal);
+		break;
+	default:
+		break;
+	}
+	++M_SurvivalFactionStep;
 }
 
 void UMapSmokeTestSubsystem::PressLoadCampaignButton()
@@ -703,6 +785,19 @@ bool UMapSmokeTestSubsystem::TickMenuFlow()
 }
 
 void UMapSmokeTestSubsystem::PressLoadCampaignButton()
+{
+}
+
+bool UMapSmokeTestSubsystem::TickSurvivalMenuFlow()
+{
+	return false;
+}
+
+void UMapSmokeTestSubsystem::PressSurvivalButton()
+{
+}
+
+void UMapSmokeTestSubsystem::TickSurvivalFactionFlow(AFactionPlayerController* FactionController)
 {
 }
 

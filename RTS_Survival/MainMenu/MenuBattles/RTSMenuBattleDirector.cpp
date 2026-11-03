@@ -813,9 +813,9 @@ void ARTSMenuBattleDirector::EndCurrentBattle()
 	{
 		GetWorld()->RemoveOnActorSpawnedHandler(M_Battle.ActorSpawnedHandle);
 	}
-	UE_LOG(LogRTSMenuBattle, Display, TEXT("RTS_MENU_BATTLE_END battle=%d germanAlive=%d sovietAlive=%d seconds=%.1f leftovers=%d"),
+	UE_LOG(LogRTSMenuBattle, Display, TEXT("RTS_MENU_BATTLE_END battle=%d germanAlive=%d sovietAlive=%d seconds=%.1f leftovers=%d hiddenShownAgain=%d"),
 	       M_Battle.BattleNumber, CountAliveGroundUnits(M_Battle.German), CountAliveGroundUnits(M_Battle.Soviet),
-	       GetTimeSeconds() - M_Battle.BeginTimeSeconds, M_Battle.SpawnedByBattle.Num());
+	       GetTimeSeconds() - M_Battle.BeginTimeSeconds, M_Battle.SpawnedByBattle.Num(), M_Battle.HiddenUnitsShownAgain);
 	if (not M_Battle.GetIsDecided())
 	{
 		LogUndecidedSurvivors();
@@ -974,7 +974,7 @@ void ARTSMenuBattleDirector::PrepareBattleUnit(AActor* Unit) const
 	}
 }
 
-void ARTSMenuBattleDirector::KeepBattleUnitsPresentable(const FRTSMenuBattleSideUnits& Side) const
+void ARTSMenuBattleDirector::KeepBattleUnitsPresentable(const FRTSMenuBattleSideUnits& Side)
 {
 	using DeveloperSettings::GamePlay::FoW::TagUnitInEnemyVision;
 	for (const TArray<TWeakObjectPtr<AActor>>* Units : {&Side.GroundUnits, &Side.Aircraft})
@@ -1006,6 +1006,7 @@ void ARTSMenuBattleDirector::KeepBattleUnitsPresentable(const FRTSMenuBattleSide
 			if (Unit->IsHidden())
 			{
 				Unit->SetActorHiddenInGame(false);
+				++M_Battle.HiddenUnitsShownAgain;
 			}
 			TArray<AActor*> Attached;
 			Unit->GetAttachedActors(Attached, true, true);

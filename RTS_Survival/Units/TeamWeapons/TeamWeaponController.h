@@ -329,6 +329,9 @@ protected:
 	virtual void ExecuteRotateTowardsCommand(const FRotator RotateToRotator, const bool IsQueueCommand) override;
 	virtual void TerminateRotateTowardsCommand() override;
 	virtual void ExecuteAttackCommand(AActor* TargetActor) override;
+	virtual ECommandQueueError AttackActorBeforeActiveCommand(AActor* Target) override;
+	/** @return False while packing or deploying: those timers end in the deferred action of the running command. */
+	virtual bool GetCanStartAttackMoveEngagement() const override;
 	virtual void TerminateAttackCommand() override;
 	virtual void ExecuteAttackGroundCommand(const FVector GroundLocation) override;
 	virtual void TerminateAttackGroundCommand() override;
@@ -379,6 +382,10 @@ private:
 	void AssignCrewToTeamWeapon();
 	void HandlePushedMoverArrived();
 	void HandlePushedMoverFailed(const FString& FailureReason);
+
+	// Only true inside AttackActorBeforeActiveCommand: the move stops for a fight, it did not fail, and the gun that
+	// stopped halfway has to deploy where it stands.
+	bool bM_IsStoppingMoveForAttackMoveEngagement = false;
 	void SetTeamWeaponState(const ETeamWeaponState NewState);
 	void TryAbandonTeamWeaponForInsufficientCrew();
 	void AbandonTeamWeapon();

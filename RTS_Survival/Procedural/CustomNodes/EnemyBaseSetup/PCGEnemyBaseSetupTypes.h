@@ -105,6 +105,9 @@ enum class EEnemyPlacementCategory : uint8
 	Hedgehog,
 	BarbedWire,
 	Decorator,
+	// Ground kept clear on purpose (streets, gate aperture); only placed by callers that reserve corridors, so nodes
+	// that never reserve one behave as if this category does not exist.
+	Reserved,
 	Count UMETA(Hidden)
 };
 

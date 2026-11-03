@@ -129,6 +129,11 @@ bool FVariantBatchWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	const TArray<EWeaponShellType> HeOnly = {EWeaponShellType::Shell_HE};
 	TestEqual(TEXT("25mm fires APCR only"), ApcrAutocannon->ShellTypes, ApcrOnly);
 	TestEqual(TEXT("Rail sniper fires APCR only"), RailSniper->ShellTypes, ApcrOnly);
+	// APCR is applied when firing: these are the values the variant menu shows.
+	using DeveloperSettings::GameBalance::Weapons::Projectiles::APCR_ArmorPenMlt;
+	using DeveloperSettings::GameBalance::Weapons::Projectiles::APCR_DamageMlt;
+	TestEqual(TEXT("Rail sniper fires 100 damage"), RailSniper->BaseDamage * APCR_DamageMlt, 100.f, Tolerance);
+	TestEqual(TEXT("Rail sniper fires 225 pen"), RailSniper->ArmorPen * APCR_ArmorPenMlt, 225.f, Tolerance);
 	TestEqual(TEXT("Howitzer fires HE only"), HowitzerHe->ShellTypes, HeOnly);
 	TestEqual(TEXT("Siege mortar fires HE only"), SiegeMortar->ShellTypes, HeOnly);
 

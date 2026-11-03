@@ -96,9 +96,9 @@ struct FRTSMenuBattleArenaSettings
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Layout", meta = (ClampMin = "2000"))
 	float LineSeparation = 9000.f;
 
-	// Sideways distance between two units of one rank.
+	// Sideways distance between two units of one rank; wide so units do not block each other on the way in.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Layout", meta = (ClampMin = "400"))
-	float SlotSpacing = 1500.f;
+	float SlotSpacing = 4500.f;
 
 	// Distance between the vehicle rank, the infantry rank behind it and the aircraft rank at the back.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Layout", meta = (ClampMin = "400"))
@@ -250,6 +250,9 @@ struct FRTSMenuBattleState
 
 	// Target each attacker was last sent at; a new order only follows once that target is dead.
 	TMap<TWeakObjectPtr<AActor>, TWeakObjectPtr<AActor>> OrderedTargets;
+
+	// How often this battle had to show a hidden unit again; above zero something still hides units that left the fog.
+	int32 HiddenUnitsShownAgain = 0;
 
 	// Attackers driving toward a target the fog of war still hides, with the time of their last move order.
 	TMap<TWeakObjectPtr<AActor>, float> AdvanceOrderSeconds;

@@ -157,29 +157,45 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 		EAllUnitType::UNType_Tank,
 		static_cast<uint8>(TankWithOffset.TankSubtype));
 	TWeakObjectPtr<AAircraftMaster> WeakAircraft(SpawnedAircraft);
-	AsyncSpawner->AsyncSpawnOptionAtLocation(
+	const FVector TankSpawnLocation = SpawnLocation + FVector(0.0f, 0.0f, TankWithOffset.TankAttachZOffset);
+	const auto OnTankSpawned = [WeakAircraft, DropRequest](const FTrainingOption&, AActor* SpawnedActor, const int32)
+	{
+		if (not WeakAircraft.IsValid())
+		{
+			return;
+		}
+
+		ATankMaster* SpawnedTank = Cast<ATankMaster>(SpawnedActor);
+		if (not IsValid(SpawnedTank))
+		{
+			WeakAircraft->Destroy();
+			return;
+		}
+
+		FAircraftDropRequest RequestWithTank = DropRequest;
+		RequestWithTank.AttachedTank = SpawnedTank;
+		WeakAircraft->OrderAircraftDrop(RequestWithTank);
+	};
+
+	if (TankWithOffset.TankClassOverride.IsNull())
+	{
+		AsyncSpawner->AsyncSpawnOptionAtLocation(
+			TankTrainingOption,
+			TankSpawnLocation,
+			const_cast<UGA_AircraftDrop*>(this),
+			AircraftIndex,
+			OnTankSpawned,
+			FRotator::ZeroRotator);
+		return;
+	}
+
+	AsyncSpawner->AsyncSpawnClassAtLocation(
+		TSoftClassPtr<AActor>(TankWithOffset.TankClassOverride.ToSoftObjectPath()),
 		TankTrainingOption,
-		SpawnLocation + FVector(0.0f, 0.0f, TankWithOffset.TankAttachZOffset),
+		TankSpawnLocation,
 		const_cast<UGA_AircraftDrop*>(this),
 		AircraftIndex,
-		[WeakAircraft, DropRequest](const FTrainingOption&, AActor* SpawnedActor, const int32)
-		{
-			if (not WeakAircraft.IsValid())
-			{
-				return;
-			}
-
-			ATankMaster* SpawnedTank = Cast<ATankMaster>(SpawnedActor);
-			if (not IsValid(SpawnedTank))
-			{
-				WeakAircraft->Destroy();
-				return;
-			}
-
-			FAircraftDropRequest RequestWithTank = DropRequest;
-			RequestWithTank.AttachedTank = SpawnedTank;
-			WeakAircraft->OrderAircraftDrop(RequestWithTank);
-		},
+		OnTankSpawned,
 		FRotator::ZeroRotator);
 }
 

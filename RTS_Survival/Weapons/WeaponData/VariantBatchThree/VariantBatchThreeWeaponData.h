@@ -18,7 +18,7 @@ namespace VariantBatchThreeWeapons
 	// The Puma Radixite Sniper's damage is per laser iteration; its turret BP must use this many BeamIterations.
 	constexpr int32 RadixiteSniperBeamIterations = 1;
 	// The sniper deals this many base Puma (KwK 39/1) shots in one beam.
-	constexpr float RadixiteSniperDamageInPumaShots = 7.f;
+	constexpr float RadixiteSniperDamageInPumaShots = 3.f;
 
 	/** @param WeaponDataMap The player weapon map, already filled by the category initializers. */
 	void AddWeapons(TMap<EWeaponName, FWeaponData>& WeaponDataMap);

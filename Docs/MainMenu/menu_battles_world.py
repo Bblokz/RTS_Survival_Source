@@ -37,22 +37,25 @@ QUADS = 63
 VERTS = COMPONENTS * QUADS + 1
 QUAD_CM = 100.0
 HALF_SIZE = (VERTS - 1) * QUAD_CM / 2.0
+RIM_SPREAD_U_CM = 19500.0
+RIM_SPREAD_V_CM = 18500.0
+MIN_CREST_FRACTION = 0.6
 
 # name, centre, battle yaw, material, layer infos, rim height (cm), terrain seed
 REGIONS = {
-    "Steppe": dict(centre=(0.0, 80000.0), yaw=0.0, rim=1600.0, bumps=110.0, seed=11,
+    "Steppe": dict(centre=(0.0, 80000.0), yaw=0.0, rim=5200.0, bumps=110.0, seed=11,
                    material=LANDSCAPE_ROOT + "CastleGrassDesertDry/MI_RTS_Landscape_DryCastle_Trains",
                    layers=["GrassCastle", "DryGrass", "Desert", "GraySand", "RockDesert"],
                    layer_root=LANDSCAPE_ROOT + "CastleGrassDesertDry/DATA/"),
-    "Meadow": dict(centre=(80000.0, 0.0), yaw=90.0, rim=2600.0, bumps=140.0, seed=23, yards=[(-1000.0, -10200.0)],
+    "Meadow": dict(centre=(80000.0, 0.0), yaw=90.0, rim=5600.0, bumps=140.0, seed=23, yards=[(-1000.0, -13000.0)],
                    material=BRUSHIFY + "MI_Landscape",
                    layers=["Grass", "GrassDry", "Forest", "ForestDry", "Desert"],
                    layer_root=BRUSHIFY + "LayerInfos/"),
-    "Farm": dict(centre=(-80000.0, 0.0), yaw=0.0, rim=1400.0, bumps=55.0, seed=51,
+    "Farm": dict(centre=(-80000.0, 0.0), yaw=0.0, rim=5000.0, bumps=55.0, seed=51, flats=[(11500.0, 10500.0, 4000.0, 3200.0)],
                  material=LANDSCAPE_ROOT + "CastleGrassDesertDry/MI_RTS_Landscape_DryCastle_Inst",
                  layers=["GrassCastle", "DryGrass", "Desert", "GraySand", "RockDesert"],
                  layer_root=LANDSCAPE_ROOT + "CastleGrassDesertDry/DATA/"),
-    "Winter": dict(centre=(0.0, -80000.0), yaw=0.0, rim=3600.0, bumps=170.0, seed=37, yards=[(1500.0, 10200.0)],
+    "Winter": dict(centre=(0.0, -80000.0), yaw=0.0, rim=6400.0, bumps=170.0, seed=37, yards=[(1500.0, 13000.0)],
                    material=BRUSHIFY + "MI_Landscape",
                    layers=["Snow", "GrassDry", "ForestDry", "Desert"],
                    layer_root=BRUSHIFY + "LayerInfos/"),
@@ -81,6 +84,8 @@ class Terrain:
         rng = random.Random(spec["seed"])
         self.phases = [rng.uniform(0, math.tau) for _ in range(12)]
         self.yards = spec.get("yards", [])
+        # Flat ground without an industrial yard on it: (u, v, half size u, half size v).
+        self.flats = spec.get("flats", [])
 
     def local(self, x, y):
         """World XY to (along battle axis, sideways) in cm."""
@@ -110,14 +115,15 @@ class Terrain:
                 + 0.5 * self.value_noise(u / (wavelength * 0.45), v / (wavelength * 0.45), salt + 1))
 
     def rim_amount(self, u, v):
-        # Elliptical bowl: the battle field (up to ~110 m along the axis, ~60 m sideways) stays open.
-        radius = math.sqrt((u / 19000.0) ** 2 + (v / 15000.0) ** 2)
-        return smoothstep(0.78, 1.12, radius)
+        # Elliptical bowl: the battle field (up to ~170 m along the axis, ~160 m sideways) stays open.
+        radius = math.sqrt((u / RIM_SPREAD_U_CM) ** 2 + (v / RIM_SPREAD_V_CM) ** 2)
+        return smoothstep(0.85, 1.12, radius)
 
     def height(self, x, y):
         u, v = self.local(x, y)
         rim = self.rim_amount(u, v)
-        ridges = 0.65 + 0.35 * self.noise(u, v, 2600.0, 0)
+        # Big separate hills with a guaranteed crest height: a low camera must not see the next landscape over a saddle.
+        ridges = max(MIN_CREST_FRACTION, 0.75 + 0.3 * self.noise(u, v, 6500.0, 0)) + 0.06 * self.noise(u, v, 1400.0, 7)
         field = self.bumps * (self.noise(u, v, 1800.0, 3) + 0.4 * self.noise(u, v, 700.0, 6))
         raw = 400.0 + field + rim * self.rim * ridges
         return self.flatten_for_yards(u, v, raw)
@@ -125,7 +131,7 @@ class Terrain:
     def flatten_for_yards(self, u, v, raw):
         half_u = YARD_COLUMNS * YARD_TILE_CM / 2.0 + 400.0
         half_v = YARD_ROWS * YARD_TILE_CM / 2.0 + 400.0
-        for yard_u, yard_v in self.yards:
+        for yard_u, yard_v, half_u, half_v in [(*yard, half_u, half_v) for yard in self.yards] + self.flats:
             outside_u = max(0.0, abs(u - yard_u) - half_u)
             outside_v = max(0.0, abs(v - yard_v) - half_v)
             flat = 1.0 - smoothstep(0.0, YARD_FLATTEN_BLEND_CM, math.hypot(outside_u, outside_v))
@@ -313,7 +319,7 @@ def wreck_meshes():
     return sorted(paths)
 
 
-def ring(rng, count, radius_min, radius_max, spread_u=19000.0, spread_v=15000.0):
+def ring(rng, count, radius_min, radius_max, spread_u=RIM_SPREAD_U_CM, spread_v=RIM_SPREAD_V_CM):
     """Points on the bowl's rim, as (u, v) in the battle frame."""
     points = []
     for index in range(count):
@@ -622,8 +628,8 @@ def detail_winter(dresser, terrain, wrecks):
 
 
 def detail_desert(dresser, arenas):
-    """The desert arenas get the start view's desert dressing at a lighter density, and the East Plain an industrial
-    yard on its south flank next to the old base buildings."""
+    """The desert arenas get the start view's desert dressing at a lighter density, and the south east corner an
+    industrial yard clear of the battle lines."""
     rng = random.Random(444)
     for label, (x0, y0), yaw, _, region in arenas:
         if region != "Desert":
@@ -639,7 +645,7 @@ def detail_desert(dresser, arenas):
         scatter(dresser, frame, rng, DESERT_ROCKS, "Desert_%s_Rock" % short, folder, 6, 11000, 7500, 12000,
                 scale=(0.6, 1.3), sink=40.0)
     yard_frame = Terrain("Steppe")
-    yard_frame.centre, yard_frame.yaw, yard_frame.yards = (16500.0, -8200.0), 0.0, []
+    yard_frame.centre, yard_frame.yaw, yard_frame.yards = (17500.0, -15500.0), 0.0, []
     build_industrial_yard(dresser, yard_frame, 0.0, -1.0, "Desert_Refinery", "Desert", 3)
 
 
@@ -652,14 +658,14 @@ GATE_WIDTH_CM = 400.0
 # Farm fields in the farm landscape's battle frame (u along the battle axis, v sideways): crop blueprint, row yaw
 # relative to the frame, corners (u, v), index of the edge that gets the fence gate.
 FARM_FIELDS = [
-    ("Wheat", 0.0, [(-13000, 7500), (-7200, 7700), (-7000, 12000), (-12800, 12200)], 0),
-    ("Wheat", 90.0, [(-5600, 7600), (300, 7400), (500, 11600), (-5400, 11800)], 0),
+    ("Wheat", 0.0, [(-11600, 7500), (-5800, 7700), (-5600, 12000), (-11400, 12200)], 0),
+    ("Wheat", 90.0, [(-4400, 7600), (1500, 7400), (1700, 11600), (-4200, 11800)], 0),
     ("WheatBurned", 4.0, [(2000, 7200), (7600, 7000), (7800, 11000), (2200, 11200)], 0),
-    ("Pumpkin", 0.0, [(-13200, -7600), (-8000, -7800), (-7800, -11600), (-13000, -11400)], 0),
-    ("Vineyard", 0.0, [(8200, -7400), (13600, -7600), (13800, -11000), (8400, -10800)], 0),
+    ("Pumpkin", 0.0, [(-11700, -7600), (-6500, -7800), (-6300, -11600), (-11500, -11400)], 0),
+    ("Vineyard", 0.0, [(6700, -7400), (12100, -7600), (12300, -11000), (6900, -10800)], 0),
 ]
-FARM_BUILDINGS = [("FarmHouse", 10500, 11800, 180), ("Barn", 14600, 10400, 170), ("HayShed", 12200, 8300, 185),
-                  ("Stable", 16200, 12800, 200)]
+FARM_BUILDINGS = [("FarmHouse", 9800, 12000, 180), ("Barn", 14000, 10400, 170), ("HayShed", 12000, 8300, 185),
+                  ("Stable", 15000, 13200, 200)]
 HAY_MESHES = ["SM_HayStack_A", "SM_HayStack_B", "SM_HayBale_Round_A", "SM_HayBale_Round_B", "SM_HayBale_Round_Stack"]
 # (animal, count, centre u, centre v, spread)
 FARM_HERDS = [("Sheep", 10, -2000, -10000, 2200), ("Cow", 6, 3500, -10500, 2000), ("Goat", 6, -4500, -12000, 1600),
@@ -668,7 +674,7 @@ FARM_HERDS = [("Sheep", 10, -2000, -10000, 2200), ("Cow", 6, 3500, -10500, 2000)
 REGION_FLOCKS = [("Farm", "WhiteStork", 0, 4000, 30), ("Farm", "Dove", -6000, -6000, 200), ("Steppe", "Crow", 2000, 3000, 70),
                  ("Meadow", "Dove", 0, -3000, 120), ("Winter", "Crow", -3000, 2000, 300),
                  ("Winter", "InkRaven", 5000, -4000, 140)]
-DESERT_FLOCKS = [("InkRaven", (-11500, 0), 40), ("CobaltRoller", (9000, 2500), 160), ("Crow", (-12000, 14000), 260)]
+DESERT_FLOCKS = [("InkRaven", (-11500, 0), 40), ("CobaltRoller", (9000, 2500), 160), ("Crow", (-10000, 13000), 260)]
 
 
 def spline_points(spline, points, closed):
@@ -757,7 +763,7 @@ def dress_farm(dresser, terrain):
         dresser.blueprint(LEAF_TREES[index % 2], "Farm_RimTree_%02d" % index, folder, x, y, yaw=rng.uniform(0, 360),
                           scale=rng.uniform(0.9, 1.3))
     for index in range(10):
-        x, y = world_point(terrain, -15500.0 + index * 3400.0, -13800.0)
+        x, y = world_point(terrain, -15500.0 + index * 3400.0, -14200.0)
         dresser.blueprint(SCORCH_POWERLINE, "Farm_Powerline_%d" % index, folder, x, y, yaw=yaw)
     craters(dresser, terrain, rng, "Farm", folder, 6, lateral=4500.0)
 
@@ -770,6 +776,41 @@ def place_flocks(dresser, terrains):
                           yaw=math.degrees(terrain.yaw) + flock_yaw)
     for index, (flock, (x, y), flock_yaw) in enumerate(DESERT_FLOCKS):
         dresser.blueprint(FLOCKS + flock, "Desert_Flock_%d_%s" % (index, flock), "Desert", x, y, yaw=flock_yaw)
+
+
+DESERT_MOUNTAINS = [ENV + "Obstacles/Desert/BP_Desert_Obstacle_Mountain3", ENV + "Obstacles/Desert/BP_Desert_Obstacle_Mountain5"]
+DESERT_EDGE_CM = 25200.0
+DESERT_MOUNTAIN_STEP_CM = 11000.0
+DESERT_MOUNTAIN_HEIGHT_CM = 6500.0
+DESERT_MOUNTAIN_BOTTOM_CM = -900.0
+
+
+def ring_desert_mountains(dresser):
+    """The desert landscape is not generated, so tall mountains past its edges hide the other landscapes from a low
+    camera. Stretched in height only, their feet stay out of the arenas."""
+    rng = random.Random(909)
+    offsets = [-DESERT_EDGE_CM + index * DESERT_MOUNTAIN_STEP_CM
+               for index in range(int(2 * DESERT_EDGE_CM / DESERT_MOUNTAIN_STEP_CM) + 2)]
+    index = 0
+    for normal_x, normal_y in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        for offset in offsets:
+            actor_class = unreal.EditorAssetLibrary.load_blueprint_class(DESERT_MOUNTAINS[index % len(DESERT_MOUNTAINS)])
+            actor = dresser.actors.spawn_actor_from_class(actor_class, unreal.Vector(0, 0, 0),
+                                                          unreal.Rotator(roll=0.0, pitch=0.0, yaw=rng.uniform(0, 360)))
+            _, extent = actor.get_actor_bounds(False)
+            height = DESERT_MOUNTAIN_HEIGHT_CM * rng.uniform(0.9, 1.25)
+            actor.set_actor_scale3d(unreal.Vector(1.0, 1.0, height / max(1.0, 2.0 * extent.z)))
+            origin, extent = actor.get_actor_bounds(False)
+            # The near foot of the mountain just reaches over the landscape's edge.
+            along_edge = offset + rng.uniform(-1500, 1500)
+            distance = DESERT_EDGE_CM + 0.7 * max(extent.x, extent.y)
+            x = normal_x * distance + (0 if normal_x else along_edge)
+            y = normal_y * distance + (0 if normal_y else along_edge)
+            location = actor.get_actor_location()
+            actor.set_actor_location(unreal.Vector(location.x + x - origin.x, location.y + y - origin.y,
+                                                   location.z + DESERT_MOUNTAIN_BOTTOM_CM - (origin.z - extent.z)), False, False)
+            dresser._finish(actor, "Desert_Mountain_%02d" % index, "Desert")
+            index += 1
 
 
 def add_sky(actors, all_actors):
@@ -837,5 +878,6 @@ def build(world, actors, arenas, start_view=None):
     if start_view is not None:
         dress_start_view(dresser, wrecks, start_view[0], start_view[1])
     detail_desert(dresser, [arena for arena in arenas if start_view is None or arena[1] != start_view[0]])
+    ring_desert_mountains(dresser)
     log("dressing actors=%d wrecks available=%d" % (dresser.count, len(wrecks)))
     return terrains

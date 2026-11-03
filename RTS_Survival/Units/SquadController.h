@@ -390,6 +390,19 @@ public:
 	 */
 	void OnSquadUnitInCombat();
 
+	/**
+	 * @brief Convoy hook: every soldier marches at this walk speed (cm/s) instead of his march multiplier, also
+	 * during a running march. 0 or less restores the normal march speed.
+	 */
+	void SetMarchSpeedOverride(const float MarchWalkSpeedCms);
+
+	/**
+	 * @brief Convoy hook: moves the far end of the running march without stopping or turning the soldiers; each
+	 * soldier keeps his offset from the squad centre.
+	 * @return False when the squad is not marching (issue MarchToLocation instead).
+	 */
+	bool RedirectMarch(const FVector& NewMarchToLocation);
+
 	int32 GetSquadUnitIndex(const ASquadUnit* SquadUnit);
 
 	// Delegate called when the squad picks up any weapon.
@@ -515,6 +528,12 @@ public:
 	 * @param TargetActor The enemy the aggressive stance picked.
 	 */
 	void IssueAutonomousAttack(AActor* TargetActor);
+
+	/** @brief The soldiers treat an attack move's fight like the aggressive stance's own attack, not like an order. */
+	virtual ECommandQueueError AttackActorBeforeActiveCommand(AActor* Target) override;
+
+	/** @return False while the squad sits inside cargo. */
+	virtual bool GetCanStartAttackMoveEngagement() const override;
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	virtual bool GetSquadAlreadyHasTeamWeapon() const;
 

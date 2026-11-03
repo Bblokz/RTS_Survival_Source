@@ -23,6 +23,7 @@
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
+#include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "GeometryCollection/GeometryCollection.h"
@@ -274,7 +275,12 @@ void UAircraftTestSubsystem::TickWaitingForStart()
 	{
 		return;
 	}
-	// The map boots paused behind the start-game widget.
+	// The map boots paused behind the start-game widget; start it as the player's "Press To Start" does.
+	UPlayerStartGameControl* StartGameControl = Controller->FindComponentByClass<UPlayerStartGameControl>();
+	if (IsValid(StartGameControl) && StartGameControl->GetIsWaitingForPlayerToStart())
+	{
+		StartGameControl->PlayerStartedGame();
+	}
 	if (Controller->GetIsGameOnPause())
 	{
 		Controller->PauseGame(ERTSPauseGameOptions::ForceUnpause);

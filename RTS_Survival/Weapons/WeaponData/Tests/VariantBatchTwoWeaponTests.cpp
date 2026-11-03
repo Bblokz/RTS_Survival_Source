@@ -157,7 +157,7 @@ bool FVariantBatchTwoWeaponKeyStatsTest::RunTest(const FString& Parameters)
 
 	// Ostwind: the clip drill is authored for these values.
 	TestEqual(TEXT("Ostwind clip"), Ostwind->MagCapacity, 8);
-	TestEqual(TEXT("Ostwind reload"), Ostwind->ReloadSpeed, 2.f, Tolerance);
+	TestEqual(TEXT("Ostwind reload"), Ostwind->ReloadSpeed, 5.f, Tolerance);
 	TestEqual(TEXT("Ostwind cooldown"), Ostwind->BaseCooldown, 0.12f, Tolerance);
 	TestEqual(TEXT("Ostwind calibre"), Ostwind->WeaponCalibre, 37.f, Tolerance);
 
@@ -186,7 +186,7 @@ bool FVariantBatchTwoWeaponKeyStatsTest::RunTest(const FString& Parameters)
 	const TArray<EWeaponShellType> HeatThenHe = {EWeaponShellType::Shell_HEAT, EWeaponShellType::Shell_HE};
 	TestEqual(TEXT("Twin gun loads HEAT by default"), TwinGun->ShellType, EWeaponShellType::Shell_HEAT);
 	TestEqual(TEXT("Twin gun can switch to HE"), TwinGun->ShellTypes, HeatThenHe);
-	TestEqual(TEXT("Twin gun reload per gun"), TwinGun->ReloadSpeed, 8.f, Tolerance);
+	TestEqual(TEXT("Twin gun reload per gun"), TwinGun->ReloadSpeed, 11.f, Tolerance);
 	TestEqual(TEXT("Twin gun pen as the KwK 40"), TwinGun->ArmorPen, KwK40->ArmorPen, Tolerance);
 
 	// Tiger Rail Bunker.

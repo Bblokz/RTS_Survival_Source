@@ -6,7 +6,8 @@
 # Log: Saved/Logs/TWCrewAnims_<label>.log, CSVs: Saved/TWCrewAnims/<label>/, crew lines: Saved/TWCrewAnims/<label>_crew.txt
 LABEL=$1; SQUADS=$2; shift 2
 PROJECT_DIR=/d/UE5Projects/RTS_Survival
-EDITOR=/d/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Win64-DebugGame-Cmd.exe
+# TWQC_EDITOR overrides the executable, e.g. the Development UnrealEditor-Cmd.exe while a DebugGame editor holds that DLL.
+EDITOR=${TWQC_EDITOR:-/d/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Win64-DebugGame-Cmd.exe}
 MAP=/Game/RTS_Survival/Maps/UnitTests/RTS_ToCopySmall
 cd "$PROJECT_DIR" || exit 1
 OUT="Saved/TWCrewAnims/$LABEL"

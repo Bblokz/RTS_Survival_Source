@@ -6,6 +6,7 @@
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/GameUI/Healthbar/HealthBarSettings/HealthBarVisibilitySettings.h"
+#include "RTS_Survival/RTSComponents/HealthInterface/HealthBarOwner.h"
 #include "CaptureActor.generated.h"
 
 class UMeshComponent;
@@ -53,7 +54,7 @@ struct FCaptureSettings
  * @brief Use to place capture points that show capture progress and respond to capture completion.
  */
 UCLASS()
-class RTS_SURVIVAL_API ACaptureActor : public ADestructableEnvActor, public ICaptureInterface
+class RTS_SURVIVAL_API ACaptureActor : public ADestructableEnvActor, public ICaptureInterface, public IHealthBarOwner
 {
 	GENERATED_BODY()
 
@@ -65,6 +66,11 @@ public:
 	virtual void OnCaptureByPlayer(const int32 Player) override;
 	virtual FVector GetCaptureLocationClosestTo(const FVector& FromLocation) override;
 	// ~ICaptureInterface
+
+	// IHealthBarOwner
+	// Capture actors may carry an optional HealthComponent (capturable vehicles); it requires its owner to be a health bar owner.
+	virtual void OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing) override;
+	// ~IHealthBarOwner
 
 	/** Text that can be shown while this actor is being captured. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Capture")
@@ -95,6 +101,10 @@ protected:
 	/** Optional overwrite for health bar colors so capturable actors stand out. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Capture|HealthBar")
 	FCaptureActorHealthBarOverrideSettings CaptureHealthBarOverrideSettings;
+
+	/** Blueprint hook fired when the optional HealthComponent reports a new health level. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Capture|Health")
+	void BP_OnCaptureActorHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing);
 
 	/** Blueprint hook fired when a capture has completely finished. */
 	UFUNCTION(BlueprintImplementableEvent)

@@ -82,6 +82,24 @@ FFlareFlightPath FFlareFlightPath::Make(const FVector& LaunchLocation, const FVe
 	return Path;
 }
 
+FFlareFlightPath FFlareFlightPath::MakeDropped(const FVector& ReleaseLocation, const FVector& GroundTarget,
+                                               const float ApexHeight, const float FallSpeed,
+                                               const float HangSeconds)
+{
+	using namespace FlareProjectileConstants;
+	FFlareFlightPath Path;
+	Path.Start = ReleaseLocation;
+	Path.Apex = GroundTarget + FVector(0.f, 0.f, FMath::Max(ApexHeight, 0.f));
+	// An aircraft that flies below the ignition height drops the flare just under itself.
+	Path.Apex.Z = FMath::Min(Path.Apex.Z, ReleaseLocation.Z - MinApexAboveLaunch);
+	Path.Landing = GroundTarget + FVector(0.f, 0.f, LandingHeight);
+	Path.Control = (Path.Start + Path.Apex) * 0.5f;
+	Path.AscentSeconds = FMath::Max(MinAscentSeconds, FVector::Dist(Path.Start, Path.Apex) / FMath::Max(
+		                                FallSpeed, MinAscentSpeed));
+	Path.HangSeconds = FMath::Max(MinHangSeconds, HangSeconds);
+	return Path;
+}
+
 FVector FFlareFlightPath::GetLocationAtTime(const float SecondsSinceLaunch) const
 {
 	if (SecondsSinceLaunch <= 0.f)
@@ -172,9 +190,8 @@ void AFlareProjectile::LaunchFlare(const FVector& LaunchLocation, const FVector&
                                    const FVector& GroundTarget, const FFlareProjectileSettings& Settings,
                                    const uint8 OwningPlayer)
 {
-	if (M_Phase != EFlareProjectilePhase::Inactive)
+	if (not GetCanStartFlight())
 	{
-		RTSFunctionLibrary::ReportError("AFlareProjectile::LaunchFlare called twice on " + GetName());
 		return;
 	}
 	M_Settings = Settings;
@@ -183,6 +200,31 @@ void AFlareProjectile::LaunchFlare(const FVector& LaunchLocation, const FVector&
 	                                      Settings.AscentSpeed, Settings.HangTimeSeconds);
 	SetupMeshes();
 	StartAscent();
+}
+
+void AFlareProjectile::DropFlare(const FVector& ReleaseLocation, const FVector& GroundTarget,
+                                 const FFlareProjectileSettings& Settings, const uint8 OwningPlayer)
+{
+	if (not GetCanStartFlight())
+	{
+		return;
+	}
+	M_Settings = Settings;
+	M_OwningPlayer = OwningPlayer;
+	M_FlightPath = FFlareFlightPath::MakeDropped(ReleaseLocation, GroundTarget, Settings.ApexHeight,
+	                                             Settings.AscentSpeed, Settings.HangTimeSeconds);
+	SetupMeshes();
+	StartAscent();
+}
+
+bool AFlareProjectile::GetCanStartFlight() const
+{
+	if (M_Phase == EFlareProjectilePhase::Inactive)
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportError("AFlareProjectile flight started twice on " + GetName());
+	return false;
 }
 
 void AFlareProjectile::Tick(float DeltaSeconds)

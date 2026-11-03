@@ -82,6 +82,7 @@ public:
 	
 	// Used to determine if the vehicle can aggro by target acquistion component.
 	bool DoesVehicleHaveAnyWeapons()const;
+	virtual bool GetCanStartAttackMoveEngagement() const override;
 
 	virtual void OnFinishedPathFollowing() override;
 

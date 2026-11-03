@@ -301,7 +301,8 @@ FWeaponData GLOBAL_GetWeaponDataForShellType(const FWeaponData& OldWeaponData)
 	case EWeaponShellType::Shell_AP:
 	case EWeaponShellType::Shell_APHE:
 	case EWeaponShellType::Shell_Railgun:
-		// No change needed for AP and APHE, return the original data.
+	case EWeaponShellType::Shell_Fire:
+		// No change needed for AP, APHE, railgun and fire shells, return the original data.
 		return NewWeaponData;
 
 	case EWeaponShellType::Shell_APHEBC:

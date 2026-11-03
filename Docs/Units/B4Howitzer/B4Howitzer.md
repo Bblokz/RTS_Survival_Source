@@ -5,10 +5,10 @@ How-to and pitfalls for building a crewed emplacement like this one: [B4Pit_Less
 The B-4 exists twice in the game:
 
 - **Team weapon** `Squad_Rus_B4_203mm`: a crewed, towable heavy howitzer that packs, moves on its wheels, deploys
-  and fires like the other team weapons (weapon `B4_203MM_TW`, reload 14 s).
+  and fires like the other team weapons (weapon `B4_203MM_TW`, reload 15 s).
 - **Building expansion** `BTX_RusB4HowitzerPit`: the same gun on a turntable in a concrete pit, with four animated
   crew (custom animation players, not squad units) who load every shell with the crane. Weapon `B4_203MM_Pit`
-  (reload 24 s, 25 % more range, less accurate). Only the gun fights; the crew is decoration.
+  (reload 12 s, 25 % more range, less accurate). Only the gun fights; the crew is decoration.
 
 ## Assets
 

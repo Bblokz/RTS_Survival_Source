@@ -92,6 +92,19 @@ private:
 
 	bool GetIsValidAnimatedMesh() const;
 	FVector GetSignedAxisVector(EAnimMeshRecoilSignedAxis Axis) const;
+	// The recoil axes are in the mesh's own frame, the offset is written to its relative location (parent space,
+	// world space for a root mesh); these turn the axes into that space so the kick follows the barrel.
+	FRotator GetMeshYawInParentSpace() const;
+	// Barrel yaw from the tracked weapon's fire socket, so guns that traverse on a bone (the 88 on its cross mount)
+	// kick along the barrel and not along the carriage; falls back to the mesh's yaw.
+	FRotator GetRecoilFrameYawInParentSpace() const;
+	/**
+	 * @brief Pitch and roll are written in the mesh's own frame, so a barrel turned away from the mesh's forward
+	 * gets the nose-up kick split over both; a pure mesh pitch would tip that barrel sideways.
+	 * @param NoseUpDeg Kick that lifts the muzzle.
+	 * @param RecoilFrameYawInParentSpace Barrel yaw from GetRecoilFrameYawInParentSpace.
+	 */
+	void AddNoseUpKickAlongBarrel(float NoseUpDeg, const FRotator& RecoilFrameYawInParentSpace);
 	void ApplyPreservedRecoilLocation() const;
 	void ApplyPreservedRecoilRotation() const;
 	void GetCurrentRecoilPitchAndRoll(float& OutRecoilPitchDeg, float& OutRecoilRollDeg) const;

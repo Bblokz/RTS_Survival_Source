@@ -1,0 +1,242 @@
+{
+ "widget_path": "/Game/RTS_Survival/SurvivalMode/UI/WBP_SurvivalStartLocationPicker",
+ "asset": {
+  "call": "create_asset",
+  "asset_type": "WidgetBlueprint",
+  "name": "WBP_SurvivalStartLocationPicker",
+  "save_path": "/Game/RTS_Survival/SurvivalMode/UI",
+  "parent_class": "/Script/RTS_Survival.W_SurvivalStartLocationPicker"
+ },
+ "class_defaults": {
+  "m_style_asset": "/Game/RTS_Survival/SurvivalMode/UI/DA_SurvivalUiStyle.DA_SurvivalUiStyle"
+ },
+ "bound_widgets": {
+  "required": [
+   "M_LocationNameText",
+   "M_PreviousButton",
+   "M_NextButton",
+   "M_ConfirmButton"
+  ],
+  "optional": [
+   "M_PanelBorder",
+   "M_TitleText",
+   "M_LocationIndexText",
+   "M_HintText",
+   "M_ConfirmText"
+  ]
+ },
+ "notes": [
+  "Root is SelfHitTestInvisible so the camera preview stays visible and the panel is the only hit target.",
+  "The previous arrow is mirrored in code (RenderScale -1,1) when the style asset has ArrowButton brushes."
+ ],
+ "steps": [
+  {
+   "call": "create_widget_from_layout",
+   "replace": true,
+   "canvas_size": "1920,1080",
+   "layout": [
+    {
+     "name": "Root",
+     "type": "Overlay",
+     "properties": {
+      "Visibility": "SelfHitTestInvisible"
+     },
+     "children": [
+      {
+       "name": "PickerBox",
+       "type": "SizeBox",
+       "properties": {
+        "WidthOverride": 578,
+        "HeightOverride": 242
+       },
+       "slot": {
+        "HorizontalAlignment": "Center",
+        "VerticalAlignment": "Bottom",
+        "Padding": "0,0,0,48"
+       },
+       "children": [
+        {
+         "name": "M_PanelBorder",
+         "type": "Border",
+         "properties": {
+          "Padding": "32,22,32,22"
+         },
+         "children": [
+          {
+           "name": "PickerColumn",
+           "type": "VerticalBox",
+           "children": [
+            {
+             "name": "M_TitleText",
+             "type": "TextBlock",
+             "properties": {
+              "Text": "CHOOSE START LOCATION",
+              "Justification": "Center",
+              "FontSize": 14
+             },
+             "slot": {
+              "HorizontalAlignment": "Center"
+             }
+            },
+            {
+             "name": "NavRow",
+             "type": "HorizontalBox",
+             "slot": {
+              "Padding": "0,10,0,0"
+             },
+             "children": [
+              {
+               "name": "PrevBox",
+               "type": "SizeBox",
+               "properties": {
+                "WidthOverride": 62,
+                "HeightOverride": 69
+               },
+               "slot": {
+                "VerticalAlignment": "Center"
+               },
+               "children": [
+                {
+                 "name": "M_PreviousButton",
+                 "type": "Button",
+                 "properties": {
+                  "IsFocusable": false
+                 }
+                }
+               ]
+              },
+              {
+               "name": "NameColumn",
+               "type": "VerticalBox",
+               "slot": {
+                "size": "fill",
+                "VerticalAlignment": "Center"
+               },
+               "children": [
+                {
+                 "name": "M_LocationNameText",
+                 "type": "TextBlock",
+                 "properties": {
+                  "Text": "NORTHERN RIDGE",
+                  "Justification": "Center",
+                  "FontSize": 26
+                 },
+                 "slot": {
+                  "HorizontalAlignment": "Center"
+                 }
+                },
+                {
+                 "name": "M_LocationIndexText",
+                 "type": "TextBlock",
+                 "properties": {
+                  "Text": "1 / 5",
+                  "Justification": "Center",
+                  "FontSize": 13
+                 },
+                 "slot": {
+                  "HorizontalAlignment": "Center"
+                 }
+                }
+               ]
+              },
+              {
+               "name": "NextBox",
+               "type": "SizeBox",
+               "properties": {
+                "WidthOverride": 62,
+                "HeightOverride": 69
+               },
+               "slot": {
+                "VerticalAlignment": "Center"
+               },
+               "children": [
+                {
+                 "name": "M_NextButton",
+                 "type": "Button",
+                 "properties": {
+                  "IsFocusable": false
+                 }
+                }
+               ]
+              }
+             ]
+            },
+            {
+             "name": "ConfirmRow",
+             "type": "HorizontalBox",
+             "slot": {
+              "HorizontalAlignment": "Center",
+              "Padding": "0,10,0,0"
+             },
+             "children": [
+              {
+               "name": "ConfirmBox",
+               "type": "SizeBox",
+               "properties": {
+                "WidthOverride": 280,
+                "HeightOverride": 48
+               },
+               "children": [
+                {
+                 "name": "M_ConfirmButton",
+                 "type": "Button",
+                 "properties": {
+                  "IsFocusable": false
+                 },
+                 "children": [
+                  {
+                   "name": "M_ConfirmText",
+                   "type": "TextBlock",
+                   "properties": {
+                    "Text": "DEPLOY HERE",
+                    "Justification": "Center",
+                    "FontSize": 18
+                   },
+                   "slot": {
+                    "HorizontalAlignment": "Center",
+                    "VerticalAlignment": "Center"
+                   }
+                  }
+                 ]
+                }
+               ]
+              }
+             ]
+            },
+            {
+             "name": "M_HintText",
+             "type": "TextBlock",
+             "properties": {
+              "Text": "Left / Right to cycle, Enter to deploy",
+              "Justification": "Center",
+              "FontSize": 13
+             },
+             "slot": {
+              "HorizontalAlignment": "Center",
+              "Padding": "0,6,0,0"
+             }
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "layout_bytes_minified": 2275
+  }
+ ],
+ "post_steps": [],
+ "verify": [
+  {
+   "call": "analyze_widget_layout",
+   "resolutions": [
+    "1920x1080",
+    "1280x720"
+   ],
+   "expect": "no clipping; panel bottom-centre"
+  }
+ ]
+}

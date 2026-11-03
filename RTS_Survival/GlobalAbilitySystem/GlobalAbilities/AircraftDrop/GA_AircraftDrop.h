@@ -9,6 +9,7 @@
 #include "GA_AircraftDrop.generated.h"
 
 class AAircraftMaster;
+class ATankMaster;
 class USoundAttenuation;
 class USoundBase;
 class USoundConcurrency;
@@ -24,6 +25,11 @@ struct FAircraftDropTankWithOffset
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float TankAttachZOffset = -250.0f;
+
+	// Spawns exactly this class, for a drop that promises one variant whatever the player picked for TankSubtype.
+	// Leave empty to spawn what TankSubtype maps to. TankSubtype still has to be set: it says the entry is in use.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftClassPtr<ATankMaster> TankClassOverride;
 };
 
 USTRUCT(BlueprintType)

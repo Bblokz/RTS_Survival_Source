@@ -224,6 +224,8 @@ enum class ECommandType : uint8
 	EnterCargo,
 	CaptureActor,
 	ManAbandonedTeamWeapon,
+	// The attack button was armed and the click landed on the ground: walk there and fight on the way.
+	AttackMove,
 };
 
 static FString GetStringCommandType(const ECommandType CommandType)
@@ -234,6 +236,8 @@ static FString GetStringCommandType(const ECommandType CommandType)
 		return TEXT("Movement");
 	case ECommandType::Attack:
 		return TEXT("Attack");
+	case ECommandType::AttackMove:
+		return TEXT("AttackMove");
 	case ECommandType::AlliedCharacter:
 		return TEXT("AlliedCharacter");
 	case ECommandType::EnemyCharacter:
@@ -318,6 +322,8 @@ class RTS_SURVIVAL_API ACPPController : public APlayerController
 	friend class UApartmentDestructionTestSubsystem;
 	// For calling StartGameAtLocation with the picked location by the Start Location UI / Mngr.
 	friend class RTS_SURVIVAL_API UPlayerStartLocationManager;
+	// Survival mode starts the game at the picked start location and registers the air-dropped HQ.
+	friend class RTS_SURVIVAL_API ASurvivalModeDirector;
 
 public:
 	// Constructor
@@ -1456,7 +1462,14 @@ private:
 		const bool bForcePlayVoiceLine);
 
 
-	uint32 MoveUnitsToLocation(const FVector& MoveLocation);
+	/**
+	 * @brief Sends the selection to the location in formation.
+	 * @param MoveLocation Ground location of the order.
+	 * @param bAttackMove True to have the units fight whatever they meet on the way.
+	 * @return The amount of units that accepted the order.
+	 */
+	uint32 MoveUnitsToLocation(const FVector& MoveLocation, const bool bAttackMove = false);
+	uint32 IssueAttackMoveToSelectedUnits(EAbilityID& OutAbilityActivated, FVector& ClickedLocation);
 	uint32 OrderUnitsToAttackActor(AActor* TargetActor);
 	/** @brief Orders all selected squads (only squads) to capture the given capture actor. */
 	uint32 OrderUnitsCaptureActor(AActor* CaptureTargetActor);
@@ -1517,6 +1530,8 @@ private:
 	 * @pre All references to all selected units are valid.
 	 */
 	void ActionButtonAttack(AActor* ClickedActor, FVector& ClickedLocation);
+	// An armed attack button on plain ground has nothing to shoot at, so it marches there and fights on the way.
+	void CheckAttackCommandForAttackMove(ECommandType& OutCommandType) const;
 
 	void ActionButtonAttackGround(const FVector& ClickedLocation);
 
@@ -1995,6 +2010,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<ANomadicVehicle> M_PlayerHQ;
+	// Survival flies the HQ in after the game started; its absence at profile load is expected, not an error.
+	bool bM_IsHQDeliveredAfterStart = false;
 
 	void ShowPlayerBuildRadius(const bool bShowRadius) const;
 

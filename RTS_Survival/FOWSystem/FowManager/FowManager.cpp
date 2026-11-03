@@ -331,6 +331,21 @@ bool AFowManager::RemoveCustomMiniMapIcon(const FName IconId)
 	return true;
 }
 
+bool AFowManager::SetCustomMiniMapIconTransform(const FName IconId, const FVector& WorldLocation,
+                                                const FRotator& WorldRotation)
+{
+	FFowManagerCustomMinimapIcon* const CustomIcon = M_CustomMiniMapIcons.Find(IconId);
+	if (CustomIcon == nullptr)
+	{
+		return false;
+	}
+
+	CustomIcon->M_WorldLocation = WorldLocation;
+	CustomIcon->M_WorldRotation = WorldRotation;
+	RefreshCustomMiniMapIconDrawDataCache();
+	return true;
+}
+
 bool AFowManager::SwapCustomMiniMapIcon(const FName IconId, const EMinimapIconType NewIconType)
 {
 	if (IconId.IsNone())
