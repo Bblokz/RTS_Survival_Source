@@ -27,7 +27,7 @@ void FGunPitFireReactionWatch::Start(const float WorldSeconds, const USkeletalMe
                                      const TArray<TWeakObjectPtr<USkeletalMeshComponent>>& CrewMeshes)
 {
 	const UGunPitAnimInstance* GunAnimInstance = Cast<UGunPitAnimInstance>(GunMesh.GetAnimInstance());
-	KickBone = IsValid(GunAnimInstance) ? GunAnimInstance->GetFireKickBone() : NAME_None;
+	KickBone = IsValid(GunAnimInstance) ? GunAnimInstance->GetFireKickBone() : FallbackKickBone;
 	KickBoneAtShot = KickBone.IsNone() ? FVector::ZeroVector : GunMesh.GetBoneLocation(KickBone, EBoneSpaces::ComponentSpace);
 	CrewHeadsAtShot.Reset();
 	for (const TWeakObjectPtr<USkeletalMeshComponent>& CrewMesh : CrewMeshes)

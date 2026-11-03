@@ -313,6 +313,58 @@ namespace GunPitTestPrivate
 		return {Pit};
 	}
 
+	const TCHAR* const Flak88BunkerClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Ger_BXP_Flak88Bunker.Ger_BXP_Flak88Bunker_C");
+	// The Breakthrough Flak 88 bunker carries the emplacement's turret on its casemate roof: the gun's foot on the
+	// mesh's Turret socket, 340 above the bunker's pivot. The deck, niche and crate ring keep the pit's numbers there.
+	constexpr float Flak88BunkerGunHeight = 340.f;
+	constexpr float Flak88BunkerViewScale = 1.f;
+
+	TArray<FGunPitUnderTest> GetGerFlak88BunkerToTest()
+	{
+		// The emplacement's whole drill, runner included, on the bunker's roof pit.
+		TArray<FGunPitUnderTest> Pits = GetGerFlak88PitToTest();
+		FGunPitUnderTest& Pit = Pits[0];
+		Pit.Label = TEXT("flak88bunker");
+		Pit.ClassPath = Flak88BunkerClassPath;
+		Pit.PitMeshName = TEXT("SM_BF_Flak88Bunker");
+		Pit.ExpectedGunHeight = Flak88BunkerGunHeight;
+		Pit.ViewScale = Flak88BunkerViewScale;
+		return Pits;
+	}
+
+	const TCHAR* const FlakvierlingBunkerClassPath = TEXT(
+		"/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Ger_BXP_FlakvierlingBunker.Ger_BXP_FlakvierlingBunker_C");
+	constexpr int32 FlakvierlingCrewCount = 2;
+	// The mount stands on the dais, the Turret socket 115 above the bunker's pivot.
+	constexpr float FlakvierlingGunHeight = 115.f;
+	constexpr float FlakvierlingViewScale = 0.6f;
+	// Crew1, the loader, in the mount's PitOrigin space (RTS_BP_EmbTurret_BF_Flakvierling).
+	const FVector FlakvierlingLoaderSpot(-80.f, 80.f, 0.f);
+
+	TArray<FGunPitUnderTest> GetFlakvierlingBunkerToTest()
+	{
+		// No rounds change hands: the loader plays the Flak 37 pit's clip drill at the breeches whenever one of the
+		// four guns changes magazine; the gunner works the handwheels.
+		FGunPitUnderTest Pit;
+		Pit.Label = TEXT("flakvierlingbunker");
+		Pit.ClassPath = FlakvierlingBunkerClassPath;
+		Pit.PitMeshName = TEXT("SM_BF_FlakvierlingBunker");
+		Pit.LoaderSpot = FlakvierlingLoaderSpot;
+		Pit.ViewScale = FlakvierlingViewScale;
+		Pit.ExpectedCrewCount = FlakvierlingCrewCount;
+		Pit.bCarriesRounds = false;
+		Pit.bHasReadyCrate = false;
+		Pit.bChecksGunHeight = true;
+		Pit.ExpectedGunHeight = FlakvierlingGunHeight;
+		Pit.LoaderReloadMontage = TEXT("Montage_GerPit_LoadFlak");
+		// The gunner only idles at the wheels; the loader may be mid-drill at a shot. The mount has no gun-pit anim
+		// instance: the first gun recoils through its own fire montage.
+		Pit.FireReaction.FirstIdleCrewIndex = 1;
+		Pit.FireReaction.FallbackKickBone = TEXT("B_Gun1");
+		return {Pit};
+	}
+
 	float GetFirstTargetYawOffset(const FGunPitUnderTest& Pit)
 	{
 		return Pit.SectorHalfDegrees > 0.f ? Pit.SectorHalfDegrees + SectorOutsideMarginDegrees : GroundTargetYawOffsetDegrees;
@@ -483,6 +535,14 @@ void FGunPitTestScenario::Start()
 	else if (FParse::Param(FCommandLine::Get(), TEXT("GerFlak88PitValidate")))
 	{
 		M_Pits = GunPitTestPrivate::GetGerFlak88PitToTest();
+	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("GerFlak88BunkerValidate")))
+	{
+		M_Pits = GunPitTestPrivate::GetGerFlak88BunkerToTest();
+	}
+	else if (FParse::Param(FCommandLine::Get(), TEXT("FlakvierlingBunkerValidate")))
+	{
+		M_Pits = GunPitTestPrivate::GetFlakvierlingBunkerToTest();
 	}
 	else
 	{
@@ -918,6 +978,11 @@ void FGunPitTestScenario::TickObserving(UWorld& World)
 			WatchDrill(World, Pit);
 			continue;
 		}
+		if (not Pit.LoaderReloadMontage.IsNone())
+		{
+			WatchMontageDrill(World, Pit);
+			continue;
+		}
 		const USkeletalMeshComponent* Gunner = Pit.CrewMeshes.IsValidIndex(GunPitTestPrivate::GunnerCrewIndex)
 			                                       ? Pit.CrewMeshes[GunPitTestPrivate::GunnerCrewIndex].Get()
 			                                       : nullptr;
@@ -1244,6 +1309,47 @@ void FGunPitTestScenario::CheckBoneDrill(FGunPitUnderTest& Pit)
 	Check(Pit.ClosestHandToSecondProp < MaximumHandToDrillPropDistance, Pit.Label + TEXT("_loader_handles_") + SecondName,
 	      FString::Printf(TEXT("closest=%.1f"), Pit.ClosestHandToSecondProp));
 	Check(Pit.bGunnerFireMontageSeen, Pit.Label + TEXT("_gunner_shakes_when_firing"));
+}
+
+void FGunPitTestScenario::WatchMontageDrill(UWorld& World, FGunPitUnderTest& Pit)
+{
+	using namespace GunPitTestPrivate;
+	if (Pit.bDrillChecked || not Pit.Crew.IsValid())
+	{
+		return;
+	}
+	const float Now = World.GetTimeSeconds();
+	const bool bIsLoading = Pit.Crew->GetIsLoading();
+	if (bIsLoading && not Pit.bWasLoading)
+	{
+		Pit.DrillStartSeconds = Now;
+		Pit.NextCaptureSeconds = Now;
+	}
+	Pit.bWasLoading = bIsLoading;
+	if (Pit.DrillStartSeconds < 0.f)
+	{
+		return;
+	}
+	const USkeletalMeshComponent* Loader = Pit.CrewMeshes.IsEmpty() ? nullptr : Pit.CrewMeshes[0].Get();
+	Pit.bLoaderReloadMontageSeen |= GetActiveMontageName(Loader) == Pit.LoaderReloadMontage.ToString();
+	if (M_CaptureRig.GetIsEnabled() && bIsLoading && Now >= Pit.NextCaptureSeconds)
+	{
+		CapturePit(World, Pit, FString::Printf(TEXT("drill_t%04.1f"), Now - Pit.DrillStartSeconds));
+		Pit.NextCaptureSeconds = Now + DrillCaptureIntervalSeconds;
+	}
+	if (not bIsLoading)
+	{
+		Pit.DrillEndSeconds = Now;
+		CheckMontageDrill(Pit);
+	}
+}
+
+void FGunPitTestScenario::CheckMontageDrill(FGunPitUnderTest& Pit)
+{
+	Pit.bDrillChecked = true;
+	const float DrillSeconds = Pit.DrillEndSeconds - Pit.DrillStartSeconds;
+	Check(Pit.bLoaderReloadMontageSeen, Pit.Label + TEXT("_loader_plays_reload_drill"),
+	      FString::Printf(TEXT("montage=%s drill_seconds=%.2f"), *Pit.LoaderReloadMontage.ToString(), DrillSeconds));
 }
 
 void FGunPitTestScenario::RevealPit(const FGunPitUnderTest& Pit) const
