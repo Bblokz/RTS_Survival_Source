@@ -4709,6 +4709,7 @@ void ASquadUnit::OnMoveToSelfPathFindingFailed(const EPathFollowingRequestResult
 	const FString AIControllerName = IsValid(M_AISquadUnit) ? M_AISquadUnit->GetName() : "Invalid AI Controller";
 	FString BaseMessage = "Move to self path finding failed for unit: " + GetName() +
 		"\n AI Controller: " + AIControllerName +
+		"\n Unit Location: " + GetActorLocation().ToString() +
 		"\n Move Location: " + MoveToLocation.ToString() +
 		"\n Ability: " + UEnum::GetValueAsString(MoveContext) +
 		"\n Request Result: " + UEnum::GetValueAsString(RequestResult);

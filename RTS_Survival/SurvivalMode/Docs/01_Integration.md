@@ -70,4 +70,7 @@ goes through faction, variants and difficulty, confirms an army and a start loca
    `DA_SurvivalMode_Default` to change slots, supply, grace, waves, bases or start content for that map).
 5. Set the World Settings GameMode override to `BP_SurvivalGameMode`.
 6. Rebuild navigation and wait until it finishes before saving (a save while the editor still auto-rebuilds
-   drops most navmesh tiles; the .umap is ~128 MB when complete), then add the map to `USurvivalModeLauncher::GetSurvivalMaps` and to the cook list.
+   drops most navmesh tiles; the .umap is ~128 MB when complete), then add the map to `USurvivalModeLauncher::GetSurvivalMapChoices` (the SURVIVAL button lists these in `UW_SurvivalMapPicker`) and to the cook list.
+
+A map with one start location has no start selection and no Soviet bases. A map with an `ASurvivalMapContentVolume` runs its own
+content graph instead of the generic points of interest. `11_LevelDesign_SM_Kessel_01.md` is the worked example of both.
