@@ -818,6 +818,15 @@ private:
 	bool GetCanArmorOverPenetrate(const float EffectiveArmor, const float AdjustedArmorPen) const;
 
 	/**
+	 * @brief Damage multiplier for a kinetic penetration: side and rear plates take more, and a flanking hit from a big
+	 * enough gun may detonate a tank's ammunition, which makes this hit lethal.
+	 * @param HitActor The penetrated actor; only tanks can detonate.
+	 * @param PlateHit The plate the shell went through.
+	 * @return The multiplier to apply to the full damage of this hit.
+	 */
+	float GetKineticPenDamageMlt(AActor* HitActor, EArmorPlate PlateHit) const;
+
+	/**
 	 * @brief Builds the module damage event of a kinetic armor hit so module damage resolves exactly once per impact.
 	 * @param ArmorCalculation Armor component that resolved the hit.
 	 * @param HitResult Impact on the registered armor mesh.

@@ -283,6 +283,24 @@ void ATankMaster::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& Spa
 	Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
 }
 
+bool ATankMaster::StartAmmoDetonation()
+{
+	if (not IsUnitAlive() || not GetIsValidModuleArmor() || not M_ModuleArmor->GetAreAmmoCookOffsEnabled())
+	{
+		return false;
+	}
+
+	const TSubclassOf<UAmmoCookOffBehaviour> CookOffBehaviourClass = GetAmmoCookOffBehaviourClass();
+	if (CookOffBehaviourClass != nullptr && GetIsValidBehaviourComponent()
+		&& BehaviourComponent->GetBehaviourByClass(CookOffBehaviourClass) == nullptr)
+	{
+		BehaviourComponent->AddBehaviour(CookOffBehaviourClass);
+	}
+	// Tanks without a cook-off profile still show the cook-off death.
+	bM_IsAmmoCookingOff = true;
+	return true;
+}
+
 void ATankMaster::Debug_DieDuringAmmoCookOff()
 {
 	if (not IsUnitAlive())
