@@ -29,6 +29,8 @@
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
@@ -2574,6 +2576,29 @@ bool AProjectile::GetCanArmorOverPenetrate(const float EffectiveArmor, const flo
 	return ArmorPenPercentageNeededToPenetrate <= M_FloorArmorPenPercentageNeededAllowOverpen;
 }
 
+float AProjectile::GetKineticPenDamageMlt(AActor* HitActor, const EArmorPlate PlateHit) const
+{
+	using namespace DeveloperSettings::GameBalance::Weapons::ArmorAndModules;
+	const EArmorPlateDamageType PlateSide = Global_GetDamageTypeFromPlate(PlateHit);
+	const float* const PlateDamageMlt = PlateTypeToKineticPenDamageMlt.Find(PlateSide);
+	const float DamageMlt = PlateDamageMlt != nullptr ? *PlateDamageMlt : 1.f;
+
+	const float* const DetonationChance = PlateTypeToAmmoDetonationChance.Find(PlateSide);
+	if (DetonationChance == nullptr || M_WeaponCalibre < AmmoDetonationMinCalibreMm
+		|| FMath::FRand() >= *DetonationChance || M_FullDamage <= KINDA_SMALL_NUMBER)
+	{
+		return DamageMlt;
+	}
+	ATankMaster* Tank = Cast<ATankMaster>(HitActor);
+	if (not IsValid(Tank) || not IsValid(Tank->GetHealthComponent()) || not Tank->StartAmmoDetonation())
+	{
+		return DamageMlt;
+	}
+	// Twice the max health outlasts any damage reduction; the health component only applies what the tank had left.
+	const float LethalDamage = 2.f * Tank->GetHealthComponent()->GetMaxHealth();
+	return FMath::Max(DamageMlt, LethalDamage / M_FullDamage);
+}
+
 void AProjectile::OnOverPenetratingArmorHit(AActor* HitActor, const FHitResult& HitResult,
                                             const ERTSSurfaceType HitSurface,
                                             const FRotator& HitRotation, const float DamageMlt,
@@ -2633,7 +2658,7 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 	ProjectileHitPropagateNotification(false);
 
 	const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
-	constexpr float DamageMlt = 1.f;
+	const float DamageMlt = GetKineticPenDamageMlt(HitActor, PlateHit);
 	if (bOverpenetrating)
 	{
 		OnOverPenetratingArmorHit(HitActor, HitResult, SurfaceTypeHit, MakeImpactOutwardRotationZ(HitResult),

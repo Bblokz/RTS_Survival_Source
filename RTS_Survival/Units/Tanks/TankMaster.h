@@ -327,6 +327,13 @@ public:
 	/** @brief Kept up to date by UAmmoCookOffBehaviour so the death event knows whether ammunition was burning. */
 	void SetIsAmmoCookingOff(const bool bIsCookingOff) { bM_IsAmmoCookingOff = bIsCookingOff; }
 
+	/**
+	 * @brief A flanking penetration set off the ammunition: starts the cook-off so the killing hit that follows plays
+	 * the cook-off death (turret toss).
+	 * @return False when cook-offs are disabled on this tank or it is already dead; the caller then deals normal damage.
+	 */
+	bool StartAmmoDetonation();
+
 	/** @brief Testing aid: starts this tank's ammo cook-off and kills it at once, so the cook-off death can be watched. */
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_DieDuringAmmoCookOff();

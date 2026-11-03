@@ -6823,7 +6823,11 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34E, TankData);
 
 	// T-34/85
-	TankData.MaxHealth = MediumTankHealthBase + OneMediumTankShotHp;
+	{
+		// 15 HP under the medium step so three Pz IV 75mm hits (3 x 221.4) still kill it.
+		constexpr float T34_85BreakpointTrim = 15.f;
+		TankData.MaxHealth = MediumTankHealthBase + OneMediumTankShotHp - T34_85BreakpointTrim;
+	}
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
@@ -6836,7 +6840,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * 1.45f, 5);
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		MediumTankHealthBase / DeveloperSettings::GameBalance::UnitHealth::VehicleHealthMlt * 1.45f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_85, TankData);
 
@@ -6854,7 +6859,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(MediumTankHealthBase * 2.2f, 5);
+	TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		MediumTankHealthBase / DeveloperSettings::GameBalance::UnitHealth::VehicleHealthMlt * 2.2f, 5);
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_100, TankData);
 
@@ -7370,7 +7376,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 	});
 	TankData.Abilities = BasicTankAbilities;
 	TankData.ExperienceLevels = GetMediumTankExpLevels();
-	TankData.ExperienceWorth = MediumTankHealthBase;
+	TankData.ExperienceWorth = MediumTankHealthBase / DeveloperSettings::GameBalance::UnitHealth::VehicleHealthMlt;
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T28, TankData);
 
@@ -7385,7 +7391,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 			{ERTSResourceType::Resource_VehicleParts, T28FVehiclePartsCost}
 		});
 	TankData.ExperienceLevels = GetMediumArtillerySpecialVehicleExpLevels();
-	TankData.ExperienceWorth = MediumTankHealthBase * 2;
+	TankData.ExperienceWorth = MediumTankHealthBase / DeveloperSettings::GameBalance::UnitHealth::VehicleHealthMlt * 2;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T28F, TankData);
 	}
 

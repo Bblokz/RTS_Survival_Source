@@ -1153,6 +1153,26 @@ namespace DeveloperSettings
 				};
 				// Multiplied with the real full damage to get the damage when the shell bounces.
 				inline constexpr float HeHeatBounceDamageMlt = 0.2;
+
+				// Flanking pays: damage multiplier for a kinetic shell that penetrates this side (turret plates included).
+				// Rollback: set all three to 1.
+				inline TMap<EArmorPlateDamageType, float> PlateTypeToKineticPenDamageMlt =
+				{
+					{EArmorPlateDamageType::DamageFront, 1.f},
+					{EArmorPlateDamageType::DamageSides, 1.5f},
+					{EArmorPlateDamageType::DamageRear, 2.f}
+				};
+
+				// Chance that a kinetic penetration through this side detonates the ammunition and kills the tank outright
+				// (cook-off death with turret toss). Rollback: set all three to 0.
+				inline TMap<EArmorPlateDamageType, float> PlateTypeToAmmoDetonationChance =
+				{
+					{EArmorPlateDamageType::DamageFront, 0.f},
+					{EArmorPlateDamageType::DamageSides, 0.15f},
+					{EArmorPlateDamageType::DamageRear, 0.25f}
+				};
+				// Smaller guns can still penetrate a rear plate but do not detonate ammunition.
+				inline constexpr float AmmoDetonationMinCalibreMm = 75.f;
 			}
 
 			inline constexpr float DamagePerMM = 1.2;
@@ -1333,32 +1353,37 @@ namespace DeveloperSettings
 		{
 			// To scale all game health calculations.
 			inline constexpr float OverallHealthMlt = 0.8f;
+			// Scales only the armored-vehicle bases below (cars, tanks, shot steps), on top of OverallHealthMlt.
+			// Infantry, buildings, trains, aircraft and nomadic trucks keep their health. Rollback: set to 1.
+			// See Docs/Balance/TankLethality.md.
+			inline constexpr float VehicleHealthMlt = 0.75f;
+			inline constexpr float VehicleHealthScale = OverallHealthMlt * VehicleHealthMlt;
 
 			// One light tank shot on avg in hp points.
-			inline constexpr float OneLightTankShotHp = RoundToNearestMultipleOfFive(100.f * OverallHealthMlt);
+			inline constexpr float OneLightTankShotHp = RoundToNearestMultipleOfFive(100.f * VehicleHealthScale);
 			// one medium tank shot on avg in hp points.
-			inline constexpr float OneMediumTankShotHp = RoundToNearestMultipleOfFive(225.f * OverallHealthMlt);
+			inline constexpr float OneMediumTankShotHp = RoundToNearestMultipleOfFive(225.f * VehicleHealthScale);
 			// one heavy tank shot on avg in hp points.
-			inline constexpr float OneHeavyTankShotHp = RoundToNearestMultipleOfFive(350.f * OverallHealthMlt);
+			inline constexpr float OneHeavyTankShotHp = RoundToNearestMultipleOfFive(350.f * VehicleHealthScale);
 
 
 			// T1 light calibre 37mm-50mm deals 80~105 damage. base armored vehicle gets killed in 3-4 shots.
-			inline constexpr float ArmoredCarHealthBase = RoundToNearestMultipleOfFive(450.f * OverallHealthMlt);
-			// T1 Light calibre 37mm~50mm deals 80~105 damage. Base light tank gets killed in 5 shots. 
-			inline constexpr float LightTankHealthBase = RoundToNearestMultipleOfFive(450.f * OverallHealthMlt);
+			inline constexpr float ArmoredCarHealthBase = RoundToNearestMultipleOfFive(450.f * VehicleHealthScale);
+			// T1 Light calibre 37mm~50mm deals 80~105 damage. Base light tank gets killed in 5 shots.
+			inline constexpr float LightTankHealthBase = RoundToNearestMultipleOfFive(450.f * VehicleHealthScale);
 			// T1.5 Between a light and medium tank, takes 6 light shots or 3 mediums shots on avg.
-			inline constexpr float LightMediumTankBase = RoundToNearestMultipleOfFive(600.f * OverallHealthMlt);
-			inline constexpr float CommandVehicleHp = RoundToNearestMultipleOfFive(1375.f * OverallHealthMlt);
-			// T2 medium calibre 75mm~85mm deals 220~260 damage. Base medium tank gets killed in 4 shots.
-			inline constexpr float MediumTankHealthBase = RoundToNearestMultipleOfFive(900.f * OverallHealthMlt);
-			// T2 heavy tank. A mid game heavy, not as durable as a T3 heavy tank, gets killed in 5 medium tank shots.
-			inline constexpr float T2HeavyTankBase = RoundToNearestMultipleOfFive(1125.f * OverallHealthMlt);
-			// T3 medium tank, a late game medium tank, gets killed in 5 medium tank shots.
-			inline constexpr float T3MediumTankBase = RoundToNearestMultipleOfFive(1125.f * OverallHealthMlt);
-			// T3 Heavy tank, very durable vehicle, gets killed in 4 heavy tank shots or 6 medium tank shots.
-			inline constexpr float T3HeavyTankBase = RoundToNearestMultipleOfFive(1500.f * OverallHealthMlt);
-			// Super heavy tank, the most durable vehicle in the game, gets killed in 7 heavy tank shots.
-			inline constexpr float SuperHeavyTankBase = RoundToNearestMultipleOfFive(2300.f * OverallHealthMlt);
+			inline constexpr float LightMediumTankBase = RoundToNearestMultipleOfFive(600.f * VehicleHealthScale);
+			inline constexpr float CommandVehicleHp = RoundToNearestMultipleOfFive(1375.f * VehicleHealthScale);
+			// T2 medium calibre 75mm~85mm deals 220~260 damage. Base medium tank gets killed in 3 frontal shots.
+			inline constexpr float MediumTankHealthBase = RoundToNearestMultipleOfFive(900.f * VehicleHealthScale);
+			// T2 heavy tank. A mid game heavy, not as durable as a T3 heavy tank.
+			inline constexpr float T2HeavyTankBase = RoundToNearestMultipleOfFive(1125.f * VehicleHealthScale);
+			// T3 medium tank, a late game medium tank.
+			inline constexpr float T3MediumTankBase = RoundToNearestMultipleOfFive(1125.f * VehicleHealthScale);
+			// T3 Heavy tank, very durable vehicle, gets killed in 3 frontal 88mm shots.
+			inline constexpr float T3HeavyTankBase = RoundToNearestMultipleOfFive(1500.f * VehicleHealthScale);
+			// Super heavy tank, the most durable vehicle in the game.
+			inline constexpr float SuperHeavyTankBase = RoundToNearestMultipleOfFive(2300.f * VehicleHealthScale);
 			inline constexpr float LightTrainHealth = RoundToNearestMultipleOfFive(4000.f * OverallHealthMlt);
 			inline constexpr float MediumTrainHealth = RoundToNearestMultipleOfFive(7000.f * OverallHealthMlt);
 			inline constexpr float HeavyTrainHealth = RoundToNearestMultipleOfFive(10000.f * OverallHealthMlt);
