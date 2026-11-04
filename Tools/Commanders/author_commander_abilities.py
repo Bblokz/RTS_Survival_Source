@@ -84,8 +84,9 @@ NEW = [
      "barrage_rail"),
     ("GA_GerSturmtigerDrop", "GA_GerE100Drop", "Mammut: Sturmtiger Delivery",
      "A Mammut heavy-lift glider delivers a Sturmtiger at the end of the marked run.", "glider_sturmtiger"),
-    ("GA_GerJagdTigerDrop", "GA_GerE100Drop", "Mammut: JagdTiger Delivery",
-     "A Mammut heavy-lift glider delivers a JagdTiger at the end of the marked run.", "glider_jagdtiger"),
+    ("GA_GerJagdTigerDrop", "GA_GerE100Drop", "Mammut: Scrap JagdTiger Delivery",
+     "A Mammut heavy-lift glider delivers the Scrap Warlord's JagdTiger, rearmed with a 128 mm cannon, at the end "
+     "of the marked run.", "glider_jagdtiger"),
     ("GA_GerKingTiger105Drop", "GA_GerE100Drop", "Mammut: King Tiger 105 Delivery",
      "A Mammut heavy-lift glider delivers a King Tiger with the 105 mm gun at the end of the marked run.",
      "glider_kt105"),
@@ -253,7 +254,8 @@ def glider_sturmtiger(obj):
 
 
 def glider_jagdtiger(obj):
-    glider(obj, "Tank_JagdTiger", "JagdTiger/Ger_Vehicle_JagdTiger.Ger_Vehicle_JagdTiger_C")
+    # The Scrap Warlord's JagdTiger: the stock JagdTiger fires the Sonnensturm laser, this one the Maus's 128 mm.
+    glider(obj, "Tank_JagdTiger", "JagdTiger/Scrap128/Ger_Vehicle_JagdTiger_Scrap128.Ger_Vehicle_JagdTiger_Scrap128_C")
 
 
 def glider_kt105(obj):

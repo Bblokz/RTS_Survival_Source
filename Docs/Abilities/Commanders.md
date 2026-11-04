@@ -42,7 +42,7 @@ Kits are set in `Config/DefaultGame.ini` (`[/Script/RTS_Survival.CommanderSettin
 | Luftwaffe Liaison | Recon flight | Pz IV harvester drop | Paratroopers | 3x Ju 87 | 2x Ho 229 (III) | E-100 drop (large aircraft) |
 | Barrage Marshal | Flare curtain | Radixite & metal supply drop | Pz IV spotter + Pz III drop | Single Ju 87 | Large barrage (III) | Sturmtiger drop |
 | Radixite Herald | Recon flight | Radixite cache drop | Radixite Pz II + Marder drop | 2x Ho 229 | Radixite V-weapon (IV) | E-100 drop |
-| Scrap Warlord | Flare curtain | Pz I harvester drop | Scavengers + support weapons drop | Me 410 strike | Air minefield (III) | JagdTiger drop |
+| Scrap Warlord | Flare curtain | Pz I harvester drop | Scavengers + support weapons drop | Me 410 strike | Air minefield (III) | Scrap JagdTiger (128 mm) drop |
 | Rail Engineer | Recon flight | Radixite & metal supply drop | 2x Pz 38(t) Railgun drop | 2x Bf 110 strafing | Rail bombardment (III) | Tiger Rail drop |
 
 Character of each kit:
@@ -51,7 +51,9 @@ Character of each kit:
 - **Barrage Marshal:** artillery; strong against static defences, weaker against mobile armour.
 - **Radixite Herald:** the late bloomer. No Tier III signature and two Tier IV abilities: weak in missions capped at
   Tier III, strongest at the end.
-- **Scrap Warlord:** cheap and early; strongest early, weakest late.
+- **Scrap Warlord:** cheap and early; strongest early, weakest late. Its finale is a custom JagdTiger with the
+  Maus's 128 mm KwK 44 instead of the stock laser (`Ger_Heavy/JagdTiger/Scrap128/Ger_Vehicle_JagdTiger_Scrap128`,
+  untested in game).
 - **Rail Engineer:** long-range kinetic anti-armour. Rail bombardment = a few high-penetration rail slugs from high
   altitude (a `GA_Barrage` template with rail weapon data). The Tiger Rail drop costs about the same as the King
   Tiger 105 mm drop.
@@ -62,7 +64,7 @@ Not in `ERTSCommander` or the config yet; balancing comes later. ✓ = unit/abil
 
 | Commander | 1 (I) | 2 (I) | 3 (II) | 4 (III) | 5 (III) | 6 (IV) |
 |---|---|---|---|---|---|---|
-| Light Bringer (laser) | Flare curtain ✓ | Power-cell drop *new* | 3x Panzerjäger I laser drop (unit ✓) | 2x Ho 229 ✓ (later a laser Ho 229) | Sonnengewehr beam sweep *new* | JagdTiger laser *new unit*, Mammut drop |
+| Light Bringer (laser) | Flare curtain ✓ | Power-cell drop *new* | 3x Panzerjäger I laser drop (unit ✓) | 2x Ho 229 ✓ (later a laser Ho 229) | Sonnengewehr beam sweep *new* | JagdTiger ✓ (the stock one fires the Sonnensturm 128L laser), Mammut drop *new template* |
 | Feuersturm (flame) | Recon flight ✓ | Pz IV harvester drop ✓ | Feuer Sturm cyborg paradrop (squad ✓) | Incendiary Ju 87 run *new weapon setup* | Fire barrage with burning ground *new effect* | Heavy flame tank *new* (Jagdpanther flamer variant or a King Tiger flame), Mammut drop |
 | Stahlläufer (mech walkers) | Recon flight ✓ | Radixite & metal supply drop *new class* | Red Spine light walker drop (✓) | Me 410 strike *new aircraft BP* | Fels Krieger medium walker drop *needs BP* | KR-12 Dachs heavy walker drop (✓) |
 | Festungsbaumeister (fortress engineer) | Flare curtain ✓ | Construction supply drop (metal-heavy) *new class* | Sturm Pionieren + Pak team drop (✓) | Ju 390 carpet bombing ✓ | Air-dropped field bunker *new building-drop class* | Maus ✓, Mammut drop |
@@ -70,8 +72,8 @@ Not in `ERTSCommander` or the config yet; balancing comes later. ✓ = unit/abil
 
 Character:
 - **Light Bringer:** precise, energy-hungry, anti-armour at range. Cheap light lasers early, a weak economy slot,
-  then the strongest beam weapon and the laser JagdTiger. The Panther-hull laser tank (`Tank_PanzerV_III`, laser
-  turret) is the fallback Tier III/IV drop if the laser JagdTiger takes long. Sonnengewehr follows the wartime
+  then the strongest beam weapon and the JagdTiger, whose stock weapon is the Sonnensturm 128L multi-hit laser.
+  The Panther-hull laser tank (`Tank_PanzerV_III`, laser turret) is another laser heavy for later. Sonnengewehr follows the wartime
   orbital "sun gun" concept: a beam sweeps the strip the player draws (strip aim exists from the flight abilities).
 - **Feuersturm:** anti-infantry and anti-bunker at short range; strong early and mid, weak against heavy armour at
   range.
@@ -83,8 +85,8 @@ Character:
 
 New work this round needs: a power-cell (energy) drop, an incendiary strike setup, a fire barrage with lingering
 fire, a building-drop ability class, a Fels Krieger walker (it has a skeletal mesh, `SK_Etasphera07`, but no
-animations or unit Blueprint), the laser JagdTiger, a heavy flame tank (the Jagdpanther flamer), and the
-Sonnengewehr beam ability. The Me 410 strike needs no new Blueprint (`Ger_Aircraft_ME5_Airbrone` exists).
+animations or unit Blueprint), and the Sonnengewehr beam ability. Built 2026-11-03: the Jagdpanther flamer
+(`Ger_Heavy/JagdPanther/Flamer/Ger_Vehicle_JagdPanther_Flamer`, Pz III Flamm flamethrower, untested in game). The Me 410 strike needs no new Blueprint (`Ger_Aircraft_ME5_Airbrone` exists).
 
 ## Ability tiers
 
