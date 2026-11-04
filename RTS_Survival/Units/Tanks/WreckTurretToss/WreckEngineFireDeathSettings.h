@@ -11,6 +11,65 @@ class UMaterialInterface;
 class USoundCue;
 
 /**
+ * @brief How the wreck's own engine deck part is blown off on a fuel explosion. Only wrecks with a static mesh
+ * component named EngineDeckComponentName (with simple collision) throw it; the others throw generic deck debris.
+ */
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FWreckEngineDeckThrowSettings
+{
+	GENERATED_BODY()
+
+	// Name of the wreck's engine deck static mesh component (the rear deck plates cut out of the hull mesh).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Engine Deck")
+	FName EngineDeckComponentName = TEXT("EngineDeck");
+
+	// Upward launch speed range in cm/s (mass independent).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Engine Deck", meta=(ClampMin="0"))
+	FVector2D UpSpeedRange = FVector2D(800.0, 1100.0);
+
+	// Sideways launch speed range in cm/s, thrown away from the hull over the engine end.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Engine Deck", meta=(ClampMin="0"))
+	FVector2D SideSpeedRange = FVector2D(150.0, 320.0);
+
+	// The sideways direction varies this many degrees either side of straight back over the engine.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Engine Deck", meta=(ClampMin="0", ClampMax="180"))
+	float DirectionSpreadDegrees = 40.f;
+
+	// Tumble speed range in degrees per second around a mostly horizontal axis.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Engine Deck", meta=(ClampMin="0"))
+	FVector2D SpinDegreesRange = FVector2D(120.0, 330.0);
+
+	// Multiplies the generic deck debris thrown along with the real deck; 0 throws only the deck.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Engine Deck", meta=(ClampMin="0"))
+	float DeckDebrisCountScale = 0.4f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing")
+	bool bPlayLandingImpact = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(EditCondition="bPlayLandingImpact"))
+	ERTS_ExplosionType LandingExplosionType = ERTS_ExplosionType::Small;
+
+	// Plays instead of the landing explosion type's own sound; empty keeps that sound.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(EditCondition="bPlayLandingImpact"))
+	TObjectPtr<USoundCue> LandingSound = nullptr;
+
+	// Below this linear speed (cm/s) for the settle duration the deck counts as landed.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(ClampMin="0"))
+	float SettleLinearSpeed = 25.f;
+
+	// Below this angular speed (deg/s) for the settle duration the deck counts as landed.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(ClampMin="0"))
+	float SettleAngularSpeed = 20.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(ClampMin="0"))
+	float SettleDuration = 0.4f;
+
+	// Physics is always switched off after this many seconds, even when the deck still slides.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Landing", meta=(ClampMin="0.5"))
+	float MaxFlightTime = 9.f;
+};
+
+/**
  * @brief Tuning for the engine fire death where the fuel explodes: the engine deck is blown apart, burning fuel
  * spills next to the hull and the wreck is charred around the engine.
  * Set per tank on ATankMaster; the values are handed to the UWreckEngineFireDeathComponent on the spawned wreck.
@@ -49,6 +108,7 @@ struct RTS_SURVIVAL_API FWreckEngineFireDeathSettings
 	float SecondaryExplosionDelay = 0.45f;
 
 	// Deck plates, grilles, hatch lids and exhaust parts thrown off the engine (pieces in Project Settings > Wreck Debris).
+	// Also gates throwing the wreck's own EngineDeck part.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deck Debris")
 	bool bThrowDeckDebris = true;
 
@@ -107,4 +167,8 @@ struct RTS_SURVIVAL_API FWreckEngineFireDeathSettings
 	// Seconds the embers in the charred metal take to cool down.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Char", meta=(ClampMin="0.1"))
 	float EmberCoolDownSeconds = 35.f;
+
+	// Hero wrecks with their own EngineDeck part throw it instead of most of the generic deck debris.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Deck Debris")
+	FWreckEngineDeckThrowSettings EngineDeckThrow;
 };

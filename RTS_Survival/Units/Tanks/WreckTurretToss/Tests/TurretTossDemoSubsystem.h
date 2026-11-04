@@ -48,6 +48,8 @@ struct FTurretTossAuditEntry
 	bool bSpawnRequested = false;
 	bool bKilled = false;
 	float MaxTurretHeightCm = 0.f;
+	// Highest the wreck's own engine deck part rose on an engine fire death (hero wrecks only).
+	float MaxDeckHeightCm = 0.f;
 };
 
 /**
@@ -98,6 +100,7 @@ private:
 	void ClearAuditBatch();
 	AActor* FindWreckNear(const FVector& Location) const;
 	static const UStaticMeshComponent* FindWreckTurret(const AActor* Wreck);
+	static UStaticMeshComponent* FindWreckEngineDeck(const AActor* Wreck);
 	bool TryGetGroundZ(const FVector& Location, float& OutGroundZ) const;
 	float GetGameSeconds() const;
 	void Finish(const TCHAR* Reason);

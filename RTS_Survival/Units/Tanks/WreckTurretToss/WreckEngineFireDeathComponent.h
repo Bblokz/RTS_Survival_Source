@@ -8,11 +8,13 @@
 
 class UStaticMeshComponent;
 class URTSFireSubsystem;
+class UWreckPartFlightComponent;
+struct FWreckPartFlightSettings;
 
 /**
  * @brief Added at runtime to a freshly spawned tank wreck when the tank died during an engine fire.
- * Blows the engine deck apart (fuel explosion + deck debris), keeps the open engine bay burning, spills burning
- * fuel next to the hull and chars the wreck around the engine with glowing embers that cool down.
+ * Blows the engine deck off (the wreck's own EngineDeck part when it has one, else generic deck debris), keeps the
+ * open engine bay burning, spills burning fuel next to the hull and chars the wreck around the engine.
  * When the ammunition cooked off as well, the turret toss owns the big explosion and this only adds the fuel fire.
  */
 UCLASS(ClassGroup=(RTS))
@@ -42,7 +44,14 @@ private:
 	FVector GetEngineDeckLocation(const FVector& EngineWorldLocation) const;
 	void SpawnExplosion(ERTS_ExplosionType ExplosionType, USoundCue* OverrideSound) const;
 	void StartSecondaryExplosion();
-	void StartDeckDebris() const;
+	void StartDeckThrow() const;
+	/** @return True when the wreck had its own engine deck part and it is now flying. */
+	bool TryThrowEngineDeck() const;
+	UStaticMeshComponent* FindEngineDeckMesh() const;
+	void LaunchEngineDeck(UWreckPartFlightComponent& DeckFlight) const;
+	FVector GetDeckLaunchSideDirection() const;
+	FWreckPartFlightSettings GetDeckFlightSettings() const;
+	void StartDeckDebris(float CountScale) const;
 	void StartDeckFire();
 	void StartFuelSpill();
 	FVector GetFuelSpillGroundLocation() const;

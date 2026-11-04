@@ -84,6 +84,9 @@ namespace TurretTossDemoPrivate
 	constexpr float AuditWreckSearchRadiusCm = 1500.f;
 	// A turret that rose this far above its tank's origin was really thrown.
 	constexpr float AuditMinThrowHeightCm = 300.f;
+	// An engine deck that rose this far above its tank's origin was really thrown (it starts on the hull at ~2 m).
+	constexpr float AuditMinDeckThrowHeightCm = 400.f;
+	const FName EngineDeckComponentName = TEXT("EngineDeck");
 
 	constexpr float GroundTraceUpCm = 20000.f;
 	constexpr float GroundTraceDownCm = 40000.f;
@@ -482,6 +485,17 @@ void UTurretTossDemoSubsystem::LogEngineFireWrecks() const
 		       GetGameSeconds() - M_StepStartGameSeconds, *Wreck->GetName(), CountThrownDebris(Wreck), MaxPieceHeight,
 		       MaxPieceDistance,
 		       IsValid(Hull) && IsValid(Hull->GetOverlayMaterial()) ? *Hull->GetOverlayMaterial()->GetName() : TEXT("none"));
+		// Non-const: the engine's GetPhysicsLinearVelocity is not const.
+		UStaticMeshComponent* Deck = FindWreckEngineDeck(Wreck);
+		if (IsValid(Deck))
+		{
+			UE_LOG(LogRTSTurretTossDemo, Display,
+			       TEXT("RTS_TTD deck t=%.2f wreck=%s height_cm=%.0f dist2d_cm=%.0f simulating=%d speed=%.0f"),
+			       GetGameSeconds() - M_StepStartGameSeconds, *Wreck->GetName(),
+			       Deck->GetComponentLocation().Z - M_DeathLocation.Z,
+			       FVector::Dist2D(Deck->GetComponentLocation(), M_DeathLocation), Deck->IsSimulatingPhysics() ? 1 : 0,
+			       Deck->IsSimulatingPhysics() ? Deck->GetPhysicsLinearVelocity().Size() : 0.f);
+		}
 	}
 }
 
@@ -526,6 +540,19 @@ void UTurretTossDemoSubsystem::ReportEngineFireAuditEntry(const FTurretTossAudit
 		return;
 	}
 	const int32 PieceCount = CountThrownDebris(Wreck);
+	const UStaticMeshComponent* Deck = FindWreckEngineDeck(Wreck);
+	if (IsValid(Deck))
+	{
+		// Hero wrecks throw their own deck: it must have flown and come to rest as a static part again.
+		const bool bDeckThrown = Entry.MaxDeckHeightCm >= TurretTossDemoPrivate::AuditMinDeckThrowHeightCm
+			&& not Deck->IsSimulatingPhysics();
+		bDeckThrown ? ++M_AuditCountsTossed : ++M_AuditCountsFailed;
+		UE_LOG(LogRTSTurretTossDemo, Display,
+		       TEXT("RTS_TTA vehicle=%s result=%s wreck=%s pieces=%d deck_max_height_cm=%.0f deck_landed_dist_cm=%.0f"),
+		       *Entry.SubtypeName, bDeckThrown ? TEXT("fuel_death_deck") : TEXT("deck_not_thrown"), *WreckName,
+		       PieceCount, Entry.MaxDeckHeightCm, FVector::Dist2D(Deck->GetComponentLocation(), Entry.Location));
+		return;
+	}
 	PieceCount > 0 ? ++M_AuditCountsTossed : ++M_AuditCountsFailed;
 	UE_LOG(LogRTSTurretTossDemo, Display, TEXT("RTS_TTA vehicle=%s result=%s wreck=%s pieces=%d"),
 	       *Entry.SubtypeName, PieceCount > 0 ? TEXT("fuel_death") : TEXT("no_debris"), *WreckName, PieceCount);
@@ -701,6 +728,12 @@ void UTurretTossDemoSubsystem::SampleAuditTurretHeights()
 			Entry.MaxTurretHeightCm = FMath::Max(Entry.MaxTurretHeightCm,
 			                                     TurretMesh->GetComponentLocation().Z - Entry.Location.Z);
 		}
+		const UStaticMeshComponent* DeckMesh = FindWreckEngineDeck(Entry.Wreck.Get());
+		if (IsValid(DeckMesh))
+		{
+			Entry.MaxDeckHeightCm = FMath::Max(Entry.MaxDeckHeightCm,
+			                                   DeckMesh->GetComponentLocation().Z - Entry.Location.Z);
+		}
 	}
 }
 
@@ -803,6 +836,25 @@ const UStaticMeshComponent* UTurretTossDemoSubsystem::FindWreckTurret(const AAct
 	{
 		// Same rule as UWreckTurretTossComponent: an empty Turret slot is no turret.
 		if (IsValid(MeshComponent) && MeshComponent->GetFName() == TEXT("Turret")
+			&& IsValid(MeshComponent->GetStaticMesh()))
+		{
+			return MeshComponent;
+		}
+	}
+	return nullptr;
+}
+
+UStaticMeshComponent* UTurretTossDemoSubsystem::FindWreckEngineDeck(const AActor* Wreck)
+{
+	if (not IsValid(Wreck))
+	{
+		return nullptr;
+	}
+	TArray<UStaticMeshComponent*> MeshComponents;
+	Wreck->GetComponents<UStaticMeshComponent>(MeshComponents);
+	for (UStaticMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (IsValid(MeshComponent) && MeshComponent->GetFName() == TurretTossDemoPrivate::EngineDeckComponentName
 			&& IsValid(MeshComponent->GetStaticMesh()))
 		{
 			return MeshComponent;

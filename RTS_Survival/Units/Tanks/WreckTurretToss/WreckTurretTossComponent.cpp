@@ -1,29 +1,17 @@
 #include "WreckTurretTossComponent.h"
 
 #include "Components/StaticMeshComponent.h"
-#include "Engine/StaticMesh.h"
-#include "PhysicsEngine/BodySetup.h"
 #include "Sound/SoundCue.h"
 #include "Engine/World.h"
-#include "TimerManager.h"
-#include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDebrisBurstComponent.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDebrisSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogWreckTurretToss, Log, All);
 
 namespace WreckTurretTossConstants
 {
-	constexpr float LandingCheckInterval = 0.1f;
-	// Ignore the first moments of flight: the turret still touches the ring and has no velocity before the impulse.
-	constexpr float MinFlightTimeBeforeLanding = 0.5f;
-	// Turret angular damping while flying so a rolling turret comes to rest instead of rocking on a curved face.
-	constexpr float FlyingAngularDamping = 0.6f;
-	// A turret this far below the ring when it settles fell through the world and is hidden.
-	constexpr float FellThroughWorldDepth = 5000.f;
 	// Share of random direction mixed into the tumble axis so not every turret flips the same way.
 	constexpr float TumbleAxisRandomness = 0.35f;
 	constexpr float FullCircleDegrees = 360.f;
@@ -52,7 +40,8 @@ bool UWreckTurretTossComponent::StartToss(const FWreckTurretTossSettings& Settin
 	M_FireSubsystem = World->GetSubsystem<URTSFireSubsystem>();
 
 	M_TurretRingLocation = GetTurretRingLocation();
-	SpawnExplosion(M_Settings.LaunchExplosionType, M_TurretRingLocation, M_Settings.LaunchSound);
+	UWreckPartFlightComponent::SpawnWreckExplosion(this, M_Settings.LaunchExplosionType, M_TurretRingLocation,
+	                                               M_Settings.LaunchSound);
 	StartHullAmmoFire();
 	StartDebrisBurst();
 	// Casemate wrecks have no separate turret: they only get the explosion and the hull ammo fire.
@@ -61,25 +50,21 @@ bool UWreckTurretTossComponent::StartToss(const FWreckTurretTossSettings& Settin
 		return true;
 	}
 
-	StoreTurretCollision();
-	PlaceTurretOnRing(LiveTurretYawOffset);
-	PrepareTurretForFlight();
-	// The body only turns dynamic once physics has processed the simulate switch; a velocity set now is lost.
-	World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+	UWreckPartFlightComponent* TurretFlight = UWreckPartFlightComponent::AddToWreck(GetOwner());
+	if (not IsValid(TurretFlight))
 	{
-		LaunchTurret();
-	}));
+		return true;
+	}
+	// Setup stores the turret's wreck collision before the ring placement makes it movable.
+	TurretFlight->SetupPart(M_TurretMesh.Get(), GetTurretFlightSettings());
+	PlaceTurretOnRing(LiveTurretYawOffset);
+	LaunchTurret(*TurretFlight);
 	StartTurretFire();
-	StartLandingChecks();
 	return true;
 }
 
 void UWreckTurretTossComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(M_LandingCheckTimerHandle);
-	}
 	StopFire(M_HullFireHandle);
 	StopFire(M_TurretFireHandle);
 	Super::EndPlay(EndPlayReason);
@@ -105,7 +90,7 @@ bool UWreckTurretTossComponent::TryFindWreckMeshes()
 		{
 			// Some wrecks keep an empty Turret slot (trucks, variants that clear it); only a mesh with physics
 			// collision can be thrown, anything else counts as a turretless wreck.
-			if (GetCanSimulateTurret(*MeshComponent))
+			if (UWreckPartFlightComponent::GetCanSimulatePart(*MeshComponent))
 			{
 				M_TurretMesh = MeshComponent;
 			}
@@ -125,14 +110,6 @@ bool UWreckTurretTossComponent::TryFindWreckMeshes()
 		TEXT("UWreckTurretTossComponent::TryFindWreckMeshes - wreck %s has no static mesh component named %s."),
 		*Wreck->GetName(), *M_Settings.HullComponentName.ToString()));
 	return false;
-}
-
-bool UWreckTurretTossComponent::GetCanSimulateTurret(UStaticMeshComponent& TurretMesh)
-{
-	// Non-const: the engine's GetBodySetup is not const.
-	const UBodySetup* TurretBodySetup = TurretMesh.GetBodySetup();
-	return IsValid(TurretMesh.GetStaticMesh()) && IsValid(TurretBodySetup)
-		&& TurretBodySetup->AggGeom.GetElementCount() > 0;
 }
 
 void UWreckTurretTossComponent::PlaceTurretOnRing(const float LiveTurretYawOffset) const
@@ -171,49 +148,8 @@ FVector UWreckTurretTossComponent::GetTurretRingLocation() const
 	return HullBounds.Origin + FVector(0.f, 0.f, HullBounds.BoxExtent.Z);
 }
 
-void UWreckTurretTossComponent::StoreTurretCollision()
+void UWreckTurretTossComponent::LaunchTurret(UWreckPartFlightComponent& TurretFlight) const
 {
-	if (not GetIsValidTurretMesh())
-	{
-		return;
-	}
-	M_TurretCollisionResponses = M_TurretMesh->GetCollisionResponseToChannels();
-	M_TurretObjectType = M_TurretMesh->GetCollisionObjectType();
-	M_TurretCollisionEnabled = M_TurretMesh->GetCollisionEnabled();
-	M_TurretMobility = M_TurretMesh->Mobility;
-}
-
-void UWreckTurretTossComponent::PrepareTurretForFlight()
-{
-	if (not GetIsValidTurretMesh())
-	{
-		return;
-	}
-
-	M_TurretMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
-	M_TurretMesh->SetMobility(EComponentMobility::Movable);
-	// Only the world blocks the flying turret: it must not shove units or bounce off its own hull.
-	M_TurretMesh->SetCollisionObjectType(ECC_PhysicsBody);
-	M_TurretMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	M_TurretMesh->SetCollisionResponseToAllChannels(ECR_Ignore);
-	M_TurretMesh->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
-	M_TurretMesh->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
-	M_TurretMesh->SetNotifyRigidBodyCollision(true);
-	M_TurretMesh->OnComponentHit.AddDynamic(this, &UWreckTurretTossComponent::OnTurretHit);
-	M_TurretMesh->SetAngularDamping(WreckTurretTossConstants::FlyingAngularDamping);
-	// Wreck parts often have gravity off since they never simulate; without it the turret never comes down.
-	M_TurretMesh->SetEnableGravity(true);
-	M_TurretMesh->SetSimulatePhysics(true);
-	bM_IsFlying = true;
-}
-
-void UWreckTurretTossComponent::LaunchTurret() const
-{
-	if (not GetIsValidTurretMesh())
-	{
-		return;
-	}
-
 	const float UpSpeed = FMath::FRandRange(M_Settings.UpSpeedRange.X, M_Settings.UpSpeedRange.Y);
 	const float SideSpeed = FMath::FRandRange(M_Settings.SideSpeedRange.X, M_Settings.SideSpeedRange.Y);
 	const float SpinSpeed = FMath::FRandRange(M_Settings.SpinDegreesRange.X, M_Settings.SpinDegreesRange.Y);
@@ -225,25 +161,20 @@ void UWreckTurretTossComponent::LaunchTurret() const
 	// Tumble over the direction of travel, with some randomness so turrets also corkscrew.
 	const FVector TumbleAxis = (FVector::CrossProduct(FVector::UpVector, SideDirection)
 		+ FMath::VRand() * WreckTurretTossConstants::TumbleAxisRandomness).GetSafeNormal();
-	M_TurretMesh->WakeRigidBody();
-	M_TurretMesh->SetPhysicsLinearVelocity(LaunchVelocity);
-	M_TurretMesh->SetPhysicsAngularVelocityInDegrees(TumbleAxis * SpinSpeed);
+	TurretFlight.Launch(LaunchVelocity, TumbleAxis * SpinSpeed);
 }
 
-void UWreckTurretTossComponent::SpawnExplosion(const ERTS_ExplosionType ExplosionType, const FVector& Location,
-                                               USoundCue* OverrideSound) const
+FWreckPartFlightSettings UWreckTurretTossComponent::GetTurretFlightSettings() const
 {
-	UGameExplosionsManager* ExplosionsManager = FRTS_Statics::GetGameExplosionsManager(this);
-	if (not IsValid(ExplosionsManager))
-	{
-		return;
-	}
-	if (IsValid(OverrideSound))
-	{
-		ExplosionsManager->SpawnExplosionAtLocationCustomSound(ExplosionType, Location, OverrideSound);
-		return;
-	}
-	ExplosionsManager->SpawnRTSExplosionAtLocation(ExplosionType, Location, true);
+	FWreckPartFlightSettings FlightSettings;
+	FlightSettings.bPlayLandingImpact = M_Settings.bPlayLandingImpact;
+	FlightSettings.LandingExplosionType = M_Settings.LandingExplosionType;
+	FlightSettings.LandingSound = M_Settings.LandingSound;
+	FlightSettings.SettleLinearSpeed = M_Settings.SettleLinearSpeed;
+	FlightSettings.SettleAngularSpeed = M_Settings.SettleAngularSpeed;
+	FlightSettings.SettleDuration = M_Settings.SettleDuration;
+	FlightSettings.MaxFlightTime = M_Settings.MaxFlightTime;
+	return FlightSettings;
 }
 
 void UWreckTurretTossComponent::StartHullAmmoFire()
@@ -301,90 +232,6 @@ void UWreckTurretTossComponent::StartTurretFire()
 		FRTSFireEffectParams());
 }
 
-void UWreckTurretTossComponent::StartLandingChecks()
-{
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
-	{
-		return;
-	}
-
-	M_LaunchWorldTime = World->GetTimeSeconds();
-	M_TimeBelowSettleSpeed = 0.f;
-	FTimerDelegate LandingCheckDelegate;
-	LandingCheckDelegate.BindWeakLambda(this, [this]()
-	{
-		CheckIfTurretLanded();
-	});
-	World->GetTimerManager().SetTimer(M_LandingCheckTimerHandle, LandingCheckDelegate,
-	                                  WreckTurretTossConstants::LandingCheckInterval, true);
-}
-
-void UWreckTurretTossComponent::CheckIfTurretLanded()
-{
-	const UWorld* World = GetWorld();
-	if (not bM_IsFlying || not IsValid(World) || not GetIsValidTurretMesh())
-	{
-		return;
-	}
-
-	const float FlightTime = World->GetTimeSeconds() - M_LaunchWorldTime;
-	if (FlightTime >= M_Settings.MaxFlightTime)
-	{
-		SettleTurret();
-		return;
-	}
-	if (FlightTime < WreckTurretTossConstants::MinFlightTimeBeforeLanding)
-	{
-		return;
-	}
-	if (not M_TurretMesh->IsAnyRigidBodyAwake())
-	{
-		SettleTurret();
-		return;
-	}
-
-	const bool bIsSlow = M_TurretMesh->GetPhysicsLinearVelocity().Size() <= M_Settings.SettleLinearSpeed
-		&& M_TurretMesh->GetPhysicsAngularVelocityInDegrees().Size() <= M_Settings.SettleAngularSpeed;
-	M_TimeBelowSettleSpeed = bIsSlow ? M_TimeBelowSettleSpeed + WreckTurretTossConstants::LandingCheckInterval : 0.f;
-	if (M_TimeBelowSettleSpeed >= M_Settings.SettleDuration)
-	{
-		SettleTurret();
-	}
-}
-
-void UWreckTurretTossComponent::SettleTurret()
-{
-	bM_IsFlying = false;
-	if (UWorld* World = GetWorld())
-	{
-		World->GetTimerManager().ClearTimer(M_LandingCheckTimerHandle);
-	}
-	if (not GetIsValidTurretMesh())
-	{
-		return;
-	}
-
-	// From here on the turret is an ordinary static wreck part: no simulation, the wreck's own collision again.
-	M_TurretMesh->SetSimulatePhysics(false);
-	M_TurretMesh->SetNotifyRigidBodyCollision(false);
-	M_TurretMesh->OnComponentHit.RemoveDynamic(this, &UWreckTurretTossComponent::OnTurretHit);
-	M_TurretMesh->SetCollisionObjectType(M_TurretObjectType);
-	M_TurretMesh->SetCollisionResponseToChannels(M_TurretCollisionResponses);
-	M_TurretMesh->SetCollisionEnabled(M_TurretCollisionEnabled);
-	if (M_TurretMobility != EComponentMobility::Movable)
-	{
-		M_TurretMesh->SetMobility(M_TurretMobility);
-	}
-
-	if (M_TurretMesh->GetComponentLocation().Z < M_TurretRingLocation.Z - WreckTurretTossConstants::FellThroughWorldDepth)
-	{
-		M_TurretMesh->SetHiddenInGame(true);
-		RTSFunctionLibrary::ReportError(
-			TEXT("UWreckTurretTossComponent::SettleTurret - tossed turret fell through the world and was hidden."));
-	}
-}
-
 void UWreckTurretTossComponent::StopFire(int32& InOutFireHandle) const
 {
 	if (InOutFireHandle == INDEX_NONE)
@@ -396,25 +243,6 @@ void UWreckTurretTossComponent::StopFire(int32& InOutFireHandle) const
 		M_FireSubsystem->StopFireByHandle(InOutFireHandle);
 	}
 	InOutFireHandle = INDEX_NONE;
-}
-
-void UWreckTurretTossComponent::OnTurretHit(UPrimitiveComponent* HitComponent, AActor* OtherActor,
-                                            UPrimitiveComponent* OtherComp, FVector NormalImpulse,
-                                            const FHitResult& Hit)
-{
-	if (bM_HasPlayedLandingImpact || not M_Settings.bPlayLandingImpact)
-	{
-		return;
-	}
-	const UWorld* World = GetWorld();
-	if (not IsValid(World)
-		|| World->GetTimeSeconds() - M_LaunchWorldTime < WreckTurretTossConstants::MinFlightTimeBeforeLanding)
-	{
-		return;
-	}
-
-	bM_HasPlayedLandingImpact = true;
-	SpawnExplosion(M_Settings.LandingExplosionType, Hit.ImpactPoint, M_Settings.LandingSound);
 }
 
 bool UWreckTurretTossComponent::GetIsValidTurretMesh() const

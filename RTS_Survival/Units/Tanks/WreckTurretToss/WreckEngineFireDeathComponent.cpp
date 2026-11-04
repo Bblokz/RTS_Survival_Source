@@ -7,13 +7,12 @@
 #include "Sound/SoundCue.h"
 #include "TimerManager.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
-#include "RTS_Survival/Game/GameState/GameExplosionManager/ExplosionManager.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDebrisBurstComponent.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDebrisSettings.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckPartFlightComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
-#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogWreckEngineFire, Log, All);
 
@@ -35,6 +34,9 @@ namespace WreckEngineFireDeathConstants
 	constexpr float GroundTraceDown = 1500.f;
 	// Scorch decals scatter this far around the fuel pool.
 	constexpr float ScorchScatter = 120.f;
+	// Share of random direction mixed into the deck's tumble axis so not every deck flips the same way.
+	constexpr float DeckTumbleAxisRandomness = 0.35f;
+	constexpr float FullCircleDegrees = 360.f;
 }
 
 FWreckEngineFireDeathSettings::FWreckEngineFireDeathSettings()
@@ -74,7 +76,7 @@ bool UWreckEngineFireDeathComponent::StartEngineFireDeath(const FWreckEngineFire
 	{
 		SpawnExplosion(M_Settings.ExplosionType, M_Settings.ExplosionSound);
 		StartSecondaryExplosion();
-		StartDeckDebris();
+		StartDeckThrow();
 	}
 	StartDeckFire();
 	StartFuelSpill();
@@ -130,17 +132,7 @@ FVector UWreckEngineFireDeathComponent::GetEngineDeckLocation(const FVector& Eng
 void UWreckEngineFireDeathComponent::SpawnExplosion(const ERTS_ExplosionType ExplosionType,
                                                     USoundCue* OverrideSound) const
 {
-	UGameExplosionsManager* ExplosionsManager = FRTS_Statics::GetGameExplosionsManager(this);
-	if (not IsValid(ExplosionsManager))
-	{
-		return;
-	}
-	if (IsValid(OverrideSound))
-	{
-		ExplosionsManager->SpawnExplosionAtLocationCustomSound(ExplosionType, M_EngineDeckLocation, OverrideSound);
-		return;
-	}
-	ExplosionsManager->SpawnRTSExplosionAtLocation(ExplosionType, M_EngineDeckLocation, true);
+	UWreckPartFlightComponent::SpawnWreckExplosion(this, ExplosionType, M_EngineDeckLocation, OverrideSound);
 }
 
 void UWreckEngineFireDeathComponent::StartSecondaryExplosion()
@@ -159,17 +151,117 @@ void UWreckEngineFireDeathComponent::StartSecondaryExplosion()
 	                                  FMath::Max(M_Settings.SecondaryExplosionDelay, KINDA_SMALL_NUMBER), false);
 }
 
-void UWreckEngineFireDeathComponent::StartDeckDebris() const
+void UWreckEngineFireDeathComponent::StartDeckThrow() const
+{
+	if (not M_Settings.bThrowDeckDebris)
+	{
+		return;
+	}
+	if (not TryThrowEngineDeck())
+	{
+		StartDeckDebris(M_Settings.DeckDebrisCountScale);
+		return;
+	}
+	// A few generic bits (grilles, exhaust parts) still fly with the real deck.
+	const float DebrisWithDeckScale = M_Settings.DeckDebrisCountScale * M_Settings.EngineDeckThrow.DeckDebrisCountScale;
+	if (DebrisWithDeckScale > 0.f)
+	{
+		StartDeckDebris(DebrisWithDeckScale);
+	}
+}
+
+bool UWreckEngineFireDeathComponent::TryThrowEngineDeck() const
+{
+	UStaticMeshComponent* DeckMesh = FindEngineDeckMesh();
+	if (DeckMesh == nullptr)
+	{
+		return false;
+	}
+	UWreckPartFlightComponent* DeckFlight = UWreckPartFlightComponent::AddToWreck(GetOwner());
+	if (not IsValid(DeckFlight))
+	{
+		return false;
+	}
+	DeckFlight->SetupPart(DeckMesh, GetDeckFlightSettings());
+	LaunchEngineDeck(*DeckFlight);
+	UE_LOG(LogWreckEngineFire, Verbose, TEXT("Engine deck %s thrown off %s"), *DeckMesh->GetName(),
+	       *GetNameSafe(GetOwner()));
+	return true;
+}
+
+UStaticMeshComponent* UWreckEngineFireDeathComponent::FindEngineDeckMesh() const
+{
+	const AActor* Wreck = GetOwner();
+	if (not IsValid(Wreck))
+	{
+		return nullptr;
+	}
+	TArray<UStaticMeshComponent*> MeshComponents;
+	Wreck->GetComponents<UStaticMeshComponent>(MeshComponents);
+	for (UStaticMeshComponent* MeshComponent : MeshComponents)
+	{
+		// Only a deck with simple collision can fly; anything else keeps the generic deck debris.
+		if (IsValid(MeshComponent) && MeshComponent->GetFName() == M_Settings.EngineDeckThrow.EngineDeckComponentName
+			&& UWreckPartFlightComponent::GetCanSimulatePart(*MeshComponent))
+		{
+			return MeshComponent;
+		}
+	}
+	return nullptr;
+}
+
+void UWreckEngineFireDeathComponent::LaunchEngineDeck(UWreckPartFlightComponent& DeckFlight) const
+{
+	const FWreckEngineDeckThrowSettings& DeckThrow = M_Settings.EngineDeckThrow;
+	const float UpSpeed = FMath::FRandRange(DeckThrow.UpSpeedRange.X, DeckThrow.UpSpeedRange.Y);
+	const float SideSpeed = FMath::FRandRange(DeckThrow.SideSpeedRange.X, DeckThrow.SideSpeedRange.Y);
+	const float SpinSpeed = FMath::FRandRange(DeckThrow.SpinDegreesRange.X, DeckThrow.SpinDegreesRange.Y);
+	const FVector SideDirection = GetDeckLaunchSideDirection();
+
+	// Velocities instead of impulses keep the arc the same for a Panther deck and a Tiger II deck.
+	const FVector LaunchVelocity = SideDirection * SideSpeed + FVector::UpVector * UpSpeed;
+	// Tumble over the direction of travel so the deck flips away from the hull.
+	const FVector TumbleAxis = (FVector::CrossProduct(FVector::UpVector, SideDirection)
+		+ FMath::VRand() * WreckEngineFireDeathConstants::DeckTumbleAxisRandomness).GetSafeNormal();
+	DeckFlight.Launch(LaunchVelocity, TumbleAxis * SpinSpeed);
+}
+
+FVector UWreckEngineFireDeathComponent::GetDeckLaunchSideDirection() const
+{
+	// Without a known engine side the deck may go any way.
+	if (M_EngineDirection.IsNearlyZero())
+	{
+		return FRotator(0.f, FMath::FRandRange(0.f, WreckEngineFireDeathConstants::FullCircleDegrees), 0.f).Vector();
+	}
+	const float Spread = M_Settings.EngineDeckThrow.DirectionSpreadDegrees;
+	return M_EngineDirection.RotateAngleAxis(FMath::FRandRange(-Spread, Spread), FVector::UpVector);
+}
+
+FWreckPartFlightSettings UWreckEngineFireDeathComponent::GetDeckFlightSettings() const
+{
+	const FWreckEngineDeckThrowSettings& DeckThrow = M_Settings.EngineDeckThrow;
+	FWreckPartFlightSettings FlightSettings;
+	FlightSettings.bPlayLandingImpact = DeckThrow.bPlayLandingImpact;
+	FlightSettings.LandingExplosionType = DeckThrow.LandingExplosionType;
+	FlightSettings.LandingSound = DeckThrow.LandingSound;
+	FlightSettings.SettleLinearSpeed = DeckThrow.SettleLinearSpeed;
+	FlightSettings.SettleAngularSpeed = DeckThrow.SettleAngularSpeed;
+	FlightSettings.SettleDuration = DeckThrow.SettleDuration;
+	FlightSettings.MaxFlightTime = DeckThrow.MaxFlightTime;
+	return FlightSettings;
+}
+
+void UWreckEngineFireDeathComponent::StartDeckDebris(const float CountScale) const
 {
 	AActor* Wreck = GetOwner();
-	if (not M_Settings.bThrowDeckDebris || not IsValid(Wreck) || not GetIsValidHullMesh())
+	if (not IsValid(Wreck) || not GetIsValidHullMesh())
 	{
 		return;
 	}
 	UWreckDebrisBurstComponent* DebrisBurst = NewObject<UWreckDebrisBurstComponent>(Wreck);
 	Wreck->AddInstanceComponent(DebrisBurst);
 	DebrisBurst->RegisterComponent();
-	DebrisBurst->StartBurst(M_EngineDeckLocation, M_HullMesh.Get(), M_Settings.DeckDebrisCountScale,
+	DebrisBurst->StartBurst(M_EngineDeckLocation, M_HullMesh.Get(), CountScale,
 	                        GetDefault<UWreckDebrisSettings>()->EngineFireBurst, M_EngineDirection);
 }
 
