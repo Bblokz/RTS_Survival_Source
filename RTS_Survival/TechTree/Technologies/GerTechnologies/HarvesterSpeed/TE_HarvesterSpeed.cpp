@@ -16,6 +16,7 @@ UTE_HarvesterSpeed::UTE_HarvesterSpeed()
 	Technology = ETechnology::Tech_HarvesterSpeed;
 	TanksToApplyTo = {
 		ETankSubtype::Tank_PzI_Harvester,
+		ETankSubtype::Tank_PzIV_Harvester,
 	};
 }
 

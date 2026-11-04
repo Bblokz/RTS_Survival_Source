@@ -6896,6 +6896,23 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_Harvester, TankData);
 
+	// Pz IV Harvester (twin saws + conveyor): medium armour, slower than a Pz IV with the saw frame and hopper.
+	TankData.MaxHealth = MediumTankHealthBase;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 22;
+	TankData.VehicleReverseSpeedKmh = 12;
+	TankData.VisionRadius = T1TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, PzIVHarvester_Radixite}
+	});
+	TankData.Abilities = BasicHarvesterTankAbilities;
+	TankData.ExperienceLevels = GetMediumTankExpLevels();
+	TankData.ExperienceWorth = BaseMediumTankExp;
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_Harvester, TankData);
+
 	// SU-85
 	{
 		const float SuMediumTankDestroyerBaseHealth = MediumTankHealthBase + OneLightTankShotHp;

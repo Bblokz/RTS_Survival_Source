@@ -519,6 +519,39 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Ger Pz IV Harvester
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_PzIV_Harvester)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			HarvesterTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_PzIV_Harvester,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+
+		FTrainingOption HarvesterItemID = FTrainingOption(
+			EAllUnitType::UNType_Harvester,
+			static_cast<uint8>(ETankSubtype::Tank_PzIV_Harvester)
+		);
+
+		FTrainingOptionState HarvesterTrainingOptionState = CreateTrainingOptionState(
+			HarvesterItemID,
+			MediumTankTrainingTime,
+			EAllUnitType::UNType_Harvester,
+			ETankSubtype::Tank_PzIV_Harvester,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(HarvesterItemID, HarvesterTrainingOptionState);
+	}
+
 	// Ger Pz I Scout
 	{
 		FTrainingOption ItemID = FTrainingOption(

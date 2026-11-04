@@ -120,7 +120,7 @@ EVehicleModuleProfile URTSBlueprintFunctionLibrary::BP_GetVehicleModuleProfileFo
 	{
 		return EVehicleModuleProfile::LightTank;
 	}
-	if (TankSubtype == ETankSubtype::Tank_T34_Harvester)
+	if (TankSubtype == ETankSubtype::Tank_T34_Harvester || TankSubtype == ETankSubtype::Tank_PzIV_Harvester)
 	{
 		return EVehicleModuleProfile::MediumTank;
 	}

@@ -215,6 +215,9 @@ enum class ETankSubtype : uint8
 	// KV-3 (Object 223): the KV line's 68 t step past the KV-1, with 120mm frontal armour and the 107mm ZiS-6 in a large
 	// cast turret; better protected than the IS-1, slower than the IS-2.
 	Tank_KV3 UMETA(DisplayName = "Rus Heavy KV-3"),
+	// German harvester on the Pz IV hull: the Pz I saw grown into two toed-in saws on a bow frame, with a conveyor
+	// lifting the ore into a large hopper over the engine deck.
+	Tank_PzIV_Harvester UMETA(DisplayName = "Ger Medium Pz IV Harvester"),
 };
 
 
