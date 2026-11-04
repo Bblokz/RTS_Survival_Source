@@ -1080,6 +1080,8 @@ private:
 
 	void BeginPlay_SetupCollisionVsBuildings();
 	void BeginPlay_SetFactionFlagPrimitiveDataIndex();
+	// The player's team colour for the camo shaders; enemy vehicles and the default colour leave the camo as is.
+	void BeginPlay_ApplyPlayerTeamColor();
 
 	// the derived bp has already set the correct tank subtype before c++ begin play.
 	void BeginPlay_SetupData();

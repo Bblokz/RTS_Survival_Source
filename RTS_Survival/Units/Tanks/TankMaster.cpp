@@ -47,6 +47,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/FactionSystem/FactionFlags/FRTS_FactionFlags.h"
+#include "RTS_Survival/FactionSystem/TeamColor/FRTS_TeamColor.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "TimerManager.h"
@@ -523,6 +524,7 @@ void ATankMaster::BeginPlay()
 
 	BeginPlay_SetupCollisionVsBuildings();
 	BeginPlay_SetFactionFlagPrimitiveDataIndex();
+	BeginPlay_ApplyPlayerTeamColor();
 
 	M_TankStartGameAction.OnBeginPlay();
 	if (GetIsValidRTSComponent() && RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank)
@@ -1984,6 +1986,11 @@ void ATankMaster::BeginPlay_SetupCollisionVsBuildings()
 void ATankMaster::BeginPlay_SetFactionFlagPrimitiveDataIndex()
 {
 	FRTS_FactionFlags::SetupFactionFlagsForActorPrimitives(this);
+}
+
+void ATankMaster::BeginPlay_ApplyPlayerTeamColor()
+{
+	FRTS_TeamColor::ApplyPlayerTeamColorToActor(this);
 }
 
 bool ATankMaster::GetIsValidHullWeapon(const UHullWeaponComponent* HullWeapon) const

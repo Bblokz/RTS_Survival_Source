@@ -1,9 +1,118 @@
-# Team colour shaders for vehicles (test, 2026-10-19)
+# Team colour shaders for vehicles
 
-Goal: give every player's vehicles a team colour without losing the hand-painted camo. Three shader types were built
-and compared on the Panzer III M (desert 3-tone camo) and the King Tiger (ambush 3-tone camo). **Nothing shared was
-changed**: `MM_Ger_PostApoTank_NoBlend`, `MI_PZIII_Hull_DesertAPO` and `M_TigerII_Hull` are untouched; everything lives in
-`/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/TeamColorTest/`.
+**In the game since 2026-11-03: CamoSwap on every German vehicle.** The player picks a team colour in the faction
+selection menu; the German hull, turret and body materials repaint their dark camo bands in it. The default ("Camo")
+changes nothing. The sections from "Assets" down describe the 2026-10-19 test that compared three shader types on copies
+(`MasterMaterials/TeamColorTest/`, still there and unused by the game).
+
+## In the game
+
+### Pieces
+
+| Piece | Where |
+|---|---|
+| `MF_TeamColor_CamoSwap` (production) | `/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/MasterMaterials/TeamColor/` |
+| Splice into the German vehicle materials | `Source/Tools/TeamColor/rollout_team_color.py` (run in the editor through the bridge) |
+| Which materials | `Source/Tools/TeamColor/team_color_targets.py` (6 hull masters, 32 vehicle materials) |
+| Per-camo keys | `pick_team_color_keys.py` from the camo textures (`survey_` -> `inspect_` -> `export_` -> `pick_` scripts) |
+| Colour storage | `URTSGameInstance::SetPlayerTeamColor` / `GetPlayerTeamColor`; saved in `USavePlayerProfile::M_PlayerTeamColor` |
+| Writing it to vehicles | `FRTS_TeamColor` (`FactionSystem/TeamColor/`), called from `ATankMaster::BeginPlay_ApplyPlayerTeamColor` |
+| Picker UI | `UW_FactionTeamColorPicker` / `UW_FactionTeamColorSwatch` (`FactionSelection/TeamColorPicker/`), built by `UW_FactionSelectionMenu::SetupTeamColorPicker` |
+
+### Default look stays exact
+
+The function's Custom node starts with `[branch] if (TeamWeight <= 0) return Base.rgb;`. Team colour weight is the alpha
+of custom primitive data 7, uniform per draw, so the branch is coherent: without a team colour (every enemy and neutral
+vehicle, and the player's vehicles while "Camo" is picked) the camo passes through bit for bit and the swap maths is
+skipped. `FRTS_TeamColor` does not even write the primitive data while the colour's alpha is 0.
+
+### How the colour reaches a vehicle
+
+1. The faction menu loads the saved colour into the game instance before its first hangar preview spawns
+   (`FRTS_Profile::LoadSavedPlayerTeamColor`, silent when there is no profile yet).
+2. A swatch click stores it on the game instance, saves it in the profile (`FRTS_Profile::SavePlayerTeamColor`; only
+   when a profile file exists, so no test profile is ever saved as the player's) and repaints every player vehicle in
+   the hangar (`FRTS_TeamColor::ApplyPlayerTeamColorToWorldVehicles`).
+3. In a mission every `ATankMaster` owned by player 1 writes the colour to custom primitive data 4-7 of all its
+   primitives and of its child actors (turrets) in `BeginPlay`, right after the faction flag (index 0) is set.
+
+Same reach as the faction flags: nomadic trucks and harvesters are tank masters, so they are covered; aircraft, team
+weapons, buildings, wrecks and parts attached after `BeginPlay` are not.
+
+### Which band is repainted
+
+The German schemes share two dark bands over a dunkelgelb base coat: red-brown (about sRGB 0.13-0.19, 0.06-0.09, 0)
+and dark green (about 0.05-0.07, 0.09-0.10, 0). The production function keys up to two bands (`TC_KeyColor`,
+`TC_KeyColor2`, whose alpha switches the second band on) and every material has its own `TC_KeyColor`, `TC_KeyColor2`,
+`TC_Strength`, `TC_KeyMin` and `TC_KeyMax` parameters (group TeamColor; instances override them). `TC_KeyMin` /
+`TC_KeyMax` is the key radius in chromaticity: fully repainted within the first, untouched beyond the second (default
+0.08 / 0.15). The keys were measured from each camo texture:
+saturated pixels in the red-brown hue range (0-32 degrees) and the green range (58-160 degrees), median chromaticity,
+kept when the band covers at least 2% of the paint and repaints at most 15% of the base coat.
+
+- **Three-tone camo** (Panzer II/III/IV, 38(t), Hetzer, Panther D, Tiger H1 rail, Maus, Panther II, E-50, King Tiger,
+  SdKfz 251, StuG): both dark bands become the team colour (6-47% of the paint), dunkelgelb stays. Strength 0.95.
+- **Pale camo** (Brummbar, Puma, SdKfz 234/4 turret, SdKfz 9): the brown and green blotches are pale and only about
+  0.06 from the dunkelgelb in chromaticity, inside the default key radius. When no band is found the picker retries
+  with `TC_KeyMin` / `TC_KeyMax` 0.015 / 0.03 and less saturated band pixels, and keeps the keys when they cover 5-35% of
+  the paint (more means the key caught a reddish base coat, or repaints more than a three-tone vehicle: the Jagdpanzer
+  IV/70's 38% read clearly stronger). 8-30% of the paint is repainted and the base coat stays.
+- **One-tone camo** (SdKfz 250, 234/3, 231, Sturmtiger, Jagdpanzer IV/70, Panzer I, Panzer II turret, rocket truck):
+  no band or blotch to repaint, so the whole paint gets a light tint, strength 0.2. 0.3 already read stronger than the
+  three-tone vehicles on colourful camo (Jagdpanzer IV/70, Tiger E). Until 2026-11-03 these (and the pale camos) were
+  repainted at 0.7 and changed far more than the rest.
+- **One band by hand** (`TARGET_KEY_OVERRIDES` in the picker, 2026-11-04): Tiger E and Panther G repaint a single camo
+  band, not a tint over all of it.
+  - Tiger E: `MM_Ger_PostApoTank` shows `lerp(TankDiffuse * DiffuseTint, Camo, CamoAlphaStrenght)` and the team colour
+    reads that blend. The raw overlay colours sit about 0.3 away from the blend in chromaticity, which is why keys
+    measured on the overlay alone (`overlay_png`) missed. The keys are measured on a rebuilt blend instead: the desert
+    overlay's red-brown on the hull and turret base (0.03 / 0.06), the forest overlay's brown on the turret
+    (0.015 / 0.03). Its two turret materials share one diffuse but not the overlay, so the override goes by material.
+  - Panther G green scheme: its olive-green blotches (hue 52-90, too pale for the generic green band) at
+    0.015 / 0.03, about 12-16% of the paint, on hull, turret and engine deck alike.
+- **Off** (strength 0): Wespe (grey paint).
+- Exceptions by hand in `pick_team_color_keys.py`: `TARGET_KEY_OVERRIDES` (above), `ONE_TONE_TEXTURES` (SdKfz 250
+  turret; the Panther G entries are overridden) and `PALE_FIRST_TEXTURES` (Brummbar side plates) so one vehicle never mixes two looks; `NO_SWAP_TEXTURES` for
+  textures that are not the camo.
+- `keys_sheet.png` (written by the picker into `Saved/TeamColorTest/`) shows every camo, its swap mask and a red
+  preview made with the shader's maths.
+
+To tune one vehicle, change `TC_KeyColor` / `TC_KeyColor2` / `TC_Strength` / `TC_KeyMin` / `TC_KeyMax` on its
+material instance (or the material's parameter defaults for vehicles without an instance).
+
+### Splice points
+
+- Hull masters with the `DiffuseTankHull` named reroute (`MM_Ger_PostApoTank_NoBlend` and its RailRed / RailOrange /
+  FullUV copies): between the `TankDiffuse` sample and the reroute, before `MF_Apply4xSquareStamp`, so unit markings,
+  flags and the shared atlas parts stay untinted.
+- Every other material (`MM_Ger_PostApoTank`, `MM_TankHull`, the vehicle materials): right before Base Color.
+  Markings there go through the function too; they are low-chroma (black, white) or far from the keys, so they keep
+  their colour.
+
+### Checks (2026-11-03)
+
+- **Default unchanged:** 19 German vehicles pictured before and after the rollout (`fleet_baseline.txt`,
+  `compare_fleet_default.py`). Before/after differences sit at the same-run lighting noise floor; the five largest
+  (JagdPanther, Panther G, SdKfz 251, Brummbar, Tiger E) were checked by eye: only the map's light differs, the camo is
+  identical.
+- **Colours:** `fleet_team_colors.txt` + `make_fleet_sheet.py` (sheets in `Saved/TeamColorTest/fleet_sheets/`).
+  Three-tone vehicles keep the dunkelgelb pattern with the dark bands in team colour (Panzer III, 38(t), Hetzer,
+  Tiger H1, King Tiger, Panther D/II, JagdPanther, Maus, E-50, SdKfz 251, trucks). Weak: Panzer IV H (few band
+  pixels show from above), Keubel (thin lines). In this first run the one-tone vehicles (Puma, Brummbar, Panther G,
+  Tiger E, SdKfz 250) were repainted almost entirely; the pale-camo keys and the 0.3 tint above replaced that
+  (`brummbar_check.txt`, `one_tone_check.txt`).
+- **Menu:** `run_faction_menu_team_colors.sh` (`-FactionMenuCaptureTeamColors`) clicks red, blue, yellow and Camo; the
+  hangar preview's primitive data follows (`0.80,0.02,0.02,1` ... `0,0,0,0`). It backs up and restores
+  `Saved/SaveGames`, because every click saves the profile.
+- **Cost:** pixel shader instructions (static count, `get_statistics`): `MM_Ger_PostApoTank_NoBlend` 423 -> 500
+  (+77; the production function keys two bands), no extra samplers, vertex shader unchanged. At runtime the branch
+  skips the maths on every vehicle without a team colour (all enemies and neutrals).
+
+### Not covered
+
+Wheels, tracks, glass, lenses, antennas, nets, MGs, tools, props atlases, crew and the shared environment masters
+(`MM_RTS_Env`) are left alone on purpose. The grey Panzer III M Schreck turret (`M_PanzerIIIM_Schreck_DarkGrey`) has no
+camo and was left out.
 
 ## Assets
 
@@ -138,9 +247,3 @@ shader permutations. The cost is base-pass pixel ALU on vehicle pixels only; not
 Cheaper later if needed: replace the gamma `pow`s with `sqrt`/square (gamma 2.0). Adding the function to the master
 means a one-time recompile of every instance on it; vehicles with their own materials need it added per material.
 
-## Not done yet
-
-- Game code does not set `TeamColor` yet; only the capture tool writes the primitive data.
-- The shared master and every vehicle instance are untouched; adopting a type means adding its function to
-  `MM_Ger_PostApoTank_NoBlend` at the spot above (and to any other vehicle masters).
-- Checked on two camos (Panzer III desert, King Tiger ambush); grey or single-colour camo not tried yet.

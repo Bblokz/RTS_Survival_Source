@@ -41,6 +41,9 @@ public:
 	void HandleTabClicked(const int32 TabIndex);
 	void HandleTileClicked(const int32 TileIndex);
 
+	/** The skin from the Blueprint defaults; the faction menu's team colour picker reuses it. */
+	const FFactionUnitBrowserStyle& GetStyle() const { return M_Style; }
+
 	int32 GetTabCount() const { return M_Tabs.Num(); }
 	FText GetTabLabel(const int32 TabIndex) const;
 	const TArray<FTrainingOption>& GetShownUnits() const { return M_ShownUnits; }

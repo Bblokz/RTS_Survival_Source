@@ -219,6 +219,40 @@ bool FRTS_Profile::SaveUnitVariantSelections(const TArray<FUnitVariantSelection>
 	return SavePlayerProfile(Profile);
 }
 
+bool FRTS_Profile::SavePlayerTeamColor(const FLinearColor& TeamColor)
+{
+	if (not UGameplayStatics::DoesSaveGameExist(M_SaveSlotName, M_UserIndex))
+	{
+		RTSFunctionLibrary::PrintToLog(TEXT("No saved player profile yet: the team colour is kept for this session only."),
+		                               false);
+		return false;
+	}
+	USavePlayerProfile* Profile = LoadProfileFromSlot(M_SaveSlotName, M_UserIndex);
+	if (not IsValid(Profile))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("The saved player profile could not be loaded to store the team colour."
+			"\nAt function: FRTS_Profile::SavePlayerTeamColor"));
+		return false;
+	}
+	Profile->M_PlayerTeamColor = TeamColor;
+	return SavePlayerProfile(Profile);
+}
+
+bool FRTS_Profile::LoadSavedPlayerTeamColor(FLinearColor& OutTeamColor)
+{
+	if (not UGameplayStatics::DoesSaveGameExist(M_SaveSlotName, M_UserIndex))
+	{
+		return false;
+	}
+	const USavePlayerProfile* Profile = LoadProfileFromSlot(M_SaveSlotName, M_UserIndex);
+	if (not IsValid(Profile))
+	{
+		return false;
+	}
+	OutTeamColor = Profile->M_PlayerTeamColor;
+	return true;
+}
+
 void FRTS_Profile::ValidateUnitVariantSelections(TArray<FUnitVariantSelection>& InOutSelections)
 {
 	TSet<FTrainingOption> SeenUnits;

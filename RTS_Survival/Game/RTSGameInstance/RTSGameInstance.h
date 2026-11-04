@@ -64,6 +64,9 @@ public:
 	bool GetHasPlayerFaction() const;
 	bool GetIsPlayerFactionChosenByPlayer() const { return bM_IsPlayerFactionChosenByPlayer; }
 	ERTSCommander GetPlayerCommander() const ;
+	// Picked in the faction selection menu; FRTS_TeamColor writes it to the player's vehicles.
+	void SetPlayerTeamColor(const FLinearColor& TeamColor) { M_PlayerTeamColor = TeamColor; }
+	FLinearColor GetPlayerTeamColor() const { return M_PlayerTeamColor; }
 
 	UFUNCTION(BlueprintCallable, Category = "World Campaign|Mission Context")
 	void SetWorldMissionContext(const FWorldMissionContext& WorldMissionContext);
@@ -128,6 +131,8 @@ private:
 	// True when M_PlayerFaction came from the player's selection rather than dev settings, menus or tests.
 	bool bM_IsPlayerFactionChosenByPlayer = false;
 	ERTSCommander M_PlayerCommander;
+	// Alpha 0 (the default) keeps every vehicle's camo exactly as authored.
+	FLinearColor M_PlayerTeamColor = FLinearColor::Transparent;
 
 	UPROPERTY()
 	FWorldMissionContext M_WorldMissionContext;

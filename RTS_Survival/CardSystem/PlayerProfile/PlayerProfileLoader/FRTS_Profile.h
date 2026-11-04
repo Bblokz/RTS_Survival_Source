@@ -77,6 +77,21 @@ public:
 	 */
 	static bool SaveUnitVariantSelections(const TArray<FUnitVariantSelection>& UnitVariantSelections);
 
+	/**
+	 * @brief Replaces only the team colour of the saved profile. Without a saved profile nothing is written: the colour
+	 * then lasts for this session only, and no test profile gets saved as the player's.
+	 * @param TeamColor Alpha 0 keeps the vehicles' camo.
+	 * @return False when there is no saved profile or it could not be saved.
+	 */
+	static bool SavePlayerTeamColor(const FLinearColor& TeamColor);
+
+	/**
+	 * @brief Reads the saved team colour without reporting errors when the player has no profile yet.
+	 * @param OutTeamColor Untouched when there is no saved profile.
+	 * @return True when a saved profile was read.
+	 */
+	static bool LoadSavedPlayerTeamColor(FLinearColor& OutTeamColor);
+
 private:
 	/**
  * @brief Attempts to load the player profile from the specified save slot.
