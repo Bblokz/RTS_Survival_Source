@@ -193,6 +193,9 @@ public:
 
 	bool GetIsBaseDestroyed(int32 BaseIndex) const;
 
+	/** @return The radius a base at this start is planned in: the settings' BuildAreaRadius, else the start location's own. */
+	float GetBaseBuildRadius(const ASurvivalStartLocation& StartLocation) const;
+
 #if RTS_WITH_MAP_TESTS
 	/** @brief Builds one base with forced preset, strength, seed and threat for FSurvivalSovietBasePreview. */
 	void GenerateBaseForPreview(ASurvivalStartLocation* StartLocation, int32 BaseIndex,
@@ -202,9 +205,6 @@ public:
 	void ClearBasesForPreview();
 
 	const TArray<FSurvivalSovietBaseState>& GetBaseStatesForPreview() const { return M_Bases; }
-
-	/** @return The radius a base at this start is planned in: the settings' BuildAreaRadius, else the start location's own. */
-	float GetBaseBuildRadius(const ASurvivalStartLocation& StartLocation) const;
 
 	/** @return What really stands in the world for this base, against what was planned, as JSON. */
 	FString BuildSpawnManifestJson(const FSurvivalSovietBaseState& Base, const FString& Label) const;

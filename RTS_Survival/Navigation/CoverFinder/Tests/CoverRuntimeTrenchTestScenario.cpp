@@ -282,26 +282,42 @@ void FCoverRuntimeTrenchTestScenario::Tick(
 bool FCoverRuntimeTrenchTestScenario::SpawnTrenches(UWorld& World)
 {
 	using namespace CoverRuntimeTrenchTestScenarioPrivate;
-	const ASquadController* PlayerSquad = nullptr;
-	for (TActorIterator<ASquadController> SquadIterator(&World); SquadIterator && PlayerSquad == nullptr; ++SquadIterator)
+	// Actors are iterated in a different order in a cooked build; the squads are taken by where they stand, so every
+	// build tests the same spot.
+	TArray<const ASquadController*> PlayerSquads;
+	for (TActorIterator<ASquadController> SquadIterator(&World); SquadIterator; ++SquadIterator)
 	{
 		const URTSComponent* SquadRTSComponent = IsValid(*SquadIterator) ? SquadIterator->GetRTSComponent() : nullptr;
 		if (IsValid(SquadRTSComponent) && SquadRTSComponent->GetOwningPlayer() == PlayerOwnedTeam)
 		{
-			PlayerSquad = *SquadIterator;
+			PlayerSquads.Add(*SquadIterator);
 		}
 	}
+	PlayerSquads.Sort([](const ASquadController& A, const ASquadController& B)
+	{
+		const FVector LocationA = A.GetActorLocation();
+		const FVector LocationB = B.GetActorLocation();
+		return LocationA.X != LocationB.X ? LocationA.X < LocationB.X : LocationA.Y < LocationB.Y;
+	});
+	const ASquadController* PlayerSquad = nullptr;
 	FVector BuiltTrenchStart = FVector::ZeroVector;
 	float BuiltTrenchNavmeshGap = TNumericLimits<float>::Max();
-	for (const FVector& Offset : BuiltTrenchOffsetsFromSquad)
+	for (const ASquadController* CandidateSquad : PlayerSquads)
 	{
-		if (not IsValid(PlayerSquad) ||
-			not TryProjectToNavigation(World, PlayerSquad->GetActorLocation() + Offset, BuiltTrenchStart))
+		for (const FVector& Offset : BuiltTrenchOffsetsFromSquad)
 		{
-			continue;
+			if (not TryProjectToNavigation(World, CandidateSquad->GetActorLocation() + Offset, BuiltTrenchStart))
+			{
+				continue;
+			}
+			BuiltTrenchNavmeshGap = GetWorstNavmeshToGroundGap(World, BuiltTrenchStart, FVector::RightVector, BuiltTrenchLength);
+			if (BuiltTrenchNavmeshGap <= MaximumNavmeshAboveGround)
+			{
+				PlayerSquad = CandidateSquad;
+				break;
+			}
 		}
-		BuiltTrenchNavmeshGap = GetWorstNavmeshToGroundGap(World, BuiltTrenchStart, FVector::RightVector, BuiltTrenchLength);
-		if (BuiltTrenchNavmeshGap <= MaximumNavmeshAboveGround)
+		if (IsValid(PlayerSquad))
 		{
 			break;
 		}

@@ -13,7 +13,8 @@ OUT="${2:-D:/UE5Projects/RTS_Survival/Saved/UnitPortraits}"
 shift; shift || true
 SKY_FILL="${SKY_FILL:-3}"
 EXPOSURE_BIAS="${EXPOSURE_BIAS:-1.0}"
-ENGINE="D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
+# UE_CMD picks another build, e.g. UnrealEditor-Win64-DebugGame-Cmd.exe while the user's editor locks the Development DLL.
+ENGINE="${UE_CMD:-D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe}"
 LOG="D:/UE5Projects/RTS_Survival/Saved/Logs/UnitPortraits.log"
 MSYS_NO_PATHCONV=1 "$ENGINE" "D:/UE5Projects/RTS_Survival/RTS_Survival.uproject" \
   /Game/RTS_Survival/Maps/AA_StartGameTutorial/RTS_GameStartTutorial \

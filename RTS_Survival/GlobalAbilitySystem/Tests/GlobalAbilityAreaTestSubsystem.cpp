@@ -298,6 +298,8 @@ void UGlobalAbilityAreaTestSubsystem::FinishPendingShaders() const
 
 void UGlobalAbilityAreaTestSubsystem::Capture(const FVector& Focus, const FString& Label) const
 {
+	// The capture rig is test code; without map tests this subsystem is never created.
+#if RTS_WITH_MAP_TESTS
 	using namespace GlobalAbilityAreaTestConstants;
 	UWorld* World = GetWorld();
 	if (not M_CaptureRig.GetIsEnabled() || not IsValid(World))
@@ -310,6 +312,7 @@ void UGlobalAbilityAreaTestSubsystem::Capture(const FVector& Focus, const FStrin
 	View.Location = Focus - ViewRotation.Vector() * CaptureDistanceCm;
 	View.LookAt = Focus;
 	M_CaptureRig.CaptureViews(*World, FTransform::Identity, {View}, Label);
+#endif
 }
 
 void UGlobalAbilityAreaTestSubsystem::CaptureEvery(const float IntervalSeconds, const FVector& Focus,
@@ -374,11 +377,13 @@ void UGlobalAbilityAreaTestSubsystem::TickWaitingForStart()
 	{
 		M_AircraftOfTheMap.Add(*It);
 	}
+#if RTS_WITH_MAP_TESTS
 	FString CaptureDirectory;
 	if (FParse::Value(FCommandLine::Get(), TEXT("GlobalAbilityAreaCapture="), CaptureDirectory))
 	{
 		M_CaptureRig.Init(*GetWorld(), CaptureDirectory);
 	}
+#endif
 	StartRecon();
 }
 

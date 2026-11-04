@@ -35,7 +35,8 @@ python publish_portraits.py ger_picks.txt D:/UE5Projects/RTS_Survival/Saved/Unit
 ```
 
 1. `run_capture.sh <list> <out folder>` runs `UnrealEditor-Cmd -game -RenderOffscreen` on the Development editor
-   target (build it first; the user's editor runs DebugGame, so there is no DLL lock). About 30 s per vehicle.
+   target (build it first). When the user's editor runs Development and locks its DLL, build DebugGame and set
+   `UE_CMD=.../UnrealEditor-Win64-DebugGame-Cmd.exe`. About 30 s per vehicle.
    Log: `Saved/Logs/UnitPortraits.log`, grep `RTS_PORTRAIT`.
 2. `crop_portraits.py` squares each picture on its `crops.csv` box and scales it to 256. `--sheet` writes a contact
    sheet per unit for picking; `--zoom` > 1 crops tighter.
