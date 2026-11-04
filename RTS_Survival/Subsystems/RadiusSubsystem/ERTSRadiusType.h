@@ -27,5 +27,6 @@ enum class ERTSRadiusType : uint8
 	FullCircle_TeamWeaponArc    UMETA(DisplayName="FullCircle_TeamWeaponArc"),
 	FullCircle_DifficultyRadius,
 	// Blast radius of a grenade on its fuse; fills up until it explodes.
-	FullCircle_GrenadeFuse      UMETA(DisplayName="FullCircle_GrenadeFuse")
+	FullCircle_GrenadeFuse      UMETA(DisplayName="FullCircle_GrenadeFuse"),
+	FullCircle_AmmoResupplyAura UMETA(DisplayName="FullCircle_AmmoResupplyAura")
 };

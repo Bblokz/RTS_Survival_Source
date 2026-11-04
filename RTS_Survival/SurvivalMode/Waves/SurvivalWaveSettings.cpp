@@ -268,6 +268,7 @@ void USurvivalWaveSettings::InitDefaultUnitPool()
 		MakeTank(ETankSubtype::Tank_T70, ETL::LightTanks, ER::LightTank, 1.5f, 25.f),
 		MakeTank(ETankSubtype::Tank_T70F, ETL::LightTanks, ER::LightTank, 1.f, 25.f),
 		MakeTank(ETankSubtype::Tank_SU_76, ETL::LightTanks, ER::TankDestroyer, 1.f, 25.f),
+		MakeTank(ETankSubtype::Tank_BTR152A, ETL::LightTanks, ER::AntiAir, 0.5f),
 		// Medium tanks.
 		MakeTank(ETankSubtype::Tank_T34_76, ETL::MediumTanks, ER::MediumTank, 3.f),
 		MakeTank(ETankSubtype::Tank_T28, ETL::MediumTanks, ER::MediumTank, 1.5f, 35.f),

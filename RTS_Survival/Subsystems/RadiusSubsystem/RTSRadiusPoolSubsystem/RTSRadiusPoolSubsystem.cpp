@@ -107,6 +107,7 @@ bool URTSRadiusPoolSubsystem::GetIsFullCircleRadiusType(const ERTSRadiusType Typ
 	case ERTSRadiusType::FullCircle_TeamWeaponArc:
 	case ERTSRadiusType::FullCircle_DifficultyRadius:
 	case ERTSRadiusType::FullCircle_GrenadeFuse:
+	case ERTSRadiusType::FullCircle_AmmoResupplyAura:
 		return true;
 	default:
 		return false;
