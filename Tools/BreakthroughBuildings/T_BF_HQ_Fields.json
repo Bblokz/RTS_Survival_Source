@@ -1,0 +1,10 @@
+{
+ "res": 1024,
+ "d_max_cm": 400.0,
+ "lamp_scale": 2.933348911651524,
+ "soot_rise_cm": 220.0,
+ "triangles": 7346,
+ "texels_inside": 471130,
+ "texels_filled": 538453,
+ "sources": "D:/UE5Projects/RTS_Survival/Saved/BF_HQ_Import/MI_BF_HQ_Concrete_sources.json"
+}
