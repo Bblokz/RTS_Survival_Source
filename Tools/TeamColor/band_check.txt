@@ -1,0 +1,7 @@
+# Tiger E and Panther G single-band keys (run_team_color_capture.sh).
+Warmup_Ger_Vehicle_TigerE=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/Tiger/Ger_Vehicle_TigerE.Ger_Vehicle_TigerE_C
+Warmup_Ger_Vehicle_PantherG=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherG/Ger_Vehicle_PantherG.Ger_Vehicle_PantherG_C
+Ger_Vehicle_TigerE_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/Tiger/Ger_Vehicle_TigerE.Ger_Vehicle_TigerE_C|TeamColor=0.8,0.02,0.02,1
+Ger_Vehicle_TigerE_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/Tiger/Ger_Vehicle_TigerE.Ger_Vehicle_TigerE_C|TeamColor=0.02,0.1,0.85,1
+Ger_Vehicle_PantherG_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherG/Ger_Vehicle_PantherG.Ger_Vehicle_PantherG_C|TeamColor=0.8,0.02,0.02,1
+Ger_Vehicle_PantherG_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherG/Ger_Vehicle_PantherG.Ger_Vehicle_PantherG_C|TeamColor=0.02,0.1,0.85,1
