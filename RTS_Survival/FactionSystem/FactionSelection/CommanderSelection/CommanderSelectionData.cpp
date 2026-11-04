@@ -77,9 +77,8 @@ namespace CommanderSelectionDataPrivate
 			                                              : nullptr;
 		if (not IsValid(AbilityTemplate))
 		{
+			// No description: the grey "?" icon and badge already mark the ability as not ready.
 			AbilitySlot.Title = MakePlaceholderTitle(Ability);
-			AbilitySlot.Description = NSLOCTEXT("CommanderSelection", "AbilityInDevelopment",
-			                                    "This ability is still being prepared for the front.");
 			return AbilitySlot;
 		}
 		AbilitySlot.bHasTemplate = true;

@@ -75,7 +75,8 @@ void UW_CommanderAbilityRow::BuildWidgetTree()
 		return;
 	}
 	UHorizontalBox* const RowBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	RowBox->SetVisibility(ESlateVisibility::HitTestInvisible);
+	// Not HitTestInvisible: the tier badge must take the hover for its tooltip.
+	RowBox->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 	WidgetTree->RootWidget = RowBox;
 	BuildIconWell(RowBox);
 	BuildTexts(RowBox);
@@ -135,6 +136,10 @@ UWidget* UW_CommanderAbilityRow::BuildTierBadge()
 	using namespace CommanderAbilityRowLayout;
 	USizeBox* const BadgeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 	BadgeBox->SetMinDesiredWidth(TierBadgeMinWidth);
+	BadgeBox->SetVisibility(ESlateVisibility::Visible);
+	BadgeBox->SetToolTipText(NSLOCTEXT("CommanderSelection", "TierTooltip",
+	                                   "Each operation sets the highest tier you may call in; abilities above it stay "
+	                                   "locked until a later operation."));
 	M_TierBadge = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
 	M_TierBadge->SetPadding(TierBadgePadding);
 	M_TierBadge->SetHorizontalAlignment(HAlign_Center);
@@ -173,6 +178,9 @@ void UW_CommanderAbilityRow::SetupRow(const FUnitVariantSelectionStyle& Style, U
 	M_DescriptionText->SetDefaultShadowOffset(UnitVariantSelectionWidgets::TextShadowOffset);
 	M_DescriptionText->SetDefaultShadowColorAndOpacity(UnitVariantSelectionWidgets::TextShadowColor);
 	M_DescriptionText->SetText(AbilitySlot.Description);
+	M_DescriptionText->SetVisibility(AbilitySlot.Description.IsEmpty()
+		                                 ? ESlateVisibility::Collapsed
+		                                 : ESlateVisibility::HitTestInvisible);
 }
 
 void UW_CommanderAbilityRow::ApplyIcon(const FCommanderSelectionAbilitySlot& AbilitySlot)

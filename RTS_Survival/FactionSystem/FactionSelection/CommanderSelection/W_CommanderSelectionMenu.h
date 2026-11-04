@@ -109,9 +109,6 @@ private:
 	TObjectPtr<UTextBlock> M_TitleText;
 
 	UPROPERTY()
-	TObjectPtr<UTextBlock> M_SubtitleText;
-
-	UPROPERTY()
 	TObjectPtr<UBorder> M_CommanderPanel;
 
 	UPROPERTY()
@@ -127,13 +124,7 @@ private:
 	TObjectPtr<UTextBlock> M_KitPanelTitle;
 
 	UPROPERTY()
-	TObjectPtr<UTextBlock> M_KitCountText;
-
-	UPROPERTY()
 	TObjectPtr<UVerticalBox> M_AbilityColumn;
-
-	UPROPERTY()
-	TObjectPtr<UTextBlock> M_FootnoteText;
 
 	UPROPERTY()
 	TObjectPtr<UBorder> M_PortraitFrame;
@@ -170,18 +161,16 @@ private:
 	void BuildButtons(UCanvasPanel* RootCanvas);
 
 	/**
-	 * @brief A side column: fixed size panel plate with a title and optional count in its header strip.
+	 * @brief A side column: fixed size panel plate with a title in its header strip.
 	 * @param RootCanvas The screen canvas the column goes on.
 	 * @param PanelSize Drawn size the panel instance was made for.
 	 * @param OutPanelSlot Receives the canvas slot, so the caller anchors the column.
 	 * @param OutTitleText Receives the title text block (left of the strip).
-	 * @param OutCountText Receives the count text block (right of the strip).
 	 * @param OutPanelPlate Receives the plate, so ApplyStyle can set its brush.
 	 * @return The overlay to put the body in, under the header strip.
 	 */
 	UOverlay* BuildSidePanel(UCanvasPanel* RootCanvas, const FVector2D& PanelSize, UCanvasPanelSlot*& OutPanelSlot,
-	                         TObjectPtr<UTextBlock>& OutTitleText, TObjectPtr<UTextBlock>& OutCountText,
-	                         TObjectPtr<UBorder>& OutPanelPlate);
+	                         TObjectPtr<UTextBlock>& OutTitleText, TObjectPtr<UBorder>& OutPanelPlate);
 
 	void ApplyStyle();
 	void LoadAbilityData();

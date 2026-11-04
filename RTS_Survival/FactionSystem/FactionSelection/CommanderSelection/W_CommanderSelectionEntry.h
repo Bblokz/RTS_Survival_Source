@@ -32,7 +32,7 @@ public:
 	 * @param Menu Receives the click.
 	 * @param EntryIndex Index of the commander in the menu's list.
 	 * @param Style Brushes, fonts and colours of the selection screens.
-	 * @param CommanderEntry Title and kit; the kit's tiers become the detail line.
+	 * @param CommanderEntry Supplies the title.
 	 */
 	void SetupEntry(UW_CommanderSelectionMenu* Menu, const int32 EntryIndex, const FUnitVariantSelectionStyle& Style,
 	                const FCommanderSelectionEntryData& CommanderEntry);
@@ -61,9 +61,6 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_TitleText;
 
-	UPROPERTY()
-	TObjectPtr<UTextBlock> M_KitTiersText;
-
 	// Copied from the menu so selection can swap the button style, the well and the text colours.
 	UPROPERTY()
 	FUnitVariantSelectionStyle M_Style;
@@ -73,11 +70,8 @@ private:
 
 	void BuildWidgetTree();
 	void BuildPortraitWell(UOverlay* EntryOverlay);
-	void BuildTexts(UOverlay* EntryOverlay);
+	void BuildTitle(UOverlay* EntryOverlay);
 	void ApplySelectionLook();
-
-	/** @return The kit's tiers in slot order, e.g. "TIERS  I · I · II · III · III · IV". */
-	static FText MakeKitTiersText(const FCommanderSelectionEntryData& CommanderEntry);
 
 	UFUNCTION()
 	void OnEntryClicked();

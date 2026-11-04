@@ -38,18 +38,15 @@ namespace CommanderSelectionLayout
 	constexpr float HeaderTop = 24.f;
 	const FVector2D HeaderSize(640.f, 80.f);
 	const FMargin HeaderPadding(40.f, 4.f, 40.f, 12.f);
-	const FMargin SubtitlePadding(0.f, 2.f, 0.f, 0.f);
 	constexpr float PanelTop = 120.f;
 	const FVector2D CommanderPanelSize(392.f, 848.f);
 	const FVector2D KitPanelSize(480.f, 848.f);
 	constexpr float PanelHeaderHeight = 52.f;
 	const FMargin PanelTitlePadding(32.f, 0.f, 0.f, 0.f);
-	const FMargin PanelCountPadding(0.f, 0.f, 24.f, 0.f);
 	const FMargin CommanderListPadding(20.f, 64.f, 20.f, 20.f);
 	const FMargin AbilityColumnPadding(20.f, 68.f, 20.f, 20.f);
 	constexpr float EntrySpacing = 6.f;
 	constexpr float AbilityRowSpacing = 10.f;
-	const FMargin FootnotePadding(0.f, 8.f, 0.f, 0.f);
 	// The centre column sits between the two side columns: (432 + 1400) / 2 is 44 left of the screen centre.
 	constexpr float CentreColumnOffsetX = -44.f;
 	const FVector2D PortraitSize(432.f, 540.f);
@@ -62,12 +59,8 @@ namespace CommanderSelectionLayout
 	const FVector2D ConfirmButtonSize(280.f, 48.f);
 	constexpr int32 TitleFontSize = 28;
 	constexpr int32 TitleLetterSpacing = 150;
-	constexpr int32 SubtitleFontSize = 15;
-	constexpr int32 SubtitleLetterSpacing = 100;
 	constexpr int32 PanelTitleFontSize = 18;
 	constexpr int32 PanelTitleLetterSpacing = 100;
-	constexpr int32 PanelCountFontSize = 13;
-	constexpr int32 FootnoteFontSize = 13;
 	constexpr int32 CommanderNameFontSize = 26;
 	constexpr int32 CommanderNameLetterSpacing = 120;
 	constexpr int32 CommanderDescriptionFontSize = 16;
@@ -136,29 +129,21 @@ void UW_CommanderSelectionMenu::BuildHeader(UCanvasPanel* RootCanvas)
 	M_HeaderPlate = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
 	M_HeaderPlate->SetPadding(HeaderPadding);
 	M_HeaderPlate->SetHorizontalAlignment(HAlign_Center);
-	M_HeaderPlate->SetVerticalAlignment(VAlign_Top);
+	M_HeaderPlate->SetVerticalAlignment(VAlign_Center);
 	UCanvasPanelSlot* const HeaderSlot = RootCanvas->AddChildToCanvas(M_HeaderPlate);
 	HeaderSlot->SetAnchors(FAnchors(0.5f, 0.f));
 	HeaderSlot->SetAlignment(FVector2D(0.5f, 0.f));
 	HeaderSlot->SetPosition(FVector2D(0.f, HeaderTop));
 	HeaderSlot->SetSize(HeaderSize);
 
-	UVerticalBox* const HeaderColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	M_HeaderPlate->SetContent(HeaderColumn);
 	M_TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	M_TitleText->SetText(NSLOCTEXT("CommanderSelection", "Title", "COMMANDER"));
-	HeaderColumn->AddChildToVerticalBox(M_TitleText)->SetHorizontalAlignment(HAlign_Center);
-	M_SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	M_SubtitleText->SetText(NSLOCTEXT("CommanderSelection", "Subtitle", "CHOOSE WHO SUPPORTS YOUR OPERATION"));
-	UVerticalBoxSlot* const SubtitleSlot = HeaderColumn->AddChildToVerticalBox(M_SubtitleText);
-	SubtitleSlot->SetHorizontalAlignment(HAlign_Center);
-	SubtitleSlot->SetPadding(SubtitlePadding);
+	M_HeaderPlate->SetContent(M_TitleText);
 }
 
 UOverlay* UW_CommanderSelectionMenu::BuildSidePanel(UCanvasPanel* RootCanvas, const FVector2D& PanelSize,
                                                     UCanvasPanelSlot*& OutPanelSlot,
                                                     TObjectPtr<UTextBlock>& OutTitleText,
-                                                    TObjectPtr<UTextBlock>& OutCountText,
                                                     TObjectPtr<UBorder>& OutPanelPlate)
 {
 	using namespace CommanderSelectionLayout;
@@ -187,10 +172,6 @@ UOverlay* UW_CommanderSelectionMenu::BuildSidePanel(UCanvasPanel* RootCanvas, co
 	TitleSlot->SetVerticalAlignment(VAlign_Center);
 	TitleSlot->SetPadding(PanelTitlePadding);
 	TitleSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-	OutCountText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	UHorizontalBoxSlot* const CountSlot = HeaderRow->AddChildToHorizontalBox(OutCountText);
-	CountSlot->SetVerticalAlignment(VAlign_Center);
-	CountSlot->SetPadding(PanelCountPadding);
 	return PanelOverlay;
 }
 
@@ -198,13 +179,11 @@ void UW_CommanderSelectionMenu::BuildCommanderPanel(UCanvasPanel* RootCanvas)
 {
 	using namespace CommanderSelectionLayout;
 	UCanvasPanelSlot* PanelSlot = nullptr;
-	TObjectPtr<UTextBlock> PanelCount;
 	UOverlay* const PanelOverlay = BuildSidePanel(RootCanvas, CommanderPanelSize, PanelSlot, M_CommanderPanelTitle,
-	                                              PanelCount, M_CommanderPanel);
+	                                              M_CommanderPanel);
 	PanelSlot->SetAnchors(FAnchors(0.f, 0.f));
 	PanelSlot->SetPosition(FVector2D(ScreenMargin, PanelTop));
-	// The list needs no count; its title sits centred in the header strip.
-	PanelCount->SetVisibility(ESlateVisibility::Collapsed);
+	// The list's title sits centred in the header strip.
 	if (UHorizontalBoxSlot* const TitleSlot = Cast<UHorizontalBoxSlot>(M_CommanderPanelTitle->Slot))
 	{
 		TitleSlot->SetHorizontalAlignment(HAlign_Center);
@@ -223,32 +202,20 @@ void UW_CommanderSelectionMenu::BuildKitPanel(UCanvasPanel* RootCanvas)
 {
 	using namespace CommanderSelectionLayout;
 	UCanvasPanelSlot* PanelSlot = nullptr;
-	UOverlay* const PanelOverlay = BuildSidePanel(RootCanvas, KitPanelSize, PanelSlot, M_KitPanelTitle,
-	                                              M_KitCountText, M_KitPanel);
+	UOverlay* const PanelOverlay = BuildSidePanel(RootCanvas, KitPanelSize, PanelSlot, M_KitPanelTitle, M_KitPanel);
 	PanelSlot->SetAnchors(FAnchors(1.f, 0.f));
 	PanelSlot->SetAlignment(FVector2D(1.f, 0.f));
 	PanelSlot->SetPosition(FVector2D(-ScreenMargin, PanelTop));
 	M_KitPanelTitle->SetText(NSLOCTEXT("CommanderSelection", "KitTitle", "GLOBAL ABILITIES"));
 
-	UVerticalBox* const Body = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	UOverlaySlot* const BodySlot = PanelOverlay->AddChildToOverlay(Body);
-	BodySlot->SetHorizontalAlignment(HAlign_Fill);
-	BodySlot->SetVerticalAlignment(VAlign_Fill);
-	BodySlot->SetPadding(AbilityColumnPadding);
-	// Takes the height the footnote leaves; its scroll bar only shows once long descriptions need more.
+	// Its scroll bar only shows once long descriptions need more than the panel's height.
 	UScrollBox* const AbilityScrollBox = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
-	Body->AddChildToVerticalBox(AbilityScrollBox)->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+	UOverlaySlot* const ScrollSlot = PanelOverlay->AddChildToOverlay(AbilityScrollBox);
+	ScrollSlot->SetHorizontalAlignment(HAlign_Fill);
+	ScrollSlot->SetVerticalAlignment(VAlign_Fill);
+	ScrollSlot->SetPadding(AbilityColumnPadding);
 	M_AbilityColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	AbilityScrollBox->AddChild(M_AbilityColumn);
-	M_FootnoteText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	M_FootnoteText->SetText(NSLOCTEXT("CommanderSelection", "Footnote",
-	                                  "Each operation sets the highest tier you may call in; abilities above it stay "
-	                                  "locked until a later operation."));
-	M_FootnoteText->SetAutoWrapText(true);
-	M_FootnoteText->SetJustification(ETextJustify::Center);
-	UVerticalBoxSlot* const FootnoteSlot = Body->AddChildToVerticalBox(M_FootnoteText);
-	FootnoteSlot->SetHorizontalAlignment(HAlign_Fill);
-	FootnoteSlot->SetPadding(FootnotePadding);
 }
 
 void UW_CommanderSelectionMenu::BuildPortrait(UCanvasPanel* RootCanvas)
@@ -361,13 +328,8 @@ void UW_CommanderSelectionMenu::ApplyStyle()
 
 	const FSlateFontInfo PanelTitleFont = MakeFont(M_Style.HeadingFont, PanelTitleFontSize, PanelTitleLetterSpacing);
 	ApplyTextOnMetal(M_TitleText, MakeFont(M_Style.HeadingFont, TitleFontSize, TitleLetterSpacing), M_Style.TextColor);
-	ApplyTextOnMetal(M_SubtitleText, MakeFont(M_Style.HeadingFont, SubtitleFontSize, SubtitleLetterSpacing),
-	                 M_Style.AccentColor);
 	ApplyTextOnMetal(M_CommanderPanelTitle, PanelTitleFont, M_Style.TextColor);
 	ApplyTextOnMetal(M_KitPanelTitle, PanelTitleFont, M_Style.TextColor);
-	ApplyTextOnMetal(M_KitCountText, MakeFont(M_Style.BodyFont, PanelCountFontSize, PanelTitleLetterSpacing),
-	                 M_Style.MutedTextColor);
-	ApplyTextOnMetal(M_FootnoteText, MakeFont(M_Style.BodyFont, FootnoteFontSize), M_Style.MutedTextColor);
 	ApplyTextOnMetal(M_PortraitPendingText, MakeFont(M_Style.HeadingFont, PortraitPendingFontSize,
 	                                                 PanelTitleLetterSpacing), M_Style.MutedTextColor);
 	ApplyTextOnMetal(M_CommanderNameText, MakeFont(M_Style.HeadingFont, CommanderNameFontSize,
@@ -529,8 +491,6 @@ void UW_CommanderSelectionMenu::SelectEntry(const int32 EntryIndex)
 	const FCommanderSelectionEntryData& Commander = M_Commanders[EntryIndex];
 	M_CommanderNameText->SetText(Commander.Title.ToUpper());
 	M_CommanderDescriptionText->SetText(Commander.Description);
-	M_KitCountText->SetText(FText::Format(NSLOCTEXT("CommanderSelection", "KitCount", "{0} ABILITIES"),
-	                                      FText::AsNumber(Commander.AbilitySlots.Num())));
 	RefreshPortrait();
 	RebuildAbilityRows();
 }
