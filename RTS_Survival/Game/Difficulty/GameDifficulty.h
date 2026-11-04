@@ -15,6 +15,14 @@ enum class ERTSGameDifficulty : uint8
 	Ironman
 };
 
+// Picked beside the difficulty; Arcade gives armored vehicles their health from before the 2026-11-03 lethality pass.
+UENUM(BlueprintType)
+enum class ERTSVehicleBalance : uint8
+{
+	Realistic,
+	Arcade
+};
+
 USTRUCT(Blueprintable)
 struct FRTSGameDifficulty
 {

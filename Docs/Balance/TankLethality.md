@@ -41,8 +41,8 @@ side, turret rear as rear, and the combined sides-and-rear turret plate as side 
 
 Other changes that go with it, in `Game/GameState/CPPGameState.cpp`:
 
-- T-34/85 health is trimmed by `T34_85BreakpointTrim` (15) to 660, so three Pz IV 75mm hits (3 × 221.4 = 664) still
-  kill it. Without the trim it would be 675 and need four.
+- T-34/85 health is trimmed by `T34_85BreakpointTrim` (15, in `DeveloperSettings.h`) to 660, so three Pz IV 75mm
+  hits (3 × 221.4 = 664) still kill it. Without the trim it would be 675 and need four.
 - Four units derive their experience worth from `MediumTankHealthBase` (T-34/85, T-34/100 and the two units that set
   `ExperienceWorth = MediumTankHealthBase` / `* 2`). These now divide by `VehicleHealthMlt`, so their experience worth
   stays as before.
@@ -52,7 +52,7 @@ Other changes that go with it, in `Game/GameState/CPPGameState.cpp`:
 - Anything that damages vehicles now kills them sooner: mines, AT infantry, artillery, aircraft rockets and bombs,
   fire, and radiation. Fire thresholds scale with max health, so vehicles also start burning from smaller fires.
 
-### 3. Flanking hits can detonate the ammunition
+### 3. Flanking hits can detonate the ammunition (Realistic only since 2026-11-04)
 
 When a kinetic shell of 75 mm or more penetrates a tank's side or rear, there is a chance that the ammunition detonates
 and the tank dies from that hit. It plays the existing cook-off death, including the turret toss and the cook-off
@@ -88,6 +88,65 @@ The front engine chance of 1.00 was a test value; the main front plate now threa
 glacis (upper 0.15, lower 0.35). `RTS.VehicleModules.AmmoCookOffChance` checks the cook-off numbers, and
 `RTS.VehicleModules.FrontPlateModuleRules` checks the front plate stays below both glacis plates.
 
+### 5. Arcade or realistic vehicle balance (2026-11-04)
+
+Players choose the vehicle balance in a column beside the difficulty buttons (both the mission picker and the faction
+campaign picker). **Realistic** is everything above plus overmatch kills (part 6). **Arcade** (the default) plays like
+before this pass, except for the side/rear damage multipliers and the front engine fix, which apply in both:
+
+| | Arcade | Realistic |
+|---|---|---|
+| Armored vehicle health | as before (`VehicleHealthMlt` undone) | ×0.75 |
+| Side ×1.5 / rear ×2 penetration damage | yes | yes |
+| Flank ammo detonation (part 3) | no | yes |
+| Module ammo cook-off (damaged / destroyed rack) | 10% / 20% | 15% / 25% |
+| Overmatch kills (part 6) | no | yes |
+
+- The choice lives on the game instance (`URTSGameInstance::Get/SetVehicleBalance`); it survives map loads and
+  restarts but not a game relaunch. For PIE, set `Vehicle Balance` in Project Settings > Game > RTS PIE Startup.
+- The tank data maps are built for Realistic. `ACPPGameState::SetVehicleBalance` rescales `MaxHealth` and the fire
+  threshold of every entry with `FTankData::bScalesWithVehicleBalance` (trains are excluded). It runs from
+  `PostInitializeComponents`, before level actors begin play. When the in-mission picker changes it after placed
+  vehicles began play, those vehicles get `SetMaxHealth` and keep their health percentage.
+- Fixed amounts a vehicle adds to its base (`FixedVehicleHealthOffsets` in `DeveloperSettings.h`, e.g. Brumbär
+  +400) are kept out of the rescale, and Arcade drops the T-34/85 trim, so Arcade values match the old ones
+  (T-34/85 900, Tiger 1200, Brumbär 1120). Entries rounded after a multiplier (e.g. SU-76) can differ by a few HP.
+- A new offset on a vehicle base must be added to `FixedVehicleHealthOffsets` and
+  `VehicleBalanceHealth::GetFixedHealthOffset` in `CPPGameState.cpp`, or Arcade scales it too.
+- Gameplay code asks `ACPPGameState::GetIsRealisticVehicleBalance(WorldContext)`; without a game state it says Arcade.
+
+### 6. Overmatch: big guns crush the armor (Realistic only, 2026-11-04)
+
+A kinetic penetration destroys the vehicle in one hit and shows **ARMOR DESTROYED!!** (the red of "HE destroyed
+armor!!") when both hold:
+
+- pen at impact ≥ `OvermatchPenToEffectiveArmorRatio` (1.5) × the effective, angled armor, and
+- shell damage ≥ `OvermatchMinDamageShareOfMaxHealth` (45%) × the target's max health.
+
+The values live in `ArmorAndModules` in `DeveloperSettings.h`; the check is `AProjectile::GetIsArmorOvermatched`, called
+from `GetKineticPenDamageMlt`. The pen ratio alone can't separate the Pz IV's long 75 (about 1.6 against a T-34 front)
+from the Tiger's 88 (about 1.8); the damage share does, and it scales with vehicle class without a gun list:
+
+| Shooter → target (front) | Damage / health | Overmatch |
+|---|---|---|
+| Tiger 88 → T-34/76 | 56% | yes |
+| Tiger 88 → T-34/85 | 46% | yes |
+| Panther L70 → T-34/76 | 57% | yes |
+| Pz IV long 75 → T-34/76 | 41% | no |
+| T-34/76 → Pz IV H | 43% | no |
+| T-34/85 → Pz IV H | 48% | yes |
+| Tiger 88 → Tiger | 33% | no |
+| IS-2 122 → Tiger | 67% | yes |
+| Any medium gun → light tank | 80%+ | yes |
+
+The margins are a few percent (43% vs 46%), so a later gun damage or vehicle health change can flip a matchup;
+`RTS.Balance.VehicleBalance.Overmatch` pins this table.
+
+How the tank dies (`AProjectile::StartOvermatchDeath`): through a front plate, half the kills play the regular death
+(`OvermatchRegularDeathChance`), a quarter an ammo detonation with turret toss (`ATankMaster::StartAmmoDetonation`) and
+a quarter a fuel explosion (`ATankMaster::StartFuelDetonation`, which starts the engine fire). A tank with that effect
+turned off plays the regular death. Side and rear overmatch kills always play the regular death.
+
 ## Expected results
 
 Shots to kill, with time to kill in brackets (first round loaded, then one reload per shot). This assumes every shot
@@ -120,9 +179,10 @@ Each part can be undone on its own. Rebuild the editor after any change; no Blue
 | To undo | Change |
 |---|---|
 | 1. Side/rear damage | In `DeveloperSettings.h`, set all three `PlateTypeToKineticPenDamageMlt` values to `1.f`. |
-| 2. Vehicle health | In `DeveloperSettings.h`, set `VehicleHealthMlt` to `1.f`. In `CPPGameState.cpp`, set `T34_85BreakpointTrim` to `0.f` (otherwise the T-34/85 has 885 instead of 900, and four Pz IV hits still kill it). The experience-worth lines can stay: dividing by 1 changes nothing. |
+| 2. Vehicle health | Players can already pick Arcade beside the difficulty. To make it the only behaviour: in `DeveloperSettings.h`, set `VehicleHealthMlt` to `1.f` and `T34_85BreakpointTrim` to `0.f` (otherwise the T-34/85 has 885 instead of 900, and four Pz IV hits still kill it). With a multiplier of 1 the two balance options are identical. The experience-worth lines can stay: dividing by 1 changes nothing. |
 | 3. Ammo detonation | In `DeveloperSettings.h`, set all three `PlateTypeToAmmoDetonationChance` values to `0.f`. |
-| 4. Module follow-up | In `VehicleModuleBalance.h`, set the cook-off chances back to `0.1f` / `0.2f` and update the two values in `RTS.VehicleModules.AmmoCookOffChance`. Leave the front engine chance at `0.10f`: 1.00 was a test value. |
+| 4. Module follow-up | Arcade already uses the old 10% / 20% cook-off odds. To drop the raise from Realistic too, set `AmmoCookOffDamagedAmmoChance` / `AmmoCookOffDestroyedAmmoChance` in `VehicleModuleBalance.h` back to `0.1f` / `0.2f` and update `RTS.VehicleModules.AmmoCookOffChance`. Leave the front engine chance at `0.10f`: 1.00 was a test value. |
+| 6. Overmatch | In `DeveloperSettings.h`, set `OvermatchMinDamageShareOfMaxHealth` to `100.f` (no shell deals a hundred health bars) and update `RTS.Balance.VehicleBalance.Overmatch`. |
 
 For a full code revert instead, undo these edits:
 

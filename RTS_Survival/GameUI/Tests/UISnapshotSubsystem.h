@@ -92,6 +92,9 @@ private:
 	void ExportMinimapTerrain() const;
 	// Maps that open on a difficulty picker (the game start tutorial) wait for it; picks Normal.
 	void DismissDifficultyPicker() const;
+	// With -UISnapshotKeepDifficultyPicker, opens the mission picker once on maps that have none, so it can be captured.
+	void ShowDifficultyPickerOnce() const;
+	mutable bool bM_HasShownDifficultyPicker = false;
 	// With -UISnapshotEnergyPreview the energy bar is held at a fixed fill so its look can be reviewed.
 	void HoldEnergyPreview() const;
 	// -UISnapshotHoverPortrait / -UISnapshotHoverAction / -UISnapshotHoverTraining hover the portrait, first action button or first training item.

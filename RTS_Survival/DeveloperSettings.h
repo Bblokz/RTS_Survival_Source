@@ -1165,8 +1165,8 @@ namespace DeveloperSettings
 					{EArmorPlateDamageType::DamageRear, 2.f}
 				};
 
-				// Chance that a kinetic penetration through this side detonates the ammunition and kills the tank outright
-				// (cook-off death with turret toss). Rollback: set all three to 0.
+				// Realistic vehicle balance only: chance that a kinetic penetration through this side detonates the
+				// ammunition and kills the tank outright (cook-off death with turret toss). Rollback: set all three to 0.
 				inline TMap<EArmorPlateDamageType, float> PlateTypeToAmmoDetonationChance =
 				{
 					{EArmorPlateDamageType::DamageFront, 0.f},
@@ -1175,6 +1175,17 @@ namespace DeveloperSettings
 				};
 				// Smaller guns can still penetrate a rear plate but do not detonate ammunition.
 				inline constexpr float AmmoDetonationMinCalibreMm = 75.f;
+
+				// Realistic vehicle balance only: a kinetic penetration "crushes" the armor and destroys the vehicle in
+				// one hit when its pen at impact is at least this many times the effective (angled) armor...
+				inline constexpr float OvermatchPenToEffectiveArmorRatio = 1.5f;
+				// ...and its shell damage is at least this share of the target's max health. This keeps the Pz IV's
+				// long 75 (41% of a T-34/76) out while the Tiger's 88 (56%) and the Panther's L70 (57%) qualify.
+				inline constexpr float OvermatchMinDamageShareOfMaxHealth = 0.45f;
+				// Front overmatch kills play the regular death this often; the rest split evenly between an ammo
+				// detonation (turret toss) and a fuel explosion. Side and rear overmatch kills always play the regular
+				// death.
+				inline constexpr float OvermatchRegularDeathChance = 0.5f;
 			}
 
 			inline constexpr float DamagePerMM = 1.2;
@@ -1360,6 +1371,23 @@ namespace DeveloperSettings
 			// See Docs/Balance/TankLethality.md.
 			inline constexpr float VehicleHealthMlt = 0.75f;
 			inline constexpr float VehicleHealthScale = OverallHealthMlt * VehicleHealthMlt;
+			// Realistic T-34/85 sits this far under the medium step so three Pz IV 75mm hits (3 x 221.4) still kill it.
+			// Arcade vehicle balance adds it back so the T-34/85 returns to its old 900.
+			inline constexpr float T34_85BreakpointTrim = 15.f;
+			// Fixed amounts some vehicles add to their base; VehicleHealthMlt does not scale them, so the arcade
+			// vehicle balance takes them out before undoing the multiplier.
+			namespace FixedVehicleHealthOffsets
+			{
+				inline constexpr float Sdkfz251 = 150.f;
+				inline constexpr float Sdkfz251PzIV = 50.f;
+				inline constexpr float BT7 = -50.f;
+				inline constexpr float MS1 = -75.f;
+				inline constexpr float T70 = 25.f;
+				inline constexpr float PzIIIAA = 50.f;
+				inline constexpr float PzIVF1 = -150.f;
+				inline constexpr float Brumbar = 400.f;
+				inline constexpr float SturmTiger = 400.f;
+			}
 
 			// One light tank shot on avg in hp points.
 			inline constexpr float OneLightTankShotHp = RoundToNearestMultipleOfFive(100.f * VehicleHealthScale);

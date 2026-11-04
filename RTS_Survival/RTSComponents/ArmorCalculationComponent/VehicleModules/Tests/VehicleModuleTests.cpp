@@ -446,9 +446,12 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleAmmoCookOffChanceTest, "RTS.VehicleModu
 bool FVehicleAmmoCookOffChanceTest::RunTest(const FString& Parameters)
 {
 	using VehicleModuleBalance::AmmoCookOff::GetChance;
-	TestEqual(TEXT("Damaged ammo cook-off chance"), GetChance(EVehicleModuleState::Damaged), 0.15f);
-	TestEqual(TEXT("Destroyed ammo cook-off chance"), GetChance(EVehicleModuleState::Destroyed), 0.25f);
-	TestEqual(TEXT("Healthy ammo cannot cook off"), GetChance(EVehicleModuleState::Healthy), 0.f);
+	constexpr bool bRealistic = true;
+	TestEqual(TEXT("Realistic damaged ammo cook-off chance"), GetChance(EVehicleModuleState::Damaged, bRealistic), 0.15f);
+	TestEqual(TEXT("Realistic destroyed ammo cook-off chance"), GetChance(EVehicleModuleState::Destroyed, bRealistic), 0.25f);
+	TestEqual(TEXT("Arcade damaged ammo cook-off chance"), GetChance(EVehicleModuleState::Damaged, not bRealistic), 0.1f);
+	TestEqual(TEXT("Arcade destroyed ammo cook-off chance"), GetChance(EVehicleModuleState::Destroyed, not bRealistic), 0.2f);
+	TestEqual(TEXT("Healthy ammo cannot cook off"), GetChance(EVehicleModuleState::Healthy, bRealistic), 0.f);
 	return true;
 }
 
@@ -578,9 +581,18 @@ bool FVehicleFrontEngineDamageTest::RunTest(const FString& Parameters)
 	constexpr float ProjectileBaseDamage = 400.f;
 	constexpr float EffectiveArmor = 20.f;
 	constexpr float ProjectileCalibreMm = 75.f;
-	Fixture.Armor->CalculateModuleDamage(EArmorPlate::Plate_Front, EffectiveArmor, true,
-	                                     ProjectileBaseDamage, ProjectileBaseDamage, ProjectileCalibreMm);
-	TestTrue(TEXT("Penetrating front hit damages the only installed engine"),
+	// The front plate only rolls the engine about one hit in ten; 200 hits all missing is below one in a billion.
+	constexpr int32 MaxFrontHits = 200;
+	for (int32 HitIndex = 0; HitIndex < MaxFrontHits; ++HitIndex)
+	{
+		Fixture.Armor->CalculateModuleDamage(EArmorPlate::Plate_Front, EffectiveArmor, true,
+		                                     ProjectileBaseDamage, ProjectileBaseDamage, ProjectileCalibreMm);
+		if (Fixture.Armor->GetModuleSnapshot(EngineModuleId).CurrentHp < EngineMaxHp)
+		{
+			break;
+		}
+	}
+	TestTrue(TEXT("Penetrating front hits can damage the only installed engine"),
 	         Fixture.Armor->GetModuleSnapshot(EngineModuleId).CurrentHp < EngineMaxHp);
 	return true;
 }

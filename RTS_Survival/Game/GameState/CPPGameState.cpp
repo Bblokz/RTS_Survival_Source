@@ -3,6 +3,9 @@
 #include "CPPGameState.h"
 
 #include "AI/NavigationSystemBase.h"
+#include "EngineUtils.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 // used in distance calculation
 
 
@@ -571,6 +574,130 @@ void ACPPGameState::PostInitializeComponents()
 	InitExplMgrOnSubsystem();
 	InitDecalMgrOnSubSystem();
 	PostInitializeComponents_SetupNomadicTrainingOptionsByFaction();
+	PostInitializeComponents_ApplyVehicleBalance();
+}
+
+void ACPPGameState::PostInitializeComponents_ApplyVehicleBalance()
+{
+	const URTSGameInstance* const GameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (not IsValid(GameInstance))
+	{
+		return;
+	}
+	SetVehicleBalance(GameInstance->GetVehicleBalance());
+}
+
+bool ACPPGameState::GetIsRealisticVehicleBalance(const UObject* WorldContextObject)
+{
+	const UWorld* const World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
+	const ACPPGameState* const GameState = IsValid(World) ? World->GetGameState<ACPPGameState>() : nullptr;
+	return IsValid(GameState) && GameState->GetVehicleBalance() == ERTSVehicleBalance::Realistic;
+}
+
+void ACPPGameState::SetVehicleBalance(const ERTSVehicleBalance NewVehicleBalance)
+{
+	if (NewVehicleBalance == M_AppliedVehicleBalance)
+	{
+		return;
+	}
+	ScaleTankDataHealthToVehicleBalance(M_TPlayerTankDataHashMap, NewVehicleBalance);
+	ScaleTankDataHealthToVehicleBalance(M_TEnemyTankDataHashMap, NewVehicleBalance);
+	M_AppliedVehicleBalance = NewVehicleBalance;
+	ApplyTankDataHealthToLiveVehicles();
+}
+
+namespace VehicleBalanceHealth
+{
+	/** @return The fixed health this subtype adds to its base, which VehicleHealthMlt never scaled. */
+	float GetFixedHealthOffset(const ETankSubtype TankSubtype)
+	{
+		using namespace DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets;
+		switch (TankSubtype)
+		{
+		case ETankSubtype::Tank_Sdkfz251_22:
+		case ETankSubtype::Tank_Sdkfz251_Mortar:
+		case ETankSubtype::Tank_Sdkfz251_Transport:
+			return Sdkfz251;
+		case ETankSubtype::Tank_Sdkfz251_PZIV:
+			return Sdkfz251PzIV;
+		case ETankSubtype::Tank_BT7:
+			return BT7;
+		case ETankSubtype::Tank_MS1:
+			return MS1;
+		case ETankSubtype::Tank_T70:
+		case ETankSubtype::Tank_T70F:
+			return T70;
+		case ETankSubtype::Tank_PzIII_AA:
+			return PzIIIAA;
+		case ETankSubtype::Tank_PzIV_F1:
+			return PzIVF1;
+		case ETankSubtype::Tank_Brumbar:
+			return Brumbar;
+		case ETankSubtype::Tank_SturmTiger:
+			return SturmTiger;
+		default:
+			return 0.f;
+		}
+	}
+}
+
+void ACPPGameState::ScaleTankDataHealthToVehicleBalance(TMap<ETankSubtype, FTankData>& TankDataMap,
+                                                        const ERTSVehicleBalance NewVehicleBalance) const
+{
+	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	const bool bToArcade = NewVehicleBalance == ERTSVehicleBalance::Arcade;
+	const float HealthScale = bToArcade ? 1.f / VehicleHealthMlt : VehicleHealthMlt;
+	for (TPair<ETankSubtype, FTankData>& TankDataPair : TankDataMap)
+	{
+		FTankData& TankData = TankDataPair.Value;
+		if (not TankData.bScalesWithVehicleBalance)
+		{
+			continue;
+		}
+		const float FixedOffset = VehicleBalanceHealth::GetFixedHealthOffset(TankDataPair.Key);
+		// Arcade restores the T-34/85's untrimmed medium step; its trim only exists for the realistic breakpoint.
+		const float BreakpointTrim = TankDataPair.Key == ETankSubtype::Tank_T34_85 ? T34_85BreakpointTrim : 0.f;
+		const float NewMaxHealth = bToArcade
+			                           ? (TankData.MaxHealth - FixedOffset + BreakpointTrim) * HealthScale + FixedOffset
+			                           : (TankData.MaxHealth - FixedOffset) * HealthScale + FixedOffset - BreakpointTrim;
+		const float HealthRatio = NewMaxHealth / FMath::Max(TankData.MaxHealth, KINDA_SMALL_NUMBER);
+		TankData.MaxHealth = NewMaxHealth;
+		TankData.ResistancesAndDamageMlt.FireResistanceData.MaxFireThreshold *= HealthRatio;
+	}
+}
+
+void ACPPGameState::ApplyTankDataHealthToLiveVehicles() const
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	for (TActorIterator<ATankMaster> TankIterator(World); TankIterator; ++TankIterator)
+	{
+		ATankMaster* const Tank = *TankIterator;
+		// Tanks that have not begun play read the scaled data themselves.
+		if (not IsValid(Tank) || not Tank->HasActorBegunPlay() || not Tank->IsUnitAlive())
+		{
+			continue;
+		}
+		URTSComponent* const RTSComponent = Tank->GetRTSComponent();
+		UHealthComponent* const HealthComponent = Tank->GetHealthComponent();
+		if (not IsValid(RTSComponent) || not IsValid(HealthComponent)
+			|| RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic)
+		{
+			continue;
+		}
+		const TMap<ETankSubtype, FTankData>& TankDataMap = RTSComponent->GetOwningPlayer() == 1
+			                                                    ? M_TPlayerTankDataHashMap
+			                                                    : M_TEnemyTankDataHashMap;
+		const FTankData* const TankData = TankDataMap.Find(RTSComponent->GetSubtypeAsTankSubtype());
+		if (TankData == nullptr || not TankData->bScalesWithVehicleBalance)
+		{
+			continue;
+		}
+		HealthComponent->SetMaxHealth(TankData->MaxHealth);
+	}
 }
 
 void ACPPGameState::PostInitializeComponents_SetupNomadicTrainingOptionsByFaction()
@@ -5754,7 +5881,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Kettenkrad, TankData);
 
 	// Sd.Kfz. 251/22
-	TankData.MaxHealth = ArmoredCarHealthBase + 150;
+	TankData.MaxHealth = ArmoredCarHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Sdkfz251;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -5773,7 +5900,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	// Sd.Kfz. 251 (Mortar)
 	{
-		TankData.MaxHealth = ArmoredCarHealthBase + 150;
+		TankData.MaxHealth = ArmoredCarHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Sdkfz251;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 		TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -5797,7 +5924,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	// Sd.Kfz. 251 (Transport)
 	{
-		TankData.MaxHealth = ArmoredCarHealthBase + 150;
+		TankData.MaxHealth = ArmoredCarHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Sdkfz251;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 		TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -5858,7 +5985,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	}
 
 	// Sd.Kfz. 251 (Pz IV)
-	TankData.MaxHealth = ArmoredCarHealthBase + 50;
+	TankData.MaxHealth = ArmoredCarHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Sdkfz251PzIV;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 30 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -6300,7 +6427,7 @@ void ACPPGameState::InitAllGameLightTankData()
 	// ------------------------------- RUS Light Tanks -------------------------------
 
 	// BT-7
-	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp - 50;
+	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::BT7;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 16 * TankTurretTurnRateMultiplier;
@@ -6355,7 +6482,7 @@ void ACPPGameState::InitAllGameLightTankData()
 
 	// MS-1 (T-18): the weakest Soviet tank. Thin riveted plates (fewer hit points than the BT-7), as slow as the T-26
 	// with a slower hand-cranked turret, and cheap.
-	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp - 75;
+	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::MS1;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 35 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
@@ -6373,7 +6500,7 @@ void ACPPGameState::InitAllGameLightTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_MS1, TankData);
 
 	// T-70
-	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp + 25;
+	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::T70;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 55 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
@@ -6505,7 +6632,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIII_J, TankData);
 
 	// Pz III AA
-	TankData.MaxHealth = LightMediumTankBase + 50;
+	TankData.MaxHealth = LightMediumTankBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::PzIIIAA;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 35 * TankTurretTurnRateMultiplier;
@@ -6618,7 +6745,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PZIV_Rockets, TankData);
 
 	// Pz IV F1
-	TankData.MaxHealth = MediumTankHealthBase - 150;
+	TankData.MaxHealth = MediumTankHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::PzIVF1;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -6672,7 +6799,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Jaguar, TankData);
 
 	// Brummbär
-	TankData.MaxHealth = MediumTankHealthBase + 400;
+	TankData.MaxHealth = MediumTankHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Brumbar;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 30 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -6839,11 +6966,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34E, TankData);
 
 	// T-34/85
-	{
-		// 15 HP under the medium step so three Pz IV 75mm hits (3 x 221.4) still kill it.
-		constexpr float T34_85BreakpointTrim = 15.f;
-		TankData.MaxHealth = MediumTankHealthBase + OneMediumTankShotHp - T34_85BreakpointTrim;
-	}
+	TankData.MaxHealth = MediumTankHealthBase + OneMediumTankShotHp
+		- DeveloperSettings::GameBalance::UnitHealth::T34_85BreakpointTrim;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
@@ -7280,7 +7404,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 
 
 	// Sturm Tiger
-	TankData.MaxHealth = T3HeavyTankBase + 400;
+	TankData.MaxHealth = T3HeavyTankBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::SturmTiger;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
@@ -7787,6 +7911,7 @@ void ACPPGameState::InitAllGameTrainData()
 	{
 		FTankData TankData;
 		TankData.MaxHealth = TrainHealth;
+		TankData.bScalesWithVehicleBalance = false;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = TrainRotationSpeed * TankTurnRateMultiplier;
 		TankData.TurretRotationSpeed = TurretRotationSpeed * TankTurretTurnRateMultiplier;

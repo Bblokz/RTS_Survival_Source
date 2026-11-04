@@ -55,6 +55,9 @@ public:
 	void SetSelectedGameDifficultyForRestart(const FRTSGameDifficulty& Difficulty);
 	bool ConsumeRestartWithNewDifficultyRequest();
 	FRTSGameDifficulty GetSelectedGameDifficulty() const { return M_SelectedGameDifficulty; }
+	// Picked beside the difficulty; kept across restarts and map loads. ACPPGameState applies it to vehicle health.
+	void SetVehicleBalance(const ERTSVehicleBalance VehicleBalance) { M_VehicleBalance = VehicleBalance; }
+	ERTSVehicleBalance GetVehicleBalance() const { return M_VehicleBalance; }
 	void SetPlayerFaction(const ERTSFaction Faction);
 	// Faction picked in the faction selection menu; mission manager faction backups never override it.
 	void SetPlayerChosenFaction(const ERTSFaction Faction);
@@ -127,6 +130,7 @@ private:
 	FCampaignGenerationSettings M_CampaignGenerationSettings;
 	FRTSGameDifficulty M_SelectedGameDifficulty;
 	bool bM_RestartWithNewDifficultyRequested = false;
+	ERTSVehicleBalance M_VehicleBalance = ERTSVehicleBalance::Arcade;
 	ERTSFaction M_PlayerFaction;
 	// True when M_PlayerFaction came from the player's selection rather than dev settings, menus or tests.
 	bool bM_IsPlayerFactionChosenByPlayer = false;

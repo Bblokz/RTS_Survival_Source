@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Game/GameSettings/RTSGameSettings.h"
 #include "RTS_Survival/Game/GameUpdateComponent/RTSGameSettingsHandler.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedRockets/RocketAbilityTypes.h"
@@ -148,6 +149,18 @@ public:
 	bool UpgradeTankDataForPlayer(const int32 PlayerOwningTank, const ETankSubtype TankSubtype,
 	                              const FTankData& NewTankData);
 
+	/**
+	 * @brief Switches armored-vehicle health between the realistic and the arcade balance. Safe to call mid-mission:
+	 * vehicles that already began play keep their health percentage.
+	 * @param NewVehicleBalance Balance the player picked beside the difficulty.
+	 */
+	void SetVehicleBalance(const ERTSVehicleBalance NewVehicleBalance);
+	ERTSVehicleBalance GetVehicleBalance() const { return M_AppliedVehicleBalance; }
+
+	/** @return Whether this world's match runs the realistic vehicle balance; false without a game state, as Arcade
+	 * is the default. */
+	static bool GetIsRealisticVehicleBalance(const UObject* WorldContextObject);
+
 	FNomadicData GetNomadicDataOfPlayer(const int32 PlayerOwningNomadic, const ENomadicSubtype NomadicSubtype) const;
 
 	FSquadData GetSquadDataOfPlayer(const int32 PlayerOwningSquad, const ESquadSubtype SquadSubtype) const;
@@ -211,6 +224,8 @@ protected:
 
 	virtual void PostInitializeComponents() override;
 	void PostInitializeComponents_SetupNomadicTrainingOptionsByFaction();
+	// Runs before level actors begin play, so placed vehicles read the chosen balance.
+	void PostInitializeComponents_ApplyVehicleBalance();
 
 	// Call at begin play; will ini the MPC time material collection to save world time.
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
@@ -281,6 +296,13 @@ private:
 
 	UPROPERTY()
 	TMap<ETankSubtype, FTankData> M_TEnemyTankDataHashMap;
+
+	// The tank data maps are built for Realistic; this tracks which balance their vehicle health currently holds.
+	ERTSVehicleBalance M_AppliedVehicleBalance = ERTSVehicleBalance::Realistic;
+
+	void ScaleTankDataHealthToVehicleBalance(TMap<ETankSubtype, FTankData>& TankDataMap,
+	                                         const ERTSVehicleBalance NewVehicleBalance) const;
+	void ApplyTankDataHealthToLiveVehicles() const;
 
 	UPROPERTY()
 	TMap<EStandaloneTurretSubtype, FStandaloneTurretData> M_TPlayerStandaloneTurretDataHashMap;

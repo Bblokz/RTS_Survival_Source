@@ -3,6 +3,7 @@
 #include "TankMaster.h"
 
 #include "AITankMaster.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "Engine/GameInstance.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
@@ -197,7 +198,8 @@ bool ATankMaster::StartAmmoCookOffChance(const EVehicleModuleState AmmoState)
 		return false;
 	}
 
-	const float CookOffChance = AmmoCookOff::GetChance(AmmoState);
+	const float CookOffChance = AmmoCookOff::GetChance(
+		AmmoState, ACPPGameState::GetIsRealisticVehicleBalance(this));
 	if (CookOffChance <= 0.f || FMath::FRand() >= CookOffChance)
 	{
 		return false;
@@ -392,6 +394,24 @@ bool ATankMaster::StartAmmoDetonation()
 	}
 	// Tanks without a cook-off profile still show the cook-off death.
 	bM_IsAmmoCookingOff = true;
+	return true;
+}
+
+bool ATankMaster::StartFuelDetonation()
+{
+	if (not IsUnitAlive() || not GetIsValidModuleArmor() || not M_ModuleArmor->GetAreEngineFiresEnabled())
+	{
+		return false;
+	}
+
+	const TSubclassOf<UTankEngineFireBehaviour> EngineFireClass = GetEngineFireBehaviourClass();
+	if (EngineFireClass != nullptr && GetIsValidBehaviourComponent()
+		&& BehaviourComponent->GetBehaviourByClass(EngineFireClass) == nullptr)
+	{
+		BehaviourComponent->AddBehaviour(EngineFireClass);
+	}
+	// Tanks without an engine fire profile still show the fuel explosion death.
+	bM_IsEngineBurning = true;
 	return true;
 }
 

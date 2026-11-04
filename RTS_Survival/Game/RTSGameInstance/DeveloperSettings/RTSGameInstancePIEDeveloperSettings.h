@@ -35,6 +35,10 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category="PIE Startup", meta=(ClampMin="1"))
 	int32 DifficultyPercentage = 150;
+
+	// Arcade gives armored vehicles their health from before the 2026-11-03 lethality pass.
+	UPROPERTY(Config, EditAnywhere, Category="PIE Startup")
+	ERTSVehicleBalance VehicleBalance = ERTSVehicleBalance::Arcade;
 	
 	UPROPERTY(Config, EditAnywhere, Category="PIE Startup")
 	ERTSFaction PlayerFaction = ERTSFaction::GerBreakthroughDoctrine;

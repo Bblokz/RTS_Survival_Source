@@ -55,4 +55,9 @@ struct FTankData
 	
 	UPROPERTY(BlueprintReadOnly)
 	int32 EnergyRequired = 0;
+
+	// False for units whose health is not built from the armored-vehicle bases (trains); the vehicle balance
+	// setting leaves those alone.
+	UPROPERTY()
+	bool bScalesWithVehicleBalance = true;
 };

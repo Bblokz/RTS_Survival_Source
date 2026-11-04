@@ -66,6 +66,8 @@ namespace UISnapshotConstants
 	const TCHAR* const CommandLineSwitch = TEXT("UISnapshot");
 	const TCHAR* const ReflectorSnapshotCommand = TEXT("WidgetReflector.TakeSnapshot 0.2");
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
+	// Leaves the mission difficulty picker open so the captures show it (and its vehicle balance column).
+	const TCHAR* const KeepDifficultyPickerSwitch = TEXT("UISnapshotKeepDifficultyPicker");
 	const FName EnergyProgressBarName(TEXT("EnergyProgressBar"));
 	const TCHAR* const EnergyPreviewSwitch = TEXT("UISnapshotEnergyPreview");
 	constexpr float EnergyPreviewPercent = 0.62f;
@@ -641,6 +643,11 @@ void UUISnapshotSubsystem::ShowCollapsedGalleryParts(UUserWidget& GalleryWidget)
 
 void UUISnapshotSubsystem::DismissDifficultyPicker() const
 {
+	if (FParse::Param(FCommandLine::Get(), UISnapshotConstants::KeepDifficultyPickerSwitch))
+	{
+		ShowDifficultyPickerOnce();
+		return;
+	}
 	TArray<UUserWidget*> Pickers;
 	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Pickers, UW_GameDifficultyPicker::StaticClass(), false);
 	for (UUserWidget* const Picker : Pickers)
@@ -655,6 +662,47 @@ void UUISnapshotSubsystem::DismissDifficultyPicker() const
 			NormalButton->OnClicked.Broadcast();
 			UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT picked normal difficulty"));
 		}
+	}
+}
+
+void UUISnapshotSubsystem::ShowDifficultyPickerOnce() const
+{
+	if (bM_HasShownDifficultyPicker)
+	{
+		return;
+	}
+	bM_HasShownDifficultyPicker = true;
+	TArray<UUserWidget*> Pickers;
+	UWidgetBlueprintLibrary::GetAllWidgetsOfClass(GetWorld(), Pickers, UW_GameDifficultyPicker::StaticClass(), false);
+	if (Pickers.Num() > 0)
+	{
+		return;
+	}
+	const TCHAR* const PickerClassPath =
+		TEXT("/Game/RTS_Survival/Blueprints/GameUI/GameDifficulty/BP_W_GameDifficultyPicker.BP_W_GameDifficultyPicker_C");
+	UClass* const PickerClass = LoadClass<UW_GameDifficultyPicker>(nullptr, PickerClassPath);
+	APlayerController* const PlayerController = GetWorld()->GetFirstPlayerController();
+	if (not IsValid(PickerClass) || not IsValid(PlayerController))
+	{
+		UE_LOG(LogTemp, Error, TEXT("UISNAPSHOT could not open the difficulty picker"));
+		return;
+	}
+	constexpr int32 PickerZOrder = 100;
+	UUserWidget* const Picker = CreateWidget<UUserWidget>(PlayerController, PickerClass);
+	if (not IsValid(Picker))
+	{
+		return;
+	}
+	Picker->AddToViewport(PickerZOrder);
+	UE_LOG(LogTemp, Display, TEXT("UISNAPSHOT opened the difficulty picker"));
+	// -UISnapshotVehicleBalance=Arcade|Realistic shows that balance's note; without it nothing is picked.
+	FString BalanceName;
+	if (FParse::Value(FCommandLine::Get(), TEXT("UISnapshotVehicleBalance="), BalanceName))
+	{
+		const ERTSVehicleBalance PreviewBalance = BalanceName.Equals(TEXT("Realistic"), ESearchCase::IgnoreCase)
+			                                          ? ERTSVehicleBalance::Realistic
+			                                          : ERTSVehicleBalance::Arcade;
+		Cast<UW_GameDifficultyPicker>(Picker)->PreviewVehicleBalance(PreviewBalance);
 	}
 }
 
@@ -717,7 +765,11 @@ void UUISnapshotSubsystem::ApplyCurrentStep()
 
 void UUISnapshotSubsystem::CaptureCurrentStep() const
 {
-	const FString StepName = GetCurrentStepName();
+	// Picker captures get their own names so they never overwrite the regular HUD captures.
+	const FString PickerPrefix = FParse::Param(FCommandLine::Get(), UISnapshotConstants::KeepDifficultyPickerSwitch)
+		                             ? TEXT("difficulty_picker_")
+		                             : TEXT("");
+	const FString StepName = PickerPrefix + GetCurrentStepName();
 	const FString ScreenshotPath = FPaths::ProjectSavedDir() / TEXT("UISnapshot") / (StepName + TEXT(".png"));
 	LogMapObjectFilterCounts();
 	FScreenshotRequest::RequestScreenshot(ScreenshotPath, true, false);

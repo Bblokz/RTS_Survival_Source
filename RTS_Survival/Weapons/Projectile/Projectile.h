@@ -33,6 +33,7 @@ struct FProjectilePoolSettings
 	int32 ProjectileIndex = INDEX_NONE;
 };
 
+class ATankMaster;
 class UArmorCalculation;
 class UAudioComponent;
 class UPrimitiveComponent;
@@ -282,6 +283,16 @@ public:
 
 	// Forces the projectile back into its dormant pooled state immediately.
 	void SetProjectileDormant();
+
+	/**
+	 * @brief Realistic vehicle balance: a big shell that crushes the armor destroys the vehicle in one hit.
+	 * @param PenAtImpact Armor pen left when the shell hits.
+	 * @param EffectiveArmor Plate armor after the impact angle.
+	 * @param ShellDamage Full damage of the shell, before side and rear multipliers.
+	 * @param TargetMaxHealth Max health of the vehicle hit.
+	 * @return Whether this hit overmatches (see OvermatchPenToEffectiveArmorRatio in DeveloperSettings.h).
+	 */
+	static bool GetIsArmorOvermatched(float PenAtImpact, float EffectiveArmor, float ShellDamage, float TargetMaxHealth);
 
 protected:
 	// Called when the game starts or when spawned
@@ -818,13 +829,26 @@ private:
 	bool GetCanArmorOverPenetrate(const float EffectiveArmor, const float AdjustedArmorPen) const;
 
 	/**
-	 * @brief Damage multiplier for a kinetic penetration: side and rear plates take more, and a flanking hit from a big
-	 * enough gun may detonate a tank's ammunition, which makes this hit lethal.
-	 * @param HitActor The penetrated actor; only tanks can detonate.
+	 * @brief Damage multiplier for a kinetic penetration: side and rear plates take more. With the realistic vehicle
+	 * balance an overmatching hit, or a flanking hit that detonates the ammunition, makes this hit lethal.
+	 * @param HitActor The penetrated actor; only tanks can be overmatched or detonate.
 	 * @param PlateHit The plate the shell went through.
+	 * @param PenAtImpact Armor pen left when the shell hit.
+	 * @param EffectiveArmor Plate armor after the impact angle.
+	 * @param bOutArmorDestroyed Set when the hit overmatched the armor, so the caller shows the armor destroyed text.
 	 * @return The multiplier to apply to the full damage of this hit.
 	 */
-	float GetKineticPenDamageMlt(AActor* HitActor, EArmorPlate PlateHit) const;
+	float GetKineticPenDamageMlt(AActor* HitActor, EArmorPlate PlateHit, float PenAtImpact, float EffectiveArmor,
+	                             bool& bOutArmorDestroyed) const;
+
+	/**
+	 * @brief Picks how an overmatched tank dies: front hits mix the regular death, an ammo detonation and a fuel
+	 * explosion so several kills in a row look different; side and rear hits play the regular death.
+	 * @param Tank The overmatched tank.
+	 * @param PlateSide Side of the tank the shell went through.
+	 */
+	static void StartOvermatchDeath(ATankMaster& Tank, EArmorPlateDamageType PlateSide);
+	float GetLethalDamageMlt(const ATankMaster& Tank, float DamageMlt) const;
 
 	/**
 	 * @brief Builds the module damage event of a kinetic armor hit so module damage resolves exactly once per impact.
@@ -967,6 +991,7 @@ private:
 	void OnArmorPen_DisplayText(const FVector& Location, const EArmorPlate PlatePenetrated);
 	void OnArmorOverPen_DisplayText(const FVector& Location);
 	void OnArmorPen_HeDisplayText(const FVector& Location);
+	void OnArmorDestroyed_DisplayText(const FVector& Location);
 
 	void HandleAoe(const FVector& HitLocation,AActor* HitActor);
 

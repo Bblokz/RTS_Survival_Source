@@ -335,6 +335,14 @@ public:
 	 */
 	bool StartAmmoDetonation();
 
+	/**
+	 * @brief An overmatching hit set off the fuel: starts the engine fire so the killing hit that follows plays the
+	 * fuel explosion death.
+	 * @return False when engine fires are disabled on this tank or it is already dead; the caller then plays the regular
+	 * death.
+	 */
+	bool StartFuelDetonation();
+
 	/** @brief Testing aid: starts this tank's ammo cook-off and kills it at once, so the cook-off death can be watched. */
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_DieDuringAmmoCookOff();

@@ -48,18 +48,26 @@ namespace VehicleModuleBalance
 	/** @brief Chance to ignite ammunition when damage changes its module state, independent of shell type. */
 	namespace AmmoCookOff
 	{
+		// Realistic vehicle balance (raised on 2026-11-04).
 		inline constexpr float AmmoCookOffDamagedAmmoChance = 0.15f;
 		inline constexpr float AmmoCookOffDestroyedAmmoChance = 0.25f;
+		// Arcade vehicle balance keeps the odds from before.
+		inline constexpr float ArcadeAmmoCookOffDamagedAmmoChance = 0.1f;
+		inline constexpr float ArcadeAmmoCookOffDestroyedAmmoChance = 0.2f;
 
-		/** @return Cook-off probability for the resulting ammo state; healthy ammo cannot ignite here. */
-		constexpr float GetChance(const EVehicleModuleState AmmoState)
+		/**
+		 * @param AmmoState State reached by the ammo rack after damage.
+		 * @param bIsRealisticVehicleBalance Whether the match runs the realistic vehicle balance.
+		 * @return Cook-off probability for the resulting ammo state; healthy ammo cannot ignite here.
+		 */
+		constexpr float GetChance(const EVehicleModuleState AmmoState, const bool bIsRealisticVehicleBalance)
 		{
 			switch (AmmoState)
 			{
 			case EVehicleModuleState::Damaged:
-				return AmmoCookOffDamagedAmmoChance;
+				return bIsRealisticVehicleBalance ? AmmoCookOffDamagedAmmoChance : ArcadeAmmoCookOffDamagedAmmoChance;
 			case EVehicleModuleState::Destroyed:
-				return AmmoCookOffDestroyedAmmoChance;
+				return bIsRealisticVehicleBalance ? AmmoCookOffDestroyedAmmoChance : ArcadeAmmoCookOffDestroyedAmmoChance;
 			default:
 				return 0.f;
 			}

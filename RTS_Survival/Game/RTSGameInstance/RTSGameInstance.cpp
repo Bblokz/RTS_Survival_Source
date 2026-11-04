@@ -60,7 +60,8 @@ void URTSGameInstance::ApplyPIEStartupOverrides()
 	PIEGameDifficulty.DifficultyPercentage = PIEStartupSettings->DifficultyPercentage;
 	PIEGameDifficulty.bIsInitialized = true;
 	SetSelectedGameDifficulty(PIEGameDifficulty);
-	
+	SetVehicleBalance(PIEStartupSettings->VehicleBalance);
+
 	SetPlayerFaction(PIEStartupSettings->PlayerFaction);
 	SetPlayerCommander(PIEStartupSettings->PlayerCommander);
 	SetAllowUnitVariantSelection(PIEStartupSettings->bAllowUnitVariantSelection);
