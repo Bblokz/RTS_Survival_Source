@@ -37,6 +37,7 @@ ICONS = {
     "GA_GER_RADIXITE_NUKE": "GerRadixiteNuke",
     "GA_SOVIET_RADIXITE_NUKE": "SovietRadixiteNuke",
     "GA_GER_SPIES_INFILTRATION": "GerSpiesInfiltration",
+    "GA_GER_V2_ROCKET": "GerV2Rocket",
 }
 
 

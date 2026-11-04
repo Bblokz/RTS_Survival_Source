@@ -50,6 +50,13 @@ namespace GlobalAbilityAreaTestConstants
 	constexpr float StripLengthCm = 5000.f;
 	constexpr float FlightTimeoutSeconds = 60.f;
 	constexpr float NukeTimeoutSeconds = 60.f;
+	// The nuke radiates for 30 s before the V2 can use the same spot.
+	constexpr float V2RocketTimeoutSeconds = 90.f;
+	// Without radiation the warhead is done once the flash and shockwave have faded.
+	constexpr float V2SpentAfterBlastSeconds = 6.f;
+	// The arc starts 300 m out and peaks around 40 m: far from the side, under the camera.
+	constexpr float V2MinApproachDistanceCm = 15000.f;
+	constexpr float V2MaxArcHeightCm = 7000.f;
 	constexpr float FlareSettleSeconds = 4.f;
 	constexpr float MineLandingSeconds = 5.f;
 	constexpr float HalfwayFraction = 0.4f;
@@ -123,6 +130,9 @@ void UGlobalAbilityAreaTestSubsystem::Tick(const float DeltaTime)
 		return;
 	case EGlobalAbilityAreaTestStep::Nuke:
 		TickNuke();
+		return;
+	case EGlobalAbilityAreaTestStep::V2Rocket:
+		TickV2Rocket();
 		return;
 	case EGlobalAbilityAreaTestStep::Finished:
 		return;
@@ -777,7 +787,8 @@ void UGlobalAbilityAreaTestSubsystem::CheckPlayerLoadoutFitsPanel()
 	// The area abilities under test must be reachable by the player through at least one commander.
 	for (const EGlobalAbility Ability : {
 		     EGlobalAbility::GA_GerReconFlight, EGlobalAbility::GA_GerFlareCurtain,
-		     EGlobalAbility::GA_GerAirMinefield, EGlobalAbility::GA_GerRadixiteNuke
+		     EGlobalAbility::GA_GerAirMinefield, EGlobalAbility::GA_GerRadixiteNuke,
+		     EGlobalAbility::GA_GerSpiesInfiltration
 	     })
 	{
 		Check(AbilitiesInAnyKit.Contains(Ability), TEXT("ability_in_player_loadout"), UEnum::GetValueAsString(Ability));
@@ -802,20 +813,23 @@ void UGlobalAbilityAreaTestSubsystem::StartNuke()
 		return;
 	}
 	const FGlobalAbilityAreaAimSettings& AreaAim = Ability->GetAimSettings().AreaAim;
-	UClass* VictimClass = LoadClass<AActor>(nullptr, VictimClassPath);
-	const auto SpawnVictim = [this, VictimClass](const FVector2D& Offset, const uint8 OwningPlayer) -> AActor*
-	{
-		FVector Ground;
-		FindGround(FVector2D(M_Anchor.X, M_Anchor.Y) + Offset, Ground);
-		return FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*GetWorld(), VictimClass,
-		                                                 FTransform(Ground + FVector(0.f, 0.f, 120.f)), OwningPlayer);
-	};
-	M_CoreVictim = SpawnVictim(FVector2D(AreaAim.InnerRadius * 0.3f, 0.f), EnemyPlayer);
-	M_EdgeVictim = SpawnVictim(FVector2D(0.f, AreaAim.AreaRadius * 0.9f), EnemyPlayer);
-	M_FarBystander = SpawnVictim(FVector2D(0.f, AreaAim.AreaRadius * 2.f), EnemyPlayer);
+	M_CoreVictim = SpawnVictimNearAnchor(FVector2D(AreaAim.InnerRadius * 0.3f, 0.f), EnemyPlayer);
+	M_EdgeVictim = SpawnVictimNearAnchor(FVector2D(0.f, AreaAim.AreaRadius * 0.9f), EnemyPlayer);
+	M_FarBystander = SpawnVictimNearAnchor(FVector2D(0.f, AreaAim.AreaRadius * 2.f), EnemyPlayer);
 
 	M_LineStart = M_Anchor;
 	StartAim(Ability, TEXT("Nuke"));
+}
+
+AActor* UGlobalAbilityAreaTestSubsystem::SpawnVictimNearAnchor(const FVector2D& Offset, const uint8 OwningPlayer) const
+{
+	constexpr float SpawnAboveGroundCm = 120.f;
+	UClass* VictimClass = LoadClass<AActor>(nullptr, GlobalAbilityAreaTestConstants::VictimClassPath);
+	FVector Ground;
+	FindGround(FVector2D(M_Anchor.X, M_Anchor.Y) + Offset, Ground);
+	return FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*GetWorld(), VictimClass,
+	                                                 FTransform(Ground + FVector(0.f, 0.f, SpawnAboveGroundCm)),
+	                                                 OwningPlayer);
 }
 
 void UGlobalAbilityAreaTestSubsystem::TickNuke()
@@ -836,7 +850,7 @@ void UGlobalAbilityAreaTestSubsystem::TickNuke()
 	if (bPastBlast && M_CaptureIndex > 0 && GetStepSeconds() > 14.f)
 	{
 		CheckNukeResult();
-		Finish();
+		StartV2Rocket();
 		return;
 	}
 	if (GetStepSeconds() > NukeTimeoutSeconds)
@@ -854,6 +868,127 @@ void UGlobalAbilityAreaTestSubsystem::CheckNukeResult()
 	Check(IsValid(FarBystander) && FarBystander->IsUnitAlive(), TEXT("nuke_spares_outside_the_blast"));
 	UE_LOG(LogRTSGlobalAbilityAreaTest, Display, TEXT("RTS_ABILITY_TEST NUKE edge_victim_alive=%d"),
 	       IsValid(EdgeVictim) && EdgeVictim->IsUnitAlive() ? 1 : 0);
+}
+
+void UGlobalAbilityAreaTestSubsystem::StartV2Rocket()
+{
+	EnterStep(EGlobalAbilityAreaTestStep::V2Rocket);
+	M_V2Rocket.Reset();
+	bM_HasAimedV2Rocket = false;
+	M_V2MaxApproachDistance = 0.f;
+	M_V2MaxHeight = 0.f;
+	M_V2BlastSeconds = -1.f;
+}
+
+void UGlobalAbilityAreaTestSubsystem::AimV2Rocket()
+{
+	using namespace GlobalAbilityAreaTestConstants;
+	bM_HasAimedV2Rocket = true;
+	UGlobalAbility* Ability = MakeAbility(EGlobalAbility::GA_GerV2Rocket, HumanPlayer);
+	if (not IsValid(Ability))
+	{
+		Finish();
+		return;
+	}
+	const FGlobalAbilityAreaAimSettings& AreaAim = Ability->GetAimSettings().AreaAim;
+	Check(AreaAim.AreaRadius > 1.f && AreaAim.InnerRadius > 1.f, TEXT("v2_template_has_blast_and_core"));
+	M_CoreVictim = SpawnVictimNearAnchor(FVector2D(AreaAim.InnerRadius * 0.3f, 0.f), EnemyPlayer);
+	M_EdgeVictim = SpawnVictimNearAnchor(FVector2D(-AreaAim.AreaRadius * 0.9f, 0.f), EnemyPlayer);
+	M_FarBystander = SpawnVictimNearAnchor(FVector2D(0.f, -AreaAim.AreaRadius * 2.f), EnemyPlayer);
+	M_LineStart = M_Anchor;
+	StartAim(Ability, TEXT("V2Rocket"));
+}
+
+void UGlobalAbilityAreaTestSubsystem::TickV2Rocket()
+{
+	using namespace GlobalAbilityAreaTestConstants;
+	if (GetStepSeconds() > V2RocketTimeoutSeconds)
+	{
+		Check(false, TEXT("v2_detonated"), M_V2Rocket.IsValid() ? UEnum::GetValueAsString(M_V2Rocket->GetPhase())
+			                                       : TEXT("none"));
+		Finish();
+		return;
+	}
+	if (not bM_HasAimedV2Rocket)
+	{
+		if (not IsAnyNukeActive())
+		{
+			AimV2Rocket();
+		}
+		return;
+	}
+	if (TickAim())
+	{
+		return;
+	}
+	TrackV2Flight();
+	if (not M_V2Rocket.IsValid())
+	{
+		return;
+	}
+	// The pictures follow the rocket while it flies, then look at the blast.
+	const bool bIsFlying = M_V2Rocket->GetPhase() == ERadixiteNukePhase::Falling;
+	CaptureEvery(0.5f, bIsFlying ? M_V2Rocket->GetWarheadLocation() : M_Anchor, TEXT("V2Rocket"));
+	if (M_V2Rocket->GetPhase() == ERadixiteNukePhase::Spent && M_CaptureIndex > 0)
+	{
+		CheckV2Result();
+		Finish();
+	}
+}
+
+void UGlobalAbilityAreaTestSubsystem::TrackV2Flight()
+{
+	if (not M_V2Rocket.IsValid())
+	{
+		for (TActorIterator<ARadixiteNuke> It(GetWorld()); It; ++It)
+		{
+			if (It->GetPhase() != ERadixiteNukePhase::Spent)
+			{
+				M_V2Rocket = *It;
+			}
+		}
+		return;
+	}
+	const ERadixiteNukePhase Phase = M_V2Rocket->GetPhase();
+	if (Phase == ERadixiteNukePhase::Falling)
+	{
+		const FVector Offset = M_V2Rocket->GetWarheadLocation() - M_V2Rocket->GetActorLocation();
+		M_V2MaxApproachDistance = FMath::Max(M_V2MaxApproachDistance, Offset.Size2D());
+		M_V2MaxHeight = FMath::Max(M_V2MaxHeight, Offset.Z);
+		return;
+	}
+	if (Phase != ERadixiteNukePhase::Warning && M_V2BlastSeconds < 0.f)
+	{
+		M_V2BlastSeconds = GetWorld()->GetTimeSeconds();
+	}
+}
+
+void UGlobalAbilityAreaTestSubsystem::CheckV2Result()
+{
+	using namespace GlobalAbilityAreaTestConstants;
+	const float SpentAfterBlastSeconds = GetWorld()->GetTimeSeconds() - M_V2BlastSeconds;
+	Check(M_V2MaxApproachDistance > V2MinApproachDistanceCm, TEXT("v2_flies_in_from_afar"),
+	      FString::Printf(TEXT("approach=%.0f"), M_V2MaxApproachDistance));
+	Check(M_V2MaxHeight > 0.f && M_V2MaxHeight < V2MaxArcHeightCm, TEXT("v2_flies_a_low_arc"),
+	      FString::Printf(TEXT("max_height=%.0f"), M_V2MaxHeight));
+	Check(M_V2BlastSeconds > 0.f && SpentAfterBlastSeconds < V2SpentAfterBlastSeconds, TEXT("v2_leaves_no_radiation"),
+	      FString::Printf(TEXT("spent_after=%.1f"), SpentAfterBlastSeconds));
+	Check(not M_CoreVictim.IsValid() || not M_CoreVictim->IsUnitAlive(), TEXT("v2_core_kills"));
+	Check(M_FarBystander.IsValid() && M_FarBystander->IsUnitAlive(), TEXT("v2_spares_outside_the_blast"));
+	UE_LOG(LogRTSGlobalAbilityAreaTest, Display, TEXT("RTS_ABILITY_TEST V2 edge_victim_alive=%d"),
+	       M_EdgeVictim.IsValid() && M_EdgeVictim->IsUnitAlive() ? 1 : 0);
+}
+
+bool UGlobalAbilityAreaTestSubsystem::IsAnyNukeActive() const
+{
+	for (TActorIterator<ARadixiteNuke> It(GetWorld()); It; ++It)
+	{
+		if (It->GetPhase() != ERadixiteNukePhase::Spent)
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 int32 UGlobalAbilityAreaTestSubsystem::CountBubbles() const

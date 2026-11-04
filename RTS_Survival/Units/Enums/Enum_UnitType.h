@@ -404,6 +404,69 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	}
 }
 
+/** @return True for Soviet vehicles (display name "Rus ..."); every other subtype but Tank_None is German.
+ * Keep in step with ETankSubtype: the display names are editor-only, so packaged builds cannot read them. */
+static bool Global_GetIsSovietTank(const ETankSubtype TankSubtype)
+{
+	switch (TankSubtype)
+	{
+	case ETankSubtype::Tank_Ba12:
+	case ETankSubtype::Tank_Ba14:
+	case ETankSubtype::Tank_ZilAmmo:
+	case ETankSubtype::Tank_ZilFuel:
+	case ETankSubtype::Tank_SovietTanker:
+	case ETankSubtype::Tank_BT7:
+	case ETankSubtype::Tank_T26:
+	case ETankSubtype::Tank_BT7_4:
+	case ETankSubtype::Tank_T70:
+	case ETankSubtype::Tank_T70F:
+	case ETankSubtype::Tank_SU_76:
+	case ETankSubtype::Tank_T34_85:
+	case ETankSubtype::Tank_T34_100:
+	case ETankSubtype::Tank_T34_76:
+	case ETankSubtype::Tank_T34_AA:
+	case ETankSubtype::Tank_T34_76_L:
+	case ETankSubtype::Tank_T34E:
+	case ETankSubtype::Tank_SU_85:
+	case ETankSubtype::Tank_SU_85_L:
+	case ETankSubtype::Tank_SU_100:
+	case ETankSubtype::Tank_SU_122:
+	case ETankSubtype::Tank_T44_100L:
+	case ETankSubtype::Tank_T35:
+	case ETankSubtype::Tank_KV_1:
+	case ETankSubtype::Tank_KV_2:
+	case ETankSubtype::Tank_KV_1E:
+	case ETankSubtype::Tank_KV_1_Arc:
+	case ETankSubtype::Tank_T28:
+	case ETankSubtype::Tank_T28F:
+	case ETankSubtype::Tank_IS_1:
+	case ETankSubtype::Tank_KV_IS:
+	case ETankSubtype::Tank_IS_2:
+	case ETankSubtype::Tank_IS_3:
+	case ETankSubtype::Tank_IS_3_Flame:
+	case ETankSubtype::Tank_KV_5:
+	case ETankSubtype::Tank_SU_152:
+	case ETankSubtype::Tank_FuelTrain:
+	case ETankSubtype::Tank_LightTrain:
+	case ETankSubtype::Tank_MediumTrain:
+	case ETankSubtype::Tank_HeavyTrain:
+	case ETankSubtype::Tank_ISU_152:
+	case ETankSubtype::Tank_T34_Harvester:
+	case ETankSubtype::Tank_T44_155:
+	case ETankSubtype::Tank_IS6:
+	case ETankSubtype::Tank_SMK:
+	case ETankSubtype::Tank_ISU_130:
+	case ETankSubtype::Tank_BM13:
+	case ETankSubtype::Tank_MS1:
+	case ETankSubtype::Tank_KV3:
+	case ETankSubtype::Tank_BTR152A:
+	case ETankSubtype::Tank_GAZMM_72K:
+		return true;
+	default:
+		return false;
+	}
+}
+
 UENUM(BlueprintType)
 enum class ESquadSubtype: uint8
 {
@@ -495,6 +558,9 @@ enum class ESquadSubtype: uint8
 	Squad_Rus_Dyakonov UMETA(DisplayName = "Rus Dyakonov Squad (grenade rifle)"),
 	Squad_Rus_KorovinAssault UMETA(DisplayName = "Korovin Assautl squad"),
 	Squad_Rus_ROKS3_PPSH UMETA(DisplayName = "Rus ROKS S3PPSH (flame close range)"),
+	// Rail Engineer commander: heavily armoured scavengers with M920 rail rifles. Appended to preserve the
+	// numeric subtype IDs stored in training options.
+	Squad_Ger_RailTroopers UMETA(DisplayName = "Ger Rail Troopers (armoured scavengers with railguns)"),
 };
 
 
@@ -503,6 +569,7 @@ static bool Global_GetIsAntiTankSquad(const ESquadSubtype SquadSubtype)
 	switch (SquadSubtype)
 	{
 	case ESquadSubtype::Squad_Ger_PanzerGrenadiere:
+	case ESquadSubtype::Squad_Ger_RailTroopers:
 	case ESquadSubtype::Squad_Ger_PaK38:
 	case ESquadSubtype::Squad_Ger_PaK40:
 	case ESquadSubtype::Squad_Rus_Zis_57MM:
@@ -641,6 +708,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "ROKS-3 PPSh Squad";
 	case ESquadSubtype::Squad_Ger_IronStorm:
 		return "Iron Storm Squad";
+	case ESquadSubtype::Squad_Ger_RailTroopers:
+		return "Rail Troopers";
 	case ESquadSubtype::Squad_Rus_RedHammer:
 		return "RedHammer Squad";
 	case ESquadSubtype::Squad_Rus_RedHamerPTRS:

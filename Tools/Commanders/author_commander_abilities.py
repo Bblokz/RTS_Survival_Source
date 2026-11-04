@@ -122,6 +122,8 @@ BALANCE = [
     ("GA_GerRailBombardment", "TierIII", {R: 700, VP: 200}, 240),
     ("GA_GerAirMinefield", "TierIII", {R: 600}, 180),
     ("GA_GerRadixiteNuke", "TierIV", {R: 2000, VP: 500}, 420),
+    # Created by GlobalAbilityTargetAreas/setup_v2_rocket.py.
+    ("GA_GerV2Rocket", "TierIV", {R: 1800, VP: 450}, 360),
     ("GA_GerKingTiger105Drop", "TierIV", {R: 1600, VP: 850}, 360),
     ("GA_GerTigerRailDrop", "TierIV", {R: 1650, VP: 850}, 360),
     ("GA_GerSturmtigerDrop", "TierIV", {R: 1750, VP: 800}, 360),

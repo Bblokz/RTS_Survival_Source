@@ -19,7 +19,9 @@ enum class ERegularDeathVariant : uint8
 	// A Niagara burst of hull-coloured chunks, thrown away from the killing projectile when there was one.
 	Debris,
 	// The Debris burst with more pieces; takes more of the concurrent burst budget.
-	HeavyDebris
+	HeavyDebris,
+	// A few road wheels thrown off one side of the hull; tracked German and Soviet vehicles only, others play Debris.
+	WheelThrow
 };
 
 /** Pose and char variation every regular-death wreck gets, so two wrecks of one tank never sit identically. */
@@ -161,10 +163,54 @@ struct RTS_SURVIVAL_API FWreckNiagaraDebrisSettings
 	bool bOnlyWhenSeen = true;
 };
 
+/** Road wheels the WheelThrow variant throws off one side of the hull; they bounce, lie a while and sink away. */
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FWreckWheelThrowSettings
+{
+	GENERATED_BODY()
+
+	// Panzer IV road wheels and sprocket; thrown by every German tracked vehicle.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw")
+	TSoftObjectPtr<UNiagaraSystem> GermanWheelSystem;
+
+	// T-34 road wheels and sprocket; thrown by every Soviet tracked vehicle.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw")
+	TSoftObjectPtr<UNiagaraSystem> SovietWheelSystem;
+
+	// Min and max wheels for light tanks.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw")
+	FIntPoint LightTankWheels = FIntPoint(1, 2);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw")
+	FIntPoint MediumTankWheels = FIntPoint(2, 3);
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw")
+	FIntPoint HeavyTankWheels = FIntPoint(3, 4);
+
+	// Half-tracks and other tracked vehicles that are no light, medium or heavy tank.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw")
+	FIntPoint OtherTrackedWheels = FIntPoint(1, 2);
+
+	// How far the throw leans out of the hull's side; 0 throws straight up, 1 flat sideways.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw", meta=(ClampMin="0", ClampMax="1"))
+	float SideLean = 0.55f;
+
+	// Half-angle (degrees) of the throw cone around the side direction.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw", meta=(ClampMin="0", ClampMax="90"))
+	float ConeDegrees = 25.f;
+
+	// Seconds the wheels lie on the ground before they start to sink away.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw", meta=(ClampMin="0"))
+	float LieSeconds = 15.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Wheel Throw", meta=(ClampMin="0.1"))
+	float SinkSeconds = 2.5f;
+};
+
 /**
- * @brief Per-tank tuning for regular deaths. Every regular death draws one of four variants (Standard, ChainReaction,
- * Debris, HeavyDebris) from a per-match shuffle and always varies the wreck's pose and char; the wreck Blueprint's own
- * explosion sequence plays underneath in all of them.
+ * @brief Per-tank tuning for regular deaths. Every regular death draws one of five variants (Standard, ChainReaction,
+ * Debris, HeavyDebris, WheelThrow) from a per-match shuffle and always varies the wreck's pose and char; the wreck
+ * Blueprint's own explosion sequence plays underneath in all of them.
  */
 USTRUCT(BlueprintType)
 struct RTS_SURVIVAL_API FWreckRegularDeathSettings
@@ -190,4 +236,7 @@ struct RTS_SURVIVAL_API FWreckRegularDeathSettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Regular Death", meta=(EditCondition="bVaryRegularDeaths"))
 	FWreckNiagaraDebrisSettings Debris;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Regular Death", meta=(EditCondition="bVaryRegularDeaths"))
+	FWreckWheelThrowSettings WheelThrow;
 };

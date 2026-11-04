@@ -25,6 +25,7 @@
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "TrackedTank/TrackedAnimationInstance.h"
 #include "TrackedTank/PathFollowingComponent/TrackPathFollowingComponent.h"
 #include "WheeledTank/Components/ChaosTankMovementComponent.h"
 
@@ -324,6 +325,11 @@ void ATankMaster::DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActor
 	Request.Variant = DrawRegularDeathVariant();
 	Request.KillShotDirection = M_KillShotDirection;
 	Request.bIsSeen = OnUnitDies_GetIsSeen();
+	Request.TankSubtype = IsValid(RTSComponent) ? RTSComponent->GetSubtypeAsTankSubtype() : ETankSubtype::Tank_None;
+	// Tracked chassis (tanks and half-tracks) animate with the tracked instance; wheeled cars and trucks do not.
+	const USkeletalMeshComponent* ChassisMesh = GetTankMesh();
+	Request.bHasTrackWheels = IsValid(ChassisMesh) && IsValid(ChassisMesh->GetAnimInstance())
+		&& ChassisMesh->GetAnimInstance()->IsA<UTrackedAnimationInstance>();
 	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX, [Request](AActor* SpawnedActor)
 	{
 		FWreckRegularDeath::StartOnWreck(SpawnedActor, Request);

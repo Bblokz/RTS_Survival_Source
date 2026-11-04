@@ -724,6 +724,38 @@ def radixite_nuke(faction, seed):
     return finish(img)
 
 
+def v2_rocket(seed):
+    """The rocket on its low arc, trailing smoke, just before it hits the orange blast it makes."""
+    img = background("ger", seed)
+    hit = np.array([330.0, GROUND_Y])
+    start, control = np.array([-40.0, 170.0]), np.array([168.0, 36.0])
+
+    def arc(t):
+        return (1 - t) ** 2 * start + 2 * t * (1 - t) * control + t * t * hit
+
+    img = light_pool(img, tuple(hit), 230, 66, (255, 110, 30), 0.85, 30)
+    img = light_pool(img, tuple(hit - [0, 60]), 110, 80, (255, 150, 60), 0.6, 26)
+    img = blast(img, tuple(hit * SS), 96 * SS, seed)
+    rocket_t = 0.74
+    samples = [arc(rocket_t * i / 40.0) for i in range(41)]
+
+    def trail(width_scale):
+        def draw_trail(draw):
+            for i in range(len(samples) - 1):
+                k0, k1 = i / 40.0, (i + 1) / 40.0
+                taper(draw, samples[i] * SS, samples[i + 1] * SS, (6 + 22 * k0) * width_scale * SS,
+                      (6 + 22 * k1) * width_scale * SS)
+        return draw_trail
+
+    img = add(img, light_layer(drawn(trail(1.0), blur=6 * SS), (215, 205, 190)), 0.5)
+    img = add(img, light_layer(drawn(trail(0.25), blur=2 * SS), (255, 190, 110)), 0.55)
+    tangent = 2 * (1 - rocket_t) * (control - start) + 2 * rocket_t * (hit - control)
+    heading = math.degrees(math.atan2(tangent[1], tangent[0]))
+    # the rocket render stands nose up
+    img = prop_item(img, "V2_Rocket", tuple(arc(rocket_t)), 176, heading + 90, gain=1.15, tall=True)
+    return finish(img)
+
+
 SPY_HORIZON = 0.36
 REVEAL_RGB = (200, 236, 255)
 # Holes in the fog, far ones first: (x, y, ground radius, tank render or None, tank length). Three carry a tank,
@@ -822,6 +854,7 @@ ICONS = {
     "SovietAirMinefield": lambda: air_minefield("sov", "PE8_Level", "Mine_TM41", 113, (250, 112), 0.36, 1.0, 90.0),
     "GerRadixiteNuke": lambda: radixite_nuke("ger", 127),
     "SovietRadixiteNuke": lambda: radixite_nuke("sov", 131),
+    "GerV2Rocket": lambda: v2_rocket(137),
     "GerSpiesInfiltration": lambda: spies_infiltration("Spy_Spot"),
 }
 

@@ -24,11 +24,12 @@ def export_events(trace_path, threads):
     if os.path.exists(csv_path):
         return csv_path
     log_path = os.path.splitext(trace_path)[0] + '_insights.log'
-    # No quotes inside: the command line arrives as one quoted switch, and nested quotes stop it from running.
     command = (f'TimingInsights.ExportTimingEvents {csv_path} -threads={threads} '
                f'-columns=ThreadName,TimerName,StartTime,EndTime,Duration,Depth')
-    subprocess.run([INSIGHTS, f'-OpenTraceFile={trace_path}', f'-ABSLOG={log_path}', '-AutoQuit', '-NoUI',
-                    f'-ExecOnAnalysisCompleteCmd={command}', '-log'], check=True)
+    # One command-line string: Insights reads -ExecOnAnalysisCompleteCmd only when the quotes follow the '=', and
+    # an argument list would quote the whole switch.
+    subprocess.run(f'"{INSIGHTS}" -OpenTraceFile="{trace_path}" -ABSLOG="{log_path}" -AutoQuit -NoUI '
+                   f'-ExecOnAnalysisCompleteCmd="{command}" -log', check=True)
     return csv_path
 
 

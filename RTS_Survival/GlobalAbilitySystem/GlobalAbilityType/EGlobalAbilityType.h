@@ -61,4 +61,5 @@ enum class EGlobalAbility : uint8
 	GA_GerE100Drop,
 	GA_GerTigerRailDrop,
 	GA_GerSpiesInfiltration,
+	GA_GerV2Rocket,
 };

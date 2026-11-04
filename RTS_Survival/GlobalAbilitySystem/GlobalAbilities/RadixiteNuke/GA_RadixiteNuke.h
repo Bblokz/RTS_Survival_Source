@@ -12,6 +12,7 @@ struct FStreamableHandle;
 /**
  * @brief A radixite warhead comes down on the target after a warning everyone can see. The blast reaches the aim
  * area's AreaRadius and the core its InnerRadius, so the target area shows what will happen; both sides are hurt.
+ * The V2 rocket (GA_GerV2Rocket) is a template of this class: it flies in on a low arc and leaves no radiation.
  */
 UCLASS(BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UGA_RadixiteNuke : public UGlobalAbility

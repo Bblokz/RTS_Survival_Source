@@ -4,6 +4,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
@@ -22,6 +23,10 @@ namespace WreckRegularDeathConstants
 		TEXT("/Game/RTS_Survival/SpecialEffects/AllExplosions/WreckDebris/NS_WreckDebrisBurst.NS_WreckDebrisBurst");
 	const TCHAR* const ChunkMaterialPath =
 		TEXT("/Game/RTS_Survival/SpecialEffects/AllExplosions/WreckDebris/M_WreckDebrisChunk.M_WreckDebrisChunk");
+	const TCHAR* const GermanWheelSystemPath =
+		TEXT("/Game/RTS_Survival/SpecialEffects/AllExplosions/WreckDebris/NS_WreckWheelBurst_Ger.NS_WreckWheelBurst_Ger");
+	const TCHAR* const SovietWheelSystemPath =
+		TEXT("/Game/RTS_Survival/SpecialEffects/AllExplosions/WreckDebris/NS_WreckWheelBurst_Rus.NS_WreckWheelBurst_Rus");
 
 	// Overlay material parameters (M_WreckChar_Overlay), shared with the engine fire death.
 	const FName CharCentreParam = TEXT("CharCentre");
@@ -49,6 +54,11 @@ namespace WreckRegularDeathConstants
 	constexpr float DebrisOriginAboveCentre = 0.5f;
 	// Burst budget slots a Debris burst holds; HeavyDebris takes its count from the settings.
 	constexpr int32 DebrisBurstSlots = 1;
+	// The wheels leave from the hull's side this share of its half width out, at this share of its height from the
+	// bottom (the road wheels), spread along this share of its half length.
+	constexpr float WheelOriginSideShare = 0.9f;
+	constexpr float WheelOriginHeightShare = 0.2f;
+	constexpr float WheelSpreadLengthShare = 0.5f;
 }
 
 FWreckRegularDeathSettings::FWreckRegularDeathSettings()
@@ -58,6 +68,10 @@ FWreckRegularDeathSettings::FWreckRegularDeathSettings()
 	Debris.DebrisSystem = TSoftObjectPtr<UNiagaraSystem>(FSoftObjectPath(WreckRegularDeathConstants::DebrisSystemPath));
 	Debris.ChunkMaterial = TSoftObjectPtr<UMaterialInterface>(
 		FSoftObjectPath(WreckRegularDeathConstants::ChunkMaterialPath));
+	WheelThrow.GermanWheelSystem = TSoftObjectPtr<UNiagaraSystem>(
+		FSoftObjectPath(WreckRegularDeathConstants::GermanWheelSystemPath));
+	WheelThrow.SovietWheelSystem = TSoftObjectPtr<UNiagaraSystem>(
+		FSoftObjectPath(WreckRegularDeathConstants::SovietWheelSystemPath));
 }
 
 void FWreckRegularDeath::StartOnWreck(AActor* Wreck, const FWreckRegularDeathRequest& Request)
@@ -77,6 +91,11 @@ void FWreckRegularDeath::StartOnWreck(AActor* Wreck, const FWreckRegularDeathReq
 	VaryPose(*Wreck, Turret, Request.Settings.Pose);
 	ApplyChar(*Wreck, *Hull, Request.Settings.Pose);
 	ERegularDeathVariant PlayedVariant = Request.Variant;
+	if (PlayedVariant == ERegularDeathVariant::WheelThrow && not StartWheelThrow(*Wreck, *Hull, Request))
+	{
+		// Wheeled vehicles, unseen deaths and a full burst budget throw debris instead, if anything.
+		PlayedVariant = ERegularDeathVariant::Debris;
+	}
 	if (PlayedVariant == ERegularDeathVariant::Debris || PlayedVariant == ERegularDeathVariant::HeavyDebris)
 	{
 		PlayedVariant = StartDebrisWithFallback(*Wreck, *Hull, Request);
@@ -85,9 +104,11 @@ void FWreckRegularDeath::StartOnWreck(AActor* Wreck, const FWreckRegularDeathReq
 	{
 		StartChainReaction(*Wreck, *Hull, Turret, Request.Settings.ChainReaction);
 	}
-	UE_LOG(LogWreckRegularDeath, Log, TEXT("RTS_WRD wreck=%s drawn=%s played=%s kill_shot=%s seen=%d"),
-	       *Wreck->GetName(), *UEnum::GetValueAsString(Request.Variant), *UEnum::GetValueAsString(PlayedVariant),
-	       *Request.KillShotDirection.ToCompactString(), Request.bIsSeen ? 1 : 0);
+	UE_LOG(LogWreckRegularDeath, Log,
+	       TEXT("RTS_WRD wreck=%s subtype=%s drawn=%s played=%s kill_shot=%s seen=%d track_wheels=%d"),
+	       *Wreck->GetName(), *UEnum::GetValueAsString(Request.TankSubtype), *UEnum::GetValueAsString(Request.Variant),
+	       *UEnum::GetValueAsString(PlayedVariant), *Request.KillShotDirection.ToCompactString(),
+	       Request.bIsSeen ? 1 : 0, Request.bHasTrackWheels ? 1 : 0);
 }
 
 UStaticMeshComponent* FWreckRegularDeath::FindNamedMesh(const AActor& Wreck, const FName ComponentName)
@@ -214,12 +235,9 @@ bool FWreckRegularDeath::StartDebris(const AActor& Wreck, UStaticMeshComponent& 
 	using namespace WreckRegularDeathConstants;
 	const FWreckNiagaraDebrisSettings& Debris = Request.Settings.Debris;
 	const int32 BurstSlots = bIsHeavy ? Debris.HeavyBurstSlots : DebrisBurstSlots;
-	UWorld* World = Wreck.GetWorld();
-	UWreckDeathVariantSubsystem* VariantSubsystem = IsValid(World)
-		                                                ? World->GetSubsystem<UWreckDeathVariantSubsystem>()
-		                                                : nullptr;
-	if ((Debris.bOnlyWhenSeen && not Request.bIsSeen) || not IsValid(VariantSubsystem)
-		|| not VariantSubsystem->GetCanStartDebrisBurst(BurstSlots) || Debris.DebrisSystem.IsNull())
+	UWreckDeathVariantSubsystem* VariantSubsystem = GetSubsystemForBurst(Wreck, Request.bIsSeen, Debris.bOnlyWhenSeen,
+	                                                                     BurstSlots);
+	if (not IsValid(VariantSubsystem) || Debris.DebrisSystem.IsNull())
 	{
 		return false;
 	}
@@ -232,25 +250,129 @@ bool FWreckRegularDeath::StartDebris(const AActor& Wreck, UStaticMeshComponent& 
 	}
 
 	const FBoxSphereBounds HullBounds = Hull.Bounds;
-	const FVector Origin = HullBounds.Origin + FVector(0.f, 0.f, HullBounds.BoxExtent.Z * DebrisOriginAboveCentre);
-	UNiagaraComponent* DebrisComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		World, DebrisSystem, Origin, FRotator::ZeroRotator, FVector::OneVector, true, false);
-	if (not IsValid(DebrisComponent))
+	const bool bHasKillShot = not FVector(Request.KillShotDirection.X, Request.KillShotDirection.Y, 0.f).IsNearlyZero();
+	FWreckMeshBurstSpawn Burst;
+	Burst.Origin = HullBounds.Origin + FVector(0.f, 0.f, HullBounds.BoxExtent.Z * DebrisOriginAboveCentre);
+	Burst.PieceCount = GetDebrisPieceCount(Debris, Hull, bIsHeavy);
+	Burst.ThrowDirection = GetDebrisThrowDirection(Debris, Request.KillShotDirection);
+	Burst.ConeDegrees = bHasKillShot ? Debris.ShotConeDegrees : Debris.UpConeDegrees;
+	Burst.SpreadRadius = HullBounds.SphereRadius;
+	Burst.Material = VariantSubsystem->GetDebrisMaterialForHull(Hull.GetMaterial(0),
+	                                                            Debris.ChunkMaterial.LoadSynchronous());
+	Burst.BurstSlots = BurstSlots;
+	Burst.LieSeconds = Debris.LieSeconds;
+	Burst.SinkSeconds = Debris.SinkSeconds;
+	return SpawnMeshBurst(Wreck, *DebrisSystem, Burst, *VariantSubsystem);
+}
+
+bool FWreckRegularDeath::StartWheelThrow(const AActor& Wreck, const UStaticMeshComponent& Hull,
+                                         const FWreckRegularDeathRequest& Request)
+{
+	using namespace WreckRegularDeathConstants;
+	const FWreckWheelThrowSettings& WheelThrow = Request.Settings.WheelThrow;
+	const TSoftObjectPtr<UNiagaraSystem>& WheelSystemPath = Global_GetIsSovietTank(Request.TankSubtype)
+		                                                        ? WheelThrow.SovietWheelSystem
+		                                                        : WheelThrow.GermanWheelSystem;
+	const UStaticMesh* HullMesh = Hull.GetStaticMesh();
+	if (not Request.bHasTrackWheels || Request.TankSubtype == ETankSubtype::Tank_None || WheelSystemPath.IsNull()
+		|| not IsValid(HullMesh))
 	{
 		return false;
 	}
-	const bool bHasKillShot = not FVector(Request.KillShotDirection.X, Request.KillShotDirection.Y, 0.f).IsNearlyZero();
-	DebrisComponent->SetVariableInt(DebrisPieceCountParam, GetDebrisPieceCount(Debris, Hull, bIsHeavy));
-	DebrisComponent->SetVariableVec3(DebrisThrowDirectionParam,
-	                                 GetDebrisThrowDirection(Debris, Request.KillShotDirection));
-	DebrisComponent->SetVariableFloat(DebrisConeAngleParam, bHasKillShot ? Debris.ShotConeDegrees : Debris.UpConeDegrees);
-	DebrisComponent->SetVariableFloat(DebrisHullRadiusParam, HullBounds.SphereRadius);
-	UMaterialInterface* ChunkMaterial = Debris.ChunkMaterial.LoadSynchronous();
-	DebrisComponent->SetVariableMaterial(DebrisMaterialParam,
-	                                     VariantSubsystem->GetDebrisMaterialForHull(Hull.GetMaterial(0), ChunkMaterial));
-	DebrisComponent->SetVariableVec3(DebrisScaleParam, FVector::OneVector);
-	DebrisComponent->Activate(true);
-	VariantSubsystem->RegisterDebrisBurst(DebrisComponent, Debris.LieSeconds, Debris.SinkSeconds, BurstSlots);
+	UWreckDeathVariantSubsystem* VariantSubsystem = GetSubsystemForBurst(
+		Wreck, Request.bIsSeen, Request.Settings.Debris.bOnlyWhenSeen, DebrisBurstSlots);
+	if (not IsValid(VariantSubsystem))
+	{
+		return false;
+	}
+	UNiagaraSystem* WheelSystem = WheelSystemPath.LoadSynchronous();
+	if (not IsValid(WheelSystem))
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(
+			TEXT("FWreckRegularDeath::StartWheelThrow - could not load %s."), *WheelSystemPath.ToString()));
+		return false;
+	}
+
+	// The hull's own frame: the wreck may stand at any yaw, so world-aligned bounds would pick the wrong side.
+	const FBox LocalHullBox = HullMesh->GetBoundingBox();
+	const float Side = GetWheelThrowSide(Hull, Request.KillShotDirection);
+	const FVector LocalOrigin(LocalHullBox.GetCenter().X,
+	                          LocalHullBox.GetCenter().Y + Side * LocalHullBox.GetExtent().Y * WheelOriginSideShare,
+	                          LocalHullBox.Min.Z + LocalHullBox.GetSize().Z * WheelOriginHeightShare);
+	const FTransform& HullTransform = Hull.GetComponentTransform();
+	const FVector SideDirection = (HullTransform.TransformVectorNoScale(FVector::RightVector) * Side).GetSafeNormal2D();
+	FWreckMeshBurstSpawn Burst;
+	Burst.Origin = HullTransform.TransformPosition(LocalOrigin);
+	Burst.PieceCount = GetWheelCount(WheelThrow, Request.TankSubtype);
+	Burst.ThrowDirection = FMath::Lerp(FVector::UpVector, SideDirection, WheelThrow.SideLean).GetSafeNormal();
+	Burst.ConeDegrees = WheelThrow.ConeDegrees;
+	Burst.SpreadRadius = LocalHullBox.GetExtent().X * HullTransform.GetScale3D().X * WheelSpreadLengthShare;
+	Burst.BurstSlots = DebrisBurstSlots;
+	Burst.LieSeconds = WheelThrow.LieSeconds;
+	Burst.SinkSeconds = WheelThrow.SinkSeconds;
+	return SpawnMeshBurst(Wreck, *WheelSystem, Burst, *VariantSubsystem);
+}
+
+int32 FWreckRegularDeath::GetWheelCount(const FWreckWheelThrowSettings& WheelThrow, const ETankSubtype TankSubtype)
+{
+	const FIntPoint WheelRange = Global_GetIsHeavyTank(TankSubtype)
+		                             ? WheelThrow.HeavyTankWheels
+		                             : Global_GetIsMediumTank(TankSubtype)
+		                             ? WheelThrow.MediumTankWheels
+		                             : Global_GetIsLightTank(TankSubtype)
+		                             ? WheelThrow.LightTankWheels
+		                             : WheelThrow.OtherTrackedWheels;
+	return FMath::Max(1, FMath::RandRange(WheelRange.X, WheelRange.Y));
+}
+
+float FWreckRegularDeath::GetWheelThrowSide(const UStaticMeshComponent& Hull, const FVector& KillShotDirection)
+{
+	const FVector ShotHorizontal = FVector(KillShotDirection.X, KillShotDirection.Y, 0.f).GetSafeNormal();
+	if (ShotHorizontal.IsNearlyZero())
+	{
+		return FMath::RandBool() ? 1.f : -1.f;
+	}
+	// A shot travelling towards the hull's right exits through its right side.
+	return FVector::DotProduct(ShotHorizontal, Hull.GetRightVector()) >= 0.f ? 1.f : -1.f;
+}
+
+UWreckDeathVariantSubsystem* FWreckRegularDeath::GetSubsystemForBurst(const AActor& Wreck, const bool bIsSeen,
+                                                                      const bool bOnlyWhenSeen,
+                                                                      const int32 BurstSlots)
+{
+	UWorld* World = Wreck.GetWorld();
+	UWreckDeathVariantSubsystem* VariantSubsystem = IsValid(World)
+		                                                ? World->GetSubsystem<UWreckDeathVariantSubsystem>()
+		                                                : nullptr;
+	if ((bOnlyWhenSeen && not bIsSeen) || not IsValid(VariantSubsystem)
+		|| not VariantSubsystem->GetCanStartDebrisBurst(BurstSlots))
+	{
+		return nullptr;
+	}
+	return VariantSubsystem;
+}
+
+bool FWreckRegularDeath::SpawnMeshBurst(const AActor& Wreck, UNiagaraSystem& System, const FWreckMeshBurstSpawn& Burst,
+                                        UWreckDeathVariantSubsystem& VariantSubsystem)
+{
+	using namespace WreckRegularDeathConstants;
+	UNiagaraComponent* BurstComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		Wreck.GetWorld(), &System, Burst.Origin, FRotator::ZeroRotator, FVector::OneVector, true, false);
+	if (not IsValid(BurstComponent))
+	{
+		return false;
+	}
+	BurstComponent->SetVariableInt(DebrisPieceCountParam, Burst.PieceCount);
+	BurstComponent->SetVariableVec3(DebrisThrowDirectionParam, Burst.ThrowDirection);
+	BurstComponent->SetVariableFloat(DebrisConeAngleParam, Burst.ConeDegrees);
+	BurstComponent->SetVariableFloat(DebrisHullRadiusParam, Burst.SpreadRadius);
+	if (IsValid(Burst.Material))
+	{
+		BurstComponent->SetVariableMaterial(DebrisMaterialParam, Burst.Material);
+	}
+	BurstComponent->SetVariableVec3(DebrisScaleParam, FVector::OneVector);
+	BurstComponent->Activate(true);
+	VariantSubsystem.RegisterDebrisBurst(BurstComponent, Burst.LieSeconds, Burst.SinkSeconds, Burst.BurstSlots);
 	return true;
 }
 

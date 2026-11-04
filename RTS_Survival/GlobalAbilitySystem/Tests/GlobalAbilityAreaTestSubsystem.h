@@ -11,6 +11,7 @@
 class AAircraftMaster;
 class ACPPController;
 class APlayerAimAbility;
+class ARadixiteNuke;
 class UGlobalAbility;
 
 UENUM()
@@ -31,6 +32,8 @@ enum class EGlobalAbilityAreaTestStep : uint8
 	// Clicked like the panel button: no aim, vision bubbles on hidden enemy units.
 	SpiesInfiltration,
 	Nuke,
+	// Fired once the nuke's radiation is over, on the same spot: a low arc in, a blast and no radiation.
+	V2Rocket,
 	Finished
 };
 
@@ -97,6 +100,13 @@ private:
 	TArray<TWeakObjectPtr<AActor>> M_RevealedBySpies;
 	bool bM_HasSentSpies = false;
 
+	// The V2 is aimed only after the nuke's radiation ends; its flight is measured while it is in the air.
+	TWeakObjectPtr<ARadixiteNuke> M_V2Rocket;
+	bool bM_HasAimedV2Rocket = false;
+	float M_V2MaxApproachDistance = 0.f;
+	float M_V2MaxHeight = 0.f;
+	float M_V2BlastSeconds = -1.f;
+
 	FB4HowitzerCaptureRig M_CaptureRig;
 
 	void Check(const bool bCondition, const FString& Description, const FString& Details = FString());
@@ -145,8 +155,15 @@ private:
 	void CheckSpiesReveal();
 	TArray<AActor*> GetHiddenEnemyUnits() const;
 	void StartNuke();
+	AActor* SpawnVictimNearAnchor(const FVector2D& Offset, const uint8 OwningPlayer) const;
 	void TickNuke();
 	void CheckNukeResult();
+	void StartV2Rocket();
+	void AimV2Rocket();
+	void TickV2Rocket();
+	void TrackV2Flight();
+	void CheckV2Result();
+	bool IsAnyNukeActive() const;
 
 	int32 CountBubbles() const;
 	AAircraftMaster* FindRunAircraft() const;

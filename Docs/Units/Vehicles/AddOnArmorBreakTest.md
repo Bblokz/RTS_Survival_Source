@@ -156,7 +156,24 @@ Game thread / render thread, best repeat (ms):
   collection runs. In the clean matrix: BakedMask r2 411 ms, BakedOpaque r2 329 ms (two runs back to back), BakedWpo r1
   132 ms in idle. The game thread is normal in these frames; the log has nothing at those times. BakedOpaque has them
   too, so it is not the hiding material. A hit only writes one Custom Primitive Data float (a primitive uniform
-  buffer update on the render thread). Cause not established; it needs an Unreal trace of a baked run.
+  buffer update on the render thread). See the trace and quiet-machine runs below: these were outside load.
+
+### Render-thread stalls: trace and quiet-machine check
+
+- Unreal trace (`TraceClose_*`, 4 baked runs, `trace_hitches.py`): one stall caught, BakedMask r2, 313 ms render
+  thread in the first second of the hitting phase. Inside it the render thread did the same work as in every other
+  frame (Lumen surface cache: 37 card captures per frame, median 0.9 ms, 51 ms in that frame), and leaf scopes that
+  take 0.01 ms took 10-14 ms once each (view uniform buffer setup, a buffer creation, the fog of war post process).
+  That is the thread losing the CPU in scheduler-sized slices, not extra work.
+- Other sessions run headless Unreal processes on this machine, including `UnrealEditor-Win64-DebugGame-Cmd`, which
+  the matrix's wait did not catch. `run_matrix.sh` now waits for any `UnrealEditor*-Cmd` and writes a `CONCURRENT`
+  line when one is still running after a run ends.
+- Quiet-machine matrix (`PerfCloseQuiet_*`, `matrix_20261104_180534.txt`: None, BakedOpaque, BakedMask, 4 repeats,
+  editor closed): no frame over 250 ms in any of the 12 runs. Frames of 80-170 ms: BakedMask r2 in the idle phase
+  (before any hit, game thread, the whole phase 5 ms slower: load), BakedOpaque r1 92 ms (flagged CONCURRENT: another
+  session's run started as it ended). None of them happens on the hit path.
+- Means, quiet machine, hitting phase (median of 4): frame None 14.28 / BakedOpaque 15.17 / BakedMask 14.23 ms, GPU
+  7.95 / 8.17 / 7.93 ms, game thread 7.33 / 8.07 / 7.52 ms. BakedMask equals None.
 
 ### Measurement problems in this matrix
 
@@ -185,8 +202,8 @@ loses thin pieces through the ground and leaves a permanent game-thread cost on 
 
 Baked skirts with a masked material remove the intact-skirt cost: same CPU as no skirts, GPU cost below what this
 test resolves, one Custom Primitive Data write per hit. Mask is preferred over WPO: same pictures, no WPO vertex
-cost. Open points: the render-thread hitches seen with the baked hull (cause unknown), the lighting artefact under
-the skirt edge and LODs for the merged mesh.
+cost. The render-thread stalls seen in the shared-machine matrices did not recur on a quiet machine (see above).
+Open points: the lighting artefact under the skirt edge and LODs for the merged mesh.
 
 ## Running it
 
@@ -203,4 +220,6 @@ python Tools/AddOnArmorBreak/profilegpu_report.py --view Close && python Tools/A
 TECHNIQUE_LIST="None Niagara BakedOpaque BakedMask BakedWpo" REPEATS=3 SCALES="25:10" VIEW_TAG=CloseClean \
   Tools/AddOnArmorBreak/run_matrix.sh -AddOnArmorBreakViewDistance=2500 -AddOnArmorBreakViewPitch=-25
 python Tools/AddOnArmorBreak/frames_report.py PerfCloseClean_ --no-profile
+# what holds the long frames of a traced run (TRACE=1 run_test.sh ...); exports all events, takes ~2 min per trace
+python Tools/AddOnArmorBreak/trace_hitches.py Saved/AddOnArmorBreak/<tag>.utrace
 ```

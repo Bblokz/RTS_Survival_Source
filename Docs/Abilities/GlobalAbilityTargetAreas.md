@@ -12,6 +12,7 @@ happen rather than a crosshair texture.
 | `GA_GerFlareCurtain` | `UGA_FlareCurtain` | `Ger_Aircraft_JU390B_AirborneUnarmed` |
 | `GA_GerAirMinefield`, `GA_SovietAirMinefield` | `UGA_AirMinefield` | `Ger_Aircraft_ME5_Airbrone_Transport`, `Rus_PE8_Aircraft_Transport` |
 | `GA_GerRadixiteNuke`, `GA_SovietRadixiteNuke` | `UGA_RadixiteNuke` | V2 mesh falling on the target (`ARadixiteNuke`) |
+| `GA_GerV2Rocket` | `UGA_RadixiteNuke` | V2 rocket on a low arc (`ARadixiteNuke` with `ArcApproachDistance`), no radiation |
 
 The first three derive from `UGA_StripFlight`: it spawns the aircraft on the line of the strip at the map edge, orders
 `OrderStraightFlightRun` and reports progress along the strip. A shot-down aircraft ends the run, so what it had not
@@ -19,6 +20,20 @@ reached does not happen. Enemy AI and missions only give a point; the strip is t
 
 The aim settings are the single source of the sizes: `AreaRadius` is the reveal radius, the flare vision radius, the
 half width of the minefield or the blast radius, and `ShaderMarkerCount` is the number of flares.
+
+## V2 rocket
+
+`GA_GerV2Rocket` is a template of the nuke class, written by `Source/Tools/GlobalAbilityTargetAreas/setup_v2_rocket.py`
+(only its own template; it also builds the fire-coloured `M_TargetArea_V2Rocket` with an impact cross instead of the
+radiation sign, and `M_V2RocketShockwave`). With `ArcApproachDistance` above 0, `ARadixiteNuke` flies the warhead on a
+quadratic Bezier from 300 m out and 15 m up, peaking at `ArcApexHeight` (40 m) and diving in at about 35 degrees. It
+comes across the screen from a random side of the player's camera, a little from its far side. `FallSeconds` equals
+`WarningSeconds` (7 s), so the rocket launches on the order and is in the air the whole time. The siren
+(`S_SirenStart`) plays 2D at launch (`bWarningSound2D`) so the player always hears it. Blast: `NS_Nuke_3` untinted,
+core 6000 and blast 2100 (nuke: 4000 and 1400) over the same 45 m / 18 m radii, both sides. `RadiationSeconds` 0
+leaves no radiation: the scar is plain burnt ground (`Glow` 0) and the actor stops once the flash has faded. The owner
+keeps vision of the blast for at least 8 s after it. Tier IV, 1800 radixite + 450 vehicle parts, 360 s cooldown. It is
+in no commander kit yet.
 
 ## Aiming
 
@@ -59,7 +74,9 @@ UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject /Game/RTS_Survival/Ma
 
 `UGlobalAbilityAreaTestSubsystem` logs `RTS_ABILITY_TEST`. It clicks through the controller, kills a recon aircraft
 halfway, compares mines with the preview, checks enemy mines are hidden and that the nuke kills its core and spares
-what is outside. It holds each aim stage two seconds and finishes shader compilation first: a picture in the frame the
+what is outside. After the nuke's radiation ends it fires the V2 on the same spot and checks that it comes from far
+away on a low arc, kills its core, spares what is outside and leaves no radiation; its pictures follow the rocket in
+flight. It holds each aim stage two seconds and finishes shader compilation first: a picture in the frame the
 area appears shows nothing. Flares and mines of earlier steps stay in later pictures.
 
 `cmd.exe /c Build.bat` can report exit 0 after compile errors. Check the log and the DLL time.

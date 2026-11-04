@@ -42,7 +42,7 @@ Kits are set in `Config/DefaultGame.ini` (`[/Script/RTS_Survival.CommanderSettin
 | Luftwaffe Liaison | Recon flight | Pz IV harvester drop | Paratroopers | 3x Ju 87 | 2x Ho 229 (III) | E-100 drop (large aircraft) |
 | Barrage Marshal | Flare curtain | Radixite & metal supply drop | Pz IV spotter + Pz III drop | Single Ju 87 | Large barrage (III) | Sturmtiger drop |
 | Radixite Herald | Recon flight | Radixite cache drop | Radixite Pz II + Marder drop | 2x Ho 229 | Radixite V-weapon (IV) | E-100 drop |
-| Scrap Warlord | Flare curtain | Pz I harvester drop | Scavengers + support weapons drop | Me 410 strike | Air minefield (III) | Scrap JagdTiger (128 mm) drop |
+| Scrap Warlord | Spies infiltration | Pz I harvester drop | Scavengers + support weapons drop | Me 410 strike | Air minefield (III) | Scrap JagdTiger (128 mm) drop |
 | Rail Engineer | Recon flight | Radixite & metal supply drop | 2x Pz 38(t) Railgun drop | 2x Bf 110 strafing | Rail bombardment (III) | Tiger Rail drop |
 
 Character of each kit:
@@ -95,7 +95,7 @@ animations or unit Blueprint), and the Sonnengewehr beam ability. Built 2026-11-
 | I | `GA_GerReconFlight`, `GA_GerFlareCurtain`, `GA_GerSpiesInfiltration`, `GA_HarvesterDrop` (Pz IV harvester), `GA_GerPzIHarvesterDrop`, `GA_GerRadixiteMetalSupplyDrop`, `GA_GerRadixiteCacheDrop` |
 | II | `GA_GerParatroopers`, `GA_GerSpotterPzIIIDrop`, `GA_GerRadixitePzIIMarderDrop`, `GA_ScavengersDrop`, `GA_GerPz38tRailgunDrop` |
 | III | `GA_3xJu87Strafing`, `GA_Ju87Strafing`, `GA_2xHortentrafing`, `GA_Me410Airstrike`, `GA_2xBf110Strafing`, `GA_Barrage`, `GA_LargeBarrage`, `GA_GerAirMinefield`, `GA_GerRailBombardment` |
-| IV | `GA_GerRadixiteNuke`, `GA_GerKingTiger105Drop`, `GA_GerE100Drop`, `GA_GerSturmtigerDrop`, `GA_GerJagdTigerDrop`, `GA_GerTigerRailDrop` |
+| IV | `GA_GerRadixiteNuke`, `GA_GerV2Rocket` (in no kit yet), `GA_GerKingTiger105Drop`, `GA_GerE100Drop`, `GA_GerSturmtigerDrop`, `GA_GerJagdTigerDrop`, `GA_GerTigerRailDrop` |
 
 ## Spies Infiltration (`GA_GerSpiesInfiltration`)
 
@@ -104,8 +104,8 @@ units of the opponent that its owner cannot see (enemy units the fog hides; for 
 the in-enemy-vision tag), one soldier per squad, and attaches a 600 cm vision bubble (`AGlobalAbilityVisionBubble`)
 to each for 25 s, so the reveal follows the unit. The picks are random; they are spread at least one reveal radius
 apart before nearby units fill the rest, and units revealed by the previous use go last. Cooldown 180 s, cost 200
-radixite (`author_spies_infiltration.py`, also in `author_commander_abilities.py` BALANCE). It is in no commander
-kit yet. Icon: `spies_infiltration` in `compose_ability_icons.py` (soldier with field glasses, `Spy_Spot` render).
+radixite (`author_spies_infiltration.py`, also in `author_commander_abilities.py` BALANCE). Scrap Warlord slot 1
+(replaced its flare curtain, 2026-11-04). Icon: `spies_infiltration` in `compose_ability_icons.py` (soldier with field glasses, `Spy_Spot` render).
 With no hidden enemy units it still fires and starts its cooldown. Because it skips the aim, the controller's activate
 sounds (`AnnouncerSoundOnActivate`, `Sound2DOnActivate`) never play: put its sound on `Sound2DOnExecute`. Candidates
 are filtered by `IsHidden()`, so a unit hidden for another reason (outside the fog grid at a map edge) can take a pick.

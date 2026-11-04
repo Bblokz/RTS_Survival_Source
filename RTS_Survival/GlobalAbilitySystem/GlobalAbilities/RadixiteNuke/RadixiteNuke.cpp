@@ -2,6 +2,7 @@
 
 #include "RadixiteNuke.h"
 
+#include "Camera/PlayerCameraManager.h"
 #include "Components/DecalComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -34,6 +35,12 @@ namespace RadixiteNukeConstants
 	constexpr float ShockwaveSeconds = 2.f;
 	// Steep but not vertical, so the warhead reads as arriving from somewhere.
 	constexpr float FallSidewaysFraction = 0.35f;
+	// Distance of the arc's control point from the target, as part of the approach: sets the dive angle (~35 deg).
+	constexpr float ArcControlDistanceFraction = 0.3f;
+	// How much of the arc's speed-up comes from easing in time; the rest of the flight runs at about even speed.
+	constexpr float ArcEaseIn = 0.5f;
+	// The arc comes in across the screen, a little from its far side, so the whole flight is seen.
+	constexpr float ArcFromFarSideFraction = 0.5f;
 	constexpr int32 ShakeCalibreMm = 800;
 
 	const FName PlaneLengthParameter(TEXT("PlaneLength"));
@@ -82,6 +89,10 @@ ARadixiteNuke::ARadixiteNuke()
 	M_TrailEffect->SetupAttachment(M_WarheadMesh);
 	M_TrailEffect->SetAutoActivate(false);
 
+	M_SmokeTrailEffect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SmokeTrailEffect"));
+	M_SmokeTrailEffect->SetupAttachment(M_WarheadMesh);
+	M_SmokeTrailEffect->SetAutoActivate(false);
+
 	M_FlashLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("FlashLight"));
 	M_FlashLight->SetupAttachment(M_Root);
 	M_FlashLight->SetCastShadows(false);
@@ -112,11 +123,23 @@ void ARadixiteNuke::StartNuke(const FVector& GroundZero, const float BlastRadius
 	SetupScar();
 	if (USoundBase* WarningSound = Visuals.WarningSound.Get())
 	{
-		UGameplayStatics::SpawnSoundAtLocation(this, WarningSound, GroundZero);
+		if (Visuals.bWarningSound2D)
+		{
+			UGameplayStatics::PlaySound2D(this, WarningSound);
+		}
+		else
+		{
+			UGameplayStatics::SpawnSoundAtLocation(this, WarningSound, GroundZero);
+		}
 	}
 	M_Phase = ERadixiteNukePhase::Warning;
 	M_PhaseSeconds = 0.f;
 	SetActorTickEnabled(true);
+}
+
+FVector ARadixiteNuke::GetWarheadLocation() const
+{
+	return M_WarheadMesh->GetComponentLocation();
 }
 
 void ARadixiteNuke::SetupWarningArea()
@@ -213,25 +236,67 @@ void ARadixiteNuke::StartFalling()
 		M_WarheadMesh->SetRelativeScale3D(FVector(M_Visuals.WarheadScale));
 		M_WarheadMesh->SetVisibility(true);
 	}
-	if (UNiagaraSystem* TrailEffect = M_Visuals.WarheadTrailEffect.Get())
+	const auto StartTrail = [this](UNiagaraComponent* Trail, UNiagaraSystem* Effect)
 	{
-		M_TrailEffect->SetAsset(TrailEffect);
-		M_TrailEffect->Activate(true);
-	}
+		if (not IsValid(Effect))
+		{
+			return;
+		}
+		Trail->SetRelativeLocationAndRotation(M_Visuals.WarheadTrailOffset, M_Visuals.WarheadTrailRotation);
+		Trail->SetAsset(Effect);
+		Trail->Activate(true);
+	};
+	M_TrailEffect->SetRelativeScale3D(FVector(M_Visuals.WarheadTrailScale));
+	StartTrail(M_TrailEffect, M_Visuals.WarheadTrailEffect.Get());
+	StartTrail(M_SmokeTrailEffect, M_Visuals.WarheadSmokeTrailEffect.Get());
+	SetupFlightPath();
 	TickFalling();
+}
+
+void ARadixiteNuke::SetupFlightPath()
+{
+	using namespace RadixiteNukeConstants;
+	if (M_Settings.ArcApproachDistance <= 0.f)
+	{
+		M_FlightStart = M_GroundZero + FVector(M_Settings.FallStartHeight * FallSidewaysFraction, 0.f,
+		                                       M_Settings.FallStartHeight);
+		M_FlightControl = FMath::Lerp(M_FlightStart, M_GroundZero, 0.5f);
+		return;
+	}
+	const FVector Direction = GetArcApproachDirection();
+	const float StartHeight = M_Settings.ArcStartHeight;
+	const float ApexHeight = FMath::Max(M_Settings.ArcApexHeight, StartHeight);
+	// The highest point of a quadratic Bezier from StartHeight down to 0 through a control point at height C is
+	// C^2 / (2C - StartHeight); solved for C.
+	const float ControlHeight = ApexHeight + FMath::Sqrt(ApexHeight * (ApexHeight - StartHeight));
+	M_FlightStart = M_GroundZero + Direction * M_Settings.ArcApproachDistance + FVector(0.f, 0.f, StartHeight);
+	M_FlightControl = M_GroundZero + Direction * (M_Settings.ArcApproachDistance * ArcControlDistanceFraction)
+		+ FVector(0.f, 0.f, ControlHeight);
+}
+
+FVector ARadixiteNuke::GetArcApproachDirection() const
+{
+	using namespace RadixiteNukeConstants;
+	const APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(this, 0);
+	const FRotator CameraYaw(0.f, IsValid(CameraManager) ? CameraManager->GetCameraRotation().Yaw : 0.f, 0.f);
+	const FVector Side = FRotationMatrix(CameraYaw).GetUnitAxis(EAxis::Y) * (FMath::RandBool() ? 1.f : -1.f);
+	const FVector FarSide = FRotationMatrix(CameraYaw).GetUnitAxis(EAxis::X) * ArcFromFarSideFraction;
+	return (Side + FarSide).GetSafeNormal();
 }
 
 void ARadixiteNuke::TickFalling()
 {
 	using namespace RadixiteNukeConstants;
-	const FVector FallStart = M_GroundZero + FVector(M_Settings.FallStartHeight * FallSidewaysFraction, 0.f,
-	                                                 M_Settings.FallStartHeight);
 	const float Alpha = FMath::Clamp(M_PhaseSeconds / M_Settings.FallSeconds, 0.f, 1.f);
-	// It keeps accelerating down to the ground.
-	const FVector Location = FMath::Lerp(FallStart, M_GroundZero, Alpha * Alpha);
-	const FRotator FlightRotation = (M_GroundZero - FallStart).Rotation();
+	// The falling warhead keeps accelerating down to the ground; the arc only speeds up a little in its dive.
+	const float T = M_Settings.ArcApproachDistance > 0.f
+		                ? FMath::Lerp(Alpha, Alpha * Alpha, ArcEaseIn)
+		                : Alpha * Alpha;
+	const float U = 1.f - T;
+	const FVector Location = U * U * M_FlightStart + 2.f * U * T * M_FlightControl + T * T * M_GroundZero;
+	const FVector Tangent = U * (M_FlightControl - M_FlightStart) + T * (M_GroundZero - M_FlightControl);
 	M_WarheadMesh->SetWorldLocationAndRotation(
-		Location, (FlightRotation.Quaternion() * M_Visuals.WarheadRotation.Quaternion()).Rotator());
+		Location, (Tangent.Rotation().Quaternion() * M_Visuals.WarheadRotation.Quaternion()).Rotator());
 }
 
 void ARadixiteNuke::Detonate()
@@ -243,6 +308,7 @@ void ARadixiteNuke::Detonate()
 	M_WarningPlane->SetVisibility(false);
 	M_WarheadMesh->SetVisibility(false);
 	M_TrailEffect->Deactivate();
+	M_SmokeTrailEffect->Deactivate();
 
 	M_FlashLight->SetLightColor(M_Visuals.FlashColor);
 	M_FlashLight->SetAttenuationRadius(M_BlastRadius * FlashRadiusFraction);
@@ -336,9 +402,12 @@ void ARadixiteNuke::TickBlastVisuals() const
 		M_ShockwavePlane->SetVisibility(false);
 	}
 
-	if (IsValid(M_ScarMaterial) && M_Settings.RadiationSeconds > 0.f)
+	if (IsValid(M_ScarMaterial))
 	{
-		const float RadiationAlpha = FMath::Clamp(M_PhaseSeconds / M_Settings.RadiationSeconds, 0.f, 1.f);
+		// Without radiation the scar is plain burnt ground from the start.
+		const float RadiationAlpha = M_Settings.RadiationSeconds > 0.f
+			                             ? FMath::Clamp(M_PhaseSeconds / M_Settings.RadiationSeconds, 0.f, 1.f)
+			                             : 1.f;
 		M_ScarMaterial->SetScalarParameterValue(GlowParameter, 1.f - RadiationAlpha);
 	}
 }
@@ -350,7 +419,10 @@ void ARadixiteNuke::TickRadiating(const float DeltaSeconds)
 		M_NextRadiationPulseSeconds += M_Settings.RadiationPulseSeconds;
 		DealRadiationPulse();
 	}
-	if (M_PhaseSeconds > M_Settings.RadiationSeconds)
+	// Without radiation the flash and the shockwave still need their ticks to fade out.
+	const float BlastVisualSeconds = FMath::Max(RadixiteNukeConstants::FlashFadeSeconds,
+	                                            RadixiteNukeConstants::ShockwaveSeconds);
+	if (M_PhaseSeconds > FMath::Max(M_Settings.RadiationSeconds, BlastVisualSeconds))
 	{
 		EndRadiation();
 	}

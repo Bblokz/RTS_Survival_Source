@@ -87,7 +87,7 @@ void UWreckDeathVariantSubsystem::RefillVariantBag()
 {
 	M_VariantBag = {
 		ERegularDeathVariant::Standard, ERegularDeathVariant::ChainReaction, ERegularDeathVariant::Debris,
-		ERegularDeathVariant::HeavyDebris
+		ERegularDeathVariant::HeavyDebris, ERegularDeathVariant::WheelThrow
 	};
 	for (int32 Index = M_VariantBag.Num() - 1; Index > 0; --Index)
 	{

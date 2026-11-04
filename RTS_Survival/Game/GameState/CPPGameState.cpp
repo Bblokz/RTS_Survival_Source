@@ -10208,6 +10208,24 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_IronStorm, SquadData);
 
+	// Rail Troopers: heavy armour on the scavenger body, slow, anti-tank rail rifles.
+	SquadData.MaxHealth = EliteInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	SquadData.MaxAcceleration = SlowInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RailTroopers_Radixite},
+		{ERTSResourceType::Resource_Metal, RailTroopers_Metal}
+	});
+	SquadData.Abilities = BasicSquadAbilities;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_RailTroopers, SquadData);
+
 	// --------------------------------------------------
 	//                     Rus Infantry
 	// --------------------------------------------------

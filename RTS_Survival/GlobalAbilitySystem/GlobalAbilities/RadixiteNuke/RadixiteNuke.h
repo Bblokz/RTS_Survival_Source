@@ -25,7 +25,7 @@ enum class ERadixiteNukePhase : uint8
 	Warning,
 	// The warhead comes down on the target.
 	Falling,
-	// The blast is over; the ground poisons whatever stays on it.
+	// The blast is over; the ground poisons whatever stays on it, if the settings have radiation.
 	Radiating,
 	// Only the scar remains.
 	Spent
@@ -48,6 +48,19 @@ struct FRadixiteNukeSettings
 	// Height above the target at which the warhead appears; above the RTS camera.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "100"))
 	float FallStartHeight = 9000.f;
+
+	// Above 0 the warhead flies in on a low arc from this far away instead of falling from above, like a V2 rocket.
+	// It crosses the screen from the side, so set FallSeconds to WarningSeconds to show the whole flight.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float ArcApproachDistance = 0.f;
+
+	// Height above the target at which the arc starts.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float ArcStartHeight = 1500.f;
+
+	// Highest point of the arc above the target; at least ArcStartHeight. Keep it under the RTS camera.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	float ArcApexHeight = 4000.f;
 
 	// Damage at the centre of the core zone, which ignores armor; falls off towards the edge of the core.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
@@ -78,6 +91,7 @@ struct FRadixiteNukeSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.25"))
 	float RadiationPulseSeconds = 2.f;
 
+	// 0 leaves no radiation: the scar is plain burnt ground.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
 	float RadiationSeconds = 30.f;
 
@@ -105,6 +119,21 @@ struct FRadixiteNukeVisuals
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<UNiagaraSystem> WarheadTrailEffect;
 
+	// Place of the trail effect relative to the warhead mesh, e.g. at the nozzle of a rocket.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector WarheadTrailOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FRotator WarheadTrailRotation = FRotator::ZeroRotator;
+
+	// Exhaust effects made for small rockets scale with their component; a 14 m rocket needs a bigger flame.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.01"))
+	float WarheadTrailScale = 1.f;
+
+	// Optional smoke left behind along the flight, at the same place as the trail effect.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UNiagaraSystem> WarheadSmokeTrailEffect;
+
 	// The fireball and mushroom.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<UNiagaraSystem> DetonationEffect;
@@ -131,6 +160,10 @@ struct FRadixiteNukeVisuals
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<USoundBase> WarningSound;
+
+	// Plays the warning sound for everyone at full volume instead of at the target, where the camera may not be.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bWarningSound2D = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<USoundBase> DetonationSound;
@@ -169,6 +202,7 @@ public:
 	               const uint8 OwningPlayer);
 
 	ERadixiteNukePhase GetPhase() const { return M_Phase; }
+	FVector GetWarheadLocation() const;
 
 protected:
 	virtual void Tick(float DeltaSeconds) override;
@@ -188,6 +222,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UNiagaraComponent> M_TrailEffect;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraComponent> M_SmokeTrailEffect;
 
 	UPROPERTY()
 	TObjectPtr<UPointLightComponent> M_FlashLight;
@@ -212,6 +249,9 @@ private:
 
 	ERadixiteNukePhase M_Phase = ERadixiteNukePhase::Inactive;
 	FVector M_GroundZero = FVector::ZeroVector;
+	// Start and control point of the flight; a quadratic Bezier that ends at ground zero.
+	FVector M_FlightStart = FVector::ZeroVector;
+	FVector M_FlightControl = FVector::ZeroVector;
 	float M_BlastRadius = 0.f;
 	float M_CoreRadius = 0.f;
 	float M_PhaseSeconds = 0.f;
@@ -223,6 +263,8 @@ private:
 	void SetupScar();
 
 	void StartFalling();
+	void SetupFlightPath();
+	FVector GetArcApproachDirection() const;
 	void TickFalling();
 	void Detonate();
 	void DealBlastDamage() const;

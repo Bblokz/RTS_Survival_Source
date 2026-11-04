@@ -569,6 +569,8 @@ namespace DeveloperSettings
 				inline constexpr int32 LightBringers_Metal = 200;
 				inline constexpr int32 IronStorm_Radixite = 700;
 				inline constexpr int32 IronStorm_Metal = 300;
+				inline constexpr int32 RailTroopers_Radixite = 750;
+				inline constexpr int32 RailTroopers_Metal = 350;
 			}
 
 			namespace TeamWeapons
