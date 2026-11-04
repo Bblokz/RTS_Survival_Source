@@ -36,8 +36,9 @@ RADIXITE_CENTRE = [(RADIXITE + "_LargeWithGrowth", 1.0, 0)]
 RADIXITE_MEMBERS = [(RADIXITE, 1.0, 0), (RADIXITE + "_SmallDecal", 1.0, 0), (RADIXITE + "_NoDecal", 0.6, 0)]
 RADIXITE_BASE = [(RADIXITE, 1.0, 0), (RADIXITE + "_SmallDecal", 1.0, 0)]
 METAL_CENTRE = [(METAL + "MetalTower", 1.0, 0), (METAL + "Metal_Ruin1", 0.6, 0), (METAL + "Metal_BrokenWaterTank", 0.5, 0)]
-METAL_MEMBERS = [(METAL + "Metal_Barrels", 1.0, 0), (METAL + "Metal_Rails", 1.0, 0)]
-METAL_BASE = [(METAL + "Metal_Barrels", 1.0, 0), (METAL + "Metal_Rails", 1.0, 0)]
+# No rail bundles: their thin parallel rods read as debug lines from the game camera (critic, 2026-11-04).
+METAL_MEMBERS = [(METAL + "Metal_Barrels", 1.0, 0)]
+METAL_BASE = [(METAL + "Metal_Barrels", 1.0, 0)]
 HERDS = [(ANIMALS + "Sheep/BP_Wanderer_Sheep", 1.2, 0), (ANIMALS + "Cow/BP_Wanderer_Cow", 1.0, 0),
          (ANIMALS + "Goat/BP_Wanderer_Goat", 0.8, 0), (ANIMALS + "Pig/BP_Wanderer_Pig", 0.6, 0),
          (ANIMALS + "Chicken/BP_Wanderer_Chicken", 0.6, 0)]
@@ -56,8 +57,8 @@ NODES = [
     ("RadixiteNear", "RADIXITE", 3, 4, 7500.0, 18500.0, 8000.0, RADIXITE_CENTRE, "RANDOM", RADIXITE_MEMBERS, 5, 8, 320.0, 650.0, False),
     ("RadixiteFar", "RADIXITE", 3, 4, 18500.0, 100000.0, 9000.0, RADIXITE_CENTRE, "RANDOM", RADIXITE_MEMBERS, 5, 8, 320.0, 650.0, False),
     ("MetalBase", "METAL", 2, 2, 0.0, 7500.0, 3000.0, METAL_BASE, "RANDOM", [], 0, 0, 300.0, 0.0, False),
-    ("MetalNear", "METAL", 3, 4, 7500.0, 18500.0, 8000.0, METAL_CENTRE, "RANDOM", METAL_MEMBERS, 2, 4, 700.0, 1000.0, False),
-    ("MetalFar", "METAL", 3, 4, 18500.0, 100000.0, 9000.0, METAL_CENTRE, "RANDOM", METAL_MEMBERS, 2, 4, 700.0, 1000.0, False),
+    ("MetalNear", "METAL", 3, 4, 7500.0, 18500.0, 8000.0, METAL_CENTRE, "RANDOM", METAL_MEMBERS, 2, 4, 700.0, 1500.0, False),
+    ("MetalFar", "METAL", 3, 4, 18500.0, 100000.0, 9000.0, METAL_CENTRE, "RANDOM", METAL_MEMBERS, 2, 4, 700.0, 1500.0, False),
     ("TankHulks", "WRECK", 12, 16, 0.0, 100000.0, 2500.0, TANK_HULKS, "RANDOM", [], 0, 0, 300.0, 0.0, False),
     ("VehicleParts", "VEHICLE_PARTS", 7, 9, 0.0, 100000.0, 3000.0, VEHICLE_PARTS, "RANDOM", [], 0, 0, 300.0, 0.0, False),
     ("Herds", "ANIMALS", 5, 7, 0.0, 100000.0, 9000.0, [], "RANDOM", HERDS, 3, 6, 420.0, 0.0, True),
