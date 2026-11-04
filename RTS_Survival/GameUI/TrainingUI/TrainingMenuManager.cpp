@@ -1520,6 +1520,42 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Rus BTR-152A: anti-aircraft armoured car with the twin 14.5mm KPV mount.
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_BTR152A)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_BTR152A,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus GAZ-MM 72-K: light anti-aircraft truck with the 25mm 72-K pedestal gun.
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_GAZMM_72K)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_GAZMM_72K,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
 
 	// RUS LIGHT TANKS
 

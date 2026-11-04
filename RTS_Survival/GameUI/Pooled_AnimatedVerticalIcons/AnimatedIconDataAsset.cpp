@@ -8,4 +8,5 @@ UAnimatedIconDataAsset::UAnimatedIconDataAsset()
 	IconDefinitions.Add(ERTSVerticalAnimatedIcon::CommanderBoost);
 	IconDefinitions.Add(ERTSVerticalAnimatedIcon::RangeBoost);
 	IconDefinitions.Add(ERTSVerticalAnimatedIcon::Healing);
+	IconDefinitions.Add(ERTSVerticalAnimatedIcon::AmmoResupply);
 }

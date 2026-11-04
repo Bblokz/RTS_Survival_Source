@@ -3787,6 +3787,24 @@ void ACPPGameState::InitAllGameLightWeapons()
 		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flakvierling38_20MM_Emplaced, EmplacedFlakvierlingData);
 	}
 
+	// GAZ-MM 72-K 25mm: the Flak 38 setup (anti-aircraft autocannon, AP, light cannon range) with a heavier round
+	// (about +20% damage and penetration) fired from 7-round clips: a faster cycle and a short clip swap (about 1.4x
+	// a Flak 38's sustained output: 7 rounds per 2.1 s + 4 s).
+	{
+		constexpr float Gun72KDamageMlt = 1.2f;
+		constexpr float Gun72KPenMlt = 1.2f;
+		FWeaponData Gun72KData = WeaponData;
+		Gun72KData.WeaponName = EWeaponName::Gun72K_25MM;
+		Gun72KData.WeaponCalibre = 25;
+		Gun72KData.BaseDamage = WeaponData.BaseDamage * Gun72KDamageMlt;
+		Gun72KData.ArmorPen = FMath::RoundToFloat(WeaponData.ArmorPen * Gun72KPenMlt);
+		Gun72KData.ArmorPenMaxRange = FMath::RoundToFloat(WeaponData.ArmorPenMaxRange * Gun72KPenMlt);
+		Gun72KData.MagCapacity = 7;
+		Gun72KData.ReloadSpeed = 4.f;
+		Gun72KData.BaseCooldown = 0.3f;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Gun72K_25MM, Gun72KData);
+	}
+
 	// Flak Luchs: twin MG 151/15 fired through a multi projectile weapon on 2 sockets, so all stats are per
 	// projectile and one shot (one magazine round) fires both barrels. Damage formula as the Flak 38.
 	{
@@ -3816,6 +3834,37 @@ void ACPPGameState::InitAllGameLightWeapons()
 		TwinMg151Data.ShrapnelPen = 0;
 		TwinMg151Data.ProjectileMovementSpeed = BaseProjectileSpeed * TwinMg151ProjectileSpeedMlt;
 		M_TPlayerWeaponDataHashMap.Add(EWeaponName::MG151_15MM_Twin, TwinMg151Data);
+	}
+
+	// BTR-152A ZPTU-2: twin 14.5mm KPV fired through a multi projectile weapon on 2 sockets, so all stats are per
+	// projectile and one shot (one magazine round) fires both barrels. The PTRS round out of a heavy machine gun:
+	// it outranges and outpenetrates the DShK, but has no explosive filler like the 15mm MG 151.
+	{
+		constexpr float TwinKpvRangeMlt = 1.3f;
+		constexpr float TwinKpvProjectileSpeedMlt = 1.1f;
+		FWeaponData TwinKpvData = {};
+		TwinKpvData.WeaponName = EWeaponName::KPV_14_5MM_Twin;
+		TwinKpvData.DamageType = ERTSDamageType::Kinetic;
+		TwinKpvData.ShellType = EWeaponShellType::Shell_AP;
+		TwinKpvData.ShellTypes = {EWeaponShellType::Shell_AP};
+		TwinKpvData.WeaponCalibre = 14.5f;
+		TwinKpvData.TNTExplosiveGrams = 0.f;
+		TwinKpvData.BaseDamage = DamagePerMM * TwinKpvData.WeaponCalibre * FlakCannonBonusDamageFactor;
+		TwinKpvData.DamageFlux = DamageFluxPercentage;
+		TwinKpvData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(BasicSmallArmsRange * TwinKpvRangeMlt, 10);
+		TwinKpvData.ArmorPen = 40;
+		TwinKpvData.ArmorPenMaxRange = 32;
+		TwinKpvData.MagCapacity = 30;
+		TwinKpvData.ReloadSpeed = 6.f;
+		TwinKpvData.BaseCooldown = 0.3f;
+		TwinKpvData.CooldownFlux = CooldownFluxPercentage;
+		TwinKpvData.Accuracy = 82;
+		TwinKpvData.ShrapnelRange = 0;
+		TwinKpvData.ShrapnelDamage = 0;
+		TwinKpvData.ShrapnelParticles = 0;
+		TwinKpvData.ShrapnelPen = 0;
+		TwinKpvData.ProjectileMovementSpeed = BaseProjectileSpeed * TwinKpvProjectileSpeedMlt;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::KPV_14_5MM_Twin, TwinKpvData);
 	}
 
 	// Flak 36 37mm
@@ -6041,6 +6090,33 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Ba14, TankData);
 
+	// BTR-152A: thin open-topped hull, but a full-circle twin KPV mount that tracks aircraft quickly.
+	{
+		constexpr float BTR152AHealthMlt = 0.9f;
+		constexpr float BTR152ARotationSpeed = 38.f;
+		constexpr float BTR152AMountRotationSpeed = 45.f;
+		constexpr float BTR152AMaxSpeedKmh = 65.f;
+		constexpr float BTR152AReverseSpeedKmh = 25.f;
+		constexpr float BTR152AExpWorthMlt = 1.2f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * BTR152AHealthMlt, 5);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = BTR152ARotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = BTR152AMountRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = BTR152AMaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = BTR152AReverseSpeedKmh;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * BTR152AExpWorthMlt, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Puma_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Puma_VehicleParts}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_BTR152A, TankData);
+	}
+
 	// Zil ammo truck: unarmed supply truck carrying ammo crates.
 	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * 0.8f, 5);
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
@@ -6123,6 +6199,34 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.ExperienceMultiplier = 1.0f;
 		TankData.Abilities = BasicTankAbilities;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_BM13, TankData);
+	}
+
+	// GAZ-MM 72-K: the light GAZ-MM truck with a 25mm 72-K on a full-traverse pedestal. Unarmoured like the Zil
+	// trucks and a little lighter; the hand-cranked pedestal traverses faster than the BTR-152A's ZPTU-2.
+	{
+		constexpr float GAZMM72KHealthMlt = 0.8f;
+		constexpr float GAZMM72KRotationSpeed = 38.f;
+		constexpr float GAZMM72KMountRotationSpeed = 50.f;
+		constexpr float GAZMM72KMaxSpeedKmh = 60.f;
+		constexpr float GAZMM72KReverseSpeedKmh = 20.f;
+		constexpr float GAZMM72KExpWorthMlt = 1.1f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * GAZMM72KHealthMlt, 5);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = GAZMM72KRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = GAZMM72KMountRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = GAZMM72KMaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = GAZMM72KReverseSpeedKmh;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * GAZMM72KExpWorthMlt, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, GAZMM72K_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, GAZMM72K_VehicleParts}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_GAZMM_72K, TankData);
 	}
 }
 

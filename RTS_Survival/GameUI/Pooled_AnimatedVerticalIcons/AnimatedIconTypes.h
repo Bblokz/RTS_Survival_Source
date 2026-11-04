@@ -10,6 +10,7 @@ enum class ERTSVerticalAnimatedIcon : uint8
 	CommanderBoost,
 	RangeBoost,
 	Healing,
+	AmmoResupply,
 	// Command entries are shown next to the cursor by UHoverCommandIconComponent, not as rising world icons.
 	// Leave an entry out of the data asset to never preview that command.
 	Command_Attack,
