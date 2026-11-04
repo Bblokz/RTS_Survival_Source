@@ -233,6 +233,14 @@ sizing in `MainGameUI_HUD`.
 - **Instances:** each widget type has its own (`MI_GlassPane_ActionButton`, `_TrainingItem`, `_BxpItem`,
   `_BxpOption`), whose `InsetFrac` puts the pane on that button's inner face (SceneItem body at 0.11 plus bevel).
   Without it the overflowing action buttons' panes overlapped and showed light bars.
+- **Global ability buttons:** `ui_glass_panes.apply_global_ability_items()` puts the pane into `W_BP_GA_Item`
+  (`Overlay_34`: cooldown button, `M_GlassPane`, hotkey) with `MI_GlassPane_GlobalAbility`.
+  - The icons are cut-corner cards, so the shader has a `ChamferFrac` scalar (0 = the rounded square, unchanged for
+    every other pane). Here it is 0.045 with `InsetFrac` 0.016, the picture inside the card's steel frame.
+  - The pane slot copies the cooldown image's padding (4 / 2 / 4 / 2), so it lies on the stretched 88 × 92 card.
+  - Weapon-card scratches and dust, a weaker streak (0.07), scratch edge bias 0.6. The cooldown stays in
+    `MI_GA_Cooldown` under the pane.
+  - Originals in `Saved/UISkinSwitcher/backup_globalability/`.
 - **Undo:** run `ui_glass_panes.restore()` (state in `Saved/UISkinSwitcher/glass_panes_state.json`, backups in
   `Saved/UISkinSwitcher/backup_glasspanes/`).
 - **Capture switches for the glass panes:**

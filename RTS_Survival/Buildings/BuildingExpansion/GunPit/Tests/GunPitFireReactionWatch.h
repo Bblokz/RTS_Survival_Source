@@ -32,6 +32,9 @@ struct FGunPitFireReactionWatch
 
 	// Crew from this index on only idle (spotter, commander); the loader and handler start their drill at the shot.
 	int32 FirstIdleCrewIndex = 2;
+	// Watched when the gun's anim instance has no gun-pit kick (a turret that recoils through its own fire montages,
+	// the Flakvierling's B_Gun1).
+	FName FallbackKickBone = NAME_None;
 	bool bChecked = false;
 	// Pictures taken so far after the shot (the scenario captures the kick peak and the held brace).
 	int32 CapturesTaken = 0;

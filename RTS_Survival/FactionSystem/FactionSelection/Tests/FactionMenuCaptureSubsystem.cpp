@@ -5,6 +5,7 @@
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
 #if RTS_WITH_MAP_TESTS
+#include "EngineUtils.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
 #include "UObject/UObjectIterator.h"
@@ -15,6 +16,10 @@
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitBrowser/W_FactionUnitTab.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitBrowser/W_FactionUnitTile.h"
 #include "RTS_Survival/FactionSystem/Factions/Factions.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/TeamColorPicker/W_FactionTeamColorPicker.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/TeamColorPicker/W_FactionTeamColorSwatch.h"
+#include "RTS_Survival/FactionSystem/TeamColor/FRTS_TeamColor.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSFactionMenuCapture, Log, All);
@@ -22,6 +27,9 @@ DEFINE_LOG_CATEGORY_STATIC(LogRTSFactionMenuCapture, Log, All);
 namespace FactionMenuCapturePrivate
 {
 	const TCHAR* const CommandLineSwitch = TEXT("FactionMenuCapture");
+	const TCHAR* const TeamColorsSwitch = TEXT("FactionMenuCaptureTeamColors");
+	// Red, blue, yellow, then the camo default again to show the preview goes back to its camo.
+	const int32 TeamColorSwatchesToClick[] = {1, 2, 4, 0};
 	// Shaders compile on the first frames of a fresh run; the first picture waits for them.
 	constexpr float FirstStepDelaySeconds = 12.f;
 	// Long enough for the preview unit a click spawns and for the screenshot of the previous step to be written.
@@ -63,7 +71,15 @@ void UFactionMenuCaptureSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
 	RTSFunctionLibrary::PushModalDialogSuppression();
-	BuildSteps();
+	M_OriginalTeamColor = FRTS_TeamColor::GetPlayerTeamColor(&InWorld);
+	if (FParse::Param(FCommandLine::Get(), FactionMenuCapturePrivate::TeamColorsSwitch))
+	{
+		BuildTeamColorSteps();
+	}
+	else
+	{
+		BuildSteps();
+	}
 	bM_IsActive = true;
 	M_NextStepRealSeconds = InWorld.GetRealTimeSeconds() + FactionMenuCapturePrivate::FirstStepDelaySeconds;
 	UE_LOG(LogRTSFactionMenuCapture, Display, TEXT("RTS_FACTION_MENU_CAPTURE started steps=%d"), M_Steps.Num());
@@ -80,6 +96,16 @@ void UFactionMenuCaptureSubsystem::BuildSteps()
 			M_Steps.Add({Faction, TabIndex, INDEX_NONE});
 		}
 		M_Steps.Add({Faction, 0, TileToClick});
+	}
+}
+
+void UFactionMenuCaptureSubsystem::BuildTeamColorSteps()
+{
+	using namespace FactionMenuCapturePrivate;
+	M_Steps.Add({ERTSFaction::GerBreakthroughDoctrine, INDEX_NONE, INDEX_NONE, INDEX_NONE});
+	for (const int32 SwatchIndex : TeamColorSwatchesToClick)
+	{
+		M_Steps.Add({ERTSFaction::GerBreakthroughDoctrine, INDEX_NONE, INDEX_NONE, SwatchIndex});
 	}
 }
 
@@ -110,6 +136,7 @@ void UFactionMenuCaptureSubsystem::Tick(const float DeltaTime)
 	{
 		const FString StepName = GetStepName(M_Steps[M_StepIndex]);
 		LogShownUnits(StepName);
+		LogPreviewTeamColor(StepName);
 		Capture(StepName);
 		bM_IsWaitingForScreenshot = true;
 		M_NextStepRealSeconds = World->GetRealTimeSeconds() + FactionMenuCapturePrivate::ScreenshotWriteSeconds;
@@ -155,8 +182,12 @@ UW_FactionUnitBrowser* UFactionMenuCaptureSubsystem::GetBrowser() const
 	return M_Menu.IsValid() ? M_Menu->GetUnitBrowser() : nullptr;
 }
 
-bool UFactionMenuCaptureSubsystem::ApplyStep(const FCaptureStep& Step) const
+bool UFactionMenuCaptureSubsystem::ApplyStep(const FCaptureStep& Step)
 {
+	if (Step.TeamColorSwatch != INDEX_NONE)
+	{
+		return ApplyTeamColorStep(Step);
+	}
 	if (Step.TabIndex == INDEX_NONE)
 	{
 		M_Menu->ShowFaction(Step.Faction);
@@ -185,6 +216,49 @@ bool UFactionMenuCaptureSubsystem::ApplyStep(const FCaptureStep& Step) const
 	}
 	Tile->SimulateClick();
 	return true;
+}
+
+bool UFactionMenuCaptureSubsystem::ApplyTeamColorStep(const FCaptureStep& Step)
+{
+	const UW_FactionTeamColorPicker* Picker = M_Menu->GetTeamColorPicker();
+	UW_FactionTeamColorSwatch* Swatch = IsValid(Picker) ? Picker->GetSwatch(Step.TeamColorSwatch) : nullptr;
+	if (not IsValid(Swatch))
+	{
+		UE_LOG(LogRTSFactionMenuCapture, Display, TEXT("RTS_FACTION_MENU_CAPTURE no_team_color_swatch %d"),
+		       Step.TeamColorSwatch);
+		return false;
+	}
+	bM_HasChangedTeamColor = true;
+	Swatch->SimulateClick();
+	return true;
+}
+
+void UFactionMenuCaptureSubsystem::LogPreviewTeamColor(const FString& StepName) const
+{
+	constexpr int32 TeamColorComponents = 4;
+	for (TActorIterator<ATankMaster> TankIterator(GetWorld()); TankIterator; ++TankIterator)
+	{
+		const UPrimitiveComponent* Mesh = TankIterator->FindComponentByClass<UPrimitiveComponent>();
+		const TArray<float>& Data = IsValid(Mesh) ? Mesh->GetCustomPrimitiveData().Data : TArray<float>();
+		FString TeamColorText = TEXT("unset");
+		if (Data.Num() >= FRTS_TeamColor::TeamColorPrimitiveDataIndex + TeamColorComponents)
+		{
+			const int32 First = FRTS_TeamColor::TeamColorPrimitiveDataIndex;
+			TeamColorText = FString::Printf(TEXT("%.2f,%.2f,%.2f,%.2f"), Data[First], Data[First + 1], Data[First + 2],
+			                                Data[First + 3]);
+		}
+		UE_LOG(LogRTSFactionMenuCapture, Display, TEXT("RTS_FACTION_MENU_CAPTURE %s preview=%s team_color=%s"),
+		       *StepName, *TankIterator->GetName(), *TeamColorText);
+	}
+}
+
+void UFactionMenuCaptureSubsystem::RestoreTeamColor()
+{
+	if (not bM_HasChangedTeamColor || not M_Menu.IsValid())
+	{
+		return;
+	}
+	M_Menu->HandleTeamColorSelected(M_OriginalTeamColor);
 }
 
 void UFactionMenuCaptureSubsystem::LogShownUnits(const FString& StepName) const
@@ -219,6 +293,10 @@ FString UFactionMenuCaptureSubsystem::GetStepName(const FCaptureStep& Step) cons
 {
 	FString FactionName = UEnum::GetValueAsString(Step.Faction);
 	FactionName.RemoveFromStart(TEXT("ERTSFaction::"));
+	if (Step.TeamColorSwatch != INDEX_NONE)
+	{
+		return FactionName + FString::Printf(TEXT("_TeamColor%d"), Step.TeamColorSwatch);
+	}
 	if (Step.TabIndex == INDEX_NONE)
 	{
 		return FactionName + TEXT("_Default");
@@ -235,6 +313,7 @@ FString UFactionMenuCaptureSubsystem::GetStepName(const FCaptureStep& Step) cons
 void UFactionMenuCaptureSubsystem::Finish()
 {
 	bM_IsActive = false;
+	RestoreTeamColor();
 	UE_LOG(LogRTSFactionMenuCapture, Display, TEXT("RTS_FACTION_MENU_CAPTURE done"));
 	RTSFunctionLibrary::PopModalDialogSuppression();
 	FPlatformMisc::RequestExit(false, TEXT("FactionMenuCapture"));

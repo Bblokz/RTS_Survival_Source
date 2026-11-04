@@ -1,0 +1,19 @@
+# Soldier meshes baked into corpse pose libraries by run_pose_bake.sh <label> <project> -RagdollPoseMeshes=<this file>.
+# Prefix|SkeletalMeshPath|Poses. The Scavenger and Mosin crew meshes are baked without a list (approved batch, 16 each).
+# The Walker spheres (EspSphere_01/04) are machines and leave no corpse.
+GerArmored|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/GermanSoldier/Meshes/Armored/SK_Ger_Armored.SK_Ger_Armored|12
+GerHeavilyArmored|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/GermanSoldier/Meshes/HeavilyArmored/SK_Ger_HeavilyArmored.SK_Ger_HeavilyArmored|12
+GerSoldierVarA|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/GermanSoldier/Meshes/SK_WWII_GermanSoldier_varA.SK_WWII_GermanSoldier_varA|12
+GerSniper|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/Sniper/SK_GerSniper.SK_GerSniper|12
+GerFemaleSniper|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/FemaleSniper/SK_GerFemaleSniper.SK_GerFemaleSniper|12
+GerHazmat|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/GerHazmat/SK_GerHazmat.SK_GerHazmat|12
+CyborgInfantry|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/CyborgInf(Flame)/Mesh/SK_cyborginfantry1.SK_cyborginfantry1|12
+CyborgArmored|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/CyborgInf_Flame_/MeshArmored/SK_Cyborg_Armored.SK_Cyborg_Armored|12
+DystopiaSoldier|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/Dystopian/SK_RTSDystopia_Soldier.SK_RTSDystopia_Soldier|12
+InfantryMaster|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/SK_InfantryMaster.SK_InfantryMaster|12
+RusCyborg|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/RusCyborg/SK_RusCyborg.SK_RusCyborg|12
+RusGreenHazmat|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/RusLightGreenhzmt/SK_RusLightGreenHazmat.SK_RusLightGreenHazmat|12
+RusGreenHazmatArmored|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/RusLightGreenhzmt/SK_RusLightGreenHazmatArmored.SK_RusLightGreenHazmatArmored|12
+RusBackroomHazmat|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/SkeletonsRus/Hazmat/SK_SovietBackroomHazmat.SK_SovietBackroomHazmat|12
+RusProject24|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/SkeletonsRus/Projekt24/SK_Rus_Project24.SK_Rus_Project24|12
+RusCortexOfficer|/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Rus/DystopianGeneral/Full/SK_Rus_CortexOfficer.SK_Rus_CortexOfficer|12

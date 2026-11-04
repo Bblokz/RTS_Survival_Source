@@ -519,6 +519,39 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
 	}
 
+	// Ger Pz IV Harvester
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_PzIV_Harvester)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			HarvesterTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_PzIV_Harvester,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+
+		FTrainingOption HarvesterItemID = FTrainingOption(
+			EAllUnitType::UNType_Harvester,
+			static_cast<uint8>(ETankSubtype::Tank_PzIV_Harvester)
+		);
+
+		FTrainingOptionState HarvesterTrainingOptionState = CreateTrainingOptionState(
+			HarvesterItemID,
+			MediumTankTrainingTime,
+			EAllUnitType::UNType_Harvester,
+			ETankSubtype::Tank_PzIV_Harvester,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(HarvesterItemID, HarvesterTrainingOptionState);
+	}
+
 	// Ger Pz I Scout
 	{
 		FTrainingOption ItemID = FTrainingOption(
@@ -1481,6 +1514,42 @@ void UTrainingMenuManager::InitAllGameTankTrainingOptions()
 			ArmoredCarMediumCalibreTrainingTime,
 			EAllUnitType::UNType_Tank,
 			ETankSubtype::Tank_BM13,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus BTR-152A: anti-aircraft armoured car with the twin 14.5mm KPV mount.
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_BTR152A)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_BTR152A,
+			ENomadicSubtype::Nomadic_None,
+			ESquadSubtype::Squad_None
+		);
+		M_TrainingOptionsMap.Add(ItemID, NewTrainingOptionState);
+	}
+
+	// Rus GAZ-MM 72-K: light anti-aircraft truck with the 25mm 72-K pedestal gun.
+	{
+		FTrainingOption ItemID = FTrainingOption(
+			EAllUnitType::UNType_Tank,
+			static_cast<uint8>(ETankSubtype::Tank_GAZMM_72K)
+		);
+
+		FTrainingOptionState NewTrainingOptionState = CreateTrainingOptionState(
+			ItemID,
+			LightTankTrainingTime,
+			EAllUnitType::UNType_Tank,
+			ETankSubtype::Tank_GAZMM_72K,
 			ENomadicSubtype::Nomadic_None,
 			ESquadSubtype::Squad_None
 		);

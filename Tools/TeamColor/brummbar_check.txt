@@ -1,0 +1,21 @@
+# Brummbar pale-camo key check next to three-tone vehicles (run_team_color_capture.sh).
+Warmup_Ger_Vehicle_PanzerIII_M=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIII/Ger_Vehicle_PanzerIII_M.Ger_Vehicle_PanzerIII_M_C
+Warmup_Ger_Vehicle_Hetzer=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Hetzer/Ger_Vehicle_Hetzer.Ger_Vehicle_Hetzer_C
+Warmup_Ger_Vehicle_PantherD=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherD/Ger_Vehicle_PantherD.Ger_Vehicle_PantherD_C
+Warmup_Ger_Vehicle_Brummbar=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Brumbar/Ger_Vehicle_Brummbar.Ger_Vehicle_Brummbar_C
+Ger_Vehicle_PanzerIII_M_Default=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIII/Ger_Vehicle_PanzerIII_M.Ger_Vehicle_PanzerIII_M_C
+Ger_Vehicle_PanzerIII_M_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIII/Ger_Vehicle_PanzerIII_M.Ger_Vehicle_PanzerIII_M_C|TeamColor=0.8,0.02,0.02,1
+Ger_Vehicle_PanzerIII_M_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIII/Ger_Vehicle_PanzerIII_M.Ger_Vehicle_PanzerIII_M_C|TeamColor=0.02,0.1,0.85,1
+Ger_Vehicle_PanzerIII_M_Yellow=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIII/Ger_Vehicle_PanzerIII_M.Ger_Vehicle_PanzerIII_M_C|TeamColor=0.9,0.7,0.02,1
+Ger_Vehicle_Hetzer_Default=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Hetzer/Ger_Vehicle_Hetzer.Ger_Vehicle_Hetzer_C
+Ger_Vehicle_Hetzer_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Hetzer/Ger_Vehicle_Hetzer.Ger_Vehicle_Hetzer_C|TeamColor=0.8,0.02,0.02,1
+Ger_Vehicle_Hetzer_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Hetzer/Ger_Vehicle_Hetzer.Ger_Vehicle_Hetzer_C|TeamColor=0.02,0.1,0.85,1
+Ger_Vehicle_Hetzer_Yellow=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/Hetzer/Ger_Vehicle_Hetzer.Ger_Vehicle_Hetzer_C|TeamColor=0.9,0.7,0.02,1
+Ger_Vehicle_PantherD_Default=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherD/Ger_Vehicle_PantherD.Ger_Vehicle_PantherD_C
+Ger_Vehicle_PantherD_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherD/Ger_Vehicle_PantherD.Ger_Vehicle_PantherD_C|TeamColor=0.8,0.02,0.02,1
+Ger_Vehicle_PantherD_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherD/Ger_Vehicle_PantherD.Ger_Vehicle_PantherD_C|TeamColor=0.02,0.1,0.85,1
+Ger_Vehicle_PantherD_Yellow=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/PantherD/Ger_Vehicle_PantherD.Ger_Vehicle_PantherD_C|TeamColor=0.9,0.7,0.02,1
+Ger_Vehicle_Brummbar_Default=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Brumbar/Ger_Vehicle_Brummbar.Ger_Vehicle_Brummbar_C
+Ger_Vehicle_Brummbar_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Brumbar/Ger_Vehicle_Brummbar.Ger_Vehicle_Brummbar_C|TeamColor=0.8,0.02,0.02,1
+Ger_Vehicle_Brummbar_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Brumbar/Ger_Vehicle_Brummbar.Ger_Vehicle_Brummbar_C|TeamColor=0.02,0.1,0.85,1
+Ger_Vehicle_Brummbar_Yellow=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Brumbar/Ger_Vehicle_Brummbar.Ger_Vehicle_Brummbar_C|TeamColor=0.9,0.7,0.02,1

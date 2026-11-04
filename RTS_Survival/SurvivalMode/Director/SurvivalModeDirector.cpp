@@ -17,6 +17,7 @@
 #include "RTS_Survival/SurvivalMode/Data/SurvivalModeSettings.h"
 #include "RTS_Survival/SurvivalMode/Deployment/SurvivalDeploymentComponent.h"
 #include "RTS_Survival/SurvivalMode/Director/Tests/SurvivalLoadoutTest.h"
+#include "RTS_Survival/SurvivalMode/MapContent/SurvivalMapContentVolume.h"
 #include "RTS_Survival/SurvivalMode/SovietBases/SurvivalSovietBaseComponent.h"
 #include "RTS_Survival/SurvivalMode/PointsOfInterest/SurvivalPointsOfInterestSubsystem.h"
 #include "RTS_Survival/SurvivalMode/Events/SurvivalEventSubsystem.h"
@@ -411,6 +412,12 @@ void ASurvivalModeDirector::ShowArmySelection()
 void ASurvivalModeDirector::ShowStartLocationPicker()
 {
 	SetPhase(ESurvivalPhase::StartLocationSelection);
+	// A map with one start location always starts there: there is nothing to pick.
+	if (M_StartLocations.Num() == 1 and M_StartLocations[0].IsValid())
+	{
+		ConfirmStartLocation(M_StartLocations[0].Get());
+		return;
+	}
 	ACPPController* PlayerController = GetPlayerController();
 	if (not IsValid(PlayerController) or not StartLocationPickerWidgetClass)
 	{
@@ -545,8 +552,12 @@ void ASurvivalModeDirector::GenerateStartLocationContent()
 		}
 		M_SovietBases->GenerateSovietBaseAt(StartLocation.Get(), BaseIndex++);
 	}
-	// Points of interest and wildlife (runtime PCG), after the base volumes exist so they keep clear of them.
-	USurvivalPointsOfInterestSubsystem::StartForMatch(this);
+	// A map with its own content graph brings its own sites and animals; the others get the generic points of interest.
+	if (not ASurvivalMapContentVolume::StartForMatch(this))
+	{
+		// Points of interest and wildlife (runtime PCG), after the base volumes exist so they keep clear of them.
+		USurvivalPointsOfInterestSubsystem::StartForMatch(this);
+	}
 	// Random events between waves (escorted supply convoys); binds to the phases and the wave director's rounds.
 	USurvivalEventSubsystem::StartForMatch(this);
 }

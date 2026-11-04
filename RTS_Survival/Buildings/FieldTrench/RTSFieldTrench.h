@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "RTS_Survival/Buildings/FieldTrench/FieldTrenchLayout.h"
+#include "RTS_Survival/Buildings/FieldTrench/Anchors/FieldTrenchAnchorComponent.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverSocketSource.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 
@@ -128,6 +129,31 @@ public:
 		const float MaximumLengthCm,
 		const float GroundHeight) const;
 
+	/**
+	 * @brief Plans a trench along a dragged path, see above.
+	 * @param Options With a start port the trench is joined to it and gets no start cap.
+	 */
+	TArray<FFieldTrenchPiecePlacement> PlanOnGround(
+		const TArray<FVector2D>& DragPath,
+		const float MaximumLengthCm,
+		const float GroundHeight,
+		const FFieldTrenchPlanOptions& Options) const;
+
+	/**
+	 * @brief The trench starts at this anchor: its first planned piece lies on the anchor's port. The anchor is
+	 * claimed when construction starts; while the trench is only laid out it is just used to find the ground,
+	 * which near the anchor lies under its owner's walls. An unset handle starts the trench with a cap.
+	 */
+	void SetStartAnchor(const FFieldTrenchAnchorHandle& Anchor);
+	const FFieldTrenchAnchorHandle& GetStartAnchor() const { return M_StartAnchor; }
+
+	/**
+	 * @brief The anchor this trench starts at is gone, with its owner; the trench closes that end with a cap.
+	 * @param AnchorPort The anchor's port: where the trench's first piece joined it.
+	 * @param AnchorHeight The height of the anchor.
+	 */
+	void OnStartAnchorLost(const FFieldTrenchOpenPort& AnchorPort, const float AnchorHeight);
+
 	/** @return What a piece of this length costs at the given price per metre; at least 1 of every priced resource. */
 	static TMap<ERTSResourceType, int32> GetCostOfLength(
 		const TMap<ERTSResourceType, int32>& CostPerMetre,
@@ -171,6 +197,13 @@ private:
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> M_PlannedMaterial;
 
+	FFieldTrenchAnchorHandle M_StartAnchor;
+	// The piece on the start anchor; the anchor shows its neck once this piece is dug.
+	TWeakObjectPtr<UStaticMeshComponent> M_StartAnchorPiece;
+	// The actor of the start anchor; the ground is looked for through it, also after the anchor was lost.
+	TWeakObjectPtr<AActor> M_GroundIgnoredActor;
+	bool bM_HasClaimedStartAnchor = false;
+
 	int32 M_OwningPlayer = INDEX_NONE;
 	float M_TimeUntilResourceRetry = 0.0f;
 	bool bM_IsWaitingForResources = false;
@@ -193,6 +226,8 @@ private:
 	bool TryPayForPiece(const FFieldTrenchPieceRuntime& Piece) const;
 	void RefundPiece(const FFieldTrenchPieceRuntime& Piece) const;
 	void OnPieceBuilt(FFieldTrenchPieceRuntime& Piece);
+	void ClaimStartAnchor();
+	void ReleaseStartAnchor();
 
 	// Pieces often finish or go in the same frame; the cover finder reads the trench once at the next tick.
 	void ScheduleCoverRefresh();

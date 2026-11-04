@@ -81,4 +81,8 @@ public:
 	// The variant the player picked per unit type; empty (all Base) for saves made before variants existed.
 	UPROPERTY(SaveGame)
 	TArray<FUnitVariantSelection> M_UnitVariantSelections;
+
+	// The team colour of the player's vehicles; alpha 0 (also in saves made before team colours) keeps the camo.
+	UPROPERTY(SaveGame)
+	FLinearColor M_PlayerTeamColor = FLinearColor::Transparent;
 };

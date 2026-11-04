@@ -48,4 +48,16 @@ enum class EGlobalAbility : uint8
 	GA_SovietAirMinefield,
 	GA_GerRadixiteNuke,
 	GA_SovietRadixiteNuke,
+	// Commander kits (2026-11). Appended so existing assets and config keep their values.
+	GA_GerPzIHarvesterDrop,
+	GA_GerRadixiteMetalSupplyDrop,
+	GA_GerRadixiteCacheDrop,
+	GA_GerPz38tRailgunDrop,
+	GA_2xBf110Strafing,
+	GA_GerRailBombardment,
+	GA_GerSturmtigerDrop,
+	GA_GerJagdTigerDrop,
+	GA_GerKingTiger105Drop,
+	GA_GerE100Drop,
+	GA_GerTigerRailDrop,
 };

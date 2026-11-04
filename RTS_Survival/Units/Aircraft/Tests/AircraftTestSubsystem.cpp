@@ -83,6 +83,7 @@ namespace AircraftTestPrivate
 			{TEXT("GerFlakBunker"), TEXT("GerBxps/Bunkers/FlakBunker/Ger_BXP_FlakBunker.Ger_BXP_FlakBunker_C")},
 			{TEXT("GerPanzerIIIAA"), TEXT("@Ger_Medium/PanzerIII/Ger_Vehicle_PanzerIII_AA.Ger_Vehicle_PanzerIII_AA_C")},
 			{TEXT("RusT34AA"), TEXT("@Rus_Medium/T34/Rus_Vehicle_T34AA.Rus_Vehicle_T34AA_C")},
+			{TEXT("RusBTR152A"), TEXT("@Rus_ArmoredCar/BTR152A/Rus_ArmoredCar_BTR152A.Rus_ArmoredCar_BTR152A_C")},
 			// Crewed guns traverse slowly; an aircraft circling close by outruns the barrel most of the time.
 			{TEXT("GerFlak37TeamWeapon"), TEXT("#Flak37mm/Ger_SquadTW_Flak37MM.Ger_SquadTW_Flak37MM_C"), 1},
 			{TEXT("GerFlak88TeamWeapon"), TEXT("#Flak88Wheels/Ger_SquadTW_Flak88.Ger_SquadTW_Flak88_C"), 1},

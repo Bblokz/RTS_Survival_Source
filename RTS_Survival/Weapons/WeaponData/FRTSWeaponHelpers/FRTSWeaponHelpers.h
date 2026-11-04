@@ -14,6 +14,23 @@ class ASmallArmsProjectileManager;
 class UWeaponState;
 class UArmorCalculation;
 
+/**
+ * @brief Area damage that remembers where it came from: it lands async, when the pooled projectile may already
+ * have moved on, so the causer's location cannot be trusted as the epicentre.
+ */
+struct FRTSBlastDamageEvent : public FDamageEvent
+{
+	static constexpr int32 ClassID = 9100;
+
+	FVector Epicenter = FVector::ZeroVector;
+
+	virtual int32 GetTypeID() const override { return ClassID; }
+	virtual bool IsOfType(const int32 InID) const override
+	{
+		return ClassID == InID || FDamageEvent::IsOfType(InID);
+	}
+};
+
 namespace FRTSWeaponHelpers
 {
 	UArmorCalculation* GetArmorAndActorOrParentFromHit(const FHitResult& HitResult, AActor*& OutHitActor);
@@ -100,6 +117,14 @@ namespace FRTSWeaponHelpers
 	{
 		FDamageEvent E;
 		E.DamageTypeClass = GetDamageTypeClass(Type);
+		return E;
+	}
+
+	FORCEINLINE FRTSBlastDamageEvent MakeBlastDamageEvent(const ERTSDamageType Type, const FVector& Epicenter)
+	{
+		FRTSBlastDamageEvent E;
+		E.DamageTypeClass = GetDamageTypeClass(Type);
+		E.Epicenter = Epicenter;
 		return E;
 	}
 

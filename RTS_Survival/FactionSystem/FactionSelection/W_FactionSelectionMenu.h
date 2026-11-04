@@ -15,6 +15,7 @@ class USoundBase;
 struct FFactionUnitBrowserGroup;
 struct FSlateBrush;
 class UW_FactionUnitBrowser;
+class UW_FactionTeamColorPicker;
 class UW_Portrait;
 
 USTRUCT(BlueprintType)
@@ -92,7 +93,8 @@ struct FFactionMenuSetting
 
 /**
  * @brief Widget used to select a faction and preview its units before launching the campaign.
- * Creates the unit browser (M_UnitBrowserClass) on its canvas and fills it with the selected faction's units.
+ * Creates the unit browser (M_UnitBrowserClass) on its canvas and fills it with the selected faction's units, and the
+ * team colour picker under the faction buttons.
  * @note M_UnitBrowserClass: set to BP_W_FactionUnitBrowser in the class defaults.
  */
 UCLASS()
@@ -113,6 +115,10 @@ public:
 
 	/** Test access for the faction menu capture. */
 	UW_FactionUnitBrowser* GetUnitBrowser() const { return M_UnitBrowser; }
+	UW_FactionTeamColorPicker* GetTeamColorPicker() const { return M_TeamColorPicker; }
+
+	/** Stores the player's team colour (game instance and profile) and repaints the hangar preview with it. */
+	void HandleTeamColorSelected(const FLinearColor& TeamColor);
 
 protected:
 	virtual void NativeConstruct() override;
@@ -162,6 +168,12 @@ private:
 	UPROPERTY()
 	TObjectPtr<UW_FactionUnitBrowser> M_UnitBrowser;
 	void SetupUnitBrowser();
+
+	// Under the faction buttons; built in code with the unit browser's skin.
+	UPROPERTY()
+	TObjectPtr<UW_FactionTeamColorPicker> M_TeamColorPicker;
+	// Loads the saved team colour first, so the first hangar preview already shows it.
+	void SetupTeamColorPicker();
 
 	ERTSFaction M_SelectedFaction = ERTSFaction::GerBreakthroughDoctrine;
 

@@ -1,0 +1,97 @@
+{
+ "heat": [
+  {
+   "pos": [
+    900.0,
+    460.0,
+    395.0
+   ],
+   "radius": 63.0,
+   "rear": false
+  },
+  {
+   "pos": [
+    900.0,
+    -460.0,
+    395.0
+   ],
+   "radius": 63.0,
+   "rear": false
+  },
+  {
+   "pos": [
+    -150.0,
+    -1200.0,
+    279.0
+   ],
+   "radius": 135.0,
+   "rear": false
+  },
+  {
+   "pos": [
+    550.0,
+    900.0,
+    719.0
+   ],
+   "radius": 162.0,
+   "rear": false
+  },
+  {
+   "pos": [
+    1100.0,
+    900.0,
+    199.0
+   ],
+   "radius": 126.0,
+   "rear": false
+  },
+  {
+   "pos": [
+    -552.5,
+    -1200.0,
+    309.0
+   ],
+   "radius": 117.0,
+   "rear": false
+  },
+  {
+   "pos": [
+    -917.5,
+    -1200.0,
+    309.0
+   ],
+   "radius": 117.0,
+   "rear": false
+  },
+  {
+   "pos": [
+    -1100.0,
+    -360.0,
+    145.0
+   ],
+   "radius": 54.0,
+   "rear": true
+  }
+ ],
+ "soot": [
+  {
+   "pos": [
+    -1100.0,
+    -900.0,
+    320.0
+   ],
+   "radius": 90.0,
+   "what": "exhaust pipe on the rear wall"
+  },
+  {
+   "pos": [
+    -1050.0,
+    -900.0,
+    450.0
+   ],
+   "radius": 80.0,
+   "what": "fallout round the stack on the low plateau"
+  }
+ ],
+ "dropped": 1
+}

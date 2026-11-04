@@ -138,6 +138,11 @@ void UGlobalAbilitiesManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void UGlobalAbilitiesManager::SetMaxAllowedAbilityTier(const EGlobalAbilityTier MaxAllowedTier)
+{
+	M_MaxAllowedAbilityTier = MaxAllowedTier;
+}
+
 bool UGlobalAbilitiesManager::QueryRequirementForAbility(const UGlobalAbility* Ability) const
 {
 	if (not IsValid(Ability))
@@ -145,7 +150,22 @@ bool UGlobalAbilitiesManager::QueryRequirementForAbility(const UGlobalAbility* A
 		return false;
 	}
 
-	return QueryTechnologyRequirementForAbility(Ability) && QueryUnitRequirementForAbility(Ability);
+	return QueryTierAllowedForAbility(Ability) && QueryTechnologyRequirementForAbility(Ability)
+		&& QueryUnitRequirementForAbility(Ability);
+}
+
+bool UGlobalAbilitiesManager::QueryTierAllowedForAbility(const UGlobalAbility* Ability) const
+{
+	if (not IsValid(Ability))
+	{
+		return false;
+	}
+	if (IsEnemyAbilityManager())
+	{
+		return true;
+	}
+
+	return static_cast<uint8>(Ability->GetAbilityTier()) <= static_cast<uint8>(M_MaxAllowedAbilityTier);
 }
 
 bool UGlobalAbilitiesManager::QueryUnitRequirementForAbility(const UGlobalAbility* Ability) const
@@ -614,6 +634,14 @@ FText UGlobalAbilitiesManager::GetHoverDescriptionForAbility(const UGlobalAbilit
 	if (not IsValid(Ability))
 	{
 		return FText::GetEmpty();
+	}
+	if (not QueryTierAllowedForAbility(Ability))
+	{
+		return FText::FromString(FRTSRichTextConverter::MakeRTSRich(
+			FString::Printf(TEXT("Not available in this operation: %s ability (allowed up to %s)"),
+			                *Global_GetGlobalAbilityTierDisplayName(Ability->GetAbilityTier()),
+			                *Global_GetGlobalAbilityTierDisplayName(M_MaxAllowedAbilityTier)),
+			ERTSRichText::Text_Bad14));
 	}
 	if (Ability->M_AbilityRequirements.RequiredTechnology != ETechnology::Tech_NONE
 		&& not EnsureIsValidPlayerTechManager())

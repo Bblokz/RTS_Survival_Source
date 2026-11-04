@@ -21,6 +21,9 @@ class RTS_SURVIVAL_API ATrainUnit : public ATankMaster
 {
 	GENERATED_BODY()
 
+protected:
+	virtual bool GetCanThrowCrewOnDeath() const override { return false; }
+
 public:
 	ATrainUnit(const FObjectInitializer& ObjectInitializer);
 

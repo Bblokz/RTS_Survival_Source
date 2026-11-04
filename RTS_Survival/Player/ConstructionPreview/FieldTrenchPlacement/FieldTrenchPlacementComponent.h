@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/Buildings/FieldTrench/FieldTrenchLayout.h"
+#include "RTS_Survival/Buildings/FieldTrench/Anchors/FieldTrenchAnchorComponent.h"
 #include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
 
@@ -19,6 +20,10 @@ class UTrainerComponent;
  * trench starts, the trench then follows the mouse, and the second click ends it with an end cap and hands it
  * over to be dug. The trench is drawn as ghosts while it follows the mouse and is only laid where the player
  * may build. Nothing is paid here: the trench pays for each piece when its digging starts.
+ * A trench joins the player's trench anchors (UFieldTrenchAnchorComponent), such as the sockets at the back of
+ * a pit: a first click near a free anchor starts the trench on it, and while the start is free, moving the
+ * mouse near one ends the trench there. A trench joins one anchor; it is always planned from the anchor out,
+ * so the pieces fit the anchor exactly and its free end gets the cap.
  * Lives on the player controller, which routes the clicks of its field trench preview mode here.
  */
 UCLASS(ClassGroup = (Custom))
@@ -60,6 +65,8 @@ public:
 	void MapTest_SetCursorOverride(const TOptional<FVector>& CursorLocation) { M_MapTestCursorOverride = CursorLocation; }
 	const TArray<FFieldTrenchPiecePlacement>& MapTest_GetPlannedPieces() const { return M_PlannedPieces; }
 	ARTSFieldTrench* MapTest_GetLastConfirmedTrench() const { return M_LastConfirmedTrench.Get(); }
+	ARTSFieldTrench* MapTest_GetPreviewTrench() const { return M_PreviewTrench.Get(); }
+	const FFieldTrenchAnchorHandle& MapTest_GetPlanAnchor() const { return M_LastPlanAnchor; }
 #endif
 
 protected:
@@ -77,6 +84,15 @@ protected:
 	// The mouse path is recorded in steps of this length; the trench follows the recorded path.
 	UPROPERTY(EditDefaultsOnly, Category = "Field Trench", meta = (ClampMin = "10.0", Units = "cm"))
 	float PathPointSpacing = 50.0f;
+
+	// A click or the mouse this close to a free trench anchor joins the trench to it.
+	UPROPERTY(EditDefaultsOnly, Category = "Field Trench", meta = (ClampMin = "0.0", Units = "cm"))
+	float AnchorSnapRadius = 350.0f;
+
+	// A trench joined to an anchor at its end lets go of it once the mouse is this far from it; more than the
+	// snap radius, so the plan does not flip back and forth at its edge.
+	UPROPERTY(EditDefaultsOnly, Category = "Field Trench", meta = (ClampMin = "0.0", Units = "cm"))
+	float AnchorReleaseRadius = 500.0f;
 
 	// The trench stops where a piece would have to lean further than this to lie on the ground.
 	UPROPERTY(EditDefaultsOnly, Category = "Field Trench", meta = (ClampMin = "0.0", ClampMax = "45.0", Units = "deg"))
@@ -100,6 +116,12 @@ private:
 	// The path the shown plan was made for; the plan is only made again when the path changed.
 	TArray<FVector2D> M_LastPlanPath;
 	TArray<FFieldTrenchPiecePlacement> M_PlannedPieces;
+	// The anchor the first click was on.
+	FFieldTrenchAnchorHandle M_StartAnchor;
+	// The anchor the mouse is near while the start is free; the trench is then planned from it.
+	FFieldTrenchAnchorHandle M_EndAnchor;
+	// The anchor the shown plan starts at.
+	FFieldTrenchAnchorHandle M_LastPlanAnchor;
 	float M_StartHeight = 0.0f;
 	bool bM_IsPlacing = false;
 
@@ -116,10 +138,20 @@ private:
 	void UpdateDrawing();
 
 	/**
+	 * @param Location Where the click or the mouse is.
+	 * @param CurrentAnchor The anchor joined so far; kept while the location is within the release radius.
+	 * @return The free anchor of the player the trench joins there; unset for none.
+	 */
+	FFieldTrenchAnchorHandle FindAnchorNear(const FVector2D& Location,
+	                                        const FFieldTrenchAnchorHandle& CurrentAnchor) const;
+	static bool GetIsAnchorFree(const FFieldTrenchAnchorHandle& Anchor);
+
+	/**
 	 * @brief Plans the trench along the path and shortens it until every piece lies where the player may build.
 	 * @return The pieces that fit.
 	 */
-	TArray<FFieldTrenchPiecePlacement> PlanBuildableTrench(const TArray<FVector2D>& DragPath);
+	TArray<FFieldTrenchPiecePlacement> PlanBuildableTrench(const TArray<FVector2D>& DragPath,
+	                                                       const FFieldTrenchPlanOptions& Options);
 	bool GetArePiecesBuildable(const TArray<FFieldTrenchPiecePlacement>& Pieces);
 	void ResetPlacement();
 };

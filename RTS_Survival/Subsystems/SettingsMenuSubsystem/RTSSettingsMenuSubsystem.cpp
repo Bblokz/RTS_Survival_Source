@@ -60,6 +60,22 @@ namespace RTSSettingsMenuSubsystemPrivate
 		CVar->Set(static_cast<int32>(Level), ECVF_SetByGameSetting);
 	}
 
+	// Read by URTSCorpseSubsystem: how many crew corpses stay on the battlefield.
+	const TCHAR* const BattlefieldCorpsesCVarName = TEXT("rts.Corpses");
+
+	void SetBattlefieldCorpsesCVar(const ERTSBattlefieldCorpsesLevel Level)
+	{
+		IConsoleVariable* const CVar = IConsoleManager::Get().FindConsoleVariable(BattlefieldCorpsesCVarName);
+		if (CVar == nullptr)
+		{
+			RTSFunctionLibrary::ReportError(
+				FString::Printf(TEXT("Console variable %s was not found."), BattlefieldCorpsesCVarName));
+			return;
+		}
+
+		CVar->Set(global_GetBattlefieldCorpsesCount(Level), ECVF_SetByGameSetting);
+	}
+
 	const ERTSWindowMode DefaultWindowMode = ERTSWindowMode::Fullscreen;
 	const ERTSScalabilityQuality DefaultScalabilityQuality = ERTSScalabilityQuality::Epic;
 	const FIntPoint DefaultResolution = FIntPoint(1920, 1080);
@@ -317,6 +333,11 @@ void URTSSettingsMenuSubsystem::SetPendingAmbientEffectsLevel(const ERTSAmbientE
 	M_PendingSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_AmbientEffectsLevel = NewLevel;
 }
 
+void URTSSettingsMenuSubsystem::SetPendingBattlefieldCorpsesLevel(const ERTSBattlefieldCorpsesLevel NewLevel)
+{
+	M_PendingSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_BattlefieldCorpsesLevel = NewLevel;
+}
+
 void URTSSettingsMenuSubsystem::SetPendingMasterVolume(const float NewVolume)
 {
 	const float ClampedVolume = FMath::Clamp(NewVolume, RTSGameUserSettingsRanges::MinVolume, RTSGameUserSettingsRanges::MaxVolume);
@@ -550,6 +571,7 @@ void URTSSettingsMenuSubsystem::SetPendingSettingsToDefaults()
 	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_FoliageDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_StoneDensity = RTSGameUserSettingsRanges::DefaultEnvironmentDensity;
 	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_AmbientEffectsLevel = ERTSAmbientEffectsLevel::Maximum;
+	DefaultSettings.M_GraphicsSettings.M_EnvironmentDetailSettings.M_BattlefieldCorpsesLevel = ERTSBattlefieldCorpsesLevel::Some;
 
 	DefaultSettings.M_AudioSettings.M_MasterVolume = RTSGameUserSettingsRanges::DefaultVolume;
 	DefaultSettings.M_AudioSettings.M_MusicVolume = RTSGameUserSettingsRanges::DefaultVolume;
@@ -772,6 +794,7 @@ void URTSSettingsMenuSubsystem::ApplyEnvironmentDetailSettings() const
 		GameUserSettings->GetStoneDensity()
 	);
 	RTSSettingsMenuSubsystemPrivate::SetAmbientEffectsCVar(GameUserSettings->GetAmbientEffectsLevel());
+	RTSSettingsMenuSubsystemPrivate::SetBattlefieldCorpsesCVar(GameUserSettings->GetBattlefieldCorpsesLevel());
 }
 
 void URTSSettingsMenuSubsystem::ApplyAudioSettings()
@@ -1075,6 +1098,7 @@ FRTSSettingsSnapshot URTSSettingsMenuSubsystem::BuildSnapshotFromSettings(const 
 	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_FoliageDensity = GameUserSettings.GetFoliageDensity();
 	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_StoneDensity = GameUserSettings.GetStoneDensity();
 	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_AmbientEffectsLevel = GameUserSettings.GetAmbientEffectsLevel();
+	Snapshot.M_GraphicsSettings.M_EnvironmentDetailSettings.M_BattlefieldCorpsesLevel = GameUserSettings.GetBattlefieldCorpsesLevel();
 
 	Snapshot.M_AudioSettings.M_MasterVolume = GameUserSettings.GetMasterVolume();
 	Snapshot.M_AudioSettings.M_MusicVolume = GameUserSettings.GetMusicVolume();
@@ -1127,6 +1151,7 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetFoliageDensity(EnvironmentDetailSettings.M_FoliageDensity);
 	GameUserSettingsToApply.SetStoneDensity(EnvironmentDetailSettings.M_StoneDensity);
 	GameUserSettingsToApply.SetAmbientEffectsLevel(EnvironmentDetailSettings.M_AmbientEffectsLevel);
+	GameUserSettingsToApply.SetBattlefieldCorpsesLevel(EnvironmentDetailSettings.M_BattlefieldCorpsesLevel);
 
 	GameUserSettingsToApply.SetMasterVolume(SnapshotToApply.M_AudioSettings.M_MasterVolume);
 	GameUserSettingsToApply.SetMusicVolume(SnapshotToApply.M_AudioSettings.M_MusicVolume);

@@ -38,9 +38,9 @@ void UAircraftTestSubsystem::StartAircraftStrafe()
 	// check the commander's loadout from the settings and build the ability from its template as the manager does.
 	const UCommanderSettings* CommanderSettings = UCommanderSettings::Get();
 	const bool bInLoadout = IsValid(CommanderSettings)
-		&& CommanderSettings->GetCommanderSettingsForType(ERTSCommander::BalancedCommander).GlobalAbilities.Contains(
+		&& CommanderSettings->GetCommanderSettingsForType(ERTSCommander::LuftwaffeLiaison).GlobalAbilities.Contains(
 			EGlobalAbility::GA_2xHortentrafing);
-	Check(bInLoadout, TEXT("strafe_in_balanced_commander_loadout"));
+	Check(bInLoadout, TEXT("strafe_in_luftwaffe_liaison_loadout"));
 
 	ACPPController* Controller = FRTS_Statics::GetRTSController(GetWorld());
 	UGlobalAbilitiesManager* Manager = IsValid(Controller) ? Controller->GetGlobalAbilitiesManager() : nullptr;

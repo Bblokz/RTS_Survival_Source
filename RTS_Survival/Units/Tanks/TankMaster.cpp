@@ -6,6 +6,9 @@
 #include "AITankMaster.h"
 #include "Components/AudioComponent.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/RTSComponents/RTSOptimizer/RTSOptimizer.h"
+#include "RTS_Survival/Units/Ragdoll/RTSRagdollSettings.h"
+#include "RTS_Survival/Units/Ragdoll/RTSRagdollSubsystem.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "RTS_Survival/Audio/RTSVoiceLineHelpers/RTS_VoiceLineHelpers.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
@@ -44,6 +47,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "RTS_Survival/FactionSystem/FactionFlags/FRTS_FactionFlags.h"
+#include "RTS_Survival/FactionSystem/TeamColor/FRTS_TeamColor.h"
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "TimerManager.h"
@@ -520,6 +524,7 @@ void ATankMaster::BeginPlay()
 
 	BeginPlay_SetupCollisionVsBuildings();
 	BeginPlay_SetFactionFlagPrimitiveDataIndex();
+	BeginPlay_ApplyPlayerTeamColor();
 
 	M_TankStartGameAction.OnBeginPlay();
 	if (GetIsValidRTSComponent() && RTSComponent->GetUnitType() == EAllUnitType::UNType_Tank)
@@ -569,6 +574,8 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 
 	// Snapshot first: the teardown below can remove behaviours before BP_OnUnitDies reads it.
 	bM_DiedWhileAmmoCookingOff = bM_IsAmmoCookingOff;
+	bM_DiedWhileEngineBurning = bM_IsEngineBurning;
+	M_KillShotDirection = M_IncomingProjectileDirection;
 	EndTurretRangeMovement(ETurretRangeMovementEndMode::FullStop);
 	FinishCrewRepair(ECrewRepairStopReason::OwnerDestroyed);
 	CleanupTowRelationshipsOnDeath();
@@ -583,6 +590,7 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 	}
 	OnUnitDies_DisableWeapons();
 	// Before bp event as the bp event may destroy the actor immediately.
+	OnUnitDies_ThrowCrewBodies(DeathType);
 	OnUnitDies.Broadcast();
 	BP_OnUnitDies(DeathType);
 }
@@ -1465,6 +1473,52 @@ EAnnouncerVoiceLineType ATankMaster::OverrideAnnouncerDeathVoiceLine(const EAnno
 	return OriginalLine;
 }
 
+bool ATankMaster::GetIsValidOptimizationComponent() const
+{
+	if (IsValid(M_OptimizationComponent))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_OptimizationComponent",
+	                                                      "ATankMaster::GetIsValidOptimizationComponent");
+	return false;
+}
+
+bool ATankMaster::GetCanThrowCrewOnDeath() const
+{
+	return true;
+}
+
+bool ATankMaster::OnUnitDies_GetIsSeen() const
+{
+	if (not GetDefault<URTSRagdollSettings>()->bSkipUnseenVehicles)
+	{
+		return true;
+	}
+	return not IsHidden() && GetIsValidOptimizationComponent() && M_OptimizationComponent->GetIsInFOV();
+}
+
+void ATankMaster::OnUnitDies_ThrowCrewBodies(const ERTSDeathType DeathType) const
+{
+	const UWorld* World = GetWorld();
+	URTSRagdollSubsystem* RagdollSubsystem = IsValid(World) ? World->GetSubsystem<URTSRagdollSubsystem>() : nullptr;
+	if (DeathType == ERTSDeathType::Scavenging || not GetCanThrowCrewOnDeath() || not IsValid(RagdollSubsystem)
+		|| not IsValid(RTSComponent) || not OnUnitDies_GetIsSeen())
+	{
+		return;
+	}
+	FVector BoundsOrigin;
+	FVector BoundsExtent;
+	GetActorBounds(true, BoundsOrigin, BoundsExtent);
+	FRTSCrewBodyRequest Request;
+	Request.TopCentre = FVector(BoundsOrigin.X, BoundsOrigin.Y, BoundsOrigin.Z + BoundsExtent.Z);
+	Request.SpreadRadius = FMath::Min(BoundsExtent.X, BoundsExtent.Y) * 0.5f;
+	// The player's side fields Scavengers as crew, the enemy Mosin soldiers.
+	Request.Side = RTSComponent->GetOwningPlayer() == 1 ? ERTSCrewSide::German : ERTSCrewSide::Soviet;
+	Request.bIsCookOff = bM_DiedWhileAmmoCookingOff;
+	RagdollSubsystem->RequestCrewBodies(Request);
+}
+
 void ATankMaster::OnUnitDies_CheckForCargo(const ERTSDeathType DeathType) const
 {
 	UCargo* CargoComp = FindComponentByClass<UCargo>();
@@ -1933,6 +1987,11 @@ void ATankMaster::BeginPlay_SetupCollisionVsBuildings()
 void ATankMaster::BeginPlay_SetFactionFlagPrimitiveDataIndex()
 {
 	FRTS_FactionFlags::SetupFactionFlagsForActorPrimitives(this);
+}
+
+void ATankMaster::BeginPlay_ApplyPlayerTeamColor()
+{
+	FRTS_TeamColor::ApplyPlayerTeamColorToActor(this);
 }
 
 bool ATankMaster::GetIsValidHullWeapon(const UHullWeaponComponent* HullWeapon) const

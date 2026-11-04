@@ -1,0 +1,125 @@
+{
+ "lamps": [
+  {
+   "kind": "wall",
+   "bulb": [
+    1165.5,
+    220.0,
+    214.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    1225.5,
+    220.0,
+    174.2
+   ],
+   "ground_radius": 320.0,
+   "on_building": true
+  },
+  {
+   "kind": "wall",
+   "bulb": [
+    1165.5,
+    -220.0,
+    214.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    1225.5,
+    -220.0,
+    174.2
+   ],
+   "ground_radius": 320.0,
+   "on_building": true
+  },
+  {
+   "kind": "pole",
+   "bulb": [
+    1680.0,
+    -358.0,
+    413.0
+   ],
+   "pool_radius": 600.0,
+   "ground": [
+    1680.0,
+    -298.0,
+    0.0
+   ],
+   "ground_radius": 480.0,
+   "on_building": false
+  },
+  {
+   "kind": "wall",
+   "bulb": [
+    600.0,
+    -1240.5,
+    234.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    600.0,
+    -1300.5,
+    7.0
+   ],
+   "ground_radius": 320.0,
+   "on_building": false
+  },
+  {
+   "kind": "wall",
+   "bulb": [
+    1070.5,
+    900.0,
+    174.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    1130.5,
+    900.0,
+    46.6
+   ],
+   "ground_radius": 320.0,
+   "on_building": true
+  },
+  {
+   "kind": "wall",
+   "bulb": [
+    619.5,
+    260.0,
+    434.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    559.5,
+    260.0,
+    320.0
+   ],
+   "ground_radius": 320.0,
+   "on_building": true
+  },
+  {
+   "kind": "wall",
+   "bulb": [
+    76.5,
+    -900.0,
+    494.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    136.5,
+    -900.0,
+    300.0
+   ],
+   "ground_radius": 320.0,
+   "on_building": true
+  },
+  {
+   "kind": "beacon",
+   "bulb": [
+    -929.0,
+    -574.0,
+    771.4
+   ],
+   "pool_radius": 0.0
+  }
+ ]
+}

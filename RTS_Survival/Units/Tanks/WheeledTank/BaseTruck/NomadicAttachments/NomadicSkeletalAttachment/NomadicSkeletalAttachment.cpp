@@ -11,6 +11,13 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
+namespace NomadicSkeletalAttachmentPrivate
+{
+	// A montage with both sections is a working loop: Work loops back to itself, Stop takes the mesh home.
+	const FName WorkSectionName(TEXT("Work"));
+	const FName StopSectionName(TEXT("Stop"));
+}
+
 ANomadicAttachmentSkeletal::ANomadicAttachmentSkeletal()
 {
 	// Make sure to not use the inherited static mesh tick function.
@@ -162,6 +169,11 @@ void ANomadicAttachmentSkeletal::SetAttachmentAnimationState(const EAttachmentAn
 	// ---------- Robust transition handling (prevents rapid ping-pong) ----------
 	if (NewState == EAttachmentAnimationState::AOOnly)
 	{
+		// A working loop finishes the section it is in and plays its Stop section instead of snapping back.
+		if (TrySendWorkingLoopHome())
+		{
+			return;
+		}
 		// Force-stop any active montage and drop any pending montage intent.
 		if (UAnimInstance* const Anim = M_AnimInstance.Get())
 		{
@@ -183,12 +195,73 @@ void ANomadicAttachmentSkeletal::SetAttachmentAnimationState(const EAttachmentAn
 		return;
 	}
 
+	if (TryKeepWorkingLoopRunning())
+	{
+		return;
+	}
+
 	// Leaving AO-only: release any fixed hold and start fresh.
 	if (Old == EAttachmentAnimationState::AOOnly && M_SkeletalState == ENomadicSkeletalState::HoldingFixedAO)
 	{
 		M_SkeletalState = ENomadicSkeletalState::Waiting;
 		M_TimeUntilNextAction = 0.f;
 	}
+	// Decide on the next tick, so attachments that work together (two cranes over one slot) start in step.
+	if (Old == EAttachmentAnimationState::AOOnly && M_SkeletalState == ENomadicSkeletalState::Waiting)
+	{
+		M_TimeUntilNextAction = 0.f;
+	}
+}
+
+UAnimMontage* ANomadicAttachmentSkeletal::GetActiveWorkingLoopMontage() const
+{
+	const UAnimInstance* const Anim = M_AnimInstance.Get();
+	if (not Anim)
+	{
+		return nullptr;
+	}
+	UAnimMontage* const Montage = Anim->GetCurrentActiveMontage();
+	if (not IsValid(Montage)
+		|| Montage->GetSectionIndex(NomadicSkeletalAttachmentPrivate::WorkSectionName) == INDEX_NONE
+		|| Montage->GetSectionIndex(NomadicSkeletalAttachmentPrivate::StopSectionName) == INDEX_NONE)
+	{
+		return nullptr;
+	}
+	return Montage;
+}
+
+bool ANomadicAttachmentSkeletal::TrySendWorkingLoopHome() const
+{
+	UAnimMontage* const Montage = GetActiveWorkingLoopMontage();
+	if (not Montage)
+	{
+		return false;
+	}
+	UAnimInstance* const Anim = M_AnimInstance.Get();
+	const FName CurrentSection = Anim->Montage_GetCurrentSection(Montage);
+	if (CurrentSection != NomadicSkeletalAttachmentPrivate::StopSectionName)
+	{
+		Anim->Montage_SetNextSection(CurrentSection, NomadicSkeletalAttachmentPrivate::StopSectionName, Montage);
+	}
+	// The montage keeps playing; OnMontageEnded returns the state machine to AO-only waiting.
+	return true;
+}
+
+bool ANomadicAttachmentSkeletal::TryKeepWorkingLoopRunning() const
+{
+	UAnimMontage* const Montage = GetActiveWorkingLoopMontage();
+	if (not Montage)
+	{
+		return false;
+	}
+	UAnimInstance* const Anim = M_AnimInstance.Get();
+	const FName CurrentSection = Anim->Montage_GetCurrentSection(Montage);
+	// Already driving home: let it arrive; the state machine plays the montage again from the start afterwards.
+	if (CurrentSection != NomadicSkeletalAttachmentPrivate::StopSectionName)
+	{
+		Anim->Montage_SetNextSection(CurrentSection, NomadicSkeletalAttachmentPrivate::WorkSectionName, Montage);
+	}
+	return true;
 }
 
 void ANomadicAttachmentSkeletal::SetOnAOOnlyMoveToAverageCustomRotation(const bool bEnable)

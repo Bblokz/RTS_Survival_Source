@@ -378,7 +378,15 @@ enum class
 	// Horten Ho 229: one of its two wing-root MK 108 30mm cannons (both weapons share this entry).
 	MK108_30MM_Horten UMETA(DisplayName = "MK 108 30MM (Horten Ho 229)"),
 	// KV-3: the 107mm ZiS-6 with penetration matching its ballistics; ZIS_6_107MM stays the KV-5's experimental-tier entry.
-	ZIS_6_107MM_KV3 UMETA(DisplayName = "ZIS-6 107MM (KV-3)")
+	ZIS_6_107MM_KV3 UMETA(DisplayName = "ZIS-6 107MM (KV-3)"),
+	// The emplaced Flakvierling (Breakthrough Flakvierling bunker): all four barrels as one multi projectile weapon
+	// firing fast bursts; stats per projectile as the Flak 38, cooldown and reload set for the four guns' old output.
+	Flakvierling38_20MM_Emplaced UMETA(DisplayName = "Flakvierling 38 20MM (emplaced)"),
+	// BTR-152A: the ZPTU-2 mount's two 14.5mm KPV heavy machine guns fired through a multi projectile weapon on
+	// 2 sockets, so all stats are per projectile and one shot fires both barrels.
+	KPV_14_5MM_Twin UMETA(DisplayName = "2x KPV 14.5MM"),
+	// GAZ-MM 72-K: the 25mm 72-K automatic anti-aircraft gun on a full-traverse truck pedestal; fast 7-round clips.
+	Gun72K_25MM UMETA(DisplayName = "25 mm 72-K (GAZ-MM AA)")
 };
 
 static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
@@ -481,6 +489,8 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::GerRailSniper20MM: return "Rail Sniper";
 	case EWeaponName::KwK37_75MM_HE_Sdkfz250: return "KwK 37 HE";
 	case EWeaponName::MG151_15MM_Twin: return "2x MG 151/15";
+	case EWeaponName::KPV_14_5MM_Twin: return "2x KPV";
+	case EWeaponName::Gun72K_25MM: return "72-K";
 	case EWeaponName::PzI_Bison_L60_50MM: return "5 cm L/60";
 	case EWeaponName::Ger_Twin40MM_Marder: return "Twin 40mm";
 	case EWeaponName::PzIVG_DT_50MM_Artillery: return "5 cm Artillery";
@@ -526,6 +536,7 @@ static FString Global_GetWeaponDisplayName(const EWeaponName WeaponName)
 	case EWeaponName::Hotchkiss_37MM_MS1: return "Hotchkiss 37";
 	case EWeaponName::MK108_30MM_Horten: return "MK 108";
 	case EWeaponName::ZIS_6_107MM_KV3: return "ZIS-6";
+	case EWeaponName::Flakvierling38_20MM_Emplaced: return "Flakvierling 38";
 	case EWeaponName::Flak36_37MM_Pit: return "Flak 37";
 	case EWeaponName::Raketenwerfer43_88MM: return "RW 43";
 	case EWeaponName::PanzerSchreck_Pit: return "Pzr Schreck";
@@ -1027,6 +1038,10 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "KwK37_75MM_HE_Sdkfz250";
 	case EWeaponName::MG151_15MM_Twin:
 		return "MG151_15MM_Twin";
+	case EWeaponName::KPV_14_5MM_Twin:
+		return "KPV_14_5MM_Twin";
+	case EWeaponName::Gun72K_25MM:
+		return "Gun72K_25MM";
 	case EWeaponName::PzI_Bison_L60_50MM:
 		return "PzI_Bison_L60_50MM";
 	case EWeaponName::Ger_Twin40MM_Marder:
@@ -1117,6 +1132,8 @@ static FString Global_GetWeaponEnumAsString(const EWeaponName WeaponName)
 		return "MK108_30MM_Horten";
 	case EWeaponName::ZIS_6_107MM_KV3:
 		return "ZIS_6_107MM_KV3";
+	case EWeaponName::Flakvierling38_20MM_Emplaced:
+		return "Flakvierling38_20MM_Emplaced";
 	case EWeaponName::Flak36_37MM_Pit:
 		return "Flak36_37MM_Pit";
 	case EWeaponName::Raketenwerfer43_88MM:

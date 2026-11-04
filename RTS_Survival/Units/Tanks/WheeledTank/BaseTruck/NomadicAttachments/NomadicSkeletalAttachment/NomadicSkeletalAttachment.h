@@ -186,6 +186,14 @@ private:
 	float GetCurrentAOYawDeg() const;
 	void  SetAOYawDeg(float NewYawDeg) const;
 
+	// ===== Working loops (montages with a "Work" section that loops and a "Stop" section) =====
+	/** @return The playing montage if it is a working loop, otherwise null. */
+	UAnimMontage* GetActiveWorkingLoopMontage() const;
+	/** @return Whether a working loop was told to finish its section and play Stop (it keeps playing). */
+	bool TrySendWorkingLoopHome() const;
+	/** @return Whether a working loop is playing and was told to keep looping Work. */
+	bool TryKeepWorkingLoopRunning() const;
+
 	// ===== Flow =====
 	void DecideNextAction();
 	bool TryPickRandomMontage(UAnimMontage*& OutPickedMontage, USoundBase*& OutPickedSound) const;

@@ -8262,7 +8262,11 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 
 	ERTSCommander Commander = GameInstance->GetPlayerCommander();
 	FRTSCommanderSettings CommanderSettings = CommanderDevSettings->GetCommanderSettingsForType(Commander);
-
+	const AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
+	// Without a mission manager (skirmish, survival) the whole kit is available.
+	M_PlayerGlobabilitiesManager->SetMaxAllowedAbilityTier(IsValid(MissionManager)
+		                                                       ? MissionManager->GetMaxPlayerGlobalAbilityTier()
+		                                                       : EGlobalAbilityTier::TierIV);
 
 	M_PlayerGlobabilitiesManager->InitGlobalAbilitiesManager(
 		1,
@@ -8274,7 +8278,6 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 		PlayerStartLocation,
 		AircraftHeightStart
 	);
-	const AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
 	if (IsValid(MissionManager) && MissionManager->GetShouldHideGlobalAbilitiesForPlayer())
 	{
 		MainMenuWidget->HideGlobalAbilityPanelForMission();

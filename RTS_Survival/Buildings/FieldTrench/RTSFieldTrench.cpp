@@ -62,6 +62,7 @@ void ARTSFieldTrench::BeginPlay()
 void ARTSFieldTrench::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearAllTimersForObject(this);
+	ReleaseStartAnchor();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -106,6 +107,74 @@ void ARTSFieldTrench::SetPlannedPieces(const TArray<FFieldTrenchPiecePlacement>&
 	}
 }
 
+void ARTSFieldTrench::SetStartAnchor(const FFieldTrenchAnchorHandle& Anchor)
+{
+	if (Anchor == M_StartAnchor)
+	{
+		return;
+	}
+	ReleaseStartAnchor();
+	M_StartAnchor = Anchor;
+	const UFieldTrenchAnchorComponent* AnchorComponent = Anchor.Get();
+	M_GroundIgnoredActor = IsValid(AnchorComponent) ? AnchorComponent->GetOwner() : nullptr;
+}
+
+void ARTSFieldTrench::OnStartAnchorLost(const FFieldTrenchOpenPort& AnchorPort, const float AnchorHeight)
+{
+	const bool bHadPieceOnAnchor = M_StartAnchorPiece.IsValid();
+	// The anchor already let go of this trench.
+	M_StartAnchor.Reset();
+	M_StartAnchorPiece.Reset();
+	bM_HasClaimedStartAnchor = false;
+	if (not bHadPieceOnAnchor)
+	{
+		return;
+	}
+	FFieldTrenchPiecePlacement StartCap;
+	FFieldTrenchOpenPort UnusedExit;
+	FieldTrenchLayout::PlacePieceOnPort(
+		EFieldTrenchPiece::End, 0, FieldTrenchLayout::GetReversedPort(AnchorPort), StartCap, UnusedExit);
+	StartCap.Location.Z = AnchorHeight;
+	AddBuiltPiece(StartCap);
+}
+
+void ARTSFieldTrench::ClaimStartAnchor()
+{
+	UFieldTrenchAnchorComponent* AnchorComponent = M_StartAnchor.Get();
+	if (bM_HasClaimedStartAnchor || not IsValid(AnchorComponent))
+	{
+		return;
+	}
+	if (M_Pieces.IsEmpty() || not AnchorComponent->TryClaimAnchor(M_StartAnchor.AnchorIndex, *this))
+	{
+		// Taken or gone since the trench was laid out: the trench closes its start itself.
+		const FFieldTrenchOpenPort AnchorPort = AnchorComponent->GetAnchorPort(M_StartAnchor.AnchorIndex);
+		const float AnchorHeight = AnchorComponent->GetAnchorLocation(M_StartAnchor.AnchorIndex).Z;
+		M_StartAnchorPiece = M_Pieces.IsEmpty() ? nullptr : M_Pieces[0].Component.Get();
+		OnStartAnchorLost(AnchorPort, AnchorHeight);
+		return;
+	}
+	bM_HasClaimedStartAnchor = true;
+	// The planner puts the piece on the anchor first.
+	M_StartAnchorPiece = M_Pieces[0].Component;
+	if (M_Pieces[0].State == EFieldTrenchPieceState::Built)
+	{
+		AnchorComponent->SetAnchorJoined(M_StartAnchor.AnchorIndex, true);
+	}
+}
+
+void ARTSFieldTrench::ReleaseStartAnchor()
+{
+	if (UFieldTrenchAnchorComponent* AnchorComponent = M_StartAnchor.Get(); bM_HasClaimedStartAnchor &&
+		IsValid(AnchorComponent))
+	{
+		AnchorComponent->ReleaseAnchor(M_StartAnchor.AnchorIndex, *this);
+	}
+	M_StartAnchor.Reset();
+	M_StartAnchorPiece.Reset();
+	bM_HasClaimedStartAnchor = false;
+}
+
 void ARTSFieldTrench::SetPlanIsValid(const bool bIsValid)
 {
 	if (IsValid(M_PlannedMaterial) || IsValid(GetPlannedMaterial()))
@@ -124,6 +193,7 @@ void ARTSFieldTrench::StartConstruction(
 		SetPlannedPieces(Pieces);
 	}
 	SetPlanIsValid(true);
+	ClaimStartAnchor();
 	M_OwningPlayer = OwningPlayer;
 	M_CostPerMetre = CostPerMetre;
 	M_TimeUntilResourceRetry = 0.0f;
@@ -150,6 +220,11 @@ void ARTSFieldTrench::RemovePiece(const int32 PieceIndex)
 	}
 	const FFieldTrenchPieceRuntime RemovedPiece = M_Pieces[PieceIndex];
 	M_Pieces.RemoveAt(PieceIndex);
+	if (M_StartAnchorPiece.IsValid() && M_StartAnchorPiece.Get() == RemovedPiece.Component)
+	{
+		// Nothing of the trench is on the anchor any more.
+		ReleaseStartAnchor();
+	}
 	if (RemovedPiece.State == EFieldTrenchPieceState::Digging)
 	{
 		RefundPiece(RemovedPiece);
@@ -334,11 +409,22 @@ TArray<FFieldTrenchPiecePlacement> ARTSFieldTrench::PlanOnGround(
 	const float MaximumLengthCm,
 	const float GroundHeight) const
 {
+	return PlanOnGround(DragPath, MaximumLengthCm, GroundHeight, FFieldTrenchPlanOptions());
+}
+
+TArray<FFieldTrenchPiecePlacement> ARTSFieldTrench::PlanOnGround(
+	const TArray<FVector2D>& DragPath,
+	const float MaximumLengthCm,
+	const float GroundHeight,
+	const FFieldTrenchPlanOptions& Options) const
+{
 	const float ShortestStraight = FieldTrenchLayout::GetPieceDefinition(EFieldTrenchPiece::Straight_125).LengthCm;
 	TArray<FFieldTrenchPiecePlacement> Pieces;
+	FFieldTrenchPlanOptions PassOptions = Options;
 	for (const float MaximumStraight : {500.0f, 250.0f, 125.0f})
 	{
-		Pieces = FieldTrenchLayout::PlanAlongPath(DragPath, MaximumLengthCm, MaximumStraight);
+		PassOptions.MaximumStraightLengthCm = FMath::Min(Options.MaximumStraightLengthCm, MaximumStraight);
+		Pieces = FieldTrenchLayout::PlanAlongPath(DragPath, MaximumLengthCm, PassOptions);
 		bool bStraightsLieOnGround = true;
 		for (FFieldTrenchPiecePlacement& Placement : Pieces)
 		{
@@ -373,8 +459,13 @@ bool ARTSFieldTrench::TryTraceGround(const FVector2D& GroundPoint, const float A
 	}
 	const FVector TraceStart(GroundPoint, AroundHeight + RTSFieldTrenchPrivate::GroundTraceHalfHeight);
 	const FVector TraceEnd(GroundPoint, AroundHeight - RTSFieldTrenchPrivate::GroundTraceHalfHeight);
-	// The trench blocks the landscape channel itself, for whoever looks for the ground on top of it.
-	const FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(FieldTrenchGround), false, this);
+	// The trench blocks the landscape channel itself, for whoever looks for the ground on top of it; so may the
+	// walls of what the trench is joined to.
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(FieldTrenchGround), false, this);
+	if (AActor* AnchorOwner = M_GroundIgnoredActor.Get())
+	{
+		QueryParams.AddIgnoredActor(AnchorOwner);
+	}
 	FHitResult GroundHit;
 	if (not World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, QueryParams))
 	{
@@ -508,6 +599,11 @@ void ARTSFieldTrench::RefundPiece(const FFieldTrenchPieceRuntime& Piece) const
 void ARTSFieldTrench::OnPieceBuilt(FFieldTrenchPieceRuntime& Piece)
 {
 	ShowPieceState(Piece);
+	UFieldTrenchAnchorComponent* AnchorComponent = M_StartAnchor.Get();
+	if (bM_HasClaimedStartAnchor && IsValid(AnchorComponent) && M_StartAnchorPiece.Get() == Piece.Component)
+	{
+		AnchorComponent->SetAnchorJoined(M_StartAnchor.AnchorIndex, true);
+	}
 	ScheduleCoverRefresh();
 }
 

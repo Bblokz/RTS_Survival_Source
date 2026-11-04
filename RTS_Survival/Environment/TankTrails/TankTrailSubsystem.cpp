@@ -61,7 +61,7 @@ namespace TankTrailPrivate
 
 	// Old trails fade away; zero half life keeps every trail for the whole match.
 	constexpr float FadeIntervalSeconds = 4.f;
-	constexpr float FadeHalfLifeSeconds = 120.f;
+	constexpr float FadeHalfLifeSeconds = 86.f;
 
 	TAutoConsoleVariable<int32> CVarTankTrails(
 		TEXT("rts.TankTrails"),

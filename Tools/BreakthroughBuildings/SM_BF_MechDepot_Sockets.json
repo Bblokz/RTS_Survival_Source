@@ -1,0 +1,130 @@
+{
+ "TrainingPreview": {
+  "location_cm": [
+   10.0,
+   -20.0,
+   210.0
+  ],
+  "yaw": 0.0
+ },
+ "Train": {
+  "location_cm": [
+   10.0,
+   -20.0,
+   210.0
+  ],
+  "yaw": 0.0
+ },
+ "WeldLeft": {
+  "location_cm": [
+   110.0,
+   150.0,
+   240.0
+  ],
+  "yaw": -60.0
+ },
+ "WeldRight": {
+  "location_cm": [
+   110.0,
+   -190.0,
+   240.0
+  ],
+  "yaw": -300.0
+ },
+ "GenFan": {
+  "location_cm": [
+   -1180.0,
+   320.0,
+   395.0
+  ],
+  "yaw": -90.0
+ },
+ "ExhaustFlap1": {
+  "location_cm": [
+   -936.0,
+   480.0,
+   916.0
+  ],
+  "yaw": -180.0
+ },
+ "ExhaustFlap2": {
+  "location_cm": [
+   -936.0,
+   260.0,
+   916.0
+  ],
+  "yaw": -180.0
+ },
+ "CraneStow": {
+  "location_cm": [
+   -540.0,
+   670.0,
+   745.0
+  ],
+  "yaw": -270.0
+ },
+ "Crane": {
+  "location_cm": [
+   -540.0,
+   40.0,
+   745.0
+  ],
+  "yaw": 0.0
+ },
+ "UnitExit": {
+  "location_cm": [
+   1360.0,
+   -0.0,
+   0.0
+  ],
+  "yaw": 0.0
+ },
+ "Way": {
+  "location_cm": [
+   1680.0,
+   -80.0,
+   0.0
+  ],
+  "yaw": 0.0
+ },
+ "FlagPole": {
+  "location_cm": [
+   840.0,
+   -730.0,
+   0.0
+  ],
+  "yaw": -90.0
+ },
+ "Nav1": {
+  "location_cm": [
+   280.0,
+   180.0,
+   0.0
+  ],
+  "yaw": 0.0
+ },
+ "Nav2": {
+  "location_cm": [
+   -640.0,
+   10.0,
+   0.0
+  ],
+  "yaw": 0.0
+ },
+ "Nav3": {
+  "location_cm": [
+   -1220.0,
+   70.0,
+   0.0
+  ],
+  "yaw": 0.0
+ },
+ "Dressing": {
+  "location_cm": [
+   0.0,
+   -0.0,
+   0.0
+  ],
+  "yaw": 0.0
+ }
+}

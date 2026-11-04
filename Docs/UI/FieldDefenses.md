@@ -114,7 +114,8 @@ The HQ's fourth tab, Barriers, holds procedural defenses that the player drags o
 - **Laying it out:** `UFieldTrenchPlacementComponent`, which lives on the controller, handles the clicks (`Player/ConstructionPreview/FieldTrenchPlacement`).
   - The first click sets the start.
   - The trench then follows the mouse. The path is recorded every 50 cm and planned again whenever it changes.
-  - The second click confirms the trench. Both ends always get an End cap.
+  - The second click confirms the trench. Free ends get an End cap; an end joined to a trench anchor gets none.
+  - A first click within 3.5 m of a free trench anchor of the player starts the trench on it. While the start is free, the mouse within 3.5 m of a free anchor ends the trench there (it lets go beyond 5 m). See **Trench anchors** below.
   - Right click, Escape, or the HQ dying removes a trench that is not confirmed yet.
   - The trench is cut short before the first piece that would lie outside the build radii or lean more than 15°. If no piece fits, the whole plan shows in red.
 - **Planning:** `FieldTrenchLayout::PlanAlongPath` (`Buildings/FieldTrench`) chains kit pieces along the path, using straights of 125, 250 and 500 cm and bends of 15, 30 and 45° (Corner_90 above 75°). It works in the kit's port contract (`GerDefenses/FieldTrenches/Exports/field_trench_kit.json`, flipped to Unreal space).
@@ -122,8 +123,17 @@ The HQ's fourth tab, Barriers, holds procedural defenses that the player drags o
 - **Paying and digging:** `ARTSFieldTrench` holds one static mesh component per piece and lays each piece onto the ground, tilted with the slope. Pieces are dug in order, at 1 s per metre.
   - Each piece is paid for when its digging starts: `GerFieldTrench_RadixitePerMetre` (10 Radixite per metre) times its length. The tooltip cost is that per-metre price.
   - While the player cannot pay, digging waits and checks again twice a second.
+- **Trench anchors:** a trench joins an actor at the `TrenchPort_*` sockets of its static meshes. The bigger German pits have them (never at the front); the meshes and sockets are in [../Units/GerPitTrenchAnchors.md](../Units/GerPitTrenchAnchors.md).
+  - `UFieldTrenchAnchorComponent` (`Buildings/FieldTrench/Anchors`) on the actor turns every `TrenchPort_` socket into an anchor. Its `Anchors` list only adds a neck and plug mesh per socket. The pits' Blueprints get it from `Tools/GerPits/ue_gerpit_trench_anchor_components.py`.
+  - On a building expansion the anchors exist while it is built, or from the start when it was placed in the level; on any other actor from BeginPlay on, or whenever it calls `SetAnchorsAvailable`. They are listed with `UFieldTrenchAnchorSubsystem`, which finds the nearest free one of the player for the placement.
+  - A trench joins one anchor, and is always planned from that anchor out (`FFieldTrenchPlanOptions::StartPort`): its first piece lies on the socket's port and gets no start cap. A trench whose end was snapped is planned from the anchor back to the first click, so it is dug from the pit outwards.
+  - Confirming claims the anchor; no other trench can join it then. When the trench's first piece is dug, the anchor hides its plug and shows its neck. Removing that piece, or the trench, frees the anchor and closes it again.
+  - When the owner dies, packs up or is destroyed, the trench closes the joined end with a built End cap.
+  - Not yet: a trench joined at both ends (pit to pit). The kit's fixed piece lengths can't close exactly on a second port; it needs a closing solver.
+  - To give another building anchors: add `TrenchPort_<Name>` sockets to its mesh (on the trench's centreline, at ground level, +X pointing out), add the component, and list the neck and plug meshes if it has them. A building that is not a building expansion and gets its sockets later calls `SetAnchorsAvailable`.
 - **Cover:** built pieces give their `cargo_N` sockets to the cover finder through `IRTSCoverSocketSource`. Soldiers are snapped onto the sockets 60 cm under the ground, as in `BP_TrenchMaster` trenches.
 
 Map tests:
 - `-FieldDefenseValidateTrench` on `UT_Nomadics`: the menu click, the two clicks along a bent path, digging with per-metre payment, waiting while the player cannot pay, and cancelling.
+- `-FieldDefenseValidateTrenchAnchor` on `UT_Nomadics`: a Pak 40 pit is built and offers its rear anchor. A trench clicked near the anchor starts on its port, claims it, and shows the neck once the first piece is dug; removing the trench frees the anchor. A trench drawn to the anchor snaps its end and is planned from the anchor. Destroying the pit caps that trench. Then the two Breakthrough bunkers are placed as in a level: each offers its two anchors on their sockets, and a trench is laid and dug from every anchor.
 - `-CoverFinderValidateRuntimeTrench` on `TestCover/TestFieldTrench`: runtime cover publishing, a piece removed and added again, a dug trench on uneven ground, and the full stand-up cycle in a runtime trench.

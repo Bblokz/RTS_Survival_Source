@@ -298,6 +298,8 @@ void UGlobalAbilityAreaTestSubsystem::FinishPendingShaders() const
 
 void UGlobalAbilityAreaTestSubsystem::Capture(const FVector& Focus, const FString& Label) const
 {
+	// The capture rig is test code; without map tests this subsystem is never created.
+#if RTS_WITH_MAP_TESTS
 	using namespace GlobalAbilityAreaTestConstants;
 	UWorld* World = GetWorld();
 	if (not M_CaptureRig.GetIsEnabled() || not IsValid(World))
@@ -310,6 +312,7 @@ void UGlobalAbilityAreaTestSubsystem::Capture(const FVector& Focus, const FStrin
 	View.Location = Focus - ViewRotation.Vector() * CaptureDistanceCm;
 	View.LookAt = Focus;
 	M_CaptureRig.CaptureViews(*World, FTransform::Identity, {View}, Label);
+#endif
 }
 
 void UGlobalAbilityAreaTestSubsystem::CaptureEvery(const float IntervalSeconds, const FVector& Focus,
@@ -374,11 +377,13 @@ void UGlobalAbilityAreaTestSubsystem::TickWaitingForStart()
 	{
 		M_AircraftOfTheMap.Add(*It);
 	}
+#if RTS_WITH_MAP_TESTS
 	FString CaptureDirectory;
 	if (FParse::Value(FCommandLine::Get(), TEXT("GlobalAbilityAreaCapture="), CaptureDirectory))
 	{
 		M_CaptureRig.Init(*GetWorld(), CaptureDirectory);
 	}
+#endif
 	StartRecon();
 }
 
@@ -605,17 +610,25 @@ void UGlobalAbilityAreaTestSubsystem::CheckPlayerLoadoutFitsPanel()
 		Check(false, TEXT("panel_and_commander_exist"));
 		return;
 	}
-	const TArray<EGlobalAbility>& Loadout = CommanderSettings->GetCommanderSettingsForType(
-		ERTSCommander::BalancedCommander).GlobalAbilities;
 	const int32 PanelSlots = Panel->GetAbilityItems().Num();
-	Check(PanelSlots >= Loadout.Num(), TEXT("player_loadout_fits_the_panel"),
-	      FString::Printf(TEXT("slots=%d abilities=%d"), PanelSlots, Loadout.Num()));
+	TSet<EGlobalAbility> AbilitiesInAnyKit;
+	for (const TPair<ERTSCommander, FRTSCommanderSettings>& CommanderKit : CommanderSettings->CommanderSettingsByType)
+	{
+		const TArray<EGlobalAbility>& Loadout = CommanderKit.Value.GlobalAbilities;
+		const FString CommanderName = UEnum::GetValueAsString(CommanderKit.Key);
+		Check(Loadout.Num() == RTSCommanderConstants::AbilitySlotsPerCommander, TEXT("commander_kit_has_all_slots"),
+		      FString::Printf(TEXT("%s abilities=%d"), *CommanderName, Loadout.Num()));
+		Check(PanelSlots >= Loadout.Num(), TEXT("player_loadout_fits_the_panel"),
+		      FString::Printf(TEXT("%s slots=%d abilities=%d"), *CommanderName, PanelSlots, Loadout.Num()));
+		AbilitiesInAnyKit.Append(Loadout);
+	}
+	// The area abilities under test must be reachable by the player through at least one commander.
 	for (const EGlobalAbility Ability : {
 		     EGlobalAbility::GA_GerReconFlight, EGlobalAbility::GA_GerFlareCurtain,
 		     EGlobalAbility::GA_GerAirMinefield, EGlobalAbility::GA_GerRadixiteNuke
 	     })
 	{
-		Check(Loadout.Contains(Ability), TEXT("ability_in_player_loadout"), UEnum::GetValueAsString(Ability));
+		Check(AbilitiesInAnyKit.Contains(Ability), TEXT("ability_in_player_loadout"), UEnum::GetValueAsString(Ability));
 	}
 }
 

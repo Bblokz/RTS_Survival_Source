@@ -218,7 +218,7 @@ FSovietPresetLibrary::FSovietPresetLibrary()
 	LateMediums = {Tank(ETankSubtype::Tank_T34_85), Tank(ETankSubtype::Tank_SU_85)};
 	HeavyTanks = {Tank(ETankSubtype::Tank_KV_1)};
 	Breakthrough = {Tank(ETankSubtype::Tank_KV_2), Tank(ETankSubtype::Tank_IS_1)};
-	AATanks = {Tank(ETankSubtype::Tank_T34_AA)};
+	AATanks = {Tank(ETankSubtype::Tank_T34_AA), Tank(ETankSubtype::Tank_BTR152A)};
 
 	Barracks = MakeSlot(EZone::Barracks, RusBuildings, TEXT("Rus_Building_Barracks"), 0, 0, 1, 0.f);
 	Tent = MakeSlot(EZone::Barracks, RusBuildings, TEXT("Rus_Building_LargeTent"), 0, 0, 1, 0.f);

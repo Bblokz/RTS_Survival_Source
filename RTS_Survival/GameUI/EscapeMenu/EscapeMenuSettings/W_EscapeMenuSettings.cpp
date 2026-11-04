@@ -213,6 +213,7 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 	PopulateResolutionOptions();
 	PopulateQualityOptions();
 	PopulateAmbientEffectsOptions();
+	PopulateBattlefieldCorpsesOptions();
 	PopulateGameplayOptions();
 
 	SetSliderRange(M_SliderFrameRateLimit, M_SliderRanges.M_FrameRateLimitMin, M_SliderRanges.M_FrameRateLimitMax);
@@ -336,6 +337,31 @@ void UW_EscapeMenuSettings::PopulateAmbientEffectsOptions()
 	{
 		M_ComboAmbientEffects->AddOption(global_GetAmbientEffectsLevelText(Level).ToString());
 	}
+}
+
+void UW_EscapeMenuSettings::PopulateBattlefieldCorpsesOptions()
+{
+	if (not GetHasBattlefieldCorpsesWidgets())
+	{
+		return;
+	}
+
+	M_ComboBattlefieldCorpses->ClearOptions();
+	for (const ERTSBattlefieldCorpsesLevel Level : {
+		     ERTSBattlefieldCorpsesLevel::Off,
+		     ERTSBattlefieldCorpsesLevel::Few,
+		     ERTSBattlefieldCorpsesLevel::Some,
+		     ERTSBattlefieldCorpsesLevel::Many,
+		     ERTSBattlefieldCorpsesLevel::Maximum
+	     })
+	{
+		M_ComboBattlefieldCorpses->AddOption(global_GetBattlefieldCorpsesText(Level).ToString());
+	}
+}
+
+bool UW_EscapeMenuSettings::GetHasBattlefieldCorpsesWidgets() const
+{
+	return IsValid(M_TextBattlefieldCorpsesLabel) && IsValid(M_ComboBattlefieldCorpses);
 }
 
 void UW_EscapeMenuSettings::PopulateGameplayOptions()
@@ -587,6 +613,10 @@ void UW_EscapeMenuSettings::UpdateEnvironmentDetailTexts()
 	M_TextFoliageDensityLabel->SetText(M_GraphicsText.M_FoliageDensityLabelText);
 	M_TextStoneDensityLabel->SetText(M_GraphicsText.M_StoneDensityLabelText);
 	M_TextAmbientEffectsLabel->SetText(M_GraphicsText.M_AmbientEffectsLabelText);
+	if (GetHasBattlefieldCorpsesWidgets())
+	{
+		M_TextBattlefieldCorpsesLabel->SetText(M_GraphicsText.M_BattlefieldCorpsesLabelText);
+	}
 	M_TextEnvironmentAdvancedLabel->SetText(bM_IsEnvironmentAdvancedExpanded
 		                                        ? M_GraphicsText.M_EnvironmentAdvancedHideText
 		                                        : M_GraphicsText.M_EnvironmentAdvancedShowText);
@@ -621,6 +651,11 @@ void UW_EscapeMenuSettings::InitialiseGraphicsEnvironmentDetailControls(
 	M_SliderStoneDensity->SetValue(EnvironmentDetailSettings.M_StoneDensity);
 	M_ComboAmbientEffects->SetSelectedOption(
 		global_GetAmbientEffectsLevelText(EnvironmentDetailSettings.M_AmbientEffectsLevel).ToString());
+	if (GetHasBattlefieldCorpsesWidgets())
+	{
+		M_ComboBattlefieldCorpses->SetSelectedOption(
+			global_GetBattlefieldCorpsesText(EnvironmentDetailSettings.M_BattlefieldCorpsesLevel).ToString());
+	}
 }
 
 void UW_EscapeMenuSettings::SetEnvironmentAdvancedExpanded(const bool bExpanded)
@@ -1140,6 +1175,13 @@ void UW_EscapeMenuSettings::BindEnvironmentDetailCallbacks()
 
 	M_ComboAmbientEffects->OnSelectionChanged.RemoveAll(this);
 	M_ComboAmbientEffects->OnSelectionChanged.AddDynamic(this, &UW_EscapeMenuSettings::HandleAmbientEffectsSelectionChanged);
+
+	if (GetHasBattlefieldCorpsesWidgets())
+	{
+		M_ComboBattlefieldCorpses->OnSelectionChanged.RemoveAll(this);
+		M_ComboBattlefieldCorpses->OnSelectionChanged.AddDynamic(
+			this, &UW_EscapeMenuSettings::HandleBattlefieldCorpsesSelectionChanged);
+	}
 
 	M_ButtonEnvironmentAdvanced->OnClicked.RemoveAll(this);
 	M_ButtonEnvironmentAdvanced->OnClicked.AddDynamic(this, &UW_EscapeMenuSettings::HandleEnvironmentAdvancedClicked);
@@ -4136,6 +4178,29 @@ void UW_EscapeMenuSettings::HandleAmbientEffectsSelectionChanged(FString Selecte
 	}
 
 	M_SettingsSubsystem->SetPendingAmbientEffectsLevel(static_cast<ERTSAmbientEffectsLevel>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandleBattlefieldCorpsesSelectionChanged(FString SelectedItem,
+                                                                     const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem() || not GetHasBattlefieldCorpsesWidgets())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboBattlefieldCorpses->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Battlefield corpses selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingBattlefieldCorpsesLevel(static_cast<ERTSBattlefieldCorpsesLevel>(SelectedIndex));
 }
 
 void UW_EscapeMenuSettings::HandleEnvironmentAdvancedClicked()

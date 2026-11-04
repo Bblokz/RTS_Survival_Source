@@ -168,9 +168,9 @@ FName UWeaponStateMultiProjectile::ResolveSocketOrFallback(const FName& Requeste
 	return NAME_None;
 }
 
-void UWeaponStateMultiProjectile::PlayLaunchSoundOnce() const
+void UWeaponStateMultiProjectile::PlayLaunchSoundOnce()
 {
-	if (!M_WeaponVfx.LaunchSound)
+	if (!M_WeaponVfx.LaunchSound || not ConsumeLaunchSoundForShot())
 	{
 		return;
 	}

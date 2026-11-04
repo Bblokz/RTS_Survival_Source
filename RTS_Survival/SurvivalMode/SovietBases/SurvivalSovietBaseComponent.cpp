@@ -2066,6 +2066,12 @@ void USurvivalSovietBaseComponent::ConfigureStrategicAIBaseDetection(
 	bM_HasConfiguredStrategicAI = true;
 }
 
+float USurvivalSovietBaseComponent::GetBaseBuildRadius(const ASurvivalStartLocation& StartLocation) const
+{
+	const USurvivalSovietBaseSettings* Settings = GetSovietBaseSettings();
+	return Settings != nullptr and Settings->BuildAreaRadius > 0.f ? Settings->BuildAreaRadius : StartLocation.GetBuildAreaRadius();
+}
+
 // ---------------------------------------------------------------------------
 // Preview (test builds only)
 // ---------------------------------------------------------------------------
@@ -2587,12 +2593,6 @@ FString USurvivalSovietBaseComponent::BuildSpawnManifestJson(
 		*Missing);
 }
 
-float USurvivalSovietBaseComponent::GetBaseBuildRadius(const ASurvivalStartLocation& StartLocation) const
-{
-	const USurvivalSovietBaseSettings* Settings = GetSovietBaseSettings();
-	return Settings != nullptr and Settings->BuildAreaRadius > 0.f ? Settings->BuildAreaRadius : StartLocation.GetBuildAreaRadius();
-}
-
 #if RTS_WITH_MAP_TESTS
 void USurvivalSovietBaseComponent::ApplyDesertNetsForPreview(AActor& Actor)
 {
@@ -2625,6 +2625,11 @@ void USurvivalSovietBaseComponent::ApplyDesertNetsForPreview(AActor& Actor)
 	}
 }
 #endif
+#endif
+
+// ---------------------------------------------------------------------------
+// Footprint dressing (every build; the preview code above and below is test builds only)
+// ---------------------------------------------------------------------------
 
 TArray<const TArray<TSoftObjectPtr<UStaticMesh>>*> USurvivalSovietBaseComponent::GetFootprintMeshLists(const FSurvivalSovietSiteKit& Kit)
 {
@@ -2757,6 +2762,7 @@ void USurvivalSovietBaseComponent::LimitPipeConnections(AActor& Actor)
 	}
 }
 
+#if RTS_WITH_MAP_TESTS
 FString USurvivalSovietBaseComponent::GetClassNameForPreview(const int32 ClassIndex) const
 {
 	return GetNameSafe(M_ResolvedClasses.IsValidIndex(ClassIndex) ? M_ResolvedClasses[ClassIndex].Get() : nullptr);

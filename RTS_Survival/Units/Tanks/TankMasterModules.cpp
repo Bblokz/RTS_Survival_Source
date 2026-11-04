@@ -3,6 +3,7 @@
 #include "TankMaster.h"
 
 #include "AITankMaster.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "Engine/GameInstance.h"
 #include "RTS_Survival/Audio/SpacialVoiceLinePlayer/SpatialVoiceLinePlayer.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
@@ -10,7 +11,11 @@
 #include "RTS_Survival/Behaviours/Derived/Damage/TankEngineFire/TankEngineFireBehaviour.h"
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckEngineFireDeathComponent.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossComponent.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDeathVariantSubsystem.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckRegularDeath.h"
+#include "RTS_Survival/Weapons/Projectile/Projectile.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -196,7 +201,8 @@ bool ATankMaster::StartAmmoCookOffChance(const EVehicleModuleState AmmoState)
 		return false;
 	}
 
-	const float CookOffChance = AmmoCookOff::GetChance(AmmoState);
+	const float CookOffChance = AmmoCookOff::GetChance(
+		AmmoState, ACPPGameState::GetIsRealisticVehicleBalance(this));
 	if (CookOffChance <= 0.f || FMath::FRand() >= CookOffChance)
 	{
 		return false;
@@ -255,32 +261,190 @@ namespace TankWreckTurretToss
 	}
 }
 
+namespace TankWreckEngineFire
+{
+	/** Everything the wreck needs from the dying tank, read before the tank is destroyed. */
+	struct FEngineFireDeathRequest
+	{
+		FWreckEngineFireDeathSettings Settings;
+		FVector EngineWorldLocation = FVector::ZeroVector;
+		FVector EngineDirection = FVector::ZeroVector;
+		bool bIsAmmoCookOffDeath = false;
+	};
+
+	void StartOnWreck(AActor* Wreck, const FEngineFireDeathRequest& Request)
+	{
+		// Other spawned debris has no hull to burn.
+		if (not IsValid(Wreck) || not TankWreckTurretToss::GetHasComponentNamed(Wreck, Request.Settings.HullComponentName))
+		{
+			return;
+		}
+
+		UWreckEngineFireDeathComponent* EngineFireComponent = NewObject<UWreckEngineFireDeathComponent>(Wreck);
+		Wreck->AddInstanceComponent(EngineFireComponent);
+		EngineFireComponent->RegisterComponent();
+		if (not EngineFireComponent->StartEngineFireDeath(Request.Settings, Request.EngineWorldLocation,
+		                                                  Request.EngineDirection, Request.bIsAmmoCookOffDeath))
+		{
+			EngineFireComponent->DestroyComponent();
+		}
+	}
+}
+
 void ATankMaster::DestroyAndSpawnActorsWithTurretToss(const FDestroySpawnActorsParameters& SpawnParams,
                                                       const FCollapseFX CollapseFX)
 {
-	// Read now: the tank may be destroyed before the wreck class finished loading.
-	FWreckTurretTossSettings TossSettings = M_TurretTossSettings;
-	if (not IsValid(TossSettings.LaunchSound))
-	{
-		TossSettings.LaunchSound = GetCookOffTurretLaunchSound();
-	}
-	const float LiveTurretYawOffset = GetLiveTurretYawOffset();
-	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX,
-	                                    [TossSettings, LiveTurretYawOffset](AActor* SpawnedActor)
-	                                    {
-		                                    TankWreckTurretToss::StartOnWreck(
-			                                    SpawnedActor, TossSettings, LiveTurretYawOffset);
-	                                    });
+	const bool bExplodeFuel = bM_DiedWhileEngineBurning && M_EngineFireDeathSettings.bExplodeFuelOnEngineFireDeath;
+	DestroyAndSpawnActorsWithDeathEffects(SpawnParams, CollapseFX, true, bExplodeFuel);
 }
 
 void ATankMaster::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, const FCollapseFX CollapseFX)
 {
-	if (bM_DiedWhileAmmoCookingOff && M_TurretTossSettings.bTossTurretOnCookOffDeath)
+	const bool bTossTurret = bM_DiedWhileAmmoCookingOff && M_TurretTossSettings.bTossTurretOnCookOffDeath;
+	const bool bExplodeFuel = bM_DiedWhileEngineBurning && M_EngineFireDeathSettings.bExplodeFuelOnEngineFireDeath;
+	if (bTossTurret || bExplodeFuel)
 	{
-		DestroyAndSpawnActorsWithTurretToss(SpawnParams, CollapseFX);
+		DestroyAndSpawnActorsWithDeathEffects(SpawnParams, CollapseFX, bTossTurret, bExplodeFuel);
+		return;
+	}
+	if (M_RegularDeathSettings.bVaryRegularDeaths)
+	{
+		DestroyAndSpawnActorsWithRegularDeath(SpawnParams, CollapseFX);
 		return;
 	}
 	Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
+}
+
+void ATankMaster::DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActorsParameters& SpawnParams,
+                                                        const FCollapseFX& CollapseFX)
+{
+	// Read now: the tank may be destroyed before the wreck class finished loading.
+	FWreckRegularDeathRequest Request;
+	Request.Settings = M_RegularDeathSettings;
+	Request.Variant = DrawRegularDeathVariant();
+	Request.KillShotDirection = M_KillShotDirection;
+	Request.bIsSeen = OnUnitDies_GetIsSeen();
+	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX, [Request](AActor* SpawnedActor)
+	{
+		FWreckRegularDeath::StartOnWreck(SpawnedActor, Request);
+	});
+}
+
+ERegularDeathVariant ATankMaster::DrawRegularDeathVariant()
+{
+	if (M_DebugRegularDeathVariant.IsSet())
+	{
+		const ERegularDeathVariant DebugVariant = M_DebugRegularDeathVariant.GetValue();
+		M_DebugRegularDeathVariant.Reset();
+		return DebugVariant;
+	}
+	UWorld* World = GetWorld();
+	UWreckDeathVariantSubsystem* VariantSubsystem = IsValid(World)
+		                                                ? World->GetSubsystem<UWreckDeathVariantSubsystem>()
+		                                                : nullptr;
+	return IsValid(VariantSubsystem) ? VariantSubsystem->DrawVariant() : ERegularDeathVariant::Standard;
+}
+
+float ATankMaster::TakeDamage(const float DamageAmount, FDamageEvent const& DamageEvent,
+                              AController* EventInstigator, AActor* DamageCauser)
+{
+	// Only projectiles give the debris a direction; trace weapons, splash and burning do not.
+	const AProjectile* Projectile = Cast<AProjectile>(DamageCauser);
+	if (IsValid(Projectile))
+	{
+		const FVector ProjectileVelocity = Projectile->GetVelocity();
+		M_IncomingProjectileDirection = ProjectileVelocity.IsNearlyZero()
+			                                ? Projectile->GetActorForwardVector()
+			                                : ProjectileVelocity.GetSafeNormal();
+	}
+	// A killing hit dies inside Super; UnitDies snapshots the direction before it is cleared again.
+	const float Result = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	M_IncomingProjectileDirection = FVector::ZeroVector;
+	return Result;
+}
+
+void ATankMaster::Debug_DieRegularDeath(const ERegularDeathVariant Variant, const FVector KillShotDirection)
+{
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+	M_DebugRegularDeathVariant = Variant;
+	M_IncomingProjectileDirection = KillShotDirection.GetSafeNormal();
+	UnitDies(ERTSDeathType::Kinetic);
+	M_IncomingProjectileDirection = FVector::ZeroVector;
+}
+
+void ATankMaster::DestroyAndSpawnActorsWithDeathEffects(const FDestroySpawnActorsParameters& SpawnParams,
+                                                        const FCollapseFX& CollapseFX, const bool bTossTurret,
+                                                        const bool bExplodeFuel)
+{
+	// Read now: the tank may be destroyed before the wreck class finished loading.
+	FWreckTurretTossSettings TossSettings = M_TurretTossSettings;
+	if (bTossTurret && not IsValid(TossSettings.LaunchSound))
+	{
+		TossSettings.LaunchSound = GetCookOffTurretLaunchSound();
+	}
+	const float LiveTurretYawOffset = GetLiveTurretYawOffset();
+
+	TankWreckEngineFire::FEngineFireDeathRequest EngineFireRequest;
+	if (bExplodeFuel)
+	{
+		EngineFireRequest.Settings = M_EngineFireDeathSettings;
+		EngineFireRequest.EngineWorldLocation = GetEngineWorldLocation();
+		const FVector FromCentre = EngineFireRequest.EngineWorldLocation - GetActorLocation();
+		const FVector HorizontalFromCentre(FromCentre.X, FromCentre.Y, 0.f);
+		// An engine fire placed on the pivot gives no direction; most engines sit at the rear.
+		EngineFireRequest.EngineDirection = HorizontalFromCentre.IsNearlyZero(1.f)
+			                                    ? -GetActorForwardVector()
+			                                    : HorizontalFromCentre.GetSafeNormal();
+		// The turret toss owns the big blast; the fuel then only burns.
+		EngineFireRequest.bIsAmmoCookOffDeath = bTossTurret;
+	}
+
+	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX,
+	                                    [TossSettings, LiveTurretYawOffset, EngineFireRequest, bTossTurret,
+		                                    bExplodeFuel](AActor* SpawnedActor)
+	                                    {
+		                                    // Char the wreck before the toss throws debris, so the debris stays clean.
+		                                    if (bExplodeFuel)
+		                                    {
+			                                    TankWreckEngineFire::StartOnWreck(SpawnedActor, EngineFireRequest);
+		                                    }
+		                                    if (bTossTurret)
+		                                    {
+			                                    TankWreckTurretToss::StartOnWreck(
+				                                    SpawnedActor, TossSettings, LiveTurretYawOffset);
+		                                    }
+	                                    });
+}
+
+FVector ATankMaster::GetEngineWorldLocation() const
+{
+	const TSubclassOf<UTankEngineFireBehaviour> EngineFireClass = GetEngineFireBehaviourClass();
+	FVector EngineLocation;
+	if (EngineFireClass != nullptr
+		&& EngineFireClass->GetDefaultObject<UTankEngineFireBehaviour>()->GetFireWorldLocation(*this, EngineLocation))
+	{
+		return EngineLocation;
+	}
+
+	// Project convention: every tank mesh set carries an EngineFire socket.
+	static const FName EngineFireSocketName = TEXT("EngineFire");
+	TInlineComponentArray<UMeshComponent*> TankMeshes(this);
+	for (const UMeshComponent* TankMesh : TankMeshes)
+	{
+		if (IsValid(TankMesh) && TankMesh->DoesSocketExist(EngineFireSocketName))
+		{
+			return TankMesh->GetSocketLocation(EngineFireSocketName);
+		}
+	}
+
+	// No socket: the rear top of the vehicle.
+	constexpr float RearShareOfHalfLength = 0.6f;
+	const FBox TankBounds = GetComponentsBoundingBox(false);
+	const FVector RearTop = GetActorLocation() - GetActorForwardVector() * TankBounds.GetExtent().X * RearShareOfHalfLength;
+	return FVector(RearTop.X, RearTop.Y, TankBounds.Max.Z);
 }
 
 bool ATankMaster::StartAmmoDetonation()
@@ -298,6 +462,24 @@ bool ATankMaster::StartAmmoDetonation()
 	}
 	// Tanks without a cook-off profile still show the cook-off death.
 	bM_IsAmmoCookingOff = true;
+	return true;
+}
+
+bool ATankMaster::StartFuelDetonation()
+{
+	if (not IsUnitAlive() || not GetIsValidModuleArmor() || not M_ModuleArmor->GetAreEngineFiresEnabled())
+	{
+		return false;
+	}
+
+	const TSubclassOf<UTankEngineFireBehaviour> EngineFireClass = GetEngineFireBehaviourClass();
+	if (EngineFireClass != nullptr && GetIsValidBehaviourComponent()
+		&& BehaviourComponent->GetBehaviourByClass(EngineFireClass) == nullptr)
+	{
+		BehaviourComponent->AddBehaviour(EngineFireClass);
+	}
+	// Tanks without an engine fire profile still show the fuel explosion death.
+	bM_IsEngineBurning = true;
 	return true;
 }
 
@@ -327,6 +509,30 @@ void ATankMaster::Debug_StartAmmoCookOff()
 	}
 	// Tanks without a cook-off profile still show the cook-off death.
 	bM_IsAmmoCookingOff = true;
+}
+
+void ATankMaster::Debug_DieDuringEngineFire()
+{
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+
+	Debug_StartEngineFire();
+	// Tanks without an engine fire profile still show the engine fire death.
+	bM_IsEngineBurning = true;
+	UnitDies(ERTSDeathType::Kinetic);
+}
+
+void ATankMaster::Debug_StartEngineFire()
+{
+	const TSubclassOf<UTankEngineFireBehaviour> EngineFireClass = GetEngineFireBehaviourClass();
+	if (not IsUnitAlive() || EngineFireClass == nullptr || not GetIsValidBehaviourComponent()
+		|| BehaviourComponent->GetBehaviourByClass(EngineFireClass) != nullptr)
+	{
+		return;
+	}
+	BehaviourComponent->AddBehaviour(EngineFireClass);
 }
 
 USoundCue* ATankMaster::GetCookOffTurretLaunchSound() const

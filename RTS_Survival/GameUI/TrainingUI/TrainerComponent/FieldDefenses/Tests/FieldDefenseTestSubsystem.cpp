@@ -6,6 +6,7 @@
 
 #if RTS_WITH_MAP_TESTS
 #include "EngineUtils.h"
+#include "Algo/Find.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -16,6 +17,7 @@
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/Buildings/FieldTrench/RTSFieldTrench.h"
+#include "RTS_Survival/Buildings/FieldTrench/Anchors/FieldTrenchAnchorComponent.h"
 #include "RTS_Survival/Player/ConstructionPreview/FieldTrenchPlacement/FieldTrenchPlacementComponent.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
 #include "RTS_Survival/Game/GameState/BxpDataHelpers/BxpConstructionRulesHelpers.h"
@@ -111,6 +113,41 @@ namespace FieldDefenseTestPrivate
 	// Low enough that the first piece cannot be paid for.
 	constexpr int32 TrenchShortfallRadixite = 5;
 	constexpr float TrenchWaitForResourcesSeconds = 3.f;
+	// Building the pit and digging two trenches.
+	constexpr float AnchorTrenchTimeoutSeconds = 400.f;
+	// TrenchPort_Rear of SM_GerPit_Pak, in the pit's space.
+	const FVector PakRearSocket(-528.f, 0.f, 0.f);
+	// How far a click lands from the anchor; inside the snap radius.
+	constexpr float AnchorClickOffset = 200.f;
+	constexpr float AnchorTolerance = 1.f;
+	// Time for a capture before the scene changes.
+	constexpr float AnchorCaptureSeconds = 2.f;
+	// The Breakthrough bunkers are not in the build menu: placed as in a level, with their trench sockets.
+	struct FTestBunkerPort
+	{
+		const TCHAR* SocketName;
+		FVector Location;
+		float Yaw;
+	};
+	struct FTestBunker
+	{
+		const TCHAR* ClassPath;
+		FTestBunkerPort Ports[2];
+	};
+	const FTestBunker TestBunkers[] = {
+		{
+			TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/Flak88Bunker/Ger_BXP_Flak88Bunker.Ger_BXP_Flak88Bunker_C"),
+			{{TEXT("TrenchPort_Doors"), FVector(460.f, 135.f, 0.f), 0.f}, {TEXT("TrenchPort_Stairs"), FVector(535.f, -650.f, 0.f), 0.f}}
+		},
+		{
+			TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/FlakvierlingBunker/Ger_BXP_FlakvierlingBunker.Ger_BXP_FlakvierlingBunker_C"),
+			{{TEXT("TrenchPort_Passage"), FVector(260.f, -80.f, 0.f), 0.f}, {TEXT("TrenchPort_Rear"), FVector(-390.f, -150.f, 0.f), 180.f}}
+		}
+	};
+	constexpr float BunkerSpacingTowardsHQ = 1200.f;
+	constexpr float BunkerSpacingSideways = 2200.f;
+	constexpr float BunkerTrenchLength = 900.f;
+	constexpr float AnchorBunkerSettleSeconds = 1.f;
 	const FTrainingOption HarvesterOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_Harvester));
 	const FTrainingOption Pak40PitOption(EAllUnitType::UNType_BuildingExpansion,
 	                                     static_cast<uint8>(EBuildingExpansionType::BTX_GerPak40Pit));
@@ -127,7 +164,8 @@ bool UFieldDefenseTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 	const UWorld* OuterWorld = Cast<UWorld>(Outer);
 	return IsValid(OuterWorld) && OuterWorld->IsGameWorld()
 		&& (FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidate"))
-			|| FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrench")));
+			|| FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrench"))
+			|| FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrenchAnchor")));
 }
 
 TStatId UFieldDefenseTestSubsystem::GetStatId() const
@@ -211,6 +249,9 @@ void UFieldDefenseTestSubsystem::Tick(const float DeltaTime)
 		return;
 	case EFieldDefenseTestPhase::LayingTrench:
 		TickLayingTrench();
+		return;
+	case EFieldDefenseTestPhase::LayingAnchoredTrench:
+		TickLayingAnchoredTrench();
 		return;
 	}
 }
@@ -375,6 +416,11 @@ void UFieldDefenseTestSubsystem::TickExpandingHQ()
 	UE_LOG(LogRTSFieldDefenseTest, Display, TEXT("RTS_FIELD_DEFENSE_TEST hq_expanded after=%.1fs"),
 	       GetPhaseSeconds());
 	CheckLayoutAndRequirements();
+	if (FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrenchAnchor")))
+	{
+		EnterPhase(EFieldDefenseTestPhase::LayingAnchoredTrench, FieldDefenseTestPrivate::AnchorTrenchTimeoutSeconds);
+		return;
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrench")))
 	{
 		EnterPhase(EFieldDefenseTestPhase::LayingTrench, FieldDefenseTestPrivate::TrenchTimeoutSeconds);
@@ -1731,6 +1777,499 @@ void UFieldDefenseTestSubsystem::TickLayingTrench()
 		      FString::Printf(TEXT("trenches=%d expected=%d"), CountFieldTrenches(), M_TrenchCountBeforeCancel));
 		Finish();
 		return;
+	}
+}
+
+void UFieldDefenseTestSubsystem::CheckPlanStartsOnAnchor(
+	const FFieldTrenchAnchorHandle& Anchor,
+	const TArray<FFieldTrenchPiecePlacement>& Plan,
+	const FString& Description)
+{
+	using namespace FieldDefenseTestPrivate;
+	const UFieldTrenchAnchorComponent* AnchorComponent = Anchor.Get();
+	if (not IsValid(AnchorComponent) || Plan.Num() < 2)
+	{
+		Check(false, Description, FString::Printf(TEXT("anchor=%d pieces=%d"), IsValid(AnchorComponent) ? 1 : 0,
+		                                          Plan.Num()));
+		return;
+	}
+	// The first piece joins the anchor's port with its entry port, which lies at the piece origin.
+	const FFieldTrenchOpenPort& Port = AnchorComponent->GetAnchorPort(Anchor.AnchorIndex);
+	const float LocationError = FVector2D::Distance(FVector2D(Plan[0].Location), Port.Location);
+	const float YawError = FMath::Abs(FRotator::NormalizeAxis(Plan[0].Yaw - Port.Yaw));
+	const bool bJoined = Plan[0].Piece != EFieldTrenchPiece::End && Plan.Last().Piece == EFieldTrenchPiece::End &&
+		LocationError < AnchorTolerance && YawError < AnchorTolerance;
+	Check(bJoined, Description, FString::Printf(
+		      TEXT("pieces=%d first=%s last=%s location_error=%.2f yaw_error=%.2f"), Plan.Num(),
+		      *UEnum::GetValueAsString(Plan[0].Piece), *UEnum::GetValueAsString(Plan.Last().Piece), LocationError,
+		      YawError));
+}
+
+bool UFieldDefenseTestSubsystem::GetIsNeckShown() const
+{
+	const UFieldTrenchAnchorComponent* Anchor = M_TestAnchor.Get();
+	const AActor* Pit = IsValid(Anchor) ? Anchor->GetOwner() : nullptr;
+	if (not IsValid(Pit))
+	{
+		return false;
+	}
+	TArray<UStaticMeshComponent*> MeshComponents;
+	Pit->GetComponents(MeshComponents);
+	return MeshComponents.ContainsByPredicate([](const UStaticMeshComponent* MeshComponent)
+	{
+		return IsValid(MeshComponent) && IsValid(MeshComponent->GetStaticMesh()) && MeshComponent->IsVisible() &&
+			MeshComponent->GetStaticMesh()->GetName().Contains(TEXT("TrenchNeck"));
+	});
+}
+
+void UFieldDefenseTestSubsystem::TickLayingAnchoredTrench()
+{
+	using namespace FieldDefenseTestPrivate;
+	ACPPController* Controller = GetController();
+	UTrainerComponent* Trainer = M_Trainer.Get();
+	const ANomadicVehicle* HQ = M_HQ.Get();
+	UFieldTrenchPlacementComponent* Placement = IsValid(Controller) ? Controller->MapTest_GetFieldTrenchPlacement() : nullptr;
+	if (not IsValid(Trainer) || not IsValid(HQ) || not IsValid(Placement))
+	{
+		Check(false, TEXT("anchor_trench_setup"), TEXT("the HQ, its trainer or the trench placement is missing"));
+		Finish();
+		return;
+	}
+	const TMap<ERTSResourceType, int32> CostPerMetre = {
+		{ERTSResourceType::Resource_Radixite, DeveloperSettings::GameBalance::UnitCosts::Bxps::GerFieldTrench_RadixitePerMetre}
+	};
+	auto OnGround = [this, HQ](const FVector2D& Point)
+	{
+		FVector Ground;
+		return GetGroundAt(Point, Ground) ? Ground : FVector(Point, HQ->GetActorLocation().Z);
+	};
+	auto MoveCursorAlongPath = [this, Placement]()
+	{
+		M_TrenchCursorDistance = FMath::Min(M_TrenchCursorDistance + TrenchCursorStep, GetPathLength(M_TrenchPath));
+		Placement->MapTest_SetCursorOverride(GetPointAlongPath(M_TrenchPath, M_TrenchCursorDistance));
+		return M_TrenchCursorDistance >= GetPathLength(M_TrenchPath);
+	};
+	const UFieldTrenchAnchorComponent* Anchor = M_TestAnchor.Get();
+	switch (M_PhaseStep)
+	{
+	case 0:
+		{
+			const bool bPlaced = PlacePitAtValidSpot(M_PhaseSpot, Pak40PitOption);
+			Check(bPlaced, TEXT("anchor_pit_planned"), M_PhaseSpot.ToCompactString());
+			if (not bPlaced)
+			{
+				Finish();
+				return;
+			}
+			++M_PhaseStep;
+			return;
+		}
+	case 1:
+		{
+			ABuildingExpansion* Pit = FindPitNear(M_PhaseSpot);
+			if (not IsValid(Pit) || Pit->GetBuildingExpansionStatus() != EBuildingExpansionStatus::BXS_Built)
+			{
+				return;
+			}
+			M_PhasePit = Pit;
+			UFieldTrenchAnchorComponent* PitAnchor = Pit->FindComponentByClass<UFieldTrenchAnchorComponent>();
+			M_TestAnchor = PitAnchor;
+			const bool bHasAnchor = IsValid(PitAnchor) && PitAnchor->GetAreAnchorsAvailable() &&
+				PitAnchor->GetAnchorCount() == 1;
+			Check(bHasAnchor, TEXT("built_pak_pit_offers_its_rear_anchor"),
+			      FString::Printf(TEXT("component=%d anchors=%d"), IsValid(PitAnchor) ? 1 : 0,
+			                      IsValid(PitAnchor) ? PitAnchor->GetAnchorCount() : 0));
+			if (not bHasAnchor)
+			{
+				Finish();
+				return;
+			}
+			const FVector ExpectedSocket = Pit->GetActorTransform().TransformPosition(PakRearSocket);
+			const float SocketError = FVector::Dist2D(PitAnchor->GetAnchorLocation(0), ExpectedSocket);
+			Check(SocketError < AnchorTolerance && PitAnchor->GetOwningPlayer() == 1 &&
+			      PitAnchor->GetAnchorSocketName(0) == FName(TEXT("TrenchPort_Rear")) && not GetIsNeckShown(),
+			      TEXT("anchor_on_the_rear_socket_with_its_neck_hidden"),
+			      FString::Printf(TEXT("socket_error=%.2f player=%d neck_shown=%d"), SocketError,
+			                      PitAnchor->GetOwningPlayer(), GetIsNeckShown() ? 1 : 0));
+			// Out of the pit's rear, then over to the HQ, where the player may build.
+			const FFieldTrenchOpenPort& Port = PitAnchor->GetAnchorPort(0);
+			const FVector2D Out(FMath::Cos(FMath::DegreesToRadians(Port.Yaw)), FMath::Sin(FMath::DegreesToRadians(Port.Yaw)));
+			const FVector2D Clicked = Port.Location + Out * AnchorClickOffset;
+			const FVector2D Bend = Port.Location + Out * TrenchFirstLegLength;
+			const FVector2D TowardsHQ = Bend + (FVector2D(HQ->GetActorLocation()) - Bend).GetSafeNormal() *
+				TrenchSecondLegLength;
+			M_TrenchPath = {OnGround(Clicked), OnGround(Bend), OnGround(TowardsHQ)};
+			M_TrenchCursorDistance = 0.f;
+			Controller->StartFieldTrenchPlacement(Trainer, CostPerMetre);
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
+			Check(not Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath[0]) && Placement->GetIsDrawing(),
+			      TEXT("anchor_trench_first_click_near_anchor"));
+			// First over the pit itself, behind the anchor.
+			Placement->MapTest_SetCursorOverride(OnGround(Port.Location - Out * AnchorClickOffset));
+			++M_PhaseStep;
+			return;
+		}
+	case 2:
+		{
+			if (M_TrenchCursorDistance == 0.f && IsValid(Anchor))
+			{
+				const FFieldTrenchOpenPort& Port = Anchor->GetAnchorPort(0);
+				const FVector2D Out(FMath::Cos(FMath::DegreesToRadians(Port.Yaw)),
+				                    FMath::Sin(FMath::DegreesToRadians(Port.Yaw)));
+				const TArray<FFieldTrenchPiecePlacement> Plan = Placement->MapTest_GetPlannedPieces();
+				const bool bIntoPit = Plan.ContainsByPredicate([&Port, &Out](const FFieldTrenchPiecePlacement& Piece)
+				{
+					return FVector2D::DotProduct(FVector2D(Piece.Location) - Port.Location, Out) < -AnchorTolerance;
+				});
+				Check(not bIntoPit, TEXT("mouse_behind_the_anchor_plans_nothing_into_the_pit"),
+				      FString::Printf(TEXT("pieces=%d"), Plan.Num()));
+			}
+			if (MoveCursorAlongPath())
+			{
+				++M_PhaseStep;
+			}
+			return;
+		}
+	case 3:
+		{
+			Check(Placement->MapTest_GetPlanAnchor().Get() == Anchor, TEXT("first_click_near_anchor_snaps_start"));
+			CheckPlanStartsOnAnchor({M_TestAnchor, 0}, Placement->MapTest_GetPlannedPieces(),
+			                        TEXT("start_snapped_plan_leaves_the_anchor"));
+			const bool bConfirmed = Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath.Last());
+			M_TestTrench = Placement->MapTest_GetLastConfirmedTrench();
+			Placement->MapTest_SetCursorOverride(TOptional<FVector>());
+			Check(bConfirmed && M_TestTrench.IsValid() && IsValid(Anchor) && not Anchor->GetIsAnchorFree(0) &&
+			      not Anchor->GetIsAnchorJoined(0), TEXT("confirmed_trench_claims_the_anchor"));
+			if (not M_TestTrench.IsValid())
+			{
+				Finish();
+				return;
+			}
+			++M_PhaseStep;
+			return;
+		}
+	case 4:
+		{
+			const ARTSFieldTrench* Trench = M_TestTrench.Get();
+			if (IsValid(Trench) && Trench->GetBuiltPieceCount() == 0)
+			{
+				return;
+			}
+			Check(IsValid(Anchor) && Anchor->GetIsAnchorJoined(0) && GetIsNeckShown(),
+			      TEXT("neck_shows_once_the_first_piece_is_dug"));
+			if (IsValid(Anchor))
+			{
+				ScheduleCapture(TEXT("TrenchAnchor_Joined"), Anchor->GetAnchorLocation(0), 1.f);
+			}
+			M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds();
+			++M_PhaseStep;
+			return;
+		}
+	case 5:
+		{
+			// Leaves time for the capture before the trench goes.
+			if (GetWorld()->GetTimeSeconds() - M_PhaseMarkSeconds < AnchorCaptureSeconds)
+			{
+				return;
+			}
+			if (ARTSFieldTrench* Trench = M_TestTrench.Get())
+			{
+				Trench->Destroy();
+			}
+			++M_PhaseStep;
+			return;
+		}
+	case 6:
+		{
+			Check(IsValid(Anchor) && Anchor->GetIsAnchorFree(0) && not GetIsNeckShown(),
+			      TEXT("removed_trench_frees_the_anchor_and_hides_the_neck"));
+			if (not IsValid(Anchor))
+			{
+				Finish();
+				return;
+			}
+			// A trench started away from the pit and drawn to just outside its anchor.
+			const FFieldTrenchOpenPort& Port = Anchor->GetAnchorPort(0);
+			const FVector2D Out(FMath::Cos(FMath::DegreesToRadians(Port.Yaw)), FMath::Sin(FMath::DegreesToRadians(Port.Yaw)));
+			const FVector2D Side(-Out.Y, Out.X);
+			const FVector2D Start = Port.Location + Out * TrenchFirstLegLength + Side * TrenchSecondLegLength;
+			const FVector2D Near = Port.Location + Out * TrenchSecondLegLength;
+			M_TrenchPath = {OnGround(Start), OnGround(Near), OnGround(Port.Location + Out * AnchorClickOffset)};
+			M_TrenchCursorDistance = 0.f;
+			Controller->StartFieldTrenchPlacement(Trainer, CostPerMetre);
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
+			Check(not Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath[0]) && Placement->GetIsDrawing() &&
+			      not Placement->MapTest_GetPlanAnchor().IsSet(), TEXT("free_start_away_from_anchor"));
+			++M_PhaseStep;
+			return;
+		}
+	case 7:
+		{
+			if (MoveCursorAlongPath())
+			{
+				++M_PhaseStep;
+			}
+			return;
+		}
+	case 8:
+		{
+			Check(Placement->MapTest_GetPlanAnchor().Get() == Anchor, TEXT("mouse_near_anchor_snaps_the_end"));
+			// Planned from the anchor out: the anchor end comes first and the free start gets the cap.
+			const TArray<FFieldTrenchPiecePlacement> Plan = Placement->MapTest_GetPlannedPieces();
+			CheckPlanStartsOnAnchor({M_TestAnchor, 0}, Plan, TEXT("end_snapped_plan_is_laid_from_the_anchor"));
+			if (not Plan.IsEmpty())
+			{
+				const float CapToClick = FVector::Dist2D(Plan.Last().Location, M_TrenchPath[0]);
+				Check(CapToClick < TrenchFirstLegLength * 0.5f, TEXT("free_end_cap_near_the_first_click"),
+				      FString::Printf(TEXT("cap_to_click=%.0f"), CapToClick));
+			}
+			const bool bConfirmed = Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath.Last());
+			M_TestTrench = Placement->MapTest_GetLastConfirmedTrench();
+			Placement->MapTest_SetCursorOverride(TOptional<FVector>());
+			Check(bConfirmed && M_TestTrench.IsValid() && IsValid(Anchor) && not Anchor->GetIsAnchorFree(0),
+			      TEXT("end_snapped_trench_claims_the_anchor"));
+			if (not M_TestTrench.IsValid())
+			{
+				Finish();
+				return;
+			}
+			++M_PhaseStep;
+			return;
+		}
+	case 9:
+		{
+			const ARTSFieldTrench* Trench = M_TestTrench.Get();
+			if (IsValid(Trench) && Trench->GetBuiltPieceCount() == 0)
+			{
+				return;
+			}
+			Check(IsValid(Anchor) && Anchor->GetIsAnchorJoined(0) && GetIsNeckShown(),
+			      TEXT("end_snapped_trench_opens_the_neck"));
+			if (IsValid(Anchor))
+			{
+				ScheduleCapture(TEXT("TrenchAnchor_EndJoined"), Anchor->GetAnchorLocation(0), 1.f);
+			}
+			M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds();
+			++M_PhaseStep;
+			return;
+		}
+	case 10:
+		{
+			if (GetWorld()->GetTimeSeconds() - M_PhaseMarkSeconds < AnchorCaptureSeconds)
+			{
+				return;
+			}
+			const ARTSFieldTrench* Trench = M_TestTrench.Get();
+			M_TrenchPieceCountBeforePitLoss = IsValid(Trench) ? Trench->GetPieceCount() : 0;
+			if (ABuildingExpansion* Pit = M_PhasePit.Get())
+			{
+				Pit->Destroy();
+			}
+			++M_PhaseStep;
+			return;
+		}
+	case 11:
+		{
+			const ARTSFieldTrench* Trench = M_TestTrench.Get();
+			const bool bCapped = IsValid(Trench) && Trench->GetPieceCount() == M_TrenchPieceCountBeforePitLoss + 1 &&
+				Trench->GetPieces().Last().Placement.Piece == EFieldTrenchPiece::End &&
+				Trench->GetPieces().Last().State == EFieldTrenchPieceState::Built &&
+				not Trench->GetStartAnchor().IsSet();
+			Check(bCapped, TEXT("lost_pit_caps_the_joined_end"),
+			      FString::Printf(TEXT("pieces=%d before=%d"), IsValid(Trench) ? Trench->GetPieceCount() : -1,
+			                      M_TrenchPieceCountBeforePitLoss));
+			SpawnTestBunkers();
+			M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds();
+			++M_PhaseStep;
+			return;
+		}
+	case 12:
+		{
+			// Placed in the level, a bunker offers its anchors from the tick after its BeginPlay.
+			if (GetWorld()->GetTimeSeconds() - M_PhaseMarkSeconds < AnchorBunkerSettleSeconds)
+			{
+				return;
+			}
+			CollectBunkerAnchors();
+			M_BunkerAnchorIndex = 0;
+			if (M_BunkerAnchors.IsEmpty())
+			{
+				Finish();
+				return;
+			}
+			++M_PhaseStep;
+			return;
+		}
+	case 13:
+		{
+			const UFieldTrenchAnchorComponent* BunkerAnchor = M_BunkerAnchors[M_BunkerAnchorIndex].Get();
+			if (not IsValid(BunkerAnchor))
+			{
+				Check(false, TEXT("bunker_anchor_still_there"));
+				Finish();
+				return;
+			}
+			// Out of the anchor, straight away from the bunker.
+			const FFieldTrenchOpenPort& Port = BunkerAnchor->GetAnchorPort(M_BunkerAnchors[M_BunkerAnchorIndex].AnchorIndex);
+			const FVector2D Out(FMath::Cos(FMath::DegreesToRadians(Port.Yaw)), FMath::Sin(FMath::DegreesToRadians(Port.Yaw)));
+			M_TrenchPath = {OnGround(Port.Location + Out * AnchorClickOffset), OnGround(Port.Location + Out * BunkerTrenchLength)};
+			M_TrenchCursorDistance = 0.f;
+			Controller->StartFieldTrenchPlacement(Trainer, CostPerMetre);
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
+			(void)Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath[0]);
+			++M_PhaseStep;
+			return;
+		}
+	case 14:
+		{
+			if (MoveCursorAlongPath())
+			{
+				++M_PhaseStep;
+			}
+			return;
+		}
+	case 15:
+		{
+			const FFieldTrenchAnchorHandle& BunkerAnchor = M_BunkerAnchors[M_BunkerAnchorIndex];
+			const UFieldTrenchAnchorComponent* AnchorComponent = BunkerAnchor.Get();
+			const FString Label = IsValid(AnchorComponent)
+				? AnchorComponent->GetOwner()->GetClass()->GetName() + TEXT("_") +
+				AnchorComponent->GetAnchorSocketName(BunkerAnchor.AnchorIndex).ToString()
+				: FString(TEXT("gone"));
+			Check(Placement->MapTest_GetPlanAnchor() == BunkerAnchor, TEXT("bunker_click_snaps_start"), Label);
+			CheckPlanStartsOnAnchor(BunkerAnchor, Placement->MapTest_GetPlannedPieces(),
+			                        TEXT("bunker_plan_leaves_the_anchor ") + Label);
+			(void)Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath.Last());
+			M_BunkerTrenches.Add(Placement->MapTest_GetLastConfirmedTrench());
+			Placement->MapTest_SetCursorOverride(TOptional<FVector>());
+			++M_BunkerAnchorIndex;
+			M_PhaseStep = M_BunkerAnchorIndex < M_BunkerAnchors.Num() ? 13 : 16;
+			return;
+		}
+	case 16:
+		{
+			const bool bAllDug = not M_BunkerTrenches.ContainsByPredicate([](const TWeakObjectPtr<ARTSFieldTrench>& Trench)
+			{
+				return Trench.IsValid() && Trench->GetBuiltPieceCount() < Trench->GetPieceCount();
+			});
+			if (not bAllDug)
+			{
+				return;
+			}
+			int32 ClaimedAnchors = 0;
+			for (const FFieldTrenchAnchorHandle& BunkerAnchor : M_BunkerAnchors)
+			{
+				const UFieldTrenchAnchorComponent* AnchorComponent = BunkerAnchor.Get();
+				ClaimedAnchors += IsValid(AnchorComponent) && not AnchorComponent->GetIsAnchorFree(BunkerAnchor.AnchorIndex)
+					? 1
+					: 0;
+			}
+			Check(ClaimedAnchors == M_BunkerAnchors.Num() && M_BunkerTrenches.Num() == M_BunkerAnchors.Num(),
+			      TEXT("every_bunker_anchor_has_its_dug_trench"),
+			      FString::Printf(TEXT("claimed=%d anchors=%d trenches=%d"), ClaimedAnchors, M_BunkerAnchors.Num(),
+			                      M_BunkerTrenches.Num()));
+			// Reused to take the bunkers' pictures one after the other: the camera moves when one is asked for.
+			M_BunkerAnchorIndex = 0;
+			M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds() - AnchorCaptureSeconds;
+			++M_PhaseStep;
+			return;
+		}
+	default:
+		{
+			if (GetWorld()->GetTimeSeconds() - M_PhaseMarkSeconds < AnchorCaptureSeconds)
+			{
+				return;
+			}
+			if (not M_TestBunkers.IsValidIndex(M_BunkerAnchorIndex))
+			{
+				Finish();
+				return;
+			}
+			if (const AActor* Bunker = M_TestBunkers[M_BunkerAnchorIndex].Get())
+			{
+				ScheduleCapture(TEXT("TrenchAnchor_") + Bunker->GetClass()->GetName(), Bunker->GetActorLocation(), 1.f);
+			}
+			++M_BunkerAnchorIndex;
+			M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds();
+			return;
+		}
+	}
+}
+
+void UFieldDefenseTestSubsystem::SpawnTestBunkers()
+{
+	using namespace FieldDefenseTestPrivate;
+	const ANomadicVehicle* HQ = M_HQ.Get();
+	if (not IsValid(HQ))
+	{
+		return;
+	}
+	// Facing the HQ, so the front anchors lead into the build radius; the second bunker beside and ahead of the first.
+	const FVector2D Spot(M_PhaseSpot);
+	const FVector2D ToHQ = (FVector2D(HQ->GetActorLocation()) - Spot).GetSafeNormal();
+	const FVector2D Side(-ToHQ.Y, ToHQ.X);
+	const FRotator FacingHQ(0.f, FMath::RadiansToDegrees(FMath::Atan2(ToHQ.Y, ToHQ.X)), 0.f);
+	const FVector2D Spots[] = {Spot, Spot + ToHQ * BunkerSpacingTowardsHQ + Side * BunkerSpacingSideways};
+	for (int32 BunkerIndex = 0; BunkerIndex < UE_ARRAY_COUNT(TestBunkers); ++BunkerIndex)
+	{
+		UClass* BunkerClass = LoadClass<AActor>(nullptr, TestBunkers[BunkerIndex].ClassPath);
+		FVector Ground;
+		if (not IsValid(BunkerClass) || not GetGroundAt(Spots[BunkerIndex], Ground))
+		{
+			Check(false, TEXT("bunker_spawned"), TestBunkers[BunkerIndex].ClassPath);
+			continue;
+		}
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AActor* Bunker = GetWorld()->SpawnActor<AActor>(BunkerClass, FTransform(FacingHQ, Ground), SpawnParameters);
+		Check(IsValid(Bunker), TEXT("bunker_spawned"), TestBunkers[BunkerIndex].ClassPath);
+		M_TestBunkers.Add(Bunker);
+	}
+}
+
+void UFieldDefenseTestSubsystem::CollectBunkerAnchors()
+{
+	using namespace FieldDefenseTestPrivate;
+	M_BunkerAnchors.Reset();
+	for (int32 BunkerIndex = 0; BunkerIndex < M_TestBunkers.Num(); ++BunkerIndex)
+	{
+		const AActor* Bunker = M_TestBunkers[BunkerIndex].Get();
+		UFieldTrenchAnchorComponent* Anchors = IsValid(Bunker)
+			? Bunker->FindComponentByClass<UFieldTrenchAnchorComponent>()
+			: nullptr;
+		const FTestBunker& Expected = TestBunkers[BunkerIndex];
+		const bool bOffersAnchors = IsValid(Anchors) && Anchors->GetAreAnchorsAvailable() &&
+			Anchors->GetAnchorCount() == UE_ARRAY_COUNT(Expected.Ports) && Anchors->GetOwningPlayer() == 1;
+		Check(bOffersAnchors, TEXT("placed_bunker_offers_its_anchors"),
+		      FString::Printf(TEXT("%s component=%d available=%d anchors=%d player=%d"), Expected.ClassPath,
+		                      IsValid(Anchors) ? 1 : 0, IsValid(Anchors) && Anchors->GetAreAnchorsAvailable() ? 1 : 0,
+		                      IsValid(Anchors) ? Anchors->GetAnchorCount() : 0,
+		                      IsValid(Anchors) ? Anchors->GetOwningPlayer() : -1));
+		if (not bOffersAnchors)
+		{
+			continue;
+		}
+		for (int32 AnchorIndex = 0; AnchorIndex < Anchors->GetAnchorCount(); ++AnchorIndex)
+		{
+			const FName SocketName = Anchors->GetAnchorSocketName(AnchorIndex);
+			const FTestBunkerPort* Port = Algo::FindByPredicate(Expected.Ports, [SocketName](const FTestBunkerPort& Candidate)
+			{
+				return SocketName == Candidate.SocketName;
+			});
+			const FVector ExpectedLocation = Port != nullptr
+				? Bunker->GetActorTransform().TransformPosition(Port->Location)
+				: FVector::ZeroVector;
+			const float LocationError = FVector::Dist2D(Anchors->GetAnchorLocation(AnchorIndex), ExpectedLocation);
+			const float YawError = Port != nullptr
+				? FMath::Abs(FRotator::NormalizeAxis(Anchors->GetAnchorPort(AnchorIndex).Yaw -
+					(Bunker->GetActorRotation().Yaw + Port->Yaw)))
+				: 180.f;
+			Check(Port != nullptr && LocationError < AnchorTolerance && YawError < AnchorTolerance,
+			      TEXT("bunker_anchor_on_its_socket"),
+			      FString::Printf(TEXT("%s %s location_error=%.2f yaw_error=%.2f"), Expected.ClassPath,
+			                      *SocketName.ToString(), LocationError, YawError));
+			M_BunkerAnchors.Add({Anchors, AnchorIndex});
+		}
 	}
 }
 

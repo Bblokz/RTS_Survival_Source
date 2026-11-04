@@ -30,6 +30,7 @@
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
@@ -2576,26 +2577,78 @@ bool AProjectile::GetCanArmorOverPenetrate(const float EffectiveArmor, const flo
 	return ArmorPenPercentageNeededToPenetrate <= M_FloorArmorPenPercentageNeededAllowOverpen;
 }
 
-float AProjectile::GetKineticPenDamageMlt(AActor* HitActor, const EArmorPlate PlateHit) const
+bool AProjectile::GetIsArmorOvermatched(const float PenAtImpact, const float EffectiveArmor, const float ShellDamage,
+                                        const float TargetMaxHealth)
 {
 	using namespace DeveloperSettings::GameBalance::Weapons::ArmorAndModules;
+	if (EffectiveArmor <= KINDA_SMALL_NUMBER || TargetMaxHealth <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+	return PenAtImpact >= OvermatchPenToEffectiveArmorRatio * EffectiveArmor
+		&& ShellDamage >= OvermatchMinDamageShareOfMaxHealth * TargetMaxHealth;
+}
+
+float AProjectile::GetKineticPenDamageMlt(AActor* HitActor, const EArmorPlate PlateHit, const float PenAtImpact,
+                                          const float EffectiveArmor, bool& bOutArmorDestroyed) const
+{
+	using namespace DeveloperSettings::GameBalance::Weapons::ArmorAndModules;
+	bOutArmorDestroyed = false;
 	const EArmorPlateDamageType PlateSide = Global_GetDamageTypeFromPlate(PlateHit);
 	const float* const PlateDamageMlt = PlateTypeToKineticPenDamageMlt.Find(PlateSide);
 	const float DamageMlt = PlateDamageMlt != nullptr ? *PlateDamageMlt : 1.f;
 
+	ATankMaster* const Tank = Cast<ATankMaster>(HitActor);
+	if (not IsValid(Tank) || not IsValid(Tank->GetHealthComponent()) || not Tank->IsUnitAlive()
+		|| M_FullDamage <= KINDA_SMALL_NUMBER || not ACPPGameState::GetIsRealisticVehicleBalance(this))
+	{
+		return DamageMlt;
+	}
+
+	if (GetIsArmorOvermatched(PenAtImpact, EffectiveArmor, M_FullDamage, Tank->GetHealthComponent()->GetMaxHealth()))
+	{
+		bOutArmorDestroyed = true;
+		StartOvermatchDeath(*Tank, PlateSide);
+		return GetLethalDamageMlt(*Tank, DamageMlt);
+	}
+
 	const float* const DetonationChance = PlateTypeToAmmoDetonationChance.Find(PlateSide);
 	if (DetonationChance == nullptr || M_WeaponCalibre < AmmoDetonationMinCalibreMm
-		|| FMath::FRand() >= *DetonationChance || M_FullDamage <= KINDA_SMALL_NUMBER)
+		|| FMath::FRand() >= *DetonationChance || not Tank->StartAmmoDetonation())
 	{
 		return DamageMlt;
 	}
-	ATankMaster* Tank = Cast<ATankMaster>(HitActor);
-	if (not IsValid(Tank) || not IsValid(Tank->GetHealthComponent()) || not Tank->StartAmmoDetonation())
+	return GetLethalDamageMlt(*Tank, DamageMlt);
+}
+
+void AProjectile::StartOvermatchDeath(ATankMaster& Tank, const EArmorPlateDamageType PlateSide)
+{
+	using namespace DeveloperSettings::GameBalance::Weapons::ArmorAndModules;
+	if (PlateSide != EArmorPlateDamageType::DamageFront)
 	{
-		return DamageMlt;
+		return;
 	}
+	const float DeathRoll = FMath::FRand();
+	if (DeathRoll < OvermatchRegularDeathChance)
+	{
+		return;
+	}
+	// The other half splits evenly; a tank with that effect turned off falls back to the regular death.
+	constexpr float AmmoDetonationShareOfSpecialDeaths = 0.5f;
+	const float AmmoDetonationRollLimit = OvermatchRegularDeathChance
+		+ (1.f - OvermatchRegularDeathChance) * AmmoDetonationShareOfSpecialDeaths;
+	if (DeathRoll < AmmoDetonationRollLimit)
+	{
+		Tank.StartAmmoDetonation();
+		return;
+	}
+	Tank.StartFuelDetonation();
+}
+
+float AProjectile::GetLethalDamageMlt(const ATankMaster& Tank, const float DamageMlt) const
+{
 	// Twice the max health outlasts any damage reduction; the health component only applies what the tank had left.
-	const float LethalDamage = 2.f * Tank->GetHealthComponent()->GetMaxHealth();
+	const float LethalDamage = 2.f * Tank.GetHealthComponent()->GetMaxHealth();
 	return FMath::Max(DamageMlt, LethalDamage / M_FullDamage);
 }
 
@@ -2654,11 +2707,20 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 	{
 		DebugArmorHit(RawArmorValue, EffectiveArmor, AdjustedArmorPen, HitResult.Location, not bShouldBounce);
 	}
-	OnArmorPen_DisplayText(HitResult.Location, PlateHit);
+	bool bArmorDestroyed = false;
+	const float DamageMlt = GetKineticPenDamageMlt(HitActor, PlateHit, AdjustedArmorPen, EffectiveArmor,
+	                                               bArmorDestroyed);
+	if (bArmorDestroyed)
+	{
+		OnArmorDestroyed_DisplayText(HitResult.Location);
+	}
+	else
+	{
+		OnArmorPen_DisplayText(HitResult.Location, PlateHit);
+	}
 	ProjectileHitPropagateNotification(false);
 
 	const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
-	const float DamageMlt = GetKineticPenDamageMlt(HitActor, PlateHit);
 	if (bOverpenetrating)
 	{
 		OnOverPenetratingArmorHit(HitActor, HitResult, SurfaceTypeHit, MakeImpactOutwardRotationZ(HitResult),
@@ -3104,6 +3166,26 @@ void AProjectile::OnArmorPen_HeDisplayText(const FVector& Location)
 
 	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
 		FRTSRichTextConverter::MakeRTSRich("HE destroyed armor!!", ERTSRichText::Text_Bad14),
+		Location, false,
+		350, ETextJustify::Type::Left,
+		TextSettings
+	);
+}
+
+void AProjectile::OnArmorDestroyed_DisplayText(const FVector& Location)
+{
+	if (not GetIsValidWidgetPoolManager())
+	{
+		return;
+	}
+	FRTSVerticalAnimTextSettings TextSettings;
+	TextSettings.DeltaZ = 75.f;
+	TextSettings.VisibleDuration = 1.f;
+	TextSettings.FadeOutDuration = 1.f;
+
+	// Same red as the HE armor destroyed text.
+	M_AnimatedTextWidgetPoolManager->ShowAnimatedText(
+		FRTSRichTextConverter::MakeRTSRich("ARMOR DESTROYED!!", ERTSRichText::Text_Bad14),
 		Location, false,
 		350, ETextJustify::Type::Left,
 		TextSettings

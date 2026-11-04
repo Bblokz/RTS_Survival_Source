@@ -2,7 +2,8 @@
 icon uses. Run in the open editor, twice per batch (the first capture can catch unstreamed textures):
     exec(open(r"D:/UE5Projects/RTS_Survival/Source/Tools/GlobalAbilityIcons/render_ability_parts.py").read())
     run_jobs(["Ju87_Dive"])          # subset, or run_jobs() for all
-compose_ability_icons.py reads <name>_color.png, <name>_mask.png and <name>_points.json from Saved/GlobalAbilityIcons/renders.
+compose_ability_icons.py reads <name>_color.png, <name>_mask.png, <name>_normal.png and <name>_points.json from
+Saved/GlobalAbilityIcons/renders; the normal pass and the camera axes in the points drive its relight.
 """
 exec(open(r"D:/UE5Projects/RTS_Survival/Source/Tools/GlobalAbilityIcons/ue_render_unit.py").read())
 
@@ -28,7 +29,7 @@ GER_SOLDIER = "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/GerHazm
 POINTS = ["W1", "W2", "W3", "W4", "B_Gun_L", "B_Gun_R", "B_Rotor1", "B_Rotor2", "B_Rotor2_001", "B_Rotor2_002",
           "B_Rotor2_003", "B_Rotor2_004", "B_1", "B_2", "B_3", "B_4", "B_5", "B_6", "B_7", "B_8", "B_Large"]
 # Key light intensity and ambient that keep the camo readable on the bright icon sky.
-LOOK = dict(light_intensity=5.0, ambient_intensity=2.0, fov=18.0, res=2048)
+LOOK = dict(light_intensity=5.0, ambient_intensity=2.0, fov=18.0, res=2048, normals=True)
 # Level flight seen from the front right and a little above: the key light reaches the camo, and from this low
 # angle whatever hangs under the aircraft stays in view.
 LEVEL = dict(azimuth=60.0, elevation=14.0, padding=0.9)

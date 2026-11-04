@@ -19,6 +19,8 @@
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBatches.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/CrewRepairAbilityTypes.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossSettings.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckEngineFireDeathSettings.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckRegularDeathSettings.h"
 #include "TankMaster.generated.h"
 
 enum class ERTSAggroBehaviour : uint8;
@@ -334,6 +336,14 @@ public:
 	 */
 	bool StartAmmoDetonation();
 
+	/**
+	 * @brief An overmatching hit set off the fuel: starts the engine fire so the killing hit that follows plays the
+	 * fuel explosion death.
+	 * @return False when engine fires are disabled on this tank or it is already dead; the caller then plays the regular
+	 * death.
+	 */
+	bool StartFuelDetonation();
+
 	/** @brief Testing aid: starts this tank's ammo cook-off and kills it at once, so the cook-off death can be watched. */
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_DieDuringAmmoCookOff();
@@ -341,6 +351,30 @@ public:
 	/** @brief Testing and Shorts aid: starts this tank's ammo cook-off without killing it, so the burning ammo shows first. */
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_StartAmmoCookOff();
+
+	/** @brief Kept up to date by UTankEngineFireBehaviour so the death event knows whether the engine was burning. */
+	void SetIsEngineBurning(const bool bIsBurning) { bM_IsEngineBurning = bIsBurning; }
+
+	/** @brief Testing aid: sets this tank's engine on fire and kills it at once, so the fuel explosion can be watched. */
+	UFUNCTION(BlueprintCallable, Category="Death|Debug")
+	void Debug_DieDuringEngineFire();
+
+	/** @brief Testing aid: sets this tank's engine on fire without killing it, so the fuel leak can be watched. */
+	UFUNCTION(BlueprintCallable, Category="Death|Debug")
+	void Debug_StartEngineFire();
+
+	/**
+	 * @brief Testing aid: kills this tank with a regular death of the given variant, as if a projectile flying along
+	 * KillShotDirection hit it (zero for a death without a killing projectile).
+	 * @param Variant The regular death to play; overrides the shuffle for this death only.
+	 * @param KillShotDirection Travel direction of the pretend killing projectile.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Death|Debug")
+	void Debug_DieRegularDeath(ERegularDeathVariant Variant, FVector KillShotDirection);
+
+	/** @brief Records the travel direction of a killing projectile for the regular death's debris. */
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
+	                         AActor* DamageCauser) override;
 
 	// ---- Vehicle modules ----
 
@@ -507,9 +541,16 @@ public:
 
 protected:
 
+	/** @return False for vehicles with no crew to throw out, such as a nomadic vehicle deployed as a building. */
+	virtual bool GetCanThrowCrewOnDeath() const;
+
 	/** @return True when an ammo cook-off was burning as this tank died; branch on it in BP_OnUnitDies. */
 	UFUNCTION(BlueprintPure, Category="Death")
 	bool GetDiedWhileAmmoCookingOff() const { return bM_DiedWhileAmmoCookingOff; }
+
+	/** @return True when an engine fire was burning as this tank died. */
+	UFUNCTION(BlueprintPure, Category="Death")
+	bool GetDiedWhileEngineBurning() const { return bM_DiedWhileEngineBurning; }
 
 	/**
 	 * @brief Ammo cook-off death: spawns the wreck like DestroyAndSpawnActors, then blows the wreck turret off with
@@ -520,7 +561,10 @@ protected:
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Death")
 	void DestroyAndSpawnActorsWithTurretToss(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX);
 
-	/** @brief Every tank Blueprint spawns its wreck here; a cook-off death takes the turret toss path automatically. */
+	/**
+	 * @brief Every tank Blueprint spawns its wreck here; a cook-off death tosses the turret and an engine fire death
+	 * explodes the fuel automatically.
+	 */
 	virtual void DestroyAndSpawnActors(const FDestroySpawnActorsParameters& SpawnParams, FCollapseFX CollapseFX) override;
 
 	/**
@@ -909,9 +953,54 @@ private:
 	// Snapshot of bM_IsAmmoCookingOff taken as UnitDies starts, before teardown can remove the cook-off behaviour.
 	bool bM_DiedWhileAmmoCookingOff = false;
 
+	// ---- Engine fire death ----
+	bool bM_IsEngineBurning = false;
+	// Snapshot of bM_IsEngineBurning taken as UnitDies starts, before teardown can remove the engine fire behaviour.
+	bool bM_DiedWhileEngineBurning = false;
+
+	/**
+	 * @brief Spawns the wreck and starts the turret toss and/or the fuel explosion on it.
+	 * @param bTossTurret The ammunition cooked off: throw the turret.
+	 * @param bExplodeFuel The engine burned: blow the engine deck (or, with the toss, only add the fuel fire).
+	 */
+	void DestroyAndSpawnActorsWithDeathEffects(const FDestroySpawnActorsParameters& SpawnParams,
+	                                          const FCollapseFX& CollapseFX, bool bTossTurret, bool bExplodeFuel);
+
+	/** @return Where the engine fire burns (or would burn) on this tank; the rear top of the hull as a fallback. */
+	FVector GetEngineWorldLocation() const;
+
+	// ---- Regular death ----
+	// Travel direction of the projectile whose damage is being applied right now; zero outside TakeDamage.
+	FVector M_IncomingProjectileDirection = FVector::ZeroVector;
+	// Snapshot of M_IncomingProjectileDirection taken as UnitDies starts: zero unless a projectile killed this tank.
+	FVector M_KillShotDirection = FVector::ZeroVector;
+	// Set by Debug_DieRegularDeath; the next regular death plays this variant instead of drawing one.
+	TOptional<ERegularDeathVariant> M_DebugRegularDeathVariant;
+
+	/** @brief Spawns the wreck of a death without cook-off or engine fire and adds the drawn variant to it. */
+	void DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActorsParameters& SpawnParams,
+	                                           const FCollapseFX& CollapseFX);
+	ERegularDeathVariant DrawRegularDeathVariant();
+
+	/** @brief Throws crew ragdolls out of the top of the vehicle; runs before the Blueprint can destroy it. */
+	void OnUnitDies_ThrowCrewBodies(ERTSDeathType DeathType) const;
+
+	/** @return Whether the player can see this death; bodies nobody sees would only cost frames. */
+	bool OnUnitDies_GetIsSeen() const;
+
+	bool GetIsValidOptimizationComponent() const;
+
 	// How the wreck turret is thrown when this tank dies during an ammo cook-off.
 	UPROPERTY(EditDefaultsOnly, Category="Death|Turret Toss", meta=(AllowPrivateAccess="true"))
 	FWreckTurretTossSettings M_TurretTossSettings;
+
+	// How the fuel explodes and the wreck burns when this tank dies during an engine fire.
+	UPROPERTY(EditDefaultsOnly, Category="Death|Engine Fire", meta=(AllowPrivateAccess="true"))
+	FWreckEngineFireDeathSettings M_EngineFireDeathSettings;
+
+	// How deaths without a cook-off or engine fire vary: wreck pose and char, chain reaction or debris burst.
+	UPROPERTY(EditDefaultsOnly, Category="Death|Regular", meta=(AllowPrivateAccess="true"))
+	FWreckRegularDeathSettings M_RegularDeathSettings;
 
 	/** @return Yaw of the first mounted turret relative to the hull; 0 without turrets. */
 	float GetLiveTurretYawOffset() const;
@@ -1034,6 +1123,8 @@ private:
 
 	void BeginPlay_SetupCollisionVsBuildings();
 	void BeginPlay_SetFactionFlagPrimitiveDataIndex();
+	// The player's team colour for the camo shaders; enemy vehicles and the default colour leave the camo as is.
+	void BeginPlay_ApplyPlayerTeamColor();
 
 	// the derived bp has already set the correct tank subtype before c++ begin play.
 	void BeginPlay_SetupData();

@@ -253,6 +253,11 @@ struct FWeaponData
 	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
 	float RadixiteDotDurationSeconds = 0.f;
 
+	// Random burst weapons: play the launch sound on a burst's first shot only, for a launch sound that already
+	// holds a whole burst (the Flakvierling's recorded quad volleys). Other fire modes play it on every shot.
+	UPROPERTY(BlueprintReadWrite,EditDefaultsOnly)
+	bool bPlayLaunchSoundOncePerBurst = false;
+
 	void CopyWeaponDataValues(const FWeaponData* WeaponData);
 
 	bool GetHasRadixiteDotOverride() const
@@ -875,6 +880,10 @@ protected:
 
 	EWeaponFireMode GetMyFireMode()const;
 
+	/** @return Whether this shot plays the launch sound; false for a random burst's later shots when the weapon's
+	 * VFX plays it once per burst. Marks the burst's sound as played. */
+	bool ConsumeLaunchSoundForShot();
+
 private:
 	UPROPERTY()
 	TArray<TWeakObjectPtr<UObject>> M_ModuleFireRestrictionSources;
@@ -951,6 +960,9 @@ private:
 	// but only at the beginning of the burst.
 	UPROPERTY()
 	bool bM_CreateShellCaseOnEachRandomBurst = false;
+
+	// Set once the running random burst has played its launch sound (FWeaponData::bPlayLaunchSoundOncePerBurst).
+	bool bM_BurstLaunchSoundPlayed = false;
 
 
 	FTimerHandle M_WeaponTimerHandle;

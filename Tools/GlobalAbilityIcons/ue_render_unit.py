@@ -212,6 +212,9 @@ def _write_points(out_name, actors, root, sockets, cam_loc, cam_rot, fov, res):
     pts["forward"] = _project(origin + root.get_actor_forward_vector() * 300.0, cam_loc, cam_rot, fov, res)
     pts["right"] = _project(origin + root.get_actor_right_vector() * 300.0, cam_loc, cam_rot, fov, res)
     pts["up"] = _project(origin + root.get_actor_up_vector() * 300.0, cam_loc, cam_rot, fov, res)
+    # camera axes: the composer turns the world-normal pass into screen space with them
+    f, r, u = cam_rot.get_forward_vector(), cam_rot.get_right_vector(), cam_rot.get_up_vector()
+    pts["camera"] = {"forward": [f.x, f.y, f.z], "right": [r.x, r.y, r.z], "up": [u.x, u.y, u.z]}
     with open(f"{RENDER_DIR}/{out_name}_points.json", "w") as fh:
         fh.write(repr(pts).replace("'", '"'))
     print("POINTS", out_name, pts)

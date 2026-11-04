@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckRegularDeathSettings.h"
+
 #include "TurretTossDemoSubsystem.generated.h"
 
 class ACPPController;
@@ -25,6 +27,21 @@ enum class ETurretTossDemoStep : uint8
 	Done
 };
 
+/**
+ * How the demo kills its tanks (-TurretTossDemoDeath=CookOff|EngineFire|Both|Regular). LeakDrive does not kill: it sets
+ * the engine on fire and drives the tank away with the camera following, to film the burning fuel leak. Regular plays
+ * the regular death given by -RegularDeathVariant=Standard|ChainReaction|Debris, killed by a pretend projectile flying
+ * along -KillShotYaw=<degrees from the tank's forward> when that switch is given.
+ */
+enum class ETurretTossDemoDeath : uint8
+{
+	CookOff,
+	EngineFire,
+	Both,
+	LeakDrive,
+	Regular
+};
+
 /** One vehicle of the -TurretTossAudit run: spawned, killed during a cook-off and judged by what its wreck did. */
 struct FTurretTossAuditEntry
 {
@@ -36,6 +53,8 @@ struct FTurretTossAuditEntry
 	bool bSpawnRequested = false;
 	bool bKilled = false;
 	float MaxTurretHeightCm = 0.f;
+	// Highest the wreck's own engine deck part rose on an engine fire death (hero wrecks only).
+	float MaxDeckHeightCm = 0.f;
 };
 
 /**
@@ -69,6 +88,13 @@ private:
 	void AimCapture(float OrbitYawDegrees, float DistanceCm, float HeightCm, const FVector& LookAt) const;
 	void ExportFrame(const FString& FileName) const;
 	void LogTossedTurrets() const;
+	void LogEngineFireWrecks() const;
+	void KillTank(ATankMaster& Tank) const;
+	void StartLeakDrive(ATankMaster& Tank) const;
+	void ParseRegularDeathSwitches();
+	void KillTankWithRegularDeath(ATankMaster& Tank) const;
+	void ReportEngineFireAuditEntry(const FTurretTossAuditEntry& Entry, AActor* Wreck);
+	static int32 CountThrownDebris(const AActor* Wreck);
 
 	// ---- Audit of every tank subtype ----
 	void BuildAuditEntries();
@@ -81,6 +107,7 @@ private:
 	void ClearAuditBatch();
 	AActor* FindWreckNear(const FVector& Location) const;
 	static const UStaticMeshComponent* FindWreckTurret(const AActor* Wreck);
+	static UStaticMeshComponent* FindWreckEngineDeck(const AActor* Wreck);
 	bool TryGetGroundZ(const FVector& Location, float& OutGroundZ) const;
 	float GetGameSeconds() const;
 	void Finish(const TCHAR* Reason);
@@ -98,6 +125,10 @@ private:
 	TObjectPtr<UTextureRenderTarget2D> M_RenderTarget;
 
 	ETurretTossDemoStep M_Step = ETurretTossDemoStep::StartGame;
+	ETurretTossDemoDeath M_DeathKind = ETurretTossDemoDeath::CookOff;
+	ERegularDeathVariant M_RegularDeathVariant = ERegularDeathVariant::Standard;
+	// Yaw of the pretend killing projectile relative to the tank's forward; unset kills without a projectile.
+	TOptional<float> M_KillShotYaw;
 	FString M_OutputDirectory;
 	FVector M_DemoLocation = FVector::ZeroVector;
 	// Where the tank stood when it died; the camera keeps looking here after the tank is replaced by its wreck.
@@ -115,6 +146,8 @@ private:
 	int32 M_AuditCountsHullOnly = 0;
 	int32 M_AuditCountsFailed = 0;
 	bool bM_IsAudit = false;
+	bool bM_IsCloseFilm = false;
+	float M_RecordAfterDeathGameSeconds = 9.f;
 	bool bM_IsActive = false;
 	bool bM_HasKilledTank = false;
 };

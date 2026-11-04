@@ -17,3 +17,9 @@ TObjectPtr<UGlobalAbility> UGlobalAbilitySetDataAsset::GetGLobalAbilityForTypeAs
 	}
 	return DuplicateObject<UGlobalAbility>(Template, GetTransientPackage());
 }
+
+const UGlobalAbility* UGlobalAbilitySetDataAsset::FindAbilityTemplate(const EGlobalAbility Type) const
+{
+	const TObjectPtr<UGlobalAbility>* Template = M_AbilityTemplatesByType.Find(Type);
+	return Template ? Template->Get() : nullptr;
+}

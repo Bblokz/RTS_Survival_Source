@@ -76,6 +76,10 @@ public class RTS_Survival : ModuleRules
 			PrivateDependencyModuleNames.Add("Sequencer");
 			// PlanarCut and Voronoi: RTS.Aircraft.BuildCrashCollections fractures the aircraft into their crash pieces.
 			PrivateDependencyModuleNames.AddRange(new string[] { "PlanarCut", "Voronoi" });
+			// MeshDescription: the ragdoll pose bake (Units/Ragdoll/Tests/CorpsePoseBaker) builds static meshes.
+			PrivateDependencyModuleNames.AddRange(new string[] { "MeshDescription", "StaticMeshDescription" });
+			// PhysicsUtilities: the ragdoll physics fit commandlet refits capsules to a soldier's mesh.
+			PrivateDependencyModuleNames.AddRange(new string[] { "PhysicsUtilities", "MeshUtilitiesCommon" });
 		}
 
 		// Uncomment if you are using online features

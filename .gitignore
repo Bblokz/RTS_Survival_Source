@@ -42,3 +42,36 @@
 
 # Log files
 *.log
+
+# Python bytecode caches (written next to every tool script that gets imported)
+__pycache__/
+*.pyc
+*.pyo
+
+# Blender files and their autosave backups (.blend1, .blend2, ...)
+*.blend
+*.blend[0-9]*
+*.blend@
+
+# Unreal assets belong in Content/, not in the Source repo
+*.uasset
+*.umap
+
+# Unreal / IDE generated folders, in case anything gets built or opened from here
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+.vscode/
+*.sln
+*.suo
+*.user
+
+# Generated outputs of Tools scripts (rebuild with the script next to them)
+Tools/EngineFireDeath/Export/Decks/
+
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -415,6 +415,10 @@ namespace DeveloperSettings
 				// Above the Panzerwerfer (ten 150mm rockets, medium range), below the Nebelwerfer TW team weapon.
 				inline constexpr int32 BM13_Radixite = 450;
 				inline constexpr int32 BM13_VehicleParts = 200;
+				// GAZ-MM 72-K: an unarmoured light truck with one 25mm AA autocannon; above the Zil supply trucks,
+				// just below the Sd.Kfz. 7/1 Flakvierling half-track.
+				inline constexpr int32 GAZMM72K_Radixite = 110;
+				inline constexpr int32 GAZMM72K_VehicleParts = 40;
 			}
 
 			namespace LightTanks
@@ -465,6 +469,8 @@ namespace DeveloperSettings
 				inline constexpr int32 PzIIIM_VehicleParts = 200;
 				// Medium hull and armour, so it costs more than the Pz I harvester.
 				inline constexpr int32 T34Harvester_Radixite = 400;
+				// Pz IV hull with twin saws and a conveyor: priced like the T-34 harvester.
+				inline constexpr int32 PzIVHarvester_Radixite = 400;
 				inline constexpr int32 PzIIIFlamm_Radixite = 400;
 				inline constexpr int32 PzIIIFlamm_VehicleParts = 300;
 				inline constexpr int32 PzIVG_Radixite = 400;
@@ -1163,8 +1169,8 @@ namespace DeveloperSettings
 					{EArmorPlateDamageType::DamageRear, 2.f}
 				};
 
-				// Chance that a kinetic penetration through this side detonates the ammunition and kills the tank outright
-				// (cook-off death with turret toss). Rollback: set all three to 0.
+				// Realistic vehicle balance only: chance that a kinetic penetration through this side detonates the
+				// ammunition and kills the tank outright (cook-off death with turret toss). Rollback: set all three to 0.
 				inline TMap<EArmorPlateDamageType, float> PlateTypeToAmmoDetonationChance =
 				{
 					{EArmorPlateDamageType::DamageFront, 0.f},
@@ -1173,6 +1179,17 @@ namespace DeveloperSettings
 				};
 				// Smaller guns can still penetrate a rear plate but do not detonate ammunition.
 				inline constexpr float AmmoDetonationMinCalibreMm = 75.f;
+
+				// Realistic vehicle balance only: a kinetic penetration "crushes" the armor and destroys the vehicle in
+				// one hit when its pen at impact is at least this many times the effective (angled) armor...
+				inline constexpr float OvermatchPenToEffectiveArmorRatio = 1.5f;
+				// ...and its shell damage is at least this share of the target's max health. This keeps the Pz IV's
+				// long 75 (41% of a T-34/76) out while the Tiger's 88 (56%) and the Panther's L70 (57%) qualify.
+				inline constexpr float OvermatchMinDamageShareOfMaxHealth = 0.45f;
+				// Front overmatch kills play the regular death this often; the rest split evenly between an ammo
+				// detonation (turret toss) and a fuel explosion. Side and rear overmatch kills always play the regular
+				// death.
+				inline constexpr float OvermatchRegularDeathChance = 0.5f;
 			}
 
 			inline constexpr float DamagePerMM = 1.2;
@@ -1358,6 +1375,23 @@ namespace DeveloperSettings
 			// See Docs/Balance/TankLethality.md.
 			inline constexpr float VehicleHealthMlt = 0.75f;
 			inline constexpr float VehicleHealthScale = OverallHealthMlt * VehicleHealthMlt;
+			// Realistic T-34/85 sits this far under the medium step so three Pz IV 75mm hits (3 x 221.4) still kill it.
+			// Arcade vehicle balance adds it back so the T-34/85 returns to its old 900.
+			inline constexpr float T34_85BreakpointTrim = 15.f;
+			// Fixed amounts some vehicles add to their base; VehicleHealthMlt does not scale them, so the arcade
+			// vehicle balance takes them out before undoing the multiplier.
+			namespace FixedVehicleHealthOffsets
+			{
+				inline constexpr float Sdkfz251 = 150.f;
+				inline constexpr float Sdkfz251PzIV = 50.f;
+				inline constexpr float BT7 = -50.f;
+				inline constexpr float MS1 = -75.f;
+				inline constexpr float T70 = 25.f;
+				inline constexpr float PzIIIAA = 50.f;
+				inline constexpr float PzIVF1 = -150.f;
+				inline constexpr float Brumbar = 400.f;
+				inline constexpr float SturmTiger = 400.f;
+			}
 
 			// One light tank shot on avg in hp points.
 			inline constexpr float OneLightTankShotHp = RoundToNearestMultipleOfFive(100.f * VehicleHealthScale);

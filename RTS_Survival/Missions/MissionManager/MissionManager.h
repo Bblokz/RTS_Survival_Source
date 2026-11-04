@@ -20,6 +20,7 @@
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
 #include "RTS_Survival/Game/RTSGameInstance/GameInstCampaignGenerationSettings/GameInstCampaignGenerationSettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
 #include "RTS_Survival/Missions/Defeat/RTSDefeatType.h"
 #include "RTS_Survival/Missions/MissionClasses/DontLoseCommanderMission/RemoveDontLoseCommanderPost.h"
 #include "MissionManager.generated.h"
@@ -440,6 +441,7 @@ public:
 
 	void OnMainGameUIReadyAndInitialized(UW_MissionWidgetManager* MissionManagerWidget);
 	bool GetShouldHideGlobalAbilitiesForPlayer() const { return bHideGlobalAbilitiesForPlayer; }
+	EGlobalAbilityTier GetMaxPlayerGlobalAbilityTier() const { return MaxPlayerGlobalAbilityTier; }
 	
 
 protected:
@@ -473,6 +475,11 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Player")
 	bool bHideGlobalAbilitiesForPlayer = false;
+
+	// Highest global ability tier of the commander's kit the player may use here. Set per mission, independent of
+	// the campaign's EMissionTier, so two early missions can open different parts of a kit.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Player")
+	EGlobalAbilityTier MaxPlayerGlobalAbilityTier = EGlobalAbilityTier::TierIV;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|Enemy")
 	EEnemyDirector M_EnemyDirector = EEnemyDirector::DirectorOfShield;

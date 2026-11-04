@@ -8,9 +8,15 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "RTS_Survival/CardSystem/PlayerProfile/PlayerProfileLoader/FRTS_Profile.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/FactionPlayerController.h"
+#include "RTS_Survival/FactionSystem/TeamColor/FRTS_TeamColor.h"
+#include "RTS_Survival/Game/RTSGameInstance/RTSGameInstance.h"
 #include "RTS_Survival/GameUI/Portrait/PortraitWidget/W_Portrait.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "TeamColorPicker/FactionTeamColorPickerLayout.h"
+#include "TeamColorPicker/W_FactionTeamColorPicker.h"
 #include "UnitBrowser/FactionUnitBrowserLayout.h"
 #include "UnitBrowser/W_FactionUnitBrowser.h"
 
@@ -39,6 +45,7 @@ void UW_FactionSelectionMenu::NativeConstruct()
 	Super::NativeConstruct();
 	SetupFactionPlayerController();
 	SetupUnitBrowser();
+	SetupTeamColorPicker();
 	SetupButtonBindings();
 	ApplyFactionAvailability();
 	SelectGermanBreakthrough(true);
@@ -75,6 +82,52 @@ void UW_FactionSelectionMenu::SetupUnitBrowser()
 	BrowserSlot->SetAlignment(BottomCentre);
 	BrowserSlot->SetPosition(FVector2D(0.f, -BottomMargin));
 	BrowserSlot->SetAutoSize(true);
+}
+
+void UW_FactionSelectionMenu::SetupTeamColorPicker()
+{
+	using namespace FactionTeamColorPickerLayout;
+	URTSGameInstance* const GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (IsValid(M_TeamColorPicker) || not IsValid(GameInstance))
+	{
+		return;
+	}
+	// Without a saved profile the game instance keeps this session's colour (the camo default at first start).
+	FLinearColor SavedTeamColor;
+	if (FRTS_Profile::LoadSavedPlayerTeamColor(SavedTeamColor))
+	{
+		GameInstance->SetPlayerTeamColor(SavedTeamColor);
+	}
+	UCanvasPanel* const RootCanvas = IsValid(WidgetTree) ? Cast<UCanvasPanel>(WidgetTree->RootWidget) : nullptr;
+	if (not IsValid(RootCanvas) || not GetIsValidUnitBrowser())
+	{
+		return;
+	}
+	M_TeamColorPicker = CreateWidget<UW_FactionTeamColorPicker>(this, UW_FactionTeamColorPicker::StaticClass());
+	if (not IsValid(M_TeamColorPicker))
+	{
+		return;
+	}
+	M_TeamColorPicker->SetupPicker(this, M_UnitBrowser->GetStyle(), GameInstance->GetPlayerTeamColor());
+	UCanvasPanelSlot* const PickerSlot = RootCanvas->AddChildToCanvas(M_TeamColorPicker);
+	PickerSlot->SetAnchors(FAnchors(0.f, 0.f));
+	PickerSlot->SetAlignment(FVector2D::ZeroVector);
+	PickerSlot->SetPosition(CanvasPosition);
+	PickerSlot->SetAutoSize(true);
+}
+
+void UW_FactionSelectionMenu::HandleTeamColorSelected(const FLinearColor& TeamColor)
+{
+	URTSGameInstance* const GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (not IsValid(GameInstance))
+	{
+		RTSFunctionLibrary::ReportError(TEXT("No game instance to store the team colour in."
+			"\nAt function: UW_FactionSelectionMenu::HandleTeamColorSelected"));
+		return;
+	}
+	GameInstance->SetPlayerTeamColor(TeamColor);
+	FRTS_Profile::SavePlayerTeamColor(TeamColor);
+	FRTS_TeamColor::ApplyPlayerTeamColorToWorldVehicles(this);
 }
 
 void UW_FactionSelectionMenu::HandleGerBreakthroughClicked()

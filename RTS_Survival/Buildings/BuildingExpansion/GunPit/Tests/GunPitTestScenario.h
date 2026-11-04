@@ -48,6 +48,9 @@ struct FGunPitUnderTest
 	// Ampulomet's ampoule) and works its DrillSecondBone (the DShK's spare box, the Ampulomet's breech cap).
 	FName DrillPropBone = TEXT("AmmoBox");
 	FName DrillSecondBone = TEXT("SpareTop");
+	// Montage drill (crews without rounds or drill bones, the Flakvierling bunker's): the loader's reload montage of
+	// this name must play while the crew is loading. None keeps the bone drill.
+	FName LoaderReloadMontage = NAME_None;
 	// The gun bucks and the crew brace at a shot; off for the DShK, whose crew do not brace at its bursts.
 	bool bWatchesFireReaction = true;
 	// A sector pit's gun only traverses this far either side of the pit's forward; zero turns a full circle.
@@ -91,6 +94,7 @@ struct FGunPitUnderTest
 	float DrillPropTravel = 0.f;
 	FVector DrillPropStart = FVector::ZeroVector;
 	bool bGunReloadMontageSeen = false;
+	bool bLoaderReloadMontageSeen = false;
 	bool bGunnerFireMontageSeen = false;
 	bool bWasLoading = false;
 	bool bDrillChecked = false;
@@ -115,7 +119,9 @@ struct FGunPitUnderTest
  * Puppchen pit and Panzerschreck foxhole (two crew, the loader carries a rocket into the weapon); -RailPakBunkerValidate
  * the German rail Pak bunker (the Pak 40 pit's drill on a concrete pillbox roof); -GerFlak88PitValidate the German
  * Flak 88 emplacement (loader and handler on the gun, plus an ammo runner between the niche and the crate ring who
- * stays put while the gun turns). Pictures with
+ * stays put while the gun turns); -GerFlak88BunkerValidate the same turret, crew and runner on the Breakthrough Flak 88
+ * bunker's roof pit; -FlakvierlingBunkerValidate the Breakthrough Flakvierling bunker (a loader on the Flak 37 pit's
+ * clip drill and a gunner on the handwheels, both turning with the mount on its dais). Pictures with
  * -GerPitCapture=<folder>. Not in shipping.
  */
 struct FGunPitTestScenario
@@ -156,6 +162,8 @@ private:
 	void WatchBoneDrill(UWorld& World, FGunPitUnderTest& Pit);
 	void SampleBoneDrill(FGunPitUnderTest& Pit) const;
 	void CheckBoneDrill(FGunPitUnderTest& Pit);
+	void WatchMontageDrill(UWorld& World, FGunPitUnderTest& Pit);
+	void CheckMontageDrill(FGunPitUnderTest& Pit);
 	// Enemy pits sit under the fog of war; the pictures must show them.
 	void RevealPit(const FGunPitUnderTest& Pit) const;
 	void LogHandover(const FGunPitUnderTest& Pit, const UStaticMeshComponent& Round,

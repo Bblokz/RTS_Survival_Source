@@ -120,7 +120,7 @@ EVehicleModuleProfile URTSBlueprintFunctionLibrary::BP_GetVehicleModuleProfileFo
 	{
 		return EVehicleModuleProfile::LightTank;
 	}
-	if (TankSubtype == ETankSubtype::Tank_T34_Harvester)
+	if (TankSubtype == ETankSubtype::Tank_T34_Harvester || TankSubtype == ETankSubtype::Tank_PzIV_Harvester)
 	{
 		return EVehicleModuleProfile::MediumTank;
 	}
@@ -1210,9 +1210,19 @@ FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_Ba14()
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_Ba14));
 }
 
+FTrainingOption URTSBlueprintFunctionLibrary::GetArmoredCar_BTR152A()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BTR152A));
+}
+
 FTrainingOption URTSBlueprintFunctionLibrary::GetArmoredCar_BM13()
 {
 	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_BM13));
+}
+
+FTrainingOption URTSBlueprintFunctionLibrary::GetArmoredCar_GAZMM72K()
+{
+	return FTrainingOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_GAZMM_72K));
 }
 
 FTrainingOption URTSBlueprintFunctionLibrary::GetLightTank_BT7()

@@ -19,6 +19,7 @@ UTE_HarvesterCapacity::UTE_HarvesterCapacity()
 	Technology = ETechnology::Tech_HarvesterCapacity;
 	TanksToApplyTo = {
 		ETankSubtype::Tank_PzI_Harvester,
+		ETankSubtype::Tank_PzIV_Harvester,
 	};
 }
 

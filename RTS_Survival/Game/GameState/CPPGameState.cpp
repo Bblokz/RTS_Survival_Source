@@ -3,6 +3,9 @@
 #include "CPPGameState.h"
 
 #include "AI/NavigationSystemBase.h"
+#include "EngineUtils.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 // used in distance calculation
 
 
@@ -571,6 +574,130 @@ void ACPPGameState::PostInitializeComponents()
 	InitExplMgrOnSubsystem();
 	InitDecalMgrOnSubSystem();
 	PostInitializeComponents_SetupNomadicTrainingOptionsByFaction();
+	PostInitializeComponents_ApplyVehicleBalance();
+}
+
+void ACPPGameState::PostInitializeComponents_ApplyVehicleBalance()
+{
+	const URTSGameInstance* const GameInstance = Cast<URTSGameInstance>(GetGameInstance());
+	if (not IsValid(GameInstance))
+	{
+		return;
+	}
+	SetVehicleBalance(GameInstance->GetVehicleBalance());
+}
+
+bool ACPPGameState::GetIsRealisticVehicleBalance(const UObject* WorldContextObject)
+{
+	const UWorld* const World = IsValid(WorldContextObject) ? WorldContextObject->GetWorld() : nullptr;
+	const ACPPGameState* const GameState = IsValid(World) ? World->GetGameState<ACPPGameState>() : nullptr;
+	return IsValid(GameState) && GameState->GetVehicleBalance() == ERTSVehicleBalance::Realistic;
+}
+
+void ACPPGameState::SetVehicleBalance(const ERTSVehicleBalance NewVehicleBalance)
+{
+	if (NewVehicleBalance == M_AppliedVehicleBalance)
+	{
+		return;
+	}
+	ScaleTankDataHealthToVehicleBalance(M_TPlayerTankDataHashMap, NewVehicleBalance);
+	ScaleTankDataHealthToVehicleBalance(M_TEnemyTankDataHashMap, NewVehicleBalance);
+	M_AppliedVehicleBalance = NewVehicleBalance;
+	ApplyTankDataHealthToLiveVehicles();
+}
+
+namespace VehicleBalanceHealth
+{
+	/** @return The fixed health this subtype adds to its base, which VehicleHealthMlt never scaled. */
+	float GetFixedHealthOffset(const ETankSubtype TankSubtype)
+	{
+		using namespace DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets;
+		switch (TankSubtype)
+		{
+		case ETankSubtype::Tank_Sdkfz251_22:
+		case ETankSubtype::Tank_Sdkfz251_Mortar:
+		case ETankSubtype::Tank_Sdkfz251_Transport:
+			return Sdkfz251;
+		case ETankSubtype::Tank_Sdkfz251_PZIV:
+			return Sdkfz251PzIV;
+		case ETankSubtype::Tank_BT7:
+			return BT7;
+		case ETankSubtype::Tank_MS1:
+			return MS1;
+		case ETankSubtype::Tank_T70:
+		case ETankSubtype::Tank_T70F:
+			return T70;
+		case ETankSubtype::Tank_PzIII_AA:
+			return PzIIIAA;
+		case ETankSubtype::Tank_PzIV_F1:
+			return PzIVF1;
+		case ETankSubtype::Tank_Brumbar:
+			return Brumbar;
+		case ETankSubtype::Tank_SturmTiger:
+			return SturmTiger;
+		default:
+			return 0.f;
+		}
+	}
+}
+
+void ACPPGameState::ScaleTankDataHealthToVehicleBalance(TMap<ETankSubtype, FTankData>& TankDataMap,
+                                                        const ERTSVehicleBalance NewVehicleBalance) const
+{
+	using namespace DeveloperSettings::GameBalance::UnitHealth;
+	const bool bToArcade = NewVehicleBalance == ERTSVehicleBalance::Arcade;
+	const float HealthScale = bToArcade ? 1.f / VehicleHealthMlt : VehicleHealthMlt;
+	for (TPair<ETankSubtype, FTankData>& TankDataPair : TankDataMap)
+	{
+		FTankData& TankData = TankDataPair.Value;
+		if (not TankData.bScalesWithVehicleBalance)
+		{
+			continue;
+		}
+		const float FixedOffset = VehicleBalanceHealth::GetFixedHealthOffset(TankDataPair.Key);
+		// Arcade restores the T-34/85's untrimmed medium step; its trim only exists for the realistic breakpoint.
+		const float BreakpointTrim = TankDataPair.Key == ETankSubtype::Tank_T34_85 ? T34_85BreakpointTrim : 0.f;
+		const float NewMaxHealth = bToArcade
+			                           ? (TankData.MaxHealth - FixedOffset + BreakpointTrim) * HealthScale + FixedOffset
+			                           : (TankData.MaxHealth - FixedOffset) * HealthScale + FixedOffset - BreakpointTrim;
+		const float HealthRatio = NewMaxHealth / FMath::Max(TankData.MaxHealth, KINDA_SMALL_NUMBER);
+		TankData.MaxHealth = NewMaxHealth;
+		TankData.ResistancesAndDamageMlt.FireResistanceData.MaxFireThreshold *= HealthRatio;
+	}
+}
+
+void ACPPGameState::ApplyTankDataHealthToLiveVehicles() const
+{
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	for (TActorIterator<ATankMaster> TankIterator(World); TankIterator; ++TankIterator)
+	{
+		ATankMaster* const Tank = *TankIterator;
+		// Tanks that have not begun play read the scaled data themselves.
+		if (not IsValid(Tank) || not Tank->HasActorBegunPlay() || not Tank->IsUnitAlive())
+		{
+			continue;
+		}
+		URTSComponent* const RTSComponent = Tank->GetRTSComponent();
+		UHealthComponent* const HealthComponent = Tank->GetHealthComponent();
+		if (not IsValid(RTSComponent) || not IsValid(HealthComponent)
+			|| RTSComponent->GetUnitType() == EAllUnitType::UNType_Nomadic)
+		{
+			continue;
+		}
+		const TMap<ETankSubtype, FTankData>& TankDataMap = RTSComponent->GetOwningPlayer() == 1
+			                                                    ? M_TPlayerTankDataHashMap
+			                                                    : M_TEnemyTankDataHashMap;
+		const FTankData* const TankData = TankDataMap.Find(RTSComponent->GetSubtypeAsTankSubtype());
+		if (TankData == nullptr || not TankData->bScalesWithVehicleBalance)
+		{
+			continue;
+		}
+		HealthComponent->SetMaxHealth(TankData->MaxHealth);
+	}
 }
 
 void ACPPGameState::PostInitializeComponents_SetupNomadicTrainingOptionsByFaction()
@@ -3645,6 +3772,39 @@ void ACPPGameState::InitAllGameLightWeapons()
 	WeaponData.WeaponName = EWeaponName::Flakvierling38_20MM;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flakvierling38_20MM, WeaponData);
 
+	// Emplaced Flakvierling: one multi projectile weapon on all four barrels, so a magazine round is a volley of four
+	// and the stats stay per projectile (same gun, same damage). Its turret fires random bursts of 4-6 volleys
+	// 0.14 s apart (a real Flak 38's ~7 rounds a second); the cooldown between bursts keeps the old output of four
+	// independent Flak 38s (about 4 projectiles a second over a 20 s magazine cycle): 16 x 0.14 s inside 4 bursts,
+	// 3 x 2.6 s between them, 10 s reload.
+	{
+		constexpr float EmplacedFlakvierlingBurstPause = 2.6f;
+		FWeaponData EmplacedFlakvierlingData = WeaponData;
+		EmplacedFlakvierlingData.WeaponName = EWeaponName::Flakvierling38_20MM_Emplaced;
+		EmplacedFlakvierlingData.BaseCooldown = EmplacedFlakvierlingBurstPause;
+		// Its launch sound is a recorded quad burst with its echo, played once per burst.
+		EmplacedFlakvierlingData.bPlayLaunchSoundOncePerBurst = true;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Flakvierling38_20MM_Emplaced, EmplacedFlakvierlingData);
+	}
+
+	// GAZ-MM 72-K 25mm: the Flak 38 setup (anti-aircraft autocannon, AP, light cannon range) with a heavier round
+	// (about +20% damage and penetration) fired from 7-round clips: a faster cycle and a short clip swap (about 1.4x
+	// a Flak 38's sustained output: 7 rounds per 2.1 s + 4 s).
+	{
+		constexpr float Gun72KDamageMlt = 1.2f;
+		constexpr float Gun72KPenMlt = 1.2f;
+		FWeaponData Gun72KData = WeaponData;
+		Gun72KData.WeaponName = EWeaponName::Gun72K_25MM;
+		Gun72KData.WeaponCalibre = 25;
+		Gun72KData.BaseDamage = WeaponData.BaseDamage * Gun72KDamageMlt;
+		Gun72KData.ArmorPen = FMath::RoundToFloat(WeaponData.ArmorPen * Gun72KPenMlt);
+		Gun72KData.ArmorPenMaxRange = FMath::RoundToFloat(WeaponData.ArmorPenMaxRange * Gun72KPenMlt);
+		Gun72KData.MagCapacity = 7;
+		Gun72KData.ReloadSpeed = 4.f;
+		Gun72KData.BaseCooldown = 0.3f;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::Gun72K_25MM, Gun72KData);
+	}
+
 	// Flak Luchs: twin MG 151/15 fired through a multi projectile weapon on 2 sockets, so all stats are per
 	// projectile and one shot (one magazine round) fires both barrels. Damage formula as the Flak 38.
 	{
@@ -3674,6 +3834,37 @@ void ACPPGameState::InitAllGameLightWeapons()
 		TwinMg151Data.ShrapnelPen = 0;
 		TwinMg151Data.ProjectileMovementSpeed = BaseProjectileSpeed * TwinMg151ProjectileSpeedMlt;
 		M_TPlayerWeaponDataHashMap.Add(EWeaponName::MG151_15MM_Twin, TwinMg151Data);
+	}
+
+	// BTR-152A ZPTU-2: twin 14.5mm KPV fired through a multi projectile weapon on 2 sockets, so all stats are per
+	// projectile and one shot (one magazine round) fires both barrels. The PTRS round out of a heavy machine gun:
+	// it outranges and outpenetrates the DShK, but has no explosive filler like the 15mm MG 151.
+	{
+		constexpr float TwinKpvRangeMlt = 1.3f;
+		constexpr float TwinKpvProjectileSpeedMlt = 1.1f;
+		FWeaponData TwinKpvData = {};
+		TwinKpvData.WeaponName = EWeaponName::KPV_14_5MM_Twin;
+		TwinKpvData.DamageType = ERTSDamageType::Kinetic;
+		TwinKpvData.ShellType = EWeaponShellType::Shell_AP;
+		TwinKpvData.ShellTypes = {EWeaponShellType::Shell_AP};
+		TwinKpvData.WeaponCalibre = 14.5f;
+		TwinKpvData.TNTExplosiveGrams = 0.f;
+		TwinKpvData.BaseDamage = DamagePerMM * TwinKpvData.WeaponCalibre * FlakCannonBonusDamageFactor;
+		TwinKpvData.DamageFlux = DamageFluxPercentage;
+		TwinKpvData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(BasicSmallArmsRange * TwinKpvRangeMlt, 10);
+		TwinKpvData.ArmorPen = 40;
+		TwinKpvData.ArmorPenMaxRange = 32;
+		TwinKpvData.MagCapacity = 30;
+		TwinKpvData.ReloadSpeed = 6.f;
+		TwinKpvData.BaseCooldown = 0.3f;
+		TwinKpvData.CooldownFlux = CooldownFluxPercentage;
+		TwinKpvData.Accuracy = 82;
+		TwinKpvData.ShrapnelRange = 0;
+		TwinKpvData.ShrapnelDamage = 0;
+		TwinKpvData.ShrapnelParticles = 0;
+		TwinKpvData.ShrapnelPen = 0;
+		TwinKpvData.ProjectileMovementSpeed = BaseProjectileSpeed * TwinKpvProjectileSpeedMlt;
+		M_TPlayerWeaponDataHashMap.Add(EWeaponName::KPV_14_5MM_Twin, TwinKpvData);
 	}
 
 	// Flak 36 37mm
@@ -4205,8 +4396,9 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumCannonRange;
-	WeaponData.ArmorPen = 85;
-	WeaponData.ArmorPenMaxRange = 77;
+	// BR-350SP solid shot: 96 mm at 100 m, 87 mm at 500 m.
+	WeaponData.ArmorPen = 96;
+	WeaponData.ArmorPenMaxRange = 87;
 	WeaponData.MagCapacity = 1;
 	WeaponData.ReloadSpeed = 6.9f;
 	WeaponData.BaseCooldown = 1;
@@ -5738,7 +5930,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Kettenkrad, TankData);
 
 	// Sd.Kfz. 251/22
-	TankData.MaxHealth = ArmoredCarHealthBase + 150;
+	TankData.MaxHealth = ArmoredCarHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Sdkfz251;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -5757,7 +5949,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	// Sd.Kfz. 251 (Mortar)
 	{
-		TankData.MaxHealth = ArmoredCarHealthBase + 150;
+		TankData.MaxHealth = ArmoredCarHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Sdkfz251;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 		TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -5781,7 +5973,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 
 	// Sd.Kfz. 251 (Transport)
 	{
-		TankData.MaxHealth = ArmoredCarHealthBase + 150;
+		TankData.MaxHealth = ArmoredCarHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Sdkfz251;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 		TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -5842,7 +6034,7 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	}
 
 	// Sd.Kfz. 251 (Pz IV)
-	TankData.MaxHealth = ArmoredCarHealthBase + 50;
+	TankData.MaxHealth = ArmoredCarHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Sdkfz251PzIV;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 30 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -5897,6 +6089,33 @@ void ACPPGameState::InitAllGameArmoredCarData()
 	TankData.ExperienceMultiplier = 1.0f;
 	TankData.Abilities = BasicTankAbilities;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Ba14, TankData);
+
+	// BTR-152A: thin open-topped hull, but a full-circle twin KPV mount that tracks aircraft quickly.
+	{
+		constexpr float BTR152AHealthMlt = 0.9f;
+		constexpr float BTR152ARotationSpeed = 38.f;
+		constexpr float BTR152AMountRotationSpeed = 45.f;
+		constexpr float BTR152AMaxSpeedKmh = 65.f;
+		constexpr float BTR152AReverseSpeedKmh = 25.f;
+		constexpr float BTR152AExpWorthMlt = 1.2f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * BTR152AHealthMlt, 5);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = BTR152ARotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = BTR152AMountRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = BTR152AMaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = BTR152AReverseSpeedKmh;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * BTR152AExpWorthMlt, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, Puma_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, Puma_VehicleParts}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_BTR152A, TankData);
+	}
 
 	// Zil ammo truck: unarmed supply truck carrying ammo crates.
 	TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * 0.8f, 5);
@@ -5980,6 +6199,34 @@ void ACPPGameState::InitAllGameArmoredCarData()
 		TankData.ExperienceMultiplier = 1.0f;
 		TankData.Abilities = BasicTankAbilities;
 		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_BM13, TankData);
+	}
+
+	// GAZ-MM 72-K: the light GAZ-MM truck with a 25mm 72-K on a full-traverse pedestal. Unarmoured like the Zil
+	// trucks and a little lighter; the hand-cranked pedestal traverses faster than the BTR-152A's ZPTU-2.
+	{
+		constexpr float GAZMM72KHealthMlt = 0.8f;
+		constexpr float GAZMM72KRotationSpeed = 38.f;
+		constexpr float GAZMM72KMountRotationSpeed = 50.f;
+		constexpr float GAZMM72KMaxSpeedKmh = 60.f;
+		constexpr float GAZMM72KReverseSpeedKmh = 20.f;
+		constexpr float GAZMM72KExpWorthMlt = 1.1f;
+
+		TankData.MaxHealth = RTSFunctionLibrary::RoundToNearestMultipleOf(ArmoredCarHealthBase * GAZMM72KHealthMlt, 5);
+		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIArmoredCarResistances(TankData.MaxHealth);
+		TankData.VehicleRotationSpeed = GAZMM72KRotationSpeed * TankTurnRateMultiplier;
+		TankData.TurretRotationSpeed = GAZMM72KMountRotationSpeed * TankTurretTurnRateMultiplier;
+		TankData.VehicleMaxSpeedKmh = GAZMM72KMaxSpeedKmh;
+		TankData.VehicleReverseSpeedKmh = GAZMM72KReverseSpeedKmh;
+		TankData.VisionRadius = ArmoredCarVisionRadius;
+		TankData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(BaseArmoredCarExp * GAZMM72KExpWorthMlt, 5);
+		TankData.Cost = FUnitCost({
+			{ERTSResourceType::Resource_Radixite, GAZMM72K_Radixite},
+			{ERTSResourceType::Resource_VehicleParts, GAZMM72K_VehicleParts}
+		});
+		TankData.ExperienceLevels = GetArmoredCarExpLevels();
+		TankData.ExperienceMultiplier = 1.0f;
+		TankData.Abilities = BasicTankAbilities;
+		M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_GAZMM_72K, TankData);
 	}
 }
 
@@ -6284,7 +6531,7 @@ void ACPPGameState::InitAllGameLightTankData()
 	// ------------------------------- RUS Light Tanks -------------------------------
 
 	// BT-7
-	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp - 50;
+	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::BT7;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 16 * TankTurretTurnRateMultiplier;
@@ -6339,7 +6586,7 @@ void ACPPGameState::InitAllGameLightTankData()
 
 	// MS-1 (T-18): the weakest Soviet tank. Thin riveted plates (fewer hit points than the BT-7), as slow as the T-26
 	// with a slower hand-cranked turret, and cheap.
-	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp - 75;
+	TankData.MaxHealth = LightTankHealthBase - OneLightTankShotHp + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::MS1;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 35 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
@@ -6357,7 +6604,7 @@ void ACPPGameState::InitAllGameLightTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_MS1, TankData);
 
 	// T-70
-	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp + 25;
+	TankData.MaxHealth = LightTankHealthBase + OneLightTankShotHp + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::T70;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 55 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 15 * TankTurretTurnRateMultiplier;
@@ -6489,7 +6736,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIII_J, TankData);
 
 	// Pz III AA
-	TankData.MaxHealth = LightMediumTankBase + 50;
+	TankData.MaxHealth = LightMediumTankBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::PzIIIAA;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 35 * TankTurretTurnRateMultiplier;
@@ -6602,7 +6849,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PZIV_Rockets, TankData);
 
 	// Pz IV F1
-	TankData.MaxHealth = MediumTankHealthBase - 150;
+	TankData.MaxHealth = MediumTankHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::PzIVF1;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetILightArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -6656,7 +6903,7 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_Jaguar, TankData);
 
 	// Brummbär
-	TankData.MaxHealth = MediumTankHealthBase + 400;
+	TankData.MaxHealth = MediumTankHealthBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::Brumbar;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 30 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
@@ -6823,11 +7070,8 @@ void ACPPGameState::InitAllGameMediumTankData()
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34E, TankData);
 
 	// T-34/85
-	{
-		// 15 HP under the medium step so three Pz IV 75mm hits (3 x 221.4) still kill it.
-		constexpr float T34_85BreakpointTrim = 15.f;
-		TankData.MaxHealth = MediumTankHealthBase + OneMediumTankShotHp - T34_85BreakpointTrim;
-	}
+	TankData.MaxHealth = MediumTankHealthBase + OneMediumTankShotHp
+		- DeveloperSettings::GameBalance::UnitHealth::T34_85BreakpointTrim;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 20 * TankTurretTurnRateMultiplier;
@@ -6880,6 +7124,23 @@ void ACPPGameState::InitAllGameMediumTankData()
 	TankData.ExperienceWorth = BaseMediumTankExp;
 	TankData.ExperienceMultiplier = 1.0f;
 	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_T34_Harvester, TankData);
+
+	// Pz IV Harvester (twin saws + conveyor): medium armour, slower than a Pz IV with the saw frame and hopper.
+	TankData.MaxHealth = MediumTankHealthBase;
+	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
+	TankData.VehicleRotationSpeed = 40 * TankTurnRateMultiplier;
+	TankData.TurretRotationSpeed = 14 * TankTurretTurnRateMultiplier;
+	TankData.VehicleMaxSpeedKmh = 22;
+	TankData.VehicleReverseSpeedKmh = 12;
+	TankData.VisionRadius = T1TankVisionRadius;
+	TankData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, PzIVHarvester_Radixite}
+	});
+	TankData.Abilities = BasicHarvesterTankAbilities;
+	TankData.ExperienceLevels = GetMediumTankExpLevels();
+	TankData.ExperienceWorth = BaseMediumTankExp;
+	TankData.ExperienceMultiplier = 1.0f;
+	M_TPlayerTankDataHashMap.Add(ETankSubtype::Tank_PzIV_Harvester, TankData);
 
 	// SU-85
 	{
@@ -7247,7 +7508,7 @@ void ACPPGameState::InitAllGameHeavyTankData()
 
 
 	// Sturm Tiger
-	TankData.MaxHealth = T3HeavyTankBase + 400;
+	TankData.MaxHealth = T3HeavyTankBase + DeveloperSettings::GameBalance::UnitHealth::FixedVehicleHealthOffsets::SturmTiger;
 	TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyArmorResistances(TankData.MaxHealth);
 	TankData.VehicleRotationSpeed = 25 * TankTurnRateMultiplier;
 	TankData.TurretRotationSpeed = 12 * TankTurretTurnRateMultiplier;
@@ -7754,6 +8015,7 @@ void ACPPGameState::InitAllGameTrainData()
 	{
 		FTankData TankData;
 		TankData.MaxHealth = TrainHealth;
+		TankData.bScalesWithVehicleBalance = false;
 		TankData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIMediumArmorResistances(TankData.MaxHealth);
 		TankData.VehicleRotationSpeed = TrainRotationSpeed * TankTurnRateMultiplier;
 		TankData.TurretRotationSpeed = TurretRotationSpeed * TankTurretTurnRateMultiplier;

@@ -239,7 +239,8 @@ void FRTS_VoiceLineHelpers::PlayUnitDeathVoiceLineOnRadio(AActor* UnitThatDied, 
 EAnnouncerVoiceLineType FRTS_VoiceLineHelpers::GetDeathVoiceLineForTank(const ETankSubtype Type)
 {
 	// Handle the harvester as an exception
-	if (Type == ETankSubtype::Tank_PzI_Harvester || Type == ETankSubtype::Tank_T34_Harvester)
+	if (Type == ETankSubtype::Tank_PzI_Harvester || Type == ETankSubtype::Tank_T34_Harvester
+		|| Type == ETankSubtype::Tank_PzIV_Harvester)
 	{
 		return EAnnouncerVoiceLineType::LostHarvester;
 	}

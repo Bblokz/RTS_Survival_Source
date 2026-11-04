@@ -30,10 +30,61 @@ struct RTS_SURVIVAL_API FWreckDebrisPieceType
 	float Weight = 1.f;
 };
 
+/** One kind of debris burst: which pieces fly, how many, how hard and how many of them burn. */
+USTRUCT(BlueprintType)
+struct RTS_SURVIVAL_API FWreckDebrisBurstProfile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category="Pieces")
+	TArray<FWreckDebrisPieceType> PieceTypes;
+
+	// Piece count for the smallest and largest hull; the hull's bounding radius picks a value in between.
+	UPROPERTY(EditAnywhere, Category="Pieces")
+	FIntPoint PieceCountRange = FIntPoint(8, 16);
+
+	// Hull bounding radius (cm) mapped onto PieceCountRange.
+	UPROPERTY(EditAnywhere, Category="Pieces")
+	FVector2D HullRadiusRange = FVector2D(250.0, 600.0);
+
+	// Pieces start scattered this far (cm) around the burst origin.
+	UPROPERTY(EditAnywhere, Category="Pieces", meta=(ClampMin="0"))
+	float SpawnScatterRadius = 90.f;
+
+	UPROPERTY(EditAnywhere, Category="Launch", meta=(ClampMin="0"))
+	FVector2D UpSpeedRange = FVector2D(550.0, 1250.0);
+
+	UPROPERTY(EditAnywhere, Category="Launch", meta=(ClampMin="0"))
+	FVector2D SideSpeedRange = FVector2D(250.0, 900.0);
+
+	UPROPERTY(EditAnywhere, Category="Launch", meta=(ClampMin="0"))
+	FVector2D SpinDegreesRange = FVector2D(180.0, 720.0);
+
+	// 0 throws pieces all around; 1 throws every piece within DirectionSpreadDegrees of the burst's direction.
+	UPROPERTY(EditAnywhere, Category="Launch", meta=(ClampMin="0", ClampMax="1"))
+	float DirectionBias = 0.f;
+
+	// Half angle of the cone around the burst direction that biased pieces fly into.
+	UPROPERTY(EditAnywhere, Category="Launch", meta=(ClampMin="0", ClampMax="180"))
+	float DirectionSpreadDegrees = 60.f;
+
+	UPROPERTY(EditAnywhere, Category="Fire", meta=(ClampMin="0"))
+	int32 BurningPieceCount = 2;
+
+	UPROPERTY(EditAnywhere, Category="Fire")
+	ERTSFireType BurningPieceFireType = ERTSFireType::SmallOptim;
+
+	UPROPERTY(EditAnywhere, Category="Fire", meta=(ClampMin="0"))
+	float BurningPieceFireLifeTime = 6.f;
+
+	UPROPERTY(EditAnywhere, Category="Fire")
+	FVector BurningPieceFireScale = FVector(0.35);
+};
+
 /**
- * @brief Project-wide debris thrown out of a hull when a tank dies during an ammo cook-off (Project Settings >
- * Game > Wreck Debris). Read by UWreckDebrisBurstComponent; per tank only the count scale and on/off live in
- * FWreckTurretTossSettings.
+ * @brief Project-wide debris thrown out of a wreck when a tank dies during an ammo cook-off or an engine fire
+ * (Project Settings > Game > Wreck Debris). Read by UWreckDebrisBurstComponent; per tank only the count scale and
+ * on/off live in FWreckTurretTossSettings and FWreckEngineFireDeathSettings.
  */
 UCLASS(Config=Game, DefaultConfig, meta=(DisplayName="Wreck Debris"))
 class RTS_SURVIVAL_API UWreckDebrisSettings : public UDeveloperSettings
@@ -43,41 +94,13 @@ class RTS_SURVIVAL_API UWreckDebrisSettings : public UDeveloperSettings
 public:
 	UWreckDebrisSettings();
 
-	UPROPERTY(Config, EditAnywhere, Category="Pieces")
-	TArray<FWreckDebrisPieceType> PieceTypes;
+	// Metal chunks, shells, ammo boxes and cans blown out of the turret ring when the ammunition detonates.
+	UPROPERTY(Config, EditAnywhere, Category="Bursts")
+	FWreckDebrisBurstProfile AmmoCookOffBurst;
 
-	// Piece count for the smallest and largest hull; the hull's bounding radius picks a value in between.
-	UPROPERTY(Config, EditAnywhere, Category="Pieces")
-	FIntPoint PieceCountRange = FIntPoint(8, 16);
-
-	// Hull bounding radius (cm) mapped onto PieceCountRange.
-	UPROPERTY(Config, EditAnywhere, Category="Pieces")
-	FVector2D HullRadiusRange = FVector2D(250.0, 600.0);
-
-	// Pieces start scattered this far (cm) around the turret ring.
-	UPROPERTY(Config, EditAnywhere, Category="Pieces", meta=(ClampMin="0"))
-	float SpawnScatterRadius = 90.f;
-
-	UPROPERTY(Config, EditAnywhere, Category="Launch", meta=(ClampMin="0"))
-	FVector2D UpSpeedRange = FVector2D(550.0, 1250.0);
-
-	UPROPERTY(Config, EditAnywhere, Category="Launch", meta=(ClampMin="0"))
-	FVector2D SideSpeedRange = FVector2D(250.0, 900.0);
-
-	UPROPERTY(Config, EditAnywhere, Category="Launch", meta=(ClampMin="0"))
-	FVector2D SpinDegreesRange = FVector2D(180.0, 720.0);
-
-	UPROPERTY(Config, EditAnywhere, Category="Fire", meta=(ClampMin="0"))
-	int32 BurningPieceCount = 2;
-
-	UPROPERTY(Config, EditAnywhere, Category="Fire")
-	ERTSFireType BurningPieceFireType = ERTSFireType::SmallOptim;
-
-	UPROPERTY(Config, EditAnywhere, Category="Fire", meta=(ClampMin="0"))
-	float BurningPieceFireLifeTime = 6.f;
-
-	UPROPERTY(Config, EditAnywhere, Category="Fire")
-	FVector BurningPieceFireScale = FVector(0.35);
+	// Deck plates, grilles, hatch lids and exhaust parts blown off the engine deck when the fuel explodes.
+	UPROPERTY(Config, EditAnywhere, Category="Bursts")
+	FWreckDebrisBurstProfile EngineFireBurst;
 
 	// Below these speeds for SettleDuration seconds a piece freezes; MaxFlightTime freezes it regardless.
 	UPROPERTY(Config, EditAnywhere, Category="Landing", meta=(ClampMin="0"))

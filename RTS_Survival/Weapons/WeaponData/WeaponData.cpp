@@ -174,6 +174,7 @@ void FWeaponData::CopyWeaponDataValues(const FWeaponData* const WeaponData)
 	GroundFire = WeaponData->GroundFire;
 	RadixiteDotTotalDamage = WeaponData->RadixiteDotTotalDamage;
 	RadixiteDotDurationSeconds = WeaponData->RadixiteDotDurationSeconds;
+	bPlayLaunchSoundOncePerBurst = WeaponData->bPlayLaunchSoundOncePerBurst;
 }
 
 bool FLaunchEffectSettings::HasLaunchSettings() const
@@ -1409,6 +1410,7 @@ void UWeaponState::FireRandomBurst()
 void UWeaponState::InitRandomBurst()
 {
 	bM_IsOnCooldown = true;
+	bM_BurstLaunchSoundPlayed = false;
 	M_AmountLeftInBurst = FMath::RandRange(M_MinBurstAmount, M_MaxBurstAmount);
 	if (M_CurrentMagCapacity < M_AmountLeftInBurst)
 	{
@@ -1434,8 +1436,27 @@ void UWeaponState::InitRandomBurst()
 	// Immediate call to OnRandomBurst, del bound on Init.
 	M_BurstModeDel.ExecuteIfBound();
 
+	// A burst of one round has already stopped (and set its cooldown); looping it would fire a second round.
+	if (M_AmountLeftInBurst <= 0)
+	{
+		return;
+	}
 	// Loop OnSingleBurst till timer is invalidated.
 	World->GetTimerManager().SetTimer(M_WeaponTimerHandle, M_BurstModeDel, BurstCooldown, true);
+}
+
+bool UWeaponState::ConsumeLaunchSoundForShot()
+{
+	if (not WeaponData.bPlayLaunchSoundOncePerBurst || M_WeaponFireMode != EWeaponFireMode::RandomBurst)
+	{
+		return true;
+	}
+	if (bM_BurstLaunchSoundPlayed)
+	{
+		return false;
+	}
+	bM_BurstLaunchSoundPlayed = true;
+	return true;
 }
 
 void UWeaponState::OnRandomBurst()
@@ -1740,7 +1761,7 @@ void UWeaponState::CreateLaunchVfx(
 	{
 		return;
 	}
-	if (M_WeaponVfx.LaunchSound)
+	if (M_WeaponVfx.LaunchSound && ConsumeLaunchSoundForShot())
 	{
 		UGameplayStatics::PlaySoundAtLocation(World, M_WeaponVfx.LaunchSound, LaunchLocation,
 		                                      FRotator::ZeroRotator, 1, 1, 0,
@@ -3742,6 +3763,13 @@ void UWeaponStateRocketProjectile::AddAttachedRocketInstances(const FName Parent
 	M_SocketToAttachedRocketIndex.Reset();
 	// NAME_None resolves to the component transform.
 	const FTransform ParentWorldTransform = MeshComponent->GetSocketTransform(ParentBoneName, RTS_World);
+	// The instances inherit the parent bone's scale (a scaled root bone scales every bone), so cancel it to keep
+	// RocketScale relative to the mesh component like the vertical rocket weapon.
+	const FVector ParentBoneComponentScale = MeshComponent->GetSocketTransform(ParentBoneName, RTS_Component).
+	                                                       GetScale3D();
+	const FVector InstanceScale = ParentBoneComponentScale.IsNearlyZero()
+		                              ? M_RocketSettings.RocketScale
+		                              : M_RocketSettings.RocketScale / ParentBoneComponentScale;
 	for (const FName& SocketName : M_RocketSettings.FireSocketNames)
 	{
 		if (not MeshComponent->DoesSocketExist(SocketName) || M_SocketToAttachedRocketIndex.Contains(SocketName))
@@ -3752,7 +3780,7 @@ void UWeaponStateRocketProjectile::AddAttachedRocketInstances(const FName Parent
 		const FTransform SocketWorldTransform = MeshComponent->GetSocketTransform(SocketName, RTS_World);
 		FTransform InstanceTransform = SocketWorldTransform.GetRelativeTransform(ParentWorldTransform);
 		InstanceTransform.SetLocation(InstanceTransform.TransformPosition(M_RocketSettings.LocalSocketAttachOffset));
-		InstanceTransform.SetScale3D(M_RocketSettings.RocketScale);
+		InstanceTransform.SetScale3D(InstanceScale);
 
 		const int32 InstanceIndex = M_AttachedRocketInstances->AddInstance(InstanceTransform, false);
 		if (InstanceIndex != INDEX_NONE)
@@ -3823,7 +3851,7 @@ void UWeaponStateRocketProjectile::CreateLaunchVfx(
 
 	const FRocketLaunchSocketData LaunchData = GetRocketLaunchSocketData(false);
 
-	if (M_WeaponVfx.LaunchSound)
+	if (M_WeaponVfx.LaunchSound && ConsumeLaunchSoundForShot())
 	{
 		UGameplayStatics::PlaySoundAtLocation(World, M_WeaponVfx.LaunchSound, LaunchData.LaunchLocation,
 		                                      FRotator::ZeroRotator, 1, 1, 0,
@@ -4346,7 +4374,7 @@ void UVerticalRocketWeaponState::CreateLaunchVfx(
 	}
 
 	const FVerticalRocketLaunchSocketData LaunchData = GetVerticalRocketLaunchSocketData(false);
-	if (M_WeaponVfx.LaunchSound)
+	if (M_WeaponVfx.LaunchSound && ConsumeLaunchSoundForShot())
 	{
 		UGameplayStatics::PlaySoundAtLocation(World, M_WeaponVfx.LaunchSound, LaunchData.LaunchLocation,
 		                                      FRotator::ZeroRotator, 1, 1, 0,
