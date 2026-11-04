@@ -215,7 +215,8 @@ void URadiusAOEBehaviourComponent::ShowRadius()
 
 	if (RadiusSettings.bMoveRadius)
 	{
-		M_RadiusPoolSubsystem->AttachRTSRadiusToActor(
+		// Yaw only: a host pitched on a slope would otherwise tilt the disc into the ground at its far edge.
+		M_RadiusPoolSubsystem->AttachRTSRadiusToActorYawOnly(
 			M_RadiusId,
 			Owner,
 			RadiusSettings.RadiusRelativeAttachmentOffset);
