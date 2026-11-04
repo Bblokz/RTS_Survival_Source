@@ -13,6 +13,9 @@
 #include "RTS_Survival/Units/RTSDeathType/RTSDeathType.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckEngineFireDeathComponent.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossComponent.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckDeathVariantSubsystem.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckRegularDeath.h"
+#include "RTS_Survival/Weapons/Projectile/Projectile.h"
 #include "RTS_Survival/GameUI/Pooled_AnimatedVerticalText/Pooling/AnimatedTextWidgetPoolManager/AnimatedTextWidgetPoolManager.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -304,7 +307,72 @@ void ATankMaster::DestroyAndSpawnActors(const FDestroySpawnActorsParameters& Spa
 		DestroyAndSpawnActorsWithDeathEffects(SpawnParams, CollapseFX, bTossTurret, bExplodeFuel);
 		return;
 	}
+	if (M_RegularDeathSettings.bVaryRegularDeaths)
+	{
+		DestroyAndSpawnActorsWithRegularDeath(SpawnParams, CollapseFX);
+		return;
+	}
 	Super::DestroyAndSpawnActors(SpawnParams, CollapseFX);
+}
+
+void ATankMaster::DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActorsParameters& SpawnParams,
+                                                        const FCollapseFX& CollapseFX)
+{
+	// Read now: the tank may be destroyed before the wreck class finished loading.
+	FWreckRegularDeathRequest Request;
+	Request.Settings = M_RegularDeathSettings;
+	Request.Variant = DrawRegularDeathVariant();
+	Request.KillShotDirection = M_KillShotDirection;
+	Request.bIsSeen = OnUnitDies_GetIsSeen();
+	FRTS_Collapse::OnDestroySpawnActors(this, SpawnParams, CollapseFX, [Request](AActor* SpawnedActor)
+	{
+		FWreckRegularDeath::StartOnWreck(SpawnedActor, Request);
+	});
+}
+
+ERegularDeathVariant ATankMaster::DrawRegularDeathVariant()
+{
+	if (M_DebugRegularDeathVariant.IsSet())
+	{
+		const ERegularDeathVariant DebugVariant = M_DebugRegularDeathVariant.GetValue();
+		M_DebugRegularDeathVariant.Reset();
+		return DebugVariant;
+	}
+	UWorld* World = GetWorld();
+	UWreckDeathVariantSubsystem* VariantSubsystem = IsValid(World)
+		                                                ? World->GetSubsystem<UWreckDeathVariantSubsystem>()
+		                                                : nullptr;
+	return IsValid(VariantSubsystem) ? VariantSubsystem->DrawVariant() : ERegularDeathVariant::Standard;
+}
+
+float ATankMaster::TakeDamage(const float DamageAmount, FDamageEvent const& DamageEvent,
+                              AController* EventInstigator, AActor* DamageCauser)
+{
+	// Only projectiles give the debris a direction; trace weapons, splash and burning do not.
+	const AProjectile* Projectile = Cast<AProjectile>(DamageCauser);
+	if (IsValid(Projectile))
+	{
+		const FVector ProjectileVelocity = Projectile->GetVelocity();
+		M_IncomingProjectileDirection = ProjectileVelocity.IsNearlyZero()
+			                                ? Projectile->GetActorForwardVector()
+			                                : ProjectileVelocity.GetSafeNormal();
+	}
+	// A killing hit dies inside Super; UnitDies snapshots the direction before it is cleared again.
+	const float Result = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	M_IncomingProjectileDirection = FVector::ZeroVector;
+	return Result;
+}
+
+void ATankMaster::Debug_DieRegularDeath(const ERegularDeathVariant Variant, const FVector KillShotDirection)
+{
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+	M_DebugRegularDeathVariant = Variant;
+	M_IncomingProjectileDirection = KillShotDirection.GetSafeNormal();
+	UnitDies(ERTSDeathType::Kinetic);
+	M_IncomingProjectileDirection = FVector::ZeroVector;
 }
 
 void ATankMaster::DestroyAndSpawnActorsWithDeathEffects(const FDestroySpawnActorsParameters& SpawnParams,

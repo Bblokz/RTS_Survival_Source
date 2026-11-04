@@ -20,6 +20,7 @@
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/CrewRepairAbilityTypes.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossSettings.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckEngineFireDeathSettings.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckRegularDeathSettings.h"
 #include "TankMaster.generated.h"
 
 enum class ERTSAggroBehaviour : uint8;
@@ -357,6 +358,19 @@ public:
 	/** @brief Testing aid: sets this tank's engine on fire without killing it, so the fuel leak can be watched. */
 	UFUNCTION(BlueprintCallable, Category="Death|Debug")
 	void Debug_StartEngineFire();
+
+	/**
+	 * @brief Testing aid: kills this tank with a regular death of the given variant, as if a projectile flying along
+	 * KillShotDirection hit it (zero for a death without a killing projectile).
+	 * @param Variant The regular death to play; overrides the shuffle for this death only.
+	 * @param KillShotDirection Travel direction of the pretend killing projectile.
+	 */
+	UFUNCTION(BlueprintCallable, Category="Death|Debug")
+	void Debug_DieRegularDeath(ERegularDeathVariant Variant, FVector KillShotDirection);
+
+	/** @brief Records the travel direction of a killing projectile for the regular death's debris. */
+	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
+	                         AActor* DamageCauser) override;
 
 	// ---- Vehicle modules ----
 
@@ -951,6 +965,19 @@ private:
 	/** @return Where the engine fire burns (or would burn) on this tank; the rear top of the hull as a fallback. */
 	FVector GetEngineWorldLocation() const;
 
+	// ---- Regular death ----
+	// Travel direction of the projectile whose damage is being applied right now; zero outside TakeDamage.
+	FVector M_IncomingProjectileDirection = FVector::ZeroVector;
+	// Snapshot of M_IncomingProjectileDirection taken as UnitDies starts: zero unless a projectile killed this tank.
+	FVector M_KillShotDirection = FVector::ZeroVector;
+	// Set by Debug_DieRegularDeath; the next regular death plays this variant instead of drawing one.
+	TOptional<ERegularDeathVariant> M_DebugRegularDeathVariant;
+
+	/** @brief Spawns the wreck of a death without cook-off or engine fire and adds the drawn variant to it. */
+	void DestroyAndSpawnActorsWithRegularDeath(const FDestroySpawnActorsParameters& SpawnParams,
+	                                           const FCollapseFX& CollapseFX);
+	ERegularDeathVariant DrawRegularDeathVariant();
+
 	/** @brief Throws crew ragdolls out of the top of the vehicle; runs before the Blueprint can destroy it. */
 	void OnUnitDies_ThrowCrewBodies(ERTSDeathType DeathType) const;
 
@@ -966,6 +993,10 @@ private:
 	// How the fuel explodes and the wreck burns when this tank dies during an engine fire.
 	UPROPERTY(EditDefaultsOnly, Category="Death|Engine Fire", meta=(AllowPrivateAccess="true"))
 	FWreckEngineFireDeathSettings M_EngineFireDeathSettings;
+
+	// How deaths without a cook-off or engine fire vary: wreck pose and char, chain reaction or debris burst.
+	UPROPERTY(EditDefaultsOnly, Category="Death|Regular", meta=(AllowPrivateAccess="true"))
+	FWreckRegularDeathSettings M_RegularDeathSettings;
 
 	/** @return Yaw of the first mounted turret relative to the hull; 0 without turrets. */
 	float GetLiveTurretYawOffset() const;

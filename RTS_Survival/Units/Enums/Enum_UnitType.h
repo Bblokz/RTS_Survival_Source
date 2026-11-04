@@ -218,6 +218,12 @@ enum class ETankSubtype : uint8
 	// German harvester on the Pz IV hull: the Pz I saw grown into two toed-in saws on a bow frame, with a conveyor
 	// lifting the ore into a large hopper over the engine deck.
 	Tank_PzIV_Harvester UMETA(DisplayName = "Ger Medium Pz IV Harvester"),
+	// BTR-152A: the open-topped six-wheeled BTR-152 carrier with a ZPTU-2 twin 14.5mm KPV mount that turns a full
+	// circle and elevates to 80 degrees; a fast, thin-skinned anti-aircraft armoured car.
+	Tank_BTR152A UMETA(DisplayName = "Rus ArmCar BTR-152A"),
+	// GAZ-MM 72-K: the light GAZ-MM truck carrying a 25mm 72-K automatic anti-aircraft gun on a full-traverse
+	// pedestal; a cheap, unarmoured anti-aircraft truck.
+	Tank_GAZMM_72K UMETA(DisplayName = "Rus GAZ-MM 72-K"),
 };
 
 
@@ -390,6 +396,8 @@ static bool Global_GetIsArmoredCar(const ETankSubtype TankSubtype)
 	case ETankSubtype::Tank_ZilFuel:
 	case ETankSubtype::Tank_SovietTanker:
 	case ETankSubtype::Tank_BM13:
+	case ETankSubtype::Tank_BTR152A:
+	case ETankSubtype::Tank_GAZMM_72K:
 		return true;
 	default:
 		return false;
