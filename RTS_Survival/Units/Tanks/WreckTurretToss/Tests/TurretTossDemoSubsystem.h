@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckRegularDeathSettings.h"
+
 #include "TurretTossDemoSubsystem.generated.h"
 
 class ACPPController;
@@ -26,15 +28,18 @@ enum class ETurretTossDemoStep : uint8
 };
 
 /**
- * How the demo kills its tanks (-TurretTossDemoDeath=CookOff|EngineFire|Both). LeakDrive does not kill: it sets the
- * engine on fire and drives the tank away with the camera following, to film the burning fuel leak.
+ * How the demo kills its tanks (-TurretTossDemoDeath=CookOff|EngineFire|Both|Regular). LeakDrive does not kill: it sets
+ * the engine on fire and drives the tank away with the camera following, to film the burning fuel leak. Regular plays
+ * the regular death given by -RegularDeathVariant=Standard|ChainReaction|Debris, killed by a pretend projectile flying
+ * along -KillShotYaw=<degrees from the tank's forward> when that switch is given.
  */
 enum class ETurretTossDemoDeath : uint8
 {
 	CookOff,
 	EngineFire,
 	Both,
-	LeakDrive
+	LeakDrive,
+	Regular
 };
 
 /** One vehicle of the -TurretTossAudit run: spawned, killed during a cook-off and judged by what its wreck did. */
@@ -86,6 +91,8 @@ private:
 	void LogEngineFireWrecks() const;
 	void KillTank(ATankMaster& Tank) const;
 	void StartLeakDrive(ATankMaster& Tank) const;
+	void ParseRegularDeathSwitches();
+	void KillTankWithRegularDeath(ATankMaster& Tank) const;
 	void ReportEngineFireAuditEntry(const FTurretTossAuditEntry& Entry, AActor* Wreck);
 	static int32 CountThrownDebris(const AActor* Wreck);
 
@@ -119,6 +126,9 @@ private:
 
 	ETurretTossDemoStep M_Step = ETurretTossDemoStep::StartGame;
 	ETurretTossDemoDeath M_DeathKind = ETurretTossDemoDeath::CookOff;
+	ERegularDeathVariant M_RegularDeathVariant = ERegularDeathVariant::Standard;
+	// Yaw of the pretend killing projectile relative to the tank's forward; unset kills without a projectile.
+	TOptional<float> M_KillShotYaw;
 	FString M_OutputDirectory;
 	FVector M_DemoLocation = FVector::ZeroVector;
 	// Where the tank stood when it died; the camera keeps looking here after the tank is replaced by its wreck.
@@ -136,6 +146,8 @@ private:
 	int32 M_AuditCountsHullOnly = 0;
 	int32 M_AuditCountsFailed = 0;
 	bool bM_IsAudit = false;
+	bool bM_IsCloseFilm = false;
+	float M_RecordAfterDeathGameSeconds = 9.f;
 	bool bM_IsActive = false;
 	bool bM_HasKilledTank = false;
 };

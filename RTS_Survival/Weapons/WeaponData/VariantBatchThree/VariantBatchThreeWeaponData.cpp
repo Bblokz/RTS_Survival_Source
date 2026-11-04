@@ -87,7 +87,9 @@ namespace VariantBatchThreeWeaponsPrivate
 		constexpr int32 DrillingMagazine = 30;
 		// The 5.0 s crew + gun box drill is stretched to the reload time minus 0.25 s.
 		constexpr float DrillingReloadSpeed = 5.25f;
-		constexpr float DrillingCooldown = 0.30f;
+		// Just under the turret's 0.3 s fire tick: a single fire weapon only fires on that tick, and a 0.30 s cooldown
+		// always ends just after it, so each barrel would skip every other tick and fire every 0.6 s.
+		constexpr float DrillingCooldown = 0.28f;
 		constexpr int32 DrillingAccuracy = 85;
 		FWeaponData DrillingData = *TwinMg151Data;
 		DrillingData.WeaponName = EWeaponName::MG151_15MM_Drilling;

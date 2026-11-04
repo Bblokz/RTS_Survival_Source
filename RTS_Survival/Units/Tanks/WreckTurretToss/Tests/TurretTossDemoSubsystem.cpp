@@ -28,6 +28,7 @@
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
+#include "RTS_Survival/Units/Ragdoll/RTSRagdollSettings.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckEngineFireDeathComponent.h"
 #include "RTS_Survival/Units/Tanks/WreckTurretToss/WreckTurretTossComponent.h"
@@ -43,6 +44,9 @@ namespace TurretTossDemoPrivate
 	const TCHAR* const TankSwitch = TEXT("TurretTossDemoTank=");
 	// CookOff (default), EngineFire or Both.
 	const TCHAR* const DeathSwitch = TEXT("TurretTossDemoDeath=");
+	// Regular deaths: Standard (default), ChainReaction or Debris, and the pretend killing projectile's yaw.
+	const TCHAR* const RegularVariantSwitch = TEXT("RegularDeathVariant=");
+	const TCHAR* const KillShotYawSwitch = TEXT("KillShotYaw=");
 	const TCHAR* const DefaultTankSubtype = TEXT("Tank_PzIV_H");
 	const FName DifficultyButtonName(TEXT("M_NormalDifficultyButton"));
 
@@ -65,6 +69,13 @@ namespace TurretTossDemoPrivate
 	constexpr float FilmHeightCm = 650.f;
 	// High look-at so the whole turret arc (about 13 m) stays in frame.
 	const FVector FilmLookAtOffset(0.f, 0.f, 600.f);
+	// -TurretTossDemoCloseFilm: near and low enough to see small debris, for the regular deaths.
+	const TCHAR* const CloseFilmSwitch = TEXT("TurretTossDemoCloseFilm");
+	// -TurretTossDemoRecordSeconds=<s>: film longer after the death, e.g. to watch regular-death debris sink away.
+	const TCHAR* const RecordSecondsSwitch = TEXT("TurretTossDemoRecordSeconds=");
+	constexpr float CloseFilmDistanceCm = 1300.f;
+	constexpr float CloseFilmHeightCm = 450.f;
+	const FVector CloseFilmLookAtOffset(0.f, 0.f, 150.f);
 	const FVector StillLookAtOffset(0.f, 0.f, 80.f);
 	// Stills after the turret landed: orbit yaw, distance and height per picture.
 	const FVector StillCameras[] = {
@@ -116,6 +127,9 @@ void UTurretTossDemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		M_DemoLocation = FVector(FCString::Atof(*XText), FCString::Atof(*YText), 0.f);
 	}
 	bM_IsAudit = FParse::Param(FCommandLine::Get(), AuditSwitch);
+	bM_IsCloseFilm = FParse::Param(FCommandLine::Get(), CloseFilmSwitch);
+	M_RecordAfterDeathGameSeconds = RecordAfterDeathGameSeconds;
+	FParse::Value(FCommandLine::Get(), RecordSecondsSwitch, M_RecordAfterDeathGameSeconds);
 	FString DeathText;
 	if (FParse::Value(FCommandLine::Get(), DeathSwitch, DeathText))
 	{
@@ -125,8 +139,11 @@ void UTurretTossDemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			              ? ETurretTossDemoDeath::Both
 			              : DeathText.Equals(TEXT("LeakDrive"), ESearchCase::IgnoreCase)
 			              ? ETurretTossDemoDeath::LeakDrive
+			              : DeathText.Equals(TEXT("Regular"), ESearchCase::IgnoreCase)
+			              ? ETurretTossDemoDeath::Regular
 			              : ETurretTossDemoDeath::CookOff;
 	}
+	ParseRegularDeathSwitches();
 	M_StartRealSeconds = FPlatformTime::Seconds();
 	bM_IsActive = true;
 	UE_LOG(LogRTSTurretTossDemo, Display, TEXT("RTS_TTD started dir=%s at=%s"), *M_OutputDirectory,
@@ -311,7 +328,14 @@ void UTurretTossDemoSubsystem::TickRecord()
 {
 	using namespace TurretTossDemoPrivate;
 	KeepGameRunning();
-	AimCapture(FilmOrbitYawDegrees, FilmDistanceCm, FilmHeightCm, M_DeathLocation + FilmLookAtOffset);
+	if (bM_IsCloseFilm)
+	{
+		AimCapture(FilmOrbitYawDegrees, CloseFilmDistanceCm, CloseFilmHeightCm, M_DeathLocation + CloseFilmLookAtOffset);
+	}
+	else
+	{
+		AimCapture(FilmOrbitYawDegrees, FilmDistanceCm, FilmHeightCm, M_DeathLocation + FilmLookAtOffset);
+	}
 	ExportFrame(FString::Printf(TEXT("frame_%04d.png"), M_FrameIndex));
 	++M_FrameIndex;
 
@@ -344,7 +368,7 @@ void UTurretTossDemoSubsystem::TickRecord()
 		LogTossedTurrets();
 		LogEngineFireWrecks();
 	}
-	if (GetGameSeconds() - M_StepStartGameSeconds >= RecordAfterDeathGameSeconds)
+	if (GetGameSeconds() - M_StepStartGameSeconds >= M_RecordAfterDeathGameSeconds)
 	{
 		// Keep the kill time as step start so the last turret log still reads as seconds after death.
 		M_Step = ETurretTossDemoStep::Stills;
@@ -509,6 +533,9 @@ void UTurretTossDemoSubsystem::KillTank(ATankMaster& Tank) const
 	case ETurretTossDemoDeath::LeakDrive:
 		StartLeakDrive(Tank);
 		return;
+	case ETurretTossDemoDeath::Regular:
+		KillTankWithRegularDeath(Tank);
+		return;
 	case ETurretTossDemoDeath::Both:
 		Tank.SetIsEngineBurning(true);
 		Tank.Debug_DieDuringAmmoCookOff();
@@ -516,6 +543,41 @@ void UTurretTossDemoSubsystem::KillTank(ATankMaster& Tank) const
 	default:
 		Tank.Debug_DieDuringAmmoCookOff();
 	}
+}
+
+void UTurretTossDemoSubsystem::ParseRegularDeathSwitches()
+{
+	using namespace TurretTossDemoPrivate;
+	FString VariantText;
+	if (FParse::Value(FCommandLine::Get(), RegularVariantSwitch, VariantText))
+	{
+		M_RegularDeathVariant = VariantText.Equals(TEXT("ChainReaction"), ESearchCase::IgnoreCase)
+			                        ? ERegularDeathVariant::ChainReaction
+			                        : VariantText.Equals(TEXT("Debris"), ESearchCase::IgnoreCase)
+			                        ? ERegularDeathVariant::Debris
+			                        : ERegularDeathVariant::Standard;
+	}
+	float KillShotYaw = 0.f;
+	if (FParse::Value(FCommandLine::Get(), KillShotYawSwitch, KillShotYaw))
+	{
+		M_KillShotYaw = KillShotYaw;
+	}
+	// The film camera is a scene capture, not the player's view; without this every death counts as unseen.
+	if (M_DeathKind == ETurretTossDemoDeath::Regular)
+	{
+		GetMutableDefault<URTSRagdollSettings>()->bSkipUnseenVehicles = false;
+	}
+}
+
+void UTurretTossDemoSubsystem::KillTankWithRegularDeath(ATankMaster& Tank) const
+{
+	const FVector KillShotDirection = M_KillShotYaw.IsSet()
+		                                  ? Tank.GetActorForwardVector().RotateAngleAxis(
+			                                  M_KillShotYaw.GetValue(), FVector::UpVector)
+		                                  : FVector::ZeroVector;
+	UE_LOG(LogRTSTurretTossDemo, Display, TEXT("RTS_TTD regular_death variant=%s kill_shot=%s"),
+	       *UEnum::GetValueAsString(M_RegularDeathVariant), *KillShotDirection.ToCompactString());
+	Tank.Debug_DieRegularDeath(M_RegularDeathVariant, KillShotDirection);
 }
 
 void UTurretTossDemoSubsystem::StartLeakDrive(ATankMaster& Tank) const
