@@ -17,7 +17,9 @@ enum class ERegularDeathVariant : uint8
 	// Extra small secondary explosions over a few seconds, as ammunition and fuel go up piece by piece.
 	ChainReaction,
 	// A Niagara burst of hull-coloured chunks, thrown away from the killing projectile when there was one.
-	Debris
+	Debris,
+	// The Debris burst with more pieces; takes more of the concurrent burst budget.
+	HeavyDebris
 };
 
 /** Pose and char variation every regular-death wreck gets, so two wrecks of one tank never sit identically. */
@@ -126,6 +128,14 @@ struct RTS_SURVIVAL_API FWreckNiagaraDebrisSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Debris")
 	FVector2D HullRadiusRange = FVector2D(250.0, 600.0);
 
+	// The HeavyDebris variant throws this many times the Debris piece count.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Debris", meta=(ClampMin="1"))
+	float HeavyPieceCountMultiplier = 2.f;
+
+	// Concurrent burst slots a HeavyDebris burst takes (a Debris burst takes one); a full budget falls back to Debris.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Debris", meta=(ClampMin="1"))
+	int32 HeavyBurstSlots = 2;
+
 	// How far the throw leans away from the killing projectile; 0 throws straight up, 1 flat along the shot.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Debris", meta=(ClampMin="0", ClampMax="1"))
 	float KillDirectionLean = 0.6f;
@@ -152,9 +162,9 @@ struct RTS_SURVIVAL_API FWreckNiagaraDebrisSettings
 };
 
 /**
- * @brief Per-tank tuning for regular deaths. Every regular death draws one of three variants (Standard, ChainReaction,
- * Debris) from a per-match shuffle and always varies the wreck's pose and char; the wreck Blueprint's own
- * explosion sequence plays underneath in all three.
+ * @brief Per-tank tuning for regular deaths. Every regular death draws one of four variants (Standard, ChainReaction,
+ * Debris, HeavyDebris) from a per-match shuffle and always varies the wreck's pose and char; the wreck Blueprint's own
+ * explosion sequence plays underneath in all of them.
  */
 USTRUCT(BlueprintType)
 struct RTS_SURVIVAL_API FWreckRegularDeathSettings

@@ -47,6 +47,8 @@ namespace WreckRegularDeathConstants
 	constexpr float CharCentreBelowTop = 40.f;
 	// The debris bursts from just above the hull's middle.
 	constexpr float DebrisOriginAboveCentre = 0.5f;
+	// Burst budget slots a Debris burst holds; HeavyDebris takes its count from the settings.
+	constexpr int32 DebrisBurstSlots = 1;
 }
 
 FWreckRegularDeathSettings::FWreckRegularDeathSettings()
@@ -75,9 +77,9 @@ void FWreckRegularDeath::StartOnWreck(AActor* Wreck, const FWreckRegularDeathReq
 	VaryPose(*Wreck, Turret, Request.Settings.Pose);
 	ApplyChar(*Wreck, *Hull, Request.Settings.Pose);
 	ERegularDeathVariant PlayedVariant = Request.Variant;
-	if (Request.Variant == ERegularDeathVariant::Debris && not StartDebris(*Wreck, *Hull, Request))
+	if (PlayedVariant == ERegularDeathVariant::Debris || PlayedVariant == ERegularDeathVariant::HeavyDebris)
 	{
-		PlayedVariant = ERegularDeathVariant::ChainReaction;
+		PlayedVariant = StartDebrisWithFallback(*Wreck, *Hull, Request);
 	}
 	if (PlayedVariant == ERegularDeathVariant::ChainReaction)
 	{
@@ -191,17 +193,33 @@ void FWreckRegularDeath::StartChainReaction(const AActor& Wreck, const UStaticMe
 	}
 }
 
+ERegularDeathVariant FWreckRegularDeath::StartDebrisWithFallback(const AActor& Wreck, UStaticMeshComponent& Hull,
+                                                                 const FWreckRegularDeathRequest& Request)
+{
+	if (Request.Variant == ERegularDeathVariant::HeavyDebris && StartDebris(Wreck, Hull, Request, true))
+	{
+		return ERegularDeathVariant::HeavyDebris;
+	}
+	// A heavy burst that does not fit the budget may still fit as a regular one.
+	if (StartDebris(Wreck, Hull, Request, false))
+	{
+		return ERegularDeathVariant::Debris;
+	}
+	return ERegularDeathVariant::ChainReaction;
+}
+
 bool FWreckRegularDeath::StartDebris(const AActor& Wreck, UStaticMeshComponent& Hull,
-                                     const FWreckRegularDeathRequest& Request)
+                                     const FWreckRegularDeathRequest& Request, const bool bIsHeavy)
 {
 	using namespace WreckRegularDeathConstants;
 	const FWreckNiagaraDebrisSettings& Debris = Request.Settings.Debris;
+	const int32 BurstSlots = bIsHeavy ? Debris.HeavyBurstSlots : DebrisBurstSlots;
 	UWorld* World = Wreck.GetWorld();
 	UWreckDeathVariantSubsystem* VariantSubsystem = IsValid(World)
 		                                                ? World->GetSubsystem<UWreckDeathVariantSubsystem>()
 		                                                : nullptr;
 	if ((Debris.bOnlyWhenSeen && not Request.bIsSeen) || not IsValid(VariantSubsystem)
-		|| not VariantSubsystem->GetCanStartDebrisBurst() || Debris.DebrisSystem.IsNull())
+		|| not VariantSubsystem->GetCanStartDebrisBurst(BurstSlots) || Debris.DebrisSystem.IsNull())
 	{
 		return false;
 	}
@@ -222,7 +240,7 @@ bool FWreckRegularDeath::StartDebris(const AActor& Wreck, UStaticMeshComponent& 
 		return false;
 	}
 	const bool bHasKillShot = not FVector(Request.KillShotDirection.X, Request.KillShotDirection.Y, 0.f).IsNearlyZero();
-	DebrisComponent->SetVariableInt(DebrisPieceCountParam, GetDebrisPieceCount(Debris, Hull));
+	DebrisComponent->SetVariableInt(DebrisPieceCountParam, GetDebrisPieceCount(Debris, Hull, bIsHeavy));
 	DebrisComponent->SetVariableVec3(DebrisThrowDirectionParam,
 	                                 GetDebrisThrowDirection(Debris, Request.KillShotDirection));
 	DebrisComponent->SetVariableFloat(DebrisConeAngleParam, bHasKillShot ? Debris.ShotConeDegrees : Debris.UpConeDegrees);
@@ -232,7 +250,7 @@ bool FWreckRegularDeath::StartDebris(const AActor& Wreck, UStaticMeshComponent& 
 	                                     VariantSubsystem->GetDebrisMaterialForHull(Hull.GetMaterial(0), ChunkMaterial));
 	DebrisComponent->SetVariableVec3(DebrisScaleParam, FVector::OneVector);
 	DebrisComponent->Activate(true);
-	VariantSubsystem->RegisterDebrisBurst(DebrisComponent, Debris.LieSeconds, Debris.SinkSeconds);
+	VariantSubsystem->RegisterDebrisBurst(DebrisComponent, Debris.LieSeconds, Debris.SinkSeconds, BurstSlots);
 	return true;
 }
 
@@ -250,13 +268,14 @@ FVector FWreckRegularDeath::GetDebrisThrowDirection(const FWreckNiagaraDebrisSet
 }
 
 int32 FWreckRegularDeath::GetDebrisPieceCount(const FWreckNiagaraDebrisSettings& Debris,
-                                              const UStaticMeshComponent& Hull)
+                                              const UStaticMeshComponent& Hull, const bool bIsHeavy)
 {
 	const float PieceCount = FMath::GetMappedRangeValueClamped(
 		Debris.HullRadiusRange,
 		FVector2D(Debris.PieceCount.X, Debris.PieceCount.Y),
 		Hull.Bounds.SphereRadius);
-	return FMath::Max(1, FMath::RoundToInt(PieceCount));
+	const float VariantMultiplier = bIsHeavy ? Debris.HeavyPieceCountMultiplier : 1.f;
+	return FMath::Max(1, FMath::RoundToInt(PieceCount * VariantMultiplier));
 }
 
 FVector FWreckRegularDeath::GetRandomHullTopPoint(const UStaticMeshComponent& Hull)

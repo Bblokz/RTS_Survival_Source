@@ -11,8 +11,9 @@ DEFINE_LOG_CATEGORY_STATIC(LogWreckDeathVariant, Log, All);
 
 namespace WreckDeathVariantConstants
 {
-	// More bursts than this at once (a big battle) fall back to the chain reaction.
-	constexpr int32 MaxConcurrentDebrisBursts = 4;
+	// Burst slots in use at once; a Debris burst holds one, a HeavyDebris burst more. A full budget (a big battle)
+	// falls back to a lighter variant.
+	constexpr int32 MaxDebrisBurstSlots = 4;
 	const FName HullBaseColorParam = TEXT("HullBaseColor");
 	// NS_WreckDebrisBurst scales every piece by this user parameter; shrinking it to zero sinks them away.
 	const FName DebrisScaleParam = TEXT("DebrisScale");
@@ -84,7 +85,10 @@ ERegularDeathVariant UWreckDeathVariantSubsystem::DrawVariant()
 
 void UWreckDeathVariantSubsystem::RefillVariantBag()
 {
-	M_VariantBag = {ERegularDeathVariant::Standard, ERegularDeathVariant::ChainReaction, ERegularDeathVariant::Debris};
+	M_VariantBag = {
+		ERegularDeathVariant::Standard, ERegularDeathVariant::ChainReaction, ERegularDeathVariant::Debris,
+		ERegularDeathVariant::HeavyDebris
+	};
 	for (int32 Index = M_VariantBag.Num() - 1; Index > 0; --Index)
 	{
 		M_VariantBag.Swap(Index, FMath::RandRange(0, Index));
@@ -96,14 +100,24 @@ void UWreckDeathVariantSubsystem::RefillVariantBag()
 	}
 }
 
-bool UWreckDeathVariantSubsystem::GetCanStartDebrisBurst()
+bool UWreckDeathVariantSubsystem::GetCanStartDebrisBurst(const int32 BurstSlots)
 {
 	PruneFinishedDebrisBursts();
-	return M_ActiveDebrisBursts.Num() < WreckDeathVariantConstants::MaxConcurrentDebrisBursts;
+	return GetUsedDebrisBurstSlots() + BurstSlots <= WreckDeathVariantConstants::MaxDebrisBurstSlots;
+}
+
+int32 UWreckDeathVariantSubsystem::GetUsedDebrisBurstSlots() const
+{
+	int32 UsedSlots = 0;
+	for (const FWreckDebrisBurstSinkState& Burst : M_ActiveDebrisBursts)
+	{
+		UsedSlots += Burst.BurstSlots;
+	}
+	return UsedSlots;
 }
 
 void UWreckDeathVariantSubsystem::RegisterDebrisBurst(UNiagaraComponent* DebrisComponent, const float LieSeconds,
-                                                      const float SinkSeconds)
+                                                      const float SinkSeconds, const int32 BurstSlots)
 {
 	UWorld* World = GetWorld();
 	if (not IsValid(DebrisComponent) || not IsValid(World))
@@ -114,6 +128,7 @@ void UWreckDeathVariantSubsystem::RegisterDebrisBurst(UNiagaraComponent* DebrisC
 	Burst.Component = DebrisComponent;
 	Burst.SinkStartSeconds = World->GetTimeSeconds() + LieSeconds;
 	Burst.SinkSeconds = FMath::Max(SinkSeconds, WreckDeathVariantConstants::SinkTickSeconds);
+	Burst.BurstSlots = FMath::Max(1, BurstSlots);
 	FTimerManager& TimerManager = World->GetTimerManager();
 	if (not TimerManager.IsTimerActive(M_DebrisSinkTimerHandle))
 	{

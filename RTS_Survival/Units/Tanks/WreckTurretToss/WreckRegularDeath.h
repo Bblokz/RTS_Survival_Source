@@ -37,10 +37,18 @@ private:
 	static void ApplyChar(AActor& Wreck, const UStaticMeshComponent& Hull, const FWreckRegularDeathPoseSettings& Pose);
 	static void StartChainReaction(const AActor& Wreck, const UStaticMeshComponent& Hull,
 	                               const UStaticMeshComponent* Turret, const FWreckChainReactionSettings& Chain);
-	/** @return False when no burst started (unseen, capped or no system); the caller then plays the chain reaction. */
-	static bool StartDebris(const AActor& Wreck, UStaticMeshComponent& Hull, const FWreckRegularDeathRequest& Request);
+	/**
+	 * @return The variant that played: the drawn debris variant, Debris when a heavy burst did not fit the budget,
+	 * else ChainReaction.
+	 */
+	static ERegularDeathVariant StartDebrisWithFallback(const AActor& Wreck, UStaticMeshComponent& Hull,
+	                                                    const FWreckRegularDeathRequest& Request);
+	/** @return False when no burst started (unseen, over the burst budget or no system). */
+	static bool StartDebris(const AActor& Wreck, UStaticMeshComponent& Hull, const FWreckRegularDeathRequest& Request,
+	                        bool bIsHeavy);
 	static FVector GetDebrisThrowDirection(const FWreckNiagaraDebrisSettings& Debris, const FVector& KillShotDirection);
-	static int32 GetDebrisPieceCount(const FWreckNiagaraDebrisSettings& Debris, const UStaticMeshComponent& Hull);
+	static int32 GetDebrisPieceCount(const FWreckNiagaraDebrisSettings& Debris, const UStaticMeshComponent& Hull,
+	                                 bool bIsHeavy);
 	static FVector GetRandomHullTopPoint(const UStaticMeshComponent& Hull);
 	static TArray<FVector> GetChainReactionAnchors(const UStaticMeshComponent& Hull, const UStaticMeshComponent* Turret);
 };

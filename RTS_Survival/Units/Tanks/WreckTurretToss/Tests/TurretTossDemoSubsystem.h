@@ -30,8 +30,8 @@ enum class ETurretTossDemoStep : uint8
 /**
  * How the demo kills its tanks (-TurretTossDemoDeath=CookOff|EngineFire|Both|Regular). LeakDrive does not kill: it sets
  * the engine on fire and drives the tank away with the camera following, to film the burning fuel leak. Regular plays
- * the regular death given by -RegularDeathVariant=Standard|ChainReaction|Debris, killed by a pretend projectile flying
- * along -KillShotYaw=<degrees from the tank's forward> when that switch is given.
+ * the regular death given by -RegularDeathVariant=Standard|ChainReaction|Debris|HeavyDebris, killed by a pretend
+ * projectile flying along -KillShotYaw=<degrees from the tank's forward> when that switch is given.
  */
 enum class ETurretTossDemoDeath : uint8
 {
