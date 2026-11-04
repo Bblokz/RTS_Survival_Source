@@ -5,10 +5,12 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 
+#include "RTS_Survival/Buildings/FieldTrench/Anchors/FieldTrenchAnchorComponent.h"
 #include "FieldDefenseTestSubsystem.generated.h"
 
 class ABuildingExpansion;
 class ARTSFieldTrench;
+struct FFieldTrenchPiecePlacement;
 class ACPPController;
 class ANomadicVehicle;
 class AStaticPreviewMesh;
@@ -46,7 +48,11 @@ enum class EFieldDefenseTestPhase : uint8
 	// -FieldDefenseValidateTrench: the field trench of the Barriers tab is laid out with two clicks along a bent
 	// path, dug piece by piece and paid per metre; it waits while the player cannot pay, and a trench that was not
 	// confirmed goes when the placement is cancelled.
-	LayingTrench
+	LayingTrench,
+	// -FieldDefenseValidateTrenchAnchor: a Pak 40 pit is built; a trench started near its anchor joins it and opens
+	// its neck once the first piece is dug; a trench drawn towards the free anchor joins it at its end; and when
+	// the pit goes, the trench caps the end that was joined to it.
+	LayingAnchoredTrench
 };
 
 /**
@@ -173,6 +179,22 @@ private:
 	void TickWaitingForNextConstruction();
 	void TickCheckingOwnerDeath();
 	void TickLayingTrench();
+	void TickLayingAnchoredTrench();
+	/** @brief Checks that a planned trench starts on the anchor's port, without a start cap, and ends with one. */
+	void CheckPlanStartsOnAnchor(const FFieldTrenchAnchorHandle& Anchor, const TArray<FFieldTrenchPiecePlacement>& Plan,
+	                             const FString& Description);
+	/** @brief Places the Breakthrough bunkers beside the pit's spot, facing the HQ, as a level designer would. */
+	void SpawnTestBunkers();
+	/** @brief Checks each placed bunker's anchors against its socket table and lists them for the trenches. */
+	void CollectBunkerAnchors();
+	// The Breakthrough bunkers placed by the anchor test, their anchors, and the trench laid from each anchor.
+	TArray<TWeakObjectPtr<AActor>> M_TestBunkers;
+	TArray<FFieldTrenchAnchorHandle> M_BunkerAnchors;
+	TArray<TWeakObjectPtr<ARTSFieldTrench>> M_BunkerTrenches;
+	int32 M_BunkerAnchorIndex = 0;
+	bool GetIsNeckShown() const;
+	TWeakObjectPtr<UFieldTrenchAnchorComponent> M_TestAnchor;
+	int32 M_TrenchPieceCountBeforePitLoss = 0;
 	/** @return Where along the path the given distance from its start lies. */
 	static FVector GetPointAlongPath(const TArray<FVector>& Path, const float Distance);
 	static float GetPathLength(const TArray<FVector>& Path);

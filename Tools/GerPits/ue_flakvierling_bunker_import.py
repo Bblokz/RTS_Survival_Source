@@ -16,6 +16,10 @@ SHARED = BUNKERS + 'BreakthroughShared'
 HOME = BUNKERS + 'FlakvierlingBunker'
 MAIN = 'SM_BF_FlakvierlingBunker'
 SOCKETS = ('Turret', 'MG', 'Exp1', 'Exp2', 'Exp3')
+# Trench anchors, Unreal cm and yaw, +X out of the bunker (Source/Docs/Units/GerPitTrenchAnchors.md). Passage: the
+# trench ends in front of the crew passage between the Ringstand and the wedge, clear of the ring. Rear: against the
+# closed back wall; there is no opening there yet.
+TRENCH_PORTS = (('TrenchPort_Passage', (260.0, -80.0, 0.0), 0.0), ('TrenchPort_Rear', (-390.0, -150.0, 0.0), 180.0))
 TEXTURES = (
     ('SharedParts/Textures/T_BF_Trim_BaseColor.png', 'color'),
     ('SharedParts/Textures/T_BF_Trim_ORM.png', 'mask'),
@@ -128,6 +132,19 @@ def concrete_instance():
     return instance
 
 
+def set_trench_ports(mesh):
+    """Adds the trench anchors (UFieldTrenchAnchorComponent) or puts them back where they belong."""
+    for socket_name, location, yaw in TRENCH_PORTS:
+        socket = mesh.find_socket(socket_name)
+        if not socket:
+            socket = unreal.StaticMeshSocket(mesh)
+            socket.set_editor_property('socket_name', socket_name)
+            mesh.add_socket(socket)
+        socket.set_editor_property('relative_location', unreal.Vector(*location))
+        socket.set_editor_property('relative_rotation', unreal.Rotator(roll=0.0, pitch=0.0, yaw=yaw))
+        socket.set_editor_property('relative_scale', unreal.Vector(1, 1, 1))
+
+
 def finish_mesh(name, materials):
     path = f'{HOME}/Mesh/{name}'
     mesh = unreal.load_asset(path)
@@ -138,6 +155,8 @@ def finish_mesh(name, materials):
         if socket:      # FBX empties arrive tilted; every socket here is a plain position
             socket.set_editor_property('relative_rotation', unreal.Rotator(0, 0, 0))
             socket.set_editor_property('relative_scale', unreal.Vector(1, 1, 1))
+    if name in (MAIN, MAIN + '_Damaged'):
+        set_trench_ports(mesh)
     ASSETS.save_asset(path, only_if_is_dirty=False)
     body = mesh.get_editor_property('body_setup')
     hulls = len(body.get_editor_property('agg_geom').get_editor_property('convex_elems')) if body else 0

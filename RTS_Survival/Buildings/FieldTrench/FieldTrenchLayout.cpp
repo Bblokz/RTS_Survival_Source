@@ -207,7 +207,25 @@ TArray<FFieldTrenchPiecePlacement> FieldTrenchLayout::PlanAlongPath(
 	const float MaximumLengthCm,
 	const float MaximumStraightLengthCm)
 {
+	FFieldTrenchPlanOptions Options;
+	Options.MaximumStraightLengthCm = MaximumStraightLengthCm;
+	return PlanAlongPath(DragPath, MaximumLengthCm, Options);
+}
+
+FFieldTrenchOpenPort FieldTrenchLayout::GetReversedPort(const FFieldTrenchOpenPort& Port)
+{
+	FFieldTrenchOpenPort Reversed = Port;
+	Reversed.Yaw = FRotator::NormalizeAxis(Port.Yaw + 180.0f);
+	return Reversed;
+}
+
+TArray<FFieldTrenchPiecePlacement> FieldTrenchLayout::PlanAlongPath(
+	const TArray<FVector2D>& DragPath,
+	const float MaximumLengthCm,
+	const FFieldTrenchPlanOptions& Options)
+{
 	using namespace FieldTrenchLayoutPrivate;
+	const float MaximumStraightLengthCm = Options.MaximumStraightLengthCm;
 	TArray<FFieldTrenchPiecePlacement> Pieces;
 	const float ShortestStraight = GetPieceDefinition(EFieldTrenchPiece::Straight_125).LengthCm;
 	if (DragPath.Num() < 2 || FVector2D::Distance(DragPath[0], DragPath.Last()) < ShortestStraight)
@@ -217,15 +235,23 @@ TArray<FFieldTrenchPiecePlacement> FieldTrenchLayout::PlanAlongPath(
 	const FVector2D& PathEnd = DragPath.Last();
 	int32 ProgressIndex = 0;
 	FFieldTrenchOpenPort OpenPort;
-	OpenPort.Location = DragPath[0];
-	OpenPort.Yaw = GetYawTowards(OpenPort.Location, FindAimPoint(DragPath, OpenPort.Location, ProgressIndex));
-
-	// The start cap's port faces along the trench, so it joins an open port that faces back from the start.
-	FFieldTrenchOpenPort StartCapPort = OpenPort;
-	StartCapPort.Yaw = FRotator::NormalizeAxis(OpenPort.Yaw + 180.0f);
 	FFieldTrenchOpenPort UnusedExit;
-	PlacePieceOnPort(EFieldTrenchPiece::End, 0, StartCapPort, Pieces.AddDefaulted_GetRef(), UnusedExit);
-	float TotalLength = Pieces.Last().LengthCm;
+	float TotalLength = 0.0f;
+	if (Options.StartPort.IsSet())
+	{
+		// Joined to what is already there: the trench leaves the way the port points and turns to the drag.
+		OpenPort = Options.StartPort.GetValue();
+	}
+	else
+	{
+		OpenPort.Location = DragPath[0];
+		OpenPort.Yaw = GetYawTowards(OpenPort.Location, FindAimPoint(DragPath, OpenPort.Location, ProgressIndex));
+		// The start cap's port faces along the trench, so it joins an open port that faces back from the start.
+		PlacePieceOnPort(EFieldTrenchPiece::End, 0, GetReversedPort(OpenPort), Pieces.AddDefaulted_GetRef(),
+		                 UnusedExit);
+		TotalLength = Pieces.Last().LengthCm;
+	}
+	const int32 PieceCountBeforeTrench = Pieces.Num();
 
 	int32 BendsWithoutProgress = 0;
 	int32 ProgressIndexAtLastPiece = ProgressIndex;
@@ -285,7 +311,7 @@ TArray<FFieldTrenchPiecePlacement> FieldTrenchLayout::PlanAlongPath(
 		TotalLength += Placement.LengthCm;
 		ProgressIndexAtLastPiece = ProgressIndex;
 	}
-	if (Pieces.Num() < 2)
+	if (Pieces.Num() == PieceCountBeforeTrench)
 	{
 		Pieces.Reset();
 		return Pieces;

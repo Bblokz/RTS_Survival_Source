@@ -76,6 +76,19 @@ struct FFieldTrenchOpenPort
 	float Yaw = 0.0f;
 };
 
+/** @brief How a trench is planned along a drag, beyond the path itself. */
+struct FFieldTrenchPlanOptions
+{
+	// Longer straights are not used; shorter ones follow uneven ground better.
+	float MaximumStraightLengthCm = 500.0f;
+	// The trench joins something already there, such as a pit's trench anchor: its first piece is put on this
+	// port, facing the way the port points, and it gets no start cap. Unset starts the trench with an End cap
+	// at the first point of the drag, facing along the drag.
+	TOptional<FFieldTrenchOpenPort> StartPort;
+
+	bool GetHasStartCap() const { return not StartPort.IsSet(); }
+};
+
 /**
  * @brief Lays a chain of kit pieces along the path the player dragged with the mouse: an End cap at the start,
  * straights and bends that follow the path, and an End cap where the drag stopped.
@@ -115,6 +128,22 @@ namespace FieldTrenchLayout
 		const TArray<FVector2D>& DragPath,
 		float MaximumLengthCm,
 		float MaximumStraightLengthCm = 500.0f);
+
+	/**
+	 * @brief Plans a trench along a dragged path, see above.
+	 * @param Options With a start port the trench starts on it instead of with a start cap; the first piece is
+	 * then the first piece of trench.
+	 */
+	RTS_SURVIVAL_API TArray<FFieldTrenchPiecePlacement> PlanAlongPath(
+		const TArray<FVector2D>& DragPath,
+		float MaximumLengthCm,
+		const FFieldTrenchPlanOptions& Options);
+
+	/**
+	 * @return The open port facing back out of the trench at an end cap; a cap put on the port of a joined
+	 * trench end, turned round, closes that end.
+	 */
+	RTS_SURVIVAL_API FFieldTrenchOpenPort GetReversedPort(const FFieldTrenchOpenPort& Port);
 
 	/** @return The summed length of the pieces, in centimetres. */
 	RTS_SURVIVAL_API float GetTotalLengthCm(const TArray<FFieldTrenchPiecePlacement>& Pieces);
