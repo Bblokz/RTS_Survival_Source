@@ -27,7 +27,7 @@ Tracked tanks leave twin ruts in soft ground (grass, desert, sand and gravel lay
    - A jump of more than 15 m is treated as a teleport and not drawn.
    - Hidden tanks and tanks attached to another actor (carried by an aircraft for a drop) draw nothing; their trail
      starts afresh where they are set down.
-4. **Fade.** Every 4 s a full-target translucent black tile fades old trails with a 120 s half-life. The 8-bit fade leaves a faint residue, which the material's smoothstep (`TankTrail_RutLow`) hides.
+4. **Fade.** Every 4 s a full-target translucent black tile fades old trails with an 86 s half-life. The 8-bit fade leaves a faint residue, which the material's smoothstep (`TankTrail_RutLow`) hides.
 5. **Material.** Static switch `LS_TankTrails` sits between `MF_RTS_ColorVariation_Landscape` and the main `BreakMaterialAttributes`.
    - Only the main pass is affected; the runtime virtual texture output never contains trails, because its cached pages would need invalidating under every moving tank.
    - A custom HLSL node samples the target three times (centre, +X, +Y) inside `[branch] if (TrailEnabled > 0.5)`, using the shared clamped sampler, so it costs no sampler slot.

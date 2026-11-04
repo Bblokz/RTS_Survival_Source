@@ -78,6 +78,8 @@ int32 EnemyTrainingHelpers::GetTankTrainingPointsCost(const ETankSubtype TankTyp
 	case ETankSubtype::Tank_BT7:
 	case ETankSubtype::Tank_T26:
 	case ETankSubtype::Tank_BT7_4:
+	// Unarmoured truck with a single 25mm AA gun: priced with the light trucks and armoured cars.
+	case ETankSubtype::Tank_GAZMM_72K:
 		return 10;
 	// The cheapest, weakest Soviet tank.
 	case ETankSubtype::Tank_MS1:
@@ -85,6 +87,8 @@ int32 EnemyTrainingHelpers::GetTankTrainingPointsCost(const ETankSubtype TankTyp
 	case ETankSubtype::Tank_T70:
 	case ETankSubtype::Tank_T70F:
 	case ETankSubtype::Tank_SU_76:
+	// Thin armoured car, but the twin KPV shreds infantry and aircraft.
+	case ETankSubtype::Tank_BTR152A:
 		return 12;
 	case ETankSubtype::Tank_T28:
 	case ETankSubtype::Tank_T28F:

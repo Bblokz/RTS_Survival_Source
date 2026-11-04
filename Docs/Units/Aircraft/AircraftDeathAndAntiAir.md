@@ -133,7 +133,7 @@ collections. Rebuild after an aircraft mesh changes. Lessons:
   wing fire dropping that wing and spiralling towards it, the dive limit, the collection naming.
 - Map tests (`Units/Aircraft/Tests/AircraftTestSubsystem`, `RTS_AIRCRAFT_TEST` log lines), rendered offscreen on
   `UT_Nomadics` (fog of war needs rendering):
-  - `-AntiAirValidate`: the Bofors bunker, 37 mm and 88 mm flak, Flak 37 pit, flak bunker, Panzer III AA, T-34 AA
+  - `-AntiAirValidate`: the Bofors bunker, 37 mm and 88 mm flak, Flak 37 pit, flak bunker, Panzer III AA, T-34 AA, BTR-152A
     and the towed Flak 37 and Flak 88 squads must target, fire at and damage an enemy aircraft circling over them,
     then turn on an enemy tank. Optional `-AntiAirUnit=<label>`.
   - `-AircraftDeathValidate`: shoots down a Bf 109, Ju 87, Sturmovik, Me 410, Pe-2, Pe-8, Ju 390, Ho 229, both drop ships and

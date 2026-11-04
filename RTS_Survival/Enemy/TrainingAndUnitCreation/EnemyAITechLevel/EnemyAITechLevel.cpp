@@ -29,6 +29,7 @@ FEnemyLevelTraining::FEnemyLevelTraining()
 	LightTankOptions.TrainableTankSubtypes = {
 		ETankSubtype::Tank_Ba12,
 		ETankSubtype::Tank_Ba14,
+		ETankSubtype::Tank_BTR152A,
 		ETankSubtype::Tank_BT7,
 		ETankSubtype::Tank_T26,
 		ETankSubtype::Tank_BT7_4,

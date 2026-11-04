@@ -415,6 +415,10 @@ namespace DeveloperSettings
 				// Above the Panzerwerfer (ten 150mm rockets, medium range), below the Nebelwerfer TW team weapon.
 				inline constexpr int32 BM13_Radixite = 450;
 				inline constexpr int32 BM13_VehicleParts = 200;
+				// GAZ-MM 72-K: an unarmoured light truck with one 25mm AA autocannon; above the Zil supply trucks,
+				// just below the Sd.Kfz. 7/1 Flakvierling half-track.
+				inline constexpr int32 GAZMM72K_Radixite = 110;
+				inline constexpr int32 GAZMM72K_VehicleParts = 40;
 			}
 
 			namespace LightTanks
