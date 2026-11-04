@@ -1,0 +1,9 @@
+# Puma, SdKfz 234/3, E50, E75 team colour check
+Warmup_Ger_ArmoredCar_Puma=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Puma/Ger_ArmoredCar_Puma.Ger_ArmoredCar_Puma_C
+Warmup_Ger_ArmoredCar_Sdkfz_234_3=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz_234_3/Ger_ArmoredCar_Sdkfz_234_3.Ger_ArmoredCar_Sdkfz_234_3_C
+Ger_ArmoredCar_Puma_Default=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Puma/Ger_ArmoredCar_Puma.Ger_ArmoredCar_Puma_C
+Ger_ArmoredCar_Puma_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Puma/Ger_ArmoredCar_Puma.Ger_ArmoredCar_Puma_C|TeamColor=0.8,0.02,0.02,1
+Ger_ArmoredCar_Puma_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Puma/Ger_ArmoredCar_Puma.Ger_ArmoredCar_Puma_C|TeamColor=0.02,0.1,0.85,1
+Ger_ArmoredCar_Sdkfz_234_3_Default=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz_234_3/Ger_ArmoredCar_Sdkfz_234_3.Ger_ArmoredCar_Sdkfz_234_3_C
+Ger_ArmoredCar_Sdkfz_234_3_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz_234_3/Ger_ArmoredCar_Sdkfz_234_3.Ger_ArmoredCar_Sdkfz_234_3_C|TeamColor=0.8,0.02,0.02,1
+Ger_ArmoredCar_Sdkfz_234_3_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz_234_3/Ger_ArmoredCar_Sdkfz_234_3.Ger_ArmoredCar_Sdkfz_234_3_C|TeamColor=0.02,0.1,0.85,1

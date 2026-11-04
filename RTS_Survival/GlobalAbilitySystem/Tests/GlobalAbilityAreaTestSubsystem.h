@@ -28,6 +28,8 @@ enum class EGlobalAbilityAreaTestStep : uint8
 	EnemyMinefield,
 	// The Soviet aircraft, flown from a point the way the AI does.
 	EnemyRecon,
+	// Clicked like the panel button: no aim, vision bubbles on hidden enemy units.
+	SpiesInfiltration,
 	Nuke,
 	Finished
 };
@@ -89,6 +91,12 @@ private:
 	TWeakObjectPtr<AActor> M_EdgeVictim;
 	TWeakObjectPtr<AActor> M_FarBystander;
 
+	// Enemy tanks spawned out of sight for the spies, and every enemy unit that was hidden when they were sent.
+	TArray<TWeakObjectPtr<AActor>> M_SpiesTargets;
+	TArray<TWeakObjectPtr<AActor>> M_HiddenBeforeSpies;
+	TArray<TWeakObjectPtr<AActor>> M_RevealedBySpies;
+	bool bM_HasSentSpies = false;
+
 	FB4HowitzerCaptureRig M_CaptureRig;
 
 	void Check(const bool bCondition, const FString& Description, const FString& Details = FString());
@@ -131,6 +139,11 @@ private:
 	void TickEnemyRecon();
 	void CheckPlayerLoadoutFitsPanel();
 	void CheckSovietNukeTemplate();
+	void StartSpiesInfiltration();
+	void TickSpiesInfiltration();
+	void SendSpies();
+	void CheckSpiesReveal();
+	TArray<AActor*> GetHiddenEnemyUnits() const;
 	void StartNuke();
 	void TickNuke();
 	void CheckNukeResult();

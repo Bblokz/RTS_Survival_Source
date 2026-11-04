@@ -52,12 +52,12 @@ kept when the band covers at least 2% of the paint and repaints at most 15% of t
 
 - **Three-tone camo** (Panzer II/III/IV, 38(t), Hetzer, Panther D, Tiger H1 rail, Maus, Panther II, E-50, King Tiger,
   SdKfz 251, StuG): both dark bands become the team colour (6-47% of the paint), dunkelgelb stays. Strength 0.95.
-- **Pale camo** (Brummbar, Puma, SdKfz 234/4 turret, SdKfz 9): the brown and green blotches are pale and only about
+- **Pale camo** (Brummbar, SdKfz 234/4 turret, SdKfz 9): the brown and green blotches are pale and only about
   0.06 from the dunkelgelb in chromaticity, inside the default key radius. When no band is found the picker retries
   with `TC_KeyMin` / `TC_KeyMax` 0.015 / 0.03 and less saturated band pixels, and keeps the keys when they cover 5-35% of
   the paint (more means the key caught a reddish base coat, or repaints more than a three-tone vehicle: the Jagdpanzer
   IV/70's 38% read clearly stronger). 8-30% of the paint is repainted and the base coat stays.
-- **One-tone camo** (SdKfz 250, 234/3, 231, Sturmtiger, Jagdpanzer IV/70, Panzer I, Panzer II turret, rocket truck):
+- **One-tone camo** (SdKfz 250 turret `MI_Sdkfz250`, Sturmtiger, Jagdpanzer IV/70, Panzer I, Panzer II turret, rocket truck):
   no band or blotch to repaint, so the whole paint gets a light tint, strength 0.2. 0.3 already read stronger than the
   three-tone vehicles on colourful camo (Jagdpanzer IV/70, Tiger E). Until 2026-11-03 these (and the pale camos) were
   repainted at 0.7 and changed far more than the rest.
@@ -70,7 +70,45 @@ kept when the band covers at least 2% of the paint and repaints at most 15% of t
     (0.015 / 0.03). Its two turret materials share one diffuse but not the overlay, so the override goes by material.
   - Panther G green scheme: its olive-green blotches (hue 52-90, too pale for the generic green band) at
     0.015 / 0.03, about 12-16% of the paint, on hull, turret and engine deck alike.
-- **Off** (strength 0): Wespe (grey paint).
+  - SdKfz 231 (`M_sdkfz_231`, no instance of its own): its grey-brown stripes over the sand base at 0.015 / 0.03,
+    about 17% of the paint. The stripes are barely saturated, so the shader's paint mask (`PaintMin` / `PaintMax`)
+    passes only a fraction of them; `TC_Strength` 8 makes up for that (the swap clamps the weight to 1). An
+    override's optional fourth value is its strength.
+  - Puma (`M_Puma`, its hull and turret instances, `MI_Puma_RadixGlow_Red` / `_Yellow`) and SdKfz 234/3
+    (`M_Sdkfz_234_3`, `MI_Hull_Sdkfz_234_3`): repainted like the SdKfz 250 on 2026-11-04. Their three-tone camo
+    (olive, sand, red-brown) gave no band that read as a marking: the pale grey-sand key was speckled over the whole
+    vehicle at strength 6 and invisible at 2.5, and the olive key (0.012 / 0.025, strength 1.2) took too much of it.
+    `Tools/TeamColor/paint_three_tone_grey_yellow.py` turns the olive blotches (about 22% of the paint) into the dark
+    yellow and the sand and red-brown into one Panzergrau base: a neutral grey at the pixel's brightness relative to
+    its class paint, since a per-channel gain from the warm brown turned the darker panels blue. Light pixels need a
+    greener hue to count as olive, because the 234/3 sand is greenish (hue 48-54). New textures
+    `Puma/Materials/SdKfz_234_Puma_GreyYellow_D` and `Sdkfz_234_3/Materials/SdKfz234-3_GreyYellow_D`; the old ones
+    are untouched. `M_Puma`'s `DiffuseColorMap` default, the two RadixGlow instances' override, `M_Sdkfz_234_3`'s
+    plain texture sample and `MI_Hull_Sdkfz_234_3`'s `TankDiffuse` point at them. Keyed on the yellow at 0.04 / 0.08,
+    strength 0.95: the picker's maths keys 82% (Puma; the rest is dark olive mottling kept as it was) and 94% (234/3)
+    of the yellow and 0% of the grey and of neutral metal and markings. Checked in captures
+    (`Saved/TeamColorTest/pumagreyyellow/`: `puma_234_3_before_after.png`, `puma_list.txt`) of the Puma, DualBarrel,
+    RadixiteSniper and 234/3: Red and Blue repaint only the yellow blotches. The 234/3 renders much darker than the
+    Puma, so its grey reads close to black; it already did before the repaint (its instance takes the master's
+    shading defaults).
+  - SdKfz 250 hull (`MI_Sdkfz_250_Hull_DesertAPO`: SdKfz 250, ammo carrier, 250/37 and variants;
+    `MI_Sdkfz_250_Hull_Ambulance`): repainted 2026-11-04 so a team colour reads as a marking. Its old camo (sand
+    blotches over blue-grey, both low chroma) could only take the one-tone tint, so red read as a brown wash and blue
+    as grey. `Tools/TeamColor/paint_sdkfz250_grey_yellow.py` repaints the exported diffuse: the blue-grey stays as the
+    Panzergrau base (max - min about 0.02, below the paint mask, so it is never keyed), the dark-brown interior and
+    underside panels turn dark grey, and the artist's sand blotches become dark yellow (sRGB about 0.42, 0.36, 0.20,
+    fleet dunkelgelb brightness but more saturated), shrunk from about half to a third of the camo panels. Wear,
+    rust, shading, the crosses and the alpha carry over; sand that turns grey takes the grey next to it, so no ghost
+    of the old pattern stays. The ambulance keeps every pixel that differs from the plain hull (red crosses, canvas
+    tarp). New textures `HullTextures/T_Sdkfz_250_GreyYellow_D` and `T_Sdkfz250_Ambulance_GreyYellow_D`; the old ones
+    are untouched, so pointing `TankDiffuse` back reverts it. Keyed on the yellow at 0.03 / 0.06, strength 0.95: the
+    picker's maths keys 97% of the yellow and 0% of the grey, dark panels, tarp and crosses (the tarp sits about 0.08
+    from the key, so the default 0.08 / 0.15 would repaint it). Checked in captures
+    (`Saved/TeamColorTest/sdkfz250_greyyellow/`: `sdkfz250_before_after.png`, `sdkfz250_list.txt`): Red minus Default
+    changes only the yellow blotches; the grey, the markings and the tarp stay at the lighting noise floor. Out of
+    scope: the turret material `MI_Sdkfz250`
+    (SdKfz 140, Mechanized Depot), tracks and wheels.
+- **Off** (strength 0): Wespe (grey paint); E50 and E75 (custom camo the user keeps, via `TARGET_KEY_OVERRIDES`).
 - Exceptions by hand in `pick_team_color_keys.py`: `TARGET_KEY_OVERRIDES` (above), `ONE_TONE_TEXTURES` (SdKfz 250
   turret; the Panther G entries are overridden) and `PALE_FIRST_TEXTURES` (Brummbar side plates) so one vehicle never mixes two looks; `NO_SWAP_TEXTURES` for
   textures that are not the camo.

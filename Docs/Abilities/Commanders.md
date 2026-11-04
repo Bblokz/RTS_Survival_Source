@@ -10,7 +10,7 @@ Every commander has exactly six abilities (`RTSCommanderConstants::AbilitySlotsP
 
 | Slot | Role | Tier |
 |---|---|---|
-| 1 | Intel / utility (recon flight, flare curtain) | I |
+| 1 | Intel / utility (recon flight, flare curtain, spies infiltration) | I |
 | 2 | Economy (harvester or resource drop) | I |
 | 3 | Reinforcement drop (vehicles, infantry, support weapons) | II |
 | 4 | Air strike | III |
@@ -92,10 +92,23 @@ animations or unit Blueprint), and the Sonnengewehr beam ability. Built 2026-11-
 
 | Tier | Abilities |
 |---|---|
-| I | `GA_GerReconFlight`, `GA_GerFlareCurtain`, `GA_HarvesterDrop` (Pz IV harvester), `GA_GerPzIHarvesterDrop`, `GA_GerRadixiteMetalSupplyDrop`, `GA_GerRadixiteCacheDrop` |
+| I | `GA_GerReconFlight`, `GA_GerFlareCurtain`, `GA_GerSpiesInfiltration`, `GA_HarvesterDrop` (Pz IV harvester), `GA_GerPzIHarvesterDrop`, `GA_GerRadixiteMetalSupplyDrop`, `GA_GerRadixiteCacheDrop` |
 | II | `GA_GerParatroopers`, `GA_GerSpotterPzIIIDrop`, `GA_GerRadixitePzIIMarderDrop`, `GA_ScavengersDrop`, `GA_GerPz38tRailgunDrop` |
 | III | `GA_3xJu87Strafing`, `GA_Ju87Strafing`, `GA_2xHortentrafing`, `GA_Me410Airstrike`, `GA_2xBf110Strafing`, `GA_Barrage`, `GA_LargeBarrage`, `GA_GerAirMinefield`, `GA_GerRailBombardment` |
 | IV | `GA_GerRadixiteNuke`, `GA_GerKingTiger105Drop`, `GA_GerE100Drop`, `GA_GerSturmtigerDrop`, `GA_GerJagdTigerDrop`, `GA_GerTigerRailDrop` |
+
+## Spies Infiltration (`GA_GerSpiesInfiltration`)
+
+A Tier I intel ability without aiming (`UGA_SpiesInfiltration`): the panel button fires it at once. It picks up to 6
+units of the opponent that its owner cannot see (enemy units the fog hides; for an AI owner, player units without
+the in-enemy-vision tag), one soldier per squad, and attaches a 600 cm vision bubble (`AGlobalAbilityVisionBubble`)
+to each for 25 s, so the reveal follows the unit. The picks are random; they are spread at least one reveal radius
+apart before nearby units fill the rest, and units revealed by the previous use go last. Cooldown 180 s, cost 200
+radixite (`author_spies_infiltration.py`, also in `author_commander_abilities.py` BALANCE). It is in no commander
+kit yet. Icon: `spies_infiltration` in `compose_ability_icons.py` (soldier with field glasses, `Spy_Spot` render).
+With no hidden enemy units it still fires and starts its cooldown. Because it skips the aim, the controller's activate
+sounds (`AnnouncerSoundOnActivate`, `Sound2DOnActivate`) never play: put its sound on `Sound2DOnExecute`. Candidates
+are filtered by `IsHidden()`, so a unit hidden for another reason (outside the fog grid at a map edge) can take a pick.
 
 ## Cost and cooldown bands
 

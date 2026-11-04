@@ -22,7 +22,10 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AimAbilityComponent/FlareAimAbility/FlareProjectile.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/FieldConstructionAbilityComponent/FieldConstructionActor/FieldMine.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
+#include "RTS_Survival/Game/GameState/GameUnitManager/GameUnitManager.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
 
@@ -54,6 +57,15 @@ namespace GlobalAbilityAreaTestConstants
 	constexpr int32 HumanPlayer = 1;
 	constexpr float CaptureDistanceCm = 7500.f;
 	constexpr float CapturePitchDegrees = 60.f;
+	// The spies' targets stand behind the anchor, away from the strips the flights revealed.
+	constexpr int32 SpiesTargetCount = 8;
+	// UT_Nomadics: 7000 + 3 x 1400 put the last tank past the fog grid at the map edge, where nothing is ever seen.
+	constexpr float SpiesTargetDistanceCm = 5500.f;
+	constexpr float SpiesTargetSpacingCm = 1000.f;
+	// Spawned pawns join the fog TimeRemainingStartAsyncLoading + 2 s after spawning.
+	constexpr float SpiesFogSettleSeconds = 8.f;
+	constexpr float SpiesRevealSettleSeconds = 2.f;
+	constexpr int32 SpiesUnitsToReveal = 6;
 	const TCHAR* const PanelClassPath = TEXT(
 		"/Game/RTS_Survival/Blueprints/GameUI/GlobalAbilities/W_BP_GlobalAbilityPanel.W_BP_GlobalAbilityPanel_C");
 	const TCHAR* const VictimClassPath = TEXT(
@@ -105,6 +117,9 @@ void UGlobalAbilityAreaTestSubsystem::Tick(const float DeltaTime)
 		return;
 	case EGlobalAbilityAreaTestStep::EnemyRecon:
 		TickEnemyRecon();
+		return;
+	case EGlobalAbilityAreaTestStep::SpiesInfiltration:
+		TickSpiesInfiltration();
 		return;
 	case EGlobalAbilityAreaTestStep::Nuke:
 		TickNuke();
@@ -595,7 +610,144 @@ void UGlobalAbilityAreaTestSubsystem::TickEnemyRecon()
 	Check(bM_SawSovietRecon, TEXT("soviet_recon_is_the_pe2"));
 	CheckPlayerLoadoutFitsPanel();
 	CheckSovietNukeTemplate();
+	StartSpiesInfiltration();
+}
+
+void UGlobalAbilityAreaTestSubsystem::StartSpiesInfiltration()
+{
+	using namespace GlobalAbilityAreaTestConstants;
+	EnterStep(EGlobalAbilityAreaTestStep::SpiesInfiltration);
+	UClass* TargetClass = LoadClass<AActor>(nullptr, VictimClassPath);
+	for (int32 Index = 0; Index < SpiesTargetCount; ++Index)
+	{
+		const FVector2D Offset(-SpiesTargetDistanceCm - (Index / 2) * SpiesTargetSpacingCm,
+		                       (Index % 2 == 0 ? -1.f : 1.f) * SpiesTargetSpacingCm);
+		FVector Ground;
+		FindGround(FVector2D(M_Anchor.X, M_Anchor.Y) + Offset, Ground);
+		M_SpiesTargets.Add(FRTSUnitOwnerSpawning::SpawnUnitForPlayer(
+			*GetWorld(), TargetClass, FTransform(Ground + FVector(0.f, 0.f, 120.f)), EnemyPlayer));
+	}
+}
+
+void UGlobalAbilityAreaTestSubsystem::TickSpiesInfiltration()
+{
+	using namespace GlobalAbilityAreaTestConstants;
+	if (not bM_HasSentSpies)
+	{
+		if (GetStepSeconds() >= SpiesFogSettleSeconds)
+		{
+			SendSpies();
+		}
+		return;
+	}
+	if (GetStepSeconds() < SpiesFogSettleSeconds + SpiesRevealSettleSeconds)
+	{
+		return;
+	}
+	CheckSpiesReveal();
+	for (const TWeakObjectPtr<AActor>& Target : M_SpiesTargets)
+	{
+		if (Target.IsValid())
+		{
+			Target->Destroy();
+		}
+	}
 	StartNuke();
+}
+
+TArray<AActor*> UGlobalAbilityAreaTestSubsystem::GetHiddenEnemyUnits() const
+{
+	using namespace GlobalAbilityAreaTestConstants;
+	TArray<AActor*> Hidden;
+	UGameUnitManager* GameUnitManager = FRTS_Statics::GetGameUnitManager(this);
+	if (not IsValid(GameUnitManager))
+	{
+		return Hidden;
+	}
+	for (ATankMaster* Tank : GameUnitManager->GetPlayerTanks(EnemyPlayer))
+	{
+		if (IsValid(Tank) && Tank->IsHidden())
+		{
+			Hidden.Add(Tank);
+		}
+	}
+	for (ASquadUnit* SquadUnit : GameUnitManager->GetSquadUnitsOfPlayer(EnemyPlayer))
+	{
+		if (IsValid(SquadUnit) && SquadUnit->IsHidden())
+		{
+			Hidden.Add(SquadUnit);
+		}
+	}
+	return Hidden;
+}
+
+void UGlobalAbilityAreaTestSubsystem::SendSpies()
+{
+	using namespace GlobalAbilityAreaTestConstants;
+	bM_HasSentSpies = true;
+	int32 HiddenTargets = 0;
+	for (const TWeakObjectPtr<AActor>& Target : M_SpiesTargets)
+	{
+		HiddenTargets += Target.IsValid() && Target->IsHidden() ? 1 : 0;
+	}
+	Check(HiddenTargets > SpiesUnitsToReveal, TEXT("spies_targets_start_in_the_fog"),
+	      FString::Printf(TEXT("hidden=%d of %d"), HiddenTargets, M_SpiesTargets.Num()));
+	for (AActor* Unit : GetHiddenEnemyUnits())
+	{
+		M_HiddenBeforeSpies.Add(Unit);
+	}
+
+	UGlobalAbility* Ability = MakeAbility(EGlobalAbility::GA_GerSpiesInfiltration, HumanPlayer);
+	if (not IsValid(Ability))
+	{
+		return;
+	}
+	Check(Ability->GetAbilityTier() == EGlobalAbilityTier::TierI, TEXT("spies_are_tier_one"));
+	// The panel button path: no aim, the ability runs and starts its cooldown at once.
+	Ability->OnClickedAbilityButton();
+	const APlayerAimAbility* AimActor = FindAimActor();
+	Check(not IsValid(AimActor) || not AimActor->IsPlayerAimActive(), TEXT("spies_need_no_aim"));
+	Check(Ability->GetAbilityCosts().CoolDownRemaining == 180, TEXT("spies_cooldown_is_180_seconds"),
+	      FString::Printf(TEXT("cooldown=%d"), Ability->GetAbilityCosts().CoolDownRemaining));
+
+	int32 Bubbles = 0;
+	int32 OnHiddenEnemies = 0;
+	TSet<const AActor*> DistinctUnits;
+	for (TActorIterator<AGlobalAbilityVisionBubble> It(GetWorld()); It; ++It)
+	{
+		AActor* Unit = It->GetAttachParentActor();
+		if (not IsValid(Unit))
+		{
+			// The flights' bubbles stand on the ground.
+			continue;
+		}
+		++Bubbles;
+		DistinctUnits.Add(Unit);
+		OnHiddenEnemies += M_HiddenBeforeSpies.Contains(Unit) ? 1 : 0;
+		M_RevealedBySpies.Add(Unit);
+	}
+	const int32 Expected = FMath::Min(SpiesUnitsToReveal, M_HiddenBeforeSpies.Num());
+	Check(Bubbles == Expected, TEXT("spies_reveal_six_units"),
+	      FString::Printf(TEXT("bubbles=%d expected=%d hidden_enemies=%d"), Bubbles, Expected,
+	                      M_HiddenBeforeSpies.Num()));
+	Check(DistinctUnits.Num() == Bubbles, TEXT("spies_reveal_different_units"));
+	Check(OnHiddenEnemies == Bubbles, TEXT("spies_only_pick_hidden_enemies"),
+	      FString::Printf(TEXT("on_hidden=%d bubbles=%d"), OnHiddenEnemies, Bubbles));
+}
+
+void UGlobalAbilityAreaTestSubsystem::CheckSpiesReveal()
+{
+	int32 Visible = 0;
+	for (const TWeakObjectPtr<AActor>& Unit : M_RevealedBySpies)
+	{
+		const bool bVisible = Unit.IsValid() && not Unit->IsHidden();
+		Visible += bVisible ? 1 : 0;
+		UE_LOG(LogRTSGlobalAbilityAreaTest, Display, TEXT("RTS_ABILITY_TEST SPIED %s visible=%d at %s"),
+		       Unit.IsValid() ? *Unit->GetName() : TEXT("gone"), bVisible ? 1 : 0,
+		       Unit.IsValid() ? *Unit->GetActorLocation().ToCompactString() : TEXT("-"));
+	}
+	Check(M_RevealedBySpies.Num() > 0 && Visible == M_RevealedBySpies.Num(), TEXT("spied_units_show_through_the_fog"),
+	      FString::Printf(TEXT("visible=%d of %d"), Visible, M_RevealedBySpies.Num()));
 }
 
 void UGlobalAbilityAreaTestSubsystem::CheckPlayerLoadoutFitsPanel()

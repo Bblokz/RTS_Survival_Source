@@ -33,6 +33,8 @@ HORIZON = 0.72              # horizon height as a fraction of the card
 PALETTES = {
     "ger": ((30, 45, 60), (84, 112, 128), (232, 196, 140), (86, 84, 62), (40, 40, 30)),
     "sov": ((52, 30, 30), (136, 84, 66), (244, 186, 120), (92, 74, 52), (46, 34, 26)),
+    # the German sky after sunset, for the spies
+    "ger_dusk": ((22, 32, 46), (62, 84, 102), (200, 160, 112), (64, 66, 52), (30, 32, 26)),
 }
 
 # Render pixels removed from a cut-out: the Ho 229 keeps its nose gear strut in every pose the editor can show.
@@ -145,12 +147,13 @@ def noise(seed, scale_px, octaves=4):
     return total / weight
 
 
-def background(faction, seed, ground=True):
-    """ground=False is open sky to the bottom of the card, for the aircraft that are shown in the air only."""
+def background(faction, seed, ground=True, horizon=HORIZON):
+    """ground=False is open sky to the bottom of the card, for the aircraft that are shown in the air only.
+    horizon: a higher one (smaller value) shows more ground, for icons that happen on the ground."""
     top, mid, glow, far, near = [np.array(c, np.float32) / 255 for c in PALETTES[faction]]
     img = np.zeros((CANVAS, CANVAS, 4), np.float32)
     v = ys / CANVAS
-    h = HORIZON if ground else 1.08
+    h = horizon if ground else 1.08
     sky = np.zeros((CANVAS, CANVAS, 3), np.float32)
     t1 = smooth(0.0, h * 0.72, v)[..., None]
     t2 = smooth(h * 0.55, h, v)[..., None]
@@ -721,6 +724,61 @@ def radixite_nuke(faction, seed):
     return finish(img)
 
 
+SPY_HORIZON = 0.36
+REVEAL_RGB = (200, 236, 255)
+# Holes in the fog, far ones first: (x, y, ground radius, tank render or None, tank length). Three carry a tank,
+# the small far ones say there are more than three.
+SPY_REVEALS = [(262, 200, 17, None, 0), (384, 203, 19, None, 0), (482, 216, 21, None, 0),
+               (346, 246, 56, "T3476_Ground", 104), (440, 300, 70, "T3485_Ground", 128),
+               (300, 350, 84, "T3485_Ground", 154)]
+SPY_FOG_RGB = (96, 112, 124)
+
+
+def ground_ellipse(x, y, radius):
+    """Box of a circle on the ground as the low camera sees it."""
+    return [(x - radius) * SS, (y - radius * 0.38) * SS, (x + radius) * SS, (y + radius * 0.38) * SS]
+
+
+def dashed_ring(img, x, y, radius, color, width, dashes=16):
+    def ring(draw):
+        for i in range(dashes):
+            start = i * 360.0 / dashes
+            draw.arc(ground_ellipse(x, y, radius), start, start + 360.0 / dashes * 0.6, fill=255, width=int(width * SS))
+
+    return add(img, light_layer(drawn(ring, blur=0.8), color), 1.0)
+
+
+def spies_infiltration(soldier, seed=139):
+    """A German soldier at dusk watching the enemy through his glasses; out in the fog, rings of vision open around
+    enemy tanks, scattered across the field like the random picks of the ability."""
+    img = background("ger_dusk", seed, horizon=SPY_HORIZON)
+    v = ys / CANVAS
+    # dense fog over the whole field, drifting in patches; clear holes where the spies see
+    drift = noise(seed + 5, CANVAS * 0.4, 4)
+    fog = smooth(SPY_HORIZON - 0.05, SPY_HORIZON + 0.01, v) * (0.6 + 0.4 * drift) * (1 - smooth(0.5, 1.0, v) * 0.2)
+    holes = drawn(lambda dr: [dr.ellipse(ground_ellipse(x, y, r), fill=255) for x, y, r, _, _ in SPY_REVEALS],
+                  blur=4 * SS)
+    for x, y, r, tank, length in SPY_REVEALS:
+        img = light_pool(img, (x, y), r, r * 0.38, (150, 156, 132), 0.42, 9)
+    for x, y, r, tank, length in SPY_REVEALS:
+        if tank:
+            # cooled to the dusk light: the T-34's rust camo would otherwise read as a fire at button size
+            img = prop_item(img, tank, (x, y - length * 0.16), length, 0.0, gain=1.8, tint=(92, 112, 104),
+                            tint_amount=0.22)
+    img = over(img, light_layer(fog * (1 - holes), SPY_FOG_RGB) * 0.92)
+    for x, y, r, tank, _ in SPY_REVEALS:
+        img = dashed_ring(img, x, y, r, REVEAL_RGB, 3.4 if tank else 2.4, dashes=18 if tank else 10)
+    # the spy: close to the camera on the left, a dark figure against the fog with a cold edge light
+    cut, pts = load_cutout(soldier)
+    x0, y0, x1, y1 = bbox(cut)
+    height = 400
+    layer, _ = place(cut, pts, ((x0 + x1) / 2, y0), (112, 112), height / (y1 - y0), gain=0.4, tint=(10, 14, 20),
+                     tint_amount=0.55)
+    img = over(img, rim(layer, REVEAL_RGB, 2.5 * SS, 0.7))
+    img = over(img, layer)
+    return finish(img)
+
+
 ICONS = {
     "3xJu87Strafing": lambda: ju87_strafe(3),
     "2xHo229Strafing": ho229_strafe,
@@ -764,6 +822,7 @@ ICONS = {
     "SovietAirMinefield": lambda: air_minefield("sov", "PE8_Level", "Mine_TM41", 113, (250, 112), 0.36, 1.0, 90.0),
     "GerRadixiteNuke": lambda: radixite_nuke("ger", 127),
     "SovietRadixiteNuke": lambda: radixite_nuke("sov", 131),
+    "GerSpiesInfiltration": lambda: spies_infiltration("Spy_Spot"),
 }
 
 

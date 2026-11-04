@@ -60,4 +60,5 @@ enum class EGlobalAbility : uint8
 	GA_GerKingTiger105Drop,
 	GA_GerE100Drop,
 	GA_GerTigerRailDrop,
+	GA_GerSpiesInfiltration,
 };

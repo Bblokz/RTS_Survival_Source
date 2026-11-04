@@ -61,6 +61,13 @@ PALE_FIRST_TEXTURES = ["Brummbar_Plates_Yellow_Camo"]
 # that blend, not the Camo texture; the keys are its red-brown (desert) and brown (forest) band measured on the blend.
 # Its two turret materials share one diffuse but not the overlay, so this goes by material, not texture.
 # Panther G: the olive-green blotches (hue 52-90) of its green scheme; the generic green band needs saturation 0.7.
+# SdKfz 231: its grey-brown stripes over the sand base. They are barely saturated, so the paint mask (PaintMin/Max)
+# lets only a fraction through; strength 8 makes up for it (the swap clamps the weight to 1).
+# Puma and SdKfz 234/3 (2026-11-04): repainted like the SdKfz 250 (paint_three_tone_grey_yellow.py: olive -> dark
+# yellow, sand and red-brown -> Panzergrau), keyed on the yellow measured on the GreyYellow textures. Before that the
+# olive key (0.012 / 0.025, strength 1.2) read too heavy and the pale grey-sand one speckled or vanished.
+# E50 and E75: custom camo the user wants kept, so strength 0 (the key is unused).
+# An optional fourth value is the strength; STRENGTH_BAND otherwise.
 TARGET_KEY_OVERRIDES = {
     "MI_Tiger1_PostApo_HullDesert": ((0.218, 0.152, 0.109), (0.03, 0.06), "Tiger E overlay red-brown"),
     "MI_Tiger1_PostApo_TurretDesert": ((0.218, 0.152, 0.109), (0.03, 0.06), "Tiger E overlay red-brown"),
@@ -68,6 +75,24 @@ TARGET_KEY_OVERRIDES = {
     "MI_PantherG_Hull_Green": ((0.297, 0.292, 0.211), (0.015, 0.03), "Panther G olive blotches"),
     "MI_PantherG_Turret_Green": ((0.297, 0.292, 0.211), (0.015, 0.03), "Panther G olive blotches"),
     "MI_PantherG_Engine_Green": ((0.297, 0.292, 0.211), (0.015, 0.03), "Panther G olive blotches"),
+    "M_sdkfz_231": ((0.235, 0.201, 0.172), (0.015, 0.03), "SdKfz 231 grey-brown stripes", 8.0),
+    "M_Puma": ((0.332, 0.288, 0.166), (0.04, 0.08), "Puma dark-yellow blotches"),
+    "MI_PumaDesertApo": ((0.332, 0.288, 0.166), (0.04, 0.08), "Puma dark-yellow blotches"),
+    "MI_Puma_DualBarrel_Turret": ((0.332, 0.288, 0.166), (0.04, 0.08), "Puma dark-yellow blotches"),
+    "MI_Puma_RadixiteSniper_Turret": ((0.332, 0.288, 0.166), (0.04, 0.08), "Puma dark-yellow blotches"),
+    "MI_Puma_RadixGlow_Red": ((0.332, 0.288, 0.166), (0.04, 0.08), "Puma dark-yellow blotches"),
+    "MI_Puma_RadixGlow_Yellow": ((0.332, 0.288, 0.166), (0.04, 0.08), "Puma dark-yellow blotches"),
+    "M_Sdkfz_234_3": ((0.442, 0.382, 0.217), (0.04, 0.08), "SdKfz 234/3 dark-yellow blotches"),
+    "MI_Hull_Sdkfz_234_3": ((0.442, 0.382, 0.217), (0.04, 0.08), "SdKfz 234/3 dark-yellow blotches"),
+    "M_E50_Hull": ((0.0, 0.0, 0.0), (0.015, 0.03), "custom camo: off", 0.0),
+    "M_E50_Turret": ((0.0, 0.0, 0.0), (0.015, 0.03), "custom camo: off", 0.0),
+    "M_E75_Addons": ((0.0, 0.0, 0.0), (0.015, 0.03), "custom camo: off", 0.0),
+    "M_E75_Body": ((0.0, 0.0, 0.0), (0.015, 0.03), "custom camo: off", 0.0),
+    # SdKfz 250 (2026-11-04): repainted Panzergrau with dark-yellow blotches (paint_sdkfz250_grey_yellow.py) so only the
+    # yellow is keyed; measured on T_Sdkfz_250_GreyYellow_D. 0.03 / 0.06 keeps the ambulance's canvas tarp (about 0.08
+    # away) and the grey (max - min below the paint mask) out.
+    "MI_Sdkfz_250_Hull_DesertAPO": ((0.421, 0.366, 0.206), (0.03, 0.06), "SdKfz 250 dark-yellow blotches"),
+    "MI_Sdkfz_250_Hull_Ambulance": ((0.421, 0.366, 0.206), (0.03, 0.06), "SdKfz 250 dark-yellow blotches"),
 }
 PREVIEW_TEAM_SRGB = (0.85, 0.12, 0.08)
 CELL = 200
@@ -221,9 +246,10 @@ def main():
     for target, info in targets.items():
         override = TARGET_KEY_OVERRIDES.get(target.split("/")[-1])
         if override:
-            key, radius, reason = override
+            key, radius, reason = override[:3]
+            strength = override[3] if len(override) > 3 else STRENGTH_BAND
             keys[target] = {"kind": info["kind"], "texture": os.path.basename(info["png"]), "keys": [to_linear(key)],
-                            "strength": STRENGTH_BAND, "key_radius": list(radius), "reason": reason}
+                            "strength": strength, "key_radius": list(radius), "reason": reason}
             continue
         # Not the raw camo overlay of MM_Ger_PostApoTank (overlay_png): blended with the diffuse its colours shift
         # (about 0.3 in chromaticity), so keys measured on it miss on screen; see TARGET_KEY_OVERRIDES for the Tiger E.

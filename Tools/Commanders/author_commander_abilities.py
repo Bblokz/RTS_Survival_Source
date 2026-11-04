@@ -103,6 +103,8 @@ UI_FIXES = [
 BALANCE = [
     ("GA_GerReconFlight", "TierI", {R: 150}, 60),
     ("GA_GerFlareCurtain", "TierI", {R: 200}, 90),
+    # Created by author_spies_infiltration.py.
+    ("GA_GerSpiesInfiltration", "TierI", {R: 200}, 180),
     ("GA_HarvesterDrop", "TierI", {R: 500}, 90),
     ("GA_GerPzIHarvesterDrop", "TierI", {R: 350}, 60),
     ("GA_GerParatroopers", "TierII", {R: 650, M: 125}, 150),
