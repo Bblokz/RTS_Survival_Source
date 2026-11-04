@@ -16,13 +16,15 @@ enum class ECoverTrenchTestPhase : uint8
 	WaitingForStandUp,
 	WaitingForReloadDuck,
 	WaitingForStandUpAfterReload,
-	WaitingForCrouchAgain
+	WaitingForCrouchAgain,
+	HoldingTrenchWhileFlanked
 };
 
 /**
  * @brief Sends a player squad into a trench and checks the stand-up cover cycle: crouched while nothing is
  * in sight, standing up in place when an enemy appears in front, ducking while its weapon reloads and standing
- * up again afterwards, crouched again when the enemy is gone.
+ * up again afterwards, crouched again when the enemy is gone. Last, an enemy off to the side and then beside
+ * the firing step must not make the soldier trade his trench for other cover or give it up.
  * Started with -CoverFinderValidateTrenchCover on a map that has trenches of the configured class.
  */
 struct FCoverTrenchTestScenario
@@ -47,6 +49,17 @@ private:
 
 	// The first enemy is usually shot dead while the soldier reloads; one more is brought in to stand up for.
 	bool bM_HasBroughtEnemyAfterReload = false;
+
+	// Yaw of the enemy's post away from straight ahead of the firing step; zero until the flank steps.
+	float M_EnemyPostYawDegrees = 0.0f;
+	int32 M_FlankStepIndex = 0;
+	// How long the soldier's weapon had the flanking enemy as target in range, so a pass is never vacuous.
+	float M_FlankTargetedSeconds = 0.0f;
+	// How often the flank step had to put an enemy at its post; a high count means the post does not hold one.
+	int32 M_FlankEnemyPlacementCount = 0;
+	// The flanking enemy the squad was last ordered to attack. On a map full of fighting squads the weapon would
+	// otherwise pick any enemy; the order makes the flanking one the target the trench is judged against.
+	TWeakObjectPtr<ASquadUnit> M_FlankAttackOrderTarget;
 	ECoverTrenchTestPhase M_Phase = ECoverTrenchTestPhase::Inactive;
 
 	void Check(bool bCondition, const TCHAR* Description, const FString& Details = FString());
@@ -69,6 +82,13 @@ private:
 	void TickWaitingForReloadDuck(UWorld& World);
 	void TickWaitingForStandUpAfterReload(UWorld& World);
 	void TickWaitingForCrouchAgain(UWorld& World);
+
+	// Posts the enemy at the yaw of this flank step and gives the soldier the step's time to keep his point.
+	void StartFlankStep(UWorld& World, int32 FlankStepIndex);
+	void TickHoldingTrenchWhileFlanked(UWorld& World);
+	void RecordFlankTargetTime(const UWorld& World);
+	void OrderSquadToAttackFlankingEnemy();
+	FVector GetEnemyPost() const;
 
 	// With socket snap on for the trench: the soldier holds it with his feet on the socket.
 	void CheckFeetOnSocket();

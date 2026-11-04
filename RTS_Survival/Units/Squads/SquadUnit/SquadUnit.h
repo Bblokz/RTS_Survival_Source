@@ -393,6 +393,10 @@ public:
 	// Lets cover selection skip the point this unit just gave up because its target could not be engaged from it.
 	bool GetIsCoverPointRejectedForTarget(int64 PointId) const;
 
+	// A soldier that holds his trench whatever his target does must have targets he can fire at from it, so his
+	// weapon passes over enemies outside the trench's firing arc. Always true outside a trench.
+	bool GetCanAutoTargetFromHeldCover(const FVector& TargetLocation) const;
+
 	/**
 	 * @brief Stores where the player's move preview put this soldier, after its squad issued the move.
 	 * A planned cover point is taken on arrival; a planned open position is held instead of wandering to cover.
@@ -836,6 +840,10 @@ private:
 	// Fills the stress meter with health the soldier just lost and sets his stress off when it is full.
 	void RecordHealthLossForStress(float HealthLost);
 	bool GetIsHoldingCoverPoint() const;
+
+	// Trench and other cargo-socket cover is the best there is: a soldier holding it never trades it for another
+	// point or gives it up for a target he cannot hit from it. Only movement from an order takes him out of it.
+	bool GetIsHoldingTrenchCover() const;
 	void StartStress();
 	void PlayStressedVoiceLine() const;
 	void TickStress();

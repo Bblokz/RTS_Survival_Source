@@ -156,7 +156,8 @@ void AInfantryWeaponMaster::AutoEngage()
 		return;
 	}
 
-	if (GetIsTargetValidVisibleAndInRange())
+	if (GetIsTargetValidVisibleAndInRange() &&
+		M_OwningSquadUnit->GetCanAutoTargetFromHeldCover(M_TargetingData.GetActiveTargetLocation()))
 	{
 		// Let aim selection possibly rotate to a new aim point before we read the location.
 		{
@@ -392,9 +393,13 @@ bool AInfantryWeaponMaster::GetIsTargetValidVisibleAndInRange()
 void AInfantryWeaponMaster::OnTargetsFound(const TArray<AActor*>& Targets)
 {
 	bM_IsPendingTarget = false;
+	// Silent: an owner that went away has no cover to keep its targets in.
+	const bool bHasOwner = IsValid(M_OwningSquadUnit);
 	for (AActor* NewTarget : Targets)
 	{
-		if (RTSFunctionLibrary::RTSIsVisibleTarget(NewTarget, M_OwningPlayer))
+		const bool bIsInFiringArc = not bHasOwner || not IsValid(NewTarget) ||
+			M_OwningSquadUnit->GetCanAutoTargetFromHeldCover(NewTarget->GetActorLocation());
+		if (bIsInFiringArc && RTSFunctionLibrary::RTSIsVisibleTarget(NewTarget, M_OwningPlayer))
 		{
 			M_TargetingData.SetTargetActor(NewTarget);
 
