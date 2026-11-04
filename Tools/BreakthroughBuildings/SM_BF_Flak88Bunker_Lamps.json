@@ -1,0 +1,20 @@
+{
+ "lamps": [
+  {
+   "kind": "wall",
+   "bulb": [
+    490.5,
+    135.0,
+    249.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    550.5,
+    135.0,
+    0.0
+   ],
+   "ground_radius": 320.0,
+   "on_building": false
+  }
+ ]
+}
