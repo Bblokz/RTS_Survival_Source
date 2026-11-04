@@ -3763,6 +3763,13 @@ void UWeaponStateRocketProjectile::AddAttachedRocketInstances(const FName Parent
 	M_SocketToAttachedRocketIndex.Reset();
 	// NAME_None resolves to the component transform.
 	const FTransform ParentWorldTransform = MeshComponent->GetSocketTransform(ParentBoneName, RTS_World);
+	// The instances inherit the parent bone's scale (a scaled root bone scales every bone), so cancel it to keep
+	// RocketScale relative to the mesh component like the vertical rocket weapon.
+	const FVector ParentBoneComponentScale = MeshComponent->GetSocketTransform(ParentBoneName, RTS_Component).
+	                                                       GetScale3D();
+	const FVector InstanceScale = ParentBoneComponentScale.IsNearlyZero()
+		                              ? M_RocketSettings.RocketScale
+		                              : M_RocketSettings.RocketScale / ParentBoneComponentScale;
 	for (const FName& SocketName : M_RocketSettings.FireSocketNames)
 	{
 		if (not MeshComponent->DoesSocketExist(SocketName) || M_SocketToAttachedRocketIndex.Contains(SocketName))
@@ -3773,7 +3780,7 @@ void UWeaponStateRocketProjectile::AddAttachedRocketInstances(const FName Parent
 		const FTransform SocketWorldTransform = MeshComponent->GetSocketTransform(SocketName, RTS_World);
 		FTransform InstanceTransform = SocketWorldTransform.GetRelativeTransform(ParentWorldTransform);
 		InstanceTransform.SetLocation(InstanceTransform.TransformPosition(M_RocketSettings.LocalSocketAttachOffset));
-		InstanceTransform.SetScale3D(M_RocketSettings.RocketScale);
+		InstanceTransform.SetScale3D(InstanceScale);
 
 		const int32 InstanceIndex = M_AttachedRocketInstances->AddInstance(InstanceTransform, false);
 		if (InstanceIndex != INDEX_NONE)

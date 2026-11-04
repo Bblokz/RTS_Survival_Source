@@ -6,7 +6,10 @@ For each building in BUILDINGS:
 - **Lamps mesh:** imports `<Mesh>_Lamps` from the Blender kit (SharedParts/bf_lamps.py) next to the main mesh.
 - **Heat, soot and camo** (HQ, 2026-11-03): where BUILDINGS gives them, the same instance gets its soot spots from
   `<Mesh>_HeatSources.json` and the painted-camo layer with its mask.
-Copy `<Mesh>_Lamps.json` (and `<Mesh>_HeatSources.json`) from the Blender model folder next to this script first: the editor's Python only opens files inside the project.
+- **Baked fields** (HQ, 2026-11-04): where BUILDINGS gives `fields`, the instance reads its heat, soot and lamp sources from
+  one baked texture instead of looping over them (switch BF_UseBakedFields; bake with SharedParts/bf_fields.py from this
+  instance's own source values, so bake after the heat and lamps are set, then run this again).
+Copy `<Mesh>_Lamps.json` (and `<Mesh>_HeatSources.json`, `T_BF_<Name>_Fields.json`) from the Blender model folder next to this script first: the editor's Python only opens files inside the project.
 If a building's own import script runs again, it puts the plain UVTile instance back on the concrete slot: run this after it.
 
     BUILDINGS_TO_RUN = ['HQ']; exec(open(r'<this file>').read())      # default: all
@@ -34,7 +37,10 @@ BUILDINGS = {
     'HQ': dict(home=CHILD + 'BreakthroughHQ/Mesh', mesh='SM_BF_HQ', model=BLEND + 'HQ/Model/',
                # muzzle soot rather than fire: faint heat, short reach, a plume that climbs about two metres, no firelight
                heat=dict(BF_HeatAmount=0.2, BF_HeatReachCm=50, BF_SootRiseCm=220, BF_SootAmount=0.85, BF_HeatGlow=0.0),
-               camo=dict(mask='T_BF_CamoMask_Splitter', BF_CamoScaleCm=2400, BF_CamoSoftness=0.02, BF_CamoAmount=0.85)),
+               camo=dict(mask='T_BF_CamoMask_Splitter', BF_CamoScaleCm=2400, BF_CamoSoftness=0.02, BF_CamoAmount=0.85),
+               fields='T_BF_HQ_Fields',
+               # user 2026-11-04: no crack lines on the HQ; the rebar reads the mesh's curvature UVs (SharedParts/bf_curvature.py)
+               switches=dict(BF_UseCracks=False, BF_UseMeshCurvature=True)),
     'MechDepot': dict(home=CHILD + 'BreakthroughMechDepot/Mesh', mesh='SM_BF_MechDepot', model=BLEND + 'MechanizedDepot/Model/'),
     'ExperimentalFactory': dict(home=CHILD + 'BreakthroughExperimentalFactory/Mesh', mesh='SM_BF_ExperimentalFactory',
                                 model=BLEND + 'ExperimentalUnitsFactory/Model/'),
@@ -74,6 +80,36 @@ def apply_camo(mi, settings):
     print('camo', settings['mask'])
 
 
+def apply_fields(mi, b):
+    """The baked hot-spot fields (SharedParts/bf_fields.py): one texture read in place of the heat, soot and lamp loops.
+    Bake them again whenever this instance's sources, BF_SootRiseCm or the mesh's LightMapUV change."""
+    name = b['fields']
+    task = unreal.AssetImportTask()
+    task.filename = b['model'] + name + '.png'
+    task.destination_path = b['home']
+    task.destination_name = name
+    task.automated = True
+    task.replace_existing = True
+    task.save = False
+    ASSET_TOOLS.import_asset_tasks([task])
+    tex = unreal.load_asset(f"{b['home']}/{name}")
+    # exact 8-bit values, no mips (a lower mip would average neighbouring charts), clamped, never streamed
+    tex.set_editor_property('srgb', False)
+    tex.set_editor_property('compression_settings', unreal.TextureCompressionSettings.TC_VECTOR_DISPLACEMENTMAP)
+    tex.set_editor_property('mip_gen_settings', unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
+    tex.set_editor_property('address_x', unreal.TextureAddress.TA_CLAMP)
+    tex.set_editor_property('address_y', unreal.TextureAddress.TA_CLAMP)
+    tex.set_editor_property('filter', unreal.TextureFilter.TF_BILINEAR)
+    tex.set_editor_property('lod_group', unreal.TextureGroup.TEXTUREGROUP_WORLD)
+    tex.set_editor_property('never_stream', True)
+    save(f"{b['home']}/{name}")
+    meta = json.loads(open(f'{TOOLS}{name}.json', encoding='utf-8').read())
+    EDIT.set_material_instance_static_switch_parameter_value(mi, 'BF_UseBakedFields', True)
+    EDIT.set_material_instance_texture_parameter_value(mi, 'BF_FieldsMap', tex)
+    EDIT.set_material_instance_scalar_parameter_value(mi, 'BF_FieldsLampScale', meta['lamp_scale'])
+    print('fields', name, 'lamp scale', meta['lamp_scale'])
+
+
 def concrete_instance(name, b):
     path = f"{b['home']}/MI_BF_{name}_Concrete"
     if unreal.load_asset(path) is None:
@@ -85,6 +121,10 @@ def concrete_instance(name, b):
         apply_heat(mi, f"{TOOLS}{b['mesh']}_HeatSources.json", b['heat'])
     if 'camo' in b:
         apply_camo(mi, b['camo'])
+    if 'fields' in b:
+        apply_fields(mi, b)
+    for switch, value in b.get('switches', {}).items():
+        EDIT.set_material_instance_static_switch_parameter_value(mi, switch, value)
     EDIT.update_material_instance(mi)
     save(path)
     mesh = unreal.load_asset(f"{b['home']}/{b['mesh']}")
