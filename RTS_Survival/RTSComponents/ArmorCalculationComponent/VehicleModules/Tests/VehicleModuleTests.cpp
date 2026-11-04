@@ -446,8 +446,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FVehicleAmmoCookOffChanceTest, "RTS.VehicleModu
 bool FVehicleAmmoCookOffChanceTest::RunTest(const FString& Parameters)
 {
 	using VehicleModuleBalance::AmmoCookOff::GetChance;
-	TestEqual(TEXT("Damaged ammo cook-off chance"), GetChance(EVehicleModuleState::Damaged), 0.1f);
-	TestEqual(TEXT("Destroyed ammo cook-off chance"), GetChance(EVehicleModuleState::Destroyed), 0.2f);
+	TestEqual(TEXT("Damaged ammo cook-off chance"), GetChance(EVehicleModuleState::Damaged), 0.15f);
+	TestEqual(TEXT("Destroyed ammo cook-off chance"), GetChance(EVehicleModuleState::Destroyed), 0.25f);
 	TestEqual(TEXT("Healthy ammo cannot cook off"), GetChance(EVehicleModuleState::Healthy), 0.f);
 	return true;
 }
@@ -534,7 +534,6 @@ bool FVehicleFrontPlateModuleRulesTest::RunTest(const FString& Parameters)
 	const FPlateModuleDamage& LowerEngine = Lower.Entries[FirstInternalCandidateIndex];
 	const FPlateModuleDamage& LowerAmmo = Lower.Entries[SecondInternalCandidateIndex];
 	const float EngineChanceMultiplier = GetDamageChanceMultiplier(Profile, EVehicleModuleTypes::Engine);
-	constexpr float GuaranteedProbability01 = 1.f;
 
 	TestEqual(TEXT("Front targets engine"), FrontEngine.TypeToDamage, EVehicleModuleTypes::Engine);
 	TestEqual(TEXT("Front can hit ammo"), FrontAmmo.TypeToDamage, EVehicleModuleTypes::Ammo);
@@ -545,8 +544,10 @@ bool FVehicleFrontPlateModuleRulesTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Front engine uses singleton routing"), FrontEngine.TargetSelector, EModuleTargetSelector::Singleton);
 	TestEqual(TEXT("Upper engine uses singleton routing"), UpperEngine.TargetSelector, EModuleTargetSelector::Singleton);
 	TestEqual(TEXT("Lower engine uses singleton routing"), LowerEngine.TargetSelector, EModuleTargetSelector::Singleton);
-	TestEqual(TEXT("Light-tank front engine chance is guaranteed"), FrontEngine.DamageProbability, GuaranteedProbability01,
-	          VehicleModuleTestConstants::Tolerance);
+	TestTrue(TEXT("Front plate hits the engine less often than the upper glacis"),
+	         FrontEngine.DamageProbability < UpperEngine.DamageProbability);
+	TestTrue(TEXT("Front plate hits the engine less often than the lower glacis"),
+	         FrontEngine.DamageProbability < LowerEngine.DamageProbability);
 	TestEqual(TEXT("Front engine chance uses its named probability"), FrontEngine.DamageProbability,
 	          ClampRuleValue01(RuleSetProbabilities::Plate_Front::Engine * EngineChanceMultiplier),
 	          VehicleModuleTestConstants::Tolerance);

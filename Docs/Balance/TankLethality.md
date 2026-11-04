@@ -74,6 +74,20 @@ launch sound.
 - This is separate from the slower ammo cook-off that module damage can start (`AmmoCookOff::GetChance` in
   `VehicleModuleBalance.h`), which is unchanged.
 
+### 4. Module follow-up (2026-11-04)
+
+Two changes in `RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleBalance.h`:
+
+| Value | Before | After |
+|---|---|---|
+| `AmmoCookOff::AmmoCookOffDamagedAmmoChance` | 0.10 | 0.15 |
+| `AmmoCookOff::AmmoCookOffDestroyedAmmoChance` | 0.20 | 0.25 |
+| `RuleSetProbabilities::Plate_Front::Engine` (hull front engine hit chance) | 1.00 | 0.10 |
+
+The front engine chance of 1.00 was a test value; the main front plate now threatens the engine less than either
+glacis (upper 0.15, lower 0.35). `RTS.VehicleModules.AmmoCookOffChance` checks the cook-off numbers, and
+`RTS.VehicleModules.FrontPlateModuleRules` checks the front plate stays below both glacis plates.
+
 ## Expected results
 
 Shots to kill, with time to kill in brackets (first round loaded, then one reload per shot). This assumes every shot
@@ -108,6 +122,7 @@ Each part can be undone on its own. Rebuild the editor after any change; no Blue
 | 1. Side/rear damage | In `DeveloperSettings.h`, set all three `PlateTypeToKineticPenDamageMlt` values to `1.f`. |
 | 2. Vehicle health | In `DeveloperSettings.h`, set `VehicleHealthMlt` to `1.f`. In `CPPGameState.cpp`, set `T34_85BreakpointTrim` to `0.f` (otherwise the T-34/85 has 885 instead of 900, and four Pz IV hits still kill it). The experience-worth lines can stay: dividing by 1 changes nothing. |
 | 3. Ammo detonation | In `DeveloperSettings.h`, set all three `PlateTypeToAmmoDetonationChance` values to `0.f`. |
+| 4. Module follow-up | In `VehicleModuleBalance.h`, set the cook-off chances back to `0.1f` / `0.2f` and update the two values in `RTS.VehicleModules.AmmoCookOffChance`. Leave the front engine chance at `0.10f`: 1.00 was a test value. |
 
 For a full code revert instead, undo these edits:
 

@@ -48,8 +48,8 @@ namespace VehicleModuleBalance
 	/** @brief Chance to ignite ammunition when damage changes its module state, independent of shell type. */
 	namespace AmmoCookOff
 	{
-		inline constexpr float AmmoCookOffDamagedAmmoChance = 0.1f;
-		inline constexpr float AmmoCookOffDestroyedAmmoChance = 0.2f;
+		inline constexpr float AmmoCookOffDamagedAmmoChance = 0.15f;
+		inline constexpr float AmmoCookOffDestroyedAmmoChance = 0.25f;
 
 		/** @return Cook-off probability for the resulting ammo state; healthy ammo cannot ignite here. */
 		constexpr float GetChance(const EVehicleModuleState AmmoState)
@@ -77,7 +77,7 @@ namespace VehicleModuleBalance
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
 		namespace Plate_Front
 		{
-			inline constexpr float Engine = 1.00f;
+			inline constexpr float Engine = 0.10f;
 			inline constexpr float Ammo = 0.08f;
 		}
 		/** @brief Base module hit chances for this armor plate; each module rolls separately. */
