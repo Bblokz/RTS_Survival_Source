@@ -166,6 +166,17 @@ public:
 	TSoftClassPtr<AActor> GetBaseTrainingOptionClass(const FTrainingOption& TrainingOption) const;
 
 	/**
+	 * @brief Resolves the class of any variant whatever this player picked; hand it to AsyncSpawnClassAtLocation.
+	 * Units are keyed as the spawner keys them first (harvesters as tanks).
+	 * @param VariantDataAsset The asset that holds the variant classes.
+	 * @param Unit The unit as the training menu lists it.
+	 * @param Variant Base gives the class the spawner held before any variant override.
+	 * @return A null soft pointer when the spawner or the data asset has no class for it.
+	 */
+	TSoftClassPtr<AActor> GetUnitVariantClass(const UUnitVariantDataAsset& VariantDataAsset,
+	                                          const FTrainingOption& Unit, const EUnitVariant Variant) const;
+
+	/**
 	 * Syncronously gets the preview mesh of the building expansion type.
 	 * @param BuildingExpansionType The type of building expansion to get the preview mesh of.
 	 * @return The static mesh pointer of the preview mesh.

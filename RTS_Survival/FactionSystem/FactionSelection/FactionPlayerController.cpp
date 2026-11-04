@@ -236,21 +236,11 @@ void AFactionPlayerController::HandleUnitVariantPreviewRequested(const FTraining
 TSoftClassPtr<AActor> AFactionPlayerController::GetUnitVariantClass(const FTrainingOption& Unit,
                                                                    const EUnitVariant Variant) const
 {
-	// Keyed as the spawner keys it, like HandleUnitVariantPreviewRequested (harvesters as tanks).
-	const FTrainingOption SpawnerKey = UPlayerUnitVariantManager::GetSpawnerKey(Unit);
-	if (Variant != EUnitVariant::Base)
-	{
-		if (not GetIsValidVariantDataAsset())
-		{
-			return TSoftClassPtr<AActor>();
-		}
-		return M_VariantDataAsset->FindVariantClass(SpawnerKey, Variant);
-	}
-	if (not GetIsValidRTSAsyncSpawner())
+	if (not GetIsValidVariantDataAsset() || not GetIsValidRTSAsyncSpawner())
 	{
 		return TSoftClassPtr<AActor>();
 	}
-	return M_RTSAsyncSpawner->GetBaseTrainingOptionClass(SpawnerKey);
+	return M_RTSAsyncSpawner->GetUnitVariantClass(*M_VariantDataAsset, Unit, Variant);
 }
 
 void AFactionPlayerController::HandleUnitVariantSelectionConfirmed(
