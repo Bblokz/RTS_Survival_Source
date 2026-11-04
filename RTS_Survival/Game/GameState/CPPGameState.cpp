@@ -4220,8 +4220,9 @@ void ACPPGameState::InitAllGameMediumWeapons()
 		+ WeaponData.TNTExplosiveGrams * DamagePerTNTEquivalentGrams;
 	WeaponData.DamageFlux = DamageFluxPercentage;
 	WeaponData.Range = MediumCannonRange;
-	WeaponData.ArmorPen = 85;
-	WeaponData.ArmorPenMaxRange = 77;
+	// BR-350SP solid shot: 96 mm at 100 m, 87 mm at 500 m.
+	WeaponData.ArmorPen = 96;
+	WeaponData.ArmorPenMaxRange = 87;
 	WeaponData.MagCapacity = 1;
 	WeaponData.ReloadSpeed = 6.9f;
 	WeaponData.BaseCooldown = 1;
