@@ -243,10 +243,10 @@ void ARadixiteNuke::StartFalling()
 			return;
 		}
 		Trail->SetRelativeLocationAndRotation(M_Visuals.WarheadTrailOffset, M_Visuals.WarheadTrailRotation);
+		Trail->SetRelativeScale3D(FVector(M_Visuals.WarheadTrailScale));
 		Trail->SetAsset(Effect);
 		Trail->Activate(true);
 	};
-	M_TrailEffect->SetRelativeScale3D(FVector(M_Visuals.WarheadTrailScale));
 	StartTrail(M_TrailEffect, M_Visuals.WarheadTrailEffect.Get());
 	StartTrail(M_SmokeTrailEffect, M_Visuals.WarheadSmokeTrailEffect.Get());
 	SetupFlightPath();

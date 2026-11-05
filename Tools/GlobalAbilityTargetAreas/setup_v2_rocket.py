@@ -40,7 +40,7 @@ def path(asset):
 VISUALS = {
     "WarheadMesh": path("/Game/Ballistic_Missiles/Mesh/v2"),
     "WarheadTrailEffect": path("/Game/RocketThrusterExhaustFX/FX/NS_RocketExhaust_Realistic"),
-    "WarheadSmokeTrailEffect": path("/Game/RTS_Survival/SpecialEffects/sA_ShootingVfxPack/FX/NiagaraSystems/NS_ROCKET_Trail"),
+    "WarheadSmokeTrailEffect": path("/Game/RTS_Survival/SpecialEffects/ArmyVFX/Niagara/Projectiles/NS_Rocket_Smoke_1"),
     "DetonationEffect": path("/Game/BigExplosions/Niagara/NS_Nuke_3"),
     "RadiationEffect": None,
     "WarningAreaMaterial": path(AREAS + "M_TargetArea_V2Rocket"),
@@ -50,7 +50,7 @@ VISUALS = {
 }
 VISUAL_TEXT = ("WarheadScale=1.000000,WarheadRotation=(Pitch=-90.000000,Yaw=0.000000,Roll=0.000000),"
                "WarheadTrailOffset=(X=0.000000,Y=0.000000,Z=0.000000),"
-               "WarheadTrailRotation=(Pitch=0.000000,Yaw=0.000000,Roll=0.000000),"
+               "WarheadTrailRotation=(Pitch=-90.000000,Yaw=0.000000,Roll=0.000000),"
                "WarheadTrailScale=6.000000,"
                "DetonationEffectScale=3.000000,bWarningSound2D=True,"
                "FlashColor=(R=1.000000,G=0.550000,B=0.220000,A=1.000000),FlashIntensity=40000000.000000")
@@ -89,9 +89,9 @@ def set_aim(obj):
 
 def set_balance(obj):
     obj.set_editor_property("m_ability_tier", member(unreal.GlobalAbilityTier, ["TIER_IV", "TIERIV"]))
-    # ResourceCosts cannot be set on an instance from Python; text import can.
+    # ResourceCosts cannot be set on an instance from Python; text import can. Radixite only (user decision 2026-11-05).
     costs = fresh(obj, "m_ability_costs")
-    costs.import_text("(Costs=(ResourceCosts=((Resource_Radixite, 1800),(Resource_VehicleParts, 450))),"
+    costs.import_text("(Costs=(ResourceCosts=((Resource_Radixite, 1800))),"
                       "CoolDownTime=%d,CoolDownRemaining=0)" % COOLDOWN)
     obj.set_editor_property("m_ability_costs", costs)
 

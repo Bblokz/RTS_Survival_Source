@@ -28,7 +28,9 @@ half width of the minefield or the blast radius, and `ShaderMarkerCount` is the 
 radiation sign, and `M_V2RocketShockwave`). With `ArcApproachDistance` above 0, `ARadixiteNuke` flies the warhead on a
 quadratic Bezier from 300 m out and 15 m up, peaking at `ArcApexHeight` (40 m) and diving in at about 35 degrees. It
 comes across the screen from a random side of the player's camera, a little from its far side. `FallSeconds` equals
-`WarningSeconds` (7 s), so the rocket launches on the order and is in the air the whole time. The siren
+`WarningSeconds` (7 s), so the rocket launches on the order and is in the air the whole time. Its exhaust is
+`NS_RocketExhaust_Realistic` with smoke from `NS_Rocket_Smoke_1`, both at `WarheadTrailScale` 6 (the pack scales with
+its component) and turned by `WarheadTrailRotation` pitch -90 so they leave the tail of the nose-up V2 mesh. The siren
 (`S_SirenStart`) plays 2D at launch (`bWarningSound2D`) so the player always hears it. Blast: `NS_Nuke_3` untinted,
 core 6000 and blast 2100 (nuke: 4000 and 1400) over the same 45 m / 18 m radii, both sides. `RadiationSeconds` 0
 leaves no radiation: the scar is plain burnt ground (`Glow` 0) and the actor stops once the flash has faded. The owner

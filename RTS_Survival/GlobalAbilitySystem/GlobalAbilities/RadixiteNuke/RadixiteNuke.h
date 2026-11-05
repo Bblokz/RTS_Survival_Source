@@ -126,7 +126,8 @@ struct FRadixiteNukeVisuals
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FRotator WarheadTrailRotation = FRotator::ZeroRotator;
 
-	// Exhaust effects made for small rockets scale with their component; a 14 m rocket needs a bigger flame.
+	// Scale of the trail and smoke effects: exhausts made for small rockets scale with their component, and a 14 m
+	// rocket needs a bigger flame.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.01"))
 	float WarheadTrailScale = 1.f;
 
