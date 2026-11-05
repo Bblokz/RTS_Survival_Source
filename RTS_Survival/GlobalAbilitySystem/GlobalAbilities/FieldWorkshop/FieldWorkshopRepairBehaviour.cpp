@@ -6,8 +6,10 @@ namespace FieldWorkshopRepairConstants
 {
 	// A Tier III depot: a medium tank at half health is whole again in about 25 s.
 	constexpr float RepairPerSecond = 25.f;
-	// Longer than the aura's 1 s interval so the repair never gaps, short enough to stop soon after leaving.
-	constexpr float LifetimeSeconds = 1.5f;
+	// UBehaviourComp ticks every 2 s (heal and expiry come in 2 s steps); the aura refreshes every 1 s, so the
+	// lifetime must outlast a component tick plus an aura interval. Leaving the radius or the workshop's end removes
+	// the behaviour at once (the aura's leave/EndPlay), so this is only the backstop.
+	constexpr float LifetimeSeconds = 4.f;
 }
 
 UFieldWorkshopRepairBehaviour::UFieldWorkshopRepairBehaviour()

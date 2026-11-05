@@ -80,6 +80,8 @@ private:
 	float M_WorkStartSeconds = -1.f;
 	float M_ParentEndSeconds = -1.f;
 	float M_PackUpSeconds = -1.f;
+	float M_PackUpStartZ = 0.f;
+	bool bM_CheckedSinking = false;
 	float M_TanksPreparedSeconds = -1.f;
 	TArray<FTestTank> M_Tanks;
 	bool bM_TookMidShot = false;
@@ -100,6 +102,9 @@ private:
 
 	void TickWaitingForStart();
 	bool FindAnchor(FVector& OutAnchor) const;
+	/** Moves the anchor towards the landscape centre until the whole test site has ground and no enemy is near. */
+	bool FindClearSite(FVector& InOutAnchor) const;
+	bool GetIsSiteClear(const FVector& Candidate, FString& OutReason) const;
 	void StartDropScenario();
 	bool CheckTemplate(const UGA_CompositeDrop& Ability);
 	bool EnsureCanAfford(const UGA_CompositeDrop& Ability, TMap<uint8, int32>& OutBefore);

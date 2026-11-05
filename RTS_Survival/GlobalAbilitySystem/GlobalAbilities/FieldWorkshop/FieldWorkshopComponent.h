@@ -11,6 +11,7 @@ class ABuildingExpansion;
 class UAOEBehaviourComponent;
 class UFieldWorkshopRearmAura;
 class URTSRadiusPoolSubsystem;
+class UNiagaraSystem;
 
 UENUM(BlueprintType)
 enum class EFieldWorkshopState : uint8
@@ -19,7 +20,7 @@ enum class EFieldWorkshopState : uint8
 	WaitingForLanding,
 	// Repairs and rearms the owner's vehicles in its radius.
 	Working,
-	// Time is up: the auras are gone and the building plays its pack-up animation, then removes itself.
+	// Time is up: the auras are gone, the building puffs smoke and sinks into the ground, then removes itself.
 	PackingUp,
 	// Killed: the auras are gone, the Blueprint's death plays out.
 	Destroyed
@@ -34,9 +35,24 @@ struct FFieldWorkshopSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1.0"))
 	float WorkingSeconds = 90.f;
 
-	// Length of the pack-up animation (construction materials creeping back) before the building is removed.
+	// How long the building takes to sink out of sight once its time is up; then it is removed.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.5"))
 	float PackUpSeconds = 6.f;
+
+	// Deep enough to take the repair bay's cranes under the ground.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
+	float PackUpSinkDepthCm = 600.f;
+
+	// Puffed round the building when it starts to pack up.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<UNiagaraSystem> PackUpSmoke = TSoftObjectPtr<UNiagaraSystem>(FSoftObjectPath(TEXT(
+		"/Game/RTS_Survival/SpecialEffects/Smoke/ConstructionBuildingSmoke/NS_ConstructionSmokeRound_1.NS_ConstructionSmokeRound_1")));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
+	int32 PackUpSmokePuffs = 5;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
+	float PackUpSmokeRadiusCm = 350.f;
 
 	// The ground disc shown for the whole working time, sized to the rearm aura's radius.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -49,7 +65,8 @@ struct FFieldWorkshopSettings
 /**
  * @brief Turns a building expansion into a timed field workshop (UGA_BuildingParachuteDrop drops it): keeps the
  * actor's AOE auras (URadiusRepairAura + UFieldWorkshopRearmAura) off while the building falls, runs them for
- * WorkingSeconds after it landed with the radius drawn on the ground, then packs the building up and removes it.
+ * WorkingSeconds after it landed with the radius drawn on the ground, then sinks the building into the ground in a
+ * puff of smoke and removes it.
  * When the building is killed first, the auras are torn down at once, which strips their behaviours from the units.
  * Landing = built, collision back on and no cargo canopy still descending, so a building placed without a drop
  * starts working at once.
@@ -82,6 +99,8 @@ private:
 
 	EFieldWorkshopState M_State = EFieldWorkshopState::WaitingForLanding;
 	float M_WorkStartSeconds = -1.f;
+	float M_PackUpStartSeconds = -1.f;
+	FVector M_PackUpStartLocation = FVector::ZeroVector;
 
 	UPROPERTY()
 	TWeakObjectPtr<ABuildingExpansion> M_Workshop;
@@ -110,6 +129,8 @@ private:
 	bool GetHasLanded() const;
 	void StartWorking();
 	void StartPackingUp();
+	void TickPackingUp();
+	void SpawnPackUpSmoke() const;
 	void FinishPackingUp() const;
 	void OnWorkshopDies();
 

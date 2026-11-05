@@ -10,7 +10,7 @@
 #include "UnrealClient.h"
 #include "Camera/CameraActor.h"
 #include "Camera/PlayerCameraManager.h"
-#include "Engine/DamageEvents.h"
+#include "Landscape.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
@@ -83,7 +83,15 @@ namespace FieldWorkshopTestPrivate
 	constexpr float SpendShotDistanceCm = 6000.f;
 	constexpr float SpendShotHeightCm = 150.f;
 	// Scenario B: its own ground, away from scenario A's wreck-free area (map edge lies to -X, +Y).
-	const FVector2D KillScenarioOffset(4500.f, -2500.f);
+	// The drop scenario's ground is empty again once its workshop packed up and its tanks are gone.
+	const FVector2D KillScenarioOffset(0.f, 0.f);
+	// The site must have landscape this far round the anchor (radius, tanks outside it, the guns) ...
+	constexpr float SiteGroundRadiusCm = 4500.f;
+	constexpr int32 SiteGroundProbeCount = 16;
+	// ... and no enemy unit this close (a gun that sees one fights it and can be killed before the checks).
+	constexpr float SiteEnemyFreeRadiusCm = 9000.f;
+	constexpr float SiteSearchStepCm = 2500.f;
+	constexpr int32 SiteSearchMaxSteps = 24;
 	constexpr float KillRepairSeconds = 5.f;
 	constexpr float KillResidualSeconds = 2.f;
 	constexpr float KillPlateauSeconds = 5.f;
@@ -229,7 +237,7 @@ void UFieldWorkshopTestSubsystem::TickWaitingForStart()
 	{
 		return;
 	}
-	if (not FindAnchor(M_Anchor))
+	if (not FindAnchor(M_Anchor) || not FindClearSite(M_Anchor))
 	{
 		Check(false, TEXT("found_ground_anchor"));
 		Finish();
@@ -274,6 +282,75 @@ bool UFieldWorkshopTestSubsystem::FindAnchor(FVector& OutAnchor) const
 		return false;
 	}
 	return GlobalAbilityHelpers::TryFindGroundLocation(this, GroundHit.Location, OutAnchor);
+}
+
+bool UFieldWorkshopTestSubsystem::FindClearSite(FVector& InOutAnchor) const
+{
+	using namespace FieldWorkshopTestPrivate;
+	FBox LandscapeBounds(ForceInit);
+	for (TActorIterator<ALandscapeProxy> It(GetWorld()); It; ++It)
+	{
+		LandscapeBounds += It->GetComponentsBoundingBox(true);
+	}
+	const FVector LandscapeCentre = LandscapeBounds.IsValid ? LandscapeBounds.GetCenter() : FVector::ZeroVector;
+	UE_LOG(LogRTSFieldWorkshopTest, Display, TEXT("RTS_FIELD_WORKSHOP_TEST LANDSCAPE bounds=%s"),
+	       *LandscapeBounds.ToString());
+	FVector Candidate = InOutAnchor;
+	for (int32 Step = 0; Step <= SiteSearchMaxSteps; ++Step)
+	{
+		FString Reason;
+		if (GetIsSiteClear(Candidate, Reason))
+		{
+			UE_LOG(LogRTSFieldWorkshopTest, Display, TEXT("RTS_FIELD_WORKSHOP_TEST SITE %s after %d steps"),
+			       *Candidate.ToCompactString(), Step);
+			InOutAnchor = Candidate;
+			return true;
+		}
+		UE_LOG(LogRTSFieldWorkshopTest, Display, TEXT("RTS_FIELD_WORKSHOP_TEST SITE_REJECTED %s: %s"),
+		       *Candidate.ToCompactString(), *Reason);
+		const FVector ToCentre = (LandscapeCentre - Candidate).GetSafeNormal2D();
+		if (ToCentre.IsNearlyZero())
+		{
+			return false;
+		}
+		GlobalAbilityHelpers::TryFindGroundLocation(this, Candidate + ToCentre * SiteSearchStepCm, Candidate);
+	}
+	return false;
+}
+
+bool UFieldWorkshopTestSubsystem::GetIsSiteClear(const FVector& Candidate, FString& OutReason) const
+{
+	using namespace FieldWorkshopTestPrivate;
+	FVector Ground;
+	if (not GlobalAbilityHelpers::TryFindGroundLocation(this, Candidate, Ground))
+	{
+		OutReason = TEXT("no landscape at the centre");
+		return false;
+	}
+	for (int32 Probe = 0; Probe < SiteGroundProbeCount; ++Probe)
+	{
+		const FVector Offset = FRotator(0.f, 360.f * Probe / SiteGroundProbeCount, 0.f).Vector() * SiteGroundRadiusCm;
+		if (not GlobalAbilityHelpers::TryFindGroundLocation(this, Candidate + Offset, Ground))
+		{
+			OutReason = FString::Printf(TEXT("no landscape at %s"), *(Candidate + Offset).ToCompactString());
+			return false;
+		}
+	}
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		const URTSComponent* RTSComponent = It->FindComponentByClass<URTSComponent>();
+		if (not IsValid(RTSComponent) || RTSComponent->GetOwningPlayer() != EnemyPlayer)
+		{
+			continue;
+		}
+		if (FVector::Dist2D(It->GetActorLocation(), Candidate) < SiteEnemyFreeRadiusCm)
+		{
+			OutReason = FString::Printf(TEXT("enemy %s at %s"), *It->GetName(),
+			                            *It->GetActorLocation().ToCompactString());
+			return false;
+		}
+	}
+	return true;
 }
 
 void UFieldWorkshopTestSubsystem::StartDropScenario()
@@ -489,6 +566,7 @@ void UFieldWorkshopTestSubsystem::CheckLandedWorkshop()
 void UFieldWorkshopTestSubsystem::TickWaitingForGuns()
 {
 	using namespace FieldWorkshopTestPrivate;
+	RestrictGunFire();
 	const bool bSettled = M_ParentEndSeconds >= 0.f && GetNow() - M_ParentEndSeconds >= GunSettleSeconds;
 	if (not bSettled)
 	{
@@ -510,6 +588,12 @@ void UFieldWorkshopTestSubsystem::CheckGunSquads()
 {
 	using namespace FieldWorkshopTestPrivate;
 	const TArray<AActor*> GunSquads = GetNewActorsOfClass(ATeamWeaponController::StaticClass());
+	for (TActorIterator<ATeamWeaponController> It(GetWorld()); It; ++It)
+	{
+		UE_LOG(LogRTSFieldWorkshopTest, Display, TEXT("RTS_FIELD_WORKSHOP_TEST GUN_SQUAD %s at=%s pre_existing=%d alive=%d"),
+		       *It->GetName(), *It->GetActorLocation().ToCompactString(), M_PreExistingActors.Contains(*It),
+		       It->IsUnitAlive());
+	}
 	Check(GunSquads.Num() == ExpectedGunSquads, TEXT("gun_squads_dropped"),
 	      FString::Printf(TEXT("squads=%d"), GunSquads.Num()));
 	for (AActor* Actor : GunSquads)
@@ -819,8 +903,8 @@ void UFieldWorkshopTestSubsystem::TickWaitingForPackUp()
 	Check(FMath::Abs(WorkedSeconds - WorkingSeconds) <= PackUpTimingToleranceSeconds, TEXT("packs_up_after_working_time"),
 	      FString::Printf(TEXT("worked=%.1fs expected=%.0fs"), WorkedSeconds, WorkingSeconds));
 	Check(not M_WorkshopComponent->GetIsShowingWorkingRadius(), TEXT("radius_hidden_on_pack_up"));
-	Check(M_Workshop->GetStatus() == EBuildingExpansionStatus::BXS_BeingPackedUp, TEXT("building_packing_up"),
-	      UEnum::GetValueAsString(M_Workshop->GetStatus()));
+	Check(not M_Workshop->GetActorEnableCollision(), TEXT("building_packing_up_no_collision"));
+	M_PackUpStartZ = M_Workshop->GetActorLocation().Z;
 	// Damage the repaired tank again: from now on nothing may repair it.
 	for (FTestTank& TestTank : M_Tanks)
 	{
@@ -845,6 +929,13 @@ void UFieldWorkshopTestSubsystem::TickWaitingForRemoval()
 	if (M_Workshop.IsValid() && not bWaitedForChecks)
 	{
 		return;
+	}
+	if (M_Workshop.IsValid() && not bM_CheckedSinking)
+	{
+		bM_CheckedSinking = true;
+		const float Sunk = M_PackUpStartZ - M_Workshop->GetActorLocation().Z;
+		Check(Sunk > 0.f, TEXT("building_sinks_while_packing_up"), FString::Printf(TEXT("sunk=%.0f cm"), Sunk));
+		RequestScreenshot(TEXT("Drop_Sinking"));
 	}
 	if (M_Workshop.IsValid() && GetStepSeconds() < PackUpSeconds + RemovalExtraSeconds)
 	{
@@ -1062,7 +1153,12 @@ ATankMaster* UFieldWorkshopTestSubsystem::SpawnTank(const TCHAR* ClassPath, cons
 		return nullptr;
 	}
 	FVector Ground;
-	GlobalAbilityHelpers::TryFindGroundLocation(this, Location, Ground);
+	if (not GlobalAbilityHelpers::TryFindGroundLocation(this, Location, Ground))
+	{
+		UE_LOG(LogRTSFieldWorkshopTest, Error, TEXT("RTS_FIELD_WORKSHOP_TEST no landscape under tank spot %s"),
+		       *Location.ToCompactString());
+		return nullptr;
+	}
 	const FTransform Transform(FRotator(0.f, Yaw, 0.f), Ground + FVector(0.f, 0.f, TankSpawnAboveGroundCm));
 	return Cast<ATankMaster>(FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*World, TankClass, Transform,
 	                                                                   static_cast<uint8>(Owner)));
