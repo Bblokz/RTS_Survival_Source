@@ -1,10 +1,11 @@
-"""Builds the procedural ground shaders of the command, ammo resupply, heal and range auras (Docs/UI/AuraRadii.md).
+"""Builds the procedural ground shaders of the command, ammo resupply, heal, range and repair auras (Docs/UI/AuraRadii.md).
 Run through the UECP bridge:
     exec(open(r"D:/UE5Projects/RTS_Survival/Source/Tools/AuraRadii/build_aura_radius_materials.py").read())
 A new material is built from scratch; an existing one only gets its Custom node code replaced, because pooled radius
 actors may hold it and emptying a live material can crash the editor.
 The radius pool scales the 100 cm engine plane to the aura diameter and sets RadiusCm, so p below is the pixel in cm
-from the aura centre. The host vehicle covers the centre, so every motif sits on the ring."""
+from the aura centre. The host vehicle covers the centre, so motifs sit on the ring; only the repair wrench is large
+enough to show round it."""
 import unreal
 
 FOLDER = "/Game/RTS_Survival/Materials/RadiusMaterials"
@@ -182,6 +183,73 @@ Result = Aura.Over(Result, Teal, Aura.Stroke(Radial - ScaleInner, 3.0, Pixel) * 
 return Result;
 """
 
+REPAIR = COMMON + """
+float3 Yellow = float3(1.0, 0.72, 0.06);
+float3 Amber = float3(0.75, 0.42, 0.02);
+float3 Steel = float3(0.24, 0.27, 0.31);
+float3 Light = float3(0.5, 0.55, 0.6);
+float3 Dark = float3(0.015, 0.02, 0.025);
+float Motif = clamp(Radius * 0.05, 55.0, 130.0);
+float Covered = Aura.Inside(Edge, Pixel);
+
+// Each turn of the wrench: a quick pull, then it eases back.
+float PullPhase = frac(Time / 1.4);
+float Pull = smoothstep(0.0, 0.18, PullPhase) * (1.0 - smoothstep(0.35, 1.0, PullPhase));
+
+// The ground under repair: a steel wash, stronger towards the edge.
+Result = Aura.Over(Result, Light, Covered * (0.04 + 0.07 * smoothstep(Radius * 0.35, Radius, Radial)));
+
+// Border: a gunmetal cog wheel turning slowly, its teeth pointing out, bolt holes in its rim.
+float ToothDepth = Motif * 0.8;
+float RimOuter = Radius - ToothDepth;
+float RimInner = RimOuter - Motif * 0.9;
+float RimCentre = (RimOuter + RimInner) * 0.5;
+float Rim = abs(Radial - RimCentre) - (RimOuter - RimInner) * 0.5;
+float Count = max(16.0, floor(6.2831853 * RimOuter / (Motif * 2.3)));
+float Turning = Angle / 6.2831853 + Time * 0.008;
+float CellWidth = 6.2831853 * RimOuter / Count;
+float Cell = (frac(Turning * Count) - 0.5) * CellWidth * Radial / RimOuter;
+float ToothHeight = Radial - (RimOuter + Radius) * 0.5;
+float ToothTaper = lerp(1.0, 0.72, saturate(ToothHeight / ToothDepth + 0.5));
+float Tooth = Aura.Box(float2(Cell / ToothTaper, ToothHeight), float2(CellWidth * 0.24, ToothDepth * 0.5 + 6.0)) - 6.0;
+float Cog = min(Rim, Tooth);
+float Bolt = length(float2(Cell, Radial - RimCentre)) - Motif * 0.16;
+Result = Aura.Over(Result, Dark, Aura.Inside(Cog - 10.0, 10.0) * 0.6);
+Result = Aura.Over(Result, lerp(Steel, Light, saturate((Radial - RimInner) / (Radius - RimInner))), Aura.Inside(Cog, Pixel));
+Result = Aura.Over(Result, Dark, Aura.Inside(Bolt, Pixel) * 0.8);
+Result = Aura.Over(Result, Yellow, Aura.Stroke(Cog, 3.0, Pixel) * 0.9);
+Result = Aura.Over(Result, Yellow, Aura.Stroke(Radial - RimInner, 5.0, Pixel));
+
+// Centre: a large combination wrench, open jaw at one end and ring at the other, turning a bolt with each pull.
+// It reaches well past the host vehicle, which hides the middle of the disc.
+float WrenchLength = clamp(Radius * 1.05, 900.0, 2600.0);
+float HalfLength = WrenchLength * 0.5;
+float HeadRadius = WrenchLength * 0.14;
+float WrenchAngle = 0.7853982 - 0.14 * Pull;
+float2 w = float2(cos(WrenchAngle) * p.x + sin(WrenchAngle) * p.y, -sin(WrenchAngle) * p.x + cos(WrenchAngle) * p.y);
+float Handle = Aura.Box(w, float2(HalfLength - HeadRadius * 0.6, WrenchLength * 0.05)) - WrenchLength * 0.01;
+float2 OpenCentre = w - float2(HalfLength - HeadRadius, 0.0);
+float OpenHead = length(OpenCentre) - HeadRadius;
+float JawAngle = 0.26;
+float2 JawPosition = float2(cos(JawAngle) * OpenCentre.x + sin(JawAngle) * OpenCentre.y, -sin(JawAngle) * OpenCentre.x + cos(JawAngle) * OpenCentre.y);
+float Jaw = Aura.Box(JawPosition - float2(HeadRadius * 0.75, 0.0), float2(HeadRadius * 0.95, HeadRadius * 0.46));
+float2 RingCentre = w + float2(HalfLength - HeadRadius * 0.9, 0.0);
+float RingHead = length(RingCentre) - HeadRadius * 0.9;
+float2 HexPosition = abs(RingCentre);
+float Hole = max(HexPosition.x * 0.8660254 + HexPosition.y * 0.5, HexPosition.y) - HeadRadius * 0.45;
+float Wrench = max(max(min(Handle, min(OpenHead, RingHead)), -Jaw), -Hole);
+float Groove = Aura.Box(w, float2(HalfLength - HeadRadius * 2.2, WrenchLength * 0.017)) - WrenchLength * 0.006;
+Result = Aura.Over(Result, Yellow, Aura.Stroke(Wrench - 30.0, 22.0, 22.0) * (0.12 + 0.4 * Pull));
+Result = Aura.Over(Result, Dark, Aura.Inside(Wrench - 12.0, 6.0) * 0.85);
+float Bevel = saturate(0.5 - w.y / (WrenchLength * 0.1));
+Result = Aura.Over(Result, lerp(Amber, Yellow, Bevel), Aura.Inside(Wrench, Pixel));
+Result = Aura.Over(Result, Amber * 0.6, Aura.Inside(Groove, Pixel) * 0.8);
+
+// Outer line.
+Result = Aura.Over(Result, Yellow, Aura.Stroke(Edge, 6.0, Pixel));
+return Result;
+"""
+
 
 def find_custom(material):
     for index in range(8):
@@ -260,3 +328,4 @@ build("M_CommandAuraRadius", COMMAND)
 build("M_AmmoResupplyAuraRadius", AMMO)
 build("M_HealAuraRadius", HEAL)
 build("M_RangeAuraRadius", RANGE)
+build("M_RepairAuraRadius", REPAIR)

@@ -1,6 +1,6 @@
-# Aura radii: command, ammo resupply, heal and range
+# Aura radii: command, ammo resupply, heal, range and repair
 
-Four auras have their own procedural ground shader. The command and ammo auras show a rising icon over every unit
+Five auras have their own procedural ground shader. The command and ammo auras show a rising icon over every unit
 that enters them; the range aura shows one too.
 
 | Aura | Units | Component | Radius type | Material | Rising icon |
@@ -9,19 +9,21 @@ that enters them; the range aura shows one too.
 | Ammo resupply | Sd.Kfz. 250 / 251 Ammo Carrier | `URadiusAOEBehaviourComponent` (`AmmoResupplyAura`) | `FullCircle_AmmoResupplyAura` | `RadiusMaterials/M_AmmoResupplyAuraRadius` | `AmmoResupply` (`Behaviours/AmmoResupply/T_Beh_BeingResupplied`) |
 | Heal | Sd.Kfz. 251 Medic / Sd.Kfz. 250 Armoured Ambulance | `URadiusHealAura` | `Fullcircle_HealAura` | `RadiusMaterials/M_HealAuraRadius` | none (see below) |
 | Range | HQ Radar expansion (`Ger_Bxp_HQRadar`) | `URadiusImprovedRangeAura` | `FullCircle_ImprovedRangeArea` | `RadiusMaterials/M_RangeAuraRadius` | `RangeBoost` (`T_Beh_RangeBeingImproved`) |
+| Repair | Repair aura (`Ger_Bxp_HQRepairBay`) and the pulse repair behaviour (`BP_Beh_PulseRepair`) | `URadiusRepairAura` / `UPulseAuraBehaviour` | `FullCircle_RepairRange` / `FullCircle_PulseRepair` | `RadiusMaterials/M_RepairAuraRadius` | unchanged |
 
-All four materials are mapped in `DefaultGame.ini` under `RadiusPoolSettings` `TypeToMaterial`. They replace the grid
+All five materials are mapped in `DefaultGame.ini` under `RadiusPoolSettings` `TypeToMaterial`. They replace the grid
 instances `MI_CommandingRadius` (command and ammo) and `MI_RangeImprovedRadius` (heal and range), which are no longer
 mapped but left on disk. Those are instances of the grid material with a centred icon texture; it is Masked, so the
-icon's soft alpha was cut to hard steps. The repair, pulse repair, reinforcement and radiation auras still use
-`MI_RepairRadius`.
+icon's soft alpha was cut to hard steps. The repair material replaces `MI_RepairRadius` for the two repair types; the
+reinforcement and radiation auras still use it.
 
 ## The shaders
 
 Unlit, Alpha Composite, two-sided, depth test on (the host vehicle and terrain hide them like the grenade fuse warning).
 One Custom node does everything: `p = (UV - 0.5) * 2 * RadiusCm` is the pixel in cm from the aura centre, because the
 radius pool scales the 100 cm engine plane to the diameter and sets `RadiusCm`. Strokes are antialiased with
-`fwidth`, so they stay crisp at any camera height. The host vehicle covers the centre, so every motif sits on the ring.
+`fwidth`, so they stay crisp at any camera height. The host vehicle covers the centre, so motifs sit on the ring; the
+repair wrench is the one exception, drawn large enough to show round the host.
 
 - **Command:** blue wash that strengthens towards the edge, rings of orders that leave the commander and fade before
   the edge, and a blue and white border with a thin gold line inside it. Blue and gold are the colours of the
@@ -33,6 +35,9 @@ radius pool scales the 100 cm engine plane to the diameter and sets `RadiusCm`. 
 - **Range:** teal wash, dashed range rings at one and two thirds of the radius, a radar sweep (one turn every 8 s
   with a fading trail) for the HQ Radar, and a rangefinder scale on the edge (minor ticks every 2 degrees, major every
   10).
+- **Repair:** steel wash, a gunmetal cog wheel round the edge (teeth out, bolt holes in the rim, yellow outline,
+  turning slowly), and a large yellow combination wrench across the centre (about the radius long, open jaw and hex
+  ring) that pulls a few degrees every 1.4 s with a yellow glow.
 
 Tried and removed at the user's request (2026-11-04): rank stars round the command aura, supply lanes of travelling
 rounds and a large stripper clip at the centre of the ammo aura.
