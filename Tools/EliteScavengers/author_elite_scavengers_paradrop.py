@@ -2,8 +2,8 @@
 
 A UGA_Paratroopers copy of GA_GerParatroopers (same Ju 390 transport, parachutes, spread and UI icon) that drops two
 Squad_Ger_EliteScavengers squads. Tier I, Scrap Warlord.
-Cost: 125% of two squads' training cost (2 x 450 radixite + 125 metal = 900 + 250 -> 1125 + 313), rounded up a little
-for the aircraft: 1150 radixite (radixite only since 2026-11-05, the 300 metal was dropped). Cooldown 90 s (top of the Tier I band, it lands ten soldiers).
+Cost: 250 radixite per squad, 500 for the two (user decision 2026-11-05; was 1150 = 125% of two squads' training
+cost). Radixite only. Cooldown 90 s (top of the Tier I band, it lands ten soldiers).
 Placeholder icon: GA_GerParatroopers' T_GlobalAbility_GerParatroopers (copied with the UI settings).
 
 Needs an editor DLL that has EGlobalAbility::GA_GerEliteScavengersParadrop and ESquadSubtype::Squad_Ger_EliteScavengers,
@@ -24,7 +24,7 @@ TITLE = "Elite Scavenger Paradrop"
 DESCRIPTION = ("A transport drops two squads of Elite Scavengers over the target: tougher scavengers with STG 44s "
                "and Panzerfausts. Squads take orders once all their soldiers have landed.")
 SQUAD_COUNT = 2
-COSTS = {"RESOURCE_RADIXITE": 1150}  # radixite only (user decision 2026-11-05)
+RADIXITE_PER_SQUAD = 250  # user decision 2026-11-05, radixite only
 COOLDOWN = 90
 COPIED_PROPERTIES = ("m_ability_costs", "m_ability_requirements", "m_aim_settings", "m_ability_sound_settings",
                      "m_ui_settings", "m_ability_marker", "m_ability_tier", "m_paratroopers_settings")
@@ -76,11 +76,10 @@ def run():
     obj.set_editor_property("m_ui_settings", ui)
     obj.set_editor_property("m_ability_type", key)
     obj.set_editor_property("m_ability_tier", unreal.GlobalAbilityTier.TIER_I)
-    cost_state = obj.get_editor_property("m_ability_costs")
-    unit_cost = cost_state.get_editor_property("costs")
-    unit_cost.set_editor_property("resource_costs", {getattr(unreal.RTSResourceType, k): v for k, v in COSTS.items()})
-    cost_state.set_editor_property("costs", unit_cost)
-    cost_state.set_editor_property("cool_down_time", COOLDOWN)
+    # FUnitCost::ResourceCosts is EditDefaultsOnly: python cannot set it on an instance; a fresh struct from text can.
+    cost_state = type(obj.get_editor_property("m_ability_costs"))()
+    cost_state.import_text("(Costs=(ResourceCosts=((Resource_Radixite, %d))),CoolDownTime=%d,CoolDownRemaining=0)"
+                           % (RADIXITE_PER_SQUAD * SQUAD_COUNT, COOLDOWN))
     obj.set_editor_property("m_ability_costs", cost_state)
     templates[key] = obj
     asset.set_editor_property("m_ability_templates_by_type", templates)

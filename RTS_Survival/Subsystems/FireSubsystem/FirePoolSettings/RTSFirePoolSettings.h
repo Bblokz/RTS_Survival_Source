@@ -61,30 +61,36 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="1.0", UIMin="1.0"))
 	float GroundFireVfxBaseRadiusCm = 100.f;
 
-	/** Most upright flames (pool GroundFireFlame) one burning area gets. The GroundFire carpet alone is low and reads
-	 * as flat streaks from the RTS camera, so every area also gets standing flames spread over it; 0 turns them off.
-	 * Keep the GroundFireFlame pool size near MaxActiveGroundFires x the flames of a typical area. */
+	/** Most upright flames (pool GroundFireFlame) one burning area gets: one in the centre, the rest on a ring whose
+	 * flames end just inside the burning radius, so the flames show the area that does damage. The GroundFire carpet
+	 * alone is low and nearly invisible from the RTS camera; 0 turns the upright flames off.
+	 * Keep the GroundFireFlame pool size near MaxActiveGroundFires x this. */
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0", UIMin="0"))
-	int32 MaxGroundFireFlamesPerArea = 4;
+	int32 MaxGroundFireFlamesPerArea = 6;
 
-	/** One upright flame per circle of this radius (cm) of burning area, at least one per area. */
+	/** Half width (cm) one upright flame covers on the ground, seen from above, at component scale 1 (measured with
+	 * -FireFootprintStudy). */
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="1.0", UIMin="1.0"))
-	float GroundFireFlameCoverRadiusCm = 180.f;
+	float GroundFireFlameFootprintCm = 55.f;
+
+	/** How far (cm) inside the burning radius the outermost flames end. */
+	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.0", UIMin="0.0"))
+	float GroundFireFlameEdgeMarginCm = 20.f;
+
+	/** Distance between neighbouring ring flames in flame widths: 1 touches, more leaves gaps. */
+	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.5", UIMin="0.5"))
+	float GroundFireFlameSpacing = 1.6f;
 
 	/** Uniform component scale of an upright flame for each unit of the fire's VfxScale. */
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.01", UIMin="0.01"))
 	float GroundFireFlameScalePerVfxScale = 0.6f;
 
-	/** Clamp of an upright flame's uniform component scale. */
+	/** Clamp of an upright flame's uniform component scale; large areas raise it until their ring closes. */
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.01", UIMin="0.01"))
-	float GroundFireFlameMinScale = 1.f;
+	float GroundFireFlameMinScale = 1.6f;
 
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.01", UIMin="0.01"))
 	float GroundFireFlameMaxScale = 2.2f;
-
-	/** Fraction of the area radius at which the outer flames stand (the first flame stands in the centre). */
-	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.0", ClampMax="1.0", UIMin="0.0", UIMax="1.0"))
-	float GroundFireFlameRingFraction = 0.55f;
 
 	/** Whether an area also gets the low GroundFire carpet (embers, glow) under its upright flames. */
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire")

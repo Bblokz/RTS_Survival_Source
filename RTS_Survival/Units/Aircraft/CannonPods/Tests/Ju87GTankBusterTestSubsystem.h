@@ -117,7 +117,7 @@ private:
 	void PlaceCloseUpCamera(const AAircraftMaster& Aircraft, int32 ShotIndex) const;
 
 	void StartStrike();
-	void ClearCopyRequirements(UGlobalAbility& Ability) const;
+	void ClearCopyRequirements(UGlobalAbility& Ability);
 	void SpawnTargets();
 	bool EnsureCanAfford(const UGlobalAbility& Ability);
 	void OnAbilityEnded(UGlobalAbility* Ability);

@@ -16,6 +16,7 @@
 #include "Misc/Paths.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/GlobalAbilitySetDataAsset.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/RTSGlobalAbilitySettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/BuildingDrop/GA_BuildingParachuteDrop.h"
@@ -55,7 +56,7 @@ namespace FieldWorkshopTestPrivate
 	constexpr float GunSettleSeconds = 10.f;
 	constexpr float GunTimeoutSeconds = 150.f;
 	constexpr float TankPrepareDelaySeconds = 2.f;
-	// Two top-up intervals plus a margin.
+	// Long enough for the aura's 1 s sweeps to reach squads whose soldiers spawn a moment after the controller.
 	constexpr float MeasureSeconds = 12.f;
 	constexpr float DamagedHealthFraction = 0.4f;
 	constexpr float InsideRadiusFraction = 0.55f;
@@ -102,6 +103,13 @@ namespace FieldWorkshopTestPrivate
 		"/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Ger_Vehicle_PanzerIV_H.Ger_Vehicle_PanzerIV_H_C");
 	const TCHAR* const EnemyTankClassPath = TEXT(
 		"/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3476.Rus_Vehicle_T3476_C");
+	const TCHAR* const InfantrySquadClassPath = TEXT(
+		"/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/Scavengers/Squad_Ger_Scavengers.Squad_Ger_Scavengers_C");
+	const TCHAR* const Pak40SquadClassPath = TEXT(
+		"/Game/RTS_Survival/Blueprints/Squads/TeamWeapons/Pak40_75MM/Ger_SquadTW_Pak40_75MM.Ger_SquadTW_Pak40_75MM_C");
+	// BP_Beh_Weapon_AmmoResupply multiplies the reload time by 0.7.
+	constexpr float BuffedReloadFactor = 0.7f;
+	constexpr float ReloadFactorTolerance = 0.03f;
 	const TCHAR* const AmmoResupplyBehaviourPath = TEXT(
 		"/Game/RTS_Survival/Blueprints/Behaviours/Weapon/BP_Beh_Weapon_AmmoResupply.BP_Beh_Weapon_AmmoResupply_C");
 }
@@ -581,6 +589,7 @@ void UFieldWorkshopTestSubsystem::TickWaitingForGuns()
 	RestrictGunFire();
 	RequestScreenshot(TEXT("Drop_GunsDeployed"));
 	SpawnTestTanks();
+	SpawnTestSquads();
 	SetStep(EFieldWorkshopTestStep::WaitingForTanks);
 }
 
@@ -714,6 +723,7 @@ void UFieldWorkshopTestSubsystem::AddTestTank(const FString& Label, const int32 
 void UFieldWorkshopTestSubsystem::TickWaitingForTanks()
 {
 	using namespace FieldWorkshopTestPrivate;
+	RestrictTestSquadFire();
 	if (GetStepSeconds() < TankPrepareDelaySeconds)
 	{
 		return;
@@ -783,6 +793,7 @@ void UFieldWorkshopTestSubsystem::SpendTankWeapons(FTestTank& TestTank)
 void UFieldWorkshopTestSubsystem::TickMeasuring()
 {
 	using namespace FieldWorkshopTestPrivate;
+	RestrictTestSquadFire();
 	if (not bM_TookMidShot && GetStepSeconds() >= MeasureSeconds * 0.5f)
 	{
 		bM_TookMidShot = true;
@@ -833,24 +844,130 @@ void UFieldWorkshopTestSubsystem::CheckTankResults()
 		{
 			Check(Gain <= MaxUnrepairedGainHp, TestTank.Label + TEXT("_not_repaired"), Details);
 		}
-		if (TestTank.bSpend && bExpectWorkshop)
+		if (TestTank.bSpend)
 		{
-			Check(CountRefilledWeapons(TestTank) == TestTank.SpentWeapons.Num() && not TestTank.SpentWeapons.IsEmpty(),
-			      TestTank.Label + TEXT("_rearmed"), Details);
+			// "Rearm" is only a faster reload (user decision 2026-11-05): nobody tops a magazine up.
+			Check(CountRefilledWeapons(TestTank) == 0 && not TestTank.SpentWeapons.IsEmpty(),
+			      TestTank.Label + TEXT("_no_magazine_top_up"), Details);
 		}
-		if (TestTank.bSpend && not bExpectWorkshop)
-		{
-			Check(CountRefilledWeapons(TestTank) == 0, TestTank.Label + TEXT("_not_rearmed"), Details);
-		}
+		CheckReloadBuff(TestTank.Label, FRTSWeaponHelpers::GetWeaponsMountedOnTank(Tank), TestTank.Owner,
+		                bExpectWorkshop);
 		CheckTankBehaviours(TestTank, bExpectWorkshop);
 	}
-	const UFieldWorkshopRearmAura* RearmAura = M_Workshop.IsValid()
-		                                           ? M_Workshop->FindComponentByClass<UFieldWorkshopRearmAura>()
-		                                           : nullptr;
-	UE_LOG(LogRTSFieldWorkshopTest, Display, TEXT("RTS_FIELD_WORKSHOP_TEST REARM topped_up=%d interval=%.1f"),
-	       IsValid(RearmAura) ? RearmAura->GetToppedUpWeaponCount() : -1,
-	       IsValid(RearmAura) ? RearmAura->GetTopUpIntervalSeconds() : -1.f);
+	CheckTestSquadResults();
 	RequestScreenshot(TEXT("Drop_Measured"));
+}
+
+void UFieldWorkshopTestSubsystem::SpawnTestSquads()
+{
+	using namespace FieldWorkshopTestPrivate;
+	// Angles keep the squads off the tanks (160-325 degrees) and the dropped guns (+Y, 30 m out).
+	AddTestSquad(TEXT("InfantryInside"), InfantrySquadClassPath, true, 20.f);
+	AddTestSquad(TEXT("Pak40Inside"), Pak40SquadClassPath, true, 125.f);
+	AddTestSquad(TEXT("InfantryOutside"), InfantrySquadClassPath, false, 45.f);
+}
+
+void UFieldWorkshopTestSubsystem::AddTestSquad(const FString& Label, const TCHAR* ClassPath, const bool bInside,
+                                               const float AngleDegrees)
+{
+	using namespace FieldWorkshopTestPrivate;
+	UWorld* World = GetWorld();
+	UClass* SquadClass = LoadClass<AActor>(nullptr, ClassPath);
+	if (not M_Workshop.IsValid() || not M_WorkshopComponent.IsValid() || not IsValid(World) || not IsValid(SquadClass))
+	{
+		Check(false, Label + TEXT("_spawned"), ClassPath);
+		return;
+	}
+	const float Radius = M_WorkshopComponent->GetWorkshopRadius();
+	const float Distance = bInside ? Radius * InsideRadiusFraction : Radius + OutsideRadiusMarginCm;
+	const FVector Spot = M_Workshop->GetActorLocation() + FRotator(0.f, AngleDegrees, 0.f).Vector() * Distance;
+	FVector Ground;
+	if (not GlobalAbilityHelpers::TryFindGroundLocation(this, Spot, Ground))
+	{
+		Check(false, Label + TEXT("_spawned"), TEXT("no landscape under the squad spot"));
+		return;
+	}
+	const FTransform Transform(FRotator(0.f, AngleDegrees, 0.f), Ground + FVector(0.f, 0.f, TankSpawnAboveGroundCm));
+	FTestSquad TestSquad;
+	TestSquad.Label = Label;
+	TestSquad.bInside = bInside;
+	TestSquad.Squad = Cast<ASquadController>(FRTSUnitOwnerSpawning::SpawnUnitForPlayer(
+		*World, SquadClass, Transform, static_cast<uint8>(TestPlayer)));
+	Check(TestSquad.Squad.IsValid(), Label + TEXT("_spawned"));
+	M_TestSquads.Add(TestSquad);
+}
+
+void UFieldWorkshopTestSubsystem::RestrictTestSquadFire()
+{
+	for (const FTestSquad& TestSquad : M_TestSquads)
+	{
+		if (not TestSquad.Squad.IsValid())
+		{
+			continue;
+		}
+		for (UWeaponState* Weapon : TestSquad.Squad->GetWeaponsOfSquad())
+		{
+			if (IsValid(Weapon))
+			{
+				Weapon->SetModuleFireRestriction(this, true);
+			}
+		}
+	}
+}
+
+void UFieldWorkshopTestSubsystem::CheckTestSquadResults()
+{
+	using namespace FieldWorkshopTestPrivate;
+	UClass* AmmoBehaviourClass = LoadClass<UBehaviour>(nullptr, AmmoResupplyBehaviourPath);
+	for (const FTestSquad& TestSquad : M_TestSquads)
+	{
+		ASquadController* Squad = TestSquad.Squad.Get();
+		Check(IsValid(Squad), TestSquad.Label + TEXT("_alive"));
+		if (not IsValid(Squad))
+		{
+			continue;
+		}
+		CheckReloadBuff(TestSquad.Label, Squad->GetWeaponsOfSquad(), TestPlayer, TestSquad.bInside);
+		const UBehaviourComp* Behaviours = Squad->GetBehaviourComponentOfSquad();
+		const bool bHasAmmo = IsValid(Behaviours) && IsValid(AmmoBehaviourClass)
+			&& IsValid(Behaviours->GetBehaviourByClass(AmmoBehaviourClass));
+		Check(bHasAmmo == TestSquad.bInside, TestSquad.Label + (TestSquad.bInside
+			                                                        ? TEXT("_has_ammo_resupply_buff")
+			                                                        : TEXT("_no_workshop_behaviours")),
+		      FString::Printf(TEXT("ammo=%d behaviour_component=%d"), bHasAmmo, IsValid(Behaviours)));
+	}
+}
+
+void UFieldWorkshopTestSubsystem::CheckReloadBuff(const FString& Label, const TArray<UWeaponState*>& Weapons,
+                                                  const int32 Owner, const bool bExpectBuff)
+{
+	using namespace FieldWorkshopTestPrivate;
+	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+	const float ExpectedFactor = bExpectBuff ? BuffedReloadFactor : 1.f;
+	int32 Measured = 0;
+	int32 Matching = 0;
+	FString Details;
+	for (const UWeaponState* Weapon : Weapons)
+	{
+		if (not IsValid(Weapon) || not IsValid(GameState))
+		{
+			continue;
+		}
+		const FWeaponData& Raw = Weapon->GetRawWeaponData();
+		const FWeaponData* Stock = GameState->GetWeaponDataOfPlayer(Owner, Raw.WeaponName);
+		if (Stock == nullptr || Stock->ReloadSpeed <= KINDA_SMALL_NUMBER)
+		{
+			continue;
+		}
+		const float Factor = Raw.ReloadSpeed / Stock->ReloadSpeed;
+		++Measured;
+		Matching += FMath::Abs(Factor - ExpectedFactor) <= ReloadFactorTolerance ? 1 : 0;
+		Details += FString::Printf(TEXT("%s %.2f/%.2f=x%.2f "), *UEnum::GetValueAsString(Raw.WeaponName),
+		                           Raw.ReloadSpeed, Stock->ReloadSpeed, Factor);
+	}
+	Check(Measured > 0 && Matching == Measured,
+	      Label + (bExpectBuff ? TEXT("_reloads_faster") : TEXT("_normal_reload")),
+	      FString::Printf(TEXT("expected x%.2f matching=%d of %d: %s"), ExpectedFactor, Matching, Measured, *Details));
 }
 
 void UFieldWorkshopTestSubsystem::CheckTankBehaviours(const FTestTank& TestTank, const bool bExpectWorkshopEffects)

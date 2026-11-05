@@ -242,6 +242,7 @@ FAircraftDropRequest UGA_AircraftDrop::BuildBaseDropRequest(
 		? M_AircraftDropSettings.HowLongStayLandedTankDrop
 		: M_AircraftDropSettings.HowLongStayLanded;
 	DropRequest.RadiusSpawnSquads = M_AircraftDropSettings.RadiusSpawnSquads;
+	DropRequest.bSquadsWalkOutOfCargoDoor = M_AircraftDropSettings.bSquadsWalkOutOfCargoDoor;
 	DropRequest.DropOffSound = M_AircraftDropSettings.DropOffSound;
 	DropRequest.DropOffSoundAttenuation = M_AircraftDropSettings.DropOffSoundAttenuation;
 	DropRequest.DropOffSoundConcurrency = M_AircraftDropSettings.DropOffSoundConcurrency;

@@ -11,6 +11,7 @@ class ATankMaster;
 class UFieldWorkshopComponent;
 class UGA_CompositeDrop;
 class UGlobalAbility;
+class ASquadController;
 class UWeaponState;
 
 UENUM()
@@ -33,8 +34,9 @@ enum class EFieldWorkshopTestStep : uint8
 /**
  * @brief -FieldWorkshopValidate: fires GA_GerFieldWorkshopDrop on the anchor (-FieldWorkshopAnchorX= / -Y=, else the
  * camera centre) and checks the dropped workshop (upright, built, player 1, selectable), the two parachuted Pak 40s
- * (deployed, crewed, beside the workshop), repair and rearm of a damaged and a spent friendly tank inside the radius,
- * nothing for a friendly tank outside and an enemy tank inside, the pack-up after its working time, and in a second
+ * (deployed, crewed, beside the workshop), repair of a damaged friendly tank inside the radius and the rearm radius:
+ * every friendly unit inside (tanks, an infantry squad, a Pak 40 team weapon) reloads x0.7 faster and gets no magazine
+ * top-up, nothing for a friendly tank and squad outside and an enemy tank inside, the pack-up after its working time, and in a second
  * scenario that killing a workshop stops its repair. Screenshots to Saved/FieldWorkshopTest; logs
  * RTS_FIELD_WORKSHOP_TEST. Not in shipping.
  */
@@ -59,8 +61,16 @@ private:
 		bool bDamage = false;
 		bool bSpend = false;
 		float HealthAtStart = 0.f;
-		// Weapons emptied by one shot each; the workshop must refill them, nobody else may.
+		// Weapons emptied by one shot each; nobody may refill them (the workshop only speeds up reloads, 2026-11-05).
 		TArray<TWeakObjectPtr<UWeaponState>> SpentWeapons;
+	};
+
+	// A friendly infantry squad or team weapon placed in or outside the rearm radius.
+	struct FTestSquad
+	{
+		FString Label;
+		TWeakObjectPtr<ASquadController> Squad;
+		bool bInside = true;
 	};
 
 	EFieldWorkshopTestStep M_Step = EFieldWorkshopTestStep::WaitingForStart;
@@ -84,6 +94,7 @@ private:
 	bool bM_CheckedSinking = false;
 	float M_TanksPreparedSeconds = -1.f;
 	TArray<FTestTank> M_Tanks;
+	TArray<FTestSquad> M_TestSquads;
 	bool bM_TookMidShot = false;
 	float M_KillSeconds = -1.f;
 	float M_HealthAfterKill = -1.f;
@@ -121,6 +132,19 @@ private:
 	void SpawnTestTanks();
 	void AddTestTank(const FString& Label, int32 Owner, bool bInside, bool bDamage, bool bSpend, float AngleDegrees);
 	void PrepareTestTanks();
+	void SpawnTestSquads();
+	void AddTestSquad(const FString& Label, const TCHAR* ClassPath, bool bInside, float AngleDegrees);
+	// The test squads would shoot the enemy test tank: hold their fire like the dropped guns.
+	void RestrictTestSquadFire();
+	void CheckTestSquadResults();
+	/**
+	 * @brief The rearm radius only speeds up reloads: compares each weapon's reload time with the owner's stock data.
+	 * @param Label Subject name for the check.
+	 * @param Weapons The subject's weapons.
+	 * @param Owner Player whose stock weapon data is the reference.
+	 * @param bExpectBuff True inside the radius (x0.7), false outside or for an enemy (x1).
+	 */
+	void CheckReloadBuff(const FString& Label, const TArray<UWeaponState*>& Weapons, int32 Owner, bool bExpectBuff);
 	void SpendTankWeapons(FTestTank& TestTank);
 	void TickMeasuring();
 	void CheckTankResults();

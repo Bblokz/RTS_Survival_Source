@@ -50,7 +50,7 @@ only the `CommanderSettingsByType` line). `ERTSCommander` keeps its order: the r
 | Barrage Marshal | Flare curtain | Flak 88 airdrop | Radixite & metal supply | Howitzer battery airdrop | Single Ju 87 | Large barrage (III) | Sturmtiger |
 | Radixite Herald | Recon flight | 2x Radixite Pz II | Radixite cache | Radixite Pz III + Radixite Wespe | 2x Ho 229 | Radixite V-weapon (IV) | E-100 |
 | Scrap Warlord | Spies infiltration | 2x Elite Scavengers paradrop | Pz I harvester | 2x Elite Scavengers + 2x Pak 40 | Me 410 | Air minefield (III) | Scrap JagdTiger (128 mm) |
-| Rail Engineer | Recon flight | Rail Troopers paradrop | Radixite & metal supply | 2x Pz 38(t) Railgun | 2x "Bf 110" strafing | Rail bombardment (III) | Tiger Rail |
+| Rail Engineer | Recon flight | Rail Troopers paradrop | Radixite & metal supply | 2x Pz 38(t) Railgun | 2x Bf 109 strafing | Rail bombardment (III) | Tiger Rail |
 | Light Bringer (`LightBringer`) | Flare curtain | Light Bringers paradrop | Pz IV harvester | 3x Panzerjäger I laser | 2x Ho 229 | Sonnengewehr | JagdTiger (Sonnensturm laser) |
 | Feuersturm (`Feuersturm`) | Recon flight | 2x Feuer Sturm paradrop | Pz IV harvester | 2x Pz III Flamm | Incendiary Ju 87 | Fire barrage | Jagdpanther flamer |
 | Stahlläufer (`Stahllaeufer`) | Recon flight | Red Spine walker drop | Radixite & metal supply | 2x Red Spine walker drop | Me 410 | *placeholder:* Artillery Barrage (III) | Maus |
@@ -198,7 +198,8 @@ Notes:
   row of a subtype holds the stock tank. The glider drops replace the E-100 override with their own tank, the stock
   JagdTiger included.
 - **`Ger_Aircraft_BF110Airborne` is a Bf 109:** it uses the Bf 109 mesh and AnimBP (there is no Bf 110 model), so
-  `GA_2xBf110Strafing` flies two Bf 109s. `Ger_Aircraft_BF109` itself starts landed (`bM_StartedAsLanded`) and would
+  `GA_2xBf110Strafing` flies two Bf 109s; since round 5 (2026-11-05) its title and description say so ("2x Bf 109
+  Strafing"). The enum key and the Blueprint name keep "Bf110" (config and the data asset store the key). `Ger_Aircraft_BF109` itself starts landed (`bM_StartedAsLanded`) and would
   take off first, so the single Bf 109 strafing uses the airborne one.
 - The Ju 390 carpet run was 500 m (`CarpetBombingLength=50000`), against 30 m on every PE-8 template and a 60 m
   longest aimable strip: a stray zero, now 50 m. The bomber shuttles between the run's ends until its bombs are gone,
@@ -218,12 +219,12 @@ only these four keys, fingerprints every other template before and after the sav
 
 | Slot | Template | Class (copied from) | Contents | Tier | Cost | Cooldown |
 |---|---|---|---|---|---|---|
-| 1 | `GA_GerMassiveFlare` | `UGA_FlareCurtain` (`GA_GerFlareCurtain`) | one flare, circle aim: 60 m vision and light radius (curtain flare 20 m), light 4x, flare 2.5x, burns 75 s (30 s) | I | 200 R (as the curtain) | 90 |
+| 1 | `GA_GerMassiveFlare` | `UGA_FlareCurtain` (`GA_GerFlareCurtain`) | one flare, circle aim: 60 m vision and light radius (curtain flare 20 m), light 4x, flare 2.5x, burns 75 s (30 s) | I | 200 R (intel band, round 4) | 90 |
 | 2 | `GA_GerPumaDrop` | `UGA_AircraftDrop` (`GA_GerSpotterPzIIIDrop`) | a Ju 390 lands 1 `Ger_ArmoredCar_Puma` (`Tank_Puma`) | I | 225 R (Puma 180 R) | 90 |
-| 3 | `GA_GerVehiclePartsSupplyDrop` | `UGA_ResourceDrop` (`GA_GerRadixiteMetalSupplyDrop`) | 4 crates (`SM_ScavObj_VehicleParts1`) of 25 vehicle parts, 50 s each; Scavengers x3: 300 VP | I | 400 R | 90 |
+| 3 | `GA_GerVehiclePartsSupplyDrop` | `UGA_ResourceDrop` (`GA_GerRadixiteMetalSupplyDrop`) | 4 crates (`SM_ScavObj_VehicleParts1`) of 450 vehicle parts (was 25), 50 s each: 1800 VP at x1, Scavengers x3: 5400 VP | I | 400 R | 90 |
 | 4 | `GA_GerFlakLuchsStugDrop` (existing) | `UGA_AircraftDrop` | 2 Flak Luchs + 1 StuG III, landed (unchanged) | II (was I) | 975 R (2x 240 + 300 R; was empty) | 150 (was 5) |
-| 5 | `GA_GerJu87GTankBusters` | `UGA_AircraftStrafing` (Ju 87 G workstream) | two Ju 87 G with 3.7 cm cannon pods | III | 650 R | 240 |
-| 6 | `GA_GerFieldWorkshopDrop` | `UGA_CompositeDrop` (Field workshop workstream) | parachuted repair/rearm depot + 2 Pak 40 squads | III | 1500 R | 240 |
+| 5 | `GA_GerJu87GTankBusters` | `UGA_AircraftStrafing` (Ju 87 G workstream) | two Ju 87 G with 3.7 cm cannon pods, APCR through 120 mm (round 4), no tech requirement | III | 650 R | 240 |
+| 6 | `GA_GerFieldWorkshopDrop` | `UGA_CompositeDrop` (Field workshop workstream) | parachuted repair depot whose radius also makes every allied unit reload faster (round 4) + 2 Pak 40 squads | III | 1500 R | 240 |
 | 7 | `GA_GerE50Drop` | `UGA_GliderTankDrop` | E-50 by Mammut | IV | 1450 R | 360 |
 
 Notes:
@@ -232,16 +233,38 @@ Notes:
   centred on the click (`MaxStripLength` 10 m), so the flare hangs over the clicked point; the target area is the
   curtain's shader at strip length 0 (a 60 m disc with one flare marker). Ignition height stays 12 m (below the
   camera). The burn particle effect is not scaled with `MeshScale`.
-- **Vehicle parts payback:** at about 2 radixite per vehicle part (unit costs: Puma 180 R + 80 VP, StuG 300 R + 125
-  VP) the 300 VP a Scavenger squad gets are worth 600 R for 400 R, 1.5x like the radixite & metal supply drop, paid
-  back after the third crate (about 3 minutes, the supply drop measured 168 s). Other infantry with scavenging gear
-  gets a third (100 VP), which does not pay back. Scavenging adds the parts with `UPlayerResourceManager::AddResource`
-  like wreck salvage.
+- **Vehicle parts payback (round 4):** at the user's rate of 1 radixite = 3 vehicle parts, the 1800 VP a normal (x1)
+  squad gets are worth 600 R for 400 R, 1.5x like the other supply drops (see "Round 4 tuning" below); Scavengers get
+  three times that. Scavenging adds the parts with `UPlayerResourceManager::AddResource` like wreck salvage.
 - `FUnitCost::ResourceCosts` is `EditDefaultsOnly`: Python cannot set it on a template; the script rebuilds the cost
   struct from its exported text.
 - Test: `-GlobalAbilityAreaValidate -GlobalAbilityKitsOnly -GlobalAbilitySkyDrop` (`-GlobalAbilityAreaCapture=` and
   `-GlobalAbilityKitPictures=` for pictures) checks the kits, then fires the massive flare through the click path,
   the Puma drop and the vehicle parts drop once each.
+
+## Round 4 tuning (2026-11-05, user decisions; Tuning agent)
+
+Applied by `Source/Tools/Tuning/run_round4_tuning_headless.py`, which re-runs each feature's own authoring script (so a
+later re-run of any of them keeps these values) and fingerprints every other template. Costs stay radixite only.
+
+| Template | Change | Cost before -> after | Cooldown |
+|---|---|---|---|
+| `GA_GerJu87GTankBusters` | APCR penetrates 120 mm over the whole cannon range (`UAircraftCannonPodsComponent::CannonArmorPen` on the Ju 87 G Blueprint; the shared `Flak36_37MM` data keeps 45/31 mm raw = 67.5/46.5 APCR); 24 rounds per cannon and the wing MG 15s kept; the `Tech_HarvesterSpeed` requirement copied from `GA_3xJu87Strafing` removed | 650 R (unchanged) | 240 |
+| `GA_GerEliteScavengersParadrop` | 250 R per squad; the 2 Panzerfaust soldiers carry a Mauser backup (switch-weapon button); the AI counts the squad as anti-tank (`Global_GetIsAntiTankSquad`) | 1150 R -> 500 R | 90 |
+| `GA_GerSonnengewehr` | no friendly fire: burns only the ordering player's enemies (`FSonnengewehrSettings::bBurnOwnUnits` false replaces `AffectedUnits`) | 800 R -> 675 R (as the Panzer Grenadiers) | 240 |
+| `GA_GerFieldWorkshopDrop` | "rearm" = only a radius in which every allied unit (vehicles, infantry, team weapons) reloads faster (reload time x0.7); magazine top-up removed; repair kept; pack-up shows two small waves of grey dust (`NS_DestructionSmoke`) instead of five construction-smoke puffs | 1500 R (unchanged) | 240 |
+| `GA_GerRadixiteMetalSupplyDrop` | per crate 30 R + 20 M -> 90 R + 60 M (x1): 360 R + 240 M = 600 for 400 at x1 (1.5x); Scavengers x3 | 400 R | 90 |
+| `GA_GerConstructionSupplyDrop` | per crate 10 R + 40 M -> 30 R + 120 M (x1): 120 R + 480 M = 600 for 400 at x1 (1.5x) | 400 R | 90 |
+| `GA_GerRadixiteCacheDrop` | unchanged: a 1200 R deposit for 500 R (2.4x; mined by harvesters, no squad multiplier) | 500 R | 90 |
+| `GA_GerVehiclePartsSupplyDrop` | per crate 25 -> 450 VP (x1): 1800 VP = 600 R for 400 at 1 R = 3 VP (1.5x) | 400 R | 90 |
+| `GA_GerMassiveFlare` | same as the other intel abilities: 200 R / 90 s (curtain 200 R / 90 s, recon 150 R / 60 s, spies 200 R / 180 s) | 200 R (unchanged, now explicit) | 90 |
+
+- **Exchange rates:** 1 radixite = 3 vehicle parts (user). The project has no metal rate; the resource drops count
+  metal 1:1 with radixite. Crates have no lifetime and auto-scavenging stays off.
+- **Reading of the cut-off sentence:** every resource drop returns more than its radixite cost would buy, even for a
+  normal x1 squad; tuned to about 1.5x at x1. `-ResourceDropValidate` empties the crates with a Sturm Pioniere squad
+  (x1) and checks the gain beats the cost.
+- Spies' 180 s cooldown is above the Tier I band (60-90 s); left as it is.
 
 ## Iron Storm templates (round 4, 2026-11-05)
 
@@ -283,7 +306,7 @@ Done in C++:
 
 Done in data (2026-11-03 and 2026-11-05, `Source/Tools/Commanders/author_commander_abilities.py`, idempotent; check
 with `verify_commander_abilities.py`):
-- Round 2: harvester drops, Pz 38(t) Railgun drop, scavenger drop, single Ju 87, 2x Bf 110, large barrage, rail
+- Round 2: harvester drops, Pz 38(t) Railgun drop, scavenger drop, single Ju 87, 2x Bf 109 (`GA_2xBf110Strafing`), large barrage, rail
   bombardment, and the Mammut glider drops for Sturmtiger, JagdTiger, King Tiger 105 and Tiger Rail.
 - Round 3: the table above.
 - Script gotchas: `unreal.GlobalAbility` is the `UGlobalAbility` class, not the enum (take the enum type from the
@@ -293,5 +316,27 @@ with `verify_commander_abilities.py`):
 Still to do:
 - The pending items above.
 - Building requirements on the templates (which building per ability, valid for every German faction).
-- Set `MaxPlayerGlobalAbilityTier` on each mission's manager.
+- Set `MaxPlayerGlobalAbilityTier` on the other missions' managers (done for the first two, see "Round 5 fixes").
 - Uses-per-mission for Tier IV drops.
+
+## Round 5 fixes (2026-11-05)
+
+- **No technology gates on templates.** `GA_3xJu87Strafing` carried `RequiredTechnology = Tech_HarvesterSpeed` (a copy
+  bug): without that tech the click did nothing, and every template copied from it inherited the gate. Every template
+  now has `Tech_NONE` except `GA_GerJu87GTankBusters` (Tuning agent). Unit requirements are kept. Every authoring
+  script that copies `m_ability_requirements` from another template clears the technology after the copy.
+  Data pass: `Source/Tools/Round5Fixes/author_round5_fixes.py`.
+- **Walkers leave the landed Ju 390 by its cargo door.** `FAircraftDropGlobalAbilitySettings::bSquadsWalkOutOfCargoDoor`
+  (default off): the squads of a landed drop appear one after another (1.5 s apart) at the aircraft mesh's
+  `CargoDoor` socket, projected to the navmesh, and get an ordinary move order to their spot on the
+  `RadiusSpawnSquads` circle; from then on they are normal units. The aircraft stays landed until 4 s after the last
+  squad appeared. Without the socket the squads leave from under the aircraft (error logged). The Ju 390 mesh
+  (`SK_JU309B_Animated`, no collision) has the socket under the rear fuselage. On for `GA_GerRedSpineDrop`,
+  `GA_GerRedSpinePairDrop` and `GA_GerFelsKriegerDrop`.
+- **Mission caps:** `Ger_FirstMission` (the first German mission; its victory continues to `Ger_MarderStugMission`)
+  allows Tier I only; `Ger_MarderStugMission` (StuG / Marder) up to Tier II. Other missions keep Tier IV.
+- **`GA_2xBf110Strafing`** is titled "2x Bf 109 Strafing" (see the note above).
+- Test: `-Round5FixesValidate` (`GlobalAbilitySystem/Tests/Round5Fixes`): template checks, a Ju 87 strike clicked with
+  no technology researched, the sFH 18 firing beyond the leFH 18's range, and the cargo-door walk-out of the Red Spine
+  pair drop (screenshots in `Saved/Round5FixesTest`). On a mission map `-Round5FixesValidate -Round5MissionCaps=TierI`
+  checks that map's cap instead.

@@ -72,6 +72,18 @@ def fresh(obj, prop):
     return new
 
 
+def clear_required_technology(obj):
+    """No copied technology gate (round 5, user 2026-11-05): GA_3xJu87Strafing carried Tech_HarvesterSpeed, which
+    silently blocked the click, and every copy inherited it. Keeps the unit requirement."""
+    old = obj.get_editor_property("m_ability_requirements")
+    requirements = type(old)()
+    requirements.import_text(old.export_text())
+    for attr in dir(unreal.Technology):
+        if attr.replace("_", "").lower() == "technone":
+            requirements.set_editor_property("required_technology", getattr(unreal.Technology, attr))
+    obj.set_editor_property("m_ability_requirements", requirements)
+
+
 def set_visuals(obj):
     visuals = fresh(obj, "m_nuke_visuals")
     assets = ",".join('%s=%s' % (key, '"%s"' % value if value else "None") for key, value in VISUALS.items())
@@ -122,6 +134,7 @@ def run():
             obj.set_editor_property(prop, fresh(source, prop))
         report.append("created from %s" % SOURCE)
     asset.modify()
+    clear_required_technology(obj)
     obj.set_editor_property("m_ability_type", key)
     settings = fresh(obj, "m_nuke_settings")
     settings.import_text(SETTINGS)

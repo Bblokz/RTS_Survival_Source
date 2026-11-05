@@ -24,6 +24,7 @@
 #include "RTS_Survival/Units/Aircraft/AircraftAnimInstance/AircraftAnimInstance.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
@@ -36,6 +37,19 @@ const float VerticalTextAircraftZOffset = 150.f;
 namespace
 {
 	constexpr float LandedAircraftVisionRadiusMultiplier = 0.2f;
+
+	namespace AircraftDropCargoDoor
+	{
+		// Mesh socket at the cargo door of an aircraft that lets squads walk out (Ju 390: under the rear fuselage).
+		const FName SocketName = TEXT("CargoDoor");
+		// Seconds between two squads leaving the door, so they file out instead of stacking up in it.
+		constexpr float SecondsBetweenSquads = 1.5f;
+		// The aircraft waits at least this long after the last squad appeared, so it does not lift off over walkers
+		// that are still at the door.
+		constexpr float MinLandedSecondsAfterLastSquad = 4.0f;
+		// Vertical reach of the navmesh projection: the socket sits on the fuselage, above the ground.
+		const FVector ProjectionExtent(150.0f, 150.0f, 2000.0f);
+	}
 }
 
 AAircraftMaster::AAircraftMaster(const FObjectInitializer& ObjectInitializer)
@@ -3046,7 +3060,15 @@ void AAircraftMaster::AircraftDrop_OnLanded()
 		return;
 	}
 
-	const float SafeStayLandedTime = FMath::Max(0.0f, M_AircraftDropRequest.HowLongStayLanded);
+	float SafeStayLandedTime = FMath::Max(0.0f, M_AircraftDropRequest.HowLongStayLanded);
+	if (M_AircraftDropRequest.bSquadsWalkOutOfCargoDoor && M_AircraftDropRequest.PayloadType ==
+		EAircraftDropPayloadType::Infantry)
+	{
+		const float LastSquadDelay = AircraftDropCargoDoor::SecondsBetweenSquads
+			* static_cast<float>(FMath::Max(0, M_AircraftDropRequest.SquadSubtypes.Num() - 1));
+		SafeStayLandedTime = FMath::Max(SafeStayLandedTime,
+		                                LastSquadDelay + AircraftDropCargoDoor::MinLandedSecondsAfterLastSquad);
+	}
 	TWeakObjectPtr<AAircraftMaster> WeakThis(this);
 	World->GetTimerManager().SetTimer(
 		M_AircraftDropStayLandedTimerHandle,
@@ -3088,10 +3110,54 @@ void AAircraftMaster::AircraftDrop_SpawnSquads() const
 	{
 		return;
 	}
+	if (M_AircraftDropRequest.bSquadsWalkOutOfCargoDoor)
+	{
+		AircraftDrop_SpawnSquadsThroughCargoDoor();
+		return;
+	}
 
 	for (int32 SquadIndex = 0; SquadIndex < M_AircraftDropRequest.SquadSubtypes.Num(); ++SquadIndex)
 	{
 		AircraftDrop_SpawnSquad(M_AircraftDropRequest.SquadSubtypes[SquadIndex], SquadIndex);
+	}
+}
+
+void AAircraftMaster::AircraftDrop_SpawnSquadsThroughCargoDoor() const
+{
+	UWorld* World = GetWorld();
+	const int32 SquadCount = M_AircraftDropRequest.SquadSubtypes.Num();
+	if (SquadCount <= 0)
+	{
+		return;
+	}
+
+	for (int32 SquadIndex = 0; SquadIndex < SquadCount; ++SquadIndex)
+	{
+		const ESquadSubtype SquadSubtype = M_AircraftDropRequest.SquadSubtypes[SquadIndex];
+		const float SpawnDelay = AircraftDropCargoDoor::SecondsBetweenSquads * static_cast<float>(SquadIndex);
+		if (SpawnDelay <= KINDA_SMALL_NUMBER || not IsValid(World))
+		{
+			AircraftDrop_SpawnSquad(SquadSubtype, SquadIndex);
+			continue;
+		}
+
+		// The aircraft stays landed past the last delay (AircraftDrop_OnLanded); if it dies first the remaining squads
+		// are lost with it.
+		FTimerHandle SpawnTimerHandle;
+		const TWeakObjectPtr<const AAircraftMaster> WeakThis(this);
+		World->GetTimerManager().SetTimer(
+			SpawnTimerHandle,
+			[WeakThis, SquadSubtype, SquadIndex]()
+			{
+				if (not WeakThis.IsValid())
+				{
+					return;
+				}
+
+				WeakThis->AircraftDrop_SpawnSquad(SquadSubtype, SquadIndex);
+			},
+			SpawnDelay,
+			false);
 	}
 }
 
@@ -3109,19 +3175,83 @@ void AAircraftMaster::AircraftDrop_SpawnSquad(const ESquadSubtype SquadSubtype, 
 		? static_cast<UObject*>(EnemyStrategicAIComponent)
 		: static_cast<UObject*>(const_cast<AAircraftMaster*>(this));
 	const TWeakObjectPtr<UEnemyStrategicAIComponent> WeakEnemyStrategicAIComponent(EnemyStrategicAIComponent);
+	const FVector OutsideLocation = AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex);
+	const bool bWalkOutOfCargoDoor = M_AircraftDropRequest.bSquadsWalkOutOfCargoDoor;
+	const FVector SpawnLocation = bWalkOutOfCargoDoor ? AircraftDrop_GetProjectedCargoDoorLocation() : OutsideLocation;
 	AsyncSpawner->AsyncSpawnOptionAtLocation(
 		SquadTrainingOption,
-		AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex),
+		SpawnLocation,
 		CallbackOwner,
 		SquadIndex,
-		[WeakEnemyStrategicAIComponent](const FTrainingOption&, AActor* SpawnedActor, const int32)
+		[WeakEnemyStrategicAIComponent, bWalkOutOfCargoDoor, SpawnLocation, OutsideLocation](
+		const FTrainingOption&, AActor* SpawnedActor, const int32)
 		{
+			if (bWalkOutOfCargoDoor)
+			{
+				AircraftDrop_OrderSquadWalkOut(SpawnedActor, SpawnLocation, OutsideLocation);
+			}
 			if (WeakEnemyStrategicAIComponent.IsValid())
 			{
 				WeakEnemyStrategicAIComponent->RegisterDroppedUnitWithBlackboardWhenReady(SpawnedActor);
 			}
 		},
 		FRotator::ZeroRotator);
+}
+
+FVector AAircraftMaster::AircraftDrop_GetProjectedCargoDoorLocation() const
+{
+	FVector DoorLocation = M_AircraftDropRequest.ExecuteLocation;
+	if (IsValid(M_AircraftMesh) && M_AircraftMesh->DoesSocketExist(AircraftDropCargoDoor::SocketName))
+	{
+		const FVector SocketLocation = M_AircraftMesh->GetSocketLocation(AircraftDropCargoDoor::SocketName);
+		DoorLocation = FVector(SocketLocation.X, SocketLocation.Y, M_AircraftDropRequest.ExecuteLocation.Z);
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("AAircraftMaster: squads should walk out of the cargo door, but the aircraft mesh has no socket "
+				"'CargoDoor'; they leave from under the aircraft instead. Aircraft: ") + GetName());
+	}
+
+	bool bWasProjected = false;
+	return URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
+		this,
+		DoorLocation,
+		AircraftDropCargoDoor::ProjectionExtent,
+		bWasProjected);
+}
+
+void AAircraftMaster::AircraftDrop_OrderSquadWalkOut(AActor* SpawnedSquad, const FVector& DoorLocation,
+                                                     const FVector& OutsideLocation)
+{
+	ASquadController* Squad = Cast<ASquadController>(SpawnedSquad);
+	if (not IsValid(Squad))
+	{
+		return;
+	}
+
+	const FRotator FacingAwayFromAircraft = UKismetMathLibrary::FindLookAtRotation(DoorLocation, OutsideLocation);
+	const FRotator FinalRotation(0.0f, FacingAwayFromAircraft.Yaw, 0.0f);
+	const auto OrderOut = [OutsideLocation, FinalRotation](ASquadController* LoadedSquad)
+	{
+		if (not IsValid(LoadedSquad))
+		{
+			return;
+		}
+		if (LoadedSquad->MoveToLocation(OutsideLocation, true, FinalRotation) != ECommandQueueError::NoError)
+		{
+			RTSFunctionLibrary::ReportError(
+				TEXT("AAircraftMaster: a squad that appeared at the cargo door could not be ordered out of the aircraft: ")
+				+ LoadedSquad->GetName());
+		}
+	};
+	// The walkers load asynchronously; an order given before they exist would finish at once and leave them at the door.
+	if (Squad->GetIsSquadFullyLoadedAndInitialized())
+	{
+		OrderOut(Squad);
+		return;
+	}
+	Squad->OnSquadFullyLoaded.AddLambda(OrderOut);
 }
 
 void AAircraftMaster::AircraftDrop_AttachTank()

@@ -37,21 +37,31 @@ FLARE_HANG_SECONDS = 75.0
 # One click; the strip the aircraft flies is centred on the point and the single flare hangs over its middle.
 FLARE_STRIP_LENGTH = 1000.0
 
-# Vehicle parts crates: 4 crates of 25 parts before the squad multiplier (Scavengers x3: 75 per crate, 300 in all).
-# At ~2 radixite per vehicle part (unit costs: Puma 180 R + 80 VP, StuG 300 R + 125 VP) that is 600 radixite worth for
-# 400, 1.5x like the radixite & metal supply drop, paid back after the third crate (~3 min after the cast).
-VEHICLE_PARTS_PER_CRATE = 25
+# Vehicle parts crates (user decisions 2026-11-05): 1 radixite = 3 vehicle parts, and a drop must return more than
+# its radixite cost would buy even for a normal x1 squad. 4 crates of 450 parts = 1800 VP = 600 radixite worth for
+# 400 at x1, 1.5x like the radixite & metal supply drop (Scavengers x3: 5400 VP). Was 25 per crate (Tuning, round 4).
+VEHICLE_PARTS_PER_CRATE = 450
 SUPPLY_COST = 400
 SUPPLY_COOLDOWN = 90
 SUPPLY_SCAVENGE_SECONDS = 50.0
+VEHICLE_PARTS_DESCRIPTION = ("A transport flies the line you draw and drops %d crates of vehicle parts on parachutes. "
+                             "Infantry with scavenging gear empties a crate in %d seconds for %d vehicle parts: %d "
+                             "in all. Scavengers get three times as much. Crates stay until emptied.")
 
 # 1.25x the radixite training cost, rounded to 25 (DeveloperSettings.h): Puma 180 R; Flak Luchs 240 R x2 + StuG 300 R.
 PUMA_COST = 225
 FLAK_LUCHS_STUG_COST = 975
 TIER_I_COOLDOWN = 90
 TIER_II_COOLDOWN = 150
+# Massive flare: same cost and cooldown band as the other intel abilities (user decision 2026-11-05): recon flight
+# 150 R / 60 s, flare curtain 200 R / 90 s, spies 200 R / 180 s. It is the curtain's single-flare sibling: 200 R, 90 s.
+MASSIVE_FLARE_COST = 200
+MASSIVE_FLARE_COOLDOWN = 90
 
 MY_KEYS = ("GA_GerMassiveFlare", "GA_GerPumaDrop", "GA_GerVehiclePartsSupplyDrop", "GA_GerFlakLuchsStugDrop")
+# A caller that execs this file may set SKYDROP_ONLY_KEYS (a tuple of MY_KEYS names) to author only those keys; every
+# other template, the rest of MY_KEYS included, is then fingerprinted as untouched (Tools/Tuning, round 4).
+ONLY_KEYS = tuple(globals().get("SKYDROP_ONLY_KEYS") or MY_KEYS)
 
 # Every template property a fingerprint looks at; missing ones are skipped per class.
 FINGERPRINT_PROPERTIES = (
@@ -248,7 +258,7 @@ def author_massive_flare(asset, templates, report):
            "up and reveals everything within %d metres: far more than any flare of a curtain." % (
                int(FLARE_HANG_SECONDS), int(radius / 100)))
     curtain_cost = radixite_of(curtain)
-    set_balance(obj, "TierI", curtain_cost if curtain_cost > 0 else 200, TIER_I_COOLDOWN)
+    set_balance(obj, "TierI", MASSIVE_FLARE_COST, MASSIVE_FLARE_COOLDOWN)
     report.append("massive flare: curtain radius=%s hang=%s light=%s/%s mesh=%s cost=%d -> radius=%s" % (
         curtain_aim.get_editor_property("area_radius"), curtain_flare.get_editor_property("hang_time_seconds"),
         curtain_visuals.get_editor_property("light_intensity"),
@@ -324,10 +334,8 @@ def author_vehicle_parts_drop(asset, templates, report):
     obj.set_editor_property("m_aim_settings", aim)
 
     set_ui(obj, "Vehicle Parts Supply Drop",
-           "A transport flies the line you draw and drops %d crates of vehicle parts on parachutes. Scavengers empty "
-           "a crate in %d seconds for %d vehicle parts: %d in all. Other infantry with scavenging gear gets a third. "
-           "Crates stay until emptied." % (count, int(SUPPLY_SCAVENGE_SECONDS), VEHICLE_PARTS_PER_CRATE * 3,
-                                            VEHICLE_PARTS_PER_CRATE * 3 * count))
+           VEHICLE_PARTS_DESCRIPTION % (count, int(SUPPLY_SCAVENGE_SECONDS), VEHICLE_PARTS_PER_CRATE,
+                                        VEHICLE_PARTS_PER_CRATE * count))
     set_balance(obj, "TierI", SUPPLY_COST, SUPPLY_COOLDOWN)
     report.append("vehicle parts drop: %d crates x %d VP, mesh scale %.2f (crate size %.0f cm)" % (
         count, VEHICLE_PARTS_PER_CRATE, scale, crate_size))
@@ -388,12 +396,14 @@ def run():
     templates = asset.get_editor_property("m_ability_templates_by_type")
     GA_ENUM = type(next(iter(templates.keys())))
     before = len(templates)
-    mine = set(str(ga(name)) for name in MY_KEYS)
+    mine = set(str(ga(name)) for name in ONLY_KEYS)
     others_before = {str(key): fingerprint(obj) for key, obj in templates.items() if str(key) not in mine}
     report, errors = ["%d entries before" % before], []
     authored = {}
     for name, author in (("GA_GerMassiveFlare", author_massive_flare), ("GA_GerPumaDrop", author_puma_drop),
                          ("GA_GerVehiclePartsSupplyDrop", author_vehicle_parts_drop)):
+        if name not in ONLY_KEYS:
+            continue
         try:
             obj = author(asset, templates, report)
             obj.set_editor_property("m_ability_type", ga(name))
@@ -402,7 +412,8 @@ def run():
         except Exception as error:
             errors.append("%s: %s" % (name, error))
     try:
-        authored["GA_GerFlakLuchsStugDrop"] = retier_flak_luchs_stug(templates, report)
+        if "GA_GerFlakLuchsStugDrop" in ONLY_KEYS:
+            authored["GA_GerFlakLuchsStugDrop"] = retier_flak_luchs_stug(templates, report)
     except Exception as error:
         errors.append("GA_GerFlakLuchsStugDrop: %s" % error)
     others_unsaved = {str(key): fingerprint(obj) for key, obj in templates.items() if str(key) not in mine}
@@ -421,7 +432,7 @@ def run():
     missing = sorted(key for key in others_before if key not in others_after)
     report.append("VERIFY other templates unchanged: %d checked, changed=%s missing=%s" % (
         len(others_before), changed, missing))
-    for name in MY_KEYS:
+    for name in ONLY_KEYS:
         obj = check.get(ga(name))
         report.append("VERIFY " + (describe(name, obj) if obj is not None else "%s MISSING after save" % name))
     return report

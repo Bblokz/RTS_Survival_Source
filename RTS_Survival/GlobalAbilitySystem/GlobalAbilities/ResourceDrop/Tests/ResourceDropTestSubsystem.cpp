@@ -61,11 +61,18 @@ namespace ResourceDropTestPrivate
 	constexpr int32 RewardRoundMultiple = 5;
 	constexpr float MinCooldown = 60.f;
 	constexpr float MaxCooldown = 90.f;
-	// Scavenger infantry (Ger_Inf_Scavenger*, Rail Troopers) triple scavenged rewards; the templates are tuned for them.
-	constexpr float ReferenceScavengeMultiplier = 3.f;
+	// User decision 2026-11-05: a drop returns more than its radixite cost even for a normal (x1) squad; the
+	// templates aim at about 1.5x. Scavengers and Rail Troopers triple that, which is intended.
+	constexpr float CollectorScavengeMultiplier = 1.f;
+	constexpr float MinReturnAtX1 = 1.4f;
+	// Exchange rates to compare a delivery with its radixite cost: 1 radixite = 3 vehicle parts (user, 2026-11-05);
+	// the project has no metal rate, metal counts 1:1.
+	constexpr float RadixitePerMetal = 1.f;
+	constexpr float RadixitePerVehiclePart = 1.f / 3.f;
 
+	// Sturm Pioniere scavenge at x1 (no reward multiplier on their scavenger component).
 	const TCHAR* const ScavengerSquadPath =
-		TEXT("/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/Scavengers/Squad_Ger_Scavengers.Squad_Ger_Scavengers_C");
+		TEXT("/Game/RTS_Survival/Blueprints/Squads/Ger/T2/SturmPioneer/Squad_Ger_SturmPioneers.Squad_Ger_SturmPioneers_C");
 	const TCHAR* const HarvesterPath =
 		TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/PanzerIV/Harvester/Ger_Harvester_PanzerIV.Ger_Harvester_PanzerIV_C");
 	const TCHAR* const RefineryPath =
@@ -79,6 +86,29 @@ namespace ResourceDropTestPrivate
 			Text += FString::Printf(TEXT("%s:%d "), *Global_GetResourceTypeAsString(Resource.Key), Resource.Value);
 		}
 		return Text.TrimEnd();
+	}
+
+	float GetRadixiteValue(const ERTSResourceType Resource, const float Amount)
+	{
+		switch (Resource)
+		{
+		case ERTSResourceType::Resource_Metal:
+			return Amount * RadixitePerMetal;
+		case ERTSResourceType::Resource_VehicleParts:
+			return Amount * RadixitePerVehiclePart;
+		default:
+			return Amount;
+		}
+	}
+
+	float GetRadixiteValue(const TMap<ERTSResourceType, int32>& Resources)
+	{
+		float Value = 0.f;
+		for (const TPair<ERTSResourceType, int32>& Resource : Resources)
+		{
+			Value += GetRadixiteValue(Resource.Key, Resource.Value);
+		}
+		return Value;
 	}
 
 	int32 SumResources(const TMap<ERTSResourceType, int32>& Resources)
@@ -294,6 +324,7 @@ void UResourceDropTestSubsystem::BuildCases()
 		{EGlobalAbility::GA_GerRadixiteMetalSupplyDrop, TEXT("Supply")},
 		{EGlobalAbility::GA_GerConstructionSupplyDrop, TEXT("Construction")},
 		{EGlobalAbility::GA_GerRadixiteCacheDrop, TEXT("Cache")},
+		{EGlobalAbility::GA_GerVehiclePartsSupplyDrop, TEXT("VehicleParts")},
 	};
 	FString OnlyCase;
 	FParse::Value(FCommandLine::Get(), TEXT("ResourceDropOnly="), OnlyCase);
@@ -315,7 +346,8 @@ void UResourceDropTestSubsystem::GrantTestStorage() const
 	{
 		return;
 	}
-	for (const ERTSResourceType Resource : {ERTSResourceType::Resource_Radixite, ERTSResourceType::Resource_Metal})
+	for (const ERTSResourceType Resource : {ERTSResourceType::Resource_Radixite, ERTSResourceType::Resource_Metal,
+	                                        ERTSResourceType::Resource_VehicleParts})
 	{
 		// The cheat fills the storage it adds; empty half of it so gains are never capped.
 		ResourceManager->CheatAddStorage(Resource, TestStorage);
@@ -397,20 +429,24 @@ void UResourceDropTestSubsystem::CheckTemplate(const UGA_ResourceDrop& Ability)
 	const TMap<ERTSResourceType, int32> Delivered = Ability.GetTotalDeliveredResources();
 	const bool bIsContainerDrop = Ability.GetResourceDropSettings().PayloadKind
 		== EResourceDropPayloadKind::ScavengeContainer;
-	const int32 DeliveredTotal = FMath::RoundToInt(SumResources(Delivered)
-		* (bIsContainerDrop ? ReferenceScavengeMultiplier : 1.f));
+	// Containers pay their rewards times the squad's multiplier; the drop is judged at x1. A deposit is mined as is.
+	const float DeliveredValue = GetRadixiteValue(Delivered)
+		* (bIsContainerDrop ? CollectorScavengeMultiplier : 1.f);
+	const float ReturnRatio = M_Measurement.CostTotal > 0 ? DeliveredValue / M_Measurement.CostTotal : 0.f;
 	UE_LOG(LogRTSResourceDropTest, Display,
 	       TEXT("RTS_RESOURCE_DROP_TEST TEMPLATE title=\"%s\" tier=%s cooldown=%d cost=[%s] base_delivery=[%s] "
-		       "delivered_to_reference_collector=%d ratio=%.2f"),
+		       "radixite_value_at_x1=%.0f ratio=%.2f"),
 	       *UISettings.Title.ToString(), *UEnum::GetValueAsString(Ability.GetAbilityTier()), Costs.CoolDownTime,
-	       *FormatResources(Costs.Costs.ResourceCosts), *FormatResources(Delivered), DeliveredTotal,
-	       M_Measurement.CostTotal > 0 ? static_cast<float>(DeliveredTotal) / M_Measurement.CostTotal : 0.f);
+	       *FormatResources(Costs.Costs.ResourceCosts), *FormatResources(Delivered), DeliveredValue, ReturnRatio);
 	Check(Ability.GetAbilityTier() == EGlobalAbilityTier::TierI, TEXT("template_tier_I"));
 	Check(Costs.CoolDownTime >= MinCooldown && Costs.CoolDownTime <= MaxCooldown, TEXT("template_cooldown_60_90"),
 	      FString::Printf(TEXT("cooldown=%d"), Costs.CoolDownTime));
 	Check(M_Measurement.CostTotal > 0, TEXT("template_has_cost"));
-	Check(DeliveredTotal > M_Measurement.CostTotal, TEXT("template_delivers_more_than_cost"),
-	      FString::Printf(TEXT("delivers=%d cost=%d"), DeliveredTotal, M_Measurement.CostTotal));
+	Check(Costs.Costs.ResourceCosts.Num() == 1 && Costs.Costs.ResourceCosts.Contains(ERTSResourceType::Resource_Radixite),
+	      TEXT("template_costs_radixite_only"), FormatResources(Costs.Costs.ResourceCosts));
+	Check(ReturnRatio >= MinReturnAtX1, TEXT("template_returns_more_than_cost_at_x1"),
+	      FString::Printf(TEXT("value=%.0f R cost=%d ratio=%.2f min=%.2f"), DeliveredValue, M_Measurement.CostTotal,
+	                      ReturnRatio, MinReturnAtX1));
 	Check(IsValid(UISettings.AbilityIcon) && not UISettings.Title.ToString().Contains(TEXT("Ability Title")),
 	      TEXT("template_has_icon_and_title"));
 }
@@ -424,7 +460,7 @@ void UResourceDropTestSubsystem::SpawnCollectors(const UGA_ResourceDrop& Ability
 		// A fresh squad per case: a squad that finished the previous case did not take new scavenge orders.
 		M_Scavengers = Cast<ASquadController>(SpawnTestUnit(ScavengerSquadPath, M_Anchor + Sideways *
 			                                                    CollectorSideOffset, false));
-		Check(M_Scavengers.IsValid(), TEXT("scavenger_squad_spawned"));
+		Check(M_Scavengers.IsValid(), TEXT("x1_scavenger_squad_spawned"));
 		return;
 	}
 	if (not M_Refinery.IsValid())
@@ -493,8 +529,10 @@ void UResourceDropTestSubsystem::CastAbility(UGA_ResourceDrop& Ability)
 	Ability.OnResourceLanded.AddUObject(this, &UResourceDropTestSubsystem::OnResourceLanded);
 	M_Measurement.BaselineRadixite = GetPlayerResource(ERTSResourceType::Resource_Radixite);
 	M_Measurement.BaselineMetal = GetPlayerResource(ERTSResourceType::Resource_Metal);
+	M_Measurement.BaselineVehicleParts = GetPlayerResource(ERTSResourceType::Resource_VehicleParts);
 	M_LastSeenRadixite = M_Measurement.BaselineRadixite;
 	M_LastSeenMetal = M_Measurement.BaselineMetal;
+	M_LastSeenVehicleParts = M_Measurement.BaselineVehicleParts;
 	M_Measurement.CastSeconds = GetNow();
 	Ability.ExecuteAbilityAlongLine(LineStart, LineEnd);
 	UE_LOG(LogRTSResourceDropTest, Display, TEXT("RTS_RESOURCE_DROP_TEST EXECUTED strip=%.0f baseline R=%d M=%d"),
@@ -691,7 +729,8 @@ void UResourceDropTestSubsystem::TickCollecting()
 		}
 		Check(OpenEmptiedContainers == 0, TEXT("emptied_containers_closed"),
 		      FString::Printf(TEXT("still_open=%d"), OpenEmptiedContainers));
-		M_Measurement.GainAtEmptied = M_Measurement.GainedRadixite + M_Measurement.GainedMetal;
+		M_Measurement.GainAtEmptied = M_Measurement.GainedRadixite + M_Measurement.GainedMetal
+			+ M_Measurement.GainedVehicleParts;
 		SetPhase(EResourceDropTestPhase::Settling);
 	}
 }
@@ -700,24 +739,32 @@ void UResourceDropTestSubsystem::TrackResourceGain()
 {
 	const int32 Radixite = GetPlayerResource(ERTSResourceType::Resource_Radixite);
 	const int32 Metal = GetPlayerResource(ERTSResourceType::Resource_Metal);
-	if (Radixite == M_LastSeenRadixite && Metal == M_LastSeenMetal)
+	const int32 VehicleParts = GetPlayerResource(ERTSResourceType::Resource_VehicleParts);
+	if (Radixite == M_LastSeenRadixite && Metal == M_LastSeenMetal && VehicleParts == M_LastSeenVehicleParts)
 	{
 		return;
 	}
 	const float SinceCast = GetNow() - M_Measurement.CastSeconds;
-	UE_LOG(LogRTSResourceDropTest, Display, TEXT("RTS_RESOURCE_DROP_TEST GAIN at=%.1fs radixite=%+d metal=%+d"),
-	       SinceCast, Radixite - M_LastSeenRadixite, Metal - M_LastSeenMetal);
+	UE_LOG(LogRTSResourceDropTest, Display,
+	       TEXT("RTS_RESOURCE_DROP_TEST GAIN at=%.1fs radixite=%+d metal=%+d vehicle_parts=%+d"),
+	       SinceCast, Radixite - M_LastSeenRadixite, Metal - M_LastSeenMetal, VehicleParts - M_LastSeenVehicleParts);
 	M_LastSeenRadixite = Radixite;
 	M_LastSeenMetal = Metal;
+	M_LastSeenVehicleParts = VehicleParts;
 	++M_Measurement.GainEvents;
 	M_Measurement.GainedRadixite = Radixite - M_Measurement.BaselineRadixite;
 	M_Measurement.GainedMetal = Metal - M_Measurement.BaselineMetal;
+	M_Measurement.GainedVehicleParts = VehicleParts - M_Measurement.BaselineVehicleParts;
+	M_Measurement.GainedValue = ResourceDropTestPrivate::GetRadixiteValue(ERTSResourceType::Resource_Radixite,
+		                            M_Measurement.GainedRadixite)
+		+ ResourceDropTestPrivate::GetRadixiteValue(ERTSResourceType::Resource_Metal, M_Measurement.GainedMetal)
+		+ ResourceDropTestPrivate::GetRadixiteValue(ERTSResourceType::Resource_VehicleParts,
+		                                            M_Measurement.GainedVehicleParts);
 	if (M_Measurement.FirstGainSeconds < 0.f)
 	{
 		M_Measurement.FirstGainSeconds = SinceCast;
 	}
-	if (M_Measurement.PaybackSeconds < 0.f
-		&& M_Measurement.GainedRadixite + M_Measurement.GainedMetal >= M_Measurement.CostTotal)
+	if (M_Measurement.PaybackSeconds < 0.f && M_Measurement.GainedValue >= M_Measurement.CostTotal)
 	{
 		M_Measurement.PaybackSeconds = SinceCast;
 	}
@@ -844,11 +891,15 @@ void UResourceDropTestSubsystem::FinishContainerCase()
 	}
 	const int32 ExpectedRadixite = ExpectedGain.FindRef(ERTSResourceType::Resource_Radixite);
 	const int32 ExpectedMetal = ExpectedGain.FindRef(ERTSResourceType::Resource_Metal);
-	Check(M_Measurement.GainedRadixite == ExpectedRadixite && M_Measurement.GainedMetal == ExpectedMetal,
+	const int32 ExpectedVehicleParts = ExpectedGain.FindRef(ERTSResourceType::Resource_VehicleParts);
+	Check(FMath::IsNearlyEqual(Multiplier, CollectorScavengeMultiplier), TEXT("collector_scavenges_at_x1"),
+	      FString::Printf(TEXT("multiplier=%.2f"), Multiplier));
+	Check(M_Measurement.GainedRadixite == ExpectedRadixite && M_Measurement.GainedMetal == ExpectedMetal
+	      && M_Measurement.GainedVehicleParts == ExpectedVehicleParts,
 	      TEXT("gain_equals_containers_times_reward"),
-	      FString::Printf(TEXT("gained R=%d M=%d expected R=%d M=%d containers=%d multiplier=%.2f"),
-	                      M_Measurement.GainedRadixite, M_Measurement.GainedMetal, ExpectedRadixite, ExpectedMetal,
-	                      ContainerCount, Multiplier));
+	      FString::Printf(TEXT("gained R=%d M=%d VP=%d expected R=%d M=%d VP=%d containers=%d multiplier=%.2f"),
+	                      M_Measurement.GainedRadixite, M_Measurement.GainedMetal, M_Measurement.GainedVehicleParts,
+	                      ExpectedRadixite, ExpectedMetal, ExpectedVehicleParts, ContainerCount, Multiplier));
 	int32 SingleCompletions = 0;
 	int32 RemovedContainers = 0;
 	for (const TPair<TWeakObjectPtr<AScavengeableObject>, int32>& Completion : M_ScavengeCompletions)
@@ -856,7 +907,7 @@ void UResourceDropTestSubsystem::FinishContainerCase()
 		SingleCompletions += Completion.Value == 1 ? 1 : 0;
 		RemovedContainers += Completion.Key.IsValid() ? 0 : 1;
 	}
-	const int32 GainNow = M_Measurement.GainedRadixite + M_Measurement.GainedMetal;
+	const int32 GainNow = M_Measurement.GainedRadixite + M_Measurement.GainedMetal + M_Measurement.GainedVehicleParts;
 	Check(GainNow == M_Measurement.GainAtEmptied, TEXT("no_gain_after_emptied"),
 	      FString::Printf(TEXT("at_emptied=%d after_settle=%d"), M_Measurement.GainAtEmptied, GainNow));
 	Check(SingleCompletions == ContainerCount, TEXT("each_container_paid_once"),
@@ -864,8 +915,11 @@ void UResourceDropTestSubsystem::FinishContainerCase()
 	Check(RemovedContainers == ContainerCount, TEXT("emptied_containers_removed"),
 	      FString::Printf(TEXT("removed=%d of %d"), RemovedContainers, ContainerCount));
 	Check(M_Measurement.PaybackSeconds >= 0.f, TEXT("gain_covers_cost"),
-	      FString::Printf(TEXT("gained=%d cost=%d"), M_Measurement.GainedRadixite + M_Measurement.GainedMetal,
-	                      M_Measurement.CostTotal));
+	      FString::Printf(TEXT("gained_value=%.0f R cost=%d"), M_Measurement.GainedValue, M_Measurement.CostTotal));
+	Check(M_Measurement.GainedValue >= M_Measurement.CostTotal * MinReturnAtX1, TEXT("x1_gain_beats_cost"),
+	      FString::Printf(TEXT("gained_value=%.0f R cost=%d ratio=%.2f"), M_Measurement.GainedValue,
+	                      M_Measurement.CostTotal,
+	                      M_Measurement.CostTotal > 0 ? M_Measurement.GainedValue / M_Measurement.CostTotal : 0.f));
 }
 
 void UResourceDropTestSubsystem::FinishDepositCase()
@@ -896,14 +950,16 @@ void UResourceDropTestSubsystem::LogMeasurement() const
 {
 	const FResourceDropTestMeasurement& Measured = M_Measurement;
 	const float CollectWindow = Measured.CollectedSeconds - Measured.FirstGainSeconds;
-	const int32 Gained = Measured.GainedRadixite + Measured.GainedMetal;
+	const float Gained = Measured.GainedValue;
 	const float PerMinute = CollectWindow > KINDA_SMALL_NUMBER ? Gained / CollectWindow * 60.f : 0.f;
 	UE_LOG(LogRTSResourceDropTest, Display,
-	       TEXT("RTS_RESOURCE_DROP_TEST MEASURED %s cost=%d gained R=%d M=%d net=%+d landed=%.1fs first_gain=%.1fs "
-		       "payback=%.1fs collected=%.1fs gain_events=%d rate_after_first_gain=%.0f/min"),
+	       TEXT("RTS_RESOURCE_DROP_TEST MEASURED %s cost=%d gained R=%d M=%d VP=%d value=%.0fR net=%+.0f "
+		       "landed=%.1fs first_gain=%.1fs payback=%.1fs collected=%.1fs gain_events=%d "
+		       "value_rate_after_first_gain=%.0f/min multiplier=%.2f"),
 	       *M_Cases[M_CaseIndex].Name, Measured.CostTotal, Measured.GainedRadixite, Measured.GainedMetal,
-	       Gained - Measured.CostTotal, Measured.LandedSeconds, Measured.FirstGainSeconds, Measured.PaybackSeconds,
-	       Measured.CollectedSeconds, Measured.GainEvents, PerMinute);
+	       Measured.GainedVehicleParts, Gained, Gained - Measured.CostTotal, Measured.LandedSeconds,
+	       Measured.FirstGainSeconds, Measured.PaybackSeconds, Measured.CollectedSeconds, Measured.GainEvents,
+	       PerMinute, Measured.ScavengeMultiplier);
 }
 
 // ---------------------------------------------------------------------------------------------------------------

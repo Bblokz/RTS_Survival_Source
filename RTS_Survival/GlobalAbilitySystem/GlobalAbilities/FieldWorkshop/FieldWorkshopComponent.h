@@ -20,7 +20,7 @@ enum class EFieldWorkshopState : uint8
 	WaitingForLanding,
 	// Repairs and rearms the owner's vehicles in its radius.
 	Working,
-	// Time is up: the auras are gone, the building puffs smoke and sinks into the ground, then removes itself.
+	// Time is up: the auras are gone, the building sinks into the ground raising dust, then removes itself.
 	PackingUp,
 	// Killed: the auras are gone, the Blueprint's death plays out.
 	Destroyed
@@ -31,7 +31,7 @@ struct FFieldWorkshopSettings
 {
 	GENERATED_BODY()
 
-	// How long the workshop repairs and rearms once it has landed.
+	// How long the workshop repairs and speeds up reloads once it has landed.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "1.0"))
 	float WorkingSeconds = 90.f;
 
@@ -43,16 +43,22 @@ struct FFieldWorkshopSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
 	float PackUpSinkDepthCm = 600.f;
 
-	// Puffed round the building when it starts to pack up.
+	// Grey dust raised round the building's foot as it sinks: once when the pack-up starts and once halfway down.
+	// (User 2026-11-05: five stacked construction-smoke puffs read as an explosion; packing up must read as dust.)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSoftObjectPtr<UNiagaraSystem> PackUpSmoke = TSoftObjectPtr<UNiagaraSystem>(FSoftObjectPath(TEXT(
-		"/Game/RTS_Survival/SpecialEffects/Smoke/ConstructionBuildingSmoke/NS_ConstructionSmokeRound_1.NS_ConstructionSmokeRound_1")));
+		"/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Effects/NS_DestructionSmoke.NS_DestructionSmoke")));
 
+	// Puffs per wave, spread evenly round the building.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0"))
-	int32 PackUpSmokePuffs = 5;
+	int32 PackUpSmokePuffs = 3;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
-	float PackUpSmokeRadiusCm = 350.f;
+	float PackUpSmokeRadiusCm = 300.f;
+
+	// Kept small so the dust stays at the building's foot instead of towering over it.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.05"))
+	float PackUpSmokeScale = 0.6f;
 
 	// The ground disc shown for the whole working time, sized to the rearm aura's radius.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -66,7 +72,7 @@ struct FFieldWorkshopSettings
  * @brief Turns a building expansion into a timed field workshop (UGA_BuildingParachuteDrop drops it): keeps the
  * actor's AOE auras (URadiusRepairAura + UFieldWorkshopRearmAura) off while the building falls, runs them for
  * WorkingSeconds after it landed with the radius drawn on the ground, then sinks the building into the ground in a
- * puff of smoke and removes it.
+ * cloud of dust and removes it.
  * When the building is killed first, the auras are torn down at once, which strips their behaviours from the units.
  * Landing = built, collision back on and no cargo canopy still descending, so a building placed without a drop
  * starts working at once.
@@ -101,6 +107,7 @@ private:
 	float M_WorkStartSeconds = -1.f;
 	float M_PackUpStartSeconds = -1.f;
 	FVector M_PackUpStartLocation = FVector::ZeroVector;
+	bool bM_SpawnedSecondDustWave = false;
 
 	UPROPERTY()
 	TWeakObjectPtr<ABuildingExpansion> M_Workshop;
@@ -130,6 +137,7 @@ private:
 	void StartWorking();
 	void StartPackingUp();
 	void TickPackingUp();
+	/** One wave of dust puffs round the building's foot (where it stood, so the dust stays on the ground). */
 	void SpawnPackUpSmoke() const;
 	void FinishPackingUp() const;
 	void OnWorkshopDies();

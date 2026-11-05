@@ -13,6 +13,14 @@ Run make_elite_scavenger_texture.py first (plain Python) for the diffuse texture
                                     3 STG + 2 Faust soldiers
   RTS_BP_RTSAsyncSpawner            SetupGerSquads row Squad_Ger_EliteScavengers -> Squad_Ger_EliteScavengers
 Health and cost come from C++ (CPPGameState squad data), not from these Blueprints.
+
+Mauser backup (user decision 2026-11-05, Tuning agent): Ger_Inf_EliteScavenger_Faust got, like Steel Fist's
+Ger_Inf_Faust, a "SecondaryMesh" StaticMeshComponent (SM_Ger_InfWeapon_MAUSER, no collision) on Mesh socket "Secondary"
+and a BeginPlay graph Parent:BeginPlay -> M_SecondaryWeapon.ManuallySetSecondaryWeapon(SecondaryMesh, "Mauser",
+Ger_Weapon_Mauser_C), added with the UECP tools add_component/reparent_component/build_blueprint_graph (python cannot
+place K2 nodes). This script reuses the existing Blueprint, so a re-run keeps them; only a deleted Blueprint loses them
+(then replay those three UECP calls). The squad's switch-weapon button then swaps Panzerfaust <-> Mauser.
+-EliteScavengersValidate checks the backup, a Panzerfaust shot, the switch to the Mauser and back.
 Saves are verified by file mtime: a package another process holds fails with error 32 without raising.
 """
 import os

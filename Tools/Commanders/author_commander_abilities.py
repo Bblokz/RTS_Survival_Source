@@ -95,8 +95,9 @@ NEW = [
      "A single Ju 87 attacks along the marked strip: a cheaper, smaller strike.", "strafe_single_ju87"),
     ("GA_Me410Airstrike", "GA_3xJu87Strafing", "Me 410 Strike",
      "A single Me 410 heavy fighter attacks along the marked strip.", "strafe_me410"),
-    ("GA_2xBf110Strafing", "GA_2xHortentrafing", "2x Bf 110 Strafing",
-     "Two Bf 110 heavy fighters strafe along the marked strip.", "strafe_bf110"),
+    # Keeps its enum key, but Ger_Aircraft_BF110Airborne is a Bf 109 (round 5, 2026-11-05: Bf 109 wording).
+    ("GA_2xBf110Strafing", "GA_2xHortentrafing", "2x Bf 109 Strafing",
+     "Two Bf 109 fighters strafe along the marked strip.", "strafe_bf110"),
     ("GA_LargeBarrage", "GA_Barrage", "Large Barrage",
      "A long off-map barrage saturates a wide area with heavy shells.", "barrage_large"),
     ("GA_GerRailBombardment", "GA_Barrage", "Rail Bombardment",
@@ -504,6 +505,16 @@ def copy_props(source, target):
     return copied
 
 
+def clear_required_technology(obj):
+    """No copied technology gate (round 5, user 2026-11-05): GA_3xJu87Strafing carried Tech_HarvesterSpeed, which
+    silently blocked the click, and every copy inherited it. Keeps the unit requirement."""
+    requirements = detached_copy(obj.get_editor_property("m_ability_requirements"))
+    for attr in dir(unreal.Technology):
+        if attr.replace("_", "").lower() == "technone":
+            requirements.set_editor_property("required_technology", getattr(unreal.Technology, attr))
+    obj.set_editor_property("m_ability_requirements", requirements)
+
+
 def set_ui(obj, title, description):
     ui = obj.get_editor_property("m_ui_settings")
     if title is not None:
@@ -550,6 +561,7 @@ def author_new(asset, templates, entries, report, errors):
                 report.append("created %s from %s (%s, %d properties)" % (
                     name, source_name, source.get_class().get_name(), len(copied)))
             globals()[edit](obj)
+            clear_required_technology(obj)
             set_ui(obj, title, description)
             obj.set_editor_property("m_ability_type", key)
             templates[key] = obj
@@ -564,6 +576,7 @@ def apply_edits(templates, entries, errors):
             if obj is None:
                 raise RuntimeError("no template")
             globals()[edit](obj)
+            clear_required_technology(obj)
             set_ui(obj, title, description)
         except Exception as error:
             errors.append("%s: %s" % (name, error))

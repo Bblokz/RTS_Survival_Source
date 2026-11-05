@@ -22,15 +22,19 @@ DEPOSIT_CLASS = ("/Game/RTS_Survival/Blueprints/Resources/ChildBps/Radixite/Reso
 ICON_DIR = "/Game/RTS_Survival/Textures/GameUI/GlobalAbilities/"
 
 # Each entry: enum name, UI, balance, payload. Rewards are per container BEFORE the squad's scavenge multiplier:
-# Scavengers and Rail Troopers triple them (Sturm Pioniere 1x), and scavenging rounds the result to 5. The numbers are
-# tuned for one Scavenger squad: 1.5x the cost back, paid back after the third crate (~3 min after the cast).
+# Scavengers and Rail Troopers triple them (Sturm Pioniere 1x), and scavenging rounds the result to 5.
+# User decision 2026-11-05: crates have no lifetime and are worth more than their radixite cost would buy even for a
+# normal x1 squad. Tuned to 1.5x the cost at x1 (metal counted 1:1 with radixite: the project has no metal rate;
+# 1 radixite = 3 vehicle parts, see Tools/SkyDrop). Scavengers then get 4.5x; that is intended.
+# Before (2026-11-05 morning): supply 30 R + 20 M and construction 10 R + 40 M per crate (1.5x only for Scavengers).
 TEMPLATES = [
     {
         "key": "GA_GerRadixiteMetalSupplyDrop",
         "title": "Radixite & Metal Supply Drop",
-        "description": ("A transport flies the line you draw and drops 4 supply crates on parachutes. Scavengers "
-                        "empty a crate in 50 seconds for 90 radixite and 60 metal: 360 radixite and 240 metal in "
-                        "all. Other infantry with scavenging gear gets a third. Crates stay until emptied."),
+        "description": ("A transport flies the line you draw and drops 4 supply crates on parachutes. Infantry "
+                        "with scavenging gear empties a crate in 50 seconds for 90 radixite and 60 metal: 360 "
+                        "radixite and 240 metal in all. Scavengers get three times as much. Crates stay until "
+                        "emptied."),
         "icon": "T_GlobalAbility_GerAirMinefield",
         "radixite_cost": 400,
         "cooldown": 90,
@@ -39,7 +43,7 @@ TEMPLATES = [
         "falling_mesh": "/Game/MilitaryBaseCamp/Meshes/SM_CrateBig",
         "falling_scale": 1.5,
         "parachute_scale": 3.0,
-        "rewards": {"RESOURCE_RADIXITE": 30, "RESOURCE_METAL": 20},
+        "rewards": {"RESOURCE_RADIXITE": 90, "RESOURCE_METAL": 60},
         "scavenge_seconds": 50.0,
         "strip": (1200.0, 3000.0, 2000.0, 600.0),
     },
@@ -47,8 +51,9 @@ TEMPLATES = [
         "key": "GA_GerConstructionSupplyDrop",
         "title": "Construction Supply Drop",
         "description": ("A transport flies the line you draw and drops 4 bundles of construction material on "
-                        "parachutes. Scavengers empty a bundle in 50 seconds for 120 metal and 30 radixite: 480 "
-                        "metal and 120 radixite in all. Other infantry with scavenging gear gets a third."),
+                        "parachutes. Infantry with scavenging gear empties a bundle in 50 seconds for 120 metal "
+                        "and 30 radixite: 480 metal and 120 radixite in all. Scavengers get three times as much. "
+                        "Bundles stay until emptied."),
         "icon": "T_GlobalAbility_GerAirMinefield",
         "radixite_cost": 400,
         "cooldown": 90,
@@ -57,7 +62,7 @@ TEMPLATES = [
         "falling_mesh": "/Game/RTS_Survival/Blueprints/Environment/ScavengeObjects/Misc/SM_ScavObj_MetalDump",
         "falling_scale": 0.55,
         "parachute_scale": 3.5,
-        "rewards": {"RESOURCE_RADIXITE": 10, "RESOURCE_METAL": 40},
+        "rewards": {"RESOURCE_RADIXITE": 30, "RESOURCE_METAL": 120},
         "scavenge_seconds": 50.0,
         "strip": (1200.0, 3000.0, 2000.0, 600.0),
     },
@@ -119,11 +124,11 @@ def apply_ui_and_balance(obj, spec):
     ui.set_editor_property("ability_icon", load(ICON_DIR + spec["icon"]))
     obj.set_editor_property("m_ui_settings", ui)
     obj.set_editor_property("m_ability_tier", unreal.GlobalAbilityTier.TIER_I)
-    cost_state = obj.get_editor_property("m_ability_costs")
-    unit_cost = cost_state.get_editor_property("costs")
-    unit_cost.set_editor_property("resource_costs", {unreal.RTSResourceType.RESOURCE_RADIXITE: spec["radixite_cost"]})
-    cost_state.set_editor_property("costs", unit_cost)
-    cost_state.set_editor_property("cool_down_time", spec["cooldown"])
+    # FUnitCost::ResourceCosts is EditDefaultsOnly: python cannot set it on an instance; build a fresh cost state
+    # from text (radixite only, user decision 2026-11-05).
+    cost_state = type(obj.get_editor_property("m_ability_costs"))()
+    cost_state.import_text("(Costs=(ResourceCosts=((Resource_Radixite, %d))),CoolDownTime=%d,CoolDownRemaining=0)"
+                           % (spec["radixite_cost"], spec["cooldown"]))
     obj.set_editor_property("m_ability_costs", cost_state)
 
 

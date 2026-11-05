@@ -8,7 +8,8 @@ The data asset holds templates of classes the Development DLL lacks, so run head
 Saved/AgentLocks/da_globalabilities.lockdir (and the build lock):
   UnrealEditor-Win64-DebugGame-Cmd.exe RTS_Survival.uproject -run=pythonscript -script=<this file>
 Idempotent: rebuilt from the source template and these numbers on every run. Radixite-only cost (user decision
-2026-11-05). Test: -Ju87GTankBustersValidate.
+2026-11-05). The source's RequiredTechnology (Tech_HarvesterSpeed, a copy bug in the Ju 87 strafes) is NOT copied:
+user decision 2026-11-05, the template keeps only the source's RequiredUnit. Test: -Ju87GTankBustersValidate.
 """
 import re
 import time
@@ -88,6 +89,19 @@ def apply_aircraft(obj):
     return after
 
 
+def clear_required_technology(obj):
+    """Drops the copied Tech_HarvesterSpeed gate (user decision 2026-11-05); a fresh struct, never the source's."""
+    text = obj.get_editor_property("m_ability_requirements").export_text()
+    fresh = type(obj.get_editor_property("m_ability_requirements"))()
+    fresh.import_text(text)
+    fresh.set_editor_property("required_technology", member(unreal.Technology, "Tech_NONE"))
+    obj.set_editor_property("m_ability_requirements", fresh)
+    after = obj.get_editor_property("m_ability_requirements").export_text()
+    if "Tech_HarvesterSpeed" in after:
+        raise RuntimeError("required technology not cleared: %s" % after)
+    return after
+
+
 def apply_ui_and_balance(obj):
     ui = obj.get_editor_property("m_ui_settings")
     ui.set_editor_property("title", "<Text_Title>%s</>" % SPEC["title"])
@@ -98,13 +112,11 @@ def apply_ui_and_balance(obj):
     ui.set_editor_property("ability_icon", icon)
     obj.set_editor_property("m_ui_settings", ui)
     obj.set_editor_property("m_ability_tier", unreal.GlobalAbilityTier.TIER_III)
-    cost_state = obj.get_editor_property("m_ability_costs")
-    unit_cost = cost_state.get_editor_property("costs")
-    unit_cost.set_editor_property("resource_costs",
-                                  {member(unreal.RTSResourceType, k): v for k, v in SPEC["costs"].items()})
-    cost_state.set_editor_property("costs", unit_cost)
-    cost_state.set_editor_property("cool_down_time", SPEC["cooldown"])
-    cost_state.set_editor_property("cool_down_remaining", 0)
+    # FUnitCost::ResourceCosts is EditDefaultsOnly: python cannot set it on an instance, import_text can.
+    resources = ",".join("(%s, %d)" % (name, amount) for name, amount in SPEC["costs"].items())
+    cost_state = type(obj.get_editor_property("m_ability_costs"))()
+    cost_state.import_text("(Costs=(ResourceCosts=(%s)),CoolDownTime=%d,CoolDownRemaining=0)"
+                           % (resources, SPEC["cooldown"]))
     obj.set_editor_property("m_ability_costs", cost_state)
 
 
@@ -129,6 +141,8 @@ def run():
         report.append("created %s" % SPEC["key"])
     for prop in COPIED:
         import_struct(obj, prop, source.get_editor_property(prop).export_text())
+    requirements = clear_required_technology(obj)
+    report.append("requirements %s" % requirements)
     obj.set_editor_property("m_ability_type", key)
     strafing = apply_aircraft(obj)
     apply_ui_and_balance(obj)

@@ -100,12 +100,25 @@ def enum_member(enum_type, name):
     raise KeyError("%s has no member %s" % (enum_type, name))
 
 
+def clear_required_technology(obj):
+    """No copied technology gate (round 5, user 2026-11-05): GA_3xJu87Strafing carried Tech_HarvesterSpeed, which
+    silently blocked the click, and every copy inherited it. Keeps the unit requirement."""
+    old = obj.get_editor_property("m_ability_requirements")
+    requirements = type(old)()
+    requirements.import_text(old.export_text())
+    for attr in dir(unreal.Technology):
+        if attr.replace("_", "").lower() == "technone":
+            requirements.set_editor_property("required_technology", getattr(unreal.Technology, attr))
+    obj.set_editor_property("m_ability_requirements", requirements)
+
+
 def set_common(obj, key, spec, source):
     for prop in COPIED_PROPERTIES:
         try:
             obj.set_editor_property(prop, source.get_editor_property(prop))
         except Exception as error:
             unreal.log_warning(LOG + "could not copy %s: %s" % (prop, error))
+    clear_required_technology(obj)
     obj.set_editor_property("m_ability_type", key)
     obj.set_editor_property("m_ability_tier", getattr(unreal.GlobalAbilityTier, spec["tier"]))
     cost_state = obj.get_editor_property("m_ability_costs")

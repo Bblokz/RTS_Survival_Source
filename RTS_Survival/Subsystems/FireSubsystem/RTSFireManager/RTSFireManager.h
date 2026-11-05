@@ -72,13 +72,24 @@ struct FRTSGroundFireArea
 /** Upright flames of the ground fire areas; read once from URTSFirePoolSettings. */
 struct FRTSGroundFireFlameSettings
 {
-	int32 MaxFlamesPerArea = 4;
-	float CoverRadiusCm = 180.f;
+	int32 MaxFlamesPerArea = 6;
 	float ScalePerVfxScale = 0.6f;
-	float MinScale = 1.f;
+	float MinScale = 1.6f;
 	float MaxScale = 2.2f;
-	float RingFraction = 0.55f;
+	float FootprintCm = 55.f;
+	float EdgeMarginCm = 20.f;
+	float Spacing = 1.6f;
 	bool bCarpet = true;
+};
+
+/** Where the upright flames of one burning area stand: one in the centre, RingCount on a ring. */
+struct FRTSGroundFireFlameLayout
+{
+	// 0 when the area gets no upright flames at all.
+	int32 FlameCount = 0;
+	int32 RingCount = 0;
+	float RingRadiusCm = 0.f;
+	float FlameScale = 1.f;
 };
 
 /** Outcome of a ground fire request. */
@@ -186,11 +197,12 @@ public:
 	int32 GetMaxActiveGroundFires() const { return M_MaxActiveGroundFires; }
 
 	/**
-	 * @brief How many upright flames an area of this radius gets; one per cover circle, at least one, capped.
-	 * @param RadiusCm Radius of the burning area.
-	 * @return 0 when upright flames are off.
+	 * @brief Lays the upright flames out so their outer edge sits just inside the burning radius: the flames show the
+	 * area that does damage. Large areas get bigger flames until their ring closes.
+	 * @param Settings Radius and VfxScale of the burn.
+	 * @return The layout; FlameCount 0 when upright flames are off.
 	 */
-	int32 GetGroundFireFlameCount(float RadiusCm) const;
+	FRTSGroundFireFlameLayout GetGroundFireFlameLayout(const FRTSGroundFireSettings& Settings) const;
 
 	/** @return Number of pooled fire effects of this type that are currently active. */
 	int32 GetActiveFireCount(ERTSFireType FireType) const;
@@ -233,8 +245,8 @@ private:
 	 */
 	void StartGroundFireFlames(const FRTSGroundFireSettings& Settings, const FVector& GroundLocation,
 	                           TArray<int32, TInlineAllocator<6>>& OutFlameHandles);
-	FVector GetGroundFireFlameLocation(const FVector& GroundLocation, float RadiusCm, int32 FlameIndex,
-	                                   int32 FlameCount) const;
+	FVector GetGroundFireFlameLocation(const FVector& GroundLocation, const FRTSGroundFireFlameLayout& Layout,
+	                                   int32 FlameIndex) const;
 	void StopGroundFireVfx(const FRTSGroundFireArea& Area);
 	void PutOutGroundFireAt(int32 AreaIndex);
 	void DealGroundFireDamage(const FRTSGroundFireArea& Area, float BurnSeconds);

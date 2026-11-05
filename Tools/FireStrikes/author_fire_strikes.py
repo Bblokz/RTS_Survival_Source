@@ -129,6 +129,18 @@ def copy_from_source(obj, source, props):
         import_struct(obj, prop, source.get_editor_property(prop).export_text())
 
 
+def clear_required_technology(obj):
+    """No copied technology gate (round 5, user 2026-11-05): GA_3xJu87Strafing carried Tech_HarvesterSpeed, which
+    silently blocked the click, and every copy inherited it. Keeps the unit requirement."""
+    old = obj.get_editor_property("m_ability_requirements")
+    requirements = type(old)()
+    requirements.import_text(old.export_text())
+    for attr in dir(unreal.Technology):
+        if attr.replace("_", "").lower() == "technone":
+            requirements.set_editor_property("required_technology", getattr(unreal.Technology, attr))
+    obj.set_editor_property("m_ability_requirements", requirements)
+
+
 def apply_ui_and_balance(obj, spec):
     ui = obj.get_editor_property("m_ui_settings")
     ui.set_editor_property("title", "<Text_Title>%s</>" % spec["title"])
@@ -248,6 +260,7 @@ def build(asset, templates, enum_type, spec, cls, copied, apply, report):
         report.append("created %s" % spec["key"])
     # Rebuilt from the source every run, so a re-run never compounds an edit.
     copy_from_source(obj, source, copied)
+    clear_required_technology(obj)
     obj.set_editor_property("m_ability_type", key)
     apply_ui_and_balance(obj, spec)
     report.append("%s payload %s" % (spec["key"], apply(obj)[:900]))

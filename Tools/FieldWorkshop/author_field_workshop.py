@@ -55,6 +55,12 @@ RADIUS_CM = 2000.0
 AURA_INTERVAL_SECONDS = 1.0
 WORKING_SECONDS = 90.0
 PACK_UP_SECONDS = 6.0
+# User 2026-11-05: the old five NS_ConstructionSmokeRound_1 puffs read as an explosion. Packing up now raises two small
+# waves of grey dust round the building's foot (at the start and halfway down).
+PACK_UP_DUST = "/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Effects/NS_DestructionSmoke"
+PACK_UP_DUST_PUFFS = 3
+PACK_UP_DUST_RADIUS_CM = 300.0
+PACK_UP_DUST_SCALE = 0.6
 WORKSHOP_CANOPY_SCALE = 3.0
 WORKSHOP_CANOPY_COUNT = 3
 GUN_OFFSET = (0.0, 3000.0)
@@ -252,6 +258,10 @@ def set_workshop_component(bp):
     settings = fresh_copy(component.get_editor_property("M_WorkshopSettings"))
     settings.set_editor_property("working_seconds", WORKING_SECONDS)
     settings.set_editor_property("pack_up_seconds", PACK_UP_SECONDS)
+    settings.set_editor_property("pack_up_smoke", unreal.load_asset(PACK_UP_DUST))
+    settings.set_editor_property("pack_up_smoke_puffs", PACK_UP_DUST_PUFFS)
+    settings.set_editor_property("pack_up_smoke_radius_cm", PACK_UP_DUST_RADIUS_CM)
+    settings.set_editor_property("pack_up_smoke_scale", PACK_UP_DUST_SCALE)
     settings.set_editor_property("working_radius_type", member(unreal.RTSRadiusType, "FullCircle_AmmoResupplyAura"))
     component.set_editor_property("M_WorkshopSettings", settings)
     return component

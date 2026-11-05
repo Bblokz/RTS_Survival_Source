@@ -16,6 +16,8 @@
 namespace FieldWorkshopConstants
 {
 	constexpr float PackUpStepSeconds = 0.03f;
+	// The second dust wave rises when the building is this far through its sink.
+	constexpr float SecondDustWaveAlpha = 0.5f;
 }
 
 UFieldWorkshopComponent::UFieldWorkshopComponent()
@@ -188,11 +190,12 @@ void UFieldWorkshopComponent::StartPackingUp()
 	{
 		return;
 	}
-	// The crew strikes the depot: smoke puffs and it sinks out of sight. No collision on the way down, so units
+	// The crew strikes the depot: it sinks out of sight in a cloud of dust. No collision on the way down, so units
 	// standing on or against it are not lifted or blocked by a building that is leaving.
 	M_Workshop->SetActorEnableCollision(false);
 	M_PackUpStartSeconds = World->GetTimeSeconds();
 	M_PackUpStartLocation = M_Workshop->GetActorLocation();
+	bM_SpawnedSecondDustWave = false;
 	SpawnPackUpSmoke();
 	UE_LOG(LogTemp, Display, TEXT("RTS_FIELD_WORKSHOP packing_up=%s"), *M_Workshop->GetName());
 
@@ -218,6 +221,11 @@ void UFieldWorkshopComponent::TickPackingUp()
 	// Ease in: it settles slowly, then drops away.
 	const float Depth = M_WorkshopSettings.PackUpSinkDepthCm * Alpha * Alpha;
 	(void)M_Workshop->SetActorLocation(M_PackUpStartLocation - FVector(0.f, 0.f, Depth));
+	if (not bM_SpawnedSecondDustWave && Alpha >= FieldWorkshopConstants::SecondDustWaveAlpha)
+	{
+		bM_SpawnedSecondDustWave = true;
+		SpawnPackUpSmoke();
+	}
 	if (Alpha < 1.f)
 	{
 		return;
@@ -236,12 +244,15 @@ void UFieldWorkshopComponent::SpawnPackUpSmoke() const
 	{
 		return;
 	}
-	const FVector Centre = M_Workshop->GetActorLocation();
+	const FVector Centre = M_PackUpStartLocation;
+	const FVector Scale(M_WorkshopSettings.PackUpSmokeScale);
+	// The second wave is turned half a step so the two waves do not stack on the same spots.
+	const float WaveYawOffset = bM_SpawnedSecondDustWave ? 180.f / FMath::Max(1, M_WorkshopSettings.PackUpSmokePuffs) : 0.f;
 	for (int32 Puff = 0; Puff < M_WorkshopSettings.PackUpSmokePuffs; ++Puff)
 	{
-		const FVector Offset = FRotator(0.f, 360.f * Puff / M_WorkshopSettings.PackUpSmokePuffs, 0.f).Vector()
-			* M_WorkshopSettings.PackUpSmokeRadiusCm;
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Smoke, Centre + Offset);
+		const float Yaw = WaveYawOffset + 360.f * Puff / M_WorkshopSettings.PackUpSmokePuffs;
+		const FVector Offset = FRotator(0.f, Yaw, 0.f).Vector() * M_WorkshopSettings.PackUpSmokeRadiusCm;
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Smoke, Centre + Offset, FRotator::ZeroRotator, Scale);
 	}
 }
 

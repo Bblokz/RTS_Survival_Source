@@ -573,6 +573,7 @@ static bool Global_GetIsAntiTankSquad(const ESquadSubtype SquadSubtype)
 	{
 	case ESquadSubtype::Squad_Ger_PanzerGrenadiere:
 	case ESquadSubtype::Squad_Ger_RailTroopers:
+	case ESquadSubtype::Squad_Ger_EliteScavengers:
 	case ESquadSubtype::Squad_Ger_PaK38:
 	case ESquadSubtype::Squad_Ger_PaK40:
 	case ESquadSubtype::Squad_Rus_Zis_57MM:

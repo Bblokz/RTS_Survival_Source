@@ -23,7 +23,7 @@ enum class EResourceDropTestPhase : uint8
 	Finished
 };
 
-/** @brief One of the three resource drops the test runs in turn. */
+/** @brief One of the four resource drops the test runs in turn. */
 USTRUCT()
 struct FResourceDropTestCase
 {
@@ -47,8 +47,12 @@ struct FResourceDropTestMeasurement
 	int32 CostTotal = 0;
 	int32 BaselineRadixite = 0;
 	int32 BaselineMetal = 0;
+	int32 BaselineVehicleParts = 0;
 	int32 GainedRadixite = 0;
 	int32 GainedMetal = 0;
+	int32 GainedVehicleParts = 0;
+	// Everything gained, priced in radixite (1 radixite = 3 vehicle parts, metal 1:1).
+	float GainedValue = 0.f;
 	int32 GainEvents = 0;
 	int32 DepositStartAmount = 0;
 	int32 GainAtEmptied = 0;
@@ -56,10 +60,12 @@ struct FResourceDropTestMeasurement
 };
 
 /**
- * @brief -ResourceDropValidate: runs the three resource drop templates (supply, construction supply, radixite cache)
- * on the anchor (camera ground point, or -ResourceDropAnchorX= / -ResourceDropAnchorY=; -ResourceDropOnly=<name> runs
- * one case). Containers are emptied by a spawned scavenger squad, the cache is mined by a spawned Pz IV harvester into
- * a spawned refinery. Checks landing, gains against cost, payback time and that nothing pays twice. Hostile units
+ * @brief -ResourceDropValidate: runs the four resource drop templates (supply, construction supply, radixite cache,
+ * vehicle parts) on the anchor (camera ground point, or -ResourceDropAnchorX= / -ResourceDropAnchorY=;
+ * -ResourceDropOnly=<name> runs one case). Containers are emptied by a spawned Sturm Pioniere squad, which scavenges at
+ * x1 (user decision 2026-11-05: every drop returns more than its radixite cost even then), the cache is mined by a
+ * spawned Pz IV harvester into a spawned refinery. Checks landing, gains against cost (1 radixite = 3 vehicle parts,
+ * metal 1:1), payback time and that nothing pays twice. Hostile units
  * within 300 m are removed first (-ResourceDropKeepHostiles keeps them); -ResourceDropTimeScale=N speeds it up.
  * Screenshots to Saved/ResourceDropTest; logs RTS_RESOURCE_DROP_TEST. Not in shipping.
  */
@@ -92,6 +98,7 @@ private:
 	bool bM_TookMidCollectShot = false;
 	int32 M_LastSeenRadixite = 0;
 	int32 M_LastSeenMetal = 0;
+	int32 M_LastSeenVehicleParts = 0;
 	float M_NextOrderSeconds = 0.f;
 	float M_NextDiagnosticSeconds = 0.f;
 	float M_FirstFallingSeconds = -1.f;

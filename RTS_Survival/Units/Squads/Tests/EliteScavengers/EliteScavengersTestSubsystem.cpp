@@ -31,6 +31,12 @@
 #include "RTS_Survival/Units/Enums/Enum_UnitType.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/Weapons/InfantryWeapon/SecondaryWeaponComp/SecondaryWeapon.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
+#include "RTS_Survival/Weapons/WeaponData/WeaponNameConversion.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
@@ -58,6 +64,33 @@ namespace EliteScavengersTestPrivate
 	constexpr float HealthMultiplier = 1.33f;
 	constexpr int32 TierICooldownMin = 60;
 	constexpr int32 TierICooldownMax = 90;
+	// User decision 2026-11-05: 250 radixite per squad, two squads.
+	constexpr int32 ExpectedParadropRadixite = 500;
+	constexpr int32 EnemyPlayer = 2;
+	// The enemy T-34 the Panzerfausts fire at stands this far beyond the spawned squad, away from the drop anchor.
+	constexpr float EnemyTankOffset = 2500.f;
+	constexpr float EnemyTankAboveGroundCm = 120.f;
+	constexpr float FaustFireTimeoutSeconds = 45.f;
+	// A switch loads the other weapon class, plays the montage and finishes on a 1 s timer.
+	constexpr float WeaponSwitchSeconds = 4.f;
+	const TCHAR* const EnemyTankClassPath = TEXT(
+		"/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Rus_Medium/T34/Rus_Vehicle_T3476.Rus_Vehicle_T3476_C");
+	// Ger_Inf_Faust (Steel Fist) and the Elite Scavenger Panzerfaust soldier carry the same backup.
+	const FName MauserWeaponName(TEXT("Mauser"));
+
+	EWeaponName GetPrimaryWeaponName(const ASquadUnit& Unit)
+	{
+		const UWeaponState* WeaponState = Unit.GetWeaponState();
+		return IsValid(WeaponState) ? WeaponState->GetRawWeaponData().WeaponName : EWeaponName::DEFAULT_WEAPON;
+	}
+
+	EWeaponName GetSecondaryWeaponName(const ASquadUnit& Unit)
+	{
+		const USecondaryWeapon* Secondary = Unit.FindComponentByClass<USecondaryWeapon>();
+		return IsValid(Secondary) && Secondary->GetHasSecondaryWeapon()
+			       ? Secondary->GetWeaponName()
+			       : EWeaponName::DEFAULT_WEAPON;
+	}
 }
 
 bool UEliteScavengersTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -86,6 +119,12 @@ void UEliteScavengersTestSubsystem::Tick(const float DeltaTime)
 		return;
 	case EEliteScavengersTestPhase::WaitingForSpawnedSquad:
 		TickWaitingForSpawnedSquad();
+		return;
+	case EEliteScavengersTestPhase::BackupWeaponFiring:
+		TickBackupWeaponFiring();
+		return;
+	case EEliteScavengersTestPhase::BackupWeaponSwitching:
+		TickBackupWeaponSwitching();
 		return;
 	case EEliteScavengersTestPhase::WaitingForParadrop:
 		TickWaitingForParadrop();
@@ -265,7 +304,7 @@ void UEliteScavengersTestSubsystem::TickWaitingForSpawnedSquad()
 	      Squad->GetClass()->GetName());
 	CheckSquad(Squad, TEXT("spawned"));
 	RequestScreenshot(TEXT("SpawnedSquad"));
-	StartParadrop();
+	StartBackupWeaponTest();
 }
 
 void UEliteScavengersTestSubsystem::CheckSquad(ASquadController* Squad, const FString& Label)
@@ -322,6 +361,171 @@ void UEliteScavengersTestSubsystem::CheckSquad(ASquadController* Squad, const FS
 	      FString::Printf(TEXT("%d: %s"), FaustCount, *WeaponList));
 	Check(HealthMatches == Units.Num() && Units.Num() > 0, Label + TEXT("_health_is_scavenger_x1.33"),
 	      FString::Printf(TEXT("scavenger=%.1f expected=%.1f units=[%s]"), ScavengerHealth, ExpectedHealth, *HealthList));
+	// The Panzerfaust soldiers carry a Mauser backup like Steel Fist's Ger_Inf_Faust (user decision 2026-11-05).
+	const EWeaponName Mauser = Global_GetWeaponNameFromFName(MauserWeaponName);
+	int32 FaustWithMauser = 0;
+	for (const ASquadUnit* Unit : Units)
+	{
+		const bool bIsFaust = GetPrimaryWeaponName(*Unit) == EWeaponName::PanzerFaust;
+		FaustWithMauser += bIsFaust && GetSecondaryWeaponName(*Unit) == Mauser ? 1 : 0;
+	}
+	Check(FaustWithMauser == ExpectedFaustCount && Squad->HasSquadSecondaryWeapons(),
+	      Label + TEXT("_panzerfaust_soldiers_carry_mauser_backup"),
+	      FString::Printf(TEXT("with_mauser=%d of %d"), FaustWithMauser, ExpectedFaustCount));
+	Check(Global_GetIsAntiTankSquad(Subtype), Label + TEXT("_ai_counts_it_as_anti_tank"));
+}
+
+void UEliteScavengersTestSubsystem::StartBackupWeaponTest()
+{
+	using namespace EliteScavengersTestPrivate;
+	M_Phase = EEliteScavengersTestPhase::BackupWeaponFiring;
+	M_PhaseStartSeconds = GetNow();
+	ASquadController* Squad = M_SpawnedSquad.Get();
+	UWorld* World = GetWorld();
+	UClass* TankClass = LoadClass<AActor>(nullptr, EnemyTankClassPath);
+	if (not IsValid(Squad) || not IsValid(World) || not IsValid(TankClass))
+	{
+		Check(false, TEXT("backup_test_setup"));
+		StartParadrop();
+		return;
+	}
+	for (ASquadUnit* Unit : Squad->GetSquadUnitsChecked())
+	{
+		if (GetPrimaryWeaponName(*Unit) == EWeaponName::PanzerFaust)
+		{
+			M_FaustSoldiers.Add(Unit);
+		}
+	}
+	FVector Ground = M_DirectSpawnLocation + FVector(EnemyTankOffset, 0.f, 0.f);
+	GlobalAbilityHelpers::TryFindGroundLocation(this, Ground, Ground);
+	const FTransform Transform(FRotator(0.f, 180.f, 0.f), Ground + FVector(0.f, 0.f, EnemyTankAboveGroundCm));
+	M_EnemyTank = Cast<ATankMaster>(FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*World, TankClass, Transform,
+		EnemyPlayer));
+	Check(M_EnemyTank.IsValid(), TEXT("backup_test_enemy_tank_spawned"));
+	if (not M_EnemyTank.IsValid())
+	{
+		StartParadrop();
+		return;
+	}
+	HoldEnemyTankFire();
+	const ECommandQueueError OrderError = Squad->AttackActor(M_EnemyTank.Get(), true);
+	Check(OrderError == ECommandQueueError::NoError, TEXT("squad_ordered_to_attack_tank"),
+	      FString::Printf(TEXT("error=%d"), static_cast<int32>(OrderError)));
+}
+
+void UEliteScavengersTestSubsystem::HoldEnemyTankFire() const
+{
+	const ATankMaster* Tank = M_EnemyTank.Get();
+	if (not IsValid(Tank))
+	{
+		return;
+	}
+	for (ACPPTurretsMaster* Turret : Tank->GetTurrets())
+	{
+		if (IsValid(Turret))
+		{
+			Turret->DisableTurret();
+		}
+	}
+	for (UHullWeaponComponent* HullWeapon : Tank->GetHullWeapons())
+	{
+		if (IsValid(HullWeapon))
+		{
+			HullWeapon->DisableHullWeapon();
+		}
+	}
+}
+
+int32 UEliteScavengersTestSubsystem::CountFaustSoldiersThatFired() const
+{
+	int32 Fired = 0;
+	for (const TWeakObjectPtr<ASquadUnit>& Soldier : M_FaustSoldiers)
+	{
+		const UWeaponState* Faust = Soldier.IsValid() ? Soldier->GetWeaponState() : nullptr;
+		if (not IsValid(Faust))
+		{
+			continue;
+		}
+		const bool bMagazineSpent = Faust->GetCurrentMagCapacity() < Faust->GetRawWeaponData().MagCapacity;
+		Fired += bMagazineSpent || Faust->GetIsReloading() ? 1 : 0;
+	}
+	return Fired;
+}
+
+void UEliteScavengersTestSubsystem::TickBackupWeaponFiring()
+{
+	using namespace EliteScavengersTestPrivate;
+	ViewFrom(M_DirectSpawnLocation + FVector(EnemyTankOffset * 0.5f, 0.f, 0.f), 2600.f, -40.f);
+	HoldEnemyTankFire();
+	const int32 Fired = CountFaustSoldiersThatFired();
+	const bool bTimedOut = GetNow() - M_PhaseStartSeconds >= FaustFireTimeoutSeconds;
+	if (Fired < M_FaustSoldiers.Num() && not bTimedOut)
+	{
+		return;
+	}
+	Check(Fired == ExpectedFaustCount && M_FaustSoldiers.Num() == ExpectedFaustCount, TEXT("panzerfausts_fired_at_tank"),
+	      FString::Printf(TEXT("fired=%d of %d after %.1fs"), Fired, M_FaustSoldiers.Num(),
+	                      GetNow() - M_PhaseStartSeconds));
+	RequestScreenshot(TEXT("PanzerfaustsFired"));
+	ASquadController* Squad = M_SpawnedSquad.Get();
+	const ECommandQueueError SwitchError = IsValid(Squad) ? Squad->SwitchWeapons(true) : ECommandQueueError::CommandDataInvalid;
+	Check(SwitchError == ECommandQueueError::NoError, TEXT("switch_to_backup_ordered"),
+	      FString::Printf(TEXT("error=%d"), static_cast<int32>(SwitchError)));
+	M_SwitchStep = 0;
+	M_Phase = EEliteScavengersTestPhase::BackupWeaponSwitching;
+	M_PhaseStartSeconds = GetNow();
+}
+
+void UEliteScavengersTestSubsystem::TickBackupWeaponSwitching()
+{
+	using namespace EliteScavengersTestPrivate;
+	HoldEnemyTankFire();
+	if (GetNow() - M_PhaseStartSeconds < WeaponSwitchSeconds)
+	{
+		return;
+	}
+	const EWeaponName Mauser = Global_GetWeaponNameFromFName(MauserWeaponName);
+	ASquadController* Squad = M_SpawnedSquad.Get();
+	if (M_SwitchStep == 0)
+	{
+		CheckFaustSoldierWeapons(TEXT("switched_to_mauser_after_firing"), Mauser, EWeaponName::PanzerFaust);
+		RequestScreenshot(TEXT("SwitchedToMauser"));
+		const ECommandQueueError SwitchError = IsValid(Squad) ? Squad->SwitchWeapons(true) : ECommandQueueError::CommandDataInvalid;
+		Check(SwitchError == ECommandQueueError::NoError, TEXT("switch_back_ordered"),
+		      FString::Printf(TEXT("error=%d"), static_cast<int32>(SwitchError)));
+		M_SwitchStep = 1;
+		M_PhaseStartSeconds = GetNow();
+		return;
+	}
+	CheckFaustSoldierWeapons(TEXT("switched_back_to_panzerfaust"), EWeaponName::PanzerFaust, Mauser);
+	if (M_EnemyTank.IsValid())
+	{
+		M_EnemyTank->Destroy();
+	}
+	StartParadrop();
+}
+
+void UEliteScavengersTestSubsystem::CheckFaustSoldierWeapons(const FString& CheckName,
+                                                             const EWeaponName ExpectedPrimary,
+                                                             const EWeaponName ExpectedSecondary)
+{
+	using namespace EliteScavengersTestPrivate;
+	int32 Matching = 0;
+	FString Details;
+	for (const TWeakObjectPtr<ASquadUnit>& Soldier : M_FaustSoldiers)
+	{
+		if (not Soldier.IsValid())
+		{
+			Details += TEXT("dead ");
+			continue;
+		}
+		const EWeaponName Primary = GetPrimaryWeaponName(*Soldier);
+		const EWeaponName Secondary = GetSecondaryWeaponName(*Soldier);
+		Matching += Primary == ExpectedPrimary && Secondary == ExpectedSecondary ? 1 : 0;
+		Details += FString::Printf(TEXT("%s+%s "), *Global_GetWeaponDisplayName(Primary),
+		                           *Global_GetWeaponDisplayName(Secondary));
+	}
+	Check(Matching == ExpectedFaustCount, CheckName, Details);
 }
 
 void UEliteScavengersTestSubsystem::StartParadrop()
@@ -358,8 +562,10 @@ void UEliteScavengersTestSubsystem::StartParadrop()
 	      Global_GetGlobalAbilityTierDisplayName(Paradrop->GetAbilityTier()));
 	Check(Costs.CoolDownTime >= TierICooldownMin && Costs.CoolDownTime <= TierICooldownMax,
 	      TEXT("paradrop_cooldown_in_tier_I_band"), FString::Printf(TEXT("%d"), Costs.CoolDownTime));
-	Check(Radixite != nullptr && *Radixite > 0, TEXT("paradrop_has_cost"),
-	      FString::Printf(TEXT("radixite=%d metal=%d"), Radixite ? *Radixite : 0, Metal ? *Metal : 0));
+	Check(Radixite != nullptr && *Radixite == ExpectedParadropRadixite && Costs.Costs.ResourceCosts.Num() == 1,
+	      TEXT("paradrop_costs_500_radixite_only"),
+	      FString::Printf(TEXT("radixite=%d metal=%d resources=%d"), Radixite ? *Radixite : 0, Metal ? *Metal : 0,
+	                      Costs.Costs.ResourceCosts.Num()));
 
 	Paradrop->InitGlobalAbility(TestPlayer, Manager, Controller);
 	Paradrop->ExecuteAbilityAtLocation(M_Anchor);

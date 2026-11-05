@@ -414,7 +414,7 @@ void UJu87GTankBusterTestSubsystem::CheckCloseUpAircraft(AAircraftMaster& Aircra
 void UJu87GTankBusterTestSubsystem::CheckSharedFlak36DataUnchanged()
 {
 	using namespace Ju87GTestPrivate;
-	ACPPGameState* GameState = ACPPGameState::GetGameState(GetWorld());
+	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
 	const FWeaponData* Flak36Data = IsValid(GameState)
 		                                ? GameState->GetWeaponDataOfPlayer(TestPlayer, EWeaponName::Flak36_37MM)
 		                                : nullptr;
@@ -550,7 +550,7 @@ void UJu87GTankBusterTestSubsystem::StartStrike()
 	RequestScreenshot(TEXT("Strike_Clicked"));
 }
 
-void UJu87GTankBusterTestSubsystem::ClearCopyRequirements(UGlobalAbility& Ability) const
+void UJu87GTankBusterTestSubsystem::ClearCopyRequirements(UGlobalAbility& Ability)
 {
 	// The template keeps the building/tech gate of the Ju 87 strafe it was copied from; a bare test map has neither.
 	// Only this copy is cleared, after logging what the template asks for.
@@ -565,6 +565,10 @@ void UJu87GTankBusterTestSubsystem::ClearCopyRequirements(UGlobalAbility& Abilit
 	RequirementsProperty->ExportTextItem_Direct(RequirementText, Requirements, nullptr, nullptr, PPF_None);
 	UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST TEMPLATE_REQUIREMENTS %s (cleared on the test copy)"),
 	       *RequirementText);
+	// User decision 2026-11-05: the Tech_HarvesterSpeed gate copied from GA_3xJu87Strafing was a bug.
+	const FGlobalAbilityRequirements* TemplateRequirements = static_cast<const FGlobalAbilityRequirements*>(Requirements);
+	Check(TemplateRequirements->RequiredTechnology == ETechnology::Tech_NONE, TEXT("template_needs_no_technology"),
+	      RequirementText);
 	RequirementsProperty->Struct->ClearScriptStruct(Requirements);
 }
 

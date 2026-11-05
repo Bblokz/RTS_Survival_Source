@@ -62,6 +62,10 @@ struct FAircraftDropRequest
 	UPROPERTY(BlueprintReadWrite)
 	float RadiusSpawnSquads = 0.0f;
 
+	// Squads appear at the landed aircraft's cargo door and walk out to their spot on the RadiusSpawnSquads circle.
+	UPROPERTY(BlueprintReadWrite)
+	bool bSquadsWalkOutOfCargoDoor = false;
+
 	UPROPERTY(BlueprintReadWrite)
 	TObjectPtr<USoundBase> DropOffSound = nullptr;
 

@@ -692,6 +692,19 @@ private:
 	void AircraftDrop_OnVtoCompleted();
 	void AircraftDrop_SpawnSquads() const;
 	void AircraftDrop_SpawnSquad(ESquadSubtype SquadSubtype, int32 SquadIndex) const;
+	// Spawns the squads one after another at the cargo door, so they file out instead of stacking in the door.
+	void AircraftDrop_SpawnSquadsThroughCargoDoor() const;
+	/** @return The navmesh point at the mesh's cargo door socket; the landing point when the mesh has no such socket. */
+	FVector AircraftDrop_GetProjectedCargoDoorLocation() const;
+	/**
+	 * @brief Sends a squad that appeared at the cargo door to its spot outside the aircraft; from then on it is a
+	 * normal unit (the move is an ordinary command the player can override).
+	 * @param SpawnedSquad The squad controller the async spawner made.
+	 * @param DoorLocation Where the squad appeared.
+	 * @param OutsideLocation Its spot on the RadiusSpawnSquads circle.
+	 */
+	static void AircraftDrop_OrderSquadWalkOut(AActor* SpawnedSquad, const FVector& DoorLocation,
+	                                           const FVector& OutsideLocation);
 	void AircraftDrop_AttachTank();
 	void AircraftDrop_DetachTank();
 	void AircraftDrop_RegisterEnemyPayloadUnit(AActor* DroppedUnit) const;

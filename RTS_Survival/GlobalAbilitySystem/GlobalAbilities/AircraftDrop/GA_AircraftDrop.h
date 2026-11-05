@@ -58,6 +58,11 @@ struct FAircraftDropGlobalAbilitySettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
 	float RadiusSpawnSquads = 600.0f;
 
+	// Landed squad drops only: the squads appear one after another at the aircraft's cargo door (mesh socket
+	// "CargoDoor") and walk out to their spot on the RadiusSpawnSquads circle. Off: they appear on the circle.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bSquadsWalkOutOfCargoDoor = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
 	float BetweenAircraftRectangleOffset = 1000.0f;
 
