@@ -172,6 +172,8 @@ namespace DeveloperSettings
 			inline constexpr float LightTankDigInWallBuildingTime = 8.f * TankWallBuildingTimeMlp;
 			inline constexpr float MediumTankDigInWallBuildingTime = 12.f * TankWallBuildingTimeMlp;
 			inline constexpr float HeavyTankDigInWallBuildingTime = 16.f * TankWallBuildingTimeMlp;
+			// The AA truck ring covers all four sides: more sandbags than a medium tank's front wall.
+			inline constexpr float AATruckRingDigInWallBuildingTime = 14.f * TankWallBuildingTimeMlp;
 		}
 
 		namespace BuildingRadii
@@ -1466,6 +1468,8 @@ namespace DeveloperSettings
 			inline constexpr float LightTankDigInWallHealth = RoundToNearestMultipleOfFive(400.f * OverallHealthMlt);
 			inline constexpr float MediumTankDigInWallHealth = RoundToNearestMultipleOfFive(700.f * OverallHealthMlt);
 			inline constexpr float HeavyTankDigInWallHealth = RoundToNearestMultipleOfFive(1200.f * OverallHealthMlt);
+			// Ring around the unarmoured AA truck: tougher than the light and medium tank walls.
+			inline constexpr float AATruckRingDigInWallHealth = RoundToNearestMultipleOfFive(900.f * OverallHealthMlt);
 
 			// Aircraft Health settings.
 			inline constexpr float FighterHealth = RoundToNearestMultipleOfFive(800.f * OverallHealthMlt);

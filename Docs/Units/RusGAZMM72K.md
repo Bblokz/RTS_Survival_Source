@@ -34,3 +34,14 @@ The turret sets up its weapon with the FName `Gun72K_25MM` and turns a full circ
 up in the Blueprint as for the Flak 38 mounts; the weapon data carries no air flag. After the Blueprints and the
 spawner row exist: add it to `EnemyAITechLevel.cpp` `LightTankOptions` and to `SurvivalWaveSettings.cpp` (+ `wave_defaults.json`,
 `40_WavesAndAI.md`); the wave pool only takes subtypes that spawned in the unit roster test.
+
+## Dig in
+
+The truck digs in behind its own closed ring of sandbags around all four sides. Regular tank walls are a single wall in front.
+- `EDigInType::RusAATruckRingWall`: 900 HP and 14 s to build (`AATruckRingDigInWallHealth`, `AATruckRingDigInWallBuildingTime` in `DeveloperSettings.h`). The light tank wall has 400 HP and the medium 700.
+- Wall Blueprint: `/Game/RTS_Survival/Blueprints/GroundVehicles/DigIn/BP_DiginWall_RusAATruck_GAZMM72K`.
+  - Meshes: `.../Meshes/Props/SandBags/TankWalls/RusAATruck/SM_RusDigIn_GAZMM72K_Wall`, plus `_WallAt66` and `_WallAt33` for damage.
+  - Collision: one box per wall run.
+  - The `DigIn` component spawns it at the actor origin (`DigInOffset` 0).
+- The wall is 125 cm high. The 72-K fires over it at 0° elevation in every direction.
+- The Blueprints use `RusMediumTankWall` until this C++ is built. The post-build job `Saved/AgentScripts/GAZMM72KUE/job_digin_postbuild.py` then switches them to the ring type.

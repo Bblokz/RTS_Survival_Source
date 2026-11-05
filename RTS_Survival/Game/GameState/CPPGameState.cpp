@@ -5531,6 +5531,10 @@ void ACPPGameState::InitAllGameDigInData()
 	M_TPlayerDigInDataHashMap.Add(EDigInType::GerHeavyTankWall, DigInData);
 	M_TPlayerDigInDataHashMap.Add(EDigInType::RusHeavyTankWall, DigInData);
 
+	DigInData.DigInTime = AATruckRingDigInWallBuildingTime;
+	DigInData.DigInWallHealth = AATruckRingDigInWallHealth;
+	M_TPlayerDigInDataHashMap.Add(EDigInType::RusAATruckRingWall, DigInData);
+
 	M_TEnemyDigInDataHashMap = M_TPlayerDigInDataHashMap;
 }
 
