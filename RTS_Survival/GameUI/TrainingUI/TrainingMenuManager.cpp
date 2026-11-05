@@ -2973,6 +2973,8 @@ void UTrainingMenuManager::InitAllGameTrainingLayoutOnlyOptions()
 	};
 
 	AddSquadOptionIfMissing(ESquadSubtype::Squad_Ger_IronStorm, EliteInfantryTrainingTime);
+	// Rail Engineer commander unit; no building offers it, the option state lets a drop or unlock use it.
+	AddSquadOptionIfMissing(ESquadSubtype::Squad_Ger_RailTroopers, EliteInfantryTrainingTime);
 	AddSquadOptionIfMissing(ESquadSubtype::Squad_Rus_Dyakonov, BasicInfantryTrainingTime);
 	AddSquadOptionIfMissing(ESquadSubtype::Squad_Rus_KorovinAssault, ArmoredInfantryTrainingTime);
 	AddSquadOptionIfMissing(ESquadSubtype::Squad_Rus_ROKS3_PPSH, ArmoredInfantryTrainingTime);

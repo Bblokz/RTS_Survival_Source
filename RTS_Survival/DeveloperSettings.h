@@ -573,6 +573,14 @@ namespace DeveloperSettings
 				inline constexpr int32 IronStorm_Metal = 300;
 				inline constexpr int32 RailTroopers_Radixite = 750;
 				inline constexpr int32 RailTroopers_Metal = 350;
+				// Elite Scavengers: 5 scavengers with 33% more health, 3 STG 44s and 2 Panzerfausts. Between the
+				// Scavengers (250) and the armoured Panzer Grenadiers (675 + 200); well below the Rail Troopers.
+				inline constexpr int32 EliteScavengers_Radixite = 450;
+				inline constexpr int32 EliteScavengers_Metal = 125;
+				// Red Spine: 3 light mech walkers (Etasphere01) with MP46s. Priced like the elite squads it matches
+				// in total health (Iron Storm 700 + 300, Panzer Grenadiers 675 + 200), below the heavier walkers.
+				inline constexpr int32 RedSpine_Radixite = 650;
+				inline constexpr int32 RedSpine_Metal = 250;
 			}
 
 			namespace TeamWeapons
@@ -598,8 +606,8 @@ namespace DeveloperSettings
 				inline constexpr int32 RusML20_152mm_Metal = 350;
 				inline constexpr int32 RusBS3_100mm_Radixite = 550;
 				inline constexpr int32 RusBS3_100mm_Metal = 240;
-				inline constexpr int32 SFH18_150mm_Radixite = 600;
-				inline constexpr int32 SFH18_150mm_Metal = 260;
+				inline constexpr int32 SFH18_150mm_Radixite = 750;
+				inline constexpr int32 SFH18_150mm_Metal = 350;
 				inline constexpr int32 Nebelwerfer_Radixite = 600;
 				inline constexpr int32 Nebelwerfer_Metal = 260;
 			}
@@ -1456,6 +1464,14 @@ namespace DeveloperSettings
 
 			// Infantry health Settings
 			inline constexpr float BasicInfantryHealth = RoundToNearestMultipleOfFive(200.f * OverallHealthMlt);
+			// Elite Scavengers: the scavenger soldier with 33% more health, rounded to whole hit points
+			// (a multiple of five would drift to 1.31 or 1.34).
+			inline constexpr float EliteScavengersHealthMlt = 1.33f;
+			inline constexpr float EliteScavengersHealth = static_cast<float>(
+				static_cast<int32>(BasicInfantryHealth * EliteScavengersHealthMlt + 0.5f));
+			// Red Spine light mech walker, per walker: 1.2x an elite soldier, on heavy infantry armour. A squad of
+			// three (1440) sits just under a 4-man Iron Storm squad (4 x 400) and below the heavier walkers.
+			inline constexpr float RedSpineWalkerHealth = RoundToNearestMultipleOfFive(600.f * OverallHealthMlt);
 			inline constexpr float BasicSniperHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);
 			inline constexpr float ArmoredInfantryHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);
 			inline constexpr float HazmatInfantryHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);

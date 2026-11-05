@@ -561,6 +561,9 @@ enum class ESquadSubtype: uint8
 	// Rail Engineer commander: heavily armoured scavengers with M920 rail rifles. Appended to preserve the
 	// numeric subtype IDs stored in training options.
 	Squad_Ger_RailTroopers UMETA(DisplayName = "Ger Rail Troopers (armoured scavengers with railguns)"),
+	// Scrap Warlord commander: scavengers with 33% more health, 3 STG 44s and 2 Panzerfausts; delivered by the
+	// GA_GerEliteScavengersParadrop. Appended to preserve the numeric subtype IDs stored in training options.
+	Squad_Ger_EliteScavengers UMETA(DisplayName = "Ger Elite Scavengers (STG 44s and Panzerfausts)"),
 };
 
 
@@ -710,6 +713,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Iron Storm Squad";
 	case ESquadSubtype::Squad_Ger_RailTroopers:
 		return "Rail Troopers";
+	case ESquadSubtype::Squad_Ger_EliteScavengers:
+		return "Elite Scavengers";
 	case ESquadSubtype::Squad_Rus_RedHammer:
 		return "RedHammer Squad";
 	case ESquadSubtype::Squad_Rus_RedHamerPTRS:

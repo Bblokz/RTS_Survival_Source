@@ -10230,6 +10230,42 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_RailTroopers, SquadData);
 
+	// Elite Scavengers: the scavenger squad with 33% more health per soldier, STG 44s and Panzerfausts. Same body,
+	// speed and resistances as the scavengers; they keep the scavenge and repair buttons.
+	SquadData.MaxHealth = EliteScavengersHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, EliteScavengers_Radixite},
+		{ERTSResourceType::Resource_Metal, EliteScavengers_Metal}
+	});
+	SquadData.Abilities = BasicScavengerAbilities;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_EliteScavengers, SquadData);
+
+	// Red Spine: three light mech walkers on the infantry skeleton, heavy infantry armour, MP46s, normal pace.
+	SquadData.MaxHealth = RedSpineWalkerHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RedSpine_Radixite},
+		{ERTSResourceType::Resource_Metal, RedSpine_Metal}
+	});
+	SquadData.Abilities = BasicSquadAbilities;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_RedSpine, SquadData);
+
 	// --------------------------------------------------
 	//                     Rus Infantry
 	// --------------------------------------------------
