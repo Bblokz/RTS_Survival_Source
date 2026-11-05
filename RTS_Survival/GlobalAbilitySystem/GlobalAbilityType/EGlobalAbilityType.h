@@ -105,4 +105,8 @@ enum class EGlobalAbility : uint8
 	GA_GerVehiclePartsSupplyDrop,
 	GA_GerJu87GTankBusters,
 	GA_GerFieldWorkshopDrop,
+	// Sturmkommandant's "STG squad" = Iron Storm, and the Stahlläufer's Fels Krieger walkers (2026-11-05).
+	GA_GerIronStormParadrop,
+	GA_GerPzGrenIronStormParadrop,
+	GA_GerFelsKriegerDrop,
 };

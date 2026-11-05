@@ -137,6 +137,7 @@ private:
 	TArray<TWeakObjectPtr<AActor>> M_PumasBeforeDrop;
 	TArray<TWeakObjectPtr<AActor>> M_LandedSupplyCrates;
 	int32 M_ExpectedSupplyCrates = 0;
+	// Set once the step has seen its first result (flare ignited, Puma unloaded); the step clock restarts there.
 	bool bM_HasCapturedSkyDropResult = false;
 
 	void Check(const bool bCondition, const FString& Description, const FString& Details = FString());

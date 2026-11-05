@@ -177,10 +177,14 @@ void UAircraftCannonPodsComponent::SetupCannon(UAircraftWeapon& AircraftWeapon, 
 	UWeaponState* Cannon = Weapons.Last();
 	SelectFiredShell(*Cannon);
 	ApplyCannonRange(*Cannon);
+	ApplyCannonDataOverrides(*Cannon);
 	M_Cannons.Add(Cannon);
-	UE_LOG(LogRTSCannonPods, Log, TEXT("%s cannon %s on %s: shell %s range %.0f"), *GetOwner()->GetName(),
-	       *Parameters.WeaponName.ToString(), *Pod.MuzzleSocketName.ToString(),
-	       *UEnum::GetValueAsString(Cannon->GetRawWeaponData().ShellType), Cannon->GetRange());
+	const FWeaponData FiredData = Cannon->GetWeaponDataAdjustedForShellType();
+	UE_LOG(LogRTSCannonPods, Log, TEXT("%s cannon %s on %s: shell %s range %.0f accuracy %d rounds %d pen %.1f/%.1f"),
+	       *GetOwner()->GetName(), *Parameters.WeaponName.ToString(), *Pod.MuzzleSocketName.ToString(),
+	       *UEnum::GetValueAsString(Cannon->GetRawWeaponData().ShellType), Cannon->GetRange(),
+	       Cannon->GetRawWeaponData().Accuracy, Cannon->GetCurrentMagCapacity(), FiredData.ArmorPen,
+	       FiredData.ArmorPenMaxRange);
 }
 
 bool UAircraftCannonPodsComponent::CallSetupProjectileWeapon(UAircraftWeapon& AircraftWeapon,
@@ -226,4 +230,39 @@ void UAircraftCannonPodsComponent::ApplyCannonRange(UWeaponState& Cannon) const
 		return;
 	}
 	Cannon.UpgradeWeaponWithRangeMlt(CannonRange / DataRange);
+}
+
+void UAircraftCannonPodsComponent::ApplyCannonDataOverrides(UWeaponState& Cannon) const
+{
+	if (CannonAccuracy <= 0 && CannonMagazine <= 0 && CannonArmorPen <= 0.f)
+	{
+		return;
+	}
+	FWeaponData AdjustedData = Cannon.GetRawWeaponData();
+	if (CannonAccuracy > 0)
+	{
+		AdjustedData.Accuracy = CannonAccuracy;
+	}
+	if (CannonMagazine > 0)
+	{
+		AdjustedData.MagCapacity = CannonMagazine;
+	}
+	if (CannonArmorPen > 0.f)
+	{
+		ApplyCannonArmorPen(Cannon, AdjustedData);
+	}
+	Cannon.OverwriteCachedWeaponData(AdjustedData);
+}
+
+void UAircraftCannonPodsComponent::ApplyCannonArmorPen(const UWeaponState& Cannon, FWeaponData& InOutData) const
+{
+	// The shell multiplier (APCR 1.5x) is applied at launch; probe it so the fired shell lands on CannonArmorPen.
+	const FWeaponData RawData = Cannon.GetRawWeaponData();
+	const FWeaponData FiredData = Cannon.GetWeaponDataAdjustedForShellType();
+	const float PenMultiplier = RawData.ArmorPen > KINDA_SMALL_NUMBER ? FiredData.ArmorPen / RawData.ArmorPen : 1.f;
+	const float MaxRangeMultiplier = RawData.ArmorPenMaxRange > KINDA_SMALL_NUMBER
+		                                 ? FiredData.ArmorPenMaxRange / RawData.ArmorPenMaxRange
+		                                 : PenMultiplier;
+	InOutData.ArmorPen = CannonArmorPen / FMath::Max(PenMultiplier, KINDA_SMALL_NUMBER);
+	InOutData.ArmorPenMaxRange = CannonArmorPen / FMath::Max(MaxRangeMultiplier, KINDA_SMALL_NUMBER);
 }

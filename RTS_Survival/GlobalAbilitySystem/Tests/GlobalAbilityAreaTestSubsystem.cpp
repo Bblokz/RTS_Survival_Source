@@ -106,6 +106,8 @@ namespace GlobalAbilityAreaTestConstants
 	// The Ju 390 comes in from the edge of the map, lands, unloads and takes off again.
 	constexpr float PumaDropTimeoutSeconds = 240.f;
 	constexpr float PumaDropSideOffsetCm = 3000.f;
+	// After the unload the Ju 390 takes off again; the Puma is checked once it has gone.
+	constexpr float PumaTransportLeaveSeconds = 60.f;
 	constexpr float DroppedVehicleMaxHeightAboveAnchorCm = 500.f;
 	constexpr float SupplyDropTimeoutSeconds = 120.f;
 	constexpr float SupplyDropSideOffsetCm = -3000.f;
@@ -976,6 +978,7 @@ void UGlobalAbilityAreaTestSubsystem::StartSkyDropPuma()
 {
 	using namespace GlobalAbilityAreaTestConstants;
 	EnterStep(EGlobalAbilityAreaTestStep::SkyDropPuma);
+	bM_HasCapturedSkyDropResult = false;
 	M_PumasBeforeDrop.Reset();
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
@@ -1019,12 +1022,33 @@ void UGlobalAbilityAreaTestSubsystem::TickSkyDropPuma()
 {
 	using namespace GlobalAbilityAreaTestConstants;
 	const TArray<AActor*> LandedPumas = FindLandedPumas();
-	if (LandedPumas.IsEmpty() && GetStepSeconds() < PumaDropTimeoutSeconds)
+	if (not bM_HasCapturedSkyDropResult)
+	{
+		if (LandedPumas.IsEmpty() && GetStepSeconds() < PumaDropTimeoutSeconds)
+		{
+			return;
+		}
+		Check(not LandedPumas.IsEmpty(), TEXT("puma_drop_unloaded_a_puma"),
+		      FString::Printf(TEXT("after=%.1fs"), GetStepSeconds()));
+		if (LandedPumas.IsEmpty())
+		{
+			StartSkyDropVehicleParts();
+			return;
+		}
+		UE_LOG(LogRTSGlobalAbilityAreaTest, Display, TEXT("RTS_ABILITY_TEST PUMA_DROP unloaded after %.1fs"),
+		       GetStepSeconds());
+		// The step clock restarts at the unload; the Puma must still stand there once the transport has left.
+		bM_HasCapturedSkyDropResult = true;
+		M_StepStartSeconds = GetWorld()->GetTimeSeconds();
+		return;
+	}
+	const bool bTransportGone = not IsValid(FindRunAircraft());
+	if (not bTransportGone && GetStepSeconds() < PumaTransportLeaveSeconds)
 	{
 		return;
 	}
 	Check(LandedPumas.Num() == 1, TEXT("puma_drop_landed_one_puma"),
-	      FString::Printf(TEXT("landed=%d after=%.1fs"), LandedPumas.Num(), GetStepSeconds()));
+	      FString::Printf(TEXT("landed=%d transport_gone=%d"), LandedPumas.Num(), bTransportGone ? 1 : 0));
 	if (LandedPumas.IsEmpty())
 	{
 		StartSkyDropVehicleParts();
@@ -1035,8 +1059,8 @@ void UGlobalAbilityAreaTestSubsystem::TickSkyDropPuma()
 	const float DistanceToTarget = FVector::Dist2D(LandedPumas[0]->GetActorLocation(),
 	                                               M_Anchor + FVector(0.f, PumaDropSideOffsetCm, 0.f));
 	UE_LOG(LogRTSGlobalAbilityAreaTest, Display,
-	       TEXT("RTS_ABILITY_TEST PUMA_DROP landed after %.1fs, %.0fcm from the target"), GetStepSeconds(),
-	       DistanceToTarget);
+	       TEXT("RTS_ABILITY_TEST PUMA_DROP on the ground %.1fs after the unload (transport gone=%d), %.0fcm from the "
+		       "target"), GetStepSeconds(), bTransportGone ? 1 : 0, DistanceToTarget);
 	Capture(LandedPumas[0]->GetActorLocation(), TEXT("PumaDrop_Landed"));
 	StartSkyDropVehicleParts();
 }

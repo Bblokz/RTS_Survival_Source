@@ -71,6 +71,22 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cannon Pods")
 	float CannonRange;
 
+	// The pod cannon's accuracy (0 keeps the weapon data value). A ground flak gun's spread misses tanks from a strafing
+	// aircraft; the BK 3,7 was aimed through the dive sight, like the Me 410's BK 5 (accuracy 100).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cannon Pods", meta=(ClampMin="0", ClampMax="100"))
+	int32 CannonAccuracy = 0;
+
+	// Rounds per cannon (0 keeps the weapon data magazine). Aircraft do not reload in the air, so this is the sortie's
+	// ammunition: the BK 3,7 carried two 6-round clips, the reused Flak 36 data one.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cannon Pods", meta=(ClampMin="0"))
+	int32 CannonMagazine = 0;
+
+	// Armour penetration in mm of the FIRED shell (after the shell type's multiplier) over the cannon's whole range;
+	// 0 keeps the weapon data. Only this component's cannons change: the shared weapon data stays as it is. The pods
+	// fire from a dive within their short range, where the BK 3,7's tungsten round went through ~120 mm.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cannon Pods", meta=(ClampMin="0"))
+	float CannonArmorPen = 0.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Cannon Pods")
 	bool bRemoveBombBay = true;
 
@@ -100,4 +116,8 @@ private:
 	bool CallSetupProjectileWeapon(UAircraftWeapon& AircraftWeapon, const FInitWeaponStateProjectile& Parameters) const;
 	void SelectFiredShell(UWeaponState& Cannon) const;
 	void ApplyCannonRange(UWeaponState& Cannon) const;
+	/** Accuracy, magazine and penetration overrides go through one data overwrite, which also refills the magazine. */
+	void ApplyCannonDataOverrides(UWeaponState& Cannon) const;
+	/** Sets the raw penetration so the fired shell (shell multipliers applied at launch) reaches CannonArmorPen. */
+	void ApplyCannonArmorPen(const UWeaponState& Cannon, FWeaponData& InOutData) const;
 };
