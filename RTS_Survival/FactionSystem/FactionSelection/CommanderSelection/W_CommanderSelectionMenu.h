@@ -28,7 +28,7 @@ struct FStreamableHandle;
 
 /**
  * @brief Shown by AFactionPlayerController after the faction (and unit variant) choice: lists the commanders with
- * their portrait and six-ability kit and hands the chosen commander back on Confirm. Builds its own widget tree; a
+ * their portrait and seven-ability kit and hands the chosen commander back on Confirm. Builds its own widget tree; a
  * Blueprint child only fills M_Style with the skin brushes of the variant selection screen.
  */
 UCLASS()

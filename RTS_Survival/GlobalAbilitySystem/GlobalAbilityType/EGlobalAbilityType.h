@@ -62,4 +62,47 @@ enum class EGlobalAbility : uint8
 	GA_GerTigerRailDrop,
 	GA_GerSpiesInfiltration,
 	GA_GerV2Rocket,
+	// Rail Engineer: a transport lands two Rail Trooper squads (Squad_Ger_RailTroopers).
+	GA_GerRailTroopersDrop,
+	// Commander kits round 3 (2026-11-04), see Docs/Abilities/Commanders.md. Appended so stored values stay valid.
+	// Parachuted field guns and buildings.
+	GA_GerFlak88Drop,
+	GA_GerSFH18Drop,
+	GA_GerPanzerschreckPitDrop,
+	GA_GerPakPitDrop,
+	GA_GerFieldBunkerDrop,
+	// Several aircraft, each with its own delivery, fired at one target.
+	GA_GerLuftlandeSturm,
+	GA_GerMarderScavengerDrop,
+	GA_GerEliteScavengersPakDrop,
+	GA_GerSturmPionierenPakPitDrop,
+	// Resource drops.
+	GA_GerConstructionSupplyDrop,
+	// New strikes.
+	GA_GerSonnengewehr,
+	GA_GerIncendiaryJu87,
+	GA_GerFireBarrage,
+	// Unit drops built from existing ability classes.
+	GA_GerEliteScavengersParadrop,
+	GA_GerE50Drop,
+	GA_GerE75Drop,
+	GA_GerMausDrop,
+	GA_GerJagdTigerLaserDrop,
+	GA_GerJagdPantherFlamerDrop,
+	GA_Bf109Strafing,
+	GA_GerRadixitePzIIDrop,
+	GA_GerRadixitePzIIIWespeDrop,
+	GA_GerRailTroopersParadrop,
+	GA_GerLightBringersParadrop,
+	GA_GerPzJagerLaserDrop,
+	GA_GerFeuerSturmParadrop,
+	GA_GerPzIIIFlammDrop,
+	GA_GerRedSpineDrop,
+	GA_GerRedSpinePairDrop,
+	// Sky-Drop Quartermaster kit (2026-11-05).
+	GA_GerMassiveFlare,
+	GA_GerPumaDrop,
+	GA_GerVehiclePartsSupplyDrop,
+	GA_GerJu87GTankBusters,
+	GA_GerFieldWorkshopDrop,
 };

@@ -4,7 +4,9 @@ right contents. Logs lines prefixed [CommanderVerify]; run like author_commander
 import unreal
 
 DA_PATH = "/Game/RTS_Survival/Blueprints/GlobalAbilitySystem/DA_GlobalAbilitySystem"
-SLOT_TIERS = ("TIER_I", "TIER_I", "TIER_II", "TIER_III", ("TIER_III", "TIER_IV"), "TIER_IV")
+# Seven slots since round 3: intel, small reinforcements, economy (I), reinforcements (II), air strike (III),
+# signature (III or IV), super-heavy (IV).
+SLOT_TIERS = ("TIER_I", "TIER_I", "TIER_I", "TIER_II", "TIER_III", ("TIER_III", "TIER_IV"), "TIER_IV")
 
 
 def log(line):
@@ -65,8 +67,11 @@ def run():
                 "resource_costs")
             if not ok_tier or not costs:
                 problems += 1
-            log("  slot %d %s tier=%s%s%s" % (slot + 1, name_of(ability), tier, "" if ok_tier else " (SLOT MISMATCH)",
-                                              "" if costs else " (NO COST)"))
+            cooldown = obj.get_editor_property("m_ability_costs").get_editor_property("cool_down_time")
+            log("  slot %d %s %s tier=%s cd=%d costs=%s%s%s" % (
+                slot + 1, name_of(ability), obj.get_class().get_name(), tier, cooldown,
+                {name_of(k): v for k, v in costs.items()}, "" if ok_tier else " (SLOT MISMATCH)",
+                "" if costs else " (NO COST)"))
     for key, obj in templates.items():
         log(describe(key, obj))
     log("problems=%d" % problems)

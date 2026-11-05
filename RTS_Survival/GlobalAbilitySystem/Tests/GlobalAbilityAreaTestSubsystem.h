@@ -5,19 +5,31 @@
 #include "CoreMinimal.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/B4HowitzerPit/Tests/B4HowitzerCaptureRig.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
+#include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "GlobalAbilityAreaTestSubsystem.generated.h"
 
 class AAircraftMaster;
+class AFlareProjectile;
 class ACPPController;
 class APlayerAimAbility;
 class ARadixiteNuke;
 class UGlobalAbility;
+class UGlobalAbilitySetDataAsset;
+class UUserWidget;
+class UW_CommanderSelectionMenu;
+class UW_GlobalAbilityPanel;
 
 UENUM()
 enum class EGlobalAbilityAreaTestStep : uint8
 {
 	WaitingForStart,
+	// Every commander kit against the data asset, then pictures of the ability panel and the commander select screen.
+	CommanderKits,
+	// -GlobalAbilitySkyDrop only: the Sky-Drop Quartermaster's new abilities, each fired once after the kit checks.
+	SkyDropMassiveFlare,
+	SkyDropPuma,
+	SkyDropVehicleParts,
 	// Clicked through the controller: the fog must lift along the strip.
 	ReconClicked,
 	// The aircraft is shot down halfway: the reveal must stop there.
@@ -49,8 +61,10 @@ enum class EGlobalAbilityAreaAimTestStage : uint8
 /**
  * @brief Map test of the strip and area global abilities, started with -GlobalAbilityAreaValidate on a map with open
  * ground. Runs them through the real click path where a player would, and checks what they do on the ground.
- * -GlobalAbilityAreaCapture=<folder> also saves pictures of the target areas and effects. Logs RTS_ABILITY_TEST; not
- * in shipping.
+ * -GlobalAbilityAreaCapture=<folder> also saves pictures of the target areas and effects. Starts with the commander kit
+ * checks; -GlobalAbilityKitsOnly stops after them, -GlobalAbilityKitPictures=<folder> saves the panel and commander
+ * select screen there. -GlobalAbilitySkyDrop fires the massive flare, the Puma drop and the vehicle parts drop once
+ * after the kit checks. Logs RTS_ABILITY_TEST; not in shipping.
  */
 UCLASS()
 class RTS_SURVIVAL_API UGlobalAbilityAreaTestSubsystem : public UTickableWorldSubsystem
@@ -109,6 +123,22 @@ private:
 
 	FB4HowitzerCaptureRig M_CaptureRig;
 
+	// The commander kits step draws a stand-alone ability panel and the commander select screen into pictures.
+	UPROPERTY()
+	TObjectPtr<UW_GlobalAbilityPanel> M_KitPanel;
+
+	UPROPERTY()
+	TObjectPtr<UW_CommanderSelectionMenu> M_CommanderMenu;
+
+	FString M_KitPictureDirectory;
+	int32 M_KitPicturePhase = 0;
+
+	// Sky-Drop steps: what the Puma drop and the vehicle parts drop left on the ground.
+	TArray<TWeakObjectPtr<AActor>> M_PumasBeforeDrop;
+	TArray<TWeakObjectPtr<AActor>> M_LandedSupplyCrates;
+	int32 M_ExpectedSupplyCrates = 0;
+	bool bM_HasCapturedSkyDropResult = false;
+
 	void Check(const bool bCondition, const FString& Description, const FString& Details = FString());
 	float GetStepSeconds() const;
 	void EnterStep(EGlobalAbilityAreaTestStep NewStep);
@@ -147,7 +177,42 @@ private:
 	void TickEnemyMinefield();
 	void StartEnemyRecon();
 	void TickEnemyRecon();
+	void StartCommanderKits();
+	void TickCommanderKits();
 	void CheckPlayerLoadoutFitsPanel();
+
+	/**
+	 * @brief One kit: seven abilities, no ability twice, and per slot a template whose tier fits the slot.
+	 * @param Commander The kit's commander, for the log.
+	 * @param Kit Its config entry.
+	 * @param AbilitySet DA_GlobalAbilitySystem.
+	 * @param OutMissingTemplates Gets every kit ability without a template (still being authored elsewhere).
+	 */
+	void CheckCommanderKit(const ERTSCommander Commander, const FRTSCommanderSettings& Kit,
+	                       const UGlobalAbilitySetDataAsset* AbilitySet, TArray<FString>& OutMissingTemplates);
+
+	void CheckKitSlot(const FString& SlotText, const int32 SlotIndex, const EGlobalAbility Ability,
+	                  const UGlobalAbilitySetDataAsset* AbilitySet, TArray<FString>& OutMissingTemplates);
+
+	UGlobalAbilitySetDataAsset* LoadAbilitySet() const;
+	void BuildKitPanelPicture();
+	void BuildCommanderMenuPicture();
+	void FinishCommanderKits();
+
+	void StartSkyDropMassiveFlare();
+	void TickSkyDropMassiveFlare();
+	void CheckMassiveFlare(const AFlareProjectile& Flare);
+	void StartSkyDropPuma();
+	void TickSkyDropPuma();
+	TArray<AActor*> FindLandedPumas() const;
+	void StartSkyDropVehicleParts();
+	void TickSkyDropVehicleParts();
+	void CheckVehiclePartsCrates();
+	// The kit-only run ends after the Sky-Drop steps; the full run goes on with the area abilities.
+	void FinishSkyDrop();
+
+	/** @return True when the widget was drawn and its picture written to the kit picture folder. */
+	bool SaveWidgetPicture(UUserWidget* Widget, const FString& Name) const;
 	void CheckSovietNukeTemplate();
 	void StartSpiesInfiltration();
 	void TickSpiesInfiltration();

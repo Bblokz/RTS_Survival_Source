@@ -45,7 +45,8 @@ namespace CommanderSelectionLayout
 	const FMargin PanelTitlePadding(32.f, 0.f, 0.f, 0.f);
 	const FMargin CommanderListPadding(20.f, 64.f, 20.f, 20.f);
 	const FMargin AbilityColumnPadding(20.f, 68.f, 20.f, 20.f);
-	constexpr float EntrySpacing = 6.f;
+	// Twelve 60 unit entries with this spacing fill the 764 unit list (756 units) without a scroll bar.
+	constexpr float EntrySpacing = 3.f;
 	constexpr float AbilityRowSpacing = 10.f;
 	// The centre column sits between the two side columns: (432 + 1400) / 2 is 44 left of the screen centre.
 	constexpr float CentreColumnOffsetX = -44.f;

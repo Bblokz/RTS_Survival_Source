@@ -17,17 +17,18 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "W_CommanderSelectionMenu.h"
 
-// Same measures as the unit entries of the variant screen (Custom_VariantUnitEntry), whose button art it reuses.
+// The width of the variant screen's unit entries (Custom_VariantUnitEntry), whose button art it reuses; lower than
+// them so all twelve commanders fit the list without scrolling.
 namespace CommanderSelectionEntryLayout
 {
 	constexpr float EntryWidth = 352.f;
-	constexpr float EntryHeight = 80.f;
-	constexpr float PortraitWellSize = 72.f;
-	constexpr float PortraitSize = 64.f;
+	constexpr float EntryHeight = 60.f;
+	constexpr float PortraitWellSize = 52.f;
+	constexpr float PortraitSize = 44.f;
 	const FMargin PortraitWellOffset(16.f, 4.f, 0.f, 0.f);
 	const FMargin PortraitWellPadding(4.f);
 	// Centred on the entry, level with the portrait well; the kit's tiers are only listed on the right panel.
-	const FMargin TitleOffset(102.f, 0.f, 24.f, 0.f);
+	const FMargin TitleOffset(78.f, 0.f, 24.f, 0.f);
 	// Smaller than the variant screen's unit names so "LUFTWAFFE LIAISON" clears the selection chevron.
 	constexpr int32 TitleFontSize = 16;
 	// The portraits are 1024x1280 renders with the head left of centre; this 717 px square sits on it.
