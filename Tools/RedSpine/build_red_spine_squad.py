@@ -7,6 +7,11 @@ build until Development is rebuilt, under the async_spawner lock (and the build 
   Squad_Ger_RedSpine        copy of Squad_Ger_IronStorm (plain elite squad controller, no extra ability
                             components): Squad Subtype = Squad_Ger_RedSpine, 3x Ger_Inf_Walker_RedSpine
   RTS_BP_RTSAsyncSpawner    SetupGerSquads row Squad_Ger_RedSpine -> Squad_Ger_RedSpine (only that row is touched)
+Iron Storm's construction script sets the Squad Subtype variable with a literal (Squad_Ger_IronStorm), which wins over
+the CDO value and then pulls Iron Storm's squad data (400 HP). Python cannot edit K2 node pins, so on 2026-11-05 that
+pin was set to Squad_Ger_RedSpine through UECP: set_pin_default(blueprint_path=SQUAD, graph_name=
+"UserConstructionScript", node_id=<the "Set Squad Subtype" node>, pin_name="Squad Subtype", value="Squad_Ger_RedSpine"),
+then compile + save. A fresh duplicate (asset deleted) needs that step again; -RedSpineValidate checks the subtype.
 The walker soldier Blueprint Ger_Inf_Walker_RedSpine (EspSphere_01 on the infantry skeleton, AnimBp_SquadUnit, MP46)
 is used as it is. Health, armour, speed and cost come from C++ (CPPGameState squad data), not from these Blueprints.
 Saves are verified by file mtime: a package another process holds fails with error 32 without raising.

@@ -105,12 +105,13 @@ def edit_drop(obj, key, squad_count, tier, radixite, cooldown, title, descriptio
     ui.set_editor_property("description", description)
     obj.set_editor_property("m_ui_settings", ui)
 
+    # FUnitCost::ResourceCosts cannot be set on a struct instance from Python ("cannot be edited on instances"), so
+    # the whole cost state is written as text: radixite only, no time cost, no remaining cooldown.
     costs = detached_copy(obj.get_editor_property("m_ability_costs"))
-    unit_cost = detached_copy(costs.get_editor_property("costs"))
-    unit_cost.set_editor_property("resource_costs", {member(unreal.RTSResourceType, "Resource_Radixite"): radixite})
-    costs.set_editor_property("costs", unit_cost)
-    costs.set_editor_property("cool_down_time", cooldown)
+    costs.import_text("(Costs=(ResourceCosts=((Resource_Radixite, %d))),CoolDownTime=%d,CoolDownRemaining=0)"
+                      % (radixite, cooldown))
     obj.set_editor_property("m_ability_costs", costs)
+    print(LOG + str(key), "costs", costs.export_text())
 
     obj.set_editor_property("m_ability_tier", member(unreal.GlobalAbilityTier, tier))
     obj.set_editor_property("m_ability_type", key)

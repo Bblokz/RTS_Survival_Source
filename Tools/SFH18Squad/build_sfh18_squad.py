@@ -112,6 +112,9 @@ def heavier_config(cdo):
 def apply_gun(bp):
     cdo = unreal.get_default_object(bp.generated_class())
     cdo.set_editor_property("m_team_weapon_config", heavier_config(cdo))
+    # BP_TeamWeapon's BeginPlay writes this into the gun's RTS component and the crew controller takes the gun's
+    # subtype (squad data, cost, crew animation overrides); the copied gun still said Squad_Ger_LefH18.
+    cdo.set_editor_property("Squad Subtype", enum_member(unreal.SquadSubtype, SUBTYPE))
     dig_in = component(bp, "TeamWeaponDigIn")
     dig_in.set_editor_property("wall_mesh_override", unreal.load_asset(DIG_IN_PIT))
 
@@ -183,7 +186,10 @@ def report():
             print(LOG + "gun skeletal mesh component", obj.get_name(), mesh,
                   obj.get_editor_property("anim_class"))
     pit = component(unreal.load_asset(GUN), "TeamWeaponDigIn").get_editor_property("wall_mesh_override")
-    print(LOG + "gun weapon", weapon, "mesh", mesh.get_name() if mesh else None, "pit", pit)
+    gun_subtype = str(gun_cdo.get_editor_property("Squad Subtype"))
+    print(LOG + "gun weapon", weapon, "mesh", mesh.get_name() if mesh else None, "pit", pit, "subtype", gun_subtype)
+    if "SFH18" not in gun_subtype.upper():
+        FAILURES.append("gun squad subtype")
     print(LOG + "gun config", config)
     if EXPECTED_MESH not in str(mesh) or "SFH18_150MM_TW" not in weapon.upper():
         FAILURES.append("gun mesh/weapon")

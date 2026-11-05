@@ -16,8 +16,8 @@ MASTER = FOLDER + "/M_Ju87G_BK37Pod"
 MI_BODY = FOLDER + "/MI_Ju87G_BK37Pod_Body"
 MI_BARREL = FOLDER + "/MI_Ju87G_BK37Pod_Barrel"
 
-# Linear colours: RLM 70-like dark green body, burnt dark steel barrel.
-BODY = {"Color": (0.032, 0.042, 0.026), "Metallic": 0.15, "Roughness": 0.55}
+# Linear colours: the desert Stuka's sand-yellow (RLM 79-like, matched to its camo in -game screenshots), dark steel barrel.
+BODY = {"Color": (0.42, 0.26, 0.09), "Metallic": 0.1, "Roughness": 0.6}
 BARREL = {"Color": (0.018, 0.017, 0.016), "Metallic": 0.85, "Roughness": 0.4}
 
 report = []
