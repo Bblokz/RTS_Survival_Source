@@ -1,0 +1,52 @@
+{
+ "lamps": [
+  {
+   "kind": "wall",
+   "bulb": [
+    100.5,
+    -25.0,
+    204.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    160.5,
+    -25.0,
+    0.0
+   ],
+   "ground_radius": 320.0,
+   "on_building": false
+  },
+  {
+   "kind": "wall",
+   "bulb": [
+    40.5,
+    -415.0,
+    204.0
+   ],
+   "pool_radius": 420.0,
+   "ground": [
+    100.5,
+    -415.0,
+    100.0
+   ],
+   "ground_radius": 320.0,
+   "on_building": true
+  },
+  {
+   "kind": "pole",
+   "bulb": [
+    378.8,
+    216.7,
+    413.0
+   ],
+   "pool_radius": 600.0,
+   "ground": [
+    358.3,
+    160.4,
+    0.0
+   ],
+   "ground_radius": 480.0,
+   "on_building": false
+  }
+ ]
+}
