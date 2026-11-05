@@ -5,7 +5,8 @@ GA_GerSpotterPzIIIDrop: a Ju 390 that lands, lets its payload out and takes off 
 so they are delivered by the landed aircraft like team weapons in the survival deployment.
 
   GA_GerRedSpineDrop      1x Squad_Ger_RedSpine, Tier I,  cooldown 90 s,  825 radixite
-  GA_GerRedSpinePairDrop  2x Squad_Ger_RedSpine, Tier II, cooldown 150 s, 1625 radixite
+  GA_GerRedSpinePairDrop  2x Squad_Ger_RedSpine, Tier II, cooldown 150 s, 1625 radixite (both squads in one Ju 390)
+  Both: squads appear 15 m from the landing point (RadiusSpawnSquads 1500), clear of the wings.
 Cost: about 125% of the squads' radixite training cost (RedSpine_Radixite = 650 in DeveloperSettings.h):
 650 x 1.25 = 812.5 -> 825, 2 x 650 x 1.25 = 1625. Radixite only (user rule 2026-11-05: global abilities cost
 radixite and nothing else). Cooldowns: top of the Tier I band (60-90 s), middle of the Tier II band (120-180 s).
@@ -35,8 +36,10 @@ DROPS = [
     ("GA_GerRedSpinePairDrop", 2, "TierII", 1625, 150, "Red Spine Walker Pair Drop",
      "A Ju 390 lands at the target and lets out two squads of Red Spine light walkers: six walkers with MP46s."),
 ]
-# Squads stand this far from the landing point (radius of the circle they are spread on). None keeps the template's.
-RADIUS_SPAWN_SQUADS = globals().get("RS_RADIUS_SPAWN_SQUADS", None)
+# Squads appear this far from the landing point (radius of the circle they are spread on). The copied 600 cm put the
+# walkers under the wings: the Ju 390 mesh (no collision) reaches 6.1 m fore/aft and 9.6 m to each wingtip, and a
+# squad spreads about 2.5 m around its point. 1500 cm keeps every walker clear of the airframe whatever the heading.
+RADIUS_SPAWN_SQUADS = globals().get("RS_RADIUS_SPAWN_SQUADS", 1500.0)
 LOG = "[RedSpineDrops] "
 FAILURES = []
 

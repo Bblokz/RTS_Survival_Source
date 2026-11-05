@@ -349,7 +349,8 @@ def drop_pz3_flamm(obj):
 
 
 def drop_red_spine(obj):
-    # Walkers are squad units, so they land like infantry. Squad_Ger_RedSpine has no squad Blueprint or spawner row yet.
+    # Walkers are squad units, so they land like infantry. Tools/RedSpine/author_red_spine_drops.py also sets
+    # RadiusSpawnSquads 1500 (clear of the Ju 390's wings): run it after this script.
     edit_drop(obj, [], [squad("Squad_Ger_RedSpine")])
 
 
@@ -460,8 +461,8 @@ ROUND3_BALANCE = [
     ("GA_GerRadixitePzIIIWespeDrop", "TierII", {R: 650}, 150),  # Pz III J 250+100, Wespe 275+120
     ("GA_GerPzJagerLaserDrop", "TierII", {R: 375}, 150),  # 3x Panzerjager laser 100 R + 45 VP
     ("GA_GerPzIIIFlammDrop", "TierII", {R: 1000}, 180),   # 2x Pz III Flamm 400 R + 300 VP
-    ("GA_GerRedSpineDrop", "TierI", {R: 450}, 90),         # placeholder cost, see above
-    ("GA_GerRedSpinePairDrop", "TierII", {R: 875}, 150),   # placeholder cost, see above
+    ("GA_GerRedSpineDrop", "TierI", {R: 825}, 90),         # 1.25x one squad's 650 R training cost
+    ("GA_GerRedSpinePairDrop", "TierII", {R: 1625}, 150),  # 1.25x two squads
     ("GA_GerRailTroopersParadrop", "TierI", {R: 950}, 90),  # Rail Troopers 750 R + 350 M
     ("GA_GerLightBringersParadrop", "TierI", {R: 1000}, 90),  # Light Bringers 800 R + 200 M
     ("GA_GerFeuerSturmParadrop", "TierI", {R: 1250}, 90),  # 2x Feuer Sturm 500 R + 200 M

@@ -67,6 +67,19 @@ namespace SFH18SquadTestPrivate
 	const TCHAR* const ExpectedGunMeshName = TEXT("SK_Ger_SFH18Anim");
 	const TCHAR* const ScreenshotFolder = TEXT("SFH18SquadTest");
 
+	/** @return The Blueprint variable "Squad Subtype" (BP_TeamWeapon / BP_TeamWeaponController) as text. */
+	FString GetSquadSubtypeVariable(const UObject& Object)
+	{
+		const FProperty* Property = Object.GetClass()->FindPropertyByName(TEXT("Squad Subtype"));
+		if (Property == nullptr)
+		{
+			return TEXT("no variable");
+		}
+		FString Value;
+		Property->ExportTextItem_InContainer(Value, &Object, nullptr, nullptr, PPF_None);
+		return Value;
+	}
+
 	FString GetGunMeshName(const ATeamWeapon& Gun)
 	{
 		const USkeletalMeshComponent* Mesh = Gun.FindComponentByClass<USkeletalMeshComponent>();
@@ -281,8 +294,11 @@ void USFH18SquadTestSubsystem::StartSpawn()
 void USFH18SquadTestSubsystem::OnSquadSpawned(AActor* SpawnedActor)
 {
 	M_SpawnedSquad = Cast<ASquadController>(SpawnedActor);
-	UE_LOG(LogRTSSFH18SquadTest, Display, TEXT("RTS_SFH18_TEST SPAWNED %s"),
-	       IsValid(SpawnedActor) ? *SpawnedActor->GetClass()->GetName() : TEXT("none"));
+	const URTSComponent* RTSComponent = M_SpawnedSquad.IsValid() ? M_SpawnedSquad->GetRTSComponent() : nullptr;
+	UE_LOG(LogRTSSFH18SquadTest, Display, TEXT("RTS_SFH18_TEST SPAWNED %s subtype_at_spawn=%s squad_var=%s"),
+	       IsValid(SpawnedActor) ? *SpawnedActor->GetClass()->GetName() : TEXT("none"),
+	       IsValid(RTSComponent) ? *UEnum::GetValueAsString(RTSComponent->GetSubtypeAsSquadSubtype()) : TEXT("none"),
+	       IsValid(SpawnedActor) ? *SFH18SquadTestPrivate::GetSquadSubtypeVariable(*SpawnedActor) : TEXT("none"));
 }
 
 void USFH18SquadTestSubsystem::TickWaitingForSpawnedSquad()
@@ -612,8 +628,10 @@ void USFH18SquadTestSubsystem::CheckSquadIdentity(ATeamWeaponController& Squad, 
 	                      Squad.GetTeamWeaponRange()));
 	const TArray<ASquadUnit*> Units = Squad.GetSquadUnitsChecked();
 	UE_LOG(LogRTSSFH18SquadTest, Display,
-	       TEXT("RTS_SFH18_TEST CONFIG %s squad=%s gun=%s soldiers=%d operators_required=%d"),
-	       *Label, *Squad.GetClass()->GetName(), *Gun->GetClass()->GetName(), Units.Num(), Gun->GetRequiredOperators());
+	       TEXT("RTS_SFH18_TEST CONFIG %s squad=%s gun=%s soldiers=%d operators_required=%d squad_var=%s gun_var=%s gun_rts=%s"),
+	       *Label, *Squad.GetClass()->GetName(), *Gun->GetClass()->GetName(), Units.Num(), Gun->GetRequiredOperators(),
+	       *GetSquadSubtypeVariable(Squad), *GetSquadSubtypeVariable(*Gun),
+	       *UEnum::GetValueAsString(Gun->GetSquadSubtypeFromRTSComponent()));
 }
 
 void USFH18SquadTestSubsystem::CheckSquadCrewed(ATeamWeaponController& Squad, const FString& Label)

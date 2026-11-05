@@ -10,8 +10,9 @@ save BXP_FieldWorkshop or the data asset afterwards (its DLL would drop the new 
    (Ger_Bxp_HQRepairBay: repair pad + automatic welder crane, already a building that repairs vehicles) with
    - its URadiusRepairAura set to UFieldWorkshopRepairBehaviour (25 HP/s, refreshed every 1 s) in RADIUS_CM;
    - a UFieldWorkshopRearmAura "RearmAura" carrying the Sd.Kfz. 250 ammo carrier's aura settings (reload buff
-     BP_Beh_Weapon_AmmoResupply, rising AmmoResupply icon, ammo-belt ground shader), in RADIUS_CM, magazine top-up
-     every TOP_UP_SECONDS;
+     BP_Beh_Weapon_AmmoResupply: reload time x0.7, rising AmmoResupply icon, ammo-belt ground shader), in RADIUS_CM,
+     on every allied unit: vehicles, and infantry and team weapons through their squad controller. No magazine
+     top-up (user decision 2026-11-05: "rearm" is only the faster reload);
    - a UFieldWorkshopComponent "FieldWorkshop": auras off while falling, WORKING_SECONDS of work after landing with
      the radius drawn, then the game's pack-up animation and removal.
    It keeps the bay's expansion type (BTX_GerHQRepairBay: its health, armour, vision), so no enum or data row changes.
@@ -40,9 +41,9 @@ AMMO_CARRIER = ("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/
 KEY = "GA_GerFieldWorkshopDrop"
 TITLE = "Field Workshop Drop"
 DESCRIPTION = ("A Ju 390 drops a field repair depot under a cluster of giant canopies. For 90 s it repairs your "
-               "vehicles within 20 m (25 HP/s), makes them reload faster and tops up their magazines every 5 s; "
-               "then the crew packs it up. A second transport parachutes two Pak 40 guns and their crews beside it "
-               "to defend it.")
+               "vehicles within 20 m (25 HP/s) and every allied unit in that radius, vehicles, infantry and guns, "
+               "reloads faster; then the crew packs it up. A second transport parachutes two Pak 40 guns and their "
+               "crews beside it to defend it.")
 TIER = "TIER_III"
 # Repair bay (300 R + 150 M) + 2x Pak 40 (450 R + 180 M each): drop band 125% of the radixite part, radixite only
 # (user decision 2026-11-05): (300 + 900) x 1.25 = 1500.
@@ -52,7 +53,6 @@ ICON = "T_GlobalAbility_GerParatroopers"  # placeholder
 
 RADIUS_CM = 2000.0
 AURA_INTERVAL_SECONDS = 1.0
-TOP_UP_SECONDS = 5.0
 WORKING_SECONDS = 90.0
 PACK_UP_SECONDS = 6.0
 WORKSHOP_CANOPY_SCALE = 3.0
@@ -237,13 +237,13 @@ def set_rearm_aura(bp):
     settings.set_editor_property("radius", RADIUS_CM)
     settings.set_editor_property("interval_seconds", AURA_INTERVAL_SECONDS)
     settings.set_editor_property("apply_strategy", member(unreal.InAOEBehaviourApplyStrategy, "ApplyOnlyOnEnter"))
-    settings.set_editor_property("affect_squad_controllers", False)
+    # Infantry and gun crews have no behaviour component of their own: their squad controller takes the buff.
+    settings.set_editor_property("affect_squad_controllers", True)
     aura.set_editor_property("AOEBehaviourSettings", settings)
     radius.set_editor_property("show_radius_type", member(unreal.AOeBehaviourShowRadiusType, "None"))
     radius.set_editor_property("radius_type", member(unreal.RTSRadiusType, "FullCircle_AmmoResupplyAura"))
     radius.set_editor_property("host_behaviour_title_text", "<Text_Title>Field Workshop Rearms</>")
     aura.set_editor_property("RadiusSettings", radius)
-    aura.set_editor_property("TopUpIntervalSeconds", TOP_UP_SECONDS)
     return aura
 
 

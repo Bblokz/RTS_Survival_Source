@@ -38,6 +38,19 @@ CANNON = {
     "weapon_name": "Flak36_37MM",
     "fired_shell": "SHELL_APCR",
     "range": 8000.0,
+    # A strafing pass fires one burst: 3 aimed rounds 0.3 s apart from each pod (half the 6-round clip), like the
+    # Me 410's BK 5 (SingleBurst 3). Accuracy 85 (Flak 36: 60, BK 5: 100) keeps a 3-degree spread off the tank.
+    "burst_mode": "SingleBurst",
+    "burst_rounds": 3,
+    "burst_cooldown": 0.3,
+    "accuracy": 85,
+    # Aircraft do not reload in the air: the magazine is the sortie's ammunition. 6 (Flak 36 clip) lasted two of the
+    # ~12 passes a 120 s strike flies; 24 rounds per cannon = 8 passes (game balance over the historical 2 clips).
+    "magazine": 24,
+    # User decision 2026-11-05: the APCR must go through 120 mm so KV-class heavies can be hurt. The component sets
+    # this as the FIRED shell's penetration over the whole 80 m range (APCR multiplier included); the shared
+    # Flak36_37MM weapon data stays at 45/31 mm raw (67.5/46.5 mm APCR).
+    "armor_pen": 120.0,
 }
 VFX_PATHS = {
     "launch_sound": "/Game/RTS_Survival/Sounds/WeaponSounds/MediumCaliber/37mmFlak_Recorded/S_FireWeapon_Flak37_Recorded",
@@ -211,11 +224,11 @@ def build_vfx():
 def build_cannon_weapon():
     weapon = unreal.InitWeaponStateProjectile()
     weapon.set_editor_property("weapon_name", CANNON["weapon_name"])
-    weapon.set_editor_property("weapon_burst_mode", enum_member(unreal.WeaponFireMode, "Single"))
+    weapon.set_editor_property("weapon_burst_mode", enum_member(unreal.WeaponFireMode, CANNON["burst_mode"]))
     weapon.set_editor_property("projectile_system", enum_member(unreal.ProjectileNiagaraSystem, "TankShell"))
     weapon.set_editor_property("weapon_vfx", build_vfx())
-    weapon.set_editor_property("burst_cooldown", 0.0)
-    weapon.set_editor_property("single_burst_amount_max_burst_amount", 1)
+    weapon.set_editor_property("burst_cooldown", CANNON["burst_cooldown"])
+    weapon.set_editor_property("single_burst_amount_max_burst_amount", CANNON["burst_rounds"])
     weapon.set_editor_property("min_burst_amount", 1)
     return weapon
 
@@ -232,8 +245,12 @@ def configure_component(component, pod_mesh):
     component.set_editor_property("cannon_weapon", build_cannon_weapon())
     component.set_editor_property("fired_shell_type", enum_member(unreal.WeaponShellType, CANNON["fired_shell"]))
     component.set_editor_property("cannon_range", CANNON["range"])
+    component.set_editor_property("cannon_accuracy", CANNON["accuracy"])
+    component.set_editor_property("cannon_magazine", CANNON["magazine"])
+    component.set_editor_property("cannon_armor_pen", CANNON["armor_pen"])
     component.set_editor_property("remove_bomb_bay", True)
     component.set_editor_property("target_preference", enum_member(unreal.TargetPreference, "Tank"))
+    log("component armor pen %s" % component.get_editor_property("cannon_armor_pen"))
     log("component pods=%d weapon=%s shell=%s range=%s" % (
         len(component.get_editor_property("pods")),
         component.get_editor_property("cannon_weapon").get_editor_property("weapon_name"),
