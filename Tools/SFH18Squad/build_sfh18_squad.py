@@ -12,6 +12,10 @@ Hold Saved/AgentLocks/async_spawner.lockdir for the spawner step (and the build 
   Ger_SquadTW_Sfh18    copy of LefhHowitzer/Ger_SquadTW_Lefh (5 Ger_Inf_Kar crew) with TeamWeaponClass = BP_TW_Sfh18
                        and Squad Subtype = Squad_Ger_SFH18_150mm.
   RTS_BP_RTSAsyncSpawner  SetupGerSquads row Squad_Ger_SFH18_150mm -> Ger_SquadTW_Sfh18 (no other row touched).
+The squad's subtype comes from the copied construction script node "Set Squad Subtype" (each team weapon squad BP sets
+its own there; Ger_SquadTW_Lefh says Squad_Ger_LefH18). Python cannot edit pin defaults, so it was set to
+Squad_Ger_SFH18_150mm with UECP set_pin_default (UserConstructionScript, node "Set Squad Subtype") and saved; report()
+fails while the saved squad asset still names Squad_Ger_LefH18. A fresh duplicate needs that edit again.
 Health of the crew and the training cost come from C++ (CPPGameState squad data, DeveloperSettings SFH18_150mm_*).
 Saves are verified by file mtime: a package another process holds fails with error 32 without raising.
 SFH18_STEPS (a tuple in globals, set by a wrapper) limits the steps: "gun", "squad", "spawner".
@@ -196,6 +200,9 @@ def report():
     for key, value in GUN_CONFIG.items():
         if "%s=%s" % (key, value) not in config:
             FAILURES.append("gun config " + key)
+    with open(disk_path(SQUAD), "rb") as handle:
+        if b"Squad_Ger_LefH18" in handle.read():
+            FAILURES.append("squad construction script still sets Squad_Ger_LefH18 (see the module docstring)")
     squad_cdo = unreal.get_default_object(unreal.load_asset(SQUAD).generated_class())
     units = [c.get_name() for c in squad_cdo.get_editor_property("SquadUnitClasses")]
     print(LOG + "squad subtype", squad_cdo.get_editor_property("Squad Subtype"),

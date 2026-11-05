@@ -29,18 +29,20 @@ OBJECT_NAME = "GA_Sonnengewehr_Ger"
 TITLE = "Sonnengewehr"
 DESCRIPTION = ("The orbital sun gun burns the line you draw. After a 4 second warning a blinding beam comes down at "
                "the start and sweeps to the end in 5 seconds, burning everything in its 7 m path with heavy laser "
-               "damage that ignores armour thickness. It hurts both sides.")
+               "damage that ignores armour thickness. Only the enemy burns: your own units and buildings in "
+               "its path are spared.")
 
 # Tuning (Commanders.md: every global ability costs radixite only, Tier III cooldown 180-240 s).
+# User decision 2026-11-05: costs as much as the Panzer Grenadiers (675 radixite), cooldown kept.
 COOLDOWN = 240
-RADIXITE = 800
+RADIXITE = 675
 BEAM_HALF_WIDTH = 350.0
 MIN_STRIP = 1500.0
 MAX_STRIP = 6000.0
 LENGTH_BEFORE_ANCHOR = 3000.0
 
 SETTINGS = ("(WarningSeconds=4.000000,IgnitionSeconds=0.600000,SweepSeconds=5.000000,FadeSeconds=0.800000,"
-            "BeamDamage=1400.000000,DamageIntervalSeconds=0.100000,AffectedUnits=OverlapBoth,"
+            "BeamDamage=1400.000000,DamageIntervalSeconds=0.100000,bBurnOwnUnits=False,"
             "ScorchCoolSeconds=8.000000,ScorchLifeSeconds=90.000000)")
 
 
