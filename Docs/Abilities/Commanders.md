@@ -112,9 +112,10 @@ Character of each kit:
 - **Placeholders** (marked in `write_commander_kits.py`): Sturmkommandant slots 2 and 4 wait for the user's choice
   of the STG squad (now `GA_GerEliteScavengersParadrop` and `GA_GerParatroopers`); Stahlläufer slot 6 waits for a
   Fels Krieger walker unit (now `GA_Barrage`). `SK_Etasphera07` exists, but no animations or unit Blueprint.
-- **Red Spine:** `Squad_Ger_RedSpine` has a soldier Blueprint (`Squads/Ger/Walkers/RedSpine/Ger_Inf_Walker_RedSpine`)
-  but no squad Blueprint, no async spawner row and no squad data or cost in `CPPGameState`, so `GA_GerRedSpineDrop`
-  and `GA_GerRedSpinePairDrop` land nothing yet. Their costs are a guess (350 R per squad).
+- **Red Spine:** `Squad_Ger_RedSpine` is a squad since 2026-11-05: `Squads/Ger/Walkers/RedSpine/Squad_Ger_RedSpine`
+  (3 `Ger_Inf_Walker_RedSpine` with MP46s, 480 HP each on heavy infantry armour, 650 R + 250 M training cost) with an
+  async spawner row; no barracks offers it yet. The drops are authored by `Tools/RedSpine/author_red_spine_drops.py`
+  (about 125% of the squads' radixite training cost) and checked by `-RedSpineValidate`.
 - Every kit ability has a template since 2026-11-05 03:09 (71 entries; the Sonnengewehr, fire strike, composite,
   resource, parachute and Elite Scavenger templates come from their own workstreams' scripts). A missing template
   shows as a failed `kit_ability_has_template` check and in the `KIT_MISSING_TEMPLATES` line of the area test.
@@ -177,8 +178,8 @@ lock; `verify_commander_abilities.py` lists every kit slot with class, tier, cos
 | `GA_GerRadixitePzIIIWespeDrop` | `UGA_AircraftDrop` | `Ger_Vehicle_PanzerIII_J_RadixiteCannon` + `Ger_Vehicle_Wespe_RadixiteHowitzer` | II | 650 R | 150 |
 | `GA_GerPzJagerLaserDrop` | `UGA_AircraftDrop` | 3x `Ger_Vehicle_PanzerJager_Laser` | II | 375 R | 150 |
 | `GA_GerPzIIIFlammDrop` | `UGA_AircraftDrop` | 2x `Ger_Vehicle_PanzerIII_Flamm` | II | 1000 R | 180 |
-| `GA_GerRedSpineDrop` | `UGA_AircraftDrop` | 1 `Squad_Ger_RedSpine` (no squad yet) | I | 450 R | 90 |
-| `GA_GerRedSpinePairDrop` | `UGA_AircraftDrop` | 2 `Squad_Ger_RedSpine` (no squad yet) | II | 875 R | 150 |
+| `GA_GerRedSpineDrop` | `UGA_AircraftDrop` | 1 `Squad_Ger_RedSpine` (3 walkers), landed Ju 390 | I | 825 R | 90 |
+| `GA_GerRedSpinePairDrop` | `UGA_AircraftDrop` | 2 `Squad_Ger_RedSpine` (6 walkers), one landed Ju 390 | II | 1625 R | 150 |
 | `GA_GerRailTroopersParadrop` | `UGA_Paratroopers` (`GA_GerEliteScavengersParadrop`) | 1 `Squad_Ger_RailTroopers` | I | 950 R | 90 |
 | `GA_GerLightBringersParadrop` | `UGA_Paratroopers` | 1 `Squad_Ger_LightBringers` | I | 1000 R | 90 |
 | `GA_GerFeuerSturmParadrop` | `UGA_Paratroopers` | 2 `Squad_Ger_FeuerSturm` | I | 1250 R | 90 |

@@ -38,17 +38,28 @@ Result per second in a fire: basic infantry (200 HP) about 25 damage from the fi
 about 8 s to die; buildings ~25 (a 1400 HP T3 bunker loses ~30 % in one 18-20 s fire); armoured cars and light tanks
 a few points once their buffer is full; medium and heavy tanks nothing (their buffer only fills).
 
-## Limits
+## Ground fire look and cap (round 3c, 2026-11-05)
 
-- The fire subsystem caps burning areas at `MaxActiveGroundFires` = 8 (pool size 8) and merges areas of one player
-  closer than 0.75 x radius (3 m). At the cap a new fire replaces the one closest to burning out. A full Ju 87 run
-  (6) plus a barrage (up to 8) therefore never burn 14 areas at once; flame units' incendiary weapons share the cap.
-  Raising it is a project setting (`[/Script/RTS_Survival.RTSFirePoolSettings]` in `DefaultGame.ini`).
-- Barrage shells land at random in the circle, so 5-8 separate areas burn (merges; 6 and 7 in the test runs).
-- Look: `ARTSFireManager::StartGroundFireVfx` scales the pooled `RTS_GroundFire_0` component by radius / 100 in X and Y
-  only, which smears its flame sprites into flat horizontal streaks at radius 4 m (the same for every incendiary
-  weapon's ground fire). A uniform scale or a spawn-radius user parameter on the system would fix it; that file is not
-  part of this work. The fireball burst covers the first seconds.
+Every burning area of the fire subsystem (these strikes, flamethrowers, napalm, incendiary rockets) now gets:
+
+- the old low carpet: pooled `RTS_GroundFire_0` (type `GroundFire`), spread over the radius in X/Y. On its own it is
+  only a few centimetres of flame and reads as flat streaks from the RTS camera;
+- upright flames (new pool type `ERTSFireType::GroundFireFlame` = `2_Nbonefire_pt`) at uniform scale, one in the
+  centre and the rest on a ring at 0.55 x radius (turned by the area's location, each dropped onto the landscape):
+  one per 1.8 m cover circle, at least 1, at most 4 (1 m: 1, 3 m: 3, 3.5 m and up: 4). Size = VfxScale x 0.6,
+  clamped 1-2.2, +-15 % jitter. They stop with the area. All numbers are `URTSFirePoolSettings` config.
+
+Cap: `MaxActiveGroundFires` 8 -> 24, `GroundFire` pool 8 -> 24, `GroundFireFlame` pool 96 (24 x 4). A full Ju 87 run
+(6) + a barrage (up to 8) + six flame units' fires burn together with headroom; at the cap the fire closest to burning
+out is still replaced. Measured with `-FireVfxStudy` (DebugGame, 1280x720, a shared, busy machine, so GPU numbers are
++-1 ms noise): 24 areas of radius 4 m cost +0.4 ms game thread with the carpet only and +1.4 ms with the upright
+flames (96 CPU emitters), GPU and render thread within noise. Development/Shipping builds run that CPU work faster.
+
+Merging is unchanged: areas of one player closer than 0.75 x the larger radius refresh each other.
+
+- Barrage shells land at random in the circle, so 5-8 separate areas burn (merges; 6-8 in the test runs). The
+  template starts its shells 25-35 m up (`GA_Barrage` starts some at 5.9 m, and such a flat shell once landed 45 m
+  off).
 
 ## Test
 
@@ -59,6 +70,13 @@ ground fire on), one fire per canister on the planned spots (Ju 87) or within ra
 fire on the landscape, a fresh enemy squad sent into a fire loses health over 5 s, a fresh T-34 parked in a fire
 loses at most 25 % (0 % in the runs; the victim T-34 under the barrage is only logged, shells hit it), the
 fires go out after their duration, the flames stop, the ability ends once and the aircraft is gone. Screenshots go
-to `Saved/FireStrikesTest/`. Result 2026-11-05: PASS 42/42 (anchor -12145,-22000). Shots before the first burst are
-black on that map, probably the fog of war until the aircraft or the fire reveals the target; the canister in
-flight (and whether `SM_Bomb_250` falls nose first with `MeshRotationOffset` 0) has not been seen yet.
+to `Saved/FireStrikesTest/`. A third scenario, `BothAtOnce`, fires both strikes side by side while six flame-unit
+stand-ins (3 m, 7 s, fed every 5 s) burn between them, and checks that every strike fire burns its full duration and
+that all areas burned at the same time (peak areas = fires seen). Result 2026-11-05 10:49: PASS 67/67 (anchor
+-12145,-22000; BothAtOnce 18 areas at once, cap 24). The fog post process is switched off for the pictures.
+
+`-FireVfxStudy` (`FireStrikes/Tests/FireVfxStudySubsystem`) lines up pool fires of the weapons' radii and candidate
+fire systems, photographs each from the RTS camera and from the ground, and measures the cost of the full cap.
+Before/after pictures: `Saved/FireVfxStudy/Before` (run with
+`-ini:Game:[/Script/RTS_Survival.RTSFirePoolSettings]:MaxGroundFireFlamesPerArea=0`) and `Saved/FireVfxStudy/After`. The canister in flight (and whether `SM_Bomb_250` falls nose first with `MeshRotationOffset` 0) has not been seen
+yet.

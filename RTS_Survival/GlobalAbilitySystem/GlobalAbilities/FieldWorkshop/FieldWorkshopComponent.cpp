@@ -4,12 +4,19 @@
 
 #include "TimerManager.h"
 #include "Engine/World.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "FieldWorkshopRearmAura.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/Paratroopers/CargoParachuteDescentComponent.h"
 #include "RTS_Survival/RTSComponents/AOEBehaviourComponent/AOEBehaviourComponent.h"
 #include "RTS_Survival/Subsystems/RadiusSubsystem/RTSRadiusPoolSubsystem/RTSRadiusPoolSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+namespace FieldWorkshopConstants
+{
+	constexpr float PackUpStepSeconds = 0.03f;
+}
 
 UFieldWorkshopComponent::UFieldWorkshopComponent()
 {
@@ -176,23 +183,66 @@ void UFieldWorkshopComponent::StartPackingUp()
 	M_State = EFieldWorkshopState::PackingUp;
 	HideWorkingRadius();
 	TearDownAuras();
-	// The game's own pack-up: construction materials creep back slot by slot with smoke puffs.
-	M_Workshop->StartPackUpBuildingExpansion(M_WorkshopSettings.PackUpSeconds);
-	UE_LOG(LogTemp, Display, TEXT("RTS_FIELD_WORKSHOP packing_up=%s"), *M_Workshop->GetName());
-
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
 	{
 		return;
 	}
+	// The crew strikes the depot: smoke puffs and it sinks out of sight. No collision on the way down, so units
+	// standing on or against it are not lifted or blocked by a building that is leaving.
+	M_Workshop->SetActorEnableCollision(false);
+	M_PackUpStartSeconds = World->GetTimeSeconds();
+	M_PackUpStartLocation = M_Workshop->GetActorLocation();
+	SpawnPackUpSmoke();
+	UE_LOG(LogTemp, Display, TEXT("RTS_FIELD_WORKSHOP packing_up=%s"), *M_Workshop->GetName());
+
 	TWeakObjectPtr<UFieldWorkshopComponent> WeakThis(this);
 	World->GetTimerManager().SetTimer(M_PackUpTimerHandle, FTimerDelegate::CreateLambda([WeakThis]()
 	{
 		if (WeakThis.IsValid())
 		{
-			WeakThis->FinishPackingUp();
+			WeakThis->TickPackingUp();
 		}
-	}), M_WorkshopSettings.PackUpSeconds, false);
+	}), FieldWorkshopConstants::PackUpStepSeconds, true);
+}
+
+void UFieldWorkshopComponent::TickPackingUp()
+{
+	const UWorld* World = GetWorld();
+	if (M_State != EFieldWorkshopState::PackingUp || not IsValid(World) || not GetIsValidWorkshop())
+	{
+		return;
+	}
+	const float Alpha = FMath::Clamp(
+		(World->GetTimeSeconds() - M_PackUpStartSeconds) / M_WorkshopSettings.PackUpSeconds, 0.f, 1.f);
+	// Ease in: it settles slowly, then drops away.
+	const float Depth = M_WorkshopSettings.PackUpSinkDepthCm * Alpha * Alpha;
+	(void)M_Workshop->SetActorLocation(M_PackUpStartLocation - FVector(0.f, 0.f, Depth));
+	if (Alpha < 1.f)
+	{
+		return;
+	}
+	if (UWorld* MutableWorld = GetWorld())
+	{
+		MutableWorld->GetTimerManager().ClearTimer(M_PackUpTimerHandle);
+	}
+	FinishPackingUp();
+}
+
+void UFieldWorkshopComponent::SpawnPackUpSmoke() const
+{
+	UNiagaraSystem* Smoke = M_WorkshopSettings.PackUpSmoke.LoadSynchronous();
+	if (not IsValid(Smoke) || not GetIsValidWorkshop())
+	{
+		return;
+	}
+	const FVector Centre = M_Workshop->GetActorLocation();
+	for (int32 Puff = 0; Puff < M_WorkshopSettings.PackUpSmokePuffs; ++Puff)
+	{
+		const FVector Offset = FRotator(0.f, 360.f * Puff / M_WorkshopSettings.PackUpSmokePuffs, 0.f).Vector()
+			* M_WorkshopSettings.PackUpSmokeRadiusCm;
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, Smoke, Centre + Offset);
+	}
 }
 
 void UFieldWorkshopComponent::FinishPackingUp() const
@@ -202,7 +252,7 @@ void UFieldWorkshopComponent::FinishPackingUp() const
 		return;
 	}
 	UE_LOG(LogTemp, Display, TEXT("RTS_FIELD_WORKSHOP packed_up=%s"), *M_Workshop->GetName());
-	// Sets the packed-up status (a field defense has no owner to tell) and destroys the building.
+	// Sets the packed-up status (a field defense has no owner to tell, so EndPlay reports nothing) and destroys it.
 	M_Workshop->FinishPackUpExpansion();
 }
 

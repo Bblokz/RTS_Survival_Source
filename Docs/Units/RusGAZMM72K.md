@@ -45,3 +45,29 @@ The truck digs in behind its own closed ring of sandbags around all four sides. 
   - The `DigIn` component spawns it at the actor origin (`DigInOffset` 0).
 - The wall is 125 cm high. The 72-K fires over it at 0° elevation in every direction.
 - The Blueprints use `RusMediumTankWall` until this C++ is built. The post-build job `Saved/AgentScripts/GAZMM72KUE/job_digin_postbuild.py` then switches them to the ring type.
+
+## Crew
+
+Three Soviet soldiers (`SK_RussianSoldier`, the Mosin squads' mesh) ride the traverse on the gun socket `CrewFrame`. They are the `Crew1..3` components of `Rus_Turret_GAZMM72K`, driven by `PitCrew` (`UGunPitCrewComponent`):
+
+| Component | Role | Spot (gun frame, cm) | Animations (`GAZMM_72K/Crew`) |
+|---|---|---|---|
+| `Crew1` | Layer, left seat, cranks the elevation handwheel | (-50, -48, 0) | `AN_GAZMM72K_Layer_Idle` |
+| `Crew2` | Gunner, right seat, cranks the traverse handwheel | (-50, 48, 0) | `AN_GAZMM72K_Gunner_Idle` |
+| `Crew3` | Loader, stands on the bed between the seat backs | (-82, 0, -34) | `AN_GAZMM72K_Loader_Idle`, `Montage_GAZMM72K_Loader_Reload` |
+
+Every reload, the loader drops a 7-round clip into the feed. The clip is `SM_GAZMM72K_Clip`, carried as `Clip1` / `Clip2` through `PitCrew` `ShellCarry`:
+- The loader is both handler and loader (crew index 2).
+- At 0.45 of the drill the carried clip disappears into the feed.
+- At 0.80 the next clip is in his hands at his belt.
+
+The drill is authored at 15 degrees elevation, so at high elevation the hands are about 15 cm off the feed.
+
+Wiring:
+- `BP_PostInit` calls `InitPitCrew(Turret)`.
+- `BP_PlayWeaponAnimation` calls `OnGunFired` (flinch 0.25).
+- `ReloadWeapon` calls `OnReloadStarted` (`MinReloadTimeForLoadingSequence` 2 s; the weapon reloads in 4 s).
+
+Sources:
+- Animations: `CustomMapItems/InfantryAnimations/VehicleCrew/gen_gazmm72k.py`. Validated by `vcval.py` with `specs/gazmm_*.json` at full traverse and 0 to 85 degrees elevation, plus the crew-against-crew check `GAZMM72K/check_crew_overlap.py`.
+- Unreal jobs: `Saved/AgentScripts/GAZMM72KUE/job_crew_*.py`.

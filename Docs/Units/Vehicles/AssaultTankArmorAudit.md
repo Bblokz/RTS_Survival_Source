@@ -189,7 +189,7 @@ on every box: they were authored at unit scale. That is the model for a migratio
     Now side hits also damage those modules and the crew repairs them, which likely moves the tank between the two
     readings. The check now logs both readings (`right now ... (intact ...)`). This is a test-point placement issue
     on the SDKFZ-140's overlapping boxes, not a module failure. Left as a FAIL.
-- **Fix 2, option (a) chosen by the user: Brummbar family made, not saved.** Both changes compile:
+- **Fix 2, option (a) chosen by the user: Brummbar family saved by the user at 10:14 and checked.** Both changes compile:
   - `Ger_Vehicle_Brummbar` `SetupArmor`: `Plate_SideLowerLeft` now takes a mirror of the `Plate_SideLowerRight`
     transform, built from the `Right*` getters with Y, yaw and roll negated. Both boxes are ±32, so only the
     transform needs mirroring. The old `Left*` getters and their `Make Transform` stay in the graph, unconnected.
@@ -200,8 +200,15 @@ on every box: they were authored at unit scale. That is the model for a migratio
     `ExtraSides` is relabelled from `Plate_SideLeft` to `Plate_Rear`.
   - Not changed: the LateWar tie between `Turret_SideLeft` and `Turret_SideRight` (an ordering effect, not a label),
     and the Su-85 and RailBunker checks.
-  - Originals are in the same backup folder. After the save, `TAG=BrummbarCheck LIST=.../brummbar_check.txt` runs
-    the audit on the Brummbar family, the SDKFZ-140 and E25_Assault.
+  - Originals are in the same backup folder.
+  - Check run `BrummbarCheck` (`Tools/ArmorPlateAudit/brummbar_check.txt`, with `-ArmorPlateAuditAsDrawn`):
+    - The dump shows `Plate_SideLowerLeft` at the lower hull (Z -48 to 207, the mirror of the right box) and the
+      rear-centre box as `Plate_Rear`. All three Brummbars finalize their modules.
+    - With legacy coverage, left shots still resolve `Plate_Rear`, `Turret_SideLeft` and `Turret_Front`; the
+      inflated boxes come first in the check order. In the as-drawn preview the middle-left shots now resolve
+      `Plate_SideLowerLeft`; before this fix they resolved `Turret_SideLeft`.
+    - LateWar's middle-left shot still resolves `Turret_SideRight` (WRONG), from the tie between its two
+      superstructure side boxes.
 - The wider decision, kept for reference:
   - (a) Fix only the authoring errors above. Side shots on most assault tanks keep resolving front, rear or turret
     plates (legacy coverage).
