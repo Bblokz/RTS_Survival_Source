@@ -50,10 +50,12 @@ namespace Ju87GTestPrivate
 	constexpr float StartDelaySeconds = 3.f;
 	constexpr float CameraTraceLength = 500000.f;
 	constexpr float CloseUpSetupSeconds = 2.5f;
-	constexpr float CloseUpShotIntervalSeconds = 1.f;
+	// The camera holds each angle this long so the auto exposure settles before the shot.
+	constexpr float CloseUpShotIntervalSeconds = 3.f;
 	constexpr int32 CloseUpShotCount = 3;
 	constexpr float CloseUpHeightCm = 1500.f;
-	const FVector CloseUpOffsetFromAnchor(-4000.f, -4000.f, 0.f);
+	const FVector CloseUpOffsetFromAnchor(-1500.f, 1500.f, 0.f);
+	const FVector StripHalfLength(1000.f, 0.f, 0.f);
 	constexpr float StrikeTimeoutSeconds = 300.f;
 	constexpr float AfterAbilityEndSeconds = 3.f;
 	constexpr float PeriodicShotSeconds = 10.f;
@@ -302,7 +304,7 @@ void UJu87GTankBusterTestSubsystem::TickCloseUp()
 	{
 		bM_CloseUpChecked = true;
 		CheckCloseUpAircraft(Aircraft);
-		M_NextCloseUpShotSeconds = GetPhaseSeconds();
+		M_NextCloseUpShotSeconds = GetPhaseSeconds() + CloseUpShotIntervalSeconds;
 	}
 	if (GetPhaseSeconds() < M_NextCloseUpShotSeconds)
 	{
@@ -312,6 +314,7 @@ void UJu87GTankBusterTestSubsystem::TickCloseUp()
 	{
 		// The camera moved to this shot's angle last frame.
 		RequestScreenshot(FString::Printf(TEXT("CloseUp_%d"), M_CloseUpShotIndex));
+		// The screenshot is read back at the end of this frame, before the camera moves on next tick.
 		++M_CloseUpShotIndex;
 		M_NextCloseUpShotSeconds = GetPhaseSeconds() + CloseUpShotIntervalSeconds;
 		return;
@@ -401,8 +404,9 @@ void UJu87GTankBusterTestSubsystem::PlaceCloseUpCamera(const AAircraftMaster& Ai
 		return;
 	}
 	// Front-low three-quarter, side and from below-behind: every angle shows both pods.
+	// Front three-quarter from above, the side, and front-low: the sunlit top and both pods under the wings.
 	static const FVector LocalOffsets[] = {
-		FVector(1100.f, 650.f, -250.f), FVector(150.f, 1300.f, -120.f), FVector(-700.f, -900.f, -450.f)
+		FVector(1300.f, 800.f, 450.f), FVector(200.f, 1400.f, 60.f), FVector(1200.f, -700.f, -150.f)
 	};
 	const FVector Offset = LocalOffsets[FMath::Clamp(ShotIndex, 0, static_cast<int32>(UE_ARRAY_COUNT(LocalOffsets)) - 1)];
 	const FTransform AircraftTransform = Aircraft.GetActorTransform();
@@ -462,7 +466,7 @@ void UJu87GTankBusterTestSubsystem::StartStrike()
 	}
 	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 	{
-		if (It->IsA<AAircraftMaster>() || It->IsA<ATankMaster>())
+		if (It->IsA<AAircraftMaster>() || It->IsA<ATankMaster>() || It->IsA<ABombActor>())
 		{
 			M_PreExistingActors.Add(*It);
 		}
@@ -477,8 +481,24 @@ void UJu87GTankBusterTestSubsystem::StartStrike()
 	{
 		Before.Add(Cost.Key, IsValid(Resources) ? Resources->GetResourceAmount(Cost.Key) : 0);
 	}
+	// A map started without a mission manager may cap the tiers; the commander's kit allows Tier III.
+	Manager->SetMaxAllowedAbilityTier(EGlobalAbilityTier::TierIV);
+	ClearCopyRequirements(*M_Ability);
+	const bool bIsStrip = M_Ability->GetAimSettings().AreaAim.Shape == EGlobalAbilityAimShape::Strip;
+	UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST ABILITY_STATE requirements=%d costs=%d cooldown_ready=%d strip=%d"),
+	       Manager->QueryRequirementForAbility(M_Ability), Manager->QueryCostsForAbility(M_Ability),
+	       Manager->QueryCooldownForAbility(M_Ability), bIsStrip);
 	Controller->OnGlobaAbilityActivated(M_Ability->GetAimSettings(), FGlobalAbilitySoundSettings(), M_Ability);
-	Check(Controller->TryHandleActiveGlobalAbilityPrimaryClick(M_Anchor), TEXT("click_handled"));
+	if (bIsStrip)
+	{
+		// A strip is drawn with two clicks; the strike runs at its middle, which is the anchor.
+		Check(Controller->TryHandleActiveGlobalAbilityPrimaryClick(M_Anchor - StripHalfLength), TEXT("strip_anchored"));
+		Check(Controller->TryHandleActiveGlobalAbilityPrimaryClick(M_Anchor + StripHalfLength), TEXT("click_handled"));
+	}
+	else
+	{
+		Check(Controller->TryHandleActiveGlobalAbilityPrimaryClick(M_Anchor), TEXT("click_handled"));
+	}
 	bool bPaid = IsValid(Resources);
 	FString PaidText;
 	for (const TPair<ERTSResourceType, int32>& Cost : Costs.Costs.ResourceCosts)
@@ -491,6 +511,24 @@ void UJu87GTankBusterTestSubsystem::StartStrike()
 	Check(M_Ability->GetAbilityCosts().CoolDownRemaining == Costs.CoolDownTime, TEXT("cooldown_started"),
 	      FString::Printf(TEXT("remaining=%d"), M_Ability->GetAbilityCosts().CoolDownRemaining));
 	RequestScreenshot(TEXT("Strike_Clicked"));
+}
+
+void UJu87GTankBusterTestSubsystem::ClearCopyRequirements(UGlobalAbility& Ability) const
+{
+	// The template keeps the building/tech gate of the Ju 87 strafe it was copied from; a bare test map has neither.
+	// Only this copy is cleared, after logging what the template asks for.
+	const FStructProperty* RequirementsProperty = CastField<FStructProperty>(
+		UGlobalAbility::StaticClass()->FindPropertyByName(TEXT("M_AbilityRequirements")));
+	if (RequirementsProperty == nullptr)
+	{
+		return;
+	}
+	void* Requirements = RequirementsProperty->ContainerPtrToValuePtr<void>(&Ability);
+	FString RequirementText;
+	RequirementsProperty->ExportTextItem_Direct(RequirementText, Requirements, nullptr, nullptr, PPF_None);
+	UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST TEMPLATE_REQUIREMENTS %s (cleared on the test copy)"),
+	       *RequirementText);
+	RequirementsProperty->Struct->ClearScriptStruct(Requirements);
 }
 
 void UJu87GTankBusterTestSubsystem::SpawnTargets()
@@ -601,8 +639,9 @@ void UJu87GTankBusterTestSubsystem::TrackStrikeAircraft()
 			NewTrack.ClassName = Aircraft->GetClass()->GetName();
 			M_StrikeAircraft.Add(NewTrack);
 			Track = &M_StrikeAircraft.Last();
-			UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST AIRCRAFT %s at=%.1fs location=%s"),
-			       *Track->ClassName, GetPhaseSeconds(), *Aircraft->GetActorLocation().ToCompactString());
+			UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST AIRCRAFT %s at=%.1fs location=%s bomb_bay=%d"),
+			       *Track->ClassName, GetPhaseSeconds(), *Aircraft->GetActorLocation().ToCompactString(),
+			       IsValid(Aircraft->GetBombComponent()));
 			if (not M_CameraFollowAircraft.IsValid())
 			{
 				M_CameraFollowAircraft = Aircraft;
@@ -733,9 +772,10 @@ void UJu87GTankBusterTestSubsystem::TrackTargets()
 void UJu87GTankBusterTestSubsystem::TrackBombActors()
 {
 	int32 Count = 0;
+	// Pooled or map bombs that existed before the strike are not the Ju 87 G's.
 	for (TActorIterator<ABombActor> It(GetWorld()); It; ++It)
 	{
-		Count += IsValid(*It) ? 1 : 0;
+		Count += IsValid(*It) && not M_PreExistingActors.Contains(*It) ? 1 : 0;
 	}
 	M_BombActorsSeen = FMath::Max(M_BombActorsSeen, Count);
 }

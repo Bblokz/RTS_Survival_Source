@@ -75,7 +75,7 @@ struct FRTSGroundFireFlameSettings
 	int32 MaxFlamesPerArea = 4;
 	float CoverRadiusCm = 180.f;
 	float ScalePerVfxScale = 0.6f;
-	float MinScale = 0.8f;
+	float MinScale = 1.f;
 	float MaxScale = 2.2f;
 	float RingFraction = 0.55f;
 	bool bCarpet = true;

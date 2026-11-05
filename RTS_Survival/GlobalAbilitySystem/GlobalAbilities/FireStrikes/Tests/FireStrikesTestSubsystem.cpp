@@ -71,7 +71,7 @@ namespace FireStrikesTestPrivate
 	constexpr float MaxVehicleHealthShareLost = 0.25f;
 	constexpr float StripLengthCm = 4000.f;
 	// The barrage beside the strip in the combined scenario: its shells and fires stay clear of the canister fires.
-	constexpr float SecondTargetOffsetYCm = 2600.f;
+	constexpr float SecondTargetOffsetYCm = 3200.f;
 	// The fire barrage burns 20 s, the Ju 87's canisters 18 s; the shorter one bounds both.
 	constexpr float BarrageFireSecondsLowerBound = 18.f;
 	// Stand-ins for flame units burning beside the strikes in the combined scenario (flamethrower ground fire:
@@ -83,7 +83,8 @@ namespace FireStrikesTestPrivate
 	constexpr float FlamerDamagePerSecond = 18.f;
 	constexpr float FlamerRefeedSeconds = 5.f;
 	constexpr float FlamerFeedUntilSeconds = 22.f;
-	constexpr float FlamerRowOffsetYCm = -1600.f;
+	// Between the strip and the barrage: the test map's landscape ends just past the strip's other side.
+	constexpr float FlamerRowOffsetYCm = 1100.f;
 	constexpr float FlamerSpacingCm = 700.f;
 	constexpr float FlamerSpotToleranceCm = 150.f;
 	const TCHAR* const SquadClassPath = TEXT("/Game/RTS_Survival/Blueprints/Squads/Rus/Rus_Squad_Mosin.Rus_Squad_Mosin_C");

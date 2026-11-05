@@ -77,7 +77,7 @@ public:
 
 	/** Clamp of an upright flame's uniform component scale. */
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.01", UIMin="0.01"))
-	float GroundFireFlameMinScale = 0.8f;
+	float GroundFireFlameMinScale = 1.f;
 
 	UPROPERTY(Config, EditAnywhere, Category="Ground Fire", meta=(ClampMin="0.01", UIMin="0.01"))
 	float GroundFireFlameMaxScale = 2.2f;
