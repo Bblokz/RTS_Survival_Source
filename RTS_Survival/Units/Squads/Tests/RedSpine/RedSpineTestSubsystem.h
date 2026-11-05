@@ -28,7 +28,7 @@ enum class ERedSpineTestPhase : uint8
  * ground, then fires GA_GerRedSpineDrop and GA_GerRedSpinePairDrop. For each drop it checks the landed Ju 390 lets
  * out the right number of squads, that the walkers stand on the ground beside the aircraft (not on it, not inside its
  * collision, not falling), survive its take-off and follow a move order. Anchor: -RedSpineAnchorX= -RedSpineAnchorY=
- * (else where the camera looks); the pair drop lands -RedSpinePairOffsetY= (default 3500) to the side.
+ * (else where the camera looks); the pair drop lands -RedSpinePairOffset= (default 5000) towards the map centre.
  * Screenshots into Saved/RedSpineTest. Logs RTS_REDSPINE_TEST; not in shipping.
  */
 UCLASS()
@@ -52,6 +52,9 @@ private:
 	FVector M_Anchor = FVector::ZeroVector;
 	FVector M_DirectSpawnLocation = FVector::ZeroVector;
 	FVector M_MoveTarget = FVector::ZeroVector;
+	// Landscape extent of the map and the direction from the anchor to its centre; keeps test spots on the map.
+	FBox M_LandscapeBounds = FBox(ForceInit);
+	FVector M_TowardCentre = FVector(0.f, 1.f, 0.f);
 	bool bM_AttackGroundFired = false;
 
 	// Index into the drop list (single, pair) of the drop that runs.
@@ -119,6 +122,9 @@ private:
 	void FinishDropChecks();
 	void TickMovingDroppedSquads();
 
+	FBox FindLandscapeBounds() const;
+	/** @brief Clamps a test location into the landscape (minus a margin) and puts it on the ground. */
+	FVector KeepInsideLandscape(const FVector& Location) const;
 	static FVector GetSquadCentre(ASquadController* Squad);
 	void ViewFrom(const FVector& Focus, float Distance, float Pitch, float Yaw = 135.f) const;
 	void RequestScreenshot(const FString& Label);

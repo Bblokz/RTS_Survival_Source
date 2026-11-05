@@ -12,6 +12,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Engine/OverlapResult.h"
+#include "LandscapeProxy.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
@@ -81,8 +83,12 @@ namespace RedSpineTestPrivate
 	// After the squads of a drop are complete: the landed check, then the take-off has to be over.
 	constexpr float LandedCheckDelaySeconds = 2.5f;
 	constexpr float AfterTakeOffSeconds = 20.f;
-	constexpr float DirectSpawnOffsetY = -3500.f;
-	constexpr float DefaultPairOffsetY = 3500.f;
+	// The directly spawned squad stands this far to the side of the drop point (across the line to the map centre).
+	constexpr float DirectSpawnSideOffset = 3500.f;
+	// The pair drop lands this far from the single drop, towards the map centre.
+	constexpr float DefaultPairOffset = 5000.f;
+	// Every test location stays this far inside the landscape: RTS_ToCopySmall's -Y edge is close to the anchor.
+	constexpr float LandscapeEdgeMargin = 2500.f;
 	constexpr float CameraTraceLength = 500000.f;
 	// Feet within this of the ground below the walker count as standing on it.
 	constexpr float FootGroundTolerance = 60.f;
@@ -207,6 +213,15 @@ void URedSpineTestSubsystem::TickWaitingForStart()
 		Finish();
 		return;
 	}
+	M_LandscapeBounds = FindLandscapeBounds();
+	M_Anchor = KeepInsideLandscape(M_Anchor);
+	const FVector ToCentre = M_LandscapeBounds.IsValid
+		                         ? (M_LandscapeBounds.GetCenter() - M_Anchor).GetSafeNormal2D()
+		                         : FVector(0.f, 1.f, 0.f);
+	M_TowardCentre = ToCentre.IsNearlyZero() ? FVector(0.f, 1.f, 0.f) : ToCentre;
+	UE_LOG(LogRTSRedSpineTest, Display, TEXT("RTS_REDSPINE_TEST LANDSCAPE min=%s max=%s anchor=%s to_centre=%s"),
+	       *M_LandscapeBounds.Min.ToCompactString(), *M_LandscapeBounds.Max.ToCompactString(),
+	       *M_Anchor.ToCompactString(), *M_TowardCentre.ToCompactString());
 	if (UWorld* World = GetWorld())
 	{
 		M_Camera = World->SpawnActor<ACameraActor>();
@@ -246,11 +261,8 @@ void URedSpineTestSubsystem::StartDirectSpawn()
 {
 	using namespace RedSpineTestPrivate;
 	EnterPhase(ERedSpineTestPhase::WaitingForSpawnedSquad);
-	const FVector Desired = M_Anchor + FVector(0.f, DirectSpawnOffsetY, 0.f);
-	if (not GlobalAbilityHelpers::TryFindGroundLocation(this, Desired, M_DirectSpawnLocation))
-	{
-		M_DirectSpawnLocation = Desired;
-	}
+	const FVector Side(-M_TowardCentre.Y, M_TowardCentre.X, 0.f);
+	M_DirectSpawnLocation = KeepInsideLandscape(M_Anchor + Side * DirectSpawnSideOffset);
 	ARTSAsyncSpawner* Spawner = FRTS_Statics::GetAsyncSpawner(this);
 	Check(IsValid(Spawner), TEXT("async_spawner_found"));
 	if (not IsValid(Spawner))
@@ -315,11 +327,7 @@ void URedSpineTestSubsystem::TickWaitingForSpawnedSquad()
 	CheckWalkersOnGround(Squad, TEXT("spawned"));
 	RequestScreenshot(TEXT("SpawnedSquad"));
 
-	FVector Desired = GetSquadCentre(Squad) + FVector(MoveDistance, 0.f, 0.f);
-	if (not GlobalAbilityHelpers::TryFindGroundLocation(this, Desired, M_MoveTarget))
-	{
-		M_MoveTarget = Desired;
-	}
+	M_MoveTarget = KeepInsideLandscape(GetSquadCentre(Squad) + M_TowardCentre * MoveDistance);
 	const ECommandQueueError MoveResult = Squad->MoveToLocation(M_MoveTarget, true, FRotator::ZeroRotator);
 	Check(MoveResult == ECommandQueueError::NoError, TEXT("spawned_move_order_accepted"),
 	      UEnum::GetValueAsString(MoveResult));
@@ -488,12 +496,15 @@ void URedSpineTestSubsystem::CheckWalkersOnGround(ASquadController* Squad, const
 		{
 			Params.AddIgnoredActor(*It);
 		}
-		FHitResult Hit;
-		const bool bHit = World->LineTraceSingleByChannel(Hit, Location, Location - FVector(0.f, 0.f, GroundTraceLength),
-		                                                  ECC_Visibility, Params);
-		const AActor* Below = bHit ? Hit.GetActor() : nullptr;
+		const FVector TraceEnd = Location - FVector(0.f, 0.f, GroundTraceLength);
+		FHitResult GroundHit;
+		const bool bHit = World->LineTraceSingleByChannel(GroundHit, Location + FVector(0.f, 0.f, GroundTraceLength),
+		                                                  TraceEnd, COLLISION_TRACE_LANDSCAPE, Params);
+		FHitResult BelowHit;
+		World->LineTraceSingleByChannel(BelowHit, Location, TraceEnd, ECC_Visibility, Params);
+		const AActor* Below = BelowHit.GetActor();
 		const bool bOnAircraft = IsValid(Below) && Below->IsA<AAircraftMaster>();
-		const float FeetAboveGround = bHit ? (Location.Z - HalfHeight) - Hit.ImpactPoint.Z : 99999.f;
+		const float FeetAboveGround = bHit ? (Location.Z - HalfHeight) - GroundHit.ImpactPoint.Z : 99999.f;
 		const bool bFeetOnGround = FMath::Abs(FeetAboveGround) <= FootGroundTolerance;
 		if (not bFalling && bHit && not bOnAircraft && bFeetOnGround && not Unit->IsHidden())
 		{
@@ -584,14 +595,9 @@ void URedSpineTestSubsystem::StartDrop(const int32 DropIndex)
 	M_DropAnchor = M_Anchor;
 	if (DropIndex > 0)
 	{
-		float PairOffsetY = DefaultPairOffsetY;
-		FParse::Value(FCommandLine::Get(), TEXT("RedSpinePairOffsetY="), PairOffsetY);
-		const FVector Desired = M_Anchor + FVector(0.f, PairOffsetY, 0.f);
-		if (not GlobalAbilityHelpers::TryFindGroundLocation(this, Desired, M_DropAnchor))
-		{
-			Check(false, FString(Case.Label) + TEXT("_anchor_on_ground"), Desired.ToCompactString());
-			M_DropAnchor = Desired;
-		}
+		float PairOffset = DefaultPairOffset;
+		FParse::Value(FCommandLine::Get(), TEXT("RedSpinePairOffset="), PairOffset);
+		M_DropAnchor = KeepInsideLandscape(M_Anchor + M_TowardCentre * PairOffset);
 	}
 
 	ACPPController* Controller = FRTS_Statics::GetRTSController(GetWorld());
@@ -812,8 +818,7 @@ void URedSpineTestSubsystem::FinishDropChecks()
 		{
 			Away = FVector(-1.f, 0.f, 0.f);
 		}
-		FVector Target = Centre + Away * MoveDistance;
-		GlobalAbilityHelpers::TryFindGroundLocation(this, Target, Target);
+		const FVector Target = KeepInsideLandscape(Centre + Away * MoveDistance);
 		const ECommandQueueError MoveResult = Squad->MoveToLocation(Target, true, FRotator::ZeroRotator);
 		Check(MoveResult == ECommandQueueError::NoError, Squad->GetName() + TEXT("_move_order_accepted"),
 		      UEnum::GetValueAsString(MoveResult));
@@ -874,6 +879,32 @@ void URedSpineTestSubsystem::TickMovingDroppedSquads()
 		return;
 	}
 	Finish();
+}
+
+FBox URedSpineTestSubsystem::FindLandscapeBounds() const
+{
+	FBox Bounds(ForceInit);
+	for (TActorIterator<ALandscapeProxy> It(GetWorld()); It; ++It)
+	{
+		Bounds += It->GetComponentsBoundingBox(true);
+	}
+	return Bounds;
+}
+
+FVector URedSpineTestSubsystem::KeepInsideLandscape(const FVector& Location) const
+{
+	using namespace RedSpineTestPrivate;
+	FVector Clamped = Location;
+	if (M_LandscapeBounds.IsValid)
+	{
+		Clamped.X = FMath::Clamp(Location.X, M_LandscapeBounds.Min.X + LandscapeEdgeMargin,
+		                         M_LandscapeBounds.Max.X - LandscapeEdgeMargin);
+		Clamped.Y = FMath::Clamp(Location.Y, M_LandscapeBounds.Min.Y + LandscapeEdgeMargin,
+		                         M_LandscapeBounds.Max.Y - LandscapeEdgeMargin);
+	}
+	FVector OnGround = Clamped;
+	GlobalAbilityHelpers::TryFindGroundLocation(this, Clamped, OnGround);
+	return OnGround;
 }
 
 FVector URedSpineTestSubsystem::GetSquadCentre(ASquadController* Squad)

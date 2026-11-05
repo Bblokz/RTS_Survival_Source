@@ -53,7 +53,7 @@ namespace SFH18SquadTestPrivate
 	constexpr float FireTimeoutSeconds = 60.f;
 	constexpr float FireTargetRangeFraction = 0.55f;
 	constexpr float MinFireTargetDistanceCm = 1500.f;
-	constexpr float ImpactShotDelaySeconds = 3.f;
+	constexpr float ImpactShotDelaySeconds = 5.f;
 	constexpr float DropTimeoutSeconds = 150.f;
 	constexpr float DropSettleSeconds = 12.f;
 	constexpr float ScreenshotFlushSeconds = 1.5f;
@@ -305,7 +305,8 @@ void USFH18SquadTestSubsystem::TickWaitingForSpawnedSquad()
 		return;
 	}
 	Check(true, TEXT("gun_deployed_after_spawn"), FString::Printf(TEXT("after=%.1fs"), GetNow() - M_PhaseStartSeconds));
-	SetCamera(Gun->GetActorLocation() + FVector(0.f, 0.f, 120.f), 1700.f, -22.f, Gun->GetActorRotation().Yaw + 60.f);
+	// Three-quarter view from behind the left trail: the long barrel, split trails and the crew at the breech.
+	SetCamera(Gun->GetActorLocation() + FVector(0.f, 0.f, 110.f), 1000.f, -24.f, Gun->GetActorRotation().Yaw + 35.f);
 	M_PhaseStartSeconds = GetNow();
 	M_Phase = ESFH18SquadTestPhase::SettlingSpawnedSquad;
 }
@@ -354,7 +355,7 @@ void USFH18SquadTestSubsystem::StartFiring(ATeamWeaponController& Squad, ATeamWe
 	const ECommandQueueError Error = Squad.AttackGround(Target, true);
 	Check(Error == ECommandQueueError::NoError, TEXT("attack_ground_accepted"),
 	      FString::Printf(TEXT("error=%d"), static_cast<int32>(Error)));
-	SetCamera(Gun.GetActorLocation() + FVector(0.f, 0.f, 150.f), 1900.f, -14.f, Gun.GetActorRotation().Yaw + 90.f);
+	SetCamera(Gun.GetActorLocation() + FVector(0.f, 0.f, 150.f), 1300.f, -12.f, Gun.GetActorRotation().Yaw + 90.f);
 	M_PhaseStartSeconds = GetNow();
 	M_Phase = ESFH18SquadTestPhase::Firing;
 }
@@ -571,7 +572,7 @@ void USFH18SquadTestSubsystem::CheckDrop()
 	// A close look at one dropped gun and its crew.
 	if (GunLocations.Num() > 0)
 	{
-		SetCamera(GunLocations[0] + FVector(0.f, 0.f, 120.f), 1800.f, -24.f, M_CameraYaw);
+		SetCamera(GunLocations[0] + FVector(0.f, 0.f, 110.f), 1100.f, -26.f, M_CameraYaw);
 		RequestScreenshot(TEXT("drop_gun_close"));
 	}
 	M_Ability = nullptr;

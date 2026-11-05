@@ -119,6 +119,55 @@ def save_with_retry(asset, label):
     return False
 
 
+def find_group(text, field):
+    """(start, end) of 'field=(...)' (or a scalar 'field=value') in exported struct text; None when absent."""
+    start = text.find(field + "=")
+    if start < 0:
+        return None
+    index = start + len(field) + 1
+    if index >= len(text) or text[index] != "(":
+        end = index
+        while end < len(text) and text[end] not in ",)":
+            end += 1
+        return start, end
+    depth = 0
+    for end in range(index, len(text)):
+        if text[end] == "(":
+            depth += 1
+        elif text[end] == ")":
+            depth -= 1
+            if depth == 0:
+                return start, end + 1
+    raise RuntimeError("unbalanced %s in %s" % (field, text))
+
+
+def with_cost(cost_state, radixite, cooldown=None):
+    """A fresh cost state from cost_state's text with ResourceCosts = radixite only (0 = free). Python refuses to set
+    FUnitCost.ResourceCosts on some instances, so the struct is rebuilt through import_text (as
+    Tools/Commanders/make_costs_radixite_only.py does)."""
+    text = cost_state.export_text()
+    new_group = "ResourceCosts=((Resource_Radixite, %d))" % radixite if radixite else "ResourceCosts=()"
+    group = find_group(text, "ResourceCosts")
+    if group is not None:
+        text = text[:group[0]] + new_group + text[group[1]:]
+    else:
+        costs_group = find_group(text, "Costs")
+        if costs_group is None:
+            raise RuntimeError("no Costs field in %s" % text)
+        inner = text[costs_group[0]:costs_group[1]]
+        replaced = "Costs=(%s)" % new_group if inner == "Costs=()" else inner[:-1] + "," + new_group + ")"
+        text = text[:costs_group[0]] + replaced + text[costs_group[1]:]
+    fresh = type(cost_state)()
+    fresh.import_text(text)
+    if cooldown is not None:
+        fresh.set_editor_property("cool_down_time", cooldown)
+        fresh.set_editor_property("cool_down_remaining", 0)
+    got = dict(fresh.get_editor_property("costs").get_editor_property("resource_costs"))
+    if len(got) != (1 if radixite else 0) or (radixite and list(got.values())[0] != radixite):
+        raise RuntimeError("cost import gave %s (text %s)" % (got, text))
+    return fresh
+
+
 # ------------------------------------------------------------------ Blueprint
 
 def blueprint_components(bp):
@@ -264,11 +313,7 @@ def build_child(parent, name, source):
     child.set_editor_property("m_ability_marker", marker)
     child.set_editor_property("m_ability_sound_settings", unreal.GlobalAbilitySoundSettings())
     # The parent pays; children cost nothing (as make_costs_radixite_only.py leaves composite children).
-    costs = child.get_editor_property("m_ability_costs")
-    unit_cost = costs.get_editor_property("costs")
-    unit_cost.set_editor_property("resource_costs", {})
-    costs.set_editor_property("costs", unit_cost)
-    child.set_editor_property("m_ability_costs", costs)
+    child.set_editor_property("m_ability_costs", with_cost(child.get_editor_property("m_ability_costs"), 0))
     return child
 
 
@@ -312,13 +357,8 @@ def author_template(asset, templates, ga_enum, workshop_bp, report):
     parent.set_editor_property("m_ability_sound_settings",
                                fresh_copy(building_source.get_editor_property("m_ability_sound_settings")))
 
-    cost_state = parent.get_editor_property("m_ability_costs")
-    unit_cost = cost_state.get_editor_property("costs")
-    unit_cost.set_editor_property("resource_costs", {member(unreal.RTSResourceType, "Resource_Radixite"): COST_RADIXITE})
-    cost_state.set_editor_property("costs", unit_cost)
-    cost_state.set_editor_property("cool_down_time", COOLDOWN)
-    cost_state.set_editor_property("cool_down_remaining", 0)
-    parent.set_editor_property("m_ability_costs", cost_state)
+    parent.set_editor_property("m_ability_costs", with_cost(parent.get_editor_property("m_ability_costs"),
+                                                            COST_RADIXITE, COOLDOWN))
 
     ui = parent.get_editor_property("m_ui_settings")
     texture = unreal.load_asset(ICON_DIR + ICON)

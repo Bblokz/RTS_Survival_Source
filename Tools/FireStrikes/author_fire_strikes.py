@@ -197,6 +197,9 @@ def apply_barrage(obj):
     spec = BARRAGE
     barrage = obj.get_editor_property("m_barrage_settings").export_text()
     barrage = replace_field(barrage, "AmountShells", str(spec["shells"]))
+    # GA_Barrage starts some shells only 5.9 m up (MinHeightStart 587); such a flat shell can sail far past the circle
+    # (one landed 45 m off in a test run). Incendiary shells come down from 25-35 m.
+    barrage = replace_field(barrage, "MinHeightStart", "2500.000000")
     barrage = replace_field(barrage, "Radius", "%f" % spec["radius"])
     barrage = replace_field(barrage, "MinTimeBetweenBurst", "0.500000")
     barrage = replace_field(barrage, "MaxTimeBetweenBurst", "0.900000")
