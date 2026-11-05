@@ -16,6 +16,6 @@ enum class ERTSFireType : uint8
 	AmmoCookOffInf,
 	TankFire,
 	GroundFire,
-	
-	
+	// Upright flames scattered over a burning ground area (on top of the GroundFire carpet); see URTSFirePoolSettings.
+	GroundFireFlame,
 };

@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/FirePoolSettings/RTSFirePoolSettings.h"
 #include "RTS_Survival/Utils/AOE/FRTS_AOE.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace RTSFireManagerConstants
@@ -14,6 +15,16 @@ namespace RTSFireManagerConstants
 	constexpr int32 MinimumPoolSize = 1;
 	// Below this much damage a tick sends no overlap query (e.g. a tick right after the area started).
 	constexpr float MinimumGroundFireDamagePerTick = 0.5f;
+	// Upright flames: each one's size varies a little so a line of fires does not look stamped.
+	constexpr float FlameScaleJitterFraction = 0.15f;
+	// Up and down from the area centre the landscape is searched for each flame's foot.
+	constexpr float FlameGroundTraceHalfHeightCm = 400.f;
+	// Hash of the area location turns the ring, so neighbouring areas do not repeat one pattern.
+	constexpr float RingTurnPerHashStep = 0.618034f;
+	constexpr float HashWeightX = 0.013f;
+	constexpr float HashWeightY = 0.007f;
+	// Golden angle in radians: consecutive flames get unrelated size jitter.
+	constexpr float GoldenAngleRadians = 2.399963f;
 }
 
 ARTSFireManager::ARTSFireManager()
@@ -303,7 +314,10 @@ FRTSGroundFireRequestResult ARTSFireManager::RequestGroundFireAtTime(const FRTSG
 	NewArea.AreaHandle = M_NextGroundFireAreaHandle;
 	M_NextGroundFireAreaHandle = M_NextGroundFireAreaHandle >= MAX_int32 - 1 ? 1 : M_NextGroundFireAreaHandle + 1;
 	// The area may burn without flames when the pool is missing; gameplay does not depend on the VFX asset.
-	NewArea.VfxFireHandle = StartGroundFireVfx(Settings, GroundLocation);
+	NewArea.VfxFireHandle = M_GroundFireFlameSettings.bCarpet || GetGroundFireFlameCount(Settings.RadiusCm) == 0
+		                        ? StartGroundFireVfx(Settings, GroundLocation)
+		                        : INDEX_NONE;
+	StartGroundFireFlames(Settings, GroundLocation, NewArea.FlameVfxHandles);
 	M_GroundFireAreas.Add(NewArea);
 
 	Result.AreaHandle = NewArea.AreaHandle;
@@ -412,6 +426,91 @@ int32 ARTSFireManager::StartGroundFireVfx(const FRTSGroundFireSettings& Settings
 	                              EffectParams);
 }
 
+int32 ARTSFireManager::GetGroundFireFlameCount(const float RadiusCm) const
+{
+	const FRTSGroundFireFlameSettings& Flames = M_GroundFireFlameSettings;
+	if (Flames.MaxFlamesPerArea <= 0 || RadiusCm <= 0.f)
+	{
+		return 0;
+	}
+	// Burning area over the area one flame covers: 3 m gets 3 flames, 4 m and up the cap of 4 (1.8 m circles).
+	const float CoverRatio = FMath::Square(RadiusCm / FMath::Max(Flames.CoverRadiusCm, 1.f));
+	return FMath::Clamp(FMath::RoundToInt(CoverRatio), 1, Flames.MaxFlamesPerArea);
+}
+
+void ARTSFireManager::StartGroundFireFlames(const FRTSGroundFireSettings& Settings, const FVector& GroundLocation,
+                                            TArray<int32, TInlineAllocator<6>>& OutFlameHandles)
+{
+	using namespace RTSFireManagerConstants;
+	const int32 FlameCount = GetGroundFireFlameCount(Settings.RadiusCm);
+	if (FlameCount == 0 || not M_FirePools.Contains(ERTSFireType::GroundFireFlame))
+	{
+		return;
+	}
+	const FRTSGroundFireFlameSettings& Flames = M_GroundFireFlameSettings;
+	const float BaseScale = FMath::Clamp(Settings.VfxScale * Flames.ScalePerVfxScale, Flames.MinScale,
+	                                     Flames.MaxScale);
+	FRTSFireEffectParams EffectParams;
+	EffectParams.Scale = Settings.VfxScale;
+	// Lifetime 0: the flames burn until the area puts them out.
+	constexpr float KeepActiveUntilStopped = 0.f;
+	for (int32 FlameIndex = 0; FlameIndex < FlameCount; ++FlameIndex)
+	{
+		const float Jitter = 1.f + FlameScaleJitterFraction * FMath::Sin(FlameIndex * GoldenAngleRadians + GroundLocation.X);
+		const FVector FlameLocation = GetGroundFireFlameLocation(GroundLocation, Settings.RadiusCm, FlameIndex,
+		                                                         FlameCount);
+		const int32 FlameHandle = ActivateFireAtLocation(ERTSFireType::GroundFireFlame, KeepActiveUntilStopped,
+		                                                 FlameLocation, FVector(BaseScale * Jitter), EffectParams);
+		if (FlameHandle != INDEX_NONE)
+		{
+			OutFlameHandles.Add(FlameHandle);
+		}
+	}
+}
+
+FVector ARTSFireManager::GetGroundFireFlameLocation(const FVector& GroundLocation, const float RadiusCm,
+                                                    const int32 FlameIndex, const int32 FlameCount) const
+{
+	using namespace RTSFireManagerConstants;
+	if (FlameIndex == 0 || FlameCount <= 1)
+	{
+		return GroundLocation;
+	}
+	// The first flame stands in the centre, the others evenly on a ring turned by the area's location.
+	const int32 RingCount = FlameCount - 1;
+	const float HashTurn = FMath::Frac((GroundLocation.X * HashWeightX + GroundLocation.Y * HashWeightY) * RingTurnPerHashStep);
+	const float Angle = UE_TWO_PI * (static_cast<float>(FlameIndex - 1) / RingCount + HashTurn);
+	const float RingRadius = RadiusCm * M_GroundFireFlameSettings.RingFraction;
+	FVector FlameLocation = GroundLocation + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * RingRadius;
+
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return FlameLocation;
+	}
+	FHitResult GroundHit;
+	const FVector TraceOffset(0.f, 0.f, FlameGroundTraceHalfHeightCm);
+	const FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(GroundFireFlameTrace), false, this);
+	if (World->LineTraceSingleByChannel(GroundHit, FlameLocation + TraceOffset, FlameLocation - TraceOffset,
+	                                    COLLISION_TRACE_LANDSCAPE, QueryParams))
+	{
+		FlameLocation = GroundHit.ImpactPoint;
+	}
+	return FlameLocation;
+}
+
+void ARTSFireManager::StopGroundFireVfx(const FRTSGroundFireArea& Area)
+{
+	if (Area.VfxFireHandle != INDEX_NONE)
+	{
+		StopFireByHandle(Area.VfxFireHandle);
+	}
+	for (const int32 FlameHandle : Area.FlameVfxHandles)
+	{
+		StopFireByHandle(FlameHandle);
+	}
+}
+
 void ARTSFireManager::PutOutGroundFireAt(const int32 AreaIndex)
 {
 	if (not M_GroundFireAreas.IsValidIndex(AreaIndex))
@@ -419,11 +518,7 @@ void ARTSFireManager::PutOutGroundFireAt(const int32 AreaIndex)
 		return;
 	}
 
-	const int32 VfxFireHandle = M_GroundFireAreas[AreaIndex].VfxFireHandle;
-	if (VfxFireHandle != INDEX_NONE)
-	{
-		StopFireByHandle(VfxFireHandle);
-	}
+	StopGroundFireVfx(M_GroundFireAreas[AreaIndex]);
 	M_GroundFireAreas.RemoveAtSwap(AreaIndex, 1, EAllowShrinking::No);
 }
 
@@ -457,6 +552,14 @@ void ARTSFireManager::InitGroundFireSettings(const URTSFirePoolSettings* Setting
 	M_MaxActiveGroundFires = FMath::Max(Settings->MaxActiveGroundFires, 1);
 	M_GroundFireMergeDistanceFraction = FMath::Max(Settings->GroundFireMergeDistanceFraction, 0.f);
 	M_GroundFireVfxBaseRadiusCm = FMath::Max(Settings->GroundFireVfxBaseRadiusCm, 1.f);
+	M_GroundFireFlameSettings.MaxFlamesPerArea = FMath::Max(Settings->MaxGroundFireFlamesPerArea, 0);
+	M_GroundFireFlameSettings.CoverRadiusCm = FMath::Max(Settings->GroundFireFlameCoverRadiusCm, 1.f);
+	M_GroundFireFlameSettings.ScalePerVfxScale = FMath::Max(Settings->GroundFireFlameScalePerVfxScale, 0.01f);
+	M_GroundFireFlameSettings.MinScale = FMath::Max(Settings->GroundFireFlameMinScale, 0.01f);
+	M_GroundFireFlameSettings.MaxScale = FMath::Max(Settings->GroundFireFlameMaxScale,
+	                                                M_GroundFireFlameSettings.MinScale);
+	M_GroundFireFlameSettings.RingFraction = FMath::Clamp(Settings->GroundFireFlameRingFraction, 0.f, 1.f);
+	M_GroundFireFlameSettings.bCarpet = Settings->bGroundFireCarpet;
 }
 
 void ARTSFireManager::InitPoolsFromSettings(const URTSFirePoolSettings* Settings)

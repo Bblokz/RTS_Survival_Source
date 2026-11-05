@@ -65,6 +65,20 @@ struct FRTSGroundFireArea
 	int32 AreaHandle = INDEX_NONE;
 	// Pooled GroundFire Niagara of this area, or INDEX_NONE when the pool is not configured (the area still burns).
 	int32 VfxFireHandle = INDEX_NONE;
+	// Pooled upright GroundFireFlame Niagara spread over the area; empty when that pool is not configured.
+	TArray<int32, TInlineAllocator<6>> FlameVfxHandles;
+};
+
+/** Upright flames of the ground fire areas; read once from URTSFirePoolSettings. */
+struct FRTSGroundFireFlameSettings
+{
+	int32 MaxFlamesPerArea = 4;
+	float CoverRadiusCm = 180.f;
+	float ScalePerVfxScale = 0.6f;
+	float MinScale = 0.8f;
+	float MaxScale = 2.2f;
+	float RingFraction = 0.55f;
+	bool bCarpet = true;
 };
 
 /** Outcome of a ground fire request. */
@@ -168,6 +182,16 @@ public:
 	/** @return Number of ground fire areas currently burning. */
 	int32 GetActiveGroundFireCount() const { return M_GroundFireAreas.Num(); }
 
+	/** @return Most ground fire areas that burn at once; at the cap a new fire replaces the one closest to burning out. */
+	int32 GetMaxActiveGroundFires() const { return M_MaxActiveGroundFires; }
+
+	/**
+	 * @brief How many upright flames an area of this radius gets; one per cover circle, at least one, capped.
+	 * @param RadiusCm Radius of the burning area.
+	 * @return 0 when upright flames are off.
+	 */
+	int32 GetGroundFireFlameCount(float RadiusCm) const;
+
 	/** @return Number of pooled fire effects of this type that are currently active. */
 	int32 GetActiveFireCount(ERTSFireType FireType) const;
 
@@ -182,9 +206,10 @@ private:
 	// Burning ground areas; at most M_MaxActiveGroundFires, damaged from Tick (no timer or tick per fire).
 	TArray<FRTSGroundFireArea> M_GroundFireAreas;
 	int32 M_NextGroundFireAreaHandle = 1;
-	int32 M_MaxActiveGroundFires = 8;
+	int32 M_MaxActiveGroundFires = 24;
 	float M_GroundFireMergeDistanceFraction = 0.75f;
 	float M_GroundFireVfxBaseRadiusCm = 100.f;
+	FRTSGroundFireFlameSettings M_GroundFireFlameSettings;
 	bool bM_HasReportedMissingGroundFirePool = false;
 
 	FRTSGroundFireRequestResult RequestGroundFireAtTime(const FRTSGroundFireSettings& Settings,
@@ -200,6 +225,17 @@ private:
 	void MergeIntoGroundFire(FRTSGroundFireArea& Area, const FRTSGroundFireSettings& Settings,
 	                         float CurrentTimeSeconds) const;
 	int32 StartGroundFireVfx(const FRTSGroundFireSettings& Settings, const FVector& GroundLocation);
+	/**
+	 * @brief Stands upright flames over the area: one in the centre, the rest on a ring, each dropped onto the ground.
+	 * @param Settings Radius and VfxScale of the burn.
+	 * @param GroundLocation Centre of the burning area.
+	 * @param OutFlameHandles Receives the handle of every flame that started.
+	 */
+	void StartGroundFireFlames(const FRTSGroundFireSettings& Settings, const FVector& GroundLocation,
+	                           TArray<int32, TInlineAllocator<6>>& OutFlameHandles);
+	FVector GetGroundFireFlameLocation(const FVector& GroundLocation, float RadiusCm, int32 FlameIndex,
+	                                   int32 FlameCount) const;
+	void StopGroundFireVfx(const FRTSGroundFireArea& Area);
 	void PutOutGroundFireAt(int32 AreaIndex);
 	void DealGroundFireDamage(const FRTSGroundFireArea& Area, float BurnSeconds);
 	void InitGroundFireSettings(const URTSFirePoolSettings* Settings);
