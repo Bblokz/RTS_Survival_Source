@@ -170,15 +170,45 @@ def radixite_of(obj):
     return int(costs.get_editor_property("resource_costs").get(R, 0))
 
 
+def find_group(text, field):
+    """(start, end) of 'field=(...)' in an exported struct text, balanced parentheses; None when absent."""
+    start = text.find(field + "=")
+    if start < 0:
+        return None
+    depth = 0
+    for end in range(start + len(field) + 1, len(text)):
+        if text[end] == "(":
+            depth += 1
+        elif text[end] == ")":
+            depth -= 1
+            if depth == 0:
+                return start, end + 1
+    raise RuntimeError("unbalanced %s in %s" % (field, text))
+
+
 def set_balance(obj, tier_name, radixite, cooldown):
+    """FUnitCost::ResourceCosts is EditDefaultsOnly, so Python cannot set it on an instance: the cost state is
+    rebuilt from its exported text with a radixite-only ResourceCosts (as Tools/Commanders/make_costs_radixite_only.py)."""
     obj.set_editor_property("m_ability_tier", member(unreal.GlobalAbilityTier, tier_name))
-    cost_state = detached_copy(obj.get_editor_property("m_ability_costs"))
-    unit_cost = cost_state.get_editor_property("costs")
-    unit_cost.set_editor_property("resource_costs", {R: radixite})
-    cost_state.set_editor_property("costs", unit_cost)
-    cost_state.set_editor_property("cool_down_time", cooldown)
-    cost_state.set_editor_property("cool_down_remaining", 0)
-    obj.set_editor_property("m_ability_costs", cost_state)
+    cost_state = obj.get_editor_property("m_ability_costs")
+    text = cost_state.export_text()
+    new_group = "ResourceCosts=((Resource_Radixite, %d))" % radixite
+    group = find_group(text, "ResourceCosts")
+    if group is not None:
+        new_text = text[:group[0]] + new_group + text[group[1]:]
+    else:
+        costs_group = find_group(text, "Costs")
+        if costs_group is None or text[costs_group[0]:costs_group[1]] != "Costs=()":
+            raise RuntimeError("unexpected cost text %s" % text)
+        new_text = text[:costs_group[0]] + "Costs=(%s)" % new_group + text[costs_group[1]:]
+    fresh = type(cost_state)()
+    fresh.import_text(new_text)
+    fresh.set_editor_property("cool_down_time", cooldown)
+    fresh.set_editor_property("cool_down_remaining", 0)
+    got = dict(fresh.get_editor_property("costs").get_editor_property("resource_costs"))
+    if got != {R: radixite}:
+        raise RuntimeError("cost import gave %s (text %s)" % (got, new_text))
+    obj.set_editor_property("m_ability_costs", fresh)
 
 
 def author_massive_flare(asset, templates, report):
