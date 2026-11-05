@@ -2,6 +2,7 @@
 
 Meshes and textures come from D:/Blender/BlenderProjects/BlenderTanks/Planes/SuperHeavyTransport/Export
 (model_mammut.py, make_textures.py). Mesh slots are filled by name: Camo, Underside, Interior, Glass, Dark, Marking.
+M_Mammut_Airframe is shared with the Träger C (Source/Tools/TraegerC), whose instances turn on LargeCamo.
 """
 import unreal
 
@@ -38,6 +39,8 @@ MACRO_TILING = 0.23
 WEAR_COLOR = (0.26, 0.26, 0.24)
 WEAR_METALLIC = 0.5
 WEAR_ROUGHNESS_OFFSET = -0.12
+# LargeCamo only: stencil paint laid over the camo where PaintDetail's alpha says so (light grey, linear).
+OVERLAY_COLOR = (0.55, 0.54, 0.48)
 
 
 def log(msg):
@@ -130,6 +133,16 @@ def make_airframe_material(name, textures):
     tex_class = unreal.MaterialExpressionTextureSampleParameter2D
 
     base = expression(mat, tex_class, -1400, -400, parameter_name='BaseTexture', texture=unreal.load_asset(WHITE))
+    # LargeCamo (static switch, off for the Mammut): BaseTexture comes from UV channel 1, a much larger tile, and the
+    # PaintDetail multiplier on channel 0 carries the panel-scale paint work, so big airframes don't show the camo
+    # repeating (make_traeger_textures.py).
+    uv0 = expression(mat, unreal.MaterialExpressionTextureCoordinate, -1900, -450, coordinate_index=0)
+    uv1 = expression(mat, unreal.MaterialExpressionTextureCoordinate, -1900, -350, coordinate_index=1)
+    base_uv = expression(mat, unreal.MaterialExpressionStaticSwitchParameter, -1650, -400, parameter_name='LargeCamo',
+                         default_value=False)
+    link(uv1, '', base_uv, 'True')
+    link(uv0, '', base_uv, 'False')
+    link(base_uv, '', base, 'UVs')
     tint = expression(mat, unreal.MaterialExpressionVectorParameter, -1400, -150, parameter_name='Tint',
                       default_value=unreal.LinearColor(1, 1, 1, 1))
     mask = expression(mat, tex_class, -1400, 100, parameter_name='DetailMask', texture=textures['T_Mammut_Detail_M'],
@@ -151,7 +164,20 @@ def make_airframe_material(name, textures):
     one = expression(mat, unreal.MaterialExpressionConstant, -1100, 100, r=1.0)
 
     # Base colour: paint, chipped to bare metal, darkened in the seams, drifting in brightness over 26 m.
-    paint = multiply(mat, base, 'RGB', tint, '', -1000, -300)
+    plain_paint = multiply(mat, base, 'RGB', tint, '', -1000, -300)
+    detail = expression(mat, tex_class, -1400, -750, parameter_name='PaintDetail',
+                        texture=textures['T_Neutral_PaintDetail'],
+                        sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_COLOR)
+    shade = expression(mat, unreal.MaterialExpressionMultiply, -1100, -700, const_b=2.0)
+    link(detail, 'RGB', shade, 'A')
+    shaded_paint = multiply(mat, plain_paint, '', shade, '', -900, -650)
+    overlay = expression(mat, unreal.MaterialExpressionVectorParameter, -1100, -850, parameter_name='OverlayColor',
+                         default_value=unreal.LinearColor(*OVERLAY_COLOR, 1))
+    overlaid = lerp(mat, shaded_paint, '', overlay, '', detail, 'A', -750, -650)
+    paint = expression(mat, unreal.MaterialExpressionStaticSwitchParameter, -600, -450, parameter_name='LargeCamo',
+                       default_value=False)
+    link(overlaid, '', paint, 'True')
+    link(plain_paint, '', paint, 'False')
     wear_color = expression(mat, unreal.MaterialExpressionConstant3Vector, -1000, -200,
                             constant=unreal.LinearColor(*WEAR_COLOR, 1))
     wear_alpha = multiply(mat, mask, 'B', wear_amount, '', -900, -100)
@@ -233,6 +259,10 @@ def build_materials():
     textures = {}
     for name in ('T_Mammut_Splinter', 'T_Balkenkreuz'):
         textures[name] = import_file(SRC + '/Textures/' + name + '.png', ROOT + '/Textures', name)
+    neutral = import_file(SRC + '/Textures/T_Neutral_PaintDetail.png', ROOT + '/Textures', 'T_Neutral_PaintDetail')
+    neutral.set_editor_property('srgb', False)
+    unreal.EditorAssetLibrary.save_asset(neutral.get_path_name().split('.')[0], only_if_is_dirty=False)
+    textures['T_Neutral_PaintDetail'] = neutral
     textures.update(import_detail_textures())
     airframe = make_airframe_material('M_Mammut_Airframe', textures)
     marking = make_material('M_Mammut_Marking', masked=True)
