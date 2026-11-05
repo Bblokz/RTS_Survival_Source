@@ -36,9 +36,11 @@ enum class ESonnengewehrVictimLane : uint8
 };
 
 /**
- * @brief -SonnengewehrValidate: places enemy T-34s and Mosin squads on and beside a 50 m strip at the anchor (camera
+ * @brief -SonnengewehrValidate: places enemy T-34s and Mosin squads on and beside a 50 m strip, plus a friendly
+ * T-34 and Mosin squad on it (all weapons held so only the beam hurts anyone), at the anchor (camera
  * centre, or -SonnengewehrAnchorX= / -SonnengewehrAnchorY=), fires GA_GerSonnengewehr through the player's two strip
- * clicks and checks the cost, that everything on the path burns in sweep order while nothing beside it does, and that
+ * clicks and checks the cost (675 radixite only), that every enemy on the path burns in sweep order while nothing beside it
+ * and no friendly unit does, and that
  * the ability ends once, after the last burn. Screenshots to Saved/SonnengewehrTest; logs RTS_SONNEN_TEST.
  * Not in shipping.
  */
@@ -62,6 +64,8 @@ private:
 		const AActor* ActorKey = nullptr;
 		FString Label;
 		bool bIsTank = false;
+		// Owned by the player who fires the beam: must never burn (no friendly fire, user decision 2026-11-05).
+		bool bIsFriendly = false;
 		ESonnengewehrVictimLane Lane = ESonnengewehrVictimLane::Edge;
 		// Position relative to the strip when the ability is clicked.
 		float Along = 0.f;
@@ -97,6 +101,8 @@ private:
 	TArray<TWeakObjectPtr<ASquadController>> M_Squads;
 	// Squad label per squad, for the soldiers it spawns.
 	TArray<FString> M_SquadLabels;
+	// Owning player per squad, for the soldiers it spawns.
+	TArray<uint8> M_SquadOwners;
 
 	float M_BeamSpawnSeconds = -1.f;
 	float M_SweepStartSeconds = -1.f;
@@ -130,11 +136,14 @@ private:
 	bool FindAnchor(FVector& OutAnchor) const;
 	void BuildStrip();
 	void SpawnVictims();
-	AActor* SpawnEnemy(const TCHAR* ClassPath, float Along, float Lateral);
+	AActor* SpawnUnit(const TCHAR* ClassPath, float Along, float Lateral, uint8 OwningPlayer);
+	void SpawnSquad(const TCHAR* Label, float Along, float Lateral, uint8 OwningPlayer);
+	/** Friendly and enemy victims would shoot each other; only the beam may hurt anyone in this test. */
+	void PacifyVictims() const;
 	void TickPlacingVictims();
 	void CollectSquadSoldiers();
 	void ClassifyVictims();
-	void AddVictim(AActor* Actor, const FString& Label, bool bIsTank);
+	void AddVictim(AActor* Actor, const FString& Label, bool bIsTank, bool bIsFriendly = false);
 
 	void FireAbility();
 	bool CheckTemplate(const UGA_Sonnengewehr& Ability);

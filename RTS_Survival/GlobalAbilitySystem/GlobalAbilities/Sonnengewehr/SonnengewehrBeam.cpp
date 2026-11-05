@@ -14,6 +14,7 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
@@ -537,7 +538,7 @@ void ASonnengewehrBeam::BurnOverlap(const FOverlapResult& Overlap, const FVector
 		return;
 	}
 	ActorsThisTick.Add(Victim);
-	if (not RTSFunctionLibrary::RTSIsValid(Victim))
+	if (not RTSFunctionLibrary::RTSIsValid(Victim) || GetIsSparedOwnUnit(*Victim))
 	{
 		return;
 	}
@@ -614,7 +615,7 @@ FCollisionObjectQueryParams ASonnengewehrBeam::GetBeamObjectQueryParams() const
 {
 	// Same object types as the game's area damage (FRTS_AOE).
 	FCollisionObjectQueryParams ObjectQueryParams;
-	const ETriggerOverlapLogic Affected = M_Settings.AffectedUnits;
+	const ETriggerOverlapLogic Affected = GetBurntSides();
 	if (Affected == ETriggerOverlapLogic::OverlapEnemy || Affected == ETriggerOverlapLogic::OverlapBoth)
 	{
 		ObjectQueryParams.AddObjectTypesToQuery(COLLISION_OBJ_ENEMY);
@@ -625,6 +626,29 @@ FCollisionObjectQueryParams ASonnengewehrBeam::GetBeamObjectQueryParams() const
 	}
 	ObjectQueryParams.AddObjectTypesToQuery(ECC_Destructible);
 	return ObjectQueryParams;
+}
+
+ETriggerOverlapLogic ASonnengewehrBeam::GetBurntSides() const
+{
+	if (M_Settings.bBurnOwnUnits)
+	{
+		return ETriggerOverlapLogic::OverlapBoth;
+	}
+	// The enemy object channel holds the AI's units; the player channel holds the human player's.
+	return M_OwningPlayer == SonnengewehrBeamConstants::HumanPlayer
+		       ? ETriggerOverlapLogic::OverlapEnemy
+		       : ETriggerOverlapLogic::OverlapPlayer;
+}
+
+bool ASonnengewehrBeam::GetIsSparedOwnUnit(const AActor& Victim) const
+{
+	if (M_Settings.bBurnOwnUnits)
+	{
+		return false;
+	}
+	// Second gate behind the channel filter: destructibles and odd child-actor channels still reach the overlap.
+	const URTSComponent* RTSComponent = Victim.FindComponentByClass<URTSComponent>();
+	return IsValid(RTSComponent) && RTSComponent->GetOwningPlayer() == M_OwningPlayer;
 }
 
 FVector ASonnengewehrBeam::GetGroundAt(const FVector& Location) const

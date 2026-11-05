@@ -24,6 +24,10 @@
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Weapons/HullWeaponComponent/HullWeaponComponent.h"
+#include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
+#include "RTS_Survival/Weapons/Turret/CPPTurretsMaster.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -56,6 +60,12 @@ namespace SonnengewehrTestPrivate
 	const FVictimSpot OffPathTanks[] = {{2500.f, 1700.f}, {1000.f, -1700.f}};
 	const FVictimSpot OnPathSquad = {3200.f, 0.f};
 	const FVictimSpot OffPathSquad = {3200.f, -2300.f};
+	// The firing player's own units right on the path: the beam must spare them (no friendly fire, 2026-11-05).
+	const FVictimSpot FriendlyOnPathTank = {1750.f, 0.f};
+	const FVictimSpot FriendlyOnPathSquad = {4650.f, 0.f};
+	constexpr int32 MinFriendlyOnPath = 2;
+	// GA_GerSonnengewehr costs as much as the Panzer Grenadiers (user decision 2026-11-05).
+	constexpr int32 ExpectedRadixiteCost = 675;
 
 	// Inside this lateral distance minus the half width a unit must burn; past half width plus this it must not.
 	constexpr float OnPathInsetCm = 50.f;
@@ -252,28 +262,77 @@ void USonnengewehrTestSubsystem::SpawnVictims()
 	int32 TankIndex = 0;
 	for (const FVictimSpot& Spot : OnPathTanks)
 	{
-		AddVictim(SpawnEnemy(TankClassPath, Spot.Along, Spot.Lateral),
+		AddVictim(SpawnUnit(TankClassPath, Spot.Along, Spot.Lateral, EnemyPlayer),
 		          FString::Printf(TEXT("tank_on_%d"), TankIndex++), true);
 	}
 	TankIndex = 0;
 	for (const FVictimSpot& Spot : OffPathTanks)
 	{
-		AddVictim(SpawnEnemy(TankClassPath, Spot.Along, Spot.Lateral),
+		AddVictim(SpawnUnit(TankClassPath, Spot.Along, Spot.Lateral, EnemyPlayer),
 		          FString::Printf(TEXT("tank_off_%d"), TankIndex++), true);
 	}
-	const FVictimSpot Squads[] = {OnPathSquad, OffPathSquad};
-	const TCHAR* SquadLabels[] = {TEXT("squad_on"), TEXT("squad_off")};
-	for (int32 Index = 0; Index < static_cast<int32>(UE_ARRAY_COUNT(Squads)); ++Index)
+	AddVictim(SpawnUnit(TankClassPath, FriendlyOnPathTank.Along, FriendlyOnPathTank.Lateral, TestPlayer),
+	          TEXT("friendly_tank_on"), true, true);
+	SpawnSquad(TEXT("squad_on"), OnPathSquad.Along, OnPathSquad.Lateral, EnemyPlayer);
+	SpawnSquad(TEXT("squad_off"), OffPathSquad.Along, OffPathSquad.Lateral, EnemyPlayer);
+	SpawnSquad(TEXT("friendly_squad_on"), FriendlyOnPathSquad.Along, FriendlyOnPathSquad.Lateral, TestPlayer);
+	PacifyVictims();
+}
+
+void USonnengewehrTestSubsystem::SpawnSquad(const TCHAR* Label, const float Along, const float Lateral,
+                                            const uint8 OwningPlayer)
+{
+	using namespace SonnengewehrTestPrivate;
+	ASquadController* Squad = Cast<ASquadController>(SpawnUnit(SquadClassPath, Along, Lateral, OwningPlayer));
+	Check(IsValid(Squad), FString::Printf(TEXT("spawned_%s"), Label));
+	M_Squads.Add(Squad);
+	M_SquadLabels.Add(Label);
+	M_SquadOwners.Add(OwningPlayer);
+}
+
+void USonnengewehrTestSubsystem::PacifyVictims() const
+{
+	for (const FVictim& Victim : M_Victims)
 	{
-		ASquadController* Squad = Cast<ASquadController>(
-			SpawnEnemy(SquadClassPath, Squads[Index].Along, Squads[Index].Lateral));
-		Check(IsValid(Squad), FString::Printf(TEXT("spawned_%s"), SquadLabels[Index]));
-		M_Squads.Add(Squad);
-		M_SquadLabels.Add(SquadLabels[Index]);
+		const ATankMaster* Tank = Cast<ATankMaster>(Victim.Actor.Get());
+		if (not IsValid(Tank))
+		{
+			continue;
+		}
+		for (ACPPTurretsMaster* Turret : Tank->GetTurrets())
+		{
+			if (IsValid(Turret))
+			{
+				Turret->DisableTurret();
+			}
+		}
+		for (UHullWeaponComponent* HullWeapon : Tank->GetHullWeapons())
+		{
+			if (IsValid(HullWeapon))
+			{
+				HullWeapon->DisableHullWeapon();
+			}
+		}
+	}
+	for (const TWeakObjectPtr<ASquadController>& Squad : M_Squads)
+	{
+		if (not Squad.IsValid())
+		{
+			continue;
+		}
+		for (const ASquadUnit* Soldier : Squad->GetSquadUnitsChecked())
+		{
+			AInfantryWeaponMaster* Weapon = IsValid(Soldier) ? Soldier->GetInfantryWeapon() : nullptr;
+			if (IsValid(Weapon))
+			{
+				Weapon->DisableWeaponSearch();
+			}
+		}
 	}
 }
 
-AActor* USonnengewehrTestSubsystem::SpawnEnemy(const TCHAR* ClassPath, const float Along, const float Lateral)
+AActor* USonnengewehrTestSubsystem::SpawnUnit(const TCHAR* ClassPath, const float Along, const float Lateral,
+                                             const uint8 OwningPlayer)
 {
 	using namespace SonnengewehrTestPrivate;
 	UWorld* World = GetWorld();
@@ -287,10 +346,11 @@ AActor* USonnengewehrTestSubsystem::SpawnEnemy(const TCHAR* ClassPath, const flo
 	FVector Ground;
 	GlobalAbilityHelpers::TryFindGroundLocation(this, M_StripStart + M_StripDirection * Along + Left * Lateral, Ground);
 	const FTransform Transform(M_StripDirection.Rotation(), Ground + FVector(0.f, 0.f, VictimSpawnAboveGroundCm));
-	return FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*World, UnitClass, Transform, EnemyPlayer);
+	return FRTSUnitOwnerSpawning::SpawnUnitForPlayer(*World, UnitClass, Transform, OwningPlayer);
 }
 
-void USonnengewehrTestSubsystem::AddVictim(AActor* Actor, const FString& Label, const bool bIsTank)
+void USonnengewehrTestSubsystem::AddVictim(AActor* Actor, const FString& Label, const bool bIsTank,
+                                           const bool bIsFriendly)
 {
 	if (not IsValid(Actor))
 	{
@@ -302,6 +362,7 @@ void USonnengewehrTestSubsystem::AddVictim(AActor* Actor, const FString& Label, 
 	Victim.ActorKey = Actor;
 	Victim.Label = Label;
 	Victim.bIsTank = bIsTank;
+	Victim.bIsFriendly = bIsFriendly;
 	M_Victims.Add(Victim);
 }
 
@@ -309,11 +370,13 @@ void USonnengewehrTestSubsystem::TickPlacingVictims()
 {
 	using namespace SonnengewehrTestPrivate;
 	UpdateCamera();
+	PacifyVictims();
 	if (GetNow() - M_PhaseStartSeconds < PlaceVictimsSeconds)
 	{
 		return;
 	}
 	CollectSquadSoldiers();
+	PacifyVictims();
 	ClassifyVictims();
 	RequestScreenshot(TEXT("Placed"));
 	FireAbility();
@@ -337,8 +400,10 @@ void USonnengewehrTestSubsystem::CollectSquadSoldiers()
 				continue;
 			}
 			// A squad spawns its soldiers after the owner override is restored; give them the squad's owner.
-			FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(Soldier, EnemyPlayer);
-			AddVictim(Soldier, FString::Printf(TEXT("%s_soldier_%d"), *M_SquadLabels[Index], SoldierIndex++), false);
+			const uint8 SquadOwner = M_SquadOwners.IsValidIndex(Index) ? M_SquadOwners[Index] : EnemyPlayer;
+			FRTSUnitOwnerSpawning::MatchSoldierToSquadOwner(Soldier, SquadOwner);
+			AddVictim(Soldier, FString::Printf(TEXT("%s_soldier_%d"), *M_SquadLabels[Index], SoldierIndex++), false,
+			          SquadOwner == TestPlayer);
 		}
 		Check(SoldierIndex > 0, FString::Printf(TEXT("%s_has_soldiers"), *M_SquadLabels[Index]),
 		      FString::Printf(TEXT("soldiers=%d"), SoldierIndex));
@@ -443,6 +508,11 @@ bool USonnengewehrTestSubsystem::CheckTemplate(const UGA_Sonnengewehr& Ability)
 	Check(Costs.CoolDownTime >= 180 && Costs.CoolDownTime <= 240 && not Costs.Costs.ResourceCosts.IsEmpty(),
 	      TEXT("template_cost_and_cooldown"),
 	      FString::Printf(TEXT("cooldown=%d resources=%d"), Costs.CoolDownTime, Costs.Costs.ResourceCosts.Num()));
+	const int32 RadixiteCost = Costs.Costs.ResourceCosts.FindRef(ERTSResourceType::Resource_Radixite);
+	Check(Costs.Costs.ResourceCosts.Num() == 1 && RadixiteCost == SonnengewehrTestPrivate::ExpectedRadixiteCost,
+	      TEXT("template_costs_675_radixite_only"), FString::Printf(TEXT("radixite=%d resources=%d"), RadixiteCost,
+		      Costs.Costs.ResourceCosts.Num()));
+	Check(not Settings.bBurnOwnUnits, TEXT("template_spares_own_units"));
 	Check(not Ability.GetUISettings().Title.IsEmpty() && Ability.GetUISettings().Title.ToString() != TEXT("Ability Title")
 	      && IsValid(Ability.GetUISettings().AbilityIcon), TEXT("template_title_and_icon"),
 	      Ability.GetUISettings().Title.ToString());
@@ -558,6 +628,7 @@ void USonnengewehrTestSubsystem::TickRunning()
 {
 	using namespace SonnengewehrTestPrivate;
 	UpdateCamera();
+	PacifyVictims();
 	PollVictimHealth();
 	TrackBeamPhases();
 	if (M_AbilityEndCount > 0)
@@ -644,6 +715,7 @@ void USonnengewehrTestSubsystem::TickAfterSweep()
 {
 	using namespace SonnengewehrTestPrivate;
 	UpdateCamera();
+	PacifyVictims();
 	PollVictimHealth();
 	TrackBeamPhases();
 	const float SecondsAfterSweep = GetNow() - M_PhaseStartSeconds;
@@ -688,12 +760,21 @@ void USonnengewehrTestSubsystem::CheckVictimLanes()
 {
 	int32 OnPath = 0;
 	int32 OffPath = 0;
+	int32 FriendlyOnPath = 0;
 	for (const FVictim& Victim : M_Victims)
 	{
 		const FString Details = FString::Printf(
 			TEXT("lane=%s along=%.0f lateral=%.0f health=%.0f->%.0f burnt_at=%.2fs beam=%.0f damage=%.1f burns=%d died=%d"),
 			*UEnum::GetValueAsString(Victim.Lane), Victim.Along, Victim.Lateral, Victim.StartHealth, Victim.LastHealth,
 			Victim.BurntSeconds, Victim.BurntBeamDistance, Victim.BurntDamage, Victim.BurnCount, Victim.bDied);
+		if (Victim.bIsFriendly)
+		{
+			// Wherever it stood: the beam never burns its own side, so a friendly unit is untouched and alive.
+			FriendlyOnPath += Victim.Lane == ESonnengewehrVictimLane::OnPath ? 1 : 0;
+			Check(Victim.BurnCount == 0 && Victim.HurtSeconds < 0.f && not Victim.bDied,
+			      Victim.Label + TEXT("_spared"), Details);
+			continue;
+		}
 		switch (Victim.Lane)
 		{
 		case ESonnengewehrVictimLane::OnPath:
@@ -713,6 +794,8 @@ void USonnengewehrTestSubsystem::CheckVictimLanes()
 	}
 	Check(OnPath >= 4 && OffPath >= 4, TEXT("enough_victims_each_side"),
 	      FString::Printf(TEXT("on=%d off=%d"), OnPath, OffPath));
+	Check(FriendlyOnPath >= SonnengewehrTestPrivate::MinFriendlyOnPath, TEXT("friendly_units_on_the_path"),
+	      FString::Printf(TEXT("friendly_on=%d"), FriendlyOnPath));
 }
 
 void USonnengewehrTestSubsystem::CheckSweepOrder()

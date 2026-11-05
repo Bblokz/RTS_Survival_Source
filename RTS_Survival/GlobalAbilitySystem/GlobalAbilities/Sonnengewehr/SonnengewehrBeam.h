@@ -66,9 +66,10 @@ struct FSonnengewehrSettings
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.02"))
 	float DamageIntervalSeconds = 0.1f;
 
-	// Whose units the beam burns; the mirror in orbit does not ask.
+	// False (user decision 2026-11-05): the beam only burns the enemies of the player who ordered it, never his own
+	// units or buildings. True also burns his own (the mirror in orbit does not ask).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	ETriggerOverlapLogic AffectedUnits = ETriggerOverlapLogic::OverlapBoth;
+	bool bBurnOwnUnits = false;
 
 	// The scorch mark glows behind the beam and cools down over this time once the sweep is over.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.1"))
@@ -311,6 +312,10 @@ private:
 	                             const FVector& BeamPoint) const;
 
 	FCollisionObjectQueryParams GetBeamObjectQueryParams() const;
+	/** @return The collision side(s) the beam burns, seen from the ordering player (enemies only by default). */
+	ETriggerOverlapLogic GetBurntSides() const;
+	/** @return True for a unit or building of the ordering player when the beam spares his own side. */
+	bool GetIsSparedOwnUnit(const AActor& Victim) const;
 	FVector GetGroundAt(const FVector& Location) const;
 	AActor* GetDamageCauser() const;
 };
