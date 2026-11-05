@@ -20,6 +20,7 @@
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelsComponent.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleSubsystem.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
@@ -80,8 +81,17 @@ void ATankMaster::BeginVehicleModuleFinalization(UArmorCalculation* ArmorCalcula
 
 void ATankMaster::FinalizeVehicleModulesAfterTurretRegistration()
 {
-	if (bM_AreVehicleModulesInitialized || not GetIsValidModuleArmor()
-		|| M_ModuleArmor->GetInstalledModuleCount() <= 0)
+	if (bM_AreVehicleModulesInitialized || not GetIsValidModuleArmor())
+	{
+		return;
+	}
+	// Like turret modules, add-on panel zones install a tick after BeginPlay: Blueprints may clear and register the
+	// hull armour again after their module setup, which drops coverage set up before that.
+	if (UAddOnArmorPanelsComponent* AddOnArmorPanels = FindComponentByClass<UAddOnArmorPanelsComponent>())
+	{
+		AddOnArmorPanels->InstallAddOnArmorZones(M_ModuleArmor.Get());
+	}
+	if (M_ModuleArmor->GetInstalledModuleCount() <= 0)
 	{
 		return;
 	}
@@ -579,6 +589,11 @@ void ATankMaster::ShowModuleFirePopup(const FString& PopupText) const
 void ATankMaster::OnModuleAddOnArmorDamaged(
 	const FModuleStateChange& Change, const float RemainingModuleHp, const bool bIsChangeToDamagedState)
 {
+	// Panels follow every transition, repairs included.
+	if (UAddOnArmorPanelsComponent* AddOnArmorPanels = FindComponentByClass<UAddOnArmorPanelsComponent>())
+	{
+		AddOnArmorPanels->OnAddOnArmorModuleStateChanged(Change);
+	}
 	if (not bIsChangeToDamagedState)
 	{
 		return;
@@ -1031,6 +1046,11 @@ bool ATankMaster::ImportVehicleModuleSaveData(const FVehicleModuleSaveData& Save
 	M_ModuleRepairState.ModuleDamageRevision = M_ModuleArmor->GetModuleDamageRevision();
 	M_ModuleRepairState.FullServiceAccumulatedWork = FMath::Clamp(SaveData.FinishingWork, 0.f, FullModuleServiceWork);
 	RefreshModuleRepairCounts();
+	// The import emits no transitions.
+	if (UAddOnArmorPanelsComponent* AddOnArmorPanels = FindComponentByClass<UAddOnArmorPanelsComponent>())
+	{
+		AddOnArmorPanels->SyncAllZonesFromModuleState();
+	}
 	if (GetIsValidHealthComponent())
 	{
 		HealthComponent->SynchronizeModuleIconSnapshot(M_ModuleArmor->GetModuleIconStates());

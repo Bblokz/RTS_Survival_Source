@@ -158,6 +158,9 @@ struct FVehicleModuleBinding
 	bool bHasUnresolvedCoverage = false;
 };
 
+// Module ID of the damaged add-on zone and the impact position in the owning actor's space.
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAddOnArmorZoneHit, int32, const FVector&);
+
 /**
  * @brief Precomputed target of one plate candidate.
  * Centre plates hit running gear on either side: primary is the left slot, alternate the right slot,
@@ -220,6 +223,16 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "ArmorSettings")
 	bool SetArmorOfPlateType(UMeshComponent* MeshWithArmor, EArmorPlate PlateType, float NewArmorValue);
+
+	/**
+	 * @brief Lets add-on armour (skirts) set the armour it adds on top of the structural plates it covers.
+	 * @param MeshWithArmor Mesh previously supplied to InitArmorCalculation.
+	 * @param PlateType Every registered plate of this type on the mesh is updated, including zero-armor plates.
+	 * @param NewAddOnArmorValue Finite, nonnegative add-on armor; the covering zone's behaviour scales it.
+	 * @return True if at least one matching plate was updated.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "ArmorSettings")
+	bool SetAddOnArmorOfPlateType(UMeshComponent* MeshWithArmor, EArmorPlate PlateType, float NewAddOnArmorValue);
 
 	/**
 	 * @brief Applies researched armour changes directly to the stored plate data so later hit calculations use them.
@@ -457,6 +470,12 @@ public:
 	 */
 	void SetAddOnArmorContributionMultiplier(int32 ModuleId, float ContributionMultiplier);
 
+	/**
+	 * @brief Fires once per add-on zone an impact damaged, when the impact position is known; module HP and state
+	 * are already committed, the state-change dispatch of the same impact follows.
+	 */
+	FOnAddOnArmorZoneHit& GetOnAddOnArmorZoneHit() { return M_OnAddOnArmorZoneHit; }
+
 	// ------------------------------------------------------------------------------------------------
 	// Vehicle modules: queries
 	// ------------------------------------------------------------------------------------------------
@@ -684,6 +703,18 @@ private:
 	// Transitions of the mutation in progress; copied before dispatch.
 	FModuleChangeBatch M_PendingModuleChanges;
 
+	struct FPendingAddOnArmorHit
+	{
+		int32 ModuleId = INDEX_NONE;
+		FVector HullLocalHitPosition = FVector::ZeroVector;
+	};
+
+	// Add-on zones damaged by the impact being resolved; published once the mutation finished.
+	FPendingAddOnArmorHit M_PendingAddOnArmorHits[VehicleModuleBalance::MaxAddOnArmorModules];
+	int32 M_PendingAddOnArmorHitCount = 0;
+
+	FOnAddOnArmorZoneHit M_OnAddOnArmorZoneHit;
+
 	// Rejects coverage edits and nested damage while a mutation or its dispatch is running.
 	bool bM_IsMutatingModules = false;
 	bool bM_IsDispatchingModuleChanges = false;
@@ -746,7 +777,10 @@ private:
 	                                    const bool (&bAllowedToDestroy)[VehicleModuleBalance::MaxModulesPerPlate]) const;
 	bool GetWouldEntryDestroyModule(const FModuleDamageBatch::FEntry& Entry) const;
 	FModuleChangeBatch CommitModuleDamageBatch(const FModuleDamageBatch& Batch,
-	                                           EWeaponShellType DamageShellType);
+	                                           const FVehicleModuleHitContext& HitContext);
+	void RecordAddOnArmorHit(int32 SlotIndex, const FVehicleModuleHitContext& HitContext);
+	// Publishes the recorded add-on hits before the transitions of the same impact are dispatched.
+	void DispatchModuleDamageResults(const FModuleChangeBatch& Changes);
 	bool TryMakeDefaultModuleHitContext(EArmorPlate PlateHit, FVehicleModuleHitContext& OutHitContext);
 	int32 FindUniquePlateRegistration(EArmorPlate PlateHit) const;
 	int32 FindPlateRegistrationFacingLocation(const FVector& WorldLocation) const;
