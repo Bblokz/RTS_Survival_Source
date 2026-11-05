@@ -3,13 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CargoParachuteDescentComponent.h"
 #include "ParachuteDescentComponent.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "GA_Paratroopers.generated.h"
 
 class AAircraftMaster;
+class AParachuteJumperProxy;
 class ASquadController;
+class ATeamWeapon;
+class ATeamWeaponController;
 class ASquadUnit;
 struct FStreamableHandle;
 
@@ -42,6 +46,20 @@ struct FParatroopersGlobalAbilitySettings
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FParatrooperDescentSettings DescentSettings;
+
+	// Hidden squads wait on a ring of this radius around the target; a team weapon squad's gun lands where its squad
+	// waited, so drops of several guns need a wider ring.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
+	float SquadSpawnRingRadius = 200.0f;
+
+	// Raises the transport to at least this height above the target, so big cargo canopies have room to open and
+	// fall; 0 keeps the mission's aircraft height. Cinematic passes keep their own start.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (ClampMin = "0.0"))
+	float MinFlightHeightAboveTarget = 0.0f;
+
+	// Team weapon squads only: the gun comes down on its own cargo chute (jumps before its crew).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FCargoParachuteDescentSettings TeamWeaponCargoDescent;
 };
 
 /**
@@ -80,18 +98,33 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FParatroopersGlobalAbilitySettings M_ParatroopersSettings;
 
+	enum class EParatrooperJumpKind : uint8
+	{
+		// An infantry soldier: the real unit descends on his parachute.
+		Soldier,
+		// A team weapon crewman: the real unit waits hidden at his post, a look-alike proxy descends.
+		CrewProxy,
+		// A team weapon: the real gun descends on its cargo chute to where it was spawned.
+		TeamWeaponCargo
+	};
+
 	struct FParatrooperWaitingToJump
 	{
 		TWeakObjectPtr<ASquadUnit> SquadUnit;
 		TWeakObjectPtr<ASquadController> Squad;
+		EParatrooperJumpKind Kind = EParatrooperJumpKind::Soldier;
+		TWeakObjectPtr<ATeamWeapon> TeamWeapon;
+		FTransform LandingTransform = FTransform::Identity;
 	};
 
 	struct FParatrooperSquadInDrop
 	{
 		TWeakObjectPtr<ASquadController> Squad;
-		// Soldiers queued or still descending; the squad is released when this reaches zero.
+		// Soldiers (and the gun of a team weapon squad) queued or still descending; the squad is released when this
+		// reaches zero.
 		int32 UnitsNotLanded = 0;
 		bool bM_HasQueuedUnits = false;
+		bool bM_IsTeamWeaponSquad = false;
 	};
 
 	// One aircraft pass; several can overlap when missions execute the ability repeatedly.
@@ -109,6 +142,8 @@ private:
 		int32 QueuedUnitCount = 0;
 		TArray<FParatrooperWaitingToJump> UnitsWaitingToJump;
 		TArray<FParatrooperSquadInDrop> SquadsInDrop;
+		// Crew look-alikes in the air; removed when they land or the drop is cancelled.
+		TArray<TWeakObjectPtr<AParachuteJumperProxy>> JumperProxies;
 		FTimerHandle JumpTimerHandle;
 	};
 
@@ -140,6 +175,31 @@ private:
 	FVector GetProjectedSquadSpawnLocation(const FVector& TargetLocation, int32 SquadIndex, int32 SquadCount) const;
 	void OnSquadSpawned(int32 RunId, AActor* SpawnedActor);
 	void OnSquadReadyToJump(int32 RunId, ASquadController* Squad);
+
+	/**
+	 * @brief Team weapon squads: the controller spawns its gun right after the squad reports fully loaded, so the
+	 * crew and gun are queued a tick later. Queues the gun first (cargo chute), then a proxy jump per crewman.
+	 */
+	void QueueTeamWeaponSquad(int32 RunId, TWeakObjectPtr<ATeamWeaponController> WeakSquad);
+	// The gun is spawned on the ground at the hidden squad; it must not be seen there until it lands.
+	void OnActorSpawnedDuringDrop(AActor* SpawnedActor);
+	void UpdateActorSpawnedHandler();
+	bool GetHasTeamWeaponSquadWithoutGun() const;
+	static void HideTeamWeaponForDrop(ATeamWeapon* TeamWeapon);
+	void JumpSoldier(FParatrooperDropRun& Run, const FParatrooperWaitingToJump& WaitingUnit);
+	void JumpTeamWeaponCargo(FParatrooperDropRun& Run, const FParatrooperWaitingToJump& WaitingUnit);
+	void JumpCrewProxy(FParatrooperDropRun& Run, const FParatrooperWaitingToJump& WaitingUnit);
+	void OnTeamWeaponCargoLanded(int32 RunId, TWeakObjectPtr<ASquadController> Squad, AActor* Load, bool bLanded);
+	void OnCrewProxyLanded(int32 RunId, TWeakObjectPtr<ASquadController> Squad, TWeakObjectPtr<ASquadUnit> SquadUnit,
+	                       AActor* Proxy, bool bLanded);
+	/**
+	 * @brief Shows the hidden crewman at his post once his proxy has landed; he was hidden by BeginParachuteDrop.
+	 * @param bIsOperator Operators keep their rifle put away (the controller's crew role restriction).
+	 */
+	static void RevealCrewUnit(ASquadUnit* SquadUnit, bool bIsOperator);
+	void DestroyJumperProxies(FParatrooperDropRun& Run) const;
+
+	FDelegateHandle M_ActorSpawnedHandle;
 
 	void OnJumpTimer(int32 RunId);
 	void JumpNextUnit(FParatrooperDropRun& Run);
