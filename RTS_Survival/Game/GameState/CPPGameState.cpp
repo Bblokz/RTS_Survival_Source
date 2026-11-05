@@ -10266,6 +10266,25 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_RedSpine, SquadData);
 
+	// Fels Krieger: three medium mech walkers (Etasphere07) on the infantry skeleton, heavy infantry armour,
+	// Ripper Guns, the slower pace of the heavier infantry.
+	SquadData.MaxHealth = FelsKriegerWalkerHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	SquadData.MaxAcceleration = SlowInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, FelsKrieger_Radixite},
+		{ERTSResourceType::Resource_Metal, FelsKrieger_Metal}
+	});
+	SquadData.Abilities = BasicSquadAbilities;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_FelsKrieger, SquadData);
+
 	// --------------------------------------------------
 	//                     Rus Infantry
 	// --------------------------------------------------

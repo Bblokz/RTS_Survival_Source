@@ -31,6 +31,9 @@ namespace CommanderSelectionEntryLayout
 	const FMargin TitleOffset(78.f, 0.f, 24.f, 0.f);
 	// Smaller than the variant screen's unit names so "LUFTWAFFE LIAISON" clears the selection chevron.
 	constexpr int32 TitleFontSize = 16;
+	// "SKY-DROP QUARTERMASTER" (22 characters) needs a smaller size to clear the selection chevron.
+	constexpr int32 LongTitleFontSize = 13;
+	constexpr int32 LongTitleMinCharacters = 20;
 	// The portraits are 1024x1280 renders with the head left of centre; this 717 px square sits on it.
 	const FBox2d PortraitHeadUVRegion(FVector2d(0.08, 0.03), FVector2d(0.78, 0.59));
 }
@@ -114,8 +117,11 @@ void UW_CommanderSelectionEntry::SetupEntry(UW_CommanderSelectionMenu* Menu, con
 	{
 		return;
 	}
+	const int32 FontSize = CommanderEntry.Title.ToString().Len() >= LongTitleMinCharacters
+		                        ? LongTitleFontSize
+		                        : TitleFontSize;
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
-		M_TitleText, UnitVariantSelectionWidgets::MakeFont(Style.HeadingFont, TitleFontSize), Style.TextColor);
+		M_TitleText, UnitVariantSelectionWidgets::MakeFont(Style.HeadingFont, FontSize), Style.TextColor);
 	M_TitleText->SetText(CommanderEntry.Title.ToUpper());
 	ApplySelectionLook();
 }

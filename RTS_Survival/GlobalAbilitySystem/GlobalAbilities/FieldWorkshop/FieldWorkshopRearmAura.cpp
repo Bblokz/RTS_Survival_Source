@@ -3,11 +3,9 @@
 #include "FieldWorkshopRearmAura.h"
 
 #include "RTS_Survival/Behaviours/Behaviour.h"
-#include "RTS_Survival/Behaviours/BehaviourComp.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
-#include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
-#include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
 UFieldWorkshopRearmAura::UFieldWorkshopRearmAura()
 	: URadiusAOEBehaviourComponent()
@@ -18,23 +16,16 @@ UFieldWorkshopRearmAura::UFieldWorkshopRearmAura()
 	// The reload buff is permanent while in range: applied once on entering, removed on leaving.
 	AOEBehaviourSettings.ApplyStrategy = EInAOEBehaviourApplyStrategy::ApplyOnlyOnEnter;
 	AOEBehaviourSettings.IntervalSeconds = 1.f;
+	// Soldiers and gun crews carry no behaviour component of their own: the buff goes on their squad.
+	AOEBehaviourSettings.bAffectSquadControllers = true;
 }
 
 bool UFieldWorkshopRearmAura::IsValidTarget(AActor* ValidActor) const
 {
-	return IsValid(Cast<ATankMaster>(ValidActor)) && RTSFunctionLibrary::RTSIsValid(ValidActor);
-}
-
-void UFieldWorkshopRearmAura::OnTickComponentsInRange(const TArray<UBehaviourComp*>& BehaviourComponentsInRange)
-{
-	Super::OnTickComponentsInRange(BehaviourComponentsInRange);
-	M_SecondsSinceTopUp += GetAoeBehaviourSettings().IntervalSeconds;
-	if (M_SecondsSinceTopUp < TopUpIntervalSeconds)
-	{
-		return;
-	}
-	M_SecondsSinceTopUp = 0.f;
-	TopUpVehiclesInRange(BehaviourComponentsInRange);
+	// Vehicles, and soldiers of infantry squads and team weapon crews (their squad controller gets the buff).
+	const bool bIsVehicle = IsValid(Cast<ATankMaster>(ValidActor));
+	const bool bIsSoldier = IsValid(Cast<ASquadUnit>(ValidActor));
+	return (bIsVehicle || bIsSoldier) && RTSFunctionLibrary::RTSIsValid(ValidActor);
 }
 
 void UFieldWorkshopRearmAura::SetHostBehaviourUIData(UBehaviour& Behaviour) const
@@ -44,49 +35,7 @@ void UFieldWorkshopRearmAura::SetHostBehaviourUIData(UBehaviour& Behaviour) cons
 	UIData.TitleText = RadiusSettings.HostBehaviourTitleText;
 	UIData.BehaviourIcon = RadiusSettings.HostBehaviourIcon;
 	UIData.DescriptionText = FString::Printf(
-		TEXT("Your vehicles within <Text_Exp>%d m</> reload faster and get every magazine topped up every "
-			"<Text_Exp>%d s</>."),
-		FMath::RoundToInt(GetAOERadius() / CentimetresPerMetre), FMath::RoundToInt(TopUpIntervalSeconds));
+		TEXT("Your vehicles, infantry and guns within <Text_Exp>%d m</> reload faster."),
+		FMath::RoundToInt(GetAOERadius() / CentimetresPerMetre));
 	Behaviour.SetCustomUIData(UIData);
-}
-
-void UFieldWorkshopRearmAura::TopUpVehiclesInRange(const TArray<UBehaviourComp*>& BehaviourComponentsInRange)
-{
-	for (const UBehaviourComp* BehaviourComponent : BehaviourComponentsInRange)
-	{
-		if (not IsValid(BehaviourComponent))
-		{
-			continue;
-		}
-		const ATankMaster* Vehicle = Cast<ATankMaster>(BehaviourComponent->GetOwner());
-		if (not IsValid(Vehicle))
-		{
-			continue;
-		}
-		const int32 ToppedUp = TopUpVehicle(*Vehicle);
-		M_ToppedUpWeaponCount += ToppedUp;
-		if (ToppedUp > 0)
-		{
-			UE_LOG(LogTemp, Display, TEXT("RTS_FIELD_WORKSHOP rearmed=%s weapons=%d"), *Vehicle->GetName(), ToppedUp);
-		}
-	}
-}
-
-int32 UFieldWorkshopRearmAura::TopUpVehicle(const ATankMaster& Vehicle) const
-{
-	int32 ToppedUp = 0;
-	for (UWeaponState* Weapon : FRTSWeaponHelpers::GetWeaponsMountedOnTank(&Vehicle))
-	{
-		if (not IsValid(Weapon))
-		{
-			continue;
-		}
-		if (Weapon->IsWeaponFullyLoaded() && not Weapon->GetIsReloading())
-		{
-			continue;
-		}
-		Weapon->ForceInstantReload();
-		++ToppedUp;
-	}
-	return ToppedUp;
 }

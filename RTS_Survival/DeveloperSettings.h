@@ -581,6 +581,10 @@ namespace DeveloperSettings
 				// in total health (Iron Storm 700 + 300, Panzer Grenadiers 675 + 200), below the heavier walkers.
 				inline constexpr int32 RedSpine_Radixite = 650;
 				inline constexpr int32 RedSpine_Metal = 250;
+				// Fels Krieger: 3 medium mech walkers (Etasphere07) with Ripper Guns. A third more health per walker
+				// than the Red Spine and a heavier gun, so about a third more expensive.
+				inline constexpr int32 FelsKrieger_Radixite = 850;
+				inline constexpr int32 FelsKrieger_Metal = 350;
 			}
 
 			namespace TeamWeapons
@@ -1472,6 +1476,9 @@ namespace DeveloperSettings
 			// Red Spine light mech walker, per walker: 1.2x an elite soldier, on heavy infantry armour. A squad of
 			// three (1440) sits just under a 4-man Iron Storm squad (4 x 400) and below the heavier walkers.
 			inline constexpr float RedSpineWalkerHealth = RoundToNearestMultipleOfFive(600.f * OverallHealthMlt);
+			// Fels Krieger medium mech walker, per walker: a third more than the Red Spine (640 vs 480), on heavy
+			// infantry armour. A squad of three (1920) sits above the Red Spine squad (1440), below the heavy walkers.
+			inline constexpr float FelsKriegerWalkerHealth = RoundToNearestMultipleOfFive(800.f * OverallHealthMlt);
 			inline constexpr float BasicSniperHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);
 			inline constexpr float ArmoredInfantryHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);
 			inline constexpr float HazmatInfantryHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);

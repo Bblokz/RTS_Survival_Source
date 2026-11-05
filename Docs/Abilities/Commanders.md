@@ -55,7 +55,7 @@ only the `CommanderSettingsByType` line). `ERTSCommander` keeps its order: the r
 | Feuersturm (`Feuersturm`) | Recon flight | 2x Feuer Sturm paradrop | Pz IV harvester | 2x Pz III Flamm | Incendiary Ju 87 | Fire barrage | Jagdpanther flamer |
 | Stahlläufer (`Stahllaeufer`) | Recon flight | Red Spine walker drop | Radixite & metal supply | 2x Red Spine walker drop | Me 410 | *placeholder:* Artillery Barrage (III) | Maus |
 | Festungsbaumeister (`Festungsbaumeister`) | Flare curtain | Dual Panzerschreck pit drop | Construction supply | 2x Sturm Pioniere + Pak 40 pit | Ju 390 carpet bombing | Field bunker drop (III) | Maus |
-| Sturmkommandant (`Sturmkommandant`) | Recon flight | *placeholder:* 2x Elite Scavengers paradrop | Pz IV harvester | *placeholder:* 2x Vultures + 2x Panzergrenadiere paradrop | 3x Ju 87 | V2 rocket (IV) | E-75 |
+| Sturmkommandant (`Sturmkommandant`) | Recon flight | Iron Storm paradrop | Pz IV harvester | 2x Panzergrenadiere + 2x Iron Storm paradrop | 3x Ju 87 | V2 rocket (IV) | E-75 |
 | Sky-Drop Quartermaster (`SkyDropQuartermaster`) | Massive flare | Puma, landed | Vehicle parts supply | 2x Flak Luchs + StuG III, landed | Ju 87 G tank busters | Field workshop drop (III) | E-50 |
 
 Template keys, slot by slot:
@@ -72,7 +72,7 @@ Template keys, slot by slot:
 | Feuersturm | `GA_GerReconFlight` | `GA_GerFeuerSturmParadrop` | `GA_HarvesterDrop` | `GA_GerPzIIIFlammDrop` | `GA_GerIncendiaryJu87` | `GA_GerFireBarrage` | `GA_GerJagdPantherFlamerDrop` |
 | Stahlläufer | `GA_GerReconFlight` | `GA_GerRedSpineDrop` | `GA_GerRadixiteMetalSupplyDrop` | `GA_GerRedSpinePairDrop` | `GA_Me410Airstrike` | `GA_Barrage` (placeholder) | `GA_GerMausDrop` |
 | Festungsbaumeister | `GA_GerFlareCurtain` | `GA_GerPanzerschreckPitDrop` | `GA_GerConstructionSupplyDrop` | `GA_GerSturmPionierenPakPitDrop` | `GA_HeavyCarpet_Ju390B_250Gr` | `GA_GerFieldBunkerDrop` | `GA_GerMausDrop` |
-| Sturmkommandant | `GA_GerReconFlight` | `GA_GerEliteScavengersParadrop` (placeholder) | `GA_HarvesterDrop` | `GA_GerParatroopers` (placeholder) | `GA_3xJu87Strafing` | `GA_GerV2Rocket` | `GA_GerE75Drop` |
+| Sturmkommandant | `GA_GerReconFlight` | `GA_GerIronStormParadrop` | `GA_HarvesterDrop` | `GA_GerPzGrenIronStormParadrop` | `GA_3xJu87Strafing` | `GA_GerV2Rocket` | `GA_GerE75Drop` |
 | Sky-Drop Quartermaster | `GA_GerMassiveFlare` | `GA_GerPumaDrop` | `GA_GerVehiclePartsSupplyDrop` | `GA_GerFlakLuchsStugDrop` | `GA_GerJu87GTankBusters` | `GA_GerFieldWorkshopDrop` | `GA_GerE50Drop` |
 
 User decisions (2026-11-04): two Tier IVs on Field Commander and Sturmkommandant are fine; duplicate super-heavies
@@ -101,7 +101,9 @@ Character of each kit:
 - **Stahlläufer:** walkers instead of tanks; walkers are squad units, so the drops land them like infantry (Ju 390
   landing, no parachutes).
 - **Festungsbaumeister:** the defensive commander: weakest attack, strongest in hold-the-line missions.
-- **Sturmkommandant:** all-infantry pressure; weak against armour until the E-75.
+- **Sturmkommandant:** all-infantry pressure; weak against armour until the E-75. His STG squad is Iron Storm (user
+  decision 2026-11-05): cyborg storm troopers with STG 44s, alone in slot 2 and with two Panzergrenadier squads in
+  slot 4. See "Iron Storm templates" below.
 - **Sky-Drop Quartermaster** (round 3d, 2026-11-05; portraits `T_Commander_ArmorDrop*`): logistics. Everything
   arrives by air and his armour keeps fighting: landed armoured cars and tanks, vehicle parts by parachute, Ju 87 G
   cannon Stukas against tanks, a parachuted field workshop that repairs and rearms nearby vehicles (with two Pak 40
@@ -109,8 +111,7 @@ Character of each kit:
 
 ## Pending
 
-- **Placeholders** (marked in `write_commander_kits.py`): Sturmkommandant slots 2 and 4 wait for the user's choice
-  of the STG squad (now `GA_GerEliteScavengersParadrop` and `GA_GerParatroopers`); Stahlläufer slot 6 waits for a
+- **Placeholders** (marked in `write_commander_kits.py`): Stahlläufer slot 6 waits for a
   Fels Krieger walker unit (now `GA_Barrage`). `SK_Etasphera07` exists, but no animations or unit Blueprint.
 - **Red Spine:** `Squad_Ger_RedSpine` is a squad since 2026-11-05: `Squads/Ger/Walkers/RedSpine/Squad_Ger_RedSpine`
   (3 `Ger_Inf_Walker_RedSpine` with MP46s, 480 HP each on heavy infantry armour, 650 R + 250 M training cost) with an
@@ -120,6 +121,10 @@ Character of each kit:
   resource, parachute and Elite Scavenger templates come from their own workstreams' scripts). A missing template
   shows as a failed `kit_ability_has_template` check and in the `KIT_MISSING_TEMPLATES` line of the area test.
 - The Feuer Sturm paradrop squad is `Squad_Ger_FeuerSturm` (confirmed by the user, 2026-11-05).
+- **Sky-Drop Quartermaster:** in game only through the headless DebugGame test so far. Icons are placeholders (the
+  massive flare shows the flare curtain icon, the Puma drop the Pz III spotter icon, the vehicle parts drop the air
+  minefield icon). The vehicle parts payback assumes Scavengers (other infantry gets a third) and about 2 radixite per
+  vehicle part: user to confirm. The Puma drop lands one Puma at 225 R; the slot's 90 s cooldown is the Tier I top.
 - Real icons: every round-3 template carries the icon of the template it was copied from (see below).
 - Not run in game yet: the round-3 data-only drops (the classes are proven by their own tests).
 
@@ -127,9 +132,9 @@ Character of each kit:
 
 | Tier | Abilities |
 |---|---|
-| I | `GA_GerReconFlight`, `GA_GerFlareCurtain`, `GA_GerSpiesInfiltration`, `GA_HarvesterDrop` (Pz IV harvester), `GA_GerPzIHarvesterDrop`, `GA_GerRadixiteMetalSupplyDrop`, `GA_GerRadixiteCacheDrop`, `GA_GerConstructionSupplyDrop`, `GA_GerMarderScavengerDrop`, `GA_Bf109Strafing`, `GA_GerFlak88Drop`, `GA_GerPanzerschreckPitDrop`, `GA_GerRadixitePzIIDrop`, `GA_GerEliteScavengersParadrop`, `GA_GerRailTroopersParadrop`, `GA_GerLightBringersParadrop`, `GA_GerFeuerSturmParadrop`, `GA_GerRedSpineDrop` |
-| II | `GA_GerParatroopers`, `GA_GerSpotterPzIIIDrop`, `GA_GerRadixitePzIIMarderDrop`, `GA_ScavengersDrop`, `GA_GerPz38tRailgunDrop`, `GA_GerRailTroopersDrop`, `GA_GerSFH18Drop`, `GA_GerPakPitDrop`, `GA_GerEliteScavengersPakDrop`, `GA_GerSturmPionierenPakPitDrop`, `GA_GerRadixitePzIIIWespeDrop`, `GA_GerPzJagerLaserDrop`, `GA_GerPzIIIFlammDrop`, `GA_GerRedSpinePairDrop` |
-| III | `GA_3xJu87Strafing`, `GA_Ju87Strafing`, `GA_2xHortentrafing`, `GA_Me410Airstrike`, `GA_2xBf110Strafing`, `GA_Barrage`, `GA_LargeBarrage`, `GA_GerAirMinefield`, `GA_GerRailBombardment`, `GA_GerLuftlandeSturm`, `GA_GerFieldBunkerDrop`, `GA_HeavyCarpet_Ju390B_250Gr`, `GA_GerIncendiaryJu87`, `GA_GerFireBarrage`, `GA_GerSonnengewehr` |
+| I | `GA_GerReconFlight`, `GA_GerFlareCurtain`, `GA_GerSpiesInfiltration`, `GA_HarvesterDrop` (Pz IV harvester), `GA_GerPzIHarvesterDrop`, `GA_GerRadixiteMetalSupplyDrop`, `GA_GerRadixiteCacheDrop`, `GA_GerConstructionSupplyDrop`, `GA_GerMarderScavengerDrop`, `GA_Bf109Strafing`, `GA_GerFlak88Drop`, `GA_GerPanzerschreckPitDrop`, `GA_GerRadixitePzIIDrop`, `GA_GerEliteScavengersParadrop`, `GA_GerRailTroopersParadrop`, `GA_GerLightBringersParadrop`, `GA_GerFeuerSturmParadrop`, `GA_GerRedSpineDrop`, `GA_GerMassiveFlare`, `GA_GerPumaDrop`, `GA_GerVehiclePartsSupplyDrop`, `GA_GerIronStormParadrop` |
+| II | `GA_GerParatroopers`, `GA_GerSpotterPzIIIDrop`, `GA_GerRadixitePzIIMarderDrop`, `GA_ScavengersDrop`, `GA_GerPz38tRailgunDrop`, `GA_GerRailTroopersDrop`, `GA_GerSFH18Drop`, `GA_GerPakPitDrop`, `GA_GerEliteScavengersPakDrop`, `GA_GerSturmPionierenPakPitDrop`, `GA_GerRadixitePzIIIWespeDrop`, `GA_GerPzJagerLaserDrop`, `GA_GerPzIIIFlammDrop`, `GA_GerRedSpinePairDrop`, `GA_GerFlakLuchsStugDrop` (Tier II since 2026-11-05), `GA_GerPzGrenIronStormParadrop` |
+| III | `GA_3xJu87Strafing`, `GA_Ju87Strafing`, `GA_2xHortentrafing`, `GA_Me410Airstrike`, `GA_2xBf110Strafing`, `GA_Barrage`, `GA_LargeBarrage`, `GA_GerAirMinefield`, `GA_GerRailBombardment`, `GA_GerLuftlandeSturm`, `GA_GerFieldBunkerDrop`, `GA_HeavyCarpet_Ju390B_250Gr`, `GA_GerIncendiaryJu87`, `GA_GerFireBarrage`, `GA_GerSonnengewehr`, `GA_GerJu87GTankBusters`, `GA_GerFieldWorkshopDrop` |
 | IV | `GA_GerRadixiteNuke`, `GA_GerV2Rocket`, `GA_GerKingTiger105Drop` (in no kit), `GA_GerE100Drop`, `GA_GerSturmtigerDrop`, `GA_GerJagdTigerDrop`, `GA_GerTigerRailDrop`, `GA_GerE50Drop`, `GA_GerE75Drop`, `GA_GerMausDrop`, `GA_GerJagdTigerLaserDrop`, `GA_GerJagdPantherFlamerDrop` |
 
 ## Spies Infiltration (`GA_GerSpiesInfiltration`)
@@ -204,19 +209,77 @@ Notes:
 - Placeholder icons (need real ones): the glider drops show the E-100 Mammut icon, the Ju 390 drops the Pz III spotter
   icon, the paradrops the paratrooper icon, the Bf 109 strafing the 3x Ju 87 icon.
 
+## Sky-Drop Quartermaster templates (round 3d, 2026-11-05)
+
+Slots 1-4 are authored by `Source/Tools/SkyDrop/author_sky_drop_abilities.py` (headless DebugGame, DA lock; touches
+only these four keys, fingerprints every other template before and after the save; report in
+`Saved/SkyDropTest/author_sky_drop_<time>.txt`). Slots 5 and 6 come from their own workstreams (`Tools/Ju87G`,
+`Tools/FieldWorkshop`); the E-50 is the round-3 glider drop.
+
+| Slot | Template | Class (copied from) | Contents | Tier | Cost | Cooldown |
+|---|---|---|---|---|---|---|
+| 1 | `GA_GerMassiveFlare` | `UGA_FlareCurtain` (`GA_GerFlareCurtain`) | one flare, circle aim: 60 m vision and light radius (curtain flare 20 m), light 4x, flare 2.5x, burns 75 s (30 s) | I | 200 R (as the curtain) | 90 |
+| 2 | `GA_GerPumaDrop` | `UGA_AircraftDrop` (`GA_GerSpotterPzIIIDrop`) | a Ju 390 lands 1 `Ger_ArmoredCar_Puma` (`Tank_Puma`) | I | 225 R (Puma 180 R) | 90 |
+| 3 | `GA_GerVehiclePartsSupplyDrop` | `UGA_ResourceDrop` (`GA_GerRadixiteMetalSupplyDrop`) | 4 crates (`SM_ScavObj_VehicleParts1`) of 25 vehicle parts, 50 s each; Scavengers x3: 300 VP | I | 400 R | 90 |
+| 4 | `GA_GerFlakLuchsStugDrop` (existing) | `UGA_AircraftDrop` | 2 Flak Luchs + 1 StuG III, landed (unchanged) | II (was I) | 975 R (2x 240 + 300 R; was empty) | 150 (was 5) |
+| 5 | `GA_GerJu87GTankBusters` | `UGA_AircraftStrafing` (Ju 87 G workstream) | two Ju 87 G with 3.7 cm cannon pods | III | 650 R | 240 |
+| 6 | `GA_GerFieldWorkshopDrop` | `UGA_CompositeDrop` (Field workshop workstream) | parachuted repair/rearm depot + 2 Pak 40 squads | III | 1500 R | 240 |
+| 7 | `GA_GerE50Drop` | `UGA_GliderTankDrop` | E-50 by Mammut | IV | 1450 R | 360 |
+
+Notes:
+- **Massive flare:** a single flare of `UGA_FlareCurtain` (`ShaderMarkerCount` 1) hangs over the middle of the flown
+  strip (code change in `GA_FlareCurtain.cpp`; the 5-flare curtain is unchanged). With circle aim the strip is
+  centred on the click (`MaxStripLength` 10 m), so the flare hangs over the clicked point; the target area is the
+  curtain's shader at strip length 0 (a 60 m disc with one flare marker). Ignition height stays 12 m (below the
+  camera). The burn particle effect is not scaled with `MeshScale`.
+- **Vehicle parts payback:** at about 2 radixite per vehicle part (unit costs: Puma 180 R + 80 VP, StuG 300 R + 125
+  VP) the 300 VP a Scavenger squad gets are worth 600 R for 400 R, 1.5x like the radixite & metal supply drop, paid
+  back after the third crate (about 3 minutes, the supply drop measured 168 s). Other infantry with scavenging gear
+  gets a third (100 VP), which does not pay back. Scavenging adds the parts with `UPlayerResourceManager::AddResource`
+  like wreck salvage.
+- `FUnitCost::ResourceCosts` is `EditDefaultsOnly`: Python cannot set it on a template; the script rebuilds the cost
+  struct from its exported text.
+- Test: `-GlobalAbilityAreaValidate -GlobalAbilityKitsOnly -GlobalAbilitySkyDrop` (`-GlobalAbilityAreaCapture=` and
+  `-GlobalAbilityKitPictures=` for pictures) checks the kits, then fires the massive flare through the click path,
+  the Puma drop and the vehicle parts drop once each.
+
+## Iron Storm templates (round 4, 2026-11-05)
+
+The Sturmkommandant's STG squad is Iron Storm (`Squad_Ger_IronStorm`, `Squads/Ger/EliteInfantry/IronStorm/`: four
+`Ger_Inf_IronStorm_STG` cyborgs with STG 44s, elite health on heavy infantry armour, 700 R + 300 M training cost).
+Both templates are authored by `Source/Tools/IronStorm/author_iron_storm_paradrops.py` (headless DebugGame, DA lock;
+touches only these two keys, fingerprints every other template before and after the save; report in
+`Saved/IronStormTest/author_iron_storm_<time>.txt`) and checked by `-IronStormValidate`
+(`Units/Squads/Tests/IronStorm`).
+
+| Slot | Template | Class (copied from) | Contents | Tier | Cost | Cooldown |
+|---|---|---|---|---|---|---|
+| 2 | `GA_GerIronStormParadrop` | `UGA_Paratroopers` (`GA_GerEliteScavengersParadrop`) | 1 `Squad_Ger_IronStorm` | I | 875 R (700 x 1.25) | 90 |
+| 4 | `GA_GerPzGrenIronStormParadrop` | `UGA_Paratroopers` (`GA_GerEliteScavengersParadrop`) | 2 `Squad_Ger_PanzerGrenadiere` + 2 `Squad_Ger_IronStorm`, one transport | II | 3450 R ((2 x 675 + 2 x 700) x 1.25) | 180 |
+
+Notes:
+- Both show the paratrooper icon (placeholder) and keep the source's transport, parachutes, sounds and marker; the
+  four-squad drop takes `GA_GerParatroopers`' landing spread when it is wider.
+- Until 2026-11-05 the async spawner's `Squad_Ger_IronStorm` row held `Squad_Ger_SturmCommando`, so anything that
+  spawned Iron Storm by subtype (the Breakthrough and Strike Division barracks option, `DA_TrainingLayout`, survival
+  supply) got a Sturm Kommando squad, which its construction script stamps `Squad_Ger_SturmKommandos`. The row now
+  holds `Squad_Ger_IronStorm`; those paths now train the real Iron Storm squad.
+- A squad Blueprint's subtype comes from its construction script (`Squad Subtype` set with a literal), not from the
+  CDO; Iron Storm's CDO default now matches it too.
+
 ## Status (2026-11-05)
 
 Done in C++:
 - `EGlobalAbilityTier`, `UGlobalAbility::M_AbilityTier`, `AMissionManager::MaxPlayerGlobalAbilityTier`, the cap in
   `UGlobalAbilitiesManager`, set by `ACPPController::SetupGlobalAbilityManager`.
-- Eleven commanders in `ERTSCommander`, seven slots with their tier ranges in `RTSCommanderConstants`, eleven kits in
-  `DefaultGame.ini`.
+- Twelve commanders in `ERTSCommander` (Sky-Drop Quartermaster appended 2026-11-05), seven slots with their tier
+  ranges in `RTSCommanderConstants`, twelve kits in `DefaultGame.ini`.
 - Tests: `-GlobalAbilityAreaValidate` starts with the kit checks: every commander has a kit with title, description
   and portrait, seven abilities, none twice, each with a template whose tier fits the slot; it logs
   `RTS_ABILITY_TEST KIT <commander> slot=<n> <ability> class=... tier=... cost=... cooldown=...` per slot.
   `-GlobalAbilityKitsOnly` stops after the kit checks; `-GlobalAbilityKitPictures=<folder>` draws the ability panel
-  (Field Commander kit) and the commander select screen (Light Bringer, then Sturmkommandant, the last entry) into
-  PNGs with `FWidgetRenderer`. The strafe test checks the Luftwaffe Liaison kit.
+  (Field Commander kit) and the commander select screen (Light Bringer, then Sky-Drop Quartermaster, the last
+  entry) into PNGs with `FWidgetRenderer`. `-GlobalAbilitySkyDrop` adds the Sky-Drop steps after the kit checks. The strafe test checks the Luftwaffe Liaison kit.
 
 Done in data (2026-11-03 and 2026-11-05, `Source/Tools/Commanders/author_commander_abilities.py`, idempotent; check
 with `verify_commander_abilities.py`):
