@@ -715,6 +715,10 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		return "Rail Troopers";
 	case ESquadSubtype::Squad_Ger_EliteScavengers:
 		return "Elite Scavengers";
+	case ESquadSubtype::Squad_Ger_RedSpine:
+		return "Red Spine Walkers";
+	case ESquadSubtype::Squad_Ger_FelsKrieger:
+		return "Fels Krieger Walkers";
 	case ESquadSubtype::Squad_Rus_RedHammer:
 		return "RedHammer Squad";
 	case ESquadSubtype::Squad_Rus_RedHamerPTRS:

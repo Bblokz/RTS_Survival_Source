@@ -16,6 +16,7 @@
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "RTS_Survival/DeveloperSettings.h"
+#include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/GlobalAbilitySetDataAsset.h"
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/RTSGlobalAbilitySettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
@@ -52,15 +53,15 @@ namespace Ju87GTestPrivate
 	constexpr float CloseUpSetupSeconds = 2.5f;
 	// The camera holds each angle this long so the auto exposure settles before the shot.
 	constexpr float CloseUpShotIntervalSeconds = 3.f;
-	constexpr int32 CloseUpShotCount = 3;
+	constexpr int32 CloseUpShotCount = 4;
 	constexpr float CloseUpHeightCm = 1500.f;
 	const FVector CloseUpOffsetFromAnchor(-1500.f, 1500.f, 0.f);
 	const FVector StripHalfLength(1000.f, 0.f, 0.f);
 	constexpr float StrikeTimeoutSeconds = 300.f;
 	constexpr float AfterAbilityEndSeconds = 3.f;
 	constexpr float PeriodicShotSeconds = 10.f;
-	constexpr int32 MaxDiveShots = 5;
-	constexpr float DiveShotIntervalSeconds = 0.6f;
+	constexpr int32 MaxDiveShots = 8;
+	constexpr float DiveShotIntervalSeconds = 4.f;
 	constexpr float StateLogIntervalSeconds = 2.f;
 	constexpr float TargetSpawnAboveGroundCm = 120.f;
 	constexpr float ProjectileSearchRadiusCm = 900.f;
@@ -90,11 +91,18 @@ namespace Ju87GTestPrivate
 		FVector2D Offset;
 	};
 
+	// The aircraft go for the nearest tank: the KV-1E sits under the middle of the strip so the cannons reach it
+	// (120 mm APCR, 2026-11-05); one T-34 off to the side shows a medium tank still dies.
 	const FTargetSpawn TargetSpawns[] = {
-		{T34ClassPath, TEXT("T34_A"), FVector2D(600.f, 0.f)},
-		{T34ClassPath, TEXT("T34_B"), FVector2D(-600.f, 300.f)},
-		{KV1ClassPath, TEXT("KV1"), FVector2D(0.f, -700.f)},
+		{KV1ClassPath, TEXT("KV1"), FVector2D(0.f, 0.f)},
+		{T34ClassPath, TEXT("T34_A"), FVector2D(900.f, 500.f)},
 	};
+	// The fired APCR must go through this much armour over the whole cannon range (user decision 2026-11-05).
+	constexpr float MinFiredArmorPenMm = 120.f;
+	constexpr float PenToleranceMm = 0.5f;
+	// The shared Flak 36 weapon data must keep its own raw penetration: the override lives in the pod component.
+	constexpr float Flak36RawArmorPenMm = 45.f;
+	constexpr float Flak36RawArmorPenMaxRangeMm = 31.f;
 
 	float GetHealth(const AActor* Actor)
 	{
@@ -386,7 +394,14 @@ void UJu87GTankBusterTestSubsystem::CheckCloseUpAircraft(AAircraftMaster& Aircra
 		      && Raw.Range >= DeveloperSettings::GameBalance::Ranges::AircraftSmallArmsRange - 1.f,
 		      TEXT("cannon_is_37mm_apcr"), DescribeShotData(*Cannon) + TEXT(" socket=") +
 		      Cannon->GetWeaponSocket().ToString());
+		// User decision 2026-11-05: the fired APCR goes through 120 mm over the whole range (KV-class heavies).
+		const FWeaponData Fired = Cannon->GetWeaponDataAdjustedForShellType();
+		Check(Fired.ArmorPen >= MinFiredArmorPenMm - PenToleranceMm
+		      && Fired.ArmorPenMaxRange >= MinFiredArmorPenMm - PenToleranceMm,
+		      TEXT("cannon_apcr_pen_120mm"), FString::Printf(TEXT("pen=%.1f pen_max_range=%.1f"), Fired.ArmorPen,
+		                                                     Fired.ArmorPenMaxRange));
 	}
+	CheckSharedFlak36DataUnchanged();
 	FString AllWeapons;
 	for (const UWeaponState* Weapon : Aircraft.GetAllAircraftWeapons())
 	{
@@ -394,6 +409,24 @@ void UJu87GTankBusterTestSubsystem::CheckCloseUpAircraft(AAircraftMaster& Aircra
 			Weapon->GetWeaponSocket().ToString() + TEXT(" ");
 	}
 	UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST WEAPONS %s"), *AllWeapons);
+}
+
+void UJu87GTankBusterTestSubsystem::CheckSharedFlak36DataUnchanged()
+{
+	using namespace Ju87GTestPrivate;
+	ACPPGameState* GameState = ACPPGameState::GetGameState(GetWorld());
+	const FWeaponData* Flak36Data = IsValid(GameState)
+		                                ? GameState->GetWeaponDataOfPlayer(TestPlayer, EWeaponName::Flak36_37MM)
+		                                : nullptr;
+	if (Flak36Data == nullptr)
+	{
+		Check(false, TEXT("shared_flak36_data_unchanged"), TEXT("no Flak36_37MM weapon data"));
+		return;
+	}
+	Check(FMath::IsNearlyEqual(Flak36Data->ArmorPen, Flak36RawArmorPenMm)
+	      && FMath::IsNearlyEqual(Flak36Data->ArmorPenMaxRange, Flak36RawArmorPenMaxRangeMm),
+	      TEXT("shared_flak36_data_unchanged"), FString::Printf(TEXT("raw pen=%.1f pen_max_range=%.1f"),
+		                                                        Flak36Data->ArmorPen, Flak36Data->ArmorPenMaxRange));
 }
 
 void UJu87GTankBusterTestSubsystem::PlaceCloseUpCamera(const AAircraftMaster& Aircraft, const int32 ShotIndex) const
@@ -406,11 +439,15 @@ void UJu87GTankBusterTestSubsystem::PlaceCloseUpCamera(const AAircraftMaster& Ai
 	// Front-low three-quarter, side and from below-behind: every angle shows both pods.
 	// Front three-quarter from above, the side, and front-low: the sunlit top and both pods under the wings.
 	static const FVector LocalOffsets[] = {
-		FVector(1300.f, 800.f, 450.f), FVector(200.f, 1400.f, 60.f), FVector(1200.f, -700.f, -150.f)
+		FVector(1300.f, 800.f, 450.f), FVector(200.f, 1400.f, 60.f), FVector(1200.f, -700.f, -150.f),
+		FVector(650.f, 750.f, 20.f)
 	};
 	const FVector Offset = LocalOffsets[FMath::Clamp(ShotIndex, 0, static_cast<int32>(UE_ARRAY_COUNT(LocalOffsets)) - 1)];
 	const FTransform AircraftTransform = Aircraft.GetActorTransform();
-	const FVector Focus = AircraftTransform.TransformPosition(FVector(80.f, 0.f, 120.f));
+	// The last angle frames the right pod (pylon at Y 245, barrel tip 270 cm ahead).
+	const bool bPodCloseUp = ShotIndex == static_cast<int32>(UE_ARRAY_COUNT(LocalOffsets)) - 1;
+	const FVector Focus = AircraftTransform.TransformPosition(bPodCloseUp ? FVector(120.f, 245.f, 105.f)
+		                                                                     : FVector(80.f, 0.f, 120.f));
 	const FVector CameraLocation = AircraftTransform.TransformPosition(Offset);
 	M_Camera->SetActorLocationAndRotation(CameraLocation, (Focus - CameraLocation).Rotation());
 	Controller->SetViewTarget(M_Camera);
@@ -598,12 +635,15 @@ void UJu87GTankBusterTestSubsystem::TickStrike()
 {
 	using namespace Ju87GTestPrivate;
 	TrackStrikeAircraft();
+	TrackShells();
 	TrackTargets();
 	TrackBombActors();
 	UpdateStrikeCamera();
-	if (M_FirstCannonShotSeconds >= 0.f && M_DiveShotsTaken < MaxDiveShots && GetPhaseSeconds() >= M_NextDiveShotSeconds)
+	// A cannon fired this frame: the camera now follows that aircraft, so the shot shows its pods and muzzle flashes.
+	if (bM_WantDiveShot)
 	{
-		RequestScreenshot(FString::Printf(TEXT("Strike_DiveFiring_%d"), M_DiveShotsTaken++));
+		bM_WantDiveShot = false;
+		RequestScreenshot(FString::Printf(TEXT("Strike_CannonsFiring_%d"), M_DiveShotsTaken++));
 		M_NextDiveShotSeconds = GetPhaseSeconds() + DiveShotIntervalSeconds;
 	}
 	if (M_LastPeriodicShotSeconds < 0.f || GetPhaseSeconds() - M_LastPeriodicShotSeconds >= PeriodicShotSeconds)
@@ -721,12 +761,94 @@ void UJu87GTankBusterTestSubsystem::OnCannonShot(AAircraftMaster& Aircraft, FStr
 	       *MuzzleLocal.ToCompactString(), Aircraft.GetActorLocation().Z - M_Anchor.Z,
 	       Aircraft.GetActorRotation().Pitch, CountProjectilesNear(Muzzle, ProjectileSearchRadiusCm),
 	       *DescribeShotData(Weapon));
+	StartShellTracks(Muzzle);
 	if (M_FirstCannonShotSeconds < 0.f)
 	{
 		M_FirstCannonShotSeconds = GetPhaseSeconds();
-		M_CameraFollowAircraft = &Aircraft;
-		M_NextDiveShotSeconds = GetPhaseSeconds();
 	}
+	if (M_DiveShotsTaken < MaxDiveShots && GetPhaseSeconds() >= M_NextDiveShotSeconds)
+	{
+		M_CameraFollowAircraft = &Aircraft;
+		bM_WantDiveShot = true;
+	}
+}
+
+void UJu87GTankBusterTestSubsystem::StartShellTracks(const FVector& Muzzle)
+{
+	using namespace Ju87GTestPrivate;
+	for (TActorIterator<AProjectile> It(GetWorld()); It; ++It)
+	{
+		AProjectile* Shell = *It;
+		if (not IsValid(Shell) || Shell->IsHidden()
+			|| FVector::Dist(Shell->GetActorLocation(), Muzzle) > ProjectileSearchRadiusCm)
+		{
+			continue;
+		}
+		const bool bTracked = M_Shells.ContainsByPredicate([Shell](const FShellTrack& Track)
+		{
+			return Track.Shell.Get() == Shell;
+		});
+		if (bTracked)
+		{
+			continue;
+		}
+		FShellTrack Track;
+		Track.Shell = Shell;
+		Track.LastLocation = Shell->GetActorLocation();
+		Track.LaunchSeconds = GetPhaseSeconds();
+		M_Shells.Add(Track);
+	}
+}
+
+void UJu87GTankBusterTestSubsystem::TrackShells()
+{
+	using namespace Ju87GTestPrivate;
+	constexpr float ShellNearTankCm = 450.f;
+	for (int32 Index = M_Shells.Num() - 1; Index >= 0; --Index)
+	{
+		FShellTrack& Track = M_Shells[Index];
+		const AActor* Shell = Track.Shell.Get();
+		if (IsValid(Shell) && not Shell->IsHidden())
+		{
+			Track.LastLocation = Shell->GetActorLocation();
+			continue;
+		}
+		FString NearestLabel;
+		const float Distance = GetDistanceToNearestTarget(Track.LastLocation, NearestLabel);
+		if (Distance <= ShellNearTankCm)
+		{
+			++M_ShellsNearTanks;
+			M_ShellsNearTarget.FindOrAdd(NearestLabel) += 1;
+		}
+		++M_ShellsEnded;
+		UE_LOG(LogRTSJu87GTest, Display,
+		       TEXT("RTS_JU87G_TEST SHELL_END at=%.1fs flight=%.2fs last=%s nearest=%s dist=%.0f"), GetPhaseSeconds(),
+		       GetPhaseSeconds() - Track.LaunchSeconds, *Track.LastLocation.ToCompactString(), *NearestLabel, Distance);
+		M_Shells.RemoveAtSwap(Index);
+	}
+}
+
+float UJu87GTankBusterTestSubsystem::GetDistanceToNearestTarget(const FVector& Location, FString& OutLabel) const
+{
+	float Nearest = TNumericLimits<float>::Max();
+	for (const FTargetTrack& Target : M_Targets)
+	{
+		const AActor* Tank = Target.Tank.Get();
+		if (not IsValid(Tank))
+		{
+			continue;
+		}
+		FVector Origin;
+		FVector Extent;
+		Tank->GetActorBounds(true, Origin, Extent);
+		const float Distance = FVector::Dist(Location, Origin);
+		if (Distance < Nearest)
+		{
+			Nearest = Distance;
+			OutLabel = Target.Label;
+		}
+	}
+	return Nearest;
 }
 
 int32 UJu87GTankBusterTestSubsystem::CountProjectilesNear(const FVector& Location, const float Radius) const
@@ -847,8 +969,16 @@ void UJu87GTankBusterTestSubsystem::FinishStrike()
 		UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST TARGET_SUMMARY %s health=%.0f/%.0f dead=%d"),
 		       *Target.Label, Target.LastHealth, Target.StartHealth, Target.bM_Died);
 	}
+	UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST SHELLS ended=%d near_tanks=%d still_flying=%d"),
+	       M_ShellsEnded, M_ShellsNearTanks, M_Shells.Num());
+	Check(M_ShellsNearTanks > 0, TEXT("shells_strike_at_tanks"),
+	      FString::Printf(TEXT("near=%d of %d"), M_ShellsNearTanks, M_ShellsEnded));
 	Check(DamagedT34 > 0, TEXT("t34_damaged"), FString::Printf(TEXT("damaged=%d"), DamagedT34));
-	Check(bHeavyDamaged, TEXT("kv1_damaged"));
+	// With the stock 67.5 mm APCR the KV-1E bounced every shell; the 120 mm pod override must hurt it.
+	UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST KV1_RESULT shells_at_kv1=%d damaged=%d"),
+	       M_ShellsNearTarget.FindRef(TEXT("KV1")), bHeavyDamaged);
+	Check(bHeavyDamaged, TEXT("kv1_damaged"), FString::Printf(TEXT("shells_at_kv1=%d"),
+		      M_ShellsNearTarget.FindRef(TEXT("KV1"))));
 	Check(Kills > 0, TEXT("tank_killed"), FString::Printf(TEXT("kills=%d of %d"), Kills, M_Targets.Num()));
 	Check(M_AbilityEndedCount == 1, TEXT("ability_ended_once"), FString::Printf(TEXT("ended=%d at=%.1fs"),
 		      M_AbilityEndedCount, M_AbilityEndedSeconds));

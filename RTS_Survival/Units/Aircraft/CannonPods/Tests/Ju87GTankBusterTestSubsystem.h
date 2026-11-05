@@ -49,6 +49,14 @@ private:
 		float NextStateLogSeconds = 0.f;
 	};
 
+	// A cannon shell from launch until it goes back to the pool (hidden): its last location is where it struck.
+	struct FShellTrack
+	{
+		TWeakObjectPtr<AActor> Shell;
+		FVector LastLocation = FVector::ZeroVector;
+		float LaunchSeconds = 0.f;
+	};
+
 	struct FTargetTrack
 	{
 		TWeakObjectPtr<AActor> Tank;
@@ -73,6 +81,10 @@ private:
 	TSet<TWeakObjectPtr<AActor>> M_PreExistingActors;
 	TArray<FStrikeAircraftTrack> M_StrikeAircraft;
 	TArray<FTargetTrack> M_Targets;
+	TArray<FShellTrack> M_Shells;
+	int32 M_ShellsNearTanks = 0;
+	TMap<FString, int32> M_ShellsNearTarget;
+	int32 M_ShellsEnded = 0;
 	int32 M_BombActorsSeen = 0;
 	int32 M_AbilityEndedCount = 0;
 	float M_AbilityEndedSeconds = -1.f;
@@ -80,6 +92,7 @@ private:
 	float M_LastPeriodicShotSeconds = -1.f;
 	int32 M_DiveShotsTaken = 0;
 	float M_NextDiveShotSeconds = 0.f;
+	bool bM_WantDiveShot = false;
 	TWeakObjectPtr<AAircraftMaster> M_CameraFollowAircraft;
 
 	UPROPERTY()
@@ -99,6 +112,8 @@ private:
 	void StartCloseUp();
 	void TickCloseUp();
 	void CheckCloseUpAircraft(AAircraftMaster& Aircraft);
+	/** The pod override must not leak into the shared Flak36_37MM row other units fire. */
+	void CheckSharedFlak36DataUnchanged();
 	void PlaceCloseUpCamera(const AAircraftMaster& Aircraft, int32 ShotIndex) const;
 
 	void StartStrike();
@@ -111,6 +126,10 @@ private:
 	void TrackWeapons(AAircraftMaster& Aircraft, FStrikeAircraftTrack& Track);
 	void OnCannonShot(AAircraftMaster& Aircraft, FStrikeAircraftTrack& Track, const UWeaponState& Weapon);
 	int32 CountProjectilesNear(const FVector& Location, float Radius) const;
+	void StartShellTracks(const FVector& Muzzle);
+	void TrackShells();
+	/** @return Distance from the location to the nearest target tank's bounds centre; the label goes to OutLabel. */
+	float GetDistanceToNearestTarget(const FVector& Location, FString& OutLabel) const;
 	void TrackTargets();
 	void TrackBombActors();
 	void UpdateStrikeCamera();

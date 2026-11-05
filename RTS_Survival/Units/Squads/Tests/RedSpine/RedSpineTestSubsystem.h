@@ -8,6 +8,7 @@
 class AAircraftMaster;
 class ACameraActor;
 class ASquadController;
+class ASquadUnit;
 class UGlobalAbility;
 
 UENUM()
@@ -28,7 +29,8 @@ enum class ERedSpineTestPhase : uint8
  * ground, then fires GA_GerRedSpineDrop and GA_GerRedSpinePairDrop. For each drop it checks the landed Ju 390 lets
  * out the right number of squads, that the walkers stand on the ground beside the aircraft (not on it, not inside its
  * collision, not falling), survive its take-off and follow a move order. Anchor: -RedSpineAnchorX= -RedSpineAnchorY=
- * (else where the camera looks); the pair drop lands -RedSpinePairOffset= (default 5000) towards the map centre.
+ * (else where the camera looks); the pair drop lands -RedSpinePairOffset= (default 4500) on the far side of the
+ * drop point.
  * Screenshots into Saved/RedSpineTest. Logs RTS_REDSPINE_TEST; not in shipping.
  */
 UCLASS()
@@ -113,7 +115,7 @@ private:
 	void CheckSquad(ASquadController* Squad, const FString& Label);
 	/** @brief Every walker stands on the ground: not falling, nothing but terrain below it, feet near that ground. */
 	void CheckWalkersOnGround(ASquadController* Squad, const FString& Label);
-	/** @brief No walker overlaps the landed aircraft's collision or stands inside its fuselage. */
+	/** @brief No walker overlaps the landed aircraft's collision or stands in or under its airframe (wings included). */
 	void CheckWalkersOutsideAircraft(const FString& Label);
 
 	void StartDrop(int32 DropIndex);
@@ -122,6 +124,7 @@ private:
 	void FinishDropChecks();
 	void TickMovingDroppedSquads();
 
+	static bool GetHasNoResistanceOverride(const ASquadUnit* Unit);
 	FBox FindLandscapeBounds() const;
 	/** @brief Clamps a test location into the landscape (minus a margin) and puts it on the ground. */
 	FVector KeepInsideLandscape(const FVector& Location) const;

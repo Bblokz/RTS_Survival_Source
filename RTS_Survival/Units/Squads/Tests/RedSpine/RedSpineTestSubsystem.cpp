@@ -85,16 +85,17 @@ namespace RedSpineTestPrivate
 	constexpr float AfterTakeOffSeconds = 20.f;
 	// The directly spawned squad stands this far to the side of the drop point (across the line to the map centre).
 	constexpr float DirectSpawnSideOffset = 3500.f;
-	// The pair drop lands this far from the single drop, towards the map centre.
-	constexpr float DefaultPairOffset = 5000.f;
+	// The pair drop lands this far from the single drop, on the side away from the directly spawned squad. Not
+	// towards the map centre: RTS_ToCopySmall has armed gun pits there that shot a walker squad (run 3).
+	constexpr float DefaultPairOffset = 4500.f;
 	// Every test location stays this far inside the landscape: RTS_ToCopySmall's -Y edge is close to the anchor.
 	constexpr float LandscapeEdgeMargin = 2500.f;
 	constexpr float CameraTraceLength = 500000.f;
 	// Feet within this of the ground below the walker count as standing on it.
 	constexpr float FootGroundTolerance = 60.f;
 	constexpr float GroundTraceLength = 5000.f;
-	// Half the fuselage width plus a walker's radius: closer to the aircraft's long axis than this is inside it.
-	constexpr float FuselageHalfWidth = 300.f;
+	// A walker's capsule radius: a walker closer than this to the airframe's footprint stands in or under it.
+	constexpr float WalkerClearance = 42.f;
 	constexpr float MaxLandingDistance = 3500.f;
 }
 
@@ -303,7 +304,7 @@ void URedSpineTestSubsystem::OnDirectSquadSpawned(AActor* SpawnedActor)
 void URedSpineTestSubsystem::TickWaitingForSpawnedSquad()
 {
 	using namespace RedSpineTestPrivate;
-	ViewFrom(M_DirectSpawnLocation, 1300.f, -25.f);
+	ViewFrom(M_DirectSpawnLocation, 1500.f, -25.f, 225.f);
 	ASquadController* Squad = M_SpawnedSquad.Get();
 	const bool bLoaded = IsValid(Squad) && Squad->GetIsSquadFullyLoadedAndInitialized();
 	if (not bLoaded)
@@ -432,8 +433,12 @@ void URedSpineTestSubsystem::CheckSquad(ASquadController* Squad, const FString& 
 	const float ExpectedHealth = DeveloperSettings::GameBalance::UnitHealth::RedSpineWalkerHealth;
 	Check(FMath::IsNearlyEqual(Data.MaxHealth, ExpectedHealth, 0.5f), Label + TEXT("_squad_data_health"),
 	      FString::Printf(TEXT("data=%.1f expected=%.1f"), Data.MaxHealth, ExpectedHealth));
+	// Squad soldiers take the squad data's resistances unless their Blueprint overrides them with a preset.
 	const FResistanceAndDamageReductionData HeavyArmour =
 		FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(ExpectedHealth);
+	Check(Data.ResistancesAndDamageMlt.TargetTypeIcon == HeavyArmour.TargetTypeIcon,
+	      Label + TEXT("_squad_data_heavy_infantry_armour"),
+	      UEnum::GetValueAsString(Data.ResistancesAndDamageMlt.TargetTypeIcon));
 
 	TArray<ASquadUnit*> Units = Squad->GetSquadUnitsChecked();
 	Check(Units.Num() == ExpectedWalkers, Label + TEXT("_walker_count"), FString::Printf(TEXT("%d"), Units.Num()));
@@ -457,10 +462,7 @@ void URedSpineTestSubsystem::CheckSquad(ASquadController* Squad, const FString& 
 		const UHealthComponent* Health = Unit->GetHealthComponent();
 		const float MaxHealth = IsValid(Health) ? Health->GetMaxHealth() : -1.f;
 		HealthMatches += FMath::IsNearlyEqual(MaxHealth, ExpectedHealth, 0.5f) ? 1 : 0;
-		bool bFoundResistance = false;
-		const FResistanceAndDamageReductionData Resistance =
-			FUnitResistanceDataHelpers::GetUnitResistanceData(Unit, bFoundResistance);
-		ArmourMatches += bFoundResistance && Resistance.TargetTypeIcon == HeavyArmour.TargetTypeIcon ? 1 : 0;
+		ArmourMatches += GetHasNoResistanceOverride(Unit) ? 1 : 0;
 		const URTSComponent* UnitRTS = Unit->FindComponentByClass<URTSComponent>();
 		OwnerMatches += IsValid(UnitRTS) && UnitRTS->GetOwningPlayer() == TestPlayer ? 1 : 0;
 		Details += FString::Printf(TEXT("%s/%s(%s)/%.0fhp "), *UnitClass, *WeaponClass,
@@ -471,7 +473,7 @@ void URedSpineTestSubsystem::CheckSquad(ASquadController* Squad, const FString& 
 	Check(bHasUnits && WeaponCount == Units.Num(), Label + TEXT("_every_walker_has_mp46"), Details);
 	Check(bHasUnits && HealthMatches == Units.Num(), Label + TEXT("_walker_health"),
 	      FString::Printf(TEXT("expected=%.0f %s"), ExpectedHealth, *Details));
-	Check(bHasUnits && ArmourMatches == Units.Num(), Label + TEXT("_heavy_infantry_armour"),
+	Check(bHasUnits && ArmourMatches == Units.Num(), Label + TEXT("_walkers_keep_squad_armour_no_override"),
 	      FString::Printf(TEXT("%d/%d"), ArmourMatches, Units.Num()));
 	Check(bHasUnits && OwnerMatches == Units.Num(), Label + TEXT("_walkers_owned_by_player_1"),
 	      FString::Printf(TEXT("%d/%d"), OwnerMatches, Units.Num()));
@@ -528,7 +530,8 @@ void URedSpineTestSubsystem::CheckWalkersOutsideAircraft(const FString& Label)
 		return;
 	}
 	const FTransform AircraftTransform = Aircraft->GetActorTransform();
-	const FBox LocalBox = Aircraft->CalculateComponentsBoundingBoxInLocalSpace(false);
+	// The Ju 390 mesh has no collision of its own, so the visible airframe (wings included) is the footprint.
+	const FBox LocalBox = Aircraft->CalculateComponentsBoundingBoxInLocalSpace(true);
 	UE_LOG(LogRTSRedSpineTest, Display,
 	       TEXT("RTS_REDSPINE_TEST AIRCRAFT %s at=%s rot=%s airborne=%d local_box_min=%s max=%s"),
 	       *Aircraft->GetClass()->GetName(), *Aircraft->GetActorLocation().ToCompactString(),
@@ -562,10 +565,11 @@ void URedSpineTestSubsystem::CheckWalkersOutsideAircraft(const FString& Label)
 				}
 			}
 			const FVector Local = AircraftTransform.InverseTransformPosition(Unit->GetActorLocation());
-			const bool bInsideFuselage = FMath::Abs(Local.Y) < FuselageHalfWidth
-				&& Local.X > LocalBox.Min.X && Local.X < LocalBox.Max.X;
+			const bool bInsideFuselage = Local.Y > LocalBox.Min.Y - WalkerClearance
+				&& Local.Y < LocalBox.Max.Y + WalkerClearance
+				&& Local.X > LocalBox.Min.X - WalkerClearance && Local.X < LocalBox.Max.X + WalkerClearance;
 			Outside += not bOverlapsAircraft && not bInsideFuselage ? 1 : 0;
-			Details += FString::Printf(TEXT("[local=%s overlap=%d fuselage=%d] "), *Local.ToCompactString(),
+			Details += FString::Printf(TEXT("[local=%s overlap=%d under_airframe=%d] "), *Local.ToCompactString(),
 			                           bOverlapsAircraft ? 1 : 0, bInsideFuselage ? 1 : 0);
 		}
 	}
@@ -597,7 +601,8 @@ void URedSpineTestSubsystem::StartDrop(const int32 DropIndex)
 	{
 		float PairOffset = DefaultPairOffset;
 		FParse::Value(FCommandLine::Get(), TEXT("RedSpinePairOffset="), PairOffset);
-		M_DropAnchor = KeepInsideLandscape(M_Anchor + M_TowardCentre * PairOffset);
+		const FVector Side(-M_TowardCentre.Y, M_TowardCentre.X, 0.f);
+		M_DropAnchor = KeepInsideLandscape(M_Anchor - Side * PairOffset);
 	}
 
 	ACPPController* Controller = FRTS_Statics::GetRTSController(GetWorld());
@@ -879,6 +884,21 @@ void URedSpineTestSubsystem::TickMovingDroppedSquads()
 		return;
 	}
 	Finish();
+}
+
+bool URedSpineTestSubsystem::GetHasNoResistanceOverride(const ASquadUnit* Unit)
+{
+	// OverwriteUnitArmorAndResistance is protected; read it through reflection.
+	const FStructProperty* Property = FindFProperty<FStructProperty>(
+		Unit->GetClass(), TEXT("OverwriteUnitArmorAndResistance"));
+	if (Property == nullptr || Property->Struct != FSquadUnitHealthResistanceOverwrite::StaticStruct())
+	{
+		return false;
+	}
+	const FSquadUnitHealthResistanceOverwrite* Overwrite =
+		Property->ContainerPtrToValuePtr<FSquadUnitHealthResistanceOverwrite>(Unit);
+	return Overwrite->ResistancePresetType == EResistancePresetType::None
+		&& FMath::IsNearlyEqual(Overwrite->HealthMlt, 1.f);
 }
 
 FBox URedSpineTestSubsystem::FindLandscapeBounds() const
