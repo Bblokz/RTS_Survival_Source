@@ -107,9 +107,9 @@ void UWeaponStateMultiTrace::FireWeaponSystem_HandleNoValidSockets(const FVector
 	const FVector Forward = Fallback.Value;
 	const FVector Direction = bM_UseOwnerFireDirection ? SharedOwnerDir : Forward;
 
-	FVector TraceEnd = Direction * WeaponData.Range;
-	TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation,
-		Direction, WeaponData.Range, WeaponData.Accuracy, bIsAircraftWeapon);
+	const float TraceRange = WeaponData.Range * GetFlightRangeMltForCurrentTarget();
+	const FVector TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation,
+		Direction, TraceRange, WeaponData.Accuracy, bIsAircraftWeapon);
 
 	const float ProjectileLaunchTime = World->GetTimeSeconds();
 
@@ -157,8 +157,9 @@ void UWeaponStateMultiTrace::FireWeaponSystem_FireTraceFromSocket(const FName& S
 
 	const FVector Direction = bM_UseOwnerFireDirection ? SharedOwnerDir : ForwardVector;
 
-	FVector TraceEnd = Direction * WeaponData.Range;
-	TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation, Direction, WeaponData.Range, WeaponData.Accuracy, bIsAircraftWeapon);
+	const float TraceRange = WeaponData.Range * GetFlightRangeMltForCurrentTarget();
+	const FVector TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(
+		LaunchLocation, Direction, TraceRange, WeaponData.Accuracy, bIsAircraftWeapon);
 
 #if 0
 	DrawDebugLine(World, LaunchLocation, TraceEnd, FColor::Green, false, 5.f, 0, 2.f);

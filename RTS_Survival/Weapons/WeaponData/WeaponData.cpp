@@ -25,6 +25,7 @@
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxPerfCounters.h"
 #include "Trace/Trace.h"
 #include "WeaponOwner/WeaponOwner.h"
+#include "RTS_Survival/Weapons/WeaponRangeData/WeaponRangeData.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshSocket.h"
 #include "Components/SkinnedMeshComponent.h"
@@ -1030,6 +1031,18 @@ float UWeaponState::GetRange() const
 float UWeaponState::GetWeaponRangeBehaviourAdjusted() const
 {
 	return WeaponData.Range;
+}
+
+float UWeaponState::GetFlightRangeMltForCurrentTarget() const
+{
+	// Aircraft-mounted weapons already fly at their target's altitude; only ground weapons get anti-air reach.
+	if (bIsAircraftWeapon || not WeaponOwner)
+	{
+		return 1.0f;
+	}
+
+	const AActor* TargetActor = WeaponOwner->GetTargetActor(WeaponIndex);
+	return FWeaponRangeData::GetRangeMltForTarget(FWeaponRangeData::GetIsAntiAirRangeTarget(TargetActor));
 }
 
 void UWeaponState::ForceInstantReload()
@@ -2118,7 +2131,8 @@ void UWeaponStateTrace::FireTrace(const FVector& Direction)
 	FVector TraceEnd;
 	TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation, Direction,
 	                                                      WeaponData.Range *
-	                                                      DeveloperSettings::GameBalance::Ranges::TraceSimulationRangeMlt,
+	                                                      DeveloperSettings::GameBalance::Ranges::TraceSimulationRangeMlt *
+	                                                      GetFlightRangeMltForCurrentTarget(),
 	                                                      WeaponData.Accuracy, bIsAircraftWeapon);
 	if (0)
 	{
