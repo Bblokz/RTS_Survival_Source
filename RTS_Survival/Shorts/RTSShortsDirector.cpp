@@ -509,6 +509,7 @@ void ARTSShortsDirector::TickRunning()
 	KeepSmallArmsEffectsVisible();
 	TickTeamWeaponShot(Frame);
 	TickBattle(Frame);
+	TickBattleCuts(Frame);
 	TickConvoy(Frame);
 	TickParatrooperBattle(Local);
 	TickAircraftCrash(Local);
@@ -2747,6 +2748,7 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 	       M_Battle.EnemySquads.Num());
 	BeginParatrooperBattle();
 	UpdateParatrooperRangeBehaviour(false);
+	BeginBattleCuts(Segment);
 }
 
 void ARTSShortsDirector::MatchSoldierToSquadOwner(ASquadUnit* Soldier, const uint8 SquadOwner)
@@ -3748,4 +3750,5 @@ void ARTSShortsDirector::EndBattle()
 		UE_LOG(LogRTSShorts, Display, TEXT("RTS_SHORTS_ROUND_EFFECTS_CLEARED stopped=%d"), Stopped);
 	}
 	M_Battle = FRTSShortsBattleState();
+	M_BattleCuts = FRTSShortsBattleCutState();
 }

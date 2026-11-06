@@ -613,6 +613,70 @@ struct FRTSShortsSquadTactics
 	float OutlineWidth = 3.f;
 };
 
+/**
+ * @brief Large battles filmed up close: after the opening shot (the segment's Camera) the view cuts between single
+ * fighters of both lines, each shot a slow pan round one unit while it fights, so the hits and the gun sounds are near.
+ */
+USTRUCT()
+struct FRTSShortsBattleCuts
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	/** Segment-local second of the first cut; until then the segment's Camera (and its orbit) films the field. */
+	UPROPERTY()
+	float FirstCutSeconds = 6.f;
+
+	/** Length of one shot; each shot varies by up to ShotJitterSeconds either way. */
+	UPROPERTY()
+	float ShotSeconds = 5.f;
+
+	UPROPERTY()
+	float ShotJitterSeconds = 1.f;
+
+	/** A shot whose unit dies holds on the explosion this long and then cuts (never past its planned end). */
+	UPROPERTY()
+	float DeathHoldSeconds = 2.2f;
+
+	/** Camera distance from the unit (cm) for the over-the-shoulder shot; the other shots scale from it. */
+	UPROPERTY()
+	float Distance = 1300.f;
+
+	UPROPERTY()
+	float Height = 380.f;
+
+	UPROPERTY()
+	float FocalLength = 18.f;
+
+	/** Degrees the camera pans round the unit during one shot (the direction alternates). */
+	UPROPERTY()
+	float PanDegrees = 24.f;
+
+	/** How quickly the camera follows a driving unit (1/s). */
+	UPROPERTY()
+	float FollowSpeed = 3.f;
+
+	/** Over-the-shoulder shots look this far (0..1) along the line to the unit's target. */
+	UPROPERTY()
+	float TargetLookBlend = 0.4f;
+
+	/** Units that were filmed within the last this many shots are not picked again while others are left. */
+	UPROPERTY()
+	int32 RepeatGap = 6;
+
+	/** Every this-many-th shot is a wide one (twice the distance, higher, wider lens); 0 = never. */
+	UPROPERTY()
+	int32 WideEvery = 5;
+
+	UPROPERTY()
+	float ExposureBias = 0.25f;
+
+	UPROPERTY()
+	int32 RandomSeed = 1;
+};
+
 /** @brief A tree the director plants for squad battles, with cover points round its trunk. */
 USTRUCT()
 struct FRTSShortsCoverTree
@@ -977,6 +1041,10 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	FRTSShortsSquadTactics BattleSquadTactics;
 
+	/** Battle: after the opening shot the camera cuts between close shots of single fighters. */
+	UPROPERTY()
+	FRTSShortsBattleCuts BattleCuts;
+
 	/** Aircraft passes flown during this segment. */
 	UPROPERTY()
 	TArray<FRTSShortsFlyBy> FlyBys;
@@ -1195,6 +1263,10 @@ struct FRTSShortsManifestSegment
 
 	UPROPERTY()
 	TArray<FRTSShortsBattleEvent> BattleEvents;
+
+	/** Segment.BattleCuts: output frames of the camera cuts inside the segment (post must not treat them as glitches). */
+	UPROPERTY()
+	TArray<int32> CameraCutFrames;
 };
 
 /**

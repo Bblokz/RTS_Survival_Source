@@ -139,6 +139,56 @@ struct FRTSShortsSoloEvasionState
 	TSet<uint32> EffectIdsAtBegin;
 };
 
+/** How a Segment.BattleCuts shot places the camera round its unit. */
+UENUM()
+enum class ERTSShortsBattleShot : uint8
+{
+	// Behind the unit, off to one side, looking past it at what it shoots.
+	OverShoulder,
+	// Square to the line of fire, low: the unit's profile with its muzzle flash.
+	Flank,
+	// Ahead of the unit and off its line of fire, looking back at it.
+	FrontQuarter,
+	// Over the shoulder from twice as far and higher: the unit and the fight round it.
+	Wide
+};
+
+/** Segment.BattleCuts running: the shot on screen, its unit and the smoothed points the camera follows. */
+USTRUCT()
+struct FRTSShortsBattleCutState
+{
+	GENERATED_BODY()
+
+	bool bIsActive = false;
+	// Shots begun so far (the opening shot of the field not counted).
+	int32 ShotIndex = 0;
+	float ShotStartSeconds = 0.f;
+	float ShotEndSeconds = 0.f;
+	float LastSeconds = 0.f;
+	// The line unit filmed (a vehicle or a squad controller) and what it fights.
+	TWeakObjectPtr<AActor> Subject;
+	TWeakObjectPtr<AActor> Target;
+	bool bSubjectIsPlayer = false;
+	// Segment-local second the unit died; the shot ends DeathHoldSeconds later.
+	float DiedAtSeconds = -1.f;
+	// Consecutive frames the view from the unit to the camera was blocked.
+	int32 BlockedFrames = 0;
+	ERTSShortsBattleShot Shot = ERTSShortsBattleShot::OverShoulder;
+	// Bearing (degrees) of the camera round the unit at the shot's start; the pan runs PanSign x PanDegrees from it.
+	float BaseYaw = 0.f;
+	float PanSign = 1.f;
+	float Distance = 0.f;
+	float Height = 0.f;
+	float FocalLength = 18.f;
+	float LookBlend = 0.f;
+	// Smoothed ground point of the unit and of its target.
+	FVector Anchor = FVector::ZeroVector;
+	FVector TargetPoint = FVector::ZeroVector;
+	// The last units filmed, newest last.
+	TArray<TWeakObjectPtr<AActor>> Recent;
+	FRandomStream Random;
+};
+
 /** 3v3 battle of the running segment: both lines, their current targets, the decision and the wrecks it left. */
 USTRUCT()
 struct FRTSShortsBattleState
@@ -526,6 +576,31 @@ private:
 	TObjectPtr<class UGA_Paratroopers> M_ParatrooperAbility;
 	FTransform M_ParatrooperBattleCamera;
 	bool bM_ParatrooperCameraCut = false;
+	// Segment.BattleCuts (RTSShortsBattleCuts.cpp): close shots of single fighters after the opening shot.
+	void BeginBattleCuts(const FRTSShortsSegment& Segment);
+	void TickBattleCuts(int32 Frame);
+	/** Picks the next unit (alternating the lines, engaged units first, no recent repeats) and cuts to it. */
+	void StartBattleCutShot(const FRTSShortsBattleCuts& Settings, float SegmentSeconds, int32 Frame);
+	/** @return False when a camera at this bearing would be hidden behind another unit or a prop. */
+	bool GetIsBattleCutViewClear(const FVector& Anchor, float Yaw, float Distance, float Height, const AActor* Subject) const;
+	/**
+	 * @brief Moves the camera along the running shot: the pan angle at this second round the smoothed unit, kept above the ground.
+	 * @param SegmentSeconds Segment-local time.
+	 * @param bSnap The shot's first frame: the follow points jump to the unit instead of easing towards it.
+	 */
+	void PlaceBattleCutCamera(float SegmentSeconds, bool bSnap);
+	void ApplyBattleCutLens() const;
+	/**
+	 * @brief Where a line unit stands: a vehicle's location, or the centre of a squad's living soldiers (with a team
+	 * weapon's crew that is round the gun).
+	 * @return False once the unit is gone (a squad without soldiers).
+	 */
+	bool GetBattleCutUnitPoint(const AActor* LineUnit, FVector& OutPoint) const;
+	bool GetIsBattleCutUnitAlive(const AActor* LineUnit) const;
+	/** Every line unit but a reinforcement still waiting for its move order. */
+	bool GetIsBattleCutUnitFilmable(const AActor* LineUnit) const;
+	/** A reinforcement ordered in that has not joined the fight yet. */
+	bool GetIsBattleCutUnitDrivingIn(const AActor* LineUnit) const;
 	void IssueBattleOrders();
 	void KeepBattleUnitsVisible() const;
 	void OnBattleActorSpawned(AActor* SpawnedActor);
@@ -617,6 +692,7 @@ private:
 	// Niagara components of the projectile manager whose bounds were already widened.
 	TSet<TWeakObjectPtr<class UNiagaraComponent>> M_WidenedSmallArmsSystems;
 	FRTSShortsBattleState M_Battle;
+	FRTSShortsBattleCutState M_BattleCuts;
 	// Segment.BattleSquadTactics.bOutlineSoldiers: the post-process volume that draws the outlines, made once per job.
 	UPROPERTY()
 	TObjectPtr<class APostProcessVolume> M_SoldierOutlineVolume;
