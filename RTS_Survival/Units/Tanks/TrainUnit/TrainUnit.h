@@ -61,6 +61,9 @@ public:
 	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override;
 	virtual void OnUnitIdleAndNoNewCommands() override;
 
+	// Trains stay in the world as wrecks, so their health bar has to be removed explicitly on death.
+	virtual void UnitDies(const ERTSDeathType DeathType) override;
+
 	// Mission systems bind here to distinguish reaching a requested spline target from ordinary command idling.
 	FOnTrainReachedSplineTarget OnReachedSplineTarget;
 
