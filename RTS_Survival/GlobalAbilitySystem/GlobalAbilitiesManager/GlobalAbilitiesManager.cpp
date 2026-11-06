@@ -703,11 +703,98 @@ void UGlobalAbilitiesManager::OnAbilityFinishedExecuting(UGlobalAbility* Ability
 	{
 		return;
 	}
-	Ability->M_AbilityCosts.CoolDownRemaining = Ability->M_AbilityCosts.CoolDownTime;
+	Ability->M_AbilityCosts.CoolDownRemaining = GetScaledCooldownTime(Ability);
 	if (IsPlayerAbilityManager())
 	{
 		UpdateAbilityItemAvailability(Ability, false, false);
 	}
+}
+
+void UGlobalAbilitiesManager::RegisterCooldownMlt(const AActor* Source, const float CooldownMlt)
+{
+	if (not IsValid(Source))
+	{
+		RTSFunctionLibrary::ReportError("Tried to register a global ability cooldown bonus without a source."
+			"\n At function UGlobalAbilitiesManager::RegisterCooldownMlt");
+		return;
+	}
+	M_CooldownSources.RemoveAll([](const FGlobalAbilityCooldownSource& EachSource)
+	{
+		return not EachSource.Source.IsValid();
+	});
+	// A zero multiplier would make every ability free to spam.
+	constexpr float MinCooldownMlt = 0.05f;
+	const float ClampedCooldownMlt = FMath::Clamp(CooldownMlt, MinCooldownMlt, 1.f);
+	bool bIsAlreadyRegistered = false;
+	for (FGlobalAbilityCooldownSource& EachSource : M_CooldownSources)
+	{
+		if (EachSource.Source.Get() == Source)
+		{
+			EachSource.CooldownMlt = ClampedCooldownMlt;
+			bIsAlreadyRegistered = true;
+		}
+	}
+	if (not bIsAlreadyRegistered)
+	{
+		FGlobalAbilityCooldownSource NewSource;
+		NewSource.Source = Source;
+		NewSource.CooldownMlt = ClampedCooldownMlt;
+		M_CooldownSources.Add(NewSource);
+	}
+	OnCooldownMltChanged();
+}
+
+void UGlobalAbilitiesManager::UnregisterCooldownMlt(const AActor* Source)
+{
+	// A source that is not registered (never built, or already taken back) is not an error.
+	M_CooldownSources.RemoveAll([Source](const FGlobalAbilityCooldownSource& EachSource)
+	{
+		return EachSource.Source.Get() == Source || not EachSource.Source.IsValid();
+	});
+	OnCooldownMltChanged();
+}
+
+float UGlobalAbilitiesManager::GetCooldownMlt() const
+{
+	float LowestCooldownMlt = 1.f;
+	for (const FGlobalAbilityCooldownSource& EachSource : M_CooldownSources)
+	{
+		if (EachSource.Source.IsValid())
+		{
+			LowestCooldownMlt = FMath::Min(LowestCooldownMlt, EachSource.CooldownMlt);
+		}
+	}
+	return LowestCooldownMlt;
+}
+
+void UGlobalAbilitiesManager::OnCooldownMltChanged()
+{
+	const float NewCooldownMlt = GetCooldownMlt();
+	if (FMath::IsNearlyEqual(NewCooldownMlt, M_AppliedCooldownMlt) || M_AppliedCooldownMlt <= 0.f)
+	{
+		return;
+	}
+	// A cooldown that is running keeps its progress: what is left shrinks (or grows) with the new multiplier.
+	const float Ratio = NewCooldownMlt / M_AppliedCooldownMlt;
+	for (UGlobalAbility* Ability : M_GlobalAbilities)
+	{
+		if (not IsValid(Ability) || Ability->M_AbilityCosts.CoolDownRemaining <= 0)
+		{
+			continue;
+		}
+		Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(
+			1, FMath::CeilToInt32(Ability->M_AbilityCosts.CoolDownRemaining * Ratio));
+	}
+	M_AppliedCooldownMlt = NewCooldownMlt;
+}
+
+int32 UGlobalAbilitiesManager::GetScaledCooldownTime(const UGlobalAbility* Ability) const
+{
+	if (not IsValid(Ability) || Ability->M_AbilityCosts.CoolDownTime <= 0)
+	{
+		return IsValid(Ability) ? Ability->M_AbilityCosts.CoolDownTime : 0;
+	}
+	return FMath::Max(1, FMath::CeilToInt32(Ability->M_AbilityCosts.CoolDownTime * GetCooldownMlt()));
 }
 
 bool UGlobalAbilitiesManager::TryPayForAbility(UGlobalAbility* Ability) const

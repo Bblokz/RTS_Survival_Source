@@ -7,6 +7,8 @@
 
 #include "AddOnArmorPanelLayout.generated.h"
 
+class UStaticMesh;
+
 namespace AddOnArmorPanelMask
 {
 	// UV channel holding each panel's index; vehicle hulls generate their lightmap UVs into channel 2.
@@ -48,7 +50,8 @@ struct FAddOnArmorPanel
 /**
  * @brief Written onto a hull static mesh by RTS.AddOnArmor.BuildPanelHull; UAddOnArmorPanelsComponent reads it to
  * know which panels it can hide and where they sit. Array index = bit in the hidden-panel mask = value in the
- * panel geometry's PanelIndexUvChannel.
+ * panel geometry's PanelIndexUvChannel. Also holds the debris mesh: one panel as its own static mesh, thrown off as
+ * Niagara debris whenever a panel is shot off.
  */
 UCLASS()
 class RTS_SURVIVAL_API UAddOnArmorPanelLayout : public UAssetUserData
@@ -57,12 +60,19 @@ class RTS_SURVIVAL_API UAddOnArmorPanelLayout : public UAssetUserData
 
 public:
 	const TArray<FAddOnArmorPanel>& GetPanels() const { return M_Panels; }
+	UStaticMesh* GetDebrisMesh() const { return M_DebrisMesh; }
 
 #if WITH_EDITOR
 	void SetPanels(const TArray<FAddOnArmorPanel>& Panels) { M_Panels = Panels; }
+	void SetDebrisMesh(UStaticMesh* DebrisMesh) { M_DebrisMesh = DebrisMesh; }
 #endif
 
 private:
 	UPROPERTY(VisibleAnywhere, Category="AddOnArmor")
 	TArray<FAddOnArmorPanel> M_Panels;
+
+	// One left-side panel as its own static mesh: pivot at the panel centre, in the hull mesh's axes. A hit throws one
+	// per hidden panel (turned around for right-side panels). Set by RTS.AddOnArmor.SetPanelDebrisMesh.
+	UPROPERTY(VisibleAnywhere, Category="AddOnArmor")
+	TObjectPtr<UStaticMesh> M_DebrisMesh;
 };

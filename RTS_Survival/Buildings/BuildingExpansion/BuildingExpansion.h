@@ -432,6 +432,17 @@ private:
 	void ApplyFieldDefenseDiscount();
 	void RemoveFieldDefenseDiscount();
 
+	// The fraction of their cooldown the player's commander abilities take to recharge while this expansion is built
+	// (FBxpData::GlobalAbilityCooldownMlt; 1 = no effect).
+	float M_GlobalAbilityCooldownMlt = 1.f;
+
+	// Set while the cooldown bonus is registered with the player's global abilities manager, so it is taken back once.
+	bool bM_IsGlobalAbilityCooldownBonusRegistered = false;
+
+	void ApplyGlobalAbilityCooldownBonus();
+	void RemoveGlobalAbilityCooldownBonus();
+	UGlobalAbilitiesManager* GetPlayerGlobalAbilitiesManager() const;
+
 	void OnFinishedExpansionConstruction();
 
 	// Goes through the attachments array and spanws the actors at the sockets.

@@ -40,6 +40,14 @@ struct FEnemyGlobalAbilityLoadoutEntry
 };
 
 
+// One built expansion making a manager's abilities recharge faster (FBxpData::GlobalAbilityCooldownMlt). Weak: an
+// expansion that is gone without unregistering simply stops counting.
+struct FGlobalAbilityCooldownSource
+{
+	TWeakObjectPtr<const AActor> Source;
+	float CooldownMlt = 1.f;
+};
+
 class UW_GA_Description;
 class UW_GA_Item;
 class UGameUnitManager;
@@ -114,7 +122,27 @@ public:
 	FVector GetStraightFlightSpawnLocation(const FVector& LineStart, const FVector& FlightDirection,
 	                                       float MaxApproachDistance) const;
 
+	/**
+	 * @brief Lets a built expansion (the Cipher room) make these abilities recharge faster while it stands; running
+	 * cooldowns are rescaled so the countdown keeps showing real seconds.
+	 * @param Source The expansion granting the bonus; registering it again only updates its multiplier.
+	 * @param CooldownMlt The fraction of their cooldown the abilities take to recharge (0..1).
+	 */
+	void RegisterCooldownMlt(const AActor* Source, const float CooldownMlt);
+	void UnregisterCooldownMlt(const AActor* Source);
+	// 1 without a bonus; otherwise the lowest registered multiplier (bonuses do not stack).
+	float GetCooldownMlt() const;
+
 private:
+	// Built expansions that make the abilities recharge faster; the lowest multiplier counts.
+	TArray<FGlobalAbilityCooldownSource> M_CooldownSources;
+
+	// The multiplier the running cooldowns were last scaled with, so a change rescales them exactly once.
+	float M_AppliedCooldownMlt = 1.f;
+
+	void OnCooldownMltChanged();
+	int32 GetScaledCooldownTime(const UGlobalAbility* Ability) const;
+
 	FGlobalAbility_SpawnSettings M_SpawnSetings;
 
 	// Tier-capped abilities stay in the panel greyed out, so the player still sees the whole commander kit.

@@ -55,6 +55,8 @@ namespace AddOnArmorPanelAuthoring
 	{
 		FString SourcePath;
 		FString TargetPath;
+		// Debris panel to store on the layout; empty keeps the one of the hull being rebuilt.
+		FString DebrisMeshPath;
 		// Source material slot index -> material used instead of the mesh's own (Blueprint material overrides).
 		TMap<int32, FString> MaterialOverrides;
 		float MinAbsY = DefaultMinAbsY;
@@ -110,6 +112,7 @@ namespace AddOnArmorPanelAuthoring
 		FParse::Value(*Joined, TEXT("MaxZ="), OutSettings.MaxZ);
 		FParse::Value(*Joined, TEXT("MaxIslandLength="), OutSettings.MaxIslandLength);
 		FParse::Value(*Joined, TEXT("MaterialOverrides="), OverridesText);
+		FParse::Value(*Joined, TEXT("DebrisMesh="), OutSettings.DebrisMeshPath);
 		ParseMaterialOverrides(OverridesText, OutSettings.MaterialOverrides);
 		OutSettings.bRebuildPanelMaster = FParse::Param(*Joined, TEXT("RebuildPanelMaster"));
 		OutSettings.bDryRun = FParse::Param(*Joined, TEXT("DryRun"));
@@ -635,9 +638,34 @@ namespace AddOnArmorPanelAuthoring
 		return Descriptions;
 	}
 
+	UStaticMesh* LoadMeshIfPresent(const FString& PackagePath)
+	{
+		if (PackagePath.IsEmpty() || not FPackageName::DoesPackageExist(PackagePath))
+		{
+			return nullptr;
+		}
+		return LoadObject<UStaticMesh>(nullptr, *(PackagePath + TEXT(".") + FPackageName::GetShortName(PackagePath)));
+	}
+
+	/** @return The debris panel the rebuilt hull keeps: the given one, else the one the previous build had. */
+	UStaticMesh* FindDebrisMesh(const FPanelHullSettings& Settings)
+	{
+		if (not Settings.DebrisMeshPath.IsEmpty())
+		{
+			return LoadMeshIfPresent(Settings.DebrisMeshPath);
+		}
+		const UStaticMesh* const PreviousHull = LoadMeshIfPresent(Settings.TargetPath);
+		const UAddOnArmorPanelLayout* const PreviousLayout = IsValid(PreviousHull)
+			? PreviousHull->GetAssetUserData<UAddOnArmorPanelLayout>()
+			: nullptr;
+		return IsValid(PreviousLayout) ? PreviousLayout->GetDebrisMesh() : nullptr;
+	}
+
 	UStaticMesh* WritePanelHull(UStaticMesh& Source, const FPanelHullSettings& Settings, const TArray<FSkirtPanel>& Panels,
 	                            TArray<TOptional<FMeshDescription>>& Descriptions, const TArray<FPanelSlot>& PanelSlots)
 	{
+		// Read before the fresh package moves the previous hull out.
+		UStaticMesh* const DebrisMesh = FindDebrisMesh(Settings);
 		UStaticMesh* const Target = DuplicateIntoFreshPackage(Source, Settings.TargetPath);
 		if (not IsValid(Target))
 		{
@@ -660,7 +688,16 @@ namespace AddOnArmorPanelAuthoring
 			Target->CommitMeshDescription(LodIndex);
 		}
 		Target->RemoveUserDataOfClass(UAddOnArmorPanelLayout::StaticClass());
-		Target->AddAssetUserData(MakeLayout(*Target, Panels));
+		UAddOnArmorPanelLayout* const Layout = MakeLayout(*Target, Panels);
+		Layout->SetDebrisMesh(DebrisMesh);
+		Target->AddAssetUserData(Layout);
+		if (not IsValid(DebrisMesh))
+		{
+			UE_LOG(LogRTSAddOnArmorPanelAuthoring, Warning, TEXT("RTS_ADDON_PANEL_AUTHORING WARNING no debris panel mesh on %s:")
+			       TEXT(" shot-off panels will vanish without debris. Model one panel as its own static mesh and pass")
+			       TEXT(" DebrisMesh=, or run RTS.AddOnArmor.SetPanelDebrisMesh / ExtractPanelDebris (AGENTS.md)."),
+			       *Settings.TargetPath);
+		}
 		Target->Build(false);
 		Target->PostEditChange();
 		FAssetRegistryModule::AssetCreated(Target);
@@ -719,6 +756,7 @@ namespace AddOnArmorPanelAuthoring
 		TEXT("RTS.AddOnArmor.BuildPanelHull"),
 		TEXT("Copies a hull mesh with its add-on armour panels in hideable material slots. Args: Source= Target= "
 			"[MinAbsY=] [MinPanelArea=] [PanelsPerSide=] [MinZ=] [MaxZ=] [MaxIslandLength=] [MaterialOverrides=slot:material|...] "
+			"[DebrisMesh=<panel mesh; default keeps the previous build's>] "
 			"[-RebuildPanelMaster] [-DryRun]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&BuildPanelHull));
 }
