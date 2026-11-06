@@ -155,6 +155,9 @@ enum class EBuildingExpansionType : uint8
 	// Strike Division metal vault: a firebrick cupola inside the vault's sleeved scaffold tower, charged by a skip up
 	// its back face; converts metal into vehicle parts; built at the building origin.
 	BTX_GerMetalVaultSmelter UMETA(DisplayName = "Ger Metal Vault Smelter"),
+	// Communication Center: a requisition cabin hung from steel outriggers on the tower head, clad like the tower;
+	// built at the building origin. While it stands, its owner's field defenses cost less (FBxpData::FieldDefenseCostMlt).
+	BTX_GerCommRequisitionOffice UMETA(DisplayName = "Ger Comm Requisition Office"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -279,6 +282,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerCommObservationPost");
 	case EBuildingExpansionType::BTX_GerCommMG42Nests:
 		return FString("BTX_GerCommMG42Nests");
+	case EBuildingExpansionType::BTX_GerCommRequisitionOffice:
+		return FString("BTX_GerCommRequisitionOffice");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -356,6 +361,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerTwinMG42Pit: return TEXT("Twin MG42 Pit");
 	case EBuildingExpansionType::BTX_GerCommObservationPost: return TEXT("Observation Post");
 	case EBuildingExpansionType::BTX_GerCommMG42Nests: return TEXT("MG42 Nests");
+	case EBuildingExpansionType::BTX_GerCommRequisitionOffice: return TEXT("Requisition Office");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");
@@ -419,6 +425,30 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	}
 
 	return Formatted.TrimStartAndEnd();
+}
+
+// The expansions the HQ's Field Defenses tab plans and builds; keep in sync with
+// UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions. A Requisition office lowers their price
+// (FBxpData::FieldDefenseCostMlt), the field trench's per-metre price included.
+static bool Global_GetIsFieldDefenseBxpType(const EBuildingExpansionType BxpType)
+{
+	switch (BxpType)
+	{
+	case EBuildingExpansionType::BTX_GerPak40Pit:
+	case EBuildingExpansionType::BTX_GerFlak37Pit:
+	case EBuildingExpansionType::BTX_GerMortarPit:
+	case EBuildingExpansionType::BTX_GerPuppchenPit:
+	case EBuildingExpansionType::BTX_GerPanzerschreckPit:
+	case EBuildingExpansionType::BTX_GerTwinMG42Pit:
+	case EBuildingExpansionType::BTX_GerLeFH18Pit:
+	case EBuildingExpansionType::BTX_GerSFH18Pit:
+	case EBuildingExpansionType::BTX_GerFlak88Pit:
+	case EBuildingExpansionType::BTX_GerRailPakBunker:
+	case EBuildingExpansionType::BTX_GerFieldTrench:
+		return true;
+	default:
+		return false;
+	}
 }
 
 // Defines the state of the building expansion.

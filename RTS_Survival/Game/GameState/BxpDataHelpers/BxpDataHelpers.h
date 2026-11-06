@@ -455,6 +455,29 @@ namespace BxpHelpers
 			BxpData.EnergySupply = -5;
 			BxpData.Abilities = NotArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerCommObservationPost, BxpData);
+
+			// ----------------------- GER Communication Center Requisition Office Origin Expansion ----------------------
+			// The economic pick: a cabin hung on the tower; while it stands the player's field defenses cost less.
+			FBxpData OfficeData;
+			OfficeData.ConstructionTime = GerCommRequisitionOfficeBuildTime;
+			OfficeData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			OfficeData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(
+				OfficeData.Health);
+			OfficeData.VisionRadius = T2BxpVisionRadius;
+			OfficeData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerCommRequisitionOffice_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerCommRequisitionOffice_Metal
+				},
+			});
+			OfficeData.EnergySupply = -5;
+			OfficeData.Abilities = NotArmedBxpAbilities;
+			OfficeData.FieldDefenseCostMlt = GerCommRequisitionOfficeFieldDefenseCostMlt;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerCommRequisitionOffice, OfficeData);
 		}
 
 		static void InitGerLFactoryBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)

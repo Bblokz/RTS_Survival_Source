@@ -41,4 +41,9 @@ struct FBxpData
 	// packs up or dies). Empty for expansions that add no storage.
 	UPROPERTY(BlueprintReadOnly)
 	TMap<ERTSResourceType, int32> ExtraResourceStorage;
+
+	// While the expansion is built, its owner's field defenses (Global_GetIsFieldDefenseBxpType) cost this fraction of
+	// their price. 1 = no effect. With several such expansions the lowest multiplier counts: they do not stack.
+	UPROPERTY(BlueprintReadOnly)
+	float FieldDefenseCostMlt = 1.f;
 };

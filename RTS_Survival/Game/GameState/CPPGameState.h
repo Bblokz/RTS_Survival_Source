@@ -62,6 +62,14 @@ enum EGameTimeUnit
 	Days
 };
 
+// One built expansion lowering the player's field-defense prices (FBxpData::FieldDefenseCostMlt). Weak: an expansion
+// that is gone without unregistering simply stops counting.
+struct FFieldDefenseCostSource
+{
+	TWeakObjectPtr<const AActor> Source;
+	float CostMlt = 1.f;
+};
+
 /** @brief Supplies shared unit and weapon balance data and coordinates match-wide gameplay managers. */
 UCLASS()
 class RTS_SURVIVAL_API ACPPGameState : public AGameStateBase
@@ -170,7 +178,19 @@ public:
 	FAttachedRocketsData GetAttachedRocketDataOfPlayer(const int32 PlayerOwningRocket,
 		const ERocketAbility RocketType) const;
 
+	// Field defenses come back at the price the player pays right now (see GetPlayerFieldDefenseCostMlt).
 	FBxpData GetPlayerBxpData(const EBuildingExpansionType BxpType, ABuildingExpansion* BxpRequesting) const;
+
+	/**
+	 * @brief Lets a built player expansion (the Requisition office) make field defenses cheaper while it stands.
+	 * @param Source The expansion granting the discount; registering it again only updates its multiplier.
+	 * @param CostMlt The fraction of their price field defenses cost (0..1).
+	 */
+	void RegisterPlayerFieldDefenseCostMlt(const AActor* Source, const float CostMlt);
+	void UnregisterPlayerFieldDefenseCostMlt(const AActor* Source);
+	// 1 without a discount; otherwise the lowest registered multiplier (discounts do not stack).
+	float GetPlayerFieldDefenseCostMlt() const;
+
 	FAircraftData GetAircraftDataOfPlayer(const EAircraftSubtype AircraftSubtype, const uint8 PlayerOwningAircraft) const;
 	FBxpData GetEnemyBxpData(const EBuildingExpansionType BxpType, ABuildingExpansion* BxpRequesting) const;
 
@@ -411,6 +431,12 @@ FBxpOptionData InitBxpOptionEntry(const EBuildingExpansionType Type,
 
 	UPROPERTY()
 	TMap<EBuildingExpansionType, FBxpData> M_TEnemyBxpDataHashMap;
+
+	// The player's built expansions that make field defenses cheaper; GetPlayerBxpData applies the lowest multiplier.
+	TArray<FFieldDefenseCostSource> M_PlayerFieldDefenseCostSources;
+
+	void RemoveStaleFieldDefenseCostSources();
+	static void ApplyFieldDefenseCostMlt(FBxpData& InOutBxpData, const float CostMlt);
 
 	void InitAllGameBxpData();
 

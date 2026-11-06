@@ -334,14 +334,99 @@ FAttachedRocketsData ACPPGameState::GetAttachedRocketDataOfPlayer(const int32 Pl
 
 FBxpData ACPPGameState::GetPlayerBxpData(const EBuildingExpansionType BxpType, ABuildingExpansion* BxpRequesting) const
 {
-	if (M_TPlayerBxpDataHashMap.Contains(BxpType))
+	if (const FBxpData* BxpData = M_TPlayerBxpDataHashMap.Find(BxpType))
 	{
-		return M_TPlayerBxpDataHashMap[BxpType];
+		if (not Global_GetIsFieldDefenseBxpType(BxpType))
+		{
+			return *BxpData;
+		}
+		// Every price reader (tooltips, the can-pay check, the queue item, the trench's per-metre price) comes here.
+		FBxpData DiscountedData = *BxpData;
+		ApplyFieldDefenseCostMlt(DiscountedData, GetPlayerFieldDefenseCostMlt());
+		return DiscountedData;
 	}
 	const FString SafeName = IsValid(BxpRequesting) ? BxpRequesting->GetName() : "NULL";
 	RTSFunctionLibrary::ReportError(
 		"Could not find bxp data for player bxp: " + Global_GetBxpTypeEnumAsString(BxpType) + "\n" + SafeName);
 	return FBxpData();
+}
+
+void ACPPGameState::RegisterPlayerFieldDefenseCostMlt(const AActor* Source, const float CostMlt)
+{
+	if (not IsValid(Source))
+	{
+		RTSFunctionLibrary::ReportError("Tried to register a field defense discount without a source."
+			"\n At function ACPPGameState::RegisterPlayerFieldDefenseCostMlt");
+		return;
+	}
+	RemoveStaleFieldDefenseCostSources();
+	const float ClampedCostMlt = FMath::Clamp(CostMlt, 0.f, 1.f);
+	for (FFieldDefenseCostSource& EachSource : M_PlayerFieldDefenseCostSources)
+	{
+		if (EachSource.Source.Get() == Source)
+		{
+			EachSource.CostMlt = ClampedCostMlt;
+			return;
+		}
+	}
+	FFieldDefenseCostSource NewSource;
+	NewSource.Source = Source;
+	NewSource.CostMlt = ClampedCostMlt;
+	M_PlayerFieldDefenseCostSources.Add(NewSource);
+}
+
+void ACPPGameState::UnregisterPlayerFieldDefenseCostMlt(const AActor* Source)
+{
+	// A source that is not registered (never built, or already taken back) is not an error.
+	M_PlayerFieldDefenseCostSources.RemoveAll([Source](const FFieldDefenseCostSource& EachSource)
+	{
+		return EachSource.Source.Get() == Source;
+	});
+	RemoveStaleFieldDefenseCostSources();
+}
+
+float ACPPGameState::GetPlayerFieldDefenseCostMlt() const
+{
+	float LowestCostMlt = 1.f;
+	for (const FFieldDefenseCostSource& EachSource : M_PlayerFieldDefenseCostSources)
+	{
+		if (EachSource.Source.IsValid())
+		{
+			LowestCostMlt = FMath::Min(LowestCostMlt, EachSource.CostMlt);
+		}
+	}
+	return LowestCostMlt;
+}
+
+void ACPPGameState::RemoveStaleFieldDefenseCostSources()
+{
+	M_PlayerFieldDefenseCostSources.RemoveAll([](const FFieldDefenseCostSource& EachSource)
+	{
+		return not EachSource.Source.IsValid();
+	});
+}
+
+void ACPPGameState::ApplyFieldDefenseCostMlt(FBxpData& InOutBxpData, const float CostMlt)
+{
+	if (CostMlt >= 1.f)
+	{
+		return;
+	}
+	// Prices from this value on are rounded to 5 like every other price; the trench's per-metre price stays exact.
+	constexpr int32 RoundToFiveFromPrice = 50;
+	constexpr int32 MinRoundedPrice = 5;
+	constexpr int32 MinExactPrice = 1;
+	for (TPair<ERTSResourceType, int32>& EachCost : InOutBxpData.Cost.ResourceCosts)
+	{
+		if (EachCost.Value <= 0)
+		{
+			continue;
+		}
+		const int32 DiscountedPrice = FMath::RoundToInt32(EachCost.Value * CostMlt);
+		EachCost.Value = EachCost.Value >= RoundToFiveFromPrice
+			                 ? FMath::Max(MinRoundedPrice, DeveloperSettings::RoundToNearestMultipleOfFive(DiscountedPrice))
+			                 : FMath::Max(MinExactPrice, DiscountedPrice);
+	}
 }
 
 FAircraftData ACPPGameState::GetAircraftDataOfPlayer(const EAircraftSubtype AircraftSubtype,
@@ -9768,11 +9853,13 @@ void ACPPGameState::InitAllGameNomadicData()
 	// Expansion radius is for BXPs that are freely placed, building radius is for other buildings.
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
 	NomadicData.BuildRadius = 0;
-	// The observation post goes on either sandbag-wing end socket; the MG42 nests sit on both wing ends at once.
+	// The observation post goes on either sandbag-wing end socket; the MG42 nests sit on both wing ends at once; the
+	// requisition office hangs on the tower and makes the player's field defenses cheaper while it stands.
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
 		AsTech(EBuildingExpansionType::BTX_GerCommObservationPost),
 		AsDefense(EBuildingExpansionType::BTX_GerCommMG42Nests),
+		AsEconomic(EBuildingExpansionType::BTX_GerCommRequisitionOffice),
 	});
 
 	// Two observation posts and the nests.

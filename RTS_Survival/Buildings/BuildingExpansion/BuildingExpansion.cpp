@@ -315,6 +315,7 @@ void ABuildingExpansion::CancelPackUpBuildingExpansion()
 void ABuildingExpansion::FinishPackUpExpansion()
 {
 	RemoveExtraResourceStorage();
+	RemoveFieldDefenseDiscount();
 	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_PackedUp);
 	BP_OnFinishedPackupBxp();
 	Destroy();
@@ -507,8 +508,9 @@ void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 	if (EndPlayReason == EEndPlayReason::Destroyed)
 	{
-		// Destroyed without dying or packing up (those already took the storage back).
+		// Destroyed without dying or packing up (those already took the storage and the discount back).
 		RemoveExtraResourceStorage();
+		RemoveFieldDefenseDiscount();
 	}
 
 	if (M_StatusBuildingExpansion == EBuildingExpansionStatus::BXS_PackedUp)
@@ -534,6 +536,7 @@ void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 	}
 	DisableCargoComponent();
 	RemoveExtraResourceStorage();
+	RemoveFieldDefenseDiscount();
 
 	SetUnitDying();
 	// Before bp event as the bp event may destroy the actor immediately.
@@ -944,6 +947,7 @@ void ABuildingExpansion::InitBuildingExpansion(
 	}
 	SetUnitAbilitiesRunTime(MyData.Abilities);
 	M_ExtraResourceStorage = MyData.ExtraResourceStorage;
+	M_FieldDefenseCostMlt = MyData.FieldDefenseCostMlt;
 	OnInitBuildingExpansion_SetupCollision(bLetBuildingMeshAffectNavMesh);
 	if (GetIsValidHealthComponent())
 	{
@@ -1044,6 +1048,7 @@ void ABuildingExpansion::OnFinishedExpansionConstruction()
 	SetTurretsToAutoEngage();
 	SetMeshToBuildingMesh();
 	ApplyExtraResourceStorage();
+	ApplyFieldDefenseDiscount();
 	OnBxpConstructed.Broadcast();
 	BP_OnFinishedExpansionConstruction();
 }
@@ -1084,6 +1089,46 @@ void ABuildingExpansion::RemoveExtraResourceStorage()
 	{
 		DropOff->RemoveExpansionStorage(EachStorage.Key, EachStorage.Value);
 	}
+}
+
+void ABuildingExpansion::ApplyFieldDefenseDiscount()
+{
+	// Already registered (an unpacked or rebuilt expansion), or this expansion grants no discount.
+	if (bM_IsFieldDefenseDiscountRegistered || M_FieldDefenseCostMlt >= 1.f)
+	{
+		return;
+	}
+	// Only the player's prices change: an enemy's office makes nothing cheaper.
+	if (not GetIsValidRTSComponent() || RTSComponent->GetOwningPlayer() != 1)
+	{
+		return;
+	}
+	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+	if (not IsValid(GameState))
+	{
+		RTSFunctionLibrary::ReportError("Expansion grants a field defense discount but there is no game state."
+			"\n Expansion: " + GetName() +
+			"\n At function ABuildingExpansion::ApplyFieldDefenseDiscount");
+		return;
+	}
+	GameState->RegisterPlayerFieldDefenseCostMlt(this, M_FieldDefenseCostMlt);
+	bM_IsFieldDefenseDiscountRegistered = true;
+}
+
+void ABuildingExpansion::RemoveFieldDefenseDiscount()
+{
+	if (not bM_IsFieldDefenseDiscountRegistered)
+	{
+		return;
+	}
+	bM_IsFieldDefenseDiscountRegistered = false;
+	ACPPGameState* GameState = FRTS_Statics::GetGameState(this);
+	if (not IsValid(GameState))
+	{
+		// The match is ending: the game state and its discount list go with it.
+		return;
+	}
+	GameState->UnregisterPlayerFieldDefenseCostMlt(this);
 }
 
 UResourceDropOff* ABuildingExpansion::GetOwnerResourceDropOff() const

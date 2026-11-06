@@ -422,6 +422,16 @@ private:
 	void RemoveExtraResourceStorage();
 	UResourceDropOff* GetOwnerResourceDropOff() const;
 
+	// The fraction of their price the player's field defenses cost while this expansion is built
+	// (FBxpData::FieldDefenseCostMlt; 1 = no effect).
+	float M_FieldDefenseCostMlt = 1.f;
+
+	// Set while the discount is registered with the game state, so it is taken back exactly once.
+	bool bM_IsFieldDefenseDiscountRegistered = false;
+
+	void ApplyFieldDefenseDiscount();
+	void RemoveFieldDefenseDiscount();
+
 	void OnFinishedExpansionConstruction();
 
 	// Goes through the attachments array and spanws the actors at the sockets.

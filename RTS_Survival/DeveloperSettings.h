@@ -293,9 +293,11 @@ namespace DeveloperSettings
 			inline constexpr int32 GerPuppchenPitBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
 			inline constexpr int32 GerPanzerschreckPitBuildTime = RoundToNearestMultipleOf(12.f * GameTimeMlt, 2);
 			inline constexpr int32 GerTwinMG42PitBuildTime = RoundToNearestMultipleOf(18.f * GameTimeMlt, 2);
-			// Communication Center expansions: the concrete observation post and the two raised MG42 nests.
+			// Communication Center expansions: the concrete observation post, the two raised MG42 nests and the
+			// requisition office hung on the tower.
 			inline constexpr int32 GerCommObservationPostBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			inline constexpr int32 GerCommMG42NestsBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
+			inline constexpr int32 GerCommRequisitionOfficeBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
 		}
@@ -1001,6 +1003,10 @@ namespace DeveloperSettings
 				inline constexpr int32 GerCommObservationPost_Metal = 150;
 				inline constexpr int32 GerCommMG42Nests_Radixite = 360;
 				inline constexpr int32 GerCommMG42Nests_Metal = 160;
+				inline constexpr int32 GerCommRequisitionOffice_Radixite = 300;
+				inline constexpr int32 GerCommRequisitionOffice_Metal = 180;
+				// While the player has a Requisition office, field defenses cost this fraction of their price.
+				inline constexpr float GerCommRequisitionOfficeFieldDefenseCostMlt = 0.75f;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;

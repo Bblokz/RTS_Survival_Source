@@ -53,6 +53,8 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerCommObservationPost, WithFootprint(SocketConstructionRules, 375.f, 517.f)},
 		// Both nests sit on the wing ends of the building itself; each deck is a 4.3 m square.
 		{EBuildingExpansionType::BTX_GerCommMG42Nests, WithFootprint(OriginConstructionRules, 430.f, 430.f)},
+		// The requisition office hangs on the tower's south face: 3.05 m wide, 3.3 m out from the shaft (outriggers in).
+		{EBuildingExpansionType::BTX_GerCommRequisitionOffice, WithFootprint(OriginConstructionRules, 305.f, 330.f)},
 
 		// Ger Light Factory Expansions.
 		// The cooling tower and drum back-left of the forge: 3.9 m from the leg ring's front crib to the pump skid, 6.25 m
