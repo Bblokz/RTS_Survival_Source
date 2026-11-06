@@ -50,13 +50,10 @@ TRACK_DECALS = ["/Game/RTS_Survival/Materials/Decals/DirtTracks/MI_Decal_Dirt_Tr
 PATH_DECALS = ["/Game/RTS_Survival/Blueprints/Environment/Splines/GroundPath/Decals/MI_PathDecal_MudChurn",
                "/Game/RTS_Survival/Blueprints/Environment/Splines/GroundPath/Decals/MI_PathDecal_RutFade"]
 SAND_GROUND_MATERIAL = "/Game/RTS_Survival/Meshes/PresetRegion_PlayerStart/AirfieldGround/Materials/M_RTSGround_WithSand"
+# No barrel stacks or oil tanks: they explode when units fire during the warm-up.
 YARD_PROPS = [ENV + "DestructableEnvActor/Industrial/BP_Industrial_Dest_Container",
               ENV + "DestructableEnvActor/PostApo/BP_Dest_PostApo_ContainerBox1",
               ENV + "DestructableEnvActor/PostApo/BP_Dest_PostApo_ContainerBox2",
-              ENV + "DestructableEnvActor/Industrial/BP_Industrial_Dest_OilTankBarrels1",
-              ENV + "DestructableEnvActor/Industrial/BP_Industrial_Dest_OilTankBarrels2",
-              ENV + "DestructableEnvActor/Airport/BP_Airport_Dest_BarrelStack2",
-              ENV + "DestructableEnvActor/Airport/BP_Airport_Dest_BarrelStack3",
               ENV + "DestructableEnvActor/Airport/BP_Airport_Dest_CrateStack01",
               ENV + "DestructableEnvActor/Airport/BP_Airport_Dest_CrateStack03"]
 YARD_DECALS = ["/Game/RTS_Survival/Meshes/Industrial/Zone/Materials/Decals/MI_Decals_0%d" % index for index in (1, 2, 3, 4, 5, 6, 7, 8)]
