@@ -11,6 +11,8 @@
 
 class UArmorCalculation;
 class UMeshComponent;
+class UNiagaraSystem;
+class UStaticMesh;
 class UStaticMeshComponent;
 struct FModuleStateChange;
 struct FVehicleModuleSnapshot;
@@ -52,7 +54,8 @@ struct FAddOnArmorPanelZoneState
 /**
  * @brief Add to a tank whose hull mesh was built by RTS.AddOnArmor.BuildPanelHull. The tank installs one AddOnArmor
  * module per zone when its Blueprint finished the module setup; the zone's damage then hides panels of its side
- * (closest to the hits first, all of them once destroyed) and repairs bring them back.
+ * (closest to the hits first, all of them once destroyed) and repairs bring them back. Every panel that damage hides
+ * flies off as Niagara debris: the hull's debris panel mesh (see its panel layout) in one pooled burst per hit.
  * Structural plate values in the Blueprint's armour setup must not include the add-on armour.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -82,6 +85,17 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category="AddOnArmor")
 	TArray<FAddOnArmorPanelZoneSettings> M_ZoneSettings;
 
+	// Throws the shot-off panels; its User.DebrisMesh is set per burst to the hull's debris panel.
+	UPROPERTY(EditDefaultsOnly, Category="AddOnArmor")
+	TSoftObjectPtr<UNiagaraSystem> M_DebrisSystem;
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraSystem> M_LoadedDebrisSystem;
+
+	// One panel as its own mesh, from the panel layout; null when the hull has none (no debris then).
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> M_DebrisMesh;
+
 	// The hull mesh carrying the panel layout and the panel material slot.
 	UPROPERTY()
 	TWeakObjectPtr<UStaticMeshComponent> M_PanelMesh;
@@ -96,6 +110,9 @@ private:
 	// Panel centres in the owner's space, indexed like the layout; module hit positions use the same space.
 	TArray<FVector, TInlineAllocator<AddOnArmorPanelMask::MaxPanelsPerMesh>> M_PanelCentres;
 
+	// Panel sides in the panel mesh's own space, indexed like the layout; the debris mesh is a left-side panel.
+	TArray<EAddOnArmorPanelSide, TInlineAllocator<AddOnArmorPanelMask::MaxPanelsPerMesh>> M_PanelMeshSides;
+
 	TArray<FAddOnArmorPanelZoneState> M_Zones;
 
 	// Bit per hidden panel, written to the panel mesh's custom primitive data.
@@ -105,12 +122,14 @@ private:
 
 	bool GetIsValidPanelMesh() const;
 	bool GetIsValidArmorCalculation() const;
+	bool GetIsValidDebrisSystem() const;
 
 	/** @return The owner's static mesh component whose mesh carries a panel layout, or null. */
 	UStaticMeshComponent* FindPanelMesh(const UAddOnArmorPanelLayout*& OutLayout) const;
 	/** @return The panel mesh when registered for armour, else its nearest registered attach parent, or null. */
 	UMeshComponent* FindArmorMesh(const UArmorCalculation& ArmorCalculation) const;
 	bool CachePanelCentres(const UStaticMeshComponent& PanelMesh, const UAddOnArmorPanelLayout& Layout);
+	void CacheDebris(const UAddOnArmorPanelLayout& Layout);
 
 	/**
 	 * @brief Registers the zone's add-on armour on its plates and installs its module with that coverage.
@@ -121,7 +140,12 @@ private:
 
 	void OnAddOnArmorZoneHit(int32 ModuleId, const FVector& HullLocalHitPosition);
 	int32 FindZoneIndexByModuleId(int32 ModuleId) const;
-	void SyncZoneFromModuleState(int32 ZoneIndex);
+	/**
+	 * @brief Hides or restores the zone's panels to match its module state.
+	 * @param ZoneIndex Zone to sync.
+	 * @param bThrowDebris Whether newly hidden panels fly off as debris; false for loads, which only restore a state.
+	 */
+	void SyncZoneFromModuleState(int32 ZoneIndex, bool bThrowDebris);
 
 	/**
 	 * @brief Damage hides panels in proportion to the lost module health; yellow keeps one panel, red none.
@@ -136,4 +160,13 @@ private:
 	void RestoreLastHiddenPanel(FAddOnArmorPanelZoneState& Zone);
 	FVector GetZoneCentre(const FAddOnArmorPanelZoneState& Zone) const;
 	void WriteHiddenPanelMask() const;
+
+	/**
+	 * @brief Throws the given panels off the hull in one pooled Niagara burst.
+	 * @param Zone Zone the panels belong to; its last hit pushes the pieces away from the impact.
+	 * @param PanelIndices Layout indices of the panels that were just hidden.
+	 */
+	void ThrowPanelDebris(const FAddOnArmorPanelZoneState& Zone, TConstArrayView<int32> PanelIndices) const;
+	/** @return World Z of the ground under the location, or the owner's Z when nothing is hit. */
+	float GetGroundHeightBelow(const FVector& WorldLocation) const;
 };

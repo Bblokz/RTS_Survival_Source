@@ -46,4 +46,9 @@ struct FBxpData
 	// their price. 1 = no effect. With several such expansions the lowest multiplier counts: they do not stack.
 	UPROPERTY(BlueprintReadOnly)
 	float FieldDefenseCostMlt = 1.f;
+
+	// While the expansion is built, its owner's commander (global) abilities recharge in this fraction of their cooldown.
+	// 1 = no effect. With several such expansions the lowest multiplier counts: they do not stack.
+	UPROPERTY(BlueprintReadOnly)
+	float GlobalAbilityCooldownMlt = 1.f;
 };
