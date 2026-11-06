@@ -81,6 +81,8 @@ namespace DeveloperSettings
 			inline constexpr int32 HQBaseVehiclePartsStorage = 250;
 
 			inline constexpr int32 RefineryRadixiteStorage = 1500;
+			// Extra radixite storage the Kaskade distillation expansion adds to its refinery while it stands.
+			inline constexpr int32 RefKaskadeExtraRadixiteStorage = RefineryRadixiteStorage / 2;
 			inline constexpr int32 MetalVaultMetalStorage = 800;
 			inline constexpr int32 MetalVaultVehiclePartsStorage = 400;
 
@@ -901,6 +903,12 @@ namespace DeveloperSettings
 				inline constexpr int32 GerTurretCaptureBunker_Metal = 300;
 				inline constexpr int32 GerRefConverter_Radixite = 200;
 				inline constexpr int32 GerRefConverter_Metal = 100;
+				inline constexpr int32 GerRefKaskade_Radixite = 300;
+				inline constexpr int32 GerRefKaskade_Metal = 200;
+				inline constexpr int32 GerRefFlakStand_Radixite = 420;
+				inline constexpr int32 GerRefFlakStand_Metal = 220;
+				inline constexpr int32 GerMetalVaultSmelter_Radixite = 250;
+				inline constexpr int32 GerMetalVaultSmelter_Metal = 100;
 				inline constexpr int32 GerBarracksRadixReactor_Radixite = 200;
 				inline constexpr int32 GerBarracksRadixReactor_Metal = 200;
 				inline constexpr int32 GerBarracksFuelCell_Radixite = 150;
@@ -917,6 +925,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerHQRepairBay_Metal = 150;
 				inline constexpr int32 GerLFactoryRadixiteReactor_Radixite = 300;
 				inline constexpr int32 GerLFactoryRadixiteReactor_Metal = 300;
+				inline constexpr int32 GerForgeSchreckFrame_Radixite = 380;
+				inline constexpr int32 GerForgeSchreckFrame_Metal = 220;
 				inline constexpr int32 GerLFactoryFuelStorage_Radixite = 200;
 				inline constexpr int32 GerLFactoryFuelStorage_Metal = 200;
 				inline constexpr int32 RusFactory_Radixite = 2000;
@@ -1020,6 +1030,10 @@ namespace DeveloperSettings
 		{
 			// How much further weapon trace is allowed to fly than its range; flight range = weapon range * this mlt.
 			inline constexpr float TraceSimulationRangeMlt = 2.25f;
+			// Ground weapons engaging an aircraft reach this much further than their range (altitude + flight paths).
+			// Applied to the aircraft search, the in-range check and the shot's flight range; never to the weapon's
+			// own range so the range shown to the player stays the ground range.
+			inline constexpr float AntiAirRangeMlt = 4.f;
 			inline constexpr float GameRangeMlt = 0.4f;
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
 			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(8400.f * GameRangeMlt);

@@ -920,6 +920,55 @@ void ACPPGameState::SetupStrikeDivisionTrainingOptions()
 		FTrainingOption(),
 		FTrainingOption()
 	};
+
+	AddStrikeDivisionBxpOptions();
+}
+
+void ACPPGameState::AddStrikeDivisionBxpOptions()
+{
+	auto AddOptions = [this](const ENomadicSubtype Subtype, const TArray<FBxpOptionData>& StrikeDivisionOptions)
+	{
+		FNomadicData* NomadicData = M_TPlayerNomadicDataHashMap.Find(Subtype);
+		if (not NomadicData)
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("No player nomadic data for %s; cannot add its Strike Division options."
+					"\n At function ACPPGameState::AddStrikeDivisionBxpOptions"), *UEnum::GetValueAsString(Subtype)));
+			return;
+		}
+		for (const FBxpOptionData& Option : StrikeDivisionOptions)
+		{
+			const bool bHasOption = NomadicData->BuildingExpansionOptions.ContainsByPredicate(
+				[&Option](const FBxpOptionData& Existing)
+				{
+					return Existing.ExpansionType == Option.ExpansionType;
+				});
+			if (not bHasOption)
+			{
+				NomadicData->BuildingExpansionOptions.Add(Option);
+			}
+		}
+	};
+	// The flak stand replaces the plain 37mm Flak on this faction's refinery.
+	if (FNomadicData* RefineryData = M_TPlayerNomadicDataHashMap.Find(ENomadicSubtype::Nomadic_GerRefinery))
+	{
+		RefineryData->BuildingExpansionOptions.RemoveAll([](const FBxpOptionData& Existing)
+		{
+			return Existing.ExpansionType == EBuildingExpansionType::BTX_37mmFlak;
+		});
+	}
+	// The Kaskade, the flak stand, the Schreck frame and the smelter are drawn in the Strike Division's field-kit look,
+	// so only this faction's buildings offer them.
+	AddOptions(ENomadicSubtype::Nomadic_GerRefinery, InitBxpOptions({
+		           AsEconomic(EBuildingExpansionType::BTX_RefKaskade),
+		           AsDefense(EBuildingExpansionType::BTX_RefFlakStand)
+	           }));
+	AddOptions(ENomadicSubtype::Nomadic_GerLightSteelForge, InitBxpOptions({
+		           AsDefense(EBuildingExpansionType::BTX_GerForgeSchreckFrame)
+	           }));
+	AddOptions(ENomadicSubtype::Nomadic_GerMetalVault, InitBxpOptions({
+		           AsEconomic(EBuildingExpansionType::BTX_GerMetalVaultSmelter)
+	           }));
 }
 
 
@@ -5106,8 +5155,15 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sIG_33_150MM, WeaponData);
 
-	WeaponData.WeaponName = EWeaponName::sFH18_150MM_TW;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sFH18_150MM_TW, WeaponData);
+	// Towed sFH 18 (team weapon and the sFH 18 pit): the sIG 33's 15 cm shell from a long barrel. It outranges the
+	// leFH 18 (HowitzerArtilleryRange, 8800) like the real guns (about 13.3 km against 10.7 km), by the same 20% as
+	// the ML-20 pit: 10600. Only the range differs from the sIG 33; the JagdPanther Bollwerk sets its own range.
+	constexpr float Sfh18RangeOverLeFH18 = 1.2f;
+	FWeaponData Sfh18TowedData = WeaponData;
+	Sfh18TowedData.WeaponName = EWeaponName::sFH18_150MM_TW;
+	Sfh18TowedData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange * Sfh18RangeOverLeFH18, 100);
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sFH18_150MM_TW, Sfh18TowedData);
 
 	// https://old-wiki.warthunder.com/Brummbar
 	WeaponData.WeaponName = EWeaponName::Stu_H_43_L_12_150MM;
@@ -8691,6 +8747,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpHelpers::GerBxpData::InitGerHQBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerLFactoryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitRefineryBxpData(M_TPlayerBxpDataHashMap);
+	BxpHelpers::GerBxpData::InitGerMetalVaultBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCaptureBunkersBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerBarracksBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCommCenterBxpData(M_TPlayerBxpDataHashMap);
@@ -9498,7 +9555,9 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsEconomic(EBuildingExpansionType::BTX_RefConverter)
 	});
 
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Flak and Converter; the Strike Division swaps the Flak for its flak stand and adds the Kaskade distillation
+	// (see AddStrikeDivisionBxpOptions).
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicExp * 1.2, 5);
@@ -9666,7 +9725,8 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsEconomic(EBuildingExpansionType::BTX_GerLFactoryFuelStorage),
 	});
 
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Flak, reactor, fuel storage and (Strike Division only, see AddStrikeDivisionBxpOptions) the Schreck frame.
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicExp * 1.2, 5);

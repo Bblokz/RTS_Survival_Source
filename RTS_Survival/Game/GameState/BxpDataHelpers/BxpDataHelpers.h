@@ -188,6 +188,83 @@ namespace BxpHelpers
 			BxpData.EnergySupply = 10;
 			BxpData.Abilities = NotArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_RefConverter, BxpData);
+
+			// ----------------------- SD Refinery Kaskade distillation origin expansion -----------------------
+			// Three distillation columns and a glass receiver bank: more radixite storage on the refinery.
+			FBxpData KaskadeData;
+			KaskadeData.ConstructionTime = RoundToNearestMultipleOfFive(25);
+			KaskadeData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 2);
+			KaskadeData.VisionRadius = T1BxpVisionRadius;
+			KaskadeData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerRefKaskade_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerRefKaskade_Metal
+				},
+			});
+			KaskadeData.EnergySupply = 0;
+			KaskadeData.Abilities = NotArmedBxpAbilities;
+			KaskadeData.ExtraResourceStorage = {
+				{
+					ERTSResourceType::Resource_Radixite,
+					DeveloperSettings::GameBalance::Resources::RefKaskadeExtraRadixiteStorage
+				}
+			};
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_RefKaskade, KaskadeData);
+
+			// ----------------------- SD Refinery flak stand origin expansion -----------------------
+			// A 3.7 cm Flak 37 and its two crew on a steel stand over the storage tanks; priced like the Flak 37 pit.
+			FBxpData FlakStandData;
+			FlakStandData.ConstructionTime = RoundToNearestMultipleOfFive(25);
+			FlakStandData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 2);
+			FlakStandData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				FlakStandData.Health);
+			FlakStandData.VisionRadius = T1BxpVisionRadius;
+			FlakStandData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerRefFlakStand_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerRefFlakStand_Metal
+				},
+			});
+			FlakStandData.EnergySupply = 0;
+			FlakStandData.Abilities = ArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_RefFlakStand, FlakStandData);
+		}
+
+		static void InitGerMetalVaultBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
+		{
+			using namespace BxpHelpers;
+			using namespace DeveloperSettings::GameBalance::UnitCosts::Bxps;
+			using namespace DeveloperSettings::GameBalance::VisionRadii::BxpVision;
+			using namespace DeveloperSettings::GameBalance::UnitHealth;
+
+			// ----------------------- SD Metal Vault smelter origin expansion -----------------------
+			// A cupola in the vault's tower that turns metal into vehicle parts (its ResourceConverterComponent holds the
+			// rates); priced and powered like the refinery's converter.
+			FBxpData SmelterData;
+			SmelterData.ConstructionTime = RoundToNearestMultipleOfFive(20);
+			SmelterData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 2);
+			SmelterData.VisionRadius = T1BxpVisionRadius;
+			SmelterData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerMetalVaultSmelter_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerMetalVaultSmelter_Metal
+				},
+			});
+			SmelterData.EnergySupply = 10;
+			SmelterData.Abilities = NotArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerMetalVaultSmelter, SmelterData);
 		}
 
 		static void InitGerBarracksBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
@@ -429,6 +506,29 @@ namespace BxpHelpers
 			BxpData.EnergySupply = 5;
 			BxpData.Abilities = NotArmedBxpAbilities;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerLFactoryFuelStorage, BxpData);
+
+			// ----------------------- SD Light Forge Schreck frame origin expansion -----------------------
+			// The Panzerschreck pit's team on a steel deck over the forge's front arch: priced like the refinery's flak
+			// stand, a far bigger structure than the foxhole.
+			FBxpData SchreckFrameData;
+			SchreckFrameData.ConstructionTime = RoundToNearestMultipleOfFive(25);
+			SchreckFrameData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 2);
+			SchreckFrameData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicBuildingArmorResistances(
+				SchreckFrameData.Health);
+			SchreckFrameData.VisionRadius = T1BxpVisionRadius;
+			SchreckFrameData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerForgeSchreckFrame_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerForgeSchreckFrame_Metal
+				},
+			});
+			SchreckFrameData.EnergySupply = 0;
+			SchreckFrameData.Abilities = ArmedBxpAbilities;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerForgeSchreckFrame, SchreckFrameData);
 		}
 	}
 

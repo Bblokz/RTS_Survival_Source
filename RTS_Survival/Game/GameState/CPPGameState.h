@@ -263,6 +263,8 @@ private:
 	void SetupNomadicTrainingOptionsForFaction();
 	void SetupBreakThroughTrainingOptions();
 	void SetupStrikeDivisionTrainingOptions();
+	// Expansion options only the Strike Division's buildings offer (the shared lists are set in InitAllGameNomadicData).
+	void AddStrikeDivisionBxpOptions();
 
 	int M_GameTimeDays;
 	int M_GameTimeHours;
