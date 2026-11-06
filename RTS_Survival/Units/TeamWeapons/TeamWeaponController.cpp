@@ -3367,7 +3367,7 @@ FVector ATeamWeaponController::GetMoveLocationWithinTurretRange(const FVector& T
 	}
 
 	const float RangeSafetyMargin = 0.9f;
-	const float MaxRange = CallingTurret->GetMaxWeaponRange();
+	const float MaxRange = CallingTurret->GetMaxWeaponRangeForCurrentTarget();
 	if (MaxRange <= 0.0f)
 	{
 		return TargetLocation;

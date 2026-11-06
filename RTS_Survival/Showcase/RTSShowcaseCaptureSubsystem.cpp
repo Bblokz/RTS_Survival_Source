@@ -21,6 +21,7 @@
 #include "EngineUtils.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/HUD.h"
+#include "GameFramework/Character.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Info.h"
 #include "GameFramework/PlayerController.h"
@@ -429,6 +430,33 @@ int32 URTSShowcaseCaptureSubsystem::RestorePlacedPawns() const
 	return RestoredCount;
 }
 
+void URTSShowcaseCaptureSubsystem::FreezeVehiclesAtStageLoad(UWorld& World) const
+{
+	if (not M_Settings.bM_FreezeActors)
+	{
+		return;
+	}
+	// Enemy-owned units engage props during the warm-up (an explosive barrel chain wrecked the industrial column).
+	// Vehicles and their turrets need no warm-up; only infantry keep running so squads spawn their soldiers.
+	int32 FrozenCount = 0;
+	for (TActorIterator<APawn> It(&World); It; ++It)
+	{
+		if (It->IsA<ACharacter>())
+		{
+			continue;
+		}
+		It->CustomTimeDilation = 0.f;
+		TArray<AActor*> AttachedActors;
+		It->GetAttachedActors(AttachedActors, true, true);
+		for (AActor* const AttachedActor : AttachedActors)
+		{
+			AttachedActor->CustomTimeDilation = 0.f;
+		}
+		++FrozenCount;
+	}
+	UE_LOG(LogRTSShowcase, Display, TEXT("RTS_SHOWCASE froze %d vehicles at stage load"), FrozenCount);
+}
+
 void URTSShowcaseCaptureSubsystem::Deinitialize()
 {
 	if (M_EndFrameDelegateHandle.IsValid())
@@ -685,6 +713,7 @@ void URTSShowcaseCaptureSubsystem::TickLoadingStage()
 	GEngine->ForceGarbageCollection(true);
 	SpawnMarkedUnits(*World);
 	RecordPlacedPawns(*World);
+	FreezeVehiclesAtStageLoad(*World);
 	DisableFogOfWarPostProcess(*World);
 	bM_HasPreparedActors = false;
 	M_WarmupSecondsForStage = FMath::Max(M_Settings.M_WarmupSeconds, RTSShowcaseConstants::StageLoadWarmupSeconds);

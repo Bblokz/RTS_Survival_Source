@@ -178,6 +178,56 @@ namespace AircraftTestPrivate
 	{
 		return IsValid(Turret) && IsValid(Target) && Turret->GetCurrentTargetActor() == Target;
 	}
+
+	/** -AntiAirRingRadius=<cm> moves the ring out, beyond ground range, to check the anti-air range multiplier. */
+	float GetAntiAirRingRadius()
+	{
+		float RingRadius = AntiAirRingRadius;
+		FParse::Value(FCommandLine::Get(), TEXT("AntiAirRingRadius="), RingRadius);
+		return RingRadius;
+	}
+
+	/** @return Whether no turret of the unit reaches the ground target with its ground range. */
+	bool GetIsGroundTargetBeyondGroundRange(const FAntiAirUnitUnderTest& Unit, const AActor* GroundTarget)
+	{
+		if (not IsValid(GroundTarget))
+		{
+			return false;
+		}
+		bool bHasTurret = false;
+		for (const TWeakObjectPtr<ACPPTurretsMaster>& Turret : Unit.Turrets)
+		{
+			if (not Turret.IsValid())
+			{
+				continue;
+			}
+			bHasTurret = true;
+			if (FVector::Dist(Turret->GetActorLocation(), GroundTarget->GetActorLocation()) <= Turret->GetMaxWeaponRange())
+			{
+				return false;
+			}
+		}
+		return bHasTurret;
+	}
+
+	/** @return Turret count, unit liveness and the nearest turret distance, to tell a dead unit from one in range. */
+	FString GetGroundTargetRangeDetail(const FAntiAirUnitUnderTest& Unit, const AActor* GroundTarget)
+	{
+		int32 ValidTurrets = 0;
+		float NearestDistance = TNumericLimits<float>::Max();
+		for (const TWeakObjectPtr<ACPPTurretsMaster>& Turret : Unit.Turrets)
+		{
+			if (not Turret.IsValid() || not IsValid(GroundTarget))
+			{
+				continue;
+			}
+			++ValidTurrets;
+			NearestDistance = FMath::Min(NearestDistance,
+			                             FVector::Dist(Turret->GetActorLocation(), GroundTarget->GetActorLocation()));
+		}
+		return FString::Printf(TEXT("unit_alive=%d valid_turrets=%d nearest_dist=%.0f"),
+		                       RTSFunctionLibrary::RTSIsValid(Unit.Unit.Get()), ValidTurrets, NearestDistance);
+	}
 }
 
 bool UAircraftTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
@@ -432,6 +482,7 @@ void UAircraftTestSubsystem::SpawnAntiAirUnits()
 	using namespace AircraftTestPrivate;
 	FString OnlyLabel;
 	FParse::Value(FCommandLine::Get(), TEXT("AntiAirUnit="), OnlyLabel);
+	const float RingRadius = GetAntiAirRingRadius();
 	const TArray<FAntiAirUnitDefinition> Definitions = GetAntiAirUnitDefinitions();
 	for (int32 DefinitionIndex = 0; DefinitionIndex < Definitions.Num(); ++DefinitionIndex)
 	{
@@ -441,7 +492,7 @@ void UAircraftTestSubsystem::SpawnAntiAirUnits()
 			continue;
 		}
 		const float AngleDegrees = 360.f * DefinitionIndex / Definitions.Num();
-		const FVector2D Offset = FVector2D(FRotator(0.f, AngleDegrees, 0.f).Vector()) * AntiAirRingRadius;
+		const FVector2D Offset = FVector2D(FRotator(0.f, AngleDegrees, 0.f).Vector()) * RingRadius;
 		FVector Ground;
 		if (not GetGroundAt(FVector2D(M_Anchor) + Offset, Ground))
 		{
@@ -452,8 +503,11 @@ void UAircraftTestSubsystem::SpawnAntiAirUnits()
 		Unit.Label = Definition.Label;
 		Unit.ClassPath = ResolveAntiAirClassPath(Definition.ClassPath);
 		Unit.ShotsNeeded = Definition.ShotsNeeded;
-		// Facing away from the centre, so a turret must traverse to find the aircraft.
-		Unit.Unit = SpawnUnitForPlayer(Unit.ClassPath, FTransform(FRotator(0.f, AngleDegrees, 0.f), Ground), HumanPlayer);
+		// Facing away from the centre, so a turret must traverse to find the aircraft. On a far ring the aircraft
+		// never passes over the unit, so it faces the centre: a fixed-arc emplacement would never see it otherwise.
+		const bool bIsFarRing = RingRadius > AntiAirRingRadius;
+		const float FacingYaw = bIsFarRing ? AngleDegrees + 180.f : AngleDegrees;
+		Unit.Unit = SpawnUnitForPlayer(Unit.ClassPath, FTransform(FRotator(0.f, FacingYaw, 0.f), Ground), HumanPlayer);
 		Check(Unit.Unit.IsValid(), Unit.Label + TEXT("_spawned"), Unit.ClassPath);
 		if (Unit.Unit.IsValid())
 		{
@@ -656,9 +710,9 @@ void UAircraftTestSubsystem::LogAntiAirStatus() const
 			}
 			const float Distance = FVector::Dist(Turret->GetActorLocation(), Aircraft->GetActorLocation());
 			UE_LOG(LogRTSAircraftTest, Display,
-			       TEXT("RTS_AIRCRAFT_TEST UNIT %s turret=%s pref=%s range=%.0f dist=%.0f target=%s on_aircraft=%d shots=%d"),
+			       TEXT("RTS_AIRCRAFT_TEST UNIT %s turret=%s pref=%s range=%.0f target_range=%.0f dist=%.0f target=%s on_aircraft=%d shots=%d"),
 			       *Unit.Label, *Turret->GetName(), *Global_GetTargetPreferenceAsString(Turret->GetTargetPreference()),
-			       Turret->GetMaxWeaponRange(), Distance,
+			       Turret->GetMaxWeaponRange(), Turret->GetMaxWeaponRangeForCurrentTarget(), Distance,
 			       IsValid(Turret->GetCurrentTargetActor()) ? *Turret->GetCurrentTargetActor()->GetName() : TEXT("none"),
 			       GetIsTurretTargetingActor(Turret, Aircraft), Unit.ShotsWhileTargetingAircraft);
 		}
@@ -742,7 +796,9 @@ void UAircraftTestSubsystem::TickAntiAirGround()
 		Unit.bHasTargetedGround |= bIsTargetingGround;
 		const int32 Fired = CountShots(Unit);
 		Unit.ShotsWhileTargetingGround += bIsTargetingGround ? Fired : 0;
-		bAllEngaged &= Unit.bHasTargetedGround && Unit.ShotsWhileTargetingGround > 0;
+		// A unit beyond ground range must keep ignoring the tank, so the run waits out the timeout for it.
+		bAllEngaged &= not GetIsGroundTargetBeyondGroundRange(Unit, GroundTarget)
+			&& Unit.bHasTargetedGround && Unit.ShotsWhileTargetingGround > 0;
 	}
 	if (bAllEngaged || GetNow() - M_PhaseStartSeconds > AntiAirGroundTimeoutSeconds)
 	{
@@ -752,9 +808,18 @@ void UAircraftTestSubsystem::TickAntiAirGround()
 
 void UAircraftTestSubsystem::FinishAntiAirGround()
 {
+	using namespace AircraftTestPrivate;
 	for (const FAntiAirUnitUnderTest& Unit : M_AntiAirUnits)
 	{
-		Check(Unit.bHasTargetedGround, Unit.Label + TEXT("_targeted_ground_unit"));
+		// The anti-air range multiplier is for aircraft only: ground targets beyond ground range stay ignored.
+		if (GetIsGroundTargetBeyondGroundRange(Unit, M_GroundTarget.Get()))
+		{
+			Check(not Unit.bHasTargetedGround, Unit.Label + TEXT("_ignored_ground_unit_beyond_range"),
+			      FString::Printf(TEXT("shots=%d"), Unit.ShotsWhileTargetingGround));
+			continue;
+		}
+		Check(Unit.bHasTargetedGround, Unit.Label + TEXT("_targeted_ground_unit"),
+		      GetGroundTargetRangeDetail(Unit, M_GroundTarget.Get()));
 		Check(Unit.ShotsWhileTargetingGround > 0, Unit.Label + TEXT("_fired_at_ground_unit"),
 		      FString::Printf(TEXT("shots=%d"), Unit.ShotsWhileTargetingGround));
 	}

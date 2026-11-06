@@ -114,6 +114,7 @@ private:
 	/** Spawns the units that stand in the level as ShowcaseSpawn= tagged markers. */
 	void SpawnMarkedUnits(UWorld& World);
 	void RecordPlacedPawns(UWorld& World);
+	void FreezeVehiclesAtStageLoad(UWorld& World) const;
 	/** Puts moved pawns back and turns turrets back along their hulls. @return Number of pawns put back. */
 	int32 RestorePlacedPawns() const;
 
