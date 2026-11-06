@@ -158,6 +158,10 @@ enum class EBuildingExpansionType : uint8
 	// Communication Center: a requisition cabin hung from steel outriggers on the tower head, clad like the tower;
 	// built at the building origin. While it stands, its owner's field defenses cost less (FBxpData::FieldDefenseCostMlt).
 	BTX_GerCommRequisitionOffice UMETA(DisplayName = "Ger Comm Requisition Office"),
+	// Communication Center: a cipher cabin in the tower's style, hung from two portal frames over the inner yard's camo
+	// net; built at the building origin. While it stands, its owner's commander abilities recharge faster
+	// (FBxpData::GlobalAbilityCooldownMlt).
+	BTX_GerCommCipherRoom UMETA(DisplayName = "Ger Comm Cipher Room"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -284,6 +288,8 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerCommMG42Nests");
 	case EBuildingExpansionType::BTX_GerCommRequisitionOffice:
 		return FString("BTX_GerCommRequisitionOffice");
+	case EBuildingExpansionType::BTX_GerCommCipherRoom:
+		return FString("BTX_GerCommCipherRoom");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -362,6 +368,7 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerCommObservationPost: return TEXT("Observation Post");
 	case EBuildingExpansionType::BTX_GerCommMG42Nests: return TEXT("MG42 Nests");
 	case EBuildingExpansionType::BTX_GerCommRequisitionOffice: return TEXT("Requisition Office");
+	case EBuildingExpansionType::BTX_GerCommCipherRoom: return TEXT("Cipher Room");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");

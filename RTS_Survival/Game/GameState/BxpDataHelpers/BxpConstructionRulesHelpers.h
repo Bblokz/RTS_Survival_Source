@@ -55,6 +55,9 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerCommMG42Nests, WithFootprint(OriginConstructionRules, 430.f, 430.f)},
 		// The requisition office hangs on the tower's south face: 3.05 m wide, 3.3 m out from the shaft (outriggers in).
 		{EBuildingExpansionType::BTX_GerCommRequisitionOffice, WithFootprint(OriginConstructionRules, 305.f, 330.f)},
+		// The cipher room's two portal frames span the inner yard: 5.8 m from the front portal's knee to the cable tie at
+		// the antenna block, 5.7 m from the left pillars' piers on the band to the right columns.
+		{EBuildingExpansionType::BTX_GerCommCipherRoom, WithFootprint(OriginConstructionRules, 580.f, 570.f)},
 
 		// Ger Light Factory Expansions.
 		// The cooling tower and drum back-left of the forge: 3.9 m from the leg ring's front crib to the pump skid, 6.25 m

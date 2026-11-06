@@ -9854,15 +9854,19 @@ void ACPPGameState::InitAllGameNomadicData()
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
 	NomadicData.BuildRadius = 0;
 	// The observation post goes on either sandbag-wing end socket; the MG42 nests sit on both wing ends at once; the
-	// requisition office hangs on the tower and makes the player's field defenses cheaper while it stands.
+	// requisition office hangs on the tower and makes the player's field defenses cheaper while it stands; the cipher
+	// room hangs over the inner yard and makes the player's commander abilities recharge faster. The nests, the office
+	// and the cipher room are all origin expansions and are meant as a one-of choice, but nothing enforces that yet
+	// (IBuildingExpansionOwner::GetUnlockedBuildingExpansionTypes has its origin check commented out).
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
 		AsTech(EBuildingExpansionType::BTX_GerCommObservationPost),
 		AsDefense(EBuildingExpansionType::BTX_GerCommMG42Nests),
 		AsEconomic(EBuildingExpansionType::BTX_GerCommRequisitionOffice),
+		AsTech(EBuildingExpansionType::BTX_GerCommCipherRoom),
 	});
 
-	// Two observation posts and the nests.
+	// Two observation posts and the nests (or the office, or the cipher room).
 	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;

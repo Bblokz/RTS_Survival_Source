@@ -293,11 +293,13 @@ namespace DeveloperSettings
 			inline constexpr int32 GerPuppchenPitBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
 			inline constexpr int32 GerPanzerschreckPitBuildTime = RoundToNearestMultipleOf(12.f * GameTimeMlt, 2);
 			inline constexpr int32 GerTwinMG42PitBuildTime = RoundToNearestMultipleOf(18.f * GameTimeMlt, 2);
-			// Communication Center expansions: the concrete observation post, the two raised MG42 nests and the
-			// requisition office hung on the tower.
+			// Communication Center expansions: the concrete observation post, the two raised MG42 nests, the
+			// requisition office hung on the tower and the cipher room hung over the inner yard.
 			inline constexpr int32 GerCommObservationPostBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			inline constexpr int32 GerCommMG42NestsBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			inline constexpr int32 GerCommRequisitionOfficeBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
+			// Two portal frames and a hung cabin: more to raise than the office.
+			inline constexpr int32 GerCommCipherRoomBuildTime = RoundToNearestMultipleOf(30.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
 		}
@@ -1007,6 +1009,10 @@ namespace DeveloperSettings
 				inline constexpr int32 GerCommRequisitionOffice_Metal = 180;
 				// While the player has a Requisition office, field defenses cost this fraction of their price.
 				inline constexpr float GerCommRequisitionOfficeFieldDefenseCostMlt = 0.75f;
+				inline constexpr int32 GerCommCipherRoom_Radixite = 400;
+				inline constexpr int32 GerCommCipherRoom_Metal = 220;
+				// While the player has a Cipher room, commander abilities recharge in this fraction of their cooldown.
+				inline constexpr float GerCommCipherRoomGlobalAbilityCooldownMlt = 0.8f;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;

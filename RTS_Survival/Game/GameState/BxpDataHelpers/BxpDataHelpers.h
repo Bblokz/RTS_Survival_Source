@@ -478,6 +478,31 @@ namespace BxpHelpers
 			OfficeData.Abilities = NotArmedBxpAbilities;
 			OfficeData.FieldDefenseCostMlt = GerCommRequisitionOfficeFieldDefenseCostMlt;
 			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerCommRequisitionOffice, OfficeData);
+
+			// ----------------------- GER Communication Center Cipher Room Origin Expansion -----------------------------
+			// The technology pick: a cabin hung over the inner yard; while it stands the player's commander abilities
+			// recharge faster.
+			FBxpData CipherData;
+			CipherData.ConstructionTime = GerCommCipherRoomBuildTime;
+			CipherData.Health = RoundToNearestMultipleOfFive(T1BxpHealth * 1.5);
+			CipherData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIReinforcedArmorResistances(
+				CipherData.Health);
+			CipherData.VisionRadius = T2BxpVisionRadius;
+			CipherData.Cost = FUnitCost({
+				{
+					ERTSResourceType::Resource_Radixite,
+					GerCommCipherRoom_Radixite
+				},
+				{
+					ERTSResourceType::Resource_Metal,
+					GerCommCipherRoom_Metal
+				},
+			});
+			// Radio sets and teleprinters draw more than the office.
+			CipherData.EnergySupply = -10;
+			CipherData.Abilities = NotArmedBxpAbilities;
+			CipherData.GlobalAbilityCooldownMlt = GerCommCipherRoomGlobalAbilityCooldownMlt;
+			InPlayerDataMap.Add(EBuildingExpansionType::BTX_GerCommCipherRoom, CipherData);
 		}
 
 		static void InitGerLFactoryBxpData(TMap<EBuildingExpansionType, FBxpData>& InPlayerDataMap)
