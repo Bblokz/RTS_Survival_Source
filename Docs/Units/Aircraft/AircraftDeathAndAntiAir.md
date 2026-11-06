@@ -32,6 +32,29 @@ ever engaging one:
   15 to 30 degrees per second (the Flak 88 has 25). Crewed guns still fire less often at an aircraft passing close by
   than the turrets do (the test asks one shot of them, three of the others): a balance setting.
 
+### Anti-air range
+
+Ground weapons engage an aircraft at `DeveloperSettings::GameBalance::Ranges::AntiAirRangeMlt` (4x) their range, since
+aircraft fly high and far and the range is measured in 3D. The weapon's own range is never changed, so the range the
+player sees stays the ground range. The multiplier is applied in three places that must agree:
+
+- **Search.** `FGetAsyncTarget::ProcessTargetRequests` compares an aircraft against the requested radius times the
+  multiplier; ground actors keep the requested radius. No extra data goes to the thread: an aircraft only reaches the
+  distance check for an `Aircraft` request. This also reaches attack-move and aggro searches of `Aircraft`-preference
+  units.
+- **In-range check.** `FWeaponTargetingData` caches `GetIsAircraftTarget` when a target is set
+  (`FWeaponRangeData::GetIsAntiAirRangeTarget`: any `AAircraftMaster`), and the turret, standalone turret, hull weapon
+  and infantry weapon range checks use `FWeaponRangeData::GetMaxRangeSquaredForTarget`. Without it a turret would drop
+  the aircraft the search just gave it. A towed flak crew moving to get in range uses
+  `ACPPTurretsMaster::GetMaxWeaponRangeForCurrentTarget`.
+- **Shot reach.** `UWeaponState::GetFlightRangeMltForCurrentTarget` (the owner's target actor at fire time) lengthens
+  traces (single, multi, laser) and the projectile flight range set in `AProjectile::SetupProjectileForNewLaunch`;
+  otherwise shells expired at 1.67x range. Aircraft-mounted weapons are left out. A projectile's armour-pen falloff
+  runs over that longer flight range; a trace hit beyond 1x range uses `ArmorPenMaxRange`.
+
+Aircraft still have to be visible to the side searching (`RTSIsVisibleTarget`): beyond a flak unit's own vision the
+longer range only helps when other units reveal the aircraft.
+
 Not changed: the DShK pit (a heavy machine gun, not set to anti-air) and `URTSComponent::ChangeOwningPlayer`, which
 still re-registers tanks, squads and standalone turrets only. The VTOL resource shuttle (`AVTOLDropshipAircraft`)
 stays out of the target lists (`GetIsTargetableByAntiAir` returns false): it is scripted scenery for its pad.
@@ -135,7 +158,8 @@ collections. Rebuild after an aircraft mesh changes. Lessons:
   `UT_Nomadics` (fog of war needs rendering):
   - `-AntiAirValidate`: the Bofors bunker, 37 mm and 88 mm flak, Flak 37 pit, flak bunker, Panzer III AA, T-34 AA, BTR-152A
     and the towed Flak 37 and Flak 88 squads must target, fire at and damage an enemy aircraft circling over them,
-    then turn on an enemy tank. Optional `-AntiAirUnit=<label>`.
+    then turn on an enemy tank. Optional `-AntiAirUnit=<label>`. `-AntiAirRingRadius=<cm>` (default 1800) moves the
+    ring out: beyond ground range the units must still engage the aircraft (anti-air range) and must ignore the tank.
   - `-AircraftDeathValidate`: shoots down a Bf 109, Ju 87, Sturmovik, Me 410, Pe-2, Pe-8, Ju 390, Ho 229, both drop ships and
     the VTOL shuttle in flight, a Bf 109 parked on a field and a Bf 109 parked in a bay of an unpacked German airbase
     (`Ger_Airbase_Truck`, placed the way a trained aircraft is); checks dead-not-destroyed, out of the target lists,

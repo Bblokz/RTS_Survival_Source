@@ -16,11 +16,13 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+#include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 
 #include "BuildingExpansion.generated.h"
 
 
 class UBuildingExpansionEnergyComponent;
+class UResourceDropOff;
 class UPitAdditionalTurretComponent;
 class UResourceConverterComponent;
 class UTurretSwapComp;
@@ -407,6 +409,18 @@ private:
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> M_SpawnedAttachments;
+
+	// Storage this expansion adds to its owner's drop off while it is built (FBxpData::ExtraResourceStorage).
+	TMap<ERTSResourceType, int32> M_ExtraResourceStorage;
+
+	// The drop off holding the extra storage. Set only while the storage is applied (an unset pointer is the normal
+	// state, not an error), so the storage is taken back exactly once.
+	UPROPERTY()
+	TWeakObjectPtr<UResourceDropOff> M_ExtraStorageDropOff;
+
+	void ApplyExtraResourceStorage();
+	void RemoveExtraResourceStorage();
+	UResourceDropOff* GetOwnerResourceDropOff() const;
 
 	void OnFinishedExpansionConstruction();
 
