@@ -254,7 +254,7 @@ void AInfantryWeaponMaster::SpecificEngage()
 
 		const FVector TargetLocation = M_TargetingData.GetActiveTargetLocation();
 		const bool bInRange = (FVector::DistSquared(TargetLocation, M_OwningSquadUnit->GetActorLocation())
-			<= M_WeaponRangeData.M_MaxWeaponRangeSquared);
+			<= M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget()));
 
 		if (bInRange)
 		{
@@ -387,7 +387,8 @@ bool AInfantryWeaponMaster::GetIsTargetValidVisibleAndInRange()
 	}
 	const FVector TargetLoc = M_TargetingData.GetActiveTargetLocation();
 	const FVector MyLoc = M_OwningSquadUnit->GetActorLocation();
-	return (FVector::DistSquared(TargetLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
+	return (FVector::DistSquared(TargetLoc, MyLoc)
+		<= M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget()));
 }
 
 void AInfantryWeaponMaster::OnTargetsFound(const TArray<AActor*>& Targets)
@@ -662,7 +663,8 @@ bool AInfantryWeaponMaster::GetIsCurrentTargetInRange()
 	}
 	return FVector::DistSquared(
 		M_TargetingData.GetActiveTargetLocation(),
-		M_OwningSquadUnit->GetActorLocation()) <= M_WeaponRangeData.M_MaxWeaponRangeSquared;
+		M_OwningSquadUnit->GetActorLocation())
+		<= M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget());
 }
 
 float AInfantryWeaponMaster::GetTurretYawLimit() const

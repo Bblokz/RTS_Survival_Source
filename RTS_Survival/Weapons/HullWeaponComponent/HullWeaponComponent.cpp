@@ -917,10 +917,11 @@ void UHullWeaponComponent::SpecificEngage_OnTargetInvalid()
 bool UHullWeaponComponent::GetIsTargetInRange(const FVector& TargetLocation, const FVector& WeaponLocation) const
 {
 	const float DistanceSquared = FVector::DistSquared(TargetLocation, WeaponLocation);
+	const float MaxRangeSquared = M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget());
 	Debug_HullWeapons("Distance squared to target: " + FString::SanitizeFloat(DistanceSquared)
-	                  + "\n Squared range: " + FString::SanitizeFloat(M_WeaponRangeData.M_MaxWeaponRangeSquared),
+	                  + "\n Squared range: " + FString::SanitizeFloat(MaxRangeSquared),
 	                  FColor::Blue);
-	if (DistanceSquared > M_WeaponRangeData.M_MaxWeaponRangeSquared)
+	if (DistanceSquared > MaxRangeSquared)
 	{
 		return false;
 	}
