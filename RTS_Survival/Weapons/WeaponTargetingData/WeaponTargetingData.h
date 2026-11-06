@@ -78,6 +78,9 @@ public:
 	/** @return Current explicit mode. */
 	ETargetMode GetMode() const { return M_TargetMode; }
 
+	/** @return Whether the actor target is an aircraft, which ground weapons engage at anti-air range. */
+	bool GetIsAircraftTarget() const { return M_TargetMode == ETargetMode::Actor && bM_IsAircraftTarget; }
+
 	/** @brief Optional deterministic debug draw of aim points and selection. */
 	void DebugDraw(UWorld* World) const;
 
@@ -100,6 +103,10 @@ private:
 	/** Target actor (weak). Null if Mode != Actor. */
 	UPROPERTY()
 	TObjectPtr<AActor> M_TargetActor;
+
+	// Cached once per new actor target so per-tick range checks need no cast.
+	UPROPERTY()
+	bool bM_IsAircraftTarget = false;
 
 	/** Cached ground world location if Mode==Ground. */
 	UPROPERTY()
