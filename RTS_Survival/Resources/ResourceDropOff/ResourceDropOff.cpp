@@ -85,6 +85,47 @@ void UResourceDropOff::UpgradeDropOffCapacity(const ERTSResourceType ResourceTyp
 	UpdateDropOffVisuals(ResourceType);
 }
 
+void UResourceDropOff::AddExpansionStorage(const ERTSResourceType ResourceType, const int32 ExtraCapacity)
+{
+	FHarvesterCargoSlot* CargoSlot = M_ResourceDropOffCapacity.Find(ResourceType);
+	if (not CargoSlot)
+	{
+		RTSFunctionLibrary::ReportError("Attempted to add expansion storage for a resource this drop off does not hold!"
+			"\n Resource type: " + Global_GetResourceTypeAsString(ResourceType) +
+			"\n ResourceDropOff: " + GetName());
+		return;
+	}
+	CargoSlot->MaxCapacity += ExtraCapacity;
+	if (GetIsValidPlayerResourceManager())
+	{
+		constexpr int32 NoResourcesLost = 0;
+		M_PlayerResourceManager->OnDropOffStorageChanged(this, ResourceType, ExtraCapacity, NoResourcesLost);
+	}
+	UpdateDropOffVisuals(ResourceType);
+}
+
+void UResourceDropOff::RemoveExpansionStorage(const ERTSResourceType ResourceType, const int32 ExtraCapacity)
+{
+	FHarvesterCargoSlot* CargoSlot = M_ResourceDropOffCapacity.Find(ResourceType);
+	if (not CargoSlot)
+	{
+		RTSFunctionLibrary::ReportError(
+			"Attempted to remove expansion storage for a resource this drop off does not hold!"
+			"\n Resource type: " + Global_GetResourceTypeAsString(ResourceType) +
+			"\n ResourceDropOff: " + GetName());
+		return;
+	}
+	const int32 CapacityRemoved = FMath::Min(ExtraCapacity, CargoSlot->MaxCapacity);
+	CargoSlot->MaxCapacity -= CapacityRemoved;
+	const int32 ResourcesLost = FMath::Max(0, CargoSlot->CurrentAmount - CargoSlot->MaxCapacity);
+	CargoSlot->CurrentAmount -= ResourcesLost;
+	if (GetIsValidPlayerResourceManager())
+	{
+		M_PlayerResourceManager->OnDropOffStorageChanged(this, ResourceType, -CapacityRemoved, ResourcesLost);
+	}
+	UpdateDropOffVisuals(ResourceType);
+}
+
 void UResourceDropOff::RemoveResources(ERTSResourceType ResourceType, int32 Amount)
 {
 	if (not M_ResourceDropOffCapacity.Contains(ResourceType) || M_ResourceDropOffCapacity[ResourceType].CurrentAmount <
