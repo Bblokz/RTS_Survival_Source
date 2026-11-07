@@ -50,6 +50,22 @@
 #include "RTS_Survival/Weapons/InfantryWeapon/SecondaryWeaponComp/SecondaryWeapon.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
+#include "RTS_Survival/Utils/UnitGroundRecovery/RTSUnitGroundRecovery.h"
+
+namespace SquadUnitGroundRecovery
+{
+	// A soldier that keeps falling through the world after this many recoveries dies instead.
+	constexpr int32 MaxFellOutOfWorldRecoveries = 3;
+	constexpr float CapsuleGroundClearanceCm = 2.0f;
+}
+
+static float GetGroundRecoveryOriginHeight(const ASquadUnit& SquadUnit)
+{
+	const UCapsuleComponent* Capsule = SquadUnit.GetCapsuleComponent();
+	const float HalfHeight = IsValid(Capsule) ? Capsule->GetScaledCapsuleHalfHeight() : 0.0f;
+	return HalfHeight + SquadUnitGroundRecovery::CapsuleGroundClearanceCm;
+}
+
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCover, Log, All);
 
@@ -2852,6 +2868,10 @@ void ASquadUnit::OnProjectileHit(const bool bBounced)
 void ASquadUnit::BeginPlay()
 {
 	Super::BeginPlay();
+	// A spawn point set under the terrain (or a squad grid point under a hill) starts the unit inside the landscape,
+	// where it falls through the world: one trace now instead of any check later.
+	// The origin is the capsule centre, so any depth under the surface already means the soldier is inside it.
+	FRTSUnitGroundRecovery::TryLiftOutOfLandscape(*this, GetGroundRecoveryOriginHeight(*this), 0.0f);
 	BeginPlay_SetPhysicalMaterials();
 	// Find the child weapon actor component.
 	BeginPlay_SetupChildActorWeaponComp();
@@ -4950,4 +4970,30 @@ void ASquadUnit::OnSquadUnitSpawned_TeleportAndSetSelectable(const FVector& Squa
 	{
 		SelectionComponent->SetCanBeSelected(true);
 	}
+}
+
+void ASquadUnit::FellOutOfWorld(const UDamageType& DamageType)
+{
+	if (not IsUnitAlive())
+	{
+		// A corpse: its squad let go of it when it died, the engine's removal is fine.
+		Super::FellOutOfWorld(DamageType);
+		return;
+	}
+	if (M_FellOutOfWorldRecoveries < SquadUnitGroundRecovery::MaxFellOutOfWorldRecoveries
+		&& FRTSUnitGroundRecovery::TryPlaceBackOnGround(*this, GetGroundRecoveryOriginHeight(*this)))
+	{
+		++M_FellOutOfWorldRecoveries;
+		if (UCharacterMovementComponent* CharacterMovementComponent = GetCharacterMovement())
+		{
+			CharacterMovementComponent->StopMovementImmediately();
+			CharacterMovementComponent->SetMovementMode(MOVE_Walking);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("RTS_FELL_OUT_OF_WORLD %s put back on the ground at %s (recovery %d)"),
+		       *GetName(), *GetActorLocation().ToCompactString(), M_FellOutOfWorldRecoveries);
+		return;
+	}
+	// Nowhere to stand, or it keeps falling: it dies the normal way so its squad lets go of it.
+	UE_LOG(LogTemp, Warning, TEXT("RTS_FELL_OUT_OF_WORLD %s has no ground to return to; it dies"), *GetName());
+	TakeFatalDamage();
 }

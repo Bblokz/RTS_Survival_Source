@@ -315,6 +315,8 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 	GENERATED_BODY()
 
 	friend class ASquadController;
+	// Shipping global ability test runner (RTS_WITH_ALL_GLOBAL_ABILITIES): reads the controller pointer.
+	friend struct FAllGlobalAbilitiesTestAccess;
 #if WITH_DEV_AUTOMATION_TESTS && !UE_BUILD_SHIPPING
 	friend struct FSquadAdvanceDiagnosticAccess;
 #endif
@@ -565,6 +567,15 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
+	/**
+	 * @brief Called by the engine's KillZ check (see URTSKillZSubsystem) once the unit has fallen through the world.
+	 * Puts it back on the ground instead of the engine's plain Destroy, which would skip the death path; a unit with
+	 * nowhere to stand, or one that keeps falling, dies the normal way.
+	 */
+	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
+
+	// Times this soldier was put back on the ground after falling through the world.
+	int32 M_FellOutOfWorldRecoveries = 0;
 
 	/** @return True if the squad controller is valid; derived standalone units may make absence non-reporting. */
 	virtual bool GetIsValidSquadController() const;

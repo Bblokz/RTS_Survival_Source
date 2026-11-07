@@ -298,6 +298,8 @@ class RTS_SURVIVAL_API ASquadController : public AActor, public ICommands,
 
 public:
 	friend struct FSquadWeaponSwitch;
+	// Shipping global ability test runner (RTS_WITH_ALL_GLOBAL_ABILITIES): reads the unit list.
+	friend struct FAllGlobalAbilitiesTestAccess;
 	friend class RTS_SURVIVAL_API AWeaponPickup;
 	friend class RTS_SURVIVAL_API AScavengeableObject;
 	friend class RTS_SURVIVAL_API URepairComponent;

@@ -63,6 +63,13 @@ bool URTSOverlapEvasionComponent::GetIsValidOwnerTrackPathFollowingComponent() c
 	{
 		return true;
 	}
+	// Not possessed (yet: a unit spawned deferred overlaps in BeginPlay before its controller exists; or anymore: a
+	// dying vehicle lost its controller): there is nothing to register with, which is not an error.
+	const APawn* OwnerAsPawn = Cast<APawn>(GetOwner());
+	if (not IsValid(OwnerAsPawn) || OwnerAsPawn->GetController() == nullptr)
+	{
+		return false;
+	}
 
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,

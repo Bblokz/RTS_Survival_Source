@@ -7,12 +7,14 @@
 #include "NavigationSystem.h"
 #include "NavigationData.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "RTS_Survival/Behaviours/BehaviourComp.h"
 #include "RTS_Survival/Behaviours/Derived/BehaviourSquadRetreat/SquadRetreatBehaviour.h"
 #include "RTS_Survival/CaptureMechanic/CaptureMechanicHelpers.h"
 #include "RTS_Survival/CaptureMechanic/CaptureInterface/CaptureInterface.h"
 #include "RTS_Survival/Game/GameState/CPPGameState.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/PickupItems/Items/WeaponPickUp/WeaponPickup.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
@@ -52,6 +54,42 @@
 #include "Squads/SquadUnitHpComp/SquadUnitHealthComponent.h"
 #include "RTS_Survival/Player/ConstructionPreview/StaticMeshPreview/StaticPreviewMesh.h"
 #include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
+
+namespace SquadControllerParachuteStatics
+{
+	// Reach of the trace that finds the ground under a unit hidden in the air.
+	constexpr float GroundTraceHalfHeight = 200000.0f;
+
+	/**
+	 * @brief A hidden unit has no collision, so a unit that is still falling when it is hidden (the spawner places
+	 * soldiers a little above the ground) never lands: it sinks through the world while it waits for its jump. Crewmen
+	 * of a team weapon stay hidden at their post and their parachute proxy lands where they are, so they would come
+	 * down under the map. Puts a falling unit on the landscape below it and lets it walk.
+	 */
+	void PutFallingUnitOnGround(ASquadUnit* SquadUnit)
+	{
+		UCharacterMovementComponent* CharacterMovement = SquadUnit->GetCharacterMovement();
+		const UWorld* World = SquadUnit->GetWorld();
+		if (not IsValid(CharacterMovement) || not CharacterMovement->IsFalling() || not IsValid(World))
+		{
+			return;
+		}
+		const FVector Location = SquadUnit->GetActorLocation();
+		const FVector TraceStart(Location.X, Location.Y, Location.Z + GroundTraceHalfHeight);
+		const FVector TraceEnd(Location.X, Location.Y, Location.Z - GroundTraceHalfHeight);
+		FHitResult LandscapeHit;
+		if (not World->LineTraceSingleByChannel(LandscapeHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE))
+		{
+			return;
+		}
+		const UCapsuleComponent* Capsule = SquadUnit->GetCapsuleComponent();
+		const float HalfHeight = IsValid(Capsule) ? Capsule->GetScaledCapsuleHalfHeight() : 0.0f;
+		CharacterMovement->StopMovementImmediately();
+		SquadUnit->SetActorLocation(LandscapeHit.ImpactPoint + FVector(0.0f, 0.0f, HalfHeight), false, nullptr,
+		                            ETeleportType::TeleportPhysics);
+		CharacterMovement->SetMovementMode(MOVE_Walking);
+	}
+}
 
 namespace SquadControllerRemanStatics
 {
@@ -967,6 +1005,7 @@ void ASquadController::ParachuteDrop_HideUnit(ASquadUnit* SquadUnit) const
 	}
 	SquadUnit->CancelPendingSpawnPlacement();
 	SquadUnit->OnSquadSpawned(true, 0.f, SquadUnit->GetActorLocation());
+	SquadControllerParachuteStatics::PutFallingUnitOnGround(SquadUnit);
 	if (AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon())
 	{
 		InfantryWeapon->DisableWeaponSearch(true, true);
@@ -1333,6 +1372,9 @@ void ASquadController::TryRemanAbandonedTeamWeapon_FinalizeSuccessfulTransfer(
 void ASquadController::BeginPlay()
 {
 	Super::BeginPlay();
+	// The constructor's Init only reaches the class default object: the weapon switch's controller pointer is a
+	// UPROPERTY, so a Blueprint instance gets the archetype's value copied over it (and a placed squad the saved one).
+	M_SquadWeaponSwitch.Init(this);
 	BeginPlay_SetupPlayerController();
 
 	// Init cargo subsystem early.
@@ -3650,6 +3692,18 @@ FVector ASquadController::FindIdealSpawnLocation()
 		return SpawnLocation;
 	}
 	RTSFunctionLibrary::PrintString(TEXT("Visibility trace failed."), FColor::Red);
+
+	// The grid point can lie deeper under the ground than both searches reach (a spawn location set below the
+	// terrain, e.g. the Soviet Mosin/PTRS squad of Ger_FirstMission 3.5 m under a hill): the fallback above it would
+	// still be inside the landscape and the units would fall through the world. Stand on the landscape over it.
+	FHitResult LandscapeHit;
+	const FVector LandscapeTraceStart = InitialLocation + FVector(
+		0.f, 0.f, SquadControllerParachuteStatics::GroundTraceHalfHeight);
+	if (GetWorld()->LineTraceSingleByChannel(LandscapeHit, LandscapeTraceStart, InitialLocation,
+	                                         COLLISION_TRACE_LANDSCAPE, CollisionParams))
+	{
+		return LandscapeHit.ImpactPoint + FVector(0.f, 0.f, 50.f);
+	}
 
 	// If both methods fail, fall back to initial location plus 100 units in Z
 	IdealSpawnLocation += FVector(0.f, 0.f, 100.f);
