@@ -1,5 +1,6 @@
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
 
+#include "GenericPlatform/GenericApplication.h"
 #include "Misc/ConfigCacheIni.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -28,6 +29,35 @@ namespace RTSGameUserSettingsPrivate
 			GGameUserSettingsIni
 		);
 	}
+}
+
+FIntPoint URTSGameUserSettings::GetPrimaryMonitorMaxSharpResolution()
+{
+	FDisplayMetrics DisplayMetrics;
+	FDisplayMetrics::RebuildDisplayMetrics(DisplayMetrics);
+
+	const FIntPoint DesktopResolution(DisplayMetrics.PrimaryDisplayWidth, DisplayMetrics.PrimaryDisplayHeight);
+	FIntPoint NativeResolution = FIntPoint::ZeroValue;
+	for (const FMonitorInfo& MonitorInfo : DisplayMetrics.MonitorInfo)
+	{
+		if (MonitorInfo.bIsPrimary)
+		{
+			NativeResolution = FIntPoint(MonitorInfo.NativeWidth, MonitorInfo.NativeHeight);
+			break;
+		}
+	}
+
+	const bool bHasNative = RTSGameUserSettingsPrivate::GetIsValidResolution(NativeResolution);
+	const bool bHasDesktop = RTSGameUserSettingsPrivate::GetIsValidResolution(DesktopResolution);
+	if (bHasNative && bHasDesktop)
+	{
+		// A desktop above the EDID size means the user runs a supersampled desktop on purpose; allow it.
+		return DesktopResolution.X * DesktopResolution.Y > NativeResolution.X * NativeResolution.Y
+			       ? DesktopResolution
+			       : NativeResolution;
+	}
+
+	return bHasNative ? NativeResolution : (bHasDesktop ? DesktopResolution : FIntPoint::ZeroValue);
 }
 
 const URTSGameUserSettings* URTSGameUserSettings::Get()
@@ -113,7 +143,52 @@ void URTSGameUserSettings::LoadSettings(const bool bForceReload)
 		Scalability::SetQualityLevels(ScalabilityQuality);
 	}
 
+	SnapOversizedSavedResolution();
 	ApplyCustomSettingClamps();
+}
+
+void URTSGameUserSettings::SnapOversizedSavedResolution()
+{
+	if (GIsEditor)
+	{
+		// PIE renders into editor viewports; the saved game window size does not apply there.
+		return;
+	}
+
+	const FIntPoint SavedResolution(ResolutionSizeX, ResolutionSizeY);
+	if (not RTSGameUserSettingsPrivate::GetIsValidResolution(SavedResolution))
+	{
+		// Zero means "use the desktop"; the engine fills it in.
+		return;
+	}
+
+	const FIntPoint MaxSharpResolution = GetPrimaryMonitorMaxSharpResolution();
+	if (not RTSGameUserSettingsPrivate::GetIsValidResolution(MaxSharpResolution))
+	{
+		return;
+	}
+
+	if (SavedResolution.X <= MaxSharpResolution.X && SavedResolution.Y <= MaxSharpResolution.Y)
+	{
+		return;
+	}
+
+	FIntPoint SnappedResolution = GetDesktopResolution();
+	if (not RTSGameUserSettingsPrivate::GetIsValidResolution(SnappedResolution)
+		|| SnappedResolution.X > MaxSharpResolution.X || SnappedResolution.Y > MaxSharpResolution.Y)
+	{
+		SnappedResolution = MaxSharpResolution;
+	}
+
+	UE_LOG(LogTemp, Display, TEXT("RTSGameUserSettings: saved resolution %dx%d exceeds the monitor's native %dx%d; using %dx%d."),
+	       SavedResolution.X, SavedResolution.Y, MaxSharpResolution.X, MaxSharpResolution.Y,
+	       SnappedResolution.X, SnappedResolution.Y);
+
+	SetScreenResolution(SnappedResolution);
+	ConfirmVideoMode();
+	// The window size was already requested from the raw ini before this object loaded; correct that request too.
+	RequestResolutionChange(SnappedResolution.X, SnappedResolution.Y, GetFullscreenMode(), false);
+	SaveConfig();
 }
 
 void URTSGameUserSettings::ApplySettings(const bool bCheckForCommandLineOverrides)

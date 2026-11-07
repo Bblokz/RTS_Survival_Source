@@ -419,6 +419,9 @@ private:
 
 	void AddSupportedResolutionUnique(const FIntPoint& ResolutionToAdd);
 
+	/** @brief Orders the resolution list (and its labels) by pixel count so native is the first entry. */
+	void SortSupportedResolutionsLargestFirst();
+
 	ERTSScalabilityQuality GetScalabilityQualityFromLevel(int32 ScalabilityLevel) const;
 	int32 GetLevelFromScalabilityQuality(ERTSScalabilityQuality ScalabilityQuality) const;
 	EWindowMode::Type GetNativeWindowMode(ERTSWindowMode WindowMode) const;

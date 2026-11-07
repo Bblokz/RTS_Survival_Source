@@ -76,7 +76,9 @@ namespace RTSSettingsMenuSubsystemPrivate
 		CVar->Set(global_GetBattlefieldCorpsesCount(Level), ECVF_SetByGameSetting);
 	}
 
-	const ERTSWindowMode DefaultWindowMode = ERTSWindowMode::Fullscreen;
+	// Borderless always runs at the desktop size, so it stays sharp whatever resolution entry is selected.
+	// Matches FullscreenMode=1 in DefaultGameUserSettings.ini.
+	const ERTSWindowMode DefaultWindowMode = ERTSWindowMode::WindowedFullscreen;
 	const ERTSScalabilityQuality DefaultScalabilityQuality = ERTSScalabilityQuality::Epic;
 	const FIntPoint DefaultResolution = FIntPoint(1920, 1080);
 
@@ -672,18 +674,36 @@ void URTSSettingsMenuSubsystem::CacheSupportedResolutions()
 	M_SupportedResolutions.Empty();
 	M_SupportedResolutionLabels.Empty();
 
+	// The RHI merges the modes of every monitor on the adapter, including GPU-scaled modes above the panel's
+	// native size (a 2560x1080 panel reports 2560x1440 and 3840x2160). Those get resampled by the display and
+	// look soft, so only modes that fit inside the primary monitor's native size are offered.
+	const FIntPoint MaxSharpResolution = URTSGameUserSettings::GetPrimaryMonitorMaxSharpResolution();
+	const bool bHasMaxSharpResolution = RTSSettingsMenuSubsystemPrivate::GetIsValidResolution(MaxSharpResolution);
+
 	FScreenResolutionArray AvailableResolutions;
 	const bool bResolutionsFound = RHIGetAvailableResolutions(AvailableResolutions, false);
 	if (bResolutionsFound)
 	{
 		for (const FScreenResolutionRHI& Resolution : AvailableResolutions)
 		{
-			AddSupportedResolutionUnique(FIntPoint(Resolution.Width, Resolution.Height));
+			const FIntPoint Candidate(Resolution.Width, Resolution.Height);
+			if (bHasMaxSharpResolution && (Candidate.X > MaxSharpResolution.X || Candidate.Y > MaxSharpResolution.Y))
+			{
+				continue;
+			}
+
+			AddSupportedResolutionUnique(Candidate);
 		}
+	}
+
+	if (bHasMaxSharpResolution)
+	{
+		AddSupportedResolutionUnique(MaxSharpResolution);
 	}
 
 	if (M_SupportedResolutions.Num() > 0)
 	{
+		SortSupportedResolutionsLargestFirst();
 		return;
 	}
 
@@ -1180,6 +1200,22 @@ void URTSSettingsMenuSubsystem::ApplySnapshotToSettings(
 	GameUserSettingsToApply.SetEnemyNomadicHpBarStrat(SnapshotToApply.M_GameplaySettings.M_EnemyNomadicHpBarStrat);
 	GameUserSettingsToApply.SetEnemyBxpHpBarStrat(SnapshotToApply.M_GameplaySettings.M_EnemyBxpHpBarStrat);
 	GameUserSettingsToApply.SetEnemyAircraftHpBarStrat(SnapshotToApply.M_GameplaySettings.M_EnemyAircraftHpBarStrat);
+}
+
+void URTSSettingsMenuSubsystem::SortSupportedResolutionsLargestFirst()
+{
+	M_SupportedResolutions.Sort([](const FIntPoint& A, const FIntPoint& B)
+	{
+		const int64 PixelsA = static_cast<int64>(A.X) * A.Y;
+		const int64 PixelsB = static_cast<int64>(B.X) * B.Y;
+		return PixelsA != PixelsB ? PixelsA > PixelsB : A.X > B.X;
+	});
+
+	M_SupportedResolutionLabels.Reset(M_SupportedResolutions.Num());
+	for (const FIntPoint& Resolution : M_SupportedResolutions)
+	{
+		M_SupportedResolutionLabels.Add(RTSSettingsMenuSubsystemPrivate::BuildResolutionLabel(Resolution));
+	}
 }
 
 void URTSSettingsMenuSubsystem::AddSupportedResolutionUnique(const FIntPoint& ResolutionToAdd)
