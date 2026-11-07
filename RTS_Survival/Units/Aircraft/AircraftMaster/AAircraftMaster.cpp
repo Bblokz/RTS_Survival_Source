@@ -3469,11 +3469,24 @@ FVector AAircraftMaster::AircraftDrop_GetProjectedSquadSpawnLocation(const int32
 		0.0f);
 
 	bool bWasProjected = false;
-	return URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
+	const FVector Projected = URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
 		this,
 		DesiredLocation,
 		FVector(2.0f, 2.0f, 2.0f),
 		bWasProjected);
+	if (bWasProjected)
+	{
+		return Projected;
+	}
+	// Off the navmesh (cliffs, a drop next to the map edge) the ring point keeps the drop point's height: on a slope
+	// that is inside the ground, past the landscape edge there is nothing below. Either way the squad falls out of
+	// the world, so it stands on the landscape below the point, or at the drop point when there is none.
+	float GroundZ = 0.0f;
+	if (AircraftDrop_TraceGroundZ(DesiredLocation, GroundZ))
+	{
+		return FVector(DesiredLocation.X, DesiredLocation.Y, GroundZ);
+	}
+	return M_AircraftDropRequest.ExecuteLocation;
 }
 
 bool AAircraftMaster::GetHasCargoRopeSling() const

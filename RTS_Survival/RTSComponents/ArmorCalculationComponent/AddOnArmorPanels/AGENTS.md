@@ -4,10 +4,16 @@ Read `Docs/Units/Vehicles/AddOnArmorPanels.md` before you change anything here o
 
 ## Rule: every spaced-armour vehicle gets a debris panel mesh
 
-Whenever you develop spaced armour (side skirts, Schürzen, bolted-on plates, wire screens), model **one panel as its
-own static mesh**, besides the hull that carries all the panels. When a hit hides a panel, that mesh flies off the
-tank as Niagara debris. Without it the panel just disappears, and the component reports an error when the tank's
-zones install.
+Every spaced-armour hull (side skirts, Schürzen, bolted-on plates, wire screens) needs **one panel as its own static
+mesh asset**, besides the hull that carries all the panels. When a hit hides a panel, that mesh flies off the tank as
+Niagara debris. Without it the panel just disappears, and the component reports an error when the tank's zones install.
+
+The asset is only drawn by the Niagara burst. It is never a component on the vehicle, so it costs the tank nothing.
+The panels on the vehicle stay baked into the hull and masked.
+
+**Cut it out of the built hull. Don't model it.** `RTS.AddOnArmor.ExtractPanelDebris` copies one baked panel into its
+own mesh. It looks exactly like the panel on the hull and costs the same as a hand-made one. Model a panel by hand only
+when the panels don't exist as separate pieces in the hull, or when the user asks for it.
 
 The debris panel mesh:
 - is one **left-side** (-Y) panel as it hangs on the hull, with its bolts and clamps. Right-side panels use the same
@@ -18,14 +24,19 @@ The debris panel mesh:
 - is named `<hull>_AddOnPanels_Debris` and lives next to the hull.
 
 Store it on the hull's panel layout with one of:
-- `RTS.AddOnArmor.SetPanelDebrisMesh Hull=<_AddOnPanels mesh> Debris=<panel mesh>` for a modelled panel;
-- `RTS.AddOnArmor.BuildPanelHull ... DebrisMesh=<panel mesh>` when you build the panel hull;
-- `RTS.AddOnArmor.ExtractPanelDebris Hull=<_AddOnPanels mesh> [Panel=<index>]` cuts a left panel out of the built
-  hull. Use it only when the panels already exist as separate pieces in the hull and a modelled panel isn't available.
+- `RTS.AddOnArmor.ExtractPanelDebris Hull=<_AddOnPanels mesh> [Panel=<index>]` (the default) cuts a left panel out of
+  the built hull and stores it. Without `Panel=` it takes the left panel nearest the middle of the side, a typical
+  panel and not an end piece;
+- `RTS.AddOnArmor.SetPanelDebrisMesh Hull=<_AddOnPanels mesh> Debris=<panel mesh>` for a panel modelled by hand;
+- `RTS.AddOnArmor.BuildPanelHull ... DebrisMesh=<panel mesh>` when you build the panel hull with an existing mesh.
 
 `Tools/AddOnArmorBreak/build_panel_debris.sh` rebuilds the system and extracts a debris panel for every built hull
 (`ONLY="<hull> ..."` for some). On 2026-11-06 all 22 `_AddOnPanels` hulls got an extracted debris panel this way.
-Replace one with a modelled panel when that vehicle's skirts get worked on.
+These cut-outs are final. Don't replace them with modelled panels.
+
+Known limit: a hull stores one debris mesh, so every panel flies off with that panel's shape. End panels with a
+different size or outline fly off as the typical panel. Pass `Panel=<index>` to pick another panel when the default
+looks wrong.
 
 These commands also set "Used with Niagara Mesh Particles" on the panel's base materials, and save them. Without that
 flag a cooked build draws the default material on the debris. `BuildPanelHull` keeps the previous build's debris mesh
