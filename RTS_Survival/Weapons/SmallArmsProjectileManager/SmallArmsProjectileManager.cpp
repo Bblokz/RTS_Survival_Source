@@ -14,6 +14,10 @@ namespace SmallArmsProjectileManagerPrivate
 {
 	// User parameter of the projectile Niagara system that drives how many particles it spawns.
 	const FName NiagaraPoolSizeVarName = TEXT("Pool");
+	// The tank projectile pool grows by this many slots when barrages and guns use all of them at once.
+	constexpr int32 TankProjectilePoolGrowStep = 16;
+	// A hard cap so a runaway (projectiles that never return) cannot spawn actors without end.
+	constexpr int32 MaxTankProjectilePoolSize = 512;
 }
 
 
@@ -58,7 +62,24 @@ void ASmallArmsProjectileManager::FireProjectile(
 
 AProjectile* ASmallArmsProjectileManager::GetDormantTankProjectile()
 {
-	return M_TankProjectilesPool.GetDormantProjectile();
+	using namespace SmallArmsProjectileManagerPrivate;
+	if (AProjectile* DormantProjectile = M_TankProjectilesPool.GetDormantProjectile())
+	{
+		return DormantProjectile;
+	}
+	// Every slot is in flight (barrage shells share the pool with every tank gun): grow it rather than fail the shot.
+	const int32 CurrentSize = M_TankProjectilesPool.Projectiles.Num();
+	if (CurrentSize >= MaxTankProjectilePoolSize)
+	{
+		return nullptr;
+	}
+	UWorld* World = GetWorld();
+	URTSCameraShakeSubsystem* CameraShakeSubsystem = IsValid(World) ? World->GetSubsystem<URTSCameraShakeSubsystem>() : nullptr;
+	const int32 Added = M_TankProjectilesPool.GrowPool(
+		this, World, M_TankProjectileClass, GetActorLocation(),
+		FMath::Min(TankProjectilePoolGrowStep, MaxTankProjectilePoolSize - CurrentSize), CameraShakeSubsystem);
+	UE_LOG(LogTemp, Display, TEXT("Tank projectile pool grew by %d to %d slots."), Added, CurrentSize + Added);
+	return Added > 0 ? M_TankProjectilesPool.GetDormantProjectile() : nullptr;
 }
 
 

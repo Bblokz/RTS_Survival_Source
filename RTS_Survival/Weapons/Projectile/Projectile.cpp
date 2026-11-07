@@ -3007,6 +3007,10 @@ float AProjectile::GetWidthOfShell(const float WeaponCalibre, const EWeaponShell
 		return ShellWidth * FireShellWidthMlt;
 	case EWeaponShellType::Shell_Railgun:
 		return ShellWidth * APShellWidthMlt;
+	case EWeaponShellType::Shell_Radixite:
+		// Radixite rounds are full-calibre shells: the AP width (they used to fall through to the base width with an
+		// error on every shot).
+		return ShellWidth * APShellWidthMlt;
 	}
 	RTSFunctionLibrary::ReportError("Invalid shell type for calculating width: " +
 		FString::FromInt(static_cast<int32>(ShellType)));
@@ -3340,8 +3344,10 @@ void AProjectile::DebugArmorHit(const float Armor, const float EffectiveArmor, c
 
 void AProjectile::He_Heat_AttemptStunOnBounce(const AActor* HitActor) const
 {
+	// The stun is a vehicle behaviour (weapon lock, turret slow-down on the ATankMaster): soldiers, buildings and
+	// pits carry a behaviour component too but must not get it.
 	if (M_WeaponCalibre < DeveloperSettings::GameBalance::Weapons::Projectiles::StunCalibreThreshold || not
-		IsValid(HitActor))
+		IsValid(HitActor) || not HitActor->IsA<ATankMaster>())
 	{
 		return;
 	}
@@ -3360,7 +3366,8 @@ void AProjectile::He_Heat_AttemptStunOnPen(const AActor* HitActor) const
 		return;
 	}
 	const bool bIsHe_Heat = M_ShellType == EWeaponShellType::Shell_HE || M_ShellType == EWeaponShellType::Shell_HEAT;
-	if (not bIsHe_Heat || not IsValid(HitActor))
+	// Vehicles only, as on a bounce.
+	if (not bIsHe_Heat || not IsValid(HitActor) || not HitActor->IsA<ATankMaster>())
 	{
 		return;
 	}

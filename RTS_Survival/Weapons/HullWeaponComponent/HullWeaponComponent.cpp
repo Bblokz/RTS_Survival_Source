@@ -794,7 +794,21 @@ void UHullWeaponComponent::BeginPlay_SetupMeshOrientationTimer()
 
 void UHullWeaponComponent::OnUpdateMeshOrientation()
 {
-	if (!EnsureWorldIsValid() || !GetIsValidHullWeaponMesh() || !bM_BaseInit)
+	if (not bM_BaseInit)
+	{
+		// About 5 s of the 0.33 s timer: the owner's Blueprint has had its BeginPlay.
+		constexpr int32 TicksBeforeReportingMissingInit = 15;
+		++M_OrientationTicksWithoutInit;
+		if (not bM_HasReportedMissingInit && M_OrientationTicksWithoutInit >= TicksBeforeReportingMissingInit)
+		{
+			bM_HasReportedMissingInit = true;
+			RTSFunctionLibrary::ReportError("HullWeaponComponent " + GetName() + " on " +
+				(GetOwner() ? GetOwner()->GetName() : FString("no owner")) +
+				" was never initialised (InitHullWeaponComponent not called): it cannot aim or fire.");
+		}
+		return;
+	}
+	if (!EnsureWorldIsValid() || !GetIsValidHullWeaponMesh())
 	{
 		return;
 	}

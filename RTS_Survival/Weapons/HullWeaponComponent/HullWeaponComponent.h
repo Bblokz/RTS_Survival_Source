@@ -264,6 +264,11 @@ private:
 	// True after first successful init
 	bool bM_BaseInit = false;
 
+	// The orientation timer starts in BeginPlay, before the owner's Blueprint calls InitHullWeaponComponent; it waits
+	// quietly for the init and reports once if it never comes.
+	int32 M_OrientationTicksWithoutInit = 0;
+	bool bM_HasReportedMissingInit = false;
+
 
 	// Helpers
 	double SignedAngleDegAroundAxis(const FVector& From, const FVector& To, const FVector& Axis) const;
