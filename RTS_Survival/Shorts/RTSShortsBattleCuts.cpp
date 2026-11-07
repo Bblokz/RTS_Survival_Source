@@ -121,8 +121,9 @@ bool ARTSShortsDirector::GetIsBattleCutUnitAlive(const AActor* LineUnit) const
 
 bool ARTSShortsDirector::GetIsBattleCutUnitFilmable(const AActor* LineUnit) const
 {
-	// A reinforcement waits out of sight until its move order; once it drives in it is worth a shot of its own.
-	if (not M_Battle.HeldUnits.Contains(TWeakObjectPtr<AActor>(const_cast<AActor*>(LineUnit))))
+	// A reinforcement waits out of sight until its move order; once it drives in it is worth a shot of its own. A
+	// Segment.BattleAdvance vehicle is held while it closes in, in plain view.
+	if (not M_Battle.HeldUnits.Contains(TWeakObjectPtr<AActor>(const_cast<AActor*>(LineUnit))) || GetIsBattleAdvanceUnit(LineUnit))
 	{
 		return true;
 	}

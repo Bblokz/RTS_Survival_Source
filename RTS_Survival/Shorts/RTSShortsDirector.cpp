@@ -442,7 +442,7 @@ void ARTSShortsDirector::TickRunning()
 			M_PlacedLocation = Unit->GetActorLocation();
 		}
 	}
-	else if (AActor* Unit = Segment.BattleSoloEvasion.bEnabled ? nullptr : M_Units[M_CurrentSegment].Get())
+	else if (AActor* Unit = Segment.BattleSoloEvasion.bEnabled || Segment.BattleAdvance.bEnabled ? nullptr : M_Units[M_CurrentSegment].Get())
 	{
 		// Some units drive toward their attack-ground target (into the camera); a unit that left its mark by
 		// more than half a metre is put back where it was placed.
@@ -2691,6 +2691,7 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 		}
 	}
 	SpawnBattleReinforcements(Segment);
+	BeginBattleAdvance(Segment);
 	BeginBattleFlanks(Segment);
 	BeginSoloEvasion(Segment, MainUnit);
 	BeginSquadTactics(Segment);
@@ -3509,6 +3510,7 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 	AbsorbBattleSquadMembers();
 	KeepBattleUnitsVisible();
 	TickBattleReinforcements(Frame);
+	TickBattleAdvance(Frame);
 	TickBattleFlanks(Frame);
 	TickSoloEvasion(Frame);
 	TickSquadTactics(Frame);

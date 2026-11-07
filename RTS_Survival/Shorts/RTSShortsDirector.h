@@ -67,6 +67,22 @@ struct FRTSShortsBattleFlankState
 	float OrderedAtSeconds = 0.f;
 };
 
+/** One vehicle of a Segment.BattleAdvance line: where it drives, when, and whether it was released to fight. */
+USTRUCT()
+struct FRTSShortsAdvanceState
+{
+	GENERATED_BODY()
+
+	TWeakObjectPtr<AActor> Unit;
+	FVector Destination = FVector::ZeroVector;
+	float OrderAtSeconds = 0.f;
+	bool bEnemy = false;
+	bool bOrdered = false;
+	bool bReleased = false;
+	// Segment-local second it stopped short of its point; -1 while it is moving or has arrived.
+	float StoppedSinceSeconds = -1.f;
+};
+
 /** An attacker working round the evading unit (Segment.BattleSoloEvasion) after its flank route is done. */
 USTRUCT()
 struct FRTSShortsReflankState
@@ -217,6 +233,11 @@ struct FRTSShortsBattleState
 	TArray<FRTSShortsBattleFlankState> Flanks;
 	FRTSShortsSoloEvasionState Evasion;
 	TMap<TWeakObjectPtr<AActor>, FRTSShortsReflankState> Reflanks;
+	// Segment.BattleAdvance: every vehicle of both lines, and the opening camera that follows the German line's vehicles.
+	TArray<FRTSShortsAdvanceState> Advances;
+	FVector AdvanceCameraStart = FVector::ZeroVector;
+	FVector AdvanceAnchorStart = FVector::ZeroVector;
+	FVector AdvanceAnchor = FVector::ZeroVector;
 	// Segment.BattleSquadTactics: one entry per enemy squad.
 	TArray<FRTSShortsSquadTacticState> SquadTactics;
 	// The squads' target's health at the last tactics tick and when it last went down.
@@ -393,6 +414,24 @@ private:
 	                           float SegmentSeconds);
 	/** True for a unit that moves and picks its targets itself for now: the director's attack orders would cancel that. */
 	bool GetIsBattleUnitSelfDirected(const AActor* Unit) const;
+	/** Segment.BattleAdvance: holds every vehicle of both lines and works out where each one drives. */
+	void BeginBattleAdvance(const FRTSShortsSegment& Segment);
+	/** Orders the advance moves at their seconds and releases each vehicle to fight once it arrives or times out. */
+	void TickBattleAdvance(int32 Frame);
+	void OrderBattleAdvanceMove(FRTSShortsAdvanceState& Advance, int32 Frame);
+	/**
+	 * @brief Arrived, stopped short of its point, or timed out: from then on the vehicle fights like the rest of the line.
+	 * @param Advance Updated with when it stopped short.
+	 * @param Settings The segment's advance.
+	 * @param SegmentSeconds Segment-local time now.
+	 * @return True when it should be released to take and receive attack orders.
+	 */
+	bool GetHasBattleAdvanceFinished(FRTSShortsAdvanceState& Advance, const FRTSShortsBattleAdvance& Settings, float SegmentSeconds) const;
+	void ReleaseBattleAdvanceUnit(FRTSShortsAdvanceState& Advance, int32 Frame, float SegmentSeconds);
+	/** Keeps the opening camera with the German line as it drives forward and fights (until the first battle cut). */
+	void UpdateAdvanceFollowCamera(const FRTSShortsBattleAdvance& Settings);
+	bool GetIsBattleAdvanceUnit(const AActor* LineUnit) const;
+	bool GetBattleAdvanceAnchor(FVector& OutAnchor) const;
 	void BeginSoloEvasion(const FRTSShortsSegment& Segment, AActor* MainUnit);
 	void TickSoloEvasion(int32 Frame);
 	void TickSoloEvasionCycle(const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);

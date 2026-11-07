@@ -614,6 +614,47 @@ struct FRTSShortsSquadTactics
 };
 
 /**
+ * @brief Standoff battles: both lines spawn far apart, then every vehicle of both lines (the segment's unit too) drives
+ * straight ahead toward the other line and only takes attack orders once it is there, firing on the move with the game's
+ * own auto-engage. Commands only, no stats.
+ */
+USTRUCT()
+struct FRTSShortsBattleAdvance
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	/** Segment-local second of the first move order; the vehicles of each line follow OrderStaggerSeconds apart. */
+	UPROPERTY()
+	float OrderAtSeconds = 1.f;
+
+	UPROPERTY()
+	float OrderStaggerSeconds = 0.15f;
+
+	/** How far (cm) the player line drives toward the enemy line, and the enemy line toward the player line. */
+	UPROPERTY()
+	float PlayerAdvanceCm = 1200.f;
+
+	UPROPERTY()
+	float EnemyAdvanceCm = 2000.f;
+
+	/** A vehicle closer than this (cm) to its drive point has arrived; one that stopped short of it counts as arrived too.
+	 *  Keep it small: the attack order that follows the release cancels the rest of the drive. */
+	UPROPERTY()
+	float ArrivedCm = 200.f;
+
+	/** Seconds after its order when a vehicle takes attack orders even if it has not arrived. */
+	UPROPERTY()
+	float TimeoutSeconds = 20.f;
+
+	/** How quickly the opening camera follows the German line's living vehicles (1/s); 0 leaves it where it was framed. */
+	UPROPERTY()
+	float CameraFollowSpeed = 1.2f;
+};
+
+/**
  * @brief Large battles filmed up close: after the opening shot (the segment's Camera) the view cuts between single
  * fighters of both lines, each shot a slow pan round one unit while it fights, so the hits and the gun sounds are near.
  */
@@ -1036,6 +1077,10 @@ struct FRTSShortsSegment
 	/** Battle: the segment's unit fights the enemy line by itself instead of taking the director's attack orders. */
 	UPROPERTY()
 	FRTSShortsSoloEvasion BattleSoloEvasion;
+
+	/** Battle: both lines spawn far apart and drive toward each other before they take attack orders. */
+	UPROPERTY()
+	FRTSShortsBattleAdvance BattleAdvance;
 
 	/** Battle: the enemy squads flank and take cover behind Job.BattleCoverTrees instead of walking straight in. */
 	UPROPERTY()
