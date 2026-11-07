@@ -162,7 +162,7 @@ private:
 	void WriteHiddenPanelMask() const;
 
 	/**
-	 * @brief Throws the given panels off the hull in one pooled Niagara burst.
+	 * @brief Throws the given panels off the hull in one pooled Niagara burst; nothing while fog of war hides the owner.
 	 * @param Zone Zone the panels belong to; its last hit pushes the pieces away from the impact.
 	 * @param PanelIndices Layout indices of the panels that were just hidden.
 	 */

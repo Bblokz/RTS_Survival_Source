@@ -416,6 +416,11 @@ void UAddOnArmorPanelsComponent::ThrowPanelDebris(const FAddOnArmorPanelZoneStat
 		return;
 	}
 	const AActor* const Owner = GetOwner();
+	// Fog of war hides enemy tanks; their debris would give their position away.
+	if (Owner->IsHidden())
+	{
+		return;
+	}
 	const FTransform OwnerTransform = Owner->GetActorTransform();
 	const FTransform MeshTransform = M_PanelMesh->GetComponentTransform();
 	const FQuat MeshRotation = MeshTransform.GetRotation();

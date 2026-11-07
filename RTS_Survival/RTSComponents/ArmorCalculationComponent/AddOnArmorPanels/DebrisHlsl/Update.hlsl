@@ -5,9 +5,10 @@
 float DeltaTime = Engine.DeltaTime;
 float3 Position = Particles.Position;
 float3 Velocity = Particles.Velocity;
-float4 Orientation = Particles.MeshOrientation;
-float SpinSpeed = Particles.SpinSpeed;
-float Resting = Particles.Resting;
+// Attributes come in through input pins, also the ones this script writes: a token read alone may not load them.
+float4 Orientation = OrientationIn;
+float SpinSpeed = SpinSpeedIn;
+float Resting = RestingIn;
 float Flying = 1.0 - Resting;
 
 // Flight.
@@ -26,7 +27,8 @@ float3 PlateNormal = LocalNormal + Orientation.w * Twice + cross(Orientation.xyz
 float UpSign = step(0.0, PlateNormal.z) * 2.0 - 1.0;
 float3 TurnAxis = cross(PlateNormal, float3(0.0, 0.0, UpSign));
 float TurnSine = length(TurnAxis);
-float TurnStep = min(asin(min(TurnSine, 1.0)), 6.0 * DeltaTime);
+// The sine is the step, not asin of it: it shrinks to zero as the plate lies flat, and asin froze the turn in the VM.
+float TurnStep = min(TurnSine, 6.0 * DeltaTime);
 float3 StepVector = TurnAxis / max(TurnSine, 0.0001) * sin(0.5 * TurnStep);
 float StepScalar = cos(0.5 * TurnStep);
 float4 Turned = float4(StepScalar * Orientation.xyz + Orientation.w * StepVector + cross(StepVector, Orientation.xyz),
