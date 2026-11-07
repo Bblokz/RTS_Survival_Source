@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "AddOnArmorPanelAudioSubsystem.h"
 #include "AddOnArmorPanelLayout.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
 
@@ -55,7 +56,8 @@ struct FAddOnArmorPanelZoneState
  * @brief Add to a tank whose hull mesh was built by RTS.AddOnArmor.BuildPanelHull. The tank installs one AddOnArmor
  * module per zone when its Blueprint finished the module setup; the zone's damage then hides panels of its side
  * (closest to the hits first, all of them once destroyed) and repairs bring them back. Every panel that damage hides
- * flies off as Niagara debris: the hull's debris panel mesh (see its panel layout) in one pooled burst per hit.
+ * flies off as Niagara debris: the hull's debris panel mesh (see its panel layout) in one pooled burst per hit, with
+ * one pooled clang per hit for the tank's weight class (UAddOnArmorPanelAudioSubsystem).
  * Structural plate values in the Blueprint's armour setup must not include the add-on armour.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
@@ -115,6 +117,9 @@ private:
 
 	TArray<FAddOnArmorPanelZoneState> M_Zones;
 
+	// Which armour-off sound the tank plays, from its subtype when the zones install.
+	EAddOnArmorOffSoundWeight M_ArmorOffSoundWeight = EAddOnArmorOffSoundWeight::Medium;
+
 	// Bit per hidden panel, written to the panel mesh's custom primitive data.
 	int32 M_HiddenPanelMask = 0;
 
@@ -130,6 +135,7 @@ private:
 	UMeshComponent* FindArmorMesh(const UArmorCalculation& ArmorCalculation) const;
 	bool CachePanelCentres(const UStaticMeshComponent& PanelMesh, const UAddOnArmorPanelLayout& Layout);
 	void CacheDebris(const UAddOnArmorPanelLayout& Layout);
+	void CacheArmorOffSoundWeight();
 
 	/**
 	 * @brief Registers the zone's add-on armour on its plates and installs its module with that coverage.
@@ -167,6 +173,11 @@ private:
 	 * @param PanelIndices Layout indices of the panels that were just hidden.
 	 */
 	void ThrowPanelDebris(const FAddOnArmorPanelZoneState& Zone, TConstArrayView<int32> PanelIndices) const;
+	/**
+	 * @brief Plays the weight class's armour-off clang at the zone's last hit; nothing while fog of war hides the owner.
+	 * @param Zone Zone that just lost panels.
+	 */
+	void PlayArmorOffSound(const FAddOnArmorPanelZoneState& Zone) const;
 	/** @return World Z of the ground under the location, or the owner's Z when nothing is hit. */
 	float GetGroundHeightBelow(const FVector& WorldLocation) const;
 };

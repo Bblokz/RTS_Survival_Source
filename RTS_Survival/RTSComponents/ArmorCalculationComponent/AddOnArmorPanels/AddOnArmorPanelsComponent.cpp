@@ -13,6 +13,7 @@
 #include "NiagaraSystem.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 namespace AddOnArmorPanelsComponentConstants
@@ -72,6 +73,7 @@ void UAddOnArmorPanelsComponent::InstallAddOnArmorZones(UArmorCalculation* Armor
 		return;
 	}
 	CacheDebris(*Layout);
+	CacheArmorOffSoundWeight();
 	for (const FAddOnArmorPanelZoneSettings& Settings : M_ZoneSettings)
 	{
 		(void)InstallZone(Settings);
@@ -228,6 +230,19 @@ void UAddOnArmorPanelsComponent::CacheDebris(const UAddOnArmorPanelLayout& Layou
 	(void)GetIsValidDebrisSystem();
 }
 
+void UAddOnArmorPanelsComponent::CacheArmorOffSoundWeight()
+{
+	const URTSComponent* const RTSComponent = GetOwner()->FindComponentByClass<URTSComponent>();
+	if (not IsValid(RTSComponent))
+	{
+		RTSFunctionLibrary::ReportWarning(TEXT("UAddOnArmorPanelsComponent: ") + GetNameSafe(GetOwner())
+			+ TEXT(" has no RTS component; shot-off panels play the medium armour-off sound."));
+		return;
+	}
+	M_ArmorOffSoundWeight = UAddOnArmorPanelAudioSubsystem::GetSoundWeightForTank(
+		RTSComponent->GetSubtypeAsTankSubtype());
+}
+
 bool UAddOnArmorPanelsComponent::InstallZone(const FAddOnArmorPanelZoneSettings& Settings)
 {
 	FAddOnArmorPanelZoneState Zone;
@@ -335,6 +350,8 @@ void UAddOnArmorPanelsComponent::SyncZoneFromModuleState(const int32 ZoneIndex, 
 	const int32 NewlyHiddenCount = Zone.HiddenPanelOrder.Num() - PreviousHiddenCount;
 	if (bThrowDebris && NewlyHiddenCount > 0)
 	{
+		// Before the debris: a hull without a debris panel still clangs.
+		PlayArmorOffSound(Zone);
 		ThrowPanelDebris(Zone, MakeArrayView(Zone.HiddenPanelOrder).Slice(PreviousHiddenCount, NewlyHiddenCount));
 	}
 }
@@ -467,6 +484,27 @@ void UAddOnArmorPanelsComponent::ThrowPanelDebris(const FAddOnArmorPanelZoneStat
 	UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(Burst, PieceSpinParameter, Spins);
 	UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(Burst, PieceOrientationParameter, Orientations);
 	Burst->Activate(true);
+}
+
+void UAddOnArmorPanelsComponent::PlayArmorOffSound(const FAddOnArmorPanelZoneState& Zone) const
+{
+	const AActor* const Owner = GetOwner();
+	// Fog of war hides enemy tanks; the clang would give their position away.
+	if (not IsValid(Owner) || Owner->IsHidden())
+	{
+		return;
+	}
+	const UWorld* const World = GetWorld();
+	UAddOnArmorPanelAudioSubsystem* const AudioSubsystem = IsValid(World)
+		? World->GetSubsystem<UAddOnArmorPanelAudioSubsystem>()
+		: nullptr;
+	if (not IsValid(AudioSubsystem))
+	{
+		return;
+	}
+	const FVector HitLocation = Owner->GetActorTransform().TransformPosition(
+		Zone.bHasLastHit ? Zone.LastHitPosition : GetZoneCentre(Zone));
+	AudioSubsystem->PlayArmorOffSound(M_ArmorOffSoundWeight, HitLocation);
 }
 
 float UAddOnArmorPanelsComponent::GetGroundHeightBelow(const FVector& WorldLocation) const

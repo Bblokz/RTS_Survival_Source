@@ -17,6 +17,7 @@ panel. A hit costs one float write, and the panels add no draw calls or componen
 | `UAddOnArmorPanelLayout` | Asset user data on the hull mesh: panel centre and side per panel. Panel index = mask bit = value in UV channel 3. |
 | `RTS.AddOnArmor.BuildPanelHull` | Editor command (`AddOnArmorPanelAuthoring.cpp`). Copies a hull mesh to `<hull>_AddOnPanels`, moves the panels into hideable slots (one per source slot: `AddOnArmorPanels`, `AddOnArmorPanels_1`, ...), writes the panel UVs and the layout, and makes the panel materials. LODs with their own description are tagged too. Every prepared vehicle's parameters are in `Tools/AddOnArmorBreak/build_panel_hulls.py`, which rebuilds them all. |
 | Panel materials | `<slot material>_AddOnPanels` next to the new hull. An instance is copied and reparented to `<master>_AddOnArmorPanels`, the master duplicated as Masked (made once per master). A plain material becomes a masked copy itself. The opacity mask reads the panel index (UV 3) and the mask (custom primitive data 8, `AddOnArmorHiddenPanels`). |
+| Armour-off sound | `UAddOnArmorPanelAudioSubsystem` (world subsystem, same folder as the component). One clang per hit that hides panels, at the hit, from a pool of 16 `UAudioComponent`s (`DeveloperSettings::GamePlay::Audio::AddOnArmorOffAudioPoolSize`) on one `ARTSPooledAudio` actor; when all 16 play, the one that started first is reused. Cues: `Cue_AddOnArmorOff_Light/Medium/Heavy` in `/Game/RTS_Survival/SpecialEffects/AddOnArmor/Sounds` (always cooked, loaded by soft path). Weight from the tank subtype: heavy tank list -> Heavy, light tank or armoured car -> Light, anything else -> Medium. The cues carry their own attenuation and sound class. `-LogCmds="LogAddOnArmorAudio Verbose"` logs each sound and its pool entry. |
 | Debris | `NS_AddOnArmorPanelDebris` in `/Game/RTS_Survival/SpecialEffects/AddOnArmor`, built by `RTS.AddOnArmor.BuildDebrisSystem` (`AddOnArmorPanelDebrisAuthoring.cpp`, HLSL in `DebrisHlsl/`). A pooled CPU mesh burst: one particle per hidden panel, mesh from `User.DebrisMesh`. The mesh is the hull's debris panel, a `UAddOnArmorPanelLayout` field set by `RTS.AddOnArmor.SetPanelDebrisMesh`, `BuildPanelHull DebrisMesh=` or `RTS.AddOnArmor.ExtractPanelDebris`. It is cut out of the built hull, not modelled; the rules are in `AddOnArmorPanels/AGENTS.md`. |
 | Diagnostics | `AddOnArmorPanelDiagnostics.cpp`: `RTS.AddOnArmor.SurveyPanels` (thin outer side plates of every hull, the candidate list), `DumpMeshTriangles` (for side-view plots), `DumpMaterialHlsl`. |
 | `UArmorCalculation::SetAddOnArmorOfPlateType`, `GetOnAddOnArmorZoneHit` | Sets the add-on armour per plate type. The hit event carries each damaged zone's impact position, published before the transitions of that impact. |
@@ -36,6 +37,9 @@ generated lightmap UVs on vehicle hulls, so panels use channel 3. At most 20 pan
 - Every panel that damage hides flies off as debris. It leaves the hull face with the tank's own velocity, tumbles,
   bounces on the ground under the tank, lies flat and shrinks away 3.6 s after the hit. A loaded save throws nothing,
   and neither does a tank that fog of war hides.
+- Each hit that hides panels plays one armour-off clang for the tank's weight class (light, medium, heavy) at the
+  hit, however many panels come off. It also plays on a hull without a debris panel. Loads, repairs and tanks hidden by
+  fog of war are silent.
 
 ## Converting a vehicle
 

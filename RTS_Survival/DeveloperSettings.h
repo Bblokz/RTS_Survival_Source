@@ -1751,6 +1751,9 @@ namespace DeveloperSettings
 		{
 			// How many spatial audio actors we pool to play spatial voice lines.
 			inline constexpr int32 SpatialAudioPoolSize = 32;
+			// Pooled audio components for the clang of add-on armour panels (side skirts) shot off a tank; when all
+			// are busy the oldest one is reused.
+			inline constexpr int32 AddOnArmorOffAudioPoolSize = 16;
 			inline constexpr float BaseIntervalBetweenSpatialVoiceLines = 12.f;
 			inline constexpr float FluxPercentageIntervalBetweenSpatialVoiceLines = 30.f;
 			inline constexpr float MaxStaggerBetweenSpatialVoiceLines = 1.f;

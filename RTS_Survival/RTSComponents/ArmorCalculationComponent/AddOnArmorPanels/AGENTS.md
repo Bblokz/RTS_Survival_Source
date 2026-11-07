@@ -59,6 +59,14 @@ when you rebuild without `DebrisMesh=`. It warns when the hull has none.
   of war hides the test tank, as it does the Soviet ones) and, 2.5 s after the shell, a flat resting piece, and writes a `1_FirstHit_Flight` picture. Add `-AddOnArmorPanelsTraceDebris` to log the piece
   every frame.
 
+## The armour-off sound
+
+`UAddOnArmorPanelAudioSubsystem` plays one clang per hit that hides panels, from a pool of 16 audio components
+(`AddOnArmorOffAudioPoolSize`). Never spawn sounds for this with `UGameplayStatics::SpawnSoundAtLocation`: the pool is
+there so hits create nothing for the GC. The cues are `Cue_AddOnArmorOff_Light/Medium/Heavy` in
+`/Game/RTS_Survival/SpecialEffects/AddOnArmor/Sounds`; keep them in that always-cooked folder (soft paths don't cook)
+and give them attenuation, because the pooled components set none.
+
 ## Debris HLSL gotchas (Niagara CPU VM)
 
 - Don't use `asin` in the update. With it, resting plates froze at a tilt (45 degrees), half under the ground. A
