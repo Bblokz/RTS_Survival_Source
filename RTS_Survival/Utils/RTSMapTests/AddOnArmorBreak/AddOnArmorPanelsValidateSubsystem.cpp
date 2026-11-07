@@ -25,11 +25,19 @@
 #include "GameFramework/PlayerStart.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Misc/CommandLine.h"
+#include "NiagaraComponent.h"
+#include "NiagaraDataSetAccessor.h"
+#include "NiagaraEmitterInstance.h"
+#include "NiagaraSystem.h"
+#include "NiagaraSystemInstance.h"
+#include "NiagaraSystemInstanceController.h"
+#include "UObject/UObjectIterator.h"
 #include "ShaderCompiler.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelDebris.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelsComponent.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/VehicleModules/VehicleModuleDamageEvent.h"
@@ -72,6 +80,13 @@ namespace AddOnArmorPanelsValidateConstants
 	constexpr float LandingSeconds = 3.f;
 	constexpr float PictureSettleSeconds = 1.5f;
 	constexpr float SecondsBetweenHits = 0.4f;
+	// A resting debris plate lies flat (face normal within ~25 degrees of vertical) with its centre on the ground plane.
+	constexpr float MinRestingNormalZ = 0.9f;
+	constexpr float MaxRestingHeightAboveGround = 5.f;
+	// Game seconds after the first shell at which its debris is pictured in the air.
+	constexpr float DebrisFlightPictureSeconds = 0.2f;
+	// Game seconds after the first shell at which its pieces must lie flat: after landing, before they shrink.
+	constexpr float DebrisSettleCheckSeconds = 2.5f;
 	constexpr int32 MaxHitsUntilDestroyed = 40;
 
 	constexpr float SpawnHeight = 150.f;
@@ -163,6 +178,7 @@ void UAddOnArmorPanelsValidateSubsystem::Tick(const float DeltaTime)
 			return;
 		}
 		M_LastTankLocation = M_Tank->GetActorLocation();
+		TickFirstShotDebris();
 	}
 	switch (M_Step)
 	{
@@ -868,6 +884,127 @@ void UAddOnArmorPanelsValidateSubsystem::LogModuleWaitReason()
 	       TEXT("RTS_ADDON_PANELS waiting seconds=%.0f modules_finalized=%d shader_jobs=%d async_loading=%d"),
 	       SecondsInStep, M_Armor->GetAreModulesFinalized(),
 	       GShaderCompilingManager != nullptr ? GShaderCompilingManager->GetNumRemainingJobs() : 0, IsAsyncLoading());
+}
+
+void UAddOnArmorPanelsValidateSubsystem::TickFirstShotDebris()
+{
+	using namespace AddOnArmorPanelsValidateConstants;
+	if (M_FirstShotGameSeconds < 0.f)
+	{
+		// The first shell is fired on the first tick of its step.
+		if (M_Step == EAddOnArmorPanelsValidateStep::FirstHit && bM_StepActionDone)
+		{
+			M_FirstShotGameSeconds = M_StepStartGameSeconds;
+		}
+		return;
+	}
+	const float SecondsSinceShot = GetWorld()->GetTimeSeconds() - M_FirstShotGameSeconds;
+	if (M_FirstDebrisBurst.IsValid() && not bM_DidDebrisSettleCheck
+		&& FParse::Param(FCommandLine::Get(), TEXT("AddOnArmorPanelsTraceDebris")))
+	{
+		CheckRestingDebris(*M_FirstDebrisBurst, false);
+	}
+	if (not bM_DidFlightPicture && SecondsSinceShot >= DebrisFlightPictureSeconds)
+	{
+		bM_DidFlightPicture = true;
+		M_FirstDebrisBurst = FindActiveDebrisBurst();
+		const int32 Particles = M_FirstDebrisBurst.IsValid() ? CountParticles(*M_FirstDebrisBurst) : 0;
+		const int32 HiddenLeft = CountBits(GetHiddenPanelMask() & M_LeftPanelMask);
+		const bool bIsTankHidden = M_Tank->IsHidden();
+		UE_LOG(LogRTSAddOnArmorPanelsValidate, Display,
+		       TEXT("RTS_ADDON_PANELS first hit debris in flight particles=%d hidden_left=%d tank_hidden_by_fog=%d"),
+		       Particles, HiddenLeft, bIsTankHidden ? 1 : 0);
+		ExportPictures(TEXT("1_FirstHit_Flight"));
+		if (bIsTankHidden)
+		{
+			// Enemy vehicles of the test stay in fog of war: no debris may show where they are.
+			Expect(Particles == 0, TEXT("a tank hidden by fog of war throws no debris"));
+			bM_DidDebrisSettleCheck = true;
+			return;
+		}
+		Expect(Particles == HiddenLeft, TEXT("each panel the first hit hides flies off as one debris piece"));
+	}
+	if (not bM_DidDebrisSettleCheck && SecondsSinceShot >= DebrisSettleCheckSeconds)
+	{
+		bM_DidDebrisSettleCheck = true;
+		Expect(M_FirstDebrisBurst.IsValid(), TEXT("the first debris burst lasts until its pieces have settled"));
+		if (M_FirstDebrisBurst.IsValid())
+		{
+			CheckRestingDebris(*M_FirstDebrisBurst, true);
+		}
+	}
+}
+
+UNiagaraComponent* UAddOnArmorPanelsValidateSubsystem::FindActiveDebrisBurst() const
+{
+	for (TObjectIterator<UNiagaraComponent> It; It; ++It)
+	{
+		UNiagaraComponent* const Burst = *It;
+		const UNiagaraSystem* const System = Burst->GetAsset();
+		if (Burst->GetWorld() == GetWorld() && Burst->IsActive() && IsValid(System)
+			&& System->GetPathName() == AddOnArmorPanelDebris::SystemPath)
+		{
+			return Burst;
+		}
+	}
+	return nullptr;
+}
+
+int32 UAddOnArmorPanelsValidateSubsystem::CountParticles(const UNiagaraComponent& Burst)
+{
+	const FNiagaraSystemInstanceControllerConstPtr Controller = Burst.GetSystemInstanceController();
+	const FNiagaraSystemInstance* const Instance = Controller.IsValid() ? Controller->GetSystemInstance_Unsafe() : nullptr;
+	if (Instance == nullptr)
+	{
+		return 0;
+	}
+	int32 ParticleCount = 0;
+	for (const FNiagaraEmitterInstanceRef& Emitter : Instance->GetEmitters())
+	{
+		ParticleCount += Emitter->GetNumParticles();
+	}
+	return ParticleCount;
+}
+
+void UAddOnArmorPanelsValidateSubsystem::CheckRestingDebris(const UNiagaraComponent& Burst, const bool bExpectResting)
+{
+	using namespace AddOnArmorPanelsValidateConstants;
+	const FNiagaraSystemInstanceControllerConstPtr Controller = Burst.GetSystemInstanceController();
+	const FNiagaraSystemInstance* const Instance = Controller.IsValid() ? Controller->GetSystemInstance_Unsafe() : nullptr;
+	if (Instance == nullptr || Instance->GetEmitters().IsEmpty())
+	{
+		Expect(not bExpectResting, TEXT("the first debris burst has particles to check"));
+		return;
+	}
+	const FNiagaraDataSet& DataSet = Instance->GetEmitters()[0]->GetParticleData();
+	const int32 ParticleCount = DataSet.GetCurrentData() != nullptr ? DataSet.GetCurrentData()->GetNumInstances() : 0;
+	const float GroundHeight = Burst.GetOverrideParameters().GetParameterValue<float>(
+		FNiagaraVariable(FNiagaraTypeDefinition::GetFloatDef(), TEXT("User.GroundHeight")));
+	const auto PositionReader = FNiagaraDataSetAccessor<FNiagaraPosition>::CreateReader(DataSet, TEXT("Position"));
+	const auto OrientationReader = FNiagaraDataSetAccessor<FQuat4f>::CreateReader(DataSet, TEXT("MeshOrientation"));
+	const auto RestingReader = FNiagaraDataSetAccessor<float>::CreateReader(DataSet, TEXT("Resting"));
+	const auto ScaleReader = FNiagaraDataSetAccessor<FVector3f>::CreateReader(DataSet, TEXT("Scale"));
+	const auto AgeReader = FNiagaraDataSetAccessor<float>::CreateReader(DataSet, TEXT("Age"));
+	const auto VelocityReader = FNiagaraDataSetAccessor<FVector3f>::CreateReader(DataSet, TEXT("Velocity"));
+	for (int32 ParticleIndex = 0; ParticleIndex < ParticleCount; ++ParticleIndex)
+	{
+		const FVector3f Position = PositionReader.GetSafe(ParticleIndex, FVector3f::ZeroVector);
+		const FVector3f Normal = OrientationReader.GetSafe(ParticleIndex, FQuat4f::Identity).RotateVector(FVector3f(0.f, 1.f, 0.f));
+		const float Resting = RestingReader.GetSafe(ParticleIndex, -1.f);
+		UE_LOG(LogRTSAddOnArmorPanelsValidate, Display,
+		       TEXT("RTS_ADDON_PANELS debris piece=%d age=%.2f position=%s velocity=%s ground=%.1f resting=%.0f normal=%s scale=%s"),
+		       ParticleIndex, AgeReader.GetSafe(ParticleIndex, -1.f), *Position.ToCompactString(),
+		       *VelocityReader.GetSafe(ParticleIndex, FVector3f::ZeroVector).ToCompactString(), GroundHeight, Resting,
+		       *Normal.ToCompactString(), *ScaleReader.GetSafe(ParticleIndex, FVector3f::ZeroVector).ToCompactString());
+		if (not bExpectResting)
+		{
+			continue;
+		}
+		Expect(Resting > 0.5f, TEXT("a debris piece comes to rest"));
+		Expect(FMath::Abs(Normal.Z) >= MinRestingNormalZ, TEXT("a resting debris piece lies flat"));
+		Expect(Position.Z - GroundHeight <= MaxRestingHeightAboveGround && Position.Z >= GroundHeight,
+		       TEXT("a resting debris piece lies on its ground plane"));
+	}
 }
 
 void UAddOnArmorPanelsValidateSubsystem::Expect(const bool bCondition, const FString& What)

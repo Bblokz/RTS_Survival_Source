@@ -214,6 +214,9 @@ public:
 
 	EGliderDeliveryPhase GetDeliveryPhase() const { return M_Run.Phase; }
 
+	// How far the tank drives out of the nose on its own; read from the class defaults to plan a landing run.
+	float GetTankExitDistance() const { return M_Tuning.TankExitDistance; }
+
 	// Fires once: with the tank when it drives out, or with null when the delivery failed.
 	FOnGliderTankDelivered OnTankDelivered;
 

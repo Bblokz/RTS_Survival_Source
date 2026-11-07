@@ -11,6 +11,7 @@
 
 class ACPPController;
 class ASceneCapture2D;
+class UNiagaraComponent;
 class ATankMaster;
 class UArmorCalculation;
 class UMeshComponent;
@@ -124,6 +125,12 @@ private:
 	FAddOnArmorPanelsSideReading M_IntactRight;
 
 	int32 M_HitSerial = 0;
+	// The first shell's debris burst, checked at fixed times after the shell (shader compiles delay the step checks).
+	TWeakObjectPtr<UNiagaraComponent> M_FirstDebrisBurst;
+	// Game seconds of the first shell; negative until it was fired.
+	float M_FirstShotGameSeconds = -1.f;
+	bool bM_DidFlightPicture = false;
+	bool bM_DidDebrisSettleCheck = false;
 	int32 M_PreviousHiddenLeftCount = 0;
 	float M_NextHitGameSeconds = 0.f;
 	// Game seconds at which the left zone was seen destroyed; negative until then.
@@ -170,5 +177,19 @@ private:
 	/** @brief Says every few seconds why the tank is not ready, so a stalled wait names its cause. */
 	void LogModuleWaitReason();
 	void Expect(bool bCondition, const FString& What);
+	/**
+	 * @brief Checks the first shell's debris: one piece per hidden panel in flight, then each piece flat on the ground
+	 * before it shrinks. Runs every tick after the first shell, independent of the step checks.
+	 */
+	void TickFirstShotDebris();
+	/** @return The active panel debris burst of this world, or null. */
+	UNiagaraComponent* FindActiveDebrisBurst() const;
+	static int32 CountParticles(const UNiagaraComponent& Burst);
+	/**
+	 * @brief Logs every debris piece of the burst.
+	 * @param Burst The burst to read.
+	 * @param bExpectResting Also checks that each piece has come to rest flat on the burst's ground plane.
+	 */
+	void CheckRestingDebris(const UNiagaraComponent& Burst, bool bExpectResting);
 	void Finish();
 };

@@ -564,6 +564,7 @@ enum class ESquadSubtype: uint8
 	// Scrap Warlord commander: scavengers with 33% more health, 3 STG 44s and 2 Panzerfausts; delivered by the
 	// GA_GerEliteScavengersParadrop. Appended to preserve the numeric subtype IDs stored in training options.
 	Squad_Ger_EliteScavengers UMETA(DisplayName = "Ger Elite Scavengers (STG 44s and Panzerfausts)"),
+	Squad_Rus_ArmoredMosin UMETA(DisplayName = "Rus Armored Mosin Squad"),
 };
 
 
@@ -704,6 +705,8 @@ static FString Global_GetSquadDisplayName(const ESquadSubtype SquadSubType)
 		break;
 	case ESquadSubtype::Squad_Rus_Mosin:
 		return "Mosin Squad";
+	case ESquadSubtype::Squad_Rus_ArmoredMosin:
+		return "Armored Mosin Squad";
 	case ESquadSubtype::Squad_Rus_Dyakonov:
 		return "Dyakonov Squad";
 	case ESquadSubtype::Squad_Rus_KorovinAssault:
