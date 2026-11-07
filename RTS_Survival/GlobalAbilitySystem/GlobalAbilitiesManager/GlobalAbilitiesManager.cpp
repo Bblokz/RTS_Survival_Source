@@ -482,6 +482,18 @@ void UGlobalAbilitiesManager::LoadGlobalAbilities(TArray<EGlobalAbility> Ability
 void UGlobalAbilitiesManager::OnLoadedAbilities(TArray<TObjectPtr<UGlobalAbility>> AbilitiesLoadedCopyUObjects)
 {
 	M_GlobalAbilities = AbilitiesLoadedCopyUObjects;
+	M_BaseCooldownTimes.Reset();
+	if (M_AppliedCooldownMlt < 1.f)
+	{
+		// A cooldown bonus registered before the abilities finished loading.
+		for (UGlobalAbility* Ability : M_GlobalAbilities)
+		{
+			if (IsValid(Ability))
+			{
+				ApplyCooldownMltToAbility(Ability, M_AppliedCooldownMlt);
+			}
+		}
+	}
 	StartCooldownTimer();
 	if (IsPlayerAbilityManager())
 	{
@@ -575,6 +587,7 @@ void UGlobalAbilitiesManager::ReleaseLoadedAbilities()
 	}
 
 	M_GlobalAbilities.Reset();
+	M_BaseCooldownTimes.Reset();
 	M_GlobalAbilityPanel.Reset();
 	M_GA_Description.Reset();
 	M_PlayerTechManager.Reset();
@@ -703,7 +716,7 @@ void UGlobalAbilitiesManager::OnAbilityFinishedExecuting(UGlobalAbility* Ability
 	{
 		return;
 	}
-	Ability->M_AbilityCosts.CoolDownRemaining = GetScaledCooldownTime(Ability);
+	Ability->M_AbilityCosts.CoolDownRemaining = Ability->M_AbilityCosts.CoolDownTime;
 	if (IsPlayerAbilityManager())
 	{
 		UpdateAbilityItemAvailability(Ability, false, false);
@@ -778,23 +791,29 @@ void UGlobalAbilitiesManager::OnCooldownMltChanged()
 	const float Ratio = NewCooldownMlt / M_AppliedCooldownMlt;
 	for (UGlobalAbility* Ability : M_GlobalAbilities)
 	{
-		if (not IsValid(Ability) || Ability->M_AbilityCosts.CoolDownRemaining <= 0)
+		if (not IsValid(Ability))
 		{
 			continue;
 		}
-		Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(
-			1, FMath::CeilToInt32(Ability->M_AbilityCosts.CoolDownRemaining * Ratio));
+		ApplyCooldownMltToAbility(Ability, NewCooldownMlt);
+		if (Ability->M_AbilityCosts.CoolDownRemaining > 0)
+		{
+			Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(
+				1, FMath::CeilToInt32(Ability->M_AbilityCosts.CoolDownRemaining * Ratio));
+		}
 	}
 	M_AppliedCooldownMlt = NewCooldownMlt;
 }
 
-int32 UGlobalAbilitiesManager::GetScaledCooldownTime(const UGlobalAbility* Ability) const
+void UGlobalAbilitiesManager::ApplyCooldownMltToAbility(UGlobalAbility* Ability, const float CooldownMlt)
 {
-	if (not IsValid(Ability) || Ability->M_AbilityCosts.CoolDownTime <= 0)
+	// The first time an ability is scaled its current cooldown is its base (no bonus was active before).
+	const int32 BaseCooldownTime = M_BaseCooldownTimes.FindOrAdd(Ability, Ability->M_AbilityCosts.CoolDownTime);
+	if (BaseCooldownTime <= 0)
 	{
-		return IsValid(Ability) ? Ability->M_AbilityCosts.CoolDownTime : 0;
+		return;
 	}
-	return FMath::Max(1, FMath::CeilToInt32(Ability->M_AbilityCosts.CoolDownTime * GetCooldownMlt()));
+	Ability->M_AbilityCosts.CoolDownTime = FMath::Max(1, FMath::CeilToInt32(BaseCooldownTime * CooldownMlt));
 }
 
 bool UGlobalAbilitiesManager::TryPayForAbility(UGlobalAbility* Ability) const

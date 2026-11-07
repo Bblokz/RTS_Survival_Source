@@ -74,7 +74,9 @@ namespace BxpConstructionRules
 		{EBuildingExpansionType::BTX_GerMetalVaultSmelter, WithFootprint(OriginConstructionRules, 400.f, 580.f)},
 
 		// Ger Barracks Expansions.
-		{EBuildingExpansionType::BTX_GerBarracksRadixReactor, WithFootprint(OriginConstructionRules, 500.f, 300.f)},
+		// The switchyard on the tent's left: 7.45 m from the sandbag kerb to the switch cabinet, 4.33 m from the core's
+		// stool to the cable post (the span into the tent wall is left out).
+		{EBuildingExpansionType::BTX_GerBarracksRadixReactor, WithFootprint(OriginConstructionRules, 745.f, 435.f)},
 		{EBuildingExpansionType::BTX_GerBarrackFuelCell, WithFootprint(OriginConstructionRules, 500.f, 300.f)},
 
 		// --- Free-placed defenses ---

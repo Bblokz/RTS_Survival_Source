@@ -123,8 +123,8 @@ public:
 	                                       float MaxApproachDistance) const;
 
 	/**
-	 * @brief Lets a built expansion (the Cipher room) make these abilities recharge faster while it stands; running
-	 * cooldowns are rescaled so the countdown keeps showing real seconds.
+	 * @brief Lets a built expansion (the Cipher room) make these abilities recharge faster while it stands. Each
+	 * ability's CoolDownTime becomes the effective cooldown (button fill, tooltip) and running cooldowns are rescaled.
 	 * @param Source The expansion granting the bonus; registering it again only updates its multiplier.
 	 * @param CooldownMlt The fraction of their cooldown the abilities take to recharge (0..1).
 	 */
@@ -137,11 +137,15 @@ private:
 	// Built expansions that make the abilities recharge faster; the lowest multiplier counts.
 	TArray<FGlobalAbilityCooldownSource> M_CooldownSources;
 
-	// The multiplier the running cooldowns were last scaled with, so a change rescales them exactly once.
+	// The multiplier the cooldowns were last scaled with, so a change rescales them exactly once.
 	float M_AppliedCooldownMlt = 1.f;
 
+	// Each loaded ability's cooldown without any bonus; CoolDownTime itself holds the effective (scaled) cooldown.
+	UPROPERTY()
+	TMap<TObjectPtr<UGlobalAbility>, int32> M_BaseCooldownTimes;
+
 	void OnCooldownMltChanged();
-	int32 GetScaledCooldownTime(const UGlobalAbility* Ability) const;
+	void ApplyCooldownMltToAbility(UGlobalAbility* Ability, const float CooldownMlt);
 
 	FGlobalAbility_SpawnSettings M_SpawnSetings;
 

@@ -10474,6 +10474,14 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Untrained;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Mosin, SquadData);
+
+	constexpr float ArmoredMosinHealthMultiplier = 1.25f;
+	FSquadData ArmoredMosinSquadData = SquadData;
+	ArmoredMosinSquadData.MaxHealth *= ArmoredMosinHealthMultiplier;
+	ArmoredMosinSquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(
+		ArmoredMosinSquadData.MaxHealth);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_ArmoredMosin, ArmoredMosinSquadData);
+
 	InitAllGameSovietAssaultSquadData(SquadData);
 
 	SquadData.MaxHealth = BasicInfantryHealth;
