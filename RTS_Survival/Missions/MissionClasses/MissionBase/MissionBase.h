@@ -20,6 +20,7 @@
 #include "Engine/OverlapResult.h"
 #include "RTS_Survival/Game/Difficulty/GameDifficulty.h"
 #include "RTS_Survival/Game/UserSettings/RTSGameUserSettings.h"
+#include "RTS_Survival/Missions/NomadicAirDelivery/NomadicAirDeliveryTypes.h"
 #include "MissionBase.generated.h"
 
 enum class ERTSFaction : uint8;
@@ -248,6 +249,8 @@ public:
 
 	bool GetCanCheckTrigger() const;
 
+	inline bool GetHasMissionStarted() const { return MissionState.bIsMissionStarted; }
+
 
 	/**
 	 * Called when the mission is complete.
@@ -380,6 +383,15 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BaseSettings")
 	float LoadToStartDelay = 0.0f;
+
+	// For a mission that ends by flying the player HQ in (DeliverPlayerHQByMammutGlider in BP_OnMissionComplete):
+	// the next mission only starts once the HQ is on the ground, so it finds the player HQ when it starts.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "BaseSettings")
+	bool bStartNextMissionWhenAirDeliveredHQLands = false;
+
+	// Aircraft, beacon and landing distances of DeliverPlayerNomadicByCargoPlane and DeliverPlayerHQByMammutGlider.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mission|AirDelivery")
+	FNomadicAirDeliverySettings AirDeliverySettings;
 
 	// If set to true then this mission will use a widget with the next button which will instantly complete the mission
 	// once it is clicked and not play any mission completed sounds.
@@ -1004,6 +1016,36 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent)
 	void BP_OnSeededChoiceGroupsSpawnComplete(const TArray<AActor*>& SpawnedActors, const int32 ID);
 
+	/**
+	 * @brief Flies a player nomadic truck in under a cargo plane on ropes, sets it down on the spot and builds it there
+	 * at once, also outside the HQ build radius. A blue smoke beacon marks the spot until the truck is down.
+	 * @param NomadicSubtype The nomadic to deliver.
+	 * @param BuildLocation Where the building goes; the ground below it is used. Pick open, flat ground.
+	 * @param BuildRotation Only the yaw is used.
+	 * @param ID Handed back in BP_OnAirDeliveredNomadicLanded.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|AirDelivery")
+	void DeliverPlayerNomadicByCargoPlane(const ENomadicSubtype NomadicSubtype, const FVector BuildLocation,
+	                                      const FRotator BuildRotation, const int32 ID = 0);
+
+	/**
+	 * @brief Brings the player HQ in by the Mammut glider of the super heavy drops: it lands, the HQ drives out to
+	 * the spot and builds there at once. A blue smoke beacon marks the spot until the HQ is out.
+	 * @param BuildLocation Where the HQ goes; the glider stops short of it. Pick open, flat ground.
+	 * @param BuildRotation Only the yaw is used.
+	 * @param GliderTouchdownLocation Where the glider touches down; it skids toward BuildLocation, so leave a long
+	 * flat run between them. Zero: it comes in from the aircraft spawn side.
+	 * @param ID Handed back in BP_OnAirDeliveredNomadicLanded.
+	 */
+	UFUNCTION(BlueprintCallable, NotBlueprintable, Category = "Mission|AirDelivery")
+	void DeliverPlayerHQByMammutGlider(const FVector BuildLocation, const FRotator BuildRotation,
+	                                   const FVector GliderTouchdownLocation, const int32 ID = 0);
+
+	// The truck is on the ground and has just been ordered to build; null when the delivery failed.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Mission|AirDelivery")
+	void BP_OnAirDeliveredNomadicLanded(ANomadicVehicle* NomadicVehicle, const ENomadicSubtype NomadicSubtype,
+	                                    const int32 ID);
+
 	UFUNCTION(BlueprintCallable, NotBlueprintable)
 	void MoveCamera(FMovePlayerCamera CameraMove);
 
@@ -1365,4 +1407,14 @@ private:
 	void TeamWeaponSquadTracking_Clear();
 
 	bool bM_IgnoreTriggerOnMissionStart = false;
+
+	// HQ air deliveries of this mission that have not landed yet; with bStartNextMissionWhenAirDeliveredHQLands the
+	// next mission waits for them.
+	int32 M_PendingAirDeliveredHQCount = 0;
+	bool bM_IsNextMissionWaitingForAirDeliveredHQ = false;
+
+	void ActivateNextMissionIfConfigured();
+	void AirDelivery_Start(const FNomadicAirDeliveryOrder& Order, const int32 ID);
+	void AirDelivery_OnLanded(ANomadicVehicle* NomadicVehicle, const ENomadicSubtype NomadicSubtype,
+	                          const bool bIsHQDelivery, const int32 ID);
 };

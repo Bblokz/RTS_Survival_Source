@@ -368,12 +368,16 @@ namespace AddOnArmorPanelDebrisAuthoring
 			{TEXT("PieceCount"), MakeUserName(PieceCountParameter), FNiagaraTypeDefinition::GetIntDef()},
 			{TEXT("DebrisLifetime"), TEXT("User.DebrisLifetime"), FloatType}
 		};
-		// Attributes the update only reads come in through the map read; a token in the HLSL alone may not load them.
+		// Every attribute the update reads comes in through the map read, also the ones it writes; a token in the HLSL
+		// alone may not load it.
 		const TArray<FHlslInput> UpdateInputs = {
 			{TEXT("GroundHeight"), MakeUserName(GroundHeightParameter), FloatType},
 			{TEXT("ShrinkSeconds"), TEXT("User.DebrisShrinkSeconds"), FloatType},
 			{TEXT("SpinAxisIn"), SpinAxisAttribute.ToString(), FNiagaraTypeDefinition::GetVec3Def()},
 			{TEXT("PieceScaleIn"), PieceScaleAttribute.ToString(), FloatType},
+			{TEXT("OrientationIn"), TEXT("Particles.MeshOrientation"), FNiagaraTypeDefinition::GetQuatDef()},
+			{TEXT("SpinSpeedIn"), SpinSpeedAttribute.ToString(), FloatType},
+			{TEXT("RestingIn"), RestingAttribute.ToString(), FloatType},
 			{TEXT("AgeIn"), TEXT("Particles.Age"), FloatType},
 			{TEXT("LifetimeIn"), TEXT("Particles.Lifetime"), FloatType}
 		};

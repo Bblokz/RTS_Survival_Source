@@ -654,7 +654,7 @@ namespace AddOnArmorPanelAuthoring
 		{
 			return LoadMeshIfPresent(Settings.DebrisMeshPath);
 		}
-		const UStaticMesh* const PreviousHull = LoadMeshIfPresent(Settings.TargetPath);
+		UStaticMesh* const PreviousHull = LoadMeshIfPresent(Settings.TargetPath);
 		const UAddOnArmorPanelLayout* const PreviousLayout = IsValid(PreviousHull)
 			? PreviousHull->GetAssetUserData<UAddOnArmorPanelLayout>()
 			: nullptr;

@@ -110,6 +110,12 @@ public:
 		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback, const FRotator
 		& OptionalRotation);
 
+	// Whether AsyncSpawnOptionAtLocation can spawn this option; lets a caller fail before it spawned anything else.
+	bool GetHasClassForTrainingOption(const FTrainingOption& TrainingOption) const
+	{
+		return M_TrainingOptionMap.Contains(TrainingOption);
+	}
+
 	/**
 	 * @brief Spawns one exact class the way AsyncSpawnOptionAtLocation does, for callers that promise a specific unit
 	 * variant whatever the option maps to for this player.
