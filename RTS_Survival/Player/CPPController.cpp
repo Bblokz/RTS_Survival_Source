@@ -1,6 +1,7 @@
 // Copyright (C) Bas Blokzijl - All rights reserved.
 
 #include "CPPController.h"
+#include "RTS_Survival/GlobalAbilitySystem/Tests/AllGlobalAbilities/AllGlobalAbilitiesUnlock.h"
 #include "RTS_Survival/Player/ConstructionPreview/FieldTrenchPlacement/FieldTrenchPlacementComponent.h"
 
 #include "RTS_Survival/Player/SquadMovePreview/SquadMovePreviewComponent.h"
@@ -60,6 +61,7 @@
 #include "RTS_Survival/GlobalAbilitySystem/DevSettings/CommanderSettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbility.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityCostState.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/LandscapeDeformSystem/LandscapeDeformManager/LandscapeDeformManager.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HpCharacterObjectsMaster.h"
@@ -398,11 +400,40 @@ void ACPPController::OnGlobaAbilityActivated(const FGlobalAbilityAimSettings& Ai
 	M_PlayerAimAbility->ShowGlobalAbilityArea(AimSettings, AbilityActivated);
 }
 
+namespace GlobalAbilityClickStatics
+{
+	// Reach of the navmesh search around a click: a strike may be aimed at a cliff or roof next to walkable ground.
+	const FVector PlayableGroundNavExtent(500.f, 500.f, 2000.f);
+
+	/**
+	 * @brief Near the map edge the cursor can hit backdrop geometry past the playable area. Dropped units would spawn
+	 * where there is no ground and fall out of the world, and a strike there hits nothing. Playable ground has the
+	 * landscape below it or navmesh close by (some maps build parts of their ground from meshes, not landscape).
+	 */
+	bool GetIsPlayableGround(const UObject* WorldContextObject, const FVector& Location)
+	{
+		FVector Ground;
+		if (GlobalAbilityHelpers::TryFindGroundLocation(WorldContextObject, Location, Ground))
+		{
+			return true;
+		}
+		bool bWasProjected = false;
+		URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(WorldContextObject, Location,
+		                                                            PlayableGroundNavExtent, bWasProjected);
+		return bWasProjected;
+	}
+}
+
 bool ACPPController::TryHandleActiveGlobalAbilityPrimaryClick(const FVector& ClickedLocation)
 {
 	if (not M_ActiveGlobalAbility.IsValid())
 	{
 		return false;
+	}
+	// A click past the playable area is ignored; the ability stays armed for a click on the map.
+	if (not GlobalAbilityClickStatics::GetIsPlayableGround(this, ClickedLocation))
+	{
+		return true;
 	}
 	const bool bHasAimActor = GetIsValidPlayerAimAbilityActor();
 	if (bHasAimActor && M_PlayerAimAbility->TryAnchorStrip(ClickedLocation))
@@ -412,6 +443,11 @@ bool ACPPController::TryHandleActiveGlobalAbilityPrimaryClick(const FVector& Cli
 	FVector StripStart = FVector::ZeroVector;
 	FVector StripEnd = FVector::ZeroVector;
 	const bool bIsStrip = bHasAimActor && M_PlayerAimAbility->GetStripLine(ClickedLocation, StripStart, StripEnd);
+	// A strip shorter than its minimum is lengthened past the click, which can leave the landscape.
+	if (bIsStrip && not GlobalAbilityClickStatics::GetIsPlayableGround(this, StripEnd))
+	{
+		return true;
+	}
 
 	UGlobalAbility* ActiveGlobalAbility = M_ActiveGlobalAbility.Get();
 	M_ActiveGlobalAbility.Reset();
@@ -8263,6 +8299,23 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 	ERTSCommander Commander = GameInstance->GetPlayerCommander();
 	FRTSCommanderSettings CommanderSettings = CommanderDevSettings->GetCommanderSettingsForType(Commander);
 	const AMissionManager* MissionManager = FRTS_Statics::GetGameMissionManager(this);
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// Ability test target: every ability with a template instead of the commander's kit, no mission tier cap, and the
+	// panel stays visible on missions that hide it.
+	(void)MissionManager;
+	CommanderSettings.GlobalAbilities = RTS::AllGlobalAbilities::GetAllTemplatedAbilities();
+	M_PlayerGlobabilitiesManager->SetMaxAllowedAbilityTier(EGlobalAbilityTier::TierIV);
+	M_PlayerGlobabilitiesManager->InitGlobalAbilitiesManager(
+		1,
+		CommanderSettings.GlobalAbilities,
+		MainMenuWidget->GetGlobalAbilityPanel(),
+		M_PlayerResourceManager,
+		GameUnitManager,
+		M_PlayerTechManager,
+		PlayerStartLocation,
+		AircraftHeightStart
+	);
+#else
 	// Without a mission manager (skirmish, survival) the whole kit is available.
 	M_PlayerGlobabilitiesManager->SetMaxAllowedAbilityTier(IsValid(MissionManager)
 		                                                       ? MissionManager->GetMaxPlayerGlobalAbilityTier()
@@ -8283,7 +8336,7 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 		MainMenuWidget->HideGlobalAbilityPanelForMission();
 		return;
 	}
-	
+#endif
 }
 
 void ACPPController::DeactivateActionButton()

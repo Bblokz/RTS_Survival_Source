@@ -160,6 +160,17 @@ bool FMissionTowTeamWeaponSpawnState::TryFinishInstantTow()
 		return false;
 	}
 
+	// Both were spawned, so one that is gone now was destroyed (combat, a strike) before the tow started: nothing is
+	// left to do. Finish once instead of reporting the missing actor every tick for the rest of the mission.
+	if (not M_TankActor.IsValid() || not M_SquadController.IsValid())
+	{
+		bM_HasFailed = true;
+		UE_LOG(LogTemp, Display,
+		       TEXT("Mission tow spawn request %d ended: its vehicle or team weapon squad was destroyed before towing."),
+		       M_RequestId);
+		return false;
+	}
+
 	if (not GetIsValidTankActor())
 	{
 		return false;
