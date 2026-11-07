@@ -38,6 +38,36 @@ namespace ParatroopersConstants
 	constexpr float JumpBehindAircraftOffset = 200.0f;
 	constexpr float LandscapeTraceDepth = 200000.0f;
 	const FVector NavProjectionExtentScale(2.0f, 2.0f, 2.0f);
+	// A landscape trace starts this far above the point it looks under.
+	constexpr float LandscapeTraceHeightAbove = 100000.0f;
+
+	/**
+	 * @brief A drop aimed near the map edge spreads its squads and jumpers past the landscape; a unit put where no
+	 * landscape is falls out of the world. Finds the landscape under a point.
+	 * @return False when there is no landscape below (or above) the point.
+	 */
+	bool TryFindLandscapeBelow(const UWorld* World, const FVector& Location, const AActor* IgnoredActor,
+	                           FVector& OutGround)
+	{
+		if (not IsValid(World))
+		{
+			return false;
+		}
+		const FVector TraceStart(Location.X, Location.Y, Location.Z + LandscapeTraceHeightAbove);
+		const FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, LandscapeTraceDepth);
+		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ParatrooperLandscapeBelow), false);
+		if (IgnoredActor)
+		{
+			QueryParams.AddIgnoredActor(IgnoredActor);
+		}
+		FHitResult LandscapeHit;
+		if (not World->LineTraceSingleByChannel(LandscapeHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, QueryParams))
+		{
+			return false;
+		}
+		OutGround = LandscapeHit.ImpactPoint;
+		return true;
+	}
 }
 
 void UGA_Paratroopers::ExecuteAbilityAtLocation(const FVector& TargetLocation)
@@ -387,11 +417,21 @@ FVector UGA_Paratroopers::GetProjectedSquadSpawnLocation(
 		FMath::Sin(Angle) * M_ParatroopersSettings.SquadSpawnRingRadius,
 		0.0f);
 	bool bWasProjected = false;
-	return URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
+	const FVector Projected = URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
 		this,
 		DesiredLocation,
 		ParatroopersConstants::NavProjectionExtentScale,
 		bWasProjected);
+	FVector Ground;
+	if (ParatroopersConstants::TryFindLandscapeBelow(GetWorld(), Projected, nullptr, Ground))
+	{
+		// Off the navmesh (cliffs, the map edge) the ring point keeps the aim point's height, which can lie under the
+		// landscape there: the hidden squad would spawn inside the ground and fall through the world while it waits.
+		return bWasProjected ? Projected : Ground;
+	}
+	// The ring point is past the landscape edge (a drop aimed at the map edge): the squad waits at the target instead
+	// of where it would fall out of the world while hidden.
+	return ParatroopersConstants::TryFindLandscapeBelow(GetWorld(), TargetLocation, nullptr, Ground) ? Ground : TargetLocation;
 }
 
 void UGA_Paratroopers::OnSquadSpawned(const int32 RunId, AActor* SpawnedActor)
@@ -928,6 +968,16 @@ FVector UGA_Paratroopers::GetLandingLocation(
 		if (World->LineTraceSingleByChannel(LandscapeHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, QueryParams))
 		{
 			GroundLocation = LandscapeHit.ImpactPoint;
+		}
+		else
+		{
+			// The spiral point is past the landscape edge (a drop aimed at the map edge): land at the aim point
+			// rather than on nothing, where the soldier would fall out of the world.
+			FVector TargetGround;
+			GroundLocation = ParatroopersConstants::TryFindLandscapeBelow(
+				                 World, GetLandingTrailOrigin(Run, JumpIndex), SquadUnit, TargetGround)
+				                 ? TargetGround
+				                 : Run.TargetLocation;
 		}
 	}
 

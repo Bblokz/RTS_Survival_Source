@@ -7,6 +7,7 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
+#include "RTS_Survival/GlobalAbilitySystem/Tests/AllGlobalAbilities/AllGlobalAbilitiesUnlock.h"
 #include "GlobalAbilitiesManager.generated.h"
 
 USTRUCT(BlueprintType)
@@ -132,6 +133,15 @@ public:
 	void UnregisterCooldownMlt(const AActor* Source);
 	// 1 without a bonus; otherwise the lowest registered multiplier (bonuses do not stack).
 	float GetCooldownMlt() const;
+
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// RTS_SurvivalShippingGlobalAbilityTests only: the player has every ability, more than the panel's 8 slots, so
+	// the panel shows one page of them at a time. Wraps around; refreshes the shown items' availability.
+	void ShowAbilityPanelPage(int32 PageIndex);
+	int32 GetAbilityPanelPage() const;
+	int32 GetAbilityPanelPageCount() const;
+	const TArray<TObjectPtr<UGlobalAbility>>& GetLoadedAbilities() const { return M_GlobalAbilities; }
+#endif
 
 private:
 	// Built expansions that make the abilities recharge faster; the lowest multiplier counts.

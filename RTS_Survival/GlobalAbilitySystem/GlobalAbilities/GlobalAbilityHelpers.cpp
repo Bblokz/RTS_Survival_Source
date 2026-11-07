@@ -4,6 +4,8 @@
 
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
+#include "RTS_Survival/Units/Aircraft/VTOLDropship/VTOLDropshipAircraft.h"
+#include "RTS_Survival/Utils/HFunctionLibary.h"
 
 bool GlobalAbilityHelpers::TryFindGroundLocation(
 	const UObject* WorldContextObject,
@@ -58,6 +60,13 @@ AAircraftMaster* GlobalAbilityHelpers::SpawnAircraftAtLocation(
 	}
 
 	SpawnedAircraft->SpawnDefaultController();
+	// The VTOL resource shuttles (BP_DropShip_*) skip the aircraft movement tick on purpose: they never fly a drop,
+	// strike or move order, so an ability configured with one hovers at its spawn point and never ends.
+	if (SpawnedAircraft->IsA<AVTOLDropshipAircraft>())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("A global ability is configured with a VTOL resource shuttle, which cannot "
+			"fly ability orders; use a regular aircraft class. Class: ") + AircraftClass->GetName());
+	}
 	return SpawnedAircraft;
 }
 
