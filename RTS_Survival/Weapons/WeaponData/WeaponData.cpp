@@ -3824,7 +3824,11 @@ void UWeaponStateRocketProjectile::UnhideAllAttachedRocketInstances() const
 	}
 	for (const TPair<FName, int32>& EachSocketToInstance : M_SocketToAttachedRocketIndex)
 	{
-		M_AttachedRocketInstances->SetInstanceHidden(EachSocketToInstance.Value, false);
+		// Rockets not fired yet are still shown.
+		if (M_AttachedRocketInstances->GetIsInstanceHidden(EachSocketToInstance.Value))
+		{
+			M_AttachedRocketInstances->SetInstanceHidden(EachSocketToInstance.Value, false);
+		}
 	}
 }
 
@@ -4627,7 +4631,11 @@ void UVerticalRocketWeaponState::UnhideAllAttachedRocketInstances() const
 
 	for (const TPair<FName, int32>& EachSocketToInstance : M_SocketToInstanceIndex)
 	{
-		M_AttachedRocketInstances->SetInstanceHidden(EachSocketToInstance.Value, false);
+		// Rockets not fired yet are still shown.
+		if (M_AttachedRocketInstances->GetIsInstanceHidden(EachSocketToInstance.Value))
+		{
+			M_AttachedRocketInstances->SetInstanceHidden(EachSocketToInstance.Value, false);
+		}
 	}
 }
 

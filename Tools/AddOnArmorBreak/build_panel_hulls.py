@@ -19,8 +19,32 @@ SU_SKIRT_ARGS = (
     f'DebrisMesh={ROOT}/Rus_Medium/SU_SharedArmor/SM_SU85_SU100_SpacedArmor_AddOnPanels_Debris'
 )
 
+IS3_PANEL_ARGS = 'MinAbsY=193 MinZ=57 MaxZ=149.5 MaxIslandLength=160 MinPanelArea=8500'
+IS3_FOLDER = f'{ROOT}/Rus_Heavy/IS-1And-2/SpacedArmor_IS3'
+
 # Hull mesh -> (vehicle Blueprints using it, BuildPanelHull arguments).
 HULLS = {
+    'Rus_Heavy/IS-1And-2/SpacedArmor_IS3/SM_IS3_Standard_FacetedSkirts_Hull': (
+        ['Rus_Vehicle_IS-3'],
+        f'{IS3_PANEL_ARGS} DebrisMesh={IS3_FOLDER}/SM_IS3_Standard_FacetedSkirts_Hull_AddOnPanels_Debris'),
+    'Rus_Heavy/IS-1And-2/SpacedArmor_IS3/SM_IS3_Soviet_FacetedSkirts_Hull': (
+        ['Rus_Vehicle_IS-3_Soviet'],
+        f'{IS3_PANEL_ARGS} DebrisMesh={IS3_FOLDER}/SM_IS3_Soviet_FacetedSkirts_Hull_AddOnPanels_Debris'),
+    'Rus_Heavy/IS-1And-2/SpacedArmor_IS3/SM_IS3_Flame_FacetedSkirts_Hull': (
+        ['Rus_Vehicle_IS-3_Flame'],
+        f'{IS3_PANEL_ARGS} DebrisMesh={IS3_FOLDER}/SM_IS3_Flame_FacetedSkirts_Hull_AddOnPanels_Debris'),
+    'Rus_Heavy/IS-1And-2/HEAT_SpacedArmor/SM_IS1_HEAT_CurvedSkirts_Hull': (
+        ['Rus_Vehicle_IS-1_Soviet'],
+        'MinAbsY=159 MinZ=58 MaxZ=125 MaxIslandLength=151 MinPanelArea=9000 '
+        f'DebrisMesh={ROOT}/Rus_Heavy/IS-1And-2/HEAT_SpacedArmor/SM_IS1_HEAT_CurvedSkirts_Hull_AddOnPanels_Debris'),
+    'Rus_Light/T26/SpacedArmor/BakedHull/SM_T26_Soviet_SpacedArmor_Hull': (
+        ['Rus_Vehicle_T26_Soviet', 'Rus_Vehicle_T26_Soviet_SpacedArmor'],
+        'MinAbsY=130 MinZ=45 MaxZ=127 MaxIslandLength=125 MinPanelArea=5500 '
+        f'DebrisMesh={ROOT}/Rus_Light/T26/SpacedArmor/BakedHull/SM_T26_Soviet_SpacedArmor_Hull_AddOnPanels_Debris'),
+    'Rus_Heavy/KV1/Siege/SM_KV1_Siege_Hull': (
+        ['Rus_Vehicle_KV1_L11_Soviet_Siege'],
+        'MinAbsY=170.4 MinZ=45 MaxZ=131 MinPanelArea=6000 MaxIslandLength=135 '
+        f'DebrisMesh={ROOT}/Rus_Heavy/KV1/Siege/SM_KV1_Siege_Hull_AddOnPanels_Debris'),
     'Rus_Medium/SU85/Meshes/SM_SU85_Soviet_SpacedArmor_Hull': (
         ['Rus_Vehicle_Su85_Soviet'], SU_SKIRT_ARGS),
     'Rus_Medium/Su100/Meshes/SM_SU100_Soviet_SpacedArmor_Hull': (
