@@ -769,6 +769,17 @@ void ATeamWeaponController::UnitInSquadDied(ASquadUnit* UnitDied, bool bUnitSele
 		return;
 	}
 
+	// The last crewman: Super destroys this controller (EndPlay sets the shutdown flag), after which
+	// AssignCrewToTeamWeapon can no longer abandon the gun. It then kept a dead controller: its turret kept aiming
+	// (TurnBase errors every tick) and no squad could re-man it. Abandon it while this controller is still alive.
+	const TArray<ASquadUnit*> SquadUnits = GetSquadUnitsChecked();
+	const bool bIsLastCrewman = SquadUnits.Num() == 0 || (SquadUnits.Num() == 1 && SquadUnits.Contains(UnitDied));
+	if (bIsLastCrewman && not bM_IsTeamWeaponAbandoned && IsValid(M_TeamWeapon))
+	{
+		AbandonTeamWeapon();
+		OnTeamWeaponAbandonedForInsufficientCrew.Broadcast(this);
+	}
+
 	Super::UnitInSquadDied(UnitDied, bUnitSelected, DeathType);
 	AssignCrewToTeamWeapon();
 }

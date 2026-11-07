@@ -51,6 +51,36 @@
 #include "RTS_Survival/Game/GameState/GameUnitManager/TargetPreference/TargetPreference.h"
 #include "RTS_Survival/RTSComponents/RTSTargetAcquisition/RTSEngagementStance/RTSAggroBehaviour.h"
 #include "TimerManager.h"
+#include "RTS_Survival/Utils/UnitGroundRecovery/RTSUnitGroundRecovery.h"
+
+namespace TankMasterGroundRecovery
+{
+	// A vehicle that keeps falling through the world after this many recoveries is destroyed instead.
+	constexpr int32 MaxFellOutOfWorldRecoveries = 3;
+	// Placed this far above the ground and left to settle: physics vehicles must not start inside it.
+	constexpr float SettleDropCm = 20.0f;
+	// Guards against broken bounds: a vehicle origin is never this far above its lowest point.
+	constexpr float MaxOriginAboveBottomCm = 1000.0f;
+	// Physics ticks async (bTickPhysicsAsync): results computed before a teleport still arrive for a few frames and
+	// report the vehicle below the KillZ again. Those reports are ignored this long after a recovery.
+	constexpr double RecoveryGraceSeconds = 1.0;
+	// A vehicle origin at its tracks sits a little into the ground when placed normally: only deeper is a fault.
+	constexpr float MinDepthBeforeLiftCm = 50.0f;
+}
+
+static float GetGroundRecoveryOriginHeight(const ATankMaster& Tank)
+{
+	// The root mesh's own bounds, not the actor's: editor sprites and child actors would pull the bottom down.
+	const UPrimitiveComponent* Root = Cast<UPrimitiveComponent>(Tank.GetRootComponent());
+	float OriginAboveBottom = 0.0f;
+	if (IsValid(Root))
+	{
+		OriginAboveBottom = FMath::Clamp(static_cast<float>(Tank.GetActorLocation().Z - Root->Bounds.GetBox().Min.Z),
+		                                 0.0f, TankMasterGroundRecovery::MaxOriginAboveBottomCm);
+	}
+	return OriginAboveBottom + TankMasterGroundRecovery::SettleDropCm;
+}
+
 
 namespace TurretRangeMovement
 {
@@ -510,6 +540,22 @@ void ATankMaster::OnRotateTowardsFinished()
 void ATankMaster::BeginPlay()
 {
 	Super::BeginPlay();
+	// A spawn point set under the terrain (or a squad grid point under a hill) starts the unit inside the landscape,
+	// where it falls through the world: one trace now instead of any check later.
+	// Next tick: with async physics the vehicle's physics body only takes a teleport once it exists on the physics
+	// thread; a teleport from BeginPlay is lost and the body keeps falling from inside the ground.
+	if (UWorld* World = GetWorld())
+	{
+		TWeakObjectPtr<ATankMaster> WeakThis(this);
+		World->GetTimerManager().SetTimerForNextTick([WeakThis]()
+		{
+			if (WeakThis.IsValid())
+			{
+				FRTSUnitGroundRecovery::TryLiftOutOfLandscape(*WeakThis, GetGroundRecoveryOriginHeight(*WeakThis),
+				                                              TankMasterGroundRecovery::MinDepthBeforeLiftCm);
+			}
+		});
+	}
 	const float Interval = 2.0f + FMath::RandRange(0.0f, 0.5f);
 	if (UWorld* World = GetWorld())
 	{
@@ -2410,4 +2456,37 @@ bool ATankMaster::GetIsValidVehicleTowComponentNoReport() const
 bool ATankMaster::GetIsValidTowedActorComponentNoReport() const
 {
 	return M_TowedActorComponent.IsValid();
+}
+
+void ATankMaster::FellOutOfWorld(const UDamageType& DamageType)
+{
+	if (not IsUnitAlive())
+	{
+		Super::FellOutOfWorld(DamageType);
+		return;
+	}
+	const UWorld* World = GetWorld();
+	const double Now = IsValid(World) ? World->GetTimeSeconds() : 0.0;
+	if (M_LastFellOutOfWorldRecoverySeconds >= 0.0
+		&& Now - M_LastFellOutOfWorldRecoverySeconds < TankMasterGroundRecovery::RecoveryGraceSeconds)
+	{
+		// A stale physics result from before the teleport; the body follows the teleport within a few frames.
+		return;
+	}
+	if (M_FellOutOfWorldRecoveries < TankMasterGroundRecovery::MaxFellOutOfWorldRecoveries
+		&& FRTSUnitGroundRecovery::TryPlaceBackOnGround(*this, GetGroundRecoveryOriginHeight(*this)))
+	{
+		++M_FellOutOfWorldRecoveries;
+		M_LastFellOutOfWorldRecoverySeconds = Now;
+		if (UPrimitiveComponent* Root = Cast<UPrimitiveComponent>(GetRootComponent()))
+		{
+			Root->SetPhysicsLinearVelocity(FVector::ZeroVector);
+			Root->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("RTS_FELL_OUT_OF_WORLD %s put back on the ground at %s (recovery %d)"),
+		       *GetName(), *GetActorLocation().ToCompactString(), M_FellOutOfWorldRecoveries);
+		return;
+	}
+	UE_LOG(LogTemp, Warning, TEXT("RTS_FELL_OUT_OF_WORLD %s has no ground to return to; it is destroyed"), *GetName());
+	TakeFatalDamage();
 }

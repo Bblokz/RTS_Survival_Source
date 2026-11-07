@@ -239,6 +239,19 @@ void ATrainUnit::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 	(void)CallingTurret;
 }
 
+void ATrainUnit::OnHullWeaponOutOfRange(const FVector TargetLocation, UHullWeaponComponent* CallingHullWeapon)
+{
+	// The tank version moves the vehicle toward the target through its AAITankMaster; a train has neither the
+	// controller (plain AIController) nor the freedom to leave its track, and errored on every range check.
+	(void)TargetLocation;
+	(void)CallingHullWeapon;
+}
+
+void ATrainUnit::OnHullWeaponInRange(UHullWeaponComponent* CallingHullWeapon)
+{
+	(void)CallingHullWeapon;
+}
+
 void ATrainUnit::OnUnitIdleAndNoNewCommands()
 {
 	ASelectablePawnMaster::OnUnitIdleAndNoNewCommands();

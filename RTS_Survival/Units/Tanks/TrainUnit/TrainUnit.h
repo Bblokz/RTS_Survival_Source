@@ -59,6 +59,9 @@ public:
 
 	virtual void OnTurretOutOfRange(const FVector TargetLocation, ACPPTurretsMaster* CallingTurret) override;
 	virtual void OnTurretInRange(ACPPTurretsMaster* CallingTurret) override;
+	// A train's guns can be hull weapons (the howitzer wagon); like its turrets it cannot drive toward a target.
+	virtual void OnHullWeaponOutOfRange(const FVector TargetLocation, UHullWeaponComponent* CallingHullWeapon) override;
+	virtual void OnHullWeaponInRange(UHullWeaponComponent* CallingHullWeapon) override;
 	virtual void OnUnitIdleAndNoNewCommands() override;
 
 	// Trains stay in the world as wrecks, so their health bar has to be removed explicitly on death.

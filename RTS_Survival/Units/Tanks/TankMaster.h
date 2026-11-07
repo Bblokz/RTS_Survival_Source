@@ -587,6 +587,18 @@ protected:
 	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void BeginPlay() override;
+	/**
+	 * @brief Called by the engine's KillZ check (see URTSKillZSubsystem) once the unit has fallen through the world.
+	 * Puts it back on the ground instead of the engine's plain Destroy, which would skip the death path; a unit with
+	 * nowhere to stand, or one that keeps falling, dies the normal way.
+	 */
+	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
+
+	// Times this vehicle was put back on the ground after falling through the world.
+	int32 M_FellOutOfWorldRecoveries = 0;
+	// World time of the last recovery; physics runs async, so the fall can still be reported a few frames after it.
+	double M_LastFellOutOfWorldRecoverySeconds = -1.0;
+
 	virtual void CheckForUpgrades();
 
 	virtual void BeginDestroy() override;
