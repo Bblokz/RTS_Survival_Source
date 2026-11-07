@@ -30,18 +30,19 @@ void UGA_AircraftDrop::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 		return;
 	}
 
-	M_ActiveAircraftCount = 0;
-
+	// Not reset here: an earlier execution's aircraft may still be flying, and their destruction is counted too.
 	const TSoftClassPtr<AAircraftMaster> AircraftClassToLoad = M_AircraftDropSettings.AircraftClass;
 	if (AircraftClassToLoad.IsNull())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftDrop has no aircraft class configured."));
-		BroadcastAbilityEnded();
+		BroadcastDropFinishedIfNeeded();
 		return;
 	}
 
 	TWeakObjectPtr<UGA_AircraftDrop> WeakThis(this);
-	M_AircraftClassLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+	// Counted before the request: an already loaded class can complete inside RequestAsyncLoad.
+	++M_PendingAircraftClassLoads;
+	const TSharedPtr<FStreamableHandle> LoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
 		AircraftClassToLoad.ToSoftObjectPath(),
 		FStreamableDelegate::CreateLambda([WeakThis, AircraftClassToLoad, TargetLocation]()
 		{
@@ -52,13 +53,18 @@ void UGA_AircraftDrop::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 
 			WeakThis->OnAircraftClassLoaded(AircraftClassToLoad, TargetLocation);
 		}));
+	if (LoadHandle.IsValid() && not LoadHandle->HasLoadCompleted())
+	{
+		M_AircraftClassLoadHandles.Add(LoadHandle);
+	}
 	Super::ExecuteAbilityAtLocation(TargetLocation);
 	
 }
 
 void UGA_AircraftDrop::BeginDestroy()
 {
-	M_AircraftClassLoadHandle.Reset();
+	M_AircraftClassLoadHandles.Reset();
+	M_PendingAircraftClassLoads = 0;
 	Super::BeginDestroy();
 }
 
@@ -66,7 +72,11 @@ void UGA_AircraftDrop::OnAircraftClassLoaded(
 	const TSoftClassPtr<AAircraftMaster> AircraftClassToLoad,
 	const FVector TargetLocation)
 {
-	M_AircraftClassLoadHandle.Reset();
+	M_PendingAircraftClassLoads = FMath::Max(0, M_PendingAircraftClassLoads - 1);
+	M_AircraftClassLoadHandles.RemoveAll([](const TSharedPtr<FStreamableHandle>& Handle)
+	{
+		return not Handle.IsValid() || Handle->HasLoadCompleted() || Handle->WasCanceled();
+	});
 	UClass* AircraftClass = AircraftClassToLoad.Get();
 	if (not IsValid(AircraftClass))
 	{
@@ -177,26 +187,29 @@ void UGA_AircraftDrop::SpawnTankDropAircraft(
 		WeakAircraft->OrderAircraftDrop(RequestWithTank);
 	};
 
-	if (TankWithOffset.TankClassOverride.IsNull())
+	const bool bIsSpawnQueued = TankWithOffset.TankClassOverride.IsNull()
+		                            ? AsyncSpawner->AsyncSpawnOptionAtLocation(
+			                            TankTrainingOption,
+			                            TankSpawnLocation,
+			                            const_cast<UGA_AircraftDrop*>(this),
+			                            AircraftIndex,
+			                            OnTankSpawned,
+			                            FRotator::ZeroRotator)
+		                            : AsyncSpawner->AsyncSpawnClassAtLocation(
+			                            TSoftClassPtr<AActor>(TankWithOffset.TankClassOverride.ToSoftObjectPath()),
+			                            TankTrainingOption,
+			                            TankSpawnLocation,
+			                            const_cast<UGA_AircraftDrop*>(this),
+			                            AircraftIndex,
+			                            OnTankSpawned,
+			                            FRotator::ZeroRotator);
+	// A failed load request already ran the callback, which destroyed it.
+	if (not bIsSpawnQueued && IsValid(SpawnedAircraft))
 	{
-		AsyncSpawner->AsyncSpawnOptionAtLocation(
-			TankTrainingOption,
-			TankSpawnLocation,
-			const_cast<UGA_AircraftDrop*>(this),
-			AircraftIndex,
-			OnTankSpawned,
-			FRotator::ZeroRotator);
-		return;
+		// The spawner reported why (e.g. no class for the tank subtype). Without a tank the aircraft never gets a drop
+		// order and would circle forever, keeping the ability running: it goes, which also ends the ability.
+		SpawnedAircraft->Destroy();
 	}
-
-	AsyncSpawner->AsyncSpawnClassAtLocation(
-		TSoftClassPtr<AActor>(TankWithOffset.TankClassOverride.ToSoftObjectPath()),
-		TankTrainingOption,
-		TankSpawnLocation,
-		const_cast<UGA_AircraftDrop*>(this),
-		AircraftIndex,
-		OnTankSpawned,
-		FRotator::ZeroRotator);
 }
 
 void UGA_AircraftDrop::SpawnSquadDropAircraft(
@@ -333,7 +346,7 @@ void UGA_AircraftDrop::OnSpawnedAircraftDestroyed(AActor* DestroyedActor)
 
 void UGA_AircraftDrop::BroadcastDropFinishedIfNeeded()
 {
-	if (M_AircraftClassLoadHandle.IsValid())
+	if (M_PendingAircraftClassLoads > 0)
 	{
 		return;
 	}

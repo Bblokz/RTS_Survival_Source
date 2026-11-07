@@ -40,14 +40,26 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FAircraftBombingSettings M_AircraftBombingSettings;
 
+	// The latest bomber; M_Runs holds every bomber of the running executions.
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AAircraftMaster> M_SpawnedAircraft;
 
+	// Unused since bombers keep their own timer in M_Runs; kept so the reflected layout stays the same.
 	UPROPERTY(Transient)
 	FTimerHandle M_ForcedRetreatTimerHandle;
 
-	// Keeps the async aircraft class load request alive until the callback can safely spawn the aircraft.
-	TSharedPtr<FStreamableHandle> M_AircraftClassLoadHandle;
+	struct FBombingRun
+	{
+		TWeakObjectPtr<AAircraftMaster> Aircraft;
+		FTimerHandle ForcedRetreatTimerHandle;
+	};
+
+	// Executions can overlap (enemy AI, missions, short cooldowns): one entry per bomber in the air.
+	TArray<FBombingRun> M_Runs;
+
+	// Keep the async aircraft class load requests alive until their callbacks can safely spawn the aircraft.
+	TArray<TSharedPtr<FStreamableHandle>> M_AircraftClassLoadHandles;
+	int32 M_PendingAircraftClassLoads = 0;
 
 	void RequestSpawnAircraftAtStartLocationAsync(
 		const FVector& StartLocation,
@@ -69,11 +81,12 @@ private:
 		const FVector& StartCarpetLocation,
 		const FVector& CarpetEndLocation,
 		const FVector& RetreatLocation);
-	void StartForcedRetreatTimer();
-	void OnForcedRetreatTimerFinished();
+	void StartForcedRetreatTimer(AAircraftMaster* SpawnedAircraft);
+	void OnForcedRetreatTimerFinished(AAircraftMaster* SpawnedAircraft);
 
 	UFUNCTION()
 	void OnSpawnedAircraftDestroyed(AActor* DestroyedActor);
-	bool GetIsValidSpawnedAircraft() const;
+	// Ends the ability once no aircraft class is loading and no bomber of any execution is left.
+	void BroadcastBombingFinishedIfNeeded();
 	void ClearForcedRetreatTimer();
 };

@@ -17,7 +17,7 @@ panel. A hit costs one float write, and the panels add no draw calls or componen
 | `UAddOnArmorPanelLayout` | Asset user data on the hull mesh: panel centre and side per panel. Panel index = mask bit = value in UV channel 3. |
 | `RTS.AddOnArmor.BuildPanelHull` | Editor command (`AddOnArmorPanelAuthoring.cpp`). Copies a hull mesh to `<hull>_AddOnPanels`, moves the panels into hideable slots (one per source slot: `AddOnArmorPanels`, `AddOnArmorPanels_1`, ...), writes the panel UVs and the layout, and makes the panel materials. LODs with their own description are tagged too. Every prepared vehicle's parameters are in `Tools/AddOnArmorBreak/build_panel_hulls.py`, which rebuilds them all. |
 | Panel materials | `<slot material>_AddOnPanels` next to the new hull. An instance is copied and reparented to `<master>_AddOnArmorPanels`, the master duplicated as Masked (made once per master). A plain material becomes a masked copy itself. The opacity mask reads the panel index (UV 3) and the mask (custom primitive data 8, `AddOnArmorHiddenPanels`). |
-| Debris | `NS_AddOnArmorPanelDebris` in `/Game/RTS_Survival/SpecialEffects/AddOnArmor`, built by `RTS.AddOnArmor.BuildDebrisSystem` (`AddOnArmorPanelDebrisAuthoring.cpp`, HLSL in `DebrisHlsl/`). A pooled CPU mesh burst: one particle per hidden panel, mesh from `User.DebrisMesh`. The mesh is the hull's debris panel, a `UAddOnArmorPanelLayout` field set by `RTS.AddOnArmor.SetPanelDebrisMesh`, `BuildPanelHull DebrisMesh=` or `RTS.AddOnArmor.ExtractPanelDebris`. Rules for modelling it are in `AddOnArmorPanels/AGENTS.md`. |
+| Debris | `NS_AddOnArmorPanelDebris` in `/Game/RTS_Survival/SpecialEffects/AddOnArmor`, built by `RTS.AddOnArmor.BuildDebrisSystem` (`AddOnArmorPanelDebrisAuthoring.cpp`, HLSL in `DebrisHlsl/`). A pooled CPU mesh burst: one particle per hidden panel, mesh from `User.DebrisMesh`. The mesh is the hull's debris panel, a `UAddOnArmorPanelLayout` field set by `RTS.AddOnArmor.SetPanelDebrisMesh`, `BuildPanelHull DebrisMesh=` or `RTS.AddOnArmor.ExtractPanelDebris`. It is cut out of the built hull, not modelled; the rules are in `AddOnArmorPanels/AGENTS.md`. |
 | Diagnostics | `AddOnArmorPanelDiagnostics.cpp`: `RTS.AddOnArmor.SurveyPanels` (thin outer side plates of every hull, the candidate list), `DumpMeshTriangles` (for side-view plots), `DumpMaterialHlsl`. |
 | `UArmorCalculation::SetAddOnArmorOfPlateType`, `GetOnAddOnArmorZoneHit` | Sets the add-on armour per plate type. The hit event carries each damaged zone's impact position, published before the transitions of that impact. |
 
@@ -45,11 +45,12 @@ generated lightmap UVs on vehicle hulls, so panels use channel 3. At most 20 pan
      by more than half are the two faces of one plate and merge. Smaller islands (bolts, clamps, stiffeners) join
      the panel of their side whose X range holds them.
    - Wire screens and cages (`PanelsPerSide=N`): each side's panel geometry splits into N equal sections along X.
-2. Model one panel as its own static mesh, the debris panel (`AddOnArmorPanels/AGENTS.md`), and pass it as
-   `DebrisMesh=`. Hulls whose panels already exist only inside the hull can use `RTS.AddOnArmor.ExtractPanelDebris`.
-   Add the hull to `Tools/AddOnArmorBreak/build_panel_hulls.py` and run it (`ONLY=<hull name>`, `DRYRUN=1` to
+2. Add the hull to `Tools/AddOnArmorBreak/build_panel_hulls.py` and run it (`ONLY=<hull name>`, `DRYRUN=1` to
    classify only). Check the `panel=` lines in the log: one per panel, with the side and bounds you expect. Blueprints
    whose hull component overrides a material need `MaterialOverrides=<slot>:<material>`.
+   Then cut the debris panel out of the built hull with `RTS.AddOnArmor.ExtractPanelDebris Hull=<new hull>`
+   (`AddOnArmorPanels/AGENTS.md`). Don't model one: the cut-out is a separate mesh asset that only Niagara draws, and
+   it looks like the baked panel.
 3. In the tank Blueprint:
    - set the hull component's mesh to the new hull;
    - add `AddOnArmorPanels` (`UAddOnArmorPanelsComponent`) and adjust its zones if the defaults do not fit;

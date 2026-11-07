@@ -30,7 +30,8 @@ void UGA_AircraftBombing::ExecuteAbilityAtLocation(const FVector& TargetLocation
 void UGA_AircraftBombing::BeginDestroy()
 {
 	ClearForcedRetreatTimer();
-	M_AircraftClassLoadHandle.Reset();
+	M_AircraftClassLoadHandles.Reset();
+	M_PendingAircraftClassLoads = 0;
 	Super::BeginDestroy();
 }
 
@@ -43,12 +44,14 @@ void UGA_AircraftBombing::RequestSpawnAircraftAtStartLocationAsync(
 	if (AircraftClassToLoad.IsNull())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftBombing has no aircraft class configured."));
-		BroadcastAbilityEnded();
+		BroadcastBombingFinishedIfNeeded();
 		return;
 	}
 
 	TWeakObjectPtr<UGA_AircraftBombing> WeakThis(this);
-	M_AircraftClassLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+	// Counted before the request: an already loaded class can complete inside RequestAsyncLoad.
+	++M_PendingAircraftClassLoads;
+	const TSharedPtr<FStreamableHandle> LoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
 		AircraftClassToLoad.ToSoftObjectPath(),
 		FStreamableDelegate::CreateLambda(
 			[WeakThis, AircraftClassToLoad, StartLocation, TargetLocation, RetreatLocation]()
@@ -66,6 +69,10 @@ void UGA_AircraftBombing::RequestSpawnAircraftAtStartLocationAsync(
 					RetreatLocation);
 			})
 	);
+	if (LoadHandle.IsValid() && not LoadHandle->HasLoadCompleted())
+	{
+		M_AircraftClassLoadHandles.Add(LoadHandle);
+	}
 }
 
 void UGA_AircraftBombing::OnAircraftClassLoaded(
@@ -74,23 +81,29 @@ void UGA_AircraftBombing::OnAircraftClassLoaded(
 	const FVector& TargetLocation,
 	const FVector& RetreatLocation)
 {
-	M_AircraftClassLoadHandle.Reset();
+	M_PendingAircraftClassLoads = FMath::Max(0, M_PendingAircraftClassLoads - 1);
+	M_AircraftClassLoadHandles.RemoveAll([](const TSharedPtr<FStreamableHandle>& Handle)
+	{
+		return not Handle.IsValid() || Handle->HasLoadCompleted() || Handle->WasCanceled();
+	});
 	UClass* AircraftClass = AircraftClassToLoad.Get();
 	if (not IsValid(AircraftClass))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftBombing failed to async load a valid aircraft class."));
-		BroadcastAbilityEnded();
+		BroadcastBombingFinishedIfNeeded();
 		return;
 	}
 
 	AAircraftMaster* SpawnedAircraft = GlobalAbilityHelpers::SpawnAircraftAtLocation(this, AircraftClass, StartLocation);
 	if (not IsValid(SpawnedAircraft))
 	{
-		BroadcastAbilityEnded();
+		BroadcastBombingFinishedIfNeeded();
 		return;
 	}
 
 	M_SpawnedAircraft = SpawnedAircraft;
+	FBombingRun& Run = M_Runs.AddDefaulted_GetRef();
+	Run.Aircraft = SpawnedAircraft;
 	SpawnedAircraft->OnDestroyed.AddUniqueDynamic(this, &UGA_AircraftBombing::OnSpawnedAircraftDestroyed);
 	SpawnedAircraft->SetUnitSelectable(false);
 	const FVector CarpetEndLocation = BuildCarpetEndLocation(StartLocation, TargetLocation);
@@ -146,85 +159,114 @@ void UGA_AircraftBombing::IssueCarpetBombingOrder(
 {
 	if (not IsValid(SpawnedAircraft))
 	{
-		BroadcastAbilityEnded();
+		BroadcastBombingFinishedIfNeeded();
 		return;
 	}
 
 	SpawnedAircraft->CarpetBombing(StartCarpetLocation, CarpetEndLocation, RetreatLocation);
-	StartForcedRetreatTimer();
+	StartForcedRetreatTimer(SpawnedAircraft);
 }
 
-void UGA_AircraftBombing::StartForcedRetreatTimer()
+void UGA_AircraftBombing::StartForcedRetreatTimer(AAircraftMaster* SpawnedAircraft)
 {
 	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	FBombingRun* Run = M_Runs.FindByPredicate([SpawnedAircraft](const FBombingRun& Candidate)
+	{
+		return Candidate.Aircraft.Get() == SpawnedAircraft;
+	});
+	if (not IsValid(World) || Run == nullptr)
 	{
 		return;
 	}
 
+	// One timer per bomber: overlapping executions each keep their own fallback retreat.
 	const float SafeRetreatDelay = FMath::Max(0.0f, M_AircraftBombingSettings.TimeUntilForcedRetreat);
 	TWeakObjectPtr<UGA_AircraftBombing> WeakThis(this);
+	TWeakObjectPtr<AAircraftMaster> WeakAircraft(SpawnedAircraft);
 	World->GetTimerManager().SetTimer(
-		M_ForcedRetreatTimerHandle,
-		[WeakThis]()
+		Run->ForcedRetreatTimerHandle,
+		[WeakThis, WeakAircraft]()
 		{
 			if (not WeakThis.IsValid())
 			{
 				return;
 			}
 
-			UGA_AircraftBombing* StrongThis = WeakThis.Get();
-			StrongThis->OnForcedRetreatTimerFinished();
+			WeakThis->OnForcedRetreatTimerFinished(WeakAircraft.Get());
 		},
 		SafeRetreatDelay,
 		false);
 }
 
-void UGA_AircraftBombing::OnForcedRetreatTimerFinished()
+void UGA_AircraftBombing::OnForcedRetreatTimerFinished(AAircraftMaster* SpawnedAircraft)
 {
-	M_ForcedRetreatTimerHandle.Invalidate();
-	if (not GetIsValidSpawnedAircraft() || not GetIsValidGlobalAbilityManager())
+	// The bomber may be gone already (shot down, or retreated on its own); then there is nothing to force.
+	if (not IsValid(SpawnedAircraft) || not GetIsValidGlobalAbilityManager())
 	{
 		return;
 	}
 
-	const FVector TargetLocation = M_SpawnedAircraft->GetActorLocation();
+	const FVector TargetLocation = SpawnedAircraft->GetActorLocation();
 	const FVector RetreatLocation = GetGlobalAbilityManager()->GetAircraftBombingRetreatLocation(this, TargetLocation);
-	M_SpawnedAircraft->CarpetBombing_RetreatAndDestroy(RetreatLocation);
+	SpawnedAircraft->CarpetBombing_RetreatAndDestroy(RetreatLocation);
 }
 
 void UGA_AircraftBombing::OnSpawnedAircraftDestroyed(AActor* DestroyedActor)
 {
-	M_SpawnedAircraft.Reset();
-	ClearForcedRetreatTimer();
-	BroadcastAbilityEnded();
+	if (M_SpawnedAircraft.Get() == DestroyedActor)
+	{
+		M_SpawnedAircraft.Reset();
+	}
+	UWorld* World = GetWorld();
+	for (int32 RunIndex = M_Runs.Num() - 1; RunIndex >= 0; --RunIndex)
+	{
+		FBombingRun& Run = M_Runs[RunIndex];
+		// The weak pointer still resolves during OnDestroyed; stale entries are dropped too.
+		if (Run.Aircraft.Get() != DestroyedActor && Run.Aircraft.IsValid())
+		{
+			continue;
+		}
+		if (IsValid(World))
+		{
+			World->GetTimerManager().ClearTimer(Run.ForcedRetreatTimerHandle);
+		}
+		M_Runs.RemoveAt(RunIndex);
+	}
+	BroadcastBombingFinishedIfNeeded();
 }
 
-bool UGA_AircraftBombing::GetIsValidSpawnedAircraft() const
+void UGA_AircraftBombing::BroadcastBombingFinishedIfNeeded()
 {
-	if (M_SpawnedAircraft.IsValid())
+	// Executions can overlap (enemy AI, missions, short cooldowns): the ability ends when the last bomber is gone.
+	if (M_PendingAircraftClassLoads > 0)
 	{
-		return true;
+		return;
 	}
-
-	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
-		this,
-		"M_SpawnedAircraft",
-		"GetIsValidSpawnedAircraft",
-		this
-	);
-
-	return false;
+	for (const FBombingRun& Run : M_Runs)
+	{
+		if (Run.Aircraft.IsValid())
+		{
+			return;
+		}
+	}
+	M_Runs.Reset();
+	BroadcastAbilityEnded();
 }
 
 void UGA_AircraftBombing::ClearForcedRetreatTimer()
 {
 	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	for (FBombingRun& Run : M_Runs)
 	{
-		return;
+		if (IsValid(World))
+		{
+			World->GetTimerManager().ClearTimer(Run.ForcedRetreatTimerHandle);
+		}
+		Run.ForcedRetreatTimerHandle.Invalidate();
 	}
-
-	World->GetTimerManager().ClearTimer(M_ForcedRetreatTimerHandle);
+	if (IsValid(World))
+	{
+		World->GetTimerManager().ClearTimer(M_ForcedRetreatTimerHandle);
+	}
 	M_ForcedRetreatTimerHandle.Invalidate();
 }
