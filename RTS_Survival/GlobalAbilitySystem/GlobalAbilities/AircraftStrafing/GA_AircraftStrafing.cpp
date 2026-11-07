@@ -20,9 +20,12 @@ void UGA_AircraftStrafing::ExecuteAbilityAtLocation(const FVector& TargetLocatio
 		return;
 	}
 
-	M_AircraftClassLoadHandles.Reset();
-	M_PendingAircraftLoadCount = 0;
-	M_ActiveAircraftCount = 0;
+	// Nothing is reset here: an earlier execution's loads and aircraft may still be running (enemy AI, missions,
+	// short cooldowns), and the ability ends only when all of them are done.
+	M_AircraftClassLoadHandles.RemoveAll([](const TSharedPtr<FStreamableHandle>& Handle)
+	{
+		return not Handle.IsValid() || Handle->HasLoadCompleted() || Handle->WasCanceled();
+	});
 	RequestSpawnAircraftAtStartLocationsAsync(TargetLocation);
 	Super::ExecuteAbilityAtLocation(TargetLocation);
 }
@@ -38,7 +41,7 @@ void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationsAsync(const FVect
 	if (M_AircraftStrafingSettings.AircraftClasses.IsEmpty())
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftStrafing has no aircraft classes configured."));
-		BroadcastAbilityEnded();
+		BroadcastStrafingFinishedIfNeeded();
 		return;
 	}
 
@@ -68,7 +71,7 @@ void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationsAsync(const FVect
 	}
 
 	RTSFunctionLibrary::ReportError(TEXT("UGA_AircraftStrafing has no valid aircraft classes configured."));
-	BroadcastAbilityEnded();
+	BroadcastStrafingFinishedIfNeeded();
 }
 
 void UGA_AircraftStrafing::RequestSpawnAircraftAtStartLocationAsync(
@@ -105,7 +108,7 @@ void UGA_AircraftStrafing::OnAircraftClassLoaded(
 	const FVector& TargetLocation,
 	const FVector& PostStrafeMoveToLocation)
 {
-	--M_PendingAircraftLoadCount;
+	M_PendingAircraftLoadCount = FMath::Max(0, M_PendingAircraftLoadCount - 1);
 
 	UClass* AircraftClass = AircraftClassToLoad.Get();
 	if (not IsValid(AircraftClass))

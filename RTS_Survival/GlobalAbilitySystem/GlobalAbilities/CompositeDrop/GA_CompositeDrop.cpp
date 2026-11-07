@@ -200,11 +200,18 @@ FVector UGA_CompositeDrop::GetOffsetTarget(const FVector& Target, const FVector2
 		return Target;
 	}
 	FVector Ground;
-	GlobalAbilityHelpers::TryFindGroundLocation(this, Target + FVector(Offset.X, Offset.Y, 0.f), Ground);
+	const bool bHasLandscape = GlobalAbilityHelpers::TryFindGroundLocation(
+		this, Target + FVector(Offset.X, Offset.Y, 0.f), Ground);
 	bool bWasProjected = false;
 	const FVector Projected = RTSFunctionLibrary::GetLocationProjected(
 		this, Ground, true, bWasProjected, CompositeDropConstants::OffsetProjectionScale);
-	return bWasProjected ? Projected : Ground;
+	if (bWasProjected)
+	{
+		return Projected;
+	}
+	// Aimed next to the map edge, the offset point can lie past it, with neither navmesh nor landscape: that part
+	// of the drop would come down on nothing and fall out of the world, so it lands at the composite's own target.
+	return bHasLandscape ? Ground : Target;
 }
 
 void UGA_CompositeDrop::GetChildStrip(const FCompositeDropChild& Entry, const UGlobalAbility& Child,

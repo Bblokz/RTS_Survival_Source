@@ -92,8 +92,12 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
 	FAircraftDropGlobalAbilitySettings M_AircraftDropSettings;
 
-	TSharedPtr<FStreamableHandle> M_AircraftClassLoadHandle;
+	// One per execution whose aircraft class is still loading; executions can overlap (enemy AI, missions, short
+	// cooldowns), so the ability ends only when no load is pending and no aircraft of any execution is left.
+	TArray<TSharedPtr<FStreamableHandle>> M_AircraftClassLoadHandles;
+	int32 M_PendingAircraftClassLoads = 0;
 
+	// Aircraft of every running execution; never reset by a new execution.
 	UPROPERTY(Transient)
 	int32 M_ActiveAircraftCount = 0;
 
