@@ -126,7 +126,11 @@ Character of each kit:
   minefield icon). The vehicle parts payback assumes Scavengers (other infantry gets a third) and about 2 radixite per
   vehicle part: user to confirm. The Puma drop lands one Puma at 225 R; the slot's 90 s cooldown is the Tier I top.
 - Real icons: every round-3 template carries the icon of the template it was copied from (see below).
-- Not run in game yet: the round-3 data-only drops (the classes are proven by their own tests).
+- The round-3 data-only drops that no feature test fires (five glider drops, four landed Ju 390 drops, three paradrops,
+  the single Bf 109) are fired by `-KitDropsValidate` (`GlobalAbilitySystem/Tests/KitDrops/KitDropsTestRunner.cpp`, run
+  with `Source/Tools/KitDrops/run_kit_drops_test.ps1`): click path and payment, ability ended once, the promised tanks or
+  squads owned by the player, released and on the ground, the Bf 109 firing at an enemy T-34. The file has no UCLASS and
+  compiles to nothing without `RTS_WITH_MAP_TESTS`, so plain Shipping never contains it.
 
 ## Ability tiers
 

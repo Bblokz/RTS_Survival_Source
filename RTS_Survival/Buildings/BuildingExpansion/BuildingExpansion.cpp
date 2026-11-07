@@ -18,6 +18,8 @@
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
 #include "RTS_Survival/Collapse/VerticalCollapse/FRTS_VerticalCollapse.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
+#include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Resources/ResourceDropOff/ResourceDropOff.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/ResourceConverter/ResourceConverterComponent.h"
@@ -316,6 +318,7 @@ void ABuildingExpansion::FinishPackUpExpansion()
 {
 	RemoveExtraResourceStorage();
 	RemoveFieldDefenseDiscount();
+	RemoveGlobalAbilityCooldownBonus();
 	SetStatusAndPropagateToOwner(EBuildingExpansionStatus::BXS_PackedUp);
 	BP_OnFinishedPackupBxp();
 	Destroy();
@@ -508,9 +511,10 @@ void ABuildingExpansion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 	if (EndPlayReason == EEndPlayReason::Destroyed)
 	{
-		// Destroyed without dying or packing up (those already took the storage and the discount back).
+		// Destroyed without dying or packing up (those already took the storage and the bonuses back).
 		RemoveExtraResourceStorage();
 		RemoveFieldDefenseDiscount();
+		RemoveGlobalAbilityCooldownBonus();
 	}
 
 	if (M_StatusBuildingExpansion == EBuildingExpansionStatus::BXS_PackedUp)
@@ -537,6 +541,7 @@ void ABuildingExpansion::UnitDies(const ERTSDeathType DeathType)
 	DisableCargoComponent();
 	RemoveExtraResourceStorage();
 	RemoveFieldDefenseDiscount();
+	RemoveGlobalAbilityCooldownBonus();
 
 	SetUnitDying();
 	// Before bp event as the bp event may destroy the actor immediately.
@@ -948,6 +953,7 @@ void ABuildingExpansion::InitBuildingExpansion(
 	SetUnitAbilitiesRunTime(MyData.Abilities);
 	M_ExtraResourceStorage = MyData.ExtraResourceStorage;
 	M_FieldDefenseCostMlt = MyData.FieldDefenseCostMlt;
+	M_GlobalAbilityCooldownMlt = MyData.GlobalAbilityCooldownMlt;
 	OnInitBuildingExpansion_SetupCollision(bLetBuildingMeshAffectNavMesh);
 	if (GetIsValidHealthComponent())
 	{
@@ -1049,6 +1055,7 @@ void ABuildingExpansion::OnFinishedExpansionConstruction()
 	SetMeshToBuildingMesh();
 	ApplyExtraResourceStorage();
 	ApplyFieldDefenseDiscount();
+	ApplyGlobalAbilityCooldownBonus();
 	OnBxpConstructed.Broadcast();
 	BP_OnFinishedExpansionConstruction();
 }
@@ -1129,6 +1136,53 @@ void ABuildingExpansion::RemoveFieldDefenseDiscount()
 		return;
 	}
 	GameState->UnregisterPlayerFieldDefenseCostMlt(this);
+}
+
+void ABuildingExpansion::ApplyGlobalAbilityCooldownBonus()
+{
+	// Already registered (an unpacked or rebuilt expansion), or this expansion grants no bonus.
+	if (bM_IsGlobalAbilityCooldownBonusRegistered || M_GlobalAbilityCooldownMlt >= 1.f)
+	{
+		return;
+	}
+	// Only the player's abilities: an enemy's cipher room speeds up nothing (as the office's discount).
+	if (not GetIsValidRTSComponent() || RTSComponent->GetOwningPlayer() != 1)
+	{
+		return;
+	}
+	UGlobalAbilitiesManager* GlobalAbilitiesManager = GetPlayerGlobalAbilitiesManager();
+	if (not IsValid(GlobalAbilitiesManager))
+	{
+		RTSFunctionLibrary::ReportError("Expansion grants a commander ability cooldown bonus but the player has no"
+			" global abilities manager."
+			"\n Expansion: " + GetName() +
+			"\n At function ABuildingExpansion::ApplyGlobalAbilityCooldownBonus");
+		return;
+	}
+	GlobalAbilitiesManager->RegisterCooldownMlt(this, M_GlobalAbilityCooldownMlt);
+	bM_IsGlobalAbilityCooldownBonusRegistered = true;
+}
+
+void ABuildingExpansion::RemoveGlobalAbilityCooldownBonus()
+{
+	if (not bM_IsGlobalAbilityCooldownBonusRegistered)
+	{
+		return;
+	}
+	bM_IsGlobalAbilityCooldownBonusRegistered = false;
+	UGlobalAbilitiesManager* GlobalAbilitiesManager = GetPlayerGlobalAbilitiesManager();
+	if (not IsValid(GlobalAbilitiesManager))
+	{
+		// The match is ending: the controller and its abilities go with it.
+		return;
+	}
+	GlobalAbilitiesManager->UnregisterCooldownMlt(this);
+}
+
+UGlobalAbilitiesManager* ABuildingExpansion::GetPlayerGlobalAbilitiesManager() const
+{
+	const ACPPController* RTSController = FRTS_Statics::GetRTSController(this);
+	return IsValid(RTSController) ? RTSController->GetGlobalAbilitiesManager() : nullptr;
 }
 
 UResourceDropOff* ABuildingExpansion::GetOwnerResourceDropOff() const

@@ -23,6 +23,7 @@
 
 class UBuildingExpansionEnergyComponent;
 class UResourceDropOff;
+class UGlobalAbilitiesManager;
 class UPitAdditionalTurretComponent;
 class UResourceConverterComponent;
 class UTurretSwapComp;

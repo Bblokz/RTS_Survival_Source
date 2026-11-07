@@ -2,6 +2,9 @@
 
 > If you need to add a new ability, read `Docs/Abilities/Abilities.md` first for the full controller/decoder/ICommands setup flow.
 
+> Spaced armour (side skirts, add-on panels): model one panel as its own static mesh for the shot-off debris. See
+> `RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AGENTS.md`.
+
 Whenever you work on Unreal Engine C++ code for me, there are rules you **must** follow.  
 Ensure to follow the following coding style instructions when writing or refactoring code.
 
