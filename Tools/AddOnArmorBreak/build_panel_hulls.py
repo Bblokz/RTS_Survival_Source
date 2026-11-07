@@ -14,8 +14,17 @@ import unreal
 
 ROOT = '/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle'
 
+SU_SKIRT_ARGS = (
+    'MinAbsY=157 MinZ=13 MaxZ=98 MinPanelArea=9500 MaxIslandLength=110 '
+    f'DebrisMesh={ROOT}/Rus_Medium/SU_SharedArmor/SM_SU85_SU100_SpacedArmor_AddOnPanels_Debris'
+)
+
 # Hull mesh -> (vehicle Blueprints using it, BuildPanelHull arguments).
 HULLS = {
+    'Rus_Medium/SU85/Meshes/SM_SU85_Soviet_SpacedArmor_Hull': (
+        ['Rus_Vehicle_Su85_Soviet'], SU_SKIRT_ARGS),
+    'Rus_Medium/Su100/Meshes/SM_SU100_Soviet_SpacedArmor_Hull': (
+        ['Rus_Vehicle_Su100_Soviet'], SU_SKIRT_ARGS),
     'Ger_Light/PanzerII/SpacedArmor/SM_PZIIF_SpacedArmor_Hull': (
         ['Ger_Vehicle_PanzerII_F_SpacedArmor'], 'MinAbsY=114.9'),
     'Ger_Light/PanzerII_Luchs/Meshes/SM_Luchs_SpacedArmor_Hull': (

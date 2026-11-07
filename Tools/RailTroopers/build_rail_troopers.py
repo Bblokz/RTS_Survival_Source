@@ -5,8 +5,14 @@ Source art: D:/Blender/BlenderProjects/BlenderTanks/Infantry/GerRailTrooper (REA
 
   T_RailTrooperArmor_{BC,ORM,N,E}  armour textures (ORM = AO, roughness, metallic; E = emissive mask)
   M_RailTrooperArmor               armour material (GlowColor / GlowStrength parameters for the rail-blue parts)
-  SK_RailTrooper                   scavenger body + armour on SK_PostApoSoldier_Skeleton and its physics asset;
-                                   slot 0 the scavenger cloth (M_ScavengerNoCamo), slot 1 the armour
+  SK_RailTrooper                   scavenger body + armour on InfantryMaster_Skeleton (AnimBp_SquadUnit and every
+                                   infantry animation) with SK_PostApoSoldier_PhysicsAsset;
+                                   slot 0 the scavenger cloth (M_ScavengerNoCamo), slot 1 the armour.
+                                   Until 2026-11-06 it sat on SK_PostApoSoldier_Skeleton: the FBX carried the Blender root
+                                   empty as a 69th root bone, so it stood in the reference pose in game. The export now
+                                   leaves the empty out. A replace-import over an existing SK keeps the OLD skeleton; to
+                                   move a mesh to another skeleton, delete it and import fresh (legacy FBX importer:
+                                   Interchange.FeatureFlags.Import.FBX 0), then repoint Ger_Inf_RailTrooper's mesh.
   Ger_Inf_RailTrooper              copy of Ger_Inf_Scavenger: SK_RailTrooper, Ger_Weapon_M920Rail
   Squad_Ger_RailTroopers           copy of Squad_Ger_Scavengers: Squad Subtype = Squad_Ger_RailTroopers, 4 troopers
   RTS_BP_RTSAsyncSpawner           SetupGerSquads row Squad_Ger_RailTroopers -> Squad_Ger_RailTroopers
@@ -17,7 +23,7 @@ SRC = "D:/Blender/BlenderProjects/BlenderTanks/Infantry/GerRailTrooper"
 ROOT = "/Game/RTS_Survival/Blueprints/Squads/Ger/EliteInfantry/RailTroopers"
 SCAV = "/Game/RTS_Survival/Blueprints/Squads/Ger/Barracks_Infantry/Scavengers"
 POSTAPO = "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/PostApocalyptic"
-SKELETON = POSTAPO + "/Mesh/SK_PostApoSoldier_Skeleton"
+SKELETON = "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/InfantryMaster_Skeleton"
 PHYSICS = POSTAPO + "/Mesh/SK_PostApoSoldier_PhysicsAsset"
 CLOTH_MAT = POSTAPO + "/Material/M_ScavengerNoCamo"
 WEAPON = "/Game/RTS_Survival/Blueprints/Squads/InfantryWeapons/German/M920Rail/Ger_Weapon_M920Rail"
