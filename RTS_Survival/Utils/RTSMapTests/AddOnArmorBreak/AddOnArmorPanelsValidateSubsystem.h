@@ -29,6 +29,8 @@ enum class EAddOnArmorPanelsValidateStep : uint8
 	HitUntilDestroyed,
 	CrewRepair,
 	FullService,
+	// One more hit, then the tank dies: every panel still on it must blast off.
+	Death,
 	Done
 };
 
@@ -67,7 +69,8 @@ struct FAddOnArmorPanelsShot
  * @brief Checks a tank with add-on armour panels end to end: started with -AddOnArmorPanelsValidate in an offscreen
  * game run (Tools/AddOnArmorBreak/run_panels_validate.sh). Spawns the tank, shoots its left panels through the
  * weapons' module damage event and checks module state, armour and the hidden-panel mask after the first hit, until
- * destroyed, after a crew repair stage and after a full service; pictures go to Saved/AddOnArmorBreak/<tag>.
+ * destroyed, after a crew repair stage and after a full service; then one more hit and the tank dies, which must throw
+ * exactly the panels still on the hull (one burst per side). Pictures go to Saved/AddOnArmorBreak/<tag>.
  * -AddOnArmorPanelsInject=<hull mesh> adds the panels component and that hull to a tank Blueprint without them.
  * Not created in shipping.
  */
@@ -112,6 +115,9 @@ private:
 	bool bM_RunProbes = false;
 	bool bM_StartModuleSetup = false;
 	bool bM_DidStartModuleSetup = false;
+	// -AddOnArmorPanelsRevealTank: the test tank leaves the fog of war, so an enemy (e.g. Soviet) tank's debris shows.
+	bool bM_RevealTank = false;
+	bool bM_DidStopTankFow = false;
 
 	// Add-on modules in slot order (left zone, then right zone) and the layout's panels per side.
 	int32 M_LeftModuleId = INDEX_NONE;
@@ -136,6 +142,13 @@ private:
 	// Game seconds at which the left zone was seen destroyed; negative until then.
 	float M_DestroyedGameSeconds = -1.f;
 	int32 M_FailureCount = 0;
+	// Death step: set once the tank was killed; it may be destroyed (and the panel mesh with it) afterwards.
+	bool bM_DeathTriggered = false;
+	float M_DeathGameSeconds = -1.f;
+	int32 M_ExpectedDeathPieces = 0;
+	int32 M_ExpectedDeathBursts = 0;
+	// Debris bursts of earlier hits still playing when the tank died; the death check skips them.
+	TArray<TWeakObjectPtr<UNiagaraComponent>> M_BurstsBeforeDeath;
 
 	void EnterStep(EAddOnArmorPanelsValidateStep NewStep);
 	float GetGameSecondsInStep() const;
@@ -152,6 +165,14 @@ private:
 	// Each step acts once, waits for the pictures to settle, then checks and moves on.
 	void TickStep(EAddOnArmorPanelsValidateStep NextStep, TFunctionRef<void()> Action, TFunctionRef<void()> Check);
 	void TickHitUntilDestroyed();
+	void TickDeath();
+	void KillTank();
+	void CheckDeathDebris();
+	/** @return Death bursts for the intact panels: one per side and debris mesh (end plates can have their own). */
+	int32 CountExpectedDeathBursts(int32 IntactPanelMask) const;
+	/** @return Hull damage per test shell: one point through the tank's damage reduction, so module damage resolves. */
+	float GetHullDamagePerShell() const;
+	void RevealTankFromFog();
 
 	/**
 	 * @brief Fires a penetrating shell at a left panel through the weapons' module damage event.

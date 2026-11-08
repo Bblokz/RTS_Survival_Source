@@ -34,6 +34,8 @@
 #include "UObject/UObjectIterator.h"
 #include "ShaderCompiler.h"
 #include "RTS_Survival/GameUI/GameDifficultyPicker/W_GameDifficultyPicker.h"
+#include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
@@ -64,6 +66,8 @@ namespace AddOnArmorPanelsValidateConstants
 	// Starts the vehicle module setup on Blueprints that never call it (RTS_BP_AssaultTank children), so their panel
 	// hulls can be checked before the Blueprint is wired; the run logs that it did.
 	const TCHAR* const StartModuleSetupSwitch = TEXT("AddOnArmorPanelsStartModuleSetup");
+	// Takes the test tank out of the fog of war, so the debris checks also run on enemy-faction tanks.
+	const TCHAR* const RevealTankSwitch = TEXT("AddOnArmorPanelsRevealTank");
 	const FName StartModuleSetupFunctionName(TEXT("BeginPlay_OnModulesComplete_FinalizeVehicleModules"));
 	constexpr float AllPanelBits = 1048575.f;
 	const TCHAR* const DefaultVehicleClass = TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/"
@@ -132,6 +136,7 @@ void UAddOnArmorPanelsValidateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	FParse::Value(FCommandLine::Get(), TagSwitch, M_Tag);
 	bM_RunProbes = FParse::Param(FCommandLine::Get(), ProbeSwitch);
 	bM_StartModuleSetup = FParse::Param(FCommandLine::Get(), StartModuleSetupSwitch);
+	bM_RevealTank = FParse::Param(FCommandLine::Get(), RevealTankSwitch);
 	// Error dialogs are answered automatically in unattended runs; log them instead.
 	RTSFunctionLibrary::PushModalDialogSuppression();
 	bM_IsSuppressingErrorDialogs = true;
@@ -167,6 +172,12 @@ void UAddOnArmorPanelsValidateSubsystem::Tick(const float DeltaTime)
 		KeepGameRunning();
 		AimCameras();
 		const bool bNeedsPanelMesh = M_Step != EAddOnArmorPanelsValidateStep::WaitingForModules;
+		// A killed tank may be destroyed at once; the death step checks its debris without it.
+		if (bM_DeathTriggered)
+		{
+			TickDeath();
+			return;
+		}
 		if (not M_Tank.IsValid() || not M_Armor.IsValid() || (bNeedsPanelMesh && not M_PanelMesh.IsValid()))
 		{
 			UE_LOG(LogRTSAddOnArmorPanelsValidate, Error,
@@ -178,6 +189,10 @@ void UAddOnArmorPanelsValidateSubsystem::Tick(const float DeltaTime)
 			return;
 		}
 		M_LastTankLocation = M_Tank->GetActorLocation();
+		if (bM_RevealTank)
+		{
+			RevealTankFromFog();
+		}
 		TickFirstShotDebris();
 	}
 	switch (M_Step)
@@ -265,8 +280,11 @@ void UAddOnArmorPanelsValidateSubsystem::Tick(const float DeltaTime)
 		         [this] { CheckCrewRepair(); });
 		return;
 	case EAddOnArmorPanelsValidateStep::FullService:
-		TickStep(EAddOnArmorPanelsValidateStep::Done, [this] { M_Armor->RestoreAllModulesToHealthy(); },
+		TickStep(EAddOnArmorPanelsValidateStep::Death, [this] { M_Armor->RestoreAllModulesToHealthy(); },
 		         [this] { CheckFullService(); });
+		return;
+	case EAddOnArmorPanelsValidateStep::Death:
+		TickDeath();
 		return;
 	default:
 		return;
@@ -672,8 +690,27 @@ bool UAddOnArmorPanelsValidateSubsystem::FireAtPanel(const int32 PanelIndex)
 	BallisticHit.ShotActivationId = static_cast<uint32>(++M_HitSerial);
 	const FVehicleModuleDamageEvent DamageEvent = FVehicleModuleDamageEvent::MakeBallisticEvent(
 		BallisticHit, UDamageType::StaticClass());
-	M_Tank->TakeDamage(HullDamagePerShell, DamageEvent, nullptr, nullptr);
+	M_Tank->TakeDamage(GetHullDamagePerShell(), DamageEvent, nullptr, nullptr);
 	return true;
+}
+
+float UAddOnArmorPanelsValidateSubsystem::GetHullDamagePerShell() const
+{
+	using namespace AddOnArmorPanelsValidateConstants;
+	// Module damage only resolves when some hull damage gets through; some Blueprints add a flat damage reduction
+	// (the Soviet T-34E: AddHealth with 5 reduction), which would swallow the test's small hull damage.
+	const UHealthComponent* const Health = M_Tank->FindComponentByClass<UHealthComponent>();
+	const FStructProperty* const ReductionProperty = FindFProperty<FStructProperty>(
+		UHealthComponent::StaticClass(), TEXT("DamageReductionSettings"));
+	if (not IsValid(Health) || ReductionProperty == nullptr)
+	{
+		return HullDamagePerShell;
+	}
+	const FDamageReductionSettings* const Reduction =
+		ReductionProperty->ContainerPtrToValuePtr<FDamageReductionSettings>(Health);
+	constexpr float MinReductionMultiplier = 0.01f;
+	return (HullDamagePerShell + FMath::Max(0.f, Reduction->DamageReduction))
+		/ FMath::Max(Reduction->DamageReductionMlt, MinReductionMultiplier);
 }
 
 FAddOnArmorPanelsSideReading UAddOnArmorPanelsValidateSubsystem::ReadSide(const bool bLeftSide) const
@@ -757,6 +794,133 @@ void UAddOnArmorPanelsValidateSubsystem::ShowPanelSection(const bool bShow) cons
 EVehicleModuleState UAddOnArmorPanelsValidateSubsystem::GetModuleState(const int32 ModuleId) const
 {
 	return M_Armor->GetModuleSnapshot(ModuleId).State;
+}
+
+void UAddOnArmorPanelsValidateSubsystem::TickDeath()
+{
+	using namespace AddOnArmorPanelsValidateConstants;
+	if (not bM_StepActionDone)
+	{
+		// Some panels already shot off, so the death must throw only the ones still on the hull.
+		Expect(FireAtPanel(M_LeftPanels[M_LeftPanels.Num() / 2]), TEXT("the shell before the death resolves a plate"));
+		bM_StepActionDone = true;
+		return;
+	}
+	if (not bM_DeathTriggered)
+	{
+		if (GetGameSecondsInStep() >= PictureSettleSeconds)
+		{
+			KillTank();
+		}
+		return;
+	}
+	if (GetWorld()->GetTimeSeconds() - M_DeathGameSeconds >= DebrisFlightPictureSeconds)
+	{
+		CheckDeathDebris();
+		EnterStep(EAddOnArmorPanelsValidateStep::Done);
+	}
+}
+
+void UAddOnArmorPanelsValidateSubsystem::KillTank()
+{
+	const int32 AllPanels = M_LeftPanelMask | M_RightPanelMask;
+	const int32 HiddenBefore = GetHiddenPanelMask() & AllPanels;
+	M_ExpectedDeathPieces = AddOnArmorPanelsValidateConstants::CountBits(AllPanels & ~HiddenBefore);
+	M_ExpectedDeathBursts = CountExpectedDeathBursts(AllPanels & ~HiddenBefore);
+	M_BurstsBeforeDeath.Reset();
+	for (TObjectIterator<UNiagaraComponent> It; It; ++It)
+	{
+		const UNiagaraSystem* const System = It->GetAsset();
+		if (It->GetWorld() == GetWorld() && It->IsActive() && IsValid(System)
+			&& System->GetPathName() == AddOnArmorPanelDebris::SystemPath)
+		{
+			M_BurstsBeforeDeath.Add(*It);
+		}
+	}
+	UE_LOG(LogRTSAddOnArmorPanelsValidate, Display,
+	       TEXT("RTS_ADDON_PANELS death: mask before=0x%x intact panels=%d expected bursts=%d earlier bursts=%d"),
+	       HiddenBefore, M_ExpectedDeathPieces, M_ExpectedDeathBursts, M_BurstsBeforeDeath.Num());
+	Expect(HiddenBefore != 0 && M_ExpectedDeathPieces > 0, TEXT("the tank dies with some panels shot off and some intact"));
+	bM_DeathTriggered = true;
+	M_DeathGameSeconds = GetWorld()->GetTimeSeconds();
+	M_Tank->Debug_DieRegularDeath(ERegularDeathVariant::Standard, -M_Tank->GetActorRightVector());
+	// The panel mesh may be gone already when the death destroys the tank at once.
+	if (M_PanelMesh.IsValid())
+	{
+		const int32 HiddenAfter = GetHiddenPanelMask() & AllPanels;
+		UE_LOG(LogRTSAddOnArmorPanelsValidate, Display, TEXT("RTS_ADDON_PANELS death: mask after=0x%x"), HiddenAfter);
+		Expect(HiddenAfter == AllPanels, TEXT("a dead tank hides every panel"));
+	}
+}
+
+int32 UAddOnArmorPanelsValidateSubsystem::CountExpectedDeathBursts(const int32 IntactPanelMask) const
+{
+	UStaticMesh* const Hull = M_PanelMesh.IsValid() ? M_PanelMesh->GetStaticMesh() : nullptr;
+	const UAddOnArmorPanelLayout* const Layout = IsValid(Hull) ? Hull->GetAssetUserData<UAddOnArmorPanelLayout>() : nullptr;
+	if (not IsValid(Layout))
+	{
+		return 0;
+	}
+	int32 Bursts = 0;
+	for (const int32 SideMask : {M_LeftPanelMask, M_RightPanelMask})
+	{
+		TSet<const UStaticMesh*> SideMeshes;
+		for (int32 PanelIndex = 0; PanelIndex < Layout->GetPanels().Num(); ++PanelIndex)
+		{
+			bool bIsOwnSideMesh = false;
+			const UStaticMesh* const DebrisMesh = Layout->GetDebrisMeshForPanel(PanelIndex, bIsOwnSideMesh);
+			if ((SideMask & IntactPanelMask & (1 << PanelIndex)) != 0 && IsValid(DebrisMesh))
+			{
+				SideMeshes.Add(DebrisMesh);
+			}
+		}
+		Bursts += SideMeshes.Num();
+	}
+	return Bursts;
+}
+
+void UAddOnArmorPanelsValidateSubsystem::RevealTankFromFog()
+{
+	if (not bM_DidStopTankFow)
+	{
+		UFowComp* const FowComponent = M_Tank->FindComponentByClass<UFowComp>();
+		if (IsValid(FowComponent))
+		{
+			FowComponent->StopFowParticipation();
+		}
+		bM_DidStopTankFow = true;
+		UE_LOG(LogRTSAddOnArmorPanelsValidate, Display, TEXT("RTS_ADDON_PANELS NOTE tank taken out of the fog of war (fow component %d)"),
+		       IsValid(FowComponent) ? 1 : 0);
+	}
+	if (M_Tank->IsHidden())
+	{
+		M_Tank->SetActorHiddenInGame(false);
+	}
+}
+
+void UAddOnArmorPanelsValidateSubsystem::CheckDeathDebris()
+{
+	int32 Bursts = 0;
+	int32 Pieces = 0;
+	for (TObjectIterator<UNiagaraComponent> It; It; ++It)
+	{
+		UNiagaraComponent* const Burst = *It;
+		const UNiagaraSystem* const System = Burst->GetAsset();
+		if (Burst->GetWorld() != GetWorld() || not Burst->IsActive() || not IsValid(System)
+			|| System->GetPathName() != AddOnArmorPanelDebris::SystemPath
+			|| M_BurstsBeforeDeath.Contains(TWeakObjectPtr<UNiagaraComponent>(Burst)))
+		{
+			continue;
+		}
+		++Bursts;
+		Pieces += CountParticles(*Burst);
+	}
+	UE_LOG(LogRTSAddOnArmorPanelsValidate, Display,
+	       TEXT("RTS_ADDON_PANELS death debris bursts=%d (expected %d) pieces=%d (expected %d) tank_alive=%d"),
+	       Bursts, M_ExpectedDeathBursts, Pieces, M_ExpectedDeathPieces, M_Tank.IsValid());
+	Expect(Bursts == M_ExpectedDeathBursts, TEXT("the death throws one burst per side and debris mesh that still had panels"));
+	Expect(Pieces == M_ExpectedDeathPieces, TEXT("the death throws exactly the panels that were still on the hull"));
+	ExportPictures(TEXT("5_Death"));
 }
 
 void UAddOnArmorPanelsValidateSubsystem::CheckIntact()

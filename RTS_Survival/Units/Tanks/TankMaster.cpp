@@ -18,6 +18,7 @@
 #include "RTS_Survival/Resources/Harvester/Harvester.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelsComponent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/ArmorComponent/Armor.h"
@@ -636,6 +637,11 @@ void ATankMaster::UnitDies(const ERTSDeathType DeathType)
 	}
 	OnUnitDies_DisableWeapons();
 	// Before bp event as the bp event may destroy the actor immediately.
+	// Every death type: side skirts still on the hull blast off with the tank.
+	if (UAddOnArmorPanelsComponent* AddOnArmorPanels = FindComponentByClass<UAddOnArmorPanelsComponent>())
+	{
+		AddOnArmorPanels->BlowOffIntactPanelsOnDeath(M_KillShotDirection);
+	}
 	OnUnitDies_ThrowCrewBodies(DeathType);
 	OnUnitDies.Broadcast();
 	BP_OnUnitDies(DeathType);

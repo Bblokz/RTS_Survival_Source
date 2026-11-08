@@ -2,6 +2,7 @@
 
 
 #include "SquadUnit.h"
+#include "RTS_Survival/Utils/Rendering/RTSRenderPerf.h"
 
 #include <RTS_Survival/FOWSystem/FowComponent/FowType.h>
 
@@ -615,8 +616,9 @@ bool ASquadUnit::GetIsSquadEligibleForAutomaticCover() const
 	{
 		return true;
 	}
-	// Team weapon crews are positioned by their weapon and must not wander off to nearby cover.
-	if (M_SquadController->GetSquadAlreadyHasTeamWeapon())
+	// Team weapon crews are positioned by their weapon and must not wander off to nearby cover; ability preview
+	// targets stand where the preview put them.
+	if (M_SquadController->GetSquadAlreadyHasTeamWeapon() || M_SquadController->GetIsAutomaticCoverBlocked())
 	{
 		return false;
 	}
@@ -2995,6 +2997,8 @@ void ASquadUnit::PostInitializeComponents()
 	PostInitializeComp_SetupAISquadUnit();
 	// set squadUnitAnimInstance
 	PostInitializeComp_SetupAnimBP();
+	// Equipment meshes out of the distance fields and the Lumen scene (performance audit).
+	RTSRenderPerf::ExcludeSmallAttachmentsFromDistanceFields(this);
 }
 
 void ASquadUnit::PostInitializeComp_InitScavengerComponent()
