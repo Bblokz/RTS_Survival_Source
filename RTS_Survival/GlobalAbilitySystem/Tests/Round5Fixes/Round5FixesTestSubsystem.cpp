@@ -28,6 +28,9 @@
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
+#include "RTS_Survival/GlobalAbilitySystem/UI/GlobalAbilityPanel/W_GlobalAbilityPanel.h"
+#include "RTS_Survival/GlobalAbilitySystem/UI/W_GA_Item/W_GA_Item.h"
+#include "RTS_Survival/GameUI/MainGameUI.h"
 #include "RTS_Survival/Missions/MissionManager/MissionManager.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
@@ -129,6 +132,19 @@ namespace Round5FixesTestPrivate
 			return nullptr;
 		}
 		return SettingsProperty->ContainerPtrToValuePtr<FAircraftDropGlobalAbilitySettings>(Ability);
+	}
+}
+
+void URound5FixesTestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+	// A mission map started directly has no commander, so the player's kit would be empty: pick the Field
+	// Commander before the controller loads the kit (a mission manager that sets one manually still overrides it).
+	URTSGameInstance* GameInstance = FRTS_Statics::GetRTSGameInstance(this);
+	if (FCString::Strifind(FCommandLine::Get(), TEXT("Round5MissionCaps=")) != nullptr && GameInstance
+		&& GameInstance->GetPlayerCommander() == ERTSCommander::NoCommander)
+	{
+		GameInstance->SetPlayerCommander(ERTSCommander::BalancedCommander);
 	}
 }
 
@@ -398,14 +414,15 @@ void URound5FixesTestSubsystem::CheckTemplateRequirements()
 		       *UEnum::GetValueAsString(Template->GetAbilityTier()),
 		       *UEnum::GetValueAsString(Requirements->RequiredTechnology),
 		       *Requirements->RequiredUnit.GetTrainingName());
-		// The Ju 87 G keeps whatever the Tuning agent decides for it.
-		if (Requirements->RequiredTechnology != ETechnology::Tech_NONE && Type != EGlobalAbility::GA_GerJu87GTankBusters)
+		// For now no global ability needs a technology or a building/unit (2026-11-07).
+		if (Requirements->RequiredTechnology != ETechnology::Tech_NONE || not Requirements->RequiredUnit.IsNone())
 		{
 			++WithTech;
-			Offenders += TypeName + TEXT("=") + UEnum::GetValueAsString(Requirements->RequiredTechnology) + TEXT(" ");
+			Offenders += TypeName + TEXT("=") + UEnum::GetValueAsString(Requirements->RequiredTechnology) + TEXT("/")
+				+ Requirements->RequiredUnit.GetTrainingName() + TEXT(" ");
 		}
 	}
-	Check(Templates > 0 && WithTech == 0, TEXT("no_template_requires_a_technology"),
+	Check(Templates > 0 && WithTech == 0, TEXT("no_template_requires_a_technology_or_unit"),
 	      FString::Printf(TEXT("templates=%d with_tech=%d %s"), Templates, WithTech, *Offenders));
 }
 
@@ -1086,18 +1103,70 @@ void URound5FixesTestSubsystem::TickMissionCaps()
 		Finish();
 		return;
 	}
-	// The player's ability manager applies the cap: every kit ability up to the cap is allowed, none above it.
+	// -Round5MissionFree=1/0: whether the mission makes the player's abilities free (checked only when passed).
+	int32 ExpectedFree = -1;
+	FParse::Value(FCommandLine::Get(), TEXT("Round5MissionFree="), ExpectedFree);
+	if (ExpectedFree >= 0 && IsValid(MissionManager))
+	{
+		const bool bMissionFree = MissionManager->GetPlayerGlobalAbilitySettings().bDisableResourceCosts;
+		UE_LOG(LogRTSRound5Test, Display, TEXT("RTS_ROUND5_TEST MISSION_CAP free=%d manager_free=%d expected=%d"),
+		       bMissionFree, Manager->GetAreResourceCostsDisabled(), ExpectedFree);
+		Check(bMissionFree == (ExpectedFree == 1), TEXT("mission_manager_free_costs ") + MapName);
+		Check(Manager->GetAreResourceCostsDisabled() == (ExpectedFree == 1), TEXT("player_manager_free_costs"));
+	}
+	const URTSGlobalAbilitySettings* AbilitySettings = GetDefault<URTSGlobalAbilitySettings>();
+	const UGlobalAbilitySetDataAsset* AbilitySet = IsValid(AbilitySettings)
+		                                               ? AbilitySettings->GlobalAbilityDataAsset.LoadSynchronous()
+		                                               : nullptr;
+	Check(IsValid(AbilitySet), TEXT("ability_set_loaded"));
+	// The cap hides abilities: every kit ability up to the cap is loaded, none above it.
+	int32 ExpectedLoadedCount = 0;
 	for (const EGlobalAbility AbilityType : Kit)
 	{
-		const UGlobalAbility* Loaded = Manager->FindLoadedAbilityByType(AbilityType);
-		if (not IsValid(Loaded))
+		const UGlobalAbility* Template = IsValid(AbilitySet) ? AbilitySet->FindAbilityTemplate(AbilityType) : nullptr;
+		if (not IsValid(Template))
 		{
 			continue;
 		}
-		const bool bShouldBeAllowed = static_cast<uint8>(Loaded->GetAbilityTier()) <= static_cast<uint8>(Expected);
-		const bool bAllowed = Manager->QueryTierAllowedForAbility(Loaded);
-		Check(bAllowed == bShouldBeAllowed, TEXT("kit_ability_tier_gate ") + UEnum::GetValueAsString(AbilityType),
-		      FString::Printf(TEXT("tier=%s allowed=%d"), *UEnum::GetValueAsString(Loaded->GetAbilityTier()), bAllowed));
+		const bool bShouldBeLoaded = static_cast<uint8>(Template->GetAbilityTier()) <= static_cast<uint8>(Expected);
+		const UGlobalAbility* Loaded = Manager->FindLoadedAbilityByType(AbilityType);
+		ExpectedLoadedCount += bShouldBeLoaded ? 1 : 0;
+		UE_LOG(LogRTSRound5Test, Display, TEXT("RTS_ROUND5_TEST MISSION_CAP kit %s tier=%s loaded=%d"),
+		       *UEnum::GetValueAsString(AbilityType), *UEnum::GetValueAsString(Template->GetAbilityTier()),
+		       IsValid(Loaded));
+		Check(IsValid(Loaded) == bShouldBeLoaded, TEXT("kit_ability_tier_hidden ") + UEnum::GetValueAsString(AbilityType),
+		      FString::Printf(TEXT("tier=%s loaded=%d"), *UEnum::GetValueAsString(Template->GetAbilityTier()),
+		                      IsValid(Loaded)));
+		if (IsValid(Loaded) && ExpectedFree == 1)
+		{
+			Check(Manager->QueryCostsForAbility(Loaded) && Loaded->GetAbilityCosts().Costs.ResourceCosts.Num() == 0,
+			      TEXT("kit_ability_free ") + UEnum::GetValueAsString(AbilityType));
+		}
+	}
+	// The side panel shows exactly the loaded abilities; the hidden ones leave no greyed-out slot.
+	const ACPPController* Controller = FRTS_Statics::GetRTSController(GetWorld());
+	UMainGameUI* MainGameUI = IsValid(Controller) ? Controller->GetMainMenuUI() : nullptr;
+	UW_GlobalAbilityPanel* Panel = IsValid(MainGameUI) ? MainGameUI->GetGlobalAbilityPanel().Get() : nullptr;
+	Check(IsValid(Panel), TEXT("ability_panel_found"));
+	if (IsValid(Panel))
+	{
+		int32 VisibleItems = 0;
+		for (const UW_GA_Item* Item : Panel->GetAbilityItems())
+		{
+			if (not IsValid(Item) || Item->GetVisibility() == ESlateVisibility::Collapsed
+				|| Item->GetVisibility() == ESlateVisibility::Hidden)
+			{
+				continue;
+			}
+			++VisibleItems;
+			const UGlobalAbility* Shown = Item->GetLoadedAbility();
+			Check(IsValid(Shown) && Manager->QueryTierAllowedForAbility(Shown), TEXT("panel_item_within_cap"),
+			      IsValid(Shown) ? UEnum::GetValueAsString(Shown->GetAbilityTier()) : TEXT("none"));
+		}
+		UE_LOG(LogRTSRound5Test, Display, TEXT("RTS_ROUND5_TEST MISSION_CAP panel visible=%d expected=%d"),
+		       VisibleItems, ExpectedLoadedCount);
+		Check(VisibleItems == ExpectedLoadedCount, TEXT("panel_visible_items"),
+		      FString::Printf(TEXT("visible=%d expected=%d"), VisibleItems, ExpectedLoadedCount));
 	}
 	Finish();
 }
@@ -1167,6 +1236,7 @@ void URound5FixesTestSubsystem::RequestScreenshot(const FString& Label)
 #else
 
 bool URound5FixesTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const { return false; }
+void URound5FixesTestSubsystem::Initialize(FSubsystemCollectionBase& Collection) { Super::Initialize(Collection); }
 void URound5FixesTestSubsystem::Tick(float DeltaTime) {}
 TStatId URound5FixesTestSubsystem::GetStatId() const
 {

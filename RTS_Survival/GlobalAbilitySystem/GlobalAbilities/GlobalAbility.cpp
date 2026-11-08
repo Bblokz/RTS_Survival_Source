@@ -349,6 +349,11 @@ bool UGlobalAbility::EnsureIsValidPlayerController() const
 	{
 		return true;
 	}
+	if (M_GlobalAbilitiesManager.IsValid() && M_GlobalAbilitiesManager->GetIsAbilityPreviewManager())
+	{
+		// The commander screen's ability preview runs without an RTS player controller (no aim, no 2D feedback).
+		return false;
+	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 		this,
 		TEXT("M_PlayerController"),

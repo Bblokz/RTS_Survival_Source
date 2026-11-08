@@ -7,6 +7,7 @@
 #include "Components/ActorComponent.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
+#include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/MissionPlayerGlobalAbilitySettings.h"
 #include "RTS_Survival/GlobalAbilitySystem/Tests/AllGlobalAbilities/AllGlobalAbilitiesUnlock.h"
 #include "GlobalAbilitiesManager.generated.h"
 
@@ -78,6 +79,22 @@ public:
 	
 	void SetupSpawnSettings(const FVector& PlayerStart, float AircraftHeightStart);
 
+	/**
+	 * @brief Ability preview only (commander selection, UAbilityPreviewDirector): a player manager without panel,
+	 * resources or requirements, whose aircraft come in around an explicit area instead of the fog manager's map
+	 * (the hangar map has none). Mission managers never call this.
+	 * @param PreviewCentre Ground location the previewed abilities target.
+	 * @param AircraftApproachDirection Horizontal direction from the centre towards the edge the aircraft come from.
+	 * @param PreviewExtent Distance from the centre to that edge, along which the aircraft spawn.
+	 * @param AircraftHeight World Z the aircraft spawn and leave at.
+	 * @param SpawnLineHalfLength How far to either side of the edge centre aircraft spawn; small keeps every run on the
+	 * approach line, so the preview can place targets under it (missions use half the map extent).
+	 */
+	void SetupForAbilityPreview(const FVector& PreviewCentre, const FVector& AircraftApproachDirection,
+	                            const float PreviewExtent, const float AircraftHeight, const float SpawnLineHalfLength);
+
+	bool GetIsAbilityPreviewManager() const { return bM_IsAbilityPreviewManager; }
+
 	// Called when the game starts
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -85,11 +102,13 @@ public:
 	bool IsPlayerAbilityManager() const;
 	bool IsEnemyAbilityManager() const;
 	/**
-	 * @brief The mission caps which tiers of the commander's kit the player may use; set before the abilities are
-	 * initialised. Enemy managers ignore the cap.
-	 * @param MaxAllowedTier Highest ability tier the player may use in this mission.
+	 * @brief The mission decides which tiers of the commander's kit the player may use and whether they cost
+	 * resources. Call before InitGlobalAbilitiesManager: abilities above the tier are not loaded, so the panel never
+	 * shows them. Enemy managers ignore these settings.
+	 * @param MissionSettings The mission manager's player global ability settings.
 	 */
-	void SetMaxAllowedAbilityTier(const EGlobalAbilityTier MaxAllowedTier);
+	void SetPlayerMissionSettings(const FMissionPlayerGlobalAbilitySettings& MissionSettings);
+	bool GetAreResourceCostsDisabled() const;
 	bool QueryRequirementForAbility(const UGlobalAbility* Ability) const;
 	bool QueryTierAllowedForAbility(const UGlobalAbility* Ability) const;
 	bool QueryUnitRequirementForAbility(const UGlobalAbility* Ability) const;
@@ -159,9 +178,17 @@ private:
 
 	FGlobalAbility_SpawnSettings M_SpawnSetings;
 
-	// Tier-capped abilities stay in the panel greyed out, so the player still sees the whole commander kit.
+	// Set by SetupForAbilityPreview: abilities of this manager skip player controller feedback silently.
+	bool bM_IsAbilityPreviewManager = false;
+
+	// Preview managers only: half length of the aircraft spawn line (missions use half the map extent).
+	float M_PreviewSpawnLineHalfLength = 0.f;
+
+	// Abilities above the tier cap are never loaded for the player: they are hidden from the panel, not greyed out.
 	UPROPERTY()
-	EGlobalAbilityTier M_MaxAllowedAbilityTier = EGlobalAbilityTier::TierIV;
+	FMissionPlayerGlobalAbilitySettings M_PlayerMissionSettings;
+	// Player manager only: the template's tier is above the mission's cap, so the ability is not loaded.
+	bool GetIsAbilityTierHiddenForPlayer(const UGlobalAbility* AbilityTemplate) const;
 	UPROPERTY()
 	int32 M_OwningPlayer;
 	
@@ -219,6 +246,9 @@ private:
 
 	FTimerHandle M_CheckRequirementsTimerHandle;
 	FTimerHandle M_CooldownTimerHandle;
+
+	// Half length of the line aircraft spawn and retreat along: half the map extent, or the preview's own value.
+	float GetAircraftSpawnLineHalfLength() const;
 
 	bool TryGenerateLocationOnAircraftEdgeLine(const FVector& AircraftEdgeCenterLocation,
 													const FVector& FowManagerPosition, const FVector& PlayerStart,

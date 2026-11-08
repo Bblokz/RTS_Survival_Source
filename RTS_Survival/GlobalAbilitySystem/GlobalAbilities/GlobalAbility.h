@@ -83,6 +83,7 @@ public:
 	const FGlobalAbilityAimSettings& GetAimSettings() const { return M_AimSettings; }
 	const FGLobalAbilityCostState& GetAbilityCosts() const;
 	const FGlobalAbilityUISettings& GetUISettings() const;
+	const FGlobalAbilitySoundSettings& GetSoundSettings() const { return M_AbilitySoundSettings; }
 
 	FOnGlobalAbilityEnded OnGlobalAbilityEnded;
 

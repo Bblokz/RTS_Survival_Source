@@ -87,6 +87,28 @@ void UGlobalAbilitiesManager::SetupSpawnSettings(const FVector& PlayerStart,
 		M_SpawnSetings.Fow_ManagerPosition + DirectionToPlayerStart * M_SpawnSetings.MapExtent;
 }
 
+void UGlobalAbilitiesManager::SetupForAbilityPreview(const FVector& PreviewCentre,
+                                                     const FVector& AircraftApproachDirection,
+                                                     const float PreviewExtent, const float AircraftHeight,
+                                                     const float SpawnLineHalfLength)
+{
+	bM_IsAbilityPreviewManager = true;
+	M_PreviewSpawnLineHalfLength = FMath::Max(SpawnLineHalfLength, 0.f);
+	M_OwningPlayer = 1;
+	FVector ApproachDirection = AircraftApproachDirection.GetSafeNormal2D();
+	if (ApproachDirection.IsNearlyZero())
+	{
+		ApproachDirection = FVector::ForwardVector;
+	}
+	// The same frame SetupSpawnSettings builds from the fog manager: the "map centre" is the preview centre and the
+	// "player start" lies towards the approach edge, so the aircraft edge line sits PreviewExtent out that way.
+	M_SpawnSetings.Fow_ManagerPosition = PreviewCentre;
+	M_SpawnSetings.PlayerStartLocation = PreviewCentre + ApproachDirection * PreviewExtent;
+	M_SpawnSetings.MapExtent = PreviewExtent;
+	M_SpawnSetings.AircratHeightStart = AircraftHeight;
+	M_SpawnSetings.AircraftStartLocation = PreviewCentre + ApproachDirection * PreviewExtent;
+}
+
 bool UGlobalAbilitiesManager::TryGenerateLocationOnAircraftEdgeLine(
 	const FVector& AircraftEdgeCenterLocation,
 	const FVector& FowManagerPosition,
@@ -138,9 +160,24 @@ void UGlobalAbilitiesManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void UGlobalAbilitiesManager::SetMaxAllowedAbilityTier(const EGlobalAbilityTier MaxAllowedTier)
+void UGlobalAbilitiesManager::SetPlayerMissionSettings(const FMissionPlayerGlobalAbilitySettings& MissionSettings)
 {
-	M_MaxAllowedAbilityTier = MaxAllowedTier;
+	M_PlayerMissionSettings = MissionSettings;
+}
+
+bool UGlobalAbilitiesManager::GetAreResourceCostsDisabled() const
+{
+	return IsPlayerAbilityManager() && M_PlayerMissionSettings.bDisableResourceCosts;
+}
+
+bool UGlobalAbilitiesManager::GetIsAbilityTierHiddenForPlayer(const UGlobalAbility* AbilityTemplate) const
+{
+	if (not IsPlayerAbilityManager() || not IsValid(AbilityTemplate))
+	{
+		return false;
+	}
+	return static_cast<uint8>(AbilityTemplate->GetAbilityTier())
+		> static_cast<uint8>(M_PlayerMissionSettings.MaxAllowedTier);
 }
 
 bool UGlobalAbilitiesManager::QueryRequirementForAbility(const UGlobalAbility* Ability) const
@@ -172,7 +209,7 @@ bool UGlobalAbilitiesManager::QueryTierAllowedForAbility(const UGlobalAbility* A
 		return true;
 	}
 
-	return static_cast<uint8>(Ability->GetAbilityTier()) <= static_cast<uint8>(M_MaxAllowedAbilityTier);
+	return static_cast<uint8>(Ability->GetAbilityTier()) <= static_cast<uint8>(M_PlayerMissionSettings.MaxAllowedTier);
 }
 
 bool UGlobalAbilitiesManager::QueryUnitRequirementForAbility(const UGlobalAbility* Ability) const
@@ -256,6 +293,10 @@ bool UGlobalAbilitiesManager::QueryCostsForAbility(const UGlobalAbility* Ability
 	// Ability test target: the player's abilities are free (TryPayForAbility takes nothing).
 	return true;
 #else
+	if (GetAreResourceCostsDisabled())
+	{
+		return true;
+	}
 	if (not EnsureIsValidPlayerResourceManager())
 	{
 		return false;
@@ -302,6 +343,11 @@ void UGlobalAbilitiesManager::OnClickedAbilityButton(UGlobalAbility* ClickedAbil
 }
 
 
+float UGlobalAbilitiesManager::GetAircraftSpawnLineHalfLength() const
+{
+	return bM_IsAbilityPreviewManager ? M_PreviewSpawnLineHalfLength : M_SpawnSetings.MapExtent / 2;
+}
+
 FVector UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation(const UObject* Requester,
                                                                  const FVector& TargetLocation) const
 {
@@ -313,7 +359,7 @@ FVector UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation(const UObject* 
 		M_SpawnSetings.AircraftStartLocation,
 		M_SpawnSetings.Fow_ManagerPosition,
 		M_SpawnSetings.PlayerStartLocation,
-		M_SpawnSetings.MapExtent / 2,
+		GetAircraftSpawnLineHalfLength(),
 		M_SpawnSetings.AircratHeightStart,
 		SpawnLocation))
 	{
@@ -331,7 +377,7 @@ FVector UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation(const UObject
 		M_SpawnSetings.AircraftStartLocation,
 		M_SpawnSetings.Fow_ManagerPosition,
 		M_SpawnSetings.PlayerStartLocation,
-		M_SpawnSetings.MapExtent / 2,
+		GetAircraftSpawnLineHalfLength(),
 		M_SpawnSetings.AircratHeightStart, 
 		SpawnLocation))
 	{
@@ -475,10 +521,20 @@ void UGlobalAbilitiesManager::LoadGlobalAbilities(TArray<EGlobalAbility> Ability
 	TArray<TObjectPtr<UGlobalAbility>> AbilitiesLoadedCopyUObjects;
 	for (const EGlobalAbility AbilityEnum : AbilityEnums)
 	{
+		// Above the mission's tier cap: not loaded, so the panel hides it and nothing can execute it.
+		if (GetIsAbilityTierHiddenForPlayer(AbilitySetDataAsset->FindAbilityTemplate(AbilityEnum)))
+		{
+			continue;
+		}
 		UGlobalAbility* AbilityCopy = AbilitySetDataAsset->GetGLobalAbilityForTypeAsCopyFromTemplate(AbilityEnum);
 		if (not IsValid(AbilityCopy))
 		{
 			continue;
+		}
+		if (GetAreResourceCostsDisabled())
+		{
+			// Free in this mission: the tooltip then shows no cost either.
+			AbilityCopy->M_AbilityCosts.Costs.ResourceCosts.Reset();
 		}
 		// The enum key the template is registered under is authoritative for the loaded ability's type.
 		// Stamping it here keeps FindLoadedAbilityByType and per-ability loadout overrides (e.g. enemy
@@ -732,7 +788,7 @@ FText UGlobalAbilitiesManager::GetHoverDescriptionForAbility(const UGlobalAbilit
 		return FText::FromString(FRTSRichTextConverter::MakeRTSRich(
 			FString::Printf(TEXT("Not available in this operation: %s ability (allowed up to %s)"),
 			                *Global_GetGlobalAbilityTierDisplayName(Ability->GetAbilityTier()),
-			                *Global_GetGlobalAbilityTierDisplayName(M_MaxAllowedAbilityTier)),
+			                *Global_GetGlobalAbilityTierDisplayName(M_PlayerMissionSettings.MaxAllowedTier)),
 			ERTSRichText::Text_Bad14));
 	}
 	if (Ability->M_AbilityRequirements.RequiredTechnology != ETechnology::Tech_NONE
@@ -914,6 +970,10 @@ bool UGlobalAbilitiesManager::TryPayForAbility(UGlobalAbility* Ability) const
 	// Ability test target: the player's abilities cost nothing.
 	return true;
 #else
+	if (GetAreResourceCostsDisabled())
+	{
+		return true;
+	}
 	return M_PlayerResourceManager.Get()->PayForCosts(Ability->M_AbilityCosts.Costs.ResourceCosts);
 #endif
 }
