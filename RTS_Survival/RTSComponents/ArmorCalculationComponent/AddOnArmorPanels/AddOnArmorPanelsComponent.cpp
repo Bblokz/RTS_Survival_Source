@@ -29,6 +29,9 @@ namespace AddOnArmorPanelsComponentConstants
 	constexpr float MaxSpinSpeed = 14.f;
 	// How far below the burst the ground is searched for.
 	constexpr float GroundTraceDepth = 2000.f;
+	// The death blast throws the remaining panels harder than a hit, and pushes them along the killing shot.
+	constexpr float DeathBlastSpeedScale = 1.6f;
+	constexpr float DeathKillShotPushSpeed = 200.f;
 }
 
 UAddOnArmorPanelsComponent::UAddOnArmorPanelsComponent()
@@ -100,14 +103,57 @@ void UAddOnArmorPanelsComponent::SyncAllZonesFromModuleState()
 	}
 }
 
+void UAddOnArmorPanelsComponent::BlowOffIntactPanelsOnDeath(const FVector& KillShotDirection)
+{
+	if (bM_HasBlownOffPanelsOnDeath)
+	{
+		return;
+	}
+	bM_HasBlownOffPanelsOnDeath = true;
+	UnbindZoneHit();
+	const int32 PreviousMask = M_HiddenPanelMask;
+	const FVector ShotPush = KillShotDirection.GetSafeNormal()
+		* AddOnArmorPanelsComponentConstants::DeathKillShotPushSpeed;
+	bool bHasPlayedSound = false;
+	for (FAddOnArmorPanelZoneState& Zone : M_Zones)
+	{
+		const int32 PreviousHiddenCount = Zone.HiddenPanelOrder.Num();
+		while (HidePanelClosestToLastHit(Zone))
+		{
+		}
+		const int32 NewlyHiddenCount = Zone.HiddenPanelOrder.Num() - PreviousHiddenCount;
+		if (NewlyHiddenCount <= 0)
+		{
+			continue;
+		}
+		// One clang for the whole blast; the death explosion carries the rest.
+		if (not bHasPlayedSound)
+		{
+			PlayArmorOffSound(Zone);
+			bHasPlayedSound = true;
+		}
+		ThrowPanelDebris(Zone, MakeArrayView(Zone.HiddenPanelOrder).Slice(PreviousHiddenCount, NewlyHiddenCount),
+		                 AddOnArmorPanelsComponentConstants::DeathBlastSpeedScale, ShotPush);
+	}
+	if (M_HiddenPanelMask != PreviousMask)
+	{
+		WriteHiddenPanelMask();
+	}
+}
+
 void UAddOnArmorPanelsComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindZoneHit();
+	Super::EndPlay(EndPlayReason);
+}
+
+void UAddOnArmorPanelsComponent::UnbindZoneHit()
 {
 	if (M_ArmorCalculation.IsValid() && M_ZoneHitHandle.IsValid())
 	{
 		M_ArmorCalculation->GetOnAddOnArmorZoneHit().Remove(M_ZoneHitHandle);
 	}
 	M_ZoneHitHandle.Reset();
-	Super::EndPlay(EndPlayReason);
 }
 
 bool UAddOnArmorPanelsComponent::GetIsValidPanelMesh() const
@@ -217,13 +263,26 @@ bool UAddOnArmorPanelsComponent::CachePanelCentres(const UStaticMeshComponent& P
 
 void UAddOnArmorPanelsComponent::CacheDebris(const UAddOnArmorPanelLayout& Layout)
 {
-	M_DebrisMesh = Layout.GetDebrisMesh();
-	if (not IsValid(M_DebrisMesh))
+	M_PanelDebrisMeshes.Reset();
+	M_OwnSideDebrisMask = 0;
+	int32 PanelsWithoutDebris = 0;
+	for (int32 PanelIndex = 0; PanelIndex < Layout.GetPanels().Num(); ++PanelIndex)
 	{
-		RTSFunctionLibrary::ReportError(TEXT("UAddOnArmorPanelsComponent: the panel hull ")
-			+ GetNameSafe(M_PanelMesh->GetStaticMesh()) + TEXT(" of ") + GetNameSafe(GetOwner())
-			+ TEXT(" has no debris panel mesh, so shot-off panels vanish without debris. Model one panel as its own")
-			TEXT(" static mesh and set it with RTS.AddOnArmor.SetPanelDebrisMesh (AddOnArmorPanels/AGENTS.md)."));
+		bool bIsOwnSideMesh = false;
+		UStaticMesh* const DebrisMesh = Layout.GetDebrisMeshForPanel(PanelIndex, bIsOwnSideMesh);
+		M_PanelDebrisMeshes.Add(DebrisMesh);
+		M_OwnSideDebrisMask |= bIsOwnSideMesh ? 1 << PanelIndex : 0;
+		PanelsWithoutDebris += IsValid(DebrisMesh) ? 0 : 1;
+	}
+	if (PanelsWithoutDebris > 0)
+	{
+		RTSFunctionLibrary::ReportError(FString::Printf(TEXT("UAddOnArmorPanelsComponent: the panel hull %s of %s has no")
+			TEXT(" debris panel mesh for %d panels, so they vanish without debris when shot off. Cut one panel out with")
+			TEXT(" RTS.AddOnArmor.ExtractPanelDebris (AddOnArmorPanels/AGENTS.md)."),
+			*GetNameSafe(M_PanelMesh->GetStaticMesh()), *GetNameSafe(GetOwner()), PanelsWithoutDebris));
+	}
+	if (PanelsWithoutDebris == M_PanelDebrisMeshes.Num())
+	{
 		return;
 	}
 	M_LoadedDebrisSystem = M_DebrisSystem.LoadSynchronous();
@@ -326,6 +385,11 @@ int32 UAddOnArmorPanelsComponent::FindZoneIndexByModuleId(const int32 ModuleId) 
 
 void UAddOnArmorPanelsComponent::SyncZoneFromModuleState(const int32 ZoneIndex, const bool bThrowDebris)
 {
+	// A dead tank's panels are gone; a late transition must not bring any back.
+	if (bM_HasBlownOffPanelsOnDeath)
+	{
+		return;
+	}
 	if (not GetIsValidArmorCalculation() || not M_Zones.IsValidIndex(ZoneIndex))
 	{
 		return;
@@ -423,12 +487,11 @@ void UAddOnArmorPanelsComponent::WriteHiddenPanelMask() const
 }
 
 void UAddOnArmorPanelsComponent::ThrowPanelDebris(const FAddOnArmorPanelZoneState& Zone,
-                                                  const TConstArrayView<int32> PanelIndices) const
+                                                  const TConstArrayView<int32> PanelIndices, const float SpeedScale,
+                                                  const FVector& ExtraVelocity) const
 {
-	using namespace AddOnArmorPanelDebris;
-	using namespace AddOnArmorPanelsComponentConstants;
-	// A hull without a debris panel was reported once when the zones installed.
-	if (PanelIndices.IsEmpty() || not IsValid(M_DebrisMesh) || not GetIsValidPanelMesh() || not GetIsValidDebrisSystem())
+	// A hull without a debris panel was reported once when the zones installed; its debris system is then not loaded.
+	if (PanelIndices.IsEmpty() || not IsValid(M_LoadedDebrisSystem) || not GetIsValidPanelMesh())
 	{
 		return;
 	}
@@ -438,11 +501,50 @@ void UAddOnArmorPanelsComponent::ThrowPanelDebris(const FAddOnArmorPanelZoneStat
 	{
 		return;
 	}
+	const FVector HitLocation = Owner->GetActorTransform().TransformPosition(
+		Zone.bHasLastHit ? Zone.LastHitPosition : GetZoneCentre(Zone));
+	// One burst per debris mesh: User.DebrisMesh is one mesh per Niagara component.
+	TArray<int32, TInlineAllocator<AddOnArmorPanelMask::MaxPanelsPerMesh>> PendingPanels(PanelIndices.GetData(), PanelIndices.Num());
+	while (not PendingPanels.IsEmpty())
+	{
+		UStaticMesh* const BurstMesh = M_PanelDebrisMeshes.IsValidIndex(PendingPanels[0])
+			? M_PanelDebrisMeshes[PendingPanels[0]].Get()
+			: nullptr;
+		TArray<int32, TInlineAllocator<AddOnArmorPanelMask::MaxPanelsPerMesh>> BurstPanels;
+		for (int32 PendingIndex = PendingPanels.Num() - 1; PendingIndex >= 0; --PendingIndex)
+		{
+			const int32 PanelIndex = PendingPanels[PendingIndex];
+			const UStaticMesh* const PanelMesh = M_PanelDebrisMeshes.IsValidIndex(PanelIndex)
+				? M_PanelDebrisMeshes[PanelIndex].Get()
+				: nullptr;
+			if (PanelMesh == BurstMesh)
+			{
+				BurstPanels.Insert(PanelIndex, 0);
+				PendingPanels.RemoveAt(PendingIndex, EAllowShrinking::No);
+			}
+		}
+		if (IsValid(BurstMesh))
+		{
+			SpawnDebrisBurst(HitLocation, BurstMesh, BurstPanels, SpeedScale, ExtraVelocity);
+		}
+	}
+}
+
+void UAddOnArmorPanelsComponent::SpawnDebrisBurst(const FVector& HitLocation, UStaticMesh* const DebrisMesh,
+                                                  const TConstArrayView<int32> PanelIndices, const float SpeedScale,
+                                                  const FVector& ExtraVelocity) const
+{
+	using namespace AddOnArmorPanelDebris;
+	using namespace AddOnArmorPanelsComponentConstants;
+	if (PanelIndices.IsEmpty() || not GetIsValidDebrisSystem())
+	{
+		return;
+	}
+	const AActor* const Owner = GetOwner();
 	const FTransform OwnerTransform = Owner->GetActorTransform();
 	const FTransform MeshTransform = M_PanelMesh->GetComponentTransform();
 	const FQuat MeshRotation = MeshTransform.GetRotation();
 	const double PieceScale = MeshTransform.GetMaximumAxisScale();
-	const FVector HitLocation = OwnerTransform.TransformPosition(Zone.bHasLastHit ? Zone.LastHitPosition : GetZoneCentre(Zone));
 	const FVector OwnerVelocity = Owner->GetVelocity();
 	const int32 PieceCount = FMath::Min(PanelIndices.Num(), MaxPiecesPerBurst);
 	TArray<FVector4> Starts;
@@ -454,14 +556,18 @@ void UAddOnArmorPanelsComponent::ThrowPanelDebris(const FAddOnArmorPanelZoneStat
 	{
 		const int32 PanelIndex = PanelIndices[PieceIndex];
 		const bool bIsMeshRightSide = M_PanelMeshSides[PanelIndex] == EAddOnArmorPanelSide::Right;
+		const bool bIsOwnSideMesh = (M_OwnSideDebrisMask & (1 << PanelIndex)) != 0;
 		const FVector Centre = OwnerTransform.TransformPosition(M_PanelCentres[PanelIndex]);
 		const FVector Outward = MeshRotation.RotateVector(FVector(0.0, bIsMeshRightSide ? 1.0 : -1.0, 0.0));
-		// The debris mesh is a left-side panel; a right-side panel is the same plate turned around.
-		const FQuat Orientation = bIsMeshRightSide ? MeshRotation * FQuat(FVector::UpVector, UE_PI) : MeshRotation;
-		const FVector Velocity = Outward * FMath::FRandRange(MinOutwardSpeed, MaxOutwardSpeed)
+		// The shared debris mesh is a left-side panel; a right-side panel is the same plate turned around. A panel's own
+		// mesh already hangs on its side.
+		const FQuat Orientation = bIsMeshRightSide && not bIsOwnSideMesh
+			? MeshRotation * FQuat(FVector::UpVector, UE_PI)
+			: MeshRotation;
+		const FVector Velocity = Outward * (FMath::FRandRange(MinOutwardSpeed, MaxOutwardSpeed) * SpeedScale)
 			+ (Centre - HitLocation).GetSafeNormal() * FMath::FRandRange(0.f, MaxSpreadSpeed)
-			+ FVector::UpVector * FMath::FRandRange(MinUpKick, MaxUpKick)
-			+ OwnerVelocity;
+			+ FVector::UpVector * (FMath::FRandRange(MinUpKick, MaxUpKick) * SpeedScale)
+			+ OwnerVelocity + ExtraVelocity;
 		Starts.Add(FVector4(Centre, PieceScale));
 		Velocities.Add(FVector4(Velocity, 0.0));
 		Spins.Add(FVector4(FMath::VRand(), FMath::FRandRange(MinSpinSpeed, MaxSpinSpeed)));
@@ -476,7 +582,7 @@ void UAddOnArmorPanelsComponent::ThrowPanelDebris(const FAddOnArmorPanelZoneStat
 	{
 		return;
 	}
-	Burst->SetVariableStaticMesh(DebrisMeshParameter, M_DebrisMesh);
+	Burst->SetVariableStaticMesh(DebrisMeshParameter, DebrisMesh);
 	Burst->SetVariableInt(PieceCountParameter, PieceCount);
 	Burst->SetVariableFloat(GroundHeightParameter, GetGroundHeightBelow(BurstCentre));
 	UNiagaraDataInterfaceArrayFunctionLibrary::SetNiagaraArrayVector4(Burst, PieceStartParameter, Starts);

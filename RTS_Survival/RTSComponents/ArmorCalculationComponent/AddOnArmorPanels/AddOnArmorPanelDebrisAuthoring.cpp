@@ -540,8 +540,14 @@ namespace AddOnArmorPanelDebrisAuthoring
 		return bAllSaved;
 	}
 
-	/** @brief Stores the debris panel on the hull's layout and saves the hull; the mesh itself is not rebuilt. */
-	bool StoreDebrisMesh(UStaticMesh& Hull, UStaticMesh& DebrisMesh)
+	/**
+	 * @brief Stores the debris panel on the hull's layout and saves the hull; the mesh itself is not rebuilt.
+	 * @param Hull Panel hull with a layout.
+	 * @param DebrisMesh The cut-out or modelled panel.
+	 * @param OwnPanelIndex INDEX_NONE stores the shared debris panel; else that panel's own debris mesh.
+	 * @return False when the hull has no layout or a material or the hull could not be saved.
+	 */
+	bool StoreDebrisMesh(UStaticMesh& Hull, UStaticMesh& DebrisMesh, const int32 OwnPanelIndex = INDEX_NONE)
 	{
 		UAddOnArmorPanelLayout* const Layout = Hull.GetAssetUserData<UAddOnArmorPanelLayout>();
 		if (not IsValid(Layout) || not EnsureNiagaraMeshUsage(DebrisMesh))
@@ -550,7 +556,14 @@ namespace AddOnArmorPanelDebrisAuthoring
 		}
 		Hull.Modify();
 		Layout->Modify();
-		Layout->SetDebrisMesh(&DebrisMesh);
+		if (OwnPanelIndex == INDEX_NONE)
+		{
+			Layout->SetDebrisMesh(&DebrisMesh);
+		}
+		else
+		{
+			Layout->SetOwnDebrisMesh(OwnPanelIndex, &DebrisMesh);
+		}
 		return SaveAsset(Hull);
 	}
 
@@ -701,30 +714,36 @@ namespace AddOnArmorPanelDebrisAuthoring
 		FParse::Value(*Joined, TEXT("Hull="), HullPath);
 		FParse::Value(*Joined, TEXT("Target="), TargetPath);
 		FParse::Value(*Joined, TEXT("Panel="), PanelIndex);
+		// The panel's own debris mesh (any side, as it hangs) instead of the shared left panel.
+		const bool bOwnPanel = FParse::Param(*Joined, TEXT("OwnPanel"));
 		UStaticMesh* const Hull = LoadMesh(HullPath);
 		const UAddOnArmorPanelLayout* const Layout = IsValid(Hull) ? Hull->GetAssetUserData<UAddOnArmorPanelLayout>() : nullptr;
 		const FMeshDescription* const HullDescription = IsValid(Layout) ? Hull->GetMeshDescription(0) : nullptr;
-		PanelIndex = PanelIndex == INDEX_NONE && IsValid(Layout) ? FindTypicalLeftPanel(*Layout) : PanelIndex;
+		PanelIndex = PanelIndex == INDEX_NONE && IsValid(Layout) && not bOwnPanel ? FindTypicalLeftPanel(*Layout) : PanelIndex;
 		if (HullDescription == nullptr || not Layout->GetPanels().IsValidIndex(PanelIndex))
 		{
 			UE_LOG(LogRTSAddOnArmorDebrisAuthoring, Error, TEXT("RTS_ADDON_DEBRIS_AUTHORING extract RESULT FAIL inputs (%s)"), *Joined);
 			return;
 		}
-		TargetPath = TargetPath.IsEmpty() ? FPackageName::ObjectPathToPackageName(GetObjectPath(HullPath)) + DebrisMeshSuffix : TargetPath;
+		const FString DefaultTarget = FPackageName::ObjectPathToPackageName(GetObjectPath(HullPath)) + DebrisMeshSuffix
+			+ (bOwnPanel ? FString::Printf(TEXT("_Panel%d"), PanelIndex) : FString());
+		TargetPath = TargetPath.IsEmpty() ? DefaultTarget : TargetPath;
 		FMeshDescription Description = *HullDescription;
 		const FAddOnArmorPanel& Panel = Layout->GetPanels()[PanelIndex];
-		if (Panel.Side != EAddOnArmorPanelSide::Left || not KeepOnlyPanel(Description, PanelIndex, Panel.MeshSpaceCentre))
+		const bool bSideAllowed = bOwnPanel || Panel.Side == EAddOnArmorPanelSide::Left;
+		if (not bSideAllowed || not KeepOnlyPanel(Description, PanelIndex, Panel.MeshSpaceCentre))
 		{
 			UE_LOG(LogRTSAddOnArmorDebrisAuthoring, Error,
-			       TEXT("RTS_ADDON_DEBRIS_AUTHORING extract RESULT FAIL panel %d is not a left-side panel with geometry"), PanelIndex);
+			       TEXT("RTS_ADDON_DEBRIS_AUTHORING extract RESULT FAIL panel %d is not a left-side panel with geometry")
+			       TEXT(" (pass -OwnPanel for a right panel's own mesh)"), PanelIndex);
 			return;
 		}
 		const int32 TriangleCount = Description.Triangles().Num();
 		UStaticMesh* const Debris = WriteDebrisMesh(*Hull, MoveTemp(Description), TargetPath);
-		const bool bStored = IsValid(Debris) && StoreDebrisMesh(*Hull, *Debris);
+		const bool bStored = IsValid(Debris) && StoreDebrisMesh(*Hull, *Debris, bOwnPanel ? PanelIndex : INDEX_NONE);
 		UE_LOG(LogRTSAddOnArmorDebrisAuthoring, Display,
-		       TEXT("RTS_ADDON_DEBRIS_AUTHORING extract RESULT %s panel=%d tris=%d bounds=%s target=%s"),
-		       bStored ? TEXT("DONE") : TEXT("FAIL"), PanelIndex, TriangleCount,
+		       TEXT("RTS_ADDON_DEBRIS_AUTHORING extract RESULT %s panel=%d own=%d tris=%d bounds=%s target=%s"),
+		       bStored ? TEXT("DONE") : TEXT("FAIL"), PanelIndex, bOwnPanel ? 1 : 0, TriangleCount,
 		       IsValid(Debris) ? *Debris->GetBoundingBox().GetSize().ToCompactString() : TEXT("-"), *TargetPath);
 	}
 
@@ -741,7 +760,8 @@ namespace AddOnArmorPanelDebrisAuthoring
 	FAutoConsoleCommand ExtractPanelDebrisCommand(
 		TEXT("RTS.AddOnArmor.ExtractPanelDebris"),
 		TEXT("Cuts one left-side panel out of a panel hull as its debris panel and stores it on the layout. "
-			"Args: Hull=<_AddOnPanels mesh> [Panel=<layout index>] [Target=<package, default <hull>_Debris>]"),
+			"Args: Hull=<_AddOnPanels mesh> [Panel=<layout index>] [Target=<package, default <hull>_Debris>] "
+			"[-OwnPanel: store it as that panel's own debris mesh (any side, as it hangs; default target <hull>_Debris_Panel<i>)]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&ExtractPanelDebris));
 }
 

@@ -56,7 +56,8 @@ struct FAddOnArmorPanelZoneState
  * @brief Add to a tank whose hull mesh was built by RTS.AddOnArmor.BuildPanelHull. The tank installs one AddOnArmor
  * module per zone when its Blueprint finished the module setup; the zone's damage then hides panels of its side
  * (closest to the hits first, all of them once destroyed) and repairs bring them back. Every panel that damage hides
- * flies off as Niagara debris: the hull's debris panel mesh (see its panel layout) in one pooled burst per hit, with
+ * flies off as Niagara debris: its debris mesh from the panel layout (the shared panel or its own) in one pooled burst
+ * per hit and debris mesh, with
  * one pooled clang per hit for the tank's weight class (UAddOnArmorPanelAudioSubsystem).
  * Structural plate values in the Blueprint's armour setup must not include the add-on armour.
  */
@@ -80,6 +81,14 @@ public:
 	/** @brief Rebuilds every zone's panels from the module state; loads emit no transitions. */
 	void SyncAllZonesFromModuleState();
 
+	/**
+	 * @brief Called when the tank dies, whatever killed it: every panel still on the hull blasts off as debris (one
+	 * burst per zone, faster than a hit) with one clang, and the panels stay hidden for the rest of the tank's life.
+	 * Fog-hidden tanks only hide their panels. Later module transitions no longer change the panels.
+	 * @param KillShotDirection Direction of the killing projectile, or zero; pushes the pieces along the shot.
+	 */
+	void BlowOffIntactPanelsOnDeath(const FVector& KillShotDirection);
+
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
@@ -94,9 +103,14 @@ private:
 	UPROPERTY()
 	TObjectPtr<UNiagaraSystem> M_LoadedDebrisSystem;
 
-	// One panel as its own mesh, from the panel layout; null when the hull has none (no debris then).
+	// Debris mesh per panel, indexed like the layout: the panel's own mesh or the layout's shared one; null entries
+	// throw nothing.
 	UPROPERTY()
-	TObjectPtr<UStaticMesh> M_DebrisMesh;
+	TArray<TObjectPtr<UStaticMesh>> M_PanelDebrisMeshes;
+
+	// Bit per panel whose debris mesh is its own, already on its side; the shared mesh is a left panel turned around
+	// for right panels.
+	int32 M_OwnSideDebrisMask = 0;
 
 	// The hull mesh carrying the panel layout and the panel material slot.
 	UPROPERTY()
@@ -124,6 +138,11 @@ private:
 	int32 M_HiddenPanelMask = 0;
 
 	FDelegateHandle M_ZoneHitHandle;
+
+	// Set when the tank died and its remaining panels blew off; the panels no longer follow the modules.
+	bool bM_HasBlownOffPanelsOnDeath = false;
+
+	void UnbindZoneHit();
 
 	bool GetIsValidPanelMesh() const;
 	bool GetIsValidArmorCalculation() const;
@@ -168,11 +187,25 @@ private:
 	void WriteHiddenPanelMask() const;
 
 	/**
-	 * @brief Throws the given panels off the hull in one pooled Niagara burst; nothing while fog of war hides the owner.
+	 * @brief Throws the given panels off the hull, one pooled Niagara burst per debris mesh among them (end plates can
+	 * have their own); nothing while fog of war hides the owner.
 	 * @param Zone Zone the panels belong to; its last hit pushes the pieces away from the impact.
 	 * @param PanelIndices Layout indices of the panels that were just hidden.
+	 * @param SpeedScale Scales the outward speed and upward kick; death blasts throw harder than hits.
+	 * @param ExtraVelocity Added to every piece, e.g. a push along the killing shot.
 	 */
-	void ThrowPanelDebris(const FAddOnArmorPanelZoneState& Zone, TConstArrayView<int32> PanelIndices) const;
+	void ThrowPanelDebris(const FAddOnArmorPanelZoneState& Zone, TConstArrayView<int32> PanelIndices,
+	                      float SpeedScale = 1.f, const FVector& ExtraVelocity = FVector::ZeroVector) const;
+	/**
+	 * @brief Spawns one pooled burst of the given panels, which all fly off as the same debris mesh.
+	 * @param HitLocation World location the pieces drift away from.
+	 * @param DebrisMesh Mesh every piece of the burst draws.
+	 * @param PanelIndices Layout indices of the panels in this burst.
+	 * @param SpeedScale Scales the outward speed and upward kick.
+	 * @param ExtraVelocity Added to every piece.
+	 */
+	void SpawnDebrisBurst(const FVector& HitLocation, UStaticMesh* DebrisMesh, TConstArrayView<int32> PanelIndices,
+	                      float SpeedScale, const FVector& ExtraVelocity) const;
 	/**
 	 * @brief Plays the weight class's armour-off clang at the zone's last hit; nothing while fog of war hides the owner.
 	 * @param Zone Zone that just lost panels.

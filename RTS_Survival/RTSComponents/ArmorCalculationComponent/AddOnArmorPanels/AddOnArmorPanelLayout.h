@@ -45,13 +45,19 @@ struct FAddOnArmorPanel
 
 	UPROPERTY(VisibleAnywhere, Category="AddOnArmor")
 	EAddOnArmorPanelSide Side = EAddOnArmorPanelSide::Left;
+
+	// This panel cut out as it hangs on its own side (not turned around), for panels shaped unlike the typical one
+	// (end plates with a chamfer or nose). Null: the panel flies off as the layout's shared debris mesh.
+	// Set by RTS.AddOnArmor.ExtractPanelDebris -OwnPanel.
+	UPROPERTY(VisibleAnywhere, Category="AddOnArmor")
+	TObjectPtr<UStaticMesh> OwnDebrisMesh;
 };
 
 /**
  * @brief Written onto a hull static mesh by RTS.AddOnArmor.BuildPanelHull; UAddOnArmorPanelsComponent reads it to
  * know which panels it can hide and where they sit. Array index = bit in the hidden-panel mask = value in the
- * panel geometry's PanelIndexUvChannel. Also holds the debris mesh: one panel as its own static mesh, thrown off as
- * Niagara debris whenever a panel is shot off.
+ * panel geometry's PanelIndexUvChannel. Also holds the debris meshes thrown off as Niagara debris whenever a panel
+ * is shot off: one shared left-side panel, and optionally a panel's own mesh (see FAddOnArmorPanel::OwnDebrisMesh).
  */
 UCLASS()
 class RTS_SURVIVAL_API UAddOnArmorPanelLayout : public UAssetUserData
@@ -62,9 +68,30 @@ public:
 	const TArray<FAddOnArmorPanel>& GetPanels() const { return M_Panels; }
 	UStaticMesh* GetDebrisMesh() const { return M_DebrisMesh; }
 
+	/**
+	 * @brief Panels with their own debris mesh fly off as themselves; the rest share the left-side debris panel.
+	 * @param PanelIndex Layout index of the panel.
+	 * @param bOutIsOwnSideMesh True when the mesh is the panel's own, already on its side (no turn for right panels).
+	 * @return The mesh to throw for this panel, or null when the hull has none.
+	 */
+	UStaticMesh* GetDebrisMeshForPanel(const int32 PanelIndex, bool& bOutIsOwnSideMesh) const
+	{
+		UStaticMesh* const OwnMesh = M_Panels.IsValidIndex(PanelIndex) ? M_Panels[PanelIndex].OwnDebrisMesh.Get() : nullptr;
+		bOutIsOwnSideMesh = OwnMesh != nullptr;
+		return bOutIsOwnSideMesh ? OwnMesh : M_DebrisMesh.Get();
+	}
+
 #if WITH_EDITOR
 	void SetPanels(const TArray<FAddOnArmorPanel>& Panels) { M_Panels = Panels; }
 	void SetDebrisMesh(UStaticMesh* DebrisMesh) { M_DebrisMesh = DebrisMesh; }
+
+	void SetOwnDebrisMesh(const int32 PanelIndex, UStaticMesh* DebrisMesh)
+	{
+		if (M_Panels.IsValidIndex(PanelIndex))
+		{
+			M_Panels[PanelIndex].OwnDebrisMesh = DebrisMesh;
+		}
+	}
 #endif
 
 private:

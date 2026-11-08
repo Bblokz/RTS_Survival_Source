@@ -114,7 +114,8 @@ carrying, and hands over to `UAircraftDeathComponent` (created on every aircraft
   Pieces land on the ground and pass through units. The aircraft actor is hidden and goes after 8 s. Without a crash
   collection, or when it hits the ground before the carried wreck is up, the aircraft explodes the old way: everything
   at once, `PieceVelocityRetained` of the impact velocity, blown apart with `PieceScatterSpeed`. That old path has the
-  same physics latency with no wait: the pieces sit whole for a moment and then burst, which looked like a dropped cup.
+  same physics latency with no wait: the pieces sit whole for a moment and then burst (probably much of why the old
+  impact looked like a dropped cup).
 - **Parked.** An aircraft killed while landed on the ground (in its bay or on a field) collapses where it stands:
   its pieces get a fifth of the scatter, so they stay within about its own size and do not fly through bay walls.
   The airbase building has query-only collision: its walls do not stop pieces, only the low scatter keeps them in
