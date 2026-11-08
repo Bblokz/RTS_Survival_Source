@@ -76,6 +76,12 @@ private:
 
 	bool bM_HasReportedPoolSaturation = false;
 
+	// The tracer system draws every pool slot each frame, also with nothing in flight; it is hidden while idle.
+	bool bM_AreTracersHidden = false;
+
+	// Ticks in a row without a projectile in flight; tracers hide after a few so a fading tail is never cut.
+	int32 M_TicksWithoutActiveProjectiles = 0;
+
 	// Cached World pointer.
 	TWeakObjectPtr<UWorld> M_World;
 
@@ -121,6 +127,13 @@ private:
 	 * but currently unreal engine only supports certain arrays of their derived data interfaces.
 	 */
 	inline void UpdateNiagaraWithData();
+
+	/** @brief Hides the tracer system once no projectile has been in flight for a while (saves its idle draws). */
+	void UpdateTracerVisibility();
+
+	bool GetHasActiveProjectile() const;
+
+	void SetTracersHidden(const bool bShouldHideTracers);
 
 	void Debug_ProjectilePooling(const FString& Message) const;
 	void Debug_AmountProjectilesActive() const;

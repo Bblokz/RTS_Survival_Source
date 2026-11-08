@@ -15,6 +15,7 @@
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/Rendering/RTSRenderPerf.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateLaser.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateMultiHitLaser.h"
@@ -556,7 +557,7 @@ void AInfantryWeaponMaster::BeginPlay()
 	if (UWorld* World = GetWorld())
 	{
 		PlayerController = Cast<ACPPController>(World->GetFirstPlayerController());
-		if (not IsValid(PlayerController))
+		if (not IsValid(PlayerController) && not FRTS_Statics::GetIsInPreGameHangar(this))
 		{
 			RTSFunctionLibrary::ReportNullErrorInitialisation(this, "PlayerController",
 			                                                  "AInfantryWeaponMaster::BeginPlay");
@@ -583,6 +584,7 @@ void AInfantryWeaponMaster::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	WeaponMesh = FindComponentByClass<UStaticMeshComponent>();
+	RTSRenderPerf::ExcludeSmallAttachmentsFromDistanceFields(this);
 }
 
 void AInfantryWeaponMaster::SetWeaponAimOffsetType(const ESquadWeaponAimOffset AimOffsetType)

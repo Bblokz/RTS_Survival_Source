@@ -18,6 +18,8 @@ namespace SmallArmsProjectileManagerPrivate
 	constexpr int32 TankProjectilePoolGrowStep = 16;
 	// A hard cap so a runaway (projectiles that never return) cannot spawn actors without end.
 	constexpr int32 MaxTankProjectilePoolSize = 512;
+	// Idle manager ticks (0.25 s each) before the tracer system is hidden; covers any tracer tail after impact.
+	constexpr int32 IdleTicksBeforeHidingTracers = 2;
 }
 
 
@@ -58,6 +60,11 @@ void ASmallArmsProjectileManager::FireProjectile(
 		StartTime,
 		LifeTime,
 		Index);
+	if (bM_AreTracersHidden)
+	{
+		SetTracersHidden(false);
+		UpdateNiagaraWithData();
+	}
 }
 
 AProjectile* ASmallArmsProjectileManager::GetDormantTankProjectile()
@@ -250,6 +257,49 @@ void ASmallArmsProjectileManager::UpdateProjectiles()
 	}
 	ReleaseExpiredProjectiles(M_World->GetTimeSeconds());
 	UpdateNiagaraWithData();
+	UpdateTracerVisibility();
+}
+
+void ASmallArmsProjectileManager::UpdateTracerVisibility()
+{
+	if (GetHasActiveProjectile())
+	{
+		M_TicksWithoutActiveProjectiles = 0;
+		return;
+	}
+	if (bM_AreTracersHidden)
+	{
+		return;
+	}
+	++M_TicksWithoutActiveProjectiles;
+	if (M_TicksWithoutActiveProjectiles < SmallArmsProjectileManagerPrivate::IdleTicksBeforeHidingTracers)
+	{
+		return;
+	}
+	SetTracersHidden(true);
+}
+
+bool ASmallArmsProjectileManager::GetHasActiveProjectile() const
+{
+	for (int32 i = 0; i < FSoA_SmallArmsProjectilesPool::PoolSize; ++i)
+	{
+		if (M_SmallArmsProjectilePool.bIsActive[i])
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void ASmallArmsProjectileManager::SetTracersHidden(const bool bShouldHideTracers)
+{
+	if (not GetIsValidNiagaraComponent())
+	{
+		return;
+	}
+	bM_AreTracersHidden = bShouldHideTracers;
+	M_TicksWithoutActiveProjectiles = 0;
+	M_NiagaraComponent->SetVisibility(not bShouldHideTracers);
 }
 
 void ASmallArmsProjectileManager::UpdateNiagaraWithData()

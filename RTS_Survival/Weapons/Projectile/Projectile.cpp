@@ -2112,6 +2112,12 @@ void AProjectile::OnProjectileDormant()
 		return;
 	}
 	SetActorHiddenInGame(true);
+	// A hidden pooled projectile kept simulating its Niagara system: every dormant shell in the pool dispatched GPU
+	// sims each frame (performance audit). It is hidden already, so stopping it at once changes nothing visible.
+	if (GetIsValidNiagara())
+	{
+		M_NiagaraComponent->DeactivateImmediate();
+	}
 	M_ProjectileMovement->Velocity = FVector::ZeroVector;
 	M_ProjectileMovement->Deactivate();
 	M_ProjectileMovement->ProjectileGravityScale = M_DefaultGravityScale;
@@ -2144,6 +2150,11 @@ void AProjectile::OnRestartProjectile(const FVector& NewLocation, const FRotator
 	// Move projectile to new location.
 	SetActorLocation(NewLocation);
 	SetActorRotation(LaunchRotation);
+	// Dormant projectiles stop their Niagara system; restart it fresh at the launch location.
+	if (GetIsValidNiagara())
+	{
+		M_NiagaraComponent->Activate(true);
+	}
 	if (GetIsValidProjectileMovement())
 	{
 		M_ProjectileMovement->Activate();
