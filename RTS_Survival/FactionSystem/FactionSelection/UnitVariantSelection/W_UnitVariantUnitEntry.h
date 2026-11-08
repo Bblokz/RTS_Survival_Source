@@ -39,9 +39,6 @@ public:
 
 	void SetIsSelected(const bool bIsSelected);
 
-	/** Shows which variant is currently chosen for the unit next to its variant count. */
-	void SetChosenVariantName(const FText& ChosenVariantName);
-
 	/** Marks the entry while its chosen variant differs from the one last confirmed. */
 	void SetHasUnconfirmedChange(const bool bHasUnconfirmedChange);
 
@@ -76,7 +73,6 @@ private:
 	FUnitVariantSelectionStyle M_Style;
 
 	int32 M_EntryIndex = INDEX_NONE;
-	int32 M_VariantCount = 1;
 	bool bM_IsSelected = false;
 
 	void BuildWidgetTree();

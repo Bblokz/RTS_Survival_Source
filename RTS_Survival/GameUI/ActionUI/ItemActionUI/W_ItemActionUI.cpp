@@ -9,6 +9,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "RTS_Survival/GameUI/ActionUI/ActionUIManager/ActionUIManager.h"
+#include "RTS_Survival/GameUI/ActionUI/ItemActionUI/Description/W_ActionUIDescription.h"
 #include "RTS_Survival/GameUI/Hotkey/W_HotKey.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyProviderSubsystem.h"

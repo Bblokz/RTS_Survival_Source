@@ -112,7 +112,11 @@ void UGA_AircraftBombing::OnAircraftClassLoaded(
 
 FVector UGA_AircraftBombing::BuildCarpetEndLocation(const FVector& StartLocation, const FVector& TargetLocation) const
 {
-	return GlobalAbilityHelpers::BuildAircraftRunEndLocation(
+	// The carpet starts at the target and runs on for its length in the direction the bomber flies in from its spawn.
+	// (Measured from the spawn location, the end lay short of the target: the bomber turned over the target and bombed
+	// its way back toward its spawn edge.)
+	return GlobalAbilityHelpers::BuildAircraftRunEndLocationFromDirection(
+		TargetLocation,
 		StartLocation,
 		TargetLocation,
 		M_AircraftBombingSettings.CarpetBombingLength);
