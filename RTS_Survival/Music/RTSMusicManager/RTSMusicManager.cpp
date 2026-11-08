@@ -448,3 +448,10 @@ bool URTSMusicManager::EnsureValidAudioComponent() const
     );
     return false;
 }
+
+FString URTSMusicManager::GetCurrentTrackName() const
+{
+    return M_AudioComponent.IsValid() && IsValid(M_AudioComponent->Sound)
+               ? M_AudioComponent->Sound->GetName()
+               : FString(TEXT("none"));
+}

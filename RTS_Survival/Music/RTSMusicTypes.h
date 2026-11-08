@@ -31,7 +31,8 @@ enum class ERTSMusicType: uint8
 	CombatOrchestra,
 	CncTension,
 	HorrorCnc,
-	
+	// Waiting in the transport before deployment; plays during the commander selection.
+	TransportLoop,
 };
 
 

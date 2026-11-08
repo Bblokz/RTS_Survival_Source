@@ -3,6 +3,7 @@
 
 #include "Components/BoxComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/FOWSystem/FowComponent/FowType.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -98,7 +99,7 @@ void ASelectablePawnMaster::BeginPlay()
 			{
 				PlayerController = RTSController;
 			}
-			else
+			else if (not FRTS_Statics::GetIsInPreGameHangar(this))
 			{
 				RTSFunctionLibrary::ReportFailedCastError("RTSPlayerController",
 				                                          "ACPPController",

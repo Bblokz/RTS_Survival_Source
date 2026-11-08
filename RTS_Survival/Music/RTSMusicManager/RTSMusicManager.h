@@ -59,6 +59,11 @@ class RTS_SURVIVAL_API URTSMusicManager : public UObject
     GENERATED_BODY()
 
 public:
+    ERTSMusicType GetCurrentMusicType() const { return M_CurrentMusicType; }
+
+    /** Name of the sound the music audio component holds; "none" without one. */
+    FString GetCurrentTrackName() const;
+
     /** @brief Initialize with your music type definitions. */
     UFUNCTION(BlueprintCallable, Category="Music")
     void InitMusicManagerTracks(const TArray<FRTSMusicTypes>& InMusicTypes);
