@@ -2,10 +2,11 @@
 
 // Editor-only conversion of a tank Blueprint to add-on armour panels (see Docs/Units/Vehicles/AddOnArmorPanels.md).
 // RTS.AddOnArmor.ConvertBlueprint Blueprint=<asset> [Hull=<panel hull mesh>] [HullComponent=Hull]
-//   [Armor=Plate_SideLeft:30|Plate_SideLowerLeft:20|...] [-DryRun]
-// Swaps the hull component's mesh, sets the armour value pin of every SetArmorOfPlateType node of the listed plates,
-// adds the AddOnArmorPanels component when the Blueprint has none, then compiles and saves. -DryRun only lists the
-// SetArmorOfPlateType nodes and the hull component.
+//   [Armor=Plate_SideLeft:30|Plate_SideLowerLeft:20|...] [-ClearHullMaterialOverrides] [-DryRun]
+// Swaps the hull component's mesh, sets the armour value pin of every literal SetArmorOfPlateType node and every
+// literal Make ArmorSettings node of the listed plates, adds the AddOnArmorPanels component when the Blueprint has none,
+// then compiles and saves. -ClearHullMaterialOverrides empties the hull component's material overrides (needed when the
+// old hull's slot overrides would land on the new hull's panel slot). -DryRun only lists the armour nodes and the hull.
 
 #if WITH_EDITOR
 
@@ -20,6 +21,7 @@
 #include "Engine/SimpleConstructionScript.h"
 #include "HAL/IConsoleManager.h"
 #include "K2Node_CallFunction.h"
+#include "K2Node_MakeStruct.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
@@ -33,6 +35,9 @@ namespace AddOnArmorPanelBlueprintConversion
 	const FName SetArmorFunctionName = GET_FUNCTION_NAME_CHECKED(UArmorCalculation, SetArmorOfPlateType);
 	const FName PlateTypePinName(TEXT("PlateType"));
 	const FName ArmorValuePinName(TEXT("NewArmorValue"));
+	// Member pins of a Make ArmorSettings (FArmorSettings) node.
+	const FName MakeStructArmorTypePinName(GET_MEMBER_NAME_CHECKED(FArmorSettings, ArmorType));
+	const FName MakeStructArmorValuePinName(GET_MEMBER_NAME_CHECKED(FArmorSettings, ArmorValue));
 	const FName PanelsComponentName(TEXT("AddOnArmorPanels"));
 
 	struct FConversionSettings
@@ -43,6 +48,7 @@ namespace AddOnArmorPanelBlueprintConversion
 		// Plate enumerator name (e.g. Plate_SideLeft) -> new structural armour value.
 		TMap<FString, FString> ArmorValues;
 		bool bDryRun = false;
+		bool bClearHullMaterialOverrides = false;
 	};
 
 	FConversionSettings ParseSettings(const FString& Joined)
@@ -69,6 +75,7 @@ namespace AddOnArmorPanelBlueprintConversion
 			}
 		}
 		Settings.bDryRun = FParse::Param(*Joined, TEXT("DryRun"));
+		Settings.bClearHullMaterialOverrides = FParse::Param(*Joined, TEXT("ClearHullMaterialOverrides"));
 		return Settings;
 	}
 
@@ -103,33 +110,84 @@ namespace AddOnArmorPanelBlueprintConversion
 		return PlatePin->DefaultValue;
 	}
 
-	/** @return The number of SetArmorOfPlateType nodes whose armour value changed; reports plates it could not set. */
+	/** Make ArmorSettings nodes (FArmorSettings literals in SetupArmor graphs, e.g. Panther D, Panther II, Jaguar). */
+	TArray<UK2Node_MakeStruct*> FindMakeArmorSettingsNodes(const UBlueprint& Blueprint)
+	{
+		TArray<UEdGraph*> Graphs;
+		Blueprint.GetAllGraphs(Graphs);
+		TArray<UK2Node_MakeStruct*> Nodes;
+		for (const UEdGraph* const Graph : Graphs)
+		{
+			TArray<UK2Node_MakeStruct*> GraphNodes;
+			Graph->GetNodesOfClass(GraphNodes);
+			for (UK2Node_MakeStruct* const Node : GraphNodes)
+			{
+				if (Node->StructType == FArmorSettings::StaticStruct())
+				{
+					Nodes.Add(Node);
+				}
+			}
+		}
+		return Nodes;
+	}
+
+	/** @return The plate a Make ArmorSettings node sets, or empty when its ArmorType pin is wired instead of a literal. */
+	FString GetMakeArmorSettingsPlateName(const UK2Node_MakeStruct& Node)
+	{
+		const UEdGraphPin* const PlatePin = Node.FindPin(MakeStructArmorTypePinName);
+		if (PlatePin == nullptr || PlatePin->LinkedTo.Num() > 0)
+		{
+			return FString();
+		}
+		return PlatePin->DefaultValue;
+	}
+
+	/** Sets the literal value pin of one armour node when its plate is listed; records the plate it set. */
+	bool TrySetArmorValuePin(UEdGraphNode& Node, UEdGraphPin* const ValuePin, const FString& PlateName,
+	                         const FConversionSettings& Settings, TSet<FString>& OutAppliedPlates)
+	{
+		const FString* const NewValue = Settings.ArmorValues.Find(PlateName);
+		if (NewValue == nullptr || ValuePin == nullptr || ValuePin->LinkedTo.Num() > 0)
+		{
+			return false;
+		}
+		UE_LOG(LogRTSAddOnArmorBlueprintConversion, Display, TEXT("RTS_ADDON_PANEL_CONVERT armor %s %s -> %s in %s (%s)"),
+		       *PlateName, *ValuePin->DefaultValue, **NewValue, *GetNameSafe(Node.GetGraph()), *Node.GetName());
+		GetDefault<UEdGraphSchema_K2>()->TrySetDefaultValue(*ValuePin, *NewValue);
+		OutAppliedPlates.Add(PlateName);
+		return true;
+	}
+
+	/**
+	 * @return The number of armour nodes whose value changed: literal SetArmorOfPlateType nodes and literal
+	 * Make ArmorSettings nodes of the listed plates. Reports plates it could not set.
+	 */
 	int32 ApplyArmorValues(const UBlueprint& Blueprint, const FConversionSettings& Settings)
 	{
-		const UEdGraphSchema_K2* const Schema = GetDefault<UEdGraphSchema_K2>();
 		TSet<FString> AppliedPlates;
 		int32 ChangedNodes = 0;
 		for (UK2Node_CallFunction* const Node : FindSetArmorNodes(Blueprint))
 		{
-			const FString PlateName = GetNodePlateName(*Node);
-			UEdGraphPin* const ValuePin = Node->FindPin(ArmorValuePinName);
-			const FString* const NewValue = Settings.ArmorValues.Find(PlateName);
-			if (NewValue == nullptr || ValuePin == nullptr || ValuePin->LinkedTo.Num() > 0)
+			if (TrySetArmorValuePin(*Node, Node->FindPin(ArmorValuePinName), GetNodePlateName(*Node), Settings, AppliedPlates))
 			{
-				continue;
+				++ChangedNodes;
 			}
-			UE_LOG(LogRTSAddOnArmorBlueprintConversion, Display, TEXT("RTS_ADDON_PANEL_CONVERT armor %s %s -> %s in %s"),
-			       *PlateName, *ValuePin->DefaultValue, **NewValue, *GetNameSafe(Node->GetGraph()));
-			Schema->TrySetDefaultValue(*ValuePin, *NewValue);
-			AppliedPlates.Add(PlateName);
-			++ChangedNodes;
+		}
+		for (UK2Node_MakeStruct* const Node : FindMakeArmorSettingsNodes(Blueprint))
+		{
+			if (TrySetArmorValuePin(*Node, Node->FindPin(MakeStructArmorValuePinName), GetMakeArmorSettingsPlateName(*Node),
+			                        Settings, AppliedPlates))
+			{
+				++ChangedNodes;
+			}
 		}
 		for (const TPair<FString, FString>& Requested : Settings.ArmorValues)
 		{
 			if (not AppliedPlates.Contains(Requested.Key))
 			{
 				UE_LOG(LogRTSAddOnArmorBlueprintConversion, Error,
-				       TEXT("RTS_ADDON_PANEL_CONVERT FAIL no literal SetArmorOfPlateType node for %s"), *Requested.Key);
+				       TEXT("RTS_ADDON_PANEL_CONVERT FAIL no literal SetArmorOfPlateType or Make ArmorSettings node for %s"),
+				       *Requested.Key);
 			}
 		}
 		return ChangedNodes;
@@ -238,6 +296,14 @@ namespace AddOnArmorPanelBlueprintConversion
 			       *GetNameSafe(Node->GetGraph()), *GetNodePlateName(*Node),
 			       ValuePin != nullptr && ValuePin->LinkedTo.Num() == 0 ? *ValuePin->DefaultValue : TEXT("(wired)"));
 		}
+		for (const UK2Node_MakeStruct* const Node : FindMakeArmorSettingsNodes(Blueprint))
+		{
+			const UEdGraphPin* const ValuePin = Node->FindPin(MakeStructArmorValuePinName);
+			UE_LOG(LogRTSAddOnArmorBlueprintConversion, Display,
+			       TEXT("RTS_ADDON_PANEL_CONVERT make_armor_settings graph=%s node=%s plate=%s value=%s"),
+			       *GetNameSafe(Node->GetGraph()), *Node->GetName(), *GetMakeArmorSettingsPlateName(*Node),
+			       ValuePin != nullptr && ValuePin->LinkedTo.Num() == 0 ? *ValuePin->DefaultValue : TEXT("(wired)"));
+		}
 		bool bIsInherited = false;
 		USCS_Node* const HullNode = FindScsNodeInHierarchy(Blueprint, Settings.HullComponentName, bIsInherited);
 		const UStaticMeshComponent* const HullTemplate = GetEffectiveHullTemplate(Blueprint, HullNode, bIsInherited);
@@ -267,6 +333,12 @@ namespace AddOnArmorPanelBlueprintConversion
 		       *GetPathNameSafe(HullTemplate->GetStaticMesh()), *GetPathNameSafe(HullMesh));
 		HullTemplate->Modify();
 		HullTemplate->SetStaticMesh(HullMesh);
+		if (Settings.bClearHullMaterialOverrides)
+		{
+			UE_LOG(LogRTSAddOnArmorBlueprintConversion, Display, TEXT("RTS_ADDON_PANEL_CONVERT cleared %d hull material overrides"),
+			       HullTemplate->OverrideMaterials.Num());
+			HullTemplate->OverrideMaterials.Empty();
+		}
 		return true;
 	}
 
@@ -311,7 +383,7 @@ namespace AddOnArmorPanelBlueprintConversion
 	FAutoConsoleCommand ConvertBlueprintCommand(
 		TEXT("RTS.AddOnArmor.ConvertBlueprint"),
 		TEXT("Converts a tank Blueprint to add-on armour panels. Args: Blueprint= [Hull=] [HullComponent=Hull] "
-			"[Armor=Plate:Value|...] [-DryRun]"),
+			"[Armor=Plate:Value|...] [-ClearHullMaterialOverrides] [-DryRun]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&ConvertBlueprint));
 }
 

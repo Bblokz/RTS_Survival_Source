@@ -190,14 +190,18 @@ collections. Rebuild after an aircraft mesh changes. Lessons:
     and the towed Flak 37 and Flak 88 squads must target, fire at and damage an enemy aircraft circling over them,
     then turn on an enemy tank. Optional `-AntiAirUnit=<label>`. `-AntiAirRingRadius=<cm>` (default 1800) moves the
     ring out: beyond ground range the units must still engage the aircraft (anti-air range) and must ignore the tank.
-  - `-AircraftDeathValidate`: shoots down a Bf 109, Ju 87, Sturmovik, Me 410, Pe-2, Pe-8, Ju 390, Ho 229, both drop ships and
+  - `-AircraftDeathValidate`: shoots down a Bf 109, Ju 87, Ju 87 G, Fw 189, Sturmovik, Me 410, Pe-2, Pe-8, Ju 390, Ho 229, both drop ships and
     the VTOL shuttle in flight, a Bf 109 parked on a field and a Bf 109 parked in a bay of an unpacked German airbase
     (`Ger_Airbase_Truck`, placed the way a trained aircraft is); checks dead-not-destroyed, out of the target lists,
     fire on the right engine, the fall starting with the speed it had and carrying it on, impact on the ground, the
     breakup, the fire ending, the actor being cleared, a parked aircraft's pieces staying within its own size, and in
-    the airbase every piece staying inside the building and above the ground under it (203 checks; the aircraft are
+    the airbase every piece staying inside the building and above the ground under it, a part tearing off in the air
+    (falls longer than 1 s), the hull coming apart from the nose, every piece on the ground 3 s after the impact
+    (`_pieces_came_down`: catches pieces left hanging in the air) and no trail smoke puff still spawning when the actor
+    is cleared (`_trail_smoke_stops`) (203 checks; the aircraft are
     spread over rows of six so all fourteen land on the test map; a Ho 229 parked on a field is the fourteenth). `-AircraftDeathOnly=<label>`,
-    `-AircraftDeathCapture=<folder>` for pictures, and `-AircraftDeath<Fire|Smoke|Explosion|GroundFire>Vfx=<path|none>`
+    `-AircraftDeathCapture=<folder>` for pictures (add `-ExecCmds="r.TextureStreaming 0"`, or effects used for the first time
+    render as flat dark squares), and `-AircraftDeath<Fire|Smoke|Explosion|GroundFire>Vfx=<path|none>`
     / `...Params="Name:Value|Name:X,Y,Z|@Scale:S"` / `-AircraftDeathDumpVfxParams` to try other effects.
 
 ```

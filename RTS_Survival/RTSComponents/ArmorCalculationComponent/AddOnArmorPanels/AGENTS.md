@@ -34,9 +34,18 @@ Store it on the hull's panel layout with one of:
 (`ONLY="<hull> ..."` for some). On 2026-11-06 all 22 `_AddOnPanels` hulls got an extracted debris panel this way.
 These cut-outs are final. Don't replace them with modelled panels.
 
-Known limit: a hull stores one debris mesh, so every panel flies off with that panel's shape. End panels with a
-different size or outline fly off as the typical panel. Pass `Panel=<index>` to pick another panel when the default
-looks wrong.
+Never cut debris from a panel that carries the faction sigil stamp. Niagara has no custom primitive data, so every
+flying plate would show a sigil (the Panther D's middle plate does this; its debris comes from `Panel=5`). Look at an
+intact picture from the validation before you pick a panel.
+
+End panels with a different size or outline (a chamfer, a nose) can fly off as themselves:
+`RTS.AddOnArmor.ExtractPanelDebris Hull=<hull> Panel=<index> -OwnPanel` cuts that panel out as it hangs, on either
+side, into `<hull>_Debris_Panel<index>` and stores it as the panel's own debris mesh (`FAddOnArmorPanel::OwnDebrisMesh`).
+Cut both sides' end panels: the shared mesh is turned 180 degrees for right panels, which mirrors a symmetric plate but
+points an end plate's chamfer the wrong way; an own mesh is never turned. The component throws one burst per debris
+mesh, so a death blast throws one burst per side and mesh. A rebuild with the same panel count keeps the own meshes.
+The T-34E does this for its 4 end plates (`build_panel_debris.sh` `OWN_PANELS`). Without own meshes, every panel flies
+off as the shared one; pass `Panel=<index>` to pick another shared panel when the default looks wrong.
 
 These commands also set "Used with Niagara Mesh Particles" on the panel's base materials, and save them. Without that
 flag a cooked build draws the default material on the debris. `BuildPanelHull` keeps the previous build's debris mesh
@@ -50,7 +59,7 @@ when you rebuild without `DebrisMesh=`. It warns when the hull has none.
 - The static mesh is the user parameter **`User.DebrisMesh`**. `UAddOnArmorPanelsComponent` sets it per burst to the
   hull's debris panel, so one system serves every vehicle. The other user parameters are listed in
   `AddOnArmorPanelDebris.h`.
-- One pooled CPU burst per hit, with one particle per hidden panel. A loaded save only restores the mask and throws
+- One pooled CPU burst per hit and debris mesh, with one particle per hidden panel. When the tank dies (any death type), `BlowOffIntactPanelsOnDeath` throws every panel still on the hull, one burst per side; the validation's death step checks it. A loaded save only restores the mask and throws
   nothing, and neither does a tank that fog of war hides (its debris would give it away). Pieces bounce on an analytic ground plane (one landscape trace per burst) and shrink away after 3.6 s, so
   nothing lingers and no physics runs.
 - The folder is in `DirectoriesToAlwaysCook`, because the component loads the system by a soft path.

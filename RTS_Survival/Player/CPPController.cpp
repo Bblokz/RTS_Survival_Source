@@ -8304,7 +8304,7 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 	// panel stays visible on missions that hide it.
 	(void)MissionManager;
 	CommanderSettings.GlobalAbilities = RTS::AllGlobalAbilities::GetAllTemplatedAbilities();
-	M_PlayerGlobabilitiesManager->SetMaxAllowedAbilityTier(EGlobalAbilityTier::TierIV);
+	M_PlayerGlobabilitiesManager->SetPlayerMissionSettings(FMissionPlayerGlobalAbilitySettings());
 	M_PlayerGlobabilitiesManager->InitGlobalAbilitiesManager(
 		1,
 		CommanderSettings.GlobalAbilities,
@@ -8316,10 +8316,10 @@ void ACPPController::SetupGlobalAbilityManager(UMainGameUI* MainMenuWidget, cons
 		AircraftHeightStart
 	);
 #else
-	// Without a mission manager (skirmish, survival) the whole kit is available.
-	M_PlayerGlobabilitiesManager->SetMaxAllowedAbilityTier(IsValid(MissionManager)
-		                                                       ? MissionManager->GetMaxPlayerGlobalAbilityTier()
-		                                                       : EGlobalAbilityTier::TierIV);
+	// Without a mission manager (skirmish, survival) the whole kit is available at its normal costs.
+	M_PlayerGlobabilitiesManager->SetPlayerMissionSettings(IsValid(MissionManager)
+		                                                       ? MissionManager->GetPlayerGlobalAbilitySettings()
+		                                                       : FMissionPlayerGlobalAbilitySettings());
 
 	M_PlayerGlobabilitiesManager->InitGlobalAbilitiesManager(
 		1,

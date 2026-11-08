@@ -2,8 +2,11 @@
 
 // Editor-only authoring of hull meshes for UAddOnArmorPanelsComponent.
 // RTS.AddOnArmor.BuildPanelHull Source=<mesh> Target=<new mesh> [MinAbsY=114.9] [MinPanelArea=5000] [PanelsPerSide=0]
-//   [MinZ=] [MaxZ=] [MaxIslandLength=] [MaterialOverrides=<slot>:<material>|<slot>:<material>] [-RebuildPanelMaster]
-//   [-DryRun]
+//   [MinZ=] [MaxZ=] [MaxIslandLength=] [MaterialOverrides=<slot>:<material>|<slot>:<material>] [SplitX=<x>/<x>/...]
+//   [-RebuildPanelMaster] [-DryRun]
+// SplitX cuts islands in the panel volume (|Y| >= MinAbsY, MinZ..MaxZ) apart at those mesh-space X positions before
+// anything is classified, for skirts modelled as one piece whose plates only meet at seams (T-34E). Vertex instances
+// shared across a cut are copied so each plate's corners carry their own panel index.
 // Copies the mesh and moves its add-on panels into hideable material slots. Panel geometry = mesh islands lying
 // entirely at |Y| >= MinAbsY, within MinZ..MaxZ and no longer than MaxIslandLength along X (longer ones are rails the
 // panels hang on and stay hull). With PanelsPerSide 0, islands of at least MinPanelArea cm2 are panels (two that
@@ -23,6 +26,7 @@
 #include "CoreMinimal.h"
 #include "AddOnArmorPanelAuthoringShared.h"
 #include "AddOnArmorPanelLayout.h"
+#include "Algo/BinarySearch.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "HAL/IConsoleManager.h"
 #include "Materials/Material.h"
@@ -65,6 +69,9 @@ namespace AddOnArmorPanelAuthoring
 		float MinZ = -UnboundedZ;
 		float MaxZ = UnboundedZ;
 		float MaxIslandLength = UnboundedZ;
+		// Mesh-space X positions (ascending) at which panel-geometry islands are cut apart before they are classified:
+		// for skirts modelled as one piece whose plates only meet at seams. Polygons go to the side of their centre.
+		TArray<double> SplitX;
 		bool bRebuildPanelMaster = false;
 		bool bDryRun = false;
 	};
@@ -99,10 +106,25 @@ namespace AddOnArmorPanelAuthoring
 		}
 	}
 
+	/** @brief Cut positions separated by '/' (-ExecCmds splits commands on commas), sorted ascending. */
+	void ParseSplitX(const FString& Text, TArray<double>& OutSplitX)
+	{
+		TArray<FString> Entries;
+		Text.ParseIntoArray(Entries, TEXT("/"));
+		for (const FString& Entry : Entries)
+		{
+			OutSplitX.Add(FCString::Atod(*Entry));
+		}
+		OutSplitX.Sort();
+	}
+
 	bool ParseSettings(const TArray<FString>& Args, FPanelHullSettings& OutSettings)
 	{
 		const FString Joined = FString::Join(Args, TEXT(" "));
 		FString OverridesText;
+		FString SplitXText;
+		FParse::Value(*Joined, TEXT("SplitX="), SplitXText);
+		ParseSplitX(SplitXText, OutSettings.SplitX);
 		FParse::Value(*Joined, TEXT("Source="), OutSettings.SourcePath);
 		FParse::Value(*Joined, TEXT("Target="), OutSettings.TargetPath);
 		FParse::Value(*Joined, TEXT("MinAbsY="), OutSettings.MinAbsY);
@@ -119,11 +141,77 @@ namespace AddOnArmorPanelAuthoring
 		return not OutSettings.SourcePath.IsEmpty() && not OutSettings.TargetPath.IsEmpty();
 	}
 
-	bool GetIsPanelGeometry(const FMeshIsland& Island, const FPanelHullSettings& Settings)
+	/** @return True when the island lies outside MinAbsY and within MinZ..MaxZ, whatever its length. */
+	bool GetIsInPanelVolume(const FMeshIsland& Island, const FPanelHullSettings& Settings)
 	{
 		const bool bOutside = Island.Bounds.Min.Y >= Settings.MinAbsY || Island.Bounds.Max.Y <= -Settings.MinAbsY;
-		return bOutside && Island.Bounds.Min.Z >= Settings.MinZ && Island.Bounds.Max.Z <= Settings.MaxZ
-			&& Island.Bounds.GetSize().X <= Settings.MaxIslandLength;
+		return bOutside && Island.Bounds.Min.Z >= Settings.MinZ && Island.Bounds.Max.Z <= Settings.MaxZ;
+	}
+
+	bool GetIsPanelGeometry(const FMeshIsland& Island, const FPanelHullSettings& Settings)
+	{
+		return GetIsInPanelVolume(Island, Settings) && Island.Bounds.GetSize().X <= Settings.MaxIslandLength;
+	}
+
+	FVector GetPolygonCentre(const FMeshDescription& Description, const FPolygonID PolygonID,
+	                         const TVertexAttributesConstRef<FVector3f>& Positions)
+	{
+		const TArray<FVertexID> Corners = Description.GetPolygonVertices(PolygonID);
+		FVector Sum = FVector::ZeroVector;
+		for (const FVertexID Corner : Corners)
+		{
+			Sum += FVector(Positions[Corner]);
+		}
+		return Corners.IsEmpty() ? Sum : Sum / Corners.Num();
+	}
+
+	/**
+	 * @brief Cuts every island in the panel volume at the SplitX positions; each polygon joins the piece its centre
+	 * lies in. Skirts modelled as one piece then classify like separate plates.
+	 * @param Description Mesh the islands come from.
+	 * @param Islands Islands of Description.
+	 * @param Settings Cut positions and panel volume.
+	 * @return The islands with every cut island replaced by its pieces.
+	 */
+	TArray<FMeshIsland> SplitIslandsAtCuts(const FMeshDescription& Description, const TArray<FMeshIsland>& Islands,
+	                                       const FPanelHullSettings& Settings)
+	{
+		if (Settings.SplitX.IsEmpty())
+		{
+			return Islands;
+		}
+		const TVertexAttributesConstRef<FVector3f> Positions = FStaticMeshConstAttributes(Description).GetVertexPositions();
+		TArray<FMeshIsland> Result;
+		for (const FMeshIsland& Island : Islands)
+		{
+			if (not GetIsInPanelVolume(Island, Settings))
+			{
+				Result.Add(Island);
+				continue;
+			}
+			TArray<FMeshIsland> Pieces;
+			Pieces.SetNum(Settings.SplitX.Num() + 1);
+			for (const FPolygonID PolygonID : Island.Polygons)
+			{
+				const double CentreX = GetPolygonCentre(Description, PolygonID, Positions).X;
+				const int32 PieceIndex = Algo::UpperBound(Settings.SplitX, CentreX);
+				FMeshIsland& Piece = Pieces[PieceIndex];
+				Piece.Polygons.Add(PolygonID);
+				Piece.Area += GetPolygonArea(Description, PolygonID, Positions);
+				for (const FVertexID Corner : Description.GetPolygonVertices(PolygonID))
+				{
+					Piece.Bounds += FVector(Positions[Corner]);
+				}
+			}
+			for (FMeshIsland& Piece : Pieces)
+			{
+				if (not Piece.Polygons.IsEmpty())
+				{
+					Result.Add(MoveTemp(Piece));
+				}
+			}
+		}
+		return Result;
 	}
 
 	EAddOnArmorPanelSide GetSide(const FBox& Bounds)
@@ -307,9 +395,78 @@ namespace AddOnArmorPanelAuthoring
 	 * @param PanelSlots Panel slots shared by all LODs; new source slots add entries.
 	 * @param Description LOD description to tag.
 	 */
+	FVertexInstanceID CopyVertexInstance(FMeshDescription& Description, const FVertexInstanceID Source)
+	{
+		const FVertexInstanceID Copy = Description.CreateVertexInstance(Description.GetVertexInstanceVertex(Source));
+		FStaticMeshAttributes Attributes(Description);
+		Attributes.GetVertexInstanceNormals()[Copy] = Attributes.GetVertexInstanceNormals()[Source];
+		Attributes.GetVertexInstanceTangents()[Copy] = Attributes.GetVertexInstanceTangents()[Source];
+		Attributes.GetVertexInstanceBinormalSigns()[Copy] = Attributes.GetVertexInstanceBinormalSigns()[Source];
+		Attributes.GetVertexInstanceColors()[Copy] = Attributes.GetVertexInstanceColors()[Source];
+		TVertexInstanceAttributesRef<FVector2f> Uvs = Attributes.GetVertexInstanceUVs();
+		for (int32 Channel = 0; Channel < Uvs.GetNumChannels(); ++Channel)
+		{
+			Uvs.Set(Copy, Channel, Uvs.Get(Source, Channel));
+		}
+		return Copy;
+	}
+
+	/**
+	 * @brief Gives a panel polygon its own copy of every vertex instance it shares with a polygon of another panel or
+	 * of the hull. Cut skirts share vertices along their seams; a shared corner would carry one panel index for both.
+	 * @param IslandPanels Panel index per island, INDEX_NONE for hull geometry.
+	 * @param Islands Islands of Description.
+	 * @param Description LOD description to change.
+	 * @return The number of vertex instances copied.
+	 */
+	int32 UnshareCrossPanelVertexInstances(const TArray<int32>& IslandPanels, const TArray<FMeshIsland>& Islands,
+	                                       FMeshDescription& Description)
+	{
+		TMap<FPolygonID, int32> PanelByPolygon;
+		for (int32 IslandIndex = 0; IslandIndex < Islands.Num(); ++IslandIndex)
+		{
+			for (const FPolygonID PolygonID : Islands[IslandIndex].Polygons)
+			{
+				PanelByPolygon.Add(PolygonID, IslandPanels[IslandIndex]);
+			}
+		}
+		int32 CopiedInstances = 0;
+		for (const TPair<FPolygonID, int32>& PolygonPanel : PanelByPolygon)
+		{
+			if (PolygonPanel.Value == INDEX_NONE)
+			{
+				continue;
+			}
+			const TArray<FVertexInstanceID> Corners = Description.GetPolygonVertexInstances(PolygonPanel.Key);
+			for (int32 PerimeterIndex = 0; PerimeterIndex < Corners.Num(); ++PerimeterIndex)
+			{
+				const bool bSharedWithOtherPanel = Description.GetVertexInstanceConnectedPolygons(Corners[PerimeterIndex])
+					.ContainsByPredicate([&PanelByPolygon, &PolygonPanel](const FPolygonID Other)
+					{
+						const int32* const OtherPanel = PanelByPolygon.Find(Other);
+						return (OtherPanel != nullptr ? *OtherPanel : INDEX_NONE) != PolygonPanel.Value;
+					});
+				if (not bSharedWithOtherPanel)
+				{
+					continue;
+				}
+				Description.SetPolygonVertexInstance(PolygonPanel.Key, PerimeterIndex,
+				                                     CopyVertexInstance(Description, Corners[PerimeterIndex]));
+				++CopiedInstances;
+			}
+		}
+		return CopiedInstances;
+	}
+
 	void RetagPanels(const UStaticMesh& Mesh, const TArray<int32>& IslandPanels, const TArray<FMeshIsland>& Islands,
 	                 TArray<FPanelSlot>& PanelSlots, FMeshDescription& Description)
 	{
+		const int32 CopiedInstances = UnshareCrossPanelVertexInstances(IslandPanels, Islands, Description);
+		if (CopiedInstances > 0)
+		{
+			UE_LOG(LogRTSAddOnArmorPanelAuthoring, Display,
+			       TEXT("RTS_ADDON_PANEL_AUTHORING copied %d vertex instances shared across panel seams"), CopiedInstances);
+		}
 		FStaticMeshAttributes Attributes(Description);
 		TVertexInstanceAttributesRef<FVector2f> Uvs = Attributes.GetVertexInstanceUVs();
 		if (Uvs.GetNumChannels() <= PanelIndexUvChannel)
@@ -628,7 +785,9 @@ namespace AddOnArmorPanelAuthoring
 				continue;
 			}
 			FMeshDescription Description = *SourceDescription;
-			const TArray<FMeshIsland> Islands = LodIndex == 0 ? Lod0Islands : FindIslands(Description);
+			const TArray<FMeshIsland> Islands = LodIndex == 0
+				? Lod0Islands
+				: SplitIslandsAtCuts(Description, FindIslands(Description), Settings);
 			const TArray<int32> IslandPanels = LodIndex == 0
 				? MakeIslandPanelsForLod0(Islands, Panels)
 				: MakeIslandPanelsForLod(Islands, Panels, Settings);
@@ -661,11 +820,31 @@ namespace AddOnArmorPanelAuthoring
 		return IsValid(PreviousLayout) ? PreviousLayout->GetDebrisMesh() : nullptr;
 	}
 
+	/** @return The previous build's own debris mesh per panel, when it had the same panel count; else empty. */
+	TArray<UStaticMesh*> FindPreviousOwnDebrisMeshes(const FPanelHullSettings& Settings, const int32 PanelCount)
+	{
+		UStaticMesh* const PreviousHull = LoadMeshIfPresent(Settings.TargetPath);
+		const UAddOnArmorPanelLayout* const PreviousLayout = IsValid(PreviousHull)
+			? PreviousHull->GetAssetUserData<UAddOnArmorPanelLayout>()
+			: nullptr;
+		TArray<UStaticMesh*> OwnMeshes;
+		if (not IsValid(PreviousLayout) || PreviousLayout->GetPanels().Num() != PanelCount)
+		{
+			return OwnMeshes;
+		}
+		for (const FAddOnArmorPanel& Panel : PreviousLayout->GetPanels())
+		{
+			OwnMeshes.Add(Panel.OwnDebrisMesh);
+		}
+		return OwnMeshes;
+	}
+
 	UStaticMesh* WritePanelHull(UStaticMesh& Source, const FPanelHullSettings& Settings, const TArray<FSkirtPanel>& Panels,
 	                            TArray<TOptional<FMeshDescription>>& Descriptions, const TArray<FPanelSlot>& PanelSlots)
 	{
 		// Read before the fresh package moves the previous hull out.
 		UStaticMesh* const DebrisMesh = FindDebrisMesh(Settings);
+		const TArray<UStaticMesh*> OwnDebrisMeshes = FindPreviousOwnDebrisMeshes(Settings, Panels.Num());
 		UStaticMesh* const Target = DuplicateIntoFreshPackage(Source, Settings.TargetPath);
 		if (not IsValid(Target))
 		{
@@ -690,6 +869,11 @@ namespace AddOnArmorPanelAuthoring
 		Target->RemoveUserDataOfClass(UAddOnArmorPanelLayout::StaticClass());
 		UAddOnArmorPanelLayout* const Layout = MakeLayout(*Target, Panels);
 		Layout->SetDebrisMesh(DebrisMesh);
+		// A rebuild with the same panels keeps the end plates' own debris meshes (ExtractPanelDebris -OwnPanel).
+		for (int32 PanelIndex = 0; PanelIndex < OwnDebrisMeshes.Num(); ++PanelIndex)
+		{
+			Layout->SetOwnDebrisMesh(PanelIndex, OwnDebrisMeshes[PanelIndex]);
+		}
 		Target->AddAssetUserData(Layout);
 		if (not IsValid(DebrisMesh))
 		{
@@ -715,7 +899,7 @@ namespace AddOnArmorPanelAuthoring
 			       *FString::Join(Args, TEXT(" ")));
 			return;
 		}
-		const TArray<FMeshIsland> Islands = FindIslands(*SourceDescription);
+		const TArray<FMeshIsland> Islands = SplitIslandsAtCuts(*SourceDescription, FindIslands(*SourceDescription), Settings);
 		const TArray<FSkirtPanel> Panels = Settings.PanelsPerSide > 0
 			? ClassifyPanelsBySections(Islands, Settings)
 			: ClassifyPanelsByArea(Islands, Settings);
@@ -756,7 +940,7 @@ namespace AddOnArmorPanelAuthoring
 		TEXT("RTS.AddOnArmor.BuildPanelHull"),
 		TEXT("Copies a hull mesh with its add-on armour panels in hideable material slots. Args: Source= Target= "
 			"[MinAbsY=] [MinPanelArea=] [PanelsPerSide=] [MinZ=] [MaxZ=] [MaxIslandLength=] [MaterialOverrides=slot:material|...] "
-			"[DebrisMesh=<panel mesh; default keeps the previous build's>] "
+			"[DebrisMesh=<panel mesh; default keeps the previous build's>] [SplitX=<x>/<x>/... cuts one-piece skirts at seams] "
 			"[-RebuildPanelMaster] [-DryRun]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&BuildPanelHull));
 }
