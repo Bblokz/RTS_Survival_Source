@@ -14,8 +14,11 @@
 #include "Engine/StreamableManager.h"
 #include "Engine/World.h"
 #include "GeometryCollection/GeometryCollection.h"
+#include "GeometryCollection/GeometryCollectionComponent.h"
 #include "GeometryCollection/GeometryCollectionObject.h"
 #include "Kismet/GameplayStatics.h"
+#include "Particles/ParticleSystemComponent.h"
+#include "TimerManager.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
@@ -24,6 +27,8 @@
 #include "RTS_Survival/FOWSystem/FowComponent/FowComp.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogRTSAircraftDeath, Log, All);
 
 namespace AircraftDeathPrivate
 {
@@ -51,6 +56,70 @@ namespace AircraftDeathPrivate
 	const TCHAR* const SmokeTrailVfxPath = TEXT("/Game/RTS_Survival/SpecialEffects/Smoke/SmokeVol1/Niagara/NS_SmokePuff4a.NS_SmokePuff4a");
 	const TCHAR* const ImpactExplosionVfxPath = TEXT("/Game/RTS_Survival/SpecialEffects/AA_OptimExplosions/NS_RTS_Explosion_Big_9.NS_RTS_Explosion_Big_9");
 	const TCHAR* const GroundFireVfxPath = TEXT("/Game/RTS_Survival/SpecialEffects/AllExplosions/TankExpl/NS_LargeTank_OnFire.NS_LargeTank_OnFire");
+	const TCHAR* const AirBreakupVfxPath = TEXT("/Game/RTS_Survival/SpecialEffects/AA_OptimExplosions/NS_RTS_Explosion_Medium_1.NS_RTS_Explosion_Medium_1");
+	const TCHAR* const GroundBurstVfxPath = TEXT("/Game/RTS_Survival/SpecialEffects/AllExplosions/Niagara/Sand/NS_Explosion_Sand_6.NS_Explosion_Sand_6");
+	const TCHAR* const FuelFireballVfxPath = TEXT("/Game/RTS_Survival/SpecialEffects/AA_OptimExplosions/N_RTS_Explosion_Fuel_01.N_RTS_Explosion_Fuel_01");
+	const TCHAR* const SecondaryExplosionVfxPath = TEXT("/Game/RTS_Survival/SpecialEffects/AA_OptimExplosions/NS_RTS_Explosion_Medium_3.NS_RTS_Explosion_Medium_3");
+	const TCHAR* const BurningDebrisVfxPath = TEXT("/Game/RTS_Survival/SpecialEffects/Fire/NFire_debris_00.NFire_debris_00");
+
+	// The smoke puff system loops forever; after its first burst it is switched off and its smoke drifts away.
+	constexpr float SmokePuffBurstSeconds = 0.15f;
+	constexpr float AirBreakupExplosionScale = 0.45f;
+	constexpr float GroundBurstScale = 0.8f;
+	constexpr float FuelFireballScale = 1.1f;
+	constexpr float SecondaryExplosionScale = 0.55f;
+	constexpr float BurningDebrisScale = 0.5f;
+
+	// In the air: a nose-fire aircraft loses its tail (else a wing tip) this often.
+	constexpr float NoseFireTailShare = 0.6f;
+	// Tail pieces: the rear part of the aircraft by this share of its length.
+	constexpr float TailLengthShare = 0.25f;
+	// The outer wing panel of a burning wing starts this far beyond the engine, as a share of the half span.
+	constexpr float OuterWingMarginShare = 0.08f;
+	// A wing tip: the pieces beyond this share of the half span.
+	constexpr float WingTipSpanShare = 0.55f;
+	// A torn-off part flies off sideways, up and back by these shares of AirBreakupSeparationSpeed, randomised by the range.
+	constexpr float TornPartSideKickShare = 0.7f;
+	constexpr float TornPartUpKickShare = 0.5f;
+	constexpr float TornPartBackKickShare = 0.3f;
+	const FVector2D TornPartKickRandomRange(0.6f, 1.2f);
+	// Smoke from a torn part stops once it moved slower than the minimum after this long (it landed).
+	constexpr float TornPartSmokeMinSeconds = 0.3f;
+	// Torn-off parts spin; their smoke trail lasts this long, puffed more sparsely than the wreck's own.
+	constexpr float TornPartSpinRadians = 5.f;
+	constexpr float TornPartSmokeSeconds = 3.5f;
+	constexpr float TornPartSmokeSpacingMlt = 1.6f;
+	constexpr float TornPartSmokeScale = 0.6f;
+	constexpr float TornPartMinSmokeSpeed = 250.f;
+
+	// On the ground. Blasts in time after the nose hits.
+	constexpr float MainBlastSeconds = 0.08f;
+	constexpr float FuelBlastSeconds = 0.2f;
+	const FVector2D SecondaryBlastSeconds(0.45f, 1.4f);
+	constexpr float BurningDebrisSeconds = 2.f;
+	constexpr int32 MaxSecondaryBlasts = 3;
+	constexpr int32 FighterBurningPieces = 2;
+	constexpr int32 MaxBurningPieces = 4;
+	// The hull slows to this share of its skid speed by the time it has come apart.
+	constexpr float SkidEndSpeedShare = 0.3f;
+	// A held piece this close to the ground (by its own size, at least the minimum) is torn off at once.
+	constexpr float GroundReleaseExtentShare = 0.8f;
+	constexpr float GroundReleaseMinHeight = 40.f;
+	// Kick of a piece torn off on the ground, as shares of PieceScatterSpeed.
+	const FVector2D PieceUpKickShare(0.2f, 0.6f);
+	constexpr float PieceSideKickShare = 0.5f;
+	constexpr float PieceForwardKickShare = 0.3f;
+	const FVector2D PieceSpinRadians(2.f, 7.f);
+	// What still holds together when the hull has come apart is let go with this share of the scatter, and some spin.
+	constexpr float FinalPieceUpKickShare = 0.2f;
+	constexpr float FinalPieceSpinRadians = 2.f;
+	const FVector2D SecondaryBlastScaleRange(0.8f, 1.2f);
+	const FVector2D BurningDebrisScaleRange(0.7f, 1.2f);
+	constexpr int32 BurningDebrisAttemptsPerFire = 3;
+	// The fuel fireball goes up ahead of the hull centre by this share of its half length, a little lower than the main blast.
+	constexpr float FuelBlastForwardShare = 0.5f;
+	constexpr float FuelBlastLiftShare = 0.6f;
+	constexpr float SecondaryBlastLiftShare = 0.3f;
 	const TCHAR* const EngineHitSoundPath = TEXT("/Game/Explosion_Sounds/CUE/City/Fast/Small/Explosion_City_Fast_Small_MedDist-01_Cue.Explosion_City_Fast_Small_MedDist-01_Cue");
 	const TCHAR* const ImpactSoundPath = TEXT("/Game/Explosion_Sounds/CUE/City/Fast/Large/Explosion_City_Fast_Large_MedDist-01_Cue.Explosion_City_Fast_Large_MedDist-01_Cue");
 
@@ -122,11 +191,23 @@ UAircraftDeathComponent::UAircraftDeathComponent()
 	using namespace AircraftDeathPrivate;
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
+	// Before physics: the wreck's pieces follow the aircraft in the same frame, under the engine fire.
+	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 	// Defaults every aircraft shares; found here so they are loaded with the class and cooked with it.
 	M_DeathSettings.EngineFire.System = FindDefaultAsset<UNiagaraSystem>(EngineFireVfxPath);
 	M_DeathSettings.SmokeTrail.System = FindDefaultAsset<UNiagaraSystem>(SmokeTrailVfxPath);
 	M_DeathSettings.ImpactExplosion.System = FindDefaultAsset<UNiagaraSystem>(ImpactExplosionVfxPath);
 	M_DeathSettings.GroundFire.System = FindDefaultAsset<UNiagaraSystem>(GroundFireVfxPath);
+	M_DeathSettings.AirBreakupExplosion.System = FindDefaultAsset<UNiagaraSystem>(AirBreakupVfxPath);
+	M_DeathSettings.AirBreakupExplosion.Scale = AirBreakupExplosionScale;
+	M_DeathSettings.GroundBurst.System = FindDefaultAsset<UNiagaraSystem>(GroundBurstVfxPath);
+	M_DeathSettings.GroundBurst.Scale = GroundBurstScale;
+	M_DeathSettings.FuelFireball.System = FindDefaultAsset<UNiagaraSystem>(FuelFireballVfxPath);
+	M_DeathSettings.FuelFireball.Scale = FuelFireballScale;
+	M_DeathSettings.SecondaryExplosion.System = FindDefaultAsset<UNiagaraSystem>(SecondaryExplosionVfxPath);
+	M_DeathSettings.SecondaryExplosion.Scale = SecondaryExplosionScale;
+	M_DeathSettings.BurningDebris.System = FindDefaultAsset<UNiagaraSystem>(BurningDebrisVfxPath);
+	M_DeathSettings.BurningDebris.Scale = BurningDebrisScale;
 	M_DeathSettings.EngineFire.Scale = EngineFireScale;
 	M_DeathSettings.SmokeTrail.Scale = SmokeTrailPuffScale;
 	M_DeathSettings.EngineHitSound = FindDefaultAsset<USoundBase>(EngineHitSoundPath);
@@ -270,11 +351,22 @@ void UAircraftDeathComponent::StartDeath(const FVector& VelocityAtDeath)
 		// Parked: nothing to fall from, the aircraft blows apart where it stands.
 		bM_WasParked = true;
 		M_FlightState.Location = M_Aircraft->GetActorLocation();
-		Impact(M_Aircraft->GetActorLocation(), FVector::UpVector);
+		Impact(M_Aircraft->GetActorLocation(), FVector::UpVector, false);
 		return;
 	}
 	StartEngineFire();
 	StartCrashFlight(VelocityAtDeath);
+	// Hashed: aircraft spawned one after the other have neighbouring ids, whose first random numbers barely differ.
+	M_Random.Initialize(static_cast<int32>(HashCombine(GetTypeHash(GetOwner()->GetUniqueID()),
+	                                                   GetTypeHash(GetOwner()->GetFName()))));
+	// From the hit on the wreck is drawn by its crash pieces, held together until they tear off; the engine flash
+	// covers the swap. Without a collection the aircraft falls whole and still explodes.
+	(void)EnsureCarriedWreck();
+	if (M_DeathSettings.bBreakUpInTheAir)
+	{
+		const FVector2D Delay = M_DeathSettings.AirBreakupDelaySeconds;
+		M_AirBreakupSeconds = M_Random.FRandRange(FMath::Min(Delay.X, Delay.Y), FMath::Max(Delay.X, Delay.Y));
+	}
 	SetComponentTickEnabled(true);
 }
 
@@ -399,12 +491,17 @@ void UAircraftDeathComponent::TickComponent(const float DeltaTime, const ELevelT
                                             FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (M_DeathPhase != EAircraftDeathPhase::Crashing)
+	if (M_DeathPhase == EAircraftDeathPhase::Crashing)
 	{
-		SetComponentTickEnabled(false);
+		TickCrashFlight(DeltaTime);
 		return;
 	}
-	TickCrashFlight(DeltaTime);
+	if (bM_IsImpactStaging)
+	{
+		TickImpactStage(DeltaTime);
+		return;
+	}
+	SetComponentTickEnabled(false);
 }
 
 void UAircraftDeathComponent::TickCrashFlight(const float DeltaTime)
@@ -417,23 +514,40 @@ void UAircraftDeathComponent::TickCrashFlight(const float DeltaTime)
 		return;
 	}
 	const FVector OldLocation = M_FlightState.Location;
+	const FQuat OldRotation = Aircraft->GetActorQuat();
 	FAircraftDeathMath::StepCrashFlight(M_FlightState, M_DeathSettings, M_FireOrigin, DeltaTime, World->GetGravityZ());
+	const FQuat NewRotation = FAircraftDeathMath::GetCrashRotation(M_FlightState, Aircraft->GetActorRotation()).Quaternion();
 	FHitResult GroundHit;
-	if (FindImpact(OldLocation, M_FlightState.Location, GroundHit))
+	bool bNoseHit = false;
+	if (FindImpact(OldLocation, OldRotation, M_FlightState.Location, NewRotation, GroundHit, bNoseHit))
 	{
-		M_FlightState.Location = GroundHit.Location + FVector(0.f, 0.f, M_GroundClearance);
-		Aircraft->SetActorLocation(M_FlightState.Location, false, nullptr, ETeleportType::TeleportPhysics);
-		Impact(GroundHit.ImpactPoint, GroundHit.ImpactNormal);
+		if (bNoseHit)
+		{
+			// Where the aircraft was when its nose touched; the rest of it is still above the ground.
+			M_FlightState.Location = FMath::Lerp(OldLocation, M_FlightState.Location, GroundHit.Time);
+			Aircraft->SetActorLocationAndRotation(M_FlightState.Location,
+			                                      FQuat::Slerp(OldRotation, NewRotation, GroundHit.Time),
+			                                      false, nullptr, ETeleportType::TeleportPhysics);
+		}
+		else
+		{
+			M_FlightState.Location = GroundHit.Location + FVector(0.f, 0.f, M_GroundClearance);
+			Aircraft->SetActorLocation(M_FlightState.Location, false, nullptr, ETeleportType::TeleportPhysics);
+		}
+		TickCarriedWreck(DeltaTime);
+		Impact(GroundHit.ImpactPoint, GroundHit.ImpactNormal, true);
 		return;
 	}
-	Aircraft->SetActorLocationAndRotation(M_FlightState.Location,
-	                                      FAircraftDeathMath::GetCrashRotation(M_FlightState, Aircraft->GetActorRotation()),
-	                                      false, nullptr, ETeleportType::TeleportPhysics);
+	Aircraft->SetActorLocationAndRotation(M_FlightState.Location, NewRotation, false, nullptr,
+	                                      ETeleportType::TeleportPhysics);
 	M_DistanceSinceSmokePuff += FVector::Dist(OldLocation, M_FlightState.Location);
 	DropSmokePuffs();
+	TickAirBreakup();
+	TickCarriedWreck(DeltaTime);
 	if (M_FlightState.SecondsFalling > M_DeathSettings.MaxCrashSeconds)
 	{
-		Impact(M_FlightState.Location, FVector::UpVector);
+		// Fell off the map: no ground to plough into.
+		Impact(M_FlightState.Location, FVector::UpVector, false);
 	}
 }
 
@@ -449,43 +563,154 @@ void UAircraftDeathComponent::DropSmokePuffs()
 	const FVector FireLocation = Mesh->GetComponentTransform().TransformPosition(M_FireLocalOffset);
 	// Smoke grows slower with the size of the aircraft than the flames, or a bomber's trail hides the bomber.
 	const float SmokeScale = M_DeathSettings.EffectScale * FMath::Sqrt(M_SizeEffectScale) * M_DeathSettings.SmokeTrail.Scale;
-	UNiagaraComponent* Puff = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
-		this, M_DeathSettings.SmokeTrail.System, FireLocation, FRotator::ZeroRotator, FVector(SmokeScale), true, true,
-		ENCPoolMethod::AutoRelease);
-	AircraftDeathPrivate::ApplyEffectParameters(Puff, M_DeathSettings.SmokeTrail);
-	++M_SmokePuffCount;
+	SpawnSmokePuff(FireLocation, SmokeScale);
 }
 
-bool UAircraftDeathComponent::FindImpact(const FVector& OldLocation, const FVector& NewLocation, FHitResult& OutHit) const
+void UAircraftDeathComponent::SpawnSmokePuff(const FVector& Location, const float Scale)
 {
+	UWorld* World = GetWorld();
+	if (not IsValid(M_DeathSettings.SmokeTrail.System) || not IsValid(World))
+	{
+		return;
+	}
+	UNiagaraComponent* Puff = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		this, M_DeathSettings.SmokeTrail.System, Location, FRotator::ZeroRotator, FVector(Scale), true, true,
+		ENCPoolMethod::AutoRelease);
+	if (not IsValid(Puff))
+	{
+		return;
+	}
+	AircraftDeathPrivate::ApplyEffectParameters(Puff, M_DeathSettings.SmokeTrail);
+	++M_SmokePuffCount;
+	// The puff system loops forever: left on, every puff of the trail kept smoking where the wreck had been, long after
+	// the crash. Switched off after its first burst, its smoke drifts away and it returns to the pool.
+	TWeakObjectPtr<UNiagaraComponent> WeakPuff(Puff);
+	FTimerHandle PuffHandle;
+	World->GetTimerManager().SetTimer(PuffHandle, FTimerDelegate::CreateLambda([WeakPuff]()
+	{
+		if (WeakPuff.IsValid())
+		{
+			WeakPuff->Deactivate();
+		}
+	}), AircraftDeathPrivate::SmokePuffBurstSeconds, false);
+}
+
+bool UAircraftDeathComponent::FindImpact(const FVector& OldLocation, const FQuat& OldRotation, const FVector& NewLocation,
+                                         const FQuat& NewRotation, FHitResult& OutHit, bool& bOutNoseHit) const
+{
+	bOutNoseHit = false;
 	const UWorld* World = GetWorld();
 	if (not IsValid(World))
 	{
 		return false;
 	}
-	// From the centre of the wreck to where its belly will be: the belly meets the ground first, and a trace that
-	// started at the belly could start below the ground and miss it.
-	const FVector BellyOffset(0.f, 0.f, -M_GroundClearance);
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(AircraftCrashImpact), false, GetOwner());
+	if (M_Wreck.IsValid())
+	{
+		QueryParams.AddIgnoredActor(M_Wreck.Get());
+	}
 	const FCollisionObjectQueryParams ObjectParams(ECC_WorldStatic);
-	return World->LineTraceSingleByObjectType(OutHit, OldLocation, NewLocation + BellyOffset, ObjectParams, QueryParams);
+	// From the centre of the wreck to where its belly will be: the belly meets the ground first when it falls flat,
+	// and a trace that started at the belly could start below the ground and miss it.
+	const FVector BellyOffset(0.f, 0.f, -M_GroundClearance);
+	FHitResult BellyHit;
+	const bool bBellyHit = World->LineTraceSingleByObjectType(BellyHit, OldLocation, NewLocation + BellyOffset,
+	                                                          ObjectParams, QueryParams);
+	// In a dive the nose leads: it touches the ground while the rest of the aircraft is still in the air.
+	const float NoseReach = GetNoseReach();
+	FHitResult NoseHit;
+	const FVector OldNose = OldLocation + OldRotation.GetForwardVector() * NoseReach;
+	const FVector NewNose = NewLocation + NewRotation.GetForwardVector() * NoseReach;
+	const bool bNoseHit = NoseReach > 0.f
+		&& World->LineTraceSingleByObjectType(NoseHit, OldNose, NewNose, ObjectParams, QueryParams)
+		&& not NoseHit.bStartPenetrating;
+	if (bNoseHit && (not bBellyHit || NoseHit.Time < BellyHit.Time))
+	{
+		OutHit = NoseHit;
+		bOutNoseHit = true;
+		return true;
+	}
+	if (bBellyHit)
+	{
+		OutHit = BellyHit;
+		return true;
+	}
+	return false;
 }
 
-void UAircraftDeathComponent::Impact(const FVector& ImpactLocation, const FVector& ImpactNormal)
+float UAircraftDeathComponent::GetNoseReach() const
+{
+	if (IsValid(M_CrashCollection) && M_CrashCollection->GetGeometryCollection().IsValid())
+	{
+		// The collection is baked in the aircraft actor's space: its furthest point along +X is the nose.
+		const FGeometryCollection& Geometry = *M_CrashCollection->GetGeometryCollection();
+		float NoseX = 0.f;
+		for (int32 GeometryIndex = 0; GeometryIndex < Geometry.BoundingBox.Num(); ++GeometryIndex)
+		{
+			const int32 TransformIndex = Geometry.TransformIndex[GeometryIndex];
+			const FTransform PieceTransform = Geometry.Transform.IsValidIndex(TransformIndex)
+				                                  ? FTransform(Geometry.Transform[TransformIndex])
+				                                  : FTransform::Identity;
+			const FBox PlacedBox = FBox(Geometry.BoundingBox[GeometryIndex]).TransformBy(PieceTransform);
+			NoseX = FMath::Max(NoseX, static_cast<float>(PlacedBox.Max.X));
+		}
+		return IsValid(GetOwner()) ? NoseX * static_cast<float>(GetOwner()->GetActorScale3D().X) : NoseX;
+	}
+	const USkeletalMeshComponent* Mesh = M_AircraftMesh.Get();
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Mesh) || not IsValid(Owner))
+	{
+		return 0.f;
+	}
+	const FBox MeshBox = Mesh->CalcBounds(Mesh->GetComponentTransform()).GetBox();
+	return static_cast<float>(MeshBox.TransformBy(Owner->GetActorTransform().Inverse()).Max.X);
+}
+
+void UAircraftDeathComponent::Impact(const FVector& ImpactLocation, const FVector& ImpactNormal,
+                                     const bool bTearApartFromTheNose)
 {
 	M_DeathPhase = EAircraftDeathPhase::Impacted;
 	M_ImpactLocation = ImpactLocation;
-	SetComponentTickEnabled(false);
 	FVector UpwardNormal = ImpactNormal;
 	if (UpwardNormal.Z < AircraftDeathPrivate::MinimumUpwardNormalZ)
 	{
 		UpwardNormal = FVector::UpVector;
 	}
-	Impact_SpawnWreck();
-	Impact_SpawnEffects(ImpactLocation, UpwardNormal);
 	// Trails first: hiding the meshes would hide what is still attached to them.
 	Impact_LetTrailsFade();
-	Impact_HideAircraft();
+	// A parked aircraft blows apart where it stands; one that came down ploughs on and comes apart from the nose back.
+	// That needs the carried wreck to be up; one that hit the ground before then breaks up the old way.
+	const bool bCanTearApart = bTearApartFromTheNose && not bM_WasParked && M_Wreck.IsValid()
+		&& M_Wreck->GetIsCarriedWreckShown();
+	if (not bCanTearApart && M_Wreck.IsValid() && not M_Wreck->GetIsCarriedWreckShown())
+	{
+		M_Wreck->Destroy();
+		M_Wreck = nullptr;
+	}
+	if (bCanTearApart)
+	{
+		Impact_HideAircraft();
+		StartImpactStage(ImpactLocation, UpwardNormal);
+	}
+	else
+	{
+		SetComponentTickEnabled(false);
+		if (M_Wreck.IsValid() && M_Wreck->GetHasHeldPieces())
+		{
+			// Fell off the map while carried: let everything go.
+			for (int32 PieceIndex = 0; PieceIndex < M_Wreck->GetPieces().Num(); ++PieceIndex)
+			{
+				M_Wreck->ReleasePiece(PieceIndex, FVector::ZeroVector, FVector::ZeroVector);
+			}
+			M_BreakupPieceCount = M_Wreck->GetPieceCount();
+		}
+		else
+		{
+			Impact_SpawnWreck();
+		}
+		Impact_SpawnEffects(ImpactLocation, UpwardNormal);
+		Impact_HideAircraft();
+	}
 	if (AActor* Owner = GetOwner())
 	{
 		Owner->SetLifeSpan(AircraftDeathPrivate::TrailFadeSeconds);
@@ -518,6 +743,8 @@ void UAircraftDeathComponent::Impact_SpawnEffects(const FVector& ImpactLocation,
 			M_DeathSettings.GroundFire.System, Wreck->GetRootComponent(), NAME_None, ImpactLocation, AlongGround,
 			FVector(EffectScale * M_DeathSettings.GroundFire.Scale), EAttachLocation::KeepWorldPosition, false, ENCPoolMethod::None, true);
 		AircraftDeathPrivate::ApplyEffectParameters(GroundFire, M_DeathSettings.GroundFire);
+		Wreck->AddWreckFire(GroundFire);
+		Wreck->StopFiresAfter(M_DeathSettings.WreckFireSeconds);
 	}
 }
 
@@ -626,19 +853,15 @@ void UAircraftDeathComponent::Impact_HideAircraft()
 	{
 		return;
 	}
-	// Only the meshes: the smoke components of the aircraft must stay visible while they fade.
+	HideAircraftMeshes();
 	TArray<UMeshComponent*> Meshes;
 	Owner->GetComponents<UMeshComponent>(Meshes);
 	for (UMeshComponent* MeshComponent : Meshes)
 	{
-		if (not IsValid(MeshComponent))
+		if (IsValid(MeshComponent))
 		{
-			continue;
+			MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		}
-		MeshComponent->SetVisibility(false, false);
-		// Blueprints let the aircraft cast a shadow while hidden (fog of war); the wreck's pieces cast the shadow now.
-		MeshComponent->SetCastShadow(false);
-		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 	Owner->SetActorEnableCollision(false);
 	// The hidden aircraft lingers while its smoke fades: no engine drone at the crash site, no vision from the wreck.
@@ -669,4 +892,618 @@ void UAircraftDeathComponent::Impact_LetTrailsFade()
 		M_EngineFire->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 		M_EngineFire->Deactivate();
 	}
+	Impact_StopAircraftEffects();
+}
+
+void UAircraftDeathComponent::Impact_StopAircraftEffects()
+{
+	AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return;
+	}
+	// Exhausts, contrails and whatever else the Blueprint burns: the hidden aircraft lingers a few seconds after the
+	// impact and must not keep smoking where it came down.
+	TArray<UFXSystemComponent*> Effects;
+	Owner->GetComponents<UFXSystemComponent>(Effects);
+	for (UFXSystemComponent* Effect : Effects)
+	{
+		if (IsValid(Effect) && Effect->IsActive())
+		{
+			Effect->Deactivate();
+		}
+	}
+}
+
+
+UNiagaraComponent* UAircraftDeathComponent::SpawnDeathEffect(const FAircraftDeathEffect& Effect, const FVector& Location,
+                                                             const FRotator& Rotation, const float ScaleMultiplier) const
+{
+	if (not IsValid(Effect.System))
+	{
+		return nullptr;
+	}
+	UNiagaraComponent* Spawned = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+		this, Effect.System, Location, Rotation, FVector(GetEffectScale() * Effect.Scale * ScaleMultiplier), true, true,
+		ENCPoolMethod::None);
+	AircraftDeathPrivate::ApplyEffectParameters(Spawned, Effect);
+	return Spawned;
+}
+
+void UAircraftDeathComponent::HideAircraftMeshes() const
+{
+	AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return;
+	}
+	// Only the meshes: the fire and smoke components of the aircraft stay visible.
+	TArray<UMeshComponent*> Meshes;
+	Owner->GetComponents<UMeshComponent>(Meshes);
+	for (UMeshComponent* MeshComponent : Meshes)
+	{
+		if (not IsValid(MeshComponent))
+		{
+			continue;
+		}
+		MeshComponent->SetVisibility(false, false);
+		// Blueprints let the aircraft cast a shadow while hidden (fog of war); the wreck's pieces cast the shadow now.
+		MeshComponent->SetCastShadow(false);
+	}
+}
+
+bool UAircraftDeathComponent::EnsureCarriedWreck()
+{
+	if (M_Wreck.IsValid())
+	{
+		return M_Wreck->GetHasHeldPieces();
+	}
+	UWorld* World = GetWorld();
+	const AActor* Owner = GetOwner();
+	if (not IsValid(World) || not IsValid(Owner))
+	{
+		return false;
+	}
+	if (not IsValid(M_CrashCollection) && M_CrashCollectionPath.IsValid())
+	{
+		// Shot down before the load at BeginPlay finished.
+		M_CrashCollection = Cast<UGeometryCollection>(M_CrashCollectionPath.TryLoad());
+	}
+	if (not IsValid(M_CrashCollection))
+	{
+		return false;
+	}
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AAircraftWreckActor* Wreck = World->SpawnActor<AAircraftWreckActor>(
+		AAircraftWreckActor::StaticClass(), Owner->GetActorTransform(), SpawnParameters);
+	if (not IsValid(Wreck))
+	{
+		return false;
+	}
+	// Lives through the longest fall; set again when it lands.
+	const int32 PieceCount = Wreck->StartCarried(M_CrashCollection,
+	                                             M_DeathSettings.MaxCrashSeconds + M_DeathSettings.WreckLifeSeconds,
+	                                             M_DeathSettings.PieceLinearDamping);
+	if (PieceCount <= 0)
+	{
+		Wreck->Destroy();
+		return false;
+	}
+	M_Wreck = Wreck;
+	M_BreakupPieceCount = PieceCount;
+	// The aircraft stays visible until the wreck is ready to take its place (TickCarriedWreck).
+	return true;
+}
+
+void UAircraftDeathComponent::TickCarriedWreck(const float DeltaTime)
+{
+	AAircraftWreckActor* Wreck = M_Wreck.Get();
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Wreck) || not IsValid(Owner) || bM_IsImpactStaging)
+	{
+		return;
+	}
+	// The held pieces are kinematic: moving the actor moves them, and gives them the speed they fall on with.
+	Wreck->FollowTransform(Owner->GetActorTransform());
+	if (Wreck->GetIsCarriedWreckShown() && not bM_AircraftMeshesHidden)
+	{
+		// The wreck now draws the aircraft.
+		bM_AircraftMeshesHidden = true;
+		HideAircraftMeshes();
+	}
+	TickTornPartSmoke();
+}
+
+void UAircraftDeathComponent::BuildAirBreakupOrder()
+{
+	using namespace AircraftDeathPrivate;
+	M_AirBreakupOrder.Reset();
+	const AAircraftWreckActor* Wreck = M_Wreck.Get();
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Wreck) || not IsValid(Owner) || Wreck->GetPieces().Num() < 4)
+	{
+		return;
+	}
+	const TArray<FAircraftWreckPiece>& Pieces = Wreck->GetPieces();
+	FBox PieceBox(ForceInit);
+	for (const FAircraftWreckPiece& Piece : Pieces)
+	{
+		PieceBox += Piece.LocalCentre;
+	}
+	const float HalfSpan = FMath::Max(FMath::Abs(PieceBox.Min.Y), FMath::Abs(PieceBox.Max.Y));
+	const float Length = PieceBox.Max.X - PieceBox.Min.X;
+	// The burning engine in the actor's space, which the pieces are in.
+	FVector EngineLocal = FVector::ZeroVector;
+	if (const USkeletalMeshComponent* Mesh = M_AircraftMesh.Get())
+	{
+		EngineLocal = Owner->GetActorTransform().InverseTransformPosition(
+			Mesh->GetComponentTransform().TransformPosition(M_FireLocalOffset));
+	}
+	// Pieces ranked by a key, lowest first.
+	TArray<TPair<float, int32>> Ranked;
+	const auto RankWing = [&Pieces, &Ranked](const float SideSign, const float MinOutwardY)
+	{
+		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+		{
+			const float OutwardY = Pieces[PieceIndex].LocalCentre.Y * SideSign;
+			if (OutwardY > MinOutwardY)
+			{
+				// Outermost first.
+				Ranked.Emplace(-OutwardY, PieceIndex);
+			}
+		}
+	};
+	if (M_FireOrigin == EAircraftFireOrigin::WingEngine && not FMath::IsNearlyZero(EngineLocal.Y))
+	{
+		// The burning wing loses its outer panel, beyond the engine.
+		const float Side = FMath::Sign(EngineLocal.Y);
+		RankWing(Side, FMath::Abs(EngineLocal.Y) + OuterWingMarginShare * HalfSpan);
+		if (Ranked.Num() < 2)
+		{
+			Ranked.Reset();
+			RankWing(Side, 0.f);
+		}
+	}
+	else if (M_Random.FRand() < NoseFireTailShare)
+	{
+		// A single-engine aircraft burning at the nose loses its tail: rearmost first.
+		const float TailLimitX = PieceBox.Min.X + TailLengthShare * Length;
+		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+		{
+			if (Pieces[PieceIndex].LocalCentre.X < TailLimitX)
+			{
+				Ranked.Emplace(Pieces[PieceIndex].LocalCentre.X, PieceIndex);
+			}
+		}
+	}
+	if (Ranked.Num() < 2)
+	{
+		// Or a wing tip.
+		Ranked.Reset();
+		const float Side = M_Random.FRand() < 0.5f ? -1.f : 1.f;
+		RankWing(Side, WingTipSpanShare * HalfSpan);
+		if (Ranked.Num() < 2)
+		{
+			Ranked.Reset();
+			RankWing(Side, 0.f);
+		}
+	}
+	Ranked.Sort([](const TPair<float, int32>& A, const TPair<float, int32>& B) { return A.Key < B.Key; });
+	for (const TPair<float, int32>& Entry : Ranked)
+	{
+		M_AirBreakupOrder.Add(Entry.Value);
+	}
+}
+
+void UAircraftDeathComponent::TickAirBreakup()
+{
+	if (M_AirBreakupSeconds < 0.f || bM_DidSecondAirBreakup || not M_Wreck.IsValid()
+		|| not M_Wreck->GetIsCarriedWreckShown())
+	{
+		// Parts tear off once the wreck draws the aircraft.
+		return;
+	}
+	const float SecondsFalling = M_FlightState.SecondsFalling;
+	const int32 FirstTearCount = FMath::Max(
+		2, FMath::RoundToInt(M_DeathSettings.AirBreakupPieceShare * M_Wreck->GetPieceCount()));
+	if (not bM_DidFirstAirBreakup)
+	{
+		if (SecondsFalling < M_AirBreakupSeconds)
+		{
+			return;
+		}
+		bM_DidFirstAirBreakup = true;
+		BuildAirBreakupOrder();
+		TearOffPieces(FirstTearCount);
+		return;
+	}
+	const float SecondDelay = M_DeathSettings.AirSecondBreakupDelaySeconds;
+	if (SecondDelay <= 0.f)
+	{
+		bM_DidSecondAirBreakup = true;
+		return;
+	}
+	if (SecondsFalling >= M_AirBreakupSeconds + SecondDelay)
+	{
+		bM_DidSecondAirBreakup = true;
+		TearOffPieces(FMath::Max(1, FirstTearCount / 2));
+	}
+}
+
+void UAircraftDeathComponent::TearOffPieces(const int32 Count)
+{
+	using namespace AircraftDeathPrivate;
+	AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck))
+	{
+		return;
+	}
+	const FVector Forward = Wreck->GetActorForwardVector();
+	const FVector Right = Wreck->GetActorRightVector();
+	FVector TearCentre = FVector::ZeroVector;
+	int32 TornCount = 0;
+	for (; M_NextAirBreakupIndex < M_AirBreakupOrder.Num() && TornCount < Count; ++M_NextAirBreakupIndex)
+	{
+		const int32 PieceIndex = M_AirBreakupOrder[M_NextAirBreakupIndex];
+		if (not Wreck->GetPieces().IsValidIndex(PieceIndex) || Wreck->GetPieces()[PieceIndex].bReleased)
+		{
+			continue;
+		}
+		const FVector PieceCentre = Wreck->GetPieceWorldCentre(PieceIndex);
+		const float SideSign = Wreck->GetPieces()[PieceIndex].LocalCentre.Y >= 0.f ? 1.f : -1.f;
+		const float Separation = M_DeathSettings.AirBreakupSeparationSpeed
+			* M_Random.FRandRange(TornPartKickRandomRange.X, TornPartKickRandomRange.Y);
+		// Away from the aircraft and up a little; the air drag then holds it back behind the falling wreck.
+		const FVector Kick = Right * SideSign * Separation * TornPartSideKickShare
+			+ FVector::UpVector * Separation * TornPartUpKickShare - Forward * Separation * TornPartBackKickShare;
+		Wreck->ReleasePiece(PieceIndex, Kick, M_Random.GetUnitVector() * TornPartSpinRadians);
+		TearCentre += PieceCentre;
+		++TornCount;
+		if (M_SmokingTornPiece == INDEX_NONE)
+		{
+			M_SmokingTornPiece = PieceIndex;
+			M_SmokingTornPieceLastLocation = PieceCentre;
+			M_TornPartSmokeSeconds = 0.f;
+		}
+	}
+	if (TornCount == 0)
+	{
+		return;
+	}
+	M_AirBreakupPieceCount += TornCount;
+	TearCentre /= TornCount;
+	SpawnDeathEffect(M_DeathSettings.AirBreakupExplosion, TearCentre, Wreck->GetActorRotation());
+	if (IsValid(M_DeathSettings.EngineHitSound))
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, M_DeathSettings.EngineHitSound, TearCentre);
+	}
+	UE_LOG(LogRTSAircraftDeath, Log, TEXT("RTS_AIRCRAFT_DEATH TEAR %s pieces=%d of %d at=%s after=%.2fs"),
+	       *GetNameSafe(GetOwner()), TornCount, Wreck->GetPieceCount(), *TearCentre.ToCompactString(),
+	       M_FlightState.SecondsFalling);
+}
+
+void UAircraftDeathComponent::TickTornPartSmoke()
+{
+	using namespace AircraftDeathPrivate;
+	const UWorld* World = GetWorld();
+	if (M_SmokingTornPiece == INDEX_NONE || not M_Wreck.IsValid() || not IsValid(World))
+	{
+		return;
+	}
+	const float DeltaSeconds = World->GetDeltaSeconds();
+	M_TornPartSmokeSeconds += DeltaSeconds;
+	const FVector Location = M_Wreck->GetPieceWorldCentre(M_SmokingTornPiece);
+	const float Moved = FVector::Dist(Location, M_SmokingTornPieceLastLocation);
+	M_SmokingTornPieceLastLocation = Location;
+	const bool bCameToRest = DeltaSeconds > 0.f && M_TornPartSmokeSeconds > TornPartSmokeMinSeconds
+		&& Moved / DeltaSeconds < TornPartMinSmokeSpeed;
+	if (M_TornPartSmokeSeconds > TornPartSmokeSeconds || bCameToRest)
+	{
+		M_SmokingTornPiece = INDEX_NONE;
+		return;
+	}
+	M_DistanceSinceTornPartPuff += Moved;
+	if (M_DistanceSinceTornPartPuff < M_DeathSettings.SmokeTrailSpacing * TornPartSmokeSpacingMlt)
+	{
+		return;
+	}
+	M_DistanceSinceTornPartPuff = 0.f;
+	SpawnSmokePuff(Location, M_DeathSettings.EffectScale * FMath::Sqrt(M_SizeEffectScale)
+	               * M_DeathSettings.SmokeTrail.Scale * TornPartSmokeScale);
+}
+
+void UAircraftDeathComponent::StartImpactStage(const FVector& ContactPoint, const FVector& ContactNormal)
+{
+	using namespace AircraftDeathPrivate;
+	AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck))
+	{
+		return;
+	}
+	bM_IsImpactStaging = true;
+	bM_HullFinished = false;
+	M_ImpactStageSeconds = 0.f;
+	M_ImpactStageDuration = M_DeathSettings.ImpactBreakupSeconds * FMath::Sqrt(M_SizeEffectScale);
+	M_ContactPoint = ContactPoint;
+	M_ContactNormal = ContactNormal;
+	StartImpactStage_SetupHullMotion(*Wreck);
+	Wreck->SetLifeSpan(M_DeathSettings.WreckLifeSeconds);
+	StartImpactStage_ScheduleBlasts();
+	// The nose throws up the dirt where it hits; the fireball follows a moment later over the hull.
+	SpawnDeathEffect(M_DeathSettings.GroundBurst, ContactPoint, FRotationMatrix::MakeFromZ(ContactNormal).Rotator());
+	UE_LOG(LogRTSAircraftDeath, Log,
+	       TEXT("RTS_AIRCRAFT_DEATH IMPACT_STAGE %s contact=%s skid_speed=%.0f duration=%.2fs pieces=%d held=%d belly=%.0f"),
+	       *GetNameSafe(GetOwner()), *ContactPoint.ToCompactString(), M_SkidStartSpeed, M_ImpactStageDuration,
+	       Wreck->GetPieceCount(), Wreck->GetPieceCount() - Wreck->GetReleasedPieceCount(), M_BellyDepth);
+	ImpactStage_ReleasePieces(0.f);
+	SetComponentTickEnabled(true);
+}
+
+void UAircraftDeathComponent::StartImpactStage_SetupHullMotion(const AAircraftWreckActor& Wreck)
+{
+	const FVector& ContactPoint = M_ContactPoint;
+	const FVector& ContactNormal = M_ContactNormal;
+	const FTransform HullStart = Wreck.GetActorTransform();
+	M_HullStartRotation = HullStart.GetRotation();
+	M_HullScale = HullStart.GetScale3D();
+	// The hull skids on along the ground with part of its speed; the speed into the ground is spent on the impact.
+	const FVector AlongGround = FVector::VectorPlaneProject(M_FlightState.Velocity, ContactNormal);
+	M_SkidStartSpeed = static_cast<float>(AlongGround.Size()) * M_DeathSettings.ImpactSkidSpeedShare;
+	M_SkidDistance = 0.f;
+	FVector LevelForward = FVector::VectorPlaneProject(M_HullStartRotation.GetForwardVector(), ContactNormal).GetSafeNormal();
+	if (LevelForward.IsNearlyZero())
+	{
+		LevelForward = AlongGround.GetSafeNormal();
+	}
+	if (LevelForward.IsNearlyZero())
+	{
+		LevelForward = FVector::VectorPlaneProject(FVector::ForwardVector, ContactNormal).GetSafeNormal();
+	}
+	M_SkidDirection = AlongGround.IsNearlyZero() ? LevelForward : AlongGround.GetSafeNormal();
+	// It comes to lie flat on the ground, its nose where it hit, as the tail slams down.
+	M_HullLevelRotation = FRotationMatrix::MakeFromXZ(LevelForward, ContactNormal).ToQuat();
+	M_PivotLocal = HullStart.InverseTransformPosition(ContactPoint);
+	M_NoseLocalX = TNumericLimits<float>::Lowest();
+	M_TailLocalX = TNumericLimits<float>::Max();
+	float BottomLocalZ = M_PivotLocal.Z;
+	for (const FAircraftWreckPiece& Piece : Wreck.GetPieces())
+	{
+		M_NoseLocalX = FMath::Max(M_NoseLocalX, static_cast<float>(Piece.LocalCentre.X));
+		M_TailLocalX = FMath::Min(M_TailLocalX, static_cast<float>(Piece.LocalCentre.X));
+		BottomLocalZ = FMath::Min(BottomLocalZ, static_cast<float>(Piece.LocalCentre.Z - Piece.LocalExtent.Z));
+	}
+	// Lying flat on the nose pivot would sink the belly into the ground: the hull rises by that much as it levels.
+	M_BellyDepth = FMath::Max(0.f, (M_PivotLocal.Z - BottomLocalZ) * static_cast<float>(M_HullScale.Z));
+}
+
+void UAircraftDeathComponent::StartImpactStage_ScheduleBlasts()
+{
+	using namespace AircraftDeathPrivate;
+	bM_MainBlastDone = false;
+	bM_FuelBlastDone = false;
+	bM_DebrisFiresDone = false;
+	M_NextSecondaryBlast = 0;
+	M_SecondaryBlastSeconds.Reset();
+	const int32 SecondaryCount = FMath::Clamp(1 + FMath::RoundToInt((M_SizeEffectScale - 1.f) * 2.f), 1,
+	                                          MaxSecondaryBlasts);
+	for (int32 Index = 0; Index < SecondaryCount; ++Index)
+	{
+		M_SecondaryBlastSeconds.Add(M_Random.FRandRange(SecondaryBlastSeconds.X, SecondaryBlastSeconds.Y));
+	}
+	M_SecondaryBlastSeconds.Sort();
+}
+
+void UAircraftDeathComponent::TickImpactStage(const float DeltaTime)
+{
+	using namespace AircraftDeathPrivate;
+	if (not M_Wreck.IsValid())
+	{
+		bM_IsImpactStaging = false;
+		SetComponentTickEnabled(false);
+		return;
+	}
+	M_ImpactStageSeconds += DeltaTime;
+	if (not bM_HullFinished)
+	{
+		const float StageAlpha = FMath::Clamp(M_ImpactStageSeconds / FMath::Max(M_ImpactStageDuration, KINDA_SMALL_NUMBER),
+		                                      0.f, 1.f);
+		M_SkidDistance += M_SkidStartSpeed * FMath::Lerp(1.f, SkidEndSpeedShare, StageAlpha) * DeltaTime;
+		ImpactStage_MoveHull(StageAlpha);
+		ImpactStage_ReleasePieces(StageAlpha);
+		if (StageAlpha >= 1.f)
+		{
+			ImpactStage_FinishHull();
+		}
+	}
+	ImpactStage_SpawnBlasts();
+	TickTornPartSmoke();
+	if (not bM_DebrisFiresDone && M_ImpactStageSeconds >= BurningDebrisSeconds)
+	{
+		bM_DebrisFiresDone = true;
+		ImpactStage_SpawnBurningDebris();
+	}
+	const bool bBlastsDone = bM_MainBlastDone && bM_FuelBlastDone
+		&& M_NextSecondaryBlast >= M_SecondaryBlastSeconds.Num();
+	if (bM_HullFinished && bBlastsDone && bM_DebrisFiresDone)
+	{
+		bM_IsImpactStaging = false;
+		SetComponentTickEnabled(false);
+	}
+}
+
+void UAircraftDeathComponent::ImpactStage_MoveHull(const float StageAlpha)
+{
+	AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck))
+	{
+		return;
+	}
+	// Eases out: the tail comes down fast, then settles.
+	const float Ease = StageAlpha * (2.f - StageAlpha);
+	const FQuat Rotation = FQuat::Slerp(M_HullStartRotation, M_HullLevelRotation, Ease);
+	const FVector Pivot = M_ContactPoint + M_SkidDirection * M_SkidDistance + M_ContactNormal * (M_BellyDepth * Ease);
+	const FVector Centre = Pivot - FTransform(Rotation, FVector::ZeroVector, M_HullScale).TransformVector(M_PivotLocal);
+	Wreck->SetActorTransform(FTransform(Rotation, Centre, M_HullScale), false, nullptr, ETeleportType::None);
+}
+
+void UAircraftDeathComponent::ImpactStage_ReleasePieces(const float StageAlpha)
+{
+	using namespace AircraftDeathPrivate;
+	AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck))
+	{
+		return;
+	}
+	const float Length = M_NoseLocalX - M_TailLocalX;
+	const float Scatter = M_DeathSettings.PieceScatterSpeed;
+	const FVector Right = Wreck->GetActorRightVector();
+	const float HullScale = static_cast<float>(M_HullScale.GetMax());
+	const TArray<FAircraftWreckPiece>& Pieces = Wreck->GetPieces();
+	for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+	{
+		const FAircraftWreckPiece& Piece = Pieces[PieceIndex];
+		if (Piece.bReleased)
+		{
+			continue;
+		}
+		// A piece that meets the ground tears off; the rest of the hull comes apart from the nose back.
+		const float Height = FVector::DotProduct(Wreck->GetPieceWorldCentre(PieceIndex) - M_ContactPoint, M_ContactNormal);
+		const float ReleaseHeight = FMath::Max(GroundReleaseMinHeight,
+		                                       GroundReleaseExtentShare * static_cast<float>(Piece.LocalExtent.GetMax())) * HullScale;
+		const float BackShare = Length > 1.f ? (M_NoseLocalX - static_cast<float>(Piece.LocalCentre.X)) / Length : 0.f;
+		if (Height > ReleaseHeight && BackShare > StageAlpha)
+		{
+			continue;
+		}
+		const FVector Kick = M_ContactNormal * Scatter * M_Random.FRandRange(PieceUpKickShare.X, PieceUpKickShare.Y)
+			+ Right * Scatter * M_Random.FRandRange(-PieceSideKickShare, PieceSideKickShare)
+			+ M_SkidDirection * Scatter * M_Random.FRandRange(0.f, PieceForwardKickShare);
+		Wreck->ReleasePiece(PieceIndex, Kick,
+		                    M_Random.GetUnitVector() * M_Random.FRandRange(PieceSpinRadians.X, PieceSpinRadians.Y));
+	}
+}
+
+void UAircraftDeathComponent::ImpactStage_FinishHull()
+{
+	using namespace AircraftDeathPrivate;
+	bM_HullFinished = true;
+	AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck))
+	{
+		return;
+	}
+	// Whatever still holds together breaks off now.
+	for (int32 PieceIndex = 0; PieceIndex < Wreck->GetPieces().Num(); ++PieceIndex)
+	{
+		Wreck->ReleasePiece(PieceIndex, M_ContactNormal * M_DeathSettings.PieceScatterSpeed * FinalPieceUpKickShare,
+		                    M_Random.GetUnitVector() * FinalPieceSpinRadians);
+	}
+	// The fuel burns where the hull came to lie, and dies down with the wreck's other fires.
+	const FVector FireLocation = M_ContactPoint + M_SkidDirection * M_SkidDistance;
+	if (IsValid(M_DeathSettings.GroundFire.System))
+	{
+		UNiagaraComponent* GroundFire = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			M_DeathSettings.GroundFire.System, Wreck->GetRootComponent(), NAME_None, FireLocation,
+			FRotationMatrix::MakeFromZ(M_ContactNormal).Rotator(),
+			FVector(GetEffectScale() * M_DeathSettings.GroundFire.Scale), EAttachLocation::KeepWorldPosition, false,
+			ENCPoolMethod::None, true);
+		AircraftDeathPrivate::ApplyEffectParameters(GroundFire, M_DeathSettings.GroundFire);
+		Wreck->AddWreckFire(GroundFire);
+	}
+	Wreck->StopFiresAfter(M_DeathSettings.WreckFireSeconds);
+	UE_LOG(LogRTSAircraftDeath, Log, TEXT("RTS_AIRCRAFT_DEATH HULL_DONE %s skid=%.0f at=%s"),
+	       *GetNameSafe(GetOwner()), M_SkidDistance, *Wreck->GetActorLocation().ToCompactString());
+}
+
+void UAircraftDeathComponent::ImpactStage_SpawnBlasts()
+{
+	using namespace AircraftDeathPrivate;
+	const AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck))
+	{
+		return;
+	}
+	const FRotator AlongGround = FRotationMatrix::MakeFromZ(M_ContactNormal).Rotator();
+	const float Lift = ExplosionLift * GetEffectScale();
+	if (not bM_MainBlastDone && M_ImpactStageSeconds >= MainBlastSeconds)
+	{
+		bM_MainBlastDone = true;
+		SpawnDeathEffect(M_DeathSettings.ImpactExplosion, Wreck->GetActorLocation() + M_ContactNormal * Lift, AlongGround);
+		if (IsValid(M_DeathSettings.ImpactSound))
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, M_DeathSettings.ImpactSound, Wreck->GetActorLocation());
+		}
+	}
+	if (not bM_FuelBlastDone && M_ImpactStageSeconds >= FuelBlastSeconds)
+	{
+		bM_FuelBlastDone = true;
+		// The tanks sit in the wings and the fuselage behind the engine: over the hull, ahead along the skid.
+		const float HalfLength = 0.5f * (M_NoseLocalX - M_TailLocalX);
+		SpawnDeathEffect(M_DeathSettings.FuelFireball,
+		                 Wreck->GetActorLocation() + M_SkidDirection * HalfLength * FuelBlastForwardShare
+		                 + M_ContactNormal * Lift * FuelBlastLiftShare, AlongGround);
+	}
+	while (M_SecondaryBlastSeconds.IsValidIndex(M_NextSecondaryBlast)
+		&& M_ImpactStageSeconds >= M_SecondaryBlastSeconds[M_NextSecondaryBlast])
+	{
+		++M_NextSecondaryBlast;
+		const int32 PieceIndex = GetRandomReleasedPiece();
+		const FVector BlastLocation = (PieceIndex != INDEX_NONE ? Wreck->GetPieceWorldCentre(PieceIndex) : Wreck->GetActorLocation())
+			+ M_ContactNormal * Lift * SecondaryBlastLiftShare;
+		SpawnDeathEffect(M_DeathSettings.SecondaryExplosion, BlastLocation, AlongGround,
+		                 M_Random.FRandRange(SecondaryBlastScaleRange.X, SecondaryBlastScaleRange.Y));
+		if (IsValid(M_DeathSettings.EngineHitSound))
+		{
+			UGameplayStatics::PlaySoundAtLocation(this, M_DeathSettings.EngineHitSound, BlastLocation);
+		}
+	}
+}
+
+void UAircraftDeathComponent::ImpactStage_SpawnBurningDebris()
+{
+	using namespace AircraftDeathPrivate;
+	AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck) || not IsValid(M_DeathSettings.BurningDebris.System))
+	{
+		return;
+	}
+	const int32 FireCount = FMath::Clamp(FMath::RoundToInt(FighterBurningPieces * M_SizeEffectScale),
+	                                     FighterBurningPieces, MaxBurningPieces);
+	TArray<int32> Burning;
+	for (int32 Attempt = 0; Attempt < FireCount * BurningDebrisAttemptsPerFire && Burning.Num() < FireCount; ++Attempt)
+	{
+		const int32 PieceIndex = GetRandomReleasedPiece();
+		if (PieceIndex == INDEX_NONE || Burning.Contains(PieceIndex))
+		{
+			continue;
+		}
+		Burning.Add(PieceIndex);
+		UNiagaraComponent* Fire = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			M_DeathSettings.BurningDebris.System, Wreck->GetRootComponent(), NAME_None,
+			Wreck->GetPieceWorldCentre(PieceIndex), FRotator::ZeroRotator,
+			FVector(GetEffectScale() * M_DeathSettings.BurningDebris.Scale
+				* M_Random.FRandRange(BurningDebrisScaleRange.X, BurningDebrisScaleRange.Y)),
+			EAttachLocation::KeepWorldPosition, false, ENCPoolMethod::None, true);
+		AircraftDeathPrivate::ApplyEffectParameters(Fire, M_DeathSettings.BurningDebris);
+		Wreck->AddWreckFire(Fire);
+	}
+}
+
+int32 UAircraftDeathComponent::GetRandomReleasedPiece()
+{
+	const AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck))
+	{
+		return INDEX_NONE;
+	}
+	TArray<int32> Released;
+	for (int32 PieceIndex = 0; PieceIndex < Wreck->GetPieces().Num(); ++PieceIndex)
+	{
+		if (Wreck->GetPieces()[PieceIndex].bReleased)
+		{
+			Released.Add(PieceIndex);
+		}
+	}
+	return Released.IsEmpty() ? INDEX_NONE : Released[M_Random.RandHelper(Released.Num())];
 }

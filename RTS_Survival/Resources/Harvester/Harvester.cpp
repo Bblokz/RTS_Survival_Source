@@ -278,6 +278,11 @@ void UHarvester::SetupPlayerResourceManagerReference(const UWorld* World)
 		return;
 	}
 	const ACPPController* CPPController = Cast<ACPPController>(PlayerController);
+	// The pre-game hangar (ability preview) has no ACPPController and no resources to harvest into.
+	if (!IsValid(CPPController) && FRTS_Statics::GetIsInPreGameHangar(this))
+	{
+		return;
+	}
 	if (!IsValid(CPPController))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this,

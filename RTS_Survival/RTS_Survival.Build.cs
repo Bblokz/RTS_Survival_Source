@@ -43,6 +43,8 @@ public class RTS_Survival : ModuleRules
 			"AsyncTickPhysics",
 			"Slate",
 			"SlateCore",
+			// FDisplayMetrics (RTSGameUserSettings native-resolution cap).
+			"ApplicationCore",
 			"ProtoAnimatedText",
 			"Json",
 			"RenderCore",
