@@ -45,6 +45,10 @@ public:
 	FVector GetImpactLocation() const { return M_ImpactLocation; }
 	int32 GetBreakupPieceCount() const { return M_BreakupPieceCount; }
 	int32 GetSmokePuffCount() const { return M_SmokePuffCount; }
+	/** @return Pieces that tore off while the wreck was still in the air. */
+	int32 GetAirBreakupPieceCount() const { return M_AirBreakupPieceCount; }
+	/** @return Whether the wreck is still tearing apart and its blasts are still to come after the impact. */
+	bool GetIsImpactStaging() const { return bM_IsImpactStaging; }
 	bool GetWasParked() const { return bM_WasParked; }
 	float GetSizeEffectScaleOfAircraft() const { return M_SizeEffectScale; }
 	AAircraftWreckActor* GetWreck() const { return M_Wreck.Get(); }
@@ -108,6 +112,46 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AAircraftWreckActor> M_Wreck;
 
+	FRandomStream M_Random;
+	bool bM_AircraftMeshesHidden = false;
+
+	// In the air.
+	float M_AirBreakupSeconds = -1.f;
+	bool bM_DidFirstAirBreakup = false;
+	bool bM_DidSecondAirBreakup = false;
+	TArray<int32> M_AirBreakupOrder;
+	int32 M_NextAirBreakupIndex = 0;
+	int32 M_AirBreakupPieceCount = 0;
+	int32 M_SmokingTornPiece = INDEX_NONE;
+	FVector M_SmokingTornPieceLastLocation = FVector::ZeroVector;
+	float M_DistanceSinceTornPartPuff = 0.f;
+	float M_TornPartSmokeSeconds = 0.f;
+
+	// On the ground.
+	bool bM_IsImpactStaging = false;
+	bool bM_HullFinished = false;
+	float M_ImpactStageSeconds = 0.f;
+	float M_ImpactStageDuration = 0.f;
+	FVector M_ContactPoint = FVector::ZeroVector;
+	FVector M_ContactNormal = FVector::UpVector;
+	FVector M_SkidDirection = FVector::ForwardVector;
+	float M_SkidStartSpeed = 0.f;
+	float M_SkidDistance = 0.f;
+	FQuat M_HullStartRotation = FQuat::Identity;
+	FQuat M_HullLevelRotation = FQuat::Identity;
+	FVector M_HullScale = FVector::OneVector;
+	// Where the nose touched, in the hull's own space: the hull pivots on it as the tail comes down.
+	FVector M_PivotLocal = FVector::ZeroVector;
+	// How far the belly hangs below the pivot once the hull lies flat.
+	float M_BellyDepth = 0.f;
+	float M_NoseLocalX = 0.f;
+	float M_TailLocalX = 0.f;
+	bool bM_MainBlastDone = false;
+	bool bM_FuelBlastDone = false;
+	bool bM_DebrisFiresDone = false;
+	TArray<float> M_SecondaryBlastSeconds;
+	int32 M_NextSecondaryBlast = 0;
+
 	void BeginPlay_LoadCrashCollection();
 	FString GetCrashCollectionPath() const;
 
@@ -124,13 +168,54 @@ private:
 	/** @brief Leaves a smoke puff behind the burning engine every SmokeTrailSpacing of the fall. */
 	void DropSmokePuffs();
 
-	/** @return Whether the wreck reached the ground (or something static) on its way to NewLocation. */
-	bool FindImpact(const FVector& OldLocation, const FVector& NewLocation, FHitResult& OutHit) const;
+	/**
+	 * @return Whether the wreck reached the ground (or something static) on its way to NewLocation: with its belly or,
+	 * first in a dive, with its nose (bOutNoseHit).
+	 */
+	bool FindImpact(const FVector& OldLocation, const FQuat& OldRotation, const FVector& NewLocation,
+	                const FQuat& NewRotation, FHitResult& OutHit, bool& bOutNoseHit) const;
 
 	/** @brief The wreck hit the ground: explosion, burning fuel, the pieces, and the aircraft is cleared away. */
-	void Impact(const FVector& ImpactLocation, const FVector& ImpactNormal);
+	void Impact(const FVector& ImpactLocation, const FVector& ImpactNormal, bool bTearApartFromTheNose);
 	void Impact_SpawnEffects(const FVector& ImpactLocation, const FVector& ImpactNormal) const;
 	void Impact_SpawnWreck();
+	/** @brief Deactivates every effect on the aircraft actor (exhausts, the engine fire): they burn out and stop. */
+	void Impact_StopAircraftEffects();
+
+	/** @return Spawns one death effect in the world, scaled by the aircraft's size times ScaleMultiplier. */
+	UNiagaraComponent* SpawnDeathEffect(const FAircraftDeathEffect& Effect, const FVector& Location,
+	                                    const FRotator& Rotation, float ScaleMultiplier = 1.f) const;
+	/** @brief One smoke puff; it bursts once and is then switched off, so it never loops on where it was left. */
+	void SpawnSmokePuff(const FVector& Location, float Scale);
+
+	// ---- In the air: the collection replaces the aircraft's meshes and parts tear off. ----
+	/** @return Whether the kinematic wreck now carries the aircraft's look; spawns it when there is none yet. */
+	bool EnsureCarriedWreck();
+	void HideAircraftMeshes() const;
+	/** @brief Orders the pieces that tear off first: the burning wing's outer panel, or a single-engine's tail or a wing tip. */
+	void BuildAirBreakupOrder();
+	void TickAirBreakup();
+	/** @brief Lets the next pieces of the breakup order go with a small blast where they tear off. */
+	void TearOffPieces(int32 Count);
+	void TickCarriedWreck(float DeltaTime);
+	/** @brief Smoke from the first torn-off part while it tumbles down. */
+	void TickTornPartSmoke();
+
+	// ---- On the ground: the hull ploughs on and comes apart from the nose back while it explodes. ----
+	void StartImpactStage(const FVector& ContactPoint, const FVector& ContactNormal);
+	/** @brief Skid direction and speed, the flat pose the hull settles into, and the nose pivot it turns on. */
+	void StartImpactStage_SetupHullMotion(const AAircraftWreckActor& Wreck);
+	void StartImpactStage_ScheduleBlasts();
+	void TickImpactStage(float DeltaTime);
+	void ImpactStage_MoveHull(float StageAlpha);
+	void ImpactStage_ReleasePieces(float StageAlpha);
+	void ImpactStage_FinishHull();
+	void ImpactStage_SpawnBlasts();
+	void ImpactStage_SpawnBurningDebris();
+	/** @return A random piece that was let go, or INDEX_NONE. */
+	int32 GetRandomReleasedPiece();
+	/** @return Furthest forward point of the aircraft along its nose, from its centre: the nose meets the ground first. */
+	float GetNoseReach() const;
 	// Fallback for the wreck height when the crash collection is missing; the padded mesh bounds sit too low.
 	float GetLowestVisibleMeshPointZ() const;
 	/** @return The highest ground (static geometry) under the box, sampled on a grid; lowest float when none. */

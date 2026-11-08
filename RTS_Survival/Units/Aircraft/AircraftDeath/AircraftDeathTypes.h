@@ -132,6 +132,50 @@ struct FAircraftDeathSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup", meta=(Units="Seconds"))
 	float WreckLifeSeconds = 30.f;
 
+	// The burning aircraft already comes apart in the air: part of the burning wing (or the tail of a single-engine
+	// aircraft) tears off and tumbles down on its own.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|In the air")
+	bool bBreakUpInTheAir = true;
+
+	// Seconds after the hit at which the first part tears off; picked per aircraft in this range.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|In the air", meta=(EditCondition="bBreakUpInTheAir"))
+	FVector2D AirBreakupDelaySeconds = FVector2D(0.35f, 0.8f);
+
+	// Share of the pieces the first tear takes; at least two.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|In the air",
+		meta=(EditCondition="bBreakUpInTheAir", ClampMin="0", ClampMax="0.5"))
+	float AirBreakupPieceShare = 0.12f;
+
+	// A second, smaller tear this long after the first while the wreck still falls; 0 for none.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|In the air",
+		meta=(EditCondition="bBreakUpInTheAir", Units="Seconds"))
+	float AirSecondBreakupDelaySeconds = 1.1f;
+
+	// Sideways and upward kick of a torn-off part, on top of the speed of the aircraft.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|In the air",
+		meta=(EditCondition="bBreakUpInTheAir", Units="CentimetersPerSecond"))
+	float AirBreakupSeparationSpeed = 380.f;
+
+	// Small blast where a part tears off.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|In the air")
+	FAircraftDeathEffect AirBreakupExplosion;
+
+	// Air drag on loose pieces: torn-off parts fall behind the aircraft, pieces on the ground stop sliding sooner.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup", meta=(ClampMin="0", ClampMax="5"))
+	float PieceLinearDamping = 0.35f;
+
+	// Time the wreck takes to tear apart from the nose back once it hits the ground; bigger aircraft take longer.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|Impact", meta=(ClampMin="0.05", Units="Seconds"))
+	float ImpactBreakupSeconds = 0.45f;
+
+	// Share of its horizontal speed the hull keeps while it ploughs on and comes apart.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|Impact", meta=(ClampMin="0", ClampMax="1"))
+	float ImpactSkidSpeedShare = 0.55f;
+
+	// How long the wreck and the fuel around it burn before the fires die down.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|Impact", meta=(Units="Seconds"))
+	float WreckFireSeconds = 10.f;
+
 	// Scale of the effects; a heavy bomber burns and explodes bigger than a fighter.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects", meta=(ClampMin="0.1"))
 	float EffectScale = 1.f;
@@ -149,8 +193,25 @@ struct FAircraftDeathSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects", meta=(ClampMin="20", Units="Centimeters"))
 	float SmokeTrailSpacing = 120.f;
 
+	// Dirt the nose throws up where it hits the ground.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
+	FAircraftDeathEffect GroundBurst;
+
+	// The main blast, a moment after the nose hit, over the hull as it ploughs in.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
 	FAircraftDeathEffect ImpactExplosion;
+
+	// The fuel tanks going up right after the main blast.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
+	FAircraftDeathEffect FuelFireball;
+
+	// Smaller blasts among the pieces over the next second (fuel, ammunition); a bomber has more of them.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
+	FAircraftDeathEffect SecondaryExplosion;
+
+	// Fires on a few of the pieces once they came to rest.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")
+	FAircraftDeathEffect BurningDebris;
 
 	// Burning fuel where the wreck came down; it goes with the wreck.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Effects")

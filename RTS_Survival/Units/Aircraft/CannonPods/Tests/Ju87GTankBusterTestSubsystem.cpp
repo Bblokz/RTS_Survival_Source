@@ -519,7 +519,7 @@ void UJu87GTankBusterTestSubsystem::StartStrike()
 		Before.Add(Cost.Key, IsValid(Resources) ? Resources->GetResourceAmount(Cost.Key) : 0);
 	}
 	// A map started without a mission manager may cap the tiers; the commander's kit allows Tier III.
-	Manager->SetMaxAllowedAbilityTier(EGlobalAbilityTier::TierIV);
+	Manager->SetPlayerMissionSettings(FMissionPlayerGlobalAbilitySettings());
 	ClearCopyRequirements(*M_Ability);
 	const bool bIsStrip = M_Ability->GetAimSettings().AreaAim.Shape == EGlobalAbilityAimShape::Strip;
 	UE_LOG(LogRTSJu87GTest, Display, TEXT("RTS_JU87G_TEST ABILITY_STATE requirements=%d costs=%d cooldown_ready=%d strip=%d"),
