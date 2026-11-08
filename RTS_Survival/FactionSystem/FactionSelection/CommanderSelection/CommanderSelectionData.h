@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Styling/SlateColor.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityTier.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilityType/EGlobalAbilityType.h"
 #include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
@@ -64,4 +65,10 @@ namespace CommanderSelectionData
 
 	/** "I" to "IV"; the tier badges are too small for "Tier III". */
 	FText GetTierNumeral(const EGlobalAbilityTier Tier);
+
+	/** One badge colour per tier so a kit reads at a glance; grey while the ability has no template. */
+	FLinearColor GetTierBadgeColor(const EGlobalAbilityTier Tier, const bool bHasTemplate);
+
+	/** Dark text on the tier badges. */
+	FSlateColor GetTierBadgeTextColor();
 }

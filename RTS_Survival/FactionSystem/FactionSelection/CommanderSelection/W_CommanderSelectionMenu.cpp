@@ -53,6 +53,10 @@ namespace CommanderSelectionLayout
 	const FVector2D PortraitSize(432.f, 540.f);
 	constexpr float PortraitFramePadding = 4.f;
 	constexpr float DescriptionTop = PanelTop + 540.f + 16.f;
+	// Header, side panels, portrait and description hang from the vertical centre (at 1080 high exactly where their
+	// top offsets put them), so a taller screen shares its extra height above and below them; the buttons keep to the
+	// bottom corners.
+	constexpr float ColumnAnchorY = 0.5f;
 	constexpr float DescriptionWidth = 620.f;
 	const FMargin DescriptionPlatePadding(28.f, 14.f, 28.f, 18.f);
 	const FMargin CommanderDescriptionPadding(0.f, 6.f, 0.f, 0.f);
@@ -70,6 +74,12 @@ namespace CommanderSelectionLayout
 	const FLinearColor PortraitOutlineColor(0.25f, 0.27f, 0.27f, 1.f);
 	constexpr float PortraitOutlineWidth = 2.f;
 	const FLinearColor DescriptionPlateColor(0.f, 0.f, 0.f, 0.62f);
+
+	/** Canvas offset from the centre line of a column widget whose top sits at TopAt1080 on a 1080 high screen. */
+	float GetColumnOffsetY(const float TopAt1080)
+	{
+		return TopAt1080 - MenuDesignFrameLayout::DesignSize.Y * ColumnAnchorY;
+	}
 }
 
 void UW_CommanderSelectionMenu::NativeOnInitialized()
@@ -91,14 +101,25 @@ void UW_CommanderSelectionMenu::NativeDestruct()
 	Super::NativeDestruct();
 }
 
+void UW_CommanderSelectionMenu::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+	Super::NativeTick(MyGeometry, InDeltaTime);
+	M_DesignFrame.UpdateFrame(MyGeometry);
+}
+
 void UW_CommanderSelectionMenu::BuildWidgetTree()
 {
 	if (not IsValid(WidgetTree) || IsValid(WidgetTree->RootWidget))
 	{
 		return;
 	}
-	UCanvasPanel* const RootCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
-	WidgetTree->RootWidget = RootCanvas;
+	UCanvasPanel* const ScreenCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
+	WidgetTree->RootWidget = ScreenCanvas;
+	UCanvasPanel* const RootCanvas = M_DesignFrame.BuildFrame(*WidgetTree, *ScreenCanvas);
+	if (not IsValid(RootCanvas))
+	{
+		return;
+	}
 	BuildEdgeShades(RootCanvas);
 	BuildHeader(RootCanvas);
 	BuildCommanderPanel(RootCanvas);
@@ -132,9 +153,9 @@ void UW_CommanderSelectionMenu::BuildHeader(UCanvasPanel* RootCanvas)
 	M_HeaderPlate->SetHorizontalAlignment(HAlign_Center);
 	M_HeaderPlate->SetVerticalAlignment(VAlign_Center);
 	UCanvasPanelSlot* const HeaderSlot = RootCanvas->AddChildToCanvas(M_HeaderPlate);
-	HeaderSlot->SetAnchors(FAnchors(0.5f, 0.f));
+	HeaderSlot->SetAnchors(FAnchors(0.5f, ColumnAnchorY));
 	HeaderSlot->SetAlignment(FVector2D(0.5f, 0.f));
-	HeaderSlot->SetPosition(FVector2D(0.f, HeaderTop));
+	HeaderSlot->SetPosition(FVector2D(0.f, GetColumnOffsetY(HeaderTop)));
 	HeaderSlot->SetSize(HeaderSize);
 
 	M_TitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
@@ -182,8 +203,8 @@ void UW_CommanderSelectionMenu::BuildCommanderPanel(UCanvasPanel* RootCanvas)
 	UCanvasPanelSlot* PanelSlot = nullptr;
 	UOverlay* const PanelOverlay = BuildSidePanel(RootCanvas, CommanderPanelSize, PanelSlot, M_CommanderPanelTitle,
 	                                              M_CommanderPanel);
-	PanelSlot->SetAnchors(FAnchors(0.f, 0.f));
-	PanelSlot->SetPosition(FVector2D(ScreenMargin, PanelTop));
+	PanelSlot->SetAnchors(FAnchors(0.f, ColumnAnchorY));
+	PanelSlot->SetPosition(FVector2D(ScreenMargin, GetColumnOffsetY(PanelTop)));
 	// The list's title sits centred in the header strip.
 	if (UHorizontalBoxSlot* const TitleSlot = Cast<UHorizontalBoxSlot>(M_CommanderPanelTitle->Slot))
 	{
@@ -204,9 +225,9 @@ void UW_CommanderSelectionMenu::BuildKitPanel(UCanvasPanel* RootCanvas)
 	using namespace CommanderSelectionLayout;
 	UCanvasPanelSlot* PanelSlot = nullptr;
 	UOverlay* const PanelOverlay = BuildSidePanel(RootCanvas, KitPanelSize, PanelSlot, M_KitPanelTitle, M_KitPanel);
-	PanelSlot->SetAnchors(FAnchors(1.f, 0.f));
+	PanelSlot->SetAnchors(FAnchors(1.f, ColumnAnchorY));
 	PanelSlot->SetAlignment(FVector2D(1.f, 0.f));
-	PanelSlot->SetPosition(FVector2D(-ScreenMargin, PanelTop));
+	PanelSlot->SetPosition(FVector2D(-ScreenMargin, GetColumnOffsetY(PanelTop)));
 	M_KitPanelTitle->SetText(NSLOCTEXT("CommanderSelection", "KitTitle", "GLOBAL ABILITIES"));
 
 	// Its scroll bar only shows once long descriptions need more than the panel's height.
@@ -226,9 +247,9 @@ void UW_CommanderSelectionMenu::BuildPortrait(UCanvasPanel* RootCanvas)
 	PortraitBox->SetWidthOverride(PortraitSize.X);
 	PortraitBox->SetHeightOverride(PortraitSize.Y);
 	UCanvasPanelSlot* const PortraitSlot = RootCanvas->AddChildToCanvas(PortraitBox);
-	PortraitSlot->SetAnchors(FAnchors(0.5f, 0.f));
+	PortraitSlot->SetAnchors(FAnchors(0.5f, ColumnAnchorY));
 	PortraitSlot->SetAlignment(FVector2D(0.5f, 0.f));
-	PortraitSlot->SetPosition(FVector2D(CentreColumnOffsetX, PanelTop));
+	PortraitSlot->SetPosition(FVector2D(CentreColumnOffsetX, GetColumnOffsetY(PanelTop)));
 	PortraitSlot->SetAutoSize(true);
 
 	M_PortraitFrame = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
@@ -255,9 +276,9 @@ void UW_CommanderSelectionMenu::BuildDescription(UCanvasPanel* RootCanvas)
 	USizeBox* const DescriptionBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 	DescriptionBox->SetWidthOverride(DescriptionWidth);
 	UCanvasPanelSlot* const DescriptionSlot = RootCanvas->AddChildToCanvas(DescriptionBox);
-	DescriptionSlot->SetAnchors(FAnchors(0.5f, 0.f));
+	DescriptionSlot->SetAnchors(FAnchors(0.5f, ColumnAnchorY));
 	DescriptionSlot->SetAlignment(FVector2D(0.5f, 0.f));
-	DescriptionSlot->SetPosition(FVector2D(CentreColumnOffsetX, DescriptionTop));
+	DescriptionSlot->SetPosition(FVector2D(CentreColumnOffsetX, GetColumnOffsetY(DescriptionTop)));
 	DescriptionSlot->SetAutoSize(true);
 
 	M_DescriptionPlate = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
@@ -534,10 +555,39 @@ void UW_CommanderSelectionMenu::RebuildAbilityRows()
 		{
 			continue;
 		}
-		AbilityRow->SetupRow(M_Style, M_RichTextStyle, AbilitySlots[SlotIndex]);
+		AbilityRow->SetupRow(this, SlotIndex, M_Style, M_RichTextStyle, AbilitySlots[SlotIndex]);
 		const float BottomSpacing = SlotIndex + 1 < AbilitySlots.Num() ? AbilityRowSpacing : 0.f;
 		M_AbilityColumn->AddChildToVerticalBox(AbilityRow)->SetPadding(FMargin(0.f, 0.f, 0.f, BottomSpacing));
 	}
+}
+
+UW_CommanderAbilityRow* UW_CommanderSelectionMenu::GetAbilityRow(const int32 SlotIndex) const
+{
+	if (not IsValid(M_AbilityColumn) || SlotIndex < 0 || SlotIndex >= M_AbilityColumn->GetChildrenCount())
+	{
+		return nullptr;
+	}
+	return Cast<UW_CommanderAbilityRow>(M_AbilityColumn->GetChildAt(SlotIndex));
+}
+
+void UW_CommanderSelectionMenu::HandleAbilityRowClicked(const int32 SlotIndex)
+{
+	(void)PreviewAbilitySlot(SlotIndex);
+}
+
+bool UW_CommanderSelectionMenu::PreviewAbilitySlot(const int32 SlotIndex)
+{
+	if (not M_Commanders.IsValidIndex(M_SelectedIndex))
+	{
+		return false;
+	}
+	const TArray<FCommanderSelectionAbilitySlot>& AbilitySlots = M_Commanders[M_SelectedIndex].AbilitySlots;
+	if (not AbilitySlots.IsValidIndex(SlotIndex) || not AbilitySlots[SlotIndex].bHasTemplate
+		|| not GetIsValidFactionPlayerController())
+	{
+		return false;
+	}
+	return M_FactionPlayerController->HandleAbilityPreviewRequested(AbilitySlots[SlotIndex]);
 }
 
 FReply UW_CommanderSelectionMenu::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
