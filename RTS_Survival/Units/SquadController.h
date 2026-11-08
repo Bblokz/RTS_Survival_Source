@@ -539,6 +539,10 @@ public:
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	virtual bool GetSquadAlreadyHasTeamWeapon() const;
 
+	/** The commander screen's ability preview keeps its target squads where it placed them: no automatic cover. */
+	void SetAutomaticCoverBlocked(const bool bBlocked) { bM_IsAutomaticCoverBlocked = bBlocked; }
+	bool GetIsAutomaticCoverBlocked() const { return bM_IsAutomaticCoverBlocked; }
+
 	// ICommand interface helpers.
 	virtual FVector GetOwnerLocation() const override final;
 	virtual FString GetOwnerName() const override final;
@@ -1208,6 +1212,9 @@ protected:
 	void SetWeaponIcon(const EWeaponName HighestValuedWeapon);
 
 	void PlayAnnouncerLineNotEnoughSquadMembersToCapture();
+
+	// Off in every mission; set by AAbilityPreviewDirector's targets (SetAutomaticCoverBlocked).
+	bool bM_IsAutomaticCoverBlocked = false;
 
 	void OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const;
 };

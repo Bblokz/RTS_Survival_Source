@@ -4136,6 +4136,11 @@ bool ASquadController::GetIsValidPlayerController()
 	{
 		return true;
 	}
+	// The pre-game hangar (unit and ability previews) has no ACPPController; callers skip their player feedback.
+	if (FRTS_Statics::GetIsInPreGameHangar(this))
+	{
+		return false;
+	}
 	RTSFunctionLibrary::ReportNullErrorComponent(this, "PlayerController",
 	                                             "ASquadController::GetIsValidPlayerController"
 	                                             "\n attempting repair...");

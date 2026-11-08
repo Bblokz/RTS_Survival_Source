@@ -217,6 +217,12 @@ public:
 	// How far the tank drives out of the nose on its own; read from the class defaults to plan a landing run.
 	float GetTankExitDistance() const { return M_Tuning.TankExitDistance; }
 
+	/** The tank this delivery carries once it spawned in the hull; null before that or when it failed. */
+	ATankMaster* GetDeliveredTank() const { return M_DeliveredTank.Get(); }
+
+	/** Where the released tank drives to: TankExitDistance ahead of the glider along its landing run. */
+	FVector GetTankExitLocation() const { return GetActorLocation() + M_Run.Direction * M_Tuning.TankExitDistance; }
+
 	// Fires once: with the tank when it drives out, or with null when the delivery failed.
 	FOnGliderTankDelivered OnTankDelivered;
 

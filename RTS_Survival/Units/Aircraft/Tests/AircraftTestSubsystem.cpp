@@ -16,6 +16,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "NiagaraUserRedirectionParameterStore.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
@@ -849,6 +850,10 @@ namespace AircraftDeathTestPrivate
 	constexpr int32 MinimumPieces = 15;
 	// The fall carries the wreck on: it lands at least this share of the way its speed at death covers in a second.
 	constexpr float MinimumTravelShareOfOneSecond = 0.5f;
+	// Three seconds after the impact no piece's centre may be higher above the ground than this.
+	constexpr float MaxPieceHeightAfterLanding = 500.f;
+	// A fall this long gives the burning wreck time to lose a part before it hits the ground.
+	constexpr float FallLongEnoughToTearSeconds = 1.f;
 	const TArray<float> CaptureSecondsAfterKill = {0.5f, 1.2f};
 	const TArray<float> CaptureSecondsAfterImpact = {0.15f, 1.f, 3.f};
 	const FName NoseEngineBone(TEXT("B_Rotor1"));
@@ -876,6 +881,9 @@ namespace AircraftDeathTestPrivate
 		return {
 			{TEXT("Bf109"), TEXT("GerAircraft/BF109/Ger_Aircraft_BF110Airborne.Ger_Aircraft_BF110Airborne_C"), false, false},
 			{TEXT("Ju87"), TEXT("GerAircraft/JU_87VTO/Ger_Aircraft_StukaJu87_Airborne.Ger_Aircraft_StukaJu87_Airborne_C"), false, false},
+			{TEXT("Ju87G"), TEXT("GerAircraft/JU_87VTO/Ju87G/Ger_Aircraft_StukaJu87G_Airborne.Ger_Aircraft_StukaJu87G_Airborne_C"), false, false},
+			// Twin-boom recon aircraft with two engines: burns at a wing engine.
+			{TEXT("Fw189"), TEXT("GerAircraft/FW_Recon/Ger_Aircraft_FW189_Recon.Ger_Aircraft_FW189_Recon_C"), true, false},
 			{TEXT("Sturmovik"), TEXT("RusAircraft/Sturmovic/Rus_Aircraft_Sturmovic.Rus_Aircraft_Sturmovic_C"), false, false},
 			{TEXT("Me410"), TEXT("GerAircraft/ME410/Ger_Aircraft_ME5_Airbrone.Ger_Aircraft_ME5_Airbrone_C"), true, false},
 			{TEXT("Pe2"), TEXT("RusAircraft/PE2/Rus_PE2_Aircraft_3x250.Rus_PE2_Aircraft_3x250_C"), true, false},
@@ -1341,6 +1349,14 @@ void UAircraftTestSubsystem::CheckImpact(FAircraftDeathUnderTest& Entry)
 	{
 		return;
 	}
+	UE_LOG(LogRTSAircraftTest, Display, TEXT("RTS_AIRCRAFT_TEST AIR_BREAKUP %s torn=%d staged=%d"), *Entry.Label,
+	       Death->GetAirBreakupPieceCount(), Death->GetIsImpactStaging());
+	if (FallSeconds > FallLongEnoughToTearSeconds)
+	{
+		Check(Death->GetAirBreakupPieceCount() >= 2, Entry.Label + TEXT("_tore_apart_in_the_air"),
+		      FString::Printf(TEXT("torn=%d fall=%.2fs"), Death->GetAirBreakupPieceCount(), FallSeconds));
+	}
+	Check(Death->GetIsImpactStaging(), Entry.Label + TEXT("_comes_apart_from_the_nose"));
 	Check(FallSeconds > 0.5f, Entry.Label + TEXT("_fell_for_a_while"), FString::Printf(TEXT("fall=%.2fs"), FallSeconds));
 	Check(Travel >= Entry.HorizontalSpeedAtDeath * MinimumTravelShareOfOneSecond,
 	      Entry.Label + TEXT("_carried_on_with_its_speed"),
@@ -1356,6 +1372,10 @@ void UAircraftTestSubsystem::TickDeathWaitingForCleanup(FAircraftDeathUnderTest&
 	{
 		CaptureDeathMoment(Entry, Entry.ImpactLocation);
 		LogWreck(Entry);
+		if (CaptureIndex == CaptureSecondsAfterImpact.Num() - 1)
+		{
+			CheckPiecesCameDown(Entry);
+		}
 	}
 	if (Entry.bSpawnLanded && not Entry.bCheckedParkedSpread && SinceImpact >= ParkedSpreadCheckSeconds)
 	{
@@ -1365,6 +1385,7 @@ void UAircraftTestSubsystem::TickDeathWaitingForCleanup(FAircraftDeathUnderTest&
 	{
 		Entry.ActorClearedSeconds = GetNow();
 		Check(true, Entry.Label + TEXT("_aircraft_actor_cleared"), FString::Printf(TEXT("after=%.1fs"), SinceImpact));
+		CheckNoSmokeLingers(Entry);
 	}
 	const bool bCapturesDone = not CaptureSecondsAfterImpact.IsValidIndex(CaptureIndex);
 	if (Entry.ActorClearedSeconds >= 0.f && bCapturesDone)
@@ -1377,6 +1398,55 @@ void UAircraftTestSubsystem::TickDeathWaitingForCleanup(FAircraftDeathUnderTest&
 		Check(Entry.ActorClearedSeconds >= 0.f, Entry.Label + TEXT("_aircraft_actor_cleared"));
 		EnterDeathStep(Entry, EAircraftDeathTestStep::Done);
 	}
+}
+
+void UAircraftTestSubsystem::CheckPiecesCameDown(const FAircraftDeathUnderTest& Entry)
+{
+	using namespace AircraftDeathTestPrivate;
+	// Seconds after the impact every piece lies on the ground: none hangs in the air where the wreck was carried.
+	const TArray<FVector> PieceLocations = GetWreckPieceLocations(Entry);
+	float HighestAboveGround = PieceLocations.IsEmpty() ? -1.f : TNumericLimits<float>::Lowest();
+	for (const FVector& PieceLocation : PieceLocations)
+	{
+		HighestAboveGround = FMath::Max(HighestAboveGround, static_cast<float>(PieceLocation.Z) - Entry.GroundZ);
+	}
+	Check(not PieceLocations.IsEmpty() && HighestAboveGround < MaxPieceHeightAfterLanding,
+	      Entry.Label + TEXT("_pieces_came_down"),
+	      FString::Printf(TEXT("pieces=%d highest_above_ground=%.0f"), PieceLocations.Num(), HighestAboveGround));
+}
+
+void UAircraftTestSubsystem::CheckNoSmokeLingers(const FAircraftDeathUnderTest& Entry)
+{
+	// The trail's smoke puffs loop forever unless they are switched off after their burst; then every puff of a fall
+	// kept smoking where the wreck had been. By the time the aircraft actor is cleared, none may still be running.
+	const UNiagaraSystem* PuffSystem = nullptr;
+	if (const UClass* AircraftClass = LoadClass<AAircraftMaster>(nullptr, *Entry.ClassPath))
+	{
+		if (const AAircraftMaster* Defaults = AircraftClass->GetDefaultObject<AAircraftMaster>())
+		{
+			if (const UAircraftDeathComponent* Death = Defaults->FindComponentByClass<UAircraftDeathComponent>())
+			{
+				PuffSystem = Death->GetDeathSettings().SmokeTrail.System;
+			}
+		}
+	}
+	if (PuffSystem == nullptr)
+	{
+		PuffSystem = LoadObject<UNiagaraSystem>(nullptr, TEXT(
+			"/Game/RTS_Survival/SpecialEffects/Smoke/SmokeVol1/Niagara/NS_SmokePuff4a.NS_SmokePuff4a"));
+	}
+	int32 ActivePuffs = 0;
+	for (TObjectIterator<UNiagaraComponent> It; It; ++It)
+	{
+		const UNiagaraComponent* Effect = *It;
+		// Still asked to spawn: a puff switched off after its burst only lets its last smoke drift away.
+		if (IsValid(Effect) && Effect->GetWorld() == GetWorld() && Effect->GetAsset() == PuffSystem
+			&& Effect->GetRequestedExecutionState() == ENiagaraExecutionState::Active)
+		{
+			++ActivePuffs;
+		}
+	}
+	Check(ActivePuffs == 0, Entry.Label + TEXT("_trail_smoke_stops"), FString::Printf(TEXT("active_puffs=%d"), ActivePuffs));
 }
 
 void UAircraftTestSubsystem::CheckParkedPieces(FAircraftDeathUnderTest& Entry)
