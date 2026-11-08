@@ -318,7 +318,7 @@ void ACPPTurretsMaster::BeginPlay()
 	{
 		PlayerController = NewPlayerController;
 	}
-	else
+	else if (not FRTS_Statics::GetIsInPreGameHangar(this))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "PlayerController", "ACPPTurretsMaster::BeginPlay");
 	}

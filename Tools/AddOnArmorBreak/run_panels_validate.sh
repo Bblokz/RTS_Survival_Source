@@ -10,6 +10,8 @@
 #                            through the ground at its spawn; UT_B4Howitzer works, its artillery can hit slow runs)
 #   PROJECT=<uproject> ENGINE=<editor exe>   e.g. the DebugGame editor when the Development DLL is locked
 #   -AddOnArmorPanelsTraceDebris        logs the first hit's debris pieces every frame (debris checks always run)
+#   -AddOnArmorPanelsRevealTank         takes the test tank out of the fog of war, so the debris checks also run on
+#                                       enemy-faction (e.g. Soviet) tanks, which the fog hides otherwise
 #   -AddOnArmorPanelsStartModuleSetup   the test starts the vehicle module setup on Blueprints that never do
 #                                       (RTS_BP_AssaultTank children); logged as a NOTE
 set -u

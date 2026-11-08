@@ -12,6 +12,21 @@ CONTENT="D:/UE5Projects/RTS_Survival/Content"
 VEHICLES="$CONTENT/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle"
 LOG="D:/UE5Projects/RTS_Survival/Saved/Logs/AddOnArmorPanelDebris.log"
 
+# Hulls that throw another hull's debris panel (set by DebrisMesh= in build_panel_hulls.py): never cut their own.
+SHARED_DEBRIS=" SM_Ger_Jaguar_Hull_AddOnPanels SM_Jaguar_Flanker_Hull_AddOnPanels SM_E25_Hull_Skirts_AddOnPanels SM_E25_Hunter_Hull_Skirts_AddOnPanels "
+# Hulls whose default (middle left) panel is wrong for debris, e.g. it carries the faction sigil stamp.
+declare -A PANEL_ARGS=(
+  [SM_PantherD_AddOnPanels]="Panel=5"
+  [SM_PantherII_Strike_Hull_AddOnPanels]="Panel=2"
+  [SM_T-34E_Hull_AddOnPanels]="Panel=2"
+  [SM_T-34E_Hull_Soviet_AddOnPanels]="Panel=2"
+)
+# End plates shaped unlike the shared panel: each is cut out as its own debris mesh (-OwnPanel, any side).
+declare -A OWN_PANELS=(
+  [SM_T-34E_Hull_AddOnPanels]="0 5 6 11"
+  [SM_T-34E_Hull_Soviet_AddOnPanels]="0 5 6 11"
+)
+
 COMMANDS=()
 if [ -z "${ONLY:-}" ]; then
   COMMANDS+=("RTS.AddOnArmor.BuildDebrisSystem")
@@ -21,8 +36,14 @@ while IFS= read -r FILE; do
   if [ -n "${ONLY:-}" ] && [[ " $ONLY " != *" $NAME "* ]]; then
     continue
   fi
+  if [[ "$SHARED_DEBRIS" == *" $NAME "* ]]; then
+    continue
+  fi
   PACKAGE="/Game${FILE#"$CONTENT"}"
-  COMMANDS+=("RTS.AddOnArmor.ExtractPanelDebris Hull=${PACKAGE%.uasset}")
+  COMMANDS+=("RTS.AddOnArmor.ExtractPanelDebris Hull=${PACKAGE%.uasset} ${PANEL_ARGS[$NAME]:-}")
+  for OWN in ${OWN_PANELS[$NAME]:-}; do
+    COMMANDS+=("RTS.AddOnArmor.ExtractPanelDebris Hull=${PACKAGE%.uasset} Panel=$OWN -OwnPanel")
+  done
 done < <(find "$VEHICLES" -name "SM_*_AddOnPanels.uasset" | sort)
 COMMANDS+=("QUIT_EDITOR")
 

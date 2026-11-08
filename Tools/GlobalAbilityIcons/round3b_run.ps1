@@ -12,7 +12,7 @@ $Project = "D:\UE5Projects\RTS_Survival\RTS_Survival.uproject"
 $Script = (Join-Path $PSScriptRoot "round3b_headless.py").Replace([char]92, [char]47)
 $Arguments = @($Project, "-run=pythonscript", "-script=$Script", "-unattended", "-AllowCommandletRendering",
     "-RenderOffscreen", "-NoLiveCoding", "-DisablePlugins=Fab", "-abslog=$Log")
-$Process = Start-Process -FilePath $Engine -ArgumentList $Arguments -PassThru
+$Process = Start-Process -FilePath $Engine -ArgumentList $Arguments -WindowStyle Hidden -PassThru
 $Finished = $Process.WaitForExit(1800000)
 if (-not $Finished) { "TIMEOUT pid $($Process.Id)" }
 "EXIT $($Process.ExitCode)"
