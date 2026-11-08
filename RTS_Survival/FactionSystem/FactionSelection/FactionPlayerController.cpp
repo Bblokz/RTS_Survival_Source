@@ -14,6 +14,9 @@
 #include "RTS_Survival/FactionSystem/FactionSelection/W_FactionWorldGenerationSettings.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/W_UnitVariantSelectionMenu.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/CommanderSelection/W_CommanderSelectionMenu.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/AbilityPreview/AbilityPreviewDirector.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/AbilityPreview/W_AbilityPreviewOverlay.h"
+#include "EngineUtils.h"
 #include "RTS_Survival/GlobalAbilitySystem/RTSCommanders/RTSCommander.h"
 #include "RTS_Survival/CardSystem/PlayerProfile/PlayerProfileLoader/FRTS_Profile.h"
 #include "RTS_Survival/CardSystem/PlayerProfile/SavePlayerProfile/USavePlayerProfile.h"
@@ -24,6 +27,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutDataAsset.h"
 #include "RTS_Survival/GameUI/TrainingUI/TrainingLayout/TrainingLayoutSettings.h"
 #include "RTS_Survival/Interfaces/Commands.h"
+#include "RTS_Survival/Music/RTSMusicManager/RTSMusicManager.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
@@ -89,6 +93,7 @@ void AFactionPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	BeginPlay_InitMusic();
 	BeginPlay_InitFactionBanners();
 	InitFactionPopup();
 	InitPreviewReferences();
@@ -301,6 +306,7 @@ void AFactionPlayerController::HandleCommanderSelectionConfirmed(const ERTSComma
 void AFactionPlayerController::HandleCommanderSelectionBack()
 {
 	CloseCommanderSelection();
+	PlayMenuMusic(ERTSMusicType::MainTheme);
 	// The variant screen saved its choices on Confirm, so it reopens on them.
 	const TArray<FTrainingOption> FactionUnits = M_FactionUnitsForVariantSelection;
 	if (TryShowUnitVariantSelection(GetRTSGameInstance(), FactionUnits))
@@ -313,6 +319,136 @@ void AFactionPlayerController::HandleCommanderSelectionBack()
 		M_FactionSelectionMenu->ShowFaction(M_SelectedFaction);
 	}
 	InitInputModeForWidget(M_FactionSelectionMenu.Get());
+}
+
+namespace FactionPlayerControllerAbilityPreview
+{
+	// Centre of the preview desert in RTS_FactionSelection, used when the level has no placed director.
+	const FVector DefaultDirectorLocation(200000.f, 0.f, 0.f);
+	constexpr float CountdownUpdateSeconds = 0.2f;
+	constexpr int32 OverlayZOrder = 20;
+}
+
+AAbilityPreviewDirector* AFactionPlayerController::GetOrSpawnAbilityPreviewDirector()
+{
+	if (M_AbilityPreviewDirector.IsValid())
+	{
+		return M_AbilityPreviewDirector.Get();
+	}
+	UWorld* const World = GetWorld();
+	if (not IsValid(World))
+	{
+		return nullptr;
+	}
+	for (TActorIterator<AAbilityPreviewDirector> It(World); It; ++It)
+	{
+		M_AbilityPreviewDirector = *It;
+		return *It;
+	}
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AAbilityPreviewDirector* const Director = World->SpawnActor<AAbilityPreviewDirector>(
+		AAbilityPreviewDirector::StaticClass(), FactionPlayerControllerAbilityPreview::DefaultDirectorLocation,
+		FRotator::ZeroRotator, SpawnParameters);
+	M_AbilityPreviewDirector = Director;
+	return Director;
+}
+
+bool AFactionPlayerController::HandleAbilityPreviewRequested(const FCommanderSelectionAbilitySlot& AbilitySlot)
+{
+	if (bM_IsAbilityPreviewOpen || not GetIsValidCommanderSelectionMenu())
+	{
+		return false;
+	}
+	AAbilityPreviewDirector* const Director = GetOrSpawnAbilityPreviewDirector();
+	if (not IsValid(Director) || not Director->StartPreview(AbilitySlot.Ability))
+	{
+		return false;
+	}
+	bM_IsAbilityPreviewOpen = true;
+	Director->OnPreviewWantsToClose.BindUObject(this, &AFactionPlayerController::HandleAbilityPreviewBack);
+
+	// A hard cut; the hangar camera comes back on Back.
+	M_ViewTargetBeforeAbilityPreview = GetViewTarget();
+	SetViewTargetWithBlend(Director, 0.f);
+	if (IsValid(PlayerCameraManager))
+	{
+		PlayerCameraManager->SetGameCameraCutThisFrame();
+	}
+
+	M_CommanderSelectionMenu->SetVisibility(ESlateVisibility::Collapsed);
+	UW_AbilityPreviewOverlay* const Overlay = CreateWidget<UW_AbilityPreviewOverlay>(
+		this, UW_AbilityPreviewOverlay::StaticClass());
+	if (IsValid(Overlay))
+	{
+		Overlay->AddToViewport(FactionPlayerControllerAbilityPreview::OverlayZOrder);
+		Overlay->SetupOverlay(M_CommanderSelectionMenu->GetSelectionStyle(),
+		                      M_CommanderSelectionMenu->GetAbilityRichTextStyle(), AbilitySlot);
+		Overlay->OnBackRequested.BindUObject(this, &AFactionPlayerController::HandleAbilityPreviewBack);
+		M_AbilityPreviewOverlay = Overlay;
+		InitInputModeForWidget(Overlay);
+	}
+	if (UWorld* const World = GetWorld(); IsValid(World))
+	{
+		World->GetTimerManager().SetTimer(M_AbilityPreviewCountdownTimerHandle, this,
+		                                  &AFactionPlayerController::UpdateAbilityPreviewCountdown,
+		                                  FactionPlayerControllerAbilityPreview::CountdownUpdateSeconds, true);
+	}
+	PlayMenuMusic(ERTSMusicType::Combat);
+	return true;
+}
+
+void AFactionPlayerController::UpdateAbilityPreviewCountdown()
+{
+	if (not M_AbilityPreviewDirector.IsValid() || not M_AbilityPreviewOverlay.IsValid())
+	{
+		return;
+	}
+	const float SecondsLeft = M_AbilityPreviewDirector->GetAutoReturnSecondsLeft();
+	if (SecondsLeft >= 0.f)
+	{
+		M_AbilityPreviewOverlay->ShowAutoReturnCountdown(SecondsLeft);
+	}
+}
+
+void AFactionPlayerController::HandleAbilityPreviewBack()
+{
+	if (not bM_IsAbilityPreviewOpen)
+	{
+		return;
+	}
+	bM_IsAbilityPreviewOpen = false;
+	if (UWorld* const World = GetWorld(); IsValid(World))
+	{
+		World->GetTimerManager().ClearTimer(M_AbilityPreviewCountdownTimerHandle);
+	}
+	if (M_AbilityPreviewDirector.IsValid())
+	{
+		M_AbilityPreviewDirector->OnPreviewWantsToClose.Unbind();
+		M_AbilityPreviewDirector->StopPreview();
+	}
+	if (M_ViewTargetBeforeAbilityPreview.IsValid())
+	{
+		SetViewTargetWithBlend(M_ViewTargetBeforeAbilityPreview.Get(), 0.f);
+		if (IsValid(PlayerCameraManager))
+		{
+			PlayerCameraManager->SetGameCameraCutThisFrame();
+		}
+	}
+	M_ViewTargetBeforeAbilityPreview.Reset();
+	if (M_AbilityPreviewOverlay.IsValid())
+	{
+		M_AbilityPreviewOverlay->OnBackRequested.Unbind();
+		M_AbilityPreviewOverlay->RemoveFromParent();
+	}
+	M_AbilityPreviewOverlay.Reset();
+	if (M_CommanderSelectionMenu.IsValid())
+	{
+		M_CommanderSelectionMenu->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+		InitInputModeForWidget(M_CommanderSelectionMenu.Get());
+		// The commander screen's own music comes back (ShowCommanderSelection).
+		PlayMenuMusic(ERTSMusicType::TransportLoop);
+	}
 }
 
 void AFactionPlayerController::ShowCommanderSelection()
@@ -335,6 +471,7 @@ void AFactionPlayerController::ShowCommanderSelection()
 	M_CommanderSelectionMenu = CommanderSelectionMenu;
 	CommanderSelectionMenu->InitCommanderSelection(this, M_ConfirmedCommander);
 	InitInputModeForWidget(CommanderSelectionMenu);
+	PlayMenuMusic(ERTSMusicType::TransportLoop);
 }
 
 void AFactionPlayerController::CloseCommanderSelection()
@@ -559,7 +696,8 @@ void AFactionPlayerController::HandleWorldGenerationSettingsGenerated(const FCam
 
 void AFactionPlayerController::HandleAnnouncementFinished()
 {
-	if (not GetIsValidFactionSelectionMenu())
+	// The announcement can end after the player moved on to the variant or commander screen.
+	if (not M_FactionSelectionMenu.IsValid())
 	{
 		return;
 	}
@@ -690,6 +828,41 @@ void AFactionPlayerController::ShowFactionWorldGenerationSettings()
 
 	M_FactionWorldGenerationSettings->SetDifficultyText(M_SelectedGameDifficulty.DifficultyLevel);
 	InitInputModeForWidget(M_FactionWorldGenerationSettings.Get());
+}
+
+void AFactionPlayerController::BeginPlay_InitMusic()
+{
+	const URTSGameInstance* RTSGameInstance = GetRTSGameInstance();
+	if (RTSGameInstance == nullptr)
+	{
+		return;
+	}
+	URTSMusicManager* MusicManager = RTSGameInstance->GetMusicManager();
+	if (not IsValid(MusicManager))
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::BeginPlay_InitMusic - The game instance has no music manager.");
+		return;
+	}
+	MusicManager->SetupMusicManagerForNewWorld(this, ERTSMusicType::MainTheme);
+}
+
+void AFactionPlayerController::PlayMenuMusic(const ERTSMusicType MusicType) const
+{
+	const URTSGameInstance* RTSGameInstance = GetRTSGameInstance();
+	if (RTSGameInstance == nullptr)
+	{
+		return;
+	}
+	URTSMusicManager* MusicManager = RTSGameInstance->GetMusicManager();
+	if (not IsValid(MusicManager))
+	{
+		RTSFunctionLibrary::ReportError(
+			"AFactionPlayerController::PlayMenuMusic - The game instance has no music manager.");
+		return;
+	}
+	constexpr bool bFadeOutCurrentTrack = true;
+	MusicManager->PlayNewMusicTracks(MusicType, bFadeOutCurrentTrack);
 }
 
 URTSGameInstance* AFactionPlayerController::GetRTSGameInstance() const

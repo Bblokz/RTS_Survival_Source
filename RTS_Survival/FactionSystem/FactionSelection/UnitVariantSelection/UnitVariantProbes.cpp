@@ -3,9 +3,14 @@
 #include "UnitVariantProbes.h"
 
 #include "Components/PrimitiveComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelLayout.h"
+#include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelsComponent.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/UnitSpawning/RTSUnitOwnerSpawning.h"
@@ -116,7 +121,68 @@ FUnitVariantProbeResult UUnitVariantProbes::ReadProbe(const AActor& Probe)
 			AddWeapon(Result.Weapons, *Weapon);
 		}
 	}
+	ReadAddOnArmor(Probe, Result);
 	return Result;
+}
+
+void UUnitVariantProbes::ReadAddOnArmor(const AActor& Probe, FUnitVariantProbeResult& Result)
+{
+	if (Probe.FindComponentByClass<UAddOnArmorPanelsComponent>() == nullptr)
+	{
+		return;
+	}
+	const UArmorCalculation* const ArmorCalculation = Probe.FindComponentByClass<UArmorCalculation>();
+	if (not IsValid(ArmorCalculation))
+	{
+		return;
+	}
+	// The zones wrote their add-on armour onto the covered plates when they installed (a tick after BeginPlay, well
+	// inside the settle time), so the plates say what the panels add, per variant, without reading the zone settings.
+	const FArmorSetup Setup = ArmorCalculation->GetArmorSetup();
+	const auto ReadPlates = [&Result](const FArmorSettings* const Plates, const int32 PlateCount)
+	{
+		for (int32 PlateIndex = 0; PlateIndex < FMath::Min(PlateCount, MaxArmorPlatesPerMesh); ++PlateIndex)
+		{
+			const float AddOnMm = Plates[PlateIndex].AddOnArmorValue;
+			if (AddOnMm <= 0.f)
+			{
+				continue;
+			}
+			Result.MinAddOnArmorMm = Result.MaxAddOnArmorMm > 0.f ? FMath::Min(Result.MinAddOnArmorMm, AddOnMm) : AddOnMm;
+			Result.MaxAddOnArmorMm = FMath::Max(Result.MaxAddOnArmorMm, AddOnMm);
+			switch (Global_GetDamageTypeFromPlate(Plates[PlateIndex].ArmorType))
+			{
+			case EArmorPlateDamageType::DamageFront:
+				Result.bAddOnArmorCoversFront = true;
+				break;
+			case EArmorPlateDamageType::DamageSides:
+				Result.bAddOnArmorCoversSides = true;
+				break;
+			case EArmorPlateDamageType::DamageRear:
+				Result.bAddOnArmorCoversRear = true;
+				break;
+			}
+		}
+	};
+	ReadPlates(Setup.ArmorSettings0, Setup.NumArmorPlates0);
+	ReadPlates(Setup.ArmorSettings1, Setup.NumArmorPlates1);
+	ReadPlates(Setup.ArmorSettings2, Setup.NumArmorPlates2);
+	if (not Result.GetHasAddOnArmor())
+	{
+		return;
+	}
+	TInlineComponentArray<UStaticMeshComponent*> MeshComponents(&Probe);
+	for (const UStaticMeshComponent* const MeshComponent : MeshComponents)
+	{
+		// GetAssetUserData is not const in UE 5.5.
+		UStaticMesh* const Mesh = IsValid(MeshComponent) ? MeshComponent->GetStaticMesh() : nullptr;
+		if (const UAddOnArmorPanelLayout* const Layout = IsValid(Mesh)
+			                                                 ? Mesh->GetAssetUserData<UAddOnArmorPanelLayout>()
+			                                                 : nullptr)
+		{
+			Result.AddOnArmorPanelCount += Layout->GetPanels().Num();
+		}
+	}
 }
 
 TArray<UWeaponState*> UUnitVariantProbes::GetProbeWeapons(const AActor& Probe)

@@ -10,6 +10,7 @@
 #include "RTS_Survival/GameUI/TrainingUI/TrainingOptions/TrainingOptions.h"
 #include "FactionPlayerController.generated.h"
 
+class AAbilityPreviewDirector;
 class AFactionBanner;
 class AFactionUnitPreview;
 class ARTSAsyncSpawner;
@@ -24,10 +25,13 @@ class UW_FactionPopup;
 class UW_FactionSelectionMenu;
 class UW_FactionWorldGenerationSettings;
 class UW_UnitVariantSelectionMenu;
+class UW_AbilityPreviewOverlay;
 class UW_CommanderSelectionMenu;
+struct FCommanderSelectionAbilitySlot;
 class UUnitVariantDataAsset;
 enum class ERTSCommander : uint8;
 enum class ERTSFaction : uint8;
+enum class ERTSMusicType : uint8;
 enum class EUnitVariant : uint8;
 
 UENUM()
@@ -138,6 +142,25 @@ public:
 
 	void HandleCommanderSelectionBack();
 
+	/**
+	 * @brief A kit row on the commander screen was clicked: cuts to the preview desert, hides the commander screen
+	 * behind the preview overlay, plays combat music and lets AAbilityPreviewDirector execute the ability there.
+	 * @param AbilitySlot The clicked slot of the shown commander's kit.
+	 * @return False when the ability has no template or no director could be found or spawned.
+	 */
+	bool HandleAbilityPreviewRequested(const FCommanderSelectionAbilitySlot& AbilitySlot);
+
+	/** Back on the preview overlay, or the preview's own auto return: back to the hangar and the commander screen. */
+	void HandleAbilityPreviewBack();
+
+	UFUNCTION(BlueprintPure, Category = "Faction Selection")
+	bool GetIsAbilityPreviewOpen() const { return bM_IsAbilityPreviewOpen; }
+
+	AAbilityPreviewDirector* GetAbilityPreviewDirector() const { return M_AbilityPreviewDirector.Get(); }
+
+	/** The level's async spawner the hangar uses; FRTS_Statics::GetAsyncSpawner falls back on it in the hangar. */
+	ARTSAsyncSpawner* GetRTSAsyncSpawner() const { return M_RTSAsyncSpawner.Get(); }
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Faction Selection")
 	TSubclassOf<UW_FactionPopup> M_FactionPopupClass;
@@ -190,6 +213,23 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<UW_CommanderSelectionMenu> M_CommanderSelectionMenu;
+
+	// Placed on the preview desert of RTS_FactionSelection; spawned at the default spot when the level has none.
+	UPROPERTY()
+	TWeakObjectPtr<AAbilityPreviewDirector> M_AbilityPreviewDirector;
+
+	UPROPERTY()
+	TWeakObjectPtr<UW_AbilityPreviewOverlay> M_AbilityPreviewOverlay;
+
+	// The hangar camera the preview cut away from.
+	UPROPERTY()
+	TWeakObjectPtr<AActor> M_ViewTargetBeforeAbilityPreview;
+
+	bool bM_IsAbilityPreviewOpen = false;
+	FTimerHandle M_AbilityPreviewCountdownTimerHandle;
+
+	AAbilityPreviewDirector* GetOrSpawnAbilityPreviewDirector();
+	void UpdateAbilityPreviewCountdown();
 
 	// The faction's units the variant selection was opened with; Back on the commander screen reopens it with them.
 	TArray<FTrainingOption> M_FactionUnitsForVariantSelection;
@@ -262,6 +302,10 @@ private:
 	void ShowCommanderSelection();
 	void CloseCommanderSelection();
 	void BeginPlay_InitFactionBanners();
+	// No other actor in the faction level starts music; the previous level's audio component died with its world.
+	void BeginPlay_InitMusic();
+	/** @brief Switches the menu music; the faction and variant screens use the main theme, the commander screen the transport loop. */
+	void PlayMenuMusic(const ERTSMusicType MusicType) const;
 	void InitPreviewReferences();
 	void NotifyFactionBannersOfFactionChange();
 	void InitInputModeForWidget(UUserWidget* WidgetToFocus);

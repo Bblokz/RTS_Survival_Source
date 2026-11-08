@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "CommanderSelectionData.h"
+#include "RTS_Survival/FactionSystem/FactionSelection/MenuLayout/MenuDesignFrame.h"
 #include "RTS_Survival/FactionSystem/FactionSelection/UnitVariantSelection/UnitVariantSelectionStyle.h"
 
 #include "W_CommanderSelectionMenu.generated.h"
@@ -61,9 +62,23 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Commander Selection")
 	int32 GetCommanderCount() const { return M_Commanders.Num(); }
 
+	/** A kit row was clicked: opens the ability preview for that slot of the shown commander. */
+	void HandleAbilityRowClicked(const int32 SlotIndex);
+
+	/** Same as clicking the kit row; false when the slot has no previewable ability. */
+	UFUNCTION(BlueprintCallable, Category = "Commander Selection")
+	bool PreviewAbilitySlot(const int32 SlotIndex);
+
+	/** The kit row of the shown commander for that slot; null when there is none. */
+	UW_CommanderAbilityRow* GetAbilityRow(const int32 SlotIndex) const;
+
+	const FUnitVariantSelectionStyle& GetSelectionStyle() const { return M_Style; }
+	UDataTable* GetAbilityRichTextStyle() const { return M_RichTextStyle; }
+
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeDestruct() override;
+	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 	// Up/Down pick the commander, Enter or Space confirms, Escape goes back; the gamepad d-pad, A, Start and B too.
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
@@ -74,6 +89,10 @@ protected:
 private:
 	UPROPERTY()
 	TWeakObjectPtr<AFactionPlayerController> M_FactionPlayerController;
+
+	// Holds the 1920x1080 layout; on screens narrower than 16:9 it fits the width and the columns centre vertically.
+	UPROPERTY()
+	FMenuDesignFrame M_DesignFrame;
 
 	// Keeps the ability templates, and so the icons the ability rows show, loaded.
 	UPROPERTY()
