@@ -22,12 +22,15 @@ Every commander has exactly seven abilities (`RTSCommanderConstants::AbilitySlot
 The slot tiers live in `RTSCommanderConstants::SlotMinTiers` / `SlotMaxTiers`; the area test checks every kit against
 them. The tier itself lives on the ability template (`UGlobalAbility::M_AbilityTier`, `EGlobalAbilityTier`), so an
 ability has the same tier in every kit. Each mission sets the highest tier the player may use on its mission manager
-(`AMissionManager::MaxPlayerGlobalAbilityTier`, default Tier IV). This is set per mission and is **independent of
+(`AMissionManager::PlayerGlobalAbilitySettings.MaxAllowedTier`, struct `FMissionPlayerGlobalAbilitySettings`, default
+Tier IV). The same struct has `bDisableResourceCosts`: the player's abilities then cost no resources (cooldowns still
+apply, the tooltip shows no cost). This is set per mission and is **independent of
 the campaign's `EMissionTier`**, so two early missions can open different parts of a kit. Without a mission manager
 (skirmish, survival) the whole kit is available.
 
-Tier-capped abilities stay in the panel, greyed out, with the hover text "Not available in this operation". The
-player ability manager treats the cap as an unmet requirement (`UGlobalAbilitiesManager::QueryTierAllowedForAbility`).
+Abilities above the cap are hidden: the player ability manager does not load them (`LoadGlobalAbilities`), so the
+side panel collapses their slots and nothing can execute them (2026-11-07; before that they were greyed out).
+`QueryTierAllowedForAbility` stays as a safety net.
 Enemy managers ignore the cap, and abilities fired by mission scripts (`AMissionManager::ExecuteGlobalAbility`) skip
 the requirement checks, so the cap never blocks them.
 
@@ -297,7 +300,7 @@ Notes:
 ## Status (2026-11-05)
 
 Done in C++:
-- `EGlobalAbilityTier`, `UGlobalAbility::M_AbilityTier`, `AMissionManager::MaxPlayerGlobalAbilityTier`, the cap in
+- `EGlobalAbilityTier`, `UGlobalAbility::M_AbilityTier`, `AMissionManager::PlayerGlobalAbilitySettings`, the cap in
   `UGlobalAbilitiesManager`, set by `ACPPController::SetupGlobalAbilityManager`.
 - Twelve commanders in `ERTSCommander` (Sky-Drop Quartermaster appended 2026-11-05), seven slots with their tier
   ranges in `RTSCommanderConstants`, twelve kits in `DefaultGame.ini`.
@@ -319,8 +322,10 @@ with `verify_commander_abilities.py`):
 
 Still to do:
 - The pending items above.
-- Building requirements on the templates (which building per ability, valid for every German faction).
-- Set `MaxPlayerGlobalAbilityTier` on the other missions' managers (done for the first two, see "Round 5 fixes").
+- Building requirements on the templates (which building per ability, valid for every German faction). For now
+  (2026-11-07) no template has a technology or unit/building requirement.
+- Set `PlayerGlobalAbilitySettings` on the other missions' managers. Done: Ger_FirstMission Tier I + free costs,
+  Ger_MarderStugMission Tier II with costs (`Tools/Round5Fixes/set_mission_tier_caps.py`, one editor run per map).
 - Uses-per-mission for Tier IV drops.
 
 ## Round 5 fixes (2026-11-05)

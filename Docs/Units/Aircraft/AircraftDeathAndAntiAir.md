@@ -77,16 +77,35 @@ carrying, and hands over to `UAircraftDeathComponent` (created on every aircraft
   its nose engine; a multi-engine aircraft (Me 410, Pe-2, Pe-8, Ju 390) burns at one of its wing engines, chosen per
   aircraft (`FAircraftDeathMath::PickWingEngineIndex`, never the centre engine). The flame streams back from the
   engine (attached to the mesh at the engine, not to the spinning propeller bone), and dark smoke puffs are dropped into
-  the world every `SmokeTrailSpacing` of the fall so they form a trail. `FireSocketOverride` / `FireOrigin` on the
-  component override the choice per Blueprint.
+  the world every `SmokeTrailSpacing` of the fall so they form a trail. `NS_SmokePuff4a` loops forever, so every puff is
+  switched off 0.15 s after its burst (`SpawnSmokePuff`); before that each puff kept re-puffing where the wreck had been,
+  long after the crash. At the impact every effect on the aircraft actor (engine fire, Blueprint exhausts) is
+  deactivated too. `FireSocketOverride` / `FireOrigin` on the component override the choice per Blueprint.
 - **Fall.** `FAircraftDeathMath::StepCrashFlight`: the wreck keeps the speed it had (at least `MinCrashSpeed`), the nose
   drops into a dive of at most `MaxDiveDegrees`, gravity and drag act on it. A burning wing drops: the wreck rolls over
   towards it and turns into a spiral; a nose fire only rocks it.
-- **Impact.** A trace from the belly finds the ground (or any static object). An explosion, the impact sound, burning
-  fuel on the ground, and the wreck: `AAircraftWreckActor` with the aircraft's crash geometry collection, crumbled into
-  all its pieces at once, keeping part of the impact velocity (forward along the flight) and blown apart. Pieces land on
-  the ground and pass through units; they shrink away once asleep and the wreck goes after `WreckLifeSeconds`. The
-  aircraft actor is hidden and goes after its smoke has faded (8 s).
+- **Carried wreck.** At the hit the aircraft's meshes are hidden and its crash collection takes their place
+  (`AAircraftWreckActor::StartCarried`): the collection is kinematic, crumbled into its pieces, and the actor is moved
+  with the aircraft every tick (the death component ticks in `TG_PrePhysics`, so the pieces stay under the engine fire).
+  A held piece moves with the actor; `ReleasePiece` un-anchors it (`SetAnchoredByIndex(false)` makes a kinematic piece
+  dynamic) and it falls on with the speed its kinematic motion gave it, plus a kick. Loose pieces have
+  `PieceLinearDamping` air drag, so they fall behind.
+- **Breaking up in the air** (`bBreakUpInTheAir`). `AirBreakupDelaySeconds` after the hit the first part tears off with
+  a small blast (`AirBreakupExplosion`): a burning wing loses its outer panel beyond the engine; a nose-fire aircraft
+  loses its tail (60 %) or a wing tip. `AirBreakupPieceShare` of the pieces go, at least two; a second, smaller tear
+  follows `AirSecondBreakupDelaySeconds` later. The first torn part trails smoke while it tumbles.
+- **Impact.** Traces from the belly and from the nose (the nose leads in a dive) find the ground or any static object;
+  `EAircraftDeathPhase::Impacted` is set at that first contact. The hull then ploughs on for `ImpactBreakupSeconds`
+  (longer for bigger aircraft): it skids along the ground with `ImpactSkidSpeedShare` of its horizontal speed, pivots on
+  the nose as the tail slams down, and lets go of its pieces from the nose back, or as soon as a piece meets the
+  ground. The blasts are spread over that time: dirt thrown up where the nose hit (`GroundBurst`), the main blast over
+  the hull (`ImpactExplosion`, +0.08 s), the fuel fireball (`FuelFireball`, +0.2 s), one to three smaller blasts among
+  the pieces (`SecondaryExplosion`, 0.45-1.4 s, more for bombers), fires on two to four pieces after 2 s
+  (`BurningDebris`) and the burning fuel where the hull came to rest (`GroundFire`). The wreck's fires die down after
+  `WreckFireSeconds` (10 s), before its pieces shrink away (8-14 s asleep); the wreck goes after `WreckLifeSeconds`.
+  Pieces land on the ground and pass through units. The aircraft actor is hidden and goes after 8 s. Without a crash
+  collection the aircraft falls whole and explodes the old way: everything at once, `PieceVelocityRetained` of the
+  impact velocity, blown apart with `PieceScatterSpeed`.
 - **Parked.** An aircraft killed while landed on the ground (in its bay or on a field) collapses where it stands:
   its pieces get a fifth of the scatter, so they stay within about its own size and do not fly through bay walls.
   The airbase building has query-only collision: its walls do not stop pieces, only the low scatter keeps them in
@@ -102,7 +121,9 @@ Effects scale with the aircraft's span (`FighterHalfSpan` 700 cm, up to x2); smo
 so a bomber's trail does not hide the bomber. Every effect is an `FAircraftDeathEffect` (system, user parameters,
 scale) in `FAircraftDeathSettings`, editable per aircraft Blueprint on the `AircraftDeath` component. Defaults:
 engine fire `NS_Jet_Fire_Continuous`, smoke `NS_SmokePuff4a` (x0.6), explosion `NS_RTS_Explosion_Big_9`, ground fire
-`NS_LargeTank_OnFire`. They are listed in `CrashCollections/DA_AircraftDeathCookReferences` so the cook packs them
+`NS_LargeTank_OnFire`, air breakup `NS_RTS_Explosion_Medium_1` (x0.45), ground burst `NS_Explosion_Sand_6` (x0.8), fuel
+fireball `N_RTS_Explosion_Fuel_01` (x1.1), secondary blasts `NS_RTS_Explosion_Medium_3` (x0.55), burning debris
+`NFire_debris_00` (x0.5). They are listed in `CrashCollections/DA_AircraftDeathCookReferences` so the cook packs them
 (C++ names them by path only). The tank fire, rocket smoke and smoking-unit systems were tried and dropped: from the
 RTS camera they filled the screen with embers or haze, and their user parameters barely change that.
 

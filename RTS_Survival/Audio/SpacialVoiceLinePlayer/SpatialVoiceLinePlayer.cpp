@@ -70,6 +70,11 @@ bool USpatialVoiceLinePlayer::EnsureControllerIsValid() const
 {
 	if (!M_PlayerController.IsValid())
 	{
+		// The pre-game hangar's ability previews fly player 1 aircraft without an RTS controller: no voice lines there.
+		if (FRTS_Statics::GetIsInPreGameHangar(this))
+		{
+			return false;
+		}
 		RTSFunctionLibrary::ReportError(
 			TEXT("No valid controller found for spatial voice line player; ")
 			TEXT("component likely on a non-owned unit."));
