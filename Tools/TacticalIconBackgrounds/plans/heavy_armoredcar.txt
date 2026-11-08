@@ -1,0 +1,27 @@
+# German HeavyTanks + ArmoredCar unit textures (2026-11-07). Portraits are the NoIcon twin of each texture's import
+# source (AssetImportData), verified pixel-identical above the glyph band. Left = chassis class, right = role.
+# HeavyTanks
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_TigerII=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_KingTiger.png|T_HeavyTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Tiger105=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_KingTiger105.png|T_HeavyTankClass_Icon_V2|-
+# Panther_G texture is imported from the PantherD render (no separate PantherD texture exists); kept as is.
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Panther_G=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_PantherD.png|T_HeavyTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_PantherII=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_PantherII.png|T_HeavyTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Tiger1=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_Tiger_E.png|T_HeavyTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_TigerH1=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_TigerH1.png|T_HeavyTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Tiger1_Rail=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_Tiger1_Rail.png|T_HeavyTankClass_Icon_V2|T_RailgunClass_Icon_V2
+# Old glyph was a special star; Panther chassis, Radixite laser turret that punishes heavy armour.
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_PanzerV_III=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_PanzerV_III.png|T_HeavyTankClass_Icon_V2|T_LaserClass_Icon
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Jagdpanther=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_Jagdpanther.png|T_TankDestroyerClass_Icon|T_RocketWeaponClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_SturmTiger=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_SturmTiger.png|T_ArtilleryClass_Icon_V3|T_RocketWeaponClass_Icon_V2
+# Super-heavies (old glyph already had three peaks).
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_E100=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_E100.png|T_SuperHeavyTankClass_Icon|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/HeavyTanks/T_Ger_HeavyTank_Maus=D:/UE_Assets/Icons/TrainingUI/GerTanks/Heavy/NoIcon/T_Ger_HeavyTank_Maus.png|T_SuperHeavyTankClass_Icon|-
+# ArmoredCar
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Puma=D:/UE_Assets/Icons/TrainingUI/GerTanks/ArmoredCars/NoIcon/T_Ger_ArmoredCar_Puma.png|T_ArmoredCar_Icon|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz_231=D:/UE_Assets/Icons/TrainingUI/GerTanks/ArmoredCars/NoIcon/T_Ger_ArmoredCar_Sdkfz_231.png|T_ArmoredCar_Icon|T_AutoCannon_Class_V2
+# Sdkfz 250: garrisons one squad (old glyph: up arrows).
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz250=D:/UE_Assets/Icons/TrainingUI/GerTanks/ArmoredCars/NoIcon/T_Ger_ArmoredCar_Sdkfz250.png|T_ArmoredCar_Icon|T_CargoGarrisionClass_Icon
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz234_3=D:/UE_Assets/Icons/TrainingUI/GerTanks/ArmoredCars/NoIcon/T_Ger_ArmoredCar_Sdkfz234_3.png|T_ArtilleryClass_Icon_V3|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz251_75mm=D:/UE_Assets/Icons/TrainingUI/GerTanks/ArmoredCars/NoIcon/T_Ger_ArmoredCar_Sdkfz251_75mm.png|T_TankDestroyerClass_Icon|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz251_Mortar=D:/UE_Assets/Icons/TrainingUI/GerTanks/ArmoredCars/NoIcon/T_Ger_ArmoredCar_Sdkfz251_Mortar.png|T_ArtilleryClass_Icon_V3|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/ArmoredCar/T_Ger_ArmoredCar_Sdkfz7_Flakvierling=D:/UE_Assets/Icons/TrainingUI/GerTanks/ArmoredCars/NoIcon/T_Ger_ArmoredCar_Sdkfz7_Flakvierling.png|T_ArmoredCar_Icon|T_AntiAirClass_Icon_V3_NoStar

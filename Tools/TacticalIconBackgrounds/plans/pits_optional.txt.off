@@ -1,0 +1,10 @@
+﻿# Gun pits (building-expansion option renders, 512 px, never had neon glyphs). Held back from the first pass;
+# rename to .txt to engrave + import them (they would come out at 256 px).
+/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/UI/T_BxpOption_GerPit_Flak37=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Icons/T_BxpOption_GerPit_Flak37.png|-|T_AntiAirClass_Icon_V3_NoStar
+/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/UI/T_BxpOption_GerPit_Flak88=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Icons/T_BxpOption_GerPit_Flak88.png|T_TankDestroyerClass_Icon|T_AntiAirClass_Icon_V3_NoStar
+/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/UI/T_BxpOption_GerPit_LeFH18=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Icons/T_BxpOption_GerPit_LeFH18.png|-|T_ArtilleryClass_Icon_V3
+/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/UI/T_BxpOption_GerPit_Pak40=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Icons/T_BxpOption_GerPit_Pak40.png|-|T_TankDestroyerClass_Icon
+/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/UI/T_BxpOption_GerPit_Panzerschreck=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Icons/T_BxpOption_GerPit_Panzerschreck.png|-|T_ATInfantryClass_Icon_V2
+/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/UI/T_BxpOption_GerPit_Puppchen=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Icons/T_BxpOption_GerPit_Puppchen.png|-|T_ATInfantryClass_Icon_V2
+/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/UI/T_BxpOption_GerPit_SFH18=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Icons/T_BxpOption_GerPit_SFH18.png|-|T_ArtilleryClass_Icon_V3
+/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerPits/UI/T_BxpOption_GerRailPakBunker=D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerDefenses/Exports/Icons/T_BxpOption_GerRailPakBunker.png|-|T_RailgunClass_Icon_V2

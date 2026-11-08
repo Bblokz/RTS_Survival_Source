@@ -1,0 +1,43 @@
+﻿# Placard plan: German infantry squads, team weapons, aircraft and gun pits.
+# Portraits: each clean (NoIcon) version matches the iconed import source of the in-game texture exactly in the top 150
+# rows (import MD5s checked against the source files). Horten 229 has no clean render -> inpaint.
+
+# --- Squads (role right, left '-') ---
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_ResistanceInfantry_Icon=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/Thumb_Portrait_ResistanceInfantry_Portrait.PNG|-|T_MGClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_CortexCommander=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_SturmKommando.PNG|-|T_CommandoClass_Icon_V3
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_EliteScavengers=D:/UE5Projects/RTS_Survival/Saved/TrainingIcons/icons/T_Ger_Squad_EliteScavengers_NoIcon.png|-|T_ATInfantryClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_FLamm=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_FlameTrooper.PNG|-|T_FlameClass_Icon
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_FelsKrieger=D:/UE5Projects/RTS_Survival/Saved/TrainingIcons/icons/T_Ger_Squad_FelsKrieger_NoIcon.png|-|T_CommandoClass_Icon_V3
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_FemaleSniper=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_FemaleSniper.PNG|-|T_SniperClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_HazmatSnipers=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_HazmatSniper.png|-|T_SniperClass_Icon_V2
+# HellBringers = LightBringers squad, old star glyph; they carry Ger_Weapon_LaserB14 -> laser.
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_HellBringers=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_LightBringer.PNG|-|T_LaserClass_Icon
+# Jager shares the ResistanceInfantry picture (bullets glyph); Kar98 riflemen.
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_Jager=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/Thumb_Portrait_ResistanceInfantry_Portrait.PNG|-|T_MGClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_PanzerGrenadiers=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_PanzerGrenadier.png|-|T_ATInfantryClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_RailTroopers=D:/UE5Projects/RTS_Survival/Saved/TrainingIcons/icons/T_Ger_Squad_RailTroopers_NoIcon.png|-|T_RailgunClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_RedSpine=D:/UE5Projects/RTS_Survival/Saved/TrainingIcons/icons/T_Ger_Squad_RedSpine_NoIcon.png|-|T_MGClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_Scavengers=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_Scavengers.PNG|-|T_EngineerClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_SturmPioneers=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_SturmPioneer.PNG|-|T_EngineerClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_Squad_VultureHazmats=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_Vulture_NoIcon.PNG|-|T_AssaultClass_Icon_V3
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Squad_Ger_Faust=D:/UE_Assets/Icons/TrainingUI/GerSquads/NoIcon/T_Ger_Portrait_PanzerFaust.PNG|-|T_ATInfantryClass_Icon_V2
+
+# --- Team weapons ---
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_Flak88=D:/UE_Assets/Icons/TrainingUI/GerTeamWeapons/NoIcon/T_Ger_TeamWeapon_Flak88.png|T_TankDestroyerClass_Icon|T_AntiAirClass_Icon_V3_NoStar
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_LeFH18=D:/UE_Assets/Icons/TrainingUI/GerTeamWeapons/NoIcon/T_Ger_TeamWeapon_LeFH18.png|-|T_ArtilleryClass_Icon_V3
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_Morser210=D:/UE_Assets/Icons/TrainingUI/GerTeamWeapons/NoIcon/T_Ger_TeamWeapon_Morser210.png|-|T_ArtilleryClass_Icon_V3
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_Pak38=D:/UE_Assets/Icons/TrainingUI/GerTeamWeapons/NoIcon/T_Ger_TeamWeapon_Pak38.png|-|T_TankDestroyerClass_Icon
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Squads/T_Ger_TeamWeapon_Pak40=D:/UE_Assets/Icons/TrainingUI/GerTeamWeapons/NoIcon/T_Ger_TeamWeapon_Pak40.png|-|T_TankDestroyerClass_Icon
+
+# --- Aircraft (class left) ---
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Aircraft/T_Ger_Aircraft_Bf109=D:/UE_Assets/Icons/TrainingUI/Aircraft/NoIcon/T_Ger_Aircraft_Bf109.png|T_CASAircraftClass_Icon_V3_Clean|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Aircraft/T_Ger_Aircraft_Horten229=inpaint:D:/UE_Assets/Icons/TrainingUI/Aircraft/T_Ger_Aircraft_Horten229.png|T_CASAircraftClass_Icon_V3_Clean|-
+# Ju 87 BP has a BombComponent (old glyph was a bomb): CAS class + bomb role.
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Aircraft/T_Ger_Aircraft_Ju87=D:/UE_Assets/Icons/TrainingUI/Aircraft/NoIcon/T_Ger_Aircraft_Ju87.png|T_CASAircraftClass_Icon_V3_Clean|T_BombAircraftClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/Aircraft/T_Ger_Aircraft_Me410=D:/UE_Assets/Icons/TrainingUI/Aircraft/NoIcon/T_Ger_Aircraft_Me410.png|T_BombAircraftClass_Icon_V2|-
+
+# --- Gun pits: field-defence option pictures (DT_TrainingOptions / DT_Items). Grey Blender renders, 512x512, never had a
+# neon glyph; the portrait is the import source itself. Portrait-style renders D:/UE_Assets/Icons/TrainingUI/GermanPits/
+# T_Ger_Pit_<X>.png exist for Flak37/LeFH18/Pak40/SFH18 (+CapturedB4) but are not imported anywhere; swapping to them
+# would change the artwork. No texture exists for the Mortar pit or a CapturedB4 pit.
+# Rail Pak bunker shares the GerPits UI folder.
