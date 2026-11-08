@@ -87,6 +87,28 @@ void UGlobalAbilitiesManager::SetupSpawnSettings(const FVector& PlayerStart,
 		M_SpawnSetings.Fow_ManagerPosition + DirectionToPlayerStart * M_SpawnSetings.MapExtent;
 }
 
+void UGlobalAbilitiesManager::SetupForAbilityPreview(const FVector& PreviewCentre,
+                                                     const FVector& AircraftApproachDirection,
+                                                     const float PreviewExtent, const float AircraftHeight,
+                                                     const float SpawnLineHalfLength)
+{
+	bM_IsAbilityPreviewManager = true;
+	M_PreviewSpawnLineHalfLength = FMath::Max(SpawnLineHalfLength, 0.f);
+	M_OwningPlayer = 1;
+	FVector ApproachDirection = AircraftApproachDirection.GetSafeNormal2D();
+	if (ApproachDirection.IsNearlyZero())
+	{
+		ApproachDirection = FVector::ForwardVector;
+	}
+	// The same frame SetupSpawnSettings builds from the fog manager: the "map centre" is the preview centre and the
+	// "player start" lies towards the approach edge, so the aircraft edge line sits PreviewExtent out that way.
+	M_SpawnSetings.Fow_ManagerPosition = PreviewCentre;
+	M_SpawnSetings.PlayerStartLocation = PreviewCentre + ApproachDirection * PreviewExtent;
+	M_SpawnSetings.MapExtent = PreviewExtent;
+	M_SpawnSetings.AircratHeightStart = AircraftHeight;
+	M_SpawnSetings.AircraftStartLocation = PreviewCentre + ApproachDirection * PreviewExtent;
+}
+
 bool UGlobalAbilitiesManager::TryGenerateLocationOnAircraftEdgeLine(
 	const FVector& AircraftEdgeCenterLocation,
 	const FVector& FowManagerPosition,
@@ -138,9 +160,24 @@ void UGlobalAbilitiesManager::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
-void UGlobalAbilitiesManager::SetMaxAllowedAbilityTier(const EGlobalAbilityTier MaxAllowedTier)
+void UGlobalAbilitiesManager::SetPlayerMissionSettings(const FMissionPlayerGlobalAbilitySettings& MissionSettings)
 {
-	M_MaxAllowedAbilityTier = MaxAllowedTier;
+	M_PlayerMissionSettings = MissionSettings;
+}
+
+bool UGlobalAbilitiesManager::GetAreResourceCostsDisabled() const
+{
+	return IsPlayerAbilityManager() && M_PlayerMissionSettings.bDisableResourceCosts;
+}
+
+bool UGlobalAbilitiesManager::GetIsAbilityTierHiddenForPlayer(const UGlobalAbility* AbilityTemplate) const
+{
+	if (not IsPlayerAbilityManager() || not IsValid(AbilityTemplate))
+	{
+		return false;
+	}
+	return static_cast<uint8>(AbilityTemplate->GetAbilityTier())
+		> static_cast<uint8>(M_PlayerMissionSettings.MaxAllowedTier);
 }
 
 bool UGlobalAbilitiesManager::QueryRequirementForAbility(const UGlobalAbility* Ability) const
@@ -149,6 +186,13 @@ bool UGlobalAbilitiesManager::QueryRequirementForAbility(const UGlobalAbility* A
 	{
 		return false;
 	}
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// Ability test target: no tier cap, technology or required unit blocks the player.
+	if (IsPlayerAbilityManager())
+	{
+		return true;
+	}
+#endif
 
 	return QueryTierAllowedForAbility(Ability) && QueryTechnologyRequirementForAbility(Ability)
 		&& QueryUnitRequirementForAbility(Ability);
@@ -165,7 +209,7 @@ bool UGlobalAbilitiesManager::QueryTierAllowedForAbility(const UGlobalAbility* A
 		return true;
 	}
 
-	return static_cast<uint8>(Ability->GetAbilityTier()) <= static_cast<uint8>(M_MaxAllowedAbilityTier);
+	return static_cast<uint8>(Ability->GetAbilityTier()) <= static_cast<uint8>(M_PlayerMissionSettings.MaxAllowedTier);
 }
 
 bool UGlobalAbilitiesManager::QueryUnitRequirementForAbility(const UGlobalAbility* Ability) const
@@ -245,7 +289,14 @@ bool UGlobalAbilitiesManager::QueryCostsForAbility(const UGlobalAbility* Ability
 	{
 		return true;
 	}
-
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// Ability test target: the player's abilities are free (TryPayForAbility takes nothing).
+	return true;
+#else
+	if (GetAreResourceCostsDisabled())
+	{
+		return true;
+	}
 	if (not EnsureIsValidPlayerResourceManager())
 	{
 		return false;
@@ -253,6 +304,7 @@ bool UGlobalAbilitiesManager::QueryCostsForAbility(const UGlobalAbility* Ability
 
 	const EPlayerError Error = M_PlayerResourceManager.Get()->GetCanPayForCost(Ability->M_AbilityCosts.Costs.ResourceCosts);
 	return Error == EPlayerError::Error_None;
+#endif
 }
 
 bool UGlobalAbilitiesManager::QueryCooldownForAbility(const UGlobalAbility* Ability) const
@@ -291,6 +343,11 @@ void UGlobalAbilitiesManager::OnClickedAbilityButton(UGlobalAbility* ClickedAbil
 }
 
 
+float UGlobalAbilitiesManager::GetAircraftSpawnLineHalfLength() const
+{
+	return bM_IsAbilityPreviewManager ? M_PreviewSpawnLineHalfLength : M_SpawnSetings.MapExtent / 2;
+}
+
 FVector UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation(const UObject* Requester,
                                                                  const FVector& TargetLocation) const
 {
@@ -302,7 +359,7 @@ FVector UGlobalAbilitiesManager::GetAircraftBombingSpawnLocation(const UObject* 
 		M_SpawnSetings.AircraftStartLocation,
 		M_SpawnSetings.Fow_ManagerPosition,
 		M_SpawnSetings.PlayerStartLocation,
-		M_SpawnSetings.MapExtent / 2,
+		GetAircraftSpawnLineHalfLength(),
 		M_SpawnSetings.AircratHeightStart,
 		SpawnLocation))
 	{
@@ -320,7 +377,7 @@ FVector UGlobalAbilitiesManager::GetAircraftBombingRetreatLocation(const UObject
 		M_SpawnSetings.AircraftStartLocation,
 		M_SpawnSetings.Fow_ManagerPosition,
 		M_SpawnSetings.PlayerStartLocation,
-		M_SpawnSetings.MapExtent / 2,
+		GetAircraftSpawnLineHalfLength(),
 		M_SpawnSetings.AircratHeightStart, 
 		SpawnLocation))
 	{
@@ -464,10 +521,20 @@ void UGlobalAbilitiesManager::LoadGlobalAbilities(TArray<EGlobalAbility> Ability
 	TArray<TObjectPtr<UGlobalAbility>> AbilitiesLoadedCopyUObjects;
 	for (const EGlobalAbility AbilityEnum : AbilityEnums)
 	{
+		// Above the mission's tier cap: not loaded, so the panel hides it and nothing can execute it.
+		if (GetIsAbilityTierHiddenForPlayer(AbilitySetDataAsset->FindAbilityTemplate(AbilityEnum)))
+		{
+			continue;
+		}
 		UGlobalAbility* AbilityCopy = AbilitySetDataAsset->GetGLobalAbilityForTypeAsCopyFromTemplate(AbilityEnum);
 		if (not IsValid(AbilityCopy))
 		{
 			continue;
+		}
+		if (GetAreResourceCostsDisabled())
+		{
+			// Free in this mission: the tooltip then shows no cost either.
+			AbilityCopy->M_AbilityCosts.Costs.ResourceCosts.Reset();
 		}
 		// The enum key the template is registered under is authoritative for the loaded ability's type.
 		// Stamping it here keeps FindLoadedAbilityByType and per-ability loadout overrides (e.g. enemy
@@ -482,7 +549,32 @@ void UGlobalAbilitiesManager::LoadGlobalAbilities(TArray<EGlobalAbility> Ability
 void UGlobalAbilitiesManager::OnLoadedAbilities(TArray<TObjectPtr<UGlobalAbility>> AbilitiesLoadedCopyUObjects)
 {
 	M_GlobalAbilities = AbilitiesLoadedCopyUObjects;
+	M_BaseCooldownTimes.Reset();
+	if (M_AppliedCooldownMlt < 1.f)
+	{
+		// A cooldown bonus registered before the abilities finished loading.
+		for (UGlobalAbility* Ability : M_GlobalAbilities)
+		{
+			if (IsValid(Ability))
+			{
+				ApplyCooldownMltToAbility(Ability, M_AppliedCooldownMlt);
+			}
+		}
+	}
 	StartCooldownTimer();
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// Ability test target: a template that starts on cooldown does not block the player either.
+	if (IsPlayerAbilityManager())
+	{
+		for (UGlobalAbility* Ability : M_GlobalAbilities)
+		{
+			if (IsValid(Ability))
+			{
+				Ability->M_AbilityCosts.CoolDownRemaining = 0;
+			}
+		}
+	}
+#endif
 	if (IsPlayerAbilityManager())
 	{
 		InitAbilityPanel(AbilitiesLoadedCopyUObjects);
@@ -497,8 +589,56 @@ void UGlobalAbilitiesManager::InitAbilityPanel(TArray<TObjectPtr<UGlobalAbility>
 	{
 		return;
 	}
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// More abilities than panel slots: show the first page; RTS.GlobalAbilities.Page shows the others.
+	if (LoadedAbilities.Num() > RTS::AllGlobalAbilities::PanelPageSize)
+	{
+		ShowAbilityPanelPage(0);
+		return;
+	}
+#endif
 	M_GlobalAbilityPanel.Get()->InitWithLoadedAbilities(LoadedAbilities, this);
 }
+
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+namespace
+{
+	// One player ability manager per world; the shown page of its panel.
+	int32 GAllAbilitiesPanelPage = 0;
+}
+
+void UGlobalAbilitiesManager::ShowAbilityPanelPage(const int32 PageIndex)
+{
+	if (not IsPlayerAbilityManager() || not EnsureIsValidGlobalAbilityPanel())
+	{
+		return;
+	}
+	const int32 PageCount = GetAbilityPanelPageCount();
+	GAllAbilitiesPanelPage = ((PageIndex % PageCount) + PageCount) % PageCount;
+	TArray<TObjectPtr<UGlobalAbility>> PageAbilities;
+	const int32 FirstIndex = GAllAbilitiesPanelPage * RTS::AllGlobalAbilities::PanelPageSize;
+	for (int32 Index = FirstIndex;
+	     Index < FirstIndex + RTS::AllGlobalAbilities::PanelPageSize && M_GlobalAbilities.IsValidIndex(Index); ++Index)
+	{
+		PageAbilities.Add(M_GlobalAbilities[Index]);
+	}
+	M_GlobalAbilityPanel.Get()->InitWithLoadedAbilities(PageAbilities, this);
+	CheckRequirements();
+	UE_LOG(LogTemp, Display, TEXT("RTS_ALL_GLOBAL_ABILITIES panel page %d/%d (abilities %d..%d of %d)"),
+	       GAllAbilitiesPanelPage + 1, PageCount, FirstIndex + 1, FirstIndex + PageAbilities.Num(),
+	       M_GlobalAbilities.Num());
+}
+
+int32 UGlobalAbilitiesManager::GetAbilityPanelPage() const
+{
+	return GAllAbilitiesPanelPage;
+}
+
+int32 UGlobalAbilitiesManager::GetAbilityPanelPageCount() const
+{
+	return FMath::Max(1, FMath::DivideAndRoundUp(M_GlobalAbilities.Num(), RTS::AllGlobalAbilities::PanelPageSize));
+}
+#endif
 
 void UGlobalAbilitiesManager::StartPlayerRequirementTimer()
 {
@@ -575,6 +715,7 @@ void UGlobalAbilitiesManager::ReleaseLoadedAbilities()
 	}
 
 	M_GlobalAbilities.Reset();
+	M_BaseCooldownTimes.Reset();
 	M_GlobalAbilityPanel.Reset();
 	M_GA_Description.Reset();
 	M_PlayerTechManager.Reset();
@@ -635,12 +776,19 @@ FText UGlobalAbilitiesManager::GetHoverDescriptionForAbility(const UGlobalAbilit
 	{
 		return FText::GetEmpty();
 	}
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// Ability test target: nothing blocks the player, so the tooltip shows the ability itself.
+	if (IsPlayerAbilityManager())
+	{
+		return Ability->M_UISettings.Description;
+	}
+#endif
 	if (not QueryTierAllowedForAbility(Ability))
 	{
 		return FText::FromString(FRTSRichTextConverter::MakeRTSRich(
 			FString::Printf(TEXT("Not available in this operation: %s ability (allowed up to %s)"),
 			                *Global_GetGlobalAbilityTierDisplayName(Ability->GetAbilityTier()),
-			                *Global_GetGlobalAbilityTierDisplayName(M_MaxAllowedAbilityTier)),
+			                *Global_GetGlobalAbilityTierDisplayName(M_PlayerMissionSettings.MaxAllowedTier)),
 			ERTSRichText::Text_Bad14));
 	}
 	if (Ability->M_AbilityRequirements.RequiredTechnology != ETechnology::Tech_NONE
@@ -704,10 +852,112 @@ void UGlobalAbilitiesManager::OnAbilityFinishedExecuting(UGlobalAbility* Ability
 		return;
 	}
 	Ability->M_AbilityCosts.CoolDownRemaining = Ability->M_AbilityCosts.CoolDownTime;
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// Ability test target: no cooldown blocks the player; the button stays available.
+	if (IsPlayerAbilityManager())
+	{
+		Ability->M_AbilityCosts.CoolDownRemaining = 0;
+		UpdateAbilityItemAvailability(Ability, true, false);
+		return;
+	}
+#endif
 	if (IsPlayerAbilityManager())
 	{
 		UpdateAbilityItemAvailability(Ability, false, false);
 	}
+}
+
+void UGlobalAbilitiesManager::RegisterCooldownMlt(const AActor* Source, const float CooldownMlt)
+{
+	if (not IsValid(Source))
+	{
+		RTSFunctionLibrary::ReportError("Tried to register a global ability cooldown bonus without a source."
+			"\n At function UGlobalAbilitiesManager::RegisterCooldownMlt");
+		return;
+	}
+	M_CooldownSources.RemoveAll([](const FGlobalAbilityCooldownSource& EachSource)
+	{
+		return not EachSource.Source.IsValid();
+	});
+	// A zero multiplier would make every ability free to spam.
+	constexpr float MinCooldownMlt = 0.05f;
+	const float ClampedCooldownMlt = FMath::Clamp(CooldownMlt, MinCooldownMlt, 1.f);
+	bool bIsAlreadyRegistered = false;
+	for (FGlobalAbilityCooldownSource& EachSource : M_CooldownSources)
+	{
+		if (EachSource.Source.Get() == Source)
+		{
+			EachSource.CooldownMlt = ClampedCooldownMlt;
+			bIsAlreadyRegistered = true;
+		}
+	}
+	if (not bIsAlreadyRegistered)
+	{
+		FGlobalAbilityCooldownSource NewSource;
+		NewSource.Source = Source;
+		NewSource.CooldownMlt = ClampedCooldownMlt;
+		M_CooldownSources.Add(NewSource);
+	}
+	OnCooldownMltChanged();
+}
+
+void UGlobalAbilitiesManager::UnregisterCooldownMlt(const AActor* Source)
+{
+	// A source that is not registered (never built, or already taken back) is not an error.
+	M_CooldownSources.RemoveAll([Source](const FGlobalAbilityCooldownSource& EachSource)
+	{
+		return EachSource.Source.Get() == Source || not EachSource.Source.IsValid();
+	});
+	OnCooldownMltChanged();
+}
+
+float UGlobalAbilitiesManager::GetCooldownMlt() const
+{
+	float LowestCooldownMlt = 1.f;
+	for (const FGlobalAbilityCooldownSource& EachSource : M_CooldownSources)
+	{
+		if (EachSource.Source.IsValid())
+		{
+			LowestCooldownMlt = FMath::Min(LowestCooldownMlt, EachSource.CooldownMlt);
+		}
+	}
+	return LowestCooldownMlt;
+}
+
+void UGlobalAbilitiesManager::OnCooldownMltChanged()
+{
+	const float NewCooldownMlt = GetCooldownMlt();
+	if (FMath::IsNearlyEqual(NewCooldownMlt, M_AppliedCooldownMlt) || M_AppliedCooldownMlt <= 0.f)
+	{
+		return;
+	}
+	// A cooldown that is running keeps its progress: what is left shrinks (or grows) with the new multiplier.
+	const float Ratio = NewCooldownMlt / M_AppliedCooldownMlt;
+	for (UGlobalAbility* Ability : M_GlobalAbilities)
+	{
+		if (not IsValid(Ability))
+		{
+			continue;
+		}
+		ApplyCooldownMltToAbility(Ability, NewCooldownMlt);
+		if (Ability->M_AbilityCosts.CoolDownRemaining > 0)
+		{
+			Ability->M_AbilityCosts.CoolDownRemaining = FMath::Max(
+				1, FMath::CeilToInt32(Ability->M_AbilityCosts.CoolDownRemaining * Ratio));
+		}
+	}
+	M_AppliedCooldownMlt = NewCooldownMlt;
+}
+
+void UGlobalAbilitiesManager::ApplyCooldownMltToAbility(UGlobalAbility* Ability, const float CooldownMlt)
+{
+	// The first time an ability is scaled its current cooldown is its base (no bonus was active before).
+	const int32 BaseCooldownTime = M_BaseCooldownTimes.FindOrAdd(Ability, Ability->M_AbilityCosts.CoolDownTime);
+	if (BaseCooldownTime <= 0)
+	{
+		return;
+	}
+	Ability->M_AbilityCosts.CoolDownTime = FMath::Max(1, FMath::CeilToInt32(BaseCooldownTime * CooldownMlt));
 }
 
 bool UGlobalAbilitiesManager::TryPayForAbility(UGlobalAbility* Ability) const
@@ -716,7 +966,16 @@ bool UGlobalAbilitiesManager::TryPayForAbility(UGlobalAbility* Ability) const
 	{
 		return false;
 	}
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// Ability test target: the player's abilities cost nothing.
+	return true;
+#else
+	if (GetAreResourceCostsDisabled())
+	{
+		return true;
+	}
 	return M_PlayerResourceManager.Get()->PayForCosts(Ability->M_AbilityCosts.Costs.ResourceCosts);
+#endif
 }
 
 bool UGlobalAbilitiesManager::GetHasActiveAbility() const

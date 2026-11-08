@@ -1,0 +1,32 @@
+# German light + medium tank unit icons (UnitIcons/Ger/LightTanks, UnitIcons/Ger/MediumTanks).
+# <UE texture path>=<clean portrait png>|<left icon stem or ->|<right icon stem or ->
+# Clean portraits: NoIcon PNG where it is the same render as the in-game iconed source (top 150 rows identical).
+# inpaint: where the only NoIcon/crop PNG is a different, newer render.
+
+# --- LightTanks ---
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Hetzer=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_Hetzer.png|T_TankDestroyerClass_Icon|T_RocketWeaponClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_JagdPz=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_JagdPz.png|T_TankDestroyerClass_Icon|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Marder=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_Marder.png|T_TankDestroyerClass_Icon|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Panzer1_150MM=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_Panzer1_150MM.png|T_ArtilleryClass_Icon_V3|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Panzer1_Harvester=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_Panzer1_Harvester.png|T_LightTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Panzer38t=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_Panzer38t.png|T_LightTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Panzer38t_R=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_Panzer38t_R.png|T_LightTankClass_Icon_V2|T_RocketWeaponClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_PanzerII_F=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_PanzerII_F.png|T_LightTankClass_Icon_V2|T_AutoCannon_Class_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_PanzerII_Luchs=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_PanzerII_Luchs.png|T_LightTankClass_Icon_V2|T_AutoCannon_Class_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Pz38_Rail=inpaint:D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_icons/T_Ger_LightTank_Pz38_Rail.png|T_LightTankClass_Icon_V2|T_RailgunClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_PzJager_Laser=inpaint:D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_icons/T_Ger_LightTank_PzJager_Laser.png|T_LightTankClass_Icon_V2|T_LaserClass_Icon
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/LightTanks/T_Ger_LightTank_Sdkfz_140=D:/UE_Assets/Icons/TrainingUI/GerTanks/Light/NoIcon/T_Ger_LightTank_Sdkfz_140.png|T_LightTankClass_Icon_V2|T_AutoCannon_Class_V2
+
+# --- MediumTanks ---
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/Ger_MediumTank_Brummbar=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/Ger_MediumTank_Brummbar.png|T_ArtilleryClass_Icon_V3|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_Jaguar=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_Jaguar.png|T_MediumTankClass_Icon_V2|T_AutoCannon_Class_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIIIAA=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIIIAA.png|T_MediumTankClass_Icon_V2|T_AntiAirClass_Icon_V3_NoStar
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIIICommander=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIIICommander.png|T_MediumTankClass_Icon_V2|T_RangeProviderClass_ICon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIIIFLamm=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIIIFLamm.png|T_MediumTankClass_Icon_V2|T_FlameClass_Icon_TankGun
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIV_F=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIV_F.png|T_ArtilleryClass_Icon_V3|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIV_H=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIV_H.png|T_MediumTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PZIV_Rockets=inpaint:D:/UE5Projects/RTS_Survival/Saved/UnitPortraits/gaps_icons/T_Ger_MediumTank_PZIV_Rockets.png|T_MediumTankClass_Icon_V2|T_RocketWeaponClass_Icon_V2
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PanzerIII_J=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIII_J.png|T_MediumTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PanzerIV_G=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIV_G.png|T_MediumTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_PzIII_M=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/T_Ger_MediumTank_PZIII_M.png|T_MediumTankClass_Icon_V2|-
+/Game/RTS_Survival/Textures/GameUI/UnitIcons/Ger/MediumTanks/T_Ger_MediumTank_StugIII=D:/UE_Assets/Icons/TrainingUI/GerTanks/Medium/NoIcon/Ger_MediumTank_StugIII.png|T_TankDestroyerClass_Icon|-

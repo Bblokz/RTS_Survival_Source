@@ -16,11 +16,14 @@
 #include "RTS_Survival/RTSComponents/AbilityComponents/AttachedWeaponAbilityComponent/AttachWeaponAbilityTypes.h"
 #include "RTS_Survival/RTSComponents/AbilityComponents/TurretSwapComponent/TurretSwapAbilityTypes.h"
 #include "RTS_Survival/Utils/RTSMapTests/RTSMapTests.h"
+#include "RTS_Survival/Resources/ResourceTypes/ResourceTypes.h"
 
 #include "BuildingExpansion.generated.h"
 
 
 class UBuildingExpansionEnergyComponent;
+class UResourceDropOff;
+class UGlobalAbilitiesManager;
 class UPitAdditionalTurretComponent;
 class UResourceConverterComponent;
 class UTurretSwapComp;
@@ -407,6 +410,39 @@ private:
 
 	UPROPERTY()
 	TArray<TWeakObjectPtr<AActor>> M_SpawnedAttachments;
+
+	// Storage this expansion adds to its owner's drop off while it is built (FBxpData::ExtraResourceStorage).
+	TMap<ERTSResourceType, int32> M_ExtraResourceStorage;
+
+	// The drop off holding the extra storage. Set only while the storage is applied (an unset pointer is the normal
+	// state, not an error), so the storage is taken back exactly once.
+	UPROPERTY()
+	TWeakObjectPtr<UResourceDropOff> M_ExtraStorageDropOff;
+
+	void ApplyExtraResourceStorage();
+	void RemoveExtraResourceStorage();
+	UResourceDropOff* GetOwnerResourceDropOff() const;
+
+	// The fraction of their price the player's field defenses cost while this expansion is built
+	// (FBxpData::FieldDefenseCostMlt; 1 = no effect).
+	float M_FieldDefenseCostMlt = 1.f;
+
+	// Set while the discount is registered with the game state, so it is taken back exactly once.
+	bool bM_IsFieldDefenseDiscountRegistered = false;
+
+	void ApplyFieldDefenseDiscount();
+	void RemoveFieldDefenseDiscount();
+
+	// The fraction of their cooldown the player's commander abilities take to recharge while this expansion is built
+	// (FBxpData::GlobalAbilityCooldownMlt; 1 = no effect).
+	float M_GlobalAbilityCooldownMlt = 1.f;
+
+	// Set while the cooldown bonus is registered with the player's global abilities manager, so it is taken back once.
+	bool bM_IsGlobalAbilityCooldownBonusRegistered = false;
+
+	void ApplyGlobalAbilityCooldownBonus();
+	void RemoveGlobalAbilityCooldownBonus();
+	UGlobalAbilitiesManager* GetPlayerGlobalAbilitiesManager() const;
 
 	void OnFinishedExpansionConstruction();
 

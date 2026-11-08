@@ -311,9 +311,9 @@ void UWeaponStateLaser::FireTraceIteration(const int32 PulseSerial)
 	const FVector LaunchLocation = LaunchAndForward.Key;
 	const FVector Direction = WeaponOwner->GetFireDirection(WeaponIndex);
 
-	FVector TraceEnd = Direction * WeaponData.Range;
-	TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation, Direction, WeaponData.Range,
-	                                                      WeaponData.Accuracy, bIsAircraftWeapon);
+	const float TraceRange = WeaponData.Range * GetFlightRangeMltForCurrentTarget();
+	FVector TraceEnd = FRTSWeaponHelpers::GetTraceEndWithAccuracy(LaunchLocation, Direction, TraceRange,
+	                                                              WeaponData.Accuracy, bIsAircraftWeapon);
 
 	const float ProjectileLaunchTime = World->GetTimeSeconds();
 

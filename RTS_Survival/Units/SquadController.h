@@ -298,6 +298,8 @@ class RTS_SURVIVAL_API ASquadController : public AActor, public ICommands,
 
 public:
 	friend struct FSquadWeaponSwitch;
+	// Shipping global ability test runner (RTS_WITH_ALL_GLOBAL_ABILITIES): reads the unit list.
+	friend struct FAllGlobalAbilitiesTestAccess;
 	friend class RTS_SURVIVAL_API AWeaponPickup;
 	friend class RTS_SURVIVAL_API AScavengeableObject;
 	friend class RTS_SURVIVAL_API URepairComponent;
@@ -536,6 +538,10 @@ public:
 	virtual bool GetCanStartAttackMoveEngagement() const override;
 	bool TryRemanAbandonedTeamWeapon(ATeamWeapon* AbandonedTeamWeapon);
 	virtual bool GetSquadAlreadyHasTeamWeapon() const;
+
+	/** The commander screen's ability preview keeps its target squads where it placed them: no automatic cover. */
+	void SetAutomaticCoverBlocked(const bool bBlocked) { bM_IsAutomaticCoverBlocked = bBlocked; }
+	bool GetIsAutomaticCoverBlocked() const { return bM_IsAutomaticCoverBlocked; }
 
 	// ICommand interface helpers.
 	virtual FVector GetOwnerLocation() const override final;
@@ -1206,6 +1212,9 @@ protected:
 	void SetWeaponIcon(const EWeaponName HighestValuedWeapon);
 
 	void PlayAnnouncerLineNotEnoughSquadMembersToCapture();
+
+	// Off in every mission; set by AAbilityPreviewDirector's targets (SetAutomaticCoverBlocked).
+	bool bM_IsAutomaticCoverBlocked = false;
 
 	void OnLevelUp_UpdateHealthbarRankIcon(const int32 Level, const EVeterancyIconSet IconSetUsed) const;
 };

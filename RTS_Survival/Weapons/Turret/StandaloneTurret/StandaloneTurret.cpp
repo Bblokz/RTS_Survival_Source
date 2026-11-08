@@ -1130,7 +1130,7 @@ bool AStandaloneTurret::GetIsTargetWithinWeaponRange(const FVector& TargetLocati
 	}
 
 	return FVector::DistSquared(TargetLocation, GetActorLocation())
-		<= M_WeaponRangeData.M_MaxWeaponRangeSquared;
+		<= M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget());
 }
 
 bool AStandaloneTurret::GetIsTargetBelowMinimumRange(const FVector& TargetLocation) const

@@ -551,11 +551,10 @@ void UTurretTossDemoSubsystem::ParseRegularDeathSwitches()
 	FString VariantText;
 	if (FParse::Value(FCommandLine::Get(), RegularVariantSwitch, VariantText))
 	{
-		M_RegularDeathVariant = VariantText.Equals(TEXT("ChainReaction"), ESearchCase::IgnoreCase)
-			                        ? ERegularDeathVariant::ChainReaction
-			                        : VariantText.Equals(TEXT("Debris"), ESearchCase::IgnoreCase)
-			                        ? ERegularDeathVariant::Debris
-			                        : ERegularDeathVariant::Standard;
+		const int64 VariantValue = StaticEnum<ERegularDeathVariant>()->GetValueByNameString(VariantText);
+		M_RegularDeathVariant = VariantValue == INDEX_NONE
+			                        ? ERegularDeathVariant::Standard
+			                        : static_cast<ERegularDeathVariant>(VariantValue);
 	}
 	float KillShotYaw = 0.f;
 	if (FParse::Value(FCommandLine::Get(), KillShotYawSwitch, KillShotYaw))

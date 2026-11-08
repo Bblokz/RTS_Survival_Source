@@ -154,6 +154,17 @@ public:
 	void RegisterEnergyComponent(UEnergyComp* EnergyComponent);
 	void DeregisterEnergyComponent(UEnergyComp* EnergyComponent);
 	void RegisterDropOff(TWeakObjectPtr<UResourceDropOff> DropOff, const bool bRegister);
+
+	/**
+	 * @brief Keeps the player's storage totals equal to the sum of the registered drop offs when one's capacity
+	 * changes at runtime (an expansion that adds storage); unregistered drop offs are not counted, so are ignored.
+	 * @param DropOff The drop off whose capacity changed.
+	 * @param Resource The resource whose capacity changed.
+	 * @param StorageDelta Capacity added (positive) or removed (negative).
+	 * @param ResourcesLost Stored resources that no longer fit and were taken out of the drop off.
+	 */
+	void OnDropOffStorageChanged(const TWeakObjectPtr<UResourceDropOff> DropOff, const ERTSResourceType Resource,
+	                             const int32 StorageDelta, const int32 ResourcesLost);
 	void UpdateEnergySupplyForUpgradedComponent(UEnergyComp* EnergyCompUpgraded, const int32 OldEnergyAmount);
 
 	UFUNCTION(BlueprintCallable, NotBlueprintable, Category="Resources")

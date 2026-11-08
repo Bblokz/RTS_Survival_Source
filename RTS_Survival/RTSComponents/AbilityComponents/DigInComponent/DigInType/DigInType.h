@@ -14,4 +14,6 @@ enum class EDigInType : uint8
 	RusLightTankWall,
 	RusMediumTankWall,
 	RusHeavyTankWall,
+	// Closed sandbag ring around a soft-skinned Soviet AA truck (GAZ-MM 72-K): front, sides and rear.
+	RusAATruckRingWall,
 };

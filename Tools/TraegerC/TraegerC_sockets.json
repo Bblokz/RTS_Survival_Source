@@ -1,0 +1,153 @@
+{
+  "note": "Unreal cm in the airframe pivot (nose tips, ground). Fairings open by pitching about +Y at their hinge.",
+  "props": [
+    {
+      "name": "Prop_P1",
+      "location": [
+        -945.2,
+        -1380.0,
+        1034.2
+      ],
+      "spin": 1
+    },
+    {
+      "name": "Prop_P2",
+      "location": [
+        -1009.2,
+        -2180.0,
+        1069.1
+      ],
+      "spin": 1
+    },
+    {
+      "name": "Prop_P3",
+      "location": [
+        -1073.2,
+        -2980.0,
+        1104.1
+      ],
+      "spin": 1
+    },
+    {
+      "name": "Prop_S1",
+      "location": [
+        -945.2,
+        1380.0,
+        1034.2
+      ],
+      "spin": -1
+    },
+    {
+      "name": "Prop_S2",
+      "location": [
+        -1009.2,
+        2180.0,
+        1069.1
+      ],
+      "spin": -1
+    },
+    {
+      "name": "Prop_S3",
+      "location": [
+        -1073.2,
+        2980.0,
+        1104.1
+      ],
+      "spin": -1
+    }
+  ],
+  "bow_fairing_hinge": [
+    -1340.0,
+    0,
+    985.0
+  ],
+  "bow_fairing_open_deg": 68,
+  "tail_fairing_hinge": [
+    -2280.0,
+    0,
+    985.0
+  ],
+  "tail_fairing_open_deg": 68,
+  "spreader_pivot": [
+    -1802.5,
+    0.0,
+    947.0
+  ],
+  "lowering_stroke_cm": 530.0,
+  "cable_anchors": [
+    [
+      -1395.0,
+      -200.0,
+      950.0
+    ],
+    [
+      -1395.0,
+      200.0,
+      950.0
+    ],
+    [
+      -2210.0,
+      -200.0,
+      950.0
+    ],
+    [
+      -2210.0,
+      200.0,
+      950.0
+    ]
+  ],
+  "cable_eyes_on_spreader": [
+    [
+      407.5,
+      -200.0,
+      6.0
+    ],
+    [
+      407.5,
+      200.0,
+      6.0
+    ],
+    [
+      -407.5,
+      -200.0,
+      6.0
+    ],
+    [
+      -407.5,
+      200.0,
+      6.0
+    ]
+  ],
+  "tank_hull_centre_bottom_carried": [
+    -1808.5,
+    0,
+    530.0
+  ],
+  "tank_hull_centre_bottom_from_spreader": [
+    -6.0,
+    0,
+    -417.0
+  ],
+  "hook_lugs_carried": [
+    [
+      -1395.0,
+      -200.0,
+      796.0
+    ],
+    [
+      -1395.0,
+      200.0,
+      796.0
+    ],
+    [
+      -2210.0,
+      -200.0,
+      796.0
+    ],
+    [
+      -2210.0,
+      200.0,
+      796.0
+    ]
+  ]
+}

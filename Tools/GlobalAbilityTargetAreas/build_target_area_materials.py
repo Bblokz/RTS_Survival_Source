@@ -175,6 +175,29 @@ float3 Color = lerp(float3(0.3, 1.0, 0.42), float3(0.95, 1.0, 0.9), Ahead * (1.0
 return float4(Color * Ring * 6.0, Ring);
 """
 
+# The V2 rocket is a conventional warhead: the nuke's shaders in fire colours.
+# No radiation: an impact cross takes the place of the radiation sign.
+V2_IMPACT_CROSS = """
+// Impact cross where the rocket comes down.
+float SignRadius = min(InnerRadius * 0.62, 1500.0);
+float Gap = step(SignRadius * 0.3, Radial);
+float CrossX = Area.Stroke(p.y, 40.0, 10.0) * step(abs(p.x), SignRadius);
+float CrossY = Area.Stroke(p.x, 40.0, 10.0) * step(abs(p.y), SignRadius);
+Result = Area.Over(Result, Dark, Area.Inside(Radial - SignRadius * 1.1, 14.0) * 0.5);
+Result = Area.Over(Result, Core, max(CrossX, CrossY) * Gap);
+Result = Area.Over(Result, Core, Area.Inside(Radial - SignRadius * 0.12, 10.0));
+Result = Area.Over(Result, Radixite, Area.Stroke(Radial - SignRadius * 1.1, 22.0, 8.0));
+return Result;
+"""
+V2_TARGET_AREA = NUKE[:NUKE.index("// Radiation sign")] + V2_IMPACT_CROSS
+V2_TARGET_AREA = (V2_TARGET_AREA.replace("float3(0.22, 1.0, 0.34)", "float3(1.0, 0.42, 0.12)")
+                  .replace("float3(0.86, 1.0, 0.24)", "float3(1.0, 0.78, 0.22)")
+                  .replace("float3(0.92, 1.0, 0.9)", "float3(1.0, 0.95, 0.88)")
+                  .replace("float3(0.0, 0.05, 0.015)", "float3(0.05, 0.015, 0.0)"))
+V2_SHOCKWAVE = SHOCKWAVE.replace("float3(0.3, 1.0, 0.42), float3(0.95, 1.0, 0.9)",
+                                 "float3(1.0, 0.45, 0.14), float3(1.0, 0.92, 0.8)")
+assert V2_TARGET_AREA.count("1.0, 0.42, 0.12") and V2_SHOCKWAVE != SHOCKWAVE
+
 SCAR = """
 // Ragged circle of burnt ground with cracks that glow and die down over the radiation.
 float2 p = UV * 2.0 - 1.0;
@@ -322,11 +345,19 @@ def build_ghost():
     print("built M_DropPointGhost", unreal.EditorAssetLibrary.save_loaded_asset(material, False))
 
 
-unreal.EditorAssetLibrary.make_directory(FOLDER)
-build_overlay("M_TargetArea_Recon", RECON, SCALARS)
-build_overlay("M_TargetArea_FlareCurtain", FLARE, SCALARS)
-build_overlay("M_TargetArea_Minefield", MINEFIELD, SCALARS)
-build_overlay("M_TargetArea_RadixiteNuke", NUKE, SCALARS)
-build_overlay("M_RadixiteNukeShockwave", SHOCKWAVE, ["PlaneLength", "AreaRadius", "Progress"])
-build_scar()
-build_ghost()
+def build_v2_rocket():
+    build_overlay("M_TargetArea_V2Rocket", V2_TARGET_AREA, SCALARS)
+    build_overlay("M_V2RocketShockwave", V2_SHOCKWAVE, ["PlaneLength", "AreaRadius", "Progress"])
+
+
+# Loaded by setup_v2_rocket.py under another name, it only defines the builders.
+if __name__ == "__main__":
+    unreal.EditorAssetLibrary.make_directory(FOLDER)
+    build_overlay("M_TargetArea_Recon", RECON, SCALARS)
+    build_overlay("M_TargetArea_FlareCurtain", FLARE, SCALARS)
+    build_overlay("M_TargetArea_Minefield", MINEFIELD, SCALARS)
+    build_overlay("M_TargetArea_RadixiteNuke", NUKE, SCALARS)
+    build_overlay("M_RadixiteNukeShockwave", SHOCKWAVE, ["PlaneLength", "AreaRadius", "Progress"])
+    build_scar()
+    build_ghost()
+    build_v2_rocket()

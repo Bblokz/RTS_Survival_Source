@@ -658,6 +658,12 @@ public:
 	/** @return The range of this weapon in cm including behaviour adjustments. */
 	float GetWeaponRangeBehaviourAdjusted() const;
 
+	/**
+	 * @brief Ground weapons engage aircraft beyond their range, so shots at one must fly that far too.
+	 * @return The anti-air range multiplier when the owner's target is an aircraft, 1 otherwise.
+	 */
+	float GetFlightRangeMltForCurrentTarget() const;
+
 	void ForceInstantReload();
 	bool IsWeaponFullyLoaded() const;
 

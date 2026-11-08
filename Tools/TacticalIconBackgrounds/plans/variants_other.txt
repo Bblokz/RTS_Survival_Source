@@ -1,0 +1,18 @@
+# Placard plan: German unit VARIANT textures + sweep for other German neon-glyph unit icons (2026-11-07).
+# Intentionally empty: nothing in this slice carries the old blue neon glyphs.
+#
+# A) UnitIcons/Ger/Variants/T_Variant_*.uasset (28 textures): no neon glyphs.
+#    Source/Tools/UnitVariants/fill_unit_variants.py imports each one straight from
+#    Saved/VariantPortraits_Cropped/<Variant>/<Variant>_FrontRight_idle.png with no engrave step.
+#    Every texture's AssetImportData points at that crop and its stored FileMD5 matches the file on disk, e.g.
+#    T_Variant_Ger_Vehicle_Marder <- Saved/VariantPortraits_Cropped/Ger_Vehicle_Marder/Ger_Vehicle_Marder_FrontRight_idle.png
+#    (viewed: clean render, nothing in the lower band).
+#
+# B) Sweep of DT_TrainingOptions brushes and every Texture2D in Content whose import source is an icon/portrait
+#    folder or whose name holds "Ger_": all German unit icons with glyphs live in the covered folders
+#    (LightTanks, MediumTanks, HeavyTanks, ArmoredCar, Squads, Aircraft, T_Ger_Pit_*). Checked and left out:
+#    /Game/Thumbnails/Final/Thumb_Ger_PZIIIM (DT row; old cut-out thumbnail, no glyphs)
+#    /Game/Thumbnails/Thumb_Ger_Aircraft_* (editor captures, no import source, not glyph-painted)
+#    GerPits/UI/T_BxpOption_GerPit_*, FieldTrench/UI/T_BxpOption_GerFieldTrench (building expansions; Blender renders, no glyphs)
+#    UnitIcons/Ger/Ger_Buildings/*, BuildingExpansions/*, InLevelAttachmentWidgets/Materials/T_Ger_HQTruck_Small (buildings/trucks: out of scope)
+#    WeaponUI/WeaponIcons/WpUI_Ger_* (weapon thumbnails, not unit icons)

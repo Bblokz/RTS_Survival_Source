@@ -15,6 +15,7 @@
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Utils/Rendering/RTSRenderPerf.h"
 #include "RTS_Survival/Weapons/FlameThrowerWeapon/UWeaponStateFlameThrower.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateLaser.h"
 #include "RTS_Survival/Weapons/LaserWeapon/UWeaponStateMultiHitLaser.h"
@@ -156,7 +157,8 @@ void AInfantryWeaponMaster::AutoEngage()
 		return;
 	}
 
-	if (GetIsTargetValidVisibleAndInRange())
+	if (GetIsTargetValidVisibleAndInRange() &&
+		M_OwningSquadUnit->GetCanAutoTargetFromHeldCover(M_TargetingData.GetActiveTargetLocation()))
 	{
 		// Let aim selection possibly rotate to a new aim point before we read the location.
 		{
@@ -253,7 +255,7 @@ void AInfantryWeaponMaster::SpecificEngage()
 
 		const FVector TargetLocation = M_TargetingData.GetActiveTargetLocation();
 		const bool bInRange = (FVector::DistSquared(TargetLocation, M_OwningSquadUnit->GetActorLocation())
-			<= M_WeaponRangeData.M_MaxWeaponRangeSquared);
+			<= M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget()));
 
 		if (bInRange)
 		{
@@ -386,15 +388,20 @@ bool AInfantryWeaponMaster::GetIsTargetValidVisibleAndInRange()
 	}
 	const FVector TargetLoc = M_TargetingData.GetActiveTargetLocation();
 	const FVector MyLoc = M_OwningSquadUnit->GetActorLocation();
-	return (FVector::DistSquared(TargetLoc, MyLoc) <= M_WeaponRangeData.M_MaxWeaponRangeSquared);
+	return (FVector::DistSquared(TargetLoc, MyLoc)
+		<= M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget()));
 }
 
 void AInfantryWeaponMaster::OnTargetsFound(const TArray<AActor*>& Targets)
 {
 	bM_IsPendingTarget = false;
+	// Silent: an owner that went away has no cover to keep its targets in.
+	const bool bHasOwner = IsValid(M_OwningSquadUnit);
 	for (AActor* NewTarget : Targets)
 	{
-		if (RTSFunctionLibrary::RTSIsVisibleTarget(NewTarget, M_OwningPlayer))
+		const bool bIsInFiringArc = not bHasOwner || not IsValid(NewTarget) ||
+			M_OwningSquadUnit->GetCanAutoTargetFromHeldCover(NewTarget->GetActorLocation());
+		if (bIsInFiringArc && RTSFunctionLibrary::RTSIsVisibleTarget(NewTarget, M_OwningPlayer))
 		{
 			M_TargetingData.SetTargetActor(NewTarget);
 
@@ -550,7 +557,7 @@ void AInfantryWeaponMaster::BeginPlay()
 	if (UWorld* World = GetWorld())
 	{
 		PlayerController = Cast<ACPPController>(World->GetFirstPlayerController());
-		if (not IsValid(PlayerController))
+		if (not IsValid(PlayerController) && not FRTS_Statics::GetIsInPreGameHangar(this))
 		{
 			RTSFunctionLibrary::ReportNullErrorInitialisation(this, "PlayerController",
 			                                                  "AInfantryWeaponMaster::BeginPlay");
@@ -577,6 +584,7 @@ void AInfantryWeaponMaster::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 	WeaponMesh = FindComponentByClass<UStaticMeshComponent>();
+	RTSRenderPerf::ExcludeSmallAttachmentsFromDistanceFields(this);
 }
 
 void AInfantryWeaponMaster::SetWeaponAimOffsetType(const ESquadWeaponAimOffset AimOffsetType)
@@ -657,7 +665,8 @@ bool AInfantryWeaponMaster::GetIsCurrentTargetInRange()
 	}
 	return FVector::DistSquared(
 		M_TargetingData.GetActiveTargetLocation(),
-		M_OwningSquadUnit->GetActorLocation()) <= M_WeaponRangeData.M_MaxWeaponRangeSquared;
+		M_OwningSquadUnit->GetActorLocation())
+		<= M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget());
 }
 
 float AInfantryWeaponMaster::GetTurretYawLimit() const

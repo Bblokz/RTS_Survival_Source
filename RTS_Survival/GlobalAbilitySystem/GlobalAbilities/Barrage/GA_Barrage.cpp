@@ -12,22 +12,30 @@
 void UGA_Barrage::ExecuteAbilityAtLocation(const FVector& TargetLocation)
 {
 	ResetAbilityEndedBroadcast();
-	ResetBarrageRuntimeState();
-	M_PendingTargetLocation = TargetLocation;
-
+	// A barrage that is still firing keeps firing: every execution is its own run.
 	if (HasCachedProjectileManager())
 	{
 		StartBarrage(TargetLocation);
 		return;
 	}
 
+	M_TargetsWaitingForProjectileManager.Add(TargetLocation);
 	SetupCallbackToProjectileManager(nullptr);
+	// The callback may already have run (and started the runs); if it could not be registered at all, the waiting
+	// executions would never fire, so they end now.
+	if (not bM_IsWaitingForProjectileManager && not M_TargetsWaitingForProjectileManager.IsEmpty())
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UGA_Barrage could not wait for the projectile manager (no game state)."));
+		M_TargetsWaitingForProjectileManager.Reset();
+		BroadcastBarrageFinishedIfNeeded();
+	}
 }
 
 void UGA_Barrage::BeginDestroy()
 {
-	ClearBurstTimer();
-	ClearShellLaunchTimers();
+	ClearAllRunTimers();
+	M_Runs.Reset();
+	M_TargetsWaitingForProjectileManager.Reset();
 	Super::BeginDestroy();
 }
 
@@ -73,19 +81,26 @@ void UGA_Barrage::SetupCallbackToProjectileManager(const AActor* WorldContextObj
 
 void UGA_Barrage::OnProjectileManagerLoaded(const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager)
 {
+	bM_IsWaitingForProjectileManager = false;
+	// Moved out first: starting a run can end it at once and re-enter through the finished broadcast.
+	const TArray<FVector> WaitingTargets = MoveTemp(M_TargetsWaitingForProjectileManager);
+	M_TargetsWaitingForProjectileManager.Reset();
 	if (not IsValid(ProjectileManager))
 	{
-		bM_IsWaitingForProjectileManager = false;
 		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
 			this,
 			TEXT("ProjectileManager"),
 			TEXT("UGA_Barrage::OnProjectileManagerLoaded"),
 			this);
+		// Those executions can never fire; end them instead of leaving the ability running forever.
+		BroadcastBarrageFinishedIfNeeded();
 		return;
 	}
-	bM_IsWaitingForProjectileManager = false;
 	M_ProjectileManager = ProjectileManager;
-	StartBarrage(M_PendingTargetLocation);
+	for (const FVector& TargetLocation : WaitingTargets)
+	{
+		StartBarrage(TargetLocation);
+	}
 }
 
 bool UGA_Barrage::GetIsValidProjectileManager() const
@@ -104,58 +119,89 @@ bool UGA_Barrage::GetIsValidProjectileManager() const
 
 void UGA_Barrage::StartBarrage(const FVector& TargetLocation)
 {
-	M_PendingTargetLocation = TargetLocation;
 	if (M_BarrageSettings.AmountShells <= 0)
 	{
-		BroadcastAbilityEnded();
+		BroadcastBarrageFinishedIfNeeded();
 		return;
 	}
 
-	FireNextBurst();
+	FBarrageRun NewRun;
+	NewRun.RunId = M_NextRunId++;
+	NewRun.TargetLocation = TargetLocation;
+	const int32 RunId = NewRun.RunId;
+	M_Runs.Add(MoveTemp(NewRun));
+	FireNextBurst(RunId);
 }
 
-void UGA_Barrage::FireNextBurst()
+UGA_Barrage::FBarrageRun* UGA_Barrage::FindRun(const int32 RunId)
 {
-	if (not GetIsValidProjectileManager())
+	return M_Runs.FindByPredicate([RunId](const FBarrageRun& Run)
+	{
+		return Run.RunId == RunId;
+	});
+}
+
+void UGA_Barrage::FireNextBurst(const int32 RunId)
+{
+	const FBarrageRun* Run = FindRun(RunId);
+	if (Run == nullptr)
 	{
 		return;
 	}
+	if (not GetIsValidProjectileManager())
+	{
+		// No projectiles to fire: end the run rather than leaving it (and the ability) running forever.
+		FinishRun(RunId);
+		return;
+	}
 
-	const int32 ShellsRemaining = M_BarrageSettings.AmountShells - M_ShellsLaunched;
+	const int32 ShellsRemaining = M_BarrageSettings.AmountShells - Run->ShellsLaunched;
 	const int32 SafeBurstAmount = FMath::Max(M_BarrageSettings.BurstAmount, 1);
 	const int32 ShellsThisBurst = FMath::Min(SafeBurstAmount, ShellsRemaining);
 	for (int32 ShellIndex = 0; ShellIndex < ShellsThisBurst; ++ShellIndex)
 	{
-		FireSingleShell();
+		// Each shell can finish (and remove) the run, so the run is looked up again by id every time.
+		FireSingleShell(RunId);
 	}
 
-	if (M_ShellsLaunched < M_BarrageSettings.AmountShells)
+	Run = FindRun(RunId);
+	if (Run != nullptr && Run->ShellsLaunched < M_BarrageSettings.AmountShells)
 	{
-		ScheduleNextBurst();
+		ScheduleNextBurst(RunId);
 	}
 }
 
-void UGA_Barrage::FireSingleShell()
+void UGA_Barrage::FireSingleShell(const int32 RunId)
 {
+	FBarrageRun* Run = FindRun(RunId);
+	if (Run == nullptr)
+	{
+		return;
+	}
 	PlayOffMapLaunchSoundIfRequested();
 
-	++M_ShellsLaunched;
+	++Run->ShellsLaunched;
 
 	if (GetShouldDelayShellLaunchForOffMapSound())
 	{
-		ScheduleDelayedShellLaunch();
+		ScheduleDelayedShellLaunch(RunId);
 	}
 	else
 	{
-		LaunchSingleShell();
+		LaunchSingleShell(RunId);
 	}
 }
 
-void UGA_Barrage::LaunchSingleShell()
+void UGA_Barrage::LaunchSingleShell(const int32 RunId)
 {
+	const FBarrageRun* Run = FindRun(RunId);
+	if (Run == nullptr)
+	{
+		return;
+	}
 	if (not GetIsValidProjectileManager())
 	{
-		NotifyShellLaunchFinished();
+		NotifyShellLaunchFinished(RunId);
 		return;
 	}
 
@@ -163,16 +209,17 @@ void UGA_Barrage::LaunchSingleShell()
 	if (not IsValid(Projectile))
 	{
 		RTSFunctionLibrary::ReportError(TEXT("UGA_Barrage failed to obtain a dormant projectile."));
-		NotifyShellLaunchFinished();
+		NotifyShellLaunchFinished(RunId);
 		return;
 	}
 
+	const FVector TargetLocation = Run->TargetLocation;
 	const FWeaponData VariedWeaponData = BuildVariedWeaponData();
 	FProjectileVfxSettings ProjectileVfxSettings = M_BarrageSettings.ProjectileVfxSettings;
 	ProjectileVfxSettings.ShellType = VariedWeaponData.ShellType;
 	ProjectileVfxSettings.WeaponCaliber = VariedWeaponData.WeaponCalibre;
-	const FVector LaunchLocation = BuildLaunchLocation(M_PendingTargetLocation);
-	const FVector AimPoint = BuildRandomPointInRadius(M_PendingTargetLocation);
+	const FVector LaunchLocation = BuildLaunchLocation(TargetLocation);
+	const FVector AimPoint = BuildRandomPointInRadius(TargetLocation);
 	const FRotator LaunchRotation = (AimPoint - LaunchLocation).Rotation();
 	const TArray<AActor*> ActorsToIgnore;
 	const FWeaponVFX WeaponVfxForShellLaunch = BuildWeaponVfxForShellLaunch();
@@ -187,23 +234,44 @@ void UGA_Barrage::LaunchSingleShell()
 		LaunchRotation,
 		AimPoint,
 		ActorsToIgnore);
-	NotifyShellLaunchFinished();
+	NotifyShellLaunchFinished(RunId);
 }
 
-void UGA_Barrage::NotifyShellLaunchFinished()
+void UGA_Barrage::NotifyShellLaunchFinished(const int32 RunId)
 {
-	++M_ShellsActuallyLaunched;
+	FBarrageRun* Run = FindRun(RunId);
+	if (Run == nullptr)
+	{
+		return;
+	}
+	++Run->ShellsActuallyLaunched;
+	if (Run->ShellsLaunched < M_BarrageSettings.AmountShells
+		|| Run->ShellsActuallyLaunched < M_BarrageSettings.AmountShells)
+	{
+		return;
+	}
+	FinishRun(RunId);
+}
+
+void UGA_Barrage::FinishRun(const int32 RunId)
+{
+	const int32 RunIndex = M_Runs.IndexOfByPredicate([RunId](const FBarrageRun& Run)
+	{
+		return Run.RunId == RunId;
+	});
+	if (not M_Runs.IsValidIndex(RunIndex))
+	{
+		return;
+	}
+	ClearRunTimers(M_Runs[RunIndex]);
+	M_Runs.RemoveAt(RunIndex);
 	BroadcastBarrageFinishedIfNeeded();
 }
 
 void UGA_Barrage::BroadcastBarrageFinishedIfNeeded()
 {
-	if (M_ShellsLaunched < M_BarrageSettings.AmountShells)
-	{
-		return;
-	}
-
-	if (M_ShellsActuallyLaunched < M_BarrageSettings.AmountShells)
+	// The ability ends when the last running execution has launched all its shells.
+	if (not M_Runs.IsEmpty() || not M_TargetsWaitingForProjectileManager.IsEmpty())
 	{
 		return;
 	}
@@ -218,29 +286,31 @@ bool UGA_Barrage::GetShouldDelayShellLaunchForOffMapSound() const
 		&& M_BarrageSettings.TimeBetweenOffMapSoundAndStart > 0.0f;
 }
 
-void UGA_Barrage::ScheduleDelayedShellLaunch()
+void UGA_Barrage::ScheduleDelayedShellLaunch(const int32 RunId)
 {
 	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	FBarrageRun* Run = FindRun(RunId);
+	if (not IsValid(World) || Run == nullptr)
 	{
-		LaunchSingleShell();
+		LaunchSingleShell(RunId);
 		return;
 	}
 
 	TWeakObjectPtr<UGA_Barrage> WeakThis(this);
-	FTimerHandle& ShellLaunchTimerHandle = M_ShellLaunchTimerHandles.AddDefaulted_GetRef();
+	FTimerHandle ShellLaunchTimerHandle;
 	World->GetTimerManager().SetTimer(
 		ShellLaunchTimerHandle,
-		[WeakThis]()
+		[WeakThis, RunId]()
 		{
 			if (not WeakThis.IsValid())
 			{
 				return;
 			}
-			WeakThis->LaunchSingleShell();
+			WeakThis->LaunchSingleShell(RunId);
 		},
 		M_BarrageSettings.TimeBetweenOffMapSoundAndStart,
 		false);
+	Run->ShellLaunchTimerHandles.Add(ShellLaunchTimerHandle);
 }
 
 FWeaponVFX UGA_Barrage::BuildWeaponVfxForShellLaunch() const
@@ -318,10 +388,11 @@ FWeaponData UGA_Barrage::BuildVariedWeaponData() const
 	return VariedWeaponData;
 }
 
-void UGA_Barrage::ScheduleNextBurst()
+void UGA_Barrage::ScheduleNextBurst(const int32 RunId)
 {
 	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	FBarrageRun* Run = FindRun(RunId);
+	if (not IsValid(World) || Run == nullptr)
 	{
 		return;
 	}
@@ -331,53 +402,39 @@ void UGA_Barrage::ScheduleNextBurst()
 		M_BarrageSettings.MaxTimeBetweenBurst);
 	TWeakObjectPtr<UGA_Barrage> WeakThis(this);
 	World->GetTimerManager().SetTimer(
-		M_BurstTimerHandle,
-		[WeakThis]()
+		Run->BurstTimerHandle,
+		[WeakThis, RunId]()
 		{
 			if (not WeakThis.IsValid())
 			{
 				return;
 			}
-			WeakThis->FireNextBurst();
+			WeakThis->FireNextBurst(RunId);
 		},
 		Delay,
 		false);
 }
 
-
-void UGA_Barrage::ClearBurstTimer()
+void UGA_Barrage::ClearRunTimers(FBarrageRun& Run) const
 {
 	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	if (IsValid(World))
 	{
-		return;
+		World->GetTimerManager().ClearTimer(Run.BurstTimerHandle);
+		for (FTimerHandle& ShellLaunchTimerHandle : Run.ShellLaunchTimerHandles)
+		{
+			World->GetTimerManager().ClearTimer(ShellLaunchTimerHandle);
+		}
 	}
-
-	World->GetTimerManager().ClearTimer(M_BurstTimerHandle);
+	Run.ShellLaunchTimerHandles.Reset();
 }
 
-void UGA_Barrage::ClearShellLaunchTimers()
+void UGA_Barrage::ClearAllRunTimers()
 {
-	UWorld* World = GetWorld();
-	if (not IsValid(World))
+	for (FBarrageRun& Run : M_Runs)
 	{
-		M_ShellLaunchTimerHandles.Reset();
-		return;
+		ClearRunTimers(Run);
 	}
-
-	for (FTimerHandle& ShellLaunchTimerHandle : M_ShellLaunchTimerHandles)
-	{
-		World->GetTimerManager().ClearTimer(ShellLaunchTimerHandle);
-	}
-	M_ShellLaunchTimerHandles.Reset();
-}
-
-void UGA_Barrage::ResetBarrageRuntimeState()
-{
-	ClearBurstTimer();
-	ClearShellLaunchTimers();
-	M_ShellsLaunched = 0;
-	M_ShellsActuallyLaunched = 0;
 }
 
 bool UGA_Barrage::HasCachedProjectileManager() const

@@ -56,6 +56,13 @@ public:
 	static const URTSGameUserSettings* Get();
 	static URTSGameUserSettings* GetMutable();
 
+	/**
+	 * @brief Returns the largest resolution the primary monitor shows without rescaling.
+	 * Drivers also report GPU-scaled modes above the panel's native size; those look soft, so menus cap at this.
+	 * @return The larger of the monitor's EDID native size and the desktop size, or zero when neither is known.
+	 */
+	static FIntPoint GetPrimaryMonitorMaxSharpResolution();
+
 	/** @brief Restores the native display resolution, Epic graphics, and project gameplay defaults. */
 	virtual void SetToDefaults() override;
 
@@ -308,6 +315,12 @@ public:
 	void SetQualityLevels(const Scalability::FQualityLevels& NewQualityLevels);
 
 private:
+	/**
+	 * @brief Snaps a saved resolution above the monitor's native size back to the desktop size.
+	 * Runs before the game window is created, so the window opens at the corrected size.
+	 */
+	void SnapOversizedSavedResolution();
+
 	void ApplyCustomSettingClamps();
 	void ApplyEnvironmentDensityClamps();
 	static void ClampEnvironmentDensity(float& DensityToClamp, const TCHAR* DensityName);

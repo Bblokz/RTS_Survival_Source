@@ -175,6 +175,17 @@ bool FMissionCargoSquadWithVehicleSpawnState::TryProgressState()
 		return false;
 	}
 
+	// Both were spawned, so one that is gone now was destroyed (combat, a strike) before the squad boarded: nothing is
+	// left to do. Finish once instead of reporting the missing actor every tick for the rest of the mission.
+	if (not M_TankActor.IsValid() || not M_SquadController.IsValid())
+	{
+		bM_HasFailed = true;
+		UE_LOG(LogTemp, Display,
+		       TEXT("Mission cargo spawn request %d ended: its vehicle or squad was destroyed before boarding."),
+		       M_RequestId);
+		return false;
+	}
+
 	if (not GetIsValidTankActor() || not GetIsValidSquadController() || not GetIsValidSquadCargoComponent())
 	{
 		return false;

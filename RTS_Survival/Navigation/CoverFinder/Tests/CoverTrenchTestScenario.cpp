@@ -18,6 +18,7 @@
 #include "RTS_Survival/Units/Squads/SquadUnit/AnimSquadUnit/SquadUnitAnimInstance.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
+#include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSCoverTrenchTest, Log, All);
 
@@ -37,6 +38,12 @@ namespace CoverTrenchTestScenarioPrivate
 	constexpr float MaximumEnemyDriftFromPost = 150.0f;
 	// Standing up must not move the soldier; this only allows for the floor under his feet.
 	constexpr float MaximumStandUpTravel = 15.0f;
+	// Off to the side, where the trench no longer counts as protection but the soldier can still aim, then beside
+	// him, where he cannot aim at all. Each made soldiers trade their trench for other cover or give it up.
+	constexpr float FlankYawDegrees[] = {75.0f, 115.0f};
+	// Longer than a cover reevaluation and the tolerance for a target that cannot be engaged together.
+	constexpr float FlankHoldSeconds = 14.0f;
+	constexpr float MinimumFlankTargetedSeconds = 6.0f;
 
 	ESquadIdleAnimationPose GetIdlePose(const ASquadUnit& SquadUnit)
 	{
@@ -64,6 +71,7 @@ namespace CoverTrenchTestScenarioPrivate
 void FCoverTrenchTestScenario::Start(AActor* RequiredTrenchActor)
 {
 	M_Phase = ECoverTrenchTestPhase::WaitingForCoverScan;
+	M_EnemyPostYawDegrees = 0.0f;
 	M_RequiredTrenchActor = RequiredTrenchActor;
 	bM_RequiresTrenchActor = RequiredTrenchActor != nullptr;
 	UE_LOG(
@@ -160,6 +168,11 @@ void FCoverTrenchTestScenario::Tick(URTSCoverFinderWorldSubsystem& CoverSubsyste
 	if (M_Phase == ECoverTrenchTestPhase::WaitingForStandUpAfterReload)
 	{
 		TickWaitingForStandUpAfterReload(*World);
+		return;
+	}
+	if (M_Phase == ECoverTrenchTestPhase::HoldingTrenchWhileFlanked)
+	{
+		TickHoldingTrenchWhileFlanked(*World);
 		return;
 	}
 	TickWaitingForCrouchAgain(*World);
@@ -326,9 +339,8 @@ bool FCoverTrenchTestScenario::PlaceLivingEnemyInFrontOfTrench(UWorld& World)
 		M_Enemy = Enemy;
 		M_EnemyStartLocation = Enemy->GetActorLocation();
 	}
-	// Straight ahead of the firing step, where the soldier looks.
-	const FVector FacingDirection = -M_TrenchPoint.CoverNormal.GetSafeNormal2D();
-	const FVector EnemyLocation = M_TrenchPoint.Location + FacingDirection * EnemyDistanceInFrontOfTrench;
+	++M_FlankEnemyPlacementCount;
+	const FVector EnemyLocation = GetEnemyPost();
 	// Dropped onto the ground there from a little above it; where the enemy came from may lie higher or lower.
 	const UCapsuleComponent* EnemyCapsule = Enemy->GetCapsuleComponent();
 	const float EnemyHalfHeight = IsValid(EnemyCapsule) ? EnemyCapsule->GetScaledCapsuleHalfHeight() : 0.0f;
@@ -454,18 +466,27 @@ void FCoverTrenchTestScenario::KeepEnemyInFrontOfTrench(UWorld& World)
 	using namespace CoverTrenchTestScenarioPrivate;
 	const bool bEnemyIsNeeded = M_Phase == ECoverTrenchTestPhase::WaitingForStandUp ||
 		M_Phase == ECoverTrenchTestPhase::WaitingForReloadDuck ||
-		M_Phase == ECoverTrenchTestPhase::WaitingForStandUpAfterReload;
+		M_Phase == ECoverTrenchTestPhase::WaitingForStandUpAfterReload ||
+		M_Phase == ECoverTrenchTestPhase::HoldingTrenchWhileFlanked;
 	const ASquadUnit* Enemy = M_Enemy.Get();
 	if (not bEnemyIsNeeded || not IsValid(Enemy))
 	{
 		return;
 	}
-	const FVector EnemyPost = M_TrenchPoint.Location -
-		M_TrenchPoint.CoverNormal.GetSafeNormal2D() * EnemyDistanceInFrontOfTrench;
-	if (FVector::Dist2D(Enemy->GetActorLocation(), EnemyPost) > MaximumEnemyDriftFromPost)
+	if (FVector::Dist2D(Enemy->GetActorLocation(), GetEnemyPost()) > MaximumEnemyDriftFromPost)
 	{
 		PlaceLivingEnemyInFrontOfTrench(World);
 	}
+}
+
+FVector FCoverTrenchTestScenario::GetEnemyPost() const
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	// Straight ahead of the firing step, where the soldier looks, turned by the yaw of the current flank step.
+	const FVector FacingDirection = (-M_TrenchPoint.CoverNormal.GetSafeNormal2D()).RotateAngleAxis(
+		M_EnemyPostYawDegrees,
+		FVector::UpVector);
+	return M_TrenchPoint.Location + FacingDirection * EnemyDistanceInFrontOfTrench;
 }
 
 void FCoverTrenchTestScenario::CheckFeetOnSocket()
@@ -522,7 +543,124 @@ void FCoverTrenchTestScenario::TickWaitingForCrouchAgain(UWorld& World)
 		return;
 	}
 	Check(bIsCrouchedAgain, TEXT("the soldier crouched again once the enemy was gone"));
-	Finish(World);
+	if (not bIsCrouchedAgain)
+	{
+		Finish(World);
+		return;
+	}
+	StartFlankStep(World, 0);
+}
+
+void FCoverTrenchTestScenario::StartFlankStep(UWorld& World, const int32 FlankStepIndex)
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	M_FlankStepIndex = FlankStepIndex;
+	M_EnemyPostYawDegrees = FlankYawDegrees[FlankStepIndex];
+	M_FlankTargetedSeconds = 0.0f;
+	M_FlankEnemyPlacementCount = 0;
+	if (not PlaceLivingEnemyInFrontOfTrench(World))
+	{
+		Check(false, TEXT("an enemy is alive to flank the trench with"));
+		Finish(World);
+		return;
+	}
+	EnterPhase(World, ECoverTrenchTestPhase::HoldingTrenchWhileFlanked, FlankHoldSeconds);
+}
+
+void FCoverTrenchTestScenario::TickHoldingTrenchWhileFlanked(UWorld& World)
+{
+	using namespace CoverTrenchTestScenarioPrivate;
+	ASquadUnit* TrenchSoldier = M_TrenchSoldier.Get();
+	const bool bSoldierIsAlive = IsValid(TrenchSoldier) && TrenchSoldier->IsUnitAlive();
+	const bool bHoldsTrenchPoint = bSoldierIsAlive && GetIsInTrenchCover(*TrenchSoldier) &&
+		TrenchSoldier->GetCoverRuntimeState().AssignedCoverPoint.PointId == M_TrenchPoint.PointId;
+	if (not bHoldsTrenchPoint)
+	{
+		Check(
+			false,
+			TEXT("the soldier kept his trench point while flanked"),
+			FString::Printf(
+				TEXT("flank_yaw=%.0f alive=%d state=%s cover_type=%s held_point=%lld trench_point=%lld"),
+				M_EnemyPostYawDegrees,
+				bSoldierIsAlive ? 1 : 0,
+				IsValid(TrenchSoldier) ? *UEnum::GetValueAsString(TrenchSoldier->GetCoverRuntimeState().State) : TEXT("-"),
+				IsValid(TrenchSoldier)
+					? *UEnum::GetValueAsString(TrenchSoldier->GetCoverRuntimeState().AssignedCoverPoint.CoverType)
+					: TEXT("-"),
+				IsValid(TrenchSoldier) ? TrenchSoldier->GetCoverRuntimeState().AssignedCoverPoint.PointId : 0,
+				M_TrenchPoint.PointId));
+		Finish(World);
+		return;
+	}
+	// Squad mates in the open shoot the flanking enemy; a fresh one keeps the pressure on.
+	ASquadUnit* Enemy = M_Enemy.Get();
+	const bool bEnemyIsAlive = IsValid(Enemy) && Enemy->IsUnitAlive();
+	if (not bEnemyIsAlive && not PlaceLivingEnemyInFrontOfTrench(World))
+	{
+		Check(false, TEXT("an enemy is alive to flank the trench with"));
+		Finish(World);
+		return;
+	}
+	OrderSquadToAttackFlankingEnemy();
+	RecordFlankTargetTime(World);
+	if (not GetHasPhaseTimedOut(World))
+	{
+		return;
+	}
+	AInfantryWeaponMaster* TrenchWeapon = TrenchSoldier->GetInfantryWeapon();
+	const ASquadUnit* FlankingEnemy = M_Enemy.Get();
+	Check(
+		M_FlankTargetedSeconds >= MinimumFlankTargetedSeconds,
+		TEXT("the soldier's weapon had the flanking enemy as target"),
+		FString::Printf(
+			TEXT("flank_yaw=%.0f targeted_s=%.1f weapon_target=%s enemy=%s enemy_distance_cm=%.0f enemy_height_cm=%.0f placements=%d"),
+			M_EnemyPostYawDegrees,
+			M_FlankTargetedSeconds,
+			IsValid(TrenchWeapon) ? *GetNameSafe(TrenchWeapon->GetCurrentTargetActor()) : TEXT("no weapon"),
+			*GetNameSafe(FlankingEnemy),
+			IsValid(FlankingEnemy) ? FVector::Dist(TrenchSoldier->GetActorLocation(), FlankingEnemy->GetActorLocation()) : -1.0f,
+			IsValid(FlankingEnemy) ? FlankingEnemy->GetActorLocation().Z - TrenchSoldier->GetActorLocation().Z : 0.0f,
+			M_FlankEnemyPlacementCount));
+	Check(
+		true,
+		TEXT("the soldier kept his trench point while flanked"),
+		FString::Printf(TEXT("flank_yaw=%.0f hold_s=%.0f"), M_EnemyPostYawDegrees, FlankHoldSeconds));
+	const int32 NextFlankStepIndex = M_FlankStepIndex + 1;
+	if (NextFlankStepIndex >= static_cast<int32>(UE_ARRAY_COUNT(FlankYawDegrees)))
+	{
+		Finish(World);
+		return;
+	}
+	StartFlankStep(World, NextFlankStepIndex);
+}
+
+void FCoverTrenchTestScenario::OrderSquadToAttackFlankingEnemy()
+{
+	ASquadController* OrderedSquad = M_OrderedSquad.Get();
+	ASquadUnit* FlankingEnemy = M_Enemy.Get();
+	if (not IsValid(OrderedSquad) || not IsValid(FlankingEnemy) || M_FlankAttackOrderTarget.Get() == FlankingEnemy)
+	{
+		return;
+	}
+	M_FlankAttackOrderTarget = FlankingEnemy;
+	const ECommandQueueError OrderResult = OrderedSquad->AttackActor(FlankingEnemy, true);
+	Check(
+		OrderResult == ECommandQueueError::NoError,
+		TEXT("the squad accepted the attack order on the flanking enemy"),
+		FString::Printf(
+			TEXT("flank_yaw=%.0f enemy=%s result=%s"),
+			M_EnemyPostYawDegrees,
+			*FlankingEnemy->GetName(),
+			*UEnum::GetValueAsString(OrderResult)));
+}
+
+void FCoverTrenchTestScenario::RecordFlankTargetTime(const UWorld& World)
+{
+	const ASquadUnit* TrenchSoldier = M_TrenchSoldier.Get();
+	AInfantryWeaponMaster* TrenchWeapon = IsValid(TrenchSoldier) ? TrenchSoldier->GetInfantryWeapon() : nullptr;
+	const bool bTargetsFlankingEnemy = IsValid(TrenchWeapon) && M_Enemy.IsValid() &&
+		TrenchWeapon->GetCurrentTargetActor() == M_Enemy.Get() && TrenchWeapon->GetIsCurrentTargetInRange();
+	M_FlankTargetedSeconds += bTargetsFlankingEnemy ? World.GetDeltaSeconds() : 0.0f;
 }
 
 #endif // RTS_WITH_MAP_TESTS

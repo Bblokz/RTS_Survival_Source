@@ -111,12 +111,30 @@ void UMissionBase::OnMissionComplete()
 		const bool bPlaySound = not bIsTextOnlyMission;
 		M_MissionManager->OnAnyMissionCompleted(this, bPlaySound);
 	}
-	if (NextMission)
+	if (not bStartNextMissionWhenAirDeliveredHQLands)
 	{
 		// Load the new mission that comes after this one is completed.
-		M_MissionManager->ActivateNewMission(NextMission);
+		ActivateNextMissionIfConfigured();
+		BP_OnMissionComplete();
+		return;
 	}
+	// The completion event starts the HQ delivery; the next mission waits until the HQ is on the ground.
 	BP_OnMissionComplete();
+	if (M_PendingAirDeliveredHQCount > 0)
+	{
+		bM_IsNextMissionWaitingForAirDeliveredHQ = true;
+		return;
+	}
+	ActivateNextMissionIfConfigured();
+}
+
+void UMissionBase::ActivateNextMissionIfConfigured()
+{
+	if (not NextMission || not GetIsValidMissionManager())
+	{
+		return;
+	}
+	M_MissionManager->ActivateNewMission(NextMission);
 }
 
 void UMissionBase::OnMissionFailed()

@@ -143,6 +143,25 @@ enum class EBuildingExpansionType : uint8
 	// Communication Center: a raised MG42 nest on top of each sandbag-wing end, each with a scavenger gunner and a
 	// loader who walks the deck to his ammo crate (the twin MG42 pit's turrets and crew).
 	BTX_GerCommMG42Nests UMETA(DisplayName = "Ger Comm MG42 Nests"),
+	// Strike Division refinery: three stepped distillation columns in the back sandbag rim feeding a bank of green
+	// glass receivers; built at the building origin and adds radixite storage to the refinery's drop off.
+	BTX_RefKaskade UMETA(DisplayName = "Refinery Kaskade Distillation"),
+	// Strike Division refinery: a steel flak stand on four laced legs over the radixite storage tanks, reached by a
+	// spiral stair; a 3.7 cm Flak 37 with a gunner and a loader behind a double bag ring; built at the building origin.
+	BTX_RefFlakStand UMETA(DisplayName = "Refinery Flak Stand"),
+	// Strike Division light forge: a laced steel portal over the front arch and a roof rib carrying a round deck with
+	// a Panzerschreck team behind a camo-plate parapet; built at the building origin.
+	BTX_GerForgeSchreckFrame UMETA(DisplayName = "Ger Forge Schreck Frame"),
+	// Strike Division metal vault: a firebrick cupola inside the vault's sleeved scaffold tower, charged by a skip up
+	// its back face; converts metal into vehicle parts; built at the building origin.
+	BTX_GerMetalVaultSmelter UMETA(DisplayName = "Ger Metal Vault Smelter"),
+	// Communication Center: a requisition cabin hung from steel outriggers on the tower head, clad like the tower;
+	// built at the building origin. While it stands, its owner's field defenses cost less (FBxpData::FieldDefenseCostMlt).
+	BTX_GerCommRequisitionOffice UMETA(DisplayName = "Ger Comm Requisition Office"),
+	// Communication Center: a cipher cabin in the tower's style, hung from two portal frames over the inner yard's camo
+	// net; built at the building origin. While it stands, its owner's commander abilities recharge faster
+	// (FBxpData::GlobalAbilityCooldownMlt).
+	BTX_GerCommCipherRoom UMETA(DisplayName = "Ger Comm Cipher Room"),
 };
 
 static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
@@ -267,6 +286,10 @@ static FString Global_GetBxpTypeEnumAsString(EBuildingExpansionType BxpType)
 		return FString("BTX_GerCommObservationPost");
 	case EBuildingExpansionType::BTX_GerCommMG42Nests:
 		return FString("BTX_GerCommMG42Nests");
+	case EBuildingExpansionType::BTX_GerCommRequisitionOffice:
+		return FString("BTX_GerCommRequisitionOffice");
+	case EBuildingExpansionType::BTX_GerCommCipherRoom:
+		return FString("BTX_GerCommCipherRoom");
 	case EBuildingExpansionType::BTX_GerHQRadar:
 		return FString("BTX_GerHQRadar");
 	case EBuildingExpansionType::BTX_GerHQPlatform:
@@ -344,6 +367,8 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BTX_GerTwinMG42Pit: return TEXT("Twin MG42 Pit");
 	case EBuildingExpansionType::BTX_GerCommObservationPost: return TEXT("Observation Post");
 	case EBuildingExpansionType::BTX_GerCommMG42Nests: return TEXT("MG42 Nests");
+	case EBuildingExpansionType::BTX_GerCommRequisitionOffice: return TEXT("Requisition Office");
+	case EBuildingExpansionType::BTX_GerCommCipherRoom: return TEXT("Cipher Room");
 
 	case EBuildingExpansionType::BTX_RusBarracks: return TEXT("Barracks");
 	case EBuildingExpansionType::BTX_RusFactory: return TEXT("Factory");
@@ -368,6 +393,10 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	case EBuildingExpansionType::BXT_SolarLarge: return TEXT("Radixite Solar Trailer");
 
 	case EBuildingExpansionType::BTX_RefConverter: return TEXT("Refinery Converter");
+	case EBuildingExpansionType::BTX_RefKaskade: return TEXT("Kaskade Distillation");
+	case EBuildingExpansionType::BTX_RefFlakStand: return TEXT("Flak Stand");
+	case EBuildingExpansionType::BTX_GerForgeSchreckFrame: return TEXT("Panzerschreck Frame");
+	case EBuildingExpansionType::BTX_GerMetalVaultSmelter: return TEXT("Smelter");
 
 	default:
 		break;
@@ -403,6 +432,30 @@ static FString Global_GetBxpDisplayString(const EBuildingExpansionType BxpType)
 	}
 
 	return Formatted.TrimStartAndEnd();
+}
+
+// The expansions the HQ's Field Defenses tab plans and builds; keep in sync with
+// UTrainingMenuManager::InitAllGameFieldDefenseTrainingOptions. A Requisition office lowers their price
+// (FBxpData::FieldDefenseCostMlt), the field trench's per-metre price included.
+static bool Global_GetIsFieldDefenseBxpType(const EBuildingExpansionType BxpType)
+{
+	switch (BxpType)
+	{
+	case EBuildingExpansionType::BTX_GerPak40Pit:
+	case EBuildingExpansionType::BTX_GerFlak37Pit:
+	case EBuildingExpansionType::BTX_GerMortarPit:
+	case EBuildingExpansionType::BTX_GerPuppchenPit:
+	case EBuildingExpansionType::BTX_GerPanzerschreckPit:
+	case EBuildingExpansionType::BTX_GerTwinMG42Pit:
+	case EBuildingExpansionType::BTX_GerLeFH18Pit:
+	case EBuildingExpansionType::BTX_GerSFH18Pit:
+	case EBuildingExpansionType::BTX_GerFlak88Pit:
+	case EBuildingExpansionType::BTX_GerRailPakBunker:
+	case EBuildingExpansionType::BTX_GerFieldTrench:
+		return true;
+	default:
+		return false;
+	}
 }
 
 // Defines the state of the building expansion.

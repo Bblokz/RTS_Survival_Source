@@ -17,19 +17,23 @@
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "W_CommanderSelectionMenu.h"
 
-// Same measures as the unit entries of the variant screen (Custom_VariantUnitEntry), whose button art it reuses.
+// The width of the variant screen's unit entries (Custom_VariantUnitEntry), whose button art it reuses; lower than
+// them so all twelve commanders fit the list without scrolling.
 namespace CommanderSelectionEntryLayout
 {
 	constexpr float EntryWidth = 352.f;
-	constexpr float EntryHeight = 80.f;
-	constexpr float PortraitWellSize = 72.f;
-	constexpr float PortraitSize = 64.f;
+	constexpr float EntryHeight = 60.f;
+	constexpr float PortraitWellSize = 52.f;
+	constexpr float PortraitSize = 44.f;
 	const FMargin PortraitWellOffset(16.f, 4.f, 0.f, 0.f);
 	const FMargin PortraitWellPadding(4.f);
 	// Centred on the entry, level with the portrait well; the kit's tiers are only listed on the right panel.
-	const FMargin TitleOffset(102.f, 0.f, 24.f, 0.f);
+	const FMargin TitleOffset(78.f, 0.f, 24.f, 0.f);
 	// Smaller than the variant screen's unit names so "LUFTWAFFE LIAISON" clears the selection chevron.
 	constexpr int32 TitleFontSize = 16;
+	// "SKY-DROP QUARTERMASTER" (22 characters) needs a smaller size to clear the selection chevron.
+	constexpr int32 LongTitleFontSize = 13;
+	constexpr int32 LongTitleMinCharacters = 20;
 	// The portraits are 1024x1280 renders with the head left of centre; this 717 px square sits on it.
 	const FBox2d PortraitHeadUVRegion(FVector2d(0.08, 0.03), FVector2d(0.78, 0.59));
 }
@@ -113,8 +117,11 @@ void UW_CommanderSelectionEntry::SetupEntry(UW_CommanderSelectionMenu* Menu, con
 	{
 		return;
 	}
+	const int32 FontSize = CommanderEntry.Title.ToString().Len() >= LongTitleMinCharacters
+		                        ? LongTitleFontSize
+		                        : TitleFontSize;
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
-		M_TitleText, UnitVariantSelectionWidgets::MakeFont(Style.HeadingFont, TitleFontSize), Style.TextColor);
+		M_TitleText, UnitVariantSelectionWidgets::MakeFont(Style.HeadingFont, FontSize), Style.TextColor);
 	M_TitleText->SetText(CommanderEntry.Title.ToUpper());
 	ApplySelectionLook();
 }

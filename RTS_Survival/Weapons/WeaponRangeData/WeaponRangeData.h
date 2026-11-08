@@ -4,18 +4,28 @@
 
 #include "WeaponRangeData.generated.h"
 
+class AActor;
 class UWeaponState;
 
 /**
  * @brief Contains the range, squared range and the search range for a weapon
  * @pre Provide AdjustRangeForNewWeapon(const float Range) to see if the radii need to be
  * adjusted depending on the new weapon range.
- 
+
  */
 USTRUCT()
 struct FWeaponRangeData
 {
 	GENERATED_BODY()
+
+	/** @return Whether ground weapons engaging this actor get the anti-air range multiplier. */
+	static bool GetIsAntiAirRangeTarget(const AActor* Target);
+
+	/** @return Anti-air range multiplier for aircraft targets, 1 otherwise. */
+	static float GetRangeMltForTarget(const bool bIsAircraftTarget);
+
+	/** @return The squared engage range; aircraft targets are reached further out than ground targets. */
+	float GetMaxRangeSquaredForTarget(const bool bIsAircraftTarget) const;
 
 	inline void AdjustRangeForNewWeapon(const float Range)
 	{

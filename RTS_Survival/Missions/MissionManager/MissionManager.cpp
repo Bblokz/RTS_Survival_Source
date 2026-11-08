@@ -1,4 +1,5 @@
 ﻿#include "MissionManager.h"
+#include "RTS_Survival/GlobalAbilitySystem/Tests/AllGlobalAbilities/AllGlobalAbilitiesUnlock.h"
 
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
@@ -1659,6 +1660,10 @@ void AMissionManager::SetMissionManagerWidget(UW_MissionWidgetManager* MissionMa
 
 void AMissionManager::HidePlayerGlobalAbilityPanelIfNeeded() const
 {
+#if RTS_WITH_ALL_GLOBAL_ABILITIES
+	// Ability test target: the player keeps every global ability on every mission.
+	return;
+#else
 	if (not bHideGlobalAbilitiesForPlayer)
 	{
 		return;
@@ -1678,6 +1683,7 @@ void AMissionManager::HidePlayerGlobalAbilityPanelIfNeeded() const
 	}
 
 	MainGameUI->HideGlobalAbilityPanelForMission();
+#endif
 }
 
 void AMissionManager::BeginPlay_CheckForDifficultyOverrideWithWidget() const

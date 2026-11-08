@@ -31,6 +31,7 @@ struct FFlareCurtainSettings
 /**
  * @brief A bomber flies the strip and drops evenly spaced parachute flares that light it up. The number of flares is
  * the aim area's ShaderMarkerCount and their vision radius its AreaRadius, so the target area shows the real curtain.
+ * With one flare (GA_GerMassiveFlare, circle aim) it hangs over the middle of the strip, which is the aimed point.
  */
 UCLASS(BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
 class RTS_SURVIVAL_API UGA_FlareCurtain : public UGA_StripFlight

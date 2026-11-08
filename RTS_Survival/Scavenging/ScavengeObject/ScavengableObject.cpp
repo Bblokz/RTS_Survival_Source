@@ -1,4 +1,5 @@
 ﻿#include "ScavengableObject.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/GameUI/MiniMap/MapObjectFilters/RTSMapObjectFilterSubsystem.h"
 
 #include "Kismet/GameplayStatics.h"
@@ -583,6 +584,11 @@ bool AScavengeableObject::GetIsValidPlayerController()
 		{
 			return true;
 		}
+	}
+	// Supply drops land in the pre-game hangar's ability preview, which has no ACPPController.
+	if (FRTS_Statics::GetIsInPreGameHangar(this))
+	{
+		return false;
 	}
 	RTSFunctionLibrary::ReportErrorVariableNotInitialised(this, "M_PlayerController",
 	                                                      "GetIsValidPlayerController",

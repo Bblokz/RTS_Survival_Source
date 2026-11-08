@@ -23,6 +23,7 @@ class UAircraftTargetAcquisition;
 class UAircraftWeapon;
 class UAircraftMovement;
 class UAircraftDeathComponent;
+class UCargoRopeSlingComponent;
 // forward declare
 class UAircraftOwnerComp;
 
@@ -48,6 +49,8 @@ class UAircraftOwnerComp;
  * @note - Anim/weapon systems are kept in lock-step with landed state to avoid firing while docked or mid-transition.
  */
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnAircraftStraightRunPassedPoint, AAircraftMaster*);
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnAircraftDropPayloadReleased, AAircraftMaster* /*Aircraft*/,
+                                     ATankMaster* /*ReleasedTank*/);
 
 UCLASS()
 class AAircraftMaster : public ASelectablePawnMaster, public IExperienceInterface, public IRTSUnit
@@ -165,6 +168,10 @@ public:
 
 	// Fired once when a straight flight run reaches its pass-over point.
 	FOnAircraftStraightRunPassedPoint OnStraightRunPassedPoint;
+
+	// Fired once per tank drop (rope-slung or not) after the tank is detached, placed on the ground, selectable and
+	// has its weapons back.
+	FOnAircraftDropPayloadReleased OnAircraftDropPayloadReleased;
 
 	/**
 	 * @brief While held, a straight run keeps flying past its end point instead of destroying itself, so payload that
@@ -692,12 +699,94 @@ private:
 	void AircraftDrop_OnVtoCompleted();
 	void AircraftDrop_SpawnSquads() const;
 	void AircraftDrop_SpawnSquad(ESquadSubtype SquadSubtype, int32 SquadIndex) const;
+	// Spawns the squads one after another at the cargo door, so they file out instead of stacking in the door.
+	void AircraftDrop_SpawnSquadsThroughCargoDoor() const;
+	/** @return The navmesh point at the mesh's cargo door socket; the landing point when the mesh has no such socket. */
+	FVector AircraftDrop_GetProjectedCargoDoorLocation() const;
+	/**
+	 * @brief Sends a squad that appeared at the cargo door to its spot outside the aircraft; from then on it is a
+	 * normal unit (the move is an ordinary command the player can override).
+	 * @param SpawnedSquad The squad controller the async spawner made.
+	 * @param DoorLocation Where the squad appeared.
+	 * @param OutsideLocation Its spot on the RadiusSpawnSquads circle.
+	 */
+	static void AircraftDrop_OrderSquadWalkOut(AActor* SpawnedSquad, const FVector& DoorLocation,
+	                                           const FVector& OutsideLocation);
 	void AircraftDrop_AttachTank();
 	void AircraftDrop_DetachTank();
 	void AircraftDrop_RegisterEnemyPayloadUnit(AActor* DroppedUnit) const;
 	UEnemyStrategicAIComponent* AircraftDrop_GetEnemyStrategicAIComponent() const;
 	void AircraftDrop_PlayDropOffSound() const;
 	FVector AircraftDrop_GetProjectedSquadSpawnLocation(int32 SquadIndex) const;
+
+	// ----------------------- Rope-slung tank drop -----------------------
+	// Timed, eased flight of one rope-sling phase; the phase itself is M_AircraftDropRequest.State
+	// (VerticalLanding = descent until the payload touches down, LandedWaiting = hover, VerticalTakeOff = climb).
+	struct FAircraftRopeSlingFlightState
+	{
+		FVector StartLocation = FVector::ZeroVector;
+		FRotator StartRotation = FRotator::ZeroRotator;
+		FVector TargetLocation = FVector::ZeroVector;
+		float Elapsed = 0.f;
+		float Duration = 0.f;
+		float HoverBaseZ = 0.f;
+		float HoverPhase = 0.f;
+	};
+
+	FAircraftRopeSlingFlightState M_RopeSlingFlight;
+
+	// Only exists while a rope-slung payload is carried or its ropes winch up; destroys itself afterwards.
+	UPROPERTY()
+	TObjectPtr<UCargoRopeSlingComponent> M_CargoRopeSling;
+
+	/** @return Whether rope visuals exist; not an error, only rope-slung drops create them. */
+	bool GetHasCargoRopeSling() const;
+
+	/** @return Whether a rope-slung drop owns the aircraft's movement (descent, hover or climb). */
+	bool AircraftDrop_GetIsRopeSlingFlightActive() const;
+
+	void AircraftDrop_CreateRopeSling(ATankMaster* Tank);
+	void AircraftDrop_DestroyRopeSling();
+
+	/** @return Cruise Z that keeps the slung payload clear of the ground between here and the drop point. */
+	float AircraftDrop_GetRopeSlingCruiseZ() const;
+
+	/** @return Highest ground Z sampled on the straight line from the aircraft to the drop point. */
+	float AircraftDrop_GetHighestGroundZAlongApproach() const;
+
+	/**
+	 * @brief Traces down to the landscape at one XY location.
+	 * @param Location XY to sample; Z is the centre of the trace.
+	 * @param OutGroundZ Ground height when hit.
+	 * @return Whether the landscape was hit.
+	 */
+	bool AircraftDrop_TraceGroundZ(const FVector& Location, float& OutGroundZ) const;
+
+	void AircraftDrop_StartRopeSlingDescent();
+	void AircraftDrop_OnRopeSlingPayloadGrounded();
+	void AircraftDrop_StartRopeSlingClimb();
+
+	/**
+	 * @brief Starts one eased rope-sling flight phase from the current pose.
+	 * @param TargetLocation Where the aircraft origin ends.
+	 * @param Speed Average speed in cm/s; sets the duration.
+	 * @param MinDuration Lower bound of the duration in seconds.
+	 */
+	void AircraftDrop_StartRopeSlingPhase(const FVector& TargetLocation, const float Speed, const float MinDuration);
+
+	/** @return Eased 0..1 progress of the current rope-sling phase after advancing it by DeltaTime. */
+	float AircraftDrop_AdvanceRopeSlingPhase(const float DeltaTime);
+
+	void Tick_RopeSlingDrop(const float DeltaTime);
+	void Tick_RopeSlingDescent(const float DeltaTime);
+	void Tick_RopeSlingHover(const float DeltaTime);
+	void Tick_RopeSlingClimb(const float DeltaTime);
+
+	/** @brief Puts a released rope-slung tank exactly on the drop point, upright with its current heading. */
+	void AircraftDrop_PlaceRopeSlungTankOnGround(ATankMaster* Tank) const;
+
+	/** @return False for a nomadic vehicle in building form, whose hidden chassis must not start simulating. */
+	static bool AircraftDrop_ShouldEnablePayloadPhysics(const ATankMaster* Tank);
 
 	FAircraftStrafeState M_StrafeState;
 	FAircraftAttackMoveSettings M_PreStrafeAttackMoveSettings;

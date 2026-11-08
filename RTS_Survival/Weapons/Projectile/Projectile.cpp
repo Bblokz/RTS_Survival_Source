@@ -35,6 +35,7 @@
 #include "RTS_Survival/Subsystems/CameraShakeSubsystem/RTSCameraShakeSubsystem.h"
 #include "RTS_Survival/Subsystems/FireSubsystem/RTSFireSubsystem.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
+#include "RTS_Survival/Weapons/Projectile/Tests/ProjectileMapTestHooks.h"
 
 // --- local helpers (file-scope) ------------------------------------------------
 namespace
@@ -335,9 +336,21 @@ void AProjectile::SetupProjectileForNewLaunch(
 	{
 		M_Range = Range * DeveloperSettings::GameBalance::Weapons::Projectiles::DefaultProjectileRangeMlt;
 	}
+	// Shells fired at an aircraft must reach the anti-air engage range.
+	if (IsValid(NewProjectileOwner))
+	{
+		M_Range *= NewProjectileOwner->GetFlightRangeMltForCurrentTarget();
+	}
 	M_FullDamage = Damage;
 	M_ArmorPen = ArmorPen;
 	M_ArmorPenAtMaxRange = ArmorPenMaxRange;
+#if RTS_WITH_MAP_TESTS
+	if (IsValid(NewProjectileOwner))
+	{
+		FProjectileMapTestHooks::ReportShellLaunched(this, NewProjectileOwner->GetWeaponOwnerObject(),
+		                                             NewProjectileOwner->GetRawWeaponData().WeaponName);
+	}
+#endif
 	bM_CanArmorOverPenetrate = bCanArmorOverPenetrate;
 	M_PostPenArmorPenCarryOver = FMath::Clamp(PostPenArmorPenCarryOver, 0.0f, 1.0f);
 	M_FloorArmorPenPercentageNeededAllowOverpen = FMath::Clamp(FloorArmorPenPercentageNeededAllowOverpen, 0.0f, 1.0f);
@@ -2099,6 +2112,12 @@ void AProjectile::OnProjectileDormant()
 		return;
 	}
 	SetActorHiddenInGame(true);
+	// A hidden pooled projectile kept simulating its Niagara system: every dormant shell in the pool dispatched GPU
+	// sims each frame (performance audit). It is hidden already, so stopping it at once changes nothing visible.
+	if (GetIsValidNiagara())
+	{
+		M_NiagaraComponent->DeactivateImmediate();
+	}
 	M_ProjectileMovement->Velocity = FVector::ZeroVector;
 	M_ProjectileMovement->Deactivate();
 	M_ProjectileMovement->ProjectileGravityScale = M_DefaultGravityScale;
@@ -2131,6 +2150,11 @@ void AProjectile::OnRestartProjectile(const FVector& NewLocation, const FRotator
 	// Move projectile to new location.
 	SetActorLocation(NewLocation);
 	SetActorRotation(LaunchRotation);
+	// Dormant projectiles stop their Niagara system; restart it fresh at the launch location.
+	if (GetIsValidNiagara())
+	{
+		M_NiagaraComponent->Activate(true);
+	}
 	if (GetIsValidProjectileMovement())
 	{
 		M_ProjectileMovement->Activate();
@@ -2697,10 +2721,49 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 	const FVehicleModuleDamageEvent ModuleDamageEvent = MakeKineticModuleDamageEvent(
 		ArmorCalculation, HitResult, PlateHit, PlateRegistrationId, EffectiveArmor, not bShouldBounce,
 		bOverpenetrating);
+#if RTS_WITH_MAP_TESTS
+	// The hit is reported after its damage landed, so the report carries the health the victim really lost.
+	const bool bReportHitForMapTests = FProjectileMapTestHooks::GetHasListeners();
+	FMapTestArmorHitReport MapTestHitReport;
+	if (bReportHitForMapTests)
+	{
+		MapTestHitReport.ShellLaunchId = FProjectileMapTestHooks::GetShellLaunchId(this);
+		MapTestHitReport.WeaponOwner = IsValid(M_ProjectileOwner) ? M_ProjectileOwner->GetWeaponOwnerObject() : nullptr;
+		MapTestHitReport.WeaponName = IsValid(M_ProjectileOwner)
+			                              ? M_ProjectileOwner->GetRawWeaponData().WeaponName
+			                              : EWeaponName::DEFAULT_WEAPON;
+		MapTestHitReport.HitActor = HitActor;
+		MapTestHitReport.HitActorUniqueId = IsValid(HitActor) ? HitActor->GetUniqueID() : 0;
+		MapTestHitReport.ShellType = M_ShellType;
+		MapTestHitReport.WeaponCalibre = M_WeaponCalibre;
+		MapTestHitReport.PlateHit = PlateHit;
+		MapTestHitReport.RawArmor = RawArmorValue;
+		MapTestHitReport.EffectiveArmor = EffectiveArmor;
+		MapTestHitReport.PenAtImpact = AdjustedArmorPen;
+		MapTestHitReport.ShellDamage = M_FullDamage;
+		MapTestHitReport.HealthBefore = FProjectileMapTestHooks::GetHealthOrZero(HitActor);
+	}
+	const TWeakObjectPtr<AActor> MapTestHitActor(HitActor);
+	auto BroadcastMapTestHit = [&MapTestHitReport, &MapTestHitActor, bReportHitForMapTests](
+		const EMapTestArmorHitVerdict Verdict, const float DamageMlt)
+	{
+		if (not bReportHitForMapTests)
+		{
+			return;
+		}
+		MapTestHitReport.Verdict = Verdict;
+		MapTestHitReport.DamageMlt = DamageMlt;
+		MapTestHitReport.HealthAfter = FProjectileMapTestHooks::GetHealthOrZero(MapTestHitActor.Get());
+		FProjectileMapTestHooks::OnArmorHit().Broadcast(MapTestHitReport);
+	};
+#endif
 	if (bShouldBounce)
 	{
 		HandleProjectileBounce(HitResult, PlateHit, HitActor, MakeImpactOutwardRotationZ(HitResult),
 		                       &ModuleDamageEvent);
+#if RTS_WITH_MAP_TESTS
+		BroadcastMapTestHit(EMapTestArmorHitVerdict::Bounce, 0.f);
+#endif
 		return;
 	}
 	if constexpr (DeveloperSettings::Debugging::GWeapon_ArmorPen_Compile_DebugSymbols)
@@ -2719,6 +2782,26 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 		OnArmorPen_DisplayText(HitResult.Location, PlateHit);
 	}
 	ProjectileHitPropagateNotification(false);
+#if RTS_WITH_MAP_TESTS
+	EMapTestArmorHitVerdict MapTestPenVerdict = bOverpenetrating
+		                                            ? EMapTestArmorHitVerdict::OverPenetration
+		                                            : EMapTestArmorHitVerdict::Penetration;
+	if (bArmorDestroyed)
+	{
+		MapTestPenVerdict = EMapTestArmorHitVerdict::ArmorDestroyed;
+	}
+	else if (bReportHitForMapTests)
+	{
+		// A flank ammo detonation returns the lethal multiplier (twice the max health) without destroying the armor.
+		const UHealthComponent* const MapTestHealth = IsValid(HitActor)
+			                                              ? HitActor->FindComponentByClass<UHealthComponent>()
+			                                              : nullptr;
+		if (IsValid(MapTestHealth) && M_FullDamage * DamageMlt >= 2.f * MapTestHealth->GetMaxHealth() - KINDA_SMALL_NUMBER)
+		{
+			MapTestPenVerdict = EMapTestArmorHitVerdict::FlankAmmoDetonation;
+		}
+	}
+#endif
 
 	const ERTSSurfaceType SurfaceTypeHit = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
 	if (bOverpenetrating)
@@ -2731,6 +2814,9 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 			M_ProjectileMovement->MaxSpeed *=
 				DeveloperSettings::GameBalance::Weapons::RailGun::OverPenProjectileSpeedMlt;
 		}
+#if RTS_WITH_MAP_TESTS
+		BroadcastMapTestHit(MapTestPenVerdict, DamageMlt);
+#endif
 		return;
 	}
 
@@ -2739,6 +2825,9 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 		HitResult.Location,
 		SurfaceTypeHit,
 		MakeImpactOutwardRotationZ(HitResult), DamageMlt, &ModuleDamageEvent);
+#if RTS_WITH_MAP_TESTS
+	BroadcastMapTestHit(MapTestPenVerdict, DamageMlt);
+#endif
 }
 
 FVehicleModuleDamageEvent AProjectile::MakeKineticModuleDamageEvent(
@@ -2928,6 +3017,10 @@ float AProjectile::GetWidthOfShell(const float WeaponCalibre, const EWeaponShell
 	case EWeaponShellType::Shell_Fire:
 		return ShellWidth * FireShellWidthMlt;
 	case EWeaponShellType::Shell_Railgun:
+		return ShellWidth * APShellWidthMlt;
+	case EWeaponShellType::Shell_Radixite:
+		// Radixite rounds are full-calibre shells: the AP width (they used to fall through to the base width with an
+		// error on every shot).
 		return ShellWidth * APShellWidthMlt;
 	}
 	RTSFunctionLibrary::ReportError("Invalid shell type for calculating width: " +
@@ -3262,8 +3355,10 @@ void AProjectile::DebugArmorHit(const float Armor, const float EffectiveArmor, c
 
 void AProjectile::He_Heat_AttemptStunOnBounce(const AActor* HitActor) const
 {
+	// The stun is a vehicle behaviour (weapon lock, turret slow-down on the ATankMaster): soldiers, buildings and
+	// pits carry a behaviour component too but must not get it.
 	if (M_WeaponCalibre < DeveloperSettings::GameBalance::Weapons::Projectiles::StunCalibreThreshold || not
-		IsValid(HitActor))
+		IsValid(HitActor) || not HitActor->IsA<ATankMaster>())
 	{
 		return;
 	}
@@ -3282,7 +3377,8 @@ void AProjectile::He_Heat_AttemptStunOnPen(const AActor* HitActor) const
 		return;
 	}
 	const bool bIsHe_Heat = M_ShellType == EWeaponShellType::Shell_HE || M_ShellType == EWeaponShellType::Shell_HEAT;
-	if (not bIsHe_Heat || not IsValid(HitActor))
+	// Vehicles only, as on a bounce.
+	if (not bIsHe_Heat || not IsValid(HitActor) || not HitActor->IsA<ATankMaster>())
 	{
 		return;
 	}

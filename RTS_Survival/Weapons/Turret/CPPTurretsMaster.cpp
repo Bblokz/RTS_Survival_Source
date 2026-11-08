@@ -318,7 +318,7 @@ void ACPPTurretsMaster::BeginPlay()
 	{
 		PlayerController = NewPlayerController;
 	}
-	else
+	else if (not FRTS_Statics::GetIsInPreGameHangar(this))
 	{
 		RTSFunctionLibrary::ReportNullErrorInitialisation(this, "PlayerController", "ACPPTurretsMaster::BeginPlay");
 	}
@@ -1648,7 +1648,13 @@ bool ACPPTurretsMaster::GetIsTargetWithinWeaponRange(const FVector& TargetLocati
 		return false;
 	}
 
-	return FVector::DistSquared(TargetLocation, GetActorLocation()) <= M_WeaponRangeData.M_MaxWeaponRangeSquared;
+	return FVector::DistSquared(TargetLocation, GetActorLocation())
+		<= M_WeaponRangeData.GetMaxRangeSquaredForTarget(TargetingData.GetIsAircraftTarget());
+}
+
+float ACPPTurretsMaster::GetMaxWeaponRangeForCurrentTarget() const
+{
+	return GetMaxWeaponRange() * FWeaponRangeData::GetRangeMltForTarget(TargetingData.GetIsAircraftTarget());
 }
 
 void ACPPTurretsMaster::SearchForNewTargetBelowMinimumRange()

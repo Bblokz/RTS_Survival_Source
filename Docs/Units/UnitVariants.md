@@ -325,7 +325,23 @@ the selection against and keeps alive), so the spawner stores no asset and never
 
 	/** @return The class currently mapped for the training option (after overrides), or a null soft pointer. */
 	TSoftClassPtr<AActor> GetTrainingOptionClass(const FTrainingOption& TrainingOption) const;
+
+	/** @return The class the training option had before any variant override, or a null soft pointer. */
+	TSoftClassPtr<AActor> GetBaseTrainingOptionClass(const FTrainingOption& TrainingOption) const;
+
+	/**
+	 * @brief Resolves the class of any variant whatever this player picked; hand it to AsyncSpawnClassAtLocation.
+	 * Units are keyed as the spawner keys them first (harvesters as tanks).
+	 * @return A null soft pointer when the spawner or the data asset has no class for it.
+	 */
+	TSoftClassPtr<AActor> GetUnitVariantClass(const UUnitVariantDataAsset& VariantDataAsset,
+	                                          const FTrainingOption& Unit, const EUnitVariant Variant) const;
 ```
+
+To spawn a specific variant regardless of the player's pick (scripted events, tests), take the asset from
+`UPlayerUnitVariantManager::GetVariantDataAsset()`, resolve the class with `GetUnitVariantClass` and pass it to
+`AsyncSpawnClassAtLocation`. The faction screen's `AFactionPlayerController::GetUnitVariantClass` forwards to it.
+A variant the player did not pick has not been loaded yet, so its first spawn waits on the async load.
 
 Private:
 

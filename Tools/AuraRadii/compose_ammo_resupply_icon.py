@@ -14,24 +14,25 @@ SUPER = 4
 CENTRE = (SIZE - 1) / 2.0
 
 
+CLEAN_RADIUS = 58.0
+PROFILE_START = 42.0
+CENTRE_COLOUR = np.array([55.0, 225.0, 40.0, 215.0])
+
+
 def paint_out_cross(rgba):
-    """The plate gradient is radial, so a pixel of the cross takes the colour found at the same radius on a diagonal."""
-    red = (rgba[..., 0] > 150) & (rgba[..., 1] < 120)
-    ys, xs = np.nonzero(red)
-    out = rgba.copy()
-    for y, x in zip(ys, xs):
-        dx, dy = x - CENTRE, y - CENTRE
-        radius = math.hypot(dx, dy)
-        sx = int(round(CENTRE + radius * math.cos(math.radians(45))))
-        sy = int(round(CENTRE + radius * math.sin(math.radians(45))))
-        out[y, x] = rgba[sy, sx]
-    # The cross had a pale rim; give its neighbours the same treatment.
-    pale = (out[..., 0] > 200) & (out[..., 1] > 150) & (out[..., 2] > 120)
-    ring = np.hypot(*np.mgrid[0:SIZE, 0:SIZE] - CENTRE) < 70
-    ys, xs = np.nonzero(pale & ring)
-    for y, x in zip(ys, xs):
-        radius = math.hypot(x - CENTRE, y - CENTRE)
-        out[y, x] = out[int(round(CENTRE + radius * 0.7071)), int(round(CENTRE + radius * 0.7071))]
+    """The plate gradient is radial: inside CLEAN_RADIUS every pixel takes the colour of the cross-free diagonal at its
+    radius, and nearer the centre than the diagonal stays clean it brightens towards CENTRE_COLOUR."""
+    out = rgba.astype(np.float32).copy()
+    ys, xs = np.mgrid[0:SIZE, 0:SIZE]
+    radii = np.hypot(xs - CENTRE, ys - CENTRE)
+    for y, x in zip(*np.nonzero(radii < CLEAN_RADIUS)):
+        radius = radii[y, x]
+        sample_radius = max(radius, PROFILE_START)
+        offset = sample_radius * math.cos(math.radians(45))
+        colour = rgba[int(round(CENTRE + offset)), int(round(CENTRE + offset))].astype(np.float32)
+        if radius < PROFILE_START:
+            colour = colour + (CENTRE_COLOUR - colour) * (1.0 - radius / PROFILE_START)
+        out[y, x] = colour
     return out
 
 
@@ -92,12 +93,12 @@ def cartridge_layer(width, height):
         over(box(cx, base - 1.2 * scale, base + 0.6 * scale, case_half), (0.35, 0.2, 0.03))
         over(box(cx - case_half * 0.45, neck_top + 2, base - 4 * scale, 1.4 * scale) * 0.85, (1.0, 0.96, 0.78))
 
-    draw_cartridge(62, 132, 0.86)
-    draw_cartridge(118, 132, 0.86)
-    draw_cartridge(90, 138, 1.0)
+    draw_cartridge(60, 134, 0.95)
+    draw_cartridge(120, 134, 0.95)
+    draw_cartridge(90, 142, 1.12)
 
     # Plus badge, top right: the rounds are being handed out, not fired.
-    px, py, arm, half = 128, 52, 14.0, 4.6
+    px, py, arm, half = 134, 50, 15.0, 5.0
     plus = (((np.abs(xs - px) <= arm) & (np.abs(ys - py) <= half)) |
             ((np.abs(ys - py) <= arm) & (np.abs(xs - px) <= half))).astype(np.float32)
     rim_plus = (((np.abs(xs - px) <= arm + 2.6) & (np.abs(ys - py) <= half + 2.6)) |

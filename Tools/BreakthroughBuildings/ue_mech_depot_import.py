@@ -1,7 +1,7 @@
 """Imports the Breakthrough Mechanized Depot (run with the UECP execute_python action).
 
 Blender source, socket table and rebuild steps: D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerBreakthroughBuildings/
-MechanizedDepot/Model/README.md. Materials are the faction's shared ones and the airport props' MI_Props_1 / MI_Props_2.
+MechanizedDepot/Model/README.md. Materials are the faction's shared ones and its Dunkelgelb props instances MI_BF_Props_1 / MI_BF_Props_2.
 
 Safe to rerun after a Blender rebuild: every mesh reimports over the same asset and the placement preview is copied again.
 """
@@ -11,7 +11,6 @@ import unreal
 
 MODEL = 'D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/GerBreakthroughBuildings/MechanizedDepot/Model/'
 SHARED = '/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/GerBxps/Bunkers/BreakthroughShared'
-PROPS = '/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor/Airport/Materials'
 HOME = '/Game/RTS_Survival/Blueprints/GroundVehicles/BaseAndNomadic/ChildBlueprints/BreakthroughMechDepot/Mesh'
 MAIN = 'SM_BF_MechDepot'
 DRESSING = ('Sandbags', 'Crates', 'FieldSupply', 'Tanks')
@@ -25,7 +24,8 @@ SOCKETS = 'D:/UE5Projects/RTS_Survival/Source/Tools/BreakthroughBuildings/SM_BF_
 MATERIALS = dict(M_BF_SootedFortress_Concrete=SHARED + '/MI_BF_SootedFortress_UVTile', M_BF_Trim=SHARED + '/M_BF_Trim',
                  M_BF_CamoNet=SHARED + '/M_BF_CamoNet', M_BF_FieldSupply=SHARED + '/M_BF_FieldSupply',
                  T_Sn0Sn1Sn2Scaffold_Atlas='/Game/RTS_Survival/Meshes/Props/SandBags/Textures/M_GerSandBagScaffold_Atlas',
-                 T_Props_1=PROPS + '/MI_Props_1', T_Props_2=PROPS + '/MI_Props_2')
+                 # the faction's Dunkelgelb copies of the airport props instances (ue_bf_props_materials.py)
+                 T_Props_1=SHARED + '/MI_BF_Props_1', T_Props_2=SHARED + '/MI_BF_Props_2')
 # Meshes whose slots move: the depot's canvas (trim) and nets flutter on the weights in UV channels 2 and 3, the flap
 # rattles, the fan spins.
 MOVING_MATERIALS = {MAIN: dict(M_BF_Trim=MOTION + '/MI_BF_Trim_Flutter', M_BF_CamoNet=MOTION + '/MI_BF_CamoNet_Flutter'),

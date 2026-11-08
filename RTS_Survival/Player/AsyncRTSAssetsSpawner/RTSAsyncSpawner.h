@@ -110,6 +110,12 @@ public:
 		TFunction<void(const FTrainingOption&, AActor* SpawnedActor, const int32 ID)> OnSpawnedCallback, const FRotator
 		& OptionalRotation);
 
+	// Whether AsyncSpawnOptionAtLocation can spawn this option; lets a caller fail before it spawned anything else.
+	bool GetHasClassForTrainingOption(const FTrainingOption& TrainingOption) const
+	{
+		return M_TrainingOptionMap.Contains(TrainingOption);
+	}
+
 	/**
 	 * @brief Spawns one exact class the way AsyncSpawnOptionAtLocation does, for callers that promise a specific unit
 	 * variant whatever the option maps to for this player.
@@ -164,6 +170,17 @@ public:
 
 	/** @return The class the training option had before any variant override, or a null soft pointer. */
 	TSoftClassPtr<AActor> GetBaseTrainingOptionClass(const FTrainingOption& TrainingOption) const;
+
+	/**
+	 * @brief Resolves the class of any variant whatever this player picked; hand it to AsyncSpawnClassAtLocation.
+	 * Units are keyed as the spawner keys them first (harvesters as tanks).
+	 * @param VariantDataAsset The asset that holds the variant classes.
+	 * @param Unit The unit as the training menu lists it.
+	 * @param Variant Base gives the class the spawner held before any variant override.
+	 * @return A null soft pointer when the spawner or the data asset has no class for it.
+	 */
+	TSoftClassPtr<AActor> GetUnitVariantClass(const UUnitVariantDataAsset& VariantDataAsset,
+	                                          const FTrainingOption& Unit, const EUnitVariant Variant) const;
 
 	/**
 	 * Syncronously gets the preview mesh of the building expansion type.

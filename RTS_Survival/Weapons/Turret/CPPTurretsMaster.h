@@ -169,6 +169,8 @@ public:
 	UWeaponState* GetLargestCalibreWeapon() const;
 	int32 GetOwningPlayer();
 	float GetMaxWeaponRange() const { return FMath::Sqrt(M_WeaponRangeData.M_MaxWeaponRangeSquared); }
+	/** @return The range the current target is engaged at; aircraft are reached at anti-air range. */
+	float GetMaxWeaponRangeForCurrentTarget() const;
 
 	// Looks if the provided weapon is part of this turret, if so it upgrades the range on the weapon and
 	// adjusts the search range of this turret accordingly.

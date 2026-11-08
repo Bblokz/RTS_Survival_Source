@@ -39,11 +39,13 @@ BUILDINGS = {
                heat=dict(BF_HeatAmount=0.2, BF_HeatReachCm=50, BF_SootRiseCm=220, BF_SootAmount=0.85, BF_HeatGlow=0.0),
                camo=dict(mask='T_BF_CamoMask_Splitter', BF_CamoScaleCm=2400, BF_CamoSoftness=0.02, BF_CamoAmount=0.85),
                fields='T_BF_HQ_Fields',
-               # user 2026-11-04: no crack lines on the HQ; the rebar reads the mesh's curvature UVs (SharedParts/bf_curvature.py)
-               switches=dict(BF_UseCracks=False, BF_UseMeshCurvature=True)),
+               # user 2026-11-04: no crack lines on the HQ; the rebar reads the mesh's curvature UVs (SharedParts/bf_curvature.py);
+               # 2026-11-05: soot only (BF_UseHeat off), the heat tint at 0.2 stayed under 1 %
+               switches=dict(BF_UseCracks=False, BF_UseMeshCurvature=True, BF_UseHeat=False)),
     'MechDepot': dict(home=CHILD + 'BreakthroughMechDepot/Mesh', mesh='SM_BF_MechDepot', model=BLEND + 'MechanizedDepot/Model/'),
     'ExperimentalFactory': dict(home=CHILD + 'BreakthroughExperimentalFactory/Mesh', mesh='SM_BF_ExperimentalFactory',
                                 model=BLEND + 'ExperimentalUnitsFactory/Model/'),
+    'Armory': dict(home=CHILD + 'BreakthroughArmory/Mesh', mesh='SM_BF_Armory', model=BLEND + 'Armory/Model/'),
 }
 CONCRETE_SLOT = 'M_BF_SootedFortress_Concrete'
 ASSET_TOOLS = unreal.AssetToolsHelpers.get_asset_tools()

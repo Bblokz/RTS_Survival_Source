@@ -40,6 +40,8 @@ class RTS_SURVIVAL_API UGlobalAbility : public UObject
 #if RTS_WITH_MAP_TESTS
 	friend struct FGlobalAbilityTestAccess;
 #endif
+	// The global ability test runner (RTS_SurvivalShippingGlobalAbilityTests only) reads the activation state.
+	friend struct FAllGlobalAbilitiesTestAccess;
 
 public:
 	UGlobalAbility();
@@ -81,6 +83,7 @@ public:
 	const FGlobalAbilityAimSettings& GetAimSettings() const { return M_AimSettings; }
 	const FGLobalAbilityCostState& GetAbilityCosts() const;
 	const FGlobalAbilityUISettings& GetUISettings() const;
+	const FGlobalAbilitySoundSettings& GetSoundSettings() const { return M_AbilitySoundSettings; }
 
 	FOnGlobalAbilityEnded OnGlobalAbilityEnded;
 

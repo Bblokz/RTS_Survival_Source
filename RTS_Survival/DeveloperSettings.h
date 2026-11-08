@@ -81,6 +81,8 @@ namespace DeveloperSettings
 			inline constexpr int32 HQBaseVehiclePartsStorage = 250;
 
 			inline constexpr int32 RefineryRadixiteStorage = 1500;
+			// Extra radixite storage the Kaskade distillation expansion adds to its refinery while it stands.
+			inline constexpr int32 RefKaskadeExtraRadixiteStorage = RefineryRadixiteStorage / 2;
 			inline constexpr int32 MetalVaultMetalStorage = 800;
 			inline constexpr int32 MetalVaultVehiclePartsStorage = 400;
 
@@ -172,6 +174,8 @@ namespace DeveloperSettings
 			inline constexpr float LightTankDigInWallBuildingTime = 8.f * TankWallBuildingTimeMlp;
 			inline constexpr float MediumTankDigInWallBuildingTime = 12.f * TankWallBuildingTimeMlp;
 			inline constexpr float HeavyTankDigInWallBuildingTime = 16.f * TankWallBuildingTimeMlp;
+			// The AA truck ring covers all four sides: more sandbags than a medium tank's front wall.
+			inline constexpr float AATruckRingDigInWallBuildingTime = 14.f * TankWallBuildingTimeMlp;
 		}
 
 		namespace BuildingRadii
@@ -289,9 +293,13 @@ namespace DeveloperSettings
 			inline constexpr int32 GerPuppchenPitBuildTime = RoundToNearestMultipleOf(15.f * GameTimeMlt, 2);
 			inline constexpr int32 GerPanzerschreckPitBuildTime = RoundToNearestMultipleOf(12.f * GameTimeMlt, 2);
 			inline constexpr int32 GerTwinMG42PitBuildTime = RoundToNearestMultipleOf(18.f * GameTimeMlt, 2);
-			// Communication Center expansions: the concrete observation post and the two raised MG42 nests.
+			// Communication Center expansions: the concrete observation post, the two raised MG42 nests, the
+			// requisition office hung on the tower and the cipher room hung over the inner yard.
 			inline constexpr int32 GerCommObservationPostBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
 			inline constexpr int32 GerCommMG42NestsBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
+			inline constexpr int32 GerCommRequisitionOfficeBuildTime = RoundToNearestMultipleOf(20.f * GameTimeMlt, 2);
+			// Two portal frames and a hung cabin: more to raise than the office.
+			inline constexpr int32 GerCommCipherRoomBuildTime = RoundToNearestMultipleOf(30.f * GameTimeMlt, 2);
 			// A poured concrete pillbox takes longer than a sandbag pit.
 			inline constexpr int32 GerRailPakBunkerBuildTime = RoundToNearestMultipleOf(40.f * GameTimeMlt, 2);
 		}
@@ -569,6 +577,20 @@ namespace DeveloperSettings
 				inline constexpr int32 LightBringers_Metal = 200;
 				inline constexpr int32 IronStorm_Radixite = 700;
 				inline constexpr int32 IronStorm_Metal = 300;
+				inline constexpr int32 RailTroopers_Radixite = 750;
+				inline constexpr int32 RailTroopers_Metal = 350;
+				// Elite Scavengers: 5 scavengers with 33% more health, 3 STG 44s and 2 Panzerfausts. Between the
+				// Scavengers (250) and the armoured Panzer Grenadiers (675 + 200); well below the Rail Troopers.
+				inline constexpr int32 EliteScavengers_Radixite = 450;
+				inline constexpr int32 EliteScavengers_Metal = 125;
+				// Red Spine: 3 light mech walkers (Etasphere01) with MP46s. Priced like the elite squads it matches
+				// in total health (Iron Storm 700 + 300, Panzer Grenadiers 675 + 200), below the heavier walkers.
+				inline constexpr int32 RedSpine_Radixite = 650;
+				inline constexpr int32 RedSpine_Metal = 250;
+				// Fels Krieger: 3 medium mech walkers (Etasphere07) with Ripper Guns. A third more health per walker
+				// than the Red Spine and a heavier gun, so about a third more expensive.
+				inline constexpr int32 FelsKrieger_Radixite = 850;
+				inline constexpr int32 FelsKrieger_Metal = 350;
 			}
 
 			namespace TeamWeapons
@@ -594,8 +616,8 @@ namespace DeveloperSettings
 				inline constexpr int32 RusML20_152mm_Metal = 350;
 				inline constexpr int32 RusBS3_100mm_Radixite = 550;
 				inline constexpr int32 RusBS3_100mm_Metal = 240;
-				inline constexpr int32 SFH18_150mm_Radixite = 600;
-				inline constexpr int32 SFH18_150mm_Metal = 260;
+				inline constexpr int32 SFH18_150mm_Radixite = 750;
+				inline constexpr int32 SFH18_150mm_Metal = 350;
 				inline constexpr int32 Nebelwerfer_Radixite = 600;
 				inline constexpr int32 Nebelwerfer_Metal = 260;
 			}
@@ -885,6 +907,12 @@ namespace DeveloperSettings
 				inline constexpr int32 GerTurretCaptureBunker_Metal = 300;
 				inline constexpr int32 GerRefConverter_Radixite = 200;
 				inline constexpr int32 GerRefConverter_Metal = 100;
+				inline constexpr int32 GerRefKaskade_Radixite = 300;
+				inline constexpr int32 GerRefKaskade_Metal = 200;
+				inline constexpr int32 GerRefFlakStand_Radixite = 420;
+				inline constexpr int32 GerRefFlakStand_Metal = 220;
+				inline constexpr int32 GerMetalVaultSmelter_Radixite = 250;
+				inline constexpr int32 GerMetalVaultSmelter_Metal = 100;
 				inline constexpr int32 GerBarracksRadixReactor_Radixite = 200;
 				inline constexpr int32 GerBarracksRadixReactor_Metal = 200;
 				inline constexpr int32 GerBarracksFuelCell_Radixite = 150;
@@ -901,6 +929,8 @@ namespace DeveloperSettings
 				inline constexpr int32 GerHQRepairBay_Metal = 150;
 				inline constexpr int32 GerLFactoryRadixiteReactor_Radixite = 300;
 				inline constexpr int32 GerLFactoryRadixiteReactor_Metal = 300;
+				inline constexpr int32 GerForgeSchreckFrame_Radixite = 380;
+				inline constexpr int32 GerForgeSchreckFrame_Metal = 220;
 				inline constexpr int32 GerLFactoryFuelStorage_Radixite = 200;
 				inline constexpr int32 GerLFactoryFuelStorage_Metal = 200;
 				inline constexpr int32 RusFactory_Radixite = 2000;
@@ -975,6 +1005,14 @@ namespace DeveloperSettings
 				inline constexpr int32 GerCommObservationPost_Metal = 150;
 				inline constexpr int32 GerCommMG42Nests_Radixite = 360;
 				inline constexpr int32 GerCommMG42Nests_Metal = 160;
+				inline constexpr int32 GerCommRequisitionOffice_Radixite = 300;
+				inline constexpr int32 GerCommRequisitionOffice_Metal = 180;
+				// While the player has a Requisition office, field defenses cost this fraction of their price.
+				inline constexpr float GerCommRequisitionOfficeFieldDefenseCostMlt = 0.75f;
+				inline constexpr int32 GerCommCipherRoom_Radixite = 400;
+				inline constexpr int32 GerCommCipherRoom_Metal = 220;
+				// While the player has a Cipher room, commander abilities recharge in this fraction of their cooldown.
+				inline constexpr float GerCommCipherRoomGlobalAbilityCooldownMlt = 0.8f;
 				inline constexpr int32 GerRailPakBunker_Radixite = 850;
 				inline constexpr int32 GerRailPakBunker_Metal = 420;
 				inline constexpr int32 GerFlak88Pit_Radixite = 560;
@@ -1004,6 +1042,10 @@ namespace DeveloperSettings
 		{
 			// How much further weapon trace is allowed to fly than its range; flight range = weapon range * this mlt.
 			inline constexpr float TraceSimulationRangeMlt = 2.25f;
+			// Ground weapons engaging an aircraft reach this much further than their range (altitude + flight paths).
+			// Applied to the aircraft search, the in-range check and the shot's flight range; never to the weapon's
+			// own range so the range shown to the player stays the ground range.
+			inline constexpr float AntiAirRangeMlt = 4.f;
 			inline constexpr float GameRangeMlt = 0.4f;
 			inline constexpr float BasicSmallArmsRange = RoundToNearestMultipleOfFive(8000.f * GameRangeMlt);
 			inline constexpr float SmallArmsRifleRange = RoundToNearestMultipleOfFive(8400.f * GameRangeMlt);
@@ -1452,6 +1494,17 @@ namespace DeveloperSettings
 
 			// Infantry health Settings
 			inline constexpr float BasicInfantryHealth = RoundToNearestMultipleOfFive(200.f * OverallHealthMlt);
+			// Elite Scavengers: the scavenger soldier with 33% more health, rounded to whole hit points
+			// (a multiple of five would drift to 1.31 or 1.34).
+			inline constexpr float EliteScavengersHealthMlt = 1.33f;
+			inline constexpr float EliteScavengersHealth = static_cast<float>(
+				static_cast<int32>(BasicInfantryHealth * EliteScavengersHealthMlt + 0.5f));
+			// Red Spine light mech walker, per walker: 1.2x an elite soldier, on heavy infantry armour. A squad of
+			// three (1440) sits just under a 4-man Iron Storm squad (4 x 400) and below the heavier walkers.
+			inline constexpr float RedSpineWalkerHealth = RoundToNearestMultipleOfFive(600.f * OverallHealthMlt);
+			// Fels Krieger medium mech walker, per walker: a third more than the Red Spine (640 vs 480), on heavy
+			// infantry armour. A squad of three (1920) sits above the Red Spine squad (1440), below the heavy walkers.
+			inline constexpr float FelsKriegerWalkerHealth = RoundToNearestMultipleOfFive(800.f * OverallHealthMlt);
 			inline constexpr float BasicSniperHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);
 			inline constexpr float ArmoredInfantryHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);
 			inline constexpr float HazmatInfantryHealth = RoundToNearestMultipleOfFive(300.f * OverallHealthMlt);
@@ -1464,6 +1517,8 @@ namespace DeveloperSettings
 			inline constexpr float LightTankDigInWallHealth = RoundToNearestMultipleOfFive(400.f * OverallHealthMlt);
 			inline constexpr float MediumTankDigInWallHealth = RoundToNearestMultipleOfFive(700.f * OverallHealthMlt);
 			inline constexpr float HeavyTankDigInWallHealth = RoundToNearestMultipleOfFive(1200.f * OverallHealthMlt);
+			// Ring around the unarmoured AA truck: tougher than the light and medium tank walls.
+			inline constexpr float AATruckRingDigInWallHealth = RoundToNearestMultipleOfFive(900.f * OverallHealthMlt);
 
 			// Aircraft Health settings.
 			inline constexpr float FighterHealth = RoundToNearestMultipleOfFive(800.f * OverallHealthMlt);
@@ -1696,6 +1751,9 @@ namespace DeveloperSettings
 		{
 			// How many spatial audio actors we pool to play spatial voice lines.
 			inline constexpr int32 SpatialAudioPoolSize = 32;
+			// Pooled audio components for the clang of add-on armour panels (side skirts) shot off a tank; when all
+			// are busy the oldest one is reused.
+			inline constexpr int32 AddOnArmorOffAudioPoolSize = 16;
 			inline constexpr float BaseIntervalBetweenSpatialVoiceLines = 12.f;
 			inline constexpr float FluxPercentageIntervalBetweenSpatialVoiceLines = 30.f;
 			inline constexpr float MaxStaggerBetweenSpatialVoiceLines = 1.f;

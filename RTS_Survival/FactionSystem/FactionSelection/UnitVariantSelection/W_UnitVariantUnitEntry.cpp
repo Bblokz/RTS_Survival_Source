@@ -135,7 +135,6 @@ void UW_UnitVariantUnitEntry::SetupEntry(UW_UnitVariantSelectionMenu* Menu, cons
 	M_Menu = Menu;
 	M_EntryIndex = EntryIndex;
 	M_Style = Style;
-	M_VariantCount = VariantCount;
 	if (not GetIsValidButton())
 	{
 		return;
@@ -155,7 +154,9 @@ void UW_UnitVariantUnitEntry::SetupEntry(UW_UnitVariantSelectionMenu* Menu, cons
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		M_DetailText, UnitVariantSelectionWidgets::MakeFont(Style.BodyFont, DetailFontSize, DetailLetterSpacing),
 		Style.MutedTextColor);
-	SetChosenVariantName(FText::GetEmpty());
+	// Only the count: the chosen variant's letter ("Variant A") tells the player nothing; the cards show the choice.
+	M_DetailText->SetText(FText::Format(NSLOCTEXT("UnitVariantSelection", "VariantCount", "{0} VARIANTS"),
+	                                    FText::AsNumber(VariantCount)));
 	ApplySelectionLook();
 }
 
@@ -163,23 +164,6 @@ void UW_UnitVariantUnitEntry::SetIsSelected(const bool bIsSelected)
 {
 	bM_IsSelected = bIsSelected;
 	ApplySelectionLook();
-}
-
-void UW_UnitVariantUnitEntry::SetChosenVariantName(const FText& ChosenVariantName)
-{
-	if (not IsValid(M_DetailText))
-	{
-		return;
-	}
-	const FText VariantCountText = FText::Format(
-		NSLOCTEXT("UnitVariantSelection", "VariantCount", "{0} VARIANTS"), FText::AsNumber(M_VariantCount));
-	if (ChosenVariantName.IsEmpty())
-	{
-		M_DetailText->SetText(VariantCountText);
-		return;
-	}
-	M_DetailText->SetText(FText::Format(NSLOCTEXT("UnitVariantSelection", "ChosenVariant", "{0}  |  {1}"),
-	                                    VariantCountText, ChosenVariantName.ToUpper()));
 }
 
 void UW_UnitVariantUnitEntry::SetHasUnconfirmedChange(const bool bHasUnconfirmedChange)

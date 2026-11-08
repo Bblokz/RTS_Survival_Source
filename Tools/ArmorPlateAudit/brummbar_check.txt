@@ -1,0 +1,6 @@
+# Quick check after saving RTS_BP_AssaultTank and the Brummbar Blueprints.
+/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Brumbar/Ger_Vehicle_Brummbar.Ger_Vehicle_Brummbar_C
+/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Brumbar/Ger_Vehicle_Brummbar_DirectSiege.Ger_Vehicle_Brummbar_DirectSiege_C
+/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Medium/Brumbar/Ger_Vehicle_Brummbar_LateWar.Ger_Vehicle_Brummbar_LateWar_C
+/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/SDKFZ-140/Bunker/Ger_Vehicle_SDKFZ-140_Bunker.Ger_Vehicle_SDKFZ-140_Bunker_C
+/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Heavy/E25/Ger_Vehicle_E25_Assault.Ger_Vehicle_E25_Assault_C

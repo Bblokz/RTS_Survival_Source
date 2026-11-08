@@ -232,7 +232,8 @@ private:
 	void SelectUnit(const int32 EntryIndex);
 	void RebuildCards(const FTrainingOption& Unit);
 	void RefreshCardSelection();
-	void RefreshEntryChosenVariant(const int32 EntryIndex);
+	// The entry's marker for a choice that differs from the confirmed one.
+	void RefreshEntryChangeMarker(const int32 EntryIndex);
 	void RequestPreviewOfSelectedUnit() const;
 
 	void LoadAbilityTables();

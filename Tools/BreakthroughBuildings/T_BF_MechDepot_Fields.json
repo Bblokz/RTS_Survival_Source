@@ -1,0 +1,15 @@
+{
+ "res": 1024,
+ "triangles": 3810,
+ "texels_inside": 148695,
+ "texels_filled": 190932,
+ "pivot": [
+  0.0,
+  9.0
+ ],
+ "curved_texels": 47821,
+ "d_max_cm": 400.0,
+ "lamp_scale": 2.5208352921981723,
+ "soot_rise_cm": 400.0,
+ "sources": "D:/UE5Projects/RTS_Survival/Saved/BF_ShaderCost/SM_BF_MechDepot_sources.json"
+}

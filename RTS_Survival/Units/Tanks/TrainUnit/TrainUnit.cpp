@@ -4,6 +4,7 @@
 #include "Components/SplineComponent.h"
 #include "RTS_Survival/Environment/Splines/RoadSplineActor.h"
 #include "RTS_Survival/MasterObjects/SelectableBase/SelectablePawnMaster.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/Units/Tanks/TrainUnit/TrainSplineMovementComponent.h"
 #include "RTS_Survival/Utils/CollisionSetup/FRTS_CollisionSetup.h"
@@ -238,9 +239,37 @@ void ATrainUnit::OnTurretInRange(ACPPTurretsMaster* CallingTurret)
 	(void)CallingTurret;
 }
 
+void ATrainUnit::OnHullWeaponOutOfRange(const FVector TargetLocation, UHullWeaponComponent* CallingHullWeapon)
+{
+	// The tank version moves the vehicle toward the target through its AAITankMaster; a train has neither the
+	// controller (plain AIController) nor the freedom to leave its track, and errored on every range check.
+	(void)TargetLocation;
+	(void)CallingHullWeapon;
+}
+
+void ATrainUnit::OnHullWeaponInRange(UHullWeaponComponent* CallingHullWeapon)
+{
+	(void)CallingHullWeapon;
+}
+
 void ATrainUnit::OnUnitIdleAndNoNewCommands()
 {
 	ASelectablePawnMaster::OnUnitIdleAndNoNewCommands();
+}
+
+void ATrainUnit::UnitDies(const ERTSDeathType DeathType)
+{
+	if (not IsUnitAlive())
+	{
+		return;
+	}
+
+	// Before Super: BP_OnUnitDies may destroy the actor. Permanent so hover, selection or later damage cannot re-show it.
+	if (IsValid(HealthComponent))
+	{
+		HealthComponent->MakeHealthBarInvisible();
+	}
+	Super::UnitDies(DeathType);
 }
 
 bool ATrainUnit::GetIsValidAssignedRoadSpline() const

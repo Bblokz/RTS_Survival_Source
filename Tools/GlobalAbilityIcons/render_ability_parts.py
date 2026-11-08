@@ -114,6 +114,20 @@ JOBS.update({
 })
 
 
+# Spies infiltration: a German soldier watching from cover (seen from behind) and enemy tanks standing on the ground.
+GER_RIFLEMAN = "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Skeletons/GermanSoldier/Meshes/SK_WWII_GermanSoldier_varA"
+TW_ANIMS = "/Game/RTS_Survival/Blueprints/Squads/SquadUnits/Anims/TeamWeaponAnims/"
+GROUND = dict(azimuth=55.0, elevation=20.0, padding=0.9)
+JOBS.update({
+    "Spy_Crouch": dict(parts=[dict(asset=GER_RIFLEMAN, yaw=-90.0, anim=TW_ANIMS + "Commander/AN_Infantry_CommandoCrouched",
+                                   anim_time=0.3)], azimuth=215.0, elevation=10.0, padding=1.0, res=1024),
+    "Spy_Spot": dict(parts=[dict(asset=GER_RIFLEMAN, yaw=-90.0, anim=TW_ANIMS + "Howitzer/AN_Infantry_SpotHowitzer_Standing",
+                                 anim_time=0.3)], azimuth=215.0, elevation=10.0, padding=1.0, res=1024),
+    "T3485_Ground": dict(parts=[dict(asset=T34 + "Rus_Vehicle_T3485", yaw=0.0)], **GROUND),
+    "T3476_Ground": dict(parts=[dict(asset=T34 + "Rus_Vehicle_T3476", yaw=0.0)], **GROUND),
+})
+
+
 def run_jobs(names=None):
     for name in names or JOBS:
         job = dict(JOBS[name])

@@ -145,6 +145,36 @@ bool UArmorCalculation::SetArmorOfPlateType(
 	return bUpdatedArmor;
 }
 
+bool UArmorCalculation::SetAddOnArmorOfPlateType(
+	UMeshComponent* MeshWithArmor, const EArmorPlate PlateType, const float NewAddOnArmorValue)
+{
+	if (not FMath::IsFinite(NewAddOnArmorValue) || NewAddOnArmorValue < 0.0f)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("SetAddOnArmorOfPlateType: NewAddOnArmorValue must be finite and nonnegative"));
+		return false;
+	}
+
+	const TArrayView<FArmorSettings> ArmorSettings = GetMutableArmorSettingsForMesh(MeshWithArmor);
+	bool bUpdatedArmor = false;
+	for (FArmorSettings& ArmorSetting : ArmorSettings)
+	{
+		if (ArmorSetting.ArmorType != PlateType)
+		{
+			continue;
+		}
+
+		ArmorSetting.AddOnArmorValue = NewAddOnArmorValue;
+		bUpdatedArmor = true;
+	}
+
+	if (bUpdatedArmor)
+	{
+		RefreshRearArmorCache();
+	}
+	return bUpdatedArmor;
+}
+
 TArrayView<FArmorSettings> UArmorCalculation::GetMutableArmorSettingsForMesh(const UMeshComponent* MeshWithArmor)
 {
 	if (not IsValid(MeshWithArmor))

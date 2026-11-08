@@ -794,7 +794,21 @@ void UHullWeaponComponent::BeginPlay_SetupMeshOrientationTimer()
 
 void UHullWeaponComponent::OnUpdateMeshOrientation()
 {
-	if (!EnsureWorldIsValid() || !GetIsValidHullWeaponMesh() || !bM_BaseInit)
+	if (not bM_BaseInit)
+	{
+		// About 5 s of the 0.33 s timer: the owner's Blueprint has had its BeginPlay.
+		constexpr int32 TicksBeforeReportingMissingInit = 15;
+		++M_OrientationTicksWithoutInit;
+		if (not bM_HasReportedMissingInit && M_OrientationTicksWithoutInit >= TicksBeforeReportingMissingInit)
+		{
+			bM_HasReportedMissingInit = true;
+			RTSFunctionLibrary::ReportError("HullWeaponComponent " + GetName() + " on " +
+				(GetOwner() ? GetOwner()->GetName() : FString("no owner")) +
+				" was never initialised (InitHullWeaponComponent not called): it cannot aim or fire.");
+		}
+		return;
+	}
+	if (!EnsureWorldIsValid() || !GetIsValidHullWeaponMesh())
 	{
 		return;
 	}
@@ -917,10 +931,11 @@ void UHullWeaponComponent::SpecificEngage_OnTargetInvalid()
 bool UHullWeaponComponent::GetIsTargetInRange(const FVector& TargetLocation, const FVector& WeaponLocation) const
 {
 	const float DistanceSquared = FVector::DistSquared(TargetLocation, WeaponLocation);
+	const float MaxRangeSquared = M_WeaponRangeData.GetMaxRangeSquaredForTarget(M_TargetingData.GetIsAircraftTarget());
 	Debug_HullWeapons("Distance squared to target: " + FString::SanitizeFloat(DistanceSquared)
-	                  + "\n Squared range: " + FString::SanitizeFloat(M_WeaponRangeData.M_MaxWeaponRangeSquared),
+	                  + "\n Squared range: " + FString::SanitizeFloat(MaxRangeSquared),
 	                  FColor::Blue);
-	if (DistanceSquared > M_WeaponRangeData.M_MaxWeaponRangeSquared)
+	if (DistanceSquared > MaxRangeSquared)
 	{
 		return false;
 	}

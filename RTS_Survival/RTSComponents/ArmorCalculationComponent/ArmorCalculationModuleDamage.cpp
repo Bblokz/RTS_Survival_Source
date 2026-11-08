@@ -112,7 +112,7 @@ void UArmorCalculation::CalculateModuleDamage(
 
 	const FModuleChangeBatch Changes = ResolveModuleDamage(Input);
 	// Behaviours, Blueprint and UI work may allocate; it runs after the fixed-storage resolver finished.
-	DispatchModuleChangesAfterMutation(Changes);
+	DispatchModuleDamageResults(Changes);
 }
 
 void UArmorCalculation::DamageModule(const int32 ModuleId, const float Damage)
@@ -224,7 +224,7 @@ FModuleChangeBatch UArmorCalculation::ResolveModuleDamage(const FModuleDamageInp
 	ApplyPerModuleDamageCaps(Input.bPen, Batch);
 	ApplyNonPenRateBudgetIfNeeded(Input, Batch);
 	LimitNewDestroyedModules(Batch);
-	return CommitModuleDamageBatch(Batch, Input.HitContext.ShellType);
+	return CommitModuleDamageBatch(Batch, Input.HitContext);
 }
 
 float UArmorCalculation::CalculateModuleDamageEnergy(const FModuleDamageInput& Input) const
@@ -470,7 +470,7 @@ void UArmorCalculation::LimitNewDestroyedModules(FModuleDamageBatch& Batch) cons
 }
 
 FModuleChangeBatch UArmorCalculation::CommitModuleDamageBatch(const FModuleDamageBatch& Batch,
-	const EWeaponShellType DamageShellType)
+	const FVehicleModuleHitContext& HitContext)
 {
 	bool bAppliedAnyDamage = false;
 	for (int32 EntryIndex = 0; EntryIndex < Batch.Count; ++EntryIndex)
@@ -481,7 +481,8 @@ FModuleChangeBatch UArmorCalculation::CommitModuleDamageBatch(const FModuleDamag
 			continue;
 		}
 		SetModuleHealth(Entry.SlotIndex, M_Modules[Entry.SlotIndex].CurrentHp - Entry.Damage,
-		                EModuleChangeCause::Damage, DamageShellType);
+		                EModuleChangeCause::Damage, HitContext.ShellType);
+		RecordAddOnArmorHit(Entry.SlotIndex, HitContext);
 		bAppliedAnyDamage = true;
 	}
 	if (bAppliedAnyDamage)
@@ -489,6 +490,35 @@ FModuleChangeBatch UArmorCalculation::CommitModuleDamageBatch(const FModuleDamag
 		++M_ModuleDamageRevision;
 	}
 	return TakePendingModuleChanges();
+}
+
+void UArmorCalculation::RecordAddOnArmorHit(const int32 SlotIndex, const FVehicleModuleHitContext& HitContext)
+{
+	if (M_Modules[SlotIndex].Type != EVehicleModuleTypes::AddOnArmor || not HitContext.bHasHullLocalHitPosition
+		|| M_PendingAddOnArmorHitCount >= MaxAddOnArmorModules)
+	{
+		return;
+	}
+	FPendingAddOnArmorHit& Hit = M_PendingAddOnArmorHits[M_PendingAddOnArmorHitCount++];
+	Hit.ModuleId = M_Modules[SlotIndex].ModuleId;
+	Hit.HullLocalHitPosition = HitContext.HullLocalHitPosition;
+}
+
+void UArmorCalculation::DispatchModuleDamageResults(const FModuleChangeBatch& Changes)
+{
+	// Copied first: a listener may resolve another impact, which records into the same storage.
+	const int32 HitCount = M_PendingAddOnArmorHitCount;
+	FPendingAddOnArmorHit Hits[MaxAddOnArmorModules];
+	for (int32 HitIndex = 0; HitIndex < HitCount; ++HitIndex)
+	{
+		Hits[HitIndex] = M_PendingAddOnArmorHits[HitIndex];
+	}
+	M_PendingAddOnArmorHitCount = 0;
+	for (int32 HitIndex = 0; HitIndex < HitCount; ++HitIndex)
+	{
+		M_OnAddOnArmorZoneHit.Broadcast(Hits[HitIndex].ModuleId, Hits[HitIndex].HullLocalHitPosition);
+	}
+	DispatchModuleChangesAfterMutation(Changes);
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -583,9 +613,9 @@ void UArmorCalculation::CalculateMineModuleDamage(const FVector& ExplosionLocati
 		Batch.Append(SlotIndex, MineCandidateIndex, BaseDamage * MineModuleRule.DamageMultiplier);
 		ApplyPerModuleDamageCaps(true, Batch);
 		LimitNewDestroyedModules(Batch);
-		Changes = CommitModuleDamageBatch(Batch, HitContext.ShellType);
+		Changes = CommitModuleDamageBatch(Batch, HitContext);
 	}
-	DispatchModuleChangesAfterMutation(Changes);
+	DispatchModuleDamageResults(Changes);
 }
 
 void UArmorCalculation::CalculateSplashModuleDamage(const FVector& ExplosionLocation, const float AttenuatedDamage,
@@ -636,7 +666,7 @@ void UArmorCalculation::CalculateSplashModuleDamage(const FVector& ExplosionLoca
 	{
 		return;
 	}
-	DispatchModuleChangesAfterMutation(ResolveModuleDamage(Input));
+	DispatchModuleDamageResults(ResolveModuleDamage(Input));
 }
 
 int32 UArmorCalculation::FindRunningGearSlotNearest(const FVector& WorldLocation) const

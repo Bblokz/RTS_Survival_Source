@@ -36,4 +36,19 @@ struct FBxpData
 
 	UPROPERTY(BlueprintReadOnly)
 	 FResistanceAndDamageReductionData ResistancesAndDamageMlt;
+
+	// Storage the expansion adds to its owning building's resource drop off while it is built (removed again when it
+	// packs up or dies). Empty for expansions that add no storage.
+	UPROPERTY(BlueprintReadOnly)
+	TMap<ERTSResourceType, int32> ExtraResourceStorage;
+
+	// While the expansion is built, its owner's field defenses (Global_GetIsFieldDefenseBxpType) cost this fraction of
+	// their price. 1 = no effect. With several such expansions the lowest multiplier counts: they do not stack.
+	UPROPERTY(BlueprintReadOnly)
+	float FieldDefenseCostMlt = 1.f;
+
+	// While the expansion is built, its owner's commander (global) abilities recharge in this fraction of their cooldown.
+	// 1 = no effect. With several such expansions the lowest multiplier counts: they do not stack.
+	UPROPERTY(BlueprintReadOnly)
+	float GlobalAbilityCooldownMlt = 1.f;
 };

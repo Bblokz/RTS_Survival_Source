@@ -315,6 +315,8 @@ class RTS_SURVIVAL_API ASquadUnit : public ACharacterObjectsMaster, public IExpe
 	GENERATED_BODY()
 
 	friend class ASquadController;
+	// Shipping global ability test runner (RTS_WITH_ALL_GLOBAL_ABILITIES): reads the controller pointer.
+	friend struct FAllGlobalAbilitiesTestAccess;
 #if WITH_DEV_AUTOMATION_TESTS && !UE_BUILD_SHIPPING
 	friend struct FSquadAdvanceDiagnosticAccess;
 #endif
@@ -392,6 +394,10 @@ public:
 
 	// Lets cover selection skip the point this unit just gave up because its target could not be engaged from it.
 	bool GetIsCoverPointRejectedForTarget(int64 PointId) const;
+
+	// A soldier that holds his trench whatever his target does must have targets he can fire at from it, so his
+	// weapon passes over enemies outside the trench's firing arc. Always true outside a trench.
+	bool GetCanAutoTargetFromHeldCover(const FVector& TargetLocation) const;
 
 	/**
 	 * @brief Stores where the player's move preview put this soldier, after its squad issued the move.
@@ -561,6 +567,15 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void BeginDestroy() override;
+	/**
+	 * @brief Called by the engine's KillZ check (see URTSKillZSubsystem) once the unit has fallen through the world.
+	 * Puts it back on the ground instead of the engine's plain Destroy, which would skip the death path; a unit with
+	 * nowhere to stand, or one that keeps falling, dies the normal way.
+	 */
+	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
+
+	// Times this soldier was put back on the ground after falling through the world.
+	int32 M_FellOutOfWorldRecoveries = 0;
 
 	/** @return True if the squad controller is valid; derived standalone units may make absence non-reporting. */
 	virtual bool GetIsValidSquadController() const;
@@ -836,6 +851,10 @@ private:
 	// Fills the stress meter with health the soldier just lost and sets his stress off when it is full.
 	void RecordHealthLossForStress(float HealthLost);
 	bool GetIsHoldingCoverPoint() const;
+
+	// Trench and other cargo-socket cover is the best there is: a soldier holding it never trades it for another
+	// point or gives it up for a target he cannot hit from it. Only movement from an order takes him out of it.
+	bool GetIsHoldingTrenchCover() const;
 	void StartStress();
 	void PlayStressedVoiceLine() const;
 	void TickStress();

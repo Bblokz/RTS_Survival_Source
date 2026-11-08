@@ -1,0 +1,5 @@
+# SdKfz 231 stripe key check
+Warmup_Ger_ArmoredCar_Sdkfz_231=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz231/Ger_ArmoredCar_Sdkfz_231.Ger_ArmoredCar_Sdkfz_231_C
+Ger_ArmoredCar_Sdkfz_231_Default=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz231/Ger_ArmoredCar_Sdkfz_231.Ger_ArmoredCar_Sdkfz_231_C
+Ger_ArmoredCar_Sdkfz_231_Red=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz231/Ger_ArmoredCar_Sdkfz_231.Ger_ArmoredCar_Sdkfz_231_C|TeamColor=0.8,0.02,0.02,1
+Ger_ArmoredCar_Sdkfz_231_Blue=/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_ArmoredCar/Sdkfz231/Ger_ArmoredCar_Sdkfz_231.Ger_ArmoredCar_Sdkfz_231_C|TeamColor=0.02,0.1,0.85,1

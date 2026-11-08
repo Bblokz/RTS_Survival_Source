@@ -6,12 +6,18 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
+#include "Engine/World.h"
+#include "ParachuteJumperProxy.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
 #include "RTS_Survival/Enemy/StrategicAI/Component/EnemyStrategicAIComponent.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilities/GlobalAbilityHelpers.h"
 #include "RTS_Survival/GlobalAbilitySystem/GlobalAbilitiesManager/GlobalAbilitiesManager.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/RTSComponents/SelectionComponent.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeapon.h"
+#include "RTS_Survival/Units/TeamWeapons/TeamWeaponController.h"
+#include "RTS_Survival/Weapons/InfantryWeapon/InfantryWeaponMaster.h"
 #include "RTS_Survival/Units/SquadController.h"
 #include "RTS_Survival/Units/Aircraft/AircraftMaster/AAircraftMaster.h"
 #include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
@@ -22,14 +28,46 @@
 namespace ParatroopersConstants
 {
 	constexpr int32 PlayerOwner = 1;
-	// Hidden squads wait on a small ring around the target until their soldiers jump.
-	constexpr float SquadSpawnRingRadius = 200.0f;
+	// The controller spawns its gun exactly at its own location; anything this close to a waiting squad is its gun.
+	constexpr float TeamWeaponSpawnMatchDistance = 100.0f;
+	// Per unit of cargo canopy scale: about half the height of the soldier parachute.
+	constexpr float CargoCanopyClearancePerScale = 400.0f;
 	// Spacing of the landing spiral: soldier N lands about sqrt(N) * this far from the target.
 	constexpr float LandingSpiralSpacing = 150.0f;
 	constexpr float GoldenAngleRadians = 2.39996323f;
 	constexpr float JumpBehindAircraftOffset = 200.0f;
 	constexpr float LandscapeTraceDepth = 200000.0f;
 	const FVector NavProjectionExtentScale(2.0f, 2.0f, 2.0f);
+	// A landscape trace starts this far above the point it looks under.
+	constexpr float LandscapeTraceHeightAbove = 100000.0f;
+
+	/**
+	 * @brief A drop aimed near the map edge spreads its squads and jumpers past the landscape; a unit put where no
+	 * landscape is falls out of the world. Finds the landscape under a point.
+	 * @return False when there is no landscape below (or above) the point.
+	 */
+	bool TryFindLandscapeBelow(const UWorld* World, const FVector& Location, const AActor* IgnoredActor,
+	                           FVector& OutGround)
+	{
+		if (not IsValid(World))
+		{
+			return false;
+		}
+		const FVector TraceStart(Location.X, Location.Y, Location.Z + LandscapeTraceHeightAbove);
+		const FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, LandscapeTraceDepth);
+		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(ParatrooperLandscapeBelow), false);
+		if (IgnoredActor)
+		{
+			QueryParams.AddIgnoredActor(IgnoredActor);
+		}
+		FHitResult LandscapeHit;
+		if (not World->LineTraceSingleByChannel(LandscapeHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, QueryParams))
+		{
+			return false;
+		}
+		OutGround = LandscapeHit.ImpactPoint;
+		return true;
+	}
 }
 
 void UGA_Paratroopers::ExecuteAbilityAtLocation(const FVector& TargetLocation)
@@ -94,6 +132,12 @@ void UGA_Paratroopers::BeginDestroy()
 		for (FParatrooperDropRun& Run : M_DropRuns)
 		{
 			World->GetTimerManager().ClearTimer(Run.JumpTimerHandle);
+			DestroyJumperProxies(Run);
+		}
+		if (M_ActorSpawnedHandle.IsValid())
+		{
+			World->RemoveOnActorSpawnedHandler(M_ActorSpawnedHandle);
+			M_ActorSpawnedHandle.Reset();
 		}
 	}
 	M_DropRuns.Reset();
@@ -172,8 +216,10 @@ void UGA_Paratroopers::CancelActiveDrops()
 	// Remove the runs before destroying aircraft: their destruction delegates can re-enter this ability.
 	TArray<FParatrooperDropRun> CancelledRuns = MoveTemp(M_DropRuns);
 	M_DropRuns.Reset();
-	for (const FParatrooperDropRun& Run : CancelledRuns)
+	UpdateActorSpawnedHandler();
+	for (FParatrooperDropRun& Run : CancelledRuns)
 	{
+		DestroyJumperProxies(Run);
 		if (UWorld* World = GetWorld())
 		{
 			FTimerHandle JumpTimerHandle = Run.JumpTimerHandle;
@@ -206,9 +252,14 @@ void UGA_Paratroopers::OnAircraftClassLoaded(const int32 RunId)
 		return;
 	}
 
-	const FVector StartLocation = Run->AircraftStartOverride.IsSet()
+	FVector StartLocation = Run->AircraftStartOverride.IsSet()
 		? Run->AircraftStartOverride.GetValue()
 		: GetGlobalAbilityManager()->GetAircraftBombingSpawnLocation(this, Run->TargetLocation);
+	if (not Run->AircraftStartOverride.IsSet() && M_ParatroopersSettings.MinFlightHeightAboveTarget > 0.0f)
+	{
+		StartLocation.Z = FMath::Max(StartLocation.Z,
+		                             Run->TargetLocation.Z + M_ParatroopersSettings.MinFlightHeightAboveTarget);
+	}
 	Run->PassOverLocation = FVector(Run->TargetLocation.X, Run->TargetLocation.Y, StartLocation.Z);
 	const FVector EndLocation = BuildRunEndLocation(StartLocation, Run->PassOverLocation);
 	Run->RunDirection = (EndLocation - StartLocation).GetSafeNormal2D();
@@ -362,15 +413,25 @@ FVector UGA_Paratroopers::GetProjectedSquadSpawnLocation(
 {
 	const float Angle = static_cast<float>(SquadIndex) * UE_TWO_PI / FMath::Max(1, SquadCount);
 	const FVector DesiredLocation = TargetLocation + FVector(
-		FMath::Cos(Angle) * ParatroopersConstants::SquadSpawnRingRadius,
-		FMath::Sin(Angle) * ParatroopersConstants::SquadSpawnRingRadius,
+		FMath::Cos(Angle) * M_ParatroopersSettings.SquadSpawnRingRadius,
+		FMath::Sin(Angle) * M_ParatroopersSettings.SquadSpawnRingRadius,
 		0.0f);
 	bool bWasProjected = false;
-	return URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
+	const FVector Projected = URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
 		this,
 		DesiredLocation,
 		ParatroopersConstants::NavProjectionExtentScale,
 		bWasProjected);
+	FVector Ground;
+	if (ParatroopersConstants::TryFindLandscapeBelow(GetWorld(), Projected, nullptr, Ground))
+	{
+		// Off the navmesh (cliffs, the map edge) the ring point keeps the aim point's height, which can lie under the
+		// landscape there: the hidden squad would spawn inside the ground and fall through the world while it waits.
+		return bWasProjected ? Projected : Ground;
+	}
+	// The ring point is past the landscape edge (a drop aimed at the map edge): the squad waits at the target instead
+	// of where it would fall out of the world while hidden.
+	return ParatroopersConstants::TryFindLandscapeBelow(GetWorld(), TargetLocation, nullptr, Ground) ? Ground : TargetLocation;
 }
 
 void UGA_Paratroopers::OnSquadSpawned(const int32 RunId, AActor* SpawnedActor)
@@ -393,7 +454,15 @@ void UGA_Paratroopers::OnSquadSpawned(const int32 RunId, AActor* SpawnedActor)
 	Squad->BeginParachuteDrop();
 	FParatrooperSquadInDrop SquadInDrop;
 	SquadInDrop.Squad = Squad;
+	ATeamWeaponController* TeamWeaponSquad = Cast<ATeamWeaponController>(Squad);
+	SquadInDrop.bM_IsTeamWeaponSquad = IsValid(TeamWeaponSquad);
 	Run->SquadsInDrop.Add(SquadInDrop);
+	if (IsValid(TeamWeaponSquad))
+	{
+		// Usually the gun spawns later, when the crew has loaded; the spawn handler hides it on its first frame.
+		HideTeamWeaponForDrop(TeamWeaponSquad->GetControlledTeamWeaponNoReport());
+		UpdateActorSpawnedHandler();
+	}
 	if (Squad->GetIsSquadFullyLoadedAndInitialized())
 	{
 		OnSquadReadyToJump(RunId, Squad);
@@ -419,6 +488,24 @@ void UGA_Paratroopers::OnSquadReadyToJump(const int32 RunId, ASquadController* S
 		});
 	if (not SquadInDrop || SquadInDrop->bM_HasQueuedUnits)
 	{
+		return;
+	}
+	if (SquadInDrop->bM_IsTeamWeaponSquad)
+	{
+		UWorld* World = GetWorld();
+		if (not IsValid(World))
+		{
+			return;
+		}
+		TWeakObjectPtr<UGA_Paratroopers> WeakThis(this);
+		TWeakObjectPtr<ATeamWeaponController> WeakSquad(Cast<ATeamWeaponController>(Squad));
+		World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateLambda([WeakThis, RunId, WeakSquad]()
+		{
+			if (WeakThis.IsValid())
+			{
+				WeakThis->QueueTeamWeaponSquad(RunId, WeakSquad);
+			}
+		}));
 		return;
 	}
 
@@ -453,6 +540,22 @@ void UGA_Paratroopers::JumpNextUnit(FParatrooperDropRun& Run)
 {
 	const FParatrooperWaitingToJump WaitingUnit = Run.UnitsWaitingToJump[0];
 	Run.UnitsWaitingToJump.RemoveAt(0);
+	switch (WaitingUnit.Kind)
+	{
+	case EParatrooperJumpKind::TeamWeaponCargo:
+		JumpTeamWeaponCargo(Run, WaitingUnit);
+		return;
+	case EParatrooperJumpKind::CrewProxy:
+		JumpCrewProxy(Run, WaitingUnit);
+		return;
+	case EParatrooperJumpKind::Soldier:
+		JumpSoldier(Run, WaitingUnit);
+		return;
+	}
+}
+
+void UGA_Paratroopers::JumpSoldier(FParatrooperDropRun& Run, const FParatrooperWaitingToJump& WaitingUnit)
+{
 	ASquadUnit* SquadUnit = WaitingUnit.SquadUnit.Get();
 	if (not IsValid(SquadUnit) || not SquadUnit->IsUnitAlive())
 	{
@@ -483,6 +586,318 @@ void UGA_Paratroopers::JumpNextUnit(FParatrooperDropRun& Run)
 		StartLocation,
 		LandingLocation,
 		Run.RunDirection.Rotation().Yaw);
+}
+
+void UGA_Paratroopers::QueueTeamWeaponSquad(const int32 RunId, const TWeakObjectPtr<ATeamWeaponController> WeakSquad)
+{
+	FParatrooperDropRun* Run = FindRun(RunId);
+	ATeamWeaponController* Squad = WeakSquad.Get();
+	if (not Run || not IsValid(Squad))
+	{
+		return;
+	}
+	FParatrooperSquadInDrop* SquadInDrop = Run->SquadsInDrop.FindByPredicate(
+		[Squad](const FParatrooperSquadInDrop& Entry)
+		{
+			return Entry.Squad.Get() == Squad;
+		});
+	if (not SquadInDrop || SquadInDrop->bM_HasQueuedUnits)
+	{
+		return;
+	}
+	SquadInDrop->bM_HasQueuedUnits = true;
+
+	ATeamWeapon* TeamWeapon = Squad->GetControlledTeamWeaponNoReport();
+	if (IsValid(TeamWeapon))
+	{
+		HideTeamWeaponForDrop(TeamWeapon);
+		// The gun goes first: heavy cargo leaves the aircraft before its crew and falls faster.
+		FParatrooperWaitingToJump Cargo;
+		Cargo.Squad = Squad;
+		Cargo.Kind = EParatrooperJumpKind::TeamWeaponCargo;
+		Cargo.TeamWeapon = TeamWeapon;
+		Cargo.LandingTransform = TeamWeapon->GetActorTransform();
+		Run->UnitsWaitingToJump.Add(Cargo);
+		++Run->QueuedUnitCount;
+		++SquadInDrop->UnitsNotLanded;
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError(TEXT("UGA_Paratroopers: a team weapon squad has no gun after loading; its crew "
+			"jumps without one.\n Squad: ") + Squad->GetName());
+	}
+	for (ASquadUnit* SquadUnit : Squad->GetSquadUnitsChecked())
+	{
+		FParatrooperWaitingToJump Crewman;
+		Crewman.SquadUnit = SquadUnit;
+		Crewman.Squad = Squad;
+		Crewman.Kind = EParatrooperJumpKind::CrewProxy;
+		Run->UnitsWaitingToJump.Add(Crewman);
+		++Run->QueuedUnitCount;
+		++SquadInDrop->UnitsNotLanded;
+	}
+	UpdateActorSpawnedHandler();
+}
+
+void UGA_Paratroopers::OnActorSpawnedDuringDrop(AActor* SpawnedActor)
+{
+	ATeamWeapon* TeamWeapon = Cast<ATeamWeapon>(SpawnedActor);
+	if (not IsValid(TeamWeapon))
+	{
+		return;
+	}
+	for (const FParatrooperDropRun& Run : M_DropRuns)
+	{
+		for (const FParatrooperSquadInDrop& SquadInDrop : Run.SquadsInDrop)
+		{
+			const ASquadController* Squad = SquadInDrop.Squad.Get();
+			if (not SquadInDrop.bM_IsTeamWeaponSquad || SquadInDrop.bM_HasQueuedUnits || not IsValid(Squad))
+			{
+				continue;
+			}
+			if (FVector::Dist2D(Squad->GetActorLocation(), TeamWeapon->GetActorLocation()) <=
+				ParatroopersConstants::TeamWeaponSpawnMatchDistance)
+			{
+				HideTeamWeaponForDrop(TeamWeapon);
+				return;
+			}
+		}
+	}
+}
+
+void UGA_Paratroopers::UpdateActorSpawnedHandler()
+{
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return;
+	}
+	const bool bNeedsHandler = GetHasTeamWeaponSquadWithoutGun();
+	if (bNeedsHandler && not M_ActorSpawnedHandle.IsValid())
+	{
+		M_ActorSpawnedHandle = World->AddOnActorSpawnedHandler(
+			FOnActorSpawned::FDelegate::CreateUObject(this, &UGA_Paratroopers::OnActorSpawnedDuringDrop));
+		return;
+	}
+	if (not bNeedsHandler && M_ActorSpawnedHandle.IsValid())
+	{
+		World->RemoveOnActorSpawnedHandler(M_ActorSpawnedHandle);
+		M_ActorSpawnedHandle.Reset();
+	}
+}
+
+bool UGA_Paratroopers::GetHasTeamWeaponSquadWithoutGun() const
+{
+	for (const FParatrooperDropRun& Run : M_DropRuns)
+	{
+		for (const FParatrooperSquadInDrop& SquadInDrop : Run.SquadsInDrop)
+		{
+			if (SquadInDrop.bM_IsTeamWeaponSquad && not SquadInDrop.bM_HasQueuedUnits && SquadInDrop.Squad.IsValid())
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void UGA_Paratroopers::HideTeamWeaponForDrop(ATeamWeapon* TeamWeapon)
+{
+	if (not IsValid(TeamWeapon))
+	{
+		return;
+	}
+	TeamWeapon->SetActorHiddenInGame(true);
+	TeamWeapon->SetActorEnableCollision(false);
+	TeamWeapon->DisableTurret();
+}
+
+void UGA_Paratroopers::JumpTeamWeaponCargo(FParatrooperDropRun& Run, const FParatrooperWaitingToJump& WaitingUnit)
+{
+	ATeamWeapon* TeamWeapon = WaitingUnit.TeamWeapon.Get();
+	if (not IsValid(TeamWeapon) || not TeamWeapon->IsUnitAlive())
+	{
+		MarkUnitDone(Run, WaitingUnit.Squad);
+		return;
+	}
+	// The cargo canopy is far bigger than a soldier's: open it clear of the aircraft.
+	const float CanopyClearance = ParatroopersConstants::CargoCanopyClearancePerScale *
+		M_ParatroopersSettings.TeamWeaponCargoDescent.CanopyScale;
+	const FVector StartLocation = GetJumpStartLocation(Run) - FVector(0.0f, 0.0f, CanopyClearance);
+	UE_LOG(LogTemp, Display, TEXT("RTS_PARATROOPER_JUMP run=%d index=%d cargo=%s start=%s landing=%s"),
+	       Run.RunId, Run.JumpedUnitCount, *TeamWeapon->GetName(), *StartLocation.ToString(),
+	       *WaitingUnit.LandingTransform.GetLocation().ToString());
+	++Run.JumpedUnitCount;
+
+	UCargoParachuteDescentComponent* DescentComponent = NewObject<UCargoParachuteDescentComponent>(TeamWeapon);
+	DescentComponent->RegisterComponent();
+	const int32 RunId = Run.RunId;
+	const TWeakObjectPtr<ASquadController> WeakSquad = WaitingUnit.Squad;
+	DescentComponent->OnDescentFinished.BindWeakLambda(this, [this, RunId, WeakSquad](AActor* Load, const bool bLanded)
+	{
+		OnTeamWeaponCargoLanded(RunId, WeakSquad, Load, bLanded);
+	});
+	// Visible from here on; collision stays off until it is on the ground.
+	TeamWeapon->SetActorHiddenInGame(false);
+	// May finish synchronously and re-enter through OnTeamWeaponCargoLanded: Run is not used after.
+	DescentComponent->StartDescent(
+		M_ParatroopersSettings.TeamWeaponCargoDescent,
+		M_ParatroopersSettings.DescentSettings.ParachuteMesh,
+		StartLocation,
+		WaitingUnit.LandingTransform);
+}
+
+void UGA_Paratroopers::OnTeamWeaponCargoLanded(
+	const int32 RunId,
+	const TWeakObjectPtr<ASquadController> Squad,
+	AActor* Load,
+	const bool bLanded)
+{
+	ATeamWeapon* TeamWeapon = Cast<ATeamWeapon>(Load);
+	if (bLanded && IsValid(TeamWeapon))
+	{
+		TeamWeapon->SetActorEnableCollision(true);
+		TeamWeapon->ConformToGround(0.f, true);
+		// Arms only when the controller finished deploying; the descent kept it silent until now.
+		TeamWeapon->SetWeaponsEnabledForTeamWeaponState(true);
+	}
+	if (FParatrooperDropRun* Run = FindRun(RunId))
+	{
+		MarkUnitDone(*Run, Squad);
+	}
+}
+
+void UGA_Paratroopers::JumpCrewProxy(FParatrooperDropRun& Run, const FParatrooperWaitingToJump& WaitingUnit)
+{
+	ASquadUnit* SquadUnit = WaitingUnit.SquadUnit.Get();
+	if (not IsValid(SquadUnit) || not SquadUnit->IsUnitAlive() || not IsValid(SquadUnit->GetMesh()))
+	{
+		MarkUnitDone(Run, WaitingUnit.Squad);
+		return;
+	}
+	const FParatrooperDescentSettings& SoldierSettings = M_ParatroopersSettings.DescentSettings;
+	const UCapsuleComponent* Capsule = SquadUnit->GetCapsuleComponent();
+	const float HalfHeight = IsValid(Capsule) ? Capsule->GetScaledCapsuleHalfHeight() : 0.0f;
+	// The proxy's origin is the soldier's feet; the jump start is given for a soldier's capsule centre.
+	const FVector StartLocation = GetJumpStartLocation(Run) - FVector(0.0f, 0.0f, HalfHeight);
+	USkeletalMeshComponent* RealMesh = SquadUnit->GetMesh();
+	AParachuteJumperProxy* Proxy = AParachuteJumperProxy::SpawnForSquadUnit(
+		SquadUnit,
+		SoldierSettings.ParachuteMesh,
+		SoldierSettings.ParachuteMontage,
+		StartLocation,
+		RealMesh->GetComponentRotation().Yaw);
+	if (not IsValid(Proxy))
+	{
+		// Nothing to show coming down: the crewman simply appears at his post.
+		RevealCrewUnit(SquadUnit, false);
+		MarkUnitDone(Run, WaitingUnit.Squad);
+		return;
+	}
+	UE_LOG(LogTemp, Display, TEXT("RTS_PARATROOPER_JUMP run=%d index=%d crew_proxy=%s start=%s landing=%s"),
+	       Run.RunId, Run.JumpedUnitCount, *SquadUnit->GetName(), *StartLocation.ToString(),
+	       *RealMesh->GetComponentLocation().ToString());
+	++Run.JumpedUnitCount;
+	Run.JumperProxies.Add(Proxy);
+
+	FCargoParachuteDescentSettings ProxySettings;
+	ProxySettings.CanopyCount = 0;
+	ProxySettings.DescentSpeed = SoldierSettings.DescentSpeed;
+	ProxySettings.SwayAmplitudeDegrees = SoldierSettings.SwayAmplitudeDegrees;
+	ProxySettings.SwayPeriodSeconds = SoldierSettings.SwayPeriodSeconds;
+	ProxySettings.SwayPivotHeight = SoldierSettings.SwayPivotHeight;
+	ProxySettings.SwaySettleSeconds = SoldierSettings.SwaySettleSeconds;
+
+	UCargoParachuteDescentComponent* DescentComponent = NewObject<UCargoParachuteDescentComponent>(Proxy);
+	DescentComponent->RegisterComponent();
+	const int32 RunId = Run.RunId;
+	const TWeakObjectPtr<ASquadController> WeakSquad = WaitingUnit.Squad;
+	const TWeakObjectPtr<ASquadUnit> WeakUnit(SquadUnit);
+	DescentComponent->OnDescentFinished.BindWeakLambda(
+		this, [this, RunId, WeakSquad, WeakUnit](AActor* LandedProxy, const bool bLanded)
+		{
+			OnCrewProxyLanded(RunId, WeakSquad, WeakUnit, LandedProxy, bLanded);
+		});
+	const FTransform LandingTransform(FRotator(0.0f, RealMesh->GetComponentRotation().Yaw, 0.0f),
+	                                  RealMesh->GetComponentLocation());
+	// The controller keeps walking guards and snapping operators while the proxy falls: land where he is then.
+	DescentComponent->SetLandingTrackComponent(RealMesh);
+	DescentComponent->StartDescent(ProxySettings, nullptr, StartLocation, LandingTransform);
+}
+
+void UGA_Paratroopers::OnCrewProxyLanded(
+	const int32 RunId,
+	const TWeakObjectPtr<ASquadController> Squad,
+	const TWeakObjectPtr<ASquadUnit> SquadUnit,
+	AActor* Proxy,
+	const bool bLanded)
+{
+	FParatrooperDropRun* Run = FindRun(RunId);
+	if (Run)
+	{
+		Run->JumperProxies.RemoveAll([Proxy](const TWeakObjectPtr<AParachuteJumperProxy>& Entry)
+		{
+			return not Entry.IsValid() || Entry.Get() == Proxy;
+		});
+	}
+	if (IsValid(Proxy) && not Proxy->IsActorBeingDestroyed())
+	{
+		Proxy->Destroy();
+	}
+	ASquadUnit* RealUnit = SquadUnit.Get();
+	if (IsValid(RealUnit) && RealUnit->IsUnitAlive())
+	{
+		bool bIsOperator = false;
+		if (const ATeamWeaponController* TeamWeaponSquad = Cast<ATeamWeaponController>(Squad.Get()))
+		{
+			TArray<ASquadUnit*> Operators;
+			TeamWeaponSquad->GetCrewOperators(Operators);
+			bIsOperator = Operators.Contains(RealUnit);
+		}
+		RevealCrewUnit(RealUnit, bIsOperator);
+	}
+	if (Run)
+	{
+		MarkUnitDone(*Run, Squad);
+	}
+}
+
+void UGA_Paratroopers::RevealCrewUnit(ASquadUnit* SquadUnit, const bool bIsOperator)
+{
+	if (not IsValid(SquadUnit))
+	{
+		return;
+	}
+	SquadUnit->SetActorHiddenInGame(false);
+	SquadUnit->SetActorEnableCollision(true);
+	if (USelectionComponent* SelectionComponent = SquadUnit->GetSelectionComponent())
+	{
+		SelectionComponent->SetCanBeSelected(true);
+	}
+	AInfantryWeaponMaster* InfantryWeapon = SquadUnit->GetInfantryWeapon();
+	if (not IsValid(InfantryWeapon))
+	{
+		return;
+	}
+	if (bIsOperator)
+	{
+		// Same restriction the controller puts on operators: rifle away while they work the gun.
+		InfantryWeapon->DisableWeaponSearch(false, true);
+		return;
+	}
+	InfantryWeapon->SetAutoEngageTargets(false);
+}
+
+void UGA_Paratroopers::DestroyJumperProxies(FParatrooperDropRun& Run) const
+{
+	for (const TWeakObjectPtr<AParachuteJumperProxy>& Proxy : Run.JumperProxies)
+	{
+		if (AParachuteJumperProxy* LiveProxy = Proxy.Get())
+		{
+			LiveProxy->Destroy();
+		}
+	}
+	Run.JumperProxies.Reset();
 }
 
 void UGA_Paratroopers::ReleaseAircraftHoldIfAllJumped(const FParatrooperDropRun& Run) const
@@ -553,6 +968,16 @@ FVector UGA_Paratroopers::GetLandingLocation(
 		if (World->LineTraceSingleByChannel(LandscapeHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, QueryParams))
 		{
 			GroundLocation = LandscapeHit.ImpactPoint;
+		}
+		else
+		{
+			// The spiral point is past the landscape edge (a drop aimed at the map edge): land at the aim point
+			// rather than on nothing, where the soldier would fall out of the world.
+			FVector TargetGround;
+			GroundLocation = ParatroopersConstants::TryFindLandscapeBelow(
+				                 World, GetLandingTrailOrigin(Run, JumpIndex), SquadUnit, TargetGround)
+				                 ? TargetGround
+				                 : Run.TargetLocation;
 		}
 	}
 

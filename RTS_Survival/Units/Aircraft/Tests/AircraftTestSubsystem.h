@@ -243,6 +243,8 @@ private:
 	void TickDeathWaitingForAirbase(FAircraftDeathUnderTest& Entry);
 	/** @return Whether the aircraft was spawned and parked in a bay of the entry's unpacked airbase. */
 	bool ParkDeathAircraftInAirbase(FAircraftDeathUnderTest& Entry);
+	void CheckNoSmokeLingers(const FAircraftDeathUnderTest& Entry);
+	void CheckPiecesCameDown(const FAircraftDeathUnderTest& Entry);
 	void CheckParkedPieces(FAircraftDeathUnderTest& Entry);
 	void CheckPiecesStayInTheBay(const FAircraftDeathUnderTest& Entry, const TArray<FVector>& PieceLocations);
 	/** @return World locations of the wreck's pieces that have geometry; empty without a wreck. */

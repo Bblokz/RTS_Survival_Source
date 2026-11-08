@@ -38,6 +38,11 @@ void UEnergyComp::SetEnabled(const bool bEnabled)
 		PlayerResourceManager->DeregisterEnergyComponent(this);
 		return;
 	}
+	// Buildings dropped in the pre-game hangar's ability preview have no player resources to register with.
+	if (FRTS_Statics::GetIsInPreGameHangar(this))
+	{
+		return;
+	}
 	RTSFunctionLibrary::ReportError("Failed to get PlayerResourceManager in EnergyComp.cpp"
 		"\n at function SetEnabled in EnergyComp.cpp."
 		"\n for component: " + GetName());
@@ -98,6 +103,10 @@ void UEnergyComp::UpdateEnergySupplied(const int32 NewEnergySupplied)
 		{
 			// Provide the old energy supply too so we know what amount to subtract before we add the new amount.
 			PlayerResourceManager->UpdateEnergySupplyForUpgradedComponent(this, OldEnergy);
+			return;
+		}
+		if (FRTS_Statics::GetIsInPreGameHangar(this))
+		{
 			return;
 		}
 		RTSFunctionLibrary::ReportError("Failed to get PlayerResourceManager in EnergyComp.cpp"

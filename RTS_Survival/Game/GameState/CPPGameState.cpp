@@ -334,14 +334,99 @@ FAttachedRocketsData ACPPGameState::GetAttachedRocketDataOfPlayer(const int32 Pl
 
 FBxpData ACPPGameState::GetPlayerBxpData(const EBuildingExpansionType BxpType, ABuildingExpansion* BxpRequesting) const
 {
-	if (M_TPlayerBxpDataHashMap.Contains(BxpType))
+	if (const FBxpData* BxpData = M_TPlayerBxpDataHashMap.Find(BxpType))
 	{
-		return M_TPlayerBxpDataHashMap[BxpType];
+		if (not Global_GetIsFieldDefenseBxpType(BxpType))
+		{
+			return *BxpData;
+		}
+		// Every price reader (tooltips, the can-pay check, the queue item, the trench's per-metre price) comes here.
+		FBxpData DiscountedData = *BxpData;
+		ApplyFieldDefenseCostMlt(DiscountedData, GetPlayerFieldDefenseCostMlt());
+		return DiscountedData;
 	}
 	const FString SafeName = IsValid(BxpRequesting) ? BxpRequesting->GetName() : "NULL";
 	RTSFunctionLibrary::ReportError(
 		"Could not find bxp data for player bxp: " + Global_GetBxpTypeEnumAsString(BxpType) + "\n" + SafeName);
 	return FBxpData();
+}
+
+void ACPPGameState::RegisterPlayerFieldDefenseCostMlt(const AActor* Source, const float CostMlt)
+{
+	if (not IsValid(Source))
+	{
+		RTSFunctionLibrary::ReportError("Tried to register a field defense discount without a source."
+			"\n At function ACPPGameState::RegisterPlayerFieldDefenseCostMlt");
+		return;
+	}
+	RemoveStaleFieldDefenseCostSources();
+	const float ClampedCostMlt = FMath::Clamp(CostMlt, 0.f, 1.f);
+	for (FFieldDefenseCostSource& EachSource : M_PlayerFieldDefenseCostSources)
+	{
+		if (EachSource.Source.Get() == Source)
+		{
+			EachSource.CostMlt = ClampedCostMlt;
+			return;
+		}
+	}
+	FFieldDefenseCostSource NewSource;
+	NewSource.Source = Source;
+	NewSource.CostMlt = ClampedCostMlt;
+	M_PlayerFieldDefenseCostSources.Add(NewSource);
+}
+
+void ACPPGameState::UnregisterPlayerFieldDefenseCostMlt(const AActor* Source)
+{
+	// A source that is not registered (never built, or already taken back) is not an error.
+	M_PlayerFieldDefenseCostSources.RemoveAll([Source](const FFieldDefenseCostSource& EachSource)
+	{
+		return EachSource.Source.Get() == Source;
+	});
+	RemoveStaleFieldDefenseCostSources();
+}
+
+float ACPPGameState::GetPlayerFieldDefenseCostMlt() const
+{
+	float LowestCostMlt = 1.f;
+	for (const FFieldDefenseCostSource& EachSource : M_PlayerFieldDefenseCostSources)
+	{
+		if (EachSource.Source.IsValid())
+		{
+			LowestCostMlt = FMath::Min(LowestCostMlt, EachSource.CostMlt);
+		}
+	}
+	return LowestCostMlt;
+}
+
+void ACPPGameState::RemoveStaleFieldDefenseCostSources()
+{
+	M_PlayerFieldDefenseCostSources.RemoveAll([](const FFieldDefenseCostSource& EachSource)
+	{
+		return not EachSource.Source.IsValid();
+	});
+}
+
+void ACPPGameState::ApplyFieldDefenseCostMlt(FBxpData& InOutBxpData, const float CostMlt)
+{
+	if (CostMlt >= 1.f)
+	{
+		return;
+	}
+	// Prices from this value on are rounded to 5 like every other price; the trench's per-metre price stays exact.
+	constexpr int32 RoundToFiveFromPrice = 50;
+	constexpr int32 MinRoundedPrice = 5;
+	constexpr int32 MinExactPrice = 1;
+	for (TPair<ERTSResourceType, int32>& EachCost : InOutBxpData.Cost.ResourceCosts)
+	{
+		if (EachCost.Value <= 0)
+		{
+			continue;
+		}
+		const int32 DiscountedPrice = FMath::RoundToInt32(EachCost.Value * CostMlt);
+		EachCost.Value = EachCost.Value >= RoundToFiveFromPrice
+			                 ? FMath::Max(MinRoundedPrice, DeveloperSettings::RoundToNearestMultipleOfFive(DiscountedPrice))
+			                 : FMath::Max(MinExactPrice, DiscountedPrice);
+	}
 }
 
 FAircraftData ACPPGameState::GetAircraftDataOfPlayer(const EAircraftSubtype AircraftSubtype,
@@ -920,6 +1005,55 @@ void ACPPGameState::SetupStrikeDivisionTrainingOptions()
 		FTrainingOption(),
 		FTrainingOption()
 	};
+
+	AddStrikeDivisionBxpOptions();
+}
+
+void ACPPGameState::AddStrikeDivisionBxpOptions()
+{
+	auto AddOptions = [this](const ENomadicSubtype Subtype, const TArray<FBxpOptionData>& StrikeDivisionOptions)
+	{
+		FNomadicData* NomadicData = M_TPlayerNomadicDataHashMap.Find(Subtype);
+		if (not NomadicData)
+		{
+			RTSFunctionLibrary::ReportError(FString::Printf(
+				TEXT("No player nomadic data for %s; cannot add its Strike Division options."
+					"\n At function ACPPGameState::AddStrikeDivisionBxpOptions"), *UEnum::GetValueAsString(Subtype)));
+			return;
+		}
+		for (const FBxpOptionData& Option : StrikeDivisionOptions)
+		{
+			const bool bHasOption = NomadicData->BuildingExpansionOptions.ContainsByPredicate(
+				[&Option](const FBxpOptionData& Existing)
+				{
+					return Existing.ExpansionType == Option.ExpansionType;
+				});
+			if (not bHasOption)
+			{
+				NomadicData->BuildingExpansionOptions.Add(Option);
+			}
+		}
+	};
+	// The flak stand replaces the plain 37mm Flak on this faction's refinery.
+	if (FNomadicData* RefineryData = M_TPlayerNomadicDataHashMap.Find(ENomadicSubtype::Nomadic_GerRefinery))
+	{
+		RefineryData->BuildingExpansionOptions.RemoveAll([](const FBxpOptionData& Existing)
+		{
+			return Existing.ExpansionType == EBuildingExpansionType::BTX_37mmFlak;
+		});
+	}
+	// The Kaskade, the flak stand, the Schreck frame and the smelter are drawn in the Strike Division's field-kit look,
+	// so only this faction's buildings offer them.
+	AddOptions(ENomadicSubtype::Nomadic_GerRefinery, InitBxpOptions({
+		           AsEconomic(EBuildingExpansionType::BTX_RefKaskade),
+		           AsDefense(EBuildingExpansionType::BTX_RefFlakStand)
+	           }));
+	AddOptions(ENomadicSubtype::Nomadic_GerLightSteelForge, InitBxpOptions({
+		           AsDefense(EBuildingExpansionType::BTX_GerForgeSchreckFrame)
+	           }));
+	AddOptions(ENomadicSubtype::Nomadic_GerMetalVault, InitBxpOptions({
+		           AsEconomic(EBuildingExpansionType::BTX_GerMetalVaultSmelter)
+	           }));
 }
 
 
@@ -5106,8 +5240,15 @@ void ACPPGameState::InitAllGameHeavyWeapons()
 	WeaponData.ProjectileMovementSpeed = HEProjectileSpeed;
 	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sIG_33_150MM, WeaponData);
 
-	WeaponData.WeaponName = EWeaponName::sFH18_150MM_TW;
-	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sFH18_150MM_TW, WeaponData);
+	// Towed sFH 18 (team weapon and the sFH 18 pit): the sIG 33's 15 cm shell from a long barrel. It outranges the
+	// leFH 18 (HowitzerArtilleryRange, 8800) like the real guns (about 13.3 km against 10.7 km), by the same 20% as
+	// the ML-20 pit: 10600. Only the range differs from the sIG 33; the JagdPanther Bollwerk sets its own range.
+	constexpr float Sfh18RangeOverLeFH18 = 1.2f;
+	FWeaponData Sfh18TowedData = WeaponData;
+	Sfh18TowedData.WeaponName = EWeaponName::sFH18_150MM_TW;
+	Sfh18TowedData.Range = RTSFunctionLibrary::RoundToNearestMultipleOf(
+		DeveloperSettings::GameBalance::Ranges::HowitzerArtilleryRange * Sfh18RangeOverLeFH18, 100);
+	M_TPlayerWeaponDataHashMap.Add(EWeaponName::sFH18_150MM_TW, Sfh18TowedData);
 
 	// https://old-wiki.warthunder.com/Brummbar
 	WeaponData.WeaponName = EWeaponName::Stu_H_43_L_12_150MM;
@@ -5530,6 +5671,10 @@ void ACPPGameState::InitAllGameDigInData()
 	DigInData.DigInWallHealth = HeavyTankDigInWallHealth;
 	M_TPlayerDigInDataHashMap.Add(EDigInType::GerHeavyTankWall, DigInData);
 	M_TPlayerDigInDataHashMap.Add(EDigInType::RusHeavyTankWall, DigInData);
+
+	DigInData.DigInTime = AATruckRingDigInWallBuildingTime;
+	DigInData.DigInWallHealth = AATruckRingDigInWallHealth;
+	M_TPlayerDigInDataHashMap.Add(EDigInType::RusAATruckRingWall, DigInData);
 
 	M_TEnemyDigInDataHashMap = M_TPlayerDigInDataHashMap;
 }
@@ -8687,6 +8832,7 @@ void ACPPGameState::InitAllGameBxpData()
 	BxpHelpers::GerBxpData::InitGerHQBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerLFactoryBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitRefineryBxpData(M_TPlayerBxpDataHashMap);
+	BxpHelpers::GerBxpData::InitGerMetalVaultBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCaptureBunkersBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerBarracksBxpData(M_TPlayerBxpDataHashMap);
 	BxpHelpers::GerBxpData::InitGerCommCenterBxpData(M_TPlayerBxpDataHashMap);
@@ -9494,7 +9640,9 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsEconomic(EBuildingExpansionType::BTX_RefConverter)
 	});
 
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Flak and Converter; the Strike Division swaps the Flak for its flak stand and adds the Kaskade distillation
+	// (see AddStrikeDivisionBxpOptions).
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicExp * 1.2, 5);
@@ -9662,7 +9810,8 @@ void ACPPGameState::InitAllGameNomadicData()
 		AsEconomic(EBuildingExpansionType::BTX_GerLFactoryFuelStorage),
 	});
 
-	NomadicData.MaxAmountBuildingExpansions = 2;
+	// Flak, reactor, fuel storage and (Strike Division only, see AddStrikeDivisionBxpOptions) the Schreck frame.
+	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
 	NomadicData.ExperienceWorth = RTSFunctionLibrary::RoundToNearestMultipleOf(T1NomadicExp * 1.2, 5);
@@ -9704,14 +9853,20 @@ void ACPPGameState::InitAllGameNomadicData()
 	// Expansion radius is for BXPs that are freely placed, building radius is for other buildings.
 	NomadicData.ExpansionRadius = T2ExpansionRadius;
 	NomadicData.BuildRadius = 0;
-	// The observation post goes on either sandbag-wing end socket; the MG42 nests sit on both wing ends at once.
+	// The observation post goes on either sandbag-wing end socket; the MG42 nests sit on both wing ends at once; the
+	// requisition office hangs on the tower and makes the player's field defenses cheaper while it stands; the cipher
+	// room hangs over the inner yard and makes the player's commander abilities recharge faster. The nests, the office
+	// and the cipher room are all origin expansions and are meant as a one-of choice, but nothing enforces that yet
+	// (IBuildingExpansionOwner::GetUnlockedBuildingExpansionTypes has its origin check commented out).
 	NomadicData.BuildingExpansionOptions = InitBxpOptions({
 		AsDefense(EBuildingExpansionType::BTX_37mmFlak),
 		AsTech(EBuildingExpansionType::BTX_GerCommObservationPost),
 		AsDefense(EBuildingExpansionType::BTX_GerCommMG42Nests),
+		AsEconomic(EBuildingExpansionType::BTX_GerCommRequisitionOffice),
+		AsTech(EBuildingExpansionType::BTX_GerCommCipherRoom),
 	});
 
-	// Two observation posts and the nests.
+	// Two observation posts and the nests (or the office, or the cipher room).
 	NomadicData.MaxAmountBuildingExpansions = 3;
 	NomadicData.ExperienceLevels = GetNomadicTruckExpLevels();
 	NomadicData.ExperienceMultiplier = 1.0;
@@ -10208,6 +10363,79 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_IronStorm, SquadData);
 
+	// Rail Troopers: heavy armour on the scavenger body, slow, anti-tank rail rifles.
+	SquadData.MaxHealth = EliteInfantryHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	SquadData.MaxAcceleration = SlowInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RailTroopers_Radixite},
+		{ERTSResourceType::Resource_Metal, RailTroopers_Metal}
+	});
+	SquadData.Abilities = BasicSquadAbilities;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_RailTroopers, SquadData);
+
+	// Elite Scavengers: the scavenger squad with 33% more health per soldier, STG 44s and Panzerfausts. Same body,
+	// speed and resistances as the scavengers; they keep the scavenge and repair buttons.
+	SquadData.MaxHealth = EliteScavengersHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, EliteScavengers_Radixite},
+		{ERTSResourceType::Resource_Metal, EliteScavengers_Metal}
+	});
+	SquadData.Abilities = BasicScavengerAbilities;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_EliteScavengers, SquadData);
+
+	// Red Spine: three light mech walkers on the infantry skeleton, heavy infantry armour, MP46s, normal pace.
+	SquadData.MaxHealth = RedSpineWalkerHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = BasicInfantrySpeed;
+	SquadData.MaxAcceleration = BasicInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, RedSpine_Radixite},
+		{ERTSResourceType::Resource_Metal, RedSpine_Metal}
+	});
+	SquadData.Abilities = BasicSquadAbilities;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_RedSpine, SquadData);
+
+	// Fels Krieger: three medium mech walkers (Etasphere07) on the infantry skeleton, heavy infantry armour,
+	// Ripper Guns, the slower pace of the heavier infantry.
+	SquadData.MaxHealth = FelsKriegerWalkerHealth;
+	SquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIHeavyInfantryArmorResistances(
+		SquadData.MaxHealth);
+	SquadData.MaxWalkSpeedCms = SlowInfantrySpeed;
+	SquadData.MaxAcceleration = SlowInfantryAcceleration;
+	SquadData.VisionRadius = InfantryVisionRadius;
+	SquadData.Cost = FUnitCost({
+		{ERTSResourceType::Resource_Radixite, FelsKrieger_Radixite},
+		{ERTSResourceType::Resource_Metal, FelsKrieger_Metal}
+	});
+	SquadData.Abilities = BasicSquadAbilities;
+	SquadData.ExperienceLevels = GetTier2InfantryExpLevels();
+	SquadData.ExperienceMultiplier = 1.0;
+	SquadData.ExperienceWorth = EliteInfantryExp;
+	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Elite;
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Ger_FelsKrieger, SquadData);
+
 	// --------------------------------------------------
 	//                     Rus Infantry
 	// --------------------------------------------------
@@ -10246,6 +10474,14 @@ void ACPPGameState::InitAllGameSquadData()
 	SquadData.ExperienceMultiplier = 1.0;
 	SquadData.StressTolerance = DeveloperSettings::GameBalance::InfantrySettings::StressTolerance::Untrained;
 	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_Mosin, SquadData);
+
+	constexpr float ArmoredMosinHealthMultiplier = 1.25f;
+	FSquadData ArmoredMosinSquadData = SquadData;
+	ArmoredMosinSquadData.MaxHealth *= ArmoredMosinHealthMultiplier;
+	ArmoredMosinSquadData.ResistancesAndDamageMlt = FUnitResistanceDataHelpers::GetIBasicInfantryResistances(
+		ArmoredMosinSquadData.MaxHealth);
+	M_TPlayerSquadDataHashMap.Add(ESquadSubtype::Squad_Rus_ArmoredMosin, ArmoredMosinSquadData);
+
 	InitAllGameSovietAssaultSquadData(SquadData);
 
 	SquadData.MaxHealth = BasicInfantryHealth;

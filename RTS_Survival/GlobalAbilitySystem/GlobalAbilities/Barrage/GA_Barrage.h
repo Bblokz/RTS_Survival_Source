@@ -110,26 +110,47 @@ private:
 	UPROPERTY(Transient)
 	bool bM_IsWaitingForProjectileManager = false;
 
+	// M_PendingTargetLocation, M_ShellsLaunched, M_ShellsActuallyLaunched, M_BurstTimerHandle and
+	// M_ShellLaunchTimerHandles above are no longer used (the runs below hold that state); they stay so the reflected
+	// layout of the cooked templates does not change.
+
+	/** One execution: executions can overlap (enemy AI, missions, short cooldowns) and each fires all its shells. */
+	struct FBarrageRun
+	{
+		int32 RunId = INDEX_NONE;
+		FVector TargetLocation = FVector::ZeroVector;
+		int32 ShellsLaunched = 0;
+		int32 ShellsActuallyLaunched = 0;
+		FTimerHandle BurstTimerHandle;
+		TArray<FTimerHandle> ShellLaunchTimerHandles;
+	};
+
+	TArray<FBarrageRun> M_Runs;
+	int32 M_NextRunId = 0;
+	// Executions that came before the projectile manager was ready; started when it is.
+	TArray<FVector> M_TargetsWaitingForProjectileManager;
+
 	void SetupCallbackToProjectileManager(const AActor* WorldContextObject);
 	void OnProjectileManagerLoaded(const TObjectPtr<ASmallArmsProjectileManager>& ProjectileManager);
 	bool GetIsValidProjectileManager() const;
 	void StartBarrage(const FVector& TargetLocation);
-	void FireNextBurst();
-	void FireSingleShell();
-	void LaunchSingleShell();
-	void NotifyShellLaunchFinished();
+	FBarrageRun* FindRun(int32 RunId);
+	void FireNextBurst(int32 RunId);
+	void FireSingleShell(int32 RunId);
+	void LaunchSingleShell(int32 RunId);
+	void NotifyShellLaunchFinished(int32 RunId);
+	void FinishRun(int32 RunId);
 	void BroadcastBarrageFinishedIfNeeded();
 	bool GetShouldDelayShellLaunchForOffMapSound() const;
-	void ScheduleDelayedShellLaunch();
+	void ScheduleDelayedShellLaunch(int32 RunId);
 	FWeaponVFX BuildWeaponVfxForShellLaunch() const;
 	void PlayOffMapLaunchSoundIfRequested() const;
 	USoundBase* GetOffMapLaunchSound() const;
 	FVector BuildRandomPointInRadius(const FVector& CenterLocation) const;
 	FVector BuildLaunchLocation(const FVector& TargetLocation) const;
 	FWeaponData BuildVariedWeaponData() const;
-	void ScheduleNextBurst();
-	void ClearBurstTimer();
-	void ClearShellLaunchTimers();
-	void ResetBarrageRuntimeState();
+	void ScheduleNextBurst(int32 RunId);
+	void ClearRunTimers(FBarrageRun& Run) const;
+	void ClearAllRunTimers();
 	bool HasCachedProjectileManager() const;
 };

@@ -630,6 +630,26 @@ void UPlayerResourceManager::RegisterDropOff(const TWeakObjectPtr<UResourceDropO
 		" in player resource manager, but it is already registered/deregistered or it is Invalid!"
 		"\n Owner: " + OwnerName);
 }
+void UPlayerResourceManager::OnDropOffStorageChanged(const TWeakObjectPtr<UResourceDropOff> DropOff,
+                                                     const ERTSResourceType Resource, const int32 StorageDelta,
+                                                     const int32 ResourcesLost)
+{
+	if (not M_DropOffs.Contains(DropOff))
+	{
+		return;
+	}
+	FRTSResourceStorage* ResourceStorage = M_PlayerResources.Find(Resource);
+	if (not ResourceStorage)
+	{
+		RTSFunctionLibrary::ReportError("A registered drop off changed storage for a resource the player does not have."
+			"\n Resource: " + Global_GetResourceTypeAsString(Resource) +
+			"\n At function UPlayerResourceManager::OnDropOffStorageChanged");
+		return;
+	}
+	ResourceStorage->Storage += StorageDelta;
+	ResourceStorage->Amount = FMath::Max(0, ResourceStorage->Amount - ResourcesLost);
+}
+
 void UPlayerResourceManager::NotifyEnergyComponentOfCurrentBaseEnergyState(UEnergyComp* EnergyComponent) const
 {
 	if (not IsValid(EnergyComponent))

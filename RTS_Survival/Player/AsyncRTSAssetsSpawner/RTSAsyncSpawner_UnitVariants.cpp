@@ -4,6 +4,7 @@
 
 #include "Engine/StaticMesh.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Player/PlayerUnitVariantManager/PlayerUnitVariantManager.h"
 #include "RTS_Survival/Units/Variants/UnitVariantDataAsset.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
@@ -65,6 +66,18 @@ TSoftClassPtr<AActor> ARTSAsyncSpawner::GetBaseTrainingOptionClass(const FTraini
 		}
 	}
 	return GetTrainingOptionClass(TrainingOption);
+}
+
+TSoftClassPtr<AActor> ARTSAsyncSpawner::GetUnitVariantClass(const UUnitVariantDataAsset& VariantDataAsset,
+                                                            const FTrainingOption& Unit,
+                                                            const EUnitVariant Variant) const
+{
+	const FTrainingOption SpawnerKey = UPlayerUnitVariantManager::GetSpawnerKey(Unit);
+	if (Variant == EUnitVariant::Base)
+	{
+		return GetBaseTrainingOptionClass(SpawnerKey);
+	}
+	return VariantDataAsset.FindVariantClass(SpawnerKey, Variant);
 }
 
 bool ARTSAsyncSpawner::ApplyUnitVariant(const UUnitVariantDataAsset& VariantDataAsset, const FTrainingOption& Unit,

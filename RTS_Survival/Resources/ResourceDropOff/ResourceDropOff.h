@@ -56,6 +56,20 @@ public:
 	                            const bool bAlsoAddAmount = false);
 
 	/**
+	 * @brief A built expansion adds storage to its building; the player's storage total follows the drop off.
+	 * @param ResourceType The resource whose capacity grows.
+	 * @param ExtraCapacity How much capacity the expansion adds.
+	 */
+	void AddExpansionStorage(const ERTSResourceType ResourceType, const int32 ExtraCapacity);
+
+	/**
+	 * @brief Takes an expansion's storage away again when it packs up or dies; what no longer fits is lost.
+	 * @param ResourceType The resource whose capacity shrinks.
+	 * @param ExtraCapacity The capacity the expansion added before.
+	 */
+	void RemoveExpansionStorage(const ERTSResourceType ResourceType, const int32 ExtraCapacity);
+
+	/**
 	 * @brief Remove the provided amount of the provided resource type from the drop off.
 	 * @post Updates visuals of resources stored.
 	 * @param ResourceType The type of resource to remove.

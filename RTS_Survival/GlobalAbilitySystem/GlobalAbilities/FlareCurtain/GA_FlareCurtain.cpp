@@ -10,9 +10,11 @@ void UGA_FlareCurtain::OnStripFlightProgress(const FStripFlightRun& Run, const f
 {
 	const int32 FlareCount = FMath::Max(M_AimSettings.AreaAim.ShaderMarkerCount, 1);
 	const float Spacing = FlareCount > 1 ? Run.StripLength / (FlareCount - 1) : 0.0f;
+	// A single flare (the massive flare) hangs over the middle of the strip: the aimed point for a point aim.
+	const float SingleFlareDistance = Run.StripLength * 0.5f;
 	for (int32 FlareIndex = 0; FlareIndex < FlareCount; ++FlareIndex)
 	{
-		const float FlareDistance = Spacing * FlareIndex;
+		const float FlareDistance = FlareCount > 1 ? Spacing * FlareIndex : SingleFlareDistance;
 		if (FlareDistance > PreviousDistance && FlareDistance <= NewDistance)
 		{
 			DropFlare(Run, Run.LineStart + Run.Direction * FlareDistance);

@@ -2,6 +2,7 @@
 
 
 #include "SquadUnit.h"
+#include "RTS_Survival/Utils/Rendering/RTSRenderPerf.h"
 
 #include <RTS_Survival/FOWSystem/FowComponent/FowType.h>
 
@@ -50,6 +51,22 @@
 #include "RTS_Survival/Weapons/InfantryWeapon/SecondaryWeaponComp/SecondaryWeapon.h"
 #include "RTS_Survival/Weapons/WeaponData/WeaponData.h"
 #include "RTS_Survival/Scavenging/ScavengeObject/ScavengableObject.h"
+#include "RTS_Survival/Utils/UnitGroundRecovery/RTSUnitGroundRecovery.h"
+
+namespace SquadUnitGroundRecovery
+{
+	// A soldier that keeps falling through the world after this many recoveries dies instead.
+	constexpr int32 MaxFellOutOfWorldRecoveries = 3;
+	constexpr float CapsuleGroundClearanceCm = 2.0f;
+}
+
+static float GetGroundRecoveryOriginHeight(const ASquadUnit& SquadUnit)
+{
+	const UCapsuleComponent* Capsule = SquadUnit.GetCapsuleComponent();
+	const float HalfHeight = IsValid(Capsule) ? Capsule->GetScaledCapsuleHalfHeight() : 0.0f;
+	return HalfHeight + SquadUnitGroundRecovery::CapsuleGroundClearanceCm;
+}
+
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSSquadUnitCover, Log, All);
 
@@ -541,9 +558,16 @@ bool ASquadUnit::GetMayKeepFiringWhileSquadClosesRange() const
 		return false;
 	}
 	// A unit that cannot engage the ordered target from its cover point gives the point up through the cover
-	// update; a unit walking into cover goes to a point inside weapon range.
+	// update, unless it is a trench; a unit walking into cover goes to a point inside weapon range.
 	const bool bWeaponIsOnOrderedTarget = bIsAttackingGround || M_InfantryWeapon->GetCurrentTargetActor() == M_TargetActor;
-	return bWeaponIsOnOrderedTarget && M_InfantryWeapon->GetIsCurrentTargetInRange();
+	if (bWeaponIsOnOrderedTarget && M_InfantryWeapon->GetIsCurrentTargetInRange())
+	{
+		return true;
+	}
+	// The trench may hide the ordered target from his weapon; he only walks with the squad once it is out of range.
+	return bIsAttackingActor && GetIsHoldingTrenchCover() &&
+		FVector::DistSquared(GetActorLocation(), M_TargetActor->GetActorLocation()) <=
+		FMath::Square(M_InfantryWeapon->GetMaxWeaponRange());
 }
 
 bool ASquadUnit::GetIsCoverPointRejectedForTarget(const int64 PointId) const
@@ -551,6 +575,27 @@ bool ASquadUnit::GetIsCoverPointRejectedForTarget(const int64 PointId) const
 	const UWorld* World = GetWorld();
 	return PointId != 0 && PointId == M_CoverMoveGuard.RejectedPointId && IsValid(World) &&
 		World->GetTimeSeconds() < M_CoverMoveGuard.RejectedPointExpiryWorldSeconds;
+}
+
+bool ASquadUnit::GetCanAutoTargetFromHeldCover(const FVector& TargetLocation) const
+{
+	if (not GetIsHoldingTrenchCover())
+	{
+		return true;
+	}
+	const UWorld* World = GetWorld();
+	const URTSCoverFinderWorldSubsystem* CoverSubsystem = IsValid(World)
+		? World->GetSubsystem<URTSCoverFinderWorldSubsystem>()
+		: nullptr;
+	// Silent: without the cover service there is no arc to keep to.
+	if (not IsValid(CoverSubsystem))
+	{
+		return true;
+	}
+	return FRTSCombatCoverScoring::GetCanAimAt(
+		M_CoverRuntimeState.AssignedCoverPoint,
+		TargetLocation,
+		CoverSubsystem->BuildCombatCoverSettings());
 }
 
 void ASquadUnit::LeaveCoverUnusableAgainstTarget(const TCHAR* Reason)
@@ -571,8 +616,9 @@ bool ASquadUnit::GetIsSquadEligibleForAutomaticCover() const
 	{
 		return true;
 	}
-	// Team weapon crews are positioned by their weapon and must not wander off to nearby cover.
-	if (M_SquadController->GetSquadAlreadyHasTeamWeapon())
+	// Team weapon crews are positioned by their weapon and must not wander off to nearby cover; ability preview
+	// targets stand where the preview put them.
+	if (M_SquadController->GetSquadAlreadyHasTeamWeapon() || M_SquadController->GetIsAutomaticCoverBlocked())
 	{
 		return false;
 	}
@@ -748,7 +794,8 @@ bool ASquadUnit::TryRepositionToBetterCombatCover(
 		return false;
 	}
 	// A squad on hold position keeps the cover it has; only its point becoming unusable makes it move.
-	if (GetIsSquadOnHoldPosition())
+	// No point scores better than a trench, whatever the angles to the enemy say.
+	if (GetIsSquadOnHoldPosition() || GetIsHoldingTrenchCover())
 	{
 		return false;
 	}
@@ -1988,8 +2035,10 @@ bool ASquadUnit::GetIsCoverUsableAgainstTarget(
 	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
 	const float WorldSeconds = IsValid(World) ? World->GetTimeSeconds() : 0.0f;
 	const bool bIsWaitingHidden = M_CoverMoveGuard.InvalidTargetSinceWorldSeconds >= 0.0f;
-	// An attack order is tested at once: its target must never be waited out.
-	if (bIsWaitingHidden && not bTargetIsAttackOrder &&
+	const bool bIsHoldingTrench = GetIsHoldingTrenchCover();
+	// An attack order is tested at once: its target must never be waited out. A soldier in a trench waits it out
+	// all the same, since he stays whatever the test says.
+	if (bIsWaitingHidden && (not bTargetIsAttackOrder || bIsHoldingTrench) &&
 		WorldSeconds < M_CoverMoveGuard.NextInvalidTargetRecheckWorldSeconds)
 	{
 		return false;
@@ -2032,7 +2081,9 @@ bool ASquadUnit::GetIsCoverUsableAgainstTarget(
 		bTargetIsAttackOrder,
 		WorldSeconds - M_CoverMoveGuard.InvalidTargetSinceWorldSeconds,
 		IsValid(CoverSettings) ? CoverSettings->M_CoverTargetChangeToleranceSeconds : 0.0f);
-	OutShouldLeaveCover = Decision == ERTSCoverInvalidTargetDecision::LeaveCover;
+	// A target out of range is not judged here (see GetCoverJudgementTarget); that one makes the squad walk, and
+	// the walk cancels cover. One that is in range but blocked or off to the side is waited out in the trench.
+	OutShouldLeaveCover = Decision == ERTSCoverInvalidTargetDecision::LeaveCover && not bIsHoldingTrench;
 	if (OutShouldLeaveCover)
 	{
 		M_CoverMoveGuard.InvalidTargetSinceWorldSeconds = -1.0f;
@@ -2819,6 +2870,10 @@ void ASquadUnit::OnProjectileHit(const bool bBounced)
 void ASquadUnit::BeginPlay()
 {
 	Super::BeginPlay();
+	// A spawn point set under the terrain (or a squad grid point under a hill) starts the unit inside the landscape,
+	// where it falls through the world: one trace now instead of any check later.
+	// The origin is the capsule centre, so any depth under the surface already means the soldier is inside it.
+	FRTSUnitGroundRecovery::TryLiftOutOfLandscape(*this, GetGroundRecoveryOriginHeight(*this), 0.0f);
 	BeginPlay_SetPhysicalMaterials();
 	// Find the child weapon actor component.
 	BeginPlay_SetupChildActorWeaponComp();
@@ -2942,6 +2997,8 @@ void ASquadUnit::PostInitializeComponents()
 	PostInitializeComp_SetupAISquadUnit();
 	// set squadUnitAnimInstance
 	PostInitializeComp_SetupAnimBP();
+	// Equipment meshes out of the distance fields and the Lumen scene (performance audit).
+	RTSRenderPerf::ExcludeSmallAttachmentsFromDistanceFields(this);
 }
 
 void ASquadUnit::PostInitializeComp_InitScavengerComponent()
@@ -4917,4 +4974,30 @@ void ASquadUnit::OnSquadUnitSpawned_TeleportAndSetSelectable(const FVector& Squa
 	{
 		SelectionComponent->SetCanBeSelected(true);
 	}
+}
+
+void ASquadUnit::FellOutOfWorld(const UDamageType& DamageType)
+{
+	if (not IsUnitAlive())
+	{
+		// A corpse: its squad let go of it when it died, the engine's removal is fine.
+		Super::FellOutOfWorld(DamageType);
+		return;
+	}
+	if (M_FellOutOfWorldRecoveries < SquadUnitGroundRecovery::MaxFellOutOfWorldRecoveries
+		&& FRTSUnitGroundRecovery::TryPlaceBackOnGround(*this, GetGroundRecoveryOriginHeight(*this)))
+	{
+		++M_FellOutOfWorldRecoveries;
+		if (UCharacterMovementComponent* CharacterMovementComponent = GetCharacterMovement())
+		{
+			CharacterMovementComponent->StopMovementImmediately();
+			CharacterMovementComponent->SetMovementMode(MOVE_Walking);
+		}
+		UE_LOG(LogTemp, Warning, TEXT("RTS_FELL_OUT_OF_WORLD %s put back on the ground at %s (recovery %d)"),
+		       *GetName(), *GetActorLocation().ToCompactString(), M_FellOutOfWorldRecoveries);
+		return;
+	}
+	// Nowhere to stand, or it keeps falling: it dies the normal way so its squad lets go of it.
+	UE_LOG(LogTemp, Warning, TEXT("RTS_FELL_OUT_OF_WORLD %s has no ground to return to; it dies"), *GetName());
+	TakeFatalDamage();
 }

@@ -80,6 +80,12 @@ bool ASquadUnit::GetIsHoldingCoverPoint() const
 		M_CoverRuntimeState.State == ESquadUnitCoverState::Exposed;
 }
 
+bool ASquadUnit::GetIsHoldingTrenchCover() const
+{
+	return GetIsHoldingCoverPoint() &&
+		M_CoverRuntimeState.AssignedCoverPoint.CoverType == ERTSCoverType::TrenchStandUp;
+}
+
 void ASquadUnit::RecordHealthLossForStress(const float HealthLost)
 {
 	// This runs for every hit on every soldier, so whatever rules most hits out is asked first.
@@ -290,8 +296,9 @@ bool ASquadUnit::TryReserveStressRelocationPoint(
 	const URTSCoverFinderDeveloperSettings* CoverSettings = URTSCoverFinderDeveloperSettings::Get();
 	const UCharacterMovementComponent* UnitMovement = GetCharacterMovement();
 	// A soldier under orders, or one that left his cover in the meantime, is not sent anywhere by his stress.
+	// Nor is one in a trench: there is no farther cover worth leaving it for.
 	if (not IsValid(World) || not IsValid(CoverSettings) || not IsValid(UnitMovement) ||
-		not GetIsHoldingCoverPoint() || not GetMayKeepAutomaticCover() ||
+		not GetIsHoldingCoverPoint() || GetIsHoldingTrenchCover() || not GetMayKeepAutomaticCover() ||
 		not GetMayRelocateFromCoverForStress())
 	{
 		return false;

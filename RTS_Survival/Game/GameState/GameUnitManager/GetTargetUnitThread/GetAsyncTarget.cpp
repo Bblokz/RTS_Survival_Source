@@ -130,6 +130,17 @@ namespace
 
 		return RequestTargetPreference == ETargetPreference::Aircraft;
 	}
+
+	/** Aircraft fly high and far, so anti-air reaches them further out; ground targets keep the requested radius. */
+	float GetSearchRadiusForActorType(const ETargetPreference ActorType, const float RequestSearchRadius)
+	{
+		if (ActorType != ETargetPreference::Aircraft)
+		{
+			return RequestSearchRadius;
+		}
+
+		return RequestSearchRadius * DeveloperSettings::GameBalance::Ranges::AntiAirRangeMlt;
+	}
 }
 
 void FGetAsyncTarget::ProcessTargetRequests()
@@ -162,7 +173,8 @@ void FGetAsyncTarget::ProcessTargetRequests()
 			}
 
 			const float Distance = FVector::Dist(Request.SearchLocation, ActorLocation);
-			if (Distance > Request.SearchRadius || Distance < Request.MinimumSearchRadius)
+			if (Distance > GetSearchRadiusForActorType(ActorType, Request.SearchRadius)
+				|| Distance < Request.MinimumSearchRadius)
 			{
 				continue;
 			}

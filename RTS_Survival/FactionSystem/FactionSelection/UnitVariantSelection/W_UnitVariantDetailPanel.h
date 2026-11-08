@@ -9,8 +9,10 @@
 
 #include "W_UnitVariantDetailPanel.generated.h"
 
+class UBackgroundBlur;
 class UBorder;
 class UDataTable;
+class UImage;
 class UTexture2D;
 class UTextBlock;
 class UVerticalBox;
@@ -44,9 +46,10 @@ struct FUnitVariantDetailContent
 };
 
 /**
- * @brief Left of the variant cards on the unit variant selection screen: the special abilities, the weapons and the
- * stat changes of the hovered or equipped variant against Base. Created and placed by UW_UnitVariantSelectionMenu,
- * which resolves the data; builds its own widget tree.
+ * @brief Left of the variant cards on the unit variant selection screen: the special abilities, the weapons, the
+ * add-on armour panels and the stat changes of the hovered variant against Base, grouped on one glass pane under the
+ * variant's name. Created and placed by UW_UnitVariantSelectionMenu, which resolves the data; builds its own widget
+ * tree.
  */
 UCLASS()
 class RTS_SURVIVAL_API UW_UnitVariantDetailPanel : public UUserWidget
@@ -75,7 +78,19 @@ private:
 	UPROPERTY()
 	TObjectPtr<UTextBlock> M_VariantNameText;
 
-	// Labels and lists of the three sections; rebuilt for every variant shown.
+	// Blurs the plate behind the glass pane.
+	UPROPERTY()
+	TObjectPtr<UBackgroundBlur> M_GlassBlur;
+
+	// Translucent tinted pane that groups every section of the shown variant.
+	UPROPERTY()
+	TObjectPtr<UBorder> M_GlassPane;
+
+	// Thin highlight along the pane's top edge.
+	UPROPERTY()
+	TObjectPtr<UImage> M_GlassSheen;
+
+	// Labels and lists of the sections, on the glass pane; rebuilt for every variant shown.
 	UPROPERTY()
 	TObjectPtr<UVerticalBox> M_SectionColumn;
 
@@ -104,11 +119,20 @@ private:
 	bool bM_NextRowFollowsLabel = false;
 
 	void BuildWidgetTree();
+	// The glass pane under the variant name; it holds M_SectionColumn.
+	UWidget* BuildGlassSection();
 	void AddSectionLabel(const FText& Label);
 	void AddMutedLine(const FText& Text);
 	void AddAbilitySection(const FUnitVariantDetailContent& Content);
 	void AddWeaponSection(const FUnitVariantDetailContent& Content);
 	void AddComparisonSection(const FUnitVariantDetailContent& Content);
+	// Only when the variant or Base carries add-on armour panels: how many mm they add and that they can be shot off.
+	void AddAddOnArmorSection(const FUnitVariantDetailContent& Content);
+	/**
+	 * @param Armor The probe whose add-on armour is listed.
+	 * @param Change NEW when Base has no panels, REMOVED (Base's panels, dimmed) when the variant lost them.
+	 */
+	void AddAddOnArmorRow(const FUnitVariantProbeResult& Armor, const EUnitVariantChange Change);
 	void AddAbilityRow(const FUnitVariantAbilityCard& AbilityCard, const EUnitVariantChange Change);
 	/**
 	 * @param Weapon The weapon to list.

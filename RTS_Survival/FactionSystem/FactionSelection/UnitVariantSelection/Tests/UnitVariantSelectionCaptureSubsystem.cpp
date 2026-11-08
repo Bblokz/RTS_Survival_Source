@@ -41,6 +41,9 @@ namespace UnitVariantSelectionCapturePrivate
 	// Only the cards and the ability panel matter on the per-unit pictures, so the hangar preview is not waited
 	// for; the panel needs the unit's variant classes, which load async.
 	constexpr float EachUnitSettleSeconds = 2.5f;
+	// The hovered shot shows the detail panel, whose weapons and add-on armour come from the probes: class load,
+	// then ProbeSettleSeconds (2 s) on the spawned probes.
+	constexpr float EachUnitHoverSettleSeconds = 6.f;
 
 	template <typename WidgetType>
 	WidgetType* FindLiveWidget(const UWorld* World)
@@ -238,7 +241,10 @@ void UUnitVariantSelectionCaptureSubsystem::TickWaitingForLastCapture()
 
 void UUnitVariantSelectionCaptureSubsystem::TickSettlingOnEachUnit()
 {
-	if (GetPhaseSeconds() < UnitVariantSelectionCapturePrivate::EachUnitSettleSeconds)
+	const float RequiredSeconds = bM_EachUnitScrolledToEnd
+		                            ? UnitVariantSelectionCapturePrivate::EachUnitHoverSettleSeconds
+		                            : UnitVariantSelectionCapturePrivate::EachUnitSettleSeconds;
+	if (GetPhaseSeconds() < RequiredSeconds)
 	{
 		return;
 	}

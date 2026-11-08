@@ -29,6 +29,12 @@ void UBombComponent::ForceReloadAllBombsInstantly()
 		{
 			continue;
 		}
+		// An armed bomb is still shown on the aircraft; only dropped ones were hidden and come back (a full bomb bay
+		// reloaded at spawn otherwise reported "Instance N is not hidden" for every bomb).
+		if (EachEntry.IsBombArmed())
+		{
+			continue;
+		}
 
 		EachEntry.SetBombArmed(true);
 

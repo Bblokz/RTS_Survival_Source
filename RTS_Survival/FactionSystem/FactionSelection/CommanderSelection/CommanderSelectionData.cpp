@@ -147,3 +147,29 @@ FText CommanderSelectionData::GetTierNumeral(const EGlobalAbilityTier Tier)
 		return NSLOCTEXT("CommanderSelection", "TierUnknown", "?");
 	}
 }
+
+FLinearColor CommanderSelectionData::GetTierBadgeColor(const EGlobalAbilityTier Tier, const bool bHasTemplate)
+{
+	if (not bHasTemplate)
+	{
+		return FLinearColor(FColor::FromHex(TEXT("6E6F6A")));
+	}
+	switch (Tier)
+	{
+	case EGlobalAbilityTier::TierI:
+		return FLinearColor(FColor::FromHex(TEXT("8FD46B")));
+	case EGlobalAbilityTier::TierII:
+		return FLinearColor(FColor::FromHex(TEXT("38C8FF")));
+	case EGlobalAbilityTier::TierIII:
+		return FLinearColor(FColor::FromHex(TEXT("E8B04A")));
+	case EGlobalAbilityTier::TierIV:
+		return FLinearColor(FColor::FromHex(TEXT("E0614A")));
+	default:
+		return FLinearColor(FColor::FromHex(TEXT("6E6F6A")));
+	}
+}
+
+FSlateColor CommanderSelectionData::GetTierBadgeTextColor()
+{
+	return FSlateColor(FColor::FromHex(TEXT("101418")));
+}

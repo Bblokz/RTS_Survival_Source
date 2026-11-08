@@ -520,8 +520,13 @@ bool UCommandData::EnsureIsValidPlayerResourceManager() const
 		return true;
 	}
 
-	RTSFunctionLibrary::ReportError(
-		"Player resource manager is not valid in UCommandData. This is required for certain commands to function properly.");
+	// The pre-game hangar has no resources; its units only take the preview's move and attack orders.
+	if (not FRTS_Statics::GetIsInPreGameHangar(OwnerActor))
+	{
+		RTSFunctionLibrary::ReportError(
+			"Player resource manager is not valid in UCommandData. This is required for certain commands to function "
+			"properly.");
+	}
 	return false;
 }
 

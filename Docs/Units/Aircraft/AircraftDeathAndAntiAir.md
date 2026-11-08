@@ -32,6 +32,29 @@ ever engaging one:
   15 to 30 degrees per second (the Flak 88 has 25). Crewed guns still fire less often at an aircraft passing close by
   than the turrets do (the test asks one shot of them, three of the others): a balance setting.
 
+### Anti-air range
+
+Ground weapons engage an aircraft at `DeveloperSettings::GameBalance::Ranges::AntiAirRangeMlt` (4x) their range, since
+aircraft fly high and far and the range is measured in 3D. The weapon's own range is never changed, so the range the
+player sees stays the ground range. The multiplier is applied in three places that must agree:
+
+- **Search.** `FGetAsyncTarget::ProcessTargetRequests` compares an aircraft against the requested radius times the
+  multiplier; ground actors keep the requested radius. No extra data goes to the thread: an aircraft only reaches the
+  distance check for an `Aircraft` request. This also reaches attack-move and aggro searches of `Aircraft`-preference
+  units.
+- **In-range check.** `FWeaponTargetingData` caches `GetIsAircraftTarget` when a target is set
+  (`FWeaponRangeData::GetIsAntiAirRangeTarget`: any `AAircraftMaster`), and the turret, standalone turret, hull weapon
+  and infantry weapon range checks use `FWeaponRangeData::GetMaxRangeSquaredForTarget`. Without it a turret would drop
+  the aircraft the search just gave it. A towed flak crew moving to get in range uses
+  `ACPPTurretsMaster::GetMaxWeaponRangeForCurrentTarget`.
+- **Shot reach.** `UWeaponState::GetFlightRangeMltForCurrentTarget` (the owner's target actor at fire time) lengthens
+  traces (single, multi, laser) and the projectile flight range set in `AProjectile::SetupProjectileForNewLaunch`;
+  otherwise shells expired at 1.67x range. Aircraft-mounted weapons are left out. A projectile's armour-pen falloff
+  runs over that longer flight range; a trace hit beyond 1x range uses `ArmorPenMaxRange`.
+
+Aircraft still have to be visible to the side searching (`RTSIsVisibleTarget`): beyond a flak unit's own vision the
+longer range only helps when other units reveal the aircraft.
+
 Not changed: the DShK pit (a heavy machine gun, not set to anti-air) and `URTSComponent::ChangeOwningPlayer`, which
 still re-registers tanks, squads and standalone turrets only. The VTOL resource shuttle (`AVTOLDropshipAircraft`)
 stays out of the target lists (`GetIsTargetableByAntiAir` returns false): it is scripted scenery for its pad.
@@ -54,16 +77,45 @@ carrying, and hands over to `UAircraftDeathComponent` (created on every aircraft
   its nose engine; a multi-engine aircraft (Me 410, Pe-2, Pe-8, Ju 390) burns at one of its wing engines, chosen per
   aircraft (`FAircraftDeathMath::PickWingEngineIndex`, never the centre engine). The flame streams back from the
   engine (attached to the mesh at the engine, not to the spinning propeller bone), and dark smoke puffs are dropped into
-  the world every `SmokeTrailSpacing` of the fall so they form a trail. `FireSocketOverride` / `FireOrigin` on the
-  component override the choice per Blueprint.
+  the world every `SmokeTrailSpacing` of the fall so they form a trail. `NS_SmokePuff4a` loops forever, so every puff is
+  switched off 0.15 s after its burst (`SpawnSmokePuff`); before that each puff kept re-puffing where the wreck had been,
+  long after the crash. At the impact every effect on the aircraft actor (engine fire, Blueprint exhausts) is
+  deactivated too. `FireSocketOverride` / `FireOrigin` on the component override the choice per Blueprint.
 - **Fall.** `FAircraftDeathMath::StepCrashFlight`: the wreck keeps the speed it had (at least `MinCrashSpeed`), the nose
   drops into a dive of at most `MaxDiveDegrees`, gravity and drag act on it. A burning wing drops: the wreck rolls over
   towards it and turns into a spiral; a nose fire only rocks it.
-- **Impact.** A trace from the belly finds the ground (or any static object). An explosion, the impact sound, burning
-  fuel on the ground, and the wreck: `AAircraftWreckActor` with the aircraft's crash geometry collection, crumbled into
-  all its pieces at once, keeping part of the impact velocity (forward along the flight) and blown apart. Pieces land on
-  the ground and pass through units; they shrink away once asleep and the wreck goes after `WreckLifeSeconds`. The
-  aircraft actor is hidden and goes after its smoke has faded (8 s).
+- **Carried wreck.** At the hit a kinematic copy of the crash collection is spawned, hidden, where the aircraft is
+  (`AAircraftWreckActor::StartCarried`). Its physics only exists some steps later (in editor runs one frame hitches by
+  ~0.5 s right after the spawn), and Chaos places the pieces at the transform the component had at that moment: a wreck
+  moved before then carries its pieces that far behind the aircraft for good. So it stays put until
+  `GetIsObjectDynamic()` reports the physics up (2 s timeout), then follows the aircraft every tick (`FollowTransform`;
+  the death component ticks in `TG_PrePhysics`, so the pieces stay under the engine fire), is shown two frames later,
+  and the aircraft's meshes are hidden. Until then the aircraft flies its fall as itself.
+  Letting a piece go (`ReleasePiece`) takes two steps in the wreck's tick: a huge external strain on the piece tears it
+  out of its cluster (damage propagation spreads it, so the first tear frees every piece; each stays kinematic and
+  follows on its own), and two frames later a small kinematic field (`ApplyKinematicField`) around it makes it dynamic,
+  with the speed its kinematic motion gave it plus a kick. Do not use `SetAnchoredByIndex(false)` for this: it switches
+  the state of a collection particle without handing it to the solver's islands, so the piece reads dynamic but hangs
+  frozen (or falls asleep) in the air. Anchoring pieces also stops strain from tearing them out. Loose pieces have
+  `PieceLinearDamping` air drag, so they fall behind.
+- **Breaking up in the air** (`bBreakUpInTheAir`). `AirBreakupDelaySeconds` after the hit the first part tears off with
+  a small blast (`AirBreakupExplosion`): a burning wing loses its outer panel beyond the engine; a nose-fire aircraft
+  loses its tail (60 %) or a wing tip. `AirBreakupPieceShare` of the pieces go, at least two; a second, smaller tear
+  follows `AirSecondBreakupDelaySeconds` later. The first torn part trails smoke while it tumbles.
+- **Impact.** Traces from the belly and from the nose (the nose leads in a dive) find the ground or any static object;
+  `EAircraftDeathPhase::Impacted` is set at that first contact. The hull then ploughs on for `ImpactBreakupSeconds`
+  (longer for bigger aircraft): it skids along the ground with `ImpactSkidSpeedShare` of its horizontal speed, pivots on
+  the nose as the tail slams down, and lets go of its pieces from the nose back, or as soon as a piece meets the
+  ground. The blasts are spread over that time: dirt thrown up where the nose hit (`GroundBurst`), the main blast over
+  the hull (`ImpactExplosion`, +0.08 s), the fuel fireball (`FuelFireball`, +0.2 s), one to three smaller blasts among
+  the pieces (`SecondaryExplosion`, 0.45-1.4 s, more for bombers), fires on two to four pieces after 2 s
+  (`BurningDebris`) and the burning fuel where the hull came to rest (`GroundFire`). The wreck's fires die down after
+  `WreckFireSeconds` (10 s), before its pieces shrink away (8-14 s asleep); the wreck goes after `WreckLifeSeconds`.
+  Pieces land on the ground and pass through units. The aircraft actor is hidden and goes after 8 s. Without a crash
+  collection, or when it hits the ground before the carried wreck is up, the aircraft explodes the old way: everything
+  at once, `PieceVelocityRetained` of the impact velocity, blown apart with `PieceScatterSpeed`. That old path has the
+  same physics latency with no wait: the pieces sit whole for a moment and then burst (probably much of why the old
+  impact looked like a dropped cup).
 - **Parked.** An aircraft killed while landed on the ground (in its bay or on a field) collapses where it stands:
   its pieces get a fifth of the scatter, so they stay within about its own size and do not fly through bay walls.
   The airbase building has query-only collision: its walls do not stop pieces, only the low scatter keeps them in
@@ -79,7 +131,9 @@ Effects scale with the aircraft's span (`FighterHalfSpan` 700 cm, up to x2); smo
 so a bomber's trail does not hide the bomber. Every effect is an `FAircraftDeathEffect` (system, user parameters,
 scale) in `FAircraftDeathSettings`, editable per aircraft Blueprint on the `AircraftDeath` component. Defaults:
 engine fire `NS_Jet_Fire_Continuous`, smoke `NS_SmokePuff4a` (x0.6), explosion `NS_RTS_Explosion_Big_9`, ground fire
-`NS_LargeTank_OnFire`. They are listed in `CrashCollections/DA_AircraftDeathCookReferences` so the cook packs them
+`NS_LargeTank_OnFire`, air breakup `NS_RTS_Explosion_Medium_1` (x0.45), ground burst `NS_Explosion_Sand_6` (x0.8), fuel
+fireball `N_RTS_Explosion_Fuel_01` (x1.1), secondary blasts `NS_RTS_Explosion_Medium_3` (x0.55), burning debris
+`NFire_debris_00` (x0.5). They are listed in `CrashCollections/DA_AircraftDeathCookReferences` so the cook packs them
 (C++ names them by path only). The tank fire, rocket smoke and smoking-unit systems were tried and dropped: from the
 RTS camera they filled the screen with embers or haze, and their user parameters barely change that.
 
@@ -135,15 +189,20 @@ collections. Rebuild after an aircraft mesh changes. Lessons:
   `UT_Nomadics` (fog of war needs rendering):
   - `-AntiAirValidate`: the Bofors bunker, 37 mm and 88 mm flak, Flak 37 pit, flak bunker, Panzer III AA, T-34 AA, BTR-152A
     and the towed Flak 37 and Flak 88 squads must target, fire at and damage an enemy aircraft circling over them,
-    then turn on an enemy tank. Optional `-AntiAirUnit=<label>`.
-  - `-AircraftDeathValidate`: shoots down a Bf 109, Ju 87, Sturmovik, Me 410, Pe-2, Pe-8, Ju 390, Ho 229, both drop ships and
+    then turn on an enemy tank. Optional `-AntiAirUnit=<label>`. `-AntiAirRingRadius=<cm>` (default 1800) moves the
+    ring out: beyond ground range the units must still engage the aircraft (anti-air range) and must ignore the tank.
+  - `-AircraftDeathValidate`: shoots down a Bf 109, Ju 87, Ju 87 G, Fw 189, Sturmovik, Me 410, Pe-2, Pe-8, Ju 390, Ho 229, both drop ships and
     the VTOL shuttle in flight, a Bf 109 parked on a field and a Bf 109 parked in a bay of an unpacked German airbase
     (`Ger_Airbase_Truck`, placed the way a trained aircraft is); checks dead-not-destroyed, out of the target lists,
     fire on the right engine, the fall starting with the speed it had and carrying it on, impact on the ground, the
     breakup, the fire ending, the actor being cleared, a parked aircraft's pieces staying within its own size, and in
-    the airbase every piece staying inside the building and above the ground under it (203 checks; the aircraft are
+    the airbase every piece staying inside the building and above the ground under it, a part tearing off in the air
+    (falls longer than 1 s), the hull coming apart from the nose, every piece on the ground 3 s after the impact
+    (`_pieces_came_down`: catches pieces left hanging in the air) and no trail smoke puff still spawning when the actor
+    is cleared (`_trail_smoke_stops`) (203 checks; the aircraft are
     spread over rows of six so all fourteen land on the test map; a Ho 229 parked on a field is the fourteenth). `-AircraftDeathOnly=<label>`,
-    `-AircraftDeathCapture=<folder>` for pictures, and `-AircraftDeath<Fire|Smoke|Explosion|GroundFire>Vfx=<path|none>`
+    `-AircraftDeathCapture=<folder>` for pictures (add `-ExecCmds="r.TextureStreaming 0"`, or effects used for the first time
+    render as flat dark squares), and `-AircraftDeath<Fire|Smoke|Explosion|GroundFire>Vfx=<path|none>`
     / `...Params="Name:Value|Name:X,Y,Z|@Scale:S"` / `-AircraftDeathDumpVfxParams` to try other effects.
 
 ```

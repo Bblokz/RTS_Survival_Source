@@ -1,0 +1,15 @@
+{
+ "res": 1024,
+ "triangles": 1694,
+ "texels_inside": 113370,
+ "texels_filled": 148974,
+ "pivot": [
+  0.0,
+  0.9
+ ],
+ "curved_texels": 24414,
+ "d_max_cm": 400.0,
+ "lamp_scale": 3.891918806612016,
+ "soot_rise_cm": 400.0,
+ "sources": "D:/UE5Projects/RTS_Survival/Saved/BF_ShaderCost/SM_BF_ExperimentalFactory_sources.json"
+}

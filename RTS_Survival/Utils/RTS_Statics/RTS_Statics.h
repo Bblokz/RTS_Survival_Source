@@ -54,6 +54,13 @@ public:
 	// -------------------- Begin Player Related Objects --------------------
 	/** @return A IsValid CPPController or null. */
 	static ACPPController* GetRTSController(const UObject* WorldContextObject);
+
+	/**
+	 * @return True in the pre-game hangar (RTS_FactionSelection): its player controller is an
+	 * AFactionPlayerController, yet it spawns real units (the hangar preview and the commander screen's ability
+	 * preview). Code that needs the mission's ACPPController uses this to skip its "no controller" report there.
+	 */
+	static bool GetIsInPreGameHangar(const UObject* WorldContextObject);
 	
 	/** @return A IsValid PlayerResourceManager or null. */
 	static UPlayerResourceManager* GetPlayerResourceManager(const UObject* WorldContextObject);

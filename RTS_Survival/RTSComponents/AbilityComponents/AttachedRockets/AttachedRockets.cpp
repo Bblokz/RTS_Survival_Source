@@ -1002,7 +1002,11 @@ void UAttachedRockets::SetAllRocketsVisible() const
 	}
 	for (int32 Index = 0; Index < M_RocketsInstances->GetInstanceCount(); ++Index)
 	{
-		M_RocketsInstances->SetInstanceHidden(Index, false);
+		// Rockets not fired yet are still shown.
+		if (M_RocketsInstances->GetIsInstanceHidden(Index))
+		{
+			M_RocketsInstances->SetInstanceHidden(Index, false);
+		}
 	}
 }
 

@@ -5,6 +5,7 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 #include "RTS_Survival/Weapons/AimOffsetProvider/AimOffsetProvider.h"
+#include "RTS_Survival/Weapons/WeaponRangeData/WeaponRangeData.h"
 
 // Default fallback aim offsets (local space)
 const FVector FWeaponTargetingData::M_FallbackOffsets[NumAimPoints] =
@@ -48,6 +49,7 @@ void FWeaponTargetingData::SetTargetActor(AActor* NewTarget)
 
 	M_TargetMode = ETargetMode::Actor;
 	M_TargetActor = NewTarget;
+	bM_IsAircraftTarget = FWeaponRangeData::GetIsAntiAirRangeTarget(NewTarget);
 	LoadAimOffsetsFromActor(NewTarget);
 
 	M_SelectedIndex = 0;
@@ -62,6 +64,7 @@ void FWeaponTargetingData::SetTargetGround(const FVector& GroundWorldLocation)
 {
 	M_TargetMode = ETargetMode::Ground;
 	M_TargetActor = nullptr;
+	bM_IsAircraftTarget = false;
 	M_GroundWorldLocation = GroundWorldLocation;
 
 	M_SelectedIndex = 0;
@@ -73,6 +76,7 @@ void FWeaponTargetingData::ResetTarget()
 {
 	M_TargetMode = ETargetMode::None;
 	M_TargetActor = nullptr;
+	bM_IsAircraftTarget = false;
 	M_GroundWorldLocation = FVector::ZeroVector;
 	M_SelectedIndex = 0;
 	M_SwitchCounter = 0;

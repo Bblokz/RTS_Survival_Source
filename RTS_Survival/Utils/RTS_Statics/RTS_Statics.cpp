@@ -86,6 +86,17 @@ ACPPController* FRTS_Statics::GetRTSController(const UObject* WorldContextObject
 	return nullptr;
 }
 
+bool FRTS_Statics::GetIsInPreGameHangar(const UObject* WorldContextObject)
+{
+	if (not GEngine)
+	{
+		return false;
+	}
+	const UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
+	return IsValid(World) && IsValid(World->GetFirstPlayerController())
+		&& World->GetFirstPlayerController()->IsA<AFactionPlayerController>();
+}
+
 bool FRTS_Statics::IsShiftPressed(const UObject* WorldContextObject)
 {
 	if (ACPPController* RTSController = GetRTSController(WorldContextObject))
@@ -151,6 +162,20 @@ ARTSAsyncSpawner* FRTS_Statics::GetAsyncSpawner(const UObject* WorldContextObjec
 		if (IsValid(AsyncSpawner))
 		{
 			return AsyncSpawner;
+		}
+		return nullptr;
+	}
+	// The pre-game hangar has no RTS controller; its own controller holds the level's spawner (ability preview).
+	if (GEngine)
+	{
+		const UWorld* World = GEngine->GetWorldFromContextObject(WorldContextObject, EGetWorldErrorMode::ReturnNull);
+		const AFactionPlayerController* FactionController = IsValid(World)
+			                                                    ? Cast<AFactionPlayerController>(
+				                                                    World->GetFirstPlayerController())
+			                                                    : nullptr;
+		if (IsValid(FactionController))
+		{
+			return FactionController->GetRTSAsyncSpawner();
 		}
 	}
 	return nullptr;

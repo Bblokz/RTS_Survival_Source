@@ -24,7 +24,10 @@
 #include "RTS_Survival/Units/Aircraft/AircraftAnimInstance/AircraftAnimInstance.h"
 #include "RTS_Survival/Units/Aircraft/AirBase/AircraftOwnerComp/AircraftOwnerComp.h"
 #include "RTS_Survival/Player/AsyncRTSAssetsSpawner/RTSAsyncSpawner.h"
+#include "RTS_Survival/Units/SquadController.h"
+#include "RTS_Survival/Units/Aircraft/SlingDelivery/CargoRopeSlingComponent.h"
 #include "RTS_Survival/Units/Tanks/TankMaster.h"
+#include "RTS_Survival/Units/Tanks/WheeledTank/BaseTruck/NomadicVehicle.h"
 #include "RTS_Survival/Utils/RTSBlueprintFunctionLibrary.h"
 #include "RTS_Survival/Utils/RTSRichTextConverters/FRTSRichTextConverter.h"
 #include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
@@ -36,6 +39,39 @@ const float VerticalTextAircraftZOffset = 150.f;
 namespace
 {
 	constexpr float LandedAircraftVisionRadiusMultiplier = 0.2f;
+
+	namespace AircraftDropCargoDoor
+	{
+		// Mesh socket at the cargo door of an aircraft that lets squads walk out (Ju 390: under the rear fuselage).
+		const FName SocketName = TEXT("CargoDoor");
+		// Seconds between two squads leaving the door, so they file out instead of stacking up in it.
+		constexpr float SecondsBetweenSquads = 1.5f;
+		// The aircraft waits at least this long after the last squad appeared, so it does not lift off over walkers
+		// that are still at the door.
+		constexpr float MinLandedSecondsAfterLastSquad = 4.0f;
+		// Vertical reach of the navmesh projection: the socket sits on the fuselage, above the ground.
+		const FVector ProjectionExtent(150.0f, 150.0f, 2000.0f);
+	}
+
+	namespace AircraftRopeSlingFlight
+	{
+		// Average vertical speed of the hovering descent that sets the slung payload down; eased at both ends.
+		constexpr float DescentSpeed = 450.0f;
+		constexpr float MinDescentSeconds = 3.0f;
+		// Climb back to cruise height once the ropes are winched in.
+		constexpr float ClimbSpeed = 600.0f;
+		constexpr float MinClimbSeconds = 2.0f;
+		// Used when the cruise height is not above the hover point (drop point higher than the approach).
+		constexpr float MinClimbHeight = 1000.0f;
+		// The aircraft never hovers perfectly still while the released payload drives off.
+		constexpr float HoverBobAmplitude = 25.0f;
+		constexpr float HoverBobAngularSpeed = 1.25f;
+		// The aircraft stays at least this long after the ropes are in before it climbs away.
+		constexpr float MinHoverSecondsAfterRetract = 0.5f;
+		// Ground samples on the straight approach line used to pick a cruise height that clears hills.
+		constexpr int32 ApproachGroundSamples = 12;
+		constexpr float GroundTraceHalfHeight = 200000.0f;
+	}
 }
 
 AAircraftMaster::AAircraftMaster(const FObjectInitializer& ObjectInitializer)
@@ -141,6 +177,8 @@ void AAircraftMaster::UnitDies(const ERTSDeathType DeathType)
 	}
 	UnitDies_StopAllActions();
 	UnitDies_DestroyCarriedTank();
+	// The falling wreck must not keep drawing ropes to a tank that is gone.
+	AircraftDrop_DestroyRopeSling();
 	UnitDies_ReleaseOwnerBay();
 	UnitDies_RemoveFromSelectionAndUI();
 	OnUnitDies.Broadcast();
@@ -358,11 +396,24 @@ void AAircraftMaster::Tick(float DeltaTime)
 			}
 		}
 	}
-	M_AnimInstAircraft->UpdateAnim(GetActorRotation(), GetVelocity().Size());
+	float AnimMovementSpeed = GetVelocity().Size();
+	if (AircraftDrop_GetIsRopeSlingFlightActive())
+	{
+		// The rope-sling hover moves the aircraft without velocity; the propeller speed divides by this value.
+		constexpr float MinRopeSlingAnimSpeed = 1.f;
+		AnimMovementSpeed = FMath::Max(AnimMovementSpeed, MinRopeSlingAnimSpeed);
+	}
+	M_AnimInstAircraft->UpdateAnim(GetActorRotation(), AnimMovementSpeed);
 
 	if (M_StraightRunState.bM_IsActive)
 	{
 		Tick_StraightRun(DeltaTime);
+		return;
+	}
+	if (AircraftDrop_GetIsRopeSlingFlightActive())
+	{
+		// Stays airborne the whole time: the aircraft hovers while its slung payload touches down.
+		Tick_RopeSlingDrop(DeltaTime);
 		return;
 	}
 	if (M_LandedState == EAircraftLandingState::VerticalTakeOff)
@@ -2919,6 +2970,13 @@ void AAircraftMaster::OrderAircraftDrop(const FAircraftDropRequest& DropRequest)
 
 	M_AircraftDropRequest = DropRequest;
 	M_AircraftDropRequest.State = EAircraftDropRequestState::MovingToDropLocation;
+	if (M_AircraftDropRequest.bRopeSlungPayload && M_AircraftDropRequest.PayloadType != EAircraftDropPayloadType::Tank)
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("AAircraftMaster::OrderAircraftDrop: only tank payloads can hang on ropes; dropping normally. Aircraft: ")
+			+ GetName());
+		M_AircraftDropRequest.bRopeSlungPayload = false;
+	}
 	AircraftDrop_AttachTank();
 	AircraftDrop_MoveToDropLocation();
 }
@@ -2997,10 +3055,14 @@ void AAircraftMaster::SetStraightRunHoldAtEnd(const bool bHoldAtEnd)
 
 void AAircraftMaster::AircraftDrop_MoveToDropLocation()
 {
+	// A slung payload hangs far below the aircraft: cruise high enough for it to clear the ground on the way in.
+	const float CruiseZ = M_AircraftDropRequest.bRopeSlungPayload
+		                      ? AircraftDrop_GetRopeSlingCruiseZ()
+		                      : GetActorLocation().Z;
 	const FVector FlightTarget(
 		M_AircraftDropRequest.ExecuteLocation.X,
 		M_AircraftDropRequest.ExecuteLocation.Y,
-		GetActorLocation().Z);
+		CruiseZ);
 	M_AircraftLandedData.TargetAirborneHeight = FlightTarget.Z;
 	M_AircraftMoveData.SetTargetPoint(FlightTarget);
 	StartMoveTo();
@@ -3011,6 +3073,12 @@ void AAircraftMaster::AircraftDrop_OnMoveCompleted()
 	if (M_AircraftDropRequest.State == EAircraftDropRequestState::Retreating)
 	{
 		Destroy();
+		return;
+	}
+	if (M_AircraftDropRequest.bRopeSlungPayload)
+	{
+		// Hover down instead of landing: no touchdown montage, landed state or stopped propellers.
+		AircraftDrop_StartRopeSlingDescent();
 		return;
 	}
 
@@ -3046,7 +3114,22 @@ void AAircraftMaster::AircraftDrop_OnLanded()
 		return;
 	}
 
-	const float SafeStayLandedTime = FMath::Max(0.0f, M_AircraftDropRequest.HowLongStayLanded);
+	float SafeStayLandedTime = FMath::Max(0.0f, M_AircraftDropRequest.HowLongStayLanded);
+	if (M_AircraftDropRequest.bSquadsWalkOutOfCargoDoor && M_AircraftDropRequest.PayloadType ==
+		EAircraftDropPayloadType::Infantry)
+	{
+		const float LastSquadDelay = AircraftDropCargoDoor::SecondsBetweenSquads
+			* static_cast<float>(FMath::Max(0, M_AircraftDropRequest.SquadSubtypes.Num() - 1));
+		SafeStayLandedTime = FMath::Max(SafeStayLandedTime,
+		                                LastSquadDelay + AircraftDropCargoDoor::MinLandedSecondsAfterLastSquad);
+	}
+	if (M_AircraftDropRequest.bRopeSlungPayload)
+	{
+		// The ropes are winched in before the aircraft climbs away.
+		SafeStayLandedTime = FMath::Max(SafeStayLandedTime,
+		                                CargoRopeSling::RetractSeconds
+		                                + AircraftRopeSlingFlight::MinHoverSecondsAfterRetract);
+	}
 	TWeakObjectPtr<AAircraftMaster> WeakThis(this);
 	World->GetTimerManager().SetTimer(
 		M_AircraftDropStayLandedTimerHandle,
@@ -3067,6 +3150,12 @@ void AAircraftMaster::AircraftDrop_OnStayLandedFinished()
 {
 	M_AircraftDropStayLandedTimerHandle.Invalidate();
 	M_AircraftDropRequest.State = EAircraftDropRequestState::VerticalTakeOff;
+	if (M_AircraftDropRequest.bRopeSlungPayload)
+	{
+		// Still airborne: climb straight out of the hover instead of a take-off from the ground.
+		AircraftDrop_StartRopeSlingClimb();
+		return;
+	}
 	StartVto();
 }
 
@@ -3078,7 +3167,13 @@ void AAircraftMaster::AircraftDrop_OnVtoCompleted()
 	}
 
 	M_AircraftDropRequest.State = EAircraftDropRequestState::Retreating;
-	M_AircraftMoveData.SetTargetPoint(M_AircraftDropRequest.RetreatLocation);
+	FVector RetreatTarget = M_AircraftDropRequest.RetreatLocation;
+	if (M_AircraftDropRequest.bRopeSlungPayload)
+	{
+		// Leave at the height the climb ended on rather than diving towards a retreat point given at ground level.
+		RetreatTarget.Z = GetActorLocation().Z;
+	}
+	M_AircraftMoveData.SetTargetPoint(RetreatTarget);
 	StartMoveTo();
 }
 
@@ -3088,10 +3183,54 @@ void AAircraftMaster::AircraftDrop_SpawnSquads() const
 	{
 		return;
 	}
+	if (M_AircraftDropRequest.bSquadsWalkOutOfCargoDoor)
+	{
+		AircraftDrop_SpawnSquadsThroughCargoDoor();
+		return;
+	}
 
 	for (int32 SquadIndex = 0; SquadIndex < M_AircraftDropRequest.SquadSubtypes.Num(); ++SquadIndex)
 	{
 		AircraftDrop_SpawnSquad(M_AircraftDropRequest.SquadSubtypes[SquadIndex], SquadIndex);
+	}
+}
+
+void AAircraftMaster::AircraftDrop_SpawnSquadsThroughCargoDoor() const
+{
+	UWorld* World = GetWorld();
+	const int32 SquadCount = M_AircraftDropRequest.SquadSubtypes.Num();
+	if (SquadCount <= 0)
+	{
+		return;
+	}
+
+	for (int32 SquadIndex = 0; SquadIndex < SquadCount; ++SquadIndex)
+	{
+		const ESquadSubtype SquadSubtype = M_AircraftDropRequest.SquadSubtypes[SquadIndex];
+		const float SpawnDelay = AircraftDropCargoDoor::SecondsBetweenSquads * static_cast<float>(SquadIndex);
+		if (SpawnDelay <= KINDA_SMALL_NUMBER || not IsValid(World))
+		{
+			AircraftDrop_SpawnSquad(SquadSubtype, SquadIndex);
+			continue;
+		}
+
+		// The aircraft stays landed past the last delay (AircraftDrop_OnLanded); if it dies first the remaining squads
+		// are lost with it.
+		FTimerHandle SpawnTimerHandle;
+		const TWeakObjectPtr<const AAircraftMaster> WeakThis(this);
+		World->GetTimerManager().SetTimer(
+			SpawnTimerHandle,
+			[WeakThis, SquadSubtype, SquadIndex]()
+			{
+				if (not WeakThis.IsValid())
+				{
+					return;
+				}
+
+				WeakThis->AircraftDrop_SpawnSquad(SquadSubtype, SquadIndex);
+			},
+			SpawnDelay,
+			false);
 	}
 }
 
@@ -3109,19 +3248,83 @@ void AAircraftMaster::AircraftDrop_SpawnSquad(const ESquadSubtype SquadSubtype, 
 		? static_cast<UObject*>(EnemyStrategicAIComponent)
 		: static_cast<UObject*>(const_cast<AAircraftMaster*>(this));
 	const TWeakObjectPtr<UEnemyStrategicAIComponent> WeakEnemyStrategicAIComponent(EnemyStrategicAIComponent);
+	const FVector OutsideLocation = AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex);
+	const bool bWalkOutOfCargoDoor = M_AircraftDropRequest.bSquadsWalkOutOfCargoDoor;
+	const FVector SpawnLocation = bWalkOutOfCargoDoor ? AircraftDrop_GetProjectedCargoDoorLocation() : OutsideLocation;
 	AsyncSpawner->AsyncSpawnOptionAtLocation(
 		SquadTrainingOption,
-		AircraftDrop_GetProjectedSquadSpawnLocation(SquadIndex),
+		SpawnLocation,
 		CallbackOwner,
 		SquadIndex,
-		[WeakEnemyStrategicAIComponent](const FTrainingOption&, AActor* SpawnedActor, const int32)
+		[WeakEnemyStrategicAIComponent, bWalkOutOfCargoDoor, SpawnLocation, OutsideLocation](
+		const FTrainingOption&, AActor* SpawnedActor, const int32)
 		{
+			if (bWalkOutOfCargoDoor)
+			{
+				AircraftDrop_OrderSquadWalkOut(SpawnedActor, SpawnLocation, OutsideLocation);
+			}
 			if (WeakEnemyStrategicAIComponent.IsValid())
 			{
 				WeakEnemyStrategicAIComponent->RegisterDroppedUnitWithBlackboardWhenReady(SpawnedActor);
 			}
 		},
 		FRotator::ZeroRotator);
+}
+
+FVector AAircraftMaster::AircraftDrop_GetProjectedCargoDoorLocation() const
+{
+	FVector DoorLocation = M_AircraftDropRequest.ExecuteLocation;
+	if (IsValid(M_AircraftMesh) && M_AircraftMesh->DoesSocketExist(AircraftDropCargoDoor::SocketName))
+	{
+		const FVector SocketLocation = M_AircraftMesh->GetSocketLocation(AircraftDropCargoDoor::SocketName);
+		DoorLocation = FVector(SocketLocation.X, SocketLocation.Y, M_AircraftDropRequest.ExecuteLocation.Z);
+	}
+	else
+	{
+		RTSFunctionLibrary::ReportError(
+			TEXT("AAircraftMaster: squads should walk out of the cargo door, but the aircraft mesh has no socket "
+				"'CargoDoor'; they leave from under the aircraft instead. Aircraft: ") + GetName());
+	}
+
+	bool bWasProjected = false;
+	return URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
+		this,
+		DoorLocation,
+		AircraftDropCargoDoor::ProjectionExtent,
+		bWasProjected);
+}
+
+void AAircraftMaster::AircraftDrop_OrderSquadWalkOut(AActor* SpawnedSquad, const FVector& DoorLocation,
+                                                     const FVector& OutsideLocation)
+{
+	ASquadController* Squad = Cast<ASquadController>(SpawnedSquad);
+	if (not IsValid(Squad))
+	{
+		return;
+	}
+
+	const FRotator FacingAwayFromAircraft = UKismetMathLibrary::FindLookAtRotation(DoorLocation, OutsideLocation);
+	const FRotator FinalRotation(0.0f, FacingAwayFromAircraft.Yaw, 0.0f);
+	const auto OrderOut = [OutsideLocation, FinalRotation](ASquadController* LoadedSquad)
+	{
+		if (not IsValid(LoadedSquad))
+		{
+			return;
+		}
+		if (LoadedSquad->MoveToLocation(OutsideLocation, true, FinalRotation) != ECommandQueueError::NoError)
+		{
+			RTSFunctionLibrary::ReportError(
+				TEXT("AAircraftMaster: a squad that appeared at the cargo door could not be ordered out of the aircraft: ")
+				+ LoadedSquad->GetName());
+		}
+	};
+	// The walkers load asynchronously; an order given before they exist would finish at once and leave them at the door.
+	if (Squad->GetIsSquadFullyLoadedAndInitialized())
+	{
+		OrderOut(Squad);
+		return;
+	}
+	Squad->OnSquadFullyLoaded.AddLambda(OrderOut);
 }
 
 void AAircraftMaster::AircraftDrop_AttachTank()
@@ -3152,6 +3355,12 @@ void AAircraftMaster::AircraftDrop_AttachTank()
 
 	Tank->AttachToActor(this, FAttachmentTransformRules::KeepWorldTransform);
 	Tank->SetActorRelativeLocation(FVector(0.0f, 0.0f, M_AircraftDropRequest.TankAttachZOffset));
+	if (M_AircraftDropRequest.bRopeSlungPayload)
+	{
+		// Hangs nose-forward under the aircraft whatever heading it was spawned with.
+		Tank->SetActorRelativeRotation(FRotator::ZeroRotator);
+		AircraftDrop_CreateRopeSling(Tank);
+	}
 }
 
 void AAircraftMaster::AircraftDrop_DetachTank()
@@ -3162,12 +3371,32 @@ void AAircraftMaster::AircraftDrop_DetachTank()
 	}
 
 	ATankMaster* Tank = M_AircraftDropRequest.AttachedTank.Get();
+	const bool bIsRopeSlung = M_AircraftDropRequest.bRopeSlungPayload;
+	if (bIsRopeSlung && GetHasCargoRopeSling())
+	{
+		// Lets go of the tank before it is detached so the sling no longer positions it; the ropes winch up.
+		M_CargoRopeSling->ReleasePayload();
+	}
 	Tank->SetAudioCompsDisabled(false);
 	Tank->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	Tank->SetActorLocation(M_AircraftDropRequest.ExecuteLocation);
-	if (IsValid(Tank->GetTankMesh()))
+	if (bIsRopeSlung)
 	{
-		Tank->GetTankMesh()->SetSimulatePhysics(true);
+		AircraftDrop_PlaceRopeSlungTankOnGround(Tank);
+	}
+	else
+	{
+		Tank->SetActorLocation(M_AircraftDropRequest.ExecuteLocation);
+	}
+	USkeletalMeshComponent* TankMesh = Tank->GetTankMesh();
+	if (IsValid(TankMesh) && AircraftDrop_ShouldEnablePayloadPhysics(Tank))
+	{
+		TankMesh->SetSimulatePhysics(true);
+		if (bIsRopeSlung)
+		{
+			// Starts at rest on the ground: no velocity left over from the hover to bounce or slide it.
+			TankMesh->SetPhysicsLinearVelocity(FVector::ZeroVector);
+			TankMesh->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+		}
 	}
 	if (IsValid(Tank->GetFowComponent()))
 	{
@@ -3181,6 +3410,7 @@ void AAircraftMaster::AircraftDrop_DetachTank()
 	}
 
 	AircraftDrop_RegisterEnemyPayloadUnit(Tank);
+	OnAircraftDropPayloadReleased.Broadcast(this, Tank);
 }
 
 void AAircraftMaster::AircraftDrop_RegisterEnemyPayloadUnit(AActor* DroppedUnit) const
@@ -3239,9 +3469,259 @@ FVector AAircraftMaster::AircraftDrop_GetProjectedSquadSpawnLocation(const int32
 		0.0f);
 
 	bool bWasProjected = false;
-	return URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
+	const FVector Projected = URTSBlueprintFunctionLibrary::RTSProjectLocationToNavigation(
 		this,
 		DesiredLocation,
 		FVector(2.0f, 2.0f, 2.0f),
 		bWasProjected);
+	if (bWasProjected)
+	{
+		return Projected;
+	}
+	// Off the navmesh (cliffs, a drop next to the map edge) the ring point keeps the drop point's height: on a slope
+	// that is inside the ground, past the landscape edge there is nothing below. Either way the squad falls out of
+	// the world, so it stands on the landscape below the point, or at the drop point when there is none.
+	float GroundZ = 0.0f;
+	if (AircraftDrop_TraceGroundZ(DesiredLocation, GroundZ))
+	{
+		return FVector(DesiredLocation.X, DesiredLocation.Y, GroundZ);
+	}
+	return M_AircraftDropRequest.ExecuteLocation;
+}
+
+bool AAircraftMaster::GetHasCargoRopeSling() const
+{
+	// Not an error: only rope-slung drops create the sling, and it destroys itself once the ropes are in.
+	return IsValid(M_CargoRopeSling);
+}
+
+bool AAircraftMaster::AircraftDrop_GetIsRopeSlingFlightActive() const
+{
+	if (not M_AircraftDropRequest.bRopeSlungPayload)
+	{
+		return false;
+	}
+	const EAircraftDropRequestState State = M_AircraftDropRequest.State;
+	return State == EAircraftDropRequestState::VerticalLanding
+		|| State == EAircraftDropRequestState::LandedWaiting
+		|| State == EAircraftDropRequestState::VerticalTakeOff;
+}
+
+void AAircraftMaster::AircraftDrop_CreateRopeSling(ATankMaster* Tank)
+{
+	AircraftDrop_DestroyRopeSling();
+	UCargoRopeSlingComponent* RopeSling = NewObject<UCargoRopeSlingComponent>(this);
+	if (not IsValid(RopeSling))
+	{
+		return;
+	}
+	RopeSling->RegisterComponent();
+	M_CargoRopeSling = RopeSling;
+	const float HangDistance = FMath::Abs(M_AircraftDropRequest.TankAttachZOffset);
+	if (not RopeSling->StartSling(M_AircraftMesh, Tank, HangDistance))
+	{
+		// The drop still works without ropes; StartSling reported why.
+		AircraftDrop_DestroyRopeSling();
+	}
+}
+
+void AAircraftMaster::AircraftDrop_DestroyRopeSling()
+{
+	if (GetHasCargoRopeSling())
+	{
+		M_CargoRopeSling->DestroySlingImmediately();
+	}
+	M_CargoRopeSling = nullptr;
+}
+
+float AAircraftMaster::AircraftDrop_GetRopeSlingCruiseZ() const
+{
+	const float HangDistance = FMath::Abs(M_AircraftDropRequest.TankAttachZOffset);
+	const float MinCruiseZ = AircraftRopeSling::GetMinCruiseZ(AircraftDrop_GetHighestGroundZAlongApproach(),
+	                                                          HangDistance);
+	return FMath::Max(GetActorLocation().Z, MinCruiseZ);
+}
+
+float AAircraftMaster::AircraftDrop_GetHighestGroundZAlongApproach() const
+{
+	const FVector ApproachStart = GetActorLocation();
+	const FVector ApproachEnd = M_AircraftDropRequest.ExecuteLocation;
+	float HighestGroundZ = ApproachEnd.Z;
+	const int32 SampleCount = AircraftRopeSlingFlight::ApproachGroundSamples;
+	for (int32 SampleIndex = 0; SampleIndex <= SampleCount; ++SampleIndex)
+	{
+		const float Alpha = static_cast<float>(SampleIndex) / static_cast<float>(SampleCount);
+		float GroundZ = 0.f;
+		if (AircraftDrop_TraceGroundZ(FMath::Lerp(ApproachStart, ApproachEnd, Alpha), GroundZ))
+		{
+			HighestGroundZ = FMath::Max(HighestGroundZ, GroundZ);
+		}
+	}
+	return HighestGroundZ;
+}
+
+bool AAircraftMaster::AircraftDrop_TraceGroundZ(const FVector& Location, float& OutGroundZ) const
+{
+	const UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+
+	const FVector TraceStart(Location.X, Location.Y, Location.Z + AircraftRopeSlingFlight::GroundTraceHalfHeight);
+	const FVector TraceEnd(Location.X, Location.Y, Location.Z - AircraftRopeSlingFlight::GroundTraceHalfHeight);
+	FCollisionQueryParams TraceParams(FName(TEXT("RopeSlingCruiseGroundTrace")), false, this);
+	if (M_AircraftDropRequest.AttachedTank.IsValid())
+	{
+		TraceParams.AddIgnoredActor(M_AircraftDropRequest.AttachedTank.Get());
+	}
+	FHitResult GroundHit;
+	if (not World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, TraceParams))
+	{
+		return false;
+	}
+	OutGroundZ = GroundHit.ImpactPoint.Z;
+	return true;
+}
+
+void AAircraftMaster::AircraftDrop_StartRopeSlingDescent()
+{
+	M_AircraftDropRequest.State = EAircraftDropRequestState::VerticalLanding;
+	// The flight path is finished; the rope-sling tick owns the movement from here.
+	M_MovementState = EAircraftMovementState::Idle;
+	if (EnsureAircraftMovementIsValid())
+	{
+		M_AircraftMovement->KillMovement();
+	}
+	if (GetHasCargoRopeSling())
+	{
+		// Fades out well before touchdown so the payload comes down straight onto the drop point.
+		M_CargoRopeSling->SetSwayEnabled(false);
+	}
+
+	const float HangDistance = FMath::Abs(M_AircraftDropRequest.TankAttachZOffset);
+	const FVector HoverLocation = M_AircraftDropRequest.ExecuteLocation + FVector(0.0f, 0.0f, HangDistance);
+	AircraftDrop_StartRopeSlingPhase(HoverLocation, AircraftRopeSlingFlight::DescentSpeed,
+	                                 AircraftRopeSlingFlight::MinDescentSeconds);
+}
+
+void AAircraftMaster::AircraftDrop_OnRopeSlingPayloadGrounded()
+{
+	if (GetHasCargoRopeSling())
+	{
+		M_CargoRopeSling->SnapPayloadToRest();
+	}
+	M_RopeSlingFlight.HoverBaseZ = GetActorLocation().Z;
+	M_RopeSlingFlight.HoverPhase = 0.f;
+	// Same drop flow as a landing: releases the tank, plays the drop sound and waits HowLongStayLanded.
+	AircraftDrop_OnLanded();
+}
+
+void AAircraftMaster::AircraftDrop_StartRopeSlingClimb()
+{
+	const FVector CurrentLocation = GetActorLocation();
+	const float ClimbTargetZ = FMath::Max(M_AircraftLandedData.TargetAirborneHeight,
+	                                      CurrentLocation.Z + AircraftRopeSlingFlight::MinClimbHeight);
+	AircraftDrop_StartRopeSlingPhase(FVector(CurrentLocation.X, CurrentLocation.Y, ClimbTargetZ),
+	                                 AircraftRopeSlingFlight::ClimbSpeed, AircraftRopeSlingFlight::MinClimbSeconds);
+}
+
+void AAircraftMaster::AircraftDrop_StartRopeSlingPhase(const FVector& TargetLocation, const float Speed,
+                                                       const float MinDuration)
+{
+	M_RopeSlingFlight.StartLocation = GetActorLocation();
+	M_RopeSlingFlight.StartRotation = GetActorRotation();
+	M_RopeSlingFlight.TargetLocation = TargetLocation;
+	M_RopeSlingFlight.Elapsed = 0.f;
+	const float Distance = FVector::Dist(M_RopeSlingFlight.StartLocation, TargetLocation);
+	M_RopeSlingFlight.Duration = FMath::Max(MinDuration, Distance / FMath::Max(Speed, KINDA_SMALL_NUMBER));
+}
+
+float AAircraftMaster::AircraftDrop_AdvanceRopeSlingPhase(const float DeltaTime)
+{
+	M_RopeSlingFlight.Elapsed += DeltaTime;
+	if (M_RopeSlingFlight.Duration <= KINDA_SMALL_NUMBER)
+	{
+		return 1.f;
+	}
+	const float LinearAlpha = FMath::Clamp(M_RopeSlingFlight.Elapsed / M_RopeSlingFlight.Duration, 0.f, 1.f);
+	return FMath::SmoothStep(0.f, 1.f, LinearAlpha);
+}
+
+void AAircraftMaster::Tick_RopeSlingDrop(const float DeltaTime)
+{
+	switch (M_AircraftDropRequest.State)
+	{
+	case EAircraftDropRequestState::VerticalLanding:
+		Tick_RopeSlingDescent(DeltaTime);
+		break;
+	case EAircraftDropRequestState::LandedWaiting:
+		Tick_RopeSlingHover(DeltaTime);
+		break;
+	case EAircraftDropRequestState::VerticalTakeOff:
+		Tick_RopeSlingClimb(DeltaTime);
+		break;
+	default:
+		break;
+	}
+}
+
+void AAircraftMaster::Tick_RopeSlingDescent(const float DeltaTime)
+{
+	const float Alpha = AircraftDrop_AdvanceRopeSlingPhase(DeltaTime);
+	const FVector NewLocation = FMath::Lerp(M_RopeSlingFlight.StartLocation, M_RopeSlingFlight.TargetLocation, Alpha);
+	// Levels out on the way down so the payload, which hangs in the aircraft's frame, touches down upright.
+	FRotator NewRotation = M_RopeSlingFlight.StartRotation;
+	NewRotation.Pitch = FMath::Lerp(M_RopeSlingFlight.StartRotation.Pitch, 0.f, Alpha);
+	NewRotation.Roll = FMath::Lerp(M_RopeSlingFlight.StartRotation.Roll, 0.f, Alpha);
+	SetActorLocationAndRotation(NewLocation, NewRotation);
+	if (Alpha < 1.f)
+	{
+		return;
+	}
+	AircraftDrop_OnRopeSlingPayloadGrounded();
+}
+
+void AAircraftMaster::Tick_RopeSlingHover(const float DeltaTime)
+{
+	// Starts at phase zero, so the bob begins exactly where the payload was set down.
+	M_RopeSlingFlight.HoverPhase += DeltaTime * AircraftRopeSlingFlight::HoverBobAngularSpeed;
+	const FVector CurrentLocation = GetActorLocation();
+	const float BobOffset = AircraftRopeSlingFlight::HoverBobAmplitude * FMath::Sin(M_RopeSlingFlight.HoverPhase);
+	SetActorLocation(FVector(CurrentLocation.X, CurrentLocation.Y, M_RopeSlingFlight.HoverBaseZ + BobOffset));
+}
+
+void AAircraftMaster::Tick_RopeSlingClimb(const float DeltaTime)
+{
+	const float Alpha = AircraftDrop_AdvanceRopeSlingPhase(DeltaTime);
+	SetActorLocation(FMath::Lerp(M_RopeSlingFlight.StartLocation, M_RopeSlingFlight.TargetLocation, Alpha));
+	if (Alpha < 1.f)
+	{
+		return;
+	}
+	M_AircraftLandedData.TargetAirborneHeight = GetActorLocation().Z;
+	AircraftDrop_OnVtoCompleted();
+}
+
+void AAircraftMaster::AircraftDrop_PlaceRopeSlungTankOnGround(ATankMaster* Tank) const
+{
+	if (not IsValid(Tank))
+	{
+		return;
+	}
+	// Exactly on the ordered spot, level, keeping the heading it hung with; physics starts from this pose.
+	const FRotator UprightRotation(0.0f, Tank->GetActorRotation().Yaw, 0.0f);
+	Tank->SetActorLocationAndRotation(M_AircraftDropRequest.ExecuteLocation, UprightRotation, false, nullptr,
+	                                  ETeleportType::ResetPhysics);
+}
+
+bool AAircraftMaster::AircraftDrop_ShouldEnablePayloadPhysics(const ATankMaster* Tank)
+{
+	const ANomadicVehicle* NomadicVehicle = Cast<ANomadicVehicle>(Tank);
+	if (not IsValid(NomadicVehicle))
+	{
+		return true;
+	}
+	// In building form the chassis is hidden without collision; simulating it would let it fall through the world.
+	return NomadicVehicle->GetIsInTruckMode();
 }

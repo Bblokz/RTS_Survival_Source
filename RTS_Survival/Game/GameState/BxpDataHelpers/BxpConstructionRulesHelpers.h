@@ -43,19 +43,40 @@ namespace BxpConstructionRules
 
 		// Refinery Expansions.
 		{EBuildingExpansionType::BTX_RefConverter, WithFootprint(SocketConstructionRules, 800.f, 400.f)},
+		// The Kaskade spans the refinery's back rim: three columns over 6.3 m plus the glass bank, 1.7 m deep.
+		{EBuildingExpansionType::BTX_RefKaskade, WithFootprint(OriginConstructionRules, 920.f, 350.f)},
+		// The flak stand over the storage tanks: 8.3 m along the truck (stair to the rear legs), 5.3 m across (the deck).
+		{EBuildingExpansionType::BTX_RefFlakStand, WithFootprint(OriginConstructionRules, 830.f, 530.f)},
 
 		// Communication Center Expansions.
 		// The observation post in socket space: 3.75 m out of the sandbag-wing end wall, 5.17 m along it.
 		{EBuildingExpansionType::BTX_GerCommObservationPost, WithFootprint(SocketConstructionRules, 375.f, 517.f)},
 		// Both nests sit on the wing ends of the building itself; each deck is a 4.3 m square.
 		{EBuildingExpansionType::BTX_GerCommMG42Nests, WithFootprint(OriginConstructionRules, 430.f, 430.f)},
+		// The requisition office hangs on the tower's south face: 3.05 m wide, 3.3 m out from the shaft (outriggers in).
+		{EBuildingExpansionType::BTX_GerCommRequisitionOffice, WithFootprint(OriginConstructionRules, 305.f, 330.f)},
+		// The cipher room's two portal frames span the inner yard: 5.8 m from the front portal's knee to the cable tie at
+		// the antenna block, 5.7 m from the left pillars' piers on the band to the right columns.
+		{EBuildingExpansionType::BTX_GerCommCipherRoom, WithFootprint(OriginConstructionRules, 580.f, 570.f)},
 
 		// Ger Light Factory Expansions.
-		{EBuildingExpansionType::BTX_GerLFactoryRadixiteReactor, WithFootprint(OriginConstructionRules, 200.f, 200.f)},
-		{EBuildingExpansionType::BTX_GerLFactoryFuelStorage, WithFootprint(OriginConstructionRules, 200.f, 200.f)},
+		// The cooling tower and drum back-left of the forge: 3.9 m from the leg ring's front crib to the pump skid, 6.25 m
+		// from the ladder cage to the switch cabinet (the cable span to the back arch is left out).
+		{EBuildingExpansionType::BTX_GerLFactoryRadixiteReactor, WithFootprint(OriginConstructionRules, 395.f, 625.f)},
+		// The glass receiver bank front-left of the forge: 6.0 m from the manifold to the back post, 5.3 m from the kerb to
+		// the ladder cage (the feed pipe into the arch flank is left out).
+		{EBuildingExpansionType::BTX_GerLFactoryFuelStorage, WithFootprint(OriginConstructionRules, 600.f, 530.f)},
+		// The Schreck frame over the front arch: 6.4 m from the roof rib to the ladder, 9.7 m between the hoop footings.
+		{EBuildingExpansionType::BTX_GerForgeSchreckFrame, WithFootprint(OriginConstructionRules, 640.f, 970.f)},
+
+		// Ger Metal Vault Expansions.
+		// The smelter tower, wheel rack and link pallet behind the truck: 4.0 m along the truck, 5.8 m across.
+		{EBuildingExpansionType::BTX_GerMetalVaultSmelter, WithFootprint(OriginConstructionRules, 400.f, 580.f)},
 
 		// Ger Barracks Expansions.
-		{EBuildingExpansionType::BTX_GerBarracksRadixReactor, WithFootprint(OriginConstructionRules, 500.f, 300.f)},
+		// The switchyard on the tent's left: 7.45 m from the sandbag kerb to the switch cabinet, 4.33 m from the core's
+		// stool to the cable post (the span into the tent wall is left out).
+		{EBuildingExpansionType::BTX_GerBarracksRadixReactor, WithFootprint(OriginConstructionRules, 745.f, 435.f)},
 		{EBuildingExpansionType::BTX_GerBarrackFuelCell, WithFootprint(OriginConstructionRules, 500.f, 300.f)},
 
 		// --- Free-placed defenses ---

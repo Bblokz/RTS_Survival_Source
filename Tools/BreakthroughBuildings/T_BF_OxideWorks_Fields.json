@@ -1,0 +1,15 @@
+{
+ "res": 1024,
+ "triangles": 2178,
+ "texels_inside": 263413,
+ "texels_filled": 366941,
+ "pivot": [
+  0.0,
+  0.0
+ ],
+ "curved_texels": 83181,
+ "d_max_cm": 400.0,
+ "lamp_scale": 2.2345720722394398,
+ "soot_rise_cm": 400.0,
+ "sources": "D:/UE5Projects/RTS_Survival/Saved/BF_ShaderCost/SM_BF_OxideWorks_sources.json"
+}

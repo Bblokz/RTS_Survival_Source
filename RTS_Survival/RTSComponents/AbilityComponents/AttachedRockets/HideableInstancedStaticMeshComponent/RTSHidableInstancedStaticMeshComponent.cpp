@@ -98,6 +98,12 @@ void URTSHidableInstancedStaticMeshComponent::SetInstanceHidden(int32 InstanceIn
 	InstanceHiddenMap[InstanceIndex] = bHide;
 }
 
+bool URTSHidableInstancedStaticMeshComponent::GetIsInstanceHidden(const int32 InstanceIndex) const
+{
+	const bool* bHidden = InstanceHiddenMap.Find(InstanceIndex);
+	return bHidden != nullptr && *bHidden;
+}
+
 int32 URTSHidableInstancedStaticMeshComponent::GetNumVisibleInstances() const
 {
 	int32 VisibleCount = 0;

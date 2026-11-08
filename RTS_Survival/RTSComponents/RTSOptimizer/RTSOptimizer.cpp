@@ -362,7 +362,7 @@ ERTSOptimizationDistance URTSOptimizer::GetOptimizationDistanceToCamera() const
 void URTSOptimizer::BeginPlay_SetPlayerController()
 {
 	M_PlayerController = FRTS_Statics::GetRTSController(this);
-	if (not M_PlayerController)
+	if (not M_PlayerController && not FRTS_Statics::GetIsInPreGameHangar(this))
 	{
 		RTSFunctionLibrary::ReportError("Failed to set player controller for URTSOptimizer!");
 	}

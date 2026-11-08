@@ -30,6 +30,9 @@ public:
 
 	void GetFirstNonHiddenInstance(FTransform& OutTransform, int32& OutInstanceIndex) const;
 
+	// Lets "show every instance" reloads skip the ones still shown instead of reporting each as an error.
+	bool GetIsInstanceHidden(int32 InstanceIndex) const;
+
 	virtual int32 AddInstance(const FTransform& InstanceTransform, bool bWorldSpace) override;
 	virtual bool RemoveInstance(int32 InstanceIndex);
 

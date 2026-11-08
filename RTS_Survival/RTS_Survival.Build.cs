@@ -43,6 +43,8 @@ public class RTS_Survival : ModuleRules
 			"AsyncTickPhysics",
 			"Slate",
 			"SlateCore",
+			// FDisplayMetrics (RTSGameUserSettings native-resolution cap).
+			"ApplicationCore",
 			"ProtoAnimatedText",
 			"Json",
 			"RenderCore",
@@ -78,6 +80,8 @@ public class RTS_Survival : ModuleRules
 			PrivateDependencyModuleNames.AddRange(new string[] { "PlanarCut", "Voronoi" });
 			// MeshDescription: the ragdoll pose bake (Units/Ragdoll/Tests/CorpsePoseBaker) builds static meshes.
 			PrivateDependencyModuleNames.AddRange(new string[] { "MeshDescription", "StaticMeshDescription" });
+			// MaterialEditor: RTS.AddOnArmor.BuildPanelHull adds the panel mask to a copy of the hull master material.
+			PrivateDependencyModuleNames.Add("MaterialEditor");
 			// PhysicsUtilities: the ragdoll physics fit commandlet refits capsules to a soldier's mesh.
 			PrivateDependencyModuleNames.AddRange(new string[] { "PhysicsUtilities", "MeshUtilitiesCommon" });
 		}

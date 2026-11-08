@@ -64,9 +64,12 @@ void UGA_RadixiteNuke::GiveOwnerVisionOfBlast(const FVector& GroundZero) const
 	{
 		return;
 	}
-	// The player who fired it should see the result, also when it lands deep in the fog.
+	// The player who fired it should see the result, also when it lands deep in the fog; a warhead without
+	// radiation still leaves the blast in view for a while.
+	constexpr float MinVisionAfterBlastSeconds = 8.f;
 	Bubble->StartVision(M_AimSettings.AreaAim.AreaRadius,
-	                    M_NukeSettings.WarningSeconds + M_NukeSettings.RadiationSeconds,
+	                    M_NukeSettings.WarningSeconds
+	                    + FMath::Max(M_NukeSettings.RadiationSeconds, MinVisionAfterBlastSeconds),
 	                    static_cast<uint8>(GetOwningPlayer()));
 }
 
@@ -75,6 +78,7 @@ TArray<FSoftObjectPath> UGA_RadixiteNuke::GetAssetsToLoad() const
 	return {
 		M_NukeVisuals.WarheadMesh.ToSoftObjectPath(),
 		M_NukeVisuals.WarheadTrailEffect.ToSoftObjectPath(),
+		M_NukeVisuals.WarheadSmokeTrailEffect.ToSoftObjectPath(),
 		M_NukeVisuals.DetonationEffect.ToSoftObjectPath(),
 		M_NukeVisuals.RadiationEffect.ToSoftObjectPath(),
 		M_NukeVisuals.WarningAreaMaterial.ToSoftObjectPath(),

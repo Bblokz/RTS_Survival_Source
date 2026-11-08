@@ -18,6 +18,8 @@ struct FWreckDebrisBurstSinkState
 	TWeakObjectPtr<UNiagaraComponent> Component;
 	float SinkStartSeconds = 0.f;
 	float SinkSeconds = 1.f;
+	// Share of the concurrent burst budget this burst holds; heavy bursts hold more.
+	int32 BurstSlots = 1;
 };
 
 /**
@@ -34,16 +36,20 @@ public:
 	/** @return The next variant of the shuffle bag. */
 	ERegularDeathVariant DrawVariant();
 
-	/** @return True when another debris burst may start; finished bursts free their slot. */
-	bool GetCanStartDebrisBurst();
+	/**
+	 * @return True when a burst needing this many slots still fits the budget; finished bursts free their slots.
+	 */
+	bool GetCanStartDebrisBurst(int32 BurstSlots);
 
 	/**
 	 * @brief Tracks a started burst and sinks its pieces away later by shrinking User.DebrisScale to zero.
 	 * @param DebrisComponent The burst; deactivated once its pieces have sunk.
 	 * @param LieSeconds Seconds before the pieces start to sink.
 	 * @param SinkSeconds Seconds the sinking takes.
+	 * @param BurstSlots Budget slots the burst holds until it ends.
 	 */
-	void RegisterDebrisBurst(UNiagaraComponent* DebrisComponent, float LieSeconds, float SinkSeconds);
+	void RegisterDebrisBurst(UNiagaraComponent* DebrisComponent, float LieSeconds, float SinkSeconds,
+	                         int32 BurstSlots);
 
 	/**
 	 * @brief Chunk material tinted like a hull: a copy of the chunk material with the hull's colour texture in it.
@@ -57,6 +63,7 @@ private:
 	void RefillVariantBag();
 	void TickDebrisSinking();
 	void PruneFinishedDebrisBursts();
+	int32 GetUsedDebrisBurstSlots() const;
 
 	// Remaining draws of the current bag; refilled (shuffled) when empty.
 	TArray<ERegularDeathVariant> M_VariantBag;

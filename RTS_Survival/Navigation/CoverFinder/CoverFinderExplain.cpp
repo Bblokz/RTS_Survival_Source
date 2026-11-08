@@ -17,6 +17,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Navigation/CoverFinder/CoverFinderWorker.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
+#include "RTS_Survival/Units/Squads/SquadUnit/SquadUnit.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSCoverExplain, Log, All);
 
