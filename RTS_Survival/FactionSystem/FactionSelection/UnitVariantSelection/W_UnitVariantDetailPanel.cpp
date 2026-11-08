@@ -3,10 +3,13 @@
 #include "W_UnitVariantDetailPanel.h"
 
 #include "Blueprint/WidgetTree.h"
+#include "Components/BackgroundBlur.h"
 #include "Components/Border.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/Image.h"
+#include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 #include "Components/RichTextBlock.h"
 #include "Components/ScaleBox.h"
 #include "Components/ScrollBox.h"
@@ -24,11 +27,19 @@
 
 namespace UnitVariantDetailPanelLayout
 {
-	constexpr float PanelWidth = 380.f;
+	constexpr float PanelWidth = 396.f;
 	// The variant panel's height; a longer list scrolls inside the plate.
 	constexpr float PanelMaxHeight = 848.f;
 	const FMargin PanelPadding(24.f, 20.f, 24.f, 24.f);
 	const FMargin SectionLabelPadding(0.f, 18.f, 0.f, 8.f);
+	// The first label sits at the glass pane's top padding.
+	const FMargin FirstSectionLabelPadding(0.f, 0.f, 0.f, 8.f);
+	// Glass pane: a gap under the variant name, then the sections inset from the pane's rim.
+	const FMargin GlassSectionPadding(0.f, 10.f, 0.f, 0.f);
+	const FMargin GlassPanePadding(10.f, 10.f, 10.f, 12.f);
+	// The sheen runs along the top edge, inset so it stays inside the rounded rim.
+	constexpr float GlassSheenHeight = 1.f;
+	const FMargin GlassSheenPadding(4.f, 1.f, 4.f, 0.f);
 	constexpr float RowSpacing = 12.f;
 	const FVector2D AbilityIconSize(64.f, 64.f);
 	const FVector2D WeaponIconSize(56.f, 56.f);
@@ -85,10 +96,39 @@ void UW_UnitVariantDetailPanel::BuildWidgetTree()
 	M_VariantNameText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	M_VariantNameText->SetAutoWrapText(true);
 	PanelColumn->AddChildToVerticalBox(M_VariantNameText);
-	M_SectionColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	PanelColumn->AddChildToVerticalBox(M_SectionColumn);
+	PanelColumn->AddChildToVerticalBox(BuildGlassSection())->SetPadding(GlassSectionPadding);
 	// Never takes the mouse from the hangar or the cards it sits next to.
 	SetVisibility(ESlateVisibility::Hidden);
+}
+
+UWidget* UW_UnitVariantDetailPanel::BuildGlassSection()
+{
+	using namespace UnitVariantDetailPanelLayout;
+	M_GlassBlur = WidgetTree->ConstructWidget<UBackgroundBlur>(UBackgroundBlur::StaticClass());
+	M_GlassBlur->SetPadding(FMargin(0.f));
+	M_GlassBlur->SetHorizontalAlignment(HAlign_Fill);
+	M_GlassBlur->SetVerticalAlignment(VAlign_Fill);
+	UOverlay* const GlassOverlay = WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass());
+	M_GlassBlur->SetContent(GlassOverlay);
+
+	M_GlassPane = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	M_GlassPane->SetPadding(GlassPanePadding);
+	UOverlaySlot* const PaneSlot = GlassOverlay->AddChildToOverlay(M_GlassPane);
+	PaneSlot->SetHorizontalAlignment(HAlign_Fill);
+	PaneSlot->SetVerticalAlignment(VAlign_Fill);
+	M_SectionColumn = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	M_GlassPane->SetContent(M_SectionColumn);
+
+	USizeBox* const SheenBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+	SheenBox->SetHeightOverride(GlassSheenHeight);
+	// The default brush is a plain white quad; the style's tint makes it the sheen.
+	M_GlassSheen = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+	SheenBox->SetContent(M_GlassSheen);
+	UOverlaySlot* const SheenSlot = GlassOverlay->AddChildToOverlay(SheenBox);
+	SheenSlot->SetHorizontalAlignment(HAlign_Fill);
+	SheenSlot->SetVerticalAlignment(VAlign_Top);
+	SheenSlot->SetPadding(GlassSheenPadding);
+	return M_GlassBlur;
 }
 
 void UW_UnitVariantDetailPanel::SetupPanel(const FUnitVariantSelectionStyle& Style, UDataTable* RichTextStyle,
@@ -111,6 +151,11 @@ void UW_UnitVariantDetailPanel::SetupPanel(const FUnitVariantSelectionStyle& Sty
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		M_VariantNameText, UnitVariantSelectionWidgets::MakeFont(Style.HeadingFont, VariantNameFontSize),
 		Style.SelectedTextColor);
+	M_GlassPane->SetBrush(Style.VariantSectionGlass);
+	M_GlassSheen->SetColorAndOpacity(Style.VariantSectionSheenColor);
+	M_GlassBlur->SetBlurStrength(Style.VariantSectionBlurStrength);
+	// Low scalability turns the blur off; the tint alone then still marks the pane.
+	M_GlassBlur->SetLowQualityFallbackBrush(FSlateNoResource());
 }
 
 void UW_UnitVariantDetailPanel::ShowVariant(const FUnitVariantDetailContent& Content)
@@ -123,6 +168,7 @@ void UW_UnitVariantDetailPanel::ShowVariant(const FUnitVariantDetailContent& Con
 	M_SectionColumn->ClearChildren();
 	AddAbilitySection(Content);
 	AddWeaponSection(Content);
+	AddAddOnArmorSection(Content);
 	AddComparisonSection(Content);
 	SetVisibility(ESlateVisibility::HitTestInvisible);
 }
@@ -220,6 +266,94 @@ void UW_UnitVariantDetailPanel::AddComparisonSection(const FUnitVariantDetailCon
 	{
 		AddStatRow(StatRow);
 	}
+}
+
+void UW_UnitVariantDetailPanel::AddAddOnArmorSection(const FUnitVariantDetailContent& Content)
+{
+	if (Content.Probe == nullptr)
+	{
+		return;
+	}
+	const bool bBaseHasArmor = Content.BaseProbe != nullptr && Content.BaseProbe->GetHasAddOnArmor();
+	if (not Content.Probe->GetHasAddOnArmor() && not bBaseHasArmor)
+	{
+		return;
+	}
+	AddSectionLabel(NSLOCTEXT("UnitVariantSelection", "AddOnArmorLabel", "ADD-ON ARMOUR"));
+	if (Content.Probe->GetHasAddOnArmor())
+	{
+		// Base itself (no BaseProbe) and variants that keep Base's panels carry no tag.
+		const bool bIsGained = Content.BaseProbe != nullptr && not bBaseHasArmor;
+		AddAddOnArmorRow(*Content.Probe, bIsGained ? EUnitVariantChange::Gained : EUnitVariantChange::Unchanged);
+		return;
+	}
+	AddAddOnArmorRow(*Content.BaseProbe, EUnitVariantChange::Removed);
+}
+
+void UW_UnitVariantDetailPanel::AddAddOnArmorRow(const FUnitVariantProbeResult& Armor,
+                                                 const EUnitVariantChange Change)
+{
+	using namespace UnitVariantDetailPanelLayout;
+	const int32 MinMm = FMath::RoundToInt(Armor.MinAddOnArmorMm);
+	const int32 MaxMm = FMath::RoundToInt(Armor.MaxAddOnArmorMm);
+	const FText MmText = MinMm == MaxMm
+		                     ? FText::Format(NSLOCTEXT("UnitVariantSelection", "AddOnArmorMm", "+{0} mm"),
+		                                     FText::AsNumber(MaxMm))
+		                     : FText::Format(NSLOCTEXT("UnitVariantSelection", "AddOnArmorMmRange", "+{0}-{1} mm"),
+		                                     FText::AsNumber(MinMm), FText::AsNumber(MaxMm));
+
+	// The well shows the bonus the way weapon wells without art show their calibre.
+	UTextBlock* const WellText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	WellText->SetText(FText::Format(NSLOCTEXT("UnitVariantSelection", "AddOnArmorWell", "+{0}\nmm"),
+	                                FText::AsNumber(MaxMm)));
+	WellText->SetJustification(ETextJustify::Center);
+	UnitVariantSelectionWidgets::ApplyTextOnMetal(
+		WellText, UnitVariantSelectionWidgets::MakeFont(M_Style.HeadingFont, CalibreFallbackFontSize),
+		M_Style.TextColor);
+	UScaleBox* const WellScale = WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass());
+	WellScale->SetStretch(EStretch::ScaleToFit);
+	WellScale->SetStretchDirection(EStretchDirection::DownOnly);
+	WellScale->SetContent(WellText);
+
+	TArray<FText> Faces;
+	if (Armor.bAddOnArmorCoversFront)
+	{
+		Faces.Add(NSLOCTEXT("UnitVariantSelection", "AddOnArmorFront", "front"));
+	}
+	if (Armor.bAddOnArmorCoversSides)
+	{
+		Faces.Add(NSLOCTEXT("UnitVariantSelection", "AddOnArmorSides", "sides"));
+	}
+	if (Armor.bAddOnArmorCoversRear)
+	{
+		Faces.Add(NSLOCTEXT("UnitVariantSelection", "AddOnArmorRear", "rear"));
+	}
+	// "front", "front and sides", "front, sides and rear".
+	FText FacesText = Faces.IsEmpty() ? FText::GetEmpty() : Faces.Last();
+	for (int32 FaceIndex = Faces.Num() - 2; FaceIndex >= 0; --FaceIndex)
+	{
+		FacesText = FText::Format(FaceIndex == Faces.Num() - 2
+			                          ? NSLOCTEXT("UnitVariantSelection", "AddOnArmorFacesAnd", "{0} and {1}")
+			                          : NSLOCTEXT("UnitVariantSelection", "AddOnArmorFacesComma", "{0}, {1}"),
+		                          Faces[FaceIndex], FacesText);
+	}
+	// Short on purpose: the panel never scrolls (it ignores the mouse), so a long note would be cut off at the plate.
+	const FText DetailText = FText::Format(
+		NSLOCTEXT("UnitVariantSelection", "AddOnArmorDetail",
+		          "{0} on the {1}. Hits shoot panels off and take the bonus with them; repairs refit them."),
+		MmText, FacesText);
+	const FText TitleText = Armor.AddOnArmorPanelCount > 0
+		                        ? FText::Format(NSLOCTEXT("UnitVariantSelection", "AddOnArmorTitleCount",
+		                                                  "{0} armour panels"),
+		                                        FText::AsNumber(Armor.AddOnArmorPanelCount))
+		                        : NSLOCTEXT("UnitVariantSelection", "AddOnArmorTitle", "Armour panels");
+	UTextBlock* const DescriptionText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	DescriptionText->SetText(DetailText);
+	DescriptionText->SetAutoWrapText(true);
+	UnitVariantSelectionWidgets::ApplyTextOnMetal(
+		DescriptionText, UnitVariantSelectionWidgets::MakeFont(M_Style.BodyFont, BodyFontSize),
+		M_Style.DescriptionColor);
+	AddIconRow(WellScale, WeaponIconSize, TitleText, Change, DescriptionText);
 }
 
 void UW_UnitVariantDetailPanel::AddAbilityRow(const FUnitVariantAbilityCard& AbilityCard,
@@ -428,7 +562,9 @@ void UW_UnitVariantDetailPanel::AddSectionLabel(const FText& Label)
 	UnitVariantSelectionWidgets::ApplyTextOnMetal(
 		LabelText, UnitVariantSelectionWidgets::MakeFont(M_Style.HeadingFont, LabelFontSize, LabelLetterSpacing),
 		M_Style.LabelColor);
-	M_SectionColumn->AddChildToVerticalBox(LabelText)->SetPadding(SectionLabelPadding);
+	const bool bIsFirstSection = M_SectionColumn->GetChildrenCount() == 0;
+	M_SectionColumn->AddChildToVerticalBox(LabelText)->SetPadding(
+		bIsFirstSection ? FirstSectionLabelPadding : SectionLabelPadding);
 	bM_NextRowFollowsLabel = true;
 }
 
@@ -454,7 +590,8 @@ void UW_UnitVariantDetailPanel::AddToSection(UWidget* Row)
 
 bool UW_UnitVariantDetailPanel::GetIsValidPlate() const
 {
-	if (IsValid(M_Plate) && IsValid(M_SectionColumn) && IsValid(M_VariantNameText))
+	if (IsValid(M_Plate) && IsValid(M_SectionColumn) && IsValid(M_VariantNameText) && IsValid(M_GlassPane)
+		&& IsValid(M_GlassSheen) && IsValid(M_GlassBlur))
 	{
 		return true;
 	}

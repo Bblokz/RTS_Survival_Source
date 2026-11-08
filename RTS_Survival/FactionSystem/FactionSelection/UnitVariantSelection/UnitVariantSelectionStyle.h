@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Brushes/SlateRoundedBoxBrush.h"
 #include "Fonts/SlateFontInfo.h"
 #include "Styling/SlateBrush.h"
 #include "Styling/SlateColor.h"
@@ -68,6 +69,21 @@ struct FUnitVariantSelectionStyle
 	// The EQUIPPED badge on the selected card.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Variant Card")
 	FSlateBrush SelectedMarker;
+
+	// Glass pane behind everything the detail panel lists for the shown variant (abilities, weapons, add-on armour,
+	// changes against Base), so they read as one section on the metal plate: a translucent cold tint with a thin
+	// lamp-blue rim. Drawn over a background blur of the plate behind it.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Variant Detail")
+	FSlateBrush VariantSectionGlass = FSlateRoundedBoxBrush(FLinearColor(0.42f, 0.62f, 0.72f, 0.10f), 3.f,
+	                                                        FLinearColor(0.25f, 0.94f, 1.f, 0.30f), 1.f);
+
+	// 1 unit highlight along the top edge of the glass pane.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Variant Detail")
+	FLinearColor VariantSectionSheenColor = FLinearColor(1.f, 1.f, 1.f, 0.14f);
+
+	// Background blur strength under the glass pane; 0 leaves only the tint.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Variant Detail", meta = (ClampMin = "0", ClampMax = "100"))
+	float VariantSectionBlurStrength = 10.f;
 
 	// Buttons_DataTableb: the title, description and icon the action bar shows for each ability.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Abilities")

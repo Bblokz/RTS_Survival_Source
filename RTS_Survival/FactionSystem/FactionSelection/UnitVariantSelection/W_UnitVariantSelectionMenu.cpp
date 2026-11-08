@@ -358,7 +358,7 @@ void UW_UnitVariantSelectionMenu::PopulateUnitEntries()
 		Entry->SetPadding(FMargin(0.f, 0.f, 0.f, EntrySpacing));
 		M_UnitList->AddChild(Entry);
 		M_UnitEntries.Add(Entry);
-		RefreshEntryChosenVariant(UnitIndex);
+		RefreshEntryChangeMarker(UnitIndex);
 	}
 }
 
@@ -376,7 +376,7 @@ void UW_UnitVariantSelectionMenu::HandleVariantCardClicked(const EUnitVariant Va
 	M_Selections.Add(M_Units[M_SelectedUnitIndex], Variant);
 	RefreshCardSelection();
 	RefreshAbilityPanel();
-	RefreshEntryChosenVariant(M_SelectedUnitIndex);
+	RefreshEntryChangeMarker(M_SelectedUnitIndex);
 	RequestPreviewOfSelectedUnit();
 }
 
@@ -640,7 +640,7 @@ void UW_UnitVariantSelectionMenu::OnResetClicked()
 	}
 	for (int32 UnitIndex = 0; UnitIndex < M_Units.Num(); ++UnitIndex)
 	{
-		RefreshEntryChosenVariant(UnitIndex);
+		RefreshEntryChangeMarker(UnitIndex);
 	}
 	RefreshCardSelection();
 	RefreshAbilityPanel();
@@ -887,20 +887,14 @@ void UW_UnitVariantSelectionMenu::RefreshCardSelection()
 	}
 }
 
-void UW_UnitVariantSelectionMenu::RefreshEntryChosenVariant(const int32 EntryIndex)
+void UW_UnitVariantSelectionMenu::RefreshEntryChangeMarker(const int32 EntryIndex)
 {
 	if (not M_UnitEntries.IsValidIndex(EntryIndex) || not M_Units.IsValidIndex(EntryIndex)
 		|| not IsValid(M_UnitEntries[EntryIndex]))
 	{
 		return;
 	}
-	const FTrainingOption& Unit = M_Units[EntryIndex];
-	const EUnitVariant ChosenVariant = GetChosenVariant(Unit);
-	// Base needs no reminder; otherwise the short label ("Variant A"), as full names do not fit next to the count.
-	M_UnitEntries[EntryIndex]->SetChosenVariantName(ChosenVariant == EUnitVariant::Base
-		                                                ? FText::GetEmpty()
-		                                                : UEnum::GetDisplayValueAsText(ChosenVariant));
-	M_UnitEntries[EntryIndex]->SetHasUnconfirmedChange(GetHasUnconfirmedChange(Unit));
+	M_UnitEntries[EntryIndex]->SetHasUnconfirmedChange(GetHasUnconfirmedChange(M_Units[EntryIndex]));
 }
 
 void UW_UnitVariantSelectionMenu::RequestPreviewOfSelectedUnit() const

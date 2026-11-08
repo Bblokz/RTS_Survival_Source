@@ -61,6 +61,30 @@ struct FUnitVariantProbeResult
 	// FTankVariantMobilityMultipliers.MaxSpeedMultiplier; 1 for units that are not tanks.
 	UPROPERTY()
 	float MaxSpeedMultiplier = 1.f;
+
+	// Add-on armour panels (spaced armour, skirts, fences) as installed by UAddOnArmorPanelsComponent; zero when the
+	// unit has none. Lowest and highest add-on mm over the plates the panels cover (equal for most vehicles).
+	UPROPERTY()
+	float MinAddOnArmorMm = 0.f;
+
+	UPROPERTY()
+	float MaxAddOnArmorMm = 0.f;
+
+	// How many panels the hull carries, from its panel layout; 0 when unknown.
+	UPROPERTY()
+	int32 AddOnArmorPanelCount = 0;
+
+	// Which hull faces the panels cover (EArmorPlateDamageType of the covered plates).
+	UPROPERTY()
+	bool bAddOnArmorCoversFront = false;
+
+	UPROPERTY()
+	bool bAddOnArmorCoversSides = false;
+
+	UPROPERTY()
+	bool bAddOnArmorCoversRear = false;
+
+	bool GetHasAddOnArmor() const { return MaxAddOnArmorMm > 0.f; }
 };
 
 /**
@@ -105,4 +129,6 @@ private:
 	static FUnitVariantProbeResult ReadProbe(const AActor& Probe);
 	static TArray<UWeaponState*> GetProbeWeapons(const AActor& Probe);
 	static void AddWeapon(TArray<FUnitVariantWeaponStats>& Weapons, const UWeaponState& WeaponState);
+	/** Fills the add-on armour fields of Result when the probe's panel zones installed add-on armour. */
+	static void ReadAddOnArmor(const AActor& Probe, FUnitVariantProbeResult& Result);
 };
