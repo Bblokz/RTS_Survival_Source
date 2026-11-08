@@ -29,6 +29,9 @@ void UW_GA_Description::ShowDescription(const FGlobalAbilityUISettings& UISettin
 	if (IsValid(CostDisplay))
 	{
 		CostDisplay->SetupCost(CostState.Costs.ResourceCosts);
+		// A free ability would otherwise leave an empty cost panel beside the description.
+		const bool bHasCosts = CostState.Costs.ResourceCosts.Num() > 0;
+		CostDisplay->SetVisibility(bHasCosts ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Collapsed);
 	}
 	if (IsValid(AbilityIcon))
 	{

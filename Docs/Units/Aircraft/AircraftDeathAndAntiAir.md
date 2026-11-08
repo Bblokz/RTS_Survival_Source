@@ -84,11 +84,19 @@ carrying, and hands over to `UAircraftDeathComponent` (created on every aircraft
 - **Fall.** `FAircraftDeathMath::StepCrashFlight`: the wreck keeps the speed it had (at least `MinCrashSpeed`), the nose
   drops into a dive of at most `MaxDiveDegrees`, gravity and drag act on it. A burning wing drops: the wreck rolls over
   towards it and turns into a spiral; a nose fire only rocks it.
-- **Carried wreck.** At the hit the aircraft's meshes are hidden and its crash collection takes their place
-  (`AAircraftWreckActor::StartCarried`): the collection is kinematic, crumbled into its pieces, and the actor is moved
-  with the aircraft every tick (the death component ticks in `TG_PrePhysics`, so the pieces stay under the engine fire).
-  A held piece moves with the actor; `ReleasePiece` un-anchors it (`SetAnchoredByIndex(false)` makes a kinematic piece
-  dynamic) and it falls on with the speed its kinematic motion gave it, plus a kick. Loose pieces have
+- **Carried wreck.** At the hit a kinematic copy of the crash collection is spawned, hidden, where the aircraft is
+  (`AAircraftWreckActor::StartCarried`). Its physics only exists some steps later (in editor runs one frame hitches by
+  ~0.5 s right after the spawn), and Chaos places the pieces at the transform the component had at that moment: a wreck
+  moved before then carries its pieces that far behind the aircraft for good. So it stays put until
+  `GetIsObjectDynamic()` reports the physics up (2 s timeout), then follows the aircraft every tick (`FollowTransform`;
+  the death component ticks in `TG_PrePhysics`, so the pieces stay under the engine fire), is shown two frames later,
+  and the aircraft's meshes are hidden. Until then the aircraft flies its fall as itself.
+  Letting a piece go (`ReleasePiece`) takes two steps in the wreck's tick: a huge external strain on the piece tears it
+  out of its cluster (damage propagation spreads it, so the first tear frees every piece; each stays kinematic and
+  follows on its own), and two frames later a small kinematic field (`ApplyKinematicField`) around it makes it dynamic,
+  with the speed its kinematic motion gave it plus a kick. Do not use `SetAnchoredByIndex(false)` for this: it switches
+  the state of a collection particle without handing it to the solver's islands, so the piece reads dynamic but hangs
+  frozen (or falls asleep) in the air. Anchoring pieces also stops strain from tearing them out. Loose pieces have
   `PieceLinearDamping` air drag, so they fall behind.
 - **Breaking up in the air** (`bBreakUpInTheAir`). `AirBreakupDelaySeconds` after the hit the first part tears off with
   a small blast (`AirBreakupExplosion`): a burning wing loses its outer panel beyond the engine; a nose-fire aircraft
@@ -104,8 +112,9 @@ carrying, and hands over to `UAircraftDeathComponent` (created on every aircraft
   (`BurningDebris`) and the burning fuel where the hull came to rest (`GroundFire`). The wreck's fires die down after
   `WreckFireSeconds` (10 s), before its pieces shrink away (8-14 s asleep); the wreck goes after `WreckLifeSeconds`.
   Pieces land on the ground and pass through units. The aircraft actor is hidden and goes after 8 s. Without a crash
-  collection the aircraft falls whole and explodes the old way: everything at once, `PieceVelocityRetained` of the
-  impact velocity, blown apart with `PieceScatterSpeed`.
+  collection, or when it hits the ground before the carried wreck is up, the aircraft explodes the old way: everything
+  at once, `PieceVelocityRetained` of the impact velocity, blown apart with `PieceScatterSpeed`. That old path has the
+  same physics latency with no wait: the pieces sit whole for a moment and then burst, which looked like a dropped cup.
 - **Parked.** An aircraft killed while landed on the ground (in its bay or on a field) collapses where it stands:
   its pieces get a fifth of the scatter, so they stay within about its own size and do not fly through bay walls.
   The airbase building has query-only collision: its walls do not stop pieces, only the low scatter keeps them in
