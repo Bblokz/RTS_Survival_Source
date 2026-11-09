@@ -8,6 +8,7 @@
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Environment/ImpactDecals/LandscapeImpactDecalSubsystem.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
 #include "RTS_Survival/Physics/RTSSurfaceSubtypes.h"
@@ -1897,6 +1898,9 @@ void AProjectile::HandleTimedExplosion()
 {
 	// Explode mid air.
 	FRotator Rotation = FRotator::ZeroRotator;
+	// Arcing shells are timed to land on their target, so a timed explosion just above the landscape is a ground hit.
+	ULandscapeImpactDecalSubsystem::RequestImpactDecalBelowExplosion(this, static_cast<float>(M_WeaponCalibre),
+	                                                                 GetActorLocation());
 	SpawnExplosionHandleAOE(GetActorLocation(), Rotation, ERTSSurfaceType::Air, nullptr);
 
 	OnProjectileDormant();
@@ -2531,6 +2535,9 @@ void AProjectile::SpawnExplosionHandleAOE(const FVector& Location, const FRotato
 
 	// Before the impact-data check: a surface without impact VFX must still burn.
 	TryRequestGroundFire(Location, HitSurface);
+	// Shells above 15 mm leave a crater, but only on a landscape (HitRotation's Z axis is the impact normal).
+	ULandscapeImpactDecalSubsystem::RequestImpactDecal(this, static_cast<float>(M_WeaponCalibre), Location,
+	                                                   HitRotation.Quaternion().GetUpVector(), HitActor);
 
 	// Resolve impact data once.
 	const FRTSSurfaceImpactData* const Data = FindImpactData(M_ImpactVfx, HitSurface);
