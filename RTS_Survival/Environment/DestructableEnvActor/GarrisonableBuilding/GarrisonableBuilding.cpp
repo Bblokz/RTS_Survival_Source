@@ -3,6 +3,7 @@
 
 #include "GarrisonableBuilding.h"
 
+#include "RTS_Survival/Environment/DestructableEnvActor/WallChunkDamage/WallHoleDamageComponent.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
 #include "RTS_Survival/RTSComponents/CargoMechanic/Cargo/Cargo.h"
@@ -23,6 +24,12 @@ AGarrisonableBuilding::AGarrisonableBuilding(const FObjectInitializer& ObjectIni
 
 void AGarrisonableBuilding::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
 {
+	// Repairs close the newest holes once the damage no longer fits the health.
+	UWallHoleDamageComponent* const WallHoleDamage = bIsHealing ? FindWallHoleDamage() : nullptr;
+	if (IsValid(WallHoleDamage) && IsValid(HealthComponent))
+	{
+		WallHoleDamage->OnOwnerHealed(HealthComponent->GetCurrentHealth(), HealthComponent->GetMaxHealth());
+	}
 	BP_OnHealthChanged(PercentageLeft, bIsHealing);
 }
 
@@ -105,7 +112,11 @@ float AGarrisonableBuilding::TakeDamage(float DamageAmount, FDamageEvent const& 
 		return 1.f;
 	}
 	const ERTSDamageType RtsDamageType = FRTSWeaponHelpers::GetRTSDamageType(DamageEvent);
-	if (HealthComponent->TakeDamage(DamageAmount, RtsDamageType))
+	const float HealthBefore = HealthComponent->GetCurrentHealth();
+	const bool bDied = HealthComponent->TakeDamage(DamageAmount, RtsDamageType);
+	// Before the death: a surviving bunker shows the shell hole, a dying one collapses from OnUnitDies.
+	ForwardDamageToWallHoles(DamageEvent, DamageCauser, HealthBefore, bDied);
+	if (bDied)
 	{
 		const ERTSDeathType DeathType = FRTSWeaponHelpers::TranslateDamageIntoDeathType(RtsDamageType);
 		OnUnitDies(DeathType);
@@ -128,6 +139,26 @@ void AGarrisonableBuilding::OnUnitDies(const ERTSDeathType DeathType)
 	}
 	// Sets death flag, calls bp on unit dies.
 	Super::OnUnitDies(DeathType);
+}
+
+void AGarrisonableBuilding::ForwardDamageToWallHoles(const FDamageEvent& DamageEvent, const AActor* DamageCauser,
+                                                     const float HealthBefore, const bool bDied) const
+{
+	UWallHoleDamageComponent* const WallHoleDamage = FindWallHoleDamage();
+	if (not IsValid(WallHoleDamage) || not IsValid(HealthComponent))
+	{
+		return;
+	}
+	const float HealthAfter = bDied ? 0.f : HealthComponent->GetCurrentHealth();
+	// The health component applies its own armour, so the hole is sized by the health actually lost.
+	const float DamageTaken = HealthBefore - HealthComponent->GetCurrentHealth();
+	WallHoleDamage->SetOwnerMaxHealth(HealthComponent->GetMaxHealth());
+	WallHoleDamage->OnOwnerDamaged(DamageTaken, DamageEvent, DamageCauser, HealthBefore, HealthAfter);
+}
+
+UWallHoleDamageComponent* AGarrisonableBuilding::FindWallHoleDamage() const
+{
+	return FindComponentByClass<UWallHoleDamageComponent>();
 }
 
 void AGarrisonableBuilding::OnUnitDies_HandleGarrisonState()
