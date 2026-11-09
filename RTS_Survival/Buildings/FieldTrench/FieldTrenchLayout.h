@@ -28,6 +28,19 @@ enum class EFieldTrenchPiece : uint8
 };
 
 /**
+ * Which faction's dressing the kit pieces wear. Every kit has the same pieces, ports and cover sockets
+ * (the Soviet kit is the German generator with its dressing swapped), so the layout planner serves all of them.
+ */
+UENUM(BlueprintType)
+enum class EFieldTrenchKit : uint8
+{
+	// Pallet revetment, duckboards, German sandbags (GerDefenses/FieldTrenches).
+	German,
+	// Log revetment with stakes, corduroy pole floor, Soviet sandbags (SovietsStuff/FieldTrenches).
+	Soviet
+};
+
+/**
  * @brief Where two kit pieces join: a point on the centreline at ground level and the yaw pointing out of the
  * piece, in the piece's own Unreal space. Two pieces join where a port of each coincides with opposite yaws.
  */
@@ -107,8 +120,11 @@ namespace FieldTrenchLayout
 {
 	RTS_SURVIVAL_API const FFieldTrenchPieceDefinition& GetPieceDefinition(EFieldTrenchPiece Piece);
 
-	/** @return The mesh asset of the piece under /Game/RTS_Survival/Blueprints/Environment/Trenches/FieldTrench/Meshes. */
-	RTS_SURVIVAL_API FSoftObjectPath GetPieceMeshPath(EFieldTrenchPiece Piece);
+	/**
+	 * @return The mesh asset of the piece in the kit's folder under /Game/RTS_Survival/Blueprints/Environment/Trenches:
+	 * FieldTrench/Meshes/SM_FieldTrench_* for the German kit, SovFieldTrench/Meshes/SM_SovFieldTrench_* for the Soviet one.
+	 */
+	RTS_SURVIVAL_API FSoftObjectPath GetPieceMeshPath(EFieldTrenchPiece Piece, EFieldTrenchKit Kit = EFieldTrenchKit::German);
 
 	/**
 	 * @brief Puts a piece so that one of its ports joins an open port.

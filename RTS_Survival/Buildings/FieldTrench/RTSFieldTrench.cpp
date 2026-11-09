@@ -373,13 +373,30 @@ UStaticMeshComponent* ARTSFieldTrench::CreatePieceComponent(const EFieldTrenchPi
 	return PieceComponent;
 }
 
+void ARTSFieldTrench::SetKit(const EFieldTrenchKit NewKit)
+{
+	if (Kit == NewKit)
+	{
+		return;
+	}
+	Kit = NewKit;
+	for (const FFieldTrenchPieceRuntime& Piece : M_Pieces)
+	{
+		if (IsValid(Piece.Component))
+		{
+			SetPieceMesh(*Piece.Component, Piece.Placement.Piece);
+		}
+	}
+}
+
 void ARTSFieldTrench::SetPieceMesh(UStaticMeshComponent& PieceComponent, const EFieldTrenchPiece Piece) const
 {
-	UStaticMesh* PieceMesh = Cast<UStaticMesh>(FieldTrenchLayout::GetPieceMeshPath(Piece).TryLoad());
+	UStaticMesh* PieceMesh = Cast<UStaticMesh>(FieldTrenchLayout::GetPieceMeshPath(Piece, Kit).TryLoad());
 	if (not IsValid(PieceMesh))
 	{
 		RTSFunctionLibrary::ReportError(
-			"Field trench " + GetName() + ": could not load the mesh of piece " + UEnum::GetValueAsString(Piece) + ".");
+			"Field trench " + GetName() + ": could not load the mesh of piece " + UEnum::GetValueAsString(Piece) +
+			" in kit " + UEnum::GetValueAsString(Kit) + ".");
 	}
 	PieceComponent.SetStaticMesh(PieceMesh);
 }
@@ -557,6 +574,7 @@ void ARTSFieldTrench::ShowPieceState(FFieldTrenchPieceRuntime& Piece)
 	PieceComponent->SetCollisionEnabled(bIsPlanned
 		? ECollisionEnabled::NoCollision
 		: PieceCollisionTemplate->GetCollisionEnabled());
+	PieceComponent->SetVisibility(not (bIsPlanned && bM_HidePlannedPieces));
 	UMaterialInterface* PlannedMaterial = bIsPlanned ? GetPlannedMaterial() : nullptr;
 	const int32 MaterialCount = PieceComponent->GetNumMaterials();
 	for (int32 MaterialIndex = 0; MaterialIndex < MaterialCount; ++MaterialIndex)

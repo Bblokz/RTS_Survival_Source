@@ -109,6 +109,21 @@ public:
 	void CancelUnbuiltPieces();
 
 	int32 GetPieceCount() const { return M_Pieces.Num(); }
+	EFieldTrenchKit GetKit() const { return Kit; }
+
+	/**
+	 * @brief Picks the kit the pieces are made of; pieces that already exist take its meshes at once.
+	 * The runtime trench is the C++ class for every kit, so the placement sets this right after spawning it.
+	 */
+	void SetKit(const EFieldTrenchKit NewKit);
+
+	/**
+	 * @brief Hides the pieces that are planned but not dug yet, for a trench whose plan the player must not see,
+	 * such as one the enemy AI digs; a piece shows once its digging starts. Off for the player's own trench.
+	 */
+	void SetHidePlannedPieces(const bool bHide) { bM_HidePlannedPieces = bHide; }
+
+	void SetDigSecondsPerMetre(const float SecondsPerMetre) { DigSecondsPerMetre = FMath::Max(0.0f, SecondsPerMetre); }
 	int32 GetBuiltPieceCount() const;
 	bool GetIsWaitingForResources() const { return bM_IsWaitingForResources; }
 	const TArray<FFieldTrenchPieceRuntime>& GetPieces() const { return M_Pieces; }
@@ -178,6 +193,11 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 
+	// Which faction's kit meshes the pieces use; all kits share the layout, so only the look changes.
+	// Set on a Blueprint child (BP_SovFieldTrenchSpline) or per placed trench; a spline trench rebuilds when it changes.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Field Trench")
+	EFieldTrenchKit Kit = EFieldTrenchKit::German;
+
 	// Its collision settings are copied onto every piece; it has no mesh itself.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Field Trench")
 	TObjectPtr<UStaticMeshComponent> PieceCollisionTemplate;
@@ -229,6 +249,7 @@ private:
 	// The actor of the start anchor; the ground is looked for through it, also after the anchor was lost.
 	TWeakObjectPtr<AActor> M_GroundIgnoredActor;
 	bool bM_HasClaimedStartAnchor = false;
+	bool bM_HidePlannedPieces = false;
 
 	int32 M_OwningPlayer = INDEX_NONE;
 	float M_TimeUntilResourceRetry = 0.0f;

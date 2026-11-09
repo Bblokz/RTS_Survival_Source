@@ -5,6 +5,10 @@
 namespace FieldTrenchLayoutPrivate
 {
 	const TCHAR* const MeshFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/Trenches/FieldTrench/Meshes/");
+	// The Soviet kit's meshes carry the German piece names with this prefix in place of GermanMeshPrefix.
+	const TCHAR* const SovietMeshFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/Trenches/SovFieldTrench/Meshes/");
+	const TCHAR* const GermanMeshPrefix = TEXT("SM_FieldTrench_");
+	const TCHAR* const SovietMeshPrefix = TEXT("SM_SovFieldTrench_");
 
 	// Arc radius of the bends.
 	constexpr float BendRadius = 250.0f;
@@ -171,14 +175,20 @@ const FFieldTrenchPieceDefinition& FieldTrenchLayout::GetPieceDefinition(const E
 	return Kit.IsValidIndex(PieceIndex) ? Kit[PieceIndex] : Kit[0];
 }
 
-FSoftObjectPath FieldTrenchLayout::GetPieceMeshPath(const EFieldTrenchPiece Piece)
+FSoftObjectPath FieldTrenchLayout::GetPieceMeshPath(const EFieldTrenchPiece Piece, const EFieldTrenchKit Kit)
 {
-	const FString MeshName = GetPieceDefinition(Piece).MeshName;
+	using namespace FieldTrenchLayoutPrivate;
+	FString MeshName = GetPieceDefinition(Piece).MeshName;
 	if (MeshName.IsEmpty())
 	{
 		return FSoftObjectPath();
 	}
-	return FSoftObjectPath(FString(FieldTrenchLayoutPrivate::MeshFolder) + MeshName + TEXT(".") + MeshName);
+	if (Kit == EFieldTrenchKit::Soviet)
+	{
+		MeshName = FString(SovietMeshPrefix) + MeshName.RightChop(FCString::Strlen(GermanMeshPrefix));
+		return FSoftObjectPath(FString(SovietMeshFolder) + MeshName + TEXT(".") + MeshName);
+	}
+	return FSoftObjectPath(FString(MeshFolder) + MeshName + TEXT(".") + MeshName);
 }
 
 void FieldTrenchLayout::PlacePieceOnPort(
