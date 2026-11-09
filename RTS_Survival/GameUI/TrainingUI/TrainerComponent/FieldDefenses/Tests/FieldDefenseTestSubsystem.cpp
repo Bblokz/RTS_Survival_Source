@@ -19,6 +19,9 @@
 #include "RTS_Survival/Buildings/FieldTrench/RTSFieldTrench.h"
 #include "RTS_Survival/Buildings/FieldTrench/Anchors/FieldTrenchAnchorComponent.h"
 #include "RTS_Survival/Player/ConstructionPreview/FieldTrenchPlacement/FieldTrenchPlacementComponent.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyBaseTrenchComponent/EnemyBaseTrenchComponent.h"
+#include "RTS_Survival/Utils/RTS_Statics/RTS_Statics.h"
 #include "RTS_Survival/Buildings/BuildingExpansion/Interface/BuildingExpansionOwner.h"
 #include "RTS_Survival/Game/GameState/BxpDataHelpers/BxpConstructionRulesHelpers.h"
 #include "RTS_Survival/GameUI/MainGameUI.h"
@@ -150,6 +153,59 @@ namespace FieldDefenseTestPrivate
 	constexpr float BunkerSpacingSideways = 2200.f;
 	constexpr float BunkerTrenchLength = 900.f;
 	constexpr float AnchorBunkerSettleSeconds = 1.f;
+	// The Soviet pits are not in any player's build menu: placed as player 1's, as in a level. Sockets from
+	// Docs/Units/SovPitTrenchAnchors.md; each pit has one anchor, at its crew entrance.
+	struct FSovietTestPit
+	{
+		const TCHAR* ClassPath;
+		const TCHAR* SocketName;
+		FVector SocketLocation;
+		float SocketYaw;
+	};
+	const FSovietTestPit SovietTestPits[] = {
+		{
+			TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Rus53KPit/Rus_BXP_53KPit.Rus_BXP_53KPit_C"),
+			TEXT("TrenchPort_Rear"), FVector(-625.f, 0.f, 0.f), 180.f
+		},
+		{
+			TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Rus53KPit/Rus_BXP_53KSectorPit.Rus_BXP_53KSectorPit_C"),
+			TEXT("TrenchPort_Rear"), FVector(-500.f, 0.f, 0.f), 180.f
+		},
+		{
+			TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBS3Pit/Rus_BXP_BS3Pit.Rus_BXP_BS3Pit_C"),
+			TEXT("TrenchPort_Rear"), FVector(-662.5f, 0.f, 0.f), 180.f
+		},
+		{
+			TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusDShKPit/Rus_BXP_DShKPit.Rus_BXP_DShKPit_C"),
+			TEXT("TrenchPort_Rear"), FVector(-285.f, 0.f, 0.f), 180.f
+		},
+		{
+			TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusAmpulometPit/Rus_BXP_AmpulometPit.Rus_BXP_AmpulometPit_C"),
+			TEXT("TrenchPort_Rear"), FVector(-335.f, 0.f, 0.f), 180.f
+		},
+		{
+			TEXT("/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusMortarPit/Rus_BXP_120MortarPit.Rus_BXP_120MortarPit_C"),
+			TEXT("TrenchPort_Left"), FVector(-5.f, -540.f, 0.f), -90.f
+		}
+	};
+	// The test base stands this far from the HQ (the first distance with flat ground), out of the pits' gun range.
+	const float EnemyBaseDistancesFromHQ[] = {15000.f, 12000.f, 9000.f};
+	constexpr float EnemyBaseGroundCheckRadius = 5500.f;
+	constexpr float EnemyBaseMaxHeightDifference = 150.f;
+	// The pits' anchors stand on a ring round the base centre, facing it; the pits face out.
+	constexpr float SovietAnchorRingRadius = 2600.f;
+	// Clear of the pits, which reach about 3.9 m beyond the anchor ring.
+	constexpr float EnemyBasePerimeterRadius = 5000.f;
+	constexpr int32 MinimumEnemyArcTrenches = 3;
+	constexpr float EnemyTrenchThinkSeconds = 0.5f;
+	constexpr float EnemyTrenchCooldownSeconds = 0.25f;
+	constexpr float EnemyTrenchDigSecondsPerMetre = 0.2f;
+	constexpr float EnemyTrenchMetresPerBase = 300.f;
+	constexpr int32 EnemyTrenchesPerBase = 14;
+	constexpr float EnemyTrenchTimeoutSeconds = 150.f;
+	constexpr int32 EnemyTestPlayer = 2;
+	const TCHAR* const SovietKitMeshFolder = TEXT("/SovFieldTrench/Meshes/SM_SovFieldTrench_");
+	const TCHAR* const GermanKitMeshFolder = TEXT("/FieldTrench/Meshes/SM_FieldTrench_");
 	const FTrainingOption HarvesterOption(EAllUnitType::UNType_Tank, static_cast<uint8>(ETankSubtype::Tank_PzI_Harvester));
 	const FTrainingOption Pak40PitOption(EAllUnitType::UNType_BuildingExpansion,
 	                                     static_cast<uint8>(EBuildingExpansionType::BTX_GerPak40Pit));
@@ -167,7 +223,8 @@ bool UFieldDefenseTestSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 	return IsValid(OuterWorld) && OuterWorld->IsGameWorld()
 		&& (FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidate"))
 			|| FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrench"))
-			|| FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrenchAnchor")));
+			|| FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrenchAnchor"))
+			|| FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateEnemyTrenches")));
 }
 
 TStatId UFieldDefenseTestSubsystem::GetStatId() const
@@ -254,6 +311,9 @@ void UFieldDefenseTestSubsystem::Tick(const float DeltaTime)
 		return;
 	case EFieldDefenseTestPhase::LayingAnchoredTrench:
 		TickLayingAnchoredTrench();
+		return;
+	case EFieldDefenseTestPhase::DiggingEnemyBaseTrenches:
+		TickDiggingEnemyBaseTrenches();
 		return;
 	}
 }
@@ -423,6 +483,11 @@ void UFieldDefenseTestSubsystem::TickExpandingHQ()
 	UE_LOG(LogRTSFieldDefenseTest, Display, TEXT("RTS_FIELD_DEFENSE_TEST hq_expanded after=%.1fs"),
 	       GetPhaseSeconds());
 	CheckLayoutAndRequirements();
+	if (FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateEnemyTrenches")))
+	{
+		EnterPhase(EFieldDefenseTestPhase::DiggingEnemyBaseTrenches, FieldDefenseTestPrivate::EnemyTrenchTimeoutSeconds);
+		return;
+	}
 	if (FParse::Param(FCommandLine::Get(), TEXT("FieldDefenseValidateTrenchAnchor")))
 	{
 		EnterPhase(EFieldDefenseTestPhase::LayingAnchoredTrench, FieldDefenseTestPrivate::AnchorTrenchTimeoutSeconds);
@@ -1724,6 +1789,10 @@ void UFieldDefenseTestSubsystem::TickLayingTrench()
 			Check(Spent == M_ExpectedTrenchRadixite, TEXT("trench_dug_and_paid_per_metre"),
 			      FString::Printf(TEXT("pieces=%d spent=%d expected=%d after=%.1fs"), Trench->GetPieceCount(), Spent,
 			                      M_ExpectedTrenchRadixite, GetPhaseSeconds()));
+			// The HQ's trench is always the German kit: pallets, never the Soviet logs.
+			Check(Trench->GetKit() == EFieldTrenchKit::German && GetAreAllPiecesGermanKit(*Trench),
+			      TEXT("player_trench_lays_german_sm_fieldtrench_pieces"),
+			      FString::Printf(TEXT("pieces=%d"), Trench->GetPieceCount()));
 			ScheduleCapture(TEXT("FieldTrench_Built"), M_TrenchPath[1], 1.f);
 			// Almost nothing left: the next trench has to wait for resources.
 			const int32 Radixite = GetResourceAmount(ERTSResourceType::Resource_Radixite);
@@ -1824,13 +1893,17 @@ void UFieldDefenseTestSubsystem::CheckPlanStartsOnAnchor(
 bool UFieldDefenseTestSubsystem::GetIsNeckShown() const
 {
 	const UFieldTrenchAnchorComponent* Anchor = M_TestAnchor.Get();
-	const AActor* Pit = IsValid(Anchor) ? Anchor->GetOwner() : nullptr;
-	if (not IsValid(Pit))
+	return GetIsNeckShownOn(IsValid(Anchor) ? Anchor->GetOwner() : nullptr);
+}
+
+bool UFieldDefenseTestSubsystem::GetIsNeckShownOn(const AActor* AnchorOwner)
+{
+	if (not IsValid(AnchorOwner))
 	{
 		return false;
 	}
 	TArray<UStaticMeshComponent*> MeshComponents;
-	Pit->GetComponents(MeshComponents);
+	AnchorOwner->GetComponents(MeshComponents);
 	return MeshComponents.ContainsByPredicate([](const UStaticMeshComponent* MeshComponent)
 	{
 		return IsValid(MeshComponent) && IsValid(MeshComponent->GetStaticMesh()) && MeshComponent->IsVisible() &&
@@ -2287,6 +2360,397 @@ void UFieldDefenseTestSubsystem::CollectBunkerAnchors()
 			M_BunkerAnchors.Add({Anchors, AnchorIndex});
 		}
 	}
+}
+
+void UFieldDefenseTestSubsystem::TickDiggingEnemyBaseTrenches()
+{
+	using namespace FieldDefenseTestPrivate;
+	switch (M_PhaseStep)
+	{
+	case 0:
+		if (not FindEnemyTestBaseCentre())
+		{
+			Check(false, TEXT("enemy_base_ground_found"), TEXT("no flat ground away from the HQ"));
+			Finish();
+			return;
+		}
+		SpawnSovietTestPits();
+		M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds();
+		++M_PhaseStep;
+		return;
+	case 1:
+		// Placed in the level, a pit offers its anchor from the tick after its BeginPlay.
+		if (GetWorld()->GetTimeSeconds() - M_PhaseMarkSeconds < AnchorBunkerSettleSeconds)
+		{
+			return;
+		}
+		CollectSovietPitAnchors();
+		StartEnemyBaseTrenches();
+		++M_PhaseStep;
+		return;
+	case 2:
+		WatchHiddenPlannedPieces();
+		if (GetAreEnemyTrenchesDug())
+		{
+			CheckEnemyBaseTrenches();
+			M_SovietPitIndex = 0;
+			M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds() - AnchorCaptureSeconds;
+			++M_PhaseStep;
+		}
+		return;
+	default:
+		break;
+	}
+	// One picture per pit, then one of the whole base; the camera moves when one is asked for.
+	if (GetWorld()->GetTimeSeconds() - M_PhaseMarkSeconds < AnchorCaptureSeconds)
+	{
+		return;
+	}
+	if (M_SovietPitIndex > M_SovietPits.Num())
+	{
+		Finish();
+		return;
+	}
+	const AActor* Pit = M_SovietPits.IsValidIndex(M_SovietPitIndex) ? M_SovietPits[M_SovietPitIndex].Get() : nullptr;
+	if (IsValid(Pit))
+	{
+		ScheduleCapture(TEXT("EnemyTrench_") + Pit->GetClass()->GetName(), Pit->GetActorLocation(), 1.f);
+	}
+	else if (M_SovietPitIndex == M_SovietPits.Num())
+	{
+		ScheduleCapture(TEXT("EnemyTrench_Base"), M_EnemyBaseCentre, 1.f);
+	}
+	++M_SovietPitIndex;
+	M_PhaseMarkSeconds = GetWorld()->GetTimeSeconds();
+}
+
+bool UFieldDefenseTestSubsystem::FindEnemyTestBaseCentre()
+{
+	using namespace FieldDefenseTestPrivate;
+	const ANomadicVehicle* HQ = M_HQ.Get();
+	if (not IsValid(HQ))
+	{
+		return false;
+	}
+	const FVector2D HQLocation(HQ->GetActorLocation());
+	constexpr int32 DirectionCount = 8;
+	constexpr int32 RingSamples = 8;
+	for (const float Distance : EnemyBaseDistancesFromHQ)
+	{
+		for (int32 DirectionIndex = 0; DirectionIndex < DirectionCount; ++DirectionIndex)
+		{
+			const float Angle = 2.f * PI * DirectionIndex / DirectionCount;
+			const FVector2D Centre = HQLocation + FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * Distance;
+			FVector CentreGround;
+			bool bAllGround = GetGroundAt(Centre, CentreGround);
+			// The arc's ground and its height, which must stay near the centre's for a flat test base.
+			for (int32 SampleIndex = 0; bAllGround && SampleIndex < RingSamples; ++SampleIndex)
+			{
+				const float SampleAngle = 2.f * PI * SampleIndex / RingSamples;
+				FVector SampleGround;
+				bAllGround = GetGroundAt(Centre + FVector2D(FMath::Cos(SampleAngle), FMath::Sin(SampleAngle)) *
+				                         EnemyBaseGroundCheckRadius, SampleGround) &&
+					FMath::Abs(SampleGround.Z - CentreGround.Z) < EnemyBaseMaxHeightDifference;
+			}
+			if (bAllGround)
+			{
+				M_EnemyBaseCentre = CentreGround;
+				UE_LOG(LogRTSFieldDefenseTest, Display, TEXT("RTS_FIELD_DEFENSE_TEST enemy_base at=%s distance=%.0f"),
+				       *M_EnemyBaseCentre.ToCompactString(), Distance);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void UFieldDefenseTestSubsystem::SpawnSovietTestPits()
+{
+	using namespace FieldDefenseTestPrivate;
+	const FVector2D BaseCentre(M_EnemyBaseCentre);
+	const float AngleStepDegrees = 360.f / UE_ARRAY_COUNT(SovietTestPits);
+	for (int32 PitIndex = 0; PitIndex < UE_ARRAY_COUNT(SovietTestPits); ++PitIndex)
+	{
+		const FSovietTestPit& TestPit = SovietTestPits[PitIndex];
+		const float AngleRadians = FMath::DegreesToRadians(AngleStepDegrees * PitIndex);
+		const FVector2D AnchorSpot = BaseCentre + FVector2D(FMath::Cos(AngleRadians), FMath::Sin(AngleRadians)) *
+			SovietAnchorRingRadius;
+		// The anchor's port points at the base centre, so its trench runs into the base; the pit faces out.
+		const FVector2D ToCentre = BaseCentre - AnchorSpot;
+		const float PortYaw = FMath::RadiansToDegrees(FMath::Atan2(ToCentre.Y, ToCentre.X));
+		const FRotator PitRotation(0.f, PortYaw - TestPit.SocketYaw, 0.f);
+		const FVector2D PitSpot = AnchorSpot - FVector2D(PitRotation.RotateVector(TestPit.SocketLocation));
+		UClass* PitClass = LoadClass<AActor>(nullptr, TestPit.ClassPath);
+		FVector Ground;
+		if (not IsValid(PitClass) || not GetGroundAt(PitSpot, Ground))
+		{
+			Check(false, TEXT("sov_pit_spawned"), TestPit.ClassPath);
+			M_SovietPits.Add(nullptr);
+			continue;
+		}
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		AActor* Pit = GetWorld()->SpawnActor<AActor>(PitClass, FTransform(PitRotation, Ground), SpawnParameters);
+		Check(IsValid(Pit), TEXT("sov_pit_spawned"), TestPit.ClassPath);
+		M_SovietPits.Add(Pit);
+	}
+}
+
+void UFieldDefenseTestSubsystem::CollectSovietPitAnchors()
+{
+	using namespace FieldDefenseTestPrivate;
+	M_SovietPitAnchors.Reset();
+	for (int32 PitIndex = 0; PitIndex < M_SovietPits.Num(); ++PitIndex)
+	{
+		const AActor* Pit = M_SovietPits[PitIndex].Get();
+		UFieldTrenchAnchorComponent* Anchors = IsValid(Pit) ? Pit->FindComponentByClass<UFieldTrenchAnchorComponent>() : nullptr;
+		const FSovietTestPit& Expected = SovietTestPits[PitIndex];
+		// The pits keep their Blueprint owner: the enemy AI.
+		const bool bOffersAnchor = IsValid(Anchors) && Anchors->GetAreAnchorsAvailable() &&
+			Anchors->GetAnchorCount() == 1 && Anchors->GetOwningPlayer() == EnemyTestPlayer &&
+			Anchors->GetAnchorSocketName(0) == FName(Expected.SocketName);
+		Check(bOffersAnchor, TEXT("enemy_pit_offers_its_anchor"),
+		      FString::Printf(TEXT("%s component=%d available=%d anchors=%d player=%d"), Expected.ClassPath,
+		                      IsValid(Anchors) ? 1 : 0, IsValid(Anchors) && Anchors->GetAreAnchorsAvailable() ? 1 : 0,
+		                      IsValid(Anchors) ? Anchors->GetAnchorCount() : 0,
+		                      IsValid(Anchors) ? Anchors->GetOwningPlayer() : -1));
+		if (not bOffersAnchor)
+		{
+			continue;
+		}
+		const FVector ExpectedLocation = Pit->GetActorTransform().TransformPosition(Expected.SocketLocation);
+		const float LocationError = FVector::Dist2D(Anchors->GetAnchorLocation(0), ExpectedLocation);
+		Check(LocationError < AnchorTolerance && not GetIsNeckShownOn(Pit),
+		      TEXT("enemy_pit_anchor_on_its_socket_with_its_neck_hidden"),
+		      FString::Printf(TEXT("%s location_error=%.2f"), Expected.ClassPath, LocationError));
+		M_SovietPitAnchors.Add({Anchors, 0});
+	}
+}
+
+void UFieldDefenseTestSubsystem::StartEnemyBaseTrenches()
+{
+	using namespace FieldDefenseTestPrivate;
+	AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	UEnemyBaseTrenchComponent* BaseTrenches = IsValid(EnemyController)
+		? EnemyController->GetEnemyBaseTrenchComponent()
+		: nullptr;
+	UEnemyStrategicAIComponent* StrategicAI = IsValid(EnemyController)
+		? EnemyController->GetEnemyStrategicAIComponent()
+		: nullptr;
+	Check(IsValid(BaseTrenches) && IsValid(StrategicAI), TEXT("enemy_controller_has_base_trenches"));
+	if (not IsValid(BaseTrenches) || not IsValid(StrategicAI))
+	{
+		Finish();
+		return;
+	}
+	// UT_Nomadics starts its strategic AI at BeginPlay, so the AI may dig already; the pits it saw before the test
+	// base was added are then fortified alone until AddFortifiedBase takes them in.
+	const bool bWasDigging = BaseTrenches->GetIsDigging();
+	// Restarted so the faster think interval applies.
+	BaseTrenches->StopBaseTrenchDigging();
+	// The default caps and shape, only faster, and a base budget that fits the six pits and the whole arc.
+	FEnemyBaseTrenchSettings TestSettings = BaseTrenches->MapTest_GetSettings();
+	TestSettings.ThinkIntervalSeconds = EnemyTrenchThinkSeconds;
+	TestSettings.DigCooldownSeconds = EnemyTrenchCooldownSeconds;
+	TestSettings.DigSecondsPerMetre = EnemyTrenchDigSecondsPerMetre;
+	TestSettings.MaxTrenchMetresPerBase = EnemyTrenchMetresPerBase;
+	TestSettings.MaxTrenchesPerBase = EnemyTrenchesPerBase;
+	BaseTrenches->MapTest_SetSettings(TestSettings);
+	const ANomadicVehicle* HQ = M_HQ.Get();
+	const FVector2D TowardsHQ = IsValid(HQ)
+		                            ? (FVector2D(HQ->GetActorLocation()) - FVector2D(M_EnemyBaseCentre)).GetSafeNormal()
+		                            : FVector2D(1.f, 0.f);
+	BaseTrenches->AddFortifiedBase(M_EnemyBaseCentre, EnemyBasePerimeterRadius, TowardsHQ);
+	if (bWasDigging)
+	{
+		BaseTrenches->StartBaseTrenchDigging();
+	}
+	else
+	{
+		// The way a match starts it: with the strategic AI's thinking.
+		StrategicAI->StartStrategicAIThinkingTimer();
+	}
+	Check(BaseTrenches->GetIsDigging(), TEXT("strategic_ai_start_starts_base_trenches"),
+	      FString::Printf(TEXT("already_digging=%d"), bWasDigging ? 1 : 0));
+}
+
+bool UFieldDefenseTestSubsystem::GetAreAllPiecesSovietKit(const ARTSFieldTrench& Trench)
+{
+	using namespace FieldDefenseTestPrivate;
+	if (Trench.GetPieceCount() == 0)
+	{
+		return false;
+	}
+	return not Trench.GetPieces().ContainsByPredicate([](const FFieldTrenchPieceRuntime& Piece)
+	{
+		const UStaticMesh* PieceMesh = IsValid(Piece.Component) ? Piece.Component->GetStaticMesh() : nullptr;
+		return not IsValid(PieceMesh) || not PieceMesh->GetPathName().Contains(SovietKitMeshFolder);
+	});
+}
+
+void UFieldDefenseTestSubsystem::WatchHiddenPlannedPieces()
+{
+	const AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	const UEnemyBaseTrenchComponent* BaseTrenches = IsValid(EnemyController)
+		? EnemyController->GetEnemyBaseTrenchComponent()
+		: nullptr;
+	if (not IsValid(BaseTrenches))
+	{
+		return;
+	}
+	for (const TWeakObjectPtr<ARTSFieldTrench>& Trench : BaseTrenches->GetDugTrenches())
+	{
+		if (not Trench.IsValid())
+		{
+			continue;
+		}
+		for (const FFieldTrenchPieceRuntime& Piece : Trench->GetPieces())
+		{
+			if (Piece.State != EFieldTrenchPieceState::Planned)
+			{
+				continue;
+			}
+			++M_EnemyPlannedPiecesSeen;
+			M_EnemyPlannedPiecesShown += IsValid(Piece.Component) && Piece.Component->IsVisible() ? 1 : 0;
+		}
+	}
+}
+
+bool UFieldDefenseTestSubsystem::GetAreEnemyTrenchesDug() const
+{
+	const AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	const UEnemyBaseTrenchComponent* BaseTrenches = IsValid(EnemyController)
+		? EnemyController->GetEnemyBaseTrenchComponent()
+		: nullptr;
+	if (not IsValid(BaseTrenches) || BaseTrenches->GetDugTrenches().Num() <= M_SovietPitAnchors.Num())
+	{
+		return false;
+	}
+	const bool bEveryAnchorClaimed = not M_SovietPitAnchors.ContainsByPredicate([](const FFieldTrenchAnchorHandle& Anchor)
+	{
+		const UFieldTrenchAnchorComponent* AnchorComponent = Anchor.Get();
+		return IsValid(AnchorComponent) && AnchorComponent->GetIsAnchorFree(Anchor.AnchorIndex);
+	});
+	const bool bEveryTrenchDug = not BaseTrenches->GetDugTrenches().ContainsByPredicate(
+		[](const TWeakObjectPtr<ARTSFieldTrench>& Trench)
+		{
+			return Trench.IsValid() && Trench->GetBuiltPieceCount() < Trench->GetPieceCount();
+		});
+	// The arc is planned after the pits; it is done when no base has a section left to try.
+	const bool bEveryArcTried = not BaseTrenches->GetBases().ContainsByPredicate([](const FEnemyTrenchBase& Base)
+	{
+		return Base.PerimeterRadius > 0.f &&
+			(Base.PerimeterSections.IsEmpty() || Base.NextPerimeterSection < Base.PerimeterSections.Num());
+	});
+	return bEveryAnchorClaimed && bEveryTrenchDug && bEveryArcTried;
+}
+
+void UFieldDefenseTestSubsystem::CheckEnemyBaseTrenches()
+{
+	using namespace FieldDefenseTestPrivate;
+	const AEnemyController* EnemyController = FRTS_Statics::GetEnemyController(this);
+	const UEnemyBaseTrenchComponent* BaseTrenches = EnemyController->GetEnemyBaseTrenchComponent();
+	for (const FFieldTrenchAnchorHandle& PitAnchor : M_SovietPitAnchors)
+	{
+		const UFieldTrenchAnchorComponent* AnchorComponent = PitAnchor.Get();
+		const AActor* Pit = IsValid(AnchorComponent) ? AnchorComponent->GetOwner() : nullptr;
+		const TWeakObjectPtr<ARTSFieldTrench>* PitTrench = BaseTrenches->GetDugTrenches().FindByPredicate(
+			[&PitAnchor](const TWeakObjectPtr<ARTSFieldTrench>& Trench)
+			{
+				return Trench.IsValid() && Trench->GetStartAnchor() == PitAnchor;
+			});
+		const bool bJoinedWithNeck = PitTrench != nullptr && GetAreAllPiecesSovietKit(*PitTrench->Get()) &&
+			IsValid(Pit) && AnchorComponent->GetIsAnchorJoined(PitAnchor.AnchorIndex) && GetIsNeckShownOn(Pit);
+		Check(bJoinedWithNeck, TEXT("enemy_dug_soviet_trench_out_of_pit_and_neck_shows"),
+		      FString::Printf(TEXT("%s trench=%d pieces=%d"), IsValid(Pit) ? *Pit->GetClass()->GetName() : TEXT("gone"),
+		                      PitTrench != nullptr ? 1 : 0,
+		                      PitTrench != nullptr ? (*PitTrench)->GetPieceCount() : -1));
+	}
+	int32 ArcTrenches = 0;
+	int32 SovietArcTrenches = 0;
+	float FarthestArcPiece = 0.f;
+	for (const TWeakObjectPtr<ARTSFieldTrench>& Trench : BaseTrenches->GetDugTrenches())
+	{
+		if (not Trench.IsValid() || Trench->GetStartAnchor().IsSet())
+		{
+			continue;
+		}
+		++ArcTrenches;
+		SovietArcTrenches += GetAreAllPiecesSovietKit(*Trench.Get()) ? 1 : 0;
+		for (const FFieldTrenchPieceRuntime& Piece : Trench->GetPieces())
+		{
+			FarthestArcPiece = FMath::Max(FarthestArcPiece,
+			                              FVector::Dist2D(Piece.GroundTransform.GetLocation(), M_EnemyBaseCentre));
+		}
+	}
+	const FEnemyBaseTrenchSettings& TrenchSettings = BaseTrenches->MapTest_GetSettings();
+	Check(ArcTrenches >= MinimumEnemyArcTrenches && SovietArcTrenches == ArcTrenches &&
+	      FarthestArcPiece <= EnemyBasePerimeterRadius + TrenchSettings.BuildRadiusMargin,
+	      TEXT("enemy_dug_soviet_fire_trenches_on_the_arc"),
+	      FString::Printf(TEXT("arc_trenches=%d soviet=%d farthest=%.0f"), ArcTrenches, SovietArcTrenches,
+	                      FarthestArcPiece));
+	const FEnemyTrenchBase* TestBase = BaseTrenches->GetBases().FindByPredicate([](const FEnemyTrenchBase& Base)
+	{
+		return Base.bIsAddedByDesigner;
+	});
+	Check(TestBase != nullptr && TestBase->TrenchCount <= TrenchSettings.MaxTrenchesPerBase &&
+	      TestBase->DugMetres <= TrenchSettings.MaxTrenchMetresPerBase &&
+	      TestBase->TrenchCount == M_SovietPitAnchors.Num() + ArcTrenches,
+	      TEXT("enemy_base_stays_within_its_caps"),
+	      FString::Printf(TEXT("trenches=%d metres=%.1f bases=%d"), TestBase != nullptr ? TestBase->TrenchCount : -1,
+	                      TestBase != nullptr ? TestBase->DugMetres : -1.f, BaseTrenches->GetBases().Num()));
+	Check(M_EnemyPlannedPiecesSeen > 0 && M_EnemyPlannedPiecesShown == 0,
+	      TEXT("enemy_planned_pieces_stay_hidden_until_dug"),
+	      FString::Printf(TEXT("planned_seen=%d shown=%d"), M_EnemyPlannedPiecesSeen, M_EnemyPlannedPiecesShown));
+	UE_LOG(LogRTSFieldDefenseTest, Display, TEXT("RTS_FIELD_DEFENSE_TEST enemy_trenches total=%d arc=%d metres=%.1f"),
+	       BaseTrenches->GetDugTrenches().Num(), ArcTrenches, TestBase != nullptr ? TestBase->DugMetres : -1.f);
+	ACPPController* Controller = GetController();
+	UTrainerComponent* Trainer = M_Trainer.Get();
+	UFieldTrenchPlacementComponent* Placement = IsValid(Controller) ? Controller->MapTest_GetFieldTrenchPlacement() : nullptr;
+	if (IsValid(Controller) && IsValid(Trainer) && IsValid(Placement))
+	{
+		CheckDefaultKitIsGerman(*Controller, *Trainer, *Placement);
+	}
+}
+
+void UFieldDefenseTestSubsystem::CheckDefaultKitIsGerman(
+	ACPPController& Controller,
+	UTrainerComponent& Trainer,
+	UFieldTrenchPlacementComponent& Placement)
+{
+	using namespace FieldDefenseTestPrivate;
+	const TMap<ERTSResourceType, int32> CostPerMetre = {
+		{ERTSResourceType::Resource_Radixite, DeveloperSettings::GameBalance::UnitCosts::Bxps::GerFieldTrench_RadixitePerMetre}
+	};
+	// Near the HQ, so the trench shown before the first click is laid out at once.
+	const ANomadicVehicle* HQ = M_HQ.Get();
+	const FVector2D Spot = IsValid(HQ)
+		                       ? FVector2D(HQ->GetActorLocation()) + FVector2D(TrenchStartDistanceFromHQ, 0.f)
+		                       : FVector2D::ZeroVector;
+	FVector Ground;
+	Placement.MapTest_SetCursorOverride(GetGroundAt(Spot, Ground) ? Ground : FVector(Spot, 0.f));
+	Controller.StartFieldTrenchPlacement(&Trainer, CostPerMetre);
+	const ARTSFieldTrench* PreviewTrench = Placement.MapTest_GetPreviewTrench();
+	Check(IsValid(PreviewTrench) && PreviewTrench->GetKit() == EFieldTrenchKit::German &&
+	      GetAreAllPiecesGermanKit(*PreviewTrench), TEXT("player_hq_trench_stays_german_beside_the_ai"),
+	      FString::Printf(TEXT("preview=%d pieces=%d"), IsValid(PreviewTrench) ? 1 : 0,
+	                      IsValid(PreviewTrench) ? PreviewTrench->GetPieceCount() : 0));
+	Controller.StopFieldTrenchPlacement();
+	Placement.MapTest_SetCursorOverride(TOptional<FVector>());
+}
+
+bool UFieldDefenseTestSubsystem::GetAreAllPiecesGermanKit(const ARTSFieldTrench& Trench)
+{
+	using namespace FieldDefenseTestPrivate;
+	if (Trench.GetPieceCount() == 0)
+	{
+		return false;
+	}
+	return not Trench.GetPieces().ContainsByPredicate([](const FFieldTrenchPieceRuntime& Piece)
+	{
+		const UStaticMesh* PieceMesh = IsValid(Piece.Component) ? Piece.Component->GetStaticMesh() : nullptr;
+		return not IsValid(PieceMesh) || not PieceMesh->GetPathName().Contains(GermanKitMeshFolder);
+	});
 }
 
 FVector UFieldDefenseTestSubsystem::GetPointAlongPath(const TArray<FVector>& Path, const float Distance)

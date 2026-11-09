@@ -201,7 +201,14 @@ bool UFieldTrenchPlacementComponent::EnsurePreviewTrench(const FVector& SpawnLoc
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	M_PreviewTrench = World->SpawnActor<ARTSFieldTrench>(SpawnClass, FTransform(SpawnLocation), SpawnParameters);
-	return IsValid(M_PreviewTrench);
+	if (not IsValid(M_PreviewTrench))
+	{
+		return false;
+	}
+	// The player's HQ trench is always the German one, whatever kit a Blueprint set as TrenchClass carries; set
+	// before any piece exists, so every piece is made from the German meshes. The Soviet AI lays its own trenches.
+	M_PreviewTrench->SetKit(EFieldTrenchKit::German);
+	return true;
 }
 
 bool UFieldTrenchPlacementComponent::BeginDrawing(const FVector& ClickedLocation, ACPPController& PlayerController)
