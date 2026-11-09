@@ -7,6 +7,7 @@
 #include "RTS_Survival/DeveloperSettings.h"
 #include "RTS_Survival/Enemy/EnemyAISettings/EnemyAISettings.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyController.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyBaseTrenchComponent/EnemyBaseTrenchComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Environment/Splines/RoadSplineActor.h"
 #include "RTS_Survival/Enemy/StrategicAI/BlackboardQueries/BlackboardQueryHelpers.h"
@@ -1461,6 +1462,11 @@ void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimer()
 		&UEnemyStrategicAIComponent::StrategicAiThinkingLoop,
 		EnemyAISettings::EnemyStrategicAIThinkingSpeed,
 		true);
+	// Bases dig in from the moment the AI starts thinking; in survival that is the grace period.
+	if (UEnemyBaseTrenchComponent* BaseTrenches = M_EnemyController->GetEnemyBaseTrenchComponent())
+	{
+		BaseTrenches->StartBaseTrenchDigging();
+	}
 }
 
 void UEnemyStrategicAIComponent::StartStrategicAIThinkingTimerAfterDelay(const float DelaySeconds)

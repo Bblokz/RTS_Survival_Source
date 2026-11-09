@@ -28,6 +28,8 @@ struct FCollapseDuration;
 class UGeometryCollection;
 class UArmorCalculation;
 class UBehaviour;
+class UWallChunkDamageComponent;
+class UWallHoleDamageComponent;
 
 
 DECLARE_MULTICAST_DELEGATE(FOnDestructibleCollapse);
@@ -63,6 +65,8 @@ public:
 	// Fires once when this actor dies from health loss or a crush (OnUnitDies). Distinct from
 	// OnDestructibleCollapse, which also fires for non-lethal collapse presentations.
 	FOnDestructableEnvActorDied OnDestructableEnvActorDied;
+
+	float GetCurrentHealth() const { return Health; }
 
 
 	/**
@@ -294,6 +298,14 @@ private:
 
 	FTimerHandle M_PostCollapseTimerHandle;
 	FTimerDelegate M_PostCollapseTimerDelegate;
+
+	// Optional: walls cut into chunks get their hits forwarded so shells knock chunks out (null on other actors).
+	UPROPERTY()
+	TObjectPtr<UWallChunkDamageComponent> M_WallChunkDamage;
+
+	// Optional: walls with procedural holes (no chunk mesh) get their hits forwarded the same way.
+	UPROPERTY()
+	TObjectPtr<UWallHoleDamageComponent> M_WallHoleDamage;
 
 	// Called when collapsed but actor not destroyed (as specified by the collapse settings).
 	UFUNCTION()

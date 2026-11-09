@@ -26,6 +26,8 @@
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 #include "RTS_Survival/Weapons/WeaponData/RTSDamageTypes/RTSDamageTypes.h"
 #include "VerticalCollapseOnCrushed/FVerticalCollapseOnCrushed.h"
+#include "WallChunkDamage/WallChunkDamageComponent.h"
+#include "WallChunkDamage/WallHoleDamageComponent.h"
 
 namespace
 {
@@ -117,6 +119,8 @@ void ADestructableEnvActor::GetAimOffsetPoints(TArray<FVector>& OutLocalOffsets)
 void ADestructableEnvActor::BeginPlay()
 {
 	Super::BeginPlay();
+	M_WallChunkDamage = FindComponentByClass<UWallChunkDamageComponent>();
+	M_WallHoleDamage = FindComponentByClass<UWallHoleDamageComponent>();
 }
 
 void ADestructableEnvActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -274,7 +278,17 @@ float ADestructableEnvActor::TakeDamage(float DamageAmount, FDamageEvent const& 
 		// Never below zero: a hit weaker than the reduction does nothing instead of adding health.
 		DamageAmount = FMath::Max(0.f, DamageAmount - DamageReduction);
 	}
+	const float HealthBefore = Health;
 	Health -= DamageAmount;
+	// Before the death check: a wall that survives the hit loses the chunks around it; a dying one collapses.
+	if (IsValid(M_WallChunkDamage) && IsUnitAlive())
+	{
+		M_WallChunkDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, Health);
+	}
+	if (IsValid(M_WallHoleDamage) && IsUnitAlive())
+	{
+		M_WallHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, Health);
+	}
 	if constexpr (DeveloperSettings::Debugging::GDamage_System_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(

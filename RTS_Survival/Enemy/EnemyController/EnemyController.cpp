@@ -10,6 +10,7 @@
 #include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatController.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyDirectControlComponent/EnemyDirectControlComponent.h"
 #include "RTS_Survival/Enemy/EnemyUnitAbilityAI/EnemyUnitAbilityAIComponent.h"
+#include "RTS_Survival/Enemy/EnemyController/EnemyBaseTrenchComponent/EnemyBaseTrenchComponent.h"
 #include "RTS_Survival/Enemy/EnemyController/EnemyRetreatController/EnemyRetreatData.h"
 #include "RTS_Survival/Enemy/EnemyWaves/AttackWave.h"
 #include "RTS_Survival/Enemy/EnemyWaves/EnemyWaveController.h"
@@ -110,6 +111,7 @@ AEnemyController::AEnemyController(const FObjectInitializer& ObjectInitializer)
 	M_EnemyGlobalAbilitiesManager = CreateDefaultSubobject<UGlobalAbilitiesManager>(TEXT("EnemyGlobalAbilitiesManager"));
 	M_EnemyUnitAbilityAIComponent = CreateDefaultSubobject<UEnemyUnitAbilityAIComponent>(
 		TEXT("EnemyUnitAbilityAIComponent"));
+	M_EnemyBaseTrenchComponent = CreateDefaultSubobject<UEnemyBaseTrenchComponent>(TEXT("EnemyBaseTrenchComponent"));
 	CacheGenerationSeedFromGameInstance();
 	if (M_FormationController)
 	{
@@ -685,6 +687,29 @@ UEnemyFormationController* AEnemyController::GetEnemyFormationController() const
 	}
 
 	return M_FormationController;
+}
+
+UEnemyBaseTrenchComponent* AEnemyController::GetEnemyBaseTrenchComponent() const
+{
+	if (not GetIsValidEnemyBaseTrenchComponent())
+	{
+		return nullptr;
+	}
+	return M_EnemyBaseTrenchComponent;
+}
+
+bool AEnemyController::GetIsValidEnemyBaseTrenchComponent() const
+{
+	if (IsValid(M_EnemyBaseTrenchComponent))
+	{
+		return true;
+	}
+	RTSFunctionLibrary::ReportErrorVariableNotInitialised(
+		this,
+		"M_EnemyBaseTrenchComponent",
+		"GetIsValidEnemyBaseTrenchComponent",
+		this);
+	return false;
 }
 
 UEnemyStrategicAIComponent* AEnemyController::GetEnemyStrategicAIComponent() const

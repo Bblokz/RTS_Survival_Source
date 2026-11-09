@@ -29,6 +29,7 @@ class UEnemyNavigationAIComponent;
 class UEnemyStrategicAIComponent;
 class UEnemyDirectControlComponent;
 class UEnemyUnitAbilityAIComponent;
+class UEnemyBaseTrenchComponent;
 class ATankMaster;
 class ASquadController;
 class URTSGameInstance;
@@ -387,6 +388,9 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
 	UEnemyStrategicAIComponent* GetEnemyStrategicAIComponent() const;
 
+	UFUNCTION(BlueprintCallable, BlueprintPure, NotBlueprintable)
+	UEnemyBaseTrenchComponent* GetEnemyBaseTrenchComponent() const;
+
 	// Starts strategic thinking when this controller is configured to wait for a mission trigger.
 	void StartStrategicAIThinkingFromMission();
 
@@ -482,6 +486,10 @@ private:
 	UPROPERTY()
 	TObjectPtr<UGlobalAbilitiesManager> M_EnemyGlobalAbilitiesManager;
 
+	// Digs Soviet trenches out of the AI's pits and around its bases; its settings are edited per map here.
+	UPROPERTY(VisibleAnywhere, Category = "Base Trenches")
+	TObjectPtr<UEnemyBaseTrenchComponent> M_EnemyBaseTrenchComponent;
+
 	TArray<TWeakObjectPtr<ATankMaster>> M_Tanks;
 	TArray<TWeakObjectPtr<ASquadController>> M_Squads;
 
@@ -494,6 +502,7 @@ private:
 	bool GetIsValidEnemyDirectControlComponent() const;
 	bool GetIsValidEnemyUnitAbilityAIComponent() const;
 	bool GetIsValidEnemyGlobalAbilitiesManager() const;
+	bool GetIsValidEnemyBaseTrenchComponent() const;
 	void CacheGenerationSeedFromGameInstance();
 	int32 GetSeededIndex(const int32 OptionCount, const int32 DecisionSalt = 0) const;
 	float GetSeededFloatInRange(const float MinValue, const float MaxValue, const int32 DecisionSalt = 0) const;
