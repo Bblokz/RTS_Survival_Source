@@ -1,0 +1,395 @@
+{
+  "pit_key": "53KPit",
+  "unreal_pit_mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Rus53KPit/Meshes/SM_53KPit",
+  "pit_geometry_changed": false,
+  "anchors": [
+    {
+      "socket": "TrenchPort_Rear",
+      "unreal_location": [
+        -625.0,
+        0.0,
+        0.0
+      ],
+      "unreal_yaw": 180.0,
+      "blender_location": [
+        -625.0,
+        0.0,
+        0.0
+      ],
+      "blender_yaw": 180.0,
+      "neck_mesh_name": "SM_53KPit_TrenchNeck_Rear",
+      "neck_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/TrenchAnchors/53KPit/Exports/SM_53KPit_TrenchNeck_Rear.fbx",
+      "neck_triangles": 1454,
+      "plug_fbx": null
+    }
+  ],
+  "neck_check": {
+    "name": "SM_53KPit_TrenchNeck_Rear",
+    "triangles": 1454,
+    "non_triangles": 0,
+    "bounds_min": [
+      -190.0,
+      -197.81,
+      -10.99
+    ],
+    "bounds_max": [
+      1.69,
+      198.94,
+      53.98
+    ],
+    "location": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      -0.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "materials": [
+      "SovTrench_Wood",
+      "RL_Sandbag"
+    ],
+    "triangles_by_material": {
+      "SovTrench_Wood": 525,
+      "RL_Sandbag": 929
+    },
+    "uv_layers": [
+      "UVMap"
+    ],
+    "objects": [
+      [
+        "SM_53KPit_TrenchNeck_Rear",
+        "MESH"
+      ]
+    ],
+    "scene_unit_scale": 0.009999999776482582
+  },
+  "pit_frame_check": {
+    "name": "SM_53KPit",
+    "triangles": 26428,
+    "non_triangles": 0,
+    "bounds_min": [
+      -548.63,
+      -555.75,
+      -4.55
+    ],
+    "bounds_max": [
+      559.84,
+      555.93,
+      71.78
+    ],
+    "location": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      -0.0,
+      0.0,
+      0.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "materials": [
+      "RL_Sandbag"
+    ],
+    "triangles_by_material": {
+      "RL_Sandbag": 26428
+    },
+    "uv_layers": [
+      "UVMap"
+    ],
+    "as_unreal_bounds": {
+      "x": [
+        -548.63,
+        559.84
+      ],
+      "y": [
+        -555.93,
+        555.75
+      ],
+      "z": [
+        -4.55,
+        71.78
+      ]
+    },
+    "unreal_reported": {
+      "triangles": 26428,
+      "x": [
+        -552.0,
+        560.6
+      ],
+      "y": [
+        -557.3,
+        562.0
+      ],
+      "z": [
+        -14.5,
+        81.6
+      ]
+    }
+  },
+  "neck_rows": [
+    {
+      "side": 1.0,
+      "logs_from": -190.0,
+      "bays": 2
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "lateral": 137.5,
+      "touch": -107.1,
+      "start": -115.1,
+      "bags": 2,
+      "bag_length": 57.6,
+      "hits": [
+        -107.1,
+        -107.1,
+        -105.6,
+        -85.3,
+        -85.3,
+        -83.7,
+        -82.3,
+        -82.3,
+        -79.6
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "lateral": 177.5,
+      "touch": -149.1,
+      "start": -157.1,
+      "bags": 3,
+      "bag_length": 52.4,
+      "hits": [
+        -89.0,
+        -89.0,
+        -89.0,
+        -138.7,
+        -138.7,
+        -138.7,
+        -149.1,
+        -149.1,
+        -149.1
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "lateral": 116.5,
+      "touch": -133.5,
+      "start": -141.5,
+      "bags": 2,
+      "bag_length": 70.8,
+      "hits": [
+        null,
+        null,
+        null,
+        -133.5,
+        -116.2,
+        -114.1,
+        -99.2,
+        -80.3,
+        -78.3
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "lateral": 154.5,
+      "touch": -117.4,
+      "start": -125.4,
+      "bags": 2,
+      "bag_length": 62.7,
+      "hits": [
+        -91.3,
+        -79.3,
+        -76.7,
+        -87.4,
+        -82.8,
+        -81.7,
+        -149.9,
+        -184.1,
+        -183.8
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "lateral": 124.5,
+      "touch": -149.1,
+      "start": -157.1,
+      "bags": 3,
+      "bag_length": 52.4,
+      "hits": [
+        -167.8,
+        -167.6,
+        -167.3,
+        -119.1,
+        -117.3,
+        -115.0,
+        -80.1,
+        -118.8,
+        -116.7
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "lateral": 130.5,
+      "touch": -185.9,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -153.2,
+        -156.4,
+        -154.7,
+        -125.7,
+        -157.0,
+        -154.0,
+        -178.8,
+        -185.9,
+        -185.4
+      ]
+    },
+    {
+      "side": -1.0,
+      "logs_from": -190.0,
+      "bays": 2
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "lateral": 137.5,
+      "touch": -114.4,
+      "start": -122.4,
+      "bags": 2,
+      "bag_length": 61.2,
+      "hits": [
+        -112.9,
+        -112.9,
+        -114.4,
+        -84.7,
+        -84.7,
+        -81.9,
+        -88.3,
+        -88.3,
+        -85.0
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "lateral": 177.5,
+      "touch": -150.0,
+      "start": -158.0,
+      "bags": 3,
+      "bag_length": 52.7,
+      "hits": [
+        -134.9,
+        -134.9,
+        -134.9,
+        -141.7,
+        -141.7,
+        -141.7,
+        -150.0,
+        -150.0,
+        -150.0
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "lateral": 116.5,
+      "touch": -125.7,
+      "start": -133.7,
+      "bags": 2,
+      "bag_length": 66.9,
+      "hits": [
+        null,
+        null,
+        null,
+        -125.7,
+        -121.0,
+        -120.6,
+        -88.2,
+        -85.1,
+        -84.2
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "lateral": 154.5,
+      "touch": -180.6,
+      "start": -188.6,
+      "bags": 3,
+      "bag_length": 62.9,
+      "hits": [
+        -77.9,
+        -84.0,
+        -83.1,
+        -94.0,
+        -180.4,
+        -180.6,
+        -141.0,
+        -149.5,
+        -147.4
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "lateral": 124.5,
+      "touch": -150.1,
+      "start": -158.1,
+      "bags": 3,
+      "bag_length": 52.7,
+      "hits": [
+        -162.0,
+        -159.2,
+        -156.6,
+        -119.9,
+        -120.1,
+        -117.6,
+        -86.5,
+        -117.3,
+        -114.7
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "lateral": 130.5,
+      "touch": -183.1,
+      "start": -190.0,
+      "bags": 2,
+      "bag_length": 63.3,
+      "hits": [
+        -159.2,
+        -151.5,
+        -150.1,
+        -120.7,
+        -153.1,
+        -152.6,
+        -186.5,
+        -182.1,
+        -181.4
+      ]
+    }
+  ],
+  "notes": "Unreal holds the _Opt cut (SM_53KPit_Opt.fbx, 26,428 triangles = the Unreal mesh); the neck was fitted to and culled against that cut. One anchor at the existing 30 degree crew entrance (rear, -X): no new gap, no plug, pit unchanged; add only the socket. Socket 76 cm past the cheek tips (the rearmost bags, x -549), so the first kit straight (port A on the socket) clears the pit. Neck: logs and the mud/pole floor run 190 cm back through the entrance to the pit inner face (x -435; the pit floor is bare ground); each of the six kit bag rows starts where ray casts meet the pit bags, 8 cm into them. Section at the socket = kit (+-82.5 inner, +-197.5 outer). Hidden-triangle cull as the kit, with the pit as occluder. Slots SovTrench_Wood, RL_Sandbag. Rear anchor on the X axis: Unreal = Blender values, yaw 180. Unreal-reported bounds are a few cm wider in x/y and 10 cm wider in z than the FBX (same centre); triangle count is exact."
+}

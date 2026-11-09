@@ -1,0 +1,408 @@
+{
+  "pit_key": "Rus120MortarPit",
+  "unreal_pit_mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusMortarPit/Meshes/SM_Rus120MortarPit",
+  "pit_geometry_changed": false,
+  "anchors": [
+    {
+      "socket": "TrenchPort_Left",
+      "unreal_location": [
+        -5.0,
+        -540.0,
+        0.0
+      ],
+      "unreal_yaw": -90.0,
+      "blender_location": [
+        -5.0,
+        540.0,
+        0.0
+      ],
+      "blender_yaw": 90.0,
+      "neck_mesh_name": "SM_Rus120MortarPit_TrenchNeck_Left",
+      "neck_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/TrenchAnchors/Rus120MortarPit/Exports/SM_Rus120MortarPit_TrenchNeck_Left.fbx",
+      "neck_triangles": 664,
+      "neck_triangles_before_cull": 872,
+      "neck_triangles_by_material": {
+        "SovTrench_Wood": 282,
+        "RL_Sandbag": 382
+      },
+      "neck_bounds_min": [
+        -120.0,
+        -198.36,
+        -9.13
+      ],
+      "neck_bounds_max": [
+        1.8,
+        200.94,
+        53.38
+      ],
+      "neck_clean_import": {
+        "objects": [
+          "SM_Rus120MortarPit_TrenchNeck_Left"
+        ],
+        "location": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          -0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "bounds_min": [
+          -120.0,
+          -198.36,
+          -9.13
+        ],
+        "bounds_max": [
+          1.8,
+          200.94,
+          53.38
+        ],
+        "materials": [
+          "SovTrench_Wood",
+          "RL_Sandbag"
+        ],
+        "uv_layers": [
+          "UVMap"
+        ],
+        "triangles": 664,
+        "all_triangles": true,
+        "triangles_by_material": {
+          "SovTrench_Wood": 282,
+          "RL_Sandbag": 382
+        }
+      },
+      "plug_fbx": null
+    }
+  ],
+  "pit_frame_check": {
+    "source_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/TrenchAnchors/Rus120MortarPit/Source/SM_Rus120MortarPit.fbx",
+    "triangles": 22290,
+    "material_slots_in_fbx": [
+      "MI_Rus_SandBag_01"
+    ],
+    "blender_bounds_min": [
+      -482.65,
+      -482.65,
+      0.0
+    ],
+    "blender_bounds_max": [
+      482.65,
+      482.65,
+      124.3
+    ],
+    "unreal_bounds_expected_min": [
+      -482.65,
+      -482.65,
+      0.0
+    ],
+    "unreal_bounds_expected_max": [
+      482.65,
+      482.65,
+      124.3
+    ],
+    "unreal_bounds_given": [
+      [
+        -482.7,
+        -482.7,
+        0.0
+      ],
+      [
+        482.7,
+        482.7,
+        124.3
+      ]
+    ],
+    "bounds_match": true,
+    "open_directions_from_centre_deg": {
+      "z10": [
+        45,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        225
+      ],
+      "z30": [
+        6,
+        44,
+        45,
+        46,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        134,
+        135,
+        136,
+        163,
+        174,
+        224,
+        225,
+        226,
+        227,
+        254,
+        265,
+        314,
+        315,
+        316,
+        317,
+        335,
+        345
+      ],
+      "z60": [
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        309,
+        310,
+        311,
+        312,
+        313,
+        314,
+        315,
+        316,
+        317,
+        318,
+        319,
+        320,
+        321,
+        322
+      ]
+    },
+    "gap_cheeks_blender_x_at_wall_middle": {
+      "z5": [
+        -95.5,
+        86.8
+      ],
+      "z15": [
+        -93.0,
+        84.9
+      ],
+      "z45": [
+        -112.0,
+        99.6
+      ],
+      "z80": [
+        -149.7,
+        135.5
+      ],
+      "z115": [
+        -157.3,
+        153.3
+      ]
+    }
+  },
+  "neck_rows": [
+    {
+      "side": 1.0,
+      "course": 0,
+      "offset": 55.0,
+      "start": -77.5,
+      "probe_hits": 10,
+      "bags": 1,
+      "length": 77.5
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "offset": 95.0,
+      "start": -83.7,
+      "probe_hits": 3,
+      "bags": 1,
+      "length": 83.7
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "offset": 34.0,
+      "start": -70.7,
+      "probe_hits": 13,
+      "bags": 1,
+      "length": 70.7
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "offset": 72.0,
+      "start": -70.7,
+      "probe_hits": 15,
+      "bags": 1,
+      "length": 70.7
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "offset": 42.0,
+      "start": -78.2,
+      "probe_hits": 14,
+      "bags": 1,
+      "length": 78.2
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "offset": 48.0,
+      "start": -71.0,
+      "probe_hits": 14,
+      "bags": 1,
+      "length": 71.0
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "offset": 55.0,
+      "start": -77.2,
+      "probe_hits": 10,
+      "bags": 1,
+      "length": 77.2
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "offset": 95.0,
+      "start": -83.7,
+      "probe_hits": 3,
+      "bags": 1,
+      "length": 83.7
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "offset": 34.0,
+      "start": -70.6,
+      "probe_hits": 15,
+      "bags": 1,
+      "length": 70.6
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "offset": 72.0,
+      "start": -70.1,
+      "probe_hits": 14,
+      "bags": 1,
+      "length": 70.1
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "offset": 42.0,
+      "start": -76.8,
+      "probe_hits": 14,
+      "bags": 1,
+      "length": 76.8
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "offset": 48.0,
+      "start": -71.8,
+      "probe_hits": 14,
+      "bags": 1,
+      "length": 71.8
+    }
+  ],
+  "notes": "No Blender source exists (merged in Unreal from SandBagPack pieces); the pit FBX was exported from Unreal into Source/ and only loaded here; the pit is not re-exported, only the socket is new. RULE DEVIATION: the anchor is on the pit's side (Unreal -Y, left), not the rear or a rear quarter: the only way in is the existing gap in the middle of that wall (~180 cm at the ground, cheeks at Unreal x -96..+88, stepping wider up to ~310 cm at the top; the four corners are stepped low with narrow slits above ~25 cm and hairline cracks at the ground at two of them, nothing a crew could pass). Accepted because the mortar fires over the walls and has no front arc to keep clear; front (+X) stays closed. The neck walls (log face at +-82.5) close against the wall's outer face (Unreal y -478); the gap is wider than the 165 cm kit channel, so no funnel. The neck brings the floor (mud + corduroy poles) through the gap to 8 cm inside the pit's inner face (Unreal y -420), since the pit has no floor. Neck materials: SovTrench_Wood (slot 0), RL_Sandbag (slot 1, use MI_Rus_SandBag_01 like the pit and the Soviet kit). Hidden triangles culled like the kit, with the pit as an extra occluder. Import the neck like the Soviet kit pieces (complex collision, no Nanite); add the socket to the existing mesh with add_socket (location in Unreal space, yaw -90). Y MIRROR: bounds are symmetric, so they prove scale and Z only; the side is from two sources: the Soviet survey top shot (pitch -90, yaw 0, image-right = Unreal +Y) shows the gap on image-left = Unreal -Y, and the FBX gap is at Blender +Y = Unreal -Y under the exporter's Y negation. Before add_socket, confirm in the viewport that the gap is on the pit's -Y side. The saved .blend shows the pit with RL_Sandbag for rendering only (the FBX slot is MI_Rus_SandBag_01). The outer course-0 neck row is one bag stretched 1.35x (SINGLE_BAG_MAX) to reach the wall foot."
+}

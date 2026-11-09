@@ -1,0 +1,179 @@
+{
+  "pit_key": "BS3Pit",
+  "unreal_pit_mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/RusBS3Pit/Meshes/SM_BS3Pit",
+  "pit_geometry_changed": false,
+  "anchors": [
+    {
+      "socket": "TrenchPort_Rear",
+      "unreal_location": [
+        -662.5,
+        0.0,
+        0.0
+      ],
+      "unreal_yaw": 180.0,
+      "blender_location": [
+        -662.5,
+        0.0,
+        0.0
+      ],
+      "blender_yaw": 180.0,
+      "neck_mesh_name": "SM_BS3Pit_TrenchNeck_Rear",
+      "neck_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/TrenchAnchors/BS3Pit/Exports/SM_BS3Pit_TrenchNeck_Rear.fbx",
+      "neck_triangles": 1219,
+      "neck_triangles_by_material": {
+        "SovTrench_Wood": 502,
+        "RL_Sandbag": 717
+      },
+      "neck_clean_import": {
+        "objects": [
+          [
+            "SM_BS3Pit_TrenchNeck_Rear",
+            "MESH"
+          ]
+        ],
+        "scene_unit_scale": 0.009999999776482582,
+        "location": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          -0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "material_slots": [
+          "SovTrench_Wood",
+          "RL_Sandbag"
+        ],
+        "uv_layers": [
+          "UVMap"
+        ],
+        "non_triangles": 0
+      },
+      "neck_bounds_anchor_frame_blender": {
+        "min": [
+          -188.5,
+          -197.72,
+          -9.18
+        ],
+        "max": [
+          1.75,
+          199.66,
+          54.06
+        ]
+      },
+      "plug_fbx": null
+    }
+  ],
+  "pit_source_fbx": "D:/Blender/BlenderProjects/BlenderTanks/(KADO-3D)/BS3_100mmAT/Exports/SM_BS3Pit_Opt.fbx",
+  "pit_source_triangles": 38366,
+  "pit_source_bounds_blender": {
+    "min": [
+      -607.8,
+      -616.8,
+      -4.4
+    ],
+    "max": [
+      603.7,
+      614.5,
+      72.2
+    ]
+  },
+  "socket_clearance_cm": 54.7,
+  "neck_cull": {
+    "before_cull": 1542,
+    "after_cull": 1219,
+    "kit_rule_only": 1283
+  },
+  "neck_rows": [
+    {
+      "side": 1.0,
+      "course": 0,
+      "lateral": 137.5,
+      "start_x": -558.1
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "lateral": 177.5,
+      "start_x": -595.0
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "lateral": 116.5,
+      "start_x": -518.6
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "lateral": 154.5,
+      "start_x": -593.1
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "lateral": 124.5,
+      "start_x": -555.3
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "lateral": 130.5,
+      "start_x": -555.4
+    },
+    {
+      "side": 1.0,
+      "log_start_x": -518.6,
+      "bays": 2
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "lateral": 137.5,
+      "start_x": -556.9
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "lateral": 177.5,
+      "start_x": -592.7
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "lateral": 116.5,
+      "start_x": -521.2
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "lateral": 154.5,
+      "start_x": -596.8
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "lateral": 124.5,
+      "start_x": -550.8
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "lateral": 130.5,
+      "start_x": -554.0
+    },
+    {
+      "side": -1.0,
+      "log_start_x": -521.2,
+      "bays": 2
+    }
+  ],
+  "notes": "Anchor at the pit's existing rear crew entrance (-X); pit mesh unchanged, no plug. Unreal SM_BS3Pit is the _Opt cut (38,366 tris = Exports/SM_BS3Pit_Opt.fbx, which this script loads; the full FBX is 109,618). Socket on the X axis, so Unreal and Blender values match (Unreal yaw 180). The neck is in the anchor frame: origin on the socket, +X out of the pit, the pit at negative x; materials SovTrench_Wood (slot 0) then RL_Sandbag (slot 1, MI_Rus_SandBag_01 in Unreal like the pit); one UV map; triangulated. Its bag rows start where each meets the entrance's stepped cheeks (8 cm inside them); log revetment from the innermost row start to the socket; mud + corduroy poles through the entrance to the pit's inner face (x -474), widened to the inner row's gap there. Culled by the kit's hidden-triangle rule with the pit bags as extra occluders. Import like the Soviet kit pieces, attach on the socket with no offset. The neck is 188 cm long (it runs through the 116 cm thick wall), hence ~1.2k tris rather than the German 0.5-1k; like the kit, bags reach up to ~2 cm past the port plane. Frame check: the Opt FBX imports at identity and its vertex bounds (x -607.8..603.7, y -616.8..614.5, z -4.4..72.2, Blender) match the reported Unreal x min (-607.8) exactly; the other Unreal reported extents are 0.6-10 cm larger (x max 609.9, z -14.5..80.9), which reads as bounds padding, not an offset. Pit and neck go through the same FBX import, so their relative placement holds either way."
+}
