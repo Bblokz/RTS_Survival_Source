@@ -47,6 +47,8 @@ public:
 	int32 GetSmokePuffCount() const { return M_SmokePuffCount; }
 	/** @return Pieces that tore off while the wreck was still in the air. */
 	int32 GetAirBreakupPieceCount() const { return M_AirBreakupPieceCount; }
+	/** @return Seconds into the fall at which the carried wreck took over the aircraft's look; -1 if it never did. */
+	float GetCarriedWreckShownAtSeconds() const { return M_CarriedWreckShownAtSeconds; }
 	/** @return Whether the wreck is still tearing apart and its blasts are still to come after the impact. */
 	bool GetIsImpactStaging() const { return bM_IsImpactStaging; }
 	bool GetWasParked() const { return bM_WasParked; }
@@ -114,6 +116,7 @@ private:
 
 	FRandomStream M_Random;
 	bool bM_AircraftMeshesHidden = false;
+	float M_CarriedWreckShownAtSeconds = -1.f;
 
 	// In the air.
 	float M_AirBreakupSeconds = -1.f;
@@ -139,6 +142,12 @@ private:
 	float M_SkidDistance = 0.f;
 	FQuat M_HullStartRotation = FQuat::Identity;
 	FQuat M_HullLevelRotation = FQuat::Identity;
+	// Where the hull was last frame: gives the speed of each held piece into the ground.
+	FTransform M_PrevHullTransform = FTransform::Identity;
+	// Where each piece is in the physics and how fast it really moves there, frame to frame. A release takes away only
+	// the speed into the ground a piece really has: pieces whose physics lagged the hull were thrown 20 m up.
+	TArray<FVector> M_PiecePhysicsCentres;
+	TArray<FVector> M_PiecePhysicsVelocities;
 	FVector M_HullScale = FVector::OneVector;
 	// Where the nose touched, in the hull's own space: the hull pivots on it as the tail comes down.
 	FVector M_PivotLocal = FVector::ZeroVector;
@@ -194,10 +203,15 @@ private:
 	void HideAircraftMeshes() const;
 	/** @brief Orders the pieces that tear off first: the burning wing's outer panel, or a single-engine's tail or a wing tip. */
 	void BuildAirBreakupOrder();
+	/** @return Where the burning engine is in the actor's space, which the wreck's pieces are in. */
+	FVector GetFireLocationInActorSpace() const;
+	/** @return The aircraft's transform without its scale: the space the crash collection is built in. */
+	FTransform GetUnscaledAircraftTransform() const;
 	void TickAirBreakup();
 	/** @brief Lets the next pieces of the breakup order go with a small blast where they tear off. */
 	void TearOffPieces(int32 Count);
 	void TickCarriedWreck(float DeltaTime);
+	void UpdatePiecePhysicsVelocities(float DeltaTime);
 	/** @brief Smoke from the first torn-off part while it tumbles down. */
 	void TickTornPartSmoke();
 
@@ -206,9 +220,20 @@ private:
 	/** @brief Skid direction and speed, the flat pose the hull settles into, and the nose pivot it turns on. */
 	void StartImpactStage_SetupHullMotion(const AAircraftWreckActor& Wreck);
 	void StartImpactStage_ScheduleBlasts();
+	/** @brief Lengthens the stage so no piece of a long hull moves faster than the maximum as it levels. */
+	void StartImpactStage_LimitHullSpeed(const AAircraftWreckActor& Wreck);
 	void TickImpactStage(float DeltaTime);
 	void ImpactStage_MoveHull(float StageAlpha);
 	void ImpactStage_ReleasePieces(float StageAlpha);
+	/**
+	 * @brief Lets a held piece go once it meets the ground, or will within a moment, or the tear from the nose back
+	 * reaches it; most of its speed into the ground is taken away so it does not fall through.
+	 * @param Wreck The carried wreck.
+	 * @param PieceIndex Index into the wreck's pieces.
+	 * @param StageAlpha How far the hull has come apart, 0 to 1.
+	 * @param DeltaSeconds Frame time, for the piece's speed into the ground.
+	 */
+	void ImpactStage_TryReleasePiece(AAircraftWreckActor& Wreck, int32 PieceIndex, float StageAlpha, float DeltaSeconds);
 	void ImpactStage_FinishHull();
 	void ImpactStage_SpawnBlasts();
 	void ImpactStage_SpawnBurningDebris();
@@ -216,6 +241,13 @@ private:
 	int32 GetRandomReleasedPiece();
 	/** @return Furthest forward point of the aircraft along its nose, from its centre: the nose meets the ground first. */
 	float GetNoseReach() const;
+	/**
+	 * @brief A banked or diving aircraft can touch down first with a wing or an engine boom, which the belly and nose
+	 * traces miss: that part sank into the ground before the impact and fell through it once let go.
+	 * @return Whether the lowest point of the held wreck pieces reaches something static between the two transforms.
+	 */
+	bool TraceLowestHeldPiece(const FTransform& OldTransform, const FTransform& NewTransform,
+	                          const FCollisionQueryParams& QueryParams, FHitResult& OutHit) const;
 	// Fallback for the wreck height when the crash collection is missing; the padded mesh bounds sit too low.
 	float GetLowestVisibleMeshPointZ() const;
 	/** @return The highest ground (static geometry) under the box, sampled on a grid; lowest float when none. */

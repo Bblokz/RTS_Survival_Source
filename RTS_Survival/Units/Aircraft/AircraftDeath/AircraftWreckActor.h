@@ -35,6 +35,12 @@ struct FAircraftWreckPiece
 	bool bReleased = false;
 	EAircraftWreckPieceState State = EAircraftWreckPieceState::Held;
 	uint64 TornOutFrame = 0;
+	// Frame of the last release field; the physics state is checked a few frames later and the field retried.
+	uint64 ReleaseFieldFrame = 0;
+	int32 ReleaseFieldAttempts = 0;
+	bool bIsConfirmedDynamic = false;
+	// World time it was let go; tells a part torn off in the air from one released on the ground.
+	float ReleasedAtSeconds = -1.f;
 	FVector PendingVelocity = FVector::ZeroVector;
 	FVector PendingSpin = FVector::ZeroVector;
 };
@@ -139,12 +145,20 @@ private:
 	uint64 M_PhysicsReadyFrame = 0;
 	// Hidden until it has moved onto the aircraft after its physics came up.
 	bool bM_IsShown = false;
+	// After the first tear every piece is a kinematic body of its own and can be made dynamic at once.
+	bool bM_AreClustersBroken = false;
 
 	/** @return Whether the collection's physics exists now; it reports dynamic once its proxy runs. */
 	bool Carried_CheckPhysicsReady();
 
 	/** @brief Moves released pieces on: torn out of their cluster first, made dynamic a couple of frames later. */
 	void Carried_AdvanceReleases();
+	/** @brief A dynamic-state field that turns the pieces inside the sphere dynamic and leaves all others alone. */
+	void Carried_MakeDynamicInSphere(const FVector& Centre, float Radius) const;
+	/** @brief Turns a torn-out piece dynamic with a dynamic-state field around it; wider on each retry. */
+	void Carried_ApplyReleaseField(int32 PieceIndex);
+	/** @return Whether the physics reports the piece dynamic now (not asleep in mid-air), so the field caught it. */
+	bool Carried_GetIsPieceDynamicInPhysics(const FAircraftWreckPiece& Piece) const;
 
 	bool GetIsValidGeometryCollection() const;
 	void SetupPieceCollision() const;

@@ -160,9 +160,11 @@ struct FAircraftDeathSettings
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|In the air")
 	FAircraftDeathEffect AirBreakupExplosion;
 
-	// Air drag on loose pieces: torn-off parts fall behind the aircraft, pieces on the ground stop sliding sooner.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup", meta=(ClampMin="0", ClampMax="5"))
-	float PieceLinearDamping = 0.35f;
+	// Air drag on loose pieces: torn-off parts flutter down behind the aircraft. Chaos applies it far more strongly
+	// than the value suggests: 0.35 held torn parts to about 3 m/s (falling like leaves); with 0.05 they hit the
+	// ground fast enough to fall through it.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup", meta=(ClampMin="0", ClampMax="1"))
+	float PieceLinearDamping = 0.12f;
 
 	// Time the wreck takes to tear apart from the nose back once it hits the ground; bigger aircraft take longer.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Breakup|Impact", meta=(ClampMin="0.05", Units="Seconds"))

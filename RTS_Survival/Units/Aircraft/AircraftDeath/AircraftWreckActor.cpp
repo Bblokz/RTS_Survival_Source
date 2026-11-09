@@ -7,6 +7,8 @@
 #include "GeometryCollection/GeometryCollection.h"
 #include "GeometryCollection/GeometryCollectionComponent.h"
 #include "GeometryCollection/GeometryCollectionObject.h"
+#include "GeometryCollectionProxyData.h"
+#include "Field/FieldSystemObjects.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "TimerManager.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
@@ -37,6 +39,13 @@ namespace AircraftWreckPrivate
 	// The field that turns a released piece dynamic reaches this far around it (by its own size, at least the minimum).
 	constexpr float ReleaseFieldExtentShare = 0.5f;
 	constexpr float MinReleaseFieldRadius = 25.f;
+	// The physics state of a released piece is read back this many frames after its field; a missed piece gets a
+	// field this much wider, at most this many times.
+	constexpr uint64 FramesBeforeReleaseCheck = 6;
+	constexpr float ReleaseFieldRetryGrowth = 2.f;
+	constexpr int32 MaxReleaseFieldAttempts = 4;
+	// Reaches every piece of the largest aircraft from its centre.
+	constexpr float WholeWreckFieldRadius = 10000.f;
 	// A torn-out piece is still kinematic and moves with the wreck; it is made dynamic this many frames later, by
 	// when it has the wreck's speed of its own.
 	constexpr uint64 FramesBeforeTornPieceIsLoose = 2;
@@ -68,6 +77,21 @@ bool AAircraftWreckActor::CreateCollectionComponent(UGeometryCollection* CrashCo
 	M_GeometryCollection->SetRelativeTransform(FTransform::Identity);
 	SetupPieceCollision();
 	M_GeometryCollection->BodyInstance.LinearDamping = PieceLinearDamping;
+	if (bKinematic)
+	{
+		// A carried wreck lets its pieces go one by one while the rest still moves kinematically: released pieces
+		// overlapping held ones were thrown tens of metres, and continuous collision on pieces switching from
+		// kinematic to dynamic tripped a Chaos assert, or (with the pieces ignoring each other) silently broke the
+		// ground's collision for the rest of the run. Its pieces only land on static ground, without CCD; the death
+		// component lets each go before it reaches the ground, so none starts out buried.
+		M_GeometryCollection->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Ignore);
+		M_GeometryCollection->BodyInstance.bUseCCD = false;
+		// Motion-aware collision in place of CCD: fast pieces (a bomber's, or parts torn off high up) tunnelled
+		// through the landscape without it.
+		M_GeometryCollection->BodyInstance.SetUseMACD(true);
+	}
+	// Not on a wreck that breaks up at once (it has CCD): with both, pieces piled on each other were squeezed through
+	// the landscape. A Bf109 blown up in its bay lost a piece under the floor in half the runs, and none without MACD.
 	return true;
 }
 
@@ -222,19 +246,28 @@ void AAircraftWreckActor::Carried_AdvanceReleases()
 		else if (Piece.State == EAircraftWreckPieceState::TornOut
 			&& GFrameCounter - Piece.TornOutFrame >= FramesBeforeTornPieceIsLoose)
 		{
-			// A dynamic-state field is the engine's way to turn collection pieces dynamic (it also hands them to the
-			// solver's islands; switching the state directly leaves them frozen). It keeps the speed its kinematic
-			// motion gave it. The field covers where the piece is between the last physics result and its target.
-			const FVector PhysicsCentre = GetPiecePhysicsCentre(PieceIndex);
-			const FVector TargetCentre = M_GeometryCollection->GetComponentTransform().TransformPosition(Piece.LocalCentre);
-			const float FieldRadius = 0.5f * static_cast<float>(FVector::Dist(PhysicsCentre, TargetCentre))
-				+ FMath::Max(MinReleaseFieldRadius, ReleaseFieldExtentShare * static_cast<float>(Piece.LocalExtent.GetMin()));
-			M_GeometryCollection->ApplyKinematicField(FieldRadius, 0.5f * (PhysicsCentre + TargetCentre));
-			M_GeometryCollection->ApplyLinearVelocity(Piece.TransformIndex, Piece.PendingVelocity);
-			M_GeometryCollection->ApplyAngularVelocity(Piece.TransformIndex, Piece.PendingSpin);
 			Piece.State = EAircraftWreckPieceState::Loose;
+			Carried_ApplyReleaseField(PieceIndex);
+			// The first tear's strain spreads to every piece: from now on each is a body of its own.
+			bM_AreClustersBroken = true;
 		}
-		bAllLoose &= Piece.State == EAircraftWreckPieceState::Loose;
+		else if (Piece.State == EAircraftWreckPieceState::Loose && not Piece.bIsConfirmedDynamic
+			&& GFrameCounter - Piece.ReleaseFieldFrame >= FramesBeforeReleaseCheck)
+		{
+			// A field placed from a stale physics result can miss the piece; it would hang in the air for good.
+			Piece.bIsConfirmedDynamic = Carried_GetIsPieceDynamicInPhysics(Piece);
+			if (not Piece.bIsConfirmedDynamic && Piece.ReleaseFieldAttempts >= MaxReleaseFieldAttempts)
+			{
+				// Still missed: one field over the whole wreck, rather than a piece left hanging in the air.
+				Carried_MakeDynamicInSphere(GetActorLocation(), WholeWreckFieldRadius);
+				Piece.bIsConfirmedDynamic = true;
+			}
+			if (not Piece.bIsConfirmedDynamic)
+			{
+				Carried_ApplyReleaseField(PieceIndex);
+			}
+		}
+		bAllLoose &= Piece.State == EAircraftWreckPieceState::Loose && Piece.bIsConfirmedDynamic;
 	}
 	if (bAllLoose)
 	{
@@ -242,6 +275,58 @@ void AAircraftWreckActor::Carried_AdvanceReleases()
 		bM_IsCarried = false;
 		SetActorTickEnabled(false);
 	}
+}
+
+void AAircraftWreckActor::Carried_ApplyReleaseField(const int32 PieceIndex)
+{
+	using namespace AircraftWreckPrivate;
+	FAircraftWreckPiece& Piece = M_Pieces[PieceIndex];
+	// A dynamic-state field is the engine's way to turn collection pieces dynamic (it also hands them to the solver's
+	// islands; switching the state directly leaves them frozen). The piece keeps the speed its kinematic motion gave
+	// it. The field covers where the piece is between the last physics result and its target, wider on each retry.
+	const FVector PhysicsCentre = GetPiecePhysicsCentre(PieceIndex);
+	const FVector TargetCentre = M_GeometryCollection->GetComponentTransform().TransformPosition(Piece.LocalCentre);
+	const float RetryScale = FMath::Pow(ReleaseFieldRetryGrowth, static_cast<float>(Piece.ReleaseFieldAttempts));
+	const FVector FieldCentre = FMath::Lerp(PhysicsCentre, TargetCentre, 0.5f);
+	const float FieldRadius = static_cast<float>(FVector::Dist(PhysicsCentre, FieldCentre))
+		+ RetryScale * FMath::Max(MinReleaseFieldRadius,
+		                          ReleaseFieldExtentShare * static_cast<float>(Piece.LocalExtent.GetMin()));
+	Carried_MakeDynamicInSphere(FieldCentre, FieldRadius);
+	if (Piece.ReleaseFieldAttempts == 0)
+	{
+		// Once: the velocity adds up, and a retried piece sped up that way punched through the ground.
+		M_GeometryCollection->ApplyLinearVelocity(Piece.TransformIndex, Piece.PendingVelocity);
+		M_GeometryCollection->ApplyAngularVelocity(Piece.TransformIndex, Piece.PendingSpin);
+	}
+	Piece.ReleaseFieldFrame = GFrameCounter;
+	++Piece.ReleaseFieldAttempts;
+}
+
+void AAircraftWreckActor::Carried_MakeDynamicInSphere(const FVector& Centre, const float Radius) const
+{
+	// Inside the sphere only. ApplyKinematicField sets everything outside it that is not already dynamic to kinematic:
+	// pieces resting asleep on the ground turned kinematic, were carried on by the moving hull and left hanging.
+	URadialFalloff* Sphere = NewObject<URadialFalloff>(GetTransientPackage());
+	Sphere->SetRadialFalloff(1.f, 0.f, 1.f, 0.f, Radius, Centre, EFieldFalloffType::Field_FallOff_None);
+	UUniformInteger* DynamicState = NewObject<UUniformInteger>(GetTransientPackage());
+	DynamicState->SetUniformInteger(static_cast<int32>(Chaos::EObjectStateType::Dynamic));
+	UCullingField* InsideOnly = NewObject<UCullingField>(GetTransientPackage());
+	InsideOnly->SetCullingField(Sphere, DynamicState, EFieldCullingOperationType::Field_Culling_Outside);
+	M_GeometryCollection->ApplyPhysicsField(true, EGeometryCollectionPhysicsTypeEnum::Chaos_DynamicState, nullptr,
+	                                        InsideOnly);
+}
+
+bool AAircraftWreckActor::Carried_GetIsPieceDynamicInPhysics(const FAircraftWreckPiece& Piece) const
+{
+	const FGeometryDynamicCollection* Dynamic = M_GeometryCollection->GetDynamicCollection();
+	if (Dynamic == nullptr || not Dynamic->DynamicState.IsValidIndex(Piece.TransformIndex))
+	{
+		// Nothing to check against: take the release as done.
+		return true;
+	}
+	// Dynamic only: a piece asleep a few frames after its release went to sleep in mid-air and would hang there; the
+	// next field wakes it.
+	return Dynamic->DynamicState[Piece.TransformIndex] == static_cast<uint8>(Chaos::EObjectStateType::Dynamic);
 }
 
 void AAircraftWreckActor::ReleasePiece(const int32 PieceIndex, const FVector& AddedVelocity,
@@ -254,10 +339,19 @@ void AAircraftWreckActor::ReleasePiece(const int32 PieceIndex, const FVector& Ad
 	FAircraftWreckPiece& Piece = M_Pieces[PieceIndex];
 	Piece.bReleased = true;
 	++M_ReleasedPieceCount;
-	// The tick tears it out of the wreck and then lets it fall.
-	Piece.State = EAircraftWreckPieceState::ReleaseRequested;
+	Piece.ReleasedAtSeconds = IsValid(GetWorld()) ? GetWorld()->GetTimeSeconds() : 0.f;
 	Piece.PendingVelocity = AddedVelocity;
 	Piece.PendingSpin = AngularVelocity;
+	if (bM_AreClustersBroken)
+	{
+		// Every piece is already on its own: let it go now. Riding the kinematic hull for two more frames drove
+		// pieces deep into the ground at low frame rates, and they fell through once loose.
+		Piece.State = EAircraftWreckPieceState::Loose;
+		Carried_ApplyReleaseField(PieceIndex);
+		return;
+	}
+	// The tick tears it out of the wreck and then lets it fall.
+	Piece.State = EAircraftWreckPieceState::ReleaseRequested;
 }
 
 bool AAircraftWreckActor::GetHasHeldPieces() const

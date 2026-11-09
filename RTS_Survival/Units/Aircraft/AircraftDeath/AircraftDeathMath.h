@@ -12,7 +12,9 @@ namespace FAircraftDeathMath
 {
 	// Folder of the pieces built by RTS.Aircraft.BuildCrashCollections; one collection per set of aircraft meshes.
 	inline const TCHAR* const CrashCollectionFolder = TEXT("/Game/RTS_Survival/Blueprints/Aircraft/CrashCollections");
-	inline const TCHAR* const CrashCollectionPrefix = TEXT("GC_Crash_");
+	// "GC_Crash_" collections were built without the aircraft's own scale (a scaled Pe-8 came out a tenth of its
+	// size, and its pieces fell through the ground); the rebuilt ones carry it and have their own name.
+	inline const TCHAR* const CrashCollectionPrefix = TEXT("GC_AircraftCrash_");
 	// Propeller bones of the aircraft skeletons start with this; the wing flaps are "B_WingRotor" and are no engines.
 	inline const TCHAR* const EngineBonePrefix = TEXT("B_Rotor");
 
@@ -64,7 +66,7 @@ namespace FAircraftDeathMath
 	RTS_SURVIVAL_API FRotator GetCrashRotation(const FAircraftCrashFlightState& State, const FRotator& FallbackRotation);
 
 	/**
-	 * @return Asset name of the crash collection for an aircraft drawn with these meshes, e.g. GC_Crash_SM_PE2_Frame;
+	 * @return Asset name of the crash collection for an aircraft drawn with these meshes, e.g. GC_AircraftCrash_SM_PE2_Frame;
 	 * the static frame names it when there is one, the builder and the aircraft agree on it by this function.
 	 * @param StaticMeshNames Asset names of the aircraft's static meshes.
 	 * @param SkeletalMeshNames Asset names of the aircraft's skeletal meshes.
