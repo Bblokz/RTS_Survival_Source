@@ -121,6 +121,9 @@ public:
 
 	void SetCameraShakeSubsystem(URTSCameraShakeSubsystem* CameraShakeSubsystem);
 
+	// Calibre of the weapon that fired this shell, in mm; wall chunk damage sizes its holes by it.
+	int32 GetWeaponCalibre() const { return M_WeaponCalibre; }
+
 	void SetupProjectileForNewLaunch(
 		UWeaponStateProjectile* NewProjectileOwner,
 		const ERTSDamageType DamageType,

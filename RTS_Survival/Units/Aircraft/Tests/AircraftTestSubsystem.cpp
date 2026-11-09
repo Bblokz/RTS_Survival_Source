@@ -1568,11 +1568,7 @@ void UAircraftTestSubsystem::CheckPiecesStayInTheBay(const FAircraftDeathUnderTe
 	                                        PieceLocations.Num(), PiecesOutsideTheBuilding, PiecesUnderTheFloor,
 	                                        *BuildingBox.ToString(), *Entry.BayLocation.ToCompactString());
 	Check(PiecesOutsideTheBuilding == 0, Entry.Label + TEXT("_pieces_stay_inside_the_airbase"), Details);
-	// As for an aircraft that came down: now and then Chaos drops a piece of the settled pile through the landscape
-	// (about one run in fifteen, out of sight under the hangar floor); more than a few means the wreck is broken.
-	const int32 AllowedUnderTheFloor = FMath::Max(MaxPiecesUnderTheGround,
-	                                              FMath::FloorToInt(PieceLocations.Num() * MaxShareUnderTheGround));
-	Check(PiecesUnderTheFloor <= AllowedUnderTheFloor, Entry.Label + TEXT("_pieces_stay_on_the_bay_floor"), Details);
+	Check(PiecesUnderTheFloor == 0, Entry.Label + TEXT("_pieces_stay_on_the_bay_floor"), Details);
 }
 
 void UAircraftTestSubsystem::LogStaticHitsUnder(const FVector2D& Location2D) const

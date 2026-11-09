@@ -84,7 +84,6 @@ bool AAircraftWreckActor::CreateCollectionComponent(UGeometryCollection* CrashCo
 		// kinematic to dynamic tripped a Chaos assert, or (with the pieces ignoring each other) silently broke the
 		// ground's collision for the rest of the run. Its pieces only land on static ground, without CCD; the death
 		// component lets each go before it reaches the ground, so none starts out buried.
-		M_GeometryCollection->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Ignore);
 		M_GeometryCollection->BodyInstance.bUseCCD = false;
 		// Motion-aware collision in place of CCD: fast pieces (a bomber's, or parts torn off high up) tunnelled
 		// through the landscape without it.
@@ -92,6 +91,9 @@ bool AAircraftWreckActor::CreateCollectionComponent(UGeometryCollection* CrashCo
 	}
 	// Not on a wreck that breaks up at once (it has CCD): with both, pieces piled on each other were squeezed through
 	// the landscape. A Bf109 blown up in its bay lost a piece under the floor in half the runs, and none without MACD.
+	// The pieces of every wreck pass through each other: a parked aircraft's pieces collapse into one pile, and the
+	// pile still squeezed a thin panel through the landscape now and then (about one run in fifteen).
+	M_GeometryCollection->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Ignore);
 	return true;
 }
 
@@ -462,7 +464,8 @@ void AAircraftWreckActor::SetupPieceCollision() const
 	{
 		return;
 	}
-	// Pieces land on the ground and on each other; units, weapons, the cursor and building previews pass through.
+	// Pieces land on the ground (CreateCollectionComponent lets them pass through each other); units, weapons, the cursor
+	// and building previews pass through.
 	M_GeometryCollection->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	M_GeometryCollection->SetCollisionObjectType(ECC_PhysicsBody);
 	M_GeometryCollection->SetCollisionResponseToAllChannels(ECR_Ignore);
