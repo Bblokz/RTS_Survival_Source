@@ -110,15 +110,18 @@ carrying, and hands over to `UAircraftDeathComponent` (created on every aircraft
   instead broke the ground's collision for the rest of the run (an aircraft fell through the world, ground traces
   failed). It uses motion-aware collision (`SetUseMACD(true)`) instead, which stopped fast pieces tunnelling through
   the landscape (Sturmovik 7-9 of 23 pieces under the ground before, 0 after). The parked-aircraft wreck keeps CCD and
-  inter-piece collision and has no MACD: with CCD and MACD both on, pieces piled on each other were squeezed through
-  the landscape (a Bf109 blown up in its bay lost a piece under the floor in half the runs; 0 of 4 without MACD, while
-  CCD off was worse still). The Pe-2 and Pe-8 used to lose about a third of their pieces under the ground: their collections held only
+  has no MACD: with CCD and MACD both on, pieces piled on each other were squeezed through the landscape (a Bf109
+  blown up in its bay lost a piece under the floor in half the runs; CCD off was worse still). Without MACD the pile
+  still pushed a thin panel through about one run in fifteen, so its pieces now pass through each other too, like the
+  carried wreck's: 0 of 10 bay runs lost a piece. The Pe-2 and Pe-8 used to lose about a third of their pieces under the ground: their collections held only
   the propellers (see the crash collection notes below).
 - **Breaking up in the air** (`bBreakUpInTheAir`). `AirBreakupDelaySeconds` after the hit the first part tears off with
   a small blast (`AirBreakupExplosion`): a burning wing loses its outer panel beyond the engine; a nose-fire aircraft
   loses its tail (60 %) or a wing tip. `AirBreakupPieceShare` of the pieces go, at least two; a second, smaller tear
   follows `AirSecondBreakupDelaySeconds` later. The first torn part trails smoke while it tumbles.
-- **Impact.** Traces from the belly and from the nose (the nose leads in a dive) find the ground or any static object;
+- **Impact.** Traces from the belly, from the nose (the nose leads in a dive) and from the lowest point of the held
+  wreck pieces (`TraceLowestHeldPiece`: a banked Fw 189 touched down with an engine boom first, which sank into the
+  ground before the impact and fell through it once let go) find the ground or any static object;
   `EAircraftDeathPhase::Impacted` is set at that first contact. The hull then ploughs on for `ImpactBreakupSeconds`
   (longer for bigger aircraft, and long enough that no piece moves faster than 25 m/s as the hull levels, along a
   smoothstep: easing out from the start brought a Ju 390's tail down at 45 m/s and threw its pieces tens of metres up): it skids along the ground with `ImpactSkidSpeedShare` of its horizontal speed, pivots on
@@ -126,7 +129,10 @@ carrying, and hands over to `UAircraftDeathComponent` (created on every aircraft
   ground: when its lowest point (its box projected on the ground normal) comes within 30 cm of the ground, or will
   within 0.08 s at its speed into it. Held until its centre came down, a big bomber piece was buried metres deep and
   fell through the ground once loose (40 % of a Pe-2's pieces). All of a released piece's speed into the ground is
-  taken away: without CCD a thin panel driven into the ground at speed falls through it. The blasts are spread over that time: dirt thrown up where the nose hit (`GroundBurst`), the main blast over
+  taken away: without CCD a thin panel driven into the ground at speed falls through it. That is the speed the piece
+  really has in the physics (its simulated position frame to frame, `UpdatePiecePhysicsVelocities`), never more than
+  the hull's: `ApplyLinearVelocity` adds to the physics velocity, and a piece whose physics lagged the hull was thrown
+  20 m up by the difference. The blasts are spread over that time: dirt thrown up where the nose hit (`GroundBurst`), the main blast over
   the hull (`ImpactExplosion`, +0.08 s), the fuel fireball (`FuelFireball`, +0.2 s), one to three smaller blasts among
   the pieces (`SecondaryExplosion`, 0.45-1.4 s, more for bombers), fires on two to four pieces after 2 s
   (`BurningDebris`) and the burning fuel where the hull came to rest (`GroundFire`). The wreck's fires die down after
@@ -242,3 +248,8 @@ UnrealEditor-Cmd.exe RTS_Survival.uproject /Game/RTS_Survival/Maps/UnitTests/UT_
 ```
 
 UT_Nomadics has aircraft of its own circling the map; their shadows show in the pictures.
+
+Physics ticks async (10 ms steps) and a game frame is clamped to `MaxPhysicsDeltaTime` (33 ms). On a busy machine
+(another editor compiling shaders, a Shorts render) frames run longer, physics falls behind game time, and thrown
+pieces still hang in the air when the test checks them. Add `-benchmark -fps=60` (or 30) for a fixed timestep that
+does not depend on machine load. All 341 checks passed at fixed 60 and 30 fps on 2026-11-09.

@@ -49,6 +49,29 @@ FFieldTrenchAnchorHandle UFieldTrenchAnchorSubsystem::FindFreeAnchorNear(
 	return Nearest;
 }
 
+void UFieldTrenchAnchorSubsystem::GetFreeAnchorsOfPlayer(
+	const int32 OwningPlayer,
+	TArray<FFieldTrenchAnchorHandle>& OutAnchors) const
+{
+	OutAnchors.Reset();
+	for (const TWeakObjectPtr<UFieldTrenchAnchorComponent>& Registered : M_AnchorComponents)
+	{
+		UFieldTrenchAnchorComponent* AnchorComponent = Registered.Get();
+		if (not IsValid(AnchorComponent) || AnchorComponent->GetOwningPlayer() != OwningPlayer ||
+			not AnchorComponent->GetAreAnchorsAvailable())
+		{
+			continue;
+		}
+		for (int32 AnchorIndex = 0; AnchorIndex < AnchorComponent->GetAnchorCount(); ++AnchorIndex)
+		{
+			if (AnchorComponent->GetIsAnchorFree(AnchorIndex))
+			{
+				OutAnchors.Add({AnchorComponent, AnchorIndex});
+			}
+		}
+	}
+}
+
 bool UFieldTrenchAnchorSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
 {
 	return WorldType == EWorldType::Game || WorldType == EWorldType::PIE;
