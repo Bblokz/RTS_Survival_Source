@@ -28,6 +28,7 @@
 #include "VerticalCollapseOnCrushed/FVerticalCollapseOnCrushed.h"
 #include "WallChunkDamage/WallChunkDamageComponent.h"
 #include "WallChunkDamage/WallHoleDamageComponent.h"
+#include "WreckHoleDamage/WreckHoleDamageComponent.h"
 
 namespace
 {
@@ -121,6 +122,7 @@ void ADestructableEnvActor::BeginPlay()
 	Super::BeginPlay();
 	M_WallChunkDamage = FindComponentByClass<UWallChunkDamageComponent>();
 	M_WallHoleDamage = FindComponentByClass<UWallHoleDamageComponent>();
+	M_WreckHoleDamage = FindComponentByClass<UWreckHoleDamageComponent>();
 }
 
 void ADestructableEnvActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -288,6 +290,10 @@ float ADestructableEnvActor::TakeDamage(float DamageAmount, FDamageEvent const& 
 	if (IsValid(M_WallHoleDamage) && IsUnitAlive())
 	{
 		M_WallHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, Health);
+	}
+	if (IsValid(M_WreckHoleDamage) && IsUnitAlive())
+	{
+		M_WreckHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, Health);
 	}
 	if constexpr (DeveloperSettings::Debugging::GDamage_System_Compile_DebugSymbols)
 	{

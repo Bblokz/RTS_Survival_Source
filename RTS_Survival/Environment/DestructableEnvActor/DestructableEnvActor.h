@@ -30,6 +30,7 @@ class UArmorCalculation;
 class UBehaviour;
 class UWallChunkDamageComponent;
 class UWallHoleDamageComponent;
+class UWreckHoleDamageComponent;
 
 
 DECLARE_MULTICAST_DELEGATE(FOnDestructibleCollapse);
@@ -306,6 +307,10 @@ private:
 	// Optional: walls with procedural holes (no chunk mesh) get their hits forwarded the same way.
 	UPROPERTY()
 	TObjectPtr<UWallHoleDamageComponent> M_WallHoleDamage;
+
+	// Optional: vehicle wrecks and scavengeable vehicle parts get shell holes on any of their meshes.
+	UPROPERTY()
+	TObjectPtr<UWreckHoleDamageComponent> M_WreckHoleDamage;
 
 	// Called when collapsed but actor not destroyed (as specified by the collapse settings).
 	UFUNCTION()
