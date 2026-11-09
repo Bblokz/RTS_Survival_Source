@@ -361,3 +361,11 @@ saved).
    shells got a ring of earth between bowl and rays, clustered rays, rounder oblique cells.
 3. Round 3: bombs darker/warmer with no veil, debris floor without the specular "concrete", random block orientation,
    big clods, stronger broken/double variants; shells lighter warm core, less soot, brown ring, broader speck streaks.
+
+UE status at hand-off (2026-11-09 10:10): on disk = M_LandscapeImpactDecal (ImpactBCO/ImpactNRS parameters, 262 PS
+instructions, 3 samplers, validate clean), MI_BombImpactDecal, T_BombImpact_BCO/NRS. NOT on disk yet: the re-imported
+T_LandscapeImpact_BCO/NRS (shell_r3). Every save was refused (error 32) while other sessions' -game runs had the
+shell textures loaded, and a retry at 10:05 crashed the shared editor ("Illegal call to StaticFindObjectFast() while
+serializing", a UECP bridge asset-registry task during SaveLoadedAsset). To finish, with no RTS_Survival -game run
+alive: `ATLAS_DIR='D:/UE5Projects/RTS_Survival/Saved/ImpactDecals/shell_r3'; BOMB_ATLAS_DIR=None;
+BUILD_MATERIAL=False; exec(open('.../ue_build_material.py').read())`, then check the two .uasset mtimes.
