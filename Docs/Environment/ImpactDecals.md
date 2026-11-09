@@ -22,7 +22,10 @@ Hooks (all call `ULandscapeImpactDecalSubsystem::RequestImpactDecal(context, cal
   explosion often comes from the flight timer before a trace touched the ground; without this, StartGame's backdrop
   battles left 0 craters from 72 such shells. Higher air bursts still leave nothing.
 - `UWeaponStateTrace::OnAsyncTraceHitValidActor`: trace weapons (autocannons) that hit.
-- `ABombActor::OnAsyncTraceComplete` and `AICBMActor::HandleImpact`: bombs and rockets.
+- `ABombActor::OnAsyncTraceComplete` and `AICBMActor::HandleImpact`: bombs, bomb rockets and missiles call
+  `RequestBombImpactDecal(context, TNTExplosiveGrams, ...)` instead (bomb set, below); a charge of 0 falls back to the
+  shell path by calibre. A bomb's calibre is TNT / 10 (a 250 kg bomb is "25 mm"), so the shell bands would draw a
+  20 mm scuff for it.
 
 `RequestImpactDecal` rejects in this order, cheapest first: calibre <= `MinCalibreMm` (15), `rts.ImpactDecals` == 0,
 hit actor is not an `ALandscapeProxy`. Only then does it touch the subsystem. It snaps the crater height onto
@@ -33,7 +36,8 @@ crater box to miss the ground.
 ## How a crater is placed
 
 1. Band = first of the 8 bands whose `MaxCalibreMm` covers the calibre (last band takes everything larger):
-   20 / 34 / 50 / 75 / 88 / 112 / 150 / 240 mm design calibres, 40 / 70 / 110 / 160 / 210 / 290 / 400 / 600 cm.
+   20 / 34 / 50 / 75 / 88 / 112 / 150 / 240 mm design calibres, 40 / 70 / 110 / 240 / 330 / 450 / 600 / 850 cm
+   (75 mm and up were 160 / 210 / 290 / 400 / 600 cm until 2026-11-09; enlarged and redrawn at the new size).
 2. Size = band design diameter x clamp(calibre / design calibre, 0.8, 1.25) x random 0.92-1.08 x global multiplier.
    A calibre never borrows another band's art at a silly scale.
 3. Projection along the landscape normal (thin box, 40-180 cm deep by band), random spin around it.
@@ -48,10 +52,42 @@ crater box to miss the ground.
   moved to the new impact (one render-state update at end of frame). No actor spawns, no garbage per crater.
 - Cap change at runtime: shrinks to the newest N (destroys the rest); Off destroys all and the owner.
 
+## Bomb craters
+
+Aircraft bombs (250 / 400 / 500 / 1000), bomb rockets (700 - 5000) and missile warheads leave their own set, picked by
+the weapon's `TNTExplosiveGrams` (Project Settings -> RTS Impact Decals -> Bombs):
+
+| band | charge | design | decal box | projection depth | cells |
+|---|---|---|---|---|---|
+| K0 | <= 300 | 250 | 900 cm | 250 cm | 0-3 |
+| K1 | <= 600 | 500 | 1200 cm | 300 cm | 4-7 |
+| K2 | <= 1200 | 1000 | 1600 cm | 350 cm | 8-11 |
+| K3 | heavier | 2500 | 2200 cm | 450 cm | 12-15 |
+
+Size = box x clamp(cube root(charge / design), 0.8, 1.3) x random 0.92-1.08 (crater size follows charge^(1/3)).
+Cells per band: round, lopsided (oblique fall), double, broken rim. `MI_BombImpactDecal` is a second instance of the
+same master with the bomb atlas (`T_BombImpact_BCO` / `_NRS`); bomb craters share the ring and the cap with the shell
+craters, and a recycled slot swaps its material only when it changes set. For merging, bomb craters rank above every
+shell band: a shell landing inside a bomb crater adds nothing, a bomb on a shell crater is a new crater.
+Art: `Source/Tools/ImpactDecals/gen_bomb_atlas.py`, three adversarial rounds in REVIEW_LOG.md (2026-11-09), sheets in
+`Saved/ImpactDecals/bomb_final/`. The critics asked for larger bomb boxes (11-26 m); kept at 9-22 m, regenerate the
+art with the new D in gen_bomb_atlas.py BANDS if they are raised.
+
+Verified 2026-11-09 (DebugGame, Ger_Trains):
+- `run_bench.sh sizes_trains -ImpactDecalBenchLive -ImpactDecalBenchSpawnFight` runs `RunSizeCheck` (random spread
+  off): shells 20/37/50 mm = 40/76/110 cm (unchanged), 75/88/105/122/150/240 mm = 240/330/422/490/600/850 cm (was
+  160/210/290/290/400/600); bombs 250/400/500/700/800/1000/1500/2000/3000/5000 = 900/1114/1200/1421/1485/1600/1856/2042/
+  2338/2772 cm, all bomb set; a 150 mm shell inside a 500 bomb crater merges, a 250 bomb on a 240 mm crater is added;
+  a recycled shell slot becomes a bomb crater. PASS (with eviction + menu).
+- `-CarpetBombingValidate` (Ju 390, 20 x 250 bombs): every bomb that reached the ground logged
+  `RTS_IMPACT_DECALS bomb crater K0 charge 250 diameter 832-962 cm`, 12 placed + 5 merged into the crater of the
+  bomb next to it, the rest hit the tanks. (The carpet test ends with `exit`, so run it without the bench report.)
+
 ## Art
 
 `MI_LandscapeImpactDecal` (parent `M_LandscapeImpactDecal`, Deferred Decal, DBuffer colour + normal + roughness):
-2 textures, `T_LandscapeImpact_BCO` (albedo + opacity, BC3 sRGB) and `T_LandscapeImpact_NRS` (normal XY, roughness,
+the texture samples are parameters `ImpactBCO` / `ImpactNRS` (shell atlas by default, bomb atlas on
+MI_BombImpactDecal): `T_LandscapeImpact_BCO` (albedo + opacity, BC3 sRGB) and `T_LandscapeImpact_NRS` (normal XY, roughness,
 soot mask, BC3 linear), 2048², 10.7 MB together. 262 PS instructions (a constant DBuffer decal is 219), 2 samples.
 Band b uses cells 2b (round crater) and 2b+1 (oblique hit / grazing furrow for 20-37 mm).
 Material params on the MI: Tint, ScorchColor, ScorchStrength, Opacity, NormalStrength, RoughnessMul, SlopeFadeStart/End

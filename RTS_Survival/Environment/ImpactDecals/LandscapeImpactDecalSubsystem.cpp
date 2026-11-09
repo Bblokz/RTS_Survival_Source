@@ -292,11 +292,19 @@ bool ULandscapeImpactDecalSubsystem::AddBombImpactDecal(const float TntGrams, co
 	Spec.AtlasCellCount = Band->AtlasCellCount;
 	// Bomb craters rank above every shell crater: shells landing in one merge, a bomb never merges into a shell pit.
 	Spec.SizeRank = static_cast<uint8>(Settings->Bands.Num() + BandIndex);
+	const int32 MergedBefore = M_Stats.MergedIntoExisting;
 	const bool bPlaced = AddCrater(Spec, ImpactLocation, ImpactNormal, StartCycles);
 	if (bPlaced)
 	{
 		++M_Stats.BombCraters;
 	}
+#if RTS_WITH_MAP_TESTS
+	// Bombs are rare: one log line each lets any test run (e.g. -CarpetBombingValidate) prove its bomb craters.
+	UE_LOG(LogRTSImpactDecals, Display, TEXT("RTS_IMPACT_DECALS bomb crater K%d charge %.0f diameter %.0f cm at %s -> %s"),
+	       BandIndex, TntGrams, 2.f * Spec.Radius, *ImpactLocation.ToCompactString(),
+	       not bPlaced ? TEXT("not placed")
+	       : M_Stats.MergedIntoExisting > MergedBefore ? TEXT("merged") : TEXT("placed"));
+#endif
 	return bPlaced;
 }
 
