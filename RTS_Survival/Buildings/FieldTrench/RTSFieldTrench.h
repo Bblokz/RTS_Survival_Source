@@ -140,6 +140,17 @@ public:
 		const FFieldTrenchPlanOptions& Options) const;
 
 	/**
+	 * @brief Plans a trench along a dragged path, see above.
+	 * @param OutOpenEnd Receives the open end of the trench before its end cap, see FieldTrenchLayout::PlanAlongPath.
+	 */
+	TArray<FFieldTrenchPiecePlacement> PlanOnGround(
+		const TArray<FVector2D>& DragPath,
+		const float MaximumLengthCm,
+		const float GroundHeight,
+		const FFieldTrenchPlanOptions& Options,
+		FFieldTrenchOpenPort& OutOpenEnd) const;
+
+	/**
 	 * @brief The trench starts at this anchor: its first planned piece lies on the anchor's port. The anchor is
 	 * claimed when construction starts; while the trench is only laid out it is just used to find the ground,
 	 * which near the anchor lies under its owner's walls. An unset handle starts the trench with a cap.
@@ -152,7 +163,7 @@ public:
 	 * @param AnchorPort The anchor's port: where the trench's first piece joined it.
 	 * @param AnchorHeight The height of the anchor.
 	 */
-	void OnStartAnchorLost(const FFieldTrenchOpenPort& AnchorPort, const float AnchorHeight);
+	virtual void OnStartAnchorLost(const FFieldTrenchOpenPort& AnchorPort, const float AnchorHeight);
 
 	/** @return What a piece of this length costs at the given price per metre; at least 1 of every priced resource. */
 	static TMap<ERTSResourceType, int32> GetCostOfLength(
@@ -186,6 +197,21 @@ protected:
 	// How often a trench that waits for resources checks again whether the player can pay.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Field Trench", meta = (ClampMin = "0.1"))
 	float ResourceRetrySeconds = 0.5f;
+
+	/**
+	 * @brief Removes every piece at once, also the ones whose component the engine already destroyed when it
+	 * reran the construction script.
+	 */
+	void ClearAllPieces();
+
+	// Pieces made while this is set are construction script components: the engine destroys them before it
+	// reruns the construction script, saves them with the level and greys them out in the details panel.
+	// Set by trenches that rebuild themselves in OnConstruction, such as ARTSFieldTrenchSpline.
+	bool bM_CreatePiecesAsConstructionScriptComponents = false;
+
+	// Looking for the ground ignores these as well, such as the walls and trenches a trench is joined to.
+	UPROPERTY(Transient)
+	TArray<TWeakObjectPtr<AActor>> M_ExtraGroundIgnoredActors;
 
 private:
 	UPROPERTY()

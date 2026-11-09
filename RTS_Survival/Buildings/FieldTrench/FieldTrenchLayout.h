@@ -66,7 +66,14 @@ struct FFieldTrenchPiecePlacement
 	UPROPERTY(BlueprintReadOnly)
 	float LengthCm = 0.0f;
 
-	FTransform GetTransform() const { return FTransform(FRotator(0.0f, Yaw, 0.0f), Location); }
+	// Stretches the piece along its length; only a straight that closes a trench onto a port is stretched.
+	UPROPERTY(BlueprintReadOnly)
+	float LengthScale = 1.0f;
+
+	FTransform GetTransform() const
+	{
+		return FTransform(FRotator(0.0f, Yaw, 0.0f), Location, FVector(LengthScale, 1.0f, 1.0f));
+	}
 };
 
 /** @brief The open end of a trench under construction: where the next piece joins and which way it points. */
@@ -85,6 +92,8 @@ struct FFieldTrenchPlanOptions
 	// port, facing the way the port points, and it gets no start cap. Unset starts the trench with an End cap
 	// at the first point of the drag, facing along the drag.
 	TOptional<FFieldTrenchOpenPort> StartPort;
+	// Off leaves the end of the trench open, for a caller that joins it to something.
+	bool bAddEndCap = true;
 
 	bool GetHasStartCap() const { return not StartPort.IsSet(); }
 };
@@ -138,6 +147,22 @@ namespace FieldTrenchLayout
 		const TArray<FVector2D>& DragPath,
 		float MaximumLengthCm,
 		const FFieldTrenchPlanOptions& Options);
+
+	/**
+	 * @brief Plans a trench along a dragged path, see above.
+	 * @param OutOpenEnd Receives the open end of the trench before its end cap; the start port, or the first
+	 * point of the drag, when nothing was planned.
+	 */
+	RTS_SURVIVAL_API TArray<FFieldTrenchPiecePlacement> PlanAlongPath(
+		const TArray<FVector2D>& DragPath,
+		float MaximumLengthCm,
+		const FFieldTrenchPlanOptions& Options,
+		FFieldTrenchOpenPort& OutOpenEnd);
+
+	/** @return A port of a placed piece in world space, pointing out of the piece; unset for a port it has not. */
+	RTS_SURVIVAL_API TOptional<FFieldTrenchOpenPort> GetPlacedPort(
+		const FFieldTrenchPiecePlacement& Placement,
+		int32 PortIndex);
 
 	/**
 	 * @return The open port facing back out of the trench at an end cap; a cap put on the port of a joined
