@@ -2,8 +2,14 @@
 import sys
 import unreal
 sub = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
-for p in sys.argv[1:]:
-    m = unreal.load_asset(p)
+args = sys.argv[1:]
+if len(args) == 1 and args[0].startswith("@"):
+    args = open(args[0][1:]).read().split()
+for p in args:
+    try:
+        m = unreal.load_asset(p)
+    except Exception as exc:
+        unreal.log_warning("RTS_LODINFO failed %s %s" % (p, exc)); continue
     if not m:
         unreal.log_warning("RTS_LODINFO missing %s" % p); continue
     tris = [m.get_num_triangles(i) for i in range(m.get_num_lods())]

@@ -139,6 +139,35 @@ def main(argv):
                                                                       mesh.get_num_triangles(0), ok))
         elif action == "restore":
             set_pct(mesh, 1.0)
+        elif action == "scale":
+            # value: factor applied to the current LOD0 percent_triangles (e.g. 0.5 halves a baked 8k corpse to 4k)
+            current = SMES.get_lod_reduction_settings(mesh, 0).percent_triangles
+            set_pct(mesh, current * float(value))
+        elif action == "cap":
+            # value: max LOD0 triangles; meshes above it get their percent scaled down to land on it (baker-style cap)
+            cap = float(value)
+            tris0 = mesh.get_num_triangles(0)
+            if tris0 > cap:
+                current = SMES.get_lod_reduction_settings(mesh, 0).percent_triangles
+                set_pct(mesh, current * cap / tris0)
+            else:
+                log("cap %s tris0=%d already <= %d" % (mesh.get_path_name(), tris0, cap))
+        elif action == "addlod1":
+            # value: "<pct of LOD0>,<screen size>" -> exactly one generated LOD1 below the (kept) LOD0 reduction
+            pct_of_lod0, screen = [float(v) for v in value.split(",")]
+            lod0_pct = SMES.get_lod_reduction_settings(mesh, 0).percent_triangles
+            options = unreal.EditorScriptingMeshReductionOptions()
+            options.auto_compute_lod_screen_size = False
+            settings = [unreal.EditorScriptingMeshReductionSettings(lod0_pct, 1.0),
+                        # LOD1's percent is applied to the already reduced LOD0 (measured: 0.14 gave 14% of LOD0)
+                        unreal.EditorScriptingMeshReductionSettings(pct_of_lod0, screen)]
+            options.reduction_settings = settings
+            SMES.set_lods(mesh, options)
+            ok = unreal.EditorAssetLibrary.save_loaded_asset(mesh, False)
+            log("addlod1 %s lods=%d tris=%s ss=%s saved=%s" % (
+                mesh.get_path_name(), mesh.get_num_lods(),
+                [mesh.get_num_triangles(i) for i in range(mesh.get_num_lods())],
+                [round(v, 3) for v in SMES.get_lod_screen_sizes(mesh)], ok))
         elif action == "screens":
             # value: comma separated LOD screen sizes, e.g. 1.0,0.5,0.25,0.1 (auto compute is turned off)
             sizes = [float(v) for v in value.split(",")]
