@@ -42,8 +42,18 @@ bool FMissionTowTeamWeaponSpawnState::StartAsyncSpawn(ARTSAsyncSpawner* RTSAsync
 		return false;
 	}
 
+	// Only base vehicles are guaranteed to tow, so ignore the variant the player picked for this tank type.
+	const TSoftClassPtr<AActor> BaseTankClass = RTSAsyncSpawner->GetBaseTrainingOptionClass(M_TankTrainingOption);
+	if (BaseTankClass.IsNull())
+	{
+		SetStateAsFailed("Mission tow spawn request could not start: no base class for tank "
+			+ M_TankTrainingOption.GetTrainingName() + ".");
+		return false;
+	}
+
 	const TWeakObjectPtr<AMissionManager> WeakMissionManager = M_MissionManager;
-	const bool bTankSpawnRequestStarted = RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
+	const bool bTankSpawnRequestStarted = RTSAsyncSpawner->AsyncSpawnClassAtLocation(
+		BaseTankClass,
 		M_TankTrainingOption,
 		M_TankSpawnLocation,
 		M_MissionManager.Get(),
