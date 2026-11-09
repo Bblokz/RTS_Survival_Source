@@ -3,6 +3,7 @@
 #include "FieldTrenchPlacementComponent.h"
 
 #include "Algo/Reverse.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Engine/World.h"
 #include "RTS_Survival/Buildings/FieldTrench/RTSFieldTrench.h"
 #include "RTS_Survival/Buildings/FieldTrench/Anchors/FieldTrenchAnchorSubsystem.h"
@@ -20,6 +21,17 @@ namespace FieldTrenchPlacementPrivate
 	constexpr int32 MaximumShortenAttempts = 6;
 	// Lengths are summed from floats; the shortened plan must still have room for the pieces it keeps.
 	constexpr float LengthTolerance = 1.0f;
+	// A short trench turns to the mouse once the mouse is this far from the start; closer, a shaking hand would
+	// spin it round.
+	constexpr float MinimumShortTrenchAimCm = 25.0f;
+	// From the camera's forward to screen right.
+	constexpr float ScreenRightYawOffsetDegrees = 90.0f;
+
+	FVector2D GetYawDirection(const float YawDegrees)
+	{
+		const float YawRadians = FMath::DegreesToRadians(YawDegrees);
+		return FVector2D(FMath::Cos(YawRadians), FMath::Sin(YawRadians));
+	}
 }
 
 UFieldTrenchPlacementComponent::UFieldTrenchPlacementComponent()
@@ -43,55 +55,32 @@ void UFieldTrenchPlacementComponent::StartPlacement(
 	{
 		M_BuildRadii.Add(BuildRadius);
 	}
-	bM_IsPlacing = true;
+	M_Phase = EFieldTrenchPlacementPhase::Hovering;
 	SetComponentTickEnabled(true);
+	// Shown at once, not only from the next tick.
+	UpdateHover();
 }
 
 bool UFieldTrenchPlacementComponent::OnPrimaryClick(const FVector& ClickedLocation)
 {
 	using namespace FieldTrenchPlacementPrivate;
 	ACPPController* PlayerController = GetPlayerController();
-	if (not bM_IsPlacing || not IsValid(PlayerController))
+	if (not GetIsPlacing() || not IsValid(PlayerController))
 	{
 		return true;
 	}
-	if (not GetIsDrawing())
+	if (M_Phase == EFieldTrenchPlacementPhase::Hovering)
 	{
-		const FFieldTrenchAnchorHandle StartAnchor = FindAnchorNear(FVector2D(ClickedLocation), FFieldTrenchAnchorHandle());
-		const UFieldTrenchAnchorComponent* StartAnchorComponent = StartAnchor.Get();
-		const FVector StartLocation = IsValid(StartAnchorComponent)
-			? StartAnchorComponent->GetAnchorLocation(StartAnchor.AnchorIndex)
-			: ClickedLocation;
-		if (GetHasRadiiConstraint() && not GetIsWithinBuildRadii(StartLocation))
-		{
-			PlayerController->DisplayErrorMessage(EPlayerError::Error_CannotBuildHere);
-			return false;
-		}
-		UClass* SpawnClass = TrenchClass.LoadSynchronous();
-		if (not IsValid(SpawnClass))
-		{
-			SpawnClass = ARTSFieldTrench::StaticClass();
-		}
-		FActorSpawnParameters SpawnParameters;
-		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		M_PreviewTrench = GetWorld()->SpawnActor<ARTSFieldTrench>(SpawnClass, FTransform(StartLocation), SpawnParameters);
-		if (not IsValid(M_PreviewTrench))
-		{
-			return true;
-		}
-		M_DragPath = {FVector2D(StartLocation)};
-		M_LastPlanPath.Reset();
-		M_StartAnchor = StartAnchor;
-		M_EndAnchor.Reset();
-		M_LastPlanAnchor.Reset();
-		M_StartHeight = StartLocation.Z;
-		M_PlannedPieces.Reset();
-		return false;
+		return BeginDrawing(ClickedLocation, *PlayerController);
+	}
+	if (not IsValid(M_PreviewTrench))
+	{
+		return true;
 	}
 	UpdateDrawing();
 	if (M_PlannedPieces.IsEmpty())
 	{
-		// Too short, or nothing of it lies where the player may build.
+		// Nothing of it lies where the player may build.
 		PlayerController->DisplayErrorMessage(EPlayerError::Error_CannotBuildHere);
 		return false;
 	}
@@ -106,7 +95,7 @@ bool UFieldTrenchPlacementComponent::OnPrimaryClick(const FVector& ClickedLocati
 
 bool UFieldTrenchPlacementComponent::GetIsDrawing() const
 {
-	return bM_IsPlacing && IsValid(M_PreviewTrench);
+	return M_Phase == EFieldTrenchPlacementPhase::Drawing && IsValid(M_PreviewTrench);
 }
 
 void UFieldTrenchPlacementComponent::CancelPlacement()
@@ -125,7 +114,7 @@ void UFieldTrenchPlacementComponent::TickComponent(
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-	if (not bM_IsPlacing)
+	if (not GetIsPlacing())
 	{
 		SetComponentTickEnabled(false);
 		return;
@@ -142,6 +131,11 @@ void UFieldTrenchPlacementComponent::TickComponent(
 		{
 			CancelPlacement();
 		}
+		return;
+	}
+	if (M_Phase == EFieldTrenchPlacementPhase::Hovering)
+	{
+		UpdateHover();
 		return;
 	}
 	if (GetIsDrawing())
@@ -188,6 +182,75 @@ bool UFieldTrenchPlacementComponent::GetIsWithinBuildRadii(const FVector& Locati
 	return false;
 }
 
+bool UFieldTrenchPlacementComponent::EnsurePreviewTrench(const FVector& SpawnLocation)
+{
+	if (IsValid(M_PreviewTrench))
+	{
+		return true;
+	}
+	UWorld* World = GetWorld();
+	if (not IsValid(World))
+	{
+		return false;
+	}
+	UClass* SpawnClass = TrenchClass.LoadSynchronous();
+	if (not IsValid(SpawnClass))
+	{
+		SpawnClass = ARTSFieldTrench::StaticClass();
+	}
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	M_PreviewTrench = World->SpawnActor<ARTSFieldTrench>(SpawnClass, FTransform(SpawnLocation), SpawnParameters);
+	return IsValid(M_PreviewTrench);
+}
+
+bool UFieldTrenchPlacementComponent::BeginDrawing(const FVector& ClickedLocation, ACPPController& PlayerController)
+{
+	const FFieldTrenchAnchorHandle StartAnchor = FindAnchorNear(FVector2D(ClickedLocation), FFieldTrenchAnchorHandle());
+	const FVector StartLocation = GetAnchorOrFallbackLocation(StartAnchor, ClickedLocation);
+	if (GetHasRadiiConstraint() && not GetIsWithinBuildRadii(StartLocation))
+	{
+		PlayerController.DisplayErrorMessage(EPlayerError::Error_CannotBuildHere);
+		return false;
+	}
+	if (not EnsurePreviewTrench(StartLocation))
+	{
+		return true;
+	}
+	// The pieces are laid in world space; the plan is laid again below, after the actor moved to the start.
+	M_PreviewTrench->SetActorLocation(StartLocation);
+	M_DragPath = {FVector2D(StartLocation)};
+	M_LastPlanPath.Reset();
+	M_StartAnchor = StartAnchor;
+	M_EndAnchor.Reset();
+	M_LastPlanAnchor.Reset();
+	M_StartHeight = StartLocation.Z;
+	M_PlannedPieces.Reset();
+	M_Phase = EFieldTrenchPlacementPhase::Drawing;
+	// The short trench the hover showed stays up instead of vanishing for a frame.
+	UpdateDrawing();
+	return false;
+}
+
+void UFieldTrenchPlacementComponent::UpdateHover()
+{
+	FVector CursorGround;
+	if (not TryGetCursorGround(CursorGround))
+	{
+		return;
+	}
+	// Exactly what a click here would start: on the anchor the click snaps to, or at the mouse.
+	M_StartAnchor = FindAnchorNear(FVector2D(CursorGround), FFieldTrenchAnchorHandle());
+	const FVector StartLocation = GetAnchorOrFallbackLocation(M_StartAnchor, CursorGround);
+	if (not EnsurePreviewTrench(StartLocation))
+	{
+		return;
+	}
+	M_StartHeight = StartLocation.Z;
+	M_ShortTrenchDirection = GetScreenRightDirection();
+	ShowPlan({FVector2D(StartLocation)}, M_StartAnchor, false);
+}
+
 void UFieldTrenchPlacementComponent::UpdateDrawing()
 {
 	FVector CursorGround;
@@ -200,9 +263,9 @@ void UFieldTrenchPlacementComponent::UpdateDrawing()
 			M_DragPath.Add(Cursor);
 			PlanPath = M_DragPath;
 		}
-		else
+		else if (not Cursor.Equals(PlanPath.Last()))
 		{
-			// Between recorded steps the trench still reaches to the mouse.
+			// Between recorded steps the trench still reaches to the mouse. A doubled point would stall the planner.
 			PlanPath.Add(Cursor);
 		}
 	}
@@ -214,30 +277,22 @@ void UFieldTrenchPlacementComponent::UpdateDrawing()
 	M_EndAnchor = M_StartAnchor.IsSet() ? FFieldTrenchAnchorHandle() : FindAnchorNear(PlanPath.Last(), M_EndAnchor);
 	// A trench is planned from its anchor out, so it fits the anchor exactly; joined at the end, it is planned
 	// from there back to the first click.
-	const FFieldTrenchAnchorHandle PlanAnchor = M_EndAnchor.IsSet() ? M_EndAnchor : M_StartAnchor;
-	FFieldTrenchPlanOptions Options;
-	if (const UFieldTrenchAnchorComponent* AnchorComponent = PlanAnchor.Get())
+	const bool bIsJoinedAtEnd = M_EndAnchor.IsSet();
+	ShowPlan(MoveTemp(PlanPath), bIsJoinedAtEnd ? M_EndAnchor : M_StartAnchor, bIsJoinedAtEnd);
+}
+
+void UFieldTrenchPlacementComponent::ShowPlan(
+	TArray<FVector2D> PlanPath,
+	const FFieldTrenchAnchorHandle& PlanAnchor,
+	const bool bIsJoinedAtEnd)
+{
+	if (PlanPath.IsEmpty() || not IsValid(M_PreviewTrench))
 	{
-		Options.StartPort = AnchorComponent->GetAnchorPort(PlanAnchor.AnchorIndex);
-		if (M_EndAnchor.IsSet())
-		{
-			Algo::Reverse(PlanPath);
-		}
-		const FVector2D AnchorLocation = Options.StartPort->Location;
-		PlanPath[0] = AnchorLocation;
-		// The mouse over the anchor's owner, behind the anchor, would turn the trench back into it.
-		const float AnchorYawRadians = FMath::DegreesToRadians(Options.StartPort->Yaw);
-		const FVector2D AnchorOut(FMath::Cos(AnchorYawRadians), FMath::Sin(AnchorYawRadians));
-		const float ReleaseRadius = AnchorReleaseRadius;
-		for (int32 PathIndex = PlanPath.Num() - 1; PathIndex >= 1; --PathIndex)
-		{
-			const FVector2D FromAnchor = PlanPath[PathIndex] - AnchorLocation;
-			if (FromAnchor.Size() <= ReleaseRadius && FVector2D::DotProduct(FromAnchor, AnchorOut) < 0.0f)
-			{
-				PlanPath.RemoveAt(PathIndex);
-			}
-		}
+		return;
 	}
+	FFieldTrenchPlanOptions Options;
+	StartPathOnAnchor(PlanPath, Options, PlanAnchor, bIsJoinedAtEnd);
+	ExtendToMinimumShownLength(PlanPath, Options);
 	if (PlanPath == M_LastPlanPath && PlanAnchor == M_LastPlanAnchor)
 	{
 		return;
@@ -261,6 +316,90 @@ void UFieldTrenchPlacementComponent::UpdateDrawing()
 	}
 	M_PreviewTrench->SetPlannedPieces(UnbuildablePlan);
 	M_PreviewTrench->SetPlanIsValid(false);
+}
+
+void UFieldTrenchPlacementComponent::StartPathOnAnchor(
+	TArray<FVector2D>& InOutPlanPath,
+	FFieldTrenchPlanOptions& InOutOptions,
+	const FFieldTrenchAnchorHandle& PlanAnchor,
+	const bool bIsJoinedAtEnd) const
+{
+	const UFieldTrenchAnchorComponent* AnchorComponent = PlanAnchor.Get();
+	if (not IsValid(AnchorComponent))
+	{
+		return;
+	}
+	InOutOptions.StartPort = AnchorComponent->GetAnchorPort(PlanAnchor.AnchorIndex);
+	if (bIsJoinedAtEnd)
+	{
+		Algo::Reverse(InOutPlanPath);
+	}
+	const FVector2D AnchorLocation = InOutOptions.StartPort->Location;
+	InOutPlanPath[0] = AnchorLocation;
+	// The mouse over the anchor's owner, behind the anchor, would turn the trench back into it.
+	const FVector2D AnchorOut = FieldTrenchPlacementPrivate::GetYawDirection(InOutOptions.StartPort->Yaw);
+	for (int32 PathIndex = InOutPlanPath.Num() - 1; PathIndex >= 1; --PathIndex)
+	{
+		const FVector2D FromAnchor = InOutPlanPath[PathIndex] - AnchorLocation;
+		if (FromAnchor.Size() <= AnchorReleaseRadius && FVector2D::DotProduct(FromAnchor, AnchorOut) < 0.0f)
+		{
+			InOutPlanPath.RemoveAt(PathIndex);
+		}
+	}
+}
+
+void UFieldTrenchPlacementComponent::ExtendToMinimumShownLength(
+	TArray<FVector2D>& InOutPlanPath,
+	const FFieldTrenchPlanOptions& Options)
+{
+	using namespace FieldTrenchPlacementPrivate;
+	if (InOutPlanPath.IsEmpty())
+	{
+		return;
+	}
+	const FVector2D Start = InOutPlanPath[0];
+	float FarthestDistance = 0.0f;
+	for (const FVector2D& Point : InOutPlanPath)
+	{
+		FarthestDistance = FMath::Max(FarthestDistance, FVector2D::Distance(Start, Point));
+	}
+	if (FarthestDistance >= MinimumShownLength)
+	{
+		return;
+	}
+	const FVector2D TowardsMouse = InOutPlanPath.Last() - Start;
+	FVector2D Direction = M_ShortTrenchDirection;
+	if (TowardsMouse.Size() >= MinimumShortTrenchAimCm)
+	{
+		Direction = TowardsMouse.GetSafeNormal();
+		M_ShortTrenchDirection = Direction;
+	}
+	else if (Options.StartPort.IsSet())
+	{
+		// On an anchor the trench leaves the way the anchor points.
+		Direction = GetYawDirection(Options.StartPort->Yaw);
+	}
+	InOutPlanPath = {Start, Start + Direction * MinimumShownLength};
+}
+
+FVector2D UFieldTrenchPlacementComponent::GetScreenRightDirection() const
+{
+	const ACPPController* PlayerController = GetPlayerController();
+	if (not IsValid(PlayerController) || not IsValid(PlayerController->PlayerCameraManager))
+	{
+		return M_ShortTrenchDirection;
+	}
+	const float CameraYaw = PlayerController->PlayerCameraManager->GetCameraRotation().Yaw;
+	return FieldTrenchPlacementPrivate::GetYawDirection(
+		CameraYaw + FieldTrenchPlacementPrivate::ScreenRightYawOffsetDegrees);
+}
+
+FVector UFieldTrenchPlacementComponent::GetAnchorOrFallbackLocation(
+	const FFieldTrenchAnchorHandle& Anchor,
+	const FVector& Fallback)
+{
+	const UFieldTrenchAnchorComponent* AnchorComponent = Anchor.Get();
+	return IsValid(AnchorComponent) ? AnchorComponent->GetAnchorLocation(Anchor.AnchorIndex) : Fallback;
 }
 
 FFieldTrenchAnchorHandle UFieldTrenchPlacementComponent::FindAnchorNear(
@@ -358,6 +497,6 @@ void UFieldTrenchPlacementComponent::ResetPlacement()
 	M_StartAnchor.Reset();
 	M_EndAnchor.Reset();
 	M_LastPlanAnchor.Reset();
-	bM_IsPlacing = false;
+	M_Phase = EFieldTrenchPlacementPhase::Idle;
 	SetComponentTickEnabled(false);
 }

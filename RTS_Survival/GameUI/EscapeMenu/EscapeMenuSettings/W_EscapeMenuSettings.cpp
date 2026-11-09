@@ -214,6 +214,7 @@ void UW_EscapeMenuSettings::PopulateComboBoxOptions()
 	PopulateQualityOptions();
 	PopulateAmbientEffectsOptions();
 	PopulateBattlefieldCorpsesOptions();
+	PopulateImpactDecalsOptions();
 	PopulateGameplayOptions();
 
 	SetSliderRange(M_SliderFrameRateLimit, M_SliderRanges.M_FrameRateLimitMin, M_SliderRanges.M_FrameRateLimitMax);
@@ -362,6 +363,31 @@ void UW_EscapeMenuSettings::PopulateBattlefieldCorpsesOptions()
 bool UW_EscapeMenuSettings::GetHasBattlefieldCorpsesWidgets() const
 {
 	return IsValid(M_TextBattlefieldCorpsesLabel) && IsValid(M_ComboBattlefieldCorpses);
+}
+
+void UW_EscapeMenuSettings::PopulateImpactDecalsOptions()
+{
+	if (not GetHasImpactDecalsWidgets())
+	{
+		return;
+	}
+
+	M_ComboImpactDecals->ClearOptions();
+	for (const ERTSImpactDecalsLevel Level : {
+		     ERTSImpactDecalsLevel::Off,
+		     ERTSImpactDecalsLevel::Few,
+		     ERTSImpactDecalsLevel::Some,
+		     ERTSImpactDecalsLevel::Many,
+		     ERTSImpactDecalsLevel::Maximum
+	     })
+	{
+		M_ComboImpactDecals->AddOption(global_GetImpactDecalsText(Level).ToString());
+	}
+}
+
+bool UW_EscapeMenuSettings::GetHasImpactDecalsWidgets() const
+{
+	return IsValid(M_TextImpactDecalsLabel) && IsValid(M_ComboImpactDecals);
 }
 
 void UW_EscapeMenuSettings::PopulateGameplayOptions()
@@ -617,6 +643,10 @@ void UW_EscapeMenuSettings::UpdateEnvironmentDetailTexts()
 	{
 		M_TextBattlefieldCorpsesLabel->SetText(M_GraphicsText.M_BattlefieldCorpsesLabelText);
 	}
+	if (GetHasImpactDecalsWidgets())
+	{
+		M_TextImpactDecalsLabel->SetText(M_GraphicsText.M_ImpactDecalsLabelText);
+	}
 	M_TextEnvironmentAdvancedLabel->SetText(bM_IsEnvironmentAdvancedExpanded
 		                                        ? M_GraphicsText.M_EnvironmentAdvancedHideText
 		                                        : M_GraphicsText.M_EnvironmentAdvancedShowText);
@@ -655,6 +685,11 @@ void UW_EscapeMenuSettings::InitialiseGraphicsEnvironmentDetailControls(
 	{
 		M_ComboBattlefieldCorpses->SetSelectedOption(
 			global_GetBattlefieldCorpsesText(EnvironmentDetailSettings.M_BattlefieldCorpsesLevel).ToString());
+	}
+	if (GetHasImpactDecalsWidgets())
+	{
+		M_ComboImpactDecals->SetSelectedOption(
+			global_GetImpactDecalsText(EnvironmentDetailSettings.M_ImpactDecalsLevel).ToString());
 	}
 }
 
@@ -1181,6 +1216,13 @@ void UW_EscapeMenuSettings::BindEnvironmentDetailCallbacks()
 		M_ComboBattlefieldCorpses->OnSelectionChanged.RemoveAll(this);
 		M_ComboBattlefieldCorpses->OnSelectionChanged.AddDynamic(
 			this, &UW_EscapeMenuSettings::HandleBattlefieldCorpsesSelectionChanged);
+	}
+
+	if (GetHasImpactDecalsWidgets())
+	{
+		M_ComboImpactDecals->OnSelectionChanged.RemoveAll(this);
+		M_ComboImpactDecals->OnSelectionChanged.AddDynamic(
+			this, &UW_EscapeMenuSettings::HandleImpactDecalsSelectionChanged);
 	}
 
 	M_ButtonEnvironmentAdvanced->OnClicked.RemoveAll(this);
@@ -4201,6 +4243,29 @@ void UW_EscapeMenuSettings::HandleBattlefieldCorpsesSelectionChanged(FString Sel
 	}
 
 	M_SettingsSubsystem->SetPendingBattlefieldCorpsesLevel(static_cast<ERTSBattlefieldCorpsesLevel>(SelectedIndex));
+}
+
+void UW_EscapeMenuSettings::HandleImpactDecalsSelectionChanged(FString SelectedItem,
+                                                               const ESelectInfo::Type SelectionType)
+{
+	if (bM_IsInitialisingControls)
+	{
+		return;
+	}
+
+	if (not GetIsValidSettingsSubsystem() || not GetHasImpactDecalsWidgets())
+	{
+		return;
+	}
+
+	const int32 SelectedIndex = M_ComboImpactDecals->FindOptionIndex(SelectedItem);
+	if (SelectedIndex == INDEX_NONE)
+	{
+		RTSFunctionLibrary::ReportError(TEXT("Shell craters selection was not found in the combo box options."));
+		return;
+	}
+
+	M_SettingsSubsystem->SetPendingImpactDecalsLevel(static_cast<ERTSImpactDecalsLevel>(SelectedIndex));
 }
 
 void UW_EscapeMenuSettings::HandleEnvironmentAdvancedClicked()

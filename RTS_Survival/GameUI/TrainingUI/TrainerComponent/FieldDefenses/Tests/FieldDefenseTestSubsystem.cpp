@@ -51,6 +51,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogRTSFieldDefenseTest, Log, All);
 namespace FieldDefenseTestPrivate
 {
 	constexpr float StartDelaySeconds = 3.f;
+	// After the start delay the HQ is looked for this much longer before the test gives up on it.
+	constexpr float HQWaitSeconds = 30.f;
 	constexpr float ExpandTimeoutSeconds = 400.f;
 	constexpr float ConversionFastForwardSeconds = 30.f;
 	constexpr float UnitTrainingTimeoutSeconds = 400.f;
@@ -373,13 +375,18 @@ void UFieldDefenseTestSubsystem::TickWaitingForStart()
 	{
 		return;
 	}
-	GivePlayerResources();
 	if (not FindHQ())
 	{
+		// The HQ comes with the player profile after an async load; on a busy machine that takes longer.
+		if (GetPhaseSeconds() < FieldDefenseTestPrivate::StartDelaySeconds + FieldDefenseTestPrivate::HQWaitSeconds)
+		{
+			return;
+		}
 		Check(false, TEXT("hq_found"));
 		Finish();
 		return;
 	}
+	GivePlayerResources();
 	ANomadicVehicle* HQ = M_HQ.Get();
 	UE_LOG(LogRTSFieldDefenseTest, Display, TEXT("RTS_FIELD_DEFENSE_TEST hq=%s status=%d location=%s"),
 	       *HQ->GetName(), static_cast<int32>(HQ->GetNomadicStatus()), *HQ->GetActorLocation().ToString());
@@ -1635,6 +1642,10 @@ void UFieldDefenseTestSubsystem::TickLayingTrench()
 		}
 	case 1:
 		{
+			M_TrenchPath = MakePath(HQ->GetActorRotation().Yaw);
+			M_TrenchCursorDistance = 0.f;
+			// The mouse is on the start before the trench is picked, so the short trench shows from the start.
+			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
 			const bool bClicked = ClickTrainingItemWidget(FieldTrenchOption, true);
 			Check(bClicked && Placement->GetIsPlacing(), TEXT("trench_menu_click_starts_placement"),
 			      FString::Printf(TEXT("item_widget_found=%d placing=%d"), bClicked ? 1 : 0,
@@ -1644,11 +1655,16 @@ void UFieldDefenseTestSubsystem::TickLayingTrench()
 				// Without the widget the rest of the trench is still tested through the controller.
 				Controller->StartFieldTrenchPlacement(Trainer, CostPerMetre);
 			}
-			M_TrenchPath = MakePath(HQ->GetActorRotation().Yaw);
-			M_TrenchCursorDistance = 0.f;
-			Placement->MapTest_SetCursorOverride(M_TrenchPath[0]);
+			const int32 HoverPieceCount = Placement->MapTest_GetPlannedPieces().Num();
+			Check(not Placement->GetIsDrawing() && HoverPieceCount >= 3 && IsValid(Placement->MapTest_GetPreviewTrench()),
+			      TEXT("trench_shows_short_trench_before_first_click"),
+			      FString::Printf(TEXT("pieces=%d drawing=%d"), HoverPieceCount, Placement->GetIsDrawing() ? 1 : 0));
 			Check(not Controller->MapTest_ClickFieldTrenchAt(M_TrenchPath[0]) && Placement->GetIsDrawing(),
 			      TEXT("trench_first_click_starts_drawing"), M_TrenchPath[0].ToCompactString());
+			// The mouse has not moved from the start: the short trench stays up instead of vanishing.
+			const int32 FirstClickPieceCount = Placement->MapTest_GetPlannedPieces().Num();
+			Check(FirstClickPieceCount >= 3, TEXT("trench_short_trench_stays_after_first_click"),
+			      FString::Printf(TEXT("pieces=%d"), FirstClickPieceCount));
 			++M_PhaseStep;
 			return;
 		}
