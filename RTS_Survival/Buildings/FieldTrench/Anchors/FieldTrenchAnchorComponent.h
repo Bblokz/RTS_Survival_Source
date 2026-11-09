@@ -46,6 +46,16 @@ struct RTS_SURVIVAL_API FFieldTrenchAnchorHandle
 	}
 };
 
+/** @brief A TrenchPort_ socket read off an actor's meshes, in the trench planner's terms. */
+struct FFieldTrenchAnchorSocketPort
+{
+	UStaticMeshComponent* MeshComponent = nullptr;
+	FName SocketName;
+	// +X of the socket, pointing away from the owner.
+	FFieldTrenchOpenPort Port;
+	float Height = 0.0f;
+};
+
 USTRUCT()
 struct FFieldTrenchAnchorRuntime
 {
@@ -95,6 +105,12 @@ public:
 
 	/** Sockets whose names start with this are trench anchors. */
 	static const TCHAR* const SocketPrefix;
+
+	/**
+	 * @brief Reads the anchor sockets of an actor where they are now; works in the editor too, where the anchors
+	 * are not made.
+	 */
+	static void GetAnchorSocketPorts(const AActor& Owner, TArray<FFieldTrenchAnchorSocketPort>& OutSocketPorts);
 
 	/**
 	 * @brief Makes the anchors available to trenches, or takes them away and caps the trenches joined to them.

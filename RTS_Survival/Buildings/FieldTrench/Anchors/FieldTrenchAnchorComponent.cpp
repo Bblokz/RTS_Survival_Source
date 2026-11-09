@@ -24,6 +24,37 @@ UFieldTrenchAnchorComponent* FFieldTrenchAnchorHandle::Get() const
 		: nullptr;
 }
 
+void UFieldTrenchAnchorComponent::GetAnchorSocketPorts(
+	const AActor& Owner,
+	TArray<FFieldTrenchAnchorSocketPort>& OutSocketPorts)
+{
+	TArray<UStaticMeshComponent*> MeshComponents;
+	Owner.GetComponents(MeshComponents);
+	for (UStaticMeshComponent* MeshComponent : MeshComponents)
+	{
+		// Necks and plugs of an earlier round are static meshes of the owner too, without sockets of their own.
+		if (not IsValid(MeshComponent) || not IsValid(MeshComponent->GetStaticMesh()))
+		{
+			continue;
+		}
+		for (const FName& SocketName : MeshComponent->GetAllSocketNames())
+		{
+			if (not SocketName.ToString().StartsWith(SocketPrefix))
+			{
+				continue;
+			}
+			const FTransform SocketTransform = MeshComponent->GetSocketTransform(SocketName, RTS_World);
+			const FVector Forward = SocketTransform.GetRotation().GetForwardVector();
+			FFieldTrenchAnchorSocketPort& SocketPort = OutSocketPorts.AddDefaulted_GetRef();
+			SocketPort.MeshComponent = MeshComponent;
+			SocketPort.SocketName = SocketName;
+			SocketPort.Port.Location = FVector2D(SocketTransform.GetLocation());
+			SocketPort.Port.Yaw = FMath::RadiansToDegrees(FMath::Atan2(Forward.Y, Forward.X));
+			SocketPort.Height = SocketTransform.GetLocation().Z;
+		}
+	}
+}
+
 UFieldTrenchAnchorComponent::UFieldTrenchAnchorComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -213,38 +244,25 @@ void UFieldTrenchAnchorComponent::CreateAnchors()
 	const URTSComponent* RTSComponent = Owner->FindComponentByClass<URTSComponent>();
 	M_OwningPlayer = IsValid(RTSComponent) ? RTSComponent->GetOwningPlayer() : INDEX_NONE;
 
-	TArray<UStaticMeshComponent*> MeshComponents;
-	Owner->GetComponents(MeshComponents);
+	TArray<FFieldTrenchAnchorSocketPort> SocketPorts;
+	GetAnchorSocketPorts(*Owner, SocketPorts);
 	M_Anchors.Reset();
-	for (UStaticMeshComponent* MeshComponent : MeshComponents)
+	for (const FFieldTrenchAnchorSocketPort& SocketPort : SocketPorts)
 	{
-		// Necks and plugs of an earlier round are static meshes of the owner too, without sockets of their own.
-		if (not IsValid(MeshComponent) || not IsValid(MeshComponent->GetStaticMesh()))
+		FFieldTrenchAnchorRuntime& Anchor = M_Anchors.AddDefaulted_GetRef();
+		Anchor.SocketName = SocketPort.SocketName;
+		Anchor.SocketMesh = SocketPort.MeshComponent;
+		// The owner stands still while its anchors are available, so the port is read once.
+		Anchor.Port = SocketPort.Port;
+		Anchor.Height = SocketPort.Height;
+		if (const FFieldTrenchAnchorDefinition* Definition = FindDefinition(SocketPort.SocketName))
 		{
-			continue;
+			Anchor.NeckComponent = CreateSocketVisual(*SocketPort.MeshComponent, SocketPort.SocketName,
+			                                          Definition->NeckMesh);
+			Anchor.PlugComponent = CreateSocketVisual(*SocketPort.MeshComponent, SocketPort.SocketName,
+			                                          Definition->PlugMesh);
 		}
-		for (const FName& SocketName : MeshComponent->GetAllSocketNames())
-		{
-			if (not SocketName.ToString().StartsWith(SocketPrefix))
-			{
-				continue;
-			}
-			FFieldTrenchAnchorRuntime& Anchor = M_Anchors.AddDefaulted_GetRef();
-			Anchor.SocketName = SocketName;
-			Anchor.SocketMesh = MeshComponent;
-			// The owner stands still while its anchors are available, so the port is read once.
-			const FTransform SocketTransform = MeshComponent->GetSocketTransform(SocketName, RTS_World);
-			const FVector Forward = SocketTransform.GetRotation().GetForwardVector();
-			Anchor.Port.Location = FVector2D(SocketTransform.GetLocation());
-			Anchor.Port.Yaw = FMath::RadiansToDegrees(FMath::Atan2(Forward.Y, Forward.X));
-			Anchor.Height = SocketTransform.GetLocation().Z;
-			if (const FFieldTrenchAnchorDefinition* Definition = FindDefinition(SocketName))
-			{
-				Anchor.NeckComponent = CreateSocketVisual(*MeshComponent, SocketName, Definition->NeckMesh);
-				Anchor.PlugComponent = CreateSocketVisual(*MeshComponent, SocketName, Definition->PlugMesh);
-			}
-			ShowAnchorState(Anchor);
-		}
+		ShowAnchorState(Anchor);
 	}
 	for (const FFieldTrenchAnchorDefinition& Definition : Anchors)
 	{

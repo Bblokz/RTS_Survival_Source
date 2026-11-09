@@ -93,20 +93,40 @@ carrying, and hands over to `UAircraftDeathComponent` (created on every aircraft
   and the aircraft's meshes are hidden. Until then the aircraft flies its fall as itself.
   Letting a piece go (`ReleasePiece`) takes two steps in the wreck's tick: a huge external strain on the piece tears it
   out of its cluster (damage propagation spreads it, so the first tear frees every piece; each stays kinematic and
-  follows on its own), and two frames later a small kinematic field (`ApplyKinematicField`) around it makes it dynamic,
-  with the speed its kinematic motion gave it plus a kick. Do not use `SetAnchoredByIndex(false)` for this: it switches
+  follows on its own), and two frames later a small dynamic-state field around it makes it dynamic (after the first tear every piece is
+  on its own and is made dynamic at once). The field is a radial sphere culling a uniform "dynamic" value
+  (`Carried_MakeDynamicInSphere`, through `ApplyPhysicsField`), not `ApplyKinematicField`: that one sets every piece
+  outside its sphere that is not already dynamic to kinematic, so pieces resting asleep on the ground turned kinematic,
+  were carried on by the moving hull and left hanging metres up. The piece leaves with the speed its kinematic motion
+  gave it plus a kick. Do not use `SetAnchoredByIndex(false)` for this: it switches
   the state of a collection particle without handing it to the solver's islands, so the piece reads dynamic but hangs
-  frozen (or falls asleep) in the air. Anchoring pieces also stops strain from tearing them out. Loose pieces have
-  `PieceLinearDamping` air drag, so they fall behind.
+  frozen (or falls asleep) in the air. Anchoring pieces also stops strain from tearing them out. A field placed from
+  a stale physics result can miss: six frames later the wreck reads the piece's state back
+  (`GetDynamicCollection()->DynamicState`) and retries with a field twice as wide, up to four times (the kick velocity is added only once: it adds up). Loose pieces have
+  `PieceLinearDamping` air drag (0.05; Chaos applies it far more strongly than its value suggests, 0.35 held torn parts
+  to about 3 m/s). The carried wreck's pieces ignore each other (`ECC_PhysicsBody`) and have no CCD: released pieces
+  overlapping held ones were thrown tens of metres, and CCD on pieces switching from kinematic to dynamic tripped a
+  Chaos assert (`!Constraint->IsEnabled()` in `GenerateCollisionCCDImpl`); with the pieces ignoring each other it
+  instead broke the ground's collision for the rest of the run (an aircraft fell through the world, ground traces
+  failed). It uses motion-aware collision (`SetUseMACD(true)`) instead, which stopped fast pieces tunnelling through
+  the landscape (Sturmovik 7-9 of 23 pieces under the ground before, 0 after). The parked-aircraft wreck keeps CCD and
+  inter-piece collision and has no MACD: with CCD and MACD both on, pieces piled on each other were squeezed through
+  the landscape (a Bf109 blown up in its bay lost a piece under the floor in half the runs; 0 of 4 without MACD, while
+  CCD off was worse still). The Pe-2 and Pe-8 used to lose about a third of their pieces under the ground: their collections held only
+  the propellers (see the crash collection notes below).
 - **Breaking up in the air** (`bBreakUpInTheAir`). `AirBreakupDelaySeconds` after the hit the first part tears off with
   a small blast (`AirBreakupExplosion`): a burning wing loses its outer panel beyond the engine; a nose-fire aircraft
   loses its tail (60 %) or a wing tip. `AirBreakupPieceShare` of the pieces go, at least two; a second, smaller tear
   follows `AirSecondBreakupDelaySeconds` later. The first torn part trails smoke while it tumbles.
 - **Impact.** Traces from the belly and from the nose (the nose leads in a dive) find the ground or any static object;
   `EAircraftDeathPhase::Impacted` is set at that first contact. The hull then ploughs on for `ImpactBreakupSeconds`
-  (longer for bigger aircraft): it skids along the ground with `ImpactSkidSpeedShare` of its horizontal speed, pivots on
+  (longer for bigger aircraft, and long enough that no piece moves faster than 25 m/s as the hull levels, along a
+  smoothstep: easing out from the start brought a Ju 390's tail down at 45 m/s and threw its pieces tens of metres up): it skids along the ground with `ImpactSkidSpeedShare` of its horizontal speed, pivots on
   the nose as the tail slams down, and lets go of its pieces from the nose back, or as soon as a piece meets the
-  ground. The blasts are spread over that time: dirt thrown up where the nose hit (`GroundBurst`), the main blast over
+  ground: when its lowest point (its box projected on the ground normal) comes within 30 cm of the ground, or will
+  within 0.08 s at its speed into it. Held until its centre came down, a big bomber piece was buried metres deep and
+  fell through the ground once loose (40 % of a Pe-2's pieces). All of a released piece's speed into the ground is
+  taken away: without CCD a thin panel driven into the ground at speed falls through it. The blasts are spread over that time: dirt thrown up where the nose hit (`GroundBurst`), the main blast over
   the hull (`ImpactExplosion`, +0.08 s), the fuel fireball (`FuelFireball`, +0.2 s), one to three smaller blasts among
   the pieces (`SecondaryExplosion`, 0.45-1.4 s, more for bombers), fires on two to four pieces after 2 s
   (`BurningDebris`) and the burning fuel where the hull came to rest (`GroundFire`). The wreck's fires die down after
@@ -142,14 +162,18 @@ RTS camera they filled the screen with embers or haze, and their user parameters
 
 ## Crash geometry collections
 
-`/Game/RTS_Survival/Blueprints/Aircraft/CrashCollections/GC_Crash_<mesh>` (always cooked, see `DefaultGame.ini`), one
+`/Game/RTS_Survival/Blueprints/Aircraft/CrashCollections/GC_AircraftCrash_<mesh>` (always cooked, see `DefaultGame.ini`), one
 per set of aircraft meshes; the aircraft finds its own by the same name
 (`FAircraftDeathMath::GetCrashCollectionAssetName`: the static frame names it when there is one, else the skeletal
 mesh). Built by the editor command
 
 ```
-RTS.Aircraft.BuildCrashCollections [AircraftClassNameFilter] [Overwrite]
+RTS.Aircraft.BuildCrashCollections [AircraftClassNameFilter] [Overwrite] [DryRun]
 ```
+
+`DryRun` builds every collection and logs `RTS_AIRCRAFT_CRASH_HULL` lines (pieces whose collision hull is under half
+their size on any axis) without saving anything. On 2026-11-09 it showed every hull covers at least 58 % of its piece:
+pieces that sink through the ground do so through the physics, not because of their hulls.
 
 run in a headless editor, e.g. a python script with
 `unreal.SystemLibrary.execute_console_command(None, 'RTS.Aircraft.BuildCrashCollections Overwrite')` and
@@ -159,6 +183,14 @@ bakes that into collection space, Voronoi-cuts it with sites sampled on the airc
 size), removes the uncut parent geometry, sets removal on sleep and flags the aircraft materials for geometry
 collections. Rebuild after an aircraft mesh changes. Lessons:
 
+- Skeletal meshes are appended before static ones: `FGeometryCollectionEngineConversion::AppendSkeletalMesh` builds
+  its own collection and copies it over the target (`CopyTo`), replacing whatever was appended before. With the static
+  frame appended first, the Pe-2 and Pe-8 collections held only their propellers: the bomber's body vanished when the
+  wreck took over, and the tiny propeller pieces fell through the ground. Every geometry is also baked into
+  collection space (`BakeAllGeometryIntoCollectionSpace`) before the merge, and the aircraft's root scale is baked in
+  with the wreck spawned unscaled (all aircraft have scale 1 today). The rebuilt collections use the
+  `GC_AircraftCrash_` prefix (new files, so the build works while an editor holds the old ones open); the
+  `GC_Crash_*` assets are no longer used.
 - Skeletal meshes arrive as one geometry per bone section (170 for the Bf 109) marked as embedded; mark them rigid
   before `MergeAllSelectedBones`, or nothing merges and every cell holds a piece of every part.
 - Their bone transforms carry the import scale, which Chaos ignores: without baking into collection space the pieces
@@ -197,8 +229,8 @@ collections. Rebuild after an aircraft mesh changes. Lessons:
     fire on the right engine, the fall starting with the speed it had and carrying it on, impact on the ground, the
     breakup, the fire ending, the actor being cleared, a parked aircraft's pieces staying within its own size, and in
     the airbase every piece staying inside the building and above the ground under it, a part tearing off in the air
-    (falls longer than 1 s), the hull coming apart from the nose, every piece on the ground 3 s after the impact
-    (`_pieces_came_down`: catches pieces left hanging in the air) and no trail smoke puff still spawning when the actor
+    (falls longer than 1 s), the hull coming apart from the nose, every piece on the ground when the actor is cleared, 8 s after the impact
+    (`_pieces_came_down`: catches pieces left hanging in the air; `_pieces_stay_above_the_ground` allows 8 % of the pieces, at least 2, to slip under the ground: a few small Fw 189 pieces do now and then) and no trail smoke puff still spawning when the actor
     is cleared (`_trail_smoke_stops`) (203 checks; the aircraft are
     spread over rows of six so all fourteen land on the test map; a Ho 229 parked on a field is the fourteenth). `-AircraftDeathOnly=<label>`,
     `-AircraftDeathCapture=<folder>` for pictures (add `-ExecCmds="r.TextureStreaming 0"`, or effects used for the first time
