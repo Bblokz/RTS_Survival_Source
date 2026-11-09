@@ -48,6 +48,7 @@ namespace PerfProbePrivate
 	const TCHAR* const MeshAtSwitch = TEXT("PerfProbeMeshAt=");
 	const TCHAR* const MeshSettleSwitch = TEXT("PerfProbeMeshSettle=");
 	const TCHAR* const MeshCloseOnlySwitch = TEXT("PerfProbeMeshCloseOnly");
+	const TCHAR* const TimelapseSwitch = TEXT("PerfProbeTimelapse=");
 
 	// Mesh shots: frames to settle (TSR history, streaming) before each screenshot, and the two views.
 	constexpr int32 DefaultMeshShotSettleFrames = 90;
@@ -138,7 +139,7 @@ void UPerfProbeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	// An error dialog costs milliseconds in an editor build and would be measured instead of the scene.
 	RTSFunctionLibrary::PushModalDialogSuppression();
 	bM_IsSuppressingErrorDialogs = true;
-	EnterPhase(EPerfProbePhase::WaitingForGameStart);
+	EnterPhase(ParseTimelapse() ? EPerfProbePhase::Timelapse : EPerfProbePhase::WaitingForGameStart);
 	UE_LOG(LogRTSPerfProbe, Display,
 	       TEXT("RTS_PERF_PROBE started map=%s views=%d variants=%d repeats=%d frames=%d warmup=%d profilegpu=%s"),
 	       *InWorld.GetMapName(), M_Views.Num(), M_Variants.Num(), M_Repeats, M_MeasureFrames, M_WarmupFrames,
@@ -270,6 +271,9 @@ void UPerfProbeSubsystem::Tick(const float DeltaTime)
 	case EPerfProbePhase::MeshShots:
 		KeepViewRendering();
 		TickMeshShots();
+		break;
+	case EPerfProbePhase::Timelapse:
+		TickTimelapse();
 		break;
 	default:
 		break;
@@ -508,6 +512,50 @@ void UPerfProbeSubsystem::TickMeshShots()
 	UE_LOG(LogRTSPerfProbe, Display, TEXT("RTS_PERF_PROBE meshshot %s"), *Path);
 	++M_MeshShotIndex;
 	EnterPhase(EPerfProbePhase::MeshShots);
+}
+
+bool UPerfProbeSubsystem::ParseTimelapse()
+{
+	FString TimelapseText;
+	if (not FParse::Value(FCommandLine::Get(), PerfProbePrivate::TimelapseSwitch, TimelapseText, false))
+	{
+		return false;
+	}
+	FString ShotsText;
+	FString SecondsText;
+	if (not TimelapseText.Split(TEXT(","), &ShotsText, &SecondsText))
+	{
+		ShotsText = TimelapseText;
+	}
+	M_TimelapseShots = FMath::Max(FCString::Atoi(*ShotsText), 1);
+	if (not SecondsText.IsEmpty())
+	{
+		M_TimelapseIntervalSeconds = FMath::Max(FCString::Atod(*SecondsText), 0.5);
+	}
+	return true;
+}
+
+void UPerfProbeSubsystem::TickTimelapse()
+{
+	if (M_TimelapseShotsTaken >= M_TimelapseShots)
+	{
+		Finish(true, FString::Printf(TEXT("%d time-lapse shots"), M_TimelapseShotsTaken));
+		return;
+	}
+	const double NextShotSeconds = M_TimelapseIntervalSeconds * (M_TimelapseShotsTaken + 1);
+	if (GetRealSecondsInPhase() < NextShotSeconds)
+	{
+		return;
+	}
+	FString Name = TEXT("probe");
+	FParse::Value(FCommandLine::Get(), PerfProbePrivate::NameSwitch, Name);
+	const FString Path = FPaths::ProjectSavedDir() / TEXT("PerfAudit") / TEXT("Shots") /
+		FString::Printf(TEXT("%s_tl%03d.png"), *Name, M_TimelapseShotsTaken);
+	FScreenshotRequest::RequestScreenshot(Path, false, false);
+	const UWorld* const World = GetWorld();
+	UE_LOG(LogRTSPerfProbe, Display, TEXT("RTS_PERF_PROBE timelapse %d game_t=%.1f %s"), M_TimelapseShotsTaken,
+	       IsValid(World) ? World->GetTimeSeconds() : 0.0, *Path);
+	++M_TimelapseShotsTaken;
 }
 
 bool UPerfProbeSubsystem::SpawnMeshForShot(const int32 MeshIndex)
