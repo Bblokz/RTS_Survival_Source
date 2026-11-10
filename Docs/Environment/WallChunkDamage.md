@@ -313,11 +313,12 @@ then died normally. Pictures: `Saved/WallChunks/DShKPit/debug_holes.png`, `real_
   The death (`DestroyAndSpawnActors` + rubble obstacle) is unchanged.
 - **Aim points** set in the construction script: (0, 0, 120), (±600, 0, 110), (±300, 0, 160), spread along the tent
   instead of the C++ default cluster at the centre.
-- **Collision is loose:** the 4 convex hulls wrap the guy ropes and skirt, 20 to 100 cm outside the fabric at mid
-  height (the wall is at y ≈ 195, hits land at y 230 to 300). A hole centred on such a hit reaches the fabric only when
-  it is big enough, so the tent uses 1.1 cm per mm, not 0.85; small shells hitting low on the hull still leave little.
-  The window panels also have a second fabric layer behind them, which hides shallow holes. Tighter collision on
-  `SM_RusLargeTent` would fix both; not done (gameplay-visible collision change).
+- **Collision (tightened 2026-11-10):** `SM_RusLargeTent` had 4 convex hulls that wrapped the guy ropes and stakes,
+  up to 1.9 m outside the fabric low down, so holes centred on those hits missed the cloth. It now has 3 boxes on the
+  fabric itself: the body (x ±721, y ±235, z 0 to 202) and two 60 cm roof slabs (±17.26° roll) up to the
+  ridge at 275. Traces land on the walls, roof and ends exactly; the ropes and stakes no longer collide. All 5 test
+  hits of 37 to 105 mm now show. The old hulls are in `Saved/WallChunks/LargeTent/SM_RusLargeTent_collision_backup.txt`.
+  The hole size stays at 1.1 cm per mm (the tower value): fabric tears wider than sandbags.
 - **PIE check** (`UT_VehicleObstacle`): runtime values right on both. Real tank fire tore 6 large holes along each tent
   (dark inside, scraps on the ground), and a Soviet tent at its real 4000 health died normally. Pictures:
   `Saved/WallChunks/LargeTent/real_fire_2.png`, `soviet_real_fire.png`, `base_debug_r11.png`.
