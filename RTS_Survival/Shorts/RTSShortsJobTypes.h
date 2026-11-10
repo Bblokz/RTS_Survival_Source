@@ -719,6 +719,47 @@ struct FRTSShortsBattleCuts
 };
 
 /** @brief A tree the director plants for squad battles, with cover points round its trunk. */
+/**
+ * @brief "What can pen the ...?" rounds: the segment's unit stands while the enemy line, all one attacker type, fires one
+ * main-gun shell each at its front, one after another. The round ends once every attacker fired or died and the last
+ * shell had time to bounce and be read; a round that got through the armour ends the job.
+ */
+USTRUCT()
+struct FRTSShortsPenTest
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	bool bEnabled = false;
+
+	/** Segment-local second the first attacker may fire; the others follow FireStaggerSeconds apart. */
+	UPROPERTY()
+	float FirstShotSeconds = 2.f;
+
+	UPROPERTY()
+	float FireStaggerSeconds = 1.2f;
+
+	/** After the last attacker fired (or the last one died), the round holds this long: flight, bounce, reading time. */
+	UPROPERTY()
+	float HoldAfterLastShotSeconds = 6.f;
+
+	/** A round with an attacker that never fires ends this many seconds after FirstShotSeconds anyway. */
+	UPROPERTY()
+	float RoundTimeoutSeconds = 20.f;
+
+	/** The segment's unit never fires: its return shot's dust and the attacker it kills hid the bounce being read. */
+	UPROPERTY()
+	bool bTargetHoldsFire = true;
+
+	/** Without bTargetHoldsFire: the segment's unit holds its main gun until every attacker has fired, then may answer. */
+	UPROPERTY()
+	bool bTargetAnswersAfterVolley = true;
+
+	/** A shell that got through (pen, over-pen, armour destroyed) ends the job after this round. */
+	UPROPERTY()
+	bool bStopJobOnPenetration = true;
+};
+
 USTRUCT()
 struct FRTSShortsCoverTree
 {
@@ -1090,6 +1131,10 @@ struct FRTSShortsSegment
 	UPROPERTY()
 	FRTSShortsBattleCuts BattleCuts;
 
+	/** Battle: one shell per attacker at the segment unit's front, recorded shot by shot ("What can pen the ...?"). */
+	UPROPERTY()
+	FRTSShortsPenTest PenTest;
+
 	/** Aircraft passes flown during this segment. */
 	UPROPERTY()
 	TArray<FRTSShortsFlyBy> FlyBys;
@@ -1254,6 +1299,69 @@ struct FRTSShortsBattleEvent
 	int32 EnemiesAlive = 0;
 };
 
+/** Segment.PenTest: one attacker's main-gun shell, from launch to what it did on the target's armour. */
+USTRUCT()
+struct FRTSShortsPenShot
+{
+	GENERATED_BODY()
+
+	/** Index into the segment's BattleEnemyClassPaths. */
+	UPROPERTY()
+	int32 AttackerIndex = 0;
+
+	UPROPERTY()
+	int32 LaunchFrame = -1;
+
+	/** -1 when the shell hit nothing on the target (a miss, or it hit something else first). */
+	UPROPERTY()
+	int32 HitFrame = -1;
+
+	/** "Bounce", "Penetration", "OverPenetration", "ArmorDestroyed", "FlankAmmoDetonation" or "Miss". */
+	UPROPERTY()
+	FString Verdict;
+
+	UPROPERTY()
+	FString Plate;
+
+	UPROPERTY()
+	int32 CalibreMm = 0;
+
+	UPROPERTY()
+	FString ShellType;
+
+	UPROPERTY()
+	float RawArmorMm = 0.f;
+
+	UPROPERTY()
+	float EffectiveArmorMm = 0.f;
+
+	UPROPERTY()
+	float ImpactAngleDegrees = 0.f;
+
+	/** Penetration at the distance flown, and after the impact angle reduced it (what was compared to the armour). */
+	UPROPERTY()
+	float PenAtRangeMm = 0.f;
+
+	UPROPERTY()
+	float PenAfterAngleMm = 0.f;
+
+	UPROPERTY()
+	float DistanceM = 0.f;
+
+	UPROPERTY()
+	float HealthBefore = 0.f;
+
+	UPROPERTY()
+	float HealthAfter = 0.f;
+
+	/** Where the hit was on the rendered frame, 0..1 from the top left; negative when off screen. */
+	UPROPERTY()
+	float ScreenX = -1.f;
+
+	UPROPERTY()
+	float ScreenY = -1.f;
+};
+
 /**
  * @brief What the director recorded about one segment, in output frames of the single rendered shot.
  */
@@ -1312,6 +1420,24 @@ struct FRTSShortsManifestSegment
 	/** Segment.BattleCuts: output frames of the camera cuts inside the segment (post must not treat them as glitches). */
 	UPROPERTY()
 	TArray<int32> CameraCutFrames;
+
+	/** Segment.PenTest: every attacker's shell in launch order, the attackers' main-gun calibre and the round's outcome. */
+	UPROPERTY()
+	TArray<FRTSShortsPenShot> PenShots;
+
+	UPROPERTY()
+	int32 PenAttackerCalibreMm = 0;
+
+	/** Output frame the last attacker fired or died; -1 while the volley is not complete. */
+	UPROPERTY()
+	int32 PenVolleyDoneFrame = -1;
+
+	UPROPERTY()
+	bool bPenetrated = false;
+
+	/** Attackers destroyed before they fired. */
+	UPROPERTY()
+	int32 PenAttackersLostUnfired = 0;
 };
 
 /**

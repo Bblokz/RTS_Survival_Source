@@ -197,6 +197,7 @@ void ARTSShortsDirector::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	EndTeamWeaponShot();
 	EndParatrooperBattle();
+	EndPenTest();
 	StopSubmixCapture();
 	Super::EndPlay(EndPlayReason);
 }
@@ -2695,6 +2696,7 @@ void ARTSShortsDirector::BeginBattle(const int32 SegmentIndex, AActor* MainUnit)
 	BeginBattleFlanks(Segment);
 	BeginSoloEvasion(Segment, MainUnit);
 	BeginSquadTactics(Segment);
+	BeginPenTest(Segment, MainUnit);
 #endif
 	// The fog of war would hide the enemy line from the player and keep the player line out of the AI's vision
 	// (RTSIsVisibleTarget), so neither side would fire: battle units leave the fog system and are kept visible.
@@ -3515,6 +3517,7 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 	TickSoloEvasion(Frame);
 	TickSquadTactics(Frame);
 	TrackBattleEvents(Frame);
+	TickPenTest(Frame);
 	LogBattleSquadPositions(Frame);
 	constexpr int32 OrderEveryFrames = 20;
 	if (Frame % OrderEveryFrames == 0)
@@ -3545,7 +3548,9 @@ void ARTSShortsDirector::TickBattle(const int32 Frame)
 		       M_Battle.bPlayerWon ? TEXT("player") : TEXT("enemy"), FMath::Max(PlayersAlive, EnemiesAlive));
 	}
 	const int32 HoldFrames = FMath::RoundToInt(Segment.BattleEndHoldSeconds * M_Job.Fps);
-	if (M_Battle.DecidedFrame >= 0 && not M_Battle.bSegmentShortened && Frame >= M_Battle.DecidedFrame + HoldFrames)
+	// Segment.PenTest ends its rounds itself, after every attacker has fired and the last shell has been read.
+	if (M_Battle.DecidedFrame >= 0 && not M_Battle.bSegmentShortened && not Segment.PenTest.bEnabled
+		&& Frame >= M_Battle.DecidedFrame + HoldFrames)
 	{
 		M_Battle.bSegmentShortened = true;
 		ShortenRunningSegment(Frame + 1);
@@ -3731,8 +3736,9 @@ void ARTSShortsDirector::EndBattle()
 	       M_Battle.SpawnedWrecks.Num());
 	// The segment's own unit is parked by EndSegment; everything else from this battle leaves the field.
 	const AActor* MainUnit = M_Units.IsValidIndex(M_CurrentSegment) ? M_Units[M_CurrentSegment].Get() : nullptr;
-	const bool bClearEffects = M_Battle.Evasion.bIsActive;
-	const TSet<uint32> EffectIdsAtBegin = M_Battle.Evasion.EffectIdsAtBegin;
+	const bool bClearEffects = M_Battle.Evasion.bIsActive || M_PenTest.bIsActive;
+	const TSet<uint32> EffectIdsAtBegin = M_Battle.Evasion.bIsActive ? M_Battle.Evasion.EffectIdsAtBegin : M_PenTest.EffectIdsAtBegin;
+	EndPenTest();
 	const TArray<TWeakObjectPtr<AActor>>* Groups[] = {&M_Battle.PlayerUnits, &M_Battle.EnemyUnits, &M_Battle.PlayerSquads,
 	                                                  &M_Battle.EnemySquads, &M_Battle.SpawnedWrecks, &M_Battle.Reinforcements};
 	for (const TArray<TWeakObjectPtr<AActor>>* Group : Groups)

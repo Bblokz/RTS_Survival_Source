@@ -15,6 +15,7 @@ class ACineCameraActor;
 class ACPPController;
 class UMoviePipeline;
 class USoundMix;
+struct FMapTestArmorHitReport;
 
 /** Camera orbit pan of the running segment: the start pose rotated around the framed unit's vertical axis. */
 USTRUCT()
@@ -252,6 +253,42 @@ struct FRTSShortsBattleState
 	FDelegateHandle ActorSpawnedHandle;
 };
 
+/** Segment.PenTest: one attacker of the running round and its single main-gun shot. */
+struct FRTSShortsPenAttackerState
+{
+	TWeakObjectPtr<AActor> Unit;
+	// Its largest-calibre weapon: the only one it may fire, once, from ReleaseSeconds on.
+	TWeakObjectPtr<class UWeaponState> MainGun;
+	TWeakObjectPtr<UObject> MainGunOwner;
+	uint32 MainGunName = 0;
+	float ReleaseSeconds = 0.f;
+	bool bReleased = false;
+	bool bFired = false;
+	// The launch was seen in the projectile callback; the gun is blocked again on the next tick.
+	bool bNeedsBlockAfterShot = false;
+	bool bLost = false;
+};
+
+/** Segment.PenTest running: the attackers, the target and which manifest shot each launched shell belongs to. */
+struct FRTSShortsPenTestState
+{
+	bool bIsActive = false;
+	TWeakObjectPtr<AActor> Target;
+	// Every weapon the director restricted (main guns between shots, all secondary weapons): freed when the round ends.
+	TArray<TWeakObjectPtr<class UWeaponState>> RestrictedWeapons;
+	TArray<TWeakObjectPtr<class UWeaponState>> TargetMainGuns;
+	TArray<FRTSShortsPenAttackerState> Attackers;
+	// Projectile launch id -> index into the manifest segment's PenShots.
+	TMap<uint32, int32> ShotByLaunchId;
+	int32 VolleyDoneFrame = -1;
+	int32 LastShotFrame = -1;
+	bool bTargetReleased = false;
+	bool bRoundEnded = false;
+	FDelegateHandle LaunchHandle;
+	FDelegateHandle HitHandle;
+	TSet<uint32> EffectIdsAtBegin;
+};
+
 /** Convoy segment: the vehicles driving in a wedge, their pinned turrets and the follow camera's offsets. */
 USTRUCT()
 struct FRTSShortsConvoyState
@@ -451,6 +488,18 @@ private:
 	void TickBattleReflanks(const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
 	/** Job.bStopWhenUnitDestroyed: later rounds are not rendered once the segment's unit lost; they stay skipped in the manifest. */
 	void SkipSegmentsAfterRunning(int32 Frame);
+	// Segment.PenTest (RTSShortsPenTest.cpp): one main-gun shell per attacker at the segment unit's front.
+	void BeginPenTest(const FRTSShortsSegment& Segment, AActor* MainUnit);
+	void TickPenTest(int32 Frame);
+	void EndPenTest();
+	/** Restricts every weapon of the unit but its largest-calibre one; returns that one (null before the turrets are up). */
+	class UWeaponState* RestrictSecondaryWeapons(AActor* Unit);
+	void SetPenWeaponBlocked(class UWeaponState* Weapon, bool bBlocked);
+	/** Projectile callbacks: only record, the round is advanced in TickPenTest. */
+	void OnPenShellLaunched(uint32 LaunchId, const UObject* WeaponOwner, uint32 WeaponName);
+	void OnPenArmorHit(const FMapTestArmorHitReport& Report);
+	/** Where a world point lands on the rendered frame (0..1 from the top left), or negative when behind the camera. */
+	FVector2D ProjectToFrame(const FVector& WorldLocation) const;
 	void OrderBattleReflank(AActor& Attacker, FRTSShortsReflankState& Reflank, const FRTSShortsSoloEvasion& Settings, float SegmentSeconds);
 	/** Plants Job.BattleCoverTrees once per job and publishes cover points round each trunk. */
 	void SpawnBattleCoverTrees();
@@ -732,6 +781,7 @@ private:
 	TSet<TWeakObjectPtr<class UNiagaraComponent>> M_WidenedSmallArmsSystems;
 	FRTSShortsBattleState M_Battle;
 	FRTSShortsBattleCutState M_BattleCuts;
+	FRTSShortsPenTestState M_PenTest;
 	// Segment.BattleSquadTactics.bOutlineSoldiers: the post-process volume that draws the outlines, made once per job.
 	UPROPERTY()
 	TObjectPtr<class APostProcessVolume> M_SoldierOutlineVolume;

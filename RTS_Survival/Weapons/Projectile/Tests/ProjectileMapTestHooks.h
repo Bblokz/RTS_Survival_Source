@@ -40,6 +40,12 @@ struct FMapTestArmorHitReport
 	float RawArmor = 0.f;
 	float EffectiveArmor = 0.f;
 	float PenAtImpact = 0.f;
+	// Penetration at the distance flown, before the impact angle reduced it (PenAtImpact is after the angle).
+	float PenAtRange = 0.f;
+	// Angle between the shell's path and the plate's normal, 0 (square on) to 90 (grazing).
+	float ImpactAngleDegrees = 0.f;
+	float DistanceFlownCm = 0.f;
+	FVector ImpactLocation = FVector::ZeroVector;
 	float ShellDamage = 0.f;
 	float DamageMlt = 0.f;
 	float HealthBefore = 0.f;

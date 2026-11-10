@@ -2740,6 +2740,12 @@ void AProjectile::ArmorCalc_KineticProjectile(UArmorCalculation* ArmorCalculatio
 		MapTestHitReport.RawArmor = RawArmorValue;
 		MapTestHitReport.EffectiveArmor = EffectiveArmor;
 		MapTestHitReport.PenAtImpact = AdjustedArmorPen;
+		MapTestHitReport.PenAtRange = GetArmorPenAtRange();
+		// Same angle UArmorCalculation::GetArmorAtAngle uses (|cos| of path against normal), shown as 0..90 degrees.
+		const float MapTestCosine = FMath::Abs(FVector::DotProduct(Velocity.GetSafeNormal(), HitResult.ImpactNormal));
+		MapTestHitReport.ImpactAngleDegrees = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(MapTestCosine, 0.f, 1.f)));
+		MapTestHitReport.DistanceFlownCm = FVector::Dist(M_ProjectileSpawn, GetActorLocation());
+		MapTestHitReport.ImpactLocation = HitResult.Location;
 		MapTestHitReport.ShellDamage = M_FullDamage;
 		MapTestHitReport.HealthBefore = FProjectileMapTestHooks::GetHealthOrZero(HitActor);
 	}
