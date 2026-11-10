@@ -292,6 +292,36 @@ in the bags; real tank fire swapped the slot, threw sandbag pieces and killed th
 then died normally. Pictures: `Saved/WallChunks/DShKPit/debug_holes.png`, `real_fire.png`. Test note: changing
 `RTSComponent.owning_player` on a spawned pit at runtime left it taking no damage afterwards; use a fresh actor.
 
+## Large tent (A + B, 2026-11-10)
+
+`Rus_Building_LargeTent` and its child `Rus_Building_LargeTent_Soviet` (`BuildingExpansions/RusBuildings/`), on
+`SM_RusLargeTent` (one slot, 19 x 9 x 2.75 m).
+
+- **Component** `WallHoleDamage` on the parent, inherited by the Soviet child: `BuildingMeshComponent`, `NoGrid`,
+  `HoleRadiusPerCalibreMm` 1.1 (the tower value, see below), `AreaPerDebrisPiece` 3600 / max 5, collapse on death.
+  The Soviet child overrides `DamagedMaterials`, `DebrisMeshes` and `HoleSettings` on the inherited component. The
+  override is a full copy, so later changes to the parent's settings do not reach it.
+- **Materials** in `RusBuildings/Tent/Holes/`, two-sided on the existing `MM_RTS_Env_WallHoles` (the dead-tree master),
+  with the inside darkened (`WallHoleInnerDarken` 0.6, colour (0.06, 0.055, 0.045)): `MI_SM_RusLargeTent_RusTent_WallHoles`
+  (copy of `MI_RusTent`) and `MI_SM_RusLargeTent_RusTent_Soviet_WallHoles` (copy of `MI_RusTent_Soviet`, parented to
+  the first, so it keeps only its own camo diffuse). PS 437 against 318.
+- **Debris:** thin fabric scraps, the 8 hay-shed sheet shards in tent material: `SM_RusLargeTent_Debris_0..7` and
+  `SM_RusLargeTent_Soviet_Debris_0..7`.
+- **Graph changes:** the empty `GeometryCollection` component (no rest collection, unused) was removed. The
+  `BP_InitBuildingExp` building mesh was `SM_RusBunker_MG`, a copy-paste slip that turned the tent into an MG bunker
+  whenever construction finished; it is now `SM_RusLargeTent`. The construction mesh is still `SM_BXP_37mm_Construction`.
+  The death (`DestroyAndSpawnActors` + rubble obstacle) is unchanged.
+- **Aim points** set in the construction script: (0, 0, 120), (±600, 0, 110), (±300, 0, 160), spread along the tent
+  instead of the C++ default cluster at the centre.
+- **Collision is loose:** the 4 convex hulls wrap the guy ropes and skirt, 20 to 100 cm outside the fabric at mid
+  height (the wall is at y ≈ 195, hits land at y 230 to 300). A hole centred on such a hit reaches the fabric only when
+  it is big enough, so the tent uses 1.1 cm per mm, not 0.85; small shells hitting low on the hull still leave little.
+  The window panels also have a second fabric layer behind them, which hides shallow holes. Tighter collision on
+  `SM_RusLargeTent` would fix both; not done (gameplay-visible collision change).
+- **PIE check** (`UT_VehicleObstacle`): runtime values right on both. Real tank fire tore 6 large holes along each tent
+  (dark inside, scraps on the ground), and a Soviet tent at its real 4000 health died normally. Pictures:
+  `Saved/WallChunks/LargeTent/real_fire_2.png`, `soviet_real_fire.png`, `base_debug_r11.png`.
+
 ## Open points
 
 - The collapse reads as a blast, not a falling wall. Tune `CollapseSettings.DeathSpeedScale`, or add a slumping
