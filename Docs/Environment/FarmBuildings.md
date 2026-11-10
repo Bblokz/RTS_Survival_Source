@@ -1,7 +1,7 @@
 # Destructible farm buildings (Ger_Trains)
 
-Four buildings for the farm part of Ger_Trains. Each one collapses into a pre-fractured geometry collection when it
-dies.
+Four buildings for the farm part of Ger_Trains. Shells cut procedural holes in them while they stand (see "Shell holes
+while alive"). Each one collapses into a pre-fractured geometry collection when it dies.
 
 | Blueprint | Size | Health row |
 |---|---|---|
@@ -49,6 +49,33 @@ Content lives in `/Game/RTS_Survival/Blueprints/Environment/DestructableEnvActor
   and those shatter into their pieces when they hit the ground. Resting pieces shrink away after 6-12 s.
 - **Collision.** Piece collision is shrunk by 12 %. Without that, touching and overlapping pieces fling debris across
   the map while they push each other apart.
+
+## Shell holes while alive (2026-11-09)
+The buildings use the Soviet walls' procedural holes (`UWallHoleDamageComponent`, see `WallChunkDamage.md`, "A + B").
+- **Component.** `WallHoleDamage` sits on `BP_Farm_Dest_Building`; the four children inherit it.
+  - `WallMeshComponentName = BuildingMesh`.
+  - `GridSettings.GridAxis = NoGrid`: closed buildings, holes only. When the 6 slots are full, the oldest hole merges
+    with its nearest neighbour.
+  - `CollapseSettings.bCollapseIntoChunksOnDeath = false`: the death stays the geometry-collection collapse plus
+    rubble (the user's choice). The holes vanish when the collection appears, because its pieces are the intact geometry.
+  - `DebrisMeshes`: 8 pieces per child, set on each child's inherited component.
+  - `ADestructableEnvActor::TakeDamage` forwards the hits; no Blueprint graph changes.
+- **Material.** `M_FarmBuildings_WallHoles` is the masked copy of `M_FarmBuildings`, built with the inner tint.
+  `MI_FarmBuildings_WallHoles` is a copy of `MI_FarmBuildings` on it. It is two-sided, because the walls are thick
+  slabs and you look into the cut. Back faces darken toward charred brown (`WallHoleInnerDarken` 0.6). One instance
+  serves all four meshes, because without a grid the grid parameters are unused. The intact building keeps the opaque
+  `MI_FarmBuildings` until its first hole. PS 431 against 312.
+- **Debris.** `Meshes/Debris/SM_<Building>_Debris_0..7` are built by
+  `D:/Blender/BlenderProjects/BlenderTanks/FarmBuildings/build_debris.py` (Blender 4.0, `-- [Name]`, previews in
+  `out/debris/`). They are UV-mapped into the atlas bands the building uses:
+  - FarmHouse: plaster, timber, beaver-tail tiles, chimney brick;
+  - Barn: boards, battens, old tiles;
+  - Stable: bricks, red tiles;
+  - HayShed: corrugated sheet, poles, boards.
+  Each piece lies flat in XZ with its long axis on X, because the component measures a piece's area as bounds X × Z.
+- **Debris material.** `MI_FarmBuildings_Debris` is a child of the holes instance with `BaseTint` × 0.64. On Niagara
+  mesh particles `VertexColor` returns the particle colour (white), so the material's `0.7 + 0.6 * VertexColor.B`
+  gives 1.3 instead of the buildings' 0.83.
 
 ## Rebuilding
 Pipeline: `D:/Blender/BlenderProjects/BlenderTanks/FarmBuildings/`. `ADVERSARIAL_REVIEW.md` there records the art

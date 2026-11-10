@@ -1,25 +1,47 @@
 # Howitzer impacts
 
-Three Niagara systems in `/Game/RTS_Survival/ImpactSfxVfx/5Artillery/Howitzer/` replace the old flat artillery
-impacts on every howitzer:
+Three Niagara systems in `/Game/RTS_Survival/ImpactSfxVfx/5Artillery/Howitzer/` are the impacts of every howitzer:
 
 | System | Surfaces | Look |
 |---|---|---|
-| `NS_HowitzerImpact_Regular` | Metal, Flesh, Air | Flash, rolling fireball, radial dirt rays and clods, sparks, debris, then a tall black smoke column (~4 s) |
-| `NS_HowitzerImpact_Sand` | Sand | Brown radial dirt eruption with flying clods and sparks, lingering brown dust (~3 s) |
-| `NS_HowitzerImpact_Stone` | Stone | Same eruption in grey stone dust, more sparks |
+| `NS_HowitzerImpact_Regular` | Metal, Flesh, Air | The tank explosion's fireball, sparks and debris; the fireball turns into a dark, lit smoke column (~4 s) |
+| `NS_HowitzerImpact_Sand` | Sand | A dark brown dirt column that rises fast, swells into a lit dust mass and hangs as a brown cloud (~4 s) |
+| `NS_HowitzerImpact_Stone` | Stone | The same eruption in grey, more sparks |
 
 ![Game camera](HowitzerImpacts_GameCamera.png)
 ![Side view](HowitzerImpacts_Side.png)
 
-Both sheets: `ImpactScale` 2.6, at 0.1 / 0.3 / 0.6 / 1 / 1.6 / 2.5 / 4 / 6 s; the grey block is a 6.5 m tank,
-the post next to it a soldier. Game camera = the RTS camera (spring arm 3000, -70 degrees, 90 degree FOV).
+Both sheets: `ImpactScale` 2.6, at 0.1 / 0.3 / 0.6 / 1 / 1.6 / 2.5 / 4 / 6 s, capture sky fill 1; the grey block is a
+6.5 m tank, the post next to it a soldier. Game camera = the RTS camera (spring arm 3000, -70 degrees, 90 degree FOV).
+
+## Why they look like this (redesign of 2026-11-09)
+
+The first version spread its dirt as a wide radial burst of velocity-aligned rays plus pale translucent dust sheets. From
+the -70 degree RTS camera that projects onto the ground as a flat star. The tank explosions read as volume because they
+are compact, have a dark mass that rises, and are lit. The impacts now follow that:
+
+- **Volume layers** (stateless emitters, all masked + lit with the MsvFx pack's normal-mapped smoke puff sheet
+  `MI_Smoke_01`, so the sun shades one side of the mass and the masses cast shadows):
+  - `dirt_column`: narrow (9 degree) and fast, the darkest layer: the eruption stands tall before it spreads;
+  - `dust_mass`: thrown up at 30 degrees, slows, swells and hangs: the lit body of the blast;
+  - `dust_billow`: starts at 0.25 s, drifts up and grows into the cloud that hangs to ~4 s;
+  - `ground_roll`: dark dust rolling out low along the ground (no shadow): the dark base under the column.
+- **Classic layers kept**: the flash (`impact`), sparks, debris (`parts` / `debris`) and dirt clods. Left out of the
+  sand pack system: `main`, `main001`, `smoke`, `smoke001`, `wisp`, `dust` (the radial rays and flat dust sheets).
+- Regular is now built on `AA_OptimExplosions/NS_Expl_Tank_1` (the game state's vehicle death explosion) instead of
+  `NS_Explosion_Big_8`, whose fireball flipbook ends in a flat black sheet.
+- Tints multiply a light grey sheet under strong sun and the material's default (glossy) roughness, so mid browns wash
+  out to grey: the palettes in `make_recipe.py` are dark and saturated on purpose. Particle colour does reach the
+  material (base colour = particle colour x sheet; alpha = opacity).
+
+Rejected along the way: the pack's pyro-sim dust (`MI_Pyro_Dust_01`, `M_Pyro`) renders blocky, because its packed HDR
+data texture is capped at `max_texture_size` 512 (each 8x10 frame is ~64 px); and its granular soil plume
+(`MI_Soil_Exp_01`) is too faint to read against the ground even fully saturated.
 
 ## Size comes from the weapon's ImpactScale
 
 The systems are built at the AllExplosions pack's own scale (about 5 m at scale 1); the size per gun is the
-`ImpactScale` on the turret's / team weapon's `Make Weapon VFX` node (the impact pool sets it as the component
-scale, and every layer scales with it):
+`ImpactScale` on the turret's / team weapon's `Make Weapon VFX` node:
 
 | Weapon | Blueprints | ImpactScale |
 |---|---|---|
@@ -28,45 +50,48 @@ scale, and every layer scales with it):
 | 150 / 152 mm | `RTS_BP_EmbTurret_GerPit_SFH18`, `RTS_BP_EmbTurret_ML20Pit`, `BP_TW_ML20` | 2.6 |
 | 203 mm B-4 | `RTS_BP_EmbTurret_B4Pit`, `BP_TW_B4` | 3.1 |
 
+The impact pool applies it as the component scale. That moves positions and velocities of local-space emitters (the
+stateless layers simulate in local space), but **sprite sizes do not follow the component scale**. The stateless
+layers multiply their size curve by the user parameter `ImpactSpriteScale` (Vector2), which
+`ImpactVfxSpriteScale::ApplyImpactScale` (`Weapons/ImpactVfxAuthoring/ImpactVfxSpriteScale.h`) sets next to the
+component scale: `FWeaponImpactPool::Activate` and the capture subsystem call it. Anything else that plays these
+systems with a scale must call it too, or the volume layers stay at scale-1 size.
+
 The old systems (`NS_Artillery_DefaultImpact` / `_Sand` / `_Stone`) are untouched; the aircraft bombs, the global
-bombing ability and the Hetzer / Panzer III rocket abilities still use them. Point them at the new systems the same
-way if those should get the bigger look.
+bombing ability and the Hetzer / Panzer III rocket abilities still use them.
 
 ## How they are built
 
-Layers from existing systems, composed by the recipe `Source/Tools/ImpactVfx/howitzer_impacts.json`:
+`Source/Tools/ImpactVfx/make_recipe.py` writes the recipe `howitzer_impacts.json` (layer specs, palettes, which classic
+emitters to keep); the editor-only console command `RTS.ImpactVfx.BuildFromRecipe <recipe.json>`
+(`Weapons/ImpactVfxAuthoring/ImpactVfxNiagaraAuthoring.cpp`) builds it:
 
-- Regular: base `AllExplosions/Big/NS_Explosion_Big_8` (fireball, sparks, smoke, debris) plus `main`, `dirt`, `dust`
-  from `AllExplosions/Sand/NS_Explosion_Sand_8` (dirt rays, clods, dust).
-- Sand: base `NS_Explosion_Sand_8` plus `smoke_shockwave` from `NS_Explosion_Big_8`, `LifetimeMult` 1.5.
-- Stone: base `NS_Explosion_Sand_8` with its two dirt flipbook materials swapped for
-  `Howitzer/Stone/MI_HowitzerStoneDust_1/2` (grey copies of `T_Expl_39/40`, made by
-  `make_stone_flipbooks.py`, imported at 2048 instead of 4096), `LifetimeMult` 1.4.
+- `base` / `add` / `disable` / `spawn_scale` / `materials` / `user`: copy and trim classic emitters (see the file header);
+- `stateless`: duplicates the `Fountain` emitter of the engine's `FountainLightweight` template
+  (`UNiagaraSystem::DuplicateEmitterHandle`) and sets emitter, module and renderer properties by reflection from Unreal
+  import text (distributions get their runtime values and curve tables from the module's edit hook);
+  `sprite_scale_parameter` binds `ScaleSpriteSize.ScaleCurveRange` to the user parameter and adds it to the system;
+- every Collision module is disabled.
 
-Rebuild after changing the recipe (headless editor; the open editor must not have the systems loaded, or the save
-fails with `saved=0` in the log):
+Rebuild after changing the specs (headless editor; the open editor must not have the systems loaded, or the save fails
+with `saved=0` in the log):
 
 ```
+python Source/Tools/ImpactVfx/make_recipe.py
 Source/Tools/ImpactVfx/build_systems.sh
 ```
 
-The build command is `RTS.ImpactVfx.BuildFromRecipe <recipe.json>` (editor only,
-`Weapons/ImpactVfxAuthoring/ImpactVfxNiagaraAuthoring.cpp`). It copies emitters between systems without a parent
-link, renames / disables emitters, sets per-emitter spawn count scale (a scalability override for all platforms),
-swaps renderer materials, sets user parameters and disables every Collision module.
+While the shared editor runs the Development DLL, run the scripts on the DebugGame editor (build
+`RTS_SurvivalEditor Win64 DebugGame` first): `ENGINE_EXE=.../UnrealEditor-Win64-DebugGame-Cmd.exe`.
 
 ## Cost
 
-- No collision: every Collision module is disabled (`collision_modules_disabled` in the build log).
-- No refraction: the packs' distortion shock dome (`refr_mesh`) is off; at these sizes it turned into a milky blob
-  and needs its own distortion pass.
-- Peak live particles (ImpactScale 2.6): Regular ~250, Sand ~550-650, Stone ~750-950. Most are GPU sparks (tiny
-  additive sprites); trail smoke is cut to 40 %, sparks to 60 % (Regular / Sand).
-- The large smoke and dirt flipbooks use masked (dithered) materials, so they add no blended overdraw; the only
-  large translucent sprites are the fireball (1 sprite), the flash and the few dirt-dust sprites.
+- No collision, no refraction.
+- Peak live particles (ImpactScale 2.6): Regular ~720 (mostly GPU sparks), Sand ~410, Stone ~450 (old version: 240 /
+  720 / 800). The volume layers are ~40 CPU (stateless) sprites per impact.
+- All large sprites are masked (dithered), so no blended overdraw; the column, mass and billow cast shadows (~30 masked
+  sprites in the shadow pass for ~4 s per impact). Turn `bCastShadows` off in a layer spec if that shows up in a profile.
 - One short point light per impact (the flash).
-- The packs' ground-ring smoke (`NS_Arty_SplashGround_1`) and ground cloud (`NS_RTSDebrisExplosion_Huge`) were tried
-  and left out: from the RTS camera they became large pale fog with heavy translucent overdraw.
 
 ## Looking at impacts without the editor
 
@@ -75,16 +100,19 @@ scene captures from the game camera, a far game camera and a low side view, and 
 emitter:
 
 ```
-SCALE=2.6 Source/Tools/ImpactVfx/run_capture.sh /Game/A/NS_A+/Game/B/NS_B <out folder>
+SCALE=2.6 SKY_FILL=1 Source/Tools/ImpactVfx/run_capture.sh /Game/A/NS_A+/Game/B/NS_B <out folder>
 python Source/Tools/ImpactVfx/compare_sheet.py <out folder> Game 00.10,00.30,01.00 <sheet.png>
 ```
 
-`iterate.sh <round>` does build + capture + sheets in one go. Notes:
+`SUFFIX=_Dev SCALE=2.6 SKY_FILL=1 iterate.sh <round>` does recipe + build + capture + sheets in one go on
+`NS_HowitzerImpact_*_Dev` copies (delete them afterwards). Notes:
 
 - It runs on `UT_B4Howitzer` (neutral ground). Do not point it at a map that is open in the editor: the run holds
   the package and the editor's save fails.
+- The capture adds a sky light (`SKY_FILL`, default 3) because the test map is dark. At 3 it turns lit dust blue-white;
+  judge colours at 1.
+- Scene captures have no temporal AA, so masked (dithered) edges look dotted there; in game TSR resolves them.
 - Pack systems compile their shaders on first use; the subsystem plays each effect once before the pictured run.
-- A milky square blob sometimes shows at t=0.1 in the third system of a run; it did not reproduce when the same
-  system ran first, so it is a capture artifact, not part of the effect.
+- A milky square sometimes shows at t=0.1 in the third system of a run (the flash quad); it is a capture artifact.
 - `FParse::Value` stops at commas: list switches are read with `bShouldStopOnSeparator` off, and the first copy of a
   switch wins (pass changed defaults through the runner's variables).

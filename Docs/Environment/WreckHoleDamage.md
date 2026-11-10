@@ -36,6 +36,24 @@ own death (vertical sink, geometry collection, scavenging) is not changed.
   while fog of war hides the wreck.
 - **Not visual:** collision, nav and line of sight do not change.
 
+## Bridges and logs (Wood style, 2026-11-09)
+
+- `BP_Industrial_RailRoadBridge` and `BP_Industrial_RailRoadBride90Deg` (timber trestles, `ADestructableEnvActor`)
+  and `BP_Cover_DeadTreeLog_01..10` (`ADestructableActorHealth`, whose `TakeDamage` now calls
+  `ForwardDamageToHoleComponents`) each carry the component with the `SM_WoodHoleSplinter_0..3` debris.
+- Materials use the `Wood` style of the library (`make_damaged_material(source, 'Wood')`): `<source>_WoodHoles`,
+  lightly scorched rim, dark-wood inside. Registered: `M_WeaponRack` (bridge pillars and deck) and
+  `MI_Env_DeadTree_1` (logs). The bridge rail slot `M_RustedRefinery_Atlas` is not registered, so rails never hole.
+- Bridges: `MeshSpaceHoleZones` holds one box up to z 1150 (mesh space), so holes stay on the pillars below the deck
+  beams and rails (a hit at rail height was refused in PIE). Holes are smaller there (0.25 cm per mm, at most 45 cm),
+  because the legs are about 40 cm thick.
+- Set up by `build_extra_targets()` in `build_wreck_holes.py` (`EXTRA_TARGETS`).
+- PIE: debug hits holed the logs and bridge legs; 8 tanks firing at a bridge cut 6 holes through `AProjectile`.
+  The bridges' `AimOffsetPoints` (class defaults) were three points at the actor origin, so every shell hit the end
+  leg's base. They now hold one point per trestle leg at the leg's centre, 350/450 cm up (straight bridge: x -12, 988,
+  1988 at y 156 / -234; 90-degree bridge: its six legs). In PIE ten tanks then hit the legs, filled all 6 hole slots
+  and kept cutting new holes.
+
 ## Adding a wreck
 
 A new `Env_Dest_*` or `ScavObj_*` that derives from a family root inherits the component. Build its materials and
