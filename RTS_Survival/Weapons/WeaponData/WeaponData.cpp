@@ -21,6 +21,7 @@
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/Weapons/RTSWeaponVFXSettings/RTSWeaponVFXSettings.h"
+#include "RTS_Survival/Weapons/ImpactVfxAuthoring/ImpactVfxSpriteScale.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxBatcher.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxPerfCounters.h"
@@ -751,7 +752,7 @@ void FWeaponImpactPool::Activate(
 		}
 
 		NiagaraComp->SetWorldLocationAndRotation(Location, Rotation);
-		NiagaraComp->SetWorldScale3D(NiagaraScale);
+		ImpactVfxSpriteScale::ApplyImpactScale(*NiagaraComp, NiagaraScale);
 		NiagaraComp->ReinitializeSystem();
 		NiagaraComp->Activate(true);
 	}

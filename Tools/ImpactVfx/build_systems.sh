@@ -7,7 +7,8 @@
 set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 RECIPE="$(cygpath -m "$(realpath "${1:-$HERE/howitzer_impacts.json}")")"
-ENGINE="D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
+# ENGINE_EXE overrides the editor binary, e.g. UnrealEditor-Win64-DebugGame-Cmd.exe while a Development editor is open.
+ENGINE="${ENGINE_EXE:-D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe}"
 LOG="D:/UE5Projects/RTS_Survival/Saved/Logs/ImpactVfxBuild.log"
 MSYS_NO_PATHCONV=1 "$ENGINE" "D:/UE5Projects/RTS_Survival/RTS_Survival.uproject" /Engine/Maps/Entry \
   -ExecCmds="RTS.ImpactVfx.BuildFromRecipe $RECIPE, QUIT_EDITOR" -unattended -nullrhi -nosound -DisablePlugins=Fab \
