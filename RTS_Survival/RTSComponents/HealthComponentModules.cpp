@@ -79,6 +79,7 @@ bool UHealthComponent::ApplyTankHealingTransaction(const float HealAmount)
 	{
 		UpdateHealthBar();
 	}
+	BroadcastHealedIfRaised(PreviousHealth);
 	return GetIsFullyRepairedLivingOwner();
 }
 
@@ -107,6 +108,7 @@ void UHealthComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Widget_ReleaseModuleIcons();
 	M_OnMaxHealthChanged.Clear();
+	M_OnHealthHealed.Clear();
 	M_TankRepairOwner.Reset();
 	M_DeferredHealingWork = 0.f;
 	Super::EndPlay(EndPlayReason);

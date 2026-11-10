@@ -9,6 +9,11 @@
 // - "spawn_scale": per emitter spawn count scale, written as a scalability override for every platform;
 // - "materials": renderer materials to replace ({"/Game/Old.Old": "/Game/New.New"});
 // - "user": user parameter values (number, bool, or a 3 / 4 number array for vectors and colours).
+// - "stateless": stateless (lightweight) emitters copied from a system that has one ({"from", "emitter", "name"}),
+//   then set up by reflection: "emitter_properties", "modules" ({"<Module>": {"<property>": text}}, the
+//   module named after its class without "NiagaraStatelessModule_"), "renderer" (first renderer's properties) and
+//   "sprite_scale_parameter" (a Vector2 user parameter the size curve is multiplied by; see ImpactVfxSpriteScale.h).
+//   Every value is Unreal import text; make_recipe.py writes them from compact layer specs.
 // Every Collision module of every emitter is disabled: impacts never collide.
 // Recipes live in Source/Tools/ImpactVfx. Run it in a headless editor (see Tools/ImpactVfx/build_systems.sh) while
 // the user's editor does not have the target packages loaded.
@@ -28,6 +33,7 @@
 #include "NiagaraEffectType.h"
 #include "NiagaraMeshRendererProperties.h"
 #include "NiagaraNodeFunctionCall.h"
+#include "NiagaraParameterBinding.h"
 #include "NiagaraRibbonRendererProperties.h"
 #include "NiagaraScriptSource.h"
 #include "NiagaraSpriteRendererProperties.h"
@@ -188,6 +194,199 @@ namespace ImpactVfxNiagaraAuthoring
 		UE_LOG(LogRTSImpactVfxAuthoring, Display, TEXT("RTS_IMPACT_VFX_AUTHORING added %s from %s:%s"), *NewName,
 		       *FPackageName::GetShortName(SourcePath), *SourceEmitterName);
 		return true;
+	}
+
+	const TCHAR* const StatelessModuleClassPrefix = TEXT("NiagaraStatelessModule_");
+
+	/** Sets one property from Unreal import text and runs the owner's edit hook (stateless distributions build their
+	 * runtime values and curve lookup tables there). */
+	bool ImportPropertyText(UObject& Object, const FString& PropertyName, const FString& Text, const FString& Context)
+	{
+		FProperty* const Property = Object.GetClass()->FindPropertyByName(FName(*PropertyName));
+		if (Property == nullptr)
+		{
+			UE_LOG(LogRTSImpactVfxAuthoring, Error, TEXT("RTS_IMPACT_VFX_AUTHORING %s: no property %s on %s"), *Context,
+			       *PropertyName, *Object.GetClass()->GetName());
+			return false;
+		}
+		Object.Modify();
+		void* const ValuePtr = Property->ContainerPtrToValuePtr<void>(&Object);
+		const TCHAR* const ImportEnd = Property->ImportText_Direct(*Text, ValuePtr, &Object, PPF_None);
+		if (ImportEnd == nullptr)
+		{
+			UE_LOG(LogRTSImpactVfxAuthoring, Error, TEXT("RTS_IMPACT_VFX_AUTHORING %s: cannot import %s = %s"), *Context,
+			       *PropertyName, *Text);
+			return false;
+		}
+		FPropertyChangedEvent ChangedEvent(Property, EPropertyChangeType::ValueSet);
+		ChangedEvent.MemberProperty = Property;
+		Object.PostEditChangeProperty(ChangedEvent);
+		return true;
+	}
+
+	int32 ImportPropertyMap(UObject& Object, const TSharedPtr<FJsonObject>& Properties, const FString& Context)
+	{
+		int32 FailedCount = 0;
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& Entry : Properties->Values)
+		{
+			FailedCount += ImportPropertyText(Object, Entry.Key, Entry.Value->AsString(), Context) ? 0 : 1;
+		}
+		return FailedCount;
+	}
+
+	/** Reads an instanced object array (Modules, RendererProperties) of a stateless emitter by reflection. */
+	TArray<UObject*> GetObjectArray(UObject& Owner, const FName ArrayName)
+	{
+		TArray<UObject*> Objects;
+		const FArrayProperty* const ArrayProperty = CastField<FArrayProperty>(Owner.GetClass()->FindPropertyByName(ArrayName));
+		const FObjectPropertyBase* const InnerProperty = ArrayProperty != nullptr
+			                                                 ? CastField<FObjectPropertyBase>(ArrayProperty->Inner)
+			                                                 : nullptr;
+		if (InnerProperty == nullptr)
+		{
+			return Objects;
+		}
+		FScriptArrayHelper ArrayHelper(ArrayProperty, ArrayProperty->ContainerPtrToValuePtr<void>(&Owner));
+		for (int32 Index = 0; Index < ArrayHelper.Num(); ++Index)
+		{
+			Objects.Add(InnerProperty->GetObjectPropertyValue(ArrayHelper.GetRawPtr(Index)));
+		}
+		return Objects;
+	}
+
+	UObject* FindStatelessModule(UObject& StatelessEmitter, const FString& ModuleName)
+	{
+		const FString ClassName = StatelessModuleClassPrefix + ModuleName;
+		for (UObject* const Module : GetObjectArray(StatelessEmitter, TEXT("Modules")))
+		{
+			if (Module != nullptr && Module->GetClass()->GetName() == ClassName)
+			{
+				return Module;
+			}
+		}
+		return nullptr;
+	}
+
+	int32 ApplyStatelessModules(UObject& StatelessEmitter, const TSharedPtr<FJsonObject>& Entry, const FString& Context)
+	{
+		const TSharedPtr<FJsonObject>* Modules = nullptr;
+		if (not Entry->TryGetObjectField(TEXT("modules"), Modules))
+		{
+			return 0;
+		}
+		int32 FailedCount = 0;
+		for (const TPair<FString, TSharedPtr<FJsonValue>>& ModuleEntry : (*Modules)->Values)
+		{
+			UObject* const Module = FindStatelessModule(StatelessEmitter, ModuleEntry.Key);
+			if (Module == nullptr)
+			{
+				UE_LOG(LogRTSImpactVfxAuthoring, Error, TEXT("RTS_IMPACT_VFX_AUTHORING %s: no stateless module %s"), *Context,
+				       *ModuleEntry.Key);
+				++FailedCount;
+				continue;
+			}
+			FailedCount += ImportPropertyMap(*Module, ModuleEntry.Value->AsObject(), Context + TEXT(".") + ModuleEntry.Key);
+		}
+		return FailedCount;
+	}
+
+	int32 ApplyStatelessRenderer(UObject& StatelessEmitter, const TSharedPtr<FJsonObject>& Entry, const FString& Context)
+	{
+		const TSharedPtr<FJsonObject>* RendererValues = nullptr;
+		if (not Entry->TryGetObjectField(TEXT("renderer"), RendererValues))
+		{
+			return 0;
+		}
+		const TArray<UObject*> Renderers = GetObjectArray(StatelessEmitter, TEXT("RendererProperties"));
+		if (Renderers.IsEmpty() || Renderers[0] == nullptr)
+		{
+			UE_LOG(LogRTSImpactVfxAuthoring, Error, TEXT("RTS_IMPACT_VFX_AUTHORING %s: no renderer"), *Context);
+			return 1;
+		}
+		return ImportPropertyMap(*Renderers[0], *RendererValues, Context + TEXT(".renderer"));
+	}
+
+	/** Sprite sizes do not follow the component scale (only positions do); the size curve is multiplied by a user
+	 * parameter the impact pool sets to the weapon's ImpactScale (ImpactVfxSpriteScale.h). */
+	bool BindSpriteScaleParameter(UNiagaraSystem& System, UObject& StatelessEmitter, const FString& ParameterName,
+	                              const FString& Context)
+	{
+		UObject* const Module = FindStatelessModule(StatelessEmitter, TEXT("ScaleSpriteSize"));
+		const FStructProperty* const BindingProperty = Module != nullptr
+			                                               ? CastField<FStructProperty>(Module->GetClass()->FindPropertyByName(TEXT("ScaleCurveRange")))
+			                                               : nullptr;
+		if (BindingProperty == nullptr || not BindingProperty->Struct->IsChildOf(FNiagaraParameterBinding::StaticStruct()))
+		{
+			UE_LOG(LogRTSImpactVfxAuthoring, Error, TEXT("RTS_IMPACT_VFX_AUTHORING %s: no ScaleSpriteSize.ScaleCurveRange"),
+			       *Context);
+			return false;
+		}
+		const FNiagaraVariableBase UserVariable(FNiagaraTypeDefinition::GetVec2Def(),
+		                                        FName(*(UserNamespacePrefix + ParameterName)));
+		Module->Modify();
+		FNiagaraParameterBinding* const Binding = BindingProperty->ContainerPtrToValuePtr<FNiagaraParameterBinding>(Module);
+		Binding->ResolvedParameter = UserVariable;
+		Binding->AliasedParameter = UserVariable;
+		Module->PostEditChange();
+
+		FNiagaraUserRedirectionParameterStore& Store = System.GetExposedParameters();
+		TArray<FNiagaraVariable> Parameters;
+		Store.GetParameters(Parameters);
+		if (FindUserParameter(Parameters, ParameterName) == nullptr)
+		{
+			FNiagaraVariable NewParameter(UserVariable);
+			NewParameter.SetValue(FVector2f::One());
+			Store.AddParameter(NewParameter, true);
+			Store.SetParameterValue(FVector2f::One(), NewParameter);
+		}
+		return true;
+	}
+
+	/** Copies a stateless emitter in from another system and sets it up; see the "stateless" recipe key. */
+	bool AddStatelessEmitter(UNiagaraSystem& System, const TSharedPtr<FJsonObject>& Entry)
+	{
+		const FString SourcePath = Entry->GetStringField(TEXT("from"));
+		const FString SourceEmitterName = Entry->GetStringField(TEXT("emitter"));
+		const FString NewName = Entry->GetStringField(TEXT("name"));
+		UNiagaraSystem* const SourceSystem = LoadObject<UNiagaraSystem>(nullptr, *SourcePath);
+		if (SourceSystem != nullptr)
+		{
+			SourceSystem->WaitForCompilationComplete();
+		}
+		const FNiagaraEmitterHandle* const SourceHandle = SourceSystem != nullptr
+			                                                  ? FindEmitterHandle(*SourceSystem, SourceEmitterName)
+			                                                  : nullptr;
+		if (SourceHandle == nullptr || SourceHandle->GetStatelessEmitter() == nullptr)
+		{
+			UE_LOG(LogRTSImpactVfxAuthoring, Error, TEXT("RTS_IMPACT_VFX_AUTHORING no stateless emitter %s in %s"),
+			       *SourceEmitterName, *SourcePath);
+			return false;
+		}
+		const FNiagaraEmitterHandle NewHandle = System.DuplicateEmitterHandle(*SourceHandle, MakeUniqueEmitterName(System, NewName));
+		// UNiagaraStatelessEmitter is only forward declared here; it derives from UObject alone.
+		UObject* const StatelessEmitter = reinterpret_cast<UObject*>(NewHandle.GetStatelessEmitter());
+		if (StatelessEmitter == nullptr)
+		{
+			return false;
+		}
+		const FString Context = TEXT("stateless ") + NewName;
+		int32 FailedCount = 0;
+		const TSharedPtr<FJsonObject>* EmitterValues = nullptr;
+		if (Entry->TryGetObjectField(TEXT("emitter_properties"), EmitterValues))
+		{
+			FailedCount += ImportPropertyMap(*StatelessEmitter, *EmitterValues, Context);
+		}
+		FailedCount += ApplyStatelessModules(*StatelessEmitter, Entry, Context);
+		FailedCount += ApplyStatelessRenderer(*StatelessEmitter, Entry, Context);
+		FString SpriteScaleParameter;
+		if (Entry->TryGetStringField(TEXT("sprite_scale_parameter"), SpriteScaleParameter))
+		{
+			FailedCount += BindSpriteScaleParameter(System, *StatelessEmitter, SpriteScaleParameter, Context) ? 0 : 1;
+		}
+		StatelessEmitter->PostEditChange();
+		UE_LOG(LogRTSImpactVfxAuthoring, Display, TEXT("RTS_IMPACT_VFX_AUTHORING added stateless %s from %s:%s failed=%d"),
+		       *NewHandle.GetName().ToString(), *FPackageName::GetShortName(SourcePath), *SourceEmitterName, FailedCount);
+		return FailedCount == 0;
 	}
 
 	void RenameEmitters(UNiagaraSystem& System, const TSharedPtr<FJsonObject>& Recipe)
@@ -429,6 +628,24 @@ namespace ImpactVfxNiagaraAuthoring
 	{
 		for (const FNiagaraEmitterHandle& Handle : System.GetEmitterHandles())
 		{
+			if (Handle.GetStatelessEmitter() != nullptr)
+			{
+				UObject* const StatelessEmitter = reinterpret_cast<UObject*>(Handle.GetStatelessEmitter());
+				FString EnabledModules;
+				for (const UObject* const Module : GetObjectArray(*StatelessEmitter, TEXT("Modules")))
+				{
+					const FBoolProperty* const EnabledProperty = Module != nullptr
+						? CastField<FBoolProperty>(Module->GetClass()->FindPropertyByName(TEXT("bModuleEnabled")))
+						: nullptr;
+					if (EnabledProperty != nullptr && EnabledProperty->GetPropertyValue_InContainer(Module))
+					{
+						EnabledModules += TEXT(" ") + Module->GetClass()->GetName().RightChop(FCString::Strlen(StatelessModuleClassPrefix));
+					}
+				}
+				UE_LOG(LogRTSImpactVfxAuthoring, Display, TEXT("RTS_IMPACT_VFX_AUTHORING   stateless %s enabled=%d modules:%s"),
+				       *Handle.GetName().ToString(), Handle.GetIsEnabled() ? 1 : 0, *EnabledModules);
+				continue;
+			}
 			const FVersionedNiagaraEmitterData* const EmitterData = Handle.GetEmitterData();
 			if (EmitterData == nullptr)
 			{
@@ -515,6 +732,14 @@ namespace ImpactVfxNiagaraAuthoring
 			for (const TSharedPtr<FJsonValue>& AddEntry : *AddEntries)
 			{
 				AddEmitterFromSystem(*System, AddEntry->AsObject());
+			}
+		}
+		const TArray<TSharedPtr<FJsonValue>>* StatelessEntries = nullptr;
+		if (Recipe->TryGetArrayField(TEXT("stateless"), StatelessEntries))
+		{
+			for (const TSharedPtr<FJsonValue>& StatelessEntry : *StatelessEntries)
+			{
+				AddStatelessEmitter(*System, StatelessEntry->AsObject());
 			}
 		}
 		RenameEmitters(*System, Recipe);

@@ -13,7 +13,9 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GeometryCollection/GeometryCollection.h"
+#include "Chaos/Convex.h"
 #include "GeometryCollection/GeometryCollectionAlgo.h"
+#include "GeometryCollection/GeometryCollectionConvexUtility.h"
 #include "GeometryCollection/GeometryCollectionEngineConversion.h"
 #include "GeometryCollection/GeometryCollectionObject.h"
 #include "HAL/IConsoleManager.h"
@@ -32,6 +34,8 @@ namespace RTSAircraftCrashCollection
 {
 	const TCHAR* const AircraftBlueprintFolder = TEXT("/Game/RTS_Survival/Blueprints/Aircraft");
 	const TCHAR* const OverwriteToken = TEXT("Overwrite");
+	// Builds and reports the collision hulls without saving anything.
+	const TCHAR* const DryRunToken = TEXT("DryRun");
 	// A fighter breaks into a few dozen pieces, a bomber into more; one piece per this much of the aircraft's size.
 	constexpr float CentimetresPerPiece = 45.f;
 	constexpr int32 MinimumPieces = 26;
@@ -40,6 +44,8 @@ namespace RTSAircraftCrashCollection
 	// Spacing of the collision surface samples on the cut faces; pieces only need a rough shape to tumble on.
 	constexpr double CollisionSampleSpacing = 60.0;
 	constexpr double VoronoiBoundsPadding = 10.0;
+	// A hull smaller than this share of its piece along any axis is reported.
+	constexpr float ThinHullShare = 0.5f;
 	// Texture repeats on the torn faces: once per two metres.
 	constexpr float InteriorUVScale = 0.005f;
 	// Pieces that came to rest shrink away between these times, so a wreck does not litter the map for good.
@@ -60,7 +66,12 @@ namespace RTSAircraftCrashCollection
 	void GatherAircraftMeshes(const AActor& Aircraft, TArray<FAircraftCrashMesh>& OutMeshes,
 	                          TArray<FString>& OutStaticNames, TArray<FString>& OutSkeletalNames)
 	{
-		const FTransform ActorTransform = Aircraft.GetActorTransform();
+		// Without the actor's scale: the collection carries it in its geometry (Chaos does not scale collection
+		// collision with the component), and the wreck is spawned unscaled.
+		FTransform ActorTransform = Aircraft.GetActorTransform();
+		UE_LOG(LogRTSAircraftCrashCollection, Display, TEXT("RTS_AIRCRAFT_CRASH_COLLECTION %s actor_scale=%s"),
+		       *Aircraft.GetClass()->GetName(), *ActorTransform.GetScale3D().ToCompactString());
+		ActorTransform.SetScale3D(FVector::OneVector);
 		TArray<UStaticMeshComponent*> StaticComponents;
 		Aircraft.GetComponents<UStaticMeshComponent>(StaticComponents);
 		for (const UStaticMeshComponent* Component : StaticComponents)
@@ -220,12 +231,56 @@ namespace RTSAircraftCrashCollection
 		return GetTransformsWithGeometry(Collection).Num() == 1;
 	}
 
+	/**
+	 * @brief Moves every geometry into collection space (its full global transform, scale included, baked into its
+	 * vertices) and resets every transform. The merge below keeps the geometry in the space of its first part and
+	 * drops that part's scale: with a propeller bone (carrying the skeletal import scale) first, the Pe-8's static
+	 * frame came out at a hundredth of its size, in tiny pieces that fell through the ground.
+	 */
+	void BakeAllGeometryIntoCollectionSpace(FGeometryCollection& Collection)
+	{
+		TArray<FTransform> GlobalTransforms;
+		GlobalTransforms.SetNum(Collection.Transform.Num());
+		for (int32 TransformIndex = 0; TransformIndex < Collection.Transform.Num(); ++TransformIndex)
+		{
+			GlobalTransforms[TransformIndex] = GeometryCollectionAlgo::GlobalMatrix(Collection.Transform,
+			                                                                        Collection.Parent, TransformIndex);
+		}
+		for (int32 TransformIndex = 0; TransformIndex < Collection.Transform.Num(); ++TransformIndex)
+		{
+			const int32 GeometryIndex = Collection.TransformToGeometryIndex[TransformIndex];
+			if (GeometryIndex == INDEX_NONE)
+			{
+				continue;
+			}
+			const FTransform& Global = GlobalTransforms[TransformIndex];
+			const int32 FirstVertex = Collection.VertexStart[GeometryIndex];
+			const int32 EndVertex = FirstVertex + Collection.VertexCount[GeometryIndex];
+			for (int32 VertexIndex = FirstVertex; VertexIndex < EndVertex; ++VertexIndex)
+			{
+				Collection.Vertex[VertexIndex] = FVector3f(Global.TransformPosition(FVector(Collection.Vertex[VertexIndex])));
+				Collection.Normal[VertexIndex] = FVector3f(
+					Global.TransformVectorNoScale(FVector(Collection.Normal[VertexIndex])).GetSafeNormal());
+				Collection.TangentU[VertexIndex] = FVector3f(
+					Global.TransformVectorNoScale(FVector(Collection.TangentU[VertexIndex])).GetSafeNormal());
+				Collection.TangentV[VertexIndex] = FVector3f(
+					Global.TransformVectorNoScale(FVector(Collection.TangentV[VertexIndex])).GetSafeNormal());
+			}
+		}
+		for (int32 TransformIndex = 0; TransformIndex < Collection.Transform.Num(); ++TransformIndex)
+		{
+			Collection.Transform[TransformIndex] = FTransform3f::Identity;
+		}
+		Collection.UpdateBoundingBox();
+	}
+
 	/** @return Whether the collection was cut into pieces. */
 	bool FractureCollection(FGeometryCollection& Collection)
 	{
 		// A skeletal mesh arrives as one geometry per bone; cut separately every cell would hold a piece of each.
 		TArray<int32> TransformsToCut = GetTransformsWithGeometry(Collection);
 		const int32 GeometryBeforeMerge = TransformsToCut.Num();
+		BakeAllGeometryIntoCollectionSpace(Collection);
 		if (TransformsToCut.Num() > 1)
 		{
 			// Skeletal mesh parts arrive as embedded geometry, which the merge leaves out.
@@ -244,6 +299,7 @@ namespace RTSAircraftCrashCollection
 		TransformsToCut = GetTransformsWithGeometry(Collection);
 		UE_LOG(LogRTSAircraftCrashCollection, Display, TEXT("Geometry before merge=%d after=%d transforms=%d"),
 		       GeometryBeforeMerge, TransformsToCut.Num(), Collection.Transform.Num());
+		Collection.UpdateBoundingBox();
 		FBox Bounds;
 		TArray<FVector> Sites = MakeFractureSites(Collection, MaximumPieces, Bounds);
 		if (Sites.IsEmpty() || TransformsToCut.IsEmpty())
@@ -286,6 +342,53 @@ namespace RTSAircraftCrashCollection
 		return FirstNewGeometry != INDEX_NONE;
 	}
 
+	/** Logs the pieces whose collision hulls are much smaller than the piece itself. */
+	void ReportThinHulls(FGeometryCollection& Collection, const FString& AssetName)
+	{
+		const TOptional<FGeometryCollectionConvexUtility::FGeometryCollectionConvexData> ConvexData =
+			FGeometryCollectionConvexUtility::GetConvexHullDataIfPresent(&Collection);
+		if (not ConvexData.IsSet())
+		{
+			UE_LOG(LogRTSAircraftCrashCollection, Warning, TEXT("RTS_AIRCRAFT_CRASH_HULL %s has no convex hulls"), *AssetName);
+			return;
+		}
+		int32 ThinCount = 0;
+		float SmallestShare = 1.f;
+		for (int32 TransformIndex = 0; TransformIndex < Collection.Transform.Num(); ++TransformIndex)
+		{
+			const int32 GeometryIndex = Collection.TransformToGeometryIndex[TransformIndex];
+			if (not Collection.Children[TransformIndex].IsEmpty() || GeometryIndex == INDEX_NONE)
+			{
+				continue;
+			}
+			const FVector GeometryExtent = FVector(Collection.BoundingBox[GeometryIndex].GetExtent());
+			FBox HullBox(ForceInit);
+			for (const int32 HullIndex : ConvexData->TransformToConvexIndices[TransformIndex])
+			{
+				const Chaos::FConvexPtr& Hull = ConvexData->ConvexHull[HullIndex];
+				if (Hull.IsValid())
+				{
+					HullBox += FBox(FVector(Hull->BoundingBox().Min()), FVector(Hull->BoundingBox().Max()));
+				}
+			}
+			const FVector HullExtent = HullBox.IsValid ? HullBox.GetExtent() : FVector::ZeroVector;
+			const float Share = static_cast<float>(FMath::Min3(
+				HullExtent.X / FMath::Max(GeometryExtent.X, 1.0), HullExtent.Y / FMath::Max(GeometryExtent.Y, 1.0),
+				HullExtent.Z / FMath::Max(GeometryExtent.Z, 1.0)));
+			SmallestShare = FMath::Min(SmallestShare, Share);
+			if (Share < ThinHullShare)
+			{
+				++ThinCount;
+				UE_LOG(LogRTSAircraftCrashCollection, Display,
+				       TEXT("RTS_AIRCRAFT_CRASH_HULL %s thin transform=%d hulls=%d piece_extent=%s hull_extent=%s"), *AssetName,
+				       TransformIndex, ConvexData->TransformToConvexIndices[TransformIndex].Num(),
+				       *GeometryExtent.ToCompactString(), *HullExtent.ToCompactString());
+			}
+		}
+		UE_LOG(LogRTSAircraftCrashCollection, Display, TEXT("RTS_AIRCRAFT_CRASH_HULL %s thin=%d smallest_share=%.2f"),
+		       *AssetName, ThinCount, SmallestShare);
+	}
+
 	void ApplyCrashSettings(UGeometryCollection& CollectionAsset)
 	{
 		CollectionAsset.EnableNanite = false;
@@ -296,7 +399,7 @@ namespace RTSAircraftCrashCollection
 	}
 
 	/** @return Whether the collection was built and saved. */
-	bool BuildCrashCollection(const FString& AssetName, const TArray<FAircraftCrashMesh>& Meshes)
+	bool BuildCrashCollection(const FString& AssetName, const TArray<FAircraftCrashMesh>& Meshes, const bool bDryRun)
 	{
 		const FString PackageName = FString(FAircraftDeathMath::CrashCollectionFolder) / AssetName;
 		// An existing package must be loaded in full, else saving over it is refused.
@@ -316,16 +419,23 @@ namespace RTSAircraftCrashCollection
 		}
 		UGeometryCollection* CollectionAsset = NewObject<UGeometryCollection>(
 			Package, *AssetName, RF_Public | RF_Standalone | RF_Transactional);
+		// Skeletal meshes first: appending one copies a collection built from it over the target, replacing whatever
+		// was appended before. With the static frame first, the Pe-2 and Pe-8 collections held only their propellers.
+		for (const FAircraftCrashMesh& Mesh : Meshes)
+		{
+			if (Mesh.StaticMesh == nullptr)
+			{
+				FGeometryCollectionEngineConversion::AppendSkeletalMesh(Mesh.SkeletalMesh, Mesh.SkeletalComponent,
+				                                                        Mesh.RelativeTransform, CollectionAsset, false);
+			}
+		}
 		for (const FAircraftCrashMesh& Mesh : Meshes)
 		{
 			if (Mesh.StaticMesh != nullptr)
 			{
 				FGeometryCollectionEngineConversion::AppendStaticMesh(Mesh.StaticMesh, Mesh.StaticMaterials,
 				                                                      Mesh.RelativeTransform, CollectionAsset, false);
-				continue;
 			}
-			FGeometryCollectionEngineConversion::AppendSkeletalMesh(Mesh.SkeletalMesh, Mesh.SkeletalComponent,
-			                                                        Mesh.RelativeTransform, CollectionAsset, false);
 		}
 		FGeometryCollection& Collection = *CollectionAsset->GetGeometryCollection();
 		Collection.ReindexMaterials();
@@ -338,6 +448,12 @@ namespace RTSAircraftCrashCollection
 		GeometryCollectionAlgo::PrepareForSimulation(&Collection);
 		ApplyCrashSettings(*CollectionAsset);
 		CollectionAsset->UpdateGeometryDependentProperties();
+		ReportThinHulls(Collection, AssetName);
+		if (bDryRun)
+		{
+			Package->ClearDirtyFlag();
+			return true;
+		}
 		CollectionAsset->InvalidateCollection();
 		CollectionAsset->RebuildRenderData();
 		EnsureMaterialsSupportGeometryCollections(*CollectionAsset);
@@ -391,11 +507,13 @@ namespace RTSAircraftCrashCollection
 			UE_LOG(LogRTSAircraftCrashCollection, Error, TEXT("No editor world to spawn the aircraft in."));
 			return;
 		}
-		const bool bOverwrite = Arguments.Contains(OverwriteToken);
+		const bool bDryRun = Arguments.Contains(DryRunToken);
+		const bool bOverwrite = Arguments.Contains(OverwriteToken) || bDryRun;
 		FString NameFilter;
 		for (const FString& Argument : Arguments)
 		{
-			NameFilter = Argument != OverwriteToken ? Argument : NameFilter;
+			const bool bIsToken = Argument == OverwriteToken || Argument == DryRunToken;
+			NameFilter = bIsToken ? NameFilter : Argument;
 		}
 		TSet<FString> BuiltNames;
 		int32 FailedCount = 0;
@@ -424,7 +542,7 @@ namespace RTSAircraftCrashCollection
 			if (not AssetName.IsEmpty() && not bAlreadyBuilt)
 			{
 				BuiltNames.Add(AssetName);
-				FailedCount += BuildCrashCollection(AssetName, Meshes) ? 0 : 1;
+				FailedCount += BuildCrashCollection(AssetName, Meshes, bDryRun) ? 0 : 1;
 			}
 			UE_LOG(LogRTSAircraftCrashCollection, Display, TEXT("RTS_AIRCRAFT_CRASH_COLLECTION aircraft=%s collection=%s"),
 			       *AircraftClass->GetName(), *AssetName);
@@ -437,7 +555,8 @@ namespace RTSAircraftCrashCollection
 	FAutoConsoleCommand BuildAircraftCrashCollectionsCommand(
 		TEXT("RTS.Aircraft.BuildCrashCollections"),
 		TEXT("Builds the geometry collections shot-down aircraft break into, one per set of aircraft meshes, in ")
-		TEXT("/Game/RTS_Survival/Blueprints/Aircraft/CrashCollections. Args: [AircraftClassNameFilter] [Overwrite]"),
+		TEXT("/Game/RTS_Survival/Blueprints/Aircraft/CrashCollections. ")
+		TEXT("Args: [AircraftClassNameFilter] [Overwrite] [DryRun: report collision hulls, save nothing]"),
 		FConsoleCommandWithArgsDelegate::CreateStatic(&BuildAircraftCrashCollections));
 }
 

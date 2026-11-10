@@ -12,6 +12,7 @@
 class UCargo;
 class URTSComponent;
 class UHealthComponent;
+class UWallHoleDamageComponent;
 
 // Collision is setup in the bp of this class automatically.
 /**
@@ -88,6 +89,20 @@ protected:
 private:
 
         void OnUnitDies_HandleGarrisonState();
+
+	/**
+	 * @brief Garrisons keep their health in the health component, so the base TakeDamage never runs; this gives
+	 * the optional procedural hole component the hit and the health-component numbers instead.
+	 * @param DamageEvent The hit; a point event carries the impact.
+	 * @param DamageCauser Projectile, bomb or ability actor; may be null.
+	 * @param HealthBefore Health before this hit.
+	 * @param bDied Whether this hit kills the building; the hole component then leaves it to the death.
+	 */
+	void ForwardDamageToWallHoles(const FDamageEvent& DamageEvent, const AActor* DamageCauser, float HealthBefore,
+	                              bool bDied) const;
+
+	// Optional procedural shell holes (WallChunkDamage.md, A + B); looked up per hit, null without the component.
+	UWallHoleDamageComponent* FindWallHoleDamage() const;
 
         // What the health bar visibility settings were before squads entered.
         FHealthBarVisibilitySettings M_CachedVisibilityPreGarrison;

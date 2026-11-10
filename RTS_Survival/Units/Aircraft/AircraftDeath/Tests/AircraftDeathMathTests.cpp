@@ -216,17 +216,17 @@ bool FAircraftDeathCollectionNameTest::RunTest(const FString& Parameters)
 {
 	TestEqual(TEXT("The static frame names the collection of a frame-and-rotor aircraft"),
 	          FAircraftDeathMath::GetCrashCollectionAssetName({TEXT("SM_PE2_Frame")}, {TEXT("SK_PE2_Rotors")}),
-	          FString(TEXT("GC_Crash_SM_PE2_Frame")));
+	          FString(TEXT("GC_AircraftCrash_SM_PE2_Frame")));
 	TestEqual(TEXT("A skeletal-only aircraft is named after its mesh"),
 	          FAircraftDeathMath::GetCrashCollectionAssetName({}, {TEXT("Bf109_WingAnims")}),
-	          FString(TEXT("GC_Crash_Bf109_WingAnims")));
+	          FString(TEXT("GC_AircraftCrash_Bf109_WingAnims")));
 	TestEqual(TEXT("The order of the meshes does not change the name"),
 	          FAircraftDeathMath::GetCrashCollectionAssetName({TEXT("SM_B"), TEXT("SM_A")}, {}),
 	          FAircraftDeathMath::GetCrashCollectionAssetName({TEXT("SM_A"), TEXT("SM_B")}, {}));
 	TestTrue(TEXT("No meshes, no collection"), FAircraftDeathMath::GetCrashCollectionAssetName({}, {}).IsEmpty());
 	TestEqual(TEXT("Object path of a collection"),
-	          FAircraftDeathMath::GetCrashCollectionObjectPath(TEXT("GC_Crash_SM_PE2_Frame")),
-	          FString(TEXT("/Game/RTS_Survival/Blueprints/Aircraft/CrashCollections/GC_Crash_SM_PE2_Frame.GC_Crash_SM_PE2_Frame")));
+	          FAircraftDeathMath::GetCrashCollectionObjectPath(TEXT("GC_AircraftCrash_SM_PE2_Frame")),
+	          FString(TEXT("/Game/RTS_Survival/Blueprints/Aircraft/CrashCollections/GC_AircraftCrash_SM_PE2_Frame.GC_AircraftCrash_SM_PE2_Frame")));
 	return true;
 }
 

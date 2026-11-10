@@ -3,6 +3,7 @@
 
 #include "NiagaraComponent.h"
 #include "WeaponSystems.h"
+#include "RTS_Survival/Environment/ImpactDecals/LandscapeImpactDecalSubsystem.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/Player/CPPController.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
@@ -20,6 +21,7 @@
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldComponent.h"
 #include "RTS_Survival/RTSComponents/ShieldComponent/ShieldOwner/ShieldOwner.h"
 #include "RTS_Survival/Weapons/RTSWeaponVFXSettings/RTSWeaponVFXSettings.h"
+#include "RTS_Survival/Weapons/ImpactVfxAuthoring/ImpactVfxSpriteScale.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/SmallArmsProjectileManager.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxBatcher.h"
 #include "RTS_Survival/Weapons/SmallArmsProjectileManager/TraceImpactVfx/TraceImpactVfxPerfCounters.h"
@@ -750,7 +752,7 @@ void FWeaponImpactPool::Activate(
 		}
 
 		NiagaraComp->SetWorldLocationAndRotation(Location, Rotation);
-		NiagaraComp->SetWorldScale3D(NiagaraScale);
+		ImpactVfxSpriteScale::ApplyImpactScale(*NiagaraComp, NiagaraScale);
 		NiagaraComp->ReinitializeSystem();
 		NiagaraComp->Activate(true);
 	}
@@ -2335,6 +2337,9 @@ void UWeaponStateTrace::OnAsyncTraceHitValidActor(const FHitResult& TraceHit, FV
 		OnActorPenArmor(TraceHit, HitActor);
 		OutEndLocation = TraceHit.ImpactPoint;
 		CreateTraceImpact(TraceHit.ImpactPoint, SurfaceTypeHit, TraceHit.ImpactNormal, ImpactRotation);
+		// Trace weapons above 15 mm (autocannons) leave a crater too, but only on a landscape.
+		ULandscapeImpactDecalSubsystem::RequestImpactDecal(World, WeaponData.WeaponCalibre, TraceHit.ImpactPoint,
+		                                                   TraceHit.ImpactNormal, TraceHit.GetActor());
 		return;
 	}
 	// Trace bounce.

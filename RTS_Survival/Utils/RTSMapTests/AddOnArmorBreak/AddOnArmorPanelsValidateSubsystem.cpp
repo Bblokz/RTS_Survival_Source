@@ -68,6 +68,8 @@ namespace AddOnArmorPanelsValidateConstants
 	const TCHAR* const StartModuleSetupSwitch = TEXT("AddOnArmorPanelsStartModuleSetup");
 	// Takes the test tank out of the fog of war, so the debris checks also run on enemy-faction tanks.
 	const TCHAR* const RevealTankSwitch = TEXT("AddOnArmorPanelsRevealTank");
+	// Layout index of the left panel the first shell hits (default: the middle left panel).
+	const TCHAR* const FirstHitPanelSwitch = TEXT("AddOnArmorPanelsFirstHitPanel=");
 	const FName StartModuleSetupFunctionName(TEXT("BeginPlay_OnModulesComplete_FinalizeVehicleModules"));
 	constexpr float AllPanelBits = 1048575.f;
 	const TCHAR* const DefaultVehicleClass = TEXT("/Game/RTS_Survival/Blueprints/GroundVehicles/TrackBasedVehicle/Ger_Light/"
@@ -137,6 +139,7 @@ void UAddOnArmorPanelsValidateSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	bM_RunProbes = FParse::Param(FCommandLine::Get(), ProbeSwitch);
 	bM_StartModuleSetup = FParse::Param(FCommandLine::Get(), StartModuleSetupSwitch);
 	bM_RevealTank = FParse::Param(FCommandLine::Get(), RevealTankSwitch);
+	FParse::Value(FCommandLine::Get(), FirstHitPanelSwitch, M_RequestedFirstHitPanel);
 	// Error dialogs are answered automatically in unattended runs; log them instead.
 	RTSFunctionLibrary::PushModalDialogSuppression();
 	bM_IsSuppressingErrorDialogs = true;
@@ -268,7 +271,7 @@ void UAddOnArmorPanelsValidateSubsystem::Tick(const float DeltaTime)
 		return;
 	case EAddOnArmorPanelsValidateStep::FirstHit:
 		TickStep(EAddOnArmorPanelsValidateStep::HitUntilDestroyed,
-		         [this] { Expect(FireAtPanel(M_LeftPanels[M_LeftPanels.Num() / 2]), TEXT("first shell resolves a plate")); },
+		         [this] { Expect(FireAtPanel(GetFirstHitPanel()), TEXT("first shell resolves a plate")); },
 		         [this] { CheckFirstHit(); });
 		return;
 	case EAddOnArmorPanelsValidateStep::HitUntilDestroyed:
@@ -953,9 +956,32 @@ void UAddOnArmorPanelsValidateSubsystem::CheckIntact()
 	ExportPictures(TEXT("0_Intact"));
 }
 
+int32 UAddOnArmorPanelsValidateSubsystem::GetFirstHitPanel() const
+{
+	if (M_CoveredLeftPanels.Contains(M_RequestedFirstHitPanel))
+	{
+		return M_RequestedFirstHitPanel;
+	}
+	return M_LeftPanels[M_LeftPanels.Num() / 2];
+}
+
+void UAddOnArmorPanelsValidateSubsystem::CheckFirstBurstDebrisMesh(const UNiagaraComponent& Burst)
+{
+	const int32 HitPanel = GetFirstHitPanel();
+	const UAddOnArmorPanelLayout* const Layout = M_PanelMesh->GetStaticMesh()->GetAssetUserData<UAddOnArmorPanelLayout>();
+	bool bIsOwnSideMesh = false;
+	const UStaticMesh* const ExpectedMesh = Layout->GetDebrisMeshForPanel(HitPanel, bIsOwnSideMesh);
+	const FNiagaraVariable DebrisMeshVariable(FNiagaraTypeDefinition::GetUStaticMeshDef(),
+	                                          AddOnArmorPanelDebris::DebrisMeshParameter);
+	const UObject* const BurstMesh = Burst.GetOverrideParameters().GetUObject(DebrisMeshVariable);
+	UE_LOG(LogRTSAddOnArmorPanelsValidate, Display, TEXT("RTS_ADDON_PANELS first hit panel=%d burst mesh=%s expected=%s own=%d"),
+	       HitPanel, *GetNameSafe(BurstMesh), *GetNameSafe(ExpectedMesh), bIsOwnSideMesh ? 1 : 0);
+	Expect(IsValid(BurstMesh) && BurstMesh == ExpectedMesh, TEXT("the first burst throws the hit panel's debris mesh"));
+}
+
 void UAddOnArmorPanelsValidateSubsystem::CheckFirstHit()
 {
-	const int32 HitPanel = M_LeftPanels[M_LeftPanels.Num() / 2];
+	const int32 HitPanel = GetFirstHitPanel();
 	const int32 Mask = GetHiddenPanelMask();
 	const FAddOnArmorPanelsSideReading Left = ReadSide(true);
 	UE_LOG(LogRTSAddOnArmorPanelsValidate, Display, TEXT("RTS_ADDON_PANELS first hit state=%d mask=0x%x left raw=%.2f"),
@@ -1087,6 +1113,10 @@ void UAddOnArmorPanelsValidateSubsystem::TickFirstShotDebris()
 			return;
 		}
 		Expect(Particles == HiddenLeft, TEXT("each panel the first hit hides flies off as one debris piece"));
+		if (M_FirstDebrisBurst.IsValid())
+		{
+			CheckFirstBurstDebrisMesh(*M_FirstDebrisBurst);
+		}
 	}
 	if (not bM_DidDebrisSettleCheck && SecondsSinceShot >= DebrisSettleCheckSeconds)
 	{

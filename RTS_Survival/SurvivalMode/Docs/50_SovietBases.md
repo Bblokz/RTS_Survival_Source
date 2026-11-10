@@ -224,6 +224,10 @@ One seed reproduces axis, mirror, plan variant, unit picks and placements exactl
 
 ## How bases work with the enemy AI
 
+- **Trenches**: from the strategic AI's start (the grace period), the enemy controller's `UEnemyBaseTrenchComponent` digs Soviet
+  field trenches out of the bases' pit anchors and on an arc in front of each base cluster, facing the player's HQ. They are free and capped per base. See
+  `Source/Docs/EnemyAI/EnemyBaseTrenches.md`. Not yet watched in a real match.
+
 - **Registration**: a spawned Rus building expansion registers itself in `URTSComponent::BeginPlay` →
   `UGameUnitManager::AddBxpForPlayer(OwningPlayer)`; units from the async spawner do the same. Ownership comes from the
   Blueprint defaults. Walls, fences and props are environment actors on purpose, so they never count as buildings.

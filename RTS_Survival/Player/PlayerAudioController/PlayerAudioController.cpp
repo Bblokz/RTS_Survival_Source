@@ -39,6 +39,8 @@ void UPlayerAudioController::BeginPlay()
 		M_VoiceLineAudioComponent->OnAudioFinished.AddDynamic(
 			this, &UPlayerAudioController::HandleAudioFinished
 		);
+		M_VoiceLineAudioComponent->OnAudioPlaybackPercentNative.AddUObject(
+			this, &UPlayerAudioController::OnVoiceLinePlaybackPercent);
 	}
 	BeginPlay_InitSpatialAudioPool();
 	BeginPlay_InitOffMapAbilityAudioPool();
@@ -258,6 +260,8 @@ void UPlayerAudioController::PlayCustomAnnouncerVoiceLine(
 	M_CurrentVoiceLineState.Reset();
 
 	M_VoiceLineAudioComponent->SetSound(CustomVoiceLineSound);
+	M_VoiceLinePlaybackWave.Reset();
+	M_VoiceLinePlaybackSeconds = -1.0f;
 	M_VoiceLineAudioComponent->Play();
 
 	// Record that this is now the “current” line.
@@ -547,6 +551,37 @@ bool UPlayerAudioController::GetIsValidVoiceLineAudioComp() const
 	RTSFunctionLibrary::ReportError("No valid voice line audio component on player audio controller!"
 		"\n See: UPlayerAudioController::GetIsValidVoiceLineAudioComp() for more details.");
 	return false;
+}
+
+float UPlayerAudioController::GetVoiceLinePlaybackSeconds(const USoundBase* VoiceLine) const
+{
+	constexpr float NotPlaying = -1.0f;
+	if (VoiceLine == nullptr || not GetIsValidVoiceLineAudioComp())
+	{
+		return NotPlaying;
+	}
+	if (not M_VoiceLineAudioComponent->IsPlaying() || M_VoiceLineAudioComponent->Sound != VoiceLine)
+	{
+		return NotPlaying;
+	}
+	// Positions are reported per sound wave; a sound cue never matches and gets no timed subtitle.
+	if (M_VoiceLinePlaybackWave.Get() != VoiceLine)
+	{
+		return NotPlaying;
+	}
+	return M_VoiceLinePlaybackSeconds;
+}
+
+void UPlayerAudioController::OnVoiceLinePlaybackPercent(const UAudioComponent* AudioComponent,
+                                                        const USoundWave* PlayingSoundWave,
+                                                        const float PlaybackPercent)
+{
+	if (PlayingSoundWave == nullptr)
+	{
+		return;
+	}
+	M_VoiceLinePlaybackWave = PlayingSoundWave;
+	M_VoiceLinePlaybackSeconds = PlaybackPercent * PlayingSoundWave->Duration;
 }
 
 

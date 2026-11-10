@@ -19,7 +19,8 @@ LOCATION_SWITCH=()
 if [ -n "${AT:-}" ]; then
   LOCATION_SWITCH=(-ImpactVfxAt="$AT")
 fi
-ENGINE="D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
+# ENGINE_EXE overrides the editor binary, e.g. UnrealEditor-Win64-DebugGame-Cmd.exe while a Development editor is open.
+ENGINE="${ENGINE_EXE:-D:/UnrealEngine/UE5.5_ReleaseBranch/UnrealEngine/Engine/Binaries/Win64/UnrealEditor-Cmd.exe}"
 LOG="D:/UE5Projects/RTS_Survival/Saved/Logs/ImpactVfx.log"
 MSYS_NO_PATHCONV=1 "$ENGINE" "D:/UE5Projects/RTS_Survival/RTS_Survival.uproject" "$MAP" \
   -game -unattended -nosound -RenderOffscreen -windowed -ResX=1280 -ResY=720 -DisablePlugins=Fab \

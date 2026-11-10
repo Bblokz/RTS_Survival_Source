@@ -29,6 +29,13 @@ public:
 	FFieldTrenchAnchorHandle FindFreeAnchorNear(const FVector2D& Location, const float Radius,
 	                                            const int32 OwningPlayer) const;
 
+	/**
+	 * @brief Lists every anchor of the player that no trench has taken, so the enemy AI can dig out of its pits.
+	 * @param OwningPlayer Only anchors of this player's actors are listed.
+	 * @param OutAnchors Receives the free anchors; emptied first.
+	 */
+	void GetFreeAnchorsOfPlayer(const int32 OwningPlayer, TArray<FFieldTrenchAnchorHandle>& OutAnchors) const;
+
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 

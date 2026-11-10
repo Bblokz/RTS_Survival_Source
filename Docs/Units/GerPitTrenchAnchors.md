@@ -53,7 +53,7 @@ Unreal space is Blender's with Y mirrored (Unreal yaw = −Blender yaw), the sam
 
 In `GerPits/Meshes` (the twin MG42's in `GerPits/TwinMG42Pit/Meshes`). Each has its origin on the socket, with +X pointing out of the pit, so a component attached to the socket with no offset is in place.
 
-- **`<Pit>_TrenchNeck_Rear` / `_Side`:** the trench stub from the pit's outer wall to the socket, about 1 m long. It is built from the kit's own pallet revetment and bag rows, and each bag row starts where it meets the round wall, so the 340 cm-wide trench end closes against the curved wall. The game shows it only while a trench is attached. Rear necks reuse the plank tongue the crew entrance already has as their floor; side necks bring their own tongue.
+- **`<Pit>_TrenchNeck_Rear` / `_Side`:** the trench stub from the pit's outer wall to the socket, about 1 m long. It is built from the kit's own pallet revetment and bag rows, and each bag row starts where it meets the round wall, so the 400 cm-wide trench end (165 cm between the pallets since the kit was widened on 2026-11-09) closes against the curved wall. The game shows it only while a trench is attached. Rear necks reuse the plank tongue the crew entrance already has as their floor; side necks bring their own tongue.
   - Materials: `M_GerCamoConcretePalet_Atlas` and `M_GerSandBagScaffold_Atlas`.
   - Complex collision, LOD group LargeProp, no Nanite.
 - **`<Pit>_TrenchPlug`:** only for anchors cut into a wall that was closed. It holds the wall bags taken out of the gap and is shown while no trench is attached, so the pit stays closed. Rear anchors use the existing entrance and have no plug.
@@ -62,12 +62,12 @@ Side necks also bring what a closed wall lacks: the round pits a deck tongue, th
 
 | Mesh | Triangles |
 |---|---|
-| `SM_GerPit_Pak_TrenchNeck_Rear` | 620 |
-| `SM_GerPit_Flak_TrenchNeck_Rear` | 568 |
-| `SM_GerPit_Howitzer_TrenchNeck_Rear` / `_Side` | 570 / 612 |
+| `SM_GerPit_Pak_TrenchNeck_Rear` | 854 |
+| `SM_GerPit_Flak_TrenchNeck_Rear` | 702 |
+| `SM_GerPit_Howitzer_TrenchNeck_Rear` / `_Side` | 682 / 798 |
 | `SM_GerPit_Howitzer_TrenchPlug_RearLeft` / `_RearRight` | 1,352 / 1,328 (cut to 0.4 like the pit's bags) |
 | `SM_GerMortarPit_TrenchNeck_RearRight` | 560 |
-| `SM_GerTwinMG42Pit_TrenchNeck_Left` / `_Right` | 898 / 850 |
+| `SM_GerTwinMG42Pit_TrenchNeck_Left` / `_Right` | 1,028 / 1,024 |
 | `SM_GerTwinMG42Pit_TrenchPlug_Left` / `_Right` | 862 / 964 (cut to 0.4) |
 | `SM_GerFlak88Pit_TrenchNeck_Rear` / `_Right` | 498 / 592 |
 | `SM_GerFlak88Pit_TrenchPlug_Right` | 1,797 |
@@ -86,6 +86,7 @@ The pit keys are `Pak`, `Flak`, `Howitzer`, `Mortar`, `TwinMG42` and `Flak88`. T
 - it reimports changed pits from the `_Opt` cut;
 - it sets every socket to its pure-yaw transform;
 - it imports the necks and plugs.
+- with `NECKS_ONLY = True` it imports only the necks and leaves the pit, its sockets and the plugs alone (used when only the kit's width changed).
 
 The script:
 - rebuilds the pit with `gerpit_build.py`'s own builders and seeds, so the pit keeps its bags. A new gap takes its bags out after they have used up the generator's random numbers.

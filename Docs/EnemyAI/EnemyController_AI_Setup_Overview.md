@@ -114,3 +114,7 @@ So the natural extension is to add blueprint-callable entry points that:
 5. apply controller-issued direct orders for only those selected units.
 
 That keeps the current waves untouched while layering an opt-in "direct AI control block" system on top.
+
+## Base trenches
+
+`UEnemyBaseTrenchComponent` (created by `AEnemyController`) is a separate AI action on its own timer. It starts with `StartStrategicAIThinkingTimer` and digs Soviet trenches out of the AI's pits and around its bases; see [EnemyBaseTrenches.md](EnemyBaseTrenches.md).

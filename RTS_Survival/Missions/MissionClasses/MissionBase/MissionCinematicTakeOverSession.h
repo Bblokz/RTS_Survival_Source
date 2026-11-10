@@ -9,6 +9,7 @@
 class ACPPController;
 class UMissionBase;
 class UMovieSceneSequencePlayer;
+class UW_CinematicOverlay;
 class UW_HoldToSkip;
 
 UENUM(BlueprintType)
@@ -102,6 +103,9 @@ private:
 
 	bool CreateSkipWidget();
 	void RemoveSkipWidget();
+	/** Subtitle strip (voice lines found in the sequence's audio tracks) + countdown; never blocks the takeover. */
+	void ShowCinematicOverlay();
+	void RemoveCinematicOverlay();
 	void BindSequencePlayerDelegates();
 	void UnbindSequencePlayerDelegates();
 	void ApplySkipWidgetInputMode() const;
@@ -112,6 +116,7 @@ private:
 	bool GetIsValidSequencePlayer(const bool bReportError = true) const;
 	bool GetIsValidPlayerController(const bool bReportError = true) const;
 	bool GetIsValidSkipWidget(const bool bReportError = true) const;
+	bool GetIsValidCinematicOverlay(const bool bReportError = true) const;
 
 private:
 	UPROPERTY()
@@ -125,6 +130,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UW_HoldToSkip> M_SkipWidget = nullptr;
+
+	UPROPERTY()
+	TObjectPtr<UW_CinematicOverlay> M_CinematicOverlay = nullptr;
 
 	UPROPERTY(Transient)
 	FMissionCinematicTakeOverSessionRuntimeState M_RuntimeState;

@@ -78,6 +78,9 @@ namespace AircraftDeathPrivate
 	constexpr float OuterWingMarginShare = 0.08f;
 	// A wing tip: the pieces beyond this share of the half span.
 	constexpr float WingTipSpanShare = 0.55f;
+	// A wreck with fewer pieces does not tear apart in the air; a tear takes at least this many.
+	constexpr int32 MinPiecesForAirBreakup = 4;
+	constexpr int32 MinTornPieces = 2;
 	// A torn-off part flies off sideways, up and back by these shares of AirBreakupSeparationSpeed, randomised by the range.
 	constexpr float TornPartSideKickShare = 0.7f;
 	constexpr float TornPartUpKickShare = 0.5f;
@@ -102,9 +105,19 @@ namespace AircraftDeathPrivate
 	constexpr int32 MaxBurningPieces = 4;
 	// The hull slows to this share of its skid speed by the time it has come apart.
 	constexpr float SkidEndSpeedShare = 0.3f;
-	// A held piece this close to the ground (by its own size, at least the minimum) is torn off at once.
-	constexpr float GroundReleaseExtentShare = 0.8f;
-	constexpr float GroundReleaseMinHeight = 40.f;
+	// A held piece whose lowest point comes this close to the ground is torn off at once.
+	constexpr float GroundReleaseClearance = 30.f;
+	// A held piece is let go this long before it would reach the ground; it is made dynamic a few frames later.
+	constexpr float GroundReleaseLookAheadSeconds = 0.08f;
+	// No piece of the hull moves faster than this while it levels on the ground.
+	constexpr float MaxHullPieceSpeed = 2500.f;
+	// Peak over average speed of the smoothstep the hull levels with.
+	constexpr float SmoothstepPeakSpeedFactor = 1.5f;
+	// At low frame rates the hull moves far per frame: look ahead at least this many frames.
+	constexpr float GroundReleaseLookAheadFrames = 3.f;
+	// Share of a released piece's speed into the ground the ground takes away: all of it. A piece is let go within
+	// 30 cm of the ground and needs none of it; with 15 % kept, small Fw 189 pieces still fell through.
+	constexpr float GroundAbsorbShare = 1.f;
 	// Kick of a piece torn off on the ground, as shares of PieceScatterSpeed.
 	const FVector2D PieceUpKickShare(0.2f, 0.6f);
 	constexpr float PieceSideKickShare = 0.5f;
@@ -175,6 +188,34 @@ namespace AircraftDeathPrivate
 		for (const TPair<FName, FLinearColor>& Parameter : Settings.ColorParameters)
 		{
 			Effect->SetVariableLinearColor(Parameter.Key, Parameter.Value);
+		}
+	}
+
+	/** @brief Adds the pieces on one side of the aircraft beyond MinOutwardY, keyed outermost first. */
+	void RankWingPieces(const TArray<FAircraftWreckPiece>& Pieces, const float SideSign, const float MinOutwardY,
+	                    TArray<TPair<float, int32>>& OutRanked)
+	{
+		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+		{
+			const float OutwardY = static_cast<float>(Pieces[PieceIndex].LocalCentre.Y) * SideSign;
+			if (OutwardY > MinOutwardY)
+			{
+				OutRanked.Emplace(-OutwardY, PieceIndex);
+			}
+		}
+	}
+
+	/** @brief Adds the pieces behind TailLimitX, keyed rearmost first. */
+	void RankTailPieces(const TArray<FAircraftWreckPiece>& Pieces, const float TailLimitX,
+	                    TArray<TPair<float, int32>>& OutRanked)
+	{
+		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+		{
+			const float PieceX = static_cast<float>(Pieces[PieceIndex].LocalCentre.X);
+			if (PieceX < TailLimitX)
+			{
+				OutRanked.Emplace(PieceX, PieceIndex);
+			}
 		}
 	}
 
@@ -624,6 +665,16 @@ bool UAircraftDeathComponent::FindImpact(const FVector& OldLocation, const FQuat
 	const bool bNoseHit = NoseReach > 0.f
 		&& World->LineTraceSingleByObjectType(NoseHit, OldNose, NewNose, ObjectParams, QueryParams)
 		&& not NoseHit.bStartPenetrating;
+	FHitResult PieceHit;
+	const bool bPieceHit = TraceLowestHeldPiece(FTransform(OldRotation, OldLocation), FTransform(NewRotation, NewLocation),
+	                                            QueryParams, PieceHit);
+	if (bPieceHit && (not bNoseHit || PieceHit.Time < NoseHit.Time) && (not bBellyHit || PieceHit.Time < BellyHit.Time))
+	{
+		// Placed like a nose hit: where the aircraft was when that part touched.
+		OutHit = PieceHit;
+		bOutNoseHit = true;
+		return true;
+	}
 	if (bNoseHit && (not bBellyHit || NoseHit.Time < BellyHit.Time))
 	{
 		OutHit = NoseHit;
@@ -636,6 +687,51 @@ bool UAircraftDeathComponent::FindImpact(const FVector& OldLocation, const FQuat
 		return true;
 	}
 	return false;
+}
+
+bool UAircraftDeathComponent::TraceLowestHeldPiece(const FTransform& OldTransform, const FTransform& NewTransform,
+                                                   const FCollisionQueryParams& QueryParams, FHitResult& OutHit) const
+{
+	const AAircraftWreckActor* Wreck = M_Wreck.Get();
+	const UWorld* World = GetWorld();
+	if (not IsValid(Wreck) || not IsValid(World) || not Wreck->GetIsCarriedWreckShown())
+	{
+		return false;
+	}
+	// The piece whose bottom will be lowest; its bottom is traced from where it was to where it will be.
+	int32 LowestPieceIndex = INDEX_NONE;
+	float LowestBottomZ = TNumericLimits<float>::Max();
+	FVector LowestBottomOffset = FVector::ZeroVector;
+	const TArray<FAircraftWreckPiece>& Pieces = Wreck->GetPieces();
+	for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+	{
+		const FAircraftWreckPiece& Piece = Pieces[PieceIndex];
+		if (Piece.bReleased)
+		{
+			continue;
+		}
+		const float HalfHeight = static_cast<float>(
+			FMath::Abs(NewTransform.GetUnitAxis(EAxis::X).Z) * Piece.LocalExtent.X
+			+ FMath::Abs(NewTransform.GetUnitAxis(EAxis::Y).Z) * Piece.LocalExtent.Y
+			+ FMath::Abs(NewTransform.GetUnitAxis(EAxis::Z).Z) * Piece.LocalExtent.Z);
+		const float BottomZ = static_cast<float>(NewTransform.TransformPosition(Piece.LocalCentre).Z) - HalfHeight;
+		if (BottomZ < LowestBottomZ)
+		{
+			LowestBottomZ = BottomZ;
+			LowestPieceIndex = PieceIndex;
+			LowestBottomOffset = FVector(0.f, 0.f, -HalfHeight);
+		}
+	}
+	if (LowestPieceIndex == INDEX_NONE)
+	{
+		return false;
+	}
+	const FVector LocalCentre = Pieces[LowestPieceIndex].LocalCentre;
+	const FVector OldBottom = OldTransform.TransformPosition(LocalCentre) + LowestBottomOffset;
+	const FVector NewBottom = NewTransform.TransformPosition(LocalCentre) + LowestBottomOffset;
+	const FCollisionObjectQueryParams ObjectParams(ECC_WorldStatic);
+	return World->LineTraceSingleByObjectType(OutHit, OldBottom, NewBottom, ObjectParams, QueryParams)
+		&& not OutHit.bStartPenetrating;
 }
 
 float UAircraftDeathComponent::GetNoseReach() const
@@ -654,7 +750,7 @@ float UAircraftDeathComponent::GetNoseReach() const
 			const FBox PlacedBox = FBox(Geometry.BoundingBox[GeometryIndex]).TransformBy(PieceTransform);
 			NoseX = FMath::Max(NoseX, static_cast<float>(PlacedBox.Max.X));
 		}
-		return IsValid(GetOwner()) ? NoseX * static_cast<float>(GetOwner()->GetActorScale3D().X) : NoseX;
+		return NoseX;
 	}
 	const USkeletalMeshComponent* Mesh = M_AircraftMesh.Get();
 	const AActor* Owner = GetOwner();
@@ -663,7 +759,7 @@ float UAircraftDeathComponent::GetNoseReach() const
 		return 0.f;
 	}
 	const FBox MeshBox = Mesh->CalcBounds(Mesh->GetComponentTransform()).GetBox();
-	return static_cast<float>(MeshBox.TransformBy(Owner->GetActorTransform().Inverse()).Max.X);
+	return static_cast<float>(MeshBox.TransformBy(GetUnscaledAircraftTransform().Inverse()).Max.X);
 }
 
 void UAircraftDeathComponent::Impact(const FVector& ImpactLocation, const FVector& ImpactNormal,
@@ -763,7 +859,7 @@ void UAircraftDeathComponent::Impact_SpawnWreck()
 		// Shot down before the load at BeginPlay finished.
 		M_CrashCollection = Cast<UGeometryCollection>(M_CrashCollectionPath.TryLoad());
 	}
-	FTransform WreckTransform = Owner->GetActorTransform();
+	FTransform WreckTransform = GetUnscaledAircraftTransform();
 	// The nose-down wreck reaches below the impact point, and the ground under a wing can be higher than under the
 	// centre; pieces that start inside the ground are pushed down through it.
 	FBox PlacedWreckBox(ForceInit);
@@ -976,7 +1072,7 @@ bool UAircraftDeathComponent::EnsureCarriedWreck()
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	AAircraftWreckActor* Wreck = World->SpawnActor<AAircraftWreckActor>(
-		AAircraftWreckActor::StaticClass(), Owner->GetActorTransform(), SpawnParameters);
+		AAircraftWreckActor::StaticClass(), GetUnscaledAircraftTransform(), SpawnParameters);
 	if (not IsValid(Wreck))
 	{
 		return false;
@@ -1004,15 +1100,39 @@ void UAircraftDeathComponent::TickCarriedWreck(const float DeltaTime)
 	{
 		return;
 	}
+	UpdatePiecePhysicsVelocities(DeltaTime);
 	// The held pieces are kinematic: moving the actor moves them, and gives them the speed they fall on with.
-	Wreck->FollowTransform(Owner->GetActorTransform());
+	Wreck->FollowTransform(GetUnscaledAircraftTransform());
 	if (Wreck->GetIsCarriedWreckShown() && not bM_AircraftMeshesHidden)
 	{
 		// The wreck now draws the aircraft.
 		bM_AircraftMeshesHidden = true;
+		M_CarriedWreckShownAtSeconds = M_FlightState.SecondsFalling;
 		HideAircraftMeshes();
 	}
 	TickTornPartSmoke();
+}
+
+void UAircraftDeathComponent::UpdatePiecePhysicsVelocities(const float DeltaTime)
+{
+	const AAircraftWreckActor* Wreck = M_Wreck.Get();
+	if (not IsValid(Wreck) || not Wreck->GetIsCarriedWreckShown())
+	{
+		return;
+	}
+	const int32 PieceCount = Wreck->GetPieces().Num();
+	const bool bHasLastFrame = M_PiecePhysicsCentres.Num() == PieceCount && DeltaTime > KINDA_SMALL_NUMBER;
+	M_PiecePhysicsCentres.SetNum(PieceCount);
+	M_PiecePhysicsVelocities.SetNumZeroed(PieceCount);
+	for (int32 PieceIndex = 0; PieceIndex < PieceCount; ++PieceIndex)
+	{
+		const FVector Centre = Wreck->GetPiecePhysicsCentre(PieceIndex);
+		if (bHasLastFrame)
+		{
+			M_PiecePhysicsVelocities[PieceIndex] = (Centre - M_PiecePhysicsCentres[PieceIndex]) / DeltaTime;
+		}
+		M_PiecePhysicsCentres[PieceIndex] = Centre;
+	}
 }
 
 void UAircraftDeathComponent::BuildAirBreakupOrder()
@@ -1020,8 +1140,7 @@ void UAircraftDeathComponent::BuildAirBreakupOrder()
 	using namespace AircraftDeathPrivate;
 	M_AirBreakupOrder.Reset();
 	const AAircraftWreckActor* Wreck = M_Wreck.Get();
-	const AActor* Owner = GetOwner();
-	if (not IsValid(Wreck) || not IsValid(Owner) || Wreck->GetPieces().Num() < 4)
+	if (not IsValid(Wreck) || Wreck->GetPieces().Num() < MinPiecesForAirBreakup)
 	{
 		return;
 	}
@@ -1032,61 +1151,35 @@ void UAircraftDeathComponent::BuildAirBreakupOrder()
 		PieceBox += Piece.LocalCentre;
 	}
 	const float HalfSpan = FMath::Max(FMath::Abs(PieceBox.Min.Y), FMath::Abs(PieceBox.Max.Y));
-	const float Length = PieceBox.Max.X - PieceBox.Min.X;
-	// The burning engine in the actor's space, which the pieces are in.
-	FVector EngineLocal = FVector::ZeroVector;
-	if (const USkeletalMeshComponent* Mesh = M_AircraftMesh.Get())
-	{
-		EngineLocal = Owner->GetActorTransform().InverseTransformPosition(
-			Mesh->GetComponentTransform().TransformPosition(M_FireLocalOffset));
-	}
+	const FVector EngineLocal = GetFireLocationInActorSpace();
 	// Pieces ranked by a key, lowest first.
 	TArray<TPair<float, int32>> Ranked;
-	const auto RankWing = [&Pieces, &Ranked](const float SideSign, const float MinOutwardY)
-	{
-		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
-		{
-			const float OutwardY = Pieces[PieceIndex].LocalCentre.Y * SideSign;
-			if (OutwardY > MinOutwardY)
-			{
-				// Outermost first.
-				Ranked.Emplace(-OutwardY, PieceIndex);
-			}
-		}
-	};
 	if (M_FireOrigin == EAircraftFireOrigin::WingEngine && not FMath::IsNearlyZero(EngineLocal.Y))
 	{
 		// The burning wing loses its outer panel, beyond the engine.
 		const float Side = FMath::Sign(EngineLocal.Y);
-		RankWing(Side, FMath::Abs(EngineLocal.Y) + OuterWingMarginShare * HalfSpan);
-		if (Ranked.Num() < 2)
+		RankWingPieces(Pieces, Side, FMath::Abs(EngineLocal.Y) + OuterWingMarginShare * HalfSpan, Ranked);
+		if (Ranked.Num() < MinTornPieces)
 		{
 			Ranked.Reset();
-			RankWing(Side, 0.f);
+			RankWingPieces(Pieces, Side, 0.f, Ranked);
 		}
 	}
 	else if (M_Random.FRand() < NoseFireTailShare)
 	{
-		// A single-engine aircraft burning at the nose loses its tail: rearmost first.
-		const float TailLimitX = PieceBox.Min.X + TailLengthShare * Length;
-		for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
-		{
-			if (Pieces[PieceIndex].LocalCentre.X < TailLimitX)
-			{
-				Ranked.Emplace(Pieces[PieceIndex].LocalCentre.X, PieceIndex);
-			}
-		}
+		// A single-engine aircraft burning at the nose loses its tail.
+		RankTailPieces(Pieces, PieceBox.Min.X + TailLengthShare * (PieceBox.Max.X - PieceBox.Min.X), Ranked);
 	}
-	if (Ranked.Num() < 2)
+	if (Ranked.Num() < MinTornPieces)
 	{
 		// Or a wing tip.
 		Ranked.Reset();
-		const float Side = M_Random.FRand() < 0.5f ? -1.f : 1.f;
-		RankWing(Side, WingTipSpanShare * HalfSpan);
-		if (Ranked.Num() < 2)
+		const float Side = M_Random.FRandRange(-1.f, 1.f) < 0.f ? -1.f : 1.f;
+		RankWingPieces(Pieces, Side, WingTipSpanShare * HalfSpan, Ranked);
+		if (Ranked.Num() < MinTornPieces)
 		{
 			Ranked.Reset();
-			RankWing(Side, 0.f);
+			RankWingPieces(Pieces, Side, 0.f, Ranked);
 		}
 	}
 	Ranked.Sort([](const TPair<float, int32>& A, const TPair<float, int32>& B) { return A.Key < B.Key; });
@@ -1094,6 +1187,31 @@ void UAircraftDeathComponent::BuildAirBreakupOrder()
 	{
 		M_AirBreakupOrder.Add(Entry.Value);
 	}
+}
+
+FVector UAircraftDeathComponent::GetFireLocationInActorSpace() const
+{
+	const AActor* Owner = GetOwner();
+	const USkeletalMeshComponent* Mesh = M_AircraftMesh.Get();
+	if (not IsValid(Owner) || not IsValid(Mesh))
+	{
+		return FVector::ZeroVector;
+	}
+	return GetUnscaledAircraftTransform().InverseTransformPosition(
+		Mesh->GetComponentTransform().TransformPosition(M_FireLocalOffset));
+}
+
+FTransform UAircraftDeathComponent::GetUnscaledAircraftTransform() const
+{
+	const AActor* Owner = GetOwner();
+	if (not IsValid(Owner))
+	{
+		return FTransform::Identity;
+	}
+	// The crash collections carry the aircraft's scale in their geometry; the wreck itself is never scaled.
+	FTransform Transform = Owner->GetActorTransform();
+	Transform.SetScale3D(FVector::OneVector);
+	return Transform;
 }
 
 void UAircraftDeathComponent::TickAirBreakup()
@@ -1246,6 +1364,12 @@ void UAircraftDeathComponent::StartImpactStage_SetupHullMotion(const AAircraftWr
 	const FVector& ContactNormal = M_ContactNormal;
 	const FTransform HullStart = Wreck.GetActorTransform();
 	M_HullStartRotation = HullStart.GetRotation();
+	// Last frame the hull was a step back along its flight: the nose pieces released right away come in at that speed.
+	M_PrevHullTransform = HullStart;
+	if (const UWorld* World = GetWorld())
+	{
+		M_PrevHullTransform.AddToTranslation(-M_FlightState.Velocity * World->GetDeltaSeconds());
+	}
 	M_HullScale = HullStart.GetScale3D();
 	// The hull skids on along the ground with part of its speed; the speed into the ground is spent on the impact.
 	const FVector AlongGround = FVector::VectorPlaneProject(M_FlightState.Velocity, ContactNormal);
@@ -1275,6 +1399,22 @@ void UAircraftDeathComponent::StartImpactStage_SetupHullMotion(const AAircraftWr
 	}
 	// Lying flat on the nose pivot would sink the belly into the ground: the hull rises by that much as it levels.
 	M_BellyDepth = FMath::Max(0.f, (M_PivotLocal.Z - BottomLocalZ) * static_cast<float>(M_HullScale.Z));
+	StartImpactStage_LimitHullSpeed(Wreck);
+}
+
+void UAircraftDeathComponent::StartImpactStage_LimitHullSpeed(const AAircraftWreckActor& Wreck)
+{
+	using namespace AircraftDeathPrivate;
+	// The piece furthest from the nose pivot moves fastest as the hull levels: it gets at least enough time that no
+	// piece goes faster than the maximum (the smoothstep peaks at 1.5 times its average speed).
+	float FurthestFromPivot = 0.f;
+	for (const FAircraftWreckPiece& Piece : Wreck.GetPieces())
+	{
+		FurthestFromPivot = FMath::Max(FurthestFromPivot, static_cast<float>(FVector::Dist(Piece.LocalCentre, M_PivotLocal)));
+	}
+	const float LevelingRadians = M_HullStartRotation.AngularDistance(M_HullLevelRotation);
+	const float SlowestStage = SmoothstepPeakSpeedFactor * FurthestFromPivot * LevelingRadians / MaxHullPieceSpeed;
+	M_ImpactStageDuration = FMath::Max(M_ImpactStageDuration, SlowestStage);
 }
 
 void UAircraftDeathComponent::StartImpactStage_ScheduleBlasts()
@@ -1306,6 +1446,7 @@ void UAircraftDeathComponent::TickImpactStage(const float DeltaTime)
 	M_ImpactStageSeconds += DeltaTime;
 	if (not bM_HullFinished)
 	{
+		UpdatePiecePhysicsVelocities(DeltaTime);
 		const float StageAlpha = FMath::Clamp(M_ImpactStageSeconds / FMath::Max(M_ImpactStageDuration, KINDA_SMALL_NUMBER),
 		                                      0.f, 1.f);
 		M_SkidDistance += M_SkidStartSpeed * FMath::Lerp(1.f, SkidEndSpeedShare, StageAlpha) * DeltaTime;
@@ -1339,8 +1480,10 @@ void UAircraftDeathComponent::ImpactStage_MoveHull(const float StageAlpha)
 	{
 		return;
 	}
-	// Eases out: the tail comes down fast, then settles.
-	const float Ease = StageAlpha * (2.f - StageAlpha);
+	M_PrevHullTransform = Wreck->GetActorTransform();
+	// Starts and ends gently: easing out from the start brought a long bomber's tail down at 45 m/s, and the pieces
+	// it let go were thrown tens of metres up.
+	const float Ease = StageAlpha * StageAlpha * (3.f - 2.f * StageAlpha);
 	const FQuat Rotation = FQuat::Slerp(M_HullStartRotation, M_HullLevelRotation, Ease);
 	const FVector Pivot = M_ContactPoint + M_SkidDirection * M_SkidDistance + M_ContactNormal * (M_BellyDepth * Ease);
 	const FVector Centre = Pivot - FTransform(Rotation, FVector::ZeroVector, M_HullScale).TransformVector(M_PivotLocal);
@@ -1349,39 +1492,68 @@ void UAircraftDeathComponent::ImpactStage_MoveHull(const float StageAlpha)
 
 void UAircraftDeathComponent::ImpactStage_ReleasePieces(const float StageAlpha)
 {
-	using namespace AircraftDeathPrivate;
 	AAircraftWreckActor* Wreck = M_Wreck.Get();
 	if (not IsValid(Wreck))
 	{
 		return;
 	}
-	const float Length = M_NoseLocalX - M_TailLocalX;
-	const float Scatter = M_DeathSettings.PieceScatterSpeed;
-	const FVector Right = Wreck->GetActorRightVector();
-	const float HullScale = static_cast<float>(M_HullScale.GetMax());
-	const TArray<FAircraftWreckPiece>& Pieces = Wreck->GetPieces();
-	for (int32 PieceIndex = 0; PieceIndex < Pieces.Num(); ++PieceIndex)
+	const float DeltaSeconds = IsValid(GetWorld()) ? GetWorld()->GetDeltaSeconds() : 0.f;
+	for (int32 PieceIndex = 0; PieceIndex < Wreck->GetPieces().Num(); ++PieceIndex)
 	{
-		const FAircraftWreckPiece& Piece = Pieces[PieceIndex];
-		if (Piece.bReleased)
+		if (not Wreck->GetPieces()[PieceIndex].bReleased)
 		{
-			continue;
+			ImpactStage_TryReleasePiece(*Wreck, PieceIndex, StageAlpha, DeltaSeconds);
 		}
-		// A piece that meets the ground tears off; the rest of the hull comes apart from the nose back.
-		const float Height = FVector::DotProduct(Wreck->GetPieceWorldCentre(PieceIndex) - M_ContactPoint, M_ContactNormal);
-		const float ReleaseHeight = FMath::Max(GroundReleaseMinHeight,
-		                                       GroundReleaseExtentShare * static_cast<float>(Piece.LocalExtent.GetMax())) * HullScale;
-		const float BackShare = Length > 1.f ? (M_NoseLocalX - static_cast<float>(Piece.LocalCentre.X)) / Length : 0.f;
-		if (Height > ReleaseHeight && BackShare > StageAlpha)
-		{
-			continue;
-		}
-		const FVector Kick = M_ContactNormal * Scatter * M_Random.FRandRange(PieceUpKickShare.X, PieceUpKickShare.Y)
-			+ Right * Scatter * M_Random.FRandRange(-PieceSideKickShare, PieceSideKickShare)
-			+ M_SkidDirection * Scatter * M_Random.FRandRange(0.f, PieceForwardKickShare);
-		Wreck->ReleasePiece(PieceIndex, Kick,
-		                    M_Random.GetUnitVector() * M_Random.FRandRange(PieceSpinRadians.X, PieceSpinRadians.Y));
 	}
+}
+
+void UAircraftDeathComponent::ImpactStage_TryReleasePiece(AAircraftWreckActor& Wreck, const int32 PieceIndex,
+                                                          const float StageAlpha, const float DeltaSeconds)
+{
+	using namespace AircraftDeathPrivate;
+	const FAircraftWreckPiece& Piece = Wreck.GetPieces()[PieceIndex];
+	// How fast the held piece moves into the ground with the hull: from where it was last frame.
+	const FVector PieceCentre = Wreck.GetPieceWorldCentre(PieceIndex);
+	const FVector LastFrameCentre = M_PrevHullTransform.TransformPosition(Piece.LocalCentre);
+	// Capped: a frame-time glitch must not turn into a huge kick.
+	const float IntoGroundSpeed = DeltaSeconds > KINDA_SMALL_NUMBER
+		? FMath::Clamp(static_cast<float>(FVector::DotProduct(PieceCentre - LastFrameCentre, M_ContactNormal)) / DeltaSeconds,
+		               -MaxHullPieceSpeed, 0.f)
+		: 0.f;
+	// A piece whose lowest point meets the ground (or will by the time it is let go) tears off; the rest of the hull
+	// comes apart from the nose back. By its lowest point, not its centre: a big bomber piece held until its centre
+	// came down was buried metres deep and fell through the ground once loose.
+	const FTransform& HullTransform = Wreck.GetActorTransform();
+	const FVector ScaledExtent = Piece.LocalExtent * HullTransform.GetScale3D();
+	const float HalfDepthAlongNormal = static_cast<float>(
+		FMath::Abs(FVector::DotProduct(HullTransform.GetUnitAxis(EAxis::X), M_ContactNormal)) * ScaledExtent.X
+		+ FMath::Abs(FVector::DotProduct(HullTransform.GetUnitAxis(EAxis::Y), M_ContactNormal)) * ScaledExtent.Y
+		+ FMath::Abs(FVector::DotProduct(HullTransform.GetUnitAxis(EAxis::Z), M_ContactNormal)) * ScaledExtent.Z);
+	const float PredictedClearance = static_cast<float>(FVector::DotProduct(PieceCentre - M_ContactPoint, M_ContactNormal))
+		- HalfDepthAlongNormal + IntoGroundSpeed * FMath::Max(GroundReleaseLookAheadSeconds,
+		                                                      GroundReleaseLookAheadFrames * DeltaSeconds);
+	const float Length = M_NoseLocalX - M_TailLocalX;
+	const float BackShare = Length > KINDA_SMALL_NUMBER ? (M_NoseLocalX - static_cast<float>(Piece.LocalCentre.X)) / Length : 0.f;
+	if (PredictedClearance > GroundReleaseClearance && BackShare > StageAlpha)
+	{
+		return;
+	}
+	// The ground takes most of its speed into it: a thin panel driven into the ground at speed falls through. Only
+	// the speed the piece really has in the physics: one that lagged the hull would be thrown up by the difference.
+	float AbsorbedSpeed = IntoGroundSpeed;
+	if (M_PiecePhysicsVelocities.IsValidIndex(PieceIndex))
+	{
+		const float PhysicsIntoGroundSpeed = FMath::Clamp(
+			static_cast<float>(FVector::DotProduct(M_PiecePhysicsVelocities[PieceIndex], M_ContactNormal)),
+			-MaxHullPieceSpeed, 0.f);
+		AbsorbedSpeed = FMath::Max(AbsorbedSpeed, PhysicsIntoGroundSpeed);
+	}
+	const float Scatter = M_DeathSettings.PieceScatterSpeed;
+	const FVector Kick = M_ContactNormal * (Scatter * M_Random.FRandRange(PieceUpKickShare.X, PieceUpKickShare.Y)
+			- AbsorbedSpeed * GroundAbsorbShare)
+		+ Wreck.GetActorRightVector() * Scatter * M_Random.FRandRange(-PieceSideKickShare, PieceSideKickShare)
+		+ M_SkidDirection * Scatter * M_Random.FRandRange(0.f, PieceForwardKickShare);
+	Wreck.ReleasePiece(PieceIndex, Kick, M_Random.GetUnitVector() * M_Random.FRandRange(PieceSpinRadians.X, PieceSpinRadians.Y));
 }
 
 void UAircraftDeathComponent::ImpactStage_FinishHull()

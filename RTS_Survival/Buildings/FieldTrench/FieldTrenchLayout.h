@@ -28,6 +28,19 @@ enum class EFieldTrenchPiece : uint8
 };
 
 /**
+ * Which faction's dressing the kit pieces wear. Every kit has the same pieces, ports and cover sockets
+ * (the Soviet kit is the German generator with its dressing swapped), so the layout planner serves all of them.
+ */
+UENUM(BlueprintType)
+enum class EFieldTrenchKit : uint8
+{
+	// Pallet revetment, duckboards, German sandbags (GerDefenses/FieldTrenches).
+	German,
+	// Log revetment with stakes, corduroy pole floor, Soviet sandbags (SovietsStuff/FieldTrenches).
+	Soviet
+};
+
+/**
  * @brief Where two kit pieces join: a point on the centreline at ground level and the yaw pointing out of the
  * piece, in the piece's own Unreal space. Two pieces join where a port of each coincides with opposite yaws.
  */
@@ -66,7 +79,14 @@ struct FFieldTrenchPiecePlacement
 	UPROPERTY(BlueprintReadOnly)
 	float LengthCm = 0.0f;
 
-	FTransform GetTransform() const { return FTransform(FRotator(0.0f, Yaw, 0.0f), Location); }
+	// Stretches the piece along its length; only a straight that closes a trench onto a port is stretched.
+	UPROPERTY(BlueprintReadOnly)
+	float LengthScale = 1.0f;
+
+	FTransform GetTransform() const
+	{
+		return FTransform(FRotator(0.0f, Yaw, 0.0f), Location, FVector(LengthScale, 1.0f, 1.0f));
+	}
 };
 
 /** @brief The open end of a trench under construction: where the next piece joins and which way it points. */
@@ -85,6 +105,8 @@ struct FFieldTrenchPlanOptions
 	// port, facing the way the port points, and it gets no start cap. Unset starts the trench with an End cap
 	// at the first point of the drag, facing along the drag.
 	TOptional<FFieldTrenchOpenPort> StartPort;
+	// Off leaves the end of the trench open, for a caller that joins it to something.
+	bool bAddEndCap = true;
 
 	bool GetHasStartCap() const { return not StartPort.IsSet(); }
 };
@@ -98,8 +120,11 @@ namespace FieldTrenchLayout
 {
 	RTS_SURVIVAL_API const FFieldTrenchPieceDefinition& GetPieceDefinition(EFieldTrenchPiece Piece);
 
-	/** @return The mesh asset of the piece under /Game/RTS_Survival/Blueprints/Environment/Trenches/FieldTrench/Meshes. */
-	RTS_SURVIVAL_API FSoftObjectPath GetPieceMeshPath(EFieldTrenchPiece Piece);
+	/**
+	 * @return The mesh asset of the piece in the kit's folder under /Game/RTS_Survival/Blueprints/Environment/Trenches:
+	 * FieldTrench/Meshes/SM_FieldTrench_* for the German kit, SovFieldTrench/Meshes/SM_SovFieldTrench_* for the Soviet one.
+	 */
+	RTS_SURVIVAL_API FSoftObjectPath GetPieceMeshPath(EFieldTrenchPiece Piece, EFieldTrenchKit Kit = EFieldTrenchKit::German);
 
 	/**
 	 * @brief Puts a piece so that one of its ports joins an open port.
@@ -138,6 +163,22 @@ namespace FieldTrenchLayout
 		const TArray<FVector2D>& DragPath,
 		float MaximumLengthCm,
 		const FFieldTrenchPlanOptions& Options);
+
+	/**
+	 * @brief Plans a trench along a dragged path, see above.
+	 * @param OutOpenEnd Receives the open end of the trench before its end cap; the start port, or the first
+	 * point of the drag, when nothing was planned.
+	 */
+	RTS_SURVIVAL_API TArray<FFieldTrenchPiecePlacement> PlanAlongPath(
+		const TArray<FVector2D>& DragPath,
+		float MaximumLengthCm,
+		const FFieldTrenchPlanOptions& Options,
+		FFieldTrenchOpenPort& OutOpenEnd);
+
+	/** @return A port of a placed piece in world space, pointing out of the piece; unset for a port it has not. */
+	RTS_SURVIVAL_API TOptional<FFieldTrenchOpenPort> GetPlacedPort(
+		const FFieldTrenchPiecePlacement& Placement,
+		int32 PortIndex);
 
 	/**
 	 * @return The open port facing back out of the trench at an end cap; a cap put on the port of a joined

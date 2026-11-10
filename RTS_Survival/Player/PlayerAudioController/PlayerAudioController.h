@@ -233,6 +233,13 @@ public:
 
 	void SetSuppressRegularVoiceLines(const bool bSuppress);
 
+	/**
+	 * @brief Where the voice line component is in this sound, as reported by the audio renderer, so portrait
+	 * subtitles stay on the words through hitches and pauses.
+	 * @return Seconds into the sound, or < 0 when it is not the sound being played (or no position arrived yet).
+	 */
+	float GetVoiceLinePlaybackSeconds(const USoundBase* VoiceLine) const;
+
 
 	/**
 	 * @brief Play a 3D (spatial) voice‐line at a world location.
@@ -325,6 +332,13 @@ private:
 	UAudioComponent* M_VoiceLineAudioComponent = nullptr;
 
 	bool GetIsValidVoiceLineAudioComp() const;
+
+	void OnVoiceLinePlaybackPercent(const UAudioComponent* AudioComponent, const USoundWave* PlayingSoundWave,
+	                                const float PlaybackPercent);
+
+	// Last playback position the audio renderer reported for the voice line component (for portrait subtitles).
+	TWeakObjectPtr<const USoundWave> M_VoiceLinePlaybackWave;
+	float M_VoiceLinePlaybackSeconds = -1.0f;
 
 
 

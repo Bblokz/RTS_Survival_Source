@@ -10,6 +10,7 @@
 
 class ABuildingExpansion;
 class ARTSFieldTrench;
+class UFieldTrenchPlacementComponent;
 struct FFieldTrenchPiecePlacement;
 class ACPPController;
 class ANomadicVehicle;
@@ -52,7 +53,12 @@ enum class EFieldDefenseTestPhase : uint8
 	// -FieldDefenseValidateTrenchAnchor: a Pak 40 pit is built; a trench started near its anchor joins it and opens
 	// its neck once the first piece is dug; a trench drawn towards the free anchor joins it at its end; and when
 	// the pit goes, the trench caps the end that was joined to it.
-	LayingAnchoredTrench
+	LayingAnchoredTrench,
+	// -FieldDefenseValidateEnemyTrenches: six Soviet pits of the enemy AI (player 2) stand as in a level, away from
+	// the HQ. The AI's base trench component, started with its strategic AI, digs a Soviet trench out of every
+	// pit's anchor (the necks show) and fire trench sections on an arc facing the HQ, its plans hidden; the
+	// player's HQ trench stays German beside it.
+	DiggingEnemyBaseTrenches
 };
 
 /**
@@ -193,6 +199,37 @@ private:
 	TArray<TWeakObjectPtr<ARTSFieldTrench>> M_BunkerTrenches;
 	int32 M_BunkerAnchorIndex = 0;
 	bool GetIsNeckShown() const;
+	/** @return Whether a TrenchNeck mesh of the actor is visible, i.e. a dug trench is joined to its anchor. */
+	static bool GetIsNeckShownOn(const AActor* AnchorOwner);
+
+	void TickDiggingEnemyBaseTrenches();
+	/** @return Whether flat ground for the test base was found away from the HQ; sets M_EnemyBaseCentre. */
+	bool FindEnemyTestBaseCentre();
+	/** @brief Places each Soviet pit on a ring round the test base as the AI's, with its anchor facing the centre. */
+	void SpawnSovietTestPits();
+	/** @brief Checks each Soviet pit's anchor (owned by the AI, on its socket) and lists it. */
+	void CollectSovietPitAnchors();
+	/** @brief Fast settings, the test base, then the strategic AI's start, which starts the digging. */
+	void StartEnemyBaseTrenches();
+	/** @return Whether every piece of the trench shows a mesh of the Soviet kit. */
+	static bool GetAreAllPiecesSovietKit(const ARTSFieldTrench& Trench);
+	/** @return Whether every piece of the trench shows a mesh of the German kit (SM_FieldTrench_*). */
+	static bool GetAreAllPiecesGermanKit(const ARTSFieldTrench& Trench);
+	/** @brief Counts the pieces the AI planned but has not dug, and how many of them were shown. */
+	void WatchHiddenPlannedPieces();
+	/** @return Whether every pit anchor is claimed, the arc has been tried and every AI trench is dug. */
+	bool GetAreEnemyTrenchesDug() const;
+	void CheckEnemyBaseTrenches();
+	/** @brief A trench of the HQ's Barriers tab stays German while the AI digs Soviet ones. */
+	void CheckDefaultKitIsGerman(ACPPController& Controller, UTrainerComponent& Trainer,
+	                             UFieldTrenchPlacementComponent& Placement);
+	// The Soviet pits placed by the enemy trench test and their anchors.
+	TArray<TWeakObjectPtr<AActor>> M_SovietPits;
+	TArray<FFieldTrenchAnchorHandle> M_SovietPitAnchors;
+	int32 M_SovietPitIndex = 0;
+	FVector M_EnemyBaseCentre = FVector::ZeroVector;
+	int32 M_EnemyPlannedPiecesSeen = 0;
+	int32 M_EnemyPlannedPiecesShown = 0;
 	TWeakObjectPtr<UFieldTrenchAnchorComponent> M_TestAnchor;
 	int32 M_TrenchPieceCountBeforePitLoss = 0;
 	/** @return Where along the path the given distance from its start lies. */

@@ -15,10 +15,22 @@ class ARTSFieldTrench;
 class URadiusComp;
 class UTrainerComponent;
 
+UENUM()
+enum class EFieldTrenchPlacementPhase : uint8
+{
+	// No trench is being laid out.
+	Idle,
+	// A short trench follows the mouse and shows where a first click would start it.
+	Hovering,
+	// The start is set; the trench runs from it to the mouse.
+	Drawing
+};
+
 /**
- * @brief Lets the player lay out a field trench picked in the HQ's training menu: the first click sets where the
- * trench starts, the trench then follows the mouse, and the second click ends it with an end cap and hands it
- * over to be dug. The trench is drawn as ghosts while it follows the mouse and is only laid where the player
+ * @brief Lets the player lay out a field trench picked in the HQ's training menu: before the first click a short
+ * trench follows the mouse, the first click sets where the trench starts, the trench then follows the mouse, and
+ * the second click ends it with an end cap and hands it over to be dug. The trench shown is never shorter than
+ * MinimumShownLength, and what is shown is what the confirming click builds. The trench is drawn as ghosts while it follows the mouse and is only laid where the player
  * may build. Nothing is paid here: the trench pays for each piece when its digging starts.
  * A trench joins the player's trench anchors (UFieldTrenchAnchorComponent), such as the sockets at the back of
  * a pit: a first click near a free anchor starts the trench on it, and while the start is free, moving the
@@ -55,7 +67,7 @@ public:
 	/** @brief Stops placing; a trench that was not confirmed yet is removed. A confirmed trench is kept. */
 	void CancelPlacement();
 
-	bool GetIsPlacing() const { return bM_IsPlacing; }
+	bool GetIsPlacing() const { return M_Phase != EFieldTrenchPlacementPhase::Idle; }
 	// The start of the trench is set and the trench follows the mouse.
 	bool GetIsDrawing() const;
 	const UTrainerComponent* GetTrainer() const { return M_Trainer.Get(); }
@@ -94,6 +106,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Field Trench", meta = (ClampMin = "0.0", Units = "cm"))
 	float AnchorReleaseRadius = 500.0f;
 
+	// The trench shown before the first click, and while the mouse is still close to the start, is this long, so
+	// the player always sees what a click builds. More than the shortest straight (125 cm), or nothing is planned.
+	UPROPERTY(EditDefaultsOnly, Category = "Field Trench", meta = (ClampMin = "130.0", Units = "cm"))
+	float MinimumShownLength = 150.0f;
+
 	// The trench stops where a piece would have to lean further than this to lie on the ground.
 	UPROPERTY(EditDefaultsOnly, Category = "Field Trench", meta = (ClampMin = "0.0", ClampMax = "45.0", Units = "deg"))
 	float MaximumSlope = 15.0f;
@@ -123,7 +140,10 @@ private:
 	// The anchor the shown plan starts at.
 	FFieldTrenchAnchorHandle M_LastPlanAnchor;
 	float M_StartHeight = 0.0f;
-	bool bM_IsPlacing = false;
+	// Which way a trench shorter than MinimumShownLength is laid: screen right before the first click, then the
+	// last way the mouse went from the start, so the short trench does not flip when the mouse returns to it.
+	FVector2D M_ShortTrenchDirection = FVector2D(1.0f, 0.0f);
+	EFieldTrenchPlacementPhase M_Phase = EFieldTrenchPlacementPhase::Idle;
 
 #if RTS_WITH_MAP_TESTS
 	TOptional<FVector> M_MapTestCursorOverride;
@@ -134,8 +154,47 @@ private:
 	bool GetIsWithinBuildRadii(const FVector& Location) const;
 	bool GetHasRadiiConstraint() const { return not M_BuildRadii.IsEmpty(); }
 
+	/**
+	 * @brief Spawns the trench that shows the plan, if there is none yet.
+	 * @return Whether there is one.
+	 */
+	bool EnsurePreviewTrench(const FVector& SpawnLocation);
+
+	/**
+	 * @brief The first click: the trench starts at the anchor it snaps to, or where the player clicked.
+	 * @return What OnPrimaryClick returns.
+	 */
+	bool BeginDrawing(const FVector& ClickedLocation, ACPPController& PlayerController);
+
+	/** @brief Shows the short trench a click at the mouse would start: on the anchor it snaps to, or at the mouse. */
+	void UpdateHover();
+
 	/** @brief Records the mouse and plans the trench along the recorded path up to where the mouse is now. */
 	void UpdateDrawing();
+
+	/**
+	 * @brief Plans the trench along the path and shows it; red when nothing of it can be built.
+	 * @param PlanPath Ground points from the start of the trench to the mouse.
+	 * @param PlanAnchor The anchor the trench is planned from; unset starts it with a cap.
+	 * @param bIsJoinedAtEnd The anchor is at the end of the path: the trench is planned from there back to the start.
+	 */
+	void ShowPlan(TArray<FVector2D> PlanPath, const FFieldTrenchAnchorHandle& PlanAnchor, const bool bIsJoinedAtEnd);
+
+	/**
+	 * @brief Starts the path on the anchor's port and drops points behind the anchor, where the mouse over its
+	 * owner would turn the trench back into it. Without an anchor the path is left as it is.
+	 */
+	void StartPathOnAnchor(TArray<FVector2D>& InOutPlanPath, FFieldTrenchPlanOptions& InOutOptions,
+	                       const FFieldTrenchAnchorHandle& PlanAnchor, const bool bIsJoinedAtEnd) const;
+
+	/** @brief Replaces a path that stays within MinimumShownLength of its start by a straight that long. */
+	void ExtendToMinimumShownLength(TArray<FVector2D>& InOutPlanPath, const FFieldTrenchPlanOptions& Options);
+
+	/** @return Right on the screen, on the ground; the way a trench is laid before the mouse showed one. */
+	FVector2D GetScreenRightDirection() const;
+
+	/** @return The location of the anchor, or the fallback when it is unset. */
+	static FVector GetAnchorOrFallbackLocation(const FFieldTrenchAnchorHandle& Anchor, const FVector& Fallback);
 
 	/**
 	 * @param Location Where the click or the mouse is.

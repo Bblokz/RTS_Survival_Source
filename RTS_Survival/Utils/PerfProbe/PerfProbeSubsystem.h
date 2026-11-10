@@ -18,6 +18,7 @@ enum class EPerfProbePhase : uint8
 	WarmingUp,
 	Measuring,
 	MeshShots,
+	Timelapse,
 	Done
 };
 
@@ -53,6 +54,8 @@ struct FPerfProbeStep
  * used to compare a mesh before and after a triangle reduction in real game lighting. Skeletal meshes are shot twice
  * per view, forced to LOD0 and to their last LOD (<mesh>_<name>_<view>_lod<N>.png).
  * -PerfProbeMeshSettle=<frames> (default 90) and -PerfProbeMeshCloseOnly speed up large batches.
+ * Time-lapse instead: -PerfProbeTimelapse=<shots>,<seconds> saves the current view every <seconds> from map start
+ * without starting a game or moving the camera (e.g. the main-menu backdrop battle; Saved/PerfAudit/Shots/<name>_tl<N>.png).
  * Not in a shipping build. Runner: Source/Tools/PerfAudit/run_gpu_probe.sh.
  */
 UCLASS()
@@ -103,6 +106,11 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AActor> M_MeshActor;
 
+	// Time-lapse mode: how many screenshots, the real-time interval between them, and how many were taken.
+	int32 M_TimelapseShots = 0;
+	double M_TimelapseIntervalSeconds = 5.0;
+	int32 M_TimelapseShotsTaken = 0;
+
 	void EnterPhase(EPerfProbePhase NewPhase);
 	double GetRealSecondsInPhase() const;
 	void Finish(bool bSucceeded, const FString& Reason);
@@ -115,6 +123,8 @@ private:
 	void TickWarmingUp();
 	void TickMeasuring();
 	void TickMeshShots();
+	void TickTimelapse();
+	bool ParseTimelapse();
 	bool SpawnMeshForShot(int32 MeshIndex);
 	void PlaceCameraForMeshShot(int32 ViewIndex, int32 LodVariant) const;
 	void BeginStep(int32 StepIndex);

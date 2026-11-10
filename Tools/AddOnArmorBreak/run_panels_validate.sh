@@ -12,6 +12,8 @@
 #   -AddOnArmorPanelsTraceDebris        logs the first hit's debris pieces every frame (debris checks always run)
 #   -AddOnArmorPanelsRevealTank         takes the test tank out of the fog of war, so the debris checks also run on
 #                                       enemy-faction (e.g. Soviet) tanks, which the fog hides otherwise
+#   -AddOnArmorPanelsFirstHitPanel=<i>  the first shell hits left panel <i> (layout index) instead of the middle one and
+#                                       checks its burst throws that panel's debris mesh, e.g. an end plate's own mesh
 #   -AddOnArmorPanelsStartModuleSetup   the test starts the vehicle module setup on Blueprints that never do
 #                                       (RTS_BP_AssaultTank children); logged as a NOTE
 set -u

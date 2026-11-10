@@ -118,6 +118,9 @@ private:
 	// -AddOnArmorPanelsRevealTank: the test tank leaves the fog of war, so an enemy (e.g. Soviet) tank's debris shows.
 	bool bM_RevealTank = false;
 	bool bM_DidStopTankFow = false;
+	// -AddOnArmorPanelsFirstHitPanel=<layout index>: the first shell hits this left panel instead of the middle one, so an
+	// end plate's own debris mesh can be checked; INDEX_NONE when not given.
+	int32 M_RequestedFirstHitPanel = INDEX_NONE;
 
 	// Add-on modules in slot order (left zone, then right zone) and the layout's panels per side.
 	int32 M_LeftModuleId = INDEX_NONE;
@@ -173,6 +176,10 @@ private:
 	/** @return Hull damage per test shell: one point through the tank's damage reduction, so module damage resolves. */
 	float GetHullDamagePerShell() const;
 	void RevealTankFromFog();
+	/** @return The left panel the first shell hits: the requested one when it is a covered left panel, else the middle one. */
+	int32 GetFirstHitPanel() const;
+	/** @brief Checks the first burst throws the hit panel's debris mesh (its own mesh for an end plate). */
+	void CheckFirstBurstDebrisMesh(const UNiagaraComponent& Burst);
 
 	/**
 	 * @brief Fires a penetrating shell at a left panel through the weapons' module damage event.

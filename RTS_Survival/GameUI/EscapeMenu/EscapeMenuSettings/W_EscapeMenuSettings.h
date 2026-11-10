@@ -84,6 +84,9 @@ struct FEscapeMenuSettingsGraphicsText
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
 	FText M_BattlefieldCorpsesLabelText = FText::FromString(TEXT("<Text_Armor>Battlefield Corpses</>"));
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Text")
+	FText M_ImpactDecalsLabelText = FText::FromString(TEXT("<Text_Armor>Shell Craters</>"));
 };
 
 /**
@@ -610,6 +613,15 @@ private:
 	bool GetHasBattlefieldCorpsesWidgets() const;
 
 	UFUNCTION()
+	void HandleImpactDecalsSelectionChanged(FString SelectedItem, ESelectInfo::Type SelectionType);
+
+	// Off, 50, 100, 200, 400 in ERTSImpactDecalsLevel order.
+	void PopulateImpactDecalsOptions();
+
+	/** @return Whether the Blueprint holds the optional Shell Craters row; without it the setting keeps its value. */
+	bool GetHasImpactDecalsWidgets() const;
+
+	UFUNCTION()
 	void HandleEnvironmentAdvancedClicked();
 
 	UFUNCTION()
@@ -1103,6 +1115,18 @@ private:
 	 */
 	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidgetOptional, AllowPrivateAccess="true"), Category="Settings|Widgets")
 	TObjectPtr<UComboBoxString> M_ComboBattlefieldCorpses = nullptr;
+
+	/** @brief Optional RichTextBlock named M_TextImpactDecalsLabel, the label of the Shell Craters row. */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidgetOptional, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<URichTextBlock> M_TextImpactDecalsLabel = nullptr;
+
+	/**
+	 * @brief Optional ComboBoxString named M_ComboImpactDecals.
+	 * @note Sets how many shell craters (impact decals) stay on the landscape, Off for none; the main environment
+	 * slider leaves it alone.
+	 */
+	UPROPERTY(VisibleAnywhere, Transient, meta=(BindWidgetOptional, AllowPrivateAccess="true"), Category="Settings|Widgets")
+	TObjectPtr<UComboBoxString> M_ComboImpactDecals = nullptr;
 
 	/**
 	 * @brief BindWidget variable must reference a RichTextBlock named M_TextAudioHeader in the Widget Blueprint.

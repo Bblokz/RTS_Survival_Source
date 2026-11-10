@@ -6,6 +6,7 @@
 #include "RTS_Survival/Game/UserSettings/GameplaySettings/HealthbarVisibilityStrategy/HealthBarVisibilityStrategy.h"
 #include "RTS_Survival/Game/UserSettings/GraphicsSettings/AmbientEffectsLevel.h"
 #include "RTS_Survival/Game/UserSettings/GraphicsSettings/BattlefieldCorpsesLevel.h"
+#include "RTS_Survival/Game/UserSettings/GraphicsSettings/ImpactDecalsLevel.h"
 #include "RTS_Survival/Subsystems/HotkeyProviderSubsystem/RTSHotkeyTypes.h"
 
 #include "RTSGameUserSettings.generated.h"
@@ -203,6 +204,12 @@ public:
 	/** @brief Writes the battlefield corpses level before saving. */
 	void SetBattlefieldCorpsesLevel(const ERTSBattlefieldCorpsesLevel NewBattlefieldCorpsesLevel);
 
+	/** @brief Returns how many shell craters may stay on the landscape at once (Off for none). */
+	ERTSImpactDecalsLevel GetImpactDecalsLevel() const;
+
+	/** @brief Writes the shell crater level before saving. */
+	void SetImpactDecalsLevel(const ERTSImpactDecalsLevel NewImpactDecalsLevel);
+
 
 	/** @brief Returns saved single-key overrides so controllers can restore remaps during startup. */
 	const TArray<FRTSSavedKeyBinding>& GetSavedKeyBindings() const;
@@ -384,6 +391,9 @@ private:
 
 	UPROPERTY(config)
 	ERTSBattlefieldCorpsesLevel M_BattlefieldCorpsesLevel = ERTSBattlefieldCorpsesLevel::Some;
+
+	UPROPERTY(config)
+	ERTSImpactDecalsLevel M_ImpactDecalsLevel = ERTSImpactDecalsLevel::Some;
 
 	UPROPERTY(config)
 	TArray<FRTSSavedKeyBinding> M_SavedKeyBindings;

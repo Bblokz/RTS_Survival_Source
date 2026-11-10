@@ -1,6 +1,7 @@
 #include "BombActor.h"
 
 #include "NiagaraFunctionLibrary.h"
+#include "RTS_Survival/Environment/ImpactDecals/LandscapeImpactDecalSubsystem.h"
 #include "RTS_Survival/Weapons/BombComponent/BombComponent.h"
 #include "TimerManager.h"
 #include "Engine/World.h"
@@ -324,6 +325,19 @@ void ABombActor::OnAsyncTraceComplete(const FTraceHandle& /*Handle*/, FTraceDatu
 	}
 	const FHitResult Result = Datum.OutHits[0];
 	const ERTSSurfaceType HitSurfaceType = FRTS_PhysicsHelper::GetRTSSurfaceType(Result.PhysMaterial);
+	// Bombs on a landscape leave a bomb crater sized by their explosive weight (their calibre is only TNT / 10, which
+	// would pick a 25 mm shell crater for a 250 kg bomb); a bomb without a charge falls back to its calibre.
+	if (M_WeaponData.TNTExplosiveGrams > 0.f)
+	{
+		ULandscapeImpactDecalSubsystem::RequestBombImpactDecal(this, M_WeaponData.TNTExplosiveGrams,
+		                                                       Result.ImpactPoint, Result.ImpactNormal,
+		                                                       Result.GetActor());
+	}
+	else
+	{
+		ULandscapeImpactDecalSubsystem::RequestImpactDecal(this, M_WeaponData.WeaponCalibre, Result.ImpactPoint,
+		                                                   Result.ImpactNormal, Result.GetActor());
+	}
 	OnHitActor(Result.GetActor(), Result.Location, HitSurfaceType);
 	SetBombDormant();
 }

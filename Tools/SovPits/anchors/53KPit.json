@@ -1,0 +1,1115 @@
+{
+  "pit_key": "53KPit",
+  "unreal_pit_mesh": "/Game/RTS_Survival/Blueprints/Buildings/BuildingExpansions/Rus53KPit/Meshes/SM_53KPit",
+  "pit_geometry_changed": false,
+  "anchors": [
+    {
+      "socket": "TrenchPort_Rear",
+      "unreal_location": [
+        -625.0,
+        0.0,
+        0.0
+      ],
+      "unreal_yaw": 180.0,
+      "blender_location": [
+        -625.0,
+        0.0,
+        0.0
+      ],
+      "blender_yaw": 180.0,
+      "neck_mesh_name": "SM_53KPit_TrenchNeck_Rear",
+      "neck_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/TrenchAnchors/53KPit/Exports/SM_53KPit_TrenchNeck_Rear.fbx",
+      "neck_triangles": 3766,
+      "plug_fbx": null
+    }
+  ],
+  "neck_check": {
+    "name": "SM_53KPit_TrenchNeck_Rear",
+    "triangles": 3766,
+    "non_triangles": 0,
+    "bounds_min": [
+      -192.12,
+      -198.44,
+      -9.79
+    ],
+    "bounds_max": [
+      1.63,
+      200.35,
+      135.15
+    ],
+    "location": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      0.0,
+      0.0,
+      -0.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "materials": [
+      "SovTrench_Wood",
+      "RL_Sandbag"
+    ],
+    "triangles_by_material": {
+      "SovTrench_Wood": 864,
+      "RL_Sandbag": 2902
+    },
+    "uv_layers": [
+      "UVMap"
+    ],
+    "objects": [
+      [
+        "SM_53KPit_TrenchNeck_Rear",
+        "MESH"
+      ]
+    ],
+    "scene_unit_scale": 0.009999999776482582
+  },
+  "pit_frame_check": {
+    "name": "SM_53KPit",
+    "triangles": 26428,
+    "non_triangles": 0,
+    "bounds_min": [
+      -548.63,
+      -555.75,
+      -4.55
+    ],
+    "bounds_max": [
+      559.84,
+      555.93,
+      71.78
+    ],
+    "location": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation": [
+      -0.0,
+      0.0,
+      0.0
+    ],
+    "scale": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "materials": [
+      "RL_Sandbag"
+    ],
+    "triangles_by_material": {
+      "RL_Sandbag": 26428
+    },
+    "uv_layers": [
+      "UVMap"
+    ],
+    "as_unreal_bounds": {
+      "x": [
+        -548.63,
+        559.84
+      ],
+      "y": [
+        -555.93,
+        555.75
+      ],
+      "z": [
+        -4.55,
+        71.78
+      ]
+    },
+    "unreal_reported": {
+      "triangles": 26428,
+      "x": [
+        -552.0,
+        560.6
+      ],
+      "y": [
+        -557.3,
+        562.0
+      ],
+      "z": [
+        -14.5,
+        81.6
+      ]
+    }
+  },
+  "neck_rows": [
+    {
+      "side": 1.0,
+      "logs_from": -190.0,
+      "bays": 2
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "lateral": 114.5,
+      "touch": -155.6,
+      "start": -163.6,
+      "bags": 3,
+      "bag_length": 54.5,
+      "hits": [
+        null,
+        null,
+        -188.5,
+        -125.6,
+        -125.6,
+        -115.4,
+        -94.9,
+        -94.9,
+        -93.2
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "lateral": 144.5,
+      "touch": -97.6,
+      "start": -105.6,
+      "bags": 2,
+      "bag_length": 52.8,
+      "hits": [
+        -97.6,
+        -97.6,
+        -95.9,
+        -80.0,
+        -80.0,
+        -78.9,
+        -88.2,
+        -88.2,
+        -85.8
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "lateral": 177.5,
+      "touch": -149.1,
+      "start": -157.1,
+      "bags": 3,
+      "bag_length": 52.4,
+      "hits": [
+        -89.0,
+        -89.0,
+        -89.0,
+        -138.7,
+        -138.7,
+        -138.7,
+        -149.1,
+        -149.1,
+        -149.1
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "lateral": 114.5,
+      "touch": -131.7,
+      "start": -139.7,
+      "bags": 2,
+      "bag_length": 69.8,
+      "hits": [
+        null,
+        null,
+        null,
+        -131.7,
+        -123.4,
+        -117.0,
+        -101.8,
+        -83.0,
+        -81.0
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "lateral": 144.5,
+      "touch": -113.4,
+      "start": -121.4,
+      "bags": 2,
+      "bag_length": 60.7,
+      "hits": [
+        -104.4,
+        -85.8,
+        -83.7,
+        -83.4,
+        -80.4,
+        -77.2,
+        -144.2,
+        -181.7,
+        -181.2
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "lateral": 174.5,
+      "touch": -185.7,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -94.4,
+        -181.2,
+        -180.7,
+        -152.4,
+        -185.7,
+        -185.0,
+        -151.8,
+        -154.1,
+        -153.8
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "lateral": 114.5,
+      "touch": -185.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -185.5,
+        -183.5,
+        -183.6,
+        -155.0,
+        -147.6,
+        -141.6,
+        -90.2,
+        -118.0,
+        -115.8
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "lateral": 142.5,
+      "touch": -149.0,
+      "start": -157.0,
+      "bags": 3,
+      "bag_length": 52.3,
+      "hits": [
+        -110.1,
+        -117.7,
+        -115.3,
+        -81.0,
+        -119.0,
+        -116.9,
+        -185.1,
+        -181.9,
+        -179.9
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "lateral": 170.5,
+      "touch": -186.2,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -183.6,
+        -180.4,
+        -178.5,
+        -186.2,
+        -163.6,
+        -156.6,
+        -159.7,
+        -150.2,
+        -149.2
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "lateral": 114.5,
+      "touch": -186.4,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        -188.5,
+        -153.2,
+        -156.4,
+        -154.7,
+        -125.7,
+        -157.0,
+        -154.0
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "lateral": 139.5,
+      "touch": -187.7,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -130.4,
+        -154.3,
+        -152.0,
+        -125.9,
+        -162.5,
+        -161.2,
+        -181.3,
+        -187.7,
+        -186.7
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "lateral": 165.5,
+      "touch": -189.7,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -179.7,
+        -186.5,
+        -185.8,
+        null,
+        -189.7,
+        -188.2,
+        -152.3,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "lateral": 114.5,
+      "touch": -167.8,
+      "start": -175.8,
+      "bags": 3,
+      "bag_length": 58.6,
+      "hits": [
+        null,
+        null,
+        null,
+        -167.8,
+        null,
+        null,
+        -161.8,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "lateral": 137.5,
+      "touch": -188.8,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -157.6,
+        null,
+        null,
+        -187.7,
+        null,
+        null,
+        -188.8,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "lateral": 159.5,
+      "touch": -189.4,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -188.9,
+        null,
+        null,
+        -189.4,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 5,
+      "lateral": 114.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 5,
+      "lateral": 152.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 6,
+      "lateral": 114.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 6,
+      "lateral": 144.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 7,
+      "lateral": 114.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 7,
+      "lateral": 135.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 8,
+      "lateral": 114.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 8,
+      "lateral": 125.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": 1.0,
+      "course": 9,
+      "lateral": 116.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "logs_from": -190.0,
+      "bays": 2
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "lateral": 114.5,
+      "touch": -143.0,
+      "start": -151.0,
+      "bags": 2,
+      "bag_length": 75.5,
+      "hits": [
+        null,
+        null,
+        null,
+        -141.7,
+        -141.7,
+        -143.0,
+        -94.6,
+        -94.6,
+        -90.6
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "lateral": 144.5,
+      "touch": -115.7,
+      "start": -123.7,
+      "bags": 2,
+      "bag_length": 61.9,
+      "hits": [
+        -98.6,
+        -98.6,
+        -95.2,
+        -85.7,
+        -85.7,
+        -82.8,
+        -134.5,
+        -134.5,
+        -132.4
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "lateral": 177.5,
+      "touch": -150.0,
+      "start": -158.0,
+      "bags": 3,
+      "bag_length": 52.7,
+      "hits": [
+        -134.9,
+        -134.9,
+        -134.9,
+        -141.7,
+        -141.7,
+        -141.7,
+        -150.0,
+        -150.0,
+        -150.0
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "lateral": 114.5,
+      "touch": -156.1,
+      "start": -164.1,
+      "bags": 3,
+      "bag_length": 54.7,
+      "hits": [
+        null,
+        null,
+        null,
+        -156.1,
+        -139.4,
+        -136.8,
+        -88.6,
+        -85.4,
+        -84.6
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "lateral": 144.5,
+      "touch": -113.1,
+      "start": -121.1,
+      "bags": 2,
+      "bag_length": 60.6,
+      "hits": [
+        -88.9,
+        -85.7,
+        -84.8,
+        -83.1,
+        -82.8,
+        -82.0,
+        -138.4,
+        -181.1,
+        -167.0
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "lateral": 174.5,
+      "touch": -180.3,
+      "start": -188.3,
+      "bags": 3,
+      "bag_length": 62.8,
+      "hits": [
+        -140.2,
+        -180.9,
+        -181.1,
+        -142.4,
+        -150.3,
+        -147.8,
+        -149.8,
+        -156.2,
+        -154.7
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "lateral": 114.5,
+      "touch": -159.5,
+      "start": -167.5,
+      "bags": 3,
+      "bag_length": 55.8,
+      "hits": [
+        null,
+        null,
+        null,
+        -159.5,
+        -158.2,
+        -124.0,
+        -89.2,
+        -119.0,
+        -115.9
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "lateral": 142.5,
+      "touch": -151.3,
+      "start": -159.3,
+      "bags": 3,
+      "bag_length": 53.1,
+      "hits": [
+        -119.0,
+        -119.7,
+        -117.0,
+        -86.2,
+        -121.3,
+        -115.9,
+        -164.0,
+        -148.4,
+        -147.3
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "lateral": 170.5,
+      "touch": -170.2,
+      "start": -178.2,
+      "bags": 3,
+      "bag_length": 59.4,
+      "hits": [
+        -170.2,
+        -152.5,
+        -149.3,
+        -153.4,
+        -148.1,
+        -147.1,
+        -153.8,
+        -152.6,
+        -152.3
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "lateral": 114.5,
+      "touch": -187.5,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        -187.5,
+        -159.2,
+        -151.5,
+        -150.1,
+        -120.7,
+        -153.1,
+        -152.6
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "lateral": 139.5,
+      "touch": -183.8,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -122.2,
+        -152.0,
+        -150.3,
+        -120.1,
+        -180.8,
+        -180.2,
+        -154.6,
+        -183.8,
+        -182.8
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "lateral": 165.5,
+      "touch": -186.2,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -186.1,
+        -182.7,
+        -181.8,
+        -151.7,
+        -186.2,
+        -184.6,
+        -157.6,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "lateral": 114.5,
+      "touch": -159.2,
+      "start": -167.2,
+      "bags": 3,
+      "bag_length": 55.7,
+      "hits": [
+        null,
+        null,
+        null,
+        -152.8,
+        null,
+        null,
+        -159.2,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "lateral": 137.5,
+      "touch": -184.5,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -154.4,
+        null,
+        null,
+        -184.5,
+        null,
+        null,
+        -184.5,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "lateral": 159.5,
+      "touch": -185.4,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        -184.3,
+        null,
+        null,
+        -185.4,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 5,
+      "lateral": 114.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 5,
+      "lateral": 152.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 6,
+      "lateral": 114.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 6,
+      "lateral": 144.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 7,
+      "lateral": 114.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 7,
+      "lateral": 135.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 8,
+      "lateral": 114.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 8,
+      "lateral": 125.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "side": -1.0,
+      "course": 9,
+      "lateral": 116.5,
+      "touch": -190.0,
+      "start": -190.0,
+      "bags": 3,
+      "bag_length": 63.3,
+      "hits": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    }
+  ],
+  "notes": "Unreal holds the _Opt cut (SM_53KPit_Opt.fbx, 26,428 triangles = the Unreal mesh); the neck was fitted to and culled against that cut. One anchor at the existing 30 degree crew entrance (rear, -X): no new gap, no plug, pit unchanged; add only the socket. Socket 76 cm past the cheek tips (the rearmost bags, x -549), so the first kit straight (port A on the socket) clears the pit. Neck: logs and the mud/pole floor run 190 cm back through the entrance to the pit inner face (x -435; the pit floor is bare ground); each of the six kit bag rows starts where ray casts meet the pit bags, 8 cm into them. Section at the socket = kit (+-82.5 inner, +-197.5 outer). Hidden-triangle cull as the kit, with the pit as occluder. Slots SovTrench_Wood, RL_Sandbag. Rear anchor on the X axis: Unreal = Blender values, yaw 180. Unreal-reported bounds are a few cm wider in x/y and 10 cm wider in z than the FBX (same centre); triangle count is exact."
+}

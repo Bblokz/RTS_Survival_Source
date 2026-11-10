@@ -50,8 +50,18 @@ bool FMissionCargoSquadWithVehicleSpawnState::StartAsyncSpawn(ARTSAsyncSpawner* 
 		return false;
 	}
 
+	// Only base vehicles are guaranteed to carry cargo, so ignore the variant the player picked for this tank type.
+	const TSoftClassPtr<AActor> BaseTankClass = RTSAsyncSpawner->GetBaseTrainingOptionClass(M_TankTrainingOption);
+	if (BaseTankClass.IsNull())
+	{
+		SetStateAsFailed("Mission cargo spawn request could not start: no base class for vehicle "
+			+ M_TankTrainingOption.GetTrainingName() + ".");
+		return false;
+	}
+
 	const TWeakObjectPtr<AMissionManager> WeakMissionManager = M_MissionManager;
-	const bool bTankSpawnRequestStarted = RTSAsyncSpawner->AsyncSpawnOptionAtLocation(
+	const bool bTankSpawnRequestStarted = RTSAsyncSpawner->AsyncSpawnClassAtLocation(
+		BaseTankClass,
 		M_TankTrainingOption,
 		M_VehicleSpawnLocation,
 		M_MissionManager.Get(),

@@ -123,13 +123,17 @@ def _set_sockets(mesh, sockets):
     mesh.modify()
 
 
-def run_pit(key):
+def run_pit(key, necks_only=False):
+    """necks_only (NECKS_ONLY = True): only the TrenchNeck meshes are imported; the pit, its sockets and the plugs are
+    left alone. Used after the field trench kit changed width (2026-11-09)."""
     folder, asset, reimport_fbx, sockets, extras = PITS[key]
     mesh = unreal.load_asset(f'{folder}/{asset}')
     # Necks need the pallet atlas even where the pit itself has no atlas slot (twin MG42).
     materials = {name: unreal.load_asset(path) for name, path in SLOT_MATERIALS.items()}
     materials.update({str(s.material_slot_name): s.material_interface for s in mesh.static_materials})
-    if reimport_fbx:
+    if necks_only:
+        extras = [name for name in extras if '_TrenchNeck_' in name]
+    elif reimport_fbx:
         collision = mesh.get_editor_property('body_setup').get_editor_property('collision_trace_flag')
         lod_group = mesh.get_editor_property('lod_group')
         mesh = _import(f'{EXPORTS}/{key}/{reimport_fbx}.fbx', folder, asset)
@@ -138,9 +142,10 @@ def run_pit(key):
         if str(lod_group) != 'None':
             mesh.set_editor_property('lod_group', lod_group)
         _nanite_off(mesh)
-    _set_sockets(mesh, sockets)
-    print('TRENCH_ANCHOR pit', asset, 'tris', mesh.get_num_triangles(0), 'nanite',
-          mesh.get_editor_property('nanite_settings').enabled, 'saved', eal.save_loaded_asset(mesh, False))
+    if not necks_only:
+        _set_sockets(mesh, sockets)
+        print('TRENCH_ANCHOR pit', asset, 'tris', mesh.get_num_triangles(0), 'nanite',
+              mesh.get_editor_property('nanite_settings').enabled, 'saved', eal.save_loaded_asset(mesh, False))
     for name in extras:
         suffix = '_Opt' if name in CUT_EXTRAS else ''
         extra = _import(f'{EXPORTS}/{key}/{name}{suffix}.fbx', folder, name)
@@ -156,4 +161,4 @@ def run_pit(key):
 
 
 for _key in globals().get('PITS_TO_RUN') or []:
-    run_pit(_key)
+    run_pit(_key, bool(globals().get('NECKS_ONLY')))

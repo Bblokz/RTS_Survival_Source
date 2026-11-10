@@ -138,6 +138,7 @@ struct FEnhancedActionKeyMapping;
 class UInputMappingContext;
 class UMissionCinematicTakeOverSession;
 class UW_HoldToSkip;
+class UW_CinematicOverlay;
 
 
 struct FHoverWeaponRangeRadiusData
@@ -1052,6 +1053,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cinematics")
 	TSubclassOf<UW_HoldToSkip> M_HoldToSkipWidgetClass = nullptr;
+
+	// Optional restyled subclass of the cinematic overlay (subtitle strip + countdown); null = the C++ default look.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Cinematics")
+	TSubclassOf<UW_CinematicOverlay> M_CinematicOverlayWidgetClass = nullptr;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> M_DefaultInputMappingContext = nullptr;

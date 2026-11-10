@@ -1,0 +1,32 @@
+{
+ "name": "SM_RusBunkerOneCamoed_Chunks",
+ "chunks": 100,
+ "chunk_uv_channel": 1,
+ "uv_layers": [
+  "LightMapUV",
+  "ChunkId"
+ ],
+ "slots": [
+  "MI_Rus_BunkerConcrete_05",
+  "M_Russian_CamoPattern_Tent",
+  "ConcreteBroken"
+ ],
+ "concrete_slots": [
+  0
+ ],
+ "broken_slot": 2,
+ "collision_hulls": 1,
+ "triangles_before": 1105,
+ "triangles_after": 3909,
+ "concrete_area_m2": 489.91,
+ "debris_from_chunks": [
+  31,
+  24,
+  11,
+  73,
+  86,
+  15,
+  78,
+  69
+ ]
+}

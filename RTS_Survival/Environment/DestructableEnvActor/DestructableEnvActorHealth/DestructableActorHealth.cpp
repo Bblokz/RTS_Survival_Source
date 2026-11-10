@@ -3,6 +3,7 @@
 
 #include "DestructableActorHealth.h"
 
+#include "RTS_Survival/Environment/DestructableEnvActor/WallChunkDamage/WallHoleDamageComponent.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Weapons/WeaponData/FRTSWeaponHelpers/FRTSWeaponHelpers.h"
 
@@ -30,8 +31,12 @@ float ADestructableActorHealth::TakeDamage(float DamageAmount, FDamageEvent cons
 	if (IsValid(HealthComponent))
 	{
 		const ERTSDamageType RtsDamageType = FRTSWeaponHelpers::GetRTSDamageType(DamageEvent);
-
-		if (HealthComponent->TakeDamage(DamageAmount, RtsDamageType))
+		const float HealthBefore = HealthComponent->GetCurrentHealth();
+		const bool bDied = HealthComponent->TakeDamage(DamageAmount, RtsDamageType);
+		// Before the death: a surviving actor shows shell holes, a dying one keeps its own death.
+		ForwardDamageToHoleComponents(HealthBefore - HealthComponent->GetCurrentHealth(), DamageEvent, DamageCauser,
+		                              HealthBefore, bDied ? 0.f : HealthComponent->GetCurrentHealth());
+		if (bDied)
 		{
 			const ERTSDeathType DeathType = FRTSWeaponHelpers::TranslateDamageIntoDeathType(RtsDamageType);
 		OnUnitDies(DeathType);
@@ -51,7 +56,13 @@ float ADestructableActorHealth::TakeDamage(float DamageAmount, FDamageEvent cons
 void ADestructableActorHealth::BeginPlay()
 {
 	Super::BeginPlay();
-	
+	// The hole component caps the removed area by the share of health lost; its fallback max is the base class Health
+	// field, which this class does not use.
+	UWallHoleDamageComponent* const WallHoleDamage = FindComponentByClass<UWallHoleDamageComponent>();
+	if (IsValid(WallHoleDamage) && IsValid(HealthComponent))
+	{
+		WallHoleDamage->SetOwnerMaxHealth(HealthComponent->GetMaxHealth());
+	}
 }
 
 void ADestructableActorHealth::PostInitializeComponents()

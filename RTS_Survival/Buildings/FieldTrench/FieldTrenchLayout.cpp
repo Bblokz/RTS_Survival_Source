@@ -5,9 +5,19 @@
 namespace FieldTrenchLayoutPrivate
 {
 	const TCHAR* const MeshFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/Trenches/FieldTrench/Meshes/");
+	// The Soviet kit's meshes carry the German piece names with this prefix in place of GermanMeshPrefix.
+	const TCHAR* const SovietMeshFolder = TEXT("/Game/RTS_Survival/Blueprints/Environment/Trenches/SovFieldTrench/Meshes/");
+	const TCHAR* const GermanMeshPrefix = TEXT("SM_FieldTrench_");
+	const TCHAR* const SovietMeshPrefix = TEXT("SM_SovFieldTrench_");
 
 	// Arc radius of the bends.
 	constexpr float BendRadius = 250.0f;
+	// From the corner's entry port to the centreline corner, and from there to its exit port.
+	constexpr float CornerLegCm = 218.75f;
+	// The main run of a Tee or Cross; its branches leave from the middle.
+	constexpr float JunctionLengthCm = 437.5f;
+	// From the main centreline of a Tee or Cross to the port of a branch.
+	constexpr float JunctionBranchLengthCm = 250.0f;
 	// The end cap closes the trench over about this much ground behind its port.
 	constexpr float EndCapLengthCm = 125.0f;
 
@@ -81,14 +91,19 @@ namespace FieldTrenchLayoutPrivate
 		Kit.Add(MakeDefinition(EFieldTrenchPiece::Bend_15, TEXT("SM_FieldTrench_Bend_15"), BendLength(15.0f), {EntryA, BendExit(15.0f)}));
 		Kit.Add(MakeDefinition(EFieldTrenchPiece::Bend_30, TEXT("SM_FieldTrench_Bend_30"), BendLength(30.0f), {EntryA, BendExit(30.0f)}));
 		Kit.Add(MakeDefinition(EFieldTrenchPiece::Bend_45, TEXT("SM_FieldTrench_Bend_45"), BendLength(45.0f), {EntryA, BendExit(45.0f)}));
-		Kit.Add(MakeDefinition(EFieldTrenchPiece::Corner_90, TEXT("SM_FieldTrench_Corner_90"), 375.0f,
-			{EntryA, FFieldTrenchPort{FVector2D(187.5f, -187.5f), -90.0f}}));
-		Kit.Add(MakeDefinition(EFieldTrenchPiece::Tee, TEXT("SM_FieldTrench_Tee"), 375.0f,
-			{EntryA, StraightExit(375.0f), FFieldTrenchPort{FVector2D(187.5f, -250.0f), -90.0f}}));
-		Kit.Add(MakeDefinition(EFieldTrenchPiece::Cross, TEXT("SM_FieldTrench_Cross"), 375.0f,
+		const float JunctionMiddle = JunctionLengthCm * 0.5f;
+		Kit.Add(MakeDefinition(EFieldTrenchPiece::Corner_90, TEXT("SM_FieldTrench_Corner_90"), 2.0f * CornerLegCm,
+			{EntryA, FFieldTrenchPort{FVector2D(CornerLegCm, -CornerLegCm), -90.0f}}));
+		Kit.Add(MakeDefinition(EFieldTrenchPiece::Tee, TEXT("SM_FieldTrench_Tee"), JunctionLengthCm,
 			{
-				EntryA, StraightExit(375.0f), FFieldTrenchPort{FVector2D(187.5f, -250.0f), -90.0f},
-				FFieldTrenchPort{FVector2D(187.5f, 250.0f), 90.0f}
+				EntryA, StraightExit(JunctionLengthCm),
+				FFieldTrenchPort{FVector2D(JunctionMiddle, -JunctionBranchLengthCm), -90.0f}
+			}));
+		Kit.Add(MakeDefinition(EFieldTrenchPiece::Cross, TEXT("SM_FieldTrench_Cross"), JunctionLengthCm,
+			{
+				EntryA, StraightExit(JunctionLengthCm),
+				FFieldTrenchPort{FVector2D(JunctionMiddle, -JunctionBranchLengthCm), -90.0f},
+				FFieldTrenchPort{FVector2D(JunctionMiddle, JunctionBranchLengthCm), 90.0f}
 			}));
 		Kit.Add(MakeDefinition(EFieldTrenchPiece::End, TEXT("SM_FieldTrench_End"), EndCapLengthCm,
 			{FFieldTrenchPort{FVector2D(0.0f, 0.0f), 0.0f}}));
@@ -160,14 +175,20 @@ const FFieldTrenchPieceDefinition& FieldTrenchLayout::GetPieceDefinition(const E
 	return Kit.IsValidIndex(PieceIndex) ? Kit[PieceIndex] : Kit[0];
 }
 
-FSoftObjectPath FieldTrenchLayout::GetPieceMeshPath(const EFieldTrenchPiece Piece)
+FSoftObjectPath FieldTrenchLayout::GetPieceMeshPath(const EFieldTrenchPiece Piece, const EFieldTrenchKit Kit)
 {
-	const FString MeshName = GetPieceDefinition(Piece).MeshName;
+	using namespace FieldTrenchLayoutPrivate;
+	FString MeshName = GetPieceDefinition(Piece).MeshName;
 	if (MeshName.IsEmpty())
 	{
 		return FSoftObjectPath();
 	}
-	return FSoftObjectPath(FString(FieldTrenchLayoutPrivate::MeshFolder) + MeshName + TEXT(".") + MeshName);
+	if (Kit == EFieldTrenchKit::Soviet)
+	{
+		MeshName = FString(SovietMeshPrefix) + MeshName.RightChop(FCString::Strlen(GermanMeshPrefix));
+		return FSoftObjectPath(FString(SovietMeshFolder) + MeshName + TEXT(".") + MeshName);
+	}
+	return FSoftObjectPath(FString(MeshFolder) + MeshName + TEXT(".") + MeshName);
 }
 
 void FieldTrenchLayout::PlacePieceOnPort(
@@ -224,7 +245,38 @@ TArray<FFieldTrenchPiecePlacement> FieldTrenchLayout::PlanAlongPath(
 	const float MaximumLengthCm,
 	const FFieldTrenchPlanOptions& Options)
 {
+	FFieldTrenchOpenPort UnusedOpenEnd;
+	return PlanAlongPath(DragPath, MaximumLengthCm, Options, UnusedOpenEnd);
+}
+
+TOptional<FFieldTrenchOpenPort> FieldTrenchLayout::GetPlacedPort(
+	const FFieldTrenchPiecePlacement& Placement,
+	const int32 PortIndex)
+{
+	const FFieldTrenchPieceDefinition& Definition = GetPieceDefinition(Placement.Piece);
+	if (not Definition.Ports.IsValidIndex(PortIndex))
+	{
+		return {};
+	}
+	const FFieldTrenchPort& Port = Definition.Ports[PortIndex];
+	FFieldTrenchOpenPort PlacedPort;
+	const FVector2D LocalLocation(Port.Location.X * Placement.LengthScale, Port.Location.Y);
+	PlacedPort.Location = FVector2D(Placement.Location) +
+		FieldTrenchLayoutPrivate::RotateByYaw(LocalLocation, Placement.Yaw);
+	PlacedPort.Yaw = FRotator::NormalizeAxis(Placement.Yaw + Port.Yaw);
+	return PlacedPort;
+}
+
+TArray<FFieldTrenchPiecePlacement> FieldTrenchLayout::PlanAlongPath(
+	const TArray<FVector2D>& DragPath,
+	const float MaximumLengthCm,
+	const FFieldTrenchPlanOptions& Options,
+	FFieldTrenchOpenPort& OutOpenEnd)
+{
 	using namespace FieldTrenchLayoutPrivate;
+	OutOpenEnd = Options.StartPort.IsSet()
+		? Options.StartPort.GetValue()
+		: FFieldTrenchOpenPort{DragPath.IsEmpty() ? FVector2D::ZeroVector : DragPath[0], 0.0f};
 	const float MaximumStraightLengthCm = Options.MaximumStraightLengthCm;
 	TArray<FFieldTrenchPiecePlacement> Pieces;
 	const float ShortestStraight = GetPieceDefinition(EFieldTrenchPiece::Straight_125).LengthCm;
@@ -296,7 +348,7 @@ TArray<FFieldTrenchPiecePlacement> FieldTrenchLayout::PlanAlongPath(
 		}
 		const FFieldTrenchPieceDefinition& Definition = GetPieceDefinition(NextPiece);
 		// The end cap always has to fit.
-		const float EndCapLength = GetPieceDefinition(EFieldTrenchPiece::End).LengthCm;
+		const float EndCapLength = Options.bAddEndCap ? GetPieceDefinition(EFieldTrenchPiece::End).LengthCm : 0.0f;
 		if (TotalLength + Definition.LengthCm + EndCapLength > MaximumLengthCm)
 		{
 			if (Definition.LengthCm <= ShortestStraight ||
@@ -316,7 +368,11 @@ TArray<FFieldTrenchPiecePlacement> FieldTrenchLayout::PlanAlongPath(
 		Pieces.Reset();
 		return Pieces;
 	}
-	PlacePieceOnPort(EFieldTrenchPiece::End, 0, OpenPort, Pieces.AddDefaulted_GetRef(), UnusedExit);
+	OutOpenEnd = OpenPort;
+	if (Options.bAddEndCap)
+	{
+		PlacePieceOnPort(EFieldTrenchPiece::End, 0, OpenPort, Pieces.AddDefaulted_GetRef(), UnusedExit);
+	}
 	return Pieces;
 }
 

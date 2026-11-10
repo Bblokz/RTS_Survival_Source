@@ -1,0 +1,33 @@
+{
+ "name": "SM_RusInfBunker_03_Chunks",
+ "chunks": 100,
+ "chunk_uv_channel": 2,
+ "uv_layers": [
+  "UVmap_0",
+  "LightMapUV",
+  "ChunkId"
+ ],
+ "slots": [
+  "MI_Rus_BunkerConcrete_05",
+  "M_Russian_CamoPattern_Tent",
+  "ConcreteBroken"
+ ],
+ "concrete_slots": [
+  0
+ ],
+ "broken_slot": 2,
+ "collision_hulls": 1,
+ "triangles_before": 4700,
+ "triangles_after": 8252,
+ "concrete_area_m2": 340.68,
+ "debris_from_chunks": [
+  43,
+  61,
+  2,
+  57,
+  6,
+  51,
+  56,
+  3
+ ]
+}

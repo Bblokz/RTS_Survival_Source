@@ -17,7 +17,7 @@ skeletal meshes (#2-#24).
 | `run_inventory.sh` + `perf_inventory.py` | Headless read-only inventory per map: every drawn static mesh (instances, LOD tris, LOD screen sizes, Nanite), skeletal meshes, every material (VS/PS instruction counts, samplers, blend, two-sided), landscape, Niagara, a 60 m density grid. Output `Saved/PerfAudit/inventory_<map>.json`. `BIN=DebugGame` uses the DebugGame -Cmd. |
 | `inventory_report.py <Map...>` | Heaviest meshes/materials from the inventory. |
 | `effective_lod_report.py <dist> <Map...>` | Triangles actually drawn at the RTS camera distance (LOD picked from screen sizes), and tris per screen size (over-detailed meshes). |
-| `run_gpu_probe.sh <name> <map>` | Offscreen `-game` at Epic with `UPerfProbeSubsystem` (`-PerfProbe`, C++ in `Utils/PerfProbe/`): starts the game, waits for shaders + PSOs, holds fixed cameras, measures GPU frame ms, optional A/B console variants and ProfileGPU dumps with per-material draw events. |
+| `run_gpu_probe.sh <name> <map>` | Offscreen `-game` at Epic with `UPerfProbeSubsystem` (also `-PerfProbeTimelapse=<shots>,<s>`: screenshots of the current view without starting a game, e.g. the main-menu battle) (`-PerfProbe`, C++ in `Utils/PerfProbe/`): starts the game, waits for shaders + PSOs, holds fixed cameras, measures GPU frame ms, optional A/B console variants and ProfileGPU dumps with per-material draw events. |
 | `profilegpu_report.py <name>` | Summarises the ProfileGPU dumps of a probe run. |
 
 Facts: RTX 4070, D3D12 SM6, Lumen GI + Lumen reflections, distance fields on, non-Nanite meshes almost everywhere.
@@ -30,9 +30,9 @@ Overall Low already turns Lumen off (GI Low/Medium have no Lumen).
 The settings menu exposes only ViewDistance/Shadows/Textures/Effects/PostProcess scalability groups
 (`FRTSScalabilityGroupSettings`); anything behind "Low" for Lumen GI, reflections or shading needs that struct extended (C++).
 
-## Status (2026-11-08)
+## Status (2026-11-09)
 
-- Done without visible change: 35 entries below (C++ fixes #1, #25, #35; ~160 static meshes reduced or re-LODed; 25 skeletal
+- Done without visible change: 52 entries below (C++ fixes #1, #25, #35; ~330 static meshes reduced or re-LODed (+211 corpse poses capped); 38 skeletal
   meshes given an LOD1), every one checked with in-game before/after or forced-LOD close-ups (#35 with a live battle log).
 - Done for Low only: L1-L2 (static LOD distance scale, TSR presets no longer overridden at Low).
 - Waiting on the owner: D3-D10 (biggest: D7 Nanite off in gameplay worlds 6-13%, D3 Lumen mesh SDF tracing off ~5%).
@@ -59,6 +59,12 @@ The settings menu exposes only ViewDistance/Shadows/Textures/Effects/PostProcess
 Typical frame split (FM, 1080p Epic): Lumen DiffuseIndirectAndAO ~1.1 ms, ShadowDepths 0.5-0.8, LumenSceneLighting 0.6,
 PostProcessing 0.5, DeferredLighting 0.4-0.5, BasePass only 0.13-0.29 ms. Material shading is a small share at 1080p.
 
+## Bounds check of reduced meshes (2026-11-09)
+
+The probe logs each mesh's bounds radius; comparing before/after runs catches reductions that drop loose pieces (a
+shrinking radius) even when a close-up looks alike. Run over rounds 6-18: only SM_HetzerMortar_Destroyed (#31, fixed in #50)
+and SM_SM_SuppliesCamo_Destroyed (#49, reverted) changed.
+
 ## Collision check of reduced meshes
 
 All 57 reduced meshes checked (`mesh_collision_info.py`). Complex-as-simple (collision = reduced render mesh): Luchs hull/turret, FlakLuchs
@@ -69,6 +75,34 @@ Rounds 6-7 (79 meshes): complex-as-simple are the two PostApo bridges (50/60%, d
 hulls at 45-60% (StuG III, Pz IV family, Maus, Sd.Kfz. 251, Tiger desert hull) and, below 40%, only SM_Ger_HQ_Preview (placement
 ghost) and SM_Destroyed_SMK_Hull (wreck) at 30%; the 10% stick mine uses default collision. No projectile
 "No valid niagara component" errors in any probe log after fix #25.
+
+## Most expensive shaders per map (ranked, 2026-11-09)
+
+Engine passes are the expensive shaders on all three maps; no game material reaches 0.1 ms in clean captures. Shares of the
+GPU frame at 2560x1080 Epic, median per pass over the probe views, all three from the same 2026-11-09 baseline run
+(Saved/PerfAudit/base9.txt; the GPU was shared with other work, so the ms are inflated ~3x but the shares hold; round 3 on a
+quiet GPU gave the same order):
+
+| Rank | Ger_FirstMission | Ger_MarderStugMission | SM_Desert_01 |
+|---|---|---|---|
+| 1 | Lumen DiffuseIndirectAndAO ~30% | Lumen DiffuseIndirectAndAO ~31% | Lumen DiffuseIndirectAndAO ~38% |
+| 2 | PostProcessing (TSR ~85% of it) ~24% | PostProcessing (TSR) ~24% | PostProcessing (TSR) ~30% |
+| 3 | Deferred lighting (incl. Lumen history store) ~15% | Deferred lighting ~14% | Lumen surface cache lighting ~12% |
+| 4 | Lumen surface cache lighting ~13% | CSM ShadowDepths ~14% (HQ truck hull the largest caster) | CSM ShadowDepths ~10% |
+| 5 | CSM ShadowDepths ~7% | Lumen surface cache lighting ~8% | Deferred lighting ~10% |
+| 6 | Base pass ~6% (landscape ~half of it) | Base pass ~6% | Base pass ~6% |
+| 7 | Translucency (mostly Lumen translucency volume, D9) ~3% | Nanite VisBuffer + forced prepass ~5% (D7) | Translucency ~4% (D9) |
+| 8 | Nanite VisBuffer ~3% (D7) | | Nanite 1-3% (D7) |
+
+`VisibilityCommands` (GPU instance culling) read 2-4.5 ms in the shared-GPU run and is left out: a quiet A/B on FM
+(`ShowFlag.Landscape 1|0`, fm_land) measured it at 0.07 ms either way, so those readings were GPU wait time. The same A/B
+puts the whole landscape at ~0.95 ms base pass + ~0.5 ms shadow depths + its share of Lumen on FM (2,795 components).
+
+Heaviest game materials by measured draw time (all small): landscape layer instances (~0.1 ms each in total per map),
+MI_Desert_Mountain_01 and MI_Roads_1_Straight on FM, MI_Water_01 and MI_PlantColorable_CastleStone on Marder,
+M_SM_OasisWater and the dead-shrub billboard on the desert. By instruction count: MI_Glass 1267 PS (translucent, tiny on screen),
+M_SM_OasisWater 1086, M_Trenches 574, MM_GerSolder 564, M_RTS_BlendedRoad 555, M_DistanceMesh 513. Material edits cannot move
+the frame much; the levers are the engine passes (D1-D3 declined/open, D7, D9, D10) and geometry (the Done list).
 
 ## Inventory findings (2026-11-07)
 
@@ -123,7 +157,24 @@ All LOD0 reductions use the static mesh's own LOD0 reduction settings (source mo
 | 32 | SM_Rus120MortarPit (LOD1 0.25 -> 0.8), SM_Rus_ResearchCenter + _At33 + _At66 (LOD1 0.9 -> 1.5) | LOD screen sizes only (LOD1 was never reached at RTS zoom) | mortar pit 22.3k -> 7.8k drawn, research center 17.7k -> 8.8k drawn | forced LOD0 vs LOD1 close-ups identical | 2026-11-07 |
 | 33 | Round 9 (fresh inventory 2026-11-08): SM_RusDigIn_HeavyWallAt50 25% (damaged state of the two walls reduced in #18), SM_PostApo_Car_1/2/3 50% (scavenge cars), SM_Industrial_Dumpsters_2 40%, SM_Destroyed_PZIII_J 50% (FM wrecks), SM_Rus_GuardMgTower 50% (Soviet MG tower BXP), SM_RusInfBunker_03 50%, SM_powerplant_003 50% | LOD0 reduction | 28.1k->7.0k, 4.7k->2.4k (x3), 6.2k->2.5k, 6.4k->3.2k, 6.8k->3.4k, 9.4k->4.7k, 7.5k->3.7k | in-game close-ups before/after identical (only passing aircraft shadows differ); collision: HeavyWallAt50 complex-as-simple at the same 25% as its siblings, the rest use simple shapes | 2026-11-08 |
 | 34 | SM_TWDigIn_BP_TW_ML20 (dig-in of the SFH 18 team weapon) | LOD1 screen size 0.262 -> 0.8 (LOD1 was never reached at RTS zoom) | 35.1k -> 17.6k drawn | forced LOD0 vs LOD1 close-ups identical | 2026-11-08 |
-| 35 | ASmallArmsProjectileManager (C++): the small-arms tracer Niagara system | Hidden (SetVisibility false) once no tracer has been in flight for 2 manager ticks (0.5 s); shown again on the next FireProjectile. Before, all 1024 pool slots were drawn every frame (D6: translucency + velocity draws, 0.13-0.29 ms idle on the desert) | ~0.1-0.3 ms whenever no rifle/MG fire is in flight | live main-menu battle (StartGame, DebugGame, temporary log): hidden at t=0.6 s, shown on the first shot at 29.9 s, hidden at 49.4 s when fire paused, shown again at 49.65 s, etc.; the component stays active (sim keeps running). Tracer pixels after a re-show were not captured on screen; SetVisibility only removes/re-adds the render proxy | 2026-11-08 |
+| 35 | ASmallArmsProjectileManager (C++): the small-arms tracer Niagara system | Hidden (SetVisibility false) once no tracer has been in flight for 2 manager ticks (0.5 s); shown again on the next FireProjectile. Before, all 1024 pool slots were drawn every frame (D6: translucency + velocity draws, 0.13-0.29 ms idle on the desert) | ~0.1-0.3 ms whenever no rifle/MG fire is in flight | live main-menu battle (StartGame, DebugGame, temporary log): hidden at t=0.6 s, shown on the first shot at 29.9 s, hidden at 49.4 s when fire paused, shown again at 49.65 s, etc.; the component stays active (sim keeps running). On screen (2026-11-09): probe time-lapse of the same battle (`-PerfProbeTimelapse=60,4`, Saved/PerfAudit/tl14_zoom2.png) shows MG tracers drawn at game t=56 s, after the system had been hidden through the quiet first ~30 s | 2026-11-08 |
+| 36 | Round 10 skeletal LOD1s on units the static inventories never saw (spawned by waves / BXPs): SK_cyborginfantry1 (flame troopers, Sturmpioniere) via `SKLOD_RTS_Infantry` (12% from 0.15); walkers EspSphere_04 (KR12 Dachs), SK_FelsKrieger, EspSphere_01 (Red Spine), SK_BM13_Launcher, SK_PanzerV_III_LaserTurret, S_FLak88 via `SKLOD_RTS_Vehicle` (30% from 0.5) | Generated LOD1 (LOD0 untouched) | LOD1 verts: 12.2k->2.6k, 21.7k->7.3k, 18.1k->6.1k, 15.4k->4.9k, 13.3k->4.3k, 14.5k->4.7k, 15.4k->5.4k | forced LOD0 vs LOD1 close-ups identical; lodcheck: auto LOD0 close, LOD1 at RTS distance for all 7 | 2026-11-08 |
+| 37 | Round 11 live/wreck hulls with one LOD and no armour-panel sibling: SM_Skdfz140, SM_Sdkfz140_AA_Hull, SM_Wespe_Hull, SM_Wespe_CamouflagedNest_Hull, SM_Sdkfz234_3_IncendiarySupport_Hull, SM_JagdE100_Hull, SM_Sdkfz250_37_Hull, SM_Hull_BM13, SM_Sdkfz251Mortar_Incendiary_Hull, SM_HetzerMortar_Hull | LOD0 reduction 50% | 17.9k->9.0k, 17.0k->8.5k, 11.4k->5.7k, 16.5k->8.2k, 14.8k->7.4k, 14.7k->7.4k, 12.9k->6.4k, 12.0k->6.0k, 11.1k->5.5k, 10.6k->5.3k | in-game close-ups before/after identical, zoomed crops of the thinnest parts (Sd.Kfz. 140 whip antennas, incendiary rack lattice) unchanged | 2026-11-08 |
+| 38 | Round 12 German base buildings, mounts, wrecks, statics: SM_MetalDepot_BuildingMesh_Improved, SM_Ger_AircraftBuilding_BaseMesh, SM_Armory_BuildingMesh, SM_GerArmory_Mount, SM_Experimental_BuildingMesh, StaticMesh6 (static infantry turret), SM_Flak4, SM_Cart_HowitzerTrain at 50%; wrecks SM_DestroyedGerArmory_Mount, SM_DestroyedGerAircraftBase_Mount, SM_DestroyedExperimental_Mount, SM_Morser_Destroyed, SM_PzIVG_DoubleTurret_Destroyed at 30% | LOD0 reduction | 15.0k->7.5k, 13.7k->6.9k, 12.3k->6.1k, 10.3k->5.1k, 10.1k->5.1k, 12.1k->6.1k, 11.2k->5.6k, 10.8k->5.4k; wrecks 12.3k->3.7k, 10.9k->3.3k, 9.3k->2.8k, 10.5k->3.2k, 10.6k->3.2k | in-game close-ups before/after identical | 2026-11-08 |
+| 39 | Round 13 LOD1 never reached at RTS zoom -> LOD1 screen size 0.8 (LOD2+ unchanged): SM_RusDigIn_GAZMM72K_Wall (+ _WallAt66, _WallAt33), dig-ins SM_TWDigIn_Rus_TW_53K_45mm / _BP_TW_Rus80MM_Mortar / _BP_TW_Lefh / _Ger_TW_Flak88 / _BP_TW_Morser / _Rus_TW_Maxim, SM_GerCommCenter_MG42Nests_At50, SM_GerCommCenter_ObservationPost (+ _At50), SM_ML20Pit_TwinShoulders, wrecks SM_Destroyed_SturmTiger_Scatterer, SM_Sturmtiger_Destroyed | LOD screen sizes only | drawn tris halved per instance (e.g. GAZ-MM wall 15.4k -> 7.7k, 53-K dig-in 14.8k -> 7.4k, MG42 nests 14.0k -> 7.0k) | forced LOD0 vs LOD1 close-ups identical (15 meshes) | 2026-11-08 |
+| 40 | SM_modern_bridge_003 (BP_ModernBridge_4) | Removed imported LOD1/LOD2 that were HEAVIER than LOD0 (68k / 49k vs 8k tris, used below 0.2 screen size) | up to 60k tris less per bridge when zoomed out | close views already drew LOD0, so nothing changes there; far views now draw the same LOD0 (revert via git) | 2026-11-08 |
+| 41 | Scan of all 324 multi-LOD RTS_Survival meshes for LODs heavier than LOD0: SM_modern_bridge_001/002/004-010 (imported LOD1/2 at 27-75k vs 3-8k LOD0) and SM_Ger_Mount_Solar (gamma facility mount, LOD1 15.0k vs LOD0 12.8k) | Removed the extra LODs | up to 70k tris less per bridge zoomed out; 2.2k less per solar mount at RTS zoom | near views already drew LOD0; far views now draw LOD0 too (revert via git) | 2026-11-09 |
+| 42 | SM_Destroyed_JagdPanther_Pfeil, SM_Destroyed_Maus_AA_Turret, SM_Destroyed_JagdPanzerIV70_Ambush, SM_TWDigIn_Ger_TW_Flak37MM, SM_TWDigIn_Ger_TW_Pak40 (found by the 324-mesh scan) | LOD1 screen size -> 0.8 (LOD1 was never reached at RTS zoom) | 6.9k->3.5k, 6.3k->3.2k, 6.9k->4.1k, 5.3k->2.7k, 5.1k->2.6k drawn | forced LOD0 vs LOD1 close-ups identical | 2026-11-09 |
+| 43 | Pending saves that came free after the owner's editor restart (2026-11-09): SM_GerPit_Clip_37 30% (r9), SM_Jagdtiger_Hull, SM_Sdkfz-250_Hull, SM_Sdkfz250_AmmoCarrier_Hull, SM_Sdkfz251Mortar_GuidedMissile_Hull 50% (r11); LOD1 SK_GerFemaleSniper (`SKLOD_RTS_Infantry`), SK_TW_Morser210mm, SK_GerFlak88Pit_Gun (`SKLOD_RTS_Vehicle`) (r10) | as planned in rounds 9-11 | 1.5k->0.4k; 17.2k->8.6k, 13.7k->6.9k, 11.2k->5.6k, 10.7k->5.4k; LOD1 verts 9.7k->1.7k, 16.9k->5.8k, 15.5k->5.5k | close-ups vs the round 9/11 before shots identical (clip re-shot after exposure settled); skeletal forced LOD0 vs LOD1 identical, lodcheck auto LOD0 close / LOD1 at RTS | 2026-11-09 |
+| 44 | All 211 baked corpse poses (CorpsePoses/Poses, ISM battlefield corpses that pile up in big fights and draw in base pass + 3 CSM cascades) | LOD0 capped at 4,000 tris (was the baker's 8,000 cap): 194 reduced, 17 already below; `CorpsePoseBaker.cpp` MaxCorpseTriangles 8000 -> 4000 so a rebake keeps it. Corpses are plain ISMs (one LOD per component), so an LOD1 would not help | -4,000 tris per corpse (half), e.g. 50 corpses = -200k tris per pass | in-game close-ups of 5 poses (incl. RusProject24, 2.2% of its 182k source) before/after identical, full-res crop checked | 2026-11-09 |
+| 45 | SM_Skdfz-7_Hull_WithAttachments (German HQ truck hull, largest CSM caster on Marder) | Added one LOD1 at 40% of LOD0 from screen size 0.4 (LOD0 stays the #19 reduction) | 30.6k -> 12.2k tris at RTS zoom | forced LOD0 vs LOD1 close-ups identical | 2026-11-09 |
+| 46 | MG42 (StaticDefense twin MG pit gun), SK_Flak4_20mm (Flakvierling), SM_MiscCrane_Welding | LOD1 via `SKLOD_RTS_Vehicle` (30% from 0.5); welding crane LOD0 30% | LOD1 verts 6.4k->2.1k, 14.6k->5.9k; crane 1,552 -> 465 tris | forced LOD0 vs LOD1 close-ups identical; crane close-up vs round 9 before shot identical | 2026-11-09 |
+| 47 | SM_T35_Hull 50% (r11); SM_Destroyed_E25_Hunter, SM_Destroyed_E25_Assault, SM_GerPit_Pak LOD1 screen size -> 0.8 (r13) | as planned, applied when the files came free | 13.0k -> 6.5k; drawn 11.3k->6.8k, 7.9k->4.7k, 7.2k->3.6k | T-35 close-up vs round 11 before identical; forced LOD0 vs LOD1 close-ups identical | 2026-11-09 |
+| 48 | Round 17 single-LOD unit meshes 8-10k without armour-panel siblings: live SM_Hull_ZilTroops, SM_Sdkfz7Flak_Hull, SM_HetzerFlame_Hull, SM_E100_Turret, SM_Puma_OverchargedBeam_Hull at 50%; wrecks SM_Destroyed_Sdkfz140_Bunker, SM_ISU152_Hull_Destroyed, SM_Destroyed120MM_Mortar, SM_ML20_Destroyed, SM_PzIVRockets_Base_Destroyed, SM_PzIVRockets_IncendiarySalvo_Destroyed, SM_Destroyed_GAZMM72K, SM_Destroyed_Sdkfz251_Medic at 30% | LOD0 reduction | live ~8.4-10.1k -> 4.2-5.0k; wrecks ~8.0-9.9k -> 2.4-3.0k | in-game close-ups before/after identical (13 meshes); SM_PanzerIV_H 50% (10.1k -> 5.0k) added later the same night when its lock cleared, close-up identical | 2026-11-09 |
+| 49 | Round 18 single-LOD meshes 6-8k without armour-panel siblings (33 kept): buildings SM_RusBunker03 (+At50), SM_MidWallBunker_Concrete, SM_Ger_Bxp_HqLaser_BuildingMesh (+At33, At66), SM_Experimental_Mount, SM_Refinery_Stage3 at 50%; live SM_ISU152_Hull, SM_Hull_TigerRail_Overcharged, SM_E100_Hull, SM_Sdkfz250_Ambulance_Hull, SM_3x25, SM_Sdkfz251_Medic_Hull, SM_TigerRail_RailBunker_Hull, SM_PZ1_15cm_IndirectFire_Hull, Sm_ArmoredPuma_Hull, SM_T50_Hull, SM_PzI150mmBison_DF_Hull, SM_SovietTrain_FuelCar at 50%; wrecks SM_Destroyed_ZIS, SM_B4_Destroyed, SM_Destroyed_IS6_Turret, SM_Brummbar_DirectSiege_Destroyed, SM_Destroyed_Brummbar_LateWar, SM_PzIVH_StandardPlus_Destroyed, SM_Flak38Wheeled_Destroyed, KV5_Destroyed, SM_Destroyed_Howitzer, SM_Destroyed_MS1_Hull, SM_Rus_FuelStorage2_Destroyed, SM_Brummbar_Destroyed at 30%; SM_CyborgEquip_Radio 25% | LOD0 reduction | 6.1-8.0k -> ~3.0-4.0k (50%), ~1.9-2.2k (wrecks), radio 7.0k -> 1.7k | in-game close-ups identical AND bounds radius unchanged (new check); SM_SM_SuppliesCamo_Destroyed was REVERTED (its 30% lost thin net poles, bounds 925 -> 889). Applied later the same night when locks cleared, same checks passed: SM_SMK_Hull, SM_Rus_DomeBunkerAt33/At66, SM_Rus_GuardMgTowerAt33/At66, SM_WallBunker_Concrete, SM_B4_Trolley (50%), SM_PanzerIV_Destroyed_Hull (30%) | 2026-11-09 |
+| 50 | Correction to #31: SM_HetzerMortar_Destroyed 30% -> 50% | the bounds check found its radius 393 -> 354 at 30% (a loose piece dropped); at 50% the radius is 393 again | 15.3k -> 7.6k (was 4.6k) | bounds equal to the original | 2026-11-09 |
+| 51 | Round 19 single-LOD unit/building meshes 4-6k without armour-panel siblings (42 kept): live hulls (KV-1E, SU-85, SU-100, Puma, T-28 + Radixite, T-44 100L, KV-5, KV-IS, MS-1, PZ1 15cm, SturmTiger main, Sd.Kfz. 9/37 mm, rocket trucks), Opel expanded/mount forge, refinery stage 2, Soviet cargo car, Pak 38, IS-6 + Maus AA turret bases, HQ repair hub, admin square bunker, solar 3 at 50%; wrecks (Tiger II, T-44 hull + turrets, Puma beam, PzIV rockets launcher, Soviet howitzer, BS-3, Pak 38, ball turret, BTR-152A, wall bunker remains) at 30%; SM_Rus_anti-Infantry_StickMine 25% | LOD0 reduction | 4.0-5.9k -> ~2.0-3.0k (50%), ~1.2-1.8k (30%) | in-game close-ups identical and bounds unchanged; REVERTED SM_PZ4Harvester_CrystalsAt75 (crystal glints weaker after: facet normals); SM_SU85_Destroyed lost a piece at 30% (bounds 374 -> 362) and is now 50% (5.9k -> 3.0k, bounds 374 again); SM_Destroyed_PZII_Hull still lost it at 50% (298 -> 281) and is RESTORED to full detail | 2026-11-09 |
+| 52 | Pending items applied when their locks cleared: SM_CaptureBunker37mm 50% (7.9k -> 4.0k), SM_Hull_Sdkfz_231 50% (5.9k -> 3.0k), SM_Ger_AntiInfantry_Mine 25% (5.2k -> 1.3k) | LOD0 reduction | as listed | close-ups vs before shots (f8before) identical, bounds unchanged | 2026-11-09 |
 
 ## Done: Low setting only (scalability)
 
@@ -134,9 +185,20 @@ All LOD0 reductions use the static mesh's own LOD0 reduction settings (source mo
 
 ## Pending saves (package held open by a running game; retry when no game runs)
 
-2026-11-08: SM_MiscCrane_Welding 30% (1,552 tris at 6 cm radius, forge crane attachments) and SM_GerPit_Clip_37 30% (1,452 tris,
-Flak 37 pit clip) failed to save: the owner's open editor holds both files. Re-run
+2026-11-08: SM_MiscCrane_Welding 30% (1,552 tris at 6 cm radius, forge crane attachments) [saved 2026-11-09, verification shot pending] and SM_GerPit_Clip_37 30% (1,452 tris,
+Flak 37 pit clip) [done 2026-11-09, #43] failed to save: the owner's open editor holds both files. Re-run
 `run_mesh_reduce.sh reduce r9 <mesh>=0.3` when that editor is closed (tiny gain).
+2026-11-08 round 10: LOD1s generated but not saved (owner's editor holds the files): SK_GerFemaleSniper (`skel_lod.py applyas
+SKLOD_RTS_Infantry 0.12 0.15 <mesh>`), MG42 (StaticDefense), SK_Flak4_20mm, SK_TW_Morser210mm, Tank_t26_TrackedSim,
+SK_GerFlak88Pit_Gun (`skel_lod.py applyas SKLOD_RTS_Vehicle 0.3 0.5 <mesh>`). Re-run when that editor is closed, then shoot
+forced LOD0/LOD1 with the probe (`-PerfProbeMeshes`).
+2026-11-08 round 11 (50% LOD0, not saved, owner's editor holds them): SM_Jagdtiger_Hull, SM_Sdkfz-250_Hull,
+SM_Sdkfz250_AmmoCarrier_Hull, SM_Sdkfz251Mortar_GuidedMissile_Hull, SM_T35_Hull (`run_mesh_reduce.sh reduce r11 <mesh>=0.5`).
+Round 12 skipped SM_OpelRefinery_Mount (50% planned) for the same lock.
+Round 10 T-26 LOD1 (Tank_t26_TrackedSim) applied 2026-11-09 after the editor restart (verts 12.0k -> 4.8k; forced LOD0 vs LOD1 close-ups identical, auto LOD1 at RTS).
+Round 13 skipped (locked): SM_Destroyed_E25_Hunter, SM_Destroyed_E25_Assault, SM_GerPit_Pak (LOD1 screen size -> 0.8; `run_mesh_reduce.sh screens r13 <mesh>=1,0.8,<rest>`, see Saved/PerfAudit/round13_screens.txt).
+Corpse poses: done 2026-11-09 (#44). HQ truck LOD1: done (#45). Welding crane, MG42, Flak 4x20 mm: done (#46).
+Still locked 2026-11-09 (watched for an hour, held by the owner's editor): SM_OpelRefinery_Mount (50%, 10.8k -> 5.4k; before shot r16before exists; `run_mesh_reduce.sh reduce r16 <mesh>=0.5`, then shoot r16after and compare). T-35, E25 wrecks, Pak pit done (#47). Still locked (before shots f8before exist; pairs in Saved/PerfAudit/final8_pairs.txt): SM_Panzer1_Harvester_Optim 50%, SM_OpelDestroyed 30%, SM_Rus_LightTankMines 25%, SM_GerHQ_VehiclePartsAt100 50%, SM_OpelRefinery_Mount 50%. SM_PanzerIV_H done (#48).
 Earlier: all retried saves succeeded 2026-11-07 ~18:50. Gotcha: some packages (HQ, radixite cores, pits, MountZil) load in
 every game, so any running -game (also the probe's own) blocks saving them.
 

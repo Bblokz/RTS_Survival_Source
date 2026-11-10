@@ -13,6 +13,8 @@ struct FCollapseFX;
 struct FDestroySpawnActorsParameters;
 class RTS_SURVIVAL_API UHealthComponent;
 class RTS_SURVIVAL_API URTSComponent;
+class UWallHoleDamageComponent;
+class UWallChunkDamageComponent;
 /**
  * @note SET IN BP
  * @note ON HEALTH COMPONENT : SetMaxHealth, SetArmor
@@ -117,4 +119,13 @@ protected:
 
 	// Set on derived actors that do not use RTSComponent.
 	bool bDoNotUseRTSComponent = false;
+
+private:
+	// Optional: walls and towers with procedural holes get their hits and repairs forwarded (null on other actors).
+	UPROPERTY()
+	TObjectPtr<UWallHoleDamageComponent> M_WallHoleDamage;
+
+	// Optional: bunkers with baked concrete chunks get their hits and repairs forwarded (null on other actors).
+	UPROPERTY()
+	TObjectPtr<UWallChunkDamageComponent> M_WallChunkDamage;
 };

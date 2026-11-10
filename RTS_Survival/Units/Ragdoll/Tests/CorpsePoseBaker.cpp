@@ -23,7 +23,8 @@ namespace CorpsePoseBakerPrivate
 {
 	constexpr int32 BakedLodIndex = 0;
 	// Corpses are instanced in hundreds; denser soldier meshes are reduced to about this many triangles.
-	constexpr int32 MaxCorpseTriangles = 8000;
+	// 4000 since the 2026-11-09 perf audit (Docs/Performance/OptimizationLog.md #44): close-ups at 4k matched 8k.
+	constexpr int32 MaxCorpseTriangles = 4000;
 
 	/** Per vertex of the imported LOD, in pivot space. */
 	struct FSkinnedVertex

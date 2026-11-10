@@ -28,6 +28,9 @@ struct FCollapseDuration;
 class UGeometryCollection;
 class UArmorCalculation;
 class UBehaviour;
+class UWallChunkDamageComponent;
+class UWallHoleDamageComponent;
+class UWreckHoleDamageComponent;
 
 
 DECLARE_MULTICAST_DELEGATE(FOnDestructibleCollapse);
@@ -63,6 +66,8 @@ public:
 	// Fires once when this actor dies from health loss or a crush (OnUnitDies). Distinct from
 	// OnDestructibleCollapse, which also fires for non-lethal collapse presentations.
 	FOnDestructableEnvActorDied OnDestructableEnvActorDied;
+
+	float GetCurrentHealth() const { return Health; }
 
 
 	/**
@@ -219,6 +224,18 @@ protected:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
 	                         AActor* DamageCauser) override;
 
+	/**
+	 * @brief Shell holes (UWallHoleDamageComponent, UWreckHoleDamageComponent), also for subclasses that keep their
+	 * own health, such as ADestructableActorHealth; call after the damage is applied and before the death check.
+	 * @param DamageAmount Damage actually applied.
+	 * @param DamageEvent The hit; a point event carries the impact.
+	 * @param DamageCauser Projectile, bomb or ability actor; may be null.
+	 * @param HealthBefore Health before this hit.
+	 * @param HealthAfter Health after this hit; zero or less when the hit kills.
+	 */
+	void ForwardDamageToHoleComponents(float DamageAmount, const FDamageEvent& DamageEvent, const AActor* DamageCauser,
+	                                   float HealthBefore, float HealthAfter);
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Health")
 	float Health = 300.f;
 
@@ -294,6 +311,18 @@ private:
 
 	FTimerHandle M_PostCollapseTimerHandle;
 	FTimerDelegate M_PostCollapseTimerDelegate;
+
+	// Optional: walls cut into chunks get their hits forwarded so shells knock chunks out (null on other actors).
+	UPROPERTY()
+	TObjectPtr<UWallChunkDamageComponent> M_WallChunkDamage;
+
+	// Optional: walls with procedural holes (no chunk mesh) get their hits forwarded the same way.
+	UPROPERTY()
+	TObjectPtr<UWallHoleDamageComponent> M_WallHoleDamage;
+
+	// Optional: vehicle wrecks and scavengeable vehicle parts get shell holes on any of their meshes.
+	UPROPERTY()
+	TObjectPtr<UWreckHoleDamageComponent> M_WreckHoleDamage;
 
 	// Called when collapsed but actor not destroyed (as specified by the collapse settings).
 	UFUNCTION()

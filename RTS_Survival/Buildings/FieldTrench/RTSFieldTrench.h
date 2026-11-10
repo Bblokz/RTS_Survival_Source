@@ -63,8 +63,8 @@ struct FFieldTrenchPieceRuntime
  * trench; every piece is paid for, per metre of trench, when its digging starts, and digging waits while the
  * player cannot pay.
  * Built pieces give trench cover: the cargo sockets of their meshes are handed to the cover finder through
- * IRTSCoverSocketSource, so soldiers are placed on the sockets 60 cm below the ground the same way they are in a
- * hand-placed BP_TrenchMaster trench.
+ * IRTSCoverSocketSource, so soldiers are placed on the sockets (on the trench floor, level with its planks) the same
+ * way they are in a hand-placed BP_TrenchMaster trench.
  * @note PieceCollisionTemplate holds the collision every piece copies; its C++ defaults are BP_CargoTrench's.
  */
 UCLASS()
@@ -109,6 +109,21 @@ public:
 	void CancelUnbuiltPieces();
 
 	int32 GetPieceCount() const { return M_Pieces.Num(); }
+	EFieldTrenchKit GetKit() const { return Kit; }
+
+	/**
+	 * @brief Picks the kit the pieces are made of; pieces that already exist take its meshes at once.
+	 * The runtime trench is the C++ class for every kit, so the placement sets this right after spawning it.
+	 */
+	void SetKit(const EFieldTrenchKit NewKit);
+
+	/**
+	 * @brief Hides the pieces that are planned but not dug yet, for a trench whose plan the player must not see,
+	 * such as one the enemy AI digs; a piece shows once its digging starts. Off for the player's own trench.
+	 */
+	void SetHidePlannedPieces(const bool bHide) { bM_HidePlannedPieces = bHide; }
+
+	void SetDigSecondsPerMetre(const float SecondsPerMetre) { DigSecondsPerMetre = FMath::Max(0.0f, SecondsPerMetre); }
 	int32 GetBuiltPieceCount() const;
 	bool GetIsWaitingForResources() const { return bM_IsWaitingForResources; }
 	const TArray<FFieldTrenchPieceRuntime>& GetPieces() const { return M_Pieces; }
@@ -140,6 +155,17 @@ public:
 		const FFieldTrenchPlanOptions& Options) const;
 
 	/**
+	 * @brief Plans a trench along a dragged path, see above.
+	 * @param OutOpenEnd Receives the open end of the trench before its end cap, see FieldTrenchLayout::PlanAlongPath.
+	 */
+	TArray<FFieldTrenchPiecePlacement> PlanOnGround(
+		const TArray<FVector2D>& DragPath,
+		const float MaximumLengthCm,
+		const float GroundHeight,
+		const FFieldTrenchPlanOptions& Options,
+		FFieldTrenchOpenPort& OutOpenEnd) const;
+
+	/**
 	 * @brief The trench starts at this anchor: its first planned piece lies on the anchor's port. The anchor is
 	 * claimed when construction starts; while the trench is only laid out it is just used to find the ground,
 	 * which near the anchor lies under its owner's walls. An unset handle starts the trench with a cap.
@@ -152,7 +178,7 @@ public:
 	 * @param AnchorPort The anchor's port: where the trench's first piece joined it.
 	 * @param AnchorHeight The height of the anchor.
 	 */
-	void OnStartAnchorLost(const FFieldTrenchOpenPort& AnchorPort, const float AnchorHeight);
+	virtual void OnStartAnchorLost(const FFieldTrenchOpenPort& AnchorPort, const float AnchorHeight);
 
 	/** @return What a piece of this length costs at the given price per metre; at least 1 of every priced resource. */
 	static TMap<ERTSResourceType, int32> GetCostOfLength(
@@ -167,6 +193,11 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
 
+	// Which faction's kit meshes the pieces use; all kits share the layout, so only the look changes.
+	// Set on a Blueprint child (BP_SovFieldTrenchSpline) or per placed trench; a spline trench rebuilds when it changes.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Field Trench")
+	EFieldTrenchKit Kit = EFieldTrenchKit::German;
+
 	// Its collision settings are copied onto every piece; it has no mesh itself.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Field Trench")
 	TObjectPtr<UStaticMeshComponent> PieceCollisionTemplate;
@@ -179,13 +210,29 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Field Trench", meta = (ClampMin = "0.0"))
 	float DigSecondsPerMetre = 1.0f;
 
-	// How deep a piece starts below its place when digging begins; it rises to the ground as it is dug.
+	// How deep a piece starts below its place when digging begins; it rises to the ground as it is dug. Deeper than the
+	// kit's tallest piece (walls ~128-148 cm since 2026-11-10), so a piece starts out of sight.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Field Trench", meta = (ClampMin = "0.0"))
-	float DigStartDepth = 80.0f;
+	float DigStartDepth = 150.0f;
 
 	// How often a trench that waits for resources checks again whether the player can pay.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Field Trench", meta = (ClampMin = "0.1"))
 	float ResourceRetrySeconds = 0.5f;
+
+	/**
+	 * @brief Removes every piece at once, also the ones whose component the engine already destroyed when it
+	 * reran the construction script.
+	 */
+	void ClearAllPieces();
+
+	// Pieces made while this is set are construction script components: the engine destroys them before it
+	// reruns the construction script, saves them with the level and greys them out in the details panel.
+	// Set by trenches that rebuild themselves in OnConstruction, such as ARTSFieldTrenchSpline.
+	bool bM_CreatePiecesAsConstructionScriptComponents = false;
+
+	// Looking for the ground ignores these as well, such as the walls and trenches a trench is joined to.
+	UPROPERTY(Transient)
+	TArray<TWeakObjectPtr<AActor>> M_ExtraGroundIgnoredActors;
 
 private:
 	UPROPERTY()
@@ -203,6 +250,7 @@ private:
 	// The actor of the start anchor; the ground is looked for through it, also after the anchor was lost.
 	TWeakObjectPtr<AActor> M_GroundIgnoredActor;
 	bool bM_HasClaimedStartAnchor = false;
+	bool bM_HidePlannedPieces = false;
 
 	int32 M_OwningPlayer = INDEX_NONE;
 	float M_TimeUntilResourceRetry = 0.0f;

@@ -105,6 +105,10 @@ struct FRTSEnvironmentDetailSettings
 	// Drives rts.Corpses: how many crew corpses stay on the battlefield. Not touched by the main slider.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
 	ERTSBattlefieldCorpsesLevel M_BattlefieldCorpsesLevel = ERTSBattlefieldCorpsesLevel::Some;
+
+	// Drives rts.ImpactDecals: how many shell craters stay on the landscape (Off = none). Not touched by the main slider.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Settings|Graphics")
+	ERTSImpactDecalsLevel M_ImpactDecalsLevel = ERTSImpactDecalsLevel::Some;
 };
 
 USTRUCT(BlueprintType)
@@ -301,6 +305,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingBattlefieldCorpsesLevel(ERTSBattlefieldCorpsesLevel NewLevel);
+
+	UFUNCTION(BlueprintCallable, Category="Settings")
+	void SetPendingImpactDecalsLevel(ERTSImpactDecalsLevel NewLevel);
 
 	UFUNCTION(BlueprintCallable, Category="Settings")
 	void SetPendingMasterVolume(float NewVolume);

@@ -16,8 +16,9 @@
 namespace RTSFieldTrenchPrivate
 {
 	constexpr float GroundTraceHalfHeight = 2000.0f;
-	// The ground is sampled this far to either side of the centreline to lean the piece with a side slope.
-	constexpr float GroundSampleHalfWidth = 150.0f;
+	// The ground is sampled this far to either side of the centreline to lean the piece with a side slope; just
+	// inside the outer sandbag row (197.5 cm).
+	constexpr float GroundSampleHalfWidth = 175.0f;
 	// The end cap lies behind its port; the ground there decides its lean.
 	constexpr float EndCapGroundSampleLength = -150.0f;
 	const FName PlacementOkayParameter(TEXT("PlacementOkay"));
@@ -239,6 +240,30 @@ void ARTSFieldTrench::RemovePiece(const int32 PieceIndex)
 	}
 }
 
+void ARTSFieldTrench::ClearAllPieces()
+{
+	const bool bHadBuiltPiece = GetBuiltPieceCount() > 0;
+	ReleaseStartAnchor();
+	for (const FFieldTrenchPieceRuntime& Piece : M_Pieces)
+	{
+		if (Piece.State == EFieldTrenchPieceState::Digging)
+		{
+			RefundPiece(Piece);
+		}
+		// A copied or duplicated trench can come with references to the pieces of the trench it was copied from.
+		if (IsValid(Piece.Component) && Piece.Component->GetOwner() == this)
+		{
+			Piece.Component->DestroyComponent();
+		}
+	}
+	M_Pieces.Reset();
+	bM_IsWaitingForResources = false;
+	if (bHadBuiltPiece)
+	{
+		ScheduleCoverRefresh();
+	}
+}
+
 void ARTSFieldTrench::CancelUnbuiltPieces()
 {
 	for (int32 PieceIndex = M_Pieces.Num() - 1; PieceIndex >= 0; --PieceIndex)
@@ -307,8 +332,8 @@ void ARTSFieldTrench::GetUsableCoverSockets(TArray<FRTSActorCoverSocket>& OutCov
 			FRTSActorCoverSocket& CoverSocket = OutCoverSockets.AddDefaulted_GetRef();
 			CoverSocket.SocketName = SocketName;
 			CoverSocket.WorldTransform = Piece.Component->GetSocketTransform(SocketName, RTS_World);
-			// The sockets lie below the ground in the trench; the soldier walks to the ground right above his
-			// socket, which the trench leaves to the navigation mesh, and is lowered onto the socket from there.
+			// The sockets lie on the trench floor, level with its planks; the soldier walks to the ground right under
+			// his socket, which the trench leaves to the navigation mesh, and is snapped onto the socket from there.
 			const FVector SocketLocation = CoverSocket.WorldTransform.GetLocation();
 			CoverSocket.ApproachLocation = SocketLocation + PieceUp * FVector::DotProduct(PieceGround - SocketLocation, PieceUp);
 		}
@@ -334,18 +359,44 @@ UStaticMeshComponent* ARTSFieldTrench::CreatePieceComponent(const EFieldTrenchPi
 	PieceComponent->SetGenerateOverlapEvents(PieceCollisionTemplate->GetGenerateOverlapEvents());
 	SetPieceMesh(*PieceComponent, Piece);
 	PieceComponent->SetupAttachment(RootComponent);
+	if (bM_CreatePiecesAsConstructionScriptComponents)
+	{
+		// Set before registering; the component was filed under the actor as native when it was made, so it is
+		// added to the construction script components by hand, which is what saves it with the level.
+		PieceComponent->CreationMethod = EComponentCreationMethod::UserConstructionScript;
+		BlueprintCreatedComponents.AddUnique(PieceComponent);
+		PieceComponent->RegisterComponent();
+		return PieceComponent;
+	}
 	PieceComponent->RegisterComponent();
 	AddInstanceComponent(PieceComponent);
 	return PieceComponent;
 }
 
+void ARTSFieldTrench::SetKit(const EFieldTrenchKit NewKit)
+{
+	if (Kit == NewKit)
+	{
+		return;
+	}
+	Kit = NewKit;
+	for (const FFieldTrenchPieceRuntime& Piece : M_Pieces)
+	{
+		if (IsValid(Piece.Component))
+		{
+			SetPieceMesh(*Piece.Component, Piece.Placement.Piece);
+		}
+	}
+}
+
 void ARTSFieldTrench::SetPieceMesh(UStaticMeshComponent& PieceComponent, const EFieldTrenchPiece Piece) const
 {
-	UStaticMesh* PieceMesh = Cast<UStaticMesh>(FieldTrenchLayout::GetPieceMeshPath(Piece).TryLoad());
+	UStaticMesh* PieceMesh = Cast<UStaticMesh>(FieldTrenchLayout::GetPieceMeshPath(Piece, Kit).TryLoad());
 	if (not IsValid(PieceMesh))
 	{
 		RTSFunctionLibrary::ReportError(
-			"Field trench " + GetName() + ": could not load the mesh of piece " + UEnum::GetValueAsString(Piece) + ".");
+			"Field trench " + GetName() + ": could not load the mesh of piece " + UEnum::GetValueAsString(Piece) +
+			" in kit " + UEnum::GetValueAsString(Kit) + ".");
 	}
 	PieceComponent.SetStaticMesh(PieceMesh);
 }
@@ -356,7 +407,8 @@ void ARTSFieldTrench::FitPieceToGround(FFieldTrenchPieceRuntime& Piece) const
 	const FFieldTrenchPiecePlacement& Placement = Piece.Placement;
 	const FFieldTrenchPieceDefinition& Definition = FieldTrenchLayout::GetPieceDefinition(Placement.Piece);
 	// Every piece has its first port at its origin; the ground towards the other port gives the lean along it.
-	const float SampleLength = Definition.Ports.Num() >= 2 ? Definition.Ports[1].Location.X : EndCapGroundSampleLength;
+	const float SampleLength = (Definition.Ports.Num() >= 2 ? Definition.Ports[1].Location.X : EndCapGroundSampleLength) *
+		Placement.LengthScale;
 	const FRotator YawRotation(0.0f, Placement.Yaw, 0.0f);
 	const FVector2D Origin(Placement.Location);
 	auto ToWorld = [&YawRotation, &Origin](const float LocalX, const float LocalY)
@@ -379,7 +431,8 @@ void ARTSFieldTrench::FitPieceToGround(FFieldTrenchPieceRuntime& Piece) const
 		const FVector AlongAxis = (GroundAlong - GroundOrigin) * FMath::Sign(SampleLength);
 		GroundRotation = FRotationMatrix::MakeFromXY(AlongAxis, GroundRight - GroundLeft).Rotator();
 	}
-	Piece.GroundTransform = FTransform(GroundRotation, bHasOrigin ? GroundOrigin : Placement.Location);
+	Piece.GroundTransform = FTransform(GroundRotation, bHasOrigin ? GroundOrigin : Placement.Location,
+	                                   FVector(Placement.LengthScale, 1.0f, 1.0f));
 	const FVector PieceUp = GroundRotation.Quaternion().GetUpVector();
 	Piece.SlopeDegrees = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(PieceUp.Z, -1.0f, 1.0f)));
 	// The ground along the centreline and at the sides, measured from the plane the piece lies in.
@@ -418,13 +471,24 @@ TArray<FFieldTrenchPiecePlacement> ARTSFieldTrench::PlanOnGround(
 	const float GroundHeight,
 	const FFieldTrenchPlanOptions& Options) const
 {
+	FFieldTrenchOpenPort UnusedOpenEnd;
+	return PlanOnGround(DragPath, MaximumLengthCm, GroundHeight, Options, UnusedOpenEnd);
+}
+
+TArray<FFieldTrenchPiecePlacement> ARTSFieldTrench::PlanOnGround(
+	const TArray<FVector2D>& DragPath,
+	const float MaximumLengthCm,
+	const float GroundHeight,
+	const FFieldTrenchPlanOptions& Options,
+	FFieldTrenchOpenPort& OutOpenEnd) const
+{
 	const float ShortestStraight = FieldTrenchLayout::GetPieceDefinition(EFieldTrenchPiece::Straight_125).LengthCm;
 	TArray<FFieldTrenchPiecePlacement> Pieces;
 	FFieldTrenchPlanOptions PassOptions = Options;
 	for (const float MaximumStraight : {500.0f, 250.0f, 125.0f})
 	{
 		PassOptions.MaximumStraightLengthCm = FMath::Min(Options.MaximumStraightLengthCm, MaximumStraight);
-		Pieces = FieldTrenchLayout::PlanAlongPath(DragPath, MaximumLengthCm, PassOptions);
+		Pieces = FieldTrenchLayout::PlanAlongPath(DragPath, MaximumLengthCm, PassOptions, OutOpenEnd);
 		bool bStraightsLieOnGround = true;
 		for (FFieldTrenchPiecePlacement& Placement : Pieces)
 		{
@@ -466,6 +530,13 @@ bool ARTSFieldTrench::TryTraceGround(const FVector2D& GroundPoint, const float A
 	{
 		QueryParams.AddIgnoredActor(AnchorOwner);
 	}
+	for (const TWeakObjectPtr<AActor>& IgnoredActor : M_ExtraGroundIgnoredActors)
+	{
+		if (AActor* Actor = IgnoredActor.Get())
+		{
+			QueryParams.AddIgnoredActor(Actor);
+		}
+	}
 	FHitResult GroundHit;
 	if (not World->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, COLLISION_TRACE_LANDSCAPE, QueryParams))
 	{
@@ -503,6 +574,7 @@ void ARTSFieldTrench::ShowPieceState(FFieldTrenchPieceRuntime& Piece)
 	PieceComponent->SetCollisionEnabled(bIsPlanned
 		? ECollisionEnabled::NoCollision
 		: PieceCollisionTemplate->GetCollisionEnabled());
+	PieceComponent->SetVisibility(not (bIsPlanned && bM_HidePlannedPieces));
 	UMaterialInterface* PlannedMaterial = bIsPlanned ? GetPlannedMaterial() : nullptr;
 	const int32 MaterialCount = PieceComponent->GetNumMaterials();
 	for (int32 MaterialIndex = 0; MaterialIndex < MaterialCount; ++MaterialIndex)

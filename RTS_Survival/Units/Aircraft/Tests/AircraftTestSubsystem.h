@@ -245,10 +245,14 @@ private:
 	bool ParkDeathAircraftInAirbase(FAircraftDeathUnderTest& Entry);
 	void CheckNoSmokeLingers(const FAircraftDeathUnderTest& Entry);
 	void CheckPiecesCameDown(const FAircraftDeathUnderTest& Entry);
+	void LogSunkPieces(const FAircraftDeathUnderTest& Entry) const;
 	void CheckParkedPieces(FAircraftDeathUnderTest& Entry);
-	void CheckPiecesStayInTheBay(const FAircraftDeathUnderTest& Entry, const TArray<FVector>& PieceLocations);
+	void CheckPiecesStayInTheBay(const FAircraftDeathUnderTest& Entry);
+	void LogStaticHitsUnder(const FVector2D& Location2D) const;
 	/** @return World locations of the wreck's pieces that have geometry; empty without a wreck. */
-	TArray<FVector> GetWreckPieceLocations(const FAircraftDeathUnderTest& Entry) const;
+	/** @return World centre of every wreck piece; OutTransformIndices/OutExtents (optional) tell which piece each is. */
+	TArray<FVector> GetWreckPieceLocations(const FAircraftDeathUnderTest& Entry, TArray<int32>* OutTransformIndices = nullptr,
+	                                       TArray<FVector>* OutExtents = nullptr) const;
 	void TickDeathFlying(FAircraftDeathUnderTest& Entry);
 	void KillDeathAircraft(FAircraftDeathUnderTest& Entry);
 	void TickDeathFalling(FAircraftDeathUnderTest& Entry);

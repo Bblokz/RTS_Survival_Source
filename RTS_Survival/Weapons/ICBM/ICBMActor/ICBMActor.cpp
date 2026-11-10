@@ -4,6 +4,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "RTS_Survival/Environment/ImpactDecals/LandscapeImpactDecalSubsystem.h"
 #include "RTS_Survival/Physics/FRTS_PhysicsHelper.h"
 #include "RTS_Survival/RTSCollisionTraceChannels.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/ArmorCalculation.h"
@@ -320,6 +321,19 @@ void AICBMActor::HandleImpact(const FHitResult& HitResult)
 	AActor* HitActor = FRTSWeaponHelpers::GetHitActorAdjustedForChildActorComponents(HitResult.GetActor());
 	const ERTSSurfaceType SurfaceType = FRTS_PhysicsHelper::GetRTSSurfaceType(HitResult.PhysMaterial);
 	SpawnImpactEffects(HitResult.ImpactPoint, SurfaceType);
+	// Missile warheads dig bomb craters (by explosive weight); a warhead without a charge falls back to its calibre.
+	const FWeaponData& WarheadData = M_LaunchSettings.WeaponData;
+	if (WarheadData.TNTExplosiveGrams > 0.f)
+	{
+		ULandscapeImpactDecalSubsystem::RequestBombImpactDecal(this, WarheadData.TNTExplosiveGrams,
+		                                                       HitResult.ImpactPoint, HitResult.ImpactNormal,
+		                                                       HitResult.GetActor());
+	}
+	else
+	{
+		ULandscapeImpactDecalSubsystem::RequestImpactDecal(this, WarheadData.WeaponCalibre, HitResult.ImpactPoint,
+		                                                   HitResult.ImpactNormal, HitResult.GetActor());
+	}
 	ApplyDirectDamage(HitResult, HitActor);
 	ApplyAOEDamage(HitResult.ImpactPoint, HitActor);
 

@@ -39,6 +39,8 @@ class UVehicleModuleSubsystem;
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnHealthBarVisibilityChanged, ESlateVisibility);
 // Old max health, new max health; broadcast only when SetMaxHealth actually changes the value.
 DECLARE_MULTICAST_DELEGATE_TwoParams(FOnMaxHealthChanged, float, float);
+// Health after, max health; broadcast by every heal that actually raised the hull health (repairs, auras, medics).
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnHealthHealed, float, float);
 
 /** @brief Stack receipt of one accepted healing transaction, sent to a tank with pending module repairs. */
 struct FHealthHealingReceipt
@@ -172,6 +174,9 @@ public:
 
 	FOnMaxHealthChanged& GetOnMaxHealthChanged() { return M_OnMaxHealthChanged; }
 
+	// Unlike OnHealthChanged on the owner, this fires on every heal, not only when a notify level is reached.
+	FOnHealthHealed& GetOnHealthHealed() { return M_OnHealthHealed; }
+
 	/** @brief Enables the tank-only module icons in the healthbar's ModuleBox; rejects non-tank owners. */
 	void InitializeTankModulePresentation(ATankMaster* Tank);
 
@@ -292,6 +297,9 @@ private:
 	float M_DeferredHealingWork = 0.f;
 
 	FOnMaxHealthChanged M_OnMaxHealthChanged;
+	FOnHealthHealed M_OnHealthHealed;
+
+	void BroadcastHealedIfRaised(float PreviousHealth);
 
 	// ---- Tank module icons ----
 	void Widget_OnModulePresentationReady();

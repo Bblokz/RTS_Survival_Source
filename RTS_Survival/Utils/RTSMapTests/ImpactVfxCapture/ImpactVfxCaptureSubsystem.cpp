@@ -37,6 +37,7 @@
 #include "RTS_Survival/Player/PauseGame/PauseGameOptions.h"
 #include "RTS_Survival/Player/StartGameControl/PlayerStartGameControl.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
+#include "RTS_Survival/Weapons/ImpactVfxAuthoring/ImpactVfxSpriteScale.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogRTSImpactVfxCapture, Log, All);
 
@@ -588,7 +589,12 @@ bool UImpactVfxCaptureSubsystem::SpawnCurrentEffect()
 	M_EffectComponent = UNiagaraFunctionLibrary::SpawnSystemAtLocation(
 		GetWorld(), System, M_ImpactLocation, FRotator::ZeroRotator, FVector(M_EffectScale), false, true,
 		ENCPoolMethod::None, false);
-	return M_EffectComponent.IsValid();
+	if (not M_EffectComponent.IsValid())
+	{
+		return false;
+	}
+	ImpactVfxSpriteScale::ApplyImpactScale(*M_EffectComponent, FVector(M_EffectScale));
+	return true;
 }
 
 void UImpactVfxCaptureSubsystem::RecordParticleCounts()

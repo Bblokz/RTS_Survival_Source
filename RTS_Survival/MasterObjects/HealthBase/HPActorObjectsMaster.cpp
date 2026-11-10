@@ -5,6 +5,8 @@
 
 
 #include "RTS_Survival/Collapse/FRTS_Collapse/FRTS_Collapse.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallChunkDamage/WallChunkDamageComponent.h"
+#include "RTS_Survival/Environment/DestructableEnvActor/WallChunkDamage/WallHoleDamageComponent.h"
 #include "RTS_Survival/Weapons/CPPWeaponsMaster.h"
 #include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/RTSComponents/RTSComponent.h"
@@ -49,7 +51,21 @@ float AHPActorObjectsMaster::TakeDamage(
 
 		const ERTSDamageType RtsDamageType = FRTSWeaponHelpers::GetRTSDamageType(DamageEvent);
 
-		if (HealthComponent->TakeDamage(DamageAmount, RtsDamageType))
+		const float HealthBefore = HealthComponent->GetCurrentHealth();
+		const bool bDies = HealthComponent->TakeDamage(DamageAmount, RtsDamageType);
+		if (IsValid(M_WallHoleDamage))
+		{
+			M_WallHoleDamage->SetOwnerMaxHealth(HealthComponent->GetMaxHealth());
+			M_WallHoleDamage->OnOwnerDamaged(HealthBefore - HealthComponent->GetCurrentHealth(), DamageEvent,
+			                                 DamageCauser, HealthBefore, HealthComponent->GetCurrentHealth());
+		}
+		if (IsValid(M_WallChunkDamage))
+		{
+			M_WallChunkDamage->SetOwnerMaxHealth(HealthComponent->GetMaxHealth());
+			M_WallChunkDamage->OnOwnerDamaged(HealthBefore - HealthComponent->GetCurrentHealth(), DamageEvent,
+			                                  DamageCauser, HealthBefore, HealthComponent->GetCurrentHealth());
+		}
+		if (bDies)
 		{
 			const ERTSDeathType DeathType = FRTSWeaponHelpers::TranslateDamageIntoDeathType(RtsDamageType);
 			UnitDies(DeathType);
@@ -65,6 +81,8 @@ float AHPActorObjectsMaster::TakeDamage(
 
 void AHPActorObjectsMaster::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
 {
+	// Wall holes and chunks are not repaired here: this only fires at the health notify levels. They bind to the
+	// health component's heal event themselves and close on every heal.
 	Bp_OnHealthChanged(PercentageLeft, bIsHealing);
 }
 
@@ -103,6 +121,8 @@ void AHPActorObjectsMaster::PostInitializeComponents()
 			                                             "AHPActorObjectsMaster::PostInitializeComponents");
 		}
 	}
+	M_WallHoleDamage = FindComponentByClass<UWallHoleDamageComponent>();
+	M_WallChunkDamage = FindComponentByClass<UWallChunkDamageComponent>();
 	HealthComponent = FindComponentByClass<UHealthComponent>();
 	if (!IsValid(HealthComponent))
 	{
