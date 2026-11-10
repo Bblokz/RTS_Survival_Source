@@ -178,6 +178,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WreckHoles")
 	FWreckHoleTuning Tuning;
 
+	// Mesh-space boxes holes may sit in (empty: anywhere). A hit outside every box makes no hole, and a hole stays
+	// inside its box: bridges keep holes on the pillars, below the deck and rails.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category="WreckHoles")
+	TArray<FBox> MeshSpaceHoleZones;
+
 private:
 	void BeginPlay_GatherMeshes();
 	bool AddMeshState(UStaticMeshComponent& MeshComponent);
@@ -207,6 +212,13 @@ private:
 	static FVector GetBoundsSurfacePoint(const FBox& Bounds, const FVector& LocalPoint, FVector& OutLocalNormal);
 
 	float ApplyHit(const FWreckStruckSurface& Surface, float HoleRadius, float AllowedArea);
+
+	/**
+	 * @brief The largest hole radius MeshSpaceHoleZones allow at a point.
+	 * @param MeshPoint Hit in mesh space.
+	 * @return Mesh-space radius; max float without zones, zero outside every zone.
+	 */
+	float GetZoneRadiusLimit(const FVector& MeshPoint) const;
 
 	/**
 	 * @brief Grows the hole the hit lands in, or takes a slot (merging or dropping the oldest when full).

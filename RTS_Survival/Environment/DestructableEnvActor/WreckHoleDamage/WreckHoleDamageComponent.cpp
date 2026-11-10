@@ -366,7 +366,12 @@ float UWreckHoleDamageComponent::ApplyHit(const FWreckStruckSurface& Surface, co
 	const FTransform MeshTransform = State.Mesh->GetComponentTransform();
 	const float WorldScale = GetWorldScale(State);
 	const FVector MeshPoint = MeshTransform.InverseTransformPosition(Surface.WorldPoint);
-	const FWreckHoleCut Cut = CutHole(State, MeshPoint, CappedWorldRadius / WorldScale, AvailableArea);
+	const float MeshRadius = FMath::Min(CappedWorldRadius / WorldScale, GetZoneRadiusLimit(MeshPoint));
+	if (MeshRadius * WorldScale < Tuning.MinHoleRadius)
+	{
+		return 0.f;
+	}
+	const FWreckHoleCut Cut = CutHole(State, MeshPoint, MeshRadius, AvailableArea);
 	if (Cut.RemovedArea <= 0.f)
 	{
 		return 0.f;
@@ -383,6 +388,28 @@ float UWreckHoleDamageComponent::ApplyHit(const FWreckStruckSurface& Surface, co
 	WallDamageShared::ThrowDebrisPieces(*GetOwner(), M_LoadedDebrisSystem, DebrisMeshes, Pieces, PieceRotation,
 	                                    ShardSurface.WorldPoint, Surface.WorldNormal, Tuning.DebrisSpeedScale);
 	return Cut.RemovedArea;
+}
+
+float UWreckHoleDamageComponent::GetZoneRadiusLimit(const FVector& MeshPoint) const
+{
+	if (MeshSpaceHoleZones.IsEmpty())
+	{
+		return TNumericLimits<float>::Max();
+	}
+	float BestLimit = 0.f;
+	for (const FBox& Zone : MeshSpaceHoleZones)
+	{
+		if (not Zone.IsValid || not Zone.IsInsideOrOn(MeshPoint))
+		{
+			continue;
+		}
+		// Distance to the nearest face keeps the whole sphere inside the zone.
+		const FVector ToMin = MeshPoint - Zone.Min;
+		const FVector ToMax = Zone.Max - MeshPoint;
+		const float FaceDistance = static_cast<float>(FMath::Min(ToMin.GetMin(), ToMax.GetMin()));
+		BestLimit = FMath::Max(BestLimit, FaceDistance);
+	}
+	return BestLimit;
 }
 
 FWreckHoleCut UWreckHoleDamageComponent::CutHole(FWreckHoleMeshState& State, const FVector& MeshPoint,
@@ -404,7 +431,8 @@ FWreckHoleCut UWreckHoleDamageComponent::CutHole(FWreckHoleMeshState& State, con
 		const float OldRadius = Hole.Radius;
 		// The ring may not open more than the health cap still allows.
 		const float CapRadius = FMath::Sqrt(FMath::Square(OldRadius) + AvailableArea / (UE_PI * AreaScale));
-		const float NewRadius = FMath::Min3(MaxRadius, CapRadius,
+		const float ZoneRadius = FMath::Max(OldRadius, GetZoneRadiusLimit(Hole.Centre));
+		const float NewRadius = FMath::Min3(FMath::Min(MaxRadius, ZoneRadius), CapRadius,
 		                                    FMath::Max(OldRadius, Distance + Radius * Tuning.GrowRadiusShare));
 		if (NewRadius < OldRadius + WreckHoleDamageConstants::MinRadiusGain / WorldScale)
 		{
