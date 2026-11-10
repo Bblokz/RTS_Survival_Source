@@ -14,6 +14,8 @@
 #include "Engine/StaticMesh.h"
 #include "HAL/IConsoleManager.h"
 #include "Materials/Material.h"
+#include "MeshDescription.h"
+#include "StaticMeshAttributes.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/FileHelper.h"
 #include "Misc/PackageName.h"
@@ -200,6 +202,186 @@ namespace WallChunkLayoutAuthoring
 		       bDone ? TEXT("DONE") : TEXT("FAIL"), *MaterialPath,
 		       IsValid(Material) && Material->bCanMaskedBeAssumedOpaque ? 1 : 0);
 	}
+
+	struct FChunkAccumulator
+	{
+		FVector WeightedCentre = FVector::ZeroVector;
+		double Area = 0.0;
+		// Debris pieces are matched on bounds, not area: a chunk's area counts every surface it spans (front, back, inner
+		// shell), so it is roughly twice its face and always matched the largest piece.
+		FBox Bounds = FBox(ForceInit);
+	};
+
+	/**
+	 * @brief Sums area and area-weighted centre per chunk id over the triangles of the chunked slots.
+	 * @return False when the mesh has no description or the UV channel is missing.
+	 */
+	bool AccumulateChunks(const UStaticMesh& Mesh, const int32 UvChannel, const TSet<int32>& ChunkSlots,
+	                      TMap<int32, FChunkAccumulator>& OutChunks)
+	{
+		const FMeshDescription* const Description = Mesh.GetMeshDescription(0);
+		if (Description == nullptr)
+		{
+			return false;
+		}
+		const FStaticMeshConstAttributes Attributes(*Description);
+		const TVertexAttributesConstRef<FVector3f> Positions = Attributes.GetVertexPositions();
+		const TVertexInstanceAttributesConstRef<FVector2f> Uvs = Attributes.GetVertexInstanceUVs();
+		if (UvChannel >= Uvs.GetNumChannels())
+		{
+			return false;
+		}
+		const TPolygonGroupAttributesConstRef<FName> SlotNames = Attributes.GetPolygonGroupMaterialSlotNames();
+		const TArray<FStaticMaterial>& Materials = Mesh.GetStaticMaterials();
+		for (const FTriangleID TriangleID : Description->Triangles().GetElementIDs())
+		{
+			const FName SlotName = SlotNames[Description->GetTrianglePolygonGroup(TriangleID)];
+			const int32 SlotIndex = Materials.IndexOfByPredicate([SlotName](const FStaticMaterial& Material)
+			{
+				return Material.ImportedMaterialSlotName == SlotName || Material.MaterialSlotName == SlotName;
+			});
+			if (not ChunkSlots.Contains(SlotIndex))
+			{
+				continue;
+			}
+			const TArrayView<const FVertexInstanceID> Corners = Description->GetTriangleVertexInstances(TriangleID);
+			const FVector A(Positions[Description->GetVertexInstanceVertex(Corners[0])]);
+			const FVector B(Positions[Description->GetVertexInstanceVertex(Corners[1])]);
+			const FVector C(Positions[Description->GetVertexInstanceVertex(Corners[2])]);
+			const double Area = 0.5 * FVector::CrossProduct(B - A, C - A).Size();
+			const int32 ChunkIndex = FMath::RoundToInt32(Uvs.Get(Corners[0], UvChannel).X);
+			if (ChunkIndex < 0 || ChunkIndex >= WallChunkMask::MaxChunksPerMesh)
+			{
+				continue;
+			}
+			FChunkAccumulator& Chunk = OutChunks.FindOrAdd(ChunkIndex);
+			Chunk.WeightedCentre += (A + B + C) / 3.0 * Area;
+			Chunk.Area += Area;
+			Chunk.Bounds += A;
+			Chunk.Bounds += B;
+			Chunk.Bounds += C;
+		}
+		return true;
+	}
+
+	/**
+	 * @brief Size measure shared by chunks and debris pieces, so both are compared the same way. The thinnest side is
+	 * left out: it is the slab or shell thickness, or the debris solidify depth.
+	 * @return Product of the two largest bounds sides, at least 1.
+	 */
+	double GetFaceMeasureOfBounds(const FBox& Bounds)
+	{
+		const FVector Size = Bounds.GetSize();
+		TArray<double> Sides = {Size.X, Size.Y, Size.Z};
+		Sides.Sort();
+		return FMath::Max(Sides[1] * Sides[2], 1.0);
+	}
+
+	TArray<FWallChunk> MakeChunksFromAccumulators(const TMap<int32, FChunkAccumulator>& Accumulators,
+	                                              const TArray<UStaticMesh*>& Pieces)
+	{
+		constexpr double MinDebrisScale = 0.3;
+		constexpr double MaxDebrisScale = 2.0;
+		int32 HighestIndex = INDEX_NONE;
+		for (const TPair<int32, FChunkAccumulator>& Pair : Accumulators)
+		{
+			HighestIndex = FMath::Max(HighestIndex, Pair.Key);
+		}
+		TArray<double> PieceMeasures;
+		for (const UStaticMesh* const Piece : Pieces)
+		{
+			PieceMeasures.Add(GetFaceMeasureOfBounds(Piece->GetBoundingBox()));
+		}
+		TArray<FWallChunk> Chunks;
+		Chunks.SetNum(HighestIndex + 1);
+		for (const TPair<int32, FChunkAccumulator>& Pair : Accumulators)
+		{
+			FWallChunk& Chunk = Chunks[Pair.Key];
+			Chunk.MeshSpaceCentre = Pair.Value.Area > 0.0 ? Pair.Value.WeightedCentre / Pair.Value.Area : FVector::ZeroVector;
+			Chunk.Area = static_cast<float>(Pair.Value.Area);
+			// The debris piece closest in size, scaled to this chunk's size.
+			const double ChunkMeasure = GetFaceMeasureOfBounds(Pair.Value.Bounds);
+			double BestRatio = TNumericLimits<double>::Max();
+			for (int32 PieceIndex = 0; PieceIndex < PieceMeasures.Num(); ++PieceIndex)
+			{
+				const double Ratio = FMath::Abs(FMath::Loge(ChunkMeasure / PieceMeasures[PieceIndex]));
+				if (Ratio < BestRatio)
+				{
+					BestRatio = Ratio;
+					Chunk.DebrisPiece = PieceIndex;
+					Chunk.DebrisScale = static_cast<float>(FMath::Clamp(
+						FMath::Sqrt(ChunkMeasure / PieceMeasures[PieceIndex]), MinDebrisScale, MaxDebrisScale));
+				}
+			}
+		}
+		return Chunks;
+	}
+
+	TArray<UStaticMesh*> ReadMeshList(const FString& List)
+	{
+		TArray<FString> Paths;
+		List.ParseIntoArray(Paths, TEXT("|"));
+		TArray<UStaticMesh*> Meshes;
+		for (const FString& Path : Paths)
+		{
+			if (UStaticMesh* const Mesh = LoadAssetByPackage<UStaticMesh>(Path))
+			{
+				Meshes.Add(Mesh);
+			}
+		}
+		return Meshes;
+	}
+
+	void BuildLayoutFromMesh(const TArray<FString>& Args)
+	{
+		const FString Joined = FString::Join(Args, TEXT(" "));
+		FString MeshPath;
+		FString SlotList;
+		FString DebrisList;
+		FString DamagedList;
+		int32 UvChannel = WallChunkMask::ChunkIndexUvChannel;
+		FParse::Value(*Joined, TEXT("Mesh="), MeshPath);
+		FParse::Value(*Joined, TEXT("Slots="), SlotList, false);
+		FParse::Value(*Joined, TEXT("Debris="), DebrisList, false);
+		FParse::Value(*Joined, TEXT("Damaged="), DamagedList, false);
+		FParse::Value(*Joined, TEXT("UvChannel="), UvChannel);
+		UStaticMesh* const Mesh = LoadAssetByPackage<UStaticMesh>(MeshPath);
+		TSet<int32> ChunkSlots;
+		TArray<FString> SlotStrings;
+		SlotList.ParseIntoArray(SlotStrings, TEXT("|"));
+		for (const FString& Slot : SlotStrings)
+		{
+			ChunkSlots.Add(FCString::Atoi(*Slot));
+		}
+		const TArray<UStaticMesh*> Pieces = ReadMeshList(DebrisList);
+		TMap<int32, FChunkAccumulator> Accumulators;
+		const bool bRead = IsValid(Mesh) && not ChunkSlots.IsEmpty() && not Pieces.IsEmpty()
+			&& AccumulateChunks(*Mesh, UvChannel, ChunkSlots, Accumulators) && not Accumulators.IsEmpty();
+		bool bSaved = false;
+		if (bRead)
+		{
+			const TArray<FWallChunk> Chunks = MakeChunksFromAccumulators(Accumulators, Pieces);
+			UWallChunkLayout* Layout = Mesh->GetAssetUserData<UWallChunkLayout>();
+			if (not IsValid(Layout))
+			{
+				Layout = NewObject<UWallChunkLayout>(Mesh, NAME_None, RF_Public | RF_Transactional);
+				Mesh->AddAssetUserData(Layout);
+			}
+			Mesh->Modify();
+			Layout->SetLayout(Chunks, Pieces, ReadDamagedMaterials(DamagedList), 0.f);
+			bSaved = Chunks.Num() <= WallChunkMask::MaxChunksPerMesh && SaveAsset(*Mesh);
+		}
+		UE_LOG(LogWallChunkAuthoring, Display,
+		       TEXT("RTS_WALL_CHUNK_AUTHORING layout RESULT %s mesh=%s chunks=%d debris=%d uv=%d"),
+		       bSaved ? TEXT("DONE") : TEXT("FAIL"), *MeshPath, Accumulators.Num(), Pieces.Num(), UvChannel);
+	}
+
+	FAutoConsoleCommand BuildLayoutFromMeshCommand(
+		TEXT("RTS.WallChunks.BuildLayoutFromMesh"),
+		TEXT("Builds a chunk layout from the chunk ids baked in a mesh's UV channel. Args: Mesh=<chunked mesh> "
+			"Slots=<chunked slot index>|<...> Debris=<piece mesh>|<...> [Damaged=<masked mat slot 0>|<slot 1>|...] "
+			"[UvChannel=<n, default 2>]"),
+		FConsoleCommandWithArgsDelegate::CreateStatic(&BuildLayoutFromMesh));
 
 	FAutoConsoleCommand FinishMaskedMasterCommand(
 		TEXT("RTS.WallChunks.FinishMaskedMaster"),

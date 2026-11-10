@@ -52,12 +52,14 @@ namespace
 
 	void SpawnBurst(const AActor& Owner, UNiagaraSystem* DebrisSystem, UStaticMesh* DebrisMesh,
 	                const TConstArrayView<FWallDebrisPiece> Pieces, const FQuat& WallRotation, const FVector& HitLocation,
-	                const FVector& ShotDirection, const float SpeedScale)
+	                const FVector& ShotDirection, const float SpeedScale, const FVector& OutwardDirection)
 	{
 		using namespace AddOnArmorPanelDebris;
 		using namespace WallDamageSharedConstants;
-		const FVector FaceNormal = WallRotation.RotateVector(FVector::YAxisVector);
-		const float ShotAlongNormal = static_cast<float>(FVector::DotProduct(ShotDirection, FaceNormal));
+		// Walls: out of the Y face the shell went through. Closed shapes: out along the given direction.
+		const bool bHasOutward = not OutwardDirection.IsNearlyZero();
+		const FVector FaceNormal = bHasOutward ? OutwardDirection : WallRotation.RotateVector(FVector::YAxisVector);
+		const float ShotAlongNormal = bHasOutward ? 1.f : static_cast<float>(FVector::DotProduct(ShotDirection, FaceNormal));
 		const FVector4 Orientation(WallRotation.X, WallRotation.Y, WallRotation.Z, WallRotation.W);
 		TArray<FVector4> Starts;
 		TArray<FVector4> Velocities;
@@ -181,7 +183,7 @@ void WallDamageShared::ThrowDebrisPieces(const AActor& Owner, UNiagaraSystem* co
                                          const TArray<TObjectPtr<UStaticMesh>>& DebrisMeshes,
                                          const TConstArrayView<FWallDebrisPiece> Pieces, const FQuat& WallRotation,
                                          const FVector& HitLocation, const FVector& ShotDirection,
-                                         const float SpeedScale)
+                                         const float SpeedScale, const FVector& OutwardDirection)
 {
 	// Fog of war hides enemy structures; their debris would give them away.
 	if (Pieces.IsEmpty() || not IsValid(DebrisSystem) || Owner.IsHidden())
@@ -206,14 +208,14 @@ void WallDamageShared::ThrowDebrisPieces(const AActor& Owner, UNiagaraSystem* co
 			if (BurstPieces.Num() == AddOnArmorPanelDebris::MaxPiecesPerBurst)
 			{
 				SpawnBurst(Owner, DebrisSystem, DebrisMeshes[MeshIndex], BurstPieces, WallRotation, HitLocation,
-				           ShotDirection, SpeedScale);
+				           ShotDirection, SpeedScale, OutwardDirection);
 				BurstPieces.Reset();
 			}
 		}
 		if (not BurstPieces.IsEmpty())
 		{
 			SpawnBurst(Owner, DebrisSystem, DebrisMeshes[MeshIndex], BurstPieces, WallRotation, HitLocation,
-			           ShotDirection, SpeedScale);
+			           ShotDirection, SpeedScale, OutwardDirection);
 		}
 	}
 }

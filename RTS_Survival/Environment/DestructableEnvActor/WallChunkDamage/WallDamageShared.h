@@ -120,9 +120,11 @@ namespace WallDamageShared
 	 * @param HitLocation Pieces spread away from it on the face.
 	 * @param ShotDirection Pieces leave the face the shell went through; zero picks a face per piece.
 	 * @param SpeedScale Death throws harder than a hit.
+	 * @param OutwardDirection Closed shapes (towers, trees): pieces fly out along this instead of through the wall's
+	 * Y face, which would send them into a hollow tower. Zero keeps the wall behaviour.
 	 */
 	void ThrowDebrisPieces(const AActor& Owner, UNiagaraSystem* DebrisSystem,
 	                       const TArray<TObjectPtr<UStaticMesh>>& DebrisMeshes, TConstArrayView<FWallDebrisPiece> Pieces,
 	                       const FQuat& WallRotation, const FVector& HitLocation, const FVector& ShotDirection,
-	                       float SpeedScale);
+	                       float SpeedScale, const FVector& OutwardDirection = FVector::ZeroVector);
 }
