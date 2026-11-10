@@ -63,8 +63,8 @@ struct FFieldTrenchPieceRuntime
  * trench; every piece is paid for, per metre of trench, when its digging starts, and digging waits while the
  * player cannot pay.
  * Built pieces give trench cover: the cargo sockets of their meshes are handed to the cover finder through
- * IRTSCoverSocketSource, so soldiers are placed on the sockets 60 cm below the ground the same way they are in a
- * hand-placed BP_TrenchMaster trench.
+ * IRTSCoverSocketSource, so soldiers are placed on the sockets (on the trench floor, level with its planks) the same
+ * way they are in a hand-placed BP_TrenchMaster trench.
  * @note PieceCollisionTemplate holds the collision every piece copies; its C++ defaults are BP_CargoTrench's.
  */
 UCLASS()
@@ -210,9 +210,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Field Trench", meta = (ClampMin = "0.0"))
 	float DigSecondsPerMetre = 1.0f;
 
-	// How deep a piece starts below its place when digging begins; it rises to the ground as it is dug.
+	// How deep a piece starts below its place when digging begins; it rises to the ground as it is dug. Deeper than the
+	// kit's tallest piece (walls ~128-148 cm since 2026-11-10), so a piece starts out of sight.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Field Trench", meta = (ClampMin = "0.0"))
-	float DigStartDepth = 80.0f;
+	float DigStartDepth = 150.0f;
 
 	// How often a trench that waits for resources checks again whether the player can pay.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Field Trench", meta = (ClampMin = "0.1"))

@@ -4,6 +4,7 @@
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "MovieSceneSequencePlayer.h"
+#include "RTS_Survival/GameUI/CinematicOverlay/W_CinematicOverlay.h"
 #include "RTS_Survival/GameUI/HoldToConfirm/W_HoldToSkip.h"
 #include "RTS_Survival/Missions/MissionClasses/MissionBase/MissionBase.h"
 #include "RTS_Survival/Player/CPPController.h"
@@ -62,12 +63,14 @@ bool UMissionCinematicTakeOverSession::StartSession(
 
 	if (not bAllowOptionalSkipping)
 	{
+		ShowCinematicOverlay();
 		M_SequencePlayer->Play();
 		return true;
 	}
 
 	if (CreateSkipWidget())
 	{
+		ShowCinematicOverlay();
 		M_SequencePlayer->Play();
 		return true;
 	}
@@ -165,6 +168,26 @@ void UMissionCinematicTakeOverSession::RemoveSkipWidget()
 	M_SkipWidget = nullptr;
 }
 
+void UMissionCinematicTakeOverSession::ShowCinematicOverlay()
+{
+	if (not GetIsValidPlayerController() || not GetIsValidSequencePlayer())
+	{
+		return;
+	}
+	M_CinematicOverlay = UW_CinematicOverlay::ShowForSequence(
+		M_PlayerController.Get(), M_SequencePlayer.Get(), M_PlayerController->M_CinematicOverlayWidgetClass);
+}
+
+void UMissionCinematicTakeOverSession::RemoveCinematicOverlay()
+{
+	// The overlay also closes itself when the sequence finishes or stops; this covers cancels.
+	if (GetIsValidCinematicOverlay(false))
+	{
+		M_CinematicOverlay->CloseOverlay();
+	}
+	M_CinematicOverlay = nullptr;
+}
+
 void UMissionCinematicTakeOverSession::BindSequencePlayerDelegates()
 {
 	if (not GetIsValidSequencePlayer())
@@ -229,6 +252,7 @@ void UMissionCinematicTakeOverSession::CompleteSession(const EMissionCinematicTa
 
 	UnbindSequencePlayerDelegates();
 	RemoveSkipWidget();
+	RemoveCinematicOverlay();
 
 	if (GetIsValidPlayerController(false))
 	{
@@ -299,6 +323,26 @@ bool UMissionCinematicTakeOverSession::GetIsValidPlayerController(const bool bRe
 			this,
 			TEXT("M_PlayerController"),
 			TEXT("UMissionCinematicTakeOverSession::GetIsValidPlayerController"),
+			this
+		);
+	}
+
+	return false;
+}
+
+bool UMissionCinematicTakeOverSession::GetIsValidCinematicOverlay(const bool bReportError) const
+{
+	if (IsValid(M_CinematicOverlay))
+	{
+		return true;
+	}
+
+	if (bReportError)
+	{
+		RTSFunctionLibrary::ReportErrorVariableNotInitialised_Object(
+			this,
+			TEXT("M_CinematicOverlay"),
+			TEXT("UMissionCinematicTakeOverSession::GetIsValidCinematicOverlay"),
 			this
 		);
 	}

@@ -13,6 +13,7 @@
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HPActorObjectsMaster.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelDebris.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogWallHoleDamage, Log, All);
@@ -58,6 +59,7 @@ void UWallHoleDamageComponent::BeginPlay()
 	CacheWallShape();
 	BeginPlay_CacheDebrisAreas();
 	BeginPlay_BindOwnerDeath();
+	BeginPlay_BindOwnerHealing();
 	if (const ADestructableEnvActor* const DestructibleOwner = Cast<ADestructableEnvActor>(GetOwner()))
 	{
 		NoteOwnerHealth(DestructibleOwner->GetCurrentHealth());
@@ -78,7 +80,30 @@ void UWallHoleDamageComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		BuildingOwner->OnUnitDies.Remove(M_OwnerDiedHandle);
 	}
 	M_OwnerDiedHandle.Reset();
+	if (M_OwnerHealth.IsValid())
+	{
+		M_OwnerHealth->GetOnHealthHealed().Remove(M_OwnerHealedHandle);
+	}
+	M_OwnerHealedHandle.Reset();
 	Super::EndPlay(EndPlayReason);
+}
+
+void UWallHoleDamageComponent::BeginPlay_BindOwnerHealing()
+{
+	UHealthComponent* const OwnerHealth = GetOwner()->FindComponentByClass<UHealthComponent>();
+	// Environment walls without a health component never heal.
+	if (not IsValid(OwnerHealth))
+	{
+		return;
+	}
+	M_OwnerHealth = OwnerHealth;
+	M_OwnerHealedHandle = OwnerHealth->GetOnHealthHealed().AddUObject(
+		this, &UWallHoleDamageComponent::OnOwnerHealthHealed);
+}
+
+void UWallHoleDamageComponent::OnOwnerHealthHealed(const float HealthAfter, const float MaxHealth)
+{
+	OnOwnerHealed(HealthAfter, MaxHealth);
 }
 
 void UWallHoleDamageComponent::BeginPlay_FindWallMesh()
@@ -221,9 +246,15 @@ void UWallHoleDamageComponent::OnOwnerHealed(const float HealthAfter, const floa
 		const int32 CellIndex = M_CellOrder.Pop(EAllowShrinking::No);
 		M_CellWords[CellIndex / WallHoleMask::CellsPerGridFloat] &= ~(1u << (CellIndex % WallHoleMask::CellsPerGridFloat));
 	}
-	if (bChanged)
+	if (not bChanged)
 	{
-		WriteMask();
+		return;
+	}
+	WriteMask();
+	// Fully repaired: back to the opaque materials, so an intact wall pays nothing for the mask again.
+	if (M_Holes.IsEmpty() && M_CellOrder.IsEmpty())
+	{
+		RestoreIntactMaterials();
 	}
 }
 
@@ -646,14 +677,36 @@ void UWallHoleDamageComponent::SwapToDamagedMaterials()
 	{
 		return;
 	}
+	M_IntactMaterials.SetNum(FMath::Max(M_IntactMaterials.Num(), DamagedMaterials.Num()));
 	for (int32 SlotIndex = 0; SlotIndex < DamagedMaterials.Num(); ++SlotIndex)
 	{
 		UMaterialInterface* const Damaged = DamagedMaterials[SlotIndex];
 		if (IsValid(Damaged) && M_WallMesh->GetMaterial(SlotIndex) != Damaged)
 		{
+			M_IntactMaterials[SlotIndex] = M_WallMesh->GetMaterial(SlotIndex);
 			M_WallMesh->SetMaterial(SlotIndex, Damaged);
 		}
 	}
+}
+
+void UWallHoleDamageComponent::RestoreIntactMaterials()
+{
+	if (not GetIsValidWallMesh())
+	{
+		return;
+	}
+	for (int32 SlotIndex = 0; SlotIndex < M_IntactMaterials.Num(); ++SlotIndex)
+	{
+		UMaterialInterface* const Intact = M_IntactMaterials[SlotIndex];
+		const bool bShowsDamaged = DamagedMaterials.IsValidIndex(SlotIndex)
+			&& M_WallMesh->GetMaterial(SlotIndex) == DamagedMaterials[SlotIndex];
+		// A slot the owner re-skinned since (construction, unpacking) keeps its new material.
+		if (IsValid(Intact) && bShowsDamaged)
+		{
+			M_WallMesh->SetMaterial(SlotIndex, Intact);
+		}
+	}
+	M_IntactMaterials.Reset();
 }
 
 void UWallHoleDamageComponent::GetCollapseSampleBoxes(TArray<FBox>& OutBoxes, TArray<float>& OutWeights) const

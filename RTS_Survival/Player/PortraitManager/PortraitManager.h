@@ -97,6 +97,9 @@ private:
 	/** Start the next portrait from the queue or hide the widget if none remain. */
 	void StartNextPortraitFromQueue();
 
+	/** Name + word-timed subtitle under the portrait; caller has validated the widget. */
+	void StartSubtitlesForRequest(const FPortraitQueueEntry& Request) const;
+
 	/** Called when the current portrait duration (voice line) has elapsed. */
 	void OnCurrentPortraitFinished();
 };

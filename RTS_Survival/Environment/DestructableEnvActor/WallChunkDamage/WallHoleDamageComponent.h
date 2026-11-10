@@ -8,6 +8,7 @@
 
 #include "WallHoleDamageComponent.generated.h"
 
+class UHealthComponent;
 class UMaterialInterface;
 class UNiagaraSystem;
 class UStaticMesh;
@@ -117,7 +118,7 @@ struct FWallHole
  * @brief Procedural wall holes without extra geometry (WallHitMasking.md options A + B): a hit writes a noise-edged
  * sphere hole into custom primitive data, big hits and overflowing holes knock out whole grid cells, and the missing
  * part flies off as pooled Niagara debris. ADestructableEnvActor and AHPActorObjectsMaster (building expansions)
- * forward hits and repairs; repairs close the newest damage first.
+ * forward hits; every heal of the owner's UHealthComponent closes the newest damage first.
  * @note Set WallMeshComponentName, DamagedMaterials (masked _WallHoles instances per slot), DebrisMeshes and
  * GridSettings (axis and cell size matching the material instance).
  */
@@ -211,6 +212,9 @@ private:
 	void EnsureWallShapeIsCurrent();
 	void BeginPlay_CacheDebrisAreas();
 	void BeginPlay_BindOwnerDeath();
+	// Owners with a health component (building expansions, garrisons, health walls) close holes on every heal.
+	void BeginPlay_BindOwnerHealing();
+	void OnOwnerHealthHealed(float HealthAfter, float MaxHealth);
 
 	/** @return Where the hole sphere goes: on the surface, or moved back along the shot by HoleCentreOutsetShare. */
 	FVector GetOutsetHoleCentre(const FVector& SurfacePoint, const FTransform& MeshTransform, const FVector& ShotDirection,
@@ -273,6 +277,7 @@ private:
 	float ApplyHit(const FVector& WorldHit, const FVector& ShotDirection, float HoleRadius, float AllowedArea);
 	void WriteMask() const;
 	void SwapToDamagedMaterials();
+	void RestoreIntactMaterials();
 	void OnDestructibleOwnerDied();
 	void OnBuildingOwnerDied();
 	// True while a building expansion shows its construction, placement or packing look.
@@ -321,6 +326,15 @@ private:
 	TObjectPtr<UNiagaraSystem> M_LoadedDebrisSystem;
 
 	FDelegateHandle M_OwnerDiedHandle;
+
+	UPROPERTY()
+	TWeakObjectPtr<UHealthComponent> M_OwnerHealth;
+
+	FDelegateHandle M_OwnerHealedHandle;
+
+	// Per slot, the material shown before the first hole swapped in the masked one; put back after a full repair.
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInterface>> M_IntactMaterials;
 
 	bool bM_HasCollapsed = false;
 

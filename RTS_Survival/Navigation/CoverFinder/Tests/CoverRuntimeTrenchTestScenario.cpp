@@ -48,9 +48,9 @@ namespace CoverRuntimeTrenchTestScenarioPrivate
 
 	// How far a published point may lie from where the socket says it should.
 	constexpr float MaximumSnapError = 2.0f;
-	// The walk-to point is on the ground over the socket; the sockets lie 60 cm below the ground.
+	// The walk-to point is on the ground under the socket; the sockets lie on the trench floor, level with its planks.
 	constexpr float MaximumApproachFlatOffset = 40.0f;
-	constexpr float SocketDepthBelowGround = 60.0f;
+	constexpr float SocketHeightAboveGround = 5.5f;
 	// The navigation mesh only follows the ground roughly, more so on a slope.
 	constexpr float MaximumApproachHeightError = 30.0f;
 
@@ -430,7 +430,7 @@ bool FCoverRuntimeTrenchTestScenario::CheckPublishedCover(
 		}
 		++MatchedSocketCount;
 		const FRTSCoverPoint& Point = **MatchingPoint;
-		const float ApproachHeightError = FMath::Abs(Point.Location.Z - (SocketLocation.Z + SocketDepthBelowGround));
+		const float ApproachHeightError = FMath::Abs(Point.Location.Z - (SocketLocation.Z - SocketHeightAboveGround));
 		WorstApproachHeightError = FMath::Max(WorstApproachHeightError, ApproachHeightError);
 		const bool bIsRightPoint = Point.bSnapSoldierToSocket &&
 			FVector::Dist(Point.GetHoldLocation(), SocketLocation) <= MaximumSnapError &&

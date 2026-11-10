@@ -173,6 +173,7 @@ void UPlayerPortraitManager::StartNextPortraitFromQueue()
 
 	// Play as custom announcer line; queueing is managed on the portrait manager side.
 	M_AudioController->PlayCustomAnnouncerVoiceLine(NextRequest.VoiceLine, true);
+	StartSubtitlesForRequest(NextRequest);
 
 	UWorld* World = GetWorld();
 	if (not IsValid(World))
@@ -191,6 +192,24 @@ void UPlayerPortraitManager::StartNextPortraitFromQueue()
 		&UPlayerPortraitManager::OnCurrentPortraitFinished,
 		NextRequest.DurationSeconds,
 		false);
+}
+
+void UPlayerPortraitManager::StartSubtitlesForRequest(const FPortraitQueueEntry& Request) const
+{
+	// Words follow the audio renderer's position in the line: right even if the audio controller queued the line.
+	const TWeakObjectPtr<UPlayerAudioController> WeakAudioController = M_AudioController;
+	const TWeakObjectPtr<USoundBase> WeakVoiceLine = Request.VoiceLine;
+	M_PortraitWidget->StartSubtitles(
+		Request.PortraitType,
+		Request.VoiceLine,
+		[WeakAudioController, WeakVoiceLine]() -> float
+		{
+			if (not WeakAudioController.IsValid() || not WeakVoiceLine.IsValid())
+			{
+				return -1.0f;
+			}
+			return WeakAudioController->GetVoiceLinePlaybackSeconds(WeakVoiceLine.Get());
+		});
 }
 
 void UPlayerPortraitManager::OnCurrentPortraitFinished()

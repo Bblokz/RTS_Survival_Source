@@ -9,6 +9,7 @@
 
 #include "WallChunkDamageComponent.generated.h"
 
+class UHealthComponent;
 class UNiagaraSystem;
 class UStaticMeshComponent;
 struct FDamageEvent;
@@ -17,7 +18,7 @@ struct FDamageEvent;
  * @brief Fakes destruction without Chaos (WallHitMasking.md option D): the mesh's concrete is cut into chunks
  * (UWallChunkLayout), a hit clips the chunks around the impact through a masked material and throws them as pooled
  * Niagara debris. Works on walls (ADestructableEnvActor) and buildings (AHPActorObjectsMaster: building expansions,
- * bunkers), which forward hits and repairs; repairs bring back the newest chunks first.
+ * bunkers), which forward hits; every heal of the owner's UHealthComponent brings back the newest chunks first.
  * @note On buildings, call ThrowDeathPieces from the death graph next to VerticalDestruction for the shot-out pieces.
  */
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent), BlueprintType)
@@ -111,6 +112,9 @@ protected:
 
 private:
 	void BeginPlay_BindOwnerDeath();
+	// Owners with a health component bring chunks back on every heal, not only at the health notify levels.
+	void BeginPlay_BindOwnerHealing();
+	void OnOwnerHealthHealed(float HealthAfter, float MaxHealth);
 
 	// Finds the chunk mesh and its layout; buildings get the chunked mesh only after construction.
 	bool EnsureLayoutIsCurrent();
@@ -134,6 +138,9 @@ private:
 	void SetChunkVisible(int32 ChunkIndex);
 	void WriteHiddenChunkMask() const;
 	void SwapToDamagedMaterials();
+	void RestoreIntactMaterials();
+	// The Blueprint override for the slot when valid, else the layout's masked material; null keeps the slot as is.
+	UMaterialInterface* GetDamagedMaterialForSlot(int32 SlotIndex) const;
 	// True while a building expansion shows its construction, placement or packing look.
 	bool GetIsOwnerInTransition() const;
 
@@ -193,6 +200,15 @@ private:
 	TObjectPtr<UNiagaraSystem> M_LoadedDebrisSystem;
 
 	FDelegateHandle M_OwnerDiedHandle;
+
+	UPROPERTY()
+	TWeakObjectPtr<UHealthComponent> M_OwnerHealth;
+
+	FDelegateHandle M_OwnerHealedHandle;
+
+	// Per slot, the material shown before the first hit swapped in the masked one; put back after a full repair.
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInterface>> M_IntactMaterials;
 
 	bool bM_HasCollapsed = false;
 };

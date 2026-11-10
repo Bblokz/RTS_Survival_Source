@@ -235,6 +235,7 @@ bool UHealthComponent::Heal(const float HealAmount)
 
 bool UHealthComponent::ApplyHullOnlyHealing(const float HealAmount)
 {
+	const float PreviousHealth = CurrentHealth;
 	bool bIsFullHealth = false;
 	if (CurrentHealth + HealAmount >= MaxHealth)
 	{
@@ -251,7 +252,17 @@ bool UHealthComponent::ApplyHullOnlyHealing(const float HealAmount)
 		}
 	}
 	UpdateHealthBar();
+	BroadcastHealedIfRaised(PreviousHealth);
 	return bIsFullHealth;
+}
+
+void UHealthComponent::BroadcastHealedIfRaised(const float PreviousHealth)
+{
+	if (CurrentHealth <= PreviousHealth)
+	{
+		return;
+	}
+	M_OnHealthHealed.Broadcast(CurrentHealth, MaxHealth);
 }
 
 bool UHealthComponent::GetHasDamageToRepair() const

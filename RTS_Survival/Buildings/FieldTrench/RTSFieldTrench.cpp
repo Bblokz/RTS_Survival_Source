@@ -332,8 +332,8 @@ void ARTSFieldTrench::GetUsableCoverSockets(TArray<FRTSActorCoverSocket>& OutCov
 			FRTSActorCoverSocket& CoverSocket = OutCoverSockets.AddDefaulted_GetRef();
 			CoverSocket.SocketName = SocketName;
 			CoverSocket.WorldTransform = Piece.Component->GetSocketTransform(SocketName, RTS_World);
-			// The sockets lie below the ground in the trench; the soldier walks to the ground right above his
-			// socket, which the trench leaves to the navigation mesh, and is lowered onto the socket from there.
+			// The sockets lie on the trench floor, level with its planks; the soldier walks to the ground right under
+			// his socket, which the trench leaves to the navigation mesh, and is snapped onto the socket from there.
 			const FVector SocketLocation = CoverSocket.WorldTransform.GetLocation();
 			CoverSocket.ApproachLocation = SocketLocation + PieceUp * FVector::DotProduct(PieceGround - SocketLocation, PieceUp);
 		}

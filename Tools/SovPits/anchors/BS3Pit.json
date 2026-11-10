@@ -19,10 +19,10 @@
       "blender_yaw": 180.0,
       "neck_mesh_name": "SM_BS3Pit_TrenchNeck_Rear",
       "neck_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/TrenchAnchors/BS3Pit/Exports/SM_BS3Pit_TrenchNeck_Rear.fbx",
-      "neck_triangles": 1219,
+      "neck_triangles": 2982,
       "neck_triangles_by_material": {
-        "SovTrench_Wood": 502,
-        "RL_Sandbag": 717
+        "SovTrench_Wood": 870,
+        "RL_Sandbag": 2112
       },
       "neck_clean_import": {
         "objects": [
@@ -59,13 +59,13 @@
       "neck_bounds_anchor_frame_blender": {
         "min": [
           -188.5,
-          -197.72,
-          -9.18
+          -199.14,
+          -9.14
         ],
         "max": [
-          1.75,
-          199.66,
-          54.06
+          2.94,
+          199.48,
+          135.4
         ]
       },
       "plug_fbx": null
@@ -87,16 +87,22 @@
   },
   "socket_clearance_cm": 54.7,
   "neck_cull": {
-    "before_cull": 1542,
-    "after_cull": 1219,
-    "kit_rule_only": 1283
+    "before_cull": 5458,
+    "after_cull": 2982,
+    "kit_rule_only": 3276
   },
   "neck_rows": [
     {
       "side": 1.0,
       "course": 0,
-      "lateral": 137.5,
-      "start_x": -558.1
+      "lateral": 114.5,
+      "start_x": -518.4
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "lateral": 144.5,
+      "start_x": -558.3
     },
     {
       "side": 1.0,
@@ -107,36 +113,144 @@
     {
       "side": 1.0,
       "course": 1,
-      "lateral": 116.5,
-      "start_x": -518.6
+      "lateral": 114.5,
+      "start_x": -519.1
     },
     {
       "side": 1.0,
       "course": 1,
-      "lateral": 154.5,
-      "start_x": -593.1
+      "lateral": 144.5,
+      "start_x": -584.5
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "lateral": 174.5,
+      "start_x": -594.8
     },
     {
       "side": 1.0,
       "course": 2,
-      "lateral": 124.5,
-      "start_x": -555.3
+      "lateral": 114.5,
+      "start_x": -522.0
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "lateral": 142.5,
+      "start_x": -559.9
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "lateral": 170.5,
+      "start_x": -591.4
     },
     {
       "side": 1.0,
       "course": 3,
-      "lateral": 130.5,
-      "start_x": -555.4
+      "lateral": 114.5,
+      "start_x": -521.3
     },
     {
       "side": 1.0,
-      "log_start_x": -518.6,
+      "course": 3,
+      "lateral": 139.5,
+      "start_x": -558.0
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "lateral": 165.5,
+      "start_x": -528.7
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "lateral": 114.5,
+      "start_x": -517.6
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "lateral": 137.5,
+      "start_x": -500.4
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "lateral": 159.5,
+      "start_x": -495.4
+    },
+    {
+      "side": 1.0,
+      "course": 5,
+      "lateral": 114.5,
+      "start_x": -518.1
+    },
+    {
+      "side": 1.0,
+      "course": 5,
+      "lateral": 152.5,
+      "start_x": -589.0
+    },
+    {
+      "side": 1.0,
+      "course": 6,
+      "lateral": 114.5,
+      "start_x": -518.1
+    },
+    {
+      "side": 1.0,
+      "course": 6,
+      "lateral": 144.5,
+      "start_x": -558.0
+    },
+    {
+      "side": 1.0,
+      "course": 7,
+      "lateral": 114.5,
+      "start_x": -518.1
+    },
+    {
+      "side": 1.0,
+      "course": 7,
+      "lateral": 135.5,
+      "start_x": -557.6
+    },
+    {
+      "side": 1.0,
+      "course": 8,
+      "lateral": 114.5,
+      "start_x": -518.1
+    },
+    {
+      "side": 1.0,
+      "course": 8,
+      "lateral": 125.5,
+      "start_x": -553.8
+    },
+    {
+      "side": 1.0,
+      "course": 9,
+      "lateral": 116.5,
+      "start_x": -519.1
+    },
+    {
+      "side": 1.0,
+      "log_start_x": -495.4,
       "bays": 2
     },
     {
       "side": -1.0,
       "course": 0,
-      "lateral": 137.5,
+      "lateral": 114.5,
+      "start_x": -518.6
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "lateral": 144.5,
       "start_x": -556.9
     },
     {
@@ -148,30 +262,132 @@
     {
       "side": -1.0,
       "course": 1,
-      "lateral": 116.5,
-      "start_x": -521.2
+      "lateral": 114.5,
+      "start_x": -521.4
     },
     {
       "side": -1.0,
       "course": 1,
-      "lateral": 154.5,
-      "start_x": -596.8
+      "lateral": 144.5,
+      "start_x": -558.9
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "lateral": 174.5,
+      "start_x": -598.3
     },
     {
       "side": -1.0,
       "course": 2,
-      "lateral": 124.5,
-      "start_x": -550.8
+      "lateral": 114.5,
+      "start_x": -520.0
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "lateral": 142.5,
+      "start_x": -557.5
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "lateral": 170.5,
+      "start_x": -595.1
     },
     {
       "side": -1.0,
       "course": 3,
-      "lateral": 130.5,
-      "start_x": -554.0
+      "lateral": 114.5,
+      "start_x": -517.5
     },
     {
       "side": -1.0,
-      "log_start_x": -521.2,
+      "course": 3,
+      "lateral": 139.5,
+      "start_x": -555.5
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "lateral": 165.5,
+      "start_x": -537.3
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "lateral": 114.5,
+      "start_x": -519.0
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "lateral": 137.5,
+      "start_x": -497.6
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "lateral": 159.5,
+      "start_x": -497.6
+    },
+    {
+      "side": -1.0,
+      "course": 5,
+      "lateral": 114.5,
+      "start_x": -518.5
+    },
+    {
+      "side": -1.0,
+      "course": 5,
+      "lateral": 152.5,
+      "start_x": -591.8
+    },
+    {
+      "side": -1.0,
+      "course": 6,
+      "lateral": 114.5,
+      "start_x": -518.5
+    },
+    {
+      "side": -1.0,
+      "course": 6,
+      "lateral": 144.5,
+      "start_x": -557.3
+    },
+    {
+      "side": -1.0,
+      "course": 7,
+      "lateral": 114.5,
+      "start_x": -518.5
+    },
+    {
+      "side": -1.0,
+      "course": 7,
+      "lateral": 135.5,
+      "start_x": -557.2
+    },
+    {
+      "side": -1.0,
+      "course": 8,
+      "lateral": 114.5,
+      "start_x": -518.5
+    },
+    {
+      "side": -1.0,
+      "course": 8,
+      "lateral": 125.5,
+      "start_x": -556.2
+    },
+    {
+      "side": -1.0,
+      "course": 9,
+      "lateral": 116.5,
+      "start_x": -518.8
+    },
+    {
+      "side": -1.0,
+      "log_start_x": -497.6,
       "bays": 2
     }
   ],

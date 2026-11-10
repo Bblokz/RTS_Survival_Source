@@ -81,15 +81,8 @@ float AHPActorObjectsMaster::TakeDamage(
 
 void AHPActorObjectsMaster::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
 {
-	// Repairs close the newest holes once the damage no longer fits the health.
-	if (bIsHealing && IsValid(M_WallHoleDamage) && IsValid(HealthComponent))
-	{
-		M_WallHoleDamage->OnOwnerHealed(HealthComponent->GetCurrentHealth(), HealthComponent->GetMaxHealth());
-	}
-	if (bIsHealing && IsValid(M_WallChunkDamage) && IsValid(HealthComponent))
-	{
-		M_WallChunkDamage->OnOwnerHealed(HealthComponent->GetCurrentHealth(), HealthComponent->GetMaxHealth());
-	}
+	// Wall holes and chunks are not repaired here: this only fires at the health notify levels. They bind to the
+	// health component's heal event themselves and close on every heal.
 	Bp_OnHealthChanged(PercentageLeft, bIsHealing);
 }
 

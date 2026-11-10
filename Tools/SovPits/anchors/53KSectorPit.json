@@ -19,21 +19,21 @@
       "blender_yaw": 180.0,
       "neck_mesh_name": "SM_53KSectorPit_TrenchNeck_Rear",
       "neck_fbx": "D:/Blender/BlenderProjects/BlenderTanks/CustomMapItems/SovietsStuff/TrenchAnchors/53KSectorPit/Exports/SM_53KSectorPit_TrenchNeck_Rear.fbx",
-      "neck_triangles": 720,
-      "neck_triangles_before_cull": 1034,
+      "neck_triangles": 2080,
+      "neck_triangles_before_cull": 3496,
       "neck_triangles_by_material": {
-        "SovTrench_Wood": 256,
-        "RL_Sandbag": 464
+        "SovTrench_Wood": 412,
+        "RL_Sandbag": 1668
       },
       "neck_bounds_min": [
         -151.0,
-        -200.34,
-        -11.18
+        -199.28,
+        -11.1
       ],
       "neck_bounds_max": [
-        2.41,
-        196.11,
-        54.47
+        1.51,
+        201.63,
+        135.42
       ],
       "plug_fbx": null
     }
@@ -66,11 +66,20 @@
     {
       "side": 1.0,
       "course": 0,
-      "offset": 55.0,
+      "offset": 32.0,
       "wall_start": -80.3,
       "start": -80.3,
       "bags": 1,
       "length": 80.3
+    },
+    {
+      "side": 1.0,
+      "course": 0,
+      "offset": 62.0,
+      "wall_start": -80.1,
+      "start": -80.1,
+      "bags": 1,
+      "length": 80.1
     },
     {
       "side": 1.0,
@@ -84,8 +93,8 @@
     {
       "side": 1.0,
       "course": 1,
-      "offset": 34.0,
-      "wall_start": -86.0,
+      "offset": 32.0,
+      "wall_start": -85.6,
       "start": -83.7,
       "bags": 1,
       "length": 83.7
@@ -93,17 +102,44 @@
     {
       "side": 1.0,
       "course": 1,
-      "offset": 72.0,
-      "wall_start": -80.9,
-      "start": -80.9,
+      "offset": 62.0,
+      "wall_start": -84.7,
+      "start": -83.7,
       "bags": 1,
-      "length": 80.9
+      "length": 83.7
+    },
+    {
+      "side": 1.0,
+      "course": 1,
+      "offset": 92.0,
+      "wall_start": -81.1,
+      "start": -81.1,
+      "bags": 1,
+      "length": 81.1
     },
     {
       "side": 1.0,
       "course": 2,
-      "offset": 42.0,
-      "wall_start": -85.8,
+      "offset": 32.0,
+      "wall_start": -85.2,
+      "start": -83.7,
+      "bags": 1,
+      "length": 83.7
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "offset": 60.0,
+      "wall_start": -85.5,
+      "start": -83.7,
+      "bags": 1,
+      "length": 83.7
+    },
+    {
+      "side": 1.0,
+      "course": 2,
+      "offset": 88.0,
+      "wall_start": -85.0,
       "start": -83.7,
       "bags": 1,
       "length": 83.7
@@ -111,17 +147,152 @@
     {
       "side": 1.0,
       "course": 3,
-      "offset": 48.0,
-      "wall_start": -125.2,
-      "start": -125.2,
+      "offset": 32.0,
+      "wall_start": -127.7,
+      "start": -127.7,
       "bags": 2,
-      "length": 62.6
+      "length": 63.8
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "offset": 57.0,
+      "wall_start": -123.3,
+      "start": -123.3,
+      "bags": 2,
+      "length": 61.7
+    },
+    {
+      "side": 1.0,
+      "course": 3,
+      "offset": 83.0,
+      "wall_start": -122.2,
+      "start": -122.2,
+      "bags": 2,
+      "length": 61.1
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "offset": 32.0,
+      "wall_start": -134.3,
+      "start": -134.3,
+      "bags": 2,
+      "length": 67.2
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "offset": 55.0,
+      "wall_start": -140.7,
+      "start": -140.7,
+      "bags": 2,
+      "length": 70.4
+    },
+    {
+      "side": 1.0,
+      "course": 4,
+      "offset": 77.0,
+      "wall_start": -131.3,
+      "start": -131.3,
+      "bags": 2,
+      "length": 65.6
+    },
+    {
+      "side": 1.0,
+      "course": 5,
+      "offset": 32.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": 1.0,
+      "course": 5,
+      "offset": 70.0,
+      "wall_start": -136.9,
+      "start": -136.9,
+      "bags": 2,
+      "length": 68.5
+    },
+    {
+      "side": 1.0,
+      "course": 6,
+      "offset": 32.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": 1.0,
+      "course": 6,
+      "offset": 62.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": 1.0,
+      "course": 7,
+      "offset": 32.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": 1.0,
+      "course": 7,
+      "offset": 53.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": 1.0,
+      "course": 8,
+      "offset": 32.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": 1.0,
+      "course": 8,
+      "offset": 43.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": 1.0,
+      "course": 9,
+      "offset": 34.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
     },
     {
       "side": -1.0,
       "course": 0,
-      "offset": 55.0,
-      "wall_start": -86.0,
+      "offset": 32.0,
+      "wall_start": -84.4,
+      "start": -83.7,
+      "bags": 1,
+      "length": 83.7
+    },
+    {
+      "side": -1.0,
+      "course": 0,
+      "offset": 62.0,
+      "wall_start": -84.7,
       "start": -83.7,
       "bags": 1,
       "length": 83.7
@@ -138,8 +309,8 @@
     {
       "side": -1.0,
       "course": 1,
-      "offset": 34.0,
-      "wall_start": -87.7,
+      "offset": 32.0,
+      "wall_start": -87.2,
       "start": -83.7,
       "bags": 1,
       "length": 83.7
@@ -147,8 +318,26 @@
     {
       "side": -1.0,
       "course": 1,
-      "offset": 72.0,
-      "wall_start": -84.1,
+      "offset": 62.0,
+      "wall_start": -86.9,
+      "start": -83.7,
+      "bags": 1,
+      "length": 83.7
+    },
+    {
+      "side": -1.0,
+      "course": 1,
+      "offset": 92.0,
+      "wall_start": -78.4,
+      "start": -78.4,
+      "bags": 1,
+      "length": 78.4
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "offset": 32.0,
+      "wall_start": -89.6,
       "start": -83.7,
       "bags": 1,
       "length": 83.7
@@ -156,8 +345,17 @@
     {
       "side": -1.0,
       "course": 2,
-      "offset": 42.0,
-      "wall_start": -89.4,
+      "offset": 60.0,
+      "wall_start": -87.8,
+      "start": -83.7,
+      "bags": 1,
+      "length": 83.7
+    },
+    {
+      "side": -1.0,
+      "course": 2,
+      "offset": 88.0,
+      "wall_start": -85.7,
       "start": -83.7,
       "bags": 1,
       "length": 83.7
@@ -165,11 +363,137 @@
     {
       "side": -1.0,
       "course": 3,
-      "offset": 48.0,
-      "wall_start": -125.3,
-      "start": -125.3,
+      "offset": 32.0,
+      "wall_start": -127.7,
+      "start": -127.7,
       "bags": 2,
-      "length": 62.6
+      "length": 63.9
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "offset": 57.0,
+      "wall_start": -121.0,
+      "start": -121.0,
+      "bags": 2,
+      "length": 60.5
+    },
+    {
+      "side": -1.0,
+      "course": 3,
+      "offset": 83.0,
+      "wall_start": -122.2,
+      "start": -122.2,
+      "bags": 2,
+      "length": 61.1
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "offset": 32.0,
+      "wall_start": -135.0,
+      "start": -135.0,
+      "bags": 2,
+      "length": 67.5
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "offset": 55.0,
+      "wall_start": -130.0,
+      "start": -130.0,
+      "bags": 2,
+      "length": 65.0
+    },
+    {
+      "side": -1.0,
+      "course": 4,
+      "offset": 77.0,
+      "wall_start": -132.3,
+      "start": -132.3,
+      "bags": 2,
+      "length": 66.1
+    },
+    {
+      "side": -1.0,
+      "course": 5,
+      "offset": 32.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": -1.0,
+      "course": 5,
+      "offset": 70.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": -1.0,
+      "course": 6,
+      "offset": 32.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": -1.0,
+      "course": 6,
+      "offset": 62.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": -1.0,
+      "course": 7,
+      "offset": 32.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": -1.0,
+      "course": 7,
+      "offset": 53.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": -1.0,
+      "course": 8,
+      "offset": 32.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": -1.0,
+      "course": 8,
+      "offset": 43.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
+    },
+    {
+      "side": -1.0,
+      "course": 9,
+      "offset": 34.0,
+      "wall_start": -75.0,
+      "start": -75.0,
+      "bags": 1,
+      "length": 75.0
     }
   ],
   "notes": "Unreal holds the _Opt cut (SM_53KSectorPit_Opt.fbx, 18,392 triangles); the pit is not re-exported, only the socket is new. The anchor is the existing crew entrance in the middle of the rear wall (outer row open to |y| < 80, inner row to |y| < 55, turned cheek bags at each row end); the neck walls (log face at +-82.5) close against the outer cheeks and the rear wall face (x -433, cheeks to -446). The neck brings the floor (mud + corduroy poles) through the entrance to 6 cm inside the pit's inner face (neck x -151), since the pit has no floor. Neck materials: SovTrench_Wood (slot 0), RL_Sandbag (slot 1, MI_Rus_SandBag_01 like the pit). Hidden triangles culled like the kit, with the pit as an extra occluder. Import the neck like the Soviet kit pieces, complex collision, no Nanite. Frame check: the _Opt FBX matches Unreal in triangle count and in y (mirrored) and x-min to 2 cm; the bounds quoted from Unreal (x max 282.5, z -14.1..81.3) are about 10 cm wider than the vertices (272.0, -3.7..71.9), which looks like bounds padding, not a different mesh or frame (the Rus53K doc gives the wall as x -4.46 to +2.73 m)."

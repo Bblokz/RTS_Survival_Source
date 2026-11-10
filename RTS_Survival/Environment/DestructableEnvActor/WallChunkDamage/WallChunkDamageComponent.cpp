@@ -11,6 +11,7 @@
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
 #include "RTS_Survival/MasterObjects/HealthBase/HPActorObjectsMaster.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelDebris.h"
+#include "RTS_Survival/RTSComponents/HealthComponent.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogWallChunkDamage, Log, All);
@@ -32,6 +33,7 @@ void UWallChunkDamageComponent::BeginPlay()
 	M_LoadedDebrisSystem = M_DebrisSystem.LoadSynchronous();
 	(void)GetIsValidDebrisSystem();
 	BeginPlay_BindOwnerDeath();
+	BeginPlay_BindOwnerHealing();
 	// Buildings under construction carry their construction mesh now; the layout is found on the first hit then.
 	(void)EnsureLayoutIsCurrent();
 }
@@ -47,7 +49,30 @@ void UWallChunkDamageComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 		BuildingOwner->OnUnitDies.Remove(M_OwnerDiedHandle);
 	}
 	M_OwnerDiedHandle.Reset();
+	if (M_OwnerHealth.IsValid())
+	{
+		M_OwnerHealth->GetOnHealthHealed().Remove(M_OwnerHealedHandle);
+	}
+	M_OwnerHealedHandle.Reset();
 	Super::EndPlay(EndPlayReason);
+}
+
+void UWallChunkDamageComponent::BeginPlay_BindOwnerHealing()
+{
+	UHealthComponent* const OwnerHealth = GetOwner()->FindComponentByClass<UHealthComponent>();
+	// Environment walls without a health component never heal.
+	if (not IsValid(OwnerHealth))
+	{
+		return;
+	}
+	M_OwnerHealth = OwnerHealth;
+	M_OwnerHealedHandle = OwnerHealth->GetOnHealthHealed().AddUObject(
+		this, &UWallChunkDamageComponent::OnOwnerHealthHealed);
+}
+
+void UWallChunkDamageComponent::OnOwnerHealthHealed(const float HealthAfter, const float MaxHealth)
+{
+	OnOwnerHealed(HealthAfter, MaxHealth);
 }
 
 void UWallChunkDamageComponent::BeginPlay_BindOwnerDeath()
@@ -185,9 +210,15 @@ void UWallChunkDamageComponent::OnOwnerHealed(const float HealthAfter, const flo
 		SetChunkVisible(M_HiddenOrder.Pop(EAllowShrinking::No));
 		bChanged = true;
 	}
-	if (bChanged)
+	if (not bChanged)
 	{
-		WriteHiddenChunkMask();
+		return;
+	}
+	WriteHiddenChunkMask();
+	// Fully repaired: back to the opaque materials, so an intact building pays nothing for the mask again.
+	if (M_HiddenChunkCount == 0)
+	{
+		RestoreIntactMaterials();
 	}
 }
 
@@ -318,21 +349,48 @@ void UWallChunkDamageComponent::SwapToDamagedMaterials()
 	}
 	const TArray<TObjectPtr<UMaterialInterface>>& DamagedMaterials = M_Layout->GetDamagedSlotMaterials();
 	const int32 SlotCount = FMath::Max(DamagedMaterials.Num(), DamagedMaterialOverrides.Num());
+	M_IntactMaterials.SetNum(FMath::Max(M_IntactMaterials.Num(), SlotCount));
 	for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
 	{
-		UMaterialInterface* const Override = DamagedMaterialOverrides.IsValidIndex(SlotIndex)
-			                                     ? DamagedMaterialOverrides[SlotIndex].Get()
-			                                     : nullptr;
-		UMaterialInterface* const Damaged = IsValid(Override)
-			                                    ? Override
-			                                    : DamagedMaterials.IsValidIndex(SlotIndex)
-			                                    ? DamagedMaterials[SlotIndex].Get()
-			                                    : nullptr;
+		UMaterialInterface* const Damaged = GetDamagedMaterialForSlot(SlotIndex);
 		if (IsValid(Damaged) && M_ChunkMesh->GetMaterial(SlotIndex) != Damaged)
 		{
+			M_IntactMaterials[SlotIndex] = M_ChunkMesh->GetMaterial(SlotIndex);
 			M_ChunkMesh->SetMaterial(SlotIndex, Damaged);
 		}
 	}
+}
+
+UMaterialInterface* UWallChunkDamageComponent::GetDamagedMaterialForSlot(const int32 SlotIndex) const
+{
+	UMaterialInterface* const Override = DamagedMaterialOverrides.IsValidIndex(SlotIndex)
+		                                     ? DamagedMaterialOverrides[SlotIndex].Get()
+		                                     : nullptr;
+	if (IsValid(Override))
+	{
+		return Override;
+	}
+	const TArray<TObjectPtr<UMaterialInterface>>& DamagedMaterials = M_Layout->GetDamagedSlotMaterials();
+	return DamagedMaterials.IsValidIndex(SlotIndex) ? DamagedMaterials[SlotIndex].Get() : nullptr;
+}
+
+void UWallChunkDamageComponent::RestoreIntactMaterials()
+{
+	if (not GetIsValidChunkMesh() || not GetIsValidLayout())
+	{
+		return;
+	}
+	for (int32 SlotIndex = 0; SlotIndex < M_IntactMaterials.Num(); ++SlotIndex)
+	{
+		UMaterialInterface* const Intact = M_IntactMaterials[SlotIndex];
+		const bool bShowsDamaged = M_ChunkMesh->GetMaterial(SlotIndex) == GetDamagedMaterialForSlot(SlotIndex);
+		// A slot the owner re-skinned since (construction, unpacking) keeps its new material.
+		if (IsValid(Intact) && bShowsDamaged)
+		{
+			M_ChunkMesh->SetMaterial(SlotIndex, Intact);
+		}
+	}
+	M_IntactMaterials.Reset();
 }
 
 bool UWallChunkDamageComponent::GetIsOwnerInTransition() const

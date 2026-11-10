@@ -24,12 +24,7 @@ AGarrisonableBuilding::AGarrisonableBuilding(const FObjectInitializer& ObjectIni
 
 void AGarrisonableBuilding::OnHealthChanged(const EHealthLevel PercentageLeft, const bool bIsHealing)
 {
-	// Repairs close the newest holes once the damage no longer fits the health.
-	UWallHoleDamageComponent* const WallHoleDamage = bIsHealing ? FindWallHoleDamage() : nullptr;
-	if (IsValid(WallHoleDamage) && IsValid(HealthComponent))
-	{
-		WallHoleDamage->OnOwnerHealed(HealthComponent->GetCurrentHealth(), HealthComponent->GetMaxHealth());
-	}
+	// Wall holes close through the health component's heal event (every heal), not at these notify levels.
 	BP_OnHealthChanged(PercentageLeft, bIsHealing);
 }
 
