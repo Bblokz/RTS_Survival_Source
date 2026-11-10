@@ -268,6 +268,30 @@ three points at the wall's end: (-450, 0, 0), (-240, 0, 150) and (-600, 0, 180).
 (-1130, 0, 200) and (-1760, 0, 320), which spreads the hits over the face. The Soviet child inherits them. The other
 concrete walls still have their own construction-script points.
 
+## Ampulomet pit (A + B, 2026-11-10)
+
+`Rus_BXP_AmpulometPit` (`BuildingExpansions/RusAmpulometPit/`) has the same setup as the 53K pits, on its sandbag ring
+only (r 160 to 270 cm, z 0 to 71, plus the sandbags around the gun base).
+
+- **Component** `WallHoleDamage`: `BuildingMeshComponent`, `NoGrid`, `DamagedMaterials = [None, None, MI]`, so the
+  earth berm (`MI_RTS_DesertGround_Stones`) and the wood keep their materials and get no holes. The hole, grid and
+  collapse settings match the 53K pits: 0.85 cm per mm, 4500 / max 12, collapse on death.
+- **Material:** `RusAmpulometPit/Meshes/Holes/MI_SM_AmpulometPit_Rus_SandBag_01_WallHoles`, two-sided, on
+  `MM_Rus_SandBag_01_WallHoles`. PS 427 against 308.
+- **Debris:** `RusWalls/Meshes/Holes/SM_Rus_SandBag_Debris_0..7`.
+- **Unchanged:** the graphs, the death (`DestroyAndSpawnActors`) and the aim points (the C++ defaults, 1 m above the
+  centre). The mesh's collision (27 convex hulls) sits on the bags: debug traces hit the ring at r 211 to 287.
+- **PIE check** (`UT_VehicleObstacle`): debug hits of 37 to 105 mm cut holes through the bags, with the dark inside of
+  the bags showing. Real tank fire swapped the slot and cut holes, and killed one pit normally. Pictures:
+  `Saved/WallChunks/AmpulometPit/debug_holes_close.png`, `debug_holes_closeup2.png`, `real_fire_3.png`.
+
+**`Rus_BXP_DShKPit`** (`BuildingExpansions/RusDShKPit/`) has the same setup on its sandbag ring (r 120 to 230 cm, z up
+to 97): `RusDShKPit/Meshes/Holes/MI_SM_DShKPit_Rus_SandBag_01_WallHoles` (two-sided, PS 427 against 308) on slot 2, earth
+(slot 0) and wood (slot 1) untouched. Graphs, death and aim points unchanged. PIE: debug hits of 37 to 105 mm cut holes
+in the bags; real tank fire swapped the slot, threw sandbag pieces and killed the pit at its real 720 health, which
+then died normally. Pictures: `Saved/WallChunks/DShKPit/debug_holes.png`, `real_fire.png`. Test note: changing
+`RTSComponent.owning_player` on a spawned pit at runtime left it taking no damage afterwards; use a fresh actor.
+
 ## Open points
 
 - The collapse reads as a blast, not a falling wall. Tune `CollapseSettings.DeathSpeedScale`, or add a slumping
