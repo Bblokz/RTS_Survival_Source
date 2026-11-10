@@ -195,6 +195,47 @@ hull. Blender build: `Variants/PanzerIII_SDFence/scripts/build_sdfence.py` (Blen
   it repairs itself during the run (zone health 0.02 -> 0.07 between two hits), so one fence came back between hits.
 - Not changed: the wrecks and the training previews still show the old plates.
 
+## Panzerjäger Laser (Strike Division fences)
+
+Built 2026-11-10. `Ger_Vehicle_PanzerJager_Laser` now uses
+`PanzerJager1/Meshes/SM_PanzerJager_LaserAmmo_SDFence_Hull_AddOnPanels`. The 4 ribbed post-apo side plates (2 per side)
+and their 12 hanger brackets are gone from the laser-ammo hull. In their place, 5 wire-mesh fences per side in the Pz III
+SD style hang from the fender over the tracks: x -184 to 158 in mesh space (75.5 cm per fence in game, the hull
+component has X scale 1.15), z 28 to 92, wire plane at actor |Y| 109.5. Each strap cap reaches in to mesh |Y| 100.7; the
+fender clamps under them stay hull (|Y| <= 99.6). Blender build: `Variants/PanzerjagerLaser_SDFence/scripts/build_sdfence.py`
+(BlenderTanks, see its `AGENTS.md`). UE scripts: `Saved/AgentScripts/PzJLaserSDFence/`.
+
+- **Mesh:** a duplicate of `SM_PanzerJager_LaserAmmo_Hull` with the FBX reimported, **one LOD** (13,095 tris; the source's
+  auto LODs would drop the wires). Sockets (incl. `LaserAmmo`), complex collision and `MI_Hull_Desert_PanzerJager_LaserAmmo`
+  carry over. The laser-ammo glow bank is unchanged; no fence face is in the glow tile.
+- **Panels:** `MinAbsY=100 MinZ=20 MaxZ=94 PanelsPerSide=5 MaxIslandLength=72`, 10 panels (left 0-4, right 5-9, rear to
+  front). The hull frame sits 2 cm off the track centre line, so the left fences are at mesh |Y| 100.7-113.9 and the right
+  ones at 100.7-109.9. Debris: panel 2 (`_Debris`).
+- **Zones:** 8 mm each, covering only `Plate_SideLowerLeft` / `Plate_SideLowerRight` (the Laser registers no `Plate_Side*`).
+  Structural sides stay 16, so intact sides read 24.
+- **Armour boxes:** every panel centre resolved the scaled `Turret_SidesAndRear`, `Plate_Rear` or `Plate_FrontUpperGlacis`
+  box. `AddArmorBoxes` appended two unit-scale boxes to `SetupArmor` (Make Array pins 8 and 9): `Plate_SideLowerLeft` /
+  `Plate_SideLowerRight`, 16, X -186 to 160, |Y| 58 to 125, Z 20 to 94 in hull-mesh space (actor X -231 to 167, Z 26 to 100).
+  Inner |Y| 58 keeps the front and rear probes (collision hits at mesh |Y| 51-57) on their own plates.
+- **Checks** (`UT_B4Howitzer`, 2026-11-10): `run_panels_validate.sh` `TAG=PzJLaser_SDFence` RESULT PASS, 0 failures (every
+  left panel covered, debris, red zone after 10 hits, crew repair, full service, death blast 9 pieces in 2 bursts).
+  `run_armor_audit.sh` (`LIST=pzj_laser.txt`, `PzJLaser_Before` / `PzJLaser_After`): 0 wrong, every front and rear probe
+  unchanged; side probes at fence height now resolve the lower sides (NOTE count 18 to 12). Not covered: the front tip
+  (actor X > 167) and the right rear corner probe still resolve the glacis / rear boxes.
+- **Wreck and training preview** (overwritten in place the same day, at the same asset paths):
+  - `SM_Destroyed_PanzerJager_LaserAmmo` (`Env_Dest_PZJager_LaserAmmo`) lost its 4 ribbed plates (front-left, bent
+    rear-left, bent front-right, the crumpled rear-right one on the ground). It got the live fence layout, charred (UVs in
+    the burnt patch the wreck's laser bank uses), with the fender clamps at all 10 positions: 7 fences on the fenders (one
+    bent out 22 degrees, the front-right one hanging off at 34 degrees), 3 lost, 2 lying on the ground. 9,542 tris, one
+    LOD; the `Exp1` socket and its one convex collision are unchanged (verified). Script `build_wreck.py`: the wreck frame
+    maps to the hull frame through the base-wreck object transform in `PanzerJager1/SM_PanzerJager_Destroyed.blend`.
+  - `SM_PanzerJager_Laser_TrainingPreview` comes from the shared optimised pipeline on the plate-free hull, with box-frame
+    fences added afterwards (2,387 tris; bounds unchanged apart from the fences at |Y| 111.8). Script
+    `build_training_preview.py`.
+  - UE script `Saved/AgentScripts/PzJLaserSDFence/ow.py` (snapshots sockets and simple collision, asserts them after).
+  - Not checked in game: the wreck was only reviewed in Blender renders.
+- The old `SM_PanzerJager_LaserAmmo_Hull` is no longer used by a Blueprint.
+
 ## Panther II (Strike Division: Schürzen panels, side fences, one-atlas material)
 
 Built 2026-11-07. `Ger_Vehicle_PantherII` now uses `PantherII/StrikeDivision/SM_PantherII_Strike_Hull_AddOnPanels`.
@@ -369,6 +410,7 @@ without injection; the Pz II F does not.
 | PantherD | SM_PantherD | 6 | plates | MI_PantherD_Hull_DesertApo | full, **converted** |
 | Jaguar, Jaguar_Flanker | SM_Ger_Jaguar_Hull, SM_Jaguar_Flanker_Hull | 5 | plates | MI_PantherD_Hull_DesertApo | full, **converted** |
 | Rus ArmoredCar_BA11_Soviet, _BA14_Soviet | SM_Ba11_Soviet_SpacedArmor_Hull | 3 | skirts + belly plate (baked on) | MI_BAHull_Soviet | see BA section, **converted** |
+| PanzerJager_Laser | SM_PanzerJager_LaserAmmo_SDFence_Hull | 5 | wire-mesh fences (sections) | MI_Hull_Desert_PanzerJager_LaserAmmo | full, **converted** |
 | PantherII | SM_PantherII_Strike_Hull | 4 | plates (cut apart in Blender) | MI_PantherII_Hull_SD | full, **converted** |
 | Rus T34E, T34E_Soviet | SM_T-34E_Hull (two targets) | 6 | one-piece skirt cut at its seams (`SplitX`) | MI_T34E_PostApo / MI_T34E_Soviet | full, **converted** |
 

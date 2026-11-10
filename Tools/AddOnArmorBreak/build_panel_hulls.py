@@ -93,6 +93,11 @@ HULLS = {
         ['Ger_Vehicle_PanzerIII_AA_Flak41'], PZIII_FENCE_ARGS),
     'Ger_Medium/PanzerIII/CommandMeshes/SM_PZIII_Commander_SDFence_Hull': (
         ['Ger_Vehicle_PanzerIII_J_Commander'], PZIII_FENCE_ARGS),
+    # Panzerjaeger I Laser Strike Division fences (2026-11-10, Blender: Variants/PanzerjagerLaser_SDFence): the ribbed
+    # post-apo side plates are gone; 5 self-contained wire-mesh sections per side, every part at |Y| >= 100.7; the
+    # fender clamps stay hull (|Y| <= 99.6).
+    'Ger_Light/PanzerJager1/Meshes/SM_PanzerJager_LaserAmmo_SDFence_Hull': (
+        ['Ger_Vehicle_PanzerJager_Laser'], 'MinAbsY=100 MinZ=20 MaxZ=94 PanelsPerSide=5 MaxIslandLength=72'),
     # Pz IV family: 9 cm Schuerzen slabs; the long skirt rail stays hull.
     'Ger_Medium/PanzerIV/IV_H/StandardPlus/SM_Hull_PzIVH_StandardPlus': (
         ['Ger_Vehicle_PanzerIV_H_StandardPlus'], 'MinAbsY=154 MaxIslandLength=200'),
