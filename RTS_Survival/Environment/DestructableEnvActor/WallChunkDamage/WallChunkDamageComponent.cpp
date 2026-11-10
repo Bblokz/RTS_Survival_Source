@@ -6,17 +6,14 @@
 #include "Engine/StaticMesh.h"
 #include "GameFramework/Actor.h"
 #include "NiagaraSystem.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansion.h"
+#include "RTS_Survival/Buildings/BuildingExpansion/BuildingExpansionEnums.h"
 #include "RTS_Survival/Environment/DestructableEnvActor/DestructableEnvActor.h"
+#include "RTS_Survival/MasterObjects/HealthBase/HPActorObjectsMaster.h"
 #include "RTS_Survival/RTSComponents/ArmorCalculationComponent/AddOnArmorPanels/AddOnArmorPanelDebris.h"
 #include "RTS_Survival/Utils/HFunctionLibary.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogWallChunkDamage, Log, All);
-
-namespace WallChunkDamageConstants
-{
-	// About half a chunk's diagonal (1.1 x 1 m cells): the nearest chunk only goes when the hole reaches its edge.
-	constexpr float NearestChunkReach = 75.f;
-}
 
 UWallChunkDamageComponent::UWallChunkDamageComponent()
 {
@@ -28,8 +25,15 @@ UWallChunkDamageComponent::UWallChunkDamageComponent()
 void UWallChunkDamageComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	BeginPlay_FindChunkMesh();
+	if (const ADestructableEnvActor* const DestructibleOwner = Cast<ADestructableEnvActor>(GetOwner()))
+	{
+		NoteOwnerHealth(DestructibleOwner->GetCurrentHealth());
+	}
+	M_LoadedDebrisSystem = M_DebrisSystem.LoadSynchronous();
+	(void)GetIsValidDebrisSystem();
 	BeginPlay_BindOwnerDeath();
+	// Buildings under construction carry their construction mesh now; the layout is found on the first hit then.
+	(void)EnsureLayoutIsCurrent();
 }
 
 void UWallChunkDamageComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -38,68 +42,100 @@ void UWallChunkDamageComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 	{
 		DestructibleOwner->OnDestructableEnvActorDied.Remove(M_OwnerDiedHandle);
 	}
+	else if (AHPActorObjectsMaster* const BuildingOwner = Cast<AHPActorObjectsMaster>(GetOwner()))
+	{
+		BuildingOwner->OnUnitDies.Remove(M_OwnerDiedHandle);
+	}
 	M_OwnerDiedHandle.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
-void UWallChunkDamageComponent::BeginPlay_FindChunkMesh()
+void UWallChunkDamageComponent::BeginPlay_BindOwnerDeath()
 {
-	const AActor* const Owner = GetOwner();
-	TInlineComponentArray<UStaticMeshComponent*> MeshComponents(Owner);
+	if (not CollapseSettings.bCollapseIntoChunksOnDeath)
+	{
+		return;
+	}
+	if (ADestructableEnvActor* const DestructibleOwner = Cast<ADestructableEnvActor>(GetOwner()))
+	{
+		M_OwnerDiedHandle = DestructibleOwner->OnDestructableEnvActorDied.AddUObject(
+			this, &UWallChunkDamageComponent::OnDestructibleOwnerDied);
+		return;
+	}
+	if (AHPActorObjectsMaster* const BuildingOwner = Cast<AHPActorObjectsMaster>(GetOwner()))
+	{
+		M_OwnerDiedHandle = BuildingOwner->OnUnitDies.AddUObject(this, &UWallChunkDamageComponent::OnBuildingOwnerDied);
+	}
+}
+
+bool UWallChunkDamageComponent::EnsureLayoutIsCurrent()
+{
+	UStaticMeshComponent* Found = nullptr;
+	const UWallChunkLayout* FoundLayout = nullptr;
+	TInlineComponentArray<UStaticMeshComponent*> MeshComponents(GetOwner());
 	for (UStaticMeshComponent* const MeshComponent : MeshComponents)
 	{
-		UStaticMesh* const Mesh = IsValid(MeshComponent) ? MeshComponent->GetStaticMesh() : nullptr;
-		const UWallChunkLayout* const Layout = IsValid(Mesh) ? Mesh->GetAssetUserData<UWallChunkLayout>() : nullptr;
-		if (not IsValid(Layout))
+		if (not IsValid(MeshComponent))
 		{
 			continue;
 		}
-		M_ChunkMesh = MeshComponent;
-		M_Layout = Layout;
-		break;
+		const bool bIsNamed = ChunkMeshComponentName != NAME_None && MeshComponent->GetFName() == ChunkMeshComponentName;
+		UStaticMesh* const Mesh = MeshComponent->GetStaticMesh();
+		const UWallChunkLayout* const Layout = IsValid(Mesh) ? Mesh->GetAssetUserData<UWallChunkLayout>() : nullptr;
+		if (bIsNamed || (ChunkMeshComponentName == NAME_None && IsValid(Layout)))
+		{
+			Found = MeshComponent;
+			FoundLayout = Layout;
+			break;
+		}
 	}
-	if (not GetIsValidChunkMesh() || not GetIsValidLayout())
+	// No chunked mesh right now (a building's construction mesh): nothing to hit yet.
+	if (not IsValid(Found) || not IsValid(FoundLayout))
 	{
-		return;
+		return false;
 	}
-	M_Chunks = M_Layout->GetChunks();
-	if (M_Chunks.IsEmpty() || M_Chunks.Num() > WallChunkMask::MaxChunksPerMesh)
+	if (Found != M_ChunkMesh || FoundLayout != M_Layout)
+	{
+		CacheLayout(*Found, *FoundLayout);
+	}
+	return not M_Chunks.IsEmpty();
+}
+
+void UWallChunkDamageComponent::CacheLayout(UStaticMeshComponent& MeshComponent, const UWallChunkLayout& Layout)
+{
+	M_ChunkMesh = &MeshComponent;
+	M_Layout = &Layout;
+	M_Chunks = Layout.GetChunks();
+	FMemory::Memzero(M_HiddenChunkWords);
+	M_HiddenOrder.Reset();
+	M_HiddenChunkCount = 0;
+	M_MeshBounds = IsValid(MeshComponent.GetStaticMesh()) ? MeshComponent.GetStaticMesh()->GetBoundingBox() : FBox(ForceInit);
+	if (M_Chunks.Num() > WallChunkMask::MaxChunksPerMesh)
 	{
 		RTSFunctionLibrary::ReportError(FString::Printf(
-			TEXT("UWallChunkDamageComponent: the chunk layout of %s has %d chunks (1 to %d supported)."),
-			*GetNameSafe(M_ChunkMesh->GetStaticMesh()), M_Chunks.Num(), WallChunkMask::MaxChunksPerMesh));
+			TEXT("UWallChunkDamageComponent: the chunk layout of %s has %d chunks (at most %d supported)."),
+			*GetNameSafe(MeshComponent.GetStaticMesh()), M_Chunks.Num(), WallChunkMask::MaxChunksPerMesh));
 		M_Chunks.Reset();
 		return;
 	}
-	if (const ADestructableEnvActor* const DestructibleOwner = Cast<ADestructableEnvActor>(Owner))
+	float AreaSum = 0.f;
+	for (const FWallChunk& Chunk : M_Chunks)
 	{
-		M_MaxOwnerHealth = DestructibleOwner->GetCurrentHealth();
+		AreaSum += Chunk.Area;
 	}
-	M_LoadedDebrisSystem = M_DebrisSystem.LoadSynchronous();
-	(void)GetIsValidDebrisSystem();
+	M_TypicalChunkRadius = M_Chunks.IsEmpty() ? M_TypicalChunkRadius : FMath::Sqrt(AreaSum / M_Chunks.Num() / UE_PI);
 	WriteHiddenChunkMask();
-}
-
-void UWallChunkDamageComponent::BeginPlay_BindOwnerDeath()
-{
-	ADestructableEnvActor* const DestructibleOwner = Cast<ADestructableEnvActor>(GetOwner());
-	if (not IsValid(DestructibleOwner) || not CollapseSettings.bCollapseIntoChunksOnDeath)
-	{
-		return;
-	}
-	M_OwnerDiedHandle = DestructibleOwner->OnDestructableEnvActorDied.AddUObject(
-		this, &UWallChunkDamageComponent::OnOwnerDied);
 }
 
 void UWallChunkDamageComponent::OnOwnerDamaged(const float DamageAmount, const FDamageEvent& DamageEvent,
                                                const AActor* DamageCauser, const float HealthBefore,
                                                const float HealthAfter)
 {
-	if (bM_HasCollapsed || M_Chunks.IsEmpty() || DamageAmount <= 0.f || not GetIsValidChunkMesh())
+	if (bM_HasCollapsed || DamageAmount <= 0.f || GetIsOwnerInTransition() || not EnsureLayoutIsCurrent())
 	{
 		return;
 	}
-	M_MaxOwnerHealth = FMath::Max(M_MaxOwnerHealth, HealthBefore);
+	NoteOwnerHealth(HealthBefore);
 	FVector WorldHit;
 	FVector ShotDirection;
 	bool bIsDirectHit = false;
@@ -109,15 +145,15 @@ void UWallChunkDamageComponent::OnOwnerDamaged(const float DamageAmount, const F
 	}
 	M_LastHitLocation = WorldHit;
 	M_LastShotDirection = ShotDirection.IsNearlyZero() ? M_LastShotDirection : ShotDirection;
-	// The wall dies from this hit: the collapse throws everything, so the hole would only be thrown twice.
+	// The owner dies from this hit: its death throws the pieces.
 	if (HealthAfter <= 0.f)
 	{
 		return;
 	}
 	const FVector MeshSpaceHit = M_ChunkMesh->GetComponentTransform().InverseTransformPosition(WorldHit);
-	const float PlaneDistance = FMath::Max(0.f, static_cast<float>(FMath::Abs(MeshSpaceHit.Y - M_Chunks[0].MeshSpaceCentre.Y))
-	                                       - M_Layout->GetHalfThickness());
-	const float HoleRadius = WallDamageShared::ResolveHoleRadius(HoleSettings, DamageAmount, DamageCauser, PlaneDistance);
+	// Splash outside the mesh makes a smaller hole.
+	const float OutsideDistance = FMath::Sqrt(static_cast<float>(M_MeshBounds.ComputeSquaredDistanceToPoint(MeshSpaceHit)));
+	const float HoleRadius = WallDamageShared::ResolveHoleRadius(HoleSettings, DamageAmount, DamageCauser, OutsideDistance);
 	const float HealthFractionAfter = M_MaxOwnerHealth > 0.f ? HealthAfter / M_MaxOwnerHealth : 1.f;
 	TArray<int32> NewlyHidden;
 	HideChunksAroundHit(MeshSpaceHit, HoleRadius, bIsDirectHit, GetMaxHiddenChunks(HealthFractionAfter), NewlyHidden);
@@ -133,16 +169,38 @@ void UWallChunkDamageComponent::OnOwnerDamaged(const float DamageAmount, const F
 	       NewlyHidden.Num());
 }
 
+void UWallChunkDamageComponent::OnOwnerHealed(const float HealthAfter, const float MaxHealth)
+{
+	if (bM_HasCollapsed || not EnsureLayoutIsCurrent())
+	{
+		return;
+	}
+	SetOwnerMaxHealth(MaxHealth);
+	const float HealthFraction = M_MaxOwnerHealth > 0.f ? HealthAfter / M_MaxOwnerHealth : 1.f;
+	// A fully repaired building has all its chunks back; otherwise the newest come back until the rest fits.
+	const int32 AllowedHidden = HealthFraction >= 1.f ? 0 : GetMaxHiddenChunks(HealthFraction);
+	bool bChanged = false;
+	while (M_HiddenChunkCount > AllowedHidden && not M_HiddenOrder.IsEmpty())
+	{
+		SetChunkVisible(M_HiddenOrder.Pop(EAllowShrinking::No));
+		bChanged = true;
+	}
+	if (bChanged)
+	{
+		WriteHiddenChunkMask();
+	}
+}
+
 int32 UWallChunkDamageComponent::Debug_FireTestHit(const FVector WorldLocation, const FVector ShotDirection,
                                                    const float CalibreMm)
 {
-	if (bM_HasCollapsed || M_Chunks.IsEmpty() || not GetIsValidChunkMesh())
+	if (bM_HasCollapsed || not EnsureLayoutIsCurrent())
 	{
 		return 0;
 	}
 	const FVector MeshSpaceHit = M_ChunkMesh->GetComponentTransform().InverseTransformPosition(WorldLocation);
 	TArray<int32> NewlyHidden;
-	// No health cap: the test drives the wall directly.
+	// No health cap: the test drives the mesh directly.
 	HideChunksAroundHit(MeshSpaceHit, WallDamageShared::ResolveHoleRadiusFromCalibre(HoleSettings, CalibreMm, 0.f), true,
 	                    M_Chunks.Num(), NewlyHidden);
 	M_LastHitLocation = WorldLocation;
@@ -164,7 +222,7 @@ int32 UWallChunkDamageComponent::GetMaxHiddenChunks(const float HealthFractionAf
 	const float LostHealth01 = 1.f - FMath::Clamp(HealthFractionAfter, 0.f, 1.f);
 	const int32 Cap = FMath::CeilToInt32(LostHealth01 * HoleSettings.MaxHiddenShareWhileAlive * M_Chunks.Num());
 	// A damaged wall always shows its damage, and only the collapse takes the last chunk.
-	return FMath::Clamp(Cap, 1, M_Chunks.Num() - 1);
+	return FMath::Clamp(Cap, 1, FMath::Max(M_Chunks.Num() - 1, 1));
 }
 
 void UWallChunkDamageComponent::HideChunksAroundHit(const FVector& MeshSpaceHit, const float HoleRadius,
@@ -176,16 +234,15 @@ void UWallChunkDamageComponent::HideChunksAroundHit(const FVector& MeshSpaceHit,
 	{
 		return;
 	}
-	// Distance on the wall face (mesh X/Z); the slab is thin, so both faces hole through alike.
+	// Distance in mesh space: a sphere around the impact (on a thin wall the same as a disc on its face).
 	TArray<TPair<float, int32>> Candidates;
 	for (int32 ChunkIndex = 0; ChunkIndex < M_Chunks.Num(); ++ChunkIndex)
 	{
-		if (GetIsChunkHidden(ChunkIndex))
+		if (not GetIsChunkHidden(ChunkIndex))
 		{
-			continue;
+			Candidates.Emplace(static_cast<float>(FVector::Distance(M_Chunks[ChunkIndex].MeshSpaceCentre, MeshSpaceHit)),
+			                   ChunkIndex);
 		}
-		const FVector& Centre = M_Chunks[ChunkIndex].MeshSpaceCentre;
-		Candidates.Emplace(FVector2D(Centre.X - MeshSpaceHit.X, Centre.Z - MeshSpaceHit.Z).Size(), ChunkIndex);
 	}
 	if (Candidates.IsEmpty())
 	{
@@ -195,7 +252,7 @@ void UWallChunkDamageComponent::HideChunksAroundHit(const FVector& MeshSpaceHit,
 	// The nearest chunk goes on a direct hit with a big enough hole, and by chance with a smaller one; only when the
 	// hole reaches that chunk (shrapnel reuses its shell's old impact point, which can lie far along the wall).
 	const float NearestChance = HoleRadius / FMath::Max(HoleSettings.GuaranteedChunkRadius, 1.f);
-	const bool bNearestIsReached = Candidates[0].Key <= HoleRadius + WallChunkDamageConstants::NearestChunkReach;
+	const bool bNearestIsReached = Candidates[0].Key <= HoleRadius + M_TypicalChunkRadius;
 	const bool bTakesNearest = bIsDirectHit && bNearestIsReached && FMath::FRand() < NearestChance;
 	for (int32 CandidateIndex = 0; CandidateIndex < Candidates.Num(); ++CandidateIndex)
 	{
@@ -223,10 +280,19 @@ void UWallChunkDamageComponent::SetChunkHidden(const int32 ChunkIndex)
 	{
 		return;
 	}
-	const int32 Word = ChunkIndex / WallChunkMask::ChunksPerMaskFloat;
-	const int32 Bit = ChunkIndex % WallChunkMask::ChunksPerMaskFloat;
-	M_HiddenChunkWords[Word] |= 1u << Bit;
+	M_HiddenChunkWords[ChunkIndex / WallChunkMask::ChunksPerMaskFloat] |= 1u << (ChunkIndex % WallChunkMask::ChunksPerMaskFloat);
+	M_HiddenOrder.Add(ChunkIndex);
 	++M_HiddenChunkCount;
+}
+
+void UWallChunkDamageComponent::SetChunkVisible(const int32 ChunkIndex)
+{
+	if (not GetIsChunkHidden(ChunkIndex))
+	{
+		return;
+	}
+	M_HiddenChunkWords[ChunkIndex / WallChunkMask::ChunksPerMaskFloat] &= ~(1u << (ChunkIndex % WallChunkMask::ChunksPerMaskFloat));
+	--M_HiddenChunkCount;
 }
 
 void UWallChunkDamageComponent::WriteHiddenChunkMask() const
@@ -244,19 +310,50 @@ void UWallChunkDamageComponent::WriteHiddenChunkMask() const
 
 void UWallChunkDamageComponent::SwapToDamagedMaterials()
 {
-	// Intact walls keep their opaque materials; masked surfaces lose early-Z in the depth and shadow passes.
-	if (bM_HasSwappedToDamagedMaterials || not GetIsValidChunkMesh() || not GetIsValidLayout())
+	// Intact meshes keep their opaque materials; masked surfaces lose early-Z in the depth and shadow passes.
+	// Checked on every hit, not once: building expansions put their own materials back after construction.
+	if (not GetIsValidChunkMesh() || not GetIsValidLayout())
 	{
 		return;
 	}
-	bM_HasSwappedToDamagedMaterials = true;
 	const TArray<TObjectPtr<UMaterialInterface>>& DamagedMaterials = M_Layout->GetDamagedSlotMaterials();
-	for (int32 SlotIndex = 0; SlotIndex < DamagedMaterials.Num(); ++SlotIndex)
+	const int32 SlotCount = FMath::Max(DamagedMaterials.Num(), DamagedMaterialOverrides.Num());
+	for (int32 SlotIndex = 0; SlotIndex < SlotCount; ++SlotIndex)
 	{
-		if (IsValid(DamagedMaterials[SlotIndex]))
+		UMaterialInterface* const Override = DamagedMaterialOverrides.IsValidIndex(SlotIndex)
+			                                     ? DamagedMaterialOverrides[SlotIndex].Get()
+			                                     : nullptr;
+		UMaterialInterface* const Damaged = IsValid(Override)
+			                                    ? Override
+			                                    : DamagedMaterials.IsValidIndex(SlotIndex)
+			                                    ? DamagedMaterials[SlotIndex].Get()
+			                                    : nullptr;
+		if (IsValid(Damaged) && M_ChunkMesh->GetMaterial(SlotIndex) != Damaged)
 		{
-			M_ChunkMesh->SetMaterial(SlotIndex, DamagedMaterials[SlotIndex]);
+			M_ChunkMesh->SetMaterial(SlotIndex, Damaged);
 		}
+	}
+}
+
+bool UWallChunkDamageComponent::GetIsOwnerInTransition() const
+{
+	const ABuildingExpansion* const BuildingOwner = Cast<ABuildingExpansion>(GetOwner());
+	if (not IsValid(BuildingOwner))
+	{
+		return false;
+	}
+	// These states show construction, placement or packing looks; chunks would replace them. Placed expansions that
+	// never ran construction keep their other states and do take damage.
+	switch (BuildingOwner->GetBuildingExpansionStatus())
+	{
+	case EBuildingExpansionStatus::BXS_LookingForPlacement:
+	case EBuildingExpansionStatus::BXS_BeingBuild:
+	case EBuildingExpansionStatus::BXS_BeingPackedUp:
+	case EBuildingExpansionStatus::BXS_LookingForUnpackingLocation:
+	case EBuildingExpansionStatus::BXS_BeingUnpacked:
+		return true;
+	default:
+		return false;
 	}
 }
 
@@ -282,14 +379,56 @@ void UWallChunkDamageComponent::ThrowChunkDebris(const TConstArrayView<int32> Ch
 	                                    MeshTransform.GetRotation(), HitLocation, ShotDirection, SpeedScale);
 }
 
-void UWallChunkDamageComponent::OnOwnerDied()
+int32 UWallChunkDamageComponent::ThrowDeathPieces(const int32 MaxPieces, const float SpeedScale)
 {
-	CollapseIntoChunks();
+	if (bM_HasCollapsed || MaxPieces <= 0 || not EnsureLayoutIsCurrent())
+	{
+		return 0;
+	}
+	bM_HasCollapsed = true;
+	TArray<int32> Standing;
+	for (int32 ChunkIndex = 0; ChunkIndex < M_Chunks.Num(); ++ChunkIndex)
+	{
+		if (not GetIsChunkHidden(ChunkIndex))
+		{
+			Standing.Add(ChunkIndex);
+		}
+	}
+	// A random handful is shot out of the building; the rest stays on the mesh and sinks with it.
+	for (int32 Index = Standing.Num() - 1; Index > 0; --Index)
+	{
+		Standing.Swap(Index, FMath::RandRange(0, Index));
+	}
+	Standing.SetNum(FMath::Min(Standing.Num(), MaxPieces));
+	for (const int32 ChunkIndex : Standing)
+	{
+		SetChunkHidden(ChunkIndex);
+	}
+	if (Standing.IsEmpty())
+	{
+		return 0;
+	}
+	SwapToDamagedMaterials();
+	WriteHiddenChunkMask();
+	ThrowChunkDebris(Standing, M_ChunkMesh->Bounds.Origin, FVector::ZeroVector, SpeedScale);
+	UE_LOG(LogWallChunkDamage, Display, TEXT("RTS_WALL_CHUNKS death pieces %s threw=%d"), *GetNameSafe(GetOwner()),
+	       Standing.Num());
+	return Standing.Num();
 }
 
-void UWallChunkDamageComponent::CollapseIntoChunks()
+void UWallChunkDamageComponent::OnDestructibleOwnerDied()
 {
-	if (bM_HasCollapsed || not GetIsValidChunkMesh())
+	CollapseIntoChunks(true);
+}
+
+void UWallChunkDamageComponent::OnBuildingOwnerDied()
+{
+	CollapseIntoChunks(false);
+}
+
+void UWallChunkDamageComponent::CollapseIntoChunks(const bool bHideAndDestroyOwner)
+{
+	if (bM_HasCollapsed || not EnsureLayoutIsCurrent())
 	{
 		return;
 	}
@@ -305,13 +444,19 @@ void UWallChunkDamageComponent::CollapseIntoChunks()
 	}
 	const FVector Centre = M_ChunkMesh->Bounds.Origin;
 	ThrowChunkDebris(Remaining, Centre, M_LastShotDirection, CollapseSettings.DeathSpeedScale);
+	UE_LOG(LogWallChunkDamage, Display, TEXT("RTS_WALL_CHUNKS collapse %s threw=%d hide=%d"), *GetNameSafe(GetOwner()),
+	       Remaining.Num(), bHideAndDestroyOwner ? 1 : 0);
+	if (not bHideAndDestroyOwner)
+	{
+		SwapToDamagedMaterials();
+		WriteHiddenChunkMask();
+		return;
+	}
 	// Nothing of the wall is left to draw or to hit.
 	M_ChunkMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	M_ChunkMesh->SetVisibility(false, false);
 	WallDamageShared::PlayCollapseSound(*GetOwner(), CollapseSettings, Centre);
 	GetOwner()->SetLifeSpan(FMath::Max(CollapseSettings.DestroyOwnerDelaySeconds, UE_KINDA_SMALL_NUMBER));
-	UE_LOG(LogWallChunkDamage, Display, TEXT("RTS_WALL_CHUNKS collapse %s threw=%d"), *GetNameSafe(GetOwner()),
-	       Remaining.Num());
 }
 
 bool UWallChunkDamageComponent::GetIsValidChunkMesh() const

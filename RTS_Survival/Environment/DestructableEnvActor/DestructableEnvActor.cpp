@@ -272,6 +272,20 @@ void ADestructableEnvActor::BeginDestroy()
 	Super::BeginDestroy();
 }
 
+void ADestructableEnvActor::ForwardDamageToHoleComponents(const float DamageAmount, const FDamageEvent& DamageEvent,
+                                                         const AActor* DamageCauser, const float HealthBefore,
+                                                         const float HealthAfter)
+{
+	if (IsValid(M_WallHoleDamage) && IsUnitAlive())
+	{
+		M_WallHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, HealthAfter);
+	}
+	if (IsValid(M_WreckHoleDamage) && IsUnitAlive())
+	{
+		M_WreckHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, HealthAfter);
+	}
+}
+
 float ADestructableEnvActor::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
                                         AController* EventInstigator, AActor* DamageCauser)
 {
@@ -287,14 +301,7 @@ float ADestructableEnvActor::TakeDamage(float DamageAmount, FDamageEvent const& 
 	{
 		M_WallChunkDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, Health);
 	}
-	if (IsValid(M_WallHoleDamage) && IsUnitAlive())
-	{
-		M_WallHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, Health);
-	}
-	if (IsValid(M_WreckHoleDamage) && IsUnitAlive())
-	{
-		M_WreckHoleDamage->OnOwnerDamaged(DamageAmount, DamageEvent, DamageCauser, HealthBefore, Health);
-	}
+	ForwardDamageToHoleComponents(DamageAmount, DamageEvent, DamageCauser, HealthBefore, Health);
 	if constexpr (DeveloperSettings::Debugging::GDamage_System_Compile_DebugSymbols)
 	{
 		RTSFunctionLibrary::PrintString(
