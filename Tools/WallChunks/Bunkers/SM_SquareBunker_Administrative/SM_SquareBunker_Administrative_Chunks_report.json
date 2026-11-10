@@ -1,0 +1,33 @@
+{
+ "name": "SM_SquareBunker_Administrative_Chunks",
+ "chunks": 100,
+ "chunk_uv_channel": 2,
+ "uv_layers": [
+  "UVmap_0",
+  "LightMapUV",
+  "ChunkId"
+ ],
+ "slots": [
+  "MI_SovietConcrete",
+  "M_ZoneIndustry_Atlas2",
+  "ConcreteBroken"
+ ],
+ "concrete_slots": [
+  0
+ ],
+ "broken_slot": 2,
+ "collision_hulls": 1,
+ "triangles_before": 2399,
+ "triangles_after": 9542,
+ "concrete_area_m2": 1839.4,
+ "debris_from_chunks": [
+  55,
+  34,
+  91,
+  87,
+  96,
+  33,
+  20,
+  51
+ ]
+}

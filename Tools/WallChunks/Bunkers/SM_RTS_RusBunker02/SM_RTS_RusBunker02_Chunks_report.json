@@ -1,0 +1,33 @@
+{
+ "name": "SM_RTS_RusBunker02_Chunks",
+ "chunks": 100,
+ "chunk_uv_channel": 1,
+ "uv_layers": [
+  "LightMapUV",
+  "ChunkId"
+ ],
+ "slots": [
+  "MI_Rus_BunkerConcrete_05",
+  "MI_Rus_SandBag_01",
+  "M_KV-1E_Turret",
+  "ConcreteBroken"
+ ],
+ "concrete_slots": [
+  0
+ ],
+ "broken_slot": 3,
+ "collision_hulls": 1,
+ "triangles_before": 25185,
+ "triangles_after": 28073,
+ "concrete_area_m2": 536.83,
+ "debris_from_chunks": [
+  29,
+  13,
+  48,
+  20,
+  74,
+  88,
+  37,
+  58
+ ]
+}
